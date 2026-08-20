@@ -1,0 +1,16 @@
+# Static publish of two self-contained single-file games.
+# No build step is required: each HTML file already has Three.js inlined and
+# makes zero network requests at runtime.
+#
+#   /          -> Operation Blackgate (facility FPS)
+#   /agent64/  -> Agent 64: Spy Ops
+[build]
+  publish = "deploy"
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Cache-Control = "public, max-age=0, must-revalidate"
