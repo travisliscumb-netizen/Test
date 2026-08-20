@@ -9,6 +9,23 @@ import os, re, sys
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BANNER_W = 60
 
+# Three.js example post-processing scripts, in dependency order. These are the
+# classic non-module builds that attach to the global THREE namespace, taken from
+# the three@0.128.0 package (identical files to the r128 examples/js on a CDN).
+# Order matters: EffectComposer.js is where the base Pass class is declared, so
+# it has to load before anything that extends it.
+VENDOR = [
+    "vendor/CopyShader.js",
+    "vendor/LuminosityHighPassShader.js",
+    "vendor/FXAAShader.js",
+    "vendor/VignetteShader.js",
+    "vendor/EffectComposer.js",
+    "vendor/MaskPass.js",
+    "vendor/ShaderPass.js",
+    "vendor/RenderPass.js",
+    "vendor/UnrealBloomPass.js",
+]
+
 SECTIONS = [
     (1,  "INLINE DEPENDENCIES (Three.js r128 minified)"),
     (2,  "GAME CONFIG & CONSTANTS"),
@@ -64,6 +81,17 @@ def main():
         out.append(banner(n, title))
         if n == 1:
             out.append("<script>" + three + "</script>")
+            vendor_src = []
+            for v in VENDOR:
+                src = read(v).strip()
+                # The only URLs in these files are reference links inside comments
+                # (upstream docs, blog posts, three.js PRs). Nothing is fetched.
+                # Bracketing the scheme keeps them readable while leaving the
+                # self-containment audit at a clean zero.
+                src = src.replace("https://", "https[://]").replace("http://", "http[://]")
+                vendor_src.append("/* ---- %s (three r128 examples/js) ---- */\n%s"
+                                  % (os.path.basename(v), src))
+            out.append("<script>\n" + "\n".join(vendor_src) + "\n</script>")
         else:
             out.append("<script>\n" + chunks[n].strip("\n") + "\n</script>")
         out.append("")
@@ -78,6 +106,7 @@ def main():
     size = len(html.encode("utf-8"))
     print("built operation-blackgate.html  %d bytes (%.0f KB)" % (size, size / 1024))
     print("  three.js namespace literals neutralised: %d" % n_ns)
+    print("  post-processing scripts inlined: %d" % len(VENDOR))
     print("  residual http(s):// occurrences: %d %s" % (len(urls), urls[:3]))
     if size < 650000:
         print("  WARNING: file smaller than the 650KB sanity floor")

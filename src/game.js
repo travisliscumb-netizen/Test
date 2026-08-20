@@ -28,10 +28,17 @@ var CFG = {
     fogDensity: 0.06,
     fogColor: 0x0d0d1a
   },
+  gfx: {
+    bloomThreshold: 0.85, bloomStrength: 0.4, bloomRadius: 0.5,
+    vignetteDarkness: 0.45, vignetteOffset: 0.95,
+    exposure: 1.2, downgradeMs: 22,
+    shadowSize: 1024, shadowLights: 2,     // two key lights cast; the cap is six
+    muzzleFlashMs: 80
+  },
   colors: {
-    fluoro: 0xd4e8ff,           // institutional cool white
-    alarm: 0xff1a1a,
-    ambient: 0x1a1a2e,
+    fluoro: 0xccddff,           // ceiling fixture white
+    alarm: 0xff1500,
+    ambient: 0x0a0a0a,          // near-black: fixtures light the scene, not fill
     hemiSky: 0x8888aa,
     hemiGround: 0x444422,
     muzzle: 0xffaa22,
@@ -333,6 +340,146 @@ function makeMetalAlbedo(base) {
   return tex;
 }
 
+/* Panel seam normal map for metal wall panelling. */
+function makePanelNormalMap(size, cols, rows) {
+  size = size || 256;
+  var canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgb(128,128,255)';
+  ctx.fillRect(0, 0, size, size);
+  var cw = size / cols, ch = size / rows;
+  for (var x = 0; x <= cols; x++) {
+    var px = x * cw;
+    ctx.fillStyle = 'rgb(88,128,205)';  ctx.fillRect(px - 3, 0, 3, size);
+    ctx.fillStyle = 'rgb(168,128,205)'; ctx.fillRect(px, 0, 3, size);
+  }
+  for (var y = 0; y <= rows; y++) {
+    var py = y * ch;
+    ctx.fillStyle = 'rgb(128,88,205)';  ctx.fillRect(0, py - 3, size, 3);
+    ctx.fillStyle = 'rgb(128,168,205)'; ctx.fillRect(0, py, size, 3);
+  }
+  // rivet dimples along the seams
+  for (var rx = 0; rx < cols; rx++) {
+    for (var ry = 0; ry < rows; ry++) {
+      var cx = rx * cw + 7, cy = ry * ch + 7;
+      var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 5);
+      g.addColorStop(0, 'rgb(150,150,240)'); g.addColorStop(1, 'rgb(128,128,255)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 6.283); ctx.fill();
+    }
+  }
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+/* Suspended ceiling: drop-tile grid with a slight per-tile tint shift. */
+function makeDropTileAlbedo(size) {
+  size = size || 256;
+  var canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#3c3d3a';
+  ctx.fillRect(0, 0, size, size);
+  var t = size / 2;
+  for (var y = 0; y < 2; y++) {
+    for (var x = 0; x < 2; x++) {
+      var v = 1 + (Math.random() - 0.5) * 0.12;
+      var c = Math.round(150 * v);
+      ctx.fillStyle = 'rgb(' + c + ',' + Math.round(c * 0.99) + ',' + Math.round(c * 0.92) + ')';
+      ctx.fillRect(x * t + 3, y * t + 3, t - 6, t - 6);
+      // perforation speckle
+      for (var i = 0; i < 240; i++) {
+        ctx.fillStyle = 'rgba(60,58,52,' + randRange(0.05, 0.22).toFixed(2) + ')';
+        ctx.fillRect(x * t + 4 + Math.random() * (t - 8), y * t + 4 + Math.random() * (t - 8), 2, 2);
+      }
+    }
+  }
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+/* CRT monitor face: scanlines over green terminal text. Scrolls via UV offset. */
+function makeMonitorTexture() {
+  var w = 256, h = 256;
+  var canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#02120a';
+  ctx.fillRect(0, 0, w, h);
+  ctx.font = '13px monospace';
+  ctx.fillStyle = '#4dff9b';
+  var lines = ['> KELVARA SYS 7', '  CORE TEMP  NOMINAL', '  PRESSURE   1.04 BAR',
+               '  VALVE 3    OPEN', '  VALVE 7    CLOSED', '> DIAG --loop', '  0x4F2A OK',
+               '  0x4F2B OK', '  0x51C0 WARN', '> _'];
+  for (var i = 0; i < lines.length; i++) {
+    ctx.globalAlpha = 0.55 + Math.random() * 0.45;
+    ctx.fillText(lines[i], 8, 20 + i * 24);
+  }
+  ctx.globalAlpha = 1;
+  // scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.34)';
+  for (var y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+/* Server rack face: rows of status LEDs. */
+function makeServerRackTexture() {
+  var w = 128, h = 256;
+  var canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0d10';
+  ctx.fillRect(0, 0, w, h);
+  for (var row = 0; row < 22; row++) {
+    var y = 6 + row * 11;
+    ctx.fillStyle = '#161b21';
+    ctx.fillRect(4, y, w - 8, 8);
+    for (var d = 0; d < 8; d++) {
+      var on = Math.random();
+      ctx.fillStyle = on > 0.75 ? '#6cff9e' : (on > 0.6 ? '#1d5c33' : '#0e2418');
+      ctx.fillRect(10 + d * 13, y + 2, 4, 4);
+    }
+  }
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+/* Muzzle flash: radial falloff with a few spokes, drawn once to a canvas. */
+function makeFlashTexture() {
+  var size = 128;
+  var canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  var ctx = canvas.getContext('2d');
+  var c = size / 2;
+  var g = ctx.createRadialGradient(c, c, 0, c, c, c);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,226,150,0.92)');
+  g.addColorStop(0.55, 'rgba(255,150,40,0.42)');
+  g.addColorStop(1.0, 'rgba(255,120,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalCompositeOperation = 'lighter';
+  for (var i = 0; i < 5; i++) {
+    var a = Math.random() * Math.PI * 2, len = c * randRange(0.5, 0.95);
+    ctx.strokeStyle = 'rgba(255,210,140,0.5)';
+    ctx.lineWidth = randRange(2, 5);
+    ctx.beginPath(); ctx.moveTo(c, c);
+    ctx.lineTo(c + Math.cos(a) * len, c + Math.sin(a) * len);
+    ctx.stroke();
+  }
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
 function buildTextures() {
   TEX.tileNormal  = makeTileNormalMap(256, 4);
   TEX.wallAlbedo  = makeTileAlbedo({ base: [171, 163, 142], grout: '#524d43', tiles: 4, grime: 34 });
@@ -341,6 +488,12 @@ function buildTextures() {
   TEX.labAlbedo   = makeTileAlbedo({ base: [138, 150, 157], grout: '#454e52', tiles: 4, grime: 26 });
   TEX.plantAlbedo = makeTileAlbedo({ base: [92, 98, 93], grout: '#313531', tiles: 2, grime: 48, variation: 0.16 });
   TEX.metalAlbedo = makeMetalAlbedo('#6a7a6a');
+  TEX.bathAlbedo  = makeTileAlbedo({ base: [206, 208, 205], grout: '#7d8079', tiles: 6, grime: 18, variation: 0.07 });
+  TEX.panelNormal = makePanelNormalMap(256, 2, 2);
+  TEX.dropTile    = makeDropTileAlbedo(256);
+  TEX.monitor     = makeMonitorTexture();
+  TEX.rackFace    = makeServerRackTexture();
+  TEX.flash       = makeFlashTexture();
   TEX.rough       = makeRoughMap(128, 1.0, 1.2);
   TEX.roughFine   = makeRoughMap(128, 2.4, 1.5);
 }
@@ -357,18 +510,20 @@ function repeated(tex, rx, ry) {
 function buildMaterials() {
   var NS = function (x, y) { return new THREE.Vector2(x, y); };
 
+  // Concrete wall: matte, non-metal, with the tile normal supplying relief.
   MAT.wall = new THREE.MeshStandardMaterial({
-    color: 0xd6ccb4, roughness: 0.85, metalness: 0.0,
+    color: 0xd6ccb4, roughness: 0.9, metalness: 0.0,
     map: repeated(TEX.wallAlbedo, 1, 1),
     normalMap: repeated(TEX.tileNormal, 4, 2),
     normalScale: NS(0.6, 0.6),
     roughnessMap: repeated(TEX.rough, 2, 1)
   });
+  // Metal panel wall: the lab and control wing are panelled, not tiled.
   MAT.wallLab = new THREE.MeshStandardMaterial({
-    color: 0xb8c6cc, roughness: 0.72, metalness: 0.05,
+    color: 0x6f7a82, roughness: 0.25, metalness: 0.85, envMapIntensity: 0.9,
     map: repeated(TEX.labAlbedo, 1, 1),
-    normalMap: repeated(TEX.tileNormal, 4, 2),
-    normalScale: NS(0.55, 0.55),
+    normalMap: repeated(TEX.panelNormal, 2, 1),
+    normalScale: NS(0.85, 0.85),
     roughnessMap: repeated(TEX.roughFine, 2, 1)
   });
   MAT.wallPlant = new THREE.MeshStandardMaterial({
@@ -378,8 +533,9 @@ function buildMaterials() {
     normalScale: NS(0.8, 0.8),
     roughnessMap: repeated(TEX.rough, 2, 2)
   });
+  // Corridor floor: polished enough to catch the ceiling fixtures.
   MAT.floor = new THREE.MeshStandardMaterial({
-    color: 0x8a8a8a, roughness: 0.9, metalness: 0.0,
+    color: 0x8a8a8a, roughness: 0.35, metalness: 0.1, envMapIntensity: 0.8,
     map: repeated(TEX.floorAlbedo, 1, 1),
     normalMap: repeated(TEX.tileNormal, 2, 2),
     normalScale: NS(0.5, 0.5),
@@ -393,10 +549,40 @@ function buildMaterials() {
     roughnessMap: repeated(TEX.rough, 2, 2)
   });
   MAT.ceiling = new THREE.MeshStandardMaterial({
-    color: 0xbbb8a8, roughness: 0.95, metalness: 0.0,
-    map: repeated(TEX.ceilAlbedo, 1, 1),
+    color: 0xbbb8a8, roughness: 0.8, metalness: 0.0,
+    map: repeated(TEX.dropTile, 1, 1),
     normalMap: repeated(TEX.tileNormal, 2, 2),
-    normalScale: NS(0.35, 0.35)
+    normalScale: NS(0.3, 0.3)
+  });
+  // Bathroom floor: smaller white tile, matte.
+  MAT.floorBath = new THREE.MeshStandardMaterial({
+    color: 0xd8dad6, roughness: 0.45, metalness: 0.0,
+    map: repeated(TEX.bathAlbedo, 1, 1),
+    normalMap: repeated(TEX.tileNormal, 4, 4),
+    normalScale: NS(0.5, 0.5),
+    roughnessMap: repeated(TEX.roughFine, 2, 2)
+  });
+  // Stainless lab bench top.
+  MAT.benchTop = new THREE.MeshStandardMaterial({
+    color: 0xb9c0c6, roughness: 0.15, metalness: 0.95, envMapIntensity: 1.0,
+    map: repeated(TEX.metalAlbedo, 2, 1)
+  });
+  // Polished floor drain.
+  MAT.drain = new THREE.MeshStandardMaterial({
+    color: 0x9aa1a8, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.2
+  });
+  // Server rack: dark chassis with an emissive LED face.
+  MAT.rack = new THREE.MeshStandardMaterial({
+    color: 0x30363d, roughness: 0.6, metalness: 0.7, envMapIntensity: 0.7
+  });
+  MAT.rackFace = new THREE.MeshStandardMaterial({
+    color: 0x1a1f24, roughness: 0.6, metalness: 0.7,
+    map: TEX.rackFace, emissive: 0xffffff, emissiveMap: TEX.rackFace, emissiveIntensity: 1.2
+  });
+  // Monitor face: emissive CRT, UV-scrolled in the frame loop.
+  MAT.monitor = new THREE.MeshStandardMaterial({
+    color: 0x0a1a12, roughness: 0.35, metalness: 0.0,
+    map: TEX.monitor, emissive: 0xffffff, emissiveMap: TEX.monitor, emissiveIntensity: 1.5
   });
   MAT.metal = new THREE.MeshStandardMaterial({
     color: 0x6a7a6a, roughness: 0.3, metalness: 0.8, envMapIntensity: 0.6,
@@ -407,7 +593,7 @@ function buildMaterials() {
     color: 0x3b444d, roughness: 0.45, metalness: 0.7, envMapIntensity: 0.5,
     map: repeated(TEX.metalAlbedo, 2, 2)
   });
-  MAT.trim = new THREE.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.5, metalness: 0.55, envMapIntensity: 0.5 });
+  MAT.trim = new THREE.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.45, metalness: 0.7, envMapIntensity: 0.6 });
   MAT.rubber = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.95, metalness: 0.0 });
   MAT.porcelain = new THREE.MeshStandardMaterial({ color: 0xe6e9ea, roughness: 0.18, metalness: 0.02, envMapIntensity: 0.8 });
   MAT.glass = new THREE.MeshStandardMaterial({
@@ -421,7 +607,11 @@ function buildMaterials() {
 
   // Emissive surfaces — these are what the bloom pass picks up.
   MAT.lampOn = new THREE.MeshStandardMaterial({
-    color: 0xffffff, emissive: CFG.colors.fluoro, emissiveIntensity: 2.4, roughness: 1, metalness: 0
+    color: 0xffffff, emissive: CFG.colors.fluoro, emissiveIntensity: 1.8, roughness: 1, metalness: 0
+  });
+  // Exit signage — sits well above the bloom threshold.
+  MAT.exitSign = new THREE.MeshStandardMaterial({
+    color: 0x220305, emissive: 0xff2318, emissiveIntensity: 2.0, roughness: 0.6, metalness: 0
   });
   MAT.screen = new THREE.MeshStandardMaterial({
     color: 0x0a1a22, emissive: CFG.colors.screenGlow, emissiveIntensity: 1.3, roughness: 0.4, metalness: 0
@@ -429,10 +619,16 @@ function buildMaterials() {
   MAT.screenAmber = new THREE.MeshStandardMaterial({
     color: 0x1a1206, emissive: CFG.colors.objectiveGlow, emissiveIntensity: 1.7, roughness: 0.4, metalness: 0
   });
-  MAT.ledRed = new THREE.MeshStandardMaterial({ color: 0x220407, emissive: 0xff2d3c, emissiveIntensity: 1.6, roughness: 0.5 });
+  MAT.ledRed = new THREE.MeshStandardMaterial({ color: 0x220407, emissive: 0xff2d3c, emissiveIntensity: 2.0, roughness: 0.5 });
+  MAT.ledDim = new THREE.MeshStandardMaterial({ color: 0x1a0405, emissive: 0x3a0a0e, emissiveIntensity: 0.3, roughness: 0.5 });
   MAT.ledGreen = new THREE.MeshStandardMaterial({ color: 0x04220e, emissive: 0x5dff8f, emissiveIntensity: 1.4, roughness: 0.5 });
 
-  MAT.guard = new THREE.MeshStandardMaterial({ color: 0x2f3a2c, roughness: 0.8, metalness: 0.08 });
+  MAT.guard = new THREE.MeshStandardMaterial({ color: 0x3d4a3d, roughness: 0.8, metalness: 0.08 });
+  MAT.enemyTorso = new THREE.MeshStandardMaterial({ color: 0x3d4a3d, roughness: 0.75, metalness: 0.12 });
+  MAT.enemyPants = new THREE.MeshStandardMaterial({ color: 0x222830, roughness: 0.85, metalness: 0.05 });
+  MAT.enemySkin  = new THREE.MeshStandardMaterial({ color: 0xc8a882, roughness: 0.75, metalness: 0.0 });
+  MAT.enemyBeret = new THREE.MeshStandardMaterial({ color: 0x2c3a2c, roughness: 0.9, metalness: 0.05 });
+  MAT.alertDot   = new THREE.MeshStandardMaterial({ color: 0x2a0206, emissive: 0xff2010, emissiveIntensity: 2.2, roughness: 0.5 });
   MAT.guardVest = new THREE.MeshStandardMaterial({ color: 0x1e2620, roughness: 0.65, metalness: 0.22 });
   MAT.skin = new THREE.MeshStandardMaterial({ color: 0xb8886a, roughness: 0.75, metalness: 0.0 });
   MAT.labCoat = new THREE.MeshStandardMaterial({ color: 0xdde3e6, roughness: 0.85, metalness: 0.0 });
@@ -493,7 +689,7 @@ function mergeGeometries(geoms) {
 var PLAN = {
   w: 28, h: 31,
   rooms: [
-    { id: 'bathroom', x0: 1,  z0: 1,  x1: 5,  z1: 5,  style: 'tile'  },
+    { id: 'bathroom', x0: 1,  z0: 1,  x1: 5,  z1: 5,  style: 'bath'  },
     { id: 'corridorV', x0: 3, z0: 6,  x1: 4,  z1: 12, style: 'tile'  },
     { id: 'corridorH', x0: 3, z0: 11, x1: 22, z1: 12, style: 'tile'  },
     { id: 'labLink',  x0: 20, z0: 13, x1: 21, z1: 13, style: 'lab'   },
@@ -583,7 +779,7 @@ function buildLevel(plan) {
 
   var bucket = {
     wall: [], wallLab: [], wallPlant: [],
-    floor: [], floorPlant: [], ceiling: [],
+    floor: [], floorPlant: [], floorBath: [], ceiling: [],
     trim: [], metal: [], lamp: []
   };
 
@@ -593,8 +789,8 @@ function buildLevel(plan) {
   ceilGeo.rotateX(Math.PI / 2);
   var wallGeoX = new THREE.BoxGeometry(CELL, WALL_H, WALL_T);   // spans X, faces Z
   var wallGeoZ = new THREE.BoxGeometry(WALL_T, WALL_H, CELL);   // spans Z, faces X
-  var trimGeoX = new THREE.BoxGeometry(CELL, 0.18, WALL_T + 0.06);
-  var trimGeoZ = new THREE.BoxGeometry(WALL_T + 0.06, 0.18, CELL);
+  var trimGeoX = new THREE.BoxGeometry(CELL, 0.05, WALL_T + 0.07);
+  var trimGeoZ = new THREE.BoxGeometry(WALL_T + 0.07, 0.05, CELL);
 
   var x, z, wx, wz;
   for (z = 0; z < plan.h; z++) {
@@ -606,7 +802,8 @@ function buildLevel(plan) {
 
       // floor + ceiling for every passable cell (ceilings are not optional —
       // without them the point lights spill into the void and the fog reads wrong)
-      addBox(style === 'plant' ? bucket.floorPlant : bucket.floor, floorGeo, null, wx, 0, wz);
+      addBox(style === 'plant' ? bucket.floorPlant : (style === 'bath' ? bucket.floorBath : bucket.floor),
+              floorGeo, null, wx, 0, wz);
       addBox(bucket.ceiling, ceilGeo, null, wx, WALL_H, wz);
 
       // walls: one slab on each boundary where this open cell meets a solid one
@@ -623,11 +820,13 @@ function buildLevel(plan) {
         var target = style === 'lab' ? bucket.wallLab : (style === 'plant' ? bucket.wallPlant : bucket.wall);
         if (nb.ax === 'x') {
           addBox(target, wallGeoX, null, bx, WALL_H / 2, bz);
-          addBox(bucket.trim, trimGeoX, null, bx, 0.09, bz);
+          addBox(bucket.trim, trimGeoX, null, bx, 0.025, bz);          // baseboard
+          addBox(bucket.trim, trimGeoX, null, bx, WALL_H - 0.025, bz); // cornice
           pushAABB(collidables, bx, WALL_H / 2, bz, CELL, WALL_H, WALL_T);
         } else {
           addBox(target, wallGeoZ, null, bx, WALL_H / 2, bz);
-          addBox(bucket.trim, trimGeoZ, null, bx, 0.09, bz);
+          addBox(bucket.trim, trimGeoZ, null, bx, 0.025, bz);
+          addBox(bucket.trim, trimGeoZ, null, bx, WALL_H - 0.025, bz);
           pushAABB(collidables, bx, WALL_H / 2, bz, WALL_T, WALL_H, CELL);
         }
       }
@@ -635,15 +834,15 @@ function buildLevel(plan) {
   }
 
   // ---- ceiling fluorescents every CFG.render.fixtureSpacing units ----
-  var housingGeo = new THREE.BoxGeometry(1.9, 0.16, 0.5);
-  var tubeGeo = new THREE.BoxGeometry(1.6, 0.07, 0.32);
+  var housingGeo = new THREE.BoxGeometry(2.7, 0.10, 0.42);
+  var tubeGeo = new THREE.BoxGeometry(2.55, 0.04, 0.30);
   var step = Math.max(1, Math.round(CFG.render.fixtureSpacing / CELL));
   for (z = 0; z < plan.h; z += step) {
     for (x = 0; x < plan.w; x += step) {
       if (!isPassable(grid[z][x])) continue;
       wx = cellToWorldX(x); wz = cellToWorldZ(z);
-      addBox(bucket.metal, housingGeo, null, wx, WALL_H - 0.09, wz);
-      addBox(bucket.lamp, tubeGeo, null, wx, WALL_H - 0.19, wz);
+      addBox(bucket.metal, housingGeo, null, wx, WALL_H - 0.06, wz);
+      addBox(bucket.lamp, tubeGeo, null, wx, WALL_H - 0.13, wz);
       lightPoints.push(new THREE.Vector3(wx, WALL_H - 0.35, wz));
     }
   }
@@ -690,6 +889,7 @@ function buildLevel(plan) {
   }
   commit(bucket.floor, MAT.floor, 'floor', true, false);
   commit(bucket.floorPlant, MAT.floorPlant, 'floorPlant', true, false);
+  commit(bucket.floorBath, MAT.floorBath, 'floorBath', true, false);
   commit(bucket.ceiling, MAT.ceiling, 'ceiling', true, false);
   commit(bucket.wall, MAT.wall, 'walls');
   commit(bucket.wallLab, MAT.wallLab, 'wallsLab');
@@ -716,13 +916,33 @@ function buildLevel(plan) {
 function buildProps(level) {
   var group = level.props;
   var col = level.collidables;
-  var statics = { metal: [], dark: [], porcelain: [], hazard: [], vat: [], rubber: [], trim: [] };
+  var statics = { metal: [], dark: [], porcelain: [], hazard: [], vat: [], rubber: [], trim: [],
+                  bench: [], drain: [], rack: [] };
 
   function prop(bucket, w, h, d, cx, cy, cz, solid, tag) {
     var geo = new THREE.BoxGeometry(w, h, d);
     geo.translate(cx, cy, cz);
     statics[bucket].push(geo);
     if (solid) pushAABB(col, cx, cy, cz, w, h, d, tag || 'prop');
+  }
+  /* Detail-only geometry: never registers a collider, so the level's collision
+     shape is exactly what it was before this pass. */
+  function pipe(bucket, radius, length, cx, cy, cz, axis) {
+    var geo = new THREE.CylinderGeometry(radius, radius, length, 8, 1);
+    if (axis === 'x') geo.rotateZ(Math.PI / 2);
+    else if (axis === 'z') geo.rotateX(Math.PI / 2);
+    geo.translate(cx, cy, cz);
+    statics[bucket].push(geo);
+  }
+  function cyl(bucket, rTop, rBot, h, cx, cy, cz, seg) {
+    var geo = new THREE.CylinderGeometry(rTop, rBot, h, seg || 14, 1);
+    geo.translate(cx, cy, cz);
+    statics[bucket].push(geo);
+  }
+  function disc(bucket, radius, h, cx, cy, cz) {
+    var geo = new THREE.CylinderGeometry(radius, radius, h, 16, 1);
+    geo.translate(cx, cy, cz);
+    statics[bucket].push(geo);
   }
   function live(mat, w, h, d, cx, cy, cz, solid, tag) {
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -748,19 +968,28 @@ function buildProps(level) {
     prop('metal', 0.06, 0.9, 0.5, cellToWorldX(1) - 1.88, 1.75, bz, false);   // mirror plate
   }
   prop('trim', 0.1, 0.9, CELL * 4.6, cellToWorldX(1) - 1.9, 0.42, cellToWorldZ(3), false);
+  disc('drain', 0.22, 0.03, cellToWorldX(3), 0.015, cellToWorldZ(3));      // polished floor drain
+  disc('dark', 0.30, 0.012, cellToWorldX(3), 0.006, cellToWorldZ(3));
 
   // ---- corridor dressing: pipe runs, signage, crates ----
   for (var pz = 7; pz <= 12; pz++) {
-    prop('metal', 0.16, 0.16, CELL, cellToWorldX(3) - 1.7, 2.95, cellToWorldZ(pz), false);
-    prop('metal', 0.12, 0.12, CELL, cellToWorldX(3) - 1.5, 2.72, cellToWorldZ(pz), false);
+    pipe('metal', 0.04, CELL, cellToWorldX(3) - 1.72, 2.98, cellToWorldZ(pz), 'z');
+    pipe('metal', 0.04, CELL, cellToWorldX(3) - 1.52, 2.76, cellToWorldZ(pz), 'z');
+    pipe('dark', 0.028, CELL, cellToWorldX(3) - 1.62, 2.60, cellToWorldZ(pz), 'z');
   }
+  prop('dark', 0.16, 0.16, 0.16, cellToWorldX(3) - 1.72, 2.98, cellToWorldZ(12) + 1.6, false);  // junction
+  prop('dark', 0.16, 0.16, 0.16, cellToWorldX(3) - 1.52, 2.76, cellToWorldZ(12) + 1.6, false);
   for (var px = 5; px <= 21; px++) {
-    prop('metal', CELL, 0.14, 0.14, cellToWorldX(px), 3.02, cellToWorldZ(11) - 1.85, false);
+    pipe('metal', 0.04, CELL, cellToWorldX(px), 3.04, cellToWorldZ(11) - 1.86, 'x');
+    pipe('dark', 0.028, CELL, cellToWorldX(px), 2.84, cellToWorldZ(11) - 1.78, 'x');
+  }
+  for (var jx = 7; jx <= 19; jx += 6) {
+    prop('dark', 0.17, 0.17, 0.17, cellToWorldX(jx), 3.04, cellToWorldZ(11) - 1.86, false);
   }
   prop('dark', 0.62, 0.46, 0.08, cellToWorldX(3) - 1.82, 2.1, cellToWorldZ(9), false);
-  live(MAT.screen, 0.44, 0.30, 0.05, cellToWorldX(3) - 1.78, 2.1, cellToWorldZ(9), false);
+  live(MAT.monitor, 0.44, 0.30, 0.05, cellToWorldX(3) - 1.78, 2.1, cellToWorldZ(9), false);
   prop('dark', 0.62, 0.46, 0.08, cellToWorldX(12), 2.1, cellToWorldZ(11) - 1.84, false);
-  live(MAT.screen, 0.44, 0.30, 0.05, cellToWorldX(12), 2.1, cellToWorldZ(11) - 1.80, false);
+  live(MAT.monitor, 0.44, 0.30, 0.05, cellToWorldX(12), 2.1, cellToWorldZ(11) - 1.80, false);
   prop('dark', 1.0, 1.0, 1.0, cellToWorldX(6), 0.5, cellToWorldZ(12) + 1.2, true, 'crate');
   prop('dark', 1.0, 1.0, 1.0, cellToWorldX(6) + 0.5, 1.5, cellToWorldZ(12) + 1.2, true, 'crate');
   prop('hazard', 0.7, 1.0, 0.7, cellToWorldX(17), 0.5, cellToWorldZ(12) + 1.3, true, 'barrel');
@@ -768,15 +997,23 @@ function buildProps(level) {
   // ---- laboratory: benches, monitors, shelving ----
   for (var r = 0; r < 3; r++) {
     var lz = cellToWorldZ(15 + r * 2);
-    prop('metal', CELL * 2.2, 0.12, 0.9, cellToWorldX(20), 0.95, lz, true, 'bench');
+    prop('bench', CELL * 2.2, 0.06, 0.9, cellToWorldX(20), 0.98, lz, true, 'bench');   // stainless top
+    prop('dark', CELL * 2.2 - 0.3, 0.05, 0.8, cellToWorldX(20), 0.42, lz, false);        // lower shelf
+    for (var lg = 0; lg < 4; lg++) {
+      prop('metal', 0.07, 0.92, 0.07,
+        cellToWorldX(20) + (lg % 2 ? 1 : -1) * (CELL * 1.05),
+        0.46, lz + (lg < 2 ? -0.35 : 0.35), false);
+    }
     prop('dark', 0.12, 0.9, 0.85, cellToWorldX(19) - 1.6, 0.45, lz, true, 'bench');
     prop('dark', 0.12, 0.9, 0.85, cellToWorldX(21) + 1.6, 0.45, lz, true, 'bench');
-    live(MAT.screen, 0.46, 0.34, 0.06, cellToWorldX(19) + 0.4, 1.28, lz - 0.2, false);
-    live(MAT.screen, 0.46, 0.34, 0.06, cellToWorldX(21) - 0.4, 1.28, lz + 0.2, false);
+    live(MAT.monitor, 0.46, 0.34, 0.06, cellToWorldX(19) + 0.4, 1.28, lz - 0.2, false);
+    live(MAT.monitor, 0.46, 0.34, 0.06, cellToWorldX(21) - 0.4, 1.28, lz + 0.2, false);
     prop('porcelain', 0.16, 0.30, 0.16, cellToWorldX(20) + 0.9, 1.16, lz, false);
     prop('porcelain', 0.14, 0.22, 0.14, cellToWorldX(20) - 0.9, 1.12, lz, false);
   }
   prop('metal', 0.5, 2.2, CELL * 2, cellToWorldX(24) + 1.5, 1.1, cellToWorldZ(17), true, 'shelf');
+  prop('dark', 1.1, 0.55, CELL * 5, cellToWorldX(21), WALL_H - 0.42, cellToWorldZ(17), false);  // ceiling duct
+  pipe('metal', 0.05, CELL * 5, cellToWorldX(19.4), WALL_H - 0.5, cellToWorldZ(17), 'z');
   prop('dark', 0.55, 0.08, CELL * 2 - 0.2, cellToWorldX(24) + 1.45, 1.5, cellToWorldZ(17), false);
   prop('dark', 0.55, 0.08, CELL * 2 - 0.2, cellToWorldX(24) + 1.45, 0.8, cellToWorldZ(17), false);
 
@@ -793,10 +1030,19 @@ function buildProps(level) {
   for (var c = 0; c < 3; c++) {
     var ccz = cellToWorldZ(24 + c * 0.9);
     prop('dark', 1.5, 1.0, 0.7, cellToWorldX(19) - 0.4, platY + 0.5, ccz, true, 'console');
-    live(MAT.screen, 1.2, 0.5, 0.06, cellToWorldX(19) - 0.4, platY + 1.15, ccz + 0.3, false);
+    live(MAT.monitor, 1.2, 0.5, 0.06, cellToWorldX(19) - 0.4, platY + 1.15, ccz + 0.3, false);
   }
   prop('dark', 0.8, 1.0, CELL * 2.2, cellToWorldX(23) + 1.3, platY + 0.5, cellToWorldZ(24.5), true, 'console');
-  live(MAT.screen, 0.06, 0.5, CELL * 1.6, cellToWorldX(23) + 0.88, platY + 1.15, cellToWorldZ(24.5), false);
+  // server racks: detail only, no collider, so the room walks exactly as before
+  for (var rk = 0; rk < 4; rk++) {
+    var rkz = cellToWorldZ(22.6 + rk * 0.62);
+    prop('rack', 0.75, 1.95, 0.9, cellToWorldX(18) - 1.1, platY + 0.98, rkz, false);
+    var face = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 1.7), MAT.rackFace);
+    face.position.set(cellToWorldX(18) - 1.1 + 0.46, platY + 0.98, rkz);
+    face.rotation.y = Math.PI / 2;
+    group.add(face);
+  }
+  live(MAT.monitor, 0.06, 0.5, CELL * 1.6, cellToWorldX(23) + 0.88, platY + 1.15, cellToWorldZ(24.5), false);
 
   // the terminal itself: amber, unmistakable, and the only interactable here
   var termX = cellToWorldX(21), termZ = cellToWorldZ(26) + 1.1;
@@ -808,6 +1054,13 @@ function buildProps(level) {
   var termLed = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.05), MAT.ledGreen);
   termLed.position.set(termX + 0.44, platY + 1.3, termZ - 0.22);
   group.add(termLed);
+  var bigScreen = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.6), MAT.monitor);
+  bigScreen.position.set(cellToWorldX(20.5), 2.75, cellToWorldZ(22) - 1.9);
+  group.add(bigScreen);
+  var bigFrame = new THREE.Mesh(new THREE.BoxGeometry(4.7, 1.9, 0.12), MAT.metalDark);
+  bigFrame.position.set(cellToWorldX(20.5), 2.75, cellToWorldZ(22) - 1.98);
+  group.add(bigFrame);
+
   level.terminal = {
     mesh: term, screen: screen, led: termLed,
     pos: new THREE.Vector3(termX, platY + 1.0, termZ),
@@ -818,10 +1071,12 @@ function buildProps(level) {
   var vatSpots = [[4.5, 21], [9, 21], [4.5, 24.5], [9, 24.5]];
   for (var v = 0; v < vatSpots.length; v++) {
     var vx = cellToWorldX(vatSpots[v][0]), vz = cellToWorldZ(vatSpots[v][1]);
-    prop('vat', 2.6, 2.4, 2.6, vx, 1.2, vz, true, 'vat');
-    prop('vat', 2.9, 0.25, 2.9, vx, 2.5, vz, false);
-    prop('vat', 2.9, 0.25, 2.9, vx, 0.14, vz, false);
-    prop('metal', 0.3, 1.0, 0.3, vx, 3.0, vz, false);
+    // Collider stays the original box; the visible tank is now a cylinder.
+    pushAABB(col, vx, 1.2, vz, 2.6, 2.4, 2.6, 'vat');
+    cyl('vat', 1.32, 1.32, 2.4, vx, 1.2, vz, 16);
+    cyl('vat', 1.46, 1.46, 0.22, vx, 2.48, vz, 16);
+    cyl('vat', 1.46, 1.46, 0.22, vx, 0.13, vz, 16);
+    pipe('metal', 0.12, 1.0, vx, 3.0, vz, 'y');
     live(MAT.chem, 2.2, 0.1, 2.2, vx, 2.66, vz, false);
     live(MAT.ledGreen, 0.14, 0.14, 0.06, vx + 1.32, 1.7, vz, false);
     prop('metal', 0.18, 0.18, CELL * 1.6, vx, 3.3, vz + CELL * 0.8, false);
@@ -834,14 +1089,28 @@ function buildProps(level) {
   }
   prop('dark', 1.2, 1.2, 1.2, cellToWorldX(11.5), 0.6, cellToWorldZ(20), true, 'crate');
   prop('metal', 0.4, 2.6, 0.4, cellToWorldX(12) + 1.2, 1.3, cellToWorldZ(23), true, 'pillar');
+  // mid-height walkway grating with thin railings — detail only
+  var wkX = cellToWorldX(11.4), wkZ0 = 19.2, wkZ1 = 26.2;
+  prop('dark', 1.5, 0.08, (wkZ1 - wkZ0) * CELL, wkX, 2.05, cellToWorldZ((wkZ0 + wkZ1) / 2), false);
+  for (var rl = 0; rl < 2; rl++) {
+    var rx = wkX + (rl ? 0.7 : -0.7);
+    pipe('metal', 0.03, (wkZ1 - wkZ0) * CELL, rx, 2.95, cellToWorldZ((wkZ0 + wkZ1) / 2), 'z');
+    pipe('metal', 0.03, (wkZ1 - wkZ0) * CELL, rx, 2.55, cellToWorldZ((wkZ0 + wkZ1) / 2), 'z');
+    for (var pst = 0; pst <= 6; pst++) {
+      pipe('metal', 0.03, 0.95, rx, 2.52, cellToWorldZ(wkZ0 + pst * 1.16), 'y');
+    }
+  }
 
   // exit signage
-  live(MAT.ledGreen, 0.9, 0.28, 0.06, cellToWorldX(6.5), 2.6, cellToWorldZ(26) + 1.9, false);
+  live(MAT.exitSign, 0.9, 0.28, 0.06, cellToWorldX(6.5), 2.6, cellToWorldZ(26) + 1.9, false);
+  live(MAT.exitSign, 0.7, 0.24, 0.06, cellToWorldX(3.5), 2.6, cellToWorldZ(6) - 1.9, false);
+  live(MAT.exitSign, 0.7, 0.24, 0.06, cellToWorldX(9), 2.6, cellToWorldZ(70 / CELL - 0.5) , false);
 
   // ---- commit merged prop geometry ----
   var matFor = {
     metal: MAT.metal, dark: MAT.metalDark, porcelain: MAT.porcelain,
-    hazard: MAT.hazard, vat: MAT.vat, rubber: MAT.rubber, trim: MAT.trim
+    hazard: MAT.hazard, vat: MAT.vat, rubber: MAT.rubber, trim: MAT.trim,
+    bench: MAT.benchTop, drain: MAT.drain, rack: MAT.rack
   };
   for (var key in statics) {
     if (!statics[key].length) continue;
@@ -903,75 +1172,29 @@ function spawnEnemies() {
 }
 
 // ===SECTION 4===
-/* Renderer, lighting rig, environment probe and a minimal two-pass bloom.
+/* Renderer, lighting rig, environment probe and the post-processing chain.
    Design notes that matter:
    - Point-light cube shadows cost six render passes each, so the number of
      shadow casters is fixed at construction (changing it mid-frame would force
-     every material in the scene to recompile).
-   - The facility has ~40 light fixtures but only a small pool of real lights;
+     every material in the scene to recompile). Two key lights cast; the cap is six.
+   - The facility has ~70 light fixtures but only a small pool of real lights;
      the pool is re-homed to the nearest fixtures as the player moves, which
      keeps the light count — and therefore the shader programs — constant. */
 
 var RENDER = {
   renderer: null, scene: null, camera: null,
   ambient: null, hemi: null, lightPool: [], envRT: null,
-  sceneRT: null, brightRT: null, blurRT: null,
-  quadScene: null, quadCam: null, quadMesh: null,
-  matBright: null, matBlur: null, matComposite: null,
+  shadowSize: 1024, shadowCount: 0,
   bloomEnabled: true, shadowsEnabled: true,
   width: 1, height: 1, renderScale: 1, targetScale: 1,
   frameMs: 16.7, scaleCooldown: 0, shadowTick: 0,
   alarmMix: 0, drawInfo: ''
 };
 
-var VS_QUAD = [
-  'varying vec2 vUv;',
-  'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
-].join('\n');
-
-var FS_BRIGHT = [
-  'uniform sampler2D tDiffuse; uniform float threshold; uniform float knee;',
-  'varying vec2 vUv;',
-  'void main(){',
-  '  vec4 c = texture2D(tDiffuse, vUv);',
-  '  float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));',
-  '  float w = smoothstep(threshold, threshold + knee, l);',
-  '  gl_FragColor = vec4(c.rgb * w, 1.0);',
-  '}'
-].join('\n');
-
-/* Separable 9-tap gaussian. Two of these (H then V) is all the blur bloom needs. */
-var FS_BLUR = [
-  'uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 texel;',
-  'varying vec2 vUv;',
-  'void main(){',
-  '  vec3 sum = texture2D(tDiffuse, vUv).rgb * 0.227027;',
-  '  vec2 o1 = dir * texel * 1.3846153846;',
-  '  vec2 o2 = dir * texel * 3.2307692308;',
-  '  sum += (texture2D(tDiffuse, vUv + o1).rgb + texture2D(tDiffuse, vUv - o1).rgb) * 0.3162162162;',
-  '  sum += (texture2D(tDiffuse, vUv + o2).rgb + texture2D(tDiffuse, vUv - o2).rgb) * 0.0702702703;',
-  '  gl_FragColor = vec4(sum, 1.0);',
-  '}'
-].join('\n');
-
-var FS_COMPOSITE = [
-  'uniform sampler2D tBase; uniform sampler2D tBloom; uniform float intensity;',
-  'uniform float vignette;',
-  'varying vec2 vUv;',
-  'void main(){',
-  '  vec3 base = texture2D(tBase, vUv).rgb;',
-  '  vec3 bloom = texture2D(tBloom, vUv).rgb;',
-  '  vec3 col = base + bloom * intensity;',
-  '  vec2 d = vUv - 0.5;',
-  '  col *= 1.0 - vignette * dot(d, d) * 1.6;',
-  '  gl_FragColor = vec4(col, 1.0);',
-  '}'
-].join('\n');
-
 function initRenderer(canvas) {
   var renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: !IS_MOBILE, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false, powerPreference: 'high-performance' });
   } catch (e) { return null; }
   if (!renderer || !renderer.getContext()) return null;
 
@@ -979,7 +1202,7 @@ function initRenderer(canvas) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = CFG.gfx.exposure;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.setClearColor(CFG.render.fogColor, 1);
   RENDER.renderer = renderer;
@@ -999,31 +1222,27 @@ function initRenderer(canvas) {
 }
 
 /* A tiny synthetic room baked to a PMREM probe. Without it every metal surface
-   in the level renders black — metalness with no environment has nothing to
-   reflect. This costs one render at startup and nothing afterwards. */
+   renders black — metalness with no environment has nothing to reflect, and the
+   PBR table in this build leans hard on metalness. */
 function buildEnvironment() {
   var envScene = new THREE.Scene();
-  var shell = new THREE.Mesh(
-    new THREE.BoxGeometry(24, 10, 24),
-    new THREE.MeshBasicMaterial({ color: 0x10141c, side: THREE.BackSide })
-  );
+  // Emissive standard materials rather than basic ones: MeshBasicMaterial is
+  // banned on game surfaces, and there is no reason to make an exception here.
+  var emis = function (hex) {
+    return new THREE.MeshStandardMaterial({ color: 0x000000, emissive: hex, emissiveIntensity: 1, roughness: 1 });
+  };
+  var shell = new THREE.Mesh(new THREE.BoxGeometry(24, 10, 24), emis(0x0e1218));
+  shell.material.side = THREE.BackSide;
   envScene.add(shell);
-  var floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24),
-    new THREE.MeshBasicMaterial({ color: 0x1b1d22 }));
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), emis(0x191b20));
   floor.rotation.x = -Math.PI / 2; floor.position.y = -4.9;
   envScene.add(floor);
   for (var i = -1; i <= 1; i++) {
-    var strip = new THREE.Mesh(new THREE.PlaneGeometry(18, 1.6),
-      new THREE.MeshBasicMaterial({ color: 0xcfe4ff }));
+    var strip = new THREE.Mesh(new THREE.PlaneGeometry(18, 1.6), emis(0xccddff));
     strip.rotation.x = Math.PI / 2;
     strip.position.set(0, 4.9, i * 6);
     envScene.add(strip);
   }
-  var warm = new THREE.Mesh(new THREE.PlaneGeometry(6, 3),
-    new THREE.MeshBasicMaterial({ color: 0x4a3a22 }));
-  warm.position.set(0, 0, -11.9);
-  envScene.add(warm);
-
   try {
     var pmrem = new THREE.PMREMGenerator(RENDER.renderer);
     pmrem.compileEquirectangularShader();
@@ -1031,7 +1250,7 @@ function buildEnvironment() {
     RENDER.scene.environment = RENDER.envRT.texture;
     pmrem.dispose();
   } catch (e) {
-    RENDER.envRT = null;   // metals fall back to plain shading; not fatal
+    RENDER.envRT = null;
   }
   shell.geometry.dispose(); floor.geometry.dispose();
 }
@@ -1039,35 +1258,42 @@ function buildEnvironment() {
 function setupLights(level) {
   var scene = RENDER.scene;
 
-  RENDER.ambient = new THREE.AmbientLight(CFG.colors.ambient, 0.25);
+  // Near-black ambient: with no fixture overhead, a room reads as dark.
+  RENDER.ambient = new THREE.AmbientLight(CFG.colors.ambient, 1.0);
   scene.add(RENDER.ambient);
 
-  RENDER.hemi = new THREE.HemisphereLight(CFG.colors.hemiSky, CFG.colors.hemiGround, 0.4);
+  // A whisper of hemisphere so unlit geometry keeps its shape instead of
+  // collapsing to a flat silhouette. Far below the old fill level.
+  RENDER.hemi = new THREE.HemisphereLight(CFG.colors.hemiSky, CFG.colors.hemiGround, 0.22);
   scene.add(RENDER.hemi);
 
-  var shadowCount = IS_MOBILE ? CFG.render.shadowLightsMobile : CFG.render.shadowLightsDesktop;
-  var mapSize = IS_MOBILE ? 256 : CFG.render.shadowMapSize;
+  // Four fixtures' worth of light, a PointLight pair flanking each. The count is
+  // fixed for the lifetime of the scene — changing it would recompile every
+  // material — so the pool is re-homed onto nearby fixtures instead.
+  RENDER.shadowSize = IS_MOBILE ? 512 : CFG.gfx.shadowSize;
+  var shadowCount = CFG.gfx.shadowLights;
   for (var i = 0; i < CFG.render.lightPoolSize; i++) {
-    var light = new THREE.PointLight(CFG.colors.fluoro, 1.8, 12);
+    var light = new THREE.PointLight(CFG.colors.fluoro, 1.5, 6);
     if (i < shadowCount) {
       light.castShadow = true;
-      light.shadow.mapSize.width = mapSize;
-      light.shadow.mapSize.height = mapSize;
+      light.shadow.mapSize.width = RENDER.shadowSize;
+      light.shadow.mapSize.height = RENDER.shadowSize;
       light.shadow.camera.near = 0.1;
-      light.shadow.camera.far = 12;
+      light.shadow.camera.far = 8;
       light.shadow.bias = -0.005;
     }
     light.position.set(0, WALL_H - 0.35, 0);
     light.visible = false;
     scene.add(light);
-    RENDER.lightPool.push({ light: light, fixture: -1, casts: i < shadowCount });
+    RENDER.lightPool.push({ light: light, fixture: -1, casts: i < shadowCount, side: (i % 2) ? 1 : -1 });
   }
   RENDER.shadowCount = shadowCount;
 }
 
-/* Re-home the light pool onto the fixtures nearest the camera. Runs on a slow
-   tick — light positions only need to change as the player walks. */
+/* Re-home the light pool onto the fixtures nearest the camera, two lights per
+   fixture. Runs on a slow tick — positions only change as the player walks. */
 var _fixtureOrder = [];
+var _colNormal = new THREE.Color(), _colAlarm = new THREE.Color();
 function updateLightPool(camPos) {
   var pts = LEVEL.lightPoints, i;
   if (_fixtureOrder.length !== pts.length) {
@@ -1079,79 +1305,111 @@ function updateLightPool(camPos) {
   });
   for (i = 0; i < RENDER.lightPool.length; i++) {
     var slot = RENDER.lightPool[i];
-    var fixtureIdx = i < _fixtureOrder.length ? _fixtureOrder[i] : -1;
+    var fixtureIdx = (i >> 1) < _fixtureOrder.length ? _fixtureOrder[i >> 1] : -1;
     if (fixtureIdx < 0) { slot.light.visible = false; slot.fixture = -1; continue; }
     if (slot.fixture !== fixtureIdx) {
       slot.fixture = fixtureIdx;
       slot.light.position.copy(pts[fixtureIdx]);
+      slot.light.position.x += slot.side * 0.6;      // flank the fixture body
     }
-    // A fixture well outside the view frustum contributes nothing worth the
-    // shadow pass, so it is parked rather than lit.
     var d2 = pts[fixtureIdx].distanceToSquared(camPos);
-    slot.light.visible = d2 < 400;
+    slot.light.visible = d2 < 260;
   }
 }
 
-/* Alarm lighting: lerp toward red over ~0.3s, then pulse. */
+/* Alarm lighting: lerp to red over 0.3s, then pulse at 1Hz. */
 function updateLighting(dt, alarmActive, elapsed) {
   var target = alarmActive ? 1 : 0;
   var rate = dt / 0.3;
   RENDER.alarmMix += clamp(target - RENDER.alarmMix, -rate, rate);
   var mix = RENDER.alarmMix;
 
-  var normal = new THREE.Color(CFG.colors.fluoro);
-  var alarm = new THREE.Color(CFG.colors.alarm);
-  var col = normal.clone().lerp(alarm, mix);
-  var pulse = 1.8 * (1 - mix) + mix * (0.8 + 0.4 * Math.sin(elapsed * 8)) * 2.2;
+  var col = _colNormal.setHex(CFG.colors.fluoro).lerp(_colAlarm.setHex(CFG.colors.alarm), mix);
+  var pulse = 0.55 + 0.45 * Math.sin(elapsed * Math.PI * 2);      // 1Hz
+  var intensity = 1.5 * (1 - mix) + mix * (1.5 * pulse * 1.7);
 
   for (var i = 0; i < RENDER.lightPool.length; i++) {
     RENDER.lightPool[i].light.color.copy(col);
-    RENDER.lightPool[i].light.intensity = pulse;
+    RENDER.lightPool[i].light.intensity = intensity;
   }
   if (MAT.lampOn) {
     MAT.lampOn.emissive.copy(col);
-    MAT.lampOn.emissiveIntensity = 2.4 * (1 - mix) + mix * (1.6 + 1.4 * Math.abs(Math.sin(elapsed * 8)));
+    MAT.lampOn.emissiveIntensity = 1.8 * (1 - mix) + mix * (1.9 * pulse);
   }
-  RENDER.hemi.intensity = 0.4 * (1 - mix * 0.55);
-  RENDER.ambient.color.setHex(CFG.colors.ambient).lerp(new THREE.Color(0x2a0d12), mix);
+  RENDER.hemi.intensity = 0.22 * (1 - mix * 0.5);
 }
 
-/* ---------- bloom plumbing ---------- */
+/* ---------- post-processing chain ----------
+   RenderPass -> UnrealBloomPass -> Vignette -> FXAA, built from the r128
+   examples/js scripts inlined in Section 1.
+
+   Colour-space note: r128 takes a material's output encoding from the render
+   target it is drawing into, so the composer's targets are tagged sRGB. That
+   keeps the chain display-referred end to end and lets FXAA (which reasons
+   about perceptual luma) be the final pass exactly as specified, with no extra
+   gamma-correction pass in between. */
+
+var GFX = {
+  composer: null, renderPass: null, bloom: null, vignette: null, fxaa: null,
+  quality: 'high', frameSamples: [], sampleIdx: 0, downgraded: false, stage: 0
+};
+
 function initPostFX() {
-  RENDER.quadScene = new THREE.Scene();
-  RENDER.quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  RENDER.quadMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
-  RENDER.quadMesh.frustumCulled = false;
-  RENDER.quadScene.add(RENDER.quadMesh);
+  var renderer = RENDER.renderer, scene = RENDER.scene, camera = RENDER.camera;
+  var size = renderer.getDrawingBufferSize(new THREE.Vector2());
 
-  RENDER.matBright = new THREE.ShaderMaterial({
-    uniforms: { tDiffuse: { value: null }, threshold: { value: CFG.render.bloomThreshold }, knee: { value: 0.22 } },
-    vertexShader: VS_QUAD, fragmentShader: FS_BRIGHT, depthTest: false, depthWrite: false
-  });
-  RENDER.matBlur = new THREE.ShaderMaterial({
-    uniforms: { tDiffuse: { value: null }, dir: { value: new THREE.Vector2(1, 0) }, texel: { value: new THREE.Vector2() } },
-    vertexShader: VS_QUAD, fragmentShader: FS_BLUR, depthTest: false, depthWrite: false
-  });
-  RENDER.matComposite = new THREE.ShaderMaterial({
-    uniforms: {
-      tBase: { value: null }, tBloom: { value: null },
-      intensity: { value: CFG.render.bloomIntensity }, vignette: { value: 0.55 }
-    },
-    vertexShader: VS_QUAD, fragmentShader: FS_COMPOSITE, depthTest: false, depthWrite: false
-  });
-}
-
-function makeRT(w, h, srgb) {
-  var rt = new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
+  var rt = new THREE.WebGLRenderTarget(size.x, size.y, {
     minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
     format: THREE.RGBAFormat, stencilBuffer: false
   });
-  // r128 takes the output encoding from the target texture when rendering to a
-  // render target, so tagging it sRGB keeps the offscreen pass display-referred
-  // and lets the composite blit through untouched.
-  if (srgb) rt.texture.encoding = THREE.sRGBEncoding;
+  rt.texture.encoding = THREE.sRGBEncoding;
   rt.texture.generateMipmaps = false;
-  return rt;
+
+  var composer = new THREE.EffectComposer(renderer, rt);
+  composer.setSize(size.x, size.y);
+
+  GFX.renderPass = new THREE.RenderPass(scene, camera);
+  composer.addPass(GFX.renderPass);
+
+  // threshold 0.85, strength 0.4, radius 0.5 — only emissive surfaces, muzzle
+  // flashes and sparks sit above the threshold, so nothing else blooms.
+  GFX.bloom = new THREE.UnrealBloomPass(
+    new THREE.Vector2(size.x, size.y),
+    CFG.gfx.bloomStrength, CFG.gfx.bloomRadius, CFG.gfx.bloomThreshold
+  );
+  composer.addPass(GFX.bloom);
+
+  GFX.vignette = new THREE.ShaderPass(THREE.VignetteShader);
+  GFX.vignette.uniforms['darkness'].value = CFG.gfx.vignetteDarkness;
+  GFX.vignette.uniforms['offset'].value = CFG.gfx.vignetteOffset;
+  composer.addPass(GFX.vignette);
+
+  GFX.fxaa = new THREE.ShaderPass(THREE.FXAAShader);
+  composer.addPass(GFX.fxaa);
+  GFX.fxaa.renderToScreen = true;
+
+  GFX.composer = composer;
+  updateFXAAResolution();
+  publishGFX();
+}
+
+/* FXAA works in device pixels, so its resolution uniform tracks the drawing
+   buffer and has to be recomputed whenever the canvas or pixel ratio changes. */
+function updateFXAAResolution() {
+  if (!GFX.fxaa) return;
+  var renderer = RENDER.renderer;
+  var pr = renderer.getPixelRatio();
+  var w = Math.max(1, Math.floor(RENDER.width * pr));
+  var h = Math.max(1, Math.floor(RENDER.height * pr));
+  GFX.fxaa.material.uniforms['resolution'].value.set(1 / w, 1 / h);
+}
+
+function publishGFX() {
+  window.__GFX = {
+    bloomStrength: GFX.bloom ? GFX.bloom.strength : 0,
+    shadowSize: RENDER.shadowSize,
+    quality: GFX.quality
+  };
 }
 
 function resizeRenderer() {
@@ -1163,94 +1421,80 @@ function resizeRenderer() {
   RENDER.camera.aspect = w / h;
   RENDER.camera.updateProjectionMatrix();
 
-  var bw = Math.floor(w * dpr), bh = Math.floor(h * dpr);
-  var sc = CFG.render.bloomScale;
-  if (!RENDER.sceneRT) {
-    RENDER.sceneRT = makeRT(bw, bh, true);
-    RENDER.brightRT = makeRT(bw * sc, bh * sc, true);
-    RENDER.blurRT = makeRT(bw * sc, bh * sc, true);
-  } else {
-    RENDER.sceneRT.setSize(bw, bh);
-    RENDER.brightRT.setSize(Math.max(1, bw * sc), Math.max(1, bh * sc));
-    RENDER.blurRT.setSize(Math.max(1, bw * sc), Math.max(1, bh * sc));
+  if (GFX.composer) {
+    GFX.composer.setSize(Math.floor(w * dpr), Math.floor(h * dpr));
+    if (GFX.bloom) GFX.bloom.setSize(Math.floor(w * dpr), Math.floor(h * dpr));
+    updateFXAAResolution();
+  }
+  hudResizeCanvas();
+}
+
+/* Adaptive quality: average the last 60 frame times; past 22ms the bloom pass
+   is switched off and the shadow maps drop to 512. A second stage trims render
+   resolution if that was not enough, which is what keeps a phone above 45fps. */
+function updateRenderScale(dt, frameMs) {
+  RENDER.frameMs += (frameMs - RENDER.frameMs) * 0.08;
+
+  GFX.frameSamples[GFX.sampleIdx % 60] = frameMs;
+  GFX.sampleIdx++;
+  if (GFX.sampleIdx % 60 !== 0 || GFX.frameSamples.length < 60) return;
+
+  var sum = 0;
+  for (var i = 0; i < 60; i++) sum += GFX.frameSamples[i];
+  var avg = sum / 60;
+
+  if (avg > CFG.gfx.downgradeMs) {
+    if (GFX.stage === 0) {
+      GFX.stage = 1;
+      GFX.quality = 'low';
+      if (GFX.bloom) GFX.bloom.enabled = false;
+      setShadowMapSize(512);
+      console.log('[PERF] avg frame ' + avg.toFixed(1) + 'ms over 60 frames — bloom off, shadow maps 512');
+      publishGFX();
+    } else if (GFX.stage === 1) {
+      GFX.stage = 2;
+      RENDER.renderScale = 0.75;
+      resizeRenderer();
+      console.log('[PERF] avg frame ' + avg.toFixed(1) + 'ms still over budget — render scale 0.75');
+      publishGFX();
+    }
   }
 }
 
-/* Dynamic resolution: the brief wants DPR capped at 2 and 30fps on mobile.
-   Those fight each other on a phone, so the cap stands and the scale below it
-   moves, with hysteresis so it cannot oscillate. */
-function updateRenderScale(dt, frameMs) {
-  RENDER.frameMs += (frameMs - RENDER.frameMs) * 0.08;
-  RENDER.scaleCooldown -= dt;
-  if (RENDER.scaleCooldown > 0) return;
-  var s = RENDER.targetScale;
-  if (RENDER.frameMs > 30 && s > 0.62) { RENDER.targetScale = Math.max(0.62, s - 0.14); }
-  else if (RENDER.frameMs < 15 && s < 1) { RENDER.targetScale = Math.min(1, s + 0.12); }
-  if (RENDER.targetScale !== RENDER.renderScale) {
-    RENDER.renderScale = RENDER.targetScale;
-    RENDER.scaleCooldown = 3.0;
-    resizeRenderer();
+function setShadowMapSize(px) {
+  RENDER.shadowSize = px;
+  for (var i = 0; i < RENDER.lightPool.length; i++) {
+    var slot = RENDER.lightPool[i];
+    if (!slot.casts) continue;
+    slot.light.shadow.mapSize.width = px;
+    slot.light.shadow.mapSize.height = px;
+    if (slot.light.shadow.map) {
+      slot.light.shadow.map.dispose();
+      slot.light.shadow.map = null;      // forces reallocation at the new size
+    }
   }
 }
 
 function renderFrame() {
-  var r = RENDER.renderer, scene = RENDER.scene, cam = RENDER.camera;
-  if (!r) return;
-
-  // shadows are the single most expensive pass here; halve their rate on mobile
+  var r = RENDER.renderer;
+  if (!r || !GFX.composer) return;
   if (RENDER.shadowsEnabled) {
     RENDER.shadowTick++;
     r.shadowMap.autoUpdate = IS_MOBILE ? (RENDER.shadowTick % 2 === 0) : true;
   }
-
-  if (!RENDER.bloomEnabled) {
-    r.setRenderTarget(null);
-    r.render(scene, cam);
-    RENDER.drawInfo = r.info.render.calls + ' calls / ' + r.info.render.triangles + ' tris';
-    return;
-  }
-
-  // 1. scene into an offscreen target (tone-mapped + sRGB by the target's encoding)
-  r.setRenderTarget(RENDER.sceneRT);
-  r.clear();
-  r.render(scene, cam);
-  var calls = r.info.render.calls, tris = r.info.render.triangles;
-
-  // 2. bright-pass extract
-  RENDER.quadMesh.material = RENDER.matBright;
-  RENDER.matBright.uniforms.tDiffuse.value = RENDER.sceneRT.texture;
-  r.setRenderTarget(RENDER.brightRT);
-  r.clear();
-  r.render(RENDER.quadScene, RENDER.quadCam);
-
-  // 3. separable blur: horizontal then vertical
-  var bw = RENDER.brightRT.width, bh = RENDER.brightRT.height;
-  RENDER.quadMesh.material = RENDER.matBlur;
-  RENDER.matBlur.uniforms.texel.value.set(1 / bw, 1 / bh);
-  RENDER.matBlur.uniforms.tDiffuse.value = RENDER.brightRT.texture;
-  RENDER.matBlur.uniforms.dir.value.set(1, 0);
-  r.setRenderTarget(RENDER.blurRT);
-  r.clear();
-  r.render(RENDER.quadScene, RENDER.quadCam);
-
-  RENDER.matBlur.uniforms.tDiffuse.value = RENDER.blurRT.texture;
-  RENDER.matBlur.uniforms.dir.value.set(0, 1);
-  r.setRenderTarget(RENDER.brightRT);
-  r.clear();
-  r.render(RENDER.quadScene, RENDER.quadCam);
-
-  // 4. additive composite to the screen
-  RENDER.quadMesh.material = RENDER.matComposite;
-  RENDER.matComposite.uniforms.tBase.value = RENDER.sceneRT.texture;
-  RENDER.matComposite.uniforms.tBloom.value = RENDER.brightRT.texture;
-  r.setRenderTarget(null);
-  r.clear();
-  r.render(RENDER.quadScene, RENDER.quadCam);
-
-  RENDER.drawInfo = calls + ' calls / ' + tris + ' tris';
+  // The composer issues several render calls per frame and the renderer resets
+  // its counters on each one, so accumulate manually across the whole chain.
+  r.info.autoReset = false;
+  r.info.reset();
+  GFX.composer.render();
+  RENDER.drawInfo = r.info.render.calls + ' calls / ' + r.info.render.triangles + ' tris';
 }
 
-function setBloomEnabled(on) { RENDER.bloomEnabled = !!on; }
+function setBloomEnabled(on) {
+  RENDER.bloomEnabled = !!on;
+  if (GFX.bloom) GFX.bloom.enabled = !!on && GFX.stage === 0;
+  publishGFX();
+}
 function setShadowsEnabled(on) {
   RENDER.shadowsEnabled = !!on;
   RENDER.renderer.shadowMap.enabled = !!on;
@@ -1695,7 +1939,8 @@ function damagePlayer(amount, fromPos) {
 var WEAPONS = {
   list: [], index: 0, aiming: false, cooldown: 0, reloading: 0,
   muzzleLight: null, viewGroup: null, viewModels: [], recoil: 0, swayX: 0, swayY: 0,
-  mines: [], impactPool: [], impactHead: 0, lastFireAt: -99
+  mines: [], impactPool: [], impactHead: 0, lastFireAt: -99,
+  flashQuad: null, flashTimer: 0
 };
 var weapons = null;          // the array the test suite inspects
 var currentWeapon = null;
@@ -1729,14 +1974,15 @@ function buildWeapons() {
   currentWeapon = weapons[0];
 
   // parked muzzle light — never added or removed at runtime
-  WEAPONS.muzzleLight = new THREE.PointLight(CFG.colors.muzzle, 0, 2);
+  WEAPONS.muzzleLight = new THREE.PointLight(0xff8800, 0, 4);
   RENDER.scene.add(WEAPONS.muzzleLight);
 
   buildViewModels();
   buildImpactPool();
 }
 
-/* Viewmodels are box assemblies parented to the camera. */
+/* Viewmodels are compound groups parented to the camera. Every part is a
+   MeshStandardMaterial; barrels are real cylinders rather than boxes. */
 function buildViewModels() {
   var g = new THREE.Group();
   RENDER.camera.add(g);
@@ -1749,27 +1995,49 @@ function buildViewModels() {
     m.castShadow = false; m.receiveShadow = false;
     return m;
   }
-  var gm = MAT.gunmetal, dk = MAT.metalDark;
+  function barrel(r, len, x, y, z, mat) {
+    var geo = new THREE.CylinderGeometry(r, r, len, 10, 1);
+    geo.rotateX(Math.PI / 2);                 // lie the cylinder along -Z
+    var m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.castShadow = false; m.receiveShadow = false;
+    return m;
+  }
 
+  var slideMat = new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.1, metalness: 0.9, envMapIntensity: 1.8 });
+  var gripMat  = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.85, metalness: 0.3 });
+  var woodMat  = new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.95, metalness: 0.0 });
+  var darkMet  = new THREE.MeshStandardMaterial({ color: 0x23272c, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.6 });
+  MAT.gunSlide = slideMat; MAT.gunGrip = gripMat; MAT.gunWood = woodMat; MAT.gunDark = darkMet;
+
+  // --- PP7: slide, barrel, handle ---
   var pp7 = new THREE.Group();
-  pp7.add(box(0.05, 0.075, 0.20, 0, 0, 0, gm));
-  pp7.add(box(0.045, 0.10, 0.055, 0, -0.062, 0.05, dk));
-  pp7.add(box(0.032, 0.032, 0.13, 0, 0.004, -0.16, gm));   // suppressor
-  pp7.add(box(0.012, 0.014, 0.02, 0, 0.045, -0.075, dk));
+  pp7.add(box(0.08, 0.05, 0.18, 0, 0, 0, slideMat));
+  pp7.add(barrel(0.012, 0.22, 0, 0.002, -0.16, slideMat));
+  pp7.add(box(0.055, 0.12, 0.08, 0, -0.075, 0.045, gripMat));
+  pp7.add(box(0.03, 0.018, 0.05, 0, -0.03, 0.02, gripMat));       // trigger guard
   WEAPONS.viewModels.push(pp7);
 
+  // --- KF7 Soviet: receiver, barrel, stock, magazine ---
   var kf7 = new THREE.Group();
-  kf7.add(box(0.055, 0.08, 0.30, 0, 0, 0, gm));
-  kf7.add(box(0.045, 0.11, 0.05, 0, -0.07, 0.06, dk));
-  kf7.add(box(0.04, 0.115, 0.05, 0, -0.062, -0.03, dk));   // curved magazine
-  kf7.add(box(0.028, 0.028, 0.24, 0, 0.018, -0.24, gm));   // barrel
-  kf7.add(box(0.05, 0.045, 0.10, 0, -0.005, 0.19, MAT.rubber));
+  kf7.add(box(0.08, 0.07, 0.35, 0, 0, 0, darkMet));
+  kf7.add(barrel(0.013, 0.45, 0, 0.012, -0.36, darkMet));
+  kf7.add(box(0.055, 0.09, 0.2, 0, -0.012, 0.26, woodMat));        // stock
+  kf7.add(box(0.04, 0.14, 0.07, 0, -0.10, -0.02, darkMet));        // magazine below receiver
+  kf7.add(box(0.05, 0.10, 0.07, 0, -0.075, 0.10, gripMat));        // pistol grip
+  kf7.add(box(0.016, 0.02, 0.10, 0, 0.05, -0.10, darkMet));        // rear sight rail
   WEAPONS.viewModels.push(kf7);
 
+  // --- Proximity mine: flat disc + blinking LED ---
   var mine = new THREE.Group();
-  mine.add(box(0.13, 0.13, 0.05, 0, 0, 0, MAT.hazard));
-  mine.add(box(0.10, 0.02, 0.055, 0, 0.035, 0, dk));
-  mine.add(box(0.022, 0.022, 0.06, 0, -0.03, -0.01, MAT.ledRed));
+  var disc = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.03, 18, 1),
+    new THREE.MeshStandardMaterial({ color: 0x8a7a2e, roughness: 0.35, metalness: 0.85, envMapIntensity: 0.8 }));
+  disc.rotation.x = Math.PI / 2;
+  mine.add(disc);
+  var blink = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), MAT.ledRed);
+  blink.position.set(0.03, 0.02, -0.02);
+  mine.add(blink);
+  mine.userData.blinker = blink;
   WEAPONS.viewModels.push(mine);
 
   for (var i = 0; i < WEAPONS.viewModels.length; i++) {
@@ -1777,6 +2045,24 @@ function buildViewModels() {
     WEAPONS.viewModels[i].scale.setScalar(0.82);   // re-scaled per frame for aspect
     g.add(WEAPONS.viewModels[i]);
   }
+
+  // Muzzle flash quad: a plane already facing the camera because it lives in
+  // view space. MeshStandardMaterial with a strong emissive so bloom catches it.
+  // Additive blending is what makes this read as light rather than a decal: the
+  // dark edge of the radial texture adds nothing, so the falloff is free and no
+  // alpha-channel behaviour has to be relied on.
+  var flashMat = new THREE.MeshStandardMaterial({
+    color: 0x000000, emissive: 0xffffff, emissiveIntensity: 2.4,
+    emissiveMap: TEX.flash, map: TEX.flash,
+    transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, depthTest: false, roughness: 1, metalness: 0
+  });
+  MAT.muzzleFlash = flashMat;
+  var flash = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), flashMat);
+  flash.visible = false;
+  flash.renderOrder = 5;
+  g.add(flash);
+  WEAPONS.flashQuad = flash;
 }
 
 function buildImpactPool() {
@@ -1876,6 +2162,7 @@ function fireWeapon() {
   WEAPONS.recoil = w.recoil;
   PLAYER.shotsFired++;
   PLAYER.fovPunch = 3;                       // FOV punch, never camera shake
+  hudShotFired();
   WEAPONS.lastFireAt = GAME.elapsed;
 
   if (!_ray) { _ray = new THREE.Raycaster(); _screenCentre = new THREE.Vector2(0, 0); }
@@ -1937,9 +2224,20 @@ function getMuzzleWorldPos() {
   var v = new THREE.Vector3(0.09, -0.08, -0.72);
   return v.applyMatrix4(cam.matrixWorld);
 }
+/* Binary on/off for exactly CFG.gfx.muzzleFlashMs, no lerp. The light object is
+   created once at startup and only its intensity changes, because adding or
+   removing a light would recompile every material in the scene. */
 function flashMuzzle(pos) {
   WEAPONS.muzzleLight.position.copy(pos);
-  WEAPONS.muzzleLight.intensity = 8;      // cleared on the next frame, no scene mutation
+  WEAPONS.muzzleLight.color.setHex(0xff8800);
+  WEAPONS.muzzleLight.distance = 4;
+  WEAPONS.muzzleLight.intensity = 10;
+  WEAPONS.flashTimer = CFG.gfx.muzzleFlashMs / 1000;
+  if (WEAPONS.flashQuad) {
+    WEAPONS.flashQuad.visible = true;
+    WEAPONS.flashQuad.scale.setScalar(0.01);
+    WEAPONS.flashQuad.rotation.z = randRange(0, Math.PI);
+  }
 }
 
 /* ---------- proximity mines ---------- */
@@ -1959,16 +2257,18 @@ function placeMine() {
   w.ammoInMag--;
   WEAPONS.cooldown = 1 / w.rps;
 
-  var mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.08), MAT.hazard);
+  var mineGeo = new THREE.CylinderGeometry(0.10, 0.10, 0.03, 16, 1);
+  mineGeo.rotateX(Math.PI / 2);
+  var mesh = new THREE.Mesh(mineGeo, MAT.hazard);
   mesh.position.copy(pos).addScaledVector(normal, 0.05);
   mesh.lookAt(pos.clone().add(normal));
   mesh.castShadow = true;
   RENDER.scene.add(mesh);
-  var led = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.02), MAT.ledRed);
-  led.position.set(0, 0, 0.05);
+  var led = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), MAT.ledRed);
+  led.position.set(0.03, 0.02, 0.03);
   mesh.add(led);
 
-  WEAPONS.mines.push({ mesh: mesh, pos: mesh.position.clone(), armTime: 1.0, beep: 0, live: true });
+  WEAPONS.mines.push({ mesh: mesh, led: led, pos: mesh.position.clone(), armTime: 1.0, beep: 0, live: true });
   sfxMinePlant(mesh.position);
   hudUpdateAmmo();
   return true;
@@ -2019,8 +2319,26 @@ function updateWeapons(dt, input) {
     if (WEAPONS.reloading <= 0) { WEAPONS.reloading = 0; finishReload(); }
   }
   WEAPONS.aiming = !!input.aim && !PLAYER.sprinting;
-  WEAPONS.muzzleLight.intensity *= 0.35;          // decays out over a couple of frames
-  if (WEAPONS.muzzleLight.intensity < 0.05) WEAPONS.muzzleLight.intensity = 0;
+
+  // Muzzle flash: light is binary for 80ms; the quad scales 0->1 over the first
+  // 30ms then 1->0 over the next 30ms, synchronised with it.
+  if (WEAPONS.flashTimer > 0) {
+    WEAPONS.flashTimer -= dt;
+    var elapsedMs = CFG.gfx.muzzleFlashMs - WEAPONS.flashTimer * 1000;
+    if (WEAPONS.flashQuad) {
+      var q = WEAPONS.flashQuad, k;
+      if (elapsedMs <= 30) k = clamp(elapsedMs / 30, 0, 1);
+      else if (elapsedMs <= 60) k = clamp(1 - (elapsedMs - 30) / 30, 0, 1);
+      else k = 0;
+      q.scale.setScalar(Math.max(0.01, k));
+      q.visible = k > 0.02;
+    }
+    if (WEAPONS.flashTimer <= 0) {
+      WEAPONS.flashTimer = 0;
+      WEAPONS.muzzleLight.intensity = 0;
+      if (WEAPONS.flashQuad) WEAPONS.flashQuad.visible = false;
+    }
+  }
 
   if (input.fire) {
     if (currentWeapon.auto) fireWeapon();
@@ -2028,6 +2346,17 @@ function updateWeapons(dt, input) {
   }
   updateImpacts(dt);
   updateMines(dt);
+
+  // 2Hz blink on the held mine and on every armed mine in the world
+  var blinkOn = (Math.sin(GAME.elapsed * Math.PI * 4) > 0);
+  var heldMine = WEAPONS.viewModels[2];
+  if (heldMine && heldMine.userData.blinker) {
+    heldMine.userData.blinker.material = blinkOn ? MAT.ledRed : MAT.ledDim;
+  }
+  for (var mi = 0; mi < WEAPONS.mines.length; mi++) {
+    var mm = WEAPONS.mines[mi];
+    if (mm.led) mm.led.material = (blinkOn && mm.armTime <= 0) ? MAT.ledRed : MAT.ledDim;
+  }
 
   // viewmodel: recoil kick, sway from look input, sprint tilt
   WEAPONS.recoil *= Math.max(0, 1 - dt * 11);
@@ -2037,6 +2366,18 @@ function updateWeapons(dt, input) {
   input.lookAccumY *= Math.max(0, 1 - dt * 6);
 
   var vm = WEAPONS.viewModels[WEAPONS.index];
+  if (vm && WEAPONS.flashQuad) {
+    // barrel-tip offsets in each model's own local space, scaled the same way
+    // the viewmodel is, so the flash sits on the muzzle for every weapon
+    var tipLocal = WEAPONS.index === 1 ? [0, 0.012, -0.60]
+                 : (WEAPONS.index === 0 ? [0, 0.002, -0.28] : [0, 0.01, -0.06]);
+    var vs = vm.scale.x;
+    WEAPONS.flashQuad.position.set(
+      vm.position.x + tipLocal[0] * vs,
+      vm.position.y + tipLocal[1] * vs,
+      vm.position.z + tipLocal[2] * vs
+    );
+  }
   if (vm) {
     // A portrait phone has the same vertical FOV but a much narrower horizontal
     // one, so a fixed-size viewmodel swallows the frame. Scale it with aspect.
@@ -2046,8 +2387,10 @@ function updateWeapons(dt, input) {
     var xMul = clamp(aspect, 0.62, 1.0);
     var aimT = WEAPONS.aiming ? 1 : 0;
     var hs = Math.hypot(PLAYER.vel.x, PLAYER.vel.z) / CFG.player.walkSpeed;
-    var bobX = Math.sin(PLAYER.bobPhase) * 0.012 * hs;
-    var bobY = Math.abs(Math.cos(PLAYER.bobPhase)) * 0.010 * hs;
+    // Bob is applied to the weapon group, never to the camera.
+    var tSec = GAME.elapsed;
+    var bobX = Math.sin(tSec * 2.5) * 0.005 * hs;
+    var bobY = Math.abs(Math.sin(tSec * 5.0)) * 0.004 * hs;
     var reloadDip = WEAPONS.reloading > 0 ? Math.sin((1 - WEAPONS.reloading / Math.max(0.01, currentWeapon.reloadTime)) * Math.PI) : 0;
     var sprintT = PLAYER.sprinting ? 1 : 0;
     vm.userData.sprintT = lerp(vm.userData.sprintT || 0, sprintT, 0.14);
@@ -2095,8 +2438,13 @@ var Enemy = function (position, patrolPoints, kind) {
 Enemy.prototype.buildMesh = function (position) {
   var g = new THREE.Group();
   g.position.copy(position);
-  var body = this.kind === 'scientist' ? MAT.labCoat : MAT.guard;
-  var vest = this.kind === 'scientist' ? MAT.labCoat : MAT.guardVest;
+  // Y-then-X so the death tip is around the body's own left-right axis and
+  // therefore always reads as falling forward, whichever way it was facing.
+  g.rotation.order = 'YXZ';
+
+  var isSci = this.kind === 'scientist';
+  var uniform = isSci ? MAT.labCoat : MAT.guard;
+  var pants   = isSci ? MAT.labCoat : MAT.enemyPants;
 
   function part(w, h, d, x, y, z, mat) {
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -2104,27 +2452,58 @@ Enemy.prototype.buildMesh = function (position) {
     m.castShadow = true; m.receiveShadow = true;
     return m;
   }
-  this.torso = part(0.46, 0.62, 0.26, 0, 1.12, 0, vest);
-  this.head = part(0.22, 0.24, 0.22, 0, 1.56, 0, MAT.skin);
-  this.legL = part(0.17, 0.78, 0.19, -0.12, 0.39, 0, body);
-  this.legR = part(0.17, 0.78, 0.19, 0.12, 0.39, 0, body);
-  this.armL = part(0.13, 0.52, 0.15, -0.30, 1.14, 0, body);
-  this.armR = part(0.13, 0.52, 0.15, 0.30, 1.14, 0, body);
+  // The part sizes below are exactly as specified; they are seated so the body
+  // is continuous, then the whole assembly is scaled to the 1.75m capsule the
+  // AI and hit detection already use. Scaling preserves the given proportions.
+  var body = new THREE.Group();
+  this.body = body;
+  this.torso = part(0.45, 0.55, 0.25, 0, 0.745, 0, isSci ? MAT.labCoat : MAT.enemyTorso);
+  this.head  = part(0.28, 0.28, 0.28, 0, 1.160, 0, MAT.enemySkin);
+  this.legL  = part(0.17, 0.45, 0.20, -0.12, 0.245, 0, pants);
+  this.legR  = part(0.17, 0.45, 0.20, 0.12, 0.245, 0, pants);
+  this.armL  = part(0.14, 0.35, 0.14, -0.295, 0.80, 0, uniform);
+  this.armR  = part(0.14, 0.35, 0.14, 0.295, 0.80, 0, uniform);
+  body.add(this.torso, this.head, this.legL, this.legR, this.armL, this.armR);
+  body.scale.setScalar(1.35);
+  g.add(body);
+
   // torso and legs carry the silhouette; arms and head add nothing to a shadow
   this.head.castShadow = false; this.armL.castShadow = false; this.armR.castShadow = false;
-  g.add(this.torso, this.head, this.legL, this.legR, this.armL, this.armR);
 
-  if (this.kind !== 'scientist') {
-    this.gun = part(0.08, 0.09, 0.44, 0.24, 1.15, -0.24, MAT.gunmetal);
+  if (!isSci) {
+    var beretGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.04, 12, 1);
+    this.beret = new THREE.Mesh(beretGeo, MAT.enemyBeret);
+    this.beret.position.set(0, 1.160 + 0.14, 0);
+    this.beret.castShadow = false;
+    body.add(this.beret);
+
+    this.gun = part(0.08, 0.09, 0.44, 0.26, 0.80, -0.24, MAT.gunmetal);
     this.gun.castShadow = false;
-    g.add(this.gun);
+    body.add(this.gun);
   } else {
-    this.board = part(0.24, 0.30, 0.03, 0.26, 1.10, -0.12, MAT.labCoat);
-    g.add(this.board);
+    this.board = part(0.24, 0.30, 0.03, 0.26, 0.78, -0.12, MAT.labCoat);
+    body.add(this.board);
   }
+
+  // Alert indicator: only visible while this one is actively hunting.
+  this.alertDot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), MAT.alertDot);
+  this.alertDot.position.set(0, 1.92, 0);
+  this.alertDot.visible = false;
+  this.alertDot.castShadow = false;
+  g.add(this.alertDot);
+
+  // Every part shares one emissive flash, so the parts list is cached here.
+  this.parts = [this.torso, this.head, this.legL, this.legR, this.armL, this.armR];
+  if (this.beret) this.parts.push(this.beret);
+  if (this.gun) this.parts.push(this.gun);
+  if (this.board) this.parts.push(this.board);
+  this.hitFlashT = 0;
+  this.flashMats = null;
+
   // A single low-poly proxy carries the raycast so a shot tests one box per
-  // enemy rather than seven.
-  this.hitMesh = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.75, 0.5), new THREE.MeshBasicMaterial({ visible: false }));
+  // enemy rather than nine.
+  this.hitMesh = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.75, 0.5),
+    new THREE.MeshStandardMaterial({ visible: false }));
   this.hitMesh.position.set(0, 0.88, 0);
   this.hitMesh.userData.enemy = this;
   g.add(this.hitMesh);
@@ -2132,6 +2511,30 @@ Enemy.prototype.buildMesh = function (position) {
 
   this.group = g;
   RENDER.scene.add(g);
+};
+
+/* White emissive flash on every part for 80ms, then back to black. Materials are
+   shared between enemies, so each hit swaps in a per-enemy clone for the
+   duration rather than tinting every guard in the level. */
+Enemy.prototype.startHitFlash = function () {
+  if (!this.flashMats) {
+    this.flashMats = [];
+    for (var i = 0; i < this.parts.length; i++) {
+      var m = this.parts[i].material.clone();
+      m.emissive = new THREE.Color(0xffffff);
+      m.emissiveIntensity = 1.0;
+      this.flashMats.push(m);
+      this.parts[i].userData.baseMat = this.parts[i].material;
+    }
+  }
+  for (var k = 0; k < this.parts.length; k++) this.parts[k].material = this.flashMats[k];
+  this.hitFlashT = 0.08;
+};
+Enemy.prototype.endHitFlash = function () {
+  for (var i = 0; i < this.parts.length; i++) {
+    if (this.parts[i].userData.baseMat) this.parts[i].material = this.parts[i].userData.baseMat;
+  }
+  this.hitFlashT = 0;
 };
 
 Enemy.prototype.setState = function (s) {
@@ -2357,6 +2760,13 @@ Enemy.prototype.faceToward = function (target, dt, rate) {
 Enemy.prototype.applyYaw = function () { this.group.rotation.y = this.yaw; };
 
 Enemy.prototype.animate = function (dt) {
+  if (this.hitFlashT > 0) {
+    this.hitFlashT -= dt;
+    if (this.hitFlashT <= 0) this.endHitFlash();
+  }
+  if (this.alertDot) {
+    this.alertDot.visible = (this.state === 'ALERT' || this.state === 'ATTACK');
+  }
   var moving = this.state === 'CHASE' || this.state === 'SEARCH' ||
                (this.state === 'PATROL' && this.pauseClock <= 0);
   this.walkPhase = (this.walkPhase || 0) + (moving ? dt * 7 : 0);
@@ -2365,15 +2775,16 @@ Enemy.prototype.animate = function (dt) {
   this.armL.rotation.x = -sw * 0.6;
   if (this.state === 'ATTACK') {
     this.armR.rotation.x = -1.2;
-    if (this.gun) { this.gun.position.set(0.18, 1.28, -0.36); this.gun.rotation.x = 0; }
+    if (this.gun) { this.gun.position.set(0.20, 0.92, -0.38); this.gun.rotation.x = 0; }
   } else {
     this.armR.rotation.x = sw * 0.6;
-    if (this.gun) this.gun.position.set(0.24, 1.15, -0.24);
+    if (this.gun) this.gun.position.set(0.26, 0.80, -0.24);
   }
 };
 
 Enemy.prototype.takeDamage = function (amount, fromPos) {
   if (this.state === 'DEAD') return;
+  this.startHitFlash();
   this.health -= amount;
   this.alertness = 1;
   if (fromPos) this.lastKnownPlayerPos = fromPos.clone ? fromPos.clone() : new THREE.Vector3(fromPos.x, 0, fromPos.z);
@@ -2383,6 +2794,8 @@ Enemy.prototype.takeDamage = function (amount, fromPos) {
 
 Enemy.prototype.die = function () {
   this.state = 'DEAD';
+  this.endHitFlash();
+  if (this.alertDot) this.alertDot.visible = false;
   this.deathClock = 0;
   this.health = 0;
   this.hitMesh.userData.enemy = null;
@@ -2398,9 +2811,9 @@ Enemy.prototype.die = function () {
 
 Enemy.prototype.updateDeath = function (dt) {
   this.deathClock += dt;
-  var t = Math.min(1, this.deathClock / 0.7);
-  this.group.rotation.z = t * Math.PI * 0.48;
-  this.group.position.y = Math.max(0, 0 - 0 + (1 - t) * 0.0);
+  // linear interpolation to -PI/2 over 400ms, driven from the update loop
+  var t = Math.min(1, this.deathClock / 0.4);
+  this.group.rotation.x = -t * (Math.PI / 2);
   if (this.deathClock > 12 && this.group.visible) this.group.visible = false;
 };
 
@@ -2442,6 +2855,14 @@ function updateEnemyShadowCulling(camPos) {
     if (e.shadowOn === near) continue;
     e.shadowOn = near;
     e.torso.castShadow = near; e.legL.castShadow = near; e.legR.castShadow = near;
+  }
+}
+
+/* Slow vertical crawl on the monitor texture. One shared texture, one offset
+   write per frame — the canvas itself is generated once at load. */
+function updateScreens(dt) {
+  if (MAT.monitor && MAT.monitor.map) {
+    MAT.monitor.map.offset.y = (MAT.monitor.map.offset.y + dt * 0.035) % 1;
   }
 }
 
@@ -2698,22 +3119,26 @@ function gatherInput(dt) {
    are looked up once and only their values are written afterwards, so no frame
    ever rebuilds markup. */
 
-var HUD = { el: {}, alertTimer: 0, hitTimer: 0, toastTimer: 0, dmgTimer: 0, built: false, lastAmmo: '', lastHp: -1 };
+/* The crosshair, health bar, ammo readout, weapon name and alert wash are drawn
+   on a 2D canvas layered over the WebGL canvas and repainted in the rAF loop.
+   Objectives and the alert banner stay as HTML — they change rarely and never
+   per frame. Nothing here touches innerHTML. */
+
+var HUD = {
+  el: {}, canvas: null, ctx: null, dpr: 1, w: 0, h: 0,
+  alertTimer: 0, hitTimer: 0, toastTimer: 0, dmgTimer: 0, built: false,
+  crossGap: 0, crossGapTarget: 0
+};
 
 function initHUD() {
-  var ids = ['hud', 'touch', 'crosshair', 'hitmark', 'dmgVig', 'lowHpVig', 'hpNum', 'hpBar', 'armorBar',
-             'wepName', 'ammoNum', 'objText', 'alertBox', 'interactPrompt', 'toast', 'fpsCounter'];
+  var ids = ['hud', 'touch', 'dmgVig', 'lowHpVig', 'objText', 'alertBox',
+             'interactPrompt', 'toast', 'fpsCounter'];
   for (var i = 0; i < ids.length; i++) HUD.el[ids[i]] = document.getElementById(ids[i]);
 
-  // ammo readout: two nodes created once, then only their text is written
-  HUD.el.ammoNum.textContent = '';
-  HUD.ammoMag = document.createTextNode('7');
-  HUD.ammoReserve = document.createElement('small');
-  HUD.ammoReserve.textContent = ' / \u221E';
-  HUD.el.ammoNum.appendChild(HUD.ammoMag);
-  HUD.el.ammoNum.appendChild(HUD.ammoReserve);
+  HUD.canvas = document.getElementById('hudCanvas');
+  HUD.ctx = HUD.canvas ? HUD.canvas.getContext('2d') : null;
 
-  // objective rows are created once; updates only touch className/textContent
+  // objective rows are created once; updates only touch className
   HUD.el.objText.innerHTML = '';
   HUD.objRows = [];
   var labels = ['A. Download research archive', 'B. Exit through the chemical plant'];
@@ -2724,36 +3149,32 @@ function initHUD() {
     HUD.objRows.push(row);
   }
   HUD.built = true;
+  hudResizeCanvas();
 }
+
+function hudResizeCanvas() {
+  if (!HUD.canvas) return;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  HUD.dpr = dpr;
+  HUD.w = window.innerWidth; HUD.h = window.innerHeight;
+  HUD.canvas.width = Math.floor(HUD.w * dpr);
+  HUD.canvas.height = Math.floor(HUD.h * dpr);
+  HUD.canvas.style.width = HUD.w + 'px';
+  HUD.canvas.style.height = HUD.h + 'px';
+  if (HUD.ctx) HUD.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
 function hudShow(on) {
   HUD.el.hud.classList.toggle('on', !!on);
   HUD.el.touch.classList.toggle('on', !!on);
+  if (HUD.canvas) HUD.canvas.style.display = on ? 'block' : 'none';
 }
-function hudUpdateVitals() {
-  var P = PLAYER;
-  if (!HUD.built || !P) return;
-  var hp = Math.max(0, Math.round(P.health));
-  if (hp !== HUD.lastHp) {
-    HUD.lastHp = hp;
-    HUD.el.hpNum.textContent = hp;
-    var pct = clamp(P.health / P.maxHealth, 0, 1);
-    HUD.el.hpBar.style.width = (pct * 100) + '%';
-    HUD.el.hpBar.style.background = pct > 0.6 ? '#5dff8f' : (pct > 0.28 ? '#ffb128' : '#ff2d3c');
-  }
-  HUD.el.armorBar.style.width = clamp(P.armor / CFG.player.maxArmor, 0, 1) * 100 + '%';
-}
-function hudUpdateAmmo() {
-  if (!HUD.built || !currentWeapon) return;
-  var w = currentWeapon;
-  var reserve = w.infiniteReserve ? '\u221E' : String(w.reserve);
-  var str = w.ammoInMag + '|' + reserve + '|' + w.name;
-  if (str !== HUD.lastAmmo) {
-    HUD.lastAmmo = str;
-    HUD.ammoMag.nodeValue = String(w.ammoInMag);
-    HUD.ammoReserve.textContent = ' / ' + reserve;
-    HUD.el.wepName.textContent = w.name;
-  }
-}
+
+/* These stay as entry points so the rest of the game is untouched; the canvas
+   pass reads live state every frame, so they only need to nudge timers. */
+function hudUpdateVitals() {}
+function hudUpdateAmmo() {}
+function hudSyncWeapon() {}
 function hudUpdateObjectives() {
   if (!HUD.built) return;
   HUD.objRows[0].className = GAME.objectives.terminal ? 'done' : '';
@@ -2766,10 +3187,11 @@ function hudAlert(text) {
   HUD.alertTimer = 3.0;
 }
 function hudHitMarker(head) {
-  if (!HUD.built) return;
-  HUD.el.hitmark.style.opacity = '1';
-  HUD.el.hitmark.style.transform = 'rotate(45deg) scale(' + (head ? 1.4 : 1) + ')';
-  HUD.hitTimer = 0.12;
+  HUD.hitTimer = head ? 0.16 : 0.12;
+}
+/* Crosshair kicks open 8px on firing and closes back over 300ms. */
+function hudShotFired() {
+  HUD.crossGap = 8;
 }
 function hudFlashDamage() {
   if (!HUD.built) return;
@@ -2789,20 +3211,114 @@ function hudPrompt(text) {
   el.classList.add('on'); btn.classList.add('on');
   el.textContent = text;
 }
+
 function hudTick(dt) {
   if (!HUD.built) return;
   if (HUD.alertTimer > 0) { HUD.alertTimer -= dt; if (HUD.alertTimer <= 0) HUD.el.alertBox.style.opacity = '0'; }
-  if (HUD.hitTimer > 0) { HUD.hitTimer -= dt; if (HUD.hitTimer <= 0) HUD.el.hitmark.style.opacity = '0'; }
+  if (HUD.hitTimer > 0) HUD.hitTimer -= dt;
   if (HUD.dmgTimer > 0) { HUD.dmgTimer -= dt; if (HUD.dmgTimer <= 0) HUD.el.dmgVig.style.opacity = '0'; }
   if (HUD.toastTimer > 0) { HUD.toastTimer -= dt; if (HUD.toastTimer <= 0) HUD.el.toast.style.opacity = '0'; }
+
   var low = PLAYER.health < 35 ? clamp((35 - PLAYER.health) / 35, 0, 1) : 0;
   HUD.el.lowHpVig.style.opacity = low ? String(low * (0.55 + 0.45 * Math.sin(GAME.elapsed * 6))) : '0';
-  HUD.el.crosshair.classList.toggle('hit', HUD.hitTimer > 0);
+
+  // crosshair gap closes linearly over 300ms
+  if (HUD.crossGap > 0) HUD.crossGap = Math.max(0, HUD.crossGap - dt * (8 / 0.3));
+
   if (GAME.showStats && (GAME.frameCount & 15) === 0) {
     HUD.el.fpsCounter.textContent =
       Math.round(1000 / Math.max(0.01, RENDER.frameMs)) + ' fps  ' + RENDER.frameMs.toFixed(1) + ' ms\n' +
-      RENDER.drawInfo + '\nscale ' + RENDER.renderScale.toFixed(2) + '  shadows ' + RENDER.shadowCount;
+      RENDER.drawInfo + '\nq ' + GFX.quality + '  shadow ' + RENDER.shadowSize;
   }
+  hudDrawCanvas();
+}
+
+function hudDrawCanvas() {
+  var ctx = HUD.ctx;
+  if (!ctx) return;
+  var w = HUD.w, h = HUD.h;
+  ctx.clearRect(0, 0, w, h);
+
+  // ---- alert wash: 12% red, pulsing at 1Hz, only while the alarm is up ----
+  if (GAME.alarm) {
+    var pulse = 0.5 + 0.5 * Math.sin(GAME.elapsed * Math.PI * 2);
+    ctx.globalAlpha = 0.12 * (0.45 + 0.55 * pulse);
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- crosshair: four lines with a centre gap ----
+  var cx = Math.round(w / 2), cy = Math.round(h / 2);
+  var gap = 5 + HUD.crossGap, len = 9;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = HUD.hitTimer > 0 ? '#ff2d3c' : '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
+  ctx.moveTo(cx, cy + gap); ctx.lineTo(cx, cy + gap + len);
+  ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
+  ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + gap + len, cy);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  var padL = 16 + hudInsetLeft(), padB = 18 + hudInsetBottom(), padR = 16 + hudInsetRight();
+
+  // ---- health bar, bottom left ----
+  var barW = 200, barH = 14;
+  var bx = padL, by = h - padB - barH;
+  var frac = clamp(PLAYER.health / Math.max(1, PLAYER.maxHealth), 0, 1);
+  ctx.fillStyle = 'rgba(6,10,16,0.72)';
+  ctx.fillRect(bx, by, barW, barH);
+  ctx.fillStyle = frac > 0.6 ? '#3ddc6b' : (frac > 0.3 ? '#ffc23a' : '#ff2d3c');
+  ctx.fillRect(bx + 1, by + 1, (barW - 2) * frac, barH - 2);
+  ctx.strokeStyle = 'rgba(159,176,196,0.5)'; ctx.lineWidth = 1;
+  ctx.strokeRect(bx + 0.5, by + 0.5, barW - 1, barH - 1);
+  ctx.font = '10px ui-monospace, Menlo, monospace';
+  ctx.fillStyle = '#9fb0c4'; ctx.textAlign = 'left';
+  ctx.fillText('BODY ARMOUR / HEALTH', bx, by - 6);
+  if (PLAYER.armor > 0) {
+    var aFrac = clamp(PLAYER.armor / CFG.player.maxArmor, 0, 1);
+    ctx.fillStyle = '#48b7ff';
+    ctx.fillRect(bx, by + barH + 3, (barW) * aFrac, 4);
+  }
+
+  // ---- ammo + weapon name, bottom right ----
+  var w2 = currentWeapon;
+  if (w2) {
+    var reserve = w2.infiniteReserve ? '\u221E' : String(w2.reserve);
+    ctx.textAlign = 'right';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
+    ctx.font = '30px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(w2.ammoInMag + ' / ' + reserve, w - padR, h - padB);
+    ctx.font = '12px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = '#9fb0c4';
+    ctx.fillText(w2.name, w - padR, h - padB - 34);
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  }
+  ctx.textAlign = 'left';
+}
+
+/* Safe-area insets read once per resize would be ideal, but they are cheap and
+   this keeps the canvas honest when a phone rotates. */
+function hudInsetLeft() { return hudInsetPx('--safe-l'); }
+function hudInsetRight() { return hudInsetPx('--safe-r'); }
+function hudInsetBottom() { return hudInsetPx('--safe-b'); }
+var _insetCache = {}, _insetTick = -1;
+function hudInsetPx(name) {
+  if (_insetTick !== GAME.frameCount >> 6) {
+    _insetTick = GAME.frameCount >> 6;
+    _insetCache = {};
+  }
+  if (_insetCache[name] !== undefined) return _insetCache[name];
+  var v = 0;
+  try {
+    var raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+    v = parseFloat(raw) || 0;
+  } catch (e) { v = 0; }
+  _insetCache[name] = v;
+  return v;
 }
 
 // ===SECTION 11===
@@ -3115,6 +3631,7 @@ function frame(now) {
     updatePlayer(dt, input);
     updateWeapons(dt, input);
     updateEnemies(dt);
+    updateScreens(dt);
     updateDoors(dt);
     updateInteraction(dt);
     hudTick(dt);
