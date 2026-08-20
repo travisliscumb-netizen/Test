@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05060a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Operation Blackgate</title>
+<style>
+:root{
+  --amber:#ffb128; --green:#5dff8f; --red:#ff2d3c; --steel:#9fb0c4; --ink:#e8eef6;
+  --safe-t:env(safe-area-inset-top); --safe-b:env(safe-area-inset-bottom);
+  --safe-l:env(safe-area-inset-left); --safe-r:env(safe-area-inset-right);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#05060a;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#05060a}
+
+/* ---------- HUD (absolutely positioned HTML, built once, values updated in place) ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10;display:none}
+#hud.on{display:block}
+#crosshair{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;opacity:.95}
+#crosshair i{position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.85)}
+#crosshair i.v{left:12px;top:0;width:2px;height:9px}
+#crosshair i.v2{left:12px;bottom:0;width:2px;height:9px}
+#crosshair i.h{top:12px;left:0;height:2px;width:9px}
+#crosshair i.h2{top:12px;right:0;height:2px;width:9px}
+#crosshair.hit i{background:var(--red)}
+#hitmark{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;opacity:0;transform:rotate(45deg)}
+#hitmark i{position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#hitmark i.a{left:10px;top:0;width:2px;height:22px}
+#hitmark i.b{top:10px;left:0;height:2px;width:22px}
+.panel{position:absolute;padding:2px 0}
+#vitals{left:calc(var(--safe-l) + 16px);bottom:calc(var(--safe-b) + 18px);width:190px}
+#ammo{right:calc(var(--safe-r) + 16px);bottom:calc(var(--safe-b) + 18px);text-align:right}
+.lbl{font-size:10px;letter-spacing:.28em;color:var(--steel);text-transform:uppercase;opacity:.85}
+#hpNum{font-size:30px;font-weight:700;line-height:1;letter-spacing:.02em}
+#hpBarOuter{margin-top:6px;height:8px;width:100%;background:rgba(6,10,16,.72);border:1px solid rgba(159,176,196,.4)}
+#hpBar{height:100%;width:100%;background:var(--green);transition:width .12s linear,background .2s linear}
+#armorBarOuter{margin-top:4px;height:5px;width:100%;background:rgba(6,10,16,.72);border:1px solid rgba(159,176,196,.28)}
+#armorBar{height:100%;width:0%;background:#48b7ff}
+#wepName{font-size:11px;letter-spacing:.22em;color:var(--steel);text-transform:uppercase}
+#ammoNum{font-size:32px;font-weight:700;line-height:1.02;letter-spacing:.02em}
+#ammoNum small{font-size:15px;color:var(--steel);font-weight:500}
+#objective{left:calc(var(--safe-l) + 70px);top:calc(var(--safe-t) + 14px);max-width:58vw}
+#objText{font-size:12px;line-height:1.55;color:var(--ink);margin-top:4px}
+#objText b{color:var(--amber);font-weight:600}
+#objText .done{color:var(--green);text-decoration:line-through;opacity:.75}
+#alertBox{position:absolute;left:50%;top:calc(var(--safe-t) + 16px);transform:translateX(-50%);
+  font-size:13px;letter-spacing:.24em;color:var(--red);font-weight:700;opacity:0;transition:opacity .25s;
+  text-shadow:0 0 10px rgba(255,45,60,.7);white-space:nowrap}
+#dmgVig{position:absolute;inset:0;opacity:0;transition:opacity .18s;
+  background:radial-gradient(115% 95% at 50% 50%,transparent 45%,rgba(255,45,60,.62) 100%)}
+#lowHpVig{position:absolute;inset:0;opacity:0;
+  background:radial-gradient(125% 105% at 50% 50%,transparent 48%,rgba(255,45,60,.4) 100%)}
+#interactPrompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);text-align:center;
+  font-size:12px;letter-spacing:.18em;color:var(--amber);background:rgba(5,8,14,.78);
+  border:1px solid rgba(255,177,40,.45);padding:7px 14px;display:none}
+#interactPrompt.on{display:block}
+#toast{position:absolute;left:50%;top:26%;transform:translateX(-50%);text-align:center;max-width:74vw;
+  font-size:12.5px;line-height:1.6;letter-spacing:.06em;background:rgba(5,8,14,.84);
+  border-left:2px solid var(--amber);padding:9px 14px;opacity:0;transition:opacity .3s}
+#fpsCounter{position:absolute;right:calc(var(--safe-r) + 16px);top:calc(var(--safe-t) + 14px);
+  font-size:10px;letter-spacing:.12em;color:var(--steel);opacity:.75;text-align:right;white-space:pre;display:none}
+#fpsCounter.on{display:block}
+/* Portrait phones: the objective list and the centred alert were fighting for
+   the same top strip, so the list drops below the alert row. */
+@media (max-width:560px){
+  #objective{left:calc(var(--safe-l) + 16px);top:calc(var(--safe-t) + 54px);max-width:78vw}
+  #objText{font-size:11.5px}
+  #vitals{width:150px}
+  #ammoNum{font-size:26px}
+  #hpNum{font-size:24px}
+}
+
+/* ---------- touch controls ---------- */
+#touch{position:fixed;inset:0;z-index:12;display:none;touch-action:none}
+#touch.on{display:block}
+.stick{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;
+  border:1px solid rgba(159,176,196,.34);background:rgba(10,16,26,.26);opacity:0;transition:opacity .12s;pointer-events:none}
+.stick.on{opacity:1}
+.stick i{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;
+  background:rgba(159,176,196,.34);border:1px solid rgba(232,238,246,.7)}
+.stick.sprint{border-color:var(--amber)}
+.stick.sprint i{background:rgba(255,177,40,.34);border-color:var(--amber)}
+.tbtn{position:absolute;border-radius:50%;border:1px solid rgba(159,176,196,.42);
+  background:rgba(10,16,26,.34);color:var(--ink);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:center;text-align:center;touch-action:none;pointer-events:auto}
+.tbtn.press{background:rgba(255,177,40,.3);border-color:var(--amber)}
+#btnFire{right:calc(var(--safe-r) + 22px);bottom:calc(var(--safe-b) + 108px);width:104px;height:104px;
+  font-size:13px;border-color:rgba(255,45,60,.6);background:rgba(255,45,60,.16)}
+#btnWeap{right:calc(var(--safe-r) + 34px);bottom:calc(var(--safe-b) + 226px);width:64px;height:64px}
+#btnCrouch{right:calc(var(--safe-r) + 136px);bottom:calc(var(--safe-b) + 120px);width:62px;height:62px}
+#btnUse{left:50%;margin-left:-38px;bottom:calc(var(--safe-b) + 26px);width:76px;height:76px;display:none;
+  border-color:rgba(255,177,40,.6);background:rgba(255,177,40,.16)}
+#btnUse.on{display:flex}
+#btnPause{left:calc(var(--safe-l) + 14px);top:calc(var(--safe-t) + 12px);width:44px;height:44px;border-radius:6px;font-size:14px}
+
+/* ---------- overlays ---------- */
+.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(var(--safe-t) + 20px) calc(var(--safe-r) + 20px) calc(var(--safe-b) + 20px) calc(var(--safe-l) + 20px);
+  background:radial-gradient(120% 90% at 50% 8%,rgba(255,177,40,.07),transparent 55%),
+             linear-gradient(180deg,#05060a 0%,#0a0f18 55%,#05060a 100%);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.screen.on{display:flex}
+.screen::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;
+  background:repeating-linear-gradient(0deg,rgba(159,176,196,.25) 0 1px,transparent 1px 3px)}
+.wrap{position:relative;width:100%;max-width:480px;z-index:1}
+.eyebrow{font-size:10.5px;letter-spacing:.42em;color:var(--amber);text-transform:uppercase;margin-bottom:8px}
+h1{font-size:clamp(30px,8.4vw,50px);margin:0;letter-spacing:.14em;line-height:1.04;font-weight:800}
+h1 span{color:var(--amber)}
+h2{font-size:19px;letter-spacing:.2em;margin:0 0 10px;text-transform:uppercase}
+.rule{height:1px;margin:14px 0 16px;background:linear-gradient(90deg,var(--amber),transparent);opacity:.7}
+p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
+.btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:56px;
+  padding:15px 17px;margin:9px 0;border:1px solid rgba(159,176,196,.28);border-left:3px solid rgba(255,177,40,.55);
+  background:linear-gradient(180deg,rgba(24,34,50,.9),rgba(11,17,27,.9));color:var(--ink);
+  font-family:inherit;font-size:14px;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;border-radius:3px}
+.btn:active{background:rgba(255,177,40,.2)}
+.btn.primary{border-left-color:var(--amber);background:linear-gradient(180deg,rgba(255,177,40,.22),rgba(14,20,30,.92));font-weight:700}
+.btn .k{font-size:10.5px;color:var(--steel);letter-spacing:.1em}
+.card{border:1px solid rgba(159,176,196,.22);background:rgba(11,17,27,.72);padding:14px;margin:10px 0;border-radius:3px}
+.card h3{margin:0 0 8px;font-size:11px;letter-spacing:.24em;color:var(--amber);text-transform:uppercase}
+.card p{margin:0;font-size:12px;line-height:1.75;color:var(--steel)}
+.kv{display:flex;justify-content:space-between;gap:14px;font-size:12px;padding:6px 0;
+  border-bottom:1px dashed rgba(159,176,196,.18)}
+.kv b{font-weight:600}
+.tiny{font-size:11px;color:var(--steel);line-height:1.7;opacity:.8}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px;
+  border-bottom:1px solid rgba(159,176,196,.14);font-size:12px;letter-spacing:.1em}
+.row label{color:var(--steel);text-transform:uppercase;font-size:11px;letter-spacing:.16em}
+.tog{width:56px;height:30px;border-radius:15px;background:rgba(24,34,50,.9);border:1px solid rgba(159,176,196,.3);position:relative;cursor:pointer}
+.tog i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--steel);transition:all .14s}
+.tog.on{background:rgba(255,177,40,.24);border-color:var(--amber)}
+.tog.on i{left:29px;background:var(--amber)}
+#bigStat{font-size:40px;font-weight:800;letter-spacing:.04em;color:var(--amber)}
+#endTitle.win{color:var(--green)}
+#endTitle.lose{color:var(--red)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="crosshair"><i class="v"></i><i class="v2"></i><i class="h"></i><i class="h2"></i></div>
+  <div id="hitmark"><i class="a"></i><i class="b"></i></div>
+  <div id="dmgVig"></div>
+  <div id="lowHpVig"></div>
+  <div class="panel" id="objective">
+    <div class="lbl">Objectives</div>
+    <div id="objText"></div>
+  </div>
+  <div id="alertBox">! GUARD ALERTED</div>
+  <div class="panel" id="vitals">
+    <div class="lbl">Body Armour / Health</div>
+    <div id="hpNum">100</div>
+    <div id="hpBarOuter"><div id="hpBar"></div></div>
+    <div id="armorBarOuter"><div id="armorBar"></div></div>
+  </div>
+  <div class="panel" id="ammo">
+    <div id="wepName">PP7</div>
+    <div id="ammoNum">7 <small>/ &#8734;</small></div>
+  </div>
+  <div id="interactPrompt">HOLD USE</div>
+  <div id="toast"></div>
+  <div id="fpsCounter"></div>
+</div>
+
+<div id="touch">
+  <div class="stick" id="stickL"><i></i></div>
+  <div class="stick" id="stickR"><i></i></div>
+  <button class="tbtn" id="btnFire">FIRE</button>
+  <button class="tbtn" id="btnWeap">WEAP</button>
+  <button class="tbtn" id="btnCrouch">CRCH</button>
+  <button class="tbtn" id="btnUse">USE</button>
+  <button class="tbtn" id="btnPause">| |</button>
+</div>
+
+<section class="screen on" id="screenTitle">
+  <div class="wrap">
+    <div class="eyebrow">Field Operation &#183; Severnaya Sector</div>
+    <h1>OPERATION<br><span>BLACKGATE</span></h1>
+    <div class="rule"></div>
+    <p class="lede">A chemical weapons facility cut into the rock. Get to the control room, pull the research data
+      off the terminal, and be out through the plant before the garrison works out you were ever inside.</p>
+    <button class="btn primary" id="btnStart"><span>Begin Mission</span><span class="k">&#9654;</span></button>
+    <button class="btn" id="btnBriefing"><span>Briefing</span><span class="k">i</span></button>
+    <button class="btn" id="btnControlsScreen"><span>Controls</span><span class="k">?</span></button>
+    <button class="btn" id="btnOptions"><span>Options</span><span class="k">&#9881;</span></button>
+    <p class="tiny">Runs entirely offline. Audio starts on your first tap &#8212; that is a browser rule, not a bug.</p>
+  </div>
+</section>
+
+<section class="screen" id="screenBriefing">
+  <div class="wrap">
+    <div class="eyebrow">Eyes only</div>
+    <h2>Briefing</h2>
+    <div class="card"><h3>Situation</h3><p>Blackgate processes and stores nerve agent under a research cover.
+      Its garrison is small but disciplined, and the plant floor has enough pressurised stock to make a firefight
+      a poor idea.</p></div>
+    <div class="card"><h3>Objective A</h3><p>Reach the control room and download the research archive from the terminal.</p></div>
+    <div class="card"><h3>Objective B</h3><p>Exit through the chemical plant. The exit stays sealed until the archive is yours.</p></div>
+    <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors and will call the alarm on sight.
+      Lab staff are unarmed &#8212; they run, and they raise the alarm too. Shots are loud; the suppressed PP7 is not.</p></div>
+    <div class="row"><label>Difficulty</label>
+      <select id="selDiff" style="background:#182232;color:#e8eef6;border:1px solid rgba(159,176,196,.3);padding:9px;font-family:inherit;font-size:12px;min-height:40px">
+        <option value="0">Agent</option><option value="1" selected>Secret Agent</option><option value="2">00 Agent</option>
+      </select></div>
+    <button class="btn primary" id="btnBriefStart"><span>Insert</span><span class="k">&#9654;</span></button>
+    <button class="btn" id="btnBriefBack"><span>Back</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenControls">
+  <div class="wrap">
+    <div class="eyebrow">Field manual</div>
+    <h2>Controls</h2>
+    <div class="card"><h3>Touch</h3><p>Left half of the screen is the movement stick, right half is the look stick &#8212;
+      both appear wherever your thumb lands. Push the movement stick to its rim to sprint. FIRE and WEAP sit under your
+      right thumb, CRCH crouches, and USE appears in amber when something can be operated.</p></div>
+    <div class="card"><h3>Keyboard &amp; mouse</h3><p>WASD move &#183; mouse look &#183; left click fire &#183;
+      Q/E cycle weapons &#183; 1-3 select &#183; C crouch &#183; Shift sprint &#183; E interact &#183; R reload &#183;
+      Esc pause. Click the view to lock the mouse where the browser allows it; dragging works everywhere.</p></div>
+    <div class="card"><h3>Reading the facility</h3><p>Fluorescents are cool white while you are undetected and switch to
+      pulsing red the moment the alarm goes. Guards look at their patrol path; scientists do not fight.</p></div>
+    <button class="btn" id="btnControlsBack"><span>Back</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenOptions">
+  <div class="wrap">
+    <div class="eyebrow">Configuration</div>
+    <h2>Options</h2>
+    <div class="row"><label>Look sensitivity</label><input type="range" id="rngSens" min="30" max="260" value="100"></div>
+    <div class="row"><label>Invert look Y</label><button class="tog" id="togInvert"><i></i></button></div>
+    <div class="row"><label>Master volume</label><input type="range" id="rngVol" min="0" max="100" value="75"></div>
+    <div class="row"><label>Bloom</label><button class="tog on" id="togBloom"><i></i></button></div>
+    <div class="row"><label>Shadows</label><button class="tog on" id="togShadow"><i></i></button></div>
+    <div class="row"><label>Performance readout</label><button class="tog" id="togStats"><i></i></button></div>
+    <button class="btn" id="btnOptionsBack"><span>Back</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenPause">
+  <div class="wrap">
+    <div class="eyebrow">Operation held</div>
+    <h2>Paused</h2>
+    <div class="card">
+      <div class="kv"><span>Elapsed</span><b id="pauseTime">00:00</b></div>
+      <div class="kv"><span>Alarm</span><b id="pauseAlarm">Silent</b></div>
+      <div class="kv"><span>Archive</span><b id="pauseObjA">Not retrieved</b></div>
+    </div>
+    <button class="btn primary" id="btnResume"><span>Resume</span><span class="k">&#9654;</span></button>
+    <button class="btn" id="btnPauseOptions"><span>Options</span><span class="k">&#9881;</span></button>
+    <button class="btn" id="btnAbort"><span>Abort mission</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenEnd">
+  <div class="wrap">
+    <div class="eyebrow" id="endEyebrow">Extraction</div>
+    <h2 id="endTitle">MISSION COMPLETE</h2>
+    <div id="bigStat">00:00</div>
+    <p class="lede" id="endText"></p>
+    <div class="card">
+      <div class="kv"><span>Archive retrieved</span><b id="endObjA">No</b></div>
+      <div class="kv"><span>Alarm raised</span><b id="endAlarm">No</b></div>
+      <div class="kv"><span>Guards neutralised</span><b id="endKills">0</b></div>
+      <div class="kv"><span>Accuracy</span><b id="endAcc">0%</b></div>
+      <div class="kv"><span>Best time</span><b id="endBest">&#8212;</b></div>
+    </div>
+    <button class="btn primary" id="btnPlayAgain"><span>Play again</span><span class="k">&#8635;</span></button>
+    <button class="btn" id="btnEndTitle"><span>Return to title</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenFatal">
+  <div class="wrap">
+    <div class="eyebrow">Hardware</div>
+    <h2 style="color:var(--red)">Renderer unavailable</h2>
+    <p class="lede" id="fatalMsg">This browser could not open a WebGL context.</p>
+    <button class="btn primary" id="btnFatalReload"><span>Reload</span><span class="k">&#8635;</span></button>
+  </div>
+</section>
