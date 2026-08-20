@@ -82,5 +82,35 @@ def main():
     if size < 650000:
         print("  WARNING: file smaller than the 650KB sanity floor")
 
+    art = build_artifact(html)
+    art_path = os.path.join(ROOT, "deploy", "blackgate.artifact.html")
+    with open(art_path, "w", encoding="utf-8") as f:
+        f.write(art)
+    for tag in ("<!DOCTYPE", "<html", "<head", "<body"):
+        if tag.lower() in art.lower():
+            print("  WARNING: artifact build still contains %s" % tag)
+    print("  artifact build: deploy/blackgate.artifact.html  %d bytes" % len(art.encode("utf-8")))
+
+def build_artifact(html):
+    """Strip the outer document scaffolding for Claude Artifact hosting.
+
+    The artifact host supplies its own <!doctype>/<head>/<body>, so the page
+    content is handed over bare. Nothing about the game changes: the same
+    <title>, the same <style>, the same markup and the same twelve <script>
+    blocks, byte for byte. env(safe-area-inset-*) simply resolves to 0 inside
+    the host frame, which is the no-notch case the CSS already handles.
+    """
+    out = html
+    out = re.sub(r'<!DOCTYPE html>\s*', '', out, flags=re.I)
+    out = re.sub(r'<html[^>]*>\s*', '', out, flags=re.I)
+    out = out.replace('</html>', '')
+    # drop the head/body element tags themselves, keep everything inside them
+    out = re.sub(r'</?head>\s*', '', out, flags=re.I)
+    out = re.sub(r'</?body>\s*', '', out, flags=re.I)
+    # meta tags belong to the host document, not to embedded content
+    out = re.sub(r'^[ \t]*<meta[^>]*>\n?', '', out, flags=re.I | re.M)
+    return out.strip() + "\n"
+
+
 if __name__ == "__main__":
     main()
