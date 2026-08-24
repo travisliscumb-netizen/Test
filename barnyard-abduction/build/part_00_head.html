@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#7fc4e8">
+<title>Barnyard Abduction</title>
+<style>
+/* ============================================================
+   BARNYARD ABDUCTION — UI STYLESHEET
+   Touch-first, iPhone Safari primary target (D-004).
+   Large tap targets, no hover-dependent interaction (S13).
+   ============================================================ */
+:root{
+  --sky:#7fc4e8; --grass:#6cbf4a; --barn:#c8452f; --barn-dark:#96301f;
+  --cream:#fff6e2; --ink:#2a1f16; --ink-soft:#5b4636;
+  --alien:#7df2c8; --alien-deep:#16d69a; --beam:#9df7ff;
+  --gold:#ffc94a; --danger:#ff5f52; --shield:#5fd0ff;
+  --panel:rgba(28,22,17,.90); --panel-line:rgba(255,246,226,.22);
+  --tap:56px;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0f1a22;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  color:var(--cream);-webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+button{font-family:inherit;font-weight:800;color:inherit;border:none;background:none;cursor:pointer}
+.hidden{display:none!important}
+
+/* ---------- Boot / load ---------- */
+#boot{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px;
+  background:linear-gradient(#0b1620,#16323f 60%,#1d4436)}
+#boot h1{font-size:clamp(30px,9vw,52px);margin:0;letter-spacing:-.02em;
+  text-shadow:0 0 26px rgba(125,242,200,.55);color:var(--alien)}
+#boot .sub{color:#bcd6cc;font-size:15px;max-width:30ch;line-height:1.5;font-weight:600}
+#bootbar{width:min(280px,70vw);height:10px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden}
+#bootbar i{display:block;height:100%;width:12%;border-radius:99px;
+  background:linear-gradient(90deg,var(--alien-deep),var(--beam));transition:width .3s}
+#booterr{color:#ffb8b0;font-size:14px;max-width:34ch;line-height:1.5;font-weight:600}
+
+/* ---------- HUD (always visible, S11 / D-017) ---------- */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none}
+.hudtop{position:absolute;top:calc(var(--safe-t) + 8px);left:calc(var(--safe-l) + 10px);
+  right:calc(var(--safe-r) + 10px);display:flex;gap:8px;align-items:flex-start}
+.chip{background:var(--panel);border:1.5px solid var(--panel-line);border-radius:14px;
+  padding:7px 11px;min-width:60px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.chip .lab{font-size:9px;letter-spacing:.14em;font-weight:800;color:#c3b3a2;text-transform:uppercase}
+.chip .val{font-size:19px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+#c-score .val{color:var(--gold)}
+#c-goal .val{color:var(--alien)}
+#c-time .val{color:#fff}
+#c-time.low .val{color:var(--danger)}
+.hudtop .spacer{flex:1}
+#btn-pause{pointer-events:auto;width:var(--tap);height:var(--tap);border-radius:16px;
+  background:var(--panel);border:1.5px solid var(--panel-line);font-size:19px;
+  display:flex;align-items:center;justify-content:center;flex:none}
+
+/* shields + alert row */
+.hudsub{position:absolute;top:calc(var(--safe-t) + 66px);left:calc(var(--safe-l) + 10px);
+  display:flex;flex-direction:column;gap:6px}
+#shieldwrap{display:flex;align-items:center;gap:7px}
+#shieldbar{width:118px;height:12px;border-radius:99px;background:rgba(0,0,0,.55);
+  border:1.5px solid var(--panel-line);overflow:hidden}
+#shieldbar i{display:block;height:100%;width:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--shield),#c6f0ff);transition:width .18s}
+#shieldbar.hurt i{background:linear-gradient(90deg,var(--danger),#ffa79f)}
+.mini{font-size:10px;font-weight:900;letter-spacing:.1em;color:#c3b3a2}
+#alert{display:inline-flex;align-items:center;gap:6px;background:var(--panel);
+  border:1.5px solid var(--panel-line);border-radius:11px;padding:4px 9px;font-size:11px;
+  font-weight:900;letter-spacing:.08em;opacity:.9}
+#alert .dot{width:9px;height:9px;border-radius:99px;background:#6cbf4a}
+#alert.s1 .dot{background:var(--gold)} #alert.s1{color:var(--gold)}
+#alert.s2 .dot{background:var(--danger);animation:pulse .7s infinite} #alert.s2{color:var(--danger)}
+@keyframes pulse{50%{opacity:.25}}
+#beamstate{display:inline-flex;align-items:center;gap:6px;background:var(--panel);
+  border:1.5px solid var(--panel-line);border-radius:11px;padding:4px 9px;font-size:11px;
+  font-weight:900;letter-spacing:.08em;color:#9a8c7d}
+#beamstate.on{color:var(--beam);border-color:rgba(157,247,255,.5)}
+
+/* combo */
+#combo{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%) scale(.5);
+  font-size:clamp(34px,12vw,68px);font-weight:900;color:var(--gold);opacity:0;
+  text-shadow:0 4px 0 #b8791a,0 0 34px rgba(255,201,74,.85);letter-spacing:-.03em}
+#combo.pop{animation:comboPop .75s ease-out}
+@keyframes comboPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.5) rotate(-9deg)}
+  25%{opacity:1;transform:translate(-50%,-50%) scale(1.18) rotate(3deg)}
+  70%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
+  100%{opacity:0;transform:translate(-50%,-55%) scale(.95)}}
+
+/* toast */
+#toast{position:absolute;top:calc(var(--safe-t) + 120px);left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;gap:6px;align-items:center;width:max-content;max-width:88vw}
+.tmsg{background:var(--panel);border:1.5px solid var(--panel-line);border-radius:13px;
+  padding:8px 14px;font-size:14px;font-weight:800;animation:tin .3s ease-out;text-align:center}
+@keyframes tin{from{opacity:0;transform:translateY(-9px)}}
+
+/* ---------- Touch controls ---------- */
+#stick{position:absolute;left:calc(var(--safe-l) + 22px);bottom:calc(var(--safe-b) + 30px);
+  width:132px;height:132px;border-radius:99px;pointer-events:auto;
+  background:radial-gradient(circle,rgba(255,246,226,.13),rgba(255,246,226,.05));
+  border:2.5px solid rgba(255,246,226,.32);touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;
+  border-radius:99px;background:radial-gradient(circle at 35% 32%,#fff,var(--alien) 62%,var(--alien-deep));
+  box-shadow:0 5px 18px rgba(0,0,0,.45),0 0 22px rgba(125,242,200,.5);pointer-events:none}
+.rbtn{position:absolute;pointer-events:auto;border-radius:99px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;line-height:1.05;text-align:center;
+  border:2.5px solid rgba(255,246,226,.34);background:var(--panel);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);touch-action:none;
+  transition:transform .07s,box-shadow .12s}
+.rbtn:active,.rbtn.down{transform:scale(.93)}
+.rbtn .t{font-size:10px;letter-spacing:.1em;font-weight:900;opacity:.85}
+.rbtn .g{font-size:22px}
+#btn-beam{right:calc(var(--safe-r) + 22px);bottom:calc(var(--safe-b) + 34px);width:108px;height:108px;
+  border-color:rgba(157,247,255,.6);box-shadow:0 0 0 rgba(157,247,255,0)}
+#btn-beam.down{box-shadow:0 0 30px rgba(157,247,255,.75);border-color:#fff}
+#btn-beam .g{font-size:30px}
+#btn-scout{right:calc(var(--safe-r) + 142px);bottom:calc(var(--safe-b) + 42px);width:74px;height:74px}
+#btn-boost{right:calc(var(--safe-r) + 30px);bottom:calc(var(--safe-b) + 156px);width:74px;height:74px;
+  border-color:rgba(255,201,74,.55)}
+#btn-boost.empty{opacity:.4}
+#boostbar{position:absolute;right:calc(var(--safe-r) + 30px);bottom:calc(var(--safe-b) + 146px);
+  width:74px;height:6px;border-radius:99px;background:rgba(0,0,0,.5);overflow:hidden;
+  border:1.5px solid var(--panel-line)}
+#boostbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--gold),#ffe6a8)}
+#btn-up,#btn-down{left:calc(var(--safe-l) + 168px);width:62px;height:62px;font-size:24px}
+#btn-up{bottom:calc(var(--safe-b) + 112px)}
+#btn-down{bottom:calc(var(--safe-b) + 40px)}
+@media (max-width:380px){
+  #stick{width:116px;height:116px} #btn-beam{width:96px;height:96px}
+  #btn-scout,#btn-boost{width:66px;height:66px} #btn-up,#btn-down{width:56px;height:56px;left:calc(var(--safe-l) + 150px)}
+  #boostbar{width:66px}
+}
+
+/* ---------- Screens / menus ---------- */
+.screen{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-start;padding:calc(var(--safe-t) + 20px) 16px calc(var(--safe-b) + 20px);
+  background:linear-gradient(#0b1620ee,#16323fee 55%,#1d4436ee);backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.screen.sheet{background:rgba(9,16,20,.93)}
+.title{font-size:clamp(28px,8.5vw,46px);font-weight:900;letter-spacing:-.02em;margin:0 0 2px;
+  color:var(--alien);text-shadow:0 0 26px rgba(125,242,200,.5)}
+.subtitle{color:#a9c4bb;font-size:13px;font-weight:700;margin:0 0 20px;text-align:center;line-height:1.5}
+.menu{width:100%;max-width:420px;display:flex;flex-direction:column;gap:11px}
+.mbtn{min-height:var(--tap);border-radius:17px;padding:14px 18px;font-size:17px;font-weight:900;
+  background:linear-gradient(#2a4b3f,#1d3a30);border:2px solid rgba(125,242,200,.28);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+.mbtn:active{transform:scale(.98)}
+.mbtn.primary{background:linear-gradient(#1fae7d,#128a61);border-color:#7df2c8;color:#04231a}
+.mbtn.warn{background:linear-gradient(#8c3226,#6d251b);border-color:rgba(255,150,140,.4)}
+.mbtn .hint{font-size:11px;font-weight:800;opacity:.7;letter-spacing:.04em}
+.mbtn[disabled]{opacity:.42}
+.sec{width:100%;max-width:420px;margin:20px 0 8px;font-size:11px;letter-spacing:.16em;
+  font-weight:900;color:#8fb3a8;text-transform:uppercase}
+.card{width:100%;max-width:420px;background:rgba(255,246,226,.07);border:1.5px solid var(--panel-line);
+  border-radius:17px;padding:13px 15px;margin-bottom:10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 0;border-bottom:1px solid rgba(255,246,226,.11);min-height:50px}
+.row:last-child{border-bottom:none}
+.row .name{font-size:15px;font-weight:800}
+.row .desc{font-size:11.5px;color:#a9bdb5;font-weight:600;margin-top:2px;line-height:1.45}
+.row .left{flex:1;min-width:0}
+/* toggle */
+.tg{flex:none;width:56px;height:32px;border-radius:99px;background:rgba(0,0,0,.5);
+  border:2px solid rgba(255,246,226,.25);position:relative;transition:background .16s,border-color .16s}
+.tg i{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:99px;
+  background:#cfc3b4;transition:transform .16s,background .16s}
+.tg.on{background:var(--alien-deep);border-color:var(--alien)}
+.tg.on i{transform:translateX(24px);background:#04231a}
+/* stepper + slider */
+.step{flex:none;display:flex;align-items:center;gap:9px}
+.step button{width:38px;height:38px;border-radius:12px;background:rgba(255,246,226,.13);
+  border:1.5px solid var(--panel-line);font-size:19px}
+.step .v{min-width:52px;text-align:center;font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}
+input[type=range]{flex:none;width:132px;height:34px;-webkit-appearance:none;background:none}
+input[type=range]::-webkit-slider-runnable-track{height:7px;border-radius:99px;background:rgba(255,255,255,.2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-10px;
+  border-radius:99px;background:var(--alien);border:2px solid #04231a}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:100%;max-width:420px}
+.pill{padding:11px 8px;border-radius:14px;font-size:12.5px;font-weight:800;text-align:center;
+  background:rgba(255,246,226,.09);border:1.5px solid var(--panel-line);min-height:46px;
+  display:flex;align-items:center;justify-content:center}
+.pill.on{background:var(--alien-deep);border-color:var(--alien);color:#04231a}
+.bignum{font-size:44px;font-weight:900;color:var(--gold);line-height:1;font-variant-numeric:tabular-nums}
+.stats{width:100%;max-width:420px;display:flex;gap:9px;margin-bottom:14px}
+.stat{flex:1;background:rgba(255,246,226,.07);border:1.5px solid var(--panel-line);
+  border-radius:15px;padding:11px;text-align:center}
+.stat .k{font-size:9.5px;letter-spacing:.12em;color:#9db3ab;font-weight:900;text-transform:uppercase}
+.stat .v{font-size:21px;font-weight:900;margin-top:3px;font-variant-numeric:tabular-nums}
+.note{width:100%;max-width:420px;font-size:11.5px;line-height:1.55;color:#93a9a1;
+  font-weight:600;margin:10px 0 4px}
+.badge{font-size:9.5px;font-weight:900;letter-spacing:.1em;padding:3px 8px;border-radius:99px;
+  background:rgba(255,246,226,.15);color:#cbb9a6;flex:none}
+.badge.ok{background:rgba(125,242,200,.22);color:var(--alien)}
+.badge.lock{background:rgba(255,255,255,.09);color:#8d9c96}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <h1>BARNYARD ABDUCTION</h1>
+  <div class="sub" id="bootmsg">Warming up the tractor beam…</div>
+  <div id="bootbar"><i></i></div>
+  <div id="booterr"></div>
+</div>
+
+<!-- ===================== HUD ===================== -->
+<div id="hud" class="hidden">
+  <div class="hudtop">
+    <div class="chip" id="c-score"><div class="lab">Score</div><div class="val">0</div></div>
+    <div class="chip" id="c-goal"><div class="lab">Animals</div><div class="val">0/0</div></div>
+    <div class="chip" id="c-time"><div class="lab">Time</div><div class="val">3:00</div></div>
+    <div class="spacer"></div>
+    <button id="btn-pause">⏸</button>
+  </div>
+  <div class="hudsub">
+    <div id="shieldwrap">
+      <div id="shieldbar"><i></i></div><span class="mini" id="shieldtxt">SHIELDS</span>
+    </div>
+    <div id="alert"><span class="dot"></span><span class="txt">CALM</span></div>
+    <div id="beamstate">BEAM READY</div>
+  </div>
+  <div id="combo"></div>
+  <div id="toast"></div>
+
+  <div id="stick"><div id="knob"></div></div>
+  <button class="rbtn" id="btn-up"><span class="g">▲</span></button>
+  <button class="rbtn" id="btn-down"><span class="g">▼</span></button>
+  <button class="rbtn" id="btn-beam"><span class="g">🛸</span><span class="t">BEAM</span></button>
+  <button class="rbtn" id="btn-scout"><span class="g">🔭</span><span class="t">SCOUT</span></button>
+  <div id="boostbar"><i></i></div>
+  <button class="rbtn" id="btn-boost"><span class="g">⚡</span><span class="t">BOOST</span></button>
+</div>
+
+<!-- ===================== SCREENS ===================== -->
+<div id="scr-title" class="screen hidden">
+  <h1 class="title">BARNYARD ABDUCTION</h1>
+  <p class="subtitle">Fly the saucer. Beam the livestock.<br>Try not to annoy the farmer too much.</p>
+  <div class="stats">
+    <div class="stat"><div class="k">Career</div><div class="v" id="t-career">0</div></div>
+    <div class="stat"><div class="k">Best Combo</div><div class="v" id="t-combo">0×</div></div>
+    <div class="stat"><div class="k">Abducted</div><div class="v" id="t-abd">0</div></div>
+  </div>
+  <div class="menu">
+    <button class="mbtn primary" id="m-play">▶ PLAY <span class="hint" id="m-play-hint"></span></button>
+    <button class="mbtn" id="m-campaign">🗺 CAMPAIGN <span class="hint">10 maps</span></button>
+    <button class="mbtn" id="m-upgrades">🛠 UFO UPGRADES <span class="hint" id="m-up-hint"></span></button>
+    <button class="mbtn" id="m-cheats">🎉 CHEAT MENU <span class="hint">25 cheats</span></button>
+    <button class="mbtn" id="m-settings">⚙️ SETTINGS</button>
+    <button class="mbtn" id="m-free">🐄 FREE FLIGHT <span class="hint">no timer</span></button>
+  </div>
+  <p class="note">Built to the Barnyard Abduction Studio canon — single-file Three.js r128, iPhone-Safari first, touch-first controls.</p>
+</div>
+
+<div id="scr-pause" class="screen sheet hidden">
+  <h1 class="title">PAUSED</h1>
+  <p class="subtitle" id="p-sub"></p>
+  <div class="menu">
+    <button class="mbtn primary" id="p-resume">▶ RESUME</button>
+    <button class="mbtn" id="p-restart">↻ RESTART MISSION</button>
+    <button class="mbtn" id="p-cheats">🎉 CHEAT MENU</button>
+    <button class="mbtn" id="p-settings">⚙️ SETTINGS</button>
+    <button class="mbtn warn" id="p-quit">✕ QUIT TO TITLE</button>
+  </div>
+</div>
+
+<div id="scr-result" class="screen sheet hidden">
+  <h1 class="title" id="r-title">MISSION COMPLETE</h1>
+  <p class="subtitle" id="r-sub"></p>
+  <div class="stats">
+    <div class="stat"><div class="k">Score</div><div class="v" id="r-score">0</div></div>
+    <div class="stat"><div class="k">Animals</div><div class="v" id="r-count">0</div></div>
+    <div class="stat"><div class="k">Best Combo</div><div class="v" id="r-combo">0×</div></div>
+  </div>
+  <div class="card" id="r-break"></div>
+  <div class="menu">
+    <button class="mbtn primary" id="r-next">▶ CONTINUE</button>
+    <button class="mbtn" id="r-retry">↻ RETRY</button>
+    <button class="mbtn" id="r-quit">✕ TITLE</button>
+  </div>
+</div>
+
+<div id="scr-campaign" class="screen hidden">
+  <h1 class="title">CAMPAIGN</h1>
+  <p class="subtitle">Linear campaign. Maps unlock in order and stay replayable.</p>
+  <div class="menu" id="camp-list"></div>
+  <p class="note" id="camp-note"></p>
+  <div class="menu" style="margin-top:14px"><button class="mbtn" id="camp-back">← BACK</button></div>
+</div>
+
+<div id="scr-upgrades" class="screen hidden">
+  <h1 class="title">UFO UPGRADES</h1>
+  <p class="subtitle">Permanent. They carry across the whole campaign and never reset between missions.</p>
+  <div class="stats"><div class="stat" style="flex:1"><div class="k">Career points available</div><div class="v" id="u-bank">0</div></div></div>
+  <div id="u-list" style="width:100%;max-width:420px"></div>
+  <div class="menu" style="margin-top:6px"><button class="mbtn" id="u-back">← BACK</button></div>
+</div>
+
+<div id="scr-cheats" class="screen hidden">
+  <h1 class="title">CHEAT MENU</h1>
+  <p class="subtitle">All 25 cheats, always unlocked — no grinding required.<br>Combine anything that isn't mutually exclusive.</p>
+  <div class="menu" style="margin-bottom:8px">
+    <button class="mbtn warn" id="ch-clear">⟲ TURN EVERYTHING OFF</button>
+  </div>
+  <div id="ch-list" style="width:100%;max-width:420px"></div>
+  <div class="menu" style="margin-top:6px"><button class="mbtn" id="ch-back">← BACK</button></div>
+</div>
+
+<div id="scr-settings" class="screen hidden">
+  <h1 class="title">SETTINGS</h1>
+  <p class="subtitle">Tuned for iPhone Safari. Everything here saves automatically.</p>
+  <div id="set-list" style="width:100%;max-width:420px"></div>
+  <div class="menu" style="margin-top:6px">
+    <button class="mbtn warn" id="set-wipe">🗑 ERASE ALL SAVED PROGRESS</button>
+    <button class="mbtn" id="set-back">← BACK</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
