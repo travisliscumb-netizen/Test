@@ -1,0 +1,3023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#071018">
+<title>Barnyard Abduction</title>
+<style>
+  :root{
+    --cy:#6ff0ff; --cy-soft:#a9f6ff; --cy-dim:#2f7c8d;
+    --panel:rgba(5,20,28,.70); --panel-line:rgba(111,240,255,.55);
+    --warn:#ffcf4d; --bad:#ff6a52; --good:#7dff9b;
+    --hud-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#071018;
+    font-family:var(--hud-font);-webkit-user-select:none;user-select:none;
+    overscroll-behavior:none;touch-action:none}
+  #scene{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+  /* ---------- generic HUD panel with angular corner brackets ---------- */
+  .panel{position:absolute;background:var(--panel);border:1px solid rgba(111,240,255,.25);
+    border-radius:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    box-shadow:0 0 18px rgba(0,0,0,.35), inset 0 0 20px rgba(111,240,255,.05)}
+  .panel::before,.panel::after{content:"";position:absolute;width:14px;height:14px;
+    border:2px solid var(--panel-line);pointer-events:none}
+  .panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
+  .panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0;border-radius:0 0 10px 0}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;
+    padding:calc(env(safe-area-inset-top,0px) + 10px) calc(env(safe-area-inset-right,0px) + 10px)
+            calc(env(safe-area-inset-bottom,0px) + 10px) calc(env(safe-area-inset-left,0px) + 10px)}
+  .label{font-size:10px;letter-spacing:.18em;color:var(--cy-dim);font-weight:700;text-transform:uppercase}
+  .value{font-size:26px;font-weight:800;color:#fff;line-height:1;letter-spacing:.02em;
+    text-shadow:0 0 12px rgba(111,240,255,.5)}
+  .value.small{font-size:18px}
+  .accent{color:var(--cy)}
+
+  /* ---------- score / abducted ---------- */
+  #stats{top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 10px);
+    padding:8px 14px 10px;min-width:118px}
+  #stats .divider{height:1px;background:linear-gradient(90deg,var(--panel-line),transparent);margin:7px 0}
+
+  /* ---------- timer ---------- */
+  #timer{top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);
+    width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  #timer::before,#timer::after{display:none}
+  #timer svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  #timerTrack{fill:none;stroke:rgba(111,240,255,.15);stroke-width:4}
+  #timerArc{fill:none;stroke:var(--cy);stroke-width:4;stroke-linecap:round;
+    filter:drop-shadow(0 0 4px var(--cy));transition:stroke .3s}
+  #timerText{position:relative;font-size:21px;font-weight:800;color:#fff}
+  #timerText span{font-size:12px;color:var(--cy-dim)}
+
+  /* ---------- radar ---------- */
+  #radar{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);
+    width:92px;height:104px;padding:6px}
+  #radar .label{text-align:center;margin-bottom:3px}
+  #radarCanvas{width:80px;height:80px;display:block}
+
+  /* ---------- hull bar ---------- */
+  #hull{left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 10px);height:44px;display:flex;align-items:center;
+    gap:10px;padding:0 14px}
+  #hullPct{font-size:17px;font-weight:800;color:#fff;min-width:52px}
+  #hullBar{flex:1;height:14px;border-radius:7px;background:rgba(111,240,255,.10);
+    border:1px solid rgba(111,240,255,.25);overflow:hidden;position:relative}
+  #hullFill{height:100%;width:100%;border-radius:6px;
+    background:linear-gradient(90deg,#2ea8d8,#6ff0ff);box-shadow:0 0 12px rgba(111,240,255,.6);
+    transition:width .25s ease, background .25s ease}
+  #hullFill.warn{background:linear-gradient(90deg,#d8952e,#ffcf4d)}
+  #hullFill.bad{background:linear-gradient(90deg,#d8452e,#ff6a52)}
+  .shield{width:22px;height:24px;flex:none;opacity:.9}
+
+  /* ---------- controls ---------- */
+  #stick{position:absolute;left:calc(env(safe-area-inset-left,0px) + 22px);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 74px);width:132px;height:132px;border-radius:50%;
+    background:rgba(5,20,28,.42);border:2px solid rgba(111,240,255,.30);pointer-events:auto;
+    touch-action:none;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  #stickNub{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;
+    border-radius:50%;background:radial-gradient(circle at 35% 30%,#bff7ff,#2ea8d8);
+    box-shadow:0 0 18px rgba(111,240,255,.55);pointer-events:none}
+
+  .btn{position:absolute;pointer-events:auto;touch-action:none;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:3px;border-radius:16px;
+    background:rgba(5,20,28,.55);border:2px solid rgba(111,240,255,.35);color:var(--cy-soft);
+    font-weight:800;letter-spacing:.1em;font-size:10px;text-transform:uppercase;
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:transform .08s, box-shadow .12s, background .12s}
+  .btn.active{background:rgba(111,240,255,.28);box-shadow:0 0 26px rgba(111,240,255,.7);transform:scale(.95)}
+  #beamBtn{left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 76px);
+    width:96px;height:96px;border-radius:22px}
+  #beamBtn.active{transform:translateX(-50%) scale(.95)}
+  #beamBtn .arrow{font-size:30px;line-height:1;color:#fff;text-shadow:0 0 12px var(--cy)}
+  #scoutBtn{right:calc(env(safe-area-inset-right,0px) + 22px);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 92px);width:84px;height:84px;border-radius:50%}
+  #boostBtn{right:calc(env(safe-area-inset-right,0px) + 26px);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 186px);width:64px;height:64px;border-radius:50%;font-size:9px}
+
+  /* ---------- reticle ---------- */
+  #reticle{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;
+    opacity:0;transition:opacity .18s;will-change:transform}
+  #reticle.on{opacity:1}
+
+  /* ---------- toast ---------- */
+  #toast{position:absolute;left:50%;top:26%;transform:translateX(-50%);color:#fff;font-weight:800;
+    font-size:22px;letter-spacing:.05em;text-shadow:0 2px 14px rgba(0,0,0,.7),0 0 18px var(--cy);
+    opacity:0;transition:opacity .3s, transform .3s;white-space:nowrap}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(-10px)}
+
+  /* ---------- overlays ---------- */
+  #overlay{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%,rgba(10,40,55,.86),rgba(3,10,16,.95));
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);text-align:center;padding:24px}
+  #overlay.hidden{display:none}
+  #overlayCard{max-width:420px;width:100%}
+  #overlayTitle{font-size:clamp(30px,8vw,46px);font-weight:900;letter-spacing:-.01em;margin:0 0 6px;
+    color:#fff;text-shadow:0 0 26px rgba(111,240,255,.55)}
+  #overlaySub{color:var(--cy-soft);font-size:14px;line-height:1.55;margin:0 0 22px;opacity:.92}
+  #overlaySub b{color:#fff}
+  #overlayStats{color:var(--cy-soft);font-size:15px;line-height:1.9;margin:0 0 22px}
+  #overlayStats .k{color:var(--cy-dim);letter-spacing:.12em;font-size:11px;text-transform:uppercase}
+  #startBtn{pointer-events:auto;display:inline-block;padding:16px 44px;border-radius:14px;border:2px solid var(--cy);
+    background:linear-gradient(180deg,rgba(111,240,255,.22),rgba(111,240,255,.06));color:#fff;
+    font-size:17px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+    box-shadow:0 0 30px rgba(111,240,255,.35)}
+  #startBtn:active{transform:scale(.97)}
+  #hint{margin-top:18px;color:var(--cy-dim);font-size:11px;letter-spacing:.06em;line-height:1.7}
+
+  #loading{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;background:#071018;color:var(--cy-soft);font-size:13px;letter-spacing:.18em}
+  #loading.hidden{display:none}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(111,240,255,.2);
+    border-top-color:var(--cy);animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media (max-height:520px){
+    #stick{width:112px;height:112px}
+    #beamBtn{width:82px;height:82px}
+    #scoutBtn{width:70px;height:70px}
+    #boostBtn{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="hud">
+  <div class="panel" id="stats">
+    <div class="label">Score</div>
+    <div class="value" id="scoreVal">0</div>
+    <div class="divider"></div>
+    <div class="label">Abducted</div>
+    <div class="value small"><span class="accent" id="abdVal">0</span> / <span id="abdGoal">15</span></div>
+  </div>
+
+  <div class="panel" id="timer">
+    <svg viewBox="0 0 100 100"><circle id="timerTrack" cx="50" cy="50" r="45"/>
+    <circle id="timerArc" cx="50" cy="50" r="45"/></svg>
+    <div id="timerText">70<span>s</span></div>
+  </div>
+
+  <div class="panel" id="radar">
+    <div class="label">Radar</div>
+    <canvas id="radarCanvas" width="160" height="160"></canvas>
+  </div>
+
+  <div class="panel" id="hull">
+    <div class="label">Hull</div>
+    <div id="hullPct">100%</div>
+    <svg class="shield" viewBox="0 0 24 26"><path d="M12 1 L22 5 V13 C22 19 17 23.5 12 25 C7 23.5 2 19 2 13 V5 Z"
+      fill="rgba(111,240,255,.14)" stroke="#6ff0ff" stroke-width="1.6"/></svg>
+    <div id="hullBar"><div id="hullFill"></div></div>
+  </div>
+
+  <div id="stick"><div id="stickNub"></div></div>
+  <div class="btn" id="beamBtn"><div class="arrow">&#8595;</div>Tractor Beam</div>
+  <div class="btn" id="scoutBtn">Scout</div>
+  <div class="btn" id="boostBtn">Boost</div>
+
+  <svg id="reticle" viewBox="0 0 64 64">
+    <g fill="none" stroke="#6ff0ff" stroke-width="2.5" stroke-linecap="round">
+      <path d="M4 18 V4 H18"/><path d="M46 4 H60 V18"/><path d="M60 46 V60 H46"/><path d="M18 60 H4 V46"/>
+    </g>
+    <circle cx="32" cy="32" r="9" fill="none" stroke="#6ff0ff" stroke-width="2"/>
+    <circle cx="32" cy="32" r="2.5" fill="#6ff0ff"/>
+  </svg>
+
+  <div id="toast"></div>
+</div>
+
+<div id="overlay">
+  <div id="overlayCard">
+    <h1 id="overlayTitle">Barnyard Abduction</h1>
+    <p id="overlaySub">The herd is grazing and the farmer is not paying attention.<br>
+       Beam up <b><span id="briefGoal">15</span> animals</b> before the clock runs out.</p>
+    <div id="overlayStats" style="display:none"></div>
+    <div id="startBtn">Launch</div>
+    <div id="hint">Left stick to fly &nbsp;&middot;&nbsp; Hold TRACTOR BEAM to abduct<br>
+      Hold SCOUT for the full farm view &nbsp;&middot;&nbsp; Watch out for the farmer</div>
+  </div>
+</div>
+
+<div id="loading"><div class="spinner"></div><div>BUILDING FARM&hellip;</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ==========================================================================
+   BARNYARD ABDUCTION
+   Single-file build. Three.js r128.
+   Target: iPhone Safari, touch-first (D-004).
+
+   Section map:
+     1  CONFIG + MAP DATA        map-agnostic world definition (D-024)
+     2  UTILITIES                deterministic RNG, math, geometry helpers
+     3  RENDERER / SCENE / SKY
+     4  TERRAIN + ROADS
+     5  WORLD PROPS              fence, farmhouse, barn, windmill, field, pond, trees
+     6  CREATURES                six species + farmer (D-011 detail bar)
+     7  UFO + TRACTOR BEAM       (D-013, D-014)
+     8  INPUT                    joystick, beam, scout, boost
+     9  CAMERA                   chase + scout (D-012)
+    10  AI                       animal behaviour (D-015), farmer behaviour (D-016)
+    11  MISSION / SCORE / HUD    (D-017)
+    12  MAIN LOOP
+   ========================================================================== */
+'use strict';
+
+/* ==========================================================================
+   1. CONFIG + MAP DATA
+   Core systems read from a map definition rather than hard-coded farm values,
+   so later maps (Small Town, Campground, ...) can plug in without rewriting
+   the UFO, beam, camera, AI, mission, or HUD systems. (D-024, World Bible)
+   ========================================================================== */
+
+const MAP_FARM = {
+  id: 'farm',
+  name: 'Rolling Acres Farm',
+
+  // Playable footprint is 425 x 425 world units (D-005).
+  half: 212.5,
+  // The perimeter fence is a rounded "superellipse" so it reads as the soft
+  // oval boundary in the canonical reference art rather than a hard square.
+  fence: { radius: 203, exponent: 2.6, postGap: 4.6, height: 5.2 },
+
+  sky:   { top: 0x3f97e0, bottom: 0xc8ecff, fog: 0xd6ecfb, fogNear: 430, fogFar: 1250 },
+
+  light: {
+    sun:     { color: 0xfff4d8, intensity: 1.28, dir: [-90, 130, 70] },
+    ambient: { color: 0xa8ccff, intensity: 0.48 },
+    bounce:  { color: 0x84c95a, intensity: 0.30 }   // green bounce off the pasture
+  },
+
+  ground: {
+    grass:     0x69bf34,
+    grassAlt:  0x55a828,
+    grassWarm: 0x86cf42,
+    dirt:      0xb98d54,
+    dirtDark:  0x946c3c,
+    field:     0x6b4526,
+    outside:   0x74c246
+  },
+
+  // Landmark anchors, laid out to match the canonical Map 1 reference image.
+  // Screen-space in the reference maps to world as: image top = -Z, left = -X.
+  landmarks: {
+    farmhouse: { x: -138, z: -128, rot:  0.06 },
+    barn:      { x:  -86, z: -142, rot: -0.04 },
+    windmill:  { x:   72, z:   36, rot:  0.00 },
+    field:     { x:   96, z: -108, w: 132, h: 96 },
+    pond:      { x:  118, z:  104, rx: 52, rz: 38 },
+    grove:     { x: -126, z:   78, r: 78 }
+  },
+
+  // Curving dirt roads (D-009). Sampled as polylines; the terrain shader-free
+  // vertex painter blends dirt in near them, so there are no hard edges (D-006).
+  roads: [
+    { width: 7.5, pts: [[-120,-104],[-84,-86],[-40,-74],[4,-70],[36,-78],[64,-92],[86,-100]] },
+    { width: 6.8, pts: [[4,-70],[-2,-40],[-14,-6],[-10,28],[6,72],[20,118],[14,166],[8,206]] },
+    { width: 5.4, pts: [[-10,28],[26,40],[54,40],[70,38]] }
+  ],
+
+  // Gates where roads cross the fence line (D-007).
+  gates: [[8, 203]],
+
+  spawnZones: [
+    { x: -20, z: -26, r: 74, weight: 3 },
+    { x:  46, z:  22, r: 52, weight: 2 },
+    { x: -84, z:  16, r: 46, weight: 2 },
+    { x:  10, z:  96, r: 46, weight: 1 }
+  ],
+
+  // Mission data lives with the map so later maps define their own (D-024).
+  mission: { goal: 15, seconds: 150, hull: 100 }
+};
+
+const CFG = {
+  ufo: {
+    radius: 6.2,
+    accel: 78,            // analog acceleration, m/s^2
+    maxSpeed: 44,
+    boostMul: 1.75,
+    drag: 2.35,           // velocity damping -> momentum without floatiness (D-013)
+    bankMax: 0.42,
+    minY: 13, maxY: 62,
+    liftRate: 26
+  },
+  beam: {
+    range: 46,            // reach from the UFO downward
+    coneAngle: 0.30,      // half-angle of the cone, radians
+    lockConeAngle: 0.42,  // slightly wider acquisition cone, forgiving for kids
+    liftSpeed: 15,
+    captureHeight: 7.5,   // distance below UFO at which a target counts as captured
+    struggleShake: 0.5
+  },
+  farmer: {
+    walkSpeed: 7.5, chaseSpeed: 13.5,
+    sightRange: 96, sightRangeBeam: 140,
+    shootRange: 78, shootCooldown: 1.9,
+    projectileSpeed: 58, damage: 9,
+    alertDecay: 0.32, alertGain: 1.5
+  },
+  camera: {
+    chaseDist: 47, chaseHeight: 28, lerp: 4.2,
+    scoutLerp: 2.2, scoutMargin: 1.05   // 5% margin outside the fence (D-012)
+  }
+};
+
+// Species table. Points differ per species (Step 4 spec section 6).
+const SPECIES = [
+  { id:'cow',     name:'Cow',     points:30, mass:1.00, speed:2.6, scale:1.00, skittish:0.55 },
+  { id:'horse',   name:'Horse',   points:40, mass:1.15, speed:4.4, scale:1.05, skittish:0.80 },
+  { id:'sheep',   name:'Sheep',   points:20, mass:0.75, speed:3.2, scale:0.82, skittish:0.70 },
+  { id:'pig',     name:'Pig',     points:25, mass:0.85, speed:2.9, scale:0.80, skittish:0.50 },
+  { id:'chicken', name:'Chicken', points:15, mass:0.35, speed:4.8, scale:0.46, skittish:0.95 },
+  { id:'goat',    name:'Goat',    points:35, mass:0.70, speed:3.8, scale:0.74, skittish:0.75 }
+];
+
+/* ==========================================================================
+   2. UTILITIES
+   ========================================================================== */
+
+// Deterministic RNG so the farm builds identically every run. That makes the
+// world testable and keeps prop layout stable between sessions.
+function makeRng(seed){
+  let s = seed >>> 0;
+  return function(){
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5;  s >>>= 0;
+    return s / 4294967296;
+  };
+}
+const rng = makeRng(0x5eed1234);
+const rand  = (a,b) => a + rng() * (b - a);
+const randI = (a,b) => Math.floor(rand(a, b + 1));
+const pick  = arr => arr[Math.floor(rng() * arr.length)];
+const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
+const lerp  = (a,b,t) => a + (b - a) * t;
+const smoothstep = (e0,e1,x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+// Frame-rate independent exponential smoothing.
+const damp = (a,b,lambda,dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
+
+// Superellipse radius at a given angle -- defines the rounded fence perimeter.
+function fenceRadiusAt(angle){
+  const f = MAP_FARM.fence, n = f.exponent;
+  const c = Math.abs(Math.cos(angle)), s = Math.abs(Math.sin(angle));
+  return f.radius / Math.pow(Math.pow(c, n) + Math.pow(s, n), 1 / n);
+}
+// How far inside the fence a point is (negative = outside).
+function insideFenceBy(x, z){
+  const a = Math.atan2(z, x);
+  return fenceRadiusAt(a) - Math.hypot(x, z);
+}
+
+// Shortest distance from a point to a polyline, used for road painting and
+// for keeping props off the roads.
+function distToPolyline(x, z, pts){
+  let best = Infinity;
+  for (let i = 0; i < pts.length - 1; i++){
+    const ax = pts[i][0],   az = pts[i][1];
+    const bx = pts[i+1][0], bz = pts[i+1][1];
+    const dx = bx - ax, dz = bz - az;
+    const len2 = dx*dx + dz*dz || 1e-6;
+    let t = ((x - ax) * dx + (z - az) * dz) / len2;
+    t = clamp(t, 0, 1);
+    const px = ax + dx * t, pz = az + dz * t;
+    const d = Math.hypot(x - px, z - pz);
+    if (d < best) best = d;
+  }
+  return best;
+}
+function distToAnyRoad(x, z){
+  let best = Infinity;
+  for (const r of MAP_FARM.roads){
+    const d = distToPolyline(x, z, r.pts) - r.width * 0.5;
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+// Resample a polyline into evenly spaced points with light Chaikin smoothing,
+// so roads curve instead of showing kinks at the control points.
+function smoothPolyline(pts, passes){
+  let out = pts.map(p => [p[0], p[1]]);
+  for (let k = 0; k < passes; k++){
+    const next = [out[0]];
+    for (let i = 0; i < out.length - 1; i++){
+      const a = out[i], b = out[i+1];
+      next.push([a[0]*0.75 + b[0]*0.25, a[1]*0.75 + b[1]*0.25]);
+      next.push([a[0]*0.25 + b[0]*0.75, a[1]*0.25 + b[1]*0.75]);
+    }
+    next.push(out[out.length-1]);
+    out = next;
+  }
+  return out;
+}
+// Pre-smooth the road control points once at load.
+MAP_FARM.roads.forEach(r => { r.pts = smoothPolyline(r.pts, 2); });
+
+// Cheap value noise for terrain colour variation.
+function vnoise(x, z){
+  const s = Math.sin(x * 0.071) * 43758.5453 + Math.sin(z * 0.089) * 12345.6789;
+  const t = Math.sin(x * 0.031 + z * 0.047) * 2.7;
+  return (s - Math.floor(s)) * 0.6 + (Math.sin(t) * 0.5 + 0.5) * 0.4;
+}
+
+// r128 has no CapsuleGeometry, so limbs/bodies are built from primitives.
+function capsule(radius, height, mat, radialSeg){
+  const g = new THREE.Group();
+  const rs = radialSeg || 8;
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, rs), mat);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(radius, rs, 6), mat);
+  const bot = new THREE.Mesh(new THREE.SphereGeometry(radius, rs, 6), mat);
+  top.position.y =  height / 2;
+  bot.position.y = -height / 2;
+  g.add(cyl, top, bot);
+  return g;
+}
+
+function markShadow(obj, cast, receive){
+  obj.traverse(o => { if (o.isMesh){ o.castShadow = !!cast; o.receiveShadow = !!receive; } });
+  return obj;
+}
+
+/* ==========================================================================
+   3. RENDERER / SCENE / SKY
+   ========================================================================== */
+
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+
+// Quality tier. iPhone Safari is the primary target, so cap the pixel ratio
+// rather than rendering at full retina density (Step 4 spec section 10).
+const QUALITY = (function(){
+  const dpr = window.devicePixelRatio || 1;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 480;
+  return { dprCap: small ? 1.6 : 2.0, shadows: true, shadowSize: small ? 1024 : 2048, dpr };
+})();
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY.dprCap));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = QUALITY.shadows;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Left at the default linear encoding on purpose: r128 has no colour
+// management, so sRGB output would wash the authored palette out.
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(MAP_FARM.sky.fog, MAP_FARM.sky.fogNear, MAP_FARM.sky.fogFar);
+
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 1400);
+camera.position.set(0, 40, 60);
+
+// --- sky dome: vertical gradient, no texture needed -----------------------
+(function buildSky(){
+  const uniforms = {
+    top:    { value: new THREE.Color(MAP_FARM.sky.top) },
+    bottom: { value: new THREE.Color(MAP_FARM.sky.bottom) }
+  };
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    vertexShader: `
+      varying float vH;
+      void main(){
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vH = normalize(wp.xyz).y;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: `
+      uniform vec3 top; uniform vec3 bottom; varying float vH;
+      void main(){
+        float t = clamp(vH * 1.15 + 0.12, 0.0, 1.0);
+        gl_FragColor = vec4(mix(bottom, top, pow(t, 0.85)), 1.0);
+      }`
+  });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 24, 16), mat);
+  dome.renderOrder = -1000;
+  scene.add(dome);
+})();
+
+// --- lighting -------------------------------------------------------------
+const L = MAP_FARM.light;
+const sun = new THREE.DirectionalLight(L.sun.color, L.sun.intensity);
+sun.position.set(L.sun.dir[0], L.sun.dir[1], L.sun.dir[2]);
+sun.castShadow = QUALITY.shadows;
+if (QUALITY.shadows){
+  // The shadow camera tracks the UFO with a tight frustum. Covering the whole
+  // 425-unit farm in one shadow map would be far too coarse to read.
+  const s = 78;
+  sun.shadow.mapSize.set(QUALITY.shadowSize, QUALITY.shadowSize);
+  sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
+  sun.shadow.camera.top  =  s; sun.shadow.camera.bottom = -s;
+  sun.shadow.camera.near = 1;  sun.shadow.camera.far = 340;
+  sun.shadow.bias = -0.0012;
+  sun.shadow.normalBias = 0.5;
+}
+scene.add(sun);
+scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(L.ambient.color, L.bounce.color, L.ambient.intensity));
+scene.add(new THREE.AmbientLight(0xffffff, 0.10));
+
+// --- shared material palette ---------------------------------------------
+const M = {
+  grass:      new THREE.MeshLambertMaterial({ vertexColors: true }),
+  dirt:       new THREE.MeshLambertMaterial({ color: MAP_FARM.ground.dirt, vertexColors: true, transparent: true }),
+  fieldSoil:  new THREE.MeshLambertMaterial({ color: MAP_FARM.ground.field }),
+  white:      new THREE.MeshLambertMaterial({ color: 0xfdfdf7 }),
+  barnRed:    new THREE.MeshLambertMaterial({ color: 0xc9342c }),
+  barnRedDk:  new THREE.MeshLambertMaterial({ color: 0xa5271f }),
+  roofGrey:   new THREE.MeshLambertMaterial({ color: 0x4a5560 }),
+  wood:       new THREE.MeshLambertMaterial({ color: 0x8b6239 }),
+  woodDark:   new THREE.MeshLambertMaterial({ color: 0x63451f }),
+  metal:      new THREE.MeshPhongMaterial({ color: 0x6f7c8b, shininess: 70 }),
+  metalDark:  new THREE.MeshPhongMaterial({ color: 0x4d5661, shininess: 40 }),
+  glassBlue:  new THREE.MeshPhongMaterial({ color: 0x8fe3ff, shininess: 110, transparent: true, opacity: 0.55 }),
+  water:      new THREE.MeshPhongMaterial({ color: 0x3aa6d8, shininess: 90, transparent: true, opacity: 0.88 }),
+  leaf:       new THREE.MeshLambertMaterial({ color: 0x3f9c34 }),
+  leafLight:  new THREE.MeshLambertMaterial({ color: 0x57b845 }),
+  hay:        new THREE.MeshLambertMaterial({ color: 0xd9b45c }),
+  tractorGrn: new THREE.MeshLambertMaterial({ color: 0x2f8f2f }),
+  tractorRed: new THREE.MeshLambertMaterial({ color: 0xcf3b2f }),
+  tyre:       new THREE.MeshLambertMaterial({ color: 0x2a2a2c }),
+  cloud:      new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xdfeeff, emissiveIntensity: 0.35, fog: false })
+};
+
+// --- clouds ---------------------------------------------------------------
+(function buildClouds(){
+  const clouds = new THREE.Group();
+  for (let i = 0; i < 16; i++){
+    const c = new THREE.Group();
+    const puffs = randI(4, 7);
+    for (let p = 0; p < puffs; p++){
+      const r = rand(9, 17);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), M.cloud);
+      m.position.set(rand(-22, 22), rand(-3, 4), rand(-9, 9));
+      m.scale.y = rand(0.6, 0.85);
+      c.add(m);
+    }
+    const a = rand(0, Math.PI * 2), d = rand(240, 520);
+    c.position.set(Math.cos(a) * d, rand(150, 235), Math.sin(a) * d);
+    c.userData.drift = rand(0.35, 0.9);
+    clouds.add(c);
+  }
+  scene.add(clouds);
+  window.__clouds = clouds;
+})();
+
+/* ==========================================================================
+   4. TERRAIN + ROADS
+   Regions blend by painting vertex colours instead of using hard-edged
+   texture boundaries, so there are no visible quadrant borders (D-006).
+   ========================================================================== */
+
+const G = MAP_FARM.ground;
+const cGrass     = new THREE.Color(G.grass);
+const cGrassAlt  = new THREE.Color(G.grassAlt);
+const cGrassWarm = new THREE.Color(G.grassWarm);
+const cDirt      = new THREE.Color(G.dirt);
+const cField     = new THREE.Color(G.field);
+const cOutside   = new THREE.Color(G.outside);
+
+// Height is flat inside the property and rolls gently outside it, matching the
+// hills behind the fence in the reference art.
+function terrainHeight(x, z){
+  const inside = insideFenceBy(x, z);
+  if (inside > 6) return 0;
+  const t = smoothstep(4, -70, inside);
+  const h = (Math.sin(x * 0.011) * Math.cos(z * 0.009)
+           + Math.sin((x + z) * 0.006) * 0.8
+           + Math.cos(x * 0.021 - z * 0.017) * 0.35) * 15;
+  return h * t;
+}
+
+const ground = (function buildTerrain(){
+  const SIZE = 1000, SEG = 132;
+  const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+  geo.rotateX(-Math.PI / 2);
+
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const tmp = new THREE.Color();
+  const fl = MAP_FARM.landmarks.field;
+
+  for (let i = 0; i < pos.count; i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    pos.setY(i, terrainHeight(x, z));
+
+    const inside = insideFenceBy(x, z);
+    const n = vnoise(x, z);
+
+    // base pasture, mottled between three greens
+    tmp.copy(cGrass).lerp(cGrassAlt, n * 0.75);
+    tmp.lerp(cGrassWarm, smoothstep(0.55, 1.0, vnoise(x * 0.5 + 40, z * 0.5 - 17)) * 0.5);
+
+    // land outside the fence reads slightly lighter and hazier
+    if (inside < 0) tmp.lerp(cOutside, smoothstep(0, -34, inside) * 0.55);
+
+    // plowed field, soft-edged so it blends into the pasture
+    const fdx = Math.abs(x - fl.x) - fl.w * 0.5;
+    const fdz = Math.abs(z - fl.z) - fl.h * 0.5;
+    const fd  = Math.max(fdx, fdz);
+    if (fd < 8) tmp.lerp(cField, 1 - smoothstep(-6, 8, fd));
+
+    // dust and wear either side of the roads
+    const rd = distToAnyRoad(x, z);
+    if (rd < 7) tmp.lerp(cDirt, (1 - smoothstep(0.5, 7, rd)) * 0.55);
+
+    colors[i*3] = tmp.r; colors[i*3+1] = tmp.g; colors[i*3+2] = tmp.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+
+  const mesh = new THREE.Mesh(geo, M.grass);
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+})();
+
+// --- road ribbons ---------------------------------------------------------
+// Each road is a flat strip laid just above the terrain with its outer edge
+// vertices faded out, so the dirt melts into the grass with no hard seam.
+(function buildRoads(){
+  for (const road of MAP_FARM.roads){
+    const pts = road.pts, hw = road.width * 0.5;
+    const verts = [], cols = [], alphas = [], idx = [];
+    const c = new THREE.Color(G.dirt), cd = new THREE.Color(G.dirtDark);
+    const tmp = new THREE.Color();
+
+    for (let i = 0; i < pts.length; i++){
+      const p  = pts[i];
+      const pa = pts[Math.max(0, i - 1)], pb = pts[Math.min(pts.length - 1, i + 1)];
+      let dx = pb[0] - pa[0], dz = pb[1] - pa[1];
+      const len = Math.hypot(dx, dz) || 1; dx /= len; dz /= len;
+      const nx = -dz, nz = dx;               // perpendicular in the XZ plane
+
+      // five columns: faded edge, dirt, centre, dirt, faded edge
+      const offs = [-hw * 1.35, -hw * 0.72, 0, hw * 0.72, hw * 1.35];
+      const alph = [0, 0.92, 1, 0.92, 0];
+      for (let k = 0; k < offs.length; k++){
+        const vx = p[0] + nx * offs[k], vz = p[1] + nz * offs[k];
+        verts.push(vx, terrainHeight(vx, vz) + 0.09, vz);
+        tmp.copy(c).lerp(cd, vnoise(vx * 1.7, vz * 1.7) * 0.6);
+        cols.push(tmp.r, tmp.g, tmp.b);
+        alphas.push(alph[k]);
+      }
+    }
+    for (let i = 0; i < pts.length - 1; i++){
+      const a = i * 5, b = (i + 1) * 5;
+      for (let k = 0; k < 4; k++){
+        idx.push(a + k, b + k, a + k + 1);
+        idx.push(a + k + 1, b + k, b + k + 1);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('color',    new THREE.Float32BufferAttribute(cols, 3));
+    geo.setAttribute('aAlpha',   new THREE.Float32BufferAttribute(alphas, 1));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+
+    // Lambert + a tiny injected varying for the per-vertex edge fade.
+    const mat = new THREE.MeshLambertMaterial({
+      vertexColors: true, transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+    });
+    mat.onBeforeCompile = shader => {
+      shader.vertexShader = 'attribute float aAlpha;\nvarying float vA;\n' +
+        shader.vertexShader.replace('void main() {', 'void main() {\n  vA = aAlpha;');
+      shader.fragmentShader = 'varying float vA;\n' +
+        shader.fragmentShader.replace(
+          '#include <dithering_fragment>',
+          '#include <dithering_fragment>\n  gl_FragColor.a *= vA;'
+        );
+    };
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    mesh.renderOrder = 1;
+    scene.add(mesh);
+  }
+})();
+
+/* ==========================================================================
+   5. WORLD PROPS
+   ========================================================================== */
+
+// UFO world collision is limited to farmhouse, barn and windmill (D-008).
+// Everything else is decorative and non-blocking.
+const COLLIDERS = [];
+function addCollider(x, z, r, label){ COLLIDERS.push({ x, z, r, label }); }
+
+const dummy = new THREE.Object3D();
+
+// --- white picket perimeter fence (D-007) --------------------------------
+(function buildFence(){
+  const f = MAP_FARM.fence;
+
+  // A picket is a flat board with a pointed top.
+  const shape = new THREE.Shape();
+  const w = 0.45, h = f.height;
+  shape.moveTo(-w, 0); shape.lineTo(w, 0); shape.lineTo(w, h * 0.82);
+  shape.lineTo(0, h);  shape.lineTo(-w, h * 0.82); shape.lineTo(-w, 0);
+  const picketGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: false });
+  picketGeo.translate(0, 0, -0.08);
+
+  // Walk the superellipse at roughly even arc length.
+  const stations = [];
+  const STEPS = 3000;
+  let prevX = null, prevZ = null, acc = 0;
+  for (let i = 0; i <= STEPS; i++){
+    const a = (i / STEPS) * Math.PI * 2;
+    const r = fenceRadiusAt(a);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (prevX !== null){
+      acc += Math.hypot(x - prevX, z - prevZ);
+      if (acc >= f.postGap){ acc = 0; stations.push({ x, z, a }); }
+    } else stations.push({ x, z, a });
+    prevX = x; prevZ = z;
+  }
+
+  // Leave a gap where a road runs through the fence line (road gates).
+  const isGate = (x, z) => MAP_FARM.gates.some(g => Math.hypot(x - g[0], z - g[1]) < 9);
+  const open = stations.filter(s => !isGate(s.x, s.z));
+
+  const pickets = new THREE.InstancedMesh(picketGeo, M.white, open.length);
+  pickets.castShadow = true; pickets.receiveShadow = true;
+  open.forEach((s, i) => {
+    dummy.position.set(s.x, terrainHeight(s.x, s.z) - 0.2, s.z);
+    dummy.rotation.set(0, -s.a + Math.PI / 2, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    pickets.setMatrixAt(i, dummy.matrix);
+  });
+  scene.add(pickets);
+
+  // Two horizontal rails linking consecutive pickets.
+  const railGeo = new THREE.BoxGeometry(1, 0.34, 0.14);
+  const segs = [];
+  for (let i = 0; i < stations.length; i++){
+    const a = stations[i], b = stations[(i + 1) % stations.length];
+    if (isGate(a.x, a.z) || isGate(b.x, b.z)) continue;
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    if (len > f.postGap * 2) continue;
+    segs.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, len,
+                rot: Math.atan2(b.z - a.z, b.x - a.x) });
+  }
+  const rails = new THREE.InstancedMesh(railGeo, M.white, segs.length * 2);
+  rails.castShadow = true;
+  let ri = 0;
+  for (const s of segs){
+    for (const yy of [f.height * 0.34, f.height * 0.66]){
+      dummy.position.set(s.x, terrainHeight(s.x, s.z) - 0.2 + yy, s.z);
+      dummy.rotation.set(0, -s.rot, 0);
+      dummy.scale.set(s.len * 1.04, 1, 1);
+      dummy.updateMatrix();
+      rails.setMatrixAt(ri++, dummy.matrix);
+    }
+  }
+  scene.add(rails);
+})();
+
+// --- shared building pieces ----------------------------------------------
+function gableRoof(width, depth, height, mat){
+  // Triangular prism laid across the building's depth.
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, 0); shape.lineTo(width / 2, 0); shape.lineTo(0, height); shape.lineTo(-width / 2, 0);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  geo.translate(0, 0, -depth / 2);
+  return new THREE.Mesh(geo, mat);
+}
+function gambrelRoof(width, depth, h1, h2, mat){
+  // Classic two-pitch barn roof.
+  const s = new THREE.Shape();
+  const w = width / 2;
+  s.moveTo(-w, 0); s.lineTo(-w * 0.62, h1); s.lineTo(0, h1 + h2);
+  s.lineTo(w * 0.62, h1); s.lineTo(w, 0); s.lineTo(-w, 0);
+  const geo = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
+  geo.translate(0, 0, -depth / 2);
+  return new THREE.Mesh(geo, mat);
+}
+function windowPane(w, h){
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.2), M.white);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(w * 0.76, h * 0.76, 0.1), M.glassBlue);
+  glass.position.z = 0.12;
+  g.add(frame, glass);
+  return g;
+}
+
+// --- farmhouse ------------------------------------------------------------
+(function buildFarmhouse(){
+  const L = MAP_FARM.landmarks.farmhouse;
+  const g = new THREE.Group();
+  const W = 20, D = 16, H = 11;
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), M.barnRed);
+  body.position.y = H / 2;
+  g.add(body);
+
+  // white corner trim
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]){
+    const t = new THREE.Mesh(new THREE.BoxGeometry(1.1, H, 1.1), M.white);
+    t.position.set(sx * (W / 2 - 0.4), H / 2, sz * (D / 2 - 0.4));
+    g.add(t);
+  }
+
+  const roof = gableRoof(W + 2.2, D + 2.2, 7.5, M.roofGrey);
+  roof.position.y = H;
+  g.add(roof);
+
+  // chimney
+  const ch = new THREE.Mesh(new THREE.BoxGeometry(2.4, 8, 2.4), M.barnRedDk);
+  ch.position.set(-W * 0.28, H + 5.2, -D * 0.2);
+  g.add(ch);
+  const chTop = new THREE.Mesh(new THREE.BoxGeometry(3, 0.7, 3), M.white);
+  chTop.position.set(ch.position.x, H + 9.2, ch.position.z);
+  g.add(chTop);
+
+  // porch: roof on posts, facing +Z toward the yard
+  const porchRoof = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 0.6, 6), M.white);
+  porchRoof.position.set(0, 7.4, D / 2 + 2.6);
+  g.add(porchRoof);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 0.5, 6), M.wood);
+  deck.position.set(0, 0.45, D / 2 + 2.6);
+  g.add(deck);
+  for (const sx of [-1, 1]){
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 7, 0.6), M.white);
+    post.position.set(sx * W * 0.36, 3.7, D / 2 + 5.2);
+    g.add(post);
+  }
+  const door = new THREE.Mesh(new THREE.BoxGeometry(3.2, 5.6, 0.3), M.woodDark);
+  door.position.set(0, 3.3, D / 2 + 0.16);
+  g.add(door);
+
+  // windows on the front and both sides
+  for (const sx of [-1, 1]){
+    const wnd = windowPane(3.2, 3.4);
+    wnd.position.set(sx * 6.4, 6.6, D / 2 + 0.16);
+    g.add(wnd);
+  }
+  for (const sz of [-1, 1]){
+    const wnd = windowPane(3.2, 3.4);
+    wnd.rotation.y = Math.PI / 2;
+    wnd.position.set(W / 2 + 0.16, 6.2, sz * 4);
+    g.add(wnd);
+  }
+
+  g.position.set(L.x, terrainHeight(L.x, L.z), L.z);
+  g.rotation.y = L.rot;
+  markShadow(g, true, true);
+  scene.add(g);
+  addCollider(L.x, L.z, 15, 'farmhouse');
+})();
+
+// --- barn -----------------------------------------------------------------
+(function buildBarn(){
+  const L = MAP_FARM.landmarks.barn;
+  const g = new THREE.Group();
+  const W = 26, D = 20, H = 13;
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), M.barnRed);
+  body.position.y = H / 2;
+  g.add(body);
+
+  const roof = gambrelRoof(W + 1.6, D + 1.6, 5, 4.5, M.barnRedDk);
+  roof.position.y = H;
+  g.add(roof);
+
+  // white trim boards along the eaves and corners
+  for (const sx of [-1, 1]){
+    const t = new THREE.Mesh(new THREE.BoxGeometry(1.0, H, 1.0), M.white);
+    t.position.set(sx * (W / 2 - 0.3), H / 2, D / 2 - 0.3);
+    g.add(t);
+    const t2 = t.clone(); t2.position.z = -(D / 2 - 0.3);
+    g.add(t2);
+  }
+
+  // big front doors with the classic white X bracing
+  const doorW = 11, doorH = 9;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.4), M.barnRedDk);
+  door.position.set(0, doorH / 2, D / 2 + 0.2);
+  g.add(door);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(doorW + 1.2, doorH + 1.0, 0.24), M.white);
+  frame.position.set(0, doorH / 2, D / 2 + 0.1);
+  g.add(frame);
+  const barW = 0.7, diag = Math.hypot(doorW, doorH);
+  for (const s of [1, -1]){
+    const x = new THREE.Mesh(new THREE.BoxGeometry(diag * 0.94, barW, 0.2), M.white);
+    x.position.set(0, doorH / 2, D / 2 + 0.42);
+    x.rotation.z = s * Math.atan2(doorH, doorW);
+    g.add(x);
+  }
+  const midPost = new THREE.Mesh(new THREE.BoxGeometry(barW, doorH, 0.2), M.white);
+  midPost.position.set(0, doorH / 2, D / 2 + 0.42);
+  g.add(midPost);
+
+  // hayloft door under the gable
+  const loft = new THREE.Mesh(new THREE.BoxGeometry(4.6, 4.2, 0.4), M.woodDark);
+  loft.position.set(0, H + 3.4, D / 2 + 0.5);
+  g.add(loft);
+  const loftFrame = new THREE.Mesh(new THREE.BoxGeometry(5.4, 5, 0.22), M.white);
+  loftFrame.position.set(0, H + 3.4, D / 2 + 0.36);
+  g.add(loftFrame);
+
+  // cupola on the ridge
+  const cup = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), M.white);
+  cup.position.y = H + 9.8;
+  g.add(cup);
+  const cupRoof = gableRoof(3.8, 3.8, 2, M.roofGrey);
+  cupRoof.position.y = H + 11.3;
+  g.add(cupRoof);
+
+  g.position.set(L.x, terrainHeight(L.x, L.z), L.z);
+  g.rotation.y = L.rot;
+  markShadow(g, true, true);
+  scene.add(g);
+  addCollider(L.x, L.z, 18, 'barn');
+})();
+
+// --- windmill (lattice tower + spinning fan) ------------------------------
+let windmillFan = null;
+(function buildWindmill(){
+  const L = MAP_FARM.landmarks.windmill;
+  const g = new THREE.Group();
+  const H = 26, baseR = 5.0, topR = 1.5;
+
+  // four tapering legs
+  for (let i = 0; i < 4; i++){
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const bx = Math.cos(a) * baseR, bz = Math.sin(a) * baseR;
+    const tx = Math.cos(a) * topR,  tz = Math.sin(a) * topR;
+    const mid = new THREE.Vector3((bx + tx) / 2, H / 2, (bz + tz) / 2);
+    const len = Math.hypot(tx - bx, H, tz - bz);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.55, len, 6), M.metalDark);
+    leg.position.copy(mid);
+    leg.lookAt(new THREE.Vector3(tx, H, tz));
+    leg.rotateX(Math.PI / 2);
+    g.add(leg);
+  }
+  // horizontal rings + cross bracing
+  for (let lv = 1; lv <= 4; lv++){
+    const t = lv / 5;
+    const r = lerp(baseR, topR, t), y = H * t;
+    for (let i = 0; i < 4; i++){
+      const a1 = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const a2 = ((i + 1) / 4) * Math.PI * 2 + Math.PI / 4;
+      const x1 = Math.cos(a1) * r, z1 = Math.sin(a1) * r;
+      const x2 = Math.cos(a2) * r, z2 = Math.sin(a2) * r;
+      const len = Math.hypot(x2 - x1, z2 - z1);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(len, 0.28, 0.28), M.metalDark);
+      bar.position.set((x1 + x2) / 2, y, (z1 + z2) / 2);
+      bar.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+      g.add(bar);
+    }
+  }
+  // platform
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(topR + 0.9, topR + 0.9, 0.3, 8), M.metal);
+  plat.position.y = H;
+  g.add(plat);
+
+  // fan assembly
+  const fan = new THREE.Group();
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.7, 10), M.metal);
+  hub.rotation.x = Math.PI / 2;
+  fan.add(hub);
+  const bladeGeo = new THREE.BoxGeometry(0.5, 4.6, 0.08);
+  for (let i = 0; i < 18; i++){
+    const b = new THREE.Mesh(bladeGeo, M.metal);
+    const a = (i / 18) * Math.PI * 2;
+    b.position.set(Math.cos(a) * 3.1, Math.sin(a) * 3.1, 0);
+    b.rotation.z = a + Math.PI / 2;
+    b.rotation.y = 0.36;
+    fan.add(b);
+  }
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(5.4, 0.12, 5, 26), M.metal);
+  fan.add(rim);
+  fan.position.set(0, H + 2.6, 1.4);
+  g.add(fan);
+  windmillFan = fan;
+
+  // tail vane
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 7), M.metalDark);
+  boom.position.set(0, H + 2.6, -2.4);
+  g.add(boom);
+  const vane = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3, 4.4), M.metal);
+  vane.position.set(0, H + 3.0, -5.6);
+  g.add(vane);
+
+  g.position.set(L.x, terrainHeight(L.x, L.z), L.z);
+  markShadow(g, true, true);
+  scene.add(g);
+  addCollider(L.x, L.z, 7, 'windmill');
+})();
+
+// --- plowed field with furrows, tractor and plow --------------------------
+function buildTractor(bodyMat, scale){
+  const t = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.0, 5.4), bodyMat);
+  body.position.y = 2.1;
+  t.add(body);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 3.0), bodyMat);
+  hood.position.set(0, 2.5, 2.0);
+  t.add(hood);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 2.4), bodyMat);
+  cab.position.set(0, 4.0, -1.0);
+  t.add(cab);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(2.66, 1.5, 2.46), M.glassBlue);
+  glass.position.set(0, 4.5, -1.0);
+  t.add(glass);
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.6, 6), M.metalDark);
+  pipe.position.set(-1.0, 4.3, 2.9);
+  t.add(pipe);
+  // big rear wheels, small front wheels
+  for (const s of [-1, 1]){
+    const rw = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.9, 14), M.tyre);
+    rw.rotation.z = Math.PI / 2;
+    rw.position.set(s * 1.9, 1.9, -1.6);
+    t.add(rw);
+    const rh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.95, 10), M.hay);
+    rh.rotation.z = Math.PI / 2;
+    rh.position.copy(rw.position);
+    t.add(rh);
+    const fw = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.7, 12), M.tyre);
+    fw.rotation.z = Math.PI / 2;
+    fw.position.set(s * 1.6, 1.1, 2.6);
+    t.add(fw);
+  }
+  t.scale.setScalar(scale || 1);
+  return markShadow(t, true, true);
+}
+
+(function buildField(){
+  const F = MAP_FARM.landmarks.field;
+
+  // furrow ridges across the soil
+  const rows = Math.floor(F.h / 3.0);
+  const geo = new THREE.BoxGeometry(F.w * 0.97, 0.42, 1.3);
+  const soilDark = new THREE.MeshLambertMaterial({ color: 0x6a4629 });
+  const furrows = new THREE.InstancedMesh(geo, soilDark, rows);
+  furrows.receiveShadow = true;
+  for (let i = 0; i < rows; i++){
+    const z = F.z - F.h / 2 + (i + 0.5) * (F.h / rows);
+    dummy.position.set(F.x, terrainHeight(F.x, z) + 0.16, z);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    furrows.setMatrixAt(i, dummy.matrix);
+  }
+  scene.add(furrows);
+
+  // red tractor pulling a disc plow, part-way through the field
+  const tractor = buildTractor(M.tractorRed, 1.15);
+  const tx = F.x + 22, tz = F.z + 6;
+  tractor.position.set(tx, terrainHeight(tx, tz), tz);
+  tractor.rotation.y = -Math.PI / 2;
+  scene.add(tractor);
+
+  const plow = new THREE.Group();
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 5.4), M.metalDark);
+  bar.position.y = 1.4;
+  plow.add(bar);
+  for (let i = 0; i < 5; i++){
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.14, 12), M.metal);
+    disc.rotation.x = Math.PI / 2;
+    disc.rotation.z = 0.25;
+    disc.position.set(0, 1.0, -2.2 + i * 1.1);
+    plow.add(disc);
+  }
+  plow.position.set(tx + 5.2, terrainHeight(tx, tz), tz);
+  plow.rotation.y = -Math.PI / 2;
+  markShadow(plow, true, true);
+  scene.add(plow);
+})();
+
+// --- pond with lily pads, reeds and flowering bushes ----------------------
+(function buildPond(){
+  const P = MAP_FARM.landmarks.pond;
+
+  // muddy bank, slightly larger than the water
+  const bank = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshLambertMaterial({ color: 0x9c7f4f }));
+  bank.rotation.x = -Math.PI / 2;
+  bank.scale.set(P.rx + 5, P.rz + 5, 1);
+  bank.position.set(P.x, 0.06, P.z);
+  bank.receiveShadow = true;
+  scene.add(bank);
+
+  const water = new THREE.Mesh(new THREE.CircleGeometry(1, 44), M.water);
+  water.rotation.x = -Math.PI / 2;
+  water.scale.set(P.rx, P.rz, 1);
+  water.position.set(P.x, 0.18, P.z);
+  scene.add(water);
+  window.__water = water;
+
+  // lily pads and pink lilies
+  const padGeo = new THREE.CircleGeometry(1.5, 9);
+  const pads = new THREE.InstancedMesh(padGeo, new THREE.MeshLambertMaterial({ color: 0x3d8f3a, side: THREE.DoubleSide }), 22);
+  const lilyGeo = new THREE.SphereGeometry(0.5, 6, 5);
+  const lilies = new THREE.InstancedMesh(lilyGeo, new THREE.MeshLambertMaterial({ color: 0xff9ec4 }), 8);
+  let li = 0;
+  for (let i = 0; i < 22; i++){
+    const a = rand(0, Math.PI * 2), d = Math.sqrt(rng()) * 0.78;
+    const x = P.x + Math.cos(a) * P.rx * d, z = P.z + Math.sin(a) * P.rz * d;
+    dummy.position.set(x, 0.24, z);
+    dummy.rotation.set(-Math.PI / 2, 0, rand(0, Math.PI));
+    dummy.scale.setScalar(rand(0.55, 1.0));
+    dummy.updateMatrix();
+    pads.setMatrixAt(i, dummy.matrix);
+    if (li < 8 && rng() > 0.6){
+      dummy.position.set(x, 0.45, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(rand(0.8, 1.2));
+      dummy.updateMatrix();
+      lilies.setMatrixAt(li++, dummy.matrix);
+    }
+  }
+  for (; li < 8; li++){ dummy.position.set(0, -50, 0); dummy.updateMatrix(); lilies.setMatrixAt(li, dummy.matrix); }
+  scene.add(pads, lilies);
+
+  // reeds around the rim
+  const reedGeo = new THREE.ConeGeometry(0.16, 3.6, 5);
+  const reeds = new THREE.InstancedMesh(reedGeo, new THREE.MeshLambertMaterial({ color: 0x4f9c3a }), 90);
+  for (let i = 0; i < 90; i++){
+    const a = rand(0, Math.PI * 2), d = rand(0.92, 1.12);
+    const x = P.x + Math.cos(a) * P.rx * d, z = P.z + Math.sin(a) * P.rz * d;
+    dummy.position.set(x, 1.7, z);
+    dummy.rotation.set(rand(-0.16, 0.16), rand(0, 6.28), rand(-0.16, 0.16));
+    dummy.scale.setScalar(rand(0.7, 1.35));
+    dummy.updateMatrix();
+    reeds.setMatrixAt(i, dummy.matrix);
+  }
+  reeds.castShadow = true;
+  scene.add(reeds);
+
+  // flowering bushes hugging the bank. Transforms are collected first and then
+  // pushed into two instanced meshes, so 14 bushes cost 2 draw calls, not ~110.
+  const blobs = [], petals = [];
+  for (let i = 0; i < 14; i++){
+    const a = rand(0, Math.PI * 2), d = rand(1.12, 1.34);
+    const x = P.x + Math.cos(a) * P.rx * d, z = P.z + Math.sin(a) * P.rz * d;
+    const y = terrainHeight(x, z);
+    const n = randI(2, 4);
+    for (let k = 0; k < n; k++){
+      blobs.push({ x: x + rand(-1.6, 1.6), y: y + rand(1.0, 2.0), z: z + rand(-1.6, 1.6), r: rand(1.4, 2.4) });
+    }
+    for (let k = 0; k < 6; k++){
+      petals.push({ x: x + rand(-2.0, 2.0), y: y + rand(1.8, 3.2), z: z + rand(-2.0, 2.0) });
+    }
+  }
+  const blobMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 7, 6), M.leaf, blobs.length);
+  blobMesh.castShadow = true;
+  blobs.forEach((b, i) => {
+    dummy.position.set(b.x, b.y, b.z);
+    dummy.rotation.set(0, rand(0, 6.28), 0);
+    dummy.scale.set(b.r, b.r * 0.85, b.r);
+    dummy.updateMatrix();
+    blobMesh.setMatrixAt(i, dummy.matrix);
+  });
+  const petalMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 5, 4),
+    new THREE.MeshLambertMaterial({ color: 0xfff3f8 }), petals.length);
+  petals.forEach((p, i) => {
+    dummy.position.set(p.x, p.y, p.z);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(rand(0.8, 1.4));
+    dummy.updateMatrix();
+    petalMesh.setMatrixAt(i, dummy.matrix);
+  });
+  scene.add(blobMesh, petalMesh);
+})();
+
+// --- placement helper: keep props off roads, buildings, water and crops ---
+function validProp(x, z, clear){
+  if (insideFenceBy(x, z) < clear + 3) return false;
+  if (distToAnyRoad(x, z) < clear + 2) return false;
+  for (const c of COLLIDERS) if (Math.hypot(x - c.x, z - c.z) < c.r + clear) return false;
+  const P = MAP_FARM.pondNorm || MAP_FARM.landmarks.pond;
+  if (Math.hypot((x - P.x) / (P.rx + 8), (z - P.z) / (P.rz + 8)) < 1) return false;
+  const F = MAP_FARM.landmarks.field;
+  if (Math.abs(x - F.x) < F.w / 2 + 5 && Math.abs(z - F.z) < F.h / 2 + 5) return false;
+  return true;
+}
+
+// --- tree grove (irregular placement, D-009) ------------------------------
+(function buildTrees(){
+  const GR = MAP_FARM.landmarks.grove;
+  const spots = [];
+
+  // dense irregular clumping inside the grove
+  let guard = 0;
+  while (spots.length < 46 && guard++ < 3000){
+    const a = rand(0, Math.PI * 2), d = Math.pow(rng(), 0.65) * GR.r;
+    const x = GR.x + Math.cos(a) * d, z = GR.z + Math.sin(a) * d * 0.85;
+    if (!validProp(x, z, 7)) continue;
+    if (spots.some(s => Math.hypot(s.x - x, s.z - z) < 9)) continue;
+    spots.push({ x, z, s: rand(0.75, 1.45) });
+  }
+  // a few singles elsewhere so the grove does not read as a hard block
+  guard = 0;
+  while (spots.length < 58 && guard++ < 3000){
+    const x = rand(-190, 190), z = rand(-190, 190);
+    if (!validProp(x, z, 12)) continue;
+    if (spots.some(s => Math.hypot(s.x - x, s.z - z) < 26)) continue;
+    spots.push({ x, z, s: rand(0.8, 1.2) });
+  }
+
+  const trunkGeo = new THREE.CylinderGeometry(0.85, 1.25, 9, 7);
+  trunkGeo.translate(0, 4.5, 0);
+  const trunks = new THREE.InstancedMesh(trunkGeo, M.wood, spots.length);
+  trunks.castShadow = true;
+
+  const blobsPer = 3;
+  const canopyGeo = new THREE.SphereGeometry(1, 8, 7);
+  const canopy = new THREE.InstancedMesh(canopyGeo, M.leaf, spots.length * blobsPer);
+  canopy.castShadow = true;
+
+  spots.forEach((sp, i) => {
+    const y = terrainHeight(sp.x, sp.z);
+    dummy.position.set(sp.x, y, sp.z);
+    dummy.rotation.set(0, rand(0, 6.28), 0);
+    dummy.scale.set(sp.s, sp.s, sp.s);
+    dummy.updateMatrix();
+    trunks.setMatrixAt(i, dummy.matrix);
+
+    for (let b = 0; b < blobsPer; b++){
+      const r = rand(4.2, 6.4) * sp.s;
+      dummy.position.set(
+        sp.x + rand(-2.6, 2.6) * sp.s,
+        y + (9 * sp.s) + rand(-0.4, 3.0) * sp.s,
+        sp.z + rand(-2.6, 2.6) * sp.s
+      );
+      dummy.rotation.set(0, rand(0, 6.28), 0);
+      dummy.scale.set(r, r * rand(0.78, 0.95), r);
+      dummy.updateMatrix();
+      canopy.setMatrixAt(i * blobsPer + b, dummy.matrix);
+    }
+  });
+  scene.add(trunks, canopy);
+})();
+
+// --- farm hub props: gravel, vehicles, hay, crates, garden ---------------
+function buildPickup(){
+  const t = new THREE.Group();
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.3, 7.4), M.tractorRed);
+  bed.position.y = 2.0;
+  t.add(bed);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.9, 2.9), M.tractorRed);
+  cab.position.set(0, 3.4, 1.1);
+  t.add(cab);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(3.16, 1.1, 2.5), M.glassBlue);
+  glass.position.set(0, 3.7, 1.15);
+  t.add(glass);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.9, 3.6), M.tractorRed);
+  wall.position.set(0, 3.0, -1.8);
+  t.add(wall);
+  for (const s of [-1, 1]) for (const zz of [2.2, -2.2]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.7, 12), M.tyre);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(s * 1.7, 1.05, zz);
+    t.add(w);
+  }
+  return markShadow(t, true, true);
+}
+
+(function buildHub(){
+  const fh = MAP_FARM.landmarks.farmhouse, bn = MAP_FARM.landmarks.barn;
+  const hx = (fh.x + bn.x) / 2 + 4, hz = (fh.z + bn.z) / 2 + 22;
+
+  // gravel yard
+  const gravel = new THREE.Mesh(new THREE.CircleGeometry(1, 26),
+    new THREE.MeshLambertMaterial({ color: 0xa79f90, transparent: true, opacity: 0.92 }));
+  gravel.rotation.x = -Math.PI / 2;
+  gravel.scale.set(26, 17, 1);
+  gravel.position.set(hx, 0.07, hz);
+  gravel.receiveShadow = true;
+  scene.add(gravel);
+
+  const truck = buildPickup();
+  truck.position.set(hx - 14, terrainHeight(hx - 14, hz + 4), hz + 4);
+  truck.rotation.y = 0.5;
+  scene.add(truck);
+
+  const tractor = buildTractor(M.tractorGrn, 1.0);
+  tractor.position.set(hx + 6, terrainHeight(hx + 6, hz + 2), hz + 2);
+  tractor.rotation.y = -0.35;
+  scene.add(tractor);
+
+  // stacked round hay bales
+  const baleGeo = new THREE.CylinderGeometry(1.7, 1.7, 2.6, 12);
+  const bales = [[-26, -6], [-26, -2.2], [-22.4, -4], [18, -8], [21.6, -8], [19.8, -5]];
+  bales.forEach((b, i) => {
+    const bx = hx + b[0], bz = hz + b[1];
+    const m = new THREE.Mesh(baleGeo, M.hay);
+    m.rotation.z = Math.PI / 2;
+    m.position.set(bx, terrainHeight(bx, bz) + 1.7, bz);
+    markShadow(m, true, true);
+    scene.add(m);
+    // hay end-cap rings so the bales read as rolled, not as plain cylinders
+    for (const s of [-1, 1]){
+      const cap = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.16, 5, 12), M.woodDark);
+      cap.position.set(bx + s * 1.32, m.position.y, bz);
+      cap.rotation.y = Math.PI / 2;
+      scene.add(cap);
+    }
+  });
+
+  // crates
+  for (let i = 0; i < 5; i++){
+    const cx = hx + rand(10, 20), cz = hz - rand(10, 16);
+    const c = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.0, 2.4), M.hay);
+    c.position.set(cx, terrainHeight(cx, cz) + 1.0, cz);
+    c.rotation.y = rand(0, 1.5);
+    markShadow(c, true, true);
+    scene.add(c);
+  }
+
+  // wood pile
+  const logGeo = new THREE.CylinderGeometry(0.35, 0.35, 3.4, 7);
+  for (let i = 0; i < 9; i++){
+    const lx = hx - 22 + (i % 3) * 0.78, ly = Math.floor(i / 3) * 0.72;
+    const log = new THREE.Mesh(logGeo, M.woodDark);
+    log.rotation.z = Math.PI / 2;
+    log.position.set(lx, terrainHeight(lx, hz + 14) + 0.4 + ly, hz + 14);
+    markShadow(log, true, true);
+    scene.add(log);
+  }
+
+  // flower garden along the porch, instanced by colour
+  const gSpots = [];
+  for (let i = 0; i < 44; i++){
+    const gx = fh.x + rand(-9, 9), gz = fh.z + rand(11, 15);
+    gSpots.push({ x: gx, y: terrainHeight(gx, gz), z: gz, c: randI(0, 3) });
+  }
+  const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 4), M.leaf, gSpots.length);
+  gSpots.forEach((s, i) => {
+    dummy.position.set(s.x, s.y + 0.55, s.z);
+    dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    stems.setMatrixAt(i, dummy.matrix);
+  });
+  scene.add(stems);
+  [0xff6f8d, 0xffd24a, 0xff9ec4, 0xffffff].forEach((col, ci) => {
+    const set = gSpots.filter(s => s.c === ci);
+    if (!set.length) return;
+    const hm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.3, 5, 4),
+      new THREE.MeshLambertMaterial({ color: col }), set.length);
+    set.forEach((s, i) => {
+      dummy.position.set(s.x, s.y + 1.15, s.z);
+      dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(rand(0.85, 1.25));
+      dummy.updateMatrix();
+      hm.setMatrixAt(i, dummy.matrix);
+    });
+    scene.add(hm);
+  });
+})();
+
+// --- pasture detail: grass tufts and wildflowers ---------------------------
+(function buildGroundDetail(){
+  const tuftGeo = new THREE.ConeGeometry(0.34, 1.35, 4);
+  const tufts = new THREE.InstancedMesh(tuftGeo, new THREE.MeshLambertMaterial({ color: 0x79cf42 }), 650);
+  let n = 0, guard = 0;
+  while (n < 650 && guard++ < 20000){
+    const x = rand(-200, 200), z = rand(-200, 200);
+    if (insideFenceBy(x, z) < 2) continue;
+    if (distToAnyRoad(x, z) < 2) continue;
+    dummy.position.set(x, terrainHeight(x, z) + 0.36, z);
+    dummy.rotation.set(0, rand(0, 6.28), 0);
+    dummy.scale.set(rand(0.5, 0.9), rand(0.4, 0.75), rand(0.5, 0.9));
+    dummy.updateMatrix();
+    tufts.setMatrixAt(n++, dummy.matrix);
+  }
+  tufts.count = n;
+  scene.add(tufts);
+
+  // wildflowers, matching the flower-dotted grass in the reference art.
+  // Spots are gathered first so every flower gets a stem from one shared mesh.
+  const spots = [];
+  let g2 = 0;
+  while (spots.length < 620 && g2++ < 14000){
+    const x = rand(-198, 198), z = rand(-198, 198);
+    if (insideFenceBy(x, z) < 3) continue;
+    if (distToAnyRoad(x, z) < 3) continue;
+    spots.push({ x, y: terrainHeight(x, z), z, c: randI(0, 3), s: rand(0.75, 1.3) });
+  }
+  const stemMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.8, 4),
+    new THREE.MeshLambertMaterial({ color: 0x4f9c2e }), spots.length);
+  spots.forEach((sp, i) => {
+    dummy.position.set(sp.x, sp.y + 0.4, sp.z);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, sp.s, 1);
+    dummy.updateMatrix();
+    stemMesh.setMatrixAt(i, dummy.matrix);
+  });
+  scene.add(stemMesh);
+
+  const petalGeo = new THREE.SphereGeometry(0.19, 5, 4);
+  [0xffffff, 0xffd94a, 0xff8fbc, 0xa98cff].forEach((col, ci) => {
+    const set = spots.filter(sp => sp.c === ci);
+    if (!set.length) return;
+    const fm = new THREE.InstancedMesh(petalGeo, new THREE.MeshLambertMaterial({ color: col }), set.length);
+    set.forEach((sp, i) => {
+      dummy.position.set(sp.x, sp.y + 0.78 * sp.s, sp.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(sp.s);
+      dummy.updateMatrix();
+      fm.setMatrixAt(i, dummy.matrix);
+    });
+    scene.add(fm);
+  });
+})();
+
+// --- distant scenery outside the fence (world depth) ----------------------
+(function buildDistantScenery(){
+  const trunkGeo = new THREE.CylinderGeometry(0.9, 1.3, 8, 5);
+  trunkGeo.translate(0, 4, 0);
+  const canopyGeo = new THREE.SphereGeometry(1, 6, 5);
+  const N = 240;
+  const trunks = new THREE.InstancedMesh(trunkGeo, M.wood, N);
+  const canopy = new THREE.InstancedMesh(canopyGeo, M.leaf, N);
+  let n = 0, guard = 0;
+  while (n < N && guard++ < 9000){
+    const a = rand(0, Math.PI * 2), d = rand(258, 470);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (insideFenceBy(x, z) > -48) continue;
+    const y = terrainHeight(x, z), s = rand(0.9, 1.9);
+    dummy.position.set(x, y, z);
+    dummy.rotation.set(0, rand(0, 6.28), 0);
+    dummy.scale.setScalar(s);
+    dummy.updateMatrix();
+    trunks.setMatrixAt(n, dummy.matrix);
+    const r = rand(5, 8) * s;
+    dummy.position.set(x, y + 8 * s + r * 0.35, z);
+    dummy.scale.set(r, r * 0.88, r);
+    dummy.updateMatrix();
+    canopy.setMatrixAt(n, dummy.matrix);
+    n++;
+  }
+  trunks.count = n; canopy.count = n;
+  scene.add(trunks, canopy);
+})();
+
+/* ==========================================================================
+   6. CREATURES
+   The reference art sets a high detail bar -- readable eyes, ears, horns,
+   snouts, tails, udders (D-011). Building that from 25+ separate meshes per
+   animal would cost hundreds of draw calls, so each animal is authored from
+   primitives and then merged into vertex-coloured geometry: one mesh for the
+   body and legs, one for the head (kept separate so it can graze and look
+   around, which D-015 requires). Fourteen animals therefore cost 28 draws.
+   ========================================================================== */
+
+const UNIT = {
+  sphere: new THREE.SphereGeometry(1, 10, 8),
+  sphereLo: new THREE.SphereGeometry(1, 7, 6),
+  box:    new THREE.BoxGeometry(1, 1, 1),
+  cyl:    new THREE.CylinderGeometry(1, 1, 1, 9),
+  cone:   new THREE.ConeGeometry(1, 1, 8),
+  torus:  new THREE.TorusGeometry(1, 0.25, 5, 10)
+};
+
+const creatureMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+// Untextured THREE.Points draw as hard squares. This soft radial dot is used
+// for the beam sparkles and the impact/capture bursts.
+const DOT_TEX = (function(){
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  grd.addColorStop(0.0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.35, 'rgba(210,246,255,0.75)');
+  grd.addColorStop(1.0, 'rgba(150,230,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(c);
+})();
+
+// Collects primitive parts, then flattens them into a single geometry.
+function Parts(){
+  this.list = [];
+}
+Parts.prototype.add = function(geo, color, pos, scl, rot){
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler(rot ? rot[0] : 0, rot ? rot[1] : 0, rot ? rot[2] : 0);
+  q.setFromEuler(e);
+  m.compose(
+    new THREE.Vector3(pos[0], pos[1], pos[2]),
+    q,
+    new THREE.Vector3(scl[0], scl[1], scl[2])
+  );
+  this.list.push({ geo, color, mat: m });
+  return this;
+};
+Parts.prototype.ball = function(color, pos, scl, rot){ return this.add(UNIT.sphere, color, pos, scl, rot); };
+Parts.prototype.blob = function(color, pos, scl, rot){ return this.add(UNIT.sphereLo, color, pos, scl, rot); };
+Parts.prototype.box  = function(color, pos, scl, rot){ return this.add(UNIT.box,    color, pos, scl, rot); };
+Parts.prototype.cyl  = function(color, pos, scl, rot){ return this.add(UNIT.cyl,    color, pos, scl, rot); };
+Parts.prototype.cone = function(color, pos, scl, rot){ return this.add(UNIT.cone,   color, pos, scl, rot); };
+Parts.prototype.ring = function(color, pos, scl, rot){ return this.add(UNIT.torus,  color, pos, scl, rot); };
+
+// Flatten collected parts into one vertex-coloured BufferGeometry.
+Parts.prototype.build = function(){
+  const baked = [];
+  let total = 0;
+  for (const p of this.list){
+    const g = (p.geo.index ? p.geo.toNonIndexed() : p.geo.clone());
+    g.applyMatrix4(p.mat);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    total += g.attributes.position.count;
+    baked.push({ g, color: p.color });
+  }
+  const pos = new Float32Array(total * 3);
+  const nrm = new Float32Array(total * 3);
+  const col = new Float32Array(total * 3);
+  const c = new THREE.Color();
+  let o = 0;
+  for (const b of baked){
+    const n = b.g.attributes.position.count;
+    pos.set(b.g.attributes.position.array, o * 3);
+    nrm.set(b.g.attributes.normal.array, o * 3);
+    c.set(b.color);
+    for (let i = 0; i < n; i++){
+      col[(o + i) * 3]     = c.r;
+      col[(o + i) * 3 + 1] = c.g;
+      col[(o + i) * 3 + 2] = c.b;
+    }
+    o += n;
+    b.g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal',   new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  return out;
+};
+
+// Cartoon eye: white ball with a dark pupil and a highlight.
+function addEye(p, x, y, z, r, faceZ){
+  p.ball(0xffffff, [x, y, z], [r, r * 1.08, r * 0.85]);
+  p.ball(0x1a1418, [x, y, z + faceZ * r * 0.55], [r * 0.52, r * 0.58, r * 0.4]);
+  p.ball(0xffffff, [x + r * 0.2, y + r * 0.34, z + faceZ * r * 0.72], [r * 0.18, r * 0.18, r * 0.14]);
+}
+// Four legs with darker hooves.
+function addLegs(p, coat, hoof, hx, hz, top, len, r){
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]){
+    const x = sx * hx, z = sz * hz;
+    p.cyl(coat, [x, top - len / 2, z], [r, len, r]);
+    p.cyl(hoof, [x, 0.28, z], [r * 1.15, 0.56, r * 1.15]);
+  }
+}
+
+/* --- species geometry ---------------------------------------------------- */
+const CREATURE_BUILDERS = {
+
+  // Holstein cow: black-and-white patches, horns, pink snout and udder.
+  cow(){
+    const body = new Parts(), head = new Parts();
+    const white = 0xf6f4ef, black = 0x2b2b30, pink = 0xf2a3ae, hoof = 0x33313a;
+    body.ball(white, [0, 3.5, 0], [2.3, 2.15, 3.25]);
+    body.ball(white, [0, 4.05, 2.5], [1.55, 1.5, 1.5]);   // neck join
+    // patches sunk into the flank so they bulge slightly, reading as markings
+    body.blob(black, [1.55, 4.3, 0.9],  [1.2, 0.95, 1.5]);
+    body.blob(black, [-1.7, 3.6, -1.2], [1.0, 1.2, 1.3]);
+    body.blob(black, [0.4, 5.35, -1.9], [1.3, 0.8, 1.1]);
+    body.ball(pink,  [0, 1.95, -0.9], [1.0, 0.85, 1.1]);            // udder
+    for (const sx of [-1, 1]) body.cyl(pink, [sx * 0.45, 1.35, -0.9], [0.16, 0.7, 0.16]);
+    addLegs(body, white, hoof, 1.35, 2.05, 2.5, 2.5, 0.42);
+    body.cyl(white, [0, 4.6, -3.3], [0.22, 2.2, 0.22], [0.5, 0, 0]);  // tail
+    body.ball(black, [0, 3.55, -4.25], [0.34, 0.5, 0.34]);            // tail tuft
+
+    head.ball(white, [0, 0, 0], [1.5, 1.42, 1.55]);
+    head.blob(black, [-0.75, 0.55, 0.45], [0.75, 0.7, 0.9]);
+    head.ball(pink,  [0, -0.5, 1.35], [1.0, 0.78, 0.75]);             // muzzle
+    head.ball(0x8c5f68, [-0.32, -0.5, 2.0], [0.16, 0.2, 0.12]);
+    head.ball(0x8c5f68, [ 0.32, -0.5, 2.0], [0.16, 0.2, 0.12]);
+    for (const sx of [-1, 1]){
+      head.ball(white, [sx * 1.5, 0.5, -0.1], [0.62, 0.34, 0.42], [0, 0, sx * 0.5]);
+      head.ball(pink,  [sx * 1.72, 0.5, -0.05], [0.34, 0.2, 0.24], [0, 0, sx * 0.5]);
+      head.cone(0xefe0bd, [sx * 0.72, 1.25, 0.15], [0.26, 0.72, 0.26], [0, 0, sx * 0.42]);
+      addEye(head, sx * 0.72, 0.42, 1.18, 0.44, 1);
+    }
+    return { body: body.build(), head: head.build(), headAt: [0, 4.5, 4.15], radius: 3.4 };
+  },
+
+  // Horse: long neck, flowing mane and tail, cream muzzle.
+  horse(){
+    const body = new Parts(), head = new Parts();
+    const coat = 0x9c6233, dark = 0x4d2c15, hoof = 0x2e2a28, muzzle = 0xd8b48c;
+    body.ball(coat, [0, 4.0, 0], [2.1, 2.15, 3.2]);
+    body.ball(coat, [0, 5.0, 2.15], [1.45, 1.65, 1.5], [0.5, 0, 0]);  // chest/neck base
+    body.cyl(coat, [0, 6.42, 3.35], [0.8, 3.7, 0.8], [0.70, 0, 0]);  // neck
+    body.box(dark, [0, 6.65, 3.08], [0.3, 3.5, 0.5], [0.70, 0, 0]);  // mane crest along the neck
+    addLegs(body, coat, hoof, 1.3, 2.2, 3.0, 3.0, 0.42);
+    body.cyl(dark, [0, 4.9, -3.5], [0.42, 3.0, 0.42], [0.75, 0, 0]); // tail
+
+    head.ball(coat, [0, 0, 0], [0.95, 1.15, 1.5]);
+    head.ball(coat, [0, -0.55, 1.25], [0.72, 0.7, 1.0]);
+    head.ball(muzzle, [0, -0.72, 1.95], [0.6, 0.55, 0.55]);
+    head.ball(0x3a2a26, [-0.26, -0.72, 2.4], [0.14, 0.18, 0.1]);
+    head.ball(0x3a2a26, [ 0.26, -0.72, 2.4], [0.14, 0.18, 0.1]);
+    head.box(dark, [0, 0.85, -0.35], [0.3, 0.9, 1.5], [0.25, 0, 0]);
+    for (const sx of [-1, 1]){
+      head.cone(coat, [sx * 0.55, 1.25, -0.15], [0.28, 0.7, 0.24], [0, 0, sx * 0.28]);
+      addEye(head, sx * 0.72, 0.32, 0.85, 0.34, 1);
+    }
+    const hg = head.build(); hg.scale(0.86, 0.86, 0.86);
+    return { body: body.build(), head: hg, headAt: [0, 7.85, 4.55], radius: 3.3 };
+  },
+
+  // Sheep: cloud of wool over a cream face, black legs.
+  sheep(){
+    const body = new Parts(), head = new Parts();
+    const wool = 0xfaf7f0, face = 0xf0dfc8, leg = 0x3b3740, pink = 0xf0b6c0;
+    // overlapping wool lumps rather than one smooth ellipsoid
+    const lumps = [[0,3.6,0,2.5,2.3,3.0],[1.5,4.3,0.7,1.5,1.4,1.6],[-1.5,4.2,-0.5,1.5,1.4,1.6],
+                   [0,4.9,-1.2,1.6,1.4,1.5],[0,4.6,1.6,1.5,1.4,1.4],[0,3.2,-2.4,1.4,1.3,1.3]];
+    for (const l of lumps) body.blob(wool, [l[0], l[1], l[2]], [l[3], l[4], l[5]]);
+    addLegs(body, leg, leg, 1.1, 1.6, 2.4, 2.4, 0.3);
+    body.blob(wool, [0, 3.4, -3.0], [0.55, 0.55, 0.5]);
+
+    head.ball(face, [0, 0, 0], [1.05, 1.1, 1.15]);
+    head.blob(wool, [0, 0.75, -0.4], [1.1, 0.85, 0.95]);             // fringe
+    head.ball(face, [0, -0.4, 0.95], [0.7, 0.6, 0.6]);
+    head.ball(0x4a4048, [-0.22, -0.45, 1.4], [0.12, 0.14, 0.1]);
+    head.ball(0x4a4048, [ 0.22, -0.45, 1.4], [0.12, 0.14, 0.1]);
+    for (const sx of [-1, 1]){
+      head.ball(face, [sx * 1.05, 0.15, 0.05], [0.55, 0.3, 0.35], [0, 0, sx * 0.65]);
+      head.ball(pink, [sx * 1.22, 0.12, 0.08], [0.3, 0.17, 0.2], [0, 0, sx * 0.65]);
+      addEye(head, sx * 0.5, 0.2, 0.85, 0.33, 1);
+      head.blob(0xf6c9c4, [sx * 0.85, -0.3, 0.7], [0.3, 0.22, 0.2]); // rosy cheek
+    }
+    return { body: body.build(), head: head.build(), headAt: [0, 4.35, 3.45], radius: 2.9 };
+  },
+
+  // Pig: round pink body, flat snout, curly tail.
+  pig(){
+    const body = new Parts(), head = new Parts();
+    const skin = 0xf3a6b6, deep = 0xdb8496, hoof = 0x4a3a3e;
+    body.ball(skin, [0, 3.1, 0], [2.3, 2.1, 3.0]);
+    body.ball(skin, [0, 3.4, 2.05], [1.9, 1.75, 1.5]);
+    addLegs(body, skin, hoof, 1.3, 1.7, 2.1, 2.1, 0.44);
+    // curly tail built from a short spiral of small balls
+    for (let i = 0; i < 6; i++){
+      const t = i / 5;
+      body.blob(deep, [Math.sin(t * 7) * 0.45, 4.0 + t * 0.9, -3.1 - Math.cos(t * 7) * 0.3], [0.2, 0.2, 0.2]);
+    }
+
+    head.ball(skin, [0, 0, 0], [1.35, 1.25, 1.25]);
+    head.cyl(deep, [0, -0.28, 1.25], [0.62, 0.35, 0.62], [Math.PI / 2, 0, 0]);  // snout disc
+    head.ball(0x8d5563, [-0.24, -0.28, 1.46], [0.13, 0.17, 0.08]);
+    head.ball(0x8d5563, [ 0.24, -0.28, 1.46], [0.13, 0.17, 0.08]);
+    for (const sx of [-1, 1]){
+      head.cone(skin, [sx * 0.78, 1.0, 0.35], [0.42, 0.72, 0.2], [0.5, 0, sx * 0.3]);
+      addEye(head, sx * 0.6, 0.35, 1.0, 0.34, 1);
+      head.blob(0xe98ba0, [sx * 1.0, -0.15, 0.75], [0.3, 0.24, 0.2]);
+    }
+    return { body: body.build(), head: head.build(), headAt: [0, 3.85, 3.65], radius: 2.9 };
+  },
+
+  // Chicken: plump yellow body, red comb and wattle, orange beak and feet.
+  chicken(){
+    const body = new Parts(), head = new Parts();
+    const feather = 0xf7d13c, deep = 0xe0b422, orange = 0xf08c22, red = 0xd93b2f;
+    body.ball(feather, [0, 3.0, 0], [2.0, 2.2, 2.2]);
+    for (const sx of [-1, 1]) body.ball(deep, [sx * 1.75, 3.2, 0], [0.55, 1.3, 1.5], [0, 0, sx * 0.2]); // wings
+    // tail feathers
+    for (let i = 0; i < 4; i++)
+      body.cone(deep, [(i - 1.5) * 0.4, 4.4, -2.1], [0.28, 1.9, 0.28], [-1.05, 0, (i - 1.5) * 0.16]);
+    for (const sx of [-1, 1]){
+      body.cyl(orange, [sx * 0.7, 0.9, 0.2], [0.19, 1.8, 0.19]);
+      for (let t = -1; t <= 1; t++)
+        body.box(orange, [sx * 0.7 + t * 0.28, 0.1, 0.75], [0.14, 0.14, 0.9], [0, t * 0.3, 0]);
+    }
+
+    head.ball(feather, [0, 0, 0], [1.15, 1.15, 1.1]);
+    head.cone(orange, [0, -0.15, 1.15], [0.42, 0.75, 0.42], [Math.PI / 2, 0, 0]);  // beak
+    head.ball(red, [0, -0.72, 0.85], [0.22, 0.4, 0.22]);                           // wattle
+    for (let i = 0; i < 3; i++) head.ball(red, [0, 1.05 + Math.abs(i - 1) * -0.14, 0.45 - i * 0.42], [0.2, 0.42, 0.16]); // comb
+    for (const sx of [-1, 1]){
+      addEye(head, sx * 0.6, 0.28, 0.82, 0.32, 1);
+      head.blob(0xf29a9a, [sx * 0.88, -0.2, 0.6], [0.26, 0.2, 0.16]);
+    }
+    return { body: body.build(), head: head.build(), headAt: [0, 4.6, 0.9], radius: 2.2 };
+  },
+
+  // Goat: brown-and-white patches, swept horns, beard, blue collar and bell.
+  goat(){
+    const body = new Parts(), head = new Parts();
+    const white = 0xf7f3ea, brown = 0x8a5a35, hoof = 0x3a3236;
+    body.ball(white, [0, 3.3, 0], [1.9, 1.85, 2.75]);
+    body.ball(white, [0, 4.3, 2.0], [1.15, 1.25, 1.15]);  // neck join
+    body.blob(brown, [1.35, 3.9, -0.7], [0.95, 0.9, 1.3]);
+    body.blob(brown, [-1.1, 3.2, 1.0], [0.85, 0.9, 1.0]);
+    addLegs(body, white, hoof, 1.15, 1.75, 2.4, 2.4, 0.33);
+    body.cone(white, [0, 4.6, -2.9], [0.34, 1.0, 0.34], [-0.9, 0, 0]);  // upright tail
+
+    head.ball(white, [0, 0, 0], [1.0, 1.05, 1.35]);
+    head.blob(brown, [0, 0.55, -0.5], [1.0, 0.7, 0.8]);
+    head.ball(white, [0, -0.42, 1.15], [0.62, 0.55, 0.65]);
+    head.ball(0x4a3f42, [-0.24, -0.42, 1.62], [0.12, 0.15, 0.09]);
+    head.ball(0x4a3f42, [ 0.24, -0.42, 1.62], [0.12, 0.15, 0.09]);
+    head.cone(white, [0, -1.15, 0.75], [0.28, 0.95, 0.24], [0.35, 0, 0]);  // beard
+    for (const sx of [-1, 1]){
+      head.cone(0xd9c79f, [sx * 0.45, 1.35, -0.35], [0.2, 1.25, 0.2], [-0.55, 0, sx * 0.22]);  // horn
+      head.ball(brown, [sx * 1.05, 0.35, 0.05], [0.5, 0.26, 0.34], [0, 0, sx * 0.7]);          // ear
+      addEye(head, sx * 0.6, 0.3, 1.0, 0.33, 1);
+    }
+    // collar with a bell sits on the body, just under the head
+    body.cyl(0x2f6fd0, [0, 4.72, 2.5], [0.8, 0.3, 0.8], [0.35, 0, 0]);
+    body.ball(0xf0c02a, [0, 4.3, 2.72], [0.32, 0.38, 0.32]);
+    return { body: body.build(), head: head.build(), headAt: [0, 5.35, 3.25], radius: 2.6 };
+  }
+};
+
+// Build each species' geometry once and share it between all instances.
+const CREATURE_GEO = {};
+for (const s of SPECIES) CREATURE_GEO[s.id] = CREATURE_BUILDERS[s.id]();
+
+/* ==========================================================================
+   7. UFO + TRACTOR BEAM
+   Saucer, dome, antennae and glowing rim follow the HUD/gameplay reference.
+   Beam behaviour is hold-to-activate with a visible cone and auto-lock on the
+   closest eligible target (D-014, Step 4 spec section 2).
+   ========================================================================== */
+
+const ufo = {
+  group: new THREE.Group(),
+  pos: new THREE.Vector3(0, 26, 40),
+  vel: new THREE.Vector3(),
+  bank: new THREE.Vector2(),      // x = pitch, y = roll, for the visual tilt
+  spin: 0,
+  hull: MAP_FARM.mission.hull,
+  hitFlash: 0
+};
+
+// Beam state is kept as one plain object so damage (S09) and scoring (S10)
+// can read it without reaching into the render objects.
+const beam = {
+  active: false,          // input held
+  power: 0,               // 0..1 visual/eased activation
+  target: null,           // currently locked creature, or null
+  lockStrength: 0,        // 0..1 ramp once a target is acquired
+  capturedThisFrame: null // set on the frame a target completes abduction
+};
+
+(function buildUfo(){
+  const g = ufo.group;
+  const R = CFG.ufo.radius;
+
+  // saucer hull: two shallow lathe shells so it has a real silhouette
+  const hullPts = [];
+  for (let i = 0; i <= 10; i++){
+    const t = i / 10;
+    hullPts.push(new THREE.Vector2(Math.sin(t * Math.PI * 0.5) * R, Math.cos(t * Math.PI * 0.5) * R * 0.30));
+  }
+  // LatheGeometry derives its normals assuming the profile runs bottom-to-top.
+  // hullPts runs apex-to-rim, so the top shell needs the reversed profile or it
+  // renders inside-out and gets back-face culled.
+  const topPts = hullPts.slice().reverse();
+  const top = new THREE.Mesh(new THREE.LatheGeometry(topPts, 28), M.metal);
+  g.add(top);
+  const botPts = hullPts.map(p => new THREE.Vector2(p.x, -p.y * 1.25));
+  const bot = new THREE.Mesh(new THREE.LatheGeometry(botPts, 28), M.metalDark);
+  g.add(bot);
+
+  // glowing rim
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R * 0.97, R * 0.10, 8, 30),
+    new THREE.MeshBasicMaterial({ color: 0x5fe0ff }));
+  rim.rotation.x = Math.PI / 2;
+  g.add(rim);
+  const rimGlow = new THREE.Mesh(new THREE.TorusGeometry(R * 0.97, R * 0.20, 8, 30),
+    new THREE.MeshBasicMaterial({ color: 0x2fbfe6, transparent: true, opacity: 0.32,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  rimGlow.rotation.x = Math.PI / 2;
+  g.add(rimGlow);
+
+  // glass dome + inner seat glow
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(R * 0.52, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshPhongMaterial({ color: 0x7fd8f5, shininess: 120, transparent: true,
+      opacity: 0.74, side: THREE.DoubleSide }));
+  dome.position.y = R * 0.26;
+  g.add(dome);
+  const core = new THREE.Mesh(new THREE.SphereGeometry(R * 0.26, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0x7ff0ff, transparent: true, opacity: 0.75 }));
+  core.position.y = R * 0.36;
+  g.add(core);
+
+  // hull panel lights around the skirt
+  const lightGeo = new THREE.BoxGeometry(R * 0.20, R * 0.06, R * 0.09);
+  const lightMat = new THREE.MeshBasicMaterial({ color: 0x39d6ff });
+  const lights = new THREE.InstancedMesh(lightGeo, lightMat, 10);
+  for (let i = 0; i < 10; i++){
+    const a = (i / 10) * Math.PI * 2;
+    dummy.position.set(Math.cos(a) * R * 0.78, -R * 0.05, Math.sin(a) * R * 0.78);
+    dummy.rotation.set(0, -a, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    lights.setMatrixAt(i, dummy.matrix);
+  }
+  g.add(lights);
+  ufo.panelLights = lights;
+
+  // twin antennae with glowing tips
+  for (const sx of [-1, 1]){
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.035, R * 0.05, R * 0.7, 6), M.metal);
+    stalk.position.set(sx * R * 0.30, R * 0.62, -R * 0.10);
+    g.add(stalk);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(R * 0.11, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0x6ff0ff }));
+    bulb.position.set(sx * R * 0.30, R * 0.98, -R * 0.10);
+    g.add(bulb);
+  }
+
+  // beam emitter ring on the underside
+  const emitter = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.34, R * 0.30, R * 0.12, 18),
+    new THREE.MeshBasicMaterial({ color: 0x2a3a44 }));
+  emitter.position.y = -R * 0.36;
+  g.add(emitter);
+
+  markShadow(g, true, false);
+  g.position.copy(ufo.pos);
+  scene.add(g);
+})();
+
+// --- beam cone ------------------------------------------------------------
+const beamCone = (function buildBeamCone(){
+  const H = CFG.beam.range;
+  const R = Math.tan(CFG.beam.coneAngle) * H;
+  const geo = new THREE.ConeGeometry(R, H, 26, 1, true);
+  geo.translate(0, -H / 2, 0);   // apex at the origin, opening downward
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime:  { value: 0 },
+      uPower: { value: 0 },
+      uColor: { value: new THREE.Color(0x6ff0ff) },
+      uLock:  { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vN;
+      varying vec3 vV;
+      void main(){
+        vUv = uv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform float uTime; uniform float uPower; uniform float uLock;
+      uniform vec3 uColor;
+      varying vec2 vUv;
+      varying vec3 vN;
+      varying vec3 vV;
+      void main(){
+        // vUv.y runs 0 at the wide bottom to 1 at the apex on a cone
+        float down = 1.0 - vUv.y;
+        // travelling bands pulling downward, plus a soft core near the emitter
+        float bands = 0.5 + 0.5 * sin(down * 26.0 - uTime * 7.0);
+        float core  = smoothstep(1.0, 0.25, down);
+        // fade out at the very bottom so the beam does not end in a hard disc
+        float tail  = smoothstep(1.0, 0.5, down);
+        // grazing angles glow: makes the cone read as a hollow tube of light
+        // rather than a solid painted shape
+        float edge = pow(clamp(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), 1.6);
+        float a = (0.020 + bands * 0.050 + core * 0.060 + edge * 0.130) * tail;
+        a *= uPower;
+        vec3 col = mix(uColor, vec3(0.82, 1.0, 1.0), core * 0.35 + uLock * 0.2);
+        gl_FragColor = vec4(col, a);
+        if (gl_FragColor.a < 0.004) discard;
+      }`
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.visible = false;
+  mesh.renderOrder = 8;
+  ufo.group.add(mesh);
+  mesh.position.y = -CFG.ufo.radius * 0.38;
+  return mesh;
+})();
+
+// --- beam sparkles --------------------------------------------------------
+const beamSparks = (function buildSparks(){
+  const N = 150;
+  const pos = new Float32Array(N * 3);
+  const seed = new Float32Array(N);   // speed variation
+  const ang  = new Float32Array(N);   // fixed angle around the cone axis
+  const rad  = new Float32Array(N);   // fraction of the cone radius
+  for (let i = 0; i < N; i++){
+    seed[i] = rng();
+    ang[i]  = rng() * Math.PI * 2;
+    rad[i]  = Math.sqrt(rng());
+    pos[i*3+1] = -rng() * CFG.beam.range;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xcdf7ff, map: DOT_TEX, size: 1.15, transparent: true, opacity: 0.9,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.visible = false;
+  pts.renderOrder = 9;
+  pts.frustumCulled = false;
+  ufo.group.add(pts);
+  pts.userData.seed = seed;
+  pts.userData.ang = ang;
+  pts.userData.rad = rad;
+  return pts;
+})();
+
+// Advance sparkle positions along the cone each frame.
+function updateSparks(dt, t){
+  if (!beamSparks.visible) return;
+  const arr = beamSparks.geometry.attributes.position.array;
+  const seed = beamSparks.userData.seed;
+  const ang  = beamSparks.userData.ang;
+  const rad  = beamSparks.userData.rad;
+  const H = CFG.beam.range * (0.35 + 0.65 * beam.power);
+  for (let i = 0; i < seed.length; i++){
+    let y = arr[i*3+1] - (10 + seed[i] * 16) * dt;
+    if (y < -H) y = -CFG.ufo.radius * 0.4;
+    arr[i*3+1] = y;
+    // slow swirl around the axis, independent of how far down the spark is
+    const a = ang[i] + t * (0.5 + seed[i] * 0.6);
+    const r = Math.tan(CFG.beam.coneAngle) * Math.abs(y) * rad[i];
+    arr[i*3]   = Math.cos(a) * r;
+    arr[i*3+2] = Math.sin(a) * r;
+  }
+  beamSparks.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ==========================================================================
+   7b. THE FARMER
+   Straw hat, plaid shirt, blue overalls and boots, matching the reference art.
+   ========================================================================== */
+
+const FARMER_GEO = (function(){
+  const body = new Parts(), head = new Parts();
+  const denim = 0x35619e, denimDk = 0x2a4d80, shirt = 0xc4362e, shirtDk = 0x9c2a24;
+  const skin = 0xe8b48c, boot = 0x5b3a22, straw = 0xe0c169, hair = 0xf2ece2;
+
+  // legs and boots
+  for (const sx of [-1, 1]){
+    body.cyl(denim, [sx * 0.62, 2.1, 0], [0.52, 4.2, 0.52]);
+    body.box(boot, [sx * 0.62, 0.34, 0.28], [1.0, 0.68, 1.5]);
+  }
+  // torso: shirt with overall bib and straps
+  body.cyl(shirt, [0, 5.6, 0], [1.35, 3.2, 1.05]);
+  body.ball(shirt, [0, 7.1, 0], [1.35, 0.7, 1.05]);
+  body.box(denim, [0, 5.2, 0.55], [1.7, 2.6, 0.42]);            // bib
+  for (const sx of [-1, 1]) body.box(denimDk, [sx * 0.6, 6.9, 0.42], [0.34, 1.5, 0.3], [0.12, 0, 0]);
+  // plaid hint: two darker cross bands on the shirt
+  body.cyl(shirtDk, [0, 5.9, 0], [1.37, 0.28, 1.07]);
+  body.box(shirtDk, [0, 5.6, 0], [0.3, 3.2, 1.07]);
+  // arms
+  for (const sx of [-1, 1]){
+    body.cyl(shirt, [sx * 1.6, 5.8, 0], [0.42, 2.7, 0.42], [0, 0, sx * 0.16]);
+    body.ball(skin, [sx * 1.78, 4.3, 0], [0.42, 0.45, 0.42]);
+  }
+
+  // head with mustache and straw hat
+  head.ball(skin, [0, 0, 0], [1.05, 1.15, 1.0]);
+  head.ball(skin, [0, -0.28, 0.9], [0.5, 0.4, 0.45]);            // nose/muzzle area
+  head.ball(0xd99a72, [0, -0.35, 1.15], [0.26, 0.24, 0.26]);     // nose
+  for (const sx of [-1, 1]){
+    addEye(head, sx * 0.44, 0.22, 0.78, 0.28, 1);
+    head.box(hair, [sx * 0.34, -0.72, 0.72], [0.62, 0.22, 0.3], [0, 0, sx * 0.18]);  // mustache
+    head.ball(skin, [sx * 1.02, 0.0, 0.0], [0.24, 0.32, 0.26]);  // ears
+    head.box(0x8a7a68, [sx * 0.44, 0.62, 0.78], [0.55, 0.14, 0.2], [0, 0, sx * -0.22]); // brow
+  }
+  head.cyl(straw, [0, 0.95, 0], [1.5, 0.22, 1.5]);               // hat brim
+  head.cyl(straw, [0, 1.32, 0], [0.85, 0.72, 0.85]);             // crown
+  head.cyl(0xb8452f, [0, 1.08, 0], [0.88, 0.2, 0.88]);           // hat band
+
+  return { body: body.build(), head: head.build(), headAt: [0, 8.0, 0], radius: 2.0 };
+})();
+
+const farmer = {
+  group: new THREE.Group(),
+  head: null,
+  pos: new THREE.Vector3(),
+  vel: new THREE.Vector3(),
+  facing: 0,
+  state: 'patrol',       // patrol | investigate | chase | aim
+  alert: 0,              // 0..1, drives the HUD danger read
+  target: new THREE.Vector3(),
+  cooldown: 0,
+  waypoint: 0,
+  bob: 0
+};
+
+(function buildFarmer(){
+  const b = new THREE.Mesh(FARMER_GEO.body, creatureMat);
+  const h = new THREE.Mesh(FARMER_GEO.head, creatureMat);
+  h.position.set(FARMER_GEO.headAt[0], FARMER_GEO.headAt[1], FARMER_GEO.headAt[2]);
+  b.castShadow = true; h.castShadow = true;
+  farmer.group.add(b, h);
+  farmer.head = h;
+
+  // alert marker floating above him, so detection state is legible (D-016)
+  const markMat = new THREE.MeshBasicMaterial({ color: 0xffcf4d, transparent: true, opacity: 0 });
+  const mark = new THREE.Group();
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.0, 0.5), markMat);
+  bar.position.y = 1.3;
+  const dot = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), markMat);
+  mark.add(bar, dot);
+  mark.position.y = 11.2;
+  farmer.group.add(mark);
+  farmer.mark = mark;
+  farmer.markMat = markMat;
+
+  const hub = MAP_FARM.landmarks.barn;
+  farmer.pos.set(hub.x + 16, 0, hub.z + 26);
+  farmer.group.position.copy(farmer.pos);
+  scene.add(farmer.group);
+})();
+
+// Patrol route: a loop through the hub, the field edge, the pond and the grove.
+const PATROL = [
+  new THREE.Vector3(-96, 0, -104),
+  new THREE.Vector3(-10, 0, -66),
+  new THREE.Vector3(78, 0, -70),
+  new THREE.Vector3(92, 0, 66),
+  new THREE.Vector3(6, 0, 96),
+  new THREE.Vector3(-88, 0, 54),
+  new THREE.Vector3(-116, 0, -46)
+];
+
+/* --- pitchfork-throw projectiles ----------------------------------------- */
+const projectiles = [];
+const projGeo = new THREE.SphereGeometry(0.55, 8, 6);
+const projMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0 });
+const projTrailMat = new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: true,
+  opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
+
+function fireProjectile(from, toward){
+  const m = new THREE.Mesh(projGeo, projMat);
+  const trail = new THREE.Mesh(new THREE.SphereGeometry(1.05, 8, 6), projTrailMat);
+  m.add(trail);
+  m.position.copy(from);
+  scene.add(m);
+  const dir = toward.clone().sub(from).normalize();
+  projectiles.push({ mesh: m, vel: dir.multiplyScalar(CFG.farmer.projectileSpeed), life: 3.2 });
+}
+
+function updateProjectiles(dt){
+  for (let i = projectiles.length - 1; i >= 0; i--){
+    const p = projectiles[i];
+    p.mesh.position.addScaledVector(p.vel, dt);
+    p.vel.y -= 16 * dt;                       // readable cartoon arc
+    p.life -= dt;
+    const hit = p.mesh.position.distanceTo(ufo.pos) < CFG.ufo.radius * 1.15;
+    if (hit){
+      damageUfo(CFG.farmer.damage);
+      spawnBurst(p.mesh.position, 0xffc94a);
+    }
+    if (hit || p.life <= 0 || p.mesh.position.y < 0){
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+/* --- small particle bursts (impacts, captures) --------------------------- */
+const bursts = [];
+function spawnBurst(at, color){
+  const N = 14;
+  const pos = new Float32Array(N * 3);
+  const vel = [];
+  for (let i = 0; i < N; i++){
+    const a = rng() * 6.283, e = rand(0.2, 1.4);
+    vel.push(new THREE.Vector3(Math.cos(a) * rand(4, 13), e * rand(5, 15), Math.sin(a) * rand(4, 13)));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color, map: DOT_TEX, size: 2.2, transparent: true, opacity: 1,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const pts = new THREE.Points(geo, mat);
+  pts.position.copy(at);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  bursts.push({ pts, vel, life: 0.9, max: 0.9 });
+}
+function updateBursts(dt){
+  for (let i = bursts.length - 1; i >= 0; i--){
+    const b = bursts[i];
+    b.life -= dt;
+    const arr = b.pts.geometry.attributes.position.array;
+    for (let k = 0; k < b.vel.length; k++){
+      b.vel[k].y -= 26 * dt;
+      arr[k*3]   += b.vel[k].x * dt;
+      arr[k*3+1] += b.vel[k].y * dt;
+      arr[k*3+2] += b.vel[k].z * dt;
+    }
+    b.pts.geometry.attributes.position.needsUpdate = true;
+    b.pts.material.opacity = Math.max(0, b.life / b.max);
+    if (b.life <= 0){ scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose(); bursts.splice(i, 1); }
+  }
+}
+
+/* ==========================================================================
+   8. ANIMALS: instances, spawning and behaviour (D-015)
+   ========================================================================== */
+
+const animals = [];
+
+function spawnAnimal(spec, x, z){
+  const geo = CREATURE_GEO[spec.id];
+  const group = new THREE.Group();
+  const bodyMesh = new THREE.Mesh(geo.body, creatureMat);
+  const headMesh = new THREE.Mesh(geo.head, creatureMat);
+  headMesh.position.set(geo.headAt[0], geo.headAt[1], geo.headAt[2]);
+  bodyMesh.castShadow = true;
+  headMesh.castShadow = true;
+  group.add(bodyMesh, headMesh);
+  group.scale.setScalar(spec.scale);
+  group.position.set(x, terrainHeight(x, z), z);
+  scene.add(group);
+
+  const a = {
+    spec, group, headMesh,
+    headRest: geo.headAt.slice(),
+    pos: new THREE.Vector3(x, terrainHeight(x, z), z),
+    heading: rand(0, Math.PI * 2),
+    speed: 0,
+    state: 'graze',
+    timer: rand(1, 4),
+    radius: geo.radius * spec.scale,
+    lift: 0,               // metres lifted by the beam
+    captured: false,
+    panic: 0,
+    bob: rand(0, 6.28),
+    spin: 0
+  };
+  animals.push(a);
+  return a;
+}
+
+// Populate the pasture from the map's weighted spawn zones.
+(function populate(){
+  const zones = MAP_FARM.spawnZones;
+  const bag = [];
+  zones.forEach(z => { for (let i = 0; i < z.weight; i++) bag.push(z); });
+
+  // Two of every species, plus extras, so no single species can gate the goal.
+  const plan = [];
+  SPECIES.forEach(s => { plan.push(s, s); });
+  while (plan.length < 18) plan.push(pick(SPECIES));
+
+  for (const spec of plan){
+    let x = 0, z = 0, ok = false;
+    for (let tries = 0; tries < 200 && !ok; tries++){
+      const zone = pick(bag);
+      const a = rand(0, Math.PI * 2), d = Math.sqrt(rng()) * zone.r;
+      x = zone.x + Math.cos(a) * d;
+      z = zone.z + Math.sin(a) * d;
+      ok = validProp(x, z, 6) && !animals.some(o => Math.hypot(o.pos.x - x, o.pos.z - z) < 9);
+    }
+    if (ok) spawnAnimal(spec, x, z);
+  }
+})();
+
+// Keep an animal inside the fence and out of the blocking landmarks.
+function confineToFarm(p, radius){
+  const inside = insideFenceBy(p.x, p.z);
+  if (inside < radius + 2){
+    const len = Math.hypot(p.x, p.z) || 1;
+    const a = Math.atan2(p.z, p.x);
+    const maxR = fenceRadiusAt(a) - radius - 2;
+    p.x = (p.x / len) * maxR;
+    p.z = (p.z / len) * maxR;
+  }
+  for (const c of COLLIDERS){
+    const dx = p.x - c.x, dz = p.z - c.z;
+    const d = Math.hypot(dx, dz);
+    const min = c.r + radius;
+    if (d < min && d > 0.001){
+      p.x = c.x + (dx / d) * min;
+      p.z = c.z + (dz / d) * min;
+    }
+  }
+}
+
+function updateAnimals(dt, t){
+  const beamOn = beam.power > 0.15;
+  for (let i = animals.length - 1; i >= 0; i--){
+    const a = animals[i];
+
+    /* --- being abducted ------------------------------------------------- */
+    if (beam.target === a && beamOn){
+      a.lift += CFG.beam.liftSpeed * dt / a.spec.mass;
+      a.spin += dt * (3.2 + a.spec.mass);
+      a.panic = 1;
+      const wobble = Math.sin(t * 14 + a.bob) * CFG.beam.struggleShake;
+      a.group.position.set(
+        lerp(a.pos.x, ufo.pos.x, smoothstep(0, 1, a.lift / Math.max(1, ufo.pos.y))) + wobble,
+        terrainHeight(a.pos.x, a.pos.z) + a.lift,
+        lerp(a.pos.z, ufo.pos.z, smoothstep(0, 1, a.lift / Math.max(1, ufo.pos.y)))
+      );
+      a.group.rotation.y = a.spin;
+      a.group.rotation.z = Math.sin(t * 9 + a.bob) * 0.28;
+
+      // captured once it reaches the underside of the saucer
+      if (a.group.position.y > ufo.pos.y - CFG.beam.captureHeight){
+        beam.capturedThisFrame = a;
+        beam.target = null;
+        spawnBurst(a.group.position, 0x8ff2ff);
+        scene.remove(a.group);
+        animals.splice(i, 1);
+        continue;
+      }
+      continue;
+    }
+
+    // released mid-lift: fall back down and bolt
+    if (a.lift > 0.05){
+      a.lift = Math.max(0, a.lift - 42 * dt);
+      a.group.position.y = terrainHeight(a.pos.x, a.pos.z) + a.lift;
+      a.group.rotation.z = damp(a.group.rotation.z, 0, 6, dt);
+      a.panic = 1;
+      if (a.lift <= 0.05) a.group.rotation.z = 0;
+    }
+
+    /* --- ground behaviour ----------------------------------------------- */
+    const dUfo = Math.hypot(a.pos.x - ufo.pos.x, a.pos.z - ufo.pos.z);
+
+    // React to UFO proximity, and more strongly when the beam is live nearby.
+    const scareRange = beamOn ? 42 : 26;
+    if (dUfo < scareRange && ufo.pos.y < 46){
+      a.panic = Math.min(1, a.panic + dt * (beamOn ? 2.6 : 1.5) * a.spec.skittish);
+    } else {
+      a.panic = Math.max(0, a.panic - dt * 0.45);
+    }
+
+    a.timer -= dt;
+    if (a.panic > 0.5){
+      a.state = 'flee';
+    } else if (a.timer <= 0){
+      // wander -> graze -> idle -> look around (D-015)
+      a.state = pick(['wander', 'graze', 'graze', 'idle', 'look']);
+      a.timer = rand(1.6, 4.5);
+      if (a.state === 'wander') a.heading += rand(-1.6, 1.6);
+    }
+
+    let targetSpeed = 0;
+    if (a.state === 'flee'){
+      // run directly away from the UFO
+      const ax = a.pos.x - ufo.pos.x, az = a.pos.z - ufo.pos.z;
+      a.heading = Math.atan2(ax, az);
+      targetSpeed = a.spec.speed * 2.4;
+    } else if (a.state === 'wander'){
+      targetSpeed = a.spec.speed;
+      a.heading += Math.sin(t * 0.7 + a.bob) * 0.5 * dt;
+    } else if (a.state === 'look'){
+      a.heading += dt * 1.1;
+    }
+
+    a.speed = damp(a.speed, targetSpeed, 4.5, dt);
+    if (a.speed > 0.02){
+      a.pos.x += Math.sin(a.heading) * a.speed * dt;
+      a.pos.z += Math.cos(a.heading) * a.speed * dt;
+      confineToFarm(a.pos, a.radius);
+    }
+
+    if (a.lift <= 0.05){
+      a.pos.y = terrainHeight(a.pos.x, a.pos.z);
+      // gentle bob while moving, and a heavier one while panicking
+      const bobAmp = a.speed > 0.5 ? 0.16 + a.panic * 0.22 : 0.04;
+      const bobRate = 5 + a.speed * 1.4;
+      a.group.position.set(
+        a.pos.x,
+        a.pos.y + Math.abs(Math.sin(t * bobRate + a.bob)) * bobAmp * a.spec.scale,
+        a.pos.z
+      );
+      a.group.rotation.y = damp(a.group.rotation.y, a.heading, 7, dt);
+      // lean into a run
+      a.group.rotation.x = damp(a.group.rotation.x, -Math.min(a.speed / 30, 0.14), 5, dt);
+    }
+
+    // head: lowers to graze, lifts and scans otherwise
+    const rest = a.headRest;
+    const grazing = a.state === 'graze' && a.panic < 0.2;
+    const wantDrop = grazing ? rest[1] * 0.42 : rest[1];
+    const wantFwd  = grazing ? rest[2] * 1.18 : rest[2];
+    a.headMesh.position.y = damp(a.headMesh.position.y, wantDrop, 3.2, dt);
+    a.headMesh.position.z = damp(a.headMesh.position.z, wantFwd, 3.2, dt);
+    a.headMesh.rotation.x = damp(a.headMesh.rotation.x, grazing ? 0.85 : 0, 3.2, dt);
+    a.headMesh.rotation.y = (a.state === 'look' && !grazing)
+      ? Math.sin(t * 1.6 + a.bob) * 0.6
+      : damp(a.headMesh.rotation.y, 0, 4, dt);
+  }
+}
+
+/* ==========================================================================
+   9. BEAM TARGETING
+   Auto-lock the closest eligible target inside the cone, so a young player
+   does not have to aim precisely (D-014, Step 4 spec section 2).
+   ========================================================================== */
+
+function acquireTarget(){
+  let best = null, bestScore = Infinity;
+  for (const a of animals){
+    if (a.captured) continue;
+    const dx = a.pos.x - ufo.pos.x;
+    const dz = a.pos.z - ufo.pos.z;
+    const dy = ufo.pos.y - (a.pos.y + a.lift);
+    if (dy <= 0 || dy > CFG.beam.range) continue;
+    const horiz = Math.hypot(dx, dz);
+    // angle from straight down
+    const ang = Math.atan2(horiz, dy);
+    if (ang > CFG.beam.lockConeAngle) continue;
+    // prefer targets nearer the beam axis, then nearer overall
+    const score = ang * 60 + horiz;
+    if (score < bestScore){ bestScore = score; best = a; }
+  }
+  return best;
+}
+
+function updateBeam(dt, t){
+  beam.capturedThisFrame = null;
+
+  const want = beam.active && mission.state === 'playing' ? 1 : 0;
+  beam.power = damp(beam.power, want, want ? 9 : 12, dt);
+  if (beam.power < 0.02) beam.power = 0;
+
+  if (beam.active && mission.state === 'playing'){
+    // drop a target that wandered out of the cone, then try to acquire
+    if (beam.target){
+      const a = beam.target;
+      const gone = animals.indexOf(a) === -1;
+      const dy = ufo.pos.y - (a.pos.y + a.lift);
+      const horiz = Math.hypot(a.pos.x - ufo.pos.x, a.pos.z - ufo.pos.z);
+      const ang = Math.atan2(horiz, Math.max(0.01, dy));
+      if (gone || dy <= 0 || dy > CFG.beam.range || ang > CFG.beam.lockConeAngle * 1.35) beam.target = null;
+    }
+    if (!beam.target) beam.target = acquireTarget();
+    beam.lockStrength = damp(beam.lockStrength, beam.target ? 1 : 0, 8, dt);
+  } else {
+    beam.target = null;
+    beam.lockStrength = damp(beam.lockStrength, 0, 10, dt);
+  }
+
+  const visible = beam.power > 0.02;
+  beamCone.visible = visible;
+  beamSparks.visible = visible;
+  if (visible){
+    beamCone.material.uniforms.uTime.value  = t;
+    beamCone.material.uniforms.uPower.value = beam.power;
+    beamCone.material.uniforms.uLock.value  = beam.lockStrength;
+    // the cone opens out as the beam spins up
+    const s = 0.35 + 0.65 * beam.power;
+    beamCone.scale.set(s, s, s);
+  }
+  beamSparks.material.opacity = 0.9 * beam.power;
+}
+
+/* ==========================================================================
+   10. INPUT
+   Touch-first (D-004). Keyboard is a desktop/testing convenience only.
+   ========================================================================== */
+
+const input = {
+  move: new THREE.Vector2(),   // -1..1 on each axis
+  beam: false,
+  scout: false,
+  boost: false,
+  lift: 0                      // -1 down, +1 up
+};
+
+(function bindStick(){
+  const el = document.getElementById('stick');
+  const nub = document.getElementById('stickNub');
+  let id = null, cx = 0, cy = 0, radius = 52;
+
+  function start(x, y, rect){
+    cx = rect.left + rect.width / 2;
+    cy = rect.top + rect.height / 2;
+    radius = rect.width * 0.38;
+    move(x, y);
+  }
+  function move(x, y){
+    let dx = x - cx, dy = y - cy;
+    const d = Math.hypot(dx, dy);
+    if (d > radius){ dx = dx / d * radius; dy = dy / d * radius; }
+    nub.style.transform = `translate(${dx}px, ${dy}px)`;
+    input.move.set(dx / radius, dy / radius);
+  }
+  function end(){
+    id = null;
+    nub.style.transform = 'translate(0px, 0px)';
+    input.move.set(0, 0);
+  }
+
+  el.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    id = t.identifier;
+    start(t.clientX, t.clientY, el.getBoundingClientRect());
+  }, { passive: false });
+  el.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) if (t.identifier === id) move(t.clientX, t.clientY);
+  }, { passive: false });
+  el.addEventListener('touchend', e => {
+    for (const t of e.changedTouches) if (t.identifier === id) end();
+  }, { passive: false });
+  el.addEventListener('touchcancel', end, { passive: false });
+
+  // pointer fallback for desktop
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return;
+    el.setPointerCapture(e.pointerId);
+    id = 'mouse';
+    start(e.clientX, e.clientY, el.getBoundingClientRect());
+  });
+  el.addEventListener('pointermove', e => { if (id === 'mouse') move(e.clientX, e.clientY); });
+  el.addEventListener('pointerup', () => { if (id === 'mouse') end(); });
+})();
+
+function bindHoldButton(elId, onChange){
+  const el = document.getElementById(elId);
+  let held = 0;
+  const set = v => {
+    if (v === (held > 0)) return;
+    held = v ? 1 : 0;
+    el.classList.toggle('active', !!v);
+    onChange(!!v);
+  };
+  el.addEventListener('touchstart', e => { e.preventDefault(); set(true); }, { passive: false });
+  el.addEventListener('touchend',   e => { e.preventDefault(); set(false); }, { passive: false });
+  el.addEventListener('touchcancel', () => set(false), { passive: false });
+  el.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch'){ el.setPointerCapture(e.pointerId); set(true); } });
+  el.addEventListener('pointerup',   e => { if (e.pointerType !== 'touch') set(false); });
+  el.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') set(false); });
+  return el;
+}
+// Held-button state is kept separate from key state; readInput() composes the
+// two into `input` each frame. Writing straight into `input` from both places
+// meant whichever ran last won, and the keyboard pass silently cleared the
+// touch beam every frame.
+const btn = { beam: false, scout: false, boost: false };
+bindHoldButton('beamBtn',  v => { btn.beam  = v; });
+bindHoldButton('scoutBtn', v => { btn.scout = v; });
+bindHoldButton('boostBtn', v => { btn.boost = v; });
+
+// Keyboard: desktop convenience and the handle the automated tests drive.
+const keys = Object.create(null);
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+function readInput(){
+  const kx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  const ky = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+  if (kx || ky) input.move.set(kx, ky);
+  input.beam  = btn.beam  || !!keys.Space;
+  input.scout = btn.scout || !!keys.KeyQ;
+  input.boost = btn.boost || !!keys.ShiftLeft || !!keys.ShiftRight;
+  input.lift  = (keys.KeyR ? 1 : 0) - (keys.KeyF ? 1 : 0);
+}
+
+// Test hook: lets automated runs drive the game deterministically.
+window.__game = {
+  input, ufo, beam, animals, farmer, CFG, MAP_FARM,
+  scene, camera, renderer,
+  freeCam: false,   // when true the automated tests drive the camera themselves
+  setBeam(v){ btn.beam = !!v; },
+  setScout(v){ btn.scout = !!v; },
+  setBoost(v){ btn.boost = !!v; },
+  get mission(){ return mission; },
+  flyTo(x, z, y){ ufo.pos.set(x, y === undefined ? ufo.pos.y : y, z); ufo.vel.set(0, 0, 0); },
+  nearestAnimal(){
+    let best = null, bd = Infinity;
+    for (const a of animals){
+      const d = Math.hypot(a.pos.x - ufo.pos.x, a.pos.z - ufo.pos.z);
+      if (d < bd){ bd = d; best = a; }
+    }
+    return best;
+  }
+};
+
+/* ==========================================================================
+   11. UFO FLIGHT + CAMERA
+   ========================================================================== */
+
+function updateUfo(dt){
+  const C = CFG.ufo;
+  if (mission.state === 'playing'){
+    // Movement is camera-relative so "up" on the stick always flies away
+    // from the player, which is the readable behaviour on a chase cam.
+    const yaw = camYaw;
+    const ix = input.move.x, iy = input.move.y;
+    const fwdX = Math.sin(yaw),  fwdZ = Math.cos(yaw);
+    const rgtX = Math.cos(yaw),  rgtZ = -Math.sin(yaw);
+    const ax = (rgtX * ix + fwdX * iy) * C.accel * (input.boost ? C.boostMul : 1);
+    const az = (rgtZ * ix + fwdZ * iy) * C.accel * (input.boost ? C.boostMul : 1);
+    ufo.vel.x += ax * dt;
+    ufo.vel.z += az * dt;
+
+    // altitude: manual on keyboard, and the beam pulls the saucer down a little
+    let liftWanted = input.lift * C.liftRate;
+    if (beam.power > 0.3 && ufo.pos.y > C.minY + 6) liftWanted -= 4;
+    ufo.vel.y += liftWanted * dt;
+  }
+
+  // drag gives momentum without feeling floaty (D-013)
+  const dragF = Math.exp(-C.drag * dt);
+  ufo.vel.x *= dragF;
+  ufo.vel.z *= dragF;
+  ufo.vel.y *= Math.exp(-3.6 * dt);
+
+  const maxS = C.maxSpeed * (input.boost ? C.boostMul : 1);
+  const sp = Math.hypot(ufo.vel.x, ufo.vel.z);
+  if (sp > maxS){ ufo.vel.x = ufo.vel.x / sp * maxS; ufo.vel.z = ufo.vel.z / sp * maxS; }
+
+  ufo.pos.addScaledVector(ufo.vel, dt);
+  ufo.pos.y = clamp(ufo.pos.y, C.minY, C.maxY);
+
+  // keep inside the fence line
+  const inside = insideFenceBy(ufo.pos.x, ufo.pos.z);
+  if (inside < C.radius){
+    const a = Math.atan2(ufo.pos.z, ufo.pos.x);
+    const maxR = fenceRadiusAt(a) - C.radius;
+    const len = Math.hypot(ufo.pos.x, ufo.pos.z) || 1;
+    ufo.pos.x = ufo.pos.x / len * maxR;
+    ufo.pos.z = ufo.pos.z / len * maxR;
+    ufo.vel.x *= 0.4; ufo.vel.z *= 0.4;
+  }
+
+  // radial push-out from the blocking landmarks (D-008)
+  for (const c of COLLIDERS){
+    const dx = ufo.pos.x - c.x, dz = ufo.pos.z - c.z;
+    const d = Math.hypot(dx, dz);
+    const min = c.r + C.radius;
+    if (d < min && d > 0.001 && ufo.pos.y < 34){
+      ufo.pos.x = c.x + dx / d * min;
+      ufo.pos.z = c.z + dz / d * min;
+      const push = (dx / d) * ufo.vel.x + (dz / d) * ufo.vel.z;
+      if (push < 0){ ufo.vel.x -= (dx / d) * push * 1.5; ufo.vel.z -= (dz / d) * push * 1.5; }
+    }
+  }
+
+  // visual bank into the direction of travel
+  ufo.bank.x = damp(ufo.bank.x,  clamp(ufo.vel.z / C.maxSpeed, -1, 1) * C.bankMax, 5, dt);
+  ufo.bank.y = damp(ufo.bank.y, -clamp(ufo.vel.x / C.maxSpeed, -1, 1) * C.bankMax, 5, dt);
+  ufo.spin += dt * 0.85;
+
+  ufo.group.position.copy(ufo.pos);
+  ufo.group.rotation.set(ufo.bank.x, ufo.spin, ufo.bank.y);
+
+  if (ufo.hitFlash > 0){
+    ufo.hitFlash = Math.max(0, ufo.hitFlash - dt * 2.6);
+    ufo.group.position.x += Math.sin(performance.now() * 0.05) * ufo.hitFlash * 0.8;
+  }
+}
+
+// --- camera ---------------------------------------------------------------
+let camYaw = 0;              // fixed world yaw for the chase cam
+let scoutBlend = 0;          // 0 = chase, 1 = scout
+
+// Lowest camera height at which every point on the fence ring still projects
+// inside the viewport with a ~5% margin, for the actual tilted scout camera and
+// the actual aspect ratio (D-012). Solved numerically rather than with a fudge
+// factor, so portrait and landscape are both exact. Cached until the aspect
+// changes, so it costs nothing per frame.
+const FENCE_RING = (function(){
+  const ring = [];
+  for (let i = 0; i < 48; i++){
+    const a = (i / 48) * Math.PI * 2;
+    const r = fenceRadiusAt(a);
+    ring.push(new THREE.Vector3(Math.cos(a) * r, MAP_FARM.fence.height, Math.sin(a) * r));
+  }
+  return ring;
+})();
+const _scoutProbe = new THREE.PerspectiveCamera(58, 1, 1, 4000);
+const _scoutV = new THREE.Vector3();
+let _scoutCache = { aspect: -1, fov: -1, h: 420 };
+
+function scoutFits(H){
+  const limit = 1 / CFG.camera.scoutMargin;   // 1.05 margin -> 0.952 of NDC
+  _scoutProbe.fov = camera.fov;
+  _scoutProbe.aspect = camera.aspect;
+  _scoutProbe.updateProjectionMatrix();
+  _scoutProbe.position.set(0, H, H * 0.30);
+  _scoutProbe.lookAt(0, 0, -6);
+  _scoutProbe.updateMatrixWorld(true);
+  for (const p of FENCE_RING){
+    _scoutV.copy(p).project(_scoutProbe);
+    if (Math.abs(_scoutV.x) > limit || Math.abs(_scoutV.y) > limit || _scoutV.z > 1) return false;
+  }
+  return true;
+}
+
+function scoutHeight(){
+  if (_scoutCache.aspect === camera.aspect && _scoutCache.fov === camera.fov) return _scoutCache.h;
+  let lo = 80, hi = 1600;
+  if (scoutFits(lo)) hi = lo;
+  else if (!scoutFits(hi)) hi = 1600;
+  else {
+    for (let i = 0; i < 26; i++){
+      const mid = (lo + hi) / 2;
+      if (scoutFits(mid)) hi = mid; else lo = mid;
+    }
+  }
+  _scoutCache = { aspect: camera.aspect, fov: camera.fov, h: hi };
+  return hi;
+}
+
+const camTarget = new THREE.Vector3();
+const camWanted = new THREE.Vector3();
+
+function updateCamera(dt){
+  const C = CFG.camera;
+  if (window.__game && window.__game.freeCam) return;
+  scoutBlend = damp(scoutBlend, input.scout ? 1 : 0, C.scoutLerp, dt);
+
+  // chase position sits behind and above the saucer
+  const chaseX = ufo.pos.x - Math.sin(camYaw) * C.chaseDist;
+  const chaseZ = ufo.pos.z - Math.cos(camYaw) * C.chaseDist;
+  const chaseY = ufo.pos.y + C.chaseHeight;
+
+  const H = scoutHeight();
+  const scoutX = 0, scoutY = H, scoutZ = H * 0.30;
+
+  const b = smoothstep(0, 1, scoutBlend);
+  camWanted.set(lerp(chaseX, scoutX, b), lerp(chaseY, scoutY, b), lerp(chaseZ, scoutZ, b));
+  camera.position.lerp(camWanted, 1 - Math.exp(-C.lerp * dt));
+
+  camTarget.set(
+    lerp(ufo.pos.x, 0, b),
+    lerp(ufo.pos.y - 4, 0, b),
+    lerp(ufo.pos.z, -6, b)
+  );
+  camera.lookAt(camTarget);
+
+  // keep the shadow frustum tight around the saucer
+  sun.target.position.set(ufo.pos.x, 0, ufo.pos.z);
+  sun.position.set(ufo.pos.x + L.sun.dir[0] * 0.55, L.sun.dir[1], ufo.pos.z + L.sun.dir[2] * 0.55);
+  sun.target.updateMatrixWorld();
+}
+
+/* ==========================================================================
+   12. FARMER AI (D-016)
+   Patrol -> investigate -> chase -> throw. Detection is legible via the alert
+   marker above his head and the HUD danger tint.
+   ========================================================================== */
+
+function updateFarmer(dt, t){
+  const F = CFG.farmer;
+  if (mission.state !== 'playing'){
+    farmer.group.position.copy(farmer.pos);
+    return;
+  }
+
+  const toUfoX = ufo.pos.x - farmer.pos.x;
+  const toUfoZ = ufo.pos.z - farmer.pos.z;
+  const dist = Math.hypot(toUfoX, toUfoZ);
+
+  // Beam use makes the UFO far more conspicuous (Step 4 spec section 4).
+  const range = beam.power > 0.25 ? F.sightRangeBeam : F.sightRange;
+  const lowEnough = ufo.pos.y < 52;
+  const sees = dist < range && lowEnough;
+
+  if (sees) farmer.alert = Math.min(1, farmer.alert + dt * F.alertGain * (beam.power > 0.25 ? 1.5 : 1));
+  else farmer.alert = Math.max(0, farmer.alert - dt * F.alertDecay);
+
+  if (farmer.alert > 0.85)      farmer.state = 'chase';
+  else if (farmer.alert > 0.35) farmer.state = 'investigate';
+  else                          farmer.state = 'patrol';
+
+  let speed = 0, wantX = 0, wantZ = 0;
+  if (farmer.state === 'patrol'){
+    const wp = PATROL[farmer.waypoint];
+    wantX = wp.x - farmer.pos.x;
+    wantZ = wp.z - farmer.pos.z;
+    if (Math.hypot(wantX, wantZ) < 8) farmer.waypoint = (farmer.waypoint + 1) % PATROL.length;
+    speed = F.walkSpeed;
+  } else if (farmer.state === 'investigate'){
+    if (sees) farmer.target.set(ufo.pos.x, 0, ufo.pos.z);
+    wantX = farmer.target.x - farmer.pos.x;
+    wantZ = farmer.target.z - farmer.pos.z;
+    speed = F.walkSpeed * 1.25;
+  } else {
+    farmer.target.set(ufo.pos.x, 0, ufo.pos.z);
+    wantX = toUfoX; wantZ = toUfoZ;
+    // hold position once in throwing range instead of standing underneath
+    speed = dist < F.shootRange * 0.6 ? 0 : F.chaseSpeed;
+  }
+
+  const wl = Math.hypot(wantX, wantZ);
+  if (wl > 0.01 && speed > 0){
+    farmer.pos.x += (wantX / wl) * speed * dt;
+    farmer.pos.z += (wantZ / wl) * speed * dt;
+    confineToFarm(farmer.pos, 2.5);
+    farmer.bob += dt * speed * 0.9;
+  }
+  farmer.pos.y = terrainHeight(farmer.pos.x, farmer.pos.z);
+
+  // face the UFO when alerted, otherwise face the walk direction
+  const faceX = farmer.state === 'patrol' ? wantX : toUfoX;
+  const faceZ = farmer.state === 'patrol' ? wantZ : toUfoZ;
+  if (Math.hypot(faceX, faceZ) > 0.01){
+    const want = Math.atan2(faceX, faceZ);
+    let d = want - farmer.facing;
+    while (d >  Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    farmer.facing += d * Math.min(1, dt * 6);
+  }
+
+  farmer.group.position.set(
+    farmer.pos.x,
+    farmer.pos.y + Math.abs(Math.sin(farmer.bob * 3)) * 0.22,
+    farmer.pos.z
+  );
+  farmer.group.rotation.y = farmer.facing;
+  farmer.group.rotation.z = Math.sin(farmer.bob * 3) * 0.045;
+  // head tips up to watch the saucer
+  farmer.head.rotation.x = damp(farmer.head.rotation.x,
+    farmer.alert > 0.35 ? -clamp(Math.atan2(ufo.pos.y, Math.max(6, dist)), 0, 1.1) : 0, 4, dt);
+
+  // alert marker
+  farmer.markMat.opacity = smoothstep(0.3, 0.9, farmer.alert);
+  farmer.markMat.color.setHex(farmer.state === 'chase' ? 0xff5a44 : 0xffcf4d);
+  farmer.mark.rotation.y = t * 2.2;
+  farmer.mark.scale.setScalar(1 + Math.sin(t * 7) * 0.09 * farmer.alert);
+
+  // throw when alerted, in range and off cooldown
+  farmer.cooldown -= dt;
+  if (farmer.state === 'chase' && dist < F.shootRange && farmer.cooldown <= 0 && ufo.pos.y < 56){
+    farmer.cooldown = F.shootCooldown;
+    const from = new THREE.Vector3(farmer.pos.x, farmer.pos.y + 8.5, farmer.pos.z);
+    // lead the shot, and aim high so the arc reads as a lob
+    const lead = new THREE.Vector3(
+      ufo.pos.x + ufo.vel.x * 0.45,
+      ufo.pos.y + 9 + dist * 0.10,
+      ufo.pos.z + ufo.vel.z * 0.45
+    );
+    fireProjectile(from, lead);
+  }
+}
+
+/* ==========================================================================
+   13. MISSION, SCORE, HULL, HUD (D-017)
+   ========================================================================== */
+
+const mission = {
+  state: 'ready',                       // ready | playing | won | lost
+  score: 0,
+  abducted: 0,
+  goal: MAP_FARM.mission.goal,
+  time: MAP_FARM.mission.seconds,
+  timeLeft: MAP_FARM.mission.seconds,
+  combo: 0,
+  comboTimer: 0
+};
+
+const el = {
+  score:   document.getElementById('scoreVal'),
+  abd:     document.getElementById('abdVal'),
+  abdGoal: document.getElementById('abdGoal'),
+  timerText: document.getElementById('timerText'),
+  timerArc:  document.getElementById('timerArc'),
+  hullPct: document.getElementById('hullPct'),
+  hullFill: document.getElementById('hullFill'),
+  reticle: document.getElementById('reticle'),
+  toast:   document.getElementById('toast'),
+  overlay: document.getElementById('overlay'),
+  overlayTitle: document.getElementById('overlayTitle'),
+  overlaySub:   document.getElementById('overlaySub'),
+  overlayStats: document.getElementById('overlayStats'),
+  startBtn: document.getElementById('startBtn'),
+  hint:    document.getElementById('hint'),
+  briefGoal: document.getElementById('briefGoal'),
+  radar:   document.getElementById('radarCanvas')
+};
+const radarCtx = el.radar.getContext('2d');
+
+const ARC_LEN = 2 * Math.PI * 45;
+el.timerArc.style.strokeDasharray = ARC_LEN;
+
+let toastTimer = 0;
+function toast(msg){
+  el.toast.textContent = msg;
+  el.toast.classList.add('show');
+  toastTimer = 1.1;
+}
+
+function damageUfo(amount){
+  if (mission.state !== 'playing') return;
+  ufo.hull = Math.max(0, ufo.hull - amount);
+  ufo.hitFlash = 1;
+  toast('HIT!');
+  if (ufo.hull <= 0) endMission(false, 'The hull gave out.');
+}
+
+function onCapture(a){
+  const pts = a.spec.points;
+  mission.combo = mission.comboTimer > 0 ? mission.combo + 1 : 1;
+  mission.comboTimer = 3.0;
+  const mult = Math.min(4, mission.combo);
+  mission.score += pts * mult;
+  mission.abducted++;
+  toast(mult > 1 ? `${a.spec.name.toUpperCase()}  +${pts * mult}  x${mult}` : `${a.spec.name.toUpperCase()}  +${pts}`);
+  if (mission.abducted >= mission.goal) endMission(true);
+}
+
+function startMission(){
+  mission.state = 'playing';
+  mission.score = 0;
+  mission.abducted = 0;
+  mission.timeLeft = mission.time;
+  mission.combo = 0;
+  mission.comboTimer = 0;
+  ufo.hull = MAP_FARM.mission.hull;
+  el.overlay.classList.add('hidden');
+}
+
+function endMission(won, reason){
+  if (mission.state !== 'playing') return;
+  mission.state = won ? 'won' : 'lost';
+  beam.active = false;
+  input.beam = false;
+  el.overlayTitle.textContent = won ? 'Mission Complete!' : 'Mission Failed';
+  el.overlaySub.textContent = won
+    ? 'The herd is aboard. Nice flying.'
+    : (reason || 'Better luck next pass.');
+  el.overlayStats.style.display = 'block';
+  el.overlayStats.innerHTML =
+    `<div><span class="k">Score</span><br>${mission.score}</div>` +
+    `<div><span class="k">Abducted</span><br>${mission.abducted} / ${mission.goal}</div>` +
+    `<div><span class="k">Time left</span><br>${Math.ceil(Math.max(0, mission.timeLeft))}s</div>`;
+  el.startBtn.textContent = 'Fly Again';
+  el.hint.style.display = 'none';
+  el.overlay.classList.remove('hidden');
+}
+
+el.startBtn.addEventListener('click', startMission);
+el.briefGoal.textContent = mission.goal;
+el.abdGoal.textContent = mission.goal;
+
+function updateMission(dt){
+  if (mission.state !== 'playing') return;
+  mission.timeLeft -= dt;
+  if (mission.comboTimer > 0) mission.comboTimer -= dt;
+  else mission.combo = 0;
+  if (mission.timeLeft <= 0){
+    mission.timeLeft = 0;
+    endMission(false, 'Out of time.');
+  }
+}
+
+// --- radar ----------------------------------------------------------------
+function drawRadar(t){
+  const w = el.radar.width, h = el.radar.height, cx = w / 2, cy = h / 2;
+  const R = w * 0.46;
+  radarCtx.clearRect(0, 0, w, h);
+
+  radarCtx.strokeStyle = 'rgba(111,240,255,0.30)';
+  radarCtx.lineWidth = 2;
+  for (const f of [1, 0.66, 0.33]){
+    radarCtx.beginPath();
+    radarCtx.arc(cx, cy, R * f, 0, Math.PI * 2);
+    radarCtx.stroke();
+  }
+  radarCtx.beginPath();
+  radarCtx.moveTo(cx - R, cy); radarCtx.lineTo(cx + R, cy);
+  radarCtx.moveTo(cx, cy - R); radarCtx.lineTo(cx, cy + R);
+  radarCtx.stroke();
+
+  // sweep
+  const ang = t * 1.7;
+  const grad = radarCtx.createLinearGradient(cx, cy, cx + Math.cos(ang) * R, cy + Math.sin(ang) * R);
+  grad.addColorStop(0, 'rgba(111,240,255,0.55)');
+  grad.addColorStop(1, 'rgba(111,240,255,0)');
+  radarCtx.strokeStyle = grad;
+  radarCtx.lineWidth = 3;
+  radarCtx.beginPath();
+  radarCtx.moveTo(cx, cy);
+  radarCtx.lineTo(cx + Math.cos(ang) * R, cy + Math.sin(ang) * R);
+  radarCtx.stroke();
+
+  // the radar is farm-wide and UFO-centred
+  const scale = R / MAP_FARM.fence.radius;
+  const plot = (x, z, col, size) => {
+    const px = cx + (x - ufo.pos.x) * scale * 0.85;
+    const py = cy + (z - ufo.pos.z) * scale * 0.85;
+    if (Math.hypot(px - cx, py - cy) > R - 2) return;
+    radarCtx.fillStyle = col;
+    radarCtx.beginPath();
+    radarCtx.arc(px, py, size, 0, Math.PI * 2);
+    radarCtx.fill();
+  };
+  for (const a of animals) plot(a.pos.x, a.pos.z, '#7dff9b', 3.4);
+  plot(farmer.pos.x, farmer.pos.z, farmer.alert > 0.35 ? '#ff6a52' : '#ffcf4d', 4.6);
+
+  radarCtx.fillStyle = '#ffffff';
+  radarCtx.beginPath();
+  radarCtx.arc(cx, cy, 3.6, 0, Math.PI * 2);
+  radarCtx.fill();
+}
+
+const _proj = new THREE.Vector3();
+function updateHud(dt, t){
+  el.score.textContent = mission.score;
+  el.abd.textContent = mission.abducted;
+
+  const secs = Math.max(0, Math.ceil(mission.timeLeft));
+  el.timerText.innerHTML = `${secs}<span>s</span>`;
+  const frac = clamp(mission.timeLeft / mission.time, 0, 1);
+  el.timerArc.style.strokeDashoffset = ARC_LEN * (1 - frac);
+  el.timerArc.style.stroke = frac < 0.18 ? '#ff6a52' : (frac < 0.4 ? '#ffcf4d' : '#6ff0ff');
+
+  const hp = Math.round(ufo.hull);
+  el.hullPct.textContent = hp + '%';
+  el.hullFill.style.width = hp + '%';
+  el.hullFill.className = hp < 30 ? 'bad' : (hp < 60 ? 'warn' : '');
+
+  // reticle tracks the locked target on screen
+  if (beam.target && beam.lockStrength > 0.1){
+    _proj.set(beam.target.pos.x, beam.target.pos.y + beam.target.lift + 3, beam.target.pos.z);
+    _proj.project(camera);
+    const sx = (_proj.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
+    const onScreen = _proj.z < 1 && sx > 0 && sx < window.innerWidth && sy > 0 && sy < window.innerHeight;
+    el.reticle.classList.toggle('on', onScreen);
+    const pulse = 1 + Math.sin(t * 9) * 0.07;
+    el.reticle.style.transform = `translate(${sx - window.innerWidth / 2}px, ${sy - window.innerHeight / 2}px) scale(${pulse})`;
+  } else {
+    el.reticle.classList.remove('on');
+  }
+
+  if (toastTimer > 0){
+    toastTimer -= dt;
+    if (toastTimer <= 0) el.toast.classList.remove('show');
+  }
+  drawRadar(t);
+}
+
+/* ==========================================================================
+   14. MAIN LOOP
+   ========================================================================== */
+
+addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY.dprCap));
+});
+
+let last = performance.now() / 1000;
+let elapsed = 0;
+
+function frame(){
+  requestAnimationFrame(frame);
+  const now = performance.now() / 1000;
+  let dt = now - last;
+  last = now;
+  // clamp so a backgrounded tab cannot teleport everything on return
+  if (dt > 0.05) dt = 0.05;
+  elapsed += dt;
+
+  readInput();
+  beam.active = input.beam;
+
+  updateUfo(dt);
+  updateCamera(dt);
+  updateBeam(dt, elapsed);
+  updateAnimals(dt, elapsed);
+  if (beam.capturedThisFrame) onCapture(beam.capturedThisFrame);
+  updateFarmer(dt, elapsed);
+  updateProjectiles(dt);
+  updateBursts(dt);
+  updateSparks(dt, elapsed);
+  updateMission(dt);
+  updateHud(dt, elapsed);
+
+  // ambient life: windmill blades and drifting clouds
+  if (windmillFan) windmillFan.rotation.z += dt * 1.15;
+  if (window.__clouds) for (const c of window.__clouds.children){
+    c.position.x += c.userData.drift * dt;
+    if (c.position.x > 560) c.position.x = -560;
+  }
+  if (window.__water) window.__water.material.opacity = 0.84 + Math.sin(elapsed * 1.3) * 0.05;
+
+  renderer.render(scene, camera);
+}
+
+document.getElementById('loading').classList.add('hidden');
+window.__ready = true;
+frame();
+</script>
+</body>
+</html>
