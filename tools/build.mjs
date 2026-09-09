@@ -54,9 +54,9 @@ html = html
            '<script type="module" src="./assets/app.js"></script>');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 
-for (const f of ['manifest.webmanifest', 'vercel.json']) {
-  fs.copyFileSync(path.join(ROOT, f), path.join(OUT, f));
-}
+// vercel.json is read from the repository root by the platform; copying it
+// into the output would only publish the build configuration.
+fs.copyFileSync(path.join(ROOT, 'manifest.webmanifest'), path.join(OUT, 'manifest.webmanifest'));
 for (const f of fs.readdirSync(path.join(ROOT, 'icons'))) {
   fs.copyFileSync(path.join(ROOT, 'icons', f), path.join(OUT, 'icons', f));
 }

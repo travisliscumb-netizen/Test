@@ -9,3 +9,4 @@ data/verified-coords.json
 teds-route-bundle*.json
 shots/
 package-lock.json
+dist/
