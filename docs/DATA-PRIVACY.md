@@ -81,15 +81,49 @@ its button without it, so 129 properties silently arrived unmapped. In this
 version the three files are merged **once, here**, into a single file with a
 checksum, and the phone imports one thing. There is no third file to forget.
 
-## Still outstanding
+## Decision: the repository is private
 
-The addresses that were committed to `main` remain in the git history even
-though the working tree no longer contains them. Removing them requires
-rewriting history (`git filter-repo`) and a force-push, which is destructive
-and is the repository owner's decision, not one to take unasked. Two options:
+The owner chose to make `travisliscumb-netizen/Test` **private** rather than
+rewrite history. That keeps every commit, needs no force-push, and stops any
+further exposure immediately.
 
-1. **Make the repository private.** One setting, immediate, keeps all history.
-2. **Rewrite history and force-push**, then rotate anything sensitive that was
-   exposed — in particular the gate code in the old file.
+### What that does not undo
 
-Until one of those happens, treat the old addresses as public.
+The repository was public from 3 August 2026 until the change. Making it
+private now removes it from public view; it does not reach anything that was
+already taken while it was open — clones, forks, or third-party caches and
+mirrors. So:
+
+- Treat the addresses that were committed to `main` as **having been public.**
+- **Rotate the gate code** that appeared in the old `index.html`. It is the one
+  item in that file that is a live credential rather than a fact about a
+  property, and it is the only one that can be changed.
+
+Nothing further is required in the code: the working tree no longer contains
+any customer data, and `.gitignore` blocks the file names it arrives under.
+
+### The hosting consequence
+
+GitHub Pages serves sites from **public** repositories on the free plan; a
+private repository needs a paid plan. Pages was never enabled here, so nothing
+goes down — but that route to getting the app onto the phone is now closed.
+
+The app still needs to be served over **HTTPS** for two reasons that are not
+optional:
+
+- a service worker will not register otherwise, so there is no offline mode;
+- **Add to Home Screen** will not give the standalone shell.
+
+Free tiers that deploy from a *private* GitHub repository:
+
+| host | notes |
+|---|---|
+| Vercel | Hobby tier, private repos included |
+| Netlify | free tier, private repos included |
+| Cloudflare Pages | free tier, private repos included |
+
+**Publishing the app is safe.** The deployed bundle contains no address, no
+coordinate, no note and no shop location — that is the whole point of the
+split. The route lives in one file the operator holds and restores onto the
+phone, and after that it lives only in that phone's IndexedDB. A public URL
+serving this program discloses nothing about any customer.

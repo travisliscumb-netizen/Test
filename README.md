@@ -51,8 +51,9 @@ of the day's spatial state, and what the app has learned.
 
 ## Your route data is not in this repository
 
-This repository is public. The route is 238 real addresses, their service
-notes and a season of service history — customer data.
+The route is 238 real addresses, their service notes and a season of service
+history — customer data. This repository is private, and the program is still
+built so that it never needs to hold any of it.
 
 So the program is here and the data is not. On first run the app asks for a
 route file, which you keep in Files or iCloud and select once. After that it
