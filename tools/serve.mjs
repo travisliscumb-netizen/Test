@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const BASE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/** SERVE_ROOT=dist serves the production build instead of the source tree. */
+const ROOT = path.resolve(BASE, process.env.SERVE_ROOT || '.');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',

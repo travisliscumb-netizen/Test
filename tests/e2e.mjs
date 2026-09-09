@@ -384,7 +384,7 @@ await t('backup produces a file that validates and round-trips', async () => {
   const doc = await page.evaluate(async () => {
     const a = window.__teds;
     const raw = await a.store.exportRaw();
-    const { buildBackup } = await import('/app/data/backup.js');
+    const { buildBackup } = window.__teds.modules.backup;
     return buildBackup({
       properties: raw.properties, days: raw.days, events: raw.events,
       settings: a.settings, dataOrigin: a.store.dataOrigin,
@@ -393,7 +393,7 @@ await t('backup produces a file that validates and round-trips', async () => {
   const out = path.join(SHOTS, 'roundtrip-backup.json');
   fs.writeFileSync(out, JSON.stringify(doc));
   const report = await page.evaluate(async (text) => {
-    const { inspect } = await import('/app/data/backup.js');
+    const { inspect } = window.__teds.modules.backup;
     const r = await inspect(text);
     return { ok: r.ok, counts: r.counts, verified: r.meta.checksumVerified, errors: r.errors.map((e) => e.code) };
   }, JSON.stringify(doc));
@@ -461,8 +461,8 @@ await t('a large day scrolls and reorders without dropping frames', async () => 
 await t('optimising the biggest day stays inside its time budget', async () => {
   const ms = await page.evaluate(async () => {
     const a = window.__teds;
-    const { optimizeRoute } = await import('/app/routing/optimize.js');
-    const { serviceMinutesFor } = await import('/app/learning/predict.js');
+    const { optimizeRoute } = window.__teds.modules.optimize;
+    const { serviceMinutesFor } = window.__teds.modules.predict;
     const stops = [...a.store.properties.values()].filter((p) => p.crew === 'east' && p.day === 'Tue');
     const t0 = performance.now();
     optimizeRoute({

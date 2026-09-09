@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night" data-motion="full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0a0e0c">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="A personal route command centre for a one-truck lawn maintenance day. Local-first, offline-capable, and built for one phone.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ted's Route">
+<meta name="format-detection" content="telephone=no">
+<title>Ted's Route</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+<link rel="stylesheet" href="./assets/app.css">
+<style>
+  /* Boot state: shown before the module has parsed, replaced the instant the
+     controller mounts. Inline so it needs no extra round trip. */
+  #boot {
+    position: fixed; inset: 0; z-index: 90;
+    display: grid; place-content: center; justify-items: center; gap: 18px;
+    background: var(--ground);
+    transition: opacity 260ms cubic-bezier(.4,0,1,1);
+  }
+  body[data-booted='true'] #boot { opacity: 0; pointer-events: none; }
+  #boot .mark {
+    width: 62px; height: 62px; border-radius: 20px;
+    background: var(--accent-wash);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-3), var(--inner-top);
+    display: grid; place-items: center;
+  }
+  #boot .mark i {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2.5px solid var(--accent);
+    border-top-color: transparent;
+    animation: spin .9s linear infinite;
+  }
+  :root[data-motion='calm'] #boot .mark i { animation-duration: 2.4s; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #boot p { font: var(--t-label); color: var(--ink-3); }
+  #noscript { padding: 40px 24px; text-align: center; font: var(--t-body); color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="chrome" class="chrome"></header>
+  <main id="view" role="main"></main>
+  <nav id="tabbar" class="tabbar" role="tablist" aria-label="Sections"></nav>
+</div>
+
+<div id="boot">
+  <div class="mark"><i></i></div>
+  <p>Opening your route…</p>
+</div>
+
+<noscript>
+  <div id="noscript">
+    <h1>Ted's Route</h1>
+    <p>This app needs JavaScript. Everything it does — the route, the map, the timing model — runs entirely on this device, so there is no server-rendered version to fall back to.</p>
+  </div>
+</noscript>
+
+<script type="module" src="./assets/app.js"></script>
+<script>
+  // If the module fails to parse or a dependency 404s, the boot screen would
+  // otherwise spin forever. Say what happened instead.
+  setTimeout(function () {
+    if (document.body.dataset.booted === 'true') return;
+    var b = document.getElementById('boot');
+    if (!b) return;
+    b.innerHTML = '<div class="mark"><i style="animation:none;border-top-color:var(--accent)"></i></div>' +
+      '<p style="max-width:30ch;text-align:center;line-height:1.5">The app did not finish loading.<br>' +
+      'Your saved route is untouched on this device.<br><br>' +
+      '<button onclick="location.reload()" style="font:650 15px/1 -apple-system,system-ui;padding:14px 22px;border-radius:14px;background:var(--accent);color:#08110c;border:0">Reload</button></p>';
+  }, 9000);
+</script>
+</body>
+</html>

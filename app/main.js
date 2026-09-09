@@ -10,6 +10,9 @@
  */
 
 import { store, StorageError } from './data/store.js';
+import * as backupModule from './data/backup.js';
+import * as optimizeModule from './routing/optimize.js';
+import * as predictModule from './learning/predict.js';
 import { STOP_STATUS, DEFAULT_SETTINGS, META_KEYS } from './data/schema.js';
 import { buildDemoProperties, buildDemoEvents } from './data/demo.js';
 import { apply as applyBackup } from './data/backup.js';
@@ -613,5 +616,9 @@ function cssVar(name) {
 }
 
 const app = new App();
-window.__teds = app;   // the one global, for diagnostics and end-to-end tests
+// The one global. Carries the domain modules with it so the diagnostics
+// console and the end-to-end suite behave the same whether the app is served
+// as source modules or as a single bundled file.
+app.modules = { backup: backupModule, optimize: optimizeModule, predict: predictModule };
+window.__teds = app;
 app.boot();

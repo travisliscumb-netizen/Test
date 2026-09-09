@@ -1,0 +1,10 @@
+node_modules
+tests
+tools
+docs
+shots
+private
+*.private.json
+teds-route-bundle*.json
+.git
+package-lock.json
