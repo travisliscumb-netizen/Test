@@ -255,7 +255,12 @@ a { color: var(--accent); text-decoration: none; }
   display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--s3);
 }
 .stat { display: grid; gap: 2px; min-width: 0; }
-.stat .k { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3); }
+.stat .k {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
+  /* One line, always: a wrapping label pushes its value out of alignment with
+     the others and the row stops reading as a row. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .stat .v {
   font: 750 17px/1.15 var(--font-num); letter-spacing: -.015em;
   font-variant-numeric: tabular-nums;

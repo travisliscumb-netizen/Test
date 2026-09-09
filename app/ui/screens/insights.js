@@ -40,7 +40,7 @@ export class InsightsScreen {
       h('div.deck-foot', { style: { marginTop: 0, paddingTop: 0, borderTop: 0 } },
         stat('Timed lawns', `${learned.length} of ${props.length}`),
         stat('Confident', String(confident.length)),
-        stat('Work days seen', String(model?.sessionCount ?? 0))
+        stat('Days seen', String(model?.sessionCount ?? 0))
       ),
       h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s4)' },
         text: `Built from ${model?.sampleCount ?? 0} service samples across ${model?.sessionCount ?? 0} recorded days. A lawn needs about four consistent visits before its own timing overrides the day average.` })
