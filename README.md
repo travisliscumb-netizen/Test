@@ -67,22 +67,44 @@ feature — learning, optimisation, the map, insights — works immediately.
 
 ---
 
-## Running it
+## Getting it on the phone
+
+It is deployed from this branch on every push:
+
+**https://operation-blackgate-2-git-claude-teds-route-reb-786137-travis16.vercel.app**
+
+Open that in Safari, then **Share → Add to Home Screen**. That gets the
+standalone shell, the offline cache, and a better chance of Safari granting
+protected storage. Then restore your route file once.
+
+The URL is unlovely because the Vercel project this repository was already
+linked to is named after an earlier project. Renaming the project in its Vercel
+settings changes the hostname.
+
+> **The production branch is `main`.** This branch deploys to a preview URL, and
+> nothing has ever deployed `main`. Pushing to `main` while it still holds the
+> old `index.html` would publish that file — and the customer addresses in it —
+> to the production URL. Merging this rebuild into `main` removes that hazard.
+
+### Running it locally
 
 ```
-node tools/serve.mjs          # http://127.0.0.1:8099
+node tools/serve.mjs                  # source tree,  http://127.0.0.1:8099
+node tools/build.mjs                  # build to dist/
+SERVE_ROOT=dist node tools/serve.mjs  # the built artifact
 ```
-
-Any static host works. For the phone, open it in Safari and use
-**Share → Add to Home Screen**; that gets the standalone shell, the offline
-cache, and a better chance of Safari granting protected storage.
 
 ### Tests
 
 ```
-node tests/unit.mjs                                    # 41 tests, no browser
-BUNDLE=<route.json> node tests/e2e.mjs                 # full workflows in Chromium
+node tests/unit.mjs                                       # 41 tests, no browser
+BUNDLE=<route.json> node tests/e2e.mjs                    # full workflows in Chromium
+BUNDLE=<route.json> SERVE_ROOT=dist node tests/e2e.mjs    # against the built artifact
+BUNDLE=<route.json> BASE_URL=<origin> node tests/e2e.mjs  # against a deployed origin
 ```
+
+Both trees pass 26/26: the bundle is verified as what ships, not assumed
+equivalent to the source.
 
 `tests/unit.mjs` covers the statistics, service-time derivation, the travel
 metric, the optimiser, time handling and backup validation — all of it pure,

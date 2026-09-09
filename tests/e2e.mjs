@@ -28,8 +28,11 @@ async function t(name, fn) {
   catch (e) { fail++; console.log(`FAIL\n      ${e.message}`); log.push(['FAIL', `${name}: ${e.message}`]); }
 }
 
-const { server, port } = await serve(0);
-const BASE = `http://127.0.0.1:${port}/`;
+// BASE_URL points the whole suite at a deployed origin instead of a local
+// server, so the thing that was actually shipped is what gets tested.
+const REMOTE = process.env.BASE_URL;
+const { server, port } = REMOTE ? { server: { close() {} }, port: 0 } : await serve(0);
+const BASE = REMOTE ? (REMOTE.endsWith('/') ? REMOTE : REMOTE + '/') : `http://127.0.0.1:${port}/`;
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 
 const iphone = {
