@@ -1,10 +1,11 @@
+# Excluded from the deployment upload. tools/ is NOT excluded: the build script
+# lives there and the platform runs it.
 node_modules
 tests
-tools
 docs
 shots
 private
+dist
 *.private.json
 teds-route-bundle*.json
-.git
 package-lock.json
