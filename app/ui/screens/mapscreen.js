@@ -10,8 +10,8 @@
 
 import { h, svg, ICON, clear } from '../dom.js';
 import { MapEngine } from '../map/engine.js';
-import { formatDistance, boundsOf } from '../../core/geo.js';
-import { formatDuration } from '../../core/time.js';
+import { formatDistance } from '../../core/geo.js';
+import { roadKm } from '../../routing/metric.js';
 import { canNavigate } from '../../services/navigation.js';
 import { haptic } from '../motion/haptics.js';
 
@@ -24,25 +24,26 @@ export class MapScreen {
     const canvas = h('canvas', { 'aria-label': 'Route map' });
     wrap.appendChild(canvas);
 
-    wrap.appendChild(h('div.mapctl', { style: { top: 'var(--s4)' } },
+    // Two controls, bottom right, where a thumb reaches on a 6-inch phone.
+    // Zoom buttons are gone: pinch and double-tap both already work, and four
+    // stacked squares in the top corner were chrome nobody could reach anyway.
+    wrap.appendChild(h('div.mapctl', null,
       this.followBtn = h('button.iconbtn', {
         type: 'button', 'aria-label': 'Centre on my location',
         onclick: () => this.toggleFollow(),
       }, svg(ICON.target, { size: 20 })),
       h('button.iconbtn', {
-        type: 'button', 'aria-label': 'Fit the whole route',
-        onclick: () => { haptic('tap'); this.engine.fitRoute({ animate: true }); this.following = false; this.syncFollow(); },
-      }, svg(ICON.layers, { size: 20 })),
-      h('button.iconbtn', { type: 'button', 'aria-label': 'Zoom in', onclick: () => this.engine.zoomBy(1) }, h('span', { text: '+', style: { font: '700 22px/1 var(--font-num)' } })),
-      h('button.iconbtn', { type: 'button', 'aria-label': 'Zoom out', onclick: () => this.engine.zoomBy(-1) }, h('span', { text: '−', style: { font: '700 22px/1 var(--font-num)' } }))
+        type: 'button', 'aria-label': 'Frame the whole route',
+        onclick: () => { haptic('tap'); this.wide = !this.wide; this.frame({ animate: true }); this.following = false; this.syncFollow(); },
+      }, svg(ICON.layers, { size: 20 }))
     ));
 
-    wrap.appendChild(this.legend = h('div.maplegend'));
+    // The colour key is replaced by what the operator actually wants read off
+    // the map: how much of the day is left and how far it is.
+    wrap.appendChild(this.status = h('div.mapstatus'));
     wrap.appendChild(this.attr = h('div.mapattr'));
     this.el.appendChild(wrap);
-    this.el.appendChild(this.sel = h('div', {
-      style: { position: 'absolute', left: 'var(--s4)', right: 'var(--s4)', bottom: 'var(--s4)', zIndex: 5 },
-    }));
+    this.el.appendChild(this.sel = h('div.mapsel'));
     container.appendChild(this.el);
 
     this.engine = new MapEngine(canvas, { theme: this.ctx.theme, tiles: this.ctx.settings.mapTiles });
@@ -54,32 +55,42 @@ export class MapScreen {
     this.engine.addEventListener('tiles-unavailable', () => { this.attr.textContent = ''; });
 
     this.update();
-    this.renderLegend();
-    requestAnimationFrame(() => this.engine.fitRoute({ animate: false }));
+    requestAnimationFrame(() => this.frame({ animate: false }));
     return this.el;
   }
 
   unmount() { this.engine?.destroy(); this.el?.remove(); }
 
-  renderLegend() {
-    // Only the states actually on today's route: a legend explaining colours
-    // that are not on screen is noise, and it is what made this wrap.
+  /** Frame on the work in hand by default; the whole route on demand. */
+  frame({ animate = true } = {}) {
+    const pad = { padding: 46, padTop: 74, padBottom: this.selected ? 250 : 150 };
+    if (this.wide) this.engine.fitRoute({ ...pad, animate });
+    else this.engine.fitFocus({ currentIndex: this.ctx.currentIndex, ...pad, animate });
+  }
+
+  renderStatus() {
     const stops = this.ctx.stops || [];
-    const has = (st) => stops.some((s) => s.status === st);
-    const items = [['--next', 'Current'], ['--accent', 'Remaining']];
-    if (has('done')) items.push(['--done', 'Done']);
-    if (has('skipped')) items.push(['--skipped', 'Skipped']);
-    if (has('pushed')) items.push(['--pushed', 'Pushed']);
-    clear(this.legend);
-    for (const [v, label] of items) {
-      this.legend.appendChild(h('span', null,
-        h('i', { style: { background: `var(${v})` } }), label));
-    }
+    const remaining = stops.filter((s) => s.status === 'pending');
+    const done = stops.filter((s) => s.status === 'done').length;
+    const km = remainingKm(this.ctx, remaining);
+    clear(this.status);
+    if (!stops.length) return;
+    // Two deliberate lines rather than one that wraps wherever it happens to
+    // run out of room next to the controls.
+    this.status.append(
+      h('div.mapstatus-lab', { text: this.wide ? 'The whole day' : 'Around you now' }),
+      h('div.mapstatus-line', { text: remaining.length === 0
+        ? `All ${stops.length} stops done`
+        : `${remaining.length} to go · ${done} done` }),
+      remaining.length && km
+        ? h('div.mapstatus-sub', { text: `${formatDistance(km)} still to drive` })
+        : null
+    );
   }
 
   update() {
     if (!this.engine) return;
-    if (this.legend) this.renderLegend();
+    if (this.status) this.renderStatus();
     this.engine.setTheme(this.ctx.theme);
     this.engine.setTileSource(this.ctx.settings.mapTiles);
     this.engine.setRoute({ stops: this.ctx.stops, currentIndex: this.ctx.currentIndex });
@@ -111,36 +122,65 @@ export class MapScreen {
   select(stop) {
     this.selected = stop;
     this.engine.setSelected(stop?.id ?? null);
-    if (stop && Number.isFinite(stop.lat)) this.engine.flyTo(stop.lat, stop.lng, undefined, { animate: true });
+    // Off-centre on purpose: the panel that is about to rise covers the lower
+    // third, so the pin is flown to the middle of what will still be visible.
+    if (stop && Number.isFinite(stop.lat)) {
+      this.engine.fitBounds({ minLat: stop.lat, maxLat: stop.lat, minLng: stop.lng, maxLng: stop.lng },
+        { padding: 46, padTop: 74, padBottom: 250, maxZoom: 16.6, animate: true });
+    }
     this.renderSelection();
   }
 
   renderSelection() {
     clear(this.sel);
     const stop = this.selected && this.ctx.stops.find((s) => s.id === this.selected.id);
+    this.sel.dataset.open = String(!!stop);
     if (!stop) return;
     const dist = this.ctx.location?.fresh ? this.ctx.location.distanceKmTo(stop) : null;
     const idx = this.ctx.stops.indexOf(stop);
 
-    this.sel.appendChild(h('div.card.tight.enter', null,
-      h('div.row.between', null,
-        h('div', { style: { minWidth: 0 } },
-          h('div.card-title', { text: `Stop ${idx + 1} · ${statusLabel(stop.status)}` }),
-          h('div', { style: { font: 'var(--t-title2)', marginTop: '2px' }, text: stop.address }),
-          h('div', { class: 'muted', style: { font: 'var(--t-label)', marginTop: '2px' },
-            text: [dist != null ? formatDistance(dist) : null, stop.city !== 'Barrie' ? stop.city : null].filter(Boolean).join(' · ') })
-        ),
-        h('button.iconbtn', { type: 'button', 'aria-label': 'Close', onclick: () => this.select(null) }, svg(ICON.close, { size: 18 }))
-      ),
-      h('div.row', { style: { marginTop: 'var(--s4)', gap: 'var(--s3)' } },
-        h('button.btn.sm.nav', { type: 'button', disabled: !canNavigate(stop), style: { flex: 1 }, onclick: () => this.ctx.navigate(stop) }, svg(ICON.nav, { size: 17 }), 'Navigate'),
+    // Same masthead-then-keys shape as the dossier, raised off the map on a
+    // scrim rather than boxed in a card, so the map stays the subject.
+    this.sel.append(
+      h('div.mapsel-head', null,
+        h('div.masthead-eyebrow', { dataset: { status: stop.status },
+          text: `Stop ${idx + 1} of ${this.ctx.stops.length} · ${statusLabel(stop.status)}` }),
+        h('button.link.dim', { type: 'button', text: 'Close', onclick: () => this.select(null) })),
+      h('div.mapsel-addr', { text: stop.address }),
+      h('div.mapsel-facts', { text: [
+        dist != null ? `${formatDistance(dist)} away` : null,
+        stop.city && stop.city !== 'Barrie' ? stop.city : null,
+        stop.pushMow ? 'Push mow' : null,
+      ].filter(Boolean).join(' · ') }),
+      h('div.live-act', null,
+        h('button.act.act-nav', { type: 'button', disabled: !canNavigate(stop),
+          onclick: () => this.ctx.navigate(stop) }, svg(ICON.nav, { size: 20 }), 'Navigate'),
         stop.status === 'pending'
-          ? h('button.btn.sm.primary', { type: 'button', style: { flex: 1 }, onclick: (e) => this.ctx.completeStop(stop, e.currentTarget) }, svg(ICON.check, { size: 17 }), 'Done')
-          : null,
-        h('button.btn.sm.ghost', { type: 'button', onclick: () => this.ctx.openProperty(stop) }, 'Details')
-      )
-    ));
+          ? h('button.act.act-done', { type: 'button',
+              onclick: (e) => this.ctx.completeStop(stop, e.currentTarget) }, svg(ICON.check, { size: 20 }), 'Done')
+          : h('button.act.act-nav', { type: 'button',
+              onclick: () => this.ctx.openProperty(stop) }, 'Open details')),
+      stop.status === 'pending'
+        ? h('button.link', { type: 'button', text: 'Everything about this property', onclick: () => this.ctx.openProperty(stop) })
+        : null
+    );
   }
+}
+
+/**
+ * Driving distance still to cover, in the order the day is actually in. Uses
+ * the same detour factor the optimiser uses, so the figure on the map and the
+ * figure the routing engine plans against are the same number.
+ */
+function remainingKm(ctx, remaining) {
+  const pts = [];
+  const here = ctx.location?.fresh ? ctx.location.position : null;
+  if (here) pts.push(here);
+  for (const s of remaining) if (Number.isFinite(s.lat)) pts.push(s);
+  if (pts.length < 2) return 0;
+  let km = 0;
+  for (let i = 1; i < pts.length; i += 1) km += roadKm(pts[i - 1], pts[i]);
+  return km;
 }
 
 function statusLabel(s) {

@@ -29,6 +29,7 @@ const SHELL_FILES = [
   './app/version.js',
   './app/styles/tokens.css',
   './app/styles/app.css',
+  './app/styles/today.css',
   './app/core/geo.js',
   './app/core/time.js',
   './app/data/db.js',

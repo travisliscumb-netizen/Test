@@ -33,9 +33,9 @@ export class RouteScreen {
   mount(container) {
     this.el = h('div.page');
     this.el.append(
-      this.head = h('div.card.tight'),
+      this.head = h('header.routehead'),
       this.listEl = h('div.stoplist'),
-      this.foot = h('div', { style: { display: 'grid', gap: 'var(--s3)' } })
+      this.foot = h('div.routefoot')
     );
     container.appendChild(this.el);
     this.scroller = container;
@@ -56,25 +56,22 @@ export class RouteScreen {
   }
 
   renderHead() {
-    const { stops, optimization, day } = this.ctx;
+    const { stops } = this.ctx;
     const remaining = stops.filter((s) => s.status === 'pending').length;
+    const done = stops.filter((s) => s.status === 'done').length;
     clear(this.head);
+    this.el.dataset.reorder = String(this.reordering);
     this.head.append(
-      h('div.row.between', null,
-        h('div', null,
-          h('div.card-title', { text: this.reordering ? 'Drag to reorder' : 'Route order' }),
-          h('div', { style: { font: 'var(--t-label)', color: 'var(--ink-3)', marginTop: '3px' },
-            text: this.reordering
-              ? 'Completed stops stay where they are. Nothing is saved to the master route.'
-              : `${remaining} remaining of ${stops.length}` })
-        ),
-        h('button.btn.sm', {
+      h('div.routehead-top', null,
+        h('div.seam-lab', { text: this.reordering ? 'Reordering' : 'The order of the day' }),
+        h('button.link.go', {
           type: 'button',
-          class: `btn sm ${this.reordering ? 'primary' : 'ghost'}`,
           onclick: () => { this.reordering = !this.reordering; haptic('select'); this.update(); },
-          text: this.reordering ? 'Done' : 'Reorder',
-        })
-      )
+          text: this.reordering ? 'Finished' : 'Reorder',
+        })),
+      h('p.prose', { text: this.reordering
+        ? 'Drag a stop by its handle. Completed stops hold their place, and nothing here touches the master route.'
+        : `${remaining} still to do, ${done} done, ${stops.length} on the day.` })
     );
   }
 
@@ -86,10 +83,13 @@ export class RouteScreen {
   }
 
   buildRow(s) {
-    const row = h('div.stop', {
-      dataset: { status: s.status, current: String(!!s.current), id: s.id },
-    },
+    const row = h('div.stop', { dataset: { status: s.status, current: String(!!s.current), id: s.id } },
       h('span.rail'),
+      // The whole row is the target — a chevron chip on every line is 22
+      // identical decorations competing with 22 addresses. Stretched over the
+      // row rather than wrapping it, so the reorder handle can still sit above.
+      h('button.stop-open', { type: 'button', onclick: () => this.ctx.openProperty(s) }),
+      h('span.ord'),
       h('span.meat', null, h('span.addr'), h('span.meta')),
       h('span.tail')
     );
@@ -101,12 +101,15 @@ export class RouteScreen {
     row.dataset.status = s.status;
     row.dataset.current = String(!!s.current);
     row.dataset.id = s.id;
-    row.querySelector('.rail').textContent = s.status === 'done' ? '✓' : String(s.index + 1);
+    row.querySelector('.ord').textContent = String(s.index + 1);
     row.querySelector('.addr').textContent = s.address;
+    row.querySelector('.stop-open').setAttribute('aria-label', `Open ${s.address}`);
 
     const timing = describeTiming(this.ctx.model, s);
     const bits = [];
     if (s.status === 'done' && s.doneAt) bits.push(`Done ${formatClock(s.doneAt)}`);
+    else if (s.status === 'skipped') bits.push('Skipped');
+    else if (s.status === 'pushed') bits.push('Pushed to next week');
     else if (timing.minutes) bits.push(`${Math.round(timing.minutes)} min`);
     if (this.ctx.day.pinned?.includes(s.id)) bits.push('Pinned');
     row.querySelector('.meta').textContent = bits.join(' · ');
@@ -117,13 +120,6 @@ export class RouteScreen {
       const grip = h('span.grip', { 'aria-label': `Reorder ${s.address}` }, svg(ICON.grip, { size: 20 }));
       grip.addEventListener('pointerdown', (e) => this.beginDrag(e, row, s), { passive: false });
       tail.appendChild(grip);
-    } else {
-      const btn = h('button.iconbtn', {
-        type: 'button', 'aria-label': `Open ${s.address}`,
-        style: { width: '38px', height: '38px' },
-        onclick: () => this.ctx.openProperty(s),
-      }, svg(ICON.chevron, { size: 16 }));
-      tail.appendChild(btn);
     }
   }
 
@@ -132,30 +128,31 @@ export class RouteScreen {
     clear(this.foot);
     const changedFromMaster = JSON.stringify(day.order) !== JSON.stringify(day.masterOrder);
 
+    // Left-rule notes rather than icon-and-heading cards: the same voice the
+    // advice on Today speaks in, so a suggestion reads the same wherever it
+    // appears.
     if (optimization?.changed && optimization.savedMinutes > 0.5) {
-      this.foot.appendChild(h('div.banner', { dataset: { tone: 'suggest' } },
-        h('div.ico', null, svg(ICON.bolt, { size: 18 })),
-        h('div', null,
-          h('h4', { text: `Save about ${formatDuration(optimization.savedMinutes)}` }),
-          h('p', { text: `${optimization.moved.length} of the remaining stops would move. Driving drops from ${formatDuration(optimization.baselineTravel)} to ${formatDuration(optimization.optimizedTravel)}.` }),
-          h('div.row', null,
-            h('button.btn.sm.primary', { type: 'button', text: 'Apply', onclick: () => this.ctx.applyOptimization() }),
-            h('button.btn.sm.ghost', { type: 'button', text: 'Preview on map', onclick: () => this.ctx.goTo('map') })
-          ))
+      this.foot.appendChild(h('div.note', { dataset: { tone: 'suggest' } },
+        h('div.note-t', { text: `A different order finishes about ${formatDuration(optimization.savedMinutes)} sooner` }),
+        h('div.note-b', { text: `${optimization.moved.length} of the remaining stops would move. Driving drops from ${formatDuration(optimization.baselineTravel)} to ${formatDuration(optimization.optimizedTravel)}.` }),
+        h('div.note-a', null,
+          h('button.link.go', { type: 'button', text: 'Apply it', onclick: () => this.ctx.applyOptimization() }),
+          h('button.link.dim', { type: 'button', text: 'See it on the map', onclick: () => this.ctx.goTo('map') }))
       ));
     } else if (this.ctx.stops.filter((s) => s.status === 'pending').length >= 3) {
-      this.foot.appendChild(h('div.banner', { dataset: { tone: 'info' } },
-        h('div.ico', null, svg(ICON.check, { size: 18 })),
-        h('div', null,
-          h('h4', { text: 'This order is already efficient' }),
-          h('p', { text: 'No reordering of the remaining stops would save meaningful time.' }))
+      this.foot.appendChild(h('div.note', null,
+        h('div.note-t', { text: 'This order is already efficient' }),
+        h('div.note-b', { text: 'No reordering of the remaining stops would save meaningful time.' })
       ));
     }
 
     if (changedFromMaster) {
-      this.foot.appendChild(h('button.btn.ghost', {
-        type: 'button', onclick: () => this.ctx.revertOrder(),
-      }, svg(ICON.undo, { size: 18 }), 'Restore master route order'));
+      this.foot.appendChild(h('div.note', { dataset: { tone: 'info' } },
+        h('div.note-t', { text: "Today's order differs from the master route" }),
+        h('div.note-b', { text: 'The master route is what next week starts from, and it has not been changed.' }),
+        h('div.note-a', null,
+          h('button.link.go', { type: 'button', text: 'Restore master route order', onclick: () => this.ctx.revertOrder() }))
+      ));
     }
   }
 

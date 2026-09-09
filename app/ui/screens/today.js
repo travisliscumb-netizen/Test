@@ -1,48 +1,55 @@
 /**
- * Today — the command centre.
+ * Today.
  *
- * Information hierarchy is the whole design here. Glanced at from a running
- * mower, the screen has to answer, in this order:
+ * The organising idea is that a route is a *line* — a path through space and
+ * time — so the screen is built as one, rather than as a stack of rounded
+ * rectangles each holding a different fact.
  *
- *     when do I finish  ->  what is next  ->  how far through am I
+ * Three parts, in the order the question is actually asked:
  *
- * so the finish time is the largest object on the screen, the next property is
- * the only card with a coloured edge, and everything else is progressively
- * disclosed. There is deliberately no dashboard of small tiles: four numbers
- * the size of body text are four numbers nobody reads outdoors.
+ *   the hero    when do I finish, and am I ahead — a time, and the ribbon
+ *   the spine   a single continuous thread with every stop as a node on it
+ *   the ground  the same route, drawn on the map, bleeding to the screen edge
+ *
+ * The current stop is not a card. It is the point where the thread opens out:
+ * the address at display size, its facts on one line, and the two actions that
+ * matter under the thumb. Everything before it is drawn thin and quiet;
+ * everything after it is hollow. Nothing is boxed, because a box would imply
+ * these are separate objects when they are one route.
  */
 
-import { h, svg, ICON, reconcile, clear } from '../dom.js';
+import { h, svg, ICON, reconcile, clear, longPress } from '../dom.js';
 import { formatClock, formatDuration, DAY_FULL, formatDateHuman } from '../../core/time.js';
 import { formatDistance } from '../../core/geo.js';
 import { animateNumber, prefersCalm, Spring, SPRING, ticker } from '../motion/spring.js';
 import { transition } from '../motion/flip.js';
 import { describeTiming } from '../../services/insights.js';
+import { serviceMinutesFor } from '../../learning/predict.js';
 import { canNavigate } from '../../services/navigation.js';
 import { MapEngine } from '../map/engine.js';
+import { DayRibbon, ribbonModel } from '../components/ribbon.js';
+
+/** Completed stops collapse once there are more than this many. */
+const TRAIL_MIN_HIDDEN = 3;   // collapsing one or two stops is just noise
+const TRAIL_VISIBLE = 2;
 
 export class TodayScreen {
   constructor(ctx) {
     this.ctx = ctx;
-    this.el = null;
     this.preview = null;
-    this.lastDone = -1;
+    this.ribbon = new DayRibbon();
+    this.trailOpen = false;
     this.lastFinish = null;
+    this.lastDone = -1;
   }
 
   mount(container) {
-    this.el = h('div.page');
+    this.el = h('div.today');
     this.el.append(
-      this.dayNote = h('div'),
-      this.deck = h('section.deck'),
-      // Only an insight that demands action *right now* is allowed above the
-      // next property. Everything advisory sits below it, so "what is next" is
-      // always on the first screen — that is the whole point of this view.
-      this.urgentSlot = h('div', { style: { display: 'grid', gap: 'var(--s3)' } }),
-      this.nextSlot = h('div'),
-      this.insightSlot = h('div', { style: { display: 'grid', gap: 'var(--s3)' } }),
-      this.mapSlot = h('div'),
-      this.listSlot = h('section')
+      this.hero = h('header.hero'),
+      this.advice = h('div.advice'),
+      this.spine = h('ol.spine'),
+      this.ground = h('div.ground')
     );
     container.appendChild(this.el);
     this.update();
@@ -51,363 +58,374 @@ export class TodayScreen {
 
   unmount() {
     this.preview?.destroy();
-    this.preview = null;
+    this.ribbon.destroy();
     this.el?.remove();
   }
 
+  /** The id whose marker should play the seal on this render. */
+  markSealed(id) { this._seal = id; }
+
   update() {
-    this.renderDayNote();
-    this.renderDeck();
-    this.renderInsights();
-    this.renderNext();
-    this.renderMap();
-    this.renderList();
+    this.renderHero();
+    this.renderAdvice();
+    this.renderSpine();
+    this.renderGround();
   }
 
-  /** Says plainly when the screen is not showing today. */
-  renderDayNote() {
-    clear(this.dayNote);
-    if (this.ctx.isToday) return;
-    const when = DAY_FULL[this.ctx.stops[0]?.day] || formatDateHuman(this.ctx.date);
-    this.dayNote.appendChild(h('div.banner.enter', { dataset: { tone: 'info' } },
-      h('div.ico', null, svg(ICON.clock, { size: 18 })),
-      h('div', null,
-        h('h4', { text: `Showing ${when}, ${formatDateHuman(this.ctx.date)}` }),
-        h('p', { text: 'Anything you mark done is stamped with the time you tap it and filed against this day.' }),
-        h('div.row', null,
-          h('button.btn.sm.ghost', { type: 'button', text: 'Back to today', onclick: () => this.ctx.goToToday() })))
-    ));
-  }
+  // ------------------------------------------------------------------- hero
 
-  // ------------------------------------------------------------------ deck
-
-  renderDeck() {
-    const { stops, forecast, pace, location, currentIndex, day } = this.ctx;
+  renderHero() {
+    const { stops, forecast, pace, model, isToday, currentIndex, location } = this.ctx;
     const done = stops.filter((s) => s.status === 'done').length;
     const total = stops.length;
     const remaining = stops.filter((s) => s.status === 'pending').length;
-    const pct = total ? done / total : 0;
+    const planning = !isToday;
 
-    const planning = !this.ctx.isToday;
-    const finishText = total === 0 ? '—'
-      : remaining === 0 ? 'Done'
+    if (!this.hero.firstChild) {
+      this.hero.append(
+        this.whenEl = h('div.hero-when'),
+        h('div.hero-cap', null,
+          this.capEl = h('span', { text: 'Predicted finish' }),
+          this.confEl = h('span.hero-conf')),
+        this.valEl = h('div.hero-val'),
+        this.ribbon.root,
+        this.readoutEl = h('div.hero-read')
+      );
+    }
+
+    clear(this.whenEl);
+    if (planning) {
+      this.whenEl.append(
+        h('span', { text: `Viewing ${DAY_FULL[stops[0]?.day] || ''} · ${formatDateHuman(this.ctx.date)}`.replace('  ', ' ') }),
+        h('button.link.go', { type: 'button', text: 'Back to today', onclick: () => this.ctx.goToToday() })
+      );
+    }
+
+    const finishText = total === 0 ? 'Nothing scheduled'
+      : remaining === 0 ? `Finished ${formatClock(lastDoneAt(stops))}`
       : planning ? formatDuration(forecast.totalMin)
       : formatClock(forecast.finishTs);
 
-    if (!this.deck.firstChild) {
-      this.deck.append(
-        h('div.deck-grid', null,
-          this.finishBox = h('div.finish', null,
-            this.capEl = h('span.cap', { text: 'Predicted finish' }),
-            this.finishVal = h('div.val'),
-            this.bandEl = h('div.band')
-          ),
-          this.arcWrap = h('div.arcwrap', null,
-            this.arc = h('div.arc'),
-            h('div.inner', null,
-              this.countEl = h('div.count', { text: '0' }),
-              this.ofEl = h('div.of', { text: 'of 0' })
-            )
-          )
-        ),
-        this.footEl = h('div.deck-foot')
-      );
-      this.arcSpring = new Spring(0, SPRING.settle);
-    }
+    this.capEl.textContent = total === 0 ? 'This day'
+      : remaining === 0 ? 'Route complete'
+      : planning ? 'Work in this day' : 'Predicted finish';
 
-    this.capEl.textContent = planning ? 'Work on this day' : 'Predicted finish';
-
-    // Finish time: animated only when it actually moves, so the deck is calm
-    // while nothing is happening.
     if (this.lastFinish !== finishText) {
       this.lastFinish = finishText;
-      clear(this.finishVal);
-      if (remaining === 0 && total > 0) {
-        this.finishVal.append(document.createTextNode('Done'));
-        this.finishVal.append(h('span.suffix', { text: `· ${formatClock(lastDoneAt(stops))}` }));
-      } else if (planning) {
-        this.finishVal.append(document.createTextNode(finishText));
-      } else {
-        this.finishVal.append(document.createTextNode(finishText.replace(/(am|pm)$/, '')));
-        const ap = /(am|pm)$/.exec(finishText);
-        if (ap) this.finishVal.append(h('span.suffix', { text: ap[1] }));
-      }
+      clear(this.valEl);
+      const ap = /(am|pm)$/.exec(finishText);
+      this.valEl.append(document.createTextNode(ap ? finishText.slice(0, -2) : finishText));
+      if (ap) this.valEl.append(h('span.ap', { text: ap[1] }));
+      this.valEl.dataset.size = finishText.length > 12 ? 'sm' : 'lg';
       if (!prefersCalm()) {
-        this.finishVal.animate(
-          [{ transform: 'translate3d(0,-6px,0)', opacity: .3 }, { transform: 'none', opacity: 1 }],
-          { duration: 320, easing: 'cubic-bezier(.16,1,.3,1)' }
+        this.valEl.animate(
+          [{ transform: 'translate3d(0,-7px,0)', opacity: 0.25, filter: 'blur(3px)' },
+           { transform: 'none', opacity: 1, filter: 'none' }],
+          { duration: 380, easing: 'cubic-bezier(.16,1,.3,1)' }
         );
       }
     }
 
-    const bandWide = forecast && !forecast.reliable;
-    this.bandEl.className = `band${bandWide ? ' wide' : ''}`;
-    clear(this.bandEl);
-    if (total === 0) {
-      this.bandEl.append(h('span', { text: 'No stops scheduled' }));
-    } else if (remaining === 0) {
-      this.bandEl.append(h('span', { text: `${done} stop${done === 1 ? '' : 's'} complete` }));
+    // Confidence lives next to the claim it qualifies, not in a separate meter.
+    if (total && remaining && !planning) {
+      const wide = !forecast.reliable;
+      this.confEl.textContent = wide
+        ? `wide range · ${formatClock(forecast.lowTs)}–${formatClock(forecast.highTs)}`
+        : `${formatClock(forecast.lowTs)}–${formatClock(forecast.highTs)}`;
+      this.confEl.dataset.wide = String(wide);
     } else {
-      // Two short lines beat one that wraps unpredictably at three.
-      this.bandEl.append(
-        h('span', {
-          text: planning
-            ? `${remaining} stop${remaining === 1 ? '' : 's'} · driving and cutting`
-            : `Typically ${formatClock(forecast.lowTs)} – ${formatClock(forecast.highTs)}`,
-        }),
-        h('span', {
-          text: planning
-            ? `Finish depends on when you start`
-            : `${formatDuration(forecast.totalMin)} of work left`,
-        })
-      );
+      this.confEl.textContent = '';
     }
 
-    // Counter and arc animate together; both are cheap and both read as "the
-    // day moved" rather than "a number was replaced".
+    this.ribbon.update(ribbonModel({ stops, forecast, pace, model, planning }));
+
+    // One readout line. Counts animate; nothing here is a tile.
+    if (!this.readoutEl.firstChild) {
+      this.readoutEl.append(
+        this.doneNum = h('b', { text: '0' }),
+        h('span', { text: ' done' }),
+        this.restEl = h('span'),
+        this.paceEl = h('span.pace')
+      );
+    }
     if (this.lastDone !== done) {
       const from = this.lastDone < 0 ? done : this.lastDone;
       this.lastDone = done;
-      animateNumber(from, done, (v) => { this.countEl.textContent = String(Math.round(v)); });
-      this.arcSpring.to(pct);
-      ticker.add((dt) => {
-        const m = this.arcSpring.advance(dt);
-        this.arc.style.setProperty('--p', this.arcSpring.value.toFixed(4));
-        return m;
-      });
-    } else {
-      this.arc.style.setProperty('--p', pct.toFixed(4));
-      this.countEl.textContent = String(done);
+      animateNumber(from, done, (v) => { this.doneNum.textContent = String(Math.round(v)); });
     }
-    this.ofEl.textContent = `of ${total}`;
-
-    // Foot stats: three, never more. Each one is something that changes a
-    // decision in the next ten minutes.
+    this.restEl.textContent = total ? ` of ${total} · ${remaining} to go` : '';
     const next = currentIndex >= 0 ? stops[currentIndex] : null;
     const dist = next && location?.fresh ? location.distanceKmTo(next) : null;
-    const paceTone = pace ? (pace.state === 'ahead' ? 'ahead' : pace.state === 'behind' ? 'behind' : 'flat') : 'flat';
-    const stats = [
-      { k: 'Remaining', v: `${remaining} stop${remaining === 1 ? '' : 's'}` },
-      { k: 'To next', v: dist == null ? (next ? '—' : 'Nothing left') : formatDistance(dist) },
-      {
-        // Signed and short: this tile is a third of the width and "14m ahe…"
-        // is worse than useless. The full sentence is in the pace insight.
-        k: 'Pace',
-        v: !pace ? '—' : pace.state === 'on-pace' ? 'On pace'
-          : `${pace.deltaMin > 0 ? '+' : '−'}${formatDuration(Math.abs(pace.deltaMin))}`,
-        tone: paceTone,
-      },
-    ];
-    reconcile(this.footEl, stats, (s) => s.k,
-      (s) => h('div.stat', null, h('div.k', { text: s.k }), h('div.v', { text: s.v, dataset: { tone: s.tone || 'flat' } })),
-      (node, s) => {
-        const v = node.querySelector('.v');
-        if (v.textContent !== s.v) v.textContent = s.v;
-        v.dataset.tone = s.tone || 'flat';
-      });
+    // On a finished day the closing statement at the end of the spine states
+    // the pace properly; repeating it here would be the same fact twice.
+    if (total && remaining === 0 && !planning) {
+      this.paceEl.textContent = '';
+    } else if (pace && Math.abs(pace.deltaMin) >= 4 && !planning) {
+      this.paceEl.textContent = ` · ${formatDuration(Math.abs(pace.deltaMin))} ${pace.state}`;
+      this.paceEl.dataset.tone = pace.state;
+    } else if (dist != null) {
+      this.paceEl.textContent = ` · ${formatDistance(dist)} to next`;
+      this.paceEl.dataset.tone = 'flat';
+    } else {
+      this.paceEl.textContent = '';
+    }
   }
 
-  // -------------------------------------------------------------- insights
+  // ----------------------------------------------------------------- advice
 
-  renderInsights() {
-    // Keyed by content, not just id: an insight whose wording changed is a new
-    // node. Mutating one in place would mean reconciling a node the caller has
-    // already replaced, which reinserts the stale element.
-    const key = (i) => `${i.id}#${insightRev(i)}`;
-    const all = this.ctx.insights;
+  renderAdvice() {
+    const all = this.ctx.insights.filter((i) => i.id !== 'pace');
     const urgent = all.filter((i) => i.priority >= 70).slice(0, 1);
-    const rest = all.filter((i) => !urgent.includes(i)).slice(0, 2);
-    reconcile(this.urgentSlot, urgent, key, (i) => this.buildInsight(i));
-    reconcile(this.insightSlot, rest, key, (i) => this.buildInsight(i));
+    const rest = all.filter((i) => !urgent.includes(i)).slice(0, 1);
+    const shown = [...urgent, ...rest];
+    reconcile(this.advice, shown, (i) => `${i.id}#${i.title}`, (i) => this.buildAdvice(i));
   }
 
-  buildInsight(i) {
-    const el = h('div.banner.enter', { dataset: { tone: i.tone, rev: insightRev(i) } },
-      h('div.ico', null, svg(i.tone === 'warn' ? ICON.warn : i.tone === 'info' ? ICON.info : ICON.bolt, { size: 18 })),
-      h('div', null,
-        h('h4', { text: i.title }),
-        i.body ? h('p', { text: i.body }) : null,
-        i.detail ? h('p', { text: i.detail, style: { marginTop: '4px', opacity: .8 } }) : null,
-        h('div.row', null,
-          i.action ? h('button.btn.sm.primary', { type: 'button', text: i.action.label, onclick: (e) => this.ctx.runInsightAction(i, i.action, e.currentTarget) }) : null,
-          i.secondary ? h('button.btn.sm.ghost', { type: 'button', text: i.secondary.label, onclick: (e) => this.ctx.runInsightAction(i, i.secondary, e.currentTarget) }) : null,
-          h('button.btn.sm.ghost', { type: 'button', text: 'Dismiss', onclick: () => this.ctx.dismissInsight(i.id) })
+  buildAdvice(i) {
+    return h('div.note.enter', { dataset: { tone: i.tone } },
+      h('p.note-t', { text: i.title }),
+      i.body ? h('p.note-b', { text: i.body }) : null,
+      h('div.note-a', null,
+        i.action ? h('button.link.go', { type: 'button', text: i.action.label, onclick: (e) => this.ctx.runInsightAction(i, i.action, e.currentTarget) }) : null,
+        i.secondary ? h('button.link', { type: 'button', text: i.secondary.label, onclick: (e) => this.ctx.runInsightAction(i, i.secondary, e.currentTarget) }) : null,
+        h('button.link.dim', { type: 'button', text: 'Dismiss', onclick: () => this.ctx.dismissInsight(i.id) })
+      )
+    );
+  }
+
+  // ------------------------------------------------------------------ spine
+
+  renderSpine() {
+    const { stops, currentIndex } = this.ctx;
+    const doneStops = stops.filter((s) => s.status === 'done');
+    let hidden = Math.max(0, doneStops.length - TRAIL_VISIBLE);
+    if (hidden < TRAIL_MIN_HIDDEN) hidden = 0;
+
+    const rows = [];
+    stops.forEach((s, i) => {
+      const isCurrent = i === currentIndex;
+      if (s.status === 'done' && !this.trailOpen && hidden > 0) {
+        const rank = doneStops.indexOf(s);
+        if (rank === 0) rows.push({ kind: 'collapse', id: '__trail', count: hidden });
+        if (rank < hidden) return;
+      }
+      rows.push({ kind: isCurrent ? 'current' : 'stop', id: s.id, stop: s, index: i, isCurrent });
+    });
+    if (!stops.length) rows.push({ kind: 'empty', id: '__empty' });
+    if (currentIndex < 0 && stops.length) rows.push({ kind: 'finished', id: '__fin' });
+
+    const settled = stops.filter((s) => s.status !== 'pending').length;
+    const pct = stops.length ? Math.round((settled / stops.length) * 100) : 0;
+    this.spine.style.setProperty('--spine-done', `${pct}%`);
+
+    transition(this.spine, '.node', () => {
+      reconcile(this.spine, rows, (r) => r.id, (r) => this.buildRow(r), (n, r) => this.syncRow(n, r));
+    }, { stagger: 0 });
+  }
+
+  buildRow(r) {
+    if (r.kind === 'collapse') {
+      return h('li.node.node-more', null,
+        h('button.more', { type: 'button', onclick: () => { this.trailOpen = true; this.renderSpine(); } },
+          `${r.count} earlier stop${r.count === 1 ? '' : 's'} done`));
+    }
+    if (r.kind === 'empty') {
+      return h('li.node.node-msg', null,
+        h('p.msg-t', { text: 'Nothing scheduled' }),
+        h('p.msg-b', { text: 'No properties fall on this weekday for this crew.' }));
+    }
+    if (r.kind === 'finished') return this.buildClosing();
+    const node = r.isCurrent ? this.buildCurrent(r) : this.buildStop(r);
+    return node;
+  }
+
+  syncRow(node, r) {
+    const wantCurrent = r.kind === 'current';
+    const isCurrent = node.classList.contains('is-current');
+    if (wantCurrent && isCurrent && node.dataset.id === r.stop.id) {
+      this.syncCurrent(node, r);
+      return;
+    }
+    if (wantCurrent !== isCurrent) return this.buildRow(r);
+    if (r.kind === 'stop') this.syncStop(node, r);
+    else if (wantCurrent) this.syncCurrent(node, r);
+  }
+
+  /** Updates the live stop's volatile facts without rebuilding it. */
+  syncCurrent(node, r) {
+    const facts = node.querySelector('.live-facts');
+    if (!facts) return;
+    const text = this.currentFacts(r.stop).join('  ·  ');
+    if (facts.textContent !== text) facts.textContent = text;
+    const rank = node.querySelector('.live-rank');
+    const want = `Stop ${r.index + 1} of ${this.ctx.stops.length}`;
+    if (rank && rank.textContent !== want) rank.textContent = want;
+  }
+
+  currentFacts(s) {
+    const timing = describeTiming(this.ctx.model, s);
+    const dist = this.ctx.location?.fresh ? this.ctx.location.distanceKmTo(s) : null;
+    const facts = [];
+    if (timing.minutes) facts.push(`${Math.round(timing.low)}\u2013${Math.round(timing.high)} min`);
+    if (dist != null) facts.push(formatDistance(dist));
+    if (timing.confidence > 0) facts.push(`${Math.round(timing.confidence * 100)}% confident`);
+    if (s.pushMow) facts.push('push mow');
+    return facts;
+  }
+
+  buildStop(r) {
+    const s = r.stop;
+    const li = h('li.node.node-stop', {
+      dataset: { status: s.status, id: s.id },
+      style: { 'view-transition-name': `stop-${cssIdent(s.id)}` },
+    },
+      h('span.pip'),
+      h('button.stop-hit', { type: 'button', onclick: () => this.ctx.openProperty(s) },
+        h('span.stop-addr'),
+        h('span.stop-meta'))
+    );
+    this.syncStop(li, r);
+    if (this._seal === s.id) {
+      const pip = li.querySelector('.pip');
+      pip?.classList.add('just-sealed');
+      this._seal = null;
+      pip?.addEventListener('animationend', () => pip.classList.remove('just-sealed'), { once: true });
+    }
+    return li;
+  }
+
+  syncStop(li, r) {
+    const s = r.stop;
+    li.dataset.status = s.status;
+    const addr = li.querySelector('.stop-addr');
+    const meta = li.querySelector('.stop-meta');
+    if (addr.textContent !== s.address) addr.textContent = s.address;
+
+    const timing = describeTiming(this.ctx.model, s);
+    const bits = [];
+    if (s.status === 'done' && s.doneAt) bits.push(formatClock(s.doneAt));
+    else if (s.status === 'skipped') bits.push('Skipped');
+    else if (s.status === 'pushed') bits.push('Pushed');
+    else bits.push(`${Math.round(timing.minutes || 15)} min`);
+    if (s.pushMow) bits.push('push mow');
+    if (s.note) bits.push('note');
+    if (!Number.isFinite(s.lat)) bits.push('no pin');
+    const text = bits.join(' · ');
+    if (meta.textContent !== text) meta.textContent = text;
+  }
+
+  /**
+   * The end of the day.
+   *
+   * The last thing the operator sees before the phone goes in the pocket, so
+   * it says what the day actually was rather than "Route complete". Every
+   * figure is measured, not congratulatory: the clock, the comparison against
+   * the app's own estimate, and the lawn that took the longest — which is the
+   * one worth thinking about tomorrow.
+   */
+  buildClosing() {
+    const { stops, pace, model } = this.ctx;
+    const done = stops.filter((s) => s.status === 'done' && s.doneAt);
+    const settled = stops.filter((s) => s.status !== 'pending');
+    const skipped = stops.filter((s) => s.status === 'skipped' || s.status === 'pushed');
+
+    const node = h('li.node.node-msg.is-done', null,
+      h('p.msg-t', { text: done.length === stops.length ? 'The day is done' : 'Nothing left to do' }));
+
+    const lines = [];
+    if (done.length) {
+      const first = Math.min(...done.map((s) => s.doneAt));
+      const last = Math.max(...done.map((s) => s.doneAt));
+      const elapsed = (last - first) / 60000;
+      lines.push(`${done.length} stop${done.length === 1 ? '' : 's'} cut`
+        + (elapsed > 5 ? `, ${formatClock(first)} to ${formatClock(last)} — ${formatDuration(elapsed)} on the clock.` : '.'));
+    }
+    if (skipped.length) {
+      lines.push(`${skipped.length} left for another day: ${skipped.map((s) => s.address).join(', ')}.`);
+    }
+    if (pace && Math.abs(pace.deltaMin) >= 4) {
+      lines.push(pace.deltaMin > 0
+        ? `${formatDuration(pace.deltaMin)} faster than the app expected.`
+        : `${formatDuration(-pace.deltaMin)} slower than the app expected — it will take that into account.`);
+    } else if (pace) {
+      lines.push('Almost exactly the pace the app predicted.');
+    }
+    const byExpected = done.slice().sort((a, b) => serviceMinutesFor(model, b) - serviceMinutesFor(model, a))[0];
+    if (byExpected) {
+      lines.push(`Longest on the day was ${byExpected.address}, about ${Math.round(serviceMinutesFor(model, byExpected))} minutes.`);
+    }
+
+    for (const text of lines) node.appendChild(h('p.msg-b', { text }));
+    if (settled.length && !prefersCalm()) {
+      node.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 520, easing: 'cubic-bezier(.16,1,.3,1)' });
+    }
+    return node;
+  }
+
+  /** Where the thread opens out. Not a card: the page *is* this stop here. */
+  buildCurrent(r) {
+    const s = r.stop;
+    const facts = this.currentFacts(s);
+
+    const li = h('li.node.node-stop.is-current', {
+      dataset: { status: s.status, id: s.id },
+      style: { 'view-transition-name': `stop-${cssIdent(s.id)}` },
+    },
+      h('span.pip.pip-live'),
+      h('div.live', null,
+        h('div.live-rank', { text: `Stop ${r.index + 1} of ${this.ctx.stops.length}` }),
+        h('h2.live-addr', { text: s.address }),
+        h('div.live-facts', { text: facts.join('  ·  ') }),
+        s.note ? h('p.live-note', { text: s.note }) : null,
+        h('div.live-act', null,
+          h('button.act.act-nav', {
+            type: 'button', disabled: !canNavigate(s),
+            onclick: () => this.ctx.navigate(s),
+          }, svg(ICON.nav, { size: 19 }), 'Navigate'),
+          h('button.act.act-done', {
+            type: 'button',
+            onclick: (e) => this.ctx.completeStop(s, e.currentTarget),
+          }, svg(ICON.check, { size: 20 }), 'Done')
+        ),
+        h('div.live-more', null,
+          h('button.link', { type: 'button', text: 'Details', onclick: () => this.ctx.openProperty(s) }),
+          h('button.link', { type: 'button', text: 'Skip', onclick: () => this.ctx.setStatus(s, 'skipped') }),
+          h('button.link', { type: 'button', text: 'Push', onclick: () => this.ctx.setStatus(s, 'pushed') })
         )
       )
     );
-    return el;
+    return li;
   }
 
-  // ------------------------------------------------------------- next card
+  // ----------------------------------------------------------------- ground
 
-  renderNext() {
-    const { stops, currentIndex, model, location } = this.ctx;
-    clear(this.nextSlot);
-    const stop = currentIndex >= 0 ? stops[currentIndex] : null;
-
-    if (!stop) {
-      const total = stops.length;
-      this.nextSlot.appendChild(h('div.card.enter', null,
-        h('div.empty', { style: { padding: 'var(--s6) 0' } },
-          h('div.art', null, svg(ICON.check, { size: 34 })),
-          h('h3', { text: total ? 'Route complete' : 'Nothing scheduled today' }),
-          h('p', {
-            text: total
-              ? `All ${total} stops on ${DAY_FULL[stops[0]?.day] || 'today'} are accounted for. Finished at ${formatClock(lastDoneAt(stops))}.`
-              : 'There are no properties on this weekday for the selected crew.',
-          }))
-      ));
-      return;
-    }
-
-    const timing = describeTiming(model, stop);
-    const dist = location?.fresh ? location.distanceKmTo(stop) : null;
-    const flags = [];
-    if (stop.pushMow) flags.push({ kind: 'push', text: 'Push mow' });
-    if (Number.isFinite(stop.earliestMin)) flags.push({ kind: 'time', text: `After ${clockLabel(stop.earliestMin)}` });
-    if (Number.isFinite(stop.latestMin)) flags.push({ kind: 'time', text: `Before ${clockLabel(stop.latestMin)}` });
-    if (!canNavigate(stop)) flags.push({ kind: 'warn', text: 'No location' });
-    if (stop.preferLateInWeek) flags.push({ kind: 'time', text: 'Late in week' });
-
-    const card = h('article.nextcard.enter', null,
-      h('div.body', null,
-        h('div.eyebrow', null, svg(ICON.pin, { size: 13 }), `Stop ${currentIndex + 1} of ${stops.length}`),
-        h('h2.addr', { text: stop.address }),
-        h('div.sub', null,
-          h('span', null, timing.minutes ? [document.createTextNode('Usually '), h('b', { text: `${Math.round(timing.low)}–${Math.round(timing.high)} min` })] : 'No timing history yet'),
-          dist != null ? h('span', null, [document.createTextNode('Distance '), h('b', { text: formatDistance(dist) })]) : null,
-          stop.city && stop.city !== 'Barrie' ? h('span', { text: stop.city }) : null
-        ),
-        flags.length ? h('div.flagrow', null, ...flags.map((f) => h('span.flag', { dataset: { kind: f.kind }, text: f.text }))) : null,
-        stop.note ? h('div.notebox', { text: stop.note }) : null,
-        timing.confidence > 0 ? h('div', { style: { marginTop: 'var(--s4)' } },
-          h('div.row.between', { style: { marginBottom: '5px' } },
-            h('span', { class: 'muted', style: { font: 'var(--t-micro)', letterSpacing: 'var(--ls-micro)', textTransform: 'uppercase' }, text: 'Timing confidence' }),
-            h('span', { class: 'muted num', style: { font: 'var(--t-micro)' }, text: `${Math.round(timing.confidence * 100)}%` })),
-          h('div.confbar', { dataset: { level: timing.confidence > 0.55 ? 'good' : timing.confidence > 0.25 ? 'low' : 'none' } },
-            h('i', { style: { width: `${Math.max(4, timing.confidence * 100)}%` } }))
-        ) : null
-      ),
-      h('div.actions', null,
-        h('button.btn.nav', {
-          type: 'button', disabled: !canNavigate(stop),
-          onclick: () => this.ctx.navigate(stop),
-        }, svg(ICON.nav, { size: 19 }), 'Navigate'),
-        h('button.btn.primary.done-key', {
-          type: 'button',
-          onclick: (e) => this.ctx.completeStop(stop, e.currentTarget),
-        }, svg(ICON.check, { size: 20 }), 'Done')
-      ),
-      h('div.actions', { style: { gridTemplateColumns: 'repeat(3, 1fr)', paddingTop: 0 } },
-        h('button.btn.ghost.sm', { type: 'button', onclick: () => this.ctx.openProperty(stop) }, svg(ICON.info, { size: 17 }), 'Details'),
-        h('button.btn.ghost.sm', { type: 'button', onclick: () => this.ctx.setStatus(stop, 'skipped') }, svg(ICON.skip, { size: 17 }), 'Skip'),
-        h('button.btn.ghost.sm', { type: 'button', onclick: () => this.ctx.setStatus(stop, 'pushed') }, svg(ICON.push, { size: 17 }), 'Push')
-      )
-    );
-    this.nextSlot.appendChild(card);
-  }
-
-  // ------------------------------------------------------------------- map
-
-  renderMap() {
-    if (!this.mapSlot.firstChild) {
-      const wrap = h('div.mapwrap.mapcard', null);
-      const canvas = h('canvas', { 'aria-label': 'Route map preview' });
-      wrap.append(canvas,
-        h('button.btn.sm.ghost', {
-          type: 'button',
-          style: { position: 'absolute', right: 'var(--s3)', top: 'var(--s3)', background: 'var(--chrome-bg)' },
-          onclick: () => this.ctx.goTo('map'),
-          text: 'Open map',
-        }));
-      this.mapSlot.appendChild(wrap);
+  renderGround() {
+    if (!this.ground.firstChild) {
+      const wrap = h('div.groundmap');
+      const canvas = h('canvas', { 'aria-label': 'Route map' });
+      wrap.append(canvas, h('button.ground-open', {
+        type: 'button', onclick: () => this.ctx.goTo('map'),
+      }, 'Open map'));
+      this.ground.append(h('div.ground-cap', { text: 'The day on the ground' }), wrap);
       this.preview = new MapEngine(canvas, {
         theme: this.ctx.theme, tiles: this.ctx.settings.mapTiles, interactive: false,
       });
       this.preview.addEventListener('select', (e) => this.ctx.openProperty(e.detail));
-      requestAnimationFrame(() => this.preview.fitRoute({ animate: false, padding: 34 }));
+      requestAnimationFrame(() => this.preview.fitRoute({ animate: false, padding: 30 }));
     }
     this.preview.setTheme(this.ctx.theme);
+    this.preview.setTileSource(this.ctx.settings.mapTiles);
     this.preview.setRoute({ stops: this.ctx.stops, currentIndex: this.ctx.currentIndex });
     if (this.ctx.location?.position) this.preview.setUserLocation(this.ctx.location.position);
   }
-
-  // ------------------------------------------------------------------ list
-
-  renderList() {
-    const { stops, currentIndex } = this.ctx;
-    if (!this.listSlot.firstChild) {
-      this.listSlot.append(
-        h('div.card-head', null,
-          h('span.card-title', { text: 'Route' }),
-          h('button.btn.sm.ghost', { type: 'button', onclick: () => this.ctx.goTo('route') }, 'Reorder')
-        ),
-        this.listEl = h('div.stoplist')
-      );
-    }
-    const rows = stops.map((s, i) => ({ ...s, index: i, current: i === currentIndex }));
-    transition(this.listEl, '.stop', () => {
-      reconcile(this.listEl, rows, (s) => s.id,
-        (s) => this.buildRow(s),
-        (node, s) => this.updateRow(node, s));
-    }, { stagger: 0 });
-  }
-
-  buildRow(s) {
-    const row = h('button.stop', {
-      type: 'button',
-      dataset: { status: s.status, current: String(!!s.current), nocoord: String(!Number.isFinite(s.lat)) },
-      onclick: () => this.ctx.openProperty(s),
-    },
-      h('span.rail', { text: s.status === 'done' ? '' : String(s.index + 1) }),
-      h('span.meat', null,
-        h('span.addr', { text: s.address }),
-        h('span.meta')
-      ),
-      h('span.tail')
-    );
-    this.updateRow(row, s);
-    return row;
-  }
-
-  updateRow(row, s) {
-    row.dataset.status = s.status;
-    row.dataset.current = String(!!s.current);
-    row.dataset.nocoord = String(!Number.isFinite(s.lat));
-    const rail = row.querySelector('.rail');
-    const wanted = s.status === 'done' ? '✓' : String(s.index + 1);
-    if (rail.textContent !== wanted) rail.textContent = wanted;
-    row.querySelector('.addr').textContent = s.address;
-
-    const meta = row.querySelector('.meta');
-    const timing = describeTiming(this.ctx.model, s);
-    const bits = [];
-    if (s.status === 'done' && s.doneAt) bits.push(formatClock(s.doneAt));
-    else if (timing.minutes) bits.push(`${Math.round(timing.minutes)} min`);
-    if (s.status === 'skipped') bits.push('Skipped');
-    if (s.status === 'pushed') bits.push('Pushed to next visit');
-    if (s.city && s.city !== 'Barrie') bits.push(s.city);
-    const text = bits.join(' · ');
-    if (meta.textContent !== text) meta.textContent = text;
-
-    const tail = row.querySelector('.tail');
-    clear(tail);
-    if (s.pushMow) tail.appendChild(h('span.chip', { dataset: { kind: 'push' }, text: 'Push' }));
-    if (s.note) tail.appendChild(h('span.chip', { dataset: { kind: 'note' }, text: 'Note' }));
-    if (Number.isFinite(s.earliestMin) || Number.isFinite(s.latestMin)) {
-      tail.appendChild(h('span.chip', { dataset: { kind: 'time' }, text: 'Timed' }));
-    }
-    tail.appendChild(svg(ICON.chevron, { size: 15 }));
-  }
 }
 
-function insightRev(i) { return `${i.title}|${i.body || ''}`; }
 function lastDoneAt(stops) {
   return stops.reduce((m, s) => (s.doneAt && s.doneAt > m ? s.doneAt : m), 0) || Date.now();
 }
-function clockLabel(min) {
-  const h24 = Math.floor(min / 60), m = min % 60;
-  const ap = h24 >= 12 ? 'pm' : 'am';
-  const hh = h24 % 12 || 12;
-  return m ? `${hh}:${String(m).padStart(2, '0')}${ap}` : `${hh}${ap}`;
+
+/** view-transition-name must be a CSS identifier. */
+function cssIdent(id) {
+  return String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
 }

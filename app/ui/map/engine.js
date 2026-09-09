@@ -197,22 +197,33 @@ export class MapEngine extends EventTarget {
     this.invalidate();
   }
 
-  fitBounds(bounds, { padding = 56, animate = true, maxZoom = 16.5 } = {}) {
+  /**
+   * Per-side padding matters on a phone: chrome sits along the bottom edge, so
+   * a symmetric fit centres the route under the panel that is covering it. The
+   * camera is aimed at the middle of the *visible* rectangle instead.
+   */
+  fitBounds(bounds, { padding = 56, padTop = padding, padBottom = padding, animate = true, maxZoom = 16.5 } = {}) {
     if (!bounds || !this.w || !this.h) return;
     const b = padBounds(bounds, 0.06);
     const x0 = lngToNormX(b.minLng), x1 = lngToNormX(b.maxLng);
     const y0 = latToNormY(b.maxLat), y1 = latToNormY(b.minLat);
     const availW = Math.max(40, this.w - padding * 2);
-    const availH = Math.max(40, this.h - padding * 2);
+    const availH = Math.max(40, this.h - padTop - padBottom);
     const spanX = Math.max(1e-9, x1 - x0);
     const spanY = Math.max(1e-9, y1 - y0);
-    const z = Math.min(
+    const z = Math.max(MIN_Z, Math.min(maxZoom, Math.min(
       Math.log2(availW / (spanX * TILE)),
       Math.log2(availH / (spanY * TILE))
-    );
-    const lat = normYToLat((y0 + y1) / 2);
+    )));
+
+    // Shift the target so the bounds land centred in the visible band rather
+    // than in the canvas.
+    const scale = TILE * Math.pow(2, z);
+    const offsetPx = (padTop - padBottom) / 2;
+    const cy = (y0 + y1) / 2 - offsetPx / scale;
+    const lat = normYToLat(cy);
     const lng = normXToLng((x0 + x1) / 2);
-    this.flyTo(lat, lng, Math.max(MIN_Z, Math.min(maxZoom, z)), { animate });
+    this.flyTo(lat, lng, z, { animate });
   }
 
   fitRoute(opts) {
@@ -220,6 +231,25 @@ export class MapEngine extends EventTarget {
     if (this.user) pts.push(this.user);
     const b = boundsOf(pts);
     if (b) this.fitBounds(b, opts);
+  }
+
+  /**
+   * The opening frame: where the work is right now, not the whole week's
+   * geography. Fitting 22 stops into a tall phone screen produces a small
+   * cluster in a field of nothing; framing you, the stop you are on and the
+   * next couple fills the screen with the part that is actually being used.
+   */
+  fitFocus({ currentIndex = -1, lookahead = 2, ...opts } = {}) {
+    const pts = [];
+    if (this.user) pts.push(this.user);
+    const located = this.stops.filter((s) => Number.isFinite(s.lat));
+    if (currentIndex >= 0) {
+      const from = located.indexOf(this.stops[currentIndex]);
+      if (from >= 0) pts.push(...located.slice(from, from + 1 + lookahead));
+    }
+    if (pts.length < 2) return this.fitRoute(opts);
+    const b = boundsOf(pts);
+    if (b) this.fitBounds(b, { maxZoom: 16.8, ...opts });
   }
 
   zoomBy(delta, anchor) {
@@ -503,23 +533,24 @@ export class MapEngine extends EventTarget {
       ctx.restore();
     }
 
-    // Sits at the top, clear of the legend, the scale bar and the attribution.
+    // A band along the top edge rather than a floating pill: a pill sized to
+    // fit the canvas clipped its own text on a narrow phone, and centred, it
+    // sat underneath the map controls.
     const label = this.tilesEnabled
-      ? 'Map imagery unavailable — stop positions are exact'
-      : 'Map imagery off — stop positions are exact';
+      ? 'NO MAP IMAGERY — PIN POSITIONS ARE EXACT'
+      : 'MAP IMAGERY OFF — PIN POSITIONS ARE EXACT';
     ctx.save();
-    ctx.font = '600 11px -apple-system, system-ui, sans-serif';
-    ctx.textAlign = 'center';
+    const bandH = 34;
+    const grad = ctx.createLinearGradient(0, 0, 0, bandH);
+    grad.addColorStop(0, withAlpha(ink, 0.16));
+    grad.addColorStop(1, withAlpha(ink, 0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, this.w, bandH);
+    ctx.font = '700 10px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    const tw = ctx.measureText(label).width;
-    const pillW = Math.min(this.w - 96, tw + 22);
-    const x = this.w / 2 - pillW / 2;
-    const y = 14;
-    roundRect(ctx, x, y, pillW, 24, 12);
-    ctx.fillStyle = withAlpha(ink, 0.12);
-    ctx.fill();
-    ctx.fillStyle = withAlpha(ink, 0.85);
-    ctx.fillText(label, this.w / 2, y + 12);
+    ctx.fillStyle = withAlpha(ink, 0.8);
+    ctx.fillText(label, 16, 15);
     ctx.restore();
   }
 
@@ -753,15 +784,6 @@ function markerStateOf(s, i, currentIndex) {
   return MARKER_STATE.remaining;
 }
 
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
 
 function pointerSpread(pointers) {
   const [a, b] = [...pointers.values()];

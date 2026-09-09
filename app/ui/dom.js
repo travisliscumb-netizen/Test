@@ -106,7 +106,17 @@ export function reconcile(container, items, keyOf, create, update) {
       node.dataset.key = key;
       node.dataset.flipKey = key;
     } else if (update) {
-      update(node, item);
+      // An update may need to swap the element wholesale. It returns the
+      // replacement so positioning below acts on the node that is actually in
+      // the document — calling replaceWith() and letting this loop reinsert the
+      // detached original is how a row ends up rendered twice.
+      const replacement = update(node, item);
+      if (replacement && replacement !== node) {
+        replacement.dataset.key = key;
+        replacement.dataset.flipKey = key;
+        if (node.parentNode === container) node.replaceWith(replacement);
+        node = replacement;
+      }
     }
     const next = cursor ? cursor.nextSibling : container.firstChild;
     if (next !== node) container.insertBefore(node, next);

@@ -118,16 +118,14 @@ class App {
   renderFatal(err) {
     document.body.dataset.booted = 'true';
     clear(this.view);
-    this.view.appendChild(h('div.page', null,
-      h('div.banner', { dataset: { tone: 'warn' } },
-        h('div.ico', null, svg(ICON.warn, { size: 18 })),
-        h('div', null,
-          h('h4', { text: 'Local storage is unavailable' }),
-          h('p', { text: err?.message || 'The device would not open the local database.' }),
-          h('p', { style: { marginTop: 'var(--s3)' },
-            text: 'Nothing has been lost — your data is still on the device. In Safari this is almost always Private Browsing, which blocks storage entirely. Open this app in a normal tab.' }),
-          h('div.row', null,
-            h('button.btn.sm.primary', { type: 'button', text: 'Try again', onclick: () => location.reload() }))))
+    this.view.appendChild(h('div.page.firstrun', null,
+      h('header.firstrun-head', null,
+        h('div.masthead-eyebrow', { text: 'Something is wrong' }),
+        h('h1.firstrun-line', { text: 'This device will not open its storage.' }),
+        h('p.prose', { text: err?.message || 'The local database could not be opened.' })),
+      h('section.seam', null,
+        h('p.prose', { text: 'Nothing has been lost — your data is still on the device. In Safari this is almost always Private Browsing, which blocks storage entirely. Open this app in a normal tab.' }),
+        h('button.act.act-done', { type: 'button', text: 'Try again', onclick: () => location.reload() }))
     ));
   }
 
@@ -359,6 +357,7 @@ class App {
       try { burst(buttonEl.getBoundingClientRect(),
         cssVar('--accent'), cssVar('--accent-bright')); } catch { /* effects are optional */ }
     }
+    this.screen?.markSealed?.(stop.id);
     const res = await this.store.completeStop(stop.id, { date: this.date, crew: this.crew });
     if (!res.ok) { reportError(res.error, stop.address); return; }
     if (res.already) return;
@@ -570,7 +569,17 @@ class App {
     if (this.tab === tab) return;
     haptic('select');
     this.tab = tab;
-    this.render();
+
+    // A shared-element transition where one genuinely exists: the map on Today
+    // and the map screen are the same object at two sizes, so it should grow
+    // rather than the screen being replaced. Everything else cross-fades, which
+    // is enough to say "this is a sibling view, not a new place".
+    const canMorph =
+      typeof document.startViewTransition === 'function' && !prefersCalm();
+    if (!canMorph) { this.render(); return; }
+    document.documentElement.dataset.vt = 'tab';
+    const vt = document.startViewTransition(() => this.render());
+    vt.finished.finally(() => { delete document.documentElement.dataset.vt; });
   }
 
   render() {
@@ -617,12 +626,29 @@ class App {
   }
 
   renderChrome() {
+    // Before a route exists there is no day, no crew and nothing left to do.
+    // Announcing "Wednesday · Clear · South crew" over an empty device states
+    // three things that are not true yet.
+    const empty = this.store.properties.size === 0;
+    clear(this.chrome);
+    this.chrome.dataset.bare = String(empty);
+    if (empty) {
+      this.chrome.appendChild(h('div.chrome-row', null,
+        h('div.daymark'),
+        h('button.iconbtn', {
+          type: 'button', 'aria-label': 'Settings',
+          dataset: { on: String(this.tab === 'settings') },
+          onclick: () => this.goTo(this.tab === 'settings' ? 'today' : 'settings'),
+        }, svg(ICON.gear, { size: 20 }))
+      ));
+      return;
+    }
+
     const stops = this.store.properties.size ? this.computeStops() : [];
     const remaining = stops.filter((s) => s.status === STOP_STATUS.pending).length;
     const offline = !navigator.onLine;
     const gps = this.location.state;
 
-    clear(this.chrome);
     this.chrome.appendChild(h('div.chrome-row', null,
       h('div.daymark', null,
         h('div.dow', null,
@@ -655,7 +681,7 @@ class App {
       }, svg(ICON.gear, { size: 20 }))
     ));
 
-    if (this.store.properties.size) this.chrome.appendChild(this.buildWeekStrip());
+    this.chrome.appendChild(this.buildWeekStrip());
   }
 
   buildWeekStrip() {

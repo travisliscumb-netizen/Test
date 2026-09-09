@@ -17,41 +17,28 @@ export class OnboardingScreen {
   constructor(ctx) { this.ctx = ctx; }
 
   mount(container) {
-    this.el = h('div.page');
+    // No icon badge over two option cards. The first screen states what the
+    // app is in the same voice every later screen speaks in — an eyebrow, one
+    // sentence at display size, and the one key worth pressing.
+    this.el = h('div.page.firstrun');
     this.el.append(
-      h('div', { style: { textAlign: 'center', padding: 'var(--s8) 0 var(--s5)' } },
-        h('div', {
-          style: {
-            width: '78px', height: '78px', margin: '0 auto var(--s5)',
-            borderRadius: 'var(--r-xl)', display: 'grid', placeItems: 'center',
-            background: 'var(--accent-wash)', border: '1px solid var(--hairline)',
-            boxShadow: 'var(--shadow-3), var(--inner-top)', color: 'var(--accent-bright)',
-          },
-        }, svg(ICON.pin, { size: 38 })),
-        h('h1', { style: { font: 'var(--t-hero)', letterSpacing: 'var(--ls-title)' }, text: "Ted's Route" }),
-        h('p', { class: 'muted', style: { font: 'var(--t-body)', marginTop: 'var(--s3)', maxWidth: '32ch', margin: 'var(--s3) auto 0' },
-          text: 'Load your route once. After that it lives on this phone and works with no signal.' })
-      ),
+      h('header.firstrun-head', null,
+        h('div.masthead-eyebrow', { text: "Ted's Route" }),
+        h('h1.firstrun-line', { text: 'Your route lives on this phone.' }),
+        h('p.prose', { text: 'Load it once from your backup file. After that it works with no signal, '
+          + 'and nothing in it is ever uploaded anywhere.' })),
 
-      h('section.card', null,
-        h('div.card-head', null, h('span.card-title', { text: 'Recommended' })),
-        h('h3', { style: { font: 'var(--t-title2)' }, text: 'Restore your route file' }),
-        h('p', { class: 'muted', style: { font: 'var(--t-label)', margin: 'var(--s2) 0 var(--s4)' },
-          text: 'Pick the backup file from Files or iCloud. It is checked and summarised before anything is written.' }),
-        h('button.btn.primary', { type: 'button', style: { width: '100%' }, onclick: () => this.pick() },
-          svg(ICON.upload, { size: 20 }), 'Choose backup file')
-      ),
+      h('section.seam', null,
+        h('button.act.act-done', { type: 'button', onclick: () => this.pick() },
+          svg(ICON.upload, { size: 20 }), 'Choose backup file'),
+        h('p.prose', { text: 'The file is checked and summarised before a single record on this device is touched. A damaged or foreign file is refused outright.' })),
 
-      h('section.card', null,
-        h('h3', { style: { font: 'var(--t-title2)' }, text: 'Try it with demo data' }),
-        h('p', { class: 'muted', style: { font: 'var(--t-label)', margin: 'var(--s2) 0 var(--s4)' },
-          text: '32 invented properties around Barrie with six weeks of made-up history, so every feature works immediately. You can erase it later in one tap.' }),
-        h('button.btn.ghost', { type: 'button', style: { width: '100%' }, onclick: () => this.demo() },
-          svg(ICON.bolt, { size: 19 }), 'Load demo route')
-      ),
+      h('section.seam', null,
+        h('div.seam-lab', { text: 'No file to hand' }),
+        h('p.prose', { text: '32 invented properties around Barrie with six weeks of made-up history, so every part of the app works straight away. Erasable later in one tap.' }),
+        h('button.link.go', { type: 'button', text: 'Load the demo route instead', onclick: () => this.demo() })),
 
-      h('p', { class: 'muted', style: { font: 'var(--t-label)', textAlign: 'center', padding: 'var(--s5)' },
-        text: 'Your addresses are never uploaded anywhere. They are stored only in this browser on this device.' })
+      h('p.prose.firstrun-foot', { text: 'Your addresses are stored only in this browser, on this device.' })
     );
     container.appendChild(this.el);
     return this.el;

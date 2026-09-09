@@ -1,0 +1,416 @@
+/* =============================================================================
+   Today — the route as a line.
+
+   No cards. Structure comes from a single vertical thread, typographic scale,
+   and the ribbon. The only filled surfaces on this screen are the two actions
+   under the thumb, because those are the things that get pressed with gloves on
+   and they should look pressable.
+   ========================================================================== */
+
+.today {
+  display: grid;
+  gap: var(--s6);
+  padding: var(--s6) 0 calc(var(--s10) + var(--s6));
+  min-width: 0;
+}
+.today > * { min-width: 0; }
+
+/* ------------------------------------------------------------------- hero -- */
+
+.hero { padding: 0 var(--s5); display: grid; gap: var(--s3); }
+
+.hero-cap {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4);
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase;
+  color: var(--ink-3);
+}
+.hero-conf { font-variant-numeric: tabular-nums; letter-spacing: .04em; text-transform: none; }
+.hero-conf[data-wide='true'] { color: var(--warn); }
+
+.hero-val {
+  font: 420 clamp(46px, calc(15.5vw * var(--ts)), calc(74px * var(--ts)))/0.9 var(--font-num);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  display: flex; align-items: baseline; gap: 6px;
+}
+.hero-val[data-size='sm'] { font-size: clamp(26px, calc(8vw * var(--ts)), calc(38px * var(--ts))); letter-spacing: -.02em; }
+.hero-val .ap {
+  font: 500 calc(20px * var(--ts))/1 var(--font-num);
+  letter-spacing: 0; color: var(--ink-3);
+}
+
+.hero-read {
+  font: var(--t-label); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.hero-read b { color: var(--ink); font-weight: 750; font-size: 1.15em; }
+.hero-read .pace[data-tone='ahead'] { color: var(--accent-bright); font-weight: 700; }
+.hero-read .pace[data-tone='behind'] { color: var(--warn); font-weight: 700; }
+
+/* ----------------------------------------------------------------- ribbon -- */
+
+.ribbon {
+  --ribbon-tail: var(--ink-2);
+  --ribbon-fill-a: color-mix(in srgb, var(--accent) 82%, #000);
+  --ribbon-fill-b: var(--accent-bright);
+  margin: var(--s3) 0 var(--s2);
+}
+.ribbon-svg { display: block; width: 100%; height: 54px; overflow: visible; }
+
+/* Remaining track has to be visible in sunlight, so it is a real value rather
+   than a whisper of white. */
+.ribbon-track { fill: color-mix(in srgb, var(--ink) 13%, transparent); }
+.ribbon-tick {
+  stroke: color-mix(in srgb, var(--ground) 62%, transparent); stroke-width: 1;
+  transition: opacity var(--d-slow) var(--e-emphasized);
+}
+.ribbon[data-complete='true'] .ribbon-tick { opacity: .18; }
+.ribbon-edge-line { fill: none; stroke: var(--hairline-strong); stroke-width: 1; }
+
+.ribbon-mark.is-current { fill: var(--next); }
+.ribbon-mark.is-skipped { fill: color-mix(in srgb, var(--skipped) 70%, transparent); }
+.ribbon-mark.is-pushed { fill: color-mix(in srgb, var(--pushed) 70%, transparent); }
+
+.ribbon-edge { fill: var(--ink); }
+.ribbon-now { stroke: var(--ink); stroke-width: 1.5; }
+.ribbon-nowflag { fill: var(--ink); }
+
+/* The distance between the fill edge and the pace mark *is* the pace. Hatched
+   rather than solid so it reads as a gap being measured, not as more work. */
+.ribbon-gap[data-tone='ahead'] { fill: color-mix(in srgb, var(--accent) 34%, transparent); }
+.ribbon-gap[data-tone='behind'] { fill: color-mix(in srgb, var(--warn) 42%, transparent); }
+
+/* ----------------------------------------------------------------- advice -- */
+
+.advice { display: grid; gap: var(--s4); }
+.note {
+  padding: var(--s2) var(--s5) var(--s2) calc(var(--s5) - 2px);
+  border-left: 2px solid var(--ink-3);
+  margin-left: var(--s5);
+  display: grid; gap: 3px;
+}
+.note[data-tone='suggest'] { border-left-color: var(--accent); }
+.note[data-tone='warn'] { border-left-color: var(--danger); }
+.note[data-tone='info'] { border-left-color: var(--info); }
+.note-t { font: var(--t-bodystrong); letter-spacing: -.01em; }
+.note-b { font: var(--t-label); color: var(--ink-3); font-weight: 550; }
+.note-a { display: flex; flex-wrap: wrap; gap: var(--s4); margin-top: var(--s2); }
+
+.hero-when {
+  display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+  font: var(--t-label); color: var(--info);
+  padding-bottom: var(--s1);
+}
+.hero-when:empty { display: none; }
+
+/* Text controls still have to be caught with a gloved thumb. */
+.link {
+  min-height: 44px; min-width: 44px; display: inline-flex; align-items: center;
+  font: var(--t-label); color: var(--ink-2);
+  border-bottom: 1px solid transparent;
+}
+.link:active { color: var(--ink); }
+.link.go { color: var(--accent-bright); font-weight: 750; }
+.link.dim { color: var(--ink-3); }
+
+/* ------------------------------------------------------------------ spine -- */
+
+.spine {
+  position: relative;
+  display: grid;
+  padding-left: calc(var(--s5) + 22px);
+  padding-right: var(--s5);
+}
+/* The thread. Solid where the day is done, faint where it is not — the line
+   itself carries the progress, so no separate bar has to. */
+.spine::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--s5) + 6px);
+  top: 8px; bottom: 14px;
+  width: 1.5px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 55%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 55%, transparent) var(--spine-done, 0%),
+    var(--hairline) calc(var(--spine-done, 0%) + 1%),
+    var(--hairline) 100%);
+}
+
+.node { position: relative; padding: var(--s4) 0; }
+.node + .node { border-top: 1px solid color-mix(in srgb, var(--hairline) 65%, transparent); }
+
+.pip {
+  position: absolute;
+  left: calc(-22px + 1px); top: calc(var(--s4) + 4px);
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--ground);
+  border: 1.5px solid color-mix(in srgb, var(--ink-3) 55%, transparent);
+  transition: all var(--d-base) var(--e-emphasized);
+}
+.node[data-status='done'] .pip { background: var(--accent); border-color: var(--accent); }
+.node[data-status='skipped'] .pip { background: var(--skipped); border-color: var(--skipped); }
+.node[data-status='pushed'] .pip { background: var(--pushed); border-color: var(--pushed); }
+
+.node-stop[data-status='done'] .stop-addr { color: var(--ink-3); }
+.node-stop[data-status='done'] .stop-meta { color: var(--muted); }
+
+.stop-hit {
+  display: grid; gap: 2px; width: 100%; text-align: left; min-height: 44px;
+  align-content: center;
+}
+.stop-addr {
+  font: var(--t-bodystrong); letter-spacing: -.012em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stop-meta {
+  font: var(--t-label); color: var(--ink-3); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.node-more { padding: var(--s3) 0; }
+.more {
+  min-height: 44px; min-width: 44px; font: var(--t-label); color: var(--ink-3);
+  display: inline-flex; align-items: center; gap: var(--s2);
+}
+.more::before { content: ''; width: 18px; height: 1px; background: var(--hairline-strong); }
+
+.node-msg { padding: var(--s7) 0; display: grid; gap: var(--s3); }
+.msg-t {
+  font: 800 clamp(24px, calc(7.2vw * var(--ts)), calc(32px * var(--ts)))/1.05 var(--font-num);
+  letter-spacing: -.03em;
+}
+.msg-b { font: var(--t-label); color: var(--ink-2); max-width: 40ch; }
+.node-msg.is-done .msg-t { color: var(--accent-bright); }
+
+/* ------------------------------------------------------- the live stop ----- */
+
+.node.is-current { padding: var(--s6) 0 var(--s5); }
+.pip-live {
+  left: calc(-22px - 3px); top: calc(var(--s6) + 2px);
+  width: 19px; height: 19px;
+  background: var(--next); border-color: var(--next);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--next) 18%, transparent),
+              0 0 18px color-mix(in srgb, var(--next) 45%, transparent);
+}
+:root[data-motion='full'] .pip-live { animation: livepulse 2.6s var(--e-standard) infinite; }
+@keyframes livepulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--next) 18%, transparent), 0 0 18px color-mix(in srgb, var(--next) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 9px color-mix(in srgb, var(--next) 6%, transparent), 0 0 26px color-mix(in srgb, var(--next) 55%, transparent); }
+}
+
+.live { display: grid; gap: var(--s3); }
+.live-rank {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase;
+  color: var(--next);
+}
+.live-addr {
+  font: 800 clamp(27px, calc(8.4vw * var(--ts)), calc(38px * var(--ts)))/1.03 var(--font-num);
+  letter-spacing: -0.03em; color: var(--ink);
+  text-wrap: balance;
+}
+.live-facts {
+  font: var(--t-label); color: var(--ink-2); font-variant-numeric: tabular-nums;
+  letter-spacing: .005em;
+}
+.live-note {
+  font: var(--t-body); color: var(--ink-2);
+  padding-left: var(--s4); border-left: 2px solid color-mix(in srgb, var(--next) 55%, transparent);
+  margin-top: var(--s1);
+}
+
+.live-act { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s2); }
+.live-more { display: flex; gap: var(--s5); }
+
+/* The two things pressed with gloves on. Deliberately the only filled,
+   dimensional surfaces on the screen — everything else is type on ground, so
+   these read as the controls without needing a box drawn round them. */
+.act {
+  min-height: var(--tap-primary);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s3);
+  border-radius: 13px;
+  font: 750 calc(16.5px * var(--ts))/1 var(--font-ui); letter-spacing: -.01em;
+  touch-action: manipulation;
+  transition: transform 70ms var(--e-standard), box-shadow 70ms var(--e-standard), filter var(--d-quick) var(--e-standard);
+}
+.act svg { flex: 0 0 auto; }
+.act[disabled] { opacity: .4; pointer-events: none; }
+
+.act-nav {
+  color: var(--ink);
+  background: linear-gradient(178deg, color-mix(in srgb, var(--info) 22%, var(--surface-2)), var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--info) 40%, var(--hairline));
+  box-shadow: var(--shadow-1), var(--inner-top);
+}
+.act-nav:active { transform: scale(.97); }
+
+/* A physical key: it has depth, and pressing it removes the depth. */
+.act-done {
+  --depth: 5px;
+  color: var(--ink-inverse);
+  background: linear-gradient(178deg, var(--accent-bright), var(--accent));
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 55%, transparent);
+  box-shadow:
+    0 var(--depth) 0 0 color-mix(in srgb, var(--accent-deep) 92%, #000),
+    0 calc(var(--depth) + 8px) 20px color-mix(in srgb, var(--accent) 30%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.5);
+  transform: translateY(0);
+}
+.act-done:active {
+  transform: translateY(var(--depth));
+  box-shadow: 0 0 0 0 transparent, inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+/* ----------------------------------------------------------------- ground -- */
+
+.ground { display: grid; gap: var(--s3); }
+.ground-cap {
+  padding: 0 var(--s5);
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
+}
+/* Bleeds to both screen edges: the map is the world, not another panel. */
+.groundmap {
+  position: relative; height: 210px; overflow: hidden;
+  background: var(--map-ground);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.groundmap canvas { display: block; width: 100%; height: 100%; }
+.ground-open {
+  position: absolute; right: var(--s4); bottom: var(--s4);
+  min-height: 44px; min-width: 44px; padding: 0 var(--s4); border-radius: var(--r-full);
+  font: var(--t-label); color: var(--ink);
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: var(--blur-chrome); backdrop-filter: var(--blur-chrome);
+  border: 1px solid var(--hairline-strong);
+}
+
+/* Scroll-linked: the hero recedes as the spine comes up, so the screen reads
+   as one continuous surface being pulled past rather than a set of panels.
+   Progressive enhancement — without support the hero simply stays put. */
+@supports (animation-timeline: view()) {
+  :root[data-motion='full'] .hero {
+    animation: heroRecede linear both;
+    animation-timeline: view(block);
+    animation-range: exit 0% exit 70%;
+  }
+  @keyframes heroRecede {
+    to { opacity: .35; transform: translate3d(0, -6px, 0) scale(.985); }
+  }
+}
+
+/* =============================================================================
+   The property dossier.
+
+   Shares Today's language on purpose — left rules, seams, one figure at a
+   time, the same two keys. Opening a property should feel like turning to a
+   page in the same document, not like landing in a different application.
+   ========================================================================== */
+
+.masthead {
+  padding: 0 var(--s5) var(--s4);
+  display: grid; gap: var(--s2);
+  min-width: 0;
+}
+.masthead-eyebrow {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase;
+  color: var(--ink-3);
+}
+.masthead-eyebrow[data-status='pending'] { color: var(--next); }
+.masthead-eyebrow[data-status='done'] { color: var(--accent-bright); }
+.masthead-eyebrow[data-status='skipped'] { color: var(--skipped); }
+.masthead-eyebrow[data-status='pushed'] { color: var(--pushed); }
+.masthead-addr {
+  font: 800 clamp(25px, calc(7.6vw * var(--ts)), calc(34px * var(--ts)))/1.04 var(--font-num);
+  letter-spacing: -.03em; color: var(--ink); text-wrap: balance;
+}
+.masthead-facts { font: var(--t-label); color: var(--ink-3); }
+.masthead-facts:empty { display: none; }
+
+.dossier { display: grid; gap: var(--s5); min-width: 0; }
+.dossier > * { min-width: 0; }
+
+/* The job, quoted rather than boxed. */
+.order {
+  padding-left: var(--s4);
+  border-left: 2px solid color-mix(in srgb, var(--ink-3) 70%, transparent);
+  display: grid; gap: 3px;
+}
+.order[data-tone='today'] { border-left-color: var(--next); }
+.order-lab {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
+}
+.order[data-tone='today'] .order-lab { color: var(--next); }
+.order-t { font: var(--t-body); color: var(--ink); }
+
+/* A seam, not a card: a hairline and a quiet label are enough separation. */
+.seam {
+  display: grid; gap: var(--s3);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--hairline);
+}
+.seam-lab {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
+}
+.figure {
+  font: 420 clamp(30px, calc(9.5vw * var(--ts)), calc(42px * var(--ts)))/1 var(--font-num);
+  letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.prose { font: var(--t-label); color: var(--ink-2); max-width: 42ch; }
+
+/* Where this stop falls in the day's spread of service times. Every other stop
+   is a faint tick, so the comparison is the picture rather than a claim. */
+.span { display: grid; gap: var(--s3); }
+.span-axis {
+  position: relative; height: 22px;
+  border-bottom: 1px solid var(--hairline-strong);
+}
+.span-tick {
+  position: absolute; bottom: 0; width: 1px; height: 9px;
+  margin-left: -.5px;
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.span-me {
+  position: absolute; bottom: 0; width: 3px; height: 22px;
+  margin-left: -1.5px; border-radius: 1.5px;
+  background: var(--accent-bright);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.span-ends {
+  display: flex; justify-content: space-between;
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
+}
+
+/* Visits on a real time axis. Faded ticks are visits the model has faded out,
+   so confidence and the picture can never disagree. */
+.rhythm {
+  position: relative; height: 34px;
+  border-bottom: 1px solid var(--hairline-strong);
+}
+.rhythm-tick {
+  position: absolute; bottom: 0; width: 2px; height: 20px;
+  margin-left: -1px; border-radius: 1px;
+  background: var(--accent);
+}
+.rhythm-tick:first-of-type { height: 34px; background: var(--accent-bright); }
+
+.visits { display: grid; }
+.visit {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4);
+  font: var(--t-label); padding: 7px 0;
+  border-top: 1px solid color-mix(in srgb, var(--hairline) 70%, transparent);
+}
+.visit > span:last-child { color: var(--ink-3); }
+
+/* --------------------------------------------------------------- first run -- */
+
+.firstrun { gap: var(--s6); padding-top: var(--s9); }
+.firstrun-head { display: grid; gap: var(--s3); }
+.firstrun-line {
+  font: 800 clamp(30px, calc(9.4vw * var(--ts)), calc(44px * var(--ts)))/1.05 var(--font-num);
+  letter-spacing: -.035em; color: var(--ink); text-wrap: balance;
+}
+.firstrun .seam .act { width: 100%; }
+.firstrun-foot { color: var(--ink-3); padding-top: var(--s4); }
+/* The action key carries an outer glow; the note beneath it needs room. */
+.firstrun .seam { gap: var(--s5); }

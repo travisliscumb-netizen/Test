@@ -35,27 +35,26 @@ export class InsightsScreen {
     const confident = props.filter((p) => (statsFor(model, p.id)?.confidence || 0) >= 0.55);
 
     // ---- what the app knows ------------------------------------------
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'What the app has learned' })),
-      h('div.deck-foot', { style: { marginTop: 0, paddingTop: 0, borderTop: 0 } },
-        stat('Timed lawns', `${learned.length} of ${props.length}`),
-        stat('Confident', String(confident.length)),
-        stat('Days seen', String(model?.sessionCount ?? 0))
-      ),
-      h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s4)' },
-        text: `Built from ${model?.sampleCount ?? 0} service samples across ${model?.sessionCount ?? 0} recorded days. A lawn needs about four consistent visits before its own timing overrides the day average.` })
+    // One figure and a sentence, not a row of stat tiles. Three numbers side
+    // by side under three labels is the shape of a business dashboard, and it
+    // makes the reader compare things that are not comparable.
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'What the app has learned' })),
+      h('div.figure', { text: `${learned.length} of ${props.length} lawns` }),
+      h('p.prose', { text: `have their own timing now — ${confident.length} of them confidently. `
+        + `Built from ${model?.sampleCount ?? 0} service samples across ${model?.sessionCount ?? 0} recorded days.` }),
+      h('p.prose', { text: 'A lawn needs about four consistent visits before its own timing overrides the day average, so the rest are still being measured.' })
     ));
 
     // ---- travel model -------------------------------------------------
     const t = model?.travel;
     if (t) {
-      this.el.appendChild(h('section.card', null,
-        h('div.card-head', null, h('span.card-title', { text: 'Your driving' })),
-        h('div', { style: { font: 'var(--t-hero)', letterSpacing: 'var(--ls-title)' },
-          text: `${(60 / t.perKmMin).toFixed(1)} km/h` }),
-        h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s2)' },
+      this.el.appendChild(h('section.panel', null,
+        h('div.panel-head', null, h('span.panel-lab', { text: 'Your driving' })),
+        h('div.figure', { text: `${(60 / t.perKmMin).toFixed(1)} km/h` }),
+        h('p.prose', {
           text: `Effective door-to-door speed including parking and ramps — ${t.perKmMin.toFixed(2)} min per km plus ${t.fixedMin.toFixed(1)} min stopped at each property.` }),
-        h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s3)' },
+        h('p.prose', {
           text: t.refit
             ? `Fitted from ${t.n} of your own stop-to-stop transitions, using a method that ignores the slowest and fastest quarter so a lunch break cannot skew it.`
             : `Using the starting model — ${t.n} clean transitions recorded so far, ${Math.max(0, 40 - t.n)} more needed before it re-fits to you.` })
@@ -63,24 +62,26 @@ export class InsightsScreen {
     }
 
     // ---- day load -----------------------------------------------------
+    // Drawn in the same language as the day ribbon rather than as a bar chart:
+    // each weekday is a length of route with its stops as ticks, so the width
+    // says how long the day is and the ticks say how it is divided. A bar would
+    // have said only the first of those, and would have looked like a report.
     const rows = DAY_KEYS.map((d) => {
       const dayProps = store.propertiesForWeekday(d, settings.crew);
-      const mins = dayProps.reduce((sum, p) => sum + (statsFor(model, p.id)?.minutes ?? model?.global?.minutes ?? 15), 0);
-      return { day: d, count: dayProps.length, mins };
+      const mins = dayProps.map((p) => statsFor(model, p.id)?.minutes ?? model?.global?.minutes ?? 15);
+      return { day: d, count: dayProps.length, mins, total: mins.reduce((a, b) => a + b, 0) };
     });
-    const maxMins = Math.max(1, ...rows.map((r) => r.mins));
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Weekly load' })),
-      ...rows.map((r) => h('div', { style: { display: 'grid', gap: '5px', marginBottom: 'var(--s4)' } },
-        h('div.row.between', null,
-          h('span', { style: { font: 'var(--t-label)' }, text: DAY_FULL[r.day] }),
-          h('span', { class: 'muted num', style: { font: 'var(--t-label)' },
-            text: `${r.count} stops · ~${formatDuration(r.mins)} of cutting` })),
-        h('div.confbar', { style: { height: '7px' } },
-          h('i', { style: { width: `${(r.mins / maxMins) * 100}%`, background: r.mins / maxMins > 0.92 ? 'var(--warn)' : 'var(--accent)' } }))
-      )),
-      h('p', { class: 'muted', style: { font: 'var(--t-label)' },
-        text: 'Cutting time only — driving is on top of this. A day that is much taller than the others is the one worth splitting.' })
+    const maxMins = Math.max(1, ...rows.map((r) => r.total));
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Weekly load' })),
+      h('div.loadlist', null, ...rows.map((r) => h('div.loadrow', { dataset: { heavy: String(r.total >= maxMins * 0.92) } },
+        h('div.loadhead', null,
+          h('span.loadday', { text: DAY_FULL[r.day] }),
+          h('span.loadnum', { text: `${r.count} stops · ${formatDuration(r.total)}${r.total >= maxMins * 0.92 ? ' · longest' : ''}` })),
+        dayBar(r, maxMins)
+      ))),
+      h('p.prose', {
+        text: 'Cutting time only — driving is on top of this. The longest day is the one worth splitting.' })
     ));
 
     // ---- trending slower ----------------------------------------------
@@ -90,9 +91,9 @@ export class InsightsScreen {
       .sort((a, b) => Math.abs(b.s.trend.deltaMin) - Math.abs(a.s.trend.deltaMin))
       .slice(0, 6);
     if (trending.length) {
-      this.el.appendChild(h('section.card', null,
-        h('div.card-head', null, h('span.card-title', { text: 'Changing pace' })),
-        h('div.stoplist', null, ...trending.map(({ p, s }) => h('div.stop', { style: { gridTemplateColumns: 'minmax(0,1fr) auto' } },
+      this.el.appendChild(h('section.panel', null,
+        h('div.panel-head', null, h('span.panel-lab', { text: 'Changing pace' })),
+        h('div.plainlist', null, ...trending.map(({ p, s }) => h('div.stop', null,
           h('span.meat', null,
             h('span.addr', { text: p.address }),
             h('span.meta', { text: `${Math.round(s.minutes)} min now · ${s.samples} visits` })),
@@ -110,9 +111,9 @@ export class InsightsScreen {
       .filter((r) => r.s && r.s.samples >= 2)
       .sort((a, b) => b.s.minutes - a.s.minutes);
     if (ranked.length >= 4) {
-      this.el.appendChild(h('section.card', null,
-        h('div.card-head', null, h('span.card-title', { text: 'Longest lawns' })),
-        h('div.stoplist', null, ...ranked.slice(0, 5).map(({ p, s }) => h('div.stop', { style: { gridTemplateColumns: 'minmax(0,1fr) auto' } },
+      this.el.appendChild(h('section.panel', null,
+        h('div.panel-head', null, h('span.panel-lab', { text: 'Longest lawns' })),
+        h('div.plainlist', null, ...ranked.slice(0, 5).map(({ p, s }) => h('div.stop', null,
           h('span.meat', null,
             h('span.addr', { text: p.address }),
             h('span.meta', { text: `${DAY_FULL[p.day]} · ${s.samples} visits · confidence ${Math.round(s.confidence * 100)}%` })),
@@ -131,6 +132,42 @@ export class InsightsScreen {
   }
 }
 
-function stat(k, v) {
-  return h('div.stat', null, h('div.k', { text: k }), h('div.v', { text: v }));
+/**
+ * One weekday drawn as a length of route rather than as a bar: a rule sitting
+ * on a baseline, with each stop as a riser. The length says how long the day
+ * is, the risers say how it is divided, and neither needs a colour key.
+ */
+function dayBar(row, maxMins) {
+  const NSU = 'http://www.w3.org/2000/svg';
+  const W = 320, H = 14, BASE = 11;
+  const svgEl = document.createElementNS(NSU, 'svg');
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('preserveAspectRatio', 'none');
+  svgEl.setAttribute('class', 'loadbar');
+  svgEl.setAttribute('aria-hidden', 'true');
+  const w = Math.max(2, W * (row.total / maxMins));
+
+  const base = document.createElementNS(NSU, 'line');
+  base.setAttribute('x1', 0); base.setAttribute('x2', W);
+  base.setAttribute('y1', BASE); base.setAttribute('y2', BASE);
+  base.setAttribute('class', 'loadbar-base');
+  svgEl.appendChild(base);
+
+  const rule = document.createElementNS(NSU, 'line');
+  rule.setAttribute('x1', 0); rule.setAttribute('x2', w);
+  rule.setAttribute('y1', BASE); rule.setAttribute('y2', BASE);
+  rule.setAttribute('class', 'loadbar-rule');
+  svgEl.appendChild(rule);
+
+  let x = 0;
+  for (const m of row.mins) {
+    const t = document.createElementNS(NSU, 'line');
+    t.setAttribute('x1', x); t.setAttribute('x2', x);
+    t.setAttribute('y1', BASE); t.setAttribute('y2', 3);
+    t.setAttribute('class', 'loadbar-tick');
+    svgEl.appendChild(t);
+    x += (m / Math.max(1, row.total)) * w;
+  }
+  return svgEl;
 }
+

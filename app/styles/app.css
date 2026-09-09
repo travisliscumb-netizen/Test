@@ -118,38 +118,41 @@ a { color: var(--accent); text-decoration: none; }
   border: 1px solid transparent;
 }
 .weekstep:active { background: var(--track); }
+
+/* Days are type with a state mark under them, not five boxes. The selected day
+   is the only one that gets a surface, so the row reads as a scale being
+   pointed at rather than a segmented control. */
 .daybtn {
+  position: relative;
   min-height: var(--tap-min);
-  display: grid; place-items: center; align-content: center; gap: 1px;
+  display: grid; place-items: center; align-content: center; gap: 2px;
   border-radius: var(--r-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-1), var(--inner-top);
+  background: transparent; border: 0; box-shadow: none;
   color: var(--ink-3);
-  transition: transform var(--d-instant) var(--e-standard),
-              background var(--d-quick) var(--e-standard),
-              color var(--d-quick) var(--e-standard),
-              border-color var(--d-quick) var(--e-standard);
+  transition: color var(--d-quick) var(--e-standard), background var(--d-quick) var(--e-standard);
 }
-.daybtn:active { transform: scale(.94); }
-.daybtn .d { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; }
+.daybtn:active { background: var(--track); }
+.daybtn .d { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; opacity: .8; }
 .daybtn .n {
-  font: 750 calc(13px * var(--ts))/1 var(--font-num);
+  font: 750 calc(15px * var(--ts))/1 var(--font-num);
   font-variant-numeric: tabular-nums; color: var(--ink-2);
 }
-.daybtn[data-state='clear'] .n { color: var(--done); }
+.daybtn[data-state='clear'] .n { color: var(--accent); }
 .daybtn[data-state='empty'] .n { color: var(--muted); }
 .daybtn[data-state='behind'] .n { color: var(--warn); }
-/* Today is marked even when another day is selected, so the operator always
-   knows where "now" is. */
-.daybtn[data-today='true'] { border-color: color-mix(in srgb, var(--ink-2) 34%, transparent); }
-.daybtn[aria-selected='true'] {
-  background: var(--accent-wash);
-  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  color: var(--accent-bright);
-  box-shadow: var(--shadow-2), var(--inner-top);
+/* Today keeps a dot under it whether or not it is the day being viewed. */
+.daybtn[data-today='true']::after {
+  content: ''; position: absolute; bottom: 4px;
+  width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3);
 }
+.daybtn[aria-selected='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+.daybtn[aria-selected='true'] .d { opacity: 1; }
 .daybtn[aria-selected='true'] .n { color: var(--accent-bright); }
+.daybtn[aria-selected='true'][data-today='true']::after { background: var(--accent-bright); }
 
 /* Round icon buttons: tactile, with a real press response. */
 .iconbtn {
@@ -230,154 +233,10 @@ a { color: var(--accent); text-decoration: none; }
   font: 800 10.5px/17px var(--font-ui); text-align: center;
 }
 
-/* --------------------------------------------------------------- cards ---- */
+/* -------------------------------------------------------- section labels --- */
 
-.card {
-  position: relative;
-  border-radius: var(--r-lg);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-2), var(--inner-top);
-  padding: var(--s5);
-  contain: layout paint style;
-}
-.card.flat { box-shadow: var(--shadow-1), var(--inner-top); background: var(--surface); }
-.card.tight { padding: var(--s4); }
-
-.card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s4); }
-.card-title { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3); }
-
-/* --------------------------------------------------------- command deck --- */
-
-.deck {
-  position: relative;
-  border-radius: var(--r-xl);
-  padding: var(--s6) var(--s5) var(--s5);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-3), var(--inner-top-strong);
-  overflow: hidden;
-}
-/* A single soft light source at the top-left, so the deck reads as a physical
-   object rather than a rectangle with a border. */
-.deck::before {
-  content: ''; position: absolute; inset: -40% -20% auto -20%; height: 180px;
-  background: radial-gradient(60% 100% at 30% 0%, var(--accent-glow), transparent 70%);
-  opacity: .5; pointer-events: none;
-}
-:root[data-theme='day'] .deck::before { opacity: .28; }
-
-.deck-grid {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s5);
-}
-
-.finish { display: grid; gap: var(--s1); min-width: 0; }
-.finish .cap { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3); }
-.finish .val {
-  font: var(--t-display); letter-spacing: var(--ls-display);
-  font-variant-numeric: tabular-nums; color: var(--ink);
-  display: flex; align-items: baseline; gap: 4px;
-}
-.finish .val .suffix { font: var(--t-title2); color: var(--ink-3); letter-spacing: 0; }
-.finish .band { font: var(--t-label); color: var(--ink-3); font-variant-numeric: tabular-nums; display: grid; gap: 1px; }
-.finish .band.wide { color: var(--warn); }
-
-/* Progress arc — canvas-free, one conic gradient plus a mask. Cheap enough to
-   animate every frame without touching layout. */
-.arc {
-  --p: 0;
-  position: relative; width: calc(108px * var(--ts)); height: calc(108px * var(--ts)); flex: 0 0 auto;
-  border-radius: 50%;
-  background:
-    conic-gradient(from -90deg,
-      var(--accent) 0turn,
-      var(--accent-bright) calc(var(--p) * 1turn),
-      var(--track) calc(var(--p) * 1turn),
-      var(--track) 1turn);
-  -webkit-mask: radial-gradient(circle, transparent 0 60%, #000 61.5%);
-  mask: radial-gradient(circle, transparent 0 60%, #000 61.5%);
-  transition: --p var(--d-slow) var(--e-emphasized);
-}
-.arcwrap { position: relative; width: calc(108px * var(--ts)); height: calc(108px * var(--ts)); display: grid; place-items: center; }
-.arcwrap .inner {
-  position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 0;
-  text-align: center;
-}
-.arcwrap .count {
-  font: 800 calc(30px * var(--ts))/1 var(--font-num); letter-spacing: -.03em;
-  font-variant-numeric: tabular-nums;
-}
-.arcwrap .of { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3); margin-top: 3px; }
-@property --p { syntax: '<number>'; inherits: false; initial-value: 0; }
-
-.deck-foot {
-  position: relative;
-  margin-top: var(--s5); padding-top: var(--s4);
-  border-top: 1px solid var(--hairline);
-  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--s3);
-}
-.stat { display: grid; gap: 2px; min-width: 0; }
-.stat .k {
-  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
-  /* One line, always: a wrapping label pushes its value out of alignment with
-     the others and the row stops reading as a row. */
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.stat .v {
-  font: 750 calc(17px * var(--ts))/1.15 var(--font-num); letter-spacing: -.015em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.stat .v[data-tone='ahead'] { color: var(--accent-bright); }
-.stat .v[data-tone='behind'] { color: var(--warn); }
-.stat .v[data-tone='flat'] { color: var(--ink-2); }
-
-/* ------------------------------------------------------------- next card --- */
-
-.nextcard {
-  position: relative;
-  border-radius: var(--r-xl);
-  background: var(--surface-raised);
-  border: 1px solid color-mix(in srgb, var(--next) 26%, var(--hairline));
-  box-shadow: var(--shadow-3), var(--inner-top-strong);
-  overflow: hidden;
-}
-.nextcard::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: linear-gradient(180deg, var(--next), color-mix(in srgb, var(--next) 30%, transparent));
-}
-.nextcard .body { padding: var(--s5) var(--s5) var(--s4) calc(var(--s5) + 3px); }
-.nextcard .eyebrow {
-  display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3);
-  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--next);
-}
-.nextcard .addr { font: var(--t-hero); letter-spacing: var(--ls-title); }
-.nextcard .sub { margin-top: var(--s2); font: var(--t-label); color: var(--ink-3); display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); }
-.nextcard .sub b { color: var(--ink-2); font-weight: 700; }
-
-.flagrow { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
-.flag {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 9px; border-radius: var(--r-xs);
-  font: var(--t-micro); letter-spacing: .04em; text-transform: uppercase;
-  background: var(--track); color: var(--ink-2); border: 1px solid var(--hairline);
-}
-.flag[data-kind='push'] { background: var(--info-wash); color: var(--info); border-color: color-mix(in srgb, var(--info) 28%, transparent); }
-.flag[data-kind='warn'] { background: var(--danger-wash); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
-.flag[data-kind='time'] { background: var(--next-wash); color: var(--next); border-color: color-mix(in srgb, var(--next) 30%, transparent); }
-
-.notebox {
-  margin-top: var(--s4); padding: var(--s4);
-  border-radius: var(--r-md);
-  background: var(--surface-sunken);
-  border: 1px solid var(--hairline);
-  border-left: 3px solid var(--next);
-  font: var(--t-body); color: var(--ink-2);
-}
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s4); }
+.panel-lab { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3); }
 
 /* --------------------------------------------------------------- actions -- */
 
@@ -442,64 +301,6 @@ a { color: var(--accent); text-decoration: none; }
     inset 0 1px 0 rgba(255,255,255,.28);
 }
 
-/* ---------------------------------------------------------------- stops ---- */
-
-.stoplist { display: grid; gap: var(--s2); }
-
-.stop {
-  position: relative;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s4);
-  padding: var(--s4) var(--s4) var(--s4) var(--s3);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-1);
-  contain: layout paint style;
-  transition: background var(--d-quick) var(--e-standard),
-              opacity var(--d-base) var(--e-standard),
-              box-shadow var(--d-quick) var(--e-standard);
-  touch-action: pan-y;
-}
-.stop:active { background: var(--surface-2); }
-
-.stop .rail {
-  width: 34px; height: 34px; border-radius: var(--r-sm);
-  display: grid; place-items: center;
-  font: 750 14px/1 var(--font-num); font-variant-numeric: tabular-nums;
-  background: var(--track); color: var(--ink-3);
-  border: 1px solid transparent;
-  transition: all var(--d-base) var(--e-emphasized);
-}
-.stop .meat { min-width: 0; display: grid; gap: 3px; }
-.stop .addr {
-  font: var(--t-bodystrong); letter-spacing: -.008em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.stop .meta { font: var(--t-label); color: var(--ink-3); display: flex; gap: var(--s3); flex-wrap: wrap; }
-.stop .meta .dot { color: var(--muted); }
-.stop .tail { display: flex; align-items: center; gap: var(--s2); min-width: 0; overflow: hidden; }
-
-.stop[data-status='done'] { opacity: .58; }
-.stop[data-status='done'] .rail { background: color-mix(in srgb, var(--done) 22%, transparent); color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
-.stop[data-status='done'] .addr { text-decoration: line-through; text-decoration-color: var(--ink-3); text-decoration-thickness: 1.5px; }
-.stop[data-status='skipped'] .rail { background: color-mix(in srgb, var(--skipped) 20%, transparent); color: var(--skipped); }
-.stop[data-status='skipped'] { opacity: .6; }
-.stop[data-status='pushed'] .rail { background: color-mix(in srgb, var(--pushed) 20%, transparent); color: var(--pushed); }
-.stop[data-current='true'] {
-  background: var(--surface-2);
-  border-color: color-mix(in srgb, var(--next) 42%, transparent);
-  box-shadow: var(--shadow-2), 0 0 0 1px color-mix(in srgb, var(--next) 18%, transparent);
-}
-.stop[data-current='true'] .rail { background: var(--next-wash); color: var(--next); border-color: color-mix(in srgb, var(--next) 44%, transparent); }
-.stop[data-nocoord='true'] .rail::after {
-  content: ''; position: absolute; margin: -18px 0 0 22px;
-  width: 8px; height: 8px; border-radius: 50%; background: var(--warn);
-  border: 2px solid var(--surface);
-}
-
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
   height: 22px; padding: 0 7px; border-radius: var(--r-xs);
@@ -512,43 +313,24 @@ a { color: var(--accent); text-decoration: none; }
 
 /* ------------------------------------------------------------- reordering -- */
 
-.stoplist[data-reorder='true'] .stop { padding-right: var(--s2); }
 .grip {
   width: 42px; height: 42px; margin-right: calc(var(--s2) * -1);
   display: grid; place-items: center; color: var(--ink-3);
   touch-action: none; cursor: grab;
 }
+/* The one moment a row is allowed to be an object: it has genuinely been
+   picked up, so it gets a surface, an edge and a shadow, and gives them back
+   on the drop. */
 .stop.lifted {
   z-index: 5;
-  box-shadow: var(--shadow-lift);
-  background: var(--surface-2);
-  border-color: var(--hairline-strong);
-}
-.dropgap {
-  border-radius: var(--r-md);
-  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
-  background: var(--accent-wash);
-}
-
-/* ---------------------------------------------------------------- banner --- */
-
-.banner {
-  display: grid; grid-template-columns: 34px minmax(0,1fr); gap: var(--s4);
-  align-items: start;
-  padding: var(--s4);
+  padding-left: var(--s3); padding-right: var(--s3);
+  margin-left: calc(var(--s3) * -1); margin-right: calc(var(--s3) * -1);
+  border-top-color: transparent;
   border-radius: var(--r-md);
   background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-1), var(--inner-top);
+  box-shadow: var(--shadow-lift), 0 0 0 1px var(--hairline-strong);
 }
-.banner .ico { width: 34px; height: 34px; border-radius: var(--r-sm); display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); }
-.banner h4 { font: var(--t-bodystrong); margin-bottom: 2px; }
-.banner p { font: var(--t-label); color: var(--ink-3); font-weight: 550; }
-.banner .row { display: flex; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
-.banner[data-tone='suggest'] { border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
-.banner[data-tone='warn'] .ico { background: var(--danger-wash); color: var(--danger); }
-.banner[data-tone='warn'] { border-color: color-mix(in srgb, var(--danger) 32%, transparent); }
-.banner[data-tone='info'] .ico { background: var(--info-wash); color: var(--info); }
+.stop.lifted .rail { box-shadow: 0 0 0 4px color-mix(in srgb, var(--next) 22%, transparent); }
 
 /* ----------------------------------------------------------------- sheet --- */
 
@@ -564,7 +346,7 @@ a { color: var(--accent); text-decoration: none; }
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sheet);
   max-height: 92dvh;
-  display: grid; grid-template-rows: auto minmax(0,1fr) auto;
+  display: flex; flex-direction: column;
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   background: var(--ground-2);
   border-top: 1px solid var(--hairline-strong);
@@ -578,16 +360,18 @@ a { color: var(--accent); text-decoration: none; }
   touch-action: none;
 }
 .sheet .grabber i { width: 38px; height: 4px; border-radius: 2px; background: var(--hairline-strong); display: block; }
-.sheet .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 var(--s5) var(--s5); display: grid; gap: var(--s4); }
+.sheet > * { flex: 0 0 auto; }
+.sheet .scroll {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 0 var(--s5) var(--s5); display: grid; gap: var(--s4);
+}
 .sheet .foot { padding: var(--s4) var(--s5) var(--s5); border-top: 1px solid var(--hairline); display: grid; gap: var(--s3); }
 
 .sheet-title { padding: 0 var(--s5) var(--s4); display: grid; gap: var(--s1); }
 .sheet-title h2 { font: var(--t-title1); letter-spacing: var(--ls-title); }
 .sheet-title p { font: var(--t-label); color: var(--ink-3); }
 
-.actiongrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); }
-.actiongrid .btn { flex-direction: column; gap: var(--s2); min-height: 76px; font-size: 13px; }
-.actiongrid .btn svg { width: 22px; height: 22px; }
 
 /* ----------------------------------------------------------------- toast --- */
 
@@ -616,23 +400,57 @@ a { color: var(--accent); text-decoration: none; }
 
 .mapwrap { position: relative; background: var(--map-ground); overflow: hidden; }
 .mapwrap canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.mapcard { border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-2); height: 190px; }
 .mapfull { position: absolute; inset: 0; }
 
-.mapctl { position: absolute; right: var(--s4); display: grid; gap: var(--s2); }
-.mapctl .iconbtn { background: var(--chrome-bg); -webkit-backdrop-filter: var(--blur-chrome); backdrop-filter: var(--blur-chrome); }
-
-.maplegend {
-  position: absolute; left: var(--s4); bottom: var(--s4);
-  display: flex; gap: var(--s4); flex-wrap: wrap;
-  padding: var(--s3) var(--s4); border-radius: var(--r-sm);
-  background: var(--chrome-bg); border: 1px solid var(--hairline);
-  font: var(--t-micro); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2);
+/* Bottom right, above the selection panel and clear of the tab bar. */
+.mapctl {
+  position: absolute; right: var(--s4); bottom: calc(var(--s10) + var(--s5));
+  display: grid; gap: var(--s2); z-index: 4;
+  transition: transform var(--d-slow) var(--e-emphasized);
 }
-.maplegend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+.mapctl .iconbtn { background: var(--chrome-bg); -webkit-backdrop-filter: var(--blur-chrome); backdrop-filter: var(--blur-chrome); }
+.page:has(.mapsel[data-open='true']) .mapctl { transform: translateY(-132px); }
+/* One statement at a time along the bottom edge. */
+.page:has(.mapsel[data-open='true']) .mapstatus { opacity: 0; }
+.mapstatus { transition: opacity var(--d-base) var(--e-standard); }
+
+/* Not a legend. What the operator wants read off a map is how much is left. */
+.mapstatus {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  /* Clears the control column on the right so the line never runs under it. */
+  padding: var(--s8) calc(var(--s10) + var(--s5)) calc(var(--s10) + var(--s3)) var(--s5);
+  display: grid; gap: 2px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--ground) 88%, transparent) 55%, var(--ground));
+}
+.mapstatus-lab {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3);
+}
+.mapstatus-line { font: var(--t-bodystrong); color: var(--ink); font-variant-numeric: tabular-nums; }
+.mapstatus-sub { font: var(--t-label); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* The selected stop rises off the map on a scrim. No card: boxing it would
+   make the map the background to a panel instead of the subject. */
+.mapsel {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  padding: var(--s9) var(--s5) calc(var(--s10) + var(--s4));
+  display: grid; gap: var(--s2);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--ground) 90%, transparent) 42%, var(--ground) 72%);
+  transform: translateY(14px); opacity: 0;
+  transition: transform var(--d-slow) var(--e-emphasized), opacity var(--d-base) var(--e-standard);
+}
+.mapsel[data-open='false'] { pointer-events: none; }
+.mapsel[data-open='true'] { transform: none; opacity: 1; }
+.mapsel-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); }
+.mapsel-addr {
+  font: 800 clamp(24px, calc(7.2vw * var(--ts)), calc(32px * var(--ts)))/1.05 var(--font-num);
+  letter-spacing: -.03em; color: var(--ink); text-wrap: balance;
+}
+.mapsel-facts { font: var(--t-label); color: var(--ink-3); }
+.mapsel-facts:empty { display: none; }
+.mapsel .live-act { margin-top: var(--s3); }
 
 .mapattr {
-  position: absolute; right: var(--s2); bottom: var(--s1);
+  position: absolute; right: var(--s4); top: var(--s3); z-index: 3;
   font: 500 9.5px/1.3 var(--font-ui); color: var(--ink-3); opacity: .75;
 }
 
@@ -644,11 +462,6 @@ a { color: var(--accent); text-decoration: none; }
 .muted { color: var(--ink-3); }
 .num { font-variant-numeric: tabular-nums; }
 .hide { display: none !important; }
-
-.confbar { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
-.confbar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width var(--d-slow) var(--e-emphasized); }
-.confbar[data-level='low'] i { background: var(--warn); }
-.confbar[data-level='none'] i { background: var(--muted); }
 
 .field {
   width: 100%; min-height: var(--tap-min);
@@ -713,3 +526,192 @@ textarea.field { min-height: 96px; resize: vertical; }
 .enter { animation: enter var(--d-slow) var(--e-emphasized) both; }
 @keyframes enter { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
 :root[data-motion='calm'] .enter { animation-duration: var(--d-quick); }
+
+/* =============================================================================
+   Panels — the non-card layout used by Route, Learned and Settings.
+
+   A section is a label, a hairline, and its rows. No background, no border, no
+   radius: the page is one surface and the type does the grouping. This is what
+   stops five different screens from all looking like the same stack of boxes.
+   ========================================================================== */
+
+.panel {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s6) var(--s5) var(--s5);
+  border-top: 1px solid var(--hairline);
+}
+.panel:first-child { border-top: 0; padding-top: var(--s4); }
+.panel > .panel-head { margin: 0; }
+.panel .panel-lab {
+  font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase;
+  color: var(--ink-3);
+}
+/* A nested block that genuinely is a discrete object keeps a light surface. */
+.sub {
+  display: grid; gap: var(--s2);
+  padding: var(--s4) 0 var(--s4) var(--s4);
+  border-left: 2px solid var(--hairline-strong);
+}
+.sub .panel-lab { color: var(--ink-3); }
+
+.panel .switchrow:first-of-type { padding-top: 0; }
+.panel .switchrow { border-top: 1px solid color-mix(in srgb, var(--hairline) 70%, transparent); }
+.panel .switchrow:first-of-type { border-top: 0; }
+
+/* The route list shares the spine's language: markers on a thread, hairline
+   separators, no boxes — so Route and Today read as one product. The line
+   number does the work the chevron used to: it says where you are in the day,
+   which the chevron never did. */
+.routehead { display: grid; gap: var(--s2); padding: 0 0 var(--s2); }
+.routehead-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); }
+.routefoot { display: grid; gap: var(--s5); padding: var(--s5) 0 0; }
+
+.stoplist {
+  position: relative;
+  display: grid; gap: 0;
+  padding-left: 22px;
+}
+.stoplist::before {
+  content: '';
+  position: absolute; left: 6px; top: 10px; bottom: 10px; width: 1.5px;
+  background: var(--hairline);
+  transition: background var(--d-base) var(--e-standard);
+}
+.page[data-reorder='true'] .stoplist::before { background: color-mix(in srgb, var(--next) 45%, transparent); }
+
+.stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.4ch minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s4);
+  padding: var(--s4) 0;
+  border-top: 1px solid color-mix(in srgb, var(--hairline) 70%, transparent);
+  contain: layout style;
+  touch-action: pan-y;
+}
+.stop:first-child { border-top: 0; }
+
+/* The hit area is the row, stretched underneath its content, so the grip can
+   still sit above it in reorder mode without nesting one button in another. */
+.stop-open {
+  position: absolute; inset: 0; z-index: 0;
+  background: transparent; border: 0; border-radius: var(--r-sm);
+}
+.stop-open:active { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.stop > .ord, .stop > .meat { position: relative; z-index: 1; pointer-events: none; }
+.stop > .tail { position: relative; z-index: 2; }
+
+.ord {
+  font: 600 calc(12px * var(--ts))/1.5 var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3); text-align: right;
+  letter-spacing: .02em;
+}
+.stop[data-status='done'] .ord { color: color-mix(in srgb, var(--accent) 75%, transparent); }
+.stop[data-current='true'] .ord { color: var(--next); font-weight: 800; }
+
+.stop .rail {
+  position: absolute; left: -22px; top: calc(var(--s4) + 5px);
+  width: 11px; height: 11px; min-width: 0; border-radius: 50%;
+  background: var(--ground);
+  border: 1.5px solid color-mix(in srgb, var(--ink-3) 55%, transparent);
+  font-size: 0; color: transparent; overflow: hidden;
+  display: block; padding: 0;
+  transition: all var(--d-base) var(--e-emphasized);
+}
+.stop .meat { min-width: 0; display: grid; gap: 2px; }
+.stop .addr {
+  font: var(--t-bodystrong); letter-spacing: -.012em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stop .meta {
+  font: var(--t-label); color: var(--ink-3); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stop .meta:empty { display: none; }
+.stop .tail { display: flex; align-items: center; min-width: 0; }
+
+.stop[data-status='done'] .rail { background: var(--accent); border-color: var(--accent); }
+.stop[data-status='done'] .addr { color: var(--ink-3); }
+.stop[data-status='skipped'] .rail { background: var(--skipped); border-color: var(--skipped); }
+.stop[data-status='skipped'] .addr { color: var(--ink-3); }
+.stop[data-status='pushed'] .rail { background: var(--pushed); border-color: var(--pushed); }
+.stop[data-status='pushed'] .addr { color: var(--ink-3); }
+.stop[data-current='true'] .rail {
+  background: var(--next); border-color: var(--next);
+  width: 15px; height: 15px; top: calc(var(--s4) + 3px); left: -24px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--next) 20%, transparent);
+}
+.stop[data-current='true'] .addr { color: var(--ink); font-weight: 800; }
+
+/* On a settings or detail panel a button is a row control, not a headline.
+   The Done key on Today is the only 60px slab in the product. */
+.panel .btn { min-height: var(--tap-min); font-size: calc(15.5px * var(--ts)); }
+.panel .btn.primary { box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.35); }
+.panel p.muted { font: var(--t-label); color: var(--ink-3); max-width: 44ch; }
+
+.loadlist { display: grid; gap: var(--s5); }
+.loadrow { display: grid; gap: var(--s2); }
+.loadhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+.loadday { font: var(--t-bodystrong); letter-spacing: -.01em; }
+.loadnum { font: var(--t-label); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.loadbar { display: block; width: 100%; height: 14px; overflow: visible; }
+.loadbar-base { stroke: var(--hairline); stroke-width: 1; }
+.loadbar-rule { stroke: var(--accent); stroke-width: 2.5; }
+.loadrow[data-heavy='true'] .loadbar-rule { stroke: var(--warn); }
+.loadbar-tick { stroke: color-mix(in srgb, var(--ink) 26%, transparent); stroke-width: 1; }
+.loadrow[data-heavy='true'] .loadday { color: var(--warn); }
+
+/* A ranking, not a route: no thread, and no marker pretending to be one. */
+.plainlist { display: grid; }
+.plainlist .stop { grid-template-columns: minmax(0, 1fr) auto; }
+.plainlist .rail, .plainlist .ord { display: none; }
+
+/* ---------------------------------------------------------- view transitions
+   Progressive enhancement: without support the views simply swap, which is
+   what happened before. The map is named on both screens so the browser morphs
+   the one into the other instead of cross-fading two pictures of a map. */
+@supports (view-transition-name: none) {
+  .groundmap, .mapfull { view-transition-name: routemap; }
+
+  :root[data-vt='tab']::view-transition-old(root),
+  :root[data-vt='tab']::view-transition-new(root) {
+    animation-duration: 260ms;
+    animation-timing-function: cubic-bezier(.2, .8, .2, 1);
+  }
+  :root[data-vt='tab']::view-transition-old(routemap),
+  :root[data-vt='tab']::view-transition-new(routemap) {
+    animation-duration: 380ms;
+    animation-timing-function: cubic-bezier(.16, 1, .3, 1);
+  }
+  :root[data-motion='calm'] ::view-transition-group(*),
+  :root[data-motion='calm'] ::view-transition-old(*),
+  :root[data-motion='calm'] ::view-transition-new(*) { animation-duration: 1ms; }
+}
+
+/* A completed stop seals: the marker fills and stamps a check, once, and the
+   thread behind it advances. This is the only celebratory motion in the app,
+   and it lasts less time than the tap that caused it. */
+@keyframes pipSeal {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(1.55); }
+  100% { transform: scale(1); }
+}
+.node[data-status='done'] .pip.just-sealed {
+  animation: pipSeal 420ms var(--e-emphasized);
+}
+.node[data-status='done'] .pip.just-sealed::after {
+  content: '';
+  position: absolute; inset: -9px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: pipRing 560ms var(--e-standard) forwards;
+}
+@keyframes pipRing {
+  from { transform: scale(.5); opacity: .9; }
+  to   { transform: scale(1.9); opacity: 0; }
+}
+:root[data-motion='calm'] .pip.just-sealed,
+:root[data-motion='calm'] .pip.just-sealed::after { animation: none; }

@@ -35,8 +35,8 @@ export class SettingsScreen {
     clear(this.el);
 
     // ---------------------------------------------------------------- data
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Your data' })),
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Your data' })),
       h('button.btn.primary', { type: 'button', style: { width: '100%' }, onclick: () => this.backup() },
         svg(ICON.download, { size: 20 }), 'Back up everything now'),
       h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s3)' },
@@ -50,8 +50,8 @@ export class SettingsScreen {
     this.renderStorage();
 
     // ------------------------------------------------------------- working
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Working day' })),
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Working day' })),
       this.row('Crew', 'Which route this device runs.',
         this.seg([['south', 'South'], ['east', 'East']], settings.crew, (v) => this.set({ crew: v }))),
       this.row('Start time', 'Used for the finish estimate before the first stop is marked.',
@@ -76,16 +76,16 @@ export class SettingsScreen {
     ));
 
     // ---------------------------------------------------------- navigation
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Navigation' })),
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Navigation' })),
       this.row('Open directions in', 'Destinations are always handed over as coordinates, never as text to re-look-up.',
         this.seg(NAV_APPS.map((a) => [a.key, a.label]), settings.navApp, (v) => this.set({ navApp: v })))
     ));
 
     // ---------------------------------------------------------------- gps
     const loc = this.ctx.location;
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Location' })),
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Location' })),
       this.row('GPS', 'Balanced tracks coarsely and only sharpens within 400 m of the next stop, which is most of the battery difference.',
         this.seg([['off', 'Off'], ['balanced', 'Balanced'], ['precise', 'Precise']], settings.gpsMode,
           (v) => { this.set({ gpsMode: v }); loc.setMode(v); })),
@@ -95,8 +95,8 @@ export class SettingsScreen {
     ));
 
     // ------------------------------------------------------------ feel
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Look and feel' })),
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Look and feel' })),
       this.row('Theme', 'Daylight is built for direct sun: higher contrast, no translucency.',
         this.seg([['auto', 'Auto'], ['night', 'Night'], ['day', 'Daylight']], settings.theme, (v) => this.set({ theme: v }))),
       this.row('Text size', 'iOS text-size settings do not reach a web app, so this is the app\u2019s own. Buttons grow with it.',
@@ -111,8 +111,8 @@ export class SettingsScreen {
     ));
 
     // ----------------------------------------------------------- danger
-    this.el.appendChild(h('section.card', null,
-      h('div.card-head', null, h('span.card-title', { text: 'Reset' })),
+    this.el.appendChild(h('section.panel', null,
+      h('div.panel-head', null, h('span.panel-lab', { text: 'Reset' })),
       h('button.btn.danger', { type: 'button', style: { width: '100%' }, onclick: () => this.confirmWipe() },
         svg(ICON.warn, { size: 19 }), 'Erase everything on this device'),
       h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s3)' },
@@ -133,17 +133,16 @@ export class SettingsScreen {
     const parts = [];
     if (est.usage != null) parts.push(`${(est.usage / 1048576).toFixed(1)} MB used`);
     if (est.quota != null) parts.push(`${(est.quota / 1073741824).toFixed(1)} GB available`);
-    this.storageBox.appendChild(h('div.row.between', { style: { font: 'var(--t-label)' } },
-      h('span', { class: 'muted', text: parts.join(' · ') || 'Storage size unavailable' }),
-      h('span', {
-        class: 'chip', dataset: { kind: persisted ? 'note' : 'time' },
-        text: persisted ? 'Protected' : 'Not protected',
-      })
-    ));
-    if (!persisted) {
-      this.storageBox.appendChild(h('p', { class: 'muted', style: { font: 'var(--t-label)', marginTop: 'var(--s2)' },
-        text: 'Safari can evict data from sites that are not used for a while. Adding this app to the Home Screen and using it usually earns protected storage. Backing up regularly is the real safeguard either way.' }));
-    }
+    // A coloured chip floating beside a wrapping sentence collided with it and
+    // said nothing a sentence could not. The state is the headline instead.
+    this.storageBox.appendChild(h('p.prose', { text: parts.join(' · ') || 'Storage size unavailable' }));
+    this.storageBox.appendChild(persisted
+      ? h('div.note', { dataset: { tone: 'suggest' } },
+          h('div.note-t', { text: 'Storage is protected' }),
+          h('div.note-b', { text: 'This device has granted the app persistent storage, so Safari will not evict the route to reclaim space. Keep backing up anyway — a lost phone is the case persistence cannot cover.' }))
+      : h('div.note', { dataset: { tone: 'warn' } },
+          h('div.note-t', { text: 'Storage is not protected yet' }),
+          h('div.note-b', { text: 'Safari can evict data from sites that are not used for a while. Adding this app to the Home Screen and using it usually earns protected storage. Backing up regularly is the real safeguard either way.' })));
   }
 
   // ------------------------------------------------------------ primitives
@@ -256,12 +255,10 @@ export class SettingsScreen {
 
     if (!report.ok) {
       haptic('error');
-      body.appendChild(h('div.banner', { dataset: { tone: 'warn' } },
-        h('div.ico', null, svg(ICON.warn, { size: 18 })),
-        h('div', null,
-          h('h4', { text: 'This file was not restored' }),
-          h('p', { text: report.errors[0]?.message || 'The file could not be validated.' }),
-          h('p', { style: { marginTop: 'var(--s3)' }, text: 'Nothing on this device has been changed.' }))
+      body.appendChild(h('div.note', { dataset: { tone: 'warn' } },
+        h('div.note-t', { text: 'This file was not restored' }),
+        h('div.note-b', { text: report.errors[0]?.message || 'The file could not be validated.' }),
+        h('div.note-b', { text: 'Nothing on this device has been changed.' })
       ));
       for (const e of report.errors.slice(1, 4)) {
         body.appendChild(h('p', { class: 'muted', style: { font: 'var(--t-label)' }, text: e.message }));
@@ -271,8 +268,8 @@ export class SettingsScreen {
     }
 
     const c = report.counts;
-    body.appendChild(h('div.card.flat.tight', null,
-      h('div.card-title', { text: 'This file contains' }),
+    body.appendChild(h('div.sub', null,
+      h('div.panel-lab', { text: 'This file contains' }),
       h('div', { style: { display: 'grid', gap: '6px', marginTop: 'var(--s3)', font: 'var(--t-label)' } },
         line('Properties', `${c.properties} (${c.active} active)`),
         line('With coordinates', `${c.withCoordinates}${c.missingCoordinates ? ` — ${c.missingCoordinates} missing` : ''}`),
@@ -288,15 +285,13 @@ export class SettingsScreen {
     }
 
     const current = this.ctx.store.properties.size;
-    body.appendChild(h('div.banner', { dataset: { tone: current ? 'warn' : 'info' } },
-      h('div.ico', null, svg(current ? ICON.warn : ICON.info, { size: 18 })),
-      h('div', null,
-        h('h4', { text: current ? 'This replaces what is on the device' : 'This device is empty' }),
-        h('p', {
-          text: current
-            ? `${current} properties and their history are here now and will be replaced. A safety copy is taken first and offered to you if the restore turns out to be the wrong file.`
-            : 'Nothing will be overwritten.',
-        }))
+    body.appendChild(h('div.note', { dataset: { tone: current ? 'warn' : 'info' } },
+      h('div.note-t', { text: current ? 'This replaces what is on the device' : 'This device is empty' }),
+      h('div.note-b', {
+        text: current
+          ? `${current} properties and their history are here now and will be replaced. A safety copy is taken first and offered to you if the restore turns out to be the wrong file.`
+          : 'Nothing will be overwritten.',
+      })
     ));
 
     openSheet({
@@ -304,7 +299,7 @@ export class SettingsScreen {
       subtitle: report.meta.filename || '',
       content: body,
       footer: h('div', { style: { display: 'grid', gap: 'var(--s3)' } },
-        h('button.btn.primary', {
+        h('button.act.act-done', {
           type: 'button',
           onclick: async () => {
             closeSheet();
@@ -319,7 +314,7 @@ export class SettingsScreen {
             } catch (e) { reportError(e, 'restore'); }
           },
         }, 'Restore now'),
-        h('button.btn.ghost', { type: 'button', text: 'Cancel', onclick: () => closeSheet() })
+        h('button.link.dim', { type: 'button', text: 'Cancel', style: { justifySelf: 'center' }, onclick: () => closeSheet() })
       ),
     });
   }

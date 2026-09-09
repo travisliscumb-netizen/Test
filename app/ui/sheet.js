@@ -14,7 +14,7 @@ import { haptic } from './motion/haptics.js';
 
 let active = null;
 
-export function openSheet({ title, subtitle, content, footer, onClose, labelledBy }) {
+export function openSheet({ title, subtitle, masthead, content, footer, onClose, labelledBy }) {
   closeSheet(true);
 
   const scrim = h('div.scrim', { dataset: { open: 'false' } });
@@ -25,7 +25,10 @@ export function openSheet({ title, subtitle, content, footer, onClose, labelledB
 
   const grabber = h('div.grabber', { 'aria-hidden': 'true' }, h('i'));
   sheet.appendChild(grabber);
-  if (title) {
+  // A caller that brings its own masthead gets it verbatim: `title` then only
+  // names the dialog for assistive tech rather than drawing a heading twice.
+  if (masthead) sheet.appendChild(masthead);
+  else if (title) {
     sheet.appendChild(h('header.sheet-title', null,
       h('h2', { text: title }),
       subtitle ? h('p', { text: subtitle }) : null));

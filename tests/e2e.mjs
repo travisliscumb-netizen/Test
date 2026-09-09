@@ -83,7 +83,8 @@ let { ctx, page } = await newCtx();
 await t('cold start shows first-run rather than an empty dashboard', async () => {
   await boot(page);
   const text = await page.textContent('#view');
-  if (!/Restore your route file/.test(text)) throw new Error('onboarding not shown');
+  if (!/Your route lives on this phone/.test(text)) throw new Error('onboarding not shown');
+  if (!/Choose backup file/.test(text)) throw new Error('onboarding offers no way to load a route');
 });
 
 await t('the real route restores through the validated path', async () => {
@@ -109,15 +110,19 @@ await t("today's route renders with the right stops for the weekday", async () =
   });
   if (info.n < 1) throw new Error('no stops for today');
   if (info.crew !== 'south') throw new Error(`unexpected crew ${info.crew}`);
+  await page.evaluate(() => window.__teds.goTo('route'));
+  await page.waitForTimeout(400);
   const rows = await page.locator('#view .stop').count();
   if (rows !== info.n) throw new Error(`${rows} rows rendered for ${info.n} stops`);
+  await page.evaluate(() => window.__teds.goTo('today'));
+  await page.waitForTimeout(300);
 });
 
 await t('the deck shows a finish time and a range, not a bare number', async () => {
-  const val = await page.textContent('.finish .val');
-  const band = await page.textContent('.finish .band');
+  const val = await page.textContent('.hero-val');
+  const band = await page.textContent('.hero-cap');
   if (!/\d/.test(val)) throw new Error(`finish value looks wrong: "${val}"`);
-  if (!/Typically|complete|No stops/.test(band)) throw new Error(`band looks wrong: "${band}"`);
+  if (!/Predicted finish|Route complete|This day/.test(band)) throw new Error(`caption looks wrong: "${band}"`);
 });
 
 await t('predictions come from real learned history, not a flat default', async () => {
@@ -145,7 +150,7 @@ await t('completing a stop is instant and survives a reload', async () => {
   // animation — rather than the time the app takes to commit the change.
   const r = await page.evaluate(() => {
     const a = window.__teds;
-    const btn = document.querySelector('.nextcard button.done-key');
+    const btn = document.querySelector('.act-done');
     const before = a.computeStops().filter((s) => s.status === 'pending').length;
     const target = a.computeStops().find((s) => s.status === 'pending').address;
     const t0 = performance.now();
@@ -168,7 +173,7 @@ await t('completing a stop is instant and survives a reload', async () => {
 
 await t('rapid repeated taps produce exactly one completion', async () => {
   const id = await page.evaluate(() => window.__teds.computeStops().find((s) => s.status === 'pending').id);
-  const btn = page.locator('.nextcard button:has-text("Done")');
+  const btn = page.locator('.act-done').first();
   await Promise.all([btn.click(), btn.click({ force: true }), btn.click({ force: true })]).catch(() => {});
   await page.waitForTimeout(700);
   // Scoped to today: the imported history legitimately contains completions
@@ -183,16 +188,40 @@ await t('rapid repeated taps produce exactly one completion', async () => {
 });
 
 await t('a run of eight completions stays responsive', async () => {
-  const t0 = Date.now();
-  for (let i = 0; i < 8; i++) {
-    const has = await page.locator('.nextcard button:has-text("Done")').count();
-    if (!has) break;
-    await page.locator('.nextcard button:has-text("Done")').click();
-    await page.waitForTimeout(90);
-  }
-  const elapsed = Date.now() - t0;
-  if (elapsed > 9000) throw new Error(`eight completions took ${elapsed}ms`);
+  // Measured in the page. Clicking through the driver would time its
+  // actionability wait — the live marker breathes continuously by design, so
+  // the element is never "stable" — rather than the work the app does.
+  const r = await page.evaluate(async () => {
+    const a = window.__teds;
+    const commits = [];
+    for (let i = 0; i < 8; i++) {
+      const btn = document.querySelector('.act-done');
+      if (!btn) break;
+      const t0 = performance.now();
+      btn.click();
+      commits.push(performance.now() - t0);
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+    }
+    return { n: commits.length, worst: Math.max(...commits), total: commits.reduce((x, y) => x + y, 0) };
+  });
+  if (r.n < 8) throw new Error(`only ${r.n} completions were possible`);
+  if (r.worst > 90) throw new Error(`slowest completion blocked the main thread for ${r.worst.toFixed(0)}ms`);
+
+  // And the interface must keep painting while that is happening.
+  const fps = await page.evaluate(() => new Promise((resolve) => {
+    let frames = 0; const start = performance.now();
+    const tick = () => { frames++; if (performance.now() - start < 1000) requestAnimationFrame(tick); else resolve(frames); };
+    requestAnimationFrame(tick);
+  }));
+  if (fps < 30) throw new Error(`only ${fps} frames in the second after a burst of completions`);
   if (page.errors.length) throw new Error(`console errors: ${page.errors.slice(0, 2).join(' | ')}`);
+});
+
+await t('exactly one stop is live at a time', async () => {
+  const n = await page.evaluate(() => document.querySelectorAll('.node.is-current').length);
+  if (n !== 1) throw new Error(`${n} stops rendered as live`);
+  const done = await page.locator('.act-done').count();
+  if (done !== 1) throw new Error(`${done} Done keys on screen`);
 });
 
 await t('undo restores the last completion', async () => {
@@ -233,8 +262,8 @@ await t('the day can be switched, and switched back', async () => {
   if (after.isToday) throw new Error('isToday should be false when viewing another day');
 
   const banner = await page.textContent('#view');
-  if (!/Showing /.test(banner)) throw new Error('no indication that this is not today');
-  if (!/Work on this day/.test(banner)) throw new Error('the deck still claims a finish time for a day not being worked');
+  if (!/Viewing /.test(banner)) throw new Error('no indication that this is not today');
+  if (!/Work in this day/.test(banner)) throw new Error('the hero still claims a finish time for a day not being worked');
 
   await page.getByRole('button', { name: 'Back to today' }).click();
   await page.waitForTimeout(500);
@@ -274,7 +303,7 @@ await t('the app works with the network completely down', async () => {
   await page.waitForFunction(() => document.body.dataset.booted === 'true', { timeout: 25000 });
   const n = await page.evaluate(() => window.__teds.store.properties.size);
   if (n !== 238) throw new Error(`offline reload lost data: ${n} properties`);
-  await page.locator('.nextcard button:has-text("Done")').click();
+  await page.locator('.act-done').first().click();
   await page.waitForTimeout(500);
   const chrome = await page.textContent('#chrome');
   if (!/Offline/.test(chrome)) throw new Error('offline state not surfaced in the header');
@@ -309,8 +338,11 @@ await t('tapping a pin exposes its actions', async () => {
   });
   await page.mouse.click(hit.x, hit.y);
   await page.waitForTimeout(500);
-  const sel = await page.locator('#view .card').first().textContent().catch(() => '');
+  const panel = page.locator('#view .mapsel[data-open="true"]');
+  if (!(await panel.count())) throw new Error('tapping a pin did not raise the selection panel');
+  const sel = await panel.first().textContent().catch(() => '');
   if (!/Navigate/.test(sel)) throw new Error('pin selection did not expose actions');
+  if (!sel.includes(hit.address)) throw new Error(`the panel names the wrong stop: ${sel}`);
 });
 
 await t('route optimisation reports a saving and applies reversibly', async () => {
@@ -405,7 +437,7 @@ await t('GPS denial degrades without breaking anything', async () => {
   await p2.waitForTimeout(400);
   const txt = await p2.textContent('#view');
   if (/NaN|undefined|Infinity/.test(txt)) throw new Error('denied GPS produced junk in the interface');
-  const stops = await p2.locator('#view .stop').count();
+  const stops = await p2.locator('#view .node-stop').count();
   if (stops < 1) throw new Error('route disappeared when GPS was denied');
   const desc = await p2.evaluate(() => window.__teds.location.describe());
   if (!/declined/i.test(desc)) throw new Error(`unhelpful GPS message: ${desc}`);
@@ -550,9 +582,9 @@ await t('reduced motion still renders a complete, polished screen', async () => 
   await p5.waitForTimeout(500);
   const motion = await p5.evaluate(() => document.documentElement.dataset.motion);
   if (motion !== 'calm') throw new Error(`reduced motion not honoured: ${motion}`);
-  const rows = await p5.locator('#view .stop').count();
+  const rows = await p5.locator('#view .node-stop').count();
   if (rows < 1) throw new Error('calm mode lost the route');
-  await p5.locator('.nextcard button:has-text("Done")').click();
+  await p5.locator('.act-done').first().click();
   await p5.waitForTimeout(400);
   const fx = await p5.evaluate(() => !!document.querySelector('canvas.fx-layer'));
   if (fx) throw new Error('particle layer created in reduced-motion mode');
@@ -584,12 +616,21 @@ await t('the daylight theme is art-directed, not an inversion', async () => {
 await t('no interactive control is smaller than 44px', async () => {
   await page.evaluate(() => window.__teds.goTo('today'));
   await page.waitForTimeout(400);
+  // An element mid-transform measures smaller than it is. Wait for every
+  // running animation to finish first, or this reports scale(.97) as a
+  // too-small button roughly one run in three.
+  await page.evaluate(() => Promise.all(
+    document.getAnimations()
+      // The live-stop pulse never finishes by design; awaiting it would hang.
+      .filter((a) => Number.isFinite(a.effect?.getComputedTiming?.().endTime))
+      .map((a) => a.finished.catch(() => {}))
+  ));
   const small = await page.evaluate(() => {
     const out = [];
     for (const el of document.querySelectorAll('#view button, #tabbar button, #chrome button')) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
-      if (r.height < 44 || r.width < 44) out.push(`${el.className || el.tagName}: ${Math.round(r.width)}x${Math.round(r.height)}`);
+      if (r.height < 44 || r.width < 44) out.push(`${el.className || el.tagName} "${el.textContent.trim().slice(0, 18)}": ${r.width.toFixed(2)}x${r.height.toFixed(2)}`);
     }
     return out;
   });
@@ -723,6 +764,22 @@ await shot('09-reorder', async () => {
 });
 await sp.mouse.up();
 await sp.waitForTimeout(400);
+
+// The end of the day — a designed moment, so it gets a regression shot like
+// any other screen. Done last because it consumes the shot context's route.
+await shot('12-day-finished', async () => {
+  await sp.evaluate(() => window.__teds.goTo('route'));
+  await sp.waitForTimeout(200);
+  await sp.getByRole('button', { name: 'Finished' }).click().catch(() => {});
+  await sp.evaluate(async () => {
+    const a = window.__teds;
+    a.goTo('today');
+    for (const s of a.computeStops()) {
+      if (s.status === 'pending') await a.completeStop(s);
+    }
+  });
+  await sp.waitForTimeout(600);
+});
 
 // First run
 const fresh = await browser.newContext({ ...iphone, locale: 'en-CA', timezoneId: 'America/Toronto', colorScheme: 'dark' });
