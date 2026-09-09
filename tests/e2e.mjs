@@ -531,6 +531,38 @@ await t('no interactive control is smaller than 44px', async () => {
   if (small.length) throw new Error(`too small: ${small.slice(0, 4).join('; ')}`);
 });
 
+await t('nothing overflows the width of the phone, at any text size', async () => {
+  // A grid track sized `1fr` or `auto` carries a min-content floor, so a single
+  // nowrap label can widen the whole shell and clip the right edge of every
+  // card. It had already happened on the settings screen before anyone looked.
+  const failures = [];
+  for (const textSize of ['standard', 'larger']) {
+    await page.evaluate((v) => window.__teds.updateSettings({ textSize: v }), textSize);
+    for (const tab of ['today', 'route', 'map', 'insights', 'settings']) {
+      await page.evaluate((x) => window.__teds.goTo(x), tab);
+      await page.waitForTimeout(420);
+      const bad = await page.evaluate(() => {
+        const vw = document.documentElement.clientWidth;
+        const out = [];
+        for (const el of document.querySelectorAll('#app *')) {
+          const b = el.getBoundingClientRect();
+          if (b.width === 0 && b.height === 0) continue;
+          if (b.right > vw + 1 || b.left < -1) {
+            out.push(`${el.tagName.toLowerCase()}.${String(el.className || '').split(' ')[0]} right=${Math.round(b.right)}`);
+          }
+        }
+        return { vw, shell: document.getElementById('app').scrollWidth, out: out.slice(0, 3), n: out.length };
+      });
+      if (bad.n || bad.shell > bad.vw + 1) {
+        failures.push(`${textSize}/${tab}: shell ${bad.shell} vs ${bad.vw}, ${bad.n} elements — ${bad.out.join('; ')}`);
+      }
+    }
+  }
+  await page.evaluate(() => window.__teds.updateSettings({ textSize: 'standard' }));
+  await page.evaluate(() => window.__teds.goTo('today'));
+  if (failures.length) throw new Error(failures.join(' | '));
+});
+
 await t('no console errors across every screen', async () => {
   page.errors.length = 0;
   for (const tab of ['today', 'route', 'map', 'insights', 'settings']) {

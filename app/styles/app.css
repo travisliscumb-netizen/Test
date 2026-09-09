@@ -41,8 +41,13 @@ a { color: var(--accent); text-decoration: none; }
 #app {
   position: fixed; inset: 0;
   display: grid;
+  /* Both axes pinned. Without an explicit column the single implicit track is
+     auto-sized, so any wide row — the tab bar at a large text size — stretches
+     the whole shell past the width of the phone. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--ground);
+  overflow: hidden;
 }
 
 .chrome {
@@ -66,6 +71,12 @@ a { color: var(--accent); text-decoration: none; }
   font: var(--t-title1); letter-spacing: var(--ls-title);
   display: flex; align-items: baseline; gap: var(--s3);
   min-width: 0;
+}
+/* The weekday competes with the live pill and two 48px controls for a 393px
+   header. Sized so the longest day name still fits whole rather than
+   ellipsising to "Wednes…", which is worse than simply being smaller. */
+.daymark .dow > span:first-child {
+  font-size: clamp(18px, calc(5.2vw * var(--ts)), calc(25px * var(--ts)));
 }
 .daymark .dow > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .daymark .date { font: var(--t-label); color: var(--ink-3); letter-spacing: .01em; }
@@ -113,7 +124,7 @@ a { color: var(--accent); text-decoration: none; }
 
 #view {
   position: relative;
-  min-height: 0;
+  min-height: 0; min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
@@ -121,14 +132,19 @@ a { color: var(--accent); text-decoration: none; }
   scrollbar-width: none;
 }
 #view::-webkit-scrollbar { display: none; }
-.page { padding: var(--s5) var(--s5) var(--s10); display: grid; gap: var(--s4); }
+.page {
+  padding: var(--s5) var(--s5) var(--s10);
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4);
+  min-width: 0;
+}
+.page > * { min-width: 0; max-width: 100%; }
 .page.flush { padding: 0; }
 
 /* ------------------------------------------------------------- tab bar ----- */
 
 .tabbar {
   z-index: var(--z-nav);
-  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
   gap: var(--s1);
   padding: var(--s2) var(--s4) calc(env(safe-area-inset-bottom, 0px) + var(--s2));
   background: var(--chrome-bg);
@@ -146,7 +162,9 @@ a { color: var(--accent); text-decoration: none; }
   font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase;
   transition: color var(--d-quick) var(--e-standard), transform var(--d-instant) var(--e-standard);
 }
-.tab svg { width: 23px; height: 23px; }
+.tab { min-width: 0; overflow: hidden; padding: 0 2px; }
+.tab > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab svg { width: 23px; height: 23px; flex: 0 0 auto; }
 .tab:active { transform: scale(.93); }
 .tab[aria-selected='true'] { color: var(--accent-bright); }
 .tab[aria-selected='true']::before {
@@ -252,7 +270,7 @@ a { color: var(--accent); text-decoration: none; }
   position: relative;
   margin-top: var(--s5); padding-top: var(--s4);
   border-top: 1px solid var(--hairline);
-  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--s3);
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--s3);
 }
 .stat { display: grid; gap: 2px; min-width: 0; }
 .stat .k {
@@ -315,8 +333,8 @@ a { color: var(--accent); text-decoration: none; }
 
 /* --------------------------------------------------------------- actions -- */
 
-.actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); padding: 0 var(--s5) var(--s5); }
-.actions.solo { grid-template-columns: 1fr; }
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); padding: 0 var(--s5) var(--s5); }
+.actions.solo { grid-template-columns: minmax(0, 1fr); }
 
 .btn {
   position: relative;
@@ -414,7 +432,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .stop .meta { font: var(--t-label); color: var(--ink-3); display: flex; gap: var(--s3); flex-wrap: wrap; }
 .stop .meta .dot { color: var(--muted); }
-.stop .tail { display: flex; align-items: center; gap: var(--s2); }
+.stop .tail { display: flex; align-items: center; gap: var(--s2); min-width: 0; overflow: hidden; }
 
 .stop[data-status='done'] { opacity: .58; }
 .stop[data-status='done'] .rail { background: color-mix(in srgb, var(--done) 22%, transparent); color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
@@ -519,7 +537,7 @@ a { color: var(--accent); text-decoration: none; }
 .sheet-title h2 { font: var(--t-title1); letter-spacing: var(--ls-title); }
 .sheet-title p { font: var(--t-label); color: var(--ink-3); }
 
-.actiongrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s3); }
+.actiongrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); }
 .actiongrid .btn { flex-direction: column; gap: var(--s2); min-height: 76px; font-size: 13px; }
 .actiongrid .btn svg { width: 22px; height: 22px; }
 
@@ -597,18 +615,24 @@ a { color: var(--accent); text-decoration: none; }
 textarea.field { min-height: 96px; resize: vertical; }
 
 .switchrow {
-  display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: var(--s4);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--s2) var(--s4);
   min-height: var(--tap-min); padding: var(--s3) 0;
 }
+.switchrow > :first-child { flex: 1 1 55%; min-width: 0; }
+.switchrow > :last-child { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .switchrow + .switchrow { border-top: 1px solid var(--hairline); }
 .switchrow .k { font: var(--t-bodystrong); }
 .switchrow .d { font: var(--t-label); color: var(--ink-3); margin-top: 2px; }
 
 .seg {
-  display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, auto);
   padding: 3px; gap: 2px; border-radius: var(--r-md);
   background: var(--surface-sunken); border: 1px solid var(--hairline);
+  max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.seg::-webkit-scrollbar { display: none; }
 .seg button {
   min-height: 38px; padding: 0 var(--s4); border-radius: calc(var(--r-md) - 4px);
   font: var(--t-label); color: var(--ink-3);
