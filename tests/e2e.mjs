@@ -203,6 +203,71 @@ await t('undo restores the last completion', async () => {
   if (after !== before - 1) throw new Error(`undo left ${after} done, expected ${before - 1}`);
 });
 
+await t('the day can be switched, and switched back', async () => {
+  const before = await page.evaluate(() => {
+    const a = window.__teds;
+    return { date: a.date, weekday: a.computeStops()[0]?.day, n: a.computeStops().length, isToday: a.isToday };
+  });
+  const buttons = page.locator('#chrome .daybtn');
+  const count = await buttons.count();
+  if (count !== 5) throw new Error(`expected a Mon-Fri strip, got ${count} day buttons`);
+
+  // Pick a weekday that is not the one already showing.
+  const targetIndex = await page.evaluate((cur) => {
+    const days = window.__teds.weekDays();
+    const i = days.findIndex((d) => !d.selected && d.total > 0);
+    return i;
+  }, before.weekday);
+  if (targetIndex < 0) throw new Error('no other weekday has stops');
+
+  await buttons.nth(targetIndex).click();
+  await page.waitForTimeout(600);
+
+  const after = await page.evaluate(() => {
+    const a = window.__teds;
+    return { date: a.date, weekday: a.computeStops()[0]?.day, n: a.computeStops().length, isToday: a.isToday };
+  });
+  if (after.date === before.date) throw new Error('tapping another day did not change the date');
+  if (after.weekday === before.weekday) throw new Error(`still showing ${after.weekday}`);
+  if (!after.n) throw new Error('the selected day has no stops');
+  if (after.isToday) throw new Error('isToday should be false when viewing another day');
+
+  const banner = await page.textContent('#view');
+  if (!/Showing /.test(banner)) throw new Error('no indication that this is not today');
+  if (!/Work on this day/.test(banner)) throw new Error('the deck still claims a finish time for a day not being worked');
+
+  await page.getByRole('button', { name: 'Back to today' }).click();
+  await page.waitForTimeout(500);
+  const back = await page.evaluate(() => ({ date: window.__teds.date, isToday: window.__teds.isToday }));
+  if (back.date !== before.date || !back.isToday) throw new Error('Back to today did not return');
+});
+
+await t('work done on another day is stamped now and filed against that day', async () => {
+  const r = await page.evaluate(async () => {
+    const a = window.__teds;
+    const days = a.weekDays();
+    const other = days.find((d) => !d.selected && d.total > 0);
+    a.setDate(other.date);
+    await new Promise((res) => setTimeout(res, 300));
+    const stop = a.computeStops().find((s) => s.status === 'pending');
+    const t0 = Date.now();
+    await a.store.completeStop(stop.id, { date: a.date, crew: a.crew });
+    const evs = await a.store.historyFor(stop.id, 200);
+    const latest = evs.filter((e) => e.type === 'complete').sort((x, y) => y.at - x.at)[0];
+    a.goToToday();
+    return {
+      filedAgainst: latest.date, selected: `${other.date}|${a.crew}`,
+      stampedNow: Math.abs(latest.at - t0) < 5000,
+      sessionDay: new Date(latest.at).getDate(),
+      todayDay: new Date().getDate(),
+    };
+  });
+  if (r.filedAgainst !== r.selected) throw new Error(`filed against ${r.filedAgainst}, expected ${r.selected}`);
+  if (!r.stampedNow) throw new Error('the completion was not stamped with the real clock time');
+  if (r.sessionDay !== r.todayDay) throw new Error('the completion timestamp did not land on the actual calendar day');
+  await page.waitForTimeout(400);
+});
+
 await t('the app works with the network completely down', async () => {
   await ctx.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });

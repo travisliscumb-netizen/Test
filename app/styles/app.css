@@ -103,6 +103,54 @@ a { color: var(--accent); text-decoration: none; }
 .livepill[data-state='offline'] { background: var(--info-wash); color: var(--info); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 .livepill[data-state='idle'] { background: var(--track); color: var(--ink-3); border-color: var(--hairline); }
 
+/* Day of the week. The primary navigation for a route that slips: Thursday's
+   list gets run on a Wednesday often enough that hiding it behind anything
+   would be wrong. */
+.weekstrip {
+  display: grid;
+  grid-template-columns: minmax(0, 0.62fr) repeat(5, minmax(0, 1fr)) minmax(0, 0.62fr);
+  gap: var(--s2); margin-top: var(--s4);
+}
+.weekstep {
+  min-height: var(--tap-min); min-width: 44px;
+  border-radius: var(--r-sm);
+  color: var(--ink-3); font: 700 17px/1 var(--font-ui);
+  border: 1px solid transparent;
+}
+.weekstep:active { background: var(--track); }
+.daybtn {
+  min-height: var(--tap-min);
+  display: grid; place-items: center; align-content: center; gap: 1px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-1), var(--inner-top);
+  color: var(--ink-3);
+  transition: transform var(--d-instant) var(--e-standard),
+              background var(--d-quick) var(--e-standard),
+              color var(--d-quick) var(--e-standard),
+              border-color var(--d-quick) var(--e-standard);
+}
+.daybtn:active { transform: scale(.94); }
+.daybtn .d { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; }
+.daybtn .n {
+  font: 750 calc(13px * var(--ts))/1 var(--font-num);
+  font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.daybtn[data-state='clear'] .n { color: var(--done); }
+.daybtn[data-state='empty'] .n { color: var(--muted); }
+.daybtn[data-state='behind'] .n { color: var(--warn); }
+/* Today is marked even when another day is selected, so the operator always
+   knows where "now" is. */
+.daybtn[data-today='true'] { border-color: color-mix(in srgb, var(--ink-2) 34%, transparent); }
+.daybtn[aria-selected='true'] {
+  background: var(--accent-wash);
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  color: var(--accent-bright);
+  box-shadow: var(--shadow-2), var(--inner-top);
+}
+.daybtn[aria-selected='true'] .n { color: var(--accent-bright); }
+
 /* Round icon buttons: tactile, with a real press response. */
 .iconbtn {
   width: var(--tap-min); height: var(--tap-min); flex: 0 0 auto;

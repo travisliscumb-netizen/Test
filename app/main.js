@@ -9,7 +9,7 @@
  * without rewriting a single screen.
  */
 
-import { store, StorageError } from './data/store.js';
+import { store, StorageError, dayId } from './data/store.js';
 import * as backupModule from './data/backup.js';
 import * as optimizeModule from './routing/optimize.js';
 import * as predictModule from './learning/predict.js';
@@ -18,7 +18,10 @@ import { buildDemoProperties, buildDemoEvents } from './data/demo.js';
 import { apply as applyBackup } from './data/backup.js';
 import { buildLearningModel, forecastDay, paceToday, serviceMinutesFor } from './learning/predict.js';
 import { optimizeRoute, parseWindowFromNote } from './routing/optimize.js';
-import { dateKey, weekdayOf, DAY_FULL, formatDateHuman, parseClock, clockToTs, formatDuration } from './core/time.js';
+import {
+  dateKey, weekdayOf, DAY_FULL, DAY_KEYS, formatDateHuman, weekOf, addDays,
+  daysBetween, parseClock, clockToTs, formatDuration,
+} from './core/time.js';
 import { locationService } from './services/geolocation.js';
 import { WeatherService } from './services/weather.js';
 import { buildInsights } from './services/insights.js';
@@ -172,6 +175,53 @@ class App {
 
   get day() { return this.store.dayFor(this.date, this.crew); }
 
+  get isToday() { return this.date === dateKey(); }
+
+  /**
+   * Switches the visible day.
+   *
+   * A route slips: rain, a breakdown, a gate that was locked. The operator
+   * needs Thursday's list on a Wednesday, and needs to look back at what
+   * actually happened on Monday. The store already keys everything by date, so
+   * this is purely a matter of letting the interface point somewhere else.
+   *
+   * Completions are always stamped with the real clock time; only the route-day
+   * they are filed against follows the selection.
+   */
+  setDate(nextDate) {
+    if (!nextDate || nextDate === this.date) return;
+    this.date = nextDate;
+    this.dismissed.clear();
+    this._optimizeKey = null;
+    this.optimization = null;
+    haptic('select');
+    this.render();
+  }
+
+  goToToday() { this.setDate(dateKey()); }
+
+  /** Mon–Fri of the week containing the selected day, with its own progress. */
+  weekDays() {
+    const monday = weekOf(this.date);
+    const today = dateKey();
+    return DAY_KEYS.map((label, i) => {
+      const date = addDays(monday, i);
+      const stops = this.store.properties.size ? this.store.stopsFor(date, this.crew) : [];
+      const remaining = stops.filter((s) => s.status === STOP_STATUS.pending).length;
+      // "Started" means a day record exists with something recorded against it.
+      // Without that distinction every past day on a fresh restore reads as
+      // unfinished work, which is a false alarm rather than information.
+      const rec = this.store.days.get(dayId(date, this.crew));
+      const started = !!(rec && (rec.startedAt || Object.keys(rec.stops || {}).length));
+      return {
+        label, date, total: stops.length, remaining, started,
+        selected: date === this.date,
+        isToday: date === today,
+        past: date < today,
+      };
+    });
+  }
+
   computeStops() {
     const raw = this.store.stopsFor(this.date, this.crew);
     return raw.map((s) => {
@@ -233,6 +283,8 @@ class App {
       store: this.store, settings: this.settings, model: this.model,
       location: this.location, weather: this.weather, theme: this.theme,
       date: this.date, crew: this.crew, day, stops, currentIndex,
+      isToday: this.isToday,
+      goToToday: () => this.goToToday(),
       forecast, pace, insights, optimization: this.optimization,
       // actions
       completeStop: (s, el) => this.completeStop(s, el),
@@ -581,7 +633,14 @@ class App {
             h('span.dot'),
             offline ? 'Offline' : remaining ? `${remaining} left` : 'Clear')
         ),
-        h('div.date', { text: `${formatDateHuman(this.date)} · ${this.crew === 'south' ? 'South crew' : 'East crew'}${gps === 'live' ? '' : gps === 'denied' ? ' · GPS off' : ''}` })
+        h('div.date', {
+          text: [
+            formatDateHuman(this.date),
+            relativeWeekLabel(weekOf(this.date)),
+            this.crew === 'south' ? 'South crew' : 'East crew',
+            gps === 'denied' ? 'GPS off' : null,
+          ].filter(Boolean).join(' · '),
+        })
       ),
       this.store.canUndo
         ? h('button.iconbtn', {
@@ -595,6 +654,47 @@ class App {
         onclick: () => this.goTo(this.tab === 'settings' ? 'today' : 'settings'),
       }, svg(ICON.gear, { size: 20 }))
     ));
+
+    if (this.store.properties.size) this.chrome.appendChild(this.buildWeekStrip());
+  }
+
+  buildWeekStrip() {
+    // One row: week back, Mon-Fri, week forward. A second row of controls
+    // would cost another 44px of header on a screen where the next property
+    // is the thing that matters, and every target here still clears 44px.
+    const strip = h('div.weekstrip', { role: 'tablist', 'aria-label': 'Day of the week' });
+
+    strip.appendChild(h('button.weekstep', {
+      type: 'button', 'aria-label': 'Previous week',
+      onclick: () => this.setDate(addDays(this.date, -7)),
+    }, '\u2039'));
+
+    for (const d of this.weekDays()) {
+      strip.appendChild(h('button.daybtn', {
+        type: 'button',
+        role: 'tab',
+        'aria-selected': String(d.selected),
+        'aria-label': `${DAY_FULL[d.label]} ${formatDateHuman(d.date)}, ${d.remaining} of ${d.total} remaining`,
+        dataset: {
+          today: String(d.isToday),
+          state: d.total === 0 ? 'empty'
+            : d.remaining === 0 ? 'clear'
+            : d.past && d.started ? 'behind'
+            : 'open',
+        },
+        onclick: () => this.setDate(d.date),
+      },
+        h('span.d', { text: d.label }),
+        h('span.n', { text: d.total === 0 ? '\u2013' : d.remaining === 0 ? '\u2713' : String(d.remaining) })
+      ));
+    }
+
+    strip.appendChild(h('button.weekstep', {
+      type: 'button', 'aria-label': 'Next week',
+      onclick: () => this.setDate(addDays(this.date, 7)),
+    }, '\u203a'));
+
+    return strip;
   }
 
   renderTabs() {
@@ -618,6 +718,15 @@ class App {
         } else if (badge) badge.remove();
       });
   }
+}
+
+/** Null for the current week — saying "this week" on the normal case is noise. */
+function relativeWeekLabel(monday) {
+  const delta = Math.round(daysBetween(weekOf(dateKey()), monday) / 7);
+  if (delta === 0) return null;
+  if (delta === -1) return 'Last week';
+  if (delta === 1) return 'Next week';
+  return `${Math.abs(delta)} weeks ${delta < 0 ? 'ago' : 'ahead'}`;
 }
 
 function cssVar(name) {

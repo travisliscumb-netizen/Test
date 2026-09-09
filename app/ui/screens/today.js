@@ -33,6 +33,7 @@ export class TodayScreen {
   mount(container) {
     this.el = h('div.page');
     this.el.append(
+      this.dayNote = h('div'),
       this.deck = h('section.deck'),
       // Only an insight that demands action *right now* is allowed above the
       // next property. Everything advisory sits below it, so "what is next" is
@@ -55,11 +56,27 @@ export class TodayScreen {
   }
 
   update() {
+    this.renderDayNote();
     this.renderDeck();
     this.renderInsights();
     this.renderNext();
     this.renderMap();
     this.renderList();
+  }
+
+  /** Says plainly when the screen is not showing today. */
+  renderDayNote() {
+    clear(this.dayNote);
+    if (this.ctx.isToday) return;
+    const when = DAY_FULL[this.ctx.stops[0]?.day] || formatDateHuman(this.ctx.date);
+    this.dayNote.appendChild(h('div.banner.enter', { dataset: { tone: 'info' } },
+      h('div.ico', null, svg(ICON.clock, { size: 18 })),
+      h('div', null,
+        h('h4', { text: `Showing ${when}, ${formatDateHuman(this.ctx.date)}` }),
+        h('p', { text: 'Anything you mark done is stamped with the time you tap it and filed against this day.' }),
+        h('div.row', null,
+          h('button.btn.sm.ghost', { type: 'button', text: 'Back to today', onclick: () => this.ctx.goToToday() })))
+    ));
   }
 
   // ------------------------------------------------------------------ deck
@@ -71,15 +88,17 @@ export class TodayScreen {
     const remaining = stops.filter((s) => s.status === 'pending').length;
     const pct = total ? done / total : 0;
 
+    const planning = !this.ctx.isToday;
     const finishText = total === 0 ? '—'
       : remaining === 0 ? 'Done'
+      : planning ? formatDuration(forecast.totalMin)
       : formatClock(forecast.finishTs);
 
     if (!this.deck.firstChild) {
       this.deck.append(
         h('div.deck-grid', null,
           this.finishBox = h('div.finish', null,
-            h('span.cap', { text: 'Predicted finish' }),
+            this.capEl = h('span.cap', { text: 'Predicted finish' }),
             this.finishVal = h('div.val'),
             this.bandEl = h('div.band')
           ),
@@ -96,6 +115,8 @@ export class TodayScreen {
       this.arcSpring = new Spring(0, SPRING.settle);
     }
 
+    this.capEl.textContent = planning ? 'Work on this day' : 'Predicted finish';
+
     // Finish time: animated only when it actually moves, so the deck is calm
     // while nothing is happening.
     if (this.lastFinish !== finishText) {
@@ -104,6 +125,8 @@ export class TodayScreen {
       if (remaining === 0 && total > 0) {
         this.finishVal.append(document.createTextNode('Done'));
         this.finishVal.append(h('span.suffix', { text: `· ${formatClock(lastDoneAt(stops))}` }));
+      } else if (planning) {
+        this.finishVal.append(document.createTextNode(finishText));
       } else {
         this.finishVal.append(document.createTextNode(finishText.replace(/(am|pm)$/, '')));
         const ap = /(am|pm)$/.exec(finishText);
@@ -127,8 +150,16 @@ export class TodayScreen {
     } else {
       // Two short lines beat one that wraps unpredictably at three.
       this.bandEl.append(
-        h('span', { text: `Typically ${formatClock(forecast.lowTs)} – ${formatClock(forecast.highTs)}` }),
-        h('span', { text: `${formatDuration(forecast.totalMin)} of work left` })
+        h('span', {
+          text: planning
+            ? `${remaining} stop${remaining === 1 ? '' : 's'} · driving and cutting`
+            : `Typically ${formatClock(forecast.lowTs)} – ${formatClock(forecast.highTs)}`,
+        }),
+        h('span', {
+          text: planning
+            ? `Finish depends on when you start`
+            : `${formatDuration(forecast.totalMin)} of work left`,
+        })
       );
     }
 

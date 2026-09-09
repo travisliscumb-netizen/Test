@@ -138,12 +138,20 @@ export class Store extends EventTarget {
     return out;
   }
 
-  /** Every recorded completion, oldest first — the input to the learning model. */
+  /**
+   * Every recorded completion, oldest first — the input to the learning model.
+   *
+   * The session key is the calendar day the work actually happened on, taken
+   * from `at`, and deliberately not the route-day it was filed against. Once
+   * Thursday's route can be run on a Wednesday, those two differ, and grouping
+   * by the route-day would split one physical run into two — breaking the
+   * consecutive-gap chain that every service-time estimate is derived from.
+   */
   async allCompletions() {
     const rows = await withStore(STORE.events, 'readonly', (tx) => tx.getAll(STORE.events));
     return rows
       .filter((e) => e.type === EVENT.complete && Number.isFinite(e.at) && e.propertyId)
-      .map((e) => ({ propertyId: e.propertyId, at: e.at, dateKey: e.date }))
+      .map((e) => ({ propertyId: e.propertyId, at: e.at, dateKey: dateKey(e.at), routeDay: e.date }))
       .sort((a, b) => a.at - b.at);
   }
 
@@ -152,7 +160,9 @@ export class Store extends EventTarget {
     const out = {};
     for (const e of rows) {
       if (e.type === EVENT.dayStart && Number.isFinite(e.at)) {
-        const k = String(e.date || '').split('|')[0];
+        // Keyed the same way as sessions: by when it happened, not what it was
+        // filed against.
+        const k = dateKey(e.at);
         if (!out[k] || e.at < out[k]) out[k] = e.at;
       }
     }
