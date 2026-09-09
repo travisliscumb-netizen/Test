@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+# Customer data must never enter this repository. See docs/DATA-PRIVACY.md
+private/
+*.private.json
+data/seed-1.0.json
+data/backup-1.0*.json
+data/verified-coords.json
+teds-route-bundle*.json
+shots/
+package-lock.json

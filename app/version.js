@@ -1,0 +1,3 @@
+export const APP_VERSION = '2.0.0';
+export const APP_NAME = "Ted's Route";
+export const BUILD_CHANNEL = 'personal';
