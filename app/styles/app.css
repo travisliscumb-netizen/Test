@@ -224,7 +224,7 @@ a { color: var(--accent); text-decoration: none; }
    animate every frame without touching layout. */
 .arc {
   --p: 0;
-  position: relative; width: 108px; height: 108px; flex: 0 0 auto;
+  position: relative; width: calc(108px * var(--ts)); height: calc(108px * var(--ts)); flex: 0 0 auto;
   border-radius: 50%;
   background:
     conic-gradient(from -90deg,
@@ -236,13 +236,13 @@ a { color: var(--accent); text-decoration: none; }
   mask: radial-gradient(circle, transparent 0 60%, #000 61.5%);
   transition: --p var(--d-slow) var(--e-emphasized);
 }
-.arcwrap { position: relative; width: 108px; height: 108px; display: grid; place-items: center; }
+.arcwrap { position: relative; width: calc(108px * var(--ts)); height: calc(108px * var(--ts)); display: grid; place-items: center; }
 .arcwrap .inner {
   position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 0;
   text-align: center;
 }
 .arcwrap .count {
-  font: 800 30px/1 var(--font-num); letter-spacing: -.03em;
+  font: 800 calc(30px * var(--ts))/1 var(--font-num); letter-spacing: -.03em;
   font-variant-numeric: tabular-nums;
 }
 .arcwrap .of { font: var(--t-micro); letter-spacing: var(--ls-micro); text-transform: uppercase; color: var(--ink-3); margin-top: 3px; }
@@ -262,7 +262,7 @@ a { color: var(--accent); text-decoration: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .stat .v {
-  font: 750 17px/1.15 var(--font-num); letter-spacing: -.015em;
+  font: 750 calc(17px * var(--ts))/1.15 var(--font-num); letter-spacing: -.015em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -324,7 +324,7 @@ a { color: var(--accent); text-decoration: none; }
   display: inline-flex; align-items: center; justify-content: center; gap: var(--s3);
   padding: 0 var(--s5);
   border-radius: var(--r-md);
-  font: 750 16.5px/1 var(--font-ui); letter-spacing: -.005em;
+  font: 750 calc(16.5px * var(--ts))/1 var(--font-ui); letter-spacing: -.005em;
   background: var(--surface-2); color: var(--ink);
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-1), var(--inner-top);

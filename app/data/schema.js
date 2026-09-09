@@ -91,6 +91,7 @@ export const DEFAULT_SETTINGS = {
   navApp: 'apple',                 // apple | google | waze | ask
   theme: 'auto',                   // auto | night | day
   motion: 'full',                  // full | calm  (calm is also forced by the OS setting)
+  textSize: 'standard',            // standard | large | larger
   haptics: true,
   gpsMode: 'balanced',             // off | balanced | precise
   arrivalAssist: true,

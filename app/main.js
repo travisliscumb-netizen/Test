@@ -84,6 +84,7 @@ class App {
     setHapticsEnabled(this.settings.haptics);
     syncMotionPreference(this.settings.motion);
     this.applyTheme();
+    this.applyTextSize();
 
     if (this.settings.gpsMode !== 'off') this.location.setMode(this.settings.gpsMode);
     this.location.addEventListener('change', () => this.onLocation());
@@ -447,6 +448,7 @@ class App {
     if ('haptics' in patch) setHapticsEnabled(patch.haptics);
     if ('motion' in patch) syncMotionPreference(patch.motion);
     if ('theme' in patch) this.applyTheme();
+    if ('textSize' in patch) this.applyTextSize();
     if ('crew' in patch) { this._optimizeKey = null; await this.rebuildModel(); }
     if ('returnToDepot' in patch || 'optimizeThresholdMin' in patch) this._optimizeKey = null;
     this.refresh();
@@ -470,6 +472,7 @@ class App {
     setHapticsEnabled(this.settings.haptics);
     syncMotionPreference(this.settings.motion);
     this.applyTheme();
+    this.applyTextSize();
     this._optimizeKey = null;
     this.dismissed.clear();
     await this.rebuildModel();
@@ -477,6 +480,12 @@ class App {
   }
 
   // ----------------------------------------------------------------- render
+
+  /** Type scale. Kept next to the theme because both are whole-app appearance. */
+  applyTextSize() {
+    const factor = { standard: 1, large: 1.12, larger: 1.26 }[this.store?.settings?.textSize] ?? 1;
+    document.documentElement.style.setProperty('--ts', String(factor));
+  }
 
   applyTheme() {
     const pref = this.store?.settings?.theme ?? 'auto';

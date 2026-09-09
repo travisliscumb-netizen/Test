@@ -19,14 +19,20 @@
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, system-ui, sans-serif;
   --font-num: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
 
-  --t-display: 700 44px/0.96 var(--font-num);
-  --t-hero: 800 34px/1.02 var(--font-num);
-  --t-title1: 800 25px/1.12 var(--font-num);
-  --t-title2: 750 19px/1.2 var(--font-ui);
-  --t-body: 500 16px/1.38 var(--font-ui);
-  --t-bodystrong: 650 16px/1.34 var(--font-ui);
-  --t-label: 650 13.5px/1.25 var(--font-ui);
-  --t-micro: 700 11px/1.1 var(--font-ui);
+  /* Every size is multiplied by --ts so the whole scale moves together.
+     iOS Dynamic Type does not reach a web app's px sizes, so the app carries
+     its own control: an operator who needs larger type outdoors should not
+     have to pinch-zoom a fixed layout. Line heights are unitless ratios, so
+     they scale with the size and the vertical rhythm holds. */
+  --ts: 1;
+  --t-display: 700 calc(44px * var(--ts))/0.96 var(--font-num);
+  --t-hero: 800 calc(34px * var(--ts))/1.02 var(--font-num);
+  --t-title1: 800 calc(25px * var(--ts))/1.12 var(--font-num);
+  --t-title2: 750 calc(19px * var(--ts))/1.2 var(--font-ui);
+  --t-body: 500 calc(16px * var(--ts))/1.38 var(--font-ui);
+  --t-bodystrong: 650 calc(16px * var(--ts))/1.34 var(--font-ui);
+  --t-label: 650 calc(13.5px * var(--ts))/1.25 var(--font-ui);
+  --t-micro: 700 calc(11px * var(--ts))/1.1 var(--font-ui);
   --ls-display: -0.028em;
   --ls-title: -0.018em;
   --ls-micro: 0.075em;
@@ -39,8 +45,10 @@
   --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-full: 999px;
 
   /* ---- touch ------------------------------------------------------------- */
-  --tap-min: 48px;      /* nothing interactive is ever smaller */
-  --tap-primary: 60px;  /* the actions used with gloves on */
+  /* Targets grow with the type: larger text in a fixed-height control is how
+     you get clipped labels. */
+  --tap-min: calc(48px * var(--ts));
+  --tap-primary: calc(60px * var(--ts));
 
   /* ---- motion ------------------------------------------------------------ */
   --d-instant: 90ms;
