@@ -8,7 +8,8 @@
     "test:unit": "node --test test/logic.test.cjs",
     "test:balance": "node test/balance.mjs",
     "test:e2e": "node test/e2e.mjs",
-    "serve": "npx --yes http-server -p 8080 -c-1 ."
+    "serve": "npx --yes http-server -p 8080 -c-1 .",
+    "build": "node tools/build-artifact.js && node tools/build-artifact.js --artifact"
   },
   "devDependencies": {
     "playwright": "^1.56.1"

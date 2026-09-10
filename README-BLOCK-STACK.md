@@ -105,6 +105,27 @@ impossible — boss 100 is a genuine achievement rather than a coin flip or a wa
 
 ---
 
+## Single-file build
+
+`game.html` loads `src/` and `vendor/` as separate files. To get the whole game
+as one self-contained HTML file instead — everything inlined, no relative paths,
+no network access — run:
+
+```
+npm run build
+```
+
+* `dist/block-stack-3d.html` — a complete standalone document. Drop it on any
+  static host, open it from disk, or mail it to someone.
+* `dist/block-stack-3d.artifact.html` — the body-only form for hosts that supply
+  their own `<!doctype>`/`<head>`/`<body>` wrapper. It re-applies the head
+  metadata at runtime, because the game needs `viewport-fit=cover` and pinch
+  zoom disabled and a host's default viewport meta has neither.
+
+`dist/` is generated, so it is not committed — the build is the source of truth.
+
+---
+
 ## Project layout
 
 ```
@@ -118,6 +139,7 @@ vendor/three.min.js     three.js r180, bundled as a global (see vendor/README.md
 test/logic.test.cjs     29 unit tests over the rules
 test/balance.mjs        difficulty simulation with assertions
 test/e2e.mjs            343 checks driving the real game in headless Chromium
+tools/build-artifact.js bundles everything into one self-contained HTML file
 ```
 
 `src/logic.js` deliberately has zero dependencies on the DOM or WebGL, so every
