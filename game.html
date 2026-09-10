@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3CA5DE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Block Stack 3D - 100 levels, 10 worlds, 10 boss climbs.">
+<title>Block Stack 3D</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  :root{
+    --sky-top:#3CA5DE; --sky-bottom:#9FDCF2; --accent:#EFC429;
+    --text:#16202B; --on-accent:#1B1405;
+    --panel:rgba(255,255,255,0.72); --panel-border:rgba(18,28,40,0.14);
+    --shadow:0 10px 28px rgba(10,20,35,0.20);
+    --radius:18px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --safe-t:env(safe-area-inset-top,0px);
+    --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-l:env(safe-area-inset-left,0px);
+    --safe-r:env(safe-area-inset-right,0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    overscroll-behavior:none; touch-action:none;
+    background:#3CA5DE; color:var(--text); font-family:var(--font);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    -webkit-user-select:none; user-select:none;
+  }
+  body{position:fixed; inset:0; width:100%}
+  .hidden{display:none !important}
+  button{font-family:inherit; color:inherit; border:none; background:none; cursor:pointer; font-weight:800}
+
+  /* ---------- stage ---------- */
+  #stage{position:fixed; inset:0; background:linear-gradient(180deg,var(--sky-top),var(--sky-bottom)); will-change:transform}
+  #scene{display:block; width:100%; height:100%}
+
+  /* ---------- ui layer ---------- */
+  #ui{
+    position:fixed; inset:0; pointer-events:none; display:flex; flex-direction:column;
+    padding:calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--panel-border);
+    -webkit-backdrop-filter:blur(14px) saturate(140%); backdrop-filter:blur(14px) saturate(140%);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+  }
+
+  /* ---------- hud ---------- */
+  #hud{display:flex; flex-direction:column; gap:8px}
+  .hud-top{display:flex; align-items:flex-start; gap:8px}
+  .hud-id{padding:8px 12px; min-width:0; flex:1}
+  .hud-id .lvlno{font-size:clamp(15px,4.4vw,20px); font-weight:900; letter-spacing:-.02em; line-height:1.05}
+  .hud-id .world{font-size:clamp(10px,2.9vw,12px); font-weight:700; opacity:.72; margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .hud-right{display:flex; flex-direction:column; align-items:flex-end; gap:6px}
+  .hud-icons{display:flex; gap:6px}
+  .iconbtn{
+    pointer-events:auto; width:38px; height:38px; border-radius:13px; font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow);
+  }
+  .iconbtn:active{transform:scale(.94)}
+  .mode{
+    font-size:10.5px; font-weight:900; letter-spacing:.12em; padding:5px 10px; border-radius:999px;
+    background:rgba(255,255,255,.85); color:#1d5f8a; border:1px solid var(--panel-border);
+  }
+  .mode.boss{background:var(--accent); color:var(--on-accent); box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+  .score{padding:6px 11px; font-size:13px; font-weight:900; letter-spacing:-.01em}
+  .score span{opacity:.6; font-size:10px; letter-spacing:.1em; margin-right:5px; font-weight:800}
+
+  .hud-prog{padding:9px 12px 11px}
+  .prog-head{display:flex; justify-content:space-between; align-items:baseline; font-weight:900}
+  .prog-head .l{font-size:10px; letter-spacing:.14em; opacity:.66}
+  .prog-head .v{font-size:15px; letter-spacing:-.01em}
+  .track{height:9px; border-radius:99px; background:rgba(20,30,45,.16); overflow:hidden; margin-top:7px}
+  .track > i{display:block; height:100%; width:0; border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),#fff); transition:width .22s ease-out}
+  .track > i.met{background:linear-gradient(90deg,#3FBE6E,#BFF3C9)}
+
+  #boss-row{display:flex; gap:6px}
+  .chip{
+    flex:1; padding:7px 8px; text-align:center; border-radius:14px;
+    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow);
+  }
+  .chip b{display:block; font-size:16px; font-weight:900; letter-spacing:-.02em; line-height:1.1}
+  .chip span{display:block; font-size:9px; font-weight:800; letter-spacing:.12em; opacity:.62; margin-top:2px}
+
+  .hud-streak{display:flex; align-items:center; gap:8px; align-self:flex-start; padding:6px 11px}
+  .hud-streak .dots{display:flex; gap:4px}
+  .hud-streak .dots i{
+    width:9px; height:9px; border-radius:50%; background:rgba(20,30,45,.20);
+    transition:background .18s, transform .18s;
+  }
+  .hud-streak .dots i.on{background:var(--accent); transform:scale(1.22); box-shadow:0 0 0 2px rgba(255,255,255,.45)}
+  .hud-streak .lab{font-size:10px; font-weight:900; letter-spacing:.1em; opacity:.66}
+  .hud-streak .num{font-size:13px; font-weight:900}
+
+  /* ---------- bottom area ---------- */
+  .bottom{margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:10px}
+  #banner{
+    padding:8px 16px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:.1em;
+    background:linear-gradient(180deg,#fff,#eaf5ff); color:#17692f;
+    border:1px solid rgba(255,255,255,.7); box-shadow:0 8px 22px rgba(10,25,40,.28);
+  }
+  #banner.pop{animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes pop{0%{transform:scale(.7); opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1); opacity:1}}
+
+  .bigbtn{
+    pointer-events:auto; min-height:56px; padding:0 30px; border-radius:20px;
+    font-size:17px; font-weight:900; letter-spacing:.02em;
+    background:linear-gradient(180deg,#fff,#e9f2fb); color:#15212e;
+    box-shadow:0 8px 0 rgba(10,25,45,.18),0 14px 30px rgba(10,25,45,.26);
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .bigbtn:active{transform:translateY(4px); box-shadow:0 4px 0 rgba(10,25,45,.18),0 8px 18px rgba(10,25,45,.24)}
+  .bigbtn.accent{background:linear-gradient(180deg,var(--accent),#fff0); background-color:var(--accent); color:var(--on-accent)}
+  .bigbtn.ghost{background:var(--panel); color:var(--text); border:1px solid var(--panel-border);
+    box-shadow:var(--shadow); min-height:48px; font-size:15px; padding:0 22px}
+  #btn-advance{animation:rise .45s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes rise{from{transform:translateY(26px); opacity:0}to{transform:translateY(0); opacity:1}}
+
+  #toast{
+    position:fixed; left:50%; top:38%; transform:translate(-50%,0) scale(.9);
+    padding:10px 18px; border-radius:999px; font-size:14px; font-weight:900; letter-spacing:.04em;
+    background:linear-gradient(180deg,#fff,#f0f7ff); color:#1c6b34;
+    box-shadow:0 10px 30px rgba(10,25,45,.3); opacity:0; pointer-events:none;
+    transition:opacity .18s ease, transform .28s cubic-bezier(.2,1.5,.4,1);
+  }
+  #toast.show{opacity:1; transform:translate(-50%,-16px) scale(1)}
+
+  .hint{font-size:11.5px; font-weight:700; opacity:.7; letter-spacing:.02em; text-align:center}
+
+  /* ---------- overlays ---------- */
+  .overlay{
+    position:fixed; inset:0; pointer-events:auto; display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--safe-t) + 16px) calc(var(--safe-r) + 16px) calc(var(--safe-b) + 16px) calc(var(--safe-l) + 16px);
+    background:radial-gradient(120% 90% at 50% 0%,rgba(8,18,32,.10),rgba(8,18,32,.34));
+    -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+    animation:fade .22s ease;
+  }
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .panel{
+    width:100%; max-width:430px; max-height:100%; overflow:auto; -webkit-overflow-scrolling:touch;
+    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(244,249,255,.94));
+    border-radius:26px; padding:22px 20px; text-align:center; color:#15212e;
+    box-shadow:0 24px 60px rgba(6,16,30,.45); border:1px solid rgba(255,255,255,.8);
+  }
+  .panel h1{margin:0; font-size:clamp(26px,8vw,38px); font-weight:900; letter-spacing:-.03em; line-height:1}
+  .panel h2{margin:0 0 4px; font-size:clamp(21px,6.5vw,28px); font-weight:900; letter-spacing:-.02em}
+  .panel p{margin:8px 0 0; font-size:14px; line-height:1.5; opacity:.78; font-weight:600}
+  .panel .kicker{font-size:11px; font-weight:900; letter-spacing:.18em; opacity:.55; margin-bottom:8px}
+  .panel .btns{display:flex; flex-direction:column; gap:9px; margin-top:18px; align-items:stretch}
+  .panel .btns .bigbtn{width:100%}
+  .stats{display:flex; gap:8px; margin-top:16px}
+  .stats > div{flex:1; background:rgba(20,40,70,.06); border-radius:16px; padding:10px 6px}
+  .stats b{display:block; font-size:20px; font-weight:900; letter-spacing:-.02em}
+  .stats span{display:block; font-size:9.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; opacity:.6; margin-top:2px}
+  .iconbtn svg{display:block; pointer-events:none}
+  .logo{width:88px; height:88px; margin:0 auto 10px; display:block}
+  .logo svg{display:block; width:100%; height:100%;
+    filter:drop-shadow(0 10px 14px rgba(10,25,45,.28))}
+  .rules{margin-top:16px; text-align:left; background:rgba(20,40,70,.055); border-radius:16px; padding:12px 14px}
+  .rules li{font-size:12.5px; line-height:1.65; font-weight:650; opacity:.85; margin-left:-6px}
+
+  /* ---------- level map ---------- */
+  #overlay-levels .panel{max-width:520px; text-align:left; padding:18px 16px}
+  .maphead{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px}
+  .maphead h2{margin:0}
+  .band{margin-bottom:14px}
+  .band-head{display:flex; align-items:center; gap:8px; margin-bottom:7px; flex-wrap:wrap}
+  .band-head b{font-size:13px; font-weight:900}
+  .swatch{width:14px; height:14px; border-radius:5px; border:2px solid; display:inline-block; flex:none}
+  .bandname{font-size:12px; font-weight:700; opacity:.66}
+  .bandbest{margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.08em; opacity:.55; white-space:nowrap}
+  .band-row{display:grid; grid-template-columns:repeat(10,1fr); gap:5px}
+  .mapcell{
+    aspect-ratio:1; border-radius:11px; font-size:11.5px; font-weight:900;
+    background:linear-gradient(180deg,#fff,#eef4fb); color:#1a2b3d;
+    border:1px solid rgba(20,40,70,.12); box-shadow:0 2px 0 rgba(20,40,70,.12);
+    display:flex; align-items:center; justify-content:center; padding:0; min-width:0;
+  }
+  .mapcell.boss{background:linear-gradient(180deg,#FFD75E,#EFA92B); color:#3a2503; font-size:10px}
+  .mapcell.locked{opacity:.34; background:#dfe6ee; box-shadow:none; cursor:not-allowed}
+  .mapcell:not(.locked):active{transform:translateY(2px); box-shadow:none}
+
+  #fatal{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    padding:24px; text-align:center; font-weight:700; background:#12202f; color:#fff; z-index:99}
+
+  @media (min-width:820px){
+    #ui{padding:18px 20px 20px}
+    #hud{max-width:520px}
+    .hud-streak{align-self:flex-start}
+  }
+  @media (max-height:680px){
+    #hud{gap:6px}
+    .hud-id{padding:6px 10px}
+    .hud-prog{padding:7px 10px 9px}
+    .chip{padding:5px 6px}
+    .chip b{font-size:14px}
+    .hud-streak{padding:5px 9px}
+    .bigbtn{min-height:52px; font-size:16px}
+  }
+  @media (max-height:560px){
+    .panel{padding:16px}
+    .iconbtn svg{display:block; pointer-events:none}
+  .logo{width:52px; height:52px; font-size:24px; margin-bottom:8px}
+    .rules{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important; transition-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+
+<div id="stage"><canvas id="scene"></canvas></div>
+
+<div id="ui">
+
+  <!-- ============ HUD ============ -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-id card">
+        <div class="lvlno" id="hud-level">LEVEL 1</div>
+        <div class="world" id="hud-world">World 1 · Meadow Rise</div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-icons">
+          <span class="mode normal" id="hud-mode">NORMAL</span>
+          <button class="iconbtn" id="btn-mute" aria-label="Toggle sound"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path id="ico-sound" fill="currentColor" d="M4 9h3.2L12 5v14L7.2 15H4z"/><g id="ico-waves" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M15.2 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.8 7.2a7 7 0 0 1 0 9.6"/></g><g id="ico-mute" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M16 10l5 4"/><path d="M21 10l-5 4"/></g></svg></button>
+          <button class="iconbtn" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></g></svg></button>
+        </div>
+        <div class="score card"><span>SCORE</span><em id="hud-score" style="font-style:normal">0</em></div>
+      </div>
+    </div>
+
+    <div class="hud-prog card">
+      <div class="prog-head">
+        <span class="l" id="prog-label">STACKS</span>
+        <span class="v" id="prog-value">0 / 5</span>
+      </div>
+      <div class="track"><i id="prog-fill"></i></div>
+    </div>
+
+    <div id="boss-row" class="hidden">
+      <div class="chip"><b id="boss-req">10</b><span>REQUIRED</span></div>
+      <div class="chip"><b id="boss-now">0</b><span>HEIGHT</span></div>
+      <div class="chip"><b id="boss-best">0</b><span>BEST</span></div>
+    </div>
+
+    <div class="hud-streak card">
+      <div class="dots" id="streak-dots"><i></i><i></i><i></i></div>
+      <span class="lab">PERFECT</span>
+      <span class="num" id="streak-value">0</span>
+    </div>
+  </div>
+
+  <!-- ============ bottom ============ -->
+  <div class="bottom">
+    <div id="banner" class="hidden">REQUIRED HEIGHT REACHED</div>
+    <button class="bigbtn accent hidden" id="btn-advance">Advance ▲</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ============ menu ============ -->
+<div class="overlay hidden" id="overlay-menu">
+  <div class="panel">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 64 64">
+      <g><path d="M32 28 L54 40 L32 52 L10 40 Z" fill="#2C7CC4"/><path d="M10 40 L32 52 L32 60 L10 48 Z" fill="#1F5C93"/><path d="M54 40 L32 52 L32 60 L54 48 Z" fill="#276FB0"/></g>
+      <g><path d="M32 16 L54 28 L32 40 L10 28 Z" fill="#EFC429"/><path d="M10 28 L32 40 L32 48 L10 36 Z" fill="#BD971C"/><path d="M54 28 L32 40 L32 48 L54 36 Z" fill="#D6AC22"/></g>
+      <g><path d="M32 4 L54 16 L32 28 L10 16 Z" fill="#E0463C"/><path d="M10 16 L32 28 L32 36 L10 24 Z" fill="#AC332B"/><path d="M54 16 L32 28 L32 36 L54 24 Z" fill="#C43C33"/></g>
+    </svg></div>
+    <div class="kicker">100 LEVELS · 10 WORLDS · 10 BOSSES</div>
+    <h1>Block Stack 3D</h1>
+    <p id="menu-progress">Level 1 of 100 unlocked</p>
+    <div class="btns">
+      <button class="bigbtn accent" id="btn-play">Start Climbing</button>
+      <button class="bigbtn ghost" id="btn-levels">Level Map</button>
+    </div>
+    <ul class="rules">
+      <li><b>Tap</b> anywhere or press <b>Space</b> to drop the block.</li>
+      <li>Overhang is sliced off — the next block inherits the smaller size.</li>
+      <li>Land 3 <b>perfect</b> drops in a row to restore lost size.</li>
+      <li>Every 10th level is a <b>boss climb</b>: reach the required height, then Advance whenever you like — or keep climbing for a new record.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ level cleared ============ -->
+<div class="overlay hidden" id="overlay-clear">
+  <div class="panel">
+    <div class="kicker">CLEARED</div>
+    <h2 id="clear-title">Level Cleared</h2>
+    <p id="clear-sub"></p>
+    <div class="stats">
+      <div><b id="clear-score">0</b><span>SCORE</span></div>
+      <div><b id="clear-stat1">0</b><span>BEST STREAK</span></div>
+      <div><b id="clear-stat2">0</b><span>RECOVERIES</span></div>
+    </div>
+    <div class="btns">
+      <button class="bigbtn accent" id="btn-next">Next Level</button>
+      <button class="bigbtn ghost" id="btn-clear-menu">Level Map</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ failed ============ -->
+<div class="overlay hidden" id="overlay-fail">
+  <div class="panel">
+    <div class="kicker">RUN OVER</div>
+    <h2 id="fail-title">Tower Down</h2>
+    <p id="fail-sub"></p>
+    <div class="stats">
+      <div><b id="fail-score">0</b><span>SCORE</span></div>
+      <div><b id="fail-best">0</b><span id="fail-best-label">BEST</span></div>
+    </div>
+    <div class="btns">
+      <button class="bigbtn accent" id="btn-retry">Retry Level</button>
+      <button class="bigbtn ghost" id="btn-fail-menu">Level Map</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ level map ============ -->
+<div class="overlay hidden" id="overlay-levels">
+  <div class="panel">
+    <div class="maphead">
+      <h2>Level Map</h2>
+      <button class="bigbtn ghost" id="btn-levels-close" style="min-height:40px;padding:0 16px">Close</button>
+    </div>
+    <div id="level-grid"></div>
+  </div>
+</div>
+
+<div id="fatal" class="hidden"></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="src/logic.js"></script>
+<script src="src/render.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>

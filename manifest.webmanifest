@@ -1,0 +1,11 @@
+{
+  "name": "Block Stack 3D",
+  "short_name": "Block Stack",
+  "description": "100 levels, 10 worlds, 10 boss climbs. Stack the blocks, keep your size.",
+  "start_url": "game.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#3CA5DE",
+  "theme_color": "#3CA5DE"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "block-stack-3d",
+  "version": "1.0.0",
+  "description": "A 3-D block stacking game for iPhone and web: 100 levels, 10 worlds, 10 boss climbs.",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:unit && npm run test:balance && npm run test:e2e",
+    "test:unit": "node --test test/logic.test.cjs",
+    "test:balance": "node test/balance.mjs",
+    "test:e2e": "node test/e2e.mjs",
+    "serve": "npx --yes http-server -p 8080 -c-1 ."
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}
