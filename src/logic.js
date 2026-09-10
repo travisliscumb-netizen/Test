@@ -284,6 +284,9 @@
     if (boss) perfectWindow *= 1.28;                    // boss runs are 10-100 drops long
     var perfectTol = speed * perfectWindow;
 
+    // The sliding block hovers this far clear of the tower before it drops.
+    var dropGap = BLOCK_HEIGHT * lerp(2.0, 2.9, t);
+
     // Movement variation: the slide velocity is modulated by a sine so late
     // levels cannot be beaten with pure metronome timing.
     var sway = clamp((t - 0.10) / 0.90, 0, 1) * 0.36;
@@ -308,6 +311,13 @@
       sway: round3(sway),
       swayFreq: round3(swayFreq),
       travel: round3(BASE_SIZE * 0.80 + baseSize * 0.40),
+      // Clear air between the top of the tower and the sliding block. The block
+      // hovers up here and visibly falls when dropped, which is both the reason
+      // a drop reads as a drop and a real difficulty lever: judging alignment
+      // across a vertical gap in perspective is harder than butting two blocks
+      // together.
+      dropGap: round3(dropGap),
+      hover: round3(BLOCK_HEIGHT + dropGap),
       minSize: MIN_SIZE
     };
   }

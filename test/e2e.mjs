@@ -251,6 +251,79 @@ await group('QA: the moving block is a solid 3-D block, not a flat sheet', async
 });
 
 /* ---------------------------------------------------------------- */
+await group('QA: the block hovers clear of the tower and falls when dropped', async () => {
+  await start(page, 1);
+  await perfect(page, 3);
+  await page.evaluate(() => { window.GameDebug.freeze(true); window.GameDebug.alignPerfect(); });
+  await page.waitForTimeout(200);
+
+  let s = await state(page);
+  let b = await page.evaluate(() => window.GameDebug.movingBounds());
+  const blockH = b.h;
+  const clearAir = (b.y - blockH / 2) - (s.topY + blockH / 2);
+  ok(clearAir > blockH * 1.5,
+     `real air under the block: ${clearAir.toFixed(2)} units, over ${(clearAir / blockH).toFixed(1)} block heights`);
+  near(b.y, s.topY + s.hover, 0.1, 'the block hovers at the level hover height');
+
+  // the shadow is clipped to the block below it - a shadow wider than the
+  // surface it falls on hangs in mid-air and reads as a smudge
+  ok(b.shadowW <= b.anchorSx + 1e-6 && b.shadowD <= b.anchorSz + 1e-6,
+     `contact shadow never overhangs the block below (${b.shadowW.toFixed(2)} <= ${b.anchorSx.toFixed(2)})`);
+  ok(b.shadowOpacity > 0.35, `underside shadow stays strong (${b.shadowOpacity.toFixed(2)})`);
+  near(b.anchorY, s.topY, 1e-6, 'the shadow falls on the top of the tower');
+
+  /*
+   * The shadow blob is placed inside that clipped quad by offsetting the
+   * texture, so verify the placement by inverting the mapping: solve the
+   * texture transform for where the blob's centre lands in the world and check
+   * it sits under the block. (Sampling pixels here is unreliable - the block
+   * hovering above can occlude the very point you want to read.)
+   */
+  const blobCentre = (off) => page.evaluate((o) => {
+    window.GameDebug.setOffset(o);
+    const st = window.GameDebug.state, b = window.GameDebug.movingBounds();
+    const [ru, rv] = b.shadowRepeat, [ou, ov] = b.shadowOffset;
+    // u = 0.5 at the blob centre; the quad spans the anchor footprint
+    const u = (0.5 - ou) / ru, v = (0.5 - ov) / rv;
+    return {
+      x: b.anchorSx * (u - 0.5) + st.topX,
+      z: st.topZ - b.anchorSz * (v - 0.5),   // the quad's V axis runs against world Z
+      blockX: b.x, blockZ: b.z, axis: st.axis
+    };
+  }, off);
+
+  for (const off of [-1.4, -0.5, 0, 0.7, 1.6]) {
+    const c = await blobCentre(off);
+    near(c.x, c.blockX, 0.01, `shadow follows the block on x at offset ${off}`);
+    near(c.z, c.blockZ, 0.01, `shadow follows the block on z at offset ${off}`);
+  }
+  await page.evaluate(() => { window.GameDebug.alignPerfect(); window.GameDebug.freeze(false); });
+
+  // dropping makes it fall: the landed block descends over several frames
+  const fall = await page.evaluate(async () => {
+    window.GameDebug.alignPerfect();
+    const from = window.GameDebug.movingBounds().y;
+    const target = window.GameDebug.state.topY + 1.5;
+    window.GameDebug.tap();
+    const ys = [];
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => requestAnimationFrame(r));
+      ys.push(window.GameDebug.landedTopY());
+    }
+    return { from, target, ys };
+  });
+  ok(fall.ys[0] > fall.target + 0.2, `the block starts in the air (${fall.ys[0].toFixed(2)} vs ${fall.target.toFixed(2)})`);
+  ok(fall.ys.some((y, i) => i > 0 && y < fall.ys[i - 1]), 'it descends across frames');
+  ok(fall.ys.filter((y) => y > fall.target + 0.05).length >= 2, 'the fall takes more than one frame');
+  near(fall.ys[fall.ys.length - 1], fall.target, 0.01, 'it comes to rest exactly on the tower');
+  ok(fall.ys.every((y, i) => i === 0 || y <= fall.ys[i - 1] + 1e-6), 'it never bounces back up mid-fall');
+
+  // the gap widens as the climb gets harder
+  const gaps = await page.evaluate(() => [1, 50, 100].map((l) => window.GameDebug.logic.levelConfig(l).dropGap));
+  ok(gaps[0] < gaps[1] && gaps[1] < gaps[2], `drop height grows with level (${gaps.join(' -> ')})`);
+});
+
+/* ---------------------------------------------------------------- */
 await group('QA: boss levels appear every 10th level with the right targets', async () => {
   for (const lvl of [9, 10, 11, 50, 99, 100]) {
     await start(page, lvl);

@@ -145,7 +145,8 @@
     view.reset();
     view.setTheme(theme);
     applyThemeToUI(theme);
-    view.setFitBounds(cfg.travel + cfg.baseSize * 0.5 + 0.4, cfg.baseSize * 0.5 + 1.6);
+    view.setFitBounds(cfg.travel + cfg.baseSize * 0.5 + 0.4, cfg.baseSize * 0.5 + 1.6,
+                      cfg.hover * 0.58 + 1.2, cfg.hover * 0.42 + 2.8);
 
     view.setSpin(0);
     S.mode = 'playing';
@@ -168,7 +169,7 @@
     }
     view.addBlock({ x: 0, z: 0, y: 0, sx: cfg.baseSize, sz: cfg.baseSize, color: blockColor(0) });
 
-    view.focusOn(0, 0.5, 0, true);
+    view.focusOn(0, cfg.hover * 0.42, 0, true);
     spawnMoving();
 
     show(el.overlayMenu, false);
@@ -185,7 +186,7 @@
     S.axis = (S.height % 2 === 0) ? 'x' : 'z';
     var side = Math.random() < 0.5 ? -1 : 1;
     var start = side * cfg.travel;
-    var y = S.topY + L.BLOCK_HEIGHT;
+    var y = S.topY + cfg.hover;      // hovering clear of the tower, not resting on it
 
     S.moving = { pos: start, dir: -side, t: 0, active: true, phase: Math.random() * Math.PI * 2 };
 
@@ -193,7 +194,9 @@
     var z = S.axis === 'z' ? start : S.topZ;
 
     view.setMoving({
-      x: x, z: z, y: y, anchorY: S.topY,
+      x: x, z: z, y: y,
+      anchorY: S.topY, anchorX: S.topX, anchorZ: S.topZ,
+      anchorSx: S.sizeX, anchorSz: S.sizeZ,
       sx: S.sizeX, sz: S.sizeZ,
       color: blockColor(S.height + 1)
     });
@@ -221,12 +224,13 @@
 
     var y = S.topY + L.BLOCK_HEIGHT;
     var color = blockColor(S.height + 1);
+    var airY = S.topY + cfg.hover;
 
     if (r.missed) {
-      // the whole block tumbles away
+      // the whole block tumbles away from where it was hovering
       view.clearMoving();
       view.spawnSlice({
-        x: horiz ? movingPos : S.topX, z: horiz ? S.topZ : movingPos, y: y,
+        x: horiz ? movingPos : S.topX, z: horiz ? S.topZ : movingPos, y: airY,
         sx: S.sizeX, sz: S.sizeZ, color: color,
         dir: horiz ? [Math.sign(r.offset) || 1, 0, 0] : [0, 0, Math.sign(r.offset) || 1]
       });
@@ -242,34 +246,49 @@
     var px = horiz ? r.pos : S.topX;
     var pz = horiz ? S.topZ : r.pos;
 
-    view.landMoving({ x: px, z: pz, y: y, sx: nx, sz: nz, color: color });
-
-    // sliced-off pieces fall
-    for (var i = 0; i < r.slices.length; i++) {
-      var sl = r.slices[i];
-      var away = Math.sign(sl.pos - r.pos) || 1;
-      view.spawnSlice({
-        x: horiz ? sl.pos : px, z: horiz ? pz : sl.pos, y: y,
-        sx: horiz ? sl.size : nx, sz: horiz ? nz : sl.size,
-        color: color, dir: horiz ? [away, 0, 0] : [0, 0, away]
-      });
-    }
-
+    // The rules settle immediately - the next block must inherit the right size
+    // straight away - while everything that happens *to* the tower waits for the
+    // block to actually arrive.
     S.sizeX = nx; S.sizeZ = nz;
     S.topX = px; S.topZ = pz; S.topY = y;
     S.height += 1;
     S.score += L.dropScore({ level: S.level, perfect: r.perfect, streak: S.streak });
 
+    var recovered = null;
     if (r.perfect) {
       S.streak += 1;
       S.bestStreak = Math.max(S.bestStreak, S.streak);
-      view.perfectFx(px, y, pz, color);
       Sound.perfect(S.streak);
-      if (S.streak % L.RECOVERY_STREAK === 0) grantRecovery(px, y, pz, color);
+      if (S.streak % L.RECOVERY_STREAK === 0) recovered = grantRecovery();
     } else {
       S.streak = 0;
       Sound.land();
     }
+
+    // The block falls from where it was hovering. Its effects are held on this
+    // drop's own closure, not on shared state, so two overlapping falls (a fast
+    // player tapping again mid-flight) can never claim each other's refund.
+    var perfect = r.perfect, slices = r.slices, cutFrom = r.pos;
+    view.landMoving({
+      x: px, z: pz, y: y, sx: nx, sz: nz, color: color,
+      onLand: function () {
+        for (var i = 0; i < slices.length; i++) {
+          var sl = slices[i];
+          var away = Math.sign(sl.pos - cutFrom) || 1;
+          view.spawnSlice({
+            x: horiz ? sl.pos : px, z: horiz ? pz : sl.pos, y: y,
+            sx: horiz ? sl.size : nx, sz: horiz ? nz : sl.size,
+            color: color, dir: horiz ? [away, 0, 0] : [0, 0, away]
+          });
+        }
+        if (perfect) view.perfectFx(px, y, pz, color);
+        if (recovered) {
+          view.replaceTopBlock({ x: px, z: pz, y: y, sx: recovered.x, sz: recovered.z, color: color });
+          view.recoveryFx(px, y, pz, theme.accent);
+          flashToast('+ SIZE RESTORED');
+        }
+      }
+    });
 
     progress.addStats(1, r.perfect ? 1 : 0, 0);
 
@@ -285,7 +304,7 @@
       }
     }
 
-    view.focusOn(S.topX, S.topY + 0.5, S.topZ, false);
+    view.focusOn(S.topX, S.topY + cfg.hover * 0.42, S.topZ, false);
 
     if (!cfg.isBoss && S.height >= cfg.goal) {
       completeLevel('normal');
@@ -296,17 +315,20 @@
     updateHUD();
   }
 
-  /** 3-perfect streak refund. Never lets a footprint exceed the level base size. */
-  function grantRecovery(x, y, z, color) {
+  /**
+   * 3-perfect streak refund. Never lets a footprint exceed the level base size.
+   * The rules apply immediately, so the next block inherits the restored size.
+   * Returns the refund for the caller to play back when the block lands, or
+   * null when there was nothing to restore.
+   */
+  function grantRecovery() {
     var rec = L.applyRecovery(S.sizeX, S.sizeZ, cfg.baseSize);
-    if (!rec.gained) return;
+    if (!rec.gained) return null;
     S.sizeX = rec.x; S.sizeZ = rec.z;
     S.recoveries += 1;
-    view.replaceTopBlock({ x: x, z: z, y: y, sx: S.sizeX, sz: S.sizeZ, color: color });
-    view.recoveryFx(x, y, z, theme.accent);
     Sound.recover();
     progress.addStats(0, 0, 1);
-    flashToast('+ SIZE RESTORED');
+    return rec;
   }
 
   /* ================================================================== *
@@ -717,6 +739,7 @@
           movingPos: S.moving ? S.moving.pos : null,
           movingActive: !!(S.moving && S.moving.active),
           perfectTol: cfg ? cfg.perfectTol : 0,
+          hover: cfg ? cfg.hover : 0, dropGap: cfg ? cfg.dropGap : 0,
           bossBest: cfg && cfg.isBoss ? progress.bossBest(S.level) : 0,
           highestUnlocked: progress.highestUnlocked(),
           blockCount: view.blockCount
@@ -764,6 +787,11 @@
           y: h.mesh.position.y, x: h.mesh.position.x, z: h.mesh.position.z,
           hasShadow: !!h.shadow, hasGlow: !!h.glow,
           shadowOpacity: h.shadow ? h.shadow.material.opacity : 0,
+          shadowW: h.shadow ? h.shadow.scale.x : 0,
+          shadowD: h.shadow ? h.shadow.scale.y : 0,
+          shadowRepeat: h.shadow ? [h.shadow.material.map.repeat.x, h.shadow.material.map.repeat.y] : null,
+          shadowOffset: h.shadow ? [h.shadow.material.map.offset.x, h.shadow.material.map.offset.y] : null,
+          anchorSx: h.anchorSx, anchorSz: h.anchorSz, anchorY: h.anchorY,
           glowOpacity: h.glow ? h.glow.material.opacity : 0
         };
       },
@@ -782,6 +810,7 @@
           silhouette: view.movingSilhouette()
         };
       },
+      landedTopY: function () { return view.landedTopY(); },
       view: function () { return view; },
       logic: L
     };

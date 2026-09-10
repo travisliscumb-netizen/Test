@@ -477,7 +477,7 @@
       var rec = { mesh: mesh, y: spec.y };
       blocks.push(rec);
       if (spec.squash) {
-        anims.push({ mesh: mesh, t: 0, dur: 0.26 });
+        anims.push({ mesh: mesh, kind: 'squash', t: 0, dur: 0.26 });
       }
       // keep the scene light: only the top blocks cast shadows
       for (var i = 0; i < blocks.length; i++) {
@@ -500,10 +500,13 @@
       mesh.castShadow = shadowsOn;
       towerGroup.add(mesh);
 
+      var shTex = shadowTex.clone();
+      shTex.needsUpdate = true;
+      shTex.wrapS = shTex.wrapT = THREE.ClampToEdgeWrapping;
       var sh = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
         new THREE.MeshBasicMaterial({
-          map: shadowTex, transparent: true, depthWrite: false,
+          map: shTex, transparent: true, depthWrite: false,
           opacity: 0.55, color: new THREE.Color('#000000'), fog: false
         })
       );
@@ -522,6 +525,10 @@
         mesh: mesh, shadow: sh, glow: glow,
         baseY: spec.y, sx: spec.sx, sz: spec.sz,
         anchorY: spec.anchorY == null ? spec.y - L.BLOCK_HEIGHT : spec.anchorY,
+        anchorX: spec.anchorX == null ? spec.x : spec.anchorX,
+        anchorZ: spec.anchorZ == null ? spec.z : spec.anchorZ,
+        anchorSx: spec.anchorSx == null ? spec.sx : spec.anchorSx,
+        anchorSz: spec.anchorSz == null ? spec.sz : spec.anchorSz,
         color: spec.color, t: 0
       };
       layoutMoving(spec.x, spec.z);
@@ -533,11 +540,32 @@
       var bob = Math.sin(moving.t * 3.1) * 0.055;
       moving.mesh.position.set(x, moving.baseY + bob, z);
 
+      /*
+       * Underside shadow.
+       *
+       * The quad is the footprint of the block BELOW, never the shadow's own
+       * size - a quad bigger than the surface it falls on hangs in mid-air and
+       * reads as a smudge. The blob is placed inside that quad by offsetting the
+       * texture, so it is clipped by the block's edges exactly as a real shadow
+       * would be: it slides off the side as the player slides off the tower,
+       * which is the clearest aiming cue in the game.
+       */
       var drop = Math.max(0.4, moving.baseY - moving.anchorY);
-      var spread = 1.18 + Math.min(0.5, drop * 0.06);
-      moving.shadow.position.set(x, moving.anchorY + L.BLOCK_HEIGHT / 2 + 0.012, z);
-      moving.shadow.scale.set(moving.sx * spread, moving.sz * spread, 1);
-      moving.shadow.material.opacity = 0.62;
+      var spread = 0.85 + Math.min(0.35, drop * 0.05);      // higher block, wider blur
+      var shW = moving.sx * spread, shD = moving.sz * spread;
+      var aW = moving.anchorSx, aD = moving.anchorSz;
+
+      moving.shadow.position.set(moving.anchorX, moving.anchorY + L.BLOCK_HEIGHT / 2 + 0.012, moving.anchorZ);
+      moving.shadow.scale.set(aW, aD, 1);
+
+      var map = moving.shadow.material.map;
+      map.repeat.set(aW / shW, aD / shD);
+      map.offset.set(
+        (moving.anchorX - aW / 2 - x + shW / 2) / shW,
+        // the plane is rotated -90deg about X, so its V axis runs against world Z
+        (z + shD / 2 - (moving.anchorZ + aD / 2)) / shD
+      );
+      moving.shadow.material.opacity = 0.60 - Math.min(0.16, drop * 0.026);
 
       // pushed away from the camera so the block itself occludes the middle of
       // the glow: what is left is a soft halo around a solid block
@@ -560,17 +588,38 @@
       towerGroup.remove(moving.mesh);
       towerGroup.remove(moving.shadow);
       moving.shadow.geometry.dispose();
+      if (moving.shadow.material.map) moving.shadow.material.map.dispose();
       moving.shadow.material.dispose();
       towerGroup.remove(moving.glow);
       moving.glow.material.dispose();
       moving = null;
     }
 
-    /** Convert the moving block into a landed block (keeps the squash bounce). */
+    /**
+     * Convert the moving block into a landed block. The block falls from
+     * wherever it was hovering down to the tower, then squashes on impact.
+     * `spec.onLand` fires at the moment of impact, so slices and effects happen
+     * when the block actually arrives rather than the instant it is dropped.
+     */
     function landMoving(spec) {
+      var fromY = moving ? moving.mesh.position.y : spec.y;
       clearMoving();
-      return addBlock({ x: spec.x, z: spec.z, y: spec.y, sx: spec.sx, sz: spec.sz,
-                        color: spec.color, squash: true });
+      var rec = addBlock({ x: spec.x, z: spec.z, y: spec.y, sx: spec.sx, sz: spec.sz,
+                           color: spec.color });
+      var drop = Math.max(0, fromY - spec.y);
+      if (drop < 0.05) {
+        if (spec.onLand) spec.onLand();
+        anims.push({ mesh: rec.mesh, kind: 'squash', t: 0, dur: 0.26 });
+        return rec;
+      }
+      rec.mesh.position.y = fromY;
+      anims.push({
+        mesh: rec.mesh, kind: 'fall', t: 0,
+        // time for a real fall of this height, kept snappy
+        dur: Math.min(0.28, Math.max(0.09, Math.sqrt(2 * drop / 190))),
+        fromY: fromY, toY: spec.y, onDone: spec.onLand
+      });
+      return rec;
     }
 
     /**
@@ -581,9 +630,26 @@
       if (!blocks.length) return null;
       var old = blocks.pop();
       towerGroup.remove(old.mesh);
-      for (var i = anims.length - 1; i >= 0; i--) if (anims[i].mesh === old.mesh) anims.splice(i, 1);
-      return addBlock({ x: spec.x, z: spec.z, y: spec.y, sx: spec.sx, sz: spec.sz,
-                        color: spec.color, squash: true });
+      // if the block being replaced is still in the air, hand the fall over to
+      // its replacement instead of snapping it to the ground
+      var inFlight = null;
+      for (var i = anims.length - 1; i >= 0; i--) {
+        if (anims[i].mesh === old.mesh) {
+          if (anims[i].kind === 'fall') inFlight = anims[i];
+          anims.splice(i, 1);
+        }
+      }
+      var rec = addBlock({ x: spec.x, z: spec.z, y: spec.y, sx: spec.sx, sz: spec.sz,
+                           color: spec.color, squash: !inFlight });
+      if (inFlight) {
+        rec.mesh.position.y = old.mesh.position.y;
+        inFlight.mesh = rec.mesh;
+        inFlight.fromY = old.mesh.position.y;
+        inFlight.dur = Math.max(0.04, inFlight.dur - inFlight.t);
+        inFlight.t = 0;
+        anims.push(inFlight);
+      }
+      return rec;
     }
 
     /* ---- sliced-off debris ------------------------------------------ */
@@ -635,14 +701,15 @@
     }
 
     function perfectFx(x, y, z, color) {
-      ring(x, y + 0.78, z, L.mixHex(color, '#ffffff', 0.6), 2.2, 0.45, 1.7);
-      sparks(x, y + 0.78, z, L.mixHex(color, '#ffffff', 0.35), 6, 1);
+      // lifted clear of the block: flat on the top face it reads as a stain
+      ring(x, y + 1.5, z, L.mixHex(color, '#ffffff', 0.6), 2.4, 0.45, 1.8);
+      sparks(x, y + 0.85, z, L.mixHex(color, '#ffffff', 0.35), 6, 1);
     }
 
     function recoveryFx(x, y, z, color) {
-      ring(x, y + 0.78, z, color, 2.4, 0.75, 2.4);
-      ring(x, y + 0.78, z, '#ffffff', 1.8, 0.55, 2.0);
-      sparks(x, y + 0.78, z, color, 12, 1.5);
+      ring(x, y + 1.6, z, color, 2.6, 0.75, 2.4);
+      ring(x, y + 1.9, z, '#ffffff', 2.0, 0.55, 2.1);
+      sparks(x, y + 0.85, z, color, 12, 1.5);
     }
 
     /* ================================================================ *
@@ -653,11 +720,17 @@
     var camTarget = new THREE.Vector3(0, 0, 0);
     var camDesired = new THREE.Vector3(0, 0, 0);
     var camDist = 26;
-    var fitTravel = 6.4, fitLateral = 3.6;
+    var fitTravel = 6.4, fitLateral = 3.6, fitUp = 2.6, fitDown = 2.6;
 
-    /** Play-area extents: `travel` along the active axis, `lateral` across it. */
-    function setFitBounds(travel, lateral) {
+    /**
+     * Play-area extents relative to the camera target: `travel` along the active
+     * axis, `lateral` across it, and how far the framing must reach above and
+     * below (the sliding block hovers well clear of the tower).
+     */
+    function setFitBounds(travel, lateral, up, down) {
       fitTravel = travel; fitLateral = lateral;
+      if (up != null) fitUp = up;
+      if (down != null) fitDown = down;
       fitCamera();
     }
 
@@ -676,7 +749,7 @@
         for (var sx = -1; sx <= 1; sx += 2) {
           for (var sz = -1; sz <= 1; sz += 2) {
             for (var sy = 0; sy <= 1; sy++) {
-              pts.push(new THREE.Vector3(sx * boxes[b][0], sy ? 2.6 : -2.6, sz * boxes[b][1]));
+              pts.push(new THREE.Vector3(sx * boxes[b][0], sy ? fitUp : -fitDown, sz * boxes[b][1]));
             }
           }
         }
@@ -734,11 +807,23 @@
      * ================================================================ */
 
     function update(dt) {
-      // squash / bounce
+      // falling blocks, then squash / bounce on impact
       for (var i = anims.length - 1; i >= 0; i--) {
         var a = anims[i];
         a.t += dt;
         var p = Math.min(1, a.t / a.dur);
+
+        if (a.kind === 'fall') {
+          a.mesh.position.y = a.fromY + (a.toY - a.fromY) * p * p;   // accelerating
+          if (p >= 1) {
+            a.mesh.position.y = a.toY;
+            anims.splice(i, 1);
+            anims.push({ mesh: a.mesh, kind: 'squash', t: 0, dur: 0.26 });
+            if (a.onDone) a.onDone();
+          }
+          continue;
+        }
+
         // 1 -> 0.74 -> 1.07 -> 1
         var sy;
         if (p < 0.34)      sy = 1 - 0.26 * (p / 0.34);
@@ -922,6 +1007,8 @@
       setSpin: function (r) { spin = r || 0; },
       replaceTopBlock: replaceTopBlock, update: update, render: render,
       sampleWorldPoint: sampleWorldPoint, movingSilhouette: movingSilhouette,
+      /** y of the newest landed block - lets a test watch a drop fall */
+      landedTopY: function () { return blocks.length ? blocks[blocks.length - 1].mesh.position.y : null; },
       get movingHandle() { return moving; },
       get blockCount() { return blocks.length; },
       get shadowsEnabled() { return shadowsOn; }
