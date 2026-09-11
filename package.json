@@ -9,7 +9,10 @@
     "test:balance": "node test/balance.mjs",
     "test:e2e": "node test/e2e.mjs",
     "serve": "npx --yes http-server -p 8080 -c-1 .",
-    "build": "node tools/build-artifact.js && node tools/build-artifact.js --artifact"
+    "build": "npm run build:single && npm run build:artifact",
+    "build:single": "node tools/build-artifact.js",
+    "build:artifact": "node tools/build-artifact.js --artifact",
+    "build:deploy": "node tools/build-deploy.js"
   },
   "devDependencies": {
     "playwright": "^1.56.1"

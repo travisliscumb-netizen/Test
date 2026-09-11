@@ -1,4 +1,7 @@
 node_modules/
 test/out/
 .DS_Store
+
+# generated: regenerate with the build scripts in package.json
+deploy/
 dist/

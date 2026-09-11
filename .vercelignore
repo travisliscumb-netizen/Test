@@ -1,0 +1,13 @@
+# The game is the deployment. Everything below is repository furniture.
+node_modules
+test
+tools
+dist
+deploy
+package.json
+package-lock.json
+*.md
+
+# The repository root index.html is an unrelated pre-existing app. Excluding it
+# lets the vercel.json rewrite serve the game at / instead.
+index.html
