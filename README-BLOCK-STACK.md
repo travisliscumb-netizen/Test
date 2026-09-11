@@ -17,6 +17,34 @@ npx http-server -p 8080 -c-1 .     # then open http://localhost:8080/game.html
 
 ---
 
+## Live deployment
+
+**https://operation-blackgate-2-git-claude-block-stacking-f0ee23-travis16.vercel.app**
+
+Hosted on Vercel from this branch, serving the repository as static files with no
+install or build step (`vercel.json`). `/` rewrites to `game.html`, which is what
+lets iOS pick up the `apple-touch-icon` when the page is added to the home
+screen.
+
+### Install it on an iPhone
+
+1. Open the URL in **Safari** (not Chrome - only Safari can install to the home
+   screen).
+2. Share button, then **Add to Home Screen**.
+3. It launches full-screen with no browser chrome, using `icons/icon-180.png`.
+
+### Notes
+
+* `.vercelignore` excludes the repository's unrelated root `index.html` from the
+  deployment, so the deployed site serves only the game.
+* The Vercel project's production branch is `main`, which does not contain the
+  game - so this is a branch deployment. Merging into `main` would additionally
+  serve it from the short production URL.
+* Progress is stored per origin, so the deployed game, the local file and any
+  other copy each keep their own unlocks and boss records.
+
+---
+
 ## How it plays
 
 A block slides back and forth above the tower. Drop it, and whatever hangs over
