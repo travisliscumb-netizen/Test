@@ -251,6 +251,48 @@ await group('QA: the moving block is a solid 3-D block, not a flat sheet', async
 });
 
 /* ---------------------------------------------------------------- */
+await group('QA: a level starts on the ground and every block counts', async () => {
+  await start(page, 1);
+  let s = await state(page);
+  eq(s.height, 0, 'nothing is stacked at the start of a level');
+  eq(s.blockCount, 0, 'no blocks are placed for you - the tower starts empty');
+  eq(s.topY, 0, 'the pad is the anchor for the first drop');
+  eq(await page.textContent('#prog-value'), '0 / ' + s.goal, 'HUD opens at zero');
+
+  // the pad is exactly the level footprint, so drop one is judged like the rest
+  await page.evaluate(() => { window.GameDebug.freeze(true); window.GameDebug.alignPerfect(); });
+  const b = await page.evaluate(() => window.GameDebug.movingBounds());
+  near(b.anchorSx, s.baseSize, 1e-6, 'the pad is the level starting footprint');
+  near(b.anchorSz, s.baseSize, 1e-6, 'the pad is square to the level footprint');
+  await page.evaluate(() => window.GameDebug.freeze(false));
+
+  // the very first block counts towards the goal
+  await perfect(page, 1);
+  s = await state(page);
+  eq(s.height, 1, 'the first block counts');
+  eq(s.blockCount, 1, 'and it is the only block in the tower');
+  near(s.topY, 1.5, 1e-6, 'it rests directly on the pad');
+  eq(await page.textContent('#prog-value'), '1 / ' + s.goal, 'HUD counts it');
+
+  // the first block can be sliced like any other
+  await start(page, 1);
+  await offsetDrop(page, 0.8);
+  s = await state(page);
+  eq(s.height, 1, 'a sloppy first drop still counts');
+  near(s.sizeX, s.baseSize - 0.8, 1e-6, 'the first block is sliced by the pad edge');
+
+  // and missing the pad ends the run immediately
+  await start(page, 1);
+  await missDrop(page);
+  s = await state(page);
+  eq(s.mode, 'fail', 'missing the pad on drop one fails the run');
+  eq(s.height, 0, 'with nothing stacked');
+  await waitOverlay(page, 'overlay-fail');
+  await clickWhenArmed(page, '#btn-retry');
+  eq((await state(page)).height, 0, 'retry puts you back on the empty pad');
+});
+
+/* ---------------------------------------------------------------- */
 await group('QA: the block hovers clear of the tower and falls when dropped', async () => {
   await start(page, 1);
   await perfect(page, 3);

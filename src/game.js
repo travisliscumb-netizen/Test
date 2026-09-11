@@ -156,18 +156,10 @@
     S.height = 0; S.streak = 0; S.bestStreak = 0; S.score = 0;
     S.recoveries = 0; S.bossTargetMet = false; S.elapsed = 0; S.shake = 0;
 
-    // foundation - a plinth deep enough that the tower never looks like it is
-    // floating, at any camera height
-    for (var i = 14; i >= 1; i--) {
-      var pi = (i - 1) % theme.palette.length;
-      view.addBlock({
-        x: 0, z: 0, y: -i * L.BLOCK_HEIGHT,
-        sx: cfg.baseSize, sz: cfg.baseSize,
-        // the deeper it goes the more it settles into the world's own ground tone
-        color: L.mixHex(theme.palette[pi], theme.ground, 0.10 + i * 0.022)
-      });
-    }
-    view.addBlock({ x: 0, z: 0, y: 0, sx: cfg.baseSize, sz: cfg.baseSize, color: blockColor(0) });
+    // Start on the floor. The concrete pad is the anchor for drop one and is
+    // exactly the level's starting footprint, so the very first block can be
+    // sliced or missed like any other - every block the player lands is theirs.
+    view.setGround(theme, cfg.baseSize);
 
     view.focusOn(0, cfg.hover * 0.42, 0, true);
     spawnMoving();

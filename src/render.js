@@ -185,6 +185,46 @@
     return tex;
   }
 
+  /** Worn concrete with a painted landing square - the pad you start on. */
+  function padTexture() {
+    var size = 256;
+    var cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#a39a87';
+    ctx.fillRect(0, 0, size, size);
+    // speckle, so it reads as concrete rather than flat grey plastic
+    for (var i = 0; i < 2600; i++) {
+      var v = 128 + Math.random() * 72;
+      ctx.fillStyle = 'rgba(' + (v | 0) + ',' + ((v - 6) | 0) + ',' + ((v - 22) | 0) + ',' + (0.10 + Math.random() * 0.30) + ')';
+      var r = 0.6 + Math.random() * 2.1;
+      ctx.beginPath();
+      ctx.arc(Math.random() * size, Math.random() * size, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // painted landing square
+    ctx.strokeStyle = 'rgba(70,72,74,0.55)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(26, 26, size - 52, size - 52);
+    ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(38, 38, size - 76, size - 76);
+    // corner ticks
+    ctx.strokeStyle = 'rgba(60,62,64,0.45)';
+    ctx.lineWidth = 5;
+    var t = 30;
+    [[26, 26, 1, 1], [size - 26, 26, -1, 1], [26, size - 26, 1, -1], [size - 26, size - 26, -1, -1]]
+      .forEach(function (c) {
+        ctx.beginPath();
+        ctx.moveTo(c[0], c[1] + c[3] * t); ctx.lineTo(c[0], c[1]); ctx.lineTo(c[0] + c[2] * t, c[1]);
+        ctx.stroke();
+      });
+    var tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
   /* ================================================================== *
    * Renderer
    * ================================================================== */
@@ -240,6 +280,7 @@
     scene.add(ambient);
 
     /* ---- containers ------------------------------------------------ */
+    var groundGroup = new THREE.Group(); scene.add(groundGroup);
     var towerGroup = new THREE.Group();  scene.add(towerGroup);
     var fxGroup    = new THREE.Group();  scene.add(fxGroup);
     var decorGroup = new THREE.Group();  scene.add(decorGroup);
@@ -436,7 +477,7 @@
           var cl = new THREE.Mesh(cg, cm);
           cl.rotation.y = rand() * Math.PI * 2;
           var ca = rand() * Math.PI * 2, cr = 40 + rand() * 36;
-          cl.position.set(Math.cos(ca) * cr, -14 + rand() * 110, Math.sin(ca) * cr);
+          cl.position.set(Math.cos(ca) * cr, 7 + rand() * 112, Math.sin(ca) * cr);
           decorGroup.add(cl);
           decorItems.push({ mesh: cl, kind: 'cloud', drift: 0.25 + rand() * 0.5, angle: ca, radius: cr });
         }
@@ -451,6 +492,69 @@
         t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
+    }
+
+    /* ================================================================ *
+     * Ground and landing pad
+     *
+     * A level starts on the floor, not part way up a decorative plinth: the
+     * first block the player drops is the first block of the tower. The pad is
+     * exactly the level's starting footprint, so drop one is judged by the same
+     * rule as every drop after it.
+     * ================================================================ */
+
+    function setGround(theme, padSize) {
+      clearGroup(groundGroup);
+      if (!padSize) return;
+
+      var top = L.BLOCK_HEIGHT / 2;          // where a block centred on y=0 rests
+      var floorY = top - 1.55;
+
+      var floor = new THREE.Mesh(
+        new THREE.CircleGeometry(80, 56),
+        new THREE.MeshStandardMaterial({
+          // a touch of the sky mixed in for aerial perspective; the scene fog
+          // takes care of fading the far rim
+          color: new THREE.Color(L.mixHex(theme.ground, theme.skyBottom, 0.10)),
+          roughness: 1, metalness: 0, envMapIntensity: 0.08
+        })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = floorY;
+      floor.receiveShadow = shadowsOn;
+      groundGroup.add(floor);
+
+      // stepped plinth so the pad reads as poured concrete, not a floating tile
+      var skirtH = top - floorY;
+      var skirt = new THREE.Mesh(
+        roundedBoxGeometry(padSize + 0.85, skirtH, padSize + 0.85, 0.10, 2),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color('#7e7869'), roughness: 0.98, metalness: 0, envMapIntensity: 0.06 })
+      );
+      skirt.position.y = floorY + skirtH / 2 - 0.18;
+      skirt.receiveShadow = shadowsOn;
+      groundGroup.add(skirt);
+
+      var padH = 0.62;
+      var pad = new THREE.Mesh(
+        roundedBoxGeometry(padSize, padH, padSize, 0.08, 2),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color('#9c9382'), roughness: 0.95, metalness: 0, envMapIntensity: 0.06 })
+      );
+      pad.position.y = top - padH / 2;
+      pad.receiveShadow = shadowsOn;
+      pad.castShadow = shadowsOn;
+      groundGroup.add(pad);
+
+      var decal = new THREE.Mesh(
+        new THREE.PlaneGeometry(padSize * 0.995, padSize * 0.995),
+        new THREE.MeshStandardMaterial({
+          map: padTexture(), roughness: 0.95, metalness: 0, envMapIntensity: 0.06,
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+        })
+      );
+      decal.rotation.x = -Math.PI / 2;
+      decal.position.y = top + 0.004;
+      decal.receiveShadow = shadowsOn;
+      groundGroup.add(decal);
     }
 
     /* ================================================================ *
@@ -951,6 +1055,7 @@
 
     function reset() {
       clearMoving();
+      clearGroup(groundGroup);
       for (var i = blocks.length - 1; i >= 0; i--) towerGroup.remove(blocks[i].mesh);
       blocks = [];
       for (var d = debris.length - 1; d >= 0; d--) {
@@ -1000,6 +1105,7 @@
       renderer: renderer, scene: scene, camera: camera,
       roundedBoxGeometry: roundedBoxGeometry,
       setTheme: setTheme, resize: resize, reset: reset, collapse: collapse,
+      setGround: setGround,
       addBlock: addBlock, setMoving: setMoving, moveMoving: moveMoving,
       layoutMoving: layoutMoving, landMoving: landMoving, clearMoving: clearMoving,
       spawnSlice: spawnSlice, perfectFx: perfectFx, recoveryFx: recoveryFx,
