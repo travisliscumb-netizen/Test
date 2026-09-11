@@ -25,6 +25,8 @@
     --safe-b:env(safe-area-inset-bottom,0px);
     --safe-l:env(safe-area-inset-left,0px);
     --safe-r:env(safe-area-inset-right,0px);
+    /* one star path, used as a mask so it inherits colour and needs no font */
+    --star:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 1.8l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.6l-6.3 3.3 1.2-6.9-5-4.9 7-1z'/%3E%3C/svg%3E");
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{
@@ -53,55 +55,85 @@
     border-radius:var(--radius); box-shadow:var(--shadow);
   }
 
-  /* ---------- hud ---------- */
-  #hud{display:flex; flex-direction:column; gap:8px}
-  .hud-top{display:flex; align-items:flex-start; gap:8px}
-  .hud-id{padding:8px 12px; min-width:0; flex:1}
-  .hud-id .lvlno{font-size:clamp(15px,4.4vw,20px); font-weight:900; letter-spacing:-.02em; line-height:1.05}
-  .hud-id .world{font-size:clamp(10px,2.9vw,12px); font-weight:700; opacity:.72; margin-top:2px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .hud-right{display:flex; flex-direction:column; align-items:flex-end; gap:6px}
-  .hud-icons{display:flex; gap:6px}
+  /* ----------------------------------------------------------------
+     HUD
+
+     Chosen by measurement over three candidates (see README). Everything a
+     player needs mid-drop sits in one glass rail: how far through the level,
+     how much block is left, and how close the perfect streak is to refunding
+     it. Score is secondary; the world name is a title card at level start
+     rather than permanent chrome; the boss "required" and "current" numbers
+     live in the goal gauge instead of three separate chips that repeated them.
+     ---------------------------------------------------------------- */
+  .sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+  #hud{
+    display:flex; flex-direction:column; gap:9px;
+    padding:9px 12px 11px; border-radius:20px;
+    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow);
+    -webkit-backdrop-filter:blur(16px) saturate(150%); backdrop-filter:blur(16px) saturate(150%);
+  }
+  .rail{display:flex; align-items:center; gap:8px; min-width:0}
+  .rail-id{display:flex; align-items:center; gap:7px; min-width:0; flex:1}
+  .lvlno{font-size:clamp(14px,4vw,18px); font-weight:900; letter-spacing:-.02em; white-space:nowrap}
+  .mode{font-size:9.5px; font-weight:900; letter-spacing:.1em; padding:3px 7px; border-radius:999px; flex:none}
+  .mode.normal{background:rgba(255,255,255,.72); color:#1d5f8a}
+  .mode.boss{background:var(--accent); color:var(--on-accent)}
+  .rail-score{font-size:12.5px; font-weight:900; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .rail-score span{font-size:8.5px; letter-spacing:.1em; opacity:.55; margin-right:4px; font-weight:800}
+  .rail-acts{display:flex; gap:2px; flex:none; margin:-6px -6px -6px 0}
+  /* 44px hit area per WCAG 2.1, with a smaller visible key inside it */
   .iconbtn{
-    pointer-events:auto; width:38px; height:38px; border-radius:13px; font-size:16px;
+    pointer-events:auto; width:44px; height:44px; border:none; background:none; padding:0;
     display:flex; align-items:center; justify-content:center;
-    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow);
   }
-  .iconbtn:active{transform:scale(.94)}
-  .mode{
-    font-size:10.5px; font-weight:900; letter-spacing:.12em; padding:5px 10px; border-radius:999px;
-    background:rgba(255,255,255,.85); color:#1d5f8a; border:1px solid var(--panel-border);
+  .iconbtn svg{
+    display:block; pointer-events:none; box-sizing:content-box; padding:7px; border-radius:11px;
+    background:rgba(255,255,255,.34); border:1px solid var(--panel-border);
   }
-  .mode.boss{background:var(--accent); color:var(--on-accent); box-shadow:0 0 0 3px rgba(255,255,255,.25)}
-  .score{padding:6px 11px; font-size:13px; font-weight:900; letter-spacing:-.01em}
-  .score span{opacity:.6; font-size:10px; letter-spacing:.1em; margin-right:5px; font-weight:800}
+  .iconbtn:active svg{transform:scale(.92)}
 
-  .hud-prog{padding:9px 12px 11px}
-  .prog-head{display:flex; justify-content:space-between; align-items:baseline; font-weight:900}
-  .prog-head .l{font-size:10px; letter-spacing:.14em; opacity:.66}
-  .prog-head .v{font-size:15px; letter-spacing:-.01em}
-  .track{height:9px; border-radius:99px; background:rgba(20,30,45,.16); overflow:hidden; margin-top:7px}
-  .track > i{display:block; height:100%; width:0; border-radius:99px;
-    background:linear-gradient(90deg,var(--accent),#fff); transition:width .22s ease-out}
+  .gauges{display:flex; gap:10px; align-items:flex-start}
+  .gauge{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px}
+  .gauge.goal{flex:0 0 40%}
+  .gauge-head{display:flex; align-items:center; gap:6px; min-width:0}
+  .gauge-lab{font-size:8.5px; font-weight:900; letter-spacing:.12em; opacity:.6; flex:none}
+  .gauge-val{font-size:14px; font-weight:900; letter-spacing:-.02em; margin-left:auto;
+    font-variant-numeric:tabular-nums; white-space:nowrap}
+  .gauge-sub{font-size:9.5px; font-weight:800; opacity:.55; letter-spacing:.02em; flex:none;
+    white-space:nowrap}
+  .gauge-sub b{font-weight:900; opacity:.85; font-variant-numeric:tabular-nums}
+  .track{position:relative; height:7px; border-radius:99px; background:rgba(20,30,45,.18)}
+  .track > i{position:absolute; inset:0 auto 0 0; width:0; border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),#ffffffaa); transition:width .22s ease-out}
   .track > i.met{background:linear-gradient(90deg,#3FBE6E,#BFF3C9)}
+  #size-fill{transition:width .3s cubic-bezier(.2,.8,.3,1), background .3s}
+  .tick{position:absolute; top:-2px; bottom:-2px; width:2px; border-radius:2px;
+    background:rgba(20,30,45,.30); transform:translateX(-1px)}
+  .stars{display:flex; gap:2px; flex:none}
+  .stars i{width:12px; height:12px; background:currentColor; opacity:.20;
+    -webkit-mask:var(--star) center/contain no-repeat; mask:var(--star) center/contain no-repeat;
+    transition:opacity .25s, transform .25s}
+  .stars i.on{opacity:1; color:#F0A81E; transform:scale(1.08)}
+  .dots{display:flex; gap:3px; flex:none}
+  .dots i{width:7px; height:7px; border-radius:50%; background:rgba(20,30,45,.22);
+    transition:background .18s, transform .18s}
+  .dots i.on{background:var(--accent); transform:scale(1.25)}
 
-  #boss-row{display:flex; gap:6px}
-  .chip{
-    flex:1; padding:7px 8px; text-align:center; border-radius:14px;
-    background:var(--panel); border:1px solid var(--panel-border); box-shadow:var(--shadow);
+  /* world identity: shown once when the level opens, then out of the way */
+  #worldcard{
+    position:fixed; left:0; right:0; top:22%; pointer-events:none; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:2px; opacity:0;
+    text-shadow:0 2px 10px rgba(8,18,32,.35);
   }
-  .chip b{display:block; font-size:16px; font-weight:900; letter-spacing:-.02em; line-height:1.1}
-  .chip span{display:block; font-size:9px; font-weight:800; letter-spacing:.12em; opacity:.62; margin-top:2px}
-
-  .hud-streak{display:flex; align-items:center; gap:8px; align-self:flex-start; padding:6px 11px}
-  .hud-streak .dots{display:flex; gap:4px}
-  .hud-streak .dots i{
-    width:9px; height:9px; border-radius:50%; background:rgba(20,30,45,.20);
-    transition:background .18s, transform .18s;
+  #worldcard b{font-size:11px; font-weight:900; letter-spacing:.3em; opacity:.75}
+  #worldcard span{font-size:clamp(22px,7vw,30px); font-weight:900; letter-spacing:-.02em}
+  #worldcard.show{animation:worldcard 2.2s cubic-bezier(.2,.8,.3,1) forwards}
+  @keyframes worldcard{
+    0%{opacity:0; transform:translateY(10px) scale(.97)}
+    14%{opacity:1; transform:translateY(0) scale(1)}
+    70%{opacity:1; transform:translateY(0) scale(1)}
+    100%{opacity:0; transform:translateY(-8px) scale(1.01)}
   }
-  .hud-streak .dots i.on{background:var(--accent); transform:scale(1.22); box-shadow:0 0 0 2px rgba(255,255,255,.45)}
-  .hud-streak .lab{font-size:10px; font-weight:900; letter-spacing:.1em; opacity:.66}
-  .hud-streak .num{font-size:13px; font-weight:900}
 
   /* ---------- bottom area ---------- */
   .bottom{margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:10px}
@@ -160,6 +192,16 @@
   .panel .kicker{font-size:11px; font-weight:900; letter-spacing:.18em; opacity:.55; margin-bottom:8px}
   .panel .btns{display:flex; flex-direction:column; gap:9px; margin-top:18px; align-items:stretch}
   .panel .btns .bigbtn{width:100%}
+  .award{display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:14px}
+  .bigstars{display:flex; gap:10px}
+  .bigstars i{width:42px; height:42px; background:currentColor; color:#1a2b3d; opacity:.13;
+    -webkit-mask:var(--star) center/contain no-repeat; mask:var(--star) center/contain no-repeat;
+    transform:scale(.8); transition:opacity .3s, transform .45s cubic-bezier(.2,1.7,.4,1)}
+  .bigstars i.on{opacity:1; color:#F6C231;
+    filter:drop-shadow(0 3px 6px rgba(214,150,20,.45))}
+  .bigstars i.on.pop{transform:scale(1)}
+  .award-pct{font-size:12.5px; font-weight:700; opacity:.7}
+  .award-pct b{font-size:15px; font-weight:900; opacity:1}
   .stats{display:flex; gap:8px; margin-top:16px}
   .stats > div{flex:1; background:rgba(20,40,70,.06); border-radius:16px; padding:10px 6px}
   .stats b{display:block; font-size:20px; font-weight:900; letter-spacing:-.02em}
@@ -182,13 +224,22 @@
   .bandname{font-size:12px; font-weight:700; opacity:.66}
   .bandbest{margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.08em; opacity:.55; white-space:nowrap}
   .band-row{display:grid; grid-template-columns:repeat(10,1fr); gap:5px}
+  .mapcell .n{line-height:1}
+  .cellstars{display:flex; gap:1px; margin-top:2px; height:6px}
+  .cellstars i{width:6px; height:6px; background:currentColor; opacity:.16;
+    -webkit-mask:var(--star) center/contain no-repeat; mask:var(--star) center/contain no-repeat}
+  .cellstars[data-n="1"] i:nth-child(1),
+  .cellstars[data-n="2"] i:nth-child(-n+2),
+  .cellstars[data-n="3"] i{opacity:1; color:#E8A81C}
   .mapcell{
     aspect-ratio:1; border-radius:11px; font-size:11.5px; font-weight:900;
+    flex-direction:column; gap:0;
     background:linear-gradient(180deg,#fff,#eef4fb); color:#1a2b3d;
     border:1px solid rgba(20,40,70,.12); box-shadow:0 2px 0 rgba(20,40,70,.12);
     display:flex; align-items:center; justify-content:center; padding:0; min-width:0;
   }
-  .mapcell.boss{background:linear-gradient(180deg,#FFD75E,#EFA92B); color:#3a2503; font-size:10px}
+  .mapcell.boss{background:linear-gradient(180deg,#FFD75E,#EFA92B); color:#3a2503}
+  .mapcell.boss .n::before{content:'★'; font-size:8px; vertical-align:2px; margin-right:1px}
   .mapcell.locked{opacity:.34; background:#dfe6ee; box-shadow:none; cursor:not-allowed}
   .mapcell:not(.locked):active{transform:translateY(2px); box-shadow:none}
 
@@ -197,17 +248,25 @@
 
   @media (min-width:820px){
     #ui{padding:18px 20px 20px}
-    #hud{max-width:520px}
-    .hud-streak{align-self:flex-start}
+    #hud{max-width:560px}
   }
   @media (max-height:680px){
-    #hud{gap:6px}
+    #hud{gap:6px; padding:7px 10px 9px}
     .hud-id{padding:6px 10px}
     .hud-prog{padding:7px 10px 9px}
     .chip{padding:5px 6px}
     .chip b{font-size:14px}
-    .hud-streak{padding:5px 9px}
     .bigbtn{min-height:52px; font-size:16px}
+  }
+  /* landscape and very short screens: the rail and both gauges share one row */
+  @media (max-height:500px){
+    #hud{flex-direction:row; align-items:center; gap:12px; padding:6px 10px}
+    .rail{flex:0 0 auto}
+    .rail-id{flex:0 0 auto}
+    .gauges{flex:1; gap:10px}
+    .gauge{gap:4px}
+    .rail-acts{order:3}
+    #worldcard{top:16%}
   }
   @media (max-height:560px){
     .panel{padding:16px}
@@ -227,41 +286,58 @@
 <div id="ui">
 
   <!-- ============ HUD ============ -->
+  <!--
+    The live state a player needs mid-drop: how far through the level, how much
+    block is left, and how close the perfect streak is to refunding it. Score is
+    secondary. Everything else is between-rounds information and lives on the
+    menu, the level map, or the level-start title card.
+  -->
   <div id="hud" class="hidden">
-    <div class="hud-top">
-      <div class="hud-id card">
-        <div class="lvlno" id="hud-level">LEVEL 1</div>
-        <div class="world" id="hud-world">World 1 · Meadow Rise</div>
+
+    <div class="rail">
+      <div class="rail-id">
+        <b class="lvlno" id="hud-level">LEVEL 1</b>
+        <span class="mode normal" id="hud-mode">NORMAL</span>
       </div>
-      <div class="hud-right">
-        <div class="hud-icons">
-          <span class="mode normal" id="hud-mode">NORMAL</span>
-          <button class="iconbtn" id="btn-mute" aria-label="Toggle sound"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path id="ico-sound" fill="currentColor" d="M4 9h3.2L12 5v14L7.2 15H4z"/><g id="ico-waves" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M15.2 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.8 7.2a7 7 0 0 1 0 9.6"/></g><g id="ico-mute" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M16 10l5 4"/><path d="M21 10l-5 4"/></g></svg></button>
-          <button class="iconbtn" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></g></svg></button>
+      <div class="rail-score"><span>SCORE</span><b id="hud-score">0</b></div>
+      <div class="rail-acts">
+        <button class="iconbtn" id="btn-mute" aria-label="Toggle sound"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path id="ico-sound" fill="currentColor" d="M4 9h3.2L12 5v14L7.2 15H4z"/><g id="ico-waves" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M15.2 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.8 7.2a7 7 0 0 1 0 9.6"/></g><g id="ico-mute" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M16 10l5 4"/><path d="M21 10l-5 4"/></g></svg></button>
+        <button class="iconbtn" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></g></svg></button>
+      </div>
+    </div>
+
+    <div class="gauges">
+      <div class="gauge goal">
+        <div class="gauge-head">
+          <span class="gauge-lab" id="prog-label">STACKS</span>
+          <span class="gauge-sub hidden" id="boss-row">best <b id="boss-best">0</b></span>
+          <b class="gauge-val" id="prog-value">0 / 5</b>
         </div>
-        <div class="score card"><span>SCORE</span><em id="hud-score" style="font-style:normal">0</em></div>
+        <div class="track"><i id="prog-fill"></i></div>
+      </div>
+
+      <!-- size remaining, with the star thresholds marked on the track it is
+           measured against, and the perfect streak that refunds it -->
+      <div class="gauge size" id="size-gauge">
+        <div class="gauge-head">
+          <span class="gauge-lab">BLOCK</span>
+          <span class="dots" id="streak-dots" title="3 perfect drops restore size"><i></i><i></i><i></i></span>
+          <b class="gauge-val" id="size-pct">100%</b>
+          <span class="stars" id="stars" aria-label="Star rating"><i></i><i></i><i></i></span>
+        </div>
+        <div class="track size-track">
+          <i id="size-fill"></i>
+          <u class="tick" style="left:40%"></u>
+          <u class="tick" style="left:60%"></u>
+          <u class="tick" style="left:80%"></u>
+        </div>
       </div>
     </div>
 
-    <div class="hud-prog card">
-      <div class="prog-head">
-        <span class="l" id="prog-label">STACKS</span>
-        <span class="v" id="prog-value">0 / 5</span>
-      </div>
-      <div class="track"><i id="prog-fill"></i></div>
-    </div>
-
-    <div id="boss-row" class="hidden">
-      <div class="chip"><b id="boss-req">10</b><span>REQUIRED</span></div>
-      <div class="chip"><b id="boss-now">0</b><span>HEIGHT</span></div>
-      <div class="chip"><b id="boss-best">0</b><span>BEST</span></div>
-    </div>
-
-    <div class="hud-streak card">
-      <div class="dots" id="streak-dots"><i></i><i></i><i></i></div>
-      <span class="lab">PERFECT</span>
-      <span class="num" id="streak-value">0</span>
-    </div>
+    <span class="sr-only" id="streak-value">0</span>
+    <span class="sr-only" id="hud-world">World 1 · Meadow Rise</span>
+    <span class="sr-only" id="boss-req">10</span>
+    <span class="sr-only" id="boss-now">0</span>
   </div>
 
   <!-- ============ bottom ============ -->
@@ -272,6 +348,7 @@
 </div>
 
 <div id="toast"></div>
+<div id="worldcard" aria-hidden="true"><b id="worldcard-n">WORLD 1</b><span id="worldcard-name">Meadow Rise</span></div>
 
 <!-- ============ menu ============ -->
 <div class="overlay hidden" id="overlay-menu">
@@ -302,6 +379,10 @@
   <div class="panel">
     <div class="kicker">CLEARED</div>
     <h2 id="clear-title">Level Cleared</h2>
+    <div class="award">
+      <span class="bigstars" id="clear-stars"><i></i><i></i><i></i></span>
+      <span class="award-pct"><b id="clear-pct">100%</b> of the block survived</span>
+    </div>
     <p id="clear-sub"></p>
     <div class="stats">
       <div><b id="clear-score">0</b><span>SCORE</span></div>

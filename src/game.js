@@ -80,6 +80,7 @@
     streak: 0,                    // consecutive perfect drops
     bestStreak: 0,
     score: 0,
+    lastStars: 0,
     recoveries: 0,
     bossTargetMet: false,
     frozen: false,                // test hook only
@@ -163,6 +164,15 @@
 
     view.focusOn(0, cfg.hover * 0.42, 0, true);
     spawnMoving();
+
+    // the world identity is shown once, here, instead of sitting in the HUD
+    if (el.worldCard) {
+      txt(el.worldCardN, 'WORLD ' + cfg.world);
+      txt(el.worldCardName, theme.worldName);
+      el.worldCard.classList.remove('show');
+      void el.worldCard.offsetWidth;
+      el.worldCard.classList.add('show');
+    }
 
     show(el.overlayMenu, false);
     show(el.overlayClear, false);
@@ -379,6 +389,25 @@
       sub = 'Stacked ' + S.height + ' with ' + S.bestStreak + ' perfect in a row.';
     }
     txt(el.clearSub, sub);
+
+    // stars are earned on how much of the block survived the level
+    var frac = L.sizeFraction(S.sizeX, S.sizeZ, cfg.baseSize);
+    var stars = L.starsForFraction(frac);
+    S.lastStars = stars;
+    var improved = progress.recordStars(S.level, stars);
+    txt(el.clearPct, Math.round(frac * 100) + '%');
+    var cs = el.clearStars.children;
+    for (var i = 0; i < cs.length; i++) {
+      cs[i].classList.remove('on', 'pop');
+      if (i < stars) {
+        cs[i].classList.add('on');
+        (function (node, idx) {
+          setTimeout(function () { node.classList.add('pop'); }, 90 + idx * 130);
+        })(cs[i], i);
+      }
+    }
+    el.clearStars.setAttribute('data-best', improved ? 'new' : '');
+
     txt(el.clearScore, S.score);
     txt(el.clearStat1, S.bestStreak);
     txt(el.clearStat2, S.recoveries);
@@ -429,6 +458,7 @@
     el.progFill.style.width = pct.toFixed(1) + '%';
     el.progFill.classList.toggle('met', cfg.isBoss && S.bossTargetMet);
 
+    // the goal gauge already reads "HEIGHT 4 / 20", so a boss only adds its record
     show(el.bossRow, cfg.isBoss);
     if (cfg.isBoss) {
       txt(el.bossReq, cfg.bossTarget);
@@ -441,7 +471,25 @@
     var filled = S.streak % L.RECOVERY_STREAK;
     if (S.streak > 0 && filled === 0) filled = L.RECOVERY_STREAK;
     for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('on', i < filled);
+
+    // how much of the starting block is left, and the star tier that earns
+    var frac = L.sizeFraction(S.sizeX, S.sizeZ, cfg.baseSize);
+    var stars = L.starsForFraction(frac);
+    txt(el.sizePct, Math.round(frac * 100) + '%');
+    el.sizeFill.style.width = (frac * 100).toFixed(1) + '%';
+    el.sizeFill.style.background = STAR_FILL[stars];
+    var starEls = el.stars.children;
+    for (var j = 0; j < starEls.length; j++) starEls[j].classList.toggle('on', j < stars);
+    el.sizeGauge.setAttribute('data-stars', String(stars));
   }
+
+  /* fill colour per star tier - the meter reads as a tier, not just a number */
+  var STAR_FILL = {
+    3: 'linear-gradient(90deg,#F0A81E,#FFD95E)',
+    2: 'linear-gradient(90deg,#3E9BD6,#8FD4F5)',
+    1: 'linear-gradient(90deg,#E07A2C,#F5B86B)',
+    0: 'linear-gradient(90deg,#C4453A,#E8867C)'
+  };
 
   var toastTimer = null;
   function flashToast(msg) {
@@ -477,7 +525,8 @@
     show(el.banner, false);
     show(el.overlayMenu, true);
     armUI();
-    txt(el.menuProgress, 'Level ' + progress.highestUnlocked() + ' of ' + L.TOTAL_LEVELS + ' unlocked');
+    txt(el.menuProgress, 'Level ' + progress.highestUnlocked() + ' of ' + L.TOTAL_LEVELS +
+        ' · ' + progress.totalStars() + ' of 300 stars');
     txt(el.btnPlay, progress.highestUnlocked() > 1 ? 'Continue · Level ' + progress.highestUnlocked() : 'Start Climbing');
   }
 
@@ -498,6 +547,13 @@
     view.setSpin(0.14);
   }
 
+  /** Stars earned across a world band, for the map header. */
+  function bandStars(world) {
+    var n = 0;
+    for (var i = 1; i <= 10; i++) n += progress.stars((world - 1) * 10 + i);
+    return n;
+  }
+
   function openLevels() {
     var grid = el.levelGrid;
     grid.innerHTML = '';
@@ -511,7 +567,7 @@
       head.innerHTML = '<span class="swatch" style="background:' + wt.palette[0] +
         ';border-color:' + wt.palette[1] + '"></span>' +
         '<b>World ' + w + '</b><span class="bandname">' + wt.worldName + '</span>' +
-        '<span class="bandbest">Boss best ' + (progress.bossBest(w * 10) || '—') + '</span>';
+        '<span class="bandbest">' + bandStars(w) + ' ★ · boss ' + (progress.bossBest(w * 10) || '—') + '</span>';
       band.appendChild(head);
       var row = doc.createElement('div');
       row.className = 'band-row';
@@ -519,8 +575,10 @@
         var lvl = (w - 1) * 10 + i;
         var b = doc.createElement('button');
         var boss = L.isBossLevel(lvl);
+        var earned = progress.stars(lvl);
         b.className = 'mapcell' + (boss ? ' boss' : '') + (lvl > unlocked ? ' locked' : '');
-        b.textContent = boss ? '★' + lvl : String(lvl);
+        b.innerHTML = '<span class="n">' + lvl + '</span>' +
+          '<span class="cellstars" data-n="' + earned + '"><i></i><i></i><i></i></span>';
         b.setAttribute('aria-label', 'Level ' + lvl + (boss ? ' boss' : ''));
         if (lvl > unlocked) b.disabled = true;
         else b.addEventListener('click', (function (n) {
@@ -674,14 +732,17 @@
       hudLevel: $('hud-level'), hudWorld: $('hud-world'), hudMode: $('hud-mode'),
       hudScore: $('hud-score'),
       progLabel: $('prog-label'), progValue: $('prog-value'), progFill: $('prog-fill'),
+      sizePct: $('size-pct'), sizeFill: $('size-fill'), stars: $('stars'), sizeGauge: $('size-gauge'),
       bossRow: $('boss-row'), bossReq: $('boss-req'), bossNow: $('boss-now'), bossBest: $('boss-best'),
       streakValue: $('streak-value'), streakDots: $('streak-dots'),
       banner: $('banner'), btnAdvance: $('btn-advance'), toast: $('toast'),
+      worldCard: $('worldcard'), worldCardN: $('worldcard-n'), worldCardName: $('worldcard-name'),
       overlayMenu: $('overlay-menu'), overlayClear: $('overlay-clear'),
       overlayFail: $('overlay-fail'), overlayLevels: $('overlay-levels'),
       menuProgress: $('menu-progress'),
       btnPlay: $('btn-play'), btnLevels: $('btn-levels'), btnLevelsClose: $('btn-levels-close'),
       levelGrid: $('level-grid'),
+      clearStars: $('clear-stars'), clearPct: $('clear-pct'),
       clearTitle: $('clear-title'), clearSub: $('clear-sub'), clearScore: $('clear-score'),
       clearStat1: $('clear-stat1'), clearStat2: $('clear-stat2'),
       btnNext: $('btn-next'), btnClearMenu: $('btn-clear-menu'),
@@ -732,6 +793,9 @@
           movingActive: !!(S.moving && S.moving.active),
           perfectTol: cfg ? cfg.perfectTol : 0,
           hover: cfg ? cfg.hover : 0, dropGap: cfg ? cfg.dropGap : 0,
+          sizePercent: cfg ? L.sizePercent(S.sizeX, S.sizeZ, cfg.baseSize) : 0,
+          stars: cfg ? L.starsFor(S.sizeX, S.sizeZ, cfg.baseSize) : 0,
+          savedStars: progress.stars(S.level), totalStars: progress.totalStars(),
           bossBest: cfg && cfg.isBoss ? progress.bossBest(S.level) : 0,
           highestUnlocked: progress.highestUnlocked(),
           blockCount: view.blockCount
@@ -777,12 +841,7 @@
           w: bb.max.x - bb.min.x, h: bb.max.y - bb.min.y, d: bb.max.z - bb.min.z,
           triangles: h.mesh.geometry.attributes.position.count / 3,
           y: h.mesh.position.y, x: h.mesh.position.x, z: h.mesh.position.z,
-          hasShadow: !!h.shadow, hasGlow: !!h.glow,
-          shadowOpacity: h.shadow ? h.shadow.material.opacity : 0,
-          shadowW: h.shadow ? h.shadow.scale.x : 0,
-          shadowD: h.shadow ? h.shadow.scale.y : 0,
-          shadowRepeat: h.shadow ? [h.shadow.material.map.repeat.x, h.shadow.material.map.repeat.y] : null,
-          shadowOffset: h.shadow ? [h.shadow.material.map.offset.x, h.shadow.material.map.offset.y] : null,
+          hasShadow: !!h.shadow, castsShadow: h.mesh.castShadow, hasGlow: !!h.glow,
           anchorSx: h.anchorSx, anchorSz: h.anchorSz, anchorY: h.anchorY,
           glowOpacity: h.glow ? h.glow.material.opacity : 0
         };

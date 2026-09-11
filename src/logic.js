@@ -285,7 +285,9 @@
     var perfectTol = speed * perfectWindow;
 
     // The sliding block hovers this far clear of the tower before it drops.
-    var dropGap = BLOCK_HEIGHT * lerp(2.0, 2.9, t);
+    // Three quarters of the original gap: enough air that a drop reads as a
+    // drop, close enough that the player can judge the alignment by eye.
+    var dropGap = BLOCK_HEIGHT * lerp(2.0, 2.9, t) * 0.75;
 
     // Movement variation: the slide velocity is modulated by a sine so late
     // levels cannot be beaten with pure metronome timing.
@@ -426,6 +428,40 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Remaining size, and the star rating built on it
+   * ------------------------------------------------------------------ */
+
+  /**
+   * How much of the level's starting block is left, as a fraction of its AREA.
+   * The block is a square footprint, so the honest reading of "how much of the
+   * square is left" is width x depth over the level's starting square - losing
+   * a tenth off each axis leaves 81%, not 90%.
+   */
+  function sizeFraction(sizeX, sizeZ, baseSize) {
+    if (!(baseSize > 0)) return 0;
+    return clamp((sizeX * sizeZ) / (baseSize * baseSize), 0, 1);
+  }
+
+  /** Whole percent remaining, for display. */
+  function sizePercent(sizeX, sizeZ, baseSize) {
+    return Math.round(sizeFraction(sizeX, sizeZ, baseSize) * 100);
+  }
+
+  var STAR_THRESHOLDS = [0.80, 0.60, 0.40];   // above 80% / 60% / 40%
+
+  /** 3, 2, 1 or 0 stars for a finishing size fraction. */
+  function starsForFraction(fraction) {
+    if (fraction > STAR_THRESHOLDS[0]) return 3;
+    if (fraction > STAR_THRESHOLDS[1]) return 2;
+    if (fraction > STAR_THRESHOLDS[2]) return 1;
+    return 0;
+  }
+
+  function starsFor(sizeX, sizeZ, baseSize) {
+    return starsForFraction(sizeFraction(sizeX, sizeZ, baseSize));
+  }
+
+  /* ------------------------------------------------------------------ *
    * Scoring
    * ------------------------------------------------------------------ */
 
@@ -455,6 +491,7 @@
       version: 1,
       highestUnlocked: 1,
       bossBest: {},      // { '10': 14, '20': 23, ... }
+      levelStars: {},    // { '7': 3, '8': 2, ... } best stars earned per level
       levelBestScore: {},
       bestScore: 0,
       totalPerfects: 0,
@@ -471,6 +508,16 @@
       v = Number(v);
       return isFinite(v) ? clamp(Math.floor(v), lo, hi) : dflt;
     };
+    /*
+     * Keys are rejected when out of range, never clamped. Clamping a key turns
+     * junk into a plausible record - a stored level "200" would have become
+     * level 100, and a stored boss "5" would have become boss 10.
+     */
+    var key = function (k, lo, hi) {
+      var n = Number(k);
+      if (!isFinite(n) || Math.floor(n) !== n || n < lo || n > hi) return 0;
+      return n;
+    };
     out.highestUnlocked = num(raw.highestUnlocked, 1, TOTAL_LEVELS, 1);
     out.bestScore       = num(raw.bestScore, 0, 1e12, 0);
     out.totalPerfects   = num(raw.totalPerfects, 0, 1e12, 0);
@@ -479,15 +526,23 @@
     out.muted           = !!raw.muted;
     if (raw.bossBest && typeof raw.bossBest === 'object') {
       for (var k in raw.bossBest) {
-        var lvl = num(k, 10, TOTAL_LEVELS, 0);
+        var lvl = key(k, 10, TOTAL_LEVELS);
         if (!lvl || !isBossLevel(lvl)) continue;
         var h = num(raw.bossBest[k], 0, 100000, 0);
         if (h > 0) out.bossBest[String(lvl)] = h;
       }
     }
+    if (raw.levelStars && typeof raw.levelStars === 'object') {
+      for (var k3 in raw.levelStars) {
+        var lvl3 = key(k3, 1, TOTAL_LEVELS);
+        if (!lvl3) continue;
+        var st = num(raw.levelStars[k3], 0, 3, 0);
+        if (st > 0) out.levelStars[String(lvl3)] = st;
+      }
+    }
     if (raw.levelBestScore && typeof raw.levelBestScore === 'object') {
       for (var k2 in raw.levelBestScore) {
-        var lvl2 = num(k2, 1, TOTAL_LEVELS, 0);
+        var lvl2 = key(k2, 1, TOTAL_LEVELS);
         if (!lvl2) continue;
         var s = num(raw.levelBestScore[k2], 0, 1e12, 0);
         if (s > 0) out.levelBestScore[String(lvl2)] = s;
@@ -574,6 +629,23 @@
 
       levelBestScore: function (level) { return data.levelBestScore[String(level)] || 0; },
 
+      stars: function (level) { return data.levelStars[String(level)] || 0; },
+
+      /** Records a star rating. Returns true when it beats the stored best. */
+      recordStars: function (level, stars) {
+        level = clamp(Math.round(level) || 1, 1, TOTAL_LEVELS);
+        stars = clamp(Math.round(stars) || 0, 0, 3);
+        var key = String(level);
+        if (stars > (data.levelStars[key] || 0)) { data.levelStars[key] = stars; save(); return true; }
+        return false;
+      },
+
+      totalStars: function () {
+        var n = 0;
+        for (var k in data.levelStars) n += data.levelStars[k];
+        return n;
+      },
+
       addStats: function (drops, perfects, recoveries) {
         data.totalDrops += drops || 0;
         data.totalPerfects += perfects || 0;
@@ -611,6 +683,8 @@
     resolveDrop: resolveDrop,
     recoveryGain: recoveryGain, applyRecovery: applyRecovery,
     dropScore: dropScore,
+    sizeFraction: sizeFraction, sizePercent: sizePercent,
+    starsFor: starsFor, starsForFraction: starsForFraction, STAR_THRESHOLDS: STAR_THRESHOLDS,
     createProgress: createProgress, sanitizeSave: sanitizeSave, defaultSave: defaultSave,
     memoryStorage: memoryStorage
   };

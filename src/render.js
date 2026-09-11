@@ -286,7 +286,6 @@
     var decorGroup = new THREE.Group();  scene.add(decorGroup);
 
     /* ---- shared resources ------------------------------------------ */
-    var shadowTex = radialTexture([[0, 'rgba(0,0,0,1)'], [0.45, 'rgba(0,0,0,0.72)'], [1, 'rgba(0,0,0,0)']]);
     var glowTex   = radialTexture([[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.55)'], [1, 'rgba(255,255,255,0)']]);
     var ringTex   = ringTexture();
     var dotTex    = radialTexture([[0, 'rgba(255,255,255,1)'], [0.42, 'rgba(255,255,255,0.98)'],
@@ -601,22 +600,14 @@
     function setMoving(spec) {
       clearMoving();
       var mesh = makeBlockMesh(spec);
-      mesh.castShadow = shadowsOn;
+      /*
+       * The sliding block casts no shadow at all - neither a contact blob nor a
+       * real one. A shadow directly under it is a free aiming reticle: it told
+       * the player exactly where the block would land, so the drop took no
+       * judgement. Landed blocks still cast, so the tower keeps its depth.
+       */
+      mesh.castShadow = false;
       towerGroup.add(mesh);
-
-      var shTex = shadowTex.clone();
-      shTex.needsUpdate = true;
-      shTex.wrapS = shTex.wrapT = THREE.ClampToEdgeWrapping;
-      var sh = new THREE.Mesh(
-        new THREE.PlaneGeometry(1, 1),
-        new THREE.MeshBasicMaterial({
-          map: shTex, transparent: true, depthWrite: false,
-          opacity: 0.55, color: new THREE.Color('#000000'), fog: false
-        })
-      );
-      sh.rotation.x = -Math.PI / 2;
-      sh.renderOrder = 2;
-      towerGroup.add(sh);
 
       var glow = new THREE.Sprite(new THREE.SpriteMaterial({
         map: glowTex, color: new THREE.Color(L.mixHex(spec.color, '#ffffff', 0.45)),
@@ -626,7 +617,7 @@
       towerGroup.add(glow);
 
       moving = {
-        mesh: mesh, shadow: sh, glow: glow,
+        mesh: mesh, glow: glow,
         baseY: spec.y, sx: spec.sx, sz: spec.sz,
         anchorY: spec.anchorY == null ? spec.y - L.BLOCK_HEIGHT : spec.anchorY,
         anchorX: spec.anchorX == null ? spec.x : spec.anchorX,
@@ -643,33 +634,6 @@
       if (!moving) return;
       var bob = Math.sin(moving.t * 3.1) * 0.055;
       moving.mesh.position.set(x, moving.baseY + bob, z);
-
-      /*
-       * Underside shadow.
-       *
-       * The quad is the footprint of the block BELOW, never the shadow's own
-       * size - a quad bigger than the surface it falls on hangs in mid-air and
-       * reads as a smudge. The blob is placed inside that quad by offsetting the
-       * texture, so it is clipped by the block's edges exactly as a real shadow
-       * would be: it slides off the side as the player slides off the tower,
-       * which is the clearest aiming cue in the game.
-       */
-      var drop = Math.max(0.4, moving.baseY - moving.anchorY);
-      var spread = 0.85 + Math.min(0.35, drop * 0.05);      // higher block, wider blur
-      var shW = moving.sx * spread, shD = moving.sz * spread;
-      var aW = moving.anchorSx, aD = moving.anchorSz;
-
-      moving.shadow.position.set(moving.anchorX, moving.anchorY + L.BLOCK_HEIGHT / 2 + 0.012, moving.anchorZ);
-      moving.shadow.scale.set(aW, aD, 1);
-
-      var map = moving.shadow.material.map;
-      map.repeat.set(aW / shW, aD / shD);
-      map.offset.set(
-        (moving.anchorX - aW / 2 - x + shW / 2) / shW,
-        // the plane is rotated -90deg about X, so its V axis runs against world Z
-        (z + shD / 2 - (moving.anchorZ + aD / 2)) / shD
-      );
-      moving.shadow.material.opacity = 0.60 - Math.min(0.16, drop * 0.026);
 
       // pushed away from the camera so the block itself occludes the middle of
       // the glow: what is left is a soft halo around a solid block
@@ -690,10 +654,6 @@
     function clearMoving() {
       if (!moving) return;
       towerGroup.remove(moving.mesh);
-      towerGroup.remove(moving.shadow);
-      moving.shadow.geometry.dispose();
-      if (moving.shadow.material.map) moving.shadow.material.map.dispose();
-      moving.shadow.material.dispose();
       towerGroup.remove(moving.glow);
       moving.glow.material.dispose();
       moving = null;

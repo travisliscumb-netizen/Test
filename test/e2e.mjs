@@ -221,7 +221,8 @@ await group('QA: the moving block is a solid 3-D block, not a flat sheet', async
   ok(b.w > 1 && b.d > 1, 'real footprint');
   ok(Math.min(b.w, b.h, b.d) / Math.max(b.w, b.h, b.d) > 0.3, 'no dimension is degenerate/flat');
   ok(b.triangles > 150, `rounded-edge geometry, not a quad (${b.triangles} triangles)`);
-  ok(b.hasShadow && b.shadowOpacity >= 0.4, `underside shadow present (opacity ${b.shadowOpacity})`);
+  ok(!b.hasShadow && !b.castsShadow,
+     'the sliding block casts no shadow - a shadow under it is a free aiming reticle');
   ok(b.hasGlow && b.glowOpacity > 0.1, `floating glow present (opacity ${b.glowOpacity})`);
 
   const f = await page.evaluate(() => window.GameDebug.faceSamples());
@@ -307,38 +308,11 @@ await group('QA: the block hovers clear of the tower and falls when dropped', as
      `real air under the block: ${clearAir.toFixed(2)} units, over ${(clearAir / blockH).toFixed(1)} block heights`);
   near(b.y, s.topY + s.hover, 0.1, 'the block hovers at the level hover height');
 
-  // the shadow is clipped to the block below it - a shadow wider than the
-  // surface it falls on hangs in mid-air and reads as a smudge
-  ok(b.shadowW <= b.anchorSx + 1e-6 && b.shadowD <= b.anchorSz + 1e-6,
-     `contact shadow never overhangs the block below (${b.shadowW.toFixed(2)} <= ${b.anchorSx.toFixed(2)})`);
-  ok(b.shadowOpacity > 0.35, `underside shadow stays strong (${b.shadowOpacity.toFixed(2)})`);
-  near(b.anchorY, s.topY, 1e-6, 'the shadow falls on the top of the tower');
+  near(b.anchorY, s.topY, 1e-6, 'the block hovers over the top of the tower');
 
-  /*
-   * The shadow blob is placed inside that clipped quad by offsetting the
-   * texture, so verify the placement by inverting the mapping: solve the
-   * texture transform for where the blob's centre lands in the world and check
-   * it sits under the block. (Sampling pixels here is unreliable - the block
-   * hovering above can occlude the very point you want to read.)
-   */
-  const blobCentre = (off) => page.evaluate((o) => {
-    window.GameDebug.setOffset(o);
-    const st = window.GameDebug.state, b = window.GameDebug.movingBounds();
-    const [ru, rv] = b.shadowRepeat, [ou, ov] = b.shadowOffset;
-    // u = 0.5 at the blob centre; the quad spans the anchor footprint
-    const u = (0.5 - ou) / ru, v = (0.5 - ov) / rv;
-    return {
-      x: b.anchorSx * (u - 0.5) + st.topX,
-      z: st.topZ - b.anchorSz * (v - 0.5),   // the quad's V axis runs against world Z
-      blockX: b.x, blockZ: b.z, axis: st.axis
-    };
-  }, off);
-
-  for (const off of [-1.4, -0.5, 0, 0.7, 1.6]) {
-    const c = await blobCentre(off);
-    near(c.x, c.blockX, 0.01, `shadow follows the block on x at offset ${off}`);
-    near(c.z, c.blockZ, 0.01, `shadow follows the block on z at offset ${off}`);
-  }
+  // Landed blocks still cast shadows - only the sliding one is exempt, so the
+  // tower keeps its depth without handing the player a targeting aid.
+  ok(await page.evaluate(() => window.GameDebug.view().shadowsEnabled), 'scene shadows still enabled');
   await page.evaluate(() => { window.GameDebug.alignPerfect(); window.GameDebug.freeze(false); });
 
   // dropping makes it fall: the landed block descends over several frames
@@ -363,6 +337,83 @@ await group('QA: the block hovers clear of the tower and falls when dropped', as
   // the gap widens as the climb gets harder
   const gaps = await page.evaluate(() => [1, 50, 100].map((l) => window.GameDebug.logic.levelConfig(l).dropGap));
   ok(gaps[0] < gaps[1] && gaps[1] < gaps[2], `drop height grows with level (${gaps.join(' -> ')})`);
+});
+
+/* ---------------------------------------------------------------- */
+await group('QA: remaining size and the star rating', async () => {
+  await clearSave(page);
+  await page.evaluate(() => window.GameDebug.progress.load());
+  await start(page, 3);
+  let s = await state(page);
+  eq(s.sizePercent, 100, 'a level opens with the whole block');
+  eq(s.stars, 3, 'a full block is three stars');
+  eq(await page.textContent('#size-pct'), '100%', 'HUD shows the percentage');
+
+  // the meter reflects area, not one axis
+  await offsetDrop(page, s.baseSize * 0.1);
+  s = await state(page);
+  eq(s.sizePercent, 90, 'one axis down a tenth is 90% of the area');
+  await offsetDrop(page, s.baseSize * 0.1);
+  s = await state(page);
+  eq(s.sizePercent, 81, 'a tenth off each axis leaves 81%, not 90%');
+  eq(s.stars, 3, 'still above 80%');
+  eq(await page.textContent('#size-pct'), '81%', 'HUD tracks it');
+  const lit = await page.evaluate(() =>
+    [...document.querySelectorAll('#stars i')].filter((e) => e.classList.contains('on')).length);
+  eq(lit, 3, 'three stars lit in the HUD');
+
+  // cross each threshold and check the tier
+  const tierAt = async (frac) => {
+    await start(page, 3);
+    const base = (await state(page)).baseSize;
+    const side = Math.sqrt(frac);
+    await page.evaluate((d) => { window.GameDebug.setOffset(d); window.GameDebug.tap(); }, base * (1 - side));
+    await page.evaluate((d) => { window.GameDebug.setOffset(d); window.GameDebug.tap(); }, base * (1 - side));
+    const st = await state(page);
+    return { pct: st.sizePercent, stars: st.stars };
+  };
+  let t = await tierAt(0.70); eq(t.stars, 2, `70% is two stars (got ${t.pct}%)`);
+  t = await tierAt(0.50);     eq(t.stars, 1, `50% is one star (got ${t.pct}%)`);
+  t = await tierAt(0.30);     eq(t.stars, 0, `30% is no stars (got ${t.pct}%)`);
+
+  // recovery puts percentage back, which is the point of it
+  await start(page, 3);
+  await offsetDrop(page, 0.9);
+  const dropped = (await state(page)).sizePercent;
+  await perfect(page, 3);
+  s = await state(page);
+  ok(s.sizePercent > dropped, `recovery restores percentage (${dropped}% -> ${s.sizePercent}%)`);
+  ok(s.sizePercent <= 100, 'and never exceeds a full block');
+
+  // stars are awarded on clear, saved, and shown on the level map
+  await start(page, 1);
+  await perfect(page, 5);
+  s = await state(page);
+  eq(s.mode, 'clear', 'level cleared');
+  eq(s.stars, 3, 'a clean run is three stars');
+  await waitOverlay(page, 'overlay-clear');
+  eq(await page.textContent('#clear-pct'), '100%', 'award screen shows the percentage');
+  const awarded = await page.evaluate(() =>
+    [...document.querySelectorAll('#clear-stars i')].filter((e) => e.classList.contains('on')).length);
+  eq(awarded, 3, 'three stars shown on the award screen');
+  eq((await save(page)).levelStars['1'], 3, 'stars saved for the level');
+
+  await clickWhenArmed(page, '#btn-clear-menu');
+  await page.evaluate(() => window.GameDebug.openLevels());
+  const cell = await page.evaluate(() => {
+    const c = document.querySelector('#level-grid .mapcell .cellstars');
+    return c ? c.getAttribute('data-n') : null;
+  });
+  eq(cell, '3', 'the level map shows the stars earned');
+  await clickWhenArmed(page, '#btn-levels-close');
+
+  // a worse replay does not take stars away
+  await start(page, 1);
+  await offsetDrop(page, 1.6);
+  await perfect(page, 4);
+  await waitOverlay(page, 'overlay-clear');
+  ok((await state(page)).stars < 3, 'the replay earned fewer stars');
+  eq((await save(page)).levelStars['1'], 3, 'the stored best is unchanged');
 });
 
 /* ---------------------------------------------------------------- */
@@ -504,11 +555,15 @@ await group('QA: persistence after reload', async () => {
     const b = [...document.querySelectorAll('#level-grid .mapcell')];
     return { total: b.length, boss: b.filter(x => x.classList.contains('boss')).length,
              locked: b.filter(x => x.classList.contains('locked')).length,
-             bossLabels: b.filter(x => x.classList.contains('boss')).map(x => x.textContent) };
+             bossLabels: b.filter(x => x.classList.contains('boss'))
+                          .map(x => x.querySelector('.n').textContent.trim()),
+             bossAria: b.filter(x => x.classList.contains('boss'))
+                        .every(x => /boss/i.test(x.getAttribute('aria-label') || '')) };
   });
   eq(cells.total, 100, 'map has 100 levels');
   eq(cells.boss, 10, 'map marks 10 boss levels');
-  eq(cells.bossLabels.join(','), '★10,★20,★30,★40,★50,★60,★70,★80,★90,★100', 'bosses are every 10th level');
+  eq(cells.bossLabels.join(','), '10,20,30,40,50,60,70,80,90,100', 'bosses are every 10th level');
+  eq(cells.bossAria, true, 'boss cells are labelled as bosses for screen readers');
   eq(cells.locked, 100 - after.highestUnlocked, 'locked count matches the save');
   ok((await page.textContent('#level-grid')).includes('28'), 'map shows the boss best');
   await clickWhenArmed(page, '#btn-levels-close');
@@ -740,6 +795,9 @@ await group('QA: iPhone layout (no broken layout, no scrolling)', async () => {
         scrollW: d.scrollWidth, scrollH: d.scrollHeight,
         scrollX: window.scrollX, scrollY: window.scrollY,
         boxes,
+        tapTargets: [...document.querySelectorAll('#hud .iconbtn')].map((e) => {
+          const r = e.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height));
+        }),
         canvasCss: (() => { const r = document.getElementById('scene').getBoundingClientRect(); return [r.width, r.height]; })(),
         drawing: [document.getElementById('scene').width, document.getElementById('scene').height]
       };
@@ -759,6 +817,15 @@ await group('QA: iPhone layout (no broken layout, no scrolling)', async () => {
          `${sz.name}: #${id} stays inside the height [y=${b.y.toFixed(1)} bottom=${b.bottom.toFixed(1)} vh=${m.vh}]`);
     }
     ok(m.boxes.hud.bottom < m.boxes['btn-advance'].y, `${sz.name}: HUD does not overlap the Advance button`);
+    // contextual minimalism: the live HUD is a thin band, not a dashboard
+    ok(m.boxes.hud.h <= 104, `${sz.name}: HUD stays a thin band (${m.boxes.hud.h.toFixed(0)}px)`);
+    if (m.vh >= 560) {
+      ok(m.boxes.hud.h / m.vh < 0.20,
+         `${sz.name}: HUD uses under a fifth of the screen (${((m.boxes.hud.h / m.vh) * 100).toFixed(1)}%)`);
+    }
+    ok(m.boxes.hud.bottom < m.vh * 0.65,
+       `${sz.name}: HUD stays clear of the thumb zone`);
+    for (const t of m.tapTargets) ok(t >= 44, `${sz.name}: HUD buttons meet the 44px target (${t}px)`);
     await page.screenshot({ path: path.join(OUT, 'layout-' + sz.name.replace(/\s+/g, '-') + '.png') });
   }
 

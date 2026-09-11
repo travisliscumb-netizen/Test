@@ -54,6 +54,11 @@ tower entirely and the run is over.
 * **Tap anywhere** or press **Space** / **Enter** to drop. **Esc** returns to the map.
 * Land three **perfect** drops in a row and some of the lost size is restored,
   capped at the level's own starting size.
+* The sliding block casts **no shadow**. A shadow directly under it is a free
+  aiming reticle, so the drop is judged by eye.
+* **Stars** are earned on how much of the block survives the level, measured as
+  area of the starting square: above 80% is three stars, above 60% two, above
+  40% one. 300 stars are available across the 100 levels.
 * **Normal levels** ask for a fixed number of successful stacks (5 at level 1,
   rising to 19 by level 99).
 * **Boss levels** (10, 20, 30 … 100) are survival climbs. The required height is
@@ -97,6 +102,50 @@ progressively deeper from world 1 to world 10, so the climb reads as altitude.
 Art direction is deliberately bright, rich and toy-like — painted wooden blocks.
 No pastels, no neon, no cyberpunk; `test/logic.test.cjs` asserts this
 numerically against every colour of all 100 levels.
+
+---
+
+## The HUD, and how it was chosen
+
+The dashboard was rebuilt against published guidance rather than taste, then the
+candidates were measured rather than eyeballed.
+
+**Principles applied** — *contextual minimalism* (show only what is needed, when
+it is needed), *match information load to gameplay speed* (a fast tap game gets
+essentials and visual cues, not text panels), *progressive disclosure* (detail
+when there is time to read it), a clear *thumb zone* (persistent chrome stays out
+of the bottom third), and 44px minimum touch targets.
+
+**Three candidates were built and measured** in a bright world, a night world and
+a boss level, at 390x844:
+
+| Candidate | HUD height (worst) | Min text contrast | Verdict |
+|---|---|---|---|
+| A — panelled cards | 19.0% | 16.5:1 | Passes, but heaviest |
+| **B — one glass rail** | **16.4%** | **16.5:1** | **Chosen** |
+| C — type straight on the sky | 14.0% | **3.0:1** | **Rejected** |
+
+C was the most appealing on paper and the smallest on screen, and measurement
+killed it: with no panel behind it, HUD text sits on whatever sky the level
+paints, and a mid-tone sky drops it to 3.0:1 — far below the 4.5:1 AA floor. It
+only worked on the very light and very dark worlds. That is the whole reason for
+testing instead of choosing.
+
+**The measurements then improved the winner.** The boss row had three chips
+reading REQUIRED / HEIGHT / BEST, but the goal gauge already says "HEIGHT 4 / 20"
+— only the record was new information, so it became a small `best 6` beside the
+gauge and a whole row disappeared. The world name was being squeezed to
+"World 2 · …" in the rail, and is not needed mid-drop, so it became a title card
+shown once when the level opens. Touch targets were 32px and are now 44px with a
+smaller visible key inside the hit area.
+
+Final: **10.8% of the screen** in portrait (from 27%), 46px in landscape, one
+row of live state.
+
+The block meter is the centrepiece: it is a *meter with thresholds*, not a
+number. The track carries ticks at 40 / 60 / 80%, the fill is coloured by the
+star tier you are currently in, and the perfect-streak dots sit inside the same
+gauge — because three perfect drops are what refund that bar.
 
 ---
 

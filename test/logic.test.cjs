@@ -413,3 +413,80 @@ test('perfect drops score more, and streaks score more still', () => {
   assert.equal(L.dropScore({ level: 1, perfect: true, streak: 999 }),
                L.dropScore({ level: 1, perfect: true, streak: 10 }), 'streak bonus is capped');
 });
+
+/* ------------------------------------------------------------------ *
+ * Remaining size and stars
+ * ------------------------------------------------------------------ */
+
+test('remaining size is measured as area of the starting square', () => {
+  const base = 4;
+  assert.equal(L.sizePercent(base, base, base), 100, 'a full block is 100%');
+  // losing a tenth off each axis leaves 81% of the area, not 90%
+  assert.equal(L.sizePercent(base * 0.9, base * 0.9, base), 81);
+  assert.equal(L.sizePercent(base * 0.5, base, base), 50, 'one axis halved halves the area');
+  assert.equal(L.sizePercent(base * 0.5, base * 0.5, base), 25);
+  assert.equal(L.sizePercent(0, base, base), 0);
+  // never reports more than a full block, whatever it is handed
+  assert.equal(L.sizePercent(base * 2, base * 2, base), 100);
+  assert.equal(L.sizeFraction(1, 1, 0), 0, 'no base size is not a divide by zero');
+});
+
+test('stars follow the thresholds: above 80 / 60 / 40 percent', () => {
+  assert.deepEqual(L.STAR_THRESHOLDS, [0.80, 0.60, 0.40]);
+  assert.equal(L.starsForFraction(1.00), 3);
+  assert.equal(L.starsForFraction(0.801), 3);
+  assert.equal(L.starsForFraction(0.80), 2, 'exactly 80% is not "above 80%"');
+  assert.equal(L.starsForFraction(0.601), 2);
+  assert.equal(L.starsForFraction(0.60), 1);
+  assert.equal(L.starsForFraction(0.401), 1);
+  assert.equal(L.starsForFraction(0.40), 0);
+  assert.equal(L.starsForFraction(0), 0);
+  // and the size-based helper agrees with the fraction-based one
+  for (const [x, z] of [[4, 4], [3.6, 3.6], [3, 3], [2.5, 2.5], [1.5, 1.5]]) {
+    assert.equal(L.starsFor(x, z, 4), L.starsForFraction(L.sizeFraction(x, z, 4)));
+  }
+});
+
+test('stars are stored per level and never regress', () => {
+  const store = L.memoryStorage();
+  let p = L.createProgress(store);
+  assert.equal(p.stars(7), 0);
+  assert.equal(p.recordStars(7, 2), true);
+  assert.equal(p.recordStars(7, 1), false, 'a worse run does not overwrite');
+  assert.equal(p.stars(7), 2);
+  assert.equal(p.recordStars(7, 3), true);
+  assert.equal(p.stars(7), 3);
+  p.recordStars(8, 1);
+  assert.equal(p.totalStars(), 4);
+  // survives a reload, and 300 is the maximum possible
+  p = L.createProgress(store);
+  assert.equal(p.stars(7), 3);
+  assert.equal(p.totalStars(), 4);
+  for (let lvl = 1; lvl <= 100; lvl++) p.recordStars(lvl, 3);
+  assert.equal(p.totalStars(), 300, 'three stars on every level is 300');
+});
+
+test('corrupt star data is discarded', () => {
+  const bad = L.memoryStorage();
+  bad.setItem(L.SAVE_KEY, JSON.stringify({ levelStars: { 4: 9, 5: 'x', 0: 3, 200: 3, 6: 2 } }));
+  const p = L.createProgress(bad);
+  assert.equal(p.stars(4), 3, 'an out-of-range star count is clamped to 3');
+  assert.equal(p.stars(5), 0, 'non-numeric value dropped');
+  assert.equal(p.stars(6), 2, 'valid entry kept');
+  // an out-of-range LEVEL key is dropped, not clamped into a real level
+  assert.equal(p.stars(1), 0, 'level key 0 did not become level 1');
+  assert.equal(p.stars(100), 0, 'level key 200 did not become level 100');
+  assert.equal(p.totalStars(), 5);
+});
+
+test('the drop gap is three quarters of its old height and still real air', () => {
+  for (let lvl = 1; lvl <= 100; lvl++) {
+    const c = L.levelConfig(lvl);
+    // it was BLOCK_HEIGHT * lerp(2.0, 2.9, t); now three quarters of that
+    const t = (lvl - 1) / 99;
+    const old = L.BLOCK_HEIGHT * (2.0 + 0.9 * t);
+    assert.ok(Math.abs(c.dropGap - old * 0.75) < 0.002, 'level ' + lvl + ' gap is 3/4 of the old one');
+    assert.ok(c.dropGap > L.BLOCK_HEIGHT, 'still more than a block height of air at ' + lvl);
+    assert.equal(c.hover, Math.round((L.BLOCK_HEIGHT + c.dropGap) * 1000) / 1000);
+  }
+});
