@@ -249,6 +249,76 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Deterministic sequencing
+   *
+   * Every choice the game makes about a drop - which side the block enters
+   * from, whether the tower turns and by how much - is a pure function of
+   * (level, stack height). Nothing is drawn from Math.random().
+   *
+   * That is the difference between "hard" and "unfair": retry a level and you
+   * get the identical sequence, so a pattern can be read, learned and beaten.
+   * A player who misses can always see why.
+   * ------------------------------------------------------------------ */
+
+  function hash01(a, b, c) {
+    var h = 2166136261 >>> 0;
+    h = Math.imul(h ^ (a | 0), 16777619) >>> 0;
+    h = Math.imul(h ^ (b | 0), 16777619) >>> 0;
+    h = Math.imul(h ^ (c | 0), 16777619) >>> 0;
+    h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995) >>> 0; h ^= h >>> 15;
+    return (h >>> 0) / 4294967296;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The mechanics ladder
+   *
+   * Difficulty is carried by mechanics, not by speed. Each one is introduced
+   * alone, at a level boundary, so it can be learned before it is combined
+   * with anything else. By the last world they are all running together.
+   * ------------------------------------------------------------------ */
+
+  var MECHANICS = [
+    { level: 1,  key: 'core',       name: 'Tap to drop',        blurb: 'Land the block square on the tower.' },
+    { level: 4,  key: 'flip',       name: 'Both sides',         blurb: 'The block now enters from either side.' },
+    { level: 8,  key: 'pattern',    name: 'Entry patterns',     blurb: 'Sides follow a pattern. Learn it.' },
+    { level: 11, key: 'rotate45',   name: 'Turning tower',      blurb: 'The whole tower turns 45°. Re-read the edges.' },
+    { level: 21, key: 'rotate90',   name: 'Quarter turns',      blurb: 'Turns are now 45° or 90°.' },
+    { level: 31, key: 'ease',       name: 'Uneven speed',       blurb: 'Fast through the middle, slow at the ends.' },
+    { level: 41, key: 'rotate135',  name: 'Three-eighth turns', blurb: '135° joins the turn set.' },
+    { level: 51, key: 'hesitate',   name: 'Hesitation',         blurb: 'The block pauses at the same spot every pass.' },
+    { level: 61, key: 'rotate180',  name: 'Half turns',         blurb: '180° turns, and one every drop.' },
+    { level: 71, key: 'spin',       name: 'Live rotation',      blurb: 'The tower keeps turning while you aim.' },
+    { level: 81, key: 'reversal',   name: 'Reversals',          blurb: 'The block can double back mid-travel.' },
+    { level: 91, key: 'master',     name: 'Everything',         blurb: 'Every mechanic, tightest tolerance.' }
+  ];
+
+  /** The mechanic introduced exactly at this level, or null. */
+  function mechanicIntroducedAt(level) {
+    for (var i = 0; i < MECHANICS.length; i++) if (MECHANICS[i].level === level) return MECHANICS[i];
+    return null;
+  }
+
+  function unlocked(level, key) {
+    for (var i = 0; i < MECHANICS.length; i++) {
+      if (MECHANICS[i].key === key) return level >= MECHANICS[i].level;
+    }
+    return false;
+  }
+
+  /** Turn angles available at a level, in degrees. */
+  function rotationSet(level) {
+    var set = [];
+    if (unlocked(level, 'rotate45')) set.push(45);
+    if (unlocked(level, 'rotate90')) set.push(90);
+    if (unlocked(level, 'rotate135')) set.push(135);
+    if (unlocked(level, 'rotate180')) set.push(180);
+    // A full turn only earns its place once the tower turns while the block is
+    // travelling - otherwise it ends where it started and asks nothing.
+    if (unlocked(level, 'spin')) set.push(360);
+    return set;
+  }
+
+  /* ------------------------------------------------------------------ *
    * Level configuration
    *
    * Everything is a smooth, monotonic function of the level number, so
@@ -266,10 +336,18 @@
     if (boss) sizeScale = Math.min(1, sizeScale * 1.10);
     var baseSize = round3(BASE_SIZE * sizeScale);
 
-    // Slide speed: 2.5 -> 7.6 units/sec. Bosses run slower at the start but
-    // ramp up as the tower climbs (see speedAt).
-    var speed = 2.5 + 5.1 * Math.pow(t, 1.05);
-    if (boss) speed *= 0.80;
+    /*
+     * Slide speed: 2.5 -> 5.4 units/sec, and deliberately front-loaded.
+     *
+     * Speed is NOT the difficulty system. It used to run to 7.6 on a near
+     * straight line, which is the lazy way to make a tap game hard and ends up
+     * frustrating rather than skilful. Most of the growth now happens in the
+     * first third; after that a level is barely faster than the one before it
+     * and the difficulty comes from the mechanics ladder instead - turning
+     * towers, entry patterns, uneven speed, hesitation.
+     */
+    var speed = 2.5 + 2.9 * Math.pow(t, 0.62);
+    if (boss) speed *= 0.86;
 
     // Perfect-drop tolerance is defined as a TIME window, not a distance.
     //
@@ -278,10 +356,13 @@
     // human reaction limits and feels broken rather than hard. As a time window
     // the demand is honest: 90ms at level 1 down to 30ms at level 100, on top of
     // faster blocks, smaller starts and stronger movement variation.
-    // The exact curve below is tuned against test/balance.mjs, which simulates
+    // The window now only tightens from 95ms to 52ms, not to 18ms as it once
+    // did: the mechanics ladder carries late difficulty, so demanding both a
+    // near-frame-perfect tap AND a freshly rotated reference is doubling up.
+    // The exact curve is tuned against test/balance.mjs, which simulates
     // thousands of runs with modelled human timing error.
-    var perfectWindow = lerp(0.095, 0.018, Math.pow(t, 1.45));   // seconds
-    if (boss) perfectWindow *= 1.28;                    // boss runs are 10-100 drops long
+    var perfectWindow = lerp(0.095, 0.052, Math.pow(t, 1.15));   // seconds
+    if (boss) perfectWindow *= 1.32;                    // boss runs are 10-100 drops long
     var perfectTol = speed * perfectWindow;
 
     // The sliding block hovers this far clear of the tower before it drops.
@@ -289,10 +370,45 @@
     // drop, close enough that the player can judge the alignment by eye.
     var dropGap = BLOCK_HEIGHT * lerp(2.0, 2.9, t) * 0.75;
 
-    // Movement variation: the slide velocity is modulated by a sine so late
-    // levels cannot be beaten with pure metronome timing.
-    var sway = clamp((t - 0.10) / 0.90, 0, 1) * 0.36;
-    var swayFreq = 0.85 + 1.5 * t;
+    /*
+     * Movement rhythm.
+     *
+     * The old version modulated speed by a sine of absolute elapsed time with a
+     * random starting phase, so the block behaved differently on every pass and
+     * the player could not learn it - arbitrary, not skilful. Speed is now a
+     * function of POSITION along the travel, so the block does the same thing at
+     * the same place every single pass. Hard to master, impossible to call
+     * unfair.
+     */
+    var easeOn = unlocked(level, 'ease');
+    var hesOn = unlocked(level, 'hesitate');
+    var ep = easeOn ? clamp((level - 31) / 60, 0, 1) : 0;
+    var hp = hesOn ? clamp((level - 51) / 45, 0, 1) : 0;
+
+    var plan = {
+      // approach side: fixed, then alternating, then a readable 4-beat pattern
+      directionMode: unlocked(level, 'pattern') ? 'pattern'
+                   : (unlocked(level, 'flip') ? 'flip' : 'fixed'),
+      // tower turns
+      rotationSet: rotationSet(level),
+      /*
+       * Turn cadence. A boss is a survival climb of 10-100 unbroken drops, so
+       * it turns half as often and spins half as fast as a normal level of the
+       * same number: the same mechanics, at a pace that can be sustained for a
+       * hundred drops rather than eight.
+       */
+      rotateEvery: (unlocked(level, 'rotate180') ? 1 : (unlocked(level, 'rotate90') ? 2 : 3)) * (boss ? 2 : 1),
+      rotateDuring: unlocked(level, 'spin'),
+      spinRate: unlocked(level, 'spin')
+        ? (0.20 + 0.22 * clamp((level - 71) / 29, 0, 1)) * (boss ? 0.5 : 1) : 0,
+      // speed shape along the travel
+      easeAmount: easeOn ? round3(0.16 + 0.20 * ep) : 0,
+      hesitateDepth: hesOn ? round3(0.42 + 0.20 * hp) : 0,
+      hesitatePos: 0.42,          // as a fraction of the travel, from the centre
+      hesitateWidth: 0.16,
+      reversals: unlocked(level, 'reversal'),
+      introduces: mechanicIntroducedAt(level)
+    };
 
     return {
       level: level,
@@ -310,8 +426,10 @@
       speedRampMax: 0.25,
       perfectTol: round3(perfectTol),
       perfectWindow: round3(perfectWindow),
-      sway: round3(sway),
-      swayFreq: round3(swayFreq),
+      plan: plan,
+      // kept as a single readable number for the HUD and the balance model:
+      // how much the active mechanics load the player beyond raw timing
+      mechanicLoad: round3(mechanicLoad(plan)),
       travel: round3(BASE_SIZE * 0.80 + baseSize * 0.40),
       // Clear air between the top of the tower and the sliding block. The block
       // hovers up here and visibly falls when dropped, which is both the reason
@@ -328,6 +446,93 @@
   function speedAt(cfg, height) {
     var ramp = Math.min(cfg.speedRampMax, (cfg.speedRamp || 0) * Math.max(0, height));
     return cfg.speed * (1 + ramp);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Per-drop behaviour: all pure functions of (level, height)
+   * ------------------------------------------------------------------ */
+
+  /** Readable four-beat entry patterns. Index by height, learn the loop. */
+  var SIDE_PATTERNS = [
+    [1, 1, -1, -1],
+    [1, -1, -1, 1],
+    [1, -1, 1, -1],
+    [1, 1, -1, 1]
+  ];
+
+  /**
+   * Which side the block enters from: +1 or -1 along the active axis.
+   * Fixed early, alternating once "flip" unlocks, then a four-beat pattern
+   * chosen per level. Late levels may flip the pattern for one drop - still
+   * deterministic, so it is a thing to spot rather than a thing to suffer.
+   */
+  function approachSide(cfg, height) {
+    var plan = cfg.plan;
+    if (plan.directionMode === 'fixed') return 1;
+    if (plan.directionMode === 'flip') return (height % 2 === 0) ? 1 : -1;
+    var pat = SIDE_PATTERNS[Math.floor(hash01(cfg.level, 0, 11) * SIDE_PATTERNS.length)];
+    var side = pat[height % pat.length];
+    if (plan.reversals && hash01(cfg.level, height, 23) < 0.18) side = -side;
+    return side;
+  }
+
+  /**
+   * How far the tower turns before this drop, in degrees (signed).
+   *
+   * The whole playfield turns - tower, pad and the incoming block together -
+   * so blocks still land square on one another. The point is to take away the
+   * fixed screen-space corner the player was lining up against, not to make
+   * the geometry harder.
+   */
+  function rotationDelta(cfg, height) {
+    var plan = cfg.plan;
+    if (!plan.rotationSet.length || height < 1) return 0;
+    if (height % plan.rotateEvery !== 0) return 0;
+    var r = hash01(cfg.level, height, 71);
+    var angle = plan.rotationSet[Math.floor(r * plan.rotationSet.length)];
+    var sign = hash01(cfg.level, height, 97) < 0.5 ? -1 : 1;
+    return angle === 360 ? 360 * sign : angle * sign;
+  }
+
+  /**
+   * Speed multiplier at a point in the travel. `u` is the position as a
+   * fraction of the travel, -1 at one end, +1 at the other.
+   *
+   * Position-based, so it is identical on every pass: the same place always
+   * behaves the same way. Never returns zero or negative - the block must
+   * always be moving.
+   */
+  function speedProfile(cfg, u) {
+    var plan = cfg.plan;
+    u = clamp(u, -1, 1);
+    var f = 1;
+    // fast through the middle, slower at the turns: the demanding part of the
+    // travel is the part the player has to hit
+    if (plan.easeAmount) f *= 1 + plan.easeAmount * (1 - 2 * u * u);
+    // a hesitation at a fixed distance from the centre, on both sides
+    if (plan.hesitateDepth) {
+      var d = (Math.abs(u) - plan.hesitatePos) / plan.hesitateWidth;
+      f *= 1 - plan.hesitateDepth * Math.exp(-d * d);
+    }
+    return Math.max(0.18, f);
+  }
+
+  /**
+   * A single number for "how much is going on beyond raw timing", used by the
+   * balance model to convert mechanics into an effective loss of precision.
+   */
+  function mechanicLoad(plan) {
+    var load = 0;
+    if (plan.directionMode === 'flip') load += 0.05;
+    if (plan.directionMode === 'pattern') load += 0.10;
+    load += Math.min(0.34, plan.rotationSet.length * 0.085);
+    if (plan.rotateEvery === 1) load += 0.06;
+    load -= Math.min(0.12, (plan.rotateEvery - 1) * 0.05);   // rarer turns, less to track
+    if (plan.rotateDuring) load += 0.14 * Math.min(1, plan.spinRate / 0.20);
+    load += plan.easeAmount * 0.55;
+    load += plan.hesitateDepth * 0.22;
+    if (plan.reversals) load += 0.07;
+    return Math.max(0, load);
   }
 
   /** Total successful stacks needed to clear the level. */
@@ -680,6 +885,10 @@
     worldOf: worldOf, levelInWorld: levelInWorld, isBossLevel: isBossLevel,
     bossTarget: bossTarget, themeForLevel: themeForLevel,
     levelConfig: levelConfig, levelGoal: levelGoal, speedAt: speedAt,
+    MECHANICS: MECHANICS, mechanicIntroducedAt: mechanicIntroducedAt, unlocked: unlocked,
+    rotationSet: rotationSet, approachSide: approachSide, rotationDelta: rotationDelta,
+    speedProfile: speedProfile, mechanicLoad: mechanicLoad, hash01: hash01,
+    SIDE_PATTERNS: SIDE_PATTERNS,
     resolveDrop: resolveDrop,
     recoveryGain: recoveryGain, applyRecovery: applyRecovery,
     dropScore: dropScore,

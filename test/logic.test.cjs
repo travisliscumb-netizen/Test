@@ -55,29 +55,48 @@ test('normal levels have fixed stack goals that never shrink', () => {
 });
 
 test('difficulty rises smoothly and never spikes', () => {
-  let prevSpeed = 0, prevWindow = Infinity, prevSize = Infinity, prevSway = -1;
+  let prevSpeed = 0, prevWindow = Infinity, prevSize = Infinity, prevLoad = -1;
   for (let lvl = 1; lvl <= 100; lvl++) {
     const c = L.levelConfig(lvl);
     // compare like-for-like: boss levels have their own (gentler) curve
     if (!c.isBoss) {
       assert.ok(c.speed >= prevSpeed - 1e-9, 'speed monotonic at ' + lvl);
-      // difficulty of a perfect drop is the TIME window, not the distance:
-      // the distance grows with speed, the window the player has does not
       assert.ok(c.perfectWindow <= prevWindow + 1e-9, 'perfect window tightens at ' + lvl);
       assert.ok(c.baseSize <= prevSize + 1e-9, 'start size shrinks at ' + lvl);
-      assert.ok(c.sway >= prevSway - 1e-9, 'movement variation grows at ' + lvl);
+      assert.ok(c.mechanicLoad >= prevLoad - 1e-9, 'mechanic load grows at ' + lvl);
       // no single level may be more than 12% faster than the one before it
       if (prevSpeed > 0) assert.ok(c.speed / prevSpeed < 1.12, 'no speed spike at ' + lvl);
-      prevSpeed = c.speed; prevWindow = c.perfectWindow; prevSize = c.baseSize; prevSway = c.sway;
+      prevSpeed = c.speed; prevWindow = c.perfectWindow; prevSize = c.baseSize;
+      prevLoad = c.mechanicLoad;
     }
     assert.ok(c.speed > 0 && c.perfectTol > 0 && c.baseSize > 1.5);
     assert.ok(c.perfectWindow >= 0.017 && c.perfectWindow <= 0.13,
       'perfect window stays inside human reaction limits at ' + lvl + ' (' + c.perfectWindow + 's)');
-    // movement variation can never stop or reverse the slide
-    assert.ok(c.sway < 0.9, 'sway keeps velocity positive at ' + lvl);
   }
-  assert.ok(L.levelConfig(100).speed > L.levelConfig(10).speed, 'late bosses are faster');
-  assert.ok(L.levelConfig(99).speed > L.levelConfig(1).speed * 2.5, 'endgame much faster');
+});
+
+test('speed is not the difficulty system', () => {
+  const first = L.levelConfig(1).speed;
+  const last = L.levelConfig(99).speed;
+  // Speed rises, but nowhere near enough to carry the endgame on its own. The
+  // brief is explicit: do not scale speed until the game becomes ridiculous.
+  assert.ok(last > first * 1.5, 'speed does rise meaningfully');
+  assert.ok(last < first * 2.4, `speed growth stays sane (${(last / first).toFixed(2)}x)`);
+  // and most of what growth there is happens early, so late levels differ by
+  // mechanics rather than by pace
+  const mid = L.levelConfig(49).speed;   // 50 is a boss, which runs slower
+  assert.ok((mid - first) / (last - first) > 0.6,
+    `most speed growth is in the first half (${(((mid - first) / (last - first)) * 100).toFixed(0)}%)`);
+  // meanwhile the mechanic load keeps climbing all the way
+  assert.equal(L.levelConfig(1).mechanicLoad, 0, 'level 1 has no extra mechanics at all');
+  assert.ok(L.levelConfig(49).mechanicLoad > 0.4, 'midgame is carrying real mechanics');
+  // a boss is a 10-100 drop survival climb, so it runs the same mechanics at a
+  // sustainable pace: fewer turns, slower live rotation, lower load
+  assert.ok(L.levelConfig(50).mechanicLoad < L.levelConfig(49).mechanicLoad,
+    'boss levels turn less often than the normal level beside them');
+  assert.equal(L.levelConfig(50).plan.rotateEvery, L.levelConfig(49).plan.rotateEvery * 2);
+  assert.ok(L.levelConfig(80).plan.spinRate < L.levelConfig(79).plan.spinRate);
+  assert.ok(L.levelConfig(95).mechanicLoad > 0.95, 'endgame is carrying a lot');
 });
 
 test('boss slide speed ramps with height but stays capped', () => {
@@ -489,4 +508,127 @@ test('the drop gap is three quarters of its old height and still real air', () =
     assert.ok(c.dropGap > L.BLOCK_HEIGHT, 'still more than a block height of air at ' + lvl);
     assert.equal(c.hover, Math.round((L.BLOCK_HEIGHT + c.dropGap) * 1000) / 1000);
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * The mechanics ladder
+ * ------------------------------------------------------------------ */
+
+test('mechanics are introduced one at a time, never all at once', () => {
+  // every mechanic arrives at its own level, in order, spread out
+  const levels = L.MECHANICS.map((m) => m.level);
+  assert.deepEqual(levels, [...levels].sort((a, b) => a - b), 'the ladder is in order');
+  assert.equal(new Set(levels).size, levels.length, 'no two mechanics share a level');
+  assert.equal(levels[0], 1, 'the core mechanic is there from the first level');
+  for (const m of L.MECHANICS) {
+    assert.ok(m.name && m.blurb, m.key + ' can be explained to the player');
+    assert.equal(L.mechanicIntroducedAt(m.level).key, m.key);
+  }
+  // nothing is introduced on a level that is not a teaching level
+  assert.equal(L.mechanicIntroducedAt(2), null);
+  assert.equal(L.mechanicIntroducedAt(50), null);
+
+  // level 1 really is bare: one axis, one side, constant speed, no turning
+  const one = L.levelConfig(1).plan;
+  assert.equal(one.directionMode, 'fixed');
+  assert.deepEqual(one.rotationSet, []);
+  assert.equal(one.easeAmount, 0);
+  assert.equal(one.hesitateDepth, 0);
+  assert.equal(one.reversals, false);
+  assert.equal(one.spinRate, 0);
+});
+
+test('the rotation set grows and never shrinks', () => {
+  let prev = 0;
+  for (let lvl = 1; lvl <= 100; lvl++) {
+    const set = L.rotationSet(lvl);
+    assert.ok(set.length >= prev, 'rotation set never shrinks at ' + lvl);
+    prev = set.length;
+    for (const a of set) assert.ok([45, 90, 135, 180, 360].includes(a), 'only taught angles: ' + a);
+  }
+  assert.deepEqual(L.rotationSet(10), [], 'no rotation before world 2');
+  assert.deepEqual(L.rotationSet(11), [45], '45 degrees alone first');
+  assert.deepEqual(L.rotationSet(21), [45, 90]);
+  assert.deepEqual(L.rotationSet(41), [45, 90, 135]);
+  assert.deepEqual(L.rotationSet(61), [45, 90, 135, 180]);
+  // a full turn only appears once the tower turns WHILE the block travels,
+  // otherwise it ends where it started and asks nothing of the player
+  assert.ok(!L.rotationSet(70).includes(360));
+  assert.ok(L.rotationSet(71).includes(360));
+  assert.equal(L.levelConfig(71).plan.rotateDuring, true);
+});
+
+test('every drop is deterministic: the same level plays the same way', () => {
+  for (const lvl of [1, 7, 15, 34, 55, 78, 96]) {
+    const c = L.levelConfig(lvl);
+    for (let h = 0; h < 40; h++) {
+      const a = { side: L.approachSide(c, h), turn: L.rotationDelta(c, h) };
+      const b = { side: L.approachSide(c, h), turn: L.rotationDelta(c, h) };
+      assert.deepEqual(a, b, `level ${lvl} drop ${h} is repeatable`);
+      // and a freshly built config agrees, so a retry is identical
+      const c2 = L.levelConfig(lvl);
+      assert.equal(L.approachSide(c2, h), a.side);
+      assert.equal(L.rotationDelta(c2, h), a.turn);
+    }
+  }
+});
+
+test('entry sides are taught: fixed, then alternating, then a pattern', () => {
+  const sides = (lvl, n) => {
+    const c = L.levelConfig(lvl);
+    return Array.from({ length: n }, (_, h) => L.approachSide(c, h));
+  };
+  assert.deepEqual(sides(1, 6), [1, 1, 1, 1, 1, 1], 'level 1 always enters the same side');
+  assert.deepEqual(sides(3, 6), [1, 1, 1, 1, 1, 1], 'still fixed just before the unlock');
+  assert.deepEqual(sides(4, 6), [1, -1, 1, -1, 1, -1], 'then it alternates every drop');
+  const p = sides(12, 8);
+  assert.ok(p.every((v) => v === 1 || v === -1), 'always a real side');
+  assert.ok(p.some((v) => v === 1) && p.some((v) => v === -1), 'a pattern uses both sides');
+  // the four-beat pattern repeats, so it can be learned
+  const q = sides(12, 12);
+  assert.deepEqual(q.slice(0, 4), q.slice(4, 8), 'the pattern loops');
+});
+
+test('turns happen on a readable cadence, not every drop from the start', () => {
+  const turnsIn = (lvl, n) => {
+    const c = L.levelConfig(lvl);
+    let count = 0;
+    for (let h = 0; h < n; h++) if (L.rotationDelta(c, h) !== 0) count++;
+    return count;
+  };
+  assert.equal(turnsIn(5, 30), 0, 'no turning before it is taught');
+  assert.ok(turnsIn(15, 30) > 0 && turnsIn(15, 30) <= 10, 'world 2 turns every third drop');
+  assert.ok(turnsIn(25, 30) > turnsIn(15, 30), 'turns get more frequent');
+  assert.ok(turnsIn(65, 30) >= 29, 'late levels turn on every drop');
+  // turns are whole taught angles in either direction
+  const c = L.levelConfig(65);
+  for (let h = 1; h < 40; h++) {
+    const d = L.rotationDelta(c, h);
+    if (d) assert.ok([45, 90, 135, 180, 360].includes(Math.abs(d)), 'clean angle: ' + d);
+  }
+});
+
+test('the speed profile is position-based, positive, and learnable', () => {
+  for (const lvl of [1, 20, 35, 55, 75, 100]) {
+    const c = L.levelConfig(lvl);
+    let min = Infinity, max = 0;
+    for (let i = -100; i <= 100; i++) {
+      const f = L.speedProfile(c, i / 100);
+      assert.ok(f > 0.1, `never stalls at level ${lvl} (${f})`);
+      assert.ok(f < 2.2, 'never lurches at level ' + lvl);
+      min = Math.min(min, f); max = Math.max(max, f);
+      // identical every time it is asked - the same place always behaves the same
+      assert.equal(L.speedProfile(c, i / 100), f);
+    }
+    if (lvl === 1) assert.equal(min, max, 'level 1 is a constant speed');
+    if (lvl >= 55) assert.ok(max / min > 1.4, 'late levels have real rhythm at ' + lvl);
+    // symmetric: both directions of travel behave the same
+    for (const u of [0.2, 0.45, 0.7, 0.95]) {
+      assert.ok(Math.abs(L.speedProfile(c, u) - L.speedProfile(c, -u)) < 1e-9,
+        'profile is symmetric at level ' + lvl);
+    }
+  }
+  // fast through the middle, slower at the ends, once easing is taught
+  const c = L.levelConfig(45);
+  assert.ok(L.speedProfile(c, 0) > L.speedProfile(c, 1), 'quickest through the centre');
 });

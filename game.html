@@ -127,6 +127,10 @@
   }
   #worldcard b{font-size:11px; font-weight:900; letter-spacing:.3em; opacity:.75}
   #worldcard span{font-size:clamp(22px,7vw,30px); font-weight:900; letter-spacing:-.02em}
+  #worldcard i{font-size:12.5px; font-weight:700; font-style:normal; opacity:.72; max-width:19em}
+  /* a card that teaches a new mechanic earns a little more presence */
+  #worldcard.teach b{color:var(--accent); opacity:1}
+  #worldcard.teach.show{animation-duration:3.1s}
   #worldcard.show{animation:worldcard 2.2s cubic-bezier(.2,.8,.3,1) forwards}
   @keyframes worldcard{
     0%{opacity:0; transform:translateY(10px) scale(.97)}
@@ -348,7 +352,7 @@
 </div>
 
 <div id="toast"></div>
-<div id="worldcard" aria-hidden="true"><b id="worldcard-n">WORLD 1</b><span id="worldcard-name">Meadow Rise</span></div>
+<div id="worldcard" aria-hidden="true"><b id="worldcard-n">WORLD 1</b><span id="worldcard-name">Meadow Rise</span><i id="worldcard-sub">Where the climb begins</i></div>
 
 <!-- ============ menu ============ -->
 <div class="overlay hidden" id="overlay-menu">

@@ -252,6 +252,103 @@ await group('QA: the moving block is a solid 3-D block, not a flat sheet', async
 });
 
 /* ---------------------------------------------------------------- */
+await group('QA: the tower turns as one playfield, and drops stay square', async () => {
+  // no turning at all while it is still being taught
+  await start(page, 5);
+  await perfect(page, 6);
+  let s = await state(page);
+  eq(s.towerAngle, 0, 'world 1 never turns the tower');
+  eq(s.plan.rotationSet.length, 0, 'and has no turn angles');
+
+  // world 2 turns 45 degrees, and the whole playfield goes with it
+  await start(page, 15);
+  const angles = [];
+  for (let i = 0; i < 6; i++) {   // level 15 clears at 7, so stay inside the run
+    await perfect(page, 1);
+    await page.evaluate(() => window.GameDebug.finishTurn());
+    angles.push((await state(page)).towerAngle);
+  }
+  ok(angles.some((a) => Math.abs(a) > 1), `the tower actually turned (${angles.join(', ')})`);
+  for (const a of angles) {
+    const mod = Math.abs(Math.round(a) % 45);
+    ok(mod === 0 || mod === 45, `orientation is a taught angle, not arbitrary (${a})`);
+  }
+
+  // the critical property: turning must not break the landing geometry
+  s = await state(page);
+  eq(s.mode, 'playing', 'still playing through the turns');
+  near(s.sizeX, s.baseSize, 1e-6, 'perfect drops through turns lose no width');
+  near(s.sizeZ, s.baseSize, 1e-6, 'and no depth - the playfield turns, the blocks still land square');
+  eq(s.sizePercent, 100, 'a full block survived every rotation');
+
+  // the pad turns with the tower: the first block lands square on it
+  await start(page, 25);
+  await page.evaluate(() => { window.GameDebug.freeze(true); window.GameDebug.alignPerfect(); });
+  const before = await page.evaluate(() => window.GameDebug.view().towerAngle);
+  await page.evaluate(() => { window.GameDebug.view().turnTower(90, 0.2); window.GameDebug.finishTurn(); });
+  const after = await page.evaluate(() => window.GameDebug.view().towerAngle);
+  near(Math.abs(after - before), Math.PI / 2, 0.02, 'turnTower turns by exactly what it is asked');
+  await page.evaluate(() => { window.GameDebug.alignPerfect(); window.GameDebug.freeze(false); });
+  await perfect(page, 1);
+  eq((await state(page)).sizePercent, 100, 'a perfect drop on a turned tower is still perfect');
+
+  // a full turn only exists where the tower is also turning live
+  const late = await page.evaluate(() => {
+    const L = window.GameDebug.logic;
+    return { at70: L.rotationSet(70), at71: L.rotationSet(71),
+             during70: L.levelConfig(70).plan.rotateDuring,
+             during71: L.levelConfig(71).plan.rotateDuring,
+             spin71: L.levelConfig(71).plan.spinRate };
+  });
+  eq(late.at70.includes(360), false, 'no meaningless full turn before live rotation');
+  eq(late.at71.includes(360), true, 'a full turn arrives with live rotation');
+  eq(late.during71, true, 'and the tower is turning while the block travels');
+  ok(late.spin71 > 0, 'with a real spin rate');
+});
+
+/* ---------------------------------------------------------------- */
+await group('QA: entry sides and movement rhythm are learnable, not random', async () => {
+  // the same level plays the same way every time - the fairness guarantee
+  const runOf = (lvl) => page.evaluate((l) => {
+    const L = window.GameDebug.logic, c = L.levelConfig(l);
+    return Array.from({ length: 24 }, (_, h) => L.approachSide(c, h) + ':' + L.rotationDelta(c, h));
+  }, lvl);
+  for (const lvl of [12, 45, 88]) {
+    const a = await runOf(lvl), b = await runOf(lvl);
+    eq(a.join('|'), b.join('|'), `level ${lvl} is identical on a retry`);
+  }
+
+  // and the live game follows that plan rather than rolling dice
+  await start(page, 12);
+  const planned = await page.evaluate(() => {
+    const L = window.GameDebug.logic, c = L.levelConfig(12);
+    return [0, 1, 2, 3].map((h) => L.approachSide(c, h));
+  });
+  const actual = [];
+  for (let i = 0; i < 4; i++) {
+    actual.push((await state(page)).side);
+    await perfect(page, 1);
+    await page.evaluate(() => window.GameDebug.finishTurn());
+  }
+  eq(actual.join(','), planned.join(','), 'the block enters from the side the plan says');
+
+  // level 1 is a single constant speed; late levels have a real rhythm
+  const rhythm = await page.evaluate(() => {
+    const L = window.GameDebug.logic;
+    const sample = (l) => {
+      const c = L.levelConfig(l);
+      const vals = [];
+      for (let i = -20; i <= 20; i++) vals.push(L.speedProfile(c, i / 20));
+      return { min: Math.min(...vals), max: Math.max(...vals) };
+    };
+    return { one: sample(1), late: sample(75) };
+  });
+  eq(rhythm.one.min, rhythm.one.max, 'level 1 never changes speed');
+  ok(rhythm.late.max / rhythm.late.min > 1.4, 'late levels vary speed along the travel');
+  ok(rhythm.late.min > 0.1, 'and never stall the block');
+});
+
+/* ---------------------------------------------------------------- */
 await group('QA: a level starts on the ground and every block counts', async () => {
   await start(page, 1);
   let s = await state(page);
@@ -871,7 +968,8 @@ await group('QA: retry flow and difficulty curve in the live game', async () => 
     const L = window.GameDebug.logic;
     return [1, 25, 49, 75, 99].map(l => {   // all non-boss, so goals compare
       const c = L.levelConfig(l);
-      return { l, speed: c.speed, win: c.perfectWindow, size: c.baseSize, sway: c.sway, goal: c.goal };
+      return { l, speed: c.speed, win: c.perfectWindow, size: c.baseSize,
+               load: c.mechanicLoad, goal: c.goal };
     });
   });
   for (let i = 1; i < curve.length; i++) {
@@ -880,7 +978,13 @@ await group('QA: retry flow and difficulty curve in the live game', async () => 
     ok(curve[i].size < curve[i - 1].size, `start size shrinks by level ${curve[i].l}`);
     ok(curve[i].goal >= curve[i - 1].goal, `goal never drops by level ${curve[i].l}`);
   }
-  ok(curve[0].sway === 0 && curve[4].sway > 0.3, 'movement variation is off early and strong late');
+  for (let i = 1; i < curve.length; i++) {
+    ok(curve[i].load >= curve[i - 1].load, `mechanic load grows by level ${curve[i].l}`);
+  }
+  ok(curve[0].load === 0, 'level 1 runs no extra mechanics at all');
+  ok(curve[4].load > 0.9, 'the endgame is carrying the difficulty with mechanics');
+  ok(curve[4].speed / curve[0].speed < 2.4,
+     `speed is not the difficulty system (${(curve[4].speed / curve[0].speed).toFixed(2)}x)`);
 });
 
 /* ---------------------------------------------------------------- */

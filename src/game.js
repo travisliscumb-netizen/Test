@@ -147,15 +147,18 @@
     view.setTheme(theme);
     applyThemeToUI(theme);
     view.setFitBounds(cfg.travel + cfg.baseSize * 0.5 + 0.4, cfg.baseSize * 0.5 + 1.6,
-                      cfg.hover * 0.58 + 1.2, cfg.hover * 0.42 + 2.8);
+                      cfg.hover * 0.58 + 1.2, cfg.hover * 0.42 + 2.8,
+                      cfg.plan.rotationSet.length > 0);
 
-    view.setSpin(0);
+    // continuous rotation while aiming, once that mechanic is unlocked
+    view.setSpin(cfg.plan.spinRate || 0);
     S.mode = 'playing';
     S.axis = 'x';
     S.topX = 0; S.topZ = 0; S.topY = 0;
     S.sizeX = cfg.baseSize; S.sizeZ = cfg.baseSize;
     S.height = 0; S.streak = 0; S.bestStreak = 0; S.score = 0;
     S.recoveries = 0; S.bossTargetMet = false; S.elapsed = 0; S.shake = 0;
+    S.lastTurn = 0;
 
     // Start on the floor. The concrete pad is the anchor for drop one and is
     // exactly the level's starting footprint, so the very first block can be
@@ -167,8 +170,11 @@
 
     // the world identity is shown once, here, instead of sitting in the HUD
     if (el.worldCard) {
-      txt(el.worldCardN, 'WORLD ' + cfg.world);
-      txt(el.worldCardName, theme.worldName);
+      var intro = cfg.plan.introduces;
+      txt(el.worldCardN, intro ? 'NEW' : 'WORLD ' + cfg.world);
+      txt(el.worldCardName, intro ? intro.name : theme.worldName);
+      txt(el.worldCardSub, intro ? intro.blurb : theme.tagline);
+      el.worldCard.classList.toggle('teach', !!intro);
       el.worldCard.classList.remove('show');
       void el.worldCard.offsetWidth;
       el.worldCard.classList.add('show');
@@ -185,12 +191,26 @@
   }
 
   function spawnMoving() {
+    // The axis always alternates - that is what shrinks the tower on both sides
+    // and it is the heart of the game. What changes with progression is which
+    // SIDE of that axis the block comes from, and how the playfield is turned.
     S.axis = (S.height % 2 === 0) ? 'x' : 'z';
-    var side = Math.random() < 0.5 ? -1 : 1;
+
+    // Turn the whole playfield before the block arrives. Early levels turn
+    // between drops so the new reference can be read; from world 8 the tower is
+    // still turning while the block travels.
+    var turn = L.rotationDelta(cfg, S.height);
+    if (turn) {
+      var dur = Math.abs(turn) >= 360 ? 1.25 : (Math.abs(turn) >= 180 ? 0.72 : 0.52);
+      view.turnTower(turn, dur);
+      S.lastTurn = turn;
+    }
+
+    var side = L.approachSide(cfg, S.height);
     var start = side * cfg.travel;
     var y = S.topY + cfg.hover;      // hovering clear of the tower, not resting on it
 
-    S.moving = { pos: start, dir: -side, t: 0, active: true, phase: Math.random() * Math.PI * 2 };
+    S.moving = { pos: start, dir: -side, t: 0, active: true, side: side, reverses: 0 };
 
     var x = S.axis === 'x' ? start : S.topX;
     var z = S.axis === 'z' ? start : S.topZ;
@@ -701,10 +721,23 @@
 
     if (S.mode === 'playing' && S.moving && S.moving.active && !S.frozen) {
       var speed = L.speedAt(cfg, S.height);
-      var mod = 1 + cfg.sway * Math.sin(S.elapsed * cfg.swayFreq * Math.PI * 2 + S.moving.phase);
-      S.moving.pos += S.moving.dir * speed * mod * dt;
+      // speed depends on WHERE the block is, not how long it has been going,
+      // so every pass over a given point behaves identically
+      var u = S.moving.pos / cfg.travel;
+      S.moving.pos += S.moving.dir * speed * L.speedProfile(cfg, u) * dt;
+
       if (S.moving.pos >= cfg.travel) { S.moving.pos = cfg.travel; S.moving.dir = -1; }
       if (S.moving.pos <= -cfg.travel) { S.moving.pos = -cfg.travel; S.moving.dir = 1; }
+
+      // Late levels can double back once, at a fixed point, on the first pass -
+      // deterministic, so it is a tell to spot rather than a trick.
+      if (cfg.plan.reversals && S.moving.reverses === 0 &&
+          Math.sign(S.moving.pos) === -Math.sign(S.moving.side) &&
+          Math.abs(S.moving.pos) > cfg.travel * 0.55 &&
+          L.hash01(cfg.level, S.height, 41) < 0.35) {
+        S.moving.dir = -S.moving.dir;
+        S.moving.reverses = 1;
+      }
       var x = S.axis === 'x' ? S.moving.pos : S.topX;
       var z = S.axis === 'z' ? S.moving.pos : S.topZ;
       view.moveMoving(x, z, dt);
@@ -737,6 +770,7 @@
       streakValue: $('streak-value'), streakDots: $('streak-dots'),
       banner: $('banner'), btnAdvance: $('btn-advance'), toast: $('toast'),
       worldCard: $('worldcard'), worldCardN: $('worldcard-n'), worldCardName: $('worldcard-name'),
+      worldCardSub: $('worldcard-sub'),
       overlayMenu: $('overlay-menu'), overlayClear: $('overlay-clear'),
       overlayFail: $('overlay-fail'), overlayLevels: $('overlay-levels'),
       menuProgress: $('menu-progress'),
@@ -793,6 +827,11 @@
           movingActive: !!(S.moving && S.moving.active),
           perfectTol: cfg ? cfg.perfectTol : 0,
           hover: cfg ? cfg.hover : 0, dropGap: cfg ? cfg.dropGap : 0,
+          side: S.moving ? S.moving.side : 0, lastTurn: S.lastTurn,
+          towerAngle: view ? +(view.towerAngle * 180 / Math.PI).toFixed(2) : 0,
+          turning: view ? view.turning : false,
+          mechanicLoad: cfg ? cfg.mechanicLoad : 0,
+          plan: cfg ? cfg.plan : null,
           sizePercent: cfg ? L.sizePercent(S.sizeX, S.sizeZ, cfg.baseSize) : 0,
           stars: cfg ? L.starsFor(S.sizeX, S.sizeZ, cfg.baseSize) : 0,
           savedStars: progress.stars(S.level), totalStars: progress.totalStars(),
@@ -830,6 +869,15 @@
       step: step,
       /** test hook: hold the sliding block still so input tests are exact */
       freeze: function (on) { S.frozen = !!on; },
+      /**
+       * test hook: run any in-flight tower turn to completion with fixed steps.
+       * Waiting on wall time is unreliable under software rendering, where a
+       * frame can take 300ms and the dt clamp makes game time crawl.
+       */
+      finishTurn: function () {
+        for (var i = 0; i < 400 && view.turning; i++) view.update(1 / 60);
+        return !view.turning;
+      },
       uiLocked: uiLocked,
       constants: { UI_ARM_MS: UI_ARM_MS, FAIL_DELAY_MS: FAIL_DELAY_MS, CLEAR_DELAY_MS: CLEAR_DELAY_MS },
       movingBounds: function () {

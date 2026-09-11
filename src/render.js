@@ -282,6 +282,8 @@
     /* ---- containers ------------------------------------------------ */
     var groundGroup = new THREE.Group(); scene.add(groundGroup);
     var towerGroup = new THREE.Group();  scene.add(towerGroup);
+    // the pad turns with the tower; the floor disc is a circle, so it does not
+    var padGroup = new THREE.Group();    towerGroup.add(padGroup);
     var fxGroup    = new THREE.Group();  scene.add(fxGroup);
     var decorGroup = new THREE.Group();  scene.add(decorGroup);
 
@@ -504,6 +506,7 @@
 
     function setGround(theme, padSize) {
       clearGroup(groundGroup);
+      clearGroup(padGroup);
       if (!padSize) return;
 
       var top = L.BLOCK_HEIGHT / 2;          // where a block centred on y=0 rests
@@ -531,7 +534,7 @@
       );
       skirt.position.y = floorY + skirtH / 2 - 0.18;
       skirt.receiveShadow = shadowsOn;
-      groundGroup.add(skirt);
+      padGroup.add(skirt);
 
       var padH = 0.62;
       var pad = new THREE.Mesh(
@@ -541,7 +544,7 @@
       pad.position.y = top - padH / 2;
       pad.receiveShadow = shadowsOn;
       pad.castShadow = shadowsOn;
-      groundGroup.add(pad);
+      padGroup.add(pad);
 
       var decal = new THREE.Mesh(
         new THREE.PlaneGeometry(padSize * 0.995, padSize * 0.995),
@@ -553,14 +556,24 @@
       decal.rotation.x = -Math.PI / 2;
       decal.position.y = top + 0.004;
       decal.receiveShadow = shadowsOn;
-      groundGroup.add(decal);
+      padGroup.add(decal);
     }
 
     /* ================================================================ *
      * Tower blocks
      * ================================================================ */
 
-    var spin = 0;             // idle rotation, menu only
+    /*
+     * Tower orientation.
+     *
+     * Rotating the GROUP turns the tower, the pad and the incoming block as one
+     * rigid playfield, so every drop is still square-on-square: the geometry is
+     * untouched and only the player's visual reference moves. Rotating the
+     * incoming block on its own would change the landing shape, which is a
+     * different (and worse) game.
+     */
+    var spin = 0;             // continuous rotation, rad/s
+    var rotAnim = null;       // discrete turn in progress
     var blocks = [];          // {mesh, y}
     var anims = [];           // squash animations
     var debris = [];          // sliced pieces
@@ -720,10 +733,16 @@
     function spawnSlice(spec) {
       var mesh = new THREE.Mesh(getGeometry(spec.sx, L.BLOCK_HEIGHT, spec.sz), getMaterial(spec.color).clone());
       mesh.material.transparent = true;
-      mesh.position.set(spec.x, spec.y, spec.z);
+      // spec is in tower-local space; fxGroup is not rotated, so convert both
+      // the position and the direction it flies off in
+      mesh.position.copy(toWorld(spec.x, spec.y, spec.z));
+      mesh.rotation.y = towerGroup.rotation.y;
       mesh.castShadow = false;
       fxGroup.add(mesh);
       var away = spec.dir || [1, 0, 0];
+      var ry = towerGroup.rotation.y;
+      away = [away[0] * Math.cos(ry) + away[2] * Math.sin(ry), 0,
+              -away[0] * Math.sin(ry) + away[2] * Math.cos(ry)];
       debris.push({
         mesh: mesh, life: 0,
         vel: new THREE.Vector3(away[0] * (2.0 + Math.random()), 1.4 + Math.random() * 0.7, away[2] * (2.0 + Math.random())),
@@ -739,7 +758,7 @@
       });
       var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(x, y, z);
+      m.position.copy(toWorld(x, y, z));
       m.scale.set(size, size, 1);
       m.renderOrder = 3;
       fxGroup.add(m);
@@ -754,7 +773,7 @@
         var s = 0.17;      // one fixed size keeps the geometry cache clean
         var mesh = new THREE.Mesh(getGeometry(s, s, s), getMaterial(color).clone());
         mesh.material.transparent = true;
-        mesh.position.set(x + (Math.random() - 0.5) * 1.4, y, z + (Math.random() - 0.5) * 1.4);
+        mesh.position.copy(toWorld(x + (Math.random() - 0.5) * 1.4, y, z + (Math.random() - 0.5) * 1.4));
         mesh.scale.setScalar(0.75 + Math.random() * 0.6);
         fxGroup.add(mesh);
         effects.push({
@@ -791,8 +810,13 @@
      * axis, `lateral` across it, and how far the framing must reach above and
      * below (the sliding block hovers well clear of the tower).
      */
-    function setFitBounds(travel, lateral, up, down) {
-      fitTravel = travel; fitLateral = lateral;
+    function setFitBounds(travel, lateral, up, down, rotates) {
+      fitTravel = travel;
+      // On a level whose playfield turns, the sliding block can end up anywhere
+      // on a circle of radius `travel`, so the framing has to cover the square
+      // that contains that circle. Levels that never turn keep the tighter,
+      // closer framing.
+      fitLateral = rotates ? travel : lateral;
       if (up != null) fitUp = up;
       if (down != null) fitDown = down;
       fitCamera();
@@ -836,8 +860,10 @@
       if (scene.fog) { scene.fog.near = camDist + 16; scene.fog.far = camDist + 96; }
     }
 
+    /** Focus on a TOWER-LOCAL point; converted to world so rotation is tracked. */
     function focusOn(x, y, z, instant) {
-      camDesired.set(x, y, z);
+      var w = toWorld(x, y, z);
+      camDesired.copy(w);
       if (instant) camTarget.copy(camDesired);
     }
 
@@ -955,9 +981,26 @@
         }
       }
 
-      if (spin) towerGroup.rotation.y += spin * dt;
+      if (rotAnim) {
+        rotAnim.t += dt;
+        var rp = Math.min(1, rotAnim.t / rotAnim.dur);
+        // ease in and out: the turn reads as a deliberate move, not a snap
+        var re = rp < 0.5 ? 2 * rp * rp : 1 - Math.pow(-2 * rp + 2, 2) / 2;
+        towerGroup.rotation.y = rotAnim.from + (rotAnim.to - rotAnim.from) * re;
+        if (rp >= 1) { towerGroup.rotation.y = rotAnim.to; rotAnim = null; }
+      } else if (spin) {
+        towerGroup.rotation.y += spin * dt;
+      }
+      towerGroup.updateMatrixWorld();
 
       updateCamera(dt);
+    }
+
+    /** Tower-local point to world space (the tower may be rotated). */
+    var _v = new THREE.Vector3();
+    function toWorld(x, y, z) {
+      towerGroup.updateMatrixWorld();
+      return _v.set(x, y, z).applyMatrix4(towerGroup.matrixWorld).clone();
     }
 
     function render() { renderer.render(scene, camera); }
@@ -968,7 +1011,7 @@
      * side faces on screen (i.e. that it is a solid, not a flat sheet).
      */
     function sampleWorldPoint(x, y, z) {
-      var v = new THREE.Vector3(x, y, z).project(camera);
+      var v = toWorld(x, y, z).project(camera);
       var W = renderer.domElement.width, H = renderer.domElement.height;
       var px = Math.round((v.x * 0.5 + 0.5) * W);
       var py = Math.round((v.y * 0.5 + 0.5) * H);
@@ -992,7 +1035,7 @@
       var W = renderer.domElement.width, H = renderer.domElement.height;
       var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (var i = 0; i < 8; i++) {
-        var v = new THREE.Vector3(
+        var v = toWorld(
           p.x + (i & 1 ? hx : -hx), p.y + (i & 2 ? hy : -hy), p.z + (i & 4 ? hz : -hz)
         ).project(camera);
         var sx = (v.x * 0.5 + 0.5) * W, sy = (0.5 - v.y * 0.5) * H;
@@ -1034,6 +1077,7 @@
       camDesired.set(0, 0, 0);
       towerGroup.rotation.y = 0;
       spin = 0;
+      rotAnim = null;
       // every mesh that could reference the caches is gone by this point
       disposeCaches();
     }
@@ -1043,8 +1087,13 @@
       var top = blocks.slice(-(count || 4));
       for (var i = 0; i < top.length; i++) {
         var rec = top[i];
+        var wp = new THREE.Vector3();
+        rec.mesh.getWorldPosition(wp);
+        var wry = towerGroup.rotation.y;
         towerGroup.remove(rec.mesh);
         fxGroup.add(rec.mesh);
+        rec.mesh.position.copy(wp);
+        rec.mesh.rotation.y += wry;
         for (var a = anims.length - 1; a >= 0; a--) if (anims[a].mesh === rec.mesh) anims.splice(a, 1);
         rec.mesh.scale.set(1, 1, 1);
         rec.mesh.castShadow = false;
@@ -1071,6 +1120,25 @@
       spawnSlice: spawnSlice, perfectFx: perfectFx, recoveryFx: recoveryFx,
       focusOn: focusOn, setFitBounds: setFitBounds, fitCamera: fitCamera,
       setSpin: function (r) { spin = r || 0; },
+      /**
+       * Turn the whole playfield by `deg`, eased, over `dur` seconds.
+       *
+       * A turn still in flight is snapped to its target first. Without that, a
+       * fast player starting a new turn mid-animation abandons the old one part
+       * way and the tower drifts off the taught 45-degree grid - orientations
+       * the player was never shown, which is exactly the "unfair" feeling this
+       * mechanic has to avoid.
+       */
+      turnTower: function (deg, dur) {
+        if (rotAnim) { towerGroup.rotation.y = rotAnim.to; rotAnim = null; }
+        if (!deg) return 0;
+        var from = towerGroup.rotation.y;
+        rotAnim = { from: from, to: from + deg * Math.PI / 180, t: 0, dur: dur || 0.5 };
+        return rotAnim.dur;
+      },
+      get towerAngle() { return towerGroup.rotation.y; },
+      get turning() { return !!rotAnim; },
+      toWorld: toWorld,
       replaceTopBlock: replaceTopBlock, update: update, render: render,
       sampleWorldPoint: sampleWorldPoint, movingSilhouette: movingSilhouette,
       /** y of the newest landed block - lets a test watch a drop fall */

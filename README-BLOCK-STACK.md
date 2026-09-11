@@ -149,6 +149,74 @@ gauge — because three perfect drops are what refund that bar.
 
 ---
 
+## The mechanics ladder
+
+Difficulty is carried by mechanics, not by pace. Each one is introduced alone,
+at a level boundary, with a title card that names it — so it can be learned
+before it is combined with anything else. By world 10 they all run together.
+
+| Level | Mechanic | What changes |
+|-------|----------|--------------|
+| 1 | Tap to drop | One axis alternation, one entry side, constant speed |
+| 4 | Both sides | The block enters from either side |
+| 8 | Entry patterns | Sides follow a repeating four-beat pattern |
+| 11 | Turning tower | The whole playfield turns 45° between drops |
+| 21 | Quarter turns | 45° or 90°, every second drop |
+| 31 | Uneven speed | Fast through the middle, slow at the ends |
+| 41 | Three-eighth turns | 135° joins the set |
+| 51 | Hesitation | A pause at the same point on every pass |
+| 61 | Half turns | 180°, and a turn on every drop |
+| 71 | Live rotation | The tower keeps turning while you aim |
+| 81 | Reversals | The block can double back mid-travel |
+| 91 | Everything | Every mechanic, tightest tolerance |
+
+### Rotation turns the playfield, not the block
+
+The tower, the landing pad and the incoming block are one rigid group, and it is
+the **group** that turns. Every drop is still square-on-square: the geometry is
+untouched and only the player's visual reference moves. Rotating the incoming
+block on its own would change the landing shape, which is a different and worse
+game.
+
+A turn still in flight is snapped to its target before a new one starts, so the
+tower can never drift off the 45° grid into an orientation the player was never
+shown. A full 360° turn only exists from level 71, where the tower is *also*
+turning while the block travels — a 360° turn that ends where it started asks
+nothing of the player.
+
+### Nothing is random
+
+Every per-drop decision — entry side, whether the tower turns and by how much,
+whether the block doubles back — is a pure function of `(level, stack height)`.
+There is no `Math.random()` anywhere in the gameplay path. Retry a level and you
+get the identical sequence, so a pattern can be read, learned and beaten.
+
+The movement rhythm is a function of **position** along the travel, not elapsed
+time. The previous version modulated speed by a sine of absolute time with a
+random starting phase, so the block behaved differently on every pass and could
+not be learned — arbitrary rather than skilful. Now the same place in the travel
+always behaves the same way.
+
+### Speed is not the difficulty system
+
+| | Level 1 | Level 99 |
+|---|---|---|
+| slide speed | 2.5 u/s | 5.4 u/s (**1.9×**, was 3.0×) |
+| perfect window | 95 ms | 52 ms (was 18 ms) |
+| mechanic load | 0.00 | 1.04 |
+
+Most of what speed growth there is happens in the first half. A late level is
+barely faster than a mid one — it is turning every drop, hesitating, reversing,
+and running a pattern. The perfect window no longer collapses to 18 ms either:
+demanding a near-frame-perfect tap *and* a freshly rotated reference was
+doubling up.
+
+Boss levels run the same mechanics at a sustainable pace — half the turn
+frequency and half the spin rate — because a 100-drop unbroken climb is a
+different test from an eight-drop level.
+
+---
+
 ## Difficulty design
 
 Everything is a smooth, monotonic function of the level number. There are no
@@ -168,13 +236,18 @@ faster *and* the target shrinks — which lands past human reaction limits and
 feels broken rather than hard.
 
 `test/balance.mjs` verifies this by simulating thousands of runs against modelled
-human tap timing (σ = 25 / 45 / 75 ms). Sample of the tuned curve:
+human tap timing (σ = 25 / 45 / 75 ms), with each level's mechanic load added as
+an independent error source in quadrature — about 32 ms of extra error at full
+load. Modelling it as a multiplier instead punished weaker players far harder
+than stronger ones, which is backwards: re-reading a turned tower is a cognitive
+tax, not a motor one, and costs roughly the same accuracy whoever you are.
+Sample of the tuned curve:
 
 ```
 player                 1     5   *10    15    25    35    45   *50    65    75    85   *90    95    99  *100
-expert  (σ 25ms)    100%  100%  100%  100%  100%  100%  100%  100%  100%  100%  100%   99%   99%   96%   34%
-good    (σ 45ms)    100%  100%  100%  100%  100%  100%  100%  100%  100%   98%   78%    1%   38%   18%    0%
-casual  (σ 75ms)    100%  100%  100%  100%  100%  100%   99%   81%   69%   38%    8%    0%    1%    0%    0%
+expert  (σ 25ms)    100%  100%  100%  100%  100%  100%  100%  100%  100%  100%   96%   79%   86%   78%   36%
+good    (σ 45ms)    100%  100%  100%  100%  100%  100%  100%  100%   98%   90%   60%    2%   34%   26%    0%
+casual  (σ 75ms)    100%  100%  100%  100%  100%  100%   97%   56%   57%   29%    8%    0%    2%    1%    0%
 ```
 
 Early levels are forgiving for anyone, the endgame is brutal, and nothing is

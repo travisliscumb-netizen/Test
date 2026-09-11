@@ -22,6 +22,19 @@ const require2 = createRequire(import.meta.url);
 const L = require2('../src/logic.js');
 const QUIET = process.argv.includes('--quiet');
 
+/*
+ * Mechanic load as an error budget.
+ *
+ * A load of ~1.0 (the endgame: turning every drop, live rotation, hesitation,
+ * reversals) costs a player about 32ms of extra timing error. It is added in
+ * QUADRATURE with their own precision, not multiplied by it, because the two
+ * are independent: re-reading a freshly turned tower costs roughly the same
+ * absolute accuracy whoever you are. Modelling it as a multiplier punished
+ * weaker players far harder than stronger ones, which is backwards - the
+ * mechanic is a cognitive tax, not a motor one.
+ */
+const MECHANIC_TAX = 0.032;
+
 /* deterministic RNG so the report is reproducible */
 function rng(seed) {
   let a = seed >>> 0;
@@ -61,10 +74,23 @@ function simulate(level, sigma, rand, maxDrops) {
     const anchor = horiz ? posX : posZ;
     const speed = L.speedAt(cfg, height);
 
-    // a swaying block is moving at an unpredictable speed at the moment of the
-    // tap, so the same timing error translates into a larger positional error
-    const swayFactor = 1 + cfg.sway * (rand() * 2 - 1);
-    const err = gauss(rand) * sigma * speed * swayFactor;
+    /*
+     * Positional error = timing error x how fast the block is moving when the
+     * player taps, inflated by everything else the level is asking them to
+     * track.
+     *
+     * Two factors, both from the level's own configuration rather than a fudge:
+     *
+     *  - the speed profile AT THE CENTRE, because that is where the player aims
+     *    and, once easing is taught, it is the fastest part of the travel;
+     *  - the mechanic load, added in quadrature as an independent error source
+     *    (see MECHANIC_TAX). A player reading a freshly rotated tower is less
+     *    accurate than one lining up the same corner every time - that is the
+     *    whole point of the mechanic.
+     */
+    const centreSpeed = speed * L.speedProfile(cfg, 0);
+    const effective = Math.sqrt(sigma * sigma + Math.pow(cfg.mechanicLoad * MECHANIC_TAX, 2));
+    const err = gauss(rand) * effective * centreSpeed;
 
     const r = L.resolveDrop({
       movingPos: anchor + err, movingSize: size,
@@ -136,6 +162,7 @@ if (!QUIET) {
     const r = results['expert  (σ 25ms)'][l];
     const c = L.levelConfig(l);
     console.log(`  L${String(l).padStart(3)}  ${c.isBoss ? 'boss' : 'norm'}  window ${(c.perfectWindow * 1000).toFixed(0)}ms` +
+      `  speed ${c.speed.toFixed(1)}  load ${c.mechanicLoad.toFixed(2)}` +
       `  perfect-drop rate ${(r.perfectRate * 100).toFixed(0)}%` +
       `  avg height ${r.avgHeight.toFixed(1)}/${c.isBoss ? c.bossTarget : c.goal}` +
       `  refunds/run ${r.avgRecoveries.toFixed(1)}` +
