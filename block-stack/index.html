@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<title>Block Stack</title>
+<meta name="description" content="Stack, cut, and chase the perfect line through 100 levels and 10 worlds.">
+<meta name="theme-color" content="#12131A">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Block Stack">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<link rel="stylesheet" href="src/ui.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="stage"></canvas>
+
+  <!-- gameplay HUD -->
+  <div id="hud" class="layer hidden">
+    <div class="hud-top safe-top">
+      <button id="pauseBtn" class="icon-btn" aria-label="Pause">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.6" height="14" rx="1.3"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.3"/></svg>
+      </button>
+      <div class="hud-centre">
+        <div class="hud-level" id="hudLevel">Level 1</div>
+        <div class="hud-world" id="hudWorld">Meadow Dawn</div>
+      </div>
+      <div class="hud-score">
+        <div class="hud-score-v" id="hudScore">0</div>
+        <div class="hud-score-l">SCORE</div>
+      </div>
+    </div>
+    <div class="hud-bar-wrap safe-top">
+      <div class="hud-bar"><i id="hudBar"></i></div>
+      <span id="hudProg">0 / 10</span>
+    </div>
+    <div id="combo" class="combo"></div>
+    <div id="hint" class="hint"></div>
+    <button id="finishBtn" class="finish-btn hidden">Bank Run</button>
+  </div>
+
+  <!-- title -->
+  <section id="title" class="layer screen">
+    <div class="screen-inner">
+      <div class="logo">
+        <canvas id="logoIcon" width="220" height="220" aria-hidden="true"></canvas>
+        <h1>BLOCK<span>STACK</span></h1>
+        <p class="tag">Time the drop. Keep the line.</p>
+      </div>
+      <div class="title-actions">
+        <button id="playBtn" class="btn btn-primary btn-lg"><span id="playLabel">Play</span></button>
+        <div class="row">
+          <button id="mapBtn" class="btn">Levels</button>
+          <button id="recordsBtn" class="btn">Records</button>
+        </div>
+      </div>
+      <div class="title-foot">
+        <div class="stat"><b id="tStatLevel">1</b><span>Level</span></div>
+        <div class="stat"><b id="tStatCrowns">0</b><span>Crowns</span></div>
+        <div class="stat"><b id="tStatPerfect">0</b><span>Perfects</span></div>
+      </div>
+      <div class="toggles">
+        <button class="toggle" data-setting="sound"><span class="dot"></span>Sound</button>
+        <button class="toggle" data-setting="music"><span class="dot"></span>Music</button>
+        <button class="toggle" data-setting="haptics"><span class="dot"></span>Haptics</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- level map -->
+  <section id="map" class="layer screen">
+    <div class="map-head safe-top">
+      <button id="mapBack" class="icon-btn" aria-label="Back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="map-title">
+        <div id="mapWorldName">Meadow Dawn</div>
+        <div id="mapWorldSub">World 1 · Fundamentals</div>
+      </div>
+      <div class="map-crowns"><span id="mapCrowns">0</span>/30</div>
+    </div>
+    <div class="world-strip" id="worldStrip"></div>
+    <div class="level-grid" id="levelGrid"></div>
+    <div class="world-panel" id="worldPanel"></div>
+    <div class="map-foot" id="mapFoot"></div>
+  </section>
+
+  <!-- pause -->
+  <section id="pause" class="layer sheet-wrap">
+    <div class="sheet">
+      <h2>Paused</h2>
+      <button id="resumeBtn" class="btn btn-primary btn-lg">Resume</button>
+      <div class="row">
+        <button id="restartBtn" class="btn">Restart</button>
+        <button id="toMapBtn" class="btn">Level Map</button>
+      </div>
+      <div class="toggles">
+        <button class="toggle" data-setting="sound"><span class="dot"></span>Sound</button>
+        <button class="toggle" data-setting="music"><span class="dot"></span>Music</button>
+        <button class="toggle" data-setting="haptics"><span class="dot"></span>Haptics</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- result -->
+  <section id="result" class="layer screen result">
+    <div class="screen-inner">
+      <div class="result-card">
+        <div class="result-kicker" id="resKicker">Level 1</div>
+        <h2 id="resTitle">Complete</h2>
+        <div class="crowns" id="resCrowns"></div>
+        <div class="result-score"><b id="resScore">0</b><span>SCORE</span></div>
+        <div class="result-stats" id="resStats"></div>
+        <div class="result-next" id="resNext"></div>
+      </div>
+      <div class="result-actions">
+        <button id="resPrimary" class="btn btn-primary btn-lg">Next Level</button>
+        <div class="row">
+          <button id="resRetry" class="btn">Retry</button>
+          <button id="resMap" class="btn">Level Map</button>
+        </div>
+      </div>
+      <p class="retry-hint" id="retryHint">Tap anywhere to retry</p>
+    </div>
+  </section>
+
+  <!-- world complete -->
+  <section id="worldClear" class="layer screen">
+    <div class="screen-inner">
+      <div class="wc-kicker">World Complete</div>
+      <h2 id="wcName">Meadow Dawn</h2>
+      <div class="crowns big" id="wcCrowns"></div>
+      <p id="wcNext">Coral Bay unlocked</p>
+      <button id="wcBtn" class="btn btn-primary btn-lg">Continue</button>
+    </div>
+  </section>
+
+  <!-- records -->
+  <section id="records" class="layer screen">
+    <div class="map-head safe-top">
+      <button id="recBack" class="icon-btn" aria-label="Back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="map-title"><div>Records</div><div id="recSub">Your best runs</div></div>
+      <div style="width:44px"></div>
+    </div>
+    <div class="rec-body">
+      <div class="rec-grid" id="recGrid"></div>
+      <h3>Achievements</h3>
+      <div class="ach-list" id="achList"></div>
+      <button id="wipeBtn" class="btn btn-danger">Erase all progress</button>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+  <div id="bossBanner" class="boss-banner"></div>
+</div>
+
+<!-- iOS 17.4+ plays a system haptic when a switch control is toggled; this is
+     the only route to haptics in mobile Safari. Inert everywhere else. -->
+<input type="checkbox" switch id="hapticSwitch" aria-hidden="true" tabindex="-1">
+<label for="hapticSwitch" id="hapticLabel" aria-hidden="true"></label>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
