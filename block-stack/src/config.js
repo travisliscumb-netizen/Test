@@ -3,7 +3,9 @@
    balance simulator in tools/sim.mjs. */
 
 export const BASE = 1.0;        // full block footprint, world units
-export const BLOCK_H = 0.32;    // block height, world units
+export const BLOCK_H = 0.44;    // block height, world units -- thick enough that
+                                // the side faces read as real material, not a
+                                // sheet of paper seen edge-on
 export const MIN_SIZE = 0.045;  // thinner than this and the sliver cannot hold
 export const RECOVER = 0.18;    // width restored per 3-perfect recovery
 export const PERFECT_STREAK = 3;
@@ -235,4 +237,60 @@ export function rateRun({ placed, perfects, remaining, maxSize }) {
 export const RATING_RULES = [
   { crowns: 2, text: 'Keep 50% of the platform, or land 25% Perfects' },
   { crowns: 3, text: 'Keep 70% of the platform and land 50% Perfects' }
+];
+
+/* ------------------------------------------------------------ stack mode --
+   The endless climb. There are no levels, so the progression has to be legible
+   some other way: the tower literally ascends through all ten worlds, one every
+   twelve blocks, with the sky crossfading as you pass through. Speed, precision
+   and the mechanic pool ramp continuously rather than in steps, and each new
+   mechanic is introduced alone before it is combined with anything. */
+
+const STACK_WORLD_SPAN = 12;
+export const STACK_MILESTONE = 25;
+
+export function stackWorldAt(h) {
+  return Math.max(1, Math.min(WORLD_COUNT, 1 + Math.floor(h / STACK_WORLD_SPAN)));
+}
+
+export function stackConfig() {
+  const ramp = (h, from, to, over) => lerp(from, to, Math.min(1, h / over));
+
+  const at = (i) => {
+    const h = i;
+    const world = stackWorldAt(h);
+    const rhythms = ['constant'];
+    if (h >= 18) rhythms.push('accel', 'decel');
+    if (h >= 34) rhythms.push('pulse');
+    if (h >= 52) rhythms.push('pause');
+    if (h >= 74) rhythms.push('reverse');
+    return {
+      world,
+      palette: WORLDS[world - 1],
+      speed: +ramp(h, 1.50, 3.15, 112).toFixed(4),
+      travel: +ramp(h, 1.32, 1.15, 112).toFixed(4),
+      perfect: +ramp(h, 0.066, 0.0285, 112).toFixed(5),
+      axis: h < 10 ? 'x' : h < 26 ? 'alt2' : 'alt',
+      dir: h < 8 ? 'fixed' : 'flip',
+      rhythms
+    };
+  };
+
+  return Object.assign({
+    num: 0, world: 1, worldIndex: 0, inWorld: 0, boss: false, stack: true,
+    name: 'Stack', hint: 'Tap to Stack · climb as high as you can',
+    target: Infinity,
+    startWidth: 1, maxSize: BASE,
+    at
+  }, at(0));
+}
+
+/* What changes, and at what height -- shown once, in one line, when it happens. */
+export const STACK_BEATS = [
+  { at: 8, text: 'New: Direction Change' },
+  { at: 10, text: 'New: Axis Change' },
+  { at: 18, text: 'New: Speed Shift' },
+  { at: 34, text: 'New: Pulse' },
+  { at: 52, text: 'New: Pauses' },
+  { at: 74, text: 'New: Reversals' }
 ];

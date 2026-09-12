@@ -2,7 +2,7 @@
    it is precached on install and served cache-first: after one visit the game
    launches from the Home Screen with no network at all. */
 
-const VERSION = 'block-stack-v1';
+const VERSION = 'block-stack-v2';
 const SHELL = [
   './',
   './index.html',

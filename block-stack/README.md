@@ -40,7 +40,12 @@ block-stack/
     ui.css
 tools/
   sim.mjs         headless balance telemetry across all 100 levels
-  make-icons.mjs  renders the icon set from src/icon.js
+  profile.mjs     per-frame draw-call counts and FPS for three scenarios
+  make-icons.mjs  renders the icon set and iOS launch images from src/icon.js
+  readability.mjs captures the moment of decision on both travel axes
+  worldshots.mjs  one mid-run capture of every world
+  menushots.mjs   title / map / records / result / world-complete / stack
+  screens.mjs     pause, failure, first-run and opening-seconds states
   serve.mjs       tiny static server used by the tools
 tests/
   playtest.mjs    end-to-end Chromium playtest at three iPhone sizes
@@ -66,10 +71,31 @@ engine would buy nothing and cost a large download plus GPU time on a phone.
 Faces are drawn with per-face lighting, a chamfer plate, a specular sheen and a
 crisp top edge.
 
-**The landing shadow is a mechanic, not a decoration.** The incoming block's
-footprint is drawn on the landing surface, and darker where it actually
-overlaps. The player reads the cut before committing. Dashed guides extend the
-platform edges along the travel axis. Poor readability is a bug, not difficulty.
+**The incoming block flies above the stack.** Resting it on the platform looks
+tidier and is the obvious thing to do, but the two always share a footprint, so
+the block covers the platform *exactly* -- hiding the landing shadow, the edge
+cues and the overhang sliver in one go. That was the single worst readability
+defect in the game. Raising it is a pure vertical screen translation, so the
+block's horizontal position still maps 1:1 to where it lands; nothing has to be
+inferred from perspective, and the drop becomes a real animation with weight.
+
+**The landing shadow is a mechanic, not a decoration.** The block's footprint is
+drawn on the landing surface, clipped to it, with a crisp terminator: that edge
+against the platform's edge *is* the alignment read. At zero offset the shadow
+covers the platform exactly and no crescent shows.
+
+**Only two edges can ever decide a placement** -- the pair across the travel
+axis -- so those two are lit on the platform and the others are not. It reads as
+the surface catching the light rather than as a targeting overlay. Rails running
+*parallel* to the travel direction (the obvious thing to draw, and what this
+originally drew) tell the player nothing at all.
+
+**The camera elevation is higher than textbook 2:1 isometric** (the top face is a
+1.72:1 diamond). A higher camera spends the phone's abundant vertical budget on
+the block's travel instead of its scarce horizontal one -- which is what lets
+blocks be half the screen wide -- and shows more of the two surfaces the player
+is comparing. The anchor eases down the screen as the tower grows, so the ground
+stays in shot early and the tower gets the room later.
 
 **The perfect window is a time budget, not a distance.** `perfect` in the world
 tables is in *seconds*; the engine multiplies it by the block's instantaneous
@@ -92,6 +118,16 @@ movement. Difficulty never comes from moving the block far away.
 **Hidden comeback assistance.** Below 45% platform width the next block gets
 slightly slower, travels slightly less, and gets a slightly wider window,
 scaling with how desperate things are. It is never announced.
+
+**Stack mode is the campaign turned inside out.** No levels, so the progression
+is told through the world: the tower climbs through all ten skies, one every
+twelve blocks, crossfading as it passes. Speed, precision and the mechanic pool
+ramp continuously, each new mechanic arriving alone before it is combined.
+
+**No full-screen backdrop-filter anywhere.** The canvas behind the menus is
+animating, so a viewport-sized live blur re-composites every frame on a phone.
+The depth-of-field behind the menus is baked into the canvas once per world
+instead.
 
 ---
 

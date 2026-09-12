@@ -20,9 +20,9 @@ export function unlock() {
     if (!AC) return false;
     ctx = new AC();
     comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -12; comp.knee.value = 24; comp.ratio.value = 6;
+    comp.threshold.value = -14; comp.knee.value = 26; comp.ratio.value = 7;
     comp.attack.value = 0.004; comp.release.value = 0.18;
-    master = ctx.createGain(); master.gain.value = 0.9;
+    master = ctx.createGain(); master.gain.value = 0.82;
     sfxBus = ctx.createGain(); sfxBus.gain.value = soundOn ? 1 : 0;
     musicBus = ctx.createGain(); musicBus.gain.value = musicOn ? 1 : 0;
     sfxBus.connect(comp); musicBus.connect(comp);
@@ -94,24 +94,32 @@ const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
 const hz = (semi, base = 440) => base * Math.pow(2, semi / 12);
 
 /* ---------------------------------------------------------------- sfx ---- */
+/* A little detune on anything the player hears dozens of times a minute. Two
+   identical samples back to back is what makes a mobile game sound cheap. */
+const vary = (n = 0.05) => 1 + (Math.random() * 2 - 1) * n;
+
 export const sfx = {
   place() {
-    tone({ freq: 150, type: 'sine', decay: 0.16, gain: 0.34, slideTo: 72, slideTime: 0.12 });
-    noise({ decay: 0.07, gain: 0.13, freq: 900, q: 0.7, type: 'lowpass', sweepTo: 260 });
+    const v = vary(0.07);
+    tone({ freq: 150 * v, type: 'sine', decay: 0.155, gain: 0.30, slideTo: 72 * v, slideTime: 0.12 });
+    noise({ decay: 0.07, gain: 0.11, freq: 900 * v, q: 0.7, type: 'lowpass', sweepTo: 260 });
   },
   cut() {
-    noise({ decay: 0.16, gain: 0.13, freq: 2600, q: 1.1, sweepTo: 420 });
+    noise({ decay: 0.15, gain: 0.10, freq: 2600 * vary(0.12), q: 1.1, sweepTo: 420 });
   },
   fall() {
     tone({ freq: 220, type: 'triangle', decay: 0.42, gain: 0.1, slideTo: 62, slideTime: 0.4 });
   },
   perfect(combo = 1) {
+    // the ladder tops out rather than climbing into a shriek on a long streak
     const step = PENTA[Math.min(PENTA.length - 1, combo - 1)];
     const f = hz(step, 880);
-    tone({ freq: f, type: 'sine', attack: 0.002, decay: 0.35, gain: 0.28 });
-    tone({ freq: f * 2, type: 'sine', attack: 0.002, decay: 0.20, gain: 0.11 });
-    tone({ freq: f * 3.01, type: 'sine', attack: 0.002, decay: 0.11, gain: 0.05 });
-    noise({ decay: 0.06, gain: 0.05, freq: 6200, q: 1.6 });
+    const body = Math.min(1, 0.72 + combo * 0.06);
+    tone({ freq: f, type: 'sine', attack: 0.002, decay: 0.34, gain: 0.26 * body });
+    tone({ freq: f * 2, type: 'sine', attack: 0.002, decay: 0.19, gain: 0.10 * body });
+    tone({ freq: f * 3.01, type: 'sine', attack: 0.002, decay: 0.11, gain: 0.045 });
+    tone({ freq: f * 0.5, type: 'triangle', attack: 0.003, decay: 0.16, gain: 0.07 });
+    noise({ decay: 0.055, gain: 0.042, freq: 6200, q: 1.6 });
   },
   recover() {
     [0, 4, 7, 12].forEach((s, i) =>
@@ -148,7 +156,7 @@ export const sfx = {
     [0, 5, 9, 14].forEach((s, i) =>
       tone({ freq: hz(s, 1046), type: 'sine', t: i * 0.05, decay: 0.22, gain: 0.15 }));
   },
-  ui() { tone({ freq: 520, type: 'sine', decay: 0.07, gain: 0.12 }); },
+  ui() { tone({ freq: 520 * vary(0.03), type: 'sine', decay: 0.07, gain: 0.10 }); },
   uiBack() { tone({ freq: 320, type: 'sine', decay: 0.08, gain: 0.1 }); }
 };
 

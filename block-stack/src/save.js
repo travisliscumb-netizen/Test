@@ -11,7 +11,7 @@ const DEFAULTS = () => ({
   levels: {},                 // num -> { crowns, score, perfects, combo, remainPct, endless }
   records: {
     totalPerfects: 0, bestCombo: 0, smallest: 1, totalRuns: 0, totalBlocks: 0,
-    bestScore: 0, bestEndless: 0, recoveries: 0
+    bestScore: 0, bestEndless: 0, recoveries: 0, bestStack: 0
   },
   achievements: {},
   settings: { sound: true, music: true, haptics: true }
@@ -64,7 +64,8 @@ export const ACHIEVEMENTS = [
   { id: 'world-clear', name: 'World Complete', desc: 'Finish every level in a world' },
   { id: 'level-50', name: 'Halfway Up', desc: 'Reach level 50' },
   { id: 'level-100', name: 'Summit', desc: 'Clear level 100' },
-  { id: 'endless-25', name: 'Overtime', desc: 'Stack 25 extra blocks after a boss' }
+  { id: 'endless-25', name: 'Overtime', desc: 'Stack 25 extra blocks after a boss' },
+  { id: 'climb-60', name: 'High Climb', desc: 'Reach 60 blocks in Stack' }
 ];
 
 export function unlock(id) {
@@ -97,6 +98,11 @@ export function recordRun(summary, opts = {}) {
   if (summary.score > r.bestScore) { r.bestScore = summary.score; beat.push('score'); }
   if (summary.placed > 0 && summary.smallest < r.smallest) { r.smallest = summary.smallest; }
   if (summary.endlessBlocks > r.bestEndless) { r.bestEndless = summary.endlessBlocks; beat.push('endless'); }
+  if (opts.stack) {
+    if (summary.placed > (r.bestStack || 0)) { r.bestStack = summary.placed; beat.push('stack'); }
+    touch();
+    return beat;   // the endless climb has no level to record against
+  }
 
   if (summary.cleared) {
     const n = summary.level;

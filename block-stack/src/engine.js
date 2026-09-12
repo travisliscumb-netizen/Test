@@ -4,6 +4,15 @@
 
 import { BASE, BLOCK_H, MIN_SIZE, RECOVER, PERFECT_STREAK, blockColor, rateRun } from './config.js';
 
+/* How high the incoming block flies above the landing surface. This is purely
+   presentational, but it is the single biggest readability fix in the game:
+   resting the block directly on the platform makes it cover the platform's top
+   face EXACTLY (they always share a footprint), hiding the landing shadow, the
+   edge guides and the overhang sliver all at once. Raising it is a pure
+   vertical screen translation, so the block's horizontal position still maps
+   1:1 to where it lands -- nothing has to be inferred from perspective. */
+export const HOVER = 0.62;
+
 export const PHASE = {
   READY: 'ready',       // level armed, first block moving, nothing placed yet
   PLAYING: 'playing',
@@ -102,8 +111,8 @@ export class Game {
     return { speed: 1 - 0.18 * t, travel: 1 - 0.16 * t, perfect: 1 + 0.55 * t };
   }
 
-  _axisFor(i) {
-    const m = this.cfg.axis;
+  _axisFor(i, cfg) {
+    const m = (cfg || this.cfg).axis;
     if (m === 'x') return 'x';
     if (m === 'z') return 'z';
     if (m === 'alt') return i % 2 === 0 ? 'x' : 'z';
@@ -112,10 +121,14 @@ export class Game {
   }
 
   _spawn() {
-    const cfg = this.cfg;
     const top = this.top;
     const i = this.placed;
-    const axis = this._axisFor(i);
+    /* `at(index)` lets a mode vary its parameters per block. Campaign levels
+       leave it undefined and the level config is used as-is; the endless climb
+       uses it to ramp speed, precision and mechanics continuously. */
+    const cfg = this.cfg.at ? Object.assign({}, this.cfg, this.cfg.at(i)) : this.cfg;
+    this.live = cfg;
+    const axis = this._axisFor(i, cfg);
     const a = this._assist();
 
     const center = axis === 'x' ? top.x : top.z;
@@ -136,6 +149,7 @@ export class Game {
       y: top.y + BLOCK_H,
       index: i + 1,
       color: blockColor(cfg.world, i + 1),
+      worldId: cfg.world,
       spawnAt: this.time
     };
     this.emit('spawn', { axis, rhythm, dirFromLeft: startSide < 0 });
@@ -146,12 +160,17 @@ export class Game {
     this.time += dt;
     for (let i = this.debris.length - 1; i >= 0; i--) {
       const p = this.debris[i];
-      p.vy -= 9.8 * dt;
+      p.vy -= 15.5 * dt;                 // heavier than earth: reads as weight
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      p.rot += p.spin * dt;
+      p.spin *= (1 - 0.35 * dt);
       p.life -= dt;
-      if (p.life <= 0) this.debris.splice(i, 1);
+      if (p.life <= 0) { this.debris[i] = this.debris[this.debris.length - 1]; this.debris.pop(); }
     }
-    for (const b of this.blocks) if (b.settle > 0) b.settle = Math.max(0, b.settle - dt * 4.5);
+    for (const b of this.blocks) {
+      if (b.drop > 0) b.drop = Math.max(0, b.drop - dt / 0.085);
+      else if (b.settle > 0) b.settle = Math.max(0, b.settle - dt * 4.6);
+    }
 
     const a = this.active;
     if (!a || this.phase === PHASE.OVER || this.phase === PHASE.COMPLETE) return;
@@ -230,7 +249,8 @@ export class Game {
       y: a.y,
       index: a.index,
       color: a.color,
-      settle: 1
+      settle: 1,
+      drop: 1          // falls the hover distance, then squashes on impact
     };
 
     let gained = 10;
@@ -244,6 +264,7 @@ export class Game {
     } else {
       this.combo = 0;
       this.streakForRecovery = 0;
+      if (this.debris.length >= 8) this.debris.shift();
       this.debris.push(this._cutPiece(axis, cutCenter, cutWidth, block, a));
       this.emit('cut', { amount: mag, ratio: newSize / this.cfg.maxSize });
     }
@@ -310,12 +331,15 @@ export class Game {
       y: a.y,
       w: axis === 'x' ? width : a.w,
       d: axis === 'z' ? width : a.d,
+      // The slice keeps the EXACT colour object of the block it came from, so
+      // a falling piece is unmistakably part of the block that was just cut.
       color: a.color,
-      vx: axis === 'x' ? outward * 1.1 : 0,
-      vz: axis === 'z' ? outward * 1.1 : 0,
-      vy: 0.9,
-      life: 1.6,
-      spin: outward * 0.9
+      vx: axis === 'x' ? outward * (1.0 + Math.random() * 0.4) : (Math.random() - 0.5) * 0.2,
+      vz: axis === 'z' ? outward * (1.0 + Math.random() * 0.4) : (Math.random() - 0.5) * 0.2,
+      vy: 1.5 + Math.random() * 0.5,
+      life: 1.9,
+      rot: 0,
+      spin: outward * (2.4 + Math.random() * 2.2)
     };
   }
 
@@ -323,9 +347,9 @@ export class Game {
     const outward = o.outward || 1;
     this.debris.push({
       x: o.x, z: o.z, y: o.y, w: o.w, d: o.d, color: o.color,
-      vx: o.axis === 'x' ? outward * 1.4 : 0,
-      vz: o.axis === 'z' ? outward * 1.4 : 0,
-      vy: 1.1, life: 2.2, spin: outward * 1.2
+      vx: o.axis === 'x' ? outward * 1.3 : (Math.random() - 0.5) * 0.3,
+      vz: o.axis === 'z' ? outward * 1.3 : (Math.random() - 0.5) * 0.3,
+      vy: 1.8, life: 2.4, rot: 0, spin: outward * (2.0 + Math.random() * 2.0)
     });
   }
 

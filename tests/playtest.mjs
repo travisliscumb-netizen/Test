@@ -87,6 +87,10 @@ await page.waitForTimeout(400);
 check('play starts level 1', (await page.evaluate(() => window.__blockstack.state().cfg.num)) === 1);
 check('HUD visible during play', await page.isVisible('#hud'));
 check('level 1 shows the tap hint', await page.isVisible('#hint'));
+check('splash clears itself', await page.evaluate(() => {
+  const s = document.getElementById('splash');
+  return !s || s.classList.contains('out');
+}));
 await page.screenshot({ path: path.join(SHOTS, '01-level-1.png') });
 
 /* Perfect play should never shrink the platform. */
@@ -95,7 +99,9 @@ let st = await page.evaluate(() => window.__blockstack.state());
 check('perfect placements keep full width',
   Math.abs(st.summary.remaining - st.cfg.maxSize) < 1e-6,
   `remaining=${st.summary.remaining.toFixed(4)}`);
-check('perfect streak recorded', st.summary.perfects >= 5, `perfects=${st.summary.perfects}`);
+check('every placement in a perfect pass was perfect',
+  st.summary.perfects === st.summary.placed && st.summary.placed >= 4,
+  `${st.summary.perfects}/${st.summary.placed}`);
 check('3-perfect recovery fired at least once', st.summary.recoveries >= 1 || st.summary.remaining >= st.cfg.maxSize);
 await page.screenshot({ path: path.join(SHOTS, '02-perfect-run.png') });
 
@@ -150,7 +156,7 @@ check('all 10 world environments render', errors.length === 0, errors.slice(0, 2
 /* Boss flow, including the endless continuation */
 await page.evaluate(() => window.__blockstack.start(10));
 await page.waitForTimeout(250);
-check('boss level announces itself', await page.isVisible('#bossBanner'));
+check('boss level announces itself', await page.isVisible('#banner'));
 const bossTarget = await page.evaluate(() => window.__blockstack.state().cfg.target);
 await playBlocks(page, bossTarget, 0.004);
 st = await page.evaluate(() => window.__blockstack.state());
@@ -181,7 +187,7 @@ await page.waitForTimeout(200);
 await page.click('#recordsBtn');
 await page.waitForTimeout(250);
 check('records screen opens', await page.isVisible('#records'));
-check('achievements listed', (await page.locator('#achList .ach').count()) === 10);
+check('achievements listed', (await page.locator('#achList .ach').count()) >= 10);
 check('at least one achievement earned', (await page.locator('#achList .ach.on').count()) > 0);
 await page.screenshot({ path: path.join(SHOTS, '07-records.png') });
 
@@ -256,6 +262,162 @@ for (const v of [VIEWPORTS[0], VIEWPORTS[2]]) {
   await p2.ctx.close();
 }
 
+/* ---- polish-pass coverage ------------------------------------------- */
+const p3 = await newPage(VIEWPORTS[1]);
+
+/* Block scale: the stack must dominate the frame, not sit far away in it. */
+await p3.page.click('#playBtn');
+await p3.page.waitForTimeout(500);
+{
+  // measured from the renderer itself, not a copy of its formula
+  const m = await p3.page.evaluate(() => window.__blockstack.metrics());
+  const frac = (2 * m.k) / m.w;
+  check('blocks occupy about half the screen width', frac > 0.44 && frac < 0.58,
+    `${(frac * 100).toFixed(0)}% of viewport width`);
+  check('backing store is capped at 2x', m.dpr <= 2, `dpr=${m.dpr}`);
+}
+
+/* Rapid repeated taps must not corrupt state or double-place. */
+const tapsBefore = await p3.page.evaluate(() => window.__blockstack.game().placed);
+for (let i = 0; i < 12; i++) await p3.page.mouse.click(195, 620, { delay: 4 });
+const tapsAfter = await p3.page.evaluate(() => window.__blockstack.state());
+check('rapid repeated taps stay consistent',
+  ['playing', 'over', 'complete', 'ready'].includes(tapsAfter.phase), `phase=${tapsAfter.phase}`);
+check('rapid taps never place more than one block each',
+  tapsAfter.summary.placed <= tapsBefore + 12, `${tapsBefore} -> ${tapsAfter.summary.placed}`);
+
+/* Both travel axes, and a platform trimmed down to a sliver. */
+await p3.page.evaluate(() => window.__blockstack.start(45));
+await p3.page.waitForTimeout(200);
+const axes = await p3.page.evaluate(async () => {
+  const api = window.__blockstack;
+  const seen = new Set();
+  for (let i = 0; i < 8; i++) {
+    const g = api.game(); if (!g.active) break;
+    seen.add(g.active.axis);
+    g.active.pos = g.active.axis === 'x' ? g.top.x : g.top.z;
+    api.place();
+  }
+  return [...seen];
+});
+check('both travel axes occur in an alternating level', axes.length === 2, axes.join(','));
+
+const sliver = await p3.page.evaluate(async () => {
+  const api = window.__blockstack;
+  api.start(1);
+  const g = () => api.game();
+  for (let i = 0; i < 7 && g().active; i++) {
+    const a = g().active;
+    a.pos = (a.axis === 'x' ? g().top.x : g().top.z) + 0.11;
+    api.place();
+  }
+  return { w: g().top.w, phase: api.state().phase };
+});
+check('a heavily trimmed platform still plays', sliver.w < 0.45 && sliver.phase !== 'over',
+  `w=${sliver.w.toFixed(3)} phase=${sliver.phase}`);
+
+/* A tall tower must not degrade: culling should keep the cost flat. */
+await p3.page.evaluate(() => window.__blockstack.stack());
+await p3.page.waitForTimeout(150);
+await p3.page.evaluate(async () => {
+  const api = window.__blockstack;
+  for (let i = 0; i < 45 && api.game().active; i++) {
+    const a = api.game().active;
+    a.pos = a.axis === 'x' ? api.game().top.x : api.game().top.z;
+    api.place();
+  }
+});
+// the burst places 45 blocks in one tick: let the effects expire AND the
+// camera finish travelling before measuring steady-state cost
+await p3.page.waitForTimeout(1600);
+const tallState = await p3.page.evaluate(() => window.__blockstack.state());
+check('stack mode reaches a tall tower', tallState.summary.placed >= 40, `h=${tallState.summary.placed}`);
+check('stack mode crossed into a later world',
+  (await p3.page.evaluate(() => window.__blockstack.game().live.world)) >= 4);
+check('a new run is not interrupted by the previous run\'s result card',
+  (await p3.page.evaluate(() => window.__blockstack.state().screen)) === 'game');
+/* Frame rate at a tall tower is measured on a FRESH page. Headless Chromium
+   rasterises in software and a long-lived page degrades ~20% regardless of what
+   is drawn, so reusing this one would measure the harness, not the game. */
+{
+  const perf = await newPage(VIEWPORTS[1]);
+  await perf.page.evaluate(async () => {
+    const api = window.__blockstack;
+    api.stack();
+    for (let i = 0; i < 45 && api.game().active; i++) {
+      const a = api.game().active;
+      a.pos = a.axis === 'x' ? api.game().top.x : api.game().top.z;
+      api.place();
+    }
+  });
+  await perf.page.waitForTimeout(1500);
+  const fpsTall = await perf.page.evaluate(() => new Promise((res) => {
+    let n = 0; const t0 = performance.now();
+    function tick() { n++; if (performance.now() - t0 < 1400) requestAnimationFrame(tick); else res(n / ((performance.now() - t0) / 1000)); }
+    requestAnimationFrame(tick);
+  }));
+  const draws = await perf.page.evaluate(() => ({ blocks: window.__blockstack.game().blocks.length }));
+  check('tall tower holds frame rate', fpsTall > 50,
+    `${fpsTall.toFixed(1)} fps at ${draws.blocks} blocks (headless software raster)`);
+  await perf.ctx.close();
+}
+
+/* A cut piece must keep the exact material of the block it came from. */
+const cutColor = await p3.page.evaluate(async () => {
+  const api = window.__blockstack;
+  api.start(1);
+  const g = api.game();
+  const a = g.active;
+  const src = { ...a.color };
+  a.pos = (a.axis === 'x' ? g.top.x : g.top.z) + 0.3;
+  api.place();
+  const d = api.game().debris[0];
+  return d ? { src, got: { ...d.color } } : null;
+});
+check('cut pieces keep the parent block material',
+  !!cutColor && cutColor.src.h === cutColor.got.h && cutColor.src.l === cutColor.got.l,
+  cutColor ? `${cutColor.src.h.toFixed(1)} vs ${cutColor.got.h.toFixed(1)}` : 'no debris');
+
+/* Nothing in the interface may paint at the bottom edge of the screen. */
+const bottomEdge = await p3.page.evaluate(() => {
+  const vh = window.innerHeight;
+  const bad = [];
+  document.querySelectorAll('body *').forEach((el) => {
+    if (el.closest('#app')) return;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) return;
+    const b = el.getBoundingClientRect();
+    if (b.width === 0 && b.height === 0) return;
+    if (b.bottom > vh - 30 && b.top < vh + 40) bad.push(el.id || el.tagName);
+  });
+  return bad;
+});
+check('no stray control paints at the bottom edge', bottomEdge.length === 0, bottomEdge.join(','));
+
+/* The scenery must not end in a flat hard-edged bar across the bottom. */
+const bandScan = await p3.page.evaluate(() => {
+  const out = [];
+  const c = document.getElementById('stage');
+  const g = c.getContext('2d');
+  const dpr = c.width / c.getBoundingClientRect().width;
+  const col = Math.floor(c.width * 0.08);
+  const read = (y) => {
+    const d = g.getImageData(col, Math.round(c.height - y * dpr), 1, 1).data;
+    return [d[0], d[1], d[2]];
+  };
+  let flat = 0;
+  for (let y = 2; y < 46; y++) {
+    const a = read(y), b = read(y + 1);
+    if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) === 0) flat++;
+  }
+  out.push(flat);
+  return out[0];
+});
+check('the horizon resolves into a gradient, not a flat bar', bandScan < 34, `${bandScan}/44 identical rows`);
+
+check('polish pass produced no console errors', p3.errors.length === 0, p3.errors.slice(0, 3).join(' | '));
+await p3.ctx.close();
+
 /* Manifest + icons actually resolve */
 const mp = await browser.newPage();
 const manifest = await (await mp.goto(url + '/manifest.webmanifest')).json();
@@ -267,6 +429,12 @@ for (const i of manifest.icons) {
 }
 check('every manifest icon resolves', iconsOk);
 check('maskable icons declared', manifest.icons.some((i) => i.purpose === 'maskable'));
+let splashOk = true;
+for (const m of [[1290, 2796], [1170, 2532], [750, 1334]]) {
+  const res = await mp.goto(`${url}/icons/splash-${m[0]}x${m[1]}.png`);
+  if (!res || res.status() !== 200) splashOk = false;
+}
+check('iOS launch images resolve', splashOk);
 await mp.close();
 
 await browser.close();

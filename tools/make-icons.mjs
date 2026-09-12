@@ -35,6 +35,12 @@ const TARGETS = [
   { file: 'og-cover.png', size: 512, wide: true }
 ];
 
+/* iOS launch images. Portrait only -- the game is portrait only. */
+const SPLASHES = [
+  [1290, 2796], [1179, 2556], [1284, 2778], [1170, 2532],
+  [1125, 2436], [828, 1792], [750, 1334], [1242, 2688]
+];
+
 const { server, url } = await serve(ROOT);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 1200 } });
@@ -64,6 +70,18 @@ for (const t of TARGETS) {
   }, t);
   fs.writeFileSync(path.join(OUT, t.file), Buffer.from(data.split(',')[1], 'base64'));
   console.log('wrote', t.file);
+}
+
+for (const [w, h] of SPLASHES) {
+  const data = await page.evaluate(async ({ w, h }) => {
+    const { drawSplash } = await import('./src/icon.js');
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    drawSplash(c.getContext('2d'), w, h);
+    return c.toDataURL('image/png');
+  }, { w, h });
+  fs.writeFileSync(path.join(OUT, `splash-${w}x${h}.png`), Buffer.from(data.split(',')[1], 'base64'));
+  console.log('wrote', `splash-${w}x${h}.png`);
 }
 
 /* favicon.ico with a PNG payload -- every browser in use reads this. */

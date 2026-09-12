@@ -1,22 +1,41 @@
 /* Canvas renderer.
 
-   Projection is a FIXED 2:1 dimetric ("2.5D"): world X runs down-right, world Z
+   Projection is a FIXED dimetric ("2.5D"): world X runs down-right, world Z
    runs down-left, world Y is straight up the screen. It never rotates, never
    tilts and never swings -- the only camera motion is a vertical follow so the
-   landing surface stays at a constant screen position. That is deliberate:
-   placement is a 1-D alignment problem and the picture must never make the
-   player re-derive where the edges are.
+   landing surface stays at a stable screen position. Placement is a 1-D
+   alignment problem and the picture must never make the player re-derive where
+   the edges are.
+
+   The elevation is deliberately higher than textbook 2:1 isometric (the top
+   face is a 1.72:1 diamond, not 2:1). A higher camera spends the phone's
+   abundant VERTICAL budget on the block's travel instead of its scarce
+   horizontal one, which is what lets the blocks be half the screen wide; it
+   also shows more of the two top surfaces the player is actually comparing.
 
    A real 3D engine would buy nothing here (fixed camera, no intersecting
    geometry, painter's order is simply bottom-to-top) and would cost a large
-   download plus GPU time on a phone. Hand-projected faces with per-face
-   lighting and bevels give the same look at a fraction of the budget. */
+   download plus GPU time on a phone. */
 
 import { BLOCK_H } from './config.js';
+import { HOVER } from './engine.js';
 
-const ANCHOR = 0.44;         // landing surface sits here down the viewport,
-                             // leaving the tower to fill the space below it
-const MAX_PARTICLES = 260;
+/* Camera framing. The anchor eases down the screen as the tower grows: early on
+   the ground stays in shot for context, later the tower gets the room. The move
+   is slow enough to be invisible frame to frame. */
+const ANCHOR_LOW = 0.520;
+const ANCHOR_HIGH = 0.425;
+const ANCHOR_RAMP = 14;      // blocks over which the anchor travels
+
+const KY_RATIO = 0.58;       // top-face half-height / half-width
+/* Hard caps. Effects are spawned per placement, so a fast streak can otherwise
+   pile up dozens of simultaneous stroked-text popups and ellipse strokes -- the
+   two most expensive things this renderer draws. Oldest out. */
+const MAX_PARTICLES = 180;
+const MAX_RINGS = 5;
+const MAX_POPUPS = 6;
+const DETAIL_BLOCKS = 6;     // full material treatment for the top N blocks
+const SHADOW_BLOCKS = 3;     // clipped contact shadows only where they are seen
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -24,7 +43,6 @@ const hsl = (h, s, l, a = 1) =>
   a >= 1 ? `hsl(${h.toFixed(1)} ${clamp(s, 0, 100).toFixed(1)}% ${clamp(l, 0, 100).toFixed(1)}%)`
          : `hsl(${h.toFixed(1)} ${clamp(s, 0, 100).toFixed(1)}% ${clamp(l, 0, 100).toFixed(1)}% / ${a})`;
 
-/* deterministic noise so scenery is identical every load */
 function srand(seed) {
   let s = seed >>> 0 || 1;
   return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
@@ -37,7 +55,7 @@ export class Renderer {
     this.W = 0; this.H = 0; this.dpr = 1;
     this.K = 60;
     this.cam = { x: 0, y: 0, z: 0 };
-    this.camTarget = { x: 0, y: 0, z: 0 };
+    this.anchor = ANCHOR_LOW;
     this.ox = 0; this.oy = 0;
     this.particles = [];
     this.rings = [];
@@ -46,10 +64,12 @@ export class Renderer {
     this.flashA = 0; this.flashColor = '#fff';
     this.pulse = 0; this.shake = 0;
     this.world = null;
-    this.bg = null;
+    this.bg = null; this.bgBlur = null;
+    this.bgPrev = null; this.bgPrevBlur = null; this.fade = 1;
     this.travel = 1.3;
     this.time = 0;
     this.guideA = 0;
+    this.impact = 0;          // brief highlight on the block just landed
   }
 
   /* ------------------------------------------------------------- layout -- */
@@ -57,14 +77,14 @@ export class Renderer {
     const rect = this.canvas.getBoundingClientRect();
     const w = Math.max(1, Math.round(rect.width));
     const h = Math.max(1, Math.round(rect.height));
-    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (w === this.W && h === this.H && dpr === this.dpr) return;
     this.W = w; this.H = h; this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this._computeScale();
-    this._buildBackground();
+    this._buildBackground(true);
     this._seedAmbient();
   }
 
@@ -72,42 +92,54 @@ export class Renderer {
     this.travel = cfg.travel;
     this._computeScale();
     this.cam = { x: 0, y: 0, z: 0 };
-    this.camTarget = { x: 0, y: 0, z: 0 };
+    this.anchor = ANCHOR_LOW;
     this.particles.length = 0; this.rings.length = 0; this.popups.length = 0;
-    this.flashA = 0; this.pulse = 0; this.shake = 0; this.guideA = 0;
+    this.flashA = 0; this.pulse = 0; this.shake = 0; this.guideA = 0; this.impact = 0;
   }
 
-  setWorld(world) {
+  /** @param {object} world  @param {boolean} [crossfade] ease between skies */
+  setWorld(world, crossfade = false) {
     if (this.world && this.world.id === world.id) return;
+    if (crossfade && this.bg) {
+      this.bgPrev = this.bg; this.bgPrevBlur = this.bgBlur; this.fade = 0;
+    } else {
+      this.bgPrev = null; this.bgPrevBlur = null; this.fade = 1;
+    }
     this.world = world;
-    this._buildBackground();
+    this._buildBackground(!crossfade);
     this._seedAmbient();
   }
 
   _computeScale() {
     if (!this.W) return;
-    // Fit the full travel path across the viewport with a comfortable margin,
-    // and never let a large screen inflate blocks past a readable size.
-    const byWidth = (this.W * 0.94) / (2 * (1 + this.travel));
-    const byHeight = this.H * 0.155;
-    this.K = Math.max(26, Math.min(byWidth, byHeight, 124));
+    /* The block is sized to the SCREEN, not to the travel path. Letting the
+       outer edge clip for the instant it spends at the far extreme is a much
+       better trade than shrinking every block to keep a position nobody places
+       from permanently in frame. */
+    // Portrait is the design target; landscape is a browser fallback where the
+    // vertical budget is the scarce one, so it gets a looser height factor
+    // rather than a block a sixth of the screen wide.
+    const hFactor = this.W > this.H ? 0.235 : 0.176;
+    this.K = Math.max(30, Math.min(this.W * 0.256, this.H * hFactor, 152));
   }
 
   /* --------------------------------------------------------- projection -- */
   px(x, z) { return (x - z) * this.K + this.ox; }
-  py(x, y, z) { return (x + z) * this.K * 0.5 - y * this.K + this.oy; }
+  py(x, y, z) { return (x + z) * this.K * KY_RATIO - y * this.K + this.oy; }
 
   _updateCamera(game, dt) {
     const top = game.top;
-    this.camTarget.x = top.x;
-    this.camTarget.z = top.z;
-    this.camTarget.y = top.y + BLOCK_H;
-    const k = 1 - Math.pow(0.0016, dt);      // frame-rate independent smoothing
-    this.cam.x = lerp(this.cam.x, this.camTarget.x, k);
-    this.cam.z = lerp(this.cam.z, this.camTarget.z, k);
-    this.cam.y = lerp(this.cam.y, this.camTarget.y, k);
+    const height = game.blocks.length - 1;
+    const targetAnchor = lerp(ANCHOR_LOW, ANCHOR_HIGH, clamp(height / ANCHOR_RAMP, 0, 1));
+    this.anchor = lerp(this.anchor, targetAnchor, 1 - Math.pow(0.25, dt));
+
+    const tx = top.x, tz = top.z, ty = top.y + BLOCK_H;
+    const k = 1 - Math.pow(0.0022, dt);   // frame-rate independent smoothing
+    this.cam.x = lerp(this.cam.x, tx, k);
+    this.cam.z = lerp(this.cam.z, tz, k);
+    this.cam.y = lerp(this.cam.y, ty, k);
     this.ox = this.W / 2 - (this.cam.x - this.cam.z) * this.K;
-    this.oy = this.H * ANCHOR - ((this.cam.x + this.cam.z) * this.K * 0.5 - this.cam.y * this.K);
+    this.oy = this.H * this.anchor - ((this.cam.x + this.cam.z) * this.K * KY_RATIO - this.cam.y * this.K);
   }
 
   /* ------------------------------------------------------------ effects -- */
@@ -124,26 +156,35 @@ export class Renderer {
         life: o.life * (0.65 + Math.random() * 0.6), max: o.life,
         size: o.size * (0.6 + Math.random() * 0.8),
         color: o.color, grav: o.grav === undefined ? 3.4 : o.grav,
+        spin: (Math.random() - 0.5) * 9,
+        rot: Math.random() * Math.PI,
         kind: o.kind || 'spark'
       });
     }
   }
 
   addRing(x, y, z, color, maxR = 1.1, life = 0.5, width = 3) {
+    if (this.rings.length >= MAX_RINGS) this.rings.shift();
     this.rings.push({ x, y, z, r: 0.12, maxR, life, max: life, color, width });
   }
 
-  addPopup(text, wx, wy, wz, color, size = 20) {
-    this.popups.push({ text, x: this.px(wx, wz), y: this.py(wx, wy, wz), life: 0.9, max: 0.9, color, size });
+  addPopup(text, wx, wy, wz, color, size = 20, weight = 800) {
+    if (this.popups.length >= MAX_POPUPS) this.popups.shift();
+    this.popups.push({
+      text, x: this.px(wx, wz), y: this.py(wx, wy, wz),
+      life: 1.0, max: 1.0, color, size, weight
+    });
   }
 
   flash(color, a = 0.22) { this.flashColor = color; this.flashA = Math.max(this.flashA, a); }
   kick(amount = 0.016) { this.pulse = Math.max(this.pulse, amount); }
   shakeBy(amount) { this.shake = Math.max(this.shake, amount); }
+  strike() { this.impact = 1; }
 
   /* --------------------------------------------------------- background -- */
-  _buildBackground() {
+  _buildBackground(dropPrev) {
     if (!this.W || !this.world) return;
+    if (dropPrev) { this.bgPrev = null; this.bgPrevBlur = null; this.fade = 1; }
     const w = this.W, h = Math.round(this.H * 1.45);
     const c = document.createElement('canvas');
     const dpr = Math.min(this.dpr, 2);
@@ -160,18 +201,49 @@ export class Renderer {
     const horizon = h * 0.62;
     SCENERY[P.scenery](g, w, h, horizon, R, P);
 
-    // vignette keeps the eye on the tower
-    const vg = g.createRadialGradient(w / 2, h * 0.62, Math.min(w, h) * 0.30, w / 2, h * 0.62, Math.max(w, h) * 0.80);
+    /* Atmospheric haze at the horizon line: distance reads as distance, and it
+       keeps terrain silhouettes from cutting the sky like paper. */
+    const haze = g.createLinearGradient(0, horizon - h * 0.10, 0, horizon + h * 0.14);
+    haze.addColorStop(0, hexA(P.fog, 0));
+    haze.addColorStop(0.45, hexA(P.fog, 0.30));
+    haze.addColorStop(1, hexA(P.fog, 0));
+    g.fillStyle = haze; g.fillRect(0, horizon - h * 0.10, w, h * 0.24);
+
+    const deep = P.sky[P.sky.length - 1];
+    const fore = g.createLinearGradient(0, horizon, 0, h);
+    fore.addColorStop(0, hexA(deep, 0));
+    fore.addColorStop(0.35, hexA(deep, 0.16));
+    fore.addColorStop(1, hexA(deep, 0.72));
+    g.fillStyle = fore; g.fillRect(0, horizon, w, h - horizon);
+
+    const vg = g.createRadialGradient(w / 2, h * 0.62, Math.min(w, h) * 0.26, w / 2, h * 0.62, Math.max(w, h) * 0.80);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+    vg.addColorStop(0.62, 'rgba(0,0,0,0.16)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.52)');
     g.fillStyle = vg; g.fillRect(0, 0, w, h);
 
+    if (this.bg && this.bg !== this.bgPrev) { this.bg.width = 0; this.bg.height = 0; }
+    if (this.bgBlur && this.bgBlur !== this.bgPrevBlur) { this.bgBlur.width = 0; this.bgBlur.height = 0; }
     this.bg = c;
+    this.bgBlur = null;
     this.bgH = h;
-    // Climbing must push the horizon DOWN the screen, never drag the ground up
-    // into view. Start with the horizon at 72% and let it descend to ~90%.
     this.bgTop = -(horizon - this.H * 0.72);
     this.bgShift = Math.max(0, -this.bgTop);
+  }
+
+  /* Menus sit on a depth-of-field version of the live world. Baked once, so the
+     menus cost one blit instead of a per-frame backdrop blur. */
+  _blurred() {
+    if (this.bgBlur) return this.bgBlur;
+    if (!this.bg) return null;
+    const c = document.createElement('canvas');
+    c.width = this.bg.width; c.height = this.bg.height;
+    const g = c.getContext('2d');
+    if (typeof g.filter === 'string') g.filter = 'blur(18px) saturate(76%) brightness(92%)';
+    g.drawImage(this.bg, 0, 0);
+    g.filter = 'none';
+    this.bgBlur = c;
+    return c;
   }
 
   _seedAmbient() {
@@ -179,7 +251,7 @@ export class Renderer {
     if (!this.world || !this.W) return;
     const kind = this.world.ambient;
     if (kind === 'none') return;
-    const counts = { snow: 46, ember: 34, bubble: 26, star: 60, sand: 30 };
+    const counts = { snow: 40, ember: 30, bubble: 24, star: 52, sand: 26 };
     const n = counts[kind] || 0;
     for (let i = 0; i < n; i++) {
       this.ambient.push({
@@ -193,30 +265,31 @@ export class Renderer {
     }
   }
 
-  _drawAmbient(dt) {
+  _drawAmbient(dt, dim) {
     const ctx = this.ctx;
     if (!this.ambient.length) return;
     const W = this.W, H = this.H;
+    const k = dim ? 0.5 : 1;
     for (const a of this.ambient) {
       a.p += dt * (0.6 + a.v);
       if (a.kind === 'snow') {
         a.y += (12 + a.v * 26) * dt; a.x += Math.sin(a.p) * 9 * dt;
         if (a.y > H) { a.y = -4; a.x = Math.random() * W; }
-        ctx.fillStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(a.p) ** 2})`;
+        ctx.fillStyle = `rgba(255,255,255,${(0.5 + 0.4 * Math.sin(a.p) ** 2) * k})`;
       } else if (a.kind === 'ember') {
         a.y -= (26 + a.v * 40) * dt; a.x += Math.sin(a.p * 1.4) * 12 * dt;
         if (a.y < -4) { a.y = H + 4; a.x = Math.random() * W; }
-        ctx.fillStyle = `rgba(255,${120 + Math.floor(80 * Math.sin(a.p))},60,${0.35 + 0.3 * Math.sin(a.p) ** 2})`;
+        ctx.fillStyle = `rgba(255,${120 + Math.floor(80 * Math.sin(a.p))},60,${(0.35 + 0.3 * Math.sin(a.p) ** 2) * k})`;
       } else if (a.kind === 'bubble') {
         a.y -= (16 + a.v * 22) * dt; a.x += Math.sin(a.p) * 7 * dt;
         if (a.y < -6) { a.y = H + 6; a.x = Math.random() * W; }
-        ctx.fillStyle = `rgba(210,255,250,${0.16 + 0.14 * Math.sin(a.p) ** 2})`;
+        ctx.fillStyle = `rgba(210,255,250,${(0.16 + 0.14 * Math.sin(a.p) ** 2) * k})`;
       } else if (a.kind === 'sand') {
         a.x += (18 + a.v * 30) * dt; a.y += Math.sin(a.p) * 5 * dt;
         if (a.x > W + 4) { a.x = -4; a.y = Math.random() * H; }
-        ctx.fillStyle = `rgba(255,230,180,${0.16 + 0.12 * Math.sin(a.p) ** 2})`;
-      } else { // star
-        ctx.fillStyle = `rgba(255,255,255,${0.25 + 0.6 * Math.abs(Math.sin(a.p * 0.7))})`;
+        ctx.fillStyle = `rgba(255,230,180,${(0.16 + 0.12 * Math.sin(a.p) ** 2) * k})`;
+      } else {
+        ctx.fillStyle = `rgba(255,255,255,${(0.25 + 0.6 * Math.abs(Math.sin(a.p * 0.7))) * k})`;
       }
       ctx.beginPath();
       ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
@@ -226,109 +299,184 @@ export class Renderer {
 
   /* ------------------------------------------------------------- blocks -- */
   _faceColors(c) {
-    return {
-      top: hsl(c.h, c.s * 0.96, c.l + 14),
-      inner: hsl(c.h, c.s * 0.92, c.l + 20),
-      right: hsl(c.h, c.s, c.l - 3),
-      rightLo: hsl(c.h + 2, c.s, c.l - 12),
-      left: hsl(c.h + 5, c.s * 0.95, c.l - 16),
-      leftLo: hsl(c.h + 7, c.s * 0.95, c.l - 25),
-      edge: hsl(c.h, c.s * 0.8, c.l + 30)
+    if (c._fc) return c._fc;
+    /* One key light from above and slightly to the +x side, a cool bounce on
+       the shaded face. The spread between the three faces is what tells the
+       player where the geometry is, so it is deliberately wide. */
+    c._fc = {
+      top: hsl(c.h, c.s * 0.94, c.l + 17),
+      inner: hsl(c.h, c.s * 0.88, c.l + 23),
+      rim: hsl(c.h, c.s * 0.62, c.l + 38),
+      right: hsl(c.h + 2, c.s * 1.02, c.l - 6),
+      rightLo: hsl(c.h + 4, c.s, c.l - 16),
+      left: hsl(c.h + 8, c.s * 0.9, c.l - 21),
+      leftLo: hsl(c.h + 11, c.s * 0.85, c.l - 31),
+      edgeDark: hsl(c.h + 6, c.s * 0.8, Math.max(4, c.l - 34))
     };
+    return c._fc;
+  }
+
+  _corners(b, ws, hs, shear, rise) {
+    const w2 = (b.w * ws) / 2, d2 = (b.d * ws) / 2;
+    const yb = b.y + rise, yt = b.y + rise + BLOCK_H * hs;
+    return {
+      A: [this.px(b.x - w2, b.z - d2) + shear, this.py(b.x - w2, yt, b.z - d2)],
+      B: [this.px(b.x + w2, b.z - d2) + shear, this.py(b.x + w2, yt, b.z - d2)],
+      C: [this.px(b.x + w2, b.z + d2) + shear, this.py(b.x + w2, yt, b.z + d2)],
+      D: [this.px(b.x - w2, b.z + d2) + shear, this.py(b.x - w2, yt, b.z + d2)],
+      Ab: [this.px(b.x - w2, b.z - d2), this.py(b.x - w2, yb, b.z - d2)],
+      Bb: [this.px(b.x + w2, b.z - d2), this.py(b.x + w2, yb, b.z - d2)],
+      Cb: [this.px(b.x + w2, b.z + d2), this.py(b.x + w2, yb, b.z + d2)],
+      Db: [this.px(b.x - w2, b.z + d2), this.py(b.x - w2, yb, b.z + d2)]
+    };
+  }
+
+  /* A soft contact shadow. It is CLIPPED to the top face of the block beneath,
+     so it can only ever appear on a real surface -- an unclipped expanded
+     silhouette haloes into the air around the tower and reads as a rendering
+     fault, which is exactly what it looked like. */
+  _contactShadow(b, below, strength = 1) {
+    if (!below) return;
+    const ctx = this.ctx;
+    const y = b.y + 0.0015;
+    if (b.drop > 0) strength *= 1 - b.drop * 0.6;
+    const w2 = b.w / 2, d2 = b.d / 2;
+    const pts = [
+      [this.px(b.x - w2, b.z - d2), this.py(b.x - w2, y, b.z - d2)],
+      [this.px(b.x + w2, b.z - d2), this.py(b.x + w2, y, b.z - d2)],
+      [this.px(b.x + w2, b.z + d2), this.py(b.x + w2, y, b.z + d2)],
+      [this.px(b.x - w2, b.z + d2), this.py(b.x - w2, y, b.z + d2)]
+    ];
+    const cx = (pts[0][0] + pts[2][0]) / 2, cy = (pts[0][1] + pts[2][1]) / 2;
+    ctx.save();
+    this._facePath(ctx, below, below.y + BLOCK_H + 0.001);
+    ctx.clip();
+    ctx.fillStyle = '#000';
+    for (const [scale, alpha] of [[1.24, 0.10], [1.08, 0.13]]) {
+      ctx.globalAlpha = alpha * strength;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const x = cx + (pts[i][0] - cx) * scale - 3;
+        const yy = cy + (pts[i][1] - cy) * scale + 2;
+        if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      }
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
   }
 
   drawBlock(b, opts = {}) {
     const ctx = this.ctx;
     const settle = opts.settle === undefined ? (b.settle || 0) : opts.settle;
     const squash = settle > 0 ? Math.sin(settle * Math.PI) : 0;
-    const hs = 1 - 0.20 * squash;
-    const ws = 1 + 0.09 * squash;
+    const hs = 1 - 0.22 * squash;
+    const ws = 1 + 0.075 * squash;
     const shear = opts.shear || 0;
-
-    const w2 = (b.w * ws) / 2, d2 = (b.d * ws) / 2;
-    const yb = b.y, yt = b.y + BLOCK_H * hs;
     const alpha = opts.alpha === undefined ? 1 : opts.alpha;
     if (alpha <= 0.01) return;
+    const detail = opts.detail !== false;
+    // ease-in: the block accelerates into the platform instead of gliding
+    const drop = b.drop > 0 ? b.drop * b.drop : 0;
+    const rise = (opts.rise || 0) + drop * HOVER;
 
-    const Ax = this.px(b.x - w2, b.z - d2) + shear, Ay = this.py(b.x - w2, yt, b.z - d2);
-    const Bx = this.px(b.x + w2, b.z - d2) + shear, By = this.py(b.x + w2, yt, b.z - d2);
-    const Cx = this.px(b.x + w2, b.z + d2) + shear, Cy = this.py(b.x + w2, yt, b.z + d2);
-    const Dx = this.px(b.x - w2, b.z + d2) + shear, Dy = this.py(b.x - w2, yt, b.z + d2);
-    const Bbx = this.px(b.x + w2, b.z - d2), Bby = this.py(b.x + w2, yb, b.z - d2);
-    const Cbx = this.px(b.x + w2, b.z + d2), Cby = this.py(b.x + w2, yb, b.z + d2);
-    const Dbx = this.px(b.x - w2, b.z + d2), Dby = this.py(b.x - w2, yb, b.z + d2);
-
+    const p = this._corners(b, ws, hs, shear, rise);
     const col = this._faceColors(b.color);
     if (alpha < 1) { ctx.save(); ctx.globalAlpha = alpha; }
 
+    const poly = (pts) => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+    };
+
     // +x face (screen right)
-    let g = ctx.createLinearGradient(Bx, By, Cbx, Cby);
-    g.addColorStop(0, col.right); g.addColorStop(1, col.rightLo);
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(Bx, By); ctx.lineTo(Cx, Cy); ctx.lineTo(Cbx, Cby); ctx.lineTo(Bbx, Bby); ctx.closePath(); ctx.fill();
+    if (detail) {
+      const g = ctx.createLinearGradient(p.B[0], p.B[1], p.Cb[0], p.Cb[1]);
+      g.addColorStop(0, col.right); g.addColorStop(1, col.rightLo);
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = col.right;
+    poly([p.B, p.C, p.Cb, p.Bb]); ctx.fill();
 
     // +z face (screen left)
-    g = ctx.createLinearGradient(Dx, Dy, Cbx, Cby);
-    g.addColorStop(0, col.left); g.addColorStop(1, col.leftLo);
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(Cx, Cy); ctx.lineTo(Dx, Dy); ctx.lineTo(Dbx, Dby); ctx.lineTo(Cbx, Cby); ctx.closePath(); ctx.fill();
+    if (detail) {
+      const g = ctx.createLinearGradient(p.D[0], p.D[1], p.Cb[0], p.Cb[1]);
+      g.addColorStop(0, col.left); g.addColorStop(1, col.leftLo);
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = col.left;
+    poly([p.C, p.D, p.Db, p.Cb]); ctx.fill();
 
-    // ambient occlusion along the ground contact
-    ctx.strokeStyle = 'rgba(0,0,0,0.20)'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(Bbx, Bby); ctx.lineTo(Cbx, Cby); ctx.lineTo(Dbx, Dby); ctx.stroke();
+    // the vertical corner nearest the camera, and the ground contact line
+    if (!opts.flat) {
+      ctx.strokeStyle = col.edgeDark; ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(p.Bb[0], p.Bb[1]); ctx.lineTo(p.Cb[0], p.Cb[1]); ctx.lineTo(p.Db[0], p.Db[1]);
+      ctx.stroke();
+    }
 
     // top face
     ctx.fillStyle = col.top;
-    ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(Cx, Cy); ctx.lineTo(Dx, Dy); ctx.closePath(); ctx.fill();
+    poly([p.A, p.B, p.C, p.D]); ctx.fill();
 
-    // chamfer: an inset top plate reads as a bevelled edge without extra geometry
-    const cx = (Ax + Bx + Cx + Dx) / 4, cy = (Ay + By + Cy + Dy) / 4;
-    const span = Math.abs(Bx - Dx);
-    const inset = clamp(span * 0.055, 1.2, 7);
-    const t = clamp(inset / Math.max(8, span * 0.5), 0.02, 0.3);
-    ctx.fillStyle = col.inner;
-    ctx.beginPath();
-    ctx.moveTo(lerp(Ax, cx, t), lerp(Ay, cy, t));
-    ctx.lineTo(lerp(Bx, cx, t), lerp(By, cy, t));
-    ctx.lineTo(lerp(Cx, cx, t), lerp(Cy, cy, t));
-    ctx.lineTo(lerp(Dx, cx, t), lerp(Dy, cy, t));
-    ctx.closePath(); ctx.fill();
+    // chamfer: an inset plate reads as a bevelled edge without extra geometry
+    const cx = (p.A[0] + p.B[0] + p.C[0] + p.D[0]) / 4;
+    const cy = (p.A[1] + p.B[1] + p.C[1] + p.D[1]) / 4;
+    const span = Math.abs(p.B[0] - p.D[0]);
+    if (!opts.flat) {
+      const t = clamp(clamp(span * 0.05, 1.5, 9) / Math.max(8, span * 0.5), 0.02, 0.3);
+      const inset = [p.A, p.B, p.C, p.D].map((q) => [q[0] + (cx - q[0]) * t, q[1] + (cy - q[1]) * t]);
+      ctx.fillStyle = col.inner;
+      poly(inset); ctx.fill();
+    }
 
-    // specular sheen across the top plate
-    g = ctx.createLinearGradient(Ax, Ay, Cx, Cy);
-    g.addColorStop(0, 'rgba(255,255,255,0.16)');
-    g.addColorStop(0.55, 'rgba(255,255,255,0.02)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(Cx, Cy); ctx.lineTo(Dx, Dy); ctx.closePath(); ctx.fill();
+    if (detail) {
+      const g = ctx.createLinearGradient(p.A[0], p.A[1], p.C[0], p.C[1]);
+      g.addColorStop(0, 'rgba(255,255,255,0.17)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+      g.addColorStop(1, 'rgba(0,0,0,0.06)');
+      ctx.fillStyle = g;
+      poly([p.A, p.B, p.C, p.D]); ctx.fill();
+    }
 
-    // crisp top edge
-    ctx.strokeStyle = col.edge; ctx.lineWidth = 1.1;
-    ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(Cx, Cy); ctx.lineTo(Dx, Dy); ctx.closePath(); ctx.stroke();
+    // rim light on the two lit top edges, shade on the two away from the key
+    if (!opts.flat) {
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = col.rim;
+      ctx.beginPath(); ctx.moveTo(p.A[0], p.A[1]); ctx.lineTo(p.B[0], p.B[1]); ctx.lineTo(p.C[0], p.C[1]); ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.20)';
+      ctx.beginPath(); ctx.moveTo(p.C[0], p.C[1]); ctx.lineTo(p.D[0], p.D[1]); ctx.lineTo(p.A[0], p.A[1]); ctx.stroke();
+    }
 
     if (opts.fog > 0 && this.world) {
       ctx.save();
       ctx.globalAlpha = opts.fog;
       ctx.fillStyle = this.world.fog;
-      ctx.beginPath();
-      ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(Bbx, Bby);
-      ctx.lineTo(Cbx, Cby); ctx.lineTo(Dbx, Dby); ctx.lineTo(Dx, Dy);
-      ctx.closePath(); ctx.fill();
+      poly([p.A, p.B, p.Bb, p.Cb, p.Db, p.D]);
+      ctx.fill();
       ctx.restore();
     }
     if (opts.glow) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = opts.glow;
-      ctx.lineWidth = 2 + 3 * opts.glowAmount;
-      ctx.globalAlpha = 0.5 * opts.glowAmount;
-      ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(Cx, Cy); ctx.lineTo(Dx, Dy); ctx.closePath(); ctx.stroke();
+      ctx.lineWidth = 1.6 + 2.6 * opts.glowAmount;
+      ctx.globalAlpha = 0.42 * opts.glowAmount;
+      poly([p.A, p.B, p.C, p.D]); ctx.stroke();
+      ctx.restore();
+    }
+    if (opts.strike > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = opts.strike * 0.30;
+      ctx.fillStyle = '#fff';
+      poly([p.A, p.B, p.C, p.D]); ctx.fill();
       ctx.restore();
     }
     if (alpha < 1) ctx.restore();
   }
 
-  _topFacePath(ctx, b, y) {
+  _facePath(ctx, b, y) {
     const w2 = b.w / 2, d2 = b.d / 2;
     ctx.beginPath();
     ctx.moveTo(this.px(b.x - w2, b.z - d2), this.py(b.x - w2, y, b.z - d2));
@@ -338,10 +486,10 @@ export class Renderer {
     ctx.closePath();
   }
 
-  /* The single most important readability aid: the incoming block's footprint
-     projected onto the landing surface, drawn darker where it actually
-     overlaps. The player reads the cut before committing instead of guessing
-     what the perspective is doing. */
+  /* The most important readability aid in the game: the incoming block's
+     footprint on the landing surface, darker where it genuinely overlaps. The
+     player reads the cut before committing instead of guessing what the
+     perspective is doing. */
   _drawLandingShadow(game) {
     const a = game.active;
     if (!a) return;
@@ -353,49 +501,66 @@ export class Renderer {
       z: a.axis === 'z' ? a.pos : top.z,
       w: a.w, d: a.d
     };
-    const height = (a.y - y) / BLOCK_H;
-    const soft = clamp(1 - height * 0.12, 0.5, 1);
 
     ctx.save();
-    ctx.globalAlpha = 0.11 * soft;
-    ctx.fillStyle = '#000';
-    this._topFacePath(ctx, foot, y + 0.002);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    this._topFacePath(ctx, top, y + 0.003);
+    this._facePath(ctx, top, y + 0.003);
     ctx.clip();
-    ctx.globalAlpha = 0.26;
+    // soft penumbra, then a crisp core: the hard edge IS the alignment cue
     ctx.fillStyle = '#000';
-    this._topFacePath(ctx, foot, y + 0.003);
+    const w2 = foot.w / 2, d2 = foot.d / 2;
+    const cx = this.px(foot.x, foot.z);
+    const cy = this.py(foot.x, y, foot.z);
+    for (const [scale, alpha] of [[1.14, 0.06], [1.06, 0.08]]) {
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      const c = [[-w2, -d2], [w2, -d2], [w2, d2], [-w2, d2]];
+      c.forEach(([dx, dz], i) => {
+        const X = cx + (this.px(foot.x + dx, foot.z + dz) - cx) * scale;
+        const Y = cy + (this.py(foot.x + dx, y, foot.z + dz) - cy) * scale;
+        if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+      });
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 0.21;
+    this._facePath(ctx, foot, y + 0.003);
     ctx.fill();
+    // a crisp terminator: this edge against the platform edge IS the alignment read
+    ctx.globalAlpha = 0.42;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 1.4;
+    this._facePath(ctx, foot, y + 0.003);
+    ctx.stroke();
     ctx.restore();
   }
 
-  _drawGuides(game, accent) {
+  /* Alignment cue. Only TWO of the platform's four top edges can ever decide a
+     placement -- the pair across the travel axis -- so those two are lit and the
+     others are not. It reads as the surface catching the light rather than as a
+     targeting overlay, and it costs the player nothing to learn. */
+  _drawEdgeCue(game, accent) {
     const a = game.active;
     if (!a || this.guideA <= 0.01) return;
     const ctx = this.ctx;
     const top = game.top;
     const y = top.y + BLOCK_H + 0.004;
     const w2 = top.w / 2, d2 = top.d / 2;
-    const ext = a.range + 0.08;
+    const P = (dx, dz) => [this.px(top.x + dx, top.z + dz), this.py(top.x + dx, y, top.z + dz)];
+    const A = P(-w2, -d2), B = P(w2, -d2), C = P(w2, d2), D = P(-w2, d2);
+    const pairs = a.axis === 'x' ? [[B, C], [D, A]] : [[A, B], [C, D]];
+
+    const delta = Math.abs(a.pos - (a.axis === 'x' ? top.x : top.z));
+    const near = clamp(1 - delta / (a.range * 0.6), 0, 1);
+
     ctx.save();
-    ctx.globalAlpha = this.guideA * 0.30;
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([5, 9]);
-    const lines = a.axis === 'x'
-      ? [[[top.x - ext, top.z - d2], [top.x + ext, top.z - d2]],
-         [[top.x - ext, top.z + d2], [top.x + ext, top.z + d2]]]
-      : [[[top.x - w2, top.z - ext], [top.x - w2, top.z + ext]],
-         [[top.x + w2, top.z - ext], [top.x + w2, top.z + ext]]];
-    for (const [p0, p1] of lines) {
-      ctx.beginPath();
-      ctx.moveTo(this.px(p0[0], p0[1]), this.py(p0[0], y, p0[1]));
-      ctx.lineTo(this.px(p1[0], p1[1]), this.py(p1[0], y, p1[1]));
-      ctx.stroke();
+    ctx.lineCap = 'round';
+    for (const [p0, p1] of pairs) {
+      ctx.globalAlpha = this.guideA * (0.14 + 0.30 * near * near);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
+      ctx.globalAlpha = this.guideA * (0.42 + 0.50 * near * near);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
     }
     ctx.restore();
   }
@@ -403,13 +568,13 @@ export class Renderer {
   _drawGroundShadow(game) {
     const ctx = this.ctx;
     const base = game.blocks[0];
-    const cx = this.px(base.x, base.z);
     const cy = this.py(base.x, base.y, base.z);
-    if (cy < -80 || cy > this.H + 160) return;
-    const rx = this.K * 2.1, ry = this.K * 1.05;
+    if (cy < -80 || cy > this.H + 200) return;
+    const cx = this.px(base.x, base.z);
+    const rx = this.K * 2.3, ry = this.K * 1.05;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
-    g.addColorStop(0, 'rgba(0,0,0,0.42)');
-    g.addColorStop(0.55, 'rgba(0,0,0,0.18)');
+    g.addColorStop(0, 'rgba(0,0,0,0.44)');
+    g.addColorStop(0.5, 'rgba(0,0,0,0.17)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.save();
     ctx.translate(cx, cy); ctx.scale(1, ry / rx); ctx.translate(-cx, -cy);
@@ -426,60 +591,82 @@ export class Renderer {
 
     const P = this.world;
     const accent = P ? P.accent : '#fff';
+    const menu = !!opts.menu;
 
-    this.guideA = lerp(this.guideA, game.active && !opts.paused ? 1 : 0, 1 - Math.pow(0.004, dt));
-    this.flashA = Math.max(0, this.flashA - dt * 2.2);
-    this.pulse = Math.max(0, this.pulse - dt * 0.09);
-    this.shake = Math.max(0, this.shake - dt * 26);
+    this.guideA = lerp(this.guideA, game.active && !opts.paused && !menu ? 1 : 0, 1 - Math.pow(0.004, dt));
+    this.flashA = Math.max(0, this.flashA - dt * 2.4);
+    this.pulse = Math.max(0, this.pulse - dt * 0.10);
+    this.shake = Math.max(0, this.shake - dt * 30);
+    this.impact = Math.max(0, this.impact - dt * 8);
+    if (this.fade < 1) this.fade = Math.min(1, this.fade + dt * 0.85);
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    // background + parallax
+    const py = clamp(this.cam.y * this.K * 0.05, 0, this.bgShift || 0);
+    const paint = (img) => ctx.drawImage(img, 0, this.bgTop + py, this.W, this.bgH);
     if (this.bg) {
-      const py = clamp(this.cam.y * this.K * 0.05, 0, this.bgShift);
-      ctx.drawImage(this.bg, 0, this.bgTop + py, this.W, this.bgH);
+      const cur = menu ? (this._blurred() || this.bg) : this.bg;
+      if (this.fade < 1 && this.bgPrev) {
+        paint(menu ? (this.bgPrevBlur || this.bgPrev) : this.bgPrev);
+        ctx.globalAlpha = this.fade;
+        paint(cur);
+        ctx.globalAlpha = 1;
+      } else {
+        paint(cur);
+      }
     } else {
       ctx.fillStyle = '#101018'; ctx.fillRect(0, 0, this.W, this.H);
     }
-    this._drawAmbient(dt);
+    this._drawAmbient(dt, menu);
 
-    // Menus sit on the live world environment. Drawing the tower behind them
-    // only fights the logo and the cards for attention.
-    if (opts.menu) { ctx.globalAlpha = 1; return; }
+    if (menu) return;
 
     ctx.save();
     if (this.pulse > 0.0005 || this.shake > 0.05) {
       const s = 1 + this.pulse;
       const sx = (Math.random() - 0.5) * this.shake;
       const sy = (Math.random() - 0.5) * this.shake;
-      ctx.translate(this.W / 2 + sx, this.H * ANCHOR + sy);
+      ctx.translate(this.W / 2 + sx, this.H * this.anchor + sy);
       ctx.scale(s, s);
-      ctx.translate(-this.W / 2, -this.H * ANCHOR);
+      ctx.translate(-this.W / 2, -this.H * this.anchor);
     }
 
     this._drawGroundShadow(game);
 
-    // Cull to the viewport: a 40-block tower only ever shows ~12 blocks.
+    // Cull to the viewport: a 40-block tower only ever shows a dozen blocks.
     const blocks = game.blocks;
+    const last = blocks.length - 1;
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i];
       const sy = this.py(b.x, b.y + BLOCK_H, b.z);
-      if (sy < -this.K * 2) continue;
-      if (sy > this.H + this.K * 2) continue;
-      const depth = blocks.length - 1 - i;
-      this.drawBlock(b, { fog: depth > 14 ? Math.min(0.62, (depth - 14) * 0.05) : 0 });
+      // sy is the top face's centre; the block spans ~0.6K above it and
+      // ~1.05K below, so those are the only margins that can matter.
+      if (sy < -this.K * 1.1 || sy > this.H + this.K * 0.7) continue;
+      const depth = last - i;
+      // past this depth the haze is opaque: there is nothing left to draw
+      if (depth > 20) continue;
+      if (depth < SHADOW_BLOCKS && i > 0) this._contactShadow(b, blocks[i - 1], depth === 0 ? 1 : 0.8);
+      const fog = depth > 9 ? Math.min(0.92, (depth - 9) * 0.084) : 0;
+      this.drawBlock(b, {
+        fog,
+        detail: depth < DETAIL_BLOCKS,
+        flat: fog > 0.5,
+        strike: depth === 0 ? this.impact : 0
+      });
     }
 
-    this._drawGuides(game, accent);
     this._drawLandingShadow(game);
+    this._drawEdgeCue(game, accent);
 
-    // debris
     for (const d of game.debris) {
-      const age = 1 - d.life / 2.2;
-      this.drawBlock(d, { alpha: clamp(d.life * 1.4, 0, 1), settle: 0, shear: (d.spin || 0) * age * 22 });
+      const life = clamp(d.life * 1.5, 0, 1);
+      ctx.save();
+      const cx = this.px(d.x, d.z), cy = this.py(d.x, d.y, d.z);
+      ctx.translate(cx, cy); ctx.rotate(d.rot || 0); ctx.translate(-cx, -cy);
+      this.drawBlock(d, { alpha: life, settle: 0, detail: true });
+      ctx.restore();
     }
 
-    // active block
     if (game.active && !opts.hideActive) {
       const a = game.active;
       const blk = {
@@ -487,8 +674,8 @@ export class Renderer {
         z: a.axis === 'z' ? a.pos : game.top.z,
         y: a.y, w: a.w, d: a.d, color: a.color, settle: 0
       };
-      const g = 0.55 + 0.32 * Math.sin(this.time * 5);
-      this.drawBlock(blk, { glow: accent, glowAmount: g });
+      const g = 0.40 + 0.26 * Math.sin(this.time * 4.4);
+      this.drawBlock(blk, { glow: accent, glowAmount: g, detail: true, rise: HOVER });
     }
 
     this._drawParticles(dt);
@@ -509,12 +696,14 @@ export class Renderer {
 
   _drawParticles(dt) {
     const ctx = this.ctx;
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
+    const arr = this.particles;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const p = arr[i];
       p.life -= dt;
-      if (p.life <= 0) { this.particles.splice(i, 1); continue; }
+      if (p.life <= 0) { arr[i] = arr[arr.length - 1]; arr.pop(); continue; }
       p.vy -= p.grav * dt;
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      p.rot += p.spin * dt;
       const a = clamp(p.life / p.max, 0, 1);
       const sx = this.px(p.x, p.z), sy = this.py(p.x, p.y, p.z);
       if (sx < -30 || sx > this.W + 30 || sy < -30 || sy > this.H + 30) continue;
@@ -524,10 +713,10 @@ export class Renderer {
       if (p.kind === 'dust') {
         ctx.beginPath(); ctx.arc(sx, sy, Math.max(0.6, s * 0.5), 0, Math.PI * 2); ctx.fill();
       } else {
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - s * 0.5); ctx.lineTo(sx + s * 0.6, sy);
-        ctx.lineTo(sx, sy + s * 0.5); ctx.lineTo(sx - s * 0.6, sy);
-        ctx.closePath(); ctx.fill();
+        ctx.save();
+        ctx.translate(sx, sy); ctx.rotate(p.rot);
+        ctx.fillRect(-s * 0.42, -s * 0.42, s * 0.84, s * 0.84);
+        ctx.restore();
       }
     }
     ctx.globalAlpha = 1;
@@ -535,20 +724,20 @@ export class Renderer {
 
   _drawRings(dt) {
     const ctx = this.ctx;
-    for (let i = this.rings.length - 1; i >= 0; i--) {
-      const r = this.rings[i];
+    const arr = this.rings;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const r = arr[i];
       r.life -= dt;
-      if (r.life <= 0) { this.rings.splice(i, 1); continue; }
+      if (r.life <= 0) { arr[i] = arr[arr.length - 1]; arr.pop(); continue; }
       const t = 1 - r.life / r.max;
       const rad = lerp(0.12, r.maxR, t * (2 - t));
-      const a = (1 - t) * 0.85;
       const cx = this.px(r.x, r.z), cy = this.py(r.x, r.y, r.z);
       ctx.save();
-      ctx.globalAlpha = a;
+      ctx.globalAlpha = (1 - t) * 0.8;
       ctx.strokeStyle = r.color;
-      ctx.lineWidth = r.width * (1 - t * 0.6);
+      ctx.lineWidth = r.width * (1 - t * 0.65);
       ctx.beginPath();
-      ctx.ellipse(cx, cy, rad * this.K * 2, rad * this.K, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, rad * this.K * 2, rad * this.K * 2 * KY_RATIO, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -556,33 +745,64 @@ export class Renderer {
 
   _drawPopups(dt) {
     const ctx = this.ctx;
+    const arr = this.popups;
     ctx.textAlign = 'center';
-    for (let i = this.popups.length - 1; i >= 0; i--) {
-      const p = this.popups[i];
+    ctx.textBaseline = 'middle';
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const p = arr[i];
       p.life -= dt;
-      if (p.life <= 0) { this.popups.splice(i, 1); continue; }
+      if (p.life <= 0) { arr[i] = arr[arr.length - 1]; arr.pop(); continue; }
       const t = 1 - p.life / p.max;
-      const a = t < 0.15 ? t / 0.15 : clamp((1 - t) / 0.5, 0, 1);
-      const scale = t < 0.2 ? lerp(0.6, 1.08, t / 0.2) : lerp(1.08, 1, clamp((t - 0.2) / 0.2, 0, 1));
+      const a = t < 0.10 ? t / 0.10 : clamp((1 - t) / 0.45, 0, 1);
+      // a short overshoot, then settle -- weight, not bounce
+      const scale = t < 0.16 ? lerp(0.72, 1.06, easeOut(t / 0.16))
+                             : lerp(1.06, 1, clamp((t - 0.16) / 0.22, 0, 1));
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.translate(p.x, p.y - t * 58);
+      ctx.translate(p.x, p.y - easeOut(t) * 62);
       ctx.scale(scale, scale);
-      ctx.font = `800 ${p.size}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.font = `${p.weight} ${p.size}px ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif`;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,0.42)';
       ctx.strokeText(p.text, 0, 0);
       ctx.fillStyle = p.color;
       ctx.fillText(p.text, 0, 0);
       ctx.restore();
     }
+    ctx.globalAlpha = 1;
   }
+}
+
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
 /* ------------------------------------------------------------- scenery ----
    Each world gets its own silhouette language, not a hue swap. Everything here
    is baked once into an offscreen canvas per world/size. */
 
-function band(g, w, y0, y1, color) { g.fillStyle = color; g.fillRect(0, y0, w, y1 - y0); }
+/* Foreground ground. Deliberately NOT a flat rectangle: a hard-edged bar of
+   colour across the bottom of the screen reads as a stray UI element, not as
+   terrain, which is exactly what it looked like before. */
+function ground(g, w, h, y0, top, bottom) {
+  const grad = g.createLinearGradient(0, y0 - h * 0.02, 0, h);
+  grad.addColorStop(0, top);
+  grad.addColorStop(0.45, mix(top, bottom, 0.55));
+  grad.addColorStop(1, bottom);
+  g.fillStyle = grad;
+  g.fillRect(0, y0 - h * 0.02, w, h - y0 + h * 0.02);
+}
+
+function mix(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const r = Math.round(((pa >> 16) & 255) * (1 - t) + ((pb >> 16) & 255) * t);
+  const gg = Math.round(((pa >> 8) & 255) * (1 - t) + ((pb >> 8) & 255) * t);
+  const bl = Math.round((pa & 255) * (1 - t) + (pb & 255) * t);
+  return `rgb(${r},${gg},${bl})`;
+}
 
 function sun(g, cx, cy, r, inner, outer) {
   const rg = g.createRadialGradient(cx, cy, 0, cx, cy, r);
@@ -592,7 +812,7 @@ function sun(g, cx, cy, r, inner, outer) {
   g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
 }
 
-function ridge(g, w, baseY, amp, freq, phase, color, jag = 0, R = Math.random) {
+function ridge(g, w, baseY, amp, freq, phase, color, jag = 0) {
   g.fillStyle = color;
   g.beginPath();
   g.moveTo(0, baseY);
@@ -638,36 +858,34 @@ function stars(g, w, h, n, R, maxY) {
 const SCENERY = {
   hills(g, w, h, hz, R) {
     sun(g, w * 0.78, hz - h * 0.13, h * 0.062, 'rgba(255,244,208,0.80)', 'rgba(255,196,120,0)');
-    ridge(g, w, hz + h * 0.02, h * 0.055, 0.010, 1.2, '#8FA95C', 0, R);
-    ridge(g, w, hz + h * 0.09, h * 0.045, 0.014, 3.1, '#5E7C45', 0, R);
-    ridge(g, w, hz + h * 0.17, h * 0.040, 0.019, 0.4, '#3C5733', 0, R);
-    band(g, w, hz + h * 0.30, h, '#2A3D28');
+    ridge(g, w, hz + h * 0.02, h * 0.055, 0.010, 1.2, '#8FA95C');
+    ridge(g, w, hz + h * 0.09, h * 0.045, 0.014, 3.1, '#5E7C45');
+    ridge(g, w, hz + h * 0.17, h * 0.040, 0.019, 0.4, '#3C5733');
+    ground(g, w, h, hz + h * 0.27, '#31462B', '#141E13');
   },
   sea(g, w, h, hz, R) {
     sun(g, w * 0.24, hz - h * 0.12, h * 0.055, 'rgba(255,236,214,0.82)', 'rgba(255,150,130,0)');
-    band(g, w, hz, h, '#1B6C87');
+    ground(g, w, h, hz, '#1E7189', '#062733');
     for (let i = 0; i < 26; i++) {
       const y = hz + (i / 26) ** 1.7 * h * 0.40;
       g.fillStyle = `rgba(255,255,255,${0.10 - i * 0.003})`;
       const ww = w * (0.12 + R() * 0.28);
-      g.fillRect(w * 0.30 - ww / 2 + (R() - 0.5) * w * 0.15, y, ww, 1.6);
+      g.fillRect(w * 0.24 - ww / 2 + (R() - 0.5) * w * 0.15, y, ww, 1.6);
     }
-    ridge(g, w, hz + h * 0.06, h * 0.02, 0.03, 2.0, 'rgba(10,60,80,0.55)', 0, R);
-    band(g, w, hz + h * 0.42, h, '#0E4258');
+    ridge(g, w, hz + h * 0.06, h * 0.02, 0.03, 2.0, 'rgba(10,60,80,0.45)');
   },
   dunes(g, w, h, hz, R) {
     sun(g, w * 0.5, hz - h * 0.085, h * 0.075, 'rgba(255,248,222,0.80)', 'rgba(255,180,110,0)');
-    ridge(g, w, hz + h * 0.03, h * 0.05, 0.008, 0.7, '#E3A867', 0, R);
-    ridge(g, w, hz + h * 0.12, h * 0.048, 0.011, 2.6, '#C4854D', 0, R);
-    ridge(g, w, hz + h * 0.22, h * 0.042, 0.015, 4.4, '#9A6238', 0, R);
-    band(g, w, hz + h * 0.34, h, '#6E442A');
+    ridge(g, w, hz + h * 0.03, h * 0.05, 0.008, 0.7, '#E3A867');
+    ridge(g, w, hz + h * 0.12, h * 0.048, 0.011, 2.6, '#C4854D');
+    ridge(g, w, hz + h * 0.22, h * 0.042, 0.015, 4.4, '#9A6238');
+    ground(g, w, h, hz + h * 0.31, '#7E4F30', '#331C11');
   },
   peaks(g, w, h, hz, R) {
-    band(g, w, hz - h * 0.02, h, 'rgba(120,180,150,0.18)');
     peaks(g, w, hz + h * 0.03, h * 0.16, 7, '#4E9B74', R);
     peaks(g, w, hz + h * 0.12, h * 0.20, 5, '#2F7357', R);
     peaks(g, w, hz + h * 0.22, h * 0.15, 9, '#1C4A3C', R);
-    band(g, w, hz + h * 0.32, h, '#123027');
+    ground(g, w, h, hz + h * 0.30, '#163B30', '#07160F');
   },
   mesa(g, w, h, hz, R) {
     sun(g, w * 0.20, hz - h * 0.11, h * 0.050, 'rgba(255,226,200,0.8)', 'rgba(255,120,110,0)');
@@ -686,16 +904,15 @@ const SCENERY = {
       }
       g.lineTo(w, y + h * 0.4); g.closePath(); g.fill();
     }
-    band(g, w, hz + h * 0.30, h, '#3A162A');
+    ground(g, w, h, hz + h * 0.28, '#4A1B2E', '#1A0713');
   },
   snow(g, w, h, hz, R) {
     sun(g, w * 0.76, hz - h * 0.15, h * 0.055, 'rgba(255,255,255,0.72)', 'rgba(200,230,255,0)');
-    // darker than the sky, or a pale world turns its mountains into artefacts
     peaks(g, w, hz - h * 0.01, h * 0.20, 5, '#87AFCD', R);
     peaks(g, w, hz + h * 0.07, h * 0.14, 7, '#6791B5', R);
-    ridge(g, w, hz + h * 0.17, h * 0.040, 0.011, 1.9, '#F1F8FD', 0, R);
-    ridge(g, w, hz + h * 0.26, h * 0.034, 0.017, 4.2, '#D6E8F5', 0, R);
-    band(g, w, hz + h * 0.33, h, '#BFDAEC');
+    ridge(g, w, hz + h * 0.17, h * 0.040, 0.011, 1.9, '#F1F8FD');
+    ridge(g, w, hz + h * 0.26, h * 0.034, 0.017, 4.2, '#D6E8F5');
+    ground(g, w, h, hz + h * 0.33, '#C3DCEE', '#6E93B0');
   },
   volcano(g, w, h, hz, R) {
     sun(g, w * 0.5, hz + h * 0.02, h * 0.22, 'rgba(255,140,60,0.30)', 'rgba(255,80,40,0)');
@@ -712,7 +929,7 @@ const SCENERY = {
     g.beginPath(); g.moveTo(w * 0.41, hz - h * 0.21); g.lineTo(w * 0.59, hz - h * 0.21);
     g.lineTo(w * 0.62, hz + h * 0.06); g.lineTo(w * 0.38, hz + h * 0.06); g.closePath(); g.fill();
     peaks(g, w, hz + h * 0.10, h * 0.09, 9, '#2C0A11', R);
-    band(g, w, hz + h * 0.28, h, '#170509');
+    ground(g, w, h, hz + h * 0.22, '#22070D', '#0A0205');
   },
   deep(g, w, h, hz, R) {
     for (let i = 0; i < 7; i++) {
@@ -724,9 +941,9 @@ const SCENERY = {
       g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * 0.08, 0);
       g.lineTo(x + w * 0.20, h); g.lineTo(x - w * 0.04, h); g.closePath(); g.fill();
     }
-    ridge(g, w, hz + h * 0.14, h * 0.05, 0.012, 2.2, '#0B4450', 0, R);
-    ridge(g, w, hz + h * 0.26, h * 0.05, 0.018, 5.0, '#062F3B', 0, R);
-    band(g, w, hz + h * 0.36, h, '#031F29');
+    ridge(g, w, hz + h * 0.14, h * 0.05, 0.012, 2.2, '#0B4450');
+    ridge(g, w, hz + h * 0.26, h * 0.05, 0.018, 5.0, '#062F3B');
+    ground(g, w, h, hz + h * 0.34, '#05262F', '#010C12');
   },
   aurora(g, w, h, hz, R) {
     stars(g, w, h, 130, R, hz + h * 0.1);
@@ -745,7 +962,7 @@ const SCENERY = {
     }
     peaks(g, w, hz + h * 0.12, h * 0.16, 6, '#1A2140', R);
     peaks(g, w, hz + h * 0.24, h * 0.12, 8, '#0E1428', R);
-    band(g, w, hz + h * 0.34, h, '#080D1B');
+    ground(g, w, h, hz + h * 0.32, '#0B1120', '#03060C');
   },
   cosmos(g, w, h, hz, R) {
     stars(g, w, h, 220, R);
@@ -764,6 +981,6 @@ const SCENERY = {
     g.strokeStyle = 'rgba(255,220,170,0.5)'; g.lineWidth = pr * 0.16;
     g.beginPath(); g.ellipse(px, py, pr * 1.9, pr * 0.44, -0.32, 0, Math.PI * 2); g.stroke();
     peaks(g, w, hz + h * 0.20, h * 0.13, 7, '#150C2A', R);
-    band(g, w, hz + h * 0.32, h, '#0B0618');
+    ground(g, w, h, hz + h * 0.30, '#120A26', '#04010C');
   }
 };

@@ -15,7 +15,7 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
 await page.goto(url + '/index.html', { waitUntil: 'load' });
 await page.waitForFunction(() => !!window.__blockstack);
-await page.waitForTimeout(400);
+await page.waitForTimeout(1100);
 await page.screenshot({ path: path.join(OUT, 'm1-title.png') });
 
 // seed some progress so the map and records have something to show
@@ -26,7 +26,7 @@ await page.evaluate(() => {
       crowns: [3, 2, 3, 1, 2, 3, 2, 2, 3, 3][i % 10], score: 1200 + i * 130,
       perfects: 6 + (i % 5), combo: 4 + (i % 6), remainPct: 0.6 + (i % 4) * 0.1, endless: i === 9 ? 12 : 0
     }])),
-    records: { totalPerfects: 214, bestCombo: 14, smallest: 0.09, totalRuns: 61, totalBlocks: 780, bestScore: 4820, bestEndless: 12, recoveries: 19 },
+    records: { totalPerfects: 214, bestCombo: 14, smallest: 0.09, totalRuns: 61, totalBlocks: 780, bestScore: 4820, bestEndless: 12, recoveries: 19, bestStack: 47 },
     achievements: { 'first-perfect': 1, triple: 1, 'ten-perfect': 1, 'first-boss': 1, 'world-clear': 1, comeback: 1 },
     settings: { sound: true, music: true, haptics: true }
   };
@@ -34,7 +34,7 @@ await page.evaluate(() => {
 });
 await page.reload({ waitUntil: 'load' });
 await page.waitForFunction(() => !!window.__blockstack);
-await page.waitForTimeout(400);
+await page.waitForTimeout(1100);
 await page.screenshot({ path: path.join(OUT, 'm2-title-progress.png') });
 await page.click('#mapBtn'); await page.waitForTimeout(300);
 await page.screenshot({ path: path.join(OUT, 'm3-map.png') });
@@ -67,5 +67,24 @@ await page.waitForTimeout(1100);
 await page.screenshot({ path: path.join(OUT, 'm5-result-boss.png') });
 await page.click('#resPrimary'); await page.waitForTimeout(600);
 await page.screenshot({ path: path.join(OUT, 'm6-world-complete.png') });
+// stack mode mid-climb
+await page.evaluate(async () => {
+  const api = window.__blockstack;
+  api.stack();
+  const g = () => api.game();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 30; i++) {
+    let guard = 0;
+    while (guard++ < 900) {
+      const a = g().active; if (!a) break;
+      const c = a.axis === 'x' ? g().top.x : g().top.z;
+      if (Math.abs(a.pos - c) <= (i % 4 === 0 ? 0.12 : a.speed * 1.6 / 60)) break;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    api.place(); await sleep(40);
+  }
+});
+await page.waitForTimeout(700);
+await page.screenshot({ path: path.join(OUT, 'm7-stack.png') });
 await b.close(); server.close();
 console.log('menu screenshots written');
