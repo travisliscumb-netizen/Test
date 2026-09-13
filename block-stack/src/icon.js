@@ -51,7 +51,11 @@ export function drawIcon(ctx, S, o = {}) {
   const radius = o.radius === undefined ? (maskable ? 0 : S * 0.2237) : o.radius;
 
   ctx.save();
-  ctx.clearRect(0, 0, S, S);
+  /* Compositing onto an existing background (the launch image) must NOT clear
+     it: clearRect punches a transparent square, and the icon's rounded corners
+     then show through as nothing -- which renders as a white box behind the
+     icon on the launch screen. */
+  if (!o.noClear) ctx.clearRect(0, 0, S, S);
 
   if (!o.transparent) {
     if (radius > 0) { roundRect(ctx, 0, 0, S, S, radius); ctx.clip(); }
@@ -190,17 +194,17 @@ export function drawIcon(ctx, S, o = {}) {
   ctx.restore();
 }
 
-/** The iOS launch image: the icon on the app's ground, nothing else. */
+/** The iOS launch image.
+
+    Deliberately just the app's ground colour. Apple's guidance is that a launch
+    screen should look like the first screen of the app rather than a splash
+    graphic, and the first screen here IS this colour -- the icon and wordmark
+    fade in on top once the page paints. Putting the icon in the launch image as
+    well made it visibly jump size and position at handover, and cost 1.1 MB
+    across eight resolutions for the privilege. */
+export const SPLASH_GROUND = '#0E1120';
+
 export function drawSplash(ctx, W, H) {
-  const bg = ctx.createLinearGradient(0, 0, W * 0.5, H);
-  bg.addColorStop(0, '#232A3E');
-  bg.addColorStop(0.48, '#141827');
-  bg.addColorStop(1, '#0A0B12');
-  ctx.fillStyle = bg;
+  ctx.fillStyle = SPLASH_GROUND;
   ctx.fillRect(0, 0, W, H);
-  const S = Math.min(W, H) * 0.30;
-  ctx.save();
-  ctx.translate((W - S) / 2, (H - S) / 2 - H * 0.04);
-  drawIcon(ctx, S, { radius: S * 0.2237 });
-  ctx.restore();
 }

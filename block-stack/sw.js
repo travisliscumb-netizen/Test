@@ -2,7 +2,7 @@
    it is precached on install and served cache-first: after one visit the game
    launches from the Home Screen with no network at all. */
 
-const VERSION = 'block-stack-v2';
+const VERSION = 'block-stack-v3';
 const SHELL = [
   './',
   './index.html',
@@ -21,8 +21,7 @@ const SHELL = [
   './icons/icon-512.png',
   './icons/maskable-192.png',
   './icons/maskable-512.png',
-  './icons/apple-touch-icon-180.png',
-  './icons/apple-touch-icon-167.png'
+  './icons/apple-touch-icon-180.png'
 ];
 
 self.addEventListener('install', (e) => {

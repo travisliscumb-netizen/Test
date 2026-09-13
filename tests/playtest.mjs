@@ -418,6 +418,105 @@ check('the horizon resolves into a gradient, not a flat bar', bandScan < 34, `${
 check('polish pass produced no console errors', p3.errors.length === 0, p3.errors.slice(0, 3).join(' | '));
 await p3.ctx.close();
 
+/* ---- regression guards for bugs already fixed once ------------------- */
+{
+  const rg = await newPage(VIEWPORTS[1]);
+
+  // black crowns: the sprite has no fill of its own, so the icon must inherit
+  const crownFill = await rg.page.evaluate(() => {
+    const host = document.createElement('div');
+    host.className = 'crowns';
+    host.innerHTML = '<span class="cr on"><svg><use href="#i-crown"/></svg></span>';
+    document.getElementById('app').appendChild(host);
+    const svg = host.querySelector('svg');
+    const fill = getComputedStyle(svg).fill;
+    const colour = getComputedStyle(host.querySelector('.cr')).color;
+    host.remove();
+    return { fill, colour };
+  });
+  check('crowns inherit the accent rather than defaulting to black',
+    crownFill.fill !== 'rgb(0, 0, 0)' && crownFill.colour !== 'rgb(0, 0, 0)',
+    `fill=${crownFill.fill} colour=${crownFill.colour}`);
+
+  // color-mix is Safari 16.2+; the plain fallback must stand on its own
+  const btn = await rg.page.evaluate(() => {
+    const b = document.createElement('button');
+    b.className = 'btn btn-primary';
+    document.getElementById('app').appendChild(b);
+    const cs = getComputedStyle(b);
+    const out = { bgColor: cs.backgroundColor, bgImage: cs.backgroundImage };
+    b.remove();
+    return out;
+  });
+  check('primary button keeps a solid fill without color-mix',
+    btn.bgColor !== 'rgba(0, 0, 0, 0)' && btn.bgColor !== 'transparent', btn.bgColor);
+
+  // effect pools must not grow without bound under a long perfect streak
+  const pools = await rg.page.evaluate(async () => {
+    const api = window.__blockstack;
+    api.start(1);
+    for (let i = 0; i < 60 && api.game().active; i++) {
+      const a = api.game().active;
+      a.pos = a.axis === 'x' ? api.game().top.x : api.game().top.z;
+      api.place();
+    }
+    const r = api.pools();
+    return r;
+  });
+  check('effect pools stay capped under a 60-perfect burst',
+    pools.particles <= 180 && pools.rings <= 5 && pools.popups <= 6 && pools.debris <= 8,
+    JSON.stringify(pools));
+
+  // a stale result card must not land on a run that has already restarted
+  const stale = await rg.page.evaluate(async () => {
+    const api = window.__blockstack;
+    api.start(3);
+    const g = api.game();
+    g.active.pos = (g.active.axis === 'x' ? g.top.x : g.top.z) + 9; // guaranteed miss
+    api.place();
+    api.start(4);                       // restart immediately, before the card
+    await new Promise((r) => setTimeout(r, 900));
+    return api.state().screen;
+  });
+  check('a restarted run is never interrupted by the old result card',
+    stale === 'game', `screen=${stale}`);
+
+  // the haptic switch must be nowhere near the visible edge
+  const hap = await rg.page.evaluate(() => {
+    const el = document.getElementById('hapticSwitch');
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    return { top: Math.round(b.top), left: Math.round(b.left), vh: window.innerHeight, vw: window.innerWidth };
+  });
+  check('the iOS haptic switch sits outside the viewport',
+    hap && (hap.top < -40 || hap.left < -40), JSON.stringify(hap));
+
+  // cut material identity, re-checked on the z axis this time
+  const zcut = await rg.page.evaluate(async () => {
+    const api = window.__blockstack;
+    api.start(45);
+    const g = () => api.game();
+    let guard = 0;
+    while (g().active && g().active.axis !== 'z' && guard++ < 8) {
+      g().active.pos = g().active.axis === 'x' ? g().top.x : g().top.z;
+      api.place();
+    }
+    const a = g().active;
+    if (!a || a.axis !== 'z') return null;
+    const src = { ...a.color };
+    a.pos = g().top.z + 0.28;
+    api.place();
+    const d = api.game().debris[api.game().debris.length - 1];
+    return d ? { src, got: { ...d.color } } : null;
+  });
+  check('z-axis cut pieces keep the parent material',
+    !!zcut && zcut.src.h === zcut.got.h && zcut.src.s === zcut.got.s && zcut.src.l === zcut.got.l,
+    zcut ? `h ${zcut.src.h.toFixed(1)} vs ${zcut.got.h.toFixed(1)}` : 'no z-axis block found');
+
+  check('regression guards produced no console errors', rg.errors.length === 0, rg.errors.slice(0, 2).join(' | '));
+  await rg.ctx.close();
+}
+
 /* Manifest + icons actually resolve */
 const mp = await browser.newPage();
 const manifest = await (await mp.goto(url + '/manifest.webmanifest')).json();

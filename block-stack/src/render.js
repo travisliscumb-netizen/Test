@@ -176,6 +176,9 @@ export class Renderer {
     });
   }
 
+  /** A bigger message supersedes whatever is already floating. */
+  clearPopups() { this.popups.length = 0; }
+
   flash(color, a = 0.22) { this.flashColor = color; this.flashA = Math.max(this.flashA, a); }
   kick(amount = 0.016) { this.pulse = Math.max(this.pulse, amount); }
   shakeBy(amount) { this.shake = Math.max(this.shake, amount); }
@@ -199,7 +202,13 @@ export class Renderer {
 
     const R = srand(P.id * 7919 + 13);
     const horizon = h * 0.62;
-    SCENERY[P.scenery](g, w, h, horizon, R, P);
+    /* Only hz .. hz+0.193h of the background is ever on screen (the rest sits
+       below the viewport), so foreground layers are placed through fg(), which
+       maps a normalised depth into that band. Hand-picked offsets silently put
+       a third of the scenery -- and every world's ground plane -- out of frame,
+       which is what made several worlds read as bare gradients. */
+    const fg = (t) => horizon + h * 0.193 * t;
+    SCENERY[P.scenery](g, w, h, horizon, R, P, fg);
 
     /* Atmospheric haze at the horizon line: distance reads as distance, and it
        keeps terrain silhouettes from cutting the sky like paper. */
@@ -304,8 +313,8 @@ export class Renderer {
        the shaded face. The spread between the three faces is what tells the
        player where the geometry is, so it is deliberately wide. */
     c._fc = {
-      top: hsl(c.h, c.s * 0.94, c.l + 17),
-      inner: hsl(c.h, c.s * 0.88, c.l + 23),
+      top: hsl(c.h, c.s * 0.97, c.l + 11),
+      inner: hsl(c.h, c.s * 0.93, c.l + 16),
       rim: hsl(c.h, c.s * 0.62, c.l + 38),
       right: hsl(c.h + 2, c.s * 1.02, c.l - 6),
       rightLo: hsl(c.h + 4, c.s, c.l - 16),
@@ -431,8 +440,8 @@ export class Renderer {
 
     if (detail) {
       const g = ctx.createLinearGradient(p.A[0], p.A[1], p.C[0], p.C[1]);
-      g.addColorStop(0, 'rgba(255,255,255,0.17)');
-      g.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+      g.addColorStop(0, 'rgba(255,255,255,0.10)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.02)');
       g.addColorStop(1, 'rgba(0,0,0,0.06)');
       ctx.fillStyle = g;
       poly([p.A, p.B, p.C, p.D]); ctx.fill();
@@ -759,7 +768,7 @@ export class Renderer {
                              : lerp(1.06, 1, clamp((t - 0.16) / 0.22, 0, 1));
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.translate(p.x, p.y - easeOut(t) * 62);
+      ctx.translate(p.x, p.y - easeOut(t) * 40);
       ctx.scale(scale, scale);
       ctx.font = `${p.weight} ${p.size}px ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif`;
       ctx.lineJoin = 'round';
@@ -787,8 +796,12 @@ function hexA(hex, a) {
 /* Foreground ground. Deliberately NOT a flat rectangle: a hard-edged bar of
    colour across the bottom of the screen reads as a stray UI element, not as
    terrain, which is exactly what it looked like before. */
-function ground(g, w, h, y0, top, bottom) {
-  const grad = g.createLinearGradient(0, y0 - h * 0.02, 0, h);
+function ground(g, w, h, y0, top, bottom, end) {
+  /* The ramp has to COMPLETE inside the visible band. Running it to the canvas
+     floor -- which sits well below the viewport -- means the player only ever
+     sees a near-constant slice of it, which is a flat bar across the bottom of
+     the screen by another name. */
+  const grad = g.createLinearGradient(0, y0 - h * 0.02, 0, end);
   grad.addColorStop(0, top);
   grad.addColorStop(0.45, mix(top, bottom, 0.55));
   grad.addColorStop(1, bottom);
@@ -846,6 +859,17 @@ function peaks(g, w, baseY, height, count, color, R) {
   g.fill();
 }
 
+/* A band of haze sitting on a silhouette's base. Aerial perspective is what
+   stops three ranges of the same hue from reading as one flat shape. */
+function mist(g, w, baseY, height, color) {
+  const m = g.createLinearGradient(0, baseY - height, 0, baseY + height * 0.35);
+  m.addColorStop(0, 'rgba(255,255,255,0)');
+  m.addColorStop(0.6, color);
+  m.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = m;
+  g.fillRect(0, baseY - height, w, height * 1.35);
+}
+
 function stars(g, w, h, n, R, maxY) {
   for (let i = 0; i < n; i++) {
     const x = R() * w, y = R() * (maxY || h);
@@ -856,65 +880,98 @@ function stars(g, w, h, n, R, maxY) {
 }
 
 const SCENERY = {
-  hills(g, w, h, hz, R) {
+  hills(g, w, h, hz, R, P, fg) {
     sun(g, w * 0.78, hz - h * 0.13, h * 0.062, 'rgba(255,244,208,0.80)', 'rgba(255,196,120,0)');
-    ridge(g, w, hz + h * 0.02, h * 0.055, 0.010, 1.2, '#8FA95C');
-    ridge(g, w, hz + h * 0.09, h * 0.045, 0.014, 3.1, '#5E7C45');
-    ridge(g, w, hz + h * 0.17, h * 0.040, 0.019, 0.4, '#3C5733');
-    ground(g, w, h, hz + h * 0.27, '#31462B', '#141E13');
+    ridge(g, w, fg(0.10), h * 0.055, 0.010, 1.2, '#8FA95C');
+    ridge(g, w, fg(0.40), h * 0.045, 0.014, 3.1, '#5E7C45');
+    ridge(g, w, fg(0.72), h * 0.040, 0.019, 0.4, '#3C5733');
+    ground(g, w, h, fg(0.70), '#31462B', '#141E13', fg(1.06));
   },
-  sea(g, w, h, hz, R) {
+  sea(g, w, h, hz, R, P, fg) {
     sun(g, w * 0.24, hz - h * 0.12, h * 0.055, 'rgba(255,236,214,0.82)', 'rgba(255,150,130,0)');
-    ground(g, w, h, hz, '#1E7189', '#062733');
+    ground(g, w, h, hz, '#2A86A0', '#04202B', fg(1.06));
     for (let i = 0; i < 26; i++) {
-      const y = hz + (i / 26) ** 1.7 * h * 0.40;
-      g.fillStyle = `rgba(255,255,255,${0.10 - i * 0.003})`;
+      const y = hz + (i / 26) ** 1.7 * h * 0.19;
+      g.fillStyle = `rgba(255,255,255,${0.11 - i * 0.0032})`;
       const ww = w * (0.12 + R() * 0.28);
       g.fillRect(w * 0.24 - ww / 2 + (R() - 0.5) * w * 0.15, y, ww, 1.6);
     }
-    ridge(g, w, hz + h * 0.06, h * 0.02, 0.03, 2.0, 'rgba(10,60,80,0.45)');
+    ridge(g, w, fg(0.30), h * 0.02, 0.03, 2.0, 'rgba(10,60,80,0.45)');
   },
-  dunes(g, w, h, hz, R) {
-    sun(g, w * 0.5, hz - h * 0.085, h * 0.075, 'rgba(255,248,222,0.80)', 'rgba(255,180,110,0)');
-    ridge(g, w, hz + h * 0.03, h * 0.05, 0.008, 0.7, '#E3A867');
-    ridge(g, w, hz + h * 0.12, h * 0.048, 0.011, 2.6, '#C4854D');
-    ridge(g, w, hz + h * 0.22, h * 0.042, 0.015, 4.4, '#9A6238');
-    ground(g, w, h, hz + h * 0.31, '#7E4F30', '#331C11');
+
+  /* Amber Desert. The sun is the focal point and the dunes step down in value
+     from near-white at the horizon to deep umber in the foreground -- without
+     that separation three warm ridges on a warm sky are one flat gradient. */
+  dunes(g, w, h, hz, R, P, fg) {
+    const glow = g.createLinearGradient(0, hz - h * 0.14, 0, hz + h * 0.05);
+    glow.addColorStop(0, 'rgba(255,214,150,0)');
+    glow.addColorStop(0.7, 'rgba(255,206,140,0.45)');
+    glow.addColorStop(1, 'rgba(255,180,110,0)');
+    g.fillStyle = glow; g.fillRect(0, hz - h * 0.14, w, h * 0.19);
+    sun(g, w * 0.5, hz - h * 0.055, h * 0.062, 'rgba(255,250,232,0.98)', 'rgba(255,186,112,0)');
+    ridge(g, w, fg(0.08), h * 0.040, 0.009, 0.7, '#F0BE85');
+    ridge(g, w, fg(0.34), h * 0.044, 0.012, 2.6, '#C98A54');
+    ridge(g, w, fg(0.64), h * 0.042, 0.016, 4.4, '#8E5732');
+    ground(g, w, h, fg(0.70), '#66381F', '#2A150C', fg(1.06));
   },
-  peaks(g, w, h, hz, R) {
-    peaks(g, w, hz + h * 0.03, h * 0.16, 7, '#4E9B74', R);
-    peaks(g, w, hz + h * 0.12, h * 0.20, 5, '#2F7357', R);
-    peaks(g, w, hz + h * 0.22, h * 0.15, 9, '#1C4A3C', R);
-    ground(g, w, h, hz + h * 0.30, '#163B30', '#07160F');
+
+  /* Jade Terraces. Was a green gradient with faint pines: now a hazy valley
+     light behind three ranges that separate by value, with mist between them. */
+  peaks(g, w, h, hz, R, P, fg) {
+    const bloom = g.createRadialGradient(w * 0.62, hz - h * 0.05, 0, w * 0.62, hz - h * 0.02, h * 0.20);
+    bloom.addColorStop(0, 'rgba(236,255,236,0.55)');
+    bloom.addColorStop(0.45, 'rgba(196,240,206,0.20)');
+    bloom.addColorStop(1, 'rgba(180,230,195,0)');
+    g.fillStyle = bloom; g.fillRect(0, hz - h * 0.26, w, h * 0.30);
+    peaks(g, w, fg(0.06), h * 0.20, 6, '#71B693', R);
+    mist(g, w, fg(0.06), h * 0.045, 'rgba(226,248,232,0.45)');
+    peaks(g, w, fg(0.34), h * 0.17, 5, '#3C8863', R);
+    mist(g, w, fg(0.34), h * 0.038, 'rgba(206,240,218,0.30)');
+    peaks(g, w, fg(0.66), h * 0.13, 8, '#1D5240', R);
+    ground(g, w, h, fg(0.70), '#143427', '#05130D', fg(1.06));
   },
-  mesa(g, w, h, hz, R) {
-    sun(g, w * 0.20, hz - h * 0.11, h * 0.050, 'rgba(255,226,200,0.8)', 'rgba(255,120,110,0)');
-    for (let layer = 0; layer < 3; layer++) {
-      const y = hz + h * (0.02 + layer * 0.10);
-      const col = ['#B4584F', '#8C3B40', '#5E2434'][layer];
+
+  /* Crimson Ridge. Low hard sun, mesas stepping from dusty rose down to near
+     black, and a dust haze so the foreground silhouettes separate. */
+  mesa(g, w, h, hz, R, P, fg) {
+    const glow = g.createLinearGradient(0, hz - h * 0.16, 0, hz + h * 0.04);
+    glow.addColorStop(0, 'rgba(255,196,170,0)');
+    glow.addColorStop(0.72, 'rgba(255,178,150,0.42)');
+    glow.addColorStop(1, 'rgba(240,130,120,0)');
+    g.fillStyle = glow; g.fillRect(0, hz - h * 0.16, w, h * 0.20);
+    sun(g, w * 0.2, hz - h * 0.07, h * 0.05, 'rgba(255,240,222,0.95)', 'rgba(255,140,120,0)');
+    const bands = [
+      [fg(0.05), '#D98C7C', 0.055],
+      [fg(0.33), '#9D4550', 0.062],
+      [fg(0.66), '#5A2033', 0.068]
+    ];
+    bands.forEach(([y, col, ht], layer) => {
       g.fillStyle = col;
       g.beginPath(); g.moveTo(0, y + h * 0.4);
       let x = 0;
       while (x < w) {
         const wdt = w * (0.10 + R() * 0.16);
-        const ht = h * (0.05 + R() * 0.07) * (1 - layer * 0.15);
-        g.lineTo(x, y); g.lineTo(x + wdt * 0.18, y - ht);
-        g.lineTo(x + wdt * 0.82, y - ht); g.lineTo(x + wdt, y);
+        const tall = h * ht * (0.6 + R() * 0.7);
+        g.lineTo(x, y); g.lineTo(x + wdt * 0.16, y - tall);
+        g.lineTo(x + wdt * 0.84, y - tall); g.lineTo(x + wdt, y);
         x += wdt * (1 + R() * 0.3);
       }
       g.lineTo(w, y + h * 0.4); g.closePath(); g.fill();
-    }
-    ground(g, w, h, hz + h * 0.28, '#4A1B2E', '#1A0713');
+      if (layer < 2) mist(g, w, y, h * 0.035, 'rgba(255,176,150,0.26)');
+    });
+    ground(g, w, h, fg(0.70), '#3E1526', '#150510', fg(1.06));
   },
-  snow(g, w, h, hz, R) {
+
+  snow(g, w, h, hz, R, P, fg) {
     sun(g, w * 0.76, hz - h * 0.15, h * 0.055, 'rgba(255,255,255,0.72)', 'rgba(200,230,255,0)');
     peaks(g, w, hz - h * 0.01, h * 0.20, 5, '#87AFCD', R);
-    peaks(g, w, hz + h * 0.07, h * 0.14, 7, '#6791B5', R);
-    ridge(g, w, hz + h * 0.17, h * 0.040, 0.011, 1.9, '#F1F8FD');
-    ridge(g, w, hz + h * 0.26, h * 0.034, 0.017, 4.2, '#D6E8F5');
-    ground(g, w, h, hz + h * 0.33, '#C3DCEE', '#6E93B0');
+    mist(g, w, hz + h * 0.01, h * 0.04, 'rgba(236,246,253,0.5)');
+    peaks(g, w, fg(0.30), h * 0.14, 7, '#6791B5', R);
+    ridge(g, w, fg(0.55), h * 0.040, 0.011, 1.9, '#F1F8FD');
+    ridge(g, w, fg(0.78), h * 0.034, 0.017, 4.2, '#D6E8F5');
+    ground(g, w, h, fg(0.70), '#C3DCEE', '#6E93B0', fg(1.06));
   },
-  volcano(g, w, h, hz, R) {
+  volcano(g, w, h, hz, R, P, fg) {
     sun(g, w * 0.5, hz + h * 0.02, h * 0.22, 'rgba(255,140,60,0.30)', 'rgba(255,80,40,0)');
     g.fillStyle = '#4E1822';
     g.beginPath();
@@ -928,10 +985,10 @@ const SCENERY = {
     g.fillStyle = lg;
     g.beginPath(); g.moveTo(w * 0.41, hz - h * 0.21); g.lineTo(w * 0.59, hz - h * 0.21);
     g.lineTo(w * 0.62, hz + h * 0.06); g.lineTo(w * 0.38, hz + h * 0.06); g.closePath(); g.fill();
-    peaks(g, w, hz + h * 0.10, h * 0.09, 9, '#2C0A11', R);
-    ground(g, w, h, hz + h * 0.22, '#22070D', '#0A0205');
+    peaks(g, w, fg(0.45), h * 0.09, 9, '#2C0A11', R);
+    ground(g, w, h, fg(0.70), '#22070D', '#0A0205', fg(1.06));
   },
-  deep(g, w, h, hz, R) {
+  deep(g, w, h, hz, R, P, fg) {
     for (let i = 0; i < 7; i++) {
       const x = R() * w;
       const lg = g.createLinearGradient(x, 0, x + w * 0.10, h);
@@ -941,11 +998,11 @@ const SCENERY = {
       g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * 0.08, 0);
       g.lineTo(x + w * 0.20, h); g.lineTo(x - w * 0.04, h); g.closePath(); g.fill();
     }
-    ridge(g, w, hz + h * 0.14, h * 0.05, 0.012, 2.2, '#0B4450');
-    ridge(g, w, hz + h * 0.26, h * 0.05, 0.018, 5.0, '#062F3B');
-    ground(g, w, h, hz + h * 0.34, '#05262F', '#010C12');
+    ridge(g, w, fg(0.34), h * 0.05, 0.012, 2.2, '#0B4450');
+    ridge(g, w, fg(0.66), h * 0.05, 0.018, 5.0, '#062F3B');
+    ground(g, w, h, fg(0.70), '#05262F', '#010C12', fg(1.06));
   },
-  aurora(g, w, h, hz, R) {
+  aurora(g, w, h, hz, R, P, fg) {
     stars(g, w, h, 130, R, hz + h * 0.1);
     const cols = [['rgba(90,240,180,0.40)', 'rgba(90,240,180,0)'],
                   ['rgba(160,120,255,0.34)', 'rgba(160,120,255,0)'],
@@ -960,11 +1017,11 @@ const SCENERY = {
       for (let x = w; x >= 0; x -= 8) g.lineTo(x, y + h * 0.16 + Math.sin(x * 0.009 + i * 1.3) * h * 0.04);
       g.closePath(); g.fill();
     }
-    peaks(g, w, hz + h * 0.12, h * 0.16, 6, '#1A2140', R);
-    peaks(g, w, hz + h * 0.24, h * 0.12, 8, '#0E1428', R);
-    ground(g, w, h, hz + h * 0.32, '#0B1120', '#03060C');
+    peaks(g, w, fg(0.28), h * 0.16, 6, '#1A2140', R);
+    peaks(g, w, fg(0.62), h * 0.12, 8, '#0E1428', R);
+    ground(g, w, h, fg(0.70), '#0B1120', '#03060C', fg(1.06));
   },
-  cosmos(g, w, h, hz, R) {
+  cosmos(g, w, h, hz, R, P, fg) {
     stars(g, w, h, 220, R);
     for (let i = 0; i < 4; i++) {
       const cx = R() * w, cy = R() * h * 0.75, r = h * (0.10 + R() * 0.16);
@@ -980,7 +1037,7 @@ const SCENERY = {
     g.fillStyle = pg; g.beginPath(); g.arc(px, py, pr, 0, Math.PI * 2); g.fill();
     g.strokeStyle = 'rgba(255,220,170,0.5)'; g.lineWidth = pr * 0.16;
     g.beginPath(); g.ellipse(px, py, pr * 1.9, pr * 0.44, -0.32, 0, Math.PI * 2); g.stroke();
-    peaks(g, w, hz + h * 0.20, h * 0.13, 7, '#150C2A', R);
-    ground(g, w, h, hz + h * 0.30, '#120A26', '#04010C');
+    peaks(g, w, fg(0.42), h * 0.13, 7, '#150C2A', R);
+    ground(g, w, h, fg(0.70), '#120A26', '#04010C', fg(1.06));
   }
 };

@@ -124,7 +124,7 @@ export const WORLDS = [
   },
   {
     id: 10, name: 'Cosmic Apex', subtitle: 'Mastery',
-    hue: 44, hueRange: 300, sat: 60, light: 58,
+    hue: 44, hueRange: 300, sat: 60, light: 58, hueStep: 0.058,
     accent: '#FFD24A', fog: '#2A1745',
     sky: ['#1C1131', '#2C1247', '#3A1140', '#070310'],
     scenery: 'cosmos', ambient: 'star', tempo: 118,
@@ -217,7 +217,7 @@ export const LEVELS = Array.from({ length: LEVEL_COUNT }, (_, i) => levelConfig(
 export function blockColor(world, index) {
   const w = WORLDS[world - 1];
   const span = w.hueRange;
-  const k = index * 0.17;
+  const k = index * (w.hueStep === undefined ? 0.17 : w.hueStep);
   const h = (w.hue + ((k * span) % span) + 360) % 360;
   const s = w.sat + 7 * Math.sin(index * 0.41);
   const l = w.light + 5 * Math.sin(index * 0.27 + 1.1);

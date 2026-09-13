@@ -250,8 +250,12 @@ function drainEvents() {
         });
         renderer.kick(0.005);
       }
-      renderer.addPopup(`+${ev.gained}`, p.x, p.y + 0.06, p.z,
-        ev.perfect ? world.accent : 'rgba(255,255,255,0.88)', ev.perfect ? 19 : 16);
+      /* On a perfect the word, the combo pill and the counting score already
+         say it three times over; a fourth floating number is noise. Ordinary
+         placements keep the number, low over the deck. */
+      if (!ev.perfect) {
+        renderer.addPopup(`+${ev.gained}`, p.x, p.y + 0.9, p.z, 'rgba(255,255,255,0.88)', 16);
+      }
     } else if (ev.type === 'perfect') {
       const p = impactPoint();
       Audio.sfx.perfect(ev.combo);
@@ -263,7 +267,7 @@ function drainEvents() {
       });
       renderer.flash(world.accent, 0.09);
       renderer.kick(0.014);
-      renderer.addPopup('PERFECT', p.x, p.y + 1.0, p.z, '#FFFFFF', 21, 900);
+      renderer.addPopup('PERFECT', p.x, p.y + 1.72, p.z, '#FFFFFF', 21, 900);
       setCombo(ev.combo);
       if (Save.unlock('first-perfect')) achievementToast('first-perfect');
       if (ev.combo >= 3 && Save.unlock('triple')) achievementToast('triple');
@@ -282,7 +286,8 @@ function drainEvents() {
       });
       renderer.flash('#FFFFFF', 0.14);
       renderer.kick(0.024);
-      renderer.addPopup('WIDTH RESTORED', p.x, p.y + 1.45, p.z, world.accent, 16, 900);
+      renderer.clearPopups();
+      renderer.addPopup('WIDTH RESTORED', p.x, p.y + 1.72, p.z, world.accent, 17, 900);
       if (Save.unlock('comeback')) achievementToast('comeback');
     } else if (ev.type === 'miss') {
       Audio.sfx.miss(); Audio.sfx.fall();
@@ -331,7 +336,8 @@ function stackProgression() {
     });
     renderer.addRing(p.x, p.y, p.z, '#FFFFFF', 2.2, 0.8, 4);
     renderer.kick(0.03);
-    renderer.addPopup(`${h}`, p.x, p.y + 2.0, p.z, '#FFFFFF', 34, 900);
+    renderer.clearPopups();
+    renderer.addPopup(`${h}`, p.x, p.y + 1.85, p.z, '#FFFFFF', 34, 900);
     toast(`${h} blocks`);
   }
 }
@@ -851,6 +857,10 @@ window.__blockstack = {
   game: () => game,
   save: () => Save.get(),
   metrics: () => ({ k: renderer.K, dpr: renderer.dpr, w: renderer.W, h: renderer.H, anchor: renderer.anchor }),
+  pools: () => ({
+    particles: renderer.particles.length, rings: renderer.rings.length,
+    popups: renderer.popups.length, debris: game.debris.length
+  }),
   pause: setPaused,
   finish: () => { game.finish(); drainEvents(); }
 };
