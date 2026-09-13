@@ -841,7 +841,13 @@ function boot() {
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => { /* offline cache is optional */ });
+      // The offline cache is a bonus, never a requirement. Reading
+      // navigator.serviceWorker throws SecurityError outright in a sandboxed
+      // or opaque-origin frame, so the guard has to wrap the property access
+      // and not just the returned promise.
+      try {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      } catch (_) { /* no service worker here; the game runs from memory */ }
     });
   }
 }
