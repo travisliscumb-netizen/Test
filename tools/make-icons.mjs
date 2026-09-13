@@ -105,6 +105,47 @@ function chunk(type, data) {
   return out;
 }
 
+/* Canvas dithers its gradients to avoid banding. That dither is per-pixel noise
+   which PNG cannot model, and it dominates the file size of every icon here.
+   Snapping each channel to a small step erases the noise, costs nothing visible
+   on artwork this smooth, and lets the encoder do its job. */
+function quantise(raw, width, step) {
+  const stride = width * 4 + 1;
+  for (let o = 0; o < raw.length; o += stride) {
+    if (raw[o] !== 0) return null;          // only safe on unfiltered scanlines
+    for (let i = o + 1; i < o + stride; i += 4) {
+      raw[i] = Math.min(255, Math.round(raw[i] / step) * step);
+      raw[i + 1] = Math.min(255, Math.round(raw[i + 1] / step) * step);
+      raw[i + 2] = Math.min(255, Math.round(raw[i + 2] / step) * step);
+    }
+  }
+  return raw;
+}
+
+/* Re-filter with Paeth, which predicts smooth gradients far better than the
+   None filter the canvas encoder emits. */
+function refilter(raw, width) {
+  const bpp = 4, rowBytes = width * bpp, stride = rowBytes + 1;
+  const rows = raw.length / stride;
+  const out = Buffer.alloc(raw.length);
+  let prev = Buffer.alloc(rowBytes);
+  for (let r = 0; r < rows; r++) {
+    const line = raw.subarray(r * stride + 1, r * stride + 1 + rowBytes);
+    out[r * stride] = 4;
+    for (let i = 0; i < rowBytes; i++) {
+      const a = i >= bpp ? line[i - bpp] : 0;
+      const b = prev[i];
+      const c = i >= bpp ? prev[i - bpp] : 0;
+      const pp = a + b - c;
+      const pa = Math.abs(pp - a), pb = Math.abs(pp - b), pc = Math.abs(pp - c);
+      const pred = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      out[r * stride + 1 + i] = (line[i] - pred) & 0xFF;
+    }
+    prev = line;
+  }
+  return out;
+}
+
 function recompressPng(file) {
   const src = fs.readFileSync(file);
   if (src.length < 8 || src.readUInt32BE(0) !== 0x89504E47) return 0;
@@ -122,6 +163,13 @@ function recompressPng(file) {
   if (!idat.length) return 0;
   let raw;
   try { raw = zlib.inflateSync(Buffer.concat(idat)); } catch (e) { return 0; }
+  const ihdr = keep.find(([t]) => t === 'IHDR');
+  const width = ihdr ? ihdr[1].readUInt32BE(0) : 0;
+  const colourType = ihdr ? ihdr[1][9] : -1;
+  if (width && colourType === 6 && raw.length % (width * 4 + 1) === 0) {
+    const q = quantise(raw, width, 3);
+    if (q) raw = refilter(q, width);
+  }
   const packed = zlib.deflateSync(raw, { level: 9, memLevel: 9, strategy: zlib.constants.Z_DEFAULT_STRATEGY });
   if (packed.length >= Buffer.concat(idat).length) return 0;
   const out = Buffer.concat([

@@ -1,0 +1,13 @@
+{
+  "name": "block-stack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Time the drop. Keep the line.",
+  "type": "module",
+  "scripts": {
+    "build": "node build/icons.mjs && node build/dist.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "0.1.100"
+  }
+}
