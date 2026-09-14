@@ -1017,9 +1017,42 @@ async function testViewports() {
   await frame();
 }
 
+
+async function testCards() {
+  /* The pre-game card sizes itself from its own description text; check every
+     game's card fits the shortest supported screen with finger-sized controls. */
+  for (const vp of [{ name: 'iphone-se', width: 375, height: 667 },
+                    { name: 'iphone-15-pro-max', width: 430, height: 932 }]) {
+    await page.setViewportSize(vp);
+    for (const id of ['seals','trapeze','magician','traffic','cannon','riddle','balance','tickets','elephant','bolts','clowns','lions']) {
+      await page.evaluate(() => { MC.closeModal(); MC.goHub(); });
+      await frame();
+      await realTap(id);
+      const info = await page.evaluate(() => {
+        const mods = MC.regions.filter(r => r.layer === 'modal');
+        return {
+          kind: MC.modal && MC.modal.kind,
+          ids: mods.map(r => r.id),
+          off: mods.filter(r => r.x < -1 || r.y < -1 || r.x + r.w > MC.V.w + 1 || r.y + r.h > MC.V.h + 1).map(r => r.id),
+          small: mods.filter(r => r.w * MC.V.s < 40 || r.h * MC.V.s < 40).map(r => r.id)
+        };
+      });
+      check(`${vp.name}/${id}: card offers three difficulties and start`,
+        info.kind === 'pregame' && ['m_d_easy','m_d_medium','m_d_hard','m_start','m_close'].every(k => info.ids.includes(k)),
+        info.ids.join(','));
+      check(`${vp.name}/${id}: card fits the screen`, info.off.length === 0, info.off.join(','));
+      check(`${vp.name}/${id}: card controls are finger sized`, info.small.length === 0, info.small.join(','));
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { MC.closeModal(); MC.goHub(); });
+  await frame();
+}
+
 const SUITE = { seals: testSeals, trapeze: testTrapeze, magician: testMagician, traffic: testTraffic, cannon: testCannon, riddle: testRiddle, balance: testBalance, tickets: testTickets,
   elephant: testElephant, bolts: testBolts, clowns: testClowns, lions: testLions,
-  chrome: testChromeAndPause, audio: testAudio, pwa: testPWA, viewports: testViewports };
+  chrome: testChromeAndPause, audio: testAudio, pwa: testPWA, viewports: testViewports,
+  cards: testCards };
 for (const [name, fn] of Object.entries(SUITE)) {
   if (ONLY && ONLY !== name) continue;
   try { await fn(); }

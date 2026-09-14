@@ -30,9 +30,12 @@ node tests/math-circus.mjs cannon              # one suite
 The playtest drives the real page in Chromium at iPhone viewport sizes: it taps
 through the hub with synthetic touch events, plays **every game on every
 difficulty to a win and to a deliberate failure**, reads the saved JSON back out
-of `localStorage`, and fails on any console error or page exception. Suites:
-`seals trapeze magician traffic cannon riddle balance tickets elephant bolts
-clowns lions chrome audio pwa viewports`.
+of `localStorage`, and fails on any console error or page exception. Suites: `seals trapeze magician traffic cannon riddle balance tickets elephant
+bolts clowns lions` (gameplay), plus `chrome` (a way back to the hub and a
+working pause menu in all twelve), `audio` (counts real oscillators, and
+silence when sound is off), `pwa` (manifest/icon validity and the service
+worker outcome), `viewports` and `cards` (nothing off screen or under 44px on
+three iPhone sizes).
 
 Screenshots land in `.shots/` (gitignored).
 

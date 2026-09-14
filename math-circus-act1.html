@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Math Circus">
 <meta name="theme-color" content="#C41E3A">
-<meta name="description" content="Math Circus: Act 1 - a fan rebuild of the 1993 educational math game. Twelve circus math games, offline, touch-first.">
+<meta name="description" content="Math Circus: Act 1 - a fan rebuild of the 1993 educational math game. Twelve circus math games in one touch-first page.">
 <title>Math Circus: Act 1</title>
 <!-- Inline manifest as a data URI: keeps the whole game in one file. This is what
      Android/Chrome uses for installability. iOS Safari largely IGNORES the manifest
@@ -768,7 +768,13 @@ function drawModal(){
   if (modal.kind === 'pregame'){
     const def = GAMES[modal.id] || {short:modal.id, name:modal.id, desc:'', skill:''};
     const rec = gameState.games[modal.id];
-    const w = 318, h = 286, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    const w = 318, x = (V.w - w) / 2;
+    /* The card is measured from its own text: descriptions differ in length, and
+       fixed offsets made the longest one collide with the rows below it. */
+    const descLines = wrapLines(def.desc, w - 36, 13.5, 600);
+    const descH = descLines.length * 17;
+    const h = 268 + descH;
+    const y = Math.max(56, (V.h - h) / 2);
     panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
     g.save(); g.beginPath(); rr(g, x, y, w, h, 18); g.clip();
     g.fillStyle = C.red; g.fillRect(x, y, w, 56);
@@ -778,23 +784,28 @@ function drawModal(){
     T(def.name, x + w / 2 + 14, y + 22, {size:17, weight:800, color:C.cream, maxWidth:w - 80});
     T(def.skill, x + w / 2 + 14, y + 40, {size:11.5, weight:700, color:C.goldLight, maxWidth:w - 80});
     const close = reg('m_close', x + w - 46, y + 4, 44, 44, {});
-    T('✕', close.x + 22, close.y + 22, {size:18, weight:800, color:C.cream});
-    Twrap(def.desc, x + w / 2, y + 78, w - 36, 17, {size:13.5, weight:600, color:C.navy});
+    T('\u2715', close.x + 22, close.y + 22, {size:18, weight:800, color:C.cream});
+    let cy = y + 74;
+    for (let i = 0; i < descLines.length; i++)
+      T(descLines[i], x + w / 2, cy + i * 17, {size:13.5, weight:600, color:C.navy});
+    cy += descH + 6;
     const f = SCORE_FIELD[modal.id], best = rec[f];
-    T(best === null || best === undefined ? 'Not played yet'
-      : SCORE_LABEL[modal.id] + ': ' + best,
-      x + w / 2, y + 132, {size:12.5, weight:700, color:C.slate, num:true});
-    drawStars(x + w / 2, y + 154, rec.stars, 9, 6);
-    T('CHOOSE YOUR RING', x + w / 2, y + 180, {size:11, weight:800, color:C.slate});
-    const bw = 92, bh = 46, gap = 9, bx0 = (V.w - (bw * 3 + gap * 2)) / 2;
+    T(best === null || best === undefined ? 'Not played yet' : SCORE_LABEL[modal.id] + ': ' + best,
+      x + w / 2, cy, {size:12.5, weight:700, color:C.slate, num:true});
+    cy += 22;
+    drawStars(x + w / 2, cy, rec.stars, 9, 6);
+    cy += 26;
+    T('CHOOSE YOUR RING', x + w / 2, cy, {size:11, weight:800, color:C.slate});
+    cy += 14;
+    const bw = 92, bh = 46, gp = 9, bx0 = (V.w - (bw * 3 + gp * 2)) / 2;
     for (let i = 0; i < 3; i++){
       const d = DIFFS[i], on = modal.diff === d;
-      button('m_d_' + d, bx0 + i * (bw + gap), y + 192, bw, bh, DIFF_LABEL[d], {
-        fill: on ? DIFF_COLOR[d] : C.creamDark,
-        color: on ? C.cream : C.slate, size:15
+      button('m_d_' + d, bx0 + i * (bw + gp), cy, bw, bh, DIFF_LABEL[d], {
+        fill: on ? DIFF_COLOR[d] : C.creamDark, color: on ? C.cream : C.slate, size:15
       });
     }
-    button('m_start', x + 28, y + 246, w - 56, 52, 'START', {fill:C.gold, size:20});
+    cy += bh + 10;
+    button('m_start', x + 28, cy, w - 56, 52, 'START', {fill:C.gold, size:20});
   }
   else if (modal.kind === 'settings'){
     const w = 312, h = 274, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
@@ -954,6 +965,11 @@ function wrapLines(s, w, size, weight, num){
   if (line) out.push(line);
   return out;
 }
+/* Height of the instruction band for a given string, without drawing it, so a
+   game's layout can be derived from the text it will actually show. */
+function instrBottom(text, size){
+  return 53 + 13 + wrapLines(text, V.w - 36, size || 13.5, 700).length * 17;
+}
 /* Instruction band directly under the chrome. Returns its bottom edge. */
 function instr(text, o){
   o = o || {};
@@ -1038,10 +1054,20 @@ GAMES.seals = {
           g.fillStyle = '#6E7C8F';
           g.beginPath(); g.ellipse(cx - S * 0.05, cy + S * 0.12, S * 0.28, S * 0.13, 0, 0, 7); g.fill();
           g.beginPath(); g.ellipse(cx + S * 0.11, cy - S * 0.05, S * 0.1, S * 0.16, 0.25, 0, 7); g.fill();
+          g.fillStyle = '#5B687A';
+          g.beginPath(); g.ellipse(cx - S * 0.3, cy + S * 0.16, S * 0.12, S * 0.06, -0.5, 0, 7); g.fill();
+          g.beginPath(); g.ellipse(cx + S * 0.02, cy + S * 0.2, S * 0.09, S * 0.05, 0.3, 0, 7); g.fill();
           g.fillStyle = C.ink;
           g.beginPath(); g.arc(cx + S * 0.14, cy - S * 0.12, S * 0.025, 0, 7); g.fill();
           g.strokeStyle = '#6E7C8F'; g.lineWidth = S * 0.06; g.lineCap = 'round';
           g.beginPath(); g.moveTo(cx + S * 0.14, cy - S * 0.19); g.lineTo(cx + S * 0.05, cy - S * 0.26); g.stroke();
+          g.strokeStyle = 'rgba(14,22,38,.5)'; g.lineWidth = 1;
+          for (let wk = -1; wk <= 1; wk++){
+            g.beginPath();
+            g.moveTo(cx + S * 0.16, cy - S * 0.1);
+            g.lineTo(cx + S * 0.3, cy - S * 0.08 + wk * S * 0.05);
+            g.stroke();
+          }
           /* ball */
           const br = S * 0.17, bx = cx, by = cy - S * 0.33;
           if (isSel){
@@ -2059,8 +2085,9 @@ GAMES.balance = {
     const torqueOf = side => perf.filter(p => p.slot && p.slot[0] === side)
       .reduce((s, p) => s + p.w * (+p.slot[1]), 0);
     const placedFree = () => perf.filter(p => !p.fixed && p.slot).length;
+    const INSTR = 'Drag performers onto the spots. ' + spec.hint;
     const geo = () => {
-      const top = 53 + 13 + 2 * 17;                 /* below a two-line instruction */
+      const top = instrBottom(INSTR);
       const trayY = V.h - 92;
       /* beam sits midway between the instruction and the wings on tall phones */
       const beamY = Math.max(top + 120, Math.min(trayY - 150, (top + trayY) / 2 - 10));
@@ -2091,7 +2118,7 @@ GAMES.balance = {
         const g = ctx, G = geo();
         g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
         sawdustFloor(G.trayY - 12);
-        instr('Drag performers onto the spots. ' + spec.hint);
+        instr(INSTR);
         /* turning-force read-out */
         badge(14, G.beamY - 96, 96, 46, 'LEFT FORCE', torqueOf('L'),
           {fill: torqueOf('L') === torqueOf('R') ? '#D8F0DF' : C.creamDark, size:20});
@@ -2487,8 +2514,10 @@ GAMES.elephant = {
       pours++; Sfx.pop();
       if (vols.some(v => v === puz.target)) win();
     }
+    const INSTR_DOSE = 'Work out the dose before you measure it.';
+    const INSTR_POUR = 'Pour between the cups until one holds exactly ' + puz.target + ' ml.';
     const geo = () => {
-      const top = 53 + 13 + 3 * 17;
+      const top = instrBottom(phase === 'dose' ? INSTR_DOSE : INSTR_POUR);
       /* centre the cup bench in the space under the patient row */
       const bandTop = top + 110, bandBottom = V.h - 50;
       const rowY = bandTop + 92 + Math.max(0, (bandBottom - bandTop - 168) / 2);
@@ -2510,7 +2539,7 @@ GAMES.elephant = {
         const ex = 70, ey = G.top + 58;
         ICONS.elephant(ex, ey, 40);
         if (phase === 'dose'){
-          instr('Work out the dose before you measure it.');
+          instr(INSTR_DOSE);
           panel(8, G.top + 118, V.w - 16, 86, {fill:C.navy, stroke:C.gold, r:12, lw:2});
           T('This elephant weighs ' + weight + ' kg.', V.w / 2, G.top + 140,
             {size:14, weight:800, color:C.cream, num:true});
@@ -2525,7 +2554,7 @@ GAMES.elephant = {
               doseOptions[i] + ' ml', {fill:C.white, color:C.navy, size:20, num:true});
           }
         } else {
-          instr('Pour between the cups until one holds exactly ' + puz.target + ' ml.');
+          instr(INSTR_POUR);
           panel(V.w - 150, G.top + 20, 140, 54, {fill:C.gold, stroke:C.navy, r:12, lw:2});
           T('DOSE NEEDED', V.w - 80, G.top + 36, {size:10.5, weight:800, color:C.ink});
           T(puz.target + ' ml', V.w - 80, G.top + 58, {size:22, weight:800, color:C.ink, num:true});
@@ -2674,7 +2703,7 @@ GAMES.bolts = {
     const need = puz.missing.length;
     let cursor = null, taps = 0, found = [], note = '', noteT = 0;
     const geo = () => {
-      const top = 53 + 13 + 2 * 17 + 8;
+      const top = instrBottom(puz.prompt) + 8;
       const btnY = V.h - 66;
       const band = btnY - 46 - top;
       const cell = Math.floor(Math.min(V.w - 44, band) / puz.size);
@@ -2924,8 +2953,10 @@ GAMES.clowns = {
     const qOf = i => puz.shared ? queues[0] : queues[i];
     const totalCmds = () => puz.shared ? queues[0].length : queues.reduce((a, q) => a + q.length, 0);
     const runLen = () => puz.shared ? queues[0].length : Math.max(0, ...queues.map(q => q.length));
+    const INSTR = puz.shared ? 'One list moves every clown, each in the way it is facing.'
+                             : 'Pick a clown, build its list of moves, then tap GO.';
     const geo = () => {
-      const top = 53 + 13 + 2 * 17 + 6;
+      const top = instrBottom(INSTR) + 6;
       const padY = V.h - 232;
       const avail = padY - 44 - top;
       const size = Math.min(V.w - 60, avail);
@@ -2991,8 +3022,7 @@ GAMES.clowns = {
       draw(){
         const g = ctx, G = geo();
         g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
-        instr(puz.shared ? 'One list moves every clown, each in the way it is facing.'
-                         : 'Pick a clown, build its list of moves, then tap GO.');
+        instr(INSTR);
         const sh = shake > 0 ? Math.sin(shake * 60) * 4 : 0;
         /* ring floor */
         g.save(); g.translate(sh, 0);
@@ -3182,7 +3212,7 @@ GAMES.lions = {
     const lionOf = id => puz.lions.find(l => l.id === id);
     const slotOfLion = id => slots.indexOf(id);
     const geo = () => {
-      const top = 53 + 13 + 3 * 17 + 6;
+      const top = instrBottom(puz.prompt) + 6;
       const rows = Math.ceil(n / 3), chh = 88;
       const penH = 26 + rows * chh;
       const blockH = 162 + penH;                    /* pedestals + stats + pen */
@@ -3307,8 +3337,6 @@ GAMES.lions = {
     };
   }
 };
-
-/* __GAMES_INSERT__ */
 
 /* ===========================================================================
    PWA: inline manifest (in <head>) + blob-URL service worker
