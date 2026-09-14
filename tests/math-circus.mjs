@@ -314,7 +314,288 @@ async function testTraffic() {
   await backToHub();
 }
 
-const SUITE = { seals: testSeals, trapeze: testTrapeze, magician: testMagician, traffic: testTraffic };
+
+/* Real pointer drags (sliders and drag-and-drop), not synthetic handler calls. */
+async function regionBox(id) {
+  return page.evaluate(i => {
+    const r = MC.regions.find(rr => rr.id === i);
+    if (!r) throw new Error('no region ' + i);
+    const rect = document.getElementById('c').getBoundingClientRect();
+    const toX = vx => rect.left + MC.V.ox + vx * MC.V.s;
+    const toY = vy => rect.top + MC.V.oy + vy * MC.V.s;
+    return { track: r.track || null, cx: toX(r.x + r.w / 2), cy: toY(r.y + r.h / 2),
+             left: toX(r.x), top: toY(r.y), s: MC.V.s, vy: r.y + r.h / 2 };
+  }, id);
+}
+async function dragSliderTo(id, value, minV, maxV) {
+  const b = await regionBox(id);
+  const [tx, tw] = b.track;
+  const u = (value - minV) / (maxV - minV);
+  const rect = await page.evaluate(() => {
+    const r = document.getElementById('c').getBoundingClientRect();
+    return { l: r.left, t: r.top, ox: MC.V.ox, oy: MC.V.oy, s: MC.V.s };
+  });
+  const sx = rect.l + rect.ox + (tx + tw * u) * rect.s;
+  const sy = b.cy;
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  await page.mouse.move(sx, sy, { steps: 3 });
+  await page.mouse.up();
+  await frame();
+}
+async function dragBetween(fromId, toId) {
+  const a = await regionBox(fromId), b = await regionBox(toId);
+  await page.mouse.move(a.cx, a.cy);
+  await page.mouse.down();
+  await page.mouse.move((a.cx + b.cx) / 2, (a.cy + b.cy) / 2, { steps: 4 });
+  await page.mouse.move(b.cx, b.cy, { steps: 4 });
+  await page.mouse.up();
+  await frame();
+}
+
+/* ================================================================== GAME 5 */
+/* Mirror of the game's own flight model, including muzzle height and bucket-rim
+   height: where does the ball cross the rim line on the way down? */
+function bestShot(d) {
+  const G = d.g, KV = d.kv;
+  let best = null;
+  const forces = d.lockForce ? [d.lockForce] : [1,2,3,4,5,6,7,8,9,10];
+  for (const f of forces) for (let a = 0; a <= 90; a++) {
+    const rad = a * Math.PI / 180, v = f * KV;
+    const mx = 40 + Math.cos(rad) * 30, my = d.geo.groundY - 20 - Math.sin(rad) * 30;
+    const vx = Math.cos(rad) * v, vy = -Math.sin(rad) * v;
+    const disc = vy * vy - 2 * G * (my - d.geo.rim);
+    if (disc < 0) continue;
+    const t = (-vy + Math.sqrt(disc)) / G;           /* descending crossing of the rim */
+    const x = mx + vx * t;
+    const err = Math.abs(x - d.geo.bucketX);
+    if (!best || err < best.err) best = { f, a, err, x };
+  }
+  return best;
+}
+async function settle(maxFrames = 400) {
+  return page.evaluate(async n => {
+    const wait = () => new Promise(r => requestAnimationFrame(r));
+    for (let k = 0; k < n; k++) {
+      if (MC.modal) return true;
+      const d = MC.current.debug();
+      if (!d.flying) return false;
+      await wait();
+    }
+    return false;
+  }, maxFrames);
+}
+async function testCannon() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('cannon', diff);
+    const d0 = await dbg();
+    const wantTol = { easy: 44, medium: 30, hard: 17 }[diff];
+    check(`cannon/${diff}: tolerance ${wantTol}, ${diff === 'hard' ? '3 shots' : 'unlimited shots'}`,
+      d0.tol === wantTol && d0.maxShots === (diff === 'hard' ? 3 : 0), JSON.stringify(d0));
+    check(`cannon/${diff}: force ${diff === 'easy' ? 'locked' : 'free'}`,
+      (diff === 'easy') === (d0.lockForce > 0), 'lockForce=' + d0.lockForce);
+    const best = bestShot(d0);
+    check(`cannon/${diff}: the bucket is reachable with integer controls`,
+      best.err <= d0.tol / 2, JSON.stringify({ dist: d0.dist, best }));
+    if (diff === 'hard') await shot('cannon');
+    if (!d0.lockForce) await dragSliderTo('sForce', best.f, 1, 10);
+    await dragSliderTo('sAngle', best.a, 0, 90);
+    const d1 = await dbg();
+    check(`cannon/${diff}: sliders respond to a real drag`,
+      d1.angle === best.a && d1.force === best.f, JSON.stringify(d1));
+    await tap('fire');
+    await settle();
+    const m = await modalOf();
+    check(`cannon/${diff}: first shot in the bucket = 3 stars`, m && m.kind === 'result' && m.stars === 3, JSON.stringify(m));
+    check(`cannon/${diff}: shot count saved`, (await stored()).games.cannon.bestShots === 1);
+    await backToHub();
+  }
+  /* deliberate miss: a flat angle must fall short and cost a star */
+  await openGame('cannon', 'medium');
+  const d0 = await dbg();
+  await dragSliderTo('sAngle', 5, 0, 90);
+  await dragSliderTo('sForce', 1, 1, 10);
+  await tap('fire');
+  await settle();
+  const dm = await dbg();
+  check('cannon: a bad shot misses and counts', dm && dm.shots === 1 && !dm.hit && (await modalOf()) === null, JSON.stringify(dm));
+  const best = bestShot(d0);
+  await dragSliderTo('sForce', best.f, 1, 10);
+  await dragSliderTo('sAngle', best.a, 0, 90);
+  await tap('fire');
+  await settle();
+  const m2 = await modalOf();
+  check('cannon: second-shot hit scores 2 stars', m2 && m2.stars === 2, JSON.stringify(m2));
+  await backToHub();
+  /* hard runs out of shots */
+  await openGame('cannon', 'hard');
+  for (let i = 0; i < 3; i++) {
+    await dragSliderTo('sAngle', 5, 0, 90);
+    await dragSliderTo('sForce', 1, 1, 10);
+    await tap('fire');
+    await settle();
+  }
+  const mf = await modalOf();
+  check('cannon/hard: three misses ends the attempt', mf && mf.failed === true, JSON.stringify(mf));
+  await backToHub();
+}
+
+/* ================================================================== GAME 6 */
+async function testRiddle() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('riddle', diff);
+    const d0 = await dbg();
+    const want = { easy: [10, 2], medium: [30, 3], hard: [50, 4] }[diff];
+    check(`riddle/${diff}: range 1-${want[0]}, ${want[1]} clues`,
+      d0.max === want[0] && d0.clues.length === want[1], JSON.stringify(d0.clues));
+    check(`riddle/${diff}: exactly one number fits every clue`,
+      d0.target >= 1 && d0.target <= d0.max, 'target=' + d0.target);
+    if (diff === 'hard') {
+      check('riddle/hard: includes an indirect clue',
+        d0.clues.some(c => /Double me|Half of me/.test(c)), JSON.stringify(d0.clues));
+      await shot('riddle');
+    }
+    await tapF('n' + d0.target);
+    const m = await modalOf();
+    check(`riddle/${diff}: the right number wins with 3 stars`, m && m.stars === 3, JSON.stringify(m));
+    await backToHub();
+  }
+  /* deliberate wrong taps */
+  await openGame('riddle', 'medium');
+  const d0 = await dbg();
+  const wrongs = [];
+  for (let n = 1; n <= d0.max && wrongs.length < 1; n++) if (n !== d0.target) wrongs.push(n);
+  await tapF('n' + wrongs[0]);
+  const d1 = await dbg();
+  check('riddle: a wrong tap eliminates that number', d1.wrong === 1 && d1.dead.includes(wrongs[0]), JSON.stringify(d1));
+  check('riddle: an eliminated number is no longer tappable', !(await page.evaluate(n => MC.hasRegion('n' + n), wrongs[0])));
+  await tapF('n' + d0.target);
+  const m = await modalOf();
+  check('riddle: one wrong tap scores 2 stars', m && m.stars === 2, JSON.stringify(m));
+  await backToHub();
+}
+
+/* ================================================================== GAME 7 */
+/* Search for a legal arrangement: place exactly mustPlace free performers on
+   distinct free slots so left torque equals right torque. */
+function solveBalance(d) {
+  const slots = [];
+  for (const side of ['L', 'R']) for (let dd = 1; dd <= 4; dd++) slots.push(side + dd);
+  const taken = new Set(d.perf.filter(p => p.slot).map(p => p.slot));
+  const open = slots.filter(s => !taken.has(s));
+  const free = d.perf.filter(p => !p.fixed);
+  const base = d.perf.filter(p => p.fixed)
+    .reduce((s, p) => s + (p.slot[0] === 'R' ? 1 : -1) * p.w * (+p.slot[1]), 0);
+  const chosen = [];
+  let answer = null;
+  (function rec(i, used, net) {
+    if (answer) return;
+    if (chosen.length === d.mustPlace) { if (net === 0) answer = chosen.slice(); return; }
+    if (i >= free.length) return;
+    for (let k = 0; k < open.length; k++) {
+      if (used[k] || answer) continue;
+      used[k] = 1;
+      const sl = open[k];
+      chosen.push({ id: free[i].id, slot: sl });
+      rec(i + 1, used, net + (sl[0] === 'R' ? 1 : -1) * free[i].w * (+sl[1]));
+      chosen.pop();
+      used[k] = 0;
+    }
+    rec(i + 1, used, net);   /* leave this performer in the wings */
+  })(0, {}, base);
+  return answer;
+}
+async function testBalance() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('balance', diff);
+    const d0 = await dbg();
+    const wantLeftovers = diff === 'hard' ? 1 : 0;
+    check(`balance/${diff}: ${wantLeftovers} performer sits out`, d0.leftovers === wantLeftovers, JSON.stringify(d0));
+    if (diff === 'easy') check('balance/easy: one performer is pre-seated', d0.perf.some(p => p.fixed));
+    if (diff === 'hard') {
+      check('balance/hard: five or more performers', d0.perf.length >= 5, 'n=' + d0.perf.length);
+      await shot('balance');
+    }
+    const plan = solveBalance(d0);
+    check(`balance/${diff}: a balanced arrangement exists`, !!plan, JSON.stringify(d0.perf));
+    for (const step of plan) await dragBetween('take_' + step.id, 'slot_' + step.slot);
+    const m = await modalOf();
+    check(`balance/${diff}: dragging into balance wins with 3 stars`, m && m.kind === 'result' && m.stars === 3, JSON.stringify(m));
+    check(`balance/${diff}: moves saved`, (await stored()).games.balance.bestMoves <= plan.length);
+    await backToHub();
+  }
+  /* deliberate wrong placement first */
+  await openGame('balance', 'medium');
+  const d0 = await dbg();
+  const plan = solveBalance(d0);
+  const taken = new Set(d0.perf.filter(p => p.slot).map(p => p.slot));
+  const planned = new Set(plan.map(p => p.slot));
+  let junk = null;
+  for (const side of ['L', 'R']) for (let dd = 1; dd <= 4; dd++) {
+    const sl = side + dd;
+    if (!taken.has(sl) && !planned.has(sl) && !junk) junk = sl;
+  }
+  await dragBetween('take_' + plan[0].id, 'slot_' + junk);
+  const d1 = await dbg();
+  check('balance: a wrong placement counts a move and tips the beam',
+    d1.moves === 1 && d1.left !== d1.right, JSON.stringify(d1));
+  for (const step of plan) await dragBetween('take_' + step.id, 'slot_' + step.slot);
+  const m = await modalOf();
+  check('balance: extra moves cost stars', m && m.kind === 'result' && m.stars < 3, JSON.stringify(m));
+  await backToHub();
+}
+
+/* ================================================================== GAME 8 */
+async function serveTicketAnswer(value) {
+  const d = await dbg();
+  if (d.usesPad) {
+    for (const ch of String(value)) await tapF('k' + ch);
+    await tapF('kOK');
+  } else {
+    const i = d.options.indexOf(value);
+    if (i < 0) throw new Error('correct option missing: ' + value + ' in ' + JSON.stringify(d.options));
+    await tapF('o' + i);
+  }
+}
+async function testTickets() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('tickets', diff);
+    const d0 = await dbg();
+    check(`tickets/${diff}: ${diff === 'easy' ? 'one price' : diff === 'medium' ? 'two prices' : 'bundle pricing'}`,
+      d0.board.length === (diff === 'easy' ? 1 : diff === 'medium' ? 2 : 3), JSON.stringify(d0.board));
+    check(`tickets/${diff}: change-making ${diff === 'easy' ? 'off' : 'on'}`,
+      (d0.bill > 0) === (diff !== 'easy'), 'bill=' + d0.bill);
+    check(`tickets/${diff}: ${diff === 'hard' ? 'numpad' : 'multiple choice'}`, d0.usesPad === (diff === 'hard'));
+    if (diff === 'hard') await shot('tickets');
+    for (let i = 0; i < 20; i++) {
+      if (await page.evaluate(() => !!MC.modal)) break;
+      const d = await dbg();
+      await serveTicketAnswer(d.phase === 'total' ? d.total : d.change);
+    }
+    const m = await modalOf();
+    check(`tickets/${diff}: six clean customers = 3 stars`, m && m.kind === 'result' && m.stars === 3, JSON.stringify(m));
+    check(`tickets/${diff}: accuracy saved`, (await stored()).games.tickets.bestCorrect === 6);
+    await backToHub();
+  }
+  /* deliberate wrong total on the first customer */
+  await openGame('tickets', 'medium');
+  const d0 = await dbg();
+  const wrongIdx = d0.options.findIndex(o => o !== d0.total);
+  await tapF('o' + wrongIdx);
+  const d1 = await dbg();
+  check('tickets: a wrong total keeps the same customer at the window',
+    d1.idx === 0 && d1.phase === 'total', JSON.stringify(d1));
+  for (let i = 0; i < 20; i++) {
+    if (await page.evaluate(() => !!MC.modal)) break;
+    const d = await dbg();
+    await serveTicketAnswer(d.phase === 'total' ? d.total : d.change);
+  }
+  const m = await modalOf();
+  check('tickets: one slip drops it to 2 stars', m && m.stars === 2, JSON.stringify(m));
+  await backToHub();
+}
+
+const SUITE = { seals: testSeals, trapeze: testTrapeze, magician: testMagician, traffic: testTraffic, cannon: testCannon, riddle: testRiddle, balance: testBalance, tickets: testTickets };
 for (const [name, fn] of Object.entries(SUITE)) {
   if (ONLY && ONLY !== name) continue;
   try { await fn(); }

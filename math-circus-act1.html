@@ -1645,6 +1645,732 @@ GAMES.traffic = {
   }
 };
 
+
+/* ===========================================================================
+   GAME 5 - CANNON  (proportional reasoning)
+   ========================================================================= */
+GAMES.cannon = {
+  name:'Human Cannonball', short:'Cannon', skill:'Angle, force & distance',
+  desc:'Drag the angle and force sliders until the flight path drops into the bucket, then fire.',
+  create(diff){
+    const conf = {easy:{lockForce:8, tol:44, shots:0, near:[0.45, 0.85]},
+                  medium:{lockForce:0, tol:30, shots:0, near:[0.45, 0.85]},
+                  hard:{lockForce:0, tol:17, shots:3, near:[0.86, 0.98]}}[diff];
+    const G_ACC = 600, KV = 42;
+    const maxRange = Math.pow(10 * KV, 2) / G_ACC;           /* force 10 at 45 deg */
+    const lockRange = conf.lockForce ? Math.pow(conf.lockForce * KV, 2) / G_ACC : maxRange;
+    const dist = Math.round(lockRange * (conf.near[0] + Math.random() * (conf.near[1] - conf.near[0])));
+    let angle = 45, force = conf.lockForce || 5;
+    let shots = 0, drag = null, ball = null, note = '', noteT = 0, hit = false;
+    const geo = () => {
+      const slidersTop = V.h - 156;
+      const groundY = slidersTop - 26;
+      return {slidersTop, groundY, cx:40, bucketX:40 + dist, rim:groundY - 26};
+    };
+    const muzzle = () => {
+      const G = geo(), a = angle * Math.PI / 180;
+      return {x:G.cx + Math.cos(a) * 30, y:G.groundY - 20 - Math.sin(a) * 30};
+    };
+    const vel = () => {
+      const a = angle * Math.PI / 180, v = force * KV;
+      return {x:Math.cos(a) * v, y:-Math.sin(a) * v};
+    };
+    function fire(){
+      if (ball || hit) return;
+      const m = muzzle(), v = vel();
+      /* Position is evaluated analytically, so the flight is exactly the arc the
+         dotted preview drew, and it does not drift with frame rate. */
+      ball = {x0:m.x, y0:m.y, vx:v.x, vy:v.y, t:0, x:m.x, y:m.y};
+      shots++; Sfx.pop();
+    }
+    const at = (b, t2) => ({x:b.x0 + b.vx * t2, y:b.y0 + b.vy * t2 + 0.5 * G_ACC * t2 * t2});
+    function land(result, dx){
+      const G = geo();
+      ball = null;
+      if (result === 'in'){
+        hit = true;
+        const stars = shots <= 1 ? 3 : shots === 2 ? 2 : 1;
+        finishGame(stars, shots, 'In the bucket on shot ' + shots + '!');
+        return;
+      }
+      Sfx.bad();
+      note = dx < 0 ? 'Short by ' + Math.round(-dx) + ' - more force or a flatter angle.'
+                    : 'Long by ' + Math.round(dx) + ' - ease off.';
+      noteT = 3;
+      if (conf.shots && shots >= conf.shots)
+        failGame('Out of shots. The hard ring only gives you ' + conf.shots + '.');
+    }
+    return {
+      debug(){
+        const G = geo(), m = muzzle();
+        return {angle, force, dist, shots, tol:conf.tol, lockForce:conf.lockForce,
+                maxShots:conf.shots, flying:!!ball, hit, g:G_ACC, kv:KV,
+                geo:{groundY:G.groundY, rim:G.rim, bucketX:G.bucketX, mx:m.x, my:m.y}};
+      },
+      hudNote(){ return conf.shots ? 'Shot ' + Math.min(shots + 1, conf.shots) + '/' + conf.shots
+                                   : 'Shots ' + shots; },
+      update(dt){
+        if (noteT > 0) noteT -= dt;
+        if (!ball) return;
+        const G = geo(), steps = 8, t0 = ball.t;
+        for (let i = 1; i <= steps; i++){
+          const t2 = t0 + dt * (i / steps);
+          const prev = {x:ball.x, y:ball.y}, now = at(ball, t2);
+          ball.x = now.x; ball.y = now.y; ball.t = t2;
+          if (prev.y < G.rim && now.y >= G.rim && Math.abs(now.x - G.bucketX) <= conf.tol / 2){
+            land('in', 0); return;
+          }
+          if (now.y >= G.groundY){ land('miss', now.x - G.bucketX); return; }
+          if (now.x > V.w + 60 || t2 > 8){ land('miss', now.x - G.bucketX); return; }
+        }
+      },
+      draw(){
+        const g = ctx, G = geo();
+        /* sky */
+        const sky = g.createLinearGradient(0, 40, 0, G.groundY);
+        sky.addColorStop(0, '#BFE3F5'); sky.addColorStop(1, '#EAF6FC');
+        g.fillStyle = sky; g.fillRect(0, 0, V.w, G.groundY);
+        const top = instr(conf.lockForce
+          ? 'Force is locked at ' + conf.lockForce + '. Find the angle that drops the ball in the bucket.'
+          : 'Set the angle and the force, then fire. Watch the dotted path.');
+        /* ground */
+        g.fillStyle = C.sawdust; g.fillRect(0, G.groundY, V.w, V.h - G.groundY);
+        g.fillStyle = C.navy; g.fillRect(0, G.groundY - 2, V.w, 2);
+        /* distance ruler */
+        g.strokeStyle = 'rgba(18,32,58,.35)'; g.lineWidth = 1;
+        for (let d = 50; d < V.w; d += 50){
+          g.beginPath(); g.moveTo(40 + d, G.groundY - 6); g.lineTo(40 + d, G.groundY); g.stroke();
+        }
+        /* bucket */
+        const bx = G.bucketX, bw = conf.tol;
+        g.fillStyle = C.red;
+        g.beginPath();
+        g.moveTo(bx - bw / 2, G.rim); g.lineTo(bx + bw / 2, G.rim);
+        g.lineTo(bx + bw / 2 - 4, G.groundY); g.lineTo(bx - bw / 2 + 4, G.groundY);
+        g.closePath(); g.fill();
+        g.fillStyle = C.gold; g.fillRect(bx - bw / 2 - 2, G.rim - 4, bw + 4, 5);
+        T(dist + ' units', bx, G.rim - 16, {size:11, weight:800, color:C.navy, num:true});
+        /* cannon */
+        const a = angle * Math.PI / 180;
+        g.save(); g.translate(G.cx, G.groundY - 20); g.rotate(-a);
+        g.fillStyle = C.navy; rr(g, -10, -11, 42, 22, 8); g.fill();
+        g.fillStyle = C.slate; rr(g, 26, -13, 8, 26, 3); g.fill();
+        g.restore();
+        g.fillStyle = C.red;
+        g.beginPath(); g.arc(G.cx, G.groundY - 10, 13, 0, 7); g.fill();
+        g.lineWidth = 2; g.strokeStyle = C.navy; g.stroke();
+        /* trajectory preview */
+        if (!ball && !hit){
+          const m = muzzle(), v = vel();
+          g.fillStyle = 'rgba(18,32,58,.5)';
+          for (let i = 1; i <= 70; i++){
+            const t2 = i * 0.045;
+            const px = m.x + v.x * t2, py = m.y + v.y * t2 + 0.5 * G_ACC * t2 * t2;
+            if (py > G.groundY || px > V.w + 20) break;
+            if (py < top) continue;
+            g.beginPath(); g.arc(px, py, 2, 0, 7); g.fill();
+          }
+        }
+        if (ball){
+          g.fillStyle = C.ink;
+          g.beginPath(); g.arc(ball.x, ball.y, 7, 0, 7); g.fill();
+        }
+        if (noteT > 0){
+          panel(24, G.groundY - 78, V.w - 48, 34, {fill:C.navy, stroke:C.gold, r:10, lw:2});
+          Twrap(note, V.w / 2, G.groundY - 61, V.w - 66, 15, {size:12.5, weight:700, color:C.cream});
+        }
+        /* controls */
+        panel(6, G.slidersTop, V.w - 12, 150, {fill:C.cream, stroke:C.navy, r:14, lw:2, shadow:false});
+        const track = (id, y, label, value, minV, maxV, disabled) => {
+          T(label, 22, y - 14, {size:12, weight:800, color: disabled ? C.slate : C.navy, align:'left'});
+          T(String(value) + (id === 'sAngle' ? '°' : ''), V.w - 22, y - 14,
+            {size:16, weight:800, color: disabled ? C.slate : C.red, align:'right', num:true});
+          const tx = 22, tw = V.w - 44;
+          g.fillStyle = disabled ? '#D9D2C2' : C.creamDark;
+          rr(g, tx, y - 5, tw, 10, 5); g.fill();
+          g.strokeStyle = C.navy; g.lineWidth = 1.5; g.stroke();
+          const u = (value - minV) / (maxV - minV);
+          if (!disabled){
+            g.fillStyle = C.gold; rr(g, tx, y - 5, tw * u, 10, 5); g.fill();
+          }
+          const hx = tx + tw * u;
+          g.fillStyle = disabled ? C.slate : C.red;
+          rr(g, hx - 15, y - 17, 30, 34, 9); g.fill();
+          g.lineWidth = 2.5; g.strokeStyle = C.navy; g.stroke();
+          g.strokeStyle = C.cream; g.lineWidth = 2;
+          g.beginPath(); g.moveTo(hx, y - 8); g.lineTo(hx, y + 8); g.stroke();
+          if (!disabled) reg(id, tx - 16, y - 24, tw + 32, 48, {track:[tx, tw, minV, maxV]});
+        };
+        track('sAngle', G.slidersTop + 44, 'ANGLE', angle, 0, 90, false);
+        track('sForce', G.slidersTop + 100, 'FORCE', force, 1, 10, !!conf.lockForce);
+        button('fire', V.w / 2 - 66, V.h - 50, 132, 44, ball ? 'FIRING...' : 'FIRE',
+          {fill: ball ? C.slate : C.red, color:C.cream, size:18, disabled:!!ball || hit});
+      },
+      down(hit2, p){
+        if (!hit2) return;
+        if (hit2.id === 'sAngle' || hit2.id === 'sForce'){ drag = hit2; this.move(p); }
+      },
+      move(p){
+        if (!drag || !drag.track) return;
+        const [tx, tw, minV, maxV] = drag.track;
+        const u = Math.max(0, Math.min(1, (p.x - tx) / tw));
+        const val = Math.round(minV + u * (maxV - minV));
+        if (drag.id === 'sAngle') angle = val; else force = val;
+      },
+      cancel(){ drag = null; },
+      up(hit2, p, wasPressed){
+        drag = null;
+        if (hit2 && hit2.id === 'fire' && wasPressed === 'fire' && !hit2.disabled) fire();
+      }
+    };
+  }
+};
+
+/* ===========================================================================
+   GAME 6 - RIDDLE BOARD  (logical deduction)
+   ========================================================================= */
+function makeRiddle(diff){
+  const conf = {easy:{max:10, clues:2}, medium:{max:30, clues:3}, hard:{max:50, clues:4}}[diff];
+  const N = conf.max;
+  const all = Array.from({length:N}, (_, i) => i + 1);
+  function divisorsOf(n){
+    const d = [];
+    for (let k = 2; k <= 9; k++) if (n % k === 0 && n !== k) d.push(k);
+    return d;
+  }
+  const digitSum = n => String(n).split('').reduce((a, c) => a + (+c), 0);
+  function clueFor(kind, target){
+    switch (kind){
+      case 'parity': return target % 2 === 0
+        ? {text:'I am an even number', test:n => n % 2 === 0}
+        : {text:'I am an odd number', test:n => n % 2 === 1};
+      case 'less': { const k = Math.min(N + 1, target + rndI(1, Math.max(2, Math.round(N / 4))));
+        return {text:'I am less than ' + k, test:n => n < k}; }
+      case 'more': { const k = Math.max(0, target - rndI(1, Math.max(2, Math.round(N / 4))));
+        return {text:'I am greater than ' + k, test:n => n > k}; }
+      case 'multiple': { const ds = divisorsOf(target); if (!ds.length) return null;
+        const k = pickOne(ds);
+        return {text:'I am in the ' + k + ' times table', test:n => n % k === 0}; }
+      case 'digits': { const s = digitSum(target);
+        return {text:'My digits add up to ' + s, test:n => digitSum(n) === s}; }
+      case 'between': { const a = Math.max(1, target - rndI(1, 5)), b = Math.min(N, target + rndI(1, 5));
+        return {text:'I am between ' + a + ' and ' + b, test:n => n >= a && n <= b}; }
+      case 'exact': return {text:'Double me and add 3 and you get ' + (2 * target + 3),
+        test:n => 2 * n + 3 === 2 * target + 3};
+      case 'doubleLess': { const k = 2 * target + 3 + rndI(1, 8);
+        return {text:'Double me, add 3, and the answer is less than ' + k, test:n => 2 * n + 3 < k}; }
+      case 'halfMore': { const k = Math.max(0, Math.floor(target / 2) - rndI(0, 3));
+        return {text:'Half of me is more than ' + k, test:n => n / 2 > k}; }
+      default: return null;
+    }
+  }
+  const pool = diff === 'easy' ? ['parity', 'less', 'more', 'multiple', 'between']
+             : diff === 'medium' ? ['parity', 'less', 'more', 'multiple', 'digits', 'between']
+             : ['parity', 'less', 'more', 'multiple', 'digits'];
+  const indirect = ['exact', 'doubleLess', 'halfMore'];
+  for (let attempt = 0; attempt < 4000; attempt++){
+    const target = rndI(diff === 'easy' ? 2 : 4, N);
+    const kinds = shuffle(pool.slice()).slice(0, conf.clues - (diff === 'hard' ? 1 : 0));
+    if (diff === 'hard') kinds.push(pickOne(indirect));
+    const clues = [];
+    let bad = false;
+    for (const k of kinds){
+      const c = clueFor(k, target);
+      if (!c || !c.test(target)){ bad = true; break; }
+      clues.push(c);
+    }
+    if (bad || clues.length !== conf.clues) continue;
+    const survivors = all.filter(n => clues.every(c => c.test(n)));
+    if (survivors.length !== 1 || survivors[0] !== target) continue;
+    /* every clue must do some work, or it is decoration */
+    let redundant = false;
+    for (let i = 0; i < clues.length; i++){
+      const rest = clues.filter((_, j) => j !== i);
+      if (all.filter(n => rest.every(c => c.test(n))).length === 1){ redundant = true; break; }
+    }
+    if (redundant && diff !== 'hard') continue;
+    return {target, clues, max:N};
+  }
+  /* deterministic fallback */
+  const target = Math.min(7, N);
+  return {target, max:N, clues:[
+    {text:'I am an odd number', test:n => n % 2 === 1},
+    {text:'I am greater than 5', test:n => n > 5},
+    {text:'I am less than 9', test:n => n < 9}
+  ]};
+}
+GAMES.riddle = {
+  name:'Riddle Board', short:'Riddle Board', skill:'Logical deduction',
+  desc:'Every clue is true about one single number on the board. Tap numbers to rule them out, and tap the answer to win.',
+  create(diff){
+    const R = makeRiddle(diff);
+    const cols = R.max <= 10 ? 5 : R.max <= 30 ? 6 : 7;
+    const dead = {};
+    let wrong = 0, note = '', noteT = 0, shakeN = -1, shakeT = 0;
+    return {
+      debug(){ return {target:R.target, max:R.max, clues:R.clues.map(c => c.text), wrong,
+                       dead:Object.keys(dead).map(Number)}; },
+      hudNote(){ return 'Wrong taps ' + wrong; },
+      update(dt){ if (noteT > 0) noteT -= dt; if (shakeT > 0) shakeT = Math.max(0, shakeT - dt); },
+      draw(){
+        const g = ctx;
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        const top = instr('Which number fits every clue?');
+        /* clue board */
+        let y = top + 10;
+        panel(8, y, V.w - 16, 12 + R.clues.length * 26, {fill:C.navy, stroke:C.gold, r:12, lw:2});
+        for (let i = 0; i < R.clues.length; i++){
+          T('“' + R.clues[i].text + '”', V.w / 2, y + 19 + i * 26,
+            {size:13.5, weight:700, color:C.cream, maxWidth:V.w - 40});
+        }
+        y += 12 + R.clues.length * 26 + 12;
+        /* number grid */
+        const rows = Math.ceil(R.max / cols);
+        const cw = (V.w - 20) / cols;
+        const ch = Math.min(52, Math.max(40, (V.h - y - 30) / rows));
+        for (let n = 1; n <= R.max; n++){
+          const i = n - 1, col = i % cols, row = (i / cols) | 0;
+          const x = 10 + col * cw, yy = y + row * ch;
+          const isDead = !!dead[n];
+          const sh = (shakeN === n && shakeT > 0) ? Math.sin(shakeT * 70) * 4 : 0;
+          if (!isDead) reg('n' + n, x, yy, cw, ch, {});
+          panel(x + 3 + sh, yy + 3, cw - 6, ch - 6,
+            {fill: isDead ? '#DCD5C4' : (pressed === 'n' + n ? C.gold : C.white),
+             stroke: isDead ? '#BFB6A2' : C.navy, r:9, lw:2, shadow:!isDead});
+          T(String(n), x + cw / 2 + sh, yy + ch / 2,
+            {size: Math.min(20, ch * 0.42), weight:800, color: isDead ? '#9C9484' : C.navy, num:true});
+          if (isDead){
+            g.strokeStyle = C.red; g.lineWidth = 2.5;
+            g.beginPath();
+            g.moveTo(x + 9, yy + 9); g.lineTo(x + cw - 9, yy + ch - 9);
+            g.moveTo(x + cw - 9, yy + 9); g.lineTo(x + 9, yy + ch - 9);
+            g.stroke();
+          }
+        }
+        if (noteT > 0){
+          panel(16, V.h - 58, V.w - 32, 44, {fill:C.red, stroke:C.navy, r:12, lw:2});
+          Twrap(note, V.w / 2, V.h - 42, V.w - 50, 15, {size:12.5, weight:700, color:C.cream});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed || hit.id[0] !== 'n') return;
+        const n = parseInt(hit.id.slice(1), 10);
+        if (dead[n]) return;
+        const failed = R.clues.find(c => !c.test(n));
+        if (!failed){
+          const stars = wrong === 0 ? 3 : wrong <= 2 ? 2 : 1;
+          finishGame(stars, wrong, 'The number was ' + R.target + ', found with ' +
+            (wrong === 0 ? 'no wrong taps' : wrong + ' wrong tap' + (wrong === 1 ? '' : 's')) + '.');
+          return;
+        }
+        dead[n] = true; wrong++; shakeN = n; shakeT = 0.45; Sfx.bad();
+        note = n + ' is out: “' + failed.text + '” is not true for it.';
+        noteT = 2.6;
+      }
+    };
+  }
+};
+
+
+/* ===========================================================================
+   GAME 7 - BALANCE BEAM  (weight x distance / equivalence)
+   ========================================================================= */
+/* Find k performers on distinct distances 1..4 whose weight*distance sums to T. */
+function findSide(T, k){
+  for (let t = 0; t < 4000; t++){
+    const ds = shuffle([1, 2, 3, 4]).slice(0, k);
+    const out = [];
+    let partial = 0;
+    for (let i = 0; i < k - 1; i++){ const w = rndI(1, 5); partial += w * ds[i]; out.push({w, d:ds[i]}); }
+    const rem = T - partial, dl = ds[k - 1];
+    if (rem > 0 && rem % dl === 0 && rem / dl >= 1 && rem / dl <= 5){
+      out.push({w:rem / dl, d:dl});
+      return out;
+    }
+  }
+  return null;
+}
+function genBalance(diff){
+  if (diff === 'easy'){
+    const w = rndI(2, 4), d = rndI(1, 4);
+    return {fixed:[{w, side:'L', d}], free:[w], leftovers:0,
+            hint:'Both performers weigh the same, so they need the same distance.'};
+  }
+  if (diff === 'medium'){
+    for (let a = 0; a < 200; a++){
+      const leftCount = rndI(1, 2);
+      const ds = shuffle([1, 2, 3, 4]).slice(0, leftCount);
+      const fixed = ds.map(d => ({w:rndI(1, 5), side:'L', d}));
+      const T = fixed.reduce((s, p) => s + p.w * p.d, 0);
+      const k = leftCount === 1 ? rndI(2, 3) : 2;
+      const sol = findSide(T, k);
+      if (!sol) continue;
+      return {fixed, free:shuffle(sol.map(s => s.w)), leftovers:0,
+              hint:'The left side is already set. Match its turning force on the right.'};
+    }
+  }
+  for (let a = 0; a < 400; a++){
+    const k1 = rndI(2, 3), k2 = rndI(2, 3);
+    if (k1 + k2 < 4 || k1 + k2 > 5) continue;
+    const ds = shuffle([1, 2, 3, 4]).slice(0, k1);
+    const left = ds.map(d => ({w:rndI(1, 5), d}));
+    const T = left.reduce((s, p) => s + p.w * p.d, 0);
+    const right = findSide(T, k2);
+    if (!right) continue;
+    const ws = left.map(p => p.w).concat(right.map(p => p.w));
+    ws.push(rndI(1, 5));                       /* the one who sits out */
+    return {fixed:[], free:shuffle(ws), leftovers:1,
+            hint:'One performer has to sit this act out.'};
+  }
+  return {fixed:[{w:3, side:'L', d:2}], free:[3], leftovers:0, hint:'Match the turning force.'};
+}
+GAMES.balance = {
+  name:'Balance Beam', short:'Balance Beam', skill:'Weight x distance',
+  desc:'Turning force is weight times distance from the middle. Drag performers onto the spots until both sides match.',
+  create(diff){
+    const spec = genBalance(diff);
+    const perf = [];
+    let nid = 0;
+    for (const f of spec.fixed) perf.push({id:nid++, w:f.w, slot:f.side + f.d, fixed:true});
+    for (const w of spec.free) perf.push({id:nid++, w, slot:null, fixed:false});
+    const mustPlace = spec.free.length - spec.leftovers;
+    const limit = mustPlace + 4;
+    let moves = 0, drag = null, note = '', noteT = 0;
+    const byId = id => perf.find(p => p.id === id);
+    const occupant = slot => perf.find(p => p.slot === slot);
+    const torqueOf = side => perf.filter(p => p.slot && p.slot[0] === side)
+      .reduce((s, p) => s + p.w * (+p.slot[1]), 0);
+    const placedFree = () => perf.filter(p => !p.fixed && p.slot).length;
+    const geo = () => {
+      const top = 53 + 13 + 2 * 17;                 /* below a two-line instruction */
+      const trayY = V.h - 92;
+      /* beam sits midway between the instruction and the wings on tall phones */
+      const beamY = Math.max(top + 120, Math.min(trayY - 150, (top + trayY) / 2 - 10));
+      const cx = V.w / 2, unit = 32;
+      const net = torqueOf('R') - torqueOf('L');
+      const tilt = Math.max(-1, Math.min(1, net / 24)) * 0.2;
+      return {beamY, cx, unit, tilt, trayY};
+    };
+    const slotPos = slot => {
+      const G = geo(), d = +slot[1], sgn = slot[0] === 'L' ? -1 : 1;
+      const dx = sgn * d * G.unit;
+      return {x:G.cx + dx * Math.cos(G.tilt), y:G.beamY + dx * Math.sin(G.tilt)};
+    };
+    function checkWin(){
+      if (placedFree() !== mustPlace) return;
+      if (torqueOf('L') !== torqueOf('R')) return;
+      const stars = moves === mustPlace ? 3 : moves <= mustPlace + 2 ? 2 : 1;
+      finishGame(stars, moves, 'Balanced at ' + torqueOf('L') + ' each side in ' + moves + ' move' +
+        (moves === 1 ? '' : 's') + '.');
+    }
+    return {
+      debug(){ return {moves, limit, mustPlace, leftovers:spec.leftovers,
+                       left:torqueOf('L'), right:torqueOf('R'), placed:placedFree(),
+                       perf:perf.map(p => ({id:p.id, w:p.w, slot:p.slot, fixed:p.fixed}))}; },
+      hudNote(){ return 'Moves ' + moves + '/' + limit + '  ·  place ' + mustPlace + ' of ' + spec.free.length; },
+      update(dt){ if (noteT > 0) noteT -= dt; },
+      draw(){
+        const g = ctx, G = geo();
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        sawdustFloor(G.trayY - 12);
+        instr('Drag performers onto the spots. ' + spec.hint);
+        /* turning-force read-out */
+        badge(14, G.beamY - 96, 96, 46, 'LEFT FORCE', torqueOf('L'),
+          {fill: torqueOf('L') === torqueOf('R') ? '#D8F0DF' : C.creamDark, size:20});
+        badge(V.w - 110, G.beamY - 96, 96, 46, 'RIGHT FORCE', torqueOf('R'),
+          {fill: torqueOf('L') === torqueOf('R') ? '#D8F0DF' : C.creamDark, size:20});
+        T(torqueOf('L') === torqueOf('R') ? 'LEVEL' : (torqueOf('L') > torqueOf('R') ? 'TIPS LEFT' : 'TIPS RIGHT'),
+          V.w / 2, G.beamY - 74, {size:12.5, weight:800,
+          color: torqueOf('L') === torqueOf('R') ? C.green : C.red});
+        /* beam */
+        g.save(); g.translate(G.cx, G.beamY); g.rotate(G.tilt);
+        g.fillStyle = C.navy; rr(g, -4.7 * G.unit, -7, 9.4 * G.unit, 14, 7); g.fill();
+        for (let d = 1; d <= 4; d++){
+          for (const sgn of [-1, 1]){
+            const x = sgn * d * G.unit;
+            g.fillStyle = C.gold;
+            g.beginPath(); g.arc(x, 0, 4, 0, 7); g.fill();
+            T(String(d), x, 17, {size:11, weight:800, color:C.navy, num:true});
+          }
+        }
+        g.restore();
+        /* fulcrum */
+        g.fillStyle = C.red;
+        g.beginPath(); g.moveTo(G.cx, G.beamY + 4); g.lineTo(G.cx + 26, G.beamY + 58);
+        g.lineTo(G.cx - 26, G.beamY + 58); g.closePath(); g.fill();
+        g.fillStyle = C.navy; g.fillRect(G.cx - 34, G.beamY + 58, 68, 8);
+        /* slot drop targets + seated performers */
+        for (let d = 1; d <= 4; d++){
+          for (const side of ['L', 'R']){
+            const slot = side + d, p = slotPos(slot), who = occupant(slot);
+            reg('slot_' + slot, p.x - 22, p.y - 40, 44, 52, {slot});
+            if (!who){
+              g.strokeStyle = 'rgba(18,32,58,.35)'; g.lineWidth = 2; g.setLineDash([4, 4]);
+              g.beginPath(); g.arc(p.x, p.y - 18, 15, 0, 7); g.stroke();
+              g.setLineDash([]);
+            } else if (!drag || drag.id !== who.id){
+              drawPerformer(p.x, p.y - 18, who, false);
+              if (!who.fixed) reg('take_' + who.id, p.x - 22, p.y - 42, 44, 50, {pid:who.id});
+            }
+          }
+        }
+        /* tray */
+        panel(8, G.trayY, V.w - 16, 76, {fill:C.white, stroke:C.navy, r:12, lw:2, shadow:false});
+        T('WAITING IN THE WINGS', V.w / 2, G.trayY + 13, {size:10.5, weight:800, color:C.slate});
+        const waiting = perf.filter(p => !p.fixed && !p.slot);
+        for (let i = 0; i < waiting.length; i++){
+          const x = 34 + i * Math.min(52, (V.w - 68) / Math.max(1, waiting.length - 1 || 1));
+          const y = G.trayY + 46;
+          if (!drag || drag.id !== waiting[i].id){
+            drawPerformer(x, y, waiting[i], false);
+            reg('take_' + waiting[i].id, x - 22, y - 24, 44, 48, {pid:waiting[i].id});
+          }
+        }
+        if (drag) drawPerformer(drag.x, drag.y, byId(drag.id), true);
+        if (noteT > 0){
+          panel(20, G.trayY - 52, V.w - 40, 40, {fill:C.navy, stroke:C.gold, r:10, lw:2});
+          Twrap(note, V.w / 2, G.trayY - 38, V.w - 56, 15, {size:12.5, weight:700, color:C.cream});
+        }
+      },
+      down(hit, p){
+        if (!hit) return;
+        if (hit.id.indexOf('take_') === 0){
+          const who = byId(hit.pid);
+          if (!who || who.fixed) return;
+          drag = {id:who.id, x:p.x, y:p.y, from:who.slot};
+          who.slot = null;
+          Sfx.pop();
+        }
+      },
+      move(p){ if (drag){ drag.x = p.x; drag.y = p.y - 16; } },
+      cancel(){ drag = null; },
+      up(hit, p, wasPressed){
+        if (!drag) return;
+        const who = byId(drag.id), from = drag.from;
+        let target = null;
+        for (let d = 1; d <= 4; d++) for (const side of ['L', 'R']){
+          const slot = side + d, sp = slotPos(slot);
+          const dist = Math.hypot(sp.x - drag.x, sp.y - 18 - drag.y);
+          if (dist < 34 && !occupant(slot) && (!target || dist < target.dist)) target = {slot, dist};
+        }
+        drag = null;
+        if (!target){
+          who.slot = null;              /* back to the wings, costs nothing */
+          return;
+        }
+        who.slot = target.slot;
+        if (target.slot !== from){
+          moves++;
+          Sfx.click();
+          if (moves > limit){
+            failGame('Out of moves. You get ' + limit + ' in this ring.');
+            return;
+          }
+        }
+        checkWin();
+        if (!current.done && placedFree() === mustPlace && torqueOf('L') !== torqueOf('R')){
+          note = 'Not level: ' + torqueOf('L') + ' against ' + torqueOf('R') + '. Move someone.';
+          noteT = 2.6;
+        }
+      }
+    };
+  }
+};
+function drawPerformer(x, y, p, lifted){
+  if (!p) return;
+  const g = ctx;
+  if (lifted){ g.save(); g.globalAlpha = 0.92; }
+  g.fillStyle = C.ink; g.globalAlpha *= 0.2;
+  g.beginPath(); g.ellipse(x, y + 20, 14, 4, 0, 0, 7); g.fill();
+  g.globalAlpha = lifted ? 0.92 : 1;
+  g.fillStyle = p.fixed ? C.slate : C.purple;
+  g.beginPath(); g.moveTo(x - 12, y + 18); g.lineTo(x + 12, y + 18); g.lineTo(x, y - 6); g.closePath(); g.fill();
+  g.fillStyle = '#F0C9A0';
+  g.beginPath(); g.arc(x, y - 10, 9, 0, 7); g.fill();
+  g.fillStyle = C.gold;
+  g.beginPath(); g.arc(x, y + 6, 11, 0, 7); g.fill();
+  g.lineWidth = 2; g.strokeStyle = C.navy; g.stroke();
+  T(String(p.w), x, y + 7, {size:14, weight:800, color:C.ink, num:true});
+  if (lifted) g.restore();
+}
+
+/* ===========================================================================
+   GAME 8 - TICKET BOOTH  (money math)
+   ========================================================================= */
+function money(c){ return c % 100 === 0 ? '$' + (c / 100) : '$' + (c / 100).toFixed(2); }
+function moneyOptions(correct, unit){
+  const set = [correct];
+  const deltas = [unit, -unit, 100, -100, 50, -50, 2 * unit];
+  for (const d of shuffle(deltas.slice())){
+    const v = correct + d;
+    if (v > 0 && set.indexOf(v) < 0) set.push(v);
+    if (set.length === 4) break;
+  }
+  while (set.length < 4) set.push(correct + set.length * 25);
+  return shuffle(set);
+}
+GAMES.tickets = {
+  name:'Ticket Booth', short:'Ticket Booth', skill:'Money & totals',
+  desc:'Serve six customers: work out what they owe, and on the busy shifts work out their change too.',
+  create(diff){
+    const COUNT = 6;
+    const board = [];
+    if (diff === 'easy'){
+      board.push({name:'Ticket', cents:rndI(1, 4) * 100});
+    } else if (diff === 'medium'){
+      board.push({name:'Adult', cents:rndI(3, 5) * 100});
+      board.push({name:'Child', cents:rndI(1, 2) * 100});
+    } else {
+      board.push({name:'Adult', cents:pickOne([350, 400, 450])});
+      board.push({name:'Child', cents:pickOne([150, 200, 250])});
+      board.push({name:'Family pack (4)', cents:pickOne([1000, 1200, 1400]), bundle:4});
+    }
+    function makeCustomer(){
+      const lines = [];
+      if (diff === 'easy'){
+        lines.push({item:board[0], qty:rndI(1, 5)});
+      } else if (diff === 'medium'){
+        const a = rndI(1, 4), c = rndI(1, 4);
+        lines.push({item:board[0], qty:a});
+        lines.push({item:board[1], qty:c});
+      } else {
+        if (Math.random() < 0.6) lines.push({item:board[2], qty:1});
+        const a = rndI(0, 2), c = rndI(0, 3);
+        if (a) lines.push({item:board[0], qty:a});
+        if (c || lines.length === 0) lines.push({item:board[1], qty:Math.max(1, c)});
+      }
+      const total = lines.reduce((s, l) => s + l.item.cents * l.qty, 0);
+      let bill = 0;
+      if (diff !== 'easy'){
+        /* always a real note, and always strictly more than the total so there
+           is change to work out */
+        bill = [500, 1000, 2000, 5000].find(n => n > total) || 5000;
+      }
+      return {lines, total, bill, change: bill ? bill - total : 0};
+    }
+    /* If any price on the board carries cents, every figure shows cents, so the
+       board never mixes "$14" with "$1.50". */
+    const cents2 = board.some(b => b.cents % 100 !== 0);
+    const fm = c => cents2 ? '$' + (c / 100).toFixed(2) : money(c);
+    let idx = 0, phase = 'total', cust = makeCustomer(), entry = '', options = [];
+    let correctFirst = 0, slipped = false, note = '', noteT = 0, wait = 0, queueExtra = 0;
+    const usesPad = diff === 'hard';
+    if (!usesPad) options = moneyOptions(cust.total, board[0].cents);
+    function nextPhase(){
+      if (phase === 'total' && cust.bill){
+        phase = 'change'; entry = '';
+        if (!usesPad) options = moneyOptions(cust.change, board[0].cents);
+        return;
+      }
+      /* customer served */
+      if (!slipped) correctFirst++;
+      idx++;
+      if (idx >= COUNT){
+        const stars = correctFirst === COUNT ? 3 : correctFirst === COUNT - 1 ? 2 : 1;
+        finishGame(stars, correctFirst, correctFirst + ' of ' + COUNT + ' customers served right first time.');
+        return;
+      }
+      cust = makeCustomer(); phase = 'total'; entry = ''; slipped = false; wait = 0; queueExtra = 0;
+      if (!usesPad) options = moneyOptions(cust.total, board[0].cents);
+    }
+    function submit(value){
+      const want = phase === 'total' ? cust.total : cust.change;
+      if (value === want){ Sfx.good(); note = ''; noteT = 0; nextPhase(); }
+      else {
+        Sfx.bad(); slipped = true; entry = '';
+        note = phase === 'total' ? 'Not the right total - add each line again.'
+                                 : 'Not the right change: ' + fm(cust.bill) + ' take away the total.';
+        noteT = 2.6;
+      }
+    }
+    const requestText = () => cust.lines.map(l => l.qty + ' x ' + l.item.name).join(' and ');
+    return {
+      debug(){ return {idx, phase, total:cust.total, change:cust.change, bill:cust.bill,
+                       options:options.slice(), usesPad, correctFirst, count:COUNT,
+                       board:board.map(b => b.cents), entry}; },
+      hudNote(){ return 'Customer ' + Math.min(idx + 1, COUNT) + '/' + COUNT + '  ·  right ' + correctFirst; },
+      update(dt){
+        if (noteT > 0) noteT -= dt;
+        if (diff === 'hard'){
+          wait += dt;
+          queueExtra = Math.min(4, Math.floor(wait / 12));
+        }
+      },
+      draw(){
+        const g = ctx;
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        const top = instr(phase === 'total' ? 'What is the total?'
+          : 'They pay with ' + fm(cust.bill) + '. What is the change?');
+        /* price board */
+        const bh = 26 + board.length * 22;
+        panel(8, top + 8, V.w - 16, bh, {fill:C.navy, stroke:C.gold, r:12, lw:2});
+        T('PRICE BOARD', V.w / 2, top + 20, {size:11, weight:800, color:C.gold});
+        for (let i = 0; i < board.length; i++){
+          T(board[i].name, 24, top + 38 + i * 22, {size:13, weight:700, color:C.cream, align:'left'});
+          T(fm(board[i].cents), V.w - 24, top + 38 + i * 22,
+            {size:13.5, weight:800, color:C.cream, align:'right', num:true});
+        }
+        let y = top + bh + 16;
+        /* queue */
+        const queued = Math.min(6, (COUNT - idx - 1) + queueExtra);
+        for (let i = 0; i < queued; i++){
+          const qx = V.w - 22 - i * 20;
+          g.fillStyle = i === 0 ? C.slate : 'rgba(59,74,99,.45)';
+          g.beginPath(); g.arc(qx, y + 12, 7, 0, 7); g.fill();
+          g.fillRect(qx - 7, y + 20, 14, 16);
+        }
+        /* customer */
+        g.fillStyle = C.red;
+        g.beginPath(); g.arc(34, y + 16, 12, 0, 7); g.fill();
+        g.fillStyle = C.blue; rr(g, 22, y + 28, 24, 24, 6); g.fill();
+        speechBubble(56, y - 4, V.w - 150, 58, '"' + requestText() + ', please!"');
+        y += 66;
+        /* entry / options */
+        if (usesPad){
+          const val = entry ? parseInt(entry, 10) : 0;
+          panel(60, y, V.w - 120, 46, {fill:C.white, stroke:C.navy, r:10, lw:2, shadow:false});
+          T(entry ? fm(val) : fm(0), V.w / 2, y + 24, {size:24, weight:800, color:C.navy, num:true});
+          T('type in cents', V.w / 2, y + 58, {size:10.5, weight:700, color:C.slate});
+          y += 68;
+          const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'];
+          const kw = 96, gp = 8;
+          const kh = Math.max(44, Math.min(68, (V.h - y - 16) / 4 - gp));
+          const kx0 = (V.w - (3 * kw + 2 * gp)) / 2;
+          for (let i = 0; i < keys.length; i++){
+            const col = i % 3, row = (i / 3) | 0, k = keys[i];
+            button('k' + k, kx0 + col * (kw + gp), y + row * (kh + gp), kw, kh, k,
+              {fill: k === 'OK' ? C.green : k === 'C' ? C.red : C.white,
+               color: (k === 'OK' || k === 'C') ? C.cream : C.navy, size:19, num:true});
+          }
+        } else {
+          const ow = 150, oh = 58, gp = 10, ox0 = (V.w - (2 * ow + gp)) / 2;
+          for (let i = 0; i < options.length; i++){
+            const col = i % 2, row = (i / 2) | 0;
+            button('o' + i, ox0 + col * (ow + gp), y + row * (oh + gp), ow, oh, fm(options[i]),
+              {fill:C.white, color:C.navy, size:20, num:true});
+          }
+          y += 2 * (oh + gp);
+        }
+        if (noteT > 0){
+          panel(16, V.h - 52, V.w - 32, 40, {fill:C.red, stroke:C.navy, r:10, lw:2});
+          Twrap(note, V.w / 2, V.h - 38, V.w - 50, 15, {size:12.5, weight:700, color:C.cream});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed) return;
+        const id = hit.id;
+        if (id[0] === 'o' && options.length){ submit(options[parseInt(id.slice(1), 10)]); return; }
+        if (id.indexOf('k') === 0){
+          const k = id.slice(1);
+          if (k === 'C'){ entry = ''; Sfx.click(); return; }
+          if (k === 'OK'){ if (entry) submit(parseInt(entry, 10)); return; }
+          if (entry.length < 5){ entry += k; Sfx.click(); }
+        }
+      }
+    };
+  }
+};
+
 /* __GAMES_INSERT__ */
 
 /* ===========================================================================
