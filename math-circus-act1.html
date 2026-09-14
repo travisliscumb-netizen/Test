@@ -769,12 +769,14 @@ function drawModal(){
     const def = GAMES[modal.id] || {short:modal.id, name:modal.id, desc:'', skill:''};
     const rec = gameState.games[modal.id];
     const w = 318, x = (V.w - w) / 2;
+    /* fall through: y and h are computed from the measured description below */
     /* The card is measured from its own text: descriptions differ in length, and
        fixed offsets made the longest one collide with the rows below it. */
     const descLines = wrapLines(def.desc, w - 36, 13.5, 600);
     const descH = descLines.length * 17;
     const h = 268 + descH;
     const y = Math.max(56, (V.h - h) / 2);
+    modal.rect = {x, y, w, h};
     panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
     g.save(); g.beginPath(); rr(g, x, y, w, h, 18); g.clip();
     g.fillStyle = C.red; g.fillRect(x, y, w, 56);
@@ -808,7 +810,8 @@ function drawModal(){
     button('m_start', x + 28, cy, w - 56, 52, 'START', {fill:C.gold, size:20});
   }
   else if (modal.kind === 'settings'){
-    const w = 312, h = 274, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    const w = 312, h = 296, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    modal.rect = {x, y, w, h};
     panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
     T('Settings', x + w / 2, y + 28, {size:22, weight:800, color:C.navy});
     const close = reg('m_close', x + w - 46, y + 4, 44, 44, {});
@@ -821,10 +824,11 @@ function drawModal(){
       x + w / 2, y + 180, w - 44, 16, {size:12, weight:600, color:C.slate});
     T('Offline cache: ' + (SW_STATUS.ok ? 'ready' : 'not available here'),
       x + w / 2, y + 222, {size:11.5, weight:800, color: SW_STATUS.ok ? C.green : C.slate});
-    button('m_close2', x + 24, y + 234, w - 48, 44, 'Close', {fill:C.creamDark, color:C.navy});
+    button('m_close2', x + 24, y + 240, w - 48, 44, 'Close', {fill:C.creamDark, color:C.navy});
   }
   else if (modal.kind === 'confirm'){
     const w = 300, h = 186, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    modal.rect = {x, y, w, h};
     panel(x, y, w, h, {fill:C.cream, stroke:C.red, r:18});
     T('Are you sure?', x + w / 2, y + 34, {size:20, weight:800, color:C.red});
     Twrap(modal.text, x + w / 2, y + 68, w - 40, 17, {size:13.5, weight:600, color:C.navy});
@@ -833,6 +837,7 @@ function drawModal(){
   }
   else if (modal.kind === 'pause'){
     const w = 288, h = 288, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    modal.rect = {x, y, w, h};
     panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
     T('Paused', x + w / 2, y + 30, {size:22, weight:800, color:C.navy});
     button('m_resume', x + 24, y + 54, w - 48, 50, 'Resume', {fill:C.green, color:C.cream});
@@ -843,7 +848,13 @@ function drawModal(){
     button('m_hub', x + 24, y + 224, w - 48, 50, 'Back to Big Top', {fill:C.red, color:C.cream});
   }
   else if (modal.kind === 'result'){
-    const w = 304, h = 268, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    const w = 304, x = (V.w - w) / 2;
+    const msgLines = wrapLines(modal.message || '', w - 40, 13.5, 700);
+    const msgH = msgLines.length * 17;
+    const extra = modal.improved ? 22 : 0;
+    const h = 118 + msgH + extra + 6 + 48 + 10 + 46 + 16;
+    const y = Math.max(56, (V.h - h) / 2);
+    modal.rect = {x, y, w, h};
     panel(x, y, w, h, {fill:C.cream, stroke: modal.failed ? C.red : C.gold, r:18, lw:4});
     const title = modal.failed ? 'Curtain down' :
       modal.stars >= 3 ? 'Perfect!' : modal.stars === 2 ? 'Well done!' : 'Cleared!';
@@ -856,10 +867,18 @@ function drawModal(){
       const sc = lit ? (1.5 - 0.5 * k) : 1;
       drawStar(x + w / 2 - 54 + i * 54, y + 84, 22 * (lit ? sc : 1), lit, {lw:2.4});
     }
-    Twrap(modal.message || '', x + w / 2, y + 132, w - 40, 17, {size:13.5, weight:700, color:C.navy});
-    if (modal.improved) T('New best!', x + w / 2, y + 170, {size:13, weight:800, color:C.gold, outline:2.5, outlineColor:C.navy});
-    button('m_again', x + 22, y + 186, w - 44, 48, 'Play again', {fill:C.gold});
-    button('m_hub', x + 22, y + 240, w - 44, 46, 'Back to Big Top', {fill:C.red, color:C.cream, size:15});
+    let cy = y + 118 + 8;
+    for (let i = 0; i < msgLines.length; i++)
+      T(msgLines[i], x + w / 2, cy + i * 17, {size:13.5, weight:700, color:C.navy});
+    cy += msgH;
+    if (modal.improved){
+      T('New best!', x + w / 2, cy + 10, {size:13, weight:800, color:C.gold, outline:2.5, outlineColor:C.navy});
+      cy += extra;
+    }
+    cy += 6;
+    button('m_again', x + 22, cy, w - 44, 48, 'Play again', {fill:C.gold});
+    cy += 58;
+    button('m_hub', x + 22, cy, w - 44, 46, 'Back to Big Top', {fill:C.red, color:C.cream, size:15});
   }
 }
 function modalDown(hit){ if (hit && !hit.disabled) Sfx.click(); }

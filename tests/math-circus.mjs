@@ -1034,7 +1034,9 @@ async function testCards() {
           kind: MC.modal && MC.modal.kind,
           ids: mods.map(r => r.id),
           off: mods.filter(r => r.x < -1 || r.y < -1 || r.x + r.w > MC.V.w + 1 || r.y + r.h > MC.V.h + 1).map(r => r.id),
-          small: mods.filter(r => r.w * MC.V.s < 40 || r.h * MC.V.s < 40).map(r => r.id)
+          small: mods.filter(r => r.w * MC.V.s < 40 || r.h * MC.V.s < 40).map(r => r.id),
+          outside: (() => { const b = MC.modal.rect; return !b ? [] : mods.filter(r =>
+            r.x < b.x || r.y < b.y || r.x + r.w > b.x + b.w || r.y + r.h > b.y + b.h).map(r => r.id); })()
         };
       });
       check(`${vp.name}/${id}: card offers three difficulties and start`,
@@ -1042,7 +1044,28 @@ async function testCards() {
         info.ids.join(','));
       check(`${vp.name}/${id}: card fits the screen`, info.off.length === 0, info.off.join(','));
       check(`${vp.name}/${id}: card controls are finger sized`, info.small.length === 0, info.small.join(','));
+      check(`${vp.name}/${id}: card controls stay inside the card`, info.outside.length === 0, info.outside.join(','));
     }
+  }
+  /* the result card is the one players see most; check it at the shortest height */
+  await page.setViewportSize({ width: 900, height: 620 });
+  for (const [id, diff] of [['seals', 'medium'], ['traffic', 'hard'], ['magician', 'easy']]) {
+    await openGame(id, diff);
+    await page.evaluate(() => MC.finishGame(3, 1,
+      'A deliberately long result line, long enough to wrap onto more than one row of the card.'));
+    await frame();
+    const info = await page.evaluate(() => {
+      const r = MC.modal.rect, mods = MC.regions.filter(x => x.layer === 'modal');
+      return {
+        rect: r,
+        outside: mods.filter(x => x.x < r.x || x.y < r.y || x.x + x.w > r.x + r.w || x.y + x.h > r.y + r.h).map(x => x.id),
+        offscreen: r.y + r.h > MC.V.h + 1
+      };
+    });
+    check(`result card (${id}): buttons stay inside the card`, info.outside.length === 0, info.outside.join(','));
+    check(`result card (${id}): card fits a short screen`, !info.offscreen, JSON.stringify(info.rect));
+    await tap('m_hub');
+    await frame();
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { MC.closeModal(); MC.goHub(); });
