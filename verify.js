@@ -514,7 +514,15 @@ if (boot1) {
 
     /* --- R3: perception, combat, damage exchange --- */
     const guard = G.ENEMIES.find(e => e.key === 'guard' && e.state !== 'DEAD');
-    G.PLAYER.x = guard.x + 2; G.PLAYER.z = guard.z + 2; G.PLAYER.y = guard.y;
+    // Put the player where the guard is already looking. Dropping him at a
+    // fixed diagonal offset meant that whenever the patrol happened to have
+    // the guard facing the other way he spent the whole window turning round,
+    // ended in SEARCH, and the check failed for a reason it was not testing.
+    // The sight cone is built from atan2(dx, -dz) against e.yaw, so stepping
+    // two metres along that heading puts the player dead in front of him.
+    G.PLAYER.x = guard.x + Math.sin(guard.yaw) * 2;
+    G.PLAYER.z = guard.z - Math.cos(guard.yaw) * 2;
+    G.PLAYER.y = guard.y;
     G.PLAYER.crouch = false; G.INPUT.crouch = false;
     let detected = false, attacked = false;
     for (let i = 0; i < 400; i++) {
