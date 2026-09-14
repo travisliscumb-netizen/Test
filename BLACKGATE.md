@@ -174,6 +174,73 @@ and guards engaging you at the control-room terminal -- they see you, switch to
 ATTACK and close to their firing standoff, which the earlier report wrongly
 flagged as a possible hole.
 
+## Design pass: what the research changed
+
+The build was mechanically clean but thin in exactly the places GoldenEye was
+deep. Four systems were added, each drawn from something the N64 game actually
+did rather than from a general idea of "more features".
+
+### Objectives scale with the difficulty tier
+
+The most cited structural idea in GoldenEye is that Agent / Secret Agent / 00
+Agent did not simply move numbers around -- each tier *added objectives* on top
+of the last, so the same level asked something new of you. Here:
+
+| Tier | Objectives |
+|---|---|
+| Agent | Download the archive, exit through the plant |
+| Secret Agent | + Destroy the nerve-gas stockpile (four tanks, shoot the gauges) |
+| 00 Agent | + Leave no lab staff dead |
+
+The last one is a *constraint*: it can be failed outright and permanently, and
+it turns every panicking scientist who runs across your sights into a problem.
+Objectives are data in one table; the HUD, the briefing, the pause screen and
+the win condition all read it, so the briefing now tells you what the tier you
+picked actually demands before you commit.
+
+### The alarm is a race, not a coin flip
+
+Previously the alarm fired the instant a guard decided you were hostile: spotted
+meant caught, and nothing you did about it mattered. Now a guard has to reach
+one of seven wall panels and physically pull it. You can drop him on the way,
+or shoot the panels out beforehand and take a whole wing off the board. Cut the
+last panel and the garrison can never be called at all, which is the quiet run
+the suppressed PP7 exists for. Panels are drawn on the minimap, live or cut,
+because deciding which one to kill before you are seen is the interesting
+decision and you cannot make it if you have to find them by walking into them.
+
+Implemented without a sixth AI state -- the brief fixes the FSM at five, and
+there is a test asserting exactly those five. The runner uses CHASE with a panel
+as its target instead of the player. Guards have no path search, so a runner
+whose way is blocked would otherwise stand in a corner forever and the alarm
+would simply never arrive; a run that stops making progress for 2.5s is
+abandoned and he turns and fights.
+
+### Shots land somewhere specific
+
+GoldenEye did not treat a guard as one block. Head, torso, arm and leg now take
+different damage (2.5x / 1x / 0.5x / 0.5x) and, more importantly, do different
+things:
+
+- **Arm** -- the rifle is knocked out of his hands onto the floor and he breaks
+  for cover. You can neutralise a guard without killing him, which matters a
+  great deal when the tier you picked says no casualties.
+- **Leg** -- he stays in the fight at a little over half speed.
+- **Head** -- what you would expect.
+
+Detection still uses the single box proxy, one volume per guard rather than
+seven; the landing point is classified against the model's real proportions
+afterwards, which costs nothing.
+
+### Guards notice a colleague drop
+
+A documented GoldenEye sense that was missing. A body falling in a lit corridor
+in plain view of another guard used to change nothing, which is the kind of gap
+that makes an AI feel blind. Now any patrolling guard with line of sight to a
+death goes to ALERT. It has a real consequence: killing the guard who is running
+for a panel in front of witnesses just promotes the next one, so a silent run
+means killing cleanly *and* out of sight.
+
 ## Deliberate deviations
 
 - The brief asks for `castShadow = true` on every piece of geometry. Flat floors,

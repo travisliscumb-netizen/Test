@@ -50,6 +50,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #objText{font-size:12px;line-height:1.55;color:var(--ink);margin-top:4px}
 #objText b{color:var(--amber);font-weight:600}
 #objText .done{color:var(--green);text-decoration:line-through;opacity:.75}
+/* a constraint objective can be lost outright; that has to read as failed,
+   not as merely outstanding */
+#objText .failed{color:var(--red);text-decoration:line-through;opacity:.9}
 #alertBox{position:absolute;left:50%;top:calc(var(--safe-t) + 16px);transform:translateX(-50%);
   font-size:13px;letter-spacing:.24em;color:var(--red);font-weight:700;opacity:0;transition:opacity .25s;
   text-shadow:0 0 10px rgba(255,45,60,.7);white-space:nowrap}
@@ -193,10 +196,10 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <div class="card"><h3>Situation</h3><p>Blackgate processes and stores nerve agent under a research cover.
       Its garrison is small but disciplined, and the plant floor has enough pressurised stock to make a firefight
       a poor idea.</p></div>
-    <div class="card"><h3>Objective A</h3><p>Reach the control room and download the research archive from the terminal.</p></div>
-    <div class="card"><h3>Objective B</h3><p>Exit through the chemical plant. The exit stays sealed until the archive is yours.</p></div>
-    <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors and will call the alarm on sight.
-      Lab staff are unarmed &#8212; they run, and they raise the alarm too. Shots are loud; the suppressed PP7 is not.</p></div>
+    <div id="briefObjectives"></div>
+    <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors. A guard who spots you breaks for the nearest
+      wall panel to call the alarm in &#8212; drop him before he reaches it, or shoot the panels out first and the
+      garrison never hears a thing. Lab staff are unarmed and run. Shots are loud; the suppressed PP7 is not.</p></div>
     <div class="row"><label>Difficulty</label>
       <select id="selDiff" style="background:#182232;color:#e8eef6;border:1px solid rgba(159,176,196,.3);padding:9px;font-family:inherit;font-size:12px;min-height:40px">
         <option value="0">Agent</option><option value="1" selected>Secret Agent</option><option value="2">00 Agent</option>
@@ -2578,7 +2581,8 @@ var GAME = {
   state: 'menu',            // menu | playing | paused | over
   elapsed: 0, difficulty: 1,
   alarm: false, alarmAt: 0, kills: 0, bodies: 0,
-  objectives: { terminal: false, escaped: false },
+  objectives: { terminal: false, escaped: false, stockpile: false },
+  sciKills: 0, tanksLeft: 0,
   noise: null, frameCount: 0, lastTime: 0, raf: 0,
   showStats: false, booted: false, best: 0
 };
@@ -2631,9 +2635,63 @@ function loadBest() {
   } catch (e) { GAME.best = 0; }
 }
 
-/* ---------- objectives, win and loss ---------- */
+/* ---------- objectives, win and loss ----------
+   GoldenEye's best structural idea was that the difficulty setting did not
+   just move numbers around: each tier added objectives on top of the last, so
+   the same level asked something new of you. Agent gets in and out. Secret
+   Agent also has to destroy the stockpile the facility exists to make. 00
+   Agent has to do all of it without killing a single member of staff, which
+   turns every panicking scientist who runs across your sights into a problem.
+
+   Objectives are data. The HUD, the briefing, the pause screen and the win
+   condition all read this one list, so adding another is a single entry. */
+var OBJECTIVES = [
+  { id: 'archive', tier: 0, letter: 'A',
+    text: 'Download the research archive',
+    brief: 'Reach the control room and pull the archive off the terminal.',
+    done: function () { return GAME.objectives.terminal; } },
+  { id: 'stockpile', tier: 1, letter: 'B',
+    text: 'Destroy the nerve-gas stockpile',
+    brief: 'The plant holds the finished agent in four tanks. Rupture every one.',
+    done: function () { return GAME.objectives.stockpile; } },
+  { id: 'staff', tier: 2, letter: 'C', constraint: true,
+    text: 'Leave no lab staff dead',
+    brief: 'The scientists are civilians under duress. Bring them all out alive.',
+    done: function () { return GAME.sciKills === 0; },
+    failed: function () { return GAME.sciKills > 0; } },
+  { id: 'escape', tier: 0, letter: 'D', last: true,
+    text: 'Exit through the chemical plant',
+    brief: 'The plant door unlocks once the archive is yours.',
+    done: function () { return GAME.objectives.escaped; } }
+];
+
+/* The objectives in play at the current difficulty, in briefing order. */
+function activeObjectives() {
+  var out = [], i;
+  for (i = 0; i < OBJECTIVES.length; i++) {
+    var o = OBJECTIVES[i];
+    if (o.tier <= GAME.difficulty && !o.last) out.push(o);
+  }
+  for (i = 0; i < OBJECTIVES.length; i++) {
+    if (OBJECTIVES[i].last) out.push(OBJECTIVES[i]);
+  }
+  // relabel A, B, C... so the list always reads in order at every tier
+  for (i = 0; i < out.length; i++) out[i].letter = String.fromCharCode(65 + i);
+  return out;
+}
+
+/* Every objective except the final exit has to be met before the exit counts. */
+function fieldObjectivesMet() {
+  var list = activeObjectives();
+  for (var i = 0; i < list.length; i++) {
+    var o = list[i];
+    if (o.last) continue;
+    if (!o.done()) return false;
+  }
+  return true;
+}
 function checkWin() {
-  return GAME.objectives.terminal && playerIsAtExit();
+  return fieldObjectivesMet() && playerIsAtExit();
 }
 function checkLoss() {
   return player.health <= 0;
@@ -3405,6 +3463,7 @@ function buildLevel(plan) {
 function buildProps(level) {
   var group = level.props;
   var col = level.collidables;
+  level.tanks = [];
   var statics = { metal: [], dark: [], porcelain: [], hazard: [], vat: [], rubber: [], trim: [],
                   bench: [], drain: [], rack: [] };
 
@@ -3567,7 +3626,13 @@ function buildProps(level) {
     cyl('vat', 1.46, 1.46, 0.22, vx, 0.13, vz, 16);
     pipe('metal', 0.12, 1.0, vx, 3.0, vz, 'y');
     live(MAT.chem, 2.2, 0.1, 2.2, vx, 2.66, vz, false);
-    live(MAT.ledGreen, 0.14, 0.14, 0.06, vx + 1.32, 1.7, vz, false);
+    // The pressure gauge is the weak point. It is a live mesh rather than
+    // merged static geometry precisely so a shot can find it and so the
+    // stockpile objective has something specific to aim at.
+    var gauge = live(MAT.ledGreen, 0.26, 0.26, 0.10, vx + 1.34, 1.7, vz, false);
+    var tank = { gauge: gauge, pos: new THREE.Vector3(vx, 1.6, vz), intact: true };
+    gauge.userData.tank = tank;
+    level.tanks.push(tank);
     prop('metal', 0.18, 0.18, CELL * 1.6, vx, 3.3, vz + CELL * 0.8, false);
   }
   for (var hp = 0; hp < 6; hp++) {
@@ -3611,11 +3676,90 @@ function buildProps(level) {
     level.meshes.push(mesh);
   }
 
+  buildAlarmPanels(level, group);
+
   // Raycast set: merged statics plus the live prop meshes. Shots and sight
   // checks test these, and nothing else.
   level.raycastTargets = level.meshes.slice();
   group.traverse(function (o) { if (o.isMesh) level.raycastTargets.push(o); });
   return level;
+}
+
+/* ---------- alarm panels ----------
+   The alarm used to fire the instant a guard decided you were hostile, which
+   made stealth a coin flip: spotted meant caught, and nothing you did about it
+   mattered. Here a guard has to reach a wall panel and physically pull it, so
+   being seen starts a race instead of ending the mission. You can drop him
+   before he arrives, or shoot the panel out beforehand and take that whole
+   wing off the board. Kill the last working panel and the garrison can never
+   be called at all -- which is the quiet run the PP7 exists for. */
+var PANEL_SPOTS = [
+  [3.5, 10.0], [12.0, 11.0], [20.5, 12.0],
+  [19.0, 17.0], [22.5, 23.0], [8.0, 22.0], [5.0, 26.5]
+];
+
+function buildAlarmPanels(level, group) {
+  level.panels = [];
+  var box = new THREE.BoxGeometry(0.34, 0.42, 0.10);
+  var lamp = new THREE.BoxGeometry(0.10, 0.10, 0.04);
+  for (var i = 0; i < PANEL_SPOTS.length; i++) {
+    var wx = cellToWorldX(PANEL_SPOTS[i][0]), wz = cellToWorldZ(PANEL_SPOTS[i][1]);
+    var mesh = new THREE.Mesh(box, MAT.metalDark);
+    mesh.position.set(wx, 1.45, wz);
+    mesh.castShadow = false; mesh.receiveShadow = true;
+    var led = new THREE.Mesh(lamp, MAT.ledRed);
+    led.position.set(0, 0.12, 0.07);
+    led.castShadow = false;
+    mesh.add(led);
+    group.add(mesh);
+    var panel = { mesh: mesh, led: led, alive: true,
+                  pos: new THREE.Vector3(wx, 1.45, wz) };
+    mesh.userData.panel = panel;
+    level.panels.push(panel);
+  }
+}
+
+/* The nearest panel that still works, or null if the wing has been cut. */
+function nearestLivePanel(from) {
+  if (!LEVEL || !LEVEL.panels) return null;
+  var best = null, bestD = Infinity;
+  for (var i = 0; i < LEVEL.panels.length; i++) {
+    var p = LEVEL.panels[i];
+    if (!p.alive) continue;
+    var d = Math.hypot(p.pos.x - from.x, p.pos.z - from.z);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
+}
+
+/* Rupture a stockpile tank. Venting nerve agent is loud: it wakes the wing. */
+function ruptureTank(tank) {
+  if (!tank || !tank.intact) return;
+  tank.intact = false;
+  tank.gauge.material = MAT.ledDim;
+  spawnImpactEffect(tank.pos, null, false);
+  sfxExplosion(tank.pos);
+  flashLight(tank.pos, 14, 8, 0xa8ff7a, 0.3);
+  makeNoise(tank.pos.x, tank.pos.z, 26);
+  var left = LEVEL.tanks.filter(function (t) { return t.intact; }).length;
+  if (left) {
+    hudToast('Tank ruptured. ' + left + ' still holding.');
+  } else {
+    GAME.objectives.stockpile = true;
+    hudToast('Stockpile destroyed. Blackgate has nothing left to ship.');
+    hudUpdateObjectives();
+  }
+}
+
+function destroyPanel(panel) {
+  if (!panel || !panel.alive) return;
+  panel.alive = false;
+  panel.led.material = MAT.ledDim;
+  panel.mesh.material = MAT.metalDark;
+  sfxImpact(panel.pos, true);
+  var left = LEVEL.panels.filter(function (p) { return p.alive; }).length;
+  hudToast(left ? ('Alarm panel destroyed. ' + left + ' still live.')
+                : 'Last alarm panel destroyed. They cannot call this in.');
 }
 
 /* Guard and lab-staff placement with their patrol routes, in cell coordinates. */
@@ -3646,6 +3790,12 @@ var SPAWNS = [
 function spawnEnemies() {
   for (var i = 0; i < ENEMIES.list.length; i++) {
     var old = ENEMIES.list[i];
+    // a rifle knocked out of someone's hands lives in the scene, not on the body
+    if (old.droppedGun) {
+      RENDER.scene.remove(old.droppedGun);
+      if (old.droppedGun.geometry) old.droppedGun.geometry.dispose();
+      old.droppedGun = null;
+    }
     RENDER.scene.remove(old.group);
     old.group.traverse(function (o) {
       if (o.isMesh && o.geometry) o.geometry.dispose();   // materials are shared, geometry is not
@@ -4768,6 +4918,33 @@ function applyAimAssist(ray, w) {
   return best;
 }
 
+/* Where on the body a shot landed. GoldenEye did not treat a guard as one
+   block: a head shot dropped him, a limb shot barely hurt but visibly changed
+   what he could do. Hit detection still uses the single box proxy -- one
+   volume per guard rather than seven -- and the landing point is classified
+   against the model's real proportions afterwards, which costs nothing.
+
+   The numbers below come from the mesh: every part is laid out in local space
+   and the whole body is scaled by 1.35, so the boundaries are the part edges
+   multiplied through. */
+var BODY_SCALE = 1.35;
+var ZONE_HEAD_Y = 1.377,        // bottom of the head box
+    ZONE_LEG_Y  = 0.635,        // top of the legs
+    ZONE_ARM_X  = 0.30;         // inner edge of the arms
+var ZONE_DAMAGE = { head: 2.5, torso: 1.0, arm: 0.5, leg: 0.5 };
+
+function enemyHitZone(enemy, point) {
+  var g = enemy.group;
+  var localY = point.y - g.position.y;
+  if (localY >= ZONE_HEAD_Y) return 'head';
+  if (localY < ZONE_LEG_Y) return 'leg';
+  // inside the torso band: far enough out to the side and it is an arm
+  var dx = point.x - g.position.x, dz = point.z - g.position.z;
+  var cos = Math.cos(-g.rotation.y), sin = Math.sin(-g.rotation.y);
+  var lateral = Math.abs(dx * cos - dz * sin);
+  return lateral >= ZONE_ARM_X ? 'arm' : 'torso';
+}
+
 function fireWeapon() {
   var w = currentWeapon;
   if (!w) return false;
@@ -4826,15 +5003,18 @@ function fireWeapon() {
   makeNoise(PLAYER.pos.x, PLAYER.pos.z, w.noise);
 
   if (enemyHit && enemyDist <= wallDist) {
-    var headshot = enemyPoint.y > enemyHit.group.position.y + 1.45;
-    var dmg = w.damage * (headshot ? 2.5 : 1);
-    enemyHit.takeDamage(dmg, PLAYER.pos);
+    var zone = enemyHitZone(enemyHit, enemyPoint);
+    var dmg = w.damage * ZONE_DAMAGE[zone];
+    enemyHit.takeDamage(dmg, PLAYER.pos, zone);
     spawnImpactEffect(enemyPoint, hits[0].face ? hits[0].face.normal : null, true);
     sfxFlesh(enemyPoint);
     PLAYER.shotsHit++;
-    hudHitMarker(headshot);
+    hudHitMarker(zone === 'head');
   } else if (wallHits.length) {
     var wp = wallHits[0];
+    var ud = wp.object ? wp.object.userData : null;
+    if (ud && ud.panel) destroyPanel(ud.panel);
+    if (ud && ud.tank) ruptureTank(ud.tank);
     spawnImpactEffect(wp.point, wp.face ? wp.face.normal : null, false);
     sfxImpact(wp.point, true);
   }
@@ -5061,7 +5241,7 @@ function updateWeapons(dt, input) {
 /* Enemy AI. Guards run the five-state machine from the brief; lab staff use the
    same machine but never enter ATTACK — they run and raise the alarm instead. */
 
-var ENEMIES = { list: [], sightTick: 0 };
+var ENEMIES = { list: [], sightTick: 0, runnerActive: null };
 
 var Enemy = function (position, patrolPoints, kind) {
   this.kind = kind || 'guard';
@@ -5079,6 +5259,8 @@ var Enemy = function (position, patrolPoints, kind) {
   this.burst = 0;
   this.pauseClock = 0;
   this.deathClock = 0;
+  this.disarmed = false; this.limp = false; this.flinch = 0; this.droppedGun = null;
+  this.alarmTarget = null; this.alarmBest = Infinity; this.alarmStall = 0;
   this.speed = this.kind === 'scientist' ? 3.4 : 2.1;
   this.chaseSpeed = this.kind === 'scientist' ? 4.4 : 3.4;
   this.buildMesh(position);
@@ -5193,7 +5375,8 @@ Enemy.prototype.setState = function (s) {
   if (s === 'ATTACK') this.fireClock = CFG.difficulty[GAME.difficulty].reaction;
   // Committing to the player is what raises the alarm, from whichever state the
   // enemy got there — SEARCH can promote straight to ATTACK on sight.
-  if ((s === 'CHASE' || s === 'ATTACK') && !GAME.alarm) raiseAlarm(this);
+  // Raising the alarm is no longer a side effect of noticing you: a guard has
+  // to reach a panel and pull it. See alert() and chase().
 };
 
 /* Scratch vectors for the per-frame AI paths. Each is written immediately
@@ -5253,6 +5436,8 @@ Enemy.prototype.update = function (dt, playerPos) {
     }
   }
 
+  if (this.flinch > 0) this.flinch = Math.max(0, this.flinch - dt);
+
   switch (this.state) {
     case 'PATROL': this.patrol(dt); break;
     case 'ALERT':  this.alert(dt); break;
@@ -5278,17 +5463,49 @@ Enemy.prototype.alert = function (dt) {
   this.applyYaw();
   if (this.lastKnownPlayerPos) this.faceToward(this.lastKnownPlayerPos, dt, 7);
   if (this.stateClock >= CFG.ai.alertPause) {
-    if (!GAME.alarm) raiseAlarm(this);
-    if (this.kind === 'scientist') this.setState('SEARCH');   // staff flee rather than close in
-    else this.setState('CHASE');
+    if (!this.isCombatant()) { this.setState('SEARCH'); return; }   // staff and the disarmed flee
+    // First guard to react breaks for a panel rather than engaging. If every
+    // panel in the building is dead he has nothing to run to, and fights.
+    if (!GAME.alarm && !ENEMIES.runnerActive) {
+      var panel = nearestLivePanel(this.group.position);
+      if (panel) {
+        this.alarmTarget = panel;
+        ENEMIES.runnerActive = this;
+        this.setState('CHASE');
+        return;
+      }
+    }
+    this.setState('CHASE');
   }
 };
 
 Enemy.prototype.chase = function (dt, playerPos) {
+  // The runner ignores you entirely: his job is the panel on the wall.
+  if (this.alarmTarget) {
+    if (GAME.alarm || !this.alarmTarget.alive) { this.clearAlarmRun(); }
+    else {
+      var pp = this.alarmTarget.pos;
+      var gap = Math.hypot(pp.x - this.group.position.x, pp.z - this.group.position.z);
+      // The panel is on a wall, so he pulls it from arm's length rather than
+      // walking into it.
+      if (gap < 1.7) { raiseAlarm(this); this.clearAlarmRun(); return; }
+      // Guards walk straight at what they want; there is no path search here.
+      // A runner whose way is blocked by geometry would otherwise stand in a
+      // corner forever and the alarm would simply never come, so a run that
+      // stops making progress is abandoned and he turns and fights instead.
+      if (gap < (this.alarmBest || Infinity) - 0.05) {
+        this.alarmBest = gap; this.alarmStall = 0;
+      } else {
+        this.alarmStall = (this.alarmStall || 0) + dt;
+        if (this.alarmStall > 2.5) { this.clearAlarmRun(); }
+      }
+      if (this.alarmTarget) { this.moveToward(pp, dt, this.chaseSpeed); return; }
+    }
+  }
   var target = this.canSee ? playerPos : this.lastKnownPlayerPos;
   if (!target) { this.setState('SEARCH'); return; }
   var dist = this.group.position.distanceTo(target);
-  if (this.kind === 'scientist') {
+  if (!this.isCombatant()) {
     // run away from the player, not toward
     var away = this.group.position.clone().sub(playerPos).normalize().multiplyScalar(6).add(this.group.position);
     this.moveToward(away, dt, this.chaseSpeed);
@@ -5310,6 +5527,7 @@ Enemy.prototype.attack = function (dt, playerPos) {
   }
   var dist = this.group.position.distanceTo(playerPos);
   if (dist > CFG.ai.fireRange * 1.1) { this.setState('CHASE'); return; }
+  if (!this.isCombatant()) { this.setState('CHASE'); return; }   // CHASE is the flee path for these
   // strafe a little so they are not static targets
   var strafe = Math.sin(this.stateClock * 1.4 + this.group.position.x) * 0.7;
   _atkDir.set(playerPos.x - this.group.position.x, 0, playerPos.z - this.group.position.z).normalize();
@@ -5329,7 +5547,7 @@ Enemy.prototype.attack = function (dt, playerPos) {
 };
 
 Enemy.prototype.search = function (dt) {
-  if (this.canSee) { this.setState(this.kind === 'scientist' ? 'CHASE' : 'ATTACK'); return; }
+  if (this.canSee) { this.setState(this.isCombatant() ? 'ATTACK' : 'CHASE'); return; }
   if (this.lastKnownPlayerPos) {
     if (this.moveToward(this.lastKnownPlayerPos, dt, this.speed * 1.1)) {
       this.lastKnownPlayerPos = null;
@@ -5387,6 +5605,8 @@ function playerCanSeeEnemy(e) {
 
 Enemy.prototype.moveToward = function (target, dt, speed, noArrive) {
   var pos = this.group.position;
+  if (this.limp) speed *= 0.55;
+  if (this.flinch > 0) speed *= 0.35;      // staggered, briefly
   var dx = target.x - pos.x, dz = target.z - pos.z;
   var dist = Math.hypot(dx, dz);
   if (dist < 0.55 && !noArrive) return true;
@@ -5461,18 +5681,65 @@ Enemy.prototype.animate = function (dt) {
   }
 };
 
-Enemy.prototype.takeDamage = function (amount, fromPos) {
+Enemy.prototype.takeDamage = function (amount, fromPos, zone) {
   if (this.state === 'DEAD') return;
   this.startHitFlash();
   this.health -= amount;
   this.alertness = 1;
   if (fromPos) this.lastKnownPlayerPos = fromPos.clone ? fromPos.clone() : new THREE.Vector3(fromPos.x, 0, fromPos.z);
-  if (this.health <= 0) { this.die(); return; }
-  this.setState('ALERT');       // being shot always alerts, whatever it was doing
+  if (this.health <= 0) { this.die(zone); return; }
+
+  // A limb hit does little damage but changes what this guard can still do,
+  // which is the interesting half. An arm hit disarms him: he drops the rifle
+  // and breaks for cover instead of trading fire, so you can neutralise a
+  // guard without killing him. A leg hit leaves him in the fight but slow.
+  if (zone === 'arm' && this.gun && !this.disarmed) {
+    this.disarm();
+    this.setState('SEARCH');            // he is running, not fighting
+    this.lastKnownPlayerPos = null;
+    return;
+  }
+  if (zone === 'leg') this.limp = true;
+
+  this.flinch = 0.28;                   // brief stagger, read in animate()
+  this.setState('ALERT');               // being shot always alerts, whatever it was doing
 };
 
-Enemy.prototype.die = function () {
+/* Knock the rifle out of a guard's hands and leave it on the floor. */
+/* Lab staff never fight, and a guard whose rifle is on the floor no longer
+   can. Both run instead, which is why the two are asked the same question
+   everywhere the AI decides between closing in and getting clear. */
+Enemy.prototype.clearAlarmRun = function () {
+  this.alarmTarget = null;
+  this.alarmBest = Infinity; this.alarmStall = 0;
+  if (ENEMIES.runnerActive === this) ENEMIES.runnerActive = null;
+};
+
+Enemy.prototype.isCombatant = function () {
+  return this.kind !== 'scientist' && !this.disarmed;
+};
+
+Enemy.prototype.disarm = function () {
+  this.disarmed = true;
+  this.clearAlarmRun();
+  if (!this.gun) return;
+  var wp = new THREE.Vector3();
+  this.gun.getWorldPosition(wp);
+  this.body.remove(this.gun);
+  this.gun.position.set(wp.x, 0.06, wp.z);
+  this.gun.rotation.set(Math.PI / 2, randRange(0, Math.PI), 0);
+  RENDER.scene.add(this.gun);
+  this.droppedGun = this.gun;
+  this.gun = null;
+  var idx = this.parts.indexOf(this.droppedGun);
+  if (idx >= 0) this.parts.splice(idx, 1);
+  sfxImpact(this.group.position, false);
+};
+
+Enemy.prototype.die = function (zone) {
   this.restY = this.group.position.y;    // where the body settles, for the sink-out
+  this.deathZone = zone || 'torso';
+  this.clearAlarmRun();          // someone else can make the run now
   this.state = 'DEAD';
   this.endHitFlash();
   if (this.alertDot) this.alertDot.visible = false;
@@ -5482,12 +5749,36 @@ Enemy.prototype.die = function () {
   sfxEnemyDeath(this.group.position);
   PLAYER.kills++;
   GAME.kills++;
+  if (this.kind === 'scientist') GAME.sciKills++;
   if (!GAME.alarm && this.kind !== 'scientist') {
     // a body found later is not modelled; dying quietly is the reward for the PP7
     GAME.bodies++;
   }
   hudUpdateObjectives();
+  witnessDeath(this);
 };
+
+/* A guard who watches a colleague drop knows something is wrong, even if he
+   never saw you. GoldenEye's guards had exactly this sense, and without it a
+   body falling in plain sight in a lit corridor changes nothing, which is the
+   kind of gap that makes an AI feel blind. */
+var _witnessFrom = new THREE.Vector3(), _witnessTo = new THREE.Vector3();
+function witnessDeath(victim) {
+  var vp = victim.group.position;
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    var e = ENEMIES.list[i];
+    if (e === victim || e.state === 'DEAD') continue;
+    if (e.state !== 'PATROL') continue;            // already busy
+    var d = Math.hypot(e.group.position.x - vp.x, e.group.position.z - vp.z);
+    if (d > CFG.ai.sightRange) continue;
+    _witnessFrom.set(e.group.position.x, e.group.position.y + 1.56, e.group.position.z);
+    _witnessTo.set(vp.x, vp.y + 1.0, vp.z);
+    if (!hasLineOfSight(_witnessFrom, _witnessTo)) continue;
+    if (!e.lastKnownPlayerPos) e.lastKnownPlayerPos = new THREE.Vector3();
+    e.lastKnownPlayerPos.copy(PLAYER.pos);
+    e.setState('ALERT');
+  }
+}
 
 Enemy.prototype.updateDeath = function (dt) {
   this.deathClock += dt;
@@ -5842,7 +6133,7 @@ function initHUD() {
   // objective rows are created once; updates only touch className
   HUD.el.objText.innerHTML = '';
   HUD.objRows = [];
-  var labels = ['A. Download research archive', 'B. Exit through the chemical plant'];
+  var labels = objectiveLabels();
   for (i = 0; i < labels.length; i++) {
     var row = document.createElement('div');
     row.textContent = labels[i];
@@ -5876,10 +6167,46 @@ function hudShow(on) {
 function hudUpdateVitals() {}
 function hudUpdateAmmo() {}
 function hudSyncWeapon() {}
+function objectiveLabels() {
+  var list = activeObjectives(), out = [];
+  for (var i = 0; i < list.length; i++) out.push(list[i].letter + '. ' + list[i].text);
+  return out;
+}
+
+/* The list length changes with difficulty, so the rows are rebuilt whenever a
+   mission starts rather than assumed to be the two the markup began with. */
+function hudRebuildObjectives() {
+  if (!HUD.built) return;
+  var host = HUD.el.objText;
+  var labels = objectiveLabels();
+  while (host.firstChild) host.removeChild(host.firstChild);
+  HUD.objRows = [];
+  for (var i = 0; i < labels.length; i++) {
+    var row = document.createElement('div');
+    row.textContent = labels[i];
+    host.appendChild(row);
+    HUD.objRows.push(row);
+  }
+  hudUpdateObjectives();
+}
+
 function hudUpdateObjectives() {
   if (!HUD.built) return;
-  HUD.objRows[0].className = GAME.objectives.terminal ? 'done' : '';
-  HUD.objRows[1].className = GAME.objectives.escaped ? 'done' : '';
+  var list = activeObjectives();
+  for (var i = 0; i < list.length && i < HUD.objRows.length; i++) {
+    var o = list[i];
+    var cls = '';
+    if (o.failed && o.failed()) {
+      cls = 'failed';                 // lost outright, and it cannot come back
+    } else if (!o.constraint && o.done()) {
+      cls = 'done';
+    }
+    // A constraint is satisfied from the moment the mission starts, so ticking
+    // it off while you are still playing would tell you that you had achieved
+    // something you have merely not yet ruined. It stays neutral until the
+    // debrief, where done() is finally the whole truth.
+    HUD.objRows[i].className = cls;
+  }
 }
 function hudAlert(text) {
   if (!HUD.built) return;
@@ -6086,6 +6413,31 @@ function hudDrawMinimap(ctx, w, h) {
     if (Math.hypot(dm[0], dm[1]) > MINIMAP.range) continue;
     ctx.fillStyle = d.locked ? 'rgba(255,45,60,0.95)' : 'rgba(93,255,143,0.9)';
     ctx.fillRect(cx + dm[0] * scale - 2.5, cy + dm[1] * scale - 2.5, 5, 5);
+  }
+
+  // Alarm panels and intact stockpile tanks. Both are things you act on rather
+  // than things that act on you, so unlike guards they are always shown: the
+  // decision of which panel to cut before you are seen is the interesting one,
+  // and you cannot make it if you have to find them by walking into them.
+  for (i = 0; LEVEL.panels && i < LEVEL.panels.length; i++) {
+    var pn = LEVEL.panels[i];
+    var pm = toMap(pn.pos.x, pn.pos.z);
+    if (Math.hypot(pm[0], pm[1]) > MINIMAP.range) continue;
+    var pxx = cx + pm[0] * scale, pyy = cy + pm[1] * scale;
+    ctx.strokeStyle = pn.alive ? 'rgba(255,45,60,0.95)' : 'rgba(120,130,145,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(pxx, pyy, 3.5, 0, 6.283); ctx.stroke();
+    if (!pn.alive) {   // a cut panel gets a line through it
+      ctx.beginPath(); ctx.moveTo(pxx - 3, pyy - 3); ctx.lineTo(pxx + 3, pyy + 3); ctx.stroke();
+    }
+  }
+  for (i = 0; LEVEL.tanks && i < LEVEL.tanks.length; i++) {
+    var tk = LEVEL.tanks[i];
+    if (!tk.intact) continue;
+    var tm = toMap(tk.pos.x, tk.pos.z);
+    if (Math.hypot(tm[0], tm[1]) > MINIMAP.range) continue;
+    ctx.fillStyle = 'rgba(168,255,122,0.85)';
+    ctx.fillRect(cx + tm[0] * scale - 3, cy + tm[1] * scale - 3, 6, 6);
   }
 
   // Guards, but only the ones that have given themselves away. A radar showing
@@ -6435,6 +6787,71 @@ TEST_SUITE.run('Touch stick honours dead zone and expo curve', function () {
   return dead.mag === 0 && Math.abs(full.mag - 1) < 1e-6 && half.mag < 0.5;
 });
 
+TEST_SUITE.run('Shots are classified head / torso / arm / leg by where they land', function () {
+  var e = null;
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    if (ENEMIES.list[i].state !== 'DEAD' && ENEMIES.list[i].kind !== 'scientist') { e = ENEMIES.list[i]; break; }
+  }
+  if (!e) return false;
+  var g = e.group.position;
+  function at(y, lateral) {
+    return enemyHitZone(e, new THREE.Vector3(g.x + lateral, g.y + y, g.z));
+  }
+  // sampled at the real part centres, scaled the way the mesh is
+  return at(1.160 * BODY_SCALE, 0) === 'head'
+      && at(0.745 * BODY_SCALE, 0) === 'torso'
+      && at(0.245 * BODY_SCALE, -0.12 * BODY_SCALE) === 'leg'
+      && at(0.800 * BODY_SCALE, 0.295 * BODY_SCALE) === 'arm'
+      && ZONE_DAMAGE.head > ZONE_DAMAGE.torso && ZONE_DAMAGE.torso > ZONE_DAMAGE.arm;
+});
+TEST_SUITE.run('An arm hit disarms a guard and takes him out of the fight', function () {
+  var e = null;
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    if (ENEMIES.list[i].state !== 'DEAD' && ENEMIES.list[i].kind !== 'scientist' && ENEMIES.list[i].gun) { e = ENEMIES.list[i]; break; }
+  }
+  if (!e) return false;
+  var wasCombatant = e.isCombatant();
+  e.takeDamage(1, PLAYER.pos, 'arm');
+  var disarmed = e.disarmed && !e.gun && !!e.droppedGun && e.droppedGun.parent === RENDER.scene;
+  var out = wasCombatant && disarmed && !e.isCombatant();
+  // the roster is rebuilt on every mission start, which puts the rifle back
+  return out;
+});
+TEST_SUITE.run('The alarm needs a guard to reach a working panel', function () {
+  if (!LEVEL.panels || !LEVEL.panels.length) return false;
+  var savedAlarm = GAME.alarm, savedRunner = ENEMIES.runnerActive;
+  // with every panel cut there is nothing to run to, so nobody can call it in
+  var states = [];
+  for (var i = 0; i < LEVEL.panels.length; i++) { states.push(LEVEL.panels[i].alive); LEVEL.panels[i].alive = false; }
+  var noneLeft = nearestLivePanel(PLAYER.pos) === null;
+  LEVEL.panels[0].alive = true;
+  var findsOne = nearestLivePanel(PLAYER.pos) === LEVEL.panels[0];
+  for (i = 0; i < LEVEL.panels.length; i++) LEVEL.panels[i].alive = states[i];
+  GAME.alarm = savedAlarm; ENEMIES.runnerActive = savedRunner;
+  return noneLeft && findsOne;
+});
+TEST_SUITE.run('Objectives scale with the difficulty tier', function () {
+  var saved = GAME.difficulty;
+  GAME.difficulty = 0; var agent = activeObjectives().length;
+  GAME.difficulty = 1; var secret = activeObjectives().length;
+  GAME.difficulty = 2; var oo = activeObjectives().length;
+  // the exit is always the last line of the list, whatever the tier
+  var lastIsExit = activeObjectives()[oo - 1].id === 'escape';
+  GAME.difficulty = saved;
+  return agent === 2 && secret === 3 && oo === 4 && lastIsExit;
+});
+TEST_SUITE.run('A constraint objective can be failed outright', function () {
+  var saved = GAME.difficulty, savedKills = GAME.sciKills;
+  GAME.difficulty = 2;
+  GAME.sciKills = 0;
+  var staff = null, list = activeObjectives();
+  for (var i = 0; i < list.length; i++) if (list[i].id === 'staff') staff = list[i];
+  var okClean = staff && staff.done() && !staff.failed();
+  GAME.sciKills = 1;
+  var failsDirty = !staff.done() && staff.failed() && !fieldObjectivesMet();
+  GAME.sciKills = savedKills; GAME.difficulty = saved;
+  return okClean && failsDirty;
+});
 TEST_SUITE.run('Adaptive quality ignores warm-up, survives a stall, and recovers', function () {
   var savedStage = GFX.stage, savedGood = GFX.goodWindows, savedIdx = GFX.sampleIdx,
       savedScale = RENDER.renderScale, savedFrames = GAME.frameCount, savedState = GAME.state;
@@ -6587,6 +7004,8 @@ function startMission() {
   GAME.elapsed = 0;
   GAME.alarm = false; GAME.alarmAt = 0; GAME.kills = 0; GAME.bodies = 0;
   GAME.objectives.terminal = false; GAME.objectives.escaped = false;
+  GAME.objectives.stockpile = false; GAME.sciKills = 0;
+  hudRebuildObjectives();
   GAME.noise = null;
   setAlarmLoop(false);
   RENDER.alarmMix = 0;
@@ -6620,6 +7039,25 @@ function startMission() {
     WEAPONS.mines.splice(i, 1);
   }
   for (i = 0; i < WEAPONS.impactPool.length; i++) { WEAPONS.impactPool[i].life = 0; WEAPONS.impactPool[i].mesh.visible = false; }
+
+  // reset the stockpile
+  if (LEVEL.tanks) {
+    for (i = 0; i < LEVEL.tanks.length; i++) {
+      LEVEL.tanks[i].intact = true;
+      LEVEL.tanks[i].gauge.material = MAT.ledGreen;
+    }
+  }
+
+  // reset alarm panels and whoever was running for one
+  ENEMIES.runnerActive = null;
+  if (LEVEL.panels) {
+    for (i = 0; i < LEVEL.panels.length; i++) {
+      var pn = LEVEL.panels[i];
+      pn.alive = true;
+      pn.led.material = MAT.ledRed;
+      pn.mesh.material = MAT.metalDark;
+    }
+  }
 
   // reset terminal + doors
   LEVEL.terminal.used = false;
@@ -6663,7 +7101,11 @@ function endMission(won, reason) {
     ? (GAME.alarm ? 'Out with the archive, but Blackgate logged the intrusion.'
                   : 'Out with the archive and no alarm on record. Textbook.')
     : (reason === 'killed' ? 'The garrison put you down inside the facility.' : 'Mission aborted.');
-  document.getElementById('endObjA').textContent = GAME.objectives.terminal ? 'Yes' : 'No';
+  var objSummary = [], ol = activeObjectives();
+  for (var oi = 0; oi < ol.length; oi++) {
+    objSummary.push(ol[oi].letter + ': ' + (ol[oi].done() ? 'Yes' : 'No'));
+  }
+  document.getElementById('endObjA').textContent = objSummary.join('  ');
   document.getElementById('endAlarm').textContent = GAME.alarm ? 'Yes' : 'No';
   document.getElementById('endKills').textContent = String(GAME.kills);
   document.getElementById('endAcc').textContent = acc + '%';
@@ -6693,6 +7135,26 @@ function resumeGame() {
   GAME.lastTime = performance.now();
   showScreen(null);
   hudShow(true);
+}
+
+/* The briefing is written from the same objective table the HUD reads, so a
+   player choosing 00 Agent is told what the extra two objectives are before
+   committing rather than discovering them in the field. */
+function renderBriefing() {
+  var host = document.getElementById('briefObjectives');
+  if (!host) return;
+  while (host.firstChild) host.removeChild(host.firstChild);
+  var list = activeObjectives();
+  for (var i = 0; i < list.length; i++) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    var h = document.createElement('h3');
+    h.textContent = 'Objective ' + list[i].letter;
+    var para = document.createElement('p');
+    para.textContent = list[i].brief;
+    card.appendChild(h); card.appendChild(para);
+    host.appendChild(card);
+  }
 }
 
 function showScreen(id) {
@@ -6761,7 +7223,11 @@ function bindUI() {
   on('btnFatalReload', function () { try { location.reload(); } catch (e) {} });
 
   var diff = document.getElementById('selDiff');
-  if (diff) diff.addEventListener('change', function () { GAME.difficulty = clamp(parseInt(diff.value, 10) || 1, 0, 2); }, false);
+  if (diff) diff.addEventListener('change', function () {
+    GAME.difficulty = clamp(parseInt(diff.value, 10) || 1, 0, 2);
+    renderBriefing();      // the tier decides the objective list, so show it
+  }, false);
+  renderBriefing();
 
   var sens = document.getElementById('rngSens');
   if (sens) sens.addEventListener('input', function () { INPUT.sensitivity = clamp(parseInt(sens.value, 10) / 100, 0.2, 3); }, false);

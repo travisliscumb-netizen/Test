@@ -50,6 +50,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #objText{font-size:12px;line-height:1.55;color:var(--ink);margin-top:4px}
 #objText b{color:var(--amber);font-weight:600}
 #objText .done{color:var(--green);text-decoration:line-through;opacity:.75}
+/* a constraint objective can be lost outright; that has to read as failed,
+   not as merely outstanding */
+#objText .failed{color:var(--red);text-decoration:line-through;opacity:.9}
 #alertBox{position:absolute;left:50%;top:calc(var(--safe-t) + 16px);transform:translateX(-50%);
   font-size:13px;letter-spacing:.24em;color:var(--red);font-weight:700;opacity:0;transition:opacity .25s;
   text-shadow:0 0 10px rgba(255,45,60,.7);white-space:nowrap}
@@ -193,10 +196,10 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <div class="card"><h3>Situation</h3><p>Blackgate processes and stores nerve agent under a research cover.
       Its garrison is small but disciplined, and the plant floor has enough pressurised stock to make a firefight
       a poor idea.</p></div>
-    <div class="card"><h3>Objective A</h3><p>Reach the control room and download the research archive from the terminal.</p></div>
-    <div class="card"><h3>Objective B</h3><p>Exit through the chemical plant. The exit stays sealed until the archive is yours.</p></div>
-    <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors and will call the alarm on sight.
-      Lab staff are unarmed &#8212; they run, and they raise the alarm too. Shots are loud; the suppressed PP7 is not.</p></div>
+    <div id="briefObjectives"></div>
+    <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors. A guard who spots you breaks for the nearest
+      wall panel to call the alarm in &#8212; drop him before he reaches it, or shoot the panels out first and the
+      garrison never hears a thing. Lab staff are unarmed and run. Shots are loud; the suppressed PP7 is not.</p></div>
     <div class="row"><label>Difficulty</label>
       <select id="selDiff" style="background:#182232;color:#e8eef6;border:1px solid rgba(159,176,196,.3);padding:9px;font-family:inherit;font-size:12px;min-height:40px">
         <option value="0">Agent</option><option value="1" selected>Secret Agent</option><option value="2">00 Agent</option>
