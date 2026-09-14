@@ -807,7 +807,9 @@ function drawModal(){
       {fill: gameState.settings.sound ? C.green : C.slate, color:C.cream});
     button('m_reset', x + 24, y + 114, w - 48, 50, 'Reset all progress', {fill:C.red, color:C.cream});
     Twrap('A fan rebuild of Math Circus: Act 1 (1993). Not affiliated with the original publishers. Progress is stored on this device only.',
-      x + w / 2, y + 186, w - 44, 16, {size:12, weight:600, color:C.slate});
+      x + w / 2, y + 180, w - 44, 16, {size:12, weight:600, color:C.slate});
+    T('Offline cache: ' + (SW_STATUS.ok ? 'ready' : 'not available here'),
+      x + w / 2, y + 222, {size:11.5, weight:800, color: SW_STATUS.ok ? C.green : C.slate});
     button('m_close2', x + 24, y + 234, w - 48, 44, 'Close', {fill:C.creamDark, color:C.navy});
   }
   else if (modal.kind === 'confirm'){
@@ -2371,19 +2373,951 @@ GAMES.tickets = {
   }
 };
 
+
+/* ===========================================================================
+   GAME 9 - ELEPHANT MEDICINE  (measurement / jug puzzle)
+   ========================================================================= */
+/* Breadth-first search over container states. Ops: fill from the barrel,
+   empty into the drain, pour one cup into another. */
+function jugSearch(caps){
+  const start = caps.map(() => 0);
+  const key = v => v.join(',');
+  const dist = new Map([[key(start), 0]]);
+  let frontier = [start];
+  while (frontier.length){
+    const next = [];
+    for (const st of frontier){
+      const d = dist.get(key(st));
+      const moves = [];
+      for (let i = 0; i < caps.length; i++){
+        if (st[i] < caps[i]){ const n = st.slice(); n[i] = caps[i]; moves.push(n); }
+        if (st[i] > 0){ const n = st.slice(); n[i] = 0; moves.push(n); }
+        for (let j = 0; j < caps.length; j++){
+          if (i === j || st[i] === 0 || st[j] === caps[j]) continue;
+          const amt = Math.min(st[i], caps[j] - st[j]);
+          const n = st.slice(); n[i] -= amt; n[j] += amt; moves.push(n);
+        }
+      }
+      for (const n of moves){
+        const k = key(n);
+        if (!dist.has(k)){ dist.set(k, d + 1); next.push(n); }
+      }
+    }
+    frontier = next;
+  }
+  const best = new Map();
+  for (const [k, d] of dist){
+    for (const v of k.split(',').map(Number)){
+      if (v > 0 && (!best.has(v) || best.get(v) > d)) best.set(v, d);
+    }
+  }
+  return best;
+}
+function genElephant(diff){
+  const conf = {easy:{pool:[3, 4, 5, 6], n:2, ops:[2, 2]},
+                medium:{pool:[2, 3, 4, 5, 6, 7, 8], n:3, ops:[3, 4]},
+                hard:{pool:[3, 5, 7, 8, 9, 11, 12], n:3, ops:[4, 6]}}[diff];
+  for (let a = 0; a < 300; a++){
+    const caps = shuffle(conf.pool.slice()).slice(0, conf.n).sort((x, y) => x - y);
+    if (new Set(caps).size !== caps.length) continue;
+    const best = jugSearch(caps);
+    const targets = [];
+    for (const [t, d] of best){
+      if (caps.indexOf(t) >= 0) continue;                 /* a plain fill is no puzzle */
+      if (d >= conf.ops[0] && d <= conf.ops[1]) targets.push({t, d});
+    }
+    if (!targets.length) continue;
+    const pickT = pickOne(targets);
+    return {caps, target:pickT.t, minOps:pickT.d};
+  }
+  return {caps:[3, 5], target:4, minOps:6};
+}
+GAMES.elephant = {
+  name:'Elephant Medicine', short:'Elephant', skill:'Measuring & division',
+  desc:'Measure an exact dose using only the cups you have. Tap a cup to pick it up, then tap where it pours.',
+  create(diff){
+    const puz = genElephant(diff);
+    const caps = puz.caps;
+    const vols = caps.map(() => 0);
+    let sel = null, pours = 0, note = '', noteT = 0, preMiss = 0;
+    let phase = diff === 'easy' ? 'pour' : 'dose';
+    let ratio = 0, weight = 0, doseOptions = [];
+    if (phase === 'dose'){
+      ratio = pickOne([100, 150, 200, 250]);
+      weight = diff === 'hard'
+        ? puz.target * ratio + rndI(1, Math.floor(ratio / 2) - 1)
+        : puz.target * ratio;
+      const set = [puz.target];
+      for (const d of shuffle([1, -1, 2, -2, 3])){
+        const v = puz.target + d;
+        if (v > 0 && set.indexOf(v) < 0) set.push(v);
+        if (set.length === 4) break;
+      }
+      doseOptions = shuffle(set);
+    }
+    function win(){
+      const base = pours <= puz.minOps ? 3 : pours <= puz.minOps + 2 ? 2 : 1;
+      const stars = Math.max(1, base - (preMiss ? 1 : 0));
+      finishGame(stars, pours, 'Exactly ' + puz.target + ' ml in ' + pours + ' pour' +
+        (pours === 1 ? '' : 's') + ' (best possible: ' + puz.minOps + ').');
+    }
+    function act(kind, i, j){
+      if (kind === 'fill') vols[i] = caps[i];
+      else if (kind === 'empty') vols[i] = 0;
+      else {
+        const amt = Math.min(vols[i], caps[j] - vols[j]);
+        vols[i] -= amt; vols[j] += amt;
+      }
+      pours++; Sfx.pop();
+      if (vols.some(v => v === puz.target)) win();
+    }
+    const geo = () => {
+      const top = 53 + 13 + 3 * 17;
+      const rowY = Math.max(top + 150, V.h - 250);
+      return {top, rowY};
+    };
+    return {
+      debug(){ return {phase, caps:caps.slice(), vols:vols.slice(), target:puz.target,
+                       minOps:puz.minOps, pours, sel, preMiss,
+                       doseOptions:doseOptions.slice(), ratio, weight,
+                       doseAnswer:puz.target}; },
+      hudNote(){ return phase === 'dose' ? 'Work out the dose'
+        : 'Need ' + puz.target + ' ml  ·  pours ' + pours; },
+      update(dt){ if (noteT > 0) noteT -= dt; },
+      draw(){
+        const g = ctx, G = geo();
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        sawdustFloor(V.h - 40);
+        /* elephant patient */
+        const ex = 64, ey = G.top + 60;
+        ICONS.elephant(ex, ey, 34);
+        if (phase === 'dose'){
+          instr('Work out the dose before you measure it.');
+          panel(8, G.top + 118, V.w - 16, 86, {fill:C.navy, stroke:C.gold, r:12, lw:2});
+          T('This elephant weighs ' + weight + ' kg.', V.w / 2, G.top + 140,
+            {size:14, weight:800, color:C.cream, num:true});
+          T('Give 1 ml for every ' + ratio + ' kg.', V.w / 2, G.top + 164,
+            {size:14, weight:800, color:C.cream, num:true});
+          T(diff === 'hard' ? 'Round to the nearest whole ml.' : 'How many ml is that?',
+            V.w / 2, G.top + 188, {size:12.5, weight:700, color:C.goldLight});
+          const ow = 150, oh = 58, gp = 10, ox0 = (V.w - (2 * ow + gp)) / 2, oy = G.top + 216;
+          for (let i = 0; i < doseOptions.length; i++){
+            const col = i % 2, row = (i / 2) | 0;
+            button('d' + i, ox0 + col * (ow + gp), oy + row * (oh + gp), ow, oh,
+              doseOptions[i] + ' ml', {fill:C.white, color:C.navy, size:20, num:true});
+          }
+        } else {
+          instr('Pour between the cups until one holds exactly ' + puz.target + ' ml.');
+          panel(V.w - 150, G.top + 20, 140, 54, {fill:C.gold, stroke:C.navy, r:12, lw:2});
+          T('DOSE NEEDED', V.w - 80, G.top + 36, {size:10.5, weight:800, color:C.ink});
+          T(puz.target + ' ml', V.w - 80, G.top + 58, {size:22, weight:800, color:C.ink, num:true});
+          /* barrel */
+          const bx = 40, by = G.rowY;
+          reg('barrel', bx - 32, by - 74, 64, 100, {});
+          g.fillStyle = sel === 'barrel' ? C.gold : '#8A5A2B';
+          rr(g, bx - 26, by - 62, 52, 78, 10); g.fill();
+          g.strokeStyle = C.navy; g.lineWidth = 2.5; g.stroke();
+          g.fillStyle = C.navy;
+          g.fillRect(bx - 28, by - 44, 56, 5); g.fillRect(bx - 28, by - 10, 56, 5);
+          T('BARREL', bx, by + 28, {size:10.5, weight:800, color:C.navy});
+          /* cups */
+          const cw = 62, gap = (V.w - 150 - caps.length * cw) / (caps.length + 1);
+          for (let i = 0; i < caps.length; i++){
+            const x = 92 + gap + i * (cw + gap), yTop = G.rowY - 92, h = 104;
+            reg('c' + i, x - 4, yTop - 6, cw + 8, h + 34, {});
+            const frac = vols[i] / caps[i];
+            g.save(); g.beginPath();
+            g.moveTo(x, yTop); g.lineTo(x + cw, yTop);
+            g.lineTo(x + cw - 6, yTop + h); g.lineTo(x + 6, yTop + h); g.closePath();
+            g.clip();
+            g.fillStyle = C.white; g.fillRect(x - 4, yTop - 4, cw + 8, h + 8);
+            g.fillStyle = vols[i] === puz.target ? C.green : '#5BB6E8';
+            g.fillRect(x - 4, yTop + h * (1 - frac), cw + 8, h * frac + 4);
+            g.restore();
+            g.strokeStyle = sel === i ? C.gold : C.navy; g.lineWidth = sel === i ? 4 : 2.5;
+            g.beginPath();
+            g.moveTo(x, yTop); g.lineTo(x + cw, yTop);
+            g.lineTo(x + cw - 6, yTop + h); g.lineTo(x + 6, yTop + h); g.closePath();
+            g.stroke();
+            for (let m = 1; m < caps[i]; m++){
+              const my = yTop + h * (1 - m / caps[i]);
+              g.strokeStyle = 'rgba(18,32,58,.35)'; g.lineWidth = 1;
+              g.beginPath(); g.moveTo(x + 4, my); g.lineTo(x + 16, my); g.stroke();
+            }
+            T(vols[i] + ' / ' + caps[i], x + cw / 2, yTop + h + 16,
+              {size:12.5, weight:800, color:C.navy, num:true});
+            T('ml', x + cw / 2, yTop + h + 30, {size:10, weight:700, color:C.slate});
+          }
+          /* drain */
+          const dx = V.w - 44;
+          reg('drain', dx - 34, G.rowY - 70, 68, 96, {});
+          g.fillStyle = sel !== null && sel !== 'barrel' ? C.red : C.slate;
+          rr(g, dx - 26, G.rowY - 40, 52, 44, 8); g.fill();
+          g.strokeStyle = C.navy; g.lineWidth = 2.5; g.stroke();
+          g.fillStyle = C.cream;
+          for (let i = 0; i < 3; i++) g.fillRect(dx - 16 + i * 12, G.rowY - 28, 6, 24);
+          T('DRAIN', dx, G.rowY + 16, {size:10.5, weight:800, color:C.navy});
+          T(sel === null ? 'Tap a cup or the barrel to pick it up'
+            : sel === 'barrel' ? 'Now tap the cup to fill' : 'Now tap where it pours (or the drain)',
+            V.w / 2, G.rowY + 60, {size:12.5, weight:800, color:C.slate});
+        }
+        if (noteT > 0){
+          panel(16, V.h - 56, V.w - 32, 42, {fill:C.red, stroke:C.navy, r:10, lw:2});
+          Twrap(note, V.w / 2, V.h - 42, V.w - 50, 15, {size:12.5, weight:700, color:C.cream});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed) return;
+        const id = hit.id;
+        if (phase === 'dose'){
+          if (id[0] !== 'd') return;
+          const v = doseOptions[parseInt(id.slice(1), 10)];
+          if (v === puz.target){ Sfx.good(); phase = 'pour'; }
+          else { Sfx.bad(); preMiss++; note = 'Not quite - divide the weight by ' + ratio + '.'; noteT = 3; }
+          return;
+        }
+        if (id === 'barrel'){ sel = sel === 'barrel' ? null : 'barrel'; Sfx.click(); return; }
+        if (id === 'drain'){
+          if (sel === null || sel === 'barrel'){ sel = null; return; }
+          if (vols[sel] === 0){ sel = null; return; }
+          act('empty', sel); sel = null; return;
+        }
+        if (id[0] === 'c'){
+          const i = parseInt(id.slice(1), 10);
+          if (sel === null){ sel = i; Sfx.click(); return; }
+          if (sel === 'barrel'){
+            if (vols[i] === caps[i]){ note = 'That cup is already full.'; noteT = 2; sel = null; return; }
+            act('fill', i); sel = null; return;
+          }
+          if (sel === i){ sel = null; return; }
+          if (vols[sel] === 0){ note = 'That cup is empty - nothing to pour.'; noteT = 2; sel = null; return; }
+          if (vols[i] === caps[i]){ note = 'No room in that cup.'; noteT = 2; sel = null; return; }
+          act('pour', sel, i); sel = null;
+        }
+      }
+    };
+  }
+};
+
+/* ===========================================================================
+   GAME 10 - SCAFFOLDING BOLTS  (coordinate geometry)
+   ========================================================================= */
+function genBolts(diff){
+  if (diff === 'easy'){
+    const size = 5;
+    const target = {x:rndI(1, size), y:rndI(1, size)};
+    const shown = [];
+    while (shown.length < 4){
+      const p = {x:rndI(1, size), y:rndI(1, size)};
+      if ((p.x === target.x && p.y === target.y) || shown.some(q => q.x === p.x && q.y === p.y)) continue;
+      shown.push(p);
+    }
+    return {size, shown, missing:[target], columns:[],
+            prompt:'Put the missing bolt at (' + target.x + ', ' + target.y + ').'};
+  }
+  if (diff === 'medium'){
+    const size = 8;
+    for (let a = 0; a < 400; a++){
+      const m = pickOne([1, 1, 2, -1]), b = rndI(-2, 6);
+      const pts = [];
+      for (let x = 1; x <= 5; x++){
+        const y = m * x + b;
+        if (y < 1 || y > size) { pts.length = 0; break; }
+        pts.push({x, y});
+      }
+      if (pts.length !== 5) continue;
+      const hideAt = rndI(1, 3);                       /* never an end point */
+      const missing = [pts[hideAt]];
+      const shown = pts.filter((_, i) => i !== hideAt);
+      return {size, shown, missing, columns:[missing[0].x],
+              prompt:'The bolts follow a straight line. Where does the missing one go?'};
+    }
+  }
+  const size = 10;
+  const S = rndI(6, 11);
+  const pts = [];
+  for (let x = 1; x <= size; x++){
+    const y = S - x;
+    if (y >= 1 && y <= size) pts.push({x, y});
+  }
+  const idxs = shuffle(pts.map((_, i) => i)).slice(0, 2);
+  const missing = idxs.map(i => pts[i]);
+  const shown = pts.filter((_, i) => idxs.indexOf(i) < 0);
+  return {size, shown, missing, columns:missing.map(p => p.x),
+          prompt:'Every bolt on this brace obeys one rule. Two are missing.'};
+}
+GAMES.bolts = {
+  name:'Scaffolding Bolts', short:'Bolts', skill:'Coordinates',
+  desc:'Read the grid, work out where the missing bolt belongs, line up the cursor and fix it in place.',
+  create(diff){
+    const puz = genBolts(diff);
+    const need = puz.missing.length;
+    let cursor = null, taps = 0, found = [], note = '', noteT = 0;
+    const geo = () => {
+      const top = 53 + 13 + 2 * 17 + 8;
+      const btnY = V.h - 66;
+      const avail = Math.min(V.w - 44, btnY - 40 - top);
+      const cell = Math.floor(avail / puz.size);
+      const gw = cell * puz.size;
+      return {top, btnY, cell, gw, x0:(V.w - gw) / 2 + 12, y0:top + 26};
+    };
+    const cellAt = (gx, gy) => {
+      const G = geo();
+      return {x:G.x0 + (gx - 1) * G.cell, y:G.y0 + (puz.size - gy) * G.cell, s:G.cell};
+    };
+    function place(){
+      if (!cursor) return;
+      taps++;
+      const m = puz.missing.find(p => p.x === cursor.x && p.y === cursor.y);
+      const already = found.some(p => p.x === cursor.x && p.y === cursor.y);
+      if (m && !already){
+        found.push({x:cursor.x, y:cursor.y}); Sfx.good(); cursor = null;
+        if (found.length === need){
+          const stars = taps === need ? 3 : taps <= need + 1 ? 2 : 1;
+          finishGame(stars, taps, need === 1 ? 'Bolt placed with ' + taps + ' attempt' + (taps === 1 ? '' : 's') + '.'
+            : 'Both bolts placed in ' + taps + ' attempts.');
+        }
+        return;
+      }
+      Sfx.bad();
+      note = already ? 'There is already a bolt there.'
+                     : 'No hole at (' + cursor.x + ', ' + cursor.y + ') - look at the pattern again.';
+      noteT = 2.6;
+    }
+    return {
+      debug(){ const G = geo();
+        return {size:puz.size, missing:puz.missing.map(p => ({x:p.x, y:p.y})),
+                shown:puz.shown.length, taps, found:found.slice(), cursor,
+                columns:puz.columns.slice(), need, geo:{x0:G.x0, y0:G.y0, cell:G.cell}}; },
+      hudNote(){ return 'Bolts ' + found.length + '/' + need + '  ·  tries ' + taps; },
+      update(dt){ if (noteT > 0) noteT -= dt; },
+      draw(){
+        const g = ctx, G = geo();
+        g.fillStyle = '#EDF2F6'; g.fillRect(0, 0, V.w, V.h);
+        instr(puz.prompt);
+        /* scaffold poles behind the grid */
+        g.fillStyle = '#B8C2CC';
+        for (let i = 0; i <= puz.size; i += 2)
+          g.fillRect(G.x0 + i * G.cell - 3, G.y0, 6, G.cell * puz.size);
+        /* highlighted columns */
+        for (const cxn of puz.columns){
+          g.fillStyle = 'rgba(242,183,5,.28)';
+          g.fillRect(G.x0 + (cxn - 1) * G.cell, G.y0, G.cell, G.cell * puz.size);
+        }
+        /* grid */
+        g.strokeStyle = 'rgba(18,32,58,.45)'; g.lineWidth = 1;
+        for (let i = 0; i <= puz.size; i++){
+          g.beginPath(); g.moveTo(G.x0 + i * G.cell, G.y0); g.lineTo(G.x0 + i * G.cell, G.y0 + G.cell * puz.size); g.stroke();
+          g.beginPath(); g.moveTo(G.x0, G.y0 + i * G.cell); g.lineTo(G.x0 + G.cell * puz.size, G.y0 + i * G.cell); g.stroke();
+        }
+        /* axis labels */
+        const lab = G.cell < 30 ? 9 : 11;
+        for (let i = 1; i <= puz.size; i++){
+          T(String(i), G.x0 + (i - 0.5) * G.cell, G.y0 + G.cell * puz.size + 11,
+            {size:lab, weight:800, color:C.navy, num:true});
+          T(String(i), G.x0 - 9, G.y0 + (puz.size - i + 0.5) * G.cell,
+            {size:lab, weight:800, color:C.navy, num:true});
+        }
+        T('x', G.x0 + G.cell * puz.size + 8, G.y0 + G.cell * puz.size + 11, {size:11, weight:800, color:C.red});
+        T('y', G.x0 - 9, G.y0 - 10, {size:11, weight:800, color:C.red});
+        /* bolts */
+        const bolt = (p, col) => {
+          const c = cellAt(p.x, p.y);
+          g.fillStyle = col;
+          g.beginPath(); g.arc(c.x + c.s / 2, c.y + c.s / 2, Math.max(5, c.s * 0.26), 0, 7); g.fill();
+          g.lineWidth = 2; g.strokeStyle = C.navy; g.stroke();
+        };
+        for (const p of puz.shown) bolt(p, C.slate);
+        for (const p of found) bolt(p, C.green);
+        /* empty holes for the ones still missing */
+        for (const p of puz.missing){
+          if (found.some(f => f.x === p.x && f.y === p.y)) continue;
+          const c = cellAt(p.x, p.y);
+          g.strokeStyle = 'rgba(18,32,58,.25)'; g.lineWidth = 2; g.setLineDash([3, 3]);
+          g.beginPath(); g.arc(c.x + c.s / 2, c.y + c.s / 2, Math.max(5, c.s * 0.26), 0, 7); g.stroke();
+          g.setLineDash([]);
+        }
+        /* tap surface + cursor */
+        reg('grid', G.x0, G.y0, G.cell * puz.size, G.cell * puz.size, {});
+        if (cursor){
+          const c = cellAt(cursor.x, cursor.y);
+          g.strokeStyle = C.red; g.lineWidth = 3;
+          g.strokeRect(c.x + 2, c.y + 2, c.s - 4, c.s - 4);
+          g.fillStyle = 'rgba(196,30,58,.18)';
+          g.fillRect(c.x + 2, c.y + 2, c.s - 4, c.s - 4);
+        }
+        badge(12, G.btnY - 4, 92, 50, 'CURSOR', cursor ? '(' + cursor.x + ', ' + cursor.y + ')' : '--',
+          {size:15});
+        button('place', 112, G.btnY - 4, V.w - 126, 50,
+          cursor ? 'PLACE BOLT' : 'TAP THE GRID', {fill: cursor ? C.gold : C.creamDark,
+          color: cursor ? C.ink : C.slate, disabled:!cursor, size:17});
+        if (noteT > 0){
+          panel(16, G.btnY - 62, V.w - 32, 40, {fill:C.red, stroke:C.navy, r:10, lw:2});
+          Twrap(note, V.w / 2, G.btnY - 48, V.w - 50, 15, {size:12.5, weight:700, color:C.cream});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed) return;
+        if (hit.id === 'grid'){
+          const G = geo();
+          const gx = Math.floor((p.x - G.x0) / G.cell) + 1;
+          const gy = puz.size - Math.floor((p.y - G.y0) / G.cell);
+          if (gx < 1 || gx > puz.size || gy < 1 || gy > puz.size) return;
+          cursor = {x:gx, y:gy}; Sfx.click();
+          return;
+        }
+        if (hit.id === 'place' && !hit.disabled) place();
+      }
+    };
+  }
+};
+
+
+/* ===========================================================================
+   GAME 11 - CLOWN FORMATION  (sequencing / directional logic)
+   ========================================================================= */
+const DIRS = [{x:0, y:-1, n:'Up'}, {x:1, y:0, n:'Right'}, {x:0, y:1, n:'Down'}, {x:-1, y:0, n:'Left'}];
+const CLOWN_COLS = ['#C41E3A', '#2F6FB5', '#2E9E5B', '#6B4BA8', '#E8821E'];
+/* One simultaneous step. cmds[i] is a direction index or null (that clown waits).
+   Walking into a wall leaves a clown where it is; sharing a square or swapping
+   squares is a pile-up. */
+function clownStep(pos, cmds, faces, size, rotate){
+  const next = pos.map((p, i) => {
+    const c = cmds[i];
+    if (c === null || c === undefined) return {x:p.x, y:p.y};
+    const d = DIRS[rotate ? (c + faces[i]) % 4 : c];
+    const nx = p.x + d.x, ny = p.y + d.y;
+    if (nx < 0 || ny < 0 || nx >= size || ny >= size) return {x:p.x, y:p.y};
+    return {x:nx, y:ny};
+  });
+  for (let i = 0; i < next.length; i++){
+    for (let j = i + 1; j < next.length; j++){
+      if (next[i].x === next[j].x && next[i].y === next[j].y) return null;
+      if (next[i].x === pos[j].x && next[i].y === pos[j].y &&
+          next[j].x === pos[i].x && next[j].y === pos[i].y) return null;
+    }
+  }
+  return next;
+}
+function manhattanPath(from, to, xFirst){
+  const out = [];
+  const stepsX = to.x - from.x, stepsY = to.y - from.y;
+  const xs = () => { for (let i = 0; i < Math.abs(stepsX); i++) out.push(stepsX > 0 ? 1 : 3); };
+  const ys = () => { for (let i = 0; i < Math.abs(stepsY); i++) out.push(stepsY > 0 ? 2 : 0); };
+  if (xFirst){ xs(); ys(); } else { ys(); xs(); }
+  return out;
+}
+function genClowns(diff){
+  if (diff === 'easy'){
+    const size = 2;
+    const start = {x:rndI(0, 1), y:rndI(0, 1)};
+    let target = {x:rndI(0, 1), y:rndI(0, 1)};
+    while (target.x === start.x && target.y === start.y) target = {x:rndI(0, 1), y:rndI(0, 1)};
+    return {size, shared:false, starts:[start], targets:[target], faces:[0],
+            min:Math.abs(target.x - start.x) + Math.abs(target.y - start.y)};
+  }
+  if (diff === 'medium'){
+    const size = 4, n = 3;
+    for (let a = 0; a < 800; a++){
+      const cells = shuffle(Array.from({length:size * size}, (_, i) => ({x:i % size, y:(i / size) | 0})));
+      const starts = cells.slice(0, n), targets = shuffle(cells.slice()).slice(0, n);
+      const dists = starts.map((s, i) => Math.abs(targets[i].x - s.x) + Math.abs(targets[i].y - s.y));
+      if (dists.some(d => d < 1 || d > 4)) continue;
+      if (targets.some((t, i) => targets.some((u, j) => j !== i && u.x === t.x && u.y === t.y))) continue;
+      /* a collision-free optimal run must exist, or three stars is unreachable */
+      let ok = false;
+      for (let mask = 0; mask < 8 && !ok; mask++){
+        const qs = starts.map((s, i) => manhattanPath(s, targets[i], !!(mask & (1 << i))));
+        const len = Math.max(...qs.map(q => q.length));
+        let pos = starts.map(p => ({x:p.x, y:p.y})), good = true;
+        for (let st = 0; st < len; st++){
+          const cmds = qs.map(q => st < q.length ? q[st] : null);
+          pos = clownStep(pos, cmds, [0, 0, 0], size, false);
+          if (!pos){ good = false; break; }
+        }
+        if (good && pos.every((p, i) => p.x === targets[i].x && p.y === targets[i].y)) ok = true;
+      }
+      if (!ok) continue;
+      return {size, shared:false, starts, targets, faces:[0, 0, 0],
+              min:dists.reduce((a2, b) => a2 + b, 0)};
+    }
+  }
+  const size = 5, n = 5;
+  for (let a = 0; a < 800; a++){
+    const cells = shuffle(Array.from({length:size * size}, (_, i) => ({x:i % size, y:(i / size) | 0})));
+    const starts = cells.slice(0, n);
+    const faces = starts.map(() => rndI(0, 3));
+    const len = rndI(3, 4);
+    let pos = starts.map(p => ({x:p.x, y:p.y}));
+    const seq = [];
+    let good = true;
+    for (let s = 0; s < len; s++){
+      const c = rndI(0, 3);
+      const nxt = clownStep(pos, starts.map(() => c), faces, size, true);
+      if (!nxt){ good = false; break; }
+      seq.push(c); pos = nxt;
+    }
+    if (!good) continue;
+    if (pos.every((p, i) => p.x === starts[i].x && p.y === starts[i].y)) continue;
+    const targets = pos;
+    const min = bfsShared(starts, targets, faces, size, len);
+    if (!min) continue;
+    return {size, shared:true, starts, targets, faces, min};
+  }
+  return {size:5, shared:true, starts:[{x:0, y:0}], targets:[{x:1, y:0}], faces:[1], min:1};
+}
+/* Shortest shared command sequence that lands every clown on its target. */
+function bfsShared(starts, targets, faces, size, maxDepth){
+  const key = pos => pos.map(p => p.x + ',' + p.y).join(';');
+  const goal = key(targets);
+  let frontier = [starts.map(p => ({x:p.x, y:p.y}))];
+  const seen = new Set([key(starts)]);
+  for (let depth = 1; depth <= maxDepth + 2; depth++){
+    const next = [];
+    for (const pos of frontier){
+      for (let c = 0; c < 4; c++){
+        const n = clownStep(pos, pos.map(() => c), faces, size, true);
+        if (!n) continue;
+        const k = key(n);
+        if (k === goal) return depth;
+        if (seen.has(k)) continue;
+        seen.add(k); next.push(n);
+      }
+    }
+    if (!next.length) return 0;
+    frontier = next;
+  }
+  return 0;
+}
+GAMES.clowns = {
+  name:'Clown Formation', short:'Clowns', skill:'Sequencing directions',
+  desc:'Build a list of moves, then send the clowns off. Every clown must finish on its own marked tile.',
+  create(diff){
+    const puz = genClowns(diff);
+    const n = puz.starts.length;
+    let pos = puz.starts.map(p => ({x:p.x, y:p.y}));
+    let prev = pos.map(p => ({x:p.x, y:p.y}));
+    const queues = puz.shared ? [[]] : puz.starts.map(() => []);
+    let sel = 0, running = false, stepI = 0, stepT = 0, attempts = 1;
+    let note = '', noteT = 0, shake = 0, usedOnWin = 0;
+    const qOf = i => puz.shared ? queues[0] : queues[i];
+    const totalCmds = () => puz.shared ? queues[0].length : queues.reduce((a, q) => a + q.length, 0);
+    const runLen = () => puz.shared ? queues[0].length : Math.max(0, ...queues.map(q => q.length));
+    const geo = () => {
+      const top = 53 + 13 + 2 * 17 + 6;
+      const padY = V.h - 232;
+      const size = Math.min(V.w - 60, padY - top - 30);
+      return {top, padY, board:size, x0:(V.w - size) / 2, y0:top + 14, cell:size / puz.size};
+    };
+    function start(){
+      if (running || totalCmds() === 0) return;
+      running = true; stepI = 0; stepT = 0;
+      pos = puz.starts.map(p => ({x:p.x, y:p.y}));
+      prev = pos.map(p => ({x:p.x, y:p.y}));
+      Sfx.click();
+    }
+    function finishRun(){
+      running = false;
+      const ok = pos.every((p, i) => p.x === puz.targets[i].x && p.y === puz.targets[i].y);
+      if (ok){
+        usedOnWin = totalCmds();
+        const stars = (attempts === 1 && usedOnWin === puz.min) ? 3
+          : usedOnWin <= puz.min + 2 ? 2 : 1;
+        finishGame(stars, usedOnWin, 'Formation held with ' + usedOnWin + ' command' +
+          (usedOnWin === 1 ? '' : 's') + ' (best possible: ' + puz.min + ').');
+      } else {
+        Sfx.bad(); shake = 0.5; attempts++;
+        note = 'Not everyone landed on their tile. The ring is reset - try a new list.';
+        noteT = 3;
+        pos = puz.starts.map(p => ({x:p.x, y:p.y}));
+        prev = pos.map(p => ({x:p.x, y:p.y}));
+        if (puz.shared) queues[0] = []; else for (let i = 0; i < n; i++) queues[i] = [];
+      }
+    }
+    return {
+      debug(){ return {size:puz.size, shared:puz.shared, min:puz.min, n, attempts, running,
+                       pos:pos.map(p => ({x:p.x, y:p.y})),
+                       starts:puz.starts.map(p => ({x:p.x, y:p.y})),
+                       targets:puz.targets.map(p => ({x:p.x, y:p.y})),
+                       faces:puz.faces.slice(), queues:queues.map(q => q.slice()), sel,
+                       total:totalCmds()}; },
+      hudNote(){ return 'Commands ' + totalCmds() + '  ·  best ' + puz.min; },
+      update(dt){
+        if (noteT > 0) noteT -= dt;
+        if (shake > 0) shake = Math.max(0, shake - dt);
+        if (!running) return;
+        stepT += dt;
+        if (stepT < 0.3) return;
+        stepT = 0;
+        const cmds = puz.shared ? pos.map(() => queues[0][stepI])
+          : queues.map(q => stepI < q.length ? q[stepI] : null);
+        const nxt = clownStep(pos, cmds, puz.faces, puz.size, puz.shared);
+        prev = pos.map(p => ({x:p.x, y:p.y}));
+        if (!nxt){
+          running = false; Sfx.bad(); shake = 0.5; attempts++;
+          note = 'Pile-up! Two clowns went for the same square.';
+          noteT = 3;
+          pos = puz.starts.map(p => ({x:p.x, y:p.y}));
+          prev = pos.map(p => ({x:p.x, y:p.y}));
+          if (puz.shared) queues[0] = []; else for (let i = 0; i < n; i++) queues[i] = [];
+          return;
+        }
+        pos = nxt; stepI++;
+        if (stepI >= runLen()) finishRun();
+      },
+      draw(){
+        const g = ctx, G = geo();
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        instr(puz.shared ? 'One list moves every clown, each in the way it is facing.'
+                         : 'Pick a clown, build its list of moves, then tap GO.');
+        const sh = shake > 0 ? Math.sin(shake * 60) * 4 : 0;
+        /* ring floor */
+        g.save(); g.translate(sh, 0);
+        panel(G.x0 - 8, G.y0 - 8, G.board + 16, G.board + 16, {fill:C.sawdust, stroke:C.red, r:14, lw:4});
+        for (let i = 0; i <= puz.size; i++){
+          g.strokeStyle = 'rgba(18,32,58,.25)'; g.lineWidth = 1;
+          g.beginPath(); g.moveTo(G.x0 + i * G.cell, G.y0); g.lineTo(G.x0 + i * G.cell, G.y0 + G.board); g.stroke();
+          g.beginPath(); g.moveTo(G.x0, G.y0 + i * G.cell); g.lineTo(G.x0 + G.board, G.y0 + i * G.cell); g.stroke();
+        }
+        /* target tiles */
+        for (let i = 0; i < n; i++){
+          const t = puz.targets[i];
+          const x = G.x0 + t.x * G.cell, y = G.y0 + t.y * G.cell;
+          g.strokeStyle = CLOWN_COLS[i % CLOWN_COLS.length]; g.lineWidth = 3;
+          g.setLineDash([5, 4]);
+          g.strokeRect(x + 4, y + 4, G.cell - 8, G.cell - 8);
+          g.setLineDash([]);
+          starPath(g, x + G.cell / 2, y + G.cell / 2, G.cell * 0.16);
+          g.fillStyle = CLOWN_COLS[i % CLOWN_COLS.length]; g.globalAlpha = 0.3; g.fill(); g.globalAlpha = 1;
+        }
+        /* clowns (interpolated while a run is playing) */
+        const u = running ? Math.min(1, stepT / 0.3) : 1;
+        for (let i = 0; i < n; i++){
+          const px = prev[i].x + (pos[i].x - prev[i].x) * u;
+          const py = prev[i].y + (pos[i].y - prev[i].y) * u;
+          const cx = G.x0 + (px + 0.5) * G.cell, cy = G.y0 + (py + 0.5) * G.cell;
+          const r = G.cell * 0.3;
+          if (!puz.shared){
+            reg('sel' + i, cx - G.cell / 2, cy - G.cell / 2, G.cell, G.cell, {});
+            if (sel === i){
+              g.strokeStyle = C.gold; g.lineWidth = 3;
+              g.beginPath(); g.arc(cx, cy, r + 6, 0, 7); g.stroke();
+            }
+          }
+          g.fillStyle = C.cream;
+          g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
+          g.lineWidth = 2; g.strokeStyle = C.navy; g.stroke();
+          g.fillStyle = CLOWN_COLS[i % CLOWN_COLS.length];
+          g.beginPath(); g.moveTo(cx - r, cy - r * 0.5); g.lineTo(cx, cy - r * 1.7);
+          g.lineTo(cx + r, cy - r * 0.5); g.closePath(); g.fill();
+          g.beginPath(); g.arc(cx, cy + r * 0.25, r * 0.25, 0, 7); g.fill();
+          g.fillStyle = C.ink;
+          g.beginPath(); g.arc(cx - r * 0.33, cy - r * 0.15, r * 0.12, 0, 7); g.fill();
+          g.beginPath(); g.arc(cx + r * 0.33, cy - r * 0.15, r * 0.12, 0, 7); g.fill();
+          if (puz.shared){
+            const d = DIRS[puz.faces[i]];
+            g.strokeStyle = C.ink; g.lineWidth = 3; g.lineCap = 'round';
+            g.beginPath();
+            g.moveTo(cx + d.x * r * 0.5, cy + d.y * r * 0.5);
+            g.lineTo(cx + d.x * r * 1.5, cy + d.y * r * 1.5);
+            g.lineTo(cx + d.x * r * 1.5 - (d.x ? d.x * 5 : 5), cy + d.y * r * 1.5 - (d.y ? d.y * 5 : 5));
+            g.stroke();
+          }
+        }
+        g.restore();
+        /* queue strip */
+        const qy = G.padY - 40;
+        panel(8, qy, V.w - 16, 34, {fill:C.white, stroke:C.navy, r:10, lw:2, shadow:false});
+        const q = qOf(sel);
+        T(puz.shared ? 'LIST' : 'CLOWN ' + (sel + 1) + ' LIST', 18, qy + 17,
+          {size:10.5, weight:800, color:C.slate, align:'left'});
+        for (let i = 0; i < Math.min(q.length, 12); i++){
+          const ax = 84 + i * 22, ay = qy + 17;
+          g.fillStyle = puz.shared ? C.navy : CLOWN_COLS[sel % CLOWN_COLS.length];
+          g.save(); g.translate(ax, ay); g.rotate(q[i] * Math.PI / 2);
+          g.beginPath(); g.moveTo(0, -8); g.lineTo(6, 4); g.lineTo(-6, 4); g.closePath(); g.fill();
+          g.restore();
+        }
+        if (q.length > 12) T('+' + (q.length - 12), 84 + 12 * 22, qy + 17, {size:11, weight:800, color:C.slate});
+        /* direction pad */
+        const padCx = 84, padY = G.padY + 6, bs = 52;
+        button('dir0', padCx - bs / 2, padY, bs, 44, '▲', {fill:C.gold, disabled:running});
+        button('dir3', padCx - bs / 2 - bs - 6, padY + 48, bs, 44, '◀', {fill:C.gold, disabled:running});
+        button('dir1', padCx - bs / 2 + bs + 6, padY + 48, bs, 44, '▶', {fill:C.gold, disabled:running});
+        button('dir2', padCx - bs / 2, padY + 96, bs, 44, '▼', {fill:C.gold, disabled:running});
+        /* side controls */
+        const sx = 176, sw = V.w - sx - 12;
+        button('go', sx, padY, sw, 56, running ? 'RUNNING...' : 'GO',
+          {fill: running ? C.slate : C.green, color:C.cream, size:20, disabled:running});
+        button('undo', sx, padY + 62, sw / 2 - 4, 44, 'Undo', {fill:C.creamDark, color:C.navy, size:14, disabled:running});
+        button('clear', sx + sw / 2 + 4, padY + 62, sw / 2 - 4, 44, 'Clear', {fill:C.creamDark, color:C.navy, size:14, disabled:running});
+        if (!puz.shared){
+          for (let i = 0; i < n; i++){
+            const bw = (sw - (n - 1) * 5) / n;
+            button('pick' + i, sx + i * (bw + 5), padY + 110, bw, 44, String(i + 1),
+              {fill: sel === i ? CLOWN_COLS[i % CLOWN_COLS.length] : C.creamDark,
+               color: sel === i ? C.cream : C.navy, size:15, num:true, disabled:running});
+          }
+        } else {
+          T('All clowns obey the same list.', sx + sw / 2, padY + 130, {size:11.5, weight:700, color:C.slate, maxWidth:sw});
+        }
+        if (noteT > 0){
+          panel(16, G.padY - 82, V.w - 32, 40, {fill:C.red, stroke:C.navy, r:10, lw:2});
+          Twrap(note, V.w / 2, G.padY - 68, V.w - 50, 15, {size:12.5, weight:700, color:C.cream});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed || hit.disabled || running) return;
+        const id = hit.id;
+        if (id.indexOf('dir') === 0){ qOf(sel).push(parseInt(id.slice(3), 10)); Sfx.click(); return; }
+        if (id.indexOf('pick') === 0){ sel = parseInt(id.slice(4), 10); Sfx.click(); return; }
+        if (id.indexOf('sel') === 0 && !puz.shared){ sel = parseInt(id.slice(3), 10); Sfx.click(); return; }
+        if (id === 'undo'){ qOf(sel).pop(); Sfx.click(); return; }
+        if (id === 'clear'){
+          if (puz.shared) queues[0] = []; else queues[sel] = [];
+          Sfx.click(); return;
+        }
+        if (id === 'go') start();
+      }
+    };
+  }
+};
+
+/* ===========================================================================
+   GAME 12 - LION ARRANGEMENT  (sorting / ordering by criteria)
+   ========================================================================= */
+const LION_NAMES = ['Leo', 'Nala', 'Rex', 'Kiba', 'Sasha', 'Tor'];
+function genLions(diff){
+  const n = diff === 'easy' ? 4 : diff === 'medium' ? 5 : 6;
+  for (let a = 0; a < 500; a++){
+    const lions = LION_NAMES.slice(0, n).map((name, id) => ({
+      id, name, age:rndI(2, 14), tricks:rndI(1, 9)
+    }));
+    let prompt = '', cmp = null;
+    if (diff === 'easy'){
+      const ages = lions.map(l => l.age);
+      if (new Set(ages).size !== n) continue;
+      prompt = 'Youngest first.';
+      cmp = (x, y) => x.age - y.age;
+    } else if (diff === 'medium'){
+      const desc = Math.random() < 0.5;
+      const tr = lions.map(l => l.tricks);
+      const counts = {};
+      for (const t of tr) counts[t] = (counts[t] || 0) + 1;
+      const ties = Object.values(counts).filter(c => c > 1);
+      if (ties.length !== 1 || ties[0] !== 2) continue;      /* exactly one tie */
+      if (new Set(lions.map(l => l.age)).size !== n) continue;
+      prompt = (desc ? 'Most tricks first.' : 'Fewest tricks first.') +
+               ' If two lions have the same number of tricks, the older one goes first.';
+      cmp = (x, y) => (desc ? y.tricks - x.tricks : x.tricks - y.tricks) || (y.age - x.age);
+    } else {
+      const totals = lions.map(l => l.age + l.tricks);
+      const counts = {};
+      for (const t of totals) counts[t] = (counts[t] || 0) + 1;
+      if (!Object.values(counts).some(c => c === 2)) continue; /* at least one tiebreak */
+      if (Object.values(counts).some(c => c > 2)) continue;
+      const trick = lions.map(l => l.tricks);
+      if (new Set(trick).size !== n) continue;
+      prompt = 'Add age and tricks together: biggest total first. If two totals match, fewer tricks goes first.';
+      cmp = (x, y) => (y.age + y.tricks) - (x.age + x.tricks) || (x.tricks - y.tricks);
+    }
+    const order = lions.slice().sort(cmp);
+    let unique = true;
+    for (let i = 0; i + 1 < order.length; i++) if (cmp(order[i], order[i + 1]) === 0) unique = false;
+    if (!unique) continue;
+    return {lions:shuffle(lions.slice()), order:order.map(l => l.id), prompt, n};
+  }
+  const lions = LION_NAMES.slice(0, n).map((name, id) => ({id, name, age:2 + id * 2, tricks:1 + id}));
+  return {lions:shuffle(lions.slice()), order:lions.map(l => l.id), prompt:'Youngest first.', n};
+}
+function drawLion(x, y, s, lion, o){
+  o = o || {};
+  const g = ctx;
+  g.fillStyle = o.bad ? '#D9A0A8' : '#C98A2E';
+  for (let i = 0; i < 9; i++){
+    const a = i / 9 * Math.PI * 2;
+    g.beginPath(); g.arc(x + Math.cos(a) * s * 0.52, y + Math.sin(a) * s * 0.52, s * 0.26, 0, 7); g.fill();
+  }
+  g.fillStyle = o.bad ? C.red : C.gold;
+  g.beginPath(); g.arc(x, y, s * 0.46, 0, 7); g.fill();
+  g.lineWidth = 2; g.strokeStyle = C.navy; g.stroke();
+  g.fillStyle = C.ink;
+  g.beginPath(); g.arc(x - s * 0.17, y - s * 0.1, s * 0.06, 0, 7); g.fill();
+  g.beginPath(); g.arc(x + s * 0.17, y - s * 0.1, s * 0.06, 0, 7); g.fill();
+  g.fillStyle = '#8E5A18';
+  g.beginPath(); g.moveTo(x - s * 0.1, y + s * 0.12); g.lineTo(x + s * 0.1, y + s * 0.12);
+  g.lineTo(x, y + s * 0.24); g.closePath(); g.fill();
+}
+GAMES.lions = {
+  name:'Lion Arrangement', short:'Lions', skill:'Sorting & ordering',
+  desc:'Read the order the ringmaster wants, then drag each lion onto the right pedestal.',
+  create(diff){
+    const puz = genLions(diff);
+    const n = puz.n;
+    const slots = new Array(n).fill(null);         /* pedestal -> lion id */
+    let drag = null, placements = 0, wrongSet = [], note = '', noteT = 0;
+    const lionOf = id => puz.lions.find(l => l.id === id);
+    const slotOfLion = id => slots.indexOf(id);
+    const geo = () => {
+      const top = 53 + 13 + 3 * 17 + 6;
+      const pedY = top + 90;
+      const penY = pedY + 130;
+      const pw = Math.min(56, (V.w - 16) / n);
+      return {top, pedY, penY, pw, px0:(V.w - pw * n) / 2};
+    };
+    function checkOrder(){
+      if (slots.some(s => s === null)) return;
+      const wrong = [];
+      for (let i = 0; i < n; i++) if (slots[i] !== puz.order[i]) wrong.push(i);
+      if (!wrong.length){
+        const fixes = placements - n;
+        const stars = fixes === 0 ? 3 : fixes <= 2 ? 2 : 1;
+        finishGame(stars, fixes, fixes === 0 ? 'Perfect line-up, first time.'
+          : 'Line-up correct after ' + fixes + ' change' + (fixes === 1 ? '' : 's') + '.');
+        return;
+      }
+      wrongSet = wrong; Sfx.bad();
+      note = wrong.length + ' pedestal' + (wrong.length === 1 ? ' is' : 's are') + ' wrong. Swap them around.';
+      noteT = 3;
+    }
+    return {
+      debug(){ return {n, order:puz.order.slice(), slots:slots.slice(), placements,
+                       prompt:puz.prompt, wrong:wrongSet.slice(),
+                       lions:puz.lions.map(l => ({id:l.id, name:l.name, age:l.age, tricks:l.tricks}))}; },
+      hudNote(){ return 'Placed ' + slots.filter(s => s !== null).length + '/' + n; },
+      update(dt){ if (noteT > 0) noteT -= dt; },
+      draw(){
+        const g = ctx, G = geo();
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        sawdustFloor(G.pedY + 52);
+        instr(puz.prompt);
+        T('1st', G.px0 + G.pw / 2, G.pedY - 62, {size:11, weight:800, color:C.slate});
+        T(n + 'th', G.px0 + G.pw * (n - 0.5), G.pedY - 62, {size:11, weight:800, color:C.slate});
+        /* pedestals */
+        for (let i = 0; i < n; i++){
+          const x = G.px0 + i * G.pw, y = G.pedY;
+          reg('ped' + i, x, y - 56, G.pw, 108, {ped:i});
+          const bad = wrongSet.indexOf(i) >= 0;
+          g.fillStyle = bad ? C.red : C.navy;
+          rr(g, x + 3, y, G.pw - 6, 46, 6); g.fill();
+          T(String(i + 1), x + G.pw / 2, y + 32, {size:15, weight:800, color:C.gold, num:true});
+          const id = slots[i];
+          if (id === null){
+            g.strokeStyle = 'rgba(18,32,58,.3)'; g.lineWidth = 2; g.setLineDash([4, 4]);
+            g.beginPath(); g.arc(x + G.pw / 2, y - 22, 18, 0, 7); g.stroke();
+            g.setLineDash([]);
+          } else if (!drag || drag.id !== id){
+            const l = lionOf(id);
+            drawLion(x + G.pw / 2, y - 24, 34, l, {bad});
+            T(l.name, x + G.pw / 2, y + 12, {size:10.5, weight:800, color:C.cream, maxWidth:G.pw - 6});
+            reg('take' + id, x, y - 50, G.pw, 54, {lion:id});
+          }
+        }
+        /* pen */
+        const pen = puz.lions.filter(l => slotOfLion(l.id) < 0);
+        panel(8, G.penY, V.w - 16, V.h - G.penY - 12, {fill:C.white, stroke:C.navy, r:12, lw:2, shadow:false});
+        T('THE PRIDE', V.w / 2, G.penY + 14, {size:10.5, weight:800, color:C.slate});
+        const cols = 3, cw = (V.w - 32) / cols, chh = 78;
+        for (let i = 0; i < pen.length; i++){
+          const col = i % cols, row = (i / cols) | 0;
+          const x = 16 + col * cw, y = G.penY + 24 + row * chh;
+          if (drag && drag.id === pen[i].id) continue;
+          reg('take' + pen[i].id, x, y, cw - 4, chh - 4, {lion:pen[i].id});
+          drawLion(x + cw / 2 - 2, y + 24, 38, pen[i]);
+          T(pen[i].name, x + cw / 2 - 2, y + 50, {size:12, weight:800, color:C.navy});
+          T('Age ' + pen[i].age + '  ·  ' + pen[i].tricks + ' tricks', x + cw / 2 - 2, y + 64,
+            {size:10.5, weight:700, color:C.slate, num:true, maxWidth:cw - 8});
+        }
+        /* stats for seated lions, so they can still be compared */
+        for (let i = 0; i < n; i++){
+          const id = slots[i];
+          if (id === null) continue;
+          const l = lionOf(id);
+          T(l.age + '/' + l.tricks, G.px0 + i * G.pw + G.pw / 2, G.pedY + 60,
+            {size:10.5, weight:800, color:C.navy, num:true});
+        }
+        T('age / tricks', V.w / 2, G.pedY + 76, {size:9.5, weight:700, color:C.slate});
+        if (drag){
+          const l = lionOf(drag.id);
+          drawLion(drag.x, drag.y, 40, l);
+          T(l.name, drag.x, drag.y + 28, {size:11, weight:800, color:C.navy});
+        }
+        if (noteT > 0){
+          panel(16, G.penY - 30, V.w - 32, 26, {fill:C.red, stroke:C.navy, r:8, lw:2, shadow:false});
+          T(note, V.w / 2, G.penY - 17, {size:11.5, weight:700, color:C.cream, maxWidth:V.w - 44});
+        }
+      },
+      down(hit, p){
+        if (!hit || hit.lion === undefined) return;
+        drag = {id:hit.lion, x:p.x, y:p.y - 16};
+        Sfx.pop();
+      },
+      move(p){ if (drag){ drag.x = p.x; drag.y = p.y - 16; } },
+      cancel(){ drag = null; },
+      up(hit, p, wasPressed){
+        if (!drag) return;
+        const id = drag.id;
+        const G = geo();
+        drag = null;
+        let target = -1;
+        for (let i = 0; i < n; i++){
+          const x = G.px0 + i * G.pw;
+          if (p.x >= x && p.x <= x + G.pw && p.y >= G.pedY - 70 && p.y <= G.pedY + 60) target = i;
+        }
+        const from = slotOfLion(id);
+        if (target < 0){
+          if (from >= 0) slots[from] = null;            /* back to the pride */
+          return;
+        }
+        if (slots[target] === id) return;
+        const displaced = slots[target];
+        if (from >= 0) slots[from] = null;
+        slots[target] = id;
+        if (displaced !== null && displaced !== undefined) { /* bumped lion returns to the pen */ }
+        placements++; wrongSet = []; Sfx.click();
+        checkOrder();
+      }
+    };
+  }
+};
+
 /* __GAMES_INSERT__ */
 
 /* ===========================================================================
    PWA: inline manifest (in <head>) + blob-URL service worker
    ========================================================================= */
+/* Offline story, honestly:
+   A service worker is the only way to make a page load with the network off, and
+   the Service Worker spec (and every current engine - Chromium and WebKit alike)
+   only accepts a script URL whose scheme is http/https. A blob: or data: script
+   URL is refused outright:
+     TypeError: Failed to register a ServiceWorker: The URL protocol of the
+     script ('blob:http://...') is not supported.
+   So a genuinely single-file page cannot install one. We still attempt it (a
+   future engine may relax the rule, and it costs nothing), record exactly what
+   happened, and report it in Settings instead of implying the game is installed
+   and offline-ready when it is not. Everything else - the game, the save data,
+   the inline manifest and icon - needs no network at all. */
+const SW_STATUS = {supported:false, attempted:false, ok:false, reason:'not attempted'};
 function registerSW(){
-  if (!('serviceWorker' in navigator)) return;
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+  SW_STATUS.supported = 'serviceWorker' in navigator;
+  if (!SW_STATUS.supported){ SW_STATUS.reason = 'no service worker support'; return; }
+  const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (location.protocol !== 'https:' && !local){
+    SW_STATUS.reason = 'needs https (page is ' + location.protocol + ')';
+    return;
+  }
   const swSource = [
     "const CACHE = 'math-circus-act1-v1';",
     "const DOC = new URL(self.registration.scope).href;",
     "self.addEventListener('install', e => {",
-    "  e.waitUntil(caches.open(CACHE).then(c => c.addAll([DOC, SELF_URL])).then(() => self.skipWaiting()).catch(() => self.skipWaiting()));",
+    "  e.waitUntil((async () => {",
+    "    const c = await caches.open(CACHE);",
+    "    /* one at a time: addAll is atomic, so a single 404 would leave an empty cache */",
+    "    await c.add(SELF_URL).catch(() => {});",
+    "    if (DOC !== SELF_URL) await c.add(DOC).catch(() => {});",
+    "    await self.skipWaiting();",
+    "  })());",
     "});",
     "self.addEventListener('activate', e => {",
     "  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));",
@@ -2398,8 +3332,11 @@ function registerSW(){
   ].join('\n').replace(/SELF_URL/g, JSON.stringify(location.href.split('#')[0]));
   try {
     const url = URL.createObjectURL(new Blob([swSource], {type:'application/javascript'}));
-    navigator.serviceWorker.register(url).catch(() => { /* offline cache unavailable; game still runs */ });
-  } catch(e){ /* non-fatal */ }
+    SW_STATUS.attempted = true;
+    navigator.serviceWorker.register(url)
+      .then(() => { SW_STATUS.ok = true; SW_STATUS.reason = 'registered'; })
+      .catch(err => { SW_STATUS.reason = (err && err.message) || String(err); });
+  } catch(e){ SW_STATUS.reason = (e && e.message) || String(e); }
 }
 
 /* ------------------------------------------------------------------- boot */
@@ -2418,6 +3355,7 @@ window.MC = {
   get regions(){ return regions; },
   GAMES, V, startGame, goHub, finishGame, loadSave, persist, freshSave,
   openModal, closeModal, SAVE_KEY, GAME_IDS, SCORE_FIELD,
+  get sw(){ return SW_STATUS; },
   tapId(id){
     const r = regions.find(rr2 => rr2.id === id);
     if (!r) throw new Error('no region: ' + id);

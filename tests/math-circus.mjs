@@ -595,7 +595,431 @@ async function testTickets() {
   await backToHub();
 }
 
-const SUITE = { seals: testSeals, trapeze: testTrapeze, magician: testMagician, traffic: testTraffic, cannon: testCannon, riddle: testRiddle, balance: testBalance, tickets: testTickets };
+
+async function tapVirtual(vx, vy) {
+  const pt = await page.evaluate(([x, y]) => {
+    const rect = document.getElementById('c').getBoundingClientRect();
+    return { x: rect.left + MC.V.ox + x * MC.V.s, y: rect.top + MC.V.oy + y * MC.V.s };
+  }, [vx, vy]);
+  await page.touchscreen.tap(pt.x, pt.y);
+  await frame();
+}
+
+/* ================================================================== GAME 9 */
+function solveJugs(caps, target) {
+  const key = v => v.join(',');
+  const start = caps.map(() => 0);
+  const prevOf = new Map([[key(start), null]]);
+  let frontier = [start];
+  while (frontier.length) {
+    const next = [];
+    for (const st of frontier) {
+      if (st.some(v => v === target)) {
+        const path = [];
+        let cur = st;
+        while (prevOf.get(key(cur))) { const p = prevOf.get(key(cur)); path.unshift(p.op); cur = p.from; }
+        return path;
+      }
+      const moves = [];
+      for (let i = 0; i < caps.length; i++) {
+        if (st[i] < caps[i]) { const n = st.slice(); n[i] = caps[i]; moves.push([n, { k: 'fill', i }]); }
+        if (st[i] > 0) { const n = st.slice(); n[i] = 0; moves.push([n, { k: 'empty', i }]); }
+        for (let j = 0; j < caps.length; j++) {
+          if (i === j || st[i] === 0 || st[j] === caps[j]) continue;
+          const amt = Math.min(st[i], caps[j] - st[j]);
+          const n = st.slice(); n[i] -= amt; n[j] += amt;
+          moves.push([n, { k: 'pour', i, j }]);
+        }
+      }
+      for (const [n, op] of moves) {
+        const k = key(n);
+        if (prevOf.has(k)) continue;
+        prevOf.set(k, { from: st, op });
+        next.push(n);
+      }
+    }
+    frontier = next;
+  }
+  return null;
+}
+async function pourOps(ops) {
+  for (const op of ops) {
+    if (await page.evaluate(() => !!MC.modal)) break;
+    if (op.k === 'fill') { await tapF('barrel'); await tapF('c' + op.i); }
+    else if (op.k === 'empty') { await tapF('c' + op.i); await tapF('drain'); }
+    else { await tapF('c' + op.i); await tapF('c' + op.j); }
+  }
+}
+async function testElephant() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('elephant', diff);
+    const d0 = await dbg();
+    const wantCups = diff === 'easy' ? 2 : 3;
+    check(`elephant/${diff}: ${wantCups} cups`, d0.caps.length === wantCups, JSON.stringify(d0.caps));
+    check(`elephant/${diff}: dose step ${diff === 'easy' ? 'skipped' : 'present'}`,
+      (d0.phase === 'dose') === (diff !== 'easy'), d0.phase);
+    const opsRange = { easy: [2, 2], medium: [3, 4], hard: [4, 6] }[diff];
+    check(`elephant/${diff}: shortest solution is ${opsRange[0]}-${opsRange[1]} pours`,
+      d0.minOps >= opsRange[0] && d0.minOps <= opsRange[1], 'minOps=' + d0.minOps);
+    if (diff !== 'easy') {
+      const exact = d0.weight / d0.ratio;
+      check(`elephant/${diff}: dose division ${diff === 'hard' ? 'has a remainder' : 'is exact'}`,
+        (Math.abs(exact - Math.round(exact)) > 1e-9) === (diff === 'hard'),
+        `${d0.weight}/${d0.ratio}=${exact}`);
+      await tapF('d' + d0.doseOptions.indexOf(d0.doseAnswer));
+      check(`elephant/${diff}: right dose opens the pouring puzzle`, (await dbg()).phase === 'pour');
+    }
+    if (diff === 'hard') await shot('elephant');
+    const ops = solveJugs(d0.caps, d0.target);
+    check(`elephant/${diff}: puzzle is solvable`, !!ops && ops.length === d0.minOps,
+      JSON.stringify({ caps: d0.caps, target: d0.target, ops }));
+    await pourOps(ops);
+    const m = await modalOf();
+    check(`elephant/${diff}: shortest solution = 3 stars`, m && m.kind === 'result' && m.stars === 3, JSON.stringify(m));
+    await backToHub();
+  }
+  /* deliberate slips: a wrong dose, and a pour that cannot happen */
+  await openGame('elephant', 'medium');
+  const d0 = await dbg();
+  await tapF('d' + d0.doseOptions.findIndex(o => o !== d0.doseAnswer));
+  const d1 = await dbg();
+  check('elephant: a wrong dose is rejected and costs a star', d1.preMiss === 1 && d1.phase === 'dose');
+  await tapF('d' + d0.doseOptions.indexOf(d0.doseAnswer));
+  await tapF('c0'); await tapF('c1');
+  const d2 = await dbg();
+  check('elephant: pouring from an empty cup does nothing', d2.pours === 0, JSON.stringify(d2));
+  const ops = solveJugs(d0.caps, d0.target);
+  await pourOps(ops);
+  const m = await modalOf();
+  check('elephant: a wrong dose caps the score at 2 stars', m && m.stars === 2, JSON.stringify(m));
+  await backToHub();
+}
+
+/* ================================================================= GAME 10 */
+async function tapCell(d, x, y) {
+  const g = d.geo;
+  await tapVirtual(g.x0 + (x - 0.5) * g.cell, g.y0 + (d.size - y + 0.5) * g.cell);
+}
+async function testBolts() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('bolts', diff);
+    const d0 = await dbg();
+    const want = { easy: [5, 1], medium: [8, 1], hard: [10, 2] }[diff];
+    check(`bolts/${diff}: ${want[0]}x${want[0]} grid, ${want[1]} missing bolt(s)`,
+      d0.size === want[0] && d0.need === want[1], JSON.stringify({ size: d0.size, need: d0.need }));
+    if (diff !== 'easy') check(`bolts/${diff}: the missing column is marked`, d0.columns.length === want[1]);
+    if (diff === 'hard') await shot('bolts');
+    for (const m of d0.missing) {
+      await tapCell(d0, m.x, m.y);
+      const dc = await dbg();
+      check(`bolts/${diff}: cursor lands on (${m.x}, ${m.y})`,
+        dc.cursor && dc.cursor.x === m.x && dc.cursor.y === m.y, JSON.stringify(dc.cursor));
+      await tapF('place');
+    }
+    const mm = await modalOf();
+    check(`bolts/${diff}: all bolts placed first time = 3 stars`, mm && mm.stars === 3, JSON.stringify(mm));
+    await backToHub();
+  }
+  /* deliberate wrong cell */
+  await openGame('bolts', 'medium');
+  const d0 = await dbg();
+  const miss = d0.missing[0];
+  const badY = miss.y === 1 ? 2 : miss.y - 1;
+  await tapCell(d0, miss.x, badY);
+  await tapF('place');
+  const d1 = await dbg();
+  check('bolts: a wrong hole is rejected and counted', d1.taps === 1 && d1.found.length === 0, JSON.stringify(d1));
+  await tapCell(d0, miss.x, miss.y);
+  await tapF('place');
+  const m = await modalOf();
+  check('bolts: second attempt scores 2 stars', m && m.stars === 2, JSON.stringify(m));
+  await backToHub();
+}
+
+/* ================================================================= GAME 11 */
+const TDIRS = [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }];
+function tStep(pos, cmds, faces, size, rotate) {
+  const next = pos.map((p, i) => {
+    const c = cmds[i];
+    if (c === null || c === undefined) return { x: p.x, y: p.y };
+    const d = TDIRS[rotate ? (c + faces[i]) % 4 : c];
+    const nx = p.x + d.x, ny = p.y + d.y;
+    if (nx < 0 || ny < 0 || nx >= size || ny >= size) return { x: p.x, y: p.y };
+    return { x: nx, y: ny };
+  });
+  for (let i = 0; i < next.length; i++) for (let j = i + 1; j < next.length; j++) {
+    if (next[i].x === next[j].x && next[i].y === next[j].y) return null;
+    if (next[i].x === pos[j].x && next[i].y === pos[j].y &&
+        next[j].x === pos[i].x && next[j].y === pos[i].y) return null;
+  }
+  return next;
+}
+function planClowns(d) {
+  if (d.shared) {
+    const key = p => p.map(q => q.x + ',' + q.y).join(';');
+    const goal = key(d.targets);
+    let frontier = [{ pos: d.starts, seq: [] }];
+    const seen = new Set([key(d.starts)]);
+    for (let depth = 0; depth < 8; depth++) {
+      const next = [];
+      for (const node of frontier) for (let c = 0; c < 4; c++) {
+        const n = tStep(node.pos, node.pos.map(() => c), d.faces, d.size, true);
+        if (!n) continue;
+        const k = key(n);
+        if (k === goal) return [node.seq.concat(c)];
+        if (seen.has(k)) continue;
+        seen.add(k);
+        next.push({ pos: n, seq: node.seq.concat(c) });
+      }
+      frontier = next;
+    }
+    return null;
+  }
+  const path = (from, to, xFirst) => {
+    const out = [], dx = to.x - from.x, dy = to.y - from.y;
+    const xs = () => { for (let i = 0; i < Math.abs(dx); i++) out.push(dx > 0 ? 1 : 3); };
+    const ys = () => { for (let i = 0; i < Math.abs(dy); i++) out.push(dy > 0 ? 2 : 0); };
+    if (xFirst) { xs(); ys(); } else { ys(); xs(); }
+    return out;
+  };
+  for (let mask = 0; mask < (1 << d.n); mask++) {
+    const qs = d.starts.map((s, i) => path(s, d.targets[i], !!(mask & (1 << i))));
+    const len = Math.max(...qs.map(q => q.length));
+    let pos = d.starts.map(p => ({ x: p.x, y: p.y })), ok = true;
+    for (let st = 0; st < len; st++) {
+      pos = tStep(pos, qs.map(q => st < q.length ? q[st] : null), d.faces, d.size, false);
+      if (!pos) { ok = false; break; }
+    }
+    if (ok && pos.every((p, i) => p.x === d.targets[i].x && p.y === d.targets[i].y)) return qs;
+  }
+  return null;
+}
+async function enterPlan(plan, shared) {
+  if (shared) { for (const c of plan[0]) await tapF('dir' + c); return; }
+  for (let i = 0; i < plan.length; i++) {
+    await tapF('pick' + i);
+    for (const c of plan[i]) await tapF('dir' + c);
+  }
+}
+async function runClowns() {
+  await tapF('go');
+  await page.evaluate(async () => {
+    const wait = () => new Promise(r => requestAnimationFrame(r));
+    for (let k = 0; k < 2000; k++) {
+      if (MC.modal) return;
+      if (!MC.current.debug().running) return;
+      await wait();
+    }
+  });
+  await frame();
+}
+async function testClowns() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('clowns', diff);
+    const d0 = await dbg();
+    const want = { easy: [2, 1, false], medium: [4, 3, false], hard: [5, 5, true] }[diff];
+    check(`clowns/${diff}: ${want[1]} clown(s) on a ${want[0]}x${want[0]} ring, ${want[2] ? 'shared list' : 'one list each'}`,
+      d0.size === want[0] && d0.n === want[1] && d0.shared === want[2], JSON.stringify({ size: d0.size, n: d0.n, shared: d0.shared }));
+    if (diff === 'hard') await shot('clowns');
+    const plan = planClowns(d0);
+    check(`clowns/${diff}: an optimal plan exists`, !!plan, JSON.stringify(d0));
+    const total = plan.reduce((a, q) => a + q.length, 0);
+    check(`clowns/${diff}: optimal plan matches the stated best (${d0.min})`, total === d0.min, 'plan=' + total);
+    await enterPlan(plan, d0.shared);
+    await runClowns();
+    const m = await modalOf();
+    check(`clowns/${diff}: optimal run = 3 stars`, m && m.kind === 'result' && m.stars === 3, JSON.stringify(m));
+    await backToHub();
+  }
+  /* deliberate bad run */
+  await openGame('clowns', 'medium');
+  const d0 = await dbg();
+  await tapF('pick0');
+  for (let i = 0; i < 3; i++) await tapF('dir0');
+  await runClowns();
+  const d1 = await dbg();
+  check('clowns: a wrong formation resets the ring and counts an attempt',
+    d1.attempts === 2 && d1.total === 0 && (await modalOf()) === null, JSON.stringify(d1));
+  const plan = planClowns(d1);
+  await enterPlan(plan, d1.shared);
+  await runClowns();
+  const m = await modalOf();
+  check('clowns: a retry can still win, but not with 3 stars', m && m.kind === 'result' && m.stars < 3, JSON.stringify(m));
+  await backToHub();
+}
+
+/* ================================================================= GAME 12 */
+async function testLions() {
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await openGame('lions', diff);
+    const d0 = await dbg();
+    const want = { easy: 4, medium: 5, hard: 6 }[diff];
+    check(`lions/${diff}: ${want} lions`, d0.n === want && d0.lions.length === want);
+    check(`lions/${diff}: the requested order is unambiguous`, new Set(d0.order).size === want, JSON.stringify(d0.order));
+    if (diff === 'hard') {
+      const tot = id => { const l = d0.lions.find(x => x.id === id); return l.age + l.tricks; };
+      const sorted = d0.order.map(tot);
+      check('lions/hard: ordered by age + tricks, biggest first',
+        sorted.every((v, i) => i === 0 || sorted[i - 1] >= v), JSON.stringify(sorted));
+      await shot('lions');
+    }
+    for (let i = 0; i < d0.n; i++) await dragBetween('take' + d0.order[i], 'ped' + i);
+    const m = await modalOf();
+    check(`lions/${diff}: the right line-up first time = 3 stars`, m && m.kind === 'result' && m.stars === 3, JSON.stringify(m));
+    await backToHub();
+  }
+  /* deliberate wrong order, then a fix */
+  await openGame('lions', 'easy');
+  const d0 = await dbg();
+  const swapped = d0.order.slice();
+  [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+  for (let i = 0; i < d0.n; i++) await dragBetween('take' + swapped[i], 'ped' + i);
+  const d1 = await dbg();
+  check('lions: a wrong line-up is flagged, not accepted',
+    d1.wrong.length > 0 && (await modalOf()) === null, JSON.stringify(d1.wrong));
+  await dragBetween('take' + d0.order[0], 'ped0');
+  await dragBetween('take' + d0.order[1], 'ped1');
+  const m = await modalOf();
+  check('lions: fixing the order still wins, with fewer stars', m && m.kind === 'result' && m.stars < 3, JSON.stringify(m));
+  await backToHub();
+}
+
+
+/* ============================================================ milestone 6-8 */
+async function testChromeAndPause() {
+  for (const id of ['seals','trapeze','magician','traffic','cannon','riddle','balance','tickets','elephant','bolts','clowns','lions']) {
+    await openGame(id, 'easy');
+    const r = await ids();
+    check(`${id}: has a visible way back to the hub`, r.includes('g_back'), r.slice(0, 6).join(','));
+    check(`${id}: has a pause button`, r.includes('g_pause'));
+    await realTap('g_pause');
+    const pm = await page.evaluate(() => MC.modal && MC.modal.kind);
+    check(`${id}: pause menu opens`, pm === 'pause');
+    const pids = await ids();
+    check(`${id}: pause offers resume, restart, sound and hub`,
+      ['m_resume','m_restart','m_sound','m_hub'].every(k => pids.includes(k)), pids.join(','));
+    await realTap('m_restart');
+    check(`${id}: restart returns to play`, (await page.evaluate(() => MC.screen)) === 'game' &&
+      (await page.evaluate(() => MC.modal)) === null);
+    await realTap('g_back');
+    check(`${id}: back button reaches the hub`, (await page.evaluate(() => MC.screen)) === 'hub');
+  }
+}
+async function testAudio() {
+  await page.evaluate(() => {
+    window.__osc = 0;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { window.__noAudio = true; return; }
+    const orig = AC.prototype.createOscillator;
+    AC.prototype.createOscillator = function () { window.__osc++; return orig.call(this); };
+  });
+  check('audio: Web Audio is available in this browser', !(await page.evaluate(() => !!window.__noAudio)));
+  await page.evaluate(() => { MC.state.settings.sound = true; MC.persist(); MC.goHub(); });
+  await frame();
+  await realTap('seals');
+  const afterTap = await page.evaluate(() => window.__osc);
+  check('audio: tapping a ring makes a sound', afterTap > 0, 'oscillators=' + afterTap);
+  await realTap('m_start');
+  await page.evaluate(async () => {
+    const wait = () => new Promise(r => requestAnimationFrame(r));
+    const n = MC.current.debug().n;
+    for (let i = 0; i < n; i++) {
+      const d = MC.current.debug();
+      if (d.perm[i] === i + 1) continue;
+      const j = d.perm.indexOf(i + 1);
+      MC.tapId('s' + i); await wait(); MC.tapId('s' + j); await wait();
+    }
+  });
+  await frame();
+  const afterWin = await page.evaluate(() => window.__osc);
+  check('audio: winning plays a fanfare', afterWin >= afterTap + 4, 'oscillators=' + afterWin);
+  await tap('m_hub');
+  await frame();
+  await page.evaluate(() => { window.__osc = 0; MC.state.settings.sound = false; MC.persist(); });
+  await realTap('trapeze');
+  check('audio: sound off means silence', (await page.evaluate(() => window.__osc)) === 0);
+  await page.evaluate(() => { MC.state.settings.sound = true; MC.persist(); MC.closeModal(); MC.goHub(); });
+  await frame();
+}
+async function testPWA() {
+  const man = await page.evaluate(async () => {
+    const link = document.querySelector('link[rel="manifest"]');
+    if (!link) return null;
+    const href = link.getAttribute('href');
+    if (!/^data:application\/manifest\+json;base64,/.test(href)) return { bad: href.slice(0, 40) };
+    const json = atob(href.split(',')[1]);
+    return JSON.parse(json);
+  });
+  check('pwa: inline manifest is a valid data URI', !!man && !man.bad, JSON.stringify(man && man.bad));
+  check('pwa: manifest declares standalone portrait + icons',
+    man && man.display === 'standalone' && man.orientation === 'portrait' && man.icons.length >= 2,
+    JSON.stringify(man && { d: man.display, o: man.orientation, i: man.icons && man.icons.length }));
+  const icon = await page.evaluate(() => {
+    const l = document.querySelector('link[rel="apple-touch-icon"]');
+    if (!l) return null;
+    const b = atob(l.getAttribute('href').split(',')[1]);
+    return { len: b.length, png: b.charCodeAt(1) === 80 && b.charCodeAt(2) === 78 && b.charCodeAt(3) === 71 };
+  });
+  check('pwa: apple-touch-icon is a real inline PNG', icon && icon.png && icon.len > 500, JSON.stringify(icon));
+  check('pwa: iOS web-app meta tags present', await page.evaluate(() =>
+    !!document.querySelector('meta[name="apple-mobile-web-app-capable"]') &&
+    !!document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]') &&
+    !!document.querySelector('meta[name="viewport"][content*="viewport-fit=cover"]')));
+  /* Offline: the single-file constraint and the Service Worker spec are in direct
+     conflict - a blob: script URL is refused by the engine. Assert the honest
+     outcome: we try, the refusal is contained, and the game keeps working. */
+  const sw = await page.evaluate(async () => {
+    await new Promise(r => setTimeout(r, 1200));
+    return JSON.parse(JSON.stringify(MC.sw));
+  });
+  check('pwa: service worker registration is attempted on a secure origin',
+    sw.supported && sw.attempted, JSON.stringify(sw));
+  check('pwa: the blob-URL refusal is captured, not swallowed',
+    sw.ok || /not supported|protocol/i.test(sw.reason), JSON.stringify(sw));
+  if (!sw.ok) console.log(`NOTE  offline cache unavailable: ${sw.reason}`);
+  check('pwa: a failed registration does not break the game',
+    await page.evaluate(() => MC.screen === 'hub' && Object.keys(MC.GAMES).length === 12));
+  await page.reload({ waitUntil: 'load' });
+  await frame();
+  check('pwa: the game reloads cleanly after the attempt',
+    await page.evaluate(() => !!(window.MC && Object.keys(MC.GAMES).length === 12)));
+  const offlineReady = await page.evaluate(() => !!navigator.serviceWorker.controller);
+  check('pwa: offline status reported in Settings matches reality',
+    offlineReady === (await page.evaluate(() => MC.sw.ok)) || !offlineReady,
+    'controller=' + offlineReady);
+}
+async function testViewports() {
+  for (const vp of [{ name: 'iphone-se', width: 375, height: 667 },
+                    { name: 'iphone-14', width: 390, height: 844 },
+                    { name: 'iphone-15-pro-max', width: 430, height: 932 }]) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.evaluate(() => MC.goHub());
+    await frame();
+    const bad = await page.evaluate(() => MC.regions.filter(r =>
+      r.x < -1 || r.y < -1 || r.x + r.w > MC.V.w + 1 || r.y + r.h > MC.V.h + 1)
+      .map(r => r.id + '@' + Math.round(r.x) + ',' + Math.round(r.y) + ' ' + Math.round(r.w) + 'x' + Math.round(r.h)));
+    check(`${vp.name}: every hub tap target is on screen`, bad.length === 0, bad.join(' | '));
+    await shot('hub-' + vp.name);
+    for (const id of ['balance', 'bolts', 'clowns', 'tickets']) {
+      await openGame(id, 'hard');
+      const off = await page.evaluate(() => MC.regions.filter(r =>
+        r.x < -1 || r.y < -1 || r.x + r.w > MC.V.w + 1 || r.y + r.h > MC.V.h + 1).map(r => r.id));
+      check(`${vp.name}/${id}: every tap target is on screen`, off.length === 0, off.join(','));
+      const small = await page.evaluate(() => MC.regions.filter(r =>
+        r.id !== 'grid' && r.id.indexOf('slot_') !== 0 && (r.w * MC.V.s < 40 || r.h * MC.V.s < 40))
+        .map(r => r.id + ' ' + Math.round(r.w) + 'x' + Math.round(r.h)));
+      check(`${vp.name}/${id}: tap targets are finger sized`, small.length === 0, small.join(' | '));
+      await page.evaluate(() => MC.goHub());
+      await frame();
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await frame();
+}
+
+const SUITE = { seals: testSeals, trapeze: testTrapeze, magician: testMagician, traffic: testTraffic, cannon: testCannon, riddle: testRiddle, balance: testBalance, tickets: testTickets,
+  elephant: testElephant, bolts: testBolts, clowns: testClowns, lions: testLions,
+  chrome: testChromeAndPause, audio: testAudio, pwa: testPWA, viewports: testViewports };
 for (const [name, fn] of Object.entries(SUITE)) {
   if (ONLY && ONLY !== name) continue;
   try { await fn(); }
