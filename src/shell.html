@@ -93,7 +93,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .tbtn.press{background:rgba(255,177,40,.3);border-color:var(--amber)}
 #btnFire{right:calc(var(--safe-r) + 22px);bottom:calc(var(--safe-b) + 108px);width:104px;height:104px;
   font-size:13px;border-color:rgba(255,45,60,.6);background:rgba(255,45,60,.16)}
-#btnWeap{right:calc(var(--safe-r) + 34px);bottom:calc(var(--safe-b) + 226px);width:64px;height:64px}
+/* Weapon select sits in the inner column above crouch, not above fire: on a
+   390px-tall landscape phone the fire-column stack reaches into the minimap. */
+#btnWeap{right:calc(var(--safe-r) + 136px);bottom:calc(var(--safe-b) + 196px);width:62px;height:62px}
 #btnCrouch{right:calc(var(--safe-r) + 136px);bottom:calc(var(--safe-b) + 120px);width:62px;height:62px}
 #btnUse{left:50%;margin-left:-38px;bottom:calc(var(--safe-b) + 26px);width:76px;height:76px;display:none;
   border-color:rgba(255,177,40,.6);background:rgba(255,177,40,.16)}

@@ -71,6 +71,63 @@ python3 build.py      # regenerates operation-blackgate.html
   2 and 30fps on mobile, which conflict on a phone; the cap stands and the scale
   underneath it moves with hysteresis.
 
+## Playtest fixes (final pass)
+
+These came out of a reported play session and a scripted sweep of the level.
+
+- **Movement basis was mirrored.** The strafe/forward vectors were built from the
+  wrong sign pair, so walking "forward" went somewhere different depending on
+  which way you faced. three.js cameras look down `-Z`: forward is
+  `(-sin yaw, -cos yaw)` and right is `(cos yaw, -sin yaw)`. Verified at all
+  eight compass headings — alignment is now +1.0 at every one.
+- **Guard models faced backwards.** Rendering only; the FSM had them right all
+  along. Their yaw now gets a half turn when it reaches the mesh.
+- **The opening room no longer camps you.** You used to spawn inside a bathroom
+  with two guards already in it, which raised the alarm before you could stand
+  up. The bathroom is empty, the first guard patrols the corridor beyond the
+  door, and you meet him through the doorway on your terms.
+- **You can no longer be wedged inside a wall.** Two boxes meeting at a corner
+  could each push the body back into the other. Every clean frame is now
+  remembered, and a frame that ends overlapping eases back toward the last good
+  position instead of trapping you there.
+- **Doors were the other half of the wall-sticking.** The door's collider was
+  only synced while the slab was in motion, and a closing door switched a
+  full-height box back on at 75% closed — on top of anyone standing under it.
+  The collider now tracks the slab on every frame, and a door will not close
+  while a body is in its mouth.
+- **Guards can open doors.** Doors used to open for the player alone, so a
+  chasing guard walked into a slab and the chase died in the corridor.
+- **Guards no longer blink across the room.** The anti-grind failsafe that resets
+  a stuck guard to his patrol node now waits much longer while you can see him.
+- **The test suite no longer sounds the alarm before you play.** Driving a live
+  guard through `CHASE`/`ATTACK` tripped `raiseAlarm()`, so the mission opened
+  with "! GUARD ALERTED" on screen. The probe pins and restores the flag, and
+  `startMission()` clears the banner.
+- **The suite was also under-reporting.** Each section ships as its own
+  `<script>`, so a zero-delay timeout could fire between two of them and print
+  before the last section had added its cases. The report now waits for
+  `DOMContentLoaded`. 21 tests, all passing.
+- **HUD layout collided on short landscape phones.** At 844x390 the weapon button
+  overlapped the minimap. It moved into the inner column above crouch.
+
+## Additions that were not defects
+
+- **A rotating minimap and an objective waypoint.** The minimap is the canvas
+  HUD, drawn from cached wall rectangles, oriented so your heading points up,
+  with door markers, guard blips and a compass letter. The waypoint floats over
+  the current objective with a range readout, and pins to the screen rim with an
+  arrow when the objective is behind you.
+- **Aim assist, which is the GoldenEye mechanic.** The N64 game snapped shots
+  onto a guard inside a generous cone; on a phone, where the look stick is the
+  whole aiming budget, that is the difference between a fight and a chore. The
+  test here is a cylinder around the body rather than an angular cone — a fixed
+  cone is unusable up close, where the gap between eye height and chest height
+  eats the whole budget on its own. It only narrows a gap that already exists,
+  it needs clear line of sight, and it stands down entirely while you are aiming
+  down sights so a deliberate headshot is still yours to take. Measured on a
+  fixed 200-shot spread: 39% to 61% hit rate at 5m, 17% to 60% at 12m, with
+  wild shots (25 degrees off) never touched.
+
 ## Deliberate deviations
 
 - The brief asks for `castShadow = true` on every piece of geometry. Flat floors,
