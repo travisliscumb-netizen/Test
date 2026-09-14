@@ -1,0 +1,1712 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Math Circus">
+<meta name="theme-color" content="#C41E3A">
+<meta name="description" content="Math Circus: Act 1 - a fan rebuild of the 1993 educational math game. Twelve circus math games, offline, touch-first.">
+<title>Math Circus: Act 1</title>
+<!-- Inline manifest as a data URI: keeps the whole game in one file. This is what
+     Android/Chrome uses for installability. iOS Safari largely IGNORES the manifest
+     and instead relies on the apple-mobile-web-app-* meta tags and the
+     apple-touch-icon link below. That is expected behaviour, not a bug. -->
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiTWF0aCBDaXJjdXM6IEFjdCAxIiwic2hvcnRfbmFtZSI6Ik1hdGggQ2lyY3VzIiwiZGVzY3JpcHRpb24iOiJUd2VsdmUgY2lyY3VzIG1hdGggZ2FtZXMuIEEgZmFuIHJlYnVpbGQgb2YgdGhlIDE5OTMgb3JpZ2luYWwuIiwic3RhcnRfdXJsIjoiLiIsInNjb3BlIjoiLiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwib3JpZW50YXRpb24iOiJwb3J0cmFpdCIsImJhY2tncm91bmRfY29sb3IiOiIjMEUxNjI2IiwidGhlbWVfY29sb3IiOiIjQzQxRTNBIiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2UvcG5nO2Jhc2U2NCxpVkJPUncwS0dnb0FBQUFOU1VoRVVnQUFBTUFBQUFEQUNBWUFBQUJTM0d3SEFBQUtjRWxFUVZSNDJ1MmR2YTRjUlJDRksvRUwrQUh3elpGREhKamdFamt3UWlMQmJ3Q0ovUUlRT3NCQ2tGZ2lJTFNJZUFOTHlDS3dURWpFRzVDUXJoeVJMUnF1eGd6RHpHeDFkL1ZQZFgvQmthNzNaKzVPVDMxVjUvUmU3OHJ0cS90bmhFYVZzQWdJQUJBQ0FJUUFBQ0VBUUFnQVVEYTlmWGxyVTZ3TkFBd053S3lmbjk4K1AzMXk5WTlZTHdBWURvQkxVRHg4Y0pkMUJJQ3hBTmdUVUFEQTBBQUFCUUFBQUZBQUFBREVRekZ5MkFhQWdRRmdCd29BQUVBQlJNKzJDUUFBWU9qM0h3QmdVQUR3L3dBd0RBRHNBQUhBTUFCUTdBQXdEQUFVT3dBTUFRQi9Cd1FBd3dEQVg0SUNBUDhmQUFFQUFDQUFBQUFFQUFDQUFBQUFFQUFBQUFLQVR2VE5kOC9QZjN4N28rbG4xZ1FBaHRFbmp6NS9WL3l6cHR0WUd3QVlRbTlldnpyLy90bS9FRXcvVDdleE5nQXdsUFZaQ3lzRUFOM3IvTmVmNXpmdjNUK2ZYcjk2Vi9qVHo5TnQwMzJzRVFCMGJYMld4VDREc0lRQ0t3UUEzUWJmcWRBbnZ6L3A2R2NDTVFCMGFYM203ci9zK3N0cE1FOEJyQkFBZEJkODV5Ni9MUElsQURNYzh4UWdFQU5BVjlablhmQ2FmMk9GQUtDTDRMdTBPTFA5MlNyNDlXTUl4QURRWGZmWEFNQVVBSUJ1Z3U5ZVlTOXYyNEppZVJ0ckNRQnVyYyt5cUVNQStFODJ3QW9CZ0Zmck0rL3VyQXQ5RDREbDdhY0ZSRmdoQUhEWi9lZXR6eGdBNWkxUnBnQUF1TnZ6WDNmL3BhVTVBbUJ0ZzVaVGdQY0dBTUJOOEYwWGVTd0E2L3RZWXdCd1lYMHVGZkx5dmlNNDF2ZGhoUUNnK2VDN1ZjU25BempXUmI2MlRtdDRDTVFBMExUMXVWVGdGdmV6NWdEUVpQRGQ2djdMM1J4dGdTOTNqN2FtQUlFWUFKcTBQcHJpMVFDZ2dRZ3JCQUROQmQrMWY5L3kvMWFQSVJBRFFQUGRYOVBkdFZPQ0tRQUFUUWZmcmE2OVZiUmFBTFpnV2s4QkFqRUFOR0Y5UWdyYituRllJUUNvYm4yMkxNdGV4OVlXOXRaRTJiSlVXQ0VBYUxMNzd4V3JGb0E5cUpnQ0FORE1ubjlvb2U0OU5nU1d2Y2Z5M2dBQUZBKytSMVlsSndCYjFvcEFEQURGcmMvZWJzMWVRWWNDc1BmNHJkMGxyQkFBRkErK2U5MC9Od0JIVTRCQURBQkZyTTlSOTkrelB6RUE3Tm1ndlNtQUZRS0FJc0gzcUpoTEFIRDBIQUl4QUdTMVByR0ZlZlNjR0dpT25vTVZBb0Jzd2Zlb0tJK3NTU3dBZTFick1Ec1FpQUdnUnZjL0t1VFN6Mk1LQUlCNThEM3Eva2U3TXltRmZMVGJkRFFGQ01RQVlHNTlVb294Rm9BVTZMQkNBR0JtZlM3NThTUC9YL081V0NFQUtOTDlVN3A0eXZSZ0NnQkE5ajMvMUNKTUJTQVZQdDRiQUlBazY1TmF3QzA4SHlzRUFGSFdSOVA5TC9sd2l3SSt5Z0VxQzRZVkFvQmMzZjlTOFZrQWNBbENwZ0FBbU8vNVd4V2U1aGdXRUdtT3dUVUhBSFh3MVZpUGxnRFFXREVDTVFDb3JjK2wzUmR0NFZvQm9Ebk9wZDBvckJBQXFJS3Z0dnUzQm9BcWtCT0l4d1pBWTMwMDNWOWpmeXdCME5nZzdSUVkzUW9Kd1RlOWFGc0ZRSHNzQU1ENkZDazB6YkVzWWRJZWEyUXJKQVRmOUNJN1JjTDB3NTBieFJTdDFwcHA0UncxRUF2ZHYwekgzanJlNHpzM3Nqb2VVd0FBVElKdlNJZlY3TGJzRmV3N0lDTUIwT3hPaFV5b0VRT3hZSDNTaWt0ck1kWUFUTlpuZmwxckc2UTludGFpaFVBNm1oVVNyRTk4OXcvcHJ1dGpQbDRBc0xaQnA0cXZjelFySkhULytPNmYwcTMvQjZmQlZHRUtBRURTbm4vT29sb0NzT3orVzFNZ0JJQWNzSTcwM29BUWZPTjhkV2loTG85N3ZmRWFyNi9TajJ2NWVrY0p4SUwxaWV2K0liNTZYYWk3R1NXaVVFTnlRT2dVR01FS0NjRTNycHVHRnROODdDMzdzN1pCSVFDRVFodVVMd1lJeElMMXlWOUl5Mk5mSDd6ZXBRMktnU3NIdUwxYklTSDR4bG1KV0FBdVRxd0NBSVJZdDk0RHNXQjl3bmRUUWd0MEJ1REkvcXh0VU16eGMreGU5VzZGaE9BYjN2MWpDL1JhOGRwbkc1UVRnSmdwMEdzZ0ZycC9lUGNQdFQ5emdhcGZmd1FBb1RhSUtkQXBBS0hCTjZaN3hnQ2dzVDlMRzVRYmdCakllZ3pFTXJMMUtWVTQwKys0RGppUDZiR3hVeVkzeUwxWklSblorc1FVVFN3QW9lZFNBb0Nvck5HWkZSSzZmLzZ1K2RXakw0TFBaM3BPcStmVDB4U1FFZmY4WThOdnpPN0pwQWNmZmhwOFB0TnpRbjlQekc1V2FCanU3YjBCR2RYNnhCUkxqR1ZJS1phWTN4VnpUakZROTJLRlpFVHJFOXY5WTdwbHlzNUp6STVXcWZQcXhRb0ozYjlkdjF3cTE0dzhCV1MwUGYvU1JWSTYyNVNFdTRmM0JtUzA0QnZyazJ1OWNWVGlqYjJVZk9NOUVNdEkxaWVsKzhmNDVGcWd4K1NBbENuZzJRckpTTUUzcFRzRy8vbXpZVkdFd2g0TGVjb1U4QnFJWlNUclU3SXdMTDF4U1JzVU93VzhXaUVaSmZpbVdJTVlBR3BESDN1ZXNWdWlYZ094akdKOVluZEhhdHVmR2pib0ZKbXZQRm9oR1NINHBuYi9VQUJ5ZE1MUXlaY0NRTW9VOEJhSVpZVHVuMklKV3JBL3BXMVFTaGoyTmdXazkrQ2IyZzFEaXlGbkJ3eWRnQ25ubkJLR1BRVmk2ZDM2bEM2RW5FR3dwQTFLblFKZXJKRDBibjFTaXlBVWdKWW1ZZWx6OTJpRmhPN3Z3LzdVc0VFalRBSHBkYzgvZGVzelpqZWt4RDU0NkpxazdINmxib2w2ZUc5QWVnMitGaGUvTmZ0VHd3YWxiSWw2Q01UU3EvVko3ZjZoM2Eva3VBOVptOUxyNE0wS1NZL0IxNkw3dC93aHNqay85RGZYRkdnMUVFdVAxcWZHUlc5NWpVbzNBMDlXU0hvTHZoYSsxOFBuNk9mODNvTWNXNkt0Qm1McHpmcFlkUDlRMzF2andvWTBDb3NjWURVRldyTkMwbFB3dGVwMlhyNVFyblJUc0pnQ3JRVmk2YTM3Vy9qZEVQOWZjNnlIVElIUzYrSmxDa2hQd2RkcTFJZDB1cG9YTTZScFdFM0drOEdVYmlrUVN5L1d4NnJMZWZzKzNkSTJ5R29LdEdLRnBCZnJZOVg5UXdCb1lWY2p4QVpaclkvVkZHakJDa2t2M2Q5cXhIdXhQelZ0a0VVWWJtVUtpUGM5Zit2dUZuSnh2ZVVuS3dDc3RrUmJtS0xpUGZqV3VyQXR2YWxUd3daWlRZSGFqVVM4V3gvTGl4b0NRRXRiZVNFMnFNWmF0V3lGeEhQd3RlNytIdTFQVFJ0a09RVnFOUlR4Ykgwc3R6NURkamRhL0pzV3JRMnkzQzJ6MmhLdDJWVEVjL0MxdkpoZTdVOXRHM1F5dExJMUdvdDR0VDdXM1Qra20zbi9IM1MxMXEzRjVpSmVnNjkxSjlQNjJaYi9qNnQydWxybUFNc3dYQ01RaTBmcmsrTWlha2Q1eXgvMW9aMncxdGJSTWd5WGJqTGlNZmhhZC8rUUx0YkxKK2pWV3IvVzFsazhXaC9yN3EvMXNSNCsvbHM3YVMxelFJNHBVTW9LaWJmZ202TjdhUytlaDA4NjA2NjNkUlBKTVFWS3JMZDQ2LzdXL2pYRS8vZjBRY0kxMTdHbEtTQ2VnbStPMGEzdFhKNisvVVM3N3RicmFMMGxXbUxkeFpQMXlkRzF0UGFueCs5UnkyR0RyS2RBYmlza1hxeFBydTZ2QWNEajE0QnExajhIQURtbVFNNzFGeS9kUDhmSTd0SCsxTFpCT2NKd3ppa2dIdmI4YzNVcjdjWHkraVhRdFFDdzNoTE5lUjNFUS9DdGVhRThmd3Q2TFJ1VWF3cmttTVRpd2Zya3VrZ2FBRHphbjVCbVZITnRXN0JDMG5yd3pkWDllN2MvdFcxUXJpbGdQWkdsZGV1VFkrdFRlNEU4MjUrUXBwUnJmVStaR3FMbFZKYVdnMit1cmM4UjdFOExOaWpIbHFqMVpGWUI4UERCM2ZQVEoxZTdldkhzZy9NdlAzNmNSYjk5ZlMrTGZ2MytvNHUvKzhXemUxSDY2Y3Yzc3lqMjlWdzZ6Mmt0Y3ExenJycVlhdTZvSnFlYU5RTmdPdURibDdjUWNxT3BaZ0VBQVFBQUlBQUFBQVFBQUlBQUFBQVFBQUFBQWdBQVFBQUFBQWdBQUFBQkFBQWdBQUFBQkFBQWdBQUFBQkFBSU5TN0FBQUJBRUlBZ0JBQUlBUUFDQUVBUWdDQUVBQWdCQUFJQVFCQ0FJQVFBQ0FFQUFnQkFFSUFnQkFBSUFRQUNBRUFRZ0NBRUFBZ0JBQUlBUUJDQUlCUVkvb2JsM0VBWHBPZnJlb0FBQUFBU1VWT1JLNUNZSUk9Iiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyIsInB1cnBvc2UiOiJhbnkifSx7InNyYyI6ImRhdGE6aW1hZ2UvcG5nO2Jhc2U2NCxpVkJPUncwS0dnb0FBQUFOU1VoRVVnQUFBZ0FBQUFJQUNBWUFBQUQwZU5UNkFBQWVVMGxFUVZSNDJ1M2R1NjVzMlZVRzRFcjhBaWJuZEk0YzJnSEpJWEpnUklqZndFNjJBMUlnYzRCbFFXSkUwS0ZGUkFTaEpjdHlZSFZLeEJ1UU9OMXlSTFpScVZWTnVhakx1czA1eHh6akN6N1I5T2x6VHRYZXE5Yjh4MlZ0bjc3OXhaOS9BQUMxbkh3UkFFQUFBQUFFQUFCQUFBQUFCQUFBUUFBQUFBUUFBRUFBQUFBRUFBQkFBQUFBQkFBQVFBQUFBQVFBQUVBQUFBQUVBT0RpQjkvL3pzZFBmL0xGSnVmZjYyc0lBZ0F3b2ZOQi9vZGZmV3VUOCsvMU5RUUJBQkFBQUFFQXlCNEFmdjNQZi9MMS8vM0Z0NzhaQy9pYWdnQUFGQWtBZDM5TktBQUJBS2dYQUlRQ0VBQUFBV0JSS1BCVUFRZ0FRSkVBOEd6QlVDZ0FBUUFvRmdDRUFoQUFBQUZBS0FBQkFCQUFsb1VDeTRZZ0FBQ0ZBb0FuRUVBQUFBUUFvUUFFQUVBQUVBcEFBQUFFQUQrckFBUUFFQUFFQUU4Z2dBQUFBb0FBSUJRZ0FBQUNnQUFnRkNBQUFBS0FBT0JuRlNBQUFBSUFua0JBQUFBRUFJUUNCQUJBQUVBb1FBQUFCQUQ4ckFJRUFFQUFvTldpb1dzY0FRQVFBRlQvSUFBQUFvRDVQd2dBSUFBSUFBNTdFQUJBQUJBQUhQWWdBSUFBSUFENEtZQUlBSUFBSUFENDN3RkFBQUFFQUJ6MkNBQ0FBT0N3QndFQUVBQThZdzhDQUNBQTJNUUhBUUFRQUJ6MklBQUFBb0RESGdRQVFBRHdqRDBJQUlBQVlCTWZCQUNnVkFCdzJJTUFBQ1FQQUE1N0VBQ0F4QUhBTS9ZZ0FBREpBNEJOZkJBQWdPUUJ3R0VQQWdDUVBBQTQ3RUVBQUlvRkFJYytDQUNBQUFBSUFJQUFBQWdBZ0FBQUNBQ0FBQUFJQUlBQUFBZ0FnQUFBQ0FDQUFBQUlBSUFBQUFnQWdBQUFDQUNBQUFBSUFJQUFBQWdBZ0FBQUNBQ0FBQUFJQUNBQUNBQ0FBQUJGL2RVUGYvVHgzLy80aTd2T3YrWnJCQUlBa05ESC8veis0Ny8rK2tjZjc3Lzd6VGNILy9tZnovL3UvR3UrUmlBQUFNbjgvSisrUHV5Lyt0T3ZnOEFsQUp6LytmenZ6cjkyL205OHJVQUFBQksxL2kvVi82WGFmL1RQUmdFZ0FBQkpmUFc3MzN4VDZWOVgvZGZkZ01zL24vOWJYek1RQUlBazFmL2xrSCsvQ2dPWFEvOHlHcmlFQTEwQUVBQ0FCSXQvdHdmK2t2L2YxdzRFQUdEeTF2K2wrci9NK2U4ZCtPZGYrNk1SZ1ZFQUNBREF2SzMvNjhQK2NyamZDd0NYa0hEOTc0d0NRQUFBSnEzK0wvUDk2L24vMG4rbkN3QUNBRERaTS8rM3JmMUgxZjY5cnNEMXFNRFBCZ0FCQUppczlYOWQxVjhmOUk4Q3dQVy92M1FCakFKQUFBQW1hdjNmVnY5ckE4QWZMUXdhQllBQUFNeFIvViszOUsvYi84OEN3TFBmb3dzQUFnQVEvSm4vMjBOK2F3QzQvVFZmWXhBQWdNQ0xmNjhPOHV0ZmV4WU9ibi9OUWlBSUFFRGcxdi90SWI0bkFOeitYcU1BRUFDQWdJdC90OHQvdHdmOHF3QncrK3ZYeTRBV0FrRUFBSUsyL3E4Zi9Uc2lBTncrRW1nVUFBSUFFR3p4NzE3MWY5dkNYeElBYnNjQXQxMEFDNEVnQUFDQld2LzNxdi8zUnYrTlVRQUlBRUNBeGI5N2xmdVM2bjVwbCtEZWYyTWhFQVFBWUhEMWYrL1F2dGU2WHhvQWJrY0pkM2NGZEFGQUFBREdMZjZ0T2RpUC91OHNCSUlBQUF4cS9kK3IvdS9ON2RjYzdQZjJBTzUxQVl3Q1FBQUFCclgrN3gzcWp3N3JwUUhnVWFpNHV5OWdGQUFDQU5DLytyODNyNzgzLzIvNTMrb0NnQUFBZEhybS8xbXJmazFWdjZaYjhHaTA0R2NEZ0FBQWRGcjhlMVNsUHpyUTF3YUFSLy85b3k2QWhVQVFBSUFPcmY5SDFYL3JBUENzQzJBVUFBSUEwSER4NzFtTC9sSDdmMHNBV1B0M1dBZ0VBUUJvMlBwL2RwajNDQURQZm85UkFBZ0FRSVBGdjYwSDg3UGZzeVUwUFBzOXZuY2dBQUFIdC82ZkhjbzlBOERUM1FHakFCQUFnT01XLzE0dC96MDd5TGNHZ0dlLzcvMUpTTEVRQ0FJQWNHRDEvK2pSdnhFQjRORWpnYm9BSUFBQUJ5NytQYXYrbjdYazl3U0FWMk9BWjEwQUM0RWdBQUE3Vy8rdnF2OW4xZmpJMzJzVUFBSUFzS1AxLzZvUzMxUEY3K2tldlBxOVJnRWdBQUE3cXY5WGgvRDdqdkR3NmhCL05YcDRGVDUwQVVBQUFGWSs4My9FQVI3aDkvc2Vnd0FBckZqOFcxTDl2NXJESDNHQVA5c0RXTklGc0JBSUFnQ3dvdlcvNVBCK2RmZ2VFUUJlaFpBbGY0WlJBQWdBd01MRnYxZno5eVh6L3loL2hvVkFFQUNBQmEzL0phMzNvNnIzSTdvSVMwWVJSZ0VnQUlERnZ4ZUg1WktxZThtaGUxUUFXQkpHWG5VQkxBU0NBQUJhLzUwTzdtaC9qbEVBQ0FCZzhXOUh5MzFKKy8vSWcvdkkxMlFoRUFRQTBQcmZlR2hIRFFCTC95elhBZ2dBWVBHdjRVRzc1TTg2TWt3cy9iTXNCSUlBQUZyL0d3N1p5QUZnNldzekNnQUJBQ3orcmRpMlgzcGdIeDBBbHY1NVM1NU9zQkFJQWdDby9sYzgramREQUZqNlNLQXVBQWdBVUg3eGIwMzF2N1RGM2lJQUxCMERMTzBDV0FnRUFRQkt0LzdYVlAvdnlmNU1vd0FRQUtCazYzOU5aZDJpV20vVlZWanpaeG9GZ0FBQTVhci9OWWZxbXRaNnF3Q3dkRlN4YXJkQUZ3QUVBS2owekgvTGczcTJQOWZQQmdBQkFNb3MvcTJwL3RmTTFWc2UxR3YyQU5aMEFTd0VnZ0FBWlZyL0xRL1RWZ0dnWldneENnQUJBTkl2L3EyZHA2K1ovOC84WjFzSUJBRUFVcmYrMTFiL0xhdjBsdDJGdFYwQW93QVFBQ0R0NHQvYUtuckxJZG95QUt3TkwydTdBQllDUVFDQWxLMy8xZ2QwaGovZktBQUVBRWkxK0xlbGhiNjIvZC9qZ0c3OUhpd0VnZ0FBNWF2L0RBRkFGd0FFQUNpNytOZnI0Tnp5ZC9RSUdWditEdGNZQ0FBd2ZldC95NkdaS1FCczJqVXdDZ0FCQUdadi9hL2RudDk2TVBjS0FGditudmNOb2Nrb0FBUUFtTHI2WC92b1g4WUFzUGFSUUYwQUVBQmcybWYrdDFiL1cxcm1QUVBBMWpIQWxpNkFudzBBQWdCTXQvaTM5VkRPR2dDMi9sMnVQUkFBWUtyV2YrK0Rjc3ZmMVROc2JQMjdqQUpBQUlCcEZ2LzJISkx2SGNQRzFrTjU2MmhqYTdpeEVBZ0NBRXpSK3U5OUlGZjQrMXlMSUFCQTZNVy9QZFgvbG0zNVVRZnlscWNiOW5RQkxBU0NBQUNoVy84akRzY1JBV0JFeURFS0FBRUF3aTcrYloyUDc1bi9WL2s3TFFTQ0FBQWhXLzk3cXY4UjFmaW9yc09lTG9CUkFBZ0FFRzd4YjA5VnZPZFFIQlVBOW9TZHJWMEFDNEVnQUVDbzF2L0lnN2phMzJzVUFBSUFoRm44MjlNUzM5UCtIM2tRajN6UEZnSkJBSURwcS8rcUFVQVhBQVFBbUhyeGIrUkJ1UGZ2SGhrKzl2N2RGZ0pCQUlDaHJmKzloMkRsQUxEM3ZSc0ZnQUFBUTFyL2U3Zmg5eDdBb3dQQTNyOS96OU1QUmdFZ0FNQ3c2bi9QbzM4Q3dQNUhBblVCUUFDQXJzLzhIMVg5NzIyQlJ3Z0FlOGNBZTdzQWZqWUFDQURRZGZIdmlNTlhBRGptTlZnSUJBRUF1clQrb3h4OFI3eUdDQ0hraU5kZ0ZBQUNBRFJmL0R2aTBEdWk5UjBsQU93ZGhSeXlpMkFoRUFRQWFOMzZqM0x3ZWgxR0FTQUFRS2ZGdnlPcS95TzIzeU1kdkVjOERYRkVGOEJDSUFnQTBLejFIK213aXhJQUlvVWlvd0FRQU9Ed3hiK2o1dDFIelArOUZndUJJQURBWk5WL3BLbzdVamRDRndBRUFBaTMrSGRVbFh2VUlSY3RBQndWam83cUFsZ0lCQUVBcmY5RERwUm9CNjdYWXhRQUFnQTBidjBmMmVJK3F2MGY4Y0NOOWpVeUNrQUE4RVZBOVIvbXNCVUFkQUZBQUlBSm52bVBlckFkK1pvaWhwSWpYNVBQQWdJQVdQd2J1dnduQVBSZkJyUVFpQUFBV3Y5RHQ5dVBQbWlqQm9Balg5ZFJUMHNZQlNBQWdNVy9vZFcvQURDdUMyQWhFQUVBdFA2SFZQOUh0djhqQjRBanh3Qkhkd0dNQWhBQXdPSmY5ME5XQUlqeDJueEdFQUJBNjMvcWcrekkxeFk1bkJ6OTJvd0NFQURBNGwvWFErdzljRGc1K3BBOWVuUnlkSGl5RUlnQUFLci9LUTlZcjA4WEFBUUFPSGp4cjBYMWYrUTIreXdCNE1pbkoxcDBBU3dFSWdDQTF2OTBoOWNNQVdDR0VHVVVnQUFBV3YvTjV0Y3Q1djllbzFFQUNBQ28vb05YL3pOVTE3TjBLWFFCUUFDQXc1LzVuK25RbWlVQXpCQ20vR3dBQkFBbzN2cWY2V0QxT245dkZBQUNBRnIvY2F2L0ZuUHJtUTdXRm5zQXJib0FSZ0VJQUtENkQzOVl6UklBV29VcVhRQVFBUERNZjdtRHF0VnJuU21zdEhxdGZqWUFBZ0FVVy94cjFhb1dBTm9GZ0JhakZRdUJDQUJRcVBYZmFsdTkxWUU2V3dCbzlYcGJQRjFoRklBQUFJVVcvMXBWL3dKQSs5ZmJxZ3RnSVJBQkFKSzMvbHRXLzYzYS96TUdnRlpqZ0ZaZEFLTUFCQUJJdnZqWDhqQVZBTm9IZ0phdjJVSWdBZ0FrYmYzUGVqQzFmTTB6aHBhV3I5a29BQUVBRWk3K3RUeVVXcmFtWncwQXJVWXRUWGNYTEFRaUFJRHFQOHBCNm5YckFvQUFnTVcvb0JYcGU4T3V4YXdIYWN1bkxWcDJYQ3dFSWdCQW90Wi95OE9vWlV0NjVnRFFjdVRTT25RWkJTQUFRSUxXZit2cXYzVTE2cldQZWUxR0FRZ0FvUHBQVzBYUDNMM1FCUUFCQU0vOHB6MkVaZzhBczRjdlB4c0FBUUFtWGZ5Yi9RRDErc2UvZnA5UkJBQ1lyUFhmby9wdlBZZk9jSUMyM0FQb01vSXhDa0FBZ0xrVy8zb2NucTBQbnd3Qm9IVUk2L0VlTEFRaUFNQkVyZjhNQjArUDk1QWh4UFI0RHo2ekNBQXd3ZUpmajlhekFCQW5BUFFZeFZnSVJBQ0FDVnIvcmJmUGV4MmNXUUpBai9mUitta01vd0FFQUFpKytOZXIraGNBWXIyUExndVpGZ0lSQUtCMjlkK2ovWjhwQVBRWUErZ0NnQUJBNGNXL1hvZW1BQkF6QVBSNkx6N0xDQUFRclBXZjdhRHA4VjR5aFpsZTc4VW9BQUVBQXJYK2V4NHlBb0R2alZFQUFnQVVxLzU3SFpoYjNzL2JwNjlsZVQrNkFDQUE0Sm4vTU10L1BiYk50eDZZM3dTdW9BR2d4OU1adlpZQi9Xd0FCQUFJMFBydmViajBhakd2RFFCZmZ2cS9yL3VYbjJJR2dGNWpnSjRoelNnQUFRQUd0djU3VmY4OXE4dTE3K250S2dDc0hRTzgrejRaQlNBQWdPcC96bXI1LzRXdkJGME5YUUFRQVBETWY3bERaVTBBdUc3L2J4a0Q5QXdBR2NPYW53MkFBQUNkRi85NnpwVjdINVJyM3RmYm5RRHc5bW4rOXpYVDk4dENJQUlBV3Y4ZFcvODlxLytlYytXMUIrWERIWXlBQjJYUFBZRGVYUUNqQUFRQUxQNGxyQ1o3SHlaTDM5dTk5di9hTVVEUEFOQTd0SFhkYjdBUWlBQ0ExcitEcE5kN2Uzc1NBTmFNQVNLR214bURtMUVBQWdBVy81SzFrcU1HZ0pjZEdRR2c2K2pHUWlBQ0FGci9pYmJKZXgrUVN3UEFzL2IvMmpGQXhQYzM0OU1iUmdFSUFGajhTMVQ5UnowZzN4WUVnRGNCWUVnWHdFSWdBZ0NxL3dRdDVON3QvNlVINU9MdlQ4QUFrUDE3cUF1QUFJREZ2d1RWWThRQXNLVDl2MllNa0QwQWpIaVBGZ0lSQU5ENmQzQWMvaDdmVmdTQUpXT0FxRjJPMllPY1VRQUNBRnIva3g0YVVRUEE2dStWQURCbTE4RW9BQUVBMWYrYzFmK0lnL0hWKzF6VC9sODZCb2o0UG5VQlFBQ2crRFAvb3g3OUc3RTl2dVJnZk5zUUFONENCb0FSVDNQMGZpVFF6d1pBQU1EaTM0U0h4WWlXOFpJQXNIbGtFeXdBakJvRGpBaDFGZ0lSQU5ENm42ajZIMVV0UG51dlc2ci9KVjJBaU84MTIvZlZLQUFCQUl0L2sxVC9FYXZpenp1K2Q1Ky9tSy9ia2FrTFlDRVFBUUN0ZjRmRTVnQ3dPOEFGQ3dEVndwMVJBQUlBRnYrQ3o0bEhIWWpQM3UrZTl2K1NNWUR2cjRWQUJBQUkwZm9mV2YyUG1oTS9PeEEvSC9COWZEWUdHUFYrUit3QkRCM3hHQVVnQUdEeEwyNTFPT3B3ZVBhZUR3dHp3UUxBcUpBMzhqMWJDRVFBUVBVZmNENDhjdjcvNkQwZjBmNS9OUVo0OTMzV0JVQUFnTkdMZnlOYnd4R3I0YzhIZms4ZmpRRWlkajB5ajNvc0JDSUFvUFVmckNvY2VSQStDZ0NIZDNVbWVkK1p1d0JHQVFnQWFQMEhxLzZqSFlSSHR2K2ZqUUdxQm9DaEM1OUdBUWdBcVA1anRJUkh0djhmSFlTZkczeC83NDBCUmdhQXl0OXpYUUFFQUR6ekg2QWFqQmdBbW5WNEJJQXc3OTA5QndHQThvdC8xUStDSHUzL1oyTUF3YzlDSUFJQVd2OGxENEZvQWVCencrLzF2VEdBNzcxUkFBSUFGdi9LVmYrakQ4Qjc3Ny81OXp2NCs2LzAvYmNRaUFCQTJkYi95RWYvUm0rRDN6c0FXN2IvSDQwQlJyLy9rVTkvakg0azBDZ0FBWUNTaTM4UmJ2NmpXOEMzQWVCemgrLzU3UmhnOVBzZlBRYUlFQUxkaXhBQUtOWDZIMTM5UjZqK2JyOEczYjczZ2I4R0ZhOERvd0FFQU1vcy9rV28vS0pWdnozYS8vZkdBTkc2SUZVN1FSWUNFUUFvMGZxUGNOT1AwUHE5RGdEZE8wQ0JEci9SbzZBSVlkQW9BQUdBOUl0L1Vhci9DQWZmNWV2dzVhZisxOEdYbitKOUhhcGZEeFlDRVFCSTNmcVBVUDFIbVB0ZUgzeHZBd0xBVzZBQUVHRVBJRW9Yd0NnQUFZQ1VpMzlScXIwb04vdkwxMkxZOVJBa0FFUUpoU0gySVN3RUlnQ1F0ZnFQTU8rTk1QKy9mQzFHdFArdnh3Q1J2aGF1QzEwQUJBQ1NMdjVGYWZWR3FucmZCZ2FBeXhnZ1VqZkVhTWhDSUFJQXlWci9VYXE4S0FmZUpRQU12emFDZlQxMEFZd0NFQUJJMXZxUFV2MUhPdkJHdHYrdnh3QUNRTXd1Z0ZFQUFnQXBxdjhvTGQ0bzdmK3p0d0FCNEMxUUFIQ042QUlnQUpEb21mOW8xVjJrQUdBL0pHWUFpTlFsOHJNQkVBQndZMDkyWS8vM3YvbjdNTmZKK2JVSWlvSWlBZ0JhLzJsdjZwRUN3Ti85OE1kaHJwWHphM0d0QkY0V05RcEFBR0MyeGI5bzFiK3FUcmRvMXV2RlFpQUNBRlBkekNNOSttZTV5N0xvckk4RUdnVWdBRERkNGwra1IvOHNkbGtZbmZtUlFBdUJDQUJNMC9xUFZ2MUhxdVowamx3M1JnRUlBS1JkL0l0V3lXbi9Hd1BNM2pteUVJZ0F3QlRWZjdTYmVKUldidVEyYnBReFFMVFJVYVJsUUYwQUJBQkNMLzVGcS80alZYR3VJOWVQaFVBRUFOSzIvcU5WLzFIbXVETXNjVVhwQWtUYUE0allCVEFLUUFBZ1hPcy9ZdlVXNWVZOVErczJ5dlVVTFVSRzdBSVlCU0FBcVA1RDNaU2l6Vy85Yjd6UE9RWndIZWtDSUFBd3liUGJVVnUzVVNxM21aN2hqbkpkUmJ1T29qMFM2R2NESUFCWS9GUDlhLzhiQXhUdEFsZ0lGQUI4SWJUK1ZmL0JBNEJ3bVNNQVJPd0NHQVVJQUZqODA3TFYvamNHS0xnTWFDRlFBRURyWDdVVzlHWTk0ODA1U3NpTWVFMUZleVRRS0VBQXdPS2ZHN1gydnpGQTRTNkFoVUFCQUsxL04rbEFBV0RtbTNLRXNPbmFNZ3BBQUNEbzRsL1U1VC90ZjJPQWFzdUFGZ0lGQUxUK3l6LzZGeWtBMkRmSkdRQ2lQaEpvRkNBQVlQR3ZmUFd2L1c4TVVMVUxZQ0ZRQUVEcnYzVDFINkU2eXpDUGpUQUdjSjBaQlNBQVdQeXovS2Y5Ynd5ZzAyUWhFQUZBOWUrbUhMYzFtMmtPRzJFTUVIWFVGUFdSUUYwQUFRQTMzcExWZjRTcUxGUDFGYUVMNVhvVFJCRUF0UDVWLzFQTVpTMmgxdGtEaU53Rk1Bb1FBTkQ2TDFPTlJiZ1paNnk2SW5TaklsOXprYnNBUmdFQ0FLci9FdlBZQ1BOL2o2SzY3blFCRUFCSTljei9ESzNZMFpWWTVtcHJkRmNxZXVmcFBYRFh6czhHRUFEUWFrMWRoV24vR3dQb0FsZ0lGQURRK2k5NEE0NFFBSFNuWEg5R0FRZ0FwRnI4bTZFRnEvMXZER0FaMERVcUFLQzlXckQ2R24zenJkQmlIWDJkUmc4QU0zUUJqQUlFQUxSVzNYaTEvNDBCQ25ZQkxBUUtBR2lycHJycGpnNEFsVnFybzY5WDE2THJGUUhBNHA5SC83VC9qUUU4RW1naFVBQkFOVlgxMGI4SUFjRElTZ0NZNlpGQVhRQUJBSXQvS2FwLzdYOWpBRjBBblNzQkFLMy9ndFgvNkdxcjRrMTBkSGgxWFJvRklBQ29vRlJhMnYvR0FEcFRPbGdDQUtyL2lqZlprYTNXeWpmUGtTRjJsdEhVREk4RTZnSUlBSGptZjhycWYzU1ZWWG1HT25vTTRQclV5UklBZkJIY05BdFgvNlBuck1Lc1BZQXNYUUFMZ1FJQVd2OVRWVmNqYjY1bXAyUEhBTE9FMUptNkFFWUJBZ0RGRi85bW1hK09uditybU1aMnRGeW5RcTBBNEl2Z1JsbTB0VHE2c25KZGp4OER6SEtkenZKSW9HQXJBRkI0OFcrbXFtcmtUZFZOTWthNG5TbXN6dElGRUc0RkFBcTIvbWVicTQ2Yy81dVZ4dGh0Y2IwYUJRZ0F1RGtXYTZscS8rdHd1V2FGWEFIQUYwSDFYN0NhR25rejFmNlBOUWFZNlpyVkJVQUFjRk5VL1d2LzYzUUpyaFlDRVFEY0VGWC9Nd1VBMTNlc01ZQnJWK0FWQU5ENkw3Sk5yZjJ2NHpWejkycW1Sd0tOQWdRQWtsZi9NejM2TnpvQXFJWmlYdmV6WGIvdmt4VUlybnNCZ0dUUC9NOWEvV3YvdS9abkh3UE0xZ1Z3N1FzQUpHejl6MWo5ajZxZXRQL2pqZ0ZjeDBZQkFnQmEvOGtySisxL240RXNZNERabGdGOUJnUUFFbFgvTTk0MFI3Wk9YZU94eHdDempiSm1leVJRRjBBQUlNa3ovN05XLzZPcUp1My8rSjhGMTdQUGdnQ0F4YitrMWYvSXVhbldaL3d4d0l4N0FETjJBWFREQkFBbWIvMjdXYnJoWlF6RVFxMVJnQUNBeGIrRTg5SlI4Mzh0ejNuR0FLNXJYVEVCQUszL2hOWC9xSG1wRzkwOHdYakdQWUJadXdBNll3S0FLa2Yxbi80bTZWcWZKeHpQR201bjdRTG9qZ2tBS2h6TGYybm4vMjV3OHdWazE3Y09tUUNBeGI5RUxkSlI3WC9YK254ZEFOZTRoVUFCQU5WL291cG94TTNSalczT29EeHJBTkFGUUFCUTFiZ3hhdjhiQXdpNkZnSVJBRlEwYm9xakFvRHJmZDdBN0ZvM0NoQUEwUHFmZkR0YSsxOW9ydGJ0ZXArNHlEQUtFQURjeUR6Nk4zMEEwUDZmZXd3d2N3Q1k5WkZBd1ZrQWNCTlQvV3YvWXd4UXVBc2dQQXNBYm1DVy82WU5BS3FZSE4yem1hLzVtWmNCQldnQndNM0w4cC8yUDhZQUJaY0JoV2dCd09LZjZuL2FWcWpyUGtjWGJmYlIxK3hkQUF1QkFvQ2JsdXBmK3g5amdJSmRBR0ZhQU5DMlZQMVB0UTJ0L1ovcjh6VHoweThadWdBK1R3S0ExcjlILzZhNStibjJjM1hVaEdDakFBR0Fjb3Qvczg4L1I4ei90Zi96ZmE1OERpd0VDZ0NvL3MwL3RTdUxqZ0ZtL3h6b0FpQUFXUHdyVmZXTXVPbTU5bk4rdmpLRTRkbTdBRDVmQW9BV3BibG4yUG0vTm1YZXo1alBnMUdBQUVDSjFuK0dscWYydnpHQXowUytSd0tOQWdRQWxZbHFKK1ROenZXZmV3eVE0VE9oQzRBQTRKbC9OenJWdjgrYllPeG5BeUFBYVAzbld2NGJFUUMwSmZOLzVySUVnQXpMZ0Q1ekFvRFd2MjFuN1g5akFOMnhnbzhFR2dVSUFLcC8xWCtJQUtBZFdXY01rT1h6b1F1QUFPQ1ovNVRWdi9hLzhHME1VS01Mb1BzbUFGajhVOTBNRFFBK0IzVUNlSllBa0dVWlVBZE9BTkQ2ZDJQVC9oZkNCZVdDandUcXdna0FGdi9jMUlhMU50MTQ2Z1h4TEtPeVRGMEFDNEVDZ05hLzZsLzczeGpBNTZWb0YwQTNUZ0N3K0ZlNCt1KzkzZXlHVXpPUVozcGFKbE1YUUNBWEFMVCszY3kwLzQwQmhPYUNqd1FhQlFnQUZ2OEt6ek43ei85OUh1cDI1WHh1TEFRS0FLcC8xWC9SZWFiMmYrMHhRS1k5QUYwQUFjQVhvdGppWDdZcXB2ZE5USlZSdXp1WExUeG42d0lJNkFLQTFuK2hPV2J2K2IvUGhER0F6NDlSZ0FDZzllL1J2MklWak9wQ2x5NWpCeTNUSTRGR0FRS0E2cjlROWRMejVxV3k4Rm5OR0tKMUFRUUFrai96NzhhbC9lL3pLa2hYNlFMNHZBb0FGditTdHk1N0JnRHRmNS9aekFFZzJ6S2d6NndBb1BXZmVIdTVkOVhpYzZFTGtMMmI5cDVzMzhrb1FBQ3crSmU0K3U4VkFDd1YrZXhXQ0FBWnV3QSt1d0pBK2RaL3h1cGYreDlqQUYwQW4xOEJ3T0pmd1dxbFp3RHd1ZkFacmhJQU1pNEQrZ3dMQUdWYi8yNVVXb2creDRKMTVVY0NmWTRGZ0pLTGY1bHZVcjFhbGRxSHhnRFZSbXRadXdBV0FnVUExYjhxUmV2UUdNRG5TeGRBQVBCRnlMdjRsN242NzdXdDdJWWgwRmQ4dWlaekYwQkhUd0FvMGZwM2MzS3pFT3FGYkk4RUdnVUlBQVZiLzFubmt6M24vejRmeGdBK1owWUJBb0RxWC9WZmJEN3BKaUhjVjk4RDBBVVFBRlFJbHY5SzNwUzAvNDBCaE8zYzkwZ0J3TTNCOHAvNXY1dURrTy96Vm13WlVNZ3ZIQUF5dC80elYvKzk1cExhLzhZQTlnQnFkQUVxandKT2JncXFmemNqbFlGT245QmR0UXRRT2V5ZjNCQlUvMjVFMnYvR0FJSjM1UzVBMWNCL2NqUHc2SjhBb0NMUThSTUFxajRTV0RuMG45d0lQUHFuQ2xFTjZQcnB2bFYrSkxCcThDOFZBTEl2L21Xdi9uc0ZBQWVtenA4QVVMTUxVRzBoOE9RR29QclgvbGY5NndJWUErZ0MxQ3NBVGo3OGx2OEVBSThFNlFBS0FKWUI2eFVCSng5OGovNjU4V2ovNndJSzRoNEpyRmNJbEFnQTJSZi9LdHgwZWdRQTdYK2RRSjlGWFlCS0M0RW4xYi9xWDlXaC9XOE00UE9vQzFEdmZuRFM4clA4Wi90WSs5OFl3Tk00bGdIcjNSTk9XdjhlL2ROeTFQNDNCakFHOEVoZ3ZWSEFTYXRQOWEvYTBQNDNCdkM1MUFXb2QyODRxZjVWLythTjJ2L0dBUFlBZEFIcWRRRk9XbnlXLzZyZlpMVC9qUUdFYzh1QUZlOFJKK25lbzMvVjUvL2EvOFlBUHA4ZUNhellKVHhwL2F2K3E4OFpIWWpHQVBZQWRBRXFqZ0pPVXIzcXYvTE5SZnZmR0VCSTF3V28yaTA4U2ZTcWYrMS9oNkV4Z0tDdUMxQ3ZZM2lTNWozNlZ6a0FPQWlOQVFRQWp3Ulc3UnFlSkhtUC9tbi9Zd3lnVytlUndIcWR3eFFCNEt0Q0YxNmw2cjkxQU5EK3AzWHhVQ2tBVk9vQ1pGa0lQUGtBVy83VC9zY1l3R2ZXTW1DOUF1TGt3MnY1citMTlJQdWZYbU9BU3AvWlNzdUFHWXFJazlhLzZyL2lqY1RCUjY5Q1FuQTNDaEFBdFA3ZFJJSUVnT3ovQzEvRUtpWjhkbzBDU2dlQUgzei9PeDgvL2NrWGgvcmx6Nzc3OGR0Ly9jc3kvdk1mdmxkS3k2L2xmL3pMWDN6ODhtZmZDK1hmL3ZiUFNvbjI5VDlmRXo2L2MzeCtvem1mUlVlZmIrY3pNMDBBT0wraFAvenFXd0RBQytjelV3QUFBQUZBQUFBQUFVQUFBQUFCUUFBQUFBRkFBQUFBQVVBQUFBQUJRQUFBQUFGQUFBQUFBVUFBQUFBQlFBQUFBQUZBQUFBQUFVQUFBQUFCUUFBQUFBRkFBQUFBQVFBQUVBQUFBQUVBQUFRQUFRQUFCQUFCQUFBRUFBRUFBQVFBQVFBQUJBQUJBQUFFQUFFQUFBUUFBUUFBQkFBQkFBQUVBQUVBQUFRQUFRQUFCQUFCQUFBRUFBRUFBQVFBQVFBQUJBQUJBQUFFQU45VUFCQUFBQUFCQUFBUUFBQkFBQkFBQUVBQUVBQUFRQUNJSHdBQWdGZ0VBQUFRQUFBQUFRQUFFQUFBQUFFQUFCQUFBQUFCQUFBUUFBQUFBUUFBRUFBQUFBRUFBQkFBQUFBQkFBQVFBQUFBQVFBQUVBQUFBQUVBQUJBQUFFQUFBQUFFQUFCQUFBQUFCQUFBUUFBQUFBUUFBRUFBQUFBRUFBQkFBQUFBQkFBQVFBQUFBQVFBQUVBQUFBQUVBQUJBQUFBQUJBQUFRQUFBQUFFQUFCQUFBQUFCQUFBUUFBQUFBUUFBRUFBQUFBRUFBQkFBQUFBQkFBQVFBQUFBQVFBQUVBQUFBQUVBQUJBQUFBQUJBQUFRQUFBQUFRQUFCQUFBUUFBQUFBUUFBRUFBQUFBRUFBQkFBQUFBQkFBQVFBQUFBQVFBQUVBQUFBQUVBQUNna2Y4RmwyeUJyWjR2MUZjQUFBQUFTVVZPUks1Q1lJST0iLCJzaXplcyI6IjUxMng1MTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwicHVycG9zZSI6ImFueSBtYXNrYWJsZSJ9XX0=">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="icon" href="data:image/png;base64,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">
+<style>
+  :root{
+    --red:#C41E3A; --red-dark:#8E1428; --gold:#F2B705; --cream:#FFF8E7; --ink:#0E1626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0E1626;
+    overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+    font-family:-apple-system,"Avenir Next","Trebuchet MS",Verdana,sans-serif;color:var(--cream)}
+  #stage{position:fixed;top:env(safe-area-inset-top,0px);left:env(safe-area-inset-left,0px);
+    right:env(safe-area-inset-right,0px);bottom:env(safe-area-inset-bottom,0px)}
+  #c{display:block;width:100%;height:100%;touch-action:none}
+  /* Visible error / status banner: the target device has no attached debugger, so
+     anything that would normally be console.error has to be readable on-screen. */
+  #toast{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);
+    z-index:20;display:none;pointer-events:none;padding:10px 12px;border-radius:12px;
+    background:rgba(14,22,38,.94);border:2px solid var(--gold);color:var(--cream);
+    font-size:15px;line-height:1.35;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+  #toast.err{border-color:#FF6B6B}
+  #toast b{display:block;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin-bottom:2px}
+  #toast.err b{color:#FF9B9B}
+</style>
+<div id="stage"><canvas id="c"></canvas></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+/* ============================================================================
+   MATH CIRCUS: ACT 1 - fan rebuild (single-file, offline, touch-only)
+   Sections: constants | save | audio | engine | draw helpers | hub | games | boot
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- constants */
+const C = {
+  red:'#C41E3A', redDark:'#8E1428', redLight:'#E2536B',
+  gold:'#F2B705', goldDark:'#B98B00', goldLight:'#FFD95C',
+  cream:'#FFF8E7', creamDark:'#EFE0BF',
+  navy:'#12203A', ink:'#0E1626', slate:'#3B4A63',
+  green:'#2E9E5B', greenDark:'#1F7442', blue:'#2F6FB5', purple:'#6B4BA8',
+  sawdust:'#E0C48C', sawdustDark:'#C9A96A', white:'#FFFFFF'
+};
+const DISPLAY = '-apple-system,"Avenir Next","Trebuchet MS",Verdana,sans-serif';
+/* Numerals get a stack whose 1/l/I and 0/O are unambiguous at small sizes. */
+const NUMER   = 'Verdana,Tahoma,"DejaVu Sans","Helvetica Neue",sans-serif';
+const DIFFS = ['easy','medium','hard'];
+const DIFF_LABEL = {easy:'Easy', medium:'Medium', hard:'Hard'};
+const DIFF_COLOR = {easy:C.green, medium:C.blue, hard:C.red};
+
+/* ------------------------------------------------------------------- save */
+const SAVE_KEY = 'mathCircusSave';
+const SAVE_VERSION = 1;
+const GAME_IDS = ['seals','trapeze','magician','traffic','cannon','riddle',
+                  'balance','tickets','elephant','bolts','clowns','lions'];
+/* Which per-game number we keep, and whether bigger is better. */
+const SCORE_FIELD = {
+  seals:'bestMoves', trapeze:'bestStreak', magician:'bestHits', traffic:'bestTries',
+  cannon:'bestShots', riddle:'bestMisses', balance:'bestMoves', tickets:'bestCorrect',
+  elephant:'bestPours', bolts:'bestTaps', clowns:'bestMoves', lions:'bestFixes'
+};
+const SCORE_HIGHER = {trapeze:true, tickets:true};
+const SCORE_LABEL = {
+  seals:'Fewest swaps', trapeze:'Best clean run', magician:'Fewest hits', traffic:'Fewest tries',
+  cannon:'Fewest shots', riddle:'Fewest misses', balance:'Fewest moves', tickets:'Best served',
+  elephant:'Fewest pours', bolts:'Fewest taps', clowns:'Fewest commands', lions:'Fewest fixes'
+};
+
+function freshSave(){
+  const g = {};
+  for (const id of GAME_IDS) g[id] = {stars:0, [SCORE_FIELD[id]]:null, difficulty:'easy'};
+  return {version:SAVE_VERSION, games:g, settings:{sound:true}};
+}
+let gameState = freshSave();
+
+function loadSave(){
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch(e){ raw = null; }
+  const fresh = freshSave();
+  if (!raw) { gameState = fresh; return; }
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch(e){ parsed = null; }
+  if (!parsed || typeof parsed !== 'object') { gameState = fresh; return; }
+  /* Merge field by field so a partial or older blob can never throw. */
+  const out = fresh;
+  if (parsed.settings && typeof parsed.settings.sound === 'boolean') out.settings.sound = parsed.settings.sound;
+  const pg = parsed.games && typeof parsed.games === 'object' ? parsed.games : {};
+  for (const id of GAME_IDS){
+    const src = pg[id];
+    if (!src || typeof src !== 'object') continue;
+    const st = Number(src.stars);
+    if (Number.isFinite(st)) out.games[id].stars = Math.max(0, Math.min(3, Math.round(st)));
+    const f = SCORE_FIELD[id], v = Number(src[f]);
+    if (src[f] !== null && src[f] !== undefined && Number.isFinite(v)) out.games[id][f] = v;
+    if (DIFFS.includes(src.difficulty)) out.games[id].difficulty = src.difficulty;
+  }
+  gameState = out;
+}
+function persist(){
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(gameState)); return true; }
+  catch(e){ toast('Progress could not be saved on this device.', true); return false; }
+}
+function recordResult(id, stars, scoreValue){
+  const rec = gameState.games[id];
+  if (!rec) return;
+  rec.stars = Math.max(rec.stars, stars);
+  const f = SCORE_FIELD[id];
+  if (Number.isFinite(scoreValue)){
+    const cur = rec[f];
+    if (cur === null || cur === undefined) rec[f] = scoreValue;
+    else rec[f] = SCORE_HIGHER[id] ? Math.max(cur, scoreValue) : Math.min(cur, scoreValue);
+  }
+  persist();
+}
+
+/* ------------------------------------------------------------------ toast */
+let toastTimer = 0, lastToastMsg = '', lastToastAt = 0;
+function toast(msg, isError){
+  const el = document.getElementById('toast');
+  if (!el) return;
+  const now = Date.now();
+  if (msg === lastToastMsg && now - lastToastAt < 4000) return; /* don't spam */
+  lastToastMsg = msg; lastToastAt = now;
+  el.className = isError ? 'err' : '';
+  el.innerHTML = '<b>' + (isError ? 'Something went wrong' : 'Note') + '</b>';
+  el.appendChild(document.createTextNode(msg));
+  el.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = 'none'; }, isError ? 7000 : 3200);
+}
+window.addEventListener('error', e => toast((e.message || 'Unknown error'), true));
+window.addEventListener('unhandledrejection', e => toast('Async error: ' + (e.reason && e.reason.message || e.reason), true));
+
+/* ------------------------------------------------------------------ audio */
+const Sfx = {
+  ctx:null,
+  ensure(){
+    if (!gameState.settings.sound) return null;
+    try {
+      if (!this.ctx){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        this.ctx = new AC();
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return this.ctx;
+    } catch(e){ return null; }
+  },
+  tone(freq, dur, when, type, vol){
+    const ac = this.ensure(); if (!ac) return;
+    const t0 = ac.currentTime + (when || 0);
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.16, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  },
+  click(){ this.tone(880, 0.05, 0, 'square', 0.05); },
+  good(){ this.tone(660, 0.12, 0, 'sine', 0.14); this.tone(990, 0.20, 0.10, 'sine', 0.14); },
+  bad(){ this.tone(150, 0.22, 0, 'sawtooth', 0.10); },
+  fanfare(){ this.tone(523, 0.16, 0, 'triangle', 0.15); this.tone(659, 0.16, 0.15, 'triangle', 0.15);
+             this.tone(784, 0.32, 0.30, 'triangle', 0.17); this.tone(1046, 0.40, 0.46, 'triangle', 0.13); },
+  pop(){ this.tone(420, 0.07, 0, 'triangle', 0.10); }
+};
+
+/* ----------------------------------------------------------------- engine */
+const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+/* Virtual coordinate space: 360 wide, height follows the device aspect so the
+   layout breathes on tall phones instead of letterboxing. */
+const V = {w:360, h:640, s:1, ox:0, oy:0};
+let DPR = 1;
+
+function fit(){
+  const rect = cvs.getBoundingClientRect();
+  const cw = Math.max(1, rect.width), ch = Math.max(1, rect.height);
+  DPR = Math.min(3, window.devicePixelRatio || 1);
+  cvs.width = Math.round(cw * DPR); cvs.height = Math.round(ch * DPR);
+  let s = cw / V.w, vh = ch / s;
+  if (vh > 900){ vh = 900; s = ch / vh; }
+  if (vh < 560){ vh = 560; s = ch / vh; }
+  V.h = vh; V.s = s;
+  V.ox = (cw - V.w * s) / 2;
+  V.oy = (ch - V.h * s) / 2;
+}
+window.addEventListener('resize', fit);
+window.addEventListener('orientationchange', () => setTimeout(fit, 120));
+
+/* Hit regions are rebuilt by draw() every frame; input hit-tests the last frame.
+   Topmost (drawn last) wins. */
+let regions = [], layer = 'base';
+function reg(id, x, y, w, h, data){
+  const r = Object.assign({id, x, y, w, h, layer}, data || {});
+  regions.push(r); return r;
+}
+function pick(x, y){
+  for (let i = regions.length - 1; i >= 0; i--){
+    const r = regions[i];
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return r;
+  }
+  return null;
+}
+function inRect(r, x, y){ return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h; }
+
+/* screen: 'hub' | 'game'   modal: null | {kind:...} */
+let screen = 'hub';
+let current = null;         /* active game module instance */
+let modal = null;
+let pressed = null;         /* region id currently held, for button feedback */
+let hubTime = 0;
+
+function openModal(m){ modal = m; }
+function closeModal(){ modal = null; }
+
+function goHub(){
+  current = null; screen = 'hub'; modal = null; pressed = null;
+}
+function startGame(id, diff){
+  const def = GAMES[id];
+  if (!def){ toast('Unknown game: ' + id, true); return; }
+  gameState.games[id].difficulty = diff; persist();
+  try {
+    current = def.create(diff);
+    current.id = id; current.def = def; current.diff = diff;
+    current.done = false;
+    /* Wrap input so the always-visible chrome (Big Top / pause) is handled once,
+       centrally, instead of being re-implemented by every game module. */
+    const rawUp = current.up, rawDown = current.down;
+    current.up = function(hit, p, wasPressed){
+      if (chromeUp(hit, wasPressed)) return;
+      if (rawUp) rawUp.call(current, hit, p, wasPressed);
+    };
+    current.down = function(hit, p){
+      if (hit && typeof hit.id === 'string' && hit.id.indexOf('g_') === 0){ Sfx.click(); return; }
+      if (rawDown) rawDown.call(current, hit, p);
+    };
+    screen = 'game'; modal = null;
+  } catch(e){ toast('Could not start ' + def.name + ': ' + e.message, true); goHub(); }
+}
+function restartGame(){
+  if (!current) return;
+  startGame(current.id, current.diff);
+}
+/* Called by a game when the player finishes a level. */
+function finishGame(stars, scoreValue, message){
+  if (!current || current.done) return;
+  current.done = true;
+  stars = Math.max(0, Math.min(3, stars));
+  const prev = gameState.games[current.id].stars;
+  recordResult(current.id, stars, scoreValue);
+  if (stars >= 3) Sfx.fanfare(); else Sfx.good();
+  openModal({kind:'result', stars, message: message || '', t:0, improved: stars > prev});
+}
+function failGame(message){
+  if (!current || current.done) return;
+  current.done = true;
+  Sfx.bad();
+  openModal({kind:'result', stars:0, message: message || 'Not this time!', t:0, failed:true});
+}
+
+/* ------------------------------------------------------------------ input */
+function toV(e){
+  const rect = cvs.getBoundingClientRect();
+  return {x:(e.clientX - rect.left - V.ox) / V.s, y:(e.clientY - rect.top - V.oy) / V.s};
+}
+function guard(fn){
+  return function(e){
+    try { fn(e); }
+    catch(err){ toast(err && err.message ? err.message : String(err), true); }
+  };
+}
+cvs.addEventListener('pointerdown', guard(e => {
+  e.preventDefault();
+  if (cvs.setPointerCapture) { try { cvs.setPointerCapture(e.pointerId); } catch(_){} }
+  Sfx.ensure();
+  const p = toV(e), r = pick(p.x, p.y);
+  const lay = modal ? 'modal' : 'base';
+  const hit = r && r.layer === lay ? r : null;
+  pressed = hit ? hit.id : null;
+  if (modal) { modalDown(hit, p); return; }
+  if (screen === 'hub') hubDown(hit, p);
+  else if (current && current.down) current.down(hit, p);
+}), {passive:false});
+
+cvs.addEventListener('pointermove', guard(e => {
+  e.preventDefault();
+  const p = toV(e);
+  if (modal) return;
+  if (screen === 'game' && current && current.move) current.move(p);
+}), {passive:false});
+
+const onUp = guard(e => {
+  e.preventDefault();
+  const p = toV(e), r = pick(p.x, p.y);
+  const lay = modal ? 'modal' : 'base';
+  const hit = r && r.layer === lay ? r : null;
+  const wasPressed = pressed; pressed = null;
+  if (modal) { modalUp(hit, p, wasPressed); return; }
+  if (screen === 'hub') hubUp(hit, p, wasPressed);
+  else if (current && current.up) current.up(hit, p, wasPressed);
+});
+cvs.addEventListener('pointerup', onUp, {passive:false});
+cvs.addEventListener('pointercancel', guard(e => { pressed = null; if (current && current.cancel) current.cancel(); }), {passive:false});
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+/* ------------------------------------------------------------- draw utils */
+function rr(g, x, y, w, h, r){
+  r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+function panel(x, y, w, h, o){
+  o = o || {};
+  const g = ctx;
+  if (o.shadow !== false){
+    g.save(); g.globalAlpha = 0.22; g.fillStyle = C.ink;
+    rr(g, x + 2, y + 4, w, h, o.r == null ? 14 : o.r); g.fill(); g.restore();
+  }
+  g.fillStyle = o.fill || C.cream;
+  rr(g, x, y, w, h, o.r == null ? 14 : o.r); g.fill();
+  if (o.stroke !== false){
+    g.lineWidth = o.lw || 3; g.strokeStyle = o.stroke || C.navy; g.stroke();
+  }
+}
+function T(s, x, y, o){
+  o = o || {};
+  const g = ctx;
+  g.font = (o.weight || 700) + ' ' + (o.size || 16) + 'px ' + (o.num ? NUMER : DISPLAY);
+  g.textAlign = o.align || 'center';
+  g.textBaseline = o.baseline || 'middle';
+  if (o.outline){ g.lineWidth = o.outline; g.strokeStyle = o.outlineColor || C.ink;
+    g.lineJoin = 'round'; g.strokeText(s, x, y); }
+  g.fillStyle = o.color || C.ink;
+  if (o.maxWidth) g.fillText(s, x, y, o.maxWidth); else g.fillText(s, x, y);
+}
+/* Word-wrap into lines that fit `w`; returns number of lines drawn. */
+function Twrap(s, x, y, w, lh, o){
+  o = o || {};
+  const g = ctx;
+  g.font = (o.weight || 600) + ' ' + (o.size || 15) + 'px ' + (o.num ? NUMER : DISPLAY);
+  const words = String(s).split(' ');
+  const lines = []; let line = '';
+  for (const wd of words){
+    const t = line ? line + ' ' + wd : wd;
+    if (g.measureText(t).width > w && line){ lines.push(line); line = wd; }
+    else line = t;
+  }
+  if (line) lines.push(line);
+  for (let i = 0; i < lines.length; i++) T(lines[i], x, y + i * lh, o);
+  return lines.length;
+}
+function starPath(g, cx, cy, r){
+  g.beginPath();
+  for (let i = 0; i < 10; i++){
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr2 = (i % 2) ? r * 0.44 : r;
+    const px = cx + Math.cos(a) * rr2, py = cy + Math.sin(a) * rr2;
+    if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
+  }
+  g.closePath();
+}
+function drawStar(cx, cy, r, filled, o){
+  o = o || {};
+  const g = ctx;
+  starPath(g, cx, cy, r);
+  g.fillStyle = filled ? (o.fill || C.gold) : 'rgba(255,255,255,.12)';
+  g.fill();
+  g.lineWidth = o.lw || 1.6;
+  g.strokeStyle = filled ? (o.stroke || C.goldDark) : (o.stroke || 'rgba(14,22,38,.45)');
+  g.stroke();
+}
+function drawStars(cx, cy, n, r, gap, o){
+  const total = 3, step = r * 2 + (gap == null ? 3 : gap);
+  const x0 = cx - (total - 1) * step / 2;
+  for (let i = 0; i < total; i++) drawStar(x0 + i * step, cy, r, i < n, o);
+}
+function button(id, x, y, w, h, label, o){
+  o = o || {};
+  const g = ctx, down = pressed === id && !o.disabled;
+  const dy = down ? 2 : 0;
+  const r = reg(id, x, y, w, h, {disabled:!!o.disabled});
+  g.save();
+  g.globalAlpha = o.disabled ? 0.45 : 1;
+  /* base shadow */
+  g.fillStyle = o.shade || C.ink; g.globalAlpha *= 0.85;
+  rr(g, x, y + 4, w, h, o.r == null ? 12 : o.r); g.fill();
+  g.globalAlpha = o.disabled ? 0.45 : 1;
+  g.fillStyle = o.fill || C.gold;
+  rr(g, x, y + dy, w, h - 2, o.r == null ? 12 : o.r); g.fill();
+  g.lineWidth = 2.5; g.strokeStyle = o.stroke || C.navy; g.stroke();
+  T(label, x + w / 2, y + dy + (h - 2) / 2 + 1, {
+    size:o.size || 17, weight:800, color:o.color || C.ink, num:!!o.num, maxWidth:w - 14
+  });
+  g.restore();
+  return r;
+}
+function scrim(a){
+  ctx.fillStyle = 'rgba(8,13,24,' + (a == null ? 0.66 : a) + ')';
+  ctx.fillRect(-40, -40, V.w + 80, V.h + 80);
+}
+/* Big-top stripes radiating from a peak above the screen. */
+function tentBackdrop(){
+  const g = ctx;
+  g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+  const apexX = V.w / 2, apexY = -260, n = 14;
+  for (let i = 0; i < n; i++){
+    if (i % 2) continue;
+    const spread = V.w * 2.2;
+    const x1 = apexX - spread / 2 + spread * (i / n);
+    const x2 = apexX - spread / 2 + spread * ((i + 1) / n);
+    g.beginPath(); g.moveTo(apexX, apexY); g.lineTo(x1, V.h + 40); g.lineTo(x2, V.h + 40);
+    g.closePath(); g.fillStyle = C.red; g.globalAlpha = 0.92; g.fill(); g.globalAlpha = 1;
+  }
+}
+function sawdustFloor(y){
+  const g = ctx;
+  g.fillStyle = C.sawdust; g.fillRect(0, y, V.w, V.h - y);
+  g.fillStyle = C.sawdustDark; g.globalAlpha = 0.5;
+  for (let i = 0; i < 90; i++){
+    const px = ((i * 97) % 360), py = y + 6 + ((i * 53) % Math.max(10, (V.h - y - 10)));
+    g.fillRect(px, py, 3, 2);
+  }
+  g.globalAlpha = 1;
+  g.fillStyle = C.navy; g.fillRect(0, y - 2, V.w, 2);
+}
+function bunting(y, w){
+  const g = ctx, n = 12, step = (w || V.w) / n;
+  g.strokeStyle = C.navy; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, y); g.lineTo(w || V.w, y); g.stroke();
+  for (let i = 0; i < n; i++){
+    g.beginPath();
+    g.moveTo(i * step, y); g.lineTo((i + 1) * step, y); g.lineTo(i * step + step / 2, y + 13);
+    g.closePath();
+    g.fillStyle = (i % 3 === 0) ? C.gold : (i % 3 === 1) ? C.cream : C.red;
+    g.fill(); g.lineWidth = 1.5; g.strokeStyle = C.navy; g.stroke();
+  }
+}
+
+/* ------------------------------------------------------------ pictograms */
+/* Each pictogram draws inside a box centred on (x,y) with half-size s. */
+const ICONS = {
+  seals(x, y, s){
+    const g = ctx;
+    g.fillStyle = '#6E7C8F';
+    g.beginPath(); g.ellipse(x - 2, y + s * 0.42, s * 0.72, s * 0.34, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(x + s * 0.34, y - s * 0.1, s * 0.3, s * 0.38, 0.5, 0, 7); g.fill();
+    g.fillStyle = C.ink;
+    g.beginPath(); g.arc(x + s * 0.44, y - s * 0.2, s * 0.07, 0, 7); g.fill();
+    g.strokeStyle = '#6E7C8F'; g.lineWidth = s * 0.16; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + s * 0.5, y - s * 0.34); g.lineTo(x + s * 0.62, y - s * 0.52); g.stroke();
+    g.fillStyle = C.red;
+    g.beginPath(); g.arc(x + s * 0.68, y - s * 0.72, s * 0.26, 0, 7); g.fill();
+    g.strokeStyle = C.cream; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(x + s * 0.42, y - s * 0.72); g.lineTo(x + s * 0.94, y - s * 0.72); g.stroke();
+  },
+  trapeze(x, y, s){
+    const g = ctx;
+    g.strokeStyle = C.navy; g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(x - s * 0.55, y - s); g.lineTo(x - s * 0.55, y);
+    g.moveTo(x + s * 0.55, y - s); g.lineTo(x + s * 0.55, y); g.stroke();
+    g.strokeStyle = C.gold; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(x - s * 0.62, y); g.lineTo(x + s * 0.62, y); g.stroke();
+    g.fillStyle = C.red;
+    g.beginPath(); g.arc(x, y + s * 0.34, s * 0.19, 0, 7); g.fill();
+    g.strokeStyle = C.red; g.lineWidth = 3.4; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, y + s * 0.5); g.lineTo(x, y + s * 0.82);
+    g.moveTo(x, y + s * 0.82); g.lineTo(x - s * 0.24, y + s * 1.04);
+    g.moveTo(x, y + s * 0.82); g.lineTo(x + s * 0.24, y + s * 1.04);
+    g.moveTo(x - s * 0.2, y + s * 0.1); g.lineTo(x, y + s * 0.42);
+    g.moveTo(x + s * 0.2, y + s * 0.1); g.lineTo(x, y + s * 0.42); g.stroke();
+  },
+  magician(x, y, s){
+    const g = ctx;
+    g.fillStyle = C.purple;
+    g.beginPath(); g.moveTo(x, y - s); g.lineTo(x + s * 0.62, y + s * 0.34);
+    g.lineTo(x - s * 0.62, y + s * 0.34); g.closePath(); g.fill();
+    g.fillStyle = C.gold;
+    starPath(g, x + s * 0.06, y - s * 0.12, s * 0.26); g.fill();
+    g.fillStyle = C.navy;
+    g.fillRect(x - s * 0.8, y + s * 0.34, s * 1.6, s * 0.24);
+    g.strokeStyle = C.ink; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + s * 0.5, y + s * 0.95); g.lineTo(x + s * 0.95, y + s * 0.62); g.stroke();
+  },
+  traffic(x, y, s){
+    const g = ctx;
+    g.fillStyle = C.navy;
+    rr(g, x - s * 0.44, y - s, s * 0.88, s * 1.8, s * 0.2); g.fill();
+    const cols = [C.red, C.gold, C.green];
+    for (let i = 0; i < 3; i++){
+      g.fillStyle = cols[i];
+      g.beginPath(); g.arc(x, y - s * 0.62 + i * s * 0.6, s * 0.22, 0, 7); g.fill();
+    }
+  },
+  cannon(x, y, s){
+    const g = ctx;
+    g.save(); g.translate(x - s * 0.15, y + s * 0.3); g.rotate(-0.62);
+    g.fillStyle = C.navy; rr(g, -s * 0.2, -s * 0.3, s * 1.5, s * 0.6, s * 0.16); g.fill();
+    g.fillStyle = C.slate; rr(g, s * 1.05, -s * 0.34, s * 0.3, s * 0.68, s * 0.1); g.fill();
+    g.restore();
+    g.fillStyle = C.red;
+    g.beginPath(); g.arc(x - s * 0.2, y + s * 0.5, s * 0.34, 0, 7); g.fill();
+    g.fillStyle = C.gold;
+    g.beginPath(); g.arc(x + s * 0.72, y - s * 0.72, s * 0.2, 0, 7); g.fill();
+  },
+  riddle(x, y, s){
+    const g = ctx;
+    g.fillStyle = C.navy; rr(g, x - s * 0.86, y - s * 0.86, s * 1.72, s * 1.72, s * 0.18); g.fill();
+    g.fillStyle = C.cream; rr(g, x - s * 0.7, y - s * 0.7, s * 1.4, s * 1.4, s * 0.12); g.fill();
+    T('?', x, y + s * 0.06, {size:s * 1.5, color:C.red, weight:800});
+  },
+  balance(x, y, s){
+    const g = ctx;
+    g.strokeStyle = C.navy; g.lineWidth = 3.2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x - s * 0.9, y - s * 0.3); g.lineTo(x + s * 0.9, y + s * 0.1); g.stroke();
+    g.fillStyle = C.red;
+    g.beginPath(); g.moveTo(x, y - s * 0.1); g.lineTo(x + s * 0.34, y + s * 0.8);
+    g.lineTo(x - s * 0.34, y + s * 0.8); g.closePath(); g.fill();
+    g.fillStyle = C.gold;
+    g.beginPath(); g.arc(x - s * 0.9, y - s * 0.16, s * 0.22, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + s * 0.9, y + s * 0.24, s * 0.22, 0, 7); g.fill();
+    g.fillStyle = C.navy; g.fillRect(x - s * 0.55, y + s * 0.8, s * 1.1, s * 0.16);
+  },
+  tickets(x, y, s){
+    const g = ctx;
+    g.fillStyle = C.gold; rr(g, x - s * 0.9, y - s * 0.7, s * 1.8, s * 1.4, s * 0.16); g.fill();
+    g.strokeStyle = C.navy; g.lineWidth = 2.4; g.stroke();
+    g.fillStyle = C.cream; rr(g, x - s * 0.62, y - s * 0.44, s * 1.24, s * 0.9, s * 0.1); g.fill();
+    T('$', x, y + s * 0.04, {size:s * 0.95, color:C.red, weight:800, num:true});
+  },
+  elephant(x, y, s){
+    const g = ctx;
+    g.fillStyle = '#8D93A3';
+    g.beginPath(); g.ellipse(x, y - s * 0.1, s * 0.62, s * 0.6, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(x - s * 0.72, y - s * 0.16, s * 0.34, s * 0.46, 0.2, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(x + s * 0.72, y - s * 0.16, s * 0.34, s * 0.46, -0.2, 0, 7); g.fill();
+    g.strokeStyle = '#8D93A3'; g.lineWidth = s * 0.3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, y + s * 0.4); g.quadraticCurveTo(x + s * 0.1, y + s * 0.95, x + s * 0.4, y + s * 1.0); g.stroke();
+    g.fillStyle = C.ink;
+    g.beginPath(); g.arc(x - s * 0.24, y - s * 0.18, s * 0.08, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + s * 0.24, y - s * 0.18, s * 0.08, 0, 7); g.fill();
+  },
+  bolts(x, y, s){
+    const g = ctx;
+    g.strokeStyle = C.navy; g.lineWidth = 2;
+    for (let i = 0; i <= 3; i++){
+      g.beginPath(); g.moveTo(x - s * 0.9, y - s * 0.9 + i * s * 0.6); g.lineTo(x + s * 0.9, y - s * 0.9 + i * s * 0.6); g.stroke();
+      g.beginPath(); g.moveTo(x - s * 0.9 + i * s * 0.6, y - s * 0.9); g.lineTo(x - s * 0.9 + i * s * 0.6, y + s * 0.9); g.stroke();
+    }
+    g.fillStyle = C.gold;
+    g.beginPath(); g.arc(x - s * 0.3, y - s * 0.3, s * 0.2, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + s * 0.3, y + s * 0.3, s * 0.2, 0, 7); g.fill();
+    g.strokeStyle = C.red; g.lineWidth = 2.6; g.setLineDash([3, 3]);
+    g.beginPath(); g.arc(x + s * 0.3, y - s * 0.3, s * 0.24, 0, 7); g.stroke();
+    g.setLineDash([]);
+  },
+  clowns(x, y, s){
+    const g = ctx;
+    g.fillStyle = C.cream;
+    g.beginPath(); g.arc(x, y + s * 0.1, s * 0.66, 0, 7); g.fill();
+    g.strokeStyle = C.navy; g.lineWidth = 2; g.stroke();
+    g.fillStyle = C.red;
+    g.beginPath(); g.moveTo(x - s * 0.6, y - s * 0.34); g.lineTo(x, y - s * 1.05);
+    g.lineTo(x + s * 0.6, y - s * 0.34); g.closePath(); g.fill();
+    g.fillStyle = '#E86A2B';
+    g.beginPath(); g.arc(x - s * 0.68, y + s * 0.1, s * 0.26, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + s * 0.68, y + s * 0.1, s * 0.26, 0, 7); g.fill();
+    g.fillStyle = C.ink;
+    g.beginPath(); g.arc(x - s * 0.22, y - s * 0.02, s * 0.08, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + s * 0.22, y - s * 0.02, s * 0.08, 0, 7); g.fill();
+    g.fillStyle = C.red;
+    g.beginPath(); g.arc(x, y + s * 0.2, s * 0.17, 0, 7); g.fill();
+    g.strokeStyle = C.red; g.lineWidth = 2.2;
+    g.beginPath(); g.arc(x, y + s * 0.28, s * 0.3, 0.3, Math.PI - 0.3); g.stroke();
+  },
+  lions(x, y, s){
+    const g = ctx;
+    g.fillStyle = '#C98A2E';
+    for (let i = 0; i < 10; i++){
+      const a = i / 10 * Math.PI * 2;
+      g.beginPath(); g.arc(x + Math.cos(a) * s * 0.66, y + Math.sin(a) * s * 0.66, s * 0.3, 0, 7); g.fill();
+    }
+    g.fillStyle = C.gold;
+    g.beginPath(); g.arc(x, y, s * 0.58, 0, 7); g.fill();
+    g.fillStyle = C.ink;
+    g.beginPath(); g.arc(x - s * 0.22, y - s * 0.12, s * 0.08, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + s * 0.22, y - s * 0.12, s * 0.08, 0, 7); g.fill();
+    g.fillStyle = '#8E5A18';
+    g.beginPath(); g.moveTo(x - s * 0.14, y + s * 0.16); g.lineTo(x + s * 0.14, y + s * 0.16);
+    g.lineTo(x, y + s * 0.3); g.closePath(); g.fill();
+    g.strokeStyle = '#8E5A18'; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(x, y + s * 0.3); g.lineTo(x, y + s * 0.42); g.stroke();
+  },
+  gear(x, y, s){
+    const g = ctx;
+    g.fillStyle = C.cream;
+    g.beginPath();
+    for (let i = 0; i < 8; i++){
+      const a = i / 8 * Math.PI * 2;
+      g.lineTo(x + Math.cos(a) * s, y + Math.sin(a) * s);
+      const a2 = (i + 0.5) / 8 * Math.PI * 2;
+      g.lineTo(x + Math.cos(a2) * s * 0.74, y + Math.sin(a2) * s * 0.74);
+    }
+    g.closePath(); g.fill();
+    g.strokeStyle = C.navy; g.lineWidth = 2; g.stroke();
+    g.fillStyle = C.red;
+    g.beginPath(); g.arc(x, y, s * 0.34, 0, 7); g.fill();
+  }
+};
+
+/* ------------------------------------------------------------- ringmaster */
+const FLAVOR = [
+  'Step right up! Pick a ring to test your skills!',
+  'Twelve rings, twelve challenges. Where to first?',
+  'The seals are restless. Care to sort their balls?',
+  'Mind the cannon - angle AND force, remember!',
+  'Three stars in every ring is the grand prize!',
+  'Hard mode? The lions like a brave one.'
+];
+function drawRingmaster(x, y, s){
+  const g = ctx;
+  /* legs + body */
+  g.fillStyle = C.navy;
+  g.fillRect(x - s * 0.3, y + s * 0.5, s * 0.22, s * 0.7);
+  g.fillRect(x + s * 0.08, y + s * 0.5, s * 0.22, s * 0.7);
+  g.fillStyle = C.red;
+  rr(g, x - s * 0.5, y - s * 0.3, s * 1.0, s * 0.9, s * 0.18); g.fill();
+  g.strokeStyle = C.navy; g.lineWidth = 2; g.stroke();
+  g.fillStyle = C.gold;
+  g.fillRect(x - s * 0.08, y - s * 0.3, s * 0.16, s * 0.9);
+  /* head + hat */
+  g.fillStyle = '#F0C9A0';
+  g.beginPath(); g.arc(x, y - s * 0.56, s * 0.28, 0, 7); g.fill();
+  g.fillStyle = C.ink;
+  g.fillRect(x - s * 0.42, y - s * 0.86, s * 0.84, s * 0.1);
+  rr(g, x - s * 0.26, y - s * 1.36, s * 0.52, s * 0.52, s * 0.06); g.fill();
+  g.fillStyle = C.red; g.fillRect(x - s * 0.26, y - s * 0.98, s * 0.52, s * 0.12);
+  /* moustache + cane */
+  g.fillStyle = C.ink;
+  g.fillRect(x - s * 0.16, y - s * 0.5, s * 0.32, s * 0.06);
+  g.strokeStyle = C.cream; g.lineWidth = 2.6; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x + s * 0.52, y - s * 0.1); g.lineTo(x + s * 0.62, y + s * 0.9); g.stroke();
+}
+function speechBubble(x, y, w, h, text){
+  const g = ctx;
+  panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:12});
+  g.fillStyle = C.cream;
+  g.beginPath(); g.moveTo(x, y + h * 0.42); g.lineTo(x - 11, y + h * 0.58); g.lineTo(x + 1, y + h * 0.72);
+  g.closePath(); g.fill();
+  g.strokeStyle = C.navy; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(x + 1, y + h * 0.42); g.lineTo(x - 11, y + h * 0.58); g.lineTo(x + 1, y + h * 0.72); g.stroke();
+  Twrap(text, x + w / 2, y + h / 2 - 8, w - 18, 15, {size:12.5, weight:700, color:C.navy});
+}
+
+/* -------------------------------------------------------------- hub screen */
+function hubLayout(){
+  const cw = 112, gap = 8, cols = 3, rows = 4;
+  const top = 74, bottomReserve = 100;
+  const availH = V.h - top - bottomReserve;
+  const rowH = Math.max(94, Math.min(126, availH / rows));
+  const startY = top + Math.max(0, (availH - rowH * rows) / 2);
+  const x0 = (V.w - (cols * cw + (cols - 1) * gap)) / 2;
+  return {cw, gap, cols, rows, rowH, startY, x0};
+}
+function drawHub(dt){
+  const g = ctx;
+  tentBackdrop();
+  sawdustFloor(V.h - 92);
+  bunting(0);
+
+  T('MATH CIRCUS', V.w / 2, 34, {size:28, weight:800, color:C.gold, outline:5, outlineColor:C.ink});
+  T('A C T   1', V.w / 2, 56, {size:12, weight:800, color:C.cream, outline:3, outlineColor:C.ink});
+
+  const gearR = reg('settings', V.w - 50, 4, 46, 46, {});
+  ICONS.gear(gearR.x + 23, gearR.y + 23, pressed === 'settings' ? 14 : 15);
+
+  const L = hubLayout();
+  for (let i = 0; i < GAME_IDS.length; i++){
+    const id = GAME_IDS[i];
+    /* defensive: a broken module must not take the whole hub down with it */
+    const def = GAMES[id] || {short:id, name:id, desc:'', skill:''};
+    const col = i % L.cols, row = (i / L.cols) | 0;
+    const x = L.x0 + col * (L.cw + L.gap), y = L.startY + row * L.rowH;
+    const r = reg(id, x, y, L.cw, L.rowH - 4, {});
+    const down = pressed === id;
+    const bx = x + 6, by = y + 2 + (down ? 2 : 0), bw = L.cw - 12, bh = 54;
+    /* booth */
+    panel(bx, by, bw, bh, {fill:C.cream, stroke:C.navy, r:10});
+    g.save(); g.beginPath(); rr(g, bx, by, bw, bh, 10); g.clip();
+    const stripes = 5;
+    for (let s2 = 0; s2 < stripes; s2++){
+      g.fillStyle = s2 % 2 ? C.red : C.gold;
+      g.fillRect(bx + s2 * (bw / stripes), by, bw / stripes + 1, 13);
+    }
+    g.restore();
+    g.strokeStyle = C.navy; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(bx, by + 13); g.lineTo(bx + bw, by + 13); g.stroke();
+    ICONS[id](x + L.cw / 2, by + 35, 15);
+    /* name plate */
+    const nameY = y + 66;
+    g.fillStyle = 'rgba(14,22,38,.82)';
+    rr(g, x + 2, nameY - 9, L.cw - 4, 18, 9); g.fill();
+    T(def.short, x + L.cw / 2, nameY, {size:11, weight:800, color:C.cream, maxWidth:L.cw - 10});
+    drawStars(x + L.cw / 2, y + 84, gameState.games[id].stars, 6.5, 4);
+  }
+
+  /* ringmaster + rotating flavour line (a deliberate modern addition) */
+  const ry = V.h - 52;
+  drawRingmaster(34, ry - 12, 30);
+  const line = FLAVOR[Math.floor(hubTime / 5) % FLAVOR.length];
+  speechBubble(80, V.h - 88, V.w - 90, 56, line);
+}
+function hubDown(hit){ if (hit) Sfx.click(); }
+function hubUp(hit, p, wasPressed){
+  if (!hit || hit.id !== wasPressed) return;
+  if (hit.id === 'settings'){ openModal({kind:'settings'}); return; }
+  if (GAMES[hit.id]) openModal({kind:'pregame', id:hit.id, diff:gameState.games[hit.id].difficulty});
+}
+
+/* ----------------------------------------------------------- game chrome */
+function drawGameChrome(){
+  const g = ctx;
+  g.fillStyle = C.red; g.fillRect(0, 0, V.w, 48);
+  g.fillStyle = C.redDark; g.fillRect(0, 46, V.w, 2);
+  const back = reg('g_back', 2, 2, 62, 44, {});
+  g.save(); g.globalAlpha = pressed === 'g_back' ? 0.7 : 1;
+  T('‹ Big Top', back.x + 33, 25, {size:12.5, weight:800, color:C.cream});
+  g.restore();
+  const pause = reg('g_pause', V.w - 48, 2, 46, 44, {});
+  g.save(); g.globalAlpha = pressed === 'g_pause' ? 0.7 : 1;
+  g.fillStyle = C.cream;
+  rr(g, pause.x + 15, 15, 5, 16, 2); g.fill();
+  rr(g, pause.x + 25, 15, 5, 16, 2); g.fill();
+  g.restore();
+  T(current.def.name, V.w / 2, 18, {size:15, weight:800, color:C.cream, maxWidth:190});
+  T(DIFF_LABEL[current.diff].toUpperCase() + (current.hudNote ? '  ·  ' + current.hudNote() : ''),
+    V.w / 2, 34, {size:11.5, weight:700, color:C.goldLight, maxWidth:210, num:true});
+}
+function chromeUp(hit, wasPressed){
+  if (!hit || hit.id !== wasPressed) return false;
+  if (hit.id === 'g_back'){ Sfx.click(); goHub(); return true; }
+  if (hit.id === 'g_pause'){ Sfx.click(); openModal({kind:'pause'}); return true; }
+  return false;
+}
+
+/* ------------------------------------------------------------------ modals */
+function drawModal(){
+  const g = ctx;
+  scrim(0.68);
+  if (modal.kind === 'pregame'){
+    const def = GAMES[modal.id] || {short:modal.id, name:modal.id, desc:'', skill:''};
+    const rec = gameState.games[modal.id];
+    const w = 318, h = 286, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
+    g.save(); g.beginPath(); rr(g, x, y, w, h, 18); g.clip();
+    g.fillStyle = C.red; g.fillRect(x, y, w, 56);
+    g.restore();
+    g.strokeStyle = C.navy; g.lineWidth = 3; rr(g, x, y, w, h, 18); g.stroke();
+    ICONS[modal.id](x + 34, y + 28, 16);
+    T(def.name, x + w / 2 + 14, y + 22, {size:17, weight:800, color:C.cream, maxWidth:w - 80});
+    T(def.skill, x + w / 2 + 14, y + 40, {size:11.5, weight:700, color:C.goldLight, maxWidth:w - 80});
+    const close = reg('m_close', x + w - 46, y + 4, 44, 44, {});
+    T('✕', close.x + 22, close.y + 22, {size:18, weight:800, color:C.cream});
+    Twrap(def.desc, x + w / 2, y + 78, w - 36, 17, {size:13.5, weight:600, color:C.navy});
+    const f = SCORE_FIELD[modal.id], best = rec[f];
+    T(best === null || best === undefined ? 'Not played yet'
+      : SCORE_LABEL[modal.id] + ': ' + best,
+      x + w / 2, y + 132, {size:12.5, weight:700, color:C.slate, num:true});
+    drawStars(x + w / 2, y + 154, rec.stars, 9, 6);
+    T('CHOOSE YOUR RING', x + w / 2, y + 180, {size:11, weight:800, color:C.slate});
+    const bw = 92, bh = 46, gap = 9, bx0 = (V.w - (bw * 3 + gap * 2)) / 2;
+    for (let i = 0; i < 3; i++){
+      const d = DIFFS[i], on = modal.diff === d;
+      button('m_d_' + d, bx0 + i * (bw + gap), y + 192, bw, bh, DIFF_LABEL[d], {
+        fill: on ? DIFF_COLOR[d] : C.creamDark,
+        color: on ? C.cream : C.slate, size:15
+      });
+    }
+    button('m_start', x + 28, y + 246, w - 56, 52, 'START', {fill:C.gold, size:20});
+  }
+  else if (modal.kind === 'settings'){
+    const w = 312, h = 274, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
+    T('Settings', x + w / 2, y + 28, {size:22, weight:800, color:C.navy});
+    const close = reg('m_close', x + w - 46, y + 4, 44, 44, {});
+    T('✕', close.x + 22, close.y + 22, {size:18, weight:800, color:C.navy});
+    button('m_sound', x + 24, y + 54, w - 48, 50,
+      'Sound: ' + (gameState.settings.sound ? 'ON' : 'OFF'),
+      {fill: gameState.settings.sound ? C.green : C.slate, color:C.cream});
+    button('m_reset', x + 24, y + 114, w - 48, 50, 'Reset all progress', {fill:C.red, color:C.cream});
+    Twrap('A fan rebuild of Math Circus: Act 1 (1993). Not affiliated with the original publishers. Progress is stored on this device only.',
+      x + w / 2, y + 186, w - 44, 16, {size:12, weight:600, color:C.slate});
+    button('m_close2', x + 24, y + 234, w - 48, 44, 'Close', {fill:C.creamDark, color:C.navy});
+  }
+  else if (modal.kind === 'confirm'){
+    const w = 300, h = 186, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    panel(x, y, w, h, {fill:C.cream, stroke:C.red, r:18});
+    T('Are you sure?', x + w / 2, y + 34, {size:20, weight:800, color:C.red});
+    Twrap(modal.text, x + w / 2, y + 68, w - 40, 17, {size:13.5, weight:600, color:C.navy});
+    button('m_yes', x + 22, y + 116, (w - 56) / 2, 50, 'Yes, reset', {fill:C.red, color:C.cream, size:15});
+    button('m_no', x + w / 2 + 6, y + 116, (w - 56) / 2, 50, 'Cancel', {fill:C.creamDark, color:C.navy, size:15});
+  }
+  else if (modal.kind === 'pause'){
+    const w = 288, h = 288, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    panel(x, y, w, h, {fill:C.cream, stroke:C.navy, r:18});
+    T('Paused', x + w / 2, y + 30, {size:22, weight:800, color:C.navy});
+    button('m_resume', x + 24, y + 54, w - 48, 50, 'Resume', {fill:C.green, color:C.cream});
+    button('m_restart', x + 24, y + 112, w - 48, 50, 'Restart level', {fill:C.gold});
+    button('m_sound', x + 24, y + 170, w - 48, 46,
+      'Sound: ' + (gameState.settings.sound ? 'ON' : 'OFF'),
+      {fill: gameState.settings.sound ? C.green : C.slate, color:C.cream, size:15});
+    button('m_hub', x + 24, y + 224, w - 48, 50, 'Back to Big Top', {fill:C.red, color:C.cream});
+  }
+  else if (modal.kind === 'result'){
+    const w = 304, h = 268, x = (V.w - w) / 2, y = Math.max(56, (V.h - h) / 2);
+    panel(x, y, w, h, {fill:C.cream, stroke: modal.failed ? C.red : C.gold, r:18, lw:4});
+    const title = modal.failed ? 'Curtain down' :
+      modal.stars >= 3 ? 'Perfect!' : modal.stars === 2 ? 'Well done!' : 'Cleared!';
+    T(title, x + w / 2, y + 34, {size:24, weight:800, color: modal.failed ? C.red : C.green});
+    /* stars pop in one at a time */
+    for (let i = 0; i < 3; i++){
+      const appear = 0.25 + i * 0.28;
+      const k = Math.max(0, Math.min(1, (modal.t - appear) / 0.22));
+      const lit = i < modal.stars && k > 0;
+      const sc = lit ? (1.5 - 0.5 * k) : 1;
+      drawStar(x + w / 2 - 54 + i * 54, y + 84, 22 * (lit ? sc : 1), lit, {lw:2.4});
+    }
+    Twrap(modal.message || '', x + w / 2, y + 132, w - 40, 17, {size:13.5, weight:700, color:C.navy});
+    if (modal.improved) T('New best!', x + w / 2, y + 170, {size:13, weight:800, color:C.gold, outline:2.5, outlineColor:C.navy});
+    button('m_again', x + 22, y + 186, w - 44, 48, 'Play again', {fill:C.gold});
+    button('m_hub', x + 22, y + 240, w - 44, 46, 'Back to Big Top', {fill:C.red, color:C.cream, size:15});
+  }
+}
+function modalDown(hit){ if (hit && !hit.disabled) Sfx.click(); }
+function modalUp(hit, p, wasPressed){
+  if (!hit || hit.id !== wasPressed || hit.disabled) return;
+  const id = hit.id;
+  if (id === 'm_close' || id === 'm_close2'){
+    if (modal.kind === 'pause'){ closeModal(); return; }
+    closeModal(); return;
+  }
+  if (modal.kind === 'pregame'){
+    if (id.startsWith('m_d_')){ modal.diff = id.slice(4); return; }
+    if (id === 'm_start'){ const gid = modal.id, d = modal.diff; closeModal(); startGame(gid, d); return; }
+  }
+  else if (modal.kind === 'settings'){
+    if (id === 'm_sound'){
+      gameState.settings.sound = !gameState.settings.sound; persist();
+      if (gameState.settings.sound) Sfx.good();
+      return;
+    }
+    if (id === 'm_reset'){ openModal({kind:'confirm', text:'This clears every star and best score for all twelve games. It cannot be undone.'}); return; }
+  }
+  else if (modal.kind === 'confirm'){
+    if (id === 'm_yes'){
+      gameState = freshSave();
+      persist();
+      closeModal();
+      toast('All progress reset.');
+      return;
+    }
+    if (id === 'm_no'){ openModal({kind:'settings'}); return; }
+  }
+  else if (modal.kind === 'pause'){
+    if (id === 'm_resume'){ closeModal(); return; }
+    if (id === 'm_restart'){ closeModal(); restartGame(); return; }
+    if (id === 'm_sound'){ gameState.settings.sound = !gameState.settings.sound; persist(); return; }
+    if (id === 'm_hub'){ goHub(); return; }
+  }
+  else if (modal.kind === 'result'){
+    if (id === 'm_again'){ closeModal(); restartGame(); return; }
+    if (id === 'm_hub'){ goHub(); return; }
+  }
+}
+
+/* -------------------------------------------------------------- main loop */
+function update(dt){
+  if (screen === 'hub') hubTime += dt;
+  if (modal && modal.kind === 'result') modal.t += dt;
+  if (screen === 'game' && current && !modal && current.update) current.update(dt);
+}
+function render(){
+  regions.length = 0;
+  layer = 'base';
+  const g = ctx;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, cvs.width, cvs.height);
+  g.fillStyle = C.ink;
+  g.fillRect(0, 0, cvs.width, cvs.height);
+  g.translate(V.ox, V.oy); g.scale(V.s, V.s);
+  if (screen === 'hub') drawHub();
+  else if (current){
+    g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+    current.draw();
+    drawGameChrome();
+  }
+  if (modal){ layer = 'modal'; drawModal(); }
+}
+let lastT = 0, loopBroken = false;
+function frame(t){
+  if (!lastT) lastT = t;
+  const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
+  if (!loopBroken){
+    try { update(dt); render(); }
+    catch(e){
+      toast('Render error: ' + (e && e.message ? e.message : e), true);
+      if (window.MC) window.MC.lastError = e;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ===========================================================================
+   GAME HELPERS
+   ========================================================================= */
+const GAMES = {};
+const rndI = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+function shuffle(a){
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function wrapLines(s, w, size, weight, num){
+  ctx.font = (weight || 600) + ' ' + size + 'px ' + (num ? NUMER : DISPLAY);
+  const words = String(s).split(' '), out = []; let line = '';
+  for (const wd of words){
+    const t = line ? line + ' ' + wd : wd;
+    if (ctx.measureText(t).width > w && line){ out.push(line); line = wd; }
+    else line = t;
+  }
+  if (line) out.push(line);
+  return out;
+}
+/* Instruction band directly under the chrome. Returns its bottom edge. */
+function instr(text, o){
+  o = o || {};
+  const w = V.w - 16, size = o.size || 13.5;
+  const lines = wrapLines(text, w - 20, size, 700);
+  const h = 13 + lines.length * 17;
+  panel(8, 53, w, h, {fill:o.fill || C.navy, stroke:o.stroke || C.gold, r:12, lw:2, shadow:false});
+  for (let i = 0; i < lines.length; i++)
+    T(lines[i], V.w / 2, 53 + 12 + i * 17, {size, weight:700, color:o.color || C.cream});
+  return 53 + h;
+}
+function badge(x, y, w, h, label, value, o){
+  o = o || {};
+  panel(x, y, w, h, {fill:o.fill || C.creamDark, stroke:C.navy, r:10, lw:2, shadow:false});
+  T(label, x + w / 2, y + 13, {size:10, weight:800, color:C.slate});
+  T(String(value), x + w / 2, y + h - 14, {size:o.size || 17, weight:800, color:o.color || C.navy, num:true});
+}
+
+/* ===========================================================================
+   GAME 1 - SEALS & BALLS  (sequencing / number matching)
+   ========================================================================= */
+function minSwapsOf(perm){
+  const n = perm.length, seen = new Array(n).fill(false);
+  let cycles = 0;
+  for (let i = 0; i < n; i++){
+    if (seen[i]) continue;
+    cycles++;
+    let j = i;
+    while (!seen[j]){ seen[j] = true; j = perm[j] - 1; }
+  }
+  return n - cycles;
+}
+GAMES.seals = {
+  name:'Seals & Balls', short:'Seals & Balls', skill:'Sequencing & matching',
+  desc:'Every seal wants the ball that matches the number on its stand. Tap one ball, then tap another to swap them.',
+  create(diff){
+    const conf = {easy:{n:4, cols:2, lo:1, hi:1}, medium:{n:6, cols:3, lo:2, hi:3},
+                  hard:{n:9, cols:3, lo:4, hi:8}}[diff];
+    let perm = null, par = 0;
+    for (let tries = 0; tries < 800; tries++){
+      const cand = shuffle(Array.from({length:conf.n}, (_, i) => i + 1));
+      const p = minSwapsOf(cand);
+      if (p >= conf.lo && p <= conf.hi){ perm = cand; par = p; break; }
+    }
+    if (!perm){ /* guaranteed fallback: build a cycle of exactly conf.lo+1 length */
+      perm = Array.from({length:conf.n}, (_, i) => i + 1);
+      for (let i = 0; i <= conf.lo; i++){ const j = (i + 1) % (conf.lo + 1); const t = perm[i]; perm[i] = perm[j]; perm[j] = t; }
+      par = minSwapsOf(perm);
+    }
+    let sel = null, moves = 0, flash = 0;
+    const cellsRect = () => {
+      const rows = Math.ceil(conf.n / conf.cols);
+      const top = 118, bot = V.h - 20;
+      const cw = Math.min((V.w - 24) / conf.cols, 116);
+      const ch = Math.min((bot - top) / rows, 132);
+      const x0 = (V.w - cw * conf.cols) / 2;
+      const y0 = top + Math.min(24, Math.max(0, (bot - top) - ch * rows));
+      return {cw, ch, x0, y0, rows};
+    };
+    function solved(){ return perm.every((v, i) => v === i + 1); }
+    return {
+      debug(){ return {perm:perm.slice(), par, moves, sel, n:conf.n}; },
+      hudNote(){ return 'Swaps ' + moves + '  ·  par ' + par; },
+      update(dt){ if (flash > 0) flash = Math.max(0, flash - dt); },
+      draw(){
+        const g = ctx;
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        sawdustFloor(V.h - 26);
+        instr('Tap two balls to swap them. Ball number must match the stand number.');
+        const L = cellsRect();
+        for (let i = 0; i < conf.n; i++){
+          const col = i % conf.cols, row = (i / conf.cols) | 0;
+          const x = L.x0 + col * L.cw, y = L.y0 + row * L.ch;
+          reg('s' + i, x, y, L.cw, L.ch, {});
+          const cx = x + L.cw / 2, cy = y + L.ch / 2, S = Math.min(L.cw, L.ch);
+          const ok = perm[i] === i + 1, isSel = sel === i;
+          /* stand */
+          g.fillStyle = ok ? C.green : C.navy;
+          rr(g, cx - S * 0.28, cy + S * 0.26, S * 0.56, S * 0.2, 5); g.fill();
+          T(String(i + 1), cx, cy + S * 0.36, {size:S * 0.15, weight:800, color:C.gold, num:true});
+          /* seal */
+          g.fillStyle = '#6E7C8F';
+          g.beginPath(); g.ellipse(cx - S * 0.05, cy + S * 0.12, S * 0.28, S * 0.13, 0, 0, 7); g.fill();
+          g.beginPath(); g.ellipse(cx + S * 0.11, cy - S * 0.05, S * 0.1, S * 0.16, 0.25, 0, 7); g.fill();
+          g.fillStyle = C.ink;
+          g.beginPath(); g.arc(cx + S * 0.14, cy - S * 0.12, S * 0.025, 0, 7); g.fill();
+          g.strokeStyle = '#6E7C8F'; g.lineWidth = S * 0.06; g.lineCap = 'round';
+          g.beginPath(); g.moveTo(cx + S * 0.14, cy - S * 0.19); g.lineTo(cx + S * 0.05, cy - S * 0.26); g.stroke();
+          /* ball */
+          const br = S * 0.17, bx = cx, by = cy - S * 0.33;
+          if (isSel){
+            g.strokeStyle = C.gold; g.lineWidth = 4;
+            g.beginPath(); g.arc(bx, by, br + 6, 0, 7); g.stroke();
+          }
+          g.fillStyle = ok ? C.green : C.red;
+          g.beginPath(); g.arc(bx, by, br, 0, 7); g.fill();
+          g.lineWidth = 2; g.strokeStyle = C.navy; g.stroke();
+          g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1.5;
+          g.beginPath(); g.arc(bx, by, br * 0.62, Math.PI * 0.9, Math.PI * 1.6); g.stroke();
+          T(String(perm[i]), bx, by + 1, {size:br * 1.15, weight:800, color:C.cream, num:true});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed || hit.id[0] !== 's') return;
+        const i = parseInt(hit.id.slice(1), 10);
+        if (!Number.isFinite(i)) return;
+        if (sel === null){ sel = i; Sfx.pop(); return; }
+        if (sel === i){ sel = null; Sfx.click(); return; }
+        const t = perm[sel]; perm[sel] = perm[i]; perm[i] = t;
+        moves++; sel = null; Sfx.click();
+        if (solved()){
+          const stars = moves <= par ? 3 : moves <= par + 2 ? 2 : 1;
+          finishGame(stars, moves, 'Solved in ' + moves + ' swap' + (moves === 1 ? '' : 's') + '. Par was ' + par + '.');
+        }
+      }
+    };
+  }
+};
+
+/* ===========================================================================
+   GAME 2 - TRAPEZE TIMING  (time estimation / rhythm)
+   ========================================================================= */
+GAMES.trapeze = {
+  name:'Trapeze Timing', short:'Trapeze', skill:'Timing & estimation',
+  desc:'Let go at the very top of the swing, then tap again the instant you meet the next bar.',
+  create(diff){
+    const conf = {easy:{gaps:1, win:0.40, T:2.4, dT:0}, medium:{gaps:2, win:0.25, T:1.8, dT:0.0},
+                  hard:{gaps:3, win:0.15, T:1.5, dT:0.15}}[diff];
+    /* Rig geometry scales with viewport height. The amplitude is derived from the
+       rope length so the widest swing always stays on screen at any phone size. */
+    function geo(){
+      const ny = V.h - 46, piv = 150;
+      const L = Math.max(110, Math.min(196, (ny - piv) * 0.45));
+      return {ny, piv, L, A: Math.min(0.55, Math.asin(Math.min(0.95, 50 / L)))};
+    }
+    const n = conf.gaps + 1;
+    const bars = [];
+    for (let i = 0; i < n; i++){
+      const x = n === 1 ? V.w / 2 : 58 + i * ((V.w - 116) / (n - 1));
+      bars.push({x, T: Math.max(0.8, conf.T - conf.dT * i), phase: Math.random() * Math.PI * 2});
+    }
+    let t = 0, idx = 0, phase = 'swing', arriveT = 0, flyFrom = null, flyTo = null, flyStart = 0;
+    let misses = 0, streak = 0, best = 0, fallT = 0, fallFrom = null, msg = '', msgT = 0;
+    const w2 = bar => 2 * Math.PI / bar.T;
+    const ang = bar => geo().A * Math.cos(w2(bar) * t + bar.phase);
+    const posOf = (bar, a) => {
+      const G = geo();
+      return {x: bar.x + Math.sin(a) * G.L, y: G.piv + Math.cos(a) * G.L};
+    };
+    function errToRightApex(bar){
+      const u = ((w2(bar) * t + bar.phase) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      return Math.min(u, 2 * Math.PI - u) / w2(bar);
+    }
+    function nextLeftApex(bar, after){
+      const w = w2(bar);
+      const k = Math.ceil((after * w + bar.phase - Math.PI) / (2 * Math.PI));
+      return (Math.PI + 2 * Math.PI * k - bar.phase) / w;
+    }
+    function fall(reason){
+      fallFrom = artistPos();           /* capture BEFORE the phase flips */
+      phase = 'fall'; fallT = 0; misses++; streak = 0; msg = reason; msgT = 1.6;
+      Sfx.bad();
+    }
+    function artistPos(){
+      if (phase === 'swing'){ const b = bars[idx]; const p = posOf(b, ang(b)); return {x:p.x, y:p.y + 22}; }
+      if (phase === 'fly'){
+        const u = Math.max(0, Math.min(1, (t - flyStart) / Math.max(0.001, arriveT - flyStart)));
+        return {x: flyFrom.x + (flyTo.x - flyFrom.x) * u,
+                y: flyFrom.y + (flyTo.y - flyFrom.y) * u - Math.sin(Math.PI * u) * 58};
+      }
+      if (phase === 'fall'){
+        const u = Math.min(1, fallT / 0.75);
+        return {x: fallFrom.x, y: fallFrom.y + u * u * (V.h - 52 - fallFrom.y)};
+      }
+      const b = bars[idx]; const p = posOf(b, ang(b)); return {x:p.x, y:p.y + 22};
+    }
+    function release(){
+      const b = bars[idx];
+      const e = errToRightApex(b);
+      if (e > conf.win){ fall(e > conf.win * 2.4 ? 'Way too early!' : 'Missed the release zone!'); return; }
+      const target = bars[idx + 1];
+      arriveT = nextLeftApex(target, t + 0.75);
+      flyStart = t;
+      flyFrom = artistPos();
+      const aArrive = geo().A * Math.cos(w2(target) * arriveT + target.phase);
+      const tp = posOf(target, aArrive);
+      flyTo = {x: tp.x, y: tp.y + 22};
+      phase = 'fly';
+      Sfx.pop();
+    }
+    function grab(){
+      const e = Math.abs(t - arriveT);
+      if (e > conf.win){ fall(t < arriveT ? 'Grabbed too soon!' : 'Grabbed too late!'); return; }
+      idx++; streak++; best = Math.max(best, streak);
+      Sfx.good();
+      if (idx >= conf.gaps){
+        const stars = misses === 0 ? 3 : misses === 1 ? 2 : 1;
+        phase = 'done';
+        finishGame(stars, best, misses === 0 ? 'A clean run across ' + conf.gaps + ' gap' + (conf.gaps === 1 ? '' : 's') + '!'
+          : 'Across in ' + (misses + 1) + ' attempts (' + misses + ' fall' + (misses === 1 ? '' : 's') + ').');
+      } else { phase = 'swing'; msg = 'Caught it!'; msgT = 1.0; }
+    }
+    return {
+      debug(){
+        const b = bars[Math.min(idx, bars.length - 1)];
+        const err = phase === 'swing' ? errToRightApex(b) : phase === 'fly' ? Math.abs(t - arriveT) : 99;
+        return {phase, idx, gaps:conf.gaps, win:conf.win, err, misses, best};
+      },
+      hudNote(){ return 'Gap ' + Math.min(idx + 1, conf.gaps) + '/' + conf.gaps + '  ·  falls ' + misses; },
+      update(dt){
+        t += dt;
+        if (msgT > 0) msgT -= dt;
+        if (phase === 'fly' && t > arriveT + conf.win) fall('You sailed straight past the bar!');
+        if (phase === 'fall'){
+          fallT += dt;
+          if (fallT > 1.1){ phase = 'swing'; }
+        }
+      },
+      draw(){
+        const g = ctx;
+        g.fillStyle = '#1B2A45'; g.fillRect(0, 0, V.w, V.h);
+        /* tent ribs */
+        g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 2;
+        for (let i = -2; i < 8; i++){
+          g.beginPath(); g.moveTo(V.w / 2, -40); g.lineTo(i * 70 - 60, V.h); g.stroke();
+        }
+        const bottom = instr('Tap in the gold zone at the top of the swing to let go, then tap when you meet the next bar.');
+        reg('tap', 0, bottom, V.w, V.h - bottom, {});
+        /* spotlight cone + crowd silhouette: the height is the drama, but the
+           middle band still needs something to read against */
+        const spot = g.createLinearGradient(0, 120, 0, V.h - 40);
+        spot.addColorStop(0, 'rgba(255,248,231,.16)');
+        spot.addColorStop(1, 'rgba(255,248,231,0)');
+        g.fillStyle = spot;
+        g.beginPath(); g.moveTo(V.w / 2 - 26, 120); g.lineTo(V.w / 2 + 26, 120);
+        g.lineTo(V.w / 2 + 150, V.h - 40); g.lineTo(V.w / 2 - 150, V.h - 40); g.closePath(); g.fill();
+        g.fillStyle = 'rgba(8,13,24,.55)';
+        for (let i = 0; i < 16; i++){
+          const cx2 = i * 24 + 10;
+          g.beginPath(); g.arc(cx2, V.h - 28, 9, 0, 7); g.fill();
+          g.fillRect(cx2 - 10, V.h - 22, 20, 24);
+        }
+        /* rig */
+        const G = geo();
+        g.fillStyle = C.slate; g.fillRect(0, G.piv - 10, V.w, 8);
+        /* net */
+        g.strokeStyle = 'rgba(255,248,231,.5)'; g.lineWidth = 1.5;
+        const ny = G.ny;
+        for (let i = 0; i <= 12; i++){
+          g.beginPath(); g.moveTo(i * V.w / 12, ny); g.lineTo(i * V.w / 12 - 16, ny + 26); g.stroke();
+          g.beginPath(); g.moveTo(i * V.w / 12 - 16, ny); g.lineTo(i * V.w / 12, ny + 26); g.stroke();
+        }
+        g.strokeStyle = C.cream; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(0, ny); g.lineTo(V.w, ny); g.stroke();
+        /* bars */
+        for (let i = 0; i < bars.length; i++){
+          const b = bars[i], a = ang(b), p = posOf(b, a);
+          /* release zone on the current bar */
+          if (i === idx && phase === 'swing'){
+            /* the gold wedge is exactly the set of rope angles whose timing error
+               is inside the release window, so what you see is what is scored */
+            const a1 = G.A * Math.cos(Math.min(Math.PI / 2, w2(b) * conf.win)), a2 = G.A;
+            g.strokeStyle = 'rgba(242,183,5,.28)'; g.lineWidth = 30; g.lineCap = 'butt';
+            g.beginPath(); g.arc(b.x, G.piv, G.L + 2, Math.PI / 2 - a2, Math.PI / 2 - a1); g.stroke();
+            g.strokeStyle = C.gold; g.lineWidth = 4;
+            g.beginPath(); g.arc(b.x, G.piv, G.L + 19, Math.PI / 2 - a2, Math.PI / 2 - a1); g.stroke();
+          }
+          g.strokeStyle = i === idx ? C.gold : 'rgba(255,248,231,.45)';
+          g.lineWidth = 2;
+          g.beginPath(); g.moveTo(b.x, G.piv); g.lineTo(p.x, p.y); g.stroke();
+          g.strokeStyle = i <= idx ? C.gold : C.creamDark; g.lineWidth = 5; g.lineCap = 'round';
+          g.beginPath(); g.moveTo(p.x - 13, p.y); g.lineTo(p.x + 13, p.y); g.stroke();
+        }
+        /* platforms */
+        g.fillStyle = C.red;
+        g.fillRect(bars[0].x - 36, G.piv + G.L + 30, 32, 9);
+        g.fillRect(bars[bars.length - 1].x + 6, G.piv + G.L + 30, 32, 9);
+        /* artist */
+        const ap = artistPos();
+        g.fillStyle = phase === 'fall' ? C.slate : C.red;
+        g.beginPath(); g.arc(ap.x, ap.y - 14, 7, 0, 7); g.fill();
+        g.strokeStyle = phase === 'fall' ? C.slate : C.red; g.lineWidth = 5; g.lineCap = 'round';
+        g.beginPath();
+        g.moveTo(ap.x, ap.y - 8); g.lineTo(ap.x, ap.y + 8);
+        g.moveTo(ap.x, ap.y + 8); g.lineTo(ap.x - 8, ap.y + 20);
+        g.moveTo(ap.x, ap.y + 8); g.lineTo(ap.x + 8, ap.y + 20);
+        g.moveTo(ap.x - 9, ap.y - 20); g.lineTo(ap.x, ap.y - 6);
+        g.moveTo(ap.x + 9, ap.y - 20); g.lineTo(ap.x, ap.y - 6);
+        g.stroke();
+        /* grab ring while flying */
+        if (phase === 'fly'){
+          const rem = arriveT - t;
+          const rad = 12 + Math.abs(rem) * 150;
+          g.strokeStyle = Math.abs(rem) <= conf.win ? C.gold : 'rgba(255,248,231,.5)';
+          g.lineWidth = 3;
+          g.beginPath(); g.arc(ap.x, ap.y - 8, Math.min(90, rad), 0, 7); g.stroke();
+          g.strokeStyle = C.gold; g.lineWidth = 2;
+          g.beginPath(); g.arc(ap.x, ap.y - 8, 12, 0, 7); g.stroke();
+        }
+        /* Timing meter: the same numbers the scorer uses, made readable. The gold
+           band is the release/grab window; tap while the marker is inside it. */
+        if (phase === 'swing' || phase === 'fly'){
+          const mw = 244, mh = 16, mx = (V.w - mw) / 2, my = V.h - 118;
+          let u = 0, z0 = 0;
+          if (phase === 'swing'){
+            const b = bars[idx], a = ang(b), a1 = G.A * Math.cos(Math.min(Math.PI / 2, w2(b) * conf.win));
+            u = (a / G.A + 1) / 2; z0 = (a1 / G.A + 1) / 2;
+          } else {
+            const span = (arriveT + conf.win) - flyStart;
+            u = (t - flyStart) / span; z0 = (arriveT - conf.win - flyStart) / span;
+          }
+          panel(mx, my, mw, mh, {fill:'rgba(8,13,24,.6)', stroke:C.cream, r:mh / 2, lw:2, shadow:false});
+          g.save(); g.beginPath(); rr(g, mx, my, mw, mh, mh / 2); g.clip();
+          g.fillStyle = C.gold;
+          g.fillRect(mx + Math.max(0, z0) * mw, my, Math.max(4, (1 - Math.max(0, z0)) * mw), mh);
+          g.restore();
+          const px = mx + Math.max(0, Math.min(1, u)) * mw;
+          g.fillStyle = C.cream; rr(g, px - 3.5, my - 6, 7, mh + 12, 3.5); g.fill();
+          g.lineWidth = 2; g.strokeStyle = C.ink; g.stroke();
+          T(phase === 'swing' ? 'RELEASE WINDOW' : 'GRAB WINDOW', V.w / 2, my - 18,
+            {size:10.5, weight:800, color:C.creamDark});
+        }
+        if (msgT > 0){
+          T(msg, V.w / 2, V.h - 80, {size:16, weight:800, color:C.gold, outline:4, outlineColor:C.ink});
+        }
+        T(phase === 'swing' ? 'TAP TO RELEASE' : phase === 'fly' ? 'TAP TO GRAB' : phase === 'fall' ? 'INTO THE NET...' : '',
+          V.w / 2, V.h - 18, {size:13, weight:800, color:C.cream});
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== 'tap' || wasPressed !== 'tap') return;
+        if (phase === 'swing') release();
+        else if (phase === 'fly') grab();
+      }
+    };
+  }
+};
+
+
+/* ===========================================================================
+   GAME 3 - MAGICIAN'S RESCUE  (pattern recognition / sequences)
+   ========================================================================= */
+function seqDistractors(ans, step, k){
+  const cands = [ans + 1, ans - 1, ans + 2, ans - 2, ans + step, ans - step,
+                 ans * 2, Math.round(ans / 2), ans + 3, ans - 3, ans + 2 * step];
+  const out = [];
+  for (const c of shuffle(cands.slice()))
+    if (c !== ans && c >= 0 && Number.isFinite(c) && out.indexOf(c) < 0) out.push(c);
+  while (out.length < k) out.push(ans + out.length + 4);
+  return out.slice(0, k);
+}
+/* who: 'witch' (additive families) | 'monster' (multiplying / two-step families) */
+function makeSequence(diff, who){
+  const n = 5;
+  let terms = [], rule = '', step = 1;
+  if (diff === 'easy'){
+    const d = who === 'witch' ? rndI(1, 2) : rndI(2, 3);
+    const a = rndI(1, 9);
+    for (let i = 0; i < n; i++) terms.push(a + i * d);
+    rule = 'add ' + d + ' each time'; step = d;
+  } else if (diff === 'medium'){
+    if (who === 'witch'){
+      const down = Math.random() < 0.5, d = rndI(2, 5);
+      const a = down ? rndI(30, 48) : rndI(2, 12);
+      for (let i = 0; i < n; i++) terms.push(down ? a - i * d : a + i * d);
+      rule = (down ? 'subtract ' : 'add ') + d + ' each time'; step = d;
+    } else {
+      const r = rndI(2, 3), a = rndI(1, 4);
+      for (let i = 0; i < n; i++) terms.push(a * Math.pow(r, i));
+      rule = 'multiply by ' + r + ' each time'; step = a * (r - 1);
+    }
+  } else {
+    if (who === 'witch'){
+      const d = rndI(1, 4), m = 2, a = rndI(1, 5);
+      terms.push(a);
+      for (let i = 1; i < n; i++) terms.push(i % 2 ? terms[i - 1] + d : terms[i - 1] * m);
+      rule = 'add ' + d + ', then double, repeating'; step = d;
+    } else {
+      const d = rndI(1, 3), k = rndI(1, 3), a = rndI(1, 8);
+      terms.push(a);
+      for (let i = 1; i < n; i++) terms.push(terms[i - 1] + d + (i - 1) * k);
+      rule = 'the gap grows by ' + k + ' each time'; step = d + k;
+    }
+  }
+  const hideIdx = rndI(2, n - 1);
+  return {terms, hideIdx, answer:terms[hideIdx], rule, step};
+}
+GAMES.magician = {
+  name:"Magician's Rescue", short:'Magician', skill:'Patterns & sequences',
+  desc:'The witch and the monster attack with number patterns. Tap the missing number before the spell timer runs out.',
+  create(diff){
+    const conf = {easy:{time:6, opts:3, rounds:8}, medium:{time:4.5, opts:4, rounds:8},
+                  hard:{time:3, opts:4, rounds:8}}[diff];
+    let round = 0, hp = 3, hits = 0, phase = 'ask', fbT = 0, chosen = -1, shake = 0;
+    let q = null, options = [], timer = conf.time, who = 'witch';
+    function nextRound(){
+      who = round % 2 === 0 ? 'witch' : 'monster';
+      q = makeSequence(diff, who);
+      options = shuffle([q.answer].concat(seqDistractors(q.answer, q.step, conf.opts - 1)));
+      timer = conf.time; phase = 'ask'; chosen = -1;
+    }
+    function takeHit(){
+      hp--; hits++; shake = 0.5; Sfx.bad();
+      if (hp <= 0){ phase = 'over'; failGame('The magician is trapped! Survive ' + conf.rounds + ' spells with at least one hit point.'); }
+    }
+    function answer(i){
+      if (phase !== 'ask') return;
+      chosen = i; phase = 'feedback'; fbT = 0;
+      if (options[i] === q.answer) Sfx.good(); else takeHit();
+    }
+    nextRound();
+    return {
+      debug(){ return {round, hp, hits, phase, timer, options:options.slice(), answer:q.answer,
+                       correctIdx:options.indexOf(q.answer), rounds:conf.rounds, opts:conf.opts, time:conf.time}; },
+      hudNote(){ return 'Round ' + Math.min(round + 1, conf.rounds) + '/' + conf.rounds + '  ·  HP ' + hp; },
+      update(dt){
+        if (shake > 0) shake = Math.max(0, shake - dt);
+        if (phase === 'ask'){
+          timer -= dt;
+          if (timer <= 0){ timer = 0; phase = 'feedback'; fbT = 0; chosen = -1; takeHit(); }
+        } else if (phase === 'feedback'){
+          fbT += dt;
+          if (fbT > 0.85){
+            round++;
+            if (round >= conf.rounds){
+              phase = 'over';
+              const stars = hits === 0 ? 3 : hits === 1 ? 2 : 1;
+              finishGame(stars, hits, hits === 0 ? 'Flawless! The magician walks free.'
+                : 'Rescued with ' + hits + ' hit' + (hits === 1 ? '' : 's') + ' taken.');
+            } else nextRound();
+          }
+        }
+      },
+      draw(){
+        const g = ctx;
+        g.fillStyle = '#241A38'; g.fillRect(0, 0, V.w, V.h);
+        const top = instr('Find the missing number in the pattern before the timer empties.');
+        g.fillStyle = 'rgba(107,75,168,.30)';
+        for (let i = 0; i < 9; i++){
+          starPath(g, 24 + (i * 97) % 336, top + 30 + (i * 137) % Math.max(60, V.h - top - 60), 8 + (i % 3) * 2);
+          g.fill();
+        }
+        const sx = shake > 0 ? Math.sin(shake * 60) * 4 : 0;
+        /* lives strip, then the scene; padding keeps the block off the top on tall phones */
+        for (let i = 0; i < 3; i++){
+          const hx = 26 + i * 24, hy = top + 16;
+          g.fillStyle = i < hp ? C.red : 'rgba(255,248,231,.18)';
+          g.beginPath();
+          g.moveTo(hx, hy + 9);
+          g.bezierCurveTo(hx - 10, hy - 1, hx - 2, hy - 9, hx, hy - 3);
+          g.bezierCurveTo(hx + 2, hy - 9, hx + 10, hy - 1, hx, hy + 9);
+          g.fill();
+        }
+        T('LIVES', 95, top + 16, {size:11, weight:800, color:C.creamDark, align:'left'});
+        const pad = Math.max(0, Math.min(56, (V.h - top - 430) / 2));
+        const sceneY = top + 34 + pad, sceneH = 118;
+        g.save(); g.translate(sx, 0);
+        /* witch */
+        const wGlow = who === 'witch' && phase !== 'over';
+        g.fillStyle = wGlow ? C.purple : '#4A3A6B';
+        g.beginPath(); g.moveTo(44, sceneY + 92); g.lineTo(74, sceneY + 92); g.lineTo(59, sceneY + 40); g.closePath(); g.fill();
+        g.beginPath(); g.arc(59, sceneY + 36, 12, 0, 7); g.fillStyle = '#8FCB6B'; g.fill();
+        g.fillStyle = wGlow ? C.purple : '#4A3A6B';
+        g.beginPath(); g.moveTo(44, sceneY + 26); g.lineTo(74, sceneY + 26); g.lineTo(59, sceneY - 6); g.closePath(); g.fill();
+        T('Witch', 59, sceneY + 104, {size:11, weight:800, color: wGlow ? C.gold : C.slate});
+        /* monster */
+        const mGlow = who === 'monster' && phase !== 'over';
+        g.fillStyle = mGlow ? C.green : '#2A4A38';
+        g.beginPath(); g.ellipse(V.w - 59, sceneY + 62, 26, 32, 0, 0, 7); g.fill();
+        g.fillStyle = C.cream;
+        g.beginPath(); g.arc(V.w - 68, sceneY + 52, 7, 0, 7); g.fill();
+        g.beginPath(); g.arc(V.w - 50, sceneY + 52, 7, 0, 7); g.fill();
+        g.fillStyle = C.ink;
+        g.beginPath(); g.arc(V.w - 68, sceneY + 53, 3, 0, 7); g.fill();
+        g.beginPath(); g.arc(V.w - 50, sceneY + 53, 3, 0, 7); g.fill();
+        g.fillStyle = C.cream;
+        for (let i = 0; i < 4; i++) g.fillRect(V.w - 74 + i * 9, sceneY + 68, 6, 7);
+        T('Monster', V.w - 59, sceneY + 104, {size:11, weight:800, color: mGlow ? C.gold : C.slate});
+        /* magician in the cage */
+        const cx = V.w / 2;
+        g.fillStyle = C.blue;
+        g.beginPath(); g.moveTo(cx - 14, sceneY + 92); g.lineTo(cx + 14, sceneY + 92); g.lineTo(cx, sceneY + 44); g.closePath(); g.fill();
+        g.fillStyle = '#F0C9A0';
+        g.beginPath(); g.arc(cx, sceneY + 40, 11, 0, 7); g.fill();
+        g.fillStyle = C.blue;
+        g.beginPath(); g.moveTo(cx - 15, sceneY + 32); g.lineTo(cx + 15, sceneY + 32); g.lineTo(cx, sceneY + 4); g.closePath(); g.fill();
+        g.fillStyle = C.gold; starPath(g, cx, sceneY + 24, 5); g.fill();
+        const barsLeft = Math.max(0, 5 - Math.round(round / conf.rounds * 5));
+        g.strokeStyle = 'rgba(255,248,231,.75)'; g.lineWidth = 3;
+        for (let i = 0; i < barsLeft; i++){
+          const bx = cx - 26 + i * 13;
+          g.beginPath(); g.moveTo(bx, sceneY + 2); g.lineTo(bx, sceneY + 96); g.stroke();
+        }
+        g.restore();
+        /* sequence row */
+        const by = sceneY + sceneH + 8, bw = 56, bh = 50, gap = 6;
+        const x0 = (V.w - (5 * bw + 4 * gap)) / 2;
+        for (let i = 0; i < 5; i++){
+          const bx = x0 + i * (bw + gap), hidden = i === q.hideIdx;
+          const reveal = hidden && phase !== 'ask';
+          panel(bx, by, bw, bh, {fill: hidden ? (reveal ? C.green : C.navy) : C.cream,
+            stroke: hidden ? C.gold : C.navy, r:10, lw: hidden ? 3 : 2});
+          T(hidden && !reveal ? '?' : String(q.terms[i]), bx + bw / 2, by + bh / 2,
+            {size: hidden && !reveal ? 26 : 20, weight:800,
+             color: hidden ? (reveal ? C.cream : C.gold) : C.navy, num:true, maxWidth:bw - 8});
+        }
+        /* timer */
+        const tw = 260, tx = (V.w - tw) / 2, ty = by + bh + 12;
+        const frac = Math.max(0, timer / conf.time);
+        panel(tx, ty, tw, 14, {fill:'rgba(8,13,24,.55)', stroke:C.cream, r:7, lw:2, shadow:false});
+        g.save(); g.beginPath(); rr(g, tx, ty, tw, 14, 7); g.clip();
+        g.fillStyle = frac > 0.5 ? C.green : frac > 0.25 ? C.gold : C.red;
+        g.fillRect(tx, ty, tw * frac, 14);
+        g.restore();
+        /* options */
+        const oy = ty + 30, ow = 150, oh = 62, ogap = 10;
+        const ox0 = (V.w - (2 * ow + ogap)) / 2;
+        for (let i = 0; i < options.length; i++){
+          const col = i % 2, row = (i / 2) | 0;
+          const bx = ox0 + col * (ow + ogap), byy = oy + row * (oh + ogap);
+          let fill = C.cream, col2 = C.navy;
+          if (phase !== 'ask'){
+            if (options[i] === q.answer){ fill = C.green; col2 = C.cream; }
+            else if (i === chosen){ fill = C.red; col2 = C.cream; }
+          }
+          button('o' + i, bx, byy, ow, oh, String(options[i]),
+            {fill, color:col2, size:26, num:true, r:14});
+        }
+        if (phase === 'feedback'){
+          T(chosen >= 0 && options[chosen] === q.answer ? 'Correct!' : (chosen < 0 ? 'Too slow!' : 'Wrong!'),
+            V.w / 2, oy + 2 * (oh + ogap) + 14,
+            {size:17, weight:800, color: chosen >= 0 && options[chosen] === q.answer ? C.green : C.red});
+          T('Pattern: ' + q.rule, V.w / 2, oy + 2 * (oh + ogap) + 36,
+            {size:12.5, weight:700, color:C.creamDark});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed || hit.id[0] !== 'o') return;
+        answer(parseInt(hit.id.slice(1), 10));
+      }
+    };
+  }
+};
+
+/* ===========================================================================
+   GAME 4 - CIRCUS TRAFFIC  (elapsed time / route comparison)
+   ========================================================================= */
+function fmtMin(m){
+  const w = Math.floor(m + 1e-9), half = Math.abs(m - w - 0.5) < 1e-9;
+  return (w === 0 && half ? '' : String(w)) + (half ? '½' : '') + ' min';
+}
+GAMES.traffic = {
+  name:'Circus Traffic', short:'Traffic', skill:'Adding times',
+  desc:'Add up each route - driving plus every traffic-light wait - and pick the one that reaches the big top before the deadline.',
+  create(diff){
+    const conf = {easy:{routes:2, half:false, maxSeg:6, segs:[3, 3], transfer:false},
+                  medium:{routes:3, half:false, maxSeg:14, segs:[4, 5], transfer:true},
+                  hard:{routes:3, half:true, maxSeg:12, segs:[4, 5], transfer:true}}[diff];
+    const NAMES = ['River Road', 'Market Street', 'Old Mill Lane'];
+    let routes = null, deadline = 0;
+    for (let attempt = 0; attempt < 400; attempt++){
+      const rs = [];
+      for (let i = 0; i < conf.routes; i++){
+        const count = rndI(conf.segs[0], conf.segs[1]);
+        const segs = [];
+        for (let j = 0; j < count; j++){
+          const isLight = j % 2 === 1 && j !== count - 1;
+          let m = isLight ? rndI(1, 3) : rndI(2, conf.maxSeg);
+          if (conf.half && Math.random() < 0.55) m += 0.5;
+          segs.push({kind: isLight ? 'light' : 'drive', mins:m});
+        }
+        if (conf.transfer && i === 0) segs.splice(Math.min(2, segs.length - 1), 0, {kind:'transfer', mins: conf.half ? 1.5 : 2});
+        rs.push({name:NAMES[i], segs, total: segs.reduce((a, b) => a + b.mins, 0)});
+      }
+      const totals = rs.map(r => r.total).slice().sort((a, b) => a - b);
+      if (totals[1] - totals[0] < 1.5) continue;
+      if (conf.routes === 3 && totals[2] - totals[1] < 1) continue;
+      const cap = diff === 'easy' ? 20 : 60;
+      if (totals[totals.length - 1] > cap) continue;
+      if (diff === 'hard' && !rs.some(r => Math.abs(r.total % 1 - 0.5) < 1e-9)) continue;
+      routes = rs;
+      deadline = totals[0] + (conf.half ? 0.5 : 1);
+      break;
+    }
+    if (!routes){
+      routes = [{name:NAMES[0], segs:[{kind:'drive', mins:4}, {kind:'light', mins:2}, {kind:'drive', mins:3}], total:9},
+                {name:NAMES[1], segs:[{kind:'drive', mins:6}, {kind:'light', mins:3}, {kind:'drive', mins:5}], total:14}];
+      deadline = 10;
+    }
+    const onTime = routes.filter(r => r.total <= deadline);
+    let phase = 'choose', sel = -1, tries = 0, options = [], wrongIdx = -1, note = '', noteT = 0;
+    function buildOptions(total){
+      const set = [total];
+      const deltas = conf.half ? [0.5, -0.5, 1, -1, 1.5, 2] : [1, -1, 2, -2, 3, 5];
+      for (const d of shuffle(deltas.slice())){
+        const v = total + d;
+        if (v > 0 && set.indexOf(v) < 0) set.push(v);
+        if (set.length === 4) break;
+      }
+      return shuffle(set);
+    }
+    return {
+      debug(){ return {phase, tries, deadline, totals:routes.map(r => r.total), sel,
+                       options:options.slice(), onTime:routes.map(r => r.total <= deadline)}; },
+      hudNote(){ return 'Be there in ' + fmtMin(deadline) + '  ·  tries ' + tries; },
+      update(dt){ if (noteT > 0) noteT -= dt; },
+      draw(){
+        const g = ctx;
+        g.fillStyle = C.cream; g.fillRect(0, 0, V.w, V.h);
+        const top = instr(phase === 'choose'
+          ? 'Total up each route, then tap the one that arrives in ' + fmtMin(deadline) + ' or less.'
+          : 'How long is ' + routes[sel].name + ' in total?');
+        /* Pad is computed from the TALLEST layout (map + answer panel) so the map
+           does not jump when the answer choices appear. */
+        const laneHs = routes.map(r => 30 + Math.ceil(r.segs.length / 4) * 34);
+        const contentH = 42 + laneHs.reduce((a, b) => a + b + 8, 0) + 16 + 22 + 2 * 64 + 48;
+        const pad = Math.max(0, Math.min(50, (V.h - top - contentH) / 2));
+        panel(8, top + 8 + pad, V.w - 16, 34, {fill:C.gold, stroke:C.navy, r:10, lw:2, shadow:false});
+        T('⏱  Deadline: ' + fmtMin(deadline), V.w / 2, top + 25 + pad, {size:15, weight:800, color:C.ink, num:true});
+        let y = top + 52 + pad;
+        for (let i = 0; i < routes.length; i++){
+          const r = routes[i];
+          const chips = r.segs.length;
+          const perRow = 4, rows = Math.ceil(chips / perRow);
+          const laneH = 30 + rows * 34;
+          const active = phase === 'total' && sel === i;
+          if (phase === 'choose') reg('r' + i, 8, y, V.w - 16, laneH, {});
+          panel(8, y, V.w - 16, laneH, {
+            fill: active ? '#E8F3EA' : (pressed === 'r' + i ? C.creamDark : C.white),
+            stroke: active ? C.green : C.navy, r:12, lw: active ? 3 : 2, shadow:false});
+          T(r.name, 18, y + 15, {size:13.5, weight:800, color:C.navy, align:'left'});
+          if (phase === 'choose') T('TAP TO PICK', V.w - 18, y + 15, {size:10.5, weight:800, color:C.slate, align:'right'});
+          for (let j = 0; j < chips; j++){
+            const col = j % perRow, row = (j / perRow) | 0;
+            const cw = (V.w - 32) / perRow, cx = 16 + col * cw, cy = y + 26 + row * 34;
+            const s = r.segs[j];
+            const fill = s.kind === 'light' ? C.red : s.kind === 'transfer' ? C.purple : C.blue;
+            panel(cx, cy, cw - 6, 28, {fill, stroke:C.navy, r:8, lw:1.5, shadow:false});
+            T((s.kind === 'light' ? '● ' : s.kind === 'transfer' ? '⇄ ' : '▸ ') + fmtMin(s.mins),
+              cx + (cw - 6) / 2, cy + 14, {size:11.5, weight:800, color:C.cream, num:true, maxWidth:cw - 12});
+          }
+          y += laneH + 8;
+        }
+        T('▸ drive    ● traffic light    ⇄ change over', V.w / 2, y + 6,
+          {size:10.5, weight:700, color:C.slate});
+        if (phase === 'total'){
+          const oy = y + 22, ow = 150, oh = 54, gp = 10, ox0 = (V.w - (2 * ow + gp)) / 2;
+          for (let i = 0; i < options.length; i++){
+            const col = i % 2, row = (i / 2) | 0;
+            button('t' + i, ox0 + col * (ow + gp), oy + row * (oh + gp), ow, oh, fmtMin(options[i]),
+              {fill: wrongIdx === i ? C.red : C.cream, color: wrongIdx === i ? C.cream : C.navy, size:17, num:true});
+          }
+          button('back', (V.w - 180) / 2, oy + 2 * (oh + gp) + 2, 180, 44, 'Pick another route',
+            {fill:C.creamDark, color:C.navy, size:14});
+        }
+        if (noteT > 0){
+          panel(20, V.h - 68, V.w - 40, 44, {fill:C.navy, stroke:C.gold, r:12, lw:2});
+          Twrap(note, V.w / 2, V.h - 52, V.w - 60, 16, {size:13, weight:700, color:C.cream});
+        }
+      },
+      up(hit, p, wasPressed){
+        if (!hit || hit.id !== wasPressed) return;
+        const id = hit.id;
+        if (phase === 'choose' && id[0] === 'r'){
+          sel = parseInt(id.slice(1), 10);
+          options = buildOptions(routes[sel].total);
+          wrongIdx = -1; phase = 'total'; Sfx.click();
+          return;
+        }
+        if (phase === 'total' && id === 'back'){ phase = 'choose'; sel = -1; Sfx.click(); return; }
+        if (phase === 'total' && id[0] === 't'){
+          const i = parseInt(id.slice(1), 10);
+          tries++;
+          if (options[i] !== routes[sel].total){
+            wrongIdx = i; Sfx.bad();
+            note = 'Not quite - add every chip on that lane again.'; noteT = 2.4;
+            return;
+          }
+          if (routes[sel].total <= deadline){
+            const stars = tries === 1 ? 3 : tries === 2 ? 2 : 1;
+            finishGame(stars, tries, routes[sel].name + ' takes ' + fmtMin(routes[sel].total) +
+              ' - you made it with ' + fmtMin(deadline - routes[sel].total) + ' to spare.');
+          } else {
+            Sfx.bad();
+            note = 'Right total, wrong route: ' + fmtMin(routes[sel].total) + ' is later than the ' +
+                   fmtMin(deadline) + ' deadline. Try another lane.';
+            noteT = 3.4; phase = 'choose'; sel = -1;
+          }
+        }
+      }
+    };
+  }
+};
+
+/* __GAMES_INSERT__ */
+
+/* ===========================================================================
+   PWA: inline manifest (in <head>) + blob-URL service worker
+   ========================================================================= */
+function registerSW(){
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+  const swSource = [
+    "const CACHE = 'math-circus-act1-v1';",
+    "const DOC = new URL(self.registration.scope).href;",
+    "self.addEventListener('install', e => {",
+    "  e.waitUntil(caches.open(CACHE).then(c => c.addAll([DOC, SELF_URL])).then(() => self.skipWaiting()).catch(() => self.skipWaiting()));",
+    "});",
+    "self.addEventListener('activate', e => {",
+    "  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));",
+    "});",
+    "self.addEventListener('fetch', e => {",
+    "  if (e.request.method !== 'GET') return;",
+    "  e.respondWith(caches.match(e.request, {ignoreSearch:true}).then(hit => hit || fetch(e.request).then(res => {",
+    "    if (res && res.ok && res.type === 'basic'){ const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }",
+    "    return res;",
+    "  }).catch(() => caches.match(SELF_URL, {ignoreSearch:true}))));",
+    "});"
+  ].join('\n').replace(/SELF_URL/g, JSON.stringify(location.href.split('#')[0]));
+  try {
+    const url = URL.createObjectURL(new Blob([swSource], {type:'application/javascript'}));
+    navigator.serviceWorker.register(url).catch(() => { /* offline cache unavailable; game still runs */ });
+  } catch(e){ /* non-fatal */ }
+}
+
+/* ------------------------------------------------------------------- boot */
+function boot(){
+  loadSave();
+  fit();
+  requestAnimationFrame(frame);
+  registerSW();
+}
+/* Test/debug surface. Harmless in play; the automated playtest drives this. */
+window.MC = {
+  get state(){ return gameState; },
+  get screen(){ return screen; },
+  get modal(){ return modal; },
+  get current(){ return current; },
+  get regions(){ return regions; },
+  GAMES, V, startGame, goHub, finishGame, loadSave, persist, freshSave,
+  openModal, closeModal, SAVE_KEY, GAME_IDS, SCORE_FIELD,
+  tapId(id){
+    const r = regions.find(rr2 => rr2.id === id);
+    if (!r) throw new Error('no region: ' + id);
+    const p = {x:r.x + r.w / 2, y:r.y + r.h / 2};
+    const lay = modal ? 'modal' : 'base';
+    if (r.layer !== lay) throw new Error('region not on active layer: ' + id);
+    pressed = id;
+    if (modal) modalUp(r, p, id);
+    else if (screen === 'hub') hubUp(r, p, id);
+    else if (current) current.up(r, p, id);
+    pressed = null;
+    return true;
+  },
+  hasRegion(id){ const lay = modal ? 'modal' : 'base'; return regions.some(r => r.id === id && r.layer === lay); },
+  ids(){ const lay = modal ? 'modal' : 'base'; return regions.filter(r => r.layer === lay).map(r => r.id); }
+};
+boot();
+</script>
