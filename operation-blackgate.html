@@ -3168,6 +3168,11 @@ function buildMaterials() {
   });
   MAT.ledRed = new THREE.MeshStandardMaterial({ color: 0x220407, emissive: 0xff2d3c, emissiveIntensity: 2.0, roughness: 0.5 });
   MAT.ledDim = new THREE.MeshStandardMaterial({ color: 0x1a0405, emissive: 0x3a0a0e, emissiveIntensity: 0.3, roughness: 0.5 });
+  // Highlight variants. The aimed fixture swaps to these, so "you are pointing
+  // at me" is the same indicator turned up rather than a new visual idea.
+  MAT.ledRedHot = new THREE.MeshStandardMaterial({ color: 0xff6a72, emissive: 0xff2d3c, emissiveIntensity: 3.2, roughness: 0.35 });
+  MAT.ledAmber = new THREE.MeshStandardMaterial({ color: 0xffb128, emissive: 0xffb128, emissiveIntensity: 1.5, roughness: 0.4 });
+  MAT.ledAmberHot = new THREE.MeshStandardMaterial({ color: 0xffd98a, emissive: 0xffb128, emissiveIntensity: 3.4, roughness: 0.35 });
   MAT.ledGreen = new THREE.MeshStandardMaterial({ color: 0x04220e, emissive: 0x5dff8f, emissiveIntensity: 1.4, roughness: 0.5 });
 
   MAT.guard = new THREE.MeshStandardMaterial({ color: 0x3d4a3d, roughness: 0.8, metalness: 0.08 });
@@ -3464,6 +3469,7 @@ function buildProps(level) {
   var group = level.props;
   var col = level.collidables;
   level.tanks = [];
+  INTERACTABLES.length = 0;
   var statics = { metal: [], dark: [], porcelain: [], hazard: [], vat: [], rubber: [], trim: [],
                   bench: [], drain: [], rack: [] };
 
@@ -3614,6 +3620,19 @@ function buildProps(level) {
     pos: new THREE.Vector3(termX, platY + 1.0, termZ),
     used: false
   };
+  // The one thing you hold USE on, so it carries the other half of the colour
+  // rule: amber, which no scenery is allowed to be.
+  termLed.material = MAT.ledAmber;
+  level.terminal.setHighlight = function (on) {
+    if (!this.used) this.led.material = on ? MAT.ledAmberHot : MAT.ledAmber;
+  };
+  term.userData.terminal = level.terminal;
+  registerInteractable({
+    mesh: term, kind: 'use', label: 'ARCHIVE TERMINAL', range: 12, useRange: 2.8,
+    owner: level.terminal,
+    live: function () { return !this.owner.used; },
+    setHighlight: function (on) { this.owner.setHighlight(on); }
+  });
 
   // ---- chemical plant: vats, pipework, barrels ----
   var vatSpots = [[4.5, 21], [9, 21], [4.5, 24.5], [9, 24.5]];
@@ -3629,10 +3648,20 @@ function buildProps(level) {
     // The pressure gauge is the weak point. It is a live mesh rather than
     // merged static geometry precisely so a shot can find it and so the
     // stockpile objective has something specific to aim at.
-    var gauge = live(MAT.ledGreen, 0.26, 0.26, 0.10, vx + 1.34, 1.7, vz, false);
+    // Red, not green. One rule has to hold across the whole facility or it is
+    // not a rule: a lit red indicator means "shoot this and something happens".
+    var gauge = live(MAT.ledRed, 0.30, 0.30, 0.12, vx + 1.36, 1.7, vz, false);
     var tank = { gauge: gauge, pos: new THREE.Vector3(vx, 1.6, vz), intact: true };
     gauge.userData.tank = tank;
     level.tanks.push(tank);
+    tank.setHighlight = function (on) {
+      if (this.intact) this.gauge.material = on ? MAT.ledRedHot : MAT.ledRed;
+    };
+    registerInteractable({
+      mesh: gauge, kind: 'shoot', label: 'GAS TANK', range: 40, owner: tank,
+      live: function () { return this.owner.intact; },
+      setHighlight: function (on) { this.owner.setHighlight(on); }
+    });
     prop('metal', 0.18, 0.18, CELL * 1.6, vx, 3.3, vz + CELL * 0.8, false);
   }
   for (var hp = 0; hp < 6; hp++) {
@@ -3700,15 +3729,24 @@ var PANEL_SPOTS = [
 
 function buildAlarmPanels(level, group) {
   level.panels = [];
-  var box = new THREE.BoxGeometry(0.34, 0.42, 0.10);
-  var lamp = new THREE.BoxGeometry(0.10, 0.10, 0.04);
+  var box = new THREE.BoxGeometry(0.40, 0.50, 0.12);
+  var bezelGeo = new THREE.BoxGeometry(0.54, 0.64, 0.06);
+  var lamp = new THREE.BoxGeometry(0.17, 0.17, 0.05);
   for (var i = 0; i < PANEL_SPOTS.length; i++) {
     var wx = cellToWorldX(PANEL_SPOTS[i][0]), wz = cellToWorldZ(PANEL_SPOTS[i][1]);
+    // Half-Life 2's rule: the object should announce itself before the HUD
+    // does. A wall is flat grey tile, so the panel gets a pale raised bezel, a
+    // dark recessed face and a lamp big enough to pick out down a corridor --
+    // three cues that no piece of scenery in the building has.
     var mesh = new THREE.Mesh(box, MAT.metalDark);
     mesh.position.set(wx, 1.45, wz);
     mesh.castShadow = false; mesh.receiveShadow = true;
+    var bezel = new THREE.Mesh(bezelGeo, MAT.hazard);
+    bezel.position.set(0, 0, -0.03);
+    bezel.castShadow = false; bezel.receiveShadow = true;
+    mesh.add(bezel);
     var led = new THREE.Mesh(lamp, MAT.ledRed);
-    led.position.set(0, 0.12, 0.07);
+    led.position.set(0, 0.16, 0.075);
     led.castShadow = false;
     mesh.add(led);
     group.add(mesh);
@@ -3716,6 +3754,19 @@ function buildAlarmPanels(level, group) {
                   pos: new THREE.Vector3(wx, 1.45, wz) };
     mesh.userData.panel = panel;
     level.panels.push(panel);
+    // Both destructibles wear the same signature: a red indicator that is lit
+    // while the thing still matters, and dark once it does not.
+    panel.setHighlight = function (on) {
+      if (this.alive) this.led.material = on ? MAT.ledRedHot : MAT.ledRed;
+    };
+    // owner, not a captured local: these are built in a var-scoped loop, so a
+    // closure over the loop variable would leave all seven entries pointing at
+    // whichever panel happened to be built last
+    registerInteractable({
+      mesh: mesh, kind: 'shoot', label: 'ALARM PANEL', range: 40, owner: panel,
+      live: function () { return this.owner.alive; },
+      setHighlight: function (on) { this.owner.setHighlight(on); }
+    });
   }
 }
 
@@ -4877,6 +4928,118 @@ function finishReload() {
 /* Hitscan. Enemies and the level are both tested; nearest hit wins so nobody
    ever shoots through a wall. */
 var _ray = null, _screenCentre = null;
+/* ---------- what the crosshair is on ----------
+   Two rules run this game's interaction language, and they are borrowed rather
+   than invented. Half-Life 2's: the object's own shape and lighting should say
+   what it is before any interface does, so every interactable here wears the
+   same housing and the same lit indicator and reads as equipment on sight.
+   Mirror's Edge's: one colour, used for nothing else, means "you can act on
+   this" -- red is a thing to shoot, amber is a thing to hold USE on, and no
+   scenery is allowed either colour.
+
+   The interface is the second half, not the first. One probe down the
+   crosshair each frame classifies what is under it; the reticle, the label and
+   the object's own highlight all read that one result, so they can never
+   disagree with each other or with what a shot would actually hit. */
+var AIM = { kind: null, target: null, label: '', dist: Infinity, prompt: '' };
+var INTERACTABLES = [];        // rebuilt with the level
+var _aimRay = null, _aimCentre = null, _aimPoint = new THREE.Vector3();
+
+function registerInteractable(entry) { INTERACTABLES.push(entry); }
+
+function updateAimProbe() {
+  AIM.kind = null; AIM.target = null; AIM.label = ''; AIM.dist = Infinity; AIM.prompt = '';
+  if (!LEVEL || GAME.state !== 'playing') return;
+  if (!_aimRay) { _aimRay = new THREE.Raycaster(); _aimCentre = new THREE.Vector2(0, 0); }
+  _aimRay.setFromCamera(_aimCentre, RENDER.camera);
+  _aimRay.far = 60;
+
+  var bestDist = Infinity, bestKind = null, bestTarget = null, bestLabel = '';
+
+  // guards first: they are what you are usually pointing at
+  var meshes = [];
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    if (ENEMIES.list[i].state === 'DEAD') continue;
+    meshes.push(ENEMIES.list[i].hitMesh);
+  }
+  var eh = _aimRay.intersectObjects(meshes, true);
+  if (eh.length) {
+    bestDist = eh[0].distance; bestKind = 'enemy';
+    bestTarget = eh[0].object.userData.enemy;
+    bestLabel = bestTarget && bestTarget.kind === 'scientist' ? 'LAB STAFF' : 'GUARD';
+  }
+
+  // Then the fixtures. Shoot targets and use targets are found differently on
+  // purpose. A thing you shoot is found by the same ray the bullet takes, so
+  // the reticle can never promise a hit the shot would not make. A thing you
+  // hold USE on is found by standing near it and facing it, because a use
+  // prompt that depends on landing a ray on a box tucked behind a console desk
+  // blinks out exactly when you have walked up to the console to use it.
+  for (i = 0; i < INTERACTABLES.length; i++) {
+    var it = INTERACTABLES[i];
+    if (!it.live()) continue;
+    if (it.kind === 'shoot') {
+      var hit = _aimRay.intersectObject(it.mesh, true);
+      if (!hit.length || hit[0].distance >= bestDist) continue;
+      if (hit[0].distance > it.range) continue;
+      bestDist = hit[0].distance; bestKind = 'shoot';
+      bestTarget = it; bestLabel = it.label;
+      _aimPoint.copy(hit[0].point);
+    }
+  }
+
+  // use targets get the last word when you are genuinely next to one
+  for (i = 0; i < INTERACTABLES.length; i++) {
+    var u = INTERACTABLES[i];
+    if (u.kind !== 'use' || !u.live()) continue;
+    var up = u.owner.pos;
+    var ud2 = Math.hypot(up.x - PLAYER.pos.x, up.z - PLAYER.pos.z);
+    if (ud2 > u.range) continue;
+    var fx = -Math.sin(PLAYER.yaw), fz = -Math.cos(PLAYER.yaw);
+    if (ud2 > 0.05 && ((up.x - PLAYER.pos.x) / ud2 * fx + (up.z - PLAYER.pos.z) / ud2 * fz) < 0.45) continue;
+    if (bestKind === 'enemy' && bestDist < ud2) continue;   // a guard in the way comes first
+    bestDist = ud2; bestKind = 'use'; bestTarget = u; bestLabel = u.label;
+  }
+  if (!bestKind) return;
+  if (bestKind === 'use') {
+    // proximity-found, so the occlusion pass below does not apply to it
+    AIM.kind = 'use'; AIM.target = bestTarget; AIM.label = bestLabel; AIM.dist = bestDist;
+    AIM.prompt = bestDist <= bestTarget.useRange ? 'HOLD USE' : 'MOVE CLOSER';
+    return;
+  }
+
+  // Nothing is highlighted through a wall: the probe only tests the short list
+  // above, so the level itself has to be asked separately whether it is in the
+  // way. One extra cast, and only when something was actually found.
+  var wall = _aimRay.intersectObjects(LEVEL.raycastTargets, false);
+  for (i = 0; i < wall.length; i++) {
+    var ud = wall[i].object.userData;
+    if (ud && (ud.panel || ud.tank || ud.terminal)) continue;   // the fixture itself
+    // Geometry you are standing in or against is not "in the way": at a
+    // console or up against a rail the nearest hit is centimetres off the
+    // camera, and treating that as an occluder would blank the prompt exactly
+    // when you are close enough to use the thing.
+    if (wall[i].distance < 0.45) continue;
+    if (wall[i].distance < bestDist - 0.05) return;             // occluded
+    break;
+  }
+
+  AIM.kind = bestKind; AIM.target = bestTarget; AIM.label = bestLabel; AIM.dist = bestDist;
+  if (bestKind === 'shoot') AIM.prompt = 'SHOOT TO DISABLE';
+}
+
+/* The aimed fixture lights up. Restraint on purpose: a brighter version of the
+   indicator it already has, not an outline round the whole object, so the
+   highlight reads as the thing noticing you rather than as an overlay. */
+var _aimHighlighted = null;
+function applyAimHighlight() {
+  var want = (AIM.kind === 'shoot' || AIM.kind === 'use') ? AIM.target : null;
+  if (want === _aimHighlighted) return;
+  if (_aimHighlighted && _aimHighlighted.setHighlight) _aimHighlighted.setHighlight(false);
+  if (want && want.setHighlight) want.setHighlight(true);
+  _aimHighlighted = want;
+}
+
 /* Bend the shot toward the nearest guard the crosshair is already close to,
    GoldenEye style. The test is a cylinder around the body, not an angular cone:
    a fixed cone is unusable up close, where the gap between eye height and chest
@@ -6282,11 +6445,22 @@ function hudDrawCanvas() {
     ctx.globalAlpha = 1;
   }
 
-  // ---- crosshair: four lines with a centre gap ----
+  // ---- crosshair ----
+  // The reticle answers one question: what would this shot do? White means
+  // nothing in particular, red means a target, amber means something to hold
+  // USE on. It is the same colour rule the fixtures themselves use, so the
+  // interface and the world never tell you different things. Kept small and
+  // centred: competitive practice is that a reticle which balloons around
+  // hides the thing you are aiming at, so the state shows in colour and in a
+  // pair of corner brackets rather than in size.
   var cx = Math.round(w / 2), cy = Math.round(h / 2);
   var gap = 5 + HUD.crossGap, len = 9;
+  var aimCol = '#ffffff';
+  if (HUD.hitTimer > 0) aimCol = '#ff2d3c';
+  else if (AIM.kind === 'enemy' || AIM.kind === 'shoot') aimCol = '#ff2d3c';
+  else if (AIM.kind === 'use') aimCol = '#ffb128';
   ctx.lineWidth = 2;
-  ctx.strokeStyle = HUD.hitTimer > 0 ? '#ff2d3c' : '#ffffff';
+  ctx.strokeStyle = aimCol;
   ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 2;
   ctx.beginPath();
   ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
@@ -6294,7 +6468,45 @@ function hudDrawCanvas() {
   ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
   ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + gap + len, cy);
   ctx.stroke();
+
+  // brackets: drawn only when the probe found something, so their presence is
+  // itself the signal that this is a thing and not scenery
+  if (AIM.kind) {
+    var br = gap + len + 5, arm = 5;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (var qx = -1; qx <= 1; qx += 2) {
+      for (var qy = -1; qy <= 1; qy += 2) {
+        ctx.moveTo(cx + qx * br, cy + qy * br - qy * arm);
+        ctx.lineTo(cx + qx * br, cy + qy * br);
+        ctx.lineTo(cx + qx * br - qx * arm, cy + qy * br);
+      }
+    }
+    ctx.stroke();
+  }
   ctx.shadowBlur = 0;
+
+  // name the thing, and say what the trigger would do about it
+  if (AIM.kind && AIM.label) {
+    // Above the reticle, not below it: the hold-USE progress bar already lives
+    // under the crosshair, and two lines both saying HOLD USE on top of each
+    // other is worse than either alone.
+    var labelY = cy - gap - len - 20;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 4;
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = aimCol;
+    ctx.fillText(AIM.label + '  ' + Math.round(AIM.dist) + 'm', cx, labelY);
+    // The download bar is the better prompt whenever it is up, so defer to it.
+    var barUp = HUD.el.interactPrompt && HUD.el.interactPrompt.classList.contains('on');
+    if (AIM.prompt && !(AIM.kind === 'use' && barUp)) {
+      ctx.font = '11px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = AIM.prompt === 'MOVE CLOSER' ? '#9fb0c4' : aimCol;
+      ctx.fillText(AIM.prompt, cx, labelY - 15);
+    }
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'left';
+  }
 
   var padL = 16 + hudInsetLeft(), padB = 18 + hudInsetBottom(), padR = 16 + hudInsetRight();
 
@@ -6852,6 +7064,93 @@ TEST_SUITE.run('A constraint objective can be failed outright', function () {
   GAME.sciKills = savedKills; GAME.difficulty = saved;
   return okClean && failsDirty;
 });
+TEST_SUITE.run('Every interactable is registered and reports its own state', function () {
+  if (!INTERACTABLES.length) return false;
+  var shoot = 0, use = 0, i;
+  for (i = 0; i < INTERACTABLES.length; i++) {
+    var it = INTERACTABLES[i];
+    if (!it.mesh || !it.label || typeof it.live !== 'function') return false;
+    if (it.kind === 'shoot') shoot++; else if (it.kind === 'use') use++; else return false;
+  }
+  // seven alarm panels, four stockpile gauges, one terminal
+  if (shoot !== LEVEL.panels.length + LEVEL.tanks.length || use !== 1) return false;
+
+  // The registrations are built in var-scoped loops, so every entry must be
+  // bound to its own fixture rather than to whichever one was created last.
+  var p0 = LEVEL.panels[0], p1 = LEVEL.panels[1];
+  var e0 = null, e1 = null;
+  for (i = 0; i < INTERACTABLES.length; i++) {
+    if (INTERACTABLES[i].mesh === p0.mesh) e0 = INTERACTABLES[i];
+    if (INTERACTABLES[i].mesh === p1.mesh) e1 = INTERACTABLES[i];
+  }
+  if (!e0 || !e1) return false;
+  var was0 = p0.alive, was1 = p1.alive;
+  p0.alive = false; p1.alive = true;
+  var independent = (e0.live() === false && e1.live() === true);
+  p0.alive = was0; p1.alive = was1;
+  return independent;
+});
+TEST_SUITE.run('The reticle names what a shot would actually hit', function () {
+  var saved = { x: PLAYER.pos.x, y: PLAYER.pos.y, z: PLAYER.pos.z,
+                yaw: PLAYER.yaw, pitch: PLAYER.pitch, state: GAME.state };
+  GAME.state = 'playing';
+  function lookAt(mesh, dist) {
+    var wp = new THREE.Vector3();
+    mesh.getWorldPosition(wp);
+    PLAYER.pos.set(wp.x, 0, wp.z + dist);
+    PLAYER.yaw = 0;
+    PLAYER.pitch = Math.atan2(wp.y - (PLAYER.pos.y + PLAYER.eye), dist);
+    RENDER.camera.position.set(PLAYER.pos.x, PLAYER.pos.y + PLAYER.eye, PLAYER.pos.z);
+    RENDER.camera.rotation.set(PLAYER.pitch, PLAYER.yaw, 0);
+    RENDER.camera.updateMatrixWorld();
+    updateAimProbe();
+  }
+  var panel = LEVEL.panels[1];
+  lookAt(panel.mesh, 4);
+  var onPanel = AIM.kind === 'shoot' && AIM.target.mesh === panel.mesh && !!AIM.prompt;
+
+  // a fixture that no longer does anything must stop advertising itself
+  var wasAlive = panel.alive;
+  panel.alive = false;
+  lookAt(panel.mesh, 4);
+  var deadIsSilent = AIM.kind === null;
+  panel.alive = wasAlive;
+
+  // and nothing is named through a wall
+  PLAYER.pos.set(panel.pos.x, 0, panel.pos.z + 40);
+  PLAYER.yaw = 0; PLAYER.pitch = 0;
+  RENDER.camera.position.set(PLAYER.pos.x, PLAYER.pos.y + PLAYER.eye, PLAYER.pos.z);
+  RENDER.camera.rotation.set(0, 0, 0);
+  RENDER.camera.updateMatrixWorld();
+  updateAimProbe();
+  var noXray = AIM.kind !== 'shoot';
+
+  PLAYER.pos.set(saved.x, saved.y, saved.z);
+  PLAYER.yaw = saved.yaw; PLAYER.pitch = saved.pitch; GAME.state = saved.state;
+  updateAimProbe();
+  return onPanel && deadIsSilent && noXray;
+});
+TEST_SUITE.run('Use prompts come from proximity, not from landing a ray', function () {
+  var saved = { x: PLAYER.pos.x, z: PLAYER.pos.z, yaw: PLAYER.yaw, state: GAME.state };
+  GAME.state = 'playing';
+  var t = LEVEL.terminal;
+  function stand(dist) {
+    PLAYER.pos.set(t.pos.x, PLAYER.pos.y, t.pos.z + dist);
+    PLAYER.yaw = 0;               // facing -Z, toward the terminal
+    updateAimProbe();
+  }
+  stand(2.0);
+  var close = AIM.kind === 'use' && AIM.prompt === 'HOLD USE';
+  stand(6.0);
+  var far = AIM.kind === 'use' && AIM.prompt === 'MOVE CLOSER';
+  PLAYER.yaw = Math.PI;           // turned away from it
+  updateAimProbe();
+  var facingMatters = AIM.kind !== 'use';
+  PLAYER.pos.set(saved.x, PLAYER.pos.y, saved.z);
+  PLAYER.yaw = saved.yaw; GAME.state = saved.state;
+  updateAimProbe();
+  return close && far && facingMatters;
+});
 TEST_SUITE.run('Adaptive quality ignores warm-up, survives a stall, and recovers', function () {
   var savedStage = GFX.stage, savedGood = GFX.goodWindows, savedIdx = GFX.sampleIdx,
       savedScale = RENDER.renderScale, savedFrames = GAME.frameCount, savedState = GAME.state;
@@ -7044,7 +7343,7 @@ function startMission() {
   if (LEVEL.tanks) {
     for (i = 0; i < LEVEL.tanks.length; i++) {
       LEVEL.tanks[i].intact = true;
-      LEVEL.tanks[i].gauge.material = MAT.ledGreen;
+      LEVEL.tanks[i].gauge.material = MAT.ledRed;
     }
   }
 
@@ -7062,7 +7361,7 @@ function startMission() {
   // reset terminal + doors
   LEVEL.terminal.used = false;
   LEVEL.terminal.screen.material = MAT.screenAmber;
-  LEVEL.terminal.led.material = MAT.ledGreen;
+  LEVEL.terminal.led.material = MAT.ledAmber;
   for (i = 0; i < LEVEL.doors.length; i++) {
     var d = LEVEL.doors[i];
     d.locked = (d.tag.indexOf('exit') === 0);
@@ -7184,6 +7483,8 @@ function frame(now) {
     updateEnemies(dt);
     updateScreens(dt);
     updateDoors(dt);
+    updateAimProbe();
+    applyAimHighlight();
     updateInteraction(dt);
     hudTick(dt);
     if (checkWin()) { endMission(true, 'escaped'); }

@@ -241,6 +241,64 @@ death goes to ALERT. It has a real consequence: killing the guard who is running
 for a panel in front of witnesses just promotes the next one, so a silent run
 means killing cleanly *and* out of sight.
 
+## Interaction pass: making the actionable legible
+
+The complaint was that you could not tell what you were allowed to act on. That
+is an affordance problem, and the two games usually cited for solving it solve
+it in different halves, so both halves are here.
+
+**Half-Life 2's half: the object says it before the interface does.** Every
+interactable now wears the same signature -- a pale hazard bezel, a dark
+recessed face and a lit indicator large enough to pick out down a corridor.
+None of the building's scenery has any of those three, so a fixture reads as
+equipment on sight rather than as another grey box on a grey wall.
+
+**Mirror's Edge's half: one colour means one thing, everywhere.** Red is a thing
+to shoot. Amber is a thing to hold USE on. No scenery is permitted either
+colour. The stockpile gauges were green before, which broke the rule the moment
+there were two kinds of target, so they are red now: *a lit red indicator means
+shoot this and something happens*, with no exceptions to learn.
+
+### One probe drives all of it
+
+A single cast down the crosshair each frame classifies what is under it, and the
+reticle, the label, the prompt and the object's own highlight all read that one
+result. They cannot disagree with each other, and they cannot disagree with what
+a shot would actually do.
+
+- **Reticle** turns red on a guard or a destructible, amber on a use target,
+  white on nothing. Corner brackets appear only when the probe found something,
+  so their presence is itself the signal.
+- **Label** names the thing and its range -- `ALARM PANEL 3m` -- above the
+  crosshair, with what the trigger would do about it. Above rather than below
+  because the hold-USE progress bar already lives underneath, and two lines both
+  reading HOLD USE is worse than either alone.
+- **Highlight**: the aimed fixture's indicator brightens. Deliberately not an
+  outline round the whole object -- it should read as the thing noticing you,
+  not as an overlay on the world.
+- **Nothing is named through a wall**, and a fixture that no longer does
+  anything stops advertising itself.
+
+The reticle stays small and centred throughout. Competitive practice is that a
+crosshair which balloons hides the thing you are aiming at, so state is carried
+in colour and brackets rather than in size.
+
+### Shoot targets and use targets are found differently, on purpose
+
+A thing you shoot is found by the same ray the bullet takes, so the reticle can
+never promise a hit the shot would not make. A thing you hold USE on is found by
+proximity and facing instead, because the terminal sits behind a console desk
+and a prompt that depends on landing a ray on the box behind it blinks out
+exactly when you have walked up to the desk to use it. Beyond arm's reach the
+prompt reads MOVE CLOSER rather than vanishing.
+
+One bug worth recording, because it is the kind that hides: the seven panel
+registrations were built in a `var`-scoped loop and closed over the loop
+variable, so all seven shared one binding and every entry reported the state of
+whichever panel was built last. Destroyed panels stayed targetable and the
+highlight always lit the wrong one. Each entry now carries its own owner, and a
+test asserts that two panels report independently.
+
 ## Deliberate deviations
 
 - The brief asks for `castShadow = true` on every piece of geometry. Flat floors,
