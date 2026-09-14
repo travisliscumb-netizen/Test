@@ -128,6 +128,52 @@ These came out of a reported play session and a scripted sweep of the level.
   fixed 200-shot spread: 39% to 61% hit rate at 5m, 17% to 60% at 12m, with
   wild shots (25 degrees off) never touched.
 
+## Final polish pass
+
+A systematic review of the systems the playtest did not touch, each finding
+reproduced with a script before it was changed.
+
+- **A guard's gunshot left a light burning in the level.** All three muzzle
+  flashes -- yours, a guard's, a mine blast -- drive one shared point light, but
+  only yours armed the timer that turns it off. After the first shot fired at
+  you, a lamp sat in the middle of the facility for the rest of the mission.
+  Every source now goes through one call that ramps the light down, so a gunshot
+  snaps and a blast lingers, and neither can be left on.
+- **Mines leaked geometry.** Each throw built a fresh cylinder and sphere, and
+  the detonation disposed the body but missed the LED. Both are shared now and
+  built once. Verified: the second and third mine add nothing, and a restart
+  returns to the baseline count.
+- **Adaptive quality judged the machine on its worst moment.** It averaged the
+  first 60 frames -- the ones paying for shader compilation and the environment
+  bake -- so a perfectly capable phone could lose bloom permanently one second
+  in. It now ignores warm-up, caps any single sample so one stall cannot poison
+  a window, and climbs back when the machine proves itself over three clean
+  windows, with a wide gap between the two thresholds so it cannot flap.
+- **The off-screen objective marker could point the wrong way.** A projected
+  point behind the camera is meaningless; mirroring it could land the marker
+  near the centre of the screen. Off-screen targets are now placed by true
+  bearing: straight ahead is up, dead behind is straight down, and an arrow
+  rides the border in between. Verified at all eight bearings.
+- **Bodies blinked out of existence** on a 12-second timer. They settle through
+  the floor over the last second instead.
+- **Pausing mid-trigger swallowed your next shot.** The fire latch survived the
+  pause, so the first click after resuming did nothing on a semi-automatic.
+- **Open doors were drawn as walls on the minimap**, and guards in SEARCH -- the
+  ones actively hunting you -- were the one hostile state the map did not show.
+- **The AI hot paths allocated every frame.** Line-of-sight built a Raycaster
+  and a vector per call, the attack state built three vectors per enemy per
+  frame, and every enemy cloned the player's position every frame. All reused
+  now. Allocation in a per-frame path is what a garbage collector notices, and a
+  collection pause is exactly what makes a game feel rough on a phone.
+
+Checked and found correct, so left alone: semi-automatic fire (one shot per
+press, verified), automatic fire, reload against a partial or empty reserve,
+weapon switching mid-reload, five full restarts (scene object count, enemy
+roster, collidables and light count all flat), pause and resume (no time jump),
+and guards engaging you at the control-room terminal -- they see you, switch to
+ATTACK and close to their firing standoff, which the earlier report wrongly
+flagged as a possible hole.
+
 ## Deliberate deviations
 
 - The brief asks for `castShadow = true` on every piece of geometry. Flat floors,

@@ -2506,7 +2506,9 @@ var CFG = {
   gfx: {
     bloomThreshold: 0.85, bloomStrength: 0.4, bloomRadius: 0.5,
     vignetteDarkness: 0.45, vignetteOffset: 0.95,
-    exposure: 1.2, downgradeMs: 22,
+    // wide gap between the two: a machine has to be clearly comfortable before
+    // quality climbs back, so the two thresholds can never chase each other
+    exposure: 1.2, downgradeMs: 22, upgradeMs: 13,
     shadowSize: 1024, shadowLights: 2,     // two key lights cast; the cap is six
     muzzleFlashMs: 80
   },
@@ -3850,7 +3852,7 @@ function updateLighting(dt, alarmActive, elapsed) {
 
 var GFX = {
   composer: null, renderPass: null, bloom: null, vignette: null, fxaa: null,
-  quality: 'high', frameSamples: [], sampleIdx: 0, downgraded: false, stage: 0
+  quality: 'high', frameSamples: [], sampleIdx: 0, downgraded: false, stage: 0, goodWindows: 0
 };
 
 function initPostFX() {
@@ -3930,19 +3932,50 @@ function resizeRenderer() {
 
 /* Adaptive quality: average the last 60 frame times; past 22ms the bloom pass
    is switched off and the shadow maps drop to 512. A second stage trims render
-   resolution if that was not enough, which is what keeps a phone above 45fps. */
+   resolution if that was not enough, which is what keeps a phone above 45fps.
+
+   Three rules stop it misjudging a machine that is actually fine. It ignores
+   the first couple of seconds, because the opening frames pay for shader
+   compiles and the environment bake and are not representative of anything. It
+   caps each sample, so one stall -- a tab switch, a garbage collection --
+   cannot poison a whole window. And it can climb back up: a sustained stretch
+   comfortably under budget restores the stage it gave away, with a wide gap
+   between the two thresholds so it cannot sit there flapping. */
 function updateRenderScale(dt, frameMs) {
   RENDER.frameMs += (frameMs - RENDER.frameMs) * 0.08;
 
-  GFX.frameSamples[GFX.sampleIdx % 60] = frameMs;
+  // a single stalled frame is an event, not evidence about the hardware
+  GFX.frameSamples[GFX.sampleIdx % 60] = Math.min(frameMs, 120);
   GFX.sampleIdx++;
   if (GFX.sampleIdx % 60 !== 0 || GFX.frameSamples.length < 60) return;
+  if (GAME.frameCount < 150 || GAME.state !== 'playing') return;   // warm-up
 
   var sum = 0;
   for (var i = 0; i < 60; i++) sum += GFX.frameSamples[i];
   var avg = sum / 60;
 
+  if (avg < CFG.gfx.upgradeMs && GFX.stage > 0) {
+    GFX.goodWindows++;
+    if (GFX.goodWindows >= 3) {
+      GFX.goodWindows = 0;
+      if (GFX.stage === 2) {
+        GFX.stage = 1;
+        RENDER.renderScale = 1;
+        resizeRenderer();
+        console.log('[PERF] avg frame ' + avg.toFixed(1) + 'ms — render scale back to 1.0');
+      } else {
+        GFX.stage = 0;
+        GFX.quality = 'high';
+        if (GFX.bloom) GFX.bloom.enabled = RENDER.bloomEnabled;
+        setShadowMapSize(CFG.gfx.shadowSize);
+        console.log('[PERF] avg frame ' + avg.toFixed(1) + 'ms — bloom back on, shadow maps ' + CFG.gfx.shadowSize);
+      }
+      publishGFX();
+    }
+    return;
+  }
   if (avg > CFG.gfx.downgradeMs) {
+    GFX.goodWindows = 0;
     if (GFX.stage === 0) {
       GFX.stage = 1;
       GFX.quality = 'low';
@@ -4487,7 +4520,7 @@ var WEAPONS = {
   list: [], index: 0, aiming: false, cooldown: 0, reloading: 0,
   muzzleLight: null, viewGroup: null, viewModels: [], recoil: 0, swayX: 0, swayY: 0,
   mines: [], impactPool: [], impactHead: 0, lastFireAt: -99,
-  flashQuad: null, flashTimer: 0
+  flashQuad: null, flashTimer: 0, flashPeak: 0, flashSpan: 0, flashFromPlayer: false
 };
 var weapons = null;          // the array the test suite inspects
 var currentWeapon = null;
@@ -4818,12 +4851,23 @@ function getMuzzleWorldPos() {
 /* Binary on/off for exactly CFG.gfx.muzzleFlashMs, no lerp. The light object is
    created once at startup and only its intensity changes, because adding or
    removing a light would recompile every material in the scene. */
-function flashMuzzle(pos) {
+/* Every flash in the game drives the one shared muzzle light, so every flash
+   has to arm the timer that turns it off again. Guard fire and mine blasts used
+   to set the light and never clear it, which left a lamp burning in the middle
+   of the level for the rest of the mission. */
+function flashLight(pos, intensity, distance, colorHex, seconds) {
   WEAPONS.muzzleLight.position.copy(pos);
-  WEAPONS.muzzleLight.color.setHex(0xff8800);
-  WEAPONS.muzzleLight.distance = 4;
-  WEAPONS.muzzleLight.intensity = 10;
-  WEAPONS.flashTimer = CFG.gfx.muzzleFlashMs / 1000;
+  WEAPONS.muzzleLight.color.setHex(colorHex);
+  WEAPONS.muzzleLight.distance = distance;
+  WEAPONS.muzzleLight.intensity = intensity;
+  WEAPONS.flashTimer = seconds;
+  WEAPONS.flashPeak = intensity;
+  WEAPONS.flashSpan = seconds;
+}
+
+function flashMuzzle(pos) {
+  flashLight(pos, 10, 4, 0xff8800, CFG.gfx.muzzleFlashMs / 1000);
+  WEAPONS.flashFromPlayer = true;
   if (WEAPONS.flashQuad) {
     WEAPONS.flashQuad.visible = true;
     WEAPONS.flashQuad.scale.setScalar(0.01);
@@ -4832,6 +4876,7 @@ function flashMuzzle(pos) {
 }
 
 /* ---------- proximity mines ---------- */
+var _mineGeo = null, _mineLedGeo = null;
 function placeMine() {
   var w = currentWeapon;
   if (w.ammoInMag <= 0) return false;
@@ -4848,14 +4893,20 @@ function placeMine() {
   w.ammoInMag--;
   WEAPONS.cooldown = 1 / w.rps;
 
-  var mineGeo = new THREE.CylinderGeometry(0.10, 0.10, 0.03, 16, 1);
-  mineGeo.rotateX(Math.PI / 2);
-  var mesh = new THREE.Mesh(mineGeo, MAT.hazard);
+  // One geometry for every mine ever placed. Building a fresh cylinder and a
+  // fresh sphere per throw meant the detonation had to dispose them, and the
+  // LED sphere was being missed — a small leak that grew with every mine.
+  if (!_mineGeo) {
+    _mineGeo = new THREE.CylinderGeometry(0.10, 0.10, 0.03, 16, 1);
+    _mineGeo.rotateX(Math.PI / 2);
+    _mineLedGeo = new THREE.SphereGeometry(0.012, 8, 6);
+  }
+  var mesh = new THREE.Mesh(_mineGeo, MAT.hazard);
   mesh.position.copy(pos).addScaledVector(normal, 0.05);
   mesh.lookAt(pos.clone().add(normal));
   mesh.castShadow = true;
   RENDER.scene.add(mesh);
-  var led = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), MAT.ledRed);
+  var led = new THREE.Mesh(_mineLedGeo, MAT.ledRed);
   led.position.set(0.03, 0.02, 0.03);
   mesh.add(led);
 
@@ -4896,10 +4947,8 @@ function detonateMine(idx) {
   spawnImpactEffect(m.pos, new THREE.Vector3(0, 1, 0), false);
   sfxExplosion(m.pos);
   makeNoise(m.pos.x, m.pos.z, 30);
-  WEAPONS.muzzleLight.position.copy(m.pos);
-  WEAPONS.muzzleLight.intensity = 26;
-  RENDER.scene.remove(m.mesh);
-  m.mesh.geometry.dispose();
+  flashLight(m.pos, 26, 11, 0xffc04a, 0.22);
+  RENDER.scene.remove(m.mesh);   // geometry is shared: nothing to dispose here
   WEAPONS.mines.splice(idx, 1);
 }
 
@@ -4915,8 +4964,12 @@ function updateWeapons(dt, input) {
   // 30ms then 1->0 over the next 30ms, synchronised with it.
   if (WEAPONS.flashTimer > 0) {
     WEAPONS.flashTimer -= dt;
-    var elapsedMs = CFG.gfx.muzzleFlashMs - WEAPONS.flashTimer * 1000;
-    if (WEAPONS.flashQuad) {
+    // The light falls off across whatever span the source asked for, so a
+    // gunshot snaps and a mine blast lingers, and neither can be left burning.
+    var span = WEAPONS.flashSpan || (CFG.gfx.muzzleFlashMs / 1000);
+    WEAPONS.muzzleLight.intensity = (WEAPONS.flashPeak || 10) * clamp(WEAPONS.flashTimer / span, 0, 1);
+    if (WEAPONS.flashFromPlayer && WEAPONS.flashQuad) {
+      var elapsedMs = CFG.gfx.muzzleFlashMs - WEAPONS.flashTimer * 1000;
       var q = WEAPONS.flashQuad, k;
       if (elapsedMs <= 30) k = clamp(elapsedMs / 30, 0, 1);
       else if (elapsedMs <= 60) k = clamp(1 - (elapsedMs - 30) / 30, 0, 1);
@@ -4926,6 +4979,7 @@ function updateWeapons(dt, input) {
     }
     if (WEAPONS.flashTimer <= 0) {
       WEAPONS.flashTimer = 0;
+      WEAPONS.flashFromPlayer = false;
       WEAPONS.muzzleLight.intensity = 0;
       if (WEAPONS.flashQuad) WEAPONS.flashQuad.visible = false;
     }
@@ -5142,8 +5196,12 @@ Enemy.prototype.setState = function (s) {
   if ((s === 'CHASE' || s === 'ATTACK') && !GAME.alarm) raiseAlarm(this);
 };
 
+/* Scratch vectors for the per-frame AI paths. Each is written immediately
+   before use and never held across another call that writes the same one. */
+var _eyeVec = new THREE.Vector3(), _sightTo = new THREE.Vector3(),
+    _shootTo = new THREE.Vector3(), _shootDir = new THREE.Vector3();
 Enemy.prototype.eyePos = function () {
-  return new THREE.Vector3(this.group.position.x, this.group.position.y + 1.56, this.group.position.z);
+  return _eyeVec.set(this.group.position.x, this.group.position.y + 1.56, this.group.position.z);
 };
 
 /* Sight: range, cone and an occlusion ray. Runs on alternate frames, and not at
@@ -5163,7 +5221,7 @@ Enemy.prototype.updateSight = function (playerPos) {
   if (Math.abs(diff) > fov) return false;
 
   var from = this.eyePos();
-  var to = new THREE.Vector3(playerPos.x, playerPos.y + PLAYER.height * 0.6, playerPos.z);
+  var to = _sightTo.set(playerPos.x, playerPos.y + PLAYER.height * 0.6, playerPos.z);
   if (!hasLineOfSight(from, to)) return false;
   this.canSee = true;
   return true;
@@ -5178,7 +5236,9 @@ Enemy.prototype.update = function (dt, playerPos) {
   else if (far) this.canSee = false;
 
   if (this.canSee) {
-    this.lastKnownPlayerPos = playerPos.clone();
+    // owned vector, written in place: this ran every frame for every enemy
+    if (!this.lastKnownPlayerPos) this.lastKnownPlayerPos = new THREE.Vector3();
+    this.lastKnownPlayerPos.copy(playerPos);
     this.alertness = Math.min(1, this.alertness + dt * 2.2);
   } else {
     this.alertness = Math.max(0, this.alertness - dt * 0.25);
@@ -5240,6 +5300,8 @@ Enemy.prototype.chase = function (dt, playerPos) {
   if (!this.canSee && this.stateClock > CFG.ai.searchTimeout) this.setState('SEARCH');
 };
 
+var _atkDir = new THREE.Vector3(), _atkSide = new THREE.Vector3(), _atkWant = new THREE.Vector3(),
+    _muzzleAt = new THREE.Vector3();
 Enemy.prototype.attack = function (dt, playerPos) {
   this.faceToward(playerPos, dt, 9);
   if (!this.canSee) {
@@ -5250,12 +5312,12 @@ Enemy.prototype.attack = function (dt, playerPos) {
   if (dist > CFG.ai.fireRange * 1.1) { this.setState('CHASE'); return; }
   // strafe a little so they are not static targets
   var strafe = Math.sin(this.stateClock * 1.4 + this.group.position.x) * 0.7;
-  var dir = new THREE.Vector3(playerPos.x - this.group.position.x, 0, playerPos.z - this.group.position.z).normalize();
-  var side = new THREE.Vector3(-dir.z, 0, dir.x);
-  var want = this.group.position.clone()
-    .addScaledVector(side, strafe)
-    .addScaledVector(dir, dist > 7 ? 0.8 : -0.4);
-  this.moveToward(want, dt, this.speed * 0.9, true);
+  _atkDir.set(playerPos.x - this.group.position.x, 0, playerPos.z - this.group.position.z).normalize();
+  _atkSide.set(-_atkDir.z, 0, _atkDir.x);
+  _atkWant.copy(this.group.position)
+    .addScaledVector(_atkSide, strafe)
+    .addScaledVector(_atkDir, dist > 7 ? 0.8 : -0.4);
+  this.moveToward(_atkWant, dt, this.speed * 0.9, true);
 
   this.fireClock -= dt;
   if (this.fireClock <= 0) {
@@ -5284,11 +5346,12 @@ Enemy.prototype.search = function (dt) {
 
 Enemy.prototype.shoot = function (playerPos) {
   var from = this.eyePos();
-  var to = new THREE.Vector3(playerPos.x, playerPos.y + PLAYER.height * 0.55, playerPos.z);
+  var to = _shootTo.set(playerPos.x, playerPos.y + PLAYER.height * 0.55, playerPos.z);
   sfxGunshot('enemy', this.group.position);
   makeNoise(this.group.position.x, this.group.position.z, CFG.ai.hearingRadius);
-  WEAPONS.muzzleLight.position.copy(from).addScaledVector(to.clone().sub(from).normalize(), 0.5);
-  WEAPONS.muzzleLight.intensity = 5;
+  _shootDir.copy(to).sub(from).normalize();
+  _muzzleAt.copy(from).addScaledVector(_shootDir, 0.5);
+  flashLight(_muzzleAt, 5, 3.4, 0xffaa33, CFG.gfx.muzzleFlashMs / 1000);
 
   var aim = CFG.difficulty[GAME.difficulty].aim;
   var dist = from.distanceTo(to);
@@ -5409,6 +5472,7 @@ Enemy.prototype.takeDamage = function (amount, fromPos) {
 };
 
 Enemy.prototype.die = function () {
+  this.restY = this.group.position.y;    // where the body settles, for the sink-out
   this.state = 'DEAD';
   this.endHitFlash();
   if (this.alertDot) this.alertDot.visible = false;
@@ -5430,17 +5494,30 @@ Enemy.prototype.updateDeath = function (dt) {
   // linear interpolation to -PI/2 over 400ms, driven from the update loop
   var t = Math.min(1, this.deathClock / 0.4);
   this.group.rotation.x = -t * (Math.PI / 2);
-  if (this.deathClock > 12 && this.group.visible) this.group.visible = false;
+  // Bodies used to blink out of existence on a 12s timer, which is a visible
+  // pop if you happen to be looking at one. They now settle through the floor
+  // over the last second instead. Sinking rather than fading on purpose: every
+  // enemy shares one set of materials, so fading one would fade all of them.
+  if (this.deathClock > 11 && this.group.visible) {
+    var sink = Math.min(1, (this.deathClock - 11) / 1.0);
+    this.group.position.y = this.restY - sink * 1.1;
+    if (sink >= 1) this.group.visible = false;
+  }
 };
 
+/* Line of sight runs several times a frame across the whole roster. It used to
+   build a Raycaster and a direction vector on every call; both are now reused,
+   because allocation in a per-frame path is what a garbage collector notices. */
+var _losRay = null, _losDir = null;
 function hasLineOfSight(from, to) {
-  var dir = to.clone().sub(from);
-  var dist = dir.length();
+  if (!_losRay) { _losRay = new THREE.Raycaster(); _losDir = new THREE.Vector3(); }
+  _losDir.copy(to).sub(from);
+  var dist = _losDir.length();
   if (dist < 0.01) return true;
-  dir.normalize();
-  var ray = new THREE.Raycaster(from, dir, 0.05, dist - 0.05);
-  var hits = ray.intersectObjects(LEVEL.raycastTargets, false);
-  return hits.length === 0;
+  _losDir.divideScalar(dist);
+  _losRay.set(from, _losDir);
+  _losRay.near = 0.05; _losRay.far = dist - 0.05;
+  return _losRay.intersectObjects(LEVEL.raycastTargets, false).length === 0;
 }
 
 function makeNoise(x, z, radius) {
@@ -5959,6 +6036,7 @@ function minimapRefresh() {
   for (var i = 0; i < list.length; i++) {
     var b = list[i];
     if (b.walkable) continue;
+    if (b.disabled) continue;                            // an open door is a gap, not a wall
     if (b.maxY < PLAYER.pos.y + 0.35) continue;          // low kerbs are not walls
     if (b.maxX < px - r || b.minX > px + r) continue;
     if (b.maxZ < pz - r || b.minZ > pz + r) continue;
@@ -6010,16 +6088,19 @@ function hudDrawMinimap(ctx, w, h) {
     ctx.fillRect(cx + dm[0] * scale - 2.5, cy + dm[1] * scale - 2.5, 5, 5);
   }
 
-  // pickups
-  ctx.fillStyle = 'rgba(72,183,255,0.9)';
+  // Guards, but only the ones that have given themselves away. A radar showing
+  // every patrol would make the stealth half of the level pointless; a guard
+  // who is hunting you has already broken cover, and you should be able to see
+  // where he is going. Red is coming for you, amber is looking for you.
   for (i = 0; i < ENEMIES.list.length; i++) {
     var e = ENEMIES.list[i];
     if (e.state === 'DEAD') continue;
-    var known = e.state === 'ALERT' || e.state === 'ATTACK' || e.state === 'CHASE' || e.canSee;
+    var hunting = e.state === 'ATTACK' || e.state === 'CHASE';
+    var known = hunting || e.state === 'ALERT' || e.state === 'SEARCH' || e.canSee;
     if (!known) continue;
     var em = toMap(e.group.position.x, e.group.position.z);
     if (Math.hypot(em[0], em[1]) > MINIMAP.range) continue;
-    ctx.fillStyle = (e.state === 'ATTACK' || e.state === 'CHASE') ? '#ff2d3c' : '#ffb128';
+    ctx.fillStyle = hunting ? '#ff2d3c' : '#ffb128';
     ctx.beginPath(); ctx.arc(cx + em[0] * scale, cy + em[1] * scale, 3, 0, 6.283); ctx.fill();
   }
   ctx.restore();   // release the clip
@@ -6063,6 +6144,75 @@ function hudDrawMinimap(ctx, w, h) {
 }
 
 /* Where the player is currently supposed to be heading. */
+function hudObjectiveTarget() {
+  if (!LEVEL) return null;
+  if (!GAME.objectives.terminal) return LEVEL.terminal ? LEVEL.terminal.pos : null;
+  return LEVEL.spawnPoints.exit;
+}
+
+/* A marker in the view itself, clamped to the screen edge when off camera, so
+   the objective is findable without reading the map. */
+function hudDrawWaypoint(ctx, w, h) {
+  var obj = hudObjectiveTarget();
+  if (!obj) return;
+  var dist = Math.round(Math.hypot(obj.x - PLAYER.pos.x, obj.z - PLAYER.pos.z));
+  var cxs = w / 2, cys = h / 2, m = 46;
+  var sx, sy, offscreen;
+
+  var v = _wpVec.set(obj.x, obj.y + 1.2, obj.z).project(RENDER.camera);
+  if (v.z <= 1) {
+    sx = (v.x * 0.5 + 0.5) * w;
+    sy = (-v.y * 0.5 + 0.5) * h;
+    offscreen = sx < m || sx > w - m || sy < m || sy > h - m;
+  } else {
+    offscreen = true;
+  }
+
+  if (offscreen) {
+    // A projected point behind the camera is meaningless, and mirroring it can
+    // land the marker near the middle of the screen, pointing you the wrong
+    // way. Off-screen targets are placed by true bearing instead: straight
+    // ahead is up, dead behind is straight down, and the marker rides the
+    // border in between, so the arrow always names the way you have to turn.
+    var dx = obj.x - PLAYER.pos.x, dz = obj.z - PLAYER.pos.z;
+    var fx = -Math.sin(PLAYER.yaw), fz = -Math.cos(PLAYER.yaw);
+    var rx = Math.cos(PLAYER.yaw), rz = -Math.sin(PLAYER.yaw);
+    var bearing = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
+    var ux = Math.sin(bearing), uy = -Math.cos(bearing);
+    // push that direction out to the inset border rectangle
+    var halfW = cxs - m, halfH = cys - m;
+    var k = Math.min(
+      Math.abs(ux) > 1e-4 ? halfW / Math.abs(ux) : Infinity,
+      Math.abs(uy) > 1e-4 ? halfH / Math.abs(uy) : Infinity
+    );
+    sx = cxs + ux * k; sy = cys + uy * k;
+  }
+
+  ctx.save();
+  ctx.globalAlpha = offscreen ? 0.78 : 0.95;
+  ctx.strokeStyle = '#ffb128'; ctx.fillStyle = '#ffb128'; ctx.lineWidth = 2;
+  if (offscreen) {
+    // an arrow that points off the edge, toward where the objective actually is
+    var ang = Math.atan2(sy - cys, sx - cxs);
+    ctx.translate(sx, sy); ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.moveTo(10, 0); ctx.lineTo(-5, 7); ctx.lineTo(-5, -7);
+    ctx.closePath(); ctx.fill();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  } else {
+    ctx.beginPath(); ctx.arc(sx, sy, 9, 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - 14, sy); ctx.lineTo(sx - 5, sy);
+    ctx.moveTo(sx + 5, sy); ctx.lineTo(sx + 14, sy); ctx.stroke();
+  }
+  ctx.font = '11px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 3;
+  ctx.fillText(dist + 'm', sx, sy + 24);
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
 function hudObjectiveTarget() {
   if (!LEVEL) return null;
   if (!GAME.objectives.terminal) return LEVEL.terminal ? LEVEL.terminal.pos : null;
@@ -6285,6 +6435,56 @@ TEST_SUITE.run('Touch stick honours dead zone and expo curve', function () {
   return dead.mag === 0 && Math.abs(full.mag - 1) < 1e-6 && half.mag < 0.5;
 });
 
+TEST_SUITE.run('Adaptive quality ignores warm-up, survives a stall, and recovers', function () {
+  var savedStage = GFX.stage, savedGood = GFX.goodWindows, savedIdx = GFX.sampleIdx,
+      savedScale = RENDER.renderScale, savedFrames = GAME.frameCount, savedState = GAME.state;
+  function feed(ms, windows) {
+    for (var w = 0; w < windows; w++) for (var i = 0; i < 60; i++) updateRenderScale(0.016, ms);
+  }
+  GAME.state = 'playing';
+  GAME.frameCount = 0; GFX.stage = 0; GFX.goodWindows = 0; GFX.sampleIdx = 0;
+  feed(400, 2);
+  var warmupIgnored = GFX.stage === 0;          // boot frames prove nothing
+
+  GAME.frameCount = 1000;
+  feed(400, 2);
+  var downgraded = GFX.stage === 2;             // sustained load does
+
+  feed(8, 6);                                   // three clean windows per stage
+  var recovered = GFX.stage === 0 && RENDER.renderScale === 1;
+
+  GFX.stage = 0; GFX.goodWindows = 0;
+  for (var i = 0; i < 59; i++) updateRenderScale(0.016, 9);
+  updateRenderScale(0.016, 2000);               // one enormous stall
+  var survivedStall = GFX.stage === 0;
+
+  GFX.stage = savedStage; GFX.goodWindows = savedGood; GFX.sampleIdx = savedIdx;
+  RENDER.renderScale = savedScale; GAME.frameCount = savedFrames; GAME.state = savedState;
+  return warmupIgnored && downgraded && recovered && survivedStall;
+});
+TEST_SUITE.run('Every muzzle flash source decays the shared light to zero', function () {
+  var savedTimer = WEAPONS.flashTimer, savedPeak = WEAPONS.flashPeak,
+      savedSpan = WEAPONS.flashSpan, savedFrom = WEAPONS.flashFromPlayer;
+  var here = PLAYER.pos.clone();
+  var ok = true;
+  // guard fire and mine blasts drive the same light the player's muzzle does;
+  // each one has to arm the timer, or it burns for the rest of the mission
+  var sources = [
+    function () { flashMuzzle(here); },
+    function () { flashLight(here, 5, 3.4, 0xffaa33, 0.08); },
+    function () { flashLight(here, 26, 11, 0xffc04a, 0.22); }
+  ];
+  for (var i = 0; i < sources.length && ok; i++) {
+    sources[i]();
+    if (WEAPONS.muzzleLight.intensity <= 0) { ok = false; break; }
+    for (var f = 0; f < 60; f++) updateWeapons(0.016, INPUT);   // ~1s of frames
+    if (WEAPONS.muzzleLight.intensity !== 0 || WEAPONS.flashTimer !== 0) ok = false;
+  }
+  WEAPONS.flashTimer = savedTimer; WEAPONS.flashPeak = savedPeak;
+  WEAPONS.flashSpan = savedSpan; WEAPONS.flashFromPlayer = savedFrom;
+  WEAPONS.muzzleLight.intensity = 0;
+  return ok;
+});
 TEST_SUITE.run('Aim assist bends a near miss but ignores a wild shot', function () {
   var e = null;
   for (var i = 0; i < ENEMIES.list.length; i++) if (ENEMIES.list[i].state !== 'DEAD') { e = ENEMIES.list[i]; break; }
@@ -6402,6 +6602,11 @@ function startMission() {
   PLAYER.health = PLAYER.maxHealth;
 
   // reset weapons
+  WEAPONS.flashTimer = 0; WEAPONS.flashPeak = 0; WEAPONS.flashSpan = 0;
+  WEAPONS.flashFromPlayer = false;
+  if (WEAPONS.muzzleLight) WEAPONS.muzzleLight.intensity = 0;
+  if (WEAPONS.flashQuad) WEAPONS.flashQuad.visible = false;
+  WEAPONS.cooldown = 0; WEAPONS.reloading = 0; WEAPONS.recoil = 0;
   for (var i = 0; i < WEAPONS.list.length; i++) {
     var w = WEAPONS.list[i];
     w.ammoInMag = w.magSize;
@@ -6411,8 +6616,7 @@ function startMission() {
   WEAPONS.index = 0; currentWeapon = WEAPONS.list[0];
   for (i = 0; i < WEAPONS.viewModels.length; i++) WEAPONS.viewModels[i].visible = (i === 0);
   for (i = WEAPONS.mines.length - 1; i >= 0; i--) {
-    RENDER.scene.remove(WEAPONS.mines[i].mesh);
-    WEAPONS.mines[i].mesh.geometry.dispose();
+    RENDER.scene.remove(WEAPONS.mines[i].mesh);   // shared geometry, see placeMine
     WEAPONS.mines.splice(i, 1);
   }
   for (i = 0; i < WEAPONS.impactPool.length; i++) { WEAPONS.impactPool[i].life = 0; WEAPONS.impactPool[i].mesh.visible = false; }
@@ -6471,7 +6675,9 @@ function endMission(won, reason) {
 function pauseGame() {
   if (GAME.state !== 'playing') return;
   GAME.state = 'paused';
-  INPUT.fire = false; INPUT.interact = false;
+  // The latch has to drop with the trigger. Leaving it set means the first
+  // click after resuming is swallowed on any semi-automatic weapon.
+  INPUT.fire = false; INPUT.fireLatched = false; INPUT.interact = false;
   exitPointerLock();
   audioSuspend();
   document.getElementById('pauseTime').textContent = fmtClock(GAME.elapsed);
