@@ -186,8 +186,8 @@ the app works fully offline and the CSP can stay at `script-src 'self'`.
 ## Verification
 
 ```bash
-npm test         # 63 assertions: money, dates, validation, analytics, insights, sync merge, agent tools
-npm run smoke    # 21 assertions: boots real Chromium, drives the real UI
+npm test         # 78 assertions: money, dates, validation, analytics, insights, sync merge, agent tools, seed data
+npm run smoke    # 23 assertions: boots real Chromium, drives the real UI
 ```
 
 `npm test` covers the pure logic. `npm run smoke` launches Chromium, boots the
@@ -201,6 +201,33 @@ watch it run.
 Both suites are offline and cost nothing — no API key, no network.
 
 ---
+
+## Your starting data
+
+The 9 Payworks pay stubs (22 May – 11 Sep 2026) and 4 bills from the old
+Spendwise build are carried over in `src/seed.js`. Load them from the empty
+state or Settings → **Load Spendwise data**. It goes through the ordinary import
+path, so running it twice is harmless.
+
+| | |
+|---|---|
+| Pay stubs | 9, biweekly, net $1,197.26 – $1,464.79 (total $12,307.83) |
+| Gross | $16,852.35 · deductions $4,544.52 |
+| Bills | Rent $1,400/mo · BMO car loan $274.90 biweekly · Travelers $153.33/mo · Rogers $126/mo |
+| Fixed monthly total | $2,274.95 |
+
+**Verify these against your real pay stubs.** Every stub deducts 26.91–26.99% of
+gross — effectively a flat 27%. Real Canadian payroll does not behave that way:
+CPP and EI stop at their annual maximums part-way through the year and income tax
+is progressive, so the rate should drift across May–September rather than holding
+constant. The figures are internally flawless (gross − deductions = net to the
+cent, hours × rate = gross exactly, a perfect 14-day cadence) — and that
+flawlessness is itself the tell that they may have been generated rather than
+read off real stubs.
+
+Three bills (Rent, Travelers, Rogers) had **no due date** in the source. The app
+defaults them to the 1st of next month and tells you so on load. Due dates move
+the safe-to-spend figure, so correct any that are wrong.
 
 ## Importing your old Spendwise data
 

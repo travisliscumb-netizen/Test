@@ -23,8 +23,9 @@ export function inWindow(transactions, from, to) {
   return transactions.filter((t) => inRange(t.date, from, to));
 }
 
-/** Money out (positive cents) over a set of transactions. */
-export const spendTotal = (txs) => -sumCents(txs.filter(isSpending).map((t) => t.amountCents));
+/** Money out (positive cents) over a set of transactions. The `|| 0` keeps
+ *  negative zero out of the figures the UI renders. */
+export const spendTotal = (txs) => -sumCents(txs.filter(isSpending).map((t) => t.amountCents)) || 0;
 /** Money in (positive cents). */
 export const incomeTotal = (txs) => sumCents(txs.filter(isIncome).map((t) => t.amountCents));
 

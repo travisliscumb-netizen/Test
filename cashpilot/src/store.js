@@ -267,6 +267,7 @@ export async function importJSON(text, { mode = 'merge' } = {}) {
     transactions: incoming.transactions.length,
     bills: incoming.bills.length,
     total: state.transactions.length,
+    totalBills: state.bills.length,
   };
 }
 

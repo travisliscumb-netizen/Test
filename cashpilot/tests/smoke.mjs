@@ -221,6 +221,60 @@ try {
     assert(count === SEED.transactions.length + 1, `expected ${SEED.transactions.length + 1} transactions after reload, got ${count}`);
   });
 
+  console.log('\nreal Spendwise seed data');
+  await check('the seed loads through the UI and reconciles on screen', async () => {
+    await page.evaluate(async () => {
+      const { seedLedger } = await import('./src/seed.js');
+      await window.__cashpilot.store.importJSON(JSON.stringify(seedLedger()), { mode: 'replace' });
+      window.__cashpilot.render();
+    });
+    await page.waitForTimeout(350);
+
+    const result = await page.evaluate(async () => {
+      const { seedLedger } = await import('./src/seed.js');
+      const data = window.__cashpilot.store.getData();
+      const seed = seedLedger();
+      const A = window.__cashpilot.A;
+      const total = document.querySelector('#view-home .breakdown li.total .v')?.textContent ?? '';
+      const fixedNode = [...document.querySelectorAll('#view-home .stat')]
+        .find((n) => /Fixed bills/i.test(n.textContent));
+      return {
+        payCount: data.transactions.filter((t) => t.kind === 'income').length,
+        billCount: data.bills.length,
+        seedPay: seed.transactions.length,
+        netTotal: data.transactions.filter((t) => t.kind === 'income').reduce((a, t) => a + t.amountCents, 0),
+        fixedMonthly: A.fixedMonthlyCents(data),
+        shownTotal: total,
+        engineSafe: A.safeToSpend(data, {}).safeCents,
+        fixedText: fixedNode?.textContent ?? '',
+        anyNaN: document.querySelector('#view-home').innerText.includes('NaN'),
+      };
+    });
+
+    assert(result.payCount === 9, `expected 9 pay stubs on screen, got ${result.payCount}`);
+    assert(result.billCount === 4, `expected 4 bills, got ${result.billCount}`);
+    assert(result.netTotal === 1230783, `total net should be $12,307.83, got ${result.netTotal}`);
+    assert(result.fixedMonthly === 227495, `fixed monthly should be $2,274.95, got ${result.fixedMonthly}`);
+    assert(!result.anyNaN, 'a NaN reached the rendered page');
+    const parsed = Math.round(Number(result.shownTotal.replace(/[^0-9.-]/g, '')) * 100);
+    assert(parsed === result.engineSafe, `screen shows ${result.shownTotal} but engine says ${result.engineSafe}`);
+  });
+
+  await check('no NaN or undefined anywhere in any view', async () => {
+    const dirty = [];
+    for (const view of ['home', 'activity', 'insights', 'capture']) {
+      await page.locator(`.tab[data-goto="${view}"]`).click();
+      await page.waitForTimeout(220);
+      const text = await page.locator(`#view-${view}`).innerText();
+      if (/\bNaN\b|\bundefined\b|\[object Object\]/.test(text)) dirty.push(view);
+    }
+    assert(dirty.length === 0, `these views rendered NaN/undefined: ${dirty.join(', ')}`);
+  });
+
+  await page.locator('.tab[data-goto="home"]').click();
+  await page.waitForTimeout(200);
+  if (SHOTS) await page.screenshot({ path: `${SHOT_DIR}seeded.png`, fullPage: true });
+
   console.log('\nresponsive');
   await check('no horizontal overflow at 360px', async () => {
     await page.setViewportSize({ width: 360, height: 780 });

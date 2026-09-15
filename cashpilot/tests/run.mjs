@@ -9,6 +9,7 @@ import { generateInsights } from '../src/insights.js';
 import { mergeLedgers, tombstone } from '../src/store.js';
 import { TOOL_DEFS, MUTATING_TOOLS } from '../src/tools.js';
 import { trimHistory } from '../src/agent.js';
+import { seedLedger, SEED_PAYSTUBS, SEED_BILLS } from '../src/seed.js';
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -26,6 +27,15 @@ test('parses currency text to exact cents', () => {
   assert.equal(U.parseMoney('(45.99)'), -4599);
   assert.equal(U.parseMoney('1 234,50'), 123450);
 });
+test('negative zero never reaches the display', () => {
+  // -sumCents([]) is -0, which Intl renders as "-$0.00" and the UI then prefixes
+  // with its own minus sign, producing "--$0.00" on screen.
+  assert.equal(U.formatMoney(-0), U.formatMoney(0));
+  assert.ok(!U.formatMoney(-0).includes('-'), `got ${U.formatMoney(-0)}`);
+  assert.ok(!U.formatMoney(A.spendTotal([])).includes('-'));
+  assert.ok(Object.is(U.sumCents([]), 0), 'sumCents([]) must be +0, not -0');
+});
+
 test('no float drift over many additions', () => {
   // The canonical failure: 0.1+0.2 in float dollars. In cents it is exact.
   const cents = Array.from({ length: 10000 }, () => 10);
@@ -159,6 +169,19 @@ test('migrating garbage yields an empty ledger, not a crash', () => {
   assert.equal(M.migrate('nonsense').transactions.length, 0);
   assert.equal(M.migrate({ transactions: 'not-an-array' }).transactions.length, 0);
 });
+test('migration preserves updatedAt so merges stay correct', () => {
+  // migrate() runs on every load. If normalization restamped updatedAt, the
+  // local copy would always look newer than the remote and would win every
+  // merge conflict, silently discarding the other device's edits.
+  const stamp = '2026-03-04T05:06:07.000Z';
+  const d = M.migrate({ transactions: [{
+    id: 'x', kind: 'expense', date: '2026-03-04', amountCents: -100,
+    merchant: 'M', category: 'Other', createdAt: stamp, updatedAt: stamp, docIds: [],
+  }] });
+  assert.equal(d.transactions[0].updatedAt, stamp);
+  assert.equal(d.transactions[0].createdAt, stamp);
+});
+
 test('de-duplicates by id keeping the newest', () => {
   const d = M.migrate({ transactions: [
     { id: 'x', kind: 'expense', date: '2026-01-01', amountCents: -100, updatedAt: '2026-01-01T00:00:00Z', category: 'Other', merchant: 'a' },
@@ -532,6 +555,123 @@ test('trimming never orphans a tool_result from its tool_use', () => {
       }
     }
   }
+});
+
+// ---------------------------------------------------------------- seed data
+group('seed: legacy bill migration');
+
+test('a legacy bill in float dollars becomes exact cents, not NaN', () => {
+  // The real Spendwise export stores `amount: 1400` and no `amountCents`.
+  // Passing it through untouched makes billMonthlyCents return NaN, which then
+  // poisons safe-to-spend, the fixed-cost ratio and the entire forecast.
+  const d = M.migrate({ bills: [{ id: 'b1', name: 'Rent', amount: 1400, frequency: 'monthly', nextDue: '' }] });
+  const rent = d.bills[0];
+  assert.equal(rent.amountCents, 140000);
+  assert.ok(Number.isFinite(M.billMonthlyCents(rent)), 'monthly equivalent must be a number');
+  assert.equal(M.billMonthlyCents(rent), 140000);
+});
+
+test('a blank due date falls through to a default instead of throwing', () => {
+  const d = M.migrate({ bills: [{ id: 'b1', name: 'Rent', amount: 1400, frequency: 'monthly', nextDue: '' }] });
+  assert.equal(d.bills.length, 1, 'the bill must survive migration');
+  assert.ok(U.isValidISODate(d.bills[0].nextDue), `expected a real date, got ${d.bills[0].nextDue}`);
+});
+
+test('a monthly bill with no due date defaults forward, not into the past', () => {
+  const d = M.migrate({ bills: [{ name: 'Rent', amount: 1400, frequency: 'monthly', nextDue: '' }] });
+  assert.ok(d.bills[0].nextDue > U.toISODate(),
+    'defaulting to today would invent a charge in the current month');
+});
+
+test('no NaN reaches any headline figure after a legacy import', () => {
+  const d = M.migrate({
+    paystubs: [{ date: '2026-09-11', net: 1301.82, gross: 1782, deductions: 480.18, hours: 81, rate: 22 }],
+    bills: [{ name: 'Rent', amount: 1400, frequency: 'monthly', nextDue: '' },
+            { name: 'BMO car loan', amount: 274.90, frequency: 'biweekly', nextDue: '2026-09-17' }],
+  });
+  const sts = A.safeToSpend(d, { asOf: ASOF });
+  for (const [k, v] of Object.entries(sts)) {
+    if (typeof v === 'number') assert.ok(Number.isFinite(v), `safeToSpend.${k} is ${v}`);
+  }
+  assert.ok(Number.isFinite(A.fixedMonthlyCents(d)), 'fixed monthly total must be finite');
+  const f = A.forecast(d, { asOf: ASOF, days: 30 });
+  for (const row of f.rows) {
+    assert.ok(Number.isFinite(row.balanceCents), `forecast row ${row.date} is NaN`);
+  }
+});
+
+group('seed: the real Spendwise data');
+
+const SEED = M.migrate(seedLedger());
+
+test('all nine pay stubs load as income', () => {
+  const pay = SEED.transactions.filter((t) => t.kind === 'income');
+  assert.equal(pay.length, 9);
+  assert.equal(pay.length, SEED_PAYSTUBS.length);
+  for (const p of pay) assert.ok(p.amountCents > 0, 'income must be positive');
+});
+
+test('every stub reconciles: gross - deductions = net', () => {
+  for (const t of SEED.transactions.filter((x) => x.kind === 'income')) {
+    assert.equal(t.grossCents - t.deductionsCents, t.amountCents,
+      `${t.date}: ${t.grossCents} - ${t.deductionsCents} !== ${t.amountCents}`);
+    assert.equal(t.netMismatchCents, undefined, `${t.date} should not be flagged`);
+  }
+});
+
+test('every stub reconciles: hours x rate = gross', () => {
+  for (const t of SEED.transactions.filter((x) => x.kind === 'income')) {
+    assert.equal(Math.round(t.hours * t.rateCents), t.grossCents,
+      `${t.date}: ${t.hours}h x ${t.rateCents} !== ${t.grossCents}`);
+  }
+});
+
+test('exact totals, carried across the float-to-cents conversion', () => {
+  const pay = SEED.transactions.filter((t) => t.kind === 'income');
+  assert.equal(U.sumCents(pay.map((t) => t.amountCents)), 1230783, 'total net must be $12,307.83');
+  assert.equal(U.sumCents(pay.map((t) => t.grossCents)), 1685235, 'total gross must be $16,852.35');
+  assert.equal(U.sumCents(pay.map((t) => t.deductionsCents)), 454452, 'total deductions must be $4,544.52');
+});
+
+test('the four bills load with correct cents and categories', () => {
+  assert.equal(SEED.bills.length, 4);
+  assert.equal(SEED.bills.length, SEED_BILLS.length);
+  const byName = Object.fromEntries(SEED.bills.map((b) => [b.name, b]));
+  assert.equal(byName['Rent'].amountCents, 140000);
+  assert.equal(byName['BMO car loan'].amountCents, 27490);
+  assert.equal(byName['BMO car loan'].frequency, 'biweekly');
+  assert.equal(byName['Travelers car insurance'].amountCents, 15333);
+  assert.equal(byName['Rogers phone'].amountCents, 12600);
+  for (const b of SEED.bills) assert.ok(Number.isFinite(M.billMonthlyCents(b)));
+});
+
+test('fixed monthly cost is the real figure, not a rounded guess', () => {
+  // 1400 + 153.33 + 126 monthly, plus 274.90 biweekly (x26/12 = 595.62).
+  const expected = 140000 + 15333 + 12600 + Math.round(27490 * 26 / 12);
+  assert.equal(A.fixedMonthlyCents(SEED), expected);
+});
+
+test('biweekly pay cadence is detected from the real dates', () => {
+  const p = A.incomeProfile(SEED, { asOf: ASOF });
+  assert.equal(p.cadence, 'biweekly');
+  assert.equal(p.medianGapDays, 14);
+  assert.equal(p.averageNetCents, Math.round(1230783 / 9));
+});
+
+test('the seed produces a finite, coherent safe-to-spend', () => {
+  const sts = A.safeToSpend(SEED, { asOf: ASOF });
+  assert.ok(Number.isFinite(sts.safeCents));
+  assert.equal(sts.safeCents,
+    sts.forecastIncomeCents - sts.billsRemainingCents - sts.spentCents - sts.savedCents - sts.bufferCents);
+  assert.equal(sts.incomeForecastIsPartial, false, 'nine stubs is plenty to establish cadence');
+});
+
+test('loading the seed twice does not duplicate anything', () => {
+  // The seed goes through the ordinary merge path, so it must be idempotent.
+  const once = M.migrate(seedLedger());
+  const twice = mergeLedgers(M.migrate(seedLedger()), once);
+  assert.equal(twice.transactions.length, once.transactions.length, 'pay stubs duplicated');
+  assert.equal(twice.bills.length, once.bills.length, 'bills duplicated');
 });
 
 console.log(`\n${'='.repeat(52)}`);

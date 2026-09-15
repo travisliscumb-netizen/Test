@@ -69,6 +69,9 @@ export function parseMoney(input) {
 /** Integer cents -> display string, e.g. -123456 => "-$1,234.56". */
 export function formatMoney(cents, { sign = false, cad = false } = {}) {
   if (cents === null || cents === undefined || !Number.isFinite(cents)) return '—';
+  // Normalize negative zero. `-sumCents([])` is -0, and Intl renders that as
+  // "-$0.00", which shows up as "−-$0.00" wherever the UI adds its own minus.
+  if (cents === 0) cents = 0;
   const fmt = new Intl.NumberFormat(LOCALE, {
     style: 'currency',
     currency: CURRENCY,
@@ -89,7 +92,7 @@ export function formatMoneyShort(cents) {
 }
 
 /** Sum integer cents without float drift. */
-export const sumCents = (xs) => xs.reduce((a, b) => a + (b | 0), 0);
+export const sumCents = (xs) => xs.reduce((a, b) => a + (b | 0), 0) || 0;
 
 /**
  * Split `cents` into `n` parts that sum exactly back to `cents`.

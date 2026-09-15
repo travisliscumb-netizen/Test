@@ -53,6 +53,10 @@ function requireCents(value, field, { allowZero = false } = {}) {
 
 const isBlank = (v) => v === undefined || v === null || String(v).trim() === '';
 
+/** First value that is not blank. `??` is not enough: '' is not nullish, and
+ *  legacy records use '' for "unset" (e.g. a bill with no known due date). */
+const firstSet = (...vals) => vals.find((v) => !isBlank(v));
+
 /**
  * Read a money value that may arrive in either unit.
  *
@@ -113,7 +117,7 @@ export function makeTransaction(input = {}, { now = new Date() } = {}) {
   const t = {
     id: asString(input.id) || uid('tx'),
     kind,
-    date: requireDate(input.date ?? toISODate(now), 'date'),
+    date: requireDate(firstSet(input.date, toISODate(now)), 'date'),
     amountCents: amount,
     merchant: asString(input.merchant ?? input.description ?? input.payee) || (kind === 'income' ? 'Income' : 'Unknown'),
     category: coerceCategory(input.category, categoryList),
@@ -198,7 +202,7 @@ export function makeBill(input = {}, { now = new Date() } = {}) {
     name,
     amountCents: Math.abs(readCents(input, 'amountCents', 'amount', 'amount')),
     frequency,
-    nextDue: requireDate(input.nextDue ?? input.dueDate ?? toISODate(now), 'nextDue'),
+    nextDue: requireDate(firstSet(input.nextDue, input.dueDate, defaultNextDue(frequency, now)), 'nextDue'),
     category: coerceCategory(input.category, EXPENSE_CATEGORIES),
     autopay: Boolean(input.autopay),
     active: input.active === undefined ? true : Boolean(input.active),
@@ -206,6 +210,20 @@ export function makeBill(input = {}, { now = new Date() } = {}) {
     createdAt: asString(input.createdAt) || now.toISOString(),
     updatedAt: now.toISOString(),
   };
+}
+
+/**
+ * Due date for a bill that arrives without one (legacy records store '').
+ * Monthly-ish bills default to the 1st of next month, which is right far more
+ * often than "today" and keeps them out of the current month's remaining-bills
+ * total instead of inventing a charge that already passed.
+ */
+function defaultNextDue(frequency, now) {
+  const today = toISODate(now);
+  if (['monthly', 'quarterly', 'yearly', 'semimonthly'].includes(frequency)) {
+    return addMonths(`${today.slice(0, 7)}-01`, 1);
+  }
+  return today;
 }
 
 /** Monthly-equivalent cost of a bill, rounded to whole cents. */
@@ -351,6 +369,17 @@ export function migrate(raw) {
   delete data.expenses;
   delete data.paystubs;
 
+  // Normalize every collection through its constructor, not just transactions.
+  // A legacy bill carries `amount` in dollars and no `amountCents`; passing it
+  // through untouched makes billMonthlyCents return NaN, which then poisons
+  // safe-to-spend, the fixed-cost ratio and the whole forecast.
+  data.transactions = normalizeAll(data.transactions, makeTransaction);
+  data.bills = normalizeAll(data.bills, makeBill);
+  data.goals = normalizeAll(data.goals, makeGoal);
+  data.rules = normalizeAll(data.rules, makeRule);
+  data.budgets = normalizeAll(data.budgets, makeBudget);
+  data.documents = normalizeAll(data.documents, makeDocument);
+
   // De-duplicate by id, keeping the most recently updated copy.
   data.transactions = dedupeById(data.transactions);
   data.bills = dedupeById(data.bills);
@@ -364,6 +393,30 @@ export function migrate(raw) {
 
   data.transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   return data;
+}
+
+/**
+ * Run each row through its constructor, dropping rows that cannot be salvaged.
+ *
+ * The original `createdAt`/`updatedAt` are restored afterwards, because the
+ * constructors stamp `updatedAt` with the current time. Letting that stand would
+ * be silently catastrophic for sync: migrate() runs on every load, so the local
+ * copy would always carry a newer timestamp than the remote and would win every
+ * merge conflict, quietly discarding edits made on the other device.
+ */
+function normalizeAll(rows, make) {
+  const out = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    try {
+      const made = make(row);
+      if (row.createdAt) made.createdAt = row.createdAt;
+      if (row.updatedAt) made.updatedAt = row.updatedAt;
+      else if (row.addedAt) made.updatedAt = row.addedAt;
+      out.push(made);
+    } catch { /* unsalvageable row: drop it rather than poison the ledger */ }
+  }
+  return out;
 }
 
 function dedupeById(rows) {

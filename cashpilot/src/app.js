@@ -10,6 +10,7 @@ import * as A from './analytics.js';
 import * as charts from './charts.js';
 import { generateInsights } from './insights.js';
 import { runAgent, trimHistory } from './agent.js';
+import { seedLedger, SEED_ASSUMPTIONS, SEED_PAYSTUBS, SEED_BILLS } from './seed.js';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, FREQUENCIES, DBX_INBOX, DBX_ROOT, LS } from './config.js';
 import {
   formatMoney, formatDate, formatMonth, toISODate, startOfMonth, endOfMonth, monthKey,
@@ -255,9 +256,13 @@ function emptyStateCard() {
       <p><strong>Nothing recorded yet.</strong></p>
       <p class="small dim">Add an expense, photograph a receipt, or import your old Spendwise export from Settings. The AI can also read receipts straight out of your Dropbox Inbox.</p>
       <div class="btn-row" style="justify-content:center;margin-top:12px">
-        <button type="button" class="btn primary" data-act="add-expense">Add an expense</button>
+        <button type="button" class="btn primary" data-act="load-seed">Load my Spendwise data</button>
+        <button type="button" class="btn" data-act="add-expense">Add an expense</button>
         <button type="button" class="btn" data-act="import">Import JSON</button>
       </div>
+      <p class="small dim" style="margin-top:10px">
+        ${SEED_PAYSTUBS.length} pay stubs and ${SEED_BILLS.length} bills carried over from your old build.
+      </p>
     </div>`;
 }
 
@@ -791,9 +796,46 @@ async function quickAction(act) {
       goto('chat');
       setTimeout(() => sendChat(`Look in ${DBX_INBOX}, read every receipt and pay stub you find there, record the transactions, and file each processed file into Receipts/YYYY-MM or Paystubs/YYYY-MM. Tell me what you recorded.`), 80);
       break;
+    case 'load-seed': await loadSeed(); break;
     case 'clear-chat':
       chatTranscript = []; chatHistory = []; persistChat(); renderChat();
       break;
+  }
+}
+
+/**
+ * Load the carried-over Spendwise data.
+ *
+ * Goes through the ordinary import path, so it is validated and de-duplicated
+ * like any other file — running it twice is harmless. The assumptions it had to
+ * make are surfaced rather than buried.
+ */
+async function loadSeed() {
+  const existing = store.getData().transactions.length;
+  const message = existing
+    ? `You already have ${existing} transactions. Loading merges the ${SEED_PAYSTUBS.length} Spendwise pay stubs and ${SEED_BILLS.length} bills in; duplicates are skipped. Continue?`
+    : `Load ${SEED_PAYSTUBS.length} pay stubs and ${SEED_BILLS.length} bills from your old Spendwise build?`;
+  if (!confirm(message)) return;
+  try {
+    const res = await store.importJSON(JSON.stringify(seedLedger()), { mode: 'merge' });
+    toast(`Loaded ${res.transactions} pay stubs and ${res.bills} bills.`, 'good');
+    render();
+    if (SEED_ASSUMPTIONS.length) {
+      openSheet('Check these dates', `
+        <p class="card-sub">Your data is loaded. These bills had no due date in the old build, so
+        Cashpilot defaulted them to the 1st of next month. Due dates move the safe-to-spend
+        number, so correct any that are wrong.</p>
+        <ul class="rows" style="margin-top:12px">
+          ${SEED_ASSUMPTIONS.map((a) => `<li class="row" style="cursor:default"><div class="row-main">${esc(a)}</div></li>`).join('')}
+        </ul>
+        <div class="btn-row" style="margin-top:14px">
+          <button type="button" class="btn primary" data-close-sheet>Got it</button>
+        </div>`, (root) => {
+        $$('[data-close-sheet]', root).forEach((b) => b.addEventListener('click', closeSheet));
+      });
+    }
+  } catch (err) {
+    toast(err.message, 'bad');
   }
 }
 
@@ -1191,6 +1233,7 @@ function openSettings() {
     </ul>
     <div class="btn-row" style="margin-top:12px">
       <button type="button" class="btn" id="s-import">Import / export</button>
+      <button type="button" class="btn" id="s-seed">Load Spendwise data</button>
       <button type="button" class="btn danger" id="s-reset">Erase local data</button>
     </div>
     <p class="card-sub small" style="margin-top:14px">Cashpilot ${esc(document.title)} · everything runs in this browser.</p>
@@ -1243,6 +1286,7 @@ function openSettings() {
     });
 
     $('#s-import', root).addEventListener('click', () => { closeSheet(); openImportSheet(); });
+    $('#s-seed', root).addEventListener('click', () => { closeSheet(); void quickAction('load-seed'); });
     $('#s-reset', root).addEventListener('click', async () => {
       if (!confirm('Erase all Cashpilot data on this device? Anything already synced to Dropbox stays there.')) return;
       if (!confirm('Really erase? This cannot be undone.')) return;
