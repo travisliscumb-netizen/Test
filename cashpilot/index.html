@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cashpilot</title>
+<meta name="description" content="Personal finance tracking with an AI copilot, your files, and your Dropbox.">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cashpilot">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+
+<div id="boot" class="boot">
+  <div class="boot-mark">₵</div>
+  <p class="boot-text">Starting Cashpilot…</p>
+  <noscript><p class="boot-error">Cashpilot needs JavaScript enabled.</p></noscript>
+</div>
+
+<header class="topbar" hidden>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">₵</span>
+    <span class="brand-name">Cashpilot</span>
+  </div>
+  <div class="topbar-right">
+    <button type="button" class="chip sync-chip" id="sync-chip" title="Sync status">
+      <span class="dot" id="sync-dot"></span><span id="sync-label">Local only</span>
+    </button>
+    <button type="button" class="icon-btn" id="open-settings" aria-label="Settings" title="Settings">⚙</button>
+  </div>
+</header>
+
+<main id="app" hidden>
+  <section class="view" id="view-home" data-view="home"></section>
+  <section class="view" id="view-activity" data-view="activity" hidden></section>
+  <section class="view" id="view-insights" data-view="insights" hidden></section>
+  <section class="view" id="view-capture" data-view="capture" hidden></section>
+  <section class="view" id="view-chat" data-view="chat" hidden></section>
+</main>
+
+<nav class="tabbar" id="tabbar" hidden aria-label="Main">
+  <button type="button" class="tab active" data-goto="home"><span class="tab-icon">◎</span><span>Home</span></button>
+  <button type="button" class="tab" data-goto="activity"><span class="tab-icon">≡</span><span>Activity</span></button>
+  <button type="button" class="tab" data-goto="insights"><span class="tab-icon">◆</span><span>Insights</span></button>
+  <button type="button" class="tab" data-goto="capture"><span class="tab-icon">▣</span><span>Capture</span></button>
+  <button type="button" class="tab" data-goto="chat"><span class="tab-icon">✦</span><span>Ask AI</span></button>
+</nav>
+
+<div class="sheet-host" id="sheet-host" hidden>
+  <div class="sheet-backdrop" data-close-sheet></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-head">
+      <h2 id="sheet-title">—</h2>
+      <button type="button" class="icon-btn" data-close-sheet aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body" id="sheet-body"></div>
+  </div>
+</div>
+
+<div class="toast-host" id="toast-host" aria-live="polite"></div>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

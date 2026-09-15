@@ -1,0 +1,16 @@
+{
+  "name": "cashpilot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal finance tracking with an AI copilot, receipts, and Dropbox sync.",
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "smoke": "node tests/smoke.mjs",
+    "serve": "node tools/serve.mjs",
+    "icons": "node tools/make-icons.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}
