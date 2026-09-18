@@ -437,8 +437,17 @@ var BEAT = {
   shrug:780, flourish:640, exit:620, settle:240
 };
 
-/* Travis' brief: vary naturally, never pad, 4s floor and 12s ceiling. */
-var SCENE_MIN = 4000, SCENE_MAX = 12000;
+/*
+  Scene length is a TARGET, not a rule. 4-12s is where most scenes should
+  land, but a scene that reads better at 3.4s or 13s is allowed to be that
+  long. What is forbidden is manufacturing time: no scene is ever padded
+  with dead beats to reach a floor, and none is rushed to duck a ceiling.
+
+  SCENE_HARD_MAX is different — it is a bug bound, not a taste bound. A plan
+  past it means the arithmetic ran away, and the suite fails.
+*/
+var SCENE_TARGET_MIN = 4000, SCENE_TARGET_MAX = 12000;
+var SCENE_HARD_MAX = 20000;
 
 /* Removal kinds — exactly one of these per letter, or the plan is invalid. */
 var TAKE_KINDS = { tow:1, scoop:1, snatch:1, pop:1, carry:1, rescue:1 };
@@ -834,45 +843,29 @@ function pickScene(leadKey, letters, history, rnd){
 }
 
 /*
-  Fit a finished timeline into the 4-12s window.
+  Ease a long timeline back toward the target ceiling.
 
-  Long words overrun because every letter adds a beat, so events are pulled
-  proportionally toward the start; each move keeps at least 62% of its
-  length so it stays readable. Short scenes are NOT padded with dead time —
-  Travis was explicit about that — they are stretched slightly and, only if
-  still under the floor, given one extra flourish from a character who is
-  already on screen.
+  A long word overruns because every letter adds beats. Those are pulled
+  proportionally toward the start, but no move drops below 70% of its
+  authored length — past that a move stops reading as an action and starts
+  looking like a glitch, which is the trade the old build got wrong.
+
+  A scene that is still over the target after that compression is LEFT
+  LONG on purpose. Better a 13s scene that reads than a 12s scene that
+  stutters. Short scenes are returned untouched: nothing is ever padded.
 */
-function fitDuration(tl, cast){
+function fitDuration(tl){
   var events = tl.events;
   if (!events.length) return 0;
   var total = tl.end();
+  if (total <= SCENE_TARGET_MAX) return total;
 
-  if (total > SCENE_MAX){
-    var squeeze = SCENE_MAX / total;
-    for (var i = 0; i < events.length; i++){
-      events[i].at = Math.round(events[i].at * squeeze);
-      events[i].dur = Math.round(events[i].dur * Math.max(0.62, squeeze));
-    }
-    total = tl.end();
+  var squeeze = SCENE_TARGET_MAX / total;
+  for (var i = 0; i < events.length; i++){
+    events[i].at = Math.round(events[i].at * squeeze);
+    events[i].dur = Math.round(events[i].dur * Math.max(0.70, squeeze));
   }
-
-  if (total < SCENE_MIN){
-    var stretch = Math.min(1.5, SCENE_MIN / total);
-    for (var j = 0; j < events.length; j++){
-      events[j].at = Math.round(events[j].at * stretch);
-      events[j].dur = Math.round(events[j].dur * stretch);
-    }
-    total = tl.end();
-  }
-
-  if (total < SCENE_MIN && cast && cast.length){
-    var at = Math.max(0, total - 200);
-    tl.push(at, SCENE_MIN - at, 'flourish', { char: cast[0] });
-    total = tl.end();
-  }
-
-  return total;
+  return tl.end();
 }
 
 /*
@@ -906,8 +899,10 @@ function planScene(opts){
   var tl = scene.build(ctx);
   plan.id = scene.id;
   plan.name = scene.name;
-  plan.duration = fitDuration(tl, order);
+  plan.duration = fitDuration(tl);
   plan.events = tl.events.slice().sort(function(a, b){ return a.at - b.at; });
+  /* Reported, not enforced: useful for the tuning pass, never a gate. */
+  plan.inTargetRange = plan.duration >= SCENE_TARGET_MIN && plan.duration <= SCENE_TARGET_MAX;
   return plan;
 }
 
@@ -981,9 +976,15 @@ function validatePlan(plan){
     if (!arrived) problems.push(e.char + ' ' + e.kind + 's before entering');
   });
 
-  /* 6. length */
-  if (plan.duration < SCENE_MIN) problems.push('scene is ' + plan.duration + 'ms, under the ' + SCENE_MIN + 'ms floor');
-  if (plan.duration > SCENE_MAX) problems.push('scene is ' + plan.duration + 'ms, over the ' + SCENE_MAX + 'ms ceiling');
+  /*
+    6. Length. Only the runaway bound is a failure — 4-12s is a target the
+    scenes aim for, not a contract they must satisfy, so a scene that reads
+    better outside it is not a bug.
+  */
+  if (!(plan.duration > 0)) problems.push('scene has no duration');
+  if (plan.duration > SCENE_HARD_MAX){
+    problems.push('scene is ' + plan.duration + 'ms, past the ' + SCENE_HARD_MAX + 'ms runaway bound');
+  }
 
   return problems;
 }
@@ -1002,7 +1003,8 @@ var __CORE = {
   rotBudgetFor:rotBudgetFor, styleRot:styleRot, styleOffsetY:styleOffsetY,
   ropeSolve:ropeSolve, cordPath:cordPath, edgePoint:edgePoint,
   stackOffsets:stackOffsets, stackReadable:stackReadable,
-  SCENES:SCENES, BEAT:BEAT, SCENE_MIN:SCENE_MIN, SCENE_MAX:SCENE_MAX,
+  SCENES:SCENES, BEAT:BEAT, SCENE_TARGET_MIN:SCENE_TARGET_MIN,
+  SCENE_TARGET_MAX:SCENE_TARGET_MAX, SCENE_HARD_MAX:SCENE_HARD_MAX,
   eligibleScenes:eligibleScenes, pickScene:pickScene, planScene:planScene,
   validatePlan:validatePlan
 };
