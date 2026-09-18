@@ -1,0 +1,27 @@
+/* ---- STAGE: the four characters, their cords and the letters they carry ---- */
+#fxLayer{position:fixed;inset:0;z-index:920;pointer-events:none;overflow:hidden;will-change:transform}
+.actor{
+  position:fixed;left:0;top:0;width:148px;height:148px;
+  transform-origin:50% 50%;
+  will-change:transform,opacity;opacity:0;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.34));
+}
+.actor svg{width:100%;height:100%;overflow:visible}
+/* The cord layer sits behind the characters, so a cord reads as coming from
+   behind their hands rather than being pasted over the top of them. */
+.cordlayer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.cord{
+  fill:none;stroke:#2B3A55;stroke-width:5;stroke-linecap:round;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.28));
+}
+/* Taut reads brighter and thinner — you can see the moment it grabs. */
+.cord.taut{stroke:#12213A;stroke-width:6}
+.letterprop{
+  position:fixed;left:0;top:0;pointer-events:none;
+  will-change:transform,opacity;
+  filter:drop-shadow(0 14px 18px rgba(0,0,0,.30)) brightness(1.05);
+}
+.letterprop > *{margin:0 !important}
+.shard{position:fixed;width:13px;height:13px;border-radius:3px;pointer-events:none;will-change:transform,opacity}
+/* The buddy has this letter now — the travelling copy lives in the FX layer. */
+.taken{opacity:0 !important;transition:none !important}

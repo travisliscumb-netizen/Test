@@ -452,6 +452,15 @@ var SCENE_HARD_MAX = 20000;
 /* Removal kinds — exactly one of these per letter, or the plan is invalid. */
 var TAKE_KINDS = { tow:1, scoop:1, snatch:1, pop:1, carry:1, rescue:1 };
 
+/*
+  Beats that end with the character off the screen. Anyone who enters must
+  finish on one of these, or they are left standing in the scene doing
+  nothing — which is precisely the "walks to a letter and then stops" fault
+  the rebuild exists to kill. A 'snatch' is NOT one of these: catching a
+  block leaves you holding it, still on stage.
+*/
+var EXIT_KINDS = { exit:1, rescue:1, tow:1, scoop:1, carry:1, superpass:1 };
+
 function makeTimeline(){
   var events = [];
   return {
@@ -530,19 +539,30 @@ var SCENES = [
       ensureEnter(tl, entered, 'blip', BEAT.enter);                     t += BEAT.enter;
       tl.push(t, BEAT.stack, 'stack', { char:'blip', count:c.letters }); t += BEAT.stack;
       /* hooks the BOTTOM block, so the tower has to answer for it */
-      var after = ropeBeats(tl, t, 'blip', 0, 'right');
-      tl.push(t + BEAT.hook + BEAT.slack, BEAT.topple, 'topple', { from:1 });
+      tl.push(t, BEAT.hook, 'hook', { char:'blip', letter:0 });          t += BEAT.hook;
+      tl.push(t, BEAT.slack, 'slack', { char:'blip', letter:0 });        t += BEAT.slack;
+      tl.push(t, BEAT.topple, 'topple', { from:1 });
+      tl.push(t, BEAT.snap, 'snap', { char:'blip', letter:0 });          t += BEAT.snap;
+      /* the yank is where the comedy is, so it happens on screen: too much
+         thrust, overshoot, then a hard brake, and only then he tows it off */
+      tl.push(t, BEAT.overshoot, 'overshoot', { char:'blip' });          t += BEAT.overshoot;
+      tl.push(t, BEAT.brake, 'brake', { char:'blip' });                  t += BEAT.brake;
+      var after = t + BEAT.tow;
+      tl.push(t, BEAT.tow, 'tow', { char:'blip', letter:0, dir:'right', roped:true });
       /* the upper blocks come down and are caught, not deleted */
+      var catchers = {};
       for (var i = 1; i < c.letters; i++){
         var who = i === 1 && c.has('flip') ? 'flip' : c.pick(i);
         var catchAt = after - 240 + i * 260;
         ensureEnter(tl, entered, who, catchAt);
         tl.push(catchAt, BEAT.grab, 'snatch', { char: who, letter: i });
+        catchers[who] = Math.max(catchers[who] || 0, catchAt + BEAT.grab);
       }
-      var last = after - 240 + Math.max(1, c.letters - 1) * 260 + BEAT.grab;
-      tl.push(last, BEAT.overshoot, 'overshoot', { char:'blip' });
-      tl.push(last + BEAT.overshoot, BEAT.brake, 'brake', { char:'blip' });
-      tl.push(last + BEAT.overshoot + BEAT.brake, BEAT.exit, 'exit', { char:'blip', dir:'right' });
+      /* each catcher leaves with what he caught, rather than standing there */
+      Object.keys(catchers).forEach(function(who, n){
+        tl.push(catchers[who] + n * 120, BEAT.exit, 'exit',
+          { char: who, dir: dirFor(who, n + 1) });
+      });
       return tl;
     } },
 
@@ -612,12 +632,14 @@ var SCENES = [
       var after = t + 200 + BEAT.enter + BEAT.ollie;
       /* Zip picks up what Trip dropped without breaking momentum */
       tl.push(after, BEAT.rescue, 'rescue', { char:'zip', letter:0, dir:'left' });
+      /* Trip picks himself up while Zip carries on — he is unlucky, not idle */
+      tl.push(after - 120, 420, 'dustoff', { char:'trip' });
       var at = after + BEAT.rescue;
       for (var i = 1; i < c.letters; i++){
         tl.push(at + (i - 1) * 480, BEAT.scoop, 'scoop', { char:'zip', letter:i, dir:'left' });
       }
       var last = at + Math.max(0, c.letters - 2) * 480 + BEAT.scoop;
-      tl.push(last, BEAT.exit, 'exit', { char:'trip', dir:'right' });
+      tl.push(after + 300, BEAT.exit, 'exit', { char:'trip', dir:'right' });
       tl.push(last, BEAT.exit, 'exit', { char:'zip', dir:'left' });
       return tl;
     } },
@@ -653,7 +675,9 @@ var SCENES = [
       /* Blip lays the cord across the scene and goes */
       tl.push(t, BEAT.enter, 'enter', { char:'blip' }); t += BEAT.enter;
       var after = ropeBeats(tl, t, 'blip', 0, 'right');
-      tl.push(after, 300, 'dropcord', { char:'blip' });
+      /* the cord is left lying across the scene: a world event, not one of
+         Blip's actions, so it is not attributed to him */
+      tl.push(after, 300, 'dropcord', {});
       tl.push(after, BEAT.exit, 'exit', { char:'blip', dir:'right' });
       /* Trip runs in and finds it with his foot */
       var tt = after + 260;
@@ -697,13 +721,16 @@ var SCENES = [
       tl.push(t, BEAT.stack, 'stack', { char:builder, count:c.letters }); t += BEAT.stack;
       tl.push(t, BEAT.topple, 'topple', { from:0 });
       tl.push(t - 120, BEAT.enter, 'enter', { char:'flip' });
+      /* he watches his own tower go and reacts, rather than standing there */
+      tl.push(t + 160, 320, 'notice', { char:builder });
       var at = t + 200;
       for (var i = 0; i < c.letters; i++){
         tl.push(at + i * 300, BEAT.grab, 'snatch', { char:'flip', letter:i });
       }
       var last = at + Math.max(0, c.letters - 1) * 300 + BEAT.grab;
+      /* he leaves as soon as he has reacted — Flip has it covered */
+      tl.push(t + 480, BEAT.exit, 'exit', { char:builder, dir:'right' });
       tl.push(last, BEAT.flourish, 'aerial', { char:'flip' });
-      tl.push(last, BEAT.exit, 'exit', { char:builder, dir:'right' });
       tl.push(last + BEAT.flourish, BEAT.exit, 'exit', { char:'flip', dir:'up' });
       return tl;
     } },
@@ -872,6 +899,33 @@ function fitDuration(tl){
   Plan one scene.
   opts: { letters, lead, stage:'build'|'learn', history:[ids], rnd }
 */
+/*
+  Drop an 'exit' that follows a beat which already took the character off the
+  screen. Towing, scooping and carrying all end past the edge, so a further
+  exit is time in which nothing visible happens — which is where the dead
+  tails at the end of scenes were coming from.
+*/
+function trimRedundantExits(tl){
+  var events = tl.events;
+  var keep = [];
+  for (var i = 0; i < events.length; i++){
+    var e = events[i];
+    if (e.kind !== 'exit'){ keep.push(e); continue; }
+    var redundant = false;
+    for (var j = 0; j < events.length; j++){
+      var p = events[j];
+      if (p === e || p.char !== e.char) continue;
+      if (!EXIT_KINDS[p.kind] || p.kind === 'exit') continue;
+      /* the earlier beat already carries him out, and nothing brings him back */
+      if (p.at <= e.at && p.at + p.dur >= e.at - 40){ redundant = true; break; }
+    }
+    if (!redundant) keep.push(e);
+  }
+  tl.events.length = 0;
+  for (var k = 0; k < keep.length; k++) tl.events.push(keep[k]);
+  return tl;
+}
+
 function planScene(opts){
   opts = opts || {};
   var letters = Math.max(0, Math.floor(Number(opts.letters) || 0));
@@ -887,7 +941,14 @@ function planScene(opts){
   };
   if (!letters) return plan;
 
-  var scene = pickScene(leadKey, letters, history, rnd);
+  /* forceId is for the scene lab and the suites: play exactly this one. */
+  var scene = null;
+  if (opts.forceId){
+    for (var f = 0; f < SCENES.length; f++){
+      if (SCENES[f].id === opts.forceId){ scene = SCENES[f]; break; }
+    }
+  }
+  if (!scene) scene = pickScene(leadKey, letters, history, rnd);
   if (!scene) return plan;
 
   var ctx = {
@@ -897,6 +958,7 @@ function planScene(opts){
   };
 
   var tl = scene.build(ctx);
+  trimRedundantExits(tl);
   plan.id = scene.id;
   plan.name = scene.name;
   plan.duration = fitDuration(tl);
@@ -976,6 +1038,19 @@ function validatePlan(plan){
     if (!arrived) problems.push(e.char + ' ' + e.kind + 's before entering');
   });
 
+  /* 7. nobody is left standing on stage when the scene ends */
+  var lastOf = {};
+  plan.events.forEach(function(e){
+    if (!e.char) return;
+    var prev = lastOf[e.char];
+    if (!prev || e.at + e.dur >= prev.at + prev.dur) lastOf[e.char] = e;
+  });
+  Object.keys(lastOf).forEach(function(who){
+    if (!EXIT_KINDS[lastOf[who].kind]){
+      problems.push(who + ' is stranded on stage — last beat is ' + lastOf[who].kind);
+    }
+  });
+
   /*
     6. Length. Only the runaway bound is a failure — 4-12s is a target the
     scenes aim for, not a contract they must satisfy, so a scene that reads
@@ -1005,7 +1080,7 @@ var __CORE = {
   stackOffsets:stackOffsets, stackReadable:stackReadable,
   SCENES:SCENES, BEAT:BEAT, SCENE_TARGET_MIN:SCENE_TARGET_MIN,
   SCENE_TARGET_MAX:SCENE_TARGET_MAX, SCENE_HARD_MAX:SCENE_HARD_MAX,
-  eligibleScenes:eligibleScenes, pickScene:pickScene, planScene:planScene,
+  EXIT_KINDS:EXIT_KINDS, trimRedundantExits:trimRedundantExits, eligibleScenes:eligibleScenes, pickScene:pickScene, planScene:planScene,
   validatePlan:validatePlan
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = __CORE;

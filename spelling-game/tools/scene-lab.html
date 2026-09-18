@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>Scene Lab</title>
+<style>
+:root{
+  --blue:#2E7DF7;--blue-deep:#14479B;--blue-pale:#EEF5FF;--blue-soft:#D6E7FF;
+  --orange:#F0862B;--orange-dark:#C96714;--green:#34B764;--green-dark:#238247;
+  --green-pale:#DDF6E6;--ink:#1F3A63;--tile:clamp(68px,20vw,96px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  font-family:'Baloo 2',system-ui,-apple-system,sans-serif;color:var(--ink);
+  background:linear-gradient(180deg,#EAF3FF 0%,#F7FBFF 60%,#FFF 100%);
+  height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+}
+.stage{padding:14px;max-width:620px;margin:0 auto;width:100%;flex:1;display:flex;flex-direction:column;min-height:0}
+.card{
+  background:#fff;border:3px solid var(--blue);border-radius:28px;
+  padding:20px 16px 22px;flex:1;display:flex;flex-direction:column;
+  justify-content:center;min-height:0;
+  box-shadow:0 2px 0 rgba(255,255,255,.9) inset,0 10px 24px rgba(28,72,140,.14);
+}
+h2{text-align:center;font-size:24px;color:var(--blue);margin:0 0 18px}
+.slots{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
+.slot{
+  width:var(--tile);height:var(--tile);border-radius:18px;
+  background:var(--green-pale);border:4px solid var(--green);color:var(--green-dark);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:clamp(32px,8vw,44px);font-weight:800;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.8),0 5px 0 var(--green-dark),0 10px 16px rgba(20,110,60,.18);
+}
+.slot .low{font-size:14px;font-weight:800;text-transform:lowercase;margin-top:-4px;opacity:.75}
+#hud{
+  position:fixed;left:8px;top:8px;z-index:999;background:rgba(10,20,40,.86);color:#fff;
+  font:600 11px/1.45 ui-monospace,Menlo,monospace;padding:7px 10px;border-radius:9px;
+  pointer-events:none;white-space:pre;max-width:62vw;
+}
+#ground{position:fixed;left:0;right:0;height:2px;background:rgba(255,0,0,.25);z-index:998;display:none}
+</style>
+<link rel="stylesheet" href="../src/15-stage.css">
+</head>
+<body>
+<div class="stage">
+  <div class="card" id="card">
+    <h2 id="title">SCENE LAB</h2>
+    <div class="slots" id="slots"></div>
+  </div>
+</div>
+<div id="fxLayer"></div>
+<div id="hud"></div>
+<div id="ground"></div>
+
+<script src="../src/20-core.js"></script>
+<script src="../src/40-sfx.js"></script>
+<script src="../src/50-art.js"></script>
+<script src="../src/60-stage.js"></script>
+<script>
+/* Dev harness only. Renders a row of finished letters and plays one scene
+   against them, exactly as the real BUILD/LEARN finales will. */
+var CORE = __CORE;
+var silentSfx = { play: function(){}, unlock: function(){}, setMuted: function(){}, isMuted: function(){ return true; }, available: function(){ return false; } };
+var stage = createStage({ core: CORE, sfx: silentSfx, art: CHAR_ART });
+stage.init(document.getElementById('fxLayer'));
+
+function renderWord(word){
+  var box = document.getElementById('slots');
+  box.innerHTML = '';
+  word.split('').forEach(function(ch){
+    var s = document.createElement('div');
+    s.className = 'slot';
+    var up = document.createElement('span'); up.textContent = ch;
+    var low = document.createElement('span'); low.className = 'low'; low.textContent = ch.toLowerCase();
+    s.appendChild(up); s.appendChild(low);
+    box.appendChild(s);
+  });
+  return box.querySelectorAll('.slot');
+}
+
+var hud = document.getElementById('hud');
+var lastPlan = null;
+
+window.__lab = {
+  chars: CORE.CHAR_ORDER,
+  scenes: CORE.SCENES.map(function(s){ return { id:s.id, name:s.name, lead:s.lead, min:s.min }; }),
+
+  plan: function(id, word, lead){
+    return CORE.planScene({ letters: word.length, lead: lead, stage: 'build', forceId: id, history: [] });
+  },
+
+  run: function(id, word, lead){
+    document.getElementById('title').textContent = (id || 'auto') + '  ·  ' + lead;
+    var els = renderWord(word);
+    var plan = CORE.planScene({ letters: word.length, lead: lead, stage: 'build', forceId: id, history: [] });
+    lastPlan = plan;
+    var probs = CORE.validatePlan(plan);
+    hud.textContent = plan.id + '  ' + plan.duration + 'ms  n=' + word.length +
+      '\nlead=' + lead + '  events=' + plan.events.length +
+      (probs.length ? '\nPROBLEMS: ' + probs.join('; ') : '');
+    window.__labDone = false;
+    window.__labErrors = null;
+    return stage.play(plan, els, { card: document.getElementById('card'), layer: document.getElementById('fxLayer') })
+      .then(function(errs){
+        window.__labDone = true;
+        window.__labErrors = errs;
+        return errs;
+      });
+  },
+
+  /* what the QA pass inspects between frames */
+  probe: function(){
+    var d = stage.debug();
+    var props = document.querySelectorAll('.letterprop');
+    var boxes = [];
+    for (var i = 0; i < props.length; i++){
+      var r = props[i].getBoundingClientRect();
+      boxes.push({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+    }
+    var acts = {};
+    var A = stage.actors();
+    for (var k in A){
+      if (!A.hasOwnProperty(k)) continue;
+      acts[k] = { x: Math.round(A[k].x), y: Math.round(A[k].y), op: Number(A[k].op.toFixed(2)), rot: Math.round(A[k].rot) };
+    }
+    var cords = [];
+    var paths = document.querySelectorAll('.cord');
+    for (var j = 0; j < paths.length; j++){
+      cords.push({ taut: paths[j].getAttribute('class').indexOf('taut') !== -1, d: (paths[j].getAttribute('d') || '').length });
+    }
+    return {
+      live: d, props: boxes, actors: acts, cords: cords,
+      states: d ? d.states : [],
+      strayProps: props.length, plan: lastPlan && lastPlan.id,
+      duration: lastPlan && lastPlan.duration
+    };
+  },
+
+  /* after a scene: nothing of the performance may remain on the page */
+  residue: function(){
+    return {
+      props: document.querySelectorAll('.letterprop').length,
+      shards: document.querySelectorAll('.shard').length,
+      cordsWithPath: Array.prototype.filter.call(document.querySelectorAll('.cord'),
+        function(p){ return (p.getAttribute('d') || '').length > 0; }).length,
+      visibleActors: Array.prototype.filter.call(document.querySelectorAll('.actor'),
+        function(a){ return Number(a.style.opacity || 0) > 0.02; }).length,
+      layerTransform: document.getElementById('fxLayer').style.transform || ''
+    };
+  },
+
+  showGround: function(y){ var g = document.getElementById('ground'); g.style.top = y + 'px'; g.style.display = 'block'; }
+};
+</script>
+</body>
+</html>
