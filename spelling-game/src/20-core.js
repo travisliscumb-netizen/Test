@@ -1,0 +1,1013 @@
+/* ============================================================
+   CORE-LOGIC-START   (pure, DOM-free — exercised by tests/core.mjs)
+
+   Nothing in this block may touch the DOM, storage, audio or the clock.
+   That is what lets the whole spelling model and the entire animation
+   choreography be tested in node, without a browser and without a
+   stopwatch. If a rule matters, it is expressed here so a test can hold
+   it: "Blip never tumbles" is a bound on a number, not a convention
+   someone has to remember while editing an animation.
+   ============================================================ */
+
+var DEFAULT_WORDS = ['THE','AND','TO','IT','IS'];
+
+/* How many extra (decoy) letters join the real ones in the LEARN search. */
+var SEARCH_EXTRA_LETTERS = 4;
+
+/*
+  Spoken names for letters. The voice is fed these strings, never the raw
+  character, so iOS can never prefix "capital" and never mangles a lone
+  vowel.
+
+  A is spelled "eigh" (as in weigh, sleigh, neigh) rather than "ay". Most
+  speech engines carry "ay" and "aye" in their dictionary as the
+  interjection /aɪ/, which made AND spell out as "I - N - D". "eigh" has no
+  dictionary entry to trip over, so the engine falls back to letter-to-sound
+  rules and lands on /eɪ/. Engines still differ, so the grown-up can switch
+  it on the device without editing the file.
+*/
+var LETTER_SOUND = {
+  A:'eigh', B:'bee', C:'see', D:'dee', E:'eee', F:'eff', G:'gee', H:'aitch',
+  I:'eye', J:'jay', K:'kay', L:'ell', M:'em', N:'en', O:'oh', P:'pee',
+  Q:'cue', R:'ar', S:'ess', T:'tee', U:'you', V:'vee', W:'double-you',
+  X:'ex', Y:'why', Z:'zee'
+};
+
+/*
+  The two vowels whose sound genuinely varies between engines. E was 'ee',
+  which several engines clip to a short /ɪ/ — closer to "ih" than to the
+  name of the letter. 'eee' forces the engine to hold the vowel.
+*/
+var A_SOUND_CHOICES = ['eigh', 'ay', 'ey'];
+var E_SOUND_CHOICES = ['eee', 'ee', 'eeh'];
+var LETTER_FIX_CHOICES = { A: A_SOUND_CHOICES, E: E_SOUND_CHOICES };
+
+function letterSound(ch, overrides){
+  var c = String(ch == null ? '' : ch).toUpperCase();
+  if (overrides && overrides[c]) return String(overrides[c]);
+  return LETTER_SOUND[c] || c.toLowerCase();
+}
+
+function cleanWord(raw){
+  return String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+function normalizeWords(list){
+  var out = [], seen = {};
+  if (!list || !list.length) return out;
+  for (var i = 0; i < list.length; i++){
+    var w = cleanWord(list[i]);
+    if (w.length < 2 || w.length > 12) continue;
+    if (seen[w]) continue;
+    seen[w] = true;
+    out.push(w);
+  }
+  return out;
+}
+
+function shuffle(arr, rnd){
+  var a = arr.slice(), r = rnd || Math.random;
+  for (var i = a.length - 1; i > 0; i--){
+    var j = Math.floor(r() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+/* Real, simple words used to build wrong answers. All are genuine words. */
+var WORD_BANK = [
+  'AM','AN','AS','AT','BE','BY','DO','GO','HE','IF','IN','IS','IT','ME','MY','NO','OF','ON','OR','SO','TO','UP','US','WE',
+  'ALL','AND','ANY','ARE','ASK','BAT','BED','BIG','BOX','BOY','BUS','BUT','CAN','CAR','CAT','COW','CUP','CUT','DAD','DAY',
+  'DID','DOG','EAT','EGG','END','FAR','FEW','FOR','FOX','FUN','GET','GOT','HAD','HAS','HAT','HER','HIM','HIS','HOT','HOW',
+  'ICE','ITS','JOB','KEY','KID','LEG','LET','LOT','LOW','MAN','MAP','MAY','MOM','NEW','NOT','NOW','OLD','ONE','OUR','OUT',
+  'OWN','PEN','PIG','PUT','RAN','RED','RUN','SAT','SAW','SAY','SEA','SEE','SET','SHE','SIT','SIX','SKY','SUN','TEN','THE',
+  'TOO','TOP','TOY','TRY','TWO','USE','VAN','WAS','WAY','WET','WHO','WHY','WIN','YES','YET','YOU','ZOO',
+  'ALSO','BABY','BACK','BALL','BEAR','BEEN','BEST','BIKE','BIRD','BLUE','BOAT','BOOK','BOTH','CAKE','CALL','CAME','CARE',
+  'CITY','COLD','COME','CORN','DARK','DEEP','DOES','DONE','DOOR','DOWN','DUCK','EACH','EASY','EVEN','EVER','FACE','FALL',
+  'FARM','FAST','FEEL','FEET','FIND','FINE','FIRE','FISH','FIVE','FOOD','FOOT','FOUR','FREE','FROG','FROM','FULL','GAME',
+  'GATE','GAVE','GIVE','GOAT','GOES','GOLD','GONE','GOOD','GROW','HAND','HARD','HAVE','HEAD','HEAR','HELP','HERE','HIGH',
+  'HILL','HOLD','HOME','HOPE','HOUR','HUGE','JUMP','JUST','KEEP','KIND','KING','KNOW','LAKE','LAND','LAST','LATE','LEAF',
+  'LEFT','LESS','LIFE','LIKE','LINE','LION','LIST','LIVE','LONG','LOOK','LOST','LOUD','LOVE','MADE','MAKE','MANY','MEAL',
+  'MEAN','MEET','MILK','MIND','MINE','MISS','MOON','MORE','MOST','MOVE','MUCH','MUST','NAME','NEAR','NEED','NEXT','NICE',
+  'NINE','NOSE','NOTE','ONCE','ONLY','OPEN','OVER','PAGE','PARK','PART','PICK','PLAN','PLAY','PULL','PUSH','RACE','RAIN',
+  'READ','REAL','REST','RIDE','RING','ROAD','ROCK','ROOM','ROSE','SAID','SAME','SAND','SEAT','SEEM','SEEN','SELL','SEND',
+  'SHIP','SHOE','SHOP','SHOW','SIDE','SING','SLOW','SNOW','SOME','SONG','SOON','SORT','STAR','STAY','STEP','STOP','SUCH',
+  'SURE','SWIM','TAKE','TALK','TALL','TEAM','TELL','THAN','THAT','THEM','THEN','THEY','THIN','THIS','TIME','TINY','TOLD',
+  'TOOK','TREE','TRIP','TRUE','TURN','UPON','VERY','WAIT','WALK','WALL','WANT','WARM','WASH','WAVE','WEEK','WELL','WENT',
+  'WERE','WHAT','WHEN','WILD','WILL','WIND','WISH','WITH','WOOD','WORD','WORK','YARD','YEAR','YOUR',
+  'ABOUT','AFTER','AGAIN','ALONG','APPLE','BEACH','BEGIN','BELOW','BREAD','BRING','BROWN','BUILD','CHAIR','CHILD','CLEAN',
+  'CLOSE','CLOUD','COLOR','COULD','DREAM','DRINK','DRIVE','EARLY','EARTH','EVERY','FIRST','FLOOR','FOUND','FRONT','FRUIT',
+  'FUNNY','GRASS','GREAT','GREEN','GROUP','HAPPY','HEART','HORSE','HOUSE','LARGE','LAUGH','LEARN','LIGHT','MAYBE','MONEY',
+  'MONTH','MOUSE','MUSIC','NEVER','NIGHT','NOISE','NORTH','OCEAN','ORDER','OTHER','PAPER','PARTY','PLACE','PLANT','POINT',
+  'QUICK','QUIET','RIGHT','RIVER','ROUND','SEVEN','SHEEP','SHORT','SLEEP','SMALL','SMILE','SOUND','SOUTH','SPELL','SPORT',
+  'START','STORY','SUGAR','SWEET','TABLE','TEACH','THANK','THEIR','THERE','THESE','THING','THINK','THIRD','THOSE','THREE',
+  'TIGER','TODAY','TRAIN','TRUCK','UNDER','UNTIL','WATCH','WATER','WHEEL','WHERE','WHICH','WHILE','WHITE','WHOLE','WOMAN',
+  'WORLD','WOULD','WRITE','YOUNG'
+];
+
+/* Square brackets mark the target word so the UI can highlight it. */
+var SENTENCES = {
+  THE:'I see [the] dog.',
+  AND:'Mom [and] Dad.',
+  TO:'I go [to] school.',
+  IT:'[It] is fun!',
+  IS:'The sun [is] hot.'
+};
+
+function sentenceFor(word){
+  var w = cleanWord(word);
+  if (SENTENCES[w]) return SENTENCES[w];
+  return 'Can you spell [' + w.toLowerCase() + ']?';
+}
+
+function sentenceParts(raw){
+  var s = String(raw == null ? '' : raw);
+  var parts = [], i = 0;
+  while (i < s.length){
+    var open = s.indexOf('[', i);
+    if (open === -1){ parts.push({ text:s.slice(i), mark:false }); break; }
+    var close = s.indexOf(']', open);
+    if (close === -1){ parts.push({ text:s.slice(i), mark:false }); break; }
+    if (open > i) parts.push({ text:s.slice(i, open), mark:false });
+    parts.push({ text:s.slice(open + 1, close), mark:true });
+    i = close + 1;
+  }
+  return parts.filter(function(p){ return p.text.length > 0; });
+}
+
+function sentencePlain(raw){
+  return sentenceParts(raw).map(function(p){ return p.text; }).join('');
+}
+
+function makeDecoys(word, count, rnd){
+  var answer = cleanWord(word);
+  var n = count == null ? 2 : count;
+  var r = rnd || Math.random;
+  var picked = [], used = {};
+  used[answer] = true;
+
+  function drawFrom(pool){
+    var shuffled = shuffle(pool, r);
+    for (var i = 0; i < shuffled.length && picked.length < n; i++){
+      var w = shuffled[i];
+      if (used[w]) continue;
+      used[w] = true;
+      picked.push(w);
+    }
+  }
+
+  var exact = [], near = [], rest = [];
+  for (var i = 0; i < WORD_BANK.length; i++){
+    var w = WORD_BANK[i];
+    if (w === answer) continue;
+    var d = Math.abs(w.length - answer.length);
+    if (d === 0) exact.push(w); else if (d === 1) near.push(w); else rest.push(w);
+  }
+  drawFrom(exact);
+  if (picked.length < n) drawFrom(near);
+  if (picked.length < n) drawFrom(rest);
+  return picked;
+}
+
+function makeOptions(word, rnd){
+  var answer = cleanWord(word);
+  return shuffle(makeDecoys(answer, 2, rnd).concat([answer]), rnd);
+}
+
+function scrambleLetters(word, rnd){
+  var letters = cleanWord(word).split('');
+  if (letters.length < 2) return letters;
+  var allSame = letters.every(function(c){ return c === letters[0]; });
+  var out = shuffle(letters, rnd), tries = 0;
+  while (!allSame && out.join('') === letters.join('') && tries < 25){
+    out = shuffle(letters, rnd); tries++;
+  }
+  if (!allSame && out.join('') === letters.join('')){
+    var t = out[0]; out[0] = out[out.length - 1]; out[out.length - 1] = t;
+  }
+  return out;
+}
+
+function isPermutationOf(tiles, word){
+  var a = (tiles || []).slice().sort().join('');
+  var b = cleanWord(word).split('').sort().join('');
+  return a === b && a.length > 0;
+}
+
+function makeSearchLetters(word, extra, rnd){
+  var letters = cleanWord(word).split('');
+  var n = extra == null ? SEARCH_EXTRA_LETTERS : extra;
+  var r = rnd || Math.random;
+  var inWord = {};
+  letters.forEach(function(c){ inWord[c] = true; });
+
+  var pool = [];
+  for (var i = 0; i < 26; i++){
+    var c = String.fromCharCode(65 + i);
+    if (!inWord[c]) pool.push(c);
+  }
+  var decoys = shuffle(pool, r).slice(0, Math.min(n, pool.length));
+  return shuffle(letters.concat(decoys), r);
+}
+
+function scatterPositions(count, areaW, areaH, tile, gap, rnd){
+  var r = rnd || Math.random;
+  var g = gap == null ? 10 : gap;
+  var n = Math.max(0, count | 0);
+  if (n === 0) return { positions:[], height:0, cols:0, rows:0 };
+
+  var cols = Math.floor((areaW + g) / (tile + g));
+  if (cols < 1) cols = 1;
+  if (cols > n) cols = n;
+  var rows = Math.ceil(n / cols);
+
+  var cellW = areaW / cols;
+  var minCellH = tile + g;
+  var cellH = Math.max(minCellH, (areaH || 0) / rows);
+  var height = cellH * rows;
+
+  var cells = [];
+  for (var i = 0; i < cols * rows; i++) cells.push(i);
+  cells = shuffle(cells, r).slice(0, n);
+
+  var positions = cells.map(function(cell){
+    var cx = (cell % cols) * cellW;
+    var cy = Math.floor(cell / cols) * cellH;
+    var slackX = Math.max(0, cellW - tile);
+    var slackY = Math.max(0, cellH - tile);
+    return {
+      x: Math.round(cx + slackX * r()),
+      y: Math.round(cy + slackY * r())
+    };
+  });
+
+  return { positions:positions, height:Math.round(height), cols:cols, rows:rows };
+}
+
+function noOverlap(positions, tile){
+  for (var i = 0; i < positions.length; i++){
+    for (var j = i + 1; j < positions.length; j++){
+      var a = positions[i], b = positions[j];
+      if (Math.abs(a.x - b.x) < tile && Math.abs(a.y - b.y) < tile) return false;
+    }
+  }
+  return true;
+}
+
+/* ============================================================
+   THE FOUR CHARACTERS
+
+   `mode` is the locked movement language and nothing may blur it:
+     jet   — thrust, rocket rolls, hard braking.  Never tumbles.
+     board — carving, ollies, grinds. May bail off the board, never tumbles.
+     foot  — runs, stumbles, skids, lands on his backside. Never tumbles.
+     acro  — cartwheels, handsprings, aerials. The ONLY tumbler.
+
+   `falls` and `tumbles` are NOT the same thing, and conflating them is how
+   the identities get blurred:
+     falls   — tips over, lands on his backside, bails off the board. Messy,
+               involuntary, and it stops somewhere past upright.
+     tumbles — goes all the way round, on purpose, and lands it.
+   Trip falls constantly and never tumbles. Zip bails off the board once in
+   a while and never tumbles. Blip does neither — he brakes and recovers.
+   Flip tumbles and never falls.
+
+   GEAR: jet rig and skateboard only. The v4/v5 sword and shield are gone —
+   gear is equipment layered on a recognisable base character, and two of
+   the four carrying weapons made that read as identity instead.
+
+   COLOUR: Flip is red. The visual-direction note proposed purple; that
+   collides with a standing "no purple/pink" instruction, and teal (which v5
+   used) sits too near Zip's blue once both are 74px on a phone. Red is the
+   remaining primary that clears blue, green and the no-purple rule.
+   ============================================================ */
+var CHARS = {
+  blip: { key:'blip', name:'Blip', mode:'jet',   rig:'jet rig',    airborne:true,  falls:false, tumbles:false, color:'#F0862B' },
+  zip:  { key:'zip',  name:'Zip',  mode:'board', rig:'skateboard', airborne:false, falls:true,  tumbles:false, color:'#2E7DF7' },
+  trip: { key:'trip', name:'Trip', mode:'foot',  rig:'on foot',    airborne:false, falls:true,  tumbles:false, color:'#34B764' },
+  flip: { key:'flip', name:'Flip', mode:'acro',  rig:'no vehicle', airborne:true,  falls:false, tumbles:true,  color:'#FF4D4D' }
+};
+var CHAR_ORDER = ['blip', 'zip', 'trip', 'flip'];
+
+/* ---- motion language, as maths ---- */
+var MAX_NON_TUMBLE_ROT = 26;   /* degrees; a lean or a wobble, nothing more */
+/*
+  How far past upright a character who FALLS may end up. 115 degrees is flat
+  on his back with his boots in the air — the far side of a pratfall.
+  Anything at or beyond 180 would be going round, which is a tumble.
+*/
+var MAX_FALL_ROT = 115;
+
+/* The most any character may rotate, by what he is allowed to do. */
+function rotBudgetFor(key){
+  var c = CHARS[key];
+  if (!c) return MAX_NON_TUMBLE_ROT;
+  if (c.tumbles) return Infinity;
+  if (c.falls) return MAX_FALL_ROT;
+  return MAX_NON_TUMBLE_ROT;
+}
+
+function styleRot(mode, p, dirX, spins){
+  var t = Math.max(0, Math.min(1, Number(p) || 0));
+  switch (mode){
+    case 'jet':   return (Number(dirX) >= 0 ? 14 : -14) * Math.sin(Math.PI * t);
+    case 'board': return 12 * Math.sin(t * Math.PI * 2);
+    case 'foot':  return 7 * Math.sin(t * Math.PI * 6);
+    case 'acro':  return 360 * (spins == null ? 2 : spins) * t;
+    default:      return 0;
+  }
+}
+
+function styleOffsetY(mode, p){
+  var t = Math.max(0, Math.min(1, Number(p) || 0));
+  switch (mode){
+    case 'jet':   return -10 * Math.sin(t * Math.PI * 2);
+    case 'board': return -24 * Math.max(0, Math.sin(t * Math.PI));
+    case 'foot':  return -7 * Math.abs(Math.sin(t * Math.PI * 6));
+    case 'acro':  return -30 * Math.sin(t * Math.PI);
+    default:      return 0;
+  }
+}
+
+/* Which way a character is allowed to haul a letter off the screen. */
+function exitDirsFor(key){
+  var c = CHARS[key];
+  if (!c) return ['left', 'right'];
+  if (!c.airborne) return ['left', 'right'];
+  return ['up', 'left', 'right', 'down'];
+}
+
+function sidekickOf(leader, n){
+  var others = CHAR_ORDER.filter(function(k){ return k !== leader; });
+  if (!others.length) return CHAR_ORDER[0];
+  var i = Math.abs(Math.floor(Number(n) || 0)) % others.length;
+  return others[i];
+}
+
+/* ============================================================
+   TOW CORD  (pure)
+
+   A rope constraint, not a keyframe. While the character is near the letter
+   the cord hangs slack and the letter does not move at all; once he travels
+   past it the distance exceeds the cord length, the cord snaps taut and the
+   letter is yanked into his wake. That snap is the whole point: without the
+   slack that precedes it the cord is decoration.
+   ============================================================ */
+function ropeSolve(px, py, ax, ay, rest){
+  var dx = px - ax, dy = py - ay;
+  var d = Math.sqrt(dx * dx + dy * dy);
+  var r = Math.max(0, Number(rest) || 0);
+  if (d <= r || d === 0) return { x: px, y: py, taut: false, dist: d, pull: 0 };
+  var k = (d - r) / d;
+  return { x: px - dx * k, y: py - dy * k, taut: true, dist: d, pull: d - r };
+}
+
+/* The drawn cord: sags under its own weight when slack, straight when taut. */
+function cordPath(ax, ay, px, py, rest){
+  var d = Math.sqrt((px - ax) * (px - ax) + (py - ay) * (py - ay));
+  var slack = Math.max(0, (Number(rest) || 0) - d);
+  var mx = (ax + px) / 2;
+  var my = (ay + py) / 2 + slack * 0.55 + 3;
+  return 'M' + Math.round(ax) + ' ' + Math.round(ay) +
+         ' Q' + Math.round(mx) + ' ' + Math.round(my) +
+         ' ' + Math.round(px) + ' ' + Math.round(py);
+}
+
+/* Off-screen start/end point for an entry or exit edge. */
+function edgePoint(edge, vw, vh, size){
+  var s = size == null ? 104 : size;
+  switch (edge){
+    case 'top':    return { x: vw * 0.5 - s / 2, y: -s - 40 };
+    case 'bottom': return { x: vw * 0.5 - s / 2, y: vh + 40 };
+    case 'left':   return { x: -s - 40,          y: vh * 0.45 };
+    case 'right':  return { x: vw + 40,          y: vh * 0.45 };
+    default:       return { x: vw * 0.5 - s / 2, y: -s - 40 };
+  }
+}
+
+/*
+  Staggered stack offsets. Letters must never sit squarely on top of each
+  other — the whole point of stacking them is that Grayson can still read
+  the word. Each block steps sideways and leans a little, so a four-letter
+  stack reads as a staircase rather than one block.
+*/
+function stackOffsets(count, tile){
+  var n = Math.max(0, Math.floor(Number(count) || 0));
+  var t = Number(tile) || 68;
+  var out = [];
+  for (var i = 0; i < n; i++){
+    var dir = (i % 2 === 0) ? 1 : -1;
+    out.push({
+      dx: Math.round(dir * t * 0.34 * Math.min(1, (i + 1) / 3)),
+      dy: Math.round(-i * t * 0.62),
+      rot: dir * (4 + (i % 3) * 2)
+    });
+  }
+  return out;
+}
+
+/* Every stacked letter keeps a visible edge: no two share a centre. */
+function stackReadable(offsets, tile){
+  var t = Number(tile) || 68;
+  for (var i = 0; i < offsets.length; i++){
+    for (var j = i + 1; j < offsets.length; j++){
+      var dx = Math.abs(offsets[i].dx - offsets[j].dx);
+      var dy = Math.abs(offsets[i].dy - offsets[j].dy);
+      if (dx < t * 0.22 && dy < t * 0.22) return false;
+    }
+  }
+  return true;
+}
+
+/* ============================================================
+   SCENE PLANNER
+
+   A scene is planned as data first and executed second. Everything that
+   could be wrong about a performance — a letter nobody takes, a cord that
+   tows without ever going taut, Trip dropping something nobody picks up,
+   Blip doing a cartwheel, a scene that runs 40 seconds — is a property of
+   this plan, so the tests catch it without a browser or a stopwatch.
+   ============================================================ */
+
+/* Beat lengths in ms. */
+var BEAT = {
+  enter:700, approach:430, hook:340, slack:420, snap:240, tow:900,
+  scoop:700, grab:520, stack:820, topple:700, pop:420, ollie:520,
+  grind:900, brake:400, overshoot:520, fumble:800, rescue:700,
+  shrug:780, flourish:640, exit:620, settle:240
+};
+
+/* Travis' brief: vary naturally, never pad, 4s floor and 12s ceiling. */
+var SCENE_MIN = 4000, SCENE_MAX = 12000;
+
+/* Removal kinds — exactly one of these per letter, or the plan is invalid. */
+var TAKE_KINDS = { tow:1, scoop:1, snatch:1, pop:1, carry:1, rescue:1 };
+
+function makeTimeline(){
+  var events = [];
+  return {
+    events: events,
+    /* returns the event so a caller can read back its end time */
+    push: function(at, dur, kind, extra){
+      var e = { at: Math.max(0, Math.round(at)), dur: Math.round(dur), kind: kind };
+      for (var k in extra){ if (Object.prototype.hasOwnProperty.call(extra, k)) e[k] = extra[k]; }
+      events.push(e);
+      return e;
+    },
+    end: function(){
+      var max = 0;
+      for (var i = 0; i < events.length; i++){
+        var t = events[i].at + events[i].dur;
+        if (t > max) max = t;
+      }
+      return max;
+    }
+  };
+}
+
+/*
+  The cord, staged properly, as four beats rather than one.
+
+    hook  — he catches the block
+    slack — he moves off and the cord pays out loose behind him
+    snap  — the slack runs out and the cord goes taut with a jolt
+    tow   — only now does the block actually travel
+
+  Emitting these as separate events is what makes the staging testable:
+  a `tow` with `roped:true` and no preceding snap is a bug the suite fails.
+*/
+function ropeBeats(tl, at, who, letter, dir){
+  var t = at;
+  tl.push(t, BEAT.hook, 'hook', { char: who, letter: letter });            t += BEAT.hook;
+  tl.push(t, BEAT.slack, 'slack', { char: who, letter: letter });          t += BEAT.slack;
+  tl.push(t, BEAT.snap, 'snap', { char: who, letter: letter });            t += BEAT.snap;
+  var e = tl.push(t, BEAT.tow, 'tow', { char: who, letter: letter, dir: dir, roped: true });
+  return t + BEAT.tow;
+}
+
+/*
+  Nobody may act before they have arrived. Scenes call this instead of
+  pushing a bare 'enter', so a character who is already on stage does not
+  get a second entrance and one who is not gets a real one. This is the
+  plan-level cure for the "character appears mid-scene" and "walks to a
+  letter and then does nothing" faults.
+*/
+function ensureEnter(tl, entered, who, at){
+  if (entered[who]) return at;
+  entered[who] = true;
+  tl.push(Math.max(0, at - BEAT.enter), BEAT.enter, 'enter', { char: who });
+  return at;
+}
+
+function dirFor(who, i){
+  var dirs = exitDirsFor(who);
+  return dirs[Math.abs(i) % dirs.length];
+}
+
+/* ---------------------------------------------------------------
+   THE SCENE LIBRARY
+
+   `lead` is which character the scene is built around; 'any' means the
+   choreography works in any of the four movement languages. `weight` sets
+   how often it comes up — the chaotic and the rare ones are deliberately
+   low so they stay surprising.
+   --------------------------------------------------------------- */
+var SCENES = [
+
+  /* --- BLIP: the hero tow. Stack, hook the bottom, snap, topple. --- */
+  { id:'jet-tow-stack', name:'Jet Pull', lead:'blip', weight:10, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0, entered = {};
+      ensureEnter(tl, entered, 'blip', BEAT.enter);                     t += BEAT.enter;
+      tl.push(t, BEAT.stack, 'stack', { char:'blip', count:c.letters }); t += BEAT.stack;
+      /* hooks the BOTTOM block, so the tower has to answer for it */
+      var after = ropeBeats(tl, t, 'blip', 0, 'right');
+      tl.push(t + BEAT.hook + BEAT.slack, BEAT.topple, 'topple', { from:1 });
+      /* the upper blocks come down and are caught, not deleted */
+      for (var i = 1; i < c.letters; i++){
+        var who = i === 1 && c.has('flip') ? 'flip' : c.pick(i);
+        var catchAt = after - 240 + i * 260;
+        ensureEnter(tl, entered, who, catchAt);
+        tl.push(catchAt, BEAT.grab, 'snatch', { char: who, letter: i });
+      }
+      var last = after - 240 + Math.max(1, c.letters - 1) * 260 + BEAT.grab;
+      tl.push(last, BEAT.overshoot, 'overshoot', { char:'blip' });
+      tl.push(last + BEAT.overshoot, BEAT.brake, 'brake', { char:'blip' });
+      tl.push(last + BEAT.overshoot + BEAT.brake, BEAT.exit, 'exit', { char:'blip', dir:'right' });
+      return tl;
+    } },
+
+  /* --- BLIP: too heavy. Thrust, resist, pop loose, hard brake. --- */
+  { id:'jet-heavy', name:'Dead Weight', lead:'blip', weight:7, min:1,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'blip' }); t += BEAT.enter;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 620;
+        /* the resist beat: cord taut, nothing moves, then it gives */
+        tl.push(at, BEAT.hook, 'hook', { char:'blip', letter:i });
+        tl.push(at + BEAT.hook, BEAT.slack, 'slack', { char:'blip', letter:i });
+        tl.push(at + BEAT.hook + BEAT.slack, BEAT.snap, 'snap', { char:'blip', letter:i });
+        tl.push(at + BEAT.hook + BEAT.slack + BEAT.snap, 420, 'resist', { char:'blip', letter:i });
+        tl.push(at + BEAT.hook + BEAT.slack + BEAT.snap + 420, BEAT.tow, 'tow',
+          { char:'blip', letter:i, dir:'up', roped:true });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 620 + BEAT.hook + BEAT.slack + BEAT.snap + 420 + BEAT.tow;
+      tl.push(last, BEAT.brake, 'brake', { char:'blip' });
+      tl.push(last + BEAT.brake, BEAT.exit, 'exit', { char:'blip', dir:'up' });
+      return tl;
+    } },
+
+  /* --- ZIP: carve through and sweep the letters onto the deck. --- */
+  { id:'board-sweep', name:'Board Sweep', lead:'zip', weight:10, min:1,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'zip' }); t += BEAT.enter;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 520;
+        tl.push(at, BEAT.approach, 'approach', { char:'zip', letter:i });
+        tl.push(at + BEAT.approach, BEAT.scoop, 'scoop',
+          { char:'zip', letter:i, dir:'left' });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 520 + BEAT.approach + BEAT.scoop;
+      tl.push(last, BEAT.exit, 'exit', { char:'zip', dir:'left' });
+      return tl;
+    } },
+
+  /* --- ZIP: the grind. Letters pop loose in rhythm along the row. --- */
+  { id:'board-grind', name:'Edge Grind', lead:'zip', weight:8, min:3,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'zip' }); t += BEAT.enter;
+      tl.push(t, BEAT.grind, 'grind', { char:'zip' });
+      /* each letter is knocked free on a beat as the board passes it */
+      var step = Math.max(180, Math.floor(BEAT.grind / Math.max(1, c.letters)));
+      for (var i = 0; i < c.letters; i++){
+        tl.push(t + i * step, BEAT.scoop, 'scoop', { char:'zip', letter:i, dir:'right' });
+      }
+      var last = t + Math.max(0, c.letters - 1) * step + BEAT.scoop;
+      tl.push(last, BEAT.exit, 'exit', { char:'zip', dir:'right' });
+      return tl;
+    } },
+
+  /* --- TRIP + ZIP: Trip goes down, Zip ollies clean over him. --- */
+  { id:'ollie-over-trip', name:'Ollie Over', lead:'zip', weight:7, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'trip' }); t += BEAT.enter;
+      /* Trip carries the first one and immediately loses his feet */
+      tl.push(t, BEAT.approach, 'approach', { char:'trip', letter:0 }); t += BEAT.approach;
+      tl.push(t, BEAT.fumble, 'fumble', { char:'trip', letter:0 });
+      tl.push(t + 200, BEAT.enter, 'enter', { char:'zip' });
+      tl.push(t + 200 + BEAT.enter, BEAT.ollie, 'ollie', { char:'zip', over:'trip' });
+      var after = t + 200 + BEAT.enter + BEAT.ollie;
+      /* Zip picks up what Trip dropped without breaking momentum */
+      tl.push(after, BEAT.rescue, 'rescue', { char:'zip', letter:0, dir:'left' });
+      var at = after + BEAT.rescue;
+      for (var i = 1; i < c.letters; i++){
+        tl.push(at + (i - 1) * 480, BEAT.scoop, 'scoop', { char:'zip', letter:i, dir:'left' });
+      }
+      var last = at + Math.max(0, c.letters - 2) * 480 + BEAT.scoop;
+      tl.push(last, BEAT.exit, 'exit', { char:'trip', dir:'right' });
+      tl.push(last, BEAT.exit, 'exit', { char:'zip', dir:'left' });
+      return tl;
+    } },
+
+  /* --- TRIP: too many at once. They slip; he gets every one back. --- */
+  { id:'trip-overload', name:"Trip's Bad Idea", lead:'trip', weight:9, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0, entered = {};
+      ensureEnter(tl, entered, 'trip', BEAT.enter); t += BEAT.enter;
+      tl.push(t, BEAT.stack, 'stack', { char:'trip', count:c.letters }); t += BEAT.stack;
+      /* he drops exactly one, and the rescue for it is in the same plan */
+      var dropped = c.letters - 1;
+      tl.push(t, BEAT.fumble, 'fumble', { char:'trip', letter:dropped });
+      var resc = c.has('flip') ? 'flip' : c.pick(1);
+      var rescAt = t + BEAT.fumble - 240;
+      ensureEnter(tl, entered, resc, rescAt);
+      tl.push(rescAt, BEAT.rescue, 'rescue',
+        { char:resc, letter:dropped, dir:dirFor(resc, 0) });
+      var at = t + BEAT.fumble + 120;
+      for (var i = 0; i < dropped; i++){
+        tl.push(at + i * 300, BEAT.grab, 'carry', { char:'trip', letter:i, dir:'left' });
+      }
+      var last = Math.max(at + Math.max(0, dropped - 1) * 300 + BEAT.grab,
+                          t + BEAT.fumble - 240 + BEAT.rescue);
+      tl.push(last, BEAT.exit, 'exit', { char:'trip', dir:'left' });
+      return tl;
+    } },
+
+  /* --- TRIP: catches his foot on a cord somebody left behind. --- */
+  { id:'cord-trip', name:'Left Cord', lead:'trip', weight:8, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      /* Blip lays the cord across the scene and goes */
+      tl.push(t, BEAT.enter, 'enter', { char:'blip' }); t += BEAT.enter;
+      var after = ropeBeats(tl, t, 'blip', 0, 'right');
+      tl.push(after, 300, 'dropcord', { char:'blip' });
+      tl.push(after, BEAT.exit, 'exit', { char:'blip', dir:'right' });
+      /* Trip runs in and finds it with his foot */
+      var tt = after + 260;
+      tl.push(tt, BEAT.enter, 'enter', { char:'trip' }); tt += BEAT.enter;
+      tl.push(tt, 300, 'snag', { char:'trip' }); tt += 300;
+      tl.push(tt, BEAT.fumble, 'fumble', { char:'trip', letter:1 });
+      tt += BEAT.fumble;
+      tl.push(tt, 420, 'dustoff', { char:'trip' }); tt += 420;
+      tl.push(tt, BEAT.rescue, 'rescue', { char:'trip', letter:1, dir:'left' });
+      tt += BEAT.rescue;
+      for (var i = 2; i < c.letters; i++){
+        tl.push(tt + (i - 2) * 320, BEAT.grab, 'carry', { char:'trip', letter:i, dir:'left' });
+      }
+      var last = tt + Math.max(0, c.letters - 3) * 320 + (c.letters > 2 ? BEAT.grab : 0);
+      tl.push(last, BEAT.exit, 'exit', { char:'trip', dir:'left' });
+      return tl;
+    } },
+
+  /* --- FLIP: a letter caught on every rotation. Tumbling is his alone. --- */
+  { id:'acro-collect', name:'Acro Collection', lead:'flip', weight:10, min:1,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'flip' }); t += BEAT.enter;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 480;
+        tl.push(at, BEAT.grab, 'cartwheel', { char:'flip', letter:i });
+        tl.push(at + BEAT.grab, BEAT.grab, 'snatch', { char:'flip', letter:i });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 480 + BEAT.grab * 2;
+      tl.push(last, BEAT.flourish, 'aerial', { char:'flip' });
+      tl.push(last + BEAT.flourish, BEAT.exit, 'exit', { char:'flip', dir:'up' });
+      return tl;
+    } },
+
+  /* --- FLIP saves a stack somebody else knocked over. --- */
+  { id:'acro-save', name:'The Save', lead:'flip', weight:7, min:3,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      var builder = c.has('zip') ? 'zip' : 'blip';
+      tl.push(t, BEAT.enter, 'enter', { char:builder }); t += BEAT.enter;
+      tl.push(t, BEAT.stack, 'stack', { char:builder, count:c.letters }); t += BEAT.stack;
+      tl.push(t, BEAT.topple, 'topple', { from:0 });
+      tl.push(t - 120, BEAT.enter, 'enter', { char:'flip' });
+      var at = t + 200;
+      for (var i = 0; i < c.letters; i++){
+        tl.push(at + i * 300, BEAT.grab, 'snatch', { char:'flip', letter:i });
+      }
+      var last = at + Math.max(0, c.letters - 1) * 300 + BEAT.grab;
+      tl.push(last, BEAT.flourish, 'aerial', { char:'flip' });
+      tl.push(last, BEAT.exit, 'exit', { char:builder, dir:'right' });
+      tl.push(last + BEAT.flourish, BEAT.exit, 'exit', { char:'flip', dir:'up' });
+      return tl;
+    } },
+
+  /* --- Two characters pull opposite ways, realise, and let go. --- */
+  { id:'tug-of-war', name:'Tug of War', lead:'any', weight:5, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      var a = c.lead, b = c.pick(1);
+      tl.push(t, BEAT.enter, 'enter', { char:a });
+      tl.push(t, BEAT.enter, 'enter', { char:b }); t += BEAT.enter;
+      tl.push(t, BEAT.hook, 'hook', { char:a, letter:0 });
+      tl.push(t, BEAT.hook, 'hook', { char:b, letter:0 }); t += BEAT.hook;
+      tl.push(t, BEAT.slack, 'slack', { char:a, letter:0 }); t += BEAT.slack;
+      tl.push(t, BEAT.snap, 'snap', { char:a, letter:0 }); t += BEAT.snap;
+      tl.push(t, 620, 'tug', { char:a, other:b, letter:0 }); t += 620;
+      tl.push(t, 320, 'realise', { char:a, other:b }); t += 320;
+      tl.push(t, BEAT.tow, 'tow', { char:a, letter:0, dir:dirFor(a, 0), roped:true });
+      var at = t + BEAT.tow;
+      for (var i = 1; i < c.letters; i++){
+        tl.push(at + (i - 1) * 380, BEAT.grab, 'carry',
+          { char:b, letter:i, dir:dirFor(b, i) });
+      }
+      var last = Math.max(at, at + Math.max(0, c.letters - 2) * 380 + (c.letters > 1 ? BEAT.grab : 0));
+      tl.push(last, BEAT.exit, 'exit', { char:a, dir:dirFor(a, 0) });
+      tl.push(last, BEAT.exit, 'exit', { char:b, dir:dirFor(b, 1) });
+      return tl;
+    } },
+
+  /* --- Handoff: the leader gets most of them, someone finishes the job. --- */
+  { id:'handoff', name:'Handoff', lead:'any', weight:8, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      var a = c.lead, b = c.pick(1);
+      tl.push(t, BEAT.enter, 'enter', { char:a }); t += BEAT.enter;
+      var split = Math.max(1, c.letters - 1);
+      for (var i = 0; i < split; i++){
+        var at = t + i * 460;
+        tl.push(at, BEAT.approach, 'approach', { char:a, letter:i });
+        tl.push(at + BEAT.approach, BEAT.grab, 'carry',
+          { char:a, letter:i, dir:dirFor(a, i) });
+      }
+      var mid = t + Math.max(0, split - 1) * 460 + BEAT.approach + BEAT.grab;
+      tl.push(mid, 300, 'notice', { char:a });
+      tl.push(mid, BEAT.exit, 'exit', { char:a, dir:dirFor(a, 0) });
+      /* the one he missed */
+      tl.push(mid + 160, BEAT.enter, 'enter', { char:b });
+      var bt = mid + 160 + BEAT.enter;
+      for (var j = split; j < c.letters; j++){
+        tl.push(bt, BEAT.grab, 'carry', { char:b, letter:j, dir:dirFor(b, j) });
+        bt += BEAT.grab;
+      }
+      tl.push(bt, BEAT.exit, 'exit', { char:b, dir:dirFor(b, 1) });
+      return tl;
+    } },
+
+  /* --- Rare: all four, one letter each where the count allows. --- */
+  { id:'four-way', name:'All Four', lead:'any', weight:3, min:3,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      var order = c.order;
+      for (var i = 0; i < c.letters; i++){
+        var who = order[i % order.length];
+        var at = t + i * 420;
+        tl.push(at, BEAT.enter, 'enter', { char:who });
+        tl.push(at + BEAT.enter, BEAT.grab, 'carry',
+          { char:who, letter:i, dir:dirFor(who, i) });
+        tl.push(at + BEAT.enter + BEAT.grab, BEAT.exit, 'exit',
+          { char:who, dir:dirFor(who, i) });
+      }
+      return tl;
+    } },
+
+  /* --- Rare and quick: one fast pass takes the lot. --- */
+  { id:'super-pass', name:'Super Pass', lead:'any', weight:3, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:c.lead }); t += BEAT.enter;
+      tl.push(t, 900, 'superpass', { char:c.lead, count:c.letters });
+      for (var i = 0; i < c.letters; i++){
+        tl.push(t + 140 + i * 110, BEAT.tow, 'tow',
+          { char:c.lead, letter:i, dir:dirFor(c.lead, 0), roped:false });
+      }
+      var last = t + 140 + Math.max(0, c.letters - 1) * 110 + BEAT.tow;
+      tl.push(last, BEAT.exit, 'exit', { char:c.lead, dir:dirFor(c.lead, 0) });
+      return tl;
+    } },
+
+  /* --- Pop chain. Used sparingly: it is the one non-physical removal. --- */
+  { id:'pop-chain', name:'Pop Chain', lead:'any', weight:4, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:c.lead }); t += BEAT.enter;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 420;
+        tl.push(at, BEAT.approach, 'approach', { char:c.lead, letter:i });
+        tl.push(at + BEAT.approach, BEAT.pop, 'pop', { char:c.lead, letter:i });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 420 + BEAT.approach + BEAT.pop;
+      tl.push(last, BEAT.flourish, 'flourish', { char:c.lead });
+      tl.push(last + BEAT.flourish, BEAT.exit, 'exit', { char:c.lead, dir:dirFor(c.lead, 0) });
+      return tl;
+    } }
+];
+
+/* Scenes this leader and this word length can actually support. */
+function eligibleScenes(leadKey, letters){
+  var n = Math.max(0, Math.floor(Number(letters) || 0));
+  return SCENES.filter(function(s){
+    if (s.lead !== 'any' && s.lead !== leadKey) return false;
+    if (n < (s.min || 1)) return false;
+    return true;
+  });
+}
+
+/*
+  Weighted pick that will not replay anything in `history` (most recent
+  first) unless refusing would leave nothing to choose from. This is what
+  stops the same performance turning up twice in one sitting.
+*/
+function pickScene(leadKey, letters, history, rnd){
+  var r = rnd || Math.random;
+  var pool = eligibleScenes(leadKey, letters);
+  if (!pool.length) return null;
+  var recent = (history || []).slice(0, 3);
+  var fresh = pool.filter(function(s){ return recent.indexOf(s.id) === -1; });
+  if (fresh.length) pool = fresh;
+
+  var total = 0;
+  for (var i = 0; i < pool.length; i++) total += (pool[i].weight || 1);
+  var roll = r() * total;
+  for (var j = 0; j < pool.length; j++){
+    roll -= (pool[j].weight || 1);
+    if (roll <= 0) return pool[j];
+  }
+  return pool[pool.length - 1];
+}
+
+/*
+  Fit a finished timeline into the 4-12s window.
+
+  Long words overrun because every letter adds a beat, so events are pulled
+  proportionally toward the start; each move keeps at least 62% of its
+  length so it stays readable. Short scenes are NOT padded with dead time —
+  Travis was explicit about that — they are stretched slightly and, only if
+  still under the floor, given one extra flourish from a character who is
+  already on screen.
+*/
+function fitDuration(tl, cast){
+  var events = tl.events;
+  if (!events.length) return 0;
+  var total = tl.end();
+
+  if (total > SCENE_MAX){
+    var squeeze = SCENE_MAX / total;
+    for (var i = 0; i < events.length; i++){
+      events[i].at = Math.round(events[i].at * squeeze);
+      events[i].dur = Math.round(events[i].dur * Math.max(0.62, squeeze));
+    }
+    total = tl.end();
+  }
+
+  if (total < SCENE_MIN){
+    var stretch = Math.min(1.5, SCENE_MIN / total);
+    for (var j = 0; j < events.length; j++){
+      events[j].at = Math.round(events[j].at * stretch);
+      events[j].dur = Math.round(events[j].dur * stretch);
+    }
+    total = tl.end();
+  }
+
+  if (total < SCENE_MIN && cast && cast.length){
+    var at = Math.max(0, total - 200);
+    tl.push(at, SCENE_MIN - at, 'flourish', { char: cast[0] });
+    total = tl.end();
+  }
+
+  return total;
+}
+
+/*
+  Plan one scene.
+  opts: { letters, lead, stage:'build'|'learn', history:[ids], rnd }
+*/
+function planScene(opts){
+  opts = opts || {};
+  var letters = Math.max(0, Math.floor(Number(opts.letters) || 0));
+  var leadKey = CHARS[opts.lead] ? opts.lead : CHAR_ORDER[0];
+  var stage = opts.stage === 'learn' ? 'learn' : 'build';
+  var rnd = opts.rnd || Math.random;
+  var history = opts.history || [];
+
+  var order = [leadKey].concat(CHAR_ORDER.filter(function(k){ return k !== leadKey; }));
+  var plan = {
+    id: null, name: null, lead: leadKey, stage: stage, letters: letters,
+    cast: order, events: [], duration: 0
+  };
+  if (!letters) return plan;
+
+  var scene = pickScene(leadKey, letters, history, rnd);
+  if (!scene) return plan;
+
+  var ctx = {
+    letters: letters, lead: leadKey, order: order,
+    pick: function(i){ return order[Math.abs(i) % order.length]; },
+    has: function(k){ return order.indexOf(k) !== -1; }
+  };
+
+  var tl = scene.build(ctx);
+  plan.id = scene.id;
+  plan.name = scene.name;
+  plan.duration = fitDuration(tl, order);
+  plan.events = tl.events.slice().sort(function(a, b){ return a.at - b.at; });
+  return plan;
+}
+
+/* ---------------------------------------------------------------
+   PLAN VALIDATION — the rules the tests hold the choreography to.
+   Returns a list of problems; empty means the plan is sound.
+   --------------------------------------------------------------- */
+function validatePlan(plan){
+  var problems = [];
+  if (!plan || !plan.letters) return problems;
+  if (!plan.events.length){ problems.push('no events'); return problems; }
+
+  /* 1. every letter leaves, exactly once */
+  var taken = {};
+  plan.events.forEach(function(e){
+    if (e.letter == null) return;
+    if (!TAKE_KINDS[e.kind]) return;
+    taken[e.letter] = (taken[e.letter] || 0) + 1;
+  });
+  for (var i = 0; i < plan.letters; i++){
+    if (!taken[i]) problems.push('letter ' + i + ' is never taken');
+    else if (taken[i] > 1) problems.push('letter ' + i + ' is taken ' + taken[i] + ' times');
+  }
+
+  /* 2. a roped tow must be staged: hook -> slack -> snap -> tow */
+  plan.events.forEach(function(e){
+    if (e.kind !== 'tow' || !e.roped) return;
+    var need = ['hook', 'slack', 'snap'];
+    var seen = need.filter(function(kind){
+      return plan.events.some(function(p){
+        return p.kind === kind && p.letter === e.letter && p.at < e.at;
+      });
+    });
+    if (seen.length !== need.length){
+      problems.push('letter ' + e.letter + ' is towed without slack then snap');
+    }
+  });
+
+  /* 3. anything dropped is recovered */
+  plan.events.forEach(function(e){
+    if (e.kind !== 'fumble') return;
+    var saved = plan.events.some(function(p){
+      return (p.kind === 'rescue' || p.kind === 'carry' || p.kind === 'snatch') &&
+             p.letter === e.letter && p.at >= e.at;
+    });
+    if (!saved) problems.push('letter ' + e.letter + ' is dropped and never recovered');
+  });
+
+  /* 4. movement identity is never blurred */
+  var ACRO_ONLY = { cartwheel:1, aerial:1, handspring:1 };
+  var FALL_ONLY = { fumble:1, snag:1, dustoff:1 };
+  plan.events.forEach(function(e){
+    if (!e.char) return;
+    var c = CHARS[e.char];
+    if (!c){ problems.push('unknown character ' + e.char); return; }
+    if (ACRO_ONLY[e.kind] && !c.tumbles){
+      problems.push(c.name + ' must not ' + e.kind + ' — tumbling is Flip’s alone');
+    }
+    if (FALL_ONLY[e.kind] && !c.falls){
+      problems.push(c.name + ' must not ' + e.kind + ' — he does not fall');
+    }
+  });
+
+  /* 5. a character cannot act before arriving or after leaving */
+  var IGNORE = { enter:1 };
+  plan.events.forEach(function(e){
+    if (!e.char || IGNORE[e.kind]) return;
+    var arrived = plan.events.some(function(p){
+      return p.kind === 'enter' && p.char === e.char && p.at <= e.at;
+    });
+    if (!arrived) problems.push(e.char + ' ' + e.kind + 's before entering');
+  });
+
+  /* 6. length */
+  if (plan.duration < SCENE_MIN) problems.push('scene is ' + plan.duration + 'ms, under the ' + SCENE_MIN + 'ms floor');
+  if (plan.duration > SCENE_MAX) problems.push('scene is ' + plan.duration + 'ms, over the ' + SCENE_MAX + 'ms ceiling');
+
+  return problems;
+}
+
+var __CORE = {
+  DEFAULT_WORDS:DEFAULT_WORDS, WORD_BANK:WORD_BANK, LETTER_SOUND:LETTER_SOUND,
+  A_SOUND_CHOICES:A_SOUND_CHOICES, E_SOUND_CHOICES:E_SOUND_CHOICES,
+  LETTER_FIX_CHOICES:LETTER_FIX_CHOICES, SEARCH_EXTRA_LETTERS:SEARCH_EXTRA_LETTERS,
+  letterSound:letterSound, cleanWord:cleanWord, normalizeWords:normalizeWords,
+  shuffle:shuffle, makeDecoys:makeDecoys, makeOptions:makeOptions,
+  scrambleLetters:scrambleLetters, isPermutationOf:isPermutationOf,
+  sentenceFor:sentenceFor, sentenceParts:sentenceParts, sentencePlain:sentencePlain,
+  makeSearchLetters:makeSearchLetters, scatterPositions:scatterPositions, noOverlap:noOverlap,
+  CHARS:CHARS, CHAR_ORDER:CHAR_ORDER, sidekickOf:sidekickOf, exitDirsFor:exitDirsFor,
+  MAX_NON_TUMBLE_ROT:MAX_NON_TUMBLE_ROT, MAX_FALL_ROT:MAX_FALL_ROT,
+  rotBudgetFor:rotBudgetFor, styleRot:styleRot, styleOffsetY:styleOffsetY,
+  ropeSolve:ropeSolve, cordPath:cordPath, edgePoint:edgePoint,
+  stackOffsets:stackOffsets, stackReadable:stackReadable,
+  SCENES:SCENES, BEAT:BEAT, SCENE_MIN:SCENE_MIN, SCENE_MAX:SCENE_MAX,
+  eligibleScenes:eligibleScenes, pickScene:pickScene, planScene:planScene,
+  validatePlan:validatePlan
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = __CORE;
+
+/* ============================================================
+   CORE-LOGIC-END
+   ============================================================ */
