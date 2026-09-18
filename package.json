@@ -1,0 +1,13 @@
+{
+  "name": "test-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Workspace root: shared dev tooling for the projects in this repo.",
+  "type": "module",
+  "scripts": {
+    "playtest": "node tests/playtest.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}
