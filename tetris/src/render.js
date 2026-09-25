@@ -141,7 +141,7 @@ function skyMaterial(octaves) {
         vec3 q = d * 2.2 + vec3(uTime * 0.012, -uTime * 0.007, uTime * 0.004);
         float n = fbm(q);
         float n2 = fbm(q * 1.9 + n * 1.6 + vec3(0.0, uTime * 0.01, 0.0));
-        col += uGlow * pow(n2, 2.6) * 1.35;
+        col += uGlow * pow(n2, 2.6) * 1.0;
         col += uA * pow(n, 3.0) * 0.9;
         // A soft bright band behind the well.
         col += uGlow * 0.18 * exp(-pow(d.y * 3.0, 2.0)) * smoothstep(0.2, -0.9, d.z);
@@ -170,7 +170,7 @@ function starMaterial() {
         p.z = mod(p.z + uTravel, 260.0) - 220.0;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
-        float tw = 0.6 + 0.4 * sin(uTime * (1.5 + aPhase * 2.0) + aPhase * 40.0);
+        float tw = 0.85 + 0.15 * sin(uTime * (1.5 + aPhase * 2.0) + aPhase * 40.0);
         gl_PointSize = aSize * uPixel * (70.0 / max(1.0, -mv.z));
         vA = tw * smoothstep(-2.0, -14.0, mv.z) * smoothstep(-230.0, -150.0, p.z);
       }`,
@@ -214,7 +214,7 @@ function floorMaterial() {
         float dist = length(vW.xz * vec2(1.0, 0.8));
         float fade = exp(-dist * 0.02) * smoothstep(0.0, 18.0, dist + 6.0);
         vec3 c = mix(uColor, vec3(1.0, 0.1, 0.2), uDanger * 0.6);
-        gl_FragColor = vec4(c * line * fade * 1.4, 1.0);
+        gl_FragColor = vec4(c * line * fade * 0.9, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
@@ -323,7 +323,7 @@ function ghostMaterial() {
       void main() {
         vec2 e = min(vUv, 1.0 - vUv);
         float edge = 1.0 - smoothstep(0.0, 0.07, min(e.x, e.y));
-        float fill = 0.08 + 0.03 * sin(uTime * 4.0);
+        float fill = 0.08;
         gl_FragColor = vec4(uColor * (edge * 0.9 + fill) * uAlpha, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -482,7 +482,7 @@ export class Renderer {
     this.canvas = canvas;
     this.renderer = new WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.85;
     this.renderer.setClearColor(0x000000, 1);
 
     this.scene = new Scene();
@@ -502,6 +502,7 @@ export class Renderer {
     this.spring = { y: 0, vy: 0, rx: 0, vrx: 0, rz: 0, vrz: 0 };
     this.danger = 0;
     this.pulse = 0;
+    this.calm = false;          // title-screen demo: no flashes, shake or bursts
     this.travelSpeed = 4;
     this.travel = 0;
     this.warp = 0;
@@ -555,7 +556,7 @@ export class Renderer {
     this.gem = gemTexture();
     this.blockGeo = new RoundedBoxGeometry(0.94, 0.94, 0.94, 3, 0.13);
     this.blockMat = blockMaterial(this.gem);
-    this.activeMat = blockMaterial(this.gem, { glowBase: 0.16, envIntensity: 1.4 });
+    this.activeMat = blockMaterial(this.gem, { glowBase: 0.1, envIntensity: 1.25 });
     this.previewMat = blockMaterial(this.gem, { glowBase: 0.14, envIntensity: 1.3 });
     this.decoMat = blockMaterial(this.gem, { glowBase: 0.35, envIntensity: 0.6 });
 
@@ -775,7 +776,7 @@ export class Renderer {
       const rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: q.samples });
       this.composer = new EffectComposer(this.renderer, rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.bloom = new UnrealBloomPass(new Vector2(256, 256), 0.6, 0.32, 0.86);
+      this.bloom = new UnrealBloomPass(new Vector2(256, 256), 0.4, 0.3, 0.9);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
     } else {
@@ -820,7 +821,7 @@ export class Renderer {
     this.panel.material.uniforms.uAccent.value.copy(cur.accent);
     this.rim.color.copy(cur.accent);
     const dangerRed = this.tmpColor.setRGB(1, 0.08, 0.15);
-    this.neonMat.color.copy(cur.accent).lerp(dangerRed, this.danger * 0.8).multiplyScalar(1.5 + this.pulse * 1.5);
+    this.neonMat.color.copy(cur.accent).lerp(dangerRed, this.danger * 0.8).multiplyScalar(1.1 + this.pulse);
     this.dangerLineMat.color.copy(cur.accent).lerp(dangerRed, this.danger).multiplyScalar(1.5 + this.danger * 2);
     this.dangerLineMat.opacity = 0.25 + this.danger * 0.75;
     this.stars.material.uniforms.uColor.value.set(0xdfe8ff).lerp(cur.glow, 0.35);
@@ -830,6 +831,12 @@ export class Renderer {
 
   onEvent(e, game) {
     const P = this.particles;
+    // The attract-mode demo stays quiet: pieces land and rows clear, nothing flashes.
+    if (this.calm && ['hardDrop', 'lock', 'clear', 'gameOver', 'finish'].includes(e.type)) {
+      if (e.type === 'hardDrop') this.pieceVis = null;
+      return;
+    }
+    if (this.calm && e.type === 'levelUp') { this.applyTheme(themeFor(e.level)); return; }
     switch (e.type) {
       case 'spawn':
         this.pieceVis = null;
@@ -869,7 +876,7 @@ export class Renderer {
         break;
       }
       case 'lock':
-        for (const [x, y] of e.cells) if (y < DRAW_ROWS) this.cellFlash[y * COLS + x] = 1.3;
+        for (const [x, y] of e.cells) if (y < DRAW_ROWS) this.cellFlash[y * COLS + x] = 0.7;
         this.spring.vy -= 0.6;
         break;
       case 'clear': {
@@ -1134,8 +1141,8 @@ export class Renderer {
         const col = this.tmpColor.copy(v === GREY ? grey : this.palette[idType(v)]);
         if (clearSet && clearSet.has(y)) {
           const heat = clamp01(clearP / 0.3);
-          col.lerp(this.white, heat * 0.85);
-          g += heat * 2.2;
+          col.lerp(this.white, heat * (this.calm ? 0.2 : 0.6));
+          g += heat * (this.calm ? 0.3 : 1.2);
           const t = clamp01((clearP - 0.3 - Math.abs(x - 4.5) * 0.035) / 0.45);
           scale = 1 - easeOutCubic(t);
           if (scale <= 0.001) continue;
@@ -1192,7 +1199,7 @@ export class Renderer {
     const col = this.palette[p.type];
     const d = this.dummy;
     const cells = SHAPES[p.type][p.rot];
-    const lockGlow = game.onGround() ? 0.25 + 0.25 * Math.sin(this.time * 18) * (game.lockTimer / 500) : 0;
+    const lockGlow = game.onGround() ? 0.3 * Math.min(1, game.lockTimer / 500) : 0;
     const glowArr = this.active.geometry.getAttribute('aGlow');
     let minX = 99, maxX = -99, sx = 0, sy = 0;
     cells.forEach(([cx, cy], i) => {
@@ -1215,7 +1222,7 @@ export class Renderer {
     this.pieceLean = (sx / 4 - 4.5) / 4.5;
 
     this.pieceLight.color.copy(col);
-    this.pieceLight.intensity = damp(this.pieceLight.intensity, 9, 10, dt);
+    this.pieceLight.intensity = damp(this.pieceLight.intensity, this.calm ? 4 : 7, 10, dt);
     this.pieceLight.position.set(pv.x, pv.y, 1.6);
     this.board.localToWorld(this.pieceLight.position);
 
@@ -1339,7 +1346,7 @@ export class Renderer {
     for (const tr of this.trails) {
       if (tr.t >= 1) continue;
       tr.t = Math.min(1, tr.t + dt / 0.3);
-      tr.mesh.material.uniforms.uAlpha.value = (1 - tr.t) * 0.55;
+      tr.mesh.material.uniforms.uAlpha.value = (1 - tr.t) * 0.35;
       tr.mesh.scale.x = 1 - tr.t * 0.6;
       if (tr.t >= 1) tr.mesh.visible = false;
     }
@@ -1361,7 +1368,7 @@ export class Renderer {
     const su = this.sky.material.uniforms;
     su.uTime.value = this.time;
     su.uDanger.value = this.danger;
-    su.uPulse.value = this.pulse * 0.6;
+    su.uPulse.value = this.pulse * 0.3;
     const st = this.stars.material.uniforms;
     st.uTime.value = this.time;
     st.uTravel.value = this.travel;
@@ -1452,7 +1459,7 @@ export class Renderer {
     this.updateFx(dt);
     this.updateBackground(dt);
 
-    if (this.bloom) this.bloom.strength = 0.55 + this.pulse * 0.7;
+    if (this.bloom) this.bloom.strength = 0.38 + this.pulse * 0.45;
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
     this.watchFrameRate();

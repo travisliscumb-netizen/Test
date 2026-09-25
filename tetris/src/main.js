@@ -74,9 +74,10 @@ let lockFromHardDrop = false;
 function newDemo() {
   demo = true;
   game = new Game({ mode: 'endless', seed: (Math.random() * 2 ** 31) | 0 });
-  bot = new Bot(game, { stepMs: 45 });
+  bot = new Bot(game, { stepMs: 90 });
   game.start();
   if (renderer) {
+    renderer.calm = true;
     renderer.reset();
     renderer.applyTheme(THEMES[0], true);
   }
@@ -152,6 +153,7 @@ function startGame(mode) {
   controls.configure({ das: s.das, arr: s.arr });
 
   if (renderer) {
+    renderer.calm = false;
     renderer.reset();
     renderer.setView(s.view);
     renderer.applyTheme(themeFor(game.level));
