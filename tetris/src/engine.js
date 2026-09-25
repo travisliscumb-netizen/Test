@@ -2,7 +2,7 @@
    passed in, so every behaviour here is reproducible in node tests.
 
    Follows the Tetris Guideline: 10x20 visible matrix with a 20-row buffer,
-   SRS rotation, 7-bag randomiser, hold, 5-piece preview, ghost, 0.5 s lock
+   SRS rotation, 7-bag randomiser, hold, 5-piece preview, ghost, 0.7 s lock
    delay with 15-move extended placement, guideline scoring including T-spins,
    back-to-back, combos and perfect clears, block-out and lock-out top-outs.
 
@@ -16,7 +16,7 @@ export const ROWS = 40;
 export const VISIBLE = 20;
 export const GREY = 8;
 
-export const LOCK_DELAY = 500;
+export const LOCK_DELAY = 700;
 export const MOVE_RESET_LIMIT = 15;
 export const LINE_CLEAR_DELAY = 380;
 export const PREVIEW = 5;
@@ -36,11 +36,12 @@ const PC_B2B_TETRIS = 3200;
 
 export const CLEAR_NAMES = ['', 'Single', 'Double', 'Triple', 'Tetris'];
 
-/* Seconds per row, from the guideline (Tetris Worlds) gravity curve. Level 15
-   is ~140 rows/s, i.e. effectively 20G; the curve is clamped there. */
+/* Milliseconds per row. Deliberately gentler than the guideline curve (which
+   hits 20G by level 15): 1.25 s at level 1, each level 15% faster, so level 10
+   is ~3.5 rows/s and level 15 ~8 rows/s. Floored at 40 ms (25 rows/s). */
 export function gravityInterval(level) {
-  const l = Math.min(Math.max(level, 1), 19);
-  return Math.pow(0.8 - (l - 1) * 0.007, l - 1) * 1000;
+  const l = Math.min(Math.max(level, 1), 20);
+  return Math.max(40, 1250 * Math.pow(0.85, l - 1));
 }
 
 /* mulberry32: tiny, fast, good enough for a piece randomiser. */

@@ -20,7 +20,7 @@ import {
   EffectComposer, RenderPass, UnrealBloomPass, OutputPass, RoundedBoxGeometry, RoomEnvironment
 } from '../vendor/three.js';
 import { SHAPES, TYPES, COLORS, BOX, idType } from './pieces.js';
-import { COLS, VISIBLE, LINE_CLEAR_DELAY, GREY } from './engine.js';
+import { COLS, VISIBLE, LINE_CLEAR_DELAY, LOCK_DELAY, GREY } from './engine.js';
 
 const DRAW_ROWS = 24;                 // matrix rows ever drawn (20 visible + spawn area)
 const TAU = Math.PI * 2;
@@ -1199,7 +1199,7 @@ export class Renderer {
     const col = this.palette[p.type];
     const d = this.dummy;
     const cells = SHAPES[p.type][p.rot];
-    const lockGlow = game.onGround() ? 0.3 * Math.min(1, game.lockTimer / 500) : 0;
+    const lockGlow = game.onGround() ? 0.3 * Math.min(1, game.lockTimer / LOCK_DELAY) : 0;
     const glowArr = this.active.geometry.getAttribute('aGlow');
     let minX = 99, maxX = -99, sx = 0, sy = 0;
     cells.forEach(([cx, cy], i) => {

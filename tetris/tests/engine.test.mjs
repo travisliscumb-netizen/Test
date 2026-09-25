@@ -66,10 +66,13 @@ test('spawn: centred in rows 21-22 then drops one row into view', () => {
   assert.equal(g.drainEvents()[0].type, 'spawn');
 });
 
-test('gravity curve: level 1 is one row per second, monotone, ~20G by 15', () => {
-  assert.equal(gravityInterval(1), 1000);
+test('gravity curve: gentle start, monotone, never faster than 25 rows/s', () => {
+  assert.equal(gravityInterval(1), 1250);
   for (let l = 2; l <= 20; l++) assert.ok(gravityInterval(l) <= gravityInterval(l - 1));
-  assert.ok(gravityInterval(15) < 10);
+  assert.ok(gravityInterval(10) > 250, 'level 10 is still readable');
+  assert.ok(gravityInterval(15) > 100);
+  assert.equal(gravityInterval(25), gravityInterval(20));
+  assert.ok(gravityInterval(20) >= 40);
 });
 
 test('lock delay: piece locks 500 ms after landing, not before', () => {

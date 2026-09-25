@@ -37,8 +37,8 @@ runs without a GPU. Screenshots go to `../.shots/`.
 - 10×20 matrix with a 20-row buffer. Pieces spawn in rows 21–22 and drop one row right away.
 - Super Rotation System with the standard JLSTZ and I wall-kick tables, plus a 180° rotation (SRS+ kicks) as a modern extra.
 - 7-bag randomiser, hold (once per piece), 5-piece preview, ghost piece.
-- 0.5 s lock delay with extended placement: up to 15 resets per new lowest row.
-- Guideline gravity curve (`(0.8 − (L−1)·0.007)^(L−1)` s/row). It reaches 20G by level 15.
+- 0.7 s lock delay (a little longer than the guideline's 0.5 s) with extended placement: up to 15 resets per new lowest row.
+- A gentler speed curve than the guideline's: 1.25 s per row at level 1, 15% faster each level (level 10 ≈ 3.5 rows/s, level 15 ≈ 8 rows/s), capped at 25 rows/s.
 - Scoring: Single/Double/Triple/Tetris; T-Spin, T-Spin Mini (3-corner rule, front corners, and the TST-kick upgrade); back-to-back ×1.5; combos; perfect clears; soft and hard drop points.
 - Top-outs: block out and lock out.
 
