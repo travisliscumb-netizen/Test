@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<title>Tetris 3D</title>
+<meta name="description" content="Guideline Tetris in real-time 3D: SRS, hold, T-spins, back-to-back, four modes, bloom-lit neon worlds and a synthesised Korobeiniki.">
+<meta name="theme-color" content="#05060f">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tetris 3D">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<link rel="preload" href="fonts/orbitron-latin-900-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/exo-2-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="modulepreload" href="vendor/three.js">
+<link rel="stylesheet" href="src/ui.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.5"/><rect x="13.5" y="5" width="4" height="14" rx="1.5"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m5 9 7 7 7-7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="m6 5 6 6 6-6M6 12l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-cw" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ccw" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M4.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-hold" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M9 9h6v6H9z" fill="currentColor"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 2.8 8 4.6v9.2l-8 4.6-8-4.6V7.4z M12 12l8-4.6M12 12v9.2M12 12 4 7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+</defs></svg>
+
+<canvas id="gl" aria-label="Tetris playfield"></canvas>
+<div id="vignette" aria-hidden="true"></div>
+<div id="flash" aria-hidden="true"></div>
+
+<!-- In-game HUD. The 3D pieces for HOLD and NEXT are rendered by WebGL into the
+     transparent .slot boxes; the DOM only supplies the frames and the layout. -->
+<main id="hud" class="hud" hidden>
+  <aside class="col left">
+    <section class="panel hold-panel">
+      <header><span>Hold</span><kbd data-bind="hold"></kbd></header>
+      <div class="slot" data-slot="0"></div>
+    </section>
+    <section class="stats">
+      <div class="stat" data-stat="score"><label>Score</label><output id="s-score">0</output></div>
+      <div class="stat" data-stat="level"><label>Level</label><output id="s-level">1</output></div>
+      <div class="stat" data-stat="lines"><label>Lines</label><output id="s-lines">0</output></div>
+      <div class="stat" data-stat="time"><label id="s-time-label">Time</label><output id="s-time">0:00.00</output></div>
+    </section>
+    <section class="goal" id="goal">
+      <div class="goal-top"><label id="goal-label">Goal</label><span id="goal-text"></span></div>
+      <div class="bar"><i id="goal-bar"></i></div>
+    </section>
+  </aside>
+  <div id="stage"></div>
+  <aside class="col right">
+    <section class="panel next-panel">
+      <header><span>Next</span></header>
+      <div class="slot big" data-slot="1"></div>
+      <div class="slot" data-slot="2"></div>
+      <div class="slot" data-slot="3"></div>
+      <div class="slot" data-slot="4"></div>
+      <div class="slot" data-slot="5"></div>
+    </section>
+    <section class="minis">
+      <div><label>PPS</label><output id="s-pps">0.00</output></div>
+      <div><label>B2B</label><output id="s-b2b">–</output></div>
+      <div><label>Combo</label><output id="s-combo">–</output></div>
+    </section>
+  </aside>
+  <button id="pause-btn" class="icon-btn" aria-label="Pause"><svg><use href="#i-pause"/></svg></button>
+  <button id="view-btn" class="icon-btn" aria-label="Change camera view"><svg><use href="#i-cube"/></svg></button>
+</main>
+
+<div id="popups" aria-live="polite"></div>
+<div id="toast" role="status"></div>
+<div id="countdown" aria-live="assertive"></div>
+
+<div id="touch" hidden>
+  <div class="pad left-pad">
+    <button data-act="hold" class="t-btn small" aria-label="Hold"><svg><use href="#i-hold"/></svg><span>Hold</span></button>
+    <div class="dpad">
+      <button data-act="left" class="t-btn" aria-label="Move left"><svg><use href="#i-left"/></svg></button>
+      <button data-act="softDrop" class="t-btn" aria-label="Soft drop"><svg><use href="#i-down"/></svg></button>
+      <button data-act="right" class="t-btn" aria-label="Move right"><svg><use href="#i-right"/></svg></button>
+    </div>
+  </div>
+  <div class="pad right-pad">
+    <div class="rot">
+      <button data-act="rotateCCW" class="t-btn" aria-label="Rotate counter-clockwise"><svg><use href="#i-ccw"/></svg></button>
+      <button data-act="rotateCW" class="t-btn big" aria-label="Rotate clockwise"><svg><use href="#i-cw"/></svg></button>
+    </div>
+    <button data-act="hardDrop" class="t-btn wide" aria-label="Hard drop"><svg><use href="#i-drop"/></svg><span>Drop</span></button>
+  </div>
+</div>
+
+<!-- ============================ screens ============================ -->
+
+<section class="screen" id="title" data-screen>
+  <div class="title-layout">
+    <div class="title-main">
+      <h1 class="logo" aria-label="Tetris 3D">
+        <span class="l" style="--c:#ff2d55">T</span><span class="l" style="--c:#ff8a1f">E</span><span class="l" style="--c:#ffd81f">T</span><span class="l" style="--c:#3dff6e">R</span><span class="l" style="--c:#21e5f0">I</span><span class="l" style="--c:#b44bff">S</span>
+        <span class="logo-3d">3D</span>
+      </h1>
+      <p class="tagline">The guideline game. A whole new dimension.</p>
+      <nav class="menu" aria-label="Main menu">
+        <button class="btn primary" data-go="modes">Play</button>
+        <button class="btn" data-go="records">Records</button>
+        <button class="btn" data-go="settings">Settings</button>
+        <button class="btn" data-go="help">How to play</button>
+      </nav>
+      <p class="hint desktop-only">Arrow keys + Enter &nbsp;·&nbsp; <kbd>V</kbd> changes camera in game</p>
+    </div>
+    <div class="title-stage" id="title-stage"></div>
+  </div>
+</section>
+
+<section class="screen" id="modes" data-screen>
+  <div class="sheet wide">
+    <header class="sheet-head"><button class="back" data-back aria-label="Back"><svg><use href="#i-back"/></svg></button><h2>Choose a mode</h2></header>
+    <div class="modes">
+      <button class="mode-card" data-mode="marathon" style="--c:#21e5f0">
+        <span class="mode-name">Marathon</span>
+        <span class="mode-desc">Clear 150 lines through 15 levels of rising speed.</span>
+        <span class="mode-best" data-best="marathon"></span>
+      </button>
+      <button class="mode-card" data-mode="sprint" style="--c:#ff2d55">
+        <span class="mode-name">Sprint</span>
+        <span class="mode-desc">40 lines. Against the clock. No mercy.</span>
+        <span class="mode-best" data-best="sprint"></span>
+      </button>
+      <button class="mode-card" data-mode="ultra" style="--c:#ffd81f">
+        <span class="mode-name">Ultra</span>
+        <span class="mode-desc">Three minutes. Score as high as you can.</span>
+        <span class="mode-best" data-best="ultra"></span>
+      </button>
+      <button class="mode-card" data-mode="endless" style="--c:#b44bff">
+        <span class="mode-name">Endless</span>
+        <span class="mode-desc">No goal line. Up to level 20 and true 20G.</span>
+        <span class="mode-best" data-best="endless"></span>
+      </button>
+    </div>
+    <div class="row start-level">
+      <label for="start-level">Start level <small>(Marathon &amp; Endless)</small></label>
+      <div class="stepper">
+        <button class="step" data-step="-1" aria-label="Lower start level">–</button>
+        <output id="start-level">1</output>
+        <button class="step" data-step="1" aria-label="Raise start level">+</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="settings" data-screen>
+  <div class="sheet wide">
+    <header class="sheet-head"><button class="back" data-back aria-label="Back"><svg><use href="#i-back"/></svg></button><h2>Settings</h2></header>
+    <div class="tabs" role="tablist">
+      <button role="tab" class="tab" data-tab="gameplay" aria-selected="true">Gameplay</button>
+      <button role="tab" class="tab" data-tab="controls">Controls</button>
+      <button role="tab" class="tab" data-tab="graphics">Graphics</button>
+      <button role="tab" class="tab" data-tab="audio">Audio</button>
+    </div>
+
+    <div class="tab-body" data-body="gameplay">
+      <div class="row"><label for="set-das">Auto-shift delay (DAS)<small>How long a direction is held before the piece starts sliding.</small></label>
+        <div class="range"><input type="range" id="set-das" min="50" max="400" step="1"><output data-for="set-das"></output></div></div>
+      <div class="row"><label for="set-arr">Auto-repeat rate (ARR)<small>Time between slides once charged. 0 = instant to the wall.</small></label>
+        <div class="range"><input type="range" id="set-arr" min="0" max="100" step="1"><output data-for="set-arr"></output></div></div>
+      <div class="row"><label>Soft drop speed</label>
+        <div class="seg" data-setting="sdf">
+          <button data-value="5">5×</button><button data-value="10">10×</button><button data-value="20">20×</button><button data-value="40">40×</button><button data-value="0">Instant</button>
+        </div></div>
+      <div class="row"><label>Ghost piece</label><div class="seg" data-setting="ghost"><button data-value="true">On</button><button data-value="false">Off</button></div></div>
+      <div class="row"><label>Grid lines</label><div class="seg" data-setting="grid"><button data-value="true">On</button><button data-value="false">Off</button></div></div>
+    </div>
+
+    <div class="tab-body" data-body="controls" hidden>
+      <p class="note">Click a key slot, then press the new key. <kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears.</p>
+      <div id="bindings" class="bindings"></div>
+      <div class="row"><label>On-screen touch controls</label>
+        <div class="seg" data-setting="touchControls"><button data-value="auto">Auto</button><button data-value="on">On</button><button data-value="off">Off</button></div></div>
+      <p class="note">Gamepad: D-pad / stick move · <b>A</b> rotate ↻ · <b>B</b> rotate ↺ · <b>X</b> 180° · <b>Y</b>/<b>LB</b>/<b>RB</b> hold · <b>Up</b> hard drop · <b>Start</b> pause</p>
+      <div class="row end"><button class="btn small" id="reset-bindings">Reset keys</button></div>
+    </div>
+
+    <div class="tab-body" data-body="graphics" hidden>
+      <div class="row"><label>Camera<small>Also <kbd>V</kbd> in game.</small></label>
+        <div class="seg" data-setting="view"><button data-value="flat">Flat 2D</button><button data-value="tilt">Tilted 3D</button><button data-value="dynamic">Dynamic 3D</button></div></div>
+      <div class="row"><label>Quality<small>Auto steps down if frames drop.</small></label>
+        <div class="seg" data-setting="quality"><button data-value="auto">Auto</button><button data-value="high">High</button><button data-value="medium">Medium</button><button data-value="low">Low</button></div></div>
+      <div class="row"><label>Screen shake</label><div class="seg" data-setting="shake"><button data-value="true">On</button><button data-value="false">Off</button></div></div>
+      <div class="row"><label>Particles</label><div class="seg" data-setting="particles"><button data-value="true">On</button><button data-value="false">Off</button></div></div>
+    </div>
+
+    <div class="tab-body" data-body="audio" hidden>
+      <div class="row"><label for="set-music">Music</label>
+        <div class="range"><input type="range" id="set-music" min="0" max="100" step="1"><output data-for="set-music"></output></div></div>
+      <div class="row"><label for="set-sfx">Sound effects</label>
+        <div class="range"><input type="range" id="set-sfx" min="0" max="100" step="1"><output data-for="set-sfx"></output></div></div>
+    </div>
+    <div class="row end"><button class="btn small ghost" id="reset-settings">Restore defaults</button></div>
+  </div>
+</section>
+
+<section class="screen" id="records" data-screen>
+  <div class="sheet wide">
+    <header class="sheet-head"><button class="back" data-back aria-label="Back"><svg><use href="#i-back"/></svg></button><h2>Records</h2></header>
+    <div class="tabs" role="tablist" id="record-tabs">
+      <button role="tab" class="tab" data-rtab="marathon" aria-selected="true">Marathon</button>
+      <button role="tab" class="tab" data-rtab="sprint">Sprint</button>
+      <button role="tab" class="tab" data-rtab="ultra">Ultra</button>
+      <button role="tab" class="tab" data-rtab="endless">Endless</button>
+    </div>
+    <div id="record-table"></div>
+  </div>
+</section>
+
+<section class="screen" id="help" data-screen>
+  <div class="sheet wide">
+    <header class="sheet-head"><button class="back" data-back aria-label="Back"><svg><use href="#i-back"/></svg></button><h2>How to play</h2></header>
+    <div class="help-grid">
+      <div class="help-block">
+        <h3>Controls</h3>
+        <dl id="help-keys" class="keys"></dl>
+      </div>
+      <div class="help-block">
+        <h3>Scoring <small>× level</small></h3>
+        <table class="score-table">
+          <tr><td>Single / Double / Triple</td><td>100 / 300 / 500</td></tr>
+          <tr><td class="hl-i">Tetris</td><td>800</td></tr>
+          <tr><td class="hl-t">T-Spin Single / Double / Triple</td><td>800 / 1200 / 1600</td></tr>
+          <tr><td>T-Spin Mini (0 / 1 / 2 lines)</td><td>100 / 200 / 400</td></tr>
+          <tr><td>Back-to-back Tetris or T-Spin</td><td>×1.5</td></tr>
+          <tr><td>Combo</td><td>50 × combo</td></tr>
+          <tr><td>Perfect clear</td><td>800 – 3200</td></tr>
+          <tr><td>Soft / hard drop</td><td>1 / 2 per row</td></tr>
+        </table>
+        <h3>Tips</h3>
+        <ul class="tips">
+          <li>Keep one column open and save the I-piece for a <b>Tetris</b>.</li>
+          <li>Rotate a T into a slot under an overhang for a <b>T-Spin</b>. The piece must end with a rotation, not a move.</li>
+          <li>Chain Tetrises and T-Spins with no ordinary clears in between for <b>back-to-back</b> bonuses.</li>
+          <li>A piece on the floor locks after 0.5 s. You can move or rotate to reset that timer up to 15 times.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen overlay" id="pause" data-screen>
+  <div class="sheet narrow center">
+    <h2 class="big-title">Paused</h2>
+    <nav class="menu">
+      <button class="btn primary" id="resume">Resume</button>
+      <button class="btn" id="restart">Restart</button>
+      <button class="btn" data-go="settings">Settings</button>
+      <button class="btn ghost" id="quit">Quit to title</button>
+    </nav>
+  </div>
+</section>
+
+<section class="screen overlay" id="results" data-screen>
+  <div class="sheet center results">
+    <p class="result-kicker" id="r-kicker">Game over</p>
+    <h2 class="result-main" id="r-main">0</h2>
+    <p class="result-sub" id="r-sub"></p>
+    <p class="badge" id="r-badge" hidden>New record</p>
+    <div class="result-stats" id="r-stats"></div>
+    <div id="r-table"></div>
+    <nav class="menu row-menu">
+      <button class="btn primary" id="retry">Play again</button>
+      <button class="btn" id="to-title">Title</button>
+    </nav>
+  </div>
+</section>
+
+<section class="screen" id="fatal" data-screen>
+  <div class="sheet narrow center">
+    <h2>Can't start 3D</h2>
+    <p id="fatal-msg">This game needs WebGL 2. Try an up-to-date Chrome, Edge, Firefox or Safari, and make sure hardware acceleration is on.</p>
+  </div>
+</section>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

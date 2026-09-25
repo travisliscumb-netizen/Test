@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#2a1260"/><stop offset=".55" stop-color="#0c0b2a"/><stop offset="1" stop-color="#05060f"/>
+    </radialGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e0a8ff"/><stop offset=".5" stop-color="#b44bff"/><stop offset="1" stop-color="#7a1fd6"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#f1d6ff"/><stop offset="1" stop-color="#c77dff"/></linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d17c4"/><stop offset="1" stop-color="#3d0a78"/></linearGradient>
+    <linearGradient id="grid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22e6ff" stop-opacity="0"/><stop offset="1" stop-color="#22e6ff" stop-opacity=".55"/></linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g stroke="url(#grid)" stroke-width="2">
+    <path d="M0 400 H512 M0 436 H512 M0 476 H512 M-60 512 L180 380 M100 512 L220 380 M256 512 V380 M412 512 L292 380 M572 512 L332 380"/>
+  </g>
+  <g filter="url(#glow)" opacity=".75"><rect x="76" y="161" width="330" height="110" fill="#b44bff"/><rect x="186" y="271" width="110" height="110" fill="#b44bff"/></g>
+    <path d="M296 271 l30 -30 v110 l-30 30 z" fill="url(#side)"/>
+  <path d="M186 271 l30 -30 h110 l-30 30 z" fill="url(#top)"/>
+  <rect x="186" y="271" width="110" height="110" fill="url(#front)"/>
+  <rect x="200" y="285" width="82" height="82" rx="6" fill="none" stroke="#f3e0ff" stroke-opacity=".55" stroke-width="4"/>
+  <path d="M194 279 h94 l-18 18 h-58 v58 l-18 18 z" fill="#fff" fill-opacity=".22"/>
+  <path d="M186 161 l30 -30 v110 l-30 30 z" fill="url(#side)"/>
+  <path d="M76 161 l30 -30 h110 l-30 30 z" fill="url(#top)"/>
+  <rect x="76" y="161" width="110" height="110" fill="url(#front)"/>
+  <rect x="90" y="175" width="82" height="82" rx="6" fill="none" stroke="#f3e0ff" stroke-opacity=".55" stroke-width="4"/>
+  <path d="M84 169 h94 l-18 18 h-58 v58 l-18 18 z" fill="#fff" fill-opacity=".22"/>
+  <path d="M296 161 l30 -30 v110 l-30 30 z" fill="url(#side)"/>
+  <path d="M186 161 l30 -30 h110 l-30 30 z" fill="url(#top)"/>
+  <rect x="186" y="161" width="110" height="110" fill="url(#front)"/>
+  <rect x="200" y="175" width="82" height="82" rx="6" fill="none" stroke="#f3e0ff" stroke-opacity=".55" stroke-width="4"/>
+  <path d="M194 169 h94 l-18 18 h-58 v58 l-18 18 z" fill="#fff" fill-opacity=".22"/>
+  <path d="M406 161 l30 -30 v110 l-30 30 z" fill="url(#side)"/>
+  <path d="M296 161 l30 -30 h110 l-30 30 z" fill="url(#top)"/>
+  <rect x="296" y="161" width="110" height="110" fill="url(#front)"/>
+  <rect x="310" y="175" width="82" height="82" rx="6" fill="none" stroke="#f3e0ff" stroke-opacity=".55" stroke-width="4"/>
+  <path d="M304 169 h94 l-18 18 h-58 v58 l-18 18 z" fill="#fff" fill-opacity=".22"/>
+</svg>
