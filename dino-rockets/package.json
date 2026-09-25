@@ -9,6 +9,7 @@
     "check-build": "node tools/assemble.mjs --check",
     "test": "node tests/core.mjs && node tests/speech.mjs && node tools/assemble.mjs --check",
     "test:app": "node tests/app.mjs",
-    "qa:scenes": "node tools/scene-qa.mjs --both"
+    "qa:scenes": "node tools/scene-qa.mjs --both",
+    "qa:glitch": "node tools/glitch-qa.mjs"
   }
 }

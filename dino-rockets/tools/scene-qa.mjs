@@ -34,7 +34,7 @@ function check(scene, name, ok, detail = '') { if (!ok) { fail++; console.log(` 
 let passed = 0;
 for (const s0 of scenes) for (const mirror of MIRRORS) {
   if (only.length && !only.includes(s0.id)) continue;
-  const lead = s0.lead === 'any' ? 'trike' : s0.lead;
+  const lead = (await page.evaluate(i => window.__lab.leadsFor(i), s0.id))[0];
   const word = WORDS[Math.max(s0.min || 1, 4)];
   const id = s0.id + (mirror ? '~m' : '');
   process.stdout.write(`\n${id}  (${s0.name}, lead=${lead}, "${word}")\n`);

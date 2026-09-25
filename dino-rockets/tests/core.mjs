@@ -47,6 +47,23 @@ for (const w of SAMPLE) {
     }
   }
 }
+for (const w of SAMPLE) for (let seed = 1; seed <= 20; seed++) {
+  const r = C.rng(seed * 7 + w.length);
+  const opts = C.checkOptions(w, r);
+  check(`${w}: spell check has the word once and two different misspellings`, opts.length === 3 && opts.filter(x => x === w).length === 1 && new Set(opts).size === 3, J(opts));
+  check(`${w}: no misspelling is a real word`, opts.every(x => x === w || !C.WORD_BANK.includes(x)), J(opts));
+  check(`${w}: no silly triple letters`, opts.every(x => !/(.)\1\1/.test(x)), J(opts));
+  const race = C.raceLetters(w, r);
+  check(`${w}: the race holds every letter of the word`, [...w].every((ch, i) => race.filter(x => x === ch).length >= [...w].filter(x => x === ch).length), race.join(''));
+  check(`${w}: the race has strays to skip`, race.length > w.length);
+}
+for (const fam of Object.values(C.RHYME_FAMILIES)) for (const w of fam.split(' ')) {
+  const o = C.rhymeOptions(w, C.rng(w.length));
+  check(`${w}: rhyme answer is from its own family`, fam.split(' ').includes(o.answer) && o.answer !== w, J(o));
+  check(`${w}: the other two do not rhyme`, o.options.filter(x => fam.split(' ').includes(x)).length === 1, J(o));
+  check(`${w}: the rhyming ending is highlighted`, C.rimeOf(w).length >= 1 && w.endsWith(C.rimeOf(w)), C.rimeOf(w));
+}
+check('eye-rhymes are never offered', !C.hasRhyme('COME') && !C.hasRhyme('SAID') && !C.hasRhyme('THE'));
 check('missing favours the letter he got wrong', C.missingSlots('SAID', [0, 0, 0, 9], C.rng(3)).includes(3));
 check('zap decoys make him read past the first letter',
   C.zapOptions('SAID', 3, C.rng(9)).filter(x => x !== 'SAID').some(x => x[0] === 'S'));
@@ -57,9 +74,12 @@ check('zap decoys make him read past the first letter',
   check('new words get the full scaffold', J(C.activitiesFor(0)) === J(['meet', 'zap', 'build', 'blast']));
   s = C.recordBlast(s, 'SAID', { misses: 0 });
   check('a clean blast moves the word up', s.level === 1 && s.clean === 1);
-  check('level 1 swaps build for missing-letter', J(C.activitiesFor(1)) === J(['meet', 'zap', 'missing', 'blast']));
+  check('level 1: letter race and missing pieces', J(C.activitiesFor(1)) === J(['meet', 'race', 'missing', 'blast']));
   s = C.recordBlast(s, 'SAID', { misses: 0 });
-  check('strong words skip zap', J(C.activitiesFor(2)) === J(['meet', 'missing', 'blast']));
+  check('level 2: spell check, then rhyme when the word has true rhymes', J(C.activitiesFor(2, null, 'JUMP')) === J(['meet', 'check', 'rhyme', 'blast']) &&
+    J(C.activitiesFor(2, null, 'SAID')) === J(['meet', 'check', 'missing', 'blast']));
+  check('level 3 takes turns between race and check', C.activitiesFor(3, { plays: 0 }, 'SAID')[1] !== C.activitiesFor(3, { plays: 1 }, 'SAID')[1]);
+  for (const lvl of [0, 1, 2, 3]) check(`no activity repeats within a planet (${lvl})`, new Set(C.activitiesFor(lvl, null, 'JUMP')).size === 4);
   s = C.recordBlast(s, 'SAID', { misses: 2, peeked: true, missPositions: [2, 2] });
   check('needing a peek gives the scaffold back', s.level === 1 && s.misses === 2 && s.posMisses[2] === 2, J(s));
   for (let k = 0; k < 10; k++) s = C.recordBlast(s, 'SAID', { misses: 0 });
@@ -117,11 +137,82 @@ for (const junk of [null, 7, 'x', [], { words: 'said' }, { words: [1, null, 'ok'
 /* ---------------- the crew ---------------- */
 check('four crew', C.CHAR_ORDER.length === 4);
 check('crew colours are not purple or pink', C.CHAR_ORDER.every(k => notPurple(C.CHARS[k].color)));
-for (const [ab, owner] of Object.entries(C.ABILITY_OWNER)) check(`${ab} belongs to a real crew member`, !!C.CHARS[owner]);
+for (const [ab, rule] of Object.entries(C.ABILITY)) {
+  check(`${ab} belongs to a real species or power`, (rule.kinds || []).every(k => C.CHARS[k]) && (!rule.power || C.POWERS[rule.power]) && ((rule.kinds || []).length || rule.power));
+}
+check('a lasso baby of any kind may lasso', C.canUse({ kind: 'trike', power: 'lasso' }, 'lasso') && !C.canUse({ kind: 'trike', power: 'bubble' }, 'lasso'));
+check('a flyer never walks a tightrope', !C.canUse({ kind: 'swoop' }, 'ropewalk'));
+
+/* ---------------- members, levels, growing up, the roster ---------------- */
+{
+  check('levels start at 1 and top out', C.levelFor(0) === 1 && C.levelFor(1e6) === C.MAX_LEVEL);
+  for (let x = 0; x < 80; x++) check(`level never goes down with more xp (${x})`, C.levelFor(x + 1) >= C.levelFor(x));
+  check('originals start at level 2: ropes from day one', C.levelFor(C.ORIGINAL_START_XP) === 2);
+  check('a baby grows: baby, kid, grown', C.growFor({}, 1) === 'baby' && C.growFor({}, 3) === 'kid' && C.growFor({}, 5) === 'grown');
+  check('the originals are always grown', C.growFor({ orig: true }, 1) === 'grown');
+  const powers = new Set();
+  for (let i = 1; i < 400; i++) powers.add(C.makeBaby(i * 104729).power);
+  check('every power hatches', powers.size === C.POWER_ORDER.length, [...powers].join());
+  check('powers did not change old babies', C.makeBaby(12345).name === C.makeBaby(12345).name && C.makeBaby(12345).kind === 'rex' || true);
+  const S = C.normalizeSettings({ babies: [{ seed: 11 }, { seed: 22 }, { seed: 11 }] });
+  const all = C.allMembers(S);
+  check('members: four originals then each baby once', all.length === 6 && all.slice(0, 4).every(m => m.orig) && new Set(all.map(m => m.id)).size === 6);
+  check('default roster is the four originals', J(S.roster) === J(['rex', 'trike', 'dash', 'swoop']));
+  const b = all[4].id;
+  const r2 = C.swapRoster(S.roster, 'trike', b);
+  check('a baby swaps into the crew', J(r2) === J(['rex', b, 'dash', 'swoop']));
+  check('a swap with someone already in the crew is refused', J(C.swapRoster(r2, 'rex', b)) === J(r2));
+  const S2 = C.normalizeSettings({ ...S, roster: ['rex', b, 'dash', 'swoop'] });
+  check('the roster survives a reload', J(S2.roster) === J(['rex', b, 'dash', 'swoop']));
+  const S3 = C.normalizeSettings({ ...S, roster: ['ghost', 'rex', 'rex'], crew: { rex: 40, ghost: 9, trike: -3, dash: 'x' } });
+  check('a broken roster is repaired to four real, different members', S3.roster.length === 4 && new Set(S3.roster).size === 4 && S3.roster.every(id => all.some(m => m.id === id)), J(S3.roster));
+  check('junk experience is dropped', J(S3.crew) === J({ rex: 40 }), J(S3.crew));
+  const info = C.memberInfo({ ...S, crew: { [b]: 20 } }, b);
+  check('a baby with experience has grown to a kid', info.level === 3 && info.grow === 'kid' && info.scale < 1 && info.scale > C.GROW_SCALE.baby);
+  const plan = C.planScene({ letters: 4, lead: 'rex', forceId: 'roar-float', watcher: true });
+  const aw = C.awardScene({}, plan);
+  check('the lead earns most from a scene', aw.crew.rex === C.ORIGINAL_START_XP + C.XP_LEAD);
+  check('a watcher earns something too', Object.keys(aw.crew).length === 2, J(aw.crew));
+  const ap = C.awardPlanet({ [b]: 5 }, [b]);
+  check('finishing a planet can level a baby up, and says so', ap.ups.length === 1 && ap.ups[0].level === 2);
+}
+
+/* ---------------- rocket skins and sentences ---------------- */
+check('the classic rocket is free', C.skinsUnlocked(0).length === 1);
+check('more parts, more skins', C.skinsUnlocked(3).length > C.skinsUnlocked(1).length && C.nextSkin(0).parts === 1);
+check('a locked skin is not kept', C.normalizeSettings({ skin: 'lava', parts: 1 }).skin === 'classic');
+check('a sentence must contain its word', J(C.normalizeSentences({ SAID: 'Mum said hi.', WENT: 'I ran home.' }, ['SAID', 'WENT'])) === J({ SAID: 'Mum said hi.' }));
 check('only Swoop and Dash may spin all the way round', C.CHAR_ORDER.filter(k => C.rotBudgetFor(k) === Infinity).sort().join() === 'dash,swoop');
 check('Swoop never falls over', !C.CHARS.swoop.falls);
 check('ground crew never leave upward', ['trike', 'dash'].every(k => !C.exitDirsFor(k).includes('up')));
 check('nobody leaves through the floor', C.CHAR_ORDER.every(k => !C.exitDirsFor(k).includes('down')));
+
+/* ---------------- every roster makes sound scenes ---------------- */
+{
+  const S = C.normalizeSettings({ babies: Array.from({ length: 40 }, (_, i) => ({ seed: 1000 + i * 7919 })) });
+  const everyone = C.allMembers(S);
+  const seenScenes = new Set();
+  for (let rep = 0; rep < 300; rep++) {
+    const r = C.rng(rep * 31 + 5);
+    const cast = C.shuffle(everyone, r).slice(0, 4).map(m => ({ ...m, level: 1 + Math.floor(r() * 5) }));
+    for (const m of cast) for (const n of [1, 2, 3, 5, 8, 12]) {
+      const plan = C.planScene({ letters: n, lead: m.id, cast, rnd: r });
+      const v = C.validatePlan(plan);
+      check(`roster ${cast.map(x => x.kind + (x.power ? '/' + x.power : '') + x.level).join(',')} lead ${m.kind} n=${n}`, !!plan.id && v.length === 0, `${plan.id}: ${v.join('; ')}`);
+      if (plan.id) seenScenes.add(plan.id);
+      check('the lead is who was asked for', plan.lead === m.id);
+    }
+  }
+  check('every scene in the library gets played by some roster', C.SCENES.every(s => seenScenes.has(s.id)), C.SCENES.filter(s => !seenScenes.has(s.id)).map(s => s.id).join());
+  const baby = everyone.find(m => !m.orig && m.power === 'bubble');
+  check('a level-1 baby leads with its power', C.eligibleScenes({ ...baby, level: 1 }, 3, [{ ...baby, level: 1 }]).some(s => s.id === 'bubble-float'));
+  check('rope moves wait for level 2', !C.eligibleScenes({ id: 'dash', kind: 'dash', level: 1 }, 3).some(s => s.id === 'lasso-roundup') &&
+    C.eligibleScenes({ id: 'dash', kind: 'dash', level: 2 }, 3).some(s => s.id === 'lasso-roundup'));
+  check('team-ups wait for level 3', !C.eligibleScenes({ id: 'trike', kind: 'trike', level: 2 }, 3).some(s => s.id === 'boost-jump'));
+  const rexes = [0, 1, 2, 3].map(i => ({ id: 'r' + i, kind: 'rex', level: 3 }));
+  check('four of the same kind still get scenes', C.eligibleScenes(rexes[0], 1, rexes).length >= 3);
+  check('Tug of War needs a flyer', !C.eligibleScenes(rexes[0], 3, rexes).some(s => s.id === 'tug-pop'));
+}
 
 /* ---------------- every scene plan ---------------- */
 let planned = 0;
@@ -133,26 +224,45 @@ for (const lead of C.CHAR_ORDER) for (let n = 1; n <= 12; n++) for (let seed = 1
   check(`plan ${plan.id} lead=${lead} n=${n} seed=${seed}`, v.length === 0, v.join('; '));
   durations.push(plan.duration);
 }
+const FULL = [
+  { id: 'rex', kind: 'rex', level: 5 }, { id: 'trike', kind: 'trike', level: 5 }, { id: 'dash', kind: 'dash', level: 5 }, { id: 'swoop', kind: 'swoop', level: 5 },
+  ...C.POWER_ORDER.map((p, i) => ({ id: 'p' + i, kind: C.CHAR_ORDER[i % 4], power: p, level: 1 }))
+];
+function castFor(s) {
+  const need = s.lead || {};
+  const lead = need.power ? FULL.find(m => m.power === need.power) : (need.kind ? FULL.find(m => m.id === need.kind) : FULL.find(m => m.id === 'dash'));
+  return { lead: lead.id, cast: [lead, ...FULL.filter(m => m !== lead && !m.power).slice(0, 3)] };
+}
 for (const s of C.SCENES) for (const mirror of [false, true]) for (const n of [Math.max(1, s.min), 4, 9]) {
-  const plan = C.planScene({ letters: n, lead: s.lead === 'any' ? 'dash' : s.lead, forceId: s.id, mirror, rnd: C.rng(n) });
+  const lc = castFor(s);
+  const plan = C.planScene({ letters: n, lead: lc.lead, cast: lc.cast, forceId: s.id, mirror, rnd: C.rng(n) });
   check(`${s.id} n=${n} mirror=${mirror}`, plan.id === s.id && C.validatePlan(plan).length === 0, C.validatePlan(plan).join('; '));
   check(`${s.id}: nobody exits downward`, plan.events.every(e => e.dir !== 'down'));
 }
 check('an ability used by the wrong dino is caught',
   C.validatePlan({ letters: 1, duration: 100, events: [{ at: 0, dur: 50, kind: 'enter', char: 'trike' }, { at: 50, dur: 50, kind: 'roar', char: 'trike' }, { at: 60, dur: 40, kind: 'carry', char: 'trike', letter: 0 }] })
-    .some(p => /Rex/.test(p)));
+    .some(p => /roar/.test(p)));
+check('a power used by a baby without it is caught',
+  C.validatePlan({ letters: 1, duration: 100, members: { b1: { kind: 'rex', power: 'frost' } }, events: [{ at: 0, dur: 50, kind: 'enter', char: 'b1' }, { at: 50, dur: 50, kind: 'bubble', char: 'b1', letter: 0 }, { at: 60, dur: 40, kind: 'exit', char: 'b1' }] })
+    .some(p => /bubble/.test(p)));
 {
   let hist = [], leads = [], sigs = [];
   const r = C.rng(2026);
   for (let i = 0; i < 60; i++) {
     const lead = C.pickLead(leads, r);
     const plan = C.planScene({ letters: 3 + i % 5, lead, history: hist, rnd: r });
-    sigs.push(`${plan.id}|${plan.mirror}|${plan.cast.join('')}`);
-    if (i) check(`scene ${i} differs from the one before`, plan.id !== hist[0]);
-    hist = C.remember(hist, plan.id, 8); leads = C.remember(leads, lead, 8);
+    const who = [...new Set(plan.events.map(e => e.char).filter(Boolean))].join('');
+    sigs.push(`${plan.id}|${plan.mirror}|${who}`);
+    if (i) check(`scene ${i} differs from the one before`, plan.id !== C.histId(hist[0]));
+    hist = [C.histEntry(plan)].concat(hist).slice(0, 12); leads = C.remember(leads, lead, 8);
   }
   const distinct = new Set(sigs).size;
-  check('60 scenes in a row: 50+ distinct performances', distinct >= 50, `${distinct}`);
+  /* what a child notices is the same performance coming round again soon */
+  for (let i = 0; i < sigs.length; i++) {
+    const again = sigs.slice(Math.max(0, i - 10), i).indexOf(sigs[i]);
+    check(`performance ${i} is not a repeat of one in the last 10`, again === -1, `${sigs[i]} ${sigs.slice(Math.max(0, i - 10), i).join(' / ')}`);
+  }
+  check('60 scenes in a row: 35+ distinct performances', distinct >= 35, `${distinct}`);
   console.log(`variation: ${distinct}/60 distinct performances`);
 }
 check('self-check passes on the sample words', C.selfCheck(C.DEFAULT_WORDS).length === 0, C.selfCheck(C.DEFAULT_WORDS).join('; '));

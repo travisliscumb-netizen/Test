@@ -213,7 +213,61 @@ async function doBlast(page, word, opt) {
     await page.waitForFunction(n => document.querySelectorAll('.activity .slot.filled').length === n, i + 1, { timeout: 5000 });
   }
 }
-const DO = { meet: doMeet, zap: doZap, build: doBuild, missing: doMissing, blast: doBlast };
+async function doRace(page, word, opt) {
+  await page.waitForSelector('.race-field .race-tile', { timeout: 10000 });
+  if (opt.shots) { await page.waitForTimeout(300); await shot(page, `${opt.shots}-race`); await layoutOk(page, `${opt.shots} race`); }
+  let covered = 0;
+  for (let k = 0; k < 6; k++) {
+    covered += await page.evaluate(() => {
+      const r = [...document.querySelectorAll('.race-field .race-tile:not(.used)')].map(t => t.getBoundingClientRect());
+      let n = 0;
+      for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+        const ox = Math.min(r[i].right, r[j].right) - Math.max(r[i].left, r[j].left), oy = Math.min(r[i].bottom, r[j].bottom) - Math.max(r[i].top, r[j].top);
+        if (ox > r[i].width * 0.35 && oy > r[i].height * 0.35) n++;
+      }
+      return n;
+    });
+    await page.waitForTimeout(120);
+  }
+  check(`${opt.label} race: floating letters never hide each other`, covered === 0, `${covered} overlaps`);
+  const letters = await page.$$eval('.race-field .race-tile', ts => ts.map(t => t.getAttribute('data-letter')));
+  check(`${opt.label} race: every letter is there, with strays`, [...word].every(c => letters.includes(c)) && letters.length > word.length, letters.join(''));
+  if (opt.wrong) {
+    const stray = letters.find(c => !word.includes(c));
+    await page.click(`.race-field .race-tile[data-letter="${stray}"]`, { force: true });
+    await page.waitForTimeout(100);
+    check(`${opt.label} race: a stray letter is refused`, (await page.$$('.activity .slot.filled')).length === 0);
+  }
+  for (let i = 0; i < word.length; i++) {
+    await page.click(`.race-field .race-tile[data-letter="${word[i]}"]:not(.used):not(.flying)`, { force: true });
+    await page.waitForFunction(n => document.querySelectorAll('.activity .slot.filled').length === n, i + 1, { timeout: 5000 });
+  }
+  check(`${opt.label} race: finishing fast beats the comet`, await page.$eval('.race-track', t => t.classList.contains('won')));
+}
+async function doCheck(page, word, opt) {
+  await page.waitForSelector('.opt-card', { timeout: 10000 });
+  if (opt.shots) { await shot(page, `${opt.shots}-check`); await layoutOk(page, `${opt.shots} check`); }
+  const opts = await page.$$eval('.opt-card', bs => bs.map(b => b.textContent));
+  check(`${opt.label} check: three spellings, one right`, opts.length === 3 && opts.filter(o => o === word.toLowerCase()).length === 1, opts.join(','));
+  if (opt.wrong) {
+    const wrong = opts.find(o => o !== word.toLowerCase());
+    await page.click(`.opt-card:text-is("${wrong}")`);
+    await page.waitForTimeout(120);
+    check(`${opt.label} check: a misspelling is not accepted`, await page.$eval(`.opt-card:text-is("${wrong}")`, b => b.classList.contains('nope-done')) && (await state(page)).step === opt.step);
+  }
+  await page.click(`.opt-card:text-is("${word.toLowerCase()}")`);
+}
+async function doRhyme(page, word, opt) {
+  await page.waitForSelector('.opt-card', { timeout: 10000 });
+  if (opt.shots) { await shot(page, `${opt.shots}-rhyme`); await layoutOk(page, `${opt.shots} rhyme`); }
+  const fam = await page.evaluate(w => { const C = __game.core; for (const f of Object.values(C.RHYME_FAMILIES)) if (f.split(' ').includes(w)) return f.split(' '); return []; }, word);
+  const opts = await page.$$eval('.opt-card', bs => bs.map(b => b.textContent.toUpperCase()));
+  const right = opts.filter(o => fam.includes(o));
+  check(`${opt.label} rhyme: exactly one of three rhymes`, opts.length === 3 && right.length === 1, opts.join(','));
+  check(`${opt.label} rhyme: the rhyming ending is highlighted`, await page.$eval('.rhyme-word .rime', e => e.textContent.length > 0));
+  await page.click(`.opt-card:text-is("${right[0].toLowerCase()}")`);
+}
+const DO = { meet: doMeet, zap: doZap, build: doBuild, missing: doMissing, blast: doBlast, race: doRace, check: doCheck, rhyme: doRhyme };
 
 /* Play one planet from the play screen to the egg. Returns the scenes seen. */
 async function playPlanet(page, label, opt = {}) {
@@ -224,8 +278,8 @@ async function playPlanet(page, label, opt = {}) {
   for (let k = 0; k < acts.length; k++) {
     await waitStep(page, k);
     const before = await page.evaluate(() => window.__lastScene && JSON.stringify(window.__lastScene));
-    await DO[acts[k]](page, word, { ...opt, label: `${label} ${word}`, wrong: opt.wrong && acts[k] !== 'meet' });
-    if (acts[k] === 'build' || acts[k] === 'missing' || acts[k] === 'blast') {
+    await DO[acts[k]](page, word, { ...opt, label: `${label} ${word}`, wrong: opt.wrong && acts[k] !== 'meet', step: k });
+    if (acts[k] === 'build' || acts[k] === 'missing' || acts[k] === 'blast' || acts[k] === 'race') {
       await page.waitForFunction(b => window.__lastScene && JSON.stringify(window.__lastScene) !== b, before, { timeout: 30000 });
       scenes.push(await page.evaluate(() => window.__lastScene));
       if (acts[k] === 'blast' && opt.shots) {
@@ -348,7 +402,11 @@ async function cleanStage(page, label) {
     } else if (i < 3) await page.click('#btnHatchNext');
   }
   check('4 planets played in order', played.map(p => p.word).join(',') === 'FROG,JUMP,SAID,WENT', played.map(p => p.word).join(','));
-  check('the hatch button now offers the meteor shower', /Meteor shower/.test(await page.textContent('#btnHatchNext')));
+  check('the hatch button now offers the boss battle', /Boss battle/.test(await page.textContent('#btnHatchNext')));
+  check('a hatched baby shows its super power', /Super power/.test(await page.textContent('#babyPower')));
+  const xp = await page.evaluate(() => __game.settings().crew);
+  check('the crew earned experience on every planet', Object.keys(xp).length >= 4 && Object.values(xp).every(v => v > 0), JSON.stringify(xp));
+  check('somebody levelled up, and it was celebrated', await page.evaluate(() => (window.__levelUps || 0) > 0));
 
   const st1 = await page.evaluate(() => __game.settings().stats);
   check('mastery: clean spells level a word up', st1.FROG.level === 1 && st1.JUMP.level === 1, JSON.stringify(st1.FROG));
@@ -359,6 +417,7 @@ async function cleanStage(page, label) {
   await waitScreen(page, 'play');
   const fin = await state(page);
   check('finale: it is a review', fin.review === true);
+  check('finale: the Meteor King is there with full health', await page.$eval('#bossBar .boss-hp i', i => i.style.width === '100%'));
   check('finale: the peeked word comes first', fin.word === 'SAID', fin.word);
   check('finale: blast only, all four words', fin.acts.length === 4 && fin.acts.every(a => a === 'blast'), fin.acts.join(','));
   await shot(page, 'phone-finale');
@@ -372,6 +431,8 @@ async function cleanStage(page, label) {
   }
   await waitScreen(page, 'done');
   await cleanStage(page, 'finale');
+  check('beating the boss wins a rocket part', await page.evaluate(() => __game.settings().parts) === 1);
+  check('the rocket part is shown', !(await page.$eval('#donePart', d => d.hidden)));
   await page.waitForTimeout(1200);
   await shot(page, 'phone-done');
   await layoutOk(page, 'done');
@@ -391,6 +452,18 @@ async function cleanStage(page, label) {
   check('all four crew led a scene', new Set(allScenes.map(s => s.lead)).size === 4, allScenes.map(s => s.lead).join(','));
   check('the rocket launched from every planet (4 countdowns)', (await page.evaluate(() => window.__spoken.filter(s => s.text === '3').length)) === 4);
 
+  /* the hangar: the part buys a new paint job */
+  await page.evaluate(() => __game.go('hangar'));
+  await waitScreen(page, 'hangar');
+  await shot(page, 'phone-hangar'); await layoutOk(page, 'hangar');
+  check('hangar: one part unlocks a second rocket', (await page.$$('.skin:not(.locked)')).length === 2);
+  await page.click('.skin:not(.locked):not(.on)');
+  check('hangar: the new rocket is chosen and kept', await page.evaluate(() => __game.settings().skin) === 'blaze');
+  await page.click('.skin.locked >> nth=0');
+  check('hangar: a locked rocket cannot be chosen', await page.evaluate(() => __game.settings().skin) === 'blaze');
+  await page.evaluate(() => __game.go('done'));
+  await waitScreen(page, 'done');
+
   /* Dino Base: four babies wander and answer to their names */
   await page.click('#btnDoneBase');
   await waitScreen(page, 'base');
@@ -398,6 +471,7 @@ async function cleanStage(page, label) {
   await shot(page, 'phone-base');
   await layoutOk(page, 'base');
   check('base: four babies live here', (await page.$$('#babies .baby')).length === 4);
+  check('base: the crew has four spots', (await page.$$('#crewSlots .crew-slot')).length === 4);
   const x0 = await page.$$eval('#babies .baby', bs => bs.map(b => b.style.transform));
   await page.waitForTimeout(3500);
   const x1 = await page.$$eval('#babies .baby', bs => bs.map(b => b.style.transform));
@@ -406,14 +480,24 @@ async function cleanStage(page, label) {
   await page.click('#babies .baby >> nth=0', { force: true });
   await page.waitForTimeout(150);
   const said = await spokenSince(page, n);
-  const nm = await page.$eval('#babies .baby.named .tag', t => t.textContent);
+  const nm = await page.$eval('#babies .baby.picked .tag', t => t.textContent);
   check('base: a tapped baby says its name', said.some(t => t.startsWith(nm)), said.join('|') + ' / ' + nm);
+  /* put the tapped baby in the crew in Trike's place */
+  const pickedId = await page.evaluate(() => { const S = __game.settings(); return __game.core.allMembers(S).find(m => m.name === document.querySelector('#babies .baby.picked .tag').textContent).id; });
+  await page.click('.crew-slot[data-id="trike"]', { force: true });
+  await page.waitForTimeout(200);
+  check('base: a baby swaps into the crew', await page.evaluate(id => __game.settings().roster.includes(id) && !__game.settings().roster.includes('trike'), pickedId));
+  check('base: the benched dino joins the others on the ground', await page.$$eval('#babies .baby .tag', ts => ts.some(t => t.textContent === 'Trike')));
+  check('base: the stage now has the baby in the crew', await page.evaluate(id => !!__game.stage.actors()[id], pickedId));
+  await shot(page, 'phone-base-crew');
   const keep = await page.evaluate(() => __game.settings().babies.length);
   await page.reload();
   await page.waitForFunction(() => window.__game && __game.state().screen === 'home');
   check('babies are kept for good', await page.evaluate(() => __game.settings().babies.length) === keep);
   check('home: the base button counts them', (await page.textContent('#babyCount')).trim() === '4');
   check('home: the mission reads complete', /PLAY AGAIN/.test(await page.textContent('#playLabel')));
+  check('the new crew member is out on the launch pad', await page.evaluate(id => { const a = __game.stage.actors()[id]; return !!a && a.op > 0.5; }, pickedId));
+  check('the roster survives a reload', await page.evaluate(id => __game.settings().roster.includes(id), pickedId));
 
   const spoken = await page.evaluate(() => window.__spoken.map(s => s.text));
   const triples = spoken.filter((t, i) => i > 1 && t === spoken[i - 1] && t === spoken[i - 2]);
@@ -435,12 +519,14 @@ async function cleanStage(page, label) {
   });
   await page.evaluate(() => __game.startPlanet(4));
   await waitScreen(page, 'play');
-  check('a level-1 word swaps build for missing pieces', (await state(page)).acts.join(',') === 'meet,zap,missing,blast', (await state(page)).acts.join(','));
+  check('a level-1 word gets the letter race and missing pieces', (await state(page)).acts.join(',') === 'meet,race,missing,blast', (await state(page)).acts.join(','));
   await page.evaluate(() => __game.startPlanet(6));
   await waitScreen(page, 'play');
-  check('a level-2 word goes straight to the hard stuff', (await state(page)).acts.join(',') === 'meet,missing,blast', (await state(page)).acts.join(','));
+  check('a level-2 word gets spell check (no rhyme for WHERE)', (await state(page)).acts.join(',') === 'meet,check,missing,blast', (await state(page)).acts.join(','));
   await doMeet(page, 'WHERE', { label: 'where' });
   await waitStep(page, 1);
+  await doCheck(page, 'WHERE', { label: 'where', wrong: true, step: 1, shots: 'phone' });
+  await waitStep(page, 2);
   check('missing: the letter he missed before is a gap', await page.$eval('.activity .slot >> nth=4', s => s.classList.contains('gap') || !s.classList.contains('filled')));
   await shot(page, 'phone-missing');
   await layoutOk(page, 'missing');
@@ -485,18 +571,39 @@ async function cleanStage(page, label) {
   const lvl0 = await page.evaluate(() => __game.settings().stats.LOOK.level);
   await page.evaluate(() => __game.startPlanet(4));
   await waitScreen(page, 'play');
-  for (const a of ['meet', 'zap', 'missing']) { await waitStep(page, ['meet', 'zap', 'missing'].indexOf(a)); await DO[a](page, 'LOOK', { label: 'look' }); }
+  for (const a of ['meet', 'race', 'missing']) { await waitStep(page, ['meet', 'race', 'missing'].indexOf(a)); await DO[a](page, 'LOOK', { label: 'look', shots: a === 'race' ? 'phone' : null }); }
   await waitStep(page, 3);
   await doBlast(page, 'LOOK', { label: 'look', peek: true });
   await waitScreen(page, 'hatch');
   const lvl1 = await page.evaluate(() => __game.settings().stats.LOOK.level);
   check('a word that needed help goes back a level', lvl1 === lvl0 - 1, `${lvl0} -> ${lvl1}`);
 
+  /* a word that rhymes gets Rhyme Time, and a sentence gets used by Spell Check */
+  await page.evaluate(() => { const S = __game.settings(); S.stats.PLAY = { level: 2, plays: 2, clean: 2, misses: 0, posMisses: [0, 0, 0, 0], last: 1 }; S.sentences.PLAY = 'We can play in the park.'; });
+  await page.evaluate(() => __game.startPlanet(3));
+  await waitScreen(page, 'play');
+  check('a known word that rhymes gets Rhyme Time', (await state(page)).acts.join(',') === 'meet,check,rhyme,blast', (await state(page)).acts.join(','));
+  await doMeet(page, 'PLAY', { label: 'play' });
+  await waitStep(page, 1);
+  check('spell check shows his grown-up\'s sentence with a blank', /We can .* in the park/.test(await page.textContent('.sentence')) && (await page.$$('.sentence .blank')).length === 1);
+  await doCheck(page, 'PLAY', { label: 'play', step: 1 });
+  await waitStep(page, 2);
+  await doRhyme(page, 'PLAY', { label: 'play', shots: 'phone' });
+  await waitStep(page, 3);
+
   /* a new list is a new week */
   await page.evaluate(() => __game.go('pass'));
   for (const d of '9999') await page.click(`#keypad button:text-is("${d}")`);
   await waitScreen(page, 'words');
   check('progress lists every word with stars', (await page.$$('#progressList li')).length === 7);
+  /* a grown-up adds a sentence; one without the word is refused */
+  await page.click('#wordList li:has(.w:text-is("said")) .pen');
+  await page.fill('.sent-edit input', 'I ran home.');
+  await page.click('.sent-edit button');
+  check('a sentence without the word is refused', /needs the word/.test(await page.textContent('.sent-row .note')));
+  await page.fill('.sent-edit input', 'Mum said we can go.');
+  await page.click('.sent-edit button');
+  check('a good sentence is saved', await page.evaluate(() => __game.settings().sentences.SAID) === 'Mum said we can go.');
   await page.fill('#addInput', 'friend');
   await page.click('#addForm button[type=submit]');
   check('adding a word starts a new mission', await page.evaluate(() => __game.settings().week.done.length) === 0);
@@ -530,9 +637,14 @@ for (const [name, vp] of [['small', { width: 375, height: 667 }], ['ipad', { wid
     const fits = await page.evaluate(() => [...document.querySelectorAll('.activity .slot')].every(q => { const r = q.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }));
     check(`${name} ${act}: a 9-letter word's boxes fit across the screen`, fits);
   }
-  await page.evaluate(() => __game.jump(2, 'missing'));
-  await waitStep(page, 2);
-  await shot(page, `${name}-missing`); await layoutOk(page, `${name} missing (9 letters)`);
+  for (const [k, act] of [[2, 'missing'], [1, 'race'], [1, 'check']]) {
+    await page.evaluate(([k, a]) => __game.jump(k, a), [k, act]);
+    await waitStep(page, k);
+    await page.waitForTimeout(act === 'race' ? 2600 : 400);
+    await shot(page, `${name}-${act}`); await layoutOk(page, `${name} ${act} (9 letters)`);
+  }
+  await page.evaluate(() => __game.go('hangar'));
+  await waitScreen(page, 'hangar'); await shot(page, `${name}-hangar`); await layoutOk(page, `${name} hangar`);
   await page.evaluate(() => __game.go('hatch'));
   await waitScreen(page, 'hatch'); await shot(page, `${name}-egg`); await layoutOk(page, `${name} egg`);
   await page.evaluate(() => __game.go('map'));

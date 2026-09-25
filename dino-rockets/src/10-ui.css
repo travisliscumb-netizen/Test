@@ -116,8 +116,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .btn-launch#btnPlay{width:100%;max-width:360px;min-height:78px;font-size:32px;border-radius:26px}
 #btnPlay svg{width:44px;height:44px;animation:wiggle 2.4s ease-in-out infinite}
 @keyframes wiggle{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg) translateY(-3px)}}
-.home-row{display:flex;gap:10px;width:100%}
-.home-row .btn{flex:1;font-size:18px;padding:0 10px;white-space:nowrap;gap:8px}
+.home-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
+.home-row .btn{font-size:16px;padding:6px 4px;white-space:nowrap;gap:2px}
+.tile-btn{flex-direction:column;min-height:74px;position:relative}
+.tile-btn .ico{font-size:26px;line-height:1}
+.tile-btn b{position:absolute;right:6px;top:6px}
 .home-row b:empty{display:none}
 .home-row b{background:var(--orange);color:#fff;border-radius:12px;padding:2px 8px;font-size:15px}
 .selfcheck{min-height:44px;padding:0 16px;border-radius:22px;font-size:14px;font-weight:800;background:#DDF6E7;color:var(--good-700)}
@@ -280,11 +283,46 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 @keyframes babyIn{from{transform:scale(0) rotate(-20deg)}to{transform:none}}
 .baby-name{margin:0;font-size:32px;font-weight:900;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.4);text-align:center}
 .baby-name small{display:block;font-size:17px;color:var(--cyan)}
-.btn-next{min-width:260px;min-height:70px;font-size:26px}
+.btn-next{min-width:220px;min-height:70px;font-size:26px}
+.baby-power{margin:0;font-size:19px;font-weight:900;color:#FFE08A;text-shadow:0 2px 0 rgba(0,0,0,.4);text-align:center}
+.hatch-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+/* a level up: a banner that drops in over whatever he is doing, then goes */
+#levelUp{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 64px);transform:translateX(-50%);z-index:960;display:flex;align-items:center;gap:10px;
+  padding:8px 18px 8px 8px;border-radius:24px;background:linear-gradient(180deg,#FFD86A,#FFC53D);box-shadow:0 0 0 4px #fff,0 12px 30px rgba(0,0,0,.4);
+  animation:luIn .5s cubic-bezier(.3,1.6,.5,1);max-width:92vw;pointer-events:none}
+#levelUp .lu-art{width:72px;height:72px;flex:none}
+#levelUp .lu-art svg{width:100%;height:100%;overflow:visible}
+#levelUp .lu-text{display:flex;flex-direction:column}
+#levelUp b{font-size:22px;font-weight:900;color:#5B3A08}
+#levelUp span{font-size:15px;font-weight:800;color:#7A4E08}
+@keyframes luIn{from{transform:translate(-50%,-40px) scale(.6);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 
 /* ============================================================
    DINO BASE
    ============================================================ */
+/* the crew: four spots, swapped from everyone he has hatched */
+.crew-card{width:100%;max-width:640px;background:rgba(255,255,255,.96);border-radius:24px;padding:12px 12px 10px;border:3px solid rgba(143,227,255,.8);
+  box-shadow:0 0 0 6px rgba(143,227,255,.18),0 14px 30px rgba(0,0,0,.4);position:relative;z-index:12}
+.crew-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 4px 8px}
+.crew-label{font-weight:900;font-size:18px}
+.crew-hint{font-size:13px;font-weight:800;color:var(--ink-soft);text-align:right}
+.crew-slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.crew-slot{position:relative;min-height:112px;border-radius:18px;background:var(--blue-50);border:3px solid var(--blue-100);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:4px 2px 6px;overflow:hidden}
+.crew-slot .art{width:100%;flex:1;min-height:64px;display:flex;align-items:flex-end;justify-content:center}
+.crew-slot .art svg{width:86%;height:auto;overflow:visible}
+.crew-slot .nm{font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.crew-slot .lv{font-size:11px;letter-spacing:1px;color:var(--gold);line-height:1}
+.crew-slot .lv .off{color:#D5DEEA}
+.crew-slot .pw{position:absolute;right:4px;top:4px;font-size:16px}
+.crew-slot.target{border-color:var(--orange);background:var(--orange-100);animation:pulse 1.1s ease-in-out infinite}
+.crew-slot.swapped{animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+.crew-info{min-height:40px;margin-top:8px;padding:6px 10px;border-radius:14px;background:var(--blue-50);font-size:14px;font-weight:800;color:var(--ink-soft);display:flex;align-items:center;gap:10px}
+.crew-info b{color:var(--ink);font-size:16px}
+.xp{flex:1;height:10px;border-radius:5px;background:#DDE8F6;overflow:hidden;min-width:60px}
+.xp i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--orange))}
+.baby.picked{filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 10px #FFC53D)}
+.baby.picked .tag{opacity:1;background:var(--orange)}
+.baby .ptag{position:absolute;right:6%;top:4%;font-size:15px}
 .base{position:relative;width:100%;flex:1;min-height:0;max-width:760px}
 .dome{position:fixed;left:3%;right:3%;bottom:calc(var(--surface-h) + env(safe-area-inset-bottom) - 2px);height:min(64vh,120vw);border-radius:50% 50% 0 0 / 70% 70% 0 0;
   background:radial-gradient(ellipse at 50% 100%,rgba(143,227,255,.18),rgba(143,227,255,.06) 70%);border:3px solid rgba(143,227,255,.5);border-bottom:0}
@@ -330,6 +368,34 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .word-list .w,.progress-list .w{flex:1;font-size:22px;font-weight:900;letter-spacing:.04em}
 .word-list .n{font-size:14px;font-weight:800;color:var(--ink-soft);width:22px}
 .word-list .x{width:48px;height:48px;border-radius:14px;font-size:24px;font-weight:900;color:var(--bad);background:#fff;box-shadow:0 3px 0 #F3C9CA}
+.word-list li{flex-wrap:wrap}
+.word-list .pen{color:var(--blue);box-shadow:0 3px 0 var(--blue-200);margin-right:4px}
+.sent-row{flex-basis:100%;padding:0 6px 8px 32px}
+.sent-row:empty{display:none}
+.sent{font-size:15px;font-weight:700;color:var(--ink-soft);font-style:italic}
+.sent-edit{display:flex;gap:8px}
+.sent-edit input{flex:1;min-width:0;min-height:48px;border-radius:14px;border:3px solid var(--blue-200);padding:0 12px;font:700 17px var(--font);color:var(--ink);background:#fff}
+/* the new activities */
+.race-track{position:relative;width:100%;max-width:420px;height:40px;border-radius:20px;background:var(--blue-50);border:2px solid var(--blue-100);flex:none}
+.race-track i{position:absolute;top:50%;transform:translateY(-50%);font-style:normal;font-size:24px;transition:left .3s;left:0}
+.race-track .race-flag{left:auto;right:6px}
+.race-track .race-comet{opacity:.85}
+.race-track.won{background:#DDF6E7;border-color:var(--good)}
+.race-field{min-height:180px}
+.race-field .tile{position:absolute;left:0;top:0;--tile:clamp(52px,14vw,72px)}
+.slot.preview{animation:none}
+.opt-cards{display:flex;flex-direction:column;gap:12px;width:100%;max-width:420px;margin:auto 0}
+.opt-card{min-height:72px;border-radius:22px;font-size:clamp(30px,9vw,42px);font-weight:900;letter-spacing:.08em;background:linear-gradient(180deg,#fff,#E6F1FF);
+  border:3px solid #8FD1FF;box-shadow:0 6px 0 #2F9FD0;color:var(--ink)}
+.opt-card:active{transform:translateY(4px);box-shadow:0 2px 0 #2F9FD0}
+.opt-card.right{background:linear-gradient(180deg,#E9FBEF,#BDF0CE);border-color:var(--good);box-shadow:0 6px 0 var(--good-700)}
+.opt-card.nope-done{opacity:.45;filter:grayscale(.7)}
+.opt-card.dim{opacity:.35}
+.opt-card .rime,.rhyme-word .rime{color:var(--orange-600);text-decoration:underline;text-decoration-thickness:4px;text-underline-offset:6px}
+.rhyme-word{font-size:clamp(48px,14vw,76px);font-weight:900;letter-spacing:.08em;color:var(--ink)}
+.sentence{margin:0;font-size:clamp(22px,6vw,30px);font-weight:800;text-align:center;color:var(--ink);line-height:1.4}
+.sentence .blank{display:inline-block;min-width:3.2em;border-bottom:4px dashed var(--orange);color:var(--orange-600);text-align:center}
+.sentence .blank.fill{border-bottom-style:solid;animation:pop .3s}
 .word-list .empty{justify-content:center;color:var(--ink-soft);font-weight:800;background:transparent;border-style:dashed}
 .progress-list .stars{font-size:20px;letter-spacing:2px;color:var(--gold)}
 .progress-list .stars .off{color:#D5DEEA}
@@ -354,8 +420,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   #btnPlayBack{width:48px;padding:0;justify-content:center;font-size:0}
   #btnPlayBack::before{content:"‹";font-size:28px;line-height:1;margin-top:-3px}
   .planet-tag{font-size:13px;padding:6px 9px}
-  .home-row .btn{font-size:17px;padding:0 8px;gap:6px}
-  .home-row .btn .ico{font-size:19px}
+  .home-row .btn{font-size:14px;padding:6px 2px}
+  .home-row .btn .ico{font-size:24px}
 }
 @media (max-height:700px){
   :root{--floor:clamp(134px,20vh,160px)}
@@ -438,6 +504,15 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   .btn-next{min-width:340px;min-height:90px;font-size:34px}
   .base-empty{font-size:30px}
   .baby .tag{font-size:17px;bottom:-24px}
+  .opt-cards{max-width:560px;gap:18px}.opt-card{min-height:100px;font-size:54px}
+  .race-track{max-width:620px;height:54px}.race-track i{font-size:34px}
+  .sentence{font-size:38px}.rhyme-word{font-size:100px}
+  .crew-card{max-width:760px;padding:18px}
+  .crew-label{font-size:24px}.crew-hint{font-size:17px}
+  .crew-slot{min-height:170px}.crew-slot .nm{font-size:18px}.crew-slot .lv{font-size:15px}.crew-slot .pw{font-size:22px}
+  .crew-info{font-size:18px}.crew-info b{font-size:21px}
+  .baby-power{font-size:26px}
+  #levelUp .lu-art{width:100px;height:100px}#levelUp b{font-size:30px}#levelUp span{font-size:20px}
 
   .center-card h2{font-size:48px}
   .center-card p{font-size:25px}
@@ -459,3 +534,39 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   .voice-row select{font-size:21px;min-height:56px}
   #toast{font-size:22px}
 }
+
+/* ---------- the boss: the Meteor King ---------- */
+.boss{width:100%;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:18px;background:linear-gradient(180deg,#2A1A3A00,#0B1640);background:#0B1640;flex:none}
+.boss-face{width:64px;height:64px;flex:none;transition:transform .2s}
+.boss-face svg{width:100%;height:100%;overflow:visible}
+.boss.hit .boss-face{animation:nope .45s}
+.boss-info{flex:1;display:flex;flex-direction:column;gap:4px}
+.boss-name{color:#FFE08A;font-weight:900;font-size:16px}
+.boss-hp{height:14px;border-radius:7px;background:#3A2030;overflow:hidden;box-shadow:inset 0 0 0 2px #0006}
+.boss-hp i{display:block;height:100%;background:linear-gradient(90deg,#FF5A1F,#FFC53D);transition:width .5s cubic-bezier(.3,1.4,.5,1)}
+.boss.dead .boss-face{animation:bossBoom .8s forwards}
+@keyframes bossBoom{40%{transform:scale(1.4) rotate(15deg)}100%{transform:scale(0) rotate(90deg);opacity:0}}
+.boss-laser{position:fixed;z-index:940;width:8px;border-radius:4px;background:linear-gradient(#fff,#8FE3FF);box-shadow:0 0 16px #8FE3FF,0 0 30px #1E6FE8;pointer-events:none;transform-origin:50% 100%}
+.done-part{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:16px;background:#FFF4DC;font-weight:900;color:#7A4E08;font-size:18px}
+.done-part .pt{font-size:32px}
+/* ---------- the hangar ---------- */
+.hangar-card{gap:12px}
+.hangar-note{margin:0;font-size:17px;font-weight:800;color:var(--ink-soft);text-align:center}
+.skins{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;overflow:auto;padding:4px}
+.skin{position:relative;border-radius:20px;background:var(--blue-50);border:3px solid var(--blue-100);padding:10px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:170px}
+.skin svg{width:78px;height:110px;overflow:visible}
+.skin .sn{font-weight:900;font-size:15px}
+.skin .need{font-size:13px;font-weight:800;color:var(--ink-soft)}
+.skin.on{border-color:var(--orange);background:var(--orange-100);box-shadow:0 0 0 4px rgba(255,138,31,.25)}
+.skin.locked svg{filter:grayscale(1) brightness(.6);opacity:.55}
+@media (min-width:700px){
+  .boss-face{width:96px;height:96px}.boss-name{font-size:22px}.boss-hp{height:20px}
+  .skins{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}.skin svg{width:110px;height:150px}.skin .sn{font-size:20px}
+  .tile-btn{min-height:96px}.tile-btn .ico{font-size:36px}.home-row .btn{font-size:21px}
+}
+
+.map-boss{display:block;width:100%;height:100%;padding:6px}
+.map-boss svg{width:100%;height:100%}
+
+/* on Dino Base the crew is at the top, so news appears lower down */
+body[data-screen="base"] #toast{top:auto;bottom:calc(var(--surface-h) + 170px)}

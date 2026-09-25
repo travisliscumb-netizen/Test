@@ -49,8 +49,9 @@
           <span id="playLabel">BLAST OFF!</span>
         </button>
         <div class="home-row">
-          <button class="btn btn-soft" id="btnMap" type="button"><span class="ico">🪐</span> Star Map</button>
-          <button class="btn btn-soft" id="btnBase" type="button"><span class="ico">🥚</span> Dino Base <b id="babyCount"></b></button>
+          <button class="btn btn-soft tile-btn" id="btnMap" type="button"><span class="ico">🪐</span><span>Star Map</span></button>
+          <button class="btn btn-soft tile-btn" id="btnBase" type="button"><span class="ico">🦖</span><span>Dino Base</span><b id="babyCount"></b></button>
+          <button class="btn btn-soft tile-btn" id="btnHangar" type="button"><span class="ico">🚀</span><span>Hangar</span><b id="partCount"></b></button>
         </div>
         <button class="selfcheck" id="selfCheck" type="button"></button>
       </div>
@@ -95,7 +96,11 @@
       <button class="egg" id="egg" type="button" aria-label="Tap the egg"></button>
       <div class="baby-reveal" id="babyReveal" hidden></div>
       <p class="baby-name" id="babyName" hidden></p>
-      <button class="btn btn-launch btn-next" id="btnHatchNext" type="button" hidden>Next planet ›</button>
+      <p class="baby-power" id="babyPower" hidden></p>
+      <div class="hatch-actions">
+        <button class="btn btn-soft" id="btnHatchCrew" type="button" hidden>Put in my crew</button>
+        <button class="btn btn-launch btn-next" id="btnHatchNext" type="button" hidden>Next planet ›</button>
+      </div>
     </div>
   </section>
 
@@ -105,10 +110,27 @@
       <button class="back" type="button" data-back="home">‹ Home</button>
       <span class="bar-title">Dino Base</span><span class="bar-count" id="baseCount"></span>
     </header>
+    <div class="crew-card" id="crewCard">
+      <div class="crew-top"><span class="crew-label">My crew</span><span class="crew-hint" id="crewHint">Tap a dino below, then a crew spot to swap</span></div>
+      <div class="crew-slots" id="crewSlots"></div>
+      <div class="crew-info" id="crewInfo"></div>
+    </div>
     <div class="base" id="base">
       <div class="dome" aria-hidden="true"></div>
       <p class="base-empty" id="baseEmpty">Finish a planet to hatch your first baby dino!</p>
       <div class="babies" id="babies"></div>
+    </div>
+  </section>
+
+  <!-- ============ HANGAR: rocket paint jobs, paid for in rocket parts ============ -->
+  <section class="screen" data-screen="hangar">
+    <header class="bar">
+      <button class="back" type="button" data-back="home">‹ Home</button>
+      <span class="bar-title">Hangar</span><span class="bar-count" id="hangarParts"></span>
+    </header>
+    <div class="card hangar-card">
+      <p class="hangar-note" id="hangarNote"></p>
+      <div class="skins" id="skins"></div>
     </div>
   </section>
 
@@ -124,6 +146,7 @@
       <h2>Mission complete!</h2>
       <p id="doneLine"></p>
       <div class="done-words" id="doneWords"></div>
+      <div class="done-part" id="donePart" hidden></div>
       <button class="btn btn-launch" id="btnDoneBase" type="button">See your Dino Base</button>
       <button class="btn btn-soft" id="btnDoneHome" type="button">Home</button>
     </div>
@@ -181,6 +204,7 @@
 <div id="fxLayer" aria-hidden="true"></div>
 <div id="confetti" aria-hidden="true"></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="levelUp" aria-live="polite" hidden><div class="lu-art" id="luArt"></div><div class="lu-text"><b id="luTitle"></b><span id="luLine"></span></div></div>
 
 <!-- @SCRIPTS -->
 </body>

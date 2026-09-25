@@ -31,8 +31,23 @@ h2{margin:0 0 16px;color:#1E6FE8}
 <script>
 var CORE = __CORE;
 var silent = { play: function(){} };
-var stage = createStage({ core: CORE, sfx: silent, art: DINO_ART });
+var stage = createStage({ core: CORE, sfx: silent, art: DINO_ART, memberArt: memberArt });
 stage.init(document.getElementById('fxLayer'));
+/* the lab's crew: the originals fully levelled, and one baby for each power */
+var POOL = CORE.CHAR_ORDER.map(function(k){ return { id: k, kind: k, level: 5, grow: 'grown', scale: 1, name: CORE.CHARS[k].name }; })
+  .concat(CORE.POWER_ORDER.map(function(p, i){
+    var b = CORE.makeBaby(4000 + i * 977);
+    var grow = ['baby', 'kid', 'grown', 'kid', 'baby'][i];
+    return { id: 'p' + i, kind: CORE.CHAR_ORDER[(i + 1) % 4], power: p, level: grow === 'baby' ? 1 : (grow === 'kid' ? 3 : 5), grow: grow,
+             scale: CORE.GROW_SCALE[grow], body: b.body, spots: b.spots, pattern: b.pattern, name: b.name };
+  }));
+function castFor(sceneId, lead){
+  var s = CORE.SCENE_BY_ID[sceneId], need = (s && s.lead) || {}, L = null;
+  POOL.forEach(function(m){ if (m.id === lead) L = m; });
+  if (!L && need.power) POOL.forEach(function(m){ if (!L && m.power === need.power) L = m; });
+  if (!L) L = POOL.filter(function(m){ return m.id === (need.kind || 'dash'); })[0];
+  return [L].concat(POOL.filter(function(m){ return m !== L && !m.power; }).slice(0, 3));
+}
 function groundY(){ return document.getElementById('ground').getBoundingClientRect().top + 8; }
 function renderWord(word){
   var box = document.getElementById('slots'); box.innerHTML = '';
@@ -46,11 +61,24 @@ function renderWord(word){
 var lastPlan = null;
 window.__lab = {
   scenes: CORE.SCENES.map(function(s){ return { id: s.id, name: s.name, lead: s.lead, min: s.min }; }),
-  plan: function(id, word, lead, mirror){ return CORE.planScene({ letters: word.length, lead: lead, forceId: id, mirror: !!mirror, tempo: 1, rnd: CORE.rng(word.length * 13) }); },
-  run: function(id, word, lead, mirror){
+  pool: POOL,
+  /* everyone who may lead a scene: every kind for an open scene, plus the power baby */
+  leadsFor: function(id){
+    var s = CORE.SCENE_BY_ID[id];
+    return POOL.filter(function(m){
+      return CORE.canLead(s, m) && (!s.needs || CORE.eligibleScenes(m, Math.max(3, s.min || 1), castFor(id, m.id)).some(function(x){ return x.id === id; }));
+    }).map(function(m){ return m.id; });
+  },
+  castFor: function(id, lead){ return castFor(id, lead).map(function(m){ return m.id; }); },
+  plan: function(id, word, lead, mirror, watcher){
+    var cast = castFor(id, lead);
+    return CORE.planScene({ letters: word.length, lead: cast[0].id, cast: cast, forceId: id, mirror: !!mirror, tempo: 1, rnd: CORE.rng(word.length * 13), watcher: watcher == null ? true : watcher });
+  },
+  run: function(id, word, lead, mirror, watcher){
     document.getElementById('title').textContent = id + ' · ' + lead;
     var els = renderWord(word);
-    var plan = this.plan(id, word, lead, mirror);
+    var plan = this.plan(id, word, lead, mirror, watcher);
+    stage.setCast(castFor(id, lead));
     lastPlan = plan;
     var probs = CORE.validatePlan(plan);
     document.getElementById('hud').textContent = plan.id + '  ' + plan.duration + 'ms  n=' + word.length + (probs.length ? '\nPROBLEMS: ' + probs.join('; ') : '');
@@ -69,6 +97,14 @@ window.__lab = {
     for (var k in A) acts[k] = { x: Math.round(A[k].x), y: Math.round(A[k].y), op: Number(A[k].op.toFixed(2)), rot: Math.round(A[k].rot) };
     return { live: d, props: boxes, actors: acts, states: d ? d.states : [] };
   },
+  trace: function(on){ stage.trace(on); },
+  traced: function(){ return stage.traced(); },
+  ambient: function(keys, ceil){
+    stage.setCast(POOL.filter(function(m){ return keys.indexOf(m.id) !== -1; }));
+    stage.ambient.start({ keys: keys, groundY: groundY(), left: 6, right: window.innerWidth - 6, lineup: false, ceil: ceil == null ? null : ceil });
+  },
+  stopAmbient: function(){ stage.ambient.stop(); },
+  react: function(kind){ stage.ambient.react(kind, { x: window.innerWidth / 2, y: 200 }); },
   residue: function(){
     return {
       props: document.querySelectorAll('.letterprop').length,

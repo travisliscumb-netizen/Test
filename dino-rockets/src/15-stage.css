@@ -55,3 +55,27 @@
   clip-path:polygon(38% 0,62% 0,100% 100%,0 100%)}
 .ship{position:fixed;left:0;top:0;width:190px;height:140px;pointer-events:none;will-change:transform}
 .ship svg{width:100%;height:100%;overflow:visible}
+
+/* growing up: a baby is drawn smaller about his own feet */
+.actor .grow{width:100%;height:100%;transform-origin:50% 95%}
+/* ropes: a dark outline under a hemp-coloured core, readable on every planet */
+#fxLayer .ropes{position:fixed;left:0;top:0;width:100vw;height:100vh;overflow:visible;pointer-events:none}
+.rope path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rope .rope-back{stroke:#3B2412;stroke-width:6.5}
+.rope .rope-core{stroke:#E0A95A;stroke-width:3.2;stroke-dasharray:7 5}
+.prop{position:fixed;left:0;top:0;pointer-events:none;will-change:transform}
+.prop.post{width:12px;border-radius:6px;background:linear-gradient(90deg,#8A5A2B,#C88A4A 45%,#6E4420);box-shadow:inset 0 0 0 2px #3B2412}
+.prop.post::before{content:"";position:absolute;left:-6px;top:-6px;width:24px;height:12px;border-radius:6px;background:#FFC53D;box-shadow:inset 0 0 0 2px #8A5A08}
+.prop.lasso-loop{border:5px solid #3B2412;border-radius:50%;box-shadow:inset 0 0 0 2px #E0A95A,0 0 0 1px #E0A95A}
+.prop.hook{width:18px;height:26px}
+.prop.hook svg,.prop.magnet svg{width:100%;height:100%;display:block}
+.prop.magnet{width:44px;height:44px;filter:drop-shadow(0 0 8px rgba(143,227,255,.9))}
+.prop.bubble{border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 8%,rgba(255,255,255,.18) 9% 45%,rgba(143,227,255,.28) 70%,rgba(255,138,31,.25) 100%);
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.75),0 0 14px rgba(143,227,255,.6);z-index:5}
+.prop.hole{width:68px;height:20px;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,#0B0F1A 45%,#3B2412 70%,transparent 72%)}
+.prop.mound{width:52px;height:18px;border-radius:26px 26px 6px 6px;background:linear-gradient(#8A5A2B,#5B3A1A);box-shadow:inset 0 3px 0 rgba(255,255,255,.15)}
+.letterprop.frozen::after{content:"";position:absolute;inset:-5px;border-radius:14px;
+  background:linear-gradient(160deg,rgba(255,255,255,.7),rgba(143,227,255,.72) 50%,rgba(60,150,255,.72));
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.85),0 0 12px rgba(143,227,255,.9)}
+.fx.snow{width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 8px #BFE6FF}

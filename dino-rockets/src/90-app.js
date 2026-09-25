@@ -5,7 +5,7 @@
    each planet the word is practised through a short run of activities
    (chosen by how well he already knows it), the rocket blasts off, the
    crew clears the letters, and an egg hatches a baby dino that joins his
-   Dino Base for good. When every planet is done, a meteor shower brings
+   Dino Base for good. When every planet is done, the Meteor King brings
    the shakiest words back one more time — a spaced, from-memory review.
 
    Rules that hold the file together:
@@ -47,8 +47,12 @@
     }
   });
   if (synth && synth.addEventListener) synth.addEventListener('voiceschanged', function(){ speech.pickVoice(); });
-  var stage = createStage({ core: C, sfx: sfx, art: DINO_ART });
+  var stage = createStage({ core: C, sfx: sfx, art: DINO_ART, memberArt: memberArt });
   stage.init($('#fxLayer'));
+  /* the four he takes on missions, as they are now (level, size, badges) */
+  function crewMembers(){ return C.rosterMembers(S); }
+  function syncCast(){ stage.setCast(crewMembers()); }
+  syncCast();
   if (params.get('speed')) stage.setTimeScale(params.get('speed'));
 
   var unlocked = false;
@@ -136,7 +140,10 @@
     stage.ambient.start({
       keys: keys, groundY: groundY(), left: 6, right: window.innerWidth - 6, lineup: lineup, ceil: cardBottom(),
       dust: currentPlanet ? currentPlanet.rim : null,
-      onTap: function(key){ if (screen === 'home' || screen === 'done' || screen === 'hatch') speech.say("I'm " + C.CHARS[key].name + '!', { rate: 0.95 }); }
+      onTap: function(key){
+        var m = C.memberInfo(S, key);
+        if (m && (screen === 'home' || screen === 'done' || screen === 'hatch')) speech.say("I'm " + m.name + '!', { rate: 0.95 });
+      }
     });
   }
   /* the lowest edge of the screen's card: buddies live below it, never over it
@@ -147,8 +154,8 @@
   }
   function noBuddies(){ stage.ambient.stop(); buddyKeys = null; }
   function pickBuddies(){
-    var lead = C.pickLead(S.leadHistory);
-    var rest = C.shuffle(C.CHAR_ORDER.filter(function(k){ return k !== lead; }));
+    var lead = C.pickLead(S.leadHistory, null, S.roster);
+    var rest = C.shuffle(S.roster.filter(function(k){ return k !== lead; }));
     return [rest[0], lead];
   }
 
@@ -169,13 +176,18 @@
     later(function(){ box.innerHTML = ''; }, 4800);
   }
 
-  var ROCKET_SVG = '<svg viewBox="0 0 120 170" aria-hidden="true">' +
-    '<path d="M60 6 C84 26 92 58 88 96 L32 96 C28 58 36 26 60 6Z" fill="#fff" stroke="#0A1433" stroke-width="5"/>' +
-    '<path d="M60 6 C72 16 80 30 84 44 L36 44 C40 30 48 16 60 6Z" fill="#FF8A1F" stroke="#0A1433" stroke-width="5"/>' +
-    '<circle cx="60" cy="66" r="13" fill="#8FE3FF" stroke="#0A1433" stroke-width="5"/>' +
-    '<path d="M32 76 L12 108 L34 104 Z M88 76 L108 108 L86 104 Z" fill="#1E6FE8" stroke="#0A1433" stroke-width="5" stroke-linejoin="round"/>' +
-    '<rect x="40" y="94" width="40" height="12" rx="4" fill="#5E6B80" stroke="#0A1433" stroke-width="4"/>' +
-    '<path class="flame" d="M44 108 Q60 170 76 108 Z" fill="#FF8A1F"/><path class="flame" d="M50 108 Q60 150 70 108 Z" fill="#FFE08A"/></svg>';
+  /* the rocket, in whichever paint job he picked in the hangar */
+  function rocketSvg(skinId){
+    var k = C.ROCKET_SKINS.filter(function(x){ return x.id === (skinId || S.skin); })[0] || C.ROCKET_SKINS[0];
+    return '<svg viewBox="0 0 120 170" aria-hidden="true">' +
+      '<path d="M60 6 C84 26 92 58 88 96 L32 96 C28 58 36 26 60 6Z" fill="' + k.body + '" stroke="#0A1433" stroke-width="5"/>' +
+      (k.stripe ? '<path d="M34 78 L86 78 L87 86 L33 86 Z" fill="' + k.stripe + '"/>' : '') +
+      '<path d="M60 6 C72 16 80 30 84 44 L36 44 C40 30 48 16 60 6Z" fill="' + k.nose + '" stroke="#0A1433" stroke-width="5"/>' +
+      '<circle cx="60" cy="64" r="13" fill="' + k.window + '" stroke="#0A1433" stroke-width="5"/><circle cx="56" cy="60" r="4" fill="#fff" opacity=".8"/>' +
+      '<path d="M32 76 L12 108 L34 104 Z M88 76 L108 108 L86 104 Z" fill="' + k.fins + '" stroke="#0A1433" stroke-width="5" stroke-linejoin="round"/>' +
+      '<rect x="40" y="94" width="40" height="12" rx="4" fill="#5E6B80" stroke="#0A1433" stroke-width="4"/>' +
+      '<path class="flame" d="M44 108 Q60 170 76 108 Z" fill="#FF8A1F"/><path class="flame" d="M50 108 Q60 150 70 108 Z" fill="#FFE08A"/></svg>';
+  }
 
   /* ---------------- activities ---------------- */
   var env = {
@@ -183,22 +195,65 @@
     later: later, alive: alive, soundOf: soundOf, sayWord: sayWord, pick: pick,
     FOUND: FOUND, TRY: TRY, setNudge: setNudge, clearNudge: clearNudge,
     react: function(kind, point){ stage.ambient.react(kind, point); },
+    toast: function(m){ toast(m); },
     spellSlots: function(word, slots){
       return speech.spell(word, { soundOf: soundOf, onLetter: function(i){ slots.forEach(function(s, k){ s.classList.toggle('lit', k === i); }); } })
         .then(function(ok){ slots.forEach(function(s){ s.classList.remove('lit'); }); return ok; });
     }
   };
   var ACT = createActivities(env);
-  var ACT_ICON = { meet: '👀', zap: '☄️', build: '🔋', missing: '🧩', blast: '🚀' };
+  var ACT_ICON = { meet: '👀', zap: '☄️', build: '🔋', missing: '🧩', blast: '🚀', race: '🏁', check: '🔍', rhyme: '🎵' };
 
   function perform(els){
-    var lead = C.pickLead(S.leadHistory);
-    var plan = C.planScene({ letters: els.length, lead: lead, history: S.sceneHistory });
-    S.sceneHistory = C.remember(S.sceneHistory, plan.id, 8);
+    var cast = crewMembers();
+    var lead = C.pickLead(S.leadHistory, null, cast.map(function(m){ return m.id; }));
+    var plan = C.planScene({ letters: els.length, lead: lead, cast: cast, history: S.sceneHistory });
+    if (plan.id) S.sceneHistory = [C.histEntry(plan)].concat(S.sceneHistory).slice(0, 12);
     S.leadHistory = C.remember(S.leadHistory, plan.lead, 8);
+    /* everyone in the scene earns experience; the lead the most */
+    var aw = C.awardScene(S.crew, plan);
+    S.crew = aw.crew;
     save();
-    window.__lastScene = { id: plan.id, lead: plan.lead, mirror: plan.mirror };
-    return stage.play(plan, els, { layer: $('#fxLayer'), groundY: groundY(), dust: currentPlanet ? currentPlanet.rim : null });
+    window.__lastScene = { id: plan.id, lead: plan.lead, mirror: plan.mirror, who: Object.keys(plan.members || {}) };
+    return stage.play(plan, els, { layer: $('#fxLayer'), groundY: groundY(), dust: currentPlanet ? currentPlanet.rim : null })
+      .then(function(r){ celebrate(aw.ups); return r; });
+  }
+
+  /* ---------------- levelling up ---------------- */
+  var upQueue = [], upBusy = false;
+  function celebrate(ups){
+    (ups || []).forEach(function(u){ upQueue.push(u); });
+    if (!upBusy) nextUp();
+  }
+  /* what a new level brings: growing up, and any scene he can now lead */
+  function levelNews(m, level){
+    var before = { id: m.id, kind: m.kind, power: m.power, level: level - 1 }, after = { id: m.id, kind: m.kind, power: m.power, level: level };
+    var grewFrom = C.growFor(m, level - 1), grewTo = C.growFor(m, level);
+    var learned = C.SCENES.filter(function(sc){ return C.canLead(sc, after) && !C.canLead(sc, before); }).map(function(sc){ return sc.name; });
+    if (grewFrom !== grewTo) return { line: grewTo === 'grown' ? 'All grown up!' : 'Grew into a big kid!', say: m.name + ' grew up!' };
+    if (learned.length) return { line: 'Learned ' + learned.slice(0, 2).join(' and ') + '!', say: m.name + ' learned ' + learned[0] + '!' };
+    if (level === 4) return { line: 'Earned a gold star badge!', say: m.name + ' earned a gold star!' };
+    if (level === 5) return { line: 'Earned a crown!', say: m.name + ' earned a crown!' };
+    return { line: 'Stronger than ever!', say: '' };
+  }
+  function nextUp(){
+    var u = upQueue.shift();
+    if (!u){ upBusy = false; return; }
+    upBusy = true;
+    var m = C.memberInfo(S, u.id);
+    if (!m){ nextUp(); return; }
+    var news = levelNews(m, u.level);
+    window.__levelUps = (window.__levelUps || 0) + 1;
+    syncCast();
+    stage.celebrate(u.id);
+    $('#luArt').innerHTML = memberArt(m);
+    $('#luTitle').textContent = m.name + ' is level ' + u.level + '!';
+    $('#luLine').textContent = news.line;
+    var box = $('#levelUp');
+    box.hidden = false; box.style.animation = 'none'; void box.offsetWidth; box.style.animation = '';
+    sfx.play('fanfare');
+    speech.say('Level up! ' + m.name + ' is level ' + u.level + '. ' + news.say, { rate: 0.95 });
+    setTimeout(function(){ box.hidden = true; nextUp(); }, 3000);
   }
 
   /* ============================================================
@@ -215,14 +270,15 @@
       d.style.setProperty('--pc', planetOf(i).ground);
       track.appendChild(d);
     });
-    $('#playLabel').textContent = !n ? 'ADD WORDS' : (next !== -1 ? (done ? 'KEEP GOING!' : 'BLAST OFF!') : (S.week.finale ? 'PLAY AGAIN' : 'METEOR SHOWER!'));
+    $('#playLabel').textContent = !n ? 'ADD WORDS' : (next !== -1 ? (done ? 'KEEP GOING!' : 'BLAST OFF!') : (S.week.finale ? 'PLAY AGAIN' : 'BOSS BATTLE!'));
     $('#babyCount').textContent = S.babies.length ? String(S.babies.length) : '';
-    try { selfProblems = C.selfCheck(S.words); } catch (e){ selfProblems = ['self-check crashed: ' + e.message]; }
+    $('#partCount').textContent = S.parts ? '🔩' + S.parts : '';
+    try { selfProblems = C.selfCheck(S.words, crewMembers()); } catch (e){ selfProblems = ['self-check crashed: ' + e.message]; }
     if (!save()) selfProblems.push('this browser will not save progress (private browsing?)');
     var sc = $('#selfCheck');
     sc.classList.toggle('bad', selfProblems.length > 0);
     sc.textContent = selfProblems.length ? '⚠ ' + selfProblems.length + ' problem' + (selfProblems.length > 1 ? 's' : '') + ' — tap' : '✓ All systems go' + (speech.available() ? '' : ' (no voice)');
-    buddies(C.CHAR_ORDER.slice(), true);
+    buddies(S.roster.slice(), true);
   };
   $('#selfCheck').addEventListener('click', function(){
     toast(selfProblems.length ? selfProblems.slice(0, 3).join(' • ') : 'Checked: words, activities and all ' + C.SCENES.length + ' crew scenes.', 4000);
@@ -237,6 +293,7 @@
   });
   $('#btnMap').addEventListener('click', function(){ sfx.play('tap'); go('map'); });
   $('#btnBase').addEventListener('click', function(){ sfx.play('tap'); go('base'); });
+  $('#btnHangar').addEventListener('click', function(){ sfx.play('tap'); go('hangar'); });
   $('#btnGrownups').addEventListener('click', function(){ sfx.play('tap'); go('pass'); });
 
   /* ============================================================
@@ -255,7 +312,7 @@
       if (done && S.week.eggs[i] != null){
         var badge = el('span', 'done-badge'); var bb = el('span', 'baby'); bb.innerHTML = babyArt(C.makeBaby(S.week.eggs[i])); badge.appendChild(bb); b.appendChild(badge);
       }
-      if (i === next){ var r = el('span', 'map-rocket'); r.innerHTML = ROCKET_SVG; b.appendChild(r); }
+      if (i === next){ var r = el('span', 'map-rocket'); r.innerHTML = rocketSvg(); b.appendChild(r); }
       b.addEventListener('click', function(){ sfx.play('tap'); startPlanet(i); });
       node.appendChild(b);
       var lab = el('div', 'map-label');
@@ -266,8 +323,8 @@
     });
     if (n){
       var fin = el('div', 'map-node map-finale' + (next === -1 && !S.week.finale ? ' next' : '') + (next !== -1 ? ' locked' : ''));
-      var fb = el('button', 'planet-btn'); fb.type = 'button'; fb.setAttribute('aria-label', 'Meteor shower');
-      fb.innerHTML = '<span style="font-size:40px;line-height:86px">☄️</span>';
+      var fb = el('button', 'planet-btn'); fb.type = 'button'; fb.setAttribute('aria-label', 'The Meteor King');
+      fb.innerHTML = '<span class="map-boss">' + BOSS_SVG + '</span>';
       fb.addEventListener('click', function(){
         sfx.play('tap');
         if (next !== -1){ toast('Visit every planet first!'); return; }
@@ -275,8 +332,8 @@
       });
       fin.appendChild(fb);
       var fl = el('div', 'map-label');
-      fl.appendChild(el('span', 'map-word', 'Meteor shower'));
-      fl.appendChild(el('span', 'map-planet', S.week.finale ? 'Done ✓' : 'Final challenge'));
+      fl.appendChild(el('span', 'map-word', 'Meteor King'));
+      fl.appendChild(el('span', 'map-planet', S.week.finale ? 'Beaten ✓' : 'Boss battle'));
       fin.appendChild(fl);
       map.appendChild(fin);
     }
@@ -290,12 +347,12 @@
   function startPlanet(i){
     var w = S.words[i];
     var stat = C.normalizeStat(S.stats[w], w);
-    P = { review: false, i: i, word: w, planet: planetOf(i), stat: stat, acts: C.activitiesFor(stat.level), step: 0 };
+    P = { review: false, i: i, word: w, planet: planetOf(i), stat: stat, acts: C.activitiesFor(stat.level, stat, w), step: 0 };
     go('flight');
   }
   ENTER.flight = function(){
-    var p = P.review ? { name: 'the Meteor Shower' } : P.planet;
-    $('#flightRocket').innerHTML = ROCKET_SVG;
+    var p = P.review ? { name: 'the Meteor King' } : P.planet;
+    $('#flightRocket').innerHTML = rocketSvg();
     $('#flightText').textContent = 'Flying to ' + p.name + '…';
     noBuddies();
     sfx.play('warp');
@@ -310,13 +367,58 @@
     var box = $('#steps'); box.innerHTML = '';
     var n = P.review ? P.list.length : P.acts.length;
     for (var k = 0; k < n; k++){
-      var i = el('i', k < P.step ? 'done' : (k === P.step ? 'now' : ''), k < P.step ? '✓' : (P.review ? '☄️' : ACT_ICON[P.acts[k]]));
+      var i = el('i', k < P.step ? 'done' : (k === P.step ? 'now' : ''), k < P.step ? '✓' : (P.review ? '👑' : ACT_ICON[P.acts[k]]));
       box.appendChild(i);
     }
-    $('#planetTag').textContent = P.review ? 'Meteor shower' : P.planet.name;
+    $('#planetTag').textContent = P.review ? 'Boss battle' : P.planet.name;
   }
+  /* ---------------- the Meteor King ---------------- */
+  var BOSS_SVG = '<svg viewBox="0 0 120 120" aria-hidden="true">' +
+    '<path d="M60 8 C92 8 112 30 112 60 C112 92 90 112 60 112 C28 112 8 92 8 60 C8 30 30 8 60 8Z" fill="#7A5A48" stroke="#2A1810" stroke-width="5"/>' +
+    '<circle cx="36" cy="40" r="9" fill="#5B4034"/><circle cx="84" cy="84" r="11" fill="#5B4034"/><circle cx="88" cy="36" r="6" fill="#5B4034"/>' +
+    '<path d="M22 12 l10 14 8 -18 8 16 12 -20 12 20 8 -16 8 18 10 -14 -2 22 H24 Z" fill="#FFC53D" stroke="#8A5A08" stroke-width="3" stroke-linejoin="round"/>' +
+    '<path d="M34 54 L52 60 M86 54 L68 60" stroke="#2A1810" stroke-width="5" stroke-linecap="round"/>' +
+    '<circle cx="44" cy="66" r="8" fill="#fff" stroke="#2A1810" stroke-width="3"/><circle cx="76" cy="66" r="8" fill="#fff" stroke="#2A1810" stroke-width="3"/>' +
+    '<circle cx="46" cy="67" r="4" fill="#14213D"/><circle cx="74" cy="67" r="4" fill="#14213D"/>' +
+    '<path d="M44 90 Q60 80 76 90" fill="none" stroke="#2A1810" stroke-width="5" stroke-linecap="round"/>' +
+    '<path d="M4 44 q-10 -8 -2 -18 M116 76 q10 6 2 18" stroke="#FF8A1F" stroke-width="6" stroke-linecap="round" fill="none"/></svg>';
+  function drawBoss(){
+    var old = $('#bossBar'); if (old) old.remove();
+    if (!P || !P.review) return;
+    var b = el('div', 'boss'); b.id = 'bossBar';
+    var hp = 1 - P.hits / P.list.length;
+    b.innerHTML = '<div class="boss-face">' + BOSS_SVG + '</div><div class="boss-info"><span class="boss-name">The Meteor King</span>' +
+      '<span class="boss-hp"><i style="width:' + Math.round(hp * 100) + '%"></i></span></div>';
+    $('#playCard').insertBefore(b, $('#activity'));
+  }
+  /* a laser from the launch pad, and the boss loses a chunk of health */
+  function hitBoss(){
+    return new Promise(function(resolve){
+      var b = $('#bossBar');
+      if (!b){ resolve(); return; }
+      P.hits++;
+      var face = $('.boss-face', b).getBoundingClientRect();
+      var laser = el('div', 'boss-laser');
+      var fromY = window.innerHeight - 40, toY = face.top + face.height / 2;
+      laser.style.left = (face.left + face.width / 2 - 4) + 'px'; laser.style.top = toY + 'px'; laser.style.height = (fromY - toY) + 'px';
+      document.body.appendChild(laser);
+      sfx.play('zap');
+      try { laser.animate([{ transform: 'scaleY(0)', opacity: 1 }, { transform: 'scaleY(1)', opacity: 1, offset: 0.4 }, { transform: 'scaleY(1)', opacity: 0 }], { duration: 520 }); } catch (e){}
+      later(function(){
+        laser.remove();
+        sfx.play('explode');
+        b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit');
+        $('.boss-hp i', b).style.width = Math.round((1 - P.hits / P.list.length) * 100) + '%';
+        if (P.hits >= P.list.length){ b.classList.add('dead'); sfx.play('fanfare'); confetti(); }
+        env.react('cheer');
+        later(resolve, P.hits >= P.list.length ? 900 : 400);
+      }, 300);
+    });
+  }
+
   ENTER.play = function(){
     renderSteps();
+    drawBoss();
     $('#btnPlayBack').textContent = '‹ Map';
     buddies(pickBuddies(), false, true);
     runStep();
@@ -331,12 +433,12 @@
     var word = P.review ? P.list[P.step] : P.word;
     var st = stepTok, doneOnce = false;
     ACT[act]({
-      word: word, root: root, tok: st, stat: P.stat, review: P.review,
+      word: word, root: root, tok: st, stat: P.stat, review: P.review, sentence: S.sentences[word] || '',
       done: function(res){ if (doneOnce || st !== stepTok) return; doneOnce = true; afterStep(act, word, res || {}, st); }
     });
   }
   function afterStep(act, word, res, st){
-    if (act === 'build' || act === 'missing'){
+    if (act === 'build' || act === 'missing' || act === 'race'){
       env.react('cheer');
       sfx.play('correct');
       later(function(){
@@ -362,7 +464,7 @@
           return speech.say(pick('spelled', SPELLED) + ' You spelled ' + word.toLowerCase() + '!', { rate: 0.9 });
         }).then(function(){
           if (st !== stepTok) return;
-          if (P.review) return perform(res.slots);
+          if (P.review) return hitBoss().then(function(){ if (st === stepTok) return perform(res.slots); });
           return countdownAndLaunch().then(function(){ if (st === stepTok) return perform(res.slots); });
         }).then(function(){
           if (st !== stepTok) return;
@@ -387,7 +489,7 @@
         if (st !== stepTok){ cd.remove(); resolve(); return; }
         if (n > 0){ cd.innerHTML = '<span>' + n + '</span>'; sfx.play('countdown'); speech.say(String(n), { dedupeMs: 0, rate: 1 }); n--; later(tick, 750); return; }
         cd.innerHTML = '<span>GO!</span>'; sfx.play('go'); sfx.play('blastoff');
-        var r = el('div', 'launch-rocket'); r.innerHTML = ROCKET_SVG; document.body.appendChild(r);
+        var r = el('div', 'launch-rocket'); r.innerHTML = rocketSvg(); document.body.appendChild(r);
         var startY = window.innerHeight - 200;
         try {
           r.animate([{ transform: 'translateY(' + startY + 'px)' }, { transform: 'translateY(' + (startY + 20) + 'px)', offset: 0.15 }, { transform: 'translateY(-260px)' }],
@@ -413,9 +515,10 @@
     egg.style.setProperty('--egg', shade(baby.body, 0.55)); egg.style.setProperty('--spot', baby.body);
     egg.hidden = false;
     $('#babyReveal').hidden = true; $('#babyName').hidden = true; $('#btnHatchNext').hidden = true;
+    $('#babyPower').hidden = true; $('#btnHatchCrew').hidden = true;
     $('#hatchHint').hidden = false; $('#hatchHint').textContent = 'Tap the egg!';
     $('#hatchTitle').textContent = 'A surprise!';
-    buddies(C.CHAR_ORDER.slice(), true, true);
+    buddies(S.roster.slice(), true, true);
     later(function(){ speech.say('Something is hatching! Tap the egg!', { rate: 0.95 }); }, 400);
     setNudge(function(){ if (!hatchState.open){ wobble(); speech.say('Tap the egg!', { dedupeMs: 0 }); } });
   };
@@ -446,6 +549,9 @@
       if (S.week.done.indexOf(P.i) === -1) S.week.done.push(P.i);
       S.week.eggs[P.i] = h.seed;
     }
+    /* the whole crew grows a little with every planet */
+    var ap = C.awardPlanet(S.crew, S.roster);
+    S.crew = ap.crew;
     save();
     later(function(){
       egg.hidden = true;
@@ -456,13 +562,18 @@
       $('#hatchTitle').textContent = 'A new friend!';
       confetti(); sfx.play('fanfare');
       env.react('cheer');
-      speech.say('Meet ' + h.baby.name + '! A baby ' + { rex: 'T rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[h.baby.kind] + '!', { rate: 0.95 });
+      var pw = C.POWERS[h.baby.power];
+      var pl = $('#babyPower'); pl.textContent = 'Super power: ' + pw.icon + ' ' + pw.name; pl.hidden = false;
+      $('#btnHatchCrew').hidden = false;
+      speech.say('Meet ' + h.baby.name + '! A baby ' + { rex: 'T rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[h.baby.kind] + ' who ' + pw.says + '!', { rate: 0.95 });
+      setTimeout(function(){ celebrate(ap.ups); }, 2400);
       var more = C.nextPlanet(S.week, S.words.length);
       var nb = $('#btnHatchNext');
-      nb.textContent = more !== -1 ? 'Next planet ›' : 'Meteor shower! ›';
+      nb.textContent = more !== -1 ? 'Next planet ›' : 'Boss battle! ›';
       nb.hidden = false;
     }, 420);
   }
+  $('#btnHatchCrew').addEventListener('click', function(){ sfx.play('tap'); go('base', { pick: hatchState && hatchState.baby.id }); });
   $('#btnHatchNext').addEventListener('click', function(){
     sfx.play('tap');
     var more = C.nextPlanet(S.week, S.words.length);
@@ -470,78 +581,169 @@
   });
 
   /* ============================================================
-     METEOR SHOWER — the spaced, from-memory review
+     THE METEOR KING — the spaced, from-memory review, as a boss battle
      ============================================================ */
   function startFinale(){
     var list = C.reviewQueue(S.words, S.stats, Math.min(4, S.words.length));
-    P = { review: true, list: list, step: 0, stat: null, acts: [] };
+    P = { review: true, list: list, step: 0, stat: null, acts: [], hits: 0 };
     go('flight');
   }
+  /* beating the Meteor King the first time this week earns a rocket part */
   function finishFinale(){
-    S.week.finale = true; save();
-    go('done');
+    var first = !S.week.finale;
+    S.week.finale = true;
+    var before = C.skinsUnlocked(S.parts).length;
+    if (first) S.parts++;
+    save();
+    go('done', { part: first, newSkin: C.skinsUnlocked(S.parts).length > before });
   }
 
   /* ============================================================
      MISSION COMPLETE
      ============================================================ */
-  ENTER.done = function(){
+  ENTER.done = function(arg){
+    var dp = $('#donePart');
+    dp.hidden = !(arg && arg.part);
+    if (arg && arg.part){
+      var nx = C.nextSkin(S.parts);
+      dp.innerHTML = '<span class="pt">🔩</span><span>You won a rocket part!' + (arg.newSkin ? ' New rocket paint in the Hangar!' : (nx ? ' ' + (nx.parts - S.parts) + ' more for the next paint job.' : '')) + '</span>';
+      later(function(){ speech.say(arg.newSkin ? 'You beat the Meteor King and won a rocket part! There is new paint in the hangar!' : 'You beat the Meteor King and won a rocket part!', { rate: 0.95 }); }, 3200);
+    }
     $('#doneLine').textContent = 'You spelled all ' + S.words.length + ' word' + (S.words.length === 1 ? '' : 's') + ' and hatched ' + S.week.done.length + ' baby dino' + (S.week.done.length === 1 ? '' : 's') + '!';
     var box = $('#doneWords'); box.innerHTML = '';
     S.words.forEach(function(w){ box.appendChild(el('span', null, w.toLowerCase())); });
     applyPlanet(planetOf(0));
     confetti(); sfx.play('fanfare');
-    buddies(C.CHAR_ORDER.slice(), true, true);
+    buddies(S.roster.slice(), true, true);
     later(function(){ env.react('cheer'); }, 800);
     later(function(){ speech.say('Mission complete! Amazing work, Grayson!', { rate: 0.92 }); }, 500);
     var again = function(){ env.react('cheer'); later(again, 4200); };
     later(again, 4200);
   };
+  /* ============================================================
+     HANGAR
+     ============================================================ */
+  ENTER.hangar = function(){
+    noBuddies();
+    var box = $('#skins'); box.innerHTML = '';
+    var have = C.skinsUnlocked(S.parts), nx = C.nextSkin(S.parts);
+    $('#hangarParts').textContent = '🔩 ' + S.parts;
+    $('#hangarNote').textContent = nx ? 'Beat the Meteor King at the end of each week to win rocket parts. ' + (nx.parts - S.parts) + ' more for ' + nx.name + '!' : 'You have every rocket! Amazing!';
+    C.ROCKET_SKINS.forEach(function(k){
+      var open = have.indexOf(k.id) !== -1;
+      var b = el('button', 'skin' + (k.id === S.skin ? ' on' : '') + (open ? '' : ' locked')); b.type = 'button';
+      b.innerHTML = rocketSvg(k.id) + '<span class="sn">' + k.name + '</span><span class="need">' + (open ? (k.id === S.skin ? 'Flying this one' : 'Tap to fly') : '🔩 ' + k.parts + ' parts') + '</span>';
+      b.setAttribute('aria-label', k.name + (open ? '' : ', locked'));
+      b.addEventListener('click', function(){
+        if (!open){ sfx.play('wrong'); speech.say('You need ' + k.parts + ' rocket parts for ' + k.name + '.', { rate: 0.95 }); return; }
+        S.skin = k.id; save(); sfx.play('powerup');
+        speech.say(k.name + ' rocket, ready for launch!', { rate: 0.95 });
+        ENTER.hangar();
+      });
+      box.appendChild(b);
+    });
+  };
+
   $('#btnDoneBase').addEventListener('click', function(){ sfx.play('tap'); go('base'); });
   $('#btnDoneHome').addEventListener('click', function(){ sfx.play('tap'); go('home'); });
 
   /* ============================================================
      DINO BASE — every baby he has ever hatched, living together
      ============================================================ */
-  var baseLoop = null;
-  ENTER.base = function(){
+  var baseLoop = null, picked = null;
+  function stars(level){
+    var h = '';
+    for (var k = 1; k <= C.MAX_LEVEL; k++) h += '<span' + (k <= level ? '' : ' class="off"') + '>★</span>';
+    return h;
+  }
+  function speciesName(kind){ return { rex: 'T. rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[kind]; }
+  function showInfo(m){
+    var box = $('#crewInfo');
+    if (!m){ box.innerHTML = '<span>Every planet makes your crew stronger!</span>'; return; }
+    var pw = m.power ? C.POWERS[m.power] : null;
+    var toNext = C.xpToNext(m.xp), span = m.level >= C.MAX_LEVEL ? 1 : (C.LEVEL_XP[m.level] - C.LEVEL_XP[m.level - 1]);
+    var pct = m.level >= C.MAX_LEVEL ? 100 : Math.round((1 - toNext / span) * 100);
+    box.innerHTML = '<b>' + m.name + '</b><span>' + (m.orig ? '' : (m.grow === 'grown' ? '' : m.grow + ' ')) + speciesName(m.kind) +
+      (pw ? ' · ' + pw.icon + ' ' + pw.name : '') + '</span><span class="xp" title="to next level"><i style="width:' + pct + '%"></i></span><span>Lv ' + m.level + '</span>';
+  }
+  function drawCrew(){
+    var box = $('#crewSlots'); box.innerHTML = '';
+    S.roster.forEach(function(id){
+      var m = C.memberInfo(S, id);
+      var b = el('button', 'crew-slot'); b.type = 'button';
+      b.setAttribute('data-id', id);
+      b.setAttribute('aria-label', m.name + ', level ' + m.level);
+      b.innerHTML = '<span class="art">' + memberArt(m) + '</span><span class="nm">' + m.name + '</span><span class="lv">' + stars(m.level) + '</span>' +
+        (m.power ? '<span class="pw">' + C.POWERS[m.power].icon + '</span>' : '');
+      b.addEventListener('click', function(){ tapSlot(id, b); });
+      box.appendChild(b);
+    });
+    $all('.crew-slot').forEach(function(x){ x.classList.toggle('target', !!picked); });
+    $('#crewHint').textContent = picked ? 'Now tap a crew spot to swap in ' + C.memberInfo(S, picked).name : 'Tap a dino below, then a crew spot to swap';
+  }
+  function tapSlot(id, btn){
+    sfx.play('tap');
+    if (picked){
+      var incoming = C.memberInfo(S, picked), leaving = C.memberInfo(S, id);
+      S.roster = C.swapRoster(S.roster, id, picked);
+      picked = null;
+      save(); syncCast();
+      sfx.play('powerup');
+      speech.say(incoming.name + ' joins the crew!', { rate: 0.95 });
+      toast(incoming.name + ' is in! ' + leaving.name + ' takes a rest.');
+      ENTER.base({ quiet: true });
+      var nb = $('.crew-slot[data-id="' + incoming.id + '"]');
+      if (nb) nb.classList.add('swapped');
+      return;
+    }
+    var m = C.memberInfo(S, id);
+    showInfo(m);
+    speech.say(m.name + '! Level ' + m.level + '.' + (m.power ? ' ' + C.POWERS[m.power].name + '!' : ''), { rate: 1 });
+  }
+  ENTER.base = function(arg){
     noBuddies();
     applyPlanet(C.PLANETS[4]);
+    if (arg && arg.pick) picked = arg.pick;
+    if (picked && S.roster.indexOf(picked) !== -1) picked = null;
     var box = $('#babies'); box.innerHTML = '';
-    $('#baseCount').textContent = S.babies.length ? S.babies.length + ' dino' + (S.babies.length === 1 ? '' : 's') : '';
-    $('#baseEmpty').hidden = S.babies.length > 0;
-    /* the babies stand on the ground in up to three rows: the back rows a
-       little higher and smaller, so a big family reads as a crowd, not a pile */
+    var everyone = C.allMembers(S);
+    $('#baseCount').textContent = everyone.length + ' dinos';
+    drawCrew();
+    showInfo(picked ? C.memberInfo(S, picked) : null);
+    /* everyone not in the crew hangs out on the ground (the newest 24) */
+    var bench = everyone.filter(function(m){ return S.roster.indexOf(m.id) === -1; });
+    var orig = bench.filter(function(m){ return m.orig; }), kids = bench.filter(function(m){ return !m.orig; }).slice(-24);
+    var list = orig.concat(kids).map(function(m){ return C.memberInfo(S, m.id); });
+    $('#baseEmpty').hidden = list.length > 0;
     var W = window.innerWidth, gy = groundY();
-    var list = S.babies.slice(-24);
     var size = clamp(Math.floor(W / 4.4), 72, 170);
     var perRow = Math.max(2, Math.floor((W - 12) / (size * 0.72)));
     var rows = Math.min(3, Math.ceil(list.length / perRow));
-    var babies = list.map(function(rec, i){
-      var b = C.makeBaby(rec.seed);
-      var row = rows - 1 - (i % rows);                  /* 0 = front */
-      var k = 1 - row * 0.14, s = size * k;
-      var node = el('button', 'baby'); node.type = 'button';
-      node.style.width = node.style.height = s + 'px';
+    var babies = list.map(function(m, i){
+      var row = rows - 1 - (i % rows);
+      var k = (1 - row * 0.14) * (0.8 + 0.2 * m.scale), s2 = size * k;
+      var node = el('button', 'baby' + (m.id === picked ? ' picked' : '')); node.type = 'button';
+      node.style.width = node.style.height = s2 + 'px';
       node.style.zIndex = String(10 - row);
-      node.innerHTML = babyArt(b) + '<span class="tag">' + b.name + '</span>';
-      node.setAttribute('aria-label', b.name);
-      node.querySelectorAll('.eye').forEach(function(e){ e.style.animationDelay = (-Math.random() * 4).toFixed(2) + 's'; });
+      node.innerHTML = memberArt(m) + '<span class="tag">' + m.name + '</span>' + (m.power ? '<span class="ptag">' + C.POWERS[m.power].icon + '</span>' : '');
+      node.setAttribute('aria-label', m.name);
       box.appendChild(node);
       var inRow = Math.ceil(list.length / rows), slot = Math.floor(i / rows);
-      var lo = 6, hi = W - s - 6;
-      var x = lo + (hi - lo) * (inRow === 1 ? 0.5 : slot / (inRow - 1)) + (Math.random() - 0.5) * s * 0.3;
-      var o = { node: node, b: b, s: s, lo: lo, hi: hi, x: clamp(x, lo, hi), baseY: gy - s * 0.93 - row * size * 0.2,
+      var lo = 6, hi = W - s2 - 6;
+      var x = lo + (hi - lo) * (inRow === 1 ? 0.5 : slot / (inRow - 1)) + (Math.random() - 0.5) * s2 * 0.3;
+      var o = { node: node, m: m, s: s2, lo: lo, hi: hi, x: clamp(x, lo, hi), baseY: gy - s2 * 0.93 - row * size * 0.2,
                 face: Math.random() < 0.5 ? 1 : -1, tx: null, next: performance.now() + 600 + Math.random() * 2400, hop: 0, hopT: 0 };
       node.addEventListener('click', function(){
         sfx.play('giggle');
         o.hopT = performance.now(); o.hop = 1;
-        node.classList.add('named');
-        speech.say(b.name + '!', { rate: 1.05 });
-        setTimeout(function(){ node.classList.remove('named'); }, 1800);
+        picked = m.id;
+        $all('#babies .baby').forEach(function(n){ n.classList.toggle('picked', n === node); });
+        drawCrew(); showInfo(m);
+        speech.say(m.name + '!' + (m.power ? ' ' + C.POWERS[m.power].name + '.' : '') + ' Tap a crew spot!', { rate: 1.02 });
       });
       return o;
     });
+    if (baseLoop) cancelAnimationFrame(baseLoop);
     var last = performance.now(), mine = tok;
     function frame(now){
       if (mine !== tok){ baseLoop = null; return; }
@@ -562,9 +764,12 @@
       baseLoop = requestAnimationFrame(frame);
     }
     if (babies.length) baseLoop = requestAnimationFrame(frame);
-    later(function(){
-      speech.say(S.babies.length ? 'Welcome to Dino Base! You have ' + S.babies.length + ' baby dino' + (S.babies.length === 1 ? '' : 's') + '!' : 'Finish a planet to hatch your first baby dino!', { rate: 0.95 });
-    }, 400);
+    if (!arg || !arg.quiet){
+      later(function(){
+        if (picked){ var pm = C.memberInfo(S, picked); speech.say('Tap a crew spot to put ' + pm.name + ' in your crew!', { rate: 0.95 }); return; }
+        speech.say(list.length ? 'Welcome to Dino Base! Pick your crew of four.' : 'Finish a planet to hatch your first baby dino!', { rate: 0.95 });
+      }, 400);
+    }
   };
   LEAVE.base = function(){ if (baseLoop) cancelAnimationFrame(baseLoop); baseLoop = null; };
 
@@ -606,9 +811,33 @@
       var li = el('li');
       li.appendChild(el('span', 'n', String(i + 1)));
       li.appendChild(el('span', 'w', w.toLowerCase()));
+      /* an optional example sentence for the word, used by Spell Check */
+      var ed = el('button', 'x pen', '✎'); ed.type = 'button'; ed.setAttribute('aria-label', 'Sentence for ' + w.toLowerCase());
+      li.appendChild(ed);
       var x = el('button', 'x', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Remove ' + w.toLowerCase());
       x.addEventListener('click', function(){ setWords(C.removeWord(S.words, w)); });
-      li.appendChild(x); ul.appendChild(li);
+      li.appendChild(x);
+      var sub = el('div', 'sent-row');
+      if (S.sentences[w]) sub.appendChild(el('span', 'sent', '“' + S.sentences[w] + '”'));
+      li.appendChild(sub);
+      ed.addEventListener('click', function(){
+        sub.innerHTML = '';
+        var f = el('form', 'sent-edit'); f.setAttribute('autocomplete', 'off');
+        var inp = el('input'); inp.type = 'text'; inp.value = S.sentences[w] || ''; inp.placeholder = 'e.g. Mum said we can go.';
+        inp.setAttribute('aria-label', 'Sentence using ' + w.toLowerCase()); inp.maxLength = 140;
+        var ok = el('button', 'btn btn-blue small', 'Save'); ok.type = 'submit';
+        var msg = el('p', 'note');
+        f.appendChild(inp); f.appendChild(ok); sub.appendChild(f); sub.appendChild(msg);
+        f.addEventListener('submit', function(ev){
+          ev.preventDefault();
+          var t = inp.value.replace(/\s+/g, ' ').trim();
+          if (t && !C.sentenceHas(t, w)){ msg.className = 'note warn'; msg.textContent = 'The sentence needs the word "' + w.toLowerCase() + '" in it.'; return; }
+          if (t) S.sentences[w] = t; else delete S.sentences[w];
+          save(); drawList();
+        });
+        inp.focus();
+      });
+      ul.appendChild(li);
     });
     $('#listCount').textContent = S.words.length ? S.words.length + (S.words.length === 1 ? ' word' : ' words') : '';
     $('#btnSavePlay').disabled = !S.words.length; $('#btnSavePlay').style.opacity = S.words.length ? '' : '.5';

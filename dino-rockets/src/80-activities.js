@@ -403,7 +403,7 @@ function createActivities(env){
     var posMiss = {};
     root.innerHTML = '';
     var row = el('div', 'prompt-row');
-    var pr = el('p', 'prompt', ctx.review ? 'Meteor shower! Spell it from memory' : 'Blast off! Spell it from memory');
+    var pr = el('p', 'prompt', ctx.review ? 'Zap the Meteor King! Spell it' : 'Blast off! Spell it from memory');
     row.appendChild(pr);
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
@@ -469,8 +469,240 @@ function createActivities(env){
     });
   }
 
+  /* ============================================================
+     LETTER RACE — the word flashes up, vanishes, and he races a comet
+     to catch its letters as they float about. Winning is a bonus;
+     finishing is always a success.
+     ============================================================ */
+  function race(ctx){
+    var w = ctx.word, root = ctx.root, pos = 0, finished = false, started = false, misses = 0, t0 = 0, raf = null, won = false;
+    root.innerHTML = '';
+    var row = el('div', 'prompt-row');
+    var pr = el('p', 'prompt'); pr.innerHTML = 'Letter race! <b>' + w.toLowerCase() + '</b>';
+    row.appendChild(pr);
+    var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
+    root.appendChild(row);
+    var slotsBox = el('div', 'slots'); root.appendChild(slotsBox);
+    var track = el('div', 'race-track');
+    var me = el('i', 'race-me', '🚀'), comet = el('i', 'race-comet', '☄️'), flag = el('i', 'race-flag', '🏁');
+    track.appendChild(flag); track.appendChild(comet); track.appendChild(me);
+    root.appendChild(track);
+    var field = el('div', 'zap-field race-field'); root.appendChild(field);
+    root.style.setProperty('--tile', fitTile(root, w.length, 64) + 'px');
+    var slots = w.split('').map(function(){ var s = slotEl(); slotsBox.appendChild(s); return s; });
+    var budget = 3500 + w.length * 2300;
+    /* he sees it first, then it goes and he has to remember it */
+    slots.forEach(function(s, i){ fillSlot(s, w[i]); s.classList.add('preview'); });
+    var tiles = [];
+    function begin(){
+      if (!env.alive(ctx.tok)) return;
+      slots.forEach(function(s){ s.classList.remove('filled', 'preview'); s.querySelector('.up').textContent = ''; s.querySelector('.lo').textContent = ''; });
+      markNext(slots, 0);
+      var W = field.clientWidth, H = field.clientHeight;
+      var letters = C.raceLetters(w);
+      /* start spread over a grid, so no letter begins hidden under another */
+      var cols = Math.max(2, Math.ceil(Math.sqrt(letters.length * W / Math.max(1, H)))), rowsN = Math.ceil(letters.length / cols);
+      var cells = C.shuffle(letters.map(function(_, i){ return i; }));
+      letters.forEach(function(ch, i){
+        var t = tileEl(ch, 'button'); t.classList.add('race-tile');
+        field.appendChild(t);
+        var tw = t.offsetWidth || 56, th = t.offsetHeight || 60;
+        var cell = cells[i], cx = (cell % cols + 0.5) * W / cols, cy = (Math.floor(cell / cols) + 0.5) * H / rowsN;
+        var o = { el: t, ch: ch, x: Math.max(2, Math.min(W - tw - 2, cx - tw / 2 + (Math.random() - 0.5) * 10)), y: Math.max(2, Math.min(H - th - 2, cy - th / 2 + (Math.random() - 0.5) * 10)), w: tw, h: th,
+                  vx: (Math.random() < 0.5 ? -1 : 1) * (0.03 + Math.random() * 0.03), vy: (Math.random() < 0.5 ? -1 : 1) * (0.02 + Math.random() * 0.03), used: false };
+        t.addEventListener('click', function(){ tap(o); });
+        tiles.push(o);
+      });
+      started = true; t0 = performance.now();
+      env.sfx.play('go');
+      env.speech.say('Go! Spell ' + w.toLowerCase(), { rate: 0.9 });
+      raf = requestAnimationFrame(loop);
+    }
+    var last = 0;
+    function loop(now){
+      if (!env.alive(ctx.tok) || !field.isConnected){ raf = null; return; }
+      var dt = Math.min(48, now - (last || now)); last = now;
+      var W = field.clientWidth, H = field.clientHeight;
+      tiles.forEach(function(o){
+        if (o.used) return;
+        o.x += o.vx * dt; o.y += o.vy * dt;
+        if (o.x < 2 || o.x > W - o.w - 2){ o.vx = -o.vx; o.x = Math.max(2, Math.min(W - o.w - 2, o.x)); }
+        if (o.y < 2 || o.y > H - o.h - 2){ o.vy = -o.vy; o.y = Math.max(2, Math.min(H - o.h - 2, o.y)); }
+      });
+      /* letters bump off each other, so the one he needs is never hidden */
+      var live = tiles.filter(function(o){ return !o.used; });
+      for (var i = 0; i < live.length; i++) for (var j = i + 1; j < live.length; j++){
+        var a = live[i], b = live[j];
+        var dx = (b.x + b.w / 2) - (a.x + a.w / 2), dy = (b.y + b.h / 2) - (a.y + a.h / 2);
+        var ox = (a.w + b.w) / 2 + 4 - Math.abs(dx), oy = (a.h + b.h) / 2 + 4 - Math.abs(dy);
+        if (ox > 0 && oy > 0){
+          if (ox < oy){ var sx = dx < 0 ? -1 : 1; a.x -= sx * ox / 2; b.x += sx * ox / 2; var tvx = a.vx; a.vx = b.vx; b.vx = tvx; }
+          else { var sy = dy < 0 ? -1 : 1; a.y -= sy * oy / 2; b.y += sy * oy / 2; var tvy = a.vy; a.vy = b.vy; b.vy = tvy; }
+        }
+      }
+      live.forEach(function(o){
+        o.x = Math.max(2, Math.min(W - o.w - 2, o.x)); o.y = Math.max(2, Math.min(H - o.h - 2, o.y));
+        o.el.style.transform = 'translate(' + o.x.toFixed(1) + 'px,' + o.y.toFixed(1) + 'px)';
+      });
+      if (!finished){
+        var cp = Math.min(1, (now - t0) / budget);
+        comet.style.left = (cp * 88) + '%';
+        me.style.left = (pos / w.length * 88) + '%';
+      }
+      raf = requestAnimationFrame(loop);
+    }
+    function tap(o){
+      if (!started || finished || o.used) return;
+      env.react('look', centre(o.el));
+      if (o.ch === w[pos]){
+        var i = pos; pos++; misses = 0;
+        o.used = true;
+        tiles.forEach(function(q){ q.el.classList.remove('next-hint'); });
+        env.sfx.play('place');
+        env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'race:' + i });
+        o.el.style.transform = 'translate(' + o.x.toFixed(1) + 'px,' + o.y.toFixed(1) + 'px)';
+        flyTo(o.el, slots[i], function(){
+          o.el.classList.add('used');
+          fillSlot(slots[i], w[i]); markNext(slots, pos);
+          me.style.left = (pos / w.length * 88) + '%';
+          if (pos === w.length && !finished){
+            finished = true; env.clearNudge();
+            won = performance.now() - t0 < budget;
+            track.classList.add(won ? 'won' : 'done');
+            if (won){ env.sfx.play('powerup'); env.toast('🏁 You beat the comet!'); }
+            ctx.done({ slots: slots, won: won });
+          } else if (pos < w.length) env.react('hop', centre(slots[i]));
+        });
+      } else {
+        misses++; shake(o.el); env.sfx.play('wrong'); env.react('oops');
+        if (misses >= 2){
+          var right = tiles.filter(function(q){ return !q.used && q.ch === w[pos]; })[0];
+          if (right) right.el.classList.add('next-hint');
+          env.later(function(){ env.speech.say('Find ' + env.soundOf(w[pos]), { dedupeMs: 0 }); }, 300);
+        }
+      }
+    }
+    env.later(function(){ env.speech.say('Look! ' + w.toLowerCase() + '. Remember it!', { rate: 0.85 }); }, 300);
+    env.later(begin, 2300);
+    env.setNudge(function(){
+      if (finished || !started) return;
+      var right = tiles.filter(function(q){ return !q.used && q.ch === w[pos]; })[0];
+      if (right){ right.el.classList.add('next-hint'); env.react('wave', centre(right.el)); }
+      env.speech.say('Find ' + env.soundOf(w[pos]), { dedupeMs: 0, rate: 0.85 });
+    });
+  }
+
+  /* ============================================================
+     SPELL CHECK — which one is spelled right? (in his grown-up's
+     sentence, when there is one)
+     ============================================================ */
+  function check(ctx){
+    var w = ctx.word, root = ctx.root, finished = false;
+    root.innerHTML = '';
+    var row = el('div', 'prompt-row');
+    row.appendChild(el('p', 'prompt', 'Which one is spelled right?'));
+    var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
+    root.appendChild(row);
+    var sentence = ctx.sentence || '';
+    if (sentence){
+      var sp = el('p', 'sentence');
+      sentence.split(/(\s+)/).forEach(function(tok){
+        if (tok.replace(/[^A-Za-z]/g, '').toUpperCase() === w) sp.appendChild(el('span', 'blank', '?'));
+        else sp.appendChild(document.createTextNode(tok));
+      });
+      root.appendChild(sp);
+    }
+    var box = el('div', 'opt-cards');
+    root.appendChild(box);
+    C.checkOptions(w).forEach(function(opt){
+      var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
+      b.addEventListener('click', function(){
+        if (finished || b.classList.contains('nope-done')) return;
+        env.react('look', centre(b));
+        if (opt === w){
+          finished = true; env.clearNudge();
+          b.classList.add('right');
+          $all('.opt-card', box).forEach(function(x){ if (x !== b) x.classList.add('dim'); });
+          env.sfx.play('correct'); env.react('cheer');
+          var blank = $('.blank', root); if (blank){ blank.textContent = w.toLowerCase(); blank.classList.add('fill'); }
+          env.speech.say(env.pick('found', env.FOUND) + ' That spells ' + w.toLowerCase() + '.', { rate: 0.9 }).then(function(){
+            if (env.alive(ctx.tok)) env.later(function(){ ctx.done({}); }, 300);
+          });
+        } else {
+          b.classList.add('nope-done'); shake(b);
+          env.sfx.play('wrong'); env.react('oops');
+          env.later(function(){ env.speech.say('Not that one. Look closely at each letter.', { dedupeMs: 0, rate: 0.9 }); }, 250);
+        }
+      });
+      box.appendChild(b);
+    });
+    env.later(function(){
+      env.speech.say(sentence ? sentence + '. Which ' + w.toLowerCase() + ' is spelled right?' : 'Which one spells ' + w.toLowerCase() + '?', { rate: 0.85 });
+    }, 350);
+    env.setNudge(function(){
+      if (finished) return;
+      var right = $all('.opt-card', box).filter(function(x){ return x.textContent === w.toLowerCase(); })[0];
+      if (right) env.react('wave', centre(right));
+      env.speech.say('Which one spells ' + w.toLowerCase() + '?', { dedupeMs: 0, rate: 0.85 });
+    });
+  }
+
+  /* ============================================================
+     RHYME TIME — which word rhymes? The shared ending lights up.
+     ============================================================ */
+  function rhyme(ctx){
+    var w = ctx.word, root = ctx.root, finished = false;
+    var data = C.rhymeOptions(w);
+    if (!data){ ctx.done({}); return; }
+    var rime = C.rimeOf(w);
+    root.innerHTML = '';
+    var row = el('div', 'prompt-row');
+    var pr = el('p', 'prompt'); pr.innerHTML = 'What rhymes with <b>' + w.toLowerCase() + '</b>?';
+    row.appendChild(pr);
+    var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
+    root.appendChild(row);
+    function withRime(word){
+      var lw = word.toLowerCase(), r = rime.toLowerCase(), at = lw.lastIndexOf(r);
+      if (!r || at === -1 || at + r.length !== lw.length) return document.createTextNode(lw);
+      var f = document.createDocumentFragment();
+      f.appendChild(document.createTextNode(lw.slice(0, at)));
+      f.appendChild(el('span', 'rime', lw.slice(at)));
+      return f;
+    }
+    var big = el('div', 'rhyme-word'); big.appendChild(withRime(w)); root.appendChild(big);
+    var box = el('div', 'opt-cards'); root.appendChild(box);
+    data.options.forEach(function(opt){
+      var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
+      b.addEventListener('click', function(){
+        if (finished || b.classList.contains('nope-done')) return;
+        env.react('look', centre(b));
+        if (opt === data.answer){
+          finished = true; env.clearNudge();
+          b.textContent = ''; b.appendChild(withRime(opt)); b.classList.add('right');
+          $all('.opt-card', box).forEach(function(x){ if (x !== b) x.classList.add('dim'); });
+          env.sfx.play('correct'); env.react('cheer');
+          env.speech.say(w.toLowerCase() + ', ' + opt.toLowerCase() + '. They rhyme!', { rate: 0.85 }).then(function(){
+            if (env.alive(ctx.tok)) env.later(function(){ ctx.done({}); }, 300);
+          });
+        } else {
+          b.classList.add('nope-done'); shake(b);
+          env.sfx.play('wrong'); env.react('oops');
+          env.later(function(){ env.speech.say(w.toLowerCase() + ', ' + opt.toLowerCase() + '. No rhyme. Try another!', { dedupeMs: 0, rate: 0.85 }); }, 250);
+        }
+      });
+      box.appendChild(b);
+    });
+    env.later(function(){
+      env.speech.say('What rhymes with ' + w.toLowerCase() + '? ' + data.options.map(function(x){ return x.toLowerCase(); }).join(', ') + '?', { rate: 0.8 });
+    }, 350);
+    env.setNudge(function(){
+      if (finished) return;
+      env.speech.say('Say them out loud. Which one ends like ' + w.toLowerCase() + '?', { dedupeMs: 0, rate: 0.85 });
+    });
+  }
+
   return {
-    meet: meet, zap: zap, build: build, missing: missing, blast: blast,
+    meet: meet, zap: zap, build: build, missing: missing, blast: blast, race: race, check: check, rhyme: rhyme,
     tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile
   };
 }
