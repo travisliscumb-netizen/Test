@@ -22,7 +22,7 @@ export const LINE_CLEAR_DELAY = 380;
 export const PREVIEW = 5;
 
 export const MODES = {
-  marathon: { goalLines: 150, timeLimit: 0, levelUp: true, maxLevel: 15 },
+  marathon: { goalLines: 200, timeLimit: 0, levelUp: true, maxLevel: 20 },
   sprint: { goalLines: 40, timeLimit: 0, levelUp: false, maxLevel: 1 },
   ultra: { goalLines: 0, timeLimit: 180000, levelUp: false, maxLevel: 1 },
   endless: { goalLines: 0, timeLimit: 0, levelUp: true, maxLevel: 20 }
@@ -36,12 +36,16 @@ const PC_B2B_TETRIS = 3200;
 
 export const CLEAR_NAMES = ['', 'Single', 'Double', 'Triple', 'Tetris'];
 
-/* Milliseconds per row. Tuned to be relaxed, far gentler than the guideline
-   curve (which hits 20G by level 15): 2 s per row at level 1, each level 8%
-   faster, so level 10 is ~1 row/s and level 20 ~2.4 rows/s. Floored at 200 ms. */
+/* Milliseconds per row. A deliberately slow, even ramp across 20 levels:
+   level 1 is 2 s per row and level 20 is ~1.12 s per row (the speed the
+   previous tuning reached at level 8), with the same ratio between each pair
+   of neighbouring levels. */
+export const MAX_LEVEL = 20;
+const SLOWEST_MS = 2000;
+const FASTEST_MS = 2000 * Math.pow(0.92, 7);
 export function gravityInterval(level) {
-  const l = Math.min(Math.max(level, 1), 20);
-  return Math.max(200, 2000 * Math.pow(0.92, l - 1));
+  const l = Math.min(Math.max(level, 1), MAX_LEVEL);
+  return SLOWEST_MS * Math.pow(FASTEST_MS / SLOWEST_MS, (l - 1) / (MAX_LEVEL - 1));
 }
 
 /* mulberry32: tiny, fast, good enough for a piece randomiser. */

@@ -68,9 +68,8 @@ test('spawn: centred in rows 21-22 then drops one row into view', () => {
 
 test('gravity curve: relaxed start, monotone, capped low', () => {
   assert.equal(gravityInterval(1), 2000);
-  for (let l = 2; l <= 20; l++) assert.ok(gravityInterval(l) <= gravityInterval(l - 1));
-  assert.ok(gravityInterval(10) > 900, 'level 10 is about one row per second');
-  assert.ok(gravityInterval(20) >= 400, 'the fastest level is still under 2.5 rows/s');
+  for (let l = 2; l <= 20; l++) assert.ok(gravityInterval(l) < gravityInterval(l - 1), `level ${l} is faster than ${l - 1}`);
+  assert.ok(Math.abs(gravityInterval(20) - 2000 * 0.92 ** 7) < 1e-6, 'level 20 = the old level 8 (~1.12 s/row)');
   assert.equal(gravityInterval(25), gravityInterval(20));
 });
 

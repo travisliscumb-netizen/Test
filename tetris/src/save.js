@@ -62,7 +62,7 @@ function sanitizeSettings(s) {
   out.sdf = num(out.sdf, 0, 100, DEFAULT_SETTINGS.sdf);
   out.music = num(out.music, 0, 1, DEFAULT_SETTINGS.music);
   out.sfx = num(out.sfx, 0, 1, DEFAULT_SETTINGS.sfx);
-  out.startLevel = num(out.startLevel, 1, 15, 1) | 0;
+  out.startLevel = num(out.startLevel, 1, 20, 1) | 0;
   if (!['flat', 'tilt', 'dynamic'].includes(out.view)) out.view = DEFAULT_SETTINGS.view;
   if (!['auto', 'high', 'medium', 'low'].includes(out.quality)) out.quality = 'auto';
   if (!['auto', 'on', 'off'].includes(out.touchControls)) out.touchControls = 'auto';

@@ -625,7 +625,7 @@ $('#to-title').addEventListener('click', () => { audio.play('ui'); goTitle(); })
 
 for (const b of $$('.stepper .step')) {
   b.addEventListener('click', () => {
-    const v = Math.min(15, Math.max(1, S().startLevel + Number(b.dataset.step)));
+    const v = Math.min(20, Math.max(1, S().startLevel + Number(b.dataset.step)));
     store.setSetting('startLevel', v);
     $('#start-level').textContent = String(v);
     audio.play('ui');

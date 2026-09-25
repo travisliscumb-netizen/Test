@@ -38,11 +38,11 @@ runs without a GPU. Screenshots go to `../.shots/`.
 - Super Rotation System with the standard JLSTZ and I wall-kick tables, plus a 180° rotation (SRS+ kicks) as a modern extra.
 - 7-bag randomiser, hold (once per piece), 5-piece preview, ghost piece.
 - 1 s lock delay (double the guideline's 0.5 s) with extended placement: up to 30 resets per new lowest row.
-- A relaxed speed curve, far gentler than the guideline's: 2 s per row at level 1, 8% faster each level (level 10 ≈ 1 row/s, level 20 ≈ 2.4 rows/s).
+- A very relaxed speed curve: 2 s per row at level 1, easing evenly to about 1.1 s per row at level 20 (under 1 row per second even at the top).
 - Scoring: Single/Double/Triple/Tetris; T-Spin, T-Spin Mini (3-corner rule, front corners, and the TST-kick upgrade); back-to-back ×1.5; combos; perfect clears; soft and hard drop points.
 - Top-outs: block out and lock out.
 
-**Modes:** Marathon (150 lines, levels 1–15, selectable start level), Sprint (40 lines against the clock), Ultra (3 minutes for score), Endless (up to level 20).
+**Modes:** Marathon (200 lines, levels 1–20, selectable start level), Sprint (40 lines against the clock), Ultra (3 minutes for score), Endless (up to level 20).
 
 **3D presentation**
 - Bevelled, clear-coated gem blocks under an environment map. Each piece carries a coloured point light that glows onto its neighbours.
