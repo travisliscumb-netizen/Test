@@ -72,6 +72,19 @@
   }
   document.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
 
+  /* Praise that does not repeat itself: the same line every time stops
+     meaning anything by the second week. Never the same one twice running. */
+  var lastLine = {};
+  function pick(kind, list){
+    var pool = list.filter(function(x){ return x !== lastLine[kind]; });
+    var line = pool[Math.floor(Math.random() * pool.length)];
+    lastLine[kind] = line;
+    return line;
+  }
+  var FOUND = ['Yes!', 'You got it!', 'Great listening!', "That's it!", 'Nice one!', 'Correct!'];
+  var SPELLED = ['Awesome!', 'Super!', 'Way to go!', 'Brilliant!', 'Fantastic!', 'Woo hoo!'];
+  var TRY = ['Try again.', 'Not quite. Listen.', 'Almost! Listen again.'];
+
   function soundOf(ch){ return C.letterSound(ch, C.letterOverrides(S)); }
   function sayWord(w, opts){ return speech.say(String(w).toLowerCase(), opts); }
 
@@ -85,9 +98,36 @@
   }
   function alive(mine){ return mine === tok; }
 
+  /*
+    The nudge. A five-year-old who stalls for a few seconds is a
+    five-year-old about to wander off. If nothing is tapped for a while the
+    prompt is said again and a buddy waves at the answer — three times at
+    most, so it helps rather than nags. Any tap resets the clock.
+  */
+  var nudge = null;
+  function setNudge(fn){
+    clearNudge();
+    nudge = { fn: fn, count: 0, id: null, tok: tok };
+    armNudge();
+  }
+  function armNudge(){
+    if (!nudge) return;
+    clearTimeout(nudge.id);
+    if (nudge.count >= 3 || nudge.tok !== tok) return;
+    nudge.id = setTimeout(function(){
+      if (!nudge || nudge.tok !== tok || !stage.idle()) return;
+      nudge.count++;
+      try { nudge.fn(); } catch (e){}
+      armNudge();
+    }, 9000);
+  }
+  function clearNudge(){ if (nudge) clearTimeout(nudge.id); nudge = null; }
+  document.addEventListener('pointerdown', function(){ if (nudge) armNudge(); }, { passive: true });
+
   var ENTER = {};
   function go(name, arg){
     tok++;
+    clearNudge();
     timers.forEach(clearTimeout); timers = [];
     speech.reset();
     if (!stage.idle()) stage.stop(false);
@@ -163,6 +203,7 @@
     s.classList.add('filled');
     s.setAttribute('aria-label', ch);
   }
+  function slotCentre(el){ var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
   function markNext(slots, i){
     slots.forEach(function(s, k){ s.classList.toggle('next', k === i); });
   }
@@ -352,19 +393,25 @@
           sfx.play('correct');
           stage.ambient.react('cheer');
           speech.reset();
-          speech.say('Yes! ' + w.toLowerCase(), { rate: 0.9 });
+          speech.say(pick('found', FOUND) + ' ' + w.toLowerCase(), { rate: 0.9 });
           later(function(){ go('build'); }, 1500);
         } else {
           b.classList.add('wrong');
           sfx.play('wrong');
           stage.ambient.react('oops');
-          later(function(){ sayWord(w, { dedupeMs: 0 }); }, 450);
+          later(function(){ speech.say(pick('try', TRY) + ' ' + w.toLowerCase(), { dedupeMs: 0, rate: 0.85 }); }, 450);
         }
       });
       box.appendChild(b);
     });
     buddies(R.buddies, false);
     later(function(){ if (!locked) speech.say('Find the word. ' + w.toLowerCase(), { rate: 0.85 }); }, 380);
+    setNudge(function(){
+      if (locked) return;
+      var right = $all('#findChoices .choice').filter(function(b){ return b.textContent === w.toLowerCase(); })[0];
+      stage.ambient.react('wave', right ? slotCentre(right) : null);
+      speech.say('Which one says ' + w.toLowerCase() + '?', { dedupeMs: 0, rate: 0.85 });
+    });
   };
   $('#btnFindHear').addEventListener('click', function(){
     var b = $('#btnFindHear');
@@ -471,6 +518,7 @@
       $all('.tile', tray).forEach(function(x){ x.classList.remove('next-hint'); });
       sfx.play('place');
       speech.say(soundOf(w[i]), { dedupeMs: 0, key: 'build:' + i });
+      if (i < w.length - 1) stage.ambient.react('hop', slotCentre(slots[i]));
       flyTo(t, slots[i], function(){
         t.classList.add('used');
         t.style.transform = '';
@@ -517,6 +565,13 @@
     });
     buddies(R.buddies, false);
     later(function(){ speech.say('Build ' + w.toLowerCase(), { rate: 0.85 }); }, 380);
+    setNudge(function(){
+      if (finished) return;
+      hint();
+      var t = $all('.tile.next-hint', tray)[0];
+      stage.ambient.react('wave', t ? slotCentre(t) : null);
+      speech.say('Find ' + soundOf(w[pos]), { dedupeMs: 0, rate: 0.85 });
+    });
   };
   $('#btnBuildHear').addEventListener('click', function(){ sayWord(R.word, { dedupeMs: 0 }); });
 
@@ -571,8 +626,10 @@
         if (ch === w[pos]){
           var i = pos;
           pos++; misses = 0;
+          hunt.tiles.forEach(function(x){ x.classList.remove('next-hint'); });
           sfx.play('place');
           speech.say(soundOf(ch), { dedupeMs: 0, key: 'learn:' + i });
+          if (i < w.length - 1) stage.ambient.react('hop', slotCentre(slots[i]));
           flyTo(t, slots[i], function(){
             t.classList.add('found');
             fillSlot(slots[i], ch);
@@ -584,7 +641,10 @@
           t.classList.remove('nope'); void t.offsetWidth; t.classList.add('nope');
           sfx.play('wrong');
           stage.ambient.react('oops');
-          if (misses >= 2) later(function(){ speech.say('Find ' + soundOf(w[pos]), { dedupeMs: 0 }); }, 300);
+          if (misses >= 2){
+            later(function(){ speech.say('Find ' + soundOf(w[pos]), { dedupeMs: 0 }); }, 300);
+            learnHint();
+          }
         }
       });
       /* the wobble animation must not fight the scatter transform */
@@ -593,6 +653,23 @@
       hunt.tiles.push(t);
     });
     layoutHunt();
+
+    /* glow on the letter he needs next: the same help Build gives */
+    function learnHint(){
+      var need = w[pos], done = false;
+      hunt.tiles.forEach(function(t){
+        var on = !done && !t.classList.contains('found') && t.getAttribute('data-letter') === need;
+        if (on) done = true;
+        t.classList.toggle('next-hint', on);
+      });
+    }
+    setNudge(function(){
+      if (finished) return;
+      learnHint();
+      var t = $all('.tile.next-hint', area)[0];
+      stage.ambient.react('wave', t ? slotCentre(t) : null);
+      speech.say('Find ' + soundOf(w[pos]), { dedupeMs: 0, rate: 0.85 });
+    });
 
     function complete(){
       finished = true;
@@ -603,7 +680,7 @@
       later(function(){
         spellSlots(w, slots).then(function(){
           if (!alive(mine)) return;
-          return speech.say('You spelled ' + w.toLowerCase() + '!', { rate: 0.9 });
+          return speech.say(pick('spelled', SPELLED) + ' You spelled ' + w.toLowerCase() + '!', { rate: 0.9 });
         }).then(function(){
           if (!alive(mine)) return;
           $all('.tile', area).forEach(function(t){ t.classList.add('found'); });

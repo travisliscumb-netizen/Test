@@ -28,40 +28,52 @@ function blobTorso(top, bot, halfW){
     ' C' + L + ' ' + (top + h * 0.28) + ' ' + (100 - halfW * 0.80) + ' ' + top + ' 100 ' + top + ' Z';
 }
 
-/* The shared face. Identical eye shape and spacing for every character. */
 /*
-  The face lives on a visor. Everything expressive is a class the stage
-  toggles on the actor, never a redraw:
-    .eyes      — translated a few px so he can LOOK at a letter or a tap
-    .eye       — blinks (CSS), hidden when the happy arcs show
-    .eye-happy — ^ ^ for a cheer
-    .m-smile / .m-open / .m-oops — the mouth, one visible at a time
-  The idle face is the same friendly smile on all four; the expressions are
-  reactions, as the visual-direction notes ask.
+  THE SHARED FACE — identical on all four, so they read as one cast.
+
+  Big white eyes with dark pupils, brows and a mouth, sitting right on the
+  body. The earlier dark visor looked cool full-size but at phone size it
+  read as sunglasses: the eyes shrank to two glowing dots and every
+  reaction the stage plays (happy, surprised, oops, looking at the letter
+  he just tapped) was close to invisible. A face a five-year-old can read
+  from arm's length is the whole point of having characters react.
+
+  Everything expressive is a class the stage toggles, never a redraw:
+    .eyes          pupils only — translated so he visibly LOOKS at things
+    .eye           whites, pupils, glints — they blink (CSS)
+    .eye-happy     ^ ^ arcs for a cheer
+    .brow          raised for wow, worried for oops
+    .m-smile / .m-open / .m-oops   one mouth visible at a time
+    .sweat         the oops drop
 */
-function faceOf(vt, vw, visorFill, visorStroke, eyeFill){
-  var L = 100 - vw, R = 100 + vw;
-  var lx = L + 13, rx = R - 36, ey = vt + 11;
-  function happy(x){ return '<path class="eye-happy" d="M' + (x + 2) + ' ' + (ey + 14) + ' Q' + (x + 11.5) + ' ' + (ey + 1) + ' ' + (x + 21) + ' ' + (ey + 14) +
-    '" fill="none" stroke="' + eyeFill + '" stroke-width="5" stroke-linecap="round"/>'; }
-  function eye(x){
-    return '<rect class="eye" x="' + x + '" y="' + ey + '" width="23" height="17" rx="8.5" fill="' + eyeFill + '"/>' +
-      '<circle class="eye glint" cx="' + (x + 7) + '" cy="' + (ey + 5.5) + '" r="3" fill="#fff" opacity=".85"/>';
+var FACE_INK = '#14213D';
+function faceOf(vt, stroke){
+  var cy = vt + 14, lx = 81, rx = 119, my = vt + 37;
+  function white(x){
+    return '<ellipse class="eye white" cx="' + x + '" cy="' + cy + '" rx="13.5" ry="15.5" fill="#fff" stroke="' + stroke + '" stroke-width="3.5"/>';
   }
-  var my = vt + 31;
+  function pupil(x){
+    return '<circle class="eye pupil" cx="' + x + '" cy="' + (cy + 1) + '" r="7.5" fill="' + FACE_INK + '"/>' +
+      '<circle class="eye glint" cx="' + (x - 2.6) + '" cy="' + (cy - 2.4) + '" r="2.6" fill="#fff"/>';
+  }
+  function happy(x){
+    return '<path class="eye-happy" d="M' + (x - 11) + ' ' + (cy + 5) + ' Q' + x + ' ' + (cy - 11) + ' ' + (x + 11) + ' ' + (cy + 5) +
+      '" fill="none" stroke="' + FACE_INK + '" stroke-width="5.5" stroke-linecap="round"/>';
+  }
+  function brow(x, cls){
+    return '<path class="brow ' + cls + '" d="M' + (x - 10) + ' ' + (vt - 7) + ' Q' + x + ' ' + (vt - 12) + ' ' + (x + 10) + ' ' + (vt - 7) +
+      '" fill="none" stroke="' + stroke + '" stroke-width="4.5" stroke-linecap="round"/>';
+  }
   return '<g class="head" data-px="100" data-py="' + (vt + 20) + '">' +
-    '<path d="M' + L + ' ' + vt + ' L' + R + ' ' + vt +
-      ' Q' + (R + 5) + ' ' + vt + ' ' + (R - 2) + ' ' + (vt + 8) +
-      ' L' + (R - 9) + ' ' + (vt + 33) + ' Q' + (R - 11) + ' ' + (vt + 39) + ' ' + (R - 18) + ' ' + (vt + 39) +
-      ' L' + (L + 18) + ' ' + (vt + 39) + ' Q' + (L + 11) + ' ' + (vt + 39) + ' ' + (L + 9) + ' ' + (vt + 33) +
-      ' L' + (L + 2) + ' ' + (vt + 8) + ' Q' + (L - 5) + ' ' + vt + ' ' + L + ' ' + vt + ' Z" ' +
-      'fill="' + visorFill + '" stroke="' + visorStroke + '" stroke-width="3.5" stroke-linejoin="round"/>' +
-    /* a sheen across the glass, so it reads as a visor and not a hole */
-    '<path d="M' + (L + 6) + ' ' + (vt + 5) + ' L' + (L + 26) + ' ' + (vt + 5) + ' L' + (L + 16) + ' ' + (vt + 20) + ' L' + (L + 8) + ' ' + (vt + 20) + ' Z" fill="#fff" opacity=".10"/>' +
-    '<g class="eyes">' + eye(lx) + eye(rx) + happy(lx) + happy(rx) + '</g>' +
-    '<path class="m-smile" d="M' + 92 + ' ' + my + ' Q100 ' + (my + 6) + ' 108 ' + my + '" fill="none" stroke="' + eyeFill + '" stroke-width="3.5" stroke-linecap="round"/>' +
-    '<ellipse class="m-open" cx="100" cy="' + (my + 1.5) + '" rx="5.5" ry="4.5" fill="' + eyeFill + '"/>' +
-    '<path class="m-oops" d="M' + 91 + ' ' + (my + 2) + ' q3 -3 6 0 t6 0 t6 0" fill="none" stroke="' + eyeFill + '" stroke-width="3" stroke-linecap="round"/>' +
+    brow(lx, 'brow-l') + brow(rx, 'brow-r') +
+    white(lx) + white(rx) +
+    '<g class="eyes">' + pupil(lx) + pupil(rx) + '</g>' +
+    happy(lx) + happy(rx) +
+    '<path class="m-smile" d="M88 ' + my + ' Q100 ' + (my + 10) + ' 112 ' + my + '" fill="none" stroke="' + FACE_INK + '" stroke-width="4" stroke-linecap="round"/>' +
+    '<g class="m-open"><path d="M87 ' + (my - 2) + ' Q100 ' + (my - 3) + ' 113 ' + (my - 2) + ' Q112 ' + (my + 14) + ' 100 ' + (my + 14) + ' Q88 ' + (my + 14) + ' 87 ' + (my - 2) + ' Z" fill="' + FACE_INK + '"/>' +
+      '<ellipse cx="100" cy="' + (my + 9) + '" rx="6" ry="3.5" fill="#FF7A45"/></g>' +
+    '<path class="m-oops" d="M88 ' + (my + 3) + ' q4 -5 8 0 t8 0 t8 0" fill="none" stroke="' + FACE_INK + '" stroke-width="3.5" stroke-linecap="round"/>' +
+    '<path class="sweat" d="M' + 140 + ' ' + (vt - 16) + ' q-7 10 0 14 q7 -4 0 -14 z" fill="#A9DCFF" stroke="#2F7FD0" stroke-width="2.5" stroke-linejoin="round"/>' +
   '</g>';
 }
 
@@ -117,8 +129,7 @@ function blipArt(){
       '<path d="M126 152 L106 152 L108 180 L130 180 Z" fill="#8F3A0B" stroke="#5E2206" stroke-width="4" stroke-linejoin="round"/>' +
     '</g>' +
     '<path d="' + blobTorso(36, 160, 52) + '" fill="url(#' + u + ')" stroke="#5E2206" stroke-width="5" stroke-linejoin="round"/>' + shine(36, 52) +
-    faceOf(78, 42, '#141C2B', '#05080F', '#FFC24A') +
-    '<rect x="84" y="130" width="32" height="8" rx="4" fill="#7A300A"/>' +
+    faceOf(80, '#5E2206') +
   '</svg>';
 }
 
@@ -160,7 +171,7 @@ function zipArt(){
     '</g>' +
     /* rounder and bouncier than Blip: same family, wider and shorter */
     '<path d="' + blobTorso(38, 158, 56) + '" fill="url(#' + u + ')" stroke="#0A1F5E" stroke-width="5" stroke-linejoin="round"/>' + shine(38, 56) +
-    faceOf(80, 42, '#0B1424', '#04070E', '#7CF0E0') +
+    faceOf(82, '#0A1F5E') +
     '<path d="M104 128 l-10 16 h8 l-7 14 16 -18 h-8 z" fill="#FFD24A" stroke="#C99A12" stroke-width="2" stroke-linejoin="round"/>' +
   '</svg>';
 }
@@ -198,8 +209,7 @@ function tripArt(){
 
     /* taller and narrower than the others — stretched, not caricatured */
     '<path d="' + blobTorso(30, 162, 46) + '" fill="url(#' + u + ')" stroke="#14532D" stroke-width="5" stroke-linejoin="round"/>' + shine(30, 46) +
-    faceOf(76, 40, '#0E2A18', '#051A0C', '#B6F2C4') +
-    '<rect x="84" y="132" width="32" height="8" rx="4" fill="#0E5C33"/>' +
+    faceOf(76, '#14532D') +
   '</svg>';
 }
 
@@ -236,19 +246,18 @@ function flipArt(){
 
     /* oval and athletic: the same blob, narrowed and lengthened */
     '<path d="' + blobTorso(34, 156, 44) + '" fill="url(#' + u + ')" stroke="#630A12" stroke-width="5" stroke-linejoin="round"/>' + shine(34, 44) +
-    faceOf(78, 38, '#2A060A', '#160306', '#FFD9D2') +
-
-    /* headband with a trailing tail — the streamer is what sells the spin */
-    '<path d="M64 66 L136 66 L136 78 L64 78 Z" fill="#FFD24A" stroke="#630A12" stroke-width="3.5" stroke-linejoin="round"/>' +
-    '<g class="tail" data-px="136" data-py="72">' +
-      '<path d="M136 68 Q166 60 182 44 L174 72 Q154 82 136 79 Z" fill="#FFD24A" stroke="#630A12" stroke-width="3" stroke-linejoin="round"/>' +
+    /* headband with a trailing tail — the streamer is what sells the spin.
+       Worn high, clear of the brows, so it never hides the face */
+    '<path d="M68 50 L132 50 L134 61 L66 61 Z" fill="#FFD24A" stroke="#630A12" stroke-width="3.5" stroke-linejoin="round"/>' +
+    '<g class="tail" data-px="132" data-py="55">' +
+      '<path d="M132 51 Q162 43 178 27 L170 55 Q150 65 133 61 Z" fill="#FFD24A" stroke="#630A12" stroke-width="3" stroke-linejoin="round"/>' +
     '</g>' +
-    '<rect x="84" y="130" width="32" height="8" rx="4" fill="#8E1520"/>' +
+    faceOf(80, '#630A12') +
   '</svg>';
 }
 
 var CHAR_ART = { blip: blipArt, zip: zipArt, trip: tripArt, flip: flipArt };
 
 if (typeof module !== 'undefined' && module.exports){
-  module.exports = { faceOf:faceOf, blipArt:blipArt, zipArt:zipArt, tripArt:tripArt, flipArt:flipArt, CHAR_ART:CHAR_ART };
+  module.exports = { faceOf:faceOf, FACE_INK:FACE_INK, blipArt:blipArt, zipArt:zipArt, tripArt:tripArt, flipArt:flipArt, CHAR_ART:CHAR_ART };
 }

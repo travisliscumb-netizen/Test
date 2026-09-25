@@ -21,6 +21,8 @@ const html = `<!DOCTYPE html><style>
   .ground{position:absolute;left:0;right:0;bottom:0;height:34px;background:#F2D7A8;border-top:5px solid #E6BF7E}
   .c{position:absolute;width:118px;height:118px}
   .c svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 3px 3px rgba(9,30,66,.3))}
+  /* the idle face only: the reactions are hidden until the game shows them */
+  .eye-happy,.m-open,.m-oops,.sweat{display:none}
   .blip{left:-8px;top:24px;transform:rotate(-8deg)}
   .zip{right:-10px;top:40px}
   .tile{position:absolute;left:64px;top:14px;width:52px;height:56px;border-radius:13px;background:#FF8A1F;

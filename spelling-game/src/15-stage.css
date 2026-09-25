@@ -4,7 +4,10 @@
   position:fixed;left:0;top:0;width:148px;height:148px;
   transform-origin:50% 50%;
   will-change:transform,opacity;opacity:0;
-  filter:drop-shadow(0 6px 6px rgba(9,30,66,.22));
+  /* a white sticker rim, then a soft shadow: orange Blip on a sunset, blue
+     Zip over the sea and green Trip on the hills all stay easy to pick out */
+  filter:drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff)
+         drop-shadow(0 6px 6px rgba(9,30,66,.22));
   pointer-events:none;
 }
 .actor svg{width:100%;height:100%;overflow:visible}
@@ -19,20 +22,30 @@
   opacity:0;pointer-events:none;will-change:transform,opacity;transform-origin:50% 50%;
 }
 
-/* ---- faces ---- */
+/* ---- faces ----
+   Blinks run on `transform`; expressions use the separate `scale` and
+   `translate` properties, so a surprised or worried face is never undone
+   by the blink animation running over it. */
 .actor .eye{
   transform-box:fill-box;transform-origin:50% 50%;
   animation:blink var(--blink-dur,4.2s) var(--blink-delay,0s) infinite;
 }
-@keyframes blink{0%,94%,100%{transform:scaleY(1)}96.5%{transform:scaleY(.1)}}
-.actor .eye-happy,.actor .m-open,.actor .m-oops{display:none}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}95.5%{transform:scaleY(.08)}}
+.actor .brow,.actor .white,.actor .pupil,.actor .glint{transform-box:fill-box;transform-origin:50% 50%;transition:scale .15s,translate .15s,rotate .15s}
+.actor .eye-happy,.actor .m-open,.actor .m-oops,.actor .sweat{display:none}
 .actor.ex-happy .eye{display:none}
 .actor.ex-happy .eye-happy{display:inline}
 .actor.ex-happy .m-smile,.actor.ex-wow .m-smile,.actor.ex-oops .m-smile{display:none}
 .actor.ex-happy .m-open,.actor.ex-wow .m-open{display:inline}
+.actor.ex-happy .brow{translate:0 -3px}
+.actor.ex-wow .brow{translate:0 -6px}
+.actor.ex-wow .white{scale:1.12}
+.actor.ex-wow .pupil{scale:.78}
 .actor.ex-oops .m-oops{display:inline}
-.actor.ex-wow .eye:not(.glint){transform:scaleY(1.25)}
-.actor.ex-oops .eye:not(.glint){transform:scaleY(.55)}
+.actor.ex-oops .sweat{display:inline}
+.actor.ex-oops .white{scale:1 .72}
+.actor.ex-oops .brow-l{rotate:16deg;translate:0 -2px}
+.actor.ex-oops .brow-r{rotate:-16deg;translate:0 -2px}
 .actor.boardless .board{opacity:0}
 @media (prefers-reduced-motion: reduce){ .actor .eye{animation:none} }
 

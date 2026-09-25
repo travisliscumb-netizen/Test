@@ -279,10 +279,10 @@ function createStage(deps){
       var c = centreOf(a);
       if (a.look){
         var dx = a.look.x - c.x, dy = a.look.y - c.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
-        ex = dx / d * 4.5; ey = dy / d * 3;
+        ex = dx / d * 5.5; ey = dy / d * 4.5;
       } else if (moving){
-        ex = clamp((a.anim.tx - a.anim.fx) / 40, -4.5, 4.5);
-        ey = clamp((a.anim.ty - a.anim.fy) / 60, -2.5, 2.5);
+        ex = clamp((a.anim.tx - a.anim.fx) / 40, -5.5, 5.5);
+        ey = clamp((a.anim.ty - a.anim.fy) / 60, -4, 4);
       } else {
         ex = Math.sin(beat * 0.7 + a.key.length) * 2.2;
       }
@@ -715,6 +715,37 @@ function createStage(deps){
     return { x: clamp(x, -SIZE * 0.4, vw() - SIZE * 0.6), y: y };
   }
 
+  /* Which way this letter is going to be towed, looked up from the plan, so
+     the wind-up before the yank points the same way as the yank itself. */
+  function towDirOf(letter, who){
+    if (!live || letter == null) return null;
+    var ev = live.plan.events;
+    for (var i = 0; i < ev.length; i++){
+      if (ev[i].kind === 'tow' && ev[i].letter === letter && ev[i].char === who) return ev[i].dir;
+    }
+    return null;
+  }
+  /* How far below him his trail of letters hangs: leaving upward he has to
+     climb that much further, or the letters are still dangling on screen
+     when the scene ends — and then they would just vanish. */
+  function trailBelow(a){
+    var extra = 0;
+    if (!live) return 0;
+    live.payloads.forEach(function(q){
+      if (q.owner !== a.key || q.state === 'gone') return;
+      if (q.state === 'roped') extra = Math.max(extra, q.rest + q.h);
+      else if (q.state === 'held') extra = Math.max(extra, q.offY + q.h - SIZE);
+    });
+    return extra + 40;
+  }
+  function leave(a, dir, ground){
+    var to = edgeFor(dir, ground, a.x);
+    if (dir === 'up') to.y -= trailBelow(a);
+    else if (dir === 'left') to.x -= trailBelow(a);
+    else if (dir === 'right') to.x += trailBelow(a);
+    return to;
+  }
+
   /* An actor-box x, measured forward from a centre point in this scene's direction. */
   function ahead(cx, off){ return cx + SX() * off - SIZE / 2; }
 
@@ -775,7 +806,9 @@ function createStage(deps){
          not so much as twitch here, or the snap that follows means nothing. */
       case 'slack': {
         if (!a || !pl) break;
-        var away = { x: a.x + sx * (a.mode === 'jet' ? 70 : 82), y: a.y - (a.mode === 'jet' ? 26 : 0) };
+        var away = towDirOf(e.letter, e.char) === 'up'
+          ? { x: a.x, y: a.y - 64 }
+          : { x: a.x + sx * (a.mode === 'jet' ? 70 : 82), y: a.y - (a.mode === 'jet' ? 26 : 0) };
         move(a, t, e.dur, { x: away.x, y: away.y, sc: 1 }, { ease: 'out', effort: 0.45 });
         break;
       }
@@ -783,7 +816,9 @@ function createStage(deps){
          jolt and the sound the moment it actually goes taut. */
       case 'snap': {
         if (!a || !pl) break;
-        var far = { x: a.x + sx * 86, y: a.y - (a.mode === 'jet' ? 18 : 0) };
+        var far = towDirOf(e.letter, e.char) === 'up'
+          ? { x: a.x, y: a.y - 80 }
+          : { x: a.x + sx * 86, y: a.y - (a.mode === 'jet' ? 18 : 0) };
         move(a, t, e.dur, { x: far.x, y: far.y, sc: 1 }, { ease: 'snap', effort: 1 });
         break;
       }
@@ -791,7 +826,8 @@ function createStage(deps){
         /* he pulls and it does not come: strain, then it gives */
         if (!a) break;
         setExpr(a, 'oops', e.dur, t);
-        move(a, t, e.dur, { x: a.x + sx * 16, y: a.y - 6, sc: 0.99 }, { ease: 'inout', effort: 1 });
+        var upPull = towDirOf(e.letter, e.char) === 'up';
+        move(a, t, e.dur, { x: a.x + (upPull ? 0 : sx * 16), y: a.y - (upPull ? 12 : 6), sc: 0.99 }, { ease: 'inout', effort: 1 });
         SFX.play('strain');
         break;
       }
@@ -805,7 +841,7 @@ function createStage(deps){
           }
           else takeHold(a, pl, SIZE * 0.5, SIZE * 1.0);
         }
-        var to2 = edgeFor(e.dir, ground - SIZE * 0.86, a.x);
+        var to2 = leave(a, e.dir, ground - SIZE * 0.86);
         move(a, t, e.dur, { x: to2.x, y: to2.y, sc: 0.88 },
           { ease: 'inout', spins: a.mode === 'acro' ? 2 : 0, effort: 0.9 });
         SFX.play('yank');
@@ -1269,7 +1305,7 @@ function createStage(deps){
         if (!a) break;
         a.fallen = 0;
         setExpr(a, 'happy', e.dur, t);
-        move(a, t, e.dur, edgeFor(e.dir || 'right', ground - SIZE * 0.86, a.x),
+        move(a, t, e.dur, leave(a, e.dir || 'right', ground - SIZE * 0.86),
           { spins: a.mode === 'acro' ? 2 : 0, op: 0, ease: 'inout', rotTo: a.mode === 'acro' ? null : 0, effort: 0.7 });
         break;
       }
@@ -1741,6 +1777,28 @@ function createStage(deps){
   function react(kind, point){
     if (!amb || live) return;
     var now = performance.now();
+    if (kind === 'wave'){
+      /* a nudge: someone turns to where the answer is and waves at it */
+      var pickW = amb.keys.filter(function(k){ return !actors[k].fallen; });
+      if (!pickW.length) return;
+      var wv = actors[pickW[Math.floor(Math.random() * pickW.length)]];
+      wv.look = point || null;
+      wv.trick = { kind: 'wave', t0: now, dur: 1400 };
+      setExpr(wv, 'wow', 700, now);
+      amb.busy[wv.key] = now + 1500;
+      return;
+    }
+    if (kind === 'hop'){
+      /* one buddy, not the whole crowd, celebrates each small win */
+      var free = amb.keys.filter(function(k){ var q = actors[k]; return !q.fallen && now >= (amb.busy[k] || 0); });
+      if (!free.length) return;
+      var h = actors[free[Math.floor(Math.random() * free.length)]];
+      h.look = point || null;
+      setExpr(h, 'happy', 800, now);
+      move(h, now, 460, { x: h.x, y: restY(h), sc: amb.sc }, { arc: 30, styleY: 0, rotTo: 0, ease: 'linear', effort: 0.6 });
+      amb.busy[h.key] = now + 500;
+      return;
+    }
     amb.keys.forEach(function(k, i){
       var a = actors[k];
       if (a.fallen) return;

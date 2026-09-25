@@ -46,6 +46,22 @@ letters away in a short scene. After Learn, they hand the finished word back.
 | **Trip** (green) | on foot: runs, stumbles, skids, lands on his backside | does gymnastics |
 | **Flip** (red) | acrobatics: cartwheels, handsprings, aerials | falls |
 
+All four share one friendly face: big eyes with pupils that follow what
+Grayson taps, brows, and a mouth. So their reactions read even at phone
+size: a grin for right, raised brows for surprise, a worried face and a
+sweat drop for oops. A thin white rim keeps each one clear against every
+world, including orange Blip at sunset and blue Zip at the beach.
+
+### Keeping him going
+
+- **After every correct letter**, one of the buddies does a little hop.
+- **The praise changes** ("Great listening!", "Way to go!"…) and never
+  repeats the same line back to back.
+- **If he stops tapping for about 9 seconds**, the prompt is said again and
+  a buddy turns and waves at the answer. This happens at most 3 times per
+  screen, so it helps without nagging.
+- **Two wrong taps** make the letter he needs glow, in both Build and Learn.
+
 ### Why it doesn't look like it's on repeat
 
 - **19 different scenes.** Examples: Blip's tow cord goes slack, then snaps

@@ -285,6 +285,15 @@ async function playWord(page, word, label, { drag = false, wrongFirst = false } 
 
   await page.click('#btnIntroGo');
   await waitScreen(page, 'find');
+  /* he stalls: after a while the prompt comes again and a buddy waves */
+  {
+    const n0 = await page.evaluate(() => window.__spoken.length);
+    await page.waitForTimeout(9800);
+    const said = await page.evaluate(n => window.__spoken.slice(n).map(s => s.text), n0);
+    check('a stalled child gets a nudge', said.some(t => /Which one says look/.test(t)), said.join(' | '));
+    check('a buddy waves at the answer', await page.evaluate(() =>
+      Object.values(__game.stage.actors()).some(a => a.trick && a.trick.kind === 'wave')));
+  }
   await page.click('#findChoices .choice:text-is("look")');
   await waitScreen(page, 'build');
   await shot(page, 'phone-build');
@@ -319,6 +328,13 @@ async function playWord(page, word, label, { drag = false, wrongFirst = false } 
   await waitScreen(page, 'learn');
   await shot(page, 'phone-learn');
   await layoutOk(page, 'learn');
+  /* two misses in the hunt light up the letter he needs */
+  for (let k = 0; k < 2; k++) {
+    await page.click('#learnHunt .tile:not([data-letter="W"]):not([data-letter="H"]):not([data-letter="E"]):not([data-letter="R"])');
+    await page.waitForTimeout(120);
+  }
+  check('learn: after two misses the right letter glows',
+    await page.$$eval('#learnHunt .tile.next-hint', ts => ts.length === 1 && ts[0].getAttribute('data-letter') === 'W'));
   const huntOk = await page.evaluate(() => {
     const area = document.querySelector('#learnHunt').getBoundingClientRect();
     const tiles = [...document.querySelectorAll('#learnHunt .tile')].map(t => t.getBoundingClientRect());

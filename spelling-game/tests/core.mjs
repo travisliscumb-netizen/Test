@@ -265,6 +265,24 @@ for (const tempo of [0.5, 0.92, 1, 1.08, 3]) {
   check('no scene sends anyone out through the ground', downs === 0, `${downs} downward exits`);
 }
 
+/* ---------------- the faces: one family, fully wired ---------------- */
+{
+  const ART = require(path.join(HERE, '..', 'src', '50-art.js'));
+  /* the same parts, in the same order, at the same horizontal spacing */
+  const faceParts = svg => {
+    const head = svg.slice(svg.indexOf('<g class="head"'));
+    return (head.match(/class="[^"]+"|cx="[\d.]+"|rx="[\d.]+"|r="[\d.]+"/g) || []).join(' ');
+  };
+  const faces = C.CHAR_ORDER.map(k => faceParts(ART.CHAR_ART[k]()));
+  for (const k of C.CHAR_ORDER) {
+    const svg = ART.CHAR_ART[k]();
+    for (const cls of ['eyes', 'eye white', 'eye pupil', 'eye-happy', 'brow brow-l', 'brow brow-r', 'm-smile', 'm-open', 'm-oops', 'sweat'])
+      check(`${k}: face has ${cls}`, svg.includes(`class="${cls}"`));
+    check(`${k}: no leftover sunglasses visor`, !/visor/i.test(svg));
+  }
+  check('all four share the same face', faces.every(f => f === faces[0] && f.length > 100));
+}
+
 /* ---------------- words the grown-up types ---------------- */
 check('parse: commas, newlines, numbering',
   JSON.stringify(C.parseWordInput('1. cat, dog\nfrog;  bird/ fish')) === JSON.stringify(['CAT', 'DOG', 'FROG', 'BIRD', 'FISH']));
