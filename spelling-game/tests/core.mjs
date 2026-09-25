@@ -204,6 +204,90 @@ for (const s of C.SCENES) {
   check('empty word yields an empty plan', plan.events.length === 0 && plan.duration === 0);
 }
 
+/* ---------------- variation: "it must not look like it is on repeat" ---------------- */
+for (const mirror of [false, true]) {
+  for (const s of C.SCENES) {
+    const lead = s.lead === 'any' ? 'zip' : s.lead;
+    for (const n of [Math.max(s.min || 1, 2), 5, 9]) {
+      const plan = C.planScene({ letters: n, lead, forceId: s.id, mirror, rnd: seeded(n * 13) });
+      check(`${s.id} n=${n} mirror=${mirror}: valid`, C.validatePlan(plan).length === 0, C.validatePlan(plan).join('; '));
+      if (mirror) {
+        const straight = C.planScene({ letters: n, lead, forceId: s.id, mirror: false, rnd: seeded(n * 13) });
+        const dirs = p => p.events.filter(e => e.dir === 'left' || e.dir === 'right').map(e => e.dir);
+        const a = dirs(straight), b = dirs(plan);
+        check(`${s.id} n=${n}: mirroring swaps every side`,
+          a.length === b.length && a.every((d, i) => d !== b[i]), `${a} vs ${b}`);
+      }
+    }
+  }
+}
+for (const tempo of [0.5, 0.92, 1, 1.08, 3]) {
+  const plan = C.planScene({ letters: 12, lead: 'trip', forceId: 'trip-overload', tempo, mirror: false });
+  check(`tempo ${tempo} keeps the plan valid`, C.validatePlan(plan).length === 0, C.validatePlan(plan).join('; '));
+}
+
+/* A real session: every word gets two scenes, leads chosen fairly, history
+   carried from night to night. Count how often a performance repeats. */
+{
+  const rnd = seeded(77);
+  let sceneHist = [], leadHist = [];
+  const sigs = [];
+  const leadsSeen = [];
+  for (let i = 0; i < 60; i++) {
+    const letters = 3 + (i % 5);
+    const lead = C.pickLead(leadHist, rnd);
+    leadsSeen.push(lead);
+    const plan = C.planScene({ letters, lead, history: sceneHist, rnd });
+    check(`session scene ${i} valid`, C.validatePlan(plan).length === 0, C.validatePlan(plan).join('; '));
+    sigs.push(`${plan.id}|${plan.mirror}|${plan.cast.join('')}`);
+    sceneHist = C.remember(sceneHist, plan.id, 8);
+    leadHist = C.remember(leadHist, lead, 8);
+  }
+  for (let i = 1; i < sigs.length; i++) {
+    check(`back-to-back scenes differ (${i})`, sigs[i].split('|')[0] !== sigs[i - 1].split('|')[0]);
+  }
+  const distinct = new Set(sigs).size;
+  check('60 scenes: at least 50 distinct performances', distinct >= 50, `${distinct} distinct`);
+  for (let i = 0; i + 4 <= leadsSeen.length; i += 4) {
+    check(`leads rotate: every 4 in a row has all four (${i})`, new Set(leadsSeen.slice(i, i + 4)).size === 4,
+      leadsSeen.slice(i, i + 4).join(','));
+  }
+  console.log(`\nvariation: ${distinct}/60 distinct performances, ${new Set(sigs.map(s => s.split('|')[0])).size} scenes used`);
+}
+
+/* ---------------- words the grown-up types ---------------- */
+check('parse: commas, newlines, numbering',
+  JSON.stringify(C.parseWordInput('1. cat, dog\nfrog;  bird/ fish')) === JSON.stringify(['CAT', 'DOG', 'FROG', 'BIRD', 'FISH']));
+check('parse: empty is empty', C.parseWordInput('   ').length === 0 && C.parseWordInput(null).length === 0);
+check('add keeps order and drops duplicates',
+  JSON.stringify(C.addWords(['CAT'], 'dog cat Frog')) === JSON.stringify(['CAT', 'DOG', 'FROG']));
+check('add is capped', C.addWords([], Array.from({ length: 50 }, (_, i) => 'W' + String.fromCharCode(65 + (i % 26)) + String.fromCharCode(65 + Math.floor(i / 26))).join(' ')).length === C.MAX_WORDS);
+check('remove', JSON.stringify(C.removeWord(['CAT', 'DOG'], 'cat')) === JSON.stringify(['DOG']));
+for (const n of [4, 6, 7]) {
+  const words = ['FROG', 'JUMP', 'THE', 'SAID', 'WENT', 'COME', 'HAVE'].slice(0, n);
+  const s = C.normalizeSettings({ words });
+  check(`a week of ${n} words is kept`, s.words.length === n);
+}
+
+/* ---------------- settings survive anything in storage ---------------- */
+for (const junk of [null, undefined, 42, 'x', [], { words: 'cat' }, { words: [1, null, 'ok'] }, { aSound: 'zzz', eSound: 7 },
+  { sceneHistory: ['nope', 'jet-heavy'], leadHistory: ['bob', 'zip'], theme: 'mars' }]) {
+  const s = C.normalizeSettings(junk);
+  const ok = Array.isArray(s.words) && C.A_SOUND_CHOICES.includes(s.aSound) && C.E_SOUND_CHOICES.includes(s.eSound) &&
+    typeof s.sfx === 'boolean' && s.sceneHistory.every(id => C.SCENES.some(x => x.id === id)) &&
+    s.leadHistory.every(k => C.CHARS[k]) && (s.theme === null || C.THEMES.includes(s.theme));
+  check(`settings repaired from ${JSON.stringify(junk)}`, ok, JSON.stringify(s));
+}
+check('an emptied list stays empty (not refilled with defaults)', C.normalizeSettings({ words: [] }).words.length === 0);
+check('no stored list gets the sample words', C.normalizeSettings(null).words.join() === C.DEFAULT_WORDS.join());
+check('letter overrides follow settings', C.letterSound('A', C.letterOverrides({ aSound: 'ay' })) === 'ay');
+check('nextIndex walks and ends', C.nextIndex(0, 3) === 1 && C.nextIndex(2, 3) === -1);
+check('themes never repeat back to back', Array.from({ length: 40 }).every((_, i) => C.pickTheme('night', seeded(i + 1)) !== 'night'));
+
+/* ---------------- the launch self-check ---------------- */
+check('self-check passes on the sample words', C.selfCheck(C.DEFAULT_WORDS).length === 0, C.selfCheck(C.DEFAULT_WORDS).join('; '));
+check('self-check passes on long words', C.selfCheck(['BUTTERFLY', 'BIRTHDAY', 'ELEPHANT']).length === 0);
+
 /* Length is reported, not enforced: 4-12s is a target, so the suite shows
    where scenes actually land and only fails on a runaway. */
 {

@@ -54,16 +54,18 @@ function castFor(s) {
   return { lead, word: WORDS[Math.min(6, n)] || 'FROG' };
 }
 
-for (const s of scenes) {
-  if (only.length && !only.includes(s.id)) continue;
-  const { lead, word } = castFor(s);
-  process.stdout.write(`\n${s.id}  (${s.name}, lead=${lead}, "${word}")\n`);
+const MIRRORS = process.argv.includes('--both') ? [false, true] : [false];
+for (const s0 of scenes) for (const mirror of MIRRORS) {
+  const s = { ...s0, id: s0.id + (mirror ? '~m' : ''), base: s0.id };
+  if (only.length && !only.includes(s0.id)) continue;
+  const { lead, word } = castFor(s0);
+  process.stdout.write(`\n${s.id}  (${s.name}, lead=${lead}, "${word}"${mirror ? ', mirrored' : ''})\n`);
 
-  const plan = await page.evaluate(([id, w, l]) => window.__lab.plan(id, w, l), [s.id, word, lead]);
+  const plan = await page.evaluate(([id, w, l, m]) => window.__lab.plan(id, w, l, m), [s.base, word, lead, mirror]);
   const frames = [];
   const samples = [];
 
-  await page.evaluate(([id, w, l]) => { window.__lab.run(id, w, l); }, [s.id, word, lead]);
+  await page.evaluate(([id, w, l, m]) => { window.__lab.run(id, w, l, m); }, [s.base, word, lead, mirror]);
 
   const t0 = Date.now();
   const limit = plan.duration + 1200;
@@ -155,7 +157,7 @@ for (const s of scenes) {
 
   /* cleanup: nothing of the performance may survive it */
   check(s.id, 'no stranded props after the scene', residue.props === 0, `${residue.props} left`);
-  check(s.id, 'no stranded shards', residue.shards === 0, `${residue.shards} left`);
+  check(s.id, 'no stranded particles or boards', residue.shards === 0, `${residue.shards} left`);
   check(s.id, 'no cord left drawn', residue.cordsWithPath === 0, `${residue.cordsWithPath} left`);
   check(s.id, 'every character parked', residue.visibleActors === 0, `${residue.visibleActors} visible`);
   check(s.id, 'shake reset', residue.layerTransform === '', residue.layerTransform);

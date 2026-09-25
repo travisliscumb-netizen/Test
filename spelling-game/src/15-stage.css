@@ -4,24 +4,61 @@
   position:fixed;left:0;top:0;width:148px;height:148px;
   transform-origin:50% 50%;
   will-change:transform,opacity;opacity:0;
-  filter:drop-shadow(0 10px 14px rgba(0,0,0,.34));
+  filter:drop-shadow(0 6px 6px rgba(9,30,66,.22));
+  pointer-events:none;
 }
 .actor svg{width:100%;height:100%;overflow:visible}
+/* A buddy on the ground can be poked — but only the drawn body, never the
+   empty corners of his box, so he can never steal a tap meant for a letter. */
+.actor.tappable svg *{pointer-events:visiblePainted;cursor:pointer}
+
+/* Ground shadow: the one thing that makes them stand ON something. */
+.shadow{
+  position:fixed;left:0;top:0;width:100px;height:18px;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(9,30,66,.9) 0%,rgba(9,30,66,.35) 55%,rgba(9,30,66,0) 72%);
+  opacity:0;pointer-events:none;will-change:transform,opacity;transform-origin:50% 50%;
+}
+
+/* ---- faces ---- */
+.actor .eye{
+  transform-box:fill-box;transform-origin:50% 50%;
+  animation:blink var(--blink-dur,4.2s) var(--blink-delay,0s) infinite;
+}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96.5%{transform:scaleY(.1)}}
+.actor .eye-happy,.actor .m-open,.actor .m-oops{display:none}
+.actor.ex-happy .eye{display:none}
+.actor.ex-happy .eye-happy{display:inline}
+.actor.ex-happy .m-smile,.actor.ex-wow .m-smile,.actor.ex-oops .m-smile{display:none}
+.actor.ex-happy .m-open,.actor.ex-wow .m-open{display:inline}
+.actor.ex-oops .m-oops{display:inline}
+.actor.ex-wow .eye:not(.glint){transform:scaleY(1.25)}
+.actor.ex-oops .eye:not(.glint){transform:scaleY(.55)}
+.actor.boardless .board{opacity:0}
+@media (prefers-reduced-motion: reduce){ .actor .eye{animation:none} }
+
 /* The cord layer sits behind the characters, so a cord reads as coming from
    behind their hands rather than being pasted over the top of them. */
 .cordlayer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .cord{
-  fill:none;stroke:#2B3A55;stroke-width:5;stroke-linecap:round;
+  fill:none;stroke:#0B2A66;stroke-width:5;stroke-linecap:round;
   filter:drop-shadow(0 2px 2px rgba(0,0,0,.28));
 }
-/* Taut reads brighter and thinner — you can see the moment it grabs. */
-.cord.taut{stroke:#12213A;stroke-width:6}
+/* Taut reads darker and thicker — you can see the moment it grabs. */
+.cord.taut{stroke:#FF8A1F;stroke-width:6}
 .letterprop{
   position:fixed;left:0;top:0;pointer-events:none;
   will-change:transform,opacity;
-  filter:drop-shadow(0 14px 18px rgba(0,0,0,.30)) brightness(1.05);
+  filter:drop-shadow(0 12px 14px rgba(9,30,66,.28));
 }
 .letterprop > *{margin:0 !important}
-.shard{position:fixed;width:13px;height:13px;border-radius:3px;pointer-events:none;will-change:transform,opacity}
+.looseboard{position:fixed;left:0;top:0;width:148px;height:148px;pointer-events:none;will-change:transform}
+.looseboard svg{width:100%;height:100%;overflow:visible}
+
+/* ---- particles ---- */
+.fx{position:fixed;pointer-events:none;will-change:transform,opacity;border-radius:50%}
+.fx.smoke{width:16px;height:16px;background:radial-gradient(circle,#fff 0%,#E4ECF7 60%,rgba(228,236,247,0) 72%)}
+.fx.dust{width:14px;height:14px;background:radial-gradient(circle,#E8D2B0 0%,#D9BE93 55%,rgba(217,190,147,0) 72%)}
+.fx.spark{width:10px;height:10px;border-radius:2px;transform:rotate(45deg)}
+.fx.shard{width:13px;height:13px;border-radius:3px}
 /* The buddy has this letter now — the travelling copy lives in the FX layer. */
 .taken{opacity:0 !important;transition:none !important}

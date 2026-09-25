@@ -290,6 +290,23 @@ function createSpeech(deps){
     later(function(){ say(text, opts); }, ms);
   }
 
+  /*
+    iOS only lets a page speak after its first utterance has been started
+    inside a real tap. The queue defers every utterance by a tick, which is
+    outside the tap, so the very first tap speaks one silent utterance
+    directly. Once only: after that the synth is unlocked for the session.
+  */
+  var primed = false;
+  function prime(){
+    if (primed || !synth || !mkUtt) return false;
+    primed = true;
+    try {
+      var u = mkUtt(' ', { rate: 1, voice: voice, volume: 0 });
+      synth.speak(u);
+    } catch (e){ return false; }
+    return true;
+  }
+
   function unlock(){
     if (!synth) return false;
     try { if (synth.paused) synth.resume(); } catch (e){}
@@ -300,7 +317,7 @@ function createSpeech(deps){
 
   return {
     say: say, spell: spell, letterThen: letterThen, sayAfter: sayAfter,
-    reset: reset, unlock: unlock, pickVoice: pickVoice,
+    reset: reset, unlock: unlock, prime: prime, pickVoice: pickVoice,
     available: function(){ return !!synth; },
     /* read-only, for the suites */
     epoch: function(){ return epoch; },

@@ -450,7 +450,7 @@ var SCENE_TARGET_MIN = 4000, SCENE_TARGET_MAX = 12000;
 var SCENE_HARD_MAX = 20000;
 
 /* Removal kinds — exactly one of these per letter, or the plan is invalid. */
-var TAKE_KINDS = { tow:1, scoop:1, snatch:1, pop:1, carry:1, rescue:1 };
+var TAKE_KINDS = { tow:1, scoop:1, snatch:1, pop:1, carry:1, rescue:1, follow:1, haul:1 };
 
 /*
   Beats that end with the character off the screen. Anyone who enters must
@@ -459,7 +459,7 @@ var TAKE_KINDS = { tow:1, scoop:1, snatch:1, pop:1, carry:1, rescue:1 };
   the rebuild exists to kill. A 'snatch' is NOT one of these: catching a
   block leaves you holding it, still on stage.
 */
-var EXIT_KINDS = { exit:1, rescue:1, tow:1, scoop:1, carry:1, superpass:1 };
+var EXIT_KINDS = { exit:1, rescue:1, tow:1, scoop:1, carry:1, superpass:1, march:1, haul:1 };
 
 function makeTimeline(){
   var events = [];
@@ -773,9 +773,9 @@ var SCENES = [
         tl.push(at + BEAT.approach, BEAT.grab, 'carry',
           { char:a, letter:i, dir:dirFor(a, i) });
       }
+      /* his last carry takes him off the screen; the one he missed is left
+         sitting there for a beat, which is the whole joke */
       var mid = t + Math.max(0, split - 1) * 460 + BEAT.approach + BEAT.grab;
-      tl.push(mid, 300, 'notice', { char:a });
-      tl.push(mid, BEAT.exit, 'exit', { char:a, dir:dirFor(a, 0) });
       /* the one he missed */
       tl.push(mid + 160, BEAT.enter, 'enter', { char:b });
       var bt = mid + 160 + BEAT.enter;
@@ -833,6 +833,93 @@ var SCENES = [
       tl.push(last, BEAT.flourish, 'flourish', { char:c.lead });
       tl.push(last + BEAT.flourish, BEAT.exit, 'exit', { char:c.lead, dir:dirFor(c.lead, 0) });
       return tl;
+    } },
+
+  /* --- Letter parade: the letters hop into line and follow him off. --- */
+  { id:'letter-parade', name:'Letter Parade', lead:'any', weight:4, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:c.lead }); t += BEAT.enter;
+      /* he whistles them into formation; they hop down and line up behind him */
+      tl.push(t, 1000, 'parade', { char:c.lead, count:c.letters }); t += 1000;
+      var dir = dirFor(c.lead, 1) === 'up' || dirFor(c.lead, 1) === 'down' ? 'right' : dirFor(c.lead, 1);
+      var march = 1500 + c.letters * 140;
+      tl.push(t, march, 'march', { char:c.lead, dir:dir });
+      for (var i = 0; i < c.letters; i++){
+        /* each letter sets off a hop later, and all arrive off stage together */
+        tl.push(t + 60 + i * 70, march - 60 - i * 70, 'follow', { leader:c.lead, letter:i, dir:dir });
+      }
+      return tl;
+    } },
+
+  /* --- ZIP, rarely: the kickflip goes wrong, he bails, gets the board back. --- */
+  { id:'board-bail', name:'Board Bail', lead:'zip', weight:3, min:1,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'zip' }); t += BEAT.enter;
+      tl.push(t, 620, 'kickflip', { char:'zip' }); t += 620;
+      /* the board keeps going without him; he lands on his backside */
+      tl.push(t, 760, 'bail', { char:'zip' }); t += 760;
+      tl.push(t, 420, 'dustoff', { char:'zip' }); t += 420;
+      tl.push(t, 720, 'remount', { char:'zip' }); t += 720;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 520;
+        tl.push(at, BEAT.approach, 'approach', { char:'zip', letter:i });
+        tl.push(at + BEAT.approach, BEAT.scoop, 'scoop', { char:'zip', letter:i, dir:'right' });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 520 + BEAT.approach + BEAT.scoop;
+      tl.push(last, BEAT.exit, 'exit', { char:'zip', dir:'right' });
+      return tl;
+    } },
+
+  /* --- FLIP: a handspring kicks each letter skyward; he catches it. --- */
+  { id:'handspring-launch', name:'Handspring Launch', lead:'flip', weight:8, min:1,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'flip' }); t += BEAT.enter;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 720;
+        tl.push(at, 520, 'handspring', { char:'flip', letter:i });
+        tl.push(at + 520, BEAT.grab, 'snatch', { char:'flip', letter:i });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 720 + 520 + BEAT.grab;
+      tl.push(last, BEAT.flourish, 'aerial', { char:'flip' });
+      tl.push(last + BEAT.flourish, BEAT.exit, 'exit', { char:'flip', dir:'up' });
+      return tl;
+    } },
+
+  /* --- BLIP: a rocket roll, then he darts in for each letter. --- */
+  { id:'rocket-roll', name:'Rocket Roll', lead:'blip', weight:7, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'blip' }); t += BEAT.enter;
+      tl.push(t, 640, 'roll', { char:'blip' }); t += 640;
+      for (var i = 0; i < c.letters; i++){
+        var at = t + i * 560;
+        tl.push(at, BEAT.approach, 'approach', { char:'blip', letter:i });
+        tl.push(at + BEAT.approach, BEAT.grab, 'carry', { char:'blip', letter:i, dir:'up' });
+      }
+      var last = t + Math.max(0, c.letters - 1) * 560 + BEAT.approach + BEAT.grab;
+      tl.push(last, 640, 'roll', { char:'blip' });
+      tl.push(last + 640, BEAT.brake, 'brake', { char:'blip' });
+      tl.push(last + 640 + BEAT.brake, BEAT.exit, 'exit', { char:'blip', dir:'up' });
+      return tl;
+    } },
+
+  /* --- TRIP, rarely: the overcomplicated carry WORKS... then the crash. --- */
+  { id:'trip-lucky', name:'Lucky Trip', lead:'trip', weight:4, min:2,
+    build: function(c){
+      var tl = makeTimeline(), t = 0;
+      tl.push(t, BEAT.enter, 'enter', { char:'trip' }); t += BEAT.enter;
+      tl.push(t, BEAT.stack, 'stack', { char:'trip', count:c.letters }); t += BEAT.stack;
+      tl.push(t, 1000, 'wobble', { char:'trip' }); t += 1000;
+      tl.push(t, 520, 'cheer', { char:'trip' }); t += 520;
+      for (var i = 0; i < c.letters; i++){
+        tl.push(t, 1800, 'haul', { char:'trip', letter:i, dir:'right' });
+      }
+      /* the letters are safe; the crash happens off stage, where it is funniest */
+      tl.push(t + 1950, 500, 'offcrash', { dir:'right' });
+      return tl;
     } }
 ];
 
@@ -855,9 +942,14 @@ function pickScene(leadKey, letters, history, rnd){
   var r = rnd || Math.random;
   var pool = eligibleScenes(leadKey, letters);
   if (!pool.length) return null;
-  var recent = (history || []).slice(0, 3);
-  var fresh = pool.filter(function(s){ return recent.indexOf(s.id) === -1; });
-  if (fresh.length) pool = fresh;
+  /* the longest memory the pool can afford: five back if there is room,
+     then three, then just "not the one he saw last" */
+  var windows = [5, 3, 1];
+  for (var w = 0; w < windows.length; w++){
+    var recent = (history || []).slice(0, windows[w]);
+    var fresh = pool.filter(function(s){ return recent.indexOf(s.id) === -1; });
+    if (fresh.length >= 2 || (fresh.length && windows[w] === 1)){ pool = fresh; break; }
+  }
 
   var total = 0;
   for (var i = 0; i < pool.length; i++) total += (pool[i].weight || 1);
@@ -926,6 +1018,156 @@ function trimRedundantExits(tl){
   return tl;
 }
 
+var MIRROR_DIR = { left:'right', right:'left' };
+function mirrorTimeline(tl){
+  for (var i = 0; i < tl.events.length; i++){
+    var e = tl.events[i];
+    if (e.dir && MIRROR_DIR[e.dir]) e.dir = MIRROR_DIR[e.dir];
+  }
+  return tl;
+}
+
+/* Play the whole scene a touch faster or slower. Never past the runaway bound. */
+function applyTempo(tl, tempo){
+  var k = Math.max(0.85, Math.min(1.15, Number(tempo) || 1));
+  var end = tl.end();
+  if (end * k > SCENE_HARD_MAX) k = SCENE_HARD_MAX / end;
+  for (var i = 0; i < tl.events.length; i++){
+    tl.events[i].at = Math.round(tl.events[i].at * k);
+    tl.events[i].dur = Math.max(60, Math.round(tl.events[i].dur * k));
+  }
+  return tl.end();
+}
+
+/*
+  Who leads the next scene. Whoever has gone longest without leading gets
+  it, with a coin toss between equals — so all four take turns, but never in
+  a fixed rota the child could learn.
+*/
+function pickLead(leadHistory, rnd){
+  var r = rnd || Math.random;
+  var h = leadHistory || [];
+  var best = [], bestAge = -1;
+  for (var i = 0; i < CHAR_ORDER.length; i++){
+    var k = CHAR_ORDER[i];
+    var at = h.indexOf(k);
+    var age = at === -1 ? 1e6 : at;
+    if (age > bestAge){ best = [k]; bestAge = age; }
+    else if (age === bestAge) best.push(k);
+  }
+  return best[Math.floor(r() * best.length) % best.length];
+}
+
+/*
+  Push onto a most-recent-first history list, capped. Kept pure so the app
+  can persist it: the scene Grayson saw last night counts tonight too.
+*/
+function remember(list, item, cap){
+  var out = [item].concat((list || []).filter(function(x){ return x !== item; }));
+  return out.slice(0, cap || 8);
+}
+
+/* ---------------------------------------------------------------
+   WORLDS — the backdrop changes too, so the same scene in a new place
+   still looks new. All four are built on the orange-and-blue palette.
+   --------------------------------------------------------------- */
+var THEMES = ['morning', 'sunset', 'night', 'beach'];
+function pickTheme(prev, rnd){
+  var r = rnd || Math.random;
+  var pool = THEMES.filter(function(t){ return t !== prev; });
+  return pool[Math.floor(r() * pool.length) % pool.length];
+}
+
+/* ---------------------------------------------------------------
+   WORD ENTRY — a grown-up types or pastes this week's list however it
+   arrives: one per line, commas, spaces, numbered, with punctuation.
+   --------------------------------------------------------------- */
+var MAX_WORDS = 30;
+function parseWordInput(text){
+  var raw = String(text == null ? '' : text).split(/[\s,;\/|]+/);
+  return normalizeWords(raw);
+}
+
+/* Merge new words onto an existing list: order kept, duplicates dropped. */
+function addWords(list, text){
+  var merged = normalizeWords((list || []).concat(parseWordInput(text)));
+  return merged.slice(0, MAX_WORDS);
+}
+
+function removeWord(list, word){
+  var w = cleanWord(word);
+  return (list || []).filter(function(x){ return x !== w; });
+}
+
+/*
+  Settings, repaired on the way in. Whatever is in storage — nothing, an
+  older version, a hand-edited blob, garbage — comes out as a complete,
+  valid object, so no screen ever has to guard against a missing field.
+*/
+var SETTINGS_VERSION = 6;
+function normalizeSettings(obj){
+  var o = (obj && typeof obj === 'object') ? obj : {};
+  var words = Array.isArray(o.words) ? normalizeWords(o.words).slice(0, MAX_WORDS) : DEFAULT_WORDS.slice();
+  var a = A_SOUND_CHOICES.indexOf(o.aSound) !== -1 ? o.aSound : LETTER_SOUND.A;
+  var e = E_SOUND_CHOICES.indexOf(o.eSound) !== -1 ? o.eSound : LETTER_SOUND.E;
+  function ids(list, valid){
+    return (Array.isArray(list) ? list : []).filter(function(x){ return valid(x); }).slice(0, 8);
+  }
+  var sceneIds = {};
+  SCENES.forEach(function(s){ sceneIds[s.id] = true; });
+  return {
+    v: SETTINGS_VERSION,
+    words: words,
+    aSound: a,
+    eSound: e,
+    sfx: o.sfx !== false,
+    sceneHistory: ids(o.sceneHistory, function(x){ return sceneIds[x]; }),
+    leadHistory: ids(o.leadHistory, function(x){ return !!CHARS[x]; }),
+    theme: THEMES.indexOf(o.theme) !== -1 ? o.theme : null
+  };
+}
+
+function letterOverrides(settings){
+  var s = settings || {};
+  return { A: s.aSound || LETTER_SOUND.A, E: s.eSound || LETTER_SOUND.E };
+}
+
+/* The index to show next in a round of `n` words; -1 when the round is done. */
+function nextIndex(i, n){
+  var k = (Number(i) || 0) + 1;
+  return k < n ? k : -1;
+}
+
+/*
+  The launch self-check. Cheap enough to run on every load and it covers
+  the things that would ruin a session: a word list that cannot be played,
+  a scene that would strand a letter, a stage that is not spellable.
+*/
+function selfCheck(words){
+  var problems = [];
+  var list = normalizeWords(words || []);
+  list.forEach(function(w){
+    var opts = makeOptions(w);
+    if (opts.length !== 3 || opts.filter(function(o){ return o === w; }).length !== 1){
+      problems.push(w + ': FIND choices are wrong');
+    }
+    if (!isPermutationOf(scrambleLetters(w), w)) problems.push(w + ': BUILD letters do not make the word');
+    var pool = makeSearchLetters(w);
+    var ok = w.split('').every(function(ch){
+      var at = pool.indexOf(ch); if (at === -1) return false; pool.splice(at, 1); return true;
+    });
+    if (!ok) problems.push(w + ': LEARN letters cannot spell it');
+  });
+  for (var n = 1; n <= 12; n++){
+    for (var c = 0; c < CHAR_ORDER.length; c++){
+      var plan = planScene({ letters: n, lead: CHAR_ORDER[c] });
+      var p = validatePlan(plan);
+      if (p.length) problems.push('scene ' + plan.id + ' (' + n + ' letters): ' + p[0]);
+    }
+  }
+  return problems;
+}
+
 function planScene(opts){
   opts = opts || {};
   var letters = Math.max(0, Math.floor(Number(opts.letters) || 0));
@@ -934,10 +1176,20 @@ function planScene(opts){
   var rnd = opts.rnd || Math.random;
   var history = opts.history || [];
 
-  var order = [leadKey].concat(CHAR_ORDER.filter(function(k){ return k !== leadKey; }));
+  /*
+    Variation that sits on top of the scene library, so one scene is not one
+    performance. The supporting cast is drawn in a random order (so "who
+    comes to help" changes), and the whole thing can be mirrored and played
+    a little quicker or slower. None of these can break a plan: mirroring
+    only swaps left for right, and tempo scales every beat together.
+  */
+  var others = CHAR_ORDER.filter(function(k){ return k !== leadKey; });
+  var order = [leadKey].concat(opts.fixedCast ? others : shuffle(others, rnd));
+  var mirror = opts.mirror == null ? rnd() < 0.5 : !!opts.mirror;
+  var tempo = opts.tempo == null ? 0.92 + rnd() * 0.16 : Number(opts.tempo) || 1;
   var plan = {
     id: null, name: null, lead: leadKey, stage: stage, letters: letters,
-    cast: order, events: [], duration: 0
+    cast: order, events: [], duration: 0, mirror: mirror, tempo: tempo
   };
   if (!letters) return plan;
 
@@ -949,7 +1201,18 @@ function planScene(opts){
     }
   }
   if (!scene) scene = pickScene(leadKey, letters, history, rnd);
-  if (!scene) return plan;
+  if (!scene){
+    /* nothing this character leads fits a word this short: hand the scene to
+       someone who has one, rather than letting the letters just sit there */
+    for (var li = 0; li < CHAR_ORDER.length && !opts.noFallback; li++){
+      if (CHAR_ORDER[li] === leadKey || !eligibleScenes(CHAR_ORDER[li], letters).length) continue;
+      var copy = {};
+      for (var ok in opts){ if (Object.prototype.hasOwnProperty.call(opts, ok)) copy[ok] = opts[ok]; }
+      copy.lead = CHAR_ORDER[li]; copy.noFallback = true; copy.forceId = null;
+      return planScene(copy);
+    }
+    return plan;
+  }
 
   var ctx = {
     letters: letters, lead: leadKey, order: order,
@@ -959,9 +1222,11 @@ function planScene(opts){
 
   var tl = scene.build(ctx);
   trimRedundantExits(tl);
+  if (mirror) mirrorTimeline(tl);
   plan.id = scene.id;
   plan.name = scene.name;
-  plan.duration = fitDuration(tl);
+  fitDuration(tl);
+  plan.duration = applyTempo(tl, tempo);
   plan.events = tl.events.slice().sort(function(a, b){ return a.at - b.at; });
   /* Reported, not enforced: useful for the tuning pass, never a gate. */
   plan.inTargetRange = plan.duration >= SCENE_TARGET_MIN && plan.duration <= SCENE_TARGET_MAX;
@@ -1015,7 +1280,7 @@ function validatePlan(plan){
 
   /* 4. movement identity is never blurred */
   var ACRO_ONLY = { cartwheel:1, aerial:1, handspring:1 };
-  var FALL_ONLY = { fumble:1, snag:1, dustoff:1 };
+  var FALL_ONLY = { fumble:1, snag:1, dustoff:1, bail:1 };
   plan.events.forEach(function(e){
     if (!e.char) return;
     var c = CHARS[e.char];
@@ -1081,7 +1346,11 @@ var __CORE = {
   SCENES:SCENES, BEAT:BEAT, SCENE_TARGET_MIN:SCENE_TARGET_MIN,
   SCENE_TARGET_MAX:SCENE_TARGET_MAX, SCENE_HARD_MAX:SCENE_HARD_MAX,
   EXIT_KINDS:EXIT_KINDS, trimRedundantExits:trimRedundantExits, eligibleScenes:eligibleScenes, pickScene:pickScene, planScene:planScene,
-  validatePlan:validatePlan
+  validatePlan:validatePlan, mirrorTimeline:mirrorTimeline, applyTempo:applyTempo,
+  pickLead:pickLead, remember:remember, THEMES:THEMES, pickTheme:pickTheme,
+  MAX_WORDS:MAX_WORDS, parseWordInput:parseWordInput, addWords:addWords, removeWord:removeWord,
+  SETTINGS_VERSION:SETTINGS_VERSION, normalizeSettings:normalizeSettings,
+  letterOverrides:letterOverrides, nextIndex:nextIndex, selfCheck:selfCheck
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = __CORE;
 

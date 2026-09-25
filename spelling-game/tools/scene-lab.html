@@ -88,14 +88,14 @@ window.__lab = {
   chars: CORE.CHAR_ORDER,
   scenes: CORE.SCENES.map(function(s){ return { id:s.id, name:s.name, lead:s.lead, min:s.min }; }),
 
-  plan: function(id, word, lead){
-    return CORE.planScene({ letters: word.length, lead: lead, stage: 'build', forceId: id, history: [] });
+  plan: function(id, word, lead, mirror){
+    return CORE.planScene({ letters: word.length, lead: lead, stage: 'build', forceId: id, history: [], mirror: !!mirror, tempo: 1 });
   },
 
-  run: function(id, word, lead){
+  run: function(id, word, lead, mirror){
     document.getElementById('title').textContent = (id || 'auto') + '  ·  ' + lead;
     var els = renderWord(word);
-    var plan = CORE.planScene({ letters: word.length, lead: lead, stage: 'build', forceId: id, history: [] });
+    var plan = CORE.planScene({ letters: word.length, lead: lead, stage: 'build', forceId: id, history: [], mirror: !!mirror, tempo: 1 });
     lastPlan = plan;
     var probs = CORE.validatePlan(plan);
     hud.textContent = plan.id + '  ' + plan.duration + 'ms  n=' + word.length +
@@ -143,7 +143,7 @@ window.__lab = {
   residue: function(){
     return {
       props: document.querySelectorAll('.letterprop').length,
-      shards: document.querySelectorAll('.shard').length,
+      shards: document.querySelectorAll('.fx').length + document.querySelectorAll('.looseboard').length,
       cordsWithPath: Array.prototype.filter.call(document.querySelectorAll('.cord'),
         function(p){ return (p.getAttribute('d') || '').length > 0; }).length,
       visibleActors: Array.prototype.filter.call(document.querySelectorAll('.actor'),

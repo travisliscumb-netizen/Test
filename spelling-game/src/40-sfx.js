@@ -87,7 +87,23 @@ function createSfx(){
     dust:     function(t){ noise(t, .26, 1600, 900, 1.2, .10); },
     blink:    function(t){ tone(t, .08, 620, 880, .10, 'triangle'); },
     rescue:   function(t){ noise(t, .34, 600, 2600, .9, .20); tone(t, .26, 380, 780, .12, 'triangle'); },
-    'super':  function(t){ noise(t, .9, 400, 3200, .8, .26); tone(t, .8, 200, 620, .12, 'sawtooth'); }
+    'super':  function(t){ noise(t, .9, 400, 3200, .8, .26); tone(t, .8, 200, 620, .12, 'sawtooth'); },
+    cheer:    function(t){ tone(t, .12, 520, 700, .14, 'triangle'); tone(t + .1, .16, 700, 1040, .14, 'triangle'); },
+    giggle:   function(t){ for (var i = 0; i < 4; i++) tone(t + i * .075, .06, 880 - i * 60, 1100 - i * 70, .10, 'triangle'); },
+    kickflip: function(t){ noise(t, .08, 2400, 1200, 2, .16); tone(t + .05, .18, 300, 700, .10, 'triangle'); noise(t + .5, .1, 1400, 500, 1.4, .18); },
+    crash:    function(t){ noise(t, .6, 1200, 160, .8, .30); tone(t + .05, .3, 160, 60, .22); tone(t + .32, .12, 900, 1400, .10, 'triangle'); },
+    boing:    function(t){ tone(t, .22, 180, 520, .14, 'sine'); },
+    whistle:  function(t){ tone(t, .14, 1500, 1900, .10, 'sine'); tone(t + .18, .22, 1500, 2100, .10, 'sine'); },
+
+    /* ---- the game's own interface ---- */
+    tap:      function(t){ tone(t, .05, 660, 700, .09, 'triangle'); },
+    place:    function(t){ tone(t, .08, 520, 900, .14, 'triangle'); noise(t, .05, 3000, 2000, 2, .05); },
+    correct:  function(t){ tone(t, .12, 660, 660, .14, 'triangle'); tone(t + .1, .12, 880, 880, .14, 'triangle'); tone(t + .2, .22, 1320, 1320, .12, 'triangle'); },
+    wrong:    function(t){ tone(t, .16, 260, 200, .14, 'triangle'); tone(t + .14, .2, 220, 170, .12, 'triangle'); },
+    fanfare:  function(t){
+      var notes = [523, 659, 784, 1047, 784, 1047];
+      for (var i = 0; i < notes.length; i++) tone(t + i * .13, i === notes.length - 1 ? .5 : .14, notes[i], notes[i], .14, 'triangle');
+    }
   };
 
   function play(name){

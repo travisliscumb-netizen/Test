@@ -211,6 +211,26 @@ const soundOf = (c) => CORE.letterSound(c, {});
     JSON.stringify(synth.spoken));
 }
 
+/* ---- 9b. the iOS unlock: one silent utterance, spoken inside the tap ---- */
+{
+  const clock = makeClock();
+  const synth = makeFakeSynth(clock);
+  const made = [];
+  const speech = createSpeech({
+    synth, now: clock.now, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
+    getVoices: synth.getVoices,
+    makeUtterance: (text, o) => { const u = { text, rate: o.rate, volume: o.volume, onend: null, onerror: null }; made.push(u); return u; }
+  });
+  const first = speech.prime();
+  check('prime speaks synchronously, inside the gesture', synth.spoken.length === 1, JSON.stringify(synth.spoken));
+  check('the primer is silent', made[0] && made[0].volume === 0);
+  check('prime happens once per session', speech.prime() === false && synth.spoken.length === 1 && first === true);
+  speech.say('frog');
+  await clock.advance(2000);
+  check('speech works normally after priming', synth.spoken.includes('frog') && synth.overlaps === 0,
+    JSON.stringify(synth.spoken) + ' overlaps=' + synth.overlaps);
+}
+
 /* ---- 10. no speech support at all must not break the flow ---- */
 {
   const clock = makeClock();

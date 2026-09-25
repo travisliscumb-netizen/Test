@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1E6FE8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spelling">
+<meta name="format-detection" content="telephone=no">
+<title>Grayson's Spelling Game</title>
+<!-- @ICON -->
+<!-- @STYLES -->
+</head>
+<body class="theme-morning">
+
+<!-- The world everyone lives in. Purely decorative; it never takes a tap. -->
+<div id="world" aria-hidden="true">
+  <div class="sky"></div>
+  <div class="stars"></div>
+  <div class="sun"></div>
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <svg class="hills far" viewBox="0 0 400 120" preserveAspectRatio="none"><path d="M0 70 Q60 20 120 60 T240 50 T400 40 V120 H0 Z"/></svg>
+  <svg class="hills near" viewBox="0 0 400 120" preserveAspectRatio="none"><path d="M0 80 Q80 30 170 72 T330 60 T400 66 V120 H0 Z"/></svg>
+  <div class="sea"></div>
+  <div class="ground"><div class="lip"></div></div>
+</div>
+
+<main id="app">
+
+  <!-- ============ MENU ============ -->
+  <section class="screen" id="s-menu" data-screen="menu">
+    <header class="bar">
+      <span></span>
+      <button class="chip-btn" id="btnGrownups" type="button" aria-label="Grown-ups">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7zm7.4-2.5a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L14.9 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.4 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.9h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5z"/></svg>
+        Grown-ups
+      </button>
+    </header>
+    <div class="menu-body">
+      <h1 class="title" aria-label="Grayson's Spelling Game">
+        <span class="title-name">Grayson's</span>
+        <span class="title-tiles" id="titleTiles"></span>
+      </h1>
+      <div class="card menu-card">
+        <div class="menu-week">
+          <span class="label">This week's words</span>
+          <span class="count" id="wordCount"></span>
+        </div>
+        <div class="word-chips" id="menuChips"></div>
+        <button class="btn btn-play" id="btnPlay" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.8L9.5 4.6A1 1 0 0 0 8 5.5z"/></svg>
+          PLAY
+        </button>
+        <p class="hint">or tap a word to start there</p>
+        <button class="selfcheck" id="selfCheck" type="button"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EMPTY ============ -->
+  <section class="screen" id="s-empty" data-screen="empty">
+    <header class="bar"><span></span><span></span></header>
+    <div class="card center-card">
+      <div class="big-icon" aria-hidden="true">📝</div>
+      <h2>No words yet!</h2>
+      <p>A grown-up needs to add this week's spelling words.</p>
+      <button class="btn btn-blue" id="btnEmptyGrownups" type="button">Grown-ups: add words</button>
+    </div>
+  </section>
+
+  <!-- ============ WORD INTRO ============ -->
+  <section class="screen" id="s-intro" data-screen="intro">
+    <header class="bar">
+      <button class="back" type="button" data-back="menu" aria-label="Back to menu">‹ Menu</button>
+      <div class="progress" aria-hidden="true"></div>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="card intro-card">
+      <p class="eyebrow" id="introOf">Word 1 of 5</p>
+      <div class="word-hero" id="introWord" aria-live="polite"></div>
+      <p class="word-lower" id="introLower"></p>
+      <div class="row">
+        <button class="btn btn-blue btn-icon" id="btnIntroHear" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+          Hear it
+        </button>
+        <button class="btn btn-blue btn-icon" id="btnIntroSpell" type="button">
+          <span class="abc" aria-hidden="true">abc</span>
+          Spell it
+        </button>
+      </div>
+      <button class="btn btn-go" id="btnIntroGo" type="button">Let's go!</button>
+    </div>
+  </section>
+
+  <!-- ============ FIND ============ -->
+  <section class="screen" id="s-find" data-screen="find">
+    <header class="bar">
+      <button class="back" type="button" data-back="intro" aria-label="Back">‹ Back</button>
+      <ol class="steps" aria-label="Stages"><li data-step="find">Find</li><li data-step="build">Build</li><li data-step="learn">Learn</li></ol>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="card play-card">
+      <p class="prompt">Listen, then tap the word you hear</p>
+      <button class="hear-big" id="btnFindHear" type="button" aria-label="Hear the word">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+      </button>
+      <div class="choices" id="findChoices"></div>
+    </div>
+  </section>
+
+  <!-- ============ BUILD ============ -->
+  <section class="screen" id="s-build" data-screen="build">
+    <header class="bar">
+      <button class="back" type="button" data-back="find" aria-label="Back">‹ Back</button>
+      <ol class="steps" aria-label="Stages"><li data-step="find">Find</li><li data-step="build">Build</li><li data-step="learn">Learn</li></ol>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="card play-card" id="buildCard">
+      <div class="prompt-row">
+        <p class="prompt">Build <b id="buildWordLabel"></b></p>
+        <button class="hear-small" id="btnBuildHear" type="button" aria-label="Hear the word">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+        </button>
+      </div>
+      <div class="slots" id="buildSlots"></div>
+      <div class="tray" id="buildTray"></div>
+      <p class="hint">Tap or drag the letters into the boxes</p>
+    </div>
+  </section>
+
+  <!-- ============ LEARN ============ -->
+  <section class="screen" id="s-learn" data-screen="learn">
+    <header class="bar">
+      <button class="back" type="button" data-back="build" aria-label="Back">‹ Back</button>
+      <ol class="steps" aria-label="Stages"><li data-step="find">Find</li><li data-step="build">Build</li><li data-step="learn">Learn</li></ol>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="card play-card" id="learnCard">
+      <div class="prompt-row">
+        <p class="prompt">Find the letters for <b id="learnWordLabel"></b></p>
+        <button class="hear-small" id="btnLearnHear" type="button" aria-label="Hear the word">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+        </button>
+        <button class="hear-small mix" id="btnLearnMix" type="button" aria-label="Mix the letters up">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4-4 4V8h-2.6l-2.2 2.9-1.3-1.7L13.4 6H17V3zM3 6h5l9.1 12H17v-3l4 4-4 4v-3h-2.9L5 8H3V6zm0 12h2l2.4-3.2 1.3 1.7L6 20H3v-2z"/></svg>
+        </button>
+      </div>
+      <div class="slots" id="learnSlots"></div>
+      <div class="hunt" id="learnHunt"></div>
+      <p class="learn-cheer" id="learnCheer" hidden></p>
+      <p class="hint" id="learnHint">Tap the letters in order</p>
+      <button class="btn btn-go btn-next" id="btnNext" type="button" hidden>Next word ›</button>
+    </div>
+  </section>
+
+  <!-- ============ DONE ============ -->
+  <section class="screen" id="s-done" data-screen="done">
+    <header class="bar"><span></span><span></span></header>
+    <div class="card center-card done-card">
+      <div class="trophy" aria-hidden="true">
+        <svg viewBox="0 0 120 120"><path d="M34 16h52v14c0 16-10 30-26 32-16-2-26-16-26-32V16z" fill="#FFC53D" stroke="#B9770E" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M34 22H18c0 16 8 24 18 26M86 22h16c0 16-8 24-18 26" fill="none" stroke="#B9770E" stroke-width="5" stroke-linecap="round"/>
+        <rect x="52" y="62" width="16" height="18" fill="#F0A21F" stroke="#B9770E" stroke-width="4"/>
+        <rect x="36" y="80" width="48" height="14" rx="4" fill="#1E6FE8" stroke="#0B2A66" stroke-width="4"/>
+        <path d="M48 30 l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z" fill="#fff" opacity=".8"/></svg>
+      </div>
+      <h2>You did it!</h2>
+      <p id="doneLine">You spelled all 5 words!</p>
+      <div class="word-chips done-chips" id="doneChips"></div>
+      <button class="btn btn-go" id="btnAgain" type="button">Play again</button>
+      <button class="btn btn-ghost" id="btnDoneMenu" type="button">Main menu</button>
+    </div>
+  </section>
+
+  <!-- ============ PASSCODE ============ -->
+  <section class="screen" id="s-pass" data-screen="pass">
+    <header class="bar">
+      <button class="back" type="button" data-back="menu" aria-label="Back">‹ Back</button>
+      <span class="bar-title">Grown-ups</span>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="card center-card pass-card">
+      <h2>Enter passcode</h2>
+      <div class="dots" id="passDots" aria-live="polite"><i></i><i></i><i></i><i></i></div>
+      <div class="keypad" id="keypad"></div>
+    </div>
+  </section>
+
+  <!-- ============ WORD LIST ============ -->
+  <section class="screen" id="s-words" data-screen="words">
+    <header class="bar">
+      <button class="back" type="button" data-back="menu" aria-label="Done">‹ Done</button>
+      <span class="bar-title">Word list</span>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="card words-card">
+      <div class="scroll">
+        <h2 class="section">This week's words <span class="count" id="listCount"></span></h2>
+        <form class="add-row" id="addForm" autocomplete="off">
+          <input id="addInput" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false"
+                 placeholder="Type or paste words" aria-label="New words">
+          <button class="btn btn-blue" type="submit">Add</button>
+        </form>
+        <p class="note" id="addNote">Add one word, or paste the whole list: commas, spaces or new lines all work.</p>
+        <ul class="word-list" id="wordList"></ul>
+        <div class="row list-actions">
+          <button class="btn btn-ghost small" id="btnClear" type="button">Clear all</button>
+          <button class="btn btn-ghost small" id="btnSample" type="button">Use sample words</button>
+        </div>
+        <button class="btn btn-go" id="btnSavePlay" type="button">Save &amp; play</button>
+        <p class="note">Words are saved on this device only.</p>
+
+        <h2 class="section">Sound</h2>
+        <label class="toggle"><input type="checkbox" id="optSfx" checked><span>Sound effects</span></label>
+
+        <h2 class="section">Letter voice</h2>
+        <p class="note">Phones don't all say every letter the same way. If spelling AND sounds like "I-N-D", pick another spelling for A and tap Test.</p>
+        <div class="voice-row"><span class="vl">A</span><select id="optA" aria-label="How to say A"></select></div>
+        <div class="voice-row"><span class="vl">E</span><select id="optE" aria-label="How to say E"></select></div>
+        <button class="btn btn-blue small" id="btnVoiceTest" type="button">Test: A N D, S E E</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="fxLayer" aria-hidden="true"></div>
+<div id="confetti" aria-hidden="true"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- @SCRIPTS -->
+</body>
+</html>
