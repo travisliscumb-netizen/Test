@@ -66,13 +66,12 @@ test('spawn: centred in rows 21-22 then drops one row into view', () => {
   assert.equal(g.drainEvents()[0].type, 'spawn');
 });
 
-test('gravity curve: gentle start, monotone, never faster than 25 rows/s', () => {
-  assert.equal(gravityInterval(1), 1250);
+test('gravity curve: relaxed start, monotone, capped low', () => {
+  assert.equal(gravityInterval(1), 2000);
   for (let l = 2; l <= 20; l++) assert.ok(gravityInterval(l) <= gravityInterval(l - 1));
-  assert.ok(gravityInterval(10) > 250, 'level 10 is still readable');
-  assert.ok(gravityInterval(15) > 100);
+  assert.ok(gravityInterval(10) > 900, 'level 10 is about one row per second');
+  assert.ok(gravityInterval(20) >= 400, 'the fastest level is still under 2.5 rows/s');
   assert.equal(gravityInterval(25), gravityInterval(20));
-  assert.ok(gravityInterval(20) >= 40);
 });
 
 test('lock delay: piece locks 500 ms after landing, not before', () => {
@@ -85,7 +84,7 @@ test('lock delay: piece locks 500 ms after landing, not before', () => {
   assert.equal(g.board[0 * COLS + 4], typeId('O'));
 });
 
-test('extended placement: 15 lock resets, the 16th grounded move locks', () => {
+test('extended placement: the move after the last lock reset locks the piece', () => {
   const g = new Game({ seed: 3 });
   g.start();
   g.board.fill(0);
@@ -93,7 +92,7 @@ test('extended placement: 15 lock resets, the 16th grounded move locks', () => {
   const ref = g.piece;
   let moves = 0, dir = 1;
   while (g.piece === ref && moves < 40) {
-    run(g, 400);                          // under the 500 ms lock delay
+    run(g, 400);                          // under the lock delay
     assert.equal(g.piece, ref, `still active after ${moves} resets`);
     if (!g.move(dir)) { dir = -dir; continue; }
     dir = -dir;

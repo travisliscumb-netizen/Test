@@ -2,8 +2,8 @@
    passed in, so every behaviour here is reproducible in node tests.
 
    Follows the Tetris Guideline: 10x20 visible matrix with a 20-row buffer,
-   SRS rotation, 7-bag randomiser, hold, 5-piece preview, ghost, 0.7 s lock
-   delay with 15-move extended placement, guideline scoring including T-spins,
+   SRS rotation, 7-bag randomiser, hold, 5-piece preview, ghost, 1 s lock
+   delay with 30-move extended placement, guideline scoring including T-spins,
    back-to-back, combos and perfect clears, block-out and lock-out top-outs.
 
    Time only advances through update(dtMs). Everything the presentation layer
@@ -16,8 +16,8 @@ export const ROWS = 40;
 export const VISIBLE = 20;
 export const GREY = 8;
 
-export const LOCK_DELAY = 700;
-export const MOVE_RESET_LIMIT = 15;
+export const LOCK_DELAY = 1000;
+export const MOVE_RESET_LIMIT = 30;
 export const LINE_CLEAR_DELAY = 380;
 export const PREVIEW = 5;
 
@@ -36,12 +36,12 @@ const PC_B2B_TETRIS = 3200;
 
 export const CLEAR_NAMES = ['', 'Single', 'Double', 'Triple', 'Tetris'];
 
-/* Milliseconds per row. Deliberately gentler than the guideline curve (which
-   hits 20G by level 15): 1.25 s at level 1, each level 15% faster, so level 10
-   is ~3.5 rows/s and level 15 ~8 rows/s. Floored at 40 ms (25 rows/s). */
+/* Milliseconds per row. Tuned to be relaxed, far gentler than the guideline
+   curve (which hits 20G by level 15): 2 s per row at level 1, each level 8%
+   faster, so level 10 is ~1 row/s and level 20 ~2.4 rows/s. Floored at 200 ms. */
 export function gravityInterval(level) {
   const l = Math.min(Math.max(level, 1), 20);
-  return Math.max(40, 1250 * Math.pow(0.85, l - 1));
+  return Math.max(200, 2000 * Math.pow(0.92, l - 1));
 }
 
 /* mulberry32: tiny, fast, good enough for a piece randomiser. */
