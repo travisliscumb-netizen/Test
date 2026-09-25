@@ -334,7 +334,8 @@ function exitDirsFor(key){
   var c = CHARS[key];
   if (!c) return ['left', 'right'];
   if (!c.airborne) return ['left', 'right'];
-  return ['up', 'left', 'right', 'down'];
+  /* never 'down': leaving through the ground reads as a glitch, not a move */
+  return ['up', 'left', 'right'];
 }
 
 function sidekickOf(leader, n){

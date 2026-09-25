@@ -692,10 +692,14 @@ function createStage(deps){
     };
   }
 
-  function edgeFor(dir, ground){
+  /* Off-screen point for a direction. Up and down go straight from where he
+     is (boxX), so two characters leaving upward never converge on the same
+     spot with their letters piled into one. */
+  function edgeFor(dir, ground, boxX){
+    var ux = boxX == null ? vw() * 0.5 - SIZE / 2 : clamp(boxX, -SIZE * 0.2, vw() - SIZE * 0.8);
     switch (dir){
-      case 'up':    return { x: vw() * 0.5 - SIZE / 2, y: -SIZE - 70 };
-      case 'down':  return { x: vw() * 0.5 - SIZE / 2, y: vh() + 90 };
+      case 'up':    return { x: ux, y: -SIZE - 70 };
+      case 'down':  return { x: ux, y: vh() + 90 };
       case 'left':  return { x: -SIZE - 90, y: ground };
       default:      return { x: vw() + 90, y: ground };
     }
@@ -801,7 +805,7 @@ function createStage(deps){
           }
           else takeHold(a, pl, SIZE * 0.5, SIZE * 1.0);
         }
-        var to2 = edgeFor(e.dir, ground - SIZE * 0.86);
+        var to2 = edgeFor(e.dir, ground - SIZE * 0.86, a.x);
         move(a, t, e.dur, { x: to2.x, y: to2.y, sc: 0.88 },
           { ease: 'inout', spins: a.mode === 'acro' ? 2 : 0, effort: 0.9 });
         SFX.play('yank');
@@ -813,7 +817,7 @@ function createStage(deps){
       case 'carry': {
         if (!a || !pl) break;
         var lift = (e.kind === 'scoop' && a.mode === 'board') ? SIZE * 0.20 : SIZE * 0.58;
-        var away2 = edgeFor(e.dir || 'left', ground - SIZE * 0.86);
+        var away2 = edgeFor(e.dir || 'left', ground - SIZE * 0.86, pl.x - SIZE / 2);
         collect(a, pl, t, e.dur, SIZE * 0.56, lift, away2,
                 e.kind === 'scoop' ? 'scoop' : 'pickup');
         break;
@@ -1055,7 +1059,7 @@ function createStage(deps){
           pl.offX = SIZE * 0.5 - pl.hx; pl.offY = SIZE * 0.86 - pl.hy; pl.offRot = -5;
         }
         setExpr(a, 'happy', e.dur, t);
-        var ro = edgeFor(e.dir || 'left', ground - SIZE * 0.8);
+        var ro = edgeFor(e.dir || 'left', ground - SIZE * 0.8, a.x);
         move(a, t, e.dur, { x: ro.x, y: ro.y, sc: 0.9 },
           { ease: 'inout', spins: a.mode === 'acro' ? 2 : 0, effort: 0.9 });
         SFX.play('rescue');
@@ -1265,7 +1269,7 @@ function createStage(deps){
         if (!a) break;
         a.fallen = 0;
         setExpr(a, 'happy', e.dur, t);
-        move(a, t, e.dur, edgeFor(e.dir || 'right', ground - SIZE * 0.86),
+        move(a, t, e.dur, edgeFor(e.dir || 'right', ground - SIZE * 0.86, a.x),
           { spins: a.mode === 'acro' ? 2 : 0, op: 0, ease: 'inout', rotTo: a.mode === 'acro' ? null : 0, effort: 0.7 });
         break;
       }

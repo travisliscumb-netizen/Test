@@ -255,6 +255,16 @@ for (const tempo of [0.5, 0.92, 1, 1.08, 3]) {
   console.log(`\nvariation: ${distinct}/60 distinct performances, ${new Set(sigs.map(s => s.split('|')[0])).size} scenes used`);
 }
 
+/* nobody ever leaves by sinking through the floor */
+{
+  let downs = 0;
+  for (const lead of C.CHAR_ORDER) for (let n = 2; n <= 9; n++) for (let seed = 1; seed <= 15; seed++) {
+    const plan = C.planScene({ letters: n, lead, rnd: seeded(seed * 31 + n) });
+    downs += plan.events.filter(e => e.dir === 'down').length;
+  }
+  check('no scene sends anyone out through the ground', downs === 0, `${downs} downward exits`);
+}
+
 /* ---------------- words the grown-up types ---------------- */
 check('parse: commas, newlines, numbering',
   JSON.stringify(C.parseWordInput('1. cat, dog\nfrog;  bird/ fish')) === JSON.stringify(['CAT', 'DOG', 'FROG', 'BIRD', 'FISH']));

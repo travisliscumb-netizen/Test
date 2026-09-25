@@ -130,20 +130,27 @@ for (const s0 of scenes) for (const mirror of MIRRORS) {
 
   /* stacked letters must stay readable: no two props sharing a centre */
   const hiddenFrames = new Set();
+  let firstHidden = '';
   for (const m of mid) {
-    const b = m.p.props;
+    /* only letters the child can actually see: two props parked at the same
+       spot past the edge of the screen hide nothing from anyone */
+    const onScreen = r => r.x + r.w > 0 && r.x < VIEWPORT.width && r.y + r.h > 0 && r.y < VIEWPORT.height;
+    const b = m.p.props.filter(onScreen);
     for (let x = 0; x < b.length; x++) {
       for (let y = x + 1; y < b.length; y++) {
         const dx = Math.abs((b[x].x + b[x].w / 2) - (b[y].x + b[y].w / 2));
         const dy = Math.abs((b[x].y + b[x].h / 2) - (b[y].y + b[y].h / 2));
-        if (dx < b[x].w * 0.22 && dy < b[x].h * 0.22) hiddenFrames.add(m.t);
+        if (dx < b[x].w * 0.22 && dy < b[x].h * 0.22){
+          if (!hiddenFrames.size) firstHidden = `t=${m.t} props ${x}&${y} at (${b[x].x},${b[x].y}) states=${JSON.stringify(m.p.states)}`;
+          hiddenFrames.add(m.t);
+        }
       }
     }
   }
   /* a letter may be hidden for a beat as it is caught, but never for long */
   const hiddenPct = mid.length ? hiddenFrames.size / mid.length : 0;
   check(s.id, 'no letter stays hidden behind another', hiddenPct < 0.15,
-    `hidden in ${Math.round(hiddenPct * 100)}% of frames`);
+    `hidden in ${Math.round(hiddenPct * 100)}% of frames; first ${firstHidden}; cast ${plan.cast}`);
 
   /* every letter must have been taken by somebody by the end: a letter left
      loose on the floor is one the characters walked away from */
