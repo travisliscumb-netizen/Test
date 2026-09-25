@@ -1,0 +1,14 @@
+{
+  "name": "graysons-dino-rockets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Grayson's Dino Rockets: a single-file spelling game.",
+  "type": "commonjs",
+  "scripts": {
+    "build": "node tools/assemble.mjs",
+    "check-build": "node tools/assemble.mjs --check",
+    "test": "node tests/core.mjs && node tests/speech.mjs && node tools/assemble.mjs --check",
+    "test:app": "node tests/app.mjs",
+    "qa:scenes": "node tools/scene-qa.mjs --both"
+  }
+}

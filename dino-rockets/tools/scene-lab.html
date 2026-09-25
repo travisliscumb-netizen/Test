@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>Dino Scene Lab</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;font-family:ui-rounded,system-ui,sans-serif}
+body{background:linear-gradient(#0B1640,#1F4E8C)}
+#ground{position:fixed;left:0;right:0;bottom:0;height:110px;background:#E0592A;border-top:6px solid #FFB067}
+.card{position:fixed;left:14px;right:14px;top:70px;bottom:250px;background:rgba(255,255,255,.96);border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+h2{margin:0 0 16px;color:#1E6FE8}
+.slots{display:flex;gap:10px;flex-wrap:nowrap}
+.slot{width:64px;height:70px;border-radius:16px;background:#FF8A1F;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:36px;font-weight:900;box-shadow:0 5px 0 #C4520A}
+.slot .lo{font-size:14px;opacity:.8}
+#hud{position:fixed;left:8px;top:8px;z-index:999;background:rgba(10,20,40,.86);color:#fff;font:600 11px/1.45 ui-monospace,monospace;padding:6px 9px;border-radius:9px;white-space:pre}
+</style>
+<link rel="stylesheet" href="../src/15-stage.css">
+</head>
+<body>
+<div id="ground"></div>
+<div class="card" id="card"><h2 id="title">SCENE LAB</h2><div class="slots" id="slots"></div></div>
+<div id="fxLayer"></div>
+<div id="hud"></div>
+<script src="../src/20-core.js"></script>
+<script src="../src/40-sfx.js"></script>
+<script src="../src/50-dinos.js"></script>
+<script src="../src/60-stage.js"></script>
+<script>
+var CORE = __CORE;
+var silent = { play: function(){} };
+var stage = createStage({ core: CORE, sfx: silent, art: DINO_ART });
+stage.init(document.getElementById('fxLayer'));
+function groundY(){ return document.getElementById('ground').getBoundingClientRect().top + 8; }
+function renderWord(word){
+  var box = document.getElementById('slots'); box.innerHTML = '';
+  word.split('').forEach(function(ch){
+    var s = document.createElement('div'); s.className = 'slot';
+    s.innerHTML = '<span>' + ch + '</span><span class="lo">' + ch.toLowerCase() + '</span>';
+    box.appendChild(s);
+  });
+  return box.querySelectorAll('.slot');
+}
+var lastPlan = null;
+window.__lab = {
+  scenes: CORE.SCENES.map(function(s){ return { id: s.id, name: s.name, lead: s.lead, min: s.min }; }),
+  plan: function(id, word, lead, mirror){ return CORE.planScene({ letters: word.length, lead: lead, forceId: id, mirror: !!mirror, tempo: 1, rnd: CORE.rng(word.length * 13) }); },
+  run: function(id, word, lead, mirror){
+    document.getElementById('title').textContent = id + ' · ' + lead;
+    var els = renderWord(word);
+    var plan = this.plan(id, word, lead, mirror);
+    lastPlan = plan;
+    var probs = CORE.validatePlan(plan);
+    document.getElementById('hud').textContent = plan.id + '  ' + plan.duration + 'ms  n=' + word.length + (probs.length ? '\nPROBLEMS: ' + probs.join('; ') : '');
+    window.__labDone = false; window.__labErrors = null;
+    return stage.play(plan, els, { layer: document.getElementById('fxLayer'), groundY: groundY() }).then(function(errs){
+      window.__labDone = true; window.__labErrors = errs; return errs;
+    });
+  },
+  probe: function(){
+    var d = stage.debug(), props = document.querySelectorAll('.letterprop'), boxes = [];
+    for (var i = 0; i < props.length; i++){
+      var r = props[i].getBoundingClientRect(), op = Number(props[i].style.opacity || 1);
+      boxes.push({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), op: op });
+    }
+    var acts = {}, A = stage.actors();
+    for (var k in A) acts[k] = { x: Math.round(A[k].x), y: Math.round(A[k].y), op: Number(A[k].op.toFixed(2)), rot: Math.round(A[k].rot) };
+    return { live: d, props: boxes, actors: acts, states: d ? d.states : [] };
+  },
+  residue: function(){
+    return {
+      props: document.querySelectorAll('.letterprop').length,
+      fx: document.querySelectorAll('.fx').length + document.querySelectorAll('.ship,.beam').length,
+      visibleActors: Array.prototype.filter.call(document.querySelectorAll('.actor'), function(a){ return Number(a.style.opacity || 0) > 0.02; }).length,
+      layerTransform: document.getElementById('fxLayer').style.transform || ''
+    };
+  }
+};
+</script>
+</body>
+</html>

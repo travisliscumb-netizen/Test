@@ -1,0 +1,57 @@
+/* ---- STAGE: the crew, their props and the letters they carry ---- */
+#fxLayer{position:fixed;inset:0;z-index:920;pointer-events:none;overflow:hidden;will-change:transform}
+.actor{
+  position:fixed;left:0;top:0;width:150px;height:150px;
+  transform-origin:50% 50%;will-change:transform,opacity;opacity:0;pointer-events:none;
+  /* a light rim so every dino stands out against every planet. Two soft
+     passes, not four hard offsets: the rigs repaint every frame, and with
+     four dinos out the old rim halved the frame rate on a slow phone */
+  filter:drop-shadow(0 0 1.6px #fff) drop-shadow(0 0 1.2px #fff) drop-shadow(0 7px 6px rgba(0,0,0,.3));
+}
+.actor svg,.baby svg{width:100%;height:100%;overflow:visible}
+.actor.tappable svg *{pointer-events:visiblePainted;cursor:pointer}
+.shadow{
+  position:fixed;left:0;top:0;width:100px;height:16px;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.75) 0%,rgba(0,0,0,.3) 55%,rgba(0,0,0,0) 72%);
+  opacity:0;pointer-events:none;will-change:transform,opacity;
+}
+
+/* ---- faces: blink on transform; expressions on scale/translate/rotate so
+   the blink can never cancel a reaction ---- */
+.actor .eye,.baby .eye{transform-box:fill-box;transform-origin:50% 50%;animation:blink var(--blink-dur,4.2s) var(--blink-delay,0s) infinite}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}95.5%{transform:scaleY(.08)}}
+.actor .brow,.actor .white,.actor .pupil{transform-box:fill-box;transform-origin:50% 50%;transition:scale .15s,translate .15s,rotate .15s}
+.eye-happy,.m-open,.m-oops,.sweat{display:none}
+.ex-happy .eye{display:none}
+.ex-happy .eye-happy{display:inline}
+.ex-happy .m-smile,.ex-wow .m-smile,.ex-oops .m-smile,.ex-roar .m-smile{display:none}
+.ex-happy .m-open,.ex-wow .m-open,.ex-roar .m-open{display:inline}
+.ex-happy .brow{translate:0 -3px}
+.ex-wow .brow{translate:0 -6px}
+.ex-wow .white{scale:1.14}
+.ex-wow .pupil{scale:.75}
+.ex-roar .brow{rotate:-14deg;translate:0 3px}
+.ex-oops .m-oops,.ex-oops .sweat{display:inline}
+.ex-oops .white{scale:1 .74}
+.ex-oops .brow{rotate:14deg;translate:0 -2px}
+@media (prefers-reduced-motion: reduce){ .actor .eye{animation:none} }
+
+.cordlayer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.letterprop{position:fixed;left:0;top:0;pointer-events:none;will-change:transform,opacity;filter:drop-shadow(0 10px 12px rgba(0,0,0,.35))}
+.letterprop > *{margin:0 !important}
+.taken{opacity:0 !important;transition:none !important}
+
+/* ---- effects ---- */
+.fx{position:fixed;pointer-events:none;will-change:transform,opacity;border-radius:50%}
+.fx.smoke{width:16px;height:16px;background:radial-gradient(circle,#fff 0%,#DDE6F3 60%,rgba(221,230,243,0) 72%)}
+.fx.dust{width:14px;height:14px;background:radial-gradient(circle,var(--dust,#E8D2B0) 0%,var(--dust,#D9BE93) 55%,rgba(0,0,0,0) 72%)}
+.fx.spark{width:10px;height:10px;border-radius:2px;transform:rotate(45deg)}
+.fx.shard{width:12px;height:12px;border-radius:3px}
+.fx.speed{width:60px;height:5px;border-radius:3px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.9))}
+.fx.ring{width:40px;height:40px;background:none;border:5px solid rgba(255,220,120,.9)}
+.fx.note{width:auto;height:auto;border-radius:0;background:none;font:900 26px/1 ui-rounded,system-ui;color:#fff;text-shadow:0 2px 0 #0B2A66}
+.beam{position:fixed;pointer-events:none;opacity:0;will-change:opacity,transform;
+  background:linear-gradient(180deg,rgba(143,227,255,.75),rgba(143,227,255,.08));
+  clip-path:polygon(38% 0,62% 0,100% 100%,0 100%)}
+.ship{position:fixed;left:0;top:0;width:190px;height:140px;pointer-events:none;will-change:transform}
+.ship svg{width:100%;height:100%;overflow:visible}

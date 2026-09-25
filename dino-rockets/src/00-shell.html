@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0A1433">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dino Rockets">
+<meta name="format-detection" content="telephone=no">
+<title>Grayson's Dino Rockets</title>
+<!-- @ICON -->
+<!-- @STYLES -->
+</head>
+<body data-planet="lava">
+
+<!-- The universe: stars, nebula, a moon, and the ground of whichever planet we are on. -->
+<div id="space" aria-hidden="true">
+  <div class="stars s1"></div><div class="stars s2"></div><div class="stars s3"></div>
+  <div class="nebula n1"></div><div class="nebula n2"></div>
+  <div class="far-planet"></div>
+  <div class="comet"></div>
+  <div class="surface"><div class="rim"></div><i class="crater c1"></i><i class="crater c2"></i><i class="crater c3"></i></div>
+</div>
+
+<main id="app">
+
+  <!-- ============ LAUNCH PAD (home) ============ -->
+  <section class="screen" data-screen="home">
+    <header class="bar"><span></span><span></span>
+      <button class="pill-btn" id="btnGrownups" type="button" aria-label="Grown-ups">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7zm7.4-2.5a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L14.9 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.4 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.9h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5z"/></svg>
+      </button>
+    </header>
+    <div class="home-body">
+      <h1 class="logo" aria-label="Grayson's Dino Rockets">
+        <span class="logo-name">Grayson's</span>
+        <span class="logo-main"><span class="logo-dino">DINO</span><span class="logo-rocket">ROCKETS</span></span>
+      </h1>
+      <div class="mission-card">
+        <div class="mission-top">
+          <span class="mission-label">This week's mission</span>
+          <span class="mission-count" id="missionCount"></span>
+        </div>
+        <div class="mission-track" id="missionTrack" aria-hidden="true"></div>
+        <button class="btn btn-launch" id="btnPlay" type="button">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4c10 8 14 20 12 32l6 8-8 2-4 8h-12l-4-8-8-2 6-8C18 24 22 12 32 4z" fill="#fff"/><circle cx="32" cy="24" r="6" fill="#1E6FE8"/><path d="M26 52h12l-6 10z" fill="#FFC53D"/></svg>
+          <span id="playLabel">BLAST OFF!</span>
+        </button>
+        <div class="home-row">
+          <button class="btn btn-soft" id="btnMap" type="button"><span class="ico">🪐</span> Star Map</button>
+          <button class="btn btn-soft" id="btnBase" type="button"><span class="ico">🥚</span> Dino Base <b id="babyCount"></b></button>
+        </div>
+        <button class="selfcheck" id="selfCheck" type="button"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STAR MAP ============ -->
+  <section class="screen" data-screen="map">
+    <header class="bar">
+      <button class="back" type="button" data-back="home">‹ Home</button>
+      <span class="bar-title">Star Map</span><span></span>
+    </header>
+    <div class="map-wrap"><div class="map" id="map"></div></div>
+  </section>
+
+  <!-- ============ FLIGHT between planets ============ -->
+  <section class="screen" data-screen="flight">
+    <div class="flight" id="flight">
+      <div class="warp" aria-hidden="true"></div>
+      <div class="flight-rocket" id="flightRocket" aria-hidden="true"></div>
+      <p class="flight-text" id="flightText"></p>
+    </div>
+  </section>
+
+  <!-- ============ A WORD, on its planet ============ -->
+  <section class="screen" data-screen="play">
+    <header class="bar">
+      <button class="back" type="button" id="btnPlayBack">‹ Map</button>
+      <div class="steps" id="steps" aria-label="Activities"></div>
+      <span class="planet-tag" id="planetTag"></span>
+    </header>
+    <div class="card play-card" id="playCard">
+      <div class="activity" id="activity"></div>
+    </div>
+  </section>
+
+  <!-- ============ EGG HATCH ============ -->
+  <section class="screen" data-screen="hatch">
+    <header class="bar"><span></span><span class="bar-title" id="hatchTitle">A surprise!</span><span></span></header>
+    <div class="hatch" id="hatch">
+      <p class="hatch-hint" id="hatchHint">Tap the egg!</p>
+      <button class="egg" id="egg" type="button" aria-label="Tap the egg"></button>
+      <div class="baby-reveal" id="babyReveal" hidden></div>
+      <p class="baby-name" id="babyName" hidden></p>
+      <button class="btn btn-launch btn-next" id="btnHatchNext" type="button" hidden>Next planet ›</button>
+    </div>
+  </section>
+
+  <!-- ============ DINO BASE ============ -->
+  <section class="screen" data-screen="base">
+    <header class="bar">
+      <button class="back" type="button" data-back="home">‹ Home</button>
+      <span class="bar-title">Dino Base</span><span class="bar-count" id="baseCount"></span>
+    </header>
+    <div class="base" id="base">
+      <div class="dome" aria-hidden="true"></div>
+      <p class="base-empty" id="baseEmpty">Finish a planet to hatch your first baby dino!</p>
+      <div class="babies" id="babies"></div>
+    </div>
+  </section>
+
+  <!-- ============ MISSION COMPLETE ============ -->
+  <section class="screen" data-screen="done">
+    <header class="bar"><span></span><span></span><span></span></header>
+    <div class="card center-card done-card">
+      <div class="medal" aria-hidden="true">
+        <svg viewBox="0 0 120 120"><path d="M40 6h14l6 24-14 6zM80 6H66l-6 24 14 6z" fill="#1E6FE8" stroke="#0A1433" stroke-width="3"/>
+        <circle cx="60" cy="72" r="38" fill="#FFC53D" stroke="#B9770E" stroke-width="5"/><circle cx="60" cy="72" r="27" fill="#FFD86A"/>
+        <path d="M60 52l6 13 14 1-11 9 4 14-13-8-13 8 4-14-11-9 14-1z" fill="#FF8A1F"/></svg>
+      </div>
+      <h2>Mission complete!</h2>
+      <p id="doneLine"></p>
+      <div class="done-words" id="doneWords"></div>
+      <button class="btn btn-launch" id="btnDoneBase" type="button">See your Dino Base</button>
+      <button class="btn btn-soft" id="btnDoneHome" type="button">Home</button>
+    </div>
+  </section>
+
+  <!-- ============ GROWN-UPS: passcode ============ -->
+  <section class="screen" data-screen="pass">
+    <header class="bar"><button class="back" type="button" data-back="home">‹ Back</button><span class="bar-title">Grown-ups</span><span></span></header>
+    <div class="card center-card pass-card">
+      <h2>Enter passcode</h2>
+      <div class="dots" id="passDots" aria-live="polite"><i></i><i></i><i></i><i></i></div>
+      <div class="keypad" id="keypad"></div>
+    </div>
+  </section>
+
+  <!-- ============ GROWN-UPS: words, progress, settings ============ -->
+  <section class="screen" data-screen="words">
+    <header class="bar"><button class="back" type="button" data-back="home">‹ Done</button><span class="bar-title">Grown-ups</span><span></span></header>
+    <div class="card words-card">
+      <div class="scroll">
+        <h2 class="section">This week's words <span class="count" id="listCount"></span></h2>
+        <form class="add-row" id="addForm" autocomplete="off">
+          <input id="addInput" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Add words" aria-label="New words">
+          <button class="btn btn-blue" type="submit">Add</button>
+        </form>
+        <p class="note" id="addNote">Add one word, or paste the whole list: commas, spaces, numbers or new lines all work.</p>
+        <ul class="word-list" id="wordList"></ul>
+        <div class="row-left">
+          <button class="btn btn-soft small" id="btnClear" type="button">Clear all</button>
+          <button class="btn btn-soft small" id="btnSample" type="button">Sample words</button>
+        </div>
+        <button class="btn btn-launch wide" id="btnSavePlay" type="button">Save &amp; play</button>
+        <p class="note">A new list starts a new mission. Words and progress are saved on this device only.</p>
+
+        <h2 class="section">How it's going</h2>
+        <p class="note">Stars show how well each word is known: every clean spell from memory earns one, and a word that needed help loses one and gets its practice steps back.</p>
+        <ul class="progress-list" id="progressList"></ul>
+        <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's mission</button>
+
+        <h2 class="section">Sound</h2>
+        <label class="toggle"><input type="checkbox" id="optSfx" checked><span>Sound effects</span></label>
+        <label class="toggle"><input type="checkbox" id="optMusic" checked><span>Space music</span></label>
+
+        <h2 class="section">Letter voice</h2>
+        <p class="note">Phones don't all say every letter the same way. If spelling AND sounds like "I-N-D", pick another spelling for A and tap Test.</p>
+        <div class="voice-row"><span class="vl">A</span><select id="optA" aria-label="How to say A"></select></div>
+        <div class="voice-row"><span class="vl">E</span><select id="optE" aria-label="How to say E"></select></div>
+        <button class="btn btn-blue small" id="btnVoiceTest" type="button">Test: A N D, S E E</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="fxLayer" aria-hidden="true"></div>
+<div id="confetti" aria-hidden="true"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- @SCRIPTS -->
+</body>
+</html>
