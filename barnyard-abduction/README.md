@@ -29,6 +29,30 @@ anything was rebuilt. What was found:
 | HUD | ~40% of the screen | Radar, hull bar and 3 panels | Score + shield pips, goal chips, timer ring; world-anchored farmer alert |
 | Scope | 25 cheats, upgrades, 10-map shell | 1 mission, no audio | 5 escalating missions + Free Flight, stars, full audio |
 
+## Characters, scenery and UI (second pass)
+
+The first rebuild made animals from stacked spheres and cylinders, and on
+screen they looked like separate parts. Every character is now **sculpted**:
+- Its shape is a signed-distance field of ellipsoids and tapered capsules that melt into each other.
+- Details such as nostrils and mouths are carved in.
+- It is meshed as **one seamless surface**, with normals taken from the field itself.
+- Colour (spots, patches, socks, overall bibs) is painted from the same field with soft edges.
+- A skeleton is skinned from the field, so legs, neck and tail bend the skin instead of rotating separate parts.
+- Eyes blink.
+- Each character has a near and a far mesh (detail levels).
+
+The trees, bushes, rocks, hay bales, clouds and the alien pilot use the same
+sculpting method.
+
+The UI is a new cartoon game-app style: cream plates, wooden sign ribbons,
+chunky outlined buttons, Lilita One and Nunito fonts, and hand-drawn SVG icons.
+Every animal and farmer icon is a **portrait of the real 3D character**,
+photographed at start-up with the game's own renderer. There are no emoji
+anywhere.
+
+Sculpting all characters takes about 1.7 s in this build container's software
+renderer. A phone should be much faster, but that is not measured.
+
 ## The game
 
 - **Missions.**
@@ -104,7 +128,7 @@ Screenshots are written to `../.shots/barnyard/`.
 - Two-thumb touch feel.
 - How the synthesised audio sounds.
 
-Budget measured here: about 60 draw calls and 480k triangles in play; about 280 draw calls and 720k triangles in scout with 40+ animals on screen.
+Budget measured here: about 40 to 50 draw calls and 580k to 600k triangles in play; about 80 draw calls and 520k triangles in scout with 40+ animals on screen.
 
 ## Where to tune
 
