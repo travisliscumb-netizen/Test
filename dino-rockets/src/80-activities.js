@@ -94,6 +94,72 @@ function createActivities(env){
     }
     return -1;
   }
+  /* ============================================================
+     THE FUEL DOCK — every right answer fuels the rocket. A glowing drop
+     falls from the letter he placed into its cell on the fuel line, the
+     tank in the rocket's window rises, and when it is full the engines
+     light. The same rocket takes off at the countdown.
+     ============================================================ */
+  function fuelDock(root, n, opts){
+    opts = opts || {};
+    var box = el('div', 'fuel-dock' + (opts.big ? ' big' : ''));
+    var pipe = el('div', 'fuel-pipe');
+    var cells = [];
+    for (var i = 0; i < n; i++){ var c = el('i', 'cell'); c.appendChild(el('b')); pipe.appendChild(c); cells.push(c); }
+    var rk = el('div', 'fuel-rocket');
+    rk.innerHTML = env.rocketSvg ? env.rocketSvg() : '';
+    var tank = el('div', 'tank'), level = el('i', 'level');
+    tank.appendChild(level); rk.appendChild(tank);
+    var label = el('span', 'fuel-label', 'FUEL');
+    box.appendChild(label); box.appendChild(pipe); box.appendChild(rk);
+    root.appendChild(box);
+    var filled = 0, done = {};
+    function setLevel(){
+      var pct = Math.round(filled / n * 100);
+      level.style.height = pct + '%';
+      label.textContent = filled >= n ? 'FULL!' : 'FUEL';
+      if (filled >= n && !box.classList.contains('ready')){
+        box.classList.add('ready');
+        env.sfx.play('ignite');
+        env.later(function(){ env.sfx.play('rumble'); }, 200);
+      }
+    }
+    return {
+      el: box, rocket: rk,
+      /* instantly, for letters that were already in place */
+      set: function(i){ if (done[i]) return; done[i] = 1; filled++; cells[i].classList.add('full', 'quiet'); setLevel(); },
+      /* a drop of fuel from `from` (an element) into cell i */
+      fill: function(i, from){
+        if (i == null){ i = 0; while (done[i] && i < n) i++; }
+        if (i >= n || done[i]) return;
+        done[i] = 1;
+        var cell = cells[i];
+        var a = from ? centre(from) : centre(cell), b = centre(cell);
+        var drop = el('i', 'fuel-drop');
+        drop.style.left = a.x + 'px'; drop.style.top = a.y + 'px';
+        document.body.appendChild(drop);
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var ms = 380;
+        try {
+          drop.animate([
+            { transform: 'translate(-50%,-50%) scale(.6)', opacity: 1 },
+            { transform: 'translate(calc(-50% + ' + (dx * 0.5) + 'px), calc(-50% + ' + (dy * 0.5 - 30) + 'px)) scale(1.1)', opacity: 1, offset: 0.5 },
+            { transform: 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px)) scale(.5)', opacity: 0.9 }
+          ], { duration: ms, easing: 'cubic-bezier(.4,0,.6,1)' });
+        } catch (e){ ms = 0; }
+        env.later(function(){
+          if (drop.parentNode) drop.parentNode.removeChild(drop);
+          cell.classList.add('full');
+          filled++; setLevel();
+          env.sfx.play('glug');
+        }, ms);
+        /* the drop must never outlive the screen */
+        setTimeout(function(){ if (drop.parentNode) drop.parentNode.removeChild(drop); }, ms + 600);
+      },
+      full: function(){ return filled >= n; }
+    };
+  }
+
   function shake(node){ node.classList.remove('nope'); void node.offsetWidth; node.classList.add('nope'); }
 
   /* ============================================================
@@ -102,6 +168,7 @@ function createActivities(env){
   function meet(ctx){
     var w = ctx.word, root = ctx.root;
     root.innerHTML = '';
+    root.classList.add('meet');
     var row = el('div', 'prompt-row');
     row.appendChild(el('p', 'prompt', 'Meet your word!'));
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
@@ -118,7 +185,7 @@ function createActivities(env){
       s.setAttribute('role', 'button'); s.tabIndex = 0;
       s.addEventListener('click', function(){
         env.sfx.play('tap');
-        env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'meet:' + i });
+        env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'meet:' + i, keep: true });
         s.classList.add('lit'); env.later(function(){ s.classList.remove('lit'); }, 360);
         env.react('look', centre(s));
       });
@@ -126,7 +193,7 @@ function createActivities(env){
       return s;
     });
     var go = el('button', 'btn btn-launch', "I'm ready! ›");
-    go.type = 'button'; go.hidden = true; go.style.marginTop = 'auto';
+    go.type = 'button'; go.hidden = true;
     go.addEventListener('click', function(){ env.sfx.play('tap'); ctx.done({}); });
     root.appendChild(go);
     env.later(function(){
@@ -156,6 +223,7 @@ function createActivities(env){
     root.appendChild(row);
     var field = el('div', 'zap-field');
     root.appendChild(field);
+    var dock = fuelDock(root, ROUNDS);
     var roundLbl = el('div', 'zap-round', '');
     root.appendChild(roundLbl);
     var meteors = [], raf = null, last = 0;
@@ -232,14 +300,18 @@ function createActivities(env){
         env.sfx.play('zap');
         env.later(function(){
           boom(m); env.sfx.play('explode');
+          dock.fill(round - 1, m.el);
           m.el.style.opacity = '0'; m.el.classList.add('hit');
           env.react('cheer');
-          env.speech.say(env.pick('found', env.FOUND) + ' ' + w.toLowerCase(), { rate: 0.9 });
+          env.speech.say(env.pick('found', env.FOUND) + ' ' + w.toLowerCase(), { rate: 0.9, keep: true });
         }, 140);
-        env.later(function(){
-          if (round < ROUNDS) startRound();
-          else { raf = null; ctx.done({}); }
-        }, 1500);
+        /* the next round waits for the praise to be heard, not a guessed delay */
+        var praised = false, gone = false;
+        function next(){ if (!praised || !gone || !env.alive(ctx.tok)) return; if (round < ROUNDS) startRound(); else { raf = null; ctx.done({}); } }
+        env.later(function(){ gone = true; next(); }, 1100);
+        (function waitSpeech(){
+          env.later(function(){ if (!env.speech.busy()){ praised = true; next(); } else waitSpeech(); }, 150);
+        })();
       } else {
         m.el.classList.remove('wrong'); void m.el.offsetWidth; m.el.classList.add('wrong');
         env.sfx.play('wrong'); env.react('oops');
@@ -267,7 +339,9 @@ function createActivities(env){
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots'), tray = el('div', 'tray');
-    root.appendChild(slotsBox); root.appendChild(tray);
+    root.appendChild(slotsBox);
+    var dock = fuelDock(root, w.length);
+    root.appendChild(tray);
     root.appendChild(el('p', 'hint', 'Tap or drag the crystals in order'));
     root.style.setProperty('--tile', fitTile(root, w.length, 76) + 'px');
     var perRow = Math.ceil(w.length / (w.length > 5 ? 2 : 1));
@@ -290,11 +364,12 @@ function createActivities(env){
       var i = pos; pos++; misses = 0;
       $all('.tile', tray).forEach(function(x){ x.classList.remove('next-hint'); });
       env.sfx.play('place');
-      env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'build:' + i });
+      env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'build:' + i, keep: true });
       if (i < w.length - 1) env.react('hop', centre(slots[i]));
       flyTo(t, slots[i], function(){
         t.classList.add('used'); t.style.transform = '';
         fillSlot(slots[i], w[i]); markNext(slots, pos);
+        dock.fill(i, slots[i]);
         if (pos === w.length && !finished){ finished = true; env.clearNudge(); ctx.done({ slots: slots }); }
       });
     }
@@ -316,7 +391,7 @@ function createActivities(env){
       });
       tray.appendChild(t);
     });
-    env.later(function(){ env.speech.say('Fuel the rocket. Spell ' + w.toLowerCase(), { rate: 0.85 }); }, 350);
+    env.later(function(){ env.speech.say('Fuel the rocket. Spell ' + w.toLowerCase(), { rate: 0.85, keep: true }); }, 350);
     env.setNudge(function(){
       if (finished) return;
       hint();
@@ -341,13 +416,14 @@ function createActivities(env){
     root.appendChild(row);
     var slotsBox = el('div', 'slots');
     root.appendChild(slotsBox);
+    var dock = fuelDock(root, w.length);
     var choices = el('div', 'choices');
     root.appendChild(choices);
     root.appendChild(el('p', 'hint', 'Which letter goes in the glowing box?'));
     root.style.setProperty('--tile', fitTile(root, w.length, 76) + 'px');
     var slots = w.split('').map(function(ch, i){
       var s = slotEl();
-      if (gaps.indexOf(i) === -1) fillSlot(s, ch);
+      if (gaps.indexOf(i) === -1){ fillSlot(s, ch); dock.set(i); }
       slotsBox.appendChild(s);
       return s;
     });
@@ -364,10 +440,11 @@ function createActivities(env){
           if (ch === need){
             var i = gaps[gi];
             env.sfx.play('place');
-            env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'miss:' + i });
+            env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'miss:' + i, keep: true });
             flyTo(t, slots[i], function(){
               t.classList.add('used');
               fillSlot(slots[i], ch);
+              dock.fill(i, slots[i]);
               gi++;
               if (gi >= gaps.length){ finished = true; choices.innerHTML = ''; env.clearNudge(); ctx.done({ slots: slots }); }
               else { env.react('hop', centre(slots[i])); showGap(); }
@@ -384,7 +461,7 @@ function createActivities(env){
       });
     }
     showGap();
-    env.later(function(){ env.speech.say('Fill in the missing letters. ' + w.toLowerCase(), { rate: 0.85 }); }, 350);
+    env.later(function(){ env.speech.say('Fill in the missing letters. ' + w.toLowerCase(), { rate: 0.85, keep: true }); }, 350);
     env.setNudge(function(){
       if (finished) return;
       var need = w[gaps[gi]];
@@ -409,8 +486,7 @@ function createActivities(env){
     root.appendChild(row);
     var slotsBox = el('div', 'slots');
     root.appendChild(slotsBox);
-    var fuel = el('div', 'fuel'); var fuelBar = el('i'); fuel.appendChild(fuelBar);
-    root.appendChild(fuel);
+    var dock = fuelDock(root, w.length, { big: true });
     var keys = el('div', 'keys');
     root.appendChild(keys);
     root.style.setProperty('--tile', fitTile(root, w.length, 70) + 'px');
@@ -438,9 +514,9 @@ function createActivities(env){
           var i = pos; pos++;
           $all('.key', keys).forEach(function(x){ x.classList.remove('hint'); });
           fillSlot(slots[i], ch); markNext(slots, pos);
-          fuelBar.style.width = Math.round(pos / w.length * 100) + '%';
+          dock.fill(i, slots[i]);
           env.sfx.play('place');
-          env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'blast:' + i });
+          env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'blast:' + i, keep: true });
           if (pos === w.length){ finished = true; env.clearNudge(); ctx.done({ slots: slots, result: result }); }
           else env.react('hop', centre(slots[i]));
         } else {
@@ -453,7 +529,7 @@ function createActivities(env){
       });
       keys.appendChild(k);
     });
-    env.later(function(){ env.speech.say('Spell ' + w.toLowerCase() + ' from memory!', { rate: 0.85 }); }, 350);
+    env.later(function(){ env.speech.say('Spell ' + w.toLowerCase() + ' from memory!', { rate: 0.85, keep: true }); }, 350);
     /* a stall first gets the word again; only a second stall shows the key,
        and that counts as help, so the word keeps its practice next time */
     var nudges = 0;
@@ -483,6 +559,7 @@ function createActivities(env){
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots'); root.appendChild(slotsBox);
+    var dock = fuelDock(root, w.length);
     var track = el('div', 'race-track');
     var me = el('i', 'race-me', '🚀'), comet = el('i', 'race-comet', '☄️'), flag = el('i', 'race-flag', '🏁');
     track.appendChild(flag); track.appendChild(comet); track.appendChild(me);
@@ -559,11 +636,12 @@ function createActivities(env){
         o.used = true;
         tiles.forEach(function(q){ q.el.classList.remove('next-hint'); });
         env.sfx.play('place');
-        env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'race:' + i });
+        env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'race:' + i, keep: true });
         o.el.style.transform = 'translate(' + o.x.toFixed(1) + 'px,' + o.y.toFixed(1) + 'px)';
         flyTo(o.el, slots[i], function(){
           o.el.classList.add('used');
           fillSlot(slots[i], w[i]); markNext(slots, pos);
+          dock.fill(i, slots[i]);
           me.style.left = (pos / w.length * 88) + '%';
           if (pos === w.length && !finished){
             finished = true; env.clearNudge();
@@ -582,7 +660,7 @@ function createActivities(env){
         }
       }
     }
-    env.later(function(){ env.speech.say('Look! ' + w.toLowerCase() + '. Remember it!', { rate: 0.85 }); }, 300);
+    env.later(function(){ env.speech.say('Here is your word: ' + w.toLowerCase() + '. Remember it!', { rate: 0.85 }); }, 300);
     env.later(begin, 2300);
     env.setNudge(function(){
       if (finished || !started) return;
@@ -614,6 +692,7 @@ function createActivities(env){
     }
     var box = el('div', 'opt-cards');
     root.appendChild(box);
+    var dock = fuelDock(root, 1);
     C.checkOptions(w).forEach(function(opt){
       var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
       b.addEventListener('click', function(){
@@ -624,8 +703,9 @@ function createActivities(env){
           b.classList.add('right');
           $all('.opt-card', box).forEach(function(x){ if (x !== b) x.classList.add('dim'); });
           env.sfx.play('correct'); env.react('cheer');
+          dock.fill(0, b);
           var blank = $('.blank', root); if (blank){ blank.textContent = w.toLowerCase(); blank.classList.add('fill'); }
-          env.speech.say(env.pick('found', env.FOUND) + ' That spells ' + w.toLowerCase() + '.', { rate: 0.9 }).then(function(){
+          env.speech.say(env.pick('found', env.FOUND) + ' That spells ' + w.toLowerCase() + '.', { rate: 0.9, keep: true }).then(function(){
             if (env.alive(ctx.tok)) env.later(function(){ ctx.done({}); }, 300);
           });
         } else {
@@ -637,7 +717,7 @@ function createActivities(env){
       box.appendChild(b);
     });
     env.later(function(){
-      env.speech.say(sentence ? sentence + '. Which ' + w.toLowerCase() + ' is spelled right?' : 'Which one spells ' + w.toLowerCase() + '?', { rate: 0.85 });
+      env.speech.say(sentence ? sentence + '. Which ' + w.toLowerCase() + ' is spelled right?' : 'Which one spells ' + w.toLowerCase() + '?', { rate: 0.85, keep: true });
     }, 350);
     env.setNudge(function(){
       if (finished) return;
@@ -671,6 +751,7 @@ function createActivities(env){
     }
     var big = el('div', 'rhyme-word'); big.appendChild(withRime(w)); root.appendChild(big);
     var box = el('div', 'opt-cards'); root.appendChild(box);
+    var dock = fuelDock(root, 1);
     data.options.forEach(function(opt){
       var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
       b.addEventListener('click', function(){
@@ -681,7 +762,8 @@ function createActivities(env){
           b.textContent = ''; b.appendChild(withRime(opt)); b.classList.add('right');
           $all('.opt-card', box).forEach(function(x){ if (x !== b) x.classList.add('dim'); });
           env.sfx.play('correct'); env.react('cheer');
-          env.speech.say(w.toLowerCase() + ', ' + opt.toLowerCase() + '. They rhyme!', { rate: 0.85 }).then(function(){
+          dock.fill(0, b);
+          env.speech.say(w.toLowerCase() + ', ' + opt.toLowerCase() + '. They rhyme!', { rate: 0.85, keep: true }).then(function(){
             if (env.alive(ctx.tok)) env.later(function(){ ctx.done({}); }, 300);
           });
         } else {
@@ -693,7 +775,7 @@ function createActivities(env){
       box.appendChild(b);
     });
     env.later(function(){
-      env.speech.say('What rhymes with ' + w.toLowerCase() + '? ' + data.options.map(function(x){ return x.toLowerCase(); }).join(', ') + '?', { rate: 0.8 });
+      env.speech.say('What rhymes with ' + w.toLowerCase() + '? ' + data.options.map(function(x){ return x.toLowerCase(); }).join(', ') + '?', { rate: 0.8, keep: true });
     }, 350);
     env.setNudge(function(){
       if (finished) return;
@@ -703,7 +785,7 @@ function createActivities(env){
 
   return {
     meet: meet, zap: zap, build: build, missing: missing, blast: blast, race: race, check: check, rhyme: rhyme,
-    tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile
+    tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile, fuelDock: fuelDock
   };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createActivities: createActivities };

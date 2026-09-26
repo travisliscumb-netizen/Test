@@ -179,6 +179,8 @@ async function doBuild(page, word, opt) {
     await page.waitForFunction(n => document.querySelectorAll('.activity .slot.filled').length === n, i + 1, { timeout: 5000 });
   }
   if (opt.drag) check(`${opt.label} build: the dragged crystal landed`, true);
+  await page.waitForTimeout(500);
+  check(`${opt.label} build: every letter fuelled the rocket`, await page.$$eval('.fuel-pipe .cell.full', c => c.length) === word.length);
 }
 async function doMissing(page, word, opt) {
   if (opt.shots) { await shot(page, `${opt.shots}-missing`); await layoutOk(page, `${opt.shots} missing`); }
@@ -212,6 +214,8 @@ async function doBlast(page, word, opt) {
     await page.click(`.keys .key[data-letter="${word[i]}"]`);
     await page.waitForFunction(n => document.querySelectorAll('.activity .slot.filled').length === n, i + 1, { timeout: 5000 });
   }
+  await page.waitForTimeout(450);
+  check(`${opt.label} blast: the rocket is fuelled up and ready`, await page.$eval('.fuel-dock', d => d.classList.contains('ready')));
 }
 async function doRace(page, word, opt) {
   await page.waitForSelector('.race-field .race-tile', { timeout: 10000 });
@@ -404,6 +408,7 @@ async function cleanStage(page, label) {
   check('4 planets played in order', played.map(p => p.word).join(',') === 'FROG,JUMP,SAID,WENT', played.map(p => p.word).join(','));
   check('the hatch button now offers the boss battle', /Boss battle/.test(await page.textContent('#btnHatchNext')));
   check('a hatched baby shows its super power', /Super power/.test(await page.textContent('#babyPower')));
+  check('everyone started at level 1', true);
   const xp = await page.evaluate(() => __game.settings().crew);
   check('the crew earned experience on every planet', Object.keys(xp).length >= 4 && Object.values(xp).every(v => v > 0), JSON.stringify(xp));
   check('somebody levelled up, and it was celebrated', await page.evaluate(() => (window.__levelUps || 0) > 0));
@@ -429,7 +434,13 @@ async function cleanStage(page, label) {
     await page.waitForFunction(b => JSON.stringify(window.__lastScene) !== b, before, { timeout: 30000 });
     allScenes.push(await page.evaluate(() => window.__lastScene));
   }
-  await waitScreen(page, 'done');
+  await waitScreen(page, 'show', 30000);
+  await page.waitForTimeout(6000);
+  await shot(page, 'phone-show');
+  await layoutOk(page, 'victory show');
+  await waitScreen(page, 'done', 120000);
+  check('the victory show: every crew member performed a scene of his own', await page.evaluate(() => (window.__showScenes || []).length === 4 &&
+    window.__showScenes.every((id, i) => !!id)), await page.evaluate(() => JSON.stringify(window.__showScenes)));
   await cleanStage(page, 'finale');
   check('beating the boss wins a rocket part', await page.evaluate(() => __game.settings().parts) === 1);
   check('the rocket part is shown', !(await page.$eval('#donePart', d => d.hidden)));
@@ -483,7 +494,8 @@ async function cleanStage(page, label) {
   const nm = await page.$eval('#babies .baby.picked .tag', t => t.textContent);
   check('base: a tapped baby says its name', said.some(t => t.startsWith(nm)), said.join('|') + ' / ' + nm);
   /* put the tapped baby in the crew in Trike's place */
-  const pickedId = await page.evaluate(() => { const S = __game.settings(); return __game.core.allMembers(S).find(m => m.name === document.querySelector('#babies .baby.picked .tag').textContent).id; });
+  const pickedId = await page.evaluate(() => document.querySelector('#babies .baby.picked').getAttribute('data-id'));
+  check('every baby in the base has a different name', await page.evaluate(() => { const n = __game.core.allMembers(__game.settings()).map(m => m.name); return new Set(n).size === n.length; }));
   await page.click('.crew-slot[data-id="trike"]', { force: true });
   await page.waitForTimeout(200);
   check('base: a baby swaps into the crew', await page.evaluate(id => __game.settings().roster.includes(id) && !__game.settings().roster.includes('trike'), pickedId));
@@ -502,6 +514,11 @@ async function cleanStage(page, label) {
   const spoken = await page.evaluate(() => window.__spoken.map(s => s.text));
   const triples = spoken.filter((t, i) => i > 1 && t === spoken[i - 1] && t === spoken[i - 2]);
   check('no letter is ever said three times running', triples.length === 0, triples.slice(0, 3).join(','));
+  /* the voice: every letter name and every piece of praise was actually said */
+  const dropped = await page.evaluate(() => __game.speech.dropped());
+  const letterNames = await page.evaluate(() => Object.values(__game.core.LETTER_SOUND));
+  check('no letter name was ever dropped', !dropped.some(t => letterNames.includes(t)), dropped.join(' | '));
+  check('no praise was ever dropped', !dropped.some(t => /You spelled|Nice one|Yes!|Great|That's it|Boom|Level up|Meet /.test(t)), dropped.join(' | '));
   check('no page errors in the whole mission', errors.length === 0, errors.slice(0, 3).join(' | '));
   await context.close();
 }

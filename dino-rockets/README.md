@@ -41,7 +41,9 @@ Nothing is sent anywhere: words and progress are saved on the device.
   hangs out on the planet.
 - **Levels:** every scene earns experience (the lead earns most), and so does
   every finished planet.
-  - Level 2 brings rope tricks. The originals start there.
+  - Everyone starts at level 1, the originals too. Grown-ups can put the
+    crew back to level 1 from the grown-ups screen.
+  - Level 2 brings rope tricks.
   - Level 3 brings Tightrope and the Boost Jump team-up.
   - Level 4 earns a gold star badge, and level 5 a crown.
   - Babies grow up as they level: baby, then kid, then grown.
@@ -82,12 +84,24 @@ he already knows the word:
   flash the word and light the key. That counts as help, so the word keeps
   its practice next time.
 
+**Fuel:** every activity except Meet has a fuel line and a rocket. Each
+right letter or answer drops a glowing bit of fuel into the line, and the
+tank in the rocket's window rises. When it's full the engines light. After
+Blast, that same rocket lifts off at the countdown.
+
 Every correct spelling gets a countdown and a rocket launch, then a crew
 scene.
 - There are 23 scenes. They include ropes (lasso, tow rope, kite tail, sky
   hook, a washing line of letters to jump for, a tightrope), team-ups, and
   the five super powers.
-- Some scenes bring a buddy who watches, gasps and cheers.
+- Scenes run about 7 seconds on average (up to about 17), so there's time to
+  watch the dinosaurs do their thing. Leads usually show off as they arrive
+  and do a victory move before they leave.
+- Some scenes bring a buddy who watches, gasps and cheers. In some, a letter
+  slips (off a tow line, a washing line, a hook line or a back) and a buddy
+  runs in, catches it and runs off with it.
+- The lasso visibly wraps around each letter, and letters on a rope stay
+  tied. Sky Hook hooks the first letter and scoops each next one under it.
 - The lead is whoever has waited longest, and the tempo varies a little each
   time.
 - A scene never comes back within 3 plays of itself. If one has to repeat
@@ -96,6 +110,13 @@ scene.
 When every planet is done, the **Meteor King** boss battle brings back up to
 4 of the shakiest words to spell from memory once more (a spaced review).
 Each one blasts him with a laser.
+
+Beating him starts the **Victory Show**, which runs about 40 seconds:
+- each crew member performs one of the week's words with a scene of their
+  own, with fireworks between acts;
+- then the whole crew takes a bow.
+
+Grown-ups can skip it.
 
 The design follows the research on early spelling:
 - **Retrieval, not copying:** the word is hidden for Blast.

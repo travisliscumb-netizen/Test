@@ -19,8 +19,11 @@
        everything older, including callbacks already in flight;
      * every delayed speech is scheduled through `later()`, which is
        epoch-scoped, so a screen change cancels it by construction;
-     * the queue holds at most ONE pending request, and a newer request
-       replaces it rather than stacking behind it;
+     * the queue holds at most ONE pending instruction, and a newer one
+       replaces it rather than stacking behind it — but lines marked `keep`
+       (letter names as he places them, praise, news) wait their turn and
+       are never dropped for something newer: hearing every letter as it
+       goes in is the whole point of the game;
      * identical text inside a short window is dropped, which kills the
        double-fire from any duplicated event path;
      * a watchdog force-settles every utterance, so a synth that never
@@ -42,13 +45,15 @@ function createSpeech(deps){
   var epoch = 0;          /* bumped by reset(); invalidates everything older */
   var seq = 0;            /* unique id per utterance */
   var active = null;      /* the one utterance currently owned by the synth */
-  var pending = null;     /* at most one queued request */
+  var queue = [];         /* waiting requests: any number of `keep`, at most one other */
+  var MAX_QUEUE = 8;
   var starting = false;   /* guards the cancel->speak gap */
   var timers = [];        /* every epoch-scoped timer, cleared on reset */
   var lastSaid = {};      /* key -> ms, for the duplicate-path guard */
   var voice = null;
   var resumeTimer = null;
   var log = [];           /* what was actually spoken, for the tests */
+  var dropped = [];       /* what was asked for but replaced before it was said */
 
   var DEDUPE_MS = 400;
 
@@ -145,9 +150,8 @@ function createSpeech(deps){
   }
 
   function startNext(){
-    if (active || starting || !pending) return;
-    var req = pending;
-    pending = null;
+    if (active || starting || !queue.length) return;
+    var req = queue.shift();
     if (req.epoch !== epoch){ req.settle(false); return; }
 
     /*
@@ -213,8 +217,16 @@ function createSpeech(deps){
         Depth one, newest wins. Stacking requests is what made the old build
         read a whole backlog out after the child had moved on.
       */
-      if (pending) pending.settle(false);
-      pending = req;
+      req.keep = !!opts.keep;
+      if (!req.keep){
+        queue = queue.filter(function(q){
+          if (q.keep) return true;
+          dropped.push(q.text); q.settle(false); return false;
+        });
+      }
+      queue.push(req);
+      /* a runaway backlog is worse than a gap: the oldest goes first */
+      while (queue.length > MAX_QUEUE){ var old = queue.shift(); dropped.push(old.text); old.settle(false); }
       startNext();
     });
   }
@@ -225,7 +237,8 @@ function createSpeech(deps){
     clearTimers();
     starting = false;
     if (resumeTimer){ clearT(resumeTimer); resumeTimer = null; }
-    if (pending){ pending.settle(false); pending = null; }
+    queue.forEach(function(q){ q.settle(false); });
+    queue = [];
     settleActive(false);
     lastSaid = {};
     if (synth){ try { synth.cancel(); } catch (e){} }
@@ -322,8 +335,9 @@ function createSpeech(deps){
     /* read-only, for the suites */
     epoch: function(){ return epoch; },
     spoken: function(){ return log.slice(); },
-    clearLog: function(){ log = []; },
-    busy: function(){ return !!(active || pending || starting); }
+    clearLog: function(){ log = []; dropped = []; },
+    dropped: function(){ return dropped.slice(); },
+    busy: function(){ return !!(active || queue.length || starting); }
   };
 }
 

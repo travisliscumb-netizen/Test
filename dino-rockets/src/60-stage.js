@@ -309,7 +309,7 @@ function createStage(deps){
         rot(r.tail, Math.sin(beat * 3) * 6 - (moving ? 6 : 0) + (trick && trick.kind === 'tailwhip' ? -70 * up : 0));
         rot(r.arm, trick && trick.kind === 'reach' ? -40 + Math.sin(tp * Math.PI * 8) * 22 :
           (trick && trick.kind === 'cheer' ? -60 * up :
-          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet') ? -70 + Math.sin(beat * 18) * 10 :
+          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet' || trick.kind === 'reel') ? -70 + Math.sin(beat * 18) * 10 :
           (balancing ? -50 + flail * 40 + Math.sin(beat * 6) * 10 : Math.sin(beat * 5) * 8))));
         if (balancing) rot(r.tail, Math.sin(beat * 4) * 10 - a.rot * 0.8 + flail * 20);
         if (r.jet){
@@ -334,7 +334,7 @@ function createStage(deps){
         legs(s3 * 38, null, -s3 * 38, null);
         rot(r.tail, -s3 * 6 + (moving ? 6 : 0));
         rot(r.arm, trick && trick.kind === 'cheer' ? -60 * up :
-          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet') ? -80 + Math.sin(beat * 20) * 14 :
+          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet' || trick.kind === 'reel') ? -80 + Math.sin(beat * 20) * 14 :
           (balancing ? -60 + flail * 45 : s3 * 12)));
         if (balancing) rot(r.tail, Math.sin(beat * 4) * 10 - a.rot * 0.8 + flail * 20);
         rot(r.head, trick && trick.kind === 'cheer' ? -12 * up : s3 * 3);
@@ -713,21 +713,48 @@ function createStage(deps){
      under a lighter core, so it reads on every planet.
      ============================================================ */
   var SVGNS = 'http://www.w3.org/2000/svg';
+  /* o.pts: points to thread the rope through; or o.d: a ready-made path.
+     o.front: draw in front of the letters (the front half of a loop, a hook) */
   function addRope(o){
     var g = document.createElementNS(SVGNS, 'g');
     g.setAttribute('class', 'rope' + (o.cls ? ' ' + o.cls : ''));
     var back = document.createElementNS(SVGNS, 'path'), core = document.createElementNS(SVGNS, 'path');
     back.setAttribute('class', 'rope-back'); core.setAttribute('class', 'rope-core');
     g.appendChild(back); g.appendChild(core);
-    ropeSvg.appendChild(g);
-    var r = { g: g, back: back, core: core, pts: o.pts, sag: o.sag || 0, dead: false, op: 1 };
+    (o.front && live.frontSvg ? live.frontSvg : ropeSvg).appendChild(g);
+    var r = { g: g, back: back, core: core, pts: o.pts || null, d: o.d || null, sag: o.sag || 0, dead: false, op: 1 };
     live.ropes.push(r);
     return r;
+  }
+  /* half of a (tilted) ellipse: the back half goes behind a letter, the
+     front half in front of it, and together they read as a loop around it */
+  function halfLoop(c, rx, ry, deg, front){
+    var r = deg * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+    var x0 = c.x - rx * cs, y0 = c.y - rx * sn, x1 = c.x + rx * cs, y1 = c.y + rx * sn;
+    return 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + ' A' + rx.toFixed(1) + ' ' + ry.toFixed(1) + ' ' + deg.toFixed(1) + ' 0 ' + (front ? 0 : 1) + ' ' + x1.toFixed(1) + ' ' + y1.toFixed(1);
+  }
+  /* a loop of rope cinched round a letter's middle, both halves */
+  function addLoop(get){
+    var halves = [false, true].map(function(front){
+      return addRope({ front: front, d: function(){ var L = get(); return L ? halfLoop(L.c, L.rx, L.ry, L.deg || 0, front) : null; } });
+    });
+    return { kill: function(){ halves.forEach(killRope); } };
+  }
+  /* where a rope tied round a letter's middle leaves it, on the side towards (sx, sy) */
+  function knotOf(pl, sx){
+    var side = sx >= pl.x ? 1 : -1, r = pl.rot * Math.PI / 180, rx = pl.w * 0.5 * (pl.sx || 1);
+    return { x: pl.x + side * rx * Math.cos(r), y: pl.y + pl.h * 0.08 + side * rx * Math.sin(r) };
   }
   function killRope(r){ if (!r) return; r.dead = true; if (r.g.parentNode) r.g.parentNode.removeChild(r.g); }
   function drawRopes(){
     live.ropes = live.ropes.filter(function(r){ return !r.dead; });
     live.ropes.forEach(function(r){
+      if (r.d){
+        var dd = r.d();
+        if (!dd){ r.g.style.opacity = 0; return; }
+        r.back.setAttribute('d', dd); r.core.setAttribute('d', dd); r.g.style.opacity = r.op;
+        return;
+      }
       var P = r.pts();
       if (!P || P.length < 2){ r.g.style.opacity = 0; return; }
       var d = 'M' + P[0].x.toFixed(1) + ' ' + P[0].y.toFixed(1);
@@ -774,9 +801,19 @@ function createStage(deps){
     if (ch) return ch;
     ch = live.chains[a.key] = { owner: a.key, mode: mode };
     ch.rope = addRope({ sag: mode === 'below' ? 0 : 10, pts: function(){
-      var P = [tiePoint(a)], list = chainLetters(a.key);
-      list.forEach(function(q){ P.push(mode === 'below' ? { x: q.x, y: q.y - q.h * 0.5 } : { x: q.x, y: q.y }); });
-      if (ch.hook && list.length === 0){ var h = ch.hook(); P.push(h); }
+      var tie = tiePoint(a), P = [tie], list = chainLetters(a.key);
+      if (mode === 'below'){
+        /* from his feet to the hook in the first letter, then letter to letter */
+        list.forEach(function(q, i){
+          if (i) P.push({ x: list[i - 1].x, y: list[i - 1].y + list[i - 1].h * 0.5 - 4, sag: 0 });
+          P.push({ x: q.x, y: q.y - q.h * 0.5 + 2 });
+        });
+        if (!list.length && ch.hook) P.push(ch.hook());
+        return P;
+      }
+      /* tied round each letter's middle: the rope goes in one side, out the other */
+      var from = tie;
+      list.forEach(function(q){ var kin = knotOf(q, from.x); P.push(kin); var kout = knotOf(q, 2 * q.x - from.x); P.push({ x: kout.x, y: kout.y, sag: 0 }); from = kout; });
       return P;
     } });
     return ch;
@@ -791,15 +828,21 @@ function createStage(deps){
   }
   function chainK(pl, list, ch, a){
     var rank = 0;
+    /* on a hook line the newest hangs at the bottom; on a tow line the word reads in order */
+    if (ch.mode === 'below'){ list.forEach(function(q){ if ((q.chainT || 0) < (pl.chainT || 0)) rank++; }); return rank; }
     list.forEach(function(q){ if (q.idx < pl.idx) rank++; });
-    if (ch.mode === 'below') return rank;
     return a.faceShown > 0 ? list.length - 1 - rank : rank;
   }
   function joinChain(pl, a, mode){
-    chainFor(a, mode);
+    var ch = chainFor(a, mode);
     pl.state = 'chain'; pl.owner = a.key; pl.where = null;
+    pl.chainT = ++live.arrivals;
     pl.rot = wrapDeg(pl.rot);
     pl.sc = pl.sx = 0.86;
+    /* tied on: a little loop of rope stays cinched round the letter */
+    if (ch.mode !== 'below' && !pl.tie){
+      pl.tie = addLoop(function(){ return pl.state === 'chain' ? { c: { x: pl.x, y: pl.y + pl.h * 0.08 }, rx: pl.w * 0.5 * pl.sx, ry: 5, deg: pl.rot } : null; });
+    }
   }
   function stepChain(pl, t, dt){
     var a = actors[pl.owner], ch = live.chains[pl.owner];
@@ -890,6 +933,15 @@ function createStage(deps){
   /* ---------- per-frame work for lassos, bubbles, the lines ---------- */
   function stepExtras(t, dt){
     if (live.line) live.line.twang *= Math.pow(0.9, dt / 16);
+    /* the scoop: the letter joins the moment the bottom of the chain reaches it */
+    var H = live.hookTarget;
+    if (H && H.pl.state !== 'chain' && H.pl.state !== 'gone'){
+      var tp = tiePoint(H.a), slot = { x: tp.x, y: tp.y + H.drop };
+      if (Math.abs(slot.x - H.pl.x) < H.pl.w * 0.55 && Math.abs(slot.y - H.pl.y) < H.pl.h * 0.7){
+        joinChain(H.pl, H.a, 'below'); SFX.play('catch'); setExpr(H.a, 'happy', 500); live.hookTarget = null;
+        sparkle(H.pl.x, H.pl.y - H.pl.h * 0.5, 4);
+      }
+    } else if (H) live.hookTarget = null;
     (live.lassos || []).forEach(function(L){ stepLasso(L, t); });
     (live.bubbles || []).forEach(function(B){ stepBubble(B, t); });
   }
@@ -907,45 +959,49 @@ function createStage(deps){
       placeProp(M.el, lerp(M.x0, M.x1, mp * mp * (3 - 2 * mp)) - 26, live.groundY - 14 - Math.abs(Math.sin(t / 70)) * 3);
       if (mp >= 1 && !M.gone){ M.gone = true; setTimeout(function(){ dropProp(M.hole); }, 600 / timeScale); }
     });
-    if (live.hookEl){
-      var hk = live.hookAt();
-      placeProp(live.hookEl, hk.x - 9, hk.y - 4);
-    }
+
   }
 
-  /* ---------- the lasso ---------- */
+  /* ---------- the lasso ----------
+     Swung overhead, thrown, dropped over the letter, pulled tight round its
+     middle — its back half behind the letter, its front half in front, so
+     it is plainly ROUND the letter — then reeled in hand over hand. */
   function stepLasso(L, t){
     if (L.done) return;
     var a = L.a, pl = L.pl, p = clamp01((t - L.t0) / L.dur), hand = handPoint(a);
-    var loopC, loopR = 20;
+    var loop;
     if (p < 0.3){
       var ang = (t - L.t0) / 110;
-      loopC = { x: hand.x + Math.cos(ang) * 26 - a.faceShown * 6, y: hand.y - 70 + Math.sin(ang) * 9 };
-      L.last = loopC;
-    } else if (p < 0.5){
-      var q = (p - 0.3) / 0.2, e = 1 - Math.pow(1 - q, 2);
-      loopC = { x: lerp(L.last.x, pl.x, e), y: lerp(L.last.y, pl.y, e) - 70 * Math.sin(Math.PI * q) };
+      loop = { c: { x: hand.x + Math.cos(ang) * 22 - a.faceShown * 4, y: hand.y - 64 + Math.sin(ang) * 6 }, rx: 24, ry: 9, deg: Math.sin(ang) * 12 };
+      L.last = loop.c;
+    } else if (p < 0.48){
+      var q = (p - 0.3) / 0.18, e = 1 - Math.pow(1 - q, 2);
+      var above = { x: pl.x, y: pl.y - pl.h * 0.95 };
+      loop = { c: { x: lerp(L.last.x, above.x, e), y: lerp(L.last.y, above.y, e) - 60 * Math.sin(Math.PI * q) }, rx: 24 + 6 * q, ry: 9, deg: 0 };
       if (!L.flung){ L.flung = true; SFX.play('toss'); }
-    } else if (p < 0.56){
-      loopC = { x: pl.x, y: pl.y };
-      loopR = lerp(20, Math.max(pl.w, pl.h) * 0.58, (p - 0.5) / 0.06);
-      if (!L.caught){ L.caught = true; pl.state = 'lassoed'; pl.owner = a.key; pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); SFX.play('catch'); setExpr(a, 'happy', 500, t); }
+    } else if (p < 0.58){
+      /* it drops over the letter and snaps tight round its middle */
+      var d = (p - 0.48) / 0.1, de = d * d;
+      var wide = pl.w * 0.62, tight = pl.w * 0.52;
+      loop = { c: { x: pl.x, y: lerp(pl.y - pl.h * 0.95, pl.y + pl.h * 0.08, de) }, rx: d < 0.8 ? lerp(30, wide, d / 0.8) : lerp(wide, tight, (d - 0.8) / 0.2), ry: lerp(9, 6, d), deg: pl.rot };
+      if (d > 0.8 && !L.caught){ L.caught = true; pl.state = 'lassoed'; pl.owner = a.key; pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); SFX.play('catch'); setExpr(a, 'happy', 500, t); }
     } else {
-      var r2 = clamp01((p - 0.56) / 0.34), e2 = r2 * r2 * (3 - 2 * r2);
+      if (!L.caught){ L.caught = true; pl.state = 'lassoed'; pl.owner = a.key; pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); }
+      var r2 = clamp01((p - 0.62) / 0.32), e2 = r2 * r2 * (3 - 2 * r2);
+      /* a tug first: the letter jerks towards him, then comes in */
+      var tug = p < 0.62 ? Math.sin((p - 0.58) / 0.04 * Math.PI) * 10 : 0;
       var dest = { x: hand.x - a.faceShown * 10, y: hand.y + 10 };
-      pl.x = lerp(pl.fx, dest.x, e2); pl.y = lerp(pl.fy, dest.y, e2) - 40 * Math.sin(Math.PI * r2);
+      pl.x = lerp(pl.fx, dest.x, e2) + (hand.x > pl.fx ? 1 : -1) * tug; pl.y = lerp(pl.fy, dest.y, e2) - 40 * Math.sin(Math.PI * r2);
       pl.rot = lerp(pl.frot, 0, e2) + Math.sin(t / 50) * 5 * (1 - e2);
-      loopC = { x: pl.x, y: pl.y }; loopR = Math.max(pl.w, pl.h) * 0.58;
-      if (!L.reeling){ L.reeling = true; SFX.play('strain'); a.effort = 1; }
+      loop = { c: { x: pl.x, y: pl.y + pl.h * 0.08 }, rx: pl.w * 0.52, ry: 6, deg: pl.rot };
+      if (!L.reeling && p >= 0.62){ L.reeling = true; SFX.play('strain'); a.effort = 1; a.trick = { kind: 'reel', t0: t, dur: L.dur * 0.32 }; }
       if (r2 >= 1){
-        L.done = true; killRope(L.rope); dropProp(L.loop);
+        L.done = true; killRope(L.rope); L.loop.kill();
         joinChain(pl, a, 'behind'); SFX.play('pickup');
         return;
       }
     }
-    L.loopC = loopC; L.loopR = loopR;
-    placeProp(L.loop, loopC.x - loopR, loopC.y - loopR * 0.7);
-    L.loop.style.width = Math.round(loopR * 2) + 'px'; L.loop.style.height = Math.round(loopR * 1.4) + 'px';
+    L.cur = loop;
   }
 
   /* ---------- bubbles ---------- */
@@ -1515,7 +1571,7 @@ function createStage(deps){
       case 'stringline': { stringLine(t); break; }
       case 'jetgrab': {
         if (!a) break;
-        var jl = nextAlong(function(q){ return q.state === 'hung' || q.state === 'toline'; });
+        var jl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !live.slipping[q.idx]; });
         if (!jl) break;
         var fj = flow(), mo = offsetOf(a, 186, 96, fj);
         a.look = { x: jl.tx || jl.x, y: jl.y };
@@ -1531,7 +1587,7 @@ function createStage(deps){
       }
       case 'jumpgrab': {
         if (!a) break;
-        var hl = nextAlong(function(q){ return q.state === 'hung' || q.state === 'toline'; });
+        var hl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !live.slipping[q.idx]; });
         if (!hl) break;
         var fh = flow(), ao = offsetOf(a, 146, 118, fh), hx = (hl.tx || hl.x);
         var runX = clamp(hx - ao.x, -SIZE * 0.3, vw() - SIZE * 0.7);
@@ -1547,7 +1603,7 @@ function createStage(deps){
       }
       case 'boost': {
         if (!a) break;
-        var bl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !q.boosted; });
+        var bl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !q.boosted && !live.slipping[q.idx]; });
         if (!bl) break;
         bl.boosted = true; live.boostPl = bl;
         var fb = flow(), ho = offsetOf(a, 186, 110, fb);
@@ -1615,39 +1671,143 @@ function createStage(deps){
         if (flow() * a.face < 0) a.face = flow();
         a.trick = { kind: 'lasso', t0: t, dur: e.dur * 0.5 };
         a.look = { x: ll.x, y: ll.y };
-        var L = { a: a, pl: ll, t0: t, dur: e.dur, loop: addProp('lasso-loop') };
-        L.rope = addRope({ sag: 14, pts: function(){ return L.loopC ? [handPoint(a), { x: L.loopC.x, y: L.loopC.y + L.loopR * 0.2 }] : null; } });
+        var L = { a: a, pl: ll, t0: t, dur: e.dur, cur: null };
+        L.loop = addLoop(function(){ return L.cur; });
+        /* the rope runs from his hand to the knot on the loop's near side */
+        L.rope = addRope({ sag: 14, pts: function(){
+          if (!L.cur) return null;
+          var hp = handPoint(a), c = L.cur, sd = hp.x >= c.c.x ? 1 : -1, r = c.deg * Math.PI / 180;
+          return [hp, { x: c.c.x + sd * c.rx * Math.cos(r), y: c.c.y + sd * c.rx * Math.sin(r) }];
+        } });
         (live.lassos = live.lassos || []).push(L);
         SFX.play('whoosh');
         break;
       }
 
-      /* ---------- the sky hook ---------- */
+      /* ---------- the sky hook ----------
+         The hook goes through the top of the first letter. For each next
+         one he swoops in low from the side and the bottom of his chain
+         scoops it up, so the word grows downward, one letter at a time. */
       case 'hook': {
         if (!a) break;
         var ch = chainFor(a, 'below');
-        ch.lead = 30;
-        if (!live.hookEl){
-          live.hookEl = addProp('hook', '<svg viewBox="0 0 18 26"><path d="M9 0 v12 a6 6 0 1 1 -6 6" fill="none" stroke="#2E3440" stroke-width="5" stroke-linecap="round"/><path d="M9 0 v12 a6 6 0 1 1 -6 6" fill="none" stroke="#C9D2E0" stroke-width="2.4" stroke-linecap="round"/></svg>');
-          live.hookAt = function(){
-            var list = chainLetters(a.key);
-            if (list.length){ var last = list[list.length - 1]; return { x: last.x, y: last.y + last.h * 0.5 - 2 }; }
-            var tp = tiePoint(a); return { x: tp.x, y: tp.y + ch.lead };
-          };
+        ch.lead = 34;
+        if (!ch.hookRope){
           ch.hook = function(){ var tp = tiePoint(a); return { x: tp.x, y: tp.y + ch.lead }; };
+          /* the hook itself, in front of the letter it has hold of */
+          ch.hookRope = addRope({ front: true, d: function(){
+            var list = chainLetters(a.key), h = list.length ? { x: list[0].x, y: list[0].y - list[0].h * 0.5 + 2 } : ch.hook();
+            return 'M' + h.x.toFixed(1) + ' ' + (h.y - 6).toFixed(1) + ' v10 a7 7 0 1 1 -7 7';
+          }, cls: 'hook-line' });
         }
-        var hl2 = nextAlong(function(q){ return takeable(q) && !q.hooking; });
+        /* first letter first: the word reads top to bottom as it grows */
+        var hl2 = live.payloads.filter(function(q){ return takeable(q) && !q.hooking; }).sort(function(p1, p2){ return p1.idx - p2.idx; })[0];
         if (!hl2) break;
         hl2.hooking = true;
+        if (hl2.state === 'free') hl2.vx = 0;
         var count = chainLetters(a.key).length, gapH = Math.max(hl2.w, hl2.h) * 0.98;
-        var tie = offsetOf(a, 100, 150, 1);
-        var hx2 = clamp(hl2.x - tie.x, -SIZE * 0.4, vw() - SIZE * 0.6);
-        var hy2 = hl2.y - ch.lead - hl2.h * 0.5 - count * gapH - tie.y;
-        move(a, t, e.dur * 0.28, { x: a.x, y: Math.min(a.y, hy2) - gapH * 0.8 }, { ease: 'out', effort: 0.8, keepFace: true, rotTo: -6,
-          next: { dur: e.dur * 0.52, to: { x: hx2, y: hy2 }, opts: { ease: 'inout', effort: 0.9, rotTo: 8,
-            onEnd: function(){ if (!live || hl2.state === 'chain') return; joinChain(hl2, a, 'below'); SFX.play('catch'); setExpr(a, 'happy', 500); },
-            next: { dur: e.dur * 0.2, to: { x: hx2, y: hy2 - 16 }, opts: { ease: 'out', rotTo: 0, keepFace: true, effort: 0.5 } } } } });
+        var tieO = offsetOf(a, 100, 150, a.faceShown || 1);
+        /* where his feet must be for the bottom of the chain to meet the letter */
+        var drop = ch.lead + hl2.h * 0.5 + count * gapH;
+        var side = hl2.x < vw() / 2 ? -1 : 1;
+        if (count === 0) side = a.x + SIZE / 2 < hl2.x ? -1 : 1;
+        var tx0 = hl2.x - tieO.x, ty0 = hl2.y - drop - tieO.y;
+        var inX = clamp(tx0 + side * 110, -SIZE * 0.4, vw() - SIZE * 0.6);
+        a.look = { x: hl2.x, y: hl2.y };
+        live.hookTarget = { pl: hl2, a: a, drop: drop };
+        /* out to the side and a little high, then a low scooping swoop through the letter, then up */
+        move(a, t, e.dur * 0.34, { x: inX, y: ty0 - 36 }, { ease: 'inout', effort: 0.8, face: -side, keepFace: true, rotTo: -6,
+          next: { dur: e.dur * 0.4, to: { x: clamp(tx0 - side * 50, -SIZE * 0.4, vw() - SIZE * 0.6), y: ty0 - 36 }, opts: { ease: 'linear', effort: 1, keepFace: true, rotTo: 10,
+            path: function(ep, pp){ var fx = inX, tx = clamp(tx0 - side * 50, -SIZE * 0.4, vw() - SIZE * 0.6); return { x: lerp(fx, tx, pp * pp * (3 - 2 * pp)), y: ty0 - 36 + 44 * Math.sin(Math.PI * pp) }; },
+            onEnd: function(){ if (live && hl2.state !== 'chain' && hl2.state !== 'gone'){ joinChain(hl2, a, 'below'); SFX.play('catch'); live.hookTarget = null; } },
+            next: { dur: e.dur * 0.26, to: { x: clamp(tx0 - side * 70, -SIZE * 0.4, vw() - SIZE * 0.6), y: ty0 - 36 - gapH * 0.6 }, opts: { ease: 'out', rotTo: 0, keepFace: true, effort: 0.6 } } } } });
         SFX.play('flap');
+        break;
+      }
+
+      /* ---------- a slip, and a buddy to the rescue ---------- */
+      case 'slip': {
+        var sp = e.letter != null ? live.payloads[e.letter] : null;
+        if (!sp || sp.state === 'gone') break;
+        if (sp.tie){ sp.tie.kill(); sp.tie = null; }
+        var owner = actors[sp.owner] || a;
+        sp.state = 'free'; sp.owner = null; sp.where = null; sp.lowG = false;
+        sp.groundY = ground - sp.h * 0.5 - 6;
+        sp.vx = (owner ? -owner.faceShown : 1) * 0.08; sp.vy = -0.25; sp.spin = 0.07;
+        sp.slipped = true; delete live.slipping[sp.idx];
+        if (live.line) twangLine();
+        if (owner){ setExpr(owner, 'oops', 900, t); owner.look = { x: sp.x, y: ground }; }
+        SFX.play('huh');
+        break;
+      }
+      case 'fetch': {
+        if (!a) break;
+        var fp0 = e.letter != null ? live.payloads[e.letter] : null;
+        if (!fp0) break;
+        var runIn = e.dur * 0.42, hold = holdOf(a);
+        /* run to where it is coming down, catch it, and off */
+        var land = fp0.state === 'free' ? predict(fp0, runIn) : { x: fp0.x, y: fp0.y };
+        var hs = anchorFor(a, hold), fx2 = a.x + SIZE / 2 < land.x ? 1 : -1, ho2 = offsetOf(a, hs[0], hs[1], fx2);
+        var catchX = clamp(land.x - ho2.x, -SIZE * 0.3, vw() - SIZE * 0.7);
+        var catchY = C.CHARS[a.kind].airborne && a.kind === 'swoop' ? Math.min(sy0 - 40, land.y - ho2.y) : sy0;
+        a.look = { x: fp0.x, y: fp0.y };
+        setExpr(a, 'wow', runIn, t);
+        move(a, t, runIn, { x: catchX, y: catchY }, { ease: 'out', face: fx2, keepFace: true, effort: 1, capSpeed: 1.1,
+          onEnd: function(){
+            if (!live || fp0.state === 'held' || fp0.state === 'gone') return;
+            hopInto(fp0, a, hold, 200, live.vnow); SFX.play('catch'); setExpr(a, 'happy', 700);
+            var fpp = artPoint(a, 100, 188); dust(fpp.x, ground, 5, 40);
+          },
+          next: { dur: 380, to: { x: catchX, y: catchY }, opts: { ease: 'linear', keepFace: true, arc: 34, effort: 0.6,
+            next: { dur: e.dur * 0.58 - 380, to: edgeFor(e.dir || (fx2 > 0 ? 'right' : 'left'), a), opts: { ease: 'in', effort: 0.9, capSpeed: 1.2 } } } } });
+        SFX.play({ rex: 'jet', trike: 'stomp', dash: 'zoom', swoop: 'flap' }[a.kind]);
+        break;
+      }
+
+      /* ---------- show-off and victory: each kind's own way ---------- */
+      case 'showoff': {
+        if (!a) break;
+        setExpr(a, 'happy', e.dur, t);
+        var hx = a.x, hy = a.y, d0 = e.dur;
+        if (a.kind === 'rex'){
+          move(a, t, d0 * 0.4, { x: hx, y: hy - 90 }, { ease: 'out', keepFace: true, effort: 1, rotTo: -8,
+            onEnd: function(){ if (!live) return; a.jaw = 1; a.jawUntil = live.vnow + 500; setExpr(a, 'roar', 600); var m = artPoint(a, 186, 96); ring(m.x, m.y, false); SFX.play('roarsmall'); },
+            next: { dur: d0 * 0.6, to: { x: hx, y: hy }, opts: { ease: 'inout', keepFace: true, effort: 0.6 } } });
+          SFX.play('jet');
+        } else if (a.kind === 'trike'){
+          a.trick = { kind: 'paw', t0: t, dur: d0 * 0.45 };
+          var pawAt = artPoint(a, 124, 188); dust(pawAt.x, ground, 5, 36); SFX.play('snort');
+          move(a, t + d0 * 0.45, d0 * 0.3, { x: hx, y: hy - 30 }, { ease: 'out', keepFace: true, rotTo: -14, effort: 1,
+            next: { dur: d0 * 0.25, to: { x: hx, y: hy }, opts: { ease: 'in', keepFace: true, rotTo: 0,
+              onEnd: function(){ if (!live) return; var f = artPoint(a, 120, 190); ring(f.x, ground, false); dust(f.x, ground, 8, 50); live.shake = Math.max(live.shake, 6); SFX.play('stomp'); } } } });
+        } else if (a.kind === 'dash'){
+          var zx = clamp(hx + a.face * 120, -SIZE * 0.2, vw() - SIZE * 0.8);
+          move(a, t, d0 * 0.3, { x: zx, y: hy }, { ease: 'inout', effort: 1, keepFace: true,
+            next: { dur: d0 * 0.3, to: { x: hx, y: hy }, opts: { ease: 'inout', effort: 1, keepFace: true,
+              next: { dur: d0 * 0.4, to: { x: hx, y: hy }, opts: { ease: 'linear', arc: 70, spins: a.face, keepFace: true, effort: 1 } } } } });
+          SFX.play('zoom');
+        } else {
+          var R2 = 60;
+          move(a, t, d0, { x: hx, y: hy }, { effort: 1, ease: 'inout', spins: -a.face,
+            path: function(ep){ return { x: hx + Math.sin(ep * Math.PI * 2) * R2 * a.face, y: hy - (1 - Math.cos(ep * Math.PI * 2)) * R2 }; } });
+          SFX.play('loop');
+        }
+        break;
+      }
+      case 'victory': {
+        if (!a) break;
+        setExpr(a, 'happy', e.dur + 300, t);
+        var vx = a.x, vy = a.y;
+        a.trick = { kind: 'cheer', t0: t, dur: e.dur };
+        if (a.kind === 'dash' || a.kind === 'swoop'){
+          move(a, t, e.dur, { x: vx, y: vy }, { ease: 'linear', arc: 90, spins: a.kind === 'dash' ? -a.face : a.face, keepFace: true, effort: 1 });
+          SFX.play('spin');
+        } else {
+          move(a, t, e.dur * 0.5, { x: vx, y: vy }, { ease: 'linear', arc: 46, keepFace: true, effort: 0.8,
+            next: { dur: e.dur * 0.5, to: { x: vx, y: vy }, opts: { ease: 'linear', arc: 34, keepFace: true, effort: 0.6 } } });
+          SFX.play('cheer');
+        }
+        var vc = centreOf(a); sparkle(vc.x, vc.y - 30, 10);
         break;
       }
 
@@ -1977,6 +2137,7 @@ function createStage(deps){
     if (l.ship){ [l.ship.el, l.ship.beam].forEach(function(n){ if (n.parentNode) n.parentNode.removeChild(n); }); }
     (l.ropes || []).forEach(function(r){ if (r.g.parentNode) r.g.parentNode.removeChild(r.g); });
     (l.props || []).forEach(function(d){ if (d.parentNode) d.parentNode.removeChild(d); });
+    if (l.frontSvg && l.frontSvg.parentNode) l.frontSvg.parentNode.removeChild(l.frontSvg);
     clearParticles();
     for (var k in actors) parkActor(actors[k]);
     if (layer) layer.style.transform = '';
@@ -2014,6 +2175,17 @@ function createStage(deps){
       move(a, tNow, 800, { x: toLeft ? -SIZE - 30 : vw() + 30, y: a.y }, { op: 0, ease: 'in', effort: 0.6, face: toLeft ? -1 : 1 });
     });
     var payloads = els.map(function(el, i){ return makePayload(el, i); });
+    /* ropes drawn in front of the letters: the near half of a loop, the hook */
+    /* letters the plan will knock loose before anyone takes them: nobody grabs those first */
+    var slipping = {};
+    plan.events.forEach(function(ev){
+      if (ev.kind !== 'slip') return;
+      var takenBefore = plan.events.some(function(q){ return q.letter === ev.letter && q.at < ev.at && q.kind !== 'slip' && C.TAKE_KINDS[q.kind]; });
+      if (!takenBefore) slipping[ev.letter] = 1;
+    });
+    var frontSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    frontSvg.setAttribute('class', 'ropes ropes-front');
+    layer.appendChild(frontSvg);
     var entryFor = {};
     Object.keys(cast).forEach(function(k, i){
       if (!actors[k]) return;
@@ -2030,7 +2202,7 @@ function createStage(deps){
         plan: plan, payloads: payloads, fired: [], errors: [], t0: performance.now(), last: performance.now(), vnow: performance.now(),
         deadline: performance.now() + budget + 3500, groundY: ground, dust: opts.dust || null, entryFor: entryFor,
         resolve: once, raf: null, shake: 0, guard: null, ship: null, parade: null, tugging: false, onShake: opts.onShake || null, arrivals: 0,
-        resume: resume, cast: cast, ropes: [], props: [], chains: {}
+        resume: resume, cast: cast, ropes: [], props: [], chains: {}, frontSvg: frontSvg, slipping: slipping
       };
       live.raf = requestAnimationFrame(frame);
       live.guard = setTimeout(function(){ if (settled) return; finish(); once(['stall guard fired']); }, budget + 3900);

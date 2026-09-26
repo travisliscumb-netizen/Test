@@ -32,11 +32,15 @@ const WORDS = { 1: 'A', 2: 'GO', 3: 'THE', 4: 'SAID', 5: 'WHERE' };
 let fail = 0;
 function check(scene, name, ok, detail = '') { if (!ok) { fail++; console.log(`  FAIL  ${name}${detail ? ' -- ' + detail : ''}`); } return ok; }
 let passed = 0;
-for (const s0 of scenes) for (const mirror of MIRRORS) {
+const FUMBLES = await page.evaluate(() => window.__lab.FUMBLES);
+const runs = [];
+for (const s0 of scenes) for (const mirror of MIRRORS) { runs.push([s0, mirror, false]); if (FUMBLES.includes(s0.id)) runs.push([s0, mirror, true]); }
+for (const [s0, mirror, fumble] of runs) {
   if (only.length && !only.includes(s0.id)) continue;
+  await page.evaluate(f => window.__lab.setFumble(f), fumble);
   const lead = (await page.evaluate(i => window.__lab.leadsFor(i), s0.id))[0];
-  const word = WORDS[Math.max(s0.min || 1, 4)];
-  const id = s0.id + (mirror ? '~m' : '');
+  const word = WORDS[Math.max(s0.min || 1, fumble ? 5 : 4)];
+  const id = s0.id + (mirror ? '~m' : '') + (fumble ? '~f' : '');
   process.stdout.write(`\n${id}  (${s0.name}, lead=${lead}, "${word}")\n`);
   const plan = await page.evaluate(([i, w, l, m]) => window.__lab.plan(i, w, l, m), [s0.id, word, lead, mirror]);
   await page.evaluate(([i, w, l, m]) => { window.__lab.run(i, w, l, m); }, [s0.id, word, lead, mirror]);

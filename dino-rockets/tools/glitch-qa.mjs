@@ -34,8 +34,10 @@ function verdict(label, glitches) {
   for (const g of firsts.slice(0, 6)) console.log(`       ${g.rule} ${g.who} @${g.t}ms ${g.detail}`);
 }
 
-for (const s0 of scenes) for (const mirror of [false, true]) {
+const FUMBLES = await page.evaluate(() => window.__lab.FUMBLES);
+for (const s0 of scenes) for (const mirror of [false, true]) for (const fumble of FUMBLES.includes(s0.id) ? [false, true] : [false]) {
   if (only.length && !only.includes(s0.id)) continue;
+  await page.evaluate(f => window.__lab.setFumble(f), fumble);
   const leads = await page.evaluate(i => window.__lab.leadsFor(i), s0.id);
   for (const lead of leads) {
     for (const n of [3, 5]) {
@@ -45,7 +47,7 @@ for (const s0 of scenes) for (const mirror of [false, true]) {
       await page.waitForFunction(() => window.__labDone, null, { timeout: 60000 });
       const frames = await page.evaluate(() => window.__lab.traced());
       await page.evaluate(() => window.__lab.trace(false));
-      verdict(`${s0.id}${mirror ? '~m' : ''} ${lead} "${word}" (${frames.length} frames)`, findGlitches(frames, VP.width, VP.height));
+      verdict(`${s0.id}${mirror ? '~m' : ''}${fumble ? '~f' : ''} ${lead} "${word}" (${frames.length} frames)`, findGlitches(frames, VP.width, VP.height));
     }
   }
 }

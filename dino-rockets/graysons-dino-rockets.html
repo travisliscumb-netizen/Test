@@ -268,8 +268,32 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .key.hint{border-color:var(--orange);animation:hintglow .9s ease-in-out infinite}
 .peek{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:30;padding:14px 22px;border-radius:22px;
   background:rgba(10,20,51,.92);color:#fff;font-size:44px;font-weight:900;letter-spacing:.12em;box-shadow:0 0 0 4px #8FE3FF;animation:pop .3s}
-.fuel{width:100%;max-width:420px;height:16px;border-radius:8px;background:#E6F1FF;overflow:hidden;box-shadow:inset 0 2px 0 rgba(0,0,0,.08)}
-.fuel i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--orange));transition:width .3s}
+/* the fuel dock: a fuel line of cells, and the rocket with its tank */
+.fuel-dock{display:flex;align-items:center;gap:8px;width:100%;max-width:440px;flex:none;padding:4px 6px 4px 10px;border-radius:22px;
+  background:linear-gradient(180deg,#0E1F4A,#0B1640);box-shadow:inset 0 0 0 2px #2A4A8C,0 3px 0 #06102A}
+.fuel-label{font-size:12px;font-weight:900;letter-spacing:.08em;color:#8FE3FF;width:38px;flex:none}
+.fuel-dock.ready .fuel-label{color:var(--gold);animation:pop .4s}
+.fuel-pipe{flex:1;display:flex;gap:4px;height:26px;padding:3px;border-radius:12px;background:#06102A;box-shadow:inset 0 0 0 2px #1C3470}
+.fuel-pipe .cell{flex:1;border-radius:8px;background:#13265A;position:relative;overflow:hidden}
+.fuel-pipe .cell b{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#FFE08A,var(--orange));transition:height .35s cubic-bezier(.3,1.5,.5,1)}
+.fuel-pipe .cell.full b{height:100%;box-shadow:0 0 12px rgba(255,197,61,.9)}
+.fuel-pipe .cell.full:not(.quiet){animation:cellGlow .5s}
+@keyframes cellGlow{0%{filter:brightness(2)}100%{filter:none}}
+.fuel-rocket{position:relative;width:60px;height:86px;flex:none;margin:-14px 0 -10px}
+.fuel-rocket svg{width:100%;height:100%;overflow:visible}
+.fuel-rocket .flame{opacity:0;transform-origin:60px 108px;transition:opacity .2s}
+.fuel-dock.ready .fuel-rocket .flame{opacity:1;animation:flameFlick .12s linear infinite alternate}
+.fuel-dock.ready .fuel-rocket{animation:shake .1s linear infinite}
+@keyframes flameFlick{from{transform:scaleY(.8)}to{transform:scaleY(1.15)}}
+/* the rocket's window is the fuel tank: it fills as he spells */
+.fuel-rocket .tank{position:absolute;left:39%;top:30.5%;width:22%;height:15.5%;border-radius:50%;overflow:hidden;background:rgba(10,20,51,.55)}
+.fuel-rocket .tank .level{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#FFE08A,#FF8A1F);transition:height .4s}
+.fuel-drop{position:fixed;z-index:945;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(circle at 35% 35%,#fff,#FFE08A 40%,#FF8A1F);box-shadow:0 0 14px #FFC53D}
+.launch-smoke{position:fixed;z-index:924;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle,#fff,rgba(220,230,245,.6) 60%,transparent 70%);pointer-events:none}
+.fuel-dock.big{max-width:480px}
+.fuel-dock.big .fuel-pipe{height:32px}
+.fuel-dock.big .fuel-rocket{width:70px;height:100px;margin:-20px 0 -12px}
 .countdown{position:absolute;inset:0;z-index:40;display:grid;place-items:center;font-size:120px;font-weight:900;color:var(--orange);
   text-shadow:0 6px 0 var(--orange-700),0 0 40px rgba(255,138,31,.6);pointer-events:none}
 .countdown span{animation:pop .5s cubic-bezier(.3,1.6,.5,1)}
@@ -492,7 +516,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   .meteor{height:104px;font-size:52px;min-width:200px;border-radius:54px}
   .choices{gap:28px}
   .choices .tile{--tile:124px}
-  .fuel{max-width:600px;height:22px;border-radius:11px}
+  .fuel-dock{max-width:640px;padding:6px 10px 6px 14px;border-radius:28px}
+  .fuel-label{font-size:16px;width:52px}
+  .fuel-pipe{height:36px}.fuel-rocket{width:84px;height:120px;margin:-22px 0 -14px}
+  .fuel-dock.big .fuel-pipe{height:42px}.fuel-dock.big .fuel-rocket{width:96px;height:136px;margin:-26px 0 -16px}
   .keys{max-width:620px;gap:16px}
   .key{min-height:100px;font-size:50px;border-radius:24px}
   .peek{font-size:68px;padding:20px 34px}
@@ -585,6 +612,26 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 
 /* on Dino Base the crew is at the top, so news appears lower down */
 body[data-screen="base"] #toast{top:auto;bottom:calc(var(--surface-h) + 170px)}
+
+/* ---------- the victory show ---------- */
+.show-stage{width:100%;max-width:640px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding-top:6vh}
+.show-act{margin:0;min-height:1.3em;font-size:clamp(26px,7vw,40px);font-weight:900;color:#FFE08A;text-align:center;text-shadow:0 3px 0 rgba(0,0,0,.45);animation:pop .4s}
+.show-word{display:flex;gap:8px;justify-content:center;padding:16px 18px;border-radius:26px;background:rgba(255,255,255,.12);border:3px solid rgba(143,227,255,.55);
+  box-shadow:0 0 30px rgba(143,227,255,.3);min-height:96px;--tile:clamp(44px,13vw,72px)}
+.show-word:empty{visibility:hidden}
+.pill-btn.skip{width:auto;padding:0 14px;font-size:15px}
+.firework{position:fixed;z-index:931;width:8px;height:8px;border-radius:50%;pointer-events:none}
+@media (min-width:700px){ .show-act{font-size:52px} .show-word{--tile:96px;padding:24px 28px} }
+
+/* review fixes */
+#levelUp{min-width:min(340px,92vw)}
+#levelUp .lu-text{flex:1;min-width:0}
+#levelUp b{white-space:nowrap}
+.activity.meet{justify-content:center;gap:18px}
+.activity.meet .holo{padding:22px 10px 26px}
+.activity.meet .btn-launch{margin-top:6px !important;min-width:220px}
+.crew-hint{font-size:14px}
+@media (min-width:700px){ .activity.meet .holo{padding:36px 16px 40px} }
 
 /* ---- 15-stage.css ---- */
 /* ---- STAGE: the crew, their props and the letters they carry ---- */
@@ -779,6 +826,17 @@ body[data-screen="base"] #toast{top:auto;bottom:calc(var(--surface-h) + 170px)}
     </div>
   </section>
 
+  <!-- ============ VICTORY SHOW: the crew performs the week's words ============ -->
+  <section class="screen" data-screen="show">
+    <header class="bar"><span></span><span class="bar-title">Victory Show!</span>
+      <button class="pill-btn skip" id="btnSkipShow" type="button" aria-label="Skip the show">Skip ›</button>
+    </header>
+    <div class="show-stage">
+      <p class="show-act" id="showAct"></p>
+      <div class="show-word" id="showWord"></div>
+    </div>
+  </section>
+
   <!-- ============ HANGAR: rocket paint jobs, paid for in rocket parts ============ -->
   <section class="screen" data-screen="hangar">
     <header class="bar">
@@ -841,7 +899,10 @@ body[data-screen="base"] #toast{top:auto;bottom:calc(var(--surface-h) + 170px)}
         <h2 class="section">How it's going</h2>
         <p class="note">Stars show how well each word is known: every clean spell from memory earns one, and a word that needed help loses one and gets its practice steps back.</p>
         <ul class="progress-list" id="progressList"></ul>
-        <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's mission</button>
+        <div class="row-left">
+          <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's mission</button>
+          <button class="btn btn-soft small" id="btnResetCrew" type="button">Crew back to level 1</button>
+        </div>
 
         <h2 class="section">Sound</h2>
         <label class="toggle"><input type="checkbox" id="optSfx" checked><span>Sound effects</span></label>
@@ -1273,12 +1334,12 @@ function exitDirsFor(key){ var c = CHARS[key]; return c && c.airborne ? ['up', '
 /*
   Every scene a dinosaur is in earns experience; levels bring new moves
   (rope tricks at 2, tightrope and team-ups at 3) and, for a baby, growing
-  up: baby at levels 1–2, kid at 3–4, fully grown at 5. The originals are
-  grown already and start at level 2, so ropes are there from day one.
+  up: baby at levels 1–2, kid at 3–4, fully grown at 5. Everyone starts at
+  level 1 — the originals too — so every new trick is something he earned.
 */
 var LEVEL_XP = [0, 6, 16, 32, 56];
 var MAX_LEVEL = LEVEL_XP.length;
-var ORIGINAL_START_XP = 6;
+var ORIGINAL_START_XP = 0;
 function levelFor(xp){ var x = Math.max(0, Number(xp) || 0), l = 0; LEVEL_XP.forEach(function(t){ if (x >= t) l++; }); return Math.max(1, l); }
 function xpToNext(xp){ var l = levelFor(xp); return l >= MAX_LEVEL ? 0 : LEVEL_XP[l] - Math.max(0, Number(xp) || 0); }
 function growFor(member, level){
@@ -1478,13 +1539,18 @@ var BEAT = {
   fall:620, getup:420, carry:520, cheer:520, notice:360, march:1600, follow:1600,
   lasso:980, hitch:600, tow:1500, stringline:1000, jetgrab:640, hook:760, jumpgrab:760,
   boost:900, vault:760, rigrope:1100, ropepick:280, wobble:900, ropejump:700, anchor:500,
-  bubble:1000, magnet:800, pull:560, dig:760, popup:640, frost:1000, slide:600, react:700
+  bubble:1000, magnet:800, pull:560, dig:760, popup:640, frost:1000, slide:600, react:700,
+  slip:500, fetch:1700, showoff:1200, victory:900
 };
-var SCENE_TARGET_MIN = 3500, SCENE_TARGET_MAX = 13000, SCENE_HARD_MAX = 20000;
+/* scenes are shows, not transitions: long enough for a six-year-old to
+   enjoy the dinosaurs doing their thing, capped so practice keeps moving */
+var SCENE_TARGET_MIN = 3500, SCENE_TARGET_MAX = 17000, SCENE_HARD_MAX = 24000;
 var TAKE_KINDS = { snatch:1, tailwhip:1, scoop:1, backcatch:1, sweep:1, orbit:1, dive:1, ride:1, beam:1, catch:1, carry:1, follow:1,
-  lasso:1, hitch:1, jetgrab:1, hook:1, jumpgrab:1, vault:1, ropepick:1, bubble:1, pull:1, popup:1, slide:1 };
+  lasso:1, hitch:1, jetgrab:1, hook:1, jumpgrab:1, vault:1, ropepick:1, bubble:1, pull:1, popup:1, slide:1, fetch:1 };
+/* Beats that let go of a letter someone had (it must then be taken again). */
+var RELEASE_KINDS = { slip:1 };
 /* Beats that leave the character off stage. */
-var EXIT_KINDS = { exit:1, charge:1, zoom:1, glide:1, beamup:1, carry:1, march:1, tow:1 };
+var EXIT_KINDS = { exit:1, charge:1, zoom:1, glide:1, beamup:1, carry:1, march:1, tow:1, fetch:1 };
 
 function makeTimeline(){
   var events = [];
@@ -1511,6 +1577,16 @@ function addWatcher(tl, c, from, to){
   tl.push(mid, BEAT.react, 'react', { char:w, mood:'gasp' });
   tl.push(Math.max(mid + BEAT.react, to - BEAT.react), BEAT.react, 'react', { char:w, mood:'cheer' });
   tl.push(Math.max(mid + BEAT.react, to - BEAT.react) + BEAT.react, BEAT.exit, 'exit', { char:w, dir:c.exitFor(w, 3) });
+}
+
+/* A fumble: a letter slips, and a buddy runs in, catches it and runs off
+   with it. Only when there is a buddy to do it and letters enough. */
+function wantFumble(c){ return c.fumbler && c.letters >= 3 && c.r() < 0.6; }
+function addFumble(tl, c, letter, at, dir){
+  var H = c.fumbler;
+  tl.push(Math.max(0, at - 700), BEAT.enter, 'enter', { char:H, side:'far', stay:'edge' });
+  tl.push(at, BEAT.slip, 'slip', { letter:letter });
+  tl.push(at + 160, BEAT.fetch, 'fetch', { char:H, letter:letter, dir:dir || c.exitFor(H, 0) });
 }
 
 var SCENES = [
@@ -1549,11 +1625,15 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter - 200;
     tl.push(t, BEAT.stringline, 'stringline', {}); t += BEAT.stringline;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 600, BEAT.jetgrab, 'jetgrab', { char:L, letter:c.letters - 1 - i });
-    var last = t + Math.max(0, c.letters - 1) * 600 + BEAT.jetgrab;
+    /* sometimes his first big twang of the line knocks the far letter off */
+    var fumble = wantFumble(c), far = c.letters - 1;
+    var grabs = fumble ? c.letters - 1 : c.letters;
+    for (var i = 0; i < grabs; i++) tl.push(t + i * 600, BEAT.jetgrab, 'jetgrab', { char:L, letter:(fumble ? c.letters - 2 : c.letters - 1) - i });
+    if (fumble) addFumble(tl, c, far, t + BEAT.jetgrab * 0.6, 'right');
+    var last = t + Math.max(0, grabs - 1) * 600 + BEAT.jetgrab;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:'up' });
-    addWatcher(tl, c, 400, last + BEAT.cheer);
+    if (!fumble) addWatcher(tl, c, 400, last + BEAT.cheer);
     return tl;
   } },
 
@@ -1562,7 +1642,9 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     tl.push(t, BEAT.stomp, 'stomp', { char:L, mode:'drop' }); t += BEAT.stomp + 200;
+    /* he backs up, paws the ground, snorts... paws again... and CHARGE */
     tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw;
+    tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw + 150;
     var run = BEAT.charge + c.letters * 90;
     tl.push(t, run, 'charge', { char:L, dir:'right' });
     for (var i = 0; i < c.letters; i++) tl.push(t + 200 + i * Math.floor((run - 400) / Math.max(1, c.letters)), BEAT.scoop, 'scoop', { char:L, letter:c.letters - 1 - i });
@@ -1589,6 +1671,8 @@ var SCENES = [
     for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hitch, 'hitch', { char:L, letter:i }); t += BEAT.hitch - 60; }
     t += 120;
     tl.push(t, BEAT.tow + c.letters * 110, 'tow', { char:L, dir:'right' });
+    /* a knot comes undone as he pulls away; a buddy grabs the letter and chases after him */
+    if (wantFumble(c)) addFumble(tl, c, 0, t + 380, 'right');
     return tl;
   } },
 
@@ -1619,6 +1703,10 @@ var SCENES = [
   { id:'speed-sweep', name:'Speed Sweep', lead:{ kind:'dash' }, weight:10, min:1, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    /* a warm-up lap: across, skid, back, skid — then the real run */
+    tl.push(t, 700, 'dashpass', { char:L }); t += 700;
+    tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
+    tl.push(t, 700, 'dashpass', { char:L }); t += 700;
     tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
     var missed = c.letters >= 3 ? c.letters - 1 : -1;
     var takeN = missed === -1 ? c.letters : c.letters - 1;
@@ -1640,7 +1728,7 @@ var SCENES = [
   { id:'whirlwind', name:'Whirlwind', lead:{ kind:'dash' }, weight:8, min:2, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    var spin = Math.max(BEAT.spindash, 250 + c.letters * 180 + BEAT.orbit);
+    var spin = Math.max(2200, 250 + c.letters * 180 + BEAT.orbit + 900);
     tl.push(t, spin, 'spindash', { char:L });
     for (var i = 0; i < c.letters; i++) tl.push(t + 250 + i * 180, BEAT.orbit, 'orbit', { char:L, letter:i });
     addWatcher(tl, c, 300, t + spin);
@@ -1691,19 +1779,25 @@ var SCENES = [
     tl.push(t, BEAT.wave, 'wave', { char:L }); t += BEAT.wave;
     var run = BEAT.glide + c.letters * 120;
     tl.push(t, run, 'glide', { char:L, dir:'right' });
-    for (var i = 0; i < c.letters; i++) tl.push(t + 150 + i * Math.floor((run - 500) / Math.max(1, c.letters)), BEAT.ride, 'ride', { char:L, letter:c.letters - 1 - i });
+    var step = Math.floor((run - 500) / Math.max(1, c.letters));
+    for (var i = 0; i < c.letters; i++) tl.push(t + 150 + i * step, BEAT.ride, 'ride', { char:L, letter:c.letters - 1 - i });
+    /* the first one aboard bounces off as he picks up speed */
+    if (wantFumble(c)) addFumble(tl, c, c.letters - 1, t + 150 + (c.letters - 1) * step + BEAT.ride + 120, 'right');
     return tl;
   } },
 
   /* He flies over trailing a rope with a hook, hooks each letter off the
      ground and flies away with the word dangling beneath him. */
   { id:'sky-hook', name:'Sky Hook', lead:{ kind:'swoop' }, level:2, weight:9, min:1, watch:true, build: function(c){
+    /* a slower dance: each letter gets its own swoop */
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hook, 'hook', { char:L, letter:i }); t += BEAT.hook - 160; }
-    t += 160;
-    tl.push(t, BEAT.exit + 200, 'exit', { char:L, dir:'up' });
-    addWatcher(tl, c, 300, t);
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hook, 'hook', { char:L, letter:i }); t += BEAT.hook; }
+    /* on the way up the bottom letter wriggles loose, and a buddy dives in to catch it */
+    var fumble = wantFumble(c);
+    if (fumble){ addFumble(tl, c, c.letters - 1, t + 150, c.exitFor(c.fumbler, 1)); t += 500; }
+    tl.push(t, BEAT.exit + 400, 'exit', { char:L, dir:'up' });
+    if (!fumble) addWatcher(tl, c, 300, t);
     return tl;
   } },
 
@@ -1826,7 +1920,7 @@ var SCENES = [
     tl.push(t, BEAT.enter, 'enter', { char:b, side:'far' }); t += BEAT.enter;
     tl.push(t, BEAT.grab, 'grab', { char:a, letter:0 });
     tl.push(t, BEAT.grab, 'grab', { char:b, letter:0 }); t += BEAT.grab;
-    tl.push(t, BEAT.tug, 'tug', { char:a, other:b, letter:0 }); t += BEAT.tug;
+    tl.push(t, BEAT.tug * 1.8, 'tug', { char:a, other:b, letter:0 }); t += BEAT.tug * 1.8;
     tl.push(t, BEAT.pop, 'pop', { letter:0 });
     tl.push(t, BEAT.fall, 'fall', { char:a });
     tl.push(t, BEAT.fall, 'fall', { char:b }); t += BEAT.fall;
@@ -1848,8 +1942,8 @@ var SCENES = [
   { id:'dino-parade', name:'Dino Parade', lead:{}, weight:4, min:2, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    tl.push(t, 1000, 'parade', { char:L, count:c.letters }); t += 1000;
-    var march = BEAT.march + c.letters * 140;
+    tl.push(t, 1500, 'parade', { char:L, count:c.letters }); t += 1500;
+    var march = BEAT.march + 900 + c.letters * 180;
     tl.push(t, march, 'march', { char:L, dir:'right' });
     for (var i = 0; i < c.letters; i++) tl.push(t + 60 + i * 70, march - 60 - i * 70, 'follow', { leader:L, letter:i, dir:'right' });
     return tl;
@@ -1901,6 +1995,8 @@ function sceneCtx(lead, cast, letters, r){
     }
   };
   ctx.helper = ctx.find(function(m){ return m.kind !== 'swoop'; }) ? ctx.find(function(m){ return m.kind !== 'swoop'; }).id : null;
+  ctx.fumbler = others.length ? others[others.length - 1].id : null;
+  ctx.r = r || Math.random;
   return ctx;
 }
 function eligibleScenes(lead, letters, cast){
@@ -1918,9 +2014,14 @@ function eligibleScenes(lead, letters, cast){
 function histId(h){ return String(h).split('~')[0]; }
 function histMirror(h){ return /~m$/.test(String(h)); }
 function histEntry(plan){ return plan.id + (plan.mirror ? '~m' : ''); }
-function pickScene(lead, letters, history, rnd, cast){
+function pickScene(lead, letters, history, rnd, cast, signature){
   var r = rnd || Math.random, pool = eligibleScenes(lead, letters, cast);
   if (!pool.length) return null;
+  /* a showcase: only scenes that are his own (his species or his power) */
+  if (signature){
+    var own = pool.filter(function(sc){ var n = sc.lead || {}; return n.kind || n.power; });
+    if (own.length) pool = own;
+  }
   var windows = [10, 6, 3, 1];
   for (var w = 0; w < windows.length; w++){
     var recent = (history || []).slice(0, windows[w]).map(histId);
@@ -1933,6 +2034,24 @@ function pickScene(lead, letters, history, rnd, cast){
   for (var i = 0; i < pool.length; i++){ roll -= pool[i].weight || 1; if (roll <= 0) return pool[i]; }
   return pool[pool.length - 1];
 }
+/* Insert a beat for the lead, pushing everything from that moment on later. */
+function addFlourish(tl, id, kind){
+  var ev = tl.events, mine = ev.filter(function(e){ return e.char === id; });
+  var at = null;
+  if (kind === 'showoff'){
+    var en = mine.filter(function(e){ return e.kind === 'enter'; })[0];
+    if (!en || en.stay) return;
+    at = en.at + en.dur;
+  } else {
+    var last = mine.slice().sort(function(a, b){ return (b.at + b.dur) - (a.at + a.dur); })[0];
+    if (!last || last.kind !== 'exit') return;
+    at = last.at;
+  }
+  var D = BEAT[kind];
+  ev.forEach(function(e){ if (e.at >= at && !(kind === 'showoff' && e.kind === 'enter' && e.char === id)) e.at += D; });
+  tl.push(at, D, kind, { char: id });
+}
+
 /* The member who has waited longest for a turn in the lead. */
 function pickLead(history, rnd, ids){
   var r = rnd || Math.random, h = history || [], best = [], bestAge = -1;
@@ -1985,7 +2104,8 @@ function planScene(opts){
   cast.forEach(function(m){ if (m.id === opts.lead) lead = m; });
   if (!lead) lead = cast[0];
   var mirror = opts.mirror == null ? r() < 0.5 : !!opts.mirror;
-  var tempo = opts.tempo == null ? 0.92 + r() * 0.16 : Number(opts.tempo) || 1;
+  /* a touch unhurried, so a six-year-old can follow every move */
+  var tempo = opts.tempo == null ? 1.0 + r() * 0.12 : Number(opts.tempo) || 1;
   var members = {};
   cast.forEach(function(m){ members[m.id] = { kind: m.kind, power: m.power, level: m.level, name: m.name }; });
   var plan = { id:null, name:null, lead:lead.id, letters:letters, cast:cast.map(function(m){ return m.id; }), members:members,
@@ -1996,7 +2116,7 @@ function planScene(opts){
     var f = SCENE_BY_ID[opts.forceId];
     if (letters >= (f.min || 1) && canLead(f, lead) && (!f.needs || f.needs(sceneCtx(lead, cast, letters, rng(1))))) scene = f;
   }
-  if (!scene) scene = pickScene(lead, letters, opts.history || [], r, cast);
+  if (!scene) scene = pickScene(lead, letters, opts.history || [], r, cast, !!opts.signature);
   if (!scene) return plan;
   /* a scene that has to come round again soon is played the other way round */
   if (opts.mirror == null){
@@ -2005,8 +2125,18 @@ function planScene(opts){
   }
   var ctx = sceneCtx(lead, cast, letters, r);
   /* about half the solo scenes bring a buddy along to watch */
-  ctx.watcher = scene.watch && ctx.others.length && (opts.watcher != null ? opts.watcher : r() < 0.55) ? ctx.others[0] : null;
+  ctx.watcher = scene.watch && ctx.others.length && (opts.watcher != null ? opts.watcher : r() < 0.7) ? ctx.others[0] : null;
+  if (opts.fumble === false) ctx.fumbler = null;
+  if (opts.fumble === true) ctx.r = function(){ return 0; };
   var tl = scene.build(ctx);
+  /* the lead's own flourishes: showing off as he arrives, a victory move before he goes */
+  if (opts.showoff !== false && (opts.showoff === true || r() < 0.9)) addFlourish(tl, lead.id, 'showoff');
+  if (opts.victory !== false && (opts.victory === true || r() < 0.75)) addFlourish(tl, lead.id, 'victory');
+  /* a scene that would be over in a blink gets both flourishes */
+  if (tl.end() < 7000){
+    if (opts.showoff !== false && !tl.events.some(function(e){ return e.kind === 'showoff'; })) addFlourish(tl, lead.id, 'showoff');
+    if (opts.victory !== false && !tl.events.some(function(e){ return e.kind === 'victory'; })) addFlourish(tl, lead.id, 'victory');
+  }
   trimRedundantExits(tl);
   if (mirror) mirrorTimeline(tl);
   fitDuration(tl);
@@ -2023,8 +2153,13 @@ function validatePlan(plan){
   if (!plan.events.length) return ['no events'];
   var members = plan.members || {};
   function memberOf(id){ return members[id] || (CHARS[id] ? { kind: id, power: null } : null); }
-  var taken = {};
-  plan.events.forEach(function(e){ if (e.letter != null && TAKE_KINDS[e.kind]) taken[e.letter] = (taken[e.letter] || 0) + 1; });
+  /* in time order: a letter is taken, maybe let go, taken again — and must end up taken exactly once */
+  var taken = {}, ordered = plan.events.slice().sort(function(a, b){ return a.at - b.at; });
+  ordered.forEach(function(e){
+    if (e.letter == null) return;
+    if (TAKE_KINDS[e.kind]) taken[e.letter] = (taken[e.letter] || 0) + 1;
+    else if (RELEASE_KINDS[e.kind] && taken[e.letter] > 0) taken[e.letter]--;
+  });
   for (var i = 0; i < plan.letters; i++){
     if (!taken[i]) p.push('letter ' + i + ' is never taken');
     else if (taken[i] > 1) p.push('letter ' + i + ' is taken ' + taken[i] + ' times');
@@ -2095,7 +2230,7 @@ var __CORE = {
   ROCKET_SKINS:ROCKET_SKINS, skinsUnlocked:skinsUnlocked, nextSkin:nextSkin,
   normalizeSentences:normalizeSentences, sentenceHas:sentenceHas,
   SETTINGS_VERSION:SETTINGS_VERSION, normalizeSettings:normalizeSettings, letterOverrides:letterOverrides,
-  BEAT:BEAT, SCENES:SCENES, TAKE_KINDS:TAKE_KINDS, EXIT_KINDS:EXIT_KINDS,
+  BEAT:BEAT, SCENES:SCENES, TAKE_KINDS:TAKE_KINDS, EXIT_KINDS:EXIT_KINDS, RELEASE_KINDS:RELEASE_KINDS,
   SCENE_TARGET_MIN:SCENE_TARGET_MIN, SCENE_TARGET_MAX:SCENE_TARGET_MAX, SCENE_HARD_MAX:SCENE_HARD_MAX,
   SCENE_BY_ID:SCENE_BY_ID, defaultCast:defaultCast, castOf:castOf, canLead:canLead,
   eligibleScenes:eligibleScenes, pickScene:pickScene, pickLead:pickLead, remember:remember, histEntry:histEntry, histId:histId,
@@ -2125,8 +2260,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = __CORE;
        everything older, including callbacks already in flight;
      * every delayed speech is scheduled through `later()`, which is
        epoch-scoped, so a screen change cancels it by construction;
-     * the queue holds at most ONE pending request, and a newer request
-       replaces it rather than stacking behind it;
+     * the queue holds at most ONE pending instruction, and a newer one
+       replaces it rather than stacking behind it — but lines marked `keep`
+       (letter names as he places them, praise, news) wait their turn and
+       are never dropped for something newer: hearing every letter as it
+       goes in is the whole point of the game;
      * identical text inside a short window is dropped, which kills the
        double-fire from any duplicated event path;
      * a watchdog force-settles every utterance, so a synth that never
@@ -2148,13 +2286,15 @@ function createSpeech(deps){
   var epoch = 0;          /* bumped by reset(); invalidates everything older */
   var seq = 0;            /* unique id per utterance */
   var active = null;      /* the one utterance currently owned by the synth */
-  var pending = null;     /* at most one queued request */
+  var queue = [];         /* waiting requests: any number of `keep`, at most one other */
+  var MAX_QUEUE = 8;
   var starting = false;   /* guards the cancel->speak gap */
   var timers = [];        /* every epoch-scoped timer, cleared on reset */
   var lastSaid = {};      /* key -> ms, for the duplicate-path guard */
   var voice = null;
   var resumeTimer = null;
   var log = [];           /* what was actually spoken, for the tests */
+  var dropped = [];       /* what was asked for but replaced before it was said */
 
   var DEDUPE_MS = 400;
 
@@ -2251,9 +2391,8 @@ function createSpeech(deps){
   }
 
   function startNext(){
-    if (active || starting || !pending) return;
-    var req = pending;
-    pending = null;
+    if (active || starting || !queue.length) return;
+    var req = queue.shift();
     if (req.epoch !== epoch){ req.settle(false); return; }
 
     /*
@@ -2319,8 +2458,16 @@ function createSpeech(deps){
         Depth one, newest wins. Stacking requests is what made the old build
         read a whole backlog out after the child had moved on.
       */
-      if (pending) pending.settle(false);
-      pending = req;
+      req.keep = !!opts.keep;
+      if (!req.keep){
+        queue = queue.filter(function(q){
+          if (q.keep) return true;
+          dropped.push(q.text); q.settle(false); return false;
+        });
+      }
+      queue.push(req);
+      /* a runaway backlog is worse than a gap: the oldest goes first */
+      while (queue.length > MAX_QUEUE){ var old = queue.shift(); dropped.push(old.text); old.settle(false); }
       startNext();
     });
   }
@@ -2331,7 +2478,8 @@ function createSpeech(deps){
     clearTimers();
     starting = false;
     if (resumeTimer){ clearT(resumeTimer); resumeTimer = null; }
-    if (pending){ pending.settle(false); pending = null; }
+    queue.forEach(function(q){ q.settle(false); });
+    queue = [];
     settleActive(false);
     lastSaid = {};
     if (synth){ try { synth.cancel(); } catch (e){} }
@@ -2428,8 +2576,9 @@ function createSpeech(deps){
     /* read-only, for the suites */
     epoch: function(){ return epoch; },
     spoken: function(){ return log.slice(); },
-    clearLog: function(){ log = []; },
-    busy: function(){ return !!(active || pending || starting); }
+    clearLog: function(){ log = []; dropped = []; },
+    dropped: function(){ return dropped.slice(); },
+    busy: function(){ return !!(active || queue.length || starting); }
   };
 }
 
@@ -2496,6 +2645,9 @@ function createSfx(){
     chomp:    function(t){ tone(t, .07, 300, 120, .2, 'square'); noise(t, .06, 1800, 900, 2, .12); },
     whack:    function(t){ noise(t, .12, 2600, 700, 1.5, .26); tone(t, .18, 700, 180, .18, 'triangle'); },
     strain:   function(t){ tone(t, .5, 130, 100, .12, 'sawtooth'); },
+    glug:     function(t){ tone(t, .12, 320, 520, .13, 'sine'); tone(t + .07, .12, 420, 700, .1, 'sine'); noise(t, .1, 900, 400, 3, .06); },
+    ignite:   function(t){ noise(t, .5, 300, 2400, .6, .22); tone(t, .45, 90, 220, .12, 'sawtooth'); },
+    rumble:   function(t){ noise(t, .9, 180, 90, .8, .14, 'lowpass'); },
     beep:     function(t){ for (var i = 0; i < 3; i++) tone(t + i * .22, .12, 980, 980, .09, 'square'); },
     dig:      function(t){ for (var i = 0; i < 4; i++) noise(t + i * .09, .08, 500, 200, 1.4, .2, 'lowpass'); },
     twang:    function(t){ tone(t, .5, 180, 150, .16, 'triangle'); tone(t, .35, 360, 300, .06, 'sawtooth'); },
@@ -3174,7 +3326,7 @@ function createStage(deps){
         rot(r.tail, Math.sin(beat * 3) * 6 - (moving ? 6 : 0) + (trick && trick.kind === 'tailwhip' ? -70 * up : 0));
         rot(r.arm, trick && trick.kind === 'reach' ? -40 + Math.sin(tp * Math.PI * 8) * 22 :
           (trick && trick.kind === 'cheer' ? -60 * up :
-          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet') ? -70 + Math.sin(beat * 18) * 10 :
+          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet' || trick.kind === 'reel') ? -70 + Math.sin(beat * 18) * 10 :
           (balancing ? -50 + flail * 40 + Math.sin(beat * 6) * 10 : Math.sin(beat * 5) * 8))));
         if (balancing) rot(r.tail, Math.sin(beat * 4) * 10 - a.rot * 0.8 + flail * 20);
         if (r.jet){
@@ -3199,7 +3351,7 @@ function createStage(deps){
         legs(s3 * 38, null, -s3 * 38, null);
         rot(r.tail, -s3 * 6 + (moving ? 6 : 0));
         rot(r.arm, trick && trick.kind === 'cheer' ? -60 * up :
-          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet') ? -80 + Math.sin(beat * 20) * 14 :
+          (trick && (trick.kind === 'lasso' || trick.kind === 'magnet' || trick.kind === 'reel') ? -80 + Math.sin(beat * 20) * 14 :
           (balancing ? -60 + flail * 45 : s3 * 12)));
         if (balancing) rot(r.tail, Math.sin(beat * 4) * 10 - a.rot * 0.8 + flail * 20);
         rot(r.head, trick && trick.kind === 'cheer' ? -12 * up : s3 * 3);
@@ -3578,21 +3730,48 @@ function createStage(deps){
      under a lighter core, so it reads on every planet.
      ============================================================ */
   var SVGNS = 'http://www.w3.org/2000/svg';
+  /* o.pts: points to thread the rope through; or o.d: a ready-made path.
+     o.front: draw in front of the letters (the front half of a loop, a hook) */
   function addRope(o){
     var g = document.createElementNS(SVGNS, 'g');
     g.setAttribute('class', 'rope' + (o.cls ? ' ' + o.cls : ''));
     var back = document.createElementNS(SVGNS, 'path'), core = document.createElementNS(SVGNS, 'path');
     back.setAttribute('class', 'rope-back'); core.setAttribute('class', 'rope-core');
     g.appendChild(back); g.appendChild(core);
-    ropeSvg.appendChild(g);
-    var r = { g: g, back: back, core: core, pts: o.pts, sag: o.sag || 0, dead: false, op: 1 };
+    (o.front && live.frontSvg ? live.frontSvg : ropeSvg).appendChild(g);
+    var r = { g: g, back: back, core: core, pts: o.pts || null, d: o.d || null, sag: o.sag || 0, dead: false, op: 1 };
     live.ropes.push(r);
     return r;
+  }
+  /* half of a (tilted) ellipse: the back half goes behind a letter, the
+     front half in front of it, and together they read as a loop around it */
+  function halfLoop(c, rx, ry, deg, front){
+    var r = deg * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+    var x0 = c.x - rx * cs, y0 = c.y - rx * sn, x1 = c.x + rx * cs, y1 = c.y + rx * sn;
+    return 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + ' A' + rx.toFixed(1) + ' ' + ry.toFixed(1) + ' ' + deg.toFixed(1) + ' 0 ' + (front ? 0 : 1) + ' ' + x1.toFixed(1) + ' ' + y1.toFixed(1);
+  }
+  /* a loop of rope cinched round a letter's middle, both halves */
+  function addLoop(get){
+    var halves = [false, true].map(function(front){
+      return addRope({ front: front, d: function(){ var L = get(); return L ? halfLoop(L.c, L.rx, L.ry, L.deg || 0, front) : null; } });
+    });
+    return { kill: function(){ halves.forEach(killRope); } };
+  }
+  /* where a rope tied round a letter's middle leaves it, on the side towards (sx, sy) */
+  function knotOf(pl, sx){
+    var side = sx >= pl.x ? 1 : -1, r = pl.rot * Math.PI / 180, rx = pl.w * 0.5 * (pl.sx || 1);
+    return { x: pl.x + side * rx * Math.cos(r), y: pl.y + pl.h * 0.08 + side * rx * Math.sin(r) };
   }
   function killRope(r){ if (!r) return; r.dead = true; if (r.g.parentNode) r.g.parentNode.removeChild(r.g); }
   function drawRopes(){
     live.ropes = live.ropes.filter(function(r){ return !r.dead; });
     live.ropes.forEach(function(r){
+      if (r.d){
+        var dd = r.d();
+        if (!dd){ r.g.style.opacity = 0; return; }
+        r.back.setAttribute('d', dd); r.core.setAttribute('d', dd); r.g.style.opacity = r.op;
+        return;
+      }
       var P = r.pts();
       if (!P || P.length < 2){ r.g.style.opacity = 0; return; }
       var d = 'M' + P[0].x.toFixed(1) + ' ' + P[0].y.toFixed(1);
@@ -3639,9 +3818,19 @@ function createStage(deps){
     if (ch) return ch;
     ch = live.chains[a.key] = { owner: a.key, mode: mode };
     ch.rope = addRope({ sag: mode === 'below' ? 0 : 10, pts: function(){
-      var P = [tiePoint(a)], list = chainLetters(a.key);
-      list.forEach(function(q){ P.push(mode === 'below' ? { x: q.x, y: q.y - q.h * 0.5 } : { x: q.x, y: q.y }); });
-      if (ch.hook && list.length === 0){ var h = ch.hook(); P.push(h); }
+      var tie = tiePoint(a), P = [tie], list = chainLetters(a.key);
+      if (mode === 'below'){
+        /* from his feet to the hook in the first letter, then letter to letter */
+        list.forEach(function(q, i){
+          if (i) P.push({ x: list[i - 1].x, y: list[i - 1].y + list[i - 1].h * 0.5 - 4, sag: 0 });
+          P.push({ x: q.x, y: q.y - q.h * 0.5 + 2 });
+        });
+        if (!list.length && ch.hook) P.push(ch.hook());
+        return P;
+      }
+      /* tied round each letter's middle: the rope goes in one side, out the other */
+      var from = tie;
+      list.forEach(function(q){ var kin = knotOf(q, from.x); P.push(kin); var kout = knotOf(q, 2 * q.x - from.x); P.push({ x: kout.x, y: kout.y, sag: 0 }); from = kout; });
       return P;
     } });
     return ch;
@@ -3656,15 +3845,21 @@ function createStage(deps){
   }
   function chainK(pl, list, ch, a){
     var rank = 0;
+    /* on a hook line the newest hangs at the bottom; on a tow line the word reads in order */
+    if (ch.mode === 'below'){ list.forEach(function(q){ if ((q.chainT || 0) < (pl.chainT || 0)) rank++; }); return rank; }
     list.forEach(function(q){ if (q.idx < pl.idx) rank++; });
-    if (ch.mode === 'below') return rank;
     return a.faceShown > 0 ? list.length - 1 - rank : rank;
   }
   function joinChain(pl, a, mode){
-    chainFor(a, mode);
+    var ch = chainFor(a, mode);
     pl.state = 'chain'; pl.owner = a.key; pl.where = null;
+    pl.chainT = ++live.arrivals;
     pl.rot = wrapDeg(pl.rot);
     pl.sc = pl.sx = 0.86;
+    /* tied on: a little loop of rope stays cinched round the letter */
+    if (ch.mode !== 'below' && !pl.tie){
+      pl.tie = addLoop(function(){ return pl.state === 'chain' ? { c: { x: pl.x, y: pl.y + pl.h * 0.08 }, rx: pl.w * 0.5 * pl.sx, ry: 5, deg: pl.rot } : null; });
+    }
   }
   function stepChain(pl, t, dt){
     var a = actors[pl.owner], ch = live.chains[pl.owner];
@@ -3755,6 +3950,15 @@ function createStage(deps){
   /* ---------- per-frame work for lassos, bubbles, the lines ---------- */
   function stepExtras(t, dt){
     if (live.line) live.line.twang *= Math.pow(0.9, dt / 16);
+    /* the scoop: the letter joins the moment the bottom of the chain reaches it */
+    var H = live.hookTarget;
+    if (H && H.pl.state !== 'chain' && H.pl.state !== 'gone'){
+      var tp = tiePoint(H.a), slot = { x: tp.x, y: tp.y + H.drop };
+      if (Math.abs(slot.x - H.pl.x) < H.pl.w * 0.55 && Math.abs(slot.y - H.pl.y) < H.pl.h * 0.7){
+        joinChain(H.pl, H.a, 'below'); SFX.play('catch'); setExpr(H.a, 'happy', 500); live.hookTarget = null;
+        sparkle(H.pl.x, H.pl.y - H.pl.h * 0.5, 4);
+      }
+    } else if (H) live.hookTarget = null;
     (live.lassos || []).forEach(function(L){ stepLasso(L, t); });
     (live.bubbles || []).forEach(function(B){ stepBubble(B, t); });
   }
@@ -3772,45 +3976,49 @@ function createStage(deps){
       placeProp(M.el, lerp(M.x0, M.x1, mp * mp * (3 - 2 * mp)) - 26, live.groundY - 14 - Math.abs(Math.sin(t / 70)) * 3);
       if (mp >= 1 && !M.gone){ M.gone = true; setTimeout(function(){ dropProp(M.hole); }, 600 / timeScale); }
     });
-    if (live.hookEl){
-      var hk = live.hookAt();
-      placeProp(live.hookEl, hk.x - 9, hk.y - 4);
-    }
+
   }
 
-  /* ---------- the lasso ---------- */
+  /* ---------- the lasso ----------
+     Swung overhead, thrown, dropped over the letter, pulled tight round its
+     middle — its back half behind the letter, its front half in front, so
+     it is plainly ROUND the letter — then reeled in hand over hand. */
   function stepLasso(L, t){
     if (L.done) return;
     var a = L.a, pl = L.pl, p = clamp01((t - L.t0) / L.dur), hand = handPoint(a);
-    var loopC, loopR = 20;
+    var loop;
     if (p < 0.3){
       var ang = (t - L.t0) / 110;
-      loopC = { x: hand.x + Math.cos(ang) * 26 - a.faceShown * 6, y: hand.y - 70 + Math.sin(ang) * 9 };
-      L.last = loopC;
-    } else if (p < 0.5){
-      var q = (p - 0.3) / 0.2, e = 1 - Math.pow(1 - q, 2);
-      loopC = { x: lerp(L.last.x, pl.x, e), y: lerp(L.last.y, pl.y, e) - 70 * Math.sin(Math.PI * q) };
+      loop = { c: { x: hand.x + Math.cos(ang) * 22 - a.faceShown * 4, y: hand.y - 64 + Math.sin(ang) * 6 }, rx: 24, ry: 9, deg: Math.sin(ang) * 12 };
+      L.last = loop.c;
+    } else if (p < 0.48){
+      var q = (p - 0.3) / 0.18, e = 1 - Math.pow(1 - q, 2);
+      var above = { x: pl.x, y: pl.y - pl.h * 0.95 };
+      loop = { c: { x: lerp(L.last.x, above.x, e), y: lerp(L.last.y, above.y, e) - 60 * Math.sin(Math.PI * q) }, rx: 24 + 6 * q, ry: 9, deg: 0 };
       if (!L.flung){ L.flung = true; SFX.play('toss'); }
-    } else if (p < 0.56){
-      loopC = { x: pl.x, y: pl.y };
-      loopR = lerp(20, Math.max(pl.w, pl.h) * 0.58, (p - 0.5) / 0.06);
-      if (!L.caught){ L.caught = true; pl.state = 'lassoed'; pl.owner = a.key; pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); SFX.play('catch'); setExpr(a, 'happy', 500, t); }
+    } else if (p < 0.58){
+      /* it drops over the letter and snaps tight round its middle */
+      var d = (p - 0.48) / 0.1, de = d * d;
+      var wide = pl.w * 0.62, tight = pl.w * 0.52;
+      loop = { c: { x: pl.x, y: lerp(pl.y - pl.h * 0.95, pl.y + pl.h * 0.08, de) }, rx: d < 0.8 ? lerp(30, wide, d / 0.8) : lerp(wide, tight, (d - 0.8) / 0.2), ry: lerp(9, 6, d), deg: pl.rot };
+      if (d > 0.8 && !L.caught){ L.caught = true; pl.state = 'lassoed'; pl.owner = a.key; pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); SFX.play('catch'); setExpr(a, 'happy', 500, t); }
     } else {
-      var r2 = clamp01((p - 0.56) / 0.34), e2 = r2 * r2 * (3 - 2 * r2);
+      if (!L.caught){ L.caught = true; pl.state = 'lassoed'; pl.owner = a.key; pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); }
+      var r2 = clamp01((p - 0.62) / 0.32), e2 = r2 * r2 * (3 - 2 * r2);
+      /* a tug first: the letter jerks towards him, then comes in */
+      var tug = p < 0.62 ? Math.sin((p - 0.58) / 0.04 * Math.PI) * 10 : 0;
       var dest = { x: hand.x - a.faceShown * 10, y: hand.y + 10 };
-      pl.x = lerp(pl.fx, dest.x, e2); pl.y = lerp(pl.fy, dest.y, e2) - 40 * Math.sin(Math.PI * r2);
+      pl.x = lerp(pl.fx, dest.x, e2) + (hand.x > pl.fx ? 1 : -1) * tug; pl.y = lerp(pl.fy, dest.y, e2) - 40 * Math.sin(Math.PI * r2);
       pl.rot = lerp(pl.frot, 0, e2) + Math.sin(t / 50) * 5 * (1 - e2);
-      loopC = { x: pl.x, y: pl.y }; loopR = Math.max(pl.w, pl.h) * 0.58;
-      if (!L.reeling){ L.reeling = true; SFX.play('strain'); a.effort = 1; }
+      loop = { c: { x: pl.x, y: pl.y + pl.h * 0.08 }, rx: pl.w * 0.52, ry: 6, deg: pl.rot };
+      if (!L.reeling && p >= 0.62){ L.reeling = true; SFX.play('strain'); a.effort = 1; a.trick = { kind: 'reel', t0: t, dur: L.dur * 0.32 }; }
       if (r2 >= 1){
-        L.done = true; killRope(L.rope); dropProp(L.loop);
+        L.done = true; killRope(L.rope); L.loop.kill();
         joinChain(pl, a, 'behind'); SFX.play('pickup');
         return;
       }
     }
-    L.loopC = loopC; L.loopR = loopR;
-    placeProp(L.loop, loopC.x - loopR, loopC.y - loopR * 0.7);
-    L.loop.style.width = Math.round(loopR * 2) + 'px'; L.loop.style.height = Math.round(loopR * 1.4) + 'px';
+    L.cur = loop;
   }
 
   /* ---------- bubbles ---------- */
@@ -4380,7 +4588,7 @@ function createStage(deps){
       case 'stringline': { stringLine(t); break; }
       case 'jetgrab': {
         if (!a) break;
-        var jl = nextAlong(function(q){ return q.state === 'hung' || q.state === 'toline'; });
+        var jl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !live.slipping[q.idx]; });
         if (!jl) break;
         var fj = flow(), mo = offsetOf(a, 186, 96, fj);
         a.look = { x: jl.tx || jl.x, y: jl.y };
@@ -4396,7 +4604,7 @@ function createStage(deps){
       }
       case 'jumpgrab': {
         if (!a) break;
-        var hl = nextAlong(function(q){ return q.state === 'hung' || q.state === 'toline'; });
+        var hl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !live.slipping[q.idx]; });
         if (!hl) break;
         var fh = flow(), ao = offsetOf(a, 146, 118, fh), hx = (hl.tx || hl.x);
         var runX = clamp(hx - ao.x, -SIZE * 0.3, vw() - SIZE * 0.7);
@@ -4412,7 +4620,7 @@ function createStage(deps){
       }
       case 'boost': {
         if (!a) break;
-        var bl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !q.boosted; });
+        var bl = nextAlong(function(q){ return (q.state === 'hung' || q.state === 'toline') && !q.boosted && !live.slipping[q.idx]; });
         if (!bl) break;
         bl.boosted = true; live.boostPl = bl;
         var fb = flow(), ho = offsetOf(a, 186, 110, fb);
@@ -4480,39 +4688,143 @@ function createStage(deps){
         if (flow() * a.face < 0) a.face = flow();
         a.trick = { kind: 'lasso', t0: t, dur: e.dur * 0.5 };
         a.look = { x: ll.x, y: ll.y };
-        var L = { a: a, pl: ll, t0: t, dur: e.dur, loop: addProp('lasso-loop') };
-        L.rope = addRope({ sag: 14, pts: function(){ return L.loopC ? [handPoint(a), { x: L.loopC.x, y: L.loopC.y + L.loopR * 0.2 }] : null; } });
+        var L = { a: a, pl: ll, t0: t, dur: e.dur, cur: null };
+        L.loop = addLoop(function(){ return L.cur; });
+        /* the rope runs from his hand to the knot on the loop's near side */
+        L.rope = addRope({ sag: 14, pts: function(){
+          if (!L.cur) return null;
+          var hp = handPoint(a), c = L.cur, sd = hp.x >= c.c.x ? 1 : -1, r = c.deg * Math.PI / 180;
+          return [hp, { x: c.c.x + sd * c.rx * Math.cos(r), y: c.c.y + sd * c.rx * Math.sin(r) }];
+        } });
         (live.lassos = live.lassos || []).push(L);
         SFX.play('whoosh');
         break;
       }
 
-      /* ---------- the sky hook ---------- */
+      /* ---------- the sky hook ----------
+         The hook goes through the top of the first letter. For each next
+         one he swoops in low from the side and the bottom of his chain
+         scoops it up, so the word grows downward, one letter at a time. */
       case 'hook': {
         if (!a) break;
         var ch = chainFor(a, 'below');
-        ch.lead = 30;
-        if (!live.hookEl){
-          live.hookEl = addProp('hook', '<svg viewBox="0 0 18 26"><path d="M9 0 v12 a6 6 0 1 1 -6 6" fill="none" stroke="#2E3440" stroke-width="5" stroke-linecap="round"/><path d="M9 0 v12 a6 6 0 1 1 -6 6" fill="none" stroke="#C9D2E0" stroke-width="2.4" stroke-linecap="round"/></svg>');
-          live.hookAt = function(){
-            var list = chainLetters(a.key);
-            if (list.length){ var last = list[list.length - 1]; return { x: last.x, y: last.y + last.h * 0.5 - 2 }; }
-            var tp = tiePoint(a); return { x: tp.x, y: tp.y + ch.lead };
-          };
+        ch.lead = 34;
+        if (!ch.hookRope){
           ch.hook = function(){ var tp = tiePoint(a); return { x: tp.x, y: tp.y + ch.lead }; };
+          /* the hook itself, in front of the letter it has hold of */
+          ch.hookRope = addRope({ front: true, d: function(){
+            var list = chainLetters(a.key), h = list.length ? { x: list[0].x, y: list[0].y - list[0].h * 0.5 + 2 } : ch.hook();
+            return 'M' + h.x.toFixed(1) + ' ' + (h.y - 6).toFixed(1) + ' v10 a7 7 0 1 1 -7 7';
+          }, cls: 'hook-line' });
         }
-        var hl2 = nextAlong(function(q){ return takeable(q) && !q.hooking; });
+        /* first letter first: the word reads top to bottom as it grows */
+        var hl2 = live.payloads.filter(function(q){ return takeable(q) && !q.hooking; }).sort(function(p1, p2){ return p1.idx - p2.idx; })[0];
         if (!hl2) break;
         hl2.hooking = true;
+        if (hl2.state === 'free') hl2.vx = 0;
         var count = chainLetters(a.key).length, gapH = Math.max(hl2.w, hl2.h) * 0.98;
-        var tie = offsetOf(a, 100, 150, 1);
-        var hx2 = clamp(hl2.x - tie.x, -SIZE * 0.4, vw() - SIZE * 0.6);
-        var hy2 = hl2.y - ch.lead - hl2.h * 0.5 - count * gapH - tie.y;
-        move(a, t, e.dur * 0.28, { x: a.x, y: Math.min(a.y, hy2) - gapH * 0.8 }, { ease: 'out', effort: 0.8, keepFace: true, rotTo: -6,
-          next: { dur: e.dur * 0.52, to: { x: hx2, y: hy2 }, opts: { ease: 'inout', effort: 0.9, rotTo: 8,
-            onEnd: function(){ if (!live || hl2.state === 'chain') return; joinChain(hl2, a, 'below'); SFX.play('catch'); setExpr(a, 'happy', 500); },
-            next: { dur: e.dur * 0.2, to: { x: hx2, y: hy2 - 16 }, opts: { ease: 'out', rotTo: 0, keepFace: true, effort: 0.5 } } } } });
+        var tieO = offsetOf(a, 100, 150, a.faceShown || 1);
+        /* where his feet must be for the bottom of the chain to meet the letter */
+        var drop = ch.lead + hl2.h * 0.5 + count * gapH;
+        var side = hl2.x < vw() / 2 ? -1 : 1;
+        if (count === 0) side = a.x + SIZE / 2 < hl2.x ? -1 : 1;
+        var tx0 = hl2.x - tieO.x, ty0 = hl2.y - drop - tieO.y;
+        var inX = clamp(tx0 + side * 110, -SIZE * 0.4, vw() - SIZE * 0.6);
+        a.look = { x: hl2.x, y: hl2.y };
+        live.hookTarget = { pl: hl2, a: a, drop: drop };
+        /* out to the side and a little high, then a low scooping swoop through the letter, then up */
+        move(a, t, e.dur * 0.34, { x: inX, y: ty0 - 36 }, { ease: 'inout', effort: 0.8, face: -side, keepFace: true, rotTo: -6,
+          next: { dur: e.dur * 0.4, to: { x: clamp(tx0 - side * 50, -SIZE * 0.4, vw() - SIZE * 0.6), y: ty0 - 36 }, opts: { ease: 'linear', effort: 1, keepFace: true, rotTo: 10,
+            path: function(ep, pp){ var fx = inX, tx = clamp(tx0 - side * 50, -SIZE * 0.4, vw() - SIZE * 0.6); return { x: lerp(fx, tx, pp * pp * (3 - 2 * pp)), y: ty0 - 36 + 44 * Math.sin(Math.PI * pp) }; },
+            onEnd: function(){ if (live && hl2.state !== 'chain' && hl2.state !== 'gone'){ joinChain(hl2, a, 'below'); SFX.play('catch'); live.hookTarget = null; } },
+            next: { dur: e.dur * 0.26, to: { x: clamp(tx0 - side * 70, -SIZE * 0.4, vw() - SIZE * 0.6), y: ty0 - 36 - gapH * 0.6 }, opts: { ease: 'out', rotTo: 0, keepFace: true, effort: 0.6 } } } } });
         SFX.play('flap');
+        break;
+      }
+
+      /* ---------- a slip, and a buddy to the rescue ---------- */
+      case 'slip': {
+        var sp = e.letter != null ? live.payloads[e.letter] : null;
+        if (!sp || sp.state === 'gone') break;
+        if (sp.tie){ sp.tie.kill(); sp.tie = null; }
+        var owner = actors[sp.owner] || a;
+        sp.state = 'free'; sp.owner = null; sp.where = null; sp.lowG = false;
+        sp.groundY = ground - sp.h * 0.5 - 6;
+        sp.vx = (owner ? -owner.faceShown : 1) * 0.08; sp.vy = -0.25; sp.spin = 0.07;
+        sp.slipped = true; delete live.slipping[sp.idx];
+        if (live.line) twangLine();
+        if (owner){ setExpr(owner, 'oops', 900, t); owner.look = { x: sp.x, y: ground }; }
+        SFX.play('huh');
+        break;
+      }
+      case 'fetch': {
+        if (!a) break;
+        var fp0 = e.letter != null ? live.payloads[e.letter] : null;
+        if (!fp0) break;
+        var runIn = e.dur * 0.42, hold = holdOf(a);
+        /* run to where it is coming down, catch it, and off */
+        var land = fp0.state === 'free' ? predict(fp0, runIn) : { x: fp0.x, y: fp0.y };
+        var hs = anchorFor(a, hold), fx2 = a.x + SIZE / 2 < land.x ? 1 : -1, ho2 = offsetOf(a, hs[0], hs[1], fx2);
+        var catchX = clamp(land.x - ho2.x, -SIZE * 0.3, vw() - SIZE * 0.7);
+        var catchY = C.CHARS[a.kind].airborne && a.kind === 'swoop' ? Math.min(sy0 - 40, land.y - ho2.y) : sy0;
+        a.look = { x: fp0.x, y: fp0.y };
+        setExpr(a, 'wow', runIn, t);
+        move(a, t, runIn, { x: catchX, y: catchY }, { ease: 'out', face: fx2, keepFace: true, effort: 1, capSpeed: 1.1,
+          onEnd: function(){
+            if (!live || fp0.state === 'held' || fp0.state === 'gone') return;
+            hopInto(fp0, a, hold, 200, live.vnow); SFX.play('catch'); setExpr(a, 'happy', 700);
+            var fpp = artPoint(a, 100, 188); dust(fpp.x, ground, 5, 40);
+          },
+          next: { dur: 380, to: { x: catchX, y: catchY }, opts: { ease: 'linear', keepFace: true, arc: 34, effort: 0.6,
+            next: { dur: e.dur * 0.58 - 380, to: edgeFor(e.dir || (fx2 > 0 ? 'right' : 'left'), a), opts: { ease: 'in', effort: 0.9, capSpeed: 1.2 } } } } });
+        SFX.play({ rex: 'jet', trike: 'stomp', dash: 'zoom', swoop: 'flap' }[a.kind]);
+        break;
+      }
+
+      /* ---------- show-off and victory: each kind's own way ---------- */
+      case 'showoff': {
+        if (!a) break;
+        setExpr(a, 'happy', e.dur, t);
+        var hx = a.x, hy = a.y, d0 = e.dur;
+        if (a.kind === 'rex'){
+          move(a, t, d0 * 0.4, { x: hx, y: hy - 90 }, { ease: 'out', keepFace: true, effort: 1, rotTo: -8,
+            onEnd: function(){ if (!live) return; a.jaw = 1; a.jawUntil = live.vnow + 500; setExpr(a, 'roar', 600); var m = artPoint(a, 186, 96); ring(m.x, m.y, false); SFX.play('roarsmall'); },
+            next: { dur: d0 * 0.6, to: { x: hx, y: hy }, opts: { ease: 'inout', keepFace: true, effort: 0.6 } } });
+          SFX.play('jet');
+        } else if (a.kind === 'trike'){
+          a.trick = { kind: 'paw', t0: t, dur: d0 * 0.45 };
+          var pawAt = artPoint(a, 124, 188); dust(pawAt.x, ground, 5, 36); SFX.play('snort');
+          move(a, t + d0 * 0.45, d0 * 0.3, { x: hx, y: hy - 30 }, { ease: 'out', keepFace: true, rotTo: -14, effort: 1,
+            next: { dur: d0 * 0.25, to: { x: hx, y: hy }, opts: { ease: 'in', keepFace: true, rotTo: 0,
+              onEnd: function(){ if (!live) return; var f = artPoint(a, 120, 190); ring(f.x, ground, false); dust(f.x, ground, 8, 50); live.shake = Math.max(live.shake, 6); SFX.play('stomp'); } } } });
+        } else if (a.kind === 'dash'){
+          var zx = clamp(hx + a.face * 120, -SIZE * 0.2, vw() - SIZE * 0.8);
+          move(a, t, d0 * 0.3, { x: zx, y: hy }, { ease: 'inout', effort: 1, keepFace: true,
+            next: { dur: d0 * 0.3, to: { x: hx, y: hy }, opts: { ease: 'inout', effort: 1, keepFace: true,
+              next: { dur: d0 * 0.4, to: { x: hx, y: hy }, opts: { ease: 'linear', arc: 70, spins: a.face, keepFace: true, effort: 1 } } } } });
+          SFX.play('zoom');
+        } else {
+          var R2 = 60;
+          move(a, t, d0, { x: hx, y: hy }, { effort: 1, ease: 'inout', spins: -a.face,
+            path: function(ep){ return { x: hx + Math.sin(ep * Math.PI * 2) * R2 * a.face, y: hy - (1 - Math.cos(ep * Math.PI * 2)) * R2 }; } });
+          SFX.play('loop');
+        }
+        break;
+      }
+      case 'victory': {
+        if (!a) break;
+        setExpr(a, 'happy', e.dur + 300, t);
+        var vx = a.x, vy = a.y;
+        a.trick = { kind: 'cheer', t0: t, dur: e.dur };
+        if (a.kind === 'dash' || a.kind === 'swoop'){
+          move(a, t, e.dur, { x: vx, y: vy }, { ease: 'linear', arc: 90, spins: a.kind === 'dash' ? -a.face : a.face, keepFace: true, effort: 1 });
+          SFX.play('spin');
+        } else {
+          move(a, t, e.dur * 0.5, { x: vx, y: vy }, { ease: 'linear', arc: 46, keepFace: true, effort: 0.8,
+            next: { dur: e.dur * 0.5, to: { x: vx, y: vy }, opts: { ease: 'linear', arc: 34, keepFace: true, effort: 0.6 } } });
+          SFX.play('cheer');
+        }
+        var vc = centreOf(a); sparkle(vc.x, vc.y - 30, 10);
         break;
       }
 
@@ -4842,6 +5154,7 @@ function createStage(deps){
     if (l.ship){ [l.ship.el, l.ship.beam].forEach(function(n){ if (n.parentNode) n.parentNode.removeChild(n); }); }
     (l.ropes || []).forEach(function(r){ if (r.g.parentNode) r.g.parentNode.removeChild(r.g); });
     (l.props || []).forEach(function(d){ if (d.parentNode) d.parentNode.removeChild(d); });
+    if (l.frontSvg && l.frontSvg.parentNode) l.frontSvg.parentNode.removeChild(l.frontSvg);
     clearParticles();
     for (var k in actors) parkActor(actors[k]);
     if (layer) layer.style.transform = '';
@@ -4879,6 +5192,17 @@ function createStage(deps){
       move(a, tNow, 800, { x: toLeft ? -SIZE - 30 : vw() + 30, y: a.y }, { op: 0, ease: 'in', effort: 0.6, face: toLeft ? -1 : 1 });
     });
     var payloads = els.map(function(el, i){ return makePayload(el, i); });
+    /* ropes drawn in front of the letters: the near half of a loop, the hook */
+    /* letters the plan will knock loose before anyone takes them: nobody grabs those first */
+    var slipping = {};
+    plan.events.forEach(function(ev){
+      if (ev.kind !== 'slip') return;
+      var takenBefore = plan.events.some(function(q){ return q.letter === ev.letter && q.at < ev.at && q.kind !== 'slip' && C.TAKE_KINDS[q.kind]; });
+      if (!takenBefore) slipping[ev.letter] = 1;
+    });
+    var frontSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    frontSvg.setAttribute('class', 'ropes ropes-front');
+    layer.appendChild(frontSvg);
     var entryFor = {};
     Object.keys(cast).forEach(function(k, i){
       if (!actors[k]) return;
@@ -4895,7 +5219,7 @@ function createStage(deps){
         plan: plan, payloads: payloads, fired: [], errors: [], t0: performance.now(), last: performance.now(), vnow: performance.now(),
         deadline: performance.now() + budget + 3500, groundY: ground, dust: opts.dust || null, entryFor: entryFor,
         resolve: once, raf: null, shake: 0, guard: null, ship: null, parade: null, tugging: false, onShake: opts.onShake || null, arrivals: 0,
-        resume: resume, cast: cast, ropes: [], props: [], chains: {}
+        resume: resume, cast: cast, ropes: [], props: [], chains: {}, frontSvg: frontSvg, slipping: slipping
       };
       live.raf = requestAnimationFrame(frame);
       live.guard = setTimeout(function(){ if (settled) return; finish(); once(['stall guard fired']); }, budget + 3900);
@@ -5284,6 +5608,72 @@ function createActivities(env){
     }
     return -1;
   }
+  /* ============================================================
+     THE FUEL DOCK — every right answer fuels the rocket. A glowing drop
+     falls from the letter he placed into its cell on the fuel line, the
+     tank in the rocket's window rises, and when it is full the engines
+     light. The same rocket takes off at the countdown.
+     ============================================================ */
+  function fuelDock(root, n, opts){
+    opts = opts || {};
+    var box = el('div', 'fuel-dock' + (opts.big ? ' big' : ''));
+    var pipe = el('div', 'fuel-pipe');
+    var cells = [];
+    for (var i = 0; i < n; i++){ var c = el('i', 'cell'); c.appendChild(el('b')); pipe.appendChild(c); cells.push(c); }
+    var rk = el('div', 'fuel-rocket');
+    rk.innerHTML = env.rocketSvg ? env.rocketSvg() : '';
+    var tank = el('div', 'tank'), level = el('i', 'level');
+    tank.appendChild(level); rk.appendChild(tank);
+    var label = el('span', 'fuel-label', 'FUEL');
+    box.appendChild(label); box.appendChild(pipe); box.appendChild(rk);
+    root.appendChild(box);
+    var filled = 0, done = {};
+    function setLevel(){
+      var pct = Math.round(filled / n * 100);
+      level.style.height = pct + '%';
+      label.textContent = filled >= n ? 'FULL!' : 'FUEL';
+      if (filled >= n && !box.classList.contains('ready')){
+        box.classList.add('ready');
+        env.sfx.play('ignite');
+        env.later(function(){ env.sfx.play('rumble'); }, 200);
+      }
+    }
+    return {
+      el: box, rocket: rk,
+      /* instantly, for letters that were already in place */
+      set: function(i){ if (done[i]) return; done[i] = 1; filled++; cells[i].classList.add('full', 'quiet'); setLevel(); },
+      /* a drop of fuel from `from` (an element) into cell i */
+      fill: function(i, from){
+        if (i == null){ i = 0; while (done[i] && i < n) i++; }
+        if (i >= n || done[i]) return;
+        done[i] = 1;
+        var cell = cells[i];
+        var a = from ? centre(from) : centre(cell), b = centre(cell);
+        var drop = el('i', 'fuel-drop');
+        drop.style.left = a.x + 'px'; drop.style.top = a.y + 'px';
+        document.body.appendChild(drop);
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var ms = 380;
+        try {
+          drop.animate([
+            { transform: 'translate(-50%,-50%) scale(.6)', opacity: 1 },
+            { transform: 'translate(calc(-50% + ' + (dx * 0.5) + 'px), calc(-50% + ' + (dy * 0.5 - 30) + 'px)) scale(1.1)', opacity: 1, offset: 0.5 },
+            { transform: 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px)) scale(.5)', opacity: 0.9 }
+          ], { duration: ms, easing: 'cubic-bezier(.4,0,.6,1)' });
+        } catch (e){ ms = 0; }
+        env.later(function(){
+          if (drop.parentNode) drop.parentNode.removeChild(drop);
+          cell.classList.add('full');
+          filled++; setLevel();
+          env.sfx.play('glug');
+        }, ms);
+        /* the drop must never outlive the screen */
+        setTimeout(function(){ if (drop.parentNode) drop.parentNode.removeChild(drop); }, ms + 600);
+      },
+      full: function(){ return filled >= n; }
+    };
+  }
+
   function shake(node){ node.classList.remove('nope'); void node.offsetWidth; node.classList.add('nope'); }
 
   /* ============================================================
@@ -5292,6 +5682,7 @@ function createActivities(env){
   function meet(ctx){
     var w = ctx.word, root = ctx.root;
     root.innerHTML = '';
+    root.classList.add('meet');
     var row = el('div', 'prompt-row');
     row.appendChild(el('p', 'prompt', 'Meet your word!'));
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
@@ -5308,7 +5699,7 @@ function createActivities(env){
       s.setAttribute('role', 'button'); s.tabIndex = 0;
       s.addEventListener('click', function(){
         env.sfx.play('tap');
-        env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'meet:' + i });
+        env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'meet:' + i, keep: true });
         s.classList.add('lit'); env.later(function(){ s.classList.remove('lit'); }, 360);
         env.react('look', centre(s));
       });
@@ -5316,7 +5707,7 @@ function createActivities(env){
       return s;
     });
     var go = el('button', 'btn btn-launch', "I'm ready! ›");
-    go.type = 'button'; go.hidden = true; go.style.marginTop = 'auto';
+    go.type = 'button'; go.hidden = true;
     go.addEventListener('click', function(){ env.sfx.play('tap'); ctx.done({}); });
     root.appendChild(go);
     env.later(function(){
@@ -5346,6 +5737,7 @@ function createActivities(env){
     root.appendChild(row);
     var field = el('div', 'zap-field');
     root.appendChild(field);
+    var dock = fuelDock(root, ROUNDS);
     var roundLbl = el('div', 'zap-round', '');
     root.appendChild(roundLbl);
     var meteors = [], raf = null, last = 0;
@@ -5422,14 +5814,18 @@ function createActivities(env){
         env.sfx.play('zap');
         env.later(function(){
           boom(m); env.sfx.play('explode');
+          dock.fill(round - 1, m.el);
           m.el.style.opacity = '0'; m.el.classList.add('hit');
           env.react('cheer');
-          env.speech.say(env.pick('found', env.FOUND) + ' ' + w.toLowerCase(), { rate: 0.9 });
+          env.speech.say(env.pick('found', env.FOUND) + ' ' + w.toLowerCase(), { rate: 0.9, keep: true });
         }, 140);
-        env.later(function(){
-          if (round < ROUNDS) startRound();
-          else { raf = null; ctx.done({}); }
-        }, 1500);
+        /* the next round waits for the praise to be heard, not a guessed delay */
+        var praised = false, gone = false;
+        function next(){ if (!praised || !gone || !env.alive(ctx.tok)) return; if (round < ROUNDS) startRound(); else { raf = null; ctx.done({}); } }
+        env.later(function(){ gone = true; next(); }, 1100);
+        (function waitSpeech(){
+          env.later(function(){ if (!env.speech.busy()){ praised = true; next(); } else waitSpeech(); }, 150);
+        })();
       } else {
         m.el.classList.remove('wrong'); void m.el.offsetWidth; m.el.classList.add('wrong');
         env.sfx.play('wrong'); env.react('oops');
@@ -5457,7 +5853,9 @@ function createActivities(env){
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots'), tray = el('div', 'tray');
-    root.appendChild(slotsBox); root.appendChild(tray);
+    root.appendChild(slotsBox);
+    var dock = fuelDock(root, w.length);
+    root.appendChild(tray);
     root.appendChild(el('p', 'hint', 'Tap or drag the crystals in order'));
     root.style.setProperty('--tile', fitTile(root, w.length, 76) + 'px');
     var perRow = Math.ceil(w.length / (w.length > 5 ? 2 : 1));
@@ -5480,11 +5878,12 @@ function createActivities(env){
       var i = pos; pos++; misses = 0;
       $all('.tile', tray).forEach(function(x){ x.classList.remove('next-hint'); });
       env.sfx.play('place');
-      env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'build:' + i });
+      env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'build:' + i, keep: true });
       if (i < w.length - 1) env.react('hop', centre(slots[i]));
       flyTo(t, slots[i], function(){
         t.classList.add('used'); t.style.transform = '';
         fillSlot(slots[i], w[i]); markNext(slots, pos);
+        dock.fill(i, slots[i]);
         if (pos === w.length && !finished){ finished = true; env.clearNudge(); ctx.done({ slots: slots }); }
       });
     }
@@ -5506,7 +5905,7 @@ function createActivities(env){
       });
       tray.appendChild(t);
     });
-    env.later(function(){ env.speech.say('Fuel the rocket. Spell ' + w.toLowerCase(), { rate: 0.85 }); }, 350);
+    env.later(function(){ env.speech.say('Fuel the rocket. Spell ' + w.toLowerCase(), { rate: 0.85, keep: true }); }, 350);
     env.setNudge(function(){
       if (finished) return;
       hint();
@@ -5531,13 +5930,14 @@ function createActivities(env){
     root.appendChild(row);
     var slotsBox = el('div', 'slots');
     root.appendChild(slotsBox);
+    var dock = fuelDock(root, w.length);
     var choices = el('div', 'choices');
     root.appendChild(choices);
     root.appendChild(el('p', 'hint', 'Which letter goes in the glowing box?'));
     root.style.setProperty('--tile', fitTile(root, w.length, 76) + 'px');
     var slots = w.split('').map(function(ch, i){
       var s = slotEl();
-      if (gaps.indexOf(i) === -1) fillSlot(s, ch);
+      if (gaps.indexOf(i) === -1){ fillSlot(s, ch); dock.set(i); }
       slotsBox.appendChild(s);
       return s;
     });
@@ -5554,10 +5954,11 @@ function createActivities(env){
           if (ch === need){
             var i = gaps[gi];
             env.sfx.play('place');
-            env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'miss:' + i });
+            env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'miss:' + i, keep: true });
             flyTo(t, slots[i], function(){
               t.classList.add('used');
               fillSlot(slots[i], ch);
+              dock.fill(i, slots[i]);
               gi++;
               if (gi >= gaps.length){ finished = true; choices.innerHTML = ''; env.clearNudge(); ctx.done({ slots: slots }); }
               else { env.react('hop', centre(slots[i])); showGap(); }
@@ -5574,7 +5975,7 @@ function createActivities(env){
       });
     }
     showGap();
-    env.later(function(){ env.speech.say('Fill in the missing letters. ' + w.toLowerCase(), { rate: 0.85 }); }, 350);
+    env.later(function(){ env.speech.say('Fill in the missing letters. ' + w.toLowerCase(), { rate: 0.85, keep: true }); }, 350);
     env.setNudge(function(){
       if (finished) return;
       var need = w[gaps[gi]];
@@ -5599,8 +6000,7 @@ function createActivities(env){
     root.appendChild(row);
     var slotsBox = el('div', 'slots');
     root.appendChild(slotsBox);
-    var fuel = el('div', 'fuel'); var fuelBar = el('i'); fuel.appendChild(fuelBar);
-    root.appendChild(fuel);
+    var dock = fuelDock(root, w.length, { big: true });
     var keys = el('div', 'keys');
     root.appendChild(keys);
     root.style.setProperty('--tile', fitTile(root, w.length, 70) + 'px');
@@ -5628,9 +6028,9 @@ function createActivities(env){
           var i = pos; pos++;
           $all('.key', keys).forEach(function(x){ x.classList.remove('hint'); });
           fillSlot(slots[i], ch); markNext(slots, pos);
-          fuelBar.style.width = Math.round(pos / w.length * 100) + '%';
+          dock.fill(i, slots[i]);
           env.sfx.play('place');
-          env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'blast:' + i });
+          env.speech.say(env.soundOf(ch), { dedupeMs: 0, key: 'blast:' + i, keep: true });
           if (pos === w.length){ finished = true; env.clearNudge(); ctx.done({ slots: slots, result: result }); }
           else env.react('hop', centre(slots[i]));
         } else {
@@ -5643,7 +6043,7 @@ function createActivities(env){
       });
       keys.appendChild(k);
     });
-    env.later(function(){ env.speech.say('Spell ' + w.toLowerCase() + ' from memory!', { rate: 0.85 }); }, 350);
+    env.later(function(){ env.speech.say('Spell ' + w.toLowerCase() + ' from memory!', { rate: 0.85, keep: true }); }, 350);
     /* a stall first gets the word again; only a second stall shows the key,
        and that counts as help, so the word keeps its practice next time */
     var nudges = 0;
@@ -5673,6 +6073,7 @@ function createActivities(env){
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots'); root.appendChild(slotsBox);
+    var dock = fuelDock(root, w.length);
     var track = el('div', 'race-track');
     var me = el('i', 'race-me', '🚀'), comet = el('i', 'race-comet', '☄️'), flag = el('i', 'race-flag', '🏁');
     track.appendChild(flag); track.appendChild(comet); track.appendChild(me);
@@ -5749,11 +6150,12 @@ function createActivities(env){
         o.used = true;
         tiles.forEach(function(q){ q.el.classList.remove('next-hint'); });
         env.sfx.play('place');
-        env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'race:' + i });
+        env.speech.say(env.soundOf(w[i]), { dedupeMs: 0, key: 'race:' + i, keep: true });
         o.el.style.transform = 'translate(' + o.x.toFixed(1) + 'px,' + o.y.toFixed(1) + 'px)';
         flyTo(o.el, slots[i], function(){
           o.el.classList.add('used');
           fillSlot(slots[i], w[i]); markNext(slots, pos);
+          dock.fill(i, slots[i]);
           me.style.left = (pos / w.length * 88) + '%';
           if (pos === w.length && !finished){
             finished = true; env.clearNudge();
@@ -5772,7 +6174,7 @@ function createActivities(env){
         }
       }
     }
-    env.later(function(){ env.speech.say('Look! ' + w.toLowerCase() + '. Remember it!', { rate: 0.85 }); }, 300);
+    env.later(function(){ env.speech.say('Here is your word: ' + w.toLowerCase() + '. Remember it!', { rate: 0.85 }); }, 300);
     env.later(begin, 2300);
     env.setNudge(function(){
       if (finished || !started) return;
@@ -5804,6 +6206,7 @@ function createActivities(env){
     }
     var box = el('div', 'opt-cards');
     root.appendChild(box);
+    var dock = fuelDock(root, 1);
     C.checkOptions(w).forEach(function(opt){
       var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
       b.addEventListener('click', function(){
@@ -5814,8 +6217,9 @@ function createActivities(env){
           b.classList.add('right');
           $all('.opt-card', box).forEach(function(x){ if (x !== b) x.classList.add('dim'); });
           env.sfx.play('correct'); env.react('cheer');
+          dock.fill(0, b);
           var blank = $('.blank', root); if (blank){ blank.textContent = w.toLowerCase(); blank.classList.add('fill'); }
-          env.speech.say(env.pick('found', env.FOUND) + ' That spells ' + w.toLowerCase() + '.', { rate: 0.9 }).then(function(){
+          env.speech.say(env.pick('found', env.FOUND) + ' That spells ' + w.toLowerCase() + '.', { rate: 0.9, keep: true }).then(function(){
             if (env.alive(ctx.tok)) env.later(function(){ ctx.done({}); }, 300);
           });
         } else {
@@ -5827,7 +6231,7 @@ function createActivities(env){
       box.appendChild(b);
     });
     env.later(function(){
-      env.speech.say(sentence ? sentence + '. Which ' + w.toLowerCase() + ' is spelled right?' : 'Which one spells ' + w.toLowerCase() + '?', { rate: 0.85 });
+      env.speech.say(sentence ? sentence + '. Which ' + w.toLowerCase() + ' is spelled right?' : 'Which one spells ' + w.toLowerCase() + '?', { rate: 0.85, keep: true });
     }, 350);
     env.setNudge(function(){
       if (finished) return;
@@ -5861,6 +6265,7 @@ function createActivities(env){
     }
     var big = el('div', 'rhyme-word'); big.appendChild(withRime(w)); root.appendChild(big);
     var box = el('div', 'opt-cards'); root.appendChild(box);
+    var dock = fuelDock(root, 1);
     data.options.forEach(function(opt){
       var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
       b.addEventListener('click', function(){
@@ -5871,7 +6276,8 @@ function createActivities(env){
           b.textContent = ''; b.appendChild(withRime(opt)); b.classList.add('right');
           $all('.opt-card', box).forEach(function(x){ if (x !== b) x.classList.add('dim'); });
           env.sfx.play('correct'); env.react('cheer');
-          env.speech.say(w.toLowerCase() + ', ' + opt.toLowerCase() + '. They rhyme!', { rate: 0.85 }).then(function(){
+          dock.fill(0, b);
+          env.speech.say(w.toLowerCase() + ', ' + opt.toLowerCase() + '. They rhyme!', { rate: 0.85, keep: true }).then(function(){
             if (env.alive(ctx.tok)) env.later(function(){ ctx.done({}); }, 300);
           });
         } else {
@@ -5883,7 +6289,7 @@ function createActivities(env){
       box.appendChild(b);
     });
     env.later(function(){
-      env.speech.say('What rhymes with ' + w.toLowerCase() + '? ' + data.options.map(function(x){ return x.toLowerCase(); }).join(', ') + '?', { rate: 0.8 });
+      env.speech.say('What rhymes with ' + w.toLowerCase() + '? ' + data.options.map(function(x){ return x.toLowerCase(); }).join(', ') + '?', { rate: 0.8, keep: true });
     }, 350);
     env.setNudge(function(){
       if (finished) return;
@@ -5893,7 +6299,7 @@ function createActivities(env){
 
   return {
     meet: meet, zap: zap, build: build, missing: missing, blast: blast, race: race, check: check, rhyme: rhyme,
-    tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile
+    tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile, fuelDock: fuelDock
   };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createActivities: createActivities };
@@ -6097,6 +6503,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
     FOUND: FOUND, TRY: TRY, setNudge: setNudge, clearNudge: clearNudge,
     react: function(kind, point){ stage.ambient.react(kind, point); },
     toast: function(m){ toast(m); },
+    rocketSvg: function(){ return rocketSvg(); },
     spellSlots: function(word, slots){
       return speech.spell(word, { soundOf: soundOf, onLetter: function(i){ slots.forEach(function(s, k){ s.classList.toggle('lit', k === i); }); } })
         .then(function(ok){ slots.forEach(function(s){ s.classList.remove('lit'); }); return ok; });
@@ -6153,7 +6560,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
     var box = $('#levelUp');
     box.hidden = false; box.style.animation = 'none'; void box.offsetWidth; box.style.animation = '';
     sfx.play('fanfare');
-    speech.say('Level up! ' + m.name + ' is level ' + u.level + '. ' + news.say, { rate: 0.95 });
+    speech.say('Level up! ' + m.name + ' is level ' + u.level + '. ' + news.say, { rate: 0.95, keep: true });
     setTimeout(function(){ box.hidden = true; nextUp(); }, 3000);
   }
 
@@ -6329,6 +6736,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
     clearNudge();
     renderSteps();
     var root = $('#activity');
+    root.className = 'activity';
     root.style.animation = 'none'; void root.offsetWidth; root.style.animation = 'screenIn .3s';
     var act = P.review ? 'blast' : P.acts[P.step];
     var word = P.review ? P.list[P.step] : P.word;
@@ -6362,7 +6770,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
       later(function(){
         env.spellSlots(word, res.slots).then(function(){
           if (st !== stepTok) return;
-          return speech.say(pick('spelled', SPELLED) + ' You spelled ' + word.toLowerCase() + '!', { rate: 0.9 });
+          return speech.say(pick('spelled', SPELLED) + ' You spelled ' + word.toLowerCase() + '!', { rate: 0.9, keep: true });
         }).then(function(){
           if (st !== stepTok) return;
           if (P.review) return hitBoss().then(function(){ if (st === stepTok) return perform(res.slots); });
@@ -6390,13 +6798,30 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
         if (st !== stepTok){ cd.remove(); resolve(); return; }
         if (n > 0){ cd.innerHTML = '<span>' + n + '</span>'; sfx.play('countdown'); speech.say(String(n), { dedupeMs: 0, rate: 1 }); n--; later(tick, 750); return; }
         cd.innerHTML = '<span>GO!</span>'; sfx.play('go'); sfx.play('blastoff');
+        /* the rocket he fuelled is the one that goes: it lifts off from the dock */
+        var src = $('.activity .fuel-rocket'), from;
+        if (src){ var rr = src.getBoundingClientRect(); from = { x: rr.left + rr.width / 2, y: rr.top + rr.height / 2, s: rr.width / 120 }; src.style.visibility = 'hidden'; }
+        else from = { x: window.innerWidth / 2, y: window.innerHeight - 120, s: 1 };
         var r = el('div', 'launch-rocket'); r.innerHTML = rocketSvg(); document.body.appendChild(r);
-        var startY = window.innerHeight - 200;
+        r.style.left = (from.x - 60) + 'px'; r.style.marginLeft = '0'; r.style.top = (from.y - 85) + 'px';
+        var trail = setInterval(function(){
+          var b = r.getBoundingClientRect(); if (!b.width) return;
+          var puff = el('i', 'launch-smoke'); puff.style.left = (b.left + b.width / 2) + 'px'; puff.style.top = (b.bottom - 10) + 'px';
+          document.body.appendChild(puff);
+          try { puff.animate([{ transform: 'translate(-50%,0) scale(.4)', opacity: .9 }, { transform: 'translate(calc(-50% + ' + ((Math.random() - 0.5) * 60) + 'px), 40px) scale(1.6)', opacity: 0 }], { duration: 700, easing: 'ease-out' }); } catch (e){}
+          setTimeout(function(){ puff.remove(); }, 720);
+        }, 60);
+        var s0 = from.s, rise = from.y + 260;
         try {
-          r.animate([{ transform: 'translateY(' + startY + 'px)' }, { transform: 'translateY(' + (startY + 20) + 'px)', offset: 0.15 }, { transform: 'translateY(-260px)' }],
-            { duration: 1500, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
+          r.animate([
+            { transform: 'translateY(0) scale(' + s0 + ')' },
+            { transform: 'translate(-3px,4px) scale(' + (s0 * 1.05) + ')', offset: 0.08 },
+            { transform: 'translate(3px,2px) scale(' + (s0 * 1.1) + ')', offset: 0.16 },
+            { transform: 'translate(0,-' + (rise * 0.18) + 'px) scale(' + (s0 * 1.25) + ')', offset: 0.4 },
+            { transform: 'translate(0,-' + rise + 'px) scale(' + (s0 * 1.4) + ')' }
+          ], { duration: 1700, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
         } catch (e){}
-        setTimeout(function(){ r.remove(); cd.remove(); resolve(); }, 1550);
+        setTimeout(function(){ clearInterval(trail); r.remove(); cd.remove(); resolve(); }, 1750);
       }
       tick();
     });
@@ -6408,8 +6833,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
      ============================================================ */
   var hatchState = null;
   ENTER.hatch = function(){
-    var seed = ((Date.now() & 0x7fffffff) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
-    var baby = C.makeBaby(seed);
+    /* every baby gets a name nobody else in his base has */
+    var taken = {};
+    C.allMembers(S).forEach(function(m){ taken[m.name] = 1; });
+    var seed, baby, tries = 0;
+    do {
+      seed = ((Date.now() & 0x7fffffff) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+      baby = C.makeBaby(seed);
+    } while (taken[baby.name] && ++tries < 60);
     hatchState = { seed: seed, baby: baby, taps: 0, open: false };
     var egg = $('#egg');
     egg.className = 'egg'; egg.innerHTML = '<svg class="crack" viewBox="0 0 100 128" aria-hidden="true"></svg>';
@@ -6466,7 +6897,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
       var pw = C.POWERS[h.baby.power];
       var pl = $('#babyPower'); pl.textContent = 'Super power: ' + pw.icon + ' ' + pw.name; pl.hidden = false;
       $('#btnHatchCrew').hidden = false;
-      speech.say('Meet ' + h.baby.name + '! A baby ' + { rex: 'T rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[h.baby.kind] + ' who ' + pw.says + '!', { rate: 0.95 });
+      speech.say('Meet ' + h.baby.name + '! A baby ' + { rex: 'T rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[h.baby.kind] + ' who ' + pw.says + '!', { rate: 0.95, keep: true });
       setTimeout(function(){ celebrate(ap.ups); }, 2400);
       var more = C.nextPlanet(S.week, S.words.length);
       var nb = $('#btnHatchNext');
@@ -6496,8 +6927,84 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
     var before = C.skinsUnlocked(S.parts).length;
     if (first) S.parts++;
     save();
-    go('done', { part: first, newSkin: C.skinsUnlocked(S.parts).length > before });
+    go('show', { part: first, newSkin: C.skinsUnlocked(S.parts).length > before });
   }
+
+  /* ============================================================
+     VICTORY SHOW — after the boss, every crew member performs one of the
+     week's words in turn, fireworks between the acts, and a bow at the end.
+     It is the week's big reward: long enough to enjoy, and skippable.
+     ============================================================ */
+  function fireworks(n){
+    var box = $('#confetti'), cols = ['#FFC53D', '#FF8A1F', '#8FE3FF', '#FFFFFF', '#3FBF4F', '#E53935'];
+    for (var k = 0; k < n; k++){
+      (function(k){
+        later(function(){
+          var cx = window.innerWidth * (0.15 + Math.random() * 0.7), cy = window.innerHeight * (0.12 + Math.random() * 0.3);
+          var col = cols[Math.floor(Math.random() * cols.length)];
+          sfx.play('pop');
+          for (var i = 0; i < 22; i++){
+            var f = el('i', 'firework'); f.style.left = cx + 'px'; f.style.top = cy + 'px'; f.style.background = i % 3 ? col : '#fff';
+            box.appendChild(f);
+            var ang = (Math.PI * 2 * i) / 22, r = 60 + Math.random() * 60;
+            try { f.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: 'translate(' + (Math.cos(ang) * r) + 'px,' + (Math.sin(ang) * r + 30) + 'px) scale(.3)', opacity: 0 }],
+              { duration: 1000 + Math.random() * 300, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }); } catch (e){}
+            (function(ff){ later(function(){ ff.remove(); }, 1400); })(f);
+          }
+        }, k * 380);
+      })(k);
+    }
+  }
+  var showArg = null;
+  ENTER.show = function(arg){
+    showArg = arg || {};
+    noBuddies();
+    applyPlanet(planetOf(S.week.offset + 3));
+    var crew = crewMembers();
+    var words = C.shuffle(S.words.slice());
+    var acts = crew.map(function(m, i){ return { m: m, w: words[i % words.length] }; });
+    var mine = tok, used = [];
+    $('#showAct').textContent = '';
+    $('#showWord').innerHTML = '';
+    speech.say('Victory show! Your crew is going to show off!', { rate: 0.95, keep: true });
+    fireworks(4);
+    sfx.play('fanfare');
+    function act(i){
+      if (mine !== tok) return;
+      if (i >= acts.length){ bow(); return; }
+      var a = acts[i];
+      var line = $('#showAct'); line.textContent = a.m.name + '!'; line.style.animation = 'none'; void line.offsetWidth; line.style.animation = '';
+      var box = $('#showWord'); box.innerHTML = '';
+      var slots = a.w.split('').map(function(ch){ var sl = ACT.slotEl(); ACT.fillSlot(sl, ch); box.appendChild(sl); return sl; });
+      speech.say(a.m.name + '! ' + a.w.toLowerCase() + '!', { rate: 0.95, keep: true }).then(function(){
+        if (mine !== tok) return;
+        later(function(){
+          var plan = C.planScene({ letters: a.w.length, lead: a.m.id, cast: crew, history: used, showoff: true, victory: true, signature: true });
+          if (plan.id) used.unshift(C.histEntry(plan));
+          var aw = C.awardScene(S.crew, plan); S.crew = aw.crew; save();
+          window.__showScenes = (window.__showScenes || []).concat([plan.id]);
+          stage.play(plan, slots, { layer: $('#fxLayer'), groundY: groundY(), dust: currentPlanet ? currentPlanet.rim : null }).then(function(){
+            if (mine !== tok) return;
+            celebrate(aw.ups);
+            fireworks(3);
+            later(function(){ act(i + 1); }, 1400);
+          });
+        }, 300);
+      });
+    }
+    function bow(){
+      $('#showAct').textContent = 'Take a bow, crew!';
+      $('#showWord').innerHTML = '';
+      buddies(S.roster.slice(), true, true);
+      speech.say('Take a bow, crew! Hooray for Grayson!', { rate: 0.95, keep: true });
+      fireworks(8);
+      confetti();
+      [900, 2300, 3700].forEach(function(ms){ later(function(){ env.react('cheer'); sfx.play('cheer'); }, ms); });
+      later(function(){ go('done', showArg); }, 5600);
+    }
+    later(function(){ act(0); }, 1800);
+  };
+  $('#btnSkipShow').addEventListener('click', function(){ sfx.play('tap'); go('done', showArg); });
 
   /* ============================================================
      MISSION COMPLETE
@@ -6624,6 +7131,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
       var row = rows - 1 - (i % rows);
       var k = (1 - row * 0.14) * (0.8 + 0.2 * m.scale), s2 = size * k;
       var node = el('button', 'baby' + (m.id === picked ? ' picked' : '')); node.type = 'button';
+      node.setAttribute('data-id', m.id);
       node.style.width = node.style.height = s2 + 'px';
       node.style.zIndex = String(10 - row);
       node.innerHTML = memberArt(m) + '<span class="tag">' + m.name + '</span>' + (m.power ? '<span class="ptag">' + C.POWERS[m.power].icon + '</span>' : '');
@@ -6796,6 +7304,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = { createAc
   });
   $('#btnSample').addEventListener('click', function(){ setWords(C.DEFAULT_WORDS.slice()); });
   $('#btnSavePlay').addEventListener('click', function(){ if (!S.words.length) return; save(); startPlanet(C.nextPlanet(S.week, S.words.length) === -1 ? 0 : C.nextPlanet(S.week, S.words.length)); });
+  var crewArmed = false;
+  $('#btnResetCrew').addEventListener('click', function(){
+    if (!crewArmed){ crewArmed = true; $('#btnResetCrew').textContent = 'Tap again: all back to level 1'; setTimeout(function(){ crewArmed = false; $('#btnResetCrew').textContent = 'Crew back to level 1'; }, 4000); return; }
+    crewArmed = false; S.crew = {}; save(); syncCast();
+    $('#btnResetCrew').textContent = 'Crew back to level 1';
+    toast('Every dino is back to level 1.');
+  });
   $('#btnResetWeek').addEventListener('click', function(){ S.week.done = []; S.week.eggs = {}; S.week.finale = false; save(); toast('Mission restarted — the planets are waiting!'); });
   $('#optSfx').addEventListener('change', function(e){ S.sfx = e.target.checked; sfx.setMuted(!S.sfx); save(); if (S.sfx) sfx.play('correct'); });
   $('#optMusic').addEventListener('change', function(e){ S.music = e.target.checked; save(); if (S.music) sfx.startMusic(); else sfx.stopMusic(); });

@@ -62,6 +62,8 @@ var lastPlan = null;
 window.__lab = {
   scenes: CORE.SCENES.map(function(s){ return { id: s.id, name: s.name, lead: s.lead, min: s.min }; }),
   pool: POOL,
+  FUMBLES: ['sky-hook', 'rocket-jump', 'tow-truck', 'joy-ride'],
+  setFumble: function(on){ window.__labFumble = !!on; },
   /* everyone who may lead a scene: every kind for an open scene, plus the power baby */
   leadsFor: function(id){
     var s = CORE.SCENE_BY_ID[id];
@@ -72,7 +74,8 @@ window.__lab = {
   castFor: function(id, lead){ return castFor(id, lead).map(function(m){ return m.id; }); },
   plan: function(id, word, lead, mirror, watcher){
     var cast = castFor(id, lead);
-    return CORE.planScene({ letters: word.length, lead: cast[0].id, cast: cast, forceId: id, mirror: !!mirror, tempo: 1, rnd: CORE.rng(word.length * 13), watcher: watcher == null ? true : watcher });
+    return CORE.planScene({ letters: word.length, lead: cast[0].id, cast: cast, forceId: id, mirror: !!mirror, tempo: 1, rnd: CORE.rng(word.length * 13),
+      watcher: watcher == null ? true : watcher, fumble: !!window.__labFumble, showoff: true, victory: true });
   },
   run: function(id, word, lead, mirror, watcher){
     document.getElementById('title').textContent = id + ' · ' + lead;

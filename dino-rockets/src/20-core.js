@@ -406,12 +406,12 @@ function exitDirsFor(key){ var c = CHARS[key]; return c && c.airborne ? ['up', '
 /*
   Every scene a dinosaur is in earns experience; levels bring new moves
   (rope tricks at 2, tightrope and team-ups at 3) and, for a baby, growing
-  up: baby at levels 1–2, kid at 3–4, fully grown at 5. The originals are
-  grown already and start at level 2, so ropes are there from day one.
+  up: baby at levels 1–2, kid at 3–4, fully grown at 5. Everyone starts at
+  level 1 — the originals too — so every new trick is something he earned.
 */
 var LEVEL_XP = [0, 6, 16, 32, 56];
 var MAX_LEVEL = LEVEL_XP.length;
-var ORIGINAL_START_XP = 6;
+var ORIGINAL_START_XP = 0;
 function levelFor(xp){ var x = Math.max(0, Number(xp) || 0), l = 0; LEVEL_XP.forEach(function(t){ if (x >= t) l++; }); return Math.max(1, l); }
 function xpToNext(xp){ var l = levelFor(xp); return l >= MAX_LEVEL ? 0 : LEVEL_XP[l] - Math.max(0, Number(xp) || 0); }
 function growFor(member, level){
@@ -611,13 +611,18 @@ var BEAT = {
   fall:620, getup:420, carry:520, cheer:520, notice:360, march:1600, follow:1600,
   lasso:980, hitch:600, tow:1500, stringline:1000, jetgrab:640, hook:760, jumpgrab:760,
   boost:900, vault:760, rigrope:1100, ropepick:280, wobble:900, ropejump:700, anchor:500,
-  bubble:1000, magnet:800, pull:560, dig:760, popup:640, frost:1000, slide:600, react:700
+  bubble:1000, magnet:800, pull:560, dig:760, popup:640, frost:1000, slide:600, react:700,
+  slip:500, fetch:1700, showoff:1200, victory:900
 };
-var SCENE_TARGET_MIN = 3500, SCENE_TARGET_MAX = 13000, SCENE_HARD_MAX = 20000;
+/* scenes are shows, not transitions: long enough for a six-year-old to
+   enjoy the dinosaurs doing their thing, capped so practice keeps moving */
+var SCENE_TARGET_MIN = 3500, SCENE_TARGET_MAX = 17000, SCENE_HARD_MAX = 24000;
 var TAKE_KINDS = { snatch:1, tailwhip:1, scoop:1, backcatch:1, sweep:1, orbit:1, dive:1, ride:1, beam:1, catch:1, carry:1, follow:1,
-  lasso:1, hitch:1, jetgrab:1, hook:1, jumpgrab:1, vault:1, ropepick:1, bubble:1, pull:1, popup:1, slide:1 };
+  lasso:1, hitch:1, jetgrab:1, hook:1, jumpgrab:1, vault:1, ropepick:1, bubble:1, pull:1, popup:1, slide:1, fetch:1 };
+/* Beats that let go of a letter someone had (it must then be taken again). */
+var RELEASE_KINDS = { slip:1 };
 /* Beats that leave the character off stage. */
-var EXIT_KINDS = { exit:1, charge:1, zoom:1, glide:1, beamup:1, carry:1, march:1, tow:1 };
+var EXIT_KINDS = { exit:1, charge:1, zoom:1, glide:1, beamup:1, carry:1, march:1, tow:1, fetch:1 };
 
 function makeTimeline(){
   var events = [];
@@ -644,6 +649,16 @@ function addWatcher(tl, c, from, to){
   tl.push(mid, BEAT.react, 'react', { char:w, mood:'gasp' });
   tl.push(Math.max(mid + BEAT.react, to - BEAT.react), BEAT.react, 'react', { char:w, mood:'cheer' });
   tl.push(Math.max(mid + BEAT.react, to - BEAT.react) + BEAT.react, BEAT.exit, 'exit', { char:w, dir:c.exitFor(w, 3) });
+}
+
+/* A fumble: a letter slips, and a buddy runs in, catches it and runs off
+   with it. Only when there is a buddy to do it and letters enough. */
+function wantFumble(c){ return c.fumbler && c.letters >= 3 && c.r() < 0.6; }
+function addFumble(tl, c, letter, at, dir){
+  var H = c.fumbler;
+  tl.push(Math.max(0, at - 700), BEAT.enter, 'enter', { char:H, side:'far', stay:'edge' });
+  tl.push(at, BEAT.slip, 'slip', { letter:letter });
+  tl.push(at + 160, BEAT.fetch, 'fetch', { char:H, letter:letter, dir:dir || c.exitFor(H, 0) });
 }
 
 var SCENES = [
@@ -682,11 +697,15 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter - 200;
     tl.push(t, BEAT.stringline, 'stringline', {}); t += BEAT.stringline;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 600, BEAT.jetgrab, 'jetgrab', { char:L, letter:c.letters - 1 - i });
-    var last = t + Math.max(0, c.letters - 1) * 600 + BEAT.jetgrab;
+    /* sometimes his first big twang of the line knocks the far letter off */
+    var fumble = wantFumble(c), far = c.letters - 1;
+    var grabs = fumble ? c.letters - 1 : c.letters;
+    for (var i = 0; i < grabs; i++) tl.push(t + i * 600, BEAT.jetgrab, 'jetgrab', { char:L, letter:(fumble ? c.letters - 2 : c.letters - 1) - i });
+    if (fumble) addFumble(tl, c, far, t + BEAT.jetgrab * 0.6, 'right');
+    var last = t + Math.max(0, grabs - 1) * 600 + BEAT.jetgrab;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:'up' });
-    addWatcher(tl, c, 400, last + BEAT.cheer);
+    if (!fumble) addWatcher(tl, c, 400, last + BEAT.cheer);
     return tl;
   } },
 
@@ -695,7 +714,9 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     tl.push(t, BEAT.stomp, 'stomp', { char:L, mode:'drop' }); t += BEAT.stomp + 200;
+    /* he backs up, paws the ground, snorts... paws again... and CHARGE */
     tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw;
+    tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw + 150;
     var run = BEAT.charge + c.letters * 90;
     tl.push(t, run, 'charge', { char:L, dir:'right' });
     for (var i = 0; i < c.letters; i++) tl.push(t + 200 + i * Math.floor((run - 400) / Math.max(1, c.letters)), BEAT.scoop, 'scoop', { char:L, letter:c.letters - 1 - i });
@@ -722,6 +743,8 @@ var SCENES = [
     for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hitch, 'hitch', { char:L, letter:i }); t += BEAT.hitch - 60; }
     t += 120;
     tl.push(t, BEAT.tow + c.letters * 110, 'tow', { char:L, dir:'right' });
+    /* a knot comes undone as he pulls away; a buddy grabs the letter and chases after him */
+    if (wantFumble(c)) addFumble(tl, c, 0, t + 380, 'right');
     return tl;
   } },
 
@@ -752,6 +775,10 @@ var SCENES = [
   { id:'speed-sweep', name:'Speed Sweep', lead:{ kind:'dash' }, weight:10, min:1, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    /* a warm-up lap: across, skid, back, skid — then the real run */
+    tl.push(t, 700, 'dashpass', { char:L }); t += 700;
+    tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
+    tl.push(t, 700, 'dashpass', { char:L }); t += 700;
     tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
     var missed = c.letters >= 3 ? c.letters - 1 : -1;
     var takeN = missed === -1 ? c.letters : c.letters - 1;
@@ -773,7 +800,7 @@ var SCENES = [
   { id:'whirlwind', name:'Whirlwind', lead:{ kind:'dash' }, weight:8, min:2, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    var spin = Math.max(BEAT.spindash, 250 + c.letters * 180 + BEAT.orbit);
+    var spin = Math.max(2200, 250 + c.letters * 180 + BEAT.orbit + 900);
     tl.push(t, spin, 'spindash', { char:L });
     for (var i = 0; i < c.letters; i++) tl.push(t + 250 + i * 180, BEAT.orbit, 'orbit', { char:L, letter:i });
     addWatcher(tl, c, 300, t + spin);
@@ -824,19 +851,25 @@ var SCENES = [
     tl.push(t, BEAT.wave, 'wave', { char:L }); t += BEAT.wave;
     var run = BEAT.glide + c.letters * 120;
     tl.push(t, run, 'glide', { char:L, dir:'right' });
-    for (var i = 0; i < c.letters; i++) tl.push(t + 150 + i * Math.floor((run - 500) / Math.max(1, c.letters)), BEAT.ride, 'ride', { char:L, letter:c.letters - 1 - i });
+    var step = Math.floor((run - 500) / Math.max(1, c.letters));
+    for (var i = 0; i < c.letters; i++) tl.push(t + 150 + i * step, BEAT.ride, 'ride', { char:L, letter:c.letters - 1 - i });
+    /* the first one aboard bounces off as he picks up speed */
+    if (wantFumble(c)) addFumble(tl, c, c.letters - 1, t + 150 + (c.letters - 1) * step + BEAT.ride + 120, 'right');
     return tl;
   } },
 
   /* He flies over trailing a rope with a hook, hooks each letter off the
      ground and flies away with the word dangling beneath him. */
   { id:'sky-hook', name:'Sky Hook', lead:{ kind:'swoop' }, level:2, weight:9, min:1, watch:true, build: function(c){
+    /* a slower dance: each letter gets its own swoop */
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hook, 'hook', { char:L, letter:i }); t += BEAT.hook - 160; }
-    t += 160;
-    tl.push(t, BEAT.exit + 200, 'exit', { char:L, dir:'up' });
-    addWatcher(tl, c, 300, t);
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hook, 'hook', { char:L, letter:i }); t += BEAT.hook; }
+    /* on the way up the bottom letter wriggles loose, and a buddy dives in to catch it */
+    var fumble = wantFumble(c);
+    if (fumble){ addFumble(tl, c, c.letters - 1, t + 150, c.exitFor(c.fumbler, 1)); t += 500; }
+    tl.push(t, BEAT.exit + 400, 'exit', { char:L, dir:'up' });
+    if (!fumble) addWatcher(tl, c, 300, t);
     return tl;
   } },
 
@@ -959,7 +992,7 @@ var SCENES = [
     tl.push(t, BEAT.enter, 'enter', { char:b, side:'far' }); t += BEAT.enter;
     tl.push(t, BEAT.grab, 'grab', { char:a, letter:0 });
     tl.push(t, BEAT.grab, 'grab', { char:b, letter:0 }); t += BEAT.grab;
-    tl.push(t, BEAT.tug, 'tug', { char:a, other:b, letter:0 }); t += BEAT.tug;
+    tl.push(t, BEAT.tug * 1.8, 'tug', { char:a, other:b, letter:0 }); t += BEAT.tug * 1.8;
     tl.push(t, BEAT.pop, 'pop', { letter:0 });
     tl.push(t, BEAT.fall, 'fall', { char:a });
     tl.push(t, BEAT.fall, 'fall', { char:b }); t += BEAT.fall;
@@ -981,8 +1014,8 @@ var SCENES = [
   { id:'dino-parade', name:'Dino Parade', lead:{}, weight:4, min:2, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    tl.push(t, 1000, 'parade', { char:L, count:c.letters }); t += 1000;
-    var march = BEAT.march + c.letters * 140;
+    tl.push(t, 1500, 'parade', { char:L, count:c.letters }); t += 1500;
+    var march = BEAT.march + 900 + c.letters * 180;
     tl.push(t, march, 'march', { char:L, dir:'right' });
     for (var i = 0; i < c.letters; i++) tl.push(t + 60 + i * 70, march - 60 - i * 70, 'follow', { leader:L, letter:i, dir:'right' });
     return tl;
@@ -1034,6 +1067,8 @@ function sceneCtx(lead, cast, letters, r){
     }
   };
   ctx.helper = ctx.find(function(m){ return m.kind !== 'swoop'; }) ? ctx.find(function(m){ return m.kind !== 'swoop'; }).id : null;
+  ctx.fumbler = others.length ? others[others.length - 1].id : null;
+  ctx.r = r || Math.random;
   return ctx;
 }
 function eligibleScenes(lead, letters, cast){
@@ -1051,9 +1086,14 @@ function eligibleScenes(lead, letters, cast){
 function histId(h){ return String(h).split('~')[0]; }
 function histMirror(h){ return /~m$/.test(String(h)); }
 function histEntry(plan){ return plan.id + (plan.mirror ? '~m' : ''); }
-function pickScene(lead, letters, history, rnd, cast){
+function pickScene(lead, letters, history, rnd, cast, signature){
   var r = rnd || Math.random, pool = eligibleScenes(lead, letters, cast);
   if (!pool.length) return null;
+  /* a showcase: only scenes that are his own (his species or his power) */
+  if (signature){
+    var own = pool.filter(function(sc){ var n = sc.lead || {}; return n.kind || n.power; });
+    if (own.length) pool = own;
+  }
   var windows = [10, 6, 3, 1];
   for (var w = 0; w < windows.length; w++){
     var recent = (history || []).slice(0, windows[w]).map(histId);
@@ -1066,6 +1106,24 @@ function pickScene(lead, letters, history, rnd, cast){
   for (var i = 0; i < pool.length; i++){ roll -= pool[i].weight || 1; if (roll <= 0) return pool[i]; }
   return pool[pool.length - 1];
 }
+/* Insert a beat for the lead, pushing everything from that moment on later. */
+function addFlourish(tl, id, kind){
+  var ev = tl.events, mine = ev.filter(function(e){ return e.char === id; });
+  var at = null;
+  if (kind === 'showoff'){
+    var en = mine.filter(function(e){ return e.kind === 'enter'; })[0];
+    if (!en || en.stay) return;
+    at = en.at + en.dur;
+  } else {
+    var last = mine.slice().sort(function(a, b){ return (b.at + b.dur) - (a.at + a.dur); })[0];
+    if (!last || last.kind !== 'exit') return;
+    at = last.at;
+  }
+  var D = BEAT[kind];
+  ev.forEach(function(e){ if (e.at >= at && !(kind === 'showoff' && e.kind === 'enter' && e.char === id)) e.at += D; });
+  tl.push(at, D, kind, { char: id });
+}
+
 /* The member who has waited longest for a turn in the lead. */
 function pickLead(history, rnd, ids){
   var r = rnd || Math.random, h = history || [], best = [], bestAge = -1;
@@ -1118,7 +1176,8 @@ function planScene(opts){
   cast.forEach(function(m){ if (m.id === opts.lead) lead = m; });
   if (!lead) lead = cast[0];
   var mirror = opts.mirror == null ? r() < 0.5 : !!opts.mirror;
-  var tempo = opts.tempo == null ? 0.92 + r() * 0.16 : Number(opts.tempo) || 1;
+  /* a touch unhurried, so a six-year-old can follow every move */
+  var tempo = opts.tempo == null ? 1.0 + r() * 0.12 : Number(opts.tempo) || 1;
   var members = {};
   cast.forEach(function(m){ members[m.id] = { kind: m.kind, power: m.power, level: m.level, name: m.name }; });
   var plan = { id:null, name:null, lead:lead.id, letters:letters, cast:cast.map(function(m){ return m.id; }), members:members,
@@ -1129,7 +1188,7 @@ function planScene(opts){
     var f = SCENE_BY_ID[opts.forceId];
     if (letters >= (f.min || 1) && canLead(f, lead) && (!f.needs || f.needs(sceneCtx(lead, cast, letters, rng(1))))) scene = f;
   }
-  if (!scene) scene = pickScene(lead, letters, opts.history || [], r, cast);
+  if (!scene) scene = pickScene(lead, letters, opts.history || [], r, cast, !!opts.signature);
   if (!scene) return plan;
   /* a scene that has to come round again soon is played the other way round */
   if (opts.mirror == null){
@@ -1138,8 +1197,18 @@ function planScene(opts){
   }
   var ctx = sceneCtx(lead, cast, letters, r);
   /* about half the solo scenes bring a buddy along to watch */
-  ctx.watcher = scene.watch && ctx.others.length && (opts.watcher != null ? opts.watcher : r() < 0.55) ? ctx.others[0] : null;
+  ctx.watcher = scene.watch && ctx.others.length && (opts.watcher != null ? opts.watcher : r() < 0.7) ? ctx.others[0] : null;
+  if (opts.fumble === false) ctx.fumbler = null;
+  if (opts.fumble === true) ctx.r = function(){ return 0; };
   var tl = scene.build(ctx);
+  /* the lead's own flourishes: showing off as he arrives, a victory move before he goes */
+  if (opts.showoff !== false && (opts.showoff === true || r() < 0.9)) addFlourish(tl, lead.id, 'showoff');
+  if (opts.victory !== false && (opts.victory === true || r() < 0.75)) addFlourish(tl, lead.id, 'victory');
+  /* a scene that would be over in a blink gets both flourishes */
+  if (tl.end() < 7000){
+    if (opts.showoff !== false && !tl.events.some(function(e){ return e.kind === 'showoff'; })) addFlourish(tl, lead.id, 'showoff');
+    if (opts.victory !== false && !tl.events.some(function(e){ return e.kind === 'victory'; })) addFlourish(tl, lead.id, 'victory');
+  }
   trimRedundantExits(tl);
   if (mirror) mirrorTimeline(tl);
   fitDuration(tl);
@@ -1156,8 +1225,13 @@ function validatePlan(plan){
   if (!plan.events.length) return ['no events'];
   var members = plan.members || {};
   function memberOf(id){ return members[id] || (CHARS[id] ? { kind: id, power: null } : null); }
-  var taken = {};
-  plan.events.forEach(function(e){ if (e.letter != null && TAKE_KINDS[e.kind]) taken[e.letter] = (taken[e.letter] || 0) + 1; });
+  /* in time order: a letter is taken, maybe let go, taken again — and must end up taken exactly once */
+  var taken = {}, ordered = plan.events.slice().sort(function(a, b){ return a.at - b.at; });
+  ordered.forEach(function(e){
+    if (e.letter == null) return;
+    if (TAKE_KINDS[e.kind]) taken[e.letter] = (taken[e.letter] || 0) + 1;
+    else if (RELEASE_KINDS[e.kind] && taken[e.letter] > 0) taken[e.letter]--;
+  });
   for (var i = 0; i < plan.letters; i++){
     if (!taken[i]) p.push('letter ' + i + ' is never taken');
     else if (taken[i] > 1) p.push('letter ' + i + ' is taken ' + taken[i] + ' times');
@@ -1228,7 +1302,7 @@ var __CORE = {
   ROCKET_SKINS:ROCKET_SKINS, skinsUnlocked:skinsUnlocked, nextSkin:nextSkin,
   normalizeSentences:normalizeSentences, sentenceHas:sentenceHas,
   SETTINGS_VERSION:SETTINGS_VERSION, normalizeSettings:normalizeSettings, letterOverrides:letterOverrides,
-  BEAT:BEAT, SCENES:SCENES, TAKE_KINDS:TAKE_KINDS, EXIT_KINDS:EXIT_KINDS,
+  BEAT:BEAT, SCENES:SCENES, TAKE_KINDS:TAKE_KINDS, EXIT_KINDS:EXIT_KINDS, RELEASE_KINDS:RELEASE_KINDS,
   SCENE_TARGET_MIN:SCENE_TARGET_MIN, SCENE_TARGET_MAX:SCENE_TARGET_MAX, SCENE_HARD_MAX:SCENE_HARD_MAX,
   SCENE_BY_ID:SCENE_BY_ID, defaultCast:defaultCast, castOf:castOf, canLead:canLead,
   eligibleScenes:eligibleScenes, pickScene:pickScene, pickLead:pickLead, remember:remember, histEntry:histEntry, histId:histId,

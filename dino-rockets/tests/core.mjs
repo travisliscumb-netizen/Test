@@ -147,7 +147,8 @@ check('a flyer never walks a tightrope', !C.canUse({ kind: 'swoop' }, 'ropewalk'
 {
   check('levels start at 1 and top out', C.levelFor(0) === 1 && C.levelFor(1e6) === C.MAX_LEVEL);
   for (let x = 0; x < 80; x++) check(`level never goes down with more xp (${x})`, C.levelFor(x + 1) >= C.levelFor(x));
-  check('originals start at level 2: ropes from day one', C.levelFor(C.ORIGINAL_START_XP) === 2);
+  check('everyone starts at level 1, the originals too', C.levelFor(C.ORIGINAL_START_XP) === 1 && C.memberInfo(C.normalizeSettings({}), 'rex').level === 1);
+  check('level-1 originals still each lead scenes of their own', C.CHAR_ORDER.every(k => C.eligibleScenes({ id: k, kind: k, level: 1 }, 3).filter(s => (s.lead || {}).kind === k).length >= 2));
   check('a baby grows: baby, kid, grown', C.growFor({}, 1) === 'baby' && C.growFor({}, 3) === 'kid' && C.growFor({}, 5) === 'grown');
   check('the originals are always grown', C.growFor({ orig: true }, 1) === 'grown');
   const powers = new Set();
@@ -214,6 +215,36 @@ check('nobody leaves through the floor', C.CHAR_ORDER.every(k => !C.exitDirsFor(
   check('Tug of War needs a flyer', !C.eligibleScenes(rexes[0], 3, rexes).some(s => s.id === 'tug-pop'));
 }
 
+/* ---------------- slips, rescues and flourishes ---------------- */
+{
+  const cast = ['rex', 'trike', 'dash', 'swoop'].map(k => ({ id: k, kind: k, level: 5 }));
+  for (const id of ['sky-hook', 'rocket-jump', 'tow-truck', 'joy-ride']) for (const n of [3, 5, 9]) for (const mirror of [false, true]) {
+    const lead = { 'sky-hook': 'swoop', 'rocket-jump': 'rex', 'tow-truck': 'trike', 'joy-ride': 'swoop' }[id];
+    const plan = C.planScene({ letters: n, lead, cast, forceId: id, fumble: true, mirror, rnd: C.rng(n) });
+    const v = C.validatePlan(plan);
+    check(`${id} n=${n}: a slip and a rescue are sound`, v.length === 0 && plan.events.some(e => e.kind === 'slip') && plan.events.some(e => e.kind === 'fetch'), v.join('; '));
+    const slip = plan.events.find(e => e.kind === 'slip'), fetch = plan.events.find(e => e.kind === 'fetch');
+    check(`${id} n=${n}: the rescuer catches the letter that slipped, after it slips`, fetch.letter === slip.letter && fetch.at > slip.at && fetch.char !== lead);
+  }
+  const noF = C.planScene({ letters: 4, lead: 'swoop', cast, forceId: 'sky-hook', fumble: false, rnd: C.rng(4) });
+  check('no rescuer, no slip', !noF.events.some(e => e.kind === 'slip'));
+  const two = C.planScene({ letters: 2, lead: 'swoop', cast, forceId: 'sky-hook', fumble: true, rnd: C.rng(2) });
+  check('a two-letter word is never fumbled', !two.events.some(e => e.kind === 'slip'));
+  check('a slip with nobody catching it is caught by the rules',
+    C.validatePlan({ letters: 1, duration: 100, events: [{ at: 0, dur: 50, kind: 'enter', char: 'swoop' }, { at: 10, dur: 50, kind: 'hook', char: 'swoop', letter: 0 }, { at: 60, dur: 20, kind: 'slip', letter: 0 }, { at: 80, dur: 20, kind: 'exit', char: 'swoop' }] }).length > 0);
+  const flo = C.planScene({ letters: 4, lead: 'rex', cast, forceId: 'roar-float', showoff: true, victory: true, watcher: false, rnd: C.rng(1) });
+  const ks = flo.events.filter(e => e.char === 'rex').map(e => e.kind);
+  check('a flourish: show off on arrival, victory before leaving', ks[0] === 'enter' && ks[1] === 'showoff' && ks[ks.length - 2] === 'victory' && ks[ks.length - 1] === 'exit', ks.join(','));
+  check('flourishes keep the plan sound', C.validatePlan(flo).length === 0, C.validatePlan(flo).join('; '));
+}
+
+{
+  for (const k of C.CHAR_ORDER) for (let seed = 1; seed < 20; seed++) {
+    const plan = C.planScene({ letters: 4, lead: k, signature: true, rnd: C.rng(seed) });
+    check(`a showcase for ${k} is one of his own scenes`, (C.SCENE_BY_ID[plan.id].lead || {}).kind === k, plan.id);
+  }
+}
+
 /* ---------------- every scene plan ---------------- */
 let planned = 0;
 const durations = [];
@@ -270,6 +301,8 @@ check('self-check passes on long words', C.selfCheck(['BUTTERFLY', 'BIRTHDAY', '
 {
   const ms = durations.slice().sort((a, b) => a - b);
   console.log(`scene length: min ${ms[0]}ms  median ${ms[ms.length >> 1]}ms  max ${ms[ms.length - 1]}ms`);
+  check('scenes are long enough to enjoy (median 6.5s+)', ms[ms.length >> 1] >= 6500, `${ms[ms.length >> 1]}`);
+  check('but never drag (all under 20s)', ms[ms.length - 1] < 20000, `${ms[ms.length - 1]}`);
 }
 
 function notPurple(hex) {

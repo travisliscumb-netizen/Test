@@ -122,6 +122,17 @@
     </div>
   </section>
 
+  <!-- ============ VICTORY SHOW: the crew performs the week's words ============ -->
+  <section class="screen" data-screen="show">
+    <header class="bar"><span></span><span class="bar-title">Victory Show!</span>
+      <button class="pill-btn skip" id="btnSkipShow" type="button" aria-label="Skip the show">Skip ›</button>
+    </header>
+    <div class="show-stage">
+      <p class="show-act" id="showAct"></p>
+      <div class="show-word" id="showWord"></div>
+    </div>
+  </section>
+
   <!-- ============ HANGAR: rocket paint jobs, paid for in rocket parts ============ -->
   <section class="screen" data-screen="hangar">
     <header class="bar">
@@ -184,7 +195,10 @@
         <h2 class="section">How it's going</h2>
         <p class="note">Stars show how well each word is known: every clean spell from memory earns one, and a word that needed help loses one and gets its practice steps back.</p>
         <ul class="progress-list" id="progressList"></ul>
-        <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's mission</button>
+        <div class="row-left">
+          <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's mission</button>
+          <button class="btn btn-soft small" id="btnResetCrew" type="button">Crew back to level 1</button>
+        </div>
 
         <h2 class="section">Sound</h2>
         <label class="toggle"><input type="checkbox" id="optSfx" checked><span>Sound effects</span></label>
