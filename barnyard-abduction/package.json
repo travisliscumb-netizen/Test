@@ -1,0 +1,14 @@
+{
+  "name": "barnyard-abduction",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Fly a saucer over a sunny farm and beam up the livestock before the farmer catches on.",
+  "type": "module",
+  "scripts": {
+    "verify": "node tools/verify.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "three": "0.128.0"
+  }
+}
