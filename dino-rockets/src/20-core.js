@@ -1,5 +1,5 @@
 /* ============================================================
-   DINO ROCKETS — CORE   (pure, DOM-free; exercised by tests/core.mjs)
+   SPELLOSAURUS — CORE   (pure, DOM-free; exercised by tests/core.mjs)
 
    Nothing here may touch the DOM, storage, audio or the clock. The whole
    learning model and every piece of choreography is data, so the rules
@@ -315,78 +315,97 @@ function reviewQueue(words, stats, max){
     .slice(0, Math.max(1, max || 4)).map(function(o){ return o.w; });
 }
 
-/* ---------------- planets: one per word ---------------- */
-var PLANETS = [
-  { id:'lava',    name:'Lava Land',     sky:['#0B1640', '#3A1A12'], ground:'#E0592A', rim:'#FFB067', rock:'#8C2F14', glow:'#FF8A1F' },
-  { id:'ice',     name:'Frosty Moon',   sky:['#0A1C4A', '#1F4E8C'], ground:'#BFE6FF', rim:'#FFFFFF', rock:'#7FB8E6', glow:'#8FE3FF' },
-  { id:'jungle',  name:'Jungle World',  sky:['#081D2E', '#10485A'], ground:'#3FAE55', rim:'#8EE06A', rock:'#1E6E36', glow:'#B6FF6A' },
-  { id:'desert',  name:'Dune Planet',   sky:['#0E1B45', '#2E3A50'], ground:'#E9B64F', rim:'#FFE08A', rock:'#B27A22', glow:'#FFD24A' },
-  { id:'crater',  name:'Crater Moon',   sky:['#05102A', '#1B2A4A'], ground:'#9AA6B8', rim:'#D6DEEA', rock:'#5E6B80', glow:'#E3ECFF' },
-  { id:'ocean',   name:'Splash Planet', sky:['#06183F', '#0D4C7A'], ground:'#2B8FD8', rim:'#8FD1FF', rock:'#155A96', glow:'#6FE3FF' },
-  { id:'volcano', name:'Rumble Rock',   sky:['#0F1830', '#43201A'], ground:'#5B4A43', rim:'#FF7A2F', rock:'#2E2420', glow:'#FF5A1F' },
-  { id:'crystal', name:'Crystal Caves', sky:['#051B2E', '#0B4B55'], ground:'#34C9B8', rim:'#B9FFF4', rock:'#16847A', glow:'#9CFFF0' }
+/* ---------------- Dino Island: one spot per word ----------------
+   Daytime places on the island, each with its own sky and ground. Never
+   purple or pink: the crew's colours have to read on every one of them. */
+var LANDS = [
+  { id:'jungle',  name:'Jungle Grove',   sky:['#8FD6FF', '#D8F3FF'], ground:'#3FAE55', rim:'#8EE06A', rock:'#1E6E36', glow:'#B6FF6A', icon:'🌴' },
+  { id:'volcano', name:'Volcano Valley', sky:['#FFB36B', '#FFE3B8'], ground:'#8C4A2F', rim:'#FF8A1F', rock:'#4E2A1C', glow:'#FF6A1F', icon:'🌋' },
+  { id:'beach',   name:'Sandy Beach',    sky:['#6FC8FF', '#CFF1FF'], ground:'#F0CF7A', rim:'#FFF1B8', rock:'#B8873A', glow:'#FFE08A', icon:'🏖️' },
+  { id:'falls',   name:'Fern Falls',     sky:['#7CD3E8', '#D9FAF2'], ground:'#2FA37A', rim:'#9FF0C8', rock:'#1A6B50', glow:'#8FFFE0', icon:'💦' },
+  { id:'swamp',   name:'Muddy Swamp',    sky:['#9ED8C2', '#E4F5D8'], ground:'#6B7F3A', rim:'#B5CC6A', rock:'#3E4A20', glow:'#D6F07A', icon:'🐸' },
+  { id:'snow',    name:'Snowy Peak',     sky:['#A8DCFF', '#EEF8FF'], ground:'#E6F3FF', rim:'#FFFFFF', rock:'#8FB8D8', glow:'#CFEFFF', icon:'🏔️' },
+  { id:'canyon',  name:'Rocky Canyon',   sky:['#FFC98A', '#FFF0D6'], ground:'#C9763B', rim:'#FFB06B', rock:'#7A3E1A', glow:'#FFC53D', icon:'🪨' },
+  { id:'cave',    name:'Crystal Cave',   sky:['#1C4E6B', '#3E8FA8'], ground:'#34C9B8', rim:'#B9FFF4', rock:'#16847A', glow:'#9CFFF0', icon:'💎' }
 ];
-/* This week's route: each word lands on a different planet, starting from a
-   place chosen per week, so a new list feels like a new journey. */
-function planetFor(index, offset){
-  var n = PLANETS.length;
-  return PLANETS[(((index + (offset || 0)) % n) + n) % n];
+/* This week's trail: each word is a different spot on the island, starting
+   from a place chosen per week, so a new list feels like a new adventure. */
+function landFor(index, offset){
+  var n = LANDS.length;
+  return LANDS[(((index + (offset || 0)) % n) + n) % n];
 }
 function weekId(words){ return 'w' + hashStr((words || []).join(',')).toString(36); }
 
 /* ---------------- the crew ---------------- */
 /*
   SPECIES own the moves; a MEMBER is one particular dinosaur of a species.
-  The four originals are members too (Rex, Trike, Dash, Swoop), and every
-  baby that hatches becomes a member with its own name, colours and one
-  signature POWER on top of its species' moves.
+  The six originals are members too (Rex, Trike, Dash, Swoop, Stretch and
+  Spike), and every baby that hatches becomes a member with its own name,
+  colours and one signature POWER on top of its species' moves.
 
-    rex   — T. rex with a jet pack. Jet boosts, a ROAR that shakes letters
-            loose, a tail whip. Arms far too short to grab anything.
-    trike — Triceratops. Ground-bound and strong: paws, charges, scoops
-            letters on his horns, STOMPS, tows with a rope, boosts a buddy.
-    dash  — Raptor. Speed and spring: blurs past, skids, spin-dashes into a
-            whirlwind, lassos letters, leaps for high ones.
-    swoop — Pterosaur. Flight: dives, loops, gives rides, hooks letters off
-            a line with a rope and hook.
+    rex     — T. rex with a jet pack. Jet boosts, a ROAR that shakes letters
+              loose, a tail whip, a chomping chase. Arms far too short.
+    trike   — Triceratops. Ground-bound and strong: paws, charges, scoops
+              letters on his horns, STOMPS, stacks, tows, boosts a buddy.
+    dash    — Raptor. Speed and spring: blurs past, skids, spin-dashes into a
+              whirlwind, lassos letters, leaps for high ones.
+    swoop   — Pterosaur. Flight: dives, loops, gives rides, hooks letters off
+              a line with a rope and hook.
+    brachio — Stretch the brachiosaurus. Slow and tall: a neck that
+              stretches up like a crane, and a neck that is a slide.
+    stego   — Spike the stegosaurus. Back plates that carry letters like a
+              rack, and a spiky tail that flips them up onto them.
 */
 var CHARS = {
-  rex:   { key:'rex',   name:'Rex',   species:'T. rex',       airborne:true,  falls:true,  spins:false, walks:true,  color:'#3FBF4F', hold:'mouth' },
-  trike: { key:'trike', name:'Trike', species:'triceratops',  airborne:false, falls:true,  spins:false, walks:true,  color:'#2F7BF5', hold:'horns' },
-  dash:  { key:'dash',  name:'Dash',  species:'raptor',       airborne:false, falls:true,  spins:true,  walks:true,  color:'#FF8A1F', hold:'arms' },
-  swoop: { key:'swoop', name:'Swoop', species:'pterosaur',    airborne:true,  falls:false, spins:true,  walks:false, color:'#E53935', hold:'feet' }
+  rex:     { key:'rex',     name:'Rex',     species:'T. rex',        airborne:true,  falls:true,  spins:false, walks:true,  color:'#3FBF4F', hold:'mouth' },
+  trike:   { key:'trike',   name:'Trike',   species:'triceratops',   airborne:false, falls:true,  spins:false, walks:true,  color:'#2F7BF5', hold:'horns' },
+  dash:    { key:'dash',    name:'Dash',    species:'raptor',        airborne:false, falls:true,  spins:true,  walks:true,  color:'#FF8A1F', hold:'arms' },
+  swoop:   { key:'swoop',   name:'Swoop',   species:'pterosaur',     airborne:true,  falls:false, spins:true,  walks:false, color:'#E53935', hold:'feet' },
+  brachio: { key:'brachio', name:'Stretch', species:'brachiosaurus', airborne:false, falls:true,  spins:false, walks:true,  color:'#F2B233', hold:'back' },
+  stego:   { key:'stego',   name:'Spike',   species:'stegosaurus',   airborne:false, falls:true,  spins:false, walks:true,  color:'#1FB5A8', hold:'plates' }
 };
-var CHAR_ORDER = ['rex', 'trike', 'dash', 'swoop'];
+var CHAR_ORDER = ['rex', 'trike', 'dash', 'swoop', 'brachio', 'stego'];
 var KINDS = CHAR_ORDER;
+/* who was in the crew before Stretch and Spike arrived */
+var FIRST_FOUR = ['rex', 'trike', 'dash', 'swoop'];
 
 /* Signature powers: every baby hatches with one. */
 var POWERS = {
-  lasso:  { id:'lasso',  name:'Lasso',        icon:'🤠', says:'swings a lasso' },
+  lasso:  { id:'lasso',  name:'Lasso',         icon:'🤠', says:'swings a lasso' },
   bubble: { id:'bubble', name:'Bubble Blower', icon:'🫧', says:'blows giant bubbles' },
   magnet: { id:'magnet', name:'Super Magnet',  icon:'🧲', says:'pulls letters with a magnet' },
   tunnel: { id:'tunnel', name:'Tunnel Digger', icon:'⛏️', says:'digs tunnels' },
-  frost:  { id:'frost',  name:'Frost Breath',  icon:'❄️', says:'freezes letters into ice' }
+  frost:  { id:'frost',  name:'Frost Breath',  icon:'❄️', says:'freezes letters into ice' },
+  vine:   { id:'vine',   name:'Vine Swinger',  icon:'🌿', says:'swings on jungle vines' }
 };
-var POWER_ORDER = ['lasso', 'bubble', 'magnet', 'tunnel', 'frost'];
+var POWER_ORDER = ['lasso', 'bubble', 'magnet', 'tunnel', 'frost', 'vine'];
 
 /*
   Who may do what. A move belongs to species (and sometimes to a power as
   well): the planner will never let a dinosaur borrow a move that is not
   his, which is what keeps every character readable.
 */
+var WALKERS = ['rex', 'trike', 'dash', 'brachio', 'stego'];
 var ABILITY = {
   roar:{ kinds:['rex'] }, tailwhip:{ kinds:['rex'] }, reach:{ kinds:['rex'] }, jetgrab:{ kinds:['rex'] },
+  scatter:{ kinds:['rex'] }, chomp:{ kinds:['rex'] },
   paw:{ kinds:['trike'] }, charge:{ kinds:['trike'] }, stomp:{ kinds:['trike'] }, scoop:{ kinds:['trike'] },
   backcatch:{ kinds:['trike'] }, hitch:{ kinds:['trike'] }, tow:{ kinds:['trike'] }, boost:{ kinds:['trike'] },
+  pickup:{ kinds:['trike'] },
   zoom:{ kinds:['dash'] }, spindash:{ kinds:['dash'] }, skid:{ kinds:['dash'] }, dashpass:{ kinds:['dash'] },
   orbit:{ kinds:['dash'] }, sweep:{ kinds:['dash'] }, jumpgrab:{ kinds:['dash'] },
   lasso:{ kinds:['dash'], power:'lasso' },
   dive:{ kinds:['swoop'] }, loop:{ kinds:['swoop'] }, glide:{ kinds:['swoop'] }, ride:{ kinds:['swoop'] }, hook:{ kinds:['swoop'] },
-  ropewalk:{ kinds:['rex', 'trike', 'dash'] }, ropepick:{ kinds:['rex', 'trike', 'dash'] }, ropejump:{ kinds:['rex', 'trike', 'dash'] },
-  vault:{ kinds:['rex', 'dash'] },
+  crane:{ kinds:['brachio'] }, neckslide:{ kinds:['brachio'] }, nosedown:{ kinds:['brachio'] },
+  liftdown:{ kinds:['brachio'] },
+  tailflip:{ kinds:['stego'] }, platewalk:{ kinds:['stego'] }, platecatch:{ kinds:['stego'] },
+  thump:{ kinds:['brachio', 'stego'] }, haul:{ kinds:['trike', 'brachio', 'stego'] },
+  ropewalk:{ kinds:WALKERS }, ropepick:{ kinds:WALKERS }, ropejump:{ kinds:WALKERS },
+  vault:{ kinds:['rex', 'dash'] }, hopon:{ kinds:['rex', 'dash'] }, liftgrab:{ kinds:['rex', 'dash'] },
   bubble:{ power:'bubble' }, magnet:{ power:'magnet' }, pull:{ power:'magnet' },
   dig:{ power:'tunnel' }, popup:{ power:'tunnel' },
-  frost:{ power:'frost' }, slide:{ power:'frost' }
+  frost:{ power:'frost' }, slide:{ power:'frost' },
+  vine:{ power:'vine' }, vineswing:{ power:'vine' }, vinegrab:{ power:'vine' }
 };
 /* kept for tools that ask "whose move is this" of a single-species move */
 var ABILITY_OWNER = {};
@@ -397,6 +416,24 @@ function canUse(member, ability){
   if (!member) return false;
   if (rule.kinds && rule.kinds.indexOf(member.kind) !== -1) return true;
   return !!(rule.power && member.power === rule.power);
+}
+/*
+  RESCUES: when a letter falls, the buddy who saves it does it his own way.
+  Each way names the move it needs; running over and catching it (fetch)
+  is open to everyone, so there is always somebody who can help.
+*/
+var RESCUE_NEEDS = { lasso:'lasso', magnet:'pull', bubble:'bubble', hook:'hook', crane:'crane', tailflip:'tailflip',
+  tunnel:'popup', frost:'slide', jet:'jetgrab', horns:'scoop', fetch:null };
+var RESCUE_ORDER = ['lasso', 'magnet', 'bubble', 'hook', 'crane', 'tailflip', 'tunnel', 'frost', 'jet', 'horns'];
+/* his own special way when he has one (a power first, it is the rarer
+   sight), and now and then a plain run-and-catch for contrast */
+function rescueMethod(member, rnd){
+  var r = rnd || Math.random;
+  var own = RESCUE_ORDER.filter(function(m){ return canUse(member, RESCUE_NEEDS[m]); });
+  if (!own.length) return 'fetch';
+  var power = own.filter(function(m){ var n = ABILITY[RESCUE_NEEDS[m]]; return n && n.power && member.power === n.power; });
+  if (power.length && r() < 0.7) return power[0];
+  return r() < 0.85 ? own[Math.floor(r() * own.length) % own.length] : 'fetch';
 }
 var MAX_LEAN = 30;
 function rotBudgetFor(key){ var c = CHARS[key]; return c && c.spins ? Infinity : (c && c.falls ? 110 : MAX_LEAN); }
@@ -420,7 +457,7 @@ function growFor(member, level){
   return l <= 2 ? 'baby' : (l <= 4 ? 'kid' : 'grown');
 }
 var GROW_SCALE = { baby: 0.68, kid: 0.84, grown: 1 };
-var XP_LEAD = 3, XP_SUPPORT = 1, XP_PLANET = 1;
+var XP_LEAD = 3, XP_SUPPORT = 1, XP_LAND = 1;
 
 /* ---------------- baby dinos: the collection ---------------- */
 var BABY_COLORS = ['#3FBF4F', '#2F7BF5', '#FF8A1F', '#E53935', '#FFC53D', '#1FB5A8', '#7A8BA6', '#1E88E5', '#FF6A3D', '#2ECC71'];
@@ -428,32 +465,44 @@ var BABY_SPOTS = ['#FFFFFF', '#0B2A66', '#FFE08A', '#14532D', '#FF8A1F', '#9FE3F
 var BABY_NAMES = ['Chomp', 'Pebble', 'Rocket', 'Sprout', 'Nugget', 'Bolt', 'Comet', 'Biscuit', 'Tank', 'Zippy', 'Nacho', 'Boulder',
   'Scout', 'Blaze', 'Pickle', 'Turbo', 'Fizz', 'Crunch', 'Waffle', 'Gizmo', 'Stomper', 'Jet', 'Rusty', 'Pip', 'Moose', 'Ziggy',
   'Taco', 'Flint', 'Buster', 'Cosmo', 'Spud', 'Diesel', 'Noodle', 'Ranger', 'Bonk', 'Echo'];
-var BABY_KINDS = ['rex', 'trike', 'dash', 'swoop'];
-/* A baby is fully determined by its seed. The power is drawn last, so the
-   babies hatched before powers existed keep every other feature. */
-function makeBaby(seed){
-  var r = rng(seed);
+/* Babies hatched before Stretch and Spike (generation 1) are drawn from the
+   old lists, so nobody he already has changes into somebody else. */
+var BABY_KINDS_1 = ['rex', 'trike', 'dash', 'swoop'];
+var POWERS_1 = ['lasso', 'bubble', 'magnet', 'tunnel', 'frost'];
+var BABY_KINDS = CHAR_ORDER;
+var BABY_GEN = 2;
+/* the golden egg's baby: a gold coat and white spots, whatever its kind */
+var GOLD = { body: '#FFC21A', spots: '#FFFFFF' };
+/* A baby is fully determined by its seed, its generation and whether it came
+   from a golden egg. The power is drawn last, so the babies hatched before
+   powers existed keep every other feature. */
+function makeBaby(seed, gen, gold){
+  var r = rng(seed), g = gen >= 2 ? 2 : 1;
   var body = pickOne(BABY_COLORS, r), spots = pickOne(BABY_SPOTS, r);
   if (spots === body) spots = '#FFFFFF';
-  var b = { id: 'b' + (seed >>> 0).toString(36), kind: pickOne(BABY_KINDS, r), body: body, spots: spots,
+  var b = { id: (gold ? 'g' : 'b') + (seed >>> 0).toString(36), kind: pickOne(g === 2 ? BABY_KINDS : BABY_KINDS_1, r), body: body, spots: spots,
             name: pickOne(BABY_NAMES, r), pattern: pickOne(['spots', 'stripes', 'plain'], r), hat: pickOne(['none', 'helmet', 'cap', 'none'], r) };
-  b.power = pickOne(POWER_ORDER, r);
+  b.power = pickOne(g === 2 ? POWER_ORDER : POWERS_1, r);
+  b.gen = g;
+  if (gold){ b.gold = true; b.body = GOLD.body; b.spots = GOLD.spots; b.pattern = 'spots'; }
   return b;
 }
+function babyOf(rec){ return makeBaby(rec.seed, rec.gen || 1, !!rec.gold); }
 
 /* ---------------- members: originals and babies as one list ---------------- */
 function originalMember(key){
   var c = CHARS[key];
   return { id: key, kind: key, name: c.name, orig: true, body: null, spots: null, pattern: null, power: null };
 }
-/* Everyone he has: the four originals, then every baby in hatching order. */
+/* Everyone he has: the six originals, then every baby in hatching order. */
 function allMembers(settings){
   var out = CHAR_ORDER.map(originalMember), seen = {};
   ((settings && settings.babies) || []).forEach(function(rec){
-    var b = makeBaby(rec.seed);
+    var b = babyOf(rec);
     if (seen[b.id]) return;
     seen[b.id] = 1;
-    out.push({ id: b.id, kind: b.kind, name: b.name, orig: false, body: b.body, spots: b.spots, pattern: b.pattern, power: b.power, seed: rec.seed >>> 0 });
+    out.push({ id: b.id, kind: b.kind, name: b.name, orig: false, body: b.body, spots: b.spots, pattern: b.pattern, power: b.power,
+               seed: rec.seed >>> 0, gen: b.gen, gold: !!b.gold });
   });
   return out;
 }
@@ -468,10 +517,12 @@ function memberInfo(settings, id){
   var out = {};
   Object.keys(m).forEach(function(k){ out[k] = m[k]; });
   out.xp = xp; out.level = level; out.grow = grow; out.scale = GROW_SCALE[grow];
+  var hat = settings && settings.gear && settings.gear[id];
+  out.hat = hat && gearUnlocked(settings.fossils || 0).indexOf(hat) !== -1 ? hat : null;
   return out;
 }
 function rosterMembers(settings){
-  return ((settings && settings.roster) || CHAR_ORDER).map(function(id){ return memberInfo(settings, id); }).filter(Boolean);
+  return ((settings && settings.roster) || CHAR_ORDER.slice(0, ROSTER_SIZE)).map(function(id){ return memberInfo(settings, id); }).filter(Boolean);
 }
 var ROSTER_SIZE = 4;
 /* Put a member into the crew in place of another (both by id). */
@@ -496,32 +547,36 @@ function awardScene(crew, plan){
   });
   return { crew: c, ups: ups };
 }
-function awardPlanet(crew, roster){
+function awardLand(crew, roster){
   var c = {};
   Object.keys(crew || {}).forEach(function(k){ c[k] = crew[k]; });
   var ups = [];
   (roster || []).forEach(function(id){
     var before = c[id] == null ? (CHARS[id] ? ORIGINAL_START_XP : 0) : c[id];
-    c[id] = before + XP_PLANET;
+    c[id] = before + XP_LAND;
     if (levelFor(c[id]) > levelFor(before)) ups.push({ id: id, level: levelFor(c[id]) });
   });
   return { crew: c, ups: ups };
 }
 
-/* ---------------- rocket parts and skins ----------------
-   Beating the week's boss earns a rocket part; parts unlock new paint for
-   the rocket he flies between planets. */
-var ROCKET_SKINS = [
-  { id:'classic', name:'Classic',      parts:0,  body:'#FFFFFF', nose:'#FF8A1F', fins:'#1E6FE8', window:'#8FE3FF', stripe:null },
-  { id:'blaze',   name:'Blaze',        parts:1,  body:'#FF8A1F', nose:'#E53935', fins:'#FFC53D', window:'#FFF4DC', stripe:'#FFC53D' },
-  { id:'ocean',   name:'Deep Blue',    parts:2,  body:'#1E6FE8', nose:'#8FE3FF', fins:'#0B2A66', window:'#FFFFFF', stripe:'#8FE3FF' },
-  { id:'jungle',  name:'Dino Green',   parts:3,  body:'#3FBF4F', nose:'#FFC53D', fins:'#1E7A2E', window:'#FFFFFF', stripe:'#FFC53D' },
-  { id:'gold',    name:'Gold Rush',    parts:5,  body:'#FFC53D', nose:'#FF8A1F', fins:'#B9770E', window:'#FFFFFF', stripe:'#FFFFFF' },
-  { id:'shadow',  name:'Night Rider',  parts:7,  body:'#14213D', nose:'#FF8A1F', fins:'#1E6FE8', window:'#8FE3FF', stripe:'#FF8A1F' },
-  { id:'lava',    name:'Lava Blaster', parts:10, body:'#E53935', nose:'#14213D', fins:'#FF8A1F', window:'#FFE08A', stripe:'#FFC53D' }
+/* ---------------- fossils and dress-up ----------------
+   Every island spot he finishes digs up a fossil, and calming the volcano
+   at the end of the week digs up three more. Fossils are never spent: the
+   more he has, the more hats and gear there are to dress the crew in. */
+var FOSSIL_LAND = 1, FOSSIL_BOSS = 3;
+var GEAR = [
+  { id:'party',     name:'Party Hat',      fossils:0 },
+  { id:'cowboy',    name:'Cowboy Hat',     fossils:3 },
+  { id:'shades',    name:'Cool Shades',    fossils:6 },
+  { id:'propeller', name:'Propeller Cap',  fossils:10 },
+  { id:'pirate',    name:'Pirate Hat',     fossils:15 },
+  { id:'chef',      name:'Chef Hat',       fossils:20 },
+  { id:'knight',    name:'Knight Helmet',  fossils:26 },
+  { id:'flower',    name:'Flower Crown',   fossils:32 },
+  { id:'crown',     name:'Royal Crown',    fossils:40 }
 ];
-function skinsUnlocked(parts){ return ROCKET_SKINS.filter(function(k){ return (parts || 0) >= k.parts; }).map(function(k){ return k.id; }); }
-function nextSkin(parts){ var n = null; ROCKET_SKINS.forEach(function(k){ if (!n && k.parts > (parts || 0)) n = k; }); return n; }
+function gearUnlocked(fossils){ return GEAR.filter(function(g){ return (fossils || 0) >= g.fossils; }).map(function(g){ return g.id; }); }
+function nextGear(fossils){ var n = null; GEAR.forEach(function(g){ if (!n && g.fossils > (fossils || 0)) n = g; }); return n; }
 
 /* A grown-up can give any word an example sentence; the word must be in it. */
 function normalizeSentences(obj, words){
@@ -539,7 +594,7 @@ function sentenceHas(text, word){
 }
 
 /* ---------------- settings, repaired on the way in ---------------- */
-var SETTINGS_VERSION = 2;
+var SETTINGS_VERSION = 3;
 function normalizeSettings(obj){
   var o = obj && typeof obj === 'object' ? obj : {};
   var words = Array.isArray(o.words) ? normalizeWords(o.words).slice(0, MAX_WORDS) : DEFAULT_WORDS.slice();
@@ -554,14 +609,21 @@ function normalizeSettings(obj){
       if (i >= 0 && i < words.length && Math.floor(i) === i && typeof seed === 'number') eggs[i] = seed >>> 0;
     });
   }
+  var gs = typeof wk.goldSeed === 'number' ? wk.goldSeed >>> 0 : null;
   var week = wk.id === id
     ? { id: id, done: (Array.isArray(wk.done) ? wk.done : []).filter(function(i){ return i >= 0 && i < words.length && Math.floor(i) === i; }),
-        offset: Math.max(0, Math.floor(Number(wk.offset) || 0)) % PLANETS.length, finale: !!wk.finale, eggs: eggs }
-    : { id: id, done: [], offset: hashStr(id) % PLANETS.length, finale: false, eggs: {} };
+        offset: Math.max(0, Math.floor(Number(wk.offset) || 0)) % LANDS.length, finale: !!wk.finale, eggs: eggs,
+        goldSeed: gs, goldHatched: !!wk.goldHatched && gs != null }
+    : { id: id, done: [], offset: hashStr(id) % LANDS.length, finale: false, eggs: {}, goldSeed: null, goldHatched: false };
   var seenDone = {};
   week.done = week.done.filter(function(i){ if (seenDone[i]) return false; seenDone[i] = 1; return true; });
   var babies = (Array.isArray(o.babies) ? o.babies : []).filter(function(b){ return b && typeof b.seed === 'number'; })
-    .slice(-200).map(function(b){ return { seed: b.seed >>> 0, at: Number(b.at) || 0 }; });
+    .slice(-200).map(function(b){
+      var rec = { seed: b.seed >>> 0, at: Number(b.at) || 0 };
+      if (b.gen >= 2) rec.gen = 2;
+      if (b.gold) rec.gold = true;
+      return rec;
+    });
   var sceneIds = {};
   SCENES.forEach(function(s){ sceneIds[s.id] = 1; });
   /* the crew: experience per member, and the four he takes on missions */
@@ -575,11 +637,15 @@ function normalizeSettings(obj){
   var roster = [], inR = {};
   (Array.isArray(o.roster) ? o.roster : []).forEach(function(id){ if (valid[id] && !inR[id] && roster.length < ROSTER_SIZE){ roster.push(id); inR[id] = 1; } });
   CHAR_ORDER.forEach(function(id){ if (roster.length < ROSTER_SIZE && !inR[id]){ roster.push(id); inR[id] = 1; } });
-  var skin = ROCKET_SKINS.some(function(k){ return k.id === o.skin; }) ? o.skin : ROCKET_SKINS[0].id;
-  var parts = Math.max(0, Math.floor(Number(o.parts) || 0));
+  /* fossils: a week's rocket part from before the island counts as a boss win */
+  var fossils = Math.max(Math.floor(Number(o.fossils) || 0), Math.floor(Number(o.parts) || 0) * FOSSIL_BOSS, 0);
+  var open = gearUnlocked(fossils), gear = {};
+  if (o.gear && typeof o.gear === 'object') Object.keys(o.gear).forEach(function(k){
+    if (valid[k] && open.indexOf(o.gear[k]) !== -1) gear[k] = o.gear[k];
+  });
   return {
     v: SETTINGS_VERSION, words: words, stats: stats, week: week, babies: babies,
-    crew: crew, roster: roster, parts: parts, skin: skinsUnlocked(parts).indexOf(skin) !== -1 ? skin : ROCKET_SKINS[0].id,
+    crew: crew, roster: roster, fossils: fossils, gear: gear, metNew: !!o.metNew,
     sentences: normalizeSentences(o.sentences, words),
     aSound: A_SOUND_CHOICES.indexOf(o.aSound) !== -1 ? o.aSound : LETTER_SOUND.A,
     eSound: E_SOUND_CHOICES.indexOf(o.eSound) !== -1 ? o.eSound : LETTER_SOUND.E,
@@ -589,8 +655,8 @@ function normalizeSettings(obj){
   };
 }
 function letterOverrides(s){ return { A: (s && s.aSound) || LETTER_SOUND.A, E: (s && s.eSound) || LETTER_SOUND.E }; }
-/* Next planet to visit: the first not yet done, else -1 (the finale). */
-function nextPlanet(week, count){
+/* Next island spot to visit: the first not yet done, else -1 (the finale). */
+function nextLand(week, count){
   for (var i = 0; i < count; i++) if ((week.done || []).indexOf(i) === -1) return i;
   return -1;
 }
@@ -603,26 +669,35 @@ function nextPlanet(week, count){
    crew (a flyer for Tug of War, a jumper for Boost Jump). Events name
    crew MEMBERS, so two raptors can share a scene and a baby can lead one.
    ============================================================ */
+/*
+  Beat lengths in ms. Scenes are shows, not transitions: every grab is slow
+  enough to see what happened, and nobody runs off the screen in a blur
+  (the stage also caps how fast anyone may travel on the way out).
+*/
 var BEAT = {
-  enter:700, approach:420, exit:640, roar:900, snatch:520, reach:640, tailwhip:520,
-  paw:620, stomp:620, charge:1100, scoop:300, backcatch:520, skid:460, zoom:900, sweep:260,
-  spindash:1300, orbit:300, dive:640, loop:760, glide:1300, ride:300, wave:520,
-  ship:900, beam:520, beamup:700, toss:560, catch:320, grab:360, tug:760, pop:420,
-  fall:620, getup:420, carry:520, cheer:520, notice:360, march:1600, follow:1600,
-  lasso:980, hitch:600, tow:1500, stringline:1000, jetgrab:640, hook:760, jumpgrab:760,
-  boost:900, vault:760, rigrope:1100, ropepick:280, wobble:900, ropejump:700, anchor:500,
-  bubble:1000, magnet:800, pull:560, dig:760, popup:640, frost:1000, slide:600, react:700,
-  slip:500, fetch:1700, showoff:1200, victory:900
+  enter:900, approach:520, exit:1100, roar:1000, snatch:700, reach:700, tailwhip:700,
+  paw:700, stomp:760, charge:1700, scoop:320, backcatch:700, skid:520, zoom:1500, sweep:260,
+  spindash:1500, orbit:300, dive:900, loop:900, glide:2000, ride:320, wave:600,
+  toss:700, catch:360, grab:420, tug:900, pop:480,
+  fall:700, getup:520, carry:900, cheer:640, notice:420, march:2200, follow:2200,
+  lasso:1300, hitch:760, tow:2300, stringline:1100, jetgrab:850, hook:1000, jumpgrab:950,
+  boost:1100, vault:950, rigrope:1200, ropepick:280, wobble:1000, ropejump:800, anchor:600,
+  bubble:1300, magnet:900, pull:800, dig:900, popup:760, frost:1100, slide:760, react:800,
+  slip:600, rescue:3000, showoff:1300, victory:1000,
+  scatter:1400, chomp:1150, pickup:1250, haul:2000, crane:2000, thump:900, neckslide:2300,
+  hopon:1000, liftgrab:1700, liftdown:1100, tailflip:1500, platewalk:1400, platecatch:700,
+  vine:1100, vineswing:2000, vinegrab:400, geyser:1300
 };
 /* scenes are shows, not transitions: long enough for a six-year-old to
    enjoy the dinosaurs doing their thing, capped so practice keeps moving */
-var SCENE_TARGET_MIN = 3500, SCENE_TARGET_MAX = 17000, SCENE_HARD_MAX = 24000;
-var TAKE_KINDS = { snatch:1, tailwhip:1, scoop:1, backcatch:1, sweep:1, orbit:1, dive:1, ride:1, beam:1, catch:1, carry:1, follow:1,
-  lasso:1, hitch:1, jetgrab:1, hook:1, jumpgrab:1, vault:1, ropepick:1, bubble:1, pull:1, popup:1, slide:1, fetch:1 };
+var SCENE_TARGET_MIN = 4500, SCENE_TARGET_MAX = 22000, SCENE_HARD_MAX = 30000;
+var TAKE_KINDS = { snatch:1, tailwhip:1, scoop:1, backcatch:1, sweep:1, orbit:1, dive:1, ride:1, catch:1, carry:1, follow:1,
+  lasso:1, hitch:1, jetgrab:1, hook:1, jumpgrab:1, vault:1, ropepick:1, bubble:1, pull:1, popup:1, slide:1, rescue:1,
+  chomp:1, pickup:1, crane:1, neckslide:1, liftgrab:1, tailflip:1, platecatch:1, vinegrab:1, geyser:1 };
 /* Beats that let go of a letter someone had (it must then be taken again). */
 var RELEASE_KINDS = { slip:1 };
 /* Beats that leave the character off stage. */
-var EXIT_KINDS = { exit:1, charge:1, zoom:1, glide:1, beamup:1, carry:1, march:1, tow:1, fetch:1 };
+var EXIT_KINDS = { exit:1, charge:1, zoom:1, glide:1, carry:1, march:1, tow:1 };
 
 function makeTimeline(){
   var events = [];
@@ -651,14 +726,39 @@ function addWatcher(tl, c, from, to){
   tl.push(Math.max(mid + BEAT.react, to - BEAT.react) + BEAT.react, BEAT.exit, 'exit', { char:w, dir:c.exitFor(w, 3) });
 }
 
-/* A fumble: a letter slips, and a buddy runs in, catches it and runs off
-   with it. Only when there is a buddy to do it and letters enough. */
+/* A fumble: a letter slips, and a buddy comes to the rescue in his own way
+   (a lasso, a magnet, a bubble, a hook, a long neck, a tail flip...). With
+   `give`, he hands it back to whoever dropped it; otherwise he takes it off
+   himself. Returns when the rescue is over. */
 function wantFumble(c){ return c.fumbler && c.letters >= 3 && c.r() < 0.6; }
-function addFumble(tl, c, letter, at, dir){
+function addFumble(tl, c, letter, at, dir, give){
   var H = c.fumbler;
-  tl.push(Math.max(0, at - 700), BEAT.enter, 'enter', { char:H, side:'far', stay:'edge' });
+  tl.push(Math.max(0, at - 900), BEAT.enter, 'enter', { char:H, side:'far', stay:'edge' });
   tl.push(at, BEAT.slip, 'slip', { letter:letter });
-  tl.push(at + 160, BEAT.fetch, 'fetch', { char:H, letter:letter, dir:dir || c.exitFor(H, 0) });
+  var r0 = at + 350;
+  tl.push(r0, BEAT.rescue, 'rescue', { char:H, letter:letter, method:c.rescueFor(H), give:give || null });
+  tl.push(r0 + BEAT.rescue, BEAT.exit, 'exit', { char:H, dir:dir || c.exitFor(H, 0) });
+  return r0 + BEAT.rescue;
+}
+/* the end of a carrying scene: walk on with the load; perhaps the top one
+   wobbles off, a buddy rescues it and hands it back, and off they go */
+function haulAndGo(tl, c, t, top, dir, chance){
+  var L = c.lead;
+  tl.push(t, BEAT.haul, 'haul', { char:L, dir:dir });
+  t += BEAT.haul;
+  var fumble = c.fumbler && c.letters >= 2 && c.r() < chance;
+  if (fumble){
+    var end = addFumble(tl, c, top, t - 500, c.exitFor(c.fumbler, 1), L);
+    tl.push(t - 200, BEAT.react, 'react', { char:L, mood:'gasp' });
+    t = end - 300;
+    tl.push(t, BEAT.react, 'react', { char:L, mood:'cheer' });
+    t += BEAT.react;
+  } else {
+    tl.push(t, BEAT.cheer, 'cheer', { char:L });
+    t += BEAT.cheer;
+  }
+  tl.push(t, BEAT.exit, 'exit', { char:L, dir:dir });
+  return { t: t, fumble: fumble };
 }
 
 var SCENES = [
@@ -668,9 +768,9 @@ var SCENES = [
   { id:'roar-float', name:'Big Roar', lead:{ kind:'rex' }, weight:10, min:1, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    tl.push(t, BEAT.roar, 'roar', { char:L }); t += BEAT.roar;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 470, BEAT.snatch, 'snatch', { char:L, letter:c.letters - 1 - i });
-    var last = t + Math.max(0, c.letters - 1) * 470 + BEAT.snatch;
+    tl.push(t, BEAT.roar, 'roar', { char:L }); t += BEAT.roar + 200;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 700, BEAT.snatch, 'snatch', { char:L, letter:c.letters - 1 - i });
+    var last = t + Math.max(0, c.letters - 1) * 700 + BEAT.snatch;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:'up' });
     addWatcher(tl, c, 300, last + BEAT.cheer);
@@ -684,25 +784,38 @@ var SCENES = [
     for (var i = 0; i < c.letters; i++){
       tl.push(t, BEAT.approach, 'approach', { char:L, letter:i }); t += BEAT.approach;
       if (i === 0){ tl.push(t, BEAT.reach, 'reach', { char:L, letter:i }); t += BEAT.reach; }
-      tl.push(t, BEAT.tailwhip, 'tailwhip', { char:L, letter:i, dir: sideDir(i) }); t += BEAT.tailwhip - 80;
+      tl.push(t, BEAT.tailwhip, 'tailwhip', { char:L, letter:i, dir: sideDir(i) }); t += BEAT.tailwhip;
     }
     tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
     tl.push(t, BEAT.exit, 'exit', { char:L, dir:'up' });
     return tl;
   } },
 
+  /* A little roar and the letters hop down and scurry off, giggling. He
+     chases them round and chomps each one up. */
+  { id:'chomp-chase', name:'Chomp Chase', lead:{ kind:'rex' }, weight:10, min:2, watch:true, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    tl.push(t, BEAT.scatter, 'scatter', { char:L }); t += BEAT.scatter;
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.chomp, 'chomp', { char:L, letter:i }); t += BEAT.chomp; }
+    tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
+    tl.push(t, BEAT.exit, 'exit', { char:L, dir:'up' });
+    addWatcher(tl, c, 300, t);
+    return tl;
+  } },
+
   /* The letters leap up onto a line strung high across the sky; Rex jets
      up under each one and grabs it in his jaws. */
-  { id:'rocket-jump', name:'Rocket Jump', lead:{ kind:'rex' }, level:2, weight:9, min:1, watch:true, build: function(c){
+  { id:'jet-jump', name:'Jet Jump', lead:{ kind:'rex' }, level:2, weight:9, min:1, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter - 200;
     tl.push(t, BEAT.stringline, 'stringline', {}); t += BEAT.stringline;
     /* sometimes his first big twang of the line knocks the far letter off */
     var fumble = wantFumble(c), far = c.letters - 1;
     var grabs = fumble ? c.letters - 1 : c.letters;
-    for (var i = 0; i < grabs; i++) tl.push(t + i * 600, BEAT.jetgrab, 'jetgrab', { char:L, letter:(fumble ? c.letters - 2 : c.letters - 1) - i });
+    for (var i = 0; i < grabs; i++) tl.push(t + i * 900, BEAT.jetgrab, 'jetgrab', { char:L, letter:(fumble ? c.letters - 2 : c.letters - 1) - i });
     if (fumble) addFumble(tl, c, far, t + BEAT.jetgrab * 0.6, 'right');
-    var last = t + Math.max(0, grabs - 1) * 600 + BEAT.jetgrab;
+    var last = t + Math.max(0, grabs - 1) * 900 + BEAT.jetgrab;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:'up' });
     if (!fumble) addWatcher(tl, c, 400, last + BEAT.cheer);
@@ -710,16 +823,30 @@ var SCENES = [
   } },
 
   /* ---------- TRIKE ---------- */
-  { id:'stomp-charge', name:'Stomp & Charge', lead:{ kind:'trike' }, weight:10, min:1, build: function(c){
+  { id:'stomp-charge', name:'Stomp & Charge', lead:{ kind:'trike' }, weight:9, min:1, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    tl.push(t, BEAT.stomp, 'stomp', { char:L, mode:'drop' }); t += BEAT.stomp + 200;
+    tl.push(t, BEAT.stomp, 'stomp', { char:L, mode:'drop' }); t += BEAT.stomp + 300;
     /* he backs up, paws the ground, snorts... paws again... and CHARGE */
     tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw;
-    tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw + 150;
-    var run = BEAT.charge + c.letters * 90;
+    tl.push(t, BEAT.paw, 'paw', { char:L }); t += BEAT.paw + 200;
+    var run = BEAT.charge + c.letters * 120;
     tl.push(t, run, 'charge', { char:L, dir:'right' });
-    for (var i = 0; i < c.letters; i++) tl.push(t + 200 + i * Math.floor((run - 400) / Math.max(1, c.letters)), BEAT.scoop, 'scoop', { char:L, letter:c.letters - 1 - i });
+    for (var i = 0; i < c.letters; i++) tl.push(t + 300 + i * Math.floor((run - 600) / Math.max(1, c.letters)), BEAT.scoop, 'scoop', { char:L, letter:c.letters - 1 - i });
+    return tl;
+  } },
+
+  /* STOMP & STACK: one stomp and the letters tumble to the ground. He picks
+     each one up on his horns and stacks them into a tower — last letter
+     first, so the word reads top to bottom — then sets off with it. The
+     top one may wobble off, and a buddy saves it and puts it back. */
+  { id:'stomp-stack', name:'Stomp & Stack', lead:{ kind:'trike' }, weight:12, min:2, watch:true, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    tl.push(t, BEAT.stomp, 'stomp', { char:L, mode:'drop' }); t += BEAT.stomp + 400;
+    for (var k = 0; k < c.letters; k++){ tl.push(t, BEAT.pickup, 'pickup', { char:L, letter:c.letters - 1 - k }); t += BEAT.pickup; }
+    var end = haulAndGo(tl, c, t, 0, 'right', 0.85);
+    if (!end.fumble) addWatcher(tl, c, 300, end.t);
     return tl;
   } },
 
@@ -727,8 +854,8 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     tl.push(t, BEAT.stomp, 'stomp', { char:L, mode:'launch' }); t += BEAT.stomp;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 380, BEAT.backcatch, 'backcatch', { char:L, letter:c.letters - 1 - i });
-    var last = t + Math.max(0, c.letters - 1) * 380 + BEAT.backcatch;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 520, BEAT.backcatch, 'backcatch', { char:L, letter:c.letters - 1 - i });
+    var last = t + Math.max(0, c.letters - 1) * 520 + BEAT.backcatch;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:'left' });
     addWatcher(tl, c, 200, last + BEAT.cheer);
@@ -740,11 +867,11 @@ var SCENES = [
   { id:'tow-truck', name:'Tow Truck', lead:{ kind:'trike' }, level:2, weight:9, min:1, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hitch, 'hitch', { char:L, letter:i }); t += BEAT.hitch - 60; }
-    t += 120;
-    tl.push(t, BEAT.tow + c.letters * 110, 'tow', { char:L, dir:'right' });
-    /* a knot comes undone as he pulls away; a buddy grabs the letter and chases after him */
-    if (wantFumble(c)) addFumble(tl, c, 0, t + 380, 'right');
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hitch, 'hitch', { char:L, letter:i }); t += BEAT.hitch; }
+    t += 200;
+    tl.push(t, BEAT.tow + c.letters * 150, 'tow', { char:L, dir:'right' });
+    /* a knot comes undone as he pulls away; a buddy saves the letter */
+    if (wantFumble(c)) addFumble(tl, c, 0, t + 500, 'right');
     return tl;
   } },
 
@@ -762,7 +889,7 @@ var SCENES = [
       var i = c.letters - 1 - k;
       tl.push(t, BEAT.boost, 'boost', { char:L, other:P, letter:i });
       tl.push(t + 140, BEAT.vault, 'vault', { char:P, other:L, letter:i });
-      t += BEAT.boost + 60;
+      t += BEAT.boost + 100;
     }
     tl.push(t, BEAT.react, 'react', { char:L, mood:'cheer' });
     tl.push(t, BEAT.cheer, 'cheer', { char:P });
@@ -776,33 +903,33 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     /* a warm-up lap: across, skid, back, skid — then the real run */
-    tl.push(t, 700, 'dashpass', { char:L }); t += 700;
+    tl.push(t, 900, 'dashpass', { char:L }); t += 900;
     tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
-    tl.push(t, 700, 'dashpass', { char:L }); t += 700;
+    tl.push(t, 900, 'dashpass', { char:L }); t += 900;
     tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
     var missed = c.letters >= 3 ? c.letters - 1 : -1;
     var takeN = missed === -1 ? c.letters : c.letters - 1;
     if (missed === -1){
       tl.push(t, BEAT.zoom, 'zoom', { char:L, dir:'right' });
-      for (var i = 0; i < takeN; i++) tl.push(t + 120 + i * 110, BEAT.sweep, 'sweep', { char:L, letter:i });
+      for (var i = 0; i < takeN; i++) tl.push(t + 150 + i * 130, BEAT.sweep, 'sweep', { char:L, letter:i });
       return tl;
     }
-    tl.push(t, 700, 'dashpass', { char:L });
-    for (var j = 0; j < takeN; j++) tl.push(t + 100 + j * 100, BEAT.sweep, 'sweep', { char:L, letter:j });
-    t += 700;
+    tl.push(t, 900, 'dashpass', { char:L });
+    for (var j = 0; j < takeN; j++) tl.push(t + 120 + j * 120, BEAT.sweep, 'sweep', { char:L, letter:j });
+    t += 900;
     tl.push(t, BEAT.skid, 'skid', { char:L }); t += BEAT.skid;
-    tl.push(t, BEAT.notice, 'notice', { char:L, letter:missed }); t += BEAT.notice;
+    tl.push(t, BEAT.notice, 'notice', { char:L, letter:missed }); t += BEAT.notice + 200;
     tl.push(t, BEAT.zoom, 'zoom', { char:L, dir:'left' });
-    tl.push(t + 150, BEAT.sweep, 'sweep', { char:L, letter:missed });
+    tl.push(t + 180, BEAT.sweep, 'sweep', { char:L, letter:missed });
     return tl;
   } },
 
   { id:'whirlwind', name:'Whirlwind', lead:{ kind:'dash' }, weight:8, min:2, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    var spin = Math.max(2200, 250 + c.letters * 180 + BEAT.orbit + 900);
+    var spin = Math.max(2600, 250 + c.letters * 220 + BEAT.orbit + 1100);
     tl.push(t, spin, 'spindash', { char:L });
-    for (var i = 0; i < c.letters; i++) tl.push(t + 250 + i * 180, BEAT.orbit, 'orbit', { char:L, letter:i });
+    for (var i = 0; i < c.letters; i++) tl.push(t + 250 + i * 220, BEAT.orbit, 'orbit', { char:L, letter:i });
     addWatcher(tl, c, 300, t + spin);
     t += spin;
     tl.push(t, BEAT.zoom, 'zoom', { char:L, dir:'left' });
@@ -813,8 +940,8 @@ var SCENES = [
   { id:'lasso-roundup', name:'Lasso Round-up', lead:{ kind:'dash', power:'lasso' }, level:2, powerLevel:1, weight:10, min:1, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.lasso, 'lasso', { char:L, letter:i }); t += BEAT.lasso - 180; }
-    t += 180;
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.lasso, 'lasso', { char:L, letter:i }); t += BEAT.lasso - 200; }
+    t += 200;
     tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
     tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
     addWatcher(tl, c, 300, t);
@@ -826,7 +953,7 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter - 200;
     tl.push(t, BEAT.stringline, 'stringline', {}); t += BEAT.stringline;
-    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.jumpgrab, 'jumpgrab', { char:L, letter:i }); t += BEAT.jumpgrab - 40; }
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.jumpgrab, 'jumpgrab', { char:L, letter:i }); t += BEAT.jumpgrab; }
     tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
     tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
     addWatcher(tl, c, 400, t);
@@ -837,8 +964,8 @@ var SCENES = [
   { id:'dive-bomb', name:'Dive Bomb', lead:{ kind:'swoop' }, weight:10, min:1, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 600, BEAT.dive, 'dive', { char:L, letter:i });
-    var last = t + Math.max(0, c.letters - 1) * 600 + BEAT.dive;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 1500, BEAT.dive, 'dive', { char:L, letter:i });
+    var last = t + Math.max(0, c.letters - 1) * 1500 + BEAT.dive;
     tl.push(last, BEAT.loop, 'loop', { char:L });
     tl.push(last + BEAT.loop, BEAT.exit, 'exit', { char:L, dir:'up' });
     addWatcher(tl, c, 300, last + BEAT.loop);
@@ -849,50 +976,130 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     tl.push(t, BEAT.wave, 'wave', { char:L }); t += BEAT.wave;
-    var run = BEAT.glide + c.letters * 120;
+    var run = BEAT.glide + c.letters * 160;
     tl.push(t, run, 'glide', { char:L, dir:'right' });
-    var step = Math.floor((run - 500) / Math.max(1, c.letters));
-    for (var i = 0; i < c.letters; i++) tl.push(t + 150 + i * step, BEAT.ride, 'ride', { char:L, letter:c.letters - 1 - i });
+    var step = Math.floor((run - 700) / Math.max(1, c.letters));
+    for (var i = 0; i < c.letters; i++) tl.push(t + 200 + i * step, BEAT.ride, 'ride', { char:L, letter:c.letters - 1 - i });
     /* the first one aboard bounces off as he picks up speed */
-    if (wantFumble(c)) addFumble(tl, c, c.letters - 1, t + 150 + (c.letters - 1) * step + BEAT.ride + 120, 'right');
+    if (wantFumble(c)) addFumble(tl, c, c.letters - 1, t + 200 + (c.letters - 1) * step + BEAT.ride + 160, 'right');
     return tl;
   } },
 
   /* He flies over trailing a rope with a hook, hooks each letter off the
      ground and flies away with the word dangling beneath him. */
   { id:'sky-hook', name:'Sky Hook', lead:{ kind:'swoop' }, level:2, weight:9, min:1, watch:true, build: function(c){
-    /* a slower dance: each letter gets its own swoop */
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.hook, 'hook', { char:L, letter:i }); t += BEAT.hook; }
-    /* on the way up the bottom letter wriggles loose, and a buddy dives in to catch it */
+    /* on the way up the bottom letter wriggles loose, and a buddy saves it */
     var fumble = wantFumble(c);
-    if (fumble){ addFumble(tl, c, c.letters - 1, t + 150, c.exitFor(c.fumbler, 1)); t += 500; }
+    if (fumble){ addFumble(tl, c, c.letters - 1, t + 200, c.exitFor(c.fumbler, 1)); t += 600; }
     tl.push(t, BEAT.exit + 400, 'exit', { char:L, dir:'up' });
     if (!fumble) addWatcher(tl, c, 300, t);
+    return tl;
+  } },
+
+  /* ---------- STRETCH (brachiosaurus) ---------- */
+  /* CRANE NECK: he plods in, stretches his neck right up to each letter,
+     plucks it gently and lowers it onto his back. */
+  { id:'crane-lift', name:'Crane Neck', lead:{ kind:'brachio' }, weight:12, min:1, watch:true, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.crane, 'crane', { char:L, letter:i }); t += BEAT.crane; }
+    var end = c.letters >= 3 ? haulAndGo(tl, c, t, 0, 'right', 0.5) : null;
+    if (!end){
+      tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
+      tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
+    }
+    if (!end || !end.fumble) addWatcher(tl, c, 300, end ? end.t : t);
+    return tl;
+  } },
+
+  /* NECK SLIDE: a thump of his tail and the letters tumble down. He puts
+     his nose to each one, lifts his head high, and — wheee — it slides all
+     the way down his neck onto his back. */
+  { id:'neck-slide', name:'Neck Slide', lead:{ kind:'brachio' }, weight:12, min:1, watch:true, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    tl.push(t, BEAT.thump, 'thump', { char:L }); t += BEAT.thump + 300;
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.neckslide, 'neckslide', { char:L, letter:i }); t += BEAT.neckslide; }
+    tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
+    tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
+    addWatcher(tl, c, 300, t);
+    return tl;
+  } },
+
+  /* Team-up: a buddy hops up onto Stretch's head, and Stretch lifts him
+     right up to each letter like a crane, so he can grab it. */
+  { id:'neck-lift', name:'Neck Lift', lead:{ kind:'brachio' }, level:3, weight:10, min:1,
+    needs: function(c){ return !!c.find(function(m){ return m.kind === 'dash' || m.kind === 'rex'; }); },
+    build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    var P = c.find(function(m){ return m.kind === 'dash' || m.kind === 'rex'; }).id;
+    tl.push(t, BEAT.enter, 'enter', { char:L });
+    tl.push(t + 200, BEAT.enter, 'enter', { char:P, side:'far' }); t += BEAT.enter + 300;
+    tl.push(t, BEAT.hopon, 'hopon', { char:P, other:L }); t += BEAT.hopon;
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.liftgrab, 'liftgrab', { char:P, other:L, letter:i }); t += BEAT.liftgrab; }
+    tl.push(t, BEAT.liftdown, 'liftdown', { char:L, other:P }); t += BEAT.liftdown;
+    tl.push(t, BEAT.cheer, 'cheer', { char:P });
+    tl.push(t, BEAT.react, 'react', { char:L, mood:'cheer' });
+    tl.push(t + BEAT.cheer, BEAT.exit, 'exit', { char:P, dir:'left' });
+    tl.push(t + BEAT.react, BEAT.exit, 'exit', { char:L, dir:'right' });
+    return tl;
+  } },
+
+  /* ---------- SPIKE (stegosaurus) ---------- */
+  /* LETTER RAIN: he plods along right under the letters, and one by one
+     they drop off onto his back plates like a letter rack. */
+  { id:'letter-rain', name:'Letter Rain', lead:{ kind:'stego' }, weight:12, min:1, watch:true, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L, stay:'edge' }); t += BEAT.enter;
+    var gap = 950, walk = BEAT.platewalk + c.letters * gap;
+    tl.push(t, walk, 'platewalk', { char:L, dir:'right' });
+    for (var i = 0; i < c.letters; i++) tl.push(t + 700 + i * gap, BEAT.platecatch, 'platecatch', { char:L, letter:i });
+    t += walk;
+    tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
+    tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
+    addWatcher(tl, c, 300, t);
+    return tl;
+  } },
+
+  /* TAIL FLIP: a thump and the letters tumble down. He backs his spiky tail
+     up to each one and flips it high over his head onto his plates. */
+  { id:'tail-flip', name:'Tail Flip', lead:{ kind:'stego' }, weight:12, min:1, watch:true, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    tl.push(t, BEAT.thump, 'thump', { char:L }); t += BEAT.thump + 300;
+    for (var i = 0; i < c.letters; i++){ tl.push(t, BEAT.tailflip, 'tailflip', { char:L, letter:i }); t += BEAT.tailflip; }
+    var end = c.letters >= 3 ? haulAndGo(tl, c, t, 0, 'right', 0.5) : null;
+    if (!end){
+      tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
+      tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
+    }
+    if (!end || !end.fumble) addWatcher(tl, c, 300, end ? end.t : t);
     return tl;
   } },
 
   /* ---------- anyone who walks ---------- */
   /* A tightrope strung across the sky; the letters sit on it. He wobbles
      across, picking them up, nearly falls, and a buddy holds the rope. */
-  { id:'tightrope', name:'Tightrope', lead:{ walks:true }, level:3, weight:5, min:1, build: function(c){
+  { id:'tightrope', name:'Tightrope', lead:{ walks:true }, level:3, weight:4, min:1, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead, H = c.helper;
     tl.push(t, BEAT.enter, 'enter', { char:L, stay:'edge' });
     if (H) tl.push(t + 150, BEAT.enter, 'enter', { char:H, side:'far', stay:'edge' });
     t += BEAT.enter + 150;
     tl.push(t - 250, BEAT.rigrope, 'rigrope', {}); t += BEAT.rigrope - 250;
     if (H) tl.push(t - BEAT.anchor, BEAT.anchor, 'anchor', { char:H });
-    var walk = 900 + c.letters * 520 + BEAT.wobble;
+    var walk = 1100 + c.letters * 650 + BEAT.wobble;
     tl.push(t, walk, 'ropewalk', { char:L, dir:'right' });
     var wob = Math.min(c.letters - 1, Math.floor(c.letters / 2));
-    var tt = t + 700;
+    var tt = t + 850;
     for (var i = 0; i < c.letters; i++){
       tl.push(tt, BEAT.ropepick, 'ropepick', { char:L, letter:i });
-      tt += 520;
+      tt += 650;
       if (i === wob){
-        tl.push(tt - 200, BEAT.wobble, 'wobble', { char:L });
-        if (H) tl.push(tt - 100, BEAT.react, 'react', { char:H, mood:'gasp' });
+        tl.push(tt - 250, BEAT.wobble, 'wobble', { char:L });
+        if (H) tl.push(tt - 120, BEAT.react, 'react', { char:H, mood:'gasp' });
         tt += BEAT.wobble;
       }
     }
@@ -910,8 +1117,8 @@ var SCENES = [
   { id:'bubble-float', name:'Bubble Float', lead:{ power:'bubble' }, weight:12, min:1, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 480, BEAT.bubble, 'bubble', { char:L, letter:c.letters - 1 - i });
-    var last = t + Math.max(0, c.letters - 1) * 480 + BEAT.bubble;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 700, BEAT.bubble, 'bubble', { char:L, letter:c.letters - 1 - i });
+    var last = t + Math.max(0, c.letters - 1) * 700 + BEAT.bubble;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:c.exitFor(L, 0) });
     addWatcher(tl, c, 300, last + BEAT.cheer);
@@ -921,8 +1128,8 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     tl.push(t, BEAT.magnet, 'magnet', { char:L }); t += BEAT.magnet - 200;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 360, BEAT.pull, 'pull', { char:L, letter:c.letters - 1 - i });
-    var last = t + Math.max(0, c.letters - 1) * 360 + BEAT.pull;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 560, BEAT.pull, 'pull', { char:L, letter:c.letters - 1 - i });
+    var last = t + Math.max(0, c.letters - 1) * 560 + BEAT.pull;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:c.exitFor(L, 1) });
     addWatcher(tl, c, 300, last + BEAT.cheer);
@@ -933,7 +1140,7 @@ var SCENES = [
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     for (var i = 0; i < c.letters; i++){
       tl.push(t, BEAT.dig, 'dig', { char:L, letter:i }); t += BEAT.dig;
-      tl.push(t, BEAT.popup, 'popup', { char:L, letter:i }); t += BEAT.popup - 60;
+      tl.push(t, BEAT.popup, 'popup', { char:L, letter:i }); t += BEAT.popup;
     }
     tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
     tl.push(t, BEAT.exit, 'exit', { char:L, dir:c.exitFor(L, 2) });
@@ -944,28 +1151,46 @@ var SCENES = [
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
     tl.push(t, BEAT.frost, 'frost', { char:L }); t += BEAT.frost;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 380, BEAT.slide, 'slide', { char:L, letter:i });
-    var last = t + Math.max(0, c.letters - 1) * 380 + BEAT.slide;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 560, BEAT.slide, 'slide', { char:L, letter:i });
+    var last = t + Math.max(0, c.letters - 1) * 560 + BEAT.slide;
     tl.push(last, BEAT.cheer, 'cheer', { char:L });
     tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:c.exitFor(L, 3) });
     addWatcher(tl, c, 300, last + BEAT.cheer);
     return tl;
   } },
-
-  /* ---------- anyone ---------- */
-  { id:'beam-up', name:'Beam Me Up', lead:{}, weight:5, min:1, build: function(c){
+  /* VINE SWING: a jungle vine drops from the treetops; he grabs it and
+     swings right across, snatching every letter on the way. */
+  { id:'vine-swing', name:'Vine Swing', lead:{ power:'vine' }, weight:12, min:1, watch:true, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
-    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    tl.push(t, BEAT.wave, 'wave', { char:L }); t += BEAT.wave;
-    tl.push(t, BEAT.ship, 'shiparrive', {}); t += BEAT.ship;
-    for (var i = 0; i < c.letters; i++) tl.push(t + i * 260, BEAT.beam, 'beam', { letter:i });
-    var last = t + Math.max(0, c.letters - 1) * 260 + BEAT.beam;
-    tl.push(last, BEAT.beamup, 'beamup', { char:L });
-    tl.push(last + BEAT.beamup, BEAT.ship, 'shipleave', {});
+    tl.push(t, BEAT.enter, 'enter', { char:L, stay:'edge' }); t += BEAT.enter;
+    tl.push(t, BEAT.vine, 'vine', { char:L }); t += BEAT.vine;
+    var swing = BEAT.vineswing + c.letters * 260;
+    tl.push(t, swing, 'vineswing', { char:L, dir:'right' });
+    /* the swing's path is fixed in advance, so each grab is timed to the
+       moment he sweeps past that letter */
+    for (var i = 0; i < c.letters; i++) tl.push(t + Math.round(swing * (0.18 + 0.62 * (c.letters > 1 ? i / (c.letters - 1) : 0.5))), BEAT.vinegrab, 'vinegrab', { char:L, letter:i });
+    t += swing;
+    tl.push(t, BEAT.cheer, 'cheer', { char:L }); t += BEAT.cheer;
+    tl.push(t, BEAT.exit, 'exit', { char:L, dir:'right' });
+    addWatcher(tl, c, 300, t);
     return tl;
   } },
 
-  { id:'toss-relay', name:'Toss Relay', lead:{}, weight:7, min:2, needs: function(c){ return c.others.length >= 1; }, build: function(c){
+  /* ---------- anyone ---------- */
+  /* GEYSER SURPRISE: he stamps on a steaming spot, and one by one a geyser
+     whooshes each letter up out of the card and over into his arms. */
+  { id:'geyser-pop', name:'Geyser Surprise', lead:{}, weight:3, min:1, build: function(c){
+    var tl = makeTimeline(), t = 0, L = c.lead;
+    tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
+    tl.push(t, BEAT.wave, 'wave', { char:L }); t += BEAT.wave;
+    for (var i = 0; i < c.letters; i++) tl.push(t + i * 800, BEAT.geyser, 'geyser', { letter:i, other:L });
+    var last = t + Math.max(0, c.letters - 1) * 800 + BEAT.geyser;
+    tl.push(last, BEAT.cheer, 'cheer', { char:L });
+    tl.push(last + BEAT.cheer, BEAT.exit, 'exit', { char:L, dir:c.exitFor(L, 1) });
+    return tl;
+  } },
+
+  { id:'toss-relay', name:'Toss Relay', lead:{}, weight:3, min:2, needs: function(c){ return c.others.length >= 1; }, build: function(c){
     var tl = makeTimeline(), t = 0, a = c.lead, b = c.others[0];
     tl.push(t, BEAT.enter, 'enter', { char:a });
     tl.push(t + 150, BEAT.enter, 'enter', { char:b, side:'far' }); t += BEAT.enter + 150;
@@ -973,7 +1198,7 @@ var SCENES = [
       var i = c.letters - 1 - k;
       tl.push(t, BEAT.toss, 'toss', { char:a, other:b, letter:i });
       tl.push(t + BEAT.toss - 60, BEAT.catch, 'catch', { char:b, letter:i });
-      t += 440;
+      t += 620;
     }
     t += BEAT.catch;
     tl.push(t, BEAT.cheer, 'cheer', { char:b });
@@ -983,7 +1208,7 @@ var SCENES = [
   } },
 
   /* Two grab the same letter. Tug. It pops loose — and a flyer swoops in. */
-  { id:'tug-pop', name:'Tug of War', lead:{}, weight:6, min:2,
+  { id:'tug-pop', name:'Tug of War', lead:{}, weight:3, min:2,
     needs: function(c){ return !!c.tugTeam(); },
     build: function(c){
     var tl = makeTimeline(), t = 0, team = c.tugTeam();
@@ -1004,18 +1229,18 @@ var SCENES = [
     for (var i = 1; i < c.letters; i++){
       var who = i % 2 ? a : b;
       tl.push(tt, BEAT.carry, 'carry', { char:who, letter:i, dir: who === a ? 'left' : 'right' });
-      tt += 320;
+      tt += 420;
     }
     if (c.letters < 3) tl.push(t, BEAT.exit, 'exit', { char:b, dir:'right' });
     tl.push(t - BEAT.getup + BEAT.dive, BEAT.exit, 'exit', { char:f, dir:'up' });
     return tl;
   } },
 
-  { id:'dino-parade', name:'Dino Parade', lead:{}, weight:4, min:2, build: function(c){
+  { id:'dino-parade', name:'Dino Parade', lead:{}, weight:2, min:2, build: function(c){
     var tl = makeTimeline(), t = 0, L = c.lead;
     tl.push(t, BEAT.enter, 'enter', { char:L }); t += BEAT.enter;
-    tl.push(t, 1500, 'parade', { char:L, count:c.letters }); t += 1500;
-    var march = BEAT.march + 900 + c.letters * 180;
+    tl.push(t, 1700, 'parade', { char:L, count:c.letters }); t += 1700;
+    var march = BEAT.march + 1000 + c.letters * 220;
     tl.push(t, march, 'march', { char:L, dir:'right' });
     for (var i = 0; i < c.letters; i++) tl.push(t + 60 + i * 70, march - 60 - i * 70, 'follow', { leader:L, letter:i, dir:'right' });
     return tl;
@@ -1065,6 +1290,13 @@ function sceneCtx(lead, cast, letters, r){
       var fl = flyers.filter(function(m){ return m.id !== lead.id; });
       return mates.length && fl.length ? [lead.id, mates[0].id, fl[0].id] : null;
     }
+  };
+  ctx.memberOf = function(id){ for (var i = 0; i < cast.length; i++) if (cast[i].id === id) return cast[i]; return null; };
+  /* how a buddy saves a dropped letter: his own way, or the way a test asked for */
+  ctx.rescueFor = function(id){
+    var m = ctx.memberOf(id);
+    if (ctx.forceRescue && (RESCUE_NEEDS[ctx.forceRescue] === null || canUse(m, RESCUE_NEEDS[ctx.forceRescue]))) return ctx.forceRescue;
+    return rescueMethod(m, ctx.r);
   };
   ctx.helper = ctx.find(function(m){ return m.kind !== 'swoop'; }) ? ctx.find(function(m){ return m.kind !== 'swoop'; }).id : null;
   ctx.fumbler = others.length ? others[others.length - 1].id : null;
@@ -1156,6 +1388,8 @@ var MIRROR = { left:'right', right:'left' };
 function mirrorTimeline(tl){ tl.events.forEach(function(e){ if (MIRROR[e.dir]) e.dir = MIRROR[e.dir]; }); return tl; }
 function applyTempo(tl, tempo){
   var k = Math.max(0.85, Math.min(1.15, Number(tempo) || 1)), end = tl.end();
+  /* a scene already at full length is not stretched past it */
+  if (k > 1) k = Math.min(k, Math.max(1, SCENE_TARGET_MAX / end));
   if (end * k > SCENE_HARD_MAX) k = SCENE_HARD_MAX / end;
   tl.events.forEach(function(e){ e.at = Math.round(e.at * k); e.dur = Math.max(60, Math.round(e.dur * k)); });
   return tl.end();
@@ -1176,8 +1410,8 @@ function planScene(opts){
   cast.forEach(function(m){ if (m.id === opts.lead) lead = m; });
   if (!lead) lead = cast[0];
   var mirror = opts.mirror == null ? r() < 0.5 : !!opts.mirror;
-  /* a touch unhurried, so a six-year-old can follow every move */
-  var tempo = opts.tempo == null ? 1.0 + r() * 0.12 : Number(opts.tempo) || 1;
+  /* unhurried, so a six-year-old can follow every move */
+  var tempo = opts.tempo == null ? 1.04 + r() * 0.1 : Number(opts.tempo) || 1;
   var members = {};
   cast.forEach(function(m){ members[m.id] = { kind: m.kind, power: m.power, level: m.level, name: m.name }; });
   var plan = { id:null, name:null, lead:lead.id, letters:letters, cast:cast.map(function(m){ return m.id; }), members:members,
@@ -1198,14 +1432,16 @@ function planScene(opts){
   var ctx = sceneCtx(lead, cast, letters, r);
   /* about half the solo scenes bring a buddy along to watch */
   ctx.watcher = scene.watch && ctx.others.length && (opts.watcher != null ? opts.watcher : r() < 0.7) ? ctx.others[0] : null;
+  if (opts.fumbler && opts.fumbler !== lead.id && ctx.others.indexOf(opts.fumbler) !== -1) ctx.fumbler = opts.fumbler;
   if (opts.fumble === false) ctx.fumbler = null;
   if (opts.fumble === true) ctx.r = function(){ return 0; };
+  if (opts.rescue && RESCUE_NEEDS.hasOwnProperty(opts.rescue)) ctx.forceRescue = opts.rescue;
   var tl = scene.build(ctx);
   /* the lead's own flourishes: showing off as he arrives, a victory move before he goes */
   if (opts.showoff !== false && (opts.showoff === true || r() < 0.9)) addFlourish(tl, lead.id, 'showoff');
   if (opts.victory !== false && (opts.victory === true || r() < 0.75)) addFlourish(tl, lead.id, 'victory');
   /* a scene that would be over in a blink gets both flourishes */
-  if (tl.end() < 7000){
+  if (tl.end() < 9000){
     if (opts.showoff !== false && !tl.events.some(function(e){ return e.kind === 'showoff'; })) addFlourish(tl, lead.id, 'showoff');
     if (opts.victory !== false && !tl.events.some(function(e){ return e.kind === 'victory'; })) addFlourish(tl, lead.id, 'victory');
   }
@@ -1242,6 +1478,16 @@ function validatePlan(plan){
     var m = memberOf(e.char);
     if (!canUse(m, e.kind)) p.push(e.char + ' (' + CHARS[m.kind].name + ' kind' + (m.power ? ', ' + m.power : '') + ') used ' + e.kind + ', which is not one of theirs');
     if (e.kind === 'fall' && !CHARS[m.kind].falls) p.push(e.char + ' does not fall');
+    if (e.kind === 'rescue'){
+      if (!RESCUE_NEEDS.hasOwnProperty(e.method)) p.push(e.char + ' rescues by an unknown way: ' + e.method);
+      else if (RESCUE_NEEDS[e.method] && !canUse(m, RESCUE_NEEDS[e.method])) p.push(e.char + ' cannot rescue by ' + e.method);
+      /* a letter handed back needs somebody still there to take it */
+      if (e.give){
+        var gIn = plan.events.some(function(q){ return q.kind === 'enter' && q.char === e.give && q.at <= e.at; });
+        var gOut = plan.events.filter(function(q){ return q.char === e.give && EXIT_KINDS[q.kind]; })[0];
+        if (!gIn || !gOut || gOut.at < e.at + e.dur) p.push(e.char + ' hands a letter to ' + e.give + ', who is not there to take it');
+      }
+    }
     if (e.kind !== 'enter' && !plan.events.some(function(q){ return q.kind === 'enter' && q.char === e.char && q.at <= e.at; })){
       p.push(e.char + ' ' + e.kind + 's before entering');
     }
@@ -1290,16 +1536,17 @@ var __CORE = {
   misspellings:misspellings, checkOptions:checkOptions, RHYME_FAMILIES:RHYME_FAMILIES, hasRhyme:hasRhyme, rimeOf:rimeOf,
   rhymeOptions:rhymeOptions, raceLetters:raceLetters,
   activitiesFor:activitiesFor, blankStat:blankStat, normalizeStat:normalizeStat, recordBlast:recordBlast, reviewQueue:reviewQueue,
-  PLANETS:PLANETS, planetFor:planetFor, weekId:weekId, nextPlanet:nextPlanet,
-  CHARS:CHARS, CHAR_ORDER:CHAR_ORDER, KINDS:KINDS, ABILITY:ABILITY, ABILITY_OWNER:ABILITY_OWNER, canUse:canUse,
+  LANDS:LANDS, landFor:landFor, weekId:weekId, nextLand:nextLand,
+  CHARS:CHARS, CHAR_ORDER:CHAR_ORDER, FIRST_FOUR:FIRST_FOUR, KINDS:KINDS, ABILITY:ABILITY, ABILITY_OWNER:ABILITY_OWNER, canUse:canUse,
+  RESCUE_NEEDS:RESCUE_NEEDS, RESCUE_ORDER:RESCUE_ORDER, rescueMethod:rescueMethod,
   MAX_LEAN:MAX_LEAN, rotBudgetFor:rotBudgetFor, exitDirsFor:exitDirsFor,
   POWERS:POWERS, POWER_ORDER:POWER_ORDER,
   LEVEL_XP:LEVEL_XP, MAX_LEVEL:MAX_LEVEL, ORIGINAL_START_XP:ORIGINAL_START_XP, levelFor:levelFor, xpToNext:xpToNext,
-  growFor:growFor, GROW_SCALE:GROW_SCALE, XP_LEAD:XP_LEAD, XP_SUPPORT:XP_SUPPORT, XP_PLANET:XP_PLANET,
-  BABY_COLORS:BABY_COLORS, BABY_NAMES:BABY_NAMES, makeBaby:makeBaby,
+  growFor:growFor, GROW_SCALE:GROW_SCALE, XP_LEAD:XP_LEAD, XP_SUPPORT:XP_SUPPORT, XP_LAND:XP_LAND,
+  BABY_COLORS:BABY_COLORS, BABY_NAMES:BABY_NAMES, BABY_KINDS_1:BABY_KINDS_1, POWERS_1:POWERS_1, BABY_GEN:BABY_GEN, GOLD:GOLD, makeBaby:makeBaby, babyOf:babyOf,
   originalMember:originalMember, allMembers:allMembers, memberInfo:memberInfo, rosterMembers:rosterMembers,
-  ROSTER_SIZE:ROSTER_SIZE, swapRoster:swapRoster, awardScene:awardScene, awardPlanet:awardPlanet,
-  ROCKET_SKINS:ROCKET_SKINS, skinsUnlocked:skinsUnlocked, nextSkin:nextSkin,
+  ROSTER_SIZE:ROSTER_SIZE, swapRoster:swapRoster, awardScene:awardScene, awardLand:awardLand,
+  FOSSIL_LAND:FOSSIL_LAND, FOSSIL_BOSS:FOSSIL_BOSS, GEAR:GEAR, gearUnlocked:gearUnlocked, nextGear:nextGear,
   normalizeSentences:normalizeSentences, sentenceHas:sentenceHas,
   SETTINGS_VERSION:SETTINGS_VERSION, normalizeSettings:normalizeSettings, letterOverrides:letterOverrides,
   BEAT:BEAT, SCENES:SCENES, TAKE_KINDS:TAKE_KINDS, EXIT_KINDS:EXIT_KINDS, RELEASE_KINDS:RELEASE_KINDS,

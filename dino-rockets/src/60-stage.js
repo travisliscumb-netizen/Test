@@ -22,6 +22,8 @@ function createStage(deps){
   var ART = deps.art;
   /* memberArt(member) draws a particular dinosaur (colours, growth, badges) */
   var MEMBER_ART = deps.memberArt || null;
+  /* Stretch's neck is redrawn between his shoulders and wherever his head is */
+  var NECK_PATH = deps.neckPath || null;
   var ropeSvg = null;
   var layer = null, actors = {}, live = null, inited = false;
   var on = deps.enabled !== false, timeScale = 1;
@@ -43,6 +45,10 @@ function createStage(deps){
   }
 
   var SIZE = 150, K = SIZE / 200, FEET = 0.95, GRAV = 0.0021;
+  /* the fastest anyone may leave the screen (px per ms): slow enough to
+     follow with your eyes, whatever the screen size */
+  var SLOW_EXIT = 0.75, SLOW_CARRY = 0.65;
+  var ENTER_SFX = { rex: 'jet', trike: 'stomp', dash: 'zoom', swoop: 'flap', brachio: 'stomp', stego: 'stomp' };
 
   /* ---------- maths ---------- */
   function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
@@ -82,7 +88,7 @@ function createStage(deps){
   /* The crew on stage: any members (the originals, hatched babies, two of
      the same kind). A member already on stage in the same form keeps his
      actor; anyone who has grown is redrawn; anyone not listed leaves. */
-  function signature(m){ return [m.kind, m.body, m.spots, m.pattern, m.grow, m.level >= 4 ? 'b' : '', m.level >= 5 ? 'c' : ''].join('|'); }
+  function signature(m){ return [m.kind, m.body, m.spots, m.pattern, m.grow, m.level >= 4 ? 'b' : '', m.level >= 5 ? 'c' : '', m.hat || ''].join('|'); }
   function setCast(members){
     if (!layer) return [];
     var keep = {};
@@ -121,7 +127,8 @@ function createStage(deps){
       key: m.id, el: d, shadow: sh, kind: m.kind, g: g, sig: signature(m), name: m.name || C.CHARS[m.kind].name,
       x: -600, y: -600, sc: 1, roll: 1, face: 1, faceCur: 1, faceShown: 1, rot: 0, op: 0, bob: 0,
       anim: null, phase: 0, effort: 0, fallen: 0, look: null, expr: null, exprUntil: 0,
-      trick: null, jaw: 0, rig: collectRig(d), lastDx: 1, nextFx: 0
+      trick: null, jaw: 0, rig: collectRig(d), lastDx: 1, nextFx: 0,
+      neck: { x: 0, y: 0 }, neckAnim: null, neckKey: '', plateJolt: 0, rideOn: null, headTilt: 0
     };
     actors[m.id] = a;
     d.addEventListener('pointerdown', function(ev){ onActorTap(a, ev); });
@@ -130,7 +137,7 @@ function createStage(deps){
   }
   function collectRig(root){
     var out = {};
-    ['head', 'jaw', 'tail', 'arm', 'frill', 'scarf', 'jet', 'eyes', 'wing-n', 'wing-f', 'jetpack'].forEach(function(c){
+    ['head', 'jaw', 'tail', 'arm', 'frill', 'scarf', 'jet', 'eyes', 'wing-n', 'wing-f', 'jetpack', 'neck-path', 'plates'].forEach(function(c){
       var el = root.querySelector('.' + c);
       if (el) out[c] = { el: el, px: Number(el.getAttribute('data-px')) || 100, py: Number(el.getAttribute('data-py')) || 100, base: el.getAttribute('transform') || '' };
     });
@@ -141,10 +148,41 @@ function createStage(deps){
     });
     return out;
   }
-  function rot(part, deg){
+  function rot(part, deg, pre){
     if (!part) return;
-    part.el.setAttribute('transform', (part.base ? part.base + ' ' : '') + 'rotate(' + deg.toFixed(1) + ' ' + part.px + ' ' + part.py + ')');
+    part.el.setAttribute('transform', (pre || '') + (part.base ? part.base + ' ' : '') + 'rotate(' + deg.toFixed(1) + ' ' + part.px + ' ' + part.py + ')');
   }
+
+  /* ---------- Stretch's neck ----------
+     a.neck is how far his head has moved from where it is drawn (in the
+     drawing's own units). The head is shifted by it and the neck redrawn
+     between his shoulders and the head, so it stretches and bends. */
+  var NECK_MIN_Y = -560, NECK_MAX_Y = 150, NECK_MAX_X = 420;
+  function neckTo(a, t, dur, to, ease){
+    a.neckAnim = { t0: t, dur: Math.max(60, dur), fx: a.neck.x, fy: a.neck.y, to: to, ease: EASES[ease] || easeInOut };
+  }
+  function stepNeck(a, t){
+    var n = a.neckAnim;
+    if (!n) return;
+    var p = clamp01((t - n.t0) / n.dur), e = n.ease(p);
+    var goal = typeof n.to === 'function' ? n.to(t) : n.to;
+    if (!goal) return;
+    a.neck.x = clamp(lerp(n.fx, goal.x, e), -60, NECK_MAX_X);
+    a.neck.y = clamp(lerp(n.fy, goal.y, e), NECK_MIN_Y, NECK_MAX_Y);
+    /* a following neck keeps following after it has arrived */
+    if (p >= 1 && typeof n.to !== 'function') a.neckAnim = null;
+  }
+  function applyNeck(a){
+    var r = a.rig;
+    if (a.kind !== 'brachio' || !r['neck-path']) return;
+    var key = a.neck.x.toFixed(1) + ',' + a.neck.y.toFixed(1);
+    if (key !== a.neckKey && NECK_PATH){ r['neck-path'].el.setAttribute('d', NECK_PATH(a.neck.x, a.neck.y)); a.neckKey = key; }
+  }
+  /* screen <-> drawing: where the actor would have to be for a point of his
+     drawing to land on a screen point (at full size, facing `face`) */
+  /* the drawing y (in his own units) a screen y is at, for an actor at ay */
+  function artYOf(a, ay, py){ var g = a.g || 1; return 190 + (((py - ay - SIZE / 2) + SIZE / 2) / K - 190) / g; }
+  function artXOf(a, ax, px, face){ var g = a.g || 1, f = face || 1; return 100 + (((px - ax - SIZE / 2) / f + SIZE / 2) / K - 100) / g; }
 
   /* where a point of the drawing (svg units) is on screen, honouring facing and scale */
   function artPoint(a, sx, sy){
@@ -243,6 +281,12 @@ function createStage(deps){
       particle('dust', ft.x, ft.y, -a.face * rnd(8, 18), -rnd(2, 8), 380, 0.4, 1, null, function(p){ p.style.setProperty('--dust', dustColor()); });
       a.nextFx = now + (a.kind === 'trike' ? 150 : 200); return;
     }
+    /* the big plodders: a heavy puff of dust at every step */
+    if ((a.kind === 'brachio' || a.kind === 'stego') && onGround){
+      var fb = artPoint(a, a.kind === 'brachio' ? 118 : 136, 188);
+      particle('dust', fb.x, fb.y, -a.face * rnd(6, 14), -rnd(2, 6), 460, 0.5, 1.4, null, function(p){ p.style.setProperty('--dust', dustColor()); });
+      a.nextFx = now + 280; return;
+    }
     if (a.kind === 'swoop' && a.anim.spins){
       var c = centreOf(a);
       particle('spark', c.x + rnd(-30, 30), c.y + rnd(-30, 30), rnd(-14, 14), rnd(-14, 14), 500, 0.9, 0.2, Math.random() < 0.5 ? '#FFC53D' : '#fff');
@@ -264,7 +308,8 @@ function createStage(deps){
     var k = clamp(1 - Math.max(0, ground - feet) / 420, 0.3, 1);
     sh.style.opacity = (a.op * 0.4 * k).toFixed(3);
     var gs = k * a.sc * (a.g || 1);
-    sh.style.transform = 'translate3d(' + Math.round(a.x + SIZE / 2 - 50) + 'px,' + Math.round(ground - 8) + 'px,0) scale(' + (gs * (a.kind === 'trike' ? 1.3 : 1)).toFixed(3) + ',' + gs.toFixed(3) + ')';
+    var wide = { trike: 1.3, brachio: 1.4, stego: 1.35 }[a.kind] || 1;
+    sh.style.transform = 'translate3d(' + Math.round(a.x + SIZE / 2 - 50) + 'px,' + Math.round(ground - 8) + 'px,0) scale(' + (gs * wide).toFixed(3) + ',' + gs.toFixed(3) + ')';
   }
   function writePayload(p){
     p.el.style.opacity = p.op;
@@ -274,6 +319,8 @@ function createStage(deps){
   /* ---------- posing: legs, tails, wings, jaws ---------- */
   function poseActor(a, tms, ground){
     var r = a.rig, beat = tms / 1000, moving = !!a.anim;
+    a.headTilt += ((a.headTiltGoal || 0) - a.headTilt) * 0.12;
+    applyNeck(a);
     if (r.eyes){
       var ex = 0, ey = 0, c = centreOf(a);
       if (a.look){
@@ -290,6 +337,7 @@ function createStage(deps){
       if (legsB[0]) rot(legsB[0], ba); if (legsB[1]) rot(legsB[1], bb == null ? ba : bb);
     }
     if (a.fallen > 0){
+      if (a.kind === 'brachio') rot(r.head, 0, 'translate(' + a.neck.x.toFixed(1) + ' ' + a.neck.y.toFixed(1) + ') ');
       legs(-40 * a.fallen, -34 * a.fallen, -52 * a.fallen, -46 * a.fallen);
       rot(r.tail, 18); rot(r.arm, -30); rot(r['wing-n'], -30);
       return;
@@ -323,8 +371,15 @@ function createStage(deps){
         var t2 = moving ? Math.sin(beat * (a.anim.dur < 1200 ? 16 : 11)) : 0;
         if (trick && trick.kind === 'paw'){ var pw = Math.sin(tp * Math.PI * 6); legs(pw * 28, 0, 0, 0); }
         else legs(t2 * 22, -t2 * 22, -t2 * 22, t2 * 22);
-        rot(r.head, trick && trick.kind === 'charge' ? 12 : (trick && trick.kind === 'cheer' ? -14 * up :
-          (trick && trick.kind === 'boost' ? -34 * Math.sin(tp * Math.PI) : (balancing ? Math.sin(beat * 3) * 6 + flail * 10 : Math.sin(beat * 2.2) * 2))));
+        var th;
+        if (trick && trick.kind === 'charge') th = 12;
+        else if (trick && trick.kind === 'dip') th = 26 * up;
+        else if (trick && trick.kind === 'toss') th = -30 * up;
+        else if (trick && trick.kind === 'cheer') th = -14 * up;
+        else if (trick && trick.kind === 'boost') th = -34 * Math.sin(tp * Math.PI);
+        else if (balancing) th = Math.sin(beat * 3) * 6 + flail * 10;
+        else th = Math.sin(beat * 2.2) * 2;
+        rot(r.head, th);
         rot(r.frill, Math.sin(beat * 3) * 2);
         break;
       }
@@ -338,6 +393,29 @@ function createStage(deps){
           (balancing ? -60 + flail * 45 : s3 * 12)));
         if (balancing) rot(r.tail, Math.sin(beat * 4) * 10 - a.rot * 0.8 + flail * 20);
         rot(r.head, trick && trick.kind === 'cheer' ? -12 * up : s3 * 3);
+        break;
+      }
+      case 'brachio': {
+        /* slow, heavy strides; the neck bobs gently as he goes */
+        var sb = moving ? Math.sin(beat * 7) : 0;
+        legs(sb * 16, -sb * 16, -sb * 16, sb * 16);
+        rot(r.tail, Math.sin(beat * 1.6) * 8 + (trick && trick.kind === 'thump' ? -40 * up : 0));
+        var hd = a.headTilt + (trick && trick.kind === 'cheer' ? -10 * up : Math.sin(beat * 1.3) * 3) + (moving ? sb * 2 : 0);
+        rot(r.head, hd, 'translate(' + a.neck.x.toFixed(1) + ' ' + a.neck.y.toFixed(1) + ') ');
+        break;
+      }
+      case 'stego': {
+        var sg = moving ? Math.sin(beat * 9) : 0;
+        if (trick && trick.kind === 'paw'){ var pw2 = Math.sin(tp * Math.PI * 6); legs(pw2 * 24, 0, 0, 0); }
+        else legs(sg * 18, -sg * 18, -sg * 18, sg * 18);
+        /* the tail: a wind-up, then a big flick up and over */
+        var tf = 0;
+        if (trick && trick.kind === 'tailflip') tf = tp < 0.55 ? 22 * Math.sin(tp / 0.55 * Math.PI / 2) : 22 - 92 * Math.sin(clamp01((tp - 0.55) / 0.2) * Math.PI / 2) * (1 - clamp01((tp - 0.8) / 0.2) * 0.9);
+        if (trick && trick.kind === 'thump') tf = -40 * up;
+        rot(r.tail, Math.sin(beat * 2.2) * 6 + tf + (moving ? sg * 4 : 0));
+        a.plateJolt *= 0.9;
+        rot(r.plates, Math.sin(beat * 30) * 6 * a.plateJolt + Math.sin(beat * 1.5) * 1.2);
+        rot(r.head, a.headTilt + (trick && trick.kind === 'cheer' ? -12 * up : Math.sin(beat * 2) * 2));
         break;
       }
       case 'swoop': {
@@ -386,6 +464,7 @@ function createStage(deps){
   }
   function stepActor(a, t, dt){
     if (a.expr && t >= a.exprUntil) setExpr(a, null, 0, t);
+    stepNeck(a, t);
     /* turning round takes a moment to commit to: a dino asked to turn back
        again straight away keeps his heading instead of flickering */
     if (a.face !== a.faceShown && t - (a.turnT || -1e9) > 200){ a.faceShown = a.face; a.turnT = t; }
@@ -419,16 +498,23 @@ function createStage(deps){
     rex:   { mouth: [186, 96] },
     trike: { horns: [190, 64], back: [98, 62], mouth: [186, 116] },
     dash:  { arms: [146, 118], mouth: [186, 86] },
-    swoop: { feet: [100, 160], back: [104, 80], mouth: [186, 88] }
+    swoop: { feet: [100, 160], back: [104, 80], mouth: [186, 88] },
+    /* Stretch: letters ride on his back; his mouth is wherever his neck has put it */
+    brachio: { back: [90, 88], mouth: [192, 40], jaws: [190, 44] },
+    /* Spike: letters sit on his back plates like a rack */
+    stego: { plates: [100, 70], back: [100, 70], mouth: [190, 134] }
   };
   function anchorFor(a, kind){
     var set = ANCHOR[a.kind];
-    return (kind && set[kind]) || set.mouth || set.arms || set.feet;
+    var p = (kind && set[kind]) || set.mouth || set.arms || set.feet;
+    if (a.kind === 'brachio' && (kind === 'mouth' || kind === 'jaws' || !kind)) return [p[0] + a.neck.x, p[1] + a.neck.y];
+    return p;
   }
-  /* stack letters: up from horns, back and mouth; down from feet */
+  /* letters hang down from feet and jaws, and stack up from everything else */
+  function dirOf(where){ return where === 'feet' || where === 'jaws' ? 1 : -1; }
   function takeHold(a, pl, where){
     var anch = anchorFor(a, where);
-    var dirY = where === 'feet' ? 1 : -1;
+    var dirY = dirOf(where);
     var n = 0;
     live.payloads.forEach(function(q){ if (q !== pl && q.state === 'held' && q.owner === a.key && q.where === where) n++; });
     if (!pl.arrive) pl.arrive = ++live.arrivals;
@@ -440,6 +526,8 @@ function createStage(deps){
     a.look = null;
   }
   function releaseHold(pl){ pl.owner = null; pl.where = null; }
+  /* a letter landing on Spike makes his plates jiggle */
+  function landed(a, pl){ if (a.kind === 'stego') a.plateJolt = 1; }
   /* take a letter out of the scene: gone if already out of view, faded if not */
   function retire(pl){
     var inView = pl.x + pl.hx > 0 && pl.x - pl.hx < vw() && pl.y + pl.hy > 0 && pl.y - pl.hy < vh();
@@ -458,7 +546,7 @@ function createStage(deps){
     return pos;
   }
   function holdTarget(a, pl, where){
-    var anch = anchorFor(a, where), dirY = where === 'feet' ? 1 : -1;
+    var anch = anchorFor(a, where), dirY = dirOf(where);
     var pos = stackPos(pl, a.key, where, dirY);
     var p = artPoint(a, anch[0], anch[1]);
     return { x: p.x + (pos % 2 ? -1 : 1) * Math.min(pos, 1) * pl.w * 0.12,
@@ -473,9 +561,12 @@ function createStage(deps){
         if (!a) return;
         var ht = holdTarget(a, pl, pl.where);
         pl.slot = ht.pos;
-        var tx = ht.x, ty = ht.y;
+        var tx = ht.x, ty = ht.y, sway = 0;
+        /* a tall stack on the move sways, more the higher up it goes */
+        var wb = live.wobble && live.wobble[a.key];
+        if (wb){ var wa = wb.amp * clamp01((t - wb.t0) / 500); sway = Math.sin((t - wb.t0) / 190) * wa * (ht.pos + 1); tx += sway * 3; }
         approach(pl, tx, ty, 0.5, dt, 2.4);
-        pl.rot = lerp(pl.rot, pl.offRot + Math.sin(t / 170 + pl.idx) * 3 + wrapDeg(a.rot) * 0.3, 0.25);
+        pl.rot = lerp(pl.rot, pl.offRot + Math.sin(t / 170 + pl.idx) * 3 + wrapDeg(a.rot) * 0.3 + sway * 2.2, 0.25);
         return;
       }
       case 'hop': {
@@ -487,7 +578,7 @@ function createStage(deps){
         var e = hp * hp * (3 - 2 * hp);
         pl.x = lerp(pl.hopFx, tgt.x, e); pl.y = lerp(pl.hopFy, tgt.y, e) - pl.hopArc * Math.sin(Math.PI * hp);
         pl.rot = pl.hopRot + pl.hopSpin * hp;
-        if (hp >= 1){ takeHold(ha, pl, pl.hopWhere); SFX.play('pickup'); }
+        if (hp >= 1){ takeHold(ha, pl, pl.hopWhere); landed(ha, pl); SFX.play('pickup'); }
         return;
       }
       case 'chain': { stepChain(pl, t, dt); return; }
@@ -587,16 +678,64 @@ function createStage(deps){
         pl.rot += dt * 0.4;
         return;
       }
-      case 'beam': {
-        var bp = clamp01((t - pl.beamT0) / pl.beamDur), sh = live.ship;
-        var sx = sh ? sh.x : vw() / 2, sy = sh ? sh.y + 110 : 60;
-        pl.x = lerp(pl.beamFx, sx + Math.sin(t / 200 + pl.idx) * 10 * (1 - bp), easeInOut(bp));
-        pl.y = lerp(pl.beamFy, sy, easeIn(bp));
-        pl.sc = pl.sx = lerp(1, 0.35, bp);
-        pl.rot = Math.sin(t / 150 + pl.idx) * 20;
-        /* drawn into the ship: shrinks and fades, never blinks out */
-        pl.op = 1 - clamp01((bp - 0.7) / 0.3);
-        if (bp >= 1){ pl.state = 'gone'; pl.op = 0; }
+      case 'scurry': {
+        /* running about on the ground in little hops, away from whoever chases it */
+        pl.groundY = live.groundY - pl.h * 0.5 - 6;
+        if (pl.caughtBy){
+          /* caught out: frozen to the spot, trembling */
+          pl.y += (pl.groundY - pl.y) * 0.3;
+          pl.rot = Math.sin(t / 32) * 9;
+          return;
+        }
+        var ch = actors[pl.chaser];
+        if (ch){ var cdx = pl.x - (ch.x + SIZE / 2); if (Math.abs(cdx) < 190) pl.vx = (cdx >= 0 ? 1 : -1) * Math.max(Math.abs(pl.vx), 0.16); }
+        pl.x += pl.vx * dt;
+        if (pl.x < pl.hx + 8){ pl.x = pl.hx + 8; pl.vx = Math.abs(pl.vx); }
+        if (pl.x > vw() - pl.hx - 8){ pl.x = vw() - pl.hx - 8; pl.vx = -Math.abs(pl.vx); }
+        var hp2 = (t - pl.hopT) / 240;
+        /* eased towards the hop, so a letter never jumps into it */
+        pl.y += (pl.groundY - Math.abs(Math.sin(hp2 * Math.PI)) * 22 - pl.y) * Math.min(1, dt * 0.02);
+        pl.rot = Math.sin(hp2 * Math.PI) * 10 * (pl.vx >= 0 ? 1 : -1);
+        return;
+      }
+      case 'moveto': {
+        /* drifting to a spot, then bobbing gently there */
+        var mp = clamp01((t - pl.t0) / pl.dur), me = mp * mp * (3 - 2 * mp);
+        pl.x = lerp(pl.fx, pl.tx, me);
+        pl.y = lerp(pl.fy, pl.ty, me) - 40 * Math.sin(Math.PI * mp) + (mp >= 1 ? Math.sin(t / 300 + pl.idx) * 5 : 0);
+        pl.rot = lerp(pl.frot, 0, me) + (mp >= 1 ? Math.sin(t / 420 + pl.idx) * 4 : 0);
+        return;
+      }
+      case 'drop': {
+        /* a wiggle where it is, then a fall that lands on its new owner */
+        var da = actors[pl.owner];
+        if (!da){ pl.state = 'free'; return; }
+        if (t < pl.t0){ pl.rot = Math.sin(t / 30) * 8; return; }
+        var dp = clamp01((t - pl.t0) / pl.dur), de = dp * dp;
+        var dtg = holdTarget(da, pl, pl.dropWhere);
+        pl.x = lerp(pl.fx, dtg.x, de); pl.y = lerp(pl.fy, dtg.y, de);
+        pl.rot = lerp(pl.frot, 0, dp);
+        if (dp >= 1){ takeHold(da, pl, pl.dropWhere); landed(da, pl); SFX.play('catch'); sparkle(pl.x, pl.y, 4); }
+        return;
+      }
+      case 'neckslide': {
+        /* wheee: from his nose, down the curve of his neck, onto his back */
+        var na = actors[pl.owner];
+        if (!na){ pl.state = 'free'; return; }
+        var sp3 = clamp01((t - pl.t0) / pl.dur), s3 = sp3 * sp3;
+        var H0 = artPoint(na, 184 + na.neck.x, 30 + na.neck.y), M0 = artPoint(na, 128, 78), B0 = holdTarget(na, pl, 'back');
+        var u3 = 1 - s3;
+        pl.x = u3 * u3 * H0.x + 2 * u3 * s3 * M0.x + s3 * s3 * B0.x;
+        pl.y = u3 * u3 * H0.y + 2 * u3 * s3 * M0.y + s3 * s3 * B0.y - pl.h * 0.35 * Math.sin(Math.PI * sp3);
+        pl.rot = lerp(pl.frot, 0, sp3) - na.faceShown * 25 * Math.sin(Math.PI * sp3);
+        if (sp3 >= 1){ takeHold(na, pl, 'back'); sparkle(pl.x, pl.y, 5); SFX.play('pickup'); }
+        return;
+      }
+      case 'tethered': {
+        if (!pl.tether){ pl.state = 'free'; return; }
+        var tg = pl.tether();
+        approach(pl, tg.x, tg.y, 0.4, dt, 2);
+        pl.rot = lerp(wrapDeg(pl.rot), Math.sin(t / 200) * 8, 0.2);
         return;
       }
       case 'arc': {
@@ -685,15 +824,15 @@ function createStage(deps){
     pl.groundY = live.groundY - pl.h * 0.5 - 6;
     pl.vx = rnd(-0.03, 0.03); pl.vy = -0.08; pl.spin = rnd(-0.06, 0.06);
   }
-  function hopInto(pl, a, where, dur, t){
+  function hopInto(pl, a, where, dur, t, arc){
     if (!pl.arrive) pl.arrive = ++live.arrivals;
     pl.state = 'hop'; pl.hopTo = a.key; pl.hopWhere = where;
     pl.hopFx = pl.x; pl.hopFy = pl.y; pl.hopT0 = t;
     pl.rot = wrapDeg(pl.rot); pl.hopRot = pl.rot;
     /* long enough to be seen travelling: about a pixel per ms at most */
     var tgt = holdTarget(a, pl, where), far = Math.sqrt(Math.pow(tgt.x - pl.x, 2) + Math.pow(tgt.y - pl.y, 2));
-    pl.hopDur = Math.max(dur || 260, Math.min(800, far / 0.8));
-    pl.hopArc = clamp(far * 0.3, 20, 70);
+    pl.hopDur = Math.max(dur || 260, Math.min(900, far / 0.7));
+    pl.hopArc = arc || clamp(far * 0.3, 20, 70);
     pl.hopSpin = (tgt.x >= pl.x ? 1 : -1) * (pl.hopDur >= 400 ? 360 : 0);
   }
   /* where a free letter will be in ms */
@@ -782,10 +921,14 @@ function createStage(deps){
 
   /* where each kind ties on a rope (tow line, kite tail, hook line) and
      where each holds a rope he throws */
-  var ROPE_TIE = { rex: [74, 92], trike: [12, 130], dash: [10, 84], swoop: [100, 150] };
-  var ROPE_HAND = { rex: [138, 128], trike: [186, 116], dash: [138, 120], swoop: [100, 152] };
+  var ROPE_TIE = { rex: [74, 92], trike: [12, 130], dash: [10, 84], swoop: [100, 150], brachio: [30, 124], stego: [28, 118] };
+  /* Stretch and Spike have no hands: they hold a rope (or a vine) in their mouths */
+  var ROPE_HAND = { rex: [138, 128], trike: [186, 116], dash: [138, 120], swoop: [100, 152], brachio: [190, 42], stego: [188, 132] };
   function tiePoint(a){ var t = ROPE_TIE[a.kind]; return artPoint(a, t[0], t[1]); }
-  function handPoint(a){ var t = ROPE_HAND[a.kind]; return artPoint(a, t[0], t[1]); }
+  function handPoint(a){
+    var t = ROPE_HAND[a.kind];
+    return a.kind === 'brachio' ? artPoint(a, t[0] + a.neck.x, t[1] + a.neck.y) : artPoint(a, t[0], t[1]);
+  }
 
   /*
     CHAINS — letters tied on a rope behind (or below) whoever caught them.
@@ -871,7 +1014,9 @@ function createStage(deps){
     if (ch.mode !== 'below' && a.anim && Math.abs(gy - pl.y) < 4 && gy > live.groundY - pl.h && Math.random() < dt / 900) dust(pl.x, live.groundY, 1, 20);
   }
 
-  var FLOW_SCENES = { 'rocket-jump': 1, 'high-jump': 1, 'boost-jump': 1, 'tow-truck': 1, 'lasso-roundup': 1, 'sky-hook': 1, 'tightrope': 1 };
+  var FLOW_SCENES = { 'jet-jump': 1, 'high-jump': 1, 'boost-jump': 1, 'tow-truck': 1, 'lasso-roundup': 1, 'sky-hook': 1, 'tightrope': 1,
+    'crane-lift': 1, 'neck-slide': 1, 'neck-lift': 1, 'tail-flip': 1, 'letter-rain': 1, 'vine-swing': 1 };
+  var FLOW_SCENES_POP = { 'tunnel-pop': 1 };
   function holdOf(a){ return C.CHARS[a.kind].hold || 'mouth'; }
   /* where an art point sits relative to the actor's corner, facing `face`, at full size */
   function offsetOf(a, sx, sy, face){
@@ -890,7 +1035,7 @@ function createStage(deps){
   function takeable(q){ return q.state === 'idle' || q.state === 'free' || q.state === 'float' || q.state === 'hung' || q.state === 'onrope'; }
 
   /* ---------- the washing line the letters hang from ---------- */
-  var LINE_HIGH = { 'rocket-jump': 470, 'high-jump': 330, 'boost-jump': 440 };
+  var LINE_HIGH = { 'jet-jump': 470, 'high-jump': 330, 'boost-jump': 440 };
   function lineYAt(x){
     var L = live.line;
     if (!L) return 120;
@@ -997,7 +1142,8 @@ function createStage(deps){
       if (!L.reeling && p >= 0.62){ L.reeling = true; SFX.play('strain'); a.effort = 1; a.trick = { kind: 'reel', t0: t, dur: L.dur * 0.32 }; }
       if (r2 >= 1){
         L.done = true; killRope(L.rope); L.loop.kill();
-        joinChain(pl, a, 'behind'); SFX.play('pickup');
+        if (L.hold) takeHold(a, pl, L.hold); else joinChain(pl, a, 'behind');
+        SFX.play('pickup');
         return;
       }
     }
@@ -1027,6 +1173,311 @@ function createStage(deps){
       sparkle(pl.x, pl.y, 8); SFX.play('pop');
       takeHold(a, pl, holdOf(a));
     }
+  }
+
+  /* a big stomp or thump: the letters are shaken out of the card */
+  function shakeDown(launch){
+    var ground = live.groundY;
+    live.shake = Math.max(live.shake, 14);
+    SFX.play('boom');
+    live.payloads.forEach(function(q, i){
+      if (q.state !== 'idle' && q.state !== 'free') return;
+      q.state = 'free'; q.owner = null;
+      q.groundY = ground - q.h * 0.5 - 6;
+      q.lowG = false;
+      /* launched outward from the middle, each to its own height, so
+         they fly as separate letters and never collide in the air */
+      if (launch){ var cxw = vw() / 2; q.vy = -(0.95 + (i % 3) * 0.12); q.vx = (q.x - cxw) / 2600 + (i % 2 ? 0.02 : -0.02); q.spin = (i % 2 ? 1 : -1) * 0.2; }
+      /* shaken straight down: each lands under where it was, still spaced */
+      else { q.vy = -(0.12 + (i % 2) * 0.06); q.vx = 0; q.spin = (i % 2 ? 1 : -1) * 0.12; }
+    });
+  }
+
+  /* ---------- the lasso, thrown at one letter ---------- */
+  function throwLasso(a, ll, t, dur, hold){
+    ll.lassoTarget = true;
+    a.trick = { kind: 'lasso', t0: t, dur: dur * 0.5 };
+    a.look = { x: ll.x, y: ll.y };
+    var L = { a: a, pl: ll, t0: t, dur: dur, cur: null, hold: hold || null };
+    L.loop = addLoop(function(){ return L.cur; });
+    /* the rope runs from his hand to the knot on the loop's near side */
+    L.rope = addRope({ sag: 14, pts: function(){
+      if (!L.cur) return null;
+      var hp = handPoint(a), c = L.cur, sd = hp.x >= c.c.x ? 1 : -1, r = c.deg * Math.PI / 180;
+      return [hp, { x: c.c.x + sd * c.rx * Math.cos(r), y: c.c.y + sd * c.rx * Math.sin(r) }];
+    } });
+    (live.lassos = live.lassos || []).push(L);
+    SFX.play('whoosh');
+  }
+
+  /* ---------- tunnels: down a hole, a mound runs along, and up he pops ---------- */
+  function digTo(a, t, dd, target){
+    var ground = live.groundY, sy0 = standY(ground);
+    live.digFor = live.digFor || {}; live.digFor[a.key] = target;
+    if (target.state === 'idle' && target.y < ground - target.h * 1.4) dropToGround(target);
+    var hole = addProp('hole'); placeProp(hole, a.x + SIZE / 2 - 34, ground - 12);
+    setExpr(a, 'happy', dd * 0.3, t);
+    move(a, t, dd * 0.35, { x: a.x, y: sy0 + 60 }, { ease: 'in', keepFace: true, arc: 40, op: 0, rotTo: 30, effort: 1,
+      onEnd: function(){ if (!live) return; var fp = artPoint(a, 100, 188); dust(fp.x, ground, 10, 60); SFX.play('dust'); } });
+    var mound = addProp('mound');
+    live.mounds = live.mounds || [];
+    live.mounds.push({ el: mound, x0: a.x + SIZE / 2, x1: target.x, t0: t + dd * 0.35, dur: dd * 0.65, hole: hole });
+    SFX.play('dig');
+  }
+  function popUnder(a, t, dur, pu, hold){
+    var ground = live.groundY, sy0 = standY(ground);
+    var fp6 = pu.x >= a.x + SIZE / 2 ? 1 : -1;
+    if (live.plan && FLOW_SCENES_POP[live.plan.id]) fp6 = flow();
+    var px6 = clamp(pu.x - SIZE / 2 - fp6 * 20, -SIZE * 0.3, vw() - SIZE * 0.7);
+    a.x = px6; a.y = sy0 + 50; a.op = 0; a.rot = 0; a.face = a.faceShown = fp6;
+    var hole2 = addProp('hole'); placeProp(hole2, pu.x - 34, ground - 12);
+    dust(pu.x, ground, 12, 70); SFX.play('boom'); live.shake = Math.max(live.shake, 6);
+    /* the letter is bumped up into the air and lands on him */
+    if (pu.state !== 'chain' && pu.state !== 'held'){
+      pu.state = 'free'; pu.owner = null; pu.groundY = ground - pu.h * 0.5 - 6; pu.vy = -1.0; pu.vx = 0; pu.spin = 0.3;
+    }
+    move(a, t, dur * 0.4, { x: px6, y: sy0 - 70 }, { ease: 'out', op: 1, keepFace: true, effort: 1, rotTo: -10,
+      onEnd: function(){ if (live && pu.state !== 'held' && pu.state !== 'gone') hopInto(pu, a, hold, 240, live.vnow); setExpr(a, 'happy', 600); },
+      next: { dur: dur * 0.6, to: { x: px6 + fp6 * 30, y: sy0 }, opts: { ease: 'in', keepFace: true, effort: 0.5, rotTo: 0,
+        onEnd: function(){ if (live){ var fp = artPoint(a, 100, 188); dust(fp.x, ground, 5, 40); } } } } });
+  }
+
+  /* ---------- tasks: little per-frame jobs on the scene's own clock ----------
+     A task runs every frame until it says it is done. `whenAt` is the
+     one-shot kind: it runs once the scene clock reaches a moment, so a
+     sequence stays in step at any speed (setTimeout would not). */
+  function addTask(fn){ (live.tasks = live.tasks || []).push(fn); }
+  function whenAt(when, fn){
+    addTask(function(t){ if (t < when) return false; fn(t); return true; });
+  }
+  function runTasks(t, dt){
+    var list = live.tasks || [];
+    if (!list.length) return;
+    live.tasks = [];
+    list.forEach(function(fn){
+      var done = true;
+      try { done = fn(t, dt); } catch (err){ live.errors.push('task: ' + (err && err.message || err)); }
+      if (!done) live.tasks.push(fn);
+    });
+  }
+  /* he must end up holding it, whatever happened on the way */
+  function secure(pl, a, hold, t){
+    if (!live || pl.state === 'gone' || (pl.state === 'held' && pl.owner === a.key) || (pl.state === 'hop' && pl.hopTo === a.key)) return;
+    if (pl.tie){ pl.tie.kill(); pl.tie = null; }
+    hopInto(pl, a, hold, 280, t);
+  }
+  /* where a dino has to stand for a point of his drawing to be over screen x */
+  function standXFor(a, sx, artx, face){ return sx - offsetOf(a, artx, 0, face).x; }
+  function onGroundY(pl){ return live.groundY - pl.h * 0.5 - 6; }
+  /* a letter up in the card that a walker cannot reach tumbles down first */
+  function groundIt(pl){ if (pl.state === 'idle' || pl.state === 'float') dropToGround(pl); }
+
+  /* ---------- Stretch: reach a letter with his jaws ---------- */
+  function jawsGoal(a, pl){
+    var f = a.face;
+    return function(){ return { x: artXOf(a, a.x, pl.x, f) - 190, y: artYOf(a, a.y, pl.y - pl.h * 0.42) - 44 }; };
+  }
+  /* walk up, stretch to it, take it in his jaws, lower it and set it on his back */
+  function craneLift(a, pl, t, D){
+    var sy0 = standY(live.groundY), f = pl.x >= a.x + SIZE / 2 ? 1 : -1;
+    if (live.plan && FLOW_SCENES[live.plan.id] && live.plan.lead === a.key) f = flow();
+    /* stand so that a little forward lean puts his jaws over it (never
+       further than the neck can comfortably reach sideways) */
+    var ax = clamp(standXFor(a, pl.x, 190 + 14, f), -SIZE * 0.3, vw() - SIZE * 0.7);
+    var need = artXOf(a, ax, pl.x, f) - 190;
+    if (need > NECK_MAX_X * 0.8) ax = standXFor(a, pl.x, 190 + NECK_MAX_X * 0.8, f);
+    move(a, t, D * 0.28, { x: ax, y: sy0 }, { face: f, keepFace: true, ease: 'inout', effort: 0.5 });
+    a.look = { x: pl.x, y: pl.y };
+    whenAt(t + D * 0.3, function(t2){
+      if (pl.state === 'gone' || pl.state === 'held') return;
+      var top = artPoint(a, 190, 44 + NECK_MIN_Y * 0.9).y;
+      if (pl.y - pl.h * 0.5 < top){ pl.state = 'float'; pl.owner = null; pl.floatX = pl.x; pl.floatY = top + pl.h * 0.6; pl.vx = pl.vy = 0; pl.spin = 0; }
+      a.headTiltGoal = -6;
+      neckTo(a, t2, D * 0.26, jawsGoal(a, pl), 'inout');
+      SFX.play('stretch');
+    });
+    whenAt(t + D * 0.57, function(t3){
+      if (pl.state === 'gone' || (pl.state === 'held' && pl.owner !== a.key)) return;
+      takeHold(a, pl, 'jaws'); SFX.play('chomp'); setExpr(a, 'happy', 700, t3);
+      a.headTiltGoal = 0;
+      neckTo(a, t3, D * 0.26, { x: 0, y: 0 }, 'inout');
+    });
+    whenAt(t + D * 0.86, function(t4){
+      if (pl.state === 'held' && pl.owner === a.key && pl.where === 'jaws'){ hopInto(pl, a, 'back', 300, t4, 40); SFX.play('pickup'); }
+      else secure(pl, a, 'back', t4);
+    });
+  }
+
+  /* ---------- Spike: back the tail up to a letter and flip it onto the plates ---------- */
+  function tailFlip(a, pl, t, D, face){
+    var sy0 = standY(live.groundY), f = face || flow();
+    var ax = clamp(standXFor(a, pl.x, 10, f), -SIZE * 0.35, vw() - SIZE * 0.65);
+    if (f * (ax - a.x) < -8) SFX.play('beep');
+    move(a, t, D * 0.38, { x: ax, y: sy0 }, { face: f, keepFace: true, ease: 'inout', effort: 0.5 });
+    a.look = { x: pl.x, y: pl.y };
+    whenAt(t + D * 0.4, function(t2){
+      a.trick = { kind: 'tailflip', t0: t2, dur: D * 0.45 };
+      a.headTiltGoal = -8;
+    });
+    whenAt(t + D * 0.4 + D * 0.45 * 0.6, function(t3){
+      a.headTiltGoal = 0;
+      if (pl.state === 'gone' || (pl.state === 'held' && pl.owner === a.key)) return;
+      if (pl.tie){ pl.tie.kill(); pl.tie = null; }
+      var tip = artPoint(a, 10, 100);
+      pl.x = lerp(pl.x, tip.x, 0.4);
+      hopInto(pl, a, 'plates', 700, t3, 170);
+      pl.hopSpin = f * 360;
+      sparkle(tip.x, tip.y, 6); SFX.play('whack');
+    });
+  }
+
+  /* ---------- rescues: each buddy's own way of saving a dropped letter ---------- */
+  var MAGNET_SVG = '<svg viewBox="0 0 44 44"><path d="M8 6 v18 a14 14 0 0 0 28 0 v-18 h-9 v18 a5 5 0 0 1 -10 0 v-18 z" fill="#E53935" stroke="#14213D" stroke-width="3.5" stroke-linejoin="round"/><path d="M8 6 h9 v7 h-9 z M27 6 h9 v7 h-9 z" fill="#E6EDF7" stroke="#14213D" stroke-width="3" stroke-linejoin="round"/></svg>';
+  function startRescue(a, pl, method, t, S){
+    var ground = live.groundY, sy0 = standY(ground), hold = holdOf(a);
+    var land = pl.state === 'free' ? predict(pl, 400) : { x: pl.x, y: pl.y };
+    var f = land.x >= a.x + SIZE / 2 ? 1 : -1;
+    a.face = f;
+    a.look = { x: land.x, y: land.y };
+    switch (method){
+      case 'lasso': throwLasso(a, pl, t, S, hold); break;
+      case 'magnet': {
+        var mg = addProp('magnet', MAGNET_SVG);
+        live.magnet = mg;
+        live.magnetAt = function(){ var h = artPoint(a, anchorFor(a, hold)[0], anchorFor(a, hold)[1]); return { x: h.x, y: h.y - 70 }; };
+        a.trick = { kind: 'magnet', t0: t, dur: S };
+        var m0 = live.magnetAt(); ring(m0.x, m0.y, false);
+        SFX.play('powerup'); SFX.play('hum');
+        whenAt(t + S * 0.2, function(t2){
+          if (pl.state === 'gone' || pl.state === 'held') return;
+          pl.state = 'pulled'; pl.owner = null; pl.pullBy = a.key; pl.pulling = true;
+          pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); pl.t0 = t2; pl.dur = S * 0.6;
+          sparkle(pl.x, pl.y, 4); SFX.play('zoom');
+        });
+        whenAt(t + S * 0.95, function(){ dropProp(mg); if (live.magnet === mg){ live.magnet = null; live.magnetAt = null; } a.trick = null; });
+        break;
+      }
+      case 'bubble': {
+        var size = Math.max(pl.w, pl.h) * 1.55, el = addProp('bubble');
+        el.style.width = el.style.height = Math.round(size) + 'px';
+        (live.bubbles = live.bubbles || []).push({ a: a, pl: pl, t0: t, dur: S, el: el, size: size, x: -999, y: -999, sc: 0.2 });
+        a.jaw = 0.6; a.jawUntil = t + 300;
+        SFX.play('bubble');
+        break;
+      }
+      case 'hook': {
+        /* up over the letter, a hook on a rope goes down, catches it, and up it comes */
+        var tie = offsetOf(a, 100, 150, f);
+        var over = { x: clamp(land.x - tie.x, -SIZE * 0.4, vw() - SIZE * 0.6), y: Math.max(20, land.y - 190 - tie.y) };
+        move(a, t, S * 0.35, over, { ease: 'inout', face: f, keepFace: true, effort: 0.8 });
+        var H = { len: 0 };
+        var rope = addRope({ sag: 0, pts: function(){
+          var tp = tiePoint(a);
+          return [tp, { x: tp.x, y: tp.y + H.len }];
+        } });
+        var hk = addRope({ front: true, cls: 'hook-line', d: function(){
+          var tp = tiePoint(a), y = tp.y + H.len;
+          return 'M' + tp.x.toFixed(1) + ' ' + (y - 6).toFixed(1) + ' v10 a7 7 0 1 1 -7 7';
+        } });
+        var T0 = t + S * 0.35, T1 = t + S * 0.55, T2 = t + S * 0.9;
+        SFX.play('flap');
+        addTask(function(tt){
+          if (!live) return true;
+          var tp = tiePoint(a), want = Math.max(20, pl.y - pl.h * 0.5 - tp.y);
+          if (tt < T0) return false;
+          if (tt < T1){ H.len = want * easeInOut(clamp01((tt - T0) / (T1 - T0))); return false; }
+          if (!H.got){
+            H.got = true; H.from = want;
+            if (pl.state !== 'gone' && pl.state !== 'held'){ pl.state = 'tethered'; pl.owner = null; pl.tether = function(){ var q = tiePoint(a); return { x: q.x, y: q.y + H.len + pl.h * 0.5 - 2 }; }; SFX.play('catch'); }
+            move(a, tt, T2 - tt, { x: a.x + f * 20, y: a.y - 50 }, { ease: 'inout', keepFace: true, effort: 1 });
+          }
+          if (tt < T2){ H.len = lerp(H.from, 14, easeInOut(clamp01((tt - T1) / (T2 - T1)))); return false; }
+          killRope(rope); killRope(hk);
+          if (pl.state === 'tethered'){ pl.tether = null; takeHold(a, pl, 'feet'); SFX.play('pickup'); }
+          return true;
+        });
+        break;
+      }
+      case 'crane': craneLift(a, pl, t, S * 1.25); break;
+      case 'tailflip': tailFlip(a, pl, t, S * 1.2, f); break;
+      case 'tunnel': {
+        digTo(a, t, S * 0.5, pl);
+        whenAt(t + S * 0.5, function(t2){ popUnder(a, t2, S * 0.45, pl, hold); });
+        break;
+      }
+      case 'frost': {
+        setExpr(a, 'roar', S * 0.4, t);
+        a.jaw = 1; a.jawUntil = t + S * 0.3;
+        a.trick = { kind: 'roar', t0: t, dur: S * 0.4 };
+        var mth = artPoint(a, anchorFor(a, 'mouth')[0], anchorFor(a, 'mouth')[1]);
+        for (var k = 0; k < 6; k++) particle('snow', mth.x, mth.y, (land.x - mth.x) * (0.6 + k * 0.08), (land.y - mth.y) * (0.6 + k * 0.08), 500 + k * 60, 0.6, 1.4, null);
+        SFX.play('whoosh');
+        whenAt(t + S * 0.3, function(){ if (pl.state !== 'gone'){ pl.el.classList.add('frozen'); sparkle(pl.x, pl.y, 3); SFX.play('crack'); } });
+        whenAt(t + S * 0.4, function(t2){
+          if (pl.state === 'gone' || pl.state === 'held') return;
+          pl.state = 'sliding'; pl.owner = null; pl.slideTo = a.key;
+          pl.fx = pl.x; pl.fy = pl.y; pl.frot = wrapDeg(pl.rot); pl.t0 = t2; pl.dur = S * 0.45;
+          SFX.play('skid');
+        });
+        break;
+      }
+      case 'jet': {
+        /* he jets over and snaps it up in his jaws */
+        var mo = offsetOf(a, 186, 96, f);
+        move(a, t, S * 0.55, { x: clamp(land.x - mo.x, -SIZE * 0.25, vw() - SIZE * 0.75), y: Math.min(sy0, onGroundY(pl) - mo.y) }, { face: f, keepFace: true, ease: 'inout', effort: 1, arc: 70,
+          onEnd: function(){ if (live && pl.state !== 'held' && pl.state !== 'gone'){ takeHold(a, pl, 'mouth'); SFX.play('chomp'); setExpr(a, 'happy', 600); } },
+          next: { dur: S * 0.35, to: { x: clamp(land.x - mo.x - f * 40, -SIZE * 0.25, vw() - SIZE * 0.75), y: sy0 }, opts: { ease: 'inout', keepFace: true, effort: 0.6 } } });
+        SFX.play('jet');
+        break;
+      }
+      case 'horns':
+        /* a snort, a paw at the ground, and a charge that scoops it up */
+        a.trick = { kind: 'paw', t0: t, dur: S * 0.25 };
+        SFX.play('snort');
+        var hp0 = artPoint(a, 124, 188); dust(hp0.x, ground, 5, 36);
+        /* falls through to the run-and-catch, on his horns */
+      default: {
+        /* run over, catch it, and a happy hop */
+        var hs = anchorFor(a, hold), ho = offsetOf(a, hs[0], hs[1], f);
+        var cx = clamp(land.x - ho.x, -SIZE * 0.3, vw() - SIZE * 0.7);
+        var cy = a.kind === 'swoop' ? Math.min(sy0 - 40, land.y - ho.y) : sy0;
+        move(a, t, S * 0.55, { x: cx, y: cy }, { ease: 'out', face: f, keepFace: true, effort: 1,
+          onEnd: function(){
+            if (!live || pl.state === 'held' || pl.state === 'gone') return;
+            hopInto(pl, a, hold, 220, live.vnow); SFX.play('catch'); setExpr(a, 'happy', 700);
+            var fpp = artPoint(a, 100, 188); dust(fpp.x, ground, 5, 40);
+          },
+          next: { dur: 420, to: { x: cx, y: cy }, opts: { ease: 'linear', keepFace: true, arc: 34, effort: 0.6 } } });
+        SFX.play(ENTER_SFX[a.kind] || 'whoosh');
+      }
+    }
+  }
+
+  /* ---------- the jungle vine: one big swing across the island ---------- */
+  function vineRig(a){
+    var ground = live.groundY, f = flow();
+    var hand = ROPE_HAND[a.kind], ho = offsetOf(a, hand[0], hand[1], f);
+    var feetBelow = (190 - hand[1]) * K * (a.g || 1);
+    /* the vine hangs over a branch just above the action, so the swing is a
+       real U: down low in the middle and up high at both ends */
+    var low = ground - 24 - feetBelow, half = vw() / 2 - SIZE * 0.45;
+    var R = clamp(half / Math.sin(1.0), 150, Math.max(150, low - 110));
+    var pivot = { x: vw() / 2, y: low - R };
+    var th = Math.min(1.2, Math.asin(clamp(half / R, 0.2, 0.95)));
+    var V = { a: a, f: f, pivot: pivot, R: R, th: th, ho: ho, out: 0 };
+    /* where his hand is at a point of the swing (0..1) */
+    V.hand = function(p){
+      var u = Math.min(1, p / 0.86), ang = -f * th * Math.cos(Math.PI * u);
+      return { x: pivot.x + R * Math.sin(ang), y: pivot.y + R * Math.cos(ang), ang: ang };
+    };
+    V.pos = function(p){
+      var h = V.hand(p);
+      if (p <= 0.86) return { x: h.x - ho.x, y: h.y - ho.y };
+      var q = (p - 0.86) / 0.14, e = q * q * (3 - 2 * q), end = V.hand(0.86);
+      var lx = end.x - ho.x + f * 70, ly = standY(ground);
+      return { x: lerp(end.x - ho.x, lx, e), y: lerp(end.y - ho.y, ly, e) - 50 * Math.sin(Math.PI * q) };
+    };
+    return V;
   }
 
   /* ============================================================
@@ -1067,7 +1518,7 @@ function createStage(deps){
         if (target) a.look = { x: target.x, y: target.y };
         to.sc = 1;
         move(a, t, e.dur, to, { op: 1, ease: already ? 'inout' : 'back', effort: 0.8 });
-        SFX.play({ rex:'jet', trike:'stomp', dash:'zoom', swoop:'flap' }[a.kind]);
+        SFX.play(ENTER_SFX[a.kind] || 'whoosh');
         break;
       }
       case 'approach': {
@@ -1174,19 +1625,7 @@ function createStage(deps){
               if (!live) return;
               var fp = artPoint(a, 120, 190);
               ring(fp.x, ground, true); dust(fp.x, ground, 12, 80);
-              live.shake = Math.max(live.shake, 14);
-              SFX.play('boom');
-              live.payloads.forEach(function(q, i){
-                if (q.state !== 'idle' && q.state !== 'free') return;
-                q.state = 'free'; q.owner = null;
-                q.groundY = ground - q.h * 0.5 - 6;
-                q.lowG = false;
-                /* launched outward from the middle, each to its own height, so
-                   they fly as separate letters and never collide in the air */
-                if (launch){ var cxw = vw() / 2; q.vy = -(0.95 + (i % 3) * 0.12); q.vx = (q.x - cxw) / 2600 + (i % 2 ? 0.02 : -0.02); q.spin = (i % 2 ? 1 : -1) * 0.2; }
-                /* shaken straight down: each lands under where it was, still spaced */
-                else { q.vy = -(0.12 + (i % 2) * 0.06); q.vx = 0; q.spin = (i % 2 ? 1 : -1) * 0.12; }
-              });
+              shakeDown(launch);
             } } }
         });
         break;
@@ -1196,8 +1635,9 @@ function createStage(deps){
         var d2 = e.dir === 'left' ? -1 : 1;
         a.trick = { kind: 'charge', t0: t, dur: e.dur };
         setExpr(a, 'roar', e.dur, t);
-        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { ease: 'in', effort: 1, face: d2 });
-        a.anim.tx = d2 > 0 ? vw() + 200 + live.payloads.length * 70 : -SIZE - 200 - live.payloads.length * 70;
+        var chargeTo = edgeFor(e.dir || 'right', a);
+        chargeTo.x = d2 > 0 ? vw() + 200 + live.payloads.length * 70 : -SIZE - 200 - live.payloads.length * 70;
+        move(a, t, e.dur, chargeTo, { ease: 'in', effort: 1, face: d2, capSpeed: 1.0 });
         SFX.play('charge');
         break;
       }
@@ -1265,7 +1705,7 @@ function createStage(deps){
         if (!a) break;
         var dz = e.dir === 'left' ? -1 : 1;
         setExpr(a, 'happy', e.dur, t);
-        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { ease: 'in', effort: 1, face: dz, rotTo: 8 });
+        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { ease: 'in', effort: 1, face: dz, rotTo: 8, capSpeed: 1.0 });
         SFX.play('zoom');
         break;
       }
@@ -1322,7 +1762,7 @@ function createStage(deps){
              letters still waiting. The last one stays with him for the loop. */
           next: lastDive
             ? { dur: e.dur * 0.45, to: { x: clamp(a.x + a.face * 80, -SIZE * 0.2, vw() - SIZE * 0.8), y: Math.max(40, hy) }, opts: { ease: 'out', rotTo: -12, effort: 0.8 } }
-            : { dur: Math.max(e.dur * 0.45, (aim2.y + SIZE + 60 + pl.h * (2 + 0.6 * (above + 1))) / 1.3),
+            : { dur: Math.max(e.dur * 0.45, (aim2.y + SIZE + 60 + pl.h * (2 + 0.6 * (above + 1))) / 0.9),
                 to: { x: a.x, y: -SIZE - 60 - pl.h * (2 + 0.6 * (above + 1)) }, opts: { ease: 'in2', rotTo: -20, effort: 1,
                 onEnd: function(){ live && live.payloads.forEach(function(q){ if (q.state === 'held' && q.owner === a.key && q.where === 'feet') retire(q); }); } } }
         });
@@ -1362,31 +1802,6 @@ function createStage(deps){
         a.trick = { kind: 'cheer', t0: t, dur: e.dur };
         setExpr(a, 'happy', e.dur, t);
         a.look = { x: vw() / 2, y: 0 };
-        break;
-      }
-      case 'shiparrive': {
-        showShip(t, e.dur);
-        SFX.play('ship');
-        break;
-      }
-      case 'beam': {
-        if (!pl) break;
-        pl.state = 'beam'; pl.owner = null;
-        pl.beamT0 = t; pl.beamDur = e.dur + 400; pl.beamFx = pl.x; pl.beamFy = pl.y;
-        SFX.play('beam');
-        break;
-      }
-      case 'beamup': {
-        if (!a) break;
-        var sh2 = live.ship;
-        setExpr(a, 'happy', e.dur, t);
-        move(a, t, e.dur, { x: (sh2 ? sh2.x : vw() / 2) - SIZE / 2, y: sh2 ? sh2.y + 20 : 0, sc: 0.35 }, { ease: 'in', effort: 0.4, op: 0, spins: 1 });
-        SFX.play('beam');
-        break;
-      }
-      case 'shipleave': {
-        hideShip(t, e.dur);
-        SFX.play('blastoff');
         break;
       }
       case 'toss': {
@@ -1484,12 +1899,12 @@ function createStage(deps){
         if (!a || !pl) break;
         if (pl.state === 'held' || pl.state === 'gone') break;
         if (!C.CHARS[a.kind].airborne && pl.y < ground - pl.h * 1.4) dropToGround(pl);
-        var where = { rex:'mouth', trike:'horns', dash:'arms', swoop:'feet' }[a.kind];
+        var where = holdOf(a);
         var besideP = beside(pl, a, pl.x > a.x + SIZE / 2 ? -1 : 1);
         if (!C.CHARS[a.kind].airborne) besideP.y = sy0;
         var goDur = e.dur * 0.45;
         a.look = { x: pl.x, y: pl.y };
-        move(a, t, goDur, besideP, { ease: 'inout', effort: 0.7, capSpeed: 0.9,
+        move(a, t, goDur, besideP, { ease: 'inout', effort: 0.7, capSpeed: 0.7,
           onEnd: function(){
             if (!live) return;
             if (pl.state !== 'held' && pl.state !== 'gone') hopInto(pl, a, where, 180, live.vnow);
@@ -1497,7 +1912,7 @@ function createStage(deps){
           },
           /* he waits for the letter to land on him before he sets off */
           next: { dur: 240, to: besideP, opts: { ease: 'linear', effort: 0.3, keepFace: true,
-            next: { dur: e.dur * 0.55 + 60, to: edgeFor(e.dir || 'left', a), opts: { ease: 'inout', effort: 0.8, capSpeed: 1.2 } } } } });
+            next: { dur: e.dur * 0.55 + 60, to: edgeFor(e.dir || 'left', a), opts: { ease: 'inout', effort: 0.8, capSpeed: SLOW_CARRY } } } } });
         break;
       }
       case 'parade': {
@@ -1656,7 +2071,7 @@ function createStage(deps){
         var fw = e.dir === 'left' ? -1 : 1;
         setExpr(a, 'roar', 600, t);
         a.trick = { kind: 'charge', t0: t, dur: e.dur };
-        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { ease: 'in', face: fw, keepFace: true, effort: 1, capSpeed: 1.1 });
+        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { ease: 'in', face: fw, keepFace: true, effort: 1, capSpeed: SLOW_CARRY });
         SFX.play('charge');
         break;
       }
@@ -1666,21 +2081,9 @@ function createStage(deps){
         if (!a) break;
         var ll = nextAlong(function(q){ return takeable(q) && !q.lassoTarget; });
         if (!ll) break;
-        ll.lassoTarget = true;
         a.face = ll.x > a.x + SIZE / 2 ? 1 : -1;
         if (flow() * a.face < 0) a.face = flow();
-        a.trick = { kind: 'lasso', t0: t, dur: e.dur * 0.5 };
-        a.look = { x: ll.x, y: ll.y };
-        var L = { a: a, pl: ll, t0: t, dur: e.dur, cur: null };
-        L.loop = addLoop(function(){ return L.cur; });
-        /* the rope runs from his hand to the knot on the loop's near side */
-        L.rope = addRope({ sag: 14, pts: function(){
-          if (!L.cur) return null;
-          var hp = handPoint(a), c = L.cur, sd = hp.x >= c.c.x ? 1 : -1, r = c.deg * Math.PI / 180;
-          return [hp, { x: c.c.x + sd * c.rx * Math.cos(r), y: c.c.y + sd * c.rx * Math.sin(r) }];
-        } });
-        (live.lassos = live.lassos || []).push(L);
-        SFX.play('whoosh');
+        throwLasso(a, ll, t, e.dur, null);
         break;
       }
 
@@ -1731,6 +2134,7 @@ function createStage(deps){
         if (!sp || sp.state === 'gone') break;
         if (sp.tie){ sp.tie.kill(); sp.tie = null; }
         var owner = actors[sp.owner] || a;
+        if (owner && live.wobble) delete live.wobble[owner.key];
         sp.state = 'free'; sp.owner = null; sp.where = null; sp.lowG = false;
         sp.groundY = ground - sp.h * 0.5 - 6;
         sp.vx = (owner ? -owner.faceShown : 1) * 0.08; sp.vy = -0.25; sp.spin = 0.07;
@@ -1740,30 +2144,6 @@ function createStage(deps){
         SFX.play('huh');
         break;
       }
-      case 'fetch': {
-        if (!a) break;
-        var fp0 = e.letter != null ? live.payloads[e.letter] : null;
-        if (!fp0) break;
-        var runIn = e.dur * 0.42, hold = holdOf(a);
-        /* run to where it is coming down, catch it, and off */
-        var land = fp0.state === 'free' ? predict(fp0, runIn) : { x: fp0.x, y: fp0.y };
-        var hs = anchorFor(a, hold), fx2 = a.x + SIZE / 2 < land.x ? 1 : -1, ho2 = offsetOf(a, hs[0], hs[1], fx2);
-        var catchX = clamp(land.x - ho2.x, -SIZE * 0.3, vw() - SIZE * 0.7);
-        var catchY = C.CHARS[a.kind].airborne && a.kind === 'swoop' ? Math.min(sy0 - 40, land.y - ho2.y) : sy0;
-        a.look = { x: fp0.x, y: fp0.y };
-        setExpr(a, 'wow', runIn, t);
-        move(a, t, runIn, { x: catchX, y: catchY }, { ease: 'out', face: fx2, keepFace: true, effort: 1, capSpeed: 1.1,
-          onEnd: function(){
-            if (!live || fp0.state === 'held' || fp0.state === 'gone') return;
-            hopInto(fp0, a, hold, 200, live.vnow); SFX.play('catch'); setExpr(a, 'happy', 700);
-            var fpp = artPoint(a, 100, 188); dust(fpp.x, ground, 5, 40);
-          },
-          next: { dur: 380, to: { x: catchX, y: catchY }, opts: { ease: 'linear', keepFace: true, arc: 34, effort: 0.6,
-            next: { dur: e.dur * 0.58 - 380, to: edgeFor(e.dir || (fx2 > 0 ? 'right' : 'left'), a), opts: { ease: 'in', effort: 0.9, capSpeed: 1.2 } } } } });
-        SFX.play({ rex: 'jet', trike: 'stomp', dash: 'zoom', swoop: 'flap' }[a.kind]);
-        break;
-      }
-
       /* ---------- show-off and victory: each kind's own way ---------- */
       case 'showoff': {
         if (!a) break;
@@ -1786,6 +2166,19 @@ function createStage(deps){
             next: { dur: d0 * 0.3, to: { x: hx, y: hy }, opts: { ease: 'inout', effort: 1, keepFace: true,
               next: { dur: d0 * 0.4, to: { x: hx, y: hy }, opts: { ease: 'linear', arc: 70, spins: a.face, keepFace: true, effort: 1 } } } } });
           SFX.play('zoom');
+        } else if (a.kind === 'brachio'){
+          /* the big stretch: neck right up to the sky, a happy hoot, and back */
+          a.headTiltGoal = -20;
+          neckTo(a, t, d0 * 0.4, { x: 10, y: -170 }, 'out');
+          whenAt(t + d0 * 0.45, function(t2){ var m = artPoint(a, 192 + a.neck.x, 40 + a.neck.y); ring(m.x, m.y, false); SFX.play('hoot'); setExpr(a, 'wow', 500, t2); });
+          whenAt(t + d0 * 0.6, function(t3){ a.headTiltGoal = 0; neckTo(a, t3, d0 * 0.4, { x: 0, y: 0 }, 'inout'); });
+        } else if (a.kind === 'stego'){
+          /* plates up and shaking, a swish of the spiky tail, a stamp */
+          a.plateJolt = 1.4;
+          var pp = artPoint(a, 100, 60); sparkle(pp.x, pp.y, 8);
+          a.trick = { kind: 'thump', t0: t, dur: d0 * 0.6 };
+          whenAt(t + d0 * 0.35, function(){ var tip = artPoint(a, 10, 104); ring(tip.x, ground, false); dust(tip.x, ground, 8, 50); live.shake = Math.max(live.shake, 5); SFX.play('stomp'); });
+          SFX.play('whoosh');
         } else {
           var R2 = 60;
           move(a, t, d0, { x: hx, y: hy }, { effort: 1, ease: 'inout', spins: -a.face,
@@ -1807,6 +2200,11 @@ function createStage(deps){
             next: { dur: e.dur * 0.5, to: { x: vx, y: vy }, opts: { ease: 'linear', arc: 34, keepFace: true, effort: 0.6 } } });
           SFX.play('cheer');
         }
+        if (a.kind === 'brachio'){
+          neckTo(a, t, e.dur * 0.5, { x: 30, y: -80 }, 'inout');
+          whenAt(t + e.dur * 0.5, function(t2){ neckTo(a, t2, e.dur * 0.5, { x: 0, y: 0 }, 'inout'); });
+        }
+        if (a.kind === 'stego') a.plateJolt = 1.2;
         var vc = centreOf(a); sparkle(vc.x, vc.y - 30, 10);
         break;
       }
@@ -1962,39 +2360,15 @@ function createStage(deps){
         if (!a) break;
         var dq = nextAlong(function(q){ return takeable(q) && !q.digging; });
         if (!dq) break;
-        dq.digging = true; live.digFor = live.digFor || {}; live.digFor[a.key] = dq;
-        if (dq.state === 'idle' && dq.y < ground - dq.h * 1.4) dropToGround(dq);
-        var hole = addProp('hole'); placeProp(hole, a.x + SIZE / 2 - 34, ground - 12);
-        var fx5 = a.x, dd = e.dur;
-        setExpr(a, 'happy', dd * 0.3, t);
-        /* hop into the hole, dirt flying, and vanish into the planet */
-        move(a, t, dd * 0.35, { x: fx5, y: sy0 + 60 }, { ease: 'in', keepFace: true, arc: 40, op: 0, rotTo: 30, effort: 1,
-          onEnd: function(){ if (!live) return; var fp = artPoint(a, 100, 188); dust(fp.x, ground, 10, 60); SFX.play('dust'); } });
-        /* a mound runs along under the ground to the letter */
-        var mound = addProp('mound'), mx0 = a.x + SIZE / 2, mx1 = dq.x;
-        var mT0 = t + dd * 0.35, mDur = dd * 0.65;
-        live.mounds = live.mounds || [];
-        live.mounds.push({ el: mound, x0: mx0, x1: mx1, t0: mT0, dur: mDur, hole: hole });
-        SFX.play('dig');
+        dq.digging = true;
+        digTo(a, t, e.dur, dq);
         break;
       }
       case 'popup': {
         if (!a) break;
         var pu = (live.digFor && live.digFor[a.key]) || nextAlong(takeable);
         if (!pu) break;
-        var fp6 = flow(), hold6 = holdOf(a);
-        var px6 = clamp(pu.x - SIZE / 2 - fp6 * 20, -SIZE * 0.3, vw() - SIZE * 0.7);
-        a.x = px6; a.y = sy0 + 50; a.op = 0; a.rot = 0; a.face = a.faceShown = fp6;
-        var hole2 = addProp('hole'); placeProp(hole2, pu.x - 34, ground - 12);
-        dust(pu.x, ground, 12, 70); SFX.play('boom'); live.shake = Math.max(live.shake, 6);
-        /* the letter is bumped up into the air and lands on him */
-        if (pu.state !== 'chain' && pu.state !== 'held'){
-          pu.state = 'free'; pu.owner = null; pu.groundY = ground - pu.h * 0.5 - 6; pu.vy = -1.0; pu.vx = 0; pu.spin = 0.3;
-        }
-        move(a, t, e.dur * 0.4, { x: px6, y: sy0 - 70 }, { ease: 'out', op: 1, keepFace: true, effort: 1, rotTo: -10,
-          onEnd: function(){ if (live && pu.state !== 'held' && pu.state !== 'gone') hopInto(pu, a, hold6, 240, live.vnow); setExpr(a, 'happy', 600); },
-          next: { dur: e.dur * 0.6, to: { x: px6 + fp6 * 30, y: sy0 }, opts: { ease: 'in', keepFace: true, effort: 0.5, rotTo: 0,
-            onEnd: function(){ if (live){ var fp = artPoint(a, 100, 188); dust(fp.x, ground, 5, 40); } } } } });
+        popUnder(a, t, e.dur, pu, holdOf(a));
         break;
       }
       case 'frost': {
@@ -2034,44 +2408,401 @@ function createStage(deps){
         break;
       }
 
+      /* ---------- Rex: the chomp chase ---------- */
+      case 'scatter': {
+        if (!a) break;
+        setExpr(a, 'roar', 700, t);
+        a.trick = { kind: 'roar', t0: t, dur: 700 };
+        a.jaw = 1; a.jawUntil = t + 500;
+        var sm = artPoint(a, 186, 96); ring(sm.x, sm.y, false);
+        SFX.play('roarsmall');
+        var n7 = live.payloads.length;
+        live.payloads.forEach(function(q, i){
+          if (!takeable(q)) return;
+          groundIt(q);
+          q.vx = (i - (n7 - 1) / 2) * 0.03;
+          /* each one runs off once it has landed, never from mid-air */
+          var from = t + 520 + i * 110;
+          addTask(function(t2){
+            if (q.state !== 'free' && q.state !== 'idle') return true;
+            if (t2 < from || (q.state === 'free' && (q.y < q.groundY - 2 || Math.abs(q.vy) > 0.02) && t2 < from + 2500)) return false;
+            q.state = 'scurry'; q.owner = null; q.chaser = a.key; q.hopT = t2 + i * 57;
+            q.groundY = onGroundY(q); q.y = Math.min(q.y, q.groundY);
+            /* off they run, away from him */
+            var away = q.x >= a.x + SIZE / 2 ? 1 : -1;
+            q.vx = away * (0.1 + (i % 3) * 0.025);
+            if (i === 0) SFX.play('giggle');
+            return true;
+          });
+        });
+        break;
+      }
+      case 'chomp': {
+        if (!a) break;
+        var cq = pl && pl.state === 'scurry' && !pl.caughtBy ? pl : null;
+        if (!cq){
+          var runners = live.payloads.filter(function(q){ return q.state === 'scurry' && !q.caughtBy; });
+          if (!runners.length) runners = live.payloads.filter(function(q){ return takeable(q); });
+          runners.sort(function(p1, p2){ return Math.abs(p1.x - a.x - SIZE / 2) - Math.abs(p2.x - a.x - SIZE / 2); });
+          cq = runners[0];
+        }
+        if (!cq) break;
+        /* it freezes — eek! — and trembles while he comes for it */
+        cq.caughtBy = a.key;
+        if (cq.state !== 'scurry'){ groundIt(cq); }
+        var cf = cq.x >= a.x + SIZE / 2 ? 1 : -1, mo7 = offsetOf(a, 186, 96, cf);
+        var cx7 = clamp(cq.x - mo7.x, -SIZE * 0.3, vw() - SIZE * 0.7);
+        a.look = { x: cq.x, y: cq.y };
+        setExpr(a, 'happy', e.dur * 0.5, t);
+        move(a, t, e.dur * 0.55, { x: cx7, y: sy0 - 30 }, { face: cf, keepFace: true, ease: 'inout', effort: 1, arc: 50, rotTo: 16, capSpeed: 0.9,
+          onEnd: function(){
+            if (!live || cq.state === 'gone' || (cq.state === 'held' && cq.owner === a.key)) return;
+            a.jaw = 1; a.jawUntil = live.vnow + 250;
+            takeHold(a, cq, 'mouth'); SFX.play('chomp'); setExpr(a, 'happy', 700);
+            sparkle(cq.x, cq.y, 5);
+          },
+          next: { dur: e.dur * 0.35, to: { x: cx7, y: sy0 }, opts: { ease: 'out', keepFace: true, rotTo: 0, effort: 0.5 } } });
+        SFX.play('jet');
+        break;
+      }
+
+      /* ---------- Trike: stomp & stack ---------- */
+      case 'pickup': {
+        if (!a) break;
+        var pk = pl && (pl.state === 'free' || pl.state === 'idle') ? pl : null;
+        if (!pk){
+          var loose = live.payloads.filter(function(q){ return q.state === 'free' || q.state === 'idle'; });
+          loose.sort(function(p1, p2){ return Math.abs(p1.x - a.x) - Math.abs(p2.x - a.x); });
+          pk = loose[0];
+        }
+        if (!pk) break;
+        groundIt(pk);
+        pk.picking = true;
+        var pf = pk.x >= a.x + SIZE / 2 ? 1 : -1;
+        var px7 = clamp(standXFor(a, pk.x, 200, pf), -SIZE * 0.3, vw() - SIZE * 0.7);
+        a.look = { x: pk.x, y: onGroundY(pk) };
+        move(a, t, e.dur * 0.45, { x: px7, y: sy0 }, { face: pf, keepFace: true, ease: 'inout', effort: 0.6, capSpeed: 0.7 });
+        whenAt(t + e.dur * 0.45, function(t2){ a.trick = { kind: 'dip', t0: t2, dur: e.dur * 0.25 }; });
+        whenAt(t + e.dur * 0.56, function(t3){
+          if (pk.state === 'gone' || pk.state === 'held') return;
+          hopInto(pk, a, 'horns', 460, t3, 80); SFX.play('scoop');
+        });
+        whenAt(t + e.dur * 0.72, function(t4){ a.trick = { kind: 'toss', t0: t4, dur: e.dur * 0.25 }; setExpr(a, 'happy', 500, t4); });
+        break;
+      }
+      case 'haul': {
+        if (!a) break;
+        var hd = e.dir === 'left' ? -1 : 1;
+        var hx = a.x + hd * vw() * 0.26;
+        /* never off the edge: the rescue needs him still in view */
+        hx = clamp(hx, SIZE * 0.05, vw() - SIZE * 1.05);
+        (live.wobble = live.wobble || {})[a.key] = { t0: t, amp: 1.3 };
+        a.look = null;
+        move(a, t, e.dur, { x: hx, y: sy0 }, { ease: 'inout', face: hd, keepFace: true, effort: 0.6 });
+        SFX.play('march');
+        break;
+      }
+
+      /* ---------- Stretch ---------- */
+      case 'thump': {
+        if (!a) break;
+        a.trick = { kind: 'thump', t0: t, dur: e.dur };
+        setExpr(a, 'roar', e.dur, t);
+        whenAt(t + e.dur * 0.5, function(){
+          var tip = artPoint(a, a.kind === 'brachio' ? 6 : 10, a.kind === 'brachio' ? 134 : 104);
+          ring(tip.x, live.groundY, true); dust(tip.x, live.groundY, 12, 80);
+          shakeDown(false);
+        });
+        break;
+      }
+      case 'crane': {
+        if (!a) break;
+        var cr = nextAlong(function(q){ return takeable(q) && !q.craneTarget; });
+        if (!cr) break;
+        cr.craneTarget = true;
+        craneLift(a, cr, t, e.dur);
+        break;
+      }
+      case 'neckslide': {
+        if (!a) break;
+        var ns = nextAlong(function(q){ return (q.state === 'free' || q.state === 'idle') && !q.sliding2; });
+        if (!ns) break;
+        ns.sliding2 = true;
+        groundIt(ns);
+        var D8 = e.dur, nf = flow();
+        /* stand so his nose, reaching down and forward, is right over it */
+        var nx8 = clamp(standXFor(a, ns.x, 192 + 40, nf), -SIZE * 0.3, vw() - SIZE * 0.7);
+        move(a, t, D8 * 0.22, { x: nx8, y: sy0 }, { face: nf, keepFace: true, ease: 'inout', effort: 0.5, capSpeed: 0.6 });
+        a.look = { x: ns.x, y: onGroundY(ns) };
+        whenAt(t + D8 * 0.22, function(t2){
+          a.headTiltGoal = 22;
+          neckTo(a, t2, D8 * 0.16, function(){ return { x: artXOf(a, a.x, ns.x, nf) - 192, y: artYOf(a, a.y, onGroundY(ns) - ns.h * 0.5 - 4) - 40 }; }, 'inout');
+        });
+        whenAt(t + D8 * 0.39, function(t3){
+          if (ns.state === 'gone' || ns.state === 'held') return;
+          hopInto(ns, a, 'mouth', 200, t3, 20); SFX.play('boing');
+        });
+        whenAt(t + D8 * 0.44, function(t4){
+          a.headTiltGoal = -28;
+          neckTo(a, t4, D8 * 0.16, { x: 24, y: -150 }, 'inout');
+        });
+        whenAt(t + D8 * 0.62, function(t5){
+          if (!(ns.state === 'held' && ns.owner === a.key)){ secure(ns, a, 'back', t5); return; }
+          /* wheee: down the neck like a slide, onto his back */
+          ns.state = 'neckslide'; ns.t0 = t5; ns.dur = D8 * 0.26; ns.frot = wrapDeg(ns.rot);
+          SFX.play('whee'); setExpr(a, 'happy', D8 * 0.3, t5);
+        });
+        whenAt(t + D8 * 0.66, function(t6){ a.headTiltGoal = 0; neckTo(a, t6, D8 * 0.3, { x: 0, y: 0 }, 'inout'); });
+        break;
+      }
+      case 'hopon': {
+        if (!a) break;
+        var host = actors[e.other];
+        if (!host) break;
+        var hf = flow();
+        host.face = hf;
+        var top = artPoint(host, 170 + host.neck.x, 18 + host.neck.y), ft8 = offsetOf(a, 100, 190, hf);
+        a.look = top;
+        move(a, t, e.dur * 0.75, { x: top.x - ft8.x, y: top.y - ft8.y }, { face: hf, keepFace: true, ease: 'inout', arc: 90, effort: 1,
+          onEnd: function(){ if (!live) return; a.rideOn = host.key; SFX.play('boing'); setExpr(host, 'happy', 600); setExpr(a, 'happy', 600); } });
+        SFX.play('boing');
+        break;
+      }
+      case 'liftgrab': {
+        if (!a) break;
+        var h9 = actors[e.other];
+        var lq = nextAlong(function(q){ return takeable(q) && !q.liftTarget; });
+        if (!h9 || !lq) break;
+        lq.liftTarget = true;
+        var lf = flow(), hold9 = holdOf(a);
+        /* his grab point sits this far from his feet */
+        var ga = offsetOf(a, anchorFor(a, hold9)[0], anchorFor(a, hold9)[1], lf), gf = offsetOf(a, 100, 190, lf);
+        var dx9 = ga.x - gf.x, dy9 = ga.y - gf.y + lq.h * 0.4;
+        var hx9 = clamp(standXFor(h9, lq.x - dx9, 170 + 20, lf), -SIZE * 0.3, vw() - SIZE * 0.7);
+        move(h9, t, e.dur * 0.32, { x: hx9, y: sy0 }, { face: lf, keepFace: true, ease: 'inout', effort: 0.5, capSpeed: 0.6 });
+        whenAt(t + e.dur * 0.3, function(t2){
+          h9.headTiltGoal = -4;
+          neckTo(h9, t2, e.dur * 0.3, function(){ return { x: artXOf(h9, h9.x, lq.x - dx9, lf) - 170, y: artYOf(h9, h9.y, lq.y - dy9) - 18 }; }, 'inout');
+          SFX.play('stretch');
+        });
+        whenAt(t + e.dur * 0.62, function(t3){
+          if (lq.state === 'gone' || lq.state === 'held') return;
+          takeHold(a, lq, hold9); SFX.play('catch'); setExpr(a, 'happy', 700, t3);
+          a.trick = { kind: 'cheer', t0: t3, dur: 400 };
+          h9.headTiltGoal = 0;
+          neckTo(h9, t3, e.dur * 0.3, { x: 10, y: Math.max(NECK_MIN_Y, h9.neck.y * 0.5) }, 'inout');
+        });
+        break;
+      }
+      case 'liftdown': {
+        if (!a) break;
+        var rider = actors[e.other];
+        neckTo(a, t, e.dur * 0.5, { x: 0, y: 0 }, 'inout');
+        whenAt(t + e.dur * 0.5, function(t2){
+          if (!rider) return;
+          rider.rideOn = null;
+          var rf = a.faceShown || 1;
+          move(rider, t2, e.dur * 0.45, { x: clamp(a.x + rf * SIZE * 0.75, -SIZE * 0.2, vw() - SIZE * 0.8), y: sy0 }, { face: rf, keepFace: true, arc: 70, ease: 'inout', effort: 0.8,
+            onEnd: function(){ if (live){ var fp = artPoint(rider, 100, 188); dust(fp.x, ground, 6, 40); SFX.play('thud'); } } });
+        });
+        break;
+      }
+
+      /* ---------- Spike ---------- */
+      case 'tailflip': {
+        if (!a) break;
+        var tf9 = nextAlong(function(q){ return (q.state === 'free' || q.state === 'idle') && !q.flipping; });
+        if (!tf9) break;
+        tf9.flipping = true;
+        groundIt(tf9);
+        tailFlip(a, tf9, t, e.dur, flow());
+        break;
+      }
+      case 'platewalk': {
+        if (!a) break;
+        var wf = flow(), start = a.x;
+        var catches = live.plan.events.filter(function(q){ return q.kind === 'platecatch' && q.char === a.key; }).sort(function(p1, p2){ return p1.at - p2.at; });
+        var order = live.payloads.filter(takeable).sort(function(p1, p2){ return wf * (p1.x - p2.x); });
+        var plate = offsetOf(a, 100, 70, wf);
+        /* where he is at each catch: right under that letter */
+        var keys = [{ t: 0, x: start }];
+        order.forEach(function(q, i){
+          if (!catches[i]) return;
+          q.plateFor = a.key; q.plateSlot = i;
+          keys.push({ t: catches[i].at - e.at + catches[i].dur * 0.55, x: clamp(q.x - plate.x, -SIZE * 0.3, vw() - SIZE * 0.7) });
+        });
+        var endX = clamp(keys[keys.length - 1].x + wf * SIZE * 0.5, -SIZE * 0.3, vw() - SIZE * 0.7);
+        keys.push({ t: e.dur, x: endX });
+        move(a, t, e.dur, { x: endX, y: sy0 }, { ease: 'linear', face: wf, keepFace: true, effort: 0.5,
+          path: function(ep, p){
+            var tt = p * e.dur, k = 1;
+            while (k < keys.length - 1 && keys[k].t < tt) k++;
+            var k0 = keys[k - 1], k1 = keys[k], u = clamp01((tt - k0.t) / Math.max(1, k1.t - k0.t));
+            return { x: lerp(k0.x, k1.x, u * u * (3 - 2 * u)), y: sy0 };
+          } });
+        SFX.play('march');
+        break;
+      }
+      case 'platecatch': {
+        if (!a) break;
+        var pc = live.payloads.filter(function(q){ return q.plateFor === a.key && takeable(q) && !q.dropping; }).sort(function(p1, p2){ return p1.plateSlot - p2.plateSlot; })[0] ||
+                 nextAlong(function(q){ return takeable(q) && !q.dropping; });
+        if (!pc) break;
+        pc.dropping = true;
+        /* a wiggle in the card, then down it drops onto his plates */
+        pc.state = 'drop'; pc.owner = a.key; pc.dropWhere = 'plates';
+        pc.fx = pc.x; pc.fy = pc.y; pc.frot = wrapDeg(pc.rot); pc.t0 = t + 180; pc.dur = e.dur * 0.62;
+        SFX.play('huh');
+        break;
+      }
+
+      /* ---------- the jungle vine ---------- */
+      case 'vine': {
+        if (!a) break;
+        var V = live.vine = vineRig(a);
+        var swingEv = live.plan.events.filter(function(q){ return q.kind === 'vineswing' && q.char === a.key; })[0];
+        var grabs = live.plan.events.filter(function(q){ return q.kind === 'vinegrab' && q.char === a.key; }).sort(function(p1, p2){ return p1.at - p2.at; });
+        var n9 = live.payloads.length, hold10 = holdOf(a);
+        var ga2 = offsetOf(a, anchorFor(a, hold10)[0], anchorFor(a, hold10)[1], V.f);
+        /* each letter drifts to the spot where he will sweep past it, in word order along the swing */
+        grabs.forEach(function(g, k){
+          var q = live.payloads[V.f > 0 ? k : n9 - 1 - k];
+          if (!q || !takeable(q) || !swingEv) return;
+          var pp = (g.at - swingEv.at) / swingEv.dur, at = V.pos(pp);
+          q.vineK = k;
+          q.state = 'moveto'; q.owner = null; q.fx = q.x; q.fy = q.y; q.frot = wrapDeg(q.rot);
+          q.tx = at.x + ga2.x; q.ty = at.y + ga2.y + q.h * 0.4; q.t0 = t + k * 90; q.dur = 700;
+        });
+        /* the vine drops from the treetops, and he leaps up and grabs it */
+        V.len = 0;
+        V.rope = addRope({ cls: 'vine', sag: 0, pts: function(){
+          if (!live.vine) return null;
+          var end = V.held ? handPoint(a) : { x: V.pivot.x + V.R * Math.sin(V.hang || 0) * V.len, y: V.pivot.y + V.R * Math.cos(V.hang || 0) * V.len };
+          return [{ x: V.pivot.x - 10, y: -40 }, { x: V.pivot.x, y: V.pivot.y, sag: 0 }, { x: (V.pivot.x + end.x) / 2 + 6, y: (V.pivot.y + end.y) / 2, sag: 0 }, end];
+        } });
+        var branch = addProp('branch');
+        placeProp(branch, V.pivot.x - 40, V.pivot.y - 22);
+        V.hang = -V.f * V.th;
+        addTask(function(tt){ if (!live || V.held) return true; V.len = clamp01((tt - t) / (e.dur * 0.45)); return V.len >= 1; });
+        var st = V.pos(0);
+        move(a, t + e.dur * 0.35, e.dur * 0.6, { x: st.x, y: st.y }, { face: V.f, keepFace: true, ease: 'inout', arc: 40, effort: 1,
+          onEnd: function(){ if (live){ V.held = true; SFX.play('catch'); setExpr(a, 'happy', 600); } } });
+        SFX.play('whoosh');
+        break;
+      }
+      case 'vineswing': {
+        if (!a || !live.vine) break;
+        var V2 = live.vine, r0 = wrapDeg(a.rot);
+        V2.held = true;
+        a.trick = { kind: 'cheer', t0: t, dur: 400 };
+        setExpr(a, 'happy', e.dur, t);
+        move(a, t, e.dur, V2.pos(1), { ease: 'linear', face: V2.f, keepFace: true, effort: 0.8,
+          path: function(ep, p){ if (p > 0.86 && V2.held){ V2.held = false; V2.letGo = live.vnow; SFX.play('boing'); } return V2.pos(p); },
+          /* he leans with the swing, easing into it as he pushes off and out
+             of it as he lets go, so his body never snaps round */
+          rotFn: function(p){
+            var lean = function(q){ return -V2.f * V2.hand(Math.min(q, 0.86)).ang * 180 / Math.PI * 0.45; };
+            if (p < 0.12){ var u = p / 0.12; return lerp(r0, lean(p), u * u * (3 - 2 * u)); }
+            if (p > 0.78){ var w = clamp01((p - 0.78) / 0.16); return lerp(lean(p), 0, w * w * (3 - 2 * w)); }
+            return lean(p);
+          },
+          onEnd: function(){ if (live){ var fp = artPoint(a, 100, 188); dust(fp.x, ground, 8, 50); SFX.play('thud'); } } });
+        /* once he lets go the vine swings back up out of the way */
+        addTask(function(tt){
+          if (!live || !live.vine) return true;
+          if (V2.held || !V2.letGo) return false;
+          var q = clamp01((tt - V2.letGo) / 900);
+          V2.hang = V2.hand(0.86).ang * (1 - q); V2.len = 1 - q * 0.9;
+          return q >= 1;
+        });
+        SFX.play('whee');
+        break;
+      }
+      case 'vinegrab': {
+        if (!a) break;
+        var vg = live.payloads.filter(function(q){ return q.vineK != null && q.state !== 'held' && q.state !== 'gone' && q.state !== 'hop'; })
+          .sort(function(p1, p2){ return p1.vineK - p2.vineK; })[0] || nextAlong(takeable);
+        if (!vg) break;
+        hopInto(vg, a, holdOf(a), 160, t, 10);
+        SFX.play('catch'); sparkle(vg.x, vg.y, 4);
+        break;
+      }
+
+      /* ---------- the geyser ---------- */
+      case 'geyser': {
+        var gl = pl && takeable(pl) ? pl : nextAlong(takeable);
+        var catcher = actors[e.other];
+        if (!gl || !catcher) break;
+        var gz = addProp('geyser');
+        var gx = gl.x, gTop = gl.y + gl.h * 0.5, G = { h: 0 };
+        catcher.look = { x: gx, y: gTop };
+        addTask(function(tt){
+          if (!live) return true;
+          var p = clamp01((tt - t) / e.dur);
+          var up = p < 0.3 ? easeOut(p / 0.3) : (p < 0.55 ? 1 : 1 - easeIn(clamp01((p - 0.55) / 0.4)));
+          G.h = (ground - gTop + 40) * up;
+          gz.style.height = Math.round(G.h) + 'px';
+          placeProp(gz, gx - 30, ground - G.h);
+          gz.style.opacity = p < 0.95 ? 1 : 0;
+          if (p > 0.1 && p < 0.55 && Math.random() < 0.4) particle('drop', gx + rnd(-26, 26), ground - G.h + 10, rnd(-50, 50), rnd(-40, 20), 500, 1, 0.4, null);
+          if (p >= 1){ dropProp(gz); return true; }
+          return false;
+        });
+        SFX.play('geyser');
+        whenAt(t + e.dur * 0.22, function(t2){
+          if (!takeable(gl)) return;
+          gl.state = 'moveto'; gl.owner = null; gl.fx = gl.x; gl.fy = gl.y; gl.frot = wrapDeg(gl.rot);
+          gl.tx = gl.x; gl.ty = gl.y - 90; gl.t0 = t2; gl.dur = e.dur * 0.2;
+        });
+        whenAt(t + e.dur * 0.44, function(t3){
+          if (gl.state === 'gone' || gl.state === 'held') return;
+          hopInto(gl, catcher, holdOf(catcher), e.dur * 0.45, t3, 150);
+          gl.hopSpin = (catcher.x + SIZE / 2 > gl.x ? 1 : -1) * 360;
+          SFX.play('whoosh'); setExpr(catcher, 'wow', 600, t3);
+        });
+        break;
+      }
+
+      /* ---------- a rescue ---------- */
+      case 'rescue': {
+        if (!a) break;
+        var rp = e.letter != null ? live.payloads[e.letter] : null;
+        if (!rp || rp.state === 'gone') break;
+        var RD = e.dur, rhold = holdOf(a), giver = e.give ? actors[e.give] : null;
+        rp.rescuer = a.key;
+        a.look = { x: rp.x, y: rp.y };
+        a.face = rp.x >= a.x + SIZE / 2 ? 1 : -1;
+        setExpr(a, 'wow', RD * 0.2, t);
+        a.trick = { kind: 'cheer', t0: t, dur: RD * 0.15 };
+        SFX.play('huh');
+        whenAt(t + RD * 0.18, function(t2){ startRescue(a, rp, e.method || 'fetch', t2, RD * 0.52); });
+        whenAt(t + RD * 0.72, function(t3){ secure(rp, a, rhold, t3); });
+        if (giver) whenAt(t + RD * 0.84, function(t4){
+          if (rp.state === 'gone') return;
+          /* here you go! — tossed back up onto the one who dropped it */
+          a.face = giver.x > a.x ? 1 : -1;
+          a.trick = { kind: 'cheer', t0: t4, dur: 400 };
+          if (rp.tie){ rp.tie.kill(); rp.tie = null; }
+          releaseHold(rp);
+          hopInto(rp, giver, holdOf(giver), RD * 0.15, t4, 130);
+          SFX.play('toss');
+          setExpr(giver, 'happy', 900, t4);
+          giver.look = null;
+        });
+        break;
+      }
+
       case 'exit': {
         if (!a) break;
         a.fallen = 0;
+        a.rideOn = null;
+        if (live.wobble) delete live.wobble[a.key];
         setExpr(a, 'happy', e.dur, t);
-        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { op: 0, ease: 'inout', effort: 0.7, rotTo: 0, capSpeed: 1.2 });
+        /* a steady walk (or flight) off, never a blur */
+        move(a, t, e.dur, edgeFor(e.dir || 'right', a), { op: 0, ease: 'inout', effort: 0.7, rotTo: 0, capSpeed: SLOW_EXIT });
         break;
       }
     }
-  }
-
-  /* ---------- the rocket ship ---------- */
-  var SHIP_SVG = '<svg viewBox="0 0 190 140" aria-hidden="true">' +
-    '<ellipse cx="95" cy="92" rx="88" ry="26" fill="#2F7BF5" stroke="#0B2A66" stroke-width="5"/>' +
-    '<ellipse cx="95" cy="84" rx="70" ry="16" fill="#5DB0FF"/>' +
-    '<path d="M50 80 Q52 30 95 22 Q138 30 140 80 Z" fill="#BFE6FF" stroke="#0B2A66" stroke-width="5" opacity=".95"/>' +
-    '<path d="M70 50 Q80 34 98 32" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".8"/>' +
-    '<circle cx="40" cy="96" r="7" fill="#FFC53D" class="shiplight"/><circle cx="95" cy="104" r="7" fill="#FF8A1F" class="shiplight"/><circle cx="150" cy="96" r="7" fill="#FFC53D" class="shiplight"/>' +
-  '</svg>';
-  function showShip(t, dur){
-    if (live.ship) return;
-    var el = document.createElement('div'); el.className = 'ship'; el.innerHTML = SHIP_SVG;
-    var beam = document.createElement('div'); beam.className = 'beam';
-    layer.insertBefore(beam, layer.firstChild);
-    layer.appendChild(el);
-    live.ship = { el: el, beam: beam, x: vw() / 2, y: -160, ty: Math.max(24, vh() * 0.06), t0: t, dur: dur, leaving: false };
-  }
-  function hideShip(t, dur){ if (live.ship){ live.ship.leaving = true; live.ship.t0 = t; live.ship.dur = dur; } }
-  function stepShip(t){
-    var s = live && live.ship;
-    if (!s) return;
-    var p = clamp01((t - s.t0) / s.dur);
-    if (!s.leaving) s.y = lerp(-160, s.ty, easeOut(p)) + Math.sin(t / 300) * 4;
-    else s.y = lerp(s.ty, -260, easeIn(p));
-    s.el.style.transform = 'translate3d(' + Math.round(s.x - 95) + 'px,' + Math.round(s.y) + 'px,0)';
-    var bOn = !s.leaving && p > 0.6 ? 1 : (s.leaving ? Math.max(0, 1 - p * 3) : 0);
-    s.beam.style.opacity = bOn * (0.75 + Math.sin(t / 90) * 0.1);
-    s.beam.style.left = Math.round(s.x - 120) + 'px'; s.beam.style.width = '240px';
-    s.beam.style.top = Math.round(s.y + 104) + 'px'; s.beam.style.height = Math.max(0, live.groundY - s.y - 104) + 'px';
   }
 
   /* ---------- the loop ---------- */
@@ -2086,20 +2817,26 @@ function createStage(deps){
       live.fired[i] = 1;
       try { fire(ev[i], vnow); } catch (err){ live.errors.push(ev[i].kind + ': ' + (err && err.message || err)); }
     }
-    for (var k in actors){
+    var k;
+    for (k in actors){
       var a = actors[k];
       stepActor(a, vnow, dt);
       a.bob = 0;
       /* waiting is not freezing: a small weight-shift while he stands by */
-      if (!a.anim && a.op > 0.5 && !a.fallen && Math.abs(a.restRot || 0) < 40) a.rot = (a.restRot || 0) + Math.sin(vnow / 480 + a.key.length) * 2.6;
-      poseActor(a, vnow, live.groundY);
-      writeActor(a); writeShadow(a, live.groundY); emit(a, now, live.groundY);
+      if (!a.anim && a.op > 0.5 && !a.fallen && !a.rideOn && Math.abs(a.restRot || 0) < 40) a.rot = (a.restRot || 0) + Math.sin(vnow / 480 + a.key.length) * 2.6;
     }
+    /* a buddy riding on Stretch's head goes wherever the head goes */
+    for (k in actors) ride(actors[k]);
+    for (k in actors){
+      var b = actors[k];
+      poseActor(b, vnow, live.groundY);
+      writeActor(b); writeShadow(b, live.groundY); emit(b, now, live.groundY);
+    }
+    runTasks(vnow, dt);
     stepExtras(vnow, dt);
     for (var j = 0; j < live.payloads.length; j++){ stepPayload(live.payloads[j], vnow, dt); writePayload(live.payloads[j]); }
     stepExtras2(vnow, dt);
     drawRopes();
-    stepShip(vnow);
     if (live.shake > 0.4){
       var s = live.shake;
       layer.style.transform = 'translate3d(' + ((Math.random() - 0.5) * s).toFixed(1) + 'px,' + ((Math.random() - 0.5) * s).toFixed(1) + 'px,0)';
@@ -2111,6 +2848,15 @@ function createStage(deps){
     live.raf = requestAnimationFrame(frame);
   }
 
+  function ride(a){
+    if (!a.rideOn || a.anim) return;
+    var h = actors[a.rideOn];
+    if (!h){ a.rideOn = null; return; }
+    var top = artPoint(h, 170 + h.neck.x, 18 + h.neck.y), f = h.faceShown || 1, off = offsetOf(a, 100, 190, f);
+    a.face = f;
+    a.x = top.x - off.x; a.y = top.y - off.y;
+    a.rot = wrapDeg(h.rot) * 0.5 + h.headTilt * 0.3;
+  }
   /* the scene is over when the last dino has left, not merely when the clock says so */
   function nobodyInView(){
     for (var k in actors){
@@ -2122,6 +2868,8 @@ function createStage(deps){
   function parkActor(a){
     a.anim = null; a.op = 0; a.x = -600; a.y = -600; a.rot = 0; a.sc = 1; a.roll = 1; a.bob = 0;
     a.fallen = 0; a.effort = 0; a.look = null; a.trick = null; a.jaw = 0; a.restRot = 0;
+    a.neck.x = a.neck.y = 0; a.neckAnim = null; a.headTilt = a.headTiltGoal = 0; a.plateJolt = 0; a.rideOn = null;
+    applyNeck(a);
     a.el.classList.remove('tappable');
     setExpr(a, null);
     writeActor(a);
@@ -2134,7 +2882,6 @@ function createStage(deps){
     if (l.guard) clearTimeout(l.guard);
     live = null;
     l.payloads.forEach(function(p){ if (p.el && p.el.parentNode) p.el.parentNode.removeChild(p.el); });
-    if (l.ship){ [l.ship.el, l.ship.beam].forEach(function(n){ if (n.parentNode) n.parentNode.removeChild(n); }); }
     (l.ropes || []).forEach(function(r){ if (r.g.parentNode) r.g.parentNode.removeChild(r.g); });
     (l.props || []).forEach(function(d){ if (d.parentNode) d.parentNode.removeChild(d); });
     if (l.frontSvg && l.frontSvg.parentNode) l.frontSvg.parentNode.removeChild(l.frontSvg);
@@ -2168,6 +2915,12 @@ function createStage(deps){
     var cast = {};
     plan.events.forEach(function(ev){ [ev.char, ev.other, ev.leader].forEach(function(k){ if (k) cast[k] = 1; }); });
     var tNow = performance.now();
+    /* anyone caught mid-stretch settles his neck as the scene begins */
+    Object.keys(actors).forEach(function(k){
+      var a = actors[k];
+      a.headTiltGoal = 0;
+      if (a.neck.x || a.neck.y) neckTo(a, tNow, 400, { x: 0, y: 0 }, 'inout'); else a.neckAnim = null;
+    });
     handover.forEach(function(k){
       var a = actors[k];
       if (cast[k] || a.op < 0.5) return;
@@ -2200,12 +2953,12 @@ function createStage(deps){
       function once(errs){ if (settled) return; settled = true; resolve(errs || []); }
       live = {
         plan: plan, payloads: payloads, fired: [], errors: [], t0: performance.now(), last: performance.now(), vnow: performance.now(),
-        deadline: performance.now() + budget + 3500, groundY: ground, dust: opts.dust || null, entryFor: entryFor,
-        resolve: once, raf: null, shake: 0, guard: null, ship: null, parade: null, tugging: false, onShake: opts.onShake || null, arrivals: 0,
+        deadline: performance.now() + budget + 5000, groundY: ground, dust: opts.dust || null, entryFor: entryFor,
+        resolve: once, raf: null, shake: 0, guard: null, parade: null, tugging: false, onShake: opts.onShake || null, arrivals: 0, tasks: [], wobble: {},
         resume: resume, cast: cast, ropes: [], props: [], chains: {}, frontSvg: frontSvg, slipping: slipping
       };
       live.raf = requestAnimationFrame(frame);
-      live.guard = setTimeout(function(){ if (settled) return; finish(); once(['stall guard fired']); }, budget + 3900);
+      live.guard = setTimeout(function(){ if (settled) return; finish(); once(['stall guard fired']); }, budget + 5400);
     });
   }
   function stop(restore){
@@ -2302,7 +3055,7 @@ function createStage(deps){
   function ambWander(a, now){
     var lo = amb.left - SIZE * 0.14, hi = amb.right - SIZE * 0.86, span = amb.right - amb.left;
     var tx = freeSpot(a, function(){ return amb.lineup ? amb.home[a.key] - SIZE / 2 + rnd(-26, 26) : amb.left + Math.random() * span - SIZE / 2; }, lo, hi);
-    var speed = { rex: 0.24, trike: 0.18, dash: 0.42, swoop: 0.3 }[a.kind];
+    var speed = { rex: 0.24, trike: 0.18, dash: 0.42, swoop: 0.3, brachio: 0.13, stego: 0.15 }[a.kind] || 0.2;
     var dur = clamp(Math.abs(tx - a.x) / speed, 500, 3200);
     var ob = blocker(a, tx), y = restY(a);
     if (ob && a.kind === 'trike' && Math.random() < 0.7){
@@ -2327,9 +3080,9 @@ function createStage(deps){
     var opts = { ease: 'inout', effort: 0.6 };
     if (ob){
       a.look = centreOf(ob);
-      opts.arc = { rex: 110, dash: 90, swoop: 120, trike: 50 }[a.kind];
+      opts.arc = { rex: 110, dash: 90, swoop: 120, trike: 50, brachio: 36, stego: 40 }[a.kind] || 40;
       if (a.kind === 'dash') opts.rotTo = 10;
-      SFX.play({ rex: 'jet', dash: 'boing', swoop: 'flap', trike: 'stomp' }[a.kind]);
+      SFX.play({ rex: 'jet', dash: 'boing', swoop: 'flap', trike: 'stomp', brachio: 'stomp', stego: 'boing' }[a.kind] || 'boing');
       setExpr(ob, 'wow', dur, now); ob.look = centreOf(a);
     }
     move(a, now, dur, { x: tx, y: y, sc: amb.sc }, opts);
@@ -2374,6 +3127,34 @@ function createStage(deps){
         move(a, now, 520, { x: tx, y: y, sc: amb.sc }, { ease: 'inout', effort: 1, rotTo: 8,
           next: { dur: 300, to: { x: tx + (tx > a.x ? 18 : -18), y: y, sc: amb.sc }, opts: { ease: 'out', rotTo: 0, keepFace: true } } });
         SFX.play('zoom');
+        return 1000;
+      }
+      case 'brachio': {
+        if (pick < 0.55){
+          /* a big stretch up and a look around (never into the card) */
+          var room = headroom(a), upBy = Math.min(130, room === Infinity ? 130 : room / (K * amb.sc));
+          a.headTiltGoal = -12;
+          neckTo(a, now, 700, { x: 16, y: -upBy }, 'out');
+          var back2 = now + 1500;
+          setTimeout(function(){ if (amb && !live){ a.headTiltGoal = 0; neckTo(a, performance.now(), 800, { x: 0, y: 0 }, 'inout'); } }, 1500);
+          setExpr(a, 'wow', 900, now);
+          SFX.play('hoot');
+          return back2 - now + 900;
+        }
+        a.trick = { kind: 'thump', t0: now, dur: 800 };
+        setTimeout(function(){ if (!amb) return; var tip = artPoint(a, 6, 134); ring(tip.x, amb.groundY, false); dust(tip.x, amb.groundY, 6, 40); SFX.play('stomp'); }, 400);
+        return 900;
+      }
+      case 'stego': {
+        if (pick < 0.5){
+          a.plateJolt = 1.3;
+          var pp2 = artPoint(a, 100, 60); sparkle(pp2.x, pp2.y, 6);
+          setExpr(a, 'happy', 800, now);
+          SFX.play('boing');
+          return 900;
+        }
+        a.trick = { kind: 'tailflip', t0: now, dur: 900 };
+        SFX.play('whoosh');
         return 1000;
       }
       case 'swoop': {

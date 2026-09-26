@@ -1,9 +1,11 @@
 /* ============================================================
-   DINO ROCKETS — interface
+   SPELLOSAURUS — interface
 
-   Deep space blue for the world, orange for anything to press, white
-   hologram cards so letters are always crisp. Every target a child hits
-   is 56px or more and has a pressed state he can feel.
+   A sunny island for the world, orange for anything to press, white
+   cards so letters are always crisp. Words that sit on the sky get a
+   chunky cartoon outline, so they read on every part of the island.
+   Every target a child hits is 56px or more and has a pressed state he
+   can feel.
    ============================================================ */
 :root{
   --ink:#0A1433; --ink-soft:#3C5A8F;
@@ -11,7 +13,10 @@
   --cyan:#8FE3FF; --cyan-700:#2F9FD0;
   --orange:#FF8A1F; --orange-600:#E8680C; --orange-700:#C4520A; --orange-300:#FFB566; --orange-100:#FFF0DE;
   --gold:#FFC53D; --good:#23B05C; --good-700:#147A42; --bad:#E5484D;
-  --sky1:#0B1640; --sky2:#1F4E8C; --ground:#E0592A; --rim:#FFB067; --rock:#8C2F14; --glow:#FF8A1F;
+  --sky1:#8FD6FF; --sky2:#D8F3FF; --ground:#3FAE55; --rim:#8EE06A; --rock:#1E6E36; --glow:#B6FF6A;
+  --leaf:#3FBF4F; --leaf-700:#1E7A2E; --leaf-100:#E6F8E4; --sand:#FFF4DC;
+  /* a thick dark outline for white words on the sky */
+  --outline:0 2px 0 #0A1433,2px 0 0 #0A1433,-2px 0 0 #0A1433,0 -2px 0 #0A1433,2px 2px 0 #0A1433,-2px 2px 0 #0A1433,2px -2px 0 #0A1433,-2px -2px 0 #0A1433,0 5px 0 #0A1433;
   --floor:clamp(150px, 21vh, 210px);
   --surface-h:64px;
   --tile:64px;
@@ -19,43 +24,53 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
-body{font-family:var(--font);color:var(--ink);background:var(--sky1);-webkit-font-smoothing:antialiased;
+body{font-family:var(--font);color:var(--ink);background:var(--sky2);-webkit-font-smoothing:antialiased;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 button{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid var(--orange-300);outline-offset:3px}
 [hidden]{display:none !important}
 
 /* ============================================================
-   SPACE
+   DINO ISLAND — the world behind every screen
    ============================================================ */
-#space{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
-  background:radial-gradient(120% 80% at 70% 10%,var(--sky2) 0%,var(--sky1) 70%);transition:background 1s}
-#space .stars{position:absolute;inset:-50% 0 0 0;background-repeat:repeat;animation:starsDrift linear infinite}
-#space .s1{background-image:radial-gradient(1.5px 1.5px at 20px 30px,#fff 60%,transparent 70%),radial-gradient(1.5px 1.5px at 90px 120px,#fff 60%,transparent 70%),
-  radial-gradient(1px 1px at 150px 60px,#CFE8FF 60%,transparent 70%),radial-gradient(1.5px 1.5px at 60px 180px,#fff 60%,transparent 70%);
-  background-size:200px 200px;animation-duration:120s;opacity:.8}
-#space .s2{background-image:radial-gradient(2px 2px at 40px 80px,#fff 60%,transparent 70%),radial-gradient(1.5px 1.5px at 170px 20px,#FFE8C2 60%,transparent 70%),
-  radial-gradient(2px 2px at 120px 160px,#fff 60%,transparent 70%);background-size:260px 260px;animation-duration:80s;opacity:.9}
-#space .s3{background-image:radial-gradient(3px 3px at 60px 60px,#fff 55%,transparent 70%),radial-gradient(2.5px 2.5px at 250px 190px,#BFE6FF 55%,transparent 70%);
-  background-size:330px 330px;animation-duration:50s;animation-name:starsDrift,twinkle;animation-duration:50s,3s;animation-iteration-count:infinite,infinite;animation-direction:normal,alternate}
-@keyframes starsDrift{from{transform:translateY(0)}to{transform:translateY(50%)}}
-@keyframes twinkle{to{opacity:.4}}
-#space .nebula{position:absolute;border-radius:50%;filter:blur(40px);opacity:.45}
-#space .n1{width:70vw;height:50vh;left:-20vw;top:8vh;background:radial-gradient(circle,var(--glow),transparent 65%)}
-#space .n2{width:60vw;height:40vh;right:-20vw;top:30vh;background:radial-gradient(circle,#2F9FD0,transparent 65%);opacity:.35}
-#space .far-planet{position:absolute;right:8%;top:10%;width:clamp(60px,18vw,120px);aspect-ratio:1;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,var(--rim),var(--ground) 55%,var(--rock) 100%);
-  box-shadow:0 0 30px 6px color-mix(in srgb,var(--glow) 40%,transparent),inset -12px -10px 0 rgba(0,0,0,.25)}
-#space .far-planet::after{content:"";position:absolute;left:-30%;right:-30%;top:44%;height:14%;border-radius:50%;border:4px solid rgba(255,255,255,.55);transform:rotate(-16deg)}
-#space .comet{position:absolute;top:18%;left:-20%;width:120px;height:3px;border-radius:3px;
-  background:linear-gradient(90deg,transparent,#fff);animation:comet 9s ease-in 3s infinite;opacity:0}
-@keyframes comet{0%{transform:translate(0,0) rotate(18deg);opacity:0}4%{opacity:1}14%{transform:translate(140vw,45vh) rotate(18deg);opacity:0}100%{opacity:0}}
-#space .surface{position:absolute;left:0;right:0;bottom:0;height:calc(var(--surface-h) + env(safe-area-inset-bottom));
-  background:linear-gradient(180deg,var(--ground),var(--rock) 140%);transition:background 1s}
-#space .surface .rim{position:absolute;left:0;right:0;top:-7px;height:14px;border-radius:7px;background:var(--rim);transition:background 1s}
-#space .crater{position:absolute;border-radius:50%;background:rgba(0,0,0,.18);box-shadow:inset 0 3px 0 rgba(0,0,0,.2)}
-#space .c1{width:60px;height:14px;left:12%;top:20px}#space .c2{width:34px;height:9px;left:58%;top:34px}#space .c3{width:80px;height:16px;left:78%;top:16px}
-@media (prefers-reduced-motion: reduce){ #space .stars,#space .comet{animation:none} }
+#world{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 78%);transition:background 1s}
+#world .sun{position:absolute;right:9%;top:7%;width:clamp(56px,15vw,110px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,#FFF6B8 0 45%,#FFD23F 70%);box-shadow:0 0 0 12px rgba(255,226,120,.35),0 0 60px 20px rgba(255,214,90,.45);
+  animation:sunPulse 5s ease-in-out infinite}
+@keyframes sunPulse{50%{box-shadow:0 0 0 20px rgba(255,226,120,.25),0 0 70px 26px rgba(255,214,90,.4)}}
+#world .cloud{position:absolute;width:130px;height:40px;border-radius:40px;background:#fff;opacity:.9;
+  box-shadow:34px -18px 0 4px #fff,70px -4px 0 -2px #fff;animation:cloudDrift linear infinite}
+#world .k1{top:12%;left:-160px;animation-duration:70s}
+#world .k2{top:24%;left:-160px;transform:scale(.7);animation-duration:95s;animation-delay:-40s}
+#world .k3{top:6%;left:-160px;transform:scale(.55);animation-duration:120s;animation-delay:-80s;opacity:.8}
+@keyframes cloudDrift{from{translate:0 0}to{translate:calc(100vw + 320px) 0}}
+/* the volcano far across the island, puffing gently */
+#world .far-volcano{position:absolute;left:8%;bottom:calc(var(--surface-h) + 40px);width:clamp(140px,40vw,300px);aspect-ratio:1.8;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--rock) 70%,#8C5A3A),color-mix(in srgb,var(--rock) 85%,#000));
+  clip-path:polygon(0 100%,38% 12%,46% 18%,54% 12%,62% 18%,100% 100%);opacity:.55}
+#world .puff{position:absolute;left:47%;top:0;width:18%;aspect-ratio:1;border-radius:50%;background:#fff;opacity:0;animation:puff 6s ease-out infinite}
+#world .p2{animation-delay:2s}#world .p3{animation-delay:4s}
+@keyframes puff{0%{transform:translate(0,0) scale(.4);opacity:.7}100%{transform:translate(30%,-160%) scale(1.6);opacity:0}}
+#world .hills{position:absolute;left:-10%;right:-10%;border-radius:50% 50% 0 0}
+#world .h1{bottom:calc(var(--surface-h) - 10px);height:24vh;background:color-mix(in srgb,var(--ground) 55%,#fff);opacity:.55;border-radius:60% 40% 0 0}
+#world .h2{bottom:calc(var(--surface-h) - 10px);height:15vh;left:30%;background:color-mix(in srgb,var(--ground) 75%,#fff);opacity:.7}
+#world .palm{position:absolute;bottom:calc(var(--surface-h) - 6px);width:110px;height:clamp(160px,34vh,280px)}
+#world .pl{left:-24px}#world .pr{right:-30px;transform:scaleX(-1) scale(.85);transform-origin:bottom}
+#world .trunk{position:absolute;left:46px;bottom:0;width:16px;height:100%;border-radius:8px;
+  background:repeating-linear-gradient(180deg,#9A6A3A 0 14px,#7A4E26 14px 18px);transform:rotate(6deg);transform-origin:bottom}
+#world .frond{position:absolute;left:54px;top:4px;width:80px;height:26px;border-radius:0 80% 0 80%;background:var(--leaf);
+  transform-origin:0 50%;box-shadow:inset 0 -6px 0 var(--leaf-700);animation:sway 4s ease-in-out infinite}
+#world .f1{transform:rotate(-20deg)}#world .f2{transform:rotate(30deg)}#world .f3{transform:rotate(160deg) scaleY(-1)}#world .f4{transform:rotate(-150deg) scaleY(-1);width:64px}
+@keyframes sway{50%{rotate:6deg}}
+#world .surface{position:absolute;left:0;right:0;bottom:0;height:calc(var(--surface-h) + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,var(--ground),var(--rock) 150%);transition:background 1s}
+#world .surface .rim{position:absolute;left:0;right:0;top:-7px;height:14px;border-radius:7px;background:var(--rim);transition:background 1s}
+#world .tuft{position:absolute;top:-16px;width:26px;height:18px;background:var(--rim);clip-path:polygon(0 100%,15% 0,35% 70%,50% 5%,65% 70%,85% 0,100% 100%)}
+#world .t1{left:8%}#world .t2{left:34%;transform:scale(.8)}#world .t3{left:63%}#world .t4{left:88%;transform:scale(.7)}
+/* the dark cave is the one place the sky is dark: no sun, no clouds */
+body[data-land="cave"] #world .sun,body[data-land="cave"] #world .cloud,body[data-land="cave"] #world .palm{display:none}
+@media (prefers-reduced-motion: reduce){ #world .cloud,#world .puff,#world .frond,#world .sun{animation:none} }
 
 /* ============================================================
    SCREENS
@@ -68,15 +83,15 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .bar{width:100%;max-width:640px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;min-height:56px;gap:8px;margin-bottom:8px}
 .bar > :first-child{justify-self:start}
 .bar > :last-child{justify-self:end;grid-column:3}
-.bar-title{font-weight:900;font-size:21px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35);white-space:nowrap}
-.bar-count{color:var(--cyan);font-weight:800;font-size:16px}
+.bar-title{font-weight:900;font-size:22px;color:#fff;text-shadow:var(--outline);white-space:nowrap;letter-spacing:.02em}
+.bar-count{color:#fff;font-weight:900;font-size:17px;background:rgba(10,20,51,.55);padding:4px 12px;border-radius:14px}
 .back,.pill-btn{min-height:48px;padding:0 16px;border-radius:24px;font-weight:900;font-size:17px;white-space:nowrap;
-  background:rgba(255,255,255,.14);color:#fff;border:2px solid rgba(255,255,255,.35);display:inline-flex;align-items:center;gap:6px;backdrop-filter:blur(6px)}
+  background:rgba(10,20,51,.45);color:#fff;border:2px solid rgba(255,255,255,.7);display:inline-flex;align-items:center;gap:6px;backdrop-filter:blur(6px)}
 .pill-btn{width:48px;justify-content:center;padding:0}
 .pill-btn svg{width:24px;height:24px;fill:currentColor}
 .back:active,.pill-btn:active{transform:translateY(2px)}
 .card{position:relative;width:100%;max-width:640px;flex:1;min-height:0;background:#fff;border-radius:28px;
-  border:3px solid rgba(143,227,255,.8);box-shadow:0 0 0 6px rgba(143,227,255,.18),0 20px 44px rgba(0,0,0,.45);
+  border:4px solid #fff;box-shadow:0 0 0 5px rgba(63,191,79,.45),0 18px 36px rgba(20,60,30,.35);
   padding:18px;display:flex;flex-direction:column;align-items:center}
 
 /* buttons */
@@ -97,14 +112,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
    ============================================================ */
 .home-body{width:100%;max-width:640px;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
 .logo{margin:0;display:flex;flex-direction:column;align-items:center;line-height:.9;transform:rotate(-4deg)}
-.logo-name{font-size:clamp(22px,min(6.4vw,4vh),34px);font-weight:900;color:#fff;letter-spacing:.04em;text-shadow:0 3px 0 rgba(0,0,0,.35)}
+.logo-name{font-size:clamp(22px,min(6.4vw,4vh),34px);font-weight:900;color:#fff;letter-spacing:.04em;text-shadow:var(--outline)}
 .logo-main{display:flex;flex-direction:column;align-items:center}
-.logo-dino,.logo-rocket{font-weight:900;letter-spacing:.02em;-webkit-text-stroke:0}
-.logo-dino{font-size:clamp(52px,min(17vw,9vh),92px);color:#3FBF4F;text-shadow:0 5px 0 #1E7A2E,0 0 26px rgba(63,191,79,.55)}
-.logo-rocket{font-size:clamp(40px,min(12.5vw,6.8vh),70px);color:var(--orange);text-shadow:0 5px 0 var(--orange-700),0 0 26px rgba(255,138,31,.55)}
-.mission-card{width:100%;background:rgba(255,255,255,.96);border-radius:26px;padding:16px;border:3px solid rgba(143,227,255,.8);
-  box-shadow:0 0 0 6px rgba(143,227,255,.18),0 18px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;gap:10px}
-.mission-top{width:100%;display:flex;justify-content:space-between;align-items:baseline}
+.logo-dino,.logo-saur{font-weight:900;letter-spacing:.02em;-webkit-text-stroke:0}
+.logo-dino{font-size:clamp(46px,min(15vw,8.4vh),88px);color:#3FBF4F;text-shadow:0 3px 0 #0A1433,3px 0 0 #0A1433,-3px 0 0 #0A1433,0 -3px 0 #0A1433,0 7px 0 #1E7A2E}
+.logo-saur{font-size:clamp(46px,min(15vw,8.4vh),88px);color:var(--orange);text-shadow:0 3px 0 #0A1433,3px 0 0 #0A1433,-3px 0 0 #0A1433,0 -3px 0 #0A1433,0 7px 0 var(--orange-700);margin-top:-.08em}
+.new-friends{min-height:56px;padding:6px 18px;border-radius:28px;background:#FFF4DC;border:3px solid var(--gold);font-weight:900;font-size:17px;color:#7A4E08;
+  display:flex;align-items:center;gap:8px;box-shadow:0 5px 0 #D9A020;animation:nfGlow 1.4s ease-in-out infinite;max-width:100%}
+@keyframes nfGlow{50%{box-shadow:0 5px 0 #D9A020,0 0 0 8px rgba(255,197,61,.45)}}
+.new-friends .nf-art{display:flex}
+.new-friends .nf-art svg{width:44px;height:44px;overflow:visible}
+.mission-card{width:100%;background:rgba(255,255,255,.97);border-radius:26px;padding:16px;border:4px solid #fff;
+  box-shadow:0 0 0 5px rgba(63,191,79,.45),0 18px 36px rgba(20,60,30,.35);display:flex;flex-direction:column;align-items:center;gap:10px}
+.mission-top{width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:6px 10px;flex-wrap:wrap}
 .mission-label{font-weight:900;font-size:17px}
 .mission-count{font-weight:800;font-size:15px;color:var(--ink-soft)}
 .mission-track{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
@@ -127,55 +147,58 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .selfcheck.bad{background:#FDE3E3;color:var(--bad)}
 
 /* ============================================================
-   STAR MAP
+   ISLAND MAP — a trail of stops across the island
    ============================================================ */
-.map-wrap{width:100%;max-width:640px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:24px}
+.map-wrap{width:100%;max-width:640px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:28px;
+  background:radial-gradient(120% 80% at 50% 30%,#FFF4DC,#F2DDA8);border:4px solid #fff;box-shadow:0 0 0 5px rgba(63,191,79,.45),0 18px 36px rgba(20,60,30,.35)}
 .map{position:relative;padding:20px 22px 40px}
 .map-node{position:relative;display:flex;align-items:center;gap:14px;min-height:96px;width:100%}
 .map-node:nth-child(even){flex-direction:row-reverse;text-align:right}
-.map-node::before{content:"";position:absolute;left:50%;top:-30px;height:40px;border-left:4px dashed rgba(143,227,255,.45)}
+/* dino footprints lead from stop to stop */
+.map-node::before{content:"🐾";position:absolute;left:50%;top:-30px;font-size:22px;opacity:.45;transform:translateX(-50%) rotate(20deg)}
 .map-node:first-child::before{display:none}
-.planet-btn{width:86px;height:86px;border-radius:50%;flex:none;position:relative;
-  background:radial-gradient(circle at 35% 30%,var(--rim),var(--ground) 55%,var(--rock) 100%);
-  box-shadow:0 0 22px 2px color-mix(in srgb,var(--glow) 45%,transparent),inset -10px -10px 0 rgba(0,0,0,.22)}
-.planet-btn:active{transform:scale(.95)}
-.map-node.locked .planet-btn{filter:grayscale(.6) brightness(.7)}
-.map-node.next .planet-btn{animation:pulse 1.3s ease-in-out infinite;outline:4px solid var(--orange);outline-offset:4px}
-.map-node .done-badge{position:absolute;right:-6px;bottom:-6px;width:44px;height:44px;border-radius:50%;background:#fff;
+.spot-btn{width:86px;height:86px;border-radius:50%;flex:none;position:relative;display:grid;place-items:center;font-size:40px;
+  background:radial-gradient(circle at 35% 30%,var(--rim),var(--ground) 60%,var(--rock) 110%);border:4px solid #fff;
+  box-shadow:0 6px 0 rgba(90,60,20,.35),0 0 0 4px color-mix(in srgb,var(--ground) 40%,transparent)}
+.spot-btn .spot-ico{filter:drop-shadow(0 2px 0 rgba(0,0,0,.25))}
+.spot-btn:active{transform:scale(.95)}
+.map-node.locked .spot-btn{filter:grayscale(.6) brightness(.8)}
+.map-node.next .spot-btn{animation:pulse 1.3s ease-in-out infinite;outline:4px solid var(--orange);outline-offset:4px}
+.map-node .done-badge{position:absolute;right:-8px;bottom:-8px;width:46px;height:46px;border-radius:50%;background:#fff;
   box-shadow:0 3px 0 rgba(0,0,0,.25);display:grid;place-items:center;overflow:hidden}
-.map-node .done-badge .baby{width:52px;height:52px}
+.map-node .done-badge .baby{width:54px;height:54px;position:static}
 .map-label{display:flex;flex-direction:column;gap:2px}
-.map-word{font-size:30px;font-weight:900;color:#fff;letter-spacing:.04em;text-shadow:0 2px 0 rgba(0,0,0,.35)}
-.map-planet{font-size:15px;font-weight:800;color:var(--cyan)}
-.map-rocket{position:absolute;width:46px;height:46px;left:-8px;top:-10px;animation:wiggle 2s ease-in-out infinite}
-.map-finale .planet-btn{background:radial-gradient(circle at 35% 30%,#FFE08A,#FFC53D 55%,#B9770E 100%)}
+.map-word{font-size:30px;font-weight:900;color:var(--ink);letter-spacing:.04em}
+.map-land{font-size:15px;font-weight:800;color:#7A4E08}
+.map-here{position:absolute;width:56px;height:56px;left:-18px;top:-24px;animation:hop 1.2s ease-in-out infinite}
+.map-here svg{width:100%;height:100%;overflow:visible}
+@keyframes hop{50%{transform:translateY(-8px)}}
+.map-finale .spot-btn{background:radial-gradient(circle at 35% 30%,#FFB06B,#C9763B 60%,#5B2A10 110%)}
 .map-finale .map-word{font-size:24px}
 
 /* ============================================================
-   FLIGHT
+   TREK — off across the island to the next stop
    ============================================================ */
-.flight{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
-.flight .warp{position:absolute;inset:0;background-image:
-  radial-gradient(2px 30px at 20% 30%,rgba(255,255,255,.9),transparent),radial-gradient(2px 40px at 70% 20%,rgba(191,230,255,.9),transparent),
-  radial-gradient(2px 26px at 40% 70%,rgba(255,255,255,.9),transparent),radial-gradient(2px 36px at 85% 60%,rgba(255,232,194,.9),transparent),
-  radial-gradient(2px 30px at 10% 80%,rgba(255,255,255,.9),transparent),radial-gradient(2px 44px at 55% 45%,rgba(255,255,255,.9),transparent);
-  background-size:240px 240px;animation:warp .35s linear infinite}
-@keyframes warp{from{background-position:0 0}to{background-position:0 240px}}
-.flight-rocket{width:150px;height:200px;animation:shake .12s linear infinite}
-.flight-rocket svg{width:100%;height:100%;overflow:visible}
-@keyframes shake{0%{transform:translate(1px,0)}50%{transform:translate(-1px,1px)}100%{transform:translate(1px,-1px)}}
-.flight-text{position:relative;margin:0;font-size:26px;font-weight:900;color:#fff;text-align:center;text-shadow:0 3px 0 rgba(0,0,0,.4)}
+.trek{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.trek-ferns{position:absolute;left:0;right:0;bottom:calc(var(--surface-h) - 4px);height:90px;
+  background:radial-gradient(40px 50px at 30px 90px,var(--leaf) 60%,transparent 62%),radial-gradient(34px 60px at 110px 90px,var(--leaf-700) 60%,transparent 62%),
+  radial-gradient(28px 40px at 180px 90px,#8EE06A 60%,transparent 62%);background-size:220px 90px;background-repeat:repeat-x;animation:ferns .9s linear infinite}
+@keyframes ferns{from{background-position:0 0}to{background-position:-220px 0}}
+.trek-dino{width:190px;height:190px;animation:trot .36s ease-in-out infinite alternate}
+.trek-dino svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 8px 6px rgba(0,0,0,.25))}
+@keyframes trot{from{transform:translateY(0) rotate(-2deg)}to{transform:translateY(-14px) rotate(2deg)}}
+.trek-text{position:relative;margin:0;font-size:30px;font-weight:900;color:#fff;text-align:center;text-shadow:var(--outline);padding:0 16px}
 
 /* ============================================================
    PLAY
    ============================================================ */
-.steps{display:flex;gap:6px;padding:6px;border-radius:26px;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.3)}
-.steps i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:18px;background:rgba(255,255,255,.2)}
+.steps{display:flex;gap:6px;padding:6px;border-radius:26px;background:rgba(10,20,51,.4);border:2px solid rgba(255,255,255,.7)}
+.steps i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:18px;background:rgba(255,255,255,.35)}
 .steps i.done{background:var(--good)}
 .steps i.now{background:var(--orange);box-shadow:0 0 0 3px rgba(255,138,31,.4)}
 [data-screen="play"] .bar{grid-template-columns:auto minmax(0,1fr) auto}
 [data-screen="play"] .bar .steps{justify-self:center}
-.planet-tag{font-size:14px;font-weight:900;color:#fff;background:color-mix(in srgb,var(--ground) 80%,#000);padding:6px 10px;border-radius:14px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.land-tag{font-size:14px;font-weight:900;color:#fff;background:color-mix(in srgb,var(--ground) 70%,#000);padding:6px 10px;border-radius:14px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;border:2px solid #fff}
 .play-card{gap:10px}
 .activity{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:10px}
 .prompt{margin:0;font-size:21px;font-weight:900;text-align:center}
@@ -191,7 +214,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .hint{margin:0;font-size:16px;font-weight:800;color:var(--ink-soft);text-align:center}
 .cheer{margin:0;font-size:clamp(28px,7vw,38px);font-weight:900;color:var(--orange-600);text-align:center;animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
 
-/* letters: crystals to pick up, fuel cells to fill */
+/* letters: stones to pick up, slots to fill */
 .tile,.slot{width:var(--tile);height:calc(var(--tile) * 1.1);border-radius:calc(var(--tile) * .26);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;font-weight:900;line-height:1;position:relative}
 .tile{background:linear-gradient(160deg,#fff 0%,#EAF6FF 60%,#CDEBFF 100%);color:var(--ink);border:3px solid #8FD1FF;
   box-shadow:0 5px 0 #2F9FD0,0 0 16px rgba(143,227,255,.6);font-size:calc(var(--tile) * .56);touch-action:none}
@@ -224,20 +247,30 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .meet-hint{font-size:16px;font-weight:800;color:var(--ink-soft)}
 .holo .slot.filled{cursor:pointer}
 
-/* ZAP: meteors to blast */
+/* ZAP: jungle leaves to munch */
 .zap-field{position:relative;width:100%;flex:1;min-height:0;border-radius:20px;overflow:hidden;
-  background:radial-gradient(circle at 50% 120%,#1F4E8C,#0B1640 70%);box-shadow:inset 0 0 0 3px #BFE6FF}
-.zap-field::before{content:"";position:absolute;inset:0;background-image:radial-gradient(1.5px 1.5px at 30px 40px,#fff 60%,transparent 70%),radial-gradient(1px 1px at 110px 90px,#fff 60%,transparent 70%);background-size:140px 140px;opacity:.7}
-.meteor{position:absolute;left:0;top:0;min-width:120px;height:74px;padding:0 18px;border-radius:40px;display:grid;place-items:center;
-  font-size:clamp(28px,8vw,36px);font-weight:900;letter-spacing:.04em;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.4);
-  background:radial-gradient(circle at 30% 30%,#9A8878,#6E5A4B 60%,#4A3A2F);border:3px solid #FFB067;
-  box-shadow:0 0 18px rgba(255,138,31,.55),inset -6px -6px 0 rgba(0,0,0,.25);will-change:transform}
-.meteor::after{content:"";position:absolute;right:100%;top:50%;width:60px;height:14px;transform:translateY(-50%);
-  background:linear-gradient(90deg,transparent,rgba(255,176,103,.7));border-radius:8px}
-.meteor.left::after{right:auto;left:100%;background:linear-gradient(270deg,transparent,rgba(255,176,103,.7))}
-.meteor.wrong{animation:nope .42s;border-color:#fff;filter:grayscale(.6)}
-.meteor.hit{pointer-events:none}
-.laser{position:absolute;height:6px;border-radius:3px;background:linear-gradient(90deg,#8FE3FF,#fff);box-shadow:0 0 12px #8FE3FF;transform-origin:0 50%;pointer-events:none}
+  background:linear-gradient(180deg,#CFF3D2,#8FD99A);box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 6px rgba(63,191,79,.4)}
+.zap-field::before{content:"";position:absolute;inset:0;opacity:.35;background-size:120px 120px;
+  background-image:radial-gradient(18px 30px at 20px 110px,var(--leaf-700) 60%,transparent 62%),radial-gradient(14px 26px at 80px 118px,var(--leaf) 60%,transparent 62%)}
+.leaf{position:absolute;left:0;top:0;min-width:130px;height:78px;padding:0 24px;border-radius:70% 6% 70% 6%;display:grid;place-items:center;
+  font-size:clamp(28px,8vw,36px);font-weight:900;letter-spacing:.04em;color:#fff;text-shadow:0 2px 0 #0A1433,2px 0 0 #0A1433,-2px 0 0 #0A1433,0 -2px 0 #0A1433;
+  background:linear-gradient(135deg,#6FD86A,var(--leaf) 55%,var(--leaf-700));border:3px solid #fff;
+  box-shadow:0 5px 0 rgba(20,80,30,.45),inset 0 0 0 2px rgba(255,255,255,.35);will-change:transform}
+.leaf::after{content:"";position:absolute;left:12%;right:12%;top:50%;height:3px;border-radius:2px;background:rgba(255,255,255,.35);transform:rotate(-8deg);z-index:-1}
+.leaf.left{border-radius:6% 70% 6% 70%}
+.leaf.wrong{animation:nope .42s;filter:grayscale(.7) brightness(.9)}
+.leaf.hit{pointer-events:none}
+/* the dino jaws that snap shut on the right leaf */
+.jaws{position:absolute;width:120px;height:110px;transform:translate(-50%,-50%);pointer-events:none;z-index:5}
+.jaws i{position:absolute;left:0;right:0;height:50%;background:#3FBF4F;border:3px solid #0A1433}
+.jaws .top{top:0;border-radius:60px 60px 10px 10px;animation:jawTop .4s ease-in forwards}
+.jaws .bot{bottom:0;border-radius:10px 10px 60px 60px;animation:jawBot .4s ease-in forwards}
+.jaws .top::after,.jaws .bot::before{content:"";position:absolute;left:8px;right:8px;height:14px;
+  background:linear-gradient(135deg,transparent 50%,#fff 50%) 0 0/20px 14px repeat-x}
+.jaws .top::after{bottom:-14px;transform:scaleY(-1)}
+.jaws .bot::before{top:-14px}
+@keyframes jawTop{from{transform:translateY(-60px);opacity:.2}60%{transform:translateY(0);opacity:1}to{transform:translateY(0);opacity:0}}
+@keyframes jawBot{from{transform:translateY(60px);opacity:.2}60%{transform:translateY(0);opacity:1}to{transform:translateY(0);opacity:0}}
 .zap-round{font-size:15px;font-weight:900;color:var(--ink-soft)}
 
 /* MISSING: choices */
@@ -253,43 +286,48 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .key.hint{border-color:var(--orange);animation:hintglow .9s ease-in-out infinite}
 .peek{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:30;padding:14px 22px;border-radius:22px;
   background:rgba(10,20,51,.92);color:#fff;font-size:44px;font-weight:900;letter-spacing:.12em;box-shadow:0 0 0 4px #8FE3FF;animation:pop .3s}
-/* the fuel dock: a fuel line of cells, and the rocket with its tank */
-.fuel-dock{display:flex;align-items:center;gap:8px;width:100%;max-width:440px;flex:none;padding:4px 6px 4px 10px;border-radius:22px;
-  background:linear-gradient(180deg,#0E1F4A,#0B1640);box-shadow:inset 0 0 0 2px #2A4A8C,0 3px 0 #06102A}
-.fuel-label{font-size:12px;font-weight:900;letter-spacing:.08em;color:#8FE3FF;width:38px;flex:none}
-.fuel-dock.ready .fuel-label{color:var(--gold);animation:pop .4s}
-.fuel-pipe{flex:1;display:flex;gap:4px;height:26px;padding:3px;border-radius:12px;background:#06102A;box-shadow:inset 0 0 0 2px #1C3470}
-.fuel-pipe .cell{flex:1;border-radius:8px;background:#13265A;position:relative;overflow:hidden}
-.fuel-pipe .cell b{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#FFE08A,var(--orange));transition:height .35s cubic-bezier(.3,1.5,.5,1)}
-.fuel-pipe .cell.full b{height:100%;box-shadow:0 0 12px rgba(255,197,61,.9)}
-.fuel-pipe .cell.full:not(.quiet){animation:cellGlow .5s}
-@keyframes cellGlow{0%{filter:brightness(2)}100%{filter:none}}
-.fuel-rocket{position:relative;width:60px;height:86px;flex:none;margin:-14px 0 -10px}
-.fuel-rocket svg{width:100%;height:100%;overflow:visible}
-.fuel-rocket .flame{opacity:0;transform-origin:60px 108px;transition:opacity .2s}
-.fuel-dock.ready .fuel-rocket .flame{opacity:1;animation:flameFlick .12s linear infinite alternate}
-.fuel-dock.ready .fuel-rocket{animation:shake .1s linear infinite}
-@keyframes flameFlick{from{transform:scaleY(.8)}to{transform:scaleY(1.15)}}
-/* the rocket's window is the fuel tank: it fills as he spells */
-.fuel-rocket .tank{position:absolute;left:39%;top:30.5%;width:22%;height:15.5%;border-radius:50%;overflow:hidden;background:rgba(10,20,51,.55)}
-.fuel-rocket .tank .level{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#FFE08A,#FF8A1F);transition:height .4s}
-.fuel-drop{position:fixed;z-index:945;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:translate(-50%,-50%);pointer-events:none;
-  background:radial-gradient(circle at 35% 35%,#fff,#FFE08A 40%,#FF8A1F);box-shadow:0 0 14px #FFC53D}
-.launch-smoke{position:fixed;z-index:924;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle,#fff,rgba(220,230,245,.6) 60%,transparent 70%);pointer-events:none}
-.fuel-dock.big{max-width:480px}
-.fuel-dock.big .fuel-pipe{height:32px}
-.fuel-dock.big .fuel-rocket{width:70px;height:100px;margin:-20px 0 -12px}
+/* the egg nest: a warm-up line of cells, and the egg that gets warmer */
+.egg-dock{--heat:0;display:flex;align-items:center;gap:8px;width:100%;max-width:440px;flex:none;padding:4px 6px 4px 12px;border-radius:22px;
+  background:linear-gradient(180deg,#FFF4DC,#F6E2B4);box-shadow:inset 0 0 0 3px #E8C77A,0 3px 0 #D9B058}
+.warm-label{font-size:13px;font-weight:900;letter-spacing:.06em;color:#B8580A;width:44px;flex:none}
+.egg-dock.ready .warm-label{color:#E53935;animation:pop .4s}
+.warm-line{flex:1;display:flex;gap:4px;height:26px;padding:3px;border-radius:12px;background:#E9D3A0;box-shadow:inset 0 0 0 2px #C9A45A}
+.warm-line .cell{flex:1;border-radius:8px;background:#FFF8E8;position:relative;overflow:hidden}
+.warm-line .cell b{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#FFE08A,#FF8A1F 60%,#E53935);transition:height .35s cubic-bezier(.3,1.5,.5,1)}
+.warm-line .cell.full b{height:100%;box-shadow:0 0 12px rgba(255,138,31,.8)}
+.warm-line .cell.full:not(.quiet){animation:cellGlow .5s}
+@keyframes cellGlow{0%{filter:brightness(1.8)}100%{filter:none}}
+.nest-egg{position:relative;width:62px;height:74px;flex:none;margin:-16px 0 -8px;
+  filter:drop-shadow(0 0 calc(var(--heat) * 16px) rgba(255,140,30,calc(var(--heat) * .95)))}
+.nest-egg svg{width:100%;height:100%;overflow:visible}
+.nest-egg .egg-body{transform-origin:50px 100px;animation:eggRock calc(2.6s - var(--heat) * 1.8s) ease-in-out infinite}
+.nest-egg .egg-crack{opacity:0;transition:opacity .3s}
+.nest-egg.rock .egg-body{animation:eggJolt .45s ease-out}
+.egg-dock.ready .nest-egg .egg-body{animation:eggShake .18s linear infinite}
+.egg-dock.ready .nest-egg .egg-crack{opacity:1}
+@keyframes eggRock{0%,100%{transform:rotate(calc(var(--heat) * -9deg - 2deg))}50%{transform:rotate(calc(var(--heat) * 9deg + 2deg))}}
+@keyframes eggJolt{30%{transform:translateY(-8px) rotate(-8deg)}60%{transform:rotate(6deg)}}
+@keyframes eggShake{0%{transform:rotate(-7deg)}50%{transform:rotate(7deg) translateY(-2px)}100%{transform:rotate(-7deg)}}
+.warm-spark{position:fixed;z-index:945;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(circle at 35% 35%,#fff,#FFE08A 40%,#FF8A1F);box-shadow:0 0 16px #FFC53D}
+.egg-dock.big{max-width:480px}
+.egg-dock.big .warm-line{height:32px}
+.egg-dock.big .nest-egg{width:72px;height:86px;margin:-22px 0 -10px}
+/* 3, 2, 1, ROAR! */
 .countdown{position:absolute;inset:0;z-index:40;display:grid;place-items:center;font-size:120px;font-weight:900;color:var(--orange);
   text-shadow:0 6px 0 var(--orange-700),0 0 40px rgba(255,138,31,.6);pointer-events:none}
 .countdown span{animation:pop .5s cubic-bezier(.3,1.6,.5,1)}
-.launch-rocket{position:fixed;z-index:925;width:120px;height:170px;left:50%;margin-left:-60px;pointer-events:none}
-.launch-rocket svg{width:100%;height:100%;overflow:visible}
+.countdown .roar{font-size:.9em;color:var(--leaf);text-shadow:0 4px 0 #0A1433,4px 0 0 #0A1433,-4px 0 0 #0A1433,0 -4px 0 #0A1433,0 10px 0 var(--leaf-700);animation:roarIn .6s cubic-bezier(.3,1.6,.5,1)}
+@keyframes roarIn{0%{transform:scale(.3) rotate(-12deg)}60%{transform:scale(1.25) rotate(4deg)}100%{transform:scale(1)}}
+.roar-ring{position:fixed;z-index:941;border-radius:50%;border:8px solid rgba(255,255,255,.9);box-shadow:0 0 0 4px rgba(63,191,79,.6);pointer-events:none;transform:translate(-50%,-50%)}
+body.quake #app{animation:quake .08s linear 8}
+@keyframes quake{0%{transform:translate(3px,1px)}50%{transform:translate(-3px,-2px)}100%{transform:translate(2px,2px)}}
 
 /* ============================================================
    HATCH
    ============================================================ */
 .hatch{position:relative;width:100%;max-width:640px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-.hatch-hint{margin:0;font-size:26px;font-weight:900;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.4)}
+.hatch-hint{margin:0;font-size:28px;font-weight:900;color:#fff;text-shadow:var(--outline)}
 .egg{width:clamp(150px,44vw,210px);aspect-ratio:.78;border-radius:50% 50% 48% 48% / 60% 60% 40% 40%;position:relative;
   background:radial-gradient(circle at 35% 28%,#fff,var(--egg,#FFE08A) 45%,color-mix(in srgb,var(--egg,#FFE08A) 70%,#000) 110%);
   box-shadow:0 0 40px rgba(255,197,61,.45),inset -14px -12px 0 rgba(0,0,0,.12);animation:eggIdle 2.4s ease-in-out infinite}
@@ -301,14 +339,20 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 @keyframes eggIdle{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
 @keyframes eggWobble{20%{transform:rotate(-14deg) scale(1.04)}50%{transform:rotate(12deg)}80%{transform:rotate(-6deg)}}
 .egg.gone{animation:eggPop .45s forwards}
+/* the golden egg: gold all over, sparkling */
+.egg.gold{--egg:#FFD23F;--spot:#FFFFFF;box-shadow:0 0 60px 10px rgba(255,210,63,.8),inset -14px -12px 0 rgba(160,100,0,.18)}
+.egg.gold::after{content:"✨";position:absolute;right:-6%;top:-4%;font-size:40px;animation:twinkle2 1.2s ease-in-out infinite alternate}
+@keyframes twinkle2{to{transform:scale(1.3) rotate(20deg);opacity:.5}}
+.hatch-fossil{margin:0;font-size:20px;font-weight:900;color:#fff;background:rgba(122,78,8,.85);border:3px solid #FFE08A;padding:6px 16px;border-radius:18px;animation:pop .5s cubic-bezier(.3,1.6,.5,1)}
 @keyframes eggPop{to{transform:scale(1.6);opacity:0}}
 .baby-reveal{width:clamp(170px,50vw,240px);height:clamp(170px,50vw,240px);animation:babyIn .7s cubic-bezier(.3,1.6,.5,1)}
 .baby-reveal svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 20px rgba(255,255,255,.4))}
+.baby-reveal{cursor:pointer}
 @keyframes babyIn{from{transform:scale(0) rotate(-20deg)}to{transform:none}}
-.baby-name{margin:0;font-size:32px;font-weight:900;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.4);text-align:center}
-.baby-name small{display:block;font-size:17px;color:var(--cyan)}
+.baby-name{margin:0;font-size:34px;font-weight:900;color:#fff;text-shadow:var(--outline);text-align:center}
+.baby-name small{display:block;font-size:19px;color:#FFE08A;text-shadow:0 2px 0 #0A1433,2px 0 0 #0A1433,-2px 0 0 #0A1433,0 -1px 0 #0A1433}
 .btn-next{min-width:220px;min-height:70px;font-size:26px}
-.baby-power{margin:0;font-size:19px;font-weight:900;color:#FFE08A;text-shadow:0 2px 0 rgba(0,0,0,.4);text-align:center}
+.baby-power{margin:0;font-size:19px;font-weight:900;color:#fff;background:rgba(10,20,51,.6);padding:6px 14px;border-radius:16px;text-align:center}
 .hatch-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 /* a level up: a banner that drops in over whatever he is doing, then goes */
 #levelUp{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 64px);transform:translateX(-50%);z-index:960;display:flex;align-items:center;gap:10px;
@@ -325,8 +369,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
    DINO BASE
    ============================================================ */
 /* the crew: four spots, swapped from everyone he has hatched */
-.crew-card{width:100%;max-width:640px;background:rgba(255,255,255,.96);border-radius:24px;padding:12px 12px 10px;border:3px solid rgba(143,227,255,.8);
-  box-shadow:0 0 0 6px rgba(143,227,255,.18),0 14px 30px rgba(0,0,0,.4);position:relative;z-index:12}
+.crew-card{width:100%;max-width:640px;background:rgba(255,255,255,.97);border-radius:24px;padding:12px 12px 10px;border:4px solid #fff;
+  box-shadow:0 0 0 5px rgba(63,191,79,.45),0 14px 30px rgba(20,60,30,.35);position:relative;z-index:12}
 .crew-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 4px 8px}
 .crew-label{font-weight:900;font-size:18px}
 .crew-hint{font-size:13px;font-weight:800;color:var(--ink-soft);text-align:right}
@@ -348,14 +392,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .baby.picked .tag{opacity:1;background:var(--orange)}
 .baby .ptag{position:absolute;right:6%;top:4%;font-size:15px}
 .base{position:relative;width:100%;flex:1;min-height:0;max-width:760px}
-.dome{position:fixed;left:3%;right:3%;bottom:calc(var(--surface-h) + env(safe-area-inset-bottom) - 2px);height:min(64vh,120vw);border-radius:50% 50% 0 0 / 70% 70% 0 0;
-  background:radial-gradient(ellipse at 50% 100%,rgba(143,227,255,.18),rgba(143,227,255,.06) 70%);border:3px solid rgba(143,227,255,.5);border-bottom:0}
-.base-empty{position:absolute;left:10%;right:10%;top:36%;text-align:center;font-size:22px;font-weight:900;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.4)}
+/* the base is a big nest of a clearing, fenced with logs */
+.dome{position:fixed;left:2%;right:2%;bottom:calc(var(--surface-h) + env(safe-area-inset-bottom) - 6px);height:26px;border-radius:14px;
+  background:repeating-linear-gradient(90deg,#9A6A3A 0 44px,#7A4E26 44px 48px);box-shadow:0 -4px 0 #B8803A inset,0 3px 0 rgba(0,0,0,.2);opacity:.85}
+.base-empty{position:absolute;left:10%;right:10%;top:36%;text-align:center;font-size:22px;font-weight:900;color:#fff;text-shadow:var(--outline)}
 .babies{position:fixed;inset:0;pointer-events:none}
 .baby{position:absolute;left:0;top:0;width:96px;height:96px;will-change:transform;cursor:pointer;pointer-events:auto}
 .baby::after{content:"";position:absolute;left:22%;right:22%;bottom:2%;height:9%;border-radius:50%;background:rgba(0,0,0,.25);z-index:-1}
 .baby svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 4px 4px rgba(0,0,0,.35))}
 .baby .tag{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);font-size:13px;font-weight:900;color:#fff;background:rgba(10,20,51,.7);padding:2px 8px;border-radius:10px;white-space:nowrap;opacity:0;transition:opacity .2s}
+.baby.new-one .tag{opacity:1;background:var(--gold);color:#5B3A08}
+.babies .baby .tag{transform:translateX(-50%) scaleX(var(--face,1))}
 .baby.named .tag{opacity:1}
 
 /* ============================================================
@@ -403,7 +450,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .race-track{position:relative;width:100%;max-width:420px;height:40px;border-radius:20px;background:var(--blue-50);border:2px solid var(--blue-100);flex:none}
 .race-track i{position:absolute;top:50%;transform:translateY(-50%);font-style:normal;font-size:24px;transition:left .3s;left:0}
 .race-track .race-flag{left:auto;right:6px}
-.race-track .race-comet{opacity:.85}
+.race-track .race-rival{opacity:.9}
+/* both racers run towards the flag */
+.race-track .race-me,.race-track .race-rival{scale:-1 1}
 .race-track.won{background:#DDF6E7;border-color:var(--good)}
 .race-field{min-height:180px}
 .race-field .tile{position:absolute;left:0;top:0;--tile:clamp(52px,14vw,72px)}
@@ -434,7 +483,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 #confetti{position:fixed;inset:0;z-index:930;pointer-events:none;overflow:hidden}
 #confetti i{position:absolute;top:-20px;width:10px;height:16px;border-radius:3px}
 #toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 70px);transform:translate(-50%,-20px);z-index:950;padding:12px 20px;border-radius:18px;
-  background:rgba(10,20,51,.95);color:#fff;font-weight:800;font-size:17px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw;text-align:center;box-shadow:0 0 0 3px #8FE3FF}
+  background:rgba(10,20,51,.95);color:#fff;font-weight:800;font-size:17px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw;text-align:center;box-shadow:0 0 0 3px #fff}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 
 @media (max-width:430px){
@@ -443,7 +492,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   .back{padding:0 12px}
   #btnPlayBack{width:48px;padding:0;justify-content:center;font-size:0}
   #btnPlayBack::before{content:"‹";font-size:28px;line-height:1;margin-top:-3px}
-  .planet-tag{font-size:13px;padding:6px 9px}
+  .land-tag{font-size:13px;padding:6px 9px}
   .home-row .btn{font-size:14px;padding:6px 2px}
   .home-row .btn .ico{font-size:24px}
 }
@@ -471,8 +520,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 
   .home-body{max-width:600px;gap:26px}
   .logo-name{font-size:46px}
-  .logo-dino{font-size:132px}
-  .logo-rocket{font-size:100px}
+  .logo-dino,.logo-saur{font-size:120px}
+  .new-friends{font-size:22px;min-height:66px}
   .mission-card{padding:28px;gap:18px;border-radius:34px}
   .mission-label{font-size:26px}
   .mission-count{font-size:21px}
@@ -489,7 +538,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 
   .steps{gap:8px;padding:8px;border-radius:32px}
   .steps i{width:50px;height:50px;font-size:25px}
-  .planet-tag{font-size:19px;padding:9px 16px;border-radius:18px;max-width:240px}
+  .land-tag{font-size:19px;padding:9px 16px;border-radius:18px;max-width:240px}
   .prompt{font-size:34px}
   .prompt-row{gap:16px}
   .hear{width:76px;height:76px}
@@ -498,13 +547,14 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   .holo{padding:24px 12px 28px;border-radius:30px;gap:10px}
   .holo .lower{font-size:60px}
   .zap-round{font-size:20px}
-  .meteor{height:104px;font-size:52px;min-width:200px;border-radius:54px}
+  .leaf{height:108px;font-size:52px;min-width:210px}
+  .jaws{width:170px;height:150px}
   .choices{gap:28px}
   .choices .tile{--tile:124px}
-  .fuel-dock{max-width:640px;padding:6px 10px 6px 14px;border-radius:28px}
-  .fuel-label{font-size:16px;width:52px}
-  .fuel-pipe{height:36px}.fuel-rocket{width:84px;height:120px;margin:-22px 0 -14px}
-  .fuel-dock.big .fuel-pipe{height:42px}.fuel-dock.big .fuel-rocket{width:96px;height:136px;margin:-26px 0 -16px}
+  .egg-dock{max-width:640px;padding:6px 10px 6px 16px;border-radius:28px}
+  .warm-label{font-size:17px;width:58px}
+  .warm-line{height:36px}.nest-egg{width:84px;height:100px;margin:-24px 0 -12px}
+  .egg-dock.big .warm-line{height:42px}.egg-dock.big .nest-egg{width:96px;height:114px;margin:-28px 0 -14px}
   .keys{max-width:620px;gap:16px}
   .key{min-height:100px;font-size:50px;border-radius:24px}
   .peek{font-size:68px;padding:20px 34px}
@@ -513,17 +563,18 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   .map-wrap{max-width:760px}
   .map-node{min-height:140px;gap:22px}
   .map-node::before{top:-40px;height:54px}
-  .planet-btn{width:124px;height:124px}
+  .spot-btn{width:124px;height:124px;font-size:58px}
   .map-node .done-badge{width:60px;height:60px}
   .map-node .done-badge .baby{width:70px;height:70px}
-  .map-rocket{width:64px;height:64px}
+  .map-here{width:78px;height:78px}
   .map-word{font-size:44px}
-  .map-planet{font-size:20px}
+  .map-land{font-size:20px}
   .map-finale .map-word{font-size:34px}
-  .flight-rocket{width:220px;height:290px}
-  .flight-text{font-size:38px}
+  .trek-dino{width:280px;height:280px}
+  .trek-text{font-size:42px}
 
   .hatch-hint{font-size:38px}
+  .hatch-fossil{font-size:26px}
   .egg{width:290px}
   .baby-reveal{width:340px;height:340px}
   .baby-name{font-size:48px}
@@ -562,37 +613,54 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   #toast{font-size:22px}
 }
 
-/* ---------- the boss: the Meteor King ---------- */
-.boss{width:100%;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:18px;background:linear-gradient(180deg,#2A1A3A00,#0B1640);background:#0B1640;flex:none}
-.boss-face{width:64px;height:64px;flex:none;transition:transform .2s}
+/* ---------- the boss: the Grumpy Volcano ---------- */
+.boss{width:100%;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:18px;background:linear-gradient(180deg,#5B2A10,#3A1A0A);flex:none;border:3px solid #FF8A1F}
+.boss-face{width:72px;height:64px;flex:none;transition:transform .2s}
 .boss-face svg{width:100%;height:100%;overflow:visible}
 .boss.hit .boss-face{animation:nope .45s}
 .boss-info{flex:1;display:flex;flex-direction:column;gap:4px}
 .boss-name{color:#FFE08A;font-weight:900;font-size:16px}
-.boss-hp{height:14px;border-radius:7px;background:#3A2030;overflow:hidden;box-shadow:inset 0 0 0 2px #0006}
-.boss-hp i{display:block;height:100%;background:linear-gradient(90deg,#FF5A1F,#FFC53D);transition:width .5s cubic-bezier(.3,1.4,.5,1)}
-.boss.dead .boss-face{animation:bossBoom .8s forwards}
-@keyframes bossBoom{40%{transform:scale(1.4) rotate(15deg)}100%{transform:scale(0) rotate(90deg);opacity:0}}
-.boss-laser{position:fixed;z-index:940;width:8px;border-radius:4px;background:linear-gradient(#fff,#8FE3FF);box-shadow:0 0 16px #8FE3FF,0 0 30px #1E6FE8;pointer-events:none;transform-origin:50% 100%}
-.done-part{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:16px;background:#FFF4DC;font-weight:900;color:#7A4E08;font-size:18px}
-.done-part .pt{font-size:32px}
-/* ---------- the hangar ---------- */
-.hangar-card{gap:12px}
-.hangar-note{margin:0;font-size:17px;font-weight:800;color:var(--ink-soft);text-align:center}
-.skins{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;overflow:auto;padding:4px}
-.skin{position:relative;border-radius:20px;background:var(--blue-50);border:3px solid var(--blue-100);padding:10px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:170px}
-.skin svg{width:78px;height:110px;overflow:visible}
-.skin .sn{font-weight:900;font-size:15px}
-.skin .need{font-size:13px;font-weight:800;color:var(--ink-soft)}
-.skin.on{border-color:var(--orange);background:var(--orange-100);box-shadow:0 0 0 4px rgba(255,138,31,.25)}
-.skin.locked svg{filter:grayscale(1) brightness(.6);opacity:.55}
+.boss-hp{height:14px;border-radius:7px;background:#2A1208;overflow:hidden;box-shadow:inset 0 0 0 2px #0006}
+.boss-hp i{display:block;height:100%;background:linear-gradient(90deg,#E53935,#FF8A1F,#FFC53D);transition:width .5s cubic-bezier(.3,1.4,.5,1)}
+/* how grumpy he looks follows how grumpy he is */
+.boss .brow-grump{transition:opacity .3s}
+.boss.calmer .brow-grump{opacity:0}
+.boss .mouth-happy{opacity:0;transition:opacity .3s}
+.boss.happy .mouth-happy{opacity:1}.boss.happy .mouth-grump{opacity:0}
+.boss.happy{background:linear-gradient(180deg,#2FA37A,#1A6B50);border-color:#8EE06A}
+.boss.happy .boss-face{animation:bossHappy .6s ease-in-out 3}
+@keyframes bossHappy{50%{transform:translateY(-6px) scale(1.08)}}
+.gold-pop{position:fixed;z-index:946;width:70px;height:88px;pointer-events:none;border-radius:50% 50% 48% 48% / 60% 60% 40% 40%;
+  background:radial-gradient(circle at 35% 28%,#fff,#FFD23F 45%,#C9900A 110%);box-shadow:0 0 30px 8px rgba(255,210,63,.8)}
+.done-fossil{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:16px;background:#FFF4DC;font-weight:900;color:#7A4E08;font-size:18px}
+.done-fossil .pt{font-size:32px}
+/* ---------- dress up ---------- */
+.dress-card{gap:10px}
+.dress-who{display:flex;gap:8px;width:100%;overflow-x:auto;padding:4px 2px 8px;flex:none;-webkit-overflow-scrolling:touch}
+.who{flex:none;width:76px;min-height:92px;border-radius:18px;background:var(--blue-50);border:3px solid var(--blue-100);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:2px 2px 4px}
+.who svg{width:64px;height:64px;overflow:visible}
+.who span{font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.who.on{border-color:var(--orange);background:var(--orange-100)}
+.dress-model{width:clamp(130px,38vw,210px);height:clamp(130px,38vw,210px);flex:none}
+.dress-model svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 6px 6px rgba(0,0,0,.25))}
+.dress-model.pop{animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+.dress-note{margin:0;font-size:16px;font-weight:800;color:var(--ink-soft);text-align:center}
+.hats{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;overflow:auto;padding:4px;min-height:0;flex:1}
+.hat-btn{position:relative;border-radius:18px;background:var(--leaf-100);border:3px solid #CDEFC9;padding:4px 4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;min-height:124px}
+.hat-btn svg{width:70px;height:70px;overflow:visible;flex:none}
+.hat-btn .hn{font-weight:900;font-size:13px;text-align:center;line-height:1.1}
+.hat-btn .need{position:absolute;right:4px;top:4px;font-size:12px;font-weight:900;color:#fff;background:#7A4E08;border-radius:10px;padding:1px 6px}
+.hat-btn.on{border-color:var(--orange);background:var(--orange-100);box-shadow:0 0 0 4px rgba(255,138,31,.25)}
+.hat-btn.locked svg{filter:grayscale(1) brightness(.75);opacity:.5}
+.hat-btn.none svg{opacity:.8}
 @media (min-width:700px){
   .boss-face{width:96px;height:96px}.boss-name{font-size:22px}.boss-hp{height:20px}
-  .skins{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}.skin svg{width:110px;height:150px}.skin .sn{font-size:20px}
+  .hats{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.hat-btn svg{width:110px;height:110px}.hat-btn .hn{font-size:18px}.hat-btn .need{font-size:16px}
+  .who{width:104px;min-height:124px}.who svg{width:90px;height:90px}.who span{font-size:16px}.dress-note{font-size:21px}
   .tile-btn{min-height:96px}.tile-btn .ico{font-size:36px}.home-row .btn{font-size:21px}
 }
 
-.map-boss{display:block;width:100%;height:100%;padding:6px}
+.map-boss{display:block;width:100%;height:100%;padding:8px}
 .map-boss svg{width:100%;height:100%}
 
 /* on Dino Base the crew is at the top, so news appears lower down */
@@ -600,9 +668,9 @@ body[data-screen="base"] #toast{top:auto;bottom:calc(var(--surface-h) + 170px)}
 
 /* ---------- the victory show ---------- */
 .show-stage{width:100%;max-width:640px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding-top:6vh}
-.show-act{margin:0;min-height:1.3em;font-size:clamp(26px,7vw,40px);font-weight:900;color:#FFE08A;text-align:center;text-shadow:0 3px 0 rgba(0,0,0,.45);animation:pop .4s}
-.show-word{display:flex;gap:8px;justify-content:center;padding:16px 18px;border-radius:26px;background:rgba(255,255,255,.12);border:3px solid rgba(143,227,255,.55);
-  box-shadow:0 0 30px rgba(143,227,255,.3);min-height:96px;--tile:clamp(44px,13vw,72px)}
+.show-act{margin:0;min-height:1.3em;font-size:clamp(28px,7.5vw,42px);font-weight:900;color:#FFE08A;text-align:center;text-shadow:var(--outline);animation:pop .4s}
+.show-word{display:flex;gap:8px;justify-content:center;padding:16px 18px;border-radius:26px;background:rgba(255,255,255,.55);border:4px solid #fff;
+  box-shadow:0 0 0 5px rgba(63,191,79,.45);min-height:96px;--tile:clamp(44px,13vw,72px)}
 .show-word:empty{visibility:hidden}
 .pill-btn.skip{width:auto;padding:0 14px;font-size:15px}
 .firework{position:fixed;z-index:931;width:8px;height:8px;border-radius:50%;pointer-events:none}
@@ -617,3 +685,12 @@ body[data-screen="base"] #toast{top:auto;bottom:calc(var(--surface-h) + 170px)}
 .activity.meet .btn-launch{margin-top:6px !important;min-width:220px}
 .crew-hint{font-size:14px}
 @media (min-width:700px){ .activity.meet .holo{padding:36px 16px 40px} }
+/* the smallest phones: the banner and logo give way so the crew still fits under the card */
+@media (max-height:600px){
+  .logo-name{display:none}
+  .logo-dino,.logo-saur{font-size:40px}
+  .new-friends{min-height:48px;font-size:14px;padding:4px 12px}
+  .new-friends .nf-art svg{width:32px;height:32px}
+  .home-body{gap:8px}
+  .tile-btn{min-height:62px}
+}

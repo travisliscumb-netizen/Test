@@ -2,10 +2,10 @@
    ACTIVITIES — the five ways a word is practised.
 
      MEET     see it, hear it, tap any letter to hear its name
-     ZAP      meteors fly past carrying words: zap the one you hear
-     BUILD    letter crystals into the rocket's fuel cells, in order
+     ZAP      jungle leaves drift past carrying words: munch the one you hear
+     BUILD    letter stones into the egg's warm-up line, in order
      MISSING  the word with gaps: fill each from three believable letters
-     BLAST    the word is hidden: spell it from memory on the launch pad
+     BLAST    the word is hidden: spell it from memory, then ROAR
 
    Each activity is handed a context and calls ctx.done(result) exactly
    once. Nothing here outlives its screen: every timer goes through
@@ -95,55 +95,64 @@ function createActivities(env){
     return -1;
   }
   /* ============================================================
-     THE FUEL DOCK — every right answer fuels the rocket. A glowing drop
-     falls from the letter he placed into its cell on the fuel line, the
-     tank in the rocket's window rises, and when it is full the engines
-     light. The same rocket takes off at the countdown.
+     THE EGG NEST — every right answer warms the egg. A glowing spark
+     flies from the letter he placed into its cell on the warm-up line,
+     the egg in the nest glows brighter and rocks harder, and when it is
+     full it is HOT and wobbling: ready to hatch after the big ROAR. The
+     egg is the very one that hatches afterwards (same colours).
      ============================================================ */
-  function fuelDock(root, n, opts){
+  function EGG_SVG(c){
+    return '<svg viewBox="0 0 100 120" aria-hidden="true">' +
+      '<ellipse cx="50" cy="110" rx="44" ry="8" fill="rgba(0,0,0,.18)"/>' +
+      '<g class="egg-body"><path d="M50 8 C74 8 88 44 88 68 C88 92 71 106 50 106 C29 106 12 92 12 68 C12 44 26 8 50 8Z" fill="' + c.shell + '" stroke="#5B3A1A" stroke-width="4"/>' +
+      '<circle cx="35" cy="46" r="7" fill="' + c.spot + '"/><circle cx="63" cy="34" r="5" fill="' + c.spot + '"/><circle cx="65" cy="70" r="9" fill="' + c.spot + '"/><circle cx="33" cy="80" r="5" fill="' + c.spot + '"/>' +
+      '<path d="M30 26 q-8 12 -8 28" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".7"/>' +
+      '<path class="egg-crack" d="M50 10 L44 26 L54 34 L46 48" fill="none" stroke="#5B3A1A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>' +
+      '<path d="M4 98 q10 -12 20 -3 q8 -11 18 -2 q8 -11 18 -2 q8 -11 18 -2 q10 -9 18 5 q-4 14 -46 14 q-42 0 -46 -10z" fill="#B8803A" stroke="#5B3A1A" stroke-width="3" stroke-linejoin="round"/>' +
+      '<path d="M14 100 l8 -6 M30 102 l6 -7 M50 103 l2 -8 M68 102 l-2 -8 M84 100 l-6 -6" stroke="#7A4E1E" stroke-width="3" stroke-linecap="round"/></svg>';
+  }
+  function eggDock(root, n, opts){
     opts = opts || {};
-    var box = el('div', 'fuel-dock' + (opts.big ? ' big' : ''));
-    var pipe = el('div', 'fuel-pipe');
+    var box = el('div', 'egg-dock' + (opts.big ? ' big' : ''));
+    var pipe = el('div', 'warm-line');
     var cells = [];
     for (var i = 0; i < n; i++){ var c = el('i', 'cell'); c.appendChild(el('b')); pipe.appendChild(c); cells.push(c); }
-    var rk = el('div', 'fuel-rocket');
-    rk.innerHTML = env.rocketSvg ? env.rocketSvg() : '';
-    var tank = el('div', 'tank'), level = el('i', 'level');
-    tank.appendChild(level); rk.appendChild(tank);
-    var label = el('span', 'fuel-label', 'FUEL');
-    box.appendChild(label); box.appendChild(pipe); box.appendChild(rk);
+    var nest = el('div', 'nest-egg');
+    nest.innerHTML = EGG_SVG(env.eggColors ? env.eggColors() : { shell: '#FFF4DC', spot: '#FF8A1F' });
+    var label = el('span', 'warm-label', 'WARM');
+    box.appendChild(label); box.appendChild(pipe); box.appendChild(nest);
     root.appendChild(box);
     var filled = 0, done = {};
     function setLevel(){
-      var pct = Math.round(filled / n * 100);
-      level.style.height = pct + '%';
-      label.textContent = filled >= n ? 'FULL!' : 'FUEL';
+      /* the warmer it gets, the more it glows and rocks */
+      box.style.setProperty('--heat', (filled / n).toFixed(2));
+      label.textContent = filled >= n ? 'HOT!' : 'WARM';
       if (filled >= n && !box.classList.contains('ready')){
         box.classList.add('ready');
-        env.sfx.play('ignite');
-        env.later(function(){ env.sfx.play('rumble'); }, 200);
+        env.sfx.play('wobble');
+        env.later(function(){ env.sfx.play('sparkle'); }, 200);
       }
     }
     return {
-      el: box, rocket: rk,
+      el: box, egg: nest,
       /* instantly, for letters that were already in place */
       set: function(i){ if (done[i]) return; done[i] = 1; filled++; cells[i].classList.add('full', 'quiet'); setLevel(); },
-      /* a drop of fuel from `from` (an element) into cell i */
+      /* a warm spark from `from` (an element) into cell i */
       fill: function(i, from){
         if (i == null){ i = 0; while (done[i] && i < n) i++; }
         if (i >= n || done[i]) return;
         done[i] = 1;
         var cell = cells[i];
         var a = from ? centre(from) : centre(cell), b = centre(cell);
-        var drop = el('i', 'fuel-drop');
+        var drop = el('i', 'warm-spark');
         drop.style.left = a.x + 'px'; drop.style.top = a.y + 'px';
         document.body.appendChild(drop);
         var dx = b.x - a.x, dy = b.y - a.y;
-        var ms = 380;
+        var ms = 420;
         try {
           drop.animate([
             { transform: 'translate(-50%,-50%) scale(.6)', opacity: 1 },
-            { transform: 'translate(calc(-50% + ' + (dx * 0.5) + 'px), calc(-50% + ' + (dy * 0.5 - 30) + 'px)) scale(1.1)', opacity: 1, offset: 0.5 },
+            { transform: 'translate(calc(-50% + ' + (dx * 0.5) + 'px), calc(-50% + ' + (dy * 0.5 - 30) + 'px)) scale(1.2)', opacity: 1, offset: 0.5 },
             { transform: 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px)) scale(.5)', opacity: 0.9 }
           ], { duration: ms, easing: 'cubic-bezier(.4,0,.6,1)' });
         } catch (e){ ms = 0; }
@@ -151,9 +160,10 @@ function createActivities(env){
           if (drop.parentNode) drop.parentNode.removeChild(drop);
           cell.classList.add('full');
           filled++; setLevel();
-          env.sfx.play('glug');
+          nest.classList.remove('rock'); void nest.offsetWidth; nest.classList.add('rock');
+          env.sfx.play('warm');
         }, ms);
-        /* the drop must never outlive the screen */
+        /* the spark must never outlive the screen */
         setTimeout(function(){ if (drop.parentNode) drop.parentNode.removeChild(drop); }, ms + 600);
       },
       full: function(){ return filled >= n; }
@@ -212,33 +222,33 @@ function createActivities(env){
   }
 
   /* ============================================================
-     ZAP — meteors with words drift across space
+     ZAP — jungle leaves with words drift by: munch the one you hear
      ============================================================ */
   function zap(ctx){
     var w = ctx.word, root = ctx.root, round = 0, ROUNDS = 2, locked = false;
     root.innerHTML = '';
     var row = el('div', 'prompt-row');
-    row.appendChild(el('p', 'prompt', 'Zap the word you hear!'));
+    row.appendChild(el('p', 'prompt', 'Munch the word you hear!'));
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var field = el('div', 'zap-field');
     root.appendChild(field);
-    var dock = fuelDock(root, ROUNDS);
+    var dock = eggDock(root, ROUNDS);
     var roundLbl = el('div', 'zap-round', '');
     root.appendChild(roundLbl);
-    var meteors = [], raf = null, last = 0;
+    var leaves = [], raf = null, last = 0;
 
     function startRound(){
       round++;
       locked = false;
       roundLbl.textContent = 'Round ' + round + ' of ' + ROUNDS;
-      meteors.forEach(function(m){ if (m.el.parentNode) m.el.parentNode.removeChild(m.el); });
-      meteors = [];
+      leaves.forEach(function(m){ if (m.el.parentNode) m.el.parentNode.removeChild(m.el); });
+      leaves = [];
       var opts = C.zapOptions(w, round === 1 ? 3 : 4);
       var W = field.clientWidth, H = field.clientHeight;
       var lanes = opts.length;
       opts.forEach(function(word, i){
-        var m = el('button', 'meteor', word.toLowerCase());
+        var m = el('button', 'leaf', word.toLowerCase());
         m.type = 'button';
         field.appendChild(m);
         var dir = i % 2 ? -1 : 1;
@@ -247,18 +257,18 @@ function createActivities(env){
         var laneY = (H - mh) * (lanes === 1 ? 0.5 : (0.08 + 0.84 * i / (lanes - 1)));
         var o = { el: m, word: word, x: Math.random() * Math.max(10, W - mw), y: laneY, vx: dir * speed, w: mw, h: mh, bob: Math.random() * 6, hit: false };
         if (dir < 0) m.classList.add('left');
-        m.addEventListener('click', function(){ tapMeteor(o); });
-        meteors.push(o);
+        m.addEventListener('click', function(){ tapLeaf(o); });
+        leaves.push(o);
       });
       last = performance.now();
       if (!raf) raf = requestAnimationFrame(loop);
-      env.later(function(){ env.speech.say((round === 1 ? 'Zap the word: ' : 'Again! Zap: ') + w.toLowerCase(), { rate: 0.85 }); }, 300);
+      env.later(function(){ env.speech.say((round === 1 ? 'Munch the word: ' : 'Again! Munch: ') + w.toLowerCase(), { rate: 0.85 }); }, 300);
     }
     function loop(now){
       if (!env.alive(ctx.tok) || !field.isConnected){ raf = null; return; }
       var dt = Math.min(48, now - last); last = now;
       var W = field.clientWidth;
-      meteors.forEach(function(m){
+      leaves.forEach(function(m){
         if (m.hit) return;
         m.x += m.vx * dt;
         if (m.x < 4){ m.x = 4; m.vx = Math.abs(m.vx); m.el.classList.remove('left'); }
@@ -268,20 +278,18 @@ function createActivities(env){
       });
       raf = requestAnimationFrame(loop);
     }
-    function laser(to){
+    /* a pair of dino jaws snaps shut on the leaf */
+    function chompAt(to){
       var fr = field.getBoundingClientRect();
-      var from = { x: fr.width / 2, y: fr.height + 10 };
-      var tx = to.x - fr.left, ty = to.y - fr.top;
-      var dx = tx - from.x, dy = ty - from.y, len = Math.sqrt(dx * dx + dy * dy);
-      var l = el('div', 'laser');
-      l.style.left = from.x + 'px'; l.style.top = from.y + 'px'; l.style.width = len + 'px';
-      l.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
-      field.appendChild(l);
-      env.later(function(){ if (l.parentNode) l.parentNode.removeChild(l); }, 260);
+      var j = el('div', 'jaws');
+      j.innerHTML = '<i class="top"></i><i class="bot"></i>';
+      j.style.left = (to.x - fr.left) + 'px'; j.style.top = (to.y - fr.top) + 'px';
+      field.appendChild(j);
+      env.later(function(){ if (j.parentNode) j.parentNode.removeChild(j); }, 420);
     }
     function boom(m){
       var fr = field.getBoundingClientRect(), c = centre(m.el);
-      var cols = ['#FFC53D', '#FF8A1F', '#fff', '#8FE3FF'];
+      var cols = ['#3FBF4F', '#8EE06A', '#FFC53D', '#1E7A2E'];
       for (var i = 0; i < 14; i++){
         var p = el('i', null);
         p.style.cssText = 'position:absolute;width:10px;height:10px;border-radius:3px;left:' + (c.x - fr.left) + 'px;top:' + (c.y - fr.top) + 'px;background:' + cols[i % 4];
@@ -291,15 +299,15 @@ function createActivities(env){
         (function(pp){ env.later(function(){ if (pp.parentNode) pp.parentNode.removeChild(pp); }, 620); })(p);
       }
     }
-    function tapMeteor(m){
+    function tapLeaf(m){
       if (locked || m.hit) return;
       env.react('look', centre(m.el));
       if (m.word === w){
         locked = true; m.hit = true;
-        laser(centre(m.el));
-        env.sfx.play('zap');
+        chompAt(centre(m.el));
+        env.sfx.play('chomp');
         env.later(function(){
-          boom(m); env.sfx.play('explode');
+          boom(m); env.sfx.play('pop');
           dock.fill(round - 1, m.el);
           m.el.style.opacity = '0'; m.el.classList.add('hit');
           env.react('cheer');
@@ -321,28 +329,28 @@ function createActivities(env){
     env.later(startRound, 80);
     env.setNudge(function(){
       if (locked) return;
-      var right = meteors.filter(function(m){ return m.word === w; })[0];
+      var right = leaves.filter(function(m){ return m.word === w; })[0];
       if (right) env.react('wave', centre(right.el));
       env.speech.say('Which one says ' + w.toLowerCase() + '?', { dedupeMs: 0, rate: 0.85 });
     });
   }
 
   /* ============================================================
-     BUILD — letter crystals into fuel cells
+     BUILD — letter stones into the egg's warm-up line
      ============================================================ */
   function build(ctx){
     var w = ctx.word, root = ctx.root, pos = 0, misses = 0, finished = false;
     root.innerHTML = '';
     var row = el('div', 'prompt-row');
-    var pr = el('p', 'prompt'); pr.innerHTML = 'Fuel the rocket: <b>' + w.toLowerCase() + '</b>';
+    var pr = el('p', 'prompt'); pr.innerHTML = 'Warm the egg: <b>' + w.toLowerCase() + '</b>';
     row.appendChild(pr);
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots'), tray = el('div', 'tray');
     root.appendChild(slotsBox);
-    var dock = fuelDock(root, w.length);
+    var dock = eggDock(root, w.length);
     root.appendChild(tray);
-    root.appendChild(el('p', 'hint', 'Tap or drag the crystals in order'));
+    root.appendChild(el('p', 'hint', 'Tap or drag the letters in order'));
     root.style.setProperty('--tile', fitTile(root, w.length, 76) + 'px');
     var perRow = Math.ceil(w.length / (w.length > 5 ? 2 : 1));
     tray.style.setProperty('--tile', Math.max(fitTile(root, w.length, 76), fitTile(root, perRow + 1, 74), 52) + 'px');
@@ -391,7 +399,7 @@ function createActivities(env){
       });
       tray.appendChild(t);
     });
-    env.later(function(){ env.speech.say('Fuel the rocket. Spell ' + w.toLowerCase(), { rate: 0.85, keep: true }); }, 350);
+    env.later(function(){ env.speech.say('Warm up the egg. Spell ' + w.toLowerCase(), { rate: 0.85, keep: true }); }, 350);
     env.setNudge(function(){
       if (finished) return;
       hint();
@@ -416,7 +424,7 @@ function createActivities(env){
     root.appendChild(row);
     var slotsBox = el('div', 'slots');
     root.appendChild(slotsBox);
-    var dock = fuelDock(root, w.length);
+    var dock = eggDock(root, w.length);
     var choices = el('div', 'choices');
     root.appendChild(choices);
     root.appendChild(el('p', 'hint', 'Which letter goes in the glowing box?'));
@@ -480,13 +488,13 @@ function createActivities(env){
     var posMiss = {};
     root.innerHTML = '';
     var row = el('div', 'prompt-row');
-    var pr = el('p', 'prompt', ctx.review ? 'Zap the Meteor King! Spell it' : 'Blast off! Spell it from memory');
+    var pr = el('p', 'prompt', ctx.review ? 'Calm the volcano! Spell it' : 'Spell it from memory!');
     row.appendChild(pr);
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots');
     root.appendChild(slotsBox);
-    var dock = fuelDock(root, w.length, { big: true });
+    var dock = eggDock(root, w.length, { big: true });
     var keys = el('div', 'keys');
     root.appendChild(keys);
     root.style.setProperty('--tile', fitTile(root, w.length, 70) + 'px');
@@ -546,7 +554,7 @@ function createActivities(env){
   }
 
   /* ============================================================
-     LETTER RACE — the word flashes up, vanishes, and he races a comet
+     LETTER RACE — the word flashes up, vanishes, and he races a speedy long-neck
      to catch its letters as they float about. Winning is a bonus;
      finishing is always a success.
      ============================================================ */
@@ -559,10 +567,10 @@ function createActivities(env){
     var hb = hearBtn(false); wireHear(hb, w); row.appendChild(hb);
     root.appendChild(row);
     var slotsBox = el('div', 'slots'); root.appendChild(slotsBox);
-    var dock = fuelDock(root, w.length);
+    var dock = eggDock(root, w.length);
     var track = el('div', 'race-track');
-    var me = el('i', 'race-me', '🚀'), comet = el('i', 'race-comet', '☄️'), flag = el('i', 'race-flag', '🏁');
-    track.appendChild(flag); track.appendChild(comet); track.appendChild(me);
+    var me = el('i', 'race-me', '🦖'), rival = el('i', 'race-rival', '🦕'), flag = el('i', 'race-flag', '🏁');
+    track.appendChild(flag); track.appendChild(rival); track.appendChild(me);
     root.appendChild(track);
     var field = el('div', 'zap-field race-field'); root.appendChild(field);
     root.style.setProperty('--tile', fitTile(root, w.length, 64) + 'px');
@@ -623,7 +631,7 @@ function createActivities(env){
       });
       if (!finished){
         var cp = Math.min(1, (now - t0) / budget);
-        comet.style.left = (cp * 88) + '%';
+        rival.style.left = (cp * 88) + '%';
         me.style.left = (pos / w.length * 88) + '%';
       }
       raf = requestAnimationFrame(loop);
@@ -647,7 +655,7 @@ function createActivities(env){
             finished = true; env.clearNudge();
             won = performance.now() - t0 < budget;
             track.classList.add(won ? 'won' : 'done');
-            if (won){ env.sfx.play('powerup'); env.toast('🏁 You beat the comet!'); }
+            if (won){ env.sfx.play('powerup'); env.toast('🏁 You won the race!'); }
             ctx.done({ slots: slots, won: won });
           } else if (pos < w.length) env.react('hop', centre(slots[i]));
         });
@@ -692,7 +700,7 @@ function createActivities(env){
     }
     var box = el('div', 'opt-cards');
     root.appendChild(box);
-    var dock = fuelDock(root, 1);
+    var dock = eggDock(root, 1);
     C.checkOptions(w).forEach(function(opt){
       var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
       b.addEventListener('click', function(){
@@ -751,7 +759,7 @@ function createActivities(env){
     }
     var big = el('div', 'rhyme-word'); big.appendChild(withRime(w)); root.appendChild(big);
     var box = el('div', 'opt-cards'); root.appendChild(box);
-    var dock = fuelDock(root, 1);
+    var dock = eggDock(root, 1);
     data.options.forEach(function(opt){
       var b = el('button', 'opt-card', opt.toLowerCase()); b.type = 'button';
       b.addEventListener('click', function(){
@@ -785,7 +793,7 @@ function createActivities(env){
 
   return {
     meet: meet, zap: zap, build: build, missing: missing, blast: blast, race: race, check: check, rhyme: rhyme,
-    tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile, fuelDock: fuelDock
+    tileEl: tileEl, slotEl: slotEl, fillSlot: fillSlot, centre: centre, fitTile: fitTile, eggDock: eggDock, EGG_SVG: EGG_SVG
   };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createActivities: createActivities };

@@ -2,7 +2,7 @@
   "name": "graysons-dino-rockets",
   "version": "1.0.0",
   "private": true,
-  "description": "Grayson's Dino Rockets: a single-file spelling game.",
+  "description": "Grayson's Spellosaurus: a single-file spelling game.",
   "type": "commonjs",
   "scripts": {
     "build": "node tools/assemble.mjs",

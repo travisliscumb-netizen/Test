@@ -1,6 +1,6 @@
 /* ============================================================
    SOUND — every effect synthesised with WebAudio (one offline file, so
-   nowhere for an mp3 to live), plus a soft space-groove music loop.
+   nowhere for an mp3 to live), plus a soft jungle-marimba music loop.
 
    Rules: never throw when WebAudio is missing; never talk over the spoken
    letters (the effects bus sits under the voice, and the music ducks
@@ -58,9 +58,6 @@ function createSfx(){
     chomp:    function(t){ tone(t, .07, 300, 120, .2, 'square'); noise(t, .06, 1800, 900, 2, .12); },
     whack:    function(t){ noise(t, .12, 2600, 700, 1.5, .26); tone(t, .18, 700, 180, .18, 'triangle'); },
     strain:   function(t){ tone(t, .5, 130, 100, .12, 'sawtooth'); },
-    glug:     function(t){ tone(t, .12, 320, 520, .13, 'sine'); tone(t + .07, .12, 420, 700, .1, 'sine'); noise(t, .1, 900, 400, 3, .06); },
-    ignite:   function(t){ noise(t, .5, 300, 2400, .6, .22); tone(t, .45, 90, 220, .12, 'sawtooth'); },
-    rumble:   function(t){ noise(t, .9, 180, 90, .8, .14, 'lowpass'); },
     beep:     function(t){ for (var i = 0; i < 3; i++) tone(t + i * .22, .12, 980, 980, .09, 'square'); },
     dig:      function(t){ for (var i = 0; i < 4; i++) noise(t + i * .09, .08, 500, 200, 1.4, .2, 'lowpass'); },
     twang:    function(t){ tone(t, .5, 180, 150, .16, 'triangle'); tone(t, .35, 360, 300, .06, 'sawtooth'); },
@@ -90,23 +87,27 @@ function createSfx(){
     giggle:   function(t){ for (var i = 0; i < 4; i++) tone(t + i * .075, .06, 880 - i * 60, 1100 - i * 70, .1, 'triangle'); },
     whistle:  function(t){ tone(t, .14, 1500, 1900, .1); tone(t + .18, .22, 1500, 2100, .1); },
     march:    function(t){ for (var i = 0; i < 4; i++) tone(t + i * .2, .06, 200, 180, .12, 'square'); },
-    ship:     function(t){ tone(t, 1, 200, 420, .1, 'sine'); tone(t, 1, 300, 630, .06, 'triangle'); },
-    beam:     function(t){ tone(t, .5, 600, 1400, .08, 'sine'); tone(t, .5, 900, 2100, .05, 'sine'); },
-    blastoff: function(t){ noise(t, 1.4, 200, 2000, .6, .3, 'lowpass'); tone(t, 1.2, 80, 300, .15, 'sawtooth'); },
+    /* Stretch's neck creaking up, the slide down it, his happy call */
+    stretch:  function(t){ tone(t, .45, 160, 420, .1, 'triangle'); noise(t, .4, 300, 900, 3, .05); },
+    whee:     function(t){ tone(t, .7, 1300, 380, .12, 'sine'); tone(t + .02, .6, 1950, 560, .04, 'sine'); },
+    hoot:     function(t){ tone(t, .28, 220, 330, .16, 'sine'); tone(t + .3, .4, 330, 262, .15, 'sine'); },
+    geyser:   function(t){ noise(t, 1.1, 300, 3200, .7, .24); tone(t, .5, 140, 260, .08, 'sine'); for (var i = 0; i < 5; i++) tone(t + .2 + i * .1, .08, 700 + i * 90, 1200 + i * 90, .05, 'sine'); },
 
     /* the game */
     tap:      function(t){ tone(t, .05, 660, 720, .09, 'triangle'); },
     place:    function(t){ tone(t, .08, 520, 900, .14, 'triangle'); noise(t, .05, 3000, 2000, 2, .05); },
     correct:  function(t){ chord(t, [660, 880, 1320], .2, .13); },
     wrong:    function(t){ tone(t, .16, 260, 200, .13, 'triangle'); tone(t + .14, .2, 220, 170, .11, 'triangle'); },
-    zap:      function(t){ tone(t, .18, 1600, 200, .16, 'square'); noise(t, .2, 3000, 800, 1.2, .12); },
-    explode:  function(t){ noise(t, .5, 1200, 100, .6, .3, 'lowpass'); tone(t, .3, 200, 50, .2, 'sine'); },
     countdown:function(t){ tone(t, .14, 880, 880, .14, 'square'); },
     go:       function(t){ tone(t, .4, 1320, 1320, .16, 'square'); },
     crack:    function(t){ noise(t, .08, 3000, 1500, 3, .22); tone(t, .05, 1200, 800, .1, 'triangle'); },
+    /* the egg: a warm glow rising, a wobble, and the big ROAR at the end */
+    warm:     function(t){ tone(t, .25, 440, 660, .1, 'sine'); tone(t + .08, .25, 660, 880, .07, 'sine'); },
+    wobble:   function(t){ for (var i = 0; i < 3; i++) tone(t + i * .09, .08, 300 + (i % 2) * 60, 280 + (i % 2) * 60, .12, 'triangle'); },
+    bigroar:  function(t){ noise(t, 1.3, 1100, 160, .8, .36, 'lowpass'); tone(t, 1.2, 130, 70, .24, 'sawtooth'); tone(t + .06, 1, 196, 98, .12, 'square'); tone(t + .1, 1.1, 98, 55, .2, 'sine'); },
+    sparkle:  function(t){ for (var i = 0; i < 6; i++) tone(t + i * .05, .12, 1320 + i * 180, 1600 + i * 180, .05, 'sine'); },
     hatch:    function(t){ chord(t, [523, 659, 784, 1047], .3, .13); noise(t, .2, 3000, 1500, 2, .1); },
     powerup:  function(t){ for (var i = 0; i < 6; i++) tone(t + i * .06, .08, 400 + i * 120, 500 + i * 140, .1, 'square'); },
-    warp:     function(t){ tone(t, 1.1, 120, 1400, .12, 'sawtooth'); noise(t, 1.1, 300, 4000, .8, .14); },
     fanfare:  function(t){ var n = [523, 659, 784, 1047, 784, 1047]; n.forEach(function(f, i){ tone(t + i * .13, i === n.length - 1 ? .5 : .14, f, f, .14, 'triangle'); }); }
   };
 
@@ -136,6 +137,8 @@ function createSfx(){
         tone(nextNoteAt, step * 1.6, f, f, 0.045, 'sine', musicBus);
       }
       if (i % 4 === 2) noise(nextNoteAt, 0.05, 7000, 5000, 1, 0.012, 'highpass', musicBus);
+      /* a soft jungle drum on the beat */
+      if (i % 8 === 0 || i % 8 === 5) tone(nextNoteAt, 0.12, 180, 120, 0.05, 'sine', musicBus);
       nextNoteAt += step; seqStep++;
     }
   }

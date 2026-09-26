@@ -3,30 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0A1433">
+<meta name="theme-color" content="#8FD6FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Dino Rockets">
+<meta name="apple-mobile-web-app-title" content="Spellosaurus">
 <meta name="format-detection" content="telephone=no">
-<title>Grayson's Dino Rockets</title>
+<title>Grayson's Spellosaurus</title>
 <!-- @ICON -->
 <!-- @STYLES -->
 </head>
-<body data-planet="lava">
+<body data-land="jungle">
 
-<!-- The universe: stars, nebula, a moon, and the ground of whichever planet we are on. -->
-<div id="space" aria-hidden="true">
-  <div class="stars s1"></div><div class="stars s2"></div><div class="stars s3"></div>
-  <div class="nebula n1"></div><div class="nebula n2"></div>
-  <div class="far-planet"></div>
-  <div class="comet"></div>
-  <div class="surface"><div class="rim"></div><i class="crater c1"></i><i class="crater c2"></i><i class="crater c3"></i></div>
+<!-- Dino Island: a sunny sky, clouds, the volcano far off, hills, palms,
+     and the ground of whichever spot on the island we are at. -->
+<div id="world" aria-hidden="true">
+  <div class="sun"></div>
+  <div class="cloud k1"></div><div class="cloud k2"></div><div class="cloud k3"></div>
+  <div class="far-volcano"><i class="puff p1"></i><i class="puff p2"></i><i class="puff p3"></i></div>
+  <div class="hills h1"></div><div class="hills h2"></div>
+  <div class="palm pl"><i class="trunk"></i><i class="frond f1"></i><i class="frond f2"></i><i class="frond f3"></i><i class="frond f4"></i></div>
+  <div class="palm pr"><i class="trunk"></i><i class="frond f1"></i><i class="frond f2"></i><i class="frond f3"></i><i class="frond f4"></i></div>
+  <div class="surface"><div class="rim"></div><i class="tuft t1"></i><i class="tuft t2"></i><i class="tuft t3"></i><i class="tuft t4"></i></div>
 </div>
 
 <main id="app">
 
-  <!-- ============ LAUNCH PAD (home) ============ -->
+  <!-- ============ HOME ============ -->
   <section class="screen" data-screen="home">
     <header class="bar"><span></span><span></span>
       <button class="pill-btn" id="btnGrownups" type="button" aria-label="Grown-ups">
@@ -34,54 +37,55 @@
       </button>
     </header>
     <div class="home-body">
-      <h1 class="logo" aria-label="Grayson's Dino Rockets">
+      <h1 class="logo" aria-label="Grayson's Spellosaurus">
         <span class="logo-name">Grayson's</span>
-        <span class="logo-main"><span class="logo-dino">DINO</span><span class="logo-rocket">ROCKETS</span></span>
+        <span class="logo-main"><span class="logo-dino">SPELLO</span><span class="logo-saur">SAURUS</span></span>
       </h1>
+      <button class="new-friends" id="newFriends" type="button" hidden></button>
       <div class="mission-card">
         <div class="mission-top">
-          <span class="mission-label">This week's mission</span>
+          <span class="mission-label">This week's adventure</span>
           <span class="mission-count" id="missionCount"></span>
         </div>
         <div class="mission-track" id="missionTrack" aria-hidden="true"></div>
         <button class="btn btn-launch" id="btnPlay" type="button">
-          <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4c10 8 14 20 12 32l6 8-8 2-4 8h-12l-4-8-8-2 6-8C18 24 22 12 32 4z" fill="#fff"/><circle cx="32" cy="24" r="6" fill="#1E6FE8"/><path d="M26 52h12l-6 10z" fill="#FFC53D"/></svg>
-          <span id="playLabel">BLAST OFF!</span>
+          <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 60c-11 0-18-7-17-16 1-8 8-12 17-12s16 4 17 12c1 9-6 16-17 16z" fill="#fff"/><ellipse cx="12" cy="24" rx="6" ry="9" transform="rotate(-24 12 24)" fill="#fff"/><ellipse cx="26" cy="12" rx="6" ry="9" transform="rotate(-8 26 12)" fill="#fff"/><ellipse cx="41" cy="12" rx="6" ry="9" transform="rotate(8 41 12)" fill="#fff"/><ellipse cx="54" cy="24" rx="6" ry="9" transform="rotate(24 54 24)" fill="#fff"/></svg>
+          <span id="playLabel">LET'S GO!</span>
         </button>
         <div class="home-row">
-          <button class="btn btn-soft tile-btn" id="btnMap" type="button"><span class="ico">🪐</span><span>Star Map</span></button>
+          <button class="btn btn-soft tile-btn" id="btnMap" type="button"><span class="ico">🗺️</span><span>Island Map</span></button>
           <button class="btn btn-soft tile-btn" id="btnBase" type="button"><span class="ico">🦖</span><span>Dino Base</span><b id="babyCount"></b></button>
-          <button class="btn btn-soft tile-btn" id="btnHangar" type="button"><span class="ico">🚀</span><span>Hangar</span><b id="partCount"></b></button>
+          <button class="btn btn-soft tile-btn" id="btnDress" type="button"><span class="ico">🎩</span><span>Dress Up</span><b id="fossilCount"></b></button>
         </div>
         <button class="selfcheck" id="selfCheck" type="button"></button>
       </div>
     </div>
   </section>
 
-  <!-- ============ STAR MAP ============ -->
+  <!-- ============ ISLAND MAP ============ -->
   <section class="screen" data-screen="map">
     <header class="bar">
       <button class="back" type="button" data-back="home">‹ Home</button>
-      <span class="bar-title">Star Map</span><span></span>
+      <span class="bar-title">Island Map</span><span></span>
     </header>
     <div class="map-wrap"><div class="map" id="map"></div></div>
   </section>
 
-  <!-- ============ FLIGHT between planets ============ -->
-  <section class="screen" data-screen="flight">
-    <div class="flight" id="flight">
-      <div class="warp" aria-hidden="true"></div>
-      <div class="flight-rocket" id="flightRocket" aria-hidden="true"></div>
-      <p class="flight-text" id="flightText"></p>
+  <!-- ============ TREK: off across the island to the next spot ============ -->
+  <section class="screen" data-screen="trek">
+    <div class="trek" id="trek">
+      <div class="trek-ferns" aria-hidden="true"></div>
+      <div class="trek-dino" id="trekDino" aria-hidden="true"></div>
+      <p class="trek-text" id="trekText"></p>
     </div>
   </section>
 
-  <!-- ============ A WORD, on its planet ============ -->
+  <!-- ============ A WORD, at its spot on the island ============ -->
   <section class="screen" data-screen="play">
     <header class="bar">
       <button class="back" type="button" id="btnPlayBack">‹ Map</button>
       <div class="steps" id="steps" aria-label="Activities"></div>
-      <span class="planet-tag" id="planetTag"></span>
+      <span class="land-tag" id="landTag"></span>
     </header>
     <div class="card play-card" id="playCard">
       <div class="activity" id="activity"></div>
@@ -93,13 +97,14 @@
     <header class="bar"><span></span><span class="bar-title" id="hatchTitle">A surprise!</span><span></span></header>
     <div class="hatch" id="hatch">
       <p class="hatch-hint" id="hatchHint">Tap the egg!</p>
+      <p class="hatch-fossil" id="hatchFossil" hidden></p>
       <button class="egg" id="egg" type="button" aria-label="Tap the egg"></button>
-      <div class="baby-reveal" id="babyReveal" hidden></div>
+      <div class="baby-reveal" id="babyReveal" role="button" aria-label="Say hello to the baby" hidden></div>
       <p class="baby-name" id="babyName" hidden></p>
       <p class="baby-power" id="babyPower" hidden></p>
       <div class="hatch-actions">
         <button class="btn btn-soft" id="btnHatchCrew" type="button" hidden>Put in my crew</button>
-        <button class="btn btn-launch btn-next" id="btnHatchNext" type="button" hidden>Next planet ›</button>
+        <button class="btn btn-launch btn-next" id="btnHatchNext" type="button" hidden>Next stop ›</button>
       </div>
     </div>
   </section>
@@ -117,7 +122,7 @@
     </div>
     <div class="base" id="base">
       <div class="dome" aria-hidden="true"></div>
-      <p class="base-empty" id="baseEmpty">Finish a planet to hatch your first baby dino!</p>
+      <p class="base-empty" id="baseEmpty">Finish a spot on the island to hatch your first baby dino!</p>
       <div class="babies" id="babies"></div>
     </div>
   </section>
@@ -133,15 +138,17 @@
     </div>
   </section>
 
-  <!-- ============ HANGAR: rocket paint jobs, paid for in rocket parts ============ -->
-  <section class="screen" data-screen="hangar">
+  <!-- ============ DRESS UP: hats and gear, unlocked by digging up fossils ============ -->
+  <section class="screen" data-screen="dress">
     <header class="bar">
       <button class="back" type="button" data-back="home">‹ Home</button>
-      <span class="bar-title">Hangar</span><span class="bar-count" id="hangarParts"></span>
+      <span class="bar-title">Dress Up</span><span class="bar-count" id="dressFossils"></span>
     </header>
-    <div class="card hangar-card">
-      <p class="hangar-note" id="hangarNote"></p>
-      <div class="skins" id="skins"></div>
+    <div class="card dress-card">
+      <div class="dress-who" id="dressWho"></div>
+      <div class="dress-model" id="dressModel"></div>
+      <p class="dress-note" id="dressNote"></p>
+      <div class="hats" id="hats"></div>
     </div>
   </section>
 
@@ -154,10 +161,10 @@
         <circle cx="60" cy="72" r="38" fill="#FFC53D" stroke="#B9770E" stroke-width="5"/><circle cx="60" cy="72" r="27" fill="#FFD86A"/>
         <path d="M60 52l6 13 14 1-11 9 4 14-13-8-13 8 4-14-11-9 14-1z" fill="#FF8A1F"/></svg>
       </div>
-      <h2>Mission complete!</h2>
+      <h2>Adventure complete!</h2>
       <p id="doneLine"></p>
       <div class="done-words" id="doneWords"></div>
-      <div class="done-part" id="donePart" hidden></div>
+      <div class="done-fossil" id="doneFossil" hidden></div>
       <button class="btn btn-launch" id="btnDoneBase" type="button">See your Dino Base</button>
       <button class="btn btn-soft" id="btnDoneHome" type="button">Home</button>
     </div>
@@ -190,19 +197,19 @@
           <button class="btn btn-soft small" id="btnSample" type="button">Sample words</button>
         </div>
         <button class="btn btn-launch wide" id="btnSavePlay" type="button">Save &amp; play</button>
-        <p class="note">A new list starts a new mission. Words and progress are saved on this device only.</p>
+        <p class="note">A new list starts a new adventure. Words and progress are saved on this device only.</p>
 
         <h2 class="section">How it's going</h2>
         <p class="note">Stars show how well each word is known: every clean spell from memory earns one, and a word that needed help loses one and gets its practice steps back.</p>
         <ul class="progress-list" id="progressList"></ul>
         <div class="row-left">
-          <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's mission</button>
+          <button class="btn btn-soft small" id="btnResetWeek" type="button">Restart this week's adventure</button>
           <button class="btn btn-soft small" id="btnResetCrew" type="button">Crew back to level 1</button>
         </div>
 
         <h2 class="section">Sound</h2>
         <label class="toggle"><input type="checkbox" id="optSfx" checked><span>Sound effects</span></label>
-        <label class="toggle"><input type="checkbox" id="optMusic" checked><span>Space music</span></label>
+        <label class="toggle"><input type="checkbox" id="optMusic" checked><span>Jungle music</span></label>
 
         <h2 class="section">Letter voice</h2>
         <p class="note">Phones don't all say every letter the same way. If spelling AND sounds like "I-N-D", pick another spelling for A and tap Test.</p>

@@ -1,12 +1,14 @@
 /* ============================================================
-   APP — the mission.
+   APP — the week's adventure on Dino Island.
 
-   The week's words are a route through space: one planet per word. On
-   each planet the word is practised through a short run of activities
-   (chosen by how well he already knows it), the rocket blasts off, the
-   crew clears the letters, and an egg hatches a baby dino that joins his
-   Dino Base for good. When every planet is done, the Meteor King brings
-   the shakiest words back one more time — a spaced, from-memory review.
+   The week's words are a trail across the island: one stop per word. At
+   each stop the word is practised through a short run of activities
+   (chosen by how well he already knows it) while every right answer
+   warms an egg; then "3, 2, 1, ROAR!", the crew clears the letters, and
+   the egg hatches a baby dino that joins his Dino Base for good. When
+   every stop is done, the Grumpy Volcano brings the shakiest words back
+   one more time — a spaced, from-memory review — and calming it wins a
+   golden egg.
 
    Rules that hold the file together:
      1. go() is the only way to change screen; it bumps a token, clears
@@ -47,7 +49,7 @@
     }
   });
   if (synth && synth.addEventListener) synth.addEventListener('voiceschanged', function(){ speech.pickVoice(); });
-  var stage = createStage({ core: C, sfx: sfx, art: DINO_ART, memberArt: memberArt });
+  var stage = createStage({ core: C, sfx: sfx, art: DINO_ART, memberArt: memberArt, neckPath: brachioNeckPath });
   stage.init($('#fxLayer'));
   /* the four he takes on missions, as they are now (level, size, badges) */
   function crewMembers(){ return C.rosterMembers(S); }
@@ -75,7 +77,8 @@
     lastLine[kind] = line; return line;
   }
   var FOUND = ['Yes!', 'You got it!', 'Great listening!', "That's it!", 'Nice one!', 'Boom!'];
-  var SPELLED = ['Awesome!', 'Super!', 'Way to go!', 'Brilliant!', 'Fantastic!', 'Rocket power!'];
+  var SPELLED = ['Awesome!', 'Super!', 'Way to go!', 'Brilliant!', 'Fantastic!', 'Dino-mite!', 'Great job, Grayson!', 'Roar-some, Grayson!'];
+  var CALMER = ['The volcano is calming down!', 'Less grumpy now!', 'Keep going, it is working!'];
   var TRY = ['Try again.', 'Not that one. Listen.', 'Almost! Listen again.'];
 
   /* ---------------- screen control ---------------- */
@@ -120,17 +123,25 @@
   }
 
   /* ---------------- world ---------------- */
-  var currentPlanet = null;
-  function applyPlanet(p){
-    currentPlanet = p;
+  var currentLand = null;
+  function applyLand(p){
+    currentLand = p;
     var st = document.body.style;
     st.setProperty('--sky1', p.sky[0]); st.setProperty('--sky2', p.sky[1]);
     st.setProperty('--ground', p.ground); st.setProperty('--rim', p.rim);
     st.setProperty('--rock', p.rock); st.setProperty('--glow', p.glow);
-    document.body.setAttribute('data-planet', p.id);
+    document.body.setAttribute('data-land', p.id);
   }
-  function planetOf(i){ return C.planetFor(i, S.week.offset); }
-  function groundY(){ return $('#space .surface').getBoundingClientRect().top + 8; }
+  function landOf(i){ return C.landFor(i, S.week.offset); }
+  function groundY(){ return $('#world .surface').getBoundingClientRect().top + 8; }
+  /* a baby as he really is: his record says which generation hatched him */
+  function babyBySeed(seed, gold){
+    var rec = null;
+    S.babies.forEach(function(b){ if (b.seed === seed && !!b.gold === !!gold) rec = b; });
+    return C.babyOf(rec || { seed: seed, gen: C.BABY_GEN, gold: !!gold });
+  }
+  function speciesName(kind){ return { rex: 'T. rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur', brachio: 'brachiosaurus', stego: 'stegosaurus' }[kind]; }
+  function speciesSay(kind){ return { rex: 'T rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur', brachio: 'brachiosaurus', stego: 'stegosaurus' }[kind]; }
 
   var buddyKeys = null, buddyLineup = false;
   function buddies(keys, lineup, force){
@@ -139,7 +150,7 @@
     buddyKeys = keys; buddyLineup = !!lineup;
     stage.ambient.start({
       keys: keys, groundY: groundY(), left: 6, right: window.innerWidth - 6, lineup: lineup, ceil: cardBottom(),
-      dust: currentPlanet ? currentPlanet.rim : null,
+      dust: currentLand ? currentLand.rim : null,
       onTap: function(key){
         var m = C.memberInfo(S, key);
         if (m && (screen === 'home' || screen === 'done' || screen === 'hatch')) speech.say("I'm " + m.name + '!', { rate: 0.95 });
@@ -176,19 +187,12 @@
     later(function(){ box.innerHTML = ''; }, 4800);
   }
 
-  /* the rocket, in whichever paint job he picked in the hangar */
-  function rocketSvg(skinId){
-    var k = C.ROCKET_SKINS.filter(function(x){ return x.id === (skinId || S.skin); })[0] || C.ROCKET_SKINS[0];
-    return '<svg viewBox="0 0 120 170" aria-hidden="true">' +
-      '<path d="M60 6 C84 26 92 58 88 96 L32 96 C28 58 36 26 60 6Z" fill="' + k.body + '" stroke="#0A1433" stroke-width="5"/>' +
-      (k.stripe ? '<path d="M34 78 L86 78 L87 86 L33 86 Z" fill="' + k.stripe + '"/>' : '') +
-      '<path d="M60 6 C72 16 80 30 84 44 L36 44 C40 30 48 16 60 6Z" fill="' + k.nose + '" stroke="#0A1433" stroke-width="5"/>' +
-      '<circle cx="60" cy="64" r="13" fill="' + k.window + '" stroke="#0A1433" stroke-width="5"/><circle cx="56" cy="60" r="4" fill="#fff" opacity=".8"/>' +
-      '<path d="M32 76 L12 108 L34 104 Z M88 76 L108 108 L86 104 Z" fill="' + k.fins + '" stroke="#0A1433" stroke-width="5" stroke-linejoin="round"/>' +
-      '<rect x="40" y="94" width="40" height="12" rx="4" fill="#5E6B80" stroke="#0A1433" stroke-width="4"/>' +
-      '<path class="flame" d="M44 108 Q60 170 76 108 Z" fill="#FF8A1F"/><path class="flame" d="M50 108 Q60 150 70 108 Z" fill="#FFE08A"/></svg>';
+  /* the colours of the egg he is warming: the very baby that will hatch */
+  function eggColors(){
+    if (P && P.review) return { shell: '#FFD23F', spot: '#FFFFFF' };
+    var b = P && P.baby;
+    return b ? { shell: shade(b.body, 0.55), spot: b.body } : { shell: '#FFF4DC', spot: '#FF8A1F' };
   }
-
   /* ---------------- activities ---------------- */
   var env = {
     C: C, $: $, $all: $all, el: el, speech: speech, sfx: sfx, stage: stage,
@@ -196,14 +200,14 @@
     FOUND: FOUND, TRY: TRY, setNudge: setNudge, clearNudge: clearNudge,
     react: function(kind, point){ stage.ambient.react(kind, point); },
     toast: function(m){ toast(m); },
-    rocketSvg: function(){ return rocketSvg(); },
+    eggColors: eggColors,
     spellSlots: function(word, slots){
       return speech.spell(word, { soundOf: soundOf, onLetter: function(i){ slots.forEach(function(s, k){ s.classList.toggle('lit', k === i); }); } })
         .then(function(ok){ slots.forEach(function(s){ s.classList.remove('lit'); }); return ok; });
     }
   };
   var ACT = createActivities(env);
-  var ACT_ICON = { meet: '👀', zap: '☄️', build: '🔋', missing: '🧩', blast: '🚀', race: '🏁', check: '🔍', rhyme: '🎵' };
+  var ACT_ICON = { meet: '👀', zap: '🍃', build: '🥚', missing: '🧩', blast: '🦖', race: '🏁', check: '🔍', rhyme: '🎵' };
 
   function perform(els){
     var cast = crewMembers();
@@ -216,7 +220,7 @@
     S.crew = aw.crew;
     save();
     window.__lastScene = { id: plan.id, lead: plan.lead, mirror: plan.mirror, who: Object.keys(plan.members || {}) };
-    return stage.play(plan, els, { layer: $('#fxLayer'), groundY: groundY(), dust: currentPlanet ? currentPlanet.rim : null })
+    return stage.play(plan, els, { layer: $('#fxLayer'), groundY: groundY(), dust: currentLand ? currentLand.rim : null })
       .then(function(r){ celebrate(aw.ups); return r; });
   }
 
@@ -234,7 +238,7 @@
     if (grewFrom !== grewTo) return { line: grewTo === 'grown' ? 'All grown up!' : 'Grew into a big kid!', say: m.name + ' grew up!' };
     if (learned.length) return { line: 'Learned ' + learned.slice(0, 2).join(' and ') + '!', say: m.name + ' learned ' + learned[0] + '!' };
     if (level === 4) return { line: 'Earned a gold star badge!', say: m.name + ' earned a gold star!' };
-    if (level === 5) return { line: 'Earned a crown!', say: m.name + ' earned a crown!' };
+    if (level === 5) return { line: 'Earned a super star!', say: m.name + ' earned a super star!' };
     return { line: 'Stronger than ever!', say: '' };
   }
   function nextUp(){
@@ -258,83 +262,98 @@
   }
 
   /* ============================================================
-     LAUNCH PAD
+     HOME
      ============================================================ */
   var selfProblems = [];
   ENTER.home = function(){
-    var n = S.words.length, done = S.week.done.length, next = C.nextPlanet(S.week, n);
-    applyPlanet(planetOf(next === -1 ? 0 : next));
-    $('#missionCount').textContent = n ? done + ' of ' + n + ' planets' : 'no words yet';
+    var n = S.words.length, done = S.week.done.length, next = C.nextLand(S.week, n);
+    applyLand(landOf(next === -1 ? 0 : next));
+    $('#missionCount').textContent = n ? done + ' of ' + n + ' stops' : 'no words yet';
     var track = $('#missionTrack'); track.innerHTML = '';
     S.words.forEach(function(w, i){
       var d = el('i', S.week.done.indexOf(i) !== -1 ? 'done' : (i === next ? 'next' : ''));
-      d.style.setProperty('--pc', planetOf(i).ground);
+      d.style.setProperty('--pc', landOf(i).ground);
       track.appendChild(d);
     });
-    $('#playLabel').textContent = !n ? 'ADD WORDS' : (next !== -1 ? (done ? 'KEEP GOING!' : 'BLAST OFF!') : (S.week.finale ? 'PLAY AGAIN' : 'BOSS BATTLE!'));
+    $('#playLabel').textContent = !n ? 'ADD WORDS' : (next !== -1 ? (done ? 'KEEP GOING!' : "LET'S GO!") :
+      (!S.week.finale ? 'VOLCANO!' : (goldWaiting() ? 'GOLDEN EGG!' : 'PLAY AGAIN')));
     $('#babyCount').textContent = S.babies.length ? String(S.babies.length) : '';
-    $('#partCount').textContent = S.parts ? '🔩' + S.parts : '';
+    $('#fossilCount').textContent = S.fossils ? '🦴' + S.fossils : '';
+    /* Stretch and Spike are new: tell him, until he has been to meet them */
+    var nf = $('#newFriends');
+    nf.hidden = !!S.metNew;
+    if (!S.metNew){
+      nf.innerHTML = '<span class="nf-art">' + memberArt(C.memberInfo(S, 'brachio')) + memberArt(C.memberInfo(S, 'stego')) + '</span><span>New friends! Stretch and Spike</span>';
+      later(function(){ speech.say('Two new friends want to join your crew! Stretch and Spike!', { rate: 0.95 }); }, 900);
+    }
     try { selfProblems = C.selfCheck(S.words, crewMembers()); } catch (e){ selfProblems = ['self-check crashed: ' + e.message]; }
     if (!save()) selfProblems.push('this browser will not save progress (private browsing?)');
     var sc = $('#selfCheck');
     sc.classList.toggle('bad', selfProblems.length > 0);
-    sc.textContent = selfProblems.length ? '⚠ ' + selfProblems.length + ' problem' + (selfProblems.length > 1 ? 's' : '') + ' — tap' : '✓ All systems go' + (speech.available() ? '' : ' (no voice)');
+    sc.textContent = selfProblems.length ? '⚠ ' + selfProblems.length + ' problem' + (selfProblems.length > 1 ? 's' : '') + ' — tap' : '✓ All set' + (speech.available() ? '' : ' (no voice)');
     buddies(S.roster.slice(), true);
   };
+  function goldWaiting(){ return S.week.finale && S.week.goldSeed != null && !S.week.goldHatched; }
   $('#selfCheck').addEventListener('click', function(){
     toast(selfProblems.length ? selfProblems.slice(0, 3).join(' • ') : 'Checked: words, activities and all ' + C.SCENES.length + ' crew scenes.', 4000);
   });
   $('#btnPlay').addEventListener('click', function(){
     sfx.play('tap');
     if (!S.words.length){ go('pass'); return; }
-    var next = C.nextPlanet(S.week, S.words.length);
-    if (next !== -1) startPlanet(next);
+    var next = C.nextLand(S.week, S.words.length);
+    if (next !== -1) startLand(next);
     else if (!S.week.finale) startFinale();
+    else if (goldWaiting()) go('hatch', { gold: true });
     else go('map');
   });
+  $('#newFriends').addEventListener('click', function(){ sfx.play('tap'); go('base', { meet: true }); });
   $('#btnMap').addEventListener('click', function(){ sfx.play('tap'); go('map'); });
   $('#btnBase').addEventListener('click', function(){ sfx.play('tap'); go('base'); });
-  $('#btnHangar').addEventListener('click', function(){ sfx.play('tap'); go('hangar'); });
+  $('#btnDress').addEventListener('click', function(){ sfx.play('tap'); go('dress'); });
   $('#btnGrownups').addEventListener('click', function(){ sfx.play('tap'); go('pass'); });
 
   /* ============================================================
-     STAR MAP
+     ISLAND MAP
      ============================================================ */
   ENTER.map = function(){
     var map = $('#map'); map.innerHTML = '';
-    var n = S.words.length, next = C.nextPlanet(S.week, n);
-    applyPlanet(planetOf(next === -1 ? 0 : next));
+    var n = S.words.length, next = C.nextLand(S.week, n);
+    applyLand(landOf(next === -1 ? 0 : next));
+    var leader = C.memberInfo(S, S.roster[0]);
     S.words.forEach(function(w, i){
-      var p = planetOf(i), done = S.week.done.indexOf(i) !== -1;
+      var p = landOf(i), done = S.week.done.indexOf(i) !== -1;
       var node = el('div', 'map-node' + (done ? ' done' : '') + (i === next ? ' next' : ''));
-      var b = el('button', 'planet-btn'); b.type = 'button';
-      b.setAttribute('aria-label', 'Planet ' + (i + 1) + ': ' + w.toLowerCase());
+      var b = el('button', 'spot-btn'); b.type = 'button';
+      b.setAttribute('aria-label', 'Stop ' + (i + 1) + ': ' + w.toLowerCase());
       ['ground', 'rim', 'rock', 'glow'].forEach(function(k){ b.style.setProperty('--' + k, p[k]); });
+      b.appendChild(el('span', 'spot-ico', p.icon));
       if (done && S.week.eggs[i] != null){
-        var badge = el('span', 'done-badge'); var bb = el('span', 'baby'); bb.innerHTML = babyArt(C.makeBaby(S.week.eggs[i])); badge.appendChild(bb); b.appendChild(badge);
+        var badge = el('span', 'done-badge'); var bb = el('span', 'baby'); bb.innerHTML = babyArt(babyBySeed(S.week.eggs[i])); badge.appendChild(bb); b.appendChild(badge);
       }
-      if (i === next){ var r = el('span', 'map-rocket'); r.innerHTML = rocketSvg(); b.appendChild(r); }
-      b.addEventListener('click', function(){ sfx.play('tap'); startPlanet(i); });
+      /* the crew leader waits at the next stop */
+      if (i === next && leader){ var r = el('span', 'map-here'); r.innerHTML = memberArt(leader); b.appendChild(r); }
+      b.addEventListener('click', function(){ sfx.play('tap'); startLand(i); });
       node.appendChild(b);
       var lab = el('div', 'map-label');
       lab.appendChild(el('span', 'map-word', w.toLowerCase()));
-      lab.appendChild(el('span', 'map-planet', p.name + (done ? ' ✓' : '')));
+      lab.appendChild(el('span', 'map-land', p.name + (done ? ' ✓' : '')));
       node.appendChild(lab);
       map.appendChild(node);
     });
     if (n){
       var fin = el('div', 'map-node map-finale' + (next === -1 && !S.week.finale ? ' next' : '') + (next !== -1 ? ' locked' : ''));
-      var fb = el('button', 'planet-btn'); fb.type = 'button'; fb.setAttribute('aria-label', 'The Meteor King');
+      var fb = el('button', 'spot-btn'); fb.type = 'button'; fb.setAttribute('aria-label', 'The Grumpy Volcano');
       fb.innerHTML = '<span class="map-boss">' + BOSS_SVG + '</span>';
       fb.addEventListener('click', function(){
         sfx.play('tap');
-        if (next !== -1){ toast('Visit every planet first!'); return; }
+        if (next !== -1){ toast('Visit every stop first!'); return; }
+        if (goldWaiting()){ go('hatch', { gold: true }); return; }
         startFinale();
       });
       fin.appendChild(fb);
       var fl = el('div', 'map-label');
-      fl.appendChild(el('span', 'map-word', 'Meteor King'));
-      fl.appendChild(el('span', 'map-planet', S.week.finale ? 'Beaten ✓' : 'Boss battle'));
+      fl.appendChild(el('span', 'map-word', 'Grumpy Volcano'));
+      fl.appendChild(el('span', 'map-land', S.week.finale ? 'Calmed down ✓' : 'Boss battle'));
       fin.appendChild(fl);
       map.appendChild(fin);
     }
@@ -342,78 +361,122 @@
   };
 
   /* ============================================================
-     FLIGHT
+     TREK — off across the island to the next stop
      ============================================================ */
-  var P = null;   /* the planet (or review) being played */
-  function startPlanet(i){
+  var P = null;   /* the stop (or the review) being played */
+  function startLand(i){
     var w = S.words[i];
     var stat = C.normalizeStat(S.stats[w], w);
-    P = { review: false, i: i, word: w, planet: planetOf(i), stat: stat, acts: C.activitiesFor(stat.level, stat, w), step: 0 };
-    go('flight');
+    P = { review: false, i: i, word: w, land: landOf(i), stat: stat, acts: C.activitiesFor(stat.level, stat, w), step: 0 };
+    /* the egg he will warm here is chosen now, so the nest shows its colours */
+    var egg = freshEgg();
+    P.eggSeed = egg.seed; P.baby = egg.baby;
+    go('trek');
   }
-  ENTER.flight = function(){
-    var p = P.review ? { name: 'the Meteor King' } : P.planet;
-    $('#flightRocket').innerHTML = rocketSvg();
-    $('#flightText').textContent = 'Flying to ' + p.name + '…';
+  /* a new baby, with a name nobody else in his base has */
+  function freshEgg(){
+    var taken = {};
+    C.allMembers(S).forEach(function(m){ taken[m.name] = 1; });
+    var seed, baby, tries = 0;
+    do {
+      seed = ((Date.now() & 0x7fffffff) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+      baby = C.makeBaby(seed, C.BABY_GEN);
+    } while (taken[baby.name] && ++tries < 60);
+    return { seed: seed, baby: baby };
+  }
+  ENTER.trek = function(){
+    var p = P.review ? { name: 'the Grumpy Volcano' } : P.land;
+    var lead = C.memberInfo(S, C.pickLead(S.leadHistory, null, S.roster));
+    $('#trekDino').innerHTML = lead ? memberArt(lead) : '';
+    $('#trekText').textContent = 'Off to ' + p.name + '…';
+    if (!P.review) applyLand(P.land);
     noBuddies();
-    sfx.play('warp');
+    sfx.play('march');
     later(function(){ speech.say('Next stop: ' + p.name + '!', { rate: 0.95 }); }, 200);
-    later(function(){ if (!P.review) applyPlanet(P.planet); go('play'); }, params.has('fast') ? 300 : 2100);
+    later(function(){ go('play'); }, params.has('fast') ? 300 : 2300);
   };
 
   /* ============================================================
-     PLAY — one planet's activities in order
+     PLAY — one stop's activities in order
      ============================================================ */
   function renderSteps(){
     var box = $('#steps'); box.innerHTML = '';
     var n = P.review ? P.list.length : P.acts.length;
     for (var k = 0; k < n; k++){
-      var i = el('i', k < P.step ? 'done' : (k === P.step ? 'now' : ''), k < P.step ? '✓' : (P.review ? '👑' : ACT_ICON[P.acts[k]]));
+      var i = el('i', k < P.step ? 'done' : (k === P.step ? 'now' : ''), k < P.step ? '✓' : (P.review ? '🌋' : ACT_ICON[P.acts[k]]));
       box.appendChild(i);
     }
-    $('#planetTag').textContent = P.review ? 'Boss battle' : P.planet.name;
+    $('#landTag').textContent = P.review ? 'Grumpy Volcano' : P.land.name;
   }
-  /* ---------------- the Meteor King ---------------- */
-  var BOSS_SVG = '<svg viewBox="0 0 120 120" aria-hidden="true">' +
-    '<path d="M60 8 C92 8 112 30 112 60 C112 92 90 112 60 112 C28 112 8 92 8 60 C8 30 30 8 60 8Z" fill="#7A5A48" stroke="#2A1810" stroke-width="5"/>' +
-    '<circle cx="36" cy="40" r="9" fill="#5B4034"/><circle cx="84" cy="84" r="11" fill="#5B4034"/><circle cx="88" cy="36" r="6" fill="#5B4034"/>' +
-    '<path d="M22 12 l10 14 8 -18 8 16 12 -20 12 20 8 -16 8 18 10 -14 -2 22 H24 Z" fill="#FFC53D" stroke="#8A5A08" stroke-width="3" stroke-linejoin="round"/>' +
-    '<path d="M34 54 L52 60 M86 54 L68 60" stroke="#2A1810" stroke-width="5" stroke-linecap="round"/>' +
-    '<circle cx="44" cy="66" r="8" fill="#fff" stroke="#2A1810" stroke-width="3"/><circle cx="76" cy="66" r="8" fill="#fff" stroke="#2A1810" stroke-width="3"/>' +
-    '<circle cx="46" cy="67" r="4" fill="#14213D"/><circle cx="74" cy="67" r="4" fill="#14213D"/>' +
-    '<path d="M44 90 Q60 80 76 90" fill="none" stroke="#2A1810" stroke-width="5" stroke-linecap="round"/>' +
-    '<path d="M4 44 q-10 -8 -2 -18 M116 76 q10 6 2 18" stroke="#FF8A1F" stroke-width="6" stroke-linecap="round" fill="none"/></svg>';
+  /* ---------------- the Grumpy Volcano ---------------- */
+  var BOSS_SVG = '<svg viewBox="0 0 140 120" aria-hidden="true">' +
+    '<path d="M70 4 q10 -10 18 0 q12 -6 14 8" fill="none" stroke="#D6DEEA" stroke-width="6" stroke-linecap="round" opacity=".8"/>' +
+    '<path d="M6 116 L50 22 Q58 16 70 18 Q82 16 90 22 L134 116 Z" fill="#8C5A3A" stroke="#3A1A0A" stroke-width="5" stroke-linejoin="round"/>' +
+    '<path d="M50 22 Q70 32 90 22 L86 30 Q78 44 74 36 Q70 50 64 36 Q60 44 54 30 Z" fill="#FF6A1F" stroke="#3A1A0A" stroke-width="4" stroke-linejoin="round"/>' +
+    '<path d="M24 100 q12 -8 20 2 M104 98 q10 -8 16 2" stroke="#6B3E22" stroke-width="4" fill="none" stroke-linecap="round"/>' +
+    '<path class="brow-grump" d="M44 58 L62 66 M96 58 L78 66" stroke="#3A1A0A" stroke-width="6" stroke-linecap="round"/>' +
+    '<circle cx="56" cy="74" r="9" fill="#fff" stroke="#3A1A0A" stroke-width="3"/><circle cx="84" cy="74" r="9" fill="#fff" stroke="#3A1A0A" stroke-width="3"/>' +
+    '<circle cx="57" cy="75" r="4.5" fill="#14213D"/><circle cx="83" cy="75" r="4.5" fill="#14213D"/>' +
+    '<path class="mouth-grump" d="M56 100 Q70 90 84 100" fill="none" stroke="#3A1A0A" stroke-width="5" stroke-linecap="round"/>' +
+    '<path class="mouth-happy" d="M54 94 Q70 110 86 94" fill="#FF8A80" stroke="#3A1A0A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function drawBoss(){
     var old = $('#bossBar'); if (old) old.remove();
     if (!P || !P.review) return;
     var b = el('div', 'boss'); b.id = 'bossBar';
     var hp = 1 - P.hits / P.list.length;
-    b.innerHTML = '<div class="boss-face">' + BOSS_SVG + '</div><div class="boss-info"><span class="boss-name">The Meteor King</span>' +
-      '<span class="boss-hp"><i style="width:' + Math.round(hp * 100) + '%"></i></span></div>';
+    b.innerHTML = '<div class="boss-face">' + BOSS_SVG + '</div><div class="boss-info"><span class="boss-name">The Grumpy Volcano</span>' +
+      '<span class="boss-hp" title="grumpiness"><i style="width:' + Math.round(hp * 100) + '%"></i></span></div>';
     $('#playCard').insertBefore(b, $('#activity'));
   }
-  /* a laser from the launch pad, and the boss loses a chunk of health */
+  /* a roar wave from the crew rolls up to the volcano, and it gets less grumpy */
+  function roarWave(to){
+    var from = { x: window.innerWidth / 2, y: groundY() - 60 };
+    for (var k = 0; k < 3; k++){
+      (function(k){
+        var r = el('div', 'roar-ring'); document.body.appendChild(r);
+        r.style.left = from.x + 'px'; r.style.top = from.y + 'px'; r.style.width = r.style.height = '40px';
+        try { r.animate([
+          { left: from.x + 'px', top: from.y + 'px', width: '40px', height: '40px', opacity: 0.9 },
+          { left: to.x + 'px', top: to.y + 'px', width: '160px', height: '160px', opacity: 0 }
+        ], { duration: 700, delay: k * 120, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'both' }); } catch (e){}
+        later(function(){ r.remove(); }, 900 + k * 120);
+      })(k);
+    }
+  }
   function hitBoss(){
     return new Promise(function(resolve){
       var b = $('#bossBar');
       if (!b){ resolve(); return; }
       P.hits++;
       var face = $('.boss-face', b).getBoundingClientRect();
-      var laser = el('div', 'boss-laser');
-      var fromY = window.innerHeight - 40, toY = face.top + face.height / 2;
-      laser.style.left = (face.left + face.width / 2 - 4) + 'px'; laser.style.top = toY + 'px'; laser.style.height = (fromY - toY) + 'px';
-      document.body.appendChild(laser);
-      sfx.play('zap');
-      try { laser.animate([{ transform: 'scaleY(0)', opacity: 1 }, { transform: 'scaleY(1)', opacity: 1, offset: 0.4 }, { transform: 'scaleY(1)', opacity: 0 }], { duration: 520 }); } catch (e){}
+      sfx.play('bigroar');
+      env.react('cheer');
+      roarWave({ x: face.left + face.width / 2, y: face.top + face.height / 2 });
       later(function(){
-        laser.remove();
-        sfx.play('explode');
+        sfx.play('boom');
         b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit');
-        $('.boss-hp i', b).style.width = Math.round((1 - P.hits / P.list.length) * 100) + '%';
-        if (P.hits >= P.list.length){ b.classList.add('dead'); sfx.play('fanfare'); confetti(); }
-        env.react('cheer');
-        later(resolve, P.hits >= P.list.length ? 900 : 400);
-      }, 300);
+        var hp = 1 - P.hits / P.list.length;
+        $('.boss-hp i', b).style.width = Math.round(hp * 100) + '%';
+        b.classList.toggle('calmer', hp <= 0.5);
+        if (P.hits < P.list.length) speech.say(pick('calmer', CALMER), { rate: 0.95 });
+        if (P.hits >= P.list.length){
+          b.classList.add('happy'); sfx.play('fanfare'); confetti();
+          /* all calm, and with a happy puff it pops out a golden egg */
+          var egg = el('div', 'gold-pop'); document.body.appendChild(egg);
+          var fx = face.left + face.width / 2, fy = face.top;
+          try { egg.animate([
+            { transform: 'translate(' + (fx - 35) + 'px,' + (fy - 20) + 'px) scale(.2)', opacity: 1 },
+            { transform: 'translate(' + (fx - 35) + 'px,' + (fy - 140) + 'px) scale(1.1) rotate(-12deg)', opacity: 1, offset: 0.45 },
+            { transform: 'translate(' + (window.innerWidth / 2 - 35) + 'px,' + (window.innerHeight * 0.35) + 'px) scale(1.4) rotate(8deg)', opacity: 1 }
+          ], { duration: 1500, easing: 'cubic-bezier(.3,.7,.4,1)', fill: 'forwards' }); } catch (e){}
+          sfx.play('sparkle');
+          later(function(){ speech.say('The volcano is happy now! It gave you a golden egg!', { rate: 0.95, keep: true }); }, 300);
+          later(function(){ egg.remove(); }, 3400);
+          later(resolve, 3400);
+          return;
+        }
+        later(resolve, 500);
+      }, 650);
     });
   }
 
@@ -467,7 +530,7 @@
         }).then(function(){
           if (st !== stepTok) return;
           if (P.review) return hitBoss().then(function(){ if (st === stepTok) return perform(res.slots); });
-          return countdownAndLaunch().then(function(){ if (st === stepTok) return perform(res.slots); });
+          return countdownRoar().then(function(){ if (st === stepTok) return perform(res.slots); });
         }).then(function(){
           if (st !== stepTok) return;
           if (P.review){ P.step++; if (P.step < P.list.length) runStep(); else finishFinale(); }
@@ -480,8 +543,9 @@
   }
   function nextStep(){ P.step++; runStep(); }
 
-  /* 3, 2, 1 — and the rocket goes */
-  function countdownAndLaunch(){
+  /* 3, 2, 1 — ROAR! The whole crew roars, the island shakes, and the warm
+     egg jumps in its nest: it is ready to hatch once the crew is done */
+  function countdownRoar(){
     return new Promise(function(resolve){
       var st = stepTok;
       var card = $('#playCard');
@@ -490,34 +554,27 @@
       function tick(){
         if (st !== stepTok){ cd.remove(); resolve(); return; }
         if (n > 0){ cd.innerHTML = '<span>' + n + '</span>'; sfx.play('countdown'); speech.say(String(n), { dedupeMs: 0, rate: 1 }); n--; later(tick, 750); return; }
-        cd.innerHTML = '<span>GO!</span>'; sfx.play('go'); sfx.play('blastoff');
-        /* the rocket he fuelled is the one that goes: it lifts off from the dock */
-        var src = $('.activity .fuel-rocket'), from;
-        if (src){ var rr = src.getBoundingClientRect(); from = { x: rr.left + rr.width / 2, y: rr.top + rr.height / 2, s: rr.width / 120 }; src.style.visibility = 'hidden'; }
-        else from = { x: window.innerWidth / 2, y: window.innerHeight - 120, s: 1 };
-        var r = el('div', 'launch-rocket'); r.innerHTML = rocketSvg(); document.body.appendChild(r);
-        r.style.left = (from.x - 60) + 'px'; r.style.marginLeft = '0'; r.style.top = (from.y - 85) + 'px';
-        var trail = setInterval(function(){
-          var b = r.getBoundingClientRect(); if (!b.width) return;
-          var puff = el('i', 'launch-smoke'); puff.style.left = (b.left + b.width / 2) + 'px'; puff.style.top = (b.bottom - 10) + 'px';
-          document.body.appendChild(puff);
-          try { puff.animate([{ transform: 'translate(-50%,0) scale(.4)', opacity: .9 }, { transform: 'translate(calc(-50% + ' + ((Math.random() - 0.5) * 60) + 'px), 40px) scale(1.6)', opacity: 0 }], { duration: 700, easing: 'ease-out' }); } catch (e){}
-          setTimeout(function(){ puff.remove(); }, 720);
-        }, 60);
-        var s0 = from.s, rise = from.y + 260;
-        try {
-          r.animate([
-            { transform: 'translateY(0) scale(' + s0 + ')' },
-            { transform: 'translate(-3px,4px) scale(' + (s0 * 1.05) + ')', offset: 0.08 },
-            { transform: 'translate(3px,2px) scale(' + (s0 * 1.1) + ')', offset: 0.16 },
-            { transform: 'translate(0,-' + (rise * 0.18) + 'px) scale(' + (s0 * 1.25) + ')', offset: 0.4 },
-            { transform: 'translate(0,-' + rise + 'px) scale(' + (s0 * 1.4) + ')' }
-          ], { duration: 1700, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
-        } catch (e){}
-        setTimeout(function(){ clearInterval(trail); r.remove(); cd.remove(); resolve(); }, 1750);
+        cd.innerHTML = '<span class="roar">ROAR!</span>';
+        sfx.play('bigroar');
+        speech.say('Roar!', { dedupeMs: 0, rate: 1 });
+        document.body.classList.remove('quake'); void document.body.offsetWidth; document.body.classList.add('quake');
+        env.react('cheer');
+        var nest = $('.activity .nest-egg');
+        if (nest){
+          var r = nest.getBoundingClientRect();
+          roarRing(r.left + r.width / 2, r.top + r.height / 2);
+          try { nest.animate([{ transform: 'none' }, { transform: 'translateY(-26px) scale(1.25) rotate(-10deg)' }, { transform: 'translateY(0) scale(1.1) rotate(8deg)' }, { transform: 'none' }], { duration: 900, easing: 'ease-out' }); } catch (e){}
+        }
+        later(function(){ document.body.classList.remove('quake'); cd.remove(); resolve(); }, 1400);
       }
       tick();
     });
+  }
+  function roarRing(x, y){
+    var r = el('div', 'roar-ring'); document.body.appendChild(r);
+    r.style.left = x + 'px'; r.style.top = y + 'px';
+    try { r.animate([{ width: '20px', height: '20px', opacity: 1 }, { width: '420px', height: '420px', opacity: 0 }], { duration: 900, easing: 'ease-out', fill: 'forwards' }); } catch (e){}
+    later(function(){ r.remove(); }, 950);
   }
   $('#btnPlayBack').addEventListener('click', function(){ sfx.play('tap'); go(P && P.review ? 'home' : 'map'); });
 
@@ -525,28 +582,38 @@
      EGG HATCH — the reward is a new friend
      ============================================================ */
   var hatchState = null;
-  ENTER.hatch = function(){
-    /* every baby gets a name nobody else in his base has */
-    var taken = {};
-    C.allMembers(S).forEach(function(m){ taken[m.name] = 1; });
-    var seed, baby, tries = 0;
-    do {
-      seed = ((Date.now() & 0x7fffffff) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
-      baby = C.makeBaby(seed);
-    } while (taken[baby.name] && ++tries < 60);
-    hatchState = { seed: seed, baby: baby, taps: 0, open: false };
+  /* the egg he warmed at this stop — or, after the volcano, the golden egg */
+  ENTER.hatch = function(arg){
+    var gold = !!(arg && arg.gold);
+    var seed, baby;
+    if (gold){
+      if (S.week.goldSeed == null){ S.week.goldSeed = goldSeedFor(); save(); }
+      seed = S.week.goldSeed; baby = C.makeBaby(seed, C.BABY_GEN, true);
+    } else {
+      if (!P || !P.baby){ var fe = freshEgg(); P = P || { review: true }; P.eggSeed = fe.seed; P.baby = fe.baby; }
+      seed = P.eggSeed; baby = P.baby;
+    }
+    hatchState = { seed: seed, baby: baby, taps: 0, open: false, gold: gold, after: arg && arg.after };
     var egg = $('#egg');
-    egg.className = 'egg'; egg.innerHTML = '<svg class="crack" viewBox="0 0 100 128" aria-hidden="true"></svg>';
-    egg.style.setProperty('--egg', shade(baby.body, 0.55)); egg.style.setProperty('--spot', baby.body);
+    egg.className = 'egg' + (gold ? ' gold' : ''); egg.innerHTML = '<svg class="crack" viewBox="0 0 100 128" aria-hidden="true"></svg>';
+    egg.style.setProperty('--egg', gold ? '#FFD23F' : shade(baby.body, 0.55)); egg.style.setProperty('--spot', gold ? '#FFFFFF' : baby.body);
     egg.hidden = false;
     $('#babyReveal').hidden = true; $('#babyName').hidden = true; $('#btnHatchNext').hidden = true;
-    $('#babyPower').hidden = true; $('#btnHatchCrew').hidden = true;
+    $('#babyPower').hidden = true; $('#btnHatchCrew').hidden = true; $('#hatchFossil').hidden = true;
     $('#hatchHint').hidden = false; $('#hatchHint').textContent = 'Tap the egg!';
-    $('#hatchTitle').textContent = 'A surprise!';
+    $('#hatchTitle').textContent = gold ? 'The golden egg!' : 'A surprise!';
+    if (gold) applyLand(C.LANDS[1]);
     buddies(S.roster.slice(), true, true);
-    later(function(){ speech.say('Something is hatching! Tap the egg!', { rate: 0.95 }); }, 400);
+    later(function(){ speech.say(gold ? 'The golden egg is hatching! Tap it!' : 'Something is hatching! Tap the egg!', { rate: 0.95 }); }, 400);
     setNudge(function(){ if (!hatchState.open){ wobble(); speech.say('Tap the egg!', { dedupeMs: 0 }); } });
   };
+  /* a golden baby with a name nobody else has */
+  function goldSeedFor(){
+    var taken = {}, seed, tries = 0;
+    C.allMembers(S).forEach(function(m){ taken[m.name] = 1; });
+    do { seed = ((Date.now() & 0x7fffffff) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0; } while (taken[C.makeBaby(seed, C.BABY_GEN, true).name] && ++tries < 60);
+    return seed;
+  }
   var CRACKS = ['M50 30 L44 44 L54 52 L46 64', 'M46 64 L30 70 L36 82 M54 52 L70 58 L64 72', 'M36 82 L28 96 M64 72 L76 86 L70 98 M50 30 L58 20'];
   function wobble(){ var e = $('#egg'); e.classList.remove('wobble'); void e.offsetWidth; e.classList.add('wobble'); }
   $('#egg').addEventListener('click', function(){
@@ -568,60 +635,77 @@
     clearNudge();
     var egg = $('#egg'); egg.classList.add('gone');
     sfx.play('hatch');
-    /* remember it: in the base for good, and on this planet on the map */
-    S.babies.push({ seed: h.seed, at: Date.now() });
-    if (!P.review){
-      if (S.week.done.indexOf(P.i) === -1) S.week.done.push(P.i);
+    if (h.gold) sfx.play('sparkle');
+    /* remember it: in the base for good, and at this stop on the map */
+    var rec = { seed: h.seed, at: Date.now(), gen: C.BABY_GEN };
+    if (h.gold) rec.gold = true;
+    S.babies.push(rec);
+    var dug = 0;
+    if (h.gold) S.week.goldHatched = true;
+    else if (!P.review){
+      if (S.week.done.indexOf(P.i) === -1){ S.week.done.push(P.i); dug = C.FOSSIL_LAND; S.fossils += dug; }
       S.week.eggs[P.i] = h.seed;
     }
-    /* the whole crew grows a little with every planet */
-    var ap = C.awardPlanet(S.crew, S.roster);
+    /* the whole crew grows a little with every stop */
+    var ap = C.awardLand(S.crew, S.roster);
     S.crew = ap.crew;
     save();
     later(function(){
       egg.hidden = true;
       var rv = $('#babyReveal'); rv.innerHTML = babyArt(h.baby); rv.hidden = false;
-      var nm = $('#babyName'); nm.innerHTML = 'Meet ' + h.baby.name + '!<small>a baby ' + { rex: 'T. rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[h.baby.kind] + '</small>';
+      var nm = $('#babyName'); nm.innerHTML = 'Meet ' + h.baby.name + '!<small>a ' + (h.gold ? 'golden ' : '') + 'baby ' + speciesName(h.baby.kind) + '</small>';
       nm.hidden = false;
       $('#hatchHint').hidden = true;
-      $('#hatchTitle').textContent = 'A new friend!';
+      $('#hatchTitle').textContent = h.gold ? 'A golden friend!' : 'A new friend!';
       confetti(); sfx.play('fanfare');
       env.react('cheer');
       var pw = C.POWERS[h.baby.power];
       var pl = $('#babyPower'); pl.textContent = 'Super power: ' + pw.icon + ' ' + pw.name; pl.hidden = false;
+      if (dug){ var hf = $('#hatchFossil'); hf.textContent = '🦴 You dug up a fossil! (' + S.fossils + ')'; hf.hidden = false; }
       $('#btnHatchCrew').hidden = false;
-      speech.say('Meet ' + h.baby.name + '! A baby ' + { rex: 'T rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[h.baby.kind] + ' who ' + pw.says + '!', { rate: 0.95, keep: true });
+      speech.say('Meet ' + h.baby.name + '! A ' + (h.gold ? 'golden ' : '') + 'baby ' + speciesSay(h.baby.kind) + ' who ' + pw.says + '!' + (dug ? ' And you dug up a fossil!' : ''), { rate: 0.95, keep: true });
       setTimeout(function(){ celebrate(ap.ups); }, 2400);
-      var more = C.nextPlanet(S.week, S.words.length);
       var nb = $('#btnHatchNext');
-      nb.textContent = more !== -1 ? 'Next planet ›' : 'Boss battle! ›';
+      if (h.gold) nb.textContent = 'Hooray! ›';
+      else nb.textContent = C.nextLand(S.week, S.words.length) !== -1 ? 'Next stop ›' : 'Volcano! ›';
       nb.hidden = false;
     }, 420);
   }
+  /* a new baby wants to be tapped: a hop, a giggle and a hello */
+  $('#babyReveal').addEventListener('click', function(){
+    if (!hatchState || !hatchState.open) return;
+    var rv = $('#babyReveal');
+    sfx.play('giggle');
+    try { rv.animate([{ transform: 'none' }, { transform: 'translateY(-34px) rotate(-6deg)' }, { transform: 'none' }], { duration: 480, easing: 'ease-out' }); } catch (e){}
+    speech.say(pick('hello', ['Hi Grayson!', "I'm " + hatchState.baby.name + '!', 'Hee hee!', 'Roar!']), { rate: 1.05 });
+  });
   $('#btnHatchCrew').addEventListener('click', function(){ sfx.play('tap'); go('base', { pick: hatchState && hatchState.baby.id }); });
   $('#btnHatchNext').addEventListener('click', function(){
     sfx.play('tap');
-    var more = C.nextPlanet(S.week, S.words.length);
-    if (more !== -1) startPlanet(more); else startFinale();
+    if (hatchState && hatchState.gold){ go('done', hatchState.after || { fossils: 0 }); return; }
+    var more = C.nextLand(S.week, S.words.length);
+    if (more !== -1) startLand(more); else startFinale();
   });
 
   /* ============================================================
-     THE METEOR KING — the spaced, from-memory review, as a boss battle
+     THE GRUMPY VOLCANO — the spaced, from-memory review, as a boss battle
      ============================================================ */
   function startFinale(){
     var list = C.reviewQueue(S.words, S.stats, Math.min(4, S.words.length));
     P = { review: true, list: list, step: 0, stat: null, acts: [], hits: 0 };
-    go('flight');
+    go('trek');
   }
-  /* beating the Meteor King the first time this week earns a rocket part */
+  /* calming the volcano the first time this week digs up three fossils and
+     wins the golden egg, which hatches after the Victory Show */
   function finishFinale(){
     var first = !S.week.finale;
     S.week.finale = true;
-    var before = C.skinsUnlocked(S.parts).length;
-    if (first) S.parts++;
+    if (first){ S.fossils += C.FOSSIL_BOSS; S.week.goldSeed = goldSeedFor(); S.week.goldHatched = false; }
     save();
-    go('show', { part: first, newSkin: C.skinsUnlocked(S.parts).length > before });
+    go('show', { fossils: first ? C.FOSSIL_BOSS : 0 });
   }
+  /* after the show: the golden egg if there is one waiting, else the end */
+  function afterShow(arg){ if (goldWaiting()) go('hatch', { gold: true, after: arg }); else go('done', arg); }
 
   /* ============================================================
      VICTORY SHOW — after the boss, every crew member performs one of the
@@ -652,7 +736,7 @@
   ENTER.show = function(arg){
     showArg = arg || {};
     noBuddies();
-    applyPlanet(planetOf(S.week.offset + 3));
+    applyLand(landOf(S.week.offset + 3));
     var crew = crewMembers();
     var words = C.shuffle(S.words.slice());
     var acts = crew.map(function(m, i){ return { m: m, w: words[i % words.length] }; });
@@ -676,7 +760,7 @@
           if (plan.id) used.unshift(C.histEntry(plan));
           var aw = C.awardScene(S.crew, plan); S.crew = aw.crew; save();
           window.__showScenes = (window.__showScenes || []).concat([plan.id]);
-          stage.play(plan, slots, { layer: $('#fxLayer'), groundY: groundY(), dust: currentPlanet ? currentPlanet.rim : null }).then(function(){
+          stage.play(plan, slots, { layer: $('#fxLayer'), groundY: groundY(), dust: currentLand ? currentLand.rim : null }).then(function(){
             if (mine !== tok) return;
             celebrate(aw.ups);
             fireworks(3);
@@ -693,55 +777,77 @@
       fireworks(8);
       confetti();
       [900, 2300, 3700].forEach(function(ms){ later(function(){ env.react('cheer'); sfx.play('cheer'); }, ms); });
-      later(function(){ go('done', showArg); }, 5600);
+      later(function(){ afterShow(showArg); }, 5600);
     }
     later(function(){ act(0); }, 1800);
   };
-  $('#btnSkipShow').addEventListener('click', function(){ sfx.play('tap'); go('done', showArg); });
+  $('#btnSkipShow').addEventListener('click', function(){ sfx.play('tap'); afterShow(showArg); });
 
   /* ============================================================
      MISSION COMPLETE
      ============================================================ */
   ENTER.done = function(arg){
-    var dp = $('#donePart');
-    dp.hidden = !(arg && arg.part);
-    if (arg && arg.part){
-      var nx = C.nextSkin(S.parts);
-      dp.innerHTML = '<span class="pt">🔩</span><span>You won a rocket part!' + (arg.newSkin ? ' New rocket paint in the Hangar!' : (nx ? ' ' + (nx.parts - S.parts) + ' more for the next paint job.' : '')) + '</span>';
-      later(function(){ speech.say(arg.newSkin ? 'You beat the Meteor King and won a rocket part! There is new paint in the hangar!' : 'You beat the Meteor King and won a rocket part!', { rate: 0.95 }); }, 3200);
+    var df = $('#doneFossil');
+    df.hidden = !(arg && arg.fossils);
+    if (arg && arg.fossils){
+      var nx = C.nextGear(S.fossils);
+      df.innerHTML = '<span class="pt">🦴</span><span>You dug up ' + arg.fossils + ' fossils!' + (nx ? ' ' + (nx.fossils - S.fossils) + ' more for the ' + nx.name + '.' : ' You have every hat!') + '</span>';
+      later(function(){ speech.say('You calmed the volcano and dug up ' + arg.fossils + ' fossils! Go to Dress Up to try on hats!', { rate: 0.95 }); }, 3200);
     }
-    $('#doneLine').textContent = 'You spelled all ' + S.words.length + ' word' + (S.words.length === 1 ? '' : 's') + ' and hatched ' + S.week.done.length + ' baby dino' + (S.week.done.length === 1 ? '' : 's') + '!';
+    $('#doneLine').textContent = 'You spelled all ' + S.words.length + ' word' + (S.words.length === 1 ? '' : 's') + ' and hatched ' + (S.week.done.length + (S.week.goldHatched ? 1 : 0)) + ' baby dino' + (S.week.done.length + (S.week.goldHatched ? 1 : 0) === 1 ? '' : 's') + '!';
     var box = $('#doneWords'); box.innerHTML = '';
     S.words.forEach(function(w){ box.appendChild(el('span', null, w.toLowerCase())); });
-    applyPlanet(planetOf(0));
+    applyLand(landOf(0));
     confetti(); sfx.play('fanfare');
     buddies(S.roster.slice(), true, true);
     later(function(){ env.react('cheer'); }, 800);
-    later(function(){ speech.say('Mission complete! Amazing work, Grayson!', { rate: 0.92 }); }, 500);
+    later(function(){ speech.say('Adventure complete! Amazing work, Grayson!', { rate: 0.92 }); }, 500);
     var again = function(){ env.react('cheer'); later(again, 4200); };
     later(again, 4200);
   };
   /* ============================================================
-     HANGAR
+     DRESS UP — hats and gear for any dino, unlocked by fossils
      ============================================================ */
-  ENTER.hangar = function(){
+  var dressWho = null;
+  ENTER.dress = function(){
     noBuddies();
-    var box = $('#skins'); box.innerHTML = '';
-    var have = C.skinsUnlocked(S.parts), nx = C.nextSkin(S.parts);
-    $('#hangarParts').textContent = '🔩 ' + S.parts;
-    $('#hangarNote').textContent = nx ? 'Beat the Meteor King at the end of each week to win rocket parts. ' + (nx.parts - S.parts) + ' more for ' + nx.name + '!' : 'You have every rocket! Amazing!';
-    C.ROCKET_SKINS.forEach(function(k){
-      var open = have.indexOf(k.id) !== -1;
-      var b = el('button', 'skin' + (k.id === S.skin ? ' on' : '') + (open ? '' : ' locked')); b.type = 'button';
-      b.innerHTML = rocketSvg(k.id) + '<span class="sn">' + k.name + '</span><span class="need">' + (open ? (k.id === S.skin ? 'Flying this one' : 'Tap to fly') : '🔩 ' + k.parts + ' parts') + '</span>';
-      b.setAttribute('aria-label', k.name + (open ? '' : ', locked'));
+    applyLand(C.LANDS[2]);
+    var everyone = C.allMembers(S);
+    if (!dressWho || !everyone.some(function(m){ return m.id === dressWho; })) dressWho = S.roster[0];
+    var have = C.gearUnlocked(S.fossils), nx = C.nextGear(S.fossils);
+    $('#dressFossils').textContent = '🦴 ' + S.fossils;
+    $('#dressNote').textContent = nx ? 'Dig up fossils on the island to unlock more! ' + (nx.fossils - S.fossils) + ' more for the ' + nx.name + '.' : 'You have every hat! Amazing!';
+    /* who is getting dressed: the crew first, then everyone else */
+    var whoBox = $('#dressWho'); whoBox.innerHTML = '';
+    var order = S.roster.slice().concat(everyone.map(function(m){ return m.id; }).filter(function(id){ return S.roster.indexOf(id) === -1; }));
+    order.forEach(function(id){
+      var m = C.memberInfo(S, id);
+      var b = el('button', 'who' + (id === dressWho ? ' on' : '')); b.type = 'button'; b.setAttribute('data-id', id);
+      b.innerHTML = memberArt(m) + '<span>' + m.name + '</span>';
+      b.setAttribute('aria-label', m.name);
+      b.addEventListener('click', function(){ sfx.play('tap'); dressWho = id; speech.say(m.name + '!', { rate: 1 }); ENTER.dress(); });
+      whoBox.appendChild(b);
+    });
+    var me = C.memberInfo(S, dressWho);
+    $('#dressModel').innerHTML = memberArt(me);
+    var hats = $('#hats'); hats.innerHTML = '';
+    [{ id: null, name: 'No hat', fossils: 0 }].concat(C.GEAR).forEach(function(g){
+      var open = g.id == null || have.indexOf(g.id) !== -1;
+      var on = (me.hat || null) === g.id;
+      var b = el('button', 'hat-btn' + (on ? ' on' : '') + (open ? '' : ' locked') + (g.id ? '' : ' none')); b.type = 'button';
+      b.setAttribute('data-hat', g.id || 'none');
+      var look = {}; Object.keys(me).forEach(function(k){ look[k] = me[k]; }); look.hat = g.id;
+      b.innerHTML = memberArt(look) + '<span class="hn">' + g.name + '</span>' + (open ? '' : '<span class="need">🦴 ' + g.fossils + '</span>');
+      b.setAttribute('aria-label', g.name + (open ? '' : ', locked'));
       b.addEventListener('click', function(){
-        if (!open){ sfx.play('wrong'); speech.say('You need ' + k.parts + ' rocket parts for ' + k.name + '.', { rate: 0.95 }); return; }
-        S.skin = k.id; save(); sfx.play('powerup');
-        speech.say(k.name + ' rocket, ready for launch!', { rate: 0.95 });
-        ENTER.hangar();
+        if (!open){ sfx.play('wrong'); speech.say('You need ' + g.fossils + ' fossils for the ' + g.name + '.', { rate: 0.95 }); return; }
+        if (g.id) S.gear[dressWho] = g.id; else delete S.gear[dressWho];
+        save(); syncCast(); sfx.play('powerup');
+        speech.say(g.id ? me.name + ' has a ' + g.name + '!' : me.name + ' took off the hat.', { rate: 0.95 });
+        ENTER.dress();
+        var dm = $('#dressModel'); dm.classList.remove('pop'); void dm.offsetWidth; dm.classList.add('pop');
       });
-      box.appendChild(b);
+      hats.appendChild(b);
     });
   };
 
@@ -757,10 +863,9 @@
     for (var k = 1; k <= C.MAX_LEVEL; k++) h += '<span' + (k <= level ? '' : ' class="off"') + '>★</span>';
     return h;
   }
-  function speciesName(kind){ return { rex: 'T. rex', trike: 'triceratops', dash: 'raptor', swoop: 'pterosaur' }[kind]; }
   function showInfo(m){
     var box = $('#crewInfo');
-    if (!m){ box.innerHTML = '<span>Every planet makes your crew stronger!</span>'; return; }
+    if (!m){ box.innerHTML = '<span>Every stop on the island makes your crew stronger!</span>'; return; }
     var pw = m.power ? C.POWERS[m.power] : null;
     var toNext = C.xpToNext(m.xp), span = m.level >= C.MAX_LEVEL ? 1 : (C.LEVEL_XP[m.level] - C.LEVEL_XP[m.level - 1]);
     var pct = m.level >= C.MAX_LEVEL ? 100 : Math.round((1 - toNext / span) * 100);
@@ -803,7 +908,9 @@
   }
   ENTER.base = function(arg){
     noBuddies();
-    applyPlanet(C.PLANETS[4]);
+    applyLand(C.LANDS[0]);
+    var meeting = !S.metNew;
+    if (meeting){ S.metNew = true; save(); }
     if (arg && arg.pick) picked = arg.pick;
     if (picked && S.roster.indexOf(picked) !== -1) picked = null;
     var box = $('#babies'); box.innerHTML = '';
@@ -823,7 +930,7 @@
     var babies = list.map(function(m, i){
       var row = rows - 1 - (i % rows);
       var k = (1 - row * 0.14) * (0.8 + 0.2 * m.scale), s2 = size * k;
-      var node = el('button', 'baby' + (m.id === picked ? ' picked' : '')); node.type = 'button';
+      var node = el('button', 'baby' + (m.id === picked ? ' picked' : '') + (meeting && (m.id === 'brachio' || m.id === 'stego') ? ' new-one' : '')); node.type = 'button';
       node.setAttribute('data-id', m.id);
       node.style.width = node.style.height = s2 + 'px';
       node.style.zIndex = String(10 - row);
@@ -862,6 +969,8 @@
         var jump = o.hop ? Math.sin(hp * Math.PI) * o.s * 0.5 : 0;
         var walk = o.tx != null ? Math.abs(Math.sin(now / 110)) * 5 : 0;
         o.node.style.transform = 'translate(' + o.x.toFixed(1) + 'px,' + (o.baseY - jump - walk).toFixed(1) + 'px) scaleX(' + o.face + ')';
+        /* the name tag must not read backwards when he faces left */
+        o.node.style.setProperty('--face', o.face);
       });
       baseLoop = requestAnimationFrame(frame);
     }
@@ -869,7 +978,8 @@
     if (!arg || !arg.quiet){
       later(function(){
         if (picked){ var pm = C.memberInfo(S, picked); speech.say('Tap a crew spot to put ' + pm.name + ' in your crew!', { rate: 0.95 }); return; }
-        speech.say(list.length ? 'Welcome to Dino Base! Pick your crew of four.' : 'Finish a planet to hatch your first baby dino!', { rate: 0.95 });
+        if (meeting){ speech.say('Meet Stretch the brachiosaurus and Spike the stegosaurus! Tap one, then a crew spot, to put them in your crew.', { rate: 0.95 }); return; }
+        speech.say(list.length ? 'Welcome to Dino Base! Pick your crew of four.' : 'Finish a stop on the island to hatch your first baby dino!', { rate: 0.95 });
       }, 400);
     }
   };
@@ -996,7 +1106,7 @@
     setWords([]);
   });
   $('#btnSample').addEventListener('click', function(){ setWords(C.DEFAULT_WORDS.slice()); });
-  $('#btnSavePlay').addEventListener('click', function(){ if (!S.words.length) return; save(); startPlanet(C.nextPlanet(S.week, S.words.length) === -1 ? 0 : C.nextPlanet(S.week, S.words.length)); });
+  $('#btnSavePlay').addEventListener('click', function(){ if (!S.words.length) return; save(); startLand(C.nextLand(S.week, S.words.length) === -1 ? 0 : C.nextLand(S.week, S.words.length)); });
   var crewArmed = false;
   $('#btnResetCrew').addEventListener('click', function(){
     if (!crewArmed){ crewArmed = true; $('#btnResetCrew').textContent = 'Tap again: all back to level 1'; setTimeout(function(){ crewArmed = false; $('#btnResetCrew').textContent = 'Crew back to level 1'; }, 4000); return; }
@@ -1004,7 +1114,7 @@
     $('#btnResetCrew').textContent = 'Crew back to level 1';
     toast('Every dino is back to level 1.');
   });
-  $('#btnResetWeek').addEventListener('click', function(){ S.week.done = []; S.week.eggs = {}; S.week.finale = false; save(); toast('Mission restarted — the planets are waiting!'); });
+  $('#btnResetWeek').addEventListener('click', function(){ S.week.done = []; S.week.eggs = {}; S.week.finale = false; S.week.goldSeed = null; S.week.goldHatched = false; save(); toast('Adventure restarted — the island is waiting!'); });
   $('#optSfx').addEventListener('change', function(e){ S.sfx = e.target.checked; sfx.setMuted(!S.sfx); save(); if (S.sfx) sfx.play('correct'); });
   $('#optMusic').addEventListener('change', function(e){ S.music = e.target.checked; save(); if (S.music) sfx.startMusic(); else sfx.stopMusic(); });
   $('#optA').addEventListener('change', function(e){ S.aSound = e.target.value; save(); });
@@ -1029,9 +1139,9 @@
   /* test hooks (read-only use) */
   window.__game = {
     core: C, stage: stage, speech: speech, sfx: sfx, settings: function(){ return S; },
-    state: function(){ return { screen: screen, planet: P && P.i, word: P && (P.review ? P.list[P.step] : P.word), step: P && P.step, acts: P && (P.review ? P.list.map(function(){ return 'blast'; }) : P.acts), review: P && P.review }; },
-    go: go, startPlanet: startPlanet,
-    /* jump the current planet to step k, optionally swapping in another activity */
+    state: function(){ return { screen: screen, land: P && P.i, word: P && (P.review ? P.list[P.step] : P.word), step: P && P.step, acts: P && (P.review ? P.list.map(function(){ return 'blast'; }) : P.acts), review: P && P.review, baby: P && P.baby ? P.baby.id : null }; },
+    go: go, startLand: startLand,
+    /* jump the current stop to step k, optionally swapping in another activity */
     jump: function(k, act){ if (!P || screen !== 'play') return; if (act && !P.review) P.acts[k] = act; P.step = k; runStep(); }
   };
 

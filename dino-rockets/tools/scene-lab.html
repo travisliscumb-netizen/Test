@@ -8,8 +8,8 @@
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;font-family:ui-rounded,system-ui,sans-serif}
-body{background:linear-gradient(#0B1640,#1F4E8C)}
-#ground{position:fixed;left:0;right:0;bottom:0;height:110px;background:#E0592A;border-top:6px solid #FFB067}
+body{background:linear-gradient(#8FD6FF,#D8F3FF)}
+#ground{position:fixed;left:0;right:0;bottom:0;height:110px;background:#3FAE55;border-top:6px solid #8EE06A}
 .card{position:fixed;left:14px;right:14px;top:70px;bottom:250px;background:rgba(255,255,255,.96);border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 h2{margin:0 0 16px;color:#1E6FE8}
 .slots{display:flex;gap:10px;flex-wrap:nowrap}
@@ -31,22 +31,32 @@ h2{margin:0 0 16px;color:#1E6FE8}
 <script>
 var CORE = __CORE;
 var silent = { play: function(){} };
-var stage = createStage({ core: CORE, sfx: silent, art: DINO_ART, memberArt: memberArt });
+var stage = createStage({ core: CORE, sfx: silent, art: DINO_ART, memberArt: memberArt, neckPath: brachioNeckPath });
 stage.init(document.getElementById('fxLayer'));
 /* the lab's crew: the originals fully levelled, and one baby for each power */
 var POOL = CORE.CHAR_ORDER.map(function(k){ return { id: k, kind: k, level: 5, grow: 'grown', scale: 1, name: CORE.CHARS[k].name }; })
   .concat(CORE.POWER_ORDER.map(function(p, i){
-    var b = CORE.makeBaby(4000 + i * 977);
-    var grow = ['baby', 'kid', 'grown', 'kid', 'baby'][i];
-    return { id: 'p' + i, kind: CORE.CHAR_ORDER[(i + 1) % 4], power: p, level: grow === 'baby' ? 1 : (grow === 'kid' ? 3 : 5), grow: grow,
+    var b = CORE.makeBaby(4000 + i * 977, 2);
+    var grow = ['baby', 'kid', 'grown', 'kid', 'baby', 'kid'][i];
+    return { id: 'p' + i, kind: CORE.CHAR_ORDER[(i + 1) % CORE.CHAR_ORDER.length], power: p, level: grow === 'baby' ? 1 : (grow === 'kid' ? 3 : 5), grow: grow,
              scale: CORE.GROW_SCALE[grow], body: b.body, spots: b.spots, pattern: b.pattern, name: b.name };
   }));
+/* a rescue to film: who does it and how (null = whoever the plan picks) */
+var RESCUERS = { lasso: 'dash', magnet: 'p2', bubble: 'p1', hook: 'swoop', crane: 'brachio', tailflip: 'stego', tunnel: 'p3', frost: 'p4', jet: 'rex', fetch: 'dash' };
 function castFor(sceneId, lead){
   var s = CORE.SCENE_BY_ID[sceneId], need = (s && s.lead) || {}, L = null;
   POOL.forEach(function(m){ if (m.id === lead) L = m; });
   if (!L && need.power) POOL.forEach(function(m){ if (!L && m.power === need.power) L = m; });
   if (!L) L = POOL.filter(function(m){ return m.id === (need.kind || 'dash'); })[0];
-  return [L].concat(POOL.filter(function(m){ return m !== L && !m.power; }).slice(0, 3));
+  var rest = POOL.filter(function(m){ return m !== L && !m.power; });
+  /* the team-ups need a jumper along */
+  rest.sort(function(a, b){ return (b.kind === 'dash' || b.kind === 'rex') - (a.kind === 'dash' || a.kind === 'rex'); });
+  var cast = [L].concat(rest.slice(0, 3));
+  var R = window.__labRescue;
+  if (R && RESCUERS[R] && RESCUERS[R] !== L.id && !cast.some(function(m){ return m.id === RESCUERS[R]; })){
+    cast[cast.length - 1] = POOL.filter(function(m){ return m.id === RESCUERS[R]; })[0];
+  }
+  return cast;
 }
 function groundY(){ return document.getElementById('ground').getBoundingClientRect().top + 8; }
 function renderWord(word){
@@ -62,8 +72,10 @@ var lastPlan = null;
 window.__lab = {
   scenes: CORE.SCENES.map(function(s){ return { id: s.id, name: s.name, lead: s.lead, min: s.min }; }),
   pool: POOL,
-  FUMBLES: ['sky-hook', 'rocket-jump', 'tow-truck', 'joy-ride'],
+  FUMBLES: ['sky-hook', 'jet-jump', 'tow-truck', 'joy-ride', 'stomp-stack', 'crane-lift', 'tail-flip'],
+  RESCUES: Object.keys(RESCUERS),
   setFumble: function(on){ window.__labFumble = !!on; },
+  setRescue: function(m){ window.__labRescue = m || null; },
   /* everyone who may lead a scene: every kind for an open scene, plus the power baby */
   leadsFor: function(id){
     var s = CORE.SCENE_BY_ID[id];
@@ -75,7 +87,8 @@ window.__lab = {
   plan: function(id, word, lead, mirror, watcher){
     var cast = castFor(id, lead);
     return CORE.planScene({ letters: word.length, lead: cast[0].id, cast: cast, forceId: id, mirror: !!mirror, tempo: 1, rnd: CORE.rng(word.length * 13),
-      watcher: watcher == null ? true : watcher, fumble: !!window.__labFumble, showoff: true, victory: true });
+      watcher: watcher == null ? true : watcher, fumble: !!window.__labFumble, showoff: true, victory: true,
+      rescue: window.__labRescue || null, fumbler: window.__labRescue ? RESCUERS[window.__labRescue] : null });
   },
   run: function(id, word, lead, mirror, watcher){
     document.getElementById('title').textContent = id + ' · ' + lead;
@@ -111,7 +124,7 @@ window.__lab = {
   residue: function(){
     return {
       props: document.querySelectorAll('.letterprop').length,
-      fx: document.querySelectorAll('.fx').length + document.querySelectorAll('.ship,.beam').length,
+      fx: document.querySelectorAll('.fx').length,
       visibleActors: Array.prototype.filter.call(document.querySelectorAll('.actor'), function(a){ return Number(a.style.opacity || 0) > 0.02; }).length,
       layerTransform: document.getElementById('fxLayer').style.transform || ''
     };

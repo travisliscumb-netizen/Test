@@ -8,8 +8,9 @@
    Covers: the grown-up sets the week (passcode, paste a list, duplicates,
    too-short words), persistence across a reload, a whole mission through
    every activity (meet, zap, build by tap and by drag, missing, blast from
-   memory) with wrong answers, the countdown and launch, egg hatching, the
-   star map, the meteor-shower finale, Dino Base, mastery going up and down,
+   memory) with wrong answers, the countdown and ROAR, egg hatching, the
+   island map, the volcano finale and the golden egg, Dino Base, Dress Up,
+   Stretch and Spike joining, mastery going up and down,
    Back pressed mid-scene, stalls getting a nudge, and every screen at three
    device sizes with layout rules checked. */
 import { createRequire } from 'node:module';
@@ -106,7 +107,7 @@ async function layoutOk(page, label) {
     const over = [];
     for (const e of document.querySelectorAll('.screen.on *')) {
       const q = e.getBoundingClientRect();
-      if (!q.width || e.closest('.zap-field') || e.closest('.map') || e.closest('.babies')) continue;
+      if (!q.width || e.closest('.zap-field') || e.closest('.map') || e.closest('.babies') || e.closest('.dress-who')) continue;
       if (q.right > vw + 1 || q.left < -1) over.push((e.className && e.className.baseVal == null ? e.className : e.tagName) + '');
     }
     const card = document.querySelector('.screen.on .card');
@@ -136,20 +137,20 @@ async function doZap(page, word, opt) {
   for (let round = 1; round <= 2; round++) {
     await page.waitForFunction(r => {
       const l = document.querySelector('.zap-round');
-      return l && l.textContent === `Round ${r} of 2` && document.querySelectorAll('.meteor:not(.hit)').length >= 2;
+      return l && l.textContent === `Round ${r} of 2` && document.querySelectorAll('.leaf:not(.hit)').length >= 2;
     }, round, { timeout: 10000 });
-    const opts = await page.$$eval('.meteor', ms => ms.map(m => m.textContent));
-    check(`${opt.label} zap round ${round}: ${round + 2} meteors, one right`,
+    const opts = await page.$$eval('.leaf', ms => ms.map(m => m.textContent));
+    check(`${opt.label} zap round ${round}: ${round + 2} leaves, one right`,
       opts.length === round + 2 && opts.filter(o => o === word.toLowerCase()).length === 1, opts.join(','));
     if (opt.shots && round === 2) { await page.waitForTimeout(400); await shot(page, `${opt.shots}-zap`); await layoutOk(page, `${opt.shots} zap`); }
     if (opt.wrong && round === 1) {
       const wrong = opts.find(o => o !== word.toLowerCase());
-      await page.click(`.meteor:text-is("${wrong}")`, { force: true });
+      await page.click(`.leaf:text-is("${wrong}")`, { force: true });
       await page.waitForTimeout(150);
-      check(`${opt.label} zap: a wrong meteor is not accepted`,
-        await page.$eval(`.meteor:text-is("${wrong}")`, m => m.classList.contains('wrong') && !m.classList.contains('hit')));
+      check(`${opt.label} zap: a wrong leaf is not accepted`,
+        await page.$eval(`.leaf:text-is("${wrong}")`, m => m.classList.contains('wrong') && !m.classList.contains('hit')));
     }
-    await page.click(`.meteor:text-is("${word.toLowerCase()}")`, { force: true });
+    await page.click(`.leaf:text-is("${word.toLowerCase()}")`, { force: true });
   }
 }
 async function dragTo(page, from, to) {
@@ -180,7 +181,7 @@ async function doBuild(page, word, opt) {
   }
   if (opt.drag) check(`${opt.label} build: the dragged crystal landed`, true);
   await page.waitForTimeout(500);
-  check(`${opt.label} build: every letter fuelled the rocket`, await page.$$eval('.fuel-pipe .cell.full', c => c.length) === word.length);
+  check(`${opt.label} build: every letter warmed the egg`, await page.$$eval('.warm-line .cell.full', c => c.length) === word.length);
 }
 async function doMissing(page, word, opt) {
   if (opt.shots) { await shot(page, `${opt.shots}-missing`); await layoutOk(page, `${opt.shots} missing`); }
@@ -215,7 +216,7 @@ async function doBlast(page, word, opt) {
     await page.waitForFunction(n => document.querySelectorAll('.activity .slot.filled').length === n, i + 1, { timeout: 5000 });
   }
   await page.waitForTimeout(450);
-  check(`${opt.label} blast: the rocket is fuelled up and ready`, await page.$eval('.fuel-dock', d => d.classList.contains('ready')));
+  check(`${opt.label} blast: the egg is warmed up and ready`, await page.$eval('.egg-dock', d => d.classList.contains('ready')));
 }
 async function doRace(page, word, opt) {
   await page.waitForSelector('.race-field .race-tile', { timeout: 10000 });
@@ -246,7 +247,7 @@ async function doRace(page, word, opt) {
     await page.click(`.race-field .race-tile[data-letter="${word[i]}"]:not(.used):not(.flying)`, { force: true });
     await page.waitForFunction(n => document.querySelectorAll('.activity .slot.filled').length === n, i + 1, { timeout: 5000 });
   }
-  check(`${opt.label} race: finishing fast beats the comet`, await page.$eval('.race-track', t => t.classList.contains('won')));
+  check(`${opt.label} race: finishing fast wins the race`, await page.$eval('.race-track', t => t.classList.contains('won')));
 }
 async function doCheck(page, word, opt) {
   await page.waitForSelector('.opt-card', { timeout: 10000 });
@@ -273,8 +274,8 @@ async function doRhyme(page, word, opt) {
 }
 const DO = { meet: doMeet, zap: doZap, build: doBuild, missing: doMissing, blast: doBlast, race: doRace, check: doCheck, rhyme: doRhyme };
 
-/* Play one planet from the play screen to the egg. Returns the scenes seen. */
-async function playPlanet(page, label, opt = {}) {
+/* Play one stop from the play screen to the egg. Returns the scenes seen. */
+async function playLand(page, label, opt = {}) {
   await waitScreen(page, 'play');
   const st = await state(page);
   const word = st.word, acts = st.acts, scenes = [];
@@ -300,11 +301,13 @@ async function hatch(page, label, opt = {}) {
   await waitScreen(page, 'hatch');
   if (opt.shots) { await shot(page, `${opt.shots}-egg`); await layoutOk(page, `${opt.shots} egg`); }
   const before = await page.evaluate(() => __game.settings().babies.length);
+  const warmed = await page.evaluate(() => __game.state().baby);
   for (let t = 0; t < 3; t++) { await page.click('#egg'); await page.waitForTimeout(90); }
   await page.waitForSelector('#btnHatchNext:not([hidden])', { timeout: 5000 });
   const name = (await page.textContent('#babyName')).trim();
   check(`${label}: the egg hatches a named baby`, /^Meet \w+!/.test(name), name);
   check(`${label}: the baby joins the base`, await page.evaluate(() => __game.settings().babies.length) === before + 1);
+  if (!opt.gold) check(`${label}: the egg that hatches is the one he warmed`, await page.evaluate(id => __game.core.allMembers(__game.settings()).some(m => m.id === id), warmed), warmed);
   if (opt.shots) { await page.waitForTimeout(700); await shot(page, `${opt.shots}-hatched`); await layoutOk(page, `${opt.shots} hatched`); }
 }
 
@@ -314,9 +317,9 @@ async function cleanStage(page, label) {
   const r = await page.evaluate(() => ({
     props: document.querySelectorAll('#fxLayer .letterprop, #fxLayer .payload').length,
     fx: document.querySelectorAll('#fxLayer .fx').length,
-    rockets: document.querySelectorAll('.launch-rocket').length
+    rings: document.querySelectorAll('.roar-ring,.gold-pop').length
   }));
-  check(`${label}: the scene cleaned up after itself`, r.props === 0 && r.rockets === 0, JSON.stringify(r));
+  check(`${label}: the scene cleaned up after itself`, r.props === 0 && r.rings === 0, JSON.stringify(r));
 }
 
 /* ================================================================
@@ -327,9 +330,10 @@ async function cleanStage(page, label) {
   await page.waitForTimeout(1800);
   await shot(page, 'phone-home');
   await layoutOk(page, 'home');
-  check('home: sample words on first run', await page.textContent('#missionCount') === '0 of 5 planets');
+  check('home: sample words on first run', await page.textContent('#missionCount') === '0 of 5 stops');
   check('home: self-check is green', !(await page.$eval('#selfCheck', b => b.classList.contains('bad'))), await page.textContent('#selfCheck'));
   check('home: all four crew are out', await page.evaluate(() => Object.values(__game.stage.actors()).filter(a => a.op > 0.5).length) === 4);
+  check('home: Stretch and Spike are announced', !(await page.$eval('#newFriends', b => b.hidden)));
 
   /* the crew wander and show off, but never leave the screen */
   {
@@ -371,24 +375,24 @@ async function cleanStage(page, label) {
   await page.reload();
   await page.waitForFunction(() => window.__game && __game.state().screen === 'home');
   check('the list survives closing the app', (await page.evaluate(() => __game.settings().words.join(','))) === 'FROG,JUMP,SAID,WENT');
-  check('home shows a 4-planet mission', await page.textContent('#missionCount') === '0 of 4 planets');
-  check('4 planets on the track', (await page.$$('#missionTrack i')).length === 4);
+  check('home shows a 4-stop adventure', await page.textContent('#missionCount') === '0 of 4 stops');
+  check('4 stops on the track', (await page.$$('#missionTrack i')).length === 4);
 
   await page.click('#btnPlay');
   await waitScreen(page, 'play');
   const allScenes = [];
   const played = [];
   for (let i = 0; i < 4; i++) {
-    const label = `planet ${i + 1}`;
+    const label = `stop ${i + 1}`;
     const opt = { drag: i === 0, wrong: i === 1, peek: i === 2, shots: i === 0 ? 'phone' : null };
-    const r = await playPlanet(page, label, opt);
+    const r = await playLand(page, label, opt);
     played.push(r);
     check(`${label}: a new word starts from the beginning (meet, zap, build, blast)`, r.acts.join(',') === 'meet,zap,build,blast', r.acts.join(','));
     allScenes.push(...r.scenes);
     await hatch(page, label, { shots: i === 0 ? 'phone' : null });
     await cleanStage(page, label);
     if (i === 0) {
-      /* a look at the map between planets, then carry on from it */
+      /* a look at the map between stops, then carry on from it */
       await page.click('#btnHatchNext');
       await waitScreen(page, 'play');
       await page.click('#btnPlayBack');
@@ -396,33 +400,34 @@ async function cleanStage(page, label) {
       await page.waitForTimeout(500);
       await shot(page, 'phone-map');
       await layoutOk(page, 'map');
-      check('map: the first planet shows its baby', (await page.$$('.map-node.done .done-badge')).length === 1);
-      check('map: the rocket waits at planet 2', await page.$eval('.map-node.next .map-word', e => e.textContent) === 'jump');
+      check('map: the first stop shows its baby', (await page.$$('.map-node.done .done-badge')).length === 1);
+      check('map: the crew leader waits at stop 2', await page.$eval('.map-node.next .map-word', e => e.textContent) === 'jump' && (await page.$$('.map-node.next .map-here')).length === 1);
       check('map: the finale is locked', (await page.$$('.map-finale.locked')).length === 1);
-      await page.click('.map-finale .planet-btn', { force: true });
+      await page.click('.map-finale .spot-btn', { force: true });
       await page.waitForTimeout(200);
-      check('map: a locked finale says why', /every planet/.test(await page.textContent('#toast')));
-      await page.click('.map-node.next .planet-btn', { force: true });
+      check('map: a locked finale says why', /every stop/.test(await page.textContent('#toast')));
+      await page.click('.map-node.next .spot-btn', { force: true });
     } else if (i < 3) await page.click('#btnHatchNext');
   }
-  check('4 planets played in order', played.map(p => p.word).join(',') === 'FROG,JUMP,SAID,WENT', played.map(p => p.word).join(','));
-  check('the hatch button now offers the boss battle', /Boss battle/.test(await page.textContent('#btnHatchNext')));
+  check('4 stops played in order', played.map(p => p.word).join(',') === 'FROG,JUMP,SAID,WENT', played.map(p => p.word).join(','));
+  check('the hatch button now offers the volcano', /Volcano/.test(await page.textContent('#btnHatchNext')));
+  check('every stop dug up a fossil', await page.evaluate(() => __game.settings().fossils) === 4);
   check('a hatched baby shows its super power', /Super power/.test(await page.textContent('#babyPower')));
   check('everyone started at level 1', true);
   const xp = await page.evaluate(() => __game.settings().crew);
-  check('the crew earned experience on every planet', Object.keys(xp).length >= 4 && Object.values(xp).every(v => v > 0), JSON.stringify(xp));
+  check('the crew earned experience at every stop', Object.keys(xp).length >= 4 && Object.values(xp).every(v => v > 0), JSON.stringify(xp));
   check('somebody levelled up, and it was celebrated', await page.evaluate(() => (window.__levelUps || 0) > 0));
 
   const st1 = await page.evaluate(() => __game.settings().stats);
   check('mastery: clean spells level a word up', st1.FROG.level === 1 && st1.JUMP.level === 1, JSON.stringify(st1.FROG));
   check('mastery: a peeked word stays at level 0', st1.SAID.level === 0, JSON.stringify(st1.SAID));
 
-  /* the meteor shower: the shakiest words, blast only */
+  /* the Grumpy Volcano: the shakiest words, blast only */
   await page.click('#btnHatchNext');
   await waitScreen(page, 'play');
   const fin = await state(page);
   check('finale: it is a review', fin.review === true);
-  check('finale: the Meteor King is there with full health', await page.$eval('#bossBar .boss-hp i', i => i.style.width === '100%'));
+  check('finale: the Grumpy Volcano is there, fully grumpy', await page.$eval('#bossBar .boss-hp i', i => i.style.width === '100%'));
   check('finale: the peeked word comes first', fin.word === 'SAID', fin.word);
   check('finale: blast only, all four words', fin.acts.length === 4 && fin.acts.every(a => a === 'blast'), fin.acts.join(','));
   await shot(page, 'phone-finale');
@@ -438,12 +443,20 @@ async function cleanStage(page, label) {
   await page.waitForTimeout(6000);
   await shot(page, 'phone-show');
   await layoutOk(page, 'victory show');
-  await waitScreen(page, 'done', 120000);
+  /* after the show, the golden egg */
+  await waitScreen(page, 'hatch', 120000);
+  check('the golden egg comes after the show', await page.$eval('#egg', e => e.classList.contains('gold')));
+  await hatch(page, 'golden egg', { shots: 'phone-gold', gold: true });
+  const goldBaby = await page.evaluate(() => __game.settings().babies.slice(-1)[0]);
+  check('the golden baby is gold, and kept', goldBaby.gold === true && await page.evaluate(() => __game.settings().week.goldHatched) === true, JSON.stringify(goldBaby));
+  check('the golden baby is a golden baby', /golden baby/.test(await page.textContent('#babyName')));
+  await page.click('#btnHatchNext');
+  await waitScreen(page, 'done', 20000);
   check('the victory show: every crew member performed a scene of his own', await page.evaluate(() => (window.__showScenes || []).length === 4 &&
     window.__showScenes.every((id, i) => !!id)), await page.evaluate(() => JSON.stringify(window.__showScenes)));
   await cleanStage(page, 'finale');
-  check('beating the boss wins a rocket part', await page.evaluate(() => __game.settings().parts) === 1);
-  check('the rocket part is shown', !(await page.$eval('#donePart', d => d.hidden)));
+  check('calming the volcano digs up three more fossils', await page.evaluate(() => __game.settings().fossils) === 7);
+  check('the fossils are shown', !(await page.$eval('#doneFossil', d => d.hidden)));
   await page.waitForTimeout(1200);
   await shot(page, 'phone-done');
   await layoutOk(page, 'done');
@@ -454,34 +467,39 @@ async function cleanStage(page, label) {
 
   const ids = allScenes.map(s => s && s.id);
   console.log('  scenes played: ' + allScenes.map(s => `${s.id}(${s.lead}${s.mirror ? ',m' : ''})`).join('  '));
-  check('12 scenes played (2 per planet + 4 in the finale)', ids.filter(Boolean).length === 12, ids.join(','));
+  check('12 scenes played (2 per stop + 4 in the finale)', ids.filter(Boolean).length === 12, ids.join(','));
   for (let i = 1; i < ids.length; i++) check(`scene ${i} differs from the one before`, ids[i] !== ids[i - 1], ids.join(','));
   /* the planner's guarantee: a scene never comes back within 3 of itself
      (each lead has 6 scenes, so the 3-deep window can always be honoured) */
   for (let i = 3; i < ids.length; i++) check(`scenes ${i - 3}-${i} are all different`, new Set(ids.slice(i - 3, i + 1)).size === 4, ids.join(','));
   console.log(`  ${new Set(ids).size} different scenes in ${ids.length}`);
   check('all four crew led a scene', new Set(allScenes.map(s => s.lead)).size === 4, allScenes.map(s => s.lead).join(','));
-  check('the rocket launched from every planet (4 countdowns)', (await page.evaluate(() => window.__spoken.filter(s => s.text === '3').length)) === 4);
+  check('3, 2, 1, ROAR! at every stop', (await page.evaluate(() => window.__spoken.filter(s => s.text === 'Roar!').length)) === 4);
 
-  /* the hangar: the part buys a new paint job */
-  await page.evaluate(() => __game.go('hangar'));
-  await waitScreen(page, 'hangar');
-  await shot(page, 'phone-hangar'); await layoutOk(page, 'hangar');
-  check('hangar: one part unlocks a second rocket', (await page.$$('.skin:not(.locked)')).length === 2);
-  await page.click('.skin:not(.locked):not(.on)');
-  check('hangar: the new rocket is chosen and kept', await page.evaluate(() => __game.settings().skin) === 'blaze');
-  await page.click('.skin.locked >> nth=0');
-  check('hangar: a locked rocket cannot be chosen', await page.evaluate(() => __game.settings().skin) === 'blaze');
+  /* dress up: seven fossils unlock three hats */
+  await page.evaluate(() => __game.go('dress'));
+  await waitScreen(page, 'dress');
+  await shot(page, 'phone-dress'); await layoutOk(page, 'dress up');
+  check('dress up: seven fossils open three hats (and no hat)', (await page.$$('.hat-btn:not(.locked)')).length === 4);
+  await page.click('.hat-btn[data-hat="cowboy"]');
+  check('dress up: Rex wears the cowboy hat, and keeps it', await page.evaluate(() => __game.settings().gear.rex) === 'cowboy');
+  check('dress up: the crew on stage is redrawn in it', await page.evaluate(() => !!document.querySelector('#fxLayer .actor[data-key="rex"] .hat-cowboy')));
+  await page.click('.hat-btn.locked >> nth=0');
+  check('dress up: a locked hat cannot be worn', await page.evaluate(() => __game.settings().gear.rex) === 'cowboy');
+  await page.click('.who[data-id="brachio"]');
+  await page.click('.hat-btn[data-hat="party"]');
+  check('dress up: anyone can be dressed, Stretch too', await page.evaluate(() => __game.settings().gear.brachio) === 'party');
   await page.evaluate(() => __game.go('done'));
   await waitScreen(page, 'done');
 
-  /* Dino Base: four babies wander and answer to their names */
+  /* Dino Base: five babies (one golden), Stretch and Spike wander and answer to their names */
   await page.click('#btnDoneBase');
   await waitScreen(page, 'base');
   await page.waitForTimeout(1200);
   await shot(page, 'phone-base');
   await layoutOk(page, 'base');
-  check('base: four babies live here', (await page.$$('#babies .baby')).length === 4);
+  check('base: five babies and Stretch and Spike live here', (await page.$$('#babies .baby')).length === 7);
+  check('base: meeting Stretch and Spike is remembered', await page.evaluate(() => __game.settings().metNew) === true);
   check('base: the crew has four spots', (await page.$$('#crewSlots .crew-slot')).length === 4);
   const x0 = await page.$$eval('#babies .baby', bs => bs.map(b => b.style.transform));
   await page.waitForTimeout(3500);
@@ -506,9 +524,11 @@ async function cleanStage(page, label) {
   await page.reload();
   await page.waitForFunction(() => window.__game && __game.state().screen === 'home');
   check('babies are kept for good', await page.evaluate(() => __game.settings().babies.length) === keep);
-  check('home: the base button counts them', (await page.textContent('#babyCount')).trim() === '4');
+  check('home: the base button counts them', (await page.textContent('#babyCount')).trim() === '5');
+  check('home: the new friends banner is gone once met', await page.$eval('#newFriends', b => b.hidden));
+  check('home: the fossils are counted', (await page.textContent('#fossilCount')).trim() === '🦴7');
   check('home: the mission reads complete', /PLAY AGAIN/.test(await page.textContent('#playLabel')));
-  check('the new crew member is out on the launch pad', await page.evaluate(id => { const a = __game.stage.actors()[id]; return !!a && a.op > 0.5; }, pickedId));
+  check('the new crew member is out on the island', await page.evaluate(id => { const a = __game.stage.actors()[id]; return !!a && a.op > 0.5; }, pickedId));
   check('the roster survives a reload', await page.evaluate(id => __game.settings().roster.includes(id), pickedId));
 
   const spoken = await page.evaluate(() => window.__spoken.map(s => s.text));
@@ -528,16 +548,16 @@ async function cleanStage(page, label) {
    ================================================================ */
 {
   const { context, page, errors } = await openApp({ width: 390, height: 844 }, { words: ['the', 'come', 'have', 'play', 'look', 'said', 'where'] });
-  check('a 7-word week makes 7 planets', (await page.$$('#missionTrack i')).length === 7);
+  check('a 7-word week makes 7 stops', (await page.$$('#missionTrack i')).length === 7);
   await page.evaluate(() => {
     const S = __game.settings();
     S.stats.LOOK = { level: 1, plays: 1, clean: 1, misses: 0, posMisses: [0, 0, 0, 0], last: 1 };
     S.stats.WHERE = { level: 2, plays: 2, clean: 2, misses: 0, posMisses: [0, 0, 0, 0, 3], last: 1 };
   });
-  await page.evaluate(() => __game.startPlanet(4));
+  await page.evaluate(() => __game.startLand(4));
   await waitScreen(page, 'play');
   check('a level-1 word gets the letter race and missing pieces', (await state(page)).acts.join(',') === 'meet,race,missing,blast', (await state(page)).acts.join(','));
-  await page.evaluate(() => __game.startPlanet(6));
+  await page.evaluate(() => __game.startLand(6));
   await waitScreen(page, 'play');
   check('a level-2 word gets spell check (no rhyme for WHERE)', (await state(page)).acts.join(',') === 'meet,check,missing,blast', (await state(page)).acts.join(','));
   await doMeet(page, 'WHERE', { label: 'where' });
@@ -549,7 +569,7 @@ async function cleanStage(page, label) {
   await layoutOk(page, 'missing');
 
   /* he stalls on zap: the prompt comes again and a buddy waves */
-  await page.evaluate(() => __game.startPlanet(0));
+  await page.evaluate(() => __game.startLand(0));
   await waitScreen(page, 'play');
   await page.click('.activity .btn-launch', { timeout: 20000 }).catch(async () => {
     await page.waitForSelector('.activity .btn-launch:not([hidden])', { timeout: 20000 });
@@ -580,13 +600,13 @@ async function cleanStage(page, label) {
   check('Back mid-scene stops it cleanly', after.idle && after.props === 0, JSON.stringify(after));
   await page.waitForTimeout(2500);
   const late = await page.evaluate(n => window.__spoken.slice(n).map(s => s.screen + ':' + s.text), after.n);
-  check('nothing from the abandoned planet is said afterwards', late.every(s => s.startsWith('map:')), late.join(' | '));
+  check('nothing from the abandoned stop is said afterwards', late.every(s => s.startsWith('map:')), late.join(' | '));
   check('still on the map, not dragged on by the old scene', await screenOf(page) === 'map');
 
   /* a peek (help) during blast knocks a known word back a level */
   await page.evaluate(() => __game.stage.setTimeScale(4));
   const lvl0 = await page.evaluate(() => __game.settings().stats.LOOK.level);
-  await page.evaluate(() => __game.startPlanet(4));
+  await page.evaluate(() => __game.startLand(4));
   await waitScreen(page, 'play');
   for (const a of ['meet', 'race', 'missing']) { await waitStep(page, ['meet', 'race', 'missing'].indexOf(a)); await DO[a](page, 'LOOK', { label: 'look', shots: a === 'race' ? 'phone' : null }); }
   await waitStep(page, 3);
@@ -597,7 +617,7 @@ async function cleanStage(page, label) {
 
   /* a word that rhymes gets Rhyme Time, and a sentence gets used by Spell Check */
   await page.evaluate(() => { const S = __game.settings(); S.stats.PLAY = { level: 2, plays: 2, clean: 2, misses: 0, posMisses: [0, 0, 0, 0], last: 1 }; S.sentences.PLAY = 'We can play in the park.'; });
-  await page.evaluate(() => __game.startPlanet(3));
+  await page.evaluate(() => __game.startLand(3));
   await waitScreen(page, 'play');
   check('a known word that rhymes gets Rhyme Time', (await state(page)).acts.join(',') === 'meet,check,rhyme,blast', (await state(page)).acts.join(','));
   await doMeet(page, 'PLAY', { label: 'play' });
@@ -627,7 +647,7 @@ async function cleanStage(page, label) {
   check('known words keep their stars across weeks', await page.evaluate(() => __game.settings().stats.WHERE.level) === 2);
   await page.click('[data-back="home"] >> visible=true');
   await waitScreen(page, 'home');
-  check('home shows the 8-planet mission', await page.textContent('#missionCount') === '0 of 8 planets');
+  check('home shows the 8-stop adventure', await page.textContent('#missionCount') === '0 of 8 stops');
 
   check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   await context.close();
@@ -642,7 +662,7 @@ for (const [name, vp] of [['small', { width: 375, height: 667 }], ['ipad', { wid
   await page.evaluate(() => __game.go('home'));
   await page.waitForTimeout(1500);
   await shot(page, `${name}-home`); await layoutOk(page, `${name} home`);
-  await page.evaluate(() => __game.startPlanet(0));
+  await page.evaluate(() => __game.startLand(0));
   await waitScreen(page, 'play');
   await shot(page, `${name}-meet`); await layoutOk(page, `${name} meet (9 letters)`);
   for (const [k, act] of [[1, 'zap'], [2, 'build'], [3, 'blast']]) {
@@ -660,8 +680,8 @@ for (const [name, vp] of [['small', { width: 375, height: 667 }], ['ipad', { wid
     await page.waitForTimeout(act === 'race' ? 2600 : 400);
     await shot(page, `${name}-${act}`); await layoutOk(page, `${name} ${act} (9 letters)`);
   }
-  await page.evaluate(() => __game.go('hangar'));
-  await waitScreen(page, 'hangar'); await shot(page, `${name}-hangar`); await layoutOk(page, `${name} hangar`);
+  await page.evaluate(() => __game.go('dress'));
+  await waitScreen(page, 'dress'); await shot(page, `${name}-dress`); await layoutOk(page, `${name} dress up`);
   await page.evaluate(() => __game.go('hatch'));
   await waitScreen(page, 'hatch'); await shot(page, `${name}-egg`); await layoutOk(page, `${name} egg`);
   await page.evaluate(() => __game.go('map'));

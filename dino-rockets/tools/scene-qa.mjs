@@ -17,6 +17,8 @@ const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const VIEWPORT = { width: 390, height: 844 };
 const only = process.argv.slice(2).filter(a => !a.startsWith('-'));
 const MIRRORS = process.argv.includes('--both') ? [false, true] : [false];
+/* --rescues: Stomp & Stack once with every way a buddy can save the dropped letter */
+const RESCUE_RUNS = process.argv.includes('--rescues');
 
 const { server, url } = await serve(ROOT);
 const browser = await chromium.launch({ executablePath: fs.existsSync(CHROME) ? CHROME : undefined });
@@ -33,14 +35,17 @@ let fail = 0;
 function check(scene, name, ok, detail = '') { if (!ok) { fail++; console.log(`  FAIL  ${name}${detail ? ' -- ' + detail : ''}`); } return ok; }
 let passed = 0;
 const FUMBLES = await page.evaluate(() => window.__lab.FUMBLES);
+const RESCUES = await page.evaluate(() => window.__lab.RESCUES);
 const runs = [];
-for (const s0 of scenes) for (const mirror of MIRRORS) { runs.push([s0, mirror, false]); if (FUMBLES.includes(s0.id)) runs.push([s0, mirror, true]); }
-for (const [s0, mirror, fumble] of runs) {
+if (RESCUE_RUNS) { const st = scenes.find(s => s.id === 'stomp-stack'); for (const r of RESCUES) runs.push([st, false, true, r]); }
+else for (const s0 of scenes) for (const mirror of MIRRORS) { runs.push([s0, mirror, false, null]); if (FUMBLES.includes(s0.id)) runs.push([s0, mirror, true, null]); }
+for (const [s0, mirror, fumble, rescue] of runs) {
   if (only.length && !only.includes(s0.id)) continue;
   await page.evaluate(f => window.__lab.setFumble(f), fumble);
+  await page.evaluate(r => window.__lab.setRescue(r), rescue);
   const lead = (await page.evaluate(i => window.__lab.leadsFor(i), s0.id))[0];
   const word = WORDS[Math.max(s0.min || 1, fumble ? 5 : 4)];
-  const id = s0.id + (mirror ? '~m' : '') + (fumble ? '~f' : '');
+  const id = s0.id + (mirror ? '~m' : '') + (fumble ? '~f' : '') + (rescue ? '~' + rescue : '');
   process.stdout.write(`\n${id}  (${s0.name}, lead=${lead}, "${word}")\n`);
   const plan = await page.evaluate(([i, w, l, m]) => window.__lab.plan(i, w, l, m), [s0.id, word, lead, mirror]);
   await page.evaluate(([i, w, l, m]) => { window.__lab.run(i, w, l, m); }, [s0.id, word, lead, mirror]);
@@ -84,7 +89,10 @@ for (const [s0, mirror, fumble] of runs) {
     if (h){ hidden++; if (!window_first) window_first = `t=${m.t} ${JSON.stringify(m.p.states)} ${JSON.stringify(b.map(r => [r.x, r.y]))}`; }
   }
   checks.push(check(id, 'no letter stays hidden behind another', !mid.length || hidden / mid.length < 0.15, `${Math.round(hidden / Math.max(1, mid.length) * 100)}% first ${window_first}`));
-  /* at the end, every letter has left the screen with somebody, or been beamed/whacked away */
+  /* a dropped letter is always saved by the buddy the plan sent */
+  if (fumble) checks.push(check(id, 'the plan has a rescue', plan.events.some(e => e.kind === 'rescue'), plan.events.map(e => e.kind).join()));
+  if (rescue) checks.push(check(id, 'the rescue is done the asked way', plan.events.some(e => e.kind === 'rescue' && e.method === rescue), JSON.stringify(plan.events.filter(e => e.kind === 'rescue'))));
+  /* at the end, every letter has left the screen with somebody, or been whacked away */
   const tail = mid.filter(m => m.t > plan.duration * 0.85);
   if (tail.length) {
     const last = tail[tail.length - 1].p;
@@ -94,7 +102,7 @@ for (const [s0, mirror, fumble] of runs) {
     checks.push(check(id, 'no letter still on screen as the scene ends', onScreen.length === 0, `${onScreen.length} visible, states ${JSON.stringify(last.states)}`));
   }
   checks.push(check(id, 'cleanup: no props', residue.props === 0, `${residue.props}`));
-  checks.push(check(id, 'cleanup: no particles, ship or beam', residue.fx === 0, `${residue.fx}`));
+  checks.push(check(id, 'cleanup: no particles', residue.fx === 0, `${residue.fx}`));
   checks.push(check(id, 'cleanup: every dino parked', residue.visibleActors === 0, `${residue.visibleActors}`));
   checks.push(check(id, 'cleanup: shake reset', residue.layerTransform === ''));
   passed += checks.filter(Boolean).length;
