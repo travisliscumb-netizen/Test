@@ -38,7 +38,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #wepName{font-size:11px;letter-spacing:.22em;color:var(--steel);text-transform:uppercase}
 #ammoNum{font-size:32px;font-weight:700;line-height:1.02;letter-spacing:.02em}
 #ammoNum small{font-size:15px;color:var(--steel);font-weight:500}
-#objective{left:calc(var(--safe-l) + 70px);top:calc(var(--safe-t) + 14px);max-width:58vw}
+/* a dark backing: under the fluorescents the ceiling tiles are near white, and
+   the caption and list vanished into them */
+#objective{left:calc(var(--safe-l) + 70px);top:calc(var(--safe-t) + 14px);max-width:58vw;
+  background:rgba(5,8,14,.5);padding:6px 10px 5px;border-radius:3px;text-shadow:0 1px 2px rgba(0,0,0,.9)}
 #objText{font-size:12px;line-height:1.55;color:var(--ink);margin-top:4px}
 #objText b{color:var(--amber);font-weight:600}
 #objText .done{color:var(--green);text-decoration:line-through;opacity:.75}
@@ -65,7 +68,8 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 /* Portrait phones: the objective list and the centred alert were fighting for
    the same top strip, so the list drops below the alert row. */
 @media (max-width:560px){
-  #objective{left:calc(var(--safe-l) + 16px);top:calc(var(--safe-t) + 54px);max-width:78vw}
+  /* stop short of the minimap, which takes the top-right corner */
+  #objective{left:calc(var(--safe-l) + 16px);top:calc(var(--safe-t) + 64px);max-width:calc(100vw - 172px)}
   #objText{font-size:11.5px}
   #vitals{width:150px}
   #ammoNum{font-size:26px}
@@ -95,10 +99,24 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #btnUse{left:50%;margin-left:-38px;bottom:calc(var(--safe-b) + 26px);width:76px;height:76px;display:none;
   border-color:rgba(255,177,40,.6);background:rgba(255,177,40,.16)}
 #btnUse.on{display:flex}
+/* In portrait the bottom edge belongs to the health bar and ammo readout, so
+   USE moves up over the lower view. Declared after the base rule so it wins. */
+@media (max-width:560px){ #btnUse{bottom:auto;top:54%} }
 #btnPause{left:calc(var(--safe-l) + 14px);top:calc(var(--safe-t) + 12px);width:44px;height:44px;border-radius:6px;font-size:14px}
+/* Three columns under the right thumb, all kept below the minimap's band so a
+   390px-tall landscape phone has room: FIRE outermost, CRCH/WEAP inside it,
+   AIM/RLD innermost. Nothing sits over the ammo readout in the corner. */
+#btnAim{right:calc(var(--safe-r) + 212px);bottom:calc(var(--safe-b) + 142px);width:58px;height:58px}
+#btnReload{right:calc(var(--safe-r) + 212px);bottom:calc(var(--safe-b) + 66px);width:58px;height:58px}
+.tbtn.latched{background:rgba(255,177,40,.24);border-color:var(--amber);color:var(--amber)}
+#cheatTag{position:absolute;left:50%;bottom:calc(var(--safe-b) + 6px);transform:translateX(-50%);
+  font-size:9.5px;letter-spacing:.18em;color:#d98cff;opacity:.85;white-space:nowrap}
 
 /* ---------- overlays ---------- */
-.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;
+/* Centred with margin:auto on the child, not justify-content:center: a flex
+   container centres overflowing content upwards, past the scroll origin, so on
+   a short landscape phone the top of the title screen could not be reached. */
+.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:flex-start;
   padding:calc(var(--safe-t) + 20px) calc(var(--safe-r) + 20px) calc(var(--safe-b) + 20px) calc(var(--safe-l) + 20px);
   background:radial-gradient(120% 90% at 50% 8%,rgba(255,177,40,.07),transparent 55%),
              linear-gradient(180deg,#05060a 0%,#0a0f18 55%,#05060a 100%);
@@ -106,7 +124,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .screen.on{display:flex}
 .screen::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;
   background:repeating-linear-gradient(0deg,rgba(159,176,196,.25) 0 1px,transparent 1px 3px)}
-.wrap{position:relative;width:100%;max-width:480px;z-index:1}
+.wrap{position:relative;width:100%;max-width:480px;z-index:1;margin:auto 0}
 .eyebrow{font-size:10.5px;letter-spacing:.42em;color:var(--amber);text-transform:uppercase;margin-bottom:8px}
 h1{font-size:clamp(30px,8.4vw,50px);margin:0;letter-spacing:.14em;line-height:1.04;font-weight:800}
 h1 span{color:var(--amber)}
@@ -137,6 +155,11 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
 #bigStat{font-size:40px;font-weight:800;letter-spacing:.04em;color:var(--amber)}
 #endTitle.win{color:var(--green)}
 #endTitle.lose{color:var(--red)}
+.kv b.good{color:var(--green)}
+.kv b.bad{color:var(--red)}
+.tog:disabled{opacity:.35;cursor:not-allowed}
+.btn.armed{border-left-color:var(--red);background:rgba(255,45,60,.18)}
+#endUnlock{color:#d98cff;font-size:12px;letter-spacing:.1em;margin:8px 0 0;min-height:1em}
 </style>
 <canvas id="c"></canvas>
 <canvas id="hudCanvas"></canvas>
@@ -152,6 +175,7 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
   <div id="interactPrompt">HOLD USE</div>
   <div id="toast"></div>
   <div id="fpsCounter"></div>
+  <div id="cheatTag"></div>
 </div>
 
 <div id="touch">
@@ -160,6 +184,8 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
   <button class="tbtn" id="btnFire">FIRE</button>
   <button class="tbtn" id="btnWeap">WEAP</button>
   <button class="tbtn" id="btnCrouch">CRCH</button>
+  <button class="tbtn" id="btnAim">AIM</button>
+  <button class="tbtn" id="btnReload">RLD</button>
   <button class="tbtn" id="btnUse">USE</button>
   <button class="tbtn" id="btnPause">| |</button>
 </div>
@@ -172,9 +198,9 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <p class="lede">A chemical weapons facility cut into the rock. Get to the control room, pull the research data
       off the terminal, and be out through the plant before the garrison works out you were ever inside.</p>
     <button class="btn primary" id="btnStart"><span>Begin Mission</span><span class="k">&#9654;</span></button>
-    <button class="btn" id="btnBriefing"><span>Briefing</span><span class="k">i</span></button>
     <button class="btn" id="btnControlsScreen"><span>Controls</span><span class="k">?</span></button>
     <button class="btn" id="btnOptions"><span>Options</span><span class="k">&#9881;</span></button>
+    <button class="btn" id="btnCheats"><span>Cheats</span><span class="k">&#9733;</span></button>
     <p class="tiny">Runs entirely offline. Audio starts on your first tap &#8212; that is a browser rule, not a bug.</p>
   </div>
 </section>
@@ -190,10 +216,13 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors. A guard who spots you breaks for the nearest
       wall panel to call the alarm in &#8212; drop him before he reaches it, or shoot the panels out first and the
       garrison never hears a thing. Lab staff are unarmed and run. Shots are loud; the suppressed PP7 is not.</p></div>
+    <div class="card"><h3>Equipment</h3><p>You go in with the PP7 and three proximity mines. Take a KF7 off the first
+      guard you drop. Body armour is stashed in the insertion washroom and the control room.</p></div>
     <div class="row"><label>Difficulty</label>
       <select id="selDiff" style="background:#182232;color:#e8eef6;border:1px solid rgba(159,176,196,.3);padding:9px;font-family:inherit;font-size:12px;min-height:40px">
         <option value="0">Agent</option><option value="1" selected>Secret Agent</option><option value="2">00 Agent</option>
       </select></div>
+    <p class="tiny" id="briefBest"></p>
     <button class="btn primary" id="btnBriefStart"><span>Insert</span><span class="k">&#9654;</span></button>
     <button class="btn" id="btnBriefBack"><span>Back</span><span class="k">&#9664;</span></button>
   </div>
@@ -203,12 +232,14 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
   <div class="wrap">
     <div class="eyebrow">Field manual</div>
     <h2>Controls</h2>
-    <div class="card"><h3>Touch</h3><p>Left half of the screen is the movement stick, right half is the look stick &#8212;
-      both appear wherever your thumb lands. Push the movement stick to its rim to sprint. FIRE and WEAP sit under your
-      right thumb, CRCH crouches, and USE appears in amber when something can be operated.</p></div>
+    <div class="card"><h3>Touch</h3><p>Left half of the screen is a floating movement stick; push it to the rim to
+      sprint. Drag anywhere on the right half to look (Options can switch this to a look stick). FIRE, AIM, RLD, WEAP
+      and CRCH sit under your right thumb; AIM and CRCH are toggles. USE appears in amber when something can be
+      operated.</p></div>
     <div class="card"><h3>Keyboard &amp; mouse</h3><p>WASD move &#183; mouse look &#183; left click fire &#183;
-      Q/E cycle weapons &#183; 1-3 select &#183; C crouch &#183; Shift sprint &#183; E interact &#183; R reload &#183;
-      Esc pause. Click the view to lock the mouse where the browser allows it; dragging works everywhere.</p></div>
+      right click aim &#183; Q or wheel cycle weapons &#183; 1-3 select &#183; C crouch &#183; Shift sprint &#183;
+      E interact &#183; R reload &#183; Esc or P pause. Click the view to lock the mouse where the browser allows it;
+      dragging works everywhere.</p></div>
     <div class="card"><h3>Reading the facility</h3><p>Fluorescents are cool white while you are undetected and switch to
       pulsing red the moment the alarm goes. Guards look at their patrol path; scientists do not fight.</p></div>
     <button class="btn" id="btnControlsBack"><span>Back</span><span class="k">&#9664;</span></button>
@@ -221,11 +252,25 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <h2>Options</h2>
     <div class="row"><label>Look sensitivity</label><input type="range" id="rngSens" min="30" max="260" value="100"></div>
     <div class="row"><label>Invert look Y</label><button class="tog" id="togInvert"><i></i></button></div>
+    <div class="row"><label>Touch: drag to look</label><button class="tog on" id="togSwipe"><i></i></button></div>
     <div class="row"><label>Master volume</label><input type="range" id="rngVol" min="0" max="100" value="75"></div>
     <div class="row"><label>Bloom</label><button class="tog on" id="togBloom"><i></i></button></div>
     <div class="row"><label>Shadows</label><button class="tog on" id="togShadow"><i></i></button></div>
     <div class="row"><label>Performance readout</label><button class="tog" id="togStats"><i></i></button></div>
+    <div class="row" id="rowFullscreen"><label>Fullscreen</label><button class="btn" id="btnFullscreen" style="width:auto;min-height:40px;margin:0;padding:8px 14px"><span>Toggle</span></button></div>
+    <button class="btn" id="btnErase"><span>Erase save data</span><span class="k">&#10005;</span></button>
     <button class="btn" id="btnOptionsBack"><span>Back</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenCheats">
+  <div class="wrap">
+    <div class="eyebrow">Earned, never given</div>
+    <h2>Cheats</h2>
+    <p class="lede">Each one is unlocked by a finished run. A mission played with any cheat on keeps no time and earns
+      nothing new.</p>
+    <div id="cheatList"></div>
+    <button class="btn" id="btnCheatsBack"><span>Back</span><span class="k">&#9664;</span></button>
   </div>
 </section>
 
@@ -236,8 +281,9 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <div class="card">
       <div class="kv"><span>Elapsed</span><b id="pauseTime">00:00</b></div>
       <div class="kv"><span>Alarm</span><b id="pauseAlarm">Silent</b></div>
-      <div class="kv"><span>Archive</span><b id="pauseObjA">Not retrieved</b></div>
+      <div class="kv"><span>Difficulty</span><b id="pauseTier">&#8212;</b></div>
     </div>
+    <div class="card" id="pauseObjectives"></div>
     <button class="btn primary" id="btnResume"><span>Resume</span><span class="k">&#9654;</span></button>
     <button class="btn" id="btnPauseOptions"><span>Options</span><span class="k">&#9881;</span></button>
     <button class="btn" id="btnAbort"><span>Abort mission</span><span class="k">&#9664;</span></button>
@@ -250,13 +296,15 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <h2 id="endTitle">MISSION COMPLETE</h2>
     <div id="bigStat">00:00</div>
     <p class="lede" id="endText"></p>
+    <div class="card" id="endObjectives"></div>
     <div class="card">
-      <div class="kv"><span>Archive retrieved</span><b id="endObjA">No</b></div>
-      <div class="kv"><span>Alarm raised</span><b id="endAlarm">No</b></div>
-      <div class="kv"><span>Guards neutralised</span><b id="endKills">0</b></div>
+      <div class="kv"><span>Alarm</span><b id="endAlarm">Silent</b></div>
+      <div class="kv"><span>Kills</span><b id="endKills">0</b></div>
       <div class="kv"><span>Accuracy</span><b id="endAcc">0%</b></div>
+      <div class="kv"><span>Head / body / limb hits</span><b id="endZones">0 / 0 / 0</b></div>
       <div class="kv"><span>Best time</span><b id="endBest">&#8212;</b></div>
     </div>
+    <p id="endUnlock"></p>
     <button class="btn primary" id="btnPlayAgain"><span>Play again</span><span class="k">&#8635;</span></button>
     <button class="btn" id="btnEndTitle"><span>Return to title</span><span class="k">&#9664;</span></button>
   </div>
@@ -2534,8 +2582,39 @@ var CFG = {
     { name: 'Secret Agent', dmgTaken: 1.0, aim: 1.0,  reaction: 0.6,  health: 1.0 },
     { name: '00 Agent',     dmgTaken: 1.5, aim: 1.35, reaction: 0.42, health: 0.85 }
   ],
-  saveKey: 'blackgate.save.v1'
+  // GoldenEye's loop: you go in with a pistol and take the guards' rifles.
+  pickups: {
+    radius: 1.1,               // walk-over collection distance
+    armor: 50,                 // one vest; two fill the bar
+    kf7Drop: [12, 22],         // rounds in a fallen guard's rifle
+    kf7Crate: 60,
+    kf7ReserveCap: 240
+  },
+  saveKey: 'blackgate.save.v2',
+  legacySaveKey: 'blackgate.save.v1'
 };
+
+/* ---------- cheats ----------
+   GoldenEye's cheats were earned, not typed in: beat a level on a tier, or
+   under a target time, and something silly or powerful unlocked. Same here.
+   Any active cheat keeps the run off the best-time table and earns nothing. */
+var CHEATS = [
+  { id: 'paintball', name: 'Paintball Mode', rule: 'Complete the mission on Agent',
+    earned: function (r) { return r.tier >= 0; } },
+  { id: 'dk', name: 'DK Mode', rule: 'Complete the mission on Secret Agent',
+    earned: function (r) { return r.tier >= 1; } },
+  { id: 'turbo', name: 'Turbo Mode', rule: 'Complete the mission on 00 Agent',
+    earned: function (r) { return r.tier >= 2; } },
+  { id: 'ammo', name: 'Infinite Ammo', rule: 'Complete Secret Agent in under 3:30',
+    earned: function (r) { return r.tier >= 1 && r.time < 210; } },
+  { id: 'invincible', name: 'Invincibility', rule: 'Complete 00 Agent in under 3:00',
+    earned: function (r) { return r.tier >= 2 && r.time < 180; } }
+];
+function cheatOn(id) { return !!(SAVE.cheatsOn[id] && SAVE.unlocked[id]); }
+function anyCheatOn() {
+  for (var i = 0; i < CHEATS.length; i++) if (cheatOn(CHEATS[i].id)) return true;
+  return false;
+}
 
 /* Grid cell codes used by the level map. */
 var C_OPEN = 0, C_WALL = 1, C_DOOR = 2, C_START = 3, C_EXIT = 4;
@@ -2573,8 +2652,12 @@ var GAME = {
   alarm: false, alarmAt: 0, kills: 0, bodies: 0,
   objectives: { terminal: false, escaped: false, stockpile: false },
   sciKills: 0, tanksLeft: 0,
-  noise: null, frameCount: 0, lastTime: 0, raf: 0,
-  showStats: false, booted: false, best: 0
+  // GoldenEye's debrief broke every hit down by where it landed
+  stats: { shots: 0, hits: 0, head: 0, torso: 0, limb: 0 },
+  cheated: false,           // latched at mission start
+  noise: { x: 0, z: 0, r: 0, t: 0 },
+  frameCount: 0, lastTime: 0, raf: 0,
+  showStats: false, booted: false
 };
 var player = null;          // alias the test suite reads
 var collidables = null;
@@ -2593,6 +2676,8 @@ function bootWorld() {
 
   var level = buildLevel(PLAN);
   buildProps(level);
+  buildNav(level);
+  buildPickups(level);
   for (var i = 0; i < level.meshes.length; i++) RENDER.scene.add(level.meshes[i]);
   RENDER.scene.add(level.props);
   setupLights(level);
@@ -2607,22 +2692,87 @@ function bootWorld() {
   buildWeapons();
   spawnEnemies();
   initHUD();
-  loadBest();
   GAME.booted = true;
   return true;
 }
 
-/* localStorage is wrapped: Safari private mode throws on write. */
-function saveBest() {
-  try { window.localStorage.setItem(CFG.saveKey, JSON.stringify({ best: GAME.best })); } catch (e) {}
+/* ---------- persistence ----------
+   One validated record: best time per tier, unlocked cheats, which cheats are
+   switched on, and every option. localStorage is wrapped throughout because
+   Safari private mode throws on write; the game then simply keeps the record
+   in memory for the session. Everything read back is type- and range-checked,
+   so a hand-edited or corrupted save degrades to defaults field by field
+   instead of taking the game down. */
+var SETTINGS_DEFAULT = {
+  sensitivity: 1.0, invertY: false, volume: 0.75,
+  bloom: true, shadows: true, stats: false,
+  lookMode: 'swipe'          // touch look: 'swipe' (drag = direct look) or 'stick' (rate)
+};
+var SAVE = {
+  best: [0, 0, 0], unlocked: {}, cheatsOn: {},
+  settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULT))
+};
+
+function validTime(t) { return typeof t === 'number' && isFinite(t) && t > 0 && t < 86400; }
+
+function sanitizeSave(o) {
+  var out = { best: [0, 0, 0], unlocked: {}, cheatsOn: {},
+              settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULT)) };
+  if (!o || typeof o !== 'object') return out;
+  if (Array.isArray(o.best)) {
+    for (var i = 0; i < 3; i++) if (validTime(o.best[i])) out.best[i] = o.best[i];
+  }
+  for (var c = 0; c < CHEATS.length; c++) {
+    var id = CHEATS[c].id;
+    if (o.unlocked && o.unlocked[id] === true) out.unlocked[id] = true;
+    if (o.cheatsOn && o.cheatsOn[id] === true && out.unlocked[id]) out.cheatsOn[id] = true;
+  }
+  var s = o.settings;
+  if (s && typeof s === 'object') {
+    var d = out.settings;
+    if (typeof s.sensitivity === 'number' && isFinite(s.sensitivity)) d.sensitivity = clamp(s.sensitivity, 0.3, 2.6);
+    if (typeof s.volume === 'number' && isFinite(s.volume)) d.volume = clamp(s.volume, 0, 1);
+    if (typeof s.invertY === 'boolean') d.invertY = s.invertY;
+    if (typeof s.bloom === 'boolean') d.bloom = s.bloom;
+    if (typeof s.shadows === 'boolean') d.shadows = s.shadows;
+    if (typeof s.stats === 'boolean') d.stats = s.stats;
+    if (s.lookMode === 'swipe' || s.lookMode === 'stick') d.lookMode = s.lookMode;
+  }
+  return out;
 }
-function loadBest() {
+
+function loadSave() {
+  var raw = null;
+  try { raw = window.localStorage.getItem(CFG.saveKey); } catch (e) { raw = null; }
+  var parsed = null;
+  if (raw) { try { parsed = JSON.parse(raw); } catch (e) { parsed = null; } }
+  if (!parsed) {
+    // v1 kept a single best time with no tier; it was almost always set on the
+    // default tier, so that is where it is carried forward to.
+    try {
+      var old = JSON.parse(window.localStorage.getItem(CFG.legacySaveKey) || 'null');
+      if (old && validTime(old.best)) parsed = { best: [0, old.best, 0] };
+    } catch (e) {}
+  }
+  var s = sanitizeSave(parsed);
+  SAVE.best = s.best; SAVE.unlocked = s.unlocked; SAVE.cheatsOn = s.cheatsOn; SAVE.settings = s.settings;
+}
+
+function writeSave() {
   try {
-    var raw = window.localStorage.getItem(CFG.saveKey);
-    if (!raw) return;
-    var o = JSON.parse(raw);
-    if (o && typeof o.best === 'number' && isFinite(o.best) && o.best > 0 && o.best < 86400) GAME.best = o.best;
-  } catch (e) { GAME.best = 0; }
+    window.localStorage.setItem(CFG.saveKey, JSON.stringify({
+      v: 2, best: SAVE.best, unlocked: SAVE.unlocked, cheatsOn: SAVE.cheatsOn, settings: SAVE.settings
+    }));
+  } catch (e) {}
+}
+
+function eraseSave() {
+  var s = sanitizeSave(null);
+  SAVE.best = s.best; SAVE.unlocked = s.unlocked; SAVE.cheatsOn = s.cheatsOn; SAVE.settings = s.settings;
+  try {
+    window.localStorage.removeItem(CFG.saveKey);
+    window.localStorage.removeItem(CFG.legacySaveKey);
+  } catch (e) {}
 }
 
 /* ---------- objectives, win and loss ----------
@@ -2655,6 +2805,11 @@ var OBJECTIVES = [
     done: function () { return GAME.objectives.escaped; } }
 ];
 
+function objectiveById(id) {
+  for (var i = 0; i < OBJECTIVES.length; i++) if (OBJECTIVES[i].id === id) return OBJECTIVES[i];
+  return null;
+}
+
 /* The objectives in play at the current difficulty, in briefing order. */
 function activeObjectives() {
   var out = [], i;
@@ -2680,8 +2835,33 @@ function fieldObjectivesMet() {
   }
   return true;
 }
+/* The field objectives you can still act on: everything except the exit and
+   the constraints. A constraint is either intact or lost for good, so it can
+   never be what stands between you and the door. */
+function outstandingObjectives() {
+  var list = activeObjectives(), out = [];
+  for (var i = 0; i < list.length; i++) {
+    var o = list[i];
+    if (o.last || o.constraint) continue;
+    if (!o.done()) out.push(o);
+  }
+  return out;
+}
+function anyObjectiveFailed() {
+  var list = activeObjectives();
+  for (var i = 0; i < list.length; i++) if (list[i].failed && list[i].failed()) return true;
+  return false;
+}
+/* Reaching the exit with the actionable objectives done ends the mission. It
+   used to demand the constraints too, so a single dead scientist on 00 Agent
+   left the exit permanently inert: a soft lock with nothing on screen to say
+   why. GoldenEye's rule is the one used here -- you can always leave, and the
+   debrief tells you the mission failed because an objective did. */
+function checkExtraction() {
+  return playerIsAtExit() && outstandingObjectives().length === 0;
+}
 function checkWin() {
-  return fieldObjectivesMet() && playerIsAtExit();
+  return checkExtraction() && !anyObjectiveFailed();
 }
 function checkLoss() {
   return player.health <= 0;
@@ -2692,6 +2872,8 @@ function playerIsAtExit() {
   return Math.hypot(PLAYER.pos.x - e.x, PLAYER.pos.z - e.z) < 2.6;
 }
 
+var TERMINAL_HOLD = 1.2;     // seconds of USE to pull the archive
+
 function updateInteraction(dt) {
   var t = LEVEL.terminal;
   var prompt = null;
@@ -2699,19 +2881,29 @@ function updateInteraction(dt) {
   if (!t.used && d < 2.8 && Math.abs(PLAYER.pos.y + PLAYER.eye - t.pos.y) < 2.4) {
     if (INPUT.interact) {
       PLAYER.interactHold += dt;
-      if (PLAYER.interactHold >= 1.2) {
+      if (PLAYER.interactHold >= TERMINAL_HOLD) {
         completeTerminal();
       }
     } else PLAYER.interactHold = Math.max(0, PLAYER.interactHold - dt * 2);
-    var bar = '';
-    var n = Math.round(clamp(PLAYER.interactHold / 1.2, 0, 1) * 10);
-    for (var i = 0; i < 10; i++) bar += (i < n ? '█' : '░');
-    prompt = 'HOLD USE · DOWNLOAD ' + bar;
-  } else if (GAME.objectives.terminal && playerIsAtExit()) {
-    prompt = 'EXIT REACHED';
+    var n = Math.round(clamp(PLAYER.interactHold / TERMINAL_HOLD, 0, 1) * 10);
+    prompt = 'HOLD USE · DOWNLOAD ' + PROGRESS_BARS[n];
+  } else if (playerIsAtExit()) {
+    // Standing at the door with work left used to say nothing at all.
+    var left = outstandingObjectives();
+    if (left.length) prompt = 'EXIT HELD · ' + left[0].text.toUpperCase();
   }
   hudPrompt(prompt);
 }
+/* The eleven possible download bars, built once rather than a string per frame. */
+var PROGRESS_BARS = (function () {
+  var out = [];
+  for (var n = 0; n <= 10; n++) {
+    var s = '';
+    for (var i = 0; i < 10; i++) s += (i < n ? '█' : '░');
+    out.push(s);
+  }
+  return out;
+})();
 
 function completeTerminal() {
   var t = LEVEL.terminal;
@@ -2722,12 +2914,14 @@ function completeTerminal() {
   t.screen.material = MAT.ledGreen;
   t.led.material = MAT.ledGreen;
   sfxTerminal();
-  hudToast('Research archive downloaded. The plant exit is unlocked.');
+  hudToast(GAME.objectives.stockpile || GAME.difficulty < 1
+    ? 'Research archive downloaded. The plant exit is unlocked.'
+    : 'Archive downloaded. Exit unlocked -- the stockpile still stands.');
   hudUpdateObjectives();
   // unlock the exit doors
   for (var i = 0; i < LEVEL.doors.length; i++) {
     var d = LEVEL.doors[i];
-    if (d.locked) { d.locked = false; d.lamp.material = MAT.ledGreen; }
+    if (d.locked) { d.locked = false; setDoorLamps(d, MAT.ledGreen); }
   }
 }
 </script>
@@ -3017,6 +3211,22 @@ function makeFlashTexture() {
   return tex;
 }
 
+/* EXIT lettering for the plates on the plant exit doors. */
+function makeExitTexture() {
+  var canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 80;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1a0203';
+  ctx.fillRect(0, 0, 256, 80);
+  ctx.fillStyle = '#ff2a1c';
+  ctx.font = 'bold 56px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('EXIT', 128, 42);
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
 function buildTextures() {
   TEX.tileNormal  = makeTileNormalMap(256, 4);
   TEX.wallAlbedo  = makeTileAlbedo({ base: [171, 163, 142], grout: '#524d43', tiles: 4, grime: 34 });
@@ -3031,6 +3241,7 @@ function buildTextures() {
   TEX.monitor     = makeMonitorTexture();
   TEX.rackFace    = makeServerRackTexture();
   TEX.flash       = makeFlashTexture();
+  TEX.exit        = makeExitTexture();
   TEX.rough       = makeRoughMap(128, 1.0, 1.2);
   TEX.roughFine   = makeRoughMap(128, 2.4, 1.5);
 }
@@ -3150,6 +3361,10 @@ function buildMaterials() {
   MAT.exitSign = new THREE.MeshStandardMaterial({
     color: 0x220305, emissive: 0xff2318, emissiveIntensity: 2.0, roughness: 0.6, metalness: 0
   });
+  // Held under ACES's shoulder: a stronger red tone-maps to salmon pink.
+  MAT.exitPlate = new THREE.MeshStandardMaterial({
+    color: 0x000000, emissive: 0xffffff, emissiveMap: TEX.exit, emissiveIntensity: 1.1, roughness: 0.6, metalness: 0
+  });
   MAT.screen = new THREE.MeshStandardMaterial({
     color: 0x0a1a22, emissive: CFG.colors.screenGlow, emissiveIntensity: 1.3, roughness: 0.4, metalness: 0
   });
@@ -3175,6 +3390,11 @@ function buildMaterials() {
   MAT.skin = new THREE.MeshStandardMaterial({ color: 0xb8886a, roughness: 0.75, metalness: 0.0 });
   MAT.labCoat = new THREE.MeshStandardMaterial({ color: 0xdde3e6, roughness: 0.85, metalness: 0.0 });
   MAT.gunmetal = new THREE.MeshStandardMaterial({ color: 0x24282e, roughness: 0.35, metalness: 0.85, envMapIntensity: 0.7 });
+  // pickups: none uses red or amber, which the facility reserves for "shoot
+  // this" and "use this"; the armour's blue matches its bar on the HUD
+  MAT.armorStrip = new THREE.MeshStandardMaterial({ color: 0x0c2233, emissive: 0x48b7ff, emissiveIntensity: 1.6, roughness: 0.5 });
+  MAT.ammoCrate = new THREE.MeshStandardMaterial({ color: 0x4b5232, roughness: 0.8, metalness: 0.2 });
+  MAT.brass = new THREE.MeshStandardMaterial({ color: 0xb58a3a, roughness: 0.35, metalness: 0.9, envMapIntensity: 0.9 });
 }
 
 /* ---------- geometry merging (r128 core has no BufferGeometryUtils) ----------
@@ -3310,6 +3530,10 @@ function pushAABB(arr, cx, cy, cz, sx, sy, sz, tag) {
   });
 }
 
+function setDoorLamps(door, mat) {
+  for (var i = 0; i < door.lamps.length; i++) door.lamps[i].material = mat;
+}
+
 function buildLevel(plan) {
   var built = buildGrid(plan);
   var grid = built.grid, styleAt = built.style;
@@ -3402,12 +3626,18 @@ function buildLevel(plan) {
     addBox(bucket.trim, frameGeoV, null, wx - CELL / 2 + 0.11, WALL_H / 2, wz);
     addBox(bucket.trim, frameGeoV, null, wx + CELL / 2 - 0.11, WALL_H / 2, wz);
 
-    var lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.06), dr.locked ? MAT.ledRed : MAT.ledGreen);
-    lamp.position.set(wx + CELL / 2 - 0.4, 2.2, wz + 0.14);
+    // A lock lamp on both faces: it used to be on the south face only, so the
+    // exit door's red lamp could not be seen from the plant you approach it from.
+    var lampGeo = new THREE.BoxGeometry(0.12, 0.12, 0.06);
+    var lamp = new THREE.Mesh(lampGeo, dr.locked ? MAT.ledRed : MAT.ledGreen);
+    lamp.position.set(wx + CELL / 2 - 0.4, 2.2, wz + 0.21);
     props.add(lamp);
+    var lampBack = new THREE.Mesh(lampGeo, lamp.material);
+    lampBack.position.set(wx + CELL / 2 - 0.4, 2.2, wz - 0.21);
+    props.add(lampBack);
 
     var door = {
-      tag: dr.tag, mesh: mesh, lamp: lamp, locked: !!dr.locked, open: 0, target: 0,
+      tag: dr.tag, mesh: mesh, lamps: [lamp, lampBack], locked: !!dr.locked, open: 0, target: 0,
       closedY: (WALL_H - 0.1) / 2, x: wx, z: wz,
       aabb: { minX: wx - CELL / 2, maxX: wx + CELL / 2, minY: 0, maxY: WALL_H,
               minZ: wz - 0.18, maxZ: wz + 0.18, tag: 'door' }
@@ -3674,10 +3904,15 @@ function buildProps(level) {
     }
   }
 
-  // exit signage
-  live(MAT.exitSign, 0.9, 0.28, 0.06, cellToWorldX(6.5), 2.6, cellToWorldZ(26) + 1.9, false);
-  live(MAT.exitSign, 0.7, 0.24, 0.06, cellToWorldX(3.5), 2.6, cellToWorldZ(6) - 1.9, false);
-  live(MAT.exitSign, 0.7, 0.24, 0.06, cellToWorldX(9), 2.6, cellToWorldZ(70 / CELL - 0.5) , false);
+  // Exit signage rides on the exit door slabs themselves. The old signs hung in
+  // mid-air two metres in front of the doors, and one sat inside solid rock.
+  for (var ed = 0; ed < level.doors.length; ed++) {
+    var exDoor = level.doors[ed];
+    if (exDoor.tag.indexOf('exit') !== 0) continue;
+    var plate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.34, 0.04), MAT.exitPlate);
+    plate.position.set(0, 0.9, -0.1);            // plant side of the slab, above head height
+    exDoor.mesh.add(plate);
+  }
 
   // ---- commit merged prop geometry ----
   var matFor = {
@@ -3712,10 +3947,41 @@ function buildProps(level) {
    before he arrives, or shoot the panel out beforehand and take that whole
    wing off the board. Kill the last working panel and the garrison can never
    be called at all -- which is the quiet run the PP7 exists for. */
+/* Each panel is mounted on a named wall of a named cell: [cellX, cellZ, side].
+   They used to be given as bare coordinates, and every one of the seven had
+   ended up floating in open floor -- one dead centre in the insertion corridor,
+   walked straight through. The mount below refuses a side that has no wall. */
 var PANEL_SPOTS = [
-  [3.5, 10.0], [12.0, 11.0], [20.5, 12.0],
-  [19.0, 17.0], [22.5, 23.0], [8.0, 22.0], [5.0, 26.5]
+  [3, 9, 'W'],      // insertion corridor
+  [12, 11, 'N'],    // main corridor, halfway along
+  [19, 12, 'S'],    // corridor end, beside the lab door
+  [18, 17, 'W'],    // laboratory
+  [23, 23, 'E'],    // control room
+  [8, 19, 'N'],     // chemical plant, north wall
+  [4, 26, 'S']      // chemical plant, by the exit hall
 ];
+var SIDE_DIR = { N: [0, -1], S: [0, 1], W: [-1, 0], E: [1, 0] };
+
+/* Position and facing for something fixed flush to a cell's wall. Throws if
+   that side of the cell is open: a mount point off a wall is a level bug and
+   has to fail the build, not float. */
+function wallMount(level, cx, cz, side, standOff) {
+  var d = SIDE_DIR[side];
+  if (!d) throw new Error('bad wall side ' + side);
+  var g = level.grid;
+  var nx = cx + d[0], nz = cz + d[1];
+  if (!isPassable(g[cz] && g[cz][cx])) throw new Error('mount cell ' + cx + ',' + cz + ' is solid');
+  var solid = nz < 0 || nz >= g.length || nx < 0 || nx >= g[0].length || !isPassable(g[nz][nx]);
+  if (!solid) throw new Error('no wall on the ' + side + ' side of cell ' + cx + ',' + cz);
+  var face = CELL / 2 - WALL_T / 2;                 // wall face, from the cell centre
+  var out = face - (standOff || 0);
+  return {
+    x: cellToWorldX(cx) + d[0] * out, z: cellToWorldZ(cz) + d[1] * out,
+    // local +Z points away from the wall, into the room
+    rotY: Math.atan2(-d[0], -d[1]),
+    normalX: -d[0], normalZ: -d[1]
+  };
+}
 
 function buildAlarmPanels(level, group) {
   level.panels = [];
@@ -3723,13 +3989,16 @@ function buildAlarmPanels(level, group) {
   var bezelGeo = new THREE.BoxGeometry(0.54, 0.64, 0.06);
   var lamp = new THREE.BoxGeometry(0.17, 0.17, 0.05);
   for (var i = 0; i < PANEL_SPOTS.length; i++) {
-    var wx = cellToWorldX(PANEL_SPOTS[i][0]), wz = cellToWorldZ(PANEL_SPOTS[i][1]);
+    var sp = PANEL_SPOTS[i];
+    var mount = wallMount(level, sp[0], sp[1], sp[2], 0.06);
+    var wx = mount.x, wz = mount.z;
     // Half-Life 2's rule: the object should announce itself before the HUD
     // does. A wall is flat grey tile, so the panel gets a pale raised bezel, a
     // dark recessed face and a lamp big enough to pick out down a corridor --
     // three cues that no piece of scenery in the building has.
     var mesh = new THREE.Mesh(box, MAT.metalDark);
     mesh.position.set(wx, 1.45, wz);
+    mesh.rotation.y = mount.rotY;
     mesh.castShadow = false; mesh.receiveShadow = true;
     var bezel = new THREE.Mesh(bezelGeo, MAT.hazard);
     bezel.position.set(0, 0, -0.03);
@@ -3741,7 +4010,9 @@ function buildAlarmPanels(level, group) {
     mesh.add(led);
     group.add(mesh);
     var panel = { mesh: mesh, led: led, alive: true,
-                  pos: new THREE.Vector3(wx, 1.45, wz) };
+                  pos: new THREE.Vector3(wx, 1.45, wz),
+                  // where a guard stands to pull it: an arm's length off the wall
+                  stand: new THREE.Vector3(wx + mount.normalX * 0.75, 0, wz + mount.normalZ * 0.75) };
     mesh.userData.panel = panel;
     level.panels.push(panel);
     // Both destructibles wear the same signature: a red indicator that is lit
@@ -3829,25 +4100,15 @@ var SPAWNS = [
 ];
 
 function spawnEnemies() {
-  for (var i = 0; i < ENEMIES.list.length; i++) {
-    var old = ENEMIES.list[i];
-    // a rifle knocked out of someone's hands lives in the scene, not on the body
-    if (old.droppedGun) {
-      RENDER.scene.remove(old.droppedGun);
-      if (old.droppedGun.geometry) old.droppedGun.geometry.dispose();
-      old.droppedGun = null;
-    }
-    RENDER.scene.remove(old.group);
-    old.group.traverse(function (o) {
-      if (o.isMesh && o.geometry) o.geometry.dispose();   // materials are shared, geometry is not
-    });
-  }
+  for (var i = 0; i < ENEMIES.list.length; i++) ENEMIES.list[i].dispose();
   ENEMIES.list.length = 0;
+  ENEMIES.runnerActive = null;
   for (i = 0; i < SPAWNS.length; i++) {
     var s = SPAWNS[i];
     var pts = [];
     for (var p = 0; p < s.patrol.length; p++) pts.push(cellVec(s.patrol[p][0], s.patrol[p][1]));
     var e = new Enemy(cellVec(s.at[0], s.at[1]), pts, s.kind);
+    e.group.position.y = supportHeight(e.group.position.x, e.group.position.z);
     e.sightPhase = i & 1;          // half the roster does its sight check each frame
     // Face the first leg of the patrol rather than all staring down +Z, so the
     // opening of the level is not decided by an accident of default rotation.
@@ -3975,9 +4236,14 @@ function setupLights(level) {
       light.shadow.bias = -0.005;
     }
     light.position.set(0, WALL_H - 0.35, 0);
-    light.visible = false;
+    // Always visible. three.js counts only visible lights when it builds the
+    // lighting state every material is compiled against, so toggling .visible
+    // is a light-count change -- and a shader recompile hitch -- in disguise.
+    // An unused slot is switched off by weight instead (see updateLighting).
+    light.visible = true;
+    light.intensity = 0;
     scene.add(light);
-    RENDER.lightPool.push({ light: light, fixture: -1, casts: i < shadowCount, side: (i % 2) ? 1 : -1 });
+    RENDER.lightPool.push({ light: light, fixture: -1, casts: i < shadowCount, side: (i % 2) ? 1 : -1, weight: 0 });
   }
   RENDER.shadowCount = shadowCount;
 }
@@ -3998,14 +4264,14 @@ function updateLightPool(camPos) {
   for (i = 0; i < RENDER.lightPool.length; i++) {
     var slot = RENDER.lightPool[i];
     var fixtureIdx = (i >> 1) < _fixtureOrder.length ? _fixtureOrder[i >> 1] : -1;
-    if (fixtureIdx < 0) { slot.light.visible = false; slot.fixture = -1; continue; }
+    if (fixtureIdx < 0) { slot.weight = 0; slot.fixture = -1; continue; }
     if (slot.fixture !== fixtureIdx) {
       slot.fixture = fixtureIdx;
       slot.light.position.copy(pts[fixtureIdx]);
       slot.light.position.x += slot.side * 0.6;      // flank the fixture body
     }
     var d2 = pts[fixtureIdx].distanceToSquared(camPos);
-    slot.light.visible = d2 < 260;
+    slot.weight = d2 < 260 ? 1 : 0;
   }
 }
 
@@ -4021,8 +4287,9 @@ function updateLighting(dt, alarmActive, elapsed) {
   var intensity = 1.5 * (1 - mix) + mix * (1.5 * pulse * 1.7);
 
   for (var i = 0; i < RENDER.lightPool.length; i++) {
-    RENDER.lightPool[i].light.color.copy(col);
-    RENDER.lightPool[i].light.intensity = intensity;
+    var slot = RENDER.lightPool[i];
+    slot.light.color.copy(col);
+    slot.light.intensity = intensity * slot.weight;
   }
   if (MAT.lampOn) {
     MAT.lampOn.emissive.copy(col);
@@ -4516,6 +4783,64 @@ function aabbOverlap(a, b) {
          a.maxZ > b.minZ && a.minZ < b.maxZ;
 }
 
+/* Distance along a ray to the first enabled collision box, searched in
+   [near, far]; Infinity if nothing is hit. Slab test, no allocation.
+
+   Sight, occlusion and AI queries all come through here rather than through
+   THREE.Raycaster on the rendered level. The level mesh is ~17k merged
+   triangles and one mesh cast measured 0.75ms on a desktop; the roster made
+   several a frame. The collision boxes are the level's real shape as far as
+   bodies are concerned, and there are only a couple of hundred of them. */
+function rayBoxesDistance(o, d, near, far) {
+  var list = LEVEL.collidables, best = far;
+  // a zero component would give 0 * Infinity = NaN on a box face; nudge it
+  var ix = 1 / (d.x > 1e-9 || d.x < -1e-9 ? d.x : 1e-9),
+      iy = 1 / (d.y > 1e-9 || d.y < -1e-9 ? d.y : 1e-9),
+      iz = 1 / (d.z > 1e-9 || d.z < -1e-9 ? d.z : 1e-9);
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    if (b.disabled) continue;
+    var t1 = (b.minX - o.x) * ix, t2 = (b.maxX - o.x) * ix;
+    var tmin = t1 < t2 ? t1 : t2, tmax = t1 < t2 ? t2 : t1;
+    t1 = (b.minY - o.y) * iy; t2 = (b.maxY - o.y) * iy;
+    var lo = t1 < t2 ? t1 : t2, hi = t1 < t2 ? t2 : t1;
+    if (lo > tmin) tmin = lo;
+    if (hi < tmax) tmax = hi;
+    t1 = (b.minZ - o.z) * iz; t2 = (b.maxZ - o.z) * iz;
+    lo = t1 < t2 ? t1 : t2; hi = t1 < t2 ? t2 : t1;
+    if (lo > tmin) tmin = lo;
+    if (hi < tmax) tmax = hi;
+    if (tmax < tmin || tmax < near) continue;
+    var hit = tmin < near ? near : tmin;
+    // a ray that starts inside a box (a body against a console) is not blocked by it
+    if (tmin < near && tmax >= near && o.x > b.minX && o.x < b.maxX && o.y > b.minY && o.y < b.maxY && o.z > b.minZ && o.z < b.maxZ) continue;
+    if (hit < best) best = hit;
+  }
+  return best < far ? best : Infinity;
+}
+
+/* Clear sight between two points, judged against the collision boxes. */
+var _losDir = null;
+function hasLineOfSight(from, to) {
+  if (!_losDir) _losDir = new THREE.Vector3();
+  _losDir.copy(to).sub(from);
+  var dist = _losDir.length();
+  if (dist < 0.01) return true;
+  _losDir.divideScalar(dist);
+  return rayBoxesDistance(from, _losDir, 0.05, dist - 0.05) === Infinity;
+}
+
+/* The one proxy box per living enemy that shots and the aim probe test. Built
+   into a reused array: this runs every frame. */
+var _hitMeshes = [];
+function liveHitMeshes() {
+  _hitMeshes.length = 0;
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    if (ENEMIES.list[i].state !== 'DEAD') _hitMeshes.push(ENEMIES.list[i].hitMesh);
+  }
+  return _hitMeshes;
+}
+
 /* Resolve an AABB out of every box it overlaps, smallest penetration first.
    Returns the corrected feet position. */
 function resolveCollision(aabb, collidables) {
@@ -4589,7 +4914,7 @@ function updatePlayer(dt, input) {
   var mx = input.moveX, mz = input.moveY;
   if (mag > 1) { mx /= mag; mz /= mag; mag = 1; }
   P.sprinting = input.sprint && mag > 0.85 && !P.crouch && mz < -0.1;
-  var speed = CFG.player.walkSpeed;
+  var speed = CFG.player.walkSpeed * (GAME.turbo ? 1.5 : 1);
   if (P.crouch) speed *= CFG.player.crouchMul;
   else if (P.sprinting) speed *= CFG.player.sprintMul;
 
@@ -4616,6 +4941,7 @@ function updatePlayer(dt, input) {
   if (Math.abs(corrected.x - P.pos.x) > 1e-6) P.vel.x = 0;
   if (Math.abs(corrected.z - P.pos.z) > 1e-6) P.vel.z = 0;
   P.pos.copy(corrected);
+  separateFromBodies(P);
 
   // Wedge failsafe. Two boxes meeting at a corner can each push the body back
   // into the other, which reads to the player as being stuck inside a wall.
@@ -4653,7 +4979,7 @@ function updatePlayer(dt, input) {
       sfxFootstep(P.crouch, (Math.floor(P.bobPhase) & 1) === 0);
       // noise the AI can hear; crouching is genuinely quieter
       P.noiseRadius = P.crouch ? 3 : (P.sprinting ? 12 : 7);
-      GAME.noise = { x: P.pos.x, z: P.pos.z, r: P.noiseRadius, t: 0.4 };
+      makeNoise(P.pos.x, P.pos.z, P.noiseRadius);
     }
   } else {
     P.bob *= Math.max(0, 1 - dt * 6);
@@ -4668,15 +4994,39 @@ function updatePlayer(dt, input) {
   var cam = RENDER.camera;
   cam.position.set(P.pos.x, P.pos.y + P.eye + P.bob, P.pos.z);
   cam.rotation.set(P.pitch, P.yaw, 0);
+  // Shots and the aim probe cast from the camera's world matrix, which three.js
+  // otherwise refreshes only when it renders -- after this frame's shots. Every
+  // shot used to leave along last frame's aim.
+  cam.updateMatrixWorld();
   if (Math.abs(cam.fov - P.fovCurrent) > 0.01) {
     cam.fov = P.fovCurrent;
     cam.updateProjectionMatrix();
   }
 }
 
+/* Guards are solid. You used to walk straight through them. The push is only
+   taken if it leaves you clear of the level, so a guard can never shove you
+   into a wall; the wedge failsafe below would catch it if one did. */
+var BODY_GAP = 0.2 + 0.3;       // player half-width + guard radius
+function separateFromBodies(P) {
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    var e = ENEMIES.list[i];
+    if (e.state === 'DEAD') continue;
+    var g = e.group.position;
+    if (Math.abs(g.y - P.pos.y) > 1.2) continue;
+    var dx = P.pos.x - g.x, dz = P.pos.z - g.z, d = Math.hypot(dx, dz);
+    if (d >= BODY_GAP) continue;
+    if (d < 1e-4) { dx = 1; dz = 0; d = 1; }
+    var push = BODY_GAP - d, ox = P.pos.x, oz = P.pos.z;
+    P.pos.x += dx / d * push; P.pos.z += dz / d * push;
+    if (!playerIsClear(P.pos)) { P.pos.x = ox; P.pos.z = oz; }
+  }
+}
+
 function damagePlayer(amount, fromPos) {
   var P = PLAYER;
   if (!P.alive || GAME.state !== 'playing') return;
+  if (GAME.invincible) { hudFlashDamage(fromPos); return; }
   var diff = CFG.difficulty[GAME.difficulty];
   amount *= diff.dmgTaken;
   // body armour soaks first, exactly like the field kit it is named after
@@ -4687,11 +5037,11 @@ function damagePlayer(amount, fromPos) {
   P.health -= amount;
   P.lastDamageAt = GAME.elapsed;
   sfxPlayerHurt();
-  hudFlashDamage();
-  hudUpdateVitals();
+  hudFlashDamage(fromPos);
   if (P.health <= 0) {
     P.health = 0; P.alive = false;
-    endMission(false, 'killed');
+    // the frame loop's loss check ends the mission; ending it here as well was
+    // two code paths for one event
   }
 }
 </script>
@@ -4719,21 +5069,22 @@ var currentWeapon = null;
 function buildWeapons() {
   WEAPONS.list = [
     {
-      id: 'pp7', name: 'PP7', slot: 1,
+      id: 'pp7', name: 'PP7', slot: 1, owned: true,
       damage: 25, auto: false, rps: 4.5, magSize: 7, ammoInMag: 7,
       reserve: Infinity, infiniteReserve: true, reloadTime: 1.15,
       spread: 0.006, aimSpread: 0.0015, recoil: 0.9, range: 60,
       suppressed: true, noise: CFG.ai.suppressedHearing, sound: 'pp7'
     },
     {
-      id: 'kf7', name: 'KF7 SOVIET', slot: 2,
-      damage: 15, auto: true, rps: 10, magSize: 30, ammoInMag: 30,
-      reserve: 120, infiniteReserve: false, reloadTime: 2.1,
+      // Not carried in: taken off the first guard you drop, as in the Facility.
+      id: 'kf7', name: 'KF7 SOVIET', slot: 2, owned: false,
+      damage: 15, auto: true, rps: 10, magSize: 30, ammoInMag: 0,
+      reserve: 0, infiniteReserve: false, reloadTime: 2.1,
       spread: 0.028, aimSpread: 0.011, recoil: 1.5, range: 55,
       suppressed: false, noise: CFG.ai.hearingRadius, sound: 'kf7'
     },
     {
-      id: 'mine', name: 'PROXIMITY MINE', slot: 3,
+      id: 'mine', name: 'PROXIMITY MINE', slot: 3, owned: true,
       damage: 80, auto: false, rps: 1, magSize: 3, ammoInMag: 3,
       reserve: 0, infiniteReserve: false, reloadTime: 0,
       spread: 0, aimSpread: 0, recoil: 0.4, range: 4,
@@ -4884,16 +5235,19 @@ function updateImpacts(dt) {
 
 function switchWeapon(idx) {
   if (idx < 0 || idx >= WEAPONS.list.length || idx === WEAPONS.index) return;
+  if (!WEAPONS.list[idx].owned) return;
   WEAPONS.index = idx;
   currentWeapon = WEAPONS.list[idx];
   WEAPONS.reloading = 0;
   for (var i = 0; i < WEAPONS.viewModels.length; i++) WEAPONS.viewModels[i].visible = (i === idx);
   sfxReload('in');
-  hudUpdateAmmo();
 }
 function cycleWeapon(dir) {
   var n = WEAPONS.list.length;
-  switchWeapon(((WEAPONS.index + dir) % n + n) % n);
+  for (var step = 1; step < n; step++) {
+    var idx = ((WEAPONS.index + dir * step) % n + n) % n;
+    if (WEAPONS.list[idx].owned) { switchWeapon(idx); return; }
+  }
 }
 function reloadWeapon() {
   var w = currentWeapon;
@@ -4912,7 +5266,6 @@ function finishReload() {
     w.ammoInMag += take; w.reserve -= take;
   }
   sfxReload('in');
-  hudUpdateAmmo();
 }
 
 /* Hitscan. Enemies and the level are both tested; nearest hit wins so nobody
@@ -4947,12 +5300,8 @@ function updateAimProbe() {
   var bestDist = Infinity, bestKind = null, bestTarget = null, bestLabel = '';
 
   // guards first: they are what you are usually pointing at
-  var meshes = [];
-  for (var i = 0; i < ENEMIES.list.length; i++) {
-    if (ENEMIES.list[i].state === 'DEAD') continue;
-    meshes.push(ENEMIES.list[i].hitMesh);
-  }
-  var eh = _aimRay.intersectObjects(meshes, true);
+  var i;
+  var eh = _aimRay.intersectObjects(liveHitMeshes(), false);
   if (eh.length) {
     bestDist = eh[0].distance; bestKind = 'enemy';
     bestTarget = eh[0].object.userData.enemy;
@@ -5000,19 +5349,12 @@ function updateAimProbe() {
 
   // Nothing is highlighted through a wall: the probe only tests the short list
   // above, so the level itself has to be asked separately whether it is in the
-  // way. One extra cast, and only when something was actually found.
-  var wall = _aimRay.intersectObjects(LEVEL.raycastTargets, false);
-  for (i = 0; i < wall.length; i++) {
-    var ud = wall[i].object.userData;
-    if (ud && (ud.panel || ud.tank || ud.terminal)) continue;   // the fixture itself
-    // Geometry you are standing in or against is not "in the way": at a
-    // console or up against a rail the nearest hit is centimetres off the
-    // camera, and treating that as an occluder would blank the prompt exactly
-    // when you are close enough to use the thing.
-    if (wall[i].distance < 0.45) continue;
-    if (wall[i].distance < bestDist - 0.05) return;             // occluded
-    break;
-  }
+  // way. It asks the collision boxes rather than the rendered triangles: the
+  // merged level is ~17k triangles and a mesh raycast against it cost most of a
+  // millisecond, every frame, on a desktop. Geometry closer than 0.45m is the
+  // console or rail you are standing against, not something in the way.
+  var occl = rayBoxesDistance(_aimRay.ray.origin, _aimRay.ray.direction, 0.45, bestDist - 0.05);
+  if (occl < bestDist - 0.05) return;                            // occluded
 
   AIM.kind = bestKind; AIM.target = bestTarget; AIM.label = bestLabel; AIM.dist = bestDist;
   if (bestKind === 'shoot') AIM.prompt = 'SHOOT TO DISABLE';
@@ -5108,10 +5450,11 @@ function fireWeapon() {
     return false;
   }
 
-  w.ammoInMag--;
+  if (!GAME.infiniteAmmo) w.ammoInMag--;
   WEAPONS.cooldown = 1 / w.rps;
   WEAPONS.recoil = w.recoil;
   PLAYER.shotsFired++;
+  GAME.stats.shots++;
   PLAYER.fovPunch = 3;                       // FOV punch, never camera shake
   hudShotFired();
   WEAPONS.lastFireAt = GAME.elapsed;
@@ -5134,13 +5477,7 @@ function fireWeapon() {
   _ray.ray.direction.normalize();
 
   var enemyHit = null, enemyDist = Infinity, enemyPoint = null;
-  var meshes = [];
-  for (var i = 0; i < ENEMIES.list.length; i++) {
-    var e = ENEMIES.list[i];
-    if (e.state === 'DEAD') continue;
-    meshes.push(e.hitMesh);
-  }
-  var hits = _ray.intersectObjects(meshes, true);
+  var hits = _ray.intersectObjects(liveHitMeshes(), false);
   if (hits.length > 0) {
     enemyHit = hits[0].object.userData.enemy;
     enemyDist = hits[0].distance;
@@ -5162,6 +5499,10 @@ function fireWeapon() {
     spawnImpactEffect(enemyPoint, hits[0].face ? hits[0].face.normal : null, true);
     sfxFlesh(enemyPoint);
     PLAYER.shotsHit++;
+    GAME.stats.hits++;
+    if (zone === 'head') GAME.stats.head++;
+    else if (zone === 'torso') GAME.stats.torso++;
+    else GAME.stats.limb++;
     hudHitMarker(zone === 'head');
   } else if (wallHits.length) {
     var wp = wallHits[0];
@@ -5169,9 +5510,9 @@ function fireWeapon() {
     if (ud && ud.panel) destroyPanel(ud.panel);
     if (ud && ud.tank) ruptureTank(ud.tank);
     spawnImpactEffect(wp.point, wp.face ? wp.face.normal : null, false);
+    if (GAME.paintball) paintSplat(wp.point, wp.face ? wp.face.normal : null, wp.object);
     sfxImpact(wp.point, true);
   }
-  hudUpdateAmmo();
   if (w.ammoInMag <= 0 && (w.infiniteReserve || w.reserve > 0)) reloadWeapon();
   return true;
 }
@@ -5223,7 +5564,7 @@ function placeMine() {
     pos = RENDER.camera.position.clone().addScaledVector(_ray.ray.direction, 2);
     pos.y = PLAYER.pos.y + 0.1; normal = new THREE.Vector3(0, 1, 0);
   }
-  w.ammoInMag--;
+  if (!GAME.infiniteAmmo) w.ammoInMag--;
   WEAPONS.cooldown = 1 / w.rps;
 
   // One geometry for every mine ever placed. Building a fresh cylinder and a
@@ -5245,7 +5586,6 @@ function placeMine() {
 
   WEAPONS.mines.push({ mesh: mesh, led: led, pos: mesh.position.clone(), armTime: 1.0, beep: 0, live: true });
   sfxMinePlant(mesh.position);
-  hudUpdateAmmo();
   return true;
 }
 function updateMines(dt) {
@@ -5285,13 +5625,162 @@ function detonateMine(idx) {
   WEAPONS.mines.splice(idx, 1);
 }
 
+/* ---------- pickups ----------
+   Walk over something to take it. Static ones are placed with the level --
+   the body armour in the third bathroom stall is the Facility's, where
+   GoldenEye hid it -- and every guard who goes down leaves his rifle behind,
+   which is how the KF7 is got at all. A pickup you cannot use (armour at full,
+   a rifle when the pouch is full) stays where it is for later. */
+var PICKUP_SPOTS = [
+  { kind: 'armor', x: 4.4, z: 4.35 },    // bathroom, third stall
+  { kind: 'armor', x: 22.6, z: 25.4 },   // control room, behind the terminal bank
+  { kind: 'ammo',  x: 11.2, z: 21.2 },   // chemical plant, by the crate
+  { kind: 'ammo',  x: 23.2, z: 19.3 }    // laboratory, far corner
+];
+var PICKUPS = { list: [], statics: [] };
+
+function makeArmorMesh() {
+  var g = new THREE.Group();
+  var vest = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.52, 0.14), MAT.guardVest);
+  vest.position.y = 0.26;
+  g.add(vest);
+  var strip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.02), MAT.armorStrip);
+  strip.position.set(0, 0.38, 0.08);
+  g.add(strip);
+  g.rotation.x = -1.2;          // lying on the floor, tilted up at you
+  return g;
+}
+function makeAmmoMesh() {
+  var g = new THREE.Group();
+  var box = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.26, 0.3), MAT.ammoCrate);
+  box.position.y = 0.13;
+  g.add(box);
+  var lid = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.03, 0.32), MAT.brass);
+  lid.position.y = 0.275;
+  g.add(lid);
+  return g;
+}
+
+function buildPickups(level) {
+  PICKUPS.statics.length = 0;
+  for (var i = 0; i < PICKUP_SPOTS.length; i++) {
+    var sp = PICKUP_SPOTS[i];
+    var x = cellToWorldX(sp.x - 0.5) , z = cellToWorldZ(sp.z - 0.5);
+    var mesh = sp.kind === 'armor' ? makeArmorMesh() : makeAmmoMesh();
+    var y = supportHeight(x, z);
+    mesh.position.set(x, y, z);
+    mesh.traverse(function (o) { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+    PICKUPS.statics.push({ kind: sp.kind, mesh: mesh, pos: new THREE.Vector3(x, y, z),
+                           amount: sp.kind === 'armor' ? CFG.pickups.armor : CFG.pickups.kf7Crate,
+                           taken: false, dynamic: false, baseY: y });
+  }
+}
+
+/* Put the level's own pickups back and clear anything dropped last mission. */
+function resetPickups() {
+  for (var i = 0; i < PICKUPS.list.length; i++) {
+    var p = PICKUPS.list[i];
+    RENDER.scene.remove(p.mesh);
+    if (p.dynamic) p.mesh.traverse(function (o) { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+  }
+  PICKUPS.list.length = 0;
+  for (i = 0; i < PICKUPS.statics.length; i++) {
+    var s = PICKUPS.statics[i];
+    s.taken = false;
+    s.mesh.position.y = s.baseY;
+    RENDER.scene.add(s.mesh);
+    PICKUPS.list.push(s);
+  }
+}
+
+function spawnRiflePickup(mesh, rounds) {
+  PICKUPS.list.push({ kind: 'kf7', mesh: mesh, pos: mesh.position.clone(), amount: rounds,
+                      taken: false, dynamic: true, baseY: mesh.position.y });
+}
+
+/* Apply a pickup; returns false if it would do nothing, so it stays put. */
+function applyPickup(p) {
+  var kf7 = WEAPONS.list[1];
+  if (p.kind === 'armor') {
+    if (PLAYER.armor >= CFG.player.maxArmor) return false;
+    PLAYER.armor = Math.min(CFG.player.maxArmor, PLAYER.armor + p.amount);
+    hudToast('Body armour');
+    return true;
+  }
+  var cap = CFG.pickups.kf7ReserveCap;
+  if (kf7.owned && kf7.reserve >= cap) return false;
+  var fresh = !kf7.owned;
+  if (fresh) {
+    kf7.owned = true;
+    // a rifle comes loaded: the first magazine goes straight in
+    var load = Math.min(kf7.magSize, p.amount);
+    kf7.ammoInMag = load;
+    kf7.reserve = Math.min(cap, p.amount - load);
+  } else {
+    kf7.reserve = Math.min(cap, kf7.reserve + p.amount);
+  }
+  hudToast(fresh ? 'Picked up the KF7 Soviet  [2]' : ('KF7 ammo +' + p.amount));
+  return true;
+}
+
+function updatePickups(dt) {
+  var r2 = CFG.pickups.radius * CFG.pickups.radius;
+  for (var i = PICKUPS.list.length - 1; i >= 0; i--) {
+    var p = PICKUPS.list[i];
+    if (!p.dynamic) {
+      p.mesh.rotation.y += dt * 1.2;          // a slow turn catches the eye
+    }
+    var dx = p.pos.x - PLAYER.pos.x, dz = p.pos.z - PLAYER.pos.z;
+    if (dx * dx + dz * dz > r2 || Math.abs(p.pos.y - PLAYER.pos.y) > 1.2) continue;
+    if (!applyPickup(p)) continue;
+    p.taken = true;
+    sfxPickup();
+    RENDER.scene.remove(p.mesh);
+    if (p.dynamic) p.mesh.traverse(function (o) { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+    PICKUPS.list.splice(i, 1);
+  }
+}
+
+/* ---------- paintball mode ----------
+   GoldenEye's paintball cheat swapped bullet holes for splats of colour. A
+   fixed ring of flat discs, recycled oldest-first, so a long firefight costs
+   no allocation and never grows the scene. */
+var PAINT = { pool: [], head: 0, colors: [0xff2d9b, 0x2dd4ff, 0xffe12d, 0x7dff2d, 0xff7a2d, 0xb46bff] };
+var _paintN = new THREE.Vector3(), _paintQ = new THREE.Quaternion(), _paintUp = new THREE.Vector3(0, 0, 1);
+function ensurePaintPool() {
+  if (!PAINT.pool.length) {
+    var geo = new THREE.CircleGeometry(0.11, 10);
+    for (var i = 0; i < 48; i++) {
+      var m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      m.visible = false; m.castShadow = false; m.receiveShadow = true;
+      RENDER.scene.add(m);
+      PAINT.pool.push(m);
+    }
+  }
+}
+function paintSplat(point, normal, object) {
+  ensurePaintPool();
+  var s = PAINT.pool[PAINT.head];
+  PAINT.head = (PAINT.head + 1) % PAINT.pool.length;
+  _paintN.copy(normal || _paintUp);
+  if (object && object.matrixWorld && normal) _paintN.transformDirection(object.matrixWorld);
+  _paintQ.setFromUnitVectors(_paintUp, _paintN);
+  s.quaternion.copy(_paintQ);
+  s.position.copy(point).addScaledVector(_paintN, 0.01);
+  s.material.color.setHex(PAINT.colors[(Math.random() * PAINT.colors.length) | 0]);
+  s.scale.setScalar(randRange(0.7, 1.4));
+  s.visible = true;
+}
+function clearPaint() { for (var i = 0; i < PAINT.pool.length; i++) PAINT.pool[i].visible = false; }
+
 function updateWeapons(dt, input) {
   if (WEAPONS.cooldown > 0) WEAPONS.cooldown -= dt;
   if (WEAPONS.reloading > 0) {
     WEAPONS.reloading -= dt;
     if (WEAPONS.reloading <= 0) { WEAPONS.reloading = 0; finishReload(); }
   }
-  WEAPONS.aiming = !!input.aim && !PLAYER.sprinting;
+  WEAPONS.aiming = (!!input.aim || !!input.aimToggle) && !PLAYER.sprinting;
 
   // Muzzle flash: light is binary for 80ms; the quad scales 0->1 over the first
   // 30ms then 1->0 over the next 30ms, synchronised with it.
@@ -5396,6 +5885,210 @@ function updateWeapons(dt, input) {
 
 var ENEMIES = { list: [], sightTick: 0, runnerActive: null };
 
+/* ---------- navigation ----------
+   Guards used to walk in a straight line at whatever they wanted, with no path
+   search at all. A runner whose panel was round a corner stood against a wall
+   until a timer gave up on him, a search ended at the first doorway, and the
+   stuck failsafe teleported people back to their patrol posts. That is the
+   opposite of GoldenEye, whose garrison came and found you.
+
+   The level is already a grid of 4m cells, so the navigation graph is that
+   grid. Each open cell gets one node -- its centre, or the nearest spot in it
+   a body actually fits if furniture sits on the centre -- and A* runs over
+   eight-way links. A guard with a clear straight run skips the graph entirely,
+   and one following a path cuts corners whenever the next-but-one node is in
+   reach, so paths read as walking rather than as tracing squares. */
+var NAV = { w: 0, h: 0, open: null, nx: null, nz: null, door: null, cols: null, edge: null };
+/* The eight neighbour directions; bit k of NAV.edge[cell] says the straight
+   walk from this cell's node to that neighbour's node is clear for a body. */
+var NAV_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+var BODY_R = 0.3, BODY_STEP = 0.55;
+
+/* Collision boxes bucketed by cell, each expanded by a body radius, so a body
+   query looks at the handful of boxes near it rather than all of them. */
+function buildCollisionCells(level) {
+  var w = level.plan.w, h = level.plan.h, cells = new Array(w * h);
+  for (var i = 0; i < cells.length; i++) cells[i] = [];
+  var list = level.collidables, pad = 0.5;
+  for (i = 0; i < list.length; i++) {
+    var b = list[i];
+    var x0 = Math.max(0, worldToCellX(b.minX - pad)), x1 = Math.min(w - 1, worldToCellX(b.maxX + pad));
+    var z0 = Math.max(0, worldToCellZ(b.minZ - pad)), z1 = Math.min(h - 1, worldToCellZ(b.maxZ + pad));
+    for (var z = z0; z <= z1; z++) for (var x = x0; x <= x1; x++) cells[z * w + x].push(b);
+  }
+  NAV.cols = cells;
+}
+var _noBoxes = [];
+function boxesNear(x, z) {
+  var cx = worldToCellX(x), cz = worldToCellZ(z);
+  if (cx < 0 || cz < 0 || cx >= NAV.w || cz >= NAV.h) return _noBoxes;
+  return NAV.cols[cz * NAV.w + cx];
+}
+
+/* Would a guard's body fit here, standing on whatever supports it at y?
+   Kerbs and the control-room platform are stepped onto, not walked into:
+   guards used to treat the 0.4m platform as a wall, so the guard posted on it
+   was stuck until the failsafe teleported him off, and could never get back
+   on. Doors are ignored -- they open for anyone who walks up to them -- unless
+   locked. */
+function bodyFits(x, z, y) {
+  var list = boxesNear(x, z);
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    if (b.disabled || b.walkable) continue;
+    if (b.tag === 'door' && !b.door.locked) continue;
+    if (b.maxY - y <= BODY_STEP) continue;
+    if (x + BODY_R > b.minX && x - BODY_R < b.maxX && z + BODY_R > b.minZ && z - BODY_R < b.maxZ &&
+        y + 1.7 > b.minY && y + 0.1 < b.maxY) return false;
+  }
+  return true;
+}
+function supportHeight(x, z) {
+  var list = boxesNear(x, z), best = 0;
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    if (b.disabled || !b.walkable) continue;
+    if (x + BODY_R <= b.minX || x - BODY_R >= b.maxX || z + BODY_R <= b.minZ || z - BODY_R >= b.maxZ) continue;
+    if (b.maxY <= BODY_STEP && b.maxY > best) best = b.maxY;
+  }
+  return best;
+}
+
+/* Is a straight walk from a to b clear for a body? Sampled every 0.35m. */
+function walkClear(ax, az, bx, bz) {
+  var dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz);
+  var n = Math.max(1, Math.ceil(len / 0.35));
+  for (var i = 1; i <= n; i++) {
+    var t = i / n, x = ax + dx * t, z = az + dz * t;
+    if (!bodyFits(x, z, supportHeight(x, z))) return false;
+  }
+  return true;
+}
+
+function buildNav(level) {
+  var plan = level.plan, w = plan.w, h = plan.h;
+  NAV.w = w; NAV.h = h;
+  buildCollisionCells(level);
+  NAV.open = new Uint8Array(w * h);
+  NAV.nx = new Float32Array(w * h); NAV.nz = new Float32Array(w * h);
+  NAV.door = new Array(w * h);
+  for (var i = 0; i < level.doors.length; i++) {
+    var d = level.doors[i];
+    d.aabb.door = d;
+    NAV.door[worldToCellZ(d.z) * w + worldToCellX(d.x)] = d;
+  }
+  var offs = [[0, 0], [0.9, 0], [-0.9, 0], [0, 0.9], [0, -0.9], [0.9, 0.9], [-0.9, 0.9], [0.9, -0.9], [-0.9, -0.9],
+              [1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]];
+  for (var z = 0; z < h; z++) {
+    for (var x = 0; x < w; x++) {
+      if (!isPassable(level.grid[z][x])) continue;
+      var cx = cellToWorldX(x), cz = cellToWorldZ(z);
+      for (var k = 0; k < offs.length; k++) {
+        var px = cx + offs[k][0], pz = cz + offs[k][1];
+        if (bodyFits(px, pz, supportHeight(px, pz))) {
+          NAV.open[z * w + x] = 1; NAV.nx[z * w + x] = px; NAV.nz[z * w + x] = pz;
+          break;
+        }
+      }
+    }
+  }
+  // Two neighbouring cells being open does not make the walk between their
+  // nodes clear: a lab bench spans a whole 4m cell. Every link is walked once
+  // here, at build time, and only links a body can actually take are kept.
+  NAV.edge = new Uint8Array(w * h);
+  // Built with every door unlocked: a lock is a state, checked per query by
+  // navCellOpen. Baking the exit's lock in here cut the exit hall off for good.
+  var locks = [];
+  for (i = 0; i < level.doors.length; i++) { locks.push(level.doors[i].locked); level.doors[i].locked = false; }
+  for (z = 0; z < h; z++) {
+    for (x = 0; x < w; x++) {
+      var ci = z * w + x;
+      if (!NAV.open[ci]) continue;
+      for (var k2 = 0; k2 < NAV_DIRS.length; k2++) {
+        var ex = x + NAV_DIRS[k2][0], ez = z + NAV_DIRS[k2][1];
+        if (ex < 0 || ez < 0 || ex >= w || ez >= h) continue;
+        var ni = ez * w + ex;
+        if (!NAV.open[ni]) continue;
+        if (walkClear(NAV.nx[ci], NAV.nz[ci], NAV.nx[ni], NAV.nz[ni])) NAV.edge[ci] |= (1 << k2);
+      }
+    }
+  }
+  for (i = 0; i < level.doors.length; i++) level.doors[i].locked = locks[i];
+}
+
+function navCellOpen(x, z) {
+  if (x < 0 || z < 0 || x >= NAV.w || z >= NAV.h) return false;
+  var i = z * NAV.w + x;
+  if (!NAV.open[i]) return false;
+  var d = NAV.door[i];
+  return !(d && d.locked);
+}
+
+/* Nearest open node to a world point, searching outward a couple of rings. */
+function navCellFor(x, z) {
+  var cx = worldToCellX(x), cz = worldToCellZ(z);
+  if (navCellOpen(cx, cz)) return cz * NAV.w + cx;
+  var best = -1, bestD = Infinity;
+  for (var r = 1; r <= 2; r++) {
+    for (var dz = -r; dz <= r; dz++) for (var dx = -r; dx <= r; dx++) {
+      var nx = cx + dx, nz = cz + dz;
+      if (!navCellOpen(nx, nz)) continue;
+      var i = nz * NAV.w + nx, dd = Math.hypot(NAV.nx[i] - x, NAV.nz[i] - z);
+      if (dd < bestD) { bestD = dd; best = i; }
+    }
+    if (best >= 0) return best;
+  }
+  return -1;
+}
+
+/* A* over the cell grid. Writes node indices, start to goal, into out and
+   returns true if a route exists. Diagonal steps need both orthogonal
+   neighbours open, so a path never cuts a wall corner. */
+var _navG = null, _navF = null, _navFrom = null, _navOpen = [], _navStamp = null, _navGen = 0;
+function navPath(fromCell, toCell, out) {
+  out.length = 0;
+  if (fromCell < 0 || toCell < 0) return false;
+  var n = NAV.w * NAV.h, w = NAV.w;
+  if (!_navG || _navG.length !== n) {
+    _navG = new Float32Array(n); _navF = new Float32Array(n);
+    _navFrom = new Int32Array(n); _navStamp = new Uint32Array(n);
+  }
+  _navGen++;
+  var gen = _navGen, closedGen = (0x80000000 | gen) >>> 0;   // unsigned, to match the Uint32Array it is compared against
+  var tx = toCell % w, tz = (toCell / w) | 0;
+  function heur(i) { var dx = Math.abs(i % w - tx), dz = Math.abs(((i / w) | 0) - tz); return (dx + dz) + (1.4142 - 2) * Math.min(dx, dz); }
+  _navOpen.length = 0;
+  _navStamp[fromCell] = gen; _navG[fromCell] = 0; _navF[fromCell] = heur(fromCell); _navFrom[fromCell] = -1;
+  _navOpen.push(fromCell);
+  while (_navOpen.length) {
+    var bi = 0;
+    for (var k = 1; k < _navOpen.length; k++) if (_navF[_navOpen[k]] < _navF[_navOpen[bi]]) bi = k;
+    var cur = _navOpen[bi];
+    _navOpen[bi] = _navOpen[_navOpen.length - 1]; _navOpen.pop();
+    if (cur === toCell) {
+      for (var c = cur; c !== -1; c = _navFrom[c]) out.push(c);
+      out.reverse();
+      return true;
+    }
+    _navStamp[cur] = closedGen;
+    var cx = cur % w, cz = (cur / w) | 0;
+    for (var k = 0; k < NAV_DIRS.length; k++) {
+      if (!(NAV.edge[cur] & (1 << k))) continue;
+      var dx = NAV_DIRS[k][0], dz = NAV_DIRS[k][1];
+      var nx = cx + dx, nz = cz + dz;
+      if (!navCellOpen(nx, nz)) continue;
+      if (dx && dz && (!navCellOpen(cx + dx, cz) || !navCellOpen(cx, cz + dz))) continue;
+      var ni = nz * w + nx;
+      if (_navStamp[ni] === closedGen) continue;
+      var g = _navG[cur] + ((dx && dz) ? 1.4142 : 1);
+      if (_navStamp[ni] === gen && g >= _navG[ni]) continue;
+      if (_navStamp[ni] !== gen) _navOpen.push(ni);
+      _navStamp[ni] = gen; _navG[ni] = g; _navF[ni] = g + heur(ni); _navFrom[ni] = cur;
+    }
+  }
+  return false;
+}
+
 var Enemy = function (position, patrolPoints, kind) {
   this.kind = kind || 'guard';
   this.state = 'PATROL';
@@ -5403,7 +6096,8 @@ var Enemy = function (position, patrolPoints, kind) {
   this.maxHealth = this.health;
   this.patrolPoints = patrolPoints || [];
   this.currentPatrolIdx = 0;
-  this.lastKnownPlayerPos = null;
+  this.lastKnownPlayerPos = new THREE.Vector3();
+  this.hasLastKnown = false;
   this.stateClock = 0;
   this.alertness = 0;
   this.canSee = false;
@@ -5413,9 +6107,13 @@ var Enemy = function (position, patrolPoints, kind) {
   this.pauseClock = 0;
   this.deathClock = 0;
   this.disarmed = false; this.limp = false; this.flinch = 0; this.droppedGun = null;
-  this.alarmTarget = null; this.alarmBest = Infinity; this.alarmStall = 0;
+  this.alarmTarget = null; this.runClock = 0; this.runCheckAt = null;
   this.speed = this.kind === 'scientist' ? 3.4 : 2.1;
   this.chaseSpeed = this.kind === 'scientist' ? 4.4 : 3.4;
+  // navigation state, all owned and reused
+  this.path = []; this.pathIdx = 0; this.pathGoal = -1; this.repathClock = 0; this.direct = false;
+  this.goal = new THREE.Vector3(); this.fleeTo = new THREE.Vector3(); this.hasFlee = false;
+  this.stuck = 0; this.sweeps = 0;
   this.buildMesh(position);
 };
 
@@ -5436,9 +6134,8 @@ Enemy.prototype.buildMesh = function (position) {
     m.castShadow = true; m.receiveShadow = true;
     return m;
   }
-  // The part sizes below are exactly as specified; they are seated so the body
-  // is continuous, then the whole assembly is scaled to the 1.75m capsule the
-  // AI and hit detection already use. Scaling preserves the given proportions.
+  // The part sizes below are seated so the body is continuous, then the whole
+  // assembly is scaled to the 1.75m capsule the AI and hit detection use.
   var body = new THREE.Group();
   this.body = body;
   this.torso = part(0.45, 0.55, 0.25, 0, 0.745, 0, isSci ? MAT.labCoat : MAT.enemyTorso);
@@ -5448,16 +6145,30 @@ Enemy.prototype.buildMesh = function (position) {
   this.armL  = part(0.14, 0.35, 0.14, -0.295, 0.80, 0, uniform);
   this.armR  = part(0.14, 0.35, 0.14, 0.295, 0.80, 0, uniform);
   body.add(this.torso, this.head, this.legL, this.legR, this.armL, this.armR);
-  body.scale.setScalar(1.35);
+  body.scale.setScalar(BODY_SCALE);
   g.add(body);
 
   // torso and legs carry the silhouette; arms and head add nothing to a shadow
   this.head.castShadow = false; this.armL.castShadow = false; this.armR.castShadow = false;
 
+  // DK Mode, GoldenEye's best-loved cheat: huge heads and long arms. The head
+  // grows up from the neck so the head zone's lower edge is unchanged and the
+  // hit classifier needs no special case; only the proxy box grows to cover it.
+  var headTop = 1.30;
+  if (GAME.dk) {
+    var hs = 2.2;
+    this.head.scale.setScalar(hs);
+    this.head.position.y = 1.02 + 0.14 * hs;
+    this.armL.scale.y = this.armR.scale.y = 1.6;
+    this.armL.position.y = this.armR.position.y = 0.975 - 0.175 * 1.6;
+    headTop = 1.02 + 0.28 * hs;
+  }
+
   if (!isSci) {
     var beretGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.04, 12, 1);
     this.beret = new THREE.Mesh(beretGeo, MAT.enemyBeret);
-    this.beret.position.set(0, 1.160 + 0.14, 0);
+    this.beret.position.set(0, headTop + 0.01, 0);
+    if (GAME.dk) this.beret.scale.set(2.2, 1.5, 2.2);
     this.beret.castShadow = false;
     body.add(this.beret);
 
@@ -5471,7 +6182,7 @@ Enemy.prototype.buildMesh = function (position) {
 
   // Alert indicator: only visible while this one is actively hunting.
   this.alertDot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), MAT.alertDot);
-  this.alertDot.position.set(0, 1.92, 0);
+  this.alertDot.position.set(0, headTop * BODY_SCALE + 0.17, 0);
   this.alertDot.visible = false;
   this.alertDot.castShadow = false;
   g.add(this.alertDot);
@@ -5485,10 +6196,10 @@ Enemy.prototype.buildMesh = function (position) {
   this.flashMats = null;
 
   // A single low-poly proxy carries the raycast so a shot tests one box per
-  // enemy rather than nine.
-  this.hitMesh = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.75, 0.5),
-    new THREE.MeshStandardMaterial({ visible: false }));
-  this.hitMesh.position.set(0, 0.88, 0);
+  // enemy rather than nine. It spans feet to the top of the head.
+  var proxyH = headTop * BODY_SCALE;
+  this.hitMesh = new THREE.Mesh(new THREE.BoxGeometry(0.62, proxyH, 0.5), HIT_PROXY_MAT);
+  this.hitMesh.position.set(0, proxyH / 2, 0);
   this.hitMesh.userData.enemy = this;
   g.add(this.hitMesh);
   g.traverse((function (self) { return function (o) { o.userData.enemy = self; }; })(this));
@@ -5496,10 +6207,12 @@ Enemy.prototype.buildMesh = function (position) {
   this.group = g;
   RENDER.scene.add(g);
 };
+/* One invisible material for every proxy box rather than one per enemy. */
+var HIT_PROXY_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
-/* White emissive flash on every part for 80ms, then back to black. Materials are
-   shared between enemies, so each hit swaps in a per-enemy clone for the
-   duration rather than tinting every guard in the level. */
+/* White emissive flash on every part for 80ms, then back. Materials are shared
+   between enemies, so each hit swaps in a per-enemy clone for the duration
+   rather than tinting every guard in the level. */
 Enemy.prototype.startHitFlash = function () {
   if (!this.flashMats) {
     this.flashMats = [];
@@ -5520,22 +6233,34 @@ Enemy.prototype.endHitFlash = function () {
   }
   this.hitFlashT = 0;
 };
+/* The cloned flash materials belong to this enemy alone, so they go with it. */
+Enemy.prototype.dispose = function () {
+  RENDER.scene.remove(this.group);
+  this.group.traverse(function (o) {
+    if (o.isMesh && o.geometry) o.geometry.dispose();   // materials are shared, geometry is not
+  });
+  if (this.flashMats) for (var i = 0; i < this.flashMats.length; i++) this.flashMats[i].dispose();
+  this.flashMats = null;
+};
 
 Enemy.prototype.setState = function (s) {
   if (this.state === s) return;
   this.state = s;
   this.stateClock = 0;
+  this.pathGoal = -1;                  // a new intent plans a new route
   if (s === 'ATTACK') this.fireClock = CFG.difficulty[GAME.difficulty].reaction;
-  // Committing to the player is what raises the alarm, from whichever state the
-  // enemy got there — SEARCH can promote straight to ATTACK on sight.
-  // Raising the alarm is no longer a side effect of noticing you: a guard has
-  // to reach a panel and pull it. See alert() and chase().
+  if (s !== 'CHASE') this.hasFlee = false;
+};
+
+Enemy.prototype.setLastKnown = function (x, z) {
+  this.lastKnownPlayerPos.set(x, 0, z);
+  this.hasLastKnown = true;
 };
 
 /* Scratch vectors for the per-frame AI paths. Each is written immediately
    before use and never held across another call that writes the same one. */
 var _eyeVec = new THREE.Vector3(), _sightTo = new THREE.Vector3(),
-    _shootTo = new THREE.Vector3(), _shootDir = new THREE.Vector3();
+    _shootTo = new THREE.Vector3(), _shootDir = new THREE.Vector3(), _navTo = new THREE.Vector3();
 Enemy.prototype.eyePos = function () {
   return _eyeVec.set(this.group.position.x, this.group.position.y + 1.56, this.group.position.z);
 };
@@ -5572,19 +6297,19 @@ Enemy.prototype.update = function (dt, playerPos) {
   else if (far) this.canSee = false;
 
   if (this.canSee) {
-    // owned vector, written in place: this ran every frame for every enemy
-    if (!this.lastKnownPlayerPos) this.lastKnownPlayerPos = new THREE.Vector3();
-    this.lastKnownPlayerPos.copy(playerPos);
+    this.setLastKnown(playerPos.x, playerPos.z);
+    this.sweeps = 0;                       // a fresh sighting restarts the sweep
     this.alertness = Math.min(1, this.alertness + dt * 2.2);
   } else {
     this.alertness = Math.max(0, this.alertness - dt * 0.25);
   }
 
   // hearing: gunfire and running footsteps
-  if (GAME.noise && GAME.noise.t > 0 && this.state === 'PATROL') {
-    var nd = Math.hypot(GAME.noise.x - this.group.position.x, GAME.noise.z - this.group.position.z);
-    if (nd < GAME.noise.r) {
-      this.lastKnownPlayerPos = new THREE.Vector3(GAME.noise.x, 0, GAME.noise.z);
+  var noise = GAME.noise;
+  if (noise.t > 0 && this.state === 'PATROL') {
+    var nd = Math.hypot(noise.x - this.group.position.x, noise.z - this.group.position.z);
+    if (nd < noise.r) {
+      this.setLastKnown(noise.x, noise.z);
       this.setState('SEARCH');
     }
   }
@@ -5606,7 +6331,9 @@ Enemy.prototype.patrol = function (dt) {
   if (!this.patrolPoints.length) { this.yaw += Math.sin(this.stateClock * 0.7) * dt * 0.6; this.applyYaw(); return; }
   if (this.pauseClock > 0) { this.pauseClock -= dt; this.applyYaw(); return; }
   var target = this.patrolPoints[this.currentPatrolIdx % this.patrolPoints.length];
-  if (this.moveToward(target, dt, this.speed)) {
+  // navigate, not a straight line: after a search a guard can be a long way
+  // from his route, and the way back is rarely straight
+  if (this.navigate(target, dt, this.speed, 0.55)) {
     this.currentPatrolIdx = (this.currentPatrolIdx + 1) % this.patrolPoints.length;
     this.pauseClock = randRange(0.5, 1.8);
   }
@@ -5614,15 +6341,17 @@ Enemy.prototype.patrol = function (dt) {
 
 Enemy.prototype.alert = function (dt) {
   this.applyYaw();
-  if (this.lastKnownPlayerPos) this.faceToward(this.lastKnownPlayerPos, dt, 7);
+  if (this.hasLastKnown) this.faceToward(this.lastKnownPlayerPos, dt, 7);
   if (this.stateClock >= CFG.ai.alertPause) {
-    if (!this.isCombatant()) { this.setState('SEARCH'); return; }   // staff and the disarmed flee
+    if (!this.isCombatant()) { this.setState('CHASE'); return; }   // staff and the disarmed flee
     // First guard to react breaks for a panel rather than engaging. If every
     // panel in the building is dead he has nothing to run to, and fights.
     if (!GAME.alarm && !ENEMIES.runnerActive) {
       var panel = nearestLivePanel(this.group.position);
       if (panel) {
         this.alarmTarget = panel;
+        this.runClock = 0;
+        this.runCheckAt = null;
         ENEMIES.runnerActive = this;
         this.setState('CHASE');
         return;
@@ -5632,41 +6361,62 @@ Enemy.prototype.alert = function (dt) {
   }
 };
 
+/* Somewhere to run to: an open cell well away from the player, preferring the
+   one that puts the most distance between them. Picked once per flight. */
+Enemy.prototype.pickFleeSpot = function (playerPos) {
+  var pos = this.group.position, best = -1, bestScore = -Infinity;
+  var cx = worldToCellX(pos.x), cz = worldToCellZ(pos.z);
+  for (var dz = -4; dz <= 4; dz++) for (var dx = -4; dx <= 4; dx++) {
+    var x = cx + dx, z = cz + dz;
+    if (!navCellOpen(x, z)) continue;
+    var i = z * NAV.w + x;
+    var fromPlayer = Math.hypot(NAV.nx[i] - playerPos.x, NAV.nz[i] - playerPos.z);
+    var fromMe = Math.hypot(NAV.nx[i] - pos.x, NAV.nz[i] - pos.z);
+    var score = fromPlayer - fromMe * 0.35;
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  if (best < 0) { this.fleeTo.copy(pos); }
+  else this.fleeTo.set(NAV.nx[best], 0, NAV.nz[best]);
+  this.hasFlee = true;
+};
+
 Enemy.prototype.chase = function (dt, playerPos) {
   // The runner ignores you entirely: his job is the panel on the wall.
   if (this.alarmTarget) {
     if (GAME.alarm || !this.alarmTarget.alive) { this.clearAlarmRun(); }
     else {
-      var pp = this.alarmTarget.pos;
-      var gap = Math.hypot(pp.x - this.group.position.x, pp.z - this.group.position.z);
-      // The panel is on a wall, so he pulls it from arm's length rather than
-      // walking into it.
-      if (gap < 1.7) { raiseAlarm(this); this.clearAlarmRun(); return; }
-      // Guards walk straight at what they want; there is no path search here.
-      // A runner whose way is blocked by geometry would otherwise stand in a
-      // corner forever and the alarm would simply never come, so a run that
-      // stops making progress is abandoned and he turns and fights instead.
-      if (gap < (this.alarmBest || Infinity) - 0.05) {
-        this.alarmBest = gap; this.alarmStall = 0;
-      } else {
-        this.alarmStall = (this.alarmStall || 0) + dt;
-        if (this.alarmStall > 2.5) { this.clearAlarmRun(); }
+      var pnl = this.alarmTarget;
+      var gap = Math.hypot(pnl.pos.x - this.group.position.x, pnl.pos.z - this.group.position.z);
+      if (gap < 1.2) { raiseAlarm(this); this.clearAlarmRun(); return; }
+      // With a real route to follow a run only fails if he is physically held
+      // up -- wedged in a doorway, or boxed in by you. Progress is judged over
+      // two-second windows; a window he barely moves in ends the run.
+      this.runClock += dt;
+      if (!this.runCheckAt) this.runCheckAt = this.group.position.clone();
+      if (this.runClock > 2) {
+        var moved = this.runCheckAt.distanceTo(this.group.position);
+        this.runCheckAt.copy(this.group.position);
+        this.runClock = 0;
+        if (moved < 0.5) { this.clearAlarmRun(); }
       }
-      if (this.alarmTarget) { this.moveToward(pp, dt, this.chaseSpeed); return; }
+      if (this.alarmTarget) { this.navigate(pnl.stand, dt, this.chaseSpeed, 0.3); return; }
     }
   }
-  var target = this.canSee ? playerPos : this.lastKnownPlayerPos;
-  if (!target) { this.setState('SEARCH'); return; }
-  var dist = this.group.position.distanceTo(target);
   if (!this.isCombatant()) {
-    // run away from the player, not toward
-    var away = this.group.position.clone().sub(playerPos).normalize().multiplyScalar(6).add(this.group.position);
-    this.moveToward(away, dt, this.chaseSpeed);
-    if (!this.canSee && this.stateClock > 4) this.setState('SEARCH');
+    // Run from the player, along a real route to somewhere far from him.
+    if (!this.hasFlee) this.pickFleeSpot(playerPos);
+    var there = this.navigate(this.fleeTo, dt, this.chaseSpeed, 0.6);
+    if (there) {
+      if (this.canSee && this.stateClock > 1.5) { this.hasFlee = false; this.stateClock = 0; }
+      else if (!this.canSee) this.setState('SEARCH');
+    }
     return;
   }
+  var target = this.canSee ? playerPos : (this.hasLastKnown ? this.lastKnownPlayerPos : null);
+  if (!target) { this.setState('SEARCH'); return; }
+  var dist = Math.hypot(target.x - this.group.position.x, target.z - this.group.position.z);
   if (this.canSee && dist < CFG.ai.fireRange) { this.setState('ATTACK'); return; }
-  if (this.moveToward(target, dt, this.chaseSpeed) && !this.canSee) this.setState('SEARCH');
+  if (this.navigate(target, dt, this.chaseSpeed, 0.8) && !this.canSee) this.setState('SEARCH');
   if (!this.canSee && this.stateClock > CFG.ai.searchTimeout) this.setState('SEARCH');
 };
 
@@ -5689,6 +6439,7 @@ Enemy.prototype.attack = function (dt, playerPos) {
     .addScaledVector(_atkSide, strafe)
     .addScaledVector(_atkDir, dist > 7 ? 0.8 : -0.4);
   this.moveToward(_atkWant, dt, this.speed * 0.9, true);
+  this.faceToward(playerPos, dt, 12);   // keep the rifle on you while stepping
 
   this.fireClock -= dt;
   if (this.fireClock <= 0) {
@@ -5701,20 +6452,39 @@ Enemy.prototype.attack = function (dt, playerPos) {
 
 Enemy.prototype.search = function (dt) {
   if (this.canSee) { this.setState(this.isCombatant() ? 'ATTACK' : 'CHASE'); return; }
-  if (this.lastKnownPlayerPos) {
-    if (this.moveToward(this.lastKnownPlayerPos, dt, this.speed * 1.1)) {
-      this.lastKnownPlayerPos = null;
+  // Staff and disarmed guards stay where they fled to and keep their heads
+  // down. They used to walk back to where they last saw you, straight into you.
+  if (this.hasLastKnown && this.isCombatant()) {
+    if (this.navigate(this.lastKnownPlayerPos, dt, this.speed * (GAME.alarm ? 1.5 : 1.1), 0.8)) {
+      this.hasLastKnown = false;
+      // With the alarm up the garrison does not go back to its posts: each
+      // guard sweeps the rooms around the last sighting instead.
+      if (GAME.alarm && this.sweeps < 6) { this.sweeps++; this.pickSweepSpot(); }
     }
   } else {
     this.yaw += Math.sin(this.stateClock * 1.6) * dt * 2.0;
     this.applyYaw();
   }
-  if (this.stateClock > CFG.ai.searchTimeout) {
+  if (this.stateClock > CFG.ai.searchTimeout * (GAME.alarm ? 5 : 1)) {
     this.setState('PATROL');
-    this.lastKnownPlayerPos = null;
+    this.hasLastKnown = false;
   }
 };
 
+/* A nearby open cell to sweep next, within two cells of where he is. */
+Enemy.prototype.pickSweepSpot = function () {
+  var pos = this.group.position;
+  var cx = worldToCellX(pos.x), cz = worldToCellZ(pos.z);
+  for (var tries = 0; tries < 12; tries++) {
+    var x = cx + ((Math.random() * 5) | 0) - 2, z = cz + ((Math.random() * 5) | 0) - 2;
+    if (!navCellOpen(x, z) || (x === cx && z === cz)) continue;
+    var i = z * NAV.w + x;
+    this.setLastKnown(NAV.nx[i], NAV.nz[i]);
+    return;
+  }
+};
+
+var _missDir = new THREE.Vector3(), _missAt = new THREE.Vector3();
 Enemy.prototype.shoot = function (playerPos) {
   var from = this.eyePos();
   var to = _shootTo.set(playerPos.x, playerPos.y + PLAYER.height * 0.55, playerPos.z);
@@ -5731,16 +6501,20 @@ Enemy.prototype.shoot = function (playerPos) {
     damagePlayer(randRange(6, 11), this.group.position);
   } else {
     // visible miss: spark off whatever is behind the player
-    var dir = to.clone().sub(from).normalize();
-    dir.x += randRange(-0.06, 0.06); dir.y += randRange(-0.04, 0.06); dir.z += randRange(-0.06, 0.06);
-    var r = new THREE.Raycaster(from, dir.normalize(), 0.2, 30);
-    var h = r.intersectObjects(LEVEL.raycastTargets, false);
-    if (h.length) { spawnImpactEffect(h[0].point, h[0].face ? h[0].face.normal : null, false); sfxImpact(h[0].point, true); }
+    _missDir.copy(_shootDir);
+    _missDir.x += randRange(-0.06, 0.06); _missDir.y += randRange(-0.04, 0.06); _missDir.z += randRange(-0.06, 0.06);
+    _missDir.normalize();
+    var d = rayBoxesDistance(from, _missDir, 0.2, 30);
+    if (d !== Infinity) {
+      _missAt.copy(from).addScaledVector(_missDir, d);
+      spawnImpactEffect(_missAt, null, false);
+      sfxImpact(_missAt, true);
+    }
   }
 };
 
 /* Is this enemy plausibly on the player's screen? Cheap: a facing test first,
-   and only then the raycast. Used to decide whether a failsafe may teleport him. */
+   and only then the sight test. Used to decide whether a failsafe may move him. */
 var _seeChk = null;
 function playerCanSeeEnemy(e) {
   var p = e.group.position;
@@ -5756,6 +6530,60 @@ function playerCanSeeEnemy(e) {
   return hasLineOfSight(RENDER.camera.position, _seeChk);
 }
 
+/* Where on a fresh route to start: the furthest of the next few nodes that a
+   straight walk reaches. Node 0 is the cell you stand in, but a cell is 4m
+   across -- you may be past its node already, or behind a bench from node 1 --
+   so neither "always skip it" nor "always visit it" is right. Always visiting
+   it made anyone whose goal shared their cell walk to the node, turn for the
+   goal, re-plan, and walk back to the node, forever. */
+function furthestReachableNode(x, z, path) {
+  var best = 0;
+  for (var i = Math.min(path.length - 1, 3); i >= 1; i--) {
+    if (walkClear(x, z, NAV.nx[path[i]], NAV.nz[path[i]])) { best = i; break; }
+  }
+  return best;
+}
+
+/* Head for a target, by the straight line when it is clear and by the nav
+   graph when it is not. Returns true on arrival within arrive metres. The
+   route is re-planned twice a second, or at once if the goal changes cell. */
+Enemy.prototype.navigate = function (target, dt, speed, arrive) {
+  var pos = this.group.position;
+  var dist = Math.hypot(target.x - pos.x, target.z - pos.z);
+  if (dist < arrive) return true;
+  var goalCell = navCellFor(target.x, target.z);
+  this.repathClock -= dt;
+  if (this.repathClock <= 0 || goalCell !== this.pathGoal) {
+    this.repathClock = 0.5 + Math.random() * 0.15;     // staggered, so the roster never plans in one frame
+    this.pathGoal = goalCell;
+    this.direct = walkClear(pos.x, pos.z, target.x, target.z);
+    if (!this.direct) {
+      navPath(navCellFor(pos.x, pos.z), goalCell, this.path);
+      this.pathIdx = furthestReachableNode(pos.x, pos.z, this.path);
+    }
+  }
+  if (this.direct || !this.path.length) {
+    this.moveToward(target, dt, speed, true);
+    return false;
+  }
+  // follow the route, cutting to the next-but-one node when it is in reach
+  if (this.pathIdx >= this.path.length) { this.moveToward(target, dt, speed, true); return false; }
+  var node = this.path[this.pathIdx];
+  var nx = NAV.nx[node], nz = NAV.nz[node];
+  if (Math.hypot(nx - pos.x, nz - pos.z) < 0.7) {
+    this.pathIdx++;
+    if (this.pathIdx < this.path.length && this.pathIdx + 1 < this.path.length) {
+      var ahead = this.path[this.pathIdx + 1];
+      if (walkClear(pos.x, pos.z, NAV.nx[ahead], NAV.nz[ahead])) this.pathIdx++;
+    }
+    if (this.pathIdx >= this.path.length) { this.moveToward(target, dt, speed, true); return false; }
+    node = this.path[this.pathIdx]; nx = NAV.nx[node]; nz = NAV.nz[node];
+  }
+  _navTo.set(nx, 0, nz);
+  this.moveToward(_navTo, dt, speed, true);
+  return false;
+};
+
 Enemy.prototype.moveToward = function (target, dt, speed, noArrive) {
   var pos = this.group.position;
   if (this.limp) speed *= 0.55;
@@ -5767,37 +6595,32 @@ Enemy.prototype.moveToward = function (target, dt, speed, noArrive) {
   dx /= dist; dz /= dist;
   this.faceToward(target, dt, 6);
 
-  var step = speed * dt;
+  var step = Math.min(speed * dt, dist);
   var nx = pos.x + dx * step, nz = pos.z + dz * step;
-  // AABB slide against the level, same treatment the player gets
-  var body = { minX: nx - 0.3, maxX: nx + 0.3, minY: pos.y + 0.1, maxY: pos.y + 1.7, minZ: nz - 0.3, maxZ: nz + 0.3 };
-  var blockedX = false, blockedZ = false;
-  for (var i = 0; i < LEVEL.collidables.length; i++) {
-    var b = LEVEL.collidables[i];
-    if (b.disabled) continue;
-    if (aabbOverlap(body, b)) {
-      var testX = { minX: nx - 0.3, maxX: nx + 0.3, minY: body.minY, maxY: body.maxY, minZ: pos.z - 0.3, maxZ: pos.z + 0.3 };
-      var testZ = { minX: pos.x - 0.3, maxX: pos.x + 0.3, minY: body.minY, maxY: body.maxY, minZ: nz - 0.3, maxZ: nz + 0.3 };
-      if (aabbOverlap(testX, b)) blockedX = true;
-      if (aabbOverlap(testZ, b)) blockedZ = true;
-    }
-  }
-  if (!blockedX) pos.x = nx;
-  if (!blockedZ) pos.z = nz;
-  // Failsafe: an enemy that intends to move but cannot is put back on its patrol
-  // node rather than grinding a corner forever. A guard blinking across the room
-  // in full view is worse than the stall it fixes, so the short fuse only burns
-  // while the player cannot see him; on screen he gets a much longer grace
-  // period, and the reset is still guaranteed so nothing can lock up for good.
-  if (blockedX && blockedZ) {
-    this.stuck = (this.stuck || 0) + dt;
+  // slide along whatever is in the way, one axis at a time, stepping up onto
+  // kerbs and the platform exactly as the player does
+  var movedX = false, movedZ = false;
+  // and never into the player: a step that closes to inside a body's width is
+  // not taken, so guards stop at you instead of walking through you
+  var tooClose = PLAYER && PLAYER.alive && Math.hypot(nx - PLAYER.pos.x, nz - PLAYER.pos.z) < BODY_GAP + 0.05 &&
+                 Math.hypot(nx - PLAYER.pos.x, nz - PLAYER.pos.z) < Math.hypot(pos.x - PLAYER.pos.x, pos.z - PLAYER.pos.z);
+  if (tooClose) { this.faceToward(PLAYER.pos, dt, 6); return false; }
+  if (bodyFits(nx, pos.z, supportHeight(nx, pos.z))) { pos.x = nx; movedX = true; }
+  if (bodyFits(pos.x, nz, supportHeight(pos.x, nz))) { pos.z = nz; movedZ = true; }
+  pos.y = supportHeight(pos.x, pos.z);
+  // Failsafe for a body that intends to move and cannot. With routes to follow
+  // this should be rare; when it happens the route is thrown away and planned
+  // again, and only a guard held fast for a long time -- and never one you are
+  // looking at -- is moved back onto his patrol post.
+  if (!movedX && !movedZ) {
+    this.stuck += dt;
+    if (this.stuck > 0.6) this.repathClock = 0;
     var onScreen = this.canSee || playerCanSeeEnemy(this);
-    if (this.stuck > (onScreen ? 6 : 2)) {
+    if (this.stuck > (onScreen ? 8 : 3) && this.patrolPoints.length) {
       this.stuck = 0;
-      if (this.patrolPoints.length) {
-        var p = this.patrolPoints[this.currentPatrolIdx % this.patrolPoints.length];
-        pos.x = p.x; pos.z = p.z;
-      }
+      var p = this.patrolPoints[this.currentPatrolIdx % this.patrolPoints.length];
+      pos.x = p.x; pos.z = p.z; pos.y = supportHeight(p.x, p.z);
+      this.pathGoal = -1;
     }
   } else this.stuck = 0;
   return false;
@@ -5817,7 +6640,7 @@ Enemy.prototype.animate = function (dt) {
     if (this.hitFlashT <= 0) this.endHitFlash();
   }
   if (this.alertDot) {
-    this.alertDot.visible = (this.state === 'ALERT' || this.state === 'ATTACK');
+    this.alertDot.visible = (this.state === 'ALERT' || this.state === 'ATTACK' || !!this.alarmTarget);
   }
   var moving = this.state === 'CHASE' || this.state === 'SEARCH' ||
                (this.state === 'PATROL' && this.pauseClock <= 0);
@@ -5839,7 +6662,7 @@ Enemy.prototype.takeDamage = function (amount, fromPos, zone) {
   this.startHitFlash();
   this.health -= amount;
   this.alertness = 1;
-  if (fromPos) this.lastKnownPlayerPos = fromPos.clone ? fromPos.clone() : new THREE.Vector3(fromPos.x, 0, fromPos.z);
+  if (fromPos) this.setLastKnown(fromPos.x, fromPos.z);
   if (this.health <= 0) { this.die(zone); return; }
 
   // A limb hit does little damage but changes what this guard can still do,
@@ -5848,44 +6671,62 @@ Enemy.prototype.takeDamage = function (amount, fromPos, zone) {
   // guard without killing him. A leg hit leaves him in the fight but slow.
   if (zone === 'arm' && this.gun && !this.disarmed) {
     this.disarm();
-    this.setState('SEARCH');            // he is running, not fighting
-    this.lastKnownPlayerPos = null;
+    this.setState('CHASE');              // CHASE is the flight path for the unarmed
     return;
   }
   if (zone === 'leg') this.limp = true;
 
   this.flinch = 0.28;                   // brief stagger, read in animate()
-  this.setState('ALERT');               // being shot always alerts, whatever it was doing
+  if (this.state !== 'ATTACK' && this.state !== 'CHASE') this.setState('ALERT');
 };
 
-/* Knock the rifle out of a guard's hands and leave it on the floor. */
-/* Lab staff never fight, and a guard whose rifle is on the floor no longer
-   can. Both run instead, which is why the two are asked the same question
-   everywhere the AI decides between closing in and getting clear. */
 Enemy.prototype.clearAlarmRun = function () {
   this.alarmTarget = null;
-  this.alarmBest = Infinity; this.alarmStall = 0;
+  this.runClock = 0; this.runCheckAt = null;
   if (ENEMIES.runnerActive === this) ENEMIES.runnerActive = null;
 };
 
+/* Lab staff never fight, and a guard whose rifle is on the floor no longer
+   can. Both run instead, which is why the two are asked the same question
+   everywhere the AI decides between closing in and getting clear. */
 Enemy.prototype.isCombatant = function () {
   return this.kind !== 'scientist' && !this.disarmed;
+};
+
+/* The rifle leaves his hands and lands on the floor as something you can pick
+   up -- the GoldenEye loop of going in with a pistol and leaving with theirs. */
+Enemy.prototype.dropGun = function () {
+  if (!this.gun) return null;
+  var wp = new THREE.Vector3();
+  this.gun.getWorldPosition(wp);
+  this.body.remove(this.gun);
+  var idx = this.parts.indexOf(this.gun);
+  if (idx >= 0) this.parts.splice(idx, 1);
+  if (this.flashMats && idx >= 0) {
+    this.gun.material = this.gun.userData.baseMat || this.gun.material;
+    this.flashMats[idx].dispose();
+    this.flashMats.splice(idx, 1);
+  }
+  var gun = this.gun;
+  this.gun = null;
+  var gx = wp.x, gz = wp.z;
+  // never drop it inside a wall or a console
+  if (!bodyFits(gx, gz, supportHeight(gx, gz))) { gx = this.group.position.x; gz = this.group.position.z; }
+  var gy = supportHeight(gx, gz);
+  gun.position.set(gx, gy + 0.06, gz);
+  gun.rotation.set(0, randRange(0, Math.PI * 2), Math.PI / 2);
+  gun.scale.setScalar(BODY_SCALE);
+  gun.userData.enemy = null;
+  RENDER.scene.add(gun);
+  this.droppedGun = gun;
+  spawnRiflePickup(gun, Math.round(randRange(CFG.pickups.kf7Drop[0], CFG.pickups.kf7Drop[1])));
+  return gun;
 };
 
 Enemy.prototype.disarm = function () {
   this.disarmed = true;
   this.clearAlarmRun();
-  if (!this.gun) return;
-  var wp = new THREE.Vector3();
-  this.gun.getWorldPosition(wp);
-  this.body.remove(this.gun);
-  this.gun.position.set(wp.x, 0.06, wp.z);
-  this.gun.rotation.set(Math.PI / 2, randRange(0, Math.PI), 0);
-  RENDER.scene.add(this.gun);
-  this.droppedGun = this.gun;
-  this.gun = null;
-  var idx = this.parts.indexOf(this.droppedGun);
-  if (idx >= 0) this.parts.splice(idx, 1);
+  this.dropGun();
   sfxImpact(this.group.position, false);
 };
 
@@ -5893,8 +6734,9 @@ Enemy.prototype.die = function (zone) {
   this.restY = this.group.position.y;    // where the body settles, for the sink-out
   this.deathZone = zone || 'torso';
   this.clearAlarmRun();          // someone else can make the run now
-  this.state = 'DEAD';
   this.endHitFlash();
+  this.dropGun();
+  this.state = 'DEAD';
   if (this.alertDot) this.alertDot.visible = false;
   this.deathClock = 0;
   this.health = 0;
@@ -5902,11 +6744,15 @@ Enemy.prototype.die = function (zone) {
   sfxEnemyDeath(this.group.position);
   PLAYER.kills++;
   GAME.kills++;
-  if (this.kind === 'scientist') GAME.sciKills++;
-  if (!GAME.alarm && this.kind !== 'scientist') {
-    // a body found later is not modelled; dying quietly is the reward for the PP7
-    GAME.bodies++;
+  if (this.kind === 'scientist') {
+    GAME.sciKills++;
+    var staff = objectiveById('staff');
+    if (staff && staff.tier <= GAME.difficulty && GAME.sciKills === 1) {
+      hudAlert('OBJECTIVE FAILED');
+      hudToast('A member of the lab staff is dead. That objective cannot be recovered.');
+    }
   }
+  if (!GAME.alarm && this.kind !== 'scientist') GAME.bodies++;
   hudUpdateObjectives();
   witnessDeath(this);
 };
@@ -5927,8 +6773,7 @@ function witnessDeath(victim) {
     _witnessFrom.set(e.group.position.x, e.group.position.y + 1.56, e.group.position.z);
     _witnessTo.set(vp.x, vp.y + 1.0, vp.z);
     if (!hasLineOfSight(_witnessFrom, _witnessTo)) continue;
-    if (!e.lastKnownPlayerPos) e.lastKnownPlayerPos = new THREE.Vector3();
-    e.lastKnownPlayerPos.copy(PLAYER.pos);
+    e.setLastKnown(PLAYER.pos.x, PLAYER.pos.z);
     e.setState('ALERT');
   }
 }
@@ -5938,10 +6783,9 @@ Enemy.prototype.updateDeath = function (dt) {
   // linear interpolation to -PI/2 over 400ms, driven from the update loop
   var t = Math.min(1, this.deathClock / 0.4);
   this.group.rotation.x = -t * (Math.PI / 2);
-  // Bodies used to blink out of existence on a 12s timer, which is a visible
-  // pop if you happen to be looking at one. They now settle through the floor
-  // over the last second instead. Sinking rather than fading on purpose: every
-  // enemy shares one set of materials, so fading one would fade all of them.
+  // Bodies settle through the floor over the last second rather than popping
+  // out of existence. Sinking rather than fading on purpose: every enemy shares
+  // one set of materials, so fading one would fade all of them.
   if (this.deathClock > 11 && this.group.visible) {
     var sink = Math.min(1, (this.deathClock - 11) / 1.0);
     this.group.position.y = this.restY - sink * 1.1;
@@ -5949,23 +6793,15 @@ Enemy.prototype.updateDeath = function (dt) {
   }
 };
 
-/* Line of sight runs several times a frame across the whole roster. It used to
-   build a Raycaster and a direction vector on every call; both are now reused,
-   because allocation in a per-frame path is what a garbage collector notices. */
-var _losRay = null, _losDir = null;
-function hasLineOfSight(from, to) {
-  if (!_losRay) { _losRay = new THREE.Raycaster(); _losDir = new THREE.Vector3(); }
-  _losDir.copy(to).sub(from);
-  var dist = _losDir.length();
-  if (dist < 0.01) return true;
-  _losDir.divideScalar(dist);
-  _losRay.set(from, _losDir);
-  _losRay.near = 0.05; _losRay.far = dist - 0.05;
-  return _losRay.intersectObjects(LEVEL.raycastTargets, false).length === 0;
-}
+/* hasLineOfSight lives with the collision code in Section 6. */
 
+/* One noise slot, overwritten in place: footsteps call this several times a
+   second and used to allocate a fresh object each time. A quieter sound does
+   not mask a louder one that is still ringing. */
 function makeNoise(x, z, radius) {
-  GAME.noise = { x: x, z: z, r: radius, t: 0.4 };
+  var n = GAME.noise;
+  if (n.t > 0 && n.r > radius) return;
+  n.x = x; n.z = z; n.r = radius; n.t = 0.4;
 }
 
 function raiseAlarm(source) {
@@ -5979,8 +6815,8 @@ function raiseAlarm(source) {
   for (var i = 0; i < ENEMIES.list.length; i++) {
     var e = ENEMIES.list[i];
     if (e.state === 'DEAD' || e === source) continue;
-    if (source && source.lastKnownPlayerPos) e.lastKnownPlayerPos = source.lastKnownPlayerPos.clone();
-    else e.lastKnownPlayerPos = PLAYER.pos.clone();
+    if (source && source.hasLastKnown) e.setLastKnown(source.lastKnownPlayerPos.x, source.lastKnownPlayerPos.z);
+    else e.setLastKnown(PLAYER.pos.x, PLAYER.pos.z);
     if (e.state === 'PATROL') e.setState('SEARCH');
   }
 }
@@ -6005,8 +6841,14 @@ function updateScreens(dt) {
 
 function updateEnemies(dt) {
   ENEMIES.sightTick++;
-  if (GAME.noise && GAME.noise.t > 0) GAME.noise.t -= dt;
-  for (var i = 0; i < ENEMIES.list.length; i++) ENEMIES.list[i].update(dt, PLAYER.pos);
+  if (GAME.noise.t > 0) GAME.noise.t -= dt;
+  for (var i = 0; i < ENEMIES.list.length; i++) {
+    var e = ENEMIES.list[i];
+    e.update(dt, PLAYER.pos);
+    // same reason as the camera: shots test the proxy box at its world matrix,
+    // so it has to be where the guard is now, not where he was last render
+    if (e.group.visible) e.group.updateMatrixWorld(true);
+  }
 }
 </script>
 
@@ -6023,23 +6865,23 @@ var INPUT = {
   moveX: 0, moveY: 0,
   lookX: 0, lookY: 0,              // radians applied this frame
   lookAccumX: 0, lookAccumY: 0,    // for viewmodel sway
-  mouseDX: 0, mouseDY: 0,          // pending mouse/drag delta
-  stickLookX: 0, stickLookY: 0,    // normalised right-stick deflection
-  fire: false, fireLatched: false, aim: false, crouch: false, sprint: false,
-  interact: false, invertY: false, sensitivity: 1.0,
-  keys: {}, pointerLocked: false, mouseDown: false, usingTouch: false
+  mouseDX: 0, mouseDY: 0,          // pending mouse delta
+  swipeDX: 0, swipeDY: 0,          // pending touch-swipe delta, in CSS pixels
+  fire: false, fireLatched: false, aim: false, aimToggle: false, crouch: false, sprint: false,
+  interact: false, invertY: false, sensitivity: 1.0, lookMode: 'swipe',
+  keys: {}, pointerLocked: false, lockWanted: false, mouseDown: false, usingTouch: false
 };
 
 var TOUCH = {
   deadZone: 8, maxRadius: 60, expo: 1.5,
-  lookRate: 2.6,          // radians/second at full deflection
-  left: { id: -1, ox: 0, oy: 0, x: 0, y: 0 },
-  right: { id: -1, ox: 0, oy: 0, x: 0, y: 0 },
+  lookRate: 2.6,          // stick mode: radians/second at full deflection
+  swipeRate: 0.0052,      // swipe mode: radians per CSS pixel of drag
+  left: { id: -1, ox: 0, oy: 0, x: 0, y: 0, mag: 0 },
+  right: { id: -1, ox: 0, oy: 0, x: 0, y: 0, mag: 0, lx: 0, ly: 0 },
   els: {}
 };
 
-/* The exact pipeline the brief specifies: raw offset, radial dead zone,
-   expo curve, normalise, scale. */
+/* The stick pipeline: raw offset, radial dead zone, expo curve, normalise. */
 function applyStick(dx, dy) {
   var mag = Math.hypot(dx, dy);
   if (mag < TOUCH.deadZone) return { x: 0, y: 0, mag: 0 };
@@ -6062,9 +6904,7 @@ function initInput() {
   window.addEventListener('mouseup', onMouseUp, false);
   window.addEventListener('mousemove', onMouseMove, false);
   canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); }, false);
-  document.addEventListener('pointerlockchange', function () {
-    INPUT.pointerLocked = (document.pointerLockElement === canvas);
-  }, false);
+  document.addEventListener('pointerlockchange', onPointerLockChange, false);
   window.addEventListener('wheel', function (e) {
     if (GAME.state !== 'playing') return;
     cycleWeapon(e.deltaY > 0 ? 1 : -1);
@@ -6072,24 +6912,44 @@ function initInput() {
 
   // ---------- touch ----------
   var opts = { passive: false };
-  canvas.addEventListener('touchstart', onTouchStart, opts);
-  canvas.addEventListener('touchmove', onTouchMove, opts);
-  canvas.addEventListener('touchend', onTouchEnd, opts);
-  canvas.addEventListener('touchcancel', onTouchEnd, opts);
   var tl = document.getElementById('touch');
-  tl.addEventListener('touchstart', onTouchStart, opts);
-  tl.addEventListener('touchmove', onTouchMove, opts);
-  tl.addEventListener('touchend', onTouchEnd, opts);
-  tl.addEventListener('touchcancel', onTouchEnd, opts);
+  [canvas, tl].forEach(function (el) {
+    el.addEventListener('touchstart', onTouchStart, opts);
+    el.addEventListener('touchmove', onTouchMove, opts);
+    el.addEventListener('touchend', onTouchEnd, opts);
+    el.addEventListener('touchcancel', onTouchEnd, opts);
+  });
 
   bindHoldButton('btnFire', function (down) { INPUT.fire = down; if (!down) INPUT.fireLatched = false; });
   bindHoldButton('btnUse', function (down) { INPUT.interact = down; });
   bindTapButton('btnWeap', function () { cycleWeapon(1); });
-  bindTapButton('btnCrouch', function () { INPUT.crouch = !INPUT.crouch; });
+  bindTapButton('btnCrouch', function () { INPUT.crouch = !INPUT.crouch; syncToggleButtons(); });
+  // Aiming down sights on a phone is a toggle: holding a third thumb on a
+  // button while also moving and looking is not a thing hands can do.
+  bindTapButton('btnAim', function () { INPUT.aimToggle = !INPUT.aimToggle; syncToggleButtons(); });
+  bindTapButton('btnReload', function () { reloadWeapon(); });
   bindTapButton('btnPause', function () { if (GAME.state === 'playing') pauseGame(); });
 
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, opts);
   document.addEventListener('dblclick', function (e) { e.preventDefault(); }, opts);
+}
+
+function syncToggleButtons() {
+  var a = document.getElementById('btnAim'), c = document.getElementById('btnCrouch');
+  if (a) a.classList.toggle('latched', !!INPUT.aimToggle);
+  if (c) c.classList.toggle('latched', !!INPUT.crouch);
+}
+
+/* Browsers drop pointer lock on Esc without always delivering the keydown, so
+   losing the lock while playing is itself the pause signal. A lock the game
+   released on purpose (pausing, the end screen) is not. */
+function onPointerLockChange() {
+  var canvas = document.getElementById('c');
+  var locked = document.pointerLockElement === canvas;
+  var lost = INPUT.pointerLocked && !locked;
+  INPUT.pointerLocked = locked;
+  if (lost && INPUT.lockWanted && GAME.state === 'playing') pauseGame();
+  INPUT.lockWanted = locked;
 }
 
 function isButtonTarget(el) {
@@ -6097,19 +6957,21 @@ function isButtonTarget(el) {
 }
 function onTouchStart(e) {
   if (GAME.state !== 'playing') return;
-  INPUT.usingTouch = true;
+  if (!INPUT.usingTouch) { INPUT.usingTouch = true; hudShow(true); }
   for (var i = 0; i < e.changedTouches.length; i++) {
     var t = e.changedTouches[i];
     if (isButtonTarget(t.target)) continue;          // buttons handle themselves
     var leftHalf = t.clientX < window.innerWidth * 0.45;
     var stick = leftHalf ? TOUCH.left : TOUCH.right;
     if (stick.id !== -1) continue;
-    stick.id = t.identifier; stick.ox = t.clientX; stick.oy = t.clientY; stick.x = 0; stick.y = 0;
+    stick.id = t.identifier; stick.ox = t.clientX; stick.oy = t.clientY; stick.x = 0; stick.y = 0; stick.mag = 0;
+    stick.lx = t.clientX; stick.ly = t.clientY;
+    // In swipe mode the right thumb is a trackpad, not a stick, so no ring.
+    if (!leftHalf && INPUT.lookMode === 'swipe') continue;
     var el = leftHalf ? TOUCH.els.stickL : TOUCH.els.stickR;
     el.style.left = t.clientX + 'px'; el.style.top = t.clientY + 'px';
     el.classList.add('on');
-    el.firstElementChild.style.left = '40px';
-    el.firstElementChild.style.top = '40px';
+    el.firstElementChild.style.transform = 'translate(0px,0px)';
   }
   e.preventDefault();
 }
@@ -6120,6 +6982,14 @@ function onTouchMove(e) {
                 (t.identifier === TOUCH.right.id) ? TOUCH.right : null;
     if (!stick) continue;
     var isLeft = (stick === TOUCH.left);
+    if (!isLeft && INPUT.lookMode === 'swipe') {
+      // direct look: the view follows the thumb, the way every modern mobile
+      // shooter aims; a rate stick is too coarse for a headshot
+      INPUT.swipeDX += t.clientX - stick.lx;
+      INPUT.swipeDY += t.clientY - stick.ly;
+      stick.lx = t.clientX; stick.ly = t.clientY;
+      continue;
+    }
     var dx = t.clientX - stick.ox, dy = t.clientY - stick.oy;
     var v = applyStick(dx, dy);
     stick.x = v.x; stick.y = v.y; stick.mag = v.mag;
@@ -6127,24 +6997,31 @@ function onTouchMove(e) {
     var el = isLeft ? TOUCH.els.stickL : TOUCH.els.stickR;
     var mag = Math.min(Math.hypot(dx, dy), TOUCH.maxRadius);
     var ang = Math.atan2(dy, dx);
-    el.firstElementChild.style.left = (40 + Math.cos(ang) * mag * 0.62) + 'px';
-    el.firstElementChild.style.top = (40 + Math.sin(ang) * mag * 0.62) + 'px';
+    el.firstElementChild.style.transform =
+      'translate(' + (Math.cos(ang) * mag * 0.62).toFixed(1) + 'px,' + (Math.sin(ang) * mag * 0.62).toFixed(1) + 'px)';
     if (isLeft) el.classList.toggle('sprint', v.mag > 0.85);
   }
   e.preventDefault();
 }
+function releaseStick(stick, el) {
+  stick.id = -1; stick.x = 0; stick.y = 0; stick.mag = 0;
+  el.classList.remove('on', 'sprint');
+}
 function onTouchEnd(e) {
   for (var i = 0; i < e.changedTouches.length; i++) {
     var id = e.changedTouches[i].identifier;
-    if (id === TOUCH.left.id) {
-      TOUCH.left.id = -1; TOUCH.left.x = 0; TOUCH.left.y = 0; TOUCH.left.mag = 0;
-      TOUCH.els.stickL.classList.remove('on', 'sprint');
-    } else if (id === TOUCH.right.id) {
-      TOUCH.right.id = -1; TOUCH.right.x = 0; TOUCH.right.y = 0; TOUCH.right.mag = 0;
-      TOUCH.els.stickR.classList.remove('on');
-    }
+    if (id === TOUCH.left.id) releaseStick(TOUCH.left, TOUCH.els.stickL);
+    else if (id === TOUCH.right.id) releaseStick(TOUCH.right, TOUCH.els.stickR);
   }
   e.preventDefault();
+}
+function releaseAllInput() {
+  INPUT.fire = false; INPUT.fireLatched = false; INPUT.interact = false; INPUT.aim = false;
+  INPUT.mouseDown = false; INPUT.mouseDX = INPUT.mouseDY = 0; INPUT.swipeDX = INPUT.swipeDY = 0;
+  INPUT.keys = {};
+  if (TOUCH.els.stickL) { releaseStick(TOUCH.left, TOUCH.els.stickL); releaseStick(TOUCH.right, TOUCH.els.stickR); }
+  var pressed = document.querySelectorAll('.tbtn.press');
+  for (var i = 0; i < pressed.length; i++) pressed[i].classList.remove('press');
 }
 function bindHoldButton(id, fn) {
   var el = document.getElementById(id);
@@ -6168,15 +7045,24 @@ function bindHoldButton(id, fn) {
   el.addEventListener('mouseup', function (e) { e.preventDefault(); e.stopPropagation(); el.classList.remove('press'); fn(false); }, false);
   el.addEventListener('mouseleave', function () { if (el.classList.contains('press')) { el.classList.remove('press'); fn(false); } }, false);
 }
+/* A tap fires once. preventDefault on touchstart already suppresses the
+   synthesised click in current browsers; the timestamp guard keeps it to one
+   action on any browser that synthesises the click regardless. */
 function bindTapButton(id, fn) {
   var el = document.getElementById(id);
   if (!el) return;
+  var touchAt = -1e9;
   el.addEventListener('touchstart', function (e) {
     e.preventDefault(); e.stopPropagation();
+    touchAt = performance.now();
     el.classList.add('press'); fn();
   }, { passive: false });
   el.addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); el.classList.remove('press'); }, { passive: false });
-  el.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); fn(); }, false);
+  el.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    if (performance.now() - touchAt < 800) return;
+    fn();
+  }, false);
 }
 
 function onKeyDown(e) {
@@ -6184,21 +7070,21 @@ function onKeyDown(e) {
   if (INPUT.keys[k]) return;
   INPUT.keys[k] = true;
   INPUT.usingTouch = false;
-  if (k === 'escape') { if (GAME.state === 'playing') pauseGame(); else if (GAME.state === 'paused') resumeGame(); }
+  if (k === 'escape' || k === 'p') { if (GAME.state === 'playing') pauseGame(); else if (GAME.state === 'paused') resumeGame(); }
   if (GAME.state !== 'playing') return;
-  if (k === 'c') INPUT.crouch = !INPUT.crouch;
+  if (k === 'c') { INPUT.crouch = !INPUT.crouch; syncToggleButtons(); }
   if (k === 'r') reloadWeapon();
   if (k === 'q') cycleWeapon(-1);
-  if (k === 'e' && !e.repeat) INPUT.interact = true;
+  if (k === 'e' || k === 'f') INPUT.interact = true;
   if (k === '1') switchWeapon(0);
   if (k === '2') switchWeapon(1);
   if (k === '3') switchWeapon(2);
-  if (k === ' ') e.preventDefault();
+  if (k === ' ' || k.indexOf('arrow') === 0) e.preventDefault();
 }
 function onKeyUp(e) {
   var k = e.key.toLowerCase();
   INPUT.keys[k] = false;
-  if (k === 'e') INPUT.interact = false;
+  if (k === 'e' || k === 'f') INPUT.interact = false;
 }
 function onMouseDown(e) {
   if (GAME.state !== 'playing') return;
@@ -6214,7 +7100,7 @@ function onMouseUp(e) {
 }
 function onMouseMove(e) {
   if (GAME.state !== 'playing') return;
-  // Pointer lock where it exists; a plain drag everywhere else (iOS has no lock)
+  // Pointer lock where it exists; a plain drag everywhere else
   if (INPUT.pointerLocked || INPUT.mouseDown) {
     INPUT.mouseDX += e.movementX || 0;
     INPUT.mouseDY += e.movementY || 0;
@@ -6223,9 +7109,17 @@ function onMouseMove(e) {
 function requestPointerLock() {
   var canvas = document.getElementById('c');
   var fn = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
-  if (fn) { try { fn.call(canvas); } catch (e) {} }
+  if (!fn) return;
+  try {
+    var p = fn.call(canvas);
+    // newer browsers return a promise that rejects if the lock is refused
+    if (p && typeof p.catch === 'function') p.catch(function () {});
+  } catch (e) {}
 }
-function exitPointerLock() { try { if (document.exitPointerLock) document.exitPointerLock(); } catch (e) {} }
+function exitPointerLock() {
+  INPUT.lockWanted = false;
+  try { if (document.exitPointerLock && document.pointerLockElement) document.exitPointerLock(); } catch (e) {}
+}
 
 /* Fold every source into the per-frame input the player controller reads. */
 function gatherInput(dt) {
@@ -6240,16 +7134,25 @@ function gatherInput(dt) {
   INPUT.moveY = keyY + ty;
   INPUT.sprint = !!INPUT.keys['shift'] || (TOUCH.left.mag || 0) > 0.85;
 
-  var sens = INPUT.sensitivity;
+  // Aiming down sights narrows the field of view, so look slows with it or
+  // the scope turns every thumb twitch into a lurch.
+  var sens = INPUT.sensitivity * (WEAPONS.aiming ? 0.6 : 1);
   var mouseLookX = INPUT.mouseDX * 0.0022 * sens;
   var mouseLookY = INPUT.mouseDY * 0.0022 * sens;
   INPUT.mouseDX = 0; INPUT.mouseDY = 0;
 
-  var stickLookX = (TOUCH.right.x || 0) * TOUCH.lookRate * sens * dt;
-  var stickLookY = (TOUCH.right.y || 0) * TOUCH.lookRate * sens * dt;
+  var swipeX = INPUT.swipeDX * TOUCH.swipeRate * sens;
+  var swipeY = INPUT.swipeDY * TOUCH.swipeRate * sens;
+  INPUT.swipeDX = 0; INPUT.swipeDY = 0;
 
-  INPUT.lookX = mouseLookX + stickLookX;
-  INPUT.lookY = mouseLookY + stickLookY;
+  var stickLookX = 0, stickLookY = 0;
+  if (INPUT.lookMode === 'stick') {
+    stickLookX = (TOUCH.right.x || 0) * TOUCH.lookRate * sens * dt;
+    stickLookY = (TOUCH.right.y || 0) * TOUCH.lookRate * sens * dt;
+  }
+
+  INPUT.lookX = mouseLookX + stickLookX + swipeX;
+  INPUT.lookY = mouseLookY + stickLookY + swipeY;
   INPUT.lookAccumX += INPUT.lookX;
   INPUT.lookAccumY += INPUT.lookY;
   return INPUT;
@@ -6272,12 +7175,13 @@ function gatherInput(dt) {
 var HUD = {
   el: {}, canvas: null, ctx: null, dpr: 1, w: 0, h: 0,
   alertTimer: 0, hitTimer: 0, toastTimer: 0, dmgTimer: 0, built: false,
-  crossGap: 0, crossGapTarget: 0
+  crossGap: 0, crossGapTarget: 0, promptText: '', vigText: '', useOn: false,
+  dmgFromX: 0, dmgFromZ: 0, dmgDirTimer: 0
 };
 
 function initHUD() {
   var ids = ['hud', 'touch', 'dmgVig', 'lowHpVig', 'objText', 'alertBox',
-             'interactPrompt', 'toast', 'fpsCounter'];
+             'interactPrompt', 'toast', 'fpsCounter', 'btnUse', 'cheatTag'];
   for (var i = 0; i < ids.length; i++) HUD.el[ids[i]] = document.getElementById(ids[i]);
 
   HUD.canvas = document.getElementById('hudCanvas');
@@ -6309,17 +7213,17 @@ function hudResizeCanvas() {
   if (HUD.ctx) HUD.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+/* Touch controls only where there is touch: on a desktop they were drawn over
+   the view and did nothing. A device that reports touch, or any touch at all
+   during play, brings them up. */
 function hudShow(on) {
   HUD.el.hud.classList.toggle('on', !!on);
-  HUD.el.touch.classList.toggle('on', !!on);
+  HUD.el.touch.classList.toggle('on', !!on && (IS_TOUCH || INPUT.usingTouch));
   if (HUD.canvas) HUD.canvas.style.display = on ? 'block' : 'none';
 }
 
-/* These stay as entry points so the rest of the game is untouched; the canvas
-   pass reads live state every frame, so they only need to nudge timers. */
-function hudUpdateVitals() {}
-function hudUpdateAmmo() {}
-function hudSyncWeapon() {}
+/* Health, armour and ammo have no update hooks: the canvas pass reads live
+   state every frame. The empty hooks the DOM HUD used to need are gone. */
 function objectiveLabels() {
   var list = activeObjectives(), out = [];
   for (var i = 0; i < list.length; i++) out.push(list[i].letter + '. ' + list[i].text);
@@ -6380,10 +7284,16 @@ function hudHitMarker(head) {
 function hudShotFired() {
   HUD.crossGap = 8;
 }
-function hudFlashDamage() {
+/* The red wash, plus an arc round the crosshair pointing at whoever fired:
+   without it a hit from behind in a corridor is just a mystery. */
+function hudFlashDamage(fromPos) {
   if (!HUD.built) return;
   HUD.el.dmgVig.style.opacity = '1';
   HUD.dmgTimer = 0.16;
+  if (fromPos && PLAYER) {
+    HUD.dmgFromX = fromPos.x; HUD.dmgFromZ = fromPos.z;
+    HUD.dmgDirTimer = 1.1;
+  }
 }
 function hudToast(msg) {
   if (!HUD.built) return;
@@ -6391,11 +7301,15 @@ function hudToast(msg) {
   HUD.el.toast.style.opacity = '1';
   HUD.toastTimer = 3.4;
 }
+/* Called every frame; the DOM is only touched when the prompt changes. */
 function hudPrompt(text) {
   if (!HUD.built) return;
-  var el = HUD.el.interactPrompt, btn = document.getElementById('btnUse');
-  if (!text) { el.classList.remove('on'); btn.classList.remove('on'); return; }
-  el.classList.add('on'); btn.classList.add('on');
+  text = text || '';
+  if (text === HUD.promptText) return;
+  HUD.promptText = text;
+  var el = HUD.el.interactPrompt, btn = HUD.el.btnUse;
+  el.classList.toggle('on', !!text);
+  btn.classList.toggle('on', !!text || AIM.kind === 'use');
   el.textContent = text;
 }
 
@@ -6403,11 +7317,16 @@ function hudTick(dt) {
   if (!HUD.built) return;
   if (HUD.alertTimer > 0) { HUD.alertTimer -= dt; if (HUD.alertTimer <= 0) HUD.el.alertBox.style.opacity = '0'; }
   if (HUD.hitTimer > 0) HUD.hitTimer -= dt;
+  if (HUD.dmgDirTimer > 0) HUD.dmgDirTimer -= dt;
   if (HUD.dmgTimer > 0) { HUD.dmgTimer -= dt; if (HUD.dmgTimer <= 0) HUD.el.dmgVig.style.opacity = '0'; }
   if (HUD.toastTimer > 0) { HUD.toastTimer -= dt; if (HUD.toastTimer <= 0) HUD.el.toast.style.opacity = '0'; }
 
   var low = PLAYER.health < 35 ? clamp((35 - PLAYER.health) / 35, 0, 1) : 0;
-  HUD.el.lowHpVig.style.opacity = low ? String(low * (0.55 + 0.45 * Math.sin(GAME.elapsed * 6))) : '0';
+  var vig = low ? (low * (0.55 + 0.45 * Math.sin(GAME.elapsed * 6))).toFixed(2) : '0';
+  if (vig !== HUD.vigText) { HUD.vigText = vig; HUD.el.lowHpVig.style.opacity = vig; }
+  // the USE button also shows when the probe has found a use target in reach
+  var wantUse = !!HUD.promptText || (AIM.kind === 'use' && AIM.prompt === 'HOLD USE');
+  if (wantUse !== HUD.useOn) { HUD.useOn = wantUse; HUD.el.btnUse.classList.toggle('on', wantUse); }
 
   // crosshair gap closes linearly over 300ms
   if (HUD.crossGap > 0) HUD.crossGap = Math.max(0, HUD.crossGap - dt * (8 / 0.3));
@@ -6476,6 +7395,18 @@ function hudDrawCanvas() {
   }
   ctx.shadowBlur = 0;
 
+  // where the last hit came from: bearing relative to the view, up is ahead
+  if (HUD.dmgDirTimer > 0) {
+    var ddx = HUD.dmgFromX - PLAYER.pos.x, ddz = HUD.dmgFromZ - PLAYER.pos.z;
+    var fwx = -Math.sin(PLAYER.yaw), fwz = -Math.cos(PLAYER.yaw);
+    var rtx = Math.cos(PLAYER.yaw), rtz = -Math.sin(PLAYER.yaw);
+    var brg = Math.atan2(ddx * rtx + ddz * rtz, ddx * fwx + ddz * fwz);
+    var ang = brg - Math.PI / 2;               // canvas angle: 0 is +x, up is -PI/2
+    ctx.strokeStyle = 'rgba(255,45,60,' + clamp(HUD.dmgDirTimer / 0.5, 0, 0.9).toFixed(2) + ')';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(cx, cy, 64, ang - 0.38, ang + 0.38); ctx.stroke();
+  }
+
   // name the thing, and say what the trigger would do about it
   if (AIM.kind && AIM.label) {
     // Above the reticle, not below it: the hold-USE progress bar already lives
@@ -6484,7 +7415,7 @@ function hudDrawCanvas() {
     var labelY = cy - gap - len - 20;
     ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 4;
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = 'bold 11px ui-monospace, Menlo, monospace';
     ctx.fillStyle = aimCol;
     ctx.fillText(AIM.label + '  ' + Math.round(AIM.dist) + 'm', cx, labelY);
     // The download bar is the better prompt whenever it is up, so defer to it.
@@ -6697,10 +7628,28 @@ function hudDrawMinimap(ctx, w, h) {
   ctx.restore();
 }
 
-/* Where the player is currently supposed to be heading. */
+/* Where the player is currently supposed to be heading: the archive, then the
+   nearest tank still standing if this tier wants the stockpile, then the exit.
+   It used to jump straight from the terminal to the exit, pointing a Secret
+   Agent at a door that would not end the mission.
+
+   This function and hudDrawWaypoint were each declared twice. The later copy
+   of a function declaration wins, so the corrected off-screen marker below had
+   been silently replaced by the older mirrored one it was written to fix. */
 function hudObjectiveTarget() {
   if (!LEVEL) return null;
   if (!GAME.objectives.terminal) return LEVEL.terminal ? LEVEL.terminal.pos : null;
+  var stock = objectiveById('stockpile');
+  if (stock && stock.tier <= GAME.difficulty && !GAME.objectives.stockpile && LEVEL.tanks) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < LEVEL.tanks.length; i++) {
+      var t = LEVEL.tanks[i];
+      if (!t.intact) continue;
+      var d = Math.hypot(t.pos.x - PLAYER.pos.x, t.pos.z - PLAYER.pos.z);
+      if (d < bestD) { bestD = d; best = t.gauge.position; }
+    }
+    if (best) return best;
+  }
   return LEVEL.spawnPoints.exit;
 }
 
@@ -6767,39 +7716,6 @@ function hudDrawWaypoint(ctx, w, h) {
   ctx.restore();
 }
 
-function hudObjectiveTarget() {
-  if (!LEVEL) return null;
-  if (!GAME.objectives.terminal) return LEVEL.terminal ? LEVEL.terminal.pos : null;
-  return LEVEL.spawnPoints.exit;
-}
-
-/* A marker in the view itself, clamped to the screen edge when off camera, so
-   the objective is findable without reading the map. */
-function hudDrawWaypoint(ctx, w, h) {
-  var obj = hudObjectiveTarget();
-  if (!obj) return;
-  var v = _wpVec.set(obj.x, obj.y + 1.2, obj.z).project(RENDER.camera);
-  var behind = v.z > 1;
-  var sx = (v.x * 0.5 + 0.5) * w;
-  var sy = (-v.y * 0.5 + 0.5) * h;
-  if (behind) { sx = w - sx; sy = h - sy; }
-  var m = 46;
-  var offscreen = behind || sx < m || sx > w - m || sy < m || sy > h - m;
-  sx = clamp(sx, m, w - m); sy = clamp(sy, m, h - m);
-
-  var dist = Math.round(Math.hypot(obj.x - PLAYER.pos.x, obj.z - PLAYER.pos.z));
-  ctx.save();
-  ctx.globalAlpha = offscreen ? 0.72 : 0.95;
-  ctx.strokeStyle = '#ffb128'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(sx, sy, 9, 0, 6.283); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(sx - 14, sy); ctx.lineTo(sx - 5, sy);
-  ctx.moveTo(sx + 5, sy); ctx.lineTo(sx + 14, sy); ctx.stroke();
-  ctx.font = '11px ui-monospace, Menlo, monospace';
-  ctx.fillStyle = '#ffb128'; ctx.textAlign = 'center';
-  ctx.fillText(dist + 'm', sx, sy + 24);
-  ctx.textAlign = 'left';
-  ctx.restore();
-}
 var _wpVec = new THREE.Vector3();
 
 /* Safe-area insets read once per resize would be ideal, but they are cheap and
@@ -6826,411 +7742,7 @@ function hudInsetPx(name) {
 </script>
 
 <!-- ============================================================ -->
-<!-- SECTION 11: AUTOMATED TEST SUITE                            -->
-<!-- ============================================================ -->
-<script>
-/* Automated test suite. It runs on load against the real constructed world —
-   real level, real collidables, real weapon and enemy objects — not mocks.
-   bootWorld() is idempotent, so calling it here simply guarantees the world
-   exists before the assertions touch it; Section 12 then starts the loop. */
-
-bootWorld();
-
-var TEST_SUITE = {
-  results: [],
-
-  run: function (name, fn) {
-    try {
-      var result = fn();
-      this.results.push({ name: name, pass: !!result, error: null });
-    } catch (e) {
-      this.results.push({ name: name, pass: false, error: e.message });
-    }
-  },
-
-  report: function () {
-    var passed = this.results.filter(function (r) { return r.pass; }).length;
-    var total = this.results.length;
-    console.log('[TEST SUITE] ' + passed + '/' + total + ' passed');
-    this.results.forEach(function (r) {
-      console.log('  ' + (r.pass ? '✓' : '✗') + ' ' + r.name + (r.error ? ' — ' + r.error : ''));
-    });
-    return this.results;
-  }
-};
-
-TEST_SUITE.run('Player starts with 100 health', function () { return player.health === 100; });
-TEST_SUITE.run('Player starts with 3 weapons', function () { return weapons.length === 3; });
-TEST_SUITE.run('Collision: player cannot enter wall cell', function () {
-  // take a real wall slab out of the level and stand the player inside it
-  var wall = null;
-  for (var i = 0; i < collidables.length; i++) {
-    if (collidables[i].tag === 'wall') { wall = collidables[i]; break; }
-  }
-  if (!wall) throw new Error('no wall collidables in level');
-  var wallPos = new THREE.Vector3((wall.minX + wall.maxX) / 2, 0, (wall.minZ + wall.maxZ) / 2);
-  var result = resolveCollision(playerAABB(wallPos), collidables);
-  return result.distanceTo(wallPos) > 0.1;   // must have been pushed out
-});
-TEST_SUITE.run('Enemy transitions PATROL to ALERT on damage', function () {
-  var e = new Enemy(new THREE.Vector3(0, 0, 10), []);
-  e.setState('PATROL');
-  e.takeDamage(10);
-  var ok = e.state === 'ALERT';
-  RENDER.scene.remove(e.group);
-  return ok;
-});
-TEST_SUITE.run('Win condition false at start', function () { return !checkWin(); });
-TEST_SUITE.run('Loss condition false at full health', function () { return !checkLoss(); });
-TEST_SUITE.run('Loss condition true at zero health', function () {
-  var savedHealth = player.health;
-  player.health = 0;
-  var result = checkLoss();
-  player.health = savedHealth;
-  return result;
-});
-TEST_SUITE.run('Ammo decrements on fire', function () {
-  var before = currentWeapon.ammoInMag;
-  fireWeapon();
-  var after = currentWeapon.ammoInMag;
-  currentWeapon.ammoInMag = before;      // leave the loadout as we found it
-  WEAPONS.cooldown = 0; WEAPONS.reloading = 0;
-  PLAYER.shotsFired = 0; PLAYER.shotsHit = 0;
-  return after === before - 1;
-});
-TEST_SUITE.run('AudioContext not created before user gesture', function () {
-  return typeof audioCtx === 'undefined' || audioCtx === null;
-});
-
-/* --- additional checks over the same live world --- */
-TEST_SUITE.run('Level grid is rectangular and matches the plan', function () {
-  var g = LEVEL.grid;
-  if (g.length !== PLAN.h) return false;
-  for (var i = 0; i < g.length; i++) if (g[i].length !== PLAN.w) return false;
-  return true;
-});
-TEST_SUITE.run('Every objective is reachable from the spawn', function () {
-  // flood fill the passable grid from the start cell
-  var g = LEVEL.grid, seen = {}, q = [[PLAN.start.x, PLAN.start.z]];
-  seen[PLAN.start.x + ',' + PLAN.start.z] = true;
-  while (q.length) {
-    var c = q.shift();
-    var nb = [[c[0] + 1, c[1]], [c[0] - 1, c[1]], [c[0], c[1] + 1], [c[0], c[1] - 1]];
-    for (var i = 0; i < nb.length; i++) {
-      var x = nb[i][0], z = nb[i][1], k = x + ',' + z;
-      if (x < 0 || z < 0 || x >= PLAN.w || z >= PLAN.h || seen[k]) continue;
-      if (!isPassable(g[z][x])) continue;
-      seen[k] = true; q.push([x, z]);
-    }
-  }
-  var termCell = seen[worldToCellX(LEVEL.terminal.pos.x) + ',' + worldToCellZ(LEVEL.terminal.pos.z)];
-  var exitCell = seen[PLAN.exit.x + ',' + PLAN.exit.z];
-  return !!termCell && !!exitCell;
-});
-TEST_SUITE.run('No enemy spawns inside level geometry', function () {
-  for (var i = 0; i < ENEMIES.list.length; i++) {
-    var p = ENEMIES.list[i].group.position;
-    var box = { minX: p.x - 0.3, maxX: p.x + 0.3, minY: p.y + 0.2, maxY: p.y + 1.7, minZ: p.z - 0.3, maxZ: p.z + 0.3 };
-    for (var c = 0; c < collidables.length; c++) {
-      if (collidables[c].walkable || collidables[c].disabled) continue;
-      if (aabbOverlap(box, collidables[c])) throw new Error('spawn ' + i + ' (' + ENEMIES.list[i].kind + ') is inside ' + collidables[c].tag);
-    }
-  }
-  return ENEMIES.list.length >= 8;
-});
-TEST_SUITE.run('Every material on level geometry is physically based', function () {
-  for (var i = 0; i < LEVEL.meshes.length; i++) {
-    var m = LEVEL.meshes[i].material;
-    if (!m.isMeshStandardMaterial) throw new Error(LEVEL.meshes[i].name + ' uses ' + m.type);
-  }
-  return true;
-});
-TEST_SUITE.run('No more than six shadow-casting lights', function () {
-  var n = 0;
-  RENDER.scene.traverse(function (o) { if (o.isLight && o.castShadow) n++; });
-  return n <= 6;
-});
-TEST_SUITE.run('Weapon damage and fire-rate table matches the brief', function () {
-  var pp7 = weapons[0], kf7 = weapons[1], mine = weapons[2];
-  return pp7.damage === 25 && pp7.magSize === 7 && pp7.auto === false &&
-         kf7.damage === 15 && kf7.magSize === 30 && kf7.auto === true && kf7.rps === 10 &&
-         mine.damage === 80 && mine.magSize === 3;
-});
-TEST_SUITE.run('Enemy FSM exposes exactly the five live states', function () {
-  var e = ENEMIES.list[0];
-  var states = ['PATROL', 'ALERT', 'CHASE', 'ATTACK', 'SEARCH'];
-  // CHASE and ATTACK raise the alarm on a live enemy. Pin the alarm flag high
-  // for the duration so the probe cannot siren the building before play, then
-  // put the world back exactly as it was found.
-  var savedAlarm = GAME.alarm, savedAt = GAME.alarmAt;
-  GAME.alarm = true;
-  var ok = true;
-  for (var i = 0; i < states.length; i++) {
-    e.setState(states[i]);
-    if (e.state !== states[i]) { ok = false; break; }
-  }
-  e.setState('PATROL');
-  GAME.alarm = savedAlarm; GAME.alarmAt = savedAt;
-  return ok;
-});
-TEST_SUITE.run('Pitch clamp holds at plus/minus 80 degrees', function () {
-  var saved = PLAYER.pitch;
-  INPUT.lookY = -100; updatePlayer(0.016, INPUT);
-  var high = PLAYER.pitch;
-  INPUT.lookY = 100; updatePlayer(0.016, INPUT); updatePlayer(0.016, INPUT);
-  var low = PLAYER.pitch;
-  INPUT.lookY = 0; PLAYER.pitch = saved;
-  return high <= 1.3963 && low >= -1.3963;
-});
-TEST_SUITE.run('Touch stick honours dead zone and expo curve', function () {
-  var dead = applyStick(5, 0);                       // inside the 8px dead zone
-  var full = applyStick(TOUCH.maxRadius, 0);          // at the rim
-  var half = applyStick(TOUCH.maxRadius / 2, 0);      // halfway out
-  return dead.mag === 0 && Math.abs(full.mag - 1) < 1e-6 && half.mag < 0.5;
-});
-
-TEST_SUITE.run('Shots are classified head / torso / arm / leg by where they land', function () {
-  var e = null;
-  for (var i = 0; i < ENEMIES.list.length; i++) {
-    if (ENEMIES.list[i].state !== 'DEAD' && ENEMIES.list[i].kind !== 'scientist') { e = ENEMIES.list[i]; break; }
-  }
-  if (!e) return false;
-  var g = e.group.position;
-  function at(y, lateral) {
-    return enemyHitZone(e, new THREE.Vector3(g.x + lateral, g.y + y, g.z));
-  }
-  // sampled at the real part centres, scaled the way the mesh is
-  return at(1.160 * BODY_SCALE, 0) === 'head'
-      && at(0.745 * BODY_SCALE, 0) === 'torso'
-      && at(0.245 * BODY_SCALE, -0.12 * BODY_SCALE) === 'leg'
-      && at(0.800 * BODY_SCALE, 0.295 * BODY_SCALE) === 'arm'
-      && ZONE_DAMAGE.head > ZONE_DAMAGE.torso && ZONE_DAMAGE.torso > ZONE_DAMAGE.arm;
-});
-TEST_SUITE.run('An arm hit disarms a guard and takes him out of the fight', function () {
-  var e = null;
-  for (var i = 0; i < ENEMIES.list.length; i++) {
-    if (ENEMIES.list[i].state !== 'DEAD' && ENEMIES.list[i].kind !== 'scientist' && ENEMIES.list[i].gun) { e = ENEMIES.list[i]; break; }
-  }
-  if (!e) return false;
-  var wasCombatant = e.isCombatant();
-  e.takeDamage(1, PLAYER.pos, 'arm');
-  var disarmed = e.disarmed && !e.gun && !!e.droppedGun && e.droppedGun.parent === RENDER.scene;
-  var out = wasCombatant && disarmed && !e.isCombatant();
-  // the roster is rebuilt on every mission start, which puts the rifle back
-  return out;
-});
-TEST_SUITE.run('The alarm needs a guard to reach a working panel', function () {
-  if (!LEVEL.panels || !LEVEL.panels.length) return false;
-  var savedAlarm = GAME.alarm, savedRunner = ENEMIES.runnerActive;
-  // with every panel cut there is nothing to run to, so nobody can call it in
-  var states = [];
-  for (var i = 0; i < LEVEL.panels.length; i++) { states.push(LEVEL.panels[i].alive); LEVEL.panels[i].alive = false; }
-  var noneLeft = nearestLivePanel(PLAYER.pos) === null;
-  LEVEL.panels[0].alive = true;
-  var findsOne = nearestLivePanel(PLAYER.pos) === LEVEL.panels[0];
-  for (i = 0; i < LEVEL.panels.length; i++) LEVEL.panels[i].alive = states[i];
-  GAME.alarm = savedAlarm; ENEMIES.runnerActive = savedRunner;
-  return noneLeft && findsOne;
-});
-TEST_SUITE.run('Objectives scale with the difficulty tier', function () {
-  var saved = GAME.difficulty;
-  GAME.difficulty = 0; var agent = activeObjectives().length;
-  GAME.difficulty = 1; var secret = activeObjectives().length;
-  GAME.difficulty = 2; var oo = activeObjectives().length;
-  // the exit is always the last line of the list, whatever the tier
-  var lastIsExit = activeObjectives()[oo - 1].id === 'escape';
-  GAME.difficulty = saved;
-  return agent === 2 && secret === 3 && oo === 4 && lastIsExit;
-});
-TEST_SUITE.run('A constraint objective can be failed outright', function () {
-  var saved = GAME.difficulty, savedKills = GAME.sciKills;
-  GAME.difficulty = 2;
-  GAME.sciKills = 0;
-  var staff = null, list = activeObjectives();
-  for (var i = 0; i < list.length; i++) if (list[i].id === 'staff') staff = list[i];
-  var okClean = staff && staff.done() && !staff.failed();
-  GAME.sciKills = 1;
-  var failsDirty = !staff.done() && staff.failed() && !fieldObjectivesMet();
-  GAME.sciKills = savedKills; GAME.difficulty = saved;
-  return okClean && failsDirty;
-});
-TEST_SUITE.run('Every interactable is registered and reports its own state', function () {
-  if (!INTERACTABLES.length) return false;
-  var shoot = 0, use = 0, i;
-  for (i = 0; i < INTERACTABLES.length; i++) {
-    var it = INTERACTABLES[i];
-    if (!it.mesh || !it.label || typeof it.live !== 'function') return false;
-    if (it.kind === 'shoot') shoot++; else if (it.kind === 'use') use++; else return false;
-  }
-  // seven alarm panels, four stockpile gauges, one terminal
-  if (shoot !== LEVEL.panels.length + LEVEL.tanks.length || use !== 1) return false;
-
-  // The registrations are built in var-scoped loops, so every entry must be
-  // bound to its own fixture rather than to whichever one was created last.
-  var p0 = LEVEL.panels[0], p1 = LEVEL.panels[1];
-  var e0 = null, e1 = null;
-  for (i = 0; i < INTERACTABLES.length; i++) {
-    if (INTERACTABLES[i].mesh === p0.mesh) e0 = INTERACTABLES[i];
-    if (INTERACTABLES[i].mesh === p1.mesh) e1 = INTERACTABLES[i];
-  }
-  if (!e0 || !e1) return false;
-  var was0 = p0.alive, was1 = p1.alive;
-  p0.alive = false; p1.alive = true;
-  var independent = (e0.live() === false && e1.live() === true);
-  p0.alive = was0; p1.alive = was1;
-  return independent;
-});
-TEST_SUITE.run('The reticle names what a shot would actually hit', function () {
-  var saved = { x: PLAYER.pos.x, y: PLAYER.pos.y, z: PLAYER.pos.z,
-                yaw: PLAYER.yaw, pitch: PLAYER.pitch, state: GAME.state };
-  GAME.state = 'playing';
-  function lookAt(mesh, dist) {
-    var wp = new THREE.Vector3();
-    mesh.getWorldPosition(wp);
-    PLAYER.pos.set(wp.x, 0, wp.z + dist);
-    PLAYER.yaw = 0;
-    PLAYER.pitch = Math.atan2(wp.y - (PLAYER.pos.y + PLAYER.eye), dist);
-    RENDER.camera.position.set(PLAYER.pos.x, PLAYER.pos.y + PLAYER.eye, PLAYER.pos.z);
-    RENDER.camera.rotation.set(PLAYER.pitch, PLAYER.yaw, 0);
-    RENDER.camera.updateMatrixWorld();
-    updateAimProbe();
-  }
-  var panel = LEVEL.panels[1];
-  lookAt(panel.mesh, 4);
-  var onPanel = AIM.kind === 'shoot' && AIM.target.mesh === panel.mesh && !!AIM.prompt;
-
-  // a fixture that no longer does anything must stop advertising itself
-  var wasAlive = panel.alive;
-  panel.alive = false;
-  lookAt(panel.mesh, 4);
-  var deadIsSilent = AIM.kind === null;
-  panel.alive = wasAlive;
-
-  // and nothing is named through a wall
-  PLAYER.pos.set(panel.pos.x, 0, panel.pos.z + 40);
-  PLAYER.yaw = 0; PLAYER.pitch = 0;
-  RENDER.camera.position.set(PLAYER.pos.x, PLAYER.pos.y + PLAYER.eye, PLAYER.pos.z);
-  RENDER.camera.rotation.set(0, 0, 0);
-  RENDER.camera.updateMatrixWorld();
-  updateAimProbe();
-  var noXray = AIM.kind !== 'shoot';
-
-  PLAYER.pos.set(saved.x, saved.y, saved.z);
-  PLAYER.yaw = saved.yaw; PLAYER.pitch = saved.pitch; GAME.state = saved.state;
-  updateAimProbe();
-  return onPanel && deadIsSilent && noXray;
-});
-TEST_SUITE.run('Use prompts come from proximity, not from landing a ray', function () {
-  var saved = { x: PLAYER.pos.x, z: PLAYER.pos.z, yaw: PLAYER.yaw, state: GAME.state };
-  GAME.state = 'playing';
-  var t = LEVEL.terminal;
-  function stand(dist) {
-    PLAYER.pos.set(t.pos.x, PLAYER.pos.y, t.pos.z + dist);
-    PLAYER.yaw = 0;               // facing -Z, toward the terminal
-    updateAimProbe();
-  }
-  stand(2.0);
-  var close = AIM.kind === 'use' && AIM.prompt === 'HOLD USE';
-  stand(6.0);
-  var far = AIM.kind === 'use' && AIM.prompt === 'MOVE CLOSER';
-  PLAYER.yaw = Math.PI;           // turned away from it
-  updateAimProbe();
-  var facingMatters = AIM.kind !== 'use';
-  PLAYER.pos.set(saved.x, PLAYER.pos.y, saved.z);
-  PLAYER.yaw = saved.yaw; GAME.state = saved.state;
-  updateAimProbe();
-  return close && far && facingMatters;
-});
-TEST_SUITE.run('Adaptive quality ignores warm-up, survives a stall, and recovers', function () {
-  var savedStage = GFX.stage, savedGood = GFX.goodWindows, savedIdx = GFX.sampleIdx,
-      savedScale = RENDER.renderScale, savedFrames = GAME.frameCount, savedState = GAME.state;
-  function feed(ms, windows) {
-    for (var w = 0; w < windows; w++) for (var i = 0; i < 60; i++) updateRenderScale(0.016, ms);
-  }
-  GAME.state = 'playing';
-  GAME.frameCount = 0; GFX.stage = 0; GFX.goodWindows = 0; GFX.sampleIdx = 0;
-  feed(400, 2);
-  var warmupIgnored = GFX.stage === 0;          // boot frames prove nothing
-
-  GAME.frameCount = 1000;
-  feed(400, 2);
-  var downgraded = GFX.stage === 2;             // sustained load does
-
-  feed(8, 6);                                   // three clean windows per stage
-  var recovered = GFX.stage === 0 && RENDER.renderScale === 1;
-
-  GFX.stage = 0; GFX.goodWindows = 0;
-  for (var i = 0; i < 59; i++) updateRenderScale(0.016, 9);
-  updateRenderScale(0.016, 2000);               // one enormous stall
-  var survivedStall = GFX.stage === 0;
-
-  GFX.stage = savedStage; GFX.goodWindows = savedGood; GFX.sampleIdx = savedIdx;
-  RENDER.renderScale = savedScale; GAME.frameCount = savedFrames; GAME.state = savedState;
-  return warmupIgnored && downgraded && recovered && survivedStall;
-});
-TEST_SUITE.run('Every muzzle flash source decays the shared light to zero', function () {
-  var savedTimer = WEAPONS.flashTimer, savedPeak = WEAPONS.flashPeak,
-      savedSpan = WEAPONS.flashSpan, savedFrom = WEAPONS.flashFromPlayer;
-  var here = PLAYER.pos.clone();
-  var ok = true;
-  // guard fire and mine blasts drive the same light the player's muzzle does;
-  // each one has to arm the timer, or it burns for the rest of the mission
-  var sources = [
-    function () { flashMuzzle(here); },
-    function () { flashLight(here, 5, 3.4, 0xffaa33, 0.08); },
-    function () { flashLight(here, 26, 11, 0xffc04a, 0.22); }
-  ];
-  for (var i = 0; i < sources.length && ok; i++) {
-    sources[i]();
-    if (WEAPONS.muzzleLight.intensity <= 0) { ok = false; break; }
-    for (var f = 0; f < 60; f++) updateWeapons(0.016, INPUT);   // ~1s of frames
-    if (WEAPONS.muzzleLight.intensity !== 0 || WEAPONS.flashTimer !== 0) ok = false;
-  }
-  WEAPONS.flashTimer = savedTimer; WEAPONS.flashPeak = savedPeak;
-  WEAPONS.flashSpan = savedSpan; WEAPONS.flashFromPlayer = savedFrom;
-  WEAPONS.muzzleLight.intensity = 0;
-  return ok;
-});
-TEST_SUITE.run('Aim assist bends a near miss but ignores a wild shot', function () {
-  var e = null;
-  for (var i = 0; i < ENEMIES.list.length; i++) if (ENEMIES.list[i].state !== 'DEAD') { e = ENEMIES.list[i]; break; }
-  if (!e) return false;
-  var ep = e.group.position;
-  var origin = new THREE.Vector3(ep.x, ep.y + 1.65, ep.z + 6);
-  var toChest = new THREE.Vector3(ep.x, ep.y + 1.05, ep.z).sub(origin).normalize();
-
-  function assisted(offset) {
-    var dir = toChest.clone();
-    dir.x += offset; dir.normalize();
-    var before = dir.clone();
-    var ray = new THREE.Raycaster(origin.clone(), dir, 0, 60);
-    var hit = applyAimAssist(ray, currentWeapon);
-    return { hit: !!hit, moved: ray.ray.direction.distanceTo(before) };
-  }
-  var savedAiming = WEAPONS.aiming, savedTouch = INPUT.usingTouch;
-  WEAPONS.aiming = false; INPUT.usingTouch = true;
-  var near = assisted(0.05);     // a few degrees off: should be pulled in
-  var wild = assisted(1.4);      // most of a right angle off: must be left alone
-  WEAPONS.aiming = true;
-  var ads = assisted(0.05);      // down the sights: the player is aiming, not us
-  WEAPONS.aiming = savedAiming; INPUT.usingTouch = savedTouch;
-  return near.hit && near.moved > 1e-6 && !wild.hit && wild.moved < 1e-9 && !ads.hit;
-});
-
-window.__TESTS__ = TEST_SUITE;
-// Each section ships as its own <script>, so nothing declared in a later one is
-// visible here yet, and the parser is free to run a zero-delay timeout between
-// two of them. DOMContentLoaded is the first moment every section has run, so
-// the last one can add its own cases and the whole suite prints as one block.
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function () { TEST_SUITE.report(); });
-} else {
-  TEST_SUITE.report();
-}
-</script>
-
-<!-- ============================================================ -->
-<!-- SECTION 12: GAME LOOP & INIT                                -->
+<!-- SECTION 11: GAME LOOP & INIT                                -->
 <!-- ============================================================ -->
 <script>
 /* Game state, the frame loop, and the objective / win / loss rules. */
@@ -7294,8 +7806,20 @@ function startMission() {
   GAME.alarm = false; GAME.alarmAt = 0; GAME.kills = 0; GAME.bodies = 0;
   GAME.objectives.terminal = false; GAME.objectives.escaped = false;
   GAME.objectives.stockpile = false; GAME.sciKills = 0;
+  GAME.stats.shots = 0; GAME.stats.hits = 0; GAME.stats.head = 0; GAME.stats.torso = 0; GAME.stats.limb = 0;
+  GAME.noise.t = 0;
+  GAME.dyingT = 0;
+
+  // cheats are read once, here, so a run's rules cannot change halfway through
+  GAME.paintball = cheatOn('paintball');
+  GAME.dk = cheatOn('dk');
+  GAME.turbo = cheatOn('turbo');
+  GAME.infiniteAmmo = cheatOn('ammo');
+  GAME.invincible = cheatOn('invincible');
+  GAME.cheated = anyCheatOn();
+  clearPaint();
+
   hudRebuildObjectives();
-  GAME.noise = null;
   setAlarmLoop(false);
   RENDER.alarmMix = 0;
   hudClearAlert();
@@ -7309,7 +7833,7 @@ function startMission() {
   PLAYER.maxHealth = Math.round(CFG.player.maxHealth * CFG.difficulty[GAME.difficulty].health);
   PLAYER.health = PLAYER.maxHealth;
 
-  // reset weapons
+  // reset weapons: PP7 and mines carried in, the rifle taken in the field
   WEAPONS.flashTimer = 0; WEAPONS.flashPeak = 0; WEAPONS.flashSpan = 0;
   WEAPONS.flashFromPlayer = false;
   if (WEAPONS.muzzleLight) WEAPONS.muzzleLight.intensity = 0;
@@ -7317,10 +7841,10 @@ function startMission() {
   WEAPONS.cooldown = 0; WEAPONS.reloading = 0; WEAPONS.recoil = 0;
   for (var i = 0; i < WEAPONS.list.length; i++) {
     var w = WEAPONS.list[i];
-    w.ammoInMag = w.magSize;
-    if (!w.infiniteReserve) w.reserve = (w.id === 'kf7') ? 120 : 0;
+    w.owned = w.id !== 'kf7';
+    w.ammoInMag = w.owned ? w.magSize : 0;
+    if (!w.infiniteReserve) w.reserve = 0;
   }
-  switchWeapon(0);
   WEAPONS.index = 0; currentWeapon = WEAPONS.list[0];
   for (i = 0; i < WEAPONS.viewModels.length; i++) WEAPONS.viewModels[i].visible = (i === 0);
   for (i = WEAPONS.mines.length - 1; i >= 0; i--) {
@@ -7358,48 +7882,111 @@ function startMission() {
     d.open = 0; d.target = 0;
     d.mesh.position.y = d.closedY;
     d.aabb.disabled = false;
-    d.lamp.material = d.locked ? MAT.ledRed : MAT.ledGreen;
+    setDoorLamps(d, d.locked ? MAT.ledRed : MAT.ledGreen);
   }
 
   spawnEnemies();
-  INPUT.crouch = false; INPUT.fire = false; INPUT.fireLatched = false; INPUT.interact = false;
-  TOUCH.left.id = -1; TOUCH.right.id = -1; TOUCH.left.x = TOUCH.left.y = TOUCH.right.x = TOUCH.right.y = 0;
+  resetPickups();
+  _aimHighlighted = null;
+  if (WEAPONS.viewGroup) WEAPONS.viewGroup.visible = true;
+  releaseAllInput();
+  INPUT.crouch = false; INPUT.aimToggle = false;
+  syncToggleButtons();
 
   showScreen(null);
   hudShow(true);
-  hudUpdateVitals(); hudUpdateAmmo(); hudUpdateObjectives();
+  HUD.promptText = null; hudPrompt('');
+  hudUpdateObjectives();
+  var tag = HUD.el.cheatTag;
+  if (tag) {
+    var names = [];
+    for (i = 0; i < CHEATS.length; i++) if (cheatOn(CHEATS[i].id)) names.push(CHEATS[i].name);
+    tag.textContent = names.length ? 'CHEATS: ' + names.join(' · ') : '';
+  }
   hudToast('Insertion complete. Find the control room.');
+  // Compile every material in the scene now, behind the insertion toast.
+  // three.js otherwise compiles a shader the first time its material comes
+  // into view -- a pickup, a paint splat, a guard's hit flash -- which is a
+  // visible hitch in the middle of play on a phone.
+  // compile() skips hidden objects, so the paint ring is shown for the call
+  if (GAME.paintball) { ensurePaintPool(); PAINT.pool[0].visible = true; }
+  try { RENDER.renderer.compile(RENDER.scene, RENDER.camera); } catch (e) {}
+  if (GAME.paintball) PAINT.pool[0].visible = false;
   GAME.lastTime = performance.now();
 }
+
+/* What a finished run earned: the tier's best time, and any cheat whose rule
+   it met. A run with a cheat switched on earns neither -- it is on the record
+   as played, not as a time. */
+function recordResult(won) {
+  var out = { newBest: false, unlocked: [] };
+  if (!won || GAME.cheated) return out;
+  var t = GAME.elapsed, tier = GAME.difficulty;
+  if (!SAVE.best[tier] || t < SAVE.best[tier]) { SAVE.best[tier] = t; out.newBest = true; }
+  var result = { tier: tier, time: t };
+  for (var i = 0; i < CHEATS.length; i++) {
+    var c = CHEATS[i];
+    if (!SAVE.unlocked[c.id] && c.earned(result)) { SAVE.unlocked[c.id] = true; out.unlocked.push(c.name); }
+  }
+  writeSave();
+  return out;
+}
+
+function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
 
 function endMission(won, reason) {
   if (GAME.state === 'over') return;
   GAME.state = 'over';
-  GAME.objectives.escaped = !!won;
+  GAME.objectives.escaped = reason === 'escaped';
   exitPointerLock();
+  releaseAllInput();
   setAlarmLoop(false);
   hudShow(false);
   sfxSting(won);
 
-  var acc = PLAYER.shotsFired ? Math.round(PLAYER.shotsHit / PLAYER.shotsFired * 100) : 0;
-  document.getElementById('endTitle').textContent = won ? 'MISSION COMPLETE' : 'MISSION FAILED';
+  var st = GAME.stats;
+  var acc = st.shots ? Math.round(st.hits / st.shots * 100) : 0;
+  var tierName = CFG.difficulty[GAME.difficulty].name;
+  setText('endTitle', won ? 'MISSION COMPLETE' : 'MISSION FAILED');
   document.getElementById('endTitle').className = won ? 'win' : 'lose';
-  document.getElementById('endEyebrow').textContent = won ? 'Extraction' : 'Signal lost';
-  document.getElementById('bigStat').textContent = fmtClock(GAME.elapsed);
-  document.getElementById('endText').textContent = won
-    ? (GAME.alarm ? 'Out with the archive, but Blackgate logged the intrusion.'
-                  : 'Out with the archive and no alarm on record. Textbook.')
-    : (reason === 'killed' ? 'The garrison put you down inside the facility.' : 'Mission aborted.');
-  var objSummary = [], ol = activeObjectives();
-  for (var oi = 0; oi < ol.length; oi++) {
-    objSummary.push(ol[oi].letter + ': ' + (ol[oi].done() ? 'Yes' : 'No'));
+  setText('endEyebrow', (won || reason === 'escaped' ? 'Extraction' : 'Signal lost') + ' · ' + tierName);
+  setText('bigStat', fmtClock(GAME.elapsed));
+  var text;
+  if (won) text = GAME.alarm ? 'Out with the archive, but Blackgate logged the intrusion.'
+                             : 'Out with the archive and no alarm on record. Textbook.';
+  else if (reason === 'escaped') text = 'You made it out, but an objective was lost. The mission is a failure.';
+  else if (reason === 'killed') text = 'The garrison put you down inside the facility.';
+  else text = 'Mission aborted.';
+  setText('endText', text);
+
+  // one line per objective, GoldenEye style: completed, failed or incomplete
+  var host = document.getElementById('endObjectives');
+  if (host) {
+    while (host.firstChild) host.removeChild(host.firstChild);
+    var ol = activeObjectives();
+    for (var oi = 0; oi < ol.length; oi++) {
+      var o = ol[oi], row = document.createElement('div');
+      row.className = 'kv';
+      var name = document.createElement('span'); name.textContent = o.letter + '. ' + o.text;
+      var state = document.createElement('b');
+      var failed = o.failed && o.failed();
+      var done = o.last ? GAME.objectives.escaped : (!failed && o.done());
+      state.textContent = failed ? 'Failed' : (done ? 'Completed' : 'Incomplete');
+      state.className = failed ? 'bad' : (done ? 'good' : '');
+      row.appendChild(name); row.appendChild(state);
+      host.appendChild(row);
+    }
   }
-  document.getElementById('endObjA').textContent = objSummary.join('  ');
-  document.getElementById('endAlarm').textContent = GAME.alarm ? 'Yes' : 'No';
-  document.getElementById('endKills').textContent = String(GAME.kills);
-  document.getElementById('endAcc').textContent = acc + '%';
-  if (won && (!GAME.best || GAME.elapsed < GAME.best)) { GAME.best = GAME.elapsed; saveBest(); }
-  document.getElementById('endBest').textContent = GAME.best ? fmtClock(GAME.best) : '—';
+  setText('endAlarm', GAME.alarm ? 'Raised' : 'Silent');
+  setText('endKills', String(GAME.kills));
+  setText('endAcc', acc + '%  (' + st.hits + '/' + st.shots + ')');
+  setText('endZones', st.head + ' / ' + st.torso + ' / ' + st.limb);
+
+  var rec = recordResult(won);
+  var best = SAVE.best[GAME.difficulty];
+  setText('endBest', GAME.cheated ? 'Not recorded (cheats on)'
+    : (best ? fmtClock(best) + (rec.newBest ? '  NEW' : '') : '—'));
+  setText('endUnlock', rec.unlocked.length ? 'Cheat unlocked: ' + rec.unlocked.join(', ') : '');
   showScreen('screenEnd');
 }
 
@@ -7407,13 +7994,30 @@ function pauseGame() {
   if (GAME.state !== 'playing') return;
   GAME.state = 'paused';
   // The latch has to drop with the trigger. Leaving it set means the first
-  // click after resuming is swallowed on any semi-automatic weapon.
-  INPUT.fire = false; INPUT.fireLatched = false; INPUT.interact = false;
+  // click after resuming is swallowed on any semi-automatic weapon; and a
+  // thumb or key still held when the menu came up must not keep acting after it.
+  releaseAllInput();
   exitPointerLock();
   audioSuspend();
-  document.getElementById('pauseTime').textContent = fmtClock(GAME.elapsed);
-  document.getElementById('pauseAlarm').textContent = GAME.alarm ? 'RAISED' : 'Silent';
-  document.getElementById('pauseObjA').textContent = GAME.objectives.terminal ? 'Retrieved' : 'Not retrieved';
+  setText('pauseTime', fmtClock(GAME.elapsed));
+  setText('pauseAlarm', GAME.alarm ? 'RAISED' : 'Silent');
+  setText('pauseTier', CFG.difficulty[GAME.difficulty].name);
+  var host = document.getElementById('pauseObjectives');
+  if (host) {
+    while (host.firstChild) host.removeChild(host.firstChild);
+    var ol = activeObjectives();
+    for (var i = 0; i < ol.length; i++) {
+      var o = ol[i], row = document.createElement('div');
+      row.className = 'kv';
+      var n = document.createElement('span'); n.textContent = o.letter + '. ' + o.text;
+      var b = document.createElement('b');
+      var failed = o.failed && o.failed();
+      b.textContent = failed ? 'Failed' : (o.constraint ? 'Holding' : (o.done() ? 'Done' : '—'));
+      b.className = failed ? 'bad' : (!o.constraint && o.done() ? 'good' : '');
+      row.appendChild(n); row.appendChild(b);
+      host.appendChild(row);
+    }
+  }
   hudShow(false);
   showScreen('screenPause');
 }
@@ -7425,9 +8029,16 @@ function resumeGame() {
   showScreen(null);
   hudShow(true);
 }
+function abortMission() {
+  GAME.state = 'menu';
+  releaseAllInput();
+  hudShow(false);
+  setAlarmLoop(false);
+  showScreen('screenTitle');
+}
 
 /* The briefing is written from the same objective table the HUD reads, so a
-   player choosing 00 Agent is told what the extra two objectives are before
+   player choosing 00 Agent is told what the extra objectives are before
    committing rather than discovering them in the field. */
 function renderBriefing() {
   var host = document.getElementById('briefObjectives');
@@ -7438,21 +8049,94 @@ function renderBriefing() {
     var card = document.createElement('div');
     card.className = 'card';
     var h = document.createElement('h3');
-    h.textContent = 'Objective ' + list[i].letter;
+    h.textContent = 'Objective ' + list[i].letter + (list[i].constraint ? ' · must not fail' : '');
     var para = document.createElement('p');
     para.textContent = list[i].brief;
     card.appendChild(h); card.appendChild(para);
     host.appendChild(card);
   }
+  var best = SAVE.best[GAME.difficulty];
+  setText('briefBest', best ? 'Best time on this tier: ' + fmtClock(best) : 'No time on record for this tier yet.');
 }
 
+/* Cheat list: every cheat is shown, locked ones with the rule that earns them. */
+function renderCheats() {
+  var host = document.getElementById('cheatList');
+  if (!host) return;
+  while (host.firstChild) host.removeChild(host.firstChild);
+  for (var i = 0; i < CHEATS.length; i++) {
+    (function (c) {
+      var row = document.createElement('div');
+      row.className = 'row';
+      var label = document.createElement('label');
+      label.textContent = c.name;
+      var sub = document.createElement('div');
+      sub.className = 'tiny';
+      sub.textContent = SAVE.unlocked[c.id] ? 'Unlocked' : 'Locked — ' + c.rule;
+      var left = document.createElement('div');
+      left.appendChild(label); left.appendChild(sub);
+      row.appendChild(left);
+      var tog = document.createElement('button');
+      tog.className = 'tog' + (cheatOn(c.id) ? ' on' : '');
+      tog.id = 'cheat_' + c.id;
+      tog.disabled = !SAVE.unlocked[c.id];
+      tog.setAttribute('aria-label', c.name);
+      tog.appendChild(document.createElement('i'));
+      tog.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (!SAVE.unlocked[c.id]) return;
+        SAVE.cheatsOn[c.id] = !SAVE.cheatsOn[c.id];
+        tog.classList.toggle('on', !!SAVE.cheatsOn[c.id]);
+        ensureAudio(); sfxUI(!!SAVE.cheatsOn[c.id]);
+        writeSave();
+      }, false);
+      row.appendChild(tog);
+      host.appendChild(row);
+    })(CHEATS[i]);
+  }
+}
+
+var SCREENS = ['screenTitle', 'screenBriefing', 'screenControls', 'screenOptions', 'screenCheats',
+               'screenPause', 'screenEnd', 'screenFatal'];
 function showScreen(id) {
-  var screens = ['screenTitle', 'screenBriefing', 'screenControls', 'screenOptions', 'screenPause', 'screenEnd', 'screenFatal'];
-  for (var i = 0; i < screens.length; i++) {
-    var el = document.getElementById(screens[i]);
-    if (el) el.classList.toggle('on', screens[i] === id);
+  for (var i = 0; i < SCREENS.length; i++) {
+    var el = document.getElementById(SCREENS[i]);
+    if (el) el.classList.toggle('on', SCREENS[i] === id);
   }
   GAME.screen = id;
+}
+
+/* ---------- simulation ----------
+   One fixed step of the whole game, with no rendering and no clock reads, so
+   the frame loop and the test harness drive exactly the same code. */
+var DEATH_CAM = 1.6;       // seconds between the killing shot and the debrief
+function simulate(dt) {
+  GAME.elapsed += dt;
+  var input = gatherInput(dt);
+  if (PLAYER.alive) {
+    updatePlayer(dt, input);
+    updateWeapons(dt, input);
+    updatePickups(dt);
+  } else {
+    // GoldenEye's death: the view drops and rolls while the world carries on
+    GAME.dyingT += dt;
+    var k = clamp(GAME.dyingT / 0.9, 0, 1);
+    var cam = RENDER.camera;
+    cam.position.set(PLAYER.pos.x, PLAYER.pos.y + lerp(PLAYER.eye, 0.35, k * k), PLAYER.pos.z);
+    cam.rotation.set(PLAYER.pitch * (1 - k) + 0.35 * k, PLAYER.yaw, 1.2 * k * k);
+    if (WEAPONS.viewGroup) WEAPONS.viewGroup.visible = false;
+  }
+  updateEnemies(dt);
+  updateScreens(dt);
+  updateDoors(dt);
+  if (PLAYER.alive) {
+    updateAimProbe();
+    applyAimHighlight();
+    updateInteraction(dt);
+  }
+  hudTick(dt);
+  if (PLAYER.alive && checkExtraction()) endMission(!anyObjectiveFailed(), 'escaped');
+  else if (checkLoss() && GAME.dyingT >= DEATH_CAM) endMission(false, 'killed');
 }
 
 /* ---------- frame ---------- */
@@ -7465,21 +8149,7 @@ function frame(now) {
   var dt = Math.min(raw, 50) / 1000;      // clamp so a backgrounded tab cannot teleport anyone
   GAME.frameCount++;
 
-  if (GAME.state === 'playing') {
-    GAME.elapsed += dt;
-    var input = gatherInput(dt);
-    updatePlayer(dt, input);
-    updateWeapons(dt, input);
-    updateEnemies(dt);
-    updateScreens(dt);
-    updateDoors(dt);
-    updateAimProbe();
-    applyAimHighlight();
-    updateInteraction(dt);
-    hudTick(dt);
-    if (checkWin()) { endMission(true, 'escaped'); }
-    else if (checkLoss()) { endMission(false, 'killed'); }
-  }
+  if (GAME.state === 'playing') simulate(dt);
 
   if (GAME.booted) {
     if ((GAME.frameCount & 7) === 0) {
@@ -7492,58 +8162,116 @@ function frame(now) {
   }
 }
 
+/* ---------- settings ----------
+   Every control on the options screen reads from and writes to SAVE.settings,
+   which is persisted; applySettings pushes the record into the running game. */
+function applySettings() {
+  var s = SAVE.settings;
+  INPUT.sensitivity = s.sensitivity;
+  INPUT.invertY = s.invertY;
+  INPUT.lookMode = s.lookMode;
+  setMasterVolume(s.volume);
+  setBloomEnabled(s.bloom);
+  if (RENDER.shadowsEnabled !== s.shadows) setShadowsEnabled(s.shadows);
+  GAME.showStats = s.stats;
+  var fps = document.getElementById('fpsCounter');
+  if (fps) fps.classList.toggle('on', s.stats);
+}
+function syncOptionsUI() {
+  var s = SAVE.settings;
+  var sens = document.getElementById('rngSens'); if (sens) sens.value = String(Math.round(s.sensitivity * 100));
+  var vol = document.getElementById('rngVol'); if (vol) vol.value = String(Math.round(s.volume * 100));
+  var pairs = { togInvert: s.invertY, togBloom: s.bloom, togShadow: s.shadows, togStats: s.stats,
+                togSwipe: s.lookMode === 'swipe' };
+  for (var id in pairs) { var el = document.getElementById(id); if (el) el.classList.toggle('on', !!pairs[id]); }
+  var fs = document.getElementById('rowFullscreen');
+  if (fs) fs.style.display = fullscreenSupported() ? '' : 'none';
+}
+
+function fullscreenSupported() {
+  var d = document.documentElement;
+  return !!(d.requestFullscreen || d.webkitRequestFullscreen);
+}
+function toggleFullscreen() {
+  try {
+    var d = document.documentElement;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      var p = (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
+      if (p && typeof p.catch === 'function') p.catch(function () {});
+    }
+  } catch (e) {}
+}
+
 /* ---------- wiring ---------- */
 function bindUI() {
   function on(id, fn) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('click', function (e) { e.preventDefault(); ensureAudio(); sfxUI(true); fn(); }, false);
   }
-  on('btnStart', function () { showScreen('screenBriefing'); });
-  on('btnBriefing', function () { showScreen('screenBriefing'); });
+  on('btnStart', function () { renderBriefing(); showScreen('screenBriefing'); });
   on('btnBriefStart', function () { startMission(); });
   on('btnBriefBack', function () { showScreen('screenTitle'); });
   on('btnControlsScreen', function () { GAME.uiBack = 'screenTitle'; showScreen('screenControls'); });
   on('btnControlsBack', function () { showScreen(GAME.uiBack || 'screenTitle'); });
-  on('btnOptions', function () { GAME.uiBack = GAME.state === 'paused' ? 'screenPause' : 'screenTitle'; showScreen('screenOptions'); });
-  on('btnPauseOptions', function () { GAME.uiBack = 'screenPause'; showScreen('screenOptions'); });
-  on('btnOptionsBack', function () { showScreen(GAME.uiBack || 'screenTitle'); });
+  on('btnOptions', function () { GAME.uiBack = 'screenTitle'; syncOptionsUI(); showScreen('screenOptions'); });
+  on('btnPauseOptions', function () { GAME.uiBack = 'screenPause'; syncOptionsUI(); showScreen('screenOptions'); });
+  on('btnOptionsBack', function () { writeSave(); showScreen(GAME.uiBack || 'screenTitle'); });
+  on('btnCheats', function () { renderCheats(); showScreen('screenCheats'); });
+  on('btnCheatsBack', function () { showScreen('screenTitle'); });
   on('btnResume', function () { resumeGame(); });
-  on('btnAbort', function () { GAME.state = 'menu'; hudShow(false); setAlarmLoop(false); showScreen('screenTitle'); });
+  on('btnAbort', function () { abortMission(); });
   on('btnPlayAgain', function () { startMission(); });
   on('btnEndTitle', function () { GAME.state = 'menu'; showScreen('screenTitle'); });
   on('btnFatalReload', function () { try { location.reload(); } catch (e) {} });
+  on('btnFullscreen', function () { toggleFullscreen(); });
+  on('btnErase', function () {
+    var el = document.getElementById('btnErase');
+    // two taps: the first arms it, so a stray tap cannot wipe a save
+    if (!el.classList.contains('armed')) {
+      el.classList.add('armed');
+      el.firstElementChild.textContent = 'Tap again to erase';
+      return;
+    }
+    el.classList.remove('armed');
+    el.firstElementChild.textContent = 'Erase save data';
+    eraseSave();
+    applySettings(); syncOptionsUI();
+  });
 
   var diff = document.getElementById('selDiff');
   if (diff) diff.addEventListener('change', function () {
-    GAME.difficulty = clamp(parseInt(diff.value, 10) || 1, 0, 2);
+    GAME.difficulty = clamp(parseInt(diff.value, 10) || 0, 0, 2);
     renderBriefing();      // the tier decides the objective list, so show it
   }, false);
-  renderBriefing();
 
   var sens = document.getElementById('rngSens');
-  if (sens) sens.addEventListener('input', function () { INPUT.sensitivity = clamp(parseInt(sens.value, 10) / 100, 0.2, 3); }, false);
+  if (sens) sens.addEventListener('input', function () {
+    SAVE.settings.sensitivity = clamp(parseInt(sens.value, 10) / 100, 0.3, 2.6); applySettings();
+  }, false);
   var vol = document.getElementById('rngVol');
-  if (vol) vol.addEventListener('input', function () { setMasterVolume(clamp(parseInt(vol.value, 10) / 100, 0, 1)); }, false);
+  if (vol) vol.addEventListener('input', function () {
+    SAVE.settings.volume = clamp(parseInt(vol.value, 10) / 100, 0, 1); applySettings();
+  }, false);
 
-  function toggle(id, initial, fn) {
+  function toggle(id, fn) {
     var el = document.getElementById(id);
     if (!el) return;
-    el.classList.toggle('on', !!initial);
     el.addEventListener('click', function (e) {
       e.preventDefault();
       var on2 = !el.classList.contains('on');
       el.classList.toggle('on', on2);
       ensureAudio(); sfxUI(on2);
       fn(on2);
+      applySettings();
     }, false);
   }
-  toggle('togInvert', false, function (v) { INPUT.invertY = v; });
-  toggle('togBloom', true, function (v) { setBloomEnabled(v); });
-  toggle('togShadow', true, function (v) { setShadowsEnabled(v); });
-  toggle('togStats', false, function (v) {
-    GAME.showStats = v;
-    document.getElementById('fpsCounter').classList.toggle('on', v);
-  });
+  toggle('togInvert', function (v) { SAVE.settings.invertY = v; });
+  toggle('togBloom', function (v) { SAVE.settings.bloom = v; });
+  toggle('togShadow', function (v) { SAVE.settings.shadows = v; });
+  toggle('togStats', function (v) { SAVE.settings.stats = v; });
+  toggle('togSwipe', function (v) { SAVE.settings.lookMode = v ? 'swipe' : 'stick'; });
 
   window.addEventListener('resize', function () { resizeRenderer(); }, false);
   window.addEventListener('orientationchange', function () { setTimeout(resizeRenderer, 250); }, false);
@@ -7552,12 +8280,19 @@ function bindUI() {
     else GAME.lastTime = performance.now();
   }, false);
   window.addEventListener('blur', function () { if (GAME.state === 'playing') pauseGame(); }, false);
+  window.addEventListener('pagehide', function () { writeSave(); }, false);
 }
 
 function init() {
+  loadSave();
   if (!bootWorld()) return;      // fatal screen already shown
   initInput();
   bindUI();
+  applySettings();
+  syncOptionsUI();
+  var diff = document.getElementById('selDiff');
+  if (diff) diff.value = String(GAME.difficulty);
+  renderBriefing();
   hudShow(false);
   showScreen('screenTitle');
   GAME.lastTime = performance.now();
@@ -7565,39 +8300,4 @@ function init() {
 }
 
 init();
-
-/* Door cases live here rather than in the test section above: doors are built
-   and driven from this section, and a <script> cannot see ahead of itself. */
-TEST_SUITE.run('Door collider always agrees with the slab position', function () {
-  var d = LEVEL.doors[0];
-  var savedOpen = d.open, savedTarget = d.target, savedLocked = d.locked;
-  var ok = true;
-  d.locked = false;
-  // step the door across its whole travel and demand the box track it every frame
-  for (var o = 0; o <= 1.0001; o += 0.05) {
-    d.open = o; d.target = o;
-    updateDoors(0.016);
-    if (d.aabb.disabled !== (d.open > 0.75)) { ok = false; break; }
-  }
-  d.open = savedOpen; d.target = savedTarget; d.locked = savedLocked;
-  d.mesh.position.y = d.closedY + d.open * (WALL_H - 0.1);
-  d.aabb.disabled = d.open > 0.75;
-  return ok;
-});
-TEST_SUITE.run('A door will not close on a body standing in its mouth', function () {
-  var d = LEVEL.doors[0];
-  var savedOpen = d.open, savedTarget = d.target, savedLocked = d.locked;
-  var savedPos = PLAYER.pos.clone();
-  d.locked = false; d.open = 1; d.target = 1;
-  PLAYER.pos.set(d.x, PLAYER.pos.y, d.z);     // stood in the doorway
-  updateDoors(0.016);
-  var heldOpen = d.target === 1;
-  PLAYER.pos.set(d.x, PLAYER.pos.y, d.z + 40); // well clear, and no guard nearby
-  updateDoors(0.016);
-  var released = d.target === 0;
-  PLAYER.pos.copy(savedPos);
-  d.open = savedOpen; d.target = savedTarget; d.locked = savedLocked;
-  d.aabb.disabled = d.open > 0.75;
-  return heldOpen && released;
-});
 </script>

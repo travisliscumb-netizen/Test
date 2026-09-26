@@ -46,7 +46,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #wepName{font-size:11px;letter-spacing:.22em;color:var(--steel);text-transform:uppercase}
 #ammoNum{font-size:32px;font-weight:700;line-height:1.02;letter-spacing:.02em}
 #ammoNum small{font-size:15px;color:var(--steel);font-weight:500}
-#objective{left:calc(var(--safe-l) + 70px);top:calc(var(--safe-t) + 14px);max-width:58vw}
+/* a dark backing: under the fluorescents the ceiling tiles are near white, and
+   the caption and list vanished into them */
+#objective{left:calc(var(--safe-l) + 70px);top:calc(var(--safe-t) + 14px);max-width:58vw;
+  background:rgba(5,8,14,.5);padding:6px 10px 5px;border-radius:3px;text-shadow:0 1px 2px rgba(0,0,0,.9)}
 #objText{font-size:12px;line-height:1.55;color:var(--ink);margin-top:4px}
 #objText b{color:var(--amber);font-weight:600}
 #objText .done{color:var(--green);text-decoration:line-through;opacity:.75}
@@ -73,7 +76,8 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 /* Portrait phones: the objective list and the centred alert were fighting for
    the same top strip, so the list drops below the alert row. */
 @media (max-width:560px){
-  #objective{left:calc(var(--safe-l) + 16px);top:calc(var(--safe-t) + 54px);max-width:78vw}
+  /* stop short of the minimap, which takes the top-right corner */
+  #objective{left:calc(var(--safe-l) + 16px);top:calc(var(--safe-t) + 64px);max-width:calc(100vw - 172px)}
   #objText{font-size:11.5px}
   #vitals{width:150px}
   #ammoNum{font-size:26px}
@@ -103,10 +107,24 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #btnUse{left:50%;margin-left:-38px;bottom:calc(var(--safe-b) + 26px);width:76px;height:76px;display:none;
   border-color:rgba(255,177,40,.6);background:rgba(255,177,40,.16)}
 #btnUse.on{display:flex}
+/* In portrait the bottom edge belongs to the health bar and ammo readout, so
+   USE moves up over the lower view. Declared after the base rule so it wins. */
+@media (max-width:560px){ #btnUse{bottom:auto;top:54%} }
 #btnPause{left:calc(var(--safe-l) + 14px);top:calc(var(--safe-t) + 12px);width:44px;height:44px;border-radius:6px;font-size:14px}
+/* Three columns under the right thumb, all kept below the minimap's band so a
+   390px-tall landscape phone has room: FIRE outermost, CRCH/WEAP inside it,
+   AIM/RLD innermost. Nothing sits over the ammo readout in the corner. */
+#btnAim{right:calc(var(--safe-r) + 212px);bottom:calc(var(--safe-b) + 142px);width:58px;height:58px}
+#btnReload{right:calc(var(--safe-r) + 212px);bottom:calc(var(--safe-b) + 66px);width:58px;height:58px}
+.tbtn.latched{background:rgba(255,177,40,.24);border-color:var(--amber);color:var(--amber)}
+#cheatTag{position:absolute;left:50%;bottom:calc(var(--safe-b) + 6px);transform:translateX(-50%);
+  font-size:9.5px;letter-spacing:.18em;color:#d98cff;opacity:.85;white-space:nowrap}
 
 /* ---------- overlays ---------- */
-.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;
+/* Centred with margin:auto on the child, not justify-content:center: a flex
+   container centres overflowing content upwards, past the scroll origin, so on
+   a short landscape phone the top of the title screen could not be reached. */
+.screen{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:flex-start;
   padding:calc(var(--safe-t) + 20px) calc(var(--safe-r) + 20px) calc(var(--safe-b) + 20px) calc(var(--safe-l) + 20px);
   background:radial-gradient(120% 90% at 50% 8%,rgba(255,177,40,.07),transparent 55%),
              linear-gradient(180deg,#05060a 0%,#0a0f18 55%,#05060a 100%);
@@ -114,7 +132,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .screen.on{display:flex}
 .screen::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;
   background:repeating-linear-gradient(0deg,rgba(159,176,196,.25) 0 1px,transparent 1px 3px)}
-.wrap{position:relative;width:100%;max-width:480px;z-index:1}
+.wrap{position:relative;width:100%;max-width:480px;z-index:1;margin:auto 0}
 .eyebrow{font-size:10.5px;letter-spacing:.42em;color:var(--amber);text-transform:uppercase;margin-bottom:8px}
 h1{font-size:clamp(30px,8.4vw,50px);margin:0;letter-spacing:.14em;line-height:1.04;font-weight:800}
 h1 span{color:var(--amber)}
@@ -145,6 +163,11 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
 #bigStat{font-size:40px;font-weight:800;letter-spacing:.04em;color:var(--amber)}
 #endTitle.win{color:var(--green)}
 #endTitle.lose{color:var(--red)}
+.kv b.good{color:var(--green)}
+.kv b.bad{color:var(--red)}
+.tog:disabled{opacity:.35;cursor:not-allowed}
+.btn.armed{border-left-color:var(--red);background:rgba(255,45,60,.18)}
+#endUnlock{color:#d98cff;font-size:12px;letter-spacing:.1em;margin:8px 0 0;min-height:1em}
 </style>
 </head>
 <body>
@@ -162,6 +185,7 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
   <div id="interactPrompt">HOLD USE</div>
   <div id="toast"></div>
   <div id="fpsCounter"></div>
+  <div id="cheatTag"></div>
 </div>
 
 <div id="touch">
@@ -170,6 +194,8 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
   <button class="tbtn" id="btnFire">FIRE</button>
   <button class="tbtn" id="btnWeap">WEAP</button>
   <button class="tbtn" id="btnCrouch">CRCH</button>
+  <button class="tbtn" id="btnAim">AIM</button>
+  <button class="tbtn" id="btnReload">RLD</button>
   <button class="tbtn" id="btnUse">USE</button>
   <button class="tbtn" id="btnPause">| |</button>
 </div>
@@ -182,9 +208,9 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <p class="lede">A chemical weapons facility cut into the rock. Get to the control room, pull the research data
       off the terminal, and be out through the plant before the garrison works out you were ever inside.</p>
     <button class="btn primary" id="btnStart"><span>Begin Mission</span><span class="k">&#9654;</span></button>
-    <button class="btn" id="btnBriefing"><span>Briefing</span><span class="k">i</span></button>
     <button class="btn" id="btnControlsScreen"><span>Controls</span><span class="k">?</span></button>
     <button class="btn" id="btnOptions"><span>Options</span><span class="k">&#9881;</span></button>
+    <button class="btn" id="btnCheats"><span>Cheats</span><span class="k">&#9733;</span></button>
     <p class="tiny">Runs entirely offline. Audio starts on your first tap &#8212; that is a browser rule, not a bug.</p>
   </div>
 </section>
@@ -200,10 +226,13 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <div class="card"><h3>Opposition</h3><p>Guards patrol the corridors. A guard who spots you breaks for the nearest
       wall panel to call the alarm in &#8212; drop him before he reaches it, or shoot the panels out first and the
       garrison never hears a thing. Lab staff are unarmed and run. Shots are loud; the suppressed PP7 is not.</p></div>
+    <div class="card"><h3>Equipment</h3><p>You go in with the PP7 and three proximity mines. Take a KF7 off the first
+      guard you drop. Body armour is stashed in the insertion washroom and the control room.</p></div>
     <div class="row"><label>Difficulty</label>
       <select id="selDiff" style="background:#182232;color:#e8eef6;border:1px solid rgba(159,176,196,.3);padding:9px;font-family:inherit;font-size:12px;min-height:40px">
         <option value="0">Agent</option><option value="1" selected>Secret Agent</option><option value="2">00 Agent</option>
       </select></div>
+    <p class="tiny" id="briefBest"></p>
     <button class="btn primary" id="btnBriefStart"><span>Insert</span><span class="k">&#9654;</span></button>
     <button class="btn" id="btnBriefBack"><span>Back</span><span class="k">&#9664;</span></button>
   </div>
@@ -213,12 +242,14 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
   <div class="wrap">
     <div class="eyebrow">Field manual</div>
     <h2>Controls</h2>
-    <div class="card"><h3>Touch</h3><p>Left half of the screen is the movement stick, right half is the look stick &#8212;
-      both appear wherever your thumb lands. Push the movement stick to its rim to sprint. FIRE and WEAP sit under your
-      right thumb, CRCH crouches, and USE appears in amber when something can be operated.</p></div>
+    <div class="card"><h3>Touch</h3><p>Left half of the screen is a floating movement stick; push it to the rim to
+      sprint. Drag anywhere on the right half to look (Options can switch this to a look stick). FIRE, AIM, RLD, WEAP
+      and CRCH sit under your right thumb; AIM and CRCH are toggles. USE appears in amber when something can be
+      operated.</p></div>
     <div class="card"><h3>Keyboard &amp; mouse</h3><p>WASD move &#183; mouse look &#183; left click fire &#183;
-      Q/E cycle weapons &#183; 1-3 select &#183; C crouch &#183; Shift sprint &#183; E interact &#183; R reload &#183;
-      Esc pause. Click the view to lock the mouse where the browser allows it; dragging works everywhere.</p></div>
+      right click aim &#183; Q or wheel cycle weapons &#183; 1-3 select &#183; C crouch &#183; Shift sprint &#183;
+      E interact &#183; R reload &#183; Esc or P pause. Click the view to lock the mouse where the browser allows it;
+      dragging works everywhere.</p></div>
     <div class="card"><h3>Reading the facility</h3><p>Fluorescents are cool white while you are undetected and switch to
       pulsing red the moment the alarm goes. Guards look at their patrol path; scientists do not fight.</p></div>
     <button class="btn" id="btnControlsBack"><span>Back</span><span class="k">&#9664;</span></button>
@@ -231,11 +262,25 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <h2>Options</h2>
     <div class="row"><label>Look sensitivity</label><input type="range" id="rngSens" min="30" max="260" value="100"></div>
     <div class="row"><label>Invert look Y</label><button class="tog" id="togInvert"><i></i></button></div>
+    <div class="row"><label>Touch: drag to look</label><button class="tog on" id="togSwipe"><i></i></button></div>
     <div class="row"><label>Master volume</label><input type="range" id="rngVol" min="0" max="100" value="75"></div>
     <div class="row"><label>Bloom</label><button class="tog on" id="togBloom"><i></i></button></div>
     <div class="row"><label>Shadows</label><button class="tog on" id="togShadow"><i></i></button></div>
     <div class="row"><label>Performance readout</label><button class="tog" id="togStats"><i></i></button></div>
+    <div class="row" id="rowFullscreen"><label>Fullscreen</label><button class="btn" id="btnFullscreen" style="width:auto;min-height:40px;margin:0;padding:8px 14px"><span>Toggle</span></button></div>
+    <button class="btn" id="btnErase"><span>Erase save data</span><span class="k">&#10005;</span></button>
     <button class="btn" id="btnOptionsBack"><span>Back</span><span class="k">&#9664;</span></button>
+  </div>
+</section>
+
+<section class="screen" id="screenCheats">
+  <div class="wrap">
+    <div class="eyebrow">Earned, never given</div>
+    <h2>Cheats</h2>
+    <p class="lede">Each one is unlocked by a finished run. A mission played with any cheat on keeps no time and earns
+      nothing new.</p>
+    <div id="cheatList"></div>
+    <button class="btn" id="btnCheatsBack"><span>Back</span><span class="k">&#9664;</span></button>
   </div>
 </section>
 
@@ -246,8 +291,9 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <div class="card">
       <div class="kv"><span>Elapsed</span><b id="pauseTime">00:00</b></div>
       <div class="kv"><span>Alarm</span><b id="pauseAlarm">Silent</b></div>
-      <div class="kv"><span>Archive</span><b id="pauseObjA">Not retrieved</b></div>
+      <div class="kv"><span>Difficulty</span><b id="pauseTier">&#8212;</b></div>
     </div>
+    <div class="card" id="pauseObjectives"></div>
     <button class="btn primary" id="btnResume"><span>Resume</span><span class="k">&#9654;</span></button>
     <button class="btn" id="btnPauseOptions"><span>Options</span><span class="k">&#9881;</span></button>
     <button class="btn" id="btnAbort"><span>Abort mission</span><span class="k">&#9664;</span></button>
@@ -260,13 +306,15 @@ p.lede{font-size:12.5px;line-height:1.75;color:var(--steel);margin:10px 0 16px}
     <h2 id="endTitle">MISSION COMPLETE</h2>
     <div id="bigStat">00:00</div>
     <p class="lede" id="endText"></p>
+    <div class="card" id="endObjectives"></div>
     <div class="card">
-      <div class="kv"><span>Archive retrieved</span><b id="endObjA">No</b></div>
-      <div class="kv"><span>Alarm raised</span><b id="endAlarm">No</b></div>
-      <div class="kv"><span>Guards neutralised</span><b id="endKills">0</b></div>
+      <div class="kv"><span>Alarm</span><b id="endAlarm">Silent</b></div>
+      <div class="kv"><span>Kills</span><b id="endKills">0</b></div>
       <div class="kv"><span>Accuracy</span><b id="endAcc">0%</b></div>
+      <div class="kv"><span>Head / body / limb hits</span><b id="endZones">0 / 0 / 0</b></div>
       <div class="kv"><span>Best time</span><b id="endBest">&#8212;</b></div>
     </div>
+    <p id="endUnlock"></p>
     <button class="btn primary" id="btnPlayAgain"><span>Play again</span><span class="k">&#8635;</span></button>
     <button class="btn" id="btnEndTitle"><span>Return to title</span><span class="k">&#9664;</span></button>
   </div>

@@ -1,75 +1,197 @@
 # Operation Blackgate — Facility Remake
 
-A fan remake of the "Facility" level archetype as a single self-contained HTML
-file. Open `operation-blackgate.html` in any modern browser — no server, no
-build step, no network. Three.js r128 is inlined; every texture, sound and piece
-of geometry is generated procedurally at runtime.
+A GoldenEye 007-style infiltration FPS in one self-contained HTML file. Open
+`operation-blackgate.html` in any modern browser — no server, no build step, no
+network. Three.js r128 is inlined; every texture, sound and piece of geometry is
+generated procedurally at runtime.
 
 ## Running it
 
-Double-click `operation-blackgate.html`, or drop it on any static host. The
-first frame is the title screen; one tap or click starts the mission (and that
-gesture is where the AudioContext is created).
+Double-click `operation-blackgate.html`, or drop it on any static host. The first
+frame is the title screen; the first tap or click is where the AudioContext is
+created.
 
-## Objectives
+## The mission
 
-1. Reach the control room and hold USE / E on the amber terminal to download the
-   research archive.
-2. Leave through the chemical plant. The exit stays locked until the archive is
-   yours.
+Objectives scale with the tier you pick, exactly as GoldenEye's did:
 
-Health reaching zero fails the mission. Guards patrol, hear gunfire and raise
-the alarm — at which point the fluorescents lerp to red and pulse. The PP7 is
-suppressed and carries about a third as far as the KF7, which is the whole
-reason to use it.
+| Tier | Objectives |
+|---|---|
+| Agent | Download the archive in the control room, exit through the plant |
+| Secret Agent | + Destroy the nerve-gas stockpile (four tanks: shoot the red gauges) |
+| 00 Agent | + Leave no lab staff dead (a constraint: lost for good the moment it breaks) |
+
+You go in with the suppressed PP7 and three proximity mines. The KF7 is taken off
+the first guard you drop, and every guard after that leaves his rifle as ammo.
+Body armour is stashed in the third washroom stall and in the control room.
+
+A guard who spots you runs for the nearest of seven wall-mounted alarm panels.
+Drop him on the way, or shoot panels out beforehand; cut all seven and the alarm
+can never be raised. Once it is up, the whole garrison paths to your last known
+position and sweeps the rooms around it.
+
+Reaching the exit with the actionable objectives done always ends the mission.
+If a constraint was broken on the way, the debrief says MISSION FAILED — the exit
+is never an inert door.
 
 ## Controls
 
-**Touch (primary):** left half of the screen is the movement stick, right half
-is the look stick — both floating, appearing where your thumb lands. Push
-movement to the rim to sprint. FIRE / WEAP / CRCH sit under the right thumb; USE
-appears in amber when something can be operated.
+**Touch (primary):** left half is a floating move stick (rim = sprint). Drag on
+the right half to look — the view follows the thumb (Options can switch to a
+rate-based look stick). FIRE, AIM (toggle), RLD, WEAP and CRCH (toggle) sit under
+the right thumb; USE appears in amber when something can be operated. Touch
+controls only appear on touch devices.
 
-**Desktop:** WASD, mouse look, LMB fire, RMB aim, Q/E cycle, 1-3 select, C
-crouch, Shift sprint, E interact, R reload, Esc pause. Clicking requests pointer
-lock where the browser supports it; dragging works everywhere else.
+**Desktop:** WASD, mouse look, LMB fire, RMB aim, Q / wheel cycle, 1-3 select,
+C crouch, Shift sprint, E interact, R reload, Esc or P pause. Clicking locks the
+pointer where the browser supports it; losing the lock (Esc) pauses.
+
+## Cheats
+
+Earned, never typed in. Each finished run can unlock one:
+
+| Cheat | Unlocked by |
+|---|---|
+| Paintball Mode | Completing on Agent |
+| DK Mode | Completing on Secret Agent |
+| Turbo Mode | Completing on 00 Agent |
+| Infinite Ammo | Secret Agent in under 3:30 |
+| Invincibility | 00 Agent in under 3:00 |
+
+A run with any cheat on records no best time and unlocks nothing. Best times are
+kept per tier. Settings, times and cheats persist in `localStorage` (validated on
+load field by field; Safari private mode falls back to memory).
 
 ## Source layout
 
-The shipped artifact is the generated `operation-blackgate.html`. It is
-assembled from `src/shell.html` + `three.min.js` + `src/game.js` by `build.py`,
-purely so the game code stays editable next to a 600KB inlined library. Nothing
-in that toolchain is needed to run or host the game.
+```
+src/shell.html   markup and CSS
+src/game.js      the game, in ===SECTION n=== blocks (2..11)
+vendor/          three r128 examples/js post-processing passes
+three.min.js     three r128
+build.py         assembles every shipped file (see below)
+tests/           unit.js, e2e.js, layout.js, run.mjs
+```
+
+`python3 build.py` regenerates `operation-blackgate.html` and every file under
+`deploy/`. Those outputs are generated: never edit them by hand.
+`python3 build.py --check` fails if any of them is stale.
+
+## Testing
 
 ```
-python3 build.py      # regenerates operation-blackgate.html
+npm install        # Playwright only; uses the system Chromium if one is configured
+npm test           # build --check, the Blackgate browser suite, the Agent 64 verifier
 ```
+
+The shipped file contains no test code. `tests/run.mjs` boots the real build in
+headless Chromium (WebGL via SwiftShader) and:
+
+- injects `tests/unit.js` — 45+ cases against the live world;
+- runs `tests/e2e.js` — full missions on all three tiers walked by a bot through
+  the real movement, collision and door code; every guard's alarm run; alarm
+  convergence; a three-minute real firefight soak; five restarts with scene and
+  geometry counts checked flat; death cam; pause; pickups; swipe look;
+- reloads the page to prove settings, best times, cheats and v1-save migration
+  survive, and that a corrupt save boots;
+- lays the HUD out at 844x390, 390x844 and 667x375 with touch emulation and
+  checks no control overlaps another or the HUD, and that no screen is clipped;
+- fails on any page error or any network request.
+
+`node tests/run.mjs --shots` also writes screenshots to `.shots/`.
 
 ## Engineering decisions worth knowing
 
-- **The light pool is a fixed size.** Adding or removing a light changes the
-  lighting state every material is compiled against, so the pool is allocated
-  once and re-homed onto the nearest ceiling fixtures as the player walks. Same
-  reason the muzzle flash light is parked at zero intensity rather than added
-  per shot: a trigger pull would otherwise recompile the scene's shaders.
-- **Shadow casters are capped and asymmetric.** Six on desktop, two at 256px on
-  mobile with half-rate updates, because a shadow-casting point light is six
-  render passes. Floors, ceilings, skirting, light tubes and enemy arms are
-  excluded from the shadow pass entirely — they cost six redraws each and
-  occlude nothing.
-- **Bloom is a hand-rolled three-pass chain**, not EffectComposer (which lives
-  in three's examples, not core). Scene renders to an sRGB-tagged target — r128
-  takes output encoding from the render target — then bright-pass, separable
-  blur, additive composite.
-- **A PMREM environment probe is baked at startup** from a tiny synthetic room.
-  Without it every metalness>0 surface renders black.
-- **Static geometry is merged per material** with a hand-written merge (r128 core
-  has no BufferGeometryUtils), so the facility draws in roughly ten calls.
-- **Collision is AABB, never Raycaster.** Raycaster allocates intersection
-  records and walks the scene graph; movement only ever needs box-vs-box.
-- **Dynamic resolution sits under the DPR cap.** The brief asks for DPR capped at
-  2 and 30fps on mobile, which conflict on a phone; the cap stands and the scale
-  underneath it moves with hysteresis.
+- **The light count never changes.** three.js compiles every material against
+  the number of *visible* lights, so the pool of eight is always visible and an
+  unused slot is switched off by intensity. Toggling `.visible` — which the pool
+  used to do — is a light-count change and a recompile hitch in disguise.
+- **Materials are compiled at mission start** (`renderer.compile`), so nothing
+  compiles mid-play when a pickup or a hit flash first comes into view.
+- **Sight and occlusion are ray-vs-box, not Raycaster.** A mesh raycast against
+  the ~17k merged level triangles measured 0.75ms; the roster made several a
+  frame. The ~216 collision boxes are the level's real shape as far as bodies are
+  concerned. Bullets still hit the rendered mesh, for exact impact points.
+- **Guards navigate a grid.** Each open 4m cell gets a node where a body fits,
+  every link is walk-checked once at build time (with doors treated as unlocked;
+  locks are checked per query), and A* runs over eight-way links. A guard with a
+  clear straight run skips the graph; one on a route starts from the furthest
+  node a straight walk reaches.
+- **Hitscan reads fresh matrices.** The camera and each guard's hierarchy are
+  refreshed as they move; three.js otherwise updates world matrices only when it
+  renders, which left every shot travelling along the previous frame's aim.
+- **simulate(dt) is the whole game step** with no rendering or clock reads. The
+  frame loop and the test harness call the same function.
+- **Post-processing** is RenderPass → UnrealBloom → Vignette → FXAA from the r128
+  examples, with sRGB-tagged targets. Adaptive quality drops bloom and shadow
+  resolution, then render scale, and climbs back after sustained headroom.
+- **Shadow casters are capped** at two key lights; floors, ceilings and trim do
+  not cast.
+
+## Deliberate deviations
+
+- `castShadow` is off on flat floors, ceilings, trim and light tubes: with
+  shadow-casting point lights those surfaces are redrawn six times per light to
+  produce nothing.
+- `MeshBasicMaterial` is used in two places, neither on level geometry: inside the
+  throwaway environment-probe scene, and as the one shared invisible material on
+  the raycast proxy each enemy carries.
+
+## Rebuild (v2) — review findings and what changed
+
+A full review of both games on the branch. Blackgate is the base (real renderer,
+the GoldenEye systems); the best of Agent 64 — earned cheats, persisted settings,
+per-mode records, a proper verifier — was brought across. Every defect below was
+reproduced before it was fixed and has a test.
+
+**Defects fixed**
+
+- The corrected off-screen objective marker never ran: `hudDrawWaypoint` and
+  `hudObjectiveTarget` were each declared twice, and the later (old, mirrored)
+  copy silently won.
+- All seven alarm panels floated in open floor — one dead centre in the insertion
+  corridor, walked through. They are now mounted on named walls, and a mount on a
+  side with no wall fails the build.
+- A dead scientist on 00 Agent soft-locked the game: the exit required the
+  constraint too, so it never triggered and nothing said why.
+- Standing at the exit with the stockpile intact gave no feedback, and the
+  waypoint pointed Secret Agents at the exit before the tanks.
+- The light pool toggled `.visible`, changing the compiled light count.
+- Line of sight cost ~0.75ms per call (mesh raycast of the whole level).
+- Every shot and aim probe used the previous frame's camera and guard matrices.
+- Guards treated the 0.4m control-room platform as a wall: the guard posted on it
+  was stuck until the failsafe teleported him off, and then could never walk back
+  onto it (measured: blocked at its edge, z = 95.7).
+- Guards had no path search: runners stalled at walls, searches died at doorways,
+  and a stuck failsafe teleported people.
+- Scientists who lost sight of you walked back toward where they last saw you.
+- Guards and the player passed through each other.
+- The exit door's lock lamp was on the far face; two EXIT signs floated in the
+  air and one was buried in rock.
+- The in-file test suite shipped to players, mutated the live world on every load
+  (a guard disarmed on the title screen, real renderer resizes, `[PERF]` log spam).
+- Pointer lock lost to Esc did not pause the game.
+- On short landscape phones the top of the title screen could not be scrolled to
+  (flex centring overflowed past the scroll origin).
+- Touch controls were drawn over the desktop view.
+- Controls text said Q/E cycle weapons; E is interact.
+- Per-frame allocations: footstep noise objects, prompt strings, enemy-hit arrays.
+
+**Added**
+
+- Pistol start with rifles taken from guards; armour and ammo pickups.
+- Touch AIM and RELOAD; drag-to-look (default) or rate stick.
+- Solid guard bodies; damage-direction arc; a GoldenEye death cam.
+- Earned cheats; per-tier best times; persisted, validated settings; erase save.
+- GoldenEye-style debrief: per-objective status, accuracy, head/body/limb hits.
+- Pause screen with live objective status; fullscreen toggle.
+- Guards sweep the area around the last sighting while the alarm is up.
+
+## History
+
+The sections below record earlier passes as they were written. Where they
+describe something the rebuild changed (the in-file suite, the hand-rolled
+bloom, the waypoint), the sections above are current.
 
 ## Playtest fixes (final pass)
 
