@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a0f6b"/><stop offset=".55" stop-color="#1a0b3d"/><stop offset="1" stop-color="#12246e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".42" r=".55">
+      <stop offset="0" stop-color="#ff4fd8" stop-opacity=".45"/><stop offset="1" stop-color="#ff4fd8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <symbol id="b" viewBox="0 0 100 100">
+      <rect x="4" y="8" width="92" height="92" rx="20" fill="#000" opacity=".3"/>
+      <rect x="4" y="4" width="92" height="92" rx="20" fill="currentColor"/>
+      <rect x="18" y="18" width="64" height="64" rx="12" fill="#fff" opacity=".18"/>
+      <rect x="4" y="4" width="92" height="92" rx="20" fill="url(#gloss)"/>
+      <circle cx="26" cy="26" r="6" fill="#fff" opacity=".9"/>
+    </symbol>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <use href="#b" x="206" y="96" width="100" height="100" style="color:#b14dff"/>
+  <use href="#b" x="106" y="196" width="100" height="100" style="color:#1fd7f0"/>
+  <use href="#b" x="206" y="196" width="100" height="100" style="color:#ff4fd8"/>
+  <use href="#b" x="306" y="196" width="100" height="100" style="color:#ffd22e"/>
+  <use href="#b" x="156" y="316" width="100" height="100" style="color:#3ee06a"/>
+  <use href="#b" x="256" y="316" width="100" height="100" style="color:#ff9a2e"/>
+</svg>
