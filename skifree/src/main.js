@@ -592,8 +592,11 @@ document.addEventListener('visibilitychange', () => {
     lastTs = performance.now();
   }
 });
+// Pause when the window loses focus, but only on desktop: mobile browsers
+// fire window blur on ordinary touches, which kept pausing the game. Leaving
+// the app or tab on a phone is caught by visibilitychange above.
 window.addEventListener('blur', () => {
-  if (mode === 'playing') pause();
+  if (mode === 'playing' && !touchSeen && !coarse.matches) pause();
 });
 
 // The yeti's off-screen marker stays below the HUD card.
