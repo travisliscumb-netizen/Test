@@ -1,0 +1,14 @@
+{
+  "name": "SkiFree",
+  "short_name": "SkiFree",
+  "description": "Ski downhill, dodge everything, and try to outrun the Yeti.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#f7fafe",
+  "theme_color": "#f7fafe",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#f7fafe">
+  <meta name="description" content="Ski downhill, dodge trees, dogs and other skiers, go faster, and try to outrun the Yeti. A from-scratch tribute to the 1991 classic.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>SkiFree</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <canvas id="game" aria-label="SkiFree game view"></canvas>
+
+  <!-- In-run HUD: the classic little stats box, top right. -->
+  <div id="hud" class="hidden" aria-live="off">
+    <button id="pause-btn" class="icon-btn" aria-label="Pause (Esc)">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
+    </button>
+    <div class="stats" role="status">
+      <div><span>Time</span><b id="hud-time">0:00:00</b></div>
+      <div><span>Dist</span><b id="hud-dist">0m</b></div>
+      <div><span>Speed</span><b id="hud-speed">0 km/h</b></div>
+      <div><span>Style</span><b id="hud-style">0</b></div>
+    </div>
+    <div id="speedo" aria-hidden="true"><i></i></div>
+  </div>
+
+  <div id="toast" class="toast hidden" aria-live="polite"></div>
+
+  <!-- Title -->
+  <section id="title" class="screen">
+    <div class="title-wrap">
+      <h1 class="logo" aria-label="SkiFree">
+        <span class="logo-ski">Ski</span><span class="logo-free">Free</span>
+        <canvas id="logo-yeti" width="120" height="120" aria-hidden="true"></canvas>
+      </h1>
+      <p class="tagline">Ski. Dodge. Go faster. Don't get eaten.</p>
+      <nav class="menu" aria-label="Main menu">
+        <button class="btn primary" data-action="play">Play</button>
+        <button class="btn" data-action="controls">Controls</button>
+        <button class="btn" data-action="options">Options</button>
+        <button class="btn" data-action="about">About</button>
+      </nav>
+      <p id="best-line" class="best-line"></p>
+      <p class="hint-line desktop-only">Press <kbd>Enter</kbd> to ski</p>
+    </div>
+  </section>
+
+  <!-- Controls -->
+  <section id="controls" class="screen hidden">
+    <div class="window">
+      <header class="window-bar"><span>Controls</span><button class="x" data-action="back" aria-label="Close">×</button></header>
+      <div class="window-body">
+        <table class="keys">
+          <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd></td><td>Steer. Keep pushing across the hill to stop, then sidestep.</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>W</kbd></td><td>Point straight downhill and tuck</td></tr>
+          <tr><td><kbd>↓</kbd> / <kbd>S</kbd></td><td>Snowplough brake</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Hop. Ramps launch you properly.</td></tr>
+          <tr><td><kbd>F</kbd></td><td>Go fast. Very fast. Harder to steer.</td></tr>
+          <tr><td><kbd>Esc</kbd> / <kbd>P</kbd></td><td>Pause</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Restart run</td></tr>
+          <tr><td>Mouse</td><td>The skier heads toward the pointer. Click to hop.</td></tr>
+          <tr><td>Touch</td><td>D-pad on the left, Hop and Turbo on the right.</td></tr>
+        </table>
+        <p class="small">Land with your skis pointing the way you're flying. Slalom gates and big air earn style points.</p>
+        <div class="row-end"><button class="btn" data-action="back">OK</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Options -->
+  <section id="options" class="screen hidden">
+    <div class="window">
+      <header class="window-bar"><span>Options</span><button class="x" data-action="back" aria-label="Close">×</button></header>
+      <div class="window-body form">
+        <label>Master volume <input type="range" id="opt-master" min="0" max="1" step="0.05"></label>
+        <label>Music <input type="range" id="opt-music" min="0" max="1" step="0.05"></label>
+        <label>Sound effects <input type="range" id="opt-sfx" min="0" max="1" step="0.05"></label>
+        <label class="check"><input type="checkbox" id="opt-motion"> Reduced motion <small>(no camera wobble or speed streaks)</small></label>
+        <label class="check"><input type="checkbox" id="opt-effects"> Snow effects <small>(spray and bursts)</small></label>
+        <label>Touch controls
+          <select id="opt-touch">
+            <option value="auto">Automatic</option>
+            <option value="on">Always show</option>
+            <option value="off">Hide</option>
+          </select>
+        </label>
+        <label>Mountain
+          <select id="opt-seed-mode">
+            <option value="random">A new mountain every run</option>
+            <option value="fixed">Always the same mountain</option>
+          </select>
+        </label>
+        <label id="seed-row">Mountain number <input type="text" id="opt-seed" inputmode="numeric" maxlength="24" placeholder="e.g. 1991" autocomplete="off"></label>
+        <div class="row-end">
+          <button class="btn danger" id="reset-records">Reset records</button>
+          <button class="btn" data-action="back">OK</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About -->
+  <section id="about" class="screen hidden">
+    <div class="window">
+      <header class="window-bar"><span>About SkiFree</span><button class="x" data-action="back" aria-label="Close">×</button></header>
+      <div class="window-body">
+        <p><b>SkiFree</b> — a from-scratch modern tribute to the 1991 Windows classic by Chris Pirih.</p>
+        <p>Every line of code, every drawing and every sound here is new: the art is vector-drawn at runtime and the audio is synthesised live. Nothing is taken from the original.</p>
+        <p>Not affiliated with or endorsed by Microsoft.</p>
+        <p class="small" id="stats-line"></p>
+        <div class="row-end"><button class="btn" data-action="back">OK</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pause -->
+  <section id="pause" class="screen dim hidden">
+    <div class="window narrow">
+      <header class="window-bar"><span>Paused</span></header>
+      <div class="window-body stack">
+        <button class="btn primary" data-action="resume">Resume</button>
+        <button class="btn" data-action="restart">Restart</button>
+        <button class="btn" data-action="menu">Main menu</button>
+        <p class="small center" id="pause-seed"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game over -->
+  <section id="over" class="screen dim hidden">
+    <div class="window narrow">
+      <header class="window-bar"><span id="over-title">Eaten by the Yeti</span></header>
+      <div class="window-body">
+        <dl class="result">
+          <div><dt>Distance</dt><dd id="over-dist">0m</dd></div>
+          <div><dt>Score</dt><dd id="over-score">0</dd></div>
+          <div><dt>Max speed</dt><dd id="over-speed">0 km/h</dd></div>
+          <div id="over-escapes-row"><dt>Yeti escapes</dt><dd id="over-escapes">0</dd></div>
+        </dl>
+        <p id="over-best" class="best-badge hidden"></p>
+        <div class="stack">
+          <button class="btn primary" data-action="restart">Try again</button>
+          <button class="btn" data-action="same">Ski this mountain again</button>
+          <button class="btn" data-action="menu">Main menu</button>
+        </div>
+        <p class="small center desktop-only">Enter or Space to go again</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Touch controls -->
+  <div id="touch" class="hidden" aria-hidden="true">
+    <div class="pad">
+      <button class="tb up" data-key="up">▲</button>
+      <button class="tb left" data-key="left">◀</button>
+      <button class="tb right" data-key="right">▶</button>
+      <button class="tb down" data-key="down">▼</button>
+    </div>
+    <div class="acts">
+      <button class="tb jump" data-key="jump">HOP</button>
+      <button class="tb turbo" data-key="turbo">F<small>TURBO</small></button>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">SkiFree needs JavaScript to run.</p></noscript>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
