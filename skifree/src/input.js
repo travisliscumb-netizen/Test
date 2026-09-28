@@ -74,12 +74,15 @@ export class Input {
     }
     const k = KEYMAP[e.code];
     if (down) {
-      if (e.code === 'Escape' || e.code === 'KeyP') {
+      // F3 paused the original; Esc and P are the modern habits.
+      if (e.code === 'Escape' || e.code === 'KeyP' || e.code === 'F3') {
         if (!e.repeat) this.handlers.pause?.();
         e.preventDefault();
         return;
       }
-      if (e.code === 'KeyR' && !e.repeat && this.capture) {
+      // F2 restarted the original.
+      if (e.code === 'F2') e.preventDefault();
+      if ((e.code === 'KeyR' || e.code === 'F2') && !e.repeat && this.capture) {
         this.handlers.restart?.();
         return;
       }

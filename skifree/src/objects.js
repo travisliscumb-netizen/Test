@@ -24,6 +24,7 @@ export const OBJECTS = {
   sign:       { r: 6,  h: 44,  hit: 'tumble', yeti: 'smash',   solid: true },
   lift_tower: { r: 9,  h: 220, hit: 'crash',  yeti: 'stumble', solid: true },
   gate:       { r: 0,  h: 0,   hit: 'none',   yeti: 'ignore',  solid: false },
+  banner:     { r: 0,  h: 0,   hit: 'none',   yeti: 'ignore',  solid: false }, // START / FINISH arch over a course
 };
 
 export const TREE_TYPES = ['tree_s', 'tree_m', 'tree_l', 'tree_snowy', 'tree_dead'];

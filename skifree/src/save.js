@@ -20,6 +20,7 @@ function blank() {
   return {
     v: 1,
     best: { score: 0, distance: 0, maxSpeed: 0, escapes: 0 },
+    courses: {}, // slalom/tree: best total seconds (penalties in); freestyle: best style
     totals: { runs: 0, distance: 0, eaten: 0, escapes: 0 },
     settings: { ...DEFAULT_SETTINGS },
   };
@@ -34,6 +35,10 @@ export function sanitize(raw) {
   if (!raw || typeof raw !== 'object') return s;
   const b = raw.best || {};
   s.best = { score: num(b.score), distance: num(b.distance), maxSpeed: num(b.maxSpeed), escapes: num(b.escapes) };
+  const cs = raw.courses && typeof raw.courses === 'object' ? raw.courses : {};
+  for (const id of ['slalom', 'tree', 'freestyle']) {
+    if (typeof cs[id] === 'number' && Number.isFinite(cs[id]) && cs[id] > 0) s.courses[id] = cs[id];
+  }
   const t = raw.totals || {};
   s.totals = { runs: num(t.runs), distance: num(t.distance), eaten: num(t.eaten), escapes: num(t.escapes) };
   const st = raw.settings || {};
@@ -103,6 +108,19 @@ export class Save {
     if (eaten) t.eaten++;
     this.write();
     return broke;
+  }
+
+  // Returns true when this is a new best for the course: fastest total for
+  // the slaloms, most style for freestyle.
+  recordCourse(id, value) {
+    const prev = this.data.courses[id];
+    const higher = id === 'freestyle';
+    const best = !(prev > 0) || (higher ? value > prev : value < prev);
+    if (best && value > 0) {
+      this.data.courses[id] = value;
+      this.write();
+    }
+    return best;
   }
 
   resetRecords() {

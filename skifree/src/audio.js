@@ -266,6 +266,25 @@ export class Sound {
       case 'yeti':
         this.roar(1.3);
         break;
+      case 'yetiwarn': {
+        // Far away, muffled: something is out there.
+        this.roar(1.6, 0, 0.25);
+        break;
+      }
+      case 'trick':
+        this.tone('triangle', 520, 1040, 0.18, 0.07);
+        break;
+      case 'gatemiss':
+        this.tone('square', 220, 160, 0.16, 0.06);
+        break;
+      case 'coursestart':
+        [0, 0.18, 0.36].forEach((w, i) => this.tone('square', i < 2 ? 660 : 1320, i < 2 ? 660 : 1320, i < 2 ? 0.1 : 0.22, 0.06, w));
+        break;
+      case 'coursedone':
+        [72, 76, 79, 84].forEach((n, i) => this.tone('square', midi(n), midi(n), 0.12, 0.06, i * 0.09));
+        break;
+      case 'style':
+        break;
       case 'yetibonk':
         this.tone('sine', 700, 180, 0.22, 0.14);
         this.burst('lowpass', 800, 150, 0.25, 0.22);

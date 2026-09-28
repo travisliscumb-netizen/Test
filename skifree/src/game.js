@@ -4,12 +4,13 @@
 import { CONFIG, METER } from './config.js';
 import { OBJECTS } from './objects.js';
 import { Rng, hash } from './rng.js';
-import { World } from './world.js';
+import { World, courses } from './world.js';
 import { Player } from './player.js';
 import { spawnActors } from './actors.js';
 import { Yeti } from './yeti.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+export const TRICK_NAMES = { flip: 'Backflip', eagle: 'Spread eagle', spin: 'Helicopter' };
 
 export class Game {
   // opts: { seed, cfg, demo, viewW, viewH }
@@ -39,8 +40,17 @@ export class Game {
       yetiEscapes: 0,
       airTime: 0,
       gates: 0,
+      tricks: 0,
     };
     this.nextYetiAt = cfg.YETI_TRIGGER_DISTANCE;
+    // Stall watch: the yeti also comes for skiers who stop making progress.
+    this.progressMark = 0;
+    this.stallTime = 0;
+    this.stallWarned = false;
+    this.wanderTime = 0;
+    // Timed course in progress: { def, time, missed, passed, style0 }.
+    this.courses = courses(cfg);
+    this.course = null;
     this.hopWasDown = true; // a key still held from the menu mustn't hop on frame one
 
     // Camera (centre of view, in world units) and the view size at zoom 1.
@@ -79,12 +89,17 @@ export class Game {
       return;
     }
     this.time += dt;
+    if (this.course) this.course.time += dt;
     const p = this.player;
     const prevY = p.y;
     const firstEvent = this.events.length;
 
     // Jump is edge-triggered so holding space doesn't bunny-hop forever.
-    if (input.jump && !this.hopWasDown) p.hop(this.events);
+    // In the air the same button spins.
+    if (input.jump && !this.hopWasDown) {
+      if (p.state === 'air') p.startTrick('spin', this.events);
+      else p.hop(this.events);
+    }
     this.hopWasDown = !!input.jump;
 
     p.update(dt, input, this.events);
@@ -207,17 +222,64 @@ export class Game {
     // so a skier who doesn't steer can never be trapped crashing into one tree.
     if (insideSolid) p.grace = Math.max(p.grace, 0.15);
 
-    // Slalom gates: crossing the line between the flags scores.
+    // Slalom gates: crossing the line between the flags scores. On a timed
+    // course, crossing a gate's line outside its flags is a miss.
     if (p.y > prevY) {
-      this.world.forEachInRect(p.x - 80, prevY - 1, p.x + 80, p.y + 1, (o) => {
+      const run = this.course;
+      const x0 = run ? Math.min(p.x, run.def.x) - run.def.half - 200 : p.x - 80;
+      const x1 = run ? Math.max(p.x, run.def.x) + run.def.half + 200 : p.x + 80;
+      this.world.forEachInRect(x0, prevY - 1, x1, p.y + 1, (o) => {
         if (o.t !== 'gate' || o.state) return;
-        if (prevY < o.y && p.y >= o.y && Math.abs(p.x - o.x) < o.v / 2) {
+        if (!(prevY < o.y && p.y >= o.y)) return;
+        const onCourse = run && run.def.gates && Math.abs(o.x - run.def.x) < run.def.half + 60;
+        if (Math.abs(p.x - o.x) < o.v / 2) {
           o.state = 1;
           this.stats.gates++;
-          this.addStyle(c.STYLE_GATE);
+          if (onCourse) run.passed++;
+          this.awardStyle(c.STYLE_GATE, 'Gate', o.x, o.y);
           this.events.push({ type: 'gate', x: o.x, y: o.y });
+        } else if (onCourse) {
+          o.state = 2;
+          run.missed++;
+          this.events.push({ type: 'gatemiss', x: o.x, y: o.y, penalty: c.COURSE_MISS_PENALTY });
         }
       });
+    }
+    this.updateCourse(prevY);
+  }
+
+  // Timed runs down Slalom, Tree Slalom and Freestyle, like the original.
+  updateCourse(prevY) {
+    const p = this.player;
+    const c = this.cfg;
+    const run = this.course;
+    if (!run) {
+      for (const def of this.courses) {
+        if (prevY < def.startY && p.y >= def.startY && Math.abs(p.x - def.x) < def.half) {
+          this.course = { def, time: 0, missed: 0, passed: 0, style0: this.style };
+          this.events.push({ type: 'coursestart', id: def.id, name: def.name, x: def.x, y: def.startY });
+          break;
+        }
+      }
+      return;
+    }
+    const def = run.def;
+    if (prevY < def.endY && p.y >= def.endY) {
+      const ok = Math.abs(p.x - def.x) < def.half + 4 * METER;
+      this.course = null;
+      if (!ok) {
+        this.events.push({ type: 'courseabort', id: def.id, name: def.name, reason: 'Missed the finish' });
+        return;
+      }
+      const penalty = run.missed * c.COURSE_MISS_PENALTY;
+      this.events.push({
+        type: 'course', id: def.id, name: def.name, x: p.x, y: p.y,
+        time: run.time, missed: run.missed, passed: run.passed, total: run.time + penalty,
+        style: Math.floor(this.style - run.style0),
+      });
+    } else if (Math.abs(p.x - def.x) > c.COURSE_LANE_HALF || p.y < def.startY - 10 * METER) {
+      this.course = null;
+      this.events.push({ type: 'courseabort', id: def.id, name: def.name, reason: 'Left the course' });
     }
   }
 
@@ -260,6 +322,13 @@ export class Game {
     this.style += n;
   }
 
+  // Style with a label, so the renderer can pop a "+40 Backflip" in the world.
+  awardStyle(n, label, x, y) {
+    if (n <= 0) return;
+    this.style += n;
+    this.events.push({ type: 'style', amount: Math.round(n), label, x, y });
+  }
+
   addDecal(kind, x, y) {
     this.decals.push({ kind, x, y, age: 0 });
     if (this.decals.length > 60) this.decals.shift();
@@ -272,10 +341,18 @@ export class Game {
     for (let i = from; i < this.events.length; i++) {
       const e = this.events[i];
       // Only real air counts: hops and mogul bounces would be farmable.
-      if (e.type === 'land' && e.ramp) this.addStyle(e.air * c.STYLE_PER_AIR_SECOND + c.STYLE_RAMP_BONUS);
-      else if (e.type === 'escape') {
+      if (e.type === 'land' && e.ramp) {
+        let n = e.air * c.STYLE_PER_AIR_SECOND + c.STYLE_RAMP_BONUS;
+        const names = [];
+        for (const t of e.tricks || []) {
+          n += c.TRICKS[t].style;
+          names.push(TRICK_NAMES[t]);
+        }
+        this.stats.tricks += (e.tricks || []).length;
+        this.awardStyle(n, names.length ? names.join(' + ') : 'Big air', e.x, e.y);
+      } else if (e.type === 'escape') {
         this.stats.yetiEscapes++;
-        this.addStyle(c.STYLE_ESCAPE);
+        this.awardStyle(c.STYLE_ESCAPE, 'Escaped!', this.player.x, this.player.y);
       }
     }
   }
@@ -285,10 +362,16 @@ export class Game {
   updateYeti(dt) {
     const p = this.player;
     const c = this.cfg;
-    if (!this.yeti && !this.demo && this.stats.distance >= this.nextYetiAt && p.state !== 'caught') {
-      this.yeti = new Yeti(p, this.world, this.rng, this.stats.yetiEncounters, (this.viewW * this.zoomMul) / 2, c);
-      this.stats.yetiEncounters++;
-      this.events.push({ type: 'yeti', x: this.yeti.x, y: this.yeti.y, approach: this.yeti.approach });
+    if (!this.yeti && !this.demo && p.state !== 'caught') {
+      const reason = this.yetiReason(dt);
+      if (reason) {
+        this.yeti = new Yeti(p, this.world, this.rng, this.stats.yetiEncounters, (this.viewW * this.zoomMul) / 2, c);
+        this.stats.yetiEncounters++;
+        this.stallTime = 0;
+        this.stallWarned = false;
+        this.wanderTime = 0;
+        this.events.push({ type: 'yeti', x: this.yeti.x, y: this.yeti.y, approach: this.yeti.approach, reason });
+      }
     }
     const y = this.yeti;
     if (!y) return;
@@ -304,7 +387,32 @@ export class Game {
     if (y.state === 'gone') {
       this.yeti = null;
       this.nextYetiAt = this.stats.distance + c.YETI_RETURN_DISTANCE;
+      this.progressMark = this.stats.distance;
+      this.stallTime = 0;
     }
+  }
+
+  // Why the yeti should come now, or null. Distance is the classic trigger;
+  // stalling and wandering off the side of the mountain summon it too.
+  yetiReason(dt) {
+    const c = this.cfg;
+    const d = this.stats.distance;
+    if (d >= this.nextYetiAt) return 'distance';
+    if (d > this.progressMark + c.YETI_STALL_PROGRESS) {
+      this.progressMark = d;
+      this.stallTime = 0;
+      this.stallWarned = false;
+    } else {
+      this.stallTime += dt;
+    }
+    if (this.stallTime >= c.YETI_STALL_WARN && !this.stallWarned) {
+      this.stallWarned = true;
+      this.events.push({ type: 'yetiwarn', reason: 'stall' });
+    }
+    if (this.stallTime >= c.YETI_STALL_TIME) return 'stall';
+    this.wanderTime = Math.abs(this.player.x) > c.YETI_WANDER_X ? this.wanderTime + dt : 0;
+    if (this.wanderTime > 3) return 'wander';
+    return null;
   }
 
   // Skips the rest of the eating animation (any key once it has read).

@@ -28,6 +28,16 @@ export const BIOMES = {
 };
 const REGION_BIOMES = { open: 3, woods: 3, glade: 3, rocks: 1.4, moguls: 1.4, park: 1 };
 
+// The three courses from the original's trailhead. Built from config so the
+// world, the game rules and the tests all agree on where they are.
+export function courses(cfg = CONFIG) {
+  return [
+    { id: 'slalom', name: 'Slalom', x: cfg.SLALOM_X, half: 12 * M, startY: 22 * M, endY: cfg.COURSE_LENGTH, gates: true },
+    { id: 'tree', name: 'Tree Slalom', x: cfg.TREE_SLALOM_X, half: 12 * M, startY: 22 * M, endY: cfg.COURSE_LENGTH, gates: true },
+    { id: 'freestyle', name: 'Freestyle', x: cfg.FREESTYLE_X, half: 12 * M, startY: 22 * M, endY: cfg.COURSE_LENGTH, gates: false },
+  ];
+}
+
 const STAMPS = ['clearing', 'jump_line', 'passage', 'snowmen', 'rock_garden', 'mogul_run', 'dead_grove'];
 
 export class World {
@@ -207,10 +217,10 @@ export class World {
       put(flag, cx + half, y);
       if (inside(cx, y)) push('gate', cx, y, half * 2);
     }
-    // Finish posts at the bottom of each course.
-    for (const lx of [cfg.SLALOM_X, cfg.TREE_SLALOM_X, cfg.FREESTYLE_X]) {
-      put('sign', lx - 12 * M, cfg.COURSE_LENGTH, SIGN.FINISH);
-      put('sign', lx + 12 * M, cfg.COURSE_LENGTH, SIGN.FINISH);
+    // START and FINISH arches over each course (v: 0 start, 1 finish).
+    for (const c of courses(cfg)) {
+      put('banner', c.x, c.startY, 0);
+      put('banner', c.x, c.endY, 1);
     }
 
     // Chairlift towers.
@@ -393,8 +403,13 @@ export class World {
     const blocked = (x, y) => {
       for (const b of blockers) {
         const dx = Math.abs(b.x - x), dy = Math.abs(b.y - y);
-        // Gates keep a generous box clear so the line through them is skiable.
-        if (b.t === 'gate' ? dx < b.v / 2 + 60 && dy < 70 : dx < gap && dy < gap && Math.hypot(dx, dy) < gap) return true;
+        // Gates keep a generous box clear so the line through them is skiable;
+        // arches keep their two poles clear.
+        if (b.t === 'gate') {
+          if (dx < b.v / 2 + 60 && dy < 70) return true;
+        } else if (b.t === 'banner') {
+          if (dy < 50 && Math.abs(dx - 12 * M) < 40) return true;
+        } else if (dx < gap && dy < gap && Math.hypot(dx, dy) < gap) return true;
       }
       for (const h of holes) if (Math.hypot(h.x - x, h.y - y) < h.r + gap) return true;
       return false;

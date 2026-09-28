@@ -226,6 +226,24 @@ function handleEvents(g, live) {
           sound.play('escape', e);
           toast('You lost the Yeti!  +' + CONFIG.STYLE_ESCAPE, 2600);
           break;
+        case 'yetiwarn':
+          sound.play('yetiwarn', e);
+          break;
+        case 'coursestart':
+          sound.play('coursestart', e);
+          toast(`${e.name}: go!`, 1600);
+          break;
+        case 'course': {
+          const best = save.recordCourse(e.id, e.id === 'freestyle' ? e.style : e.total);
+          sound.play('coursedone', e);
+          const miss = e.missed ? ` (${e.missed} missed, +${e.missed * CONFIG.COURSE_MISS_PENALTY}s)` : '';
+          const extra = e.id === 'freestyle' ? ` · ${e.style} style` : '';
+          toast(`${e.name} ${fmtTime(e.total)}${miss}${extra}${best ? ' · Best!' : ''}`, 4000);
+          break;
+        }
+        case 'courseabort':
+          toast(`${e.name}: ${e.reason.toLowerCase()}`, 1800, true);
+          break;
         case 'gameover':
           gameOver();
           break;
@@ -356,6 +374,7 @@ function updateHud(g) {
 }
 
 const fmtInt = (n) => Math.floor(n).toLocaleString('en-US');
+const fmtTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
 
 // A small yeti waving from the corner of the logo.
 const logoCanvas = $('#logo-yeti');

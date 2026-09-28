@@ -350,6 +350,110 @@ function yetiTrial(seed, brain, at = 30) {
   check('a skier high in the air sails over the grab', y.state !== 'eat' || hop.player.z < CONFIG.YETI_REACH_HEIGHT);
 }
 
+// ------------------------------------------------ original-game mechanics
+{
+  // Stalling summons the yeti (with a roar of warning first).
+  const g = new Game({ seed: 50 });
+  g.setViewSize(1100, 640);
+  g.player.grace = 999;
+  const slog = run(g, 40, () => ({ left: true }));
+  const warnT = slog.find((e) => e.type === 'yetiwarn')?.t ?? null;
+  const ye = slog.find((e) => e.type === 'yeti');
+  const yetiT = ye?.t ?? null, reason = ye?.reason ?? null;
+  check('stalling summons the yeti after ~30 s, with a warning first', reason === 'stall' && warnT !== null && warnT < yetiT && Math.abs(yetiT - CONFIG.YETI_STALL_TIME) < 2, `warn ${warnT?.toFixed(1)} s, yeti ${yetiT?.toFixed(1)} s (${reason})`);
+
+  // Wandering off the side of the mountain summons it too.
+  const w = new Game({ seed: 51 });
+  w.setViewSize(1100, 640);
+  w.player.x = CONFIG.YETI_WANDER_X + 100;
+  w.player.grace = 999;
+  const wr = run(w, 6, () => ({ up: true })).find((e) => e.type === 'yeti')?.reason ?? null;
+  check('wandering off the mountain summons the yeti', wr === 'wander', String(wr));
+
+  // Skiing normally does not trigger it early.
+  const n = new Game({ seed: 52 });
+  n.setViewSize(1100, 640);
+  const early = run(n, 60, (gg) => autopilot(gg, { turbo: 'never' })).some((e) => e.type === 'yeti');
+  check('normal skiing does not summon the yeti early', !early && n.stats.distance < CONFIG.YETI_TRIGGER_DISTANCE, `${n.stats.distance.toFixed(0)} m in 60 s`);
+}
+{
+  // Air tricks off a ramp.
+  const trial = (pressAt, key) => {
+    const g = new Game({ seed: 3, demo: true });
+    const p = g.player;
+    p.grace = 999;
+    p.speed = 300;
+    p.rampLaunch(g.events);
+    let pressed = false;
+    const log = run(g, 2.5, (gg) => {
+      const inp = {};
+      if (!pressed && gg.player.state === 'air' && gg.player.airTime >= pressAt) {
+        inp[key] = true;
+        pressed = true;
+      }
+      return inp;
+    });
+    return { g, land: log.find((e) => e.type === 'land'), wipe: log.find((e) => e.type === 'wipeout'), styleEv: log.find((e) => e.type === 'style') };
+  };
+  const flip = trial(0.1, 'up');
+  check('Up in the air does a backflip, landed clean it scores', flip.land && flip.land.tricks.includes('flip') && flip.g.style >= CONFIG.TRICKS.flip.style, `style ${flip.g.style.toFixed(0)}, "${flip.styleEv?.label}"`);
+  const eagle = trial(0.1, 'down');
+  check('Down in the air does a spread eagle', eagle.land && eagle.land.tricks.includes('eagle'));
+  const spin = trial(0.1, 'jump');
+  check('Space in the air does a helicopter spin', spin.land && spin.land.tricks.includes('spin'));
+  const late = trial(0.9, 'up'); // air lasts ~1.1 s at this speed: no time to finish
+  check('landing mid-trick is a wipeout', !!late.wipe && !late.land, late.wipe ? `wiped out mid-${late.wipe.trick}` : 'landed');
+  // A hop can't farm tricks.
+  const h = new Game({ seed: 3, demo: true });
+  h.player.grace = 999;
+  run(h, 0.05, () => ({ jump: false }));
+  run(h, 2, (gg, i) => ({ jump: i < 3, down: i > 10 && i < 13 }));
+  check('tricks off a mere hop score nothing', h.style === 0, `style ${h.style}`);
+}
+{
+  // Timed courses: ski the slalom through every gate, and again straight down.
+  const lane = (id, brain) => {
+    const g = new Game({ seed: 8, demo: true });
+    const def = g.courses.find((c) => c.id === id);
+    g.player.x = def.x;
+    g.player.y = def.startY - 60;
+    g.player.grace = 1e9;
+    const log = run(g, 120, (gg) => { gg.player.grace = 1e9; return brain(gg, def); });
+    return { start: log.find((e) => e.type === 'coursestart'), done: log.find((e) => e.type === 'course'), misses: log.filter((e) => e.type === 'gatemiss').length };
+  };
+  // Aim at the next gate below us.
+  const threader = (gg, def) => {
+    const p = gg.player;
+    let next = null;
+    gg.world.forEachInRect(def.x - def.half - 100, p.y + 5, def.x + def.half + 100, p.y + 900, (o) => {
+      if (o.t === 'gate' && (!next || o.y < next.y)) next = o;
+    });
+    const tx = next ? next.x : def.x;
+    const ty = next ? next.y : p.y + 400;
+    return { aim: Math.atan2(tx - p.x, Math.max(20, ty - p.y)) };
+  };
+  const clean = lane('slalom', threader);
+  check('slalom: crossing START starts the clock', !!clean.start && clean.start.id === 'slalom');
+  check('slalom: threading every gate finishes with no misses', clean.done && clean.done.missed === 0 && clean.done.passed > 20, clean.done ? `${clean.done.time.toFixed(1)} s, ${clean.done.passed} gates` : 'no finish');
+  const sloppy = lane('slalom', () => ({ up: true }));
+  check('slalom: missed gates add a time penalty', sloppy.done && sloppy.done.missed > 5 && Math.abs(sloppy.done.total - (sloppy.done.time + sloppy.done.missed * CONFIG.COURSE_MISS_PENALTY)) < 1e-6, sloppy.done ? `${sloppy.done.missed} missed, ${sloppy.done.total.toFixed(1)} s total` : 'no finish');
+  const tree = lane('tree', threader);
+  check('tree slalom is timed too', tree.done && tree.done.id === 'tree', tree.done ? `${tree.done.total.toFixed(1)} s, ${tree.done.missed} missed` : 'no finish');
+  const free = lane('freestyle', () => ({ up: true }));
+  check('freestyle is timed and scores style', free.done && free.done.id === 'freestyle', free.done ? `${free.done.time.toFixed(1)} s, ${free.done.style} style` : 'no finish');
+  // Leaving the lane voids the run.
+  const g = new Game({ seed: 8, demo: true });
+  const def = g.courses[0];
+  g.player.x = def.x;
+  g.player.y = def.startY - 60;
+  const log = run(g, 6, (gg, i) => {
+    gg.player.grace = 1e9;
+    if (i === 300) gg.player.x += CONFIG.COURSE_LANE_HALF + 100; // veer well off the lane
+    return { up: true };
+  });
+  check('leaving the course voids the run', log.some((e) => e.type === 'courseabort'));
+}
+
 // ----------------------------------------------------------------- save
 {
   const bad = sanitize({ best: { score: -5, distance: 'x', maxSpeed: NaN }, settings: { master: 7, touch: 'weird', seed: 5 } });

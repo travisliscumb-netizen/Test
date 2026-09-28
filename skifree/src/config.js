@@ -45,6 +45,20 @@ export const CONFIG = {
   STYLE_GATE: 10,
   STYLE_ESCAPE: 500,
 
+  // --------------------------------------------------------- air tricks
+  // Up = backflip, Down = spread eagle, Space in the air = helicopter spin.
+  // A trick scores only when you land it clean off a ramp; landing mid-trick
+  // is a wipeout.
+  TRICKS: {
+    flip: { dur: 0.62, style: 40 },
+    eagle: { dur: 0.34, style: 15 },
+    spin: { dur: 0.5, style: 25 },
+  },
+
+  // -------------------------------------------------------------- courses
+  COURSE_MISS_PENALTY: 5,            // seconds added per missed gate
+  COURSE_LANE_HALF: 40 * M,          // stray further than this and the run is void
+
   // ------------------------------------------------------------ collisions
   CRASH_TIME_BASE: 0.55,             // seconds face-down after a hard hit
   CRASH_TIME_PER_SPEED: 0.0016,      // + this per u/s at impact
@@ -63,6 +77,11 @@ export const CONFIG = {
   // ------------------------------------------------------------------ yeti
   YETI_TRIGGER_DISTANCE: 2000,       // metres downhill before the first yeti
   YETI_RETURN_DISTANCE: 700,         // metres after an escape before it returns
+  // Like the original, dawdling or leaving the mountain also summons it.
+  YETI_STALL_TIME: 30,               // seconds without real downhill progress...
+  YETI_STALL_PROGRESS: 20,           // ...of at least this many metres
+  YETI_STALL_WARN: 20,               // a distant roar this long into a stall
+  YETI_WANDER_X: 900 * M,            // this far sideways from the lodge
   YETI_SPEED: 17.2 * M,              // beats cruising, loses to turbo
   YETI_SPEED_STEP: 0.04,             // +4% every time it comes back
   YETI_SPEED_STEP_MAX: 0.16,

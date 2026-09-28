@@ -40,6 +40,10 @@ export class Player {
     this.airFromRamp = false;
     this.skid = 0; // 0..1 how sideways the skis are to travel (drives spray + sound)
     this.lastMogul = 0; // id of the mogul last bounced off, so one bump = one bounce
+    this.trick = null; // { kind, t, dur } while one is in progress
+    this.tricks = []; // tricks completed during the current jump
+    this.prevUp = false; // edge detection: a key held from the ground isn't a trick
+    this.prevDown = false;
     this.anim = 0; // free-running animation clock
   }
 
@@ -81,6 +85,16 @@ export class Player {
     this.z = Math.max(this.z, 0.01);
     this.airTime = 0;
     this.airFromRamp = fromRamp;
+    this.trick = null;
+    this.tricks = [];
+  }
+
+  // Air tricks, as in the original: flip, spread eagle, spin. One at a time.
+  startTrick(kind, events) {
+    if (this.state !== 'air' || this.trick) return false;
+    this.trick = { kind, t: 0, dur: this.cfg.TRICKS[kind].dur };
+    events.push({ type: 'trick', kind, x: this.x, y: this.y });
+    return true;
   }
 
   // kind: 'crash' (flat on your face) or 'tumble' (rolls and keeps sliding).
@@ -106,6 +120,7 @@ export class Player {
     this.z = 0;
     this.vz = 0;
     this.turbo = false;
+    this.trick = null;
   }
 
   update(dt, input, events) {
@@ -173,6 +188,23 @@ export class Player {
     }
     this.heading = clamp(this.heading, -HALF_PI, HALF_PI);
 
+    // Up / Down pressed (not held) in the air start a trick.
+    const upEdge = !!input.up && !this.prevUp;
+    const downEdge = !!input.down && !this.prevDown;
+    this.prevUp = !!input.up;
+    this.prevDown = !!input.down;
+    if (air) {
+      if (upEdge) this.startTrick('flip', events);
+      else if (downEdge) this.startTrick('eagle', events);
+      if (this.trick) {
+        this.trick.t += dt;
+        if (this.trick.t >= this.trick.dur) {
+          this.tricks.push(this.trick.kind);
+          this.trick = null;
+        }
+      }
+    }
+
     if (air) {
       this.airTime += dt;
       this.vz -= c.GRAVITY_AIR * dt;
@@ -218,13 +250,16 @@ export class Player {
     this.hopCooldown = c.HOP_COOLDOWN;
     const twist = Math.abs(this.heading - this.travel);
     const air = this.airTime;
-    if (twist > c.LAND_SAFE_ANGLE) {
-      events.push({ type: 'wipeout', x: this.x, y: this.y, speed: this.speed, air });
+    // Skis across the line of flight, or still upside down: wipeout.
+    if (twist > c.LAND_SAFE_ANGLE || this.trick) {
+      events.push({ type: 'wipeout', x: this.x, y: this.y, speed: this.speed, air, trick: this.trick?.kind });
       this.knockDown('crash', Math.sin(this.travel), Math.cos(this.travel));
+      this.tricks = [];
       return;
     }
     this.heading = this.travel = (this.heading + this.travel) / 2;
-    events.push({ type: 'land', x: this.x, y: this.y, speed: this.speed, air, ramp: this.airFromRamp });
+    events.push({ type: 'land', x: this.x, y: this.y, speed: this.speed, air, ramp: this.airFromRamp, tricks: this.tricks.slice() });
+    this.tricks = [];
   }
 
   move(dt) {
