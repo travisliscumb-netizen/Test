@@ -366,7 +366,9 @@ kbd {
 .keys td:first-child { white-space: nowrap; width: 1%; padding-right: 14px; font-weight: 700; }
 
 .form { display: grid; gap: 12px; }
-.form fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; margin: 0; display: grid; gap: 10px; }
+/* min-width: 0 overrides fieldset's default min-content, which overflows narrow phones. */
+.form fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.form label, .form select, .form input { min-width: 0; max-width: 100%; }
 .form legend { padding: 0 6px; font: 800 11px/1 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
 .form label { display: grid; gap: 6px; font-weight: 700; font-size: 14px; }
 .form label.check { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 2px; font-weight: 700; }
@@ -495,8 +497,11 @@ body.touch-ui .desktop-only { display: none; }
   .pad .up, .pad .down { width: 44px; height: 44px; }
   .acts .turbo { width: 72px; height: 72px; }
   .acts .jump { width: 58px; height: 58px; }
-  #hud .stats { min-width: 170px; padding: 6px 10px 7px; }
-  #hud .stat b { font-size: 14px; }
+  #hud .stats { min-width: 150px; padding: 5px 9px 6px; gap: 0 12px; }
+  #hud .stat span { font-size: 8.5px; }
+  #hud .stat b { font-size: 13px; }
+  #speedo { margin-top: 3px; height: 5px; }
+  .icon-btn { width: 40px; height: 40px; }
 }
 
 /* Narrow portrait phones: the HUD spans the top as a strip. */

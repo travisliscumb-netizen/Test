@@ -825,8 +825,11 @@ export class Renderer {
         const cx = W / 2, cy = H / 2;
         const dx = sx - cx, dy = sy - cy;
         const s = Math.min((W / 2 - m) / Math.abs(dx || 1e-3), (H / 2 - m) / Math.abs(dy || 1e-3));
-        const ex = cx + dx * s, ey = cy + dy * s;
-        const a = Math.atan2(dy, dx);
+        const ex = cx + dx * s;
+        // Keep the marker clear of the HUD card (right) and the yeti chip (top).
+        const underHud = this.hud && ex > this.hud.left - 18;
+        const ey = Math.max(underHud ? this.hud.bottom : 60, cy + dy * s);
+        const a = Math.atan2(sy - ey, sx - ex);
         const pulse = 1 + Math.sin(this.time * 9) * 0.12;
         ctx.save();
         ctx.translate(ex, ey);

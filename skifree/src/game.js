@@ -86,6 +86,7 @@ export class Game {
       // Frozen run, but the yeti keeps celebrating behind the results.
       this.overTime += dt;
       if (this.yeti) this.yeti.update(dt, this);
+      this.updateCamera(dt);
       return;
     }
     this.time += dt;
@@ -444,7 +445,8 @@ export class Game {
     const lookX = Math.sin(p.travel) * p.speed * 0.35;
     // During the meal the yeti is the star: frame it, centred.
     const tx = eating ? y.x : p.x + lookX;
-    const ty = eating ? y.y - 40 : p.y + (0.5 - this.anchor) * h;
+    // Once the results are up, ease the yeti into the top third, above the card.
+    const ty = eating ? y.y - 40 + (this.over ? h * 0.24 : 0) : p.y + (0.5 - this.anchor) * h;
     this.camX += (tx - this.camX) * k;
     // Vertical follow is stiffer: the skier must never leave the screen.
     this.camY += (ty - this.camY) * Math.min(1, k * 2.5);

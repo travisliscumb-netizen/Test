@@ -54,6 +54,7 @@ function show(id) {
   for (const s of SCREENS) $('#' + s).classList.toggle('hidden', s !== id);
   const hudOn = mode === 'playing' || mode === 'paused' || mode === 'over';
   $('#hud').classList.toggle('hidden', !hudOn);
+  if (hudOn) measureHud();
   updateTouchUI();
   shownAt = performance.now();
   // Keyboard users land on the main action; touch users don't get a focus ring.
@@ -253,6 +254,7 @@ function handleEvents(g, live) {
           break;
         case 'yetiwarn':
           sound.play('yetiwarn', e);
+          toast('Something is watching you from the trees… keep moving!', 3000);
           break;
         case 'coursestart':
           sound.play('coursestart', e);
@@ -594,11 +596,20 @@ window.addEventListener('blur', () => {
   if (mode === 'playing') pause();
 });
 
+// The yeti's off-screen marker stays below the HUD card.
+function measureHud() {
+  requestAnimationFrame(() => {
+    const r = $('#hud .stats').getBoundingClientRect();
+    if (r.height) renderer.hud = { left: r.left, bottom: r.bottom + 22 };
+  });
+}
+
 function resize() {
   const vv = window.visualViewport;
   const w = Math.round(vv ? vv.width : innerWidth);
   const h = Math.round(vv ? vv.height : innerHeight);
   renderer.resize(w, h, devicePixelRatio || 1);
+  measureHud();
   for (const g of [game, demo]) g?.setViewSize(renderer.viewW, renderer.viewH);
   needsDraw = true;
 }
