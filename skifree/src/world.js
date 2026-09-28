@@ -315,7 +315,8 @@ export class World {
       }
       case 'snowmen': {
         const n = rng.int(3, 5);
-        for (let i = 0; i < n; i++) add('snowman', ox + (i - n / 2) * 40 + rng.range(-6, 6), oy + rng.range(-20, 20), i);
+        // 44u apart (+/-3): with r=9 that leaves >= 20u between them.
+        for (let i = 0; i < n; i++) add('snowman', ox + (i - n / 2) * 44 + rng.range(-3, 3), oy + rng.range(-20, 20), i);
         reg.holes.push({ x: ox, y: oy, r: n * 24 + 40 });
         break;
       }

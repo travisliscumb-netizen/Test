@@ -1,0 +1,17 @@
+{
+  "name": "skifree",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A from-scratch modern tribute to the 1991 classic: ski, dodge, go faster, outrun the Yeti.",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs 8080",
+    "test": "node tests/sim.mjs",
+    "test:quick": "node tests/sim.mjs --quick",
+    "test:browser": "NODE_PATH=$(npm root -g) node tests/playtest.mjs",
+    "shots": "NODE_PATH=$(npm root -g) node tools/shots.mjs && NODE_PATH=$(npm root -g) node tools/moments.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

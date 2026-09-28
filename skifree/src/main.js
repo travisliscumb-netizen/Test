@@ -31,6 +31,7 @@ let botDriver = null; // test hook: an autopilot driving the live run
 
 const SCREENS = ['title', 'controls', 'options', 'about', 'pause', 'over'];
 const coarse = matchMedia('(pointer: coarse)');
+const osReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 // ------------------------------------------------------------- screens
 
@@ -363,7 +364,8 @@ function drawLogoYeti(t) {
 function applySettings() {
   const s = save.settings;
   sound.setVolumes(s.master, s.music, s.sfx);
-  renderer.reducedMotion = s.reducedMotion;
+  // The OS preference always wins; the in-game switch can only add to it.
+  renderer.reducedMotion = s.reducedMotion || osReducedMotion.matches;
   renderer.effects = s.effects;
   $('#opt-master').value = s.master;
   $('#opt-music').value = s.music;
@@ -509,6 +511,7 @@ function resize() {
 window.addEventListener('resize', resize);
 window.visualViewport?.addEventListener('resize', resize);
 coarse.addEventListener?.('change', updateTouchUI);
+osReducedMotion.addEventListener?.('change', applySettings);
 
 // Test hook: lets the automated playtest inspect and steer the real game.
 window.__skifree = {

@@ -139,13 +139,19 @@ body.touch-ui .toast { bottom: auto; top: calc(58% + var(--safe-t)); white-space
   position: fixed;
   inset: 0;
   z-index: 10;
-  display: grid;
-  place-items: center;
+  /* Flex + auto margins centres the panel, yet when it's taller than the
+     screen it simply starts at the top and scrolls (grid centring would push
+     the title bar off-screen where it can't be scrolled to). */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
   overflow-y: auto;
   touch-action: pan-y;
 }
 .screen.dim { background: rgba(236, 243, 251, 0.55); }
+
+.screen > * { margin: auto 0; flex-shrink: 0; }
 
 #title { background: radial-gradient(ellipse at 50% 42%, rgba(247, 250, 254, 0.9) 0, rgba(247, 250, 254, 0.55) 45%, rgba(247, 250, 254, 0) 75%); }
 .title-wrap { text-align: center; max-width: 520px; width: 100%; }
@@ -270,8 +276,8 @@ kbd {
 
 .form { display: grid; gap: 12px; }
 .form label { display: grid; gap: 6px; font-weight: 700; font-size: 14px; }
-.form label.check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.form label.check small { font-weight: 500; color: var(--ink-soft); }
+.form label.check { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 2px; font-weight: 600; }
+.form label.check small { flex-basis: 100%; padding-left: 26px; font-weight: 500; color: var(--ink-soft); }
 .form input[type='range'] { width: 100%; accent-color: var(--red); }
 .form input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--red); }
 .form select, .form input[type='text'] {
@@ -302,7 +308,8 @@ kbd {
 
 /* The results sit low so the celebrating yeti stays in view above them. */
 @media (min-height: 640px) {
-  #over { align-items: end; padding-bottom: calc(5vh + var(--safe-b)); }
+  #over > .window { margin: auto 0 0; }
+  #over { padding-bottom: calc(5vh + var(--safe-b)); }
 }
 
 /* ---------------------------------------------------------------- touch */
