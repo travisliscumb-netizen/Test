@@ -90,8 +90,10 @@ export class Player {
   }
 
   // Air tricks, as in the original: flip, spread eagle, spin. One at a time.
+  // Only off a ramp: hops and mogul bumps are too short to land anything, so
+  // allowing them would turn a stray tap of Up/Down into a certain wipeout.
   startTrick(kind, events) {
-    if (this.state !== 'air' || this.trick) return false;
+    if (this.state !== 'air' || this.trick || !this.airFromRamp) return false;
     this.trick = { kind, t: 0, dur: this.cfg.TRICKS[kind].dur };
     events.push({ type: 'trick', kind, x: this.x, y: this.y });
     return true;

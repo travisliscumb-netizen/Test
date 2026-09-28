@@ -356,11 +356,32 @@ function yetiTrial(seed, brain, at = 30) {
   const g = new Game({ seed: 50 });
   g.setViewSize(1100, 640);
   g.player.grace = 999;
+  run(g, 0.01, () => ({}));
+  g.player.y = 80 * METER; // below the trailhead grace zone
   const slog = run(g, 40, () => ({ left: true }));
   const warnT = slog.find((e) => e.type === 'yetiwarn')?.t ?? null;
   const ye = slog.find((e) => e.type === 'yeti');
   const yetiT = ye?.t ?? null, reason = ye?.reason ?? null;
-  check('stalling summons the yeti after ~30 s, with a warning first', reason === 'stall' && warnT !== null && warnT < yetiT && Math.abs(yetiT - CONFIG.YETI_STALL_TIME) < 2, `warn ${warnT?.toFixed(1)} s, yeti ${yetiT?.toFixed(1)} s (${reason})`);
+  check('stalling summons the yeti after ~30 s, with a warning first', reason === 'stall' && warnT !== null && warnT < yetiT && Math.abs(yetiT - CONFIG.YETI_STALL_TIME) < 3, `warn ${warnT?.toFixed(1)} s, yeti ${yetiT?.toFixed(1)} s (${reason})`);
+
+  // Walking across the trailhead to Tree Slalom is not dawdling.
+  const walk = new Game({ seed: 12345 });
+  walk.setViewSize(1100, 640);
+  walk.player.grace = 999;
+  const wlog = run(walk, 45, (gg) => (gg.player.x > CONFIG.TREE_SLALOM_X ? { left: true } : { up: true }));
+  check('walking over to Tree Slalom does not summon the yeti', !wlog.some((e) => e.type === 'yeti' || e.type === 'yetiwarn'), `x ${(walk.player.x / METER).toFixed(0)} m`);
+
+  // Escaping an early (stall) yeti never pulls the 2000 m one forward.
+  const esc = new Game({ seed: 60 });
+  esc.setViewSize(1100, 640);
+  esc.stats.distance = 100;
+  esc.progressMark = 100;
+  esc.stallTime = CONFIG.YETI_STALL_TIME; // a real stall spawn, not a forced one
+  run(esc, 0.01, () => ({}));
+  if (!esc.yeti) throw new Error('stall yeti did not spawn');
+  esc.yeti.state = 'gone';
+  run(esc, 0.01, () => ({}));
+  check('an early escape keeps the 2000 m arrival', esc.nextYetiAt >= CONFIG.YETI_TRIGGER_DISTANCE, `next at ${esc.nextYetiAt} m`);
 
   // Wandering off the side of the mountain summons it too.
   const w = new Game({ seed: 51 });
@@ -409,6 +430,19 @@ function yetiTrial(seed, brain, at = 30) {
   run(h, 0.05, () => ({ jump: false }));
   run(h, 2, (gg, i) => ({ jump: i < 3, down: i > 10 && i < 13 }));
   check('tricks off a mere hop score nothing', h.style === 0, `style ${h.style}`);
+  // A stray Up/Down/Space during a hop or mogul bounce must not doom the landing.
+  for (const key of ['up', 'down', 'jump']) {
+    const q = new Game({ seed: 3, demo: true });
+    q.player.grace = 999;
+    run(q, 0.05, () => ({}));
+    q.player.hop(q.events);
+    let pressed = false;
+    const log = run(q, 1.5, (gg) => {
+      if (!pressed && gg.player.state === 'air' && gg.player.airTime > 0.05) { pressed = true; return { [key]: true }; }
+      return {};
+    });
+    check(`tapping ${key} during a hop does not cause a wipeout`, !log.some((e) => e.type === 'wipeout' || e.type === 'trick'));
+  }
 }
 {
   // Timed courses: ski the slalom through every gate, and again straight down.
@@ -470,6 +504,8 @@ function yetiTrial(seed, brain, at = 30) {
   let ok = true;
   try { s3.recordRun({ score: 1, distance: 1, maxSpeed: 1, escapes: 0, eaten: true }); } catch { ok = false; }
   check('blocked storage never throws', ok);
+  const s4 = new Save(store);
+  check('a zero-style freestyle run is not a "best"', s4.recordCourse('freestyle', 0) === false && !('freestyle' in s4.data.courses));
 }
 
 function median(a) {

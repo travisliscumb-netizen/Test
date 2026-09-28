@@ -510,7 +510,8 @@ body.touch-ui .desktop-only { display: none; }
   #hud .stats { grid-template-columns: repeat(4, 1fr); min-width: 0; width: 100%; gap: 0 8px; padding: 6px 10px 7px; }
   #hud .stat b { font-size: 13.5px; }
   #speedo { margin-top: 4px; }
-  .chip.yeti { top: calc(78px + var(--safe-t)); }
+  /* Below the stats strip and the course chip, which can both be showing. */
+  .chip.yeti { top: calc(110px + var(--safe-t)); }
   .menu { grid-template-columns: 1fr 1fr 1fr; }
   .btn { padding: 10px 8px; font-size: 13px; }
   .btn .ico { display: none; }

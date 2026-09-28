@@ -82,6 +82,7 @@ export const CONFIG = {
   YETI_STALL_PROGRESS: 20,           // ...of at least this many metres
   YETI_STALL_WARN: 20,               // a distant roar this long into a stall
   YETI_WANDER_X: 900 * M,            // this far sideways from the lodge
+  YETI_STALL_GRACE_METERS: 40,       // no stall clock at the trailhead
   YETI_SPEED: 17.2 * M,              // beats cruising, loses to turbo
   YETI_SPEED_STEP: 0.04,             // +4% every time it comes back
   YETI_SPEED_STEP_MAX: 0.16,

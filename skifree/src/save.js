@@ -117,8 +117,8 @@ export class Save {
   recordCourse(id, value) {
     const prev = this.data.courses[id];
     const higher = id === 'freestyle';
-    const best = !(prev > 0) || (higher ? value > prev : value < prev);
-    if (best && value > 0) {
+    const best = value > 0 && (!(prev > 0) || (higher ? value > prev : value < prev));
+    if (best) {
       this.data.courses[id] = value;
       this.write();
     }

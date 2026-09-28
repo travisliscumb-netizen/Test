@@ -98,7 +98,7 @@ export class Game {
     // Jump is edge-triggered so holding space doesn't bunny-hop forever.
     // In the air the same button spins.
     if (input.jump && !this.hopWasDown) {
-      if (p.state === 'air') p.startTrick('spin', this.events);
+      if (p.state === 'air') p.startTrick('spin', this.events); // ramp air only; ignored otherwise
       else p.hop(this.events);
     }
     this.hopWasDown = !!input.jump;
@@ -379,6 +379,7 @@ export class Game {
     y.update(dt, this);
 
     if (y.state === 'eat' && p.state !== 'caught') {
+      this.course = null; // no course clock ticking in the yeti's stomach
       p.state = 'caught';
       p.speed = 0;
       p.z = 0;
@@ -387,7 +388,8 @@ export class Game {
     if (y.state === 'eat' && y.eatTime >= c.YETI_EAT_TIME) this.finish();
     if (y.state === 'gone') {
       this.yeti = null;
-      this.nextYetiAt = this.stats.distance + c.YETI_RETURN_DISTANCE;
+      // Never pull the classic 2000 m arrival forward after an early escape.
+      this.nextYetiAt = Math.max(this.nextYetiAt, this.stats.distance + c.YETI_RETURN_DISTANCE);
       this.progressMark = this.stats.distance;
       this.stallTime = 0;
     }
@@ -399,7 +401,10 @@ export class Game {
     const c = this.cfg;
     const d = this.stats.distance;
     if (d >= this.nextYetiAt) return 'distance';
-    if (d > this.progressMark + c.YETI_STALL_PROGRESS) {
+    // The trailhead is for choosing a course: walking across it isn't dawdling.
+    if (d < c.YETI_STALL_GRACE_METERS) {
+      this.stallTime = 0;
+    } else if (d > this.progressMark + c.YETI_STALL_PROGRESS) {
       this.progressMark = d;
       this.stallTime = 0;
       this.stallWarned = false;

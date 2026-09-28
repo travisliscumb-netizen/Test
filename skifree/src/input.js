@@ -166,7 +166,8 @@ export class Input {
     for (const k in this.touch) this.touch[k] = false;
     this.mouse.down = false;
     this.jumpLatch = this.upLatch = this.downLatch = false;
-    this.finger.id = null;
+    // The finger stays tracked: its pointerup/cancel still arrive after a
+    // pause, and dropping it here left steering dead until a fresh touch.
     document.querySelectorAll?.('.held').forEach((el) => el.classList.remove('held'));
   }
 
