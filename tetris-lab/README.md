@@ -25,6 +25,14 @@ npm start            # serves on http://127.0.0.1:8080
 
 Any static server works; ES modules need a real origin, so `file://` does not.
 
+## Deploying
+
+Deployed on Vercel as the `prismfall` project, linked to this repository with
+**Root Directory `tetris-lab`**, no framework, no build or install command and
+output directory `.`: the static files are served as-is. `vercel.json` makes
+the service worker and code revalidate on every load so updates reach players
+immediately; `.vercelignore` keeps tests and tools out of the deployment.
+
 ## Verifying
 
 ```
