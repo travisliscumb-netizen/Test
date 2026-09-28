@@ -8,32 +8,50 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="format-detection" content="telephone=no">
   <title>SkiFree</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
   <canvas id="game" aria-label="SkiFree game view"></canvas>
 
-  <!-- In-run HUD: the classic little stats box, top right. -->
+  <!-- In-run HUD -->
   <div id="hud" class="hidden" aria-live="off">
     <button id="pause-btn" class="icon-btn" aria-label="Pause (Esc)">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1.2"/><rect x="11.6" y="4" width="3.4" height="12" rx="1.2"/></svg>
     </button>
-    <div class="stats" role="status">
-      <div><span>Time</span><b id="hud-time">0:00:00</b></div>
-      <div><span>Dist</span><b id="hud-dist">0m</b></div>
-      <div><span>Speed</span><b id="hud-speed">0 km/h</b></div>
-      <div><span>Style</span><b id="hud-style">0</b></div>
+    <div class="hud-right">
+      <div class="stats" role="status">
+        <div class="stat"><span>Time</span><b id="hud-time">0:00:00</b></div>
+        <div class="stat"><span>Dist</span><b id="hud-dist">0m</b></div>
+        <div class="stat"><span>Speed</span><b id="hud-speed">0 km/h</b></div>
+        <div class="stat"><span>Style</span><b id="hud-style">0</b></div>
+        <div id="speedo" aria-hidden="true"><i></i></div>
+      </div>
+      <div id="hud-course" class="chip course hidden"></div>
     </div>
-    <div id="speedo" aria-hidden="true"><i></i></div>
+    <div id="hud-yeti" class="chip yeti hidden" role="alert"></div>
   </div>
 
   <div id="toast" class="toast hidden" aria-live="polite"></div>
 
   <!-- Title -->
   <section id="title" class="screen">
+    <svg class="peaks" viewBox="0 0 1200 260" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc8f2"/><stop offset="1" stop-color="#e9f3fc"/></linearGradient>
+        <linearGradient id="far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c3d6ec"/><stop offset="1" stop-color="#e6eff9"/></linearGradient>
+        <linearGradient id="near" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eef4fb"/></linearGradient>
+      </defs>
+      <rect width="1200" height="260" fill="url(#sky)"/>
+      <circle cx="930" cy="70" r="34" fill="#fff6d6" opacity="0.9"/>
+      <path d="M0 200 L90 120 L150 160 L260 70 L360 150 L430 110 L540 175 L640 90 L760 160 L850 100 L980 170 L1080 105 L1200 160 L1200 260 L0 260Z" fill="url(#far)"/>
+      <path d="M0 230 L120 150 L200 190 L320 120 L420 200 L520 150 L600 205 L720 140 L840 210 L960 150 L1060 200 L1200 150 L1200 260 L0 260Z" fill="url(#near)" stroke="#c9d8ea" stroke-width="2"/>
+      <path d="M320 120 L300 138 L318 134 L332 146 L340 133 Z M720 140 L700 158 L716 155 L730 164 L738 152 Z M120 150 L104 164 L120 160 L130 168 Z" fill="#dbe7f5"/>
+    </svg>
     <div class="title-wrap">
       <h1 class="logo" aria-label="SkiFree">
         <span class="logo-ski">Ski</span><span class="logo-free">Free</span>
@@ -41,21 +59,21 @@
       </h1>
       <p class="tagline">Ski. Dodge. Go faster. Don't get eaten.</p>
       <nav class="menu" aria-label="Main menu">
-        <button class="btn primary" data-action="play">Play</button>
-        <button class="btn" data-action="controls">Controls</button>
-        <button class="btn" data-action="options">Options</button>
-        <button class="btn" data-action="about">About</button>
+        <button class="btn primary big" data-action="play"><span class="ico" aria-hidden="true">▶</span>Play</button>
+        <button class="btn" data-action="controls"><span class="ico" aria-hidden="true">⌨</span>Controls</button>
+        <button class="btn" data-action="options"><span class="ico" aria-hidden="true">⚙</span>Options</button>
+        <button class="btn" data-action="about"><span class="ico" aria-hidden="true">ⓘ</span>About</button>
       </nav>
-      <p id="best-line" class="best-line"></p>
+      <div id="records" class="records hidden" aria-label="Your records"></div>
       <p class="hint-line desktop-only">Press <kbd>Enter</kbd> to ski</p>
     </div>
   </section>
 
   <!-- Controls -->
-  <section id="controls" class="screen hidden">
-    <div class="window">
-      <header class="window-bar"><span>Controls</span><button class="x" data-action="back" aria-label="Close">×</button></header>
-      <div class="window-body">
+  <section id="controls" class="screen dim hidden">
+    <div class="card">
+      <header class="card-head"><h2>Controls</h2><button class="x" data-action="back" aria-label="Close">×</button></header>
+      <div class="card-body">
         <table class="keys">
           <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd></td><td>Steer. Keep pushing across the hill to stop, then sidestep.</td></tr>
           <tr><td><kbd>↑</kbd> / <kbd>W</kbd></td><td>Point straight downhill and tuck</td></tr>
@@ -66,7 +84,7 @@
           <tr><td><kbd>Esc</kbd> / <kbd>P</kbd> / <kbd>F3</kbd></td><td>Pause</td></tr>
           <tr><td><kbd>R</kbd> / <kbd>F2</kbd></td><td>Restart run</td></tr>
           <tr><td>Mouse</td><td>The skier heads toward the pointer. Click to hop.</td></tr>
-          <tr><td>Touch</td><td>Touch and hold anywhere: the skier heads for your finger. Flick up or down for tricks. HOP and TURBO buttons on the right (arrow buttons in Options if you prefer).</td></tr>
+          <tr><td>Touch</td><td>Touch and hold anywhere: the skier heads for your finger. Flick up or down for tricks. HOP and TURBO on the right (arrow buttons in Options if you prefer).</td></tr>
         </table>
         <p class="small">The three courses at the top are timed: ski through the START arch, thread the gates (each miss costs 5 s) and cross FINISH. Big air and landed tricks earn style. And keep moving: the Abominable Snow Monster doesn't like dawdlers.</p>
         <div class="row-end"><button class="btn" data-action="back">OK</button></div>
@@ -75,48 +93,60 @@
   </section>
 
   <!-- Options -->
-  <section id="options" class="screen hidden">
-    <div class="window">
-      <header class="window-bar"><span>Options</span><button class="x" data-action="back" aria-label="Close">×</button></header>
-      <div class="window-body form">
-        <label>Master volume <input type="range" id="opt-master" min="0" max="1" step="0.05"></label>
-        <label>Music <input type="range" id="opt-music" min="0" max="1" step="0.05"></label>
-        <label>Sound effects <input type="range" id="opt-sfx" min="0" max="1" step="0.05"></label>
-        <label class="check"><input type="checkbox" id="opt-motion"> Reduced motion <small>(no camera wobble or speed streaks; also follows your system setting)</small></label>
-        <label class="check"><input type="checkbox" id="opt-effects"> Snow effects <small>(spray and bursts)</small></label>
-        <label>Touch steering
-          <select id="opt-steer">
-            <option value="finger">Follow my finger</option>
-            <option value="pad">Arrow buttons</option>
-          </select>
-        </label>
-        <label>Touch controls
-          <select id="opt-touch">
-            <option value="auto">Automatic</option>
-            <option value="on">Always show</option>
-            <option value="off">Hide</option>
-          </select>
-        </label>
-        <label>Mountain
-          <select id="opt-seed-mode">
-            <option value="random">A new mountain every run</option>
-            <option value="fixed">Always the same mountain</option>
-          </select>
-        </label>
-        <label id="seed-row">Mountain number <input type="text" id="opt-seed" inputmode="numeric" maxlength="24" placeholder="e.g. 1991" autocomplete="off"></label>
+  <section id="options" class="screen dim hidden">
+    <div class="card">
+      <header class="card-head"><h2>Options</h2><button class="x" data-action="back" aria-label="Close">×</button></header>
+      <div class="card-body form">
+        <fieldset>
+          <legend>Sound</legend>
+          <label>Master volume <input type="range" id="opt-master" min="0" max="1" step="0.05"></label>
+          <label>Music <input type="range" id="opt-music" min="0" max="1" step="0.05"></label>
+          <label>Sound effects <input type="range" id="opt-sfx" min="0" max="1" step="0.05"></label>
+        </fieldset>
+        <fieldset>
+          <legend>Visuals</legend>
+          <label class="check"><input type="checkbox" id="opt-motion"> Reduced motion <small>No camera wobble or speed streaks; calmer snowfall. Also follows your system setting.</small></label>
+          <label class="check"><input type="checkbox" id="opt-effects"> Snow effects <small>Spray, bursts, snowfall and sparkle.</small></label>
+        </fieldset>
+        <fieldset>
+          <legend>Touch</legend>
+          <label>Steering
+            <select id="opt-steer">
+              <option value="finger">Follow my finger</option>
+              <option value="pad">Arrow buttons</option>
+            </select>
+          </label>
+          <label>On-screen buttons
+            <select id="opt-touch">
+              <option value="auto">Automatic</option>
+              <option value="on">Always show</option>
+              <option value="off">Hide</option>
+            </select>
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Mountain</legend>
+          <label>Layout
+            <select id="opt-seed-mode">
+              <option value="random">A new mountain every run</option>
+              <option value="fixed">Always the same mountain</option>
+            </select>
+          </label>
+          <label id="seed-row">Mountain number <input type="text" id="opt-seed" inputmode="numeric" maxlength="24" placeholder="e.g. 1991" autocomplete="off"></label>
+        </fieldset>
         <div class="row-end">
           <button class="btn danger" id="reset-records">Reset records</button>
-          <button class="btn" data-action="back">OK</button>
+          <button class="btn primary" data-action="back">Done</button>
         </div>
       </div>
     </div>
   </section>
 
   <!-- About -->
-  <section id="about" class="screen hidden">
-    <div class="window">
-      <header class="window-bar"><span>About SkiFree</span><button class="x" data-action="back" aria-label="Close">×</button></header>
-      <div class="window-body">
+  <section id="about" class="screen dim hidden">
+    <div class="card">
+      <header class="card-head"><h2>About</h2><button class="x" data-action="back" aria-label="Close">×</button></header>
+      <div class="card-body">
         <p><b>SkiFree</b> — a from-scratch modern tribute to the 1991 Windows classic by Chris Pirih.</p>
         <p>Every line of code, every drawing and every sound here is new: the art is vector-drawn at runtime and the audio is synthesised live. Nothing is taken from the original.</p>
         <p>Not affiliated with or endorsed by Microsoft.</p>
@@ -128,12 +158,12 @@
 
   <!-- Pause -->
   <section id="pause" class="screen dim hidden">
-    <div class="window narrow">
-      <header class="window-bar"><span>Paused</span></header>
-      <div class="window-body stack">
-        <button class="btn primary" data-action="resume">Resume</button>
-        <button class="btn" data-action="restart">Restart</button>
-        <button class="btn" data-action="menu">Main menu</button>
+    <div class="card narrow">
+      <header class="card-head"><h2>Paused</h2></header>
+      <div class="card-body stack">
+        <button class="btn primary big" data-action="resume"><span class="ico" aria-hidden="true">▶</span>Resume</button>
+        <button class="btn" data-action="restart"><span class="ico" aria-hidden="true">↻</span>Restart</button>
+        <button class="btn" data-action="menu"><span class="ico" aria-hidden="true">⌂</span>Main menu</button>
         <p class="small center" id="pause-seed"></p>
       </div>
     </div>
@@ -141,20 +171,23 @@
 
   <!-- Game over -->
   <section id="over" class="screen dim hidden">
-    <div class="window narrow">
-      <header class="window-bar"><span id="over-title">Eaten by the Yeti</span></header>
-      <div class="window-body">
-        <dl class="result">
-          <div><dt>Distance</dt><dd id="over-dist">0m</dd></div>
-          <div><dt>Score</dt><dd id="over-score">0</dd></div>
-          <div><dt>Max speed</dt><dd id="over-speed">0 km/h</dd></div>
-          <div id="over-escapes-row"><dt>Yeti escapes</dt><dd id="over-escapes">0</dd></div>
-        </dl>
+    <div class="card narrow over-card">
+      <div class="over-head">
+        <p class="over-kicker">Game over</p>
+        <h2 id="over-title">Eaten by the Yeti</h2>
+      </div>
+      <div class="card-body">
+        <div class="score-big"><span>Score</span><b id="over-score">0</b></div>
         <p id="over-best" class="best-badge hidden"></p>
+        <dl class="tiles">
+          <div><dt>Distance</dt><dd id="over-dist">0m</dd></div>
+          <div><dt>Max speed</dt><dd id="over-speed">0 km/h</dd></div>
+          <div id="over-escapes-row"><dt>Escapes</dt><dd id="over-escapes">0</dd></div>
+        </dl>
         <div class="stack">
-          <button class="btn primary" data-action="restart">Try again</button>
+          <button class="btn primary big" data-action="restart"><span class="ico" aria-hidden="true">↻</span>Try again</button>
           <button class="btn" data-action="same">Ski this mountain again</button>
-          <button class="btn" data-action="menu">Main menu</button>
+          <button class="btn ghost" data-action="menu">Main menu</button>
         </div>
         <p class="small center desktop-only">Enter or Space to go again</p>
       </div>

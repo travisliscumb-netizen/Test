@@ -71,6 +71,9 @@ async function stage(page, name, setup, arg) {
        {heading:-1.5708}, {heading:-0.9}, {heading:-0.4}, {heading:0.4}, {heading:0.9}, {heading:1.5708},
        {heading:0, turbo:true}, {heading:0, braking:true}, {heading:0.3, state:'air', z:30},
        {heading:0, state:'crash', travel:0.4, stateTime:0.5}, {heading:0, state:'tumble', travel:0.2}, {heading:0, state:'recover', stateTime:0.15},
+       {heading:0, state:'air', z:20, trick:{kind:'flip', t:0.2, dur:0.62}}, {heading:0, state:'air', z:20, trick:{kind:'flip', t:0.35, dur:0.62}},
+       {heading:0, state:'air', z:20, trick:{kind:'eagle', t:0.17, dur:0.34}}, {heading:0, state:'air', z:20, trick:{kind:'spin', t:0.1, dur:0.5}},
+       {heading:0.3, speed:380, turbo:true}, {heading:0, speed:0},
      ];
      g.__poses = poses;`,
   );
@@ -85,24 +88,24 @@ async function stage(page, name, setup, arg) {
     const poses = window.__skifree.game.__poses;
     poses.forEach((pp, i) => {
       ctx.save();
-      ctx.translate(30 + (i % 6) * 90, 60 + Math.floor(i / 6) * 70);
+      ctx.translate(30 + (i % 6) * 90, 60 + Math.floor(i / 6) * 62);
       drawSkier(ctx, { state: 'ski', anim: 1.3, travel: pp.heading, z: 0, outfit: 0, ...pp });
       ctx.restore();
     });
     const dogs = [{ state: 'sit' }, { state: 'go', speed: 100 }, { state: 'dash', speed: 250, heading: -1 }];
     dogs.forEach((d, i) => {
       ctx.save();
-      ctx.translate(40 + i * 60, 220);
+      ctx.translate(40 + i * 60, 250);
       drawDog(ctx, { heading: 1, anim: 0.4, look: i * 2, speed: 0, ...d });
       ctx.restore();
     });
     ctx.save();
-    ctx.translate(250, 220);
+    ctx.translate(250, 250);
     drawBoarder(ctx, { heading: 0.4, anim: 1, outfit: 3 });
     ctx.restore();
     for (const [i, st] of [['chase', 0], ['stumble', 1]].entries()) {
       ctx.save();
-      ctx.translate(360 + i * 90, 240);
+      ctx.translate(360 + i * 90, 270);
       drawYeti(ctx, { state: st[0], anim: 0.6, heading: 0.5, speed: 250, lunging: i === 0 });
       ctx.restore();
     }
@@ -118,6 +121,7 @@ async function stage(page, name, setup, arg) {
   await stage(page, 'freestyle', at, [992, 2600]);
   await stage(page, 'chairlift', at, [2080, 4000]);
   await stage(page, 'yeti-xing', at, [0, (2000 - 140) * 16 - 150]);
+  await stage(page, 'course-start', at, [-928, 22 * 16 - 120]);
   await stage(page, 'deep', at, [0, 60000]);
   await stage(page, 'deeper', at, [4000, 120000]);
   await page.close();

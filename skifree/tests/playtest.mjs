@@ -125,6 +125,7 @@ async function until(page, expr, ms = 8000) {
   await wait(page, 200);
   check('the yeti appears', (await S(page, 'S.game.yeti && S.game.yeti.state')) === 'chase');
   check('music switches to the chase theme', (await S(page, 'S.sound.mode')) === 'chase');
+  check('HUD shows the yeti alert with its distance', (await page.isVisible('#hud-yeti')) && /YETI · \d+m/.test(await page.textContent('#hud-yeti')), await page.textContent('#hud-yeti'));
   await page.keyboard.down('ArrowLeft');
   const caughtIn = await until(page, "S.game.yeti && S.game.yeti.state === 'eat'", 30000);
   await page.keyboard.up('ArrowLeft');
@@ -181,7 +182,7 @@ async function until(page, expr, ms = 8000) {
   await wait(page, 400);
   const st = await S(page, 'S.save.settings');
   check('settings survive a reload', st.music === 0.2 && st.reducedMotion === true);
-  check('records survive a reload', (await S(page, 'S.save.data.best.score')) === best && (await page.textContent('#best-line')).includes('Best'));
+  check('records survive a reload', (await S(page, 'S.save.data.best.score')) === best && (await page.isVisible('#records')) && (await page.textContent('#records')).includes('Best score'));
 
   // Soak: a bot plays for a while; watch frame rate and memory.
   await S(page, "(S.start(4242), S.bot = { turbo: 'yeti' }, 0)");

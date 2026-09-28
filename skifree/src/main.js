@@ -1,6 +1,6 @@
 // Boot, main loop, screens and glue between simulation, renderer, audio,
 // input and storage.
-import { CONFIG, toKmh } from './config.js';
+import { CONFIG, METER, toKmh } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 import { Sound } from './audio.js';
@@ -88,9 +88,32 @@ function openPanel(name) {
   show(name);
 }
 
+// The records card on the title screen: run bests and course bests.
 function refreshBestLine() {
   const b = save.data.best;
-  $('#best-line').textContent = b.score > 0 ? `Best: ${fmtInt(b.score)} pts · ${fmtInt(b.distance)}m · ${Math.round(b.maxSpeed)} km/h` : '';
+  const cs = save.data.courses;
+  const el = $('#records');
+  const any = b.score > 0 || Object.keys(cs).length > 0;
+  el.classList.toggle('hidden', !any);
+  if (!any) return;
+  const cell = (label, value) => {
+    const d = document.createElement('div');
+    const s = document.createElement('span');
+    const v = document.createElement('b');
+    s.textContent = label;
+    v.textContent = value ?? '—';
+    if (value == null) v.className = 'none';
+    d.append(s, v);
+    return d;
+  };
+  el.replaceChildren(
+    cell('Best score', b.score > 0 ? fmtInt(b.score) : null),
+    cell('Longest', b.distance > 0 ? fmtInt(b.distance) + 'm' : null),
+    cell('Top speed', b.maxSpeed > 0 ? Math.round(b.maxSpeed) + ' km/h' : null),
+    cell('Slalom', cs.slalom ? fmtTime(cs.slalom) : null),
+    cell('Tree slalom', cs.tree ? fmtTime(cs.tree) : null),
+    cell('Freestyle', cs.freestyle ? fmtInt(cs.freestyle) + ' pts' : null),
+  );
 }
 
 function refreshStatsLine() {
@@ -348,6 +371,8 @@ const hudEls = {
   style: $('#hud-style'),
   bar: $('#speedo i'),
   speedo: $('#speedo'),
+  course: $('#hud-course'),
+  yeti: $('#hud-yeti'),
 };
 const hudLast = {};
 function setText(key, text) {
@@ -372,6 +397,27 @@ function updateHud(g) {
   if (hudLast.turbo !== turbo) {
     hudLast.turbo = turbo;
     hudEls.speedo.classList.toggle('turbo', turbo);
+  }
+
+  // Course clock while on a timed run.
+  const run = g.course;
+  const courseText = run ? `${run.def.name} ${fmtTime(run.time)}${run.missed ? ` · ${run.missed} missed` : ''}` : '';
+  if (hudLast.course !== courseText) {
+    hudLast.course = courseText;
+    hudEls.course.classList.toggle('hidden', !run);
+    hudEls.course.textContent = courseText;
+  }
+
+  // Yeti alert: how far behind it is, pulsing faster as it closes in.
+  const y = g.yeti;
+  const chasing = y && (y.state === 'chase' || y.state === 'stumble');
+  const d = chasing ? Math.round(y.distanceTo(p) / METER) : 0;
+  const yetiText = chasing ? (y.state === 'stumble' ? 'YETI · stumbled!' : `YETI · ${d}m`) : '';
+  if (hudLast.yeti !== yetiText) {
+    hudLast.yeti = yetiText;
+    hudEls.yeti.classList.toggle('hidden', !chasing);
+    hudEls.yeti.textContent = yetiText;
+    hudEls.yeti.classList.toggle('close', chasing && d < 15);
   }
 }
 

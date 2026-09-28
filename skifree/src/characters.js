@@ -34,9 +34,32 @@ function line2(ctx, x0, y0, x1, y1, color, w) {
   ctx.stroke();
 }
 
+// Soft contact shadow: fades out at the rim, shrinks and lightens with height.
 export function groundShadow(ctx, rx, z = 0) {
   const k = 1 / (1 + z / 60);
-  ell(ctx, 2, 1, rx * (0.6 + 0.4 * k), rx * 0.32 * (0.6 + 0.4 * k), `rgba(38, 66, 112, ${0.2 * k + 0.05})`);
+  const r = rx * (0.6 + 0.4 * k);
+  ctx.save();
+  ctx.translate(2, 1);
+  ctx.scale(1, 0.34);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.15);
+  const a = 0.26 * k + 0.06;
+  g.addColorStop(0, `rgba(38, 66, 112, ${a})`);
+  g.addColorStop(0.6, `rgba(38, 66, 112, ${a * 0.7})`);
+  g.addColorStop(1, 'rgba(38, 66, 112, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.15, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+// White fur lit from the upper left, cool blue in the folds.
+function furFill(ctx, cx, cy, r) {
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.15);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.55, '#f3f7fc');
+  g.addColorStop(1, '#cbd8ea');
+  return g;
 }
 
 function star(ctx, x, y, r, color) {
@@ -77,20 +100,57 @@ export function drawSkier(ctx, s) {
   const tuck = s.turbo ? 1 : s.tucking ? 0.6 : 0;
   const walk = s.walking ? Math.sin(s.anim * 14) : 0;
   const zlift = -(s.z || 0);
+  const trick = s.trick;
+  const tp = trick ? Math.min(1, trick.t / trick.dur) : 0;
+  const eagle = trick && trick.kind === 'eagle' ? Math.sin(tp * Math.PI) : 0;
 
   ctx.save();
   ctx.translate(0, zlift);
+  // Tricks: the flip rotates the whole skier about their middle, the
+  // helicopter squashes them edge-on and back as they turn.
+  if (trick && trick.kind === 'flip') {
+    ctx.translate(0, -13);
+    ctx.rotate(-Math.PI * 2 * easeInOut(tp));
+    ctx.translate(0, 13);
+  } else if (trick && trick.kind === 'spin') {
+    const c = Math.cos(Math.PI * 2 * easeInOut(tp));
+    ctx.scale(Math.sign(c || 1) * Math.max(0.18, Math.abs(c)), 1);
+  }
 
-  // Skis. Braking splays the tails into a snowplough.
+  // Scarf streaming uphill behind the skier, longer the faster they go.
+  const flow = Math.min(1, (s.speed || 0) / 300);
+  if (flow > 0.05) {
+    const wav = Math.sin(s.anim * 18) * 1.5;
+    const len = 4 + flow * 9;
+    const nx = -dx * 0.6 + 2.5, ny = -21 + tuck * 5;
+    ctx.beginPath();
+    ctx.moveTo(nx - 1, ny);
+    ctx.quadraticCurveTo(nx - dx * len * 0.5 + wav, ny - len * 0.55, nx - dx * len + wav * 1.4, ny - len);
+    ctx.strokeStyle = C.outline;
+    ctx.lineWidth = 3.4;
+    ctx.stroke();
+    ctx.strokeStyle = hat;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
+
+  // Skis. Braking splays the tails into a snowplough; the eagle spreads them.
   const plough = s.braking ? 0.32 : 0;
   for (const side of [-1, 1]) {
-    const a = h + side * plough * -1;
+    const a = h - side * plough + side * eagle * 0.5;
     const sdx = Math.sin(a), sdy = Math.cos(a) * 0.72;
-    const ox = px * side * 3.3 + (side === 1 ? walk * dx * 2 : -walk * dx * 2);
-    const oy = py * side * 3.3 + 1;
+    const spread = 3.3 + eagle * 5;
+    const ox = px * side * spread + (side === 1 ? walk * dx * 2 : -walk * dx * 2);
+    const oy = py * side * spread + 1;
     line2(ctx, ox - sdx * 10, oy - sdy * 10, ox + sdx * 13, oy + sdy * 13, skiColor, 2.3);
-    // Upturned tips.
+    // Upturned tips with a glint.
     ell(ctx, ox + sdx * 13, oy + sdy * 13, 1.5, 1.5, skiColor, C.outline, 0.8);
+    ctx.beginPath();
+    ctx.moveTo(ox - sdx * 6 + 0.3, oy - sdy * 6 - 0.4);
+    ctx.lineTo(ox + sdx * 6 + 0.3, oy + sdy * 6 - 0.4);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
   }
 
   const lean = dx * (2.5 + tuck * 1.5);
@@ -101,15 +161,21 @@ export function drawSkier(ctx, s) {
 
   // Legs.
   for (const side of [-1, 1]) {
-    line2(ctx, px * side * 3.2, py * side * 3.2 - 1, lean * 0.6 + side * 2.2, hipY, pants, 3);
+    const f = 3.2 + eagle * 5;
+    line2(ctx, px * side * f, py * side * f - 1, lean * 0.6 + side * 2.2, hipY, pants, 3);
   }
-  // Poles, trailing behind.
+  // Knee highlight.
+  ell(ctx, lean * 0.3 - 1.8, hipY + 4, 0.8, 1.6, 'rgba(255,255,255,0.18)');
+
+  // Poles, trailing behind (thrown wide in the eagle).
   const poleSwing = s.walking ? Math.sin(s.anim * 14) * 3 : 0;
+  const hands = [];
   for (const side of [-1, 1]) {
-    const hx = lean + side * (6.5 - tuck * 1.5) + fwd * 0.3;
-    const hy = torsoY + 3 - tuck * 1;
-    const tx = hx - dx * (9 + tuck * 6) + side * 1.5 + side * poleSwing;
-    const ty = hy + 13 - dy * (6 + tuck * 5);
+    const hx = lean + side * (6.5 - tuck * 1.5 + eagle * 4) + fwd * 0.3;
+    const hy = torsoY + 3 - tuck * 1 - eagle * 9;
+    hands.push([hx, hy]);
+    const tx = hx - dx * (9 + tuck * 6) + side * (1.5 + eagle * 6) + side * poleSwing;
+    const ty = hy + 13 - dy * (6 + tuck * 5) - eagle * 12;
     ctx.beginPath();
     ctx.moveTo(hx, hy);
     ctx.lineTo(tx, ty);
@@ -118,18 +184,29 @@ export function drawSkier(ctx, s) {
     ctx.stroke();
     ell(ctx, tx, ty, 1.2, 0.6, null, C.outline, 0.6);
   }
-  // Torso.
-  ell(ctx, lean + fwd * 0.2, torsoY, 5.4, 6.6 - tuck * 0.8, jacket, C.outline, 1.3);
+  // Torso: lit from the upper left.
+  const tx0 = lean + fwd * 0.2;
+  const g = ctx.createLinearGradient(tx0 - 5, torsoY - 6, tx0 + 5, torsoY + 6);
+  g.addColorStop(0, shade(jacket, 0.3));
+  g.addColorStop(0.5, jacket);
+  g.addColorStop(1, shade(jacket, -0.25));
+  ell(ctx, tx0, torsoY, 5.4, 6.6 - tuck * 0.8, g, C.outline, 1.3);
   ctx.beginPath();
   ctx.moveTo(lean - 4.6, torsoY + 1);
   ctx.lineTo(lean + 4.6, torsoY + 1);
   ctx.strokeStyle = 'rgba(255,255,255,0.75)';
   ctx.lineWidth = 1.3;
   ctx.stroke();
+  // Zip.
+  ctx.beginPath();
+  ctx.moveTo(tx0 + dx, torsoY - 5);
+  ctx.lineTo(tx0 + dx, torsoY + 4);
+  ctx.strokeStyle = 'rgba(29,37,51,0.35)';
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
   // Arms.
   for (const side of [-1, 1]) {
-    const hx = lean + side * (6.5 - tuck * 1.5) + fwd * 0.3;
-    const hy = torsoY + 3 - tuck;
+    const [hx, hy] = hands[side < 0 ? 0 : 1];
     line2(ctx, lean + side * 3.8, torsoY - 3, hx, hy, jacket, 2.4);
     ell(ctx, hx, hy, 1.5, 1.5, C.outline);
   }
@@ -141,13 +218,18 @@ export function drawSkier(ctx, s) {
   if (face) {
     ctx.fillStyle = C.outline;
     ctx.fillRect(hx - 3.8 + dx * 1.2, headY - 1.4, 7.6, 2.8);
-    ctx.fillStyle = '#7fd0ff';
+    const lg = ctx.createLinearGradient(0, headY - 1, 0, headY + 1);
+    lg.addColorStop(0, '#b8ecff');
+    lg.addColorStop(1, '#3f8fd6');
+    ctx.fillStyle = lg;
     ctx.fillRect(hx - 2.8 + dx * 1.8, headY - 0.9, 5.6 - Math.abs(dx) * 2, 1.8);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(hx - 2.2 + dx * 1.8, headY - 0.8, 1.1, 0.6);
   } else {
     ctx.fillStyle = C.outline;
     ctx.fillRect(hx + Math.sign(dx) * 1 - 1.5, headY - 1.4, 4, 2.8);
   }
-  // Beanie + bobble.
+  // Beanie + bobble, with a highlight.
   ctx.beginPath();
   ctx.arc(hx, headY - 0.6, 4.6, Math.PI, 0);
   ctx.closePath();
@@ -156,8 +238,29 @@ export function drawSkier(ctx, s) {
   ctx.strokeStyle = C.outline;
   ctx.lineWidth = 1.2;
   ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(hx, headY - 0.6, 3.2, Math.PI * 1.15, Math.PI * 1.45);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
   ell(ctx, hx - dx * 1.5, headY - 5.6, 1.8, 1.8, hat, C.outline, 1);
   ctx.restore();
+}
+
+const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+// Lightens (f > 0) or darkens (f < 0) a #rrggbb colour. Memoised.
+const shadeCache = new Map();
+export function shade(hex, f) {
+  const key = hex + f;
+  let out = shadeCache.get(key);
+  if (!out) {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(f > 0 ? c + (255 - c) * f : c * (1 + f)));
+    out = `rgb(${ch[0]},${ch[1]},${ch[2]})`;
+    shadeCache.set(key, out);
+  }
+  return out;
 }
 
 function skierSprawled(ctx, s, jacket, pants, hat, skiColor) {
@@ -464,11 +567,11 @@ export function drawYeti(ctx, y) {
     furArm(ctx, s * 13, -37, hx, hy, 4.6);
   }
   // Body.
-  furBlob(ctx, 0, -28, 17, 20, 11, C.yeti, C.outline, 0.1);
-  furBlob(ctx, 5, -21, 10, 12, 7, C.yetiShade, null, 0.12);
+  furBlob(ctx, 0, -28, 17, 20, 11, furFill(ctx, 0, -28, 20), C.outline, 0.1);
+  furBlob(ctx, 5, -21, 10, 12, 7, 'rgba(190, 206, 228, 0.45)', null, 0.12);
   furBlob(ctx, 0, -28, 17, 20, 11, 'rgba(0,0,0,0)', C.outline, 0.1);
   // Head.
-  furBlob(ctx, facing * 1.5, -46, 12.5, 11, 9, C.yeti, C.outline, 0.14);
+  furBlob(ctx, facing * 1.5, -46, 12.5, 11, 9, furFill(ctx, facing * 1.5, -46, 12.5), C.outline, 0.14);
   yetiFace(ctx, facing * 2, -44, 'angry', y.lunging ? 1 : 0.35 + Math.abs(Math.sin(stride * 0.5)) * 0.25);
   if (stumble) dizzy(ctx, 0, -62, y.anim);
   ctx.restore();
@@ -527,10 +630,10 @@ function yetiEating(ctx, y) {
   ctx.translate(0, bodyY);
   for (const s of [-1, 1]) ell(ctx, s * 8, -2, 6, 3.4, C.yetiFace, C.outline, 1.5);
   for (const s of [-1, 1]) furBlob(ctx, s * 8, -9, 6, 7, 5, C.yeti, C.outline, 0.14);
-  furBlob(ctx, 0, -28, 17 + (e > 1.1 && e < 1.8 ? 2 : 0), 20, 11, C.yeti, C.outline, 0.1);
-  furBlob(ctx, 5, -21, 10, 12, 7, C.yetiShade, null, 0.12);
+  furBlob(ctx, 0, -28, 17 + (e > 1.1 && e < 1.8 ? 2 : 0), 20, 11, furFill(ctx, 0, -28, 20), C.outline, 0.1);
+  furBlob(ctx, 5, -21, 10, 12, 7, 'rgba(190, 206, 228, 0.45)', null, 0.12);
   furBlob(ctx, 0, -28, 17, 20, 11, 'rgba(0,0,0,0)', C.outline, 0.1);
-  furBlob(ctx, 0, -46, 12.5, 11, 9, C.yeti, C.outline, 0.14);
+  furBlob(ctx, 0, -46, 12.5, 11, 9, furFill(ctx, 0, -46, 12.5), C.outline, 0.14);
   // Cheeks puff while chewing.
   if (e >= 1.1 && e < 1.8) {
     const puff = 1 + Math.abs(Math.sin(e * 16)) * 0.25;

@@ -24,6 +24,7 @@ const BOUNDS = {
   flag_blue: [-4, -40, 22, 44],
   sign: [-34, -46, 68, 52],
   lift_tower: [-18, -160, 36, 166],
+  banner: [-204, -74, 408, 82],
 };
 
 export function spriteBounds(t) {
@@ -98,8 +99,27 @@ function ellipse(ctx, x, y, rx, ry, fill, stroke, lw = 1.3) {
   }
 }
 
+// Soft-edged contact shadow (baked into the cached sprite, so it's free).
 function shadow(ctx, x, y, rx, ry) {
-  ellipse(ctx, x, y, rx, ry, C.shadow);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(1, ry / rx);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx * 1.2);
+  g.addColorStop(0, 'rgba(38, 66, 112, 0.3)');
+  g.addColorStop(0.55, 'rgba(38, 66, 112, 0.18)');
+  g.addColorStop(1, 'rgba(38, 66, 112, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, rx * 1.2, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Lightens (f > 0) or darkens (f < 0) a #rrggbb colour.
+function tint(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(f > 0 ? c + (255 - c) * f : c * (1 + f)));
+  return `rgb(${ch[0]},${ch[1]},${ch[2]})`;
 }
 
 function poly(ctx, pts, fill, stroke, lw = 1.3) {
@@ -153,14 +173,19 @@ export function drawStatic(ctx, o) {
       return o.state ? signDown(ctx, o.v) : sign(ctx, o.v);
     case 'lift_tower':
       return liftTower(ctx);
+    case 'banner':
+      return banner(ctx, o.v);
   }
 }
 
 function pine(ctx, w, h, tiers, snowy, v) {
   const rng = new Rng(1000 + v * 17 + w);
-  shadow(ctx, w * 0.12, 1, w * 0.5, w * 0.17);
-  // Trunk.
-  ctx.fillStyle = C.trunk;
+  shadow(ctx, w * 0.14, 1, w * 0.55, w * 0.19);
+  // Trunk, rounded by a gradient.
+  const tg = ctx.createLinearGradient(-w * 0.07, 0, w * 0.07, 0);
+  tg.addColorStop(0, '#8a5a32');
+  tg.addColorStop(1, C.trunkDark);
+  ctx.fillStyle = tg;
   ctx.strokeStyle = C.outline;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -188,9 +213,21 @@ function pine(ctx, w, h, tiers, snowy, v) {
       pts.push(x, yb + (k % 2 ? 1.5 : -0.5));
       if (k < sc) pts.push(x - hw / sc, yb - 2.5);
     }
-    poly(ctx, pts, hueJitter, C.outline, 1.3);
-    // Light from the left.
-    poly(ctx, [cx + lean * 0.4, yt + 1.5, cx - hw * 0.82, yb - 1.5, cx - hw * 0.1, yb - 3], C.treeLight, null);
+    // The tier above casts a soft shadow onto this one's needles.
+    if (i > 0) ellipse(ctx, cx + 1, yb + 1, hw * 0.9, 2.6, 'rgba(8, 40, 22, 0.28)');
+    // Needles: lit from the upper left, deep green in the shade.
+    const fg = ctx.createLinearGradient(cx - hw, yt, cx + hw, yb);
+    fg.addColorStop(0, tint(hueJitter, 0.22));
+    fg.addColorStop(0.55, hueJitter);
+    fg.addColorStop(1, tint(hueJitter, -0.35));
+    poly(ctx, pts, fg, C.outline, 1.3);
+    // Rim light down the sunny edge.
+    ctx.beginPath();
+    ctx.moveTo(cx + lean * 0.4 - 0.6, yt + 2);
+    ctx.lineTo(cx - hw * 0.8, yb - 2.2);
+    ctx.strokeStyle = 'rgba(190, 240, 200, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     if (snowy) {
       const sy = yt + (yb - yt) * 0.52;
       poly(
@@ -285,7 +322,11 @@ function rock(ctx, rx, ry, v) {
     const y = Math.sin(a) > 0 ? Math.sin(a) * ry * 0.22 : Math.sin(a) * ry * r;
     pts.push(Math.cos(a) * rx * r, y - ry * 0.12);
   }
-  poly(ctx, pts, C.rock, C.outline, 1.4);
+  const rg = ctx.createLinearGradient(-rx, -ry, rx, ry * 0.3);
+  rg.addColorStop(0, C.rockLight);
+  rg.addColorStop(0.5, C.rock);
+  rg.addColorStop(1, C.rockDark);
+  poly(ctx, pts, rg, C.outline, 1.4);
   // Shaded underside.
   ctx.save();
   ctx.clip();
@@ -535,6 +576,58 @@ function signDown(ctx, v) {
   ctx.translate(0, 2);
   sign(ctx, v);
   ctx.restore();
+}
+
+// A START / FINISH arch spanning a course: two poles and a fabric strip.
+function banner(ctx, finish) {
+  const half = 192;
+  for (const x of [-half, half]) {
+    shadow(ctx, x + 6, 1, 8, 3);
+    ctx.fillStyle = C.steel;
+    ctx.strokeStyle = C.outline;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.rect(x - 2, -64, 4, 64);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // Fabric, sagging slightly, with a gentle shade.
+  const top = -66, hgt = 16;
+  const g = ctx.createLinearGradient(0, top, 0, top + hgt);
+  const base = finish ? '#1d2533' : C.red;
+  g.addColorStop(0, finish ? '#3a4458' : '#f05a5e');
+  g.addColorStop(1, base);
+  ctx.beginPath();
+  ctx.moveTo(-half, top);
+  ctx.quadraticCurveTo(0, top + 6, half, top);
+  ctx.lineTo(half, top + hgt);
+  ctx.quadraticCurveTo(0, top + hgt + 6, -half, top + hgt);
+  ctx.closePath();
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = C.outline;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  if (finish) {
+    // Chequered ends.
+    ctx.save();
+    ctx.clip();
+    for (const sx of [-half, half - 40]) {
+      for (let x = 0; x < 40; x += 5) {
+        for (let y = 0; y < hgt + 8; y += 5) {
+          if (((x + y) / 5) % 2) continue;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(sx + x, top + y - 2, 5, 5);
+        }
+      }
+    }
+    ctx.restore();
+  }
+  ctx.font = '900 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(finish ? 'FINISH' : 'START', 0, top + hgt / 2 + 3);
 }
 
 function liftTower(ctx) {

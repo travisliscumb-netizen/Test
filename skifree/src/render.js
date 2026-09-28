@@ -53,6 +53,23 @@ class Particles {
   }
 }
 
+function makeFlakes(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const depth = 0.15 + Math.random() * 0.5;
+    out.push({
+      x: Math.random() * 4000,
+      y: Math.random() * 4000,
+      r: 0.7 + depth * 2.4,
+      depth,
+      fall: 18 + depth * 40,
+      drift: 0.5 + Math.random(),
+      phase: Math.random() * 6.28,
+    });
+  }
+  return out;
+}
+
 export class Renderer {
   constructor(canvas, cfg = CONFIG) {
     this.canvas = canvas;
@@ -91,6 +108,12 @@ export class Renderer {
     this.particles.clear();
     this.kick = 0;
     this.sprayAcc = 0;
+    this.popups = []; // floating "+40 Backflip" texts, world space
+    this.rings = []; // landing shock rings, world space
+    this.alarm = 0; // red edge flash when the yeti appears
+    this.breath = 0;
+    this.lastCam = null;
+    if (!this.flakes) this.flakes = makeFlakes(90);
   }
 
   // Sizes the backing store and picks a zoom that shows a consistent amount
@@ -165,6 +188,8 @@ export class Renderer {
           }
           break;
         case 'land':
+          if (e.air > 0.4) this.rings.push({ x: e.x, y: e.y, t: 0, big: Math.min(1.6, e.air) });
+        // fallthrough
         case 'mogul':
           for (let i = 0; i < many(e.type === 'land' ? 12 + e.air * 16 : 7); i++) {
             const a = Math.random() * Math.PI * 2;
@@ -184,6 +209,18 @@ export class Renderer {
           break;
         case 'caught':
           this.kick = 1;
+          break;
+        case 'style':
+          this.popup(e.x, e.y, `+${e.amount} ${e.label}`, e.amount >= 100 ? '#e0393e' : '#2f6fd6');
+          break;
+        case 'gatemiss':
+          this.popup(e.x, e.y, `Missed +${e.penalty}s`, '#e0393e');
+          break;
+        case 'yeti':
+          this.alarm = 1;
+          break;
+        case 'coursestart':
+          this.popup(e.x, e.y - 60, 'GO!', '#2fa860', 1.6);
           break;
       }
     }
@@ -241,6 +278,28 @@ export class Renderer {
       }
     }
 
+    // Floating texts and rings age out.
+    for (const q of this.popups) q.t += dt;
+    this.popups = this.popups.filter((q) => q.t < 1.4);
+    for (const r of this.rings) r.t += dt;
+    this.rings = this.rings.filter((r) => r.t < 0.45);
+    this.alarm = Math.max(0, this.alarm - dt * 1.2);
+
+    // The yeti's breath steams in the cold while it runs.
+    const yb = game.yeti;
+    if (yb && (yb.state === 'chase' || yb.state === 'stumble') && this.effects) {
+      this.breath -= dt;
+      if (this.breath <= 0) {
+        this.breath = 0.22;
+        const s = this.cfg.YETI_DRAW_SCALE;
+        const mx = yb.x + Math.sin(yb.heading) * 6;
+        this.particles.spawn(mx, yb.y + 2, 44 * s, Math.sin(yb.heading) * 40 + (Math.random() - 0.5) * 20, Math.cos(yb.heading) * 25, 30, 0.7, 2.5 + Math.random() * 2, 'rgba(235, 244, 255, 0.9)');
+      }
+    }
+
+    // Snowfall drifts with the camera for a sense of depth.
+    this.updateFlakes(game, dt);
+
     // Yeti footprints.
     const y = game.yeti;
     if (y && y.state !== 'eat' && y.state !== 'gone' && y.speed > 20) {
@@ -290,10 +349,87 @@ export class Renderer {
     this.drawScene(ctx, game, v);
     this.drawParticles(ctx, v);
     this.drawLift(ctx, game, v);
+    this.drawPopups(ctx);
 
     // Screen-space overlays.
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.drawFlakes(ctx);
     this.drawOverlays(ctx, game, v, zoomEff);
+  }
+
+  popup(x, y, text, color, scale = 1) {
+    this.popups.push({ x, y, text, color, scale, t: 0 });
+    if (this.popups.length > 12) this.popups.shift();
+  }
+
+  drawPopups(ctx) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    for (const q of this.popups) {
+      const k = q.t / 1.4;
+      const pop = q.t < 0.12 ? 0.6 + (q.t / 0.12) * 0.5 : 1.1 - Math.min(0.1, (q.t - 0.12) * 0.5);
+      ctx.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+      ctx.font = `900 ${Math.round(12 * pop * q.scale)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+      const y = q.y - 44 - q.t * 38;
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeText(q.text, q.x, y);
+      ctx.fillStyle = q.color;
+      ctx.fillText(q.text, q.x, y);
+    }
+    ctx.globalAlpha = 1;
+    // Landing shock rings.
+    for (const r of this.rings) {
+      const k = r.t / 0.45;
+      const rad = 8 + k * 26 * r.big;
+      ctx.globalAlpha = (1 - k) * 0.6;
+      ctx.strokeStyle = '#9fbde6';
+      ctx.lineWidth = 2 * (1 - k) + 0.5;
+      ctx.beginPath();
+      ctx.ellipse(r.x, r.y, rad, rad * 0.38, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  updateFlakes(game, dt) {
+    const cam = { x: game.camX, y: game.camY };
+    const last = this.lastCam || cam;
+    this.lastCam = cam;
+    const z = this.zoom / game.zoomMul;
+    // Big jumps (a new run, a teleport) shouldn't sweep the snow.
+    const jump = Math.hypot(cam.x - last.x, cam.y - last.y) > 400;
+    const W = this.cssW, H = this.cssH;
+    const calm = this.reducedMotion ? 0.35 : 1;
+    for (const p of this.flakes) {
+      p.x += p.drift * Math.sin(this.time * 0.7 + p.phase) * 12 * calm * dt;
+      p.y += p.fall * calm * dt;
+      if (!jump) {
+        // Nearer flakes (bigger) slide past faster: parallax.
+        p.x -= (cam.x - last.x) * z * p.depth;
+        p.y -= (cam.y - last.y) * z * p.depth;
+      }
+      p.x = ((p.x % W) + W) % W;
+      p.y = ((p.y % H) + H) % H;
+    }
+  }
+
+  drawFlakes(ctx) {
+    if (!this.effects) return;
+    const n = this.lite ? 35 : this.flakes.length;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.strokeStyle = 'rgba(120, 150, 200, 0.35)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const p = this.flakes[i];
+      ctx.moveTo(p.x + p.r, p.y);
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    }
+    // White flakes need a cool rim to read over white snow.
+    ctx.fill();
+    ctx.stroke();
   }
 
   buildTile() {
@@ -378,6 +514,35 @@ export class Renderer {
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = this.finePattern;
     ctx.fillRect(x, y, w, h);
+    this.drawSparkles(ctx, v);
+  }
+
+  // Sun glinting off the snow: a few deterministic points per tile, each
+  // twinkling briefly now and then.
+  drawSparkles(ctx, v) {
+    if (!this.effects) return;
+    const t = this.time;
+    const cx0 = Math.floor(v.x0 / TILE), cx1 = Math.floor(v.x1 / TILE);
+    const cy0 = Math.floor(v.y0 / TILE), cy1 = Math.floor(v.y1 / TILE);
+    ctx.strokeStyle = 'rgba(150, 190, 255, 0.9)';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let i = 0; i < 4; i++) {
+          const h = hash(cx, cy, i, 57);
+          const tw = Math.sin(t * (1.3 + (h & 7) * 0.2) + ((h >> 3) & 63));
+          if (tw < 0.93) continue;
+          const r = (tw - 0.93) * 45;
+          const x = cx * TILE + ((h >> 9) & 255), y = cy * TILE + ((h >> 17) & 255);
+          ctx.moveTo(x - r, y);
+          ctx.lineTo(x + r, y);
+          ctx.moveTo(x, y - r);
+          ctx.lineTo(x, y + r);
+        }
+      }
+    }
+    ctx.stroke();
   }
 
   // Flat snow plus deterministic ripples and speckles, batched into two draw
@@ -478,7 +643,8 @@ export class Renderer {
     const items = this.items;
     items.length = 0;
     // Tall sprites extend far above their footprint, so look below the view.
-    game.world.forEachInRect(v.x0 - 40, v.y0 - 30, v.x1 + 40, v.y1 + 170, (o) => {
+    // (Course arches are 400u wide, hence the generous side margin.)
+    game.world.forEachInRect(v.x0 - 210, v.y0 - 30, v.x1 + 210, v.y1 + 170, (o) => {
       if (o.t === 'gate') return;
       items.push({ y: o.y, o, k: 0 });
     });
@@ -619,6 +785,21 @@ export class Renderer {
     const p = game.player;
     const c = this.cfg;
 
+    // A cool, soft vignette pulls the eye to the middle (skipped in lite mode).
+    if (!this.lite) {
+      if (!this.vignette) {
+        const cv = makeCanvas(128, 128);
+        const g2 = cv.getContext('2d');
+        const g = g2.createRadialGradient(64, 64, 34, 64, 64, 92);
+        g.addColorStop(0, 'rgba(60, 90, 140, 0)');
+        g.addColorStop(1, 'rgba(60, 90, 140, 0.16)');
+        g2.fillStyle = g;
+        g2.fillRect(0, 0, 128, 128);
+        this.vignette = cv;
+      }
+      ctx.drawImage(this.vignette, 0, 0, W, H);
+    }
+
     // Turbo: faint speed streaks racing up the screen.
     if (p.turbo && p.onGround && !this.reducedMotion) {
       const fast = clamp((p.speed - c.PLAYER_SPEED) / (c.TURBO_SPEED - c.PLAYER_SPEED), 0, 1);
@@ -684,9 +865,9 @@ export class Renderer {
         ctx.fill();
         ctx.restore();
       }
-      // Danger vignette as it closes in.
+      // Danger vignette as it closes in (and a flash when it first appears).
       const d = y.distanceTo(p);
-      const near = clamp(1 - (d - 60) / 360, 0, 1);
+      const near = Math.max(clamp(1 - (d - 60) / 360, 0, 1), this.alarm * (0.6 + 0.4 * Math.sin(this.time * 18)));
       if (near > 0) {
         const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
         g.addColorStop(0, 'rgba(224, 57, 62, 0)');
