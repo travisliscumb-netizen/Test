@@ -57,6 +57,8 @@ export function ruleChips(c) {
   if (rots.has('full')) chips.push(['flip', 'Rotate + mirror']);
   if ((c.pieces || []).some((p) => p.connect === 'corner')) chips.push(['spark', 'Diagonal pieces']);
   if ((c.pieces || []).some((p) => p.connect === 'loose')) chips.push(['spark', 'Gapped pieces']);
+  if (c.placement?.mode === 'timed') chips.push(['target', `No gravity · ${Number(c.placement.seconds).toFixed(1)}s clock`]);
+  if ((c.pieces || []).some((p) => p.fall && p.fall !== 1)) chips.push(['down', 'Weighted pieces']);
   chips.push(['bolt', `${c.speed?.curve || 'standard'} speed`]);
   return h('div', { class: 'chips' }, chips.map(([ic, t]) => h('span', { class: 'chip' }, icon(ic), t)));
 }

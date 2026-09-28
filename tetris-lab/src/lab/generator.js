@@ -104,6 +104,7 @@ function finishPieces(rng, raw, rotation, extra = {}) {
     color: colors[i % colors.length],
     rotation: p.rotation || rotation,
     ...(p.morphs ? { morphs: p.morphs } : {}),
+    ...(p.fall && p.fall !== 1 ? { fall: p.fall } : {}),
     connect: p.connect || 'edge',
     weight: p.weight ?? 1,
     tags: p.tags || ['generated'],
@@ -294,6 +295,39 @@ export const ARCHETYPES = [
     }
   },
   {
+    id: 'clockwork',
+    title: 'Clockwork',
+    problem: 'Falling speed turns the late game into a reflex test. Switch gravity off and give each piece a shrinking time budget instead: every placement becomes a deliberate decision made against the clock.',
+    build(rng) {
+      const sizes = rng.shuffle([3, 4, 4, 4, 5, 5]).slice(0, rng.range(5, 6));
+      const pieces = growSet(rng, 'square', sizes, { compact: 0.6 });
+      return {
+        lattice: 'square', board: { width: rng.pick([10, 11]), height: rng.range(18, 20) },
+        pieces: finishPieces(rng, pieces, 'rotate'),
+        placement: { mode: 'timed', seconds: 3 + rng.next() * 2.5 },
+        clear: { rule: 'line' }, gravityMode: 'naive',
+        speed: { curve: 'standard', linesPerLevel: 8 }
+      };
+    }
+  },
+  {
+    id: 'featherweight',
+    title: 'Featherweight',
+    problem: 'Every piece falls at the same speed, so weight is never a factor. Give pieces mass: light ones drift and leave time to think, heavy ones plummet and must be placed on instinct.',
+    build(rng) {
+      const pieces = growSet(rng, 'square', rng.shuffle([2, 3, 4, 4, 5, 5]).slice(0, 5), { compact: 0.55 });
+      // Bigger pieces are heavier: the awkward ones give you the least time.
+      pieces.sort((a, b) => a.cells.length - b.cells.length);
+      pieces.forEach((p, i) => { p.fall = [0.45, 0.6, 1, 1.6, 2.2][Math.min(4, i)]; });
+      return {
+        lattice: 'square', board: { width: 10, height: 20 },
+        pieces: finishPieces(rng, pieces, 'rotate'),
+        clear: { rule: 'line' }, gravityMode: 'naive',
+        speed: { curve: 'standard', linesPerLevel: 10 }
+      };
+    }
+  },
+  {
     id: 'free-form',
     title: 'Free Form',
     problem: 'No hypothesis: a random point in the design space, to find ideas nobody thought to ask for.',
@@ -321,7 +355,8 @@ const TWISTS = [
   { id: 'cascade', ok: (c) => c.gravityMode !== 'cascade' && c.clear.rule !== 'color-match', apply: (c) => { c.gravityMode = 'cascade'; return 'switched to cascade gravity so cleared rows let cells fall into holes'; } },
   { id: 'wrap', ok: (c) => c.lattice === 'square' && !c.wrap, apply: (c) => { c.wrap = true; return 'made the walls wrap around'; } },
   { id: 'garbage', ok: (c) => !c.garbage?.every, apply: (c) => { c.garbage = { every: 12 }; return 'added a rising garbage tide every 12 pieces'; } },
-  { id: 'gap', ok: (c) => c.clear.rule === 'line', apply: (c) => { c.clear = { rule: 'line-gap', gaps: 1 }; return 'allowed rows to clear with one gap'; } }
+  { id: 'gap', ok: (c) => c.clear.rule === 'line', apply: (c) => { c.clear = { rule: 'line-gap', gaps: 1 }; return 'allowed rows to clear with one gap'; } },
+  { id: 'timed', ok: (c) => c.placement?.mode !== 'timed', apply: (c) => { c.placement = { mode: 'timed', seconds: 4 }; return 'switched gravity off in favour of a four-second placement clock'; } }
 ];
 
 function conceptName(rng, archetype) {
@@ -380,6 +415,8 @@ export function describe(c) {
   if (c.specials?.bomb > 0) parts.push('bomb cells');
   if (c.specials?.wild > 0) parts.push('wild cells');
   if (c.garbage?.every > 0) parts.push(`garbage every ${c.garbage.every}`);
+  if (c.placement?.mode === 'timed') parts.push(`no gravity: ${Math.round(c.placement.seconds * 10) / 10}s to place each piece`);
+  if ((c.pieces || []).some((p) => p.fall && p.fall !== 1)) parts.push('pieces have weight');
   const rots = new Set((c.pieces || []).map((p) => p.rotation));
   if (rots.has('morph')) parts.push('pieces morph instead of rotating');
   else if (rots.has('flip') && rots.size === 1) parts.push('pieces mirror instead of rotating');

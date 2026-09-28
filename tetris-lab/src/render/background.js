@@ -42,9 +42,11 @@ export class Background {
 
   setTheme(th) { this.theme = th; this.frozen = false; }
   setReduced(r) { this.reduced = r; this.frozen = false; }
+  setLite(on) { this.lite = on; if (this.w) this.resize(this.w, this.h, this.lastDpr || 1); }
 
   resize(w, h, dpr) {
-    this.scale = Math.min(0.6, 0.5 * Math.max(1, dpr * 0.75));
+    this.lastDpr = dpr;
+    this.scale = this.lite ? 0.33 : Math.min(0.6, 0.5 * Math.max(1, dpr * 0.75));
     this.w = w; this.h = h;
     this.canvas.width = Math.max(1, Math.round(w * this.scale));
     this.canvas.height = Math.max(1, Math.round(h * this.scale));

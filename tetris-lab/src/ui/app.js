@@ -39,7 +39,6 @@ export const app = {
     this.save.refreshChallenges();
     this.applySettings();
     matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change', () => this.applySettings());
-    this.save.onChange(() => {});
     this.resize();
     addEventListener('resize', () => this.resize());
     addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
@@ -94,7 +93,7 @@ export const app = {
     const dpr = Math.min(2.5, window.devicePixelRatio || 1);
     const w = window.innerWidth, h2 = window.innerHeight;
     this.bg.resize(w, h2, dpr);
-    this.fx.resize(w, h2, Math.min(2, dpr));
+    this.fx.resize(w, h2, Math.min(1.25, dpr));
     this.screen?.resize?.();
   },
 
@@ -144,8 +143,29 @@ export const app = {
     if (e.key === 'Escape' && this.screenName !== 'title') { e.preventDefault(); this.back(); }
   },
 
+  /* Adaptive quality: if gameplay frames are persistently slow, switch to a
+     lite mode (20 fps, third-resolution background, no glass blur). Gameplay visuals are never
+     reduced. Measured only while playing, where frame pacing matters. */
+  quality: 'high',
+  perfAcc: 0, perfN: 0,
+  watchPerf(dt) {
+    if (this.quality !== 'high' || this.screenName !== 'play' || document.hidden || dt <= 0 || dt > 0.25) return;
+    this.perfAcc += dt; this.perfN++;
+    if (this.perfAcc < 2) return;
+    const avg = this.perfAcc / this.perfN;
+    this.perfAcc = 0; this.perfN = 0;
+    if (avg > 0.022) {
+      this.quality = 'lite';
+      document.body.classList.add('lite');
+      this.bg.setLite(true);
+      this.screen?.resize?.();
+      console.info(`[prismfall] frame time ${(avg * 1000).toFixed(1)}ms: switching to lite quality`);
+    }
+  },
+
   frame(dt) {
     const s = this.screen;
+    this.watchPerf(dt);
     try {
       s?.frame?.(dt);
     } catch (e) {
@@ -154,8 +174,13 @@ export const app = {
     }
     for (const f of this.frameHooks) f(dt);
     const st = s?.bgState?.() || {};
-    this.bg.update(dt, st);
-    this.bg.draw();
+    this.bgT = (this.bgT || 0) + dt;
+    // Lite quality redraws the ambient background at 20 fps.
+    if (this.quality === 'high' || this.bgT >= 1 / 20) {
+      this.bg.update(this.quality === 'high' ? dt : this.bgT, st);
+      this.bg.draw();
+      this.bgT = 0;
+    }
     this.fx.update(dt);
     this.fx.draw();
   },

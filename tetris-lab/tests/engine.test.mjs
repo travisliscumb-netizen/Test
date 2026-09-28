@@ -503,6 +503,40 @@ describe('game: experimental mechanics', () => {
     assert.ok(g2.move(-1));
     assert.equal(g2.active.x, 7);
   });
+  test('timed placement: no gravity, the piece drops itself when the clock runs out', () => {
+    const rules = compileRules({ placement: { mode: 'timed', seconds: 2 }, pieces: [{ id: 'a', cells: [[0, 0], [1, 0], [2, 0]] }] });
+    const g = new Game(rules, { seed: 1 });
+    g.start();
+    const y = g.active.y;
+    for (let k = 0; k < 7; k++) g.tick(250);   // 1.75s: hovering
+    assert.equal(g.active.y, y, 'no gravity');
+    assert.ok(g.placeProgress > 0.8);
+    assert.equal(g.stats.pieces, 0);
+    g.tick(250);
+    assert.equal(g.stats.pieces, 1, 'dropped itself at 2s');
+    assert.ok(g.drainEvents().some((e) => e.type === 'timeout'));
+    // Soft drop still works, without banked time teleporting the piece.
+    for (let k = 0; k < 4; k++) g.tick(250);
+    const y2 = g.active.y;
+    g.setSoftDrop(true);
+    g.tick(16);
+    assert.ok(g.active.y - y2 <= 1);
+    // The clock shrinks with level.
+    g.stats.level = 10;
+    assert.ok(g.placeLimit() < 2000 * 0.7);
+  });
+  test('piece weight changes fall speed', () => {
+    const rules = compileRules({ pieces: [{ id: 'heavy', cells: [[0, 0], [1, 0]], fall: 2 }, { id: 'light', cells: [[0, 0], [0, 1]], fall: 0.5 }] });
+    const fallIn = (idx, ms) => {
+      const g = new Game(rules, { seed: 1, randomizer: new ScriptedRandomizer([idx], null) });
+      g.start();
+      const y = g.active.y;
+      for (let t = 0; t < ms; t += 50) g.tick(50);
+      return g.active.y - y;
+    };
+    assert.equal(fallIn(0, 2000), 4, 'heavy: a row every 500ms');
+    assert.equal(fallIn(1, 2000), 1, 'light: a row every 2000ms');
+  });
   test('morph "rotation" cycles shapes', () => {
     const rules = compileRules({ pieces: [{ id: 'm', cells: [[0, 0], [1, 0], [2, 0]], rotation: 'morph', morphs: [[[0, 0], [1, 0], [1, 1]]] }] });
     const g = new Game(rules, { seed: 1, instant: true });

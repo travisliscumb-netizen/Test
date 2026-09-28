@@ -138,6 +138,7 @@ export function sanitizeConcept(c) {
     connect: pick(p.connect, ['edge', 'corner', 'loose'], 'edge'),
     color: int(p.color, 1, 31, 9),
     weight: num(p.weight, 0.1, 10, 1),
+    ...(Number.isFinite(p.fall) && p.fall !== 1 ? { fall: num(p.fall, 0.25, 3, 1) } : {}),
     tags: Array.isArray(p.tags) ? p.tags.filter((t) => typeof t === 'string').slice(0, 6) : []
   }));
   if (!n.pieces.length) return null;
@@ -225,12 +226,12 @@ export class SaveStore {
 
   load() {
     let raw = null;
-    try { raw = this.storage?.getItem(SAVE_KEY) ?? null; } catch (e) { this.loadError = 'storage unavailable'; }
+    try { raw = this.storage?.getItem(SAVE_KEY) ?? null; } catch { this.loadError = 'storage unavailable'; }
     if (raw == null) { this.data = DEFAULTS(); return this.data; }
     let parsed;
     try {
       parsed = JSON.parse(raw);
-    } catch (e) {
+    } catch {
       this.loadError = 'save data was corrupted and has been reset (a backup was kept)';
       try { this.storage.setItem(BACKUP_KEY, raw); } catch { /* ignore */ }
       this.data = DEFAULTS();
@@ -262,7 +263,7 @@ export class SaveStore {
     try {
       this.storage?.setItem(SAVE_KEY, JSON.stringify(this.data));
       return true;
-    } catch (e) {
+    } catch {
       // Quota exceeded: drop design journals from saved concepts and retry once.
       try {
         for (const c of this.data.lab.saved) if (c.design) c.design.journal = (c.design.journal || []).slice(-2);

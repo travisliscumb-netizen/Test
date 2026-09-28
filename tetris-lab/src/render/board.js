@@ -10,7 +10,6 @@
    over ~55ms, so motion is smooth while the logic stays exact. Offsets larger
    than a few cells (hard drops, wrap-around seams) snap instead. */
 
-import { BlockPainter } from './blocks.js';
 import { getLattice, SQUARE, HEX } from '../engine/lattice.js';
 import { colorOf, specialOf } from '../engine/board.js';
 import { pieceColor, rgba, lighten, HIGH_CONTRAST } from './theme.js';
@@ -317,10 +316,11 @@ export class BoardRenderer {
     for (const t of this.trails) {
       const a = 1 - t.t / 0.22;
       for (const col of t.cols) {
-        const w = this.pitch * 0.8;
+        const w = this.pitch * 0.62;
         const lg = ctx.createLinearGradient(0, col.y0, 0, col.y1);
         lg.addColorStop(0, rgba(col.color, 0));
-        lg.addColorStop(1, rgba(col.color, 0.55 * a));
+        lg.addColorStop(0.7, rgba(col.color, 0.12 * a));
+        lg.addColorStop(1, rgba(col.color, 0.38 * a));
         ctx.fillStyle = lg;
         ctx.fillRect(col.x - w / 2, col.y0, w, col.y1 - col.y0);
       }
@@ -393,6 +393,23 @@ export class BoardRenderer {
         this.painter.draw(ctx, L, 31, 0, x, y, U, 'flash');
       }
       ctx.globalAlpha = 1;
+    }
+
+    // Placement clock (timed placement concepts): a draining bar across the top.
+    if (g.rules.placement === 'timed' && g.active && g.phase === 'playing') {
+      const p = g.placeProgress;
+      const left = 1 - p;
+      const col = p < 0.5 ? '#3ee06a' : p < 0.8 ? '#ffd22e' : '#ff4d5e';
+      const pulse = p > 0.8 && !this.reduced ? 0.6 + 0.4 * Math.sin(this.time * 18) : 1;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, this.cssW, 6);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = this.reduced ? 0 : 10;
+      ctx.fillStyle = col;
+      ctx.fillRect((this.cssW * p) / 2, 0, this.cssW * left, 6);
+      ctx.restore();
     }
 
     // Active piece and ghost.

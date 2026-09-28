@@ -53,10 +53,9 @@ export function mount(root, params, app) {
         memory.focus = on ? [...memory.focus, a.id] : memory.focus.filter((x) => x !== a.id);
         e.currentTarget.setAttribute('aria-pressed', String(on));
       } }, a.title)));
-    let themeInput;
     const claudeBox = h('div', { class: memory.source === 'claude' ? '' : 'hidden', style: { display: 'grid', gap: '8px' } },
       h('label', { class: 'field' }, h('span', {}, 'Optional theme for Claude'),
-        themeInput = h('input', { type: 'text', value: memory.theme, maxlength: '120', placeholder: 'e.g. gravity that fights back', oninput: (e) => { memory.theme = e.target.value; } })));
+        h('input', { type: 'text', value: memory.theme, maxlength: '120', placeholder: 'e.g. gravity that fights back', oninput: (e) => { memory.theme = e.target.value; } })));
     const localBox = h('div', { class: memory.source === 'local' ? '' : 'hidden' }, h('div', { class: 'label-caps', style: { margin: '6px 0' } }, 'Focus (optional)'), focusChips);
 
     genBtn = h('button', { class: 'btn warm', id: 'lab-generate', onclick: () => startSession() }, icon('spark'), 'Generate designs');
@@ -77,7 +76,6 @@ export function mount(root, params, app) {
       h('div', { style: { marginTop: '14px' } },
         h('button', { class: 'btn small ghost', onclick: () => playRandom() }, icon('bolt'), 'Random experiment'),
         h('small', { class: 'faint', style: { display: 'block', marginTop: '6px' } }, 'An instant, validated but untested design — for the adventurous.')));
-    void themeInput;
 
     progressEl = h('i');
     stageEl = h('div', { class: 'muted', style: { minHeight: '1.4em' } }, running ? '' : memory.results.length ? `Last session: ${memory.results.filter((r) => r.verdict === 'accepted').length} of ${memory.results.length} designs accepted.` : 'Ready. Press Generate to start a session.');

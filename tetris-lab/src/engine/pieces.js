@@ -11,6 +11,7 @@
        rotation: 'srs' | 'srs-i' | 'srs-o' | 'rotate' | 'none' | 'flip' | 'full' | 'morph'
        morphs?: [[[x,y],...], ...]    extra shapes a 'morph' piece cycles through
        weight?: number                relative spawn weight (default 1)
+       fall?:   number                gravity multiplier: <1 drifts, >1 plummets (default 1)
        tags?:   [string]
      }
 
@@ -181,17 +182,14 @@ export function compilePiece(def, latticeId = 'square') {
     }
     for (let c = 0; c < chir; c++) {
       for (let i = 0; i < R; i++) {
-        const idx = c * R + i;
         trans.push({
           cw: c * R + ((i + 1) % R),
           ccw: c * R + ((i - 1 + R) % R),
           r180: R % 2 === 0 ? c * R + ((i + R / 2) % R) : -1,
           flip: chir === 2 ? (1 - c) * R + i : -1
         });
-        void idx;
       }
     }
-    if (latticeId === 'hex') for (const t of trans) t.r180 = R === 6 ? t.r180 : -1;
   }
 
   // Detect rotationally symmetric shapes so the bot does not waste work and the
@@ -243,6 +241,7 @@ export function compilePiece(def, latticeId = 'square') {
     distinctStates: distinct,
     colors,
     weight: Number.isFinite(def.weight) && def.weight > 0 ? def.weight : 1,
+    fall: Number.isFinite(def.fall) ? Math.max(0.25, Math.min(3, def.fall)) : 1,
     tags: Array.isArray(def.tags) ? def.tags.slice() : [],
     spawnW: w,
     spawnH: h,

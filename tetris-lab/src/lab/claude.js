@@ -48,20 +48,21 @@ const CELL = { type: 'array', items: { type: 'integer' } };
 const PIECE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'cells', 'rotation', 'connect', 'morphs'],
+  required: ['name', 'cells', 'rotation', 'connect', 'morphs', 'weight'],
   properties: {
     name: { type: 'string' },
     cells: { type: 'array', items: CELL },
     rotation: { type: 'string', enum: ['rotate', 'none', 'flip', 'full', 'morph'] },
     connect: { type: 'string', enum: ['edge', 'corner', 'loose'] },
-    morphs: { type: 'array', items: { type: 'array', items: CELL } }
+    morphs: { type: 'array', items: { type: 'array', items: CELL } },
+    weight: { type: 'string', enum: ['light', 'normal', 'heavy'] }
   }
 };
 const CONCEPT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['name', 'problem', 'rationale', 'lattice', 'width', 'height', 'wrap', 'pieces', 'clearRule', 'gaps', 'matchSize',
-    'colorMode', 'colors', 'gravityMode', 'garbageEvery', 'bombChance', 'wildChance', 'speedCurve'],
+    'colorMode', 'colors', 'gravityMode', 'garbageEvery', 'bombChance', 'wildChance', 'speedCurve', 'placement', 'placeSeconds'],
   properties: {
     name: { type: 'string' },
     problem: { type: 'string' },
@@ -80,7 +81,9 @@ const CONCEPT_SCHEMA = {
     garbageEvery: { type: 'integer' },
     bombChance: { type: 'number' },
     wildChance: { type: 'number' },
-    speedCurve: { type: 'string', enum: SPEED_CURVES }
+    speedCurve: { type: 'string', enum: SPEED_CURVES },
+    placement: { type: 'string', enum: ['gravity', 'timed'] },
+    placeSeconds: { type: 'number' }
   }
 };
 const RESPONSE_SCHEMA = {
@@ -101,6 +104,8 @@ WHAT THE ENGINE SUPPORTS (the whole design space):
 - gravityMode "naive" (rows above shift down) or "cascade" (every cell falls into holes, enabling chain reactions).
 - garbageEvery 0-40 (a garbage row rises every N pieces; 0 = off). bombChance 0-0.35 (chance a piece carries a bomb cell that blasts its neighbours when cleared). wildChance 0-0.35 (colour-match only: wildcard cells).
 - speedCurve "gentle" | "standard" | "steep".
+- placement "gravity" (pieces fall) or "timed" (no gravity: each piece hovers until placed, or drops itself after placeSeconds 1.5-10, shrinking with level).
+- each piece's weight: "light" (drifts at half speed), "normal", or "heavy" (falls about twice as fast).
 
 WHAT MAKES A DESIGN GOOD (this is how the critic scores it):
 - A simulated average player should last most of a 200-piece test without it being trivial: the stack should average 30-60% of the well.
@@ -171,6 +176,7 @@ export function toConcept(raw, index = 0) {
     connect: p?.connect || 'edge',
     color: colors[i % colors.length],
     weight: 1,
+    ...(p?.weight === 'light' ? { fall: 0.5 } : p?.weight === 'heavy' ? { fall: 2 } : {}),
     tags: ['claude']
   }));
   return {
@@ -189,6 +195,7 @@ export function toConcept(raw, index = 0) {
     specials: { bomb: r.bombChance, wild: r.wildChance },
     scoring: { kind: 'lab' },
     speed: { curve: r.speedCurve, linesPerLevel: 10 },
+    placement: { mode: r.placement === 'timed' ? 'timed' : 'gravity', seconds: r.placeSeconds },
     design: {
       archetype: 'claude',
       archetypeTitle: 'Claude original',

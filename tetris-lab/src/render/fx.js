@@ -110,9 +110,15 @@ export class FX {
 
   draw() {
     const ctx = this.ctx;
+    const idle = !this.count && !this.rings.length;
+    // Nothing to draw and nothing left on the canvas: skip the full-screen clear.
+    if (idle && this.clean) return;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.w, this.h);
-    if (!this.count && !this.rings.length) return;
+    this.clean = idle;
+    // An idle transparent full-screen layer still costs compositing: hide it.
+    this.canvas.style.visibility = idle ? 'hidden' : 'visible';
+    if (idle) return;
     ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < this.count; i++) {
       const t = this.life[i] / this.max[i];
@@ -149,4 +155,6 @@ export class FX {
 
   get active() { return this.count > 0 || this.rings.length > 0; }
   clear() { this.count = 0; this.rings = []; }
+  // Particles are soft; a lower backing resolution is indistinguishable and far cheaper.
+  static maxDpr = 1.25;
 }

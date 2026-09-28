@@ -79,7 +79,7 @@ export function mount(root, params, app) {
     return h('div', { class: 'piece-tile' },
       pieceCanvas(app, concept.lattice, p, { w: 84, hgt: 64, unit: 16, palette: pal }),
       h('b', {}, p.name),
-      h('span', {}, `${p.cells.length} cells · ${ROTATION_LABELS[p.rotation] || 'Rotates'}${p.connect === 'corner' ? ' · diagonal' : p.connect === 'loose' ? ' · gapped' : ''}`),
+      h('span', {}, `${p.cells.length} cells · ${ROTATION_LABELS[p.rotation] || 'Rotates'}${p.connect === 'corner' ? ' · diagonal' : p.connect === 'loose' ? ' · gapped' : ''}${p.fall > 1 ? ' · heavy' : p.fall < 1 ? ' · light' : ''}`),
       states > 1 ? orient : h('span', { class: 'faint' }, 'Symmetric'));
   }
 
@@ -104,7 +104,7 @@ export function mount(root, params, app) {
           ['Avg stack height', `${Math.round(m.avgHeight * 100)}%`], ['Pieces per clear', String(m.piecesPerClear)], ['Good options / turn', String(m.goodOptions)],
           ['Rotation used', `${Math.round(m.rotationUse * 100)}%`], ['Chain rate', `${(m.chainRate * 100).toFixed(1)}%`], ['Sim speed', `${m.msPerPiece} ms/piece`]]
           .map(([k, v]) => h('div', { class: 'cell' }, h('div', { class: 'label-caps' }, k), h('div', { class: 'v' }, v)))),
-      h('p', { class: 'faint', style: { marginTop: '10px' } }, 'Measured over simulated games by an expert bot and a human-like bot whose skill fades as the speed rises.')) : null;
+      h('p', { class: 'faint', style: { marginTop: '10px' } }, 'Measured over simulated games by an expert bot and a human-like bot whose accuracy drops with rising speed, a shrinking placement clock and heavy pieces.')) : null;
 
     const journal = d().journal?.length ? h('div', { class: 'panel' },
       h('h2', {}, icon('edit'), 'Design journal'),

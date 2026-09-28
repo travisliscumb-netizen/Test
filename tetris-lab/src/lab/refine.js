@@ -177,6 +177,8 @@ const FIX = {
     for (const p of fixed) p.rotation = p.rotation === 'flip' ? 'full' : 'rotate';
     return `gave ${fixed.length} fixed piece${fixed.length > 1 ? 's' : ''} full rotation`;
   },
+  moreTime: (c) => (c.placement?.mode === 'timed' && c.placement.seconds < 8 ? (c.placement.seconds = Math.min(8, c.placement.seconds + 1), `gave each piece ${c.placement.seconds.toFixed(1)}s on the clock`) : null),
+  lessTime: (c) => (c.placement?.mode === 'timed' && c.placement.seconds > 2 ? (c.placement.seconds = Math.max(2, c.placement.seconds - 0.75), `cut the placement clock to ${c.placement.seconds.toFixed(1)}s`) : null),
   moreBombs: (c) => {
     const b = c.specials?.bomb || 0;
     if (b >= 0.3) return null;
@@ -206,8 +208,8 @@ const FIX = {
 };
 
 const PLAYBOOK = {
-  'too-hard': ['relaxClearIfColor', 'widen', 'gentler', 'lessGarbage', 'shrinkLargest', 'relaxClear', 'addRelief', 'taller', 'moreBombs'],
-  'too-easy': ['narrow', 'steeper', 'growSmallest', 'moreGarbage', 'tightenClear', 'shorter'],
+  'too-hard': ['relaxClearIfColor', 'moreTime', 'widen', 'gentler', 'lessGarbage', 'shrinkLargest', 'relaxClear', 'addRelief', 'taller', 'moreBombs'],
+  'too-easy': ['lessTime', 'narrow', 'steeper', 'growSmallest', 'moreGarbage', 'tightenClear', 'shorter'],
   tedious: ['addBar', 'relaxClear', 'moreBombs', 'shrinkLargest'],
   'flat-decisions': ['addChiral', 'enableRotation', 'growSmallest', 'narrow'],
   'inert-mechanic': [],

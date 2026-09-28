@@ -31,7 +31,8 @@ export function simulate(rules, { games = 3, pieces = 200, seed = 1, playerSkill
     errors: [], invariantFailures: 0, msPerPiece: 0, placements: 0, timedOut: false
   };
   const curve = rules.concept?.speed?.curve || 'standard';
-  const pressure = SPEED_PRESSURE[curve] ?? 0.02;
+  // A placement clock is milder pressure than gravity: there is always time to think.
+  const pressure = (SPEED_PRESSURE[curve] ?? 0.02) * (rules.placement === 'timed' ? 0.7 : 1);
 
   for (const role of ['expert', 'player']) {
     for (let gi = 0; gi < games; gi++) {
@@ -55,7 +56,16 @@ export function simulate(rules, { games = 3, pieces = 200, seed = 1, playerSkill
         while (!game.isOver && game.stats.pieces < pieces && guard-- > 0) {
           const a = game.active;
           if (!a) { out.errors.push('no active piece while playing'); break; }
-          if (role === 'player') bot.skill = Math.max(0.1, playerSkill - pressure * (game.stats.level - 1));
+          if (role === 'player') {
+            // The instant simulation has no clock, so model pressure as lost
+            // accuracy: rising speed, a shrinking placement clock, heavy pieces.
+            let skill = playerSkill - pressure * (game.stats.level - 1);
+            if (rules.placement === 'timed') skill += (rules.placeSeconds(game.stats.level) - 3.5) * 0.05;
+            const fall = a.p.fall || 1;
+            if (fall > 1) skill -= 0.14 * (fall - 1);
+            else if (fall < 1) skill += 0.1 * (1 - fall);
+            bot.skill = Math.max(0.05, Math.min(1, skill));
+          }
           const list = bot.placements(game.board, a.inst.p, a.inst.colors, a.inst.specials);
           if (!list.length) { game.hardDrop(); continue; }
           list.sort((x, y) => y.score - x.score);

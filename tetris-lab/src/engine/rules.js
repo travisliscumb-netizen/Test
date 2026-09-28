@@ -18,6 +18,7 @@ export const GRAVITY_MODES = ['naive', 'cascade'];
 export const COLOR_MODES = ['piece', 'random-piece', 'random-cells'];
 export const GENERATORS = ['bag', 'weighted'];
 export const SPEED_CURVES = ['gentle', 'standard', 'steep'];
+export const PLACEMENTS = ['gravity', 'timed'];
 
 export const LIMITS = {
   width: [5, 20],
@@ -28,7 +29,8 @@ export const LIMITS = {
   garbageEvery: [0, 40],
   specialChance: [0, 0.35],
   linesPerLevel: [4, 30],
-  startLevel: [1, 20]
+  startLevel: [1, 20],
+  placeSeconds: [1.5, 10]
 };
 
 const clamp = (v, [lo, hi], dflt) => {
@@ -104,6 +106,10 @@ export function normalizeConcept(c) {
       curve: oneOf(src.speed?.curve, SPEED_CURVES, 'standard'),
       linesPerLevel: clampInt(src.speed?.linesPerLevel, LIMITS.linesPerLevel, 10)
     },
+    placement: {
+      mode: oneOf(src.placement?.mode, PLACEMENTS, 'gravity'),
+      seconds: clamp(src.placement?.seconds, LIMITS.placeSeconds, 4)
+    },
     hold: src.hold !== false,
     design: src.design && typeof src.design === 'object' ? src.design : undefined,
     metrics: src.metrics && typeof src.metrics === 'object' ? src.metrics : undefined
@@ -172,6 +178,9 @@ export function compileRules(concept) {
     lockResets: 15,
     clearDelay,
     hold: c.hold,
+    placement: c.placement.mode,
+    /** Seconds a timed-placement piece may hover before it drops itself. */
+    placeSeconds: (level) => Math.max(1.2, c.placement.seconds * Math.pow(0.94, level - 1)),
     maxLevel: 30
   };
 }

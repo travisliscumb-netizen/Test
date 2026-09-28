@@ -106,6 +106,14 @@ export class Game {
 
   msPerRow() { return this.rules.msPerRow(this.stats.level); }
 
+  /** Milliseconds a timed-placement piece may hover. */
+  placeLimit() { return this.rules.placeSeconds(this.stats.level) * 1000; }
+
+  /** 0..1 progress of the placement clock (timed placement only). */
+  get placeProgress() {
+    return this.rules.placement === 'timed' && this.active ? Math.min(1, (this.placeTimer || 0) / this.placeLimit()) : 0;
+  }
+
   tick(dt) {
     if (!(dt > 0)) return;
     dt = Math.min(dt, 250); // a backgrounded tab must not teleport the piece
@@ -126,10 +134,21 @@ export class Game {
 
     const a = this.active;
     const st = a.p.states[a.s];
-    let ms = this.msPerRow();
+    const timed = this.rules.placement === 'timed';
     const soft = this.softDrop;
-    if (soft) ms = Math.min(ms / (this.softFactor || 20), 50);
-    this.gravityAcc += dt;
+    if (timed) {
+      // Clockwork placement: no gravity; the piece drops itself when time runs out.
+      this.placeTimer += dt;
+      if (this.placeTimer >= this.placeLimit()) {
+        this.emit({ type: 'timeout' });
+        this.hardDrop();
+        return;
+      }
+    }
+    let ms = timed ? Infinity : this.msPerRow() / a.p.fall;
+    if (soft) ms = Math.min(this.msPerRow() / (this.softFactor || 20), 50);
+    // No gravity (timed placement): never bank time, or soft drop would teleport.
+    this.gravityAcc = ms === Infinity ? 0 : this.gravityAcc + dt;
     let guard = this.board.h + 2;
     while (this.gravityAcc >= ms && guard-- > 0) {
       this.gravityAcc -= ms;
@@ -355,6 +374,7 @@ export class Game {
     this.gravityAcc = 0;
     this.lockTimer = 0;
     this.lockResets = 0;
+    this.placeTimer = 0;
     this.lowestY = this.active.y;
     this.lastAction = 'spawn';
     this.lastKick = 0;

@@ -38,6 +38,8 @@ export function novelty(concept) {
   if (pieces.some((p) => p.connect === 'corner' || p.connect === 'loose')) n += 0.2;
   const nonClassic = pieces.filter((p) => !(p.tags || []).includes('classic')).length;
   n += 0.4 * (pieces.length ? nonClassic / pieces.length : 0);
+  if (concept.placement?.mode === 'timed') n += 0.3;
+  if (pieces.some((p) => p.fall && p.fall !== 1)) n += 0.15;
   const sizes = new Set(pieces.map((p) => p.cells.length));
   if (sizes.size >= 3) n += 0.05;
   return clamp01(n);

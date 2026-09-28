@@ -41,7 +41,7 @@ export function mount(root, params, app) {
   const unit = rules.progressUnit === 'groups' ? 'Groups' : 'Lines';
 
   /* --------------------------------------------------- DOM -------- */
-  const dpr = Math.min(2.5, devicePixelRatio || 1);
+  const dpr = Math.min(2, devicePixelRatio || 1);
   const boardCanvas = h('canvas', { 'aria-label': `${title} well`, role: 'img' });
   const popups = h('div', { class: 'popups', 'aria-live': 'assertive' });
   const frame = h('div', { class: 'well-frame' }, boardCanvas, popups);
@@ -77,7 +77,7 @@ export function mount(root, params, app) {
     h('div', { class: 'hud-box' },
       h('div', { class: 'stats-grid' }, S.level.el, S.lines.el, S.time.el, S.pieces.el),
       h('div', { class: 'levelbar', title: 'Progress to next level' }, levelBar)),
-    h('div', { class: 'hud-box' }, h('div', { class: 'label-caps' }, subtitle), h('div', { style: { fontWeight: 600, fontSize: '1.05rem' } }, title), goalLine),
+    h('div', { class: 'hud-box mode-box' }, h('div', { class: 'label-caps' }, subtitle), h('div', { style: { fontWeight: 600, fontSize: '1.05rem' } }, title), goalLine),
     h('div', { class: 'hud-actions' }, pauseBtn));
   const right = h('aside', { class: 'side right', 'aria-label': 'Next pieces and score' },
     h('div', { class: 'hud-box' }, h('div', { class: 'label-caps' }, h('span', {}, 'Next')), nextCanvas),
@@ -85,8 +85,8 @@ export function mount(root, params, app) {
   const mobileHud = h('div', { class: 'mobile-hud' },
     h('div', { class: 'hud-box', onclick: () => session.game.holdPiece() }, h('div', { class: 'label-caps' }, 'Hold'), mHold),
     h('div', { class: 'hud-box mid' }, M.score.el, M.level.el, M.lines.el, M.time.el),
-    h('div', { class: 'hud-box', style: { position: 'relative' } }, h('div', { class: 'label-caps' }, 'Next'), mNext,
-      h('button', { class: 'iconbtn', 'aria-label': 'Pause', style: { position: 'absolute', top: '-4px', right: '-4px', width: '34px', height: '34px' }, onclick: () => pause() }, icon('pause'))));
+    h('div', { class: 'hud-box' }, h('div', { class: 'label-caps' }, 'Next'), mNext),
+    h('button', { class: 'iconbtn m-pause', 'aria-label': 'Pause', onclick: () => pause() }, icon('pause')));
 
   const canFlip = rules.pieces.some((p) => p.trans[0].flip >= 0 && p.rotation === 'full');
   const touchBtn = (action, ico, label, cls = '') => {
@@ -134,6 +134,7 @@ export function mount(root, params, app) {
   let unlockedThisGame = [];
   let hexLines = 0;
   let countdownEl = null;
+  let lastTick = 0;
 
   function newGame() {
     const seed = randomSeed();
@@ -181,6 +182,8 @@ export function mount(root, params, app) {
     const wantTouch = settings.touch === 'buttons' || settings.touch === 'gestures' || (settings.touch === 'auto' && app.touchDevice);
     touch.classList.toggle('on', wantTouch && settings.touch !== 'off');
     touch.classList.toggle('gestures-only', settings.touch === 'gestures');
+    // Short landscape screens: the touch clusters become grid columns beside the HUD.
+    root.classList.toggle('touch-cols', touch.classList.contains('on') && settings.touch !== 'gestures' && innerWidth > innerHeight && innerHeight <= 560);
     if (settings.touch === 'gestures') for (const b of touch.querySelectorAll('.touch-btn')) b.classList.toggle('hidden', !/Hold|Hard drop/.test(b.getAttribute('aria-label')));
     else for (const b of touch.querySelectorAll('.touch-btn')) b.classList.remove('hidden');
     const fit = () => {
@@ -199,17 +202,22 @@ export function mount(root, params, app) {
         availH = root.clientHeight - padY - mobileHud.getBoundingClientRect().height - gap - touchH;
       } else {
         const gap = parseFloat(cs.columnGap) || 20;
-        const sideW = left.getBoundingClientRect().width + right.getBoundingClientRect().width;
-        availW = root.clientWidth - padX - sideW - gap * 2;
+        let others = left.getBoundingClientRect().width + right.getBoundingClientRect().width;
+        let gaps = 2;
+        if (root.classList.contains('touch-cols')) {
+          for (const g of touch.querySelectorAll('.grp')) others += g.getBoundingClientRect().width;
+          gaps = 4;
+        }
+        availW = root.clientWidth - padX - others - gap * gaps;
         availH = root.clientHeight - padY;
-        if (touch.classList.contains('on')) availW -= 0;
       }
-      const size = renderer.resize(Math.max(80, availW - 14), Math.max(120, availH - 14), dpr);
+      const size = renderer.resize(Math.max(80, availW - 14), Math.max(120, availH - 14), app.quality === 'lite' ? Math.min(1.5, dpr) : dpr);
       gestures.setCell(renderer.pitch);
       sizePreview(holdCanvas, 130, 84);
       sizePreview(nextCanvas, 130, Math.min(360, Math.max(200, size.h * 0.55)));
-      sizePreview(mHold, 64, 44);
-      sizePreview(mNext, 120, 44);
+      const narrow = innerWidth < 400;
+      sizePreview(mHold, narrow ? 48 : 60, 44);
+      sizePreview(mNext, narrow ? 84 : 110, 44);
       queueSig = holdSig = '';
     };
     fit();
@@ -290,7 +298,7 @@ export function mount(root, params, app) {
     const linesTxt = goal?.type === 'lines' ? `${Math.min(st.lines, goal.value)}/${goal.value}` : String(progress);
     S.lines.v.textContent = linesTxt; M.lines.v.textContent = linesTxt;
     const t = fmtTime(timeMs).slice(0, -1);
-    S.time.v.textContent = t; M.time.v.textContent = t;
+    S.time.v.textContent = t; M.time.v.textContent = t.slice(0, -2);
     S.pieces.v.textContent = String(st.pieces);
     S.pps.v.textContent = pps;
     S.pps.el.firstChild.textContent = 'Pieces / sec';
@@ -306,8 +314,12 @@ export function mount(root, params, app) {
   /* ------------------------------------------------------ feedback -- */
   function popup(big, small, color, cls = '') {
     if (!big && !small) return;
-    const el = h('div', { class: `pop ${cls}`, style: { '--pc': color || 'var(--accent)' } },
+    // Popups that overlap in time take successive vertical slots.
+    const live = [...popups.querySelectorAll(`.pop.${cls || 'label'}`)].filter((p) => !p.dataset.done);
+    const slot = live.length;
+    const el = h('div', { class: `pop ${cls || 'label'}`, style: { '--pc': color || 'var(--accent)', '--slot': String(slot) } },
       big ? h('span', { class: 'big' }, big) : null, small ? h('span', { class: 'small' }, small) : null);
+    setTimeout(() => { el.dataset.done = '1'; }, 700);
     popups.append(el);
     while (popups.children.length > 5) popups.firstChild.remove();
     setTimeout(() => el.remove(), 1300);
@@ -322,7 +334,7 @@ export function mount(root, params, app) {
       unlockedThisGame.push(a);
       app.audio.play('achievement');
       // On phones the HUD sits where toasts appear; hold them for the results screen.
-      if (innerWidth > 760 || session.over) toast(`Achievement: ${a.name}`, a.desc, { iconName: 'medal' });
+      if ((innerWidth > 760 && innerHeight > 560) || session.over) toast(`Achievement: ${a.name}`, a.desc, { iconName: 'medal' });
       else popup('', `★ ${a.name}`, '#ffd22e', 'points');
     }
   }
@@ -346,6 +358,7 @@ export function mount(root, params, app) {
         case 'lock': app.audio.play('lock'); break;
         case 'hold': app.audio.play('hold'); break;
         case 'garbage': app.audio.play('garbage'); doShake(3); break;
+        case 'timeout': popup('', 'TIME!', '#ff4d5e', 'points'); break;
         case 'tspin': app.audio.play('tspin'); popup(e.mini ? 'MINI T-SPIN' : 'T-SPIN', `+${fmtNum(e.points)}`, PALETTE[3]); break;
         case 'clear': onClear(e); break;
         case 'perfect':
@@ -374,7 +387,6 @@ export function mount(root, params, app) {
   }
 
   function onClear(e) {
-    const g = session.game;
     const n = e.lines || e.groups || 1;
     if (e.chain > 1) app.audio.play('chain', e); else app.audio.play('clear', { lines: n, combo: e.combo });
     if (e.tspin && e.lines) app.audio.play('tspin');
@@ -406,7 +418,6 @@ export function mount(root, params, app) {
     if (e.clutch) unlock('clutch');
     if (isLab && e.chain >= 3) unlock('lab-chain');
     if (isLab && rules.lattice === 'hex') { hexLines += e.lines; if (hexLines >= 20) unlock('hex'); }
-    void g;
   }
 
   function summary(completed) {
@@ -464,7 +475,7 @@ export function mount(root, params, app) {
     const cells = [
       [unit, String(rules.progressUnit === 'groups' ? sum.groups : sum.lines)], ['Level', String(sum.level)], ['Time', fmtTime(sum.timeMs)],
       ['Pieces/sec', sum.timeMs > 0 ? (sum.pieces / (sum.timeMs / 1000)).toFixed(2) : '0'], ['Best combo', String(sum.maxCombo)],
-      isLab ? ['Best chain', String(sum.maxChain)] : ['Tetris · T-Spin', `${sum.tetrises} · ${sum.tspins}`]
+      isLab ? ['Best chain', String(sum.maxChain)] : ['Tetris · Spin', `${sum.tetrises} · ${sum.tspins}`]
     ];
     // A finished Sprint shows its time as the hero number, so list the score instead.
     if (mode === 'sprint' && completed) cells[2] = ['Score', fmtNum(sum.score)];
@@ -584,6 +595,12 @@ export function mount(root, params, app) {
         frame.style.transform = `translate(${(Math.random() - 0.5) * shake}px, ${(Math.random() - 0.3) * shake}px)`;
       } else if (frame.style.transform) frame.style.transform = '';
       comboBoost = Math.max(0, comboBoost - dt * 0.12);
+      // Placement clock: tick in the last second.
+      if (rules.placement === 'timed' && g.active && session.started && !session.paused) {
+        const leftMs = g.placeLimit() - (g.placeTimer || 0);
+        const sec = Math.ceil(leftMs / 333);
+        if (leftMs < 1000 && sec !== lastTick) { lastTick = sec; app.audio.play('countdown', { go: false }); }
+      }
       const intensity = session.paused ? 0.1 : Math.min(1, 0.25 + (g.stats.level - 1) * 0.045 + g.danger * 0.4 + comboBoost * 0.3);
       if (!session.paused) app.audio.setIntensity(intensity, g.danger, g.stats.level);
     },

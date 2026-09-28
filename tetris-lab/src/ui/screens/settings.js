@@ -4,7 +4,6 @@ import { THEMES } from '../../render/theme.js';
 import { BlockPainter } from '../../render/blocks.js';
 import { CLAUDE_MODELS, looksLikeKey } from '../../lab/claude.js';
 import { keyLabel } from './help.js';
-import { SOUND_NAMES } from '../../audio/audio.js';
 
 const ACTION_LABELS = { left: 'Move left', right: 'Move right', soft: 'Soft drop', hard: 'Hard drop', cw: 'Rotate clockwise', ccw: 'Rotate counter-clockwise', r180: 'Rotate 180°', flip: 'Mirror', hold: 'Hold', pause: 'Pause' };
 const STYLE_NAMES = { gem: 'Gem', jelly: 'Jelly', glass: 'Glass', neon: 'Neon', retro: 'Retro', flat: 'Flat (high clarity)' };
@@ -125,7 +124,6 @@ export function mount(root, params, app) {
           if (!(await confirmDialog('Are you absolutely sure?', 'There is no undo. Consider exporting first.', { ok: 'Erase everything', danger: true }))) return;
           save.resetAll(); app.applySettings(); render(); toast('All data erased');
         } }, icon('trash'), 'Erase')));
-      void SOUND_NAMES;
     }
   }
 

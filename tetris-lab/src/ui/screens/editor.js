@@ -27,7 +27,28 @@ export function mount(root, params, app) {
   const piecesEl = h('div', { class: 'panel' });
   const statusEl = h('div', { class: 'panel' });
 
-  const changed = () => { dirty = true; c.design.verdict = 'untested'; schedule(); };
+  // Undo history: a snapshot of the working copy before every change.
+  const history = [];
+  const snapshot = () => JSON.stringify({ ...c, design: undefined, metrics: undefined });
+  let lastSnap = snapshot();
+  const changed = () => {
+    history.push(lastSnap);
+    if (history.length > 60) history.shift();
+    lastSnap = snapshot();
+    dirty = true; c.design.verdict = 'untested'; schedule();
+  };
+  const undo = () => {
+    const prev = history.pop();
+    if (!prev) return;
+    const restored = JSON.parse(prev);
+    for (const k of Object.keys(c)) if (k !== 'design' && k !== 'metrics') delete c[k];
+    Object.assign(c, restored);
+    lastSnap = prev;
+    if (sel >= c.pieces.length) sel = c.pieces.length - 1;
+    form = 0;
+    app.audio.play('back');
+    renderRules(); renderPieces(); renderStatus();
+  };
   let timer = null;
   const schedule = () => { clearTimeout(timer); timer = setTimeout(renderStatus, 120); };
 
@@ -45,6 +66,7 @@ export function mount(root, params, app) {
     const nameIn = h('input', { type: 'text', value: c.name, maxlength: '40', 'aria-label': 'Design name', oninput: (e) => { c.name = e.target.value || 'Untitled'; dirty = true; } });
     const garbageText = (v) => (v ? `A row rises every ${v} pieces` : 'Off');
     const gSub = h('small', {}, garbageText(c.garbage?.every || 0));
+    const tSub = h('small', {}, `${Number(c.placement?.seconds ?? 4).toFixed(2)}s at level 1, shrinking 6% per level`);
     add(rulesEl, 
       h('h2', {}, icon('gear'), 'Rules'),
       h('label', { class: 'field' }, h('span', {}, 'Name'), nameIn),
@@ -66,7 +88,10 @@ export function mount(root, params, app) {
       rule === 'color-match' ? row('Wild cells', slider(c.specials?.wild || 0, 0, 0.35, 0.01, (v) => { c.specials = { ...(c.specials || {}), wild: v }; changed(); }, 'Wild chance')) : null,
       h('div', { class: 'setting' }, h('div', { class: 'txt' }, h('b', {}, 'Rising garbage'), gSub),
         slider(c.garbage?.every || 0, 0, 30, 1, (v) => { c.garbage = { every: v }; changed(); gSub.textContent = garbageText(v); }, 'Garbage interval')),
-      row('Speed curve', seg([['gentle', 'Gentle'], ['standard', 'Standard'], ['steep', 'Steep']], c.speed?.curve || 'standard', (v) => { c.speed = { ...(c.speed || {}), curve: v }; changed(); }, 'Speed curve')));
+      row('Speed curve', seg([['gentle', 'Gentle'], ['standard', 'Standard'], ['steep', 'Steep']], c.speed?.curve || 'standard', (v) => { c.speed = { ...(c.speed || {}), curve: v }; changed(); }, 'Speed curve')),
+      row('Placement', seg([['gravity', 'Gravity'], ['timed', 'Clock (no gravity)']], c.placement?.mode || 'gravity', (v) => { c.placement = { seconds: 4, ...(c.placement || {}), mode: v }; changed(); renderRules(); }, 'Placement')),
+      c.placement?.mode === 'timed' ? h('div', { class: 'setting' }, h('div', { class: 'txt' }, h('b', {}, 'Time per piece'), tSub),
+        slider(c.placement.seconds ?? 4, 1.5, 10, 0.25, (v) => { c.placement.seconds = v; tSub.textContent = `${v.toFixed(2)}s at level 1, shrinking 6% per level`; changed(); }, 'Seconds per piece')) : null);
   }
 
   function renderPieces() {
@@ -96,6 +121,7 @@ export function mount(root, params, app) {
             seg(forms.map((_, i) => [i, `Form ${i + 1}`]), form, (v) => { form = v; renderPieces(); }, 'Morph form'))
           : row('Rotation', seg(ROT_OPTS, p.rotation === 'srs' || p.rotation === 'srs-i' || p.rotation === 'srs-o' ? 'rotate' : p.rotation, (v) => { p.rotation = v; changed(); }, 'Rotation')),
         row('Cells join by', seg(CONNECT_OPTS, p.connect || 'edge', (v) => { p.connect = v; changed(); }, 'Connectivity')),
+        row('Weight', seg([[0.5, 'Light'], [1, 'Normal'], [2, 'Heavy']], p.fall && p.fall < 1 ? 0.5 : p.fall > 1 ? 2 : 1, (v) => { if (v === 1) delete p.fall; else p.fall = v; changed(); }, 'Weight')),
         h('div', { class: 'label-caps' }, 'Tap cells to edit the shape'),
         c.lattice === 'hex' ? hexGrid(forms, p) : squareGrid(forms, p)));
   }
@@ -188,6 +214,7 @@ export function mount(root, params, app) {
       validation.warnings.length ? h('ul', { style: { margin: '0 0 8px', paddingLeft: '18px', color: '#ffe27a' } }, validation.warnings.slice(0, 4).map((e) => h('li', {}, e))) : null,
       d.verdict !== 'untested' && d.weaknesses?.length ? h('ul', { style: { margin: '0 0 8px', paddingLeft: '18px', color: 'var(--text-dim)' } }, d.weaknesses.slice(0, 3).map((e) => h('li', {}, e))) : null,
       h('div', { class: 'row', style: { marginTop: '10px' } },
+        h('button', { class: 'btn ghost', id: 'undo-edit', disabled: history.length ? null : true, 'aria-label': 'Undo last change', onclick: undo }, icon('ccw'), 'Undo'),
         h('button', { class: 'btn warm', id: 'test-design', disabled: !validation.ok || testing ? true : null, onclick: test }, icon('robot'), testing ? 'Testing…' : 'Test design'),
         h('button', { class: 'btn', disabled: !validation.ok ? true : null, onclick: () => app.go('play', { kind: 'lab', concept: JSON.parse(JSON.stringify(c)) }) }, icon('play'), 'Play'),
         inCollection ? h('button', { class: 'btn good', disabled: !validation.ok ? true : null, onclick: () => doSave(false) }, icon('save'), 'Save changes') : null,
@@ -253,7 +280,11 @@ export function mount(root, params, app) {
 
   return {
     bgState: () => ({ intensity: testing ? 0.45 : 0.18 }),
-    key(e) { if (e.key === 'Escape') { leave(); return true; } return false; },
+    key(e) {
+      if (e.key === 'Escape') { leave(); return true; }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.target.matches?.('input')) { e.preventDefault(); undo(); return true; }
+      return false;
+    },
     unmount() { clearTimeout(timer); if (testing) cancelLabJob(); }
   };
 }

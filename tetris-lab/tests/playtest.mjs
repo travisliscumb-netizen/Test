@@ -155,9 +155,10 @@ async function playByKeyboard(page, n) {
   check('editing marks the design untested', (await page.locator('.verdict.untested').count()) >= 1);
   if (await page.locator('text=Not playable yet').count()) {
     check('invalid edits are explained, not crashed', true);
-    // Undo the edit (toggle the same cell back) and continue with a valid design.
-    await page.locator('.editor-grid button[aria-pressed="true"], .hex-editor button[aria-pressed="true"]').last().click();
+    // Undo the edit and continue with a valid design.
+    await page.locator('#undo-edit').click();
     await page.waitForTimeout(250);
+    check('undo restores the previous shape', (await page.locator('text=Not playable yet').count()) === 0);
   }
   const valid = await page.locator('text=Valid: safe to play and test').count();
   check('the edited design validates', valid === 1);
