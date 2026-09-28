@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   reducedMotion: false,
   effects: CONFIG.SNOW_EFFECTS,
   touch: 'auto', // auto | on | off
+  touchSteer: 'finger', // finger: skier follows your finger | pad: on-screen arrows
   seedMode: 'random', // random | fixed
   seed: '',
 };
@@ -50,6 +51,7 @@ export function sanitize(raw) {
     reducedMotion: typeof st.reducedMotion === 'boolean' ? st.reducedMotion : d.reducedMotion,
     effects: typeof st.effects === 'boolean' ? st.effects : d.effects,
     touch: ['auto', 'on', 'off'].includes(st.touch) ? st.touch : d.touch,
+    touchSteer: ['finger', 'pad'].includes(st.touchSteer) ? st.touchSteer : d.touchSteer,
     seedMode: ['random', 'fixed'].includes(st.seedMode) ? st.seedMode : d.seedMode,
     seed: typeof st.seed === 'string' ? st.seed.slice(0, 24) : d.seed,
   };

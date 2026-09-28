@@ -1,5 +1,7 @@
 // Keyboard first (arrows or WASD, Space, F), with the original's mouse
-// steering (the skier points at the cursor) and on-screen touch buttons.
+// steering (the skier points at the cursor). On touch screens the same idea
+// works with a finger: the skier heads for wherever you're touching, a quick
+// swipe up or down does a trick, and HOP / TURBO are buttons.
 // Produces one plain state object per frame for the simulation.
 
 const KEYMAP = {
@@ -16,8 +18,11 @@ export class Input {
     this.keys = { left: false, right: false, up: false, down: false, jump: false, turbo: false };
     this.touch = { left: false, right: false, up: false, down: false, jump: false, turbo: false };
     this.mouse = { active: false, x: 0, y: 0, down: false, moved: 0 };
+    this.finger = { id: null, x: 0, y: 0, x0: 0, y0: 0, t0: 0 };
     // A tap can start and end between two frames; latch it so it still counts.
     this.jumpLatch = false;
+    this.upLatch = false;
+    this.downLatch = false;
     this.handlers = {}; // pause, restart, confirm, any
     this.capture = false; // true while a run is live: swallow game keys
 
@@ -53,6 +58,33 @@ export class Input {
       this.mouse.down = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Finger steering.
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' || this.finger.id !== null) return;
+      e.preventDefault();
+      canvas.setPointerCapture?.(e.pointerId);
+      Object.assign(this.finger, { id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
+      this.handlers.any?.();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== this.finger.id) return;
+      this.finger.x = e.clientX;
+      this.finger.y = e.clientY;
+    });
+    const lift = (e) => {
+      if (e.pointerId !== this.finger.id) return;
+      const f = this.finger;
+      const dx = e.clientX - f.x0, dy = e.clientY - f.y0;
+      // A quick vertical flick is a trick (up = backflip, down = spread eagle).
+      if (performance.now() - f.t0 < 350 && Math.abs(dy) > 45 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+        if (dy < 0) this.upLatch = true;
+        else this.downLatch = true;
+      }
+      f.id = null;
+    };
+    canvas.addEventListener('pointerup', lift);
+    canvas.addEventListener('pointercancel', lift);
   }
 
   on(name, fn) {
@@ -95,7 +127,11 @@ export class Input {
     if (!k) return;
     if (this.capture) e.preventDefault();
     this.keys[k] = down;
-    if (down && k === 'jump' && !e.repeat) this.jumpLatch = true;
+    if (down && !e.repeat) {
+      if (k === 'jump') this.jumpLatch = true;
+      if (k === 'up') this.upLatch = true;
+      if (k === 'down') this.downLatch = true;
+    }
     // Steering with keys hands control back from the mouse.
     if (down && (k === 'left' || k === 'right' || k === 'up')) {
       this.mouse.active = false;
@@ -129,7 +165,8 @@ export class Input {
     for (const k in this.keys) this.keys[k] = false;
     for (const k in this.touch) this.touch[k] = false;
     this.mouse.down = false;
-    this.jumpLatch = false;
+    this.jumpLatch = this.upLatch = this.downLatch = false;
+    this.finger.id = null;
     document.querySelectorAll?.('.held').forEach((el) => el.classList.remove('held'));
   }
 
@@ -139,14 +176,21 @@ export class Input {
     const s = {
       left: k.left || t.left,
       right: k.right || t.right,
-      up: k.up || t.up,
-      down: k.down || t.down,
+      up: k.up || t.up || this.upLatch,
+      down: k.down || t.down || this.downLatch,
       jump: k.jump || t.jump || this.mouse.down || this.jumpLatch,
       turbo: k.turbo || t.turbo,
       aim: null,
     };
-    if (this.mouse.active && !s.left && !s.right && aimFn) s.aim = aimFn(this.mouse.x, this.mouse.y);
-    this.jumpLatch = false;
+    if (aimFn && !s.left && !s.right) {
+      if (this.finger.id !== null) s.aim = aimFn(this.finger.x, this.finger.y);
+      else if (this.mouse.active) s.aim = aimFn(this.mouse.x, this.mouse.y);
+    }
+    this.jumpLatch = this.upLatch = this.downLatch = false;
     return s;
+  }
+
+  get fingerDown() {
+    return this.finger.id !== null;
   }
 }

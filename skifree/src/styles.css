@@ -340,6 +340,7 @@ kbd {
   user-select: none;
 }
 .tb.held { background: rgba(255, 207, 51, 0.85); transform: scale(0.95); }
+body:not(.steer-pad) .pad { visibility: hidden; }
 .pad {
   display: grid;
   grid-template-columns: repeat(3, 58px);

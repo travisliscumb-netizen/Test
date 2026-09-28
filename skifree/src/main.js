@@ -104,6 +104,7 @@ function updateTouchUI() {
   const pref = save.settings.touch;
   const touchy = pref === 'on' || (pref === 'auto' && (touchSeen || coarse.matches));
   document.body.classList.toggle('touch-ui', touchy);
+  document.body.classList.toggle('steer-pad', save.settings.touchSteer === 'pad');
   $('#touch').classList.toggle('hidden', !(touchy && mode === 'playing'));
 }
 
@@ -154,7 +155,8 @@ function startRun(seed = pickSeed()) {
   const runs = save.data.totals.runs;
   if (runs < 3) {
     const touchy = document.body.classList.contains('touch-ui');
-    toast(touchy ? 'Pad steers · HOP jumps · hold F to fly' : '← → steer · ↓ brake · Space hop · F go fast', 4200);
+    const touchTip = save.settings.touchSteer === 'pad' ? 'Arrows steer · HOP jumps · hold F to fly' : 'Hold anywhere to steer · HOP jumps · hold F to fly';
+    toast(touchy ? touchTip : '← → steer · ↓ brake · Space hop · F go fast', 4200);
   }
   if (touchSeen && innerHeight > innerWidth && !portraitTipShown) {
     portraitTipShown = true;
@@ -411,6 +413,7 @@ function applySettings() {
   $('#opt-motion').checked = s.reducedMotion;
   $('#opt-effects').checked = s.effects;
   $('#opt-touch').value = s.touch;
+  $('#opt-steer').value = s.touchSteer;
   $('#opt-seed-mode').value = s.seedMode;
   $('#opt-seed').value = s.seed;
   $('#seed-row').classList.toggle('hidden', s.seedMode !== 'fixed');
@@ -432,6 +435,7 @@ function bindOptions() {
   $('#opt-motion').addEventListener('change', (e) => change({ reducedMotion: e.target.checked }));
   $('#opt-effects').addEventListener('change', (e) => change({ effects: e.target.checked }));
   $('#opt-touch').addEventListener('change', (e) => change({ touch: e.target.value }));
+  $('#opt-steer').addEventListener('change', (e) => change({ touchSteer: e.target.value }));
   $('#opt-seed-mode').addEventListener('change', (e) => {
     const patch = { seedMode: e.target.value };
     // Switching to a fixed mountain with no number yet: pick one to start from.
@@ -528,6 +532,8 @@ window.addEventListener('pointerdown', (e) => {
     updateTouchUI();
   }
 }, { capture: true });
+// iOS only unlocks audio inside touchend/click handlers, not pointerdown.
+for (const type of ['touchend', 'click', 'keydown']) window.addEventListener(type, () => sound.unlock(), { capture: true, passive: true });
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {

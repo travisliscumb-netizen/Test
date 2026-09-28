@@ -226,18 +226,39 @@ for (const vp of [{ name: 'iphone-landscape', width: 844, height: 390 }, { name:
   const zoom = await S(page, 'S.renderer.zoom');
   check(`${vp.name}: skier is drawn at a readable size`, zoom * 26 >= 20, `${(zoom * 26).toFixed(0)} css px tall`);
 
-  // Hold the right pad button with a real touch.
-  const box = await page.locator('#touch .right').boundingBox();
   const cdp = await ctx.newCDPSession(page);
-  const pt = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const touch = async (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+
+  // Default: the skier follows your finger. Hold to the lower right of them.
   await S(page, 'S.game.player.grace = 30');
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt] });
+  const sk = await S(page, '(() => { const g = S.game, v = g.view, z = S.renderer.zoom / g.zoomMul; return { x: (g.player.x - v.x0) * z, y: (g.player.y - v.y0) * z }; })()');
+  await touch('touchStart', [{ x: Math.min(vp.width - 150, sk.x + 140), y: Math.min(vp.height - 150, sk.y + 90), id: 7 }]);
+  await wait(page, 450);
+  const hf = await S(page, 'S.game.player.heading');
+  await touch('touchEnd', []);
+  check(`${vp.name}: the skier follows your finger`, hf > 0.3, `heading ${hf.toFixed(2)}`);
+
+  // A quick upward flick in the air is a backflip.
+  await S(page, "(S.game.player.speed = 300, S.game.player.rampLaunch(S.game.events), 0)");
+  await touch('touchStart', [{ x: vp.width / 2, y: vp.height * 0.7, id: 8 }]);
+  await touch('touchMove', [{ x: vp.width / 2, y: vp.height * 0.7 - 90, id: 8 }]);
+  await touch('touchEnd', []);
+  await wait(page, 60);
+  check(`${vp.name}: flicking up in the air does a trick`, (await S(page, "S.game.player.trick ? S.game.player.trick.kind : (S.game.player.tricks[0] || null)")) === 'flip');
+  await wait(page, 1500);
+
+  // The arrow-button option.
+  await S(page, "(S.save.updateSettings({ touchSteer: 'pad' }), document.body.classList.add('steer-pad'), 0)");
+  await S(page, "(Object.assign(S.game.player, { state: 'ski', heading: 0, travel: 0, z: 0, grace: 30 }), 0)");
+  const box = await page.locator('#touch .right').boundingBox();
+  await touch('touchStart', [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 9 }]);
   await wait(page, 400);
   const h = await S(page, 'S.game.player.heading');
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  check(`${vp.name}: the touch pad steers`, h > 0.3, `heading ${h.toFixed(2)}`);
+  await touch('touchEnd', []);
+  check(`${vp.name}: the arrow-button option steers`, h > 0.3, `heading ${h.toFixed(2)}`);
 
   // Turbo + jump together (multi-touch).
+  await S(page, "(Object.assign(S.game.player, { state: 'ski', z: 0, grace: 30 }), 0)");
   const tb = await page.locator('#touch .turbo').boundingBox();
   const jb = await page.locator('#touch .jump').boundingBox();
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: tb.x + 20, y: tb.y + 20, id: 1 }] });
