@@ -36,11 +36,12 @@ build command empty.
 | `↑` / `W` | Swing the skis straight downhill and tuck |
 | `↓` / `S` | Snowplough brake |
 | `Space` | Hop. Ramps launch you properly |
+| In the air | `↑` backflip · `↓` spread eagle · `Space` helicopter. Land it or wipe out |
 | `F` | **Go fast.** Much faster, much harder to steer |
-| `Esc` / `P` | Pause (Resume / Restart / Main menu) |
-| `R` | Restart the run |
+| `Esc` / `P` / `F3` | Pause (Resume / Restart / Main menu) |
+| `R` / `F2` | Restart the run |
 | Mouse | The skier heads toward the pointer, like the original. Click to hop |
-| Touch | D-pad on the left, HOP and TURBO on the right (multi-touch) |
+| Touch | Hold anywhere: the skier heads for your finger. Flick up/down for tricks. HOP and TURBO buttons (multi-touch). Arrow buttons available in Options |
 
 ---
 
@@ -52,16 +53,22 @@ build command empty.
   set pieces give it landmarks: tree-ringed clearings, a tree wall with one gap,
   jump lines, snowman families, rock gardens, dead groves.
 - **The start** has the classic signposts: **Slalom** and **Tree Slalom**
-  courses to the left (gates score style), **Freestyle** to the right (ramps and
-  moguls), and a chairlift running down the mountain.
+  courses to the left, **Freestyle** to the right (ramps and moguls), and a
+  chairlift running down the mountain. The courses are **timed**, as in the
+  original: ski through the START arch, thread the gates (each miss adds 5 s),
+  cross FINISH. Best times (and best freestyle style) are saved.
+- **Tricks:** off a ramp, `↑` backflips, `↓` spread-eagles and `Space`
+  helicopters. Landed tricks score style; landing mid-trick is a wipeout.
 - **Other people:** skiers, careless beginners, snowboarders who launch off
   ramps, and dogs. Some dogs follow their owners, some wander, and bold ones
   sprint across your line on purpose.
 - **Collisions** are comic and short. Trees and big rocks put you on your face,
   stumps, small rocks and dogs make you tumble, snowmen explode, and slalom
   flags just fall over. You're back up in about a second.
-- **The Yeti** arrives after **2000 m**. From behind, from the side, or from
-  ahead. It predicts where you're going, steers around trees it sees coming,
+- **The Yeti** arrives after **2000 m**, or sooner if you dawdle (30 s without
+  real downhill progress, with a warning roar at 20 s) or wander off the side
+  of the mountain, just like the original. From behind, from the side, or from
+  ahead; a HUD alert shows how far behind it is. It predicts where you're going, steers around trees it sees coming,
   and is faster than you at cruising speed. On `F` you are faster than it, but
   you steer like a shopping trolley. Trees it doesn't dodge knock it flat. Stay
   far enough ahead for long enough and it gives up (+500 style). It comes back
