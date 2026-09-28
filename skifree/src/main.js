@@ -29,6 +29,19 @@ let portraitTipShown = false;
 let demoStuck = 0;
 let botDriver = null; // test hook: an autopilot driving the live run
 
+// Adaptive quality: if frames run long for a sustained stretch while skiing,
+// drop to the lite snow renderer. One-way per session, so it can't oscillate.
+const perf = { ema: 1 / 60, slow: 0 };
+function watchPerformance(dt) {
+  if (renderer.lite || dt <= 0 || document.hidden) return;
+  perf.ema += (dt - perf.ema) * 0.05;
+  perf.slow = perf.ema > 1 / 45 ? perf.slow + dt : 0;
+  if (perf.slow > 2) {
+    renderer.lite = true;
+    needsDraw = true;
+  }
+}
+
 const SCREENS = ['title', 'controls', 'options', 'about', 'pause', 'over'];
 const coarse = matchMedia('(pointer: coarse)');
 const osReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -42,12 +55,19 @@ function show(id) {
   const hudOn = mode === 'playing' || mode === 'paused' || mode === 'over';
   $('#hud').classList.toggle('hidden', !hudOn);
   updateTouchUI();
+  shownAt = performance.now();
   // Keyboard users land on the main action; touch users don't get a focus ring.
+  // Delayed, because some browsers click a focused button on the *keyup* of
+  // the Space/Enter that opened this screen.
+  clearTimeout(focusTimer);
   if (id && !touchSeen) {
-    const btn = $('#' + id + ' .btn.primary') || $('#' + id + ' .btn');
-    btn?.focus({ preventScroll: true });
+    focusTimer = setTimeout(() => {
+      if (!$('#' + id).classList.contains('hidden')) ($('#' + id + ' .btn.primary') || $('#' + id + ' .btn'))?.focus({ preventScroll: true });
+    }, 250);
   }
 }
+let shownAt = 0;
+let focusTimer = 0;
 
 function showTitle() {
   mode = 'title';
@@ -114,16 +134,14 @@ function pickSeed() {
 }
 
 function newDemo() {
-  demo = new Game({ seed: randomSeed(), demo: true });
-  demo.setViewSize(renderer.viewW, renderer.viewH);
+  demo = new Game({ seed: randomSeed(), demo: true, viewW: renderer.viewW, viewH: renderer.viewH });
   demoStuck = 0;
 }
 
 function startRun(seed = pickSeed()) {
   sound.unlock();
   sound.resume();
-  game = new Game({ seed });
-  game.setViewSize(renderer.viewW, renderer.viewH);
+  game = new Game({ seed, viewW: renderer.viewW, viewH: renderer.viewH });
   renderer.reset();
   mode = 'playing';
   input.capture = true;
@@ -275,6 +293,7 @@ function frame(ts) {
     }
   }
 
+  if (mode === 'playing' || mode === 'title') watchPerformance(dt);
   if (mode !== 'paused' || needsDraw) {
     if (mode !== 'paused') renderer.updateEffects(active, dt);
     if (active === demo) {
@@ -448,7 +467,11 @@ function onAction(action) {
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
-  if (el) onAction(el.dataset.action);
+  if (!el) return;
+  // The results appear under the player's thumbs mid-action: a click in the
+  // first moment is a stray (Space keyup, a hop tap), not a decision.
+  if (mode === 'over' && performance.now() - shownAt < 400) return;
+  onAction(el.dataset.action);
 });
 $('#pause-btn').addEventListener('click', () => pause());
 for (const el of document.querySelectorAll('#touch [data-key]')) input.bindTouchButton(el, el.dataset.key);

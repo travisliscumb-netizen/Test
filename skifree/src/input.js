@@ -60,7 +60,18 @@ export class Input {
   }
 
   onKey(e, down) {
-    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    // macOS swallows keyups while Cmd is held: drop everything when it lifts,
+    // and never treat Cmd/Ctrl shortcuts as game input.
+    if (!down && e.key === 'Meta') this.clear();
+    if (down && (e.metaKey || e.ctrlKey)) return;
+    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) {
+      // Form controls keep their keys, except Escape still closes the panel.
+      if (down && e.code === 'Escape' && !e.repeat) {
+        e.target.blur();
+        this.handlers.pause?.();
+      }
+      return;
+    }
     const k = KEYMAP[e.code];
     if (down) {
       if (e.code === 'Escape' || e.code === 'KeyP') {

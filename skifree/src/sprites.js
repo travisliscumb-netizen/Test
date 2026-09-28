@@ -132,7 +132,7 @@ export function drawStatic(ctx, o) {
     case 'tree_snowy':
       return pine(ctx, 46, 72, 4, true, v);
     case 'tree_dead':
-      return deadTree(ctx, v);
+      return o.state ? deadTreeSnapped(ctx, v) : deadTree(ctx, v);
     case 'rock_s':
       return rock(ctx, 11, 9, v);
     case 'rock_l':
@@ -248,6 +248,29 @@ function deadTree(ctx, v) {
     const b = branches[i];
     ellipse(ctx, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2 - 1.8, 3, 1.3, '#ffffff');
   }
+}
+
+// What's left after the yeti runs through one.
+function deadTreeSnapped(ctx, v) {
+  shadow(ctx, 4, 1, 16, 4);
+  ctx.save();
+  ctx.translate(2, -2);
+  ctx.rotate(v % 2 ? 1.35 : -1.35);
+  for (const pass of [[C.outline, 5], [C.trunkDark, 3.2]]) {
+    ctx.strokeStyle = pass[0];
+    ctx.lineWidth = pass[1];
+    ctx.beginPath();
+    ctx.moveTo(0, -4);
+    ctx.lineTo(0, -34);
+    ctx.moveTo(0, -16);
+    ctx.lineTo(7, -24);
+    ctx.moveTo(0, -24);
+    ctx.lineTo(-6, -31);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // Splintered stump.
+  poly(ctx, [-4, 0, -4, -7, -2, -5, 0, -9, 2, -5, 4, -8, 4, 0], C.trunk, C.outline, 1.2);
 }
 
 function rock(ctx, rx, ry, v) {

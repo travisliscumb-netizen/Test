@@ -222,8 +222,11 @@ export class World {
     // A line of warning signs shortly before the yeti's territory.
     const warnY = (cfg.YETI_TRIGGER_DISTANCE - 140) * M;
     if (warnY >= y0 && warnY < y1) {
-      for (let x = Math.ceil(x0 / (170 * M)) * 170 * M; x < x1; x += 170 * M) {
-        if (Math.abs(x) < cfg.WORLD_SIZE / 2) put('sign', x + 23 * M, warnY, SIGN['YETI XING']);
+      // Signs sit at k*170m + 23m; start the scan early enough to catch the
+      // one whose base lies in the previous chunk.
+      const step = 170 * M, off = 23 * M;
+      for (let x = Math.ceil((x0 - off) / step) * step; x + off < x1; x += step) {
+        if (Math.abs(x) < cfg.WORLD_SIZE / 2) put('sign', x + off, warnY, SIGN['YETI XING']);
       }
     }
   }

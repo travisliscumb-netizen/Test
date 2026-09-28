@@ -12,8 +12,10 @@ import { Yeti } from './yeti.js';
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 export class Game {
-  // opts: { seed, cfg, demo }  demo = attract mode behind the title (no yeti)
-  constructor({ seed, cfg = CONFIG, demo = false } = {}) {
+  // opts: { seed, cfg, demo, viewW, viewH }
+  //   demo = attract mode behind the title (no yeti)
+  //   viewW/H = visible world size, so the first actors spawn off-screen
+  constructor({ seed, cfg = CONFIG, demo = false, viewW = 900, viewH = 640 } = {}) {
     this.cfg = cfg;
     this.seed = seed >>> 0;
     this.demo = demo;
@@ -42,8 +44,8 @@ export class Game {
     this.hopWasDown = true; // a key still held from the menu mustn't hop on frame one
 
     // Camera (centre of view, in world units) and the view size at zoom 1.
-    this.viewW = 900;
-    this.viewH = 640;
+    this.viewW = viewW;
+    this.viewH = viewH;
     this.zoomMul = 1;
     this.anchor = cfg.CAMERA_ANCHOR;
     this.camX = 0;
@@ -269,7 +271,8 @@ export class Game {
     const c = this.cfg;
     for (let i = from; i < this.events.length; i++) {
       const e = this.events[i];
-      if (e.type === 'land') this.addStyle(e.air * c.STYLE_PER_AIR_SECOND + (e.ramp ? c.STYLE_RAMP_BONUS : 0));
+      // Only real air counts: hops and mogul bounces would be farmable.
+      if (e.type === 'land' && e.ramp) this.addStyle(e.air * c.STYLE_PER_AIR_SECOND + c.STYLE_RAMP_BONUS);
       else if (e.type === 'escape') {
         this.stats.yetiEscapes++;
         this.addStyle(c.STYLE_ESCAPE);

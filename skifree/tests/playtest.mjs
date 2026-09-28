@@ -90,7 +90,9 @@ async function until(page, expr, ms = 8000) {
   check('holding F goes much faster than cruising', turboFlag && turboSpeed > cruise * 1.25, `${turboSpeed.toFixed(0)} vs cruise ${cruise}`);
   check('speed bar lights up on turbo', (barClass || '').includes('turbo'), barClass);
 
-  // Hop: a tap shorter than a frame must still register.
+  // Hop: a tap shorter than a frame must still register. (Put the skier
+  // squarely on their skis first: a random mogul could have tipped them.)
+  await S(page, "(Object.assign(S.game.player, { state: 'ski', z: 0, vz: 0, hopCooldown: 0 }), 0)");
   const jumps0 = await S(page, 'S.game.stats.airTime');
   await page.evaluate(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ' }));
@@ -133,7 +135,12 @@ async function until(page, expr, ms = 8000) {
   const best = await S(page, 'S.save.data.best.score');
   check('the result is saved as a record', best > 0, `best ${best}`);
 
-  // Instant replay.
+  // A stray keypress the instant results appear doesn't skip them...
+  await page.keyboard.press('Enter');
+  await wait(page, 100);
+  check('a stray key as the results appear does not skip them', (await S(page, 'S.mode')) === 'over');
+  // ...but a deliberate one a moment later restarts immediately.
+  await wait(page, 400);
   const t0 = Date.now();
   await page.keyboard.press('Enter');
   const back = await until(page, "S.mode === 'playing'", 2000);

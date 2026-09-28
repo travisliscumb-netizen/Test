@@ -8,7 +8,9 @@ import { SpriteCache, spriteBounds, makeCanvas } from './sprites.js';
 import { drawSkier, drawBoarder, drawDog, drawYeti, drawChair, groundShadow } from './characters.js';
 import { hash, hash01 } from './rng.js';
 
-const TILE = 256;
+const TILE = 256; // fine snow texture period (world units)
+const BIG = 2048; // broad undulation period (world units)
+const BIG_PX = 256; // ...baked at 1/8 resolution: it's all soft gradients
 const TALL = new Set(['tree_s', 'tree_m', 'tree_l', 'tree_snowy', 'tree_dead', 'lift_tower', 'sign', 'snowman']);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -63,10 +65,15 @@ export class Renderer {
     this.zoom = 1;
     this.tile = null;
     this.tileScale = 0;
+    this.finePattern = null;
+    this.bigPattern = null;
     this.items = [];
     this.particles = new Particles(cfg.MAX_PARTICLES);
     this.reducedMotion = false;
     this.effects = true;
+    // Set by the host when frames run long: swaps the textured snow (cheap on
+    // a GPU, costly in software rendering) for flat snow with vector detail.
+    this.lite = false;
     this.time = 0;
     this.kick = 0; // brief impact shake
     this.reset();
@@ -91,7 +98,9 @@ export class Renderer {
   resize(cssW, cssH, dpr) {
     this.cssW = Math.max(1, cssW);
     this.cssH = Math.max(1, cssH);
-    this.dpr = clamp(dpr || 1, 1, 3);
+    // Beyond 2x the extra pixels are invisible at arm's length but cost 2.25x
+    // the fill rate on 3x phones.
+    this.dpr = clamp(dpr || 1, 1, 2);
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
     const c = this.cfg;
@@ -132,14 +141,13 @@ export class Renderer {
             }
           }
           if (def && def.hit === 'crash') {
-            this.craters.push({ x: e.x, y: e.y, age: 0 });
-            if (this.craters.length > 30) this.craters.shift();
+            this.addCrater(e.x, e.y);
             this.kick = Math.max(this.kick, Math.min(1, e.speed / 300));
           }
           break;
         }
         case 'wipeout':
-          this.craters.push({ x: e.x, y: e.y, age: 0 });
+          this.addCrater(e.x, e.y);
           this.kick = Math.max(this.kick, 0.6);
         // fallthrough
         case 'bump':
@@ -179,6 +187,11 @@ export class Renderer {
           break;
       }
     }
+  }
+
+  addCrater(x, y) {
+    this.craters.push({ x, y });
+    if (this.craters.length > 30) this.craters.shift();
   }
 
   // Samples the skier into the track ring buffer and emits spray.
@@ -287,11 +300,10 @@ export class Renderer {
     const s = this.sprites.scale;
     if (this.tile && this.tileScale === s) return;
     this.tileScale = s;
+    // Fine layer: transparent, only texture, so the broad layer shows through.
     const cv = makeCanvas(Math.round(TILE * s), Math.round(TILE * s));
     const ctx = cv.getContext('2d');
     ctx.scale(cv.width / TILE, cv.height / TILE);
-    ctx.fillStyle = C.snow;
-    ctx.fillRect(0, 0, TILE, TILE);
     // Wrapped draws make the tile seamless.
     const wrap = (fn) => {
       for (const dx of [-TILE, 0, TILE]) for (const dy of [-TILE, 0, TILE]) fn(dx, dy);
@@ -326,31 +338,80 @@ export class Renderer {
       ctx.fillRect(x, y, 0.9 + rnd() * 0.8, 0.9 + rnd() * 0.8);
     }
     this.tile = cv;
+    this.finePattern = this.ctx.createPattern(cv, 'repeat');
+    this.finePattern.setTransform?.(new DOMMatrix().scale(TILE / cv.width));
+
+    // Broad layer: opaque snow with big soft undulations, a depth cue.
+    // Built once, tiny, upscaled: gradients survive bilinear scaling intact.
+    if (!this.bigPattern) {
+      const big = makeCanvas(BIG_PX, BIG_PX);
+      const b = big.getContext('2d');
+      const k = BIG_PX / BIG;
+      b.scale(k, k);
+      b.fillStyle = C.snow;
+      b.fillRect(0, 0, BIG, BIG);
+      for (let i = 0; i < 18; i++) {
+        const hsh = hash(i, 77);
+        const x = ((hsh & 1023) / 1023) * BIG, y = (((hsh >> 10) & 1023) / 1023) * BIG;
+        const r = 170 + ((hsh >> 20) & 127);
+        for (const dx of [-BIG, 0, BIG]) {
+          for (const dy of [-BIG, 0, BIG]) {
+            const g = b.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r);
+            g.addColorStop(0, 'rgba(196, 212, 234, 0.3)');
+            g.addColorStop(1, 'rgba(196, 212, 234, 0)');
+            b.fillStyle = g;
+            b.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
+          }
+        }
+      }
+      this.bigPattern = this.ctx.createPattern(big, 'repeat');
+      this.bigPattern.setTransform?.(new DOMMatrix().scale(BIG / BIG_PX));
+    }
   }
 
+  // Two pattern fills. Patterns live in world space, so they scroll for free.
   drawSnow(ctx, v) {
+    if (this.lite) return this.drawSnowLite(ctx, v);
     this.buildTile();
-    const x0 = Math.floor(v.x0 / TILE) * TILE;
-    const y0 = Math.floor(v.y0 / TILE) * TILE;
-    for (let y = y0; y < v.y1; y += TILE) {
-      for (let x = x0; x < v.x1; x += TILE) ctx.drawImage(this.tile, x, y, TILE + 0.5, TILE + 0.5);
-    }
-    // Broad, soft undulations in the slope: cheap depth cue, deterministic.
-    const S = 520;
-    for (let gy = Math.floor(v.y0 / S) - 1; gy <= Math.floor(v.y1 / S) + 1; gy++) {
-      for (let gx = Math.floor(v.x0 / S) - 1; gx <= Math.floor(v.x1 / S) + 1; gx++) {
-        const hsh = hash(gx, gy, 77);
-        const cx = (gx + (hsh & 255) / 255) * S;
-        const cy = (gy + ((hsh >> 8) & 255) / 255) * S;
-        const r = 160 + ((hsh >> 16) & 127);
-        if (cx + r < v.x0 || cx - r > v.x1 || cy + r < v.y0 || cy - r > v.y1) continue;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        g.addColorStop(0, 'rgba(196, 212, 234, 0.22)');
-        g.addColorStop(1, 'rgba(196, 212, 234, 0)');
-        ctx.fillStyle = g;
-        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    const x = v.x0 - 4, y = v.y0 - 4, w = v.x1 - v.x0 + 8, h = v.y1 - v.y0 + 8;
+    ctx.fillStyle = this.bigPattern;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = this.finePattern;
+    ctx.fillRect(x, y, w, h);
+  }
+
+  // Flat snow plus deterministic ripples and speckles, batched into two draw
+  // calls whose raster cost scales with the marks, not the screen.
+  drawSnowLite(ctx, v) {
+    ctx.fillStyle = C.snow;
+    ctx.fillRect(v.x0 - 4, v.y0 - 4, v.x1 - v.x0 + 8, v.y1 - v.y0 + 8);
+    const cx0 = Math.floor(v.x0 / TILE), cx1 = Math.floor(v.x1 / TILE);
+    const cy0 = Math.floor(v.y0 / TILE), cy1 = Math.floor(v.y1 / TILE);
+    ctx.beginPath();
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let i = 0; i < 7; i++) {
+          const h = hash(cx, cy, i, 41);
+          const x = cx * TILE + (h & 255), y = cy * TILE + ((h >> 8) & 255), w = 10 + ((h >> 16) & 15);
+          ctx.moveTo(x - w, y);
+          ctx.quadraticCurveTo(x, y - 2.5, x + w, y);
+        }
       }
     }
+    ctx.strokeStyle = 'rgba(190, 208, 232, 0.5)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(150, 175, 212, 0.35)';
+    ctx.beginPath();
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let i = 0; i < 18; i++) {
+          const h = hash(cx, cy, i, 43);
+          ctx.rect(cx * TILE + (h & 255), cy * TILE + ((h >> 8) & 255), 1.2, 1.2);
+        }
+      }
+    }
+    ctx.fill();
   }
 
   drawDecals(ctx, game, v) {

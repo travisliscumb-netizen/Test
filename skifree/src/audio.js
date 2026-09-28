@@ -21,7 +21,8 @@ export class Sound {
   // Must be called from a user gesture (browsers keep audio locked until then).
   unlock() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended' && !this.paused) this.ctx.resume().catch(() => {});
+      // 'interrupted' is what iOS reports after a call or Siri.
+      if (this.ctx.state !== 'running' && !this.paused) this.ctx.resume().catch(() => {});
       return;
     }
     const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -94,7 +95,7 @@ export class Sound {
   }
   resume() {
     this.paused = false;
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
   }
 
   setMusic(mode) {
@@ -351,7 +352,8 @@ export class Sound {
     while (this.nextBeat < ahead) {
       const when = this.nextBeat - ctx.currentTime;
       if (this.mode === 'chase') this.chaseStep(this.beat, when);
-      else this.calmStep(this.beat, when);
+      else if (this.mode === 'calm') this.calmStep(this.beat, when);
+      // 'silent' keeps the clock running but schedules nothing.
       const bpm = this.mode === 'chase' ? 152 : 104;
       this.nextBeat += 60 / bpm / 2; // eighth notes
       this.beat++;
