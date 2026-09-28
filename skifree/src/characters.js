@@ -465,7 +465,7 @@ export function drawYeti(ctx, y) {
   }
   // Body.
   furBlob(ctx, 0, -28, 17, 20, 11, C.yeti, C.outline, 0.1);
-  ell(ctx, 4, -22, 11, 12, C.yetiShade);
+  furBlob(ctx, 5, -21, 10, 12, 7, C.yetiShade, null, 0.12);
   furBlob(ctx, 0, -28, 17, 20, 11, 'rgba(0,0,0,0)', C.outline, 0.1);
   // Head.
   furBlob(ctx, facing * 1.5, -46, 12.5, 11, 9, C.yeti, C.outline, 0.14);
@@ -528,7 +528,7 @@ function yetiEating(ctx, y) {
   for (const s of [-1, 1]) ell(ctx, s * 8, -2, 6, 3.4, C.yetiFace, C.outline, 1.5);
   for (const s of [-1, 1]) furBlob(ctx, s * 8, -9, 6, 7, 5, C.yeti, C.outline, 0.14);
   furBlob(ctx, 0, -28, 17 + (e > 1.1 && e < 1.8 ? 2 : 0), 20, 11, C.yeti, C.outline, 0.1);
-  ell(ctx, 4, -22, 11, 12, C.yetiShade);
+  furBlob(ctx, 5, -21, 10, 12, 7, C.yetiShade, null, 0.12);
   furBlob(ctx, 0, -28, 17, 20, 11, 'rgba(0,0,0,0)', C.outline, 0.1);
   furBlob(ctx, 0, -46, 12.5, 11, 9, C.yeti, C.outline, 0.14);
   // Cheeks puff while chewing.
@@ -584,7 +584,7 @@ export function drawChair(ctx, riders, looks) {
   ctx.lineTo(0, 30);
   ctx.stroke();
   for (let i = 0; i < riders; i++) {
-    const x = i ? 4 : -4;
+    const x = i ? 3.5 : -3.5;
     const o = OUTFITS[looks[i] % OUTFITS.length];
     line2(ctx, x - 1, 36, x - 1.5, 42, o[1], 2.2);
     line2(ctx, x + 1, 36, x + 1.5, 42, o[1], 2.2);
@@ -603,11 +603,11 @@ export function drawChair(ctx, riders, looks) {
   ctx.strokeStyle = C.outline;
   ctx.lineWidth = 1.1;
   ctx.beginPath();
-  ctx.rect(-10, 34, 20, 3);
+  ctx.rect(-8, 34, 16, 3);
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.rect(-10, 27, 20, 2);
+  ctx.rect(-8, 27, 16, 2);
   ctx.fill();
   ctx.stroke();
 }

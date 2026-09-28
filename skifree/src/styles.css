@@ -112,7 +112,7 @@ body.mouse-aim #game { cursor: crosshair; }
 .toast {
   position: fixed;
   left: 50%;
-  top: calc(18% + var(--safe-t));
+  bottom: calc(26px + var(--safe-b));
   transform: translateX(-50%);
   z-index: 6;
   padding: 8px 16px;
@@ -130,7 +130,8 @@ body.mouse-aim #game { cursor: crosshair; }
   animation: toast-in 0.18s ease-out;
 }
 .toast.warn { background: var(--red); color: #fff; }
-@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+body.touch-ui .toast { bottom: auto; top: calc(58% + var(--safe-t)); white-space: normal; text-align: center; width: max-content; max-width: min(420px, calc(100vw - 32px)); }
 
 /* -------------------------------------------------------------- screens */
 

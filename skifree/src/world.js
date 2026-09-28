@@ -141,7 +141,10 @@ export class World {
     // Domain warp so biome borders meander instead of following the grid.
     const wx = x + (valueNoise(this.seed ^ 0x51, x / 900, y / 900) - 0.5) * R * 0.7;
     const wy = y + (valueNoise(this.seed ^ 0xa3, x / 900, y / 900) - 0.5) * R * 0.7;
-    return this.regionBiome(Math.floor(wx / R), Math.floor(wy / R));
+    const b = this.regionBiome(Math.floor(wx / R), Math.floor(wy / R));
+    // The first stretch below the start is always friendly terrain.
+    if (y < cfg.START_EASY && Math.abs(x) < cfg.START_EASY * 1.5 && b !== 'open' && b !== 'park') return 'glade';
+    return b;
   }
 
   // --------------------------------------------------------- start area
@@ -153,7 +156,7 @@ export class World {
     return y > 20 * M && y < this.cfg.COURSE_LENGTH;
   }
   inSlalomLane(x, y) {
-    return this.inCourseDepth(y) && Math.abs(x - this.cfg.SLALOM_X) < 26 * M;
+    return this.inCourseDepth(y) && Math.abs(x - this.cfg.SLALOM_X) < 14 * M;
   }
   inTreeSlalom(x, y) {
     return this.inCourseDepth(y) && Math.abs(x - this.cfg.TREE_SLALOM_X) < 24 * M;
@@ -184,10 +187,10 @@ export class World {
     put('sign', cfg.FREESTYLE_X - 6 * M, 12 * M, SIGN.FREESTYLE);
 
     // Slalom: alternating gates weaving across the lane.
-    const gateFirst = 34 * M, gateStep = 26 * M;
+    const gateFirst = 30 * M, gateStep = 17 * M;
     for (let i = 0, y = gateFirst; y < cfg.COURSE_LENGTH; i++, y += gateStep) {
       if (y + 4 * M < y0 || y - 4 * M > y1) continue;
-      const cx = cfg.SLALOM_X + (i % 2 ? 1 : -1) * 9 * M;
+      const cx = cfg.SLALOM_X + (i % 2 ? 1 : -1) * 6 * M;
       const flag = i % 2 ? 'flag_red' : 'flag_blue';
       const half = 3.6 * M;
       put(flag, cx - half, y);
@@ -195,7 +198,7 @@ export class World {
       if (inside(cx, y)) push('gate', cx, y, half * 2);
     }
     // Tree slalom: narrower gates threaded through glade trees.
-    for (let i = 0, y = gateFirst + 8 * M; y < cfg.COURSE_LENGTH; i++, y += 32 * M) {
+    for (let i = 0, y = gateFirst + 8 * M; y < cfg.COURSE_LENGTH; i++, y += 22 * M) {
       if (y + 4 * M < y0 || y - 4 * M > y1) continue;
       const cx = cfg.TREE_SLALOM_X + (i % 2 ? 1 : -1) * 7 * M;
       const flag = i % 2 ? 'flag_red' : 'flag_blue';

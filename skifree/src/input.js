@@ -16,6 +16,8 @@ export class Input {
     this.keys = { left: false, right: false, up: false, down: false, jump: false, turbo: false };
     this.touch = { left: false, right: false, up: false, down: false, jump: false, turbo: false };
     this.mouse = { active: false, x: 0, y: 0, down: false, moved: 0 };
+    // A tap can start and end between two frames; latch it so it still counts.
+    this.jumpLatch = false;
     this.handlers = {}; // pause, restart, confirm, any
     this.capture = false; // true while a run is live: swallow game keys
 
@@ -38,6 +40,7 @@ export class Input {
       this.mouse.y = e.clientY;
       this.mouse.active = true;
       this.mouse.down = true;
+      this.jumpLatch = true;
       this.handlers.any?.();
     });
     const up = (e) => {
@@ -78,6 +81,7 @@ export class Input {
     if (!k) return;
     if (this.capture) e.preventDefault();
     this.keys[k] = down;
+    if (down && k === 'jump' && !e.repeat) this.jumpLatch = true;
     // Steering with keys hands control back from the mouse.
     if (down && (k === 'left' || k === 'right' || k === 'up')) {
       this.mouse.active = false;
@@ -90,6 +94,7 @@ export class Input {
     const set = (v) => (e) => {
       e.preventDefault();
       this.touch[key] = v;
+      if (v && key === 'jump') this.jumpLatch = true;
       el.classList.toggle('held', v);
       if (v) {
         el.setPointerCapture?.(e.pointerId);
@@ -110,6 +115,7 @@ export class Input {
     for (const k in this.keys) this.keys[k] = false;
     for (const k in this.touch) this.touch[k] = false;
     this.mouse.down = false;
+    this.jumpLatch = false;
     document.querySelectorAll?.('.held').forEach((el) => el.classList.remove('held'));
   }
 
@@ -121,11 +127,12 @@ export class Input {
       right: k.right || t.right,
       up: k.up || t.up,
       down: k.down || t.down,
-      jump: k.jump || t.jump || this.mouse.down,
+      jump: k.jump || t.jump || this.mouse.down || this.jumpLatch,
       turbo: k.turbo || t.turbo,
       aim: null,
     };
     if (this.mouse.active && !s.left && !s.right && aimFn) s.aim = aimFn(this.mouse.x, this.mouse.y);
+    this.jumpLatch = false;
     return s;
   }
 }

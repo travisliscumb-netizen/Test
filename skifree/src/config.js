@@ -81,6 +81,8 @@ export const CONFIG = {
   YETI_PROBE_TIME: 0.42,             // seconds of look-ahead for obstacle avoidance
   YETI_EAT_TIME: 3.1,                // whole grab/gulp/celebrate sequence
   YETI_EAT_SKIPPABLE_AFTER: 1.3,
+  YETI_DRAW_SCALE: 1.3,              // it's big: drawn larger than its footprint
+  CAMERA_EAT_ZOOM: 0.7,              // camera pushes in on the meal
 
   // ---------------------------------------------------------------- actors
   NPC_SKIER_SPEED_MIN: 6 * M,
@@ -106,6 +108,7 @@ export const CONFIG = {
   OBJECT_DENSITY: 1,                 // global multiplier on every biome
   DENSITY_RAMP_METERS: 1600,         // density grows to full over this distance
   START_CLEAR_RADIUS: 34 * M,
+  START_EASY: 260 * M,               // lighter biomes for the opening stretch
   ACTORS_PER_CHUNK: 0.28,
   DOGS_PER_CHUNK: 0.13,
   GENERATE_MARGIN: 700,              // u beyond the view edge kept generated
@@ -125,8 +128,12 @@ export const CONFIG = {
   CAMERA_ZOOM_OUT_FAST: 0.1,         // widen the view by this fraction at speed
   CAMERA_SMOOTH: 6,
   CAMERA_SHAKE_TURBO: 1.2,           // px of wobble at full turbo
+  // The camera shows at least this much mountain (world units)...
   VIEW_MIN_W: 560,
   VIEW_MIN_H: 640,
+  // ...relaxed on small screens so the skier never shrinks to a speck.
+  VIEW_SMALL_W: 380,
+  VIEW_SMALL_H: 440,
   ZOOM_MIN: 0.6,
   ZOOM_MAX: 2.4,
 

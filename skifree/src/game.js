@@ -324,12 +324,16 @@ export class Game {
     const c = this.cfg;
     const fast = clamp((p.speed - c.PLAYER_SPEED * 0.6) / (c.TURBO_SPEED - c.PLAYER_SPEED * 0.6), 0, 1);
     const k = 1 - Math.exp(-c.CAMERA_SMOOTH * dt);
-    this.zoomMul += (1 + c.CAMERA_ZOOM_OUT_FAST * fast - this.zoomMul) * k * 0.5;
+    const y = this.yeti;
+    const eating = y && y.state === 'eat';
+    const zoomTarget = eating ? c.CAMERA_EAT_ZOOM : 1 + c.CAMERA_ZOOM_OUT_FAST * fast;
+    this.zoomMul += (zoomTarget - this.zoomMul) * k * (eating ? 0.35 : 0.5);
     this.anchor += (c.CAMERA_ANCHOR + (c.CAMERA_ANCHOR_FAST - c.CAMERA_ANCHOR) * fast - this.anchor) * k * 0.5;
     const h = this.viewH * this.zoomMul;
     const lookX = Math.sin(p.travel) * p.speed * 0.35;
-    const tx = p.x + lookX;
-    const ty = p.y + (0.5 - this.anchor) * h;
+    // During the meal the yeti is the star: frame it, centred.
+    const tx = eating ? y.x : p.x + lookX;
+    const ty = eating ? y.y - 40 : p.y + (0.5 - this.anchor) * h;
     this.camX += (tx - this.camX) * k;
     // Vertical follow is stiffer: the skier must never leave the screen.
     this.camY += (ty - this.camY) * Math.min(1, k * 2.5);

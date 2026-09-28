@@ -27,6 +27,7 @@ let touchSeen = false;
 let wasTurbo = false;
 let portraitTipShown = false;
 let demoStuck = 0;
+let botDriver = null; // test hook: an autopilot driving the live run
 
 const SCREENS = ['title', 'controls', 'options', 'about', 'pause', 'over'];
 const coarse = matchMedia('(pointer: coarse)');
@@ -134,7 +135,7 @@ function startRun(seed = pickSeed()) {
   const runs = save.data.totals.runs;
   if (runs < 3) {
     const touchy = document.body.classList.contains('touch-ui');
-    toast(touchy ? 'Steer with the pad · HOP to jump · hold F to go fast' : '← → steer · ↓ brake · Space hop · F go fast', 4200);
+    toast(touchy ? 'Pad steers · HOP jumps · hold F to fly' : '← → steer · ↓ brake · Space hop · F go fast', 4200);
   }
   if (touchSeen && innerHeight > innerWidth && !portraitTipShown) {
     portraitTipShown = true;
@@ -252,7 +253,7 @@ function frame(ts) {
   if (mode === 'playing' || mode === 'paused' || mode === 'over') {
     active = game;
     if (mode === 'playing') {
-      const inp = input.state(aimAt);
+      const inp = botDriver ? autopilot(game, botDriver) : input.state(aimAt);
       document.body.classList.toggle('mouse-aim', inp.aim !== null);
       if (inp.turbo && !wasTurbo && game.player.controllable) sound.play('turbo');
       wasTurbo = inp.turbo;
@@ -516,6 +517,8 @@ window.__skifree = {
   get demo() { return demo; },
   get renderer() { return renderer; },
   get save() { return save; },
+  get sound() { return sound; },
+  set bot(opts) { botDriver = opts || null; },
   start: (seed) => startRun(seed),
   pause,
   resume,

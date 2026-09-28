@@ -19,7 +19,7 @@ const BOUNDS = {
   stump: [-11, -12, 24, 18],
   mogul: [-20, -8, 42, 16],
   snowman: [-18, -44, 38, 50],
-  ramp: [-22, -24, 46, 32],
+  ramp: [-26, -30, 54, 38],
   flag_red: [-4, -40, 22, 44],
   flag_blue: [-4, -40, 22, 44],
   sign: [-34, -46, 68, 52],
@@ -47,7 +47,7 @@ export class SpriteCache {
   }
 
   get(o) {
-    const key = o.t + ':' + (o.v & 3) + ':' + (o.state ? 1 : 0) + (o.fall || 0);
+    const key = o.t + ':' + variant(o) + ':' + (o.state ? 1 : 0) + (o.fall || 0);
     let spr = this.map.get(key);
     if (!spr) {
       spr = this.build(o);
@@ -69,6 +69,9 @@ export class SpriteCache {
     return { cv, x: bx - 1 / s, y: by - 1 / s, w: cv.width / s, h: cv.height / s };
   }
 }
+
+// Signs store which face they show in `v`; everything else has 4 looks.
+const variant = (o) => (o.t === 'sign' ? o.v : o.v & 3);
 
 export function makeCanvas(w, h) {
   // A plain canvas where there is a DOM: older Safari can't blit OffscreenCanvas.
@@ -118,7 +121,7 @@ function poly(ctx, pts, fill, stroke, lw = 1.3) {
 // ------------------------------------------------------------- scenery
 
 export function drawStatic(ctx, o) {
-  const v = o.v & 3;
+  const v = variant(o);
   switch (o.t) {
     case 'tree_s':
       return pine(ctx, 30, 46, 3, false, v);
@@ -366,34 +369,46 @@ function snowmanSmashed(ctx, v) {
   ctx.restore();
 }
 
+// A snow kicker: a long ramp rising towards the camera, ending in a steep lip.
 function ramp(ctx) {
-  shadow(ctx, 3, 3, 21, 5);
-  // Top (uphill-facing) surface, narrow at the back.
-  poly(ctx, [-12, -20, 12, -20, 19, -4, -19, -4], '#dcebfa', C.outline, 1.4);
-  // Lip face, towards the camera.
-  poly(ctx, [-19, -4, 19, -4, 19, 2, -19, 2], '#7fa6d4', C.outline, 1.4);
-  // Groomed stripes.
-  ctx.strokeStyle = 'rgba(130, 165, 210, 0.55)';
-  ctx.lineWidth = 1;
-  for (let i = 1; i < 4; i++) {
-    const t = i / 4;
+  shadow(ctx, 4, 4, 24, 6);
+  // Run-in: rises from the snow at the back to the lip at the front.
+  const g = ctx.createLinearGradient(0, -26, 0, -6);
+  g.addColorStop(0, '#f2f7fd');
+  g.addColorStop(1, '#ffffff');
+  poly(ctx, [-13, -26, 13, -26, 22, -6, -22, -6], g, C.outline, 1.5);
+  // Groomer corduroy.
+  ctx.strokeStyle = 'rgba(140, 170, 210, 0.5)';
+  ctx.lineWidth = 0.8;
+  for (let i = 1; i < 5; i++) {
+    const t = i / 5;
     ctx.beginPath();
-    ctx.moveTo(-12 - 7 * t, -20 + 16 * t);
-    ctx.lineTo(12 + 7 * t, -20 + 16 * t);
+    ctx.moveTo(-13 - 9 * t + 2, -26 + 20 * t);
+    ctx.lineTo(13 + 9 * t - 2, -26 + 20 * t);
     ctx.stroke();
   }
-  // Marker wands.
-  for (const x of [-19, 19]) {
-    ctx.strokeStyle = C.outline;
-    ctx.lineWidth = 2.6;
+  // The lip: a shadowed wall facing downhill.
+  poly(ctx, [-22, -6, 22, -6, 20, 2, -20, 2], '#8fb2dc', C.outline, 1.5);
+  // Hazard chevrons along the edge so it reads at speed.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-21, -6.5, 42, 3);
+  ctx.clip();
+  ctx.fillStyle = '#f28a1e';
+  ctx.fillRect(-22, -7, 44, 4);
+  ctx.fillStyle = C.outline;
+  for (let x = -22; x < 22; x += 6) {
     ctx.beginPath();
-    ctx.moveTo(x, 2);
-    ctx.lineTo(x, -14);
-    ctx.stroke();
-    ctx.strokeStyle = '#f28a1e';
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
+    ctx.moveTo(x, -3);
+    ctx.lineTo(x + 3, -7);
+    ctx.lineTo(x + 6, -7);
+    ctx.lineTo(x + 3, -3);
+    ctx.fill();
   }
+  ctx.restore();
+  ctx.strokeStyle = C.outline;
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(-21, -6.5, 42, 3);
 }
 
 function flag(ctx, color, down, fall = 1) {
@@ -523,7 +538,7 @@ function liftTower(ctx) {
   ctx.fillStyle = C.steelDark;
   ctx.fill();
   ctx.stroke();
-  for (const x of [-12, 12]) ellipse(ctx, x, -150, 2.4, 2.4, '#2d333d', C.outline, 1);
+  for (const x of [-13, 13]) ellipse(ctx, x, -150, 2.4, 2.4, '#2d333d', C.outline, 1);
   // Ladder rungs.
   ctx.strokeStyle = 'rgba(29, 37, 51, 0.5)';
   ctx.lineWidth = 0.7;

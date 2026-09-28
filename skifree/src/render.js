@@ -95,7 +95,10 @@ export class Renderer {
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
     const c = this.cfg;
-    this.zoom = clamp(Math.min(this.cssW / c.VIEW_MIN_W, this.cssH / c.VIEW_MIN_H), c.ZOOM_MIN, c.ZOOM_MAX);
+    // Small phones trade a little look-ahead for a readable skier.
+    const needW = clamp(this.cssW, c.VIEW_SMALL_W, c.VIEW_MIN_W);
+    const needH = clamp(this.cssH * 1.1, c.VIEW_SMALL_H, c.VIEW_MIN_H);
+    this.zoom = clamp(Math.min(this.cssW / needW, this.cssH / needH), c.ZOOM_MIN, c.ZOOM_MAX);
     this.sprites.setScale(this.zoom * this.dpr);
   }
 
@@ -431,7 +434,7 @@ export class Renderer {
       if (it.k === 0) continue;
       ctx.save();
       ctx.translate(it.o.x, it.o.y);
-      groundShadow(ctx, it.k === 3 ? 20 : it.o.kind === 'dog' ? 8 : 10, it.o.z || 0);
+      groundShadow(ctx, it.k === 3 ? 20 * this.cfg.YETI_DRAW_SCALE : it.o.kind === 'dog' ? 8 : 10, it.o.z || 0);
       ctx.restore();
     }
 
@@ -461,6 +464,7 @@ export class Renderer {
         else if (o.kind === 'boarder') drawBoarder(ctx, { ...o, outfit: 1 + (o.look % 5) });
         else drawSkier(ctx, { ...o, travel: o.heading, outfit: 1 + (o.look % 5), tucking: false, braking: o.beginner && o.state === 'go', stateTime: 0 });
       } else {
+        ctx.scale(this.cfg.YETI_DRAW_SCALE, this.cfg.YETI_DRAW_SCALE);
         drawYeti(ctx, { ...o, outfit: 0 });
       }
       ctx.restore();
@@ -508,12 +512,12 @@ export class Renderer {
     const end = world.liftEnd();
     const yA = Math.max(0, v.y0 - 60), yB = Math.min(end, v.y1 + H + 60);
     if (yA > yB || cfg.LIFT_X + 30 < v.x0 || cfg.LIFT_X - 30 > v.x1) return;
-    const spacing = 120;
+    const spacing = 170;
     const speed = 42;
     const t = game.time + 1000;
     const lanes = [
-      { x: cfg.LIFT_X - 12, dir: -1 }, // loaded chairs going up
-      { x: cfg.LIFT_X + 12, dir: 1 }, // empties coming down
+      { x: cfg.LIFT_X - 13, dir: -1 }, // loaded chairs going up
+      { x: cfg.LIFT_X + 13, dir: 1 }, // empties coming down
     ];
     // Shadows.
     ctx.fillStyle = 'rgba(38, 66, 112, 0.12)';
