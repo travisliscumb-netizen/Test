@@ -449,7 +449,8 @@ kbd {
   user-select: none;
 }
 .tb.held { background: radial-gradient(circle at 35% 30%, #fff3c4, rgba(255, 207, 51, 0.9)); transform: scale(0.94); }
-body:not(.steer-pad) .pad { visibility: hidden; }
+/* Finger mode keeps ◀ ▶ for precise steering at speed; the pad option adds ▲ ▼. */
+body:not(.steer-pad) .pad .up, body:not(.steer-pad) .pad .down { visibility: hidden; }
 .pad {
   display: grid;
   grid-template-columns: repeat(3, 58px);

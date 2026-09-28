@@ -179,7 +179,7 @@ function startRun(seed = pickSeed()) {
   const runs = save.data.totals.runs;
   if (runs < 3) {
     const touchy = document.body.classList.contains('touch-ui');
-    const touchTip = save.settings.touchSteer === 'pad' ? 'Arrows steer · HOP jumps · hold F to fly' : 'Hold anywhere to steer · HOP jumps · hold F to fly';
+    const touchTip = save.settings.touchSteer === 'pad' ? 'Arrows steer · HOP jumps · hold F to fly' : 'Touch anywhere or use ◀ ▶ to steer · HOP jumps · hold F to fly';
     toast(touchy ? touchTip : '← → steer · ↓ brake · Space hop · F go fast', 4200);
   }
   if (touchSeen && innerHeight > innerWidth && !portraitTipShown) {
