@@ -5,7 +5,7 @@ import { CONFIG } from './config.js';
 import { C } from './palette.js';
 import { OBJECTS } from './objects.js';
 import { SpriteCache, spriteBounds, makeCanvas } from './sprites.js';
-import { drawSkier, drawBoarder, drawDog, drawYeti, drawChair, groundShadow } from './characters.js';
+import { drawSkier, drawBoarder, drawDog, drawYeti, drawChair, drawBear, groundShadow } from './characters.js';
 import { hash, hash01 } from './rng.js';
 
 const TILE = 256; // fine snow texture period (world units)
@@ -218,6 +218,25 @@ export class Renderer {
           break;
         case 'yeti':
           this.alarm = 1;
+          break;
+        case 'poop':
+          this.popup(e.x, e.y, e.npc ? 'Ew!' : 'EWW!', '#7d5230');
+          break;
+        case 'bearhit':
+          this.kick = 1;
+          this.popup(e.x, e.y, 'BEAR!', '#e0393e', 1.3);
+          break;
+        case 'yetieat':
+          this.popup(e.x, e.y, 'Sorry, buddy!', '#e0393e', 1.2);
+          break;
+        case 'yetiretarget':
+          if (e.to !== 'player') this.popup(e.x, e.y, '!', '#e0393e', 1.6);
+          break;
+        case 'pile':
+          for (let i = 0; i < (this.effects ? 16 : 5); i++) {
+            const a = Math.random() * Math.PI * 2;
+            this.particles.spawn(e.x, e.y, 3, Math.cos(a) * 70, Math.sin(a) * 40, 90 + Math.random() * 90, 0.6, 1.8 + Math.random() * 2, '#ffffff');
+          }
           break;
         case 'coursestart':
           this.popup(e.x, e.y - 60, 'GO!', '#2fa860', 1.6);
@@ -588,6 +607,23 @@ export class Renderer {
       ctx.ellipse(c.x, c.y, 11, 5, 0.2, 0, Math.PI * 2);
       ctx.fill();
     }
+    // Dog poop: a small, unmistakable brown swirl.
+    for (const q of game.poop) {
+      if (q.y < v.y0 - 20 || q.y > v.y1 + 20 || q.x < v.x0 - 20 || q.x > v.x1 + 20) continue;
+      ctx.fillStyle = 'rgba(38, 66, 112, 0.18)';
+      ctx.beginPath();
+      ctx.ellipse(q.x + 1, q.y + 1, 5, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2b1a0e';
+      ctx.lineWidth = 0.8;
+      for (const [dy, rx, c] of [[0, 4.2, '#6b4526'], [-2.4, 3.1, '#7d5230'], [-4.4, 1.9, '#8c5e37']]) {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.ellipse(q.x, q.y + dy, rx, rx * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
     for (const d of game.decals) {
       if (d.y < v.y0 - 20 || d.y > v.y1 + 20) continue;
       if (d.kind === 'yellow') {
@@ -649,6 +685,7 @@ export class Renderer {
       items.push({ y: o.y, o, k: 0 });
     });
     for (const a of game.actors) {
+      if (a.state === 'chomped' || a.gone) continue;
       if (a.x > v.x0 - 40 && a.x < v.x1 + 40 && a.y > v.y0 - 30 && a.y < v.y1 + 60) items.push({ y: a.y, o: a, k: 1 });
     }
     const p = game.player;
@@ -661,7 +698,7 @@ export class Renderer {
       if (it.k === 0) continue;
       ctx.save();
       ctx.translate(it.o.x, it.o.y);
-      groundShadow(ctx, it.k === 3 ? 20 * this.cfg.YETI_DRAW_SCALE : it.o.kind === 'dog' ? 8 : 10, it.o.z || 0);
+      groundShadow(ctx, it.k === 3 ? 20 * this.cfg.YETI_DRAW_SCALE : it.o.kind === 'dog' ? 8 : it.o.kind === 'bear' ? 22 : 10, it.o.z || 0);
       ctx.restore();
     }
 
@@ -688,11 +725,13 @@ export class Renderer {
         this.drawPlayer(ctx, o);
       } else if (it.k === 1) {
         if (o.kind === 'dog') drawDog(ctx, o);
+        else if (o.kind === 'bear') drawBear(ctx, o);
         else if (o.kind === 'boarder') drawBoarder(ctx, { ...o, outfit: 1 + (o.look % 5) });
         else drawSkier(ctx, { ...o, travel: o.heading, outfit: 1 + (o.look % 5), tucking: false, braking: o.beginner && o.state === 'go', stateTime: 0 });
       } else {
         ctx.scale(this.cfg.YETI_DRAW_SCALE, this.cfg.YETI_DRAW_SCALE);
-        drawYeti(ctx, { ...o, outfit: 0 });
+        // Eating an NPC: it's their outfit disappearing into the yeti.
+        drawYeti(ctx, { ...o, outfit: o.victim ? 1 + (o.victim.look % 5) : 0 });
       }
       ctx.restore();
     }

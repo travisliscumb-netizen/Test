@@ -17,6 +17,7 @@ export const OBJECTS = {
   rock_l:     { r: 14, h: 26,  hit: 'crash',  yeti: 'stumble', solid: true },
   stump:      { r: 7,  h: 10,  hit: 'tumble', yeti: 'ignore',  solid: true },
   mogul:      { r: 14, h: 6,   hit: 'bounce', yeti: 'ignore',  solid: false },
+  snowpile:   { r: 12, h: 14,  hit: 'pile',   yeti: 'ignore',  solid: false },
   snowman:    { r: 9,  h: 40,  hit: 'smash',  yeti: 'smash',   solid: true },
   ramp:       { r: 16, h: 0,   hit: 'ramp',   yeti: 'ignore',  solid: false },
   flag_red:   { r: 3,  h: 40,  hit: 'knock',  yeti: 'smash',   solid: false },

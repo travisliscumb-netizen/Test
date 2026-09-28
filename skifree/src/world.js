@@ -18,12 +18,12 @@ const M = METER;
 
 // fill: chance a cell holds anything. The rest are relative weights.
 export const BIOMES = {
-  open:   { fill: 0.08, w: { tree_s: 3, tree_m: 2, rock_s: 2, stump: 1, mogul: 2, snowman: 0.15 } },
+  open:   { fill: 0.08, w: { tree_s: 3, tree_m: 2, rock_s: 2, stump: 1, mogul: 2, snowman: 0.15, snowpile: 1.2 } },
   woods:  { fill: 0.44, w: { tree_m: 4, tree_l: 3, tree_s: 2, tree_snowy: 2.5, stump: 0.5, rock_s: 0.3 } },
-  glade:  { fill: 0.2,  w: { tree_m: 3, tree_snowy: 2, tree_dead: 1, stump: 1.2, rock_s: 0.6, tree_s: 1 } },
+  glade:  { fill: 0.2,  w: { tree_m: 3, tree_snowy: 2, tree_dead: 1, stump: 1.2, rock_s: 0.6, tree_s: 1, snowpile: 0.6 } },
   rocks:  { fill: 0.22, w: { rock_s: 4, rock_l: 2.5, tree_dead: 1, stump: 0.6, tree_s: 0.5 } },
   moguls: { fill: 0.4,  w: { mogul: 9, tree_s: 0.5, rock_s: 0.4 } },
-  park:   { fill: 0.15, w: { ramp: 1.4, mogul: 3, snowman: 0.3, tree_s: 0.6, rock_s: 0.3 } },
+  park:   { fill: 0.15, w: { ramp: 1.4, mogul: 3, snowman: 0.3, tree_s: 0.6, rock_s: 0.3, snowpile: 1 } },
   wild:   { fill: 0.5,  w: { tree_l: 4, tree_m: 3, tree_snowy: 3, tree_dead: 1, rock_l: 0.5 } },
 };
 const REGION_BIOMES = { open: 3, woods: 3, glade: 3, rocks: 1.4, moguls: 1.4, park: 1 };

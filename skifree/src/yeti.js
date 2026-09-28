@@ -25,6 +25,10 @@ export class Yeti {
     this.escape = 0;
     this.eatTime = 0;
     this.lunging = false;
+    // Target: null = the player, or an NPC it has decided looks tastier.
+    this.target = null;
+    this.victim = null; // an NPC currently being eaten
+    this.retargetTimer = cfg.YETI_RETARGET_INTERVAL;
 
     // Where does it come from this time? Mostly from behind, sometimes from
     // the side, occasionally from ahead: the surprise is part of the joke.
@@ -71,9 +75,19 @@ export class Yeti {
     if (this.state === 'eat') {
       this.eatTime += dt;
       this.speed = 0;
+      const v = this.victim || player;
       // Settle exactly onto the victim.
-      this.x += (player.x - this.x) * Math.min(1, dt * 10);
-      this.y += (player.y - 4 - this.y) * Math.min(1, dt * 10);
+      this.x += (v.x - this.x) * Math.min(1, dt * 10);
+      this.y += (v.y - 4 - this.y) * Math.min(1, dt * 10);
+      // A skier is a snack: burp, then back after the player.
+      if (this.victim && this.eatTime >= c.YETI_NPC_EAT_TIME) {
+        this.victim.gone = true;
+        this.victim = null;
+        this.target = null;
+        this.state = 'chase';
+        this.speed = this.topSpeed * 0.3;
+        this.retargetTimer = 3; // not straight onto the next one
+      }
       return;
     }
 
@@ -97,11 +111,17 @@ export class Yeti {
 
     // ---- chase
     const d = this.distanceTo(player);
-    const pvx = Math.sin(player.travel) * player.speed;
-    const pvy = Math.cos(player.travel) * player.speed;
-    const lead = player.down ? 0 : Math.min(c.YETI_LEAD_TIME, d / Math.max(1, this.speed));
-    const tx = player.x + pvx * lead;
-    const ty = player.y + pvy * lead;
+    if (game.modern) this.evaluateTargets(dt, game, d);
+    const tgt = this.target;
+    const q = tgt || player;
+    const qTravel = tgt ? tgt.heading : player.travel;
+    const qDown = tgt ? tgt.fallen : player.down;
+    const dq = tgt ? Math.hypot(tgt.x - this.x, tgt.y - this.y) : d;
+    const pvx = Math.sin(qTravel) * q.speed;
+    const pvy = Math.cos(qTravel) * q.speed;
+    const lead = qDown ? 0 : Math.min(c.YETI_LEAD_TIME, dq / Math.max(1, this.speed));
+    const tx = q.x + pvx * lead;
+    const ty = q.y + pvy * lead;
     let want = Math.atan2(tx - this.x, ty - this.y);
 
     const dx = Math.sin(this.heading), dy = Math.cos(this.heading);
@@ -140,13 +160,34 @@ export class Yeti {
       }
     });
 
-    // ---- bystanders get bowled over
+    // ---- bystanders get bowled over (or eaten, if it was after them)
     for (const a of game.actors) {
-      if (a.fallen || a.hitCooldown > 0) continue;
-      if (Math.abs(a.x - this.x) < 22 && Math.abs(a.y - this.y) < 22 && Math.hypot(a.x - this.x, a.y - this.y) < YETI_RADIUS + a.radius) {
-        a.knockOver(events, game.rng);
-        a.hitCooldown = 1.5;
+      if (a.gone || a.state === 'chomped') continue;
+      const near = Math.abs(a.x - this.x) < 30 && Math.abs(a.y - this.y) < 30 && Math.hypot(a.x - this.x, a.y - this.y) < YETI_RADIUS + a.radius;
+      if (!near) continue;
+      if (a === this.target) {
+        this.state = 'eat';
+        this.eatTime = 0;
+        this.victim = a;
+        a.state = 'chomped';
+        a.speed = 0;
+        events.push({ type: 'yetieat', x: a.x, y: a.y, kind: a.kind });
+        return;
       }
+      if (a.kind === 'bear') {
+        // Even a yeti bounces off a polar bear.
+        if (this.state === 'chase') {
+          this.state = 'stumble';
+          this.timer = c.YETI_STUMBLE_TIME;
+          this.speed *= c.YETI_STUMBLE_SPEED_KEEP;
+          events.push({ type: 'yetibonk', x: this.x, y: this.y });
+          a.knockOver(events, game.rng);
+        }
+        continue;
+      }
+      if (a.fallen || a.hitCooldown > 0) continue;
+      a.knockOver(events, game.rng);
+      a.hitCooldown = 1.5;
     }
 
     // ---- the grab
@@ -164,6 +205,33 @@ export class Yeti {
       this.state = 'giveup';
       this.timer = 3;
       events.push({ type: 'escape', x: this.x, y: this.y });
+    }
+  }
+
+  // Modern mode: a skier passing close enough can steal its attention.
+  // Not every time, and only when they're clearly the easier meal.
+  evaluateTargets(dt, game, dPlayer) {
+    const c = this.cfg;
+    const t = this.target;
+    if (t && (t.gone || t.state === 'chomped' || Math.hypot(t.x - this.x, t.y - this.y) > c.YETI_RETARGET_DISTANCE * 3)) {
+      this.target = null; // lost them: back to you
+      game.events.push({ type: 'yetiretarget', x: this.x, y: this.y, to: 'player' });
+    }
+    this.retargetTimer -= dt;
+    if (this.retargetTimer > 0 || this.target) return;
+    this.retargetTimer = c.YETI_RETARGET_INTERVAL;
+    let best = null, bestD = Infinity;
+    for (const a of game.actors) {
+      if (a.gone || a.kind === 'dog' || a.kind === 'bear' || a.state === 'chomped') continue;
+      const da = Math.hypot(a.x - this.x, a.y - this.y);
+      if (da < c.YETI_RETARGET_DISTANCE && da < dPlayer * c.YETI_RETARGET_RATIO && da < bestD) {
+        best = a;
+        bestD = da;
+      }
+    }
+    if (best && game.rng.chance(c.YETI_RETARGET_CHANCE)) {
+      this.target = best;
+      game.events.push({ type: 'yetiretarget', x: best.x, y: best.y, to: best.kind });
     }
   }
 

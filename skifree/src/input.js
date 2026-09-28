@@ -187,8 +187,36 @@ export class Input {
       if (this.finger.id !== null) s.aim = aimFn(this.finger.x, this.finger.y);
       else if (this.mouse.active) s.aim = aimFn(this.mouse.x, this.mouse.y);
     }
+    this.pollGamepad(s);
     this.jumpLatch = this.upLatch = this.downLatch = false;
     return s;
+  }
+
+  // Standard-mapping gamepads: left stick or d-pad steers (analog), A hops
+  // (and does the helicopter in the air), stick up/down tuck and brake (and
+  // flip / spread eagle in the air), B brakes, RT or X is turbo, Start pauses.
+  pollGamepad(s) {
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+    let startNow = false;
+    for (const pad of pads) {
+      if (!pad || !pad.connected) continue;
+      const b = (i) => !!(pad.buttons[i] && (pad.buttons[i].pressed || pad.buttons[i].value > 0.5));
+      const x = pad.axes[0] || 0, y = pad.axes[1] || 0;
+      if (Math.abs(x) > 0.2 && !s.left && !s.right) {
+        // Analog: the stick sets how far across the hill to point.
+        s.aim = Math.max(-1, Math.min(1, (Math.abs(x) - 0.2) / 0.75)) * Math.sign(x) * (Math.PI / 2);
+      }
+      if (b(14)) s.left = true;
+      if (b(15)) s.right = true;
+      if (b(12) || y < -0.6) s.up = true;
+      if (b(13) || y > 0.6 || b(1) || b(6)) s.down = true;
+      if (b(0)) s.jump = true;
+      if (b(7) || b(2) || b(5)) s.turbo = true;
+      if (b(9)) startNow = true;
+      if (s.aim !== null || s.left || s.right) this.mouse.active = false;
+    }
+    if (startNow && !this.padStart) this.handlers.pause?.();
+    this.padStart = startNow;
   }
 
   get fingerDown() {

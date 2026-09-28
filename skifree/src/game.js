@@ -16,10 +16,14 @@ export class Game {
   // opts: { seed, cfg, demo, viewW, viewH }
   //   demo = attract mode behind the title (no yeti)
   //   viewW/H = visible world size, so the first actors spawn off-screen
-  constructor({ seed, cfg = CONFIG, demo = false, viewW = 900, viewH = 640 } = {}) {
+  //   modern = the expanded game (poop, bears, yeti retargeting, panic);
+  //            false plays like the 1991 original
+  constructor({ seed, cfg = CONFIG, demo = false, viewW = 900, viewH = 640, modern = true } = {}) {
     this.cfg = cfg;
     this.seed = seed >>> 0;
     this.demo = demo;
+    this.modern = modern;
+    this.poop = []; // { x, y } dog presents on the snow
     this.rng = new Rng(hash(this.seed, 0x5eed));
     this.world = new World(this.seed, cfg);
     this.player = new Player(0, 0, cfg);
@@ -110,6 +114,7 @@ export class Game {
       if (Math.abs(a.y - this.camY) < this.cfg.ACTOR_ACTIVE_RADIUS && Math.abs(a.x - this.camX) < this.cfg.ACTOR_ACTIVE_RADIUS) a.update(dt, this);
     }
     this.collideActors();
+    if (this.modern) this.collideCrowd();
 
     this.updateYeti(dt);
     this.scoreEvents(firstEvent);
@@ -216,8 +221,31 @@ export class Game {
         case 'ramp':
           if (p.state === 'ski' && p.z <= 0) p.rampLaunch(this.events);
           break;
+        case 'pile':
+          // A soft heap: scrubs speed and pops you up a little.
+          if (p.state !== 'ski' || o.id === p.lastMogul) break;
+          p.lastMogul = o.id;
+          p.speed *= c.PILE_SPEED_KEEP;
+          p.bounce(c.PILE_BOUNCE * (0.5 + 0.5 * Math.min(1.5, p.speed / c.PLAYER_SPEED)));
+          this.events.push({ type: 'pile', x: p.x, y: p.y, speed: p.speed });
+          break;
       }
     });
+
+    // Dog poop (modern): the skis shoot out sideways.
+    if (this.modern && p.state === 'ski' && !ghost) {
+      const q = this.poopAt(p.x, p.y, c.COLLISION_RADIUS);
+      if (q && q !== p.lastPoop) {
+        p.lastPoop = q;
+        this.events.push({ type: 'poop', x: p.x, y: p.y, speed: p.speed });
+        if (p.speed > c.PLAYER_SPEED * 0.85) {
+          p.knockDown('tumble', this.rng.sign() * 0.5, 0);
+          this.stats.falls++;
+        } else {
+          p.heading += this.rng.sign() * c.POOP_SPIN;
+        }
+      }
+    }
 
     // Still overlapping something after getting up: stay ghosted until clear,
     // so a skier who doesn't steer can never be trapped crashing into one tree.
@@ -284,6 +312,39 @@ export class Game {
     }
   }
 
+  // Everyone else bumps into everyone else: pileups and chain reactions.
+  collideCrowd() {
+    const A = this.actors;
+    for (let i = 0; i < A.length; i++) {
+      const a = A[i];
+      if (a.gone || a.state === 'chomped' || Math.abs(a.y - this.camY) > 1200) continue;
+      for (let j = i + 1; j < A.length; j++) {
+        const b = A[j];
+        if (b.gone || b.state === 'chomped') continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const r = a.radius + b.radius;
+        if (Math.abs(dx) > r || Math.abs(dy) > r || Math.hypot(dx, dy) > r) continue;
+        if (a.owner === b || b.owner === a) continue; // a dog and its person
+        if (a.hitCooldown > 0 || b.hitCooldown > 0) continue;
+        for (const [x, y] of [[a, b], [b, a]]) {
+          if (x.kind === 'dog' || x.kind === 'bear' || x.fallen) continue;
+          x.knockOver(this.events, this.rng);
+          x.hitCooldown = 1;
+          // Carried along by the collision.
+          x.heading = Math.atan2(x.x - y.x, x.y - y.y + 1);
+          x.speed = Math.max(x.speed, (y.speed || 0) * 0.6);
+        }
+        if (a.kind === 'bear' || b.kind === 'bear') {
+          const bear = a.kind === 'bear' ? a : b;
+          bear.knockOver(this.events, this.rng);
+        }
+        a.hitCooldown = Math.max(a.hitCooldown, 0.6);
+        b.hitCooldown = Math.max(b.hitCooldown, 0.6);
+        this.events.push({ type: 'pileup', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+      }
+    }
+  }
+
   collideActors() {
     const p = this.player;
     if (!p.controllable || p.grace > 0) return;
@@ -295,7 +356,14 @@ export class Game {
       if (Math.abs(p.z - a.z) > 18) continue; // jumped clean over
       a.hitCooldown = 1;
       const len = Math.hypot(dx, dy) || 1;
-      if (a.kind === 'dog') {
+      if (a.kind === 'bear') {
+        // Like skiing into a sofa: a big shove and a wipeout.
+        this.events.push({ type: 'bearhit', x: a.x, y: a.y, speed: p.speed });
+        a.knockOver(this.events, this.rng);
+        p.knockDown('crash', -dx / len, -dy / len);
+        p.knockX *= this.cfg.BEAR_KNOCKBACK / this.cfg.CRASH_KNOCKBACK;
+        p.knockY *= this.cfg.BEAR_KNOCKBACK / this.cfg.CRASH_KNOCKBACK;
+      } else if (a.kind === 'dog') {
         this.events.push({ type: 'dog', x: a.x, y: a.y, speed: p.speed });
         a.knockOver(this.events, this.rng);
         p.knockDown('tumble', -dx / len * 0.4, -dy / len * 0.4);
@@ -328,6 +396,17 @@ export class Game {
     if (n <= 0) return;
     this.style += n;
     this.events.push({ type: 'style', amount: Math.round(n), label, x, y });
+  }
+
+  addPoop(x, y) {
+    this.poop.push({ x, y });
+    if (this.poop.length > this.cfg.POOP_MAX) this.poop.shift();
+  }
+
+  poopAt(x, y, r) {
+    const R = r + this.cfg.POOP_RADIUS;
+    for (const q of this.poop) if (Math.abs(q.x - x) < R && Math.abs(q.y - y) < R && Math.hypot(q.x - x, q.y - y) < R) return q;
+    return null;
   }
 
   addDecal(kind, x, y) {
@@ -378,14 +457,14 @@ export class Game {
     if (!y) return;
     y.update(dt, this);
 
-    if (y.state === 'eat' && p.state !== 'caught') {
+    if (y.state === 'eat' && !y.victim && p.state !== 'caught') {
       this.course = null; // no course clock ticking in the yeti's stomach
       p.state = 'caught';
       p.speed = 0;
       p.z = 0;
       p.turbo = false;
     }
-    if (y.state === 'eat' && y.eatTime >= c.YETI_EAT_TIME) this.finish();
+    if (y.state === 'eat' && !y.victim && y.eatTime >= c.YETI_EAT_TIME) this.finish();
     if (y.state === 'gone') {
       this.yeti = null;
       // Never pull the classic 2000 m arrival forward after an early escape.
@@ -424,7 +503,7 @@ export class Game {
   // Skips the rest of the eating animation (any key once it has read).
   skipEating() {
     const y = this.yeti;
-    if (y && y.state === 'eat' && y.eatTime >= this.cfg.YETI_EAT_SKIPPABLE_AFTER) this.finish();
+    if (y && y.state === 'eat' && !y.victim && y.eatTime >= this.cfg.YETI_EAT_SKIPPABLE_AFTER) this.finish();
   }
 
   finish() {
@@ -442,7 +521,7 @@ export class Game {
     const fast = clamp((p.speed - c.PLAYER_SPEED * 0.6) / (c.TURBO_SPEED - c.PLAYER_SPEED * 0.6), 0, 1);
     const k = 1 - Math.exp(-c.CAMERA_SMOOTH * dt);
     const y = this.yeti;
-    const eating = y && y.state === 'eat';
+    const eating = y && y.state === 'eat' && !y.victim;
     const zoomTarget = eating ? c.CAMERA_EAT_ZOOM : 1 + c.CAMERA_ZOOM_OUT_FAST * fast;
     this.zoomMul += (zoomTarget - this.zoomMul) * k * (eating ? 0.35 : 0.5);
     this.anchor += (c.CAMERA_ANCHOR + (c.CAMERA_ANCHOR_FAST - c.CAMERA_ANCHOR) * fast - this.anchor) * k * 0.5;
@@ -463,13 +542,13 @@ export class Game {
     const fresh = this.world.update(v.x0, v.y0, v.x1, v.y1);
     for (const chunk of fresh) {
       const rng = new Rng(hash(this.seed, chunk.cx, chunk.cy, 31));
-      for (const a of spawnActors(chunk, this.world, rng, v, this.cfg)) this.actors.push(a);
+      for (const a of spawnActors(chunk, this.world, rng, v, this.cfg, this.modern && !this.demo)) this.actors.push(a);
     }
     // Forget actors far behind (or far off to the side).
     const E = this.cfg.ACTOR_DESPAWN_BEHIND;
     let n = 0;
     for (const a of this.actors) {
-      const keep = a.y > v.y0 - E && a.y < v.y1 + E * 3 && Math.abs(a.x - this.camX) < this.cfg.ACTOR_ACTIVE_RADIUS * 1.5;
+      const keep = !a.gone && a.y > v.y0 - E && a.y < v.y1 + E * 3 && Math.abs(a.x - this.camX) < this.cfg.ACTOR_ACTIVE_RADIUS * 1.5;
       if (keep) this.actors[n++] = a;
       else a.gone = true;
     }

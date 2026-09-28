@@ -40,6 +40,7 @@ export class Player {
     this.airFromRamp = false;
     this.skid = 0; // 0..1 how sideways the skis are to travel (drives spray + sound)
     this.lastMogul = 0; // id of the mogul last bounced off, so one bump = one bounce
+    this.lastPoop = null;
     this.trick = null; // { kind, t, dur } while one is in progress
     this.tricks = []; // tricks completed during the current jump
     this.prevUp = false; // edge detection: a key held from the ground isn't a trick

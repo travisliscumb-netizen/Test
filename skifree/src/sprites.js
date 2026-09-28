@@ -18,6 +18,7 @@ const BOUNDS = {
   rock_l: [-22, -24, 46, 30],
   stump: [-11, -12, 24, 18],
   mogul: [-20, -8, 42, 16],
+  snowpile: [-20, -20, 42, 26],
   snowman: [-18, -44, 38, 50],
   ramp: [-26, -30, 54, 38],
   flag_red: [-4, -40, 22, 44],
@@ -161,6 +162,8 @@ export function drawStatic(ctx, o) {
       return stump(ctx);
     case 'mogul':
       return mogul(ctx, v);
+    case 'snowpile':
+      return snowpile(ctx, v);
     case 'snowman':
       return o.state ? snowmanSmashed(ctx, v) : snowman(ctx, v);
     case 'ramp':
@@ -374,6 +377,26 @@ function mogul(ctx, v) {
   ctx.strokeStyle = 'rgba(255,255,255,0.9)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
+}
+
+// A heaped pile of snow: taller and lumpier than a mogul, with blue shade.
+function snowpile(ctx, v) {
+  const rng = new Rng(500 + v);
+  shadow(ctx, 3, 1, 17, 5);
+  const pts = [];
+  const n = 11;
+  for (let i = 0; i <= n; i++) {
+    const a = Math.PI + (i / n) * Math.PI;
+    const r = rng.range(0.85, 1.1);
+    pts.push(Math.cos(a) * 16 * r, Math.sin(a) * 15 * r * (0.7 + 0.3 * Math.sin((i / n) * Math.PI)) + 1);
+  }
+  const g = ctx.createLinearGradient(-10, -16, 10, 2);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.6, '#eef4fb');
+  g.addColorStop(1, '#c8d8ec');
+  poly(ctx, pts, g, 'rgba(110, 140, 185, 0.9)', 1.3);
+  ellipse(ctx, -5, -10, 5, 2.5, 'rgba(255,255,255,0.9)');
+  ellipse(ctx, 6, -3, 7, 2.2, 'rgba(150, 180, 220, 0.35)');
 }
 
 const SCARVES = ['#e0393e', '#2f6fd6', '#2fa860', '#8e4ad6'];

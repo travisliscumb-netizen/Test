@@ -253,7 +253,7 @@ body.touch-ui .toast {
 
 .menu {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   width: min(420px, 100%);
   margin: 0 auto;
@@ -485,7 +485,7 @@ body.touch-ui .desktop-only { display: none; }
 @media (max-height: 460px) {
   .logo { font-size: clamp(42px, 12vh, 76px); }
   .tagline { margin: 4px 0 10px; font-size: 14px; }
-  .menu { gap: 7px; grid-template-columns: repeat(4, 1fr); width: min(560px, 100%); }
+  .menu { gap: 7px; grid-template-columns: repeat(5, 1fr); width: min(640px, 100%); }
   .menu .primary { grid-column: auto; }
   .btn { padding: 8px 10px; min-height: 42px; font-size: 13px; }
   .btn.big { font-size: 15px; min-height: 42px; }
@@ -513,7 +513,7 @@ body.touch-ui .desktop-only { display: none; }
   #speedo { margin-top: 4px; }
   /* Below the stats strip and the course chip, which can both be showing. */
   .chip.yeti { top: calc(110px + var(--safe-t)); }
-  .menu { grid-template-columns: 1fr 1fr 1fr; }
+  .menu { grid-template-columns: 1fr 1fr; }
   .btn { padding: 10px 8px; font-size: 13px; }
   .btn .ico { display: none; }
   .btn.big .ico { display: inline; }

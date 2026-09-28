@@ -72,6 +72,12 @@ export class Actor {
       this.baseSpeed = rng.range(cfg.SNOWBOARDER_SPEED_MIN, cfg.SNOWBOARDER_SPEED_MAX);
       this.wobbleAmp = rng.range(0.7, 1.05);
       this.wobbleFreq = rng.range(0.55, 0.85);
+    } else if (kind === 'bear') {
+      this.baseSpeed = cfg.BEAR_SPEED;
+      this.crossDir = rng.sign();
+      this.heading = this.crossDir * 1.3;
+      this.timer = rng.range(3, 8);
+      this.look = 0;
     } else {
       this.baseSpeed = cfg.DOG_SPEED * rng.range(0.85, 1.15);
       this.state = rng.chance(0.4) ? 'sit' : 'go';
@@ -82,13 +88,21 @@ export class Actor {
   }
 
   get radius() {
-    return this.kind === 'dog' ? 7 : 6;
+    return this.kind === 'dog' ? 7 : this.kind === 'bear' ? this.cfg.BEAR_RADIUS : 6;
   }
   get fallen() {
     return this.state === 'fall' || this.state === 'chomped';
   }
 
   knockOver(events, rng) {
+    // Bears don't fall over; they just look offended.
+    if (this.kind === 'bear') {
+      this.state = 'startled';
+      this.timer = 1.2;
+      this.speed = 0;
+      events.push({ type: 'bear', x: this.x, y: this.y });
+      return;
+    }
     if (this.kind === 'dog') {
       this.state = 'flee';
       this.timer = 1.2;
@@ -107,8 +121,35 @@ export class Actor {
   update(dt, game) {
     this.anim += dt;
     if (this.hitCooldown > 0) this.hitCooldown -= dt;
+    if (this.state === 'chomped') return; // inside a yeti
     if (this.kind === 'dog') this.updateDog(dt, game);
+    else if (this.kind === 'bear') this.updateBear(dt, game);
     else this.updateRider(dt, game);
+  }
+
+  // Polar bears amble across the slope, sometimes stopping to look around.
+  updateBear(dt, game) {
+    const c = this.cfg;
+    this.timer -= dt;
+    if (this.state === 'startled' || this.state === 'sit') {
+      this.speed = 0;
+      if (this.timer <= 0) {
+        this.state = 'go';
+        this.timer = game.rng.range(4, 9);
+      }
+      return;
+    }
+    if (this.timer <= 0) {
+      this.state = 'sit';
+      this.timer = game.rng.range(1.5, 4);
+      return;
+    }
+    // Mostly across the hill, drifting a little downhill.
+    const want = this.crossDir * (Math.PI / 2 - 0.25);
+    const nudge = avoidance(game.world, this.x, this.y, Math.sin(this.heading), Math.cos(this.heading), 60, this.radius);
+    this.heading = approach(this.heading, nudge ? this.heading + nudge : want, 1.5 * dt);
+    this.speed = approach(this.speed, c.BEAR_SPEED, 60 * dt);
+    this.moveBy(dt);
   }
 
   updateRider(dt, game) {
@@ -135,16 +176,36 @@ export class Actor {
       return;
     }
 
+    // Modern mode: dog poop is slippery for everyone.
+    if (game.modern && game.poopAt(this.x, this.y, this.radius) && game.rng.chance(0.6)) {
+      this.knockOver(events, game.rng);
+      events.push({ type: 'poop', x: this.x, y: this.y, npc: true });
+      return;
+    }
+
+    // Seeing the yeti: some skiers bolt away from it, flat out.
+    const y = game.yeti;
+    if (game.modern && y && (y.state === 'chase' || y.state === 'stumble')) {
+      if (this.aware === undefined && Math.hypot(y.x - this.x, y.y - this.y) < c.NPC_PANIC_RADIUS) {
+        this.aware = game.rng.chance(c.NPC_PANIC_AWARE);
+        if (this.aware) events.push({ type: 'panic', x: this.x, y: this.y });
+      }
+    } else {
+      this.aware = undefined;
+    }
+    const panicking = this.aware && y;
+
     // Wobble (slalom / board carving) plus tree avoidance.
     this.phase += this.wobbleFreq * dt * Math.PI;
     let target = Math.sin(this.phase) * this.wobbleAmp;
+    if (panicking) target = clamp(Math.atan2(this.x - y.x, Math.max(40, this.y - y.y)), -1.2, 1.2);
     const dx = Math.sin(this.heading), dy = Math.cos(this.heading);
     const reach = 40 + this.speed * 0.55;
     const nudge = avoidance(world, this.x, this.y, dx, dy, reach, this.radius + 4);
     if (nudge) target = clamp(this.heading + nudge * 1.1, -1.35, 1.35);
     this.heading = approach(this.heading, target, (nudge ? 4.5 : 2.2) * dt);
 
-    const want = this.baseSpeed * Math.pow(Math.max(0.2, Math.cos(this.heading)), 0.5);
+    const want = this.baseSpeed * (panicking ? 1.5 : 1) * Math.pow(Math.max(0.2, Math.cos(this.heading)), 0.5);
     this.speed = approach(this.speed, want, 160 * dt);
     this.moveBy(dt);
 
@@ -225,6 +286,7 @@ export class Actor {
             if (o.t.startsWith('tree')) tree = o;
           });
           if (tree && rng.chance(0.5)) game.addDecal('yellow', this.x, this.y + 4);
+          else if (game.modern && rng.chance(c.DOG_POOP_CHANCE)) game.addPoop(this.x - Math.sin(this.heading) * 9, this.y + 3);
         }
         break;
       case 'follow': {
@@ -294,7 +356,7 @@ export class Actor {
 
 // Populates a freshly generated chunk. `forbid` is the rect currently on
 // screen: nothing ever materialises where the player can see it.
-export function spawnActors(chunk, world, rng, forbid, cfg = CONFIG) {
+export function spawnActors(chunk, world, rng, forbid, cfg = CONFIG, modern = true) {
   const S = cfg.CHUNK_SIZE;
   const x0 = chunk.cx * S, y0 = chunk.cy * S;
   const out = [];
@@ -333,6 +395,11 @@ export function spawnActors(chunk, world, rng, forbid, cfg = CONFIG) {
   if (rng.chance(cfg.DOGS_PER_CHUNK * (0.6 + depth * 0.6))) {
     const at = place(8);
     if (at) out.push(new Actor('dog', at.x, at.y, rng, cfg));
+  }
+  // Rare polar bears (modern mode only, and never in the first stretch).
+  if (modern && y0 > 400 * 16 && rng.chance(cfg.BEARS_PER_CHUNK * depth)) {
+    const at = place(cfg.BEAR_RADIUS);
+    if (at) out.push(new Actor('bear', at.x, at.y, rng, cfg));
   }
   return out;
 }

@@ -714,3 +714,50 @@ export function drawChair(ctx, riders, looks) {
   ctx.fill();
   ctx.stroke();
 }
+
+// ------------------------------------------------------------- polar bear
+// Side-on, ambling. Cream-white against white snow, so it gets a firm outline
+// and a warm shade to separate it from the snow (and from the yeti).
+export function drawBear(ctx, b) {
+  const facing = Math.sin(b.heading) >= 0 ? 1 : -1;
+  const walking = b.speed > 5 && b.state === 'go';
+  const t = b.anim * 5;
+  ctx.save();
+  ctx.scale(facing, 1);
+  const bob = walking ? Math.abs(Math.sin(t)) * 1.2 : 0;
+  // Legs.
+  for (const [x, ph] of [[-12, 0], [-7, Math.PI], [8, Math.PI * 0.5], [13, Math.PI * 1.5]]) {
+    const k = walking ? Math.sin(t + ph) * 3 : 0;
+    ell(ctx, x + k, -1, 4, 2.4, '#e8e0cc', C.outline, 1.2);
+    ctx.beginPath();
+    ctx.rect(x - 3 + k * 0.5, -10, 6, 9);
+    ctx.fillStyle = '#f4efe2';
+    ctx.fill();
+    ctx.strokeStyle = C.outline;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+  ctx.translate(0, -bob);
+  // Body: lit from above, warm underneath.
+  const g = ctx.createLinearGradient(0, -26, 0, -6);
+  g.addColorStop(0, '#fffdf6');
+  g.addColorStop(1, '#e6dcc4');
+  ell(ctx, 0, -15, 18, 10, g, C.outline, 1.5);
+  // Head, low and forward.
+  const sit = b.state === 'sit';
+  const startled = b.state === 'startled';
+  const hx = 19, hy = startled ? -24 : sit ? -20 : -16;
+  ell(ctx, hx, hy, 7.5, 6, '#fbf7ec', C.outline, 1.4);
+  ell(ctx, hx + 6, hy + 1.5, 3.4, 2.6, '#f1eadb', C.outline, 1.1);
+  ell(ctx, hx + 9, hy + 1, 1.3, 1.1, C.outline);
+  ell(ctx, hx + 2, hy - 1.5, 1, 1, C.outline);
+  ell(ctx, hx - 3, hy - 5.5, 2.2, 2, '#fbf7ec', C.outline, 1.1);
+  if (startled) {
+    ctx.font = '900 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.scale(facing, 1);
+    ctx.fillStyle = C.red;
+    ctx.fillText('?!', facing * hx, hy - 12);
+  }
+  ctx.restore();
+}

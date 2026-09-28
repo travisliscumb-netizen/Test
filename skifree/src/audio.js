@@ -285,6 +285,35 @@ export class Sound {
         break;
       case 'style':
         break;
+      case 'poop':
+        // A wet slide and an indignant "eww".
+        this.burst('bandpass', 700, 300, 0.25, 0.14, 0, 2);
+        if (!e.npc) this.voice(420, 300, 0.3, 900, 0.12, 0.05);
+        break;
+      case 'pile':
+        this.burst('lowpass', 900, 250, 0.2, 0.18);
+        break;
+      case 'bear':
+        this.voice(110, 80, 0.45, 420, 0.2);
+        break;
+      case 'bearhit':
+        this.tone('sine', 90, 40, 0.3, 0.3);
+        this.burst('lowpass', 1100, 150, 0.3, 0.25);
+        this.voice(120, 70, 0.5, 400, 0.22, 0.05);
+        break;
+      case 'yetieat':
+        for (let i = 0; i < 3; i++) this.burst('lowpass', 900, 200, 0.07, 0.2, 0.3 + i * 0.16);
+        this.voice(90, 70, 0.3, 380, 0.2, 0.9);
+        break;
+      case 'yetiretarget':
+        if (e.to !== 'player') this.roar(0.45, 0, 0.6);
+        break;
+      case 'panic':
+        this.voice(520, 700, 0.18, 1100, 0.07);
+        break;
+      case 'pileup':
+        this.burst('lowpass', 800, 200, 0.18, 0.12);
+        break;
       case 'yetibonk':
         this.tone('sine', 700, 180, 0.22, 0.14);
         this.burst('lowpass', 800, 150, 0.25, 0.22);

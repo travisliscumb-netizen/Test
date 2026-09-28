@@ -104,6 +104,26 @@ export const CONFIG = {
   YETI_DRAW_SCALE: 1.3,              // it's big: drawn larger than its footprint
   CAMERA_EAT_ZOOM: 0.7,              // camera pushes in on the meal
 
+  // ------------------------------------------------- modern-mode systems
+  // Classic mode switches all of these off and plays like the original.
+  YETI_RETARGET_DISTANCE: 230,       // skiers this close to the yeti can distract it...
+  YETI_RETARGET_RATIO: 0.6,          // ...if clearly closer than you (fraction of your distance)
+  YETI_RETARGET_CHANCE: 0.45,        // ...and it fancies them (rolled every check)
+  YETI_RETARGET_INTERVAL: 0.4,
+  YETI_NPC_EAT_TIME: 2.2,            // a quick snack, then back after you
+  NPC_PANIC_RADIUS: 520,             // skiers who see the yeti this close flee
+  NPC_PANIC_AWARE: 0.75,             // ...but only some notice
+  DOG_POOP_CHANCE: 0.22,             // per sit: dogs leave a present
+  POOP_MAX: 40,
+  POOP_RADIUS: 5,
+  POOP_SPIN: 1.3,                    // radians the skis get kicked sideways
+  BEARS_PER_CHUNK: 0.004,            // rare: roughly one per few km of slope
+  BEAR_SPEED: 2.8 * M,
+  BEAR_RADIUS: 16,
+  BEAR_KNOCKBACK: 260,
+  PILE_SPEED_KEEP: 0.72,
+  PILE_BOUNCE: 170,
+
   // ---------------------------------------------------------------- actors
   NPC_SKIER_SPEED_MIN: 6 * M,
   NPC_SKIER_SPEED_MAX: 10.5 * M,

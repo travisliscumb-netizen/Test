@@ -488,6 +488,96 @@ function yetiTrial(seed, brain, at = 30) {
   check('leaving the course voids the run', log.some((e) => e.type === 'courseabort'));
 }
 
+// ------------------------------------------------------- modern systems
+{
+  const { Actor } = await import('../src/actors.js');
+  // Setup: yeti right behind the player, a skier sitting between them.
+  const bait = (modern) => {
+    const g = new Game({ seed: 71, modern });
+    g.setViewSize(1100, 640);
+    g.player.grace = 1e9;
+    g.nextYetiAt = 0;
+    run(g, 0.01, () => ({}));
+    const y = g.yeti;
+    y.x = g.player.x; y.y = g.player.y - 420; y.heading = 0;
+    const npc = new Actor('skier', g.player.x + 10, y.y + 90, g.rng);
+    npc.baseSpeed = 20; npc.beginner = false;
+    g.actors.push(npc);
+    const log = run(g, 12, () => ({ up: true, turbo: true }));
+    return { g, npc, log };
+  };
+  let ate = 0, classicAte = 0;
+  for (let i = 0; i < 6; i++) {
+    const m = bait(true);
+    if (m.log.some((e) => e.type === 'yetieat')) ate++;
+    const c = bait(false);
+    if (c.log.some((e) => e.type === 'yetieat')) classicAte++;
+  }
+  check('modern: the yeti can switch to a nearby skier and eat them', ate >= 2, `${ate}/6 runs`);
+  check('classic: the yeti only ever wants you', classicAte === 0);
+  const m = bait(true);
+  const eat = m.log.find((e) => e.type === 'yetieat');
+  if (eat) check('after its snack the yeti comes back for you', m.npc.gone && (m.g.yeti === null || m.g.yeti.state !== 'eat' || m.g.yeti.victim === null));
+
+  // Dog poop.
+  const pg = new Game({ seed: 3, demo: true });
+  run(pg, 0.01, () => ({}));
+  pg.player.speed = 150;
+  pg.addPoop(pg.player.x, pg.player.y + 30);
+  const h0 = pg.player.heading;
+  const plog = run(pg, 0.5, () => ({}));
+  check('dog poop sends the skis sideways', plog.some((e) => e.type === 'poop') && Math.abs(pg.player.travel - h0) > 0.3);
+  const pf = new Game({ seed: 3, demo: true });
+  run(pf, 0.01, () => ({}));
+  pf.player.speed = 380;
+  pf.addPoop(pf.player.x, pf.player.y + 60);
+  run(pf, 0.4, () => ({ turbo: true }));
+  check('dog poop at speed is a wipeout', pf.player.state === 'tumble' || pf.player.state === 'recover' || pf.player.state === 'crash');
+  const pc = new Game({ seed: 3, demo: true, modern: false });
+  run(pc, 0.01, () => ({}));
+  pc.addPoop(pc.player.x, pc.player.y + 30);
+  check('classic mode has no poop hazard', !run(pc, 0.5, () => ({})).some((e) => e.type === 'poop'));
+
+  // Polar bear.
+  const bg = new Game({ seed: 3, demo: true });
+  run(bg, 0.01, () => ({}));
+  bg.player.grace = 0;
+  const bear = new Actor('bear', bg.player.x, bg.player.y + 70, bg.rng);
+  bear.state = 'sit'; bear.timer = 99;
+  bg.actors.push(bear);
+  const blog = run(bg, 1, () => ({ up: true }));
+  check('skiing into a polar bear is a big wipeout', blog.some((e) => e.type === 'bearhit') && blog.some((e) => e.type === 'bear'));
+  let bears = 0, chunks = 0;
+  for (const seed of [1, 2, 3, 4]) {
+    const w = new World(seed);
+    for (let cy = 20; cy < 200; cy++) for (let cx = -4; cx <= 4; cx++) {
+      chunks++;
+      const { spawnActors } = await import('../src/actors.js');
+      bears += spawnActors(w.chunk(cx, cy), w, new Rng(seed * 7919 + cx * 131 + cy), null, CONFIG, true).filter((a) => a.kind === 'bear').length;
+    }
+  }
+  const perKm = bears / ((chunks / 9) * CONFIG.CHUNK_SIZE / METER / 1000) / 4 * 4;
+  check('polar bears are rare', bears > 0 && bears / chunks < 0.02, `${bears} bears in ${chunks} chunks`);
+
+  // Snow pile.
+  const sg = new Game({ seed: 3, demo: true });
+  run(sg, 0.01, () => ({}));
+  sg.player.speed = 240;
+  sg.world.chunk(0, 0).objects.push({ id: 424242, t: 'snowpile', x: sg.player.x, y: sg.player.y + 40, v: 0, state: 0, timer: 0 });
+  const slog2 = run(sg, 0.4, () => ({ up: true }));
+  check('snow piles slow you and pop you up', slog2.some((e) => e.type === 'pile'));
+
+  // NPCs pile into each other.
+  const cg = new Game({ seed: 3, demo: true });
+  run(cg, 0.01, () => ({}));
+  const a1 = new Actor('skier', cg.player.x + 300, cg.player.y + 200, cg.rng);
+  const a2 = new Actor('skier', cg.player.x + 300, cg.player.y + 208, cg.rng);
+  a1.state = a2.state = 'go';
+  cg.actors.push(a1, a2);
+  const clog = run(cg, 0.1, () => ({}));
+  check('NPCs collide with each other', clog.some((e) => e.type === 'pileup') && (a1.fallen || a2.fallen));
+}
+
 // ----------------------------------------------------------------- save
 {
   const bad = sanitize({ best: { score: -5, distance: 'x', maxSpeed: NaN }, settings: { master: 7, touch: 'weird', seed: 5 } });

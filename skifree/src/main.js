@@ -163,10 +163,13 @@ function newDemo() {
   demoStuck = 0;
 }
 
-function startRun(seed = pickSeed()) {
+let classicMode = false; // remembered so Try again keeps the same mode
+
+function startRun(seed = pickSeed(), classic = classicMode) {
+  classicMode = classic;
   sound.unlock();
   sound.resume();
-  game = new Game({ seed, viewW: renderer.viewW, viewH: renderer.viewH });
+  game = new Game({ seed, viewW: renderer.viewW, viewH: renderer.viewH, modern: !classic });
   renderer.reset();
   mode = 'playing';
   input.capture = true;
@@ -278,6 +281,13 @@ function handleEvents(g, live) {
           if (e.air > 0.5) sound.play('land', e);
           else sound.play('mogul', e);
           break;
+        case 'hit':
+        case 'wipeout':
+        case 'bearhit':
+        case 'caught':
+          buzz(e.type === 'caught' ? [60, 40, 120] : e.type === 'bearhit' ? 90 : 40);
+          sound.play(e.type, e);
+          break;
         default:
           sound.play(e.type, e);
       }
@@ -339,6 +349,8 @@ function frame(ts) {
   }
 
   if (mode === 'playing' || mode === 'title') watchPerformance(dt);
+  // Gamepad Start works on every screen, not just mid-run.
+  if (mode !== 'playing') input.pollGamepad({ left: false, right: false, up: false, down: false, jump: false, turbo: false, aim: null });
   if (mode !== 'paused' || needsDraw) {
     if (mode !== 'paused') renderer.updateEffects(active, dt);
     if (active === demo) {
@@ -360,7 +372,8 @@ function musicFor(g) {
   if (mode === 'over') return 'calm';
   const y = g && !g.demo ? g.yeti : null;
   if (y && (y.state === 'chase' || y.state === 'stumble')) return 'chase';
-  if (y && y.state === 'eat') return 'silent';
+  if (y && y.state === 'eat' && !y.victim) return 'silent';
+  if (y && y.state === 'eat') return 'chase'; // it's eating someone else: keep running!
   return 'calm';
 }
 
@@ -412,9 +425,10 @@ function updateHud(g) {
 
   // Yeti alert: how far behind it is, pulsing faster as it closes in.
   const y = g.yeti;
-  const chasing = y && (y.state === 'chase' || y.state === 'stumble');
+  const snacking = y && y.state === 'eat' && y.victim;
+  const chasing = y && (y.state === 'chase' || y.state === 'stumble' || snacking);
   const d = chasing ? Math.round(y.distanceTo(p) / METER) : 0;
-  const yetiText = chasing ? (y.state === 'stumble' ? 'YETI · stumbled!' : `YETI · ${d}m`) : '';
+  const yetiText = !chasing ? '' : snacking ? 'YETI · eating someone. GO!' : y.state === 'stumble' ? 'YETI · stumbled!' : y.target ? 'YETI · chasing someone else!' : `YETI · ${d}m`;
   if (hudLast.yeti !== yetiText) {
     hudLast.yeti = yetiText;
     hudEls.yeti.classList.toggle('hidden', !chasing);
@@ -424,6 +438,10 @@ function updateHud(g) {
 }
 
 const fmtInt = (n) => Math.floor(n).toLocaleString('en-US');
+// Haptic bump on phones that support it (Android; iOS Safari ignores it).
+const buzz = (p) => {
+  if (touchSeen && !renderer.reducedMotion) navigator.vibrate?.(p);
+};
 const fmtTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
 
 // A small yeti waving from the corner of the logo.
@@ -518,7 +536,9 @@ function onAction(action) {
   sound.play('click');
   switch (action) {
     case 'play':
-      return startRun();
+      return startRun(pickSeed(), false);
+    case 'classic':
+      return startRun(pickSeed(), true);
     case 'controls':
     case 'options':
     case 'about':
@@ -548,7 +568,9 @@ $('#pause-btn').addEventListener('click', () => pause());
 for (const el of document.querySelectorAll('#touch [data-key]')) input.bindTouchButton(el, el.dataset.key);
 
 input.on('pause', () => {
-  if (mode === 'playing') pause();
+  if (mode === 'title') startRun(); // gamepad Start
+  else if (mode === 'over' && game.overTime > 0.4) startRun();
+  else if (mode === 'playing') pause();
   else if (mode === 'paused') resume();
   else if (mode === 'controls' || mode === 'options' || mode === 'about') showTitle();
 });
