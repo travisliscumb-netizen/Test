@@ -61,7 +61,10 @@ export function makeRng(seed) {
 }
 
 export class Game {
-  constructor({ mode = 'marathon', startLevel = 1, seed = Date.now(), sdf = 20 } = {}) {
+  /* picker: optional (game) => type. When set, it replaces the 7-bag: each new
+     piece is chosen for the board as it stands at spawn time, and the single
+     preview slot shows the picker's current best guess for the piece after. */
+  constructor({ mode = 'marathon', startLevel = 1, seed = Date.now(), sdf = 20, picker = null } = {}) {
     if (!MODES[mode]) throw new Error(`unknown mode: ${mode}`);
     this.mode = mode;
     this.rules = MODES[mode];
@@ -102,7 +105,10 @@ export class Game {
     this.pendingClear = null;
     this.overReason = '';
 
+    this.picker = picker;
+    this.recentTypes = [];
     this.fillQueue();
+    if (picker) this.queue = [picker(this)];
   }
 
   /* ---------- randomiser ---------- */
@@ -168,9 +174,15 @@ export class Game {
 
   spawn(type) {
     if (!type) {
-      type = this.queue.shift();
-      this.fillQueue();
+      if (this.picker) {
+        type = this.picker(this);
+      } else {
+        type = this.queue.shift();
+        this.fillQueue();
+      }
     }
+    this.recentTypes.push(type);
+    if (this.recentTypes.length > 8) this.recentTypes.shift();
     const [x, y] = SPAWN[type];
     const p = { type, rot: 0, x, y };
     if (!this.fits(type, 0, x, y)) {
@@ -186,6 +198,7 @@ export class Game {
     this.lowestY = p.y;
     this.lastMoveWasRotation = false;
     this.lastKickIndex = 0;
+    if (this.picker) this.queue = [this.picker(this)];
     this.emit({ type: 'spawn', piece: type });
     return true;
   }

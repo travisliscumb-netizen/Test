@@ -82,21 +82,24 @@
 <div id="toast" role="status"></div>
 <div id="countdown" aria-live="assertive"></div>
 
+<!-- Thumb zones: the big, frequent actions (move, rotate) sit at the bottom
+     corners; hard drop is a small pill above the rotate buttons, out of the
+     resting thumb's path, so it is hard to hit by accident. -->
 <div id="touch" hidden>
   <div class="pad left-pad">
-    <button data-act="hold" class="t-btn small" aria-label="Hold"><svg><use href="#i-hold"/></svg><span>Hold</span></button>
+    <button data-act="hold" class="t-btn pill" aria-label="Hold"><svg><use href="#i-hold"/></svg><span>Hold</span></button>
     <div class="dpad">
-      <button data-act="left" class="t-btn" aria-label="Move left"><svg><use href="#i-left"/></svg></button>
-      <button data-act="softDrop" class="t-btn" aria-label="Soft drop"><svg><use href="#i-down"/></svg></button>
-      <button data-act="right" class="t-btn" aria-label="Move right"><svg><use href="#i-right"/></svg></button>
+      <button data-act="left" class="t-btn move" aria-label="Move left"><svg><use href="#i-left"/></svg></button>
+      <button data-act="right" class="t-btn move" aria-label="Move right"><svg><use href="#i-right"/></svg></button>
     </div>
+    <button data-act="softDrop" class="t-btn soft" aria-label="Soft drop"><svg><use href="#i-down"/></svg><span>Down</span></button>
   </div>
   <div class="pad right-pad">
+    <button data-act="hardDrop" class="t-btn pill drop" aria-label="Hard drop"><svg><use href="#i-drop"/></svg><span>Drop</span></button>
     <div class="rot">
       <button data-act="rotateCCW" class="t-btn" aria-label="Rotate counter-clockwise"><svg><use href="#i-ccw"/></svg></button>
       <button data-act="rotateCW" class="t-btn big" aria-label="Rotate clockwise"><svg><use href="#i-cw"/></svg></button>
     </div>
-    <button data-act="hardDrop" class="t-btn wide" aria-label="Hard drop"><svg><use href="#i-drop"/></svg><span>Drop</span></button>
   </div>
 </div>
 
@@ -178,6 +181,8 @@
           <button data-value="5">5×</button><button data-value="10">10×</button><button data-value="20">20×</button><button data-value="40">40×</button><button data-value="0">Instant</button>
         </div></div>
       <div class="row"><label>Ghost piece</label><div class="seg" data-setting="ghost"><button data-value="true">On</button><button data-value="false">Off</button></div></div>
+      <div class="row"><label>Pieces<small>Helpful gives you the piece that fits your stack best. Classic is the standard shuffled bag.</small></label>
+        <div class="seg" data-setting="pieces"><button data-value="helpful">Helpful</button><button data-value="classic">Classic</button></div></div>
       <div class="row"><label>Grid lines</label><div class="seg" data-setting="grid"><button data-value="true">On</button><button data-value="false">Off</button></div></div>
     </div>
 

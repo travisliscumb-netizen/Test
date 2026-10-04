@@ -101,6 +101,8 @@ svg { width: 1em; height: 1em; fill: currentColor; }
 .hold-panel .slot { height: 92px; }
 .next-panel .slot.big { height: 96px; }
 .next-panel .slot + .slot { margin-top: 2px; }
+/* Helpful pieces are chosen at spawn, so only one preview is meaningful. */
+.hud.helpful .next-panel .slot:not(.big) { display: none; }
 
 .stats {
   display: grid; gap: 10px;
@@ -203,6 +205,7 @@ svg { width: 1em; height: 1em; fill: currentColor; }
   background: linear-gradient(180deg, transparent, rgba(3, 4, 12, 0.85) 35%);
 }
 .pad { display: flex; flex-direction: column; gap: 10px; }
+.right-pad { gap: 22px; }
 .left-pad { align-items: flex-start; }
 .right-pad { align-items: flex-end; }
 .dpad, .rot { display: flex; gap: 10px; }
@@ -213,9 +216,11 @@ svg { width: 1em; height: 1em; fill: currentColor; }
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   touch-action: none;
 }
-.t-btn.big { width: 72px; height: 72px; font-size: 32px; border-color: rgba(var(--accent-rgb), 0.5); }
-.t-btn.wide { width: 154px; height: 58px; grid-auto-flow: column; gap: 8px; font-size: 24px; }
-.t-btn.small { width: auto; height: 42px; padding: 0 14px; grid-auto-flow: column; gap: 6px; font-size: 18px; border-radius: 12px; }
+.t-btn.big { width: 76px; height: 76px; font-size: 34px; border-color: rgba(var(--accent-rgb), 0.5); }
+.t-btn.move { width: 70px; height: 64px; font-size: 28px; }
+.t-btn.soft { width: 150px; height: 46px; grid-auto-flow: column; gap: 8px; font-size: 20px; }
+.t-btn.pill { width: auto; height: 36px; padding: 0 14px; grid-auto-flow: column; gap: 6px; font-size: 16px; border-radius: 10px; }
+.t-btn.drop { border-color: rgba(255, 255, 255, 0.14); color: var(--dim); }
 .t-btn span { font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
 .t-btn.down { background: rgba(var(--accent-rgb), 0.28); border-color: var(--accent); transform: scale(0.95); box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4); }
 
@@ -491,9 +496,12 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
   body.touch-on .stat output, body.touch-on .stat[data-stat="score"] output { font-size: 14px; }
   body.touch-on #touch { background: none; padding-bottom: calc(8px + var(--safe-b)); }
   body.touch-on .t-btn { width: 54px; height: 54px; font-size: 22px; }
-  body.touch-on .t-btn.big { width: 60px; height: 60px; }
-  body.touch-on .t-btn.wide { width: 128px; height: 50px; }
-  body.touch-on .t-btn.small { height: 36px; }
+  body.touch-on .t-btn.big { width: 62px; height: 62px; }
+  body.touch-on .t-btn.move { width: 58px; height: 52px; }
+  body.touch-on .t-btn.soft { width: 126px; height: 40px; }
+  body.touch-on .t-btn.pill { width: auto; height: 32px; }
+  body.touch-on .pad { gap: 8px; }
+  body.touch-on .right-pad { gap: 16px; }
 
   /* Title: keep the side-by-side layout but compact it. */
   .title-main { gap: 10px; padding-top: calc(16px + var(--safe-t)); padding-bottom: calc(16px + var(--safe-b)); }

@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS = {
   sfx: 0.8,
   startLevel: 1,
   touchControls: 'auto',
+  pieces: 'helpful',     // 'helpful' (pieces chosen to fit the stack) | 'classic' (7-bag)
   bindings: DEFAULT_BINDINGS
 };
 
@@ -66,6 +67,7 @@ function sanitizeSettings(s) {
   if (!['flat', 'tilt', 'dynamic'].includes(out.view)) out.view = DEFAULT_SETTINGS.view;
   if (!['auto', 'high', 'medium', 'low'].includes(out.quality)) out.quality = 'auto';
   if (!['auto', 'on', 'off'].includes(out.touchControls)) out.touchControls = 'auto';
+  if (!['helpful', 'classic'].includes(out.pieces)) out.pieces = 'helpful';
   const b = {};
   for (const [action, keys] of Object.entries(DEFAULT_BINDINGS)) {
     const saved = s && s.bindings && Array.isArray(s.bindings[action]) ? s.bindings[action] : keys;

@@ -7,7 +7,7 @@
    considers swapping with hold. It plays through the real Game API one input
    at a time, so everything it does is something a human could do. */
 
-import { SHAPES } from './pieces.js';
+import { SHAPES, TYPES } from './pieces.js';
 import { COLS, ROWS } from './engine.js';
 
 const W = {
@@ -118,6 +118,23 @@ export function bestPlacement(board, type) {
     }
   }
   return best;
+}
+
+/* "Helpful" randomiser: hands out whichever piece the evaluator says fits the
+   current stack best, so wells get their I-piece and gaps get the shape that
+   fills them. A small penalty for recent repeats keeps some variety, and a
+   little seeded jitter breaks ties without making the choice unhelpful. */
+export function helpfulPiece(game) {
+  const recent = game.recentTypes ? game.recentTypes.slice(-3) : [];
+  let best = null, bestScore = -Infinity;
+  for (const t of TYPES) {
+    const place = bestPlacement(game.board, t);
+    if (!place) continue;
+    const repeats = recent.filter((r) => r === t).length;
+    const score = place.score - repeats * 1.5 + game.rng() * 0.5;
+    if (score > bestScore) { bestScore = score; best = t; }
+  }
+  return best || TYPES[Math.floor(game.rng() * TYPES.length)];
 }
 
 export class Bot {

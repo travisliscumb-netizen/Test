@@ -2,7 +2,7 @@
 
 import { Game, MODES } from './engine.js';
 import { Controls } from './controls.js';
-import { Bot } from './ai.js';
+import { Bot, helpfulPiece } from './ai.js';
 import { Audio } from './audio.js';
 import { Store, DEFAULT_BINDINGS } from './save.js';
 import { COLORS } from './pieces.js';
@@ -145,7 +145,8 @@ function startGame(mode) {
     mode,
     startLevel: s.startLevel,
     seed: (Math.random() * 2 ** 31) | 0,
-    sdf: s.sdf === 0 ? Infinity : s.sdf
+    sdf: s.sdf === 0 ? Infinity : s.sdf,
+    picker: s.pieces === 'helpful' ? helpfulPiece : null
   });
   if (!controls) controls = new Controls(game, { das: s.das, arr: s.arr });
   controls.releaseAll();
@@ -162,6 +163,7 @@ function startGame(mode) {
   hideScreens();
   $('#hud').hidden = false;
   $('#hud').dataset.game = mode;
+  $('#hud').classList.toggle('helpful', s.pieces === 'helpful');
   setTouchVisible(true);
   resetHud();
   audio.setLevel(game.level);
