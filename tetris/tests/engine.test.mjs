@@ -323,34 +323,66 @@ test('soak: bot plays 1500 pieces with consistent state and no exceptions', () =
   assert.equal(g.board.length, COLS * ROWS);
 });
 
-test('helpful pieces: an I-piece is handed out for a four-deep well', async () => {
+test('helpful pieces: a four-deep well usually gets an I-piece', async () => {
   const { helpfulPiece } = await import('../src/ai.js');
   const g = new Game({ seed: 21, picker: helpfulPiece });
-  g.start();
   setRows(g, ['#########.', '#########.', '#########.', '#########.']);
-  g.piece = null;
   g.recentTypes = [];
-  g.spawn();
-  assert.equal(g.piece.type, 'I');
-  assert.equal(g.queue.length, 1, 'one preview slot in helpful mode');
+  let iCount = 0;
+  for (let i = 0; i < 300; i++) if (helpfulPiece(g) === 'I') iCount++;
+  assert.ok(iCount / 300 > 0.8, `I chosen ${iCount}/300 times`);
 });
 
-test('helpful pieces: the bot survives 1500 pieces and clears far more lines', async () => {
+/* Bot run used by the helpful-mode tests; returns the game and every piece
+   that spawned, in order. */
+async function helpedRun(seed, pieces) {
   const { helpfulPiece } = await import('../src/ai.js');
-  const play = (picker) => {
-    const g = new Game({ mode: 'endless', seed: 77, picker });
-    const bot = new Bot(g, { stepMs: 0 });
-    g.start();
-    for (let i = 0; i < 400000 && g.stats.pieces < 1500 && g.state !== 'over'; i++) {
-      for (let k = 0; k < 10; k++) bot.update(16);
-      g.update(16);
-      g.drainEvents();
-    }
-    return g;
-  };
-  const helped = play(helpfulPiece);
-  assert.ok(helped.stats.pieces >= 1500, `survived ${helped.stats.pieces} pieces`);
-  assert.ok(helped.lines >= 1500 * 4 / 10 * 0.95, `cleared ${helped.lines} lines`);
-  const kinds = new Set(helped.recentTypes);
-  assert.ok(kinds.size >= 2, 'still some variety in recent pieces');
+  const g = new Game({ mode: 'endless', seed, picker: helpfulPiece });
+  const bot = new Bot(g, { stepMs: 0 });
+  const spawns = [];
+  g.start();
+  for (let i = 0; i < 600000 && g.stats.pieces < pieces && g.state !== 'over'; i++) {
+    for (let k = 0; k < 10; k++) bot.update(16);
+    g.update(16);
+    for (const e of g.drainEvents()) if (e.type === 'spawn') spawns.push(e.piece);
+  }
+  return { g, spawns };
+}
+
+test('helpful pieces: the NEXT preview is always the piece that comes', async () => {
+  const { helpfulPiece } = await import('../src/ai.js');
+  const g = new Game({ mode: 'endless', seed: 5, picker: helpfulPiece });
+  g.start();
+  for (let n = 0; n < 400; n++) {
+    const shown = g.queue[0];
+    assert.equal(g.queue.length, 1);
+    // Place the current piece somewhere sensible and let the next one spawn.
+    g.hardDrop();
+    for (let t = 0; t < 40 && g.state === 'clearing'; t++) g.update(16);
+    if (g.state !== 'playing') break;
+    assert.equal(g.piece.type, shown, `piece ${n + 1} matched the preview`);
+  }
+  // Hold with an empty hold also takes the previewed piece.
+  const h = new Game({ seed: 6, picker: helpfulPiece });
+  h.start();
+  const shown = h.queue[0];
+  h.holdPiece();
+  assert.equal(h.piece.type, shown);
+});
+
+test('helpful pieces: varied, never three in a row, and still very easy', async () => {
+  const { g, spawns } = await helpedRun(77, 1500);
+  let run = 1, maxRun = 1;
+  for (let i = 1; i < spawns.length; i++) {
+    run = spawns[i] === spawns[i - 1] ? run + 1 : 1;
+    maxRun = Math.max(maxRun, run);
+  }
+  assert.ok(maxRun <= 2, `longest run of one piece: ${maxRun}`);
+  const counts = {};
+  for (const t of spawns) counts[t] = (counts[t] || 0) + 1;
+  assert.equal(Object.keys(counts).length, 7, `all seven pieces appear: ${JSON.stringify(counts)}`);
+  const iShare = (counts.I || 0) / spawns.length;
+  assert.ok(iShare < 0.45, `I-pieces are ${(iShare * 100).toFixed(0)}% of pieces`);
+  assert.ok(g.stats.pieces >= 1500, `survived ${g.stats.pieces} pieces`);
+  assert.ok(g.lines >= 1500 * 0.4 * 0.95, `cleared ${g.lines} lines`);
 });

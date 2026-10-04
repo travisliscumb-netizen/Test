@@ -61,9 +61,10 @@ export function makeRng(seed) {
 }
 
 export class Game {
-  /* picker: optional (game) => type. When set, it replaces the 7-bag: each new
-     piece is chosen for the board as it stands at spawn time, and the single
-     preview slot shows the picker's current best guess for the piece after. */
+  /* picker: optional (game, placing) => type. When set, it replaces the
+     7-bag with a single-piece preview that is always honoured: whenever a
+     piece spawns from the preview, the picker chooses the piece after it
+     (it is told which piece is being placed, so it can look ahead). */
   constructor({ mode = 'marathon', startLevel = 1, seed = Date.now(), sdf = 20, picker = null } = {}) {
     if (!MODES[mode]) throw new Error(`unknown mode: ${mode}`);
     this.mode = mode;
@@ -173,13 +174,11 @@ export class Game {
   }
 
   spawn(type) {
+    let fromQueue = false;
     if (!type) {
-      if (this.picker) {
-        type = this.picker(this);
-      } else {
-        type = this.queue.shift();
-        this.fillQueue();
-      }
+      type = this.queue.shift();
+      fromQueue = true;
+      if (!this.picker) this.fillQueue();
     }
     this.recentTypes.push(type);
     if (this.recentTypes.length > 8) this.recentTypes.shift();
@@ -198,7 +197,7 @@ export class Game {
     this.lowestY = p.y;
     this.lastMoveWasRotation = false;
     this.lastKickIndex = 0;
-    if (this.picker) this.queue = [this.picker(this)];
+    if (this.picker && fromQueue) this.queue.push(this.picker(this, type));
     this.emit({ type: 'spawn', piece: type });
     return true;
   }

@@ -101,7 +101,7 @@ function evaluate(board, cells, x, y) {
     + W.wells * wells;
 }
 
-/* Best placement for `type` on `board`: { rot, x, score }. */
+/* Best placement for `type` on `board`: { rot, x, y, score }. */
 export function bestPlacement(board, type) {
   let best = null;
   const rots = type === 'O' ? 1 : (type === 'I' || type === 'S' || type === 'Z') ? 2 : 4;
@@ -114,27 +114,71 @@ export function bestPlacement(board, type) {
       if (!fitsOn(board, cells, x, y)) continue;
       while (fitsOn(board, cells, x, y - 1)) y--;
       const s = evaluate(board, cells, x, y);
-      if (!best || s > best.score) best = { rot, x, score: s };
+      if (!best || s > best.score) best = { rot, x, y, score: s };
     }
   }
   return best;
 }
 
-/* "Helpful" randomiser: hands out whichever piece the evaluator says fits the
-   current stack best, so wells get their I-piece and gaps get the shape that
-   fills them. A small penalty for recent repeats keeps some variety, and a
-   little seeded jitter breaks ties without making the choice unhelpful. */
-export function helpfulPiece(game) {
-  const recent = game.recentTypes ? game.recentTypes.slice(-3) : [];
-  let best = null, bestScore = -Infinity;
-  for (const t of TYPES) {
-    const place = bestPlacement(game.board, t);
-    if (!place) continue;
-    const repeats = recent.filter((r) => r === t).length;
-    const score = place.score - repeats * 1.5 + game.rng() * 0.5;
-    if (score > bestScore) { bestScore = score; best = t; }
+/* The board as it would be after `type` lands in its best spot (full rows
+   removed). Lets the picker look one piece ahead. */
+export function boardAfter(board, type) {
+  const place = bestPlacement(board, type);
+  if (!place) return board;
+  const b = board.slice();
+  for (const [cx, cy] of SHAPES[type][place.rot]) {
+    const y = place.y + cy;
+    if (y < ROWS) b[y * COLS + place.x + cx] = 9;
   }
-  return best || TYPES[Math.floor(game.rng() * TYPES.length)];
+  const out = new Uint8Array(board.length);
+  let ny = 0;
+  for (let y = 0; y < ROWS; y++) {
+    let full = true;
+    for (let x = 0; x < COLS; x++) if (!b[y * COLS + x]) { full = false; break; }
+    if (full) continue;
+    out.set(b.subarray(y * COLS, y * COLS + COLS), ny * COLS);
+    ny++;
+  }
+  return out;
+}
+
+/* "Helpful" randomiser. Called when a piece spawns, with that piece as
+   `placing`: it imagines that piece in its best spot, then chooses the piece
+   AFTER it to suit the resulting stack. So the NEXT preview is decided once
+   and always honoured; only the piece beyond it is being chosen.
+
+   It is helpful, not robotic:
+   - it draws among the good fits, weighted by how good they are, rather
+     than always taking the single best;
+   - the same piece never comes three times running, and recent repeats are
+     penalised, so a well does not mean a stream of I-pieces;
+   - a piece that has not been seen for a while gets a small boost. */
+const PICK = { temperature: 3, repeatPenalty: 4, droughtBonus: 2, droughtWindow: 8 };
+
+export function helpfulPiece(game, placing = null) {
+  const board = placing ? boardAfter(game.board, placing) : game.board;
+  const history = (game.recentTypes || []).slice();
+  const last2 = history.slice(-2);
+  const recent4 = history.slice(-4);
+  const window = history.slice(-PICK.droughtWindow);
+  const cands = [];
+  for (const t of TYPES) {
+    if (last2.length === 2 && last2[0] === t && last2[1] === t) continue; // never 3 in a row
+    const place = bestPlacement(board, t);
+    if (!place) continue;
+    let score = place.score - recent4.filter((r) => r === t).length * PICK.repeatPenalty;
+    if (history.length >= PICK.droughtWindow && !window.includes(t)) score += PICK.droughtBonus;
+    cands.push({ t, score });
+  }
+  if (!cands.length) return TYPES[Math.floor(game.rng() * TYPES.length)];
+  const best = Math.max(...cands.map((c) => c.score));
+  const weights = cands.map((c) => Math.exp((c.score - best) / PICK.temperature));
+  let r = game.rng() * weights.reduce((a, w) => a + w, 0);
+  for (let i = 0; i < cands.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return cands[i].t;
+  }
+  return cands[cands.length - 1].t;
 }
 
 export class Bot {
