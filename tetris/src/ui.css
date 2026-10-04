@@ -204,7 +204,7 @@ svg { width: 1em; height: 1em; fill: currentColor; }
   background: linear-gradient(180deg, transparent, rgba(3, 4, 12, 0.85) 35%);
 }
 .pad { display: flex; flex-direction: column; gap: 10px; }
-.right-pad { gap: 22px; }
+.mid-pad { align-items: center; justify-content: flex-end; gap: 12px; padding-bottom: 6px; }
 .left-pad { align-items: flex-start; }
 .right-pad { align-items: flex-end; }
 .dpad, .rot { display: flex; gap: 10px; }
@@ -451,42 +451,49 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
   .desktop-only { display: none; }
 }
 
-/* Portrait phones: stats across the top, narrow HOLD / NEXT rails. */
+/* Portrait phones: everything except the board lives in one slim top bar
+   (HOLD, stats, NEXT, buttons) so the board gets the full width and every
+   pixel of height between the top bar and the touch controls. */
 @media (max-aspect-ratio: 4/5) {
   .hud {
-    grid-template-columns: 66px minmax(0, 1fr) 66px;
+    grid-template-columns: 58px minmax(0, 1fr) 58px 94px;
     grid-template-rows: auto minmax(0, 1fr);
-    column-gap: 6px; row-gap: 8px;
-    padding: calc(8px + var(--safe-t)) calc(8px + var(--safe-r)) calc(8px + var(--safe-b) + var(--touch-h)) calc(8px + var(--safe-l));
+    column-gap: 6px; row-gap: 2px;
+    padding: calc(6px + var(--safe-t)) calc(4px + var(--safe-r)) calc(2px + var(--safe-b) + var(--touch-h)) calc(4px + var(--safe-l));
   }
-  .col { padding-top: 0; gap: 8px; }
-  .col.left { display: contents; }
-  .hold-panel { grid-column: 1; grid-row: 2; align-self: start; }
+  .col { padding-top: 0; gap: 0; }
+  .col.left, .col.right { display: contents; }
+  .hold-panel { grid-column: 1; grid-row: 1; }
   .stats {
-    grid-column: 1 / -1; grid-row: 1; grid-template-columns: 1.4fr 0.8fr 0.9fr 1.2fr; gap: 6px;
-    padding: 8px 10px; margin-right: 104px; border-radius: 12px;
+    grid-column: 2; grid-row: 1; align-self: stretch; align-content: center;
+    grid-template-columns: 1fr 1fr; gap: 2px 8px; padding: 6px 10px; border-radius: 14px;
   }
-  .stat label { font-size: 9px; letter-spacing: 0.14em; }
-  .stat output { font-size: 15px; }
-  .stat[data-stat="score"] output { font-size: 17px; }
-  .hud[data-game="sprint"] .stats, .hud[data-game="ultra"] .stats { grid-template-columns: 1.4fr 0.9fr 1.3fr; }
-  .hud[data-game="sprint"] .stat[data-stat="time"] output, .hud[data-game="ultra"] .stat[data-stat="time"] output { font-size: 17px; }
-  .goal { display: none; }
-  #stage { grid-column: 2; grid-row: 2; }
-  .col.right { grid-column: 3; grid-row: 2; }
-  .panel { padding: 6px 4px 6px; border-radius: 10px; }
+  .stat label { font-size: 8.5px; letter-spacing: 0.12em; }
+  .stat output, .stat[data-stat="score"] output { font-size: 14px; }
+  .hud[data-game="sprint"] .stat[data-stat="time"] output, .hud[data-game="ultra"] .stat[data-stat="time"] output { font-size: 14px; }
+  .goal, .minis { display: none; }
+  .next-panel { grid-column: 3; grid-row: 1; }
+  #stage { grid-column: 1 / -1; grid-row: 2; }
+  .panel { padding: 4px 3px; border-radius: 12px; }
   .panel::before { left: 10px; right: 10px; }
-  .panel header { justify-content: center; font-size: 8.5px; letter-spacing: 0.2em; margin-bottom: 2px; }
+  .panel header { justify-content: center; font-size: 8px; letter-spacing: 0.16em; margin-bottom: 0; }
   .panel header kbd { display: none; }
-  .slot, .hold-panel .slot { height: 44px; }
-  .next-panel .slot.big { height: 54px; }
-  .next-panel .slot[data-slot="5"] { display: none; }
-  .minis { grid-template-columns: 1fr; padding: 6px 4px; gap: 6px; text-align: center; }
-  .minis label { font-size: 8px; letter-spacing: 0.1em; }
-  .minis output { font-size: 12px; }
-  .icon-btn { top: calc(8px + var(--safe-t)); width: 44px; height: 44px; }
-  #pause-btn { right: calc(8px + var(--safe-r)); }
-  #view-btn { right: calc(58px + var(--safe-r)); }
+  .slot, .hold-panel .slot, .next-panel .slot.big { height: 40px; }
+  .next-panel .slot:not(.big) { display: none; }
+  .icon-btn { top: calc(10px + var(--safe-t)); width: 42px; height: 42px; }
+  #pause-btn { right: calc(6px + var(--safe-r)); }
+  #view-btn { right: calc(54px + var(--safe-r)); }
+  /* Controls scale with the screen width so the three groups always fit,
+     down to 360 px wide phones. */
+  #touch { padding: 6px calc(8px + var(--safe-r)) calc(10px + var(--safe-b)) calc(8px + var(--safe-l)); gap: 8px; }
+  .dpad, .rot { gap: 8px; }
+  .pad { gap: 8px; }
+  .t-btn { width: 14vw; height: 14vw; max-width: 58px; max-height: 58px; font-size: 22px; }
+  .t-btn.big { width: 16.5vw; height: 16.5vw; max-width: 68px; max-height: 68px; font-size: 28px; }
+  .t-btn.move { width: 15vw; height: 56px; max-width: 64px; max-height: none; font-size: 24px; }
+  .t-btn.soft { width: calc(30vw + 8px); height: 42px; max-width: 136px; max-height: none; font-size: 18px; }
+  .t-btn.pill { width: auto; max-width: none; height: 34px; max-height: none; padding: 0 9px; font-size: 14px; }
+  .t-btn.pill span { font-size: 11px; letter-spacing: 0.08em; }
   .modes { grid-template-columns: 1fr; }
   .tab { padding: 10px 4px; font-size: 9.5px; letter-spacing: 0.08em; }
   .mode-card { min-height: 0; padding: 16px; }
@@ -524,6 +531,7 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
   body.touch-on .t-btn.pill { width: auto; height: 32px; }
   body.touch-on .pad { gap: 8px; }
   body.touch-on .right-pad { gap: 16px; }
+  body.touch-on .mid-pad { position: absolute; right: calc(12px + var(--safe-r)); bottom: calc(84px + var(--safe-b)); flex-direction: row; padding: 0; }
 
   /* Title: keep the side-by-side layout but compact it. */
   .title-main { gap: 10px; padding-top: calc(16px + var(--safe-t)); padding-bottom: calc(16px + var(--safe-b)); }

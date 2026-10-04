@@ -19,7 +19,7 @@ export const DEFAULT_BINDINGS = {
 export const DEFAULT_SETTINGS = {
   das: 167,
   arr: 33,
-  sdf: 20,             // 0 means instant (stored as 0 because JSON has no Infinity)
+  sdf: 5,             // 0 means instant (stored as 0 because JSON has no Infinity)
   ghost: true,
   grid: true,
   view: 'dynamic',
@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS = {
 };
 
 const MODES = ['marathon', 'sprint', 'ultra', 'endless'];
+const SETTINGS_VERSION = 2;
 const MAX_RECORDS = 10;
 
 function read() {
@@ -81,13 +82,16 @@ export class Store {
   constructor() {
     const data = read() || {};
     this.settings = sanitizeSettings(data.settings);
+    // v2: the soft-drop default moved from 20x to 5x. Saved settings from
+    // before that carry the old default, so bring them onto the new one once.
+    if ((data.settingsVersion || 1) < 2) this.settings.sdf = DEFAULT_SETTINGS.sdf;
     this.records = {};
     for (const m of MODES) this.records[m] = Array.isArray(data.records && data.records[m]) ? data.records[m] : [];
     this.seenHelp = !!data.seenHelp;
   }
 
   save() {
-    return write({ settings: this.settings, records: this.records, seenHelp: this.seenHelp });
+    return write({ settingsVersion: SETTINGS_VERSION, settings: this.settings, records: this.records, seenHelp: this.seenHelp });
   }
 
   setSetting(key, value) {
