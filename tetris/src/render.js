@@ -17,7 +17,7 @@ import {
   Points, Mesh, CanvasTexture, DataTexture, RGBAFormat, LinearFilter, SRGBColorSpace, ACESFilmicToneMapping,
   HalfFloatType, WebGLRenderTarget, AdditiveBlending, BackSide, PMREMGenerator, FogExp2, Raycaster,
   DynamicDrawUsage, HemisphereLight, DirectionalLight, PointLight,
-  EffectComposer, RenderPass, UnrealBloomPass, OutputPass, RoundedBoxGeometry, RoomEnvironment
+  EffectComposer, RenderPass, UnrealBloomPass, OutputPass, RoundedBoxGeometry, RoomEnvironment, Reflector
 } from '../vendor/three.js';
 import { SHAPES, TYPES, COLORS, BOX, idType } from './pieces.js';
 import { COLS, VISIBLE, LINE_CLEAR_DELAY, LOCK_DELAY, GREY } from './engine.js';
@@ -45,14 +45,27 @@ export const VIEWS = {
   flat: { yaw: 0, pitch: 0, fov: 12, sway: 0 },
   tilt: { yaw: -16, pitch: 7, fov: 36, sway: 0 },
   dynamic: { yaw: -12, pitch: 6, fov: 42, sway: 1 },
-  showcase: { yaw: -24, pitch: 9, fov: 40, sway: 0 }
+  showcase: { yaw: -20, pitch: 8, fov: 38, sway: 0 }
 };
 
+/* Tiers only change resolution, anti-aliasing, bloom, the floor reflection
+   and the particle budget. The background itself is built once, so an
+   automatic step down never makes the scene visibly pop. */
 const QUALITY = {
-  high: { ratio: 2, bloom: true, samples: 4, particles: 1400, octaves: 5 },
-  medium: { ratio: 1.5, bloom: true, samples: 2, particles: 900, octaves: 4 },
-  low: { ratio: 1, bloom: false, samples: 0, particles: 500, octaves: 3 }
+  high: { ratio: 2, bloom: true, samples: 4, particles: 1200, reflect: 0.5 },
+  medium: { ratio: 1.5, bloom: true, samples: 2, particles: 700, reflect: 0.35 },
+  low: { ratio: 1, bloom: false, samples: 0, particles: 400, reflect: 0 }
 };
+
+/* Phones and low-memory devices start one tier down instead of starting
+   high and visibly stepping down a few seconds later. */
+function defaultTier() {
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const lowMem = (navigator.deviceMemory || 8) <= 4;
+  return coarse || lowMem ? 'medium' : 'high';
+}
+
+const FLOOR_Y = -VISIBLE / 2 - 0.6;
 
 const cellX = (x) => x - (COLS - 1) / 2;
 const cellY = (y) => y - (VISIBLE - 1) / 2;
@@ -68,30 +81,56 @@ function gemTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = s;
   const g = c.getContext('2d');
-  g.fillStyle = '#9a9a9a';
+  const rr = (x, y, w, h, r) => {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  };
+  // Rim: darker toward the bottom-right, lighter toward the top-left light.
+  const rim = g.createLinearGradient(0, 0, s, s);
+  rim.addColorStop(0, '#f2f2f2');
+  rim.addColorStop(1, '#9c9c9c');
+  g.fillStyle = rim;
   g.fillRect(0, 0, s, s);
-  const face = g.createLinearGradient(0, 0, s, s);
+  // Inset face.
+  const face = g.createLinearGradient(0, 24, 0, s - 24);
   face.addColorStop(0, '#ffffff');
-  face.addColorStop(0.45, '#e2e2e2');
-  face.addColorStop(1, '#a0a0a0');
+  face.addColorStop(0.55, '#dedede');
+  face.addColorStop(1, '#bdbdbd');
   g.fillStyle = face;
-  g.fillRect(14, 14, s - 28, s - 28);
-  const inner = g.createLinearGradient(0, s, s, 0);
-  inner.addColorStop(0, '#c8c8c8');
-  inner.addColorStop(1, '#f4f4f4');
-  g.fillStyle = inner;
-  g.fillRect(52, 52, s - 104, s - 104);
-  g.strokeStyle = 'rgba(255,255,255,0.85)';
-  g.lineWidth = 4;
-  g.strokeRect(50, 50, s - 100, s - 100);
-  const hi = g.createRadialGradient(70, 64, 4, 70, 64, 120);
-  hi.addColorStop(0, 'rgba(255,255,255,0.75)');
+  rr(26, 26, s - 52, s - 52, 30);
+  g.fill();
+  // Soft specular sweep across the upper half.
+  const hi = g.createLinearGradient(0, 30, 0, s * 0.55);
+  hi.addColorStop(0, 'rgba(255,255,255,0.55)');
   hi.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = hi;
+  rr(40, 36, s - 80, s * 0.38, 22);
+  g.fill();
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/* Soft round sprite for the light motes. */
+function moteTexture() {
+  const s = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  const r = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  r.addColorStop(0, 'rgba(255,255,255,1)');
+  r.addColorStop(0.35, 'rgba(255,255,255,0.45)');
+  r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r;
   g.fillRect(0, 0, s, s);
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
   return t;
 }
 
@@ -113,11 +152,11 @@ const NOISE = /* glsl */`
   }
 `;
 
-function skyMaterial(octaves) {
+function skyMaterial() {
   return new ShaderMaterial({
     side: BackSide,
     depthWrite: false,
-    defines: { OCTAVES: octaves },
+    defines: { OCTAVES: 4 },
     uniforms: {
       uA: { value: new Color() }, uB: { value: new Color() }, uGlow: { value: new Color() },
       uTime: { value: 0 }, uDanger: { value: 0 }, uPulse: { value: 0 }
@@ -136,17 +175,17 @@ function skyMaterial(octaves) {
       ${NOISE}
       void main() {
         vec3 d = normalize(vDir);
-        float h = d.y * 0.5 + 0.5;
-        vec3 col = mix(uB * 0.55, uA * 0.9, smoothstep(0.15, 0.85, h));
-        vec3 q = d * 2.2 + vec3(uTime * 0.012, -uTime * 0.007, uTime * 0.004);
+        float h = d.y;
+        vec3 col = mix(uB * 0.15, uA * 0.3, smoothstep(-0.25, 0.75, h));
+        // Wide, soft horizon glow behind the well.
+        col += uGlow * 0.30 * exp(-pow((h + 0.03) * 4.0, 2.0)) * (0.55 + 0.45 * smoothstep(0.4, -0.9, d.z));
+        // Nebula wisps, drifting so slowly they read as still.
+        vec3 q = d * 1.7 + vec3(uTime * 0.0035, 0.0, uTime * 0.0025);
         float n = fbm(q);
-        float n2 = fbm(q * 1.9 + n * 1.6 + vec3(0.0, uTime * 0.01, 0.0));
-        col += uGlow * pow(n2, 2.6) * 1.0;
-        col += uA * pow(n, 3.0) * 0.9;
-        // A soft bright band behind the well.
-        col += uGlow * 0.18 * exp(-pow(d.y * 3.0, 2.0)) * smoothstep(0.2, -0.9, d.z);
-        float pulse = 0.6 + 0.4 * sin(uTime * 4.0);
-        col = mix(col, vec3(0.45, 0.02, 0.06), uDanger * 0.35 * pulse);
+        float n2 = fbm(q * 2.1 + n * 1.3);
+        col += uGlow * pow(n2, 3.2) * 0.75 * smoothstep(-0.15, 0.45, h);
+        col += uA * pow(n, 3.0) * 0.35;
+        col = mix(col, vec3(0.32, 0.02, 0.05), uDanger * 0.22);
         col *= 1.0 + uPulse;
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
@@ -155,71 +194,77 @@ function skyMaterial(octaves) {
   });
 }
 
-function starMaterial() {
+/* Slow, soft bokeh motes rising through the scene. No twinkle, no warp: they
+   only add depth and must never draw the eye. */
+function moteMaterial(map) {
   return new ShaderMaterial({
     transparent: true,
     depthWrite: false,
     blending: AdditiveBlending,
-    uniforms: { uTime: { value: 0 }, uTravel: { value: 0 }, uPixel: { value: 1 }, uColor: { value: new Color(0xcfe0ff) }, uStretch: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uPixel: { value: 1 }, uColor: { value: new Color(0xcfe0ff) }, uMap: { value: map } },
     vertexShader: /* glsl */`
-      uniform float uTime, uTravel, uPixel;
+      uniform float uTime, uPixel;
       attribute float aSize, aPhase;
       varying float vA;
       void main() {
         vec3 p = position;
-        p.z = mod(p.z + uTravel, 260.0) - 220.0;
+        p.y = mod(p.y + uTime * (0.18 + aPhase * 0.3) + 24.0, 56.0) - 24.0;
+        p.x += sin(uTime * 0.07 + aPhase * 12.0) * 1.5;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
-        float tw = 0.85 + 0.15 * sin(uTime * (1.5 + aPhase * 2.0) + aPhase * 40.0);
-        gl_PointSize = aSize * uPixel * (70.0 / max(1.0, -mv.z));
-        vA = tw * smoothstep(-2.0, -14.0, mv.z) * smoothstep(-230.0, -150.0, p.z);
+        gl_PointSize = aSize * uPixel * (90.0 / max(1.0, -mv.z));
+        vA = smoothstep(-24.0, -16.0, p.y) * smoothstep(32.0, 24.0, p.y) * (0.35 + 0.65 * aPhase);
       }`,
     fragmentShader: /* glsl */`
       uniform vec3 uColor;
+      uniform sampler2D uMap;
       varying float vA;
       void main() {
-        float d = length(gl_PointCoord - 0.5);
-        float a = smoothstep(0.5, 0.0, d);
-        a = a * a;
-        gl_FragColor = vec4(uColor * a * vA * 1.8, 1.0);
+        float a = texture2D(uMap, gl_PointCoord).r;
+        gl_FragColor = vec4(uColor * a * vA * 0.18, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
   });
 }
 
-function floorMaterial() {
-  return new ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-    uniforms: { uColor: { value: new Color() }, uTravel: { value: 0 }, uDanger: { value: 0 } },
-    vertexShader: /* glsl */`
-      varying vec3 vW;
-      void main() {
-        vec4 w = modelMatrix * vec4(position, 1.0);
-        vW = w.xyz;
-        gl_Position = projectionMatrix * viewMatrix * w;
-      }`,
-    fragmentShader: /* glsl */`
-      uniform vec3 uColor;
-      uniform float uTravel, uDanger;
-      varying vec3 vW;
-      void main() {
-        vec2 g = vW.xz * 0.2;
-        g.y += uTravel * 0.2;
-        vec2 fw = fwidth(g);
-        vec2 a = smoothstep(vec2(0.0), fw * 1.6, abs(fract(g - 0.5) - 0.5));
-        float line = 1.0 - min(a.x, a.y);
-        float dist = length(vW.xz * vec2(1.0, 0.8));
-        float fade = exp(-dist * 0.02) * smoothstep(0.0, 18.0, dist + 6.0);
-        vec3 c = mix(uColor, vec3(1.0, 0.1, 0.2), uDanger * 0.6);
-        gl_FragColor = vec4(c * line * fade * 0.9, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`
-  });
-}
+/* Polished dark floor. With a reflection texture it is a tinted mirror that
+   fades out radially; without one (low tier) it is just the tint and fade. */
+const FLOOR_FRAG = /* glsl */`
+  uniform vec3 color, uGlow;
+  uniform float uReflect;
+  #ifdef REFLECT
+    uniform sampler2D tDiffuse;
+    varying vec4 vUv;
+  #endif
+  varying vec2 vPlane;
+  void main() {
+    float r = length(vPlane);
+    float fade = smoothstep(1.0, 0.12, r);
+    vec3 col = vec3(0.004, 0.005, 0.012);
+    #ifdef REFLECT
+      vec3 refl = texture2DProj(tDiffuse, vUv).rgb;
+      col += refl * color * uReflect * smoothstep(1.0, 0.0, r);
+    #endif
+    // Soft pool of light under the well.
+    col += uGlow * 0.06 * exp(-r * r * 22.0);
+    gl_FragColor = vec4(col, fade);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+const FLOOR_VERT = /* glsl */`
+  #ifdef REFLECT
+    uniform mat4 textureMatrix;
+    varying vec4 vUv;
+  #endif
+  varying vec2 vPlane;
+  void main() {
+    #ifdef REFLECT
+      vUv = textureMatrix * vec4(position, 1.0);
+    #endif
+    vPlane = position.xy / 30.0;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }`;
 
 function panelMaterial() {
   return new ShaderMaterial({
@@ -263,9 +308,9 @@ function panelMaterial() {
         vec2 dl = cell - uLightPos;
         col += uLightColor * exp(-dot(dl, dl) * 0.07) * 0.12;
 
-        float scan = 0.5 + 0.5 * sin(vUv.y * 60.0 - uTime * 3.0);
-        col += uAccent * 0.003 * scan;
-        float pulse = 0.5 + 0.5 * sin(uTime * 5.0);
+        // Gentle top-to-bottom sheen, static.
+        col += uAccent * 0.004 * smoothstep(0.2, 1.0, vUv.y);
+        float pulse = 0.5 + 0.5 * sin(uTime * 2.0);
         col += vec3(0.7, 0.02, 0.04) * uDanger * (0.02 + 0.04 * pulse) * smoothstep(0.35, 1.0, vUv.y);
         col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), uWave);
         gl_FragColor = vec4(col, 1.0);
@@ -333,17 +378,15 @@ function ghostMaterial() {
 
 /* MeshPhysicalMaterial with a per-instance emissive boost driven by an
    `aGlow` instanced attribute and the instance colour. */
-function blockMaterial(map, { glowBase = 0.06, envIntensity = 1.25 } = {}) {
+function blockMaterial(map, { glowBase = 0.06, envIntensity = 0.55 } = {}) {
   const m = new MeshPhysicalMaterial({
     color: 0xffffff,
     map,
-    roughness: 0.26,
-    metalness: 0.08,
-    clearcoat: 1,
-    clearcoatRoughness: 0.07,
-    envMapIntensity: envIntensity,
-    iridescence: 0.25,
-    iridescenceIOR: 1.4
+    roughness: 0.32,
+    metalness: 0.0,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: envIntensity
   });
   const uGlowBase = { value: glowBase };
   m.userData.glowBase = uGlowBase;
@@ -482,12 +525,13 @@ export class Renderer {
     this.canvas = canvas;
     this.renderer = new WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.85;
+    this.renderer.toneMappingExposure = 1.3;
     this.renderer.setClearColor(0x000000, 1);
 
     this.scene = new Scene();
     this.scene.fog = new FogExp2(0x05060f, 0.0065);
     this.camera = new PerspectiveCamera(40, 1, 0.5, 600);
+    this.camera.layers.enable(1);   // layer 1: HUD previews (seen by the camera, not by the floor mirror)
 
     this.palette = {};
     for (const t of TYPES) this.palette[t] = new Color(COLORS[t]);
@@ -503,9 +547,6 @@ export class Renderer {
     this.danger = 0;
     this.pulse = 0;
     this.calm = false;          // title-screen demo: no flashes, shake or bursts
-    this.travelSpeed = 4;
-    this.travel = 0;
-    this.warp = 0;
     this.showGhost = true;
     this.showGrid = true;
     this.shakeEnabled = true;
@@ -530,7 +571,7 @@ export class Renderer {
     this.lastPieceRef = null;
 
     this.build();
-    this.setQuality(this.autoQuality ? 'high' : quality);
+    this.setQuality(this.autoQuality ? defaultTier() : quality);
     this.applyTheme(THEMES[0], true);
   }
 
@@ -540,27 +581,33 @@ export class Renderer {
     const r = this.renderer;
     const pmrem = new PMREMGenerator(r);
     this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.6;
     this.scene.environment = this.envMap;
     pmrem.dispose();
 
-    this.scene.add(new HemisphereLight(0x9fb4ff, 0x1a0820, 0.55));
-    const key = new DirectionalLight(0xffffff, 1.6);
+    // Lighting is kept modest and exposure raised to match, so lit block
+    // faces stay below the bloom threshold and keep their saturation.
+    this.scene.add(new HemisphereLight(0x9fb4ff, 0x1a0820, 0.35));
+    const key = new DirectionalLight(0xffffff, 0.95);
     key.position.set(6, 14, 16);
     this.scene.add(key);
-    this.rim = new DirectionalLight(0x22e6ff, 1.4);
+    this.rim = new DirectionalLight(0x22e6ff, 0.8);
     this.rim.position.set(-10, 6, -8);
     this.scene.add(this.rim);
     this.pieceLight = new PointLight(0xffffff, 0, 7, 2);
     this.scene.add(this.pieceLight);
 
     this.gem = gemTexture();
-    this.blockGeo = new RoundedBoxGeometry(0.94, 0.94, 0.94, 3, 0.13);
+    this.blockGeo = new RoundedBoxGeometry(0.94, 0.94, 0.94, 4, 0.15);
     this.blockMat = blockMaterial(this.gem);
-    this.activeMat = blockMaterial(this.gem, { glowBase: 0.1, envIntensity: 1.25 });
-    this.previewMat = blockMaterial(this.gem, { glowBase: 0.14, envIntensity: 1.3 });
-    this.decoMat = blockMaterial(this.gem, { glowBase: 0.35, envIntensity: 0.6 });
+    this.activeMat = blockMaterial(this.gem, { glowBase: 0.1, envIntensity: 0.6 });
+    this.previewMat = blockMaterial(this.gem, { glowBase: 0.1, envIntensity: 0.6 });
+    this.decoMat = blockMaterial(this.gem, { glowBase: 0.22, envIntensity: 0.5 });
+    this.decoMat.fog = false;
+    this.decoMat.transparent = true;
+    this.decoMat.opacity = 0.55;
 
-    // Sky, stars, floor.
+    // Sky dome (follows the camera); motes, deco and floor live in world space.
     this.skyGroup = new Group();
     this.scene.add(this.skyGroup);
 
@@ -580,7 +627,7 @@ export class Renderer {
     this.boardTex.needsUpdate = true;
     this.panel.material.uniforms.uBoard.value = this.boardTex;
 
-    const metal = new MeshPhysicalMaterial({ color: 0x151a2c, metalness: 0.85, roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.2 });
+    const metal = new MeshPhysicalMaterial({ color: 0x1b2034, metalness: 0.9, roughness: 0.28, clearcoat: 0.8, clearcoatRoughness: 0.15 });
     this.neonMat = new MeshBasicMaterial({ color: 0xffffff });
     this.dangerLineMat = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
     const frame = new Group();
@@ -589,23 +636,23 @@ export class Renderer {
       const pillar = new Mesh(new RoundedBoxGeometry(0.42, H + 0.9, 1.5, 3, 0.1), metal);
       pillar.position.set(side * (COLS / 2 + 0.27), -0.2, -0.05);
       frame.add(pillar);
-      const strip = new Mesh(new BoxGeometry(0.06, H + 0.4, 0.06), this.neonMat);
+      const strip = new Mesh(new RoundedBoxGeometry(0.11, H + 0.4, 0.11, 2, 0.05), this.neonMat);
       strip.position.set(side * (COLS / 2 + 0.07), -0.2, 0.62);
       frame.add(strip);
-      const back = new Mesh(new BoxGeometry(0.05, H + 0.4, 0.05), this.neonMat);
+      const back = new Mesh(new RoundedBoxGeometry(0.09, H + 0.4, 0.09, 2, 0.04), this.neonMat);
       back.position.set(side * (COLS / 2 + 0.5), -0.2, -0.78);
       frame.add(back);
     }
     const base = new Mesh(new RoundedBoxGeometry(COLS + 1.5, 0.55, 1.9, 3, 0.12), metal);
     base.position.set(0, -VISIBLE / 2 - 0.3, -0.05);
     frame.add(base);
-    const baseStrip = new Mesh(new BoxGeometry(COLS + 0.2, 0.06, 0.06), this.neonMat);
+    const baseStrip = new Mesh(new RoundedBoxGeometry(COLS + 0.2, 0.1, 0.1, 2, 0.04), this.neonMat);
     baseStrip.position.set(0, -VISIBLE / 2 - 0.04, 0.62);
     frame.add(baseStrip);
-    const baseGlow = new Mesh(new BoxGeometry(COLS + 1.4, 0.05, 0.05), this.neonMat);
+    const baseGlow = new Mesh(new RoundedBoxGeometry(COLS + 1.4, 0.09, 0.09, 2, 0.04), this.neonMat);
     baseGlow.position.set(0, -VISIBLE / 2 - 0.58, 0.9);
     frame.add(baseGlow);
-    this.dangerLine = new Mesh(new BoxGeometry(COLS, 0.04, 0.04), this.dangerLineMat);
+    this.dangerLine = new Mesh(new BoxGeometry(COLS, 0.07, 0.07), this.dangerLineMat);
     this.dangerLine.position.set(0, VISIBLE / 2, 0.6);
     frame.add(this.dangerLine);
     this.board.add(frame);
@@ -639,6 +686,7 @@ export class Renderer {
     for (let i = 0; i < 6; i++) {
       const g = new Group();
       const m = pieceMesh(this.blockGeo, this.previewMat);
+      m.layers.set(1);
       g.add(m);
       g.visible = false;
       this.scene.add(g);
@@ -682,71 +730,95 @@ export class Renderer {
     const hx = COLS / 2 + 0.55, top = VISIBLE / 2 + 0.6, bottom = -VISIBLE / 2 - 0.65;
     this.wellCorners = [];
     for (const x of [-hx, hx]) for (const y of [bottom, top]) for (const z of [-0.8, 0.8]) this.wellCorners.push(new Vector3(x, y, z));
+    // The title framing also keeps a strip of the mirror floor in shot.
+    this.showcaseCorners = this.wellCorners.map((v) => v.clone());
+    for (const x of [-hx, hx]) this.showcaseCorners.push(new Vector3(x, bottom - 3.2, 1.5));
     this.tmpQ = new Quaternion();
     this.raycaster = new Raycaster();
+    this.buildBackground();
   }
 
-  buildBackground(q) {
-    for (const c of [...this.skyGroup.children]) {
-      this.skyGroup.remove(c);
-      c.geometry.dispose();
-      c.material.dispose();
-    }
+  /* Sky dome, light motes and distant drifting tetrominoes. Built once with a
+     fixed seed so nothing about the backdrop changes between sessions or tiers. */
+  buildBackground() {
+    let seed = 1234567;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
-    this.sky = new Mesh(new SphereGeometry(300, 48, 24), skyMaterial(q.octaves));
+    this.sky = new Mesh(new SphereGeometry(300, 48, 24), skyMaterial());
     this.sky.frustumCulled = false;
     this.sky.renderOrder = -10;
     this.skyGroup.add(this.sky);
 
-    const N = Math.round(q.particles * 1.5);
+    const N = 140;
     const pos = new Float32Array(N * 3), size = new Float32Array(N), phase = new Float32Array(N);
     for (let i = 0; i < N; i++) {
-      const a = Math.random() * TAU;
-      const rad = 16 + Math.pow(Math.random(), 0.6) * 110;
-      pos[i * 3] = Math.cos(a) * rad;
-      pos[i * 3 + 1] = Math.sin(a) * rad * 0.7;
-      pos[i * 3 + 2] = Math.random() * 260 - 220;
-      size[i] = 0.4 + Math.pow(Math.random(), 3) * 2.2;
-      phase[i] = Math.random();
+      const side = rnd() < 0.5 ? -1 : 1;
+      pos[i * 3] = side * (9 + rnd() * 55);
+      pos[i * 3 + 1] = rnd() * 56 - 24;
+      pos[i * 3 + 2] = -6 - rnd() * 80;
+      size[i] = 1.5 + Math.pow(rnd(), 2) * 5;
+      phase[i] = rnd();
     }
-    const sg = new BufferGeometry();
-    sg.setAttribute('position', new Float32BufferAttribute(pos, 3));
-    sg.setAttribute('aSize', new Float32BufferAttribute(size, 1));
-    sg.setAttribute('aPhase', new Float32BufferAttribute(phase, 1));
-    this.stars = new Points(sg, starMaterial());
-    this.stars.frustumCulled = false;
-    this.skyGroup.add(this.stars);
+    const mg = new BufferGeometry();
+    mg.setAttribute('position', new Float32BufferAttribute(pos, 3));
+    mg.setAttribute('aSize', new Float32BufferAttribute(size, 1));
+    mg.setAttribute('aPhase', new Float32BufferAttribute(phase, 1));
+    this.motes = new Points(mg, moteMaterial(moteTexture()));
+    this.motes.frustumCulled = false;
+    this.scene.add(this.motes);
 
-    this.floor = new Mesh(new PlaneGeometry(700, 700), floorMaterial());
-    this.floor.rotation.x = -Math.PI / 2;
-    this.floor.position.y = -14;
-    this.skyGroup.add(this.floor);
-
-    // Distant drifting tetrominoes for depth.
-    const DECO = 12;
+    const DECO = 8;
     const dgeo = this.blockGeo.clone();
-    const glow = new Float32Array(DECO * 4).fill(0.12);
-    dgeo.setAttribute('aGlow', new InstancedBufferAttribute(glow, 1));
+    dgeo.setAttribute('aGlow', new InstancedBufferAttribute(new Float32Array(DECO * 4).fill(0.08), 1));
     this.deco = new InstancedMesh(dgeo, this.decoMat, DECO * 4);
     this.deco.instanceMatrix.setUsage(DynamicDrawUsage);
     this.deco.frustumCulled = false;
     this.decoItems = [];
     for (let i = 0; i < DECO; i++) {
       const type = TYPES[i % TYPES.length];
-      const side = i % 2 ? 1 : -1;
-      const item = {
-        type,
+      this.decoItems.push({
         cells: centredCells(type).cells,
-        pos: new Vector3(side * (30 + Math.random() * 50), -14 + Math.random() * 44, -80 - Math.random() * 90),
-        rot: new Euler(Math.random() * TAU, Math.random() * TAU, Math.random() * TAU),
-        spin: new Vector3((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3),
-        drift: 0.3 + Math.random() * 0.6,
-        scale: 1.6 + Math.random() * 1.6
-      };
-      this.decoItems.push(item);
+        pos: new Vector3(26 + rnd() * 50, 2 + rnd() * 30, -100 - rnd() * 70),
+        rot: new Euler(rnd() * TAU, rnd() * TAU, rnd() * TAU),
+        spin: new Vector3((rnd() - 0.5) * 0.12, (rnd() - 0.5) * 0.16, (rnd() - 0.5) * 0.12),
+        drift: 0.12 + rnd() * 0.2,
+        scale: 2 + rnd() * 1.5
+      });
       for (let k = 0; k < 4; k++) this.deco.setColorAt(i * 4 + k, this.palette[type]);
     }
-    this.skyGroup.add(this.deco);
+    this.scene.add(this.deco);
+  }
+
+  /* The floor: a tinted mirror on tiers that can afford the extra pass,
+     otherwise the same tint and fade without the reflection. */
+  buildFloor(q) {
+    if (this.floor) {
+      this.scene.remove(this.floor);
+      if (this.floor.dispose) this.floor.dispose();
+      else { this.floor.geometry.dispose(); this.floor.material.dispose(); }
+    }
+    const geo = new PlaneGeometry(60, 60);
+    const uniforms = { color: { value: new Color(0.42, 0.45, 0.6) }, uGlow: { value: new Color() }, uReflect: { value: 1 } };
+    if (q.reflect > 0) {
+      this.floor = new Reflector(geo, {
+        textureWidth: 512, textureHeight: 512, clipBias: 0.003, multisample: 0,
+        shader: {
+          name: 'FloorReflector',
+          uniforms: { ...uniforms, tDiffuse: { value: null }, textureMatrix: { value: null } },
+          vertexShader: '#define REFLECT\n' + FLOOR_VERT,
+          fragmentShader: '#define REFLECT\n' + FLOOR_FRAG
+        }
+      });
+    } else {
+      this.floor = new Mesh(geo, new ShaderMaterial({ uniforms, vertexShader: FLOOR_VERT, fragmentShader: FLOOR_FRAG }));
+    }
+    this.floor.material.transparent = true;
+    this.floor.material.depthWrite = false;
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.position.set(0, FLOOR_Y, -1);
+    this.floor.renderOrder = -5;
+    this.scene.add(this.floor);
+    this.reflectScale = q.reflect;
   }
 
   /* ---------- settings ---------- */
@@ -765,7 +837,7 @@ export class Renderer {
     }
     this.particles = new Particles(q.particles);
     this.board.add(this.particles.mesh);
-    this.buildBackground(q);
+    this.buildFloor(q);
 
     if (this.composer) {
       this.composer.renderTarget1.dispose();
@@ -776,7 +848,9 @@ export class Renderer {
       const rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: q.samples });
       this.composer = new EffectComposer(this.renderer, rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.bloom = new UnrealBloomPass(new Vector2(256, 256), 0.4, 0.3, 0.9);
+      // High threshold: lit blocks stay crisp and saturated; only emissive
+      // things (neon, line-clear heat, effects) bloom.
+      this.bloom = new UnrealBloomPass(new Vector2(256, 256), 0.5, 0.42, 1.35);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
     } else {
@@ -817,14 +891,14 @@ export class Renderer {
     s.uA.value.copy(cur.a);
     s.uB.value.copy(cur.b);
     s.uGlow.value.copy(cur.glow);
-    this.floor.material.uniforms.uColor.value.copy(cur.accent);
+    this.floor.material.uniforms.uGlow.value.copy(cur.glow);
     this.panel.material.uniforms.uAccent.value.copy(cur.accent);
     this.rim.color.copy(cur.accent);
     const dangerRed = this.tmpColor.setRGB(1, 0.08, 0.15);
-    this.neonMat.color.copy(cur.accent).lerp(dangerRed, this.danger * 0.8).multiplyScalar(1.1 + this.pulse);
+    this.neonMat.color.copy(cur.accent).lerp(dangerRed, this.danger * 0.8).multiplyScalar(1.6 + this.pulse);
     this.dangerLineMat.color.copy(cur.accent).lerp(dangerRed, this.danger).multiplyScalar(1.5 + this.danger * 2);
     this.dangerLineMat.opacity = 0.25 + this.danger * 0.75;
-    this.stars.material.uniforms.uColor.value.set(0xdfe8ff).lerp(cur.glow, 0.35);
+    this.motes.material.uniforms.uColor.value.set(0xdfe8ff).lerp(cur.glow, 0.5);
   }
 
   /* ---------- events ---------- */
@@ -836,7 +910,7 @@ export class Renderer {
       if (e.type === 'hardDrop') this.pieceVis = null;
       return;
     }
-    if (this.calm && e.type === 'levelUp') { this.applyTheme(themeFor(e.level)); return; }
+    if (this.calm && e.type === 'levelUp') return;   // the title keeps one fixed theme
     switch (e.type) {
       case 'spawn':
         this.pieceVis = null;
@@ -899,7 +973,6 @@ export class Renderer {
         this.spring.vrz += (Math.random() < 0.5 ? -1 : 1) * (big ? 0.06 : 0.015);
         this.spring.vy -= big ? 6 : 2;
         if (big) {
-          this.warp = 1;
           this.pulse = 0.6;
           this.ring(cellY(e.rows[0]) + (e.lines - 1) / 2, e.lines === 4 ? this.palette.I : this.palette.T, 1);
           if (e.perfect) this.ring(0, this.palette.O, 1.6);
@@ -933,7 +1006,6 @@ export class Renderer {
       case 'levelUp':
         this.applyTheme(themeFor(e.level));
         this.ring(0, this.tmpColor.set(this.themeTo.accent), 2.2);
-        this.warp = 1;
         this.pulse = 0.5;
         break;
       case 'hold':
@@ -945,7 +1017,6 @@ export class Renderer {
         this.addShake(0.5);
         break;
       case 'finish':
-        this.warp = 1;
         this.pulse = 0.7;
         this.ring(0, this.white, 2.4);
         break;
@@ -1002,7 +1073,11 @@ export class Renderer {
       this.composer.setSize(W, H);
       this.bloom.resolution.set(W * this.pixelRatio * 0.5, H * this.pixelRatio * 0.5);
     }
-    this.stars.material.uniforms.uPixel.value = this.pixelRatio * Math.min(1.6, H / 800);
+    this.motes.material.uniforms.uPixel.value = this.pixelRatio * Math.min(1.6, H / 800);
+    if (this.floor.getRenderTarget) {
+      const k = this.pixelRatio * this.reflectScale;
+      this.floor.getRenderTarget().setSize(Math.max(64, Math.round(W * k)), Math.max(64, Math.round(H * k)));
+    }
   }
 
   /* Places the camera so the well fills `stage` (a CSS-pixel rect). */
@@ -1027,7 +1102,7 @@ export class Renderer {
       Math.cos(cs.yaw * DEG) * Math.cos(cs.pitch * DEG)
     );
     const ax = Math.max(0.05, stage.w / W), ay = Math.max(0.05, stage.h / H);
-    const corners = this.wellCorners;
+    const corners = this.view === 'showcase' ? this.showcaseCorners : this.wellCorners;
     let d = 60;
     for (let it = 0; it < 4; it++) {
       cam.position.copy(this.target).addScaledVector(dir, d);
@@ -1050,7 +1125,7 @@ export class Renderer {
       yaw += (Math.sin(this.time * 0.31) * 2.2 + (this.pieceLean || 0) * 0.9) * s;
       pitch += Math.sin(this.time * 0.23 + 1.3) * 1.1 * s;
     }
-    if (this.view === 'showcase') yaw += Math.sin(this.time * 0.17) * 14;
+    if (this.view === 'showcase') yaw += Math.sin(this.time * 0.08) * 6;
     dir.set(
       Math.sin(yaw * DEG) * Math.cos(pitch * DEG),
       Math.sin(pitch * DEG),
@@ -1188,12 +1263,15 @@ export class Renderer {
     if (Math.abs(pv.y - ty) > 3) pv.y = ty + Math.sign(pv.y - ty) * 3;
 
     this.rotAnim = damp(this.rotAnim, 0, 26, dt);
-    this.spawnAnim = Math.min(1, this.spawnAnim + dt / 0.12);
+    this.spawnAnim = Math.min(1, this.spawnAnim + dt / (this.calm ? 0.45 : 0.12));
+    // On the title the falling piece looks like any other block: no extra glow
+    // for the bloom to catch, so nothing flares when it spawns or locks.
+    this.activeMat.userData.glowBase.value = this.calm ? 0.02 : 0.08;
 
     vis.visible = true;
     vis.position.set(pv.x, pv.y, 0);
     vis.rotation.set(0, 0, this.rotAnim);
-    const sc = 0.7 + 0.3 * easeOutCubic(this.spawnAnim);
+    const sc = (this.calm ? 0.88 : 0.7) + (this.calm ? 0.12 : 0.3) * easeOutCubic(this.spawnAnim);
     vis.scale.setScalar(sc);
 
     const col = this.palette[p.type];
@@ -1222,7 +1300,7 @@ export class Renderer {
     this.pieceLean = (sx / 4 - 4.5) / 4.5;
 
     this.pieceLight.color.copy(col);
-    this.pieceLight.intensity = damp(this.pieceLight.intensity, this.calm ? 4 : 7, 10, dt);
+    this.pieceLight.intensity = damp(this.pieceLight.intensity, this.calm ? 0 : 7, 10, dt);
     this.pieceLight.position.set(pv.x, pv.y, 1.6);
     this.board.localToWorld(this.pieceLight.position);
 
@@ -1361,23 +1439,15 @@ export class Renderer {
   }
 
   updateBackground(dt) {
-    this.warp = Math.max(0, this.warp - dt * 0.7);
     this.pulse = Math.max(0, this.pulse - dt * 1.4);
-    this.travelSpeed = damp(this.travelSpeed, 4 + this.warp * 90, 6, dt);
-    this.travel += this.travelSpeed * dt;
     const su = this.sky.material.uniforms;
     su.uTime.value = this.time;
     su.uDanger.value = this.danger;
-    su.uPulse.value = this.pulse * 0.3;
-    const st = this.stars.material.uniforms;
-    st.uTime.value = this.time;
-    st.uTravel.value = this.travel;
-    const fl = this.floor.material.uniforms;
-    fl.uTravel.value = this.travel * 0.5;
-    fl.uDanger.value = this.danger;
-    this.skyGroup.position.copy(this.camera.position).multiplyScalar(0.85);
-    this.skyGroup.position.y = 0;
-    this.floor.position.set(-this.skyGroup.position.x, -14, -this.skyGroup.position.z);
+    su.uPulse.value = this.pulse * 0.25;
+    this.motes.material.uniforms.uTime.value = this.time;
+    // Drifting pieces are title-screen dressing only: in play they would read as previews.
+    this.deco.visible = this.calm;
+    this.skyGroup.position.copy(this.camera.position);
 
     const d = this.dummy;
     const q = this.tmpQ;
@@ -1386,10 +1456,10 @@ export class Renderer {
       it.rot.y += it.spin.y * dt;
       it.rot.z += it.spin.z * dt;
       it.pos.y += it.drift * dt;
-      if (it.pos.y > 30) it.pos.y = -20;
+      if (it.pos.y > 34) it.pos.y = -12;
       q.setFromEuler(it.rot);
       it.cells.forEach(([x, y], k) => {
-        d.position.set(x, y, 0).multiplyScalar(it.scale).applyQuaternion(q).add(it.pos).sub(this.skyGroup.position);
+        d.position.set(x, y, 0).multiplyScalar(it.scale).applyQuaternion(q).add(it.pos);
         d.quaternion.copy(q);
         d.scale.setScalar(it.scale * 0.98);
         d.updateMatrix();
@@ -1424,8 +1494,7 @@ export class Renderer {
   setAutoQuality(on, fallback) {
     this.autoQuality = on;
     this.fpsWindow = null;
-    if (!on) this.setQuality(fallback);
-    else this.setQuality('high');
+    this.setQuality(on ? defaultTier() : fallback);
   }
 
   frame(dt, game, stage, previewRects) {
@@ -1435,7 +1504,7 @@ export class Renderer {
 
     if (game) {
       const h = game.stackHeight();
-      this.danger = damp(this.danger, game.state !== 'over' && h >= 15 ? 1 : 0, 3, dt);
+      this.danger = damp(this.danger, !this.calm && game.state !== 'over' && h >= 15 ? 1 : 0, 3, dt);
     }
     if (this.overT >= 0) this.overT += dt;
     this.updateTheme(dt);
@@ -1459,7 +1528,7 @@ export class Renderer {
     this.updateFx(dt);
     this.updateBackground(dt);
 
-    if (this.bloom) this.bloom.strength = 0.38 + this.pulse * 0.45;
+    if (this.bloom) this.bloom.strength = 0.5 + this.pulse * 0.4;
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
     this.watchFrameRate();

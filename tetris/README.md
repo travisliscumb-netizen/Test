@@ -45,10 +45,11 @@ runs without a GPU. Screenshots go to `../.shots/`.
 **Modes:** Marathon (200 lines, levels 1–20, selectable start level), Sprint (40 lines against the clock), Ultra (3 minutes for score), Endless (up to level 20).
 
 **3D presentation**
-- Bevelled, clear-coated gem blocks under an environment map. Each piece carries a coloured point light that glows onto its neighbours.
+- Rounded candy-glass blocks under an environment map, lit low and exposed high so they stay saturated. Each falling piece carries a coloured point light that glows onto its neighbours.
 - A back panel that picks up the colour and the contact shadow of the blocks in front of it.
 - Three camera modes (Flat 2D, Tilted 3D, Dynamic 3D), switched with the <kbd>V</kbd> key or the cube button. Dynamic mode drifts and leans toward the active piece.
-- Bloom. A nebula sky that changes theme on every level (10 themes). A star tunnel that warps on a Tetris. A synthwave floor. Distant drifting tetrominoes.
+- Selective bloom (only emissive things glow). A dark, slow nebula sky that changes theme every level (10 themes), a polished mirror floor under the well, and soft drifting light motes. The background is built once and never changes with quality tier, so nothing pops.
+- The title screen is deliberately still: one fixed theme, a demo that glides pieces down with no flashes, and no pulsing UI.
 - Line clears flash white-hot and shatter into physical shards. Hard drops leave light trails and shake the well on a spring. Tetrises and T-spins fire shockwave rings.
 - The HOLD and NEXT pieces are 3D and float inside the HUD frames.
 - Danger state when the stack gets high: red pulse, faster music.

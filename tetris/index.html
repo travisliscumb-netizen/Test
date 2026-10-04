@@ -32,6 +32,10 @@
   <symbol id="i-ccw" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M4.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-hold" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M9 9h6v6H9z" fill="currentColor"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v4a5 5 0 0 1-10 0zM7 6H4.5a2.5 2.5 0 0 0 2.6 3.6M17 6h2.5a2.5 2.5 0 0 1-2.6 3.6M12 13v4M8.5 20h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2"/></symbol>
   <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 2.8 8 4.6v9.2l-8 4.6-8-4.6V7.4z M12 12l8-4.6M12 12v9.2M12 12 4 7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
 </defs></svg>
 
@@ -112,12 +116,12 @@
         <span class="l" style="--c:#ff2d55">T</span><span class="l" style="--c:#ff8a1f">E</span><span class="l" style="--c:#ffd81f">T</span><span class="l" style="--c:#3dff6e">R</span><span class="l" style="--c:#21e5f0">I</span><span class="l" style="--c:#b44bff">S</span>
         <span class="logo-3d">3D</span>
       </h1>
-      <p class="tagline">The guideline game. A whole new dimension.</p>
+      <p class="tagline">Classic Tetris, rebuilt in glass and light.</p>
       <nav class="menu" aria-label="Main menu">
-        <button class="btn primary" data-go="modes">Play</button>
-        <button class="btn" data-go="records">Records</button>
-        <button class="btn" data-go="settings">Settings</button>
-        <button class="btn" data-go="help">How to play</button>
+        <button class="btn primary" data-go="modes"><svg><use href="#i-play"/></svg><span>Play</span></button>
+        <button class="btn" data-go="records"><svg><use href="#i-trophy"/></svg><span>Records</span></button>
+        <button class="btn" data-go="settings"><svg><use href="#i-gear"/></svg><span>Settings</span></button>
+        <button class="btn" data-go="help"><svg><use href="#i-help"/></svg><span>How to play</span></button>
       </nav>
       <p class="hint desktop-only">Arrow keys + Enter &nbsp;·&nbsp; <kbd>V</kbd> changes camera in game</p>
     </div>

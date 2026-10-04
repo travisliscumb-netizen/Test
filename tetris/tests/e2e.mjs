@@ -69,7 +69,8 @@ async function startMode(page, mode) {
   const { ctx, page, errors, shot } = await open({ viewport: { width: 1280, height: 800 } }, 'desktop');
   check('desktop: title screen visible with a live demo game', await page.evaluate(() =>
     document.querySelector('#title').classList.contains('show') && __tetris.demo && __tetris.game.state === 'playing'));
-  const demoPlays = await page.waitForFunction(() => __tetris.game.stats.pieces >= 3, null, { timeout: 30000 }).then(() => true, () => false);
+  // The demo is deliberately unhurried (soft drops, no hard drops), so allow it time.
+  const demoPlays = await page.waitForFunction(() => __tetris.game.stats.pieces >= 2, null, { timeout: 60000 }).then(() => true, () => false);
   check('desktop: demo bot is placing pieces', demoPlays);
   await shot('title');
 

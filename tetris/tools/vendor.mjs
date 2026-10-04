@@ -24,7 +24,8 @@ const ADDONS = {
   UnrealBloomPass: 'three/addons/postprocessing/UnrealBloomPass.js',
   OutputPass: 'three/addons/postprocessing/OutputPass.js',
   RoundedBoxGeometry: 'three/addons/geometries/RoundedBoxGeometry.js',
-  RoomEnvironment: 'three/addons/environments/RoomEnvironment.js'
+  RoomEnvironment: 'three/addons/environments/RoomEnvironment.js',
+  Reflector: 'three/addons/objects/Reflector.js'
 };
 const names = new Set();
 for (const f of fs.readdirSync(path.join(ROOT, 'src')).filter((f) => f.endsWith('.js'))) {

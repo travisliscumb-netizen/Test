@@ -73,8 +73,10 @@ let lockFromHardDrop = false;
 
 function newDemo() {
   demo = true;
-  game = new Game({ mode: 'endless', seed: (Math.random() * 2 ** 31) | 0 });
-  bot = new Bot(game, { stepMs: 90 });
+  // Helpful pieces keep the demo stack low, so it effectively never tops out
+  // (a top-out would mean an abrupt reset behind the menu).
+  game = new Game({ mode: 'endless', seed: (Math.random() * 2 ** 31) | 0, sdf: 20, picker: helpfulPiece });
+  bot = new Bot(game, { stepMs: 110, gentle: true });
   game.start();
   if (renderer) {
     renderer.calm = true;
@@ -237,10 +239,7 @@ let lastSoftSound = 0;
 
 function handleEvent(e) {
   if (renderer) renderer.onEvent(e, game);
-  if (demo) {
-    if (e.type === 'levelUp') setAccent(themeFor(e.level).accent);
-    return;
-  }
+  if (demo) return;   // the title demo is silent and keeps one theme
   switch (e.type) {
     case 'move': audio.play('move'); break;
     case 'rotate': audio.play(e.kick > 0 ? 'kick' : 'rotate'); break;

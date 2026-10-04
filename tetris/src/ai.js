@@ -138,9 +138,12 @@ export function helpfulPiece(game) {
 }
 
 export class Bot {
-  constructor(game, { stepMs = 55 } = {}) {
+  /* gentle: instead of hard-dropping, the piece is soft-dropped and only
+     locked once it rests, so the title-screen demo never jumps. */
+  constructor(game, { stepMs = 55, gentle = false } = {}) {
     this.game = game;
     this.stepMs = stepMs;
+    this.gentle = gentle;
     this.timer = 0;
     this.plan = null;
     this.planFor = null;
@@ -167,7 +170,7 @@ export class Bot {
     this.timer += dt;
     if (this.timer < this.stepMs) return;
     this.timer = 0;
-    if (this.planFor !== g.piece || !this.plan) this.replan();
+    if (this.planFor !== g.piece || !this.plan) { g.setSoftDrop(false); this.replan(); }
     const p = g.piece, plan = this.plan;
     if (!plan) { g.hardDrop(); return; }
     if (plan.hold) { this.plan = null; if (!g.holdPiece()) g.hardDrop(); return; }
@@ -180,6 +183,7 @@ export class Bot {
       if (!g.move(Math.sign(plan.x - p.x))) g.hardDrop();
       return;
     }
-    g.hardDrop();
+    if (!this.gentle) { g.hardDrop(); return; }
+    if (g.onGround()) { g.setSoftDrop(false); g.hardDrop(); } else g.setSoftDrop(true);
   }
 }
