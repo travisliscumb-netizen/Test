@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
 <title>Pac-Man</title>
-<meta name="description" content="Arcade-accurate Pac-Man in your browser. Four ghosts with their original personalities, endless levels of rising speed, intermissions, and keyboard, swipe, D-pad or gamepad controls.">
-<meta name="theme-color" content="#04050c">
+<meta name="description" content="Arcade-accurate Pac-Man, rebuilt with real-time lighting. Four ghosts with their original personalities, endless levels of rising speed, keyboard, swipe, D-pad or gamepad.">
+<meta name="theme-color" content="#05060f">
 <meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,35 +14,54 @@
 <meta name="format-detection" content="telephone=no">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Pac-Man">
-<meta property="og:description" content="Arcade-accurate Pac-Man. Eat every dot, dodge four ghosts, chase them down after a power pellet.">
+<meta property="og:description" content="Arcade-accurate Pac-Man, rebuilt with real-time lighting.">
 <meta property="og:image" content="icons/og-cover.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="preload" href="src/fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="src/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="src/ui.css">
 </head>
 <body>
 <svg class="sprite-defs" width="0" height="0" aria-hidden="true"><defs>
   <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="2"/><rect x="13.5" y="5" width="4" height="14" rx="2"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8.6 5.2c-.8-.5-1.8.1-1.8 1v11.6c0 .9 1 1.5 1.8 1l9.4-5.8c.7-.5.7-1.5 0-2z"/></symbol>
-  <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.6 5.4 8 12l6.6 6.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.6 5.4 8 12l6.6 6.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 3.5h10v3.8a5 5 0 0 1-10 0zM4 5.2h2.1v2.3A3 3 0 0 1 4 5.2zm16 0a3 3 0 0 1-2.1 2.3V5.2zM10 13.6h4l.6 3.6H9.4zM7.4 18.6h9.2a1.2 1.2 0 0 1 1.2 1.2v.7H6.2v-.7a1.2 1.2 0 0 1 1.2-1.2z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm8.3 4.6-1.9-.3a6.6 6.6 0 0 1-.6 1.5l1.1 1.6-1.6 1.6-1.6-1.1c-.5.3-1 .5-1.5.6l-.3 1.9h-2.3l-.3-1.9a6.6 6.6 0 0 1-1.5-.6l-1.6 1.1-1.6-1.6 1.1-1.6a6.6 6.6 0 0 1-.6-1.5l-1.9-.3v-2.3l1.9-.3c.1-.5.3-1 .6-1.5L5.6 6.8l1.6-1.6 1.6 1.1c.5-.3 1-.5 1.5-.6l.3-1.9h2.3l.3 1.9c.5.1 1 .3 1.5.6l1.6-1.1 1.6 1.6-1.1 1.6c.3.5.5 1 .6 1.5l1.9.3z"/></symbol>
   <symbol id="i-help" viewBox="0 0 24 24"><path d="M12 2.8a9.2 9.2 0 1 0 0 18.4 9.2 9.2 0 0 0 0-18.4zm.1 14.9a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm1.6-5.6c-.8.5-1 .8-1 1.5v.4h-2.2v-.6c0-1.3.5-2 1.6-2.7.8-.5 1.1-.8 1.1-1.4 0-.7-.6-1.2-1.4-1.2-.9 0-1.5.6-1.6 1.5H8c.1-2.1 1.7-3.5 4.1-3.5 2.3 0 3.8 1.3 3.8 3.1 0 1.2-.6 2.1-2.2 2.9z"/></symbol>
-  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.4h3.6L12 5.2v13.6l-4.4-4.2H4a1 1 0 0 1-1-1v-3.2a1 1 0 0 1 1-1zM15.2 8.6a4.8 4.8 0 0 1 0 6.8l1.5 1.5a6.9 6.9 0 0 0 0-9.8z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 4.6V2.2L7.8 6.1 12 10V7.2a4.9 4.9 0 1 1-4.9 4.9H4.6A7.4 7.4 0 1 0 12 4.6z"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M11.2 3.6a1.2 1.2 0 0 1 1.6 0l7.6 6.8c.8.7.3 2-.8 2H18v6.8a1.2 1.2 0 0 1-1.2 1.2h-3.2v-5.2h-3.2v5.2H7.2A1.2 1.2 0 0 1 6 19.2v-6.8H4.4c-1.1 0-1.6-1.3-.8-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.6 4.6 4.6L19 7.8l-1.9-1.9-7.5 7.5-2.7-2.7z"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8.4 7.1 12l4.9-7.4L16.9 12 21 8.4 19.3 19.4H4.7z"/></symbol>
 </defs></svg>
 
 <div id="safe-probe" aria-hidden="true"></div>
 <canvas id="stage" aria-label="Pac-Man game board" role="img"></canvas>
 
-<button id="pause-btn" class="round-btn hud-btn" type="button" aria-label="Pause" hidden>
-  <svg aria-hidden="true"><use href="#i-pause"/></svg>
-</button>
+<!-- In-game HUD ----------------------------------------------------------->
+<div id="hud" class="hud" hidden>
+  <div class="hud-top" id="hud-top">
+    <div class="stat">
+      <span class="stat-label">Score</span>
+      <span class="stat-value" id="hud-score">0</span>
+    </div>
+    <div class="stat stat-best">
+      <span class="stat-label"><svg aria-hidden="true"><use href="#i-crown"/></svg>Best</span>
+      <span class="stat-value" id="hud-best">0</span>
+    </div>
+    <button id="pause-btn" class="icon-btn" type="button" aria-label="Pause">
+      <svg aria-hidden="true"><use href="#i-pause"/></svg>
+    </button>
+  </div>
+  <div class="hud-bottom" id="hud-bottom">
+    <div class="lives" id="hud-lives" aria-label="Lives"></div>
+    <div class="level-chip">Level <b id="hud-level">1</b></div>
+    <div class="shelf" id="hud-fruit" aria-label="Fruit collected"></div>
+  </div>
+</div>
 
 <div id="dpad" class="dpad" aria-hidden="true" hidden>
   <div class="dpad-base">
@@ -57,32 +76,33 @@
 <!-- Title ---------------------------------------------------------------->
 <section id="screen-title" class="screen screen-title" data-screen="title">
   <div class="title-stack">
-    <h1 class="logo" aria-label="Pac-Man"><span class="logo-word">PAC</span><span class="logo-dash" aria-hidden="true">-</span><span class="logo-word">MAN</span></h1>
-    <p class="tagline">ARCADE EDITION</p>
+    <div class="best-chip" id="title-best" hidden><svg aria-hidden="true"><use href="#i-crown"/></svg><span>Best</span><b id="title-best-value">0</b></div>
 
-    <ul class="roster" aria-label="The ghosts">
-      <li><canvas data-ghost="blinky" width="28" height="28"></canvas><span class="role">SHADOW</span><span class="nick c-blinky">"BLINKY"</span></li>
-      <li><canvas data-ghost="pinky" width="28" height="28"></canvas><span class="role">SPEEDY</span><span class="nick c-pinky">"PINKY"</span></li>
-      <li><canvas data-ghost="inky" width="28" height="28"></canvas><span class="role">BASHFUL</span><span class="nick c-inky">"INKY"</span></li>
-      <li><canvas data-ghost="clyde" width="28" height="28"></canvas><span class="role">POKEY</span><span class="nick c-clyde">"CLYDE"</span></li>
+    <header class="brand">
+      <h1 class="logo" aria-label="Pac-Man">PAC<span class="logo-dash" aria-hidden="true">-</span>MAN</h1>
+      <p class="tagline">Arcade Edition</p>
+    </header>
+
+    <canvas id="hero" class="hero" aria-hidden="true"></canvas>
+
+    <ul class="cast" aria-label="The ghosts">
+      <li class="g-blinky"><canvas data-ghost="blinky"></canvas><b>Blinky</b><span>Chaser</span></li>
+      <li class="g-pinky"><canvas data-ghost="pinky"></canvas><b>Pinky</b><span>Ambusher</span></li>
+      <li class="g-inky"><canvas data-ghost="inky"></canvas><b>Inky</b><span>Flanker</span></li>
+      <li class="g-clyde"><canvas data-ghost="clyde"></canvas><b>Clyde</b><span>Wanderer</span></li>
     </ul>
 
-    <div class="points" aria-label="Points">
-      <span><i class="pt-dot"></i>10 PTS</span>
-      <span><i class="pt-power"></i>50 PTS</span>
+    <div class="actions">
+      <button id="btn-play" class="btn btn-primary btn-xl" type="button">
+        <svg aria-hidden="true"><use href="#i-play"/></svg><span>Play</span>
+      </button>
+      <nav class="menu-row" aria-label="Menu">
+        <button class="tile" type="button" data-open="scores" aria-label="High scores"><span class="tile-icon"><svg aria-hidden="true"><use href="#i-trophy"/></svg></span><span class="tile-label">Scores</span></button>
+        <button class="tile" type="button" data-open="settings" aria-label="Settings"><span class="tile-icon"><svg aria-hidden="true"><use href="#i-gear"/></svg></span><span class="tile-label">Settings</span></button>
+        <button class="tile" type="button" data-open="help" aria-label="How to play"><span class="tile-icon"><svg aria-hidden="true"><use href="#i-help"/></svg></span><span class="tile-label">How to play</span></button>
+      </nav>
+      <p class="hint"><span class="hint-key">Press <kbd>Enter</kbd> to start</span><span class="hint-touch">Swipe or use the D-pad to steer</span></p>
     </div>
-
-    <button id="btn-play" class="pill pill-primary" type="button">
-      <svg aria-hidden="true"><use href="#i-play"/></svg><span>PLAY</span>
-    </button>
-
-    <nav class="menu-row" aria-label="Menu">
-      <button class="icon-tile" type="button" data-open="scores" aria-label="High scores"><span class="icon-circle"><svg aria-hidden="true"><use href="#i-trophy"/></svg></span><span class="icon-label">SCORES</span></button>
-      <button class="icon-tile" type="button" data-open="settings" aria-label="Settings"><span class="icon-circle"><svg aria-hidden="true"><use href="#i-gear"/></svg></span><span class="icon-label">SETTINGS</span></button>
-      <button class="icon-tile" type="button" data-open="help" aria-label="How to play"><span class="icon-circle"><svg aria-hidden="true"><use href="#i-help"/></svg></span><span class="icon-label">HELP</span></button>
-    </nav>
-
-    <p class="hint"><span class="hint-key">PRESS ENTER TO START</span><span class="hint-touch">TAP PLAY TO START</span></p>
   </div>
   <p class="credit">PAC-MAN&trade; is a trademark of Bandai Namco. Fan tribute, not affiliated.</p>
 </section>
@@ -90,12 +110,15 @@
 <!-- Pause ---------------------------------------------------------------->
 <section id="screen-pause" class="screen screen-modal" data-screen="pause" hidden>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
-    <h2 id="pause-title" class="panel-title">PAUSED</h2>
+    <header class="panel-hero">
+      <h2 id="pause-title" class="panel-title">Paused</h2>
+      <p class="panel-sub" id="pause-sub">Level 1 · 0 points</p>
+    </header>
     <div class="stack">
-      <button class="pill pill-primary" type="button" data-action="resume"><svg aria-hidden="true"><use href="#i-play"/></svg><span>RESUME</span></button>
-      <button class="pill" type="button" data-action="restart" data-confirm="TAP AGAIN TO RESTART"><svg aria-hidden="true"><use href="#i-restart"/></svg><span>RESTART</span></button>
-      <button class="pill" type="button" data-open="settings"><svg aria-hidden="true"><use href="#i-gear"/></svg><span>SETTINGS</span></button>
-      <button class="pill" type="button" data-action="quit" data-confirm="TAP AGAIN TO QUIT"><svg aria-hidden="true"><use href="#i-home"/></svg><span>MAIN MENU</span></button>
+      <button class="btn btn-primary" type="button" data-action="resume"><svg aria-hidden="true"><use href="#i-play"/></svg><span>Resume</span></button>
+      <button class="btn" type="button" data-action="restart" data-confirm="Tap again to restart"><svg aria-hidden="true"><use href="#i-restart"/></svg><span>Restart</span></button>
+      <button class="btn" type="button" data-open="settings"><svg aria-hidden="true"><use href="#i-gear"/></svg><span>Settings</span></button>
+      <button class="btn btn-quiet" type="button" data-action="quit" data-confirm="Tap again to quit"><svg aria-hidden="true"><use href="#i-home"/></svg><span>Main menu</span></button>
     </div>
   </div>
 </section>
@@ -104,18 +127,26 @@
 <section id="screen-settings" class="screen screen-modal" data-screen="settings" hidden>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <header class="panel-head">
-      <button class="round-btn small" type="button" data-action="back" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
-      <h2 id="settings-title" class="panel-title">SETTINGS</h2>
+      <button class="icon-btn" type="button" data-action="back" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+      <h2 id="settings-title" class="panel-title">Settings</h2>
       <span class="head-spacer"></span>
     </header>
-    <div class="rows">
-      <label class="row"><span>SOUND</span><input type="checkbox" class="switch" data-setting="sound"></label>
-      <label class="row row-range"><span>VOLUME</span><input type="range" min="0" max="100" step="5" data-setting="volume" aria-label="Volume"></label>
-      <label class="row"><span>CRT SCANLINES</span><input type="checkbox" class="switch" data-setting="crt"></label>
-      <label class="row touch-only"><span>ON-SCREEN D-PAD</span><input type="checkbox" class="switch" data-setting="dpad"></label>
-      <label class="row vibrate-only"><span>VIBRATION</span><input type="checkbox" class="switch" data-setting="haptics"></label>
+    <div class="group">
+      <p class="group-label">Audio</p>
+      <label class="row"><span>Sound</span><input type="checkbox" class="switch" data-setting="sound"></label>
+      <label class="row row-range"><span>Volume</span><input type="range" min="0" max="100" step="5" data-setting="volume" aria-label="Volume"></label>
     </div>
-    <button class="pill pill-danger" type="button" data-action="reset-scores" data-confirm="TAP AGAIN TO CONFIRM"><span>RESET HIGH SCORES</span></button>
+    <div class="group">
+      <p class="group-label">Display</p>
+      <label class="row"><span class="row-text">Dynamic lighting<small>Turn off on older devices</small></span><input type="checkbox" class="switch" data-setting="lighting"></label>
+      <label class="row"><span>Screen shake</span><input type="checkbox" class="switch" data-setting="shake"></label>
+    </div>
+    <div class="group touch-only-group">
+      <p class="group-label">Controls</p>
+      <label class="row touch-only"><span>On-screen D-pad</span><input type="checkbox" class="switch" data-setting="dpad"></label>
+      <label class="row vibrate-only"><span>Vibration</span><input type="checkbox" class="switch" data-setting="haptics"></label>
+    </div>
+    <button class="btn btn-danger" type="button" data-action="reset-scores" data-confirm="Tap again to confirm"><span>Reset high scores</span></button>
   </div>
 </section>
 
@@ -123,8 +154,8 @@
 <section id="screen-scores" class="screen screen-modal" data-screen="scores" hidden>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="scores-title">
     <header class="panel-head">
-      <button class="round-btn small" type="button" data-action="back" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
-      <h2 id="scores-title" class="panel-title">HIGH SCORES</h2>
+      <button class="icon-btn" type="button" data-action="back" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+      <h2 id="scores-title" class="panel-title">High scores</h2>
       <span class="head-spacer"></span>
     </header>
     <ol id="score-table" class="score-table"></ol>
@@ -135,43 +166,50 @@
 <section id="screen-help" class="screen screen-modal" data-screen="help" hidden>
   <div class="panel panel-wide" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <header class="panel-head">
-      <button class="round-btn small" type="button" data-action="back" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
-      <h2 id="help-title" class="panel-title">HOW TO PLAY</h2>
+      <button class="icon-btn" type="button" data-action="back" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+      <h2 id="help-title" class="panel-title">How to play</h2>
       <span class="head-spacer"></span>
     </header>
     <div class="help">
-      <p>Clear every dot to finish the maze. Touching a ghost costs a life.</p>
-      <p>A <b class="c-power">power pellet</b> turns the ghosts blue for a few seconds. Eat them in a row for <b>200, 400, 800, 1600</b>. Bonus fruit appears twice a level.</p>
-      <p>Each ghost hunts differently: <b class="c-blinky">Blinky</b> chases you directly, <b class="c-pinky">Pinky</b> cuts ahead, <b class="c-inky">Inky</b> flanks with Blinky, and <b class="c-clyde">Clyde</b> loses his nerve up close.</p>
-      <p>Extra life at <b>10,000</b>. Ghosts slow down in the side tunnels. Turning early around a corner is faster than turning late.</p>
+      <div class="tip"><i class="tip-dot"></i><p><b>Clear every pellet</b> to finish the maze. Touching a ghost costs a life.</p></div>
+      <div class="tip"><i class="tip-power"></i><p>A <b>power pellet</b> turns the ghosts blue. Chain them for <b>200 · 400 · 800 · 1600</b>.</p></div>
+      <div class="tip"><i class="tip-ghosts"></i><p><b class="c-blinky">Blinky</b> chases, <b class="c-pinky">Pinky</b> cuts you off, <b class="c-inky">Inky</b> flanks, and <b class="c-clyde">Clyde</b> loses his nerve up close.</p></div>
+      <div class="tip"><i class="tip-star"></i><p>Extra life at <b>10,000</b>. Ghosts slow in the side tunnels, and turning early around a corner is faster.</p></div>
       <dl class="keys">
-        <dt>MOVE</dt><dd>Arrows / WASD, swipe, D-pad or gamepad</dd>
-        <dt>PAUSE</dt><dd><span class="hint-key">P or Esc</span><span class="hint-touch">The round button, top right</span></dd>
-        <dt>MUTE</dt><dd><span class="hint-key">M</span><span class="hint-touch">Settings &rarr; Sound</span></dd>
+        <dt>Move</dt><dd><span class="hint-key"><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or <kbd>WASD</kbd></span><span class="hint-touch">Swipe anywhere, or the D-pad</span></dd>
+        <dt>Pause</dt><dd><span class="hint-key"><kbd>P</kbd> or <kbd>Esc</kbd></span><span class="hint-touch">The pause button, top right</span></dd>
+        <dt>Mute</dt><dd><span class="hint-key"><kbd>M</kbd></span><span class="hint-touch">Settings &rarr; Sound</span></dd>
       </dl>
     </div>
   </div>
 </section>
 
-<!-- Game over ------------------------------------------------------------>
+<!-- Results -------------------------------------------------------------->
 <section id="screen-over" class="screen screen-modal" data-screen="over" hidden>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
-    <h2 id="over-title" class="panel-title c-blinky">GAME OVER</h2>
-    <div class="result">
-      <div><span class="result-label">SCORE</span><span id="over-score" class="result-value">0</span></div>
-      <div><span class="result-label">LEVEL</span><span id="over-level" class="result-value">1</span></div>
-    </div>
-    <p id="over-best" class="best-banner" hidden>NEW HIGH SCORE!</p>
+    <header class="panel-hero">
+      <h2 id="over-title" class="eyebrow">Game over</h2>
+      <p class="final-score" id="over-score">0</p>
+      <p id="over-best" class="badge-best" hidden><svg aria-hidden="true"><use href="#i-crown"/></svg>New personal best</p>
+    </header>
+    <dl class="stats">
+      <div><dt>Level</dt><dd id="over-level">1</dd></div>
+      <div><dt>Pellets</dt><dd id="st-dots">0</dd></div>
+      <div><dt>Ghosts</dt><dd id="st-ghosts">0</dd></div>
+      <div><dt>Best chain</dt><dd id="st-combo">0</dd></div>
+      <div><dt>Fruit</dt><dd id="st-fruit">0</dd></div>
+      <div><dt>Time</dt><dd id="st-time">0:00</dd></div>
+    </dl>
     <form id="initials-form" class="initials" hidden autocomplete="off">
-      <label for="initials">ENTER YOUR INITIALS</label>
+      <label for="initials">Top five! Sign your score</label>
       <div class="initials-row">
         <input id="initials" name="initials" maxlength="3" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="done" placeholder="AAA" aria-label="Your initials">
-        <button class="round-btn" type="submit" aria-label="Save score"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button class="icon-btn icon-btn-primary" type="submit" aria-label="Save score"><svg aria-hidden="true"><use href="#i-check"/></svg></button>
       </div>
     </form>
     <div class="stack">
-      <button class="pill pill-primary" type="button" data-action="again"><svg aria-hidden="true"><use href="#i-restart"/></svg><span>PLAY AGAIN</span></button>
-      <button class="pill" type="button" data-action="quit"><svg aria-hidden="true"><use href="#i-home"/></svg><span>MAIN MENU</span></button>
+      <button class="btn btn-primary" type="button" data-action="again"><svg aria-hidden="true"><use href="#i-restart"/></svg><span>Play again</span></button>
+      <button class="btn btn-quiet" type="button" data-action="quit"><svg aria-hidden="true"><use href="#i-home"/></svg><span>Main menu</span></button>
     </div>
   </div>
 </section>

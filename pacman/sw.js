@@ -3,7 +3,7 @@
    whenever the network is up avoids ever mixing versions. The cache is only
    the offline fallback, refreshed on every successful fetch. */
 
-const CACHE = 'pacman-v1';
+const CACHE = 'pacman-v2';
 const SHELL = [
   './',
   'index.html',
@@ -19,7 +19,7 @@ const SHELL = [
   'src/audio.js',
   'src/input.js',
   'src/save.js',
-  'src/fonts/press-start-2p-latin.woff2',
+  'src/fonts/outfit-latin.woff2',
   'icons/favicon-32.png',
   'icons/favicon-16.png',
   'icons/apple-touch-icon-180.png',

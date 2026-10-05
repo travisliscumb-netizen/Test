@@ -125,6 +125,8 @@ export class Game {
     this.level = this.startLevelNum;
     this.extraLifeAwarded = false;
     this.tick = 0;
+    /* Lifetime counters for the results screen; never read by the rules. */
+    this.stats = { dots: 0, ghosts: 0, bestCombo: 0, fruit: 0, frames: 0 };
     this.startLevel(true);
   }
 
@@ -262,6 +264,7 @@ export class Game {
 
   stepPlaying() {
     const spec = this.spec;
+    this.stats.frames++;
 
     if (this.frightTimer > 0) {
       if (--this.frightTimer === 0) {
@@ -351,6 +354,7 @@ export class Game {
         this.items[i] = M.ITEM.NONE;
         this.dotsEaten++;
         this.dotsLeft--;
+        this.stats.dots++;
         this.idleTimer = 0;
         this.countDotForHouse();
         if (item === M.ITEM.DOT) {
@@ -372,6 +376,7 @@ export class Game {
     const f = this.fruit;
     if (f && r === M.tileOf(M.FRUIT_POS.y) && Math.abs(p.x - M.FRUIT_POS.x) <= 6) {
       this.addScore(f.points);
+      this.stats.fruit++;
       this.popups.push({ x: M.FRUIT_POS.x, y: M.FRUIT_POS.y, text: String(f.points), frames: 120, kind: 'fruit' });
       this.emit('fruit', { kind: f.kind, points: f.points, x: M.FRUIT_POS.x, y: M.FRUIT_POS.y });
       this.fruit = null;
@@ -594,6 +599,8 @@ export class Game {
       if (M.tileOf(g.x) !== pc || M.tileOf(g.y) !== pr) continue;
       if (g.frightened) {
         this.ghostsEatenInFright++;
+        this.stats.ghosts++;
+        this.stats.bestCombo = Math.max(this.stats.bestCombo, this.ghostsEatenInFright);
         const points = 200 * 2 ** (this.ghostsEatenInFright - 1);
         this.addScore(points);
         g.state = 'eyes';

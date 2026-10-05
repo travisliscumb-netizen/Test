@@ -1,12 +1,12 @@
 /* App shell: fixed-step loop, screens, layout, input routing, sound cues and
    persistence. The simulation itself lives in engine.js. */
 
-import { Game, DIR } from './engine.js';
+import { Game, DIR, fruitShelf } from './engine.js';
 import { botDirection } from './bot.js';
-import { Renderer, FRAME_W, FRAME_H } from './render.js';
+import { Renderer, BOARD_W, BOARD_H, SLAB_PAD } from './render.js';
 import { Sound } from './audio.js';
 import { Input } from './input.js';
-import { drawGhost, COLORS } from './sprites.js';
+import { drawGhost, drawPac, drawFruit, COLORS } from './sprites.js';
 import * as Save from './save.js';
 
 const STEP = 1 / 60;
@@ -30,10 +30,18 @@ sound.enabled = settings.sound;
 sound.volume = settings.volume;
 
 const renderer = new Renderer($('#stage'));
-renderer.crt = settings.crt;
+renderer.quality = settings.lighting ? 'high' : 'low';
 
 const ui = {
   pauseBtn: $('#pause-btn'),
+  hud: $('#hud'),
+  hudTop: $('#hud-top'),
+  hudBottom: $('#hud-bottom'),
+  score: $('#hud-score'),
+  best: $('#hud-best'),
+  level: $('#hud-level'),
+  lives: $('#hud-lives'),
+  fruit: $('#hud-fruit'),
   dpad: $('#dpad'),
   toast: $('#toast'),
   screens: Object.fromEntries($$('[data-screen]').map((el) => [el.dataset.screen, el]))
@@ -49,8 +57,10 @@ const state = {
   entry: null,              // pending high-score entry
   acc: 0,
   time: 0,
-  last: performance.now()
+  last: performance.now(),
+  hud: { shown: -1, best: -1, lives: -1, level: -1 }
 };
+const dprNow = () => clamp(window.devicePixelRatio || 1, 1, 3);
 
 const highScore = () => (data.scores[0] ? data.scores[0].score : 0);
 const playing = () => state.mode === 'game' && state.stack.length === 0 && state.game && state.game.phase !== 'gameover';
@@ -73,14 +83,14 @@ function refreshScreens() {
     el.hidden = name === 'title' ? state.mode !== 'title' : name !== top;
   }
   const inGame = state.mode === 'game';
-  ui.pauseBtn.hidden = !inGame || state.stack.length > 0;
+  ui.hud.hidden = !inGame;
   ui.dpad.hidden = !inGame || !state.padVisible || state.stack.length > 0;
 }
 
 function focusFirst(name) {
   const el = ui.screens[name];
   if (!el) return;
-  const target = el.querySelector('[autofocus]') || el.querySelector('.pill-primary') || el.querySelector('button, input');
+  const target = el.querySelector('[autofocus]') || el.querySelector('.btn-primary') || el.querySelector('button, input');
   if (target && !isTouch) target.focus({ preventScroll: true });
 }
 
@@ -119,6 +129,7 @@ function startGame() {
   state.overIn = -1;
   state.acc = 0;
   renderer.fx.reset();
+  state.hud = { shown: 0, best: -1, lives: -1, level: -1 };
   refreshScreens();
   document.activeElement?.blur?.();
 }
@@ -126,6 +137,8 @@ function startGame() {
 function pause() {
   if (!playing()) return;
   sound.setLoop(null);
+  const g = state.game;
+  $('#pause-sub').textContent = `Level ${g.level} · ${g.score.toLocaleString('en-US')} points`;
   open('pause');
 }
 
@@ -143,6 +156,7 @@ function quitToTitle() {
   sound.setLoop(null);
   renderer.fx.reset();
   newDemo();
+  refreshTitleBest();
   refreshScreens();
   $('#btn-play').focus({ preventScroll: true });
 }
@@ -151,6 +165,13 @@ function openGameOver() {
   const g = state.game;
   $('#over-score').textContent = g.score.toLocaleString('en-US');
   $('#over-level').textContent = String(g.level);
+  const st = g.stats;
+  const secs = Math.round(st.frames / 60);
+  $('#st-dots').textContent = st.dots.toLocaleString('en-US');
+  $('#st-ghosts').textContent = String(st.ghosts);
+  $('#st-combo').textContent = st.bestCombo ? `×${st.bestCombo}` : '—';
+  $('#st-fruit').textContent = String(st.fruit);
+  $('#st-time').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   $('#over-best').hidden = !(g.score > 0 && g.score > highScore());
   const form = $('#initials-form');
   state.entry = null;
@@ -199,34 +220,45 @@ function buzz(pattern) {
 function handleEvents(g) {
   const live = g === state.game;
   const fx = renderer.fx;
+  const rich = renderer.quality === 'high';
   for (const e of g.drainEvents()) {
     switch (e.type) {
       case 'dot':
         if (live) sound.waka();
+        if (rich) fx.burst(e.c * 8 + 4, e.r * 8 + 4, '#ffd2b8', 3, 26, 0.28, 0.55);
         break;
       case 'power':
-        fx.ring(e.c * 8 + 4, e.r * 8 + 4, '#ffd9c4', 26, 0.5, 1.6);
+        fx.ring(e.c * 8 + 4, e.r * 8 + 4, '#ffc9a8', 34, 0.6, 1.8);
+        fx.burst(e.c * 8 + 4, e.r * 8 + 4, '#ffd2b8', 14, 60, 0.5, 0.9);
+        fx.wallFlash = 1;
+        fx.wallFlashColor = '#8fa2ff';
+        fx.punch = 1;
         if (live) sound.power();
         break;
       case 'ghostEaten':
-        fx.burst(e.x, e.y, GHOST_HEX[e.ghost], 22, 75);
-        fx.ring(e.x, e.y, '#2ee8ff', 20, 0.4);
+        fx.burst(e.x, e.y, GHOST_HEX[e.ghost], 18, 80, 0.7, 1.2, 'shard');
+        fx.burst(e.x, e.y, '#ffffff', 8, 40, 0.4, 0.7);
+        fx.ring(e.x, e.y, '#5ff4ff', 22, 0.45, 1.6);
+        fx.punch = 1;
         if (live) { sound.eatGhost(); buzz(25); }
         break;
       case 'fruit':
-        fx.burst(e.x, e.y, '#ffa6ee', 18, 55);
-        fx.ring(e.x, e.y, '#ffa6ee', 16, 0.4);
+        fx.burst(e.x, e.y, '#ff9fd8', 18, 60, 0.6, 1, 'shard');
+        fx.ring(e.x, e.y, '#ff9fd8', 18, 0.45);
         if (live) sound.fruit();
         break;
       case 'extraLife':
-        if (live) { sound.extraLife(); toast('EXTRA LIFE!'); }
+        if (live) { sound.extraLife(); toast('Extra life!'); }
         break;
       case 'death':
-        if (!reducedMotion.matches) fx.shake = 1.4;
+        if (settings.shake && !reducedMotion.matches) fx.shake = 1.6;
         if (live) buzz([50, 40, 110]);
         break;
       case 'deathAnim':
         if (live) sound.death();
+        break;
+      case 'levelClear':
+        for (const [col, n] of [['#ffd93b', 18], ['#2fe4ff', 14], ['#ff8fd8', 14]]) fx.burst(g.pac.x, g.pac.y, col, n, 110, 1, 1.1, 'shard');
         break;
       case 'mazeFlash':
         if (live) sound.levelClear();
@@ -299,7 +331,7 @@ const input = new Input({
         return true;
       case 'mute':
         setSetting('sound', !settings.sound);
-        toast(settings.sound ? 'SOUND ON' : 'SOUND OFF');
+        toast(settings.sound ? 'Sound on' : 'Sound off');
         return true;
       case 'confirm': {
         if (playing() && state.game.phase === 'intermission') { state.game.nextLevel(); return true; }
@@ -326,7 +358,7 @@ function setSetting(key, value) {
   persist();
   if (key === 'sound') sound.setEnabled(value);
   if (key === 'volume') sound.setVolume(value);
-  if (key === 'crt') renderer.crt = value;
+  if (key === 'lighting') renderer.quality = value ? 'high' : 'low';
   if (key === 'dpad') layout();
   syncSettings();
 }
@@ -357,7 +389,7 @@ function renderScores() {
   if (!data.scores.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = 'NO SCORES YET. GO SET ONE!';
+    li.textContent = 'No scores yet. Go set one!';
     list.append(li);
     return;
   }
@@ -375,7 +407,7 @@ function renderScores() {
     pts.textContent = s.score.toLocaleString('en-US');
     const lvl = document.createElement('small');
     lvl.className = 'lvl';
-    lvl.textContent = `LEVEL ${s.level}`;
+    lvl.textContent = `Level ${s.level}`;
     pts.append(lvl);
     li.append(rank, who, pts);
     list.append(li);
@@ -417,7 +449,7 @@ document.addEventListener('click', (e) => {
       data.scores = [];
       state.entry = null;
       persist();
-      toast('HIGH SCORES CLEARED');
+      toast('High scores cleared');
       break;
     default: break;
   }
@@ -441,8 +473,8 @@ $('#initials-form').addEventListener('submit', (e) => {
   $('#initials-form').hidden = true;
   $('#initials').blur();
   sound.click();
-  toast(`SAVED AS #${state.entry.rank + 1}`);
-  $('[data-screen="over"] .pill-primary').focus({ preventScroll: true });
+  toast(`Saved as #${state.entry.rank + 1}`);
+  $('[data-screen="over"] .btn-primary').focus({ preventScroll: true });
 });
 
 /* ------------------------------------------------------------- layout */
@@ -455,71 +487,92 @@ function insets() {
   };
 }
 
+/* The board is drawn with a slab margin around it, so layout works in slab
+   units: the maze plus SLAB_PAD on every side. */
+const SLAB_W = BOARD_W + SLAB_PAD * 2;
+const SLAB_H = BOARD_H + SLAB_PAD * 2;
+const HUD_TOP = 58;
+const HUD_BOTTOM = 40;
+const HUD_GAP = 10;
+
+function place(el, x, y, w = null, h = null) {
+  el.style.left = `${Math.round(x)}px`;
+  el.style.top = `${Math.round(y)}px`;
+  el.style.width = w === null ? '' : `${Math.round(w)}px`;
+  el.style.height = h === null ? '' : `${Math.round(h)}px`;
+}
+
 function layout() {
   const vw = window.innerWidth, vh = window.innerHeight;
   const ins = insets();
-  const dpr = clamp(window.devicePixelRatio || 1, 1, 3);
-  const margin = 8;
+  const dpr = dprNow();
+  const margin = 10;
   const area = { x: ins.l + margin, y: ins.t + margin, w: vw - ins.l - ins.r - margin * 2, h: vh - ins.t - ins.b - margin * 2 };
   const wantPad = isTouch && settings.dpad;
   const portrait = vh >= vw;
 
-  let padZone = 0;
-  if (wantPad && portrait) padZone = clamp(vh * 0.26, 150, 240);
-  let s = Math.min(area.w / FRAME_W, (area.h - padZone) / FRAME_H);
-  /* Never let the pad squeeze the board below a playable size. */
-  if (padZone && s < area.w / FRAME_W * 0.72) { padZone = 0; s = Math.min(area.w / FRAME_W, area.h / FRAME_H); }
-  const fw = FRAME_W * s, fh = FRAME_H * s;
-  const fx = area.x + (area.w - fw) / 2;
-  const fy = padZone ? area.y + Math.max(0, (area.h - padZone - fh) * 0.3) : area.y + (area.h - fh) / 2;
-  const frame = { x: fx, y: fy, w: fw, h: fh };
-  renderer.resize(vw, vh, dpr, frame);
+  /* Side layout -- HUD in the gutters beside a full-height board -- whenever
+     the screen is wide enough to leave real gutters; otherwise HUD bars are
+     stacked above and below. */
+  const sSide = Math.min(area.w / SLAB_W, area.h / SLAB_H);
+  const side = !portrait && (area.w - SLAB_W * sSide) / 2 >= 150;
 
-  /* D-pad: centred under the board in portrait, in the widest side gutter in
+  let s, slabX, slabY, padZone = 0;
+  if (side) {
+    s = sSide;
+    slabX = area.x + (area.w - SLAB_W * s) / 2;
+    slabY = area.y + (area.h - SLAB_H * s) / 2;
+  } else {
+    const chrome = HUD_TOP + HUD_BOTTOM + HUD_GAP * 2;
+    if (wantPad && portrait) padZone = clamp(vh * 0.24, 150, 230);
+    s = Math.min(area.w / SLAB_W, (area.h - chrome - padZone) / SLAB_H);
+    if (padZone && s < (area.w / SLAB_W) * 0.72) { padZone = 0; s = Math.min(area.w / SLAB_W, (area.h - chrome) / SLAB_H); }
+    const groupH = SLAB_H * s + chrome;
+    const spare = area.h - padZone - groupH;
+    slabX = area.x + (area.w - SLAB_W * s) / 2;
+    slabY = area.y + HUD_TOP + HUD_GAP + Math.max(0, padZone ? spare * 0.3 : spare / 2);
+  }
+  const board = { x: slabX + SLAB_PAD * s, y: slabY + SLAB_PAD * s, w: BOARD_W * s, h: BOARD_H * s };
+  renderer.resize(vw, vh, dpr, board);
+
+  const slabW = SLAB_W * s, slabH = SLAB_H * s;
+  ui.hud.classList.toggle('side', side);
+  root.style.setProperty('--hud-value', `${Math.round(clamp(s * 9, 20, 34))}px`);
+  if (side) {
+    const gw = Math.min(230, slabX - ins.l - 32);
+    const gx = slabX - 24 - gw;
+    place(ui.hudTop, gx, slabY + 6, gw);
+    place(ui.hudBottom, gx, slabY + slabH - 6 - 150, gw, 150);
+    /* Pause takes the top of the opposite gutter, clear of the stat cards
+       and above the D-pad. */
+    place(ui.pauseBtn, slabX + slabW + 24, slabY + 6);
+  } else {
+    place(ui.hudTop, slabX + 4, slabY - HUD_GAP - HUD_TOP, slabW - 8, HUD_TOP);
+    ui.pauseBtn.style.left = ui.pauseBtn.style.top = '';
+    place(ui.hudBottom, slabX + 6, slabY + slabH + HUD_GAP, slabW - 12, HUD_BOTTOM);
+  }
+
+  /* D-pad: centred under the board in portrait, in the right gutter in
      landscape, hidden when there is no room for a comfortable thumb target. */
   let pad = null;
   if (wantPad) {
     if (portrait && padZone) {
-      const top = fy + fh, bottom = vh - ins.b;
-      const size = Math.min(bottom - top - 20, 210, vw * 0.58);
+      const top = slabY + slabH + HUD_GAP + HUD_BOTTOM, bottom = vh - ins.b;
+      const size = Math.min(bottom - top - 24, 210, vw * 0.58);
       if (size >= 120) pad = { size, cx: vw / 2, cy: (top + bottom) / 2 };
     } else if (!portrait) {
-      const gutter = Math.max(fx - ins.l, vw - ins.r - (fx + fw));
-      const size = Math.min(gutter - 28, 190, vh * 0.55);
-      if (size >= 120) {
-        const right = vw - ins.r - (fx + fw) >= fx - ins.l;
-        const cx = right ? (fx + fw + vw - ins.r) / 2 : (ins.l + fx) / 2;
-        pad = { size, cx, cy: vh - ins.b - size / 2 - Math.max(24, vh * 0.08) };
-      }
+      const gutter = vw - ins.r - (slabX + slabW);
+      const size = Math.min(gutter - 32, 190, vh * 0.55);
+      if (size >= 120) pad = { size, cx: (slabX + slabW + vw - ins.r) / 2, cy: vh - ins.b - size / 2 - Math.max(24, vh * 0.08) };
     }
   }
   state.padVisible = !!pad;
   if (pad) {
     ui.dpad.style.setProperty('--pad-size', `${Math.round(pad.size)}px`);
-    ui.dpad.style.left = `${Math.round(pad.cx - pad.size / 2)}px`;
-    ui.dpad.style.top = `${Math.round(pad.cy - pad.size / 2)}px`;
+    place(ui.dpad, pad.cx - pad.size / 2, pad.cy - pad.size / 2);
   }
-
-  /* Pause: in the right-hand gutter beside the score rows when the screen has
-     one, otherwise in the empty right end of the score rows themselves. It is
-     never allowed to overlap the maze, which starts 24 units down. */
-  const gutterR = vw - ins.r - (fx + fw);
-  let hud, bx, by;
-  if (gutterR >= 64) {
-    hud = 48;
-    bx = fx + fw + Math.min(16, (gutterR - hud) / 2);
-    by = Math.max(ins.t + 8, fy);
-  } else {
-    /* At least 44 px for touch; it may rise into the top margin to get it. */
-    const room = fy + 24 * s - 2 - (ins.t + 2);
-    hud = Math.floor(clamp(Math.max(44, 24 * s - 2), 36, Math.min(48, room)));
-    bx = fx + fw - hud;
-    by = Math.max(ins.t + 2, fy + (24 * s - hud) / 2);
-    if (by + hud > fy + 24 * s - 1) by = fy + 24 * s - 1 - hud;
-  }
-  ui.pauseBtn.style.setProperty('--hud-size', `${hud}px`);
-  ui.pauseBtn.style.left = `${Math.round(bx)}px`;
-  ui.pauseBtn.style.top = `${Math.round(by)}px`;
+  state.hud.lives = -1;
+  state.hud.level = -1;
   refreshScreens();
 }
 
@@ -544,22 +597,110 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('blur', () => { if (playing()) pause(); });
 
-/* ------------------------------------------------------------- roster */
+/* ------------------------------------------------------------- HUD */
 
-const rosterCanvases = $$('canvas[data-ghost]');
-function drawRoster(time) {
-  const dpr = clamp(window.devicePixelRatio || 1, 1, 3);
-  rosterCanvases.forEach((c, i) => {
-    const px = 28 * dpr;
+function iconCanvas(cssSize, draw) {
+  const dpr = dprNow();
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.round(cssSize * dpr);
+  const g = c.getContext('2d');
+  const k = c.width / 16;
+  g.setTransform(k, 0, 0, k, 0, 0);
+  draw(g);
+  return c;
+}
+
+function updateHud(dt) {
+  const g = state.game;
+  if (!g || ui.hud.hidden) return;
+  const h = state.hud;
+  /* Score counts up rather than jumping; the bump marks every gain. */
+  if (h.shown !== g.score) {
+    const gap = g.score - h.shown;
+    h.shown = gap < 0 ? g.score : Math.min(g.score, Math.ceil(h.shown + Math.max(gap * Math.min(1, dt * 14), 1)));
+    ui.score.textContent = h.shown.toLocaleString('en-US');
+    ui.score.classList.add('bump');
+    clearTimeout(h.bumpT);
+    h.bumpT = setTimeout(() => ui.score.classList.remove('bump'), 90);
+  }
+  const best = Math.max(highScore(), g.score);
+  if (h.best !== best) { h.best = best; ui.best.textContent = best.toLocaleString('en-US'); }
+  if (h.lives !== g.lives) {
+    h.lives = g.lives;
+    ui.lives.replaceChildren(...Array.from({ length: Math.min(g.lives, 6) }, () =>
+      iconCanvas(20, (c) => drawPac(c, 8, 8, 6.6, 0.6, 1))));
+  }
+  if (h.level !== g.level) {
+    h.level = g.level;
+    ui.level.textContent = String(g.level);
+    ui.fruit.replaceChildren(...fruitShelf(g.level).slice(-5).map((kind) =>
+      iconCanvas(20, (c) => drawFruit(c, kind, 8, 8.5, 1.05))));
+  }
+}
+
+/* ----------------------------------------------------------- title art */
+
+const castCanvases = $$('canvas[data-ghost]');
+const hero = $('#hero');
+
+function drawCast(time) {
+  const dpr = dprNow();
+  castCanvases.forEach((c, i) => {
+    const css = c.clientWidth || 46;
+    const px = Math.round(css * dpr);
     if (c.width !== px) { c.width = px; c.height = px; }
     const g = c.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, px, px);
-    const k = (px / 16);
+    const k = px / 17;
     g.setTransform(k, 0, 0, k, 0, 0);
-    const look = [3, 2, 1, 0][Math.floor(time * 0.7 + i) % 4];
-    drawGhost(g, 8, 8.4, { color: COLORS.ghost[c.dataset.ghost], dir: look, t: time * 8 + i });
+    const look = [3, 2, 1, 0][Math.floor(time * 0.6 + i * 0.7) % 4];
+    drawGhost(g, 8.5, 8.2, { color: COLORS.ghost[c.dataset.ghost], dir: look, t: time * 7 + i });
   });
+}
+
+/* The title strip: Pac-Man chased by the four ghosts until he reaches the
+   power pellet, then the chase reverses and he eats them one by one. */
+function drawHero(time) {
+  if (!hero || hero.offsetParent === null) return;
+  const dpr = dprNow();
+  const cw = hero.clientWidth, ch = hero.clientHeight;
+  if (hero.width !== Math.round(cw * dpr)) { hero.width = Math.round(cw * dpr); hero.height = Math.round(ch * dpr); }
+  const g = hero.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, hero.width, hero.height);
+  const k = (ch * dpr) / 22;
+  g.setTransform(k, 0, 0, k, 0, 0);
+  const W = (cw * dpr) / k, y = 11;
+  const P = 9, t = time % P;
+  const turn = W * 0.8;
+  const names = ['blinky', 'pinky', 'inky', 'clyde'];
+  const mouth = 0.95 * (0.5 - 0.5 * Math.cos(time * 9));
+  if (t < P / 2) {
+    const f = t / (P / 2);
+    const px = -20 + (turn + 20) * f;
+    for (let i = 0; i < 9; i++) {
+      const dx = 12 + i * ((turn - 18) / 9);
+      if (dx > px) { g.fillStyle = '#ffd9c4'; g.beginPath(); g.arc(dx, y, 1.1, 0, Math.PI * 2); g.fill(); }
+    }
+    if (px < turn) {
+      const pg = g.createRadialGradient(turn + 4, y, 0, turn + 4, y, 3.4);
+      pg.addColorStop(0, '#fff'); pg.addColorStop(1, '#ff9a6a');
+      g.fillStyle = pg; g.beginPath(); g.arc(turn + 4, y, 3.2 + Math.sin(time * 7) * 0.3, 0, Math.PI * 2); g.fill();
+    }
+    drawPac(g, px, y, 6.5, mouth, 3);
+    names.forEach((n, i) => drawGhost(g, px - 22 - i * 16, y, { color: COLORS.ghost[n], dir: 3, t: time * 8 + i }));
+  } else {
+    const f = (t - P / 2) / (P / 2);
+    const travel = turn + 90;
+    const px = turn + 4 - travel * 1.18 * f;
+    names.forEach((n, i) => {
+      const gx = turn - 22 - i * 16 - travel * f;
+      const eaten = px < gx + 3;
+      drawGhost(g, gx, y, { color: COLORS.ghost[n], dir: 1, t: time * 8 + i, mode: eaten ? 'eyes' : (f > 0.8 && Math.floor(time * 6) % 2 ? 'flash' : 'fright') });
+    });
+    drawPac(g, px, y, 6.5, mouth, 1);
+  }
 }
 
 /* --------------------------------------------------------------- loop */
@@ -596,21 +737,29 @@ function frame(now) {
 
   updateLoopSound();
   renderer.draw(titleMode ? state.demo : g, running ? state.acc / STEP : 1, {
-    time: state.time, demo: titleMode, highScore: highScore()
+    time: state.time, demo: titleMode, reducedMotion: reducedMotion.matches || !settings.shake
   });
-  if (titleMode && !ui.screens.title.hidden) drawRoster(state.time);
+  if (titleMode && !ui.screens.title.hidden) { drawCast(state.time); drawHero(state.time); }
+  updateHud(dt);
   requestAnimationFrame(frame);
 }
 
 /* --------------------------------------------------------------- boot */
 
+function refreshTitleBest() {
+  const best = highScore();
+  $('#title-best').hidden = !best;
+  $('#title-best-value').textContent = best.toLocaleString('en-US');
+}
+
 async function boot() {
   newDemo();
+  refreshTitleBest();
   syncSettings();
   layout();
   try {
     await Promise.race([
-      document.fonts.load('8px "Press Start 2P"'),
+      document.fonts.load('700 16px "Outfit"'),
       new Promise((r) => setTimeout(r, 1500))
     ]);
   } catch { /* fall back to the monospace stack */ }
