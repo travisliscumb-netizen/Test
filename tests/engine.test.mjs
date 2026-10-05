@@ -4,10 +4,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as M from '../src/maze.js';
-import { Game, DIR, levelSpec, fruitShelf, MAX_SPEED } from '../src/engine.js';
+import { Game, DIR, levelSpec, fruitShelf, MAX_SPEED, DIFFICULTY } from '../src/engine.js';
 import { botDirection } from '../src/bot.js';
 
-const tileType = (x, y) => M.tileAt(M.tileOf(x), M.tileOf(y));
+const tileType = (g, x, y) => g.maze.tileAt(M.tileOf(x), M.tileOf(y));
 
 test('maze has the arcade dot count and a sealed border', () => {
   assert.equal(M.TOTAL_DOTS, 244);
@@ -127,10 +127,10 @@ function soak({ seed, levels, invincible, frames }) {
     for (const a of [g.pac, ...g.ghosts]) {
       assert.ok(Number.isFinite(a.x) && Number.isFinite(a.y), 'finite position');
     }
-    const pt = tileType(g.pac.x, g.pac.y);
+    const pt = tileType(g, g.pac.x, g.pac.y);
     assert.equal(pt, M.T.PATH, `pac inside ${pt} at ${g.pac.x},${g.pac.y}`);
     for (const gh of g.ghosts) {
-      const t = tileType(gh.x, gh.y);
+      const t = tileType(g, gh.x, gh.y);
       if (gh.state === 'active' || gh.state === 'eyes') {
         assert.equal(t, M.T.PATH, `${gh.name} (${gh.state}) inside ${t} at ${gh.x},${gh.y} frame ${stats.frames}`);
       } else {
@@ -168,4 +168,103 @@ test('wall outlines trace into closed, rounded loops', async () => {
       assert.ok(v.radius > 0 && v.radius <= (v.convex ? R_CONVEX : R_CONCAVE));
     }
   }
+});
+
+test('every maze is sound: sealed, connected, no dead ends, fixed house and spawn', () => {
+  const { MAZES, mazeForLevel } = M;
+  assert.equal(MAZES.length, 4);
+  for (const mz of MAZES) {
+    let dots = 0, power = 0;
+    for (const v of mz.items) { if (v === M.ITEM.DOT) dots++; if (v === M.ITEM.POWER) power++; }
+    assert.equal(power, 4, `${mz.name} power pellets`);
+    assert.ok(dots > 200, `${mz.name} has ${dots} dots`);
+    assert.equal(mz.tileAt(13, 12), M.T.DOOR, `${mz.name} door`);
+    assert.equal(mz.tileAt(13, 14), M.T.HOUSE, `${mz.name} house`);
+    assert.ok(mz.walkable(13, 23) && mz.walkable(14, 23), `${mz.name} spawn`);
+    assert.ok(mz.walkable(13, 17) && mz.walkable(14, 17), `${mz.name} fruit spot`);
+    for (let r = 0; r < M.ROWS; r++) {
+      for (let c = 0; c < M.COLS; c++) {
+        if (!mz.walkable(c, r)) continue;
+        let exits = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (mz.walkable(c + dx, r + dy)) exits++;
+        assert.ok(exits >= 2, `${mz.name}: dead end at ${c},${r}`);
+      }
+    }
+  }
+  assert.equal(mazeForLevel(1).name, 'Classic');
+  assert.equal(mazeForLevel(4).name, 'Orchid');
+  assert.equal(mazeForLevel(7).name, 'Lagoon');
+  assert.equal(mazeForLevel(10).name, 'Ember');
+  assert.equal(mazeForLevel(13).name, 'Classic');
+});
+
+test('easy mode: more lives, repeating extra lives, slower ghosts, longer fright everywhere', () => {
+  const easy = new Game({ difficulty: 'easy' });
+  const arcade = new Game();
+  assert.equal(easy.lives, 4);
+  assert.equal(arcade.lives, 2);
+  easy.addScore(10000);
+  easy.addScore(10000);
+  assert.equal(easy.lives, 6, 'a life at 10k and again at 20k');
+  arcade.addScore(10000);
+  arcade.addScore(10000);
+  assert.equal(arcade.lives, 3, 'arcade awards only one');
+  for (let level = 1; level <= 25; level++) {
+    const e = levelSpec(level, DIFFICULTY.easy), a = levelSpec(level);
+    assert.ok(e.speed.ghost < a.speed.ghost, `ghosts slower on level ${level}`);
+    assert.ok(e.frightFrames >= 4 * 60, `fright at least 4 s on level ${level}`);
+    assert.ok(e.frightFrames >= a.frightFrames);
+    assert.equal(e.elroy1Dots, -1, 'no cruise elroy');
+    assert.ok(e.houseLimits[1] > a.houseLimits[1] && e.idleLimit > a.idleLimit, 'slower release');
+  }
+});
+
+test('easy mode: an eaten ghost rests in the house before coming back out', () => {
+  const g = new Game({ difficulty: 'easy', seed: 4 });
+  while (g.phase === 'ready') g.step();
+  const blinky = g.ghosts[0];
+  blinky.state = 'eyes';
+  let restFrames = 0, left = false;
+  for (let i = 0; i < 60 * 30 && !left; i++) {
+    g.moveGhost(blinky);
+    if (blinky.state === 'resting') restFrames++;
+    if (blinky.state === 'leaving') left = true;
+  }
+  assert.ok(left, 'eventually leaves');
+  assert.ok(restFrames >= 5 * 60 - 1, `rested ${restFrames} frames`);
+});
+
+test('easy mode: a dangerous ghost must overlap Pac-Man, not merely share a tile', () => {
+  const g = new Game({ difficulty: 'easy' });
+  while (g.phase === 'ready') g.step();
+  const gh = g.ghosts[0];
+  gh.state = 'active';
+  g.pac.x = 9 * 8 + 1; g.pac.y = 5 * 8 + 4;
+  gh.x = 9 * 8 + 7; gh.y = 5 * 8 + 4;                   // same tile, 6 apart
+  assert.equal(g.checkCollisions(), false);
+  gh.x = 9 * 8 + 5;                                     // 4 apart: real overlap
+  assert.equal(g.checkCollisions(), true);
+  assert.equal(g.phase, 'dying');
+});
+
+test('easy autopilot gets much further than arcade and reaches every maze', () => {
+  const run = (difficulty, seed) => {
+    const g = new Game({ seed, difficulty });
+    const mazes = new Set();
+    for (let f = 0; f < 60 * 60 * 60 && g.phase !== 'gameover'; f++) {
+      g.setInput(botDirection(g)); g.step(); g.drainEvents();
+      mazes.add(g.maze.name);
+    }
+    return { level: g.level, mazes };
+  };
+  let easy = 0, arcade = 0;
+  const seen = new Set();
+  for (const seed of [1, 2, 3, 4]) {
+    const e = run('easy', seed);
+    easy += e.level;
+    e.mazes.forEach((m) => seen.add(m));
+    arcade += run('arcade', seed).level;
+  }
+  assert.ok(easy >= arcade * 2, `easy reached ${easy / 4} on average vs arcade ${arcade / 4}`);
+  assert.ok(seen.size >= 3, `easy runs visited ${[...seen].join(', ')}`);
 });

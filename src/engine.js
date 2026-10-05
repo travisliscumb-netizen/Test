@@ -50,19 +50,40 @@ export function fruitForLevel(level) {
   return FRUITS[idx];
 }
 
-export function levelSpec(level) {
+/* Difficulty presets. Arcade reproduces the original machine exactly; Easy
+   keeps every rule but loosens the numbers: more lives, slower ghosts, a
+   longer stay in the house, longer fright, more scatter time, no Cruise
+   Elroy, and a ghost only catches Pac-Man when the two actually overlap. */
+export const DIFFICULTY = {
+  arcade: {
+    label: 'Arcade', lives: 2, extraLifeEvery: 0, ghostScale: 1, frightScale: 1, frightMinSec: 0,
+    houseLimits: null, idleSec: null, globalRelease: [7, 17, 32], reviveHoldSec: 0, elroy: true,
+    modes: null, catchRadius: 0
+  },
+  easy: {
+    label: 'Easy', lives: 4, extraLifeEvery: 10000, ghostScale: 0.85, frightScale: 1.6, frightMinSec: 4,
+    houseLimits: [20, 50, 90], idleSec: 7, globalRelease: [15, 40, 70], reviveHoldSec: 5, elroy: false,
+    modes: [9, 15, 9, 15, 8, 15, 8, Infinity], catchRadius: 6
+  }
+};
+
+export function levelSpec(level, rules = DIFFICULTY.arcade) {
   let s;
   if (level === 1) s = { pac: 0.80, pacF: 0.90, ghost: 0.75, ghostF: 0.50, tunnel: 0.40, elroy1: 0.80, elroy2: 0.85 };
   else if (level <= 4) s = { pac: 0.90, pacF: 0.95, ghost: 0.85, ghostF: 0.55, tunnel: 0.45, elroy1: 0.90, elroy2: 0.95 };
   else if (level <= 20) s = { pac: 1.00, pacF: 1.00, ghost: 0.95, ghostF: 0.60, tunnel: 0.50, elroy1: 1.00, elroy2: 1.05 };
   else s = { pac: 0.90, pacF: 0.90, ghost: 0.95, ghostF: 0.60, tunnel: 0.50, elroy1: 1.00, elroy2: 1.05 };
 
-  const [frightSec, flashes] = FRIGHT[level - 1] || [0, 0];
-  const elroy1Dots = ELROY_DOTS[level - 1] ?? 120;
+  for (const k of ['ghost', 'ghostF', 'tunnel', 'elroy1', 'elroy2']) s[k] *= rules.ghostScale;
+
+  const [baseFright, baseFlashes] = FRIGHT[level - 1] || [0, 0];
+  const frightSec = Math.max(baseFright * rules.frightScale, rules.frightMinSec);
+  const flashes = frightSec > 0 ? Math.max(baseFlashes, rules.frightMinSec ? 5 : 0) : 0;
+  const elroy1Dots = rules.elroy ? ELROY_DOTS[level - 1] ?? 120 : -1;
   const sec = (v) => Math.round(v * FPS);
-  const modes = level === 1 ? [7, 20, 7, 20, 5, 20, 5, Infinity]
+  const modes = rules.modes || (level === 1 ? [7, 20, 7, 20, 5, 20, 5, Infinity]
     : level <= 4 ? [7, 20, 7, 20, 5, 1033, 1 / 60, Infinity]
-      : [5, 20, 5, 20, 5, 1037, 1 / 60, Infinity];
+      : [5, 20, 5, 20, 5, 1037, 1 / 60, Infinity]);
 
   return {
     speed: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v * MAX_SPEED])),
@@ -71,8 +92,8 @@ export function levelSpec(level) {
     elroy1Dots,
     elroy2Dots: elroy1Dots / 2,
     modeFrames: modes.map((v) => (v === Infinity ? Infinity : Math.max(1, sec(v)))),
-    houseLimits: level === 1 ? [0, 30, 60] : level === 2 ? [0, 0, 50] : [0, 0, 0],
-    idleLimit: level <= 4 ? sec(4) : sec(3),
+    houseLimits: rules.houseLimits || (level === 1 ? [0, 30, 60] : level === 2 ? [0, 0, 50] : [0, 0, 0]),
+    idleLimit: sec(rules.idleSec || (level <= 4 ? 4 : 3)),
     fruit: fruitForLevel(level)
   };
 }
@@ -108,7 +129,9 @@ const inTunnel = (c, r) => {
 };
 
 export class Game {
-  constructor({ seed = 1, startLevel = 1, invincible = false } = {}) {
+  constructor({ seed = 1, startLevel = 1, invincible = false, difficulty = 'arcade' } = {}) {
+    this.difficulty = DIFFICULTY[difficulty] ? difficulty : 'arcade';
+    this.rules = DIFFICULTY[this.difficulty];
     this.rand = mulberry32(seed);
     this.startLevelNum = startLevel;
     this.invincible = invincible;
@@ -121,9 +144,9 @@ export class Game {
 
   newGame() {
     this.score = 0;
-    this.lives = 2;                  // in reserve; the one in play is not counted
+    this.lives = this.rules.lives;   // in reserve; the one in play is not counted
     this.level = this.startLevelNum;
-    this.extraLifeAwarded = false;
+    this.nextExtraLife = EXTRA_LIFE_AT;
     this.tick = 0;
     /* Lifetime counters for the results screen; never read by the rules. */
     this.stats = { dots: 0, ghosts: 0, bestCombo: 0, fruit: 0, frames: 0 };
@@ -131,17 +154,18 @@ export class Game {
   }
 
   startLevel(first = false) {
-    this.spec = levelSpec(this.level);
-    this.items = M.BASE_ITEMS.slice();
+    this.spec = levelSpec(this.level, this.rules);
+    this.maze = M.mazeForLevel(this.level);
+    this.items = this.maze.items.slice();
     this.dotsEaten = 0;
-    this.dotsLeft = M.TOTAL_DOTS;
+    this.dotsLeft = this.maze.totalDots;
     this.houseCounters = [0, 0, 0];
     this.globalCounterOn = false;
     this.globalCounter = 0;
     this.elroySuspended = false;
     this.resetActors();
     this.setPhase('ready', first ? 252 : 120);
-    this.emit(first ? 'gameStart' : 'levelStart', { level: this.level });
+    this.emit(first ? 'gameStart' : 'levelStart', { level: this.level, maze: this.maze.name });
   }
 
   resetActors() {
@@ -189,12 +213,11 @@ export class Game {
   setInput(dir) { if (dir >= 0 && dir <= 3) this.pac.want = dir; }
 
   addScore(n) {
-    const before = this.score;
     this.score += n;
-    if (!this.extraLifeAwarded && before < EXTRA_LIFE_AT && this.score >= EXTRA_LIFE_AT) {
-      this.extraLifeAwarded = true;
+    while (this.score >= this.nextExtraLife) {
       this.lives++;
       this.emit('extraLife');
+      this.nextExtraLife = this.rules.extraLifeEvery ? this.nextExtraLife + this.rules.extraLifeEvery : Infinity;
     }
   }
 
@@ -304,7 +327,7 @@ export class Game {
   reverseGhosts() {
     for (const g of this.ghosts) {
       if (g.state === 'active') g.dir = opposite(g.dir);
-      else if (g.state === 'house' || g.state === 'leaving') g.exitRight = true;
+      else if (g.state === 'house' || g.state === 'leaving' || g.state === 'resting') g.exitRight = true;
     }
   }
 
@@ -317,11 +340,11 @@ export class Game {
 
     if (want >= 0 && want !== p.dir) {
       if (want === opposite(p.dir)) p.dir = want;
-      else if (M.walkable(tc + DX[want], tr + DY[want])) p.dir = want;
+      else if (this.maze.walkable(tc + DX[want], tr + DY[want])) p.dir = want;
     }
 
     const d = p.dir;
-    const open = M.walkable(tc + DX[d], tr + DY[d]);
+    const open = this.maze.walkable(tc + DX[d], tr + DY[d]);
     const ox = p.x, oy = p.y;
     if (DX[d] !== 0) {
       const cx = M.centerOf(tc);
@@ -399,9 +422,10 @@ export class Game {
     if (this.globalCounterOn) {
       this.globalCounter++;
       const [, pinky, inky, clyde] = this.ghosts;
-      if (this.globalCounter === 7 && pinky.state === 'house') this.release(pinky);
-      else if (this.globalCounter === 17 && inky.state === 'house') this.release(inky);
-      else if (this.globalCounter === 32 && clyde.state === 'house') {
+      const [p, i, c] = this.rules.globalRelease;
+      if (this.globalCounter === p && pinky.state === 'house') this.release(pinky);
+      else if (this.globalCounter === i && inky.state === 'house') this.release(inky);
+      else if (this.globalCounter === c && clyde.state === 'house') {
         this.release(clyde);
         this.globalCounterOn = false;
       }
@@ -438,7 +462,7 @@ export class Game {
   ghostSpeed(g) {
     const s = this.spec.speed;
     if (g.state === 'eyes' || g.state === 'entering') return EYES_SPEED;
-    if (g.state === 'house' || g.state === 'leaving') return HOUSE_SPEED;
+    if (g.state === 'house' || g.state === 'leaving' || g.state === 'resting') return HOUSE_SPEED;
     if (inTunnel(M.tileOf(g.x), M.tileOf(g.y))) return s.tunnel;
     if (g.frightened) return s.ghostF;
     if (g.idx === 0) {
@@ -454,6 +478,10 @@ export class Game {
     const ox = g.x, oy = g.y;
     switch (g.state) {
       case 'house': this.bob(g, dist); break;
+      case 'resting':
+        this.bob(g, dist);
+        if (--g.hold <= 0) g.state = 'leaving';
+        break;
       case 'leaving': this.leave(g, dist); break;
       case 'entering': this.enter(g, dist); break;
       default: this.moveOnGrid(g, dist);
@@ -495,7 +523,10 @@ export class Game {
     if (dist > 0 && g.x === M.HOUSE_DOOR_X) dist = this.approach(g, 'y', M.HOUSE_CENTER_Y, dist);
     if (dist > 0 && g.y === M.HOUSE_CENTER_Y) dist = this.approach(g, 'x', g.home, dist);
     if (g.y === M.HOUSE_CENTER_Y && g.x === g.home) {
-      g.state = 'leaving';
+      /* A revived ghost may have to sit out a spell before leaving again. */
+      const hold = Math.round(this.rules.reviveHoldSec * FPS);
+      g.state = hold > 0 ? 'resting' : 'leaving';
+      g.hold = hold;
       g.frightened = false;
       this.emit('ghostHome', { ghost: g.name });
     }
@@ -533,7 +564,7 @@ export class Game {
     const options = [];
     for (let d = 0; d < 4; d++) {
       if (d === opposite(g.dir)) continue;
-      if (!M.walkable(c + DX[d], r + DY[d])) continue;
+      if (!this.maze.walkable(c + DX[d], r + DY[d])) continue;
       if (d === DIR.UP && g.state === 'active' && !g.frightened && M.RED_ZONES.has(tileKey(c, r))) continue;
       options.push(d);
     }
@@ -596,7 +627,13 @@ export class Game {
     const pc = M.tileOf(p.x), pr = M.tileOf(p.y);
     for (const g of this.ghosts) {
       if (g.state !== 'active') continue;
-      if (M.tileOf(g.x) !== pc || M.tileOf(g.y) !== pr) continue;
+      const sameTile = M.tileOf(g.x) === pc && M.tileOf(g.y) === pr;
+      const d = Math.hypot(g.x - p.x, g.y - p.y);
+      /* Arcade: sharing a tile is contact. Easy: a frightened ghost is caught
+         generously, but a dangerous one only on real overlap. */
+      const r = this.rules.catchRadius;
+      const touching = !r ? sameTile : g.frightened ? sameTile || d < 10 : d < r;
+      if (!touching) continue;
       if (g.frightened) {
         this.ghostsEatenInFright++;
         this.stats.ghosts++;

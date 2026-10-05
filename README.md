@@ -21,6 +21,18 @@ ES modules need a real origin, so `file://` will not work.
 | Mute | M | Settings | — |
 | Skip intermission | Enter / Space | — | A |
 
+## Difficulty and mazes
+
+**Easy** (the default) keeps every rule but loosens the numbers: five lives and
+an extra life every 10,000, ghosts 15 % slower, later ghost-house release, an
+eaten ghost rests 5 s before coming back out, fright of at least 4 s on every
+level, longer scatter, no Cruise Elroy, and a dangerous ghost must actually
+overlap Pac-Man. **Arcade** is the original machine, unchanged.
+
+Levels are endless. Four mazes -- Classic, Orchid, Lagoon, Ember -- rotate every
+three levels, each with its own colour theme. They share the arcade's middle
+band (house, tunnels, fruit corridor), so ghost behaviour holds in all of them.
+
 ## How faithful is it
 
 The engine follows the original hardware as documented in Jamey Pittman's
