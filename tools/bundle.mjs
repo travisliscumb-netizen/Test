@@ -21,9 +21,9 @@ const js = esbuild.buildSync({
   legalComments: 'none'
 }).outputFiles[0].text;
 
-const font = fs.readFileSync(path.join(ROOT, 'src', 'fonts', 'press-start-2p-latin.woff2')).toString('base64');
+const font = fs.readFileSync(path.join(ROOT, 'src', 'fonts', 'outfit-latin.woff2')).toString('base64');
 let css = fs.readFileSync(path.join(ROOT, 'src', 'ui.css'), 'utf8')
-  .replace("url('fonts/press-start-2p-latin.woff2')", `url(data:font/woff2;base64,${font})`);
+  .replace("url('fonts/outfit-latin.woff2')", `url(data:font/woff2;base64,${font})`);
 css = esbuild.transformSync(css, { loader: 'css', minify: true }).code;
 
 let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

@@ -29,9 +29,10 @@ const page = await browser.newPage();
 await page.goto(`${url}/sw.js`);
 
 const results = await page.evaluate(async (jobs) => {
-  const face = new FontFace('Press Start 2P', 'url(/src/fonts/press-start-2p-latin.woff2)');
+  const face = new FontFace('Outfit', 'url(/src/fonts/outfit-latin.woff2)', { weight: '100 900' });
   document.fonts.add(await face.load());
-  const { drawPac, drawGhost, COLORS } = await import('/src/sprites.js');
+  const { drawPac, drawGhost, drawShadow, COLORS } = await import('/src/sprites.js');
+  const TAU = Math.PI * 2;
 
   const rounded = (g, x, y, w, h, r) => {
     g.beginPath();
@@ -40,32 +41,44 @@ const results = await page.evaluate(async (jobs) => {
     g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r);
     g.closePath();
   };
-  const backdrop = (g, w, h) => {
-    const grd = g.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
-    grd.addColorStop(0, '#16205a');
-    grd.addColorStop(0.6, '#080b24');
-    grd.addColorStop(1, '#03040c');
-    return grd;
-  };
-  const glow = (g, x, y, r, color) => {
+  const glow = (g, x, y, r, color, a) => {
     const grd = g.createRadialGradient(x, y, 0, x, y, r);
-    grd.addColorStop(0, color);
-    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    grd.addColorStop(0, color.replace('A', a));
+    grd.addColorStop(1, color.replace('A', 0));
     g.fillStyle = grd;
     g.fillRect(x - r, y - r, r * 2, r * 2);
   };
+  /* The game's sky: deep indigo with an aurora of violet and cyan. */
+  const sky = (g, w, h) => {
+    const base = g.createLinearGradient(0, 0, 0, h);
+    base.addColorStop(0, '#11163f');
+    base.addColorStop(1, '#05060f');
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'lighter';
+    glow(g, w * 0.82, h * 0.95, Math.max(w, h) * 0.7, 'rgba(192,44,255,A)', 0.3);
+    glow(g, w * 0.1, h * 0.9, Math.max(w, h) * 0.6, 'rgba(0,184,255,A)', 0.22);
+    glow(g, w * 0.3, h * 0.05, Math.max(w, h) * 0.6, 'rgba(58,44,255,A)', 0.35);
+    g.globalCompositeOperation = 'source-over';
+  };
+  const pellet = (g, x, y, r) => {
+    glow(g, x, y, r * 3, 'rgba(255,170,130,A)', 0.55);
+    const b = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.05, x, y, r);
+    b.addColorStop(0, '#ffffff'); b.addColorStop(0.5, '#ffe2cf'); b.addColorStop(1, '#ff9a6a');
+    g.fillStyle = b;
+    g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+  };
 
-  /* Pac-Man chasing a dot with Blinky behind, in a 32-unit square. */
-  const scene = (g, u, ox, oy, simple) => {
+  /* The icon: a portrait of Pac-Man, mouth open toward a pellet, lit from
+     behind, in a 32-unit square. */
+  const portrait = (g, u, ox, oy) => {
     g.save();
     g.translate(ox, oy);
     g.scale(u, u);
-    glow(g, 13, 16, 16, 'rgba(255, 210, 40, 0.35)');
-    if (!simple) {
-      g.fillStyle = '#ffd9c4';
-      g.beginPath(); g.arc(27.2, 16, 1.6, 0, Math.PI * 2); g.fill();
-    }
-    drawPac(g, simple ? 16 : 13.5, 16, simple ? 13 : 10.5, 0.7, 3);
+    glow(g, 14.5, 15.5, 17, 'rgba(255,200,40,A)', 0.5);
+    drawShadow(g, 15, 28.2, 9.5, 1.7, 0.55);
+    pellet(g, 28, 16, 1.55);
+    drawPac(g, 14.2, 16, 11.4, 0.66, 3);
     g.restore();
   };
 
@@ -76,69 +89,63 @@ const results = await page.evaluate(async (jobs) => {
     const g = c.getContext('2d');
     const { w, h } = job;
     if (job.kind === 'cover') {
-      g.fillStyle = backdrop(g, w, h);
-      g.fillRect(0, 0, w, h);
-      g.strokeStyle = 'rgba(61, 99, 255, 0.9)';
-      g.shadowColor = 'rgba(61, 99, 255, 0.9)';
-      g.shadowBlur = 18;
-      g.lineWidth = 5;
-      rounded(g, 40, 40, w - 80, h - 80, 46);
-      g.stroke();
-      g.lineWidth = 2;
-      g.strokeStyle = '#b8c8ff';
-      g.shadowBlur = 0;
-      rounded(g, 52, 52, w - 104, h - 104, 36);
-      g.stroke();
-      g.font = '96px "Press Start 2P"';
+      sky(g, w, h);
       g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      const tg = g.createLinearGradient(0, 150, 0, 260);
-      tg.addColorStop(0, '#fffbd0'); tg.addColorStop(0.4, '#ffe94a'); tg.addColorStop(1, '#e08a00');
-      g.fillStyle = '#6a3a00';
-      g.fillText('PAC-MAN', w / 2, 218);
+      g.textBaseline = 'alphabetic';
+      g.font = '900 150px Outfit';
+      if ('letterSpacing' in g) g.letterSpacing = '-5px';
+      const tg = g.createLinearGradient(0, 120, 0, 250);
+      tg.addColorStop(0, '#fffbe0'); tg.addColorStop(0.3, '#ffe84a'); tg.addColorStop(0.62, '#ffc21a'); tg.addColorStop(1, '#f08f00');
+      g.fillStyle = '#7a3e00';
+      g.fillText('PAC-MAN', w / 2, 262);
+      g.shadowColor = 'rgba(255, 190, 30, 0.45)';
+      g.shadowBlur = 40;
       g.fillStyle = tg;
-      g.shadowColor = 'rgba(255, 200, 30, 0.6)';
-      g.shadowBlur = 30;
-      g.fillText('PAC-MAN', w / 2, 210);
+      g.fillText('PAC-MAN', w / 2, 252);
       g.shadowBlur = 0;
-      g.font = '22px "Press Start 2P"';
-      g.fillStyle = '#2ee8ff';
-      g.fillText('ARCADE EDITION', w / 2, 292);
-      /* Row spans units 28..213; centre it on the card. */
-      const y = 430, u = 5;
+      g.font = '600 26px Outfit';
+      if ('letterSpacing' in g) g.letterSpacing = '13px';
+      g.fillStyle = '#9ff2ff';
+      g.fillText('ARCADE EDITION', w / 2 + 6, 318);
+      if ('letterSpacing' in g) g.letterSpacing = '0px';
+      const y = 455, u = 5.4;
       g.save(); g.translate(w / 2 - 120.5 * u, y); g.scale(u, u);
-      for (let i = 0; i < 7; i++) { g.fillStyle = '#ffd9c4'; g.beginPath(); g.arc(30 + i * 9, 0, 1.1, 0, Math.PI * 2); g.fill(); }
-      glow(g, 112, 0, 22, 'rgba(255, 210, 40, 0.35)');
+      for (let i = 0; i < 7; i++) pellet(g, 30 + i * 9, 0, 1.1);
+      glow(g, 112, 0, 24, 'rgba(255,200,40,A)', 0.45);
+      drawShadow(g, 112, 9, 8, 1.6, 0.5);
       drawPac(g, 112, 0, 9, 0.7, 1);
       ['blinky', 'pinky', 'inky', 'clyde'].forEach((n, i) => {
-        glow(g, 145 + i * 20, 0, 14, 'rgba(120, 140, 255, 0.18)');
-        drawGhost(g, 145 + i * 20, 0, { color: COLORS.ghost[n], dir: 1, t: i * 1.3 });
+        const gx = 145 + i * 20;
+        glow(g, gx, 0, 14, n === 'blinky' ? 'rgba(255,61,79,A)' : n === 'pinky' ? 'rgba(255,143,216,A)' : n === 'inky' ? 'rgba(47,228,255,A)' : 'rgba(255,173,66,A)', 0.3);
+        drawShadow(g, gx, 8.5, 6.5, 1.6, 0.5);
+        drawGhost(g, gx, 0, { color: COLORS.ghost[n], dir: 1, t: i * 1.3 });
       });
       g.restore();
+    } else if (job.kind === 'tiny') {
+      /* At 16-32 px only the silhouette survives: Pac-Man, edge to edge. */
+      rounded(g, 0, 0, w, h, w * 0.22);
+      g.fillStyle = '#0b0f30';
+      g.fill();
+      g.save();
+      g.scale(w / 32, h / 32);
+      drawPac(g, 15.6, 16, 13.4, 0.68, 3);
+      g.restore();
+    } else if (job.kind === 'rounded') {
+      rounded(g, 0, 0, w, h, w * 0.225);
+      g.save();
+      g.clip();
+      sky(g, w, h);
+      g.restore();
+      rounded(g, w * 0.012, h * 0.012, w * 0.976, h * 0.976, w * 0.215);
+      g.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      g.lineWidth = Math.max(1, w * 0.008);
+      g.stroke();
+      portrait(g, w / 32 * 0.9, w * 0.05, h * 0.05);
     } else {
-      if (job.kind === 'rounded') {
-        rounded(g, 0, 0, w, h, w * 0.22);
-        g.fillStyle = backdrop(g, w, h);
-        g.fill();
-        g.save();
-        rounded(g, w * 0.035, h * 0.035, w * 0.93, h * 0.93, w * 0.19);
-        g.strokeStyle = 'rgba(61, 99, 255, 0.85)';
-        g.lineWidth = Math.max(1, w * 0.018);
-        g.shadowColor = 'rgba(61, 99, 255, 0.9)';
-        g.shadowBlur = w * 0.04;
-        g.stroke();
-        g.restore();
-        scene(g, w / 32 * 0.86, w * 0.07, h * 0.07, false);
-      } else if (job.kind === 'full') {
-        g.fillStyle = backdrop(g, w, h);
-        g.fillRect(0, 0, w, h);
-        scene(g, w / 32 * 0.7, w * 0.15, h * 0.15, false);
-      } else {
-        rounded(g, 0, 0, w, h, w * 0.25);
-        g.fillStyle = '#080b24';
-        g.fill();
-        scene(g, w / 32, 0, 0, true);
-      }
+      /* Full bleed: iOS rounds the corners itself, and Android masks keep
+         only the central 80 %, so the portrait sits inside that. */
+      sky(g, w, h);
+      portrait(g, w / 32 * 0.76, w * 0.12, h * 0.12);
     }
     out[job.file] = c.toDataURL('image/png');
   }

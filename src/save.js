@@ -8,7 +8,8 @@ export const TABLE_SIZE = 5;
 export const DEFAULT_SETTINGS = Object.freeze({
   sound: true,
   volume: 0.7,
-  crt: true,
+  lighting: true,
+  shake: true,
   dpad: true,
   haptics: true
 });

@@ -29,7 +29,7 @@ async function open(opts) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(url, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__pacman && document.fonts.check('8px "Press Start 2P"'));
+  await page.waitForFunction(() => window.__pacman && [...document.fonts].some((f) => f.family.includes('Outfit') && f.status === 'loaded'));
   return { ctx, page, errors };
 }
 
@@ -82,10 +82,10 @@ const waitPhase = (page, phase, timeout = 8000) =>
   });
   check('simulation is frozen while paused', frozen);
   const focused = await page.evaluate(() => document.activeElement && document.activeElement.textContent.trim());
-  check('pause menu takes keyboard focus', focused === 'RESUME', focused);
+  check('pause menu takes keyboard focus', focused === 'Resume', focused);
   await page.keyboard.press('ArrowDown');
   const moved = await page.evaluate(() => document.activeElement.textContent.trim());
-  check('arrow keys move focus through menus', moved === 'RESTART', moved);
+  check('arrow keys move focus through menus', moved === 'Restart', moved);
   await page.keyboard.press('Escape');
   check('Escape resumes', !(await page.isVisible('#screen-pause')));
 
@@ -93,10 +93,10 @@ const waitPhase = (page, phase, timeout = 8000) =>
   check('pause button opens the pause menu', await page.isVisible('#screen-pause'));
   await page.click('[data-screen="pause"] [data-open="settings"]');
   check('settings open from pause', await page.isVisible('#screen-settings'));
-  await page.click('[data-setting="crt"]', { force: true });
+  await page.click('[data-setting="lighting"]', { force: true });
   await page.keyboard.press('KeyM');
   const st = await game(page, () => ({ ...window.__pacman.settings }));
-  check('settings toggle and M mutes', st.crt === false && st.sound === false, JSON.stringify(st));
+  check('settings toggle and M mutes', st.lighting === false && st.sound === false, JSON.stringify(st));
   await page.click('[data-screen="settings"] [data-action="back"]');
   check('back returns to pause', await page.isVisible('#screen-pause'));
   await page.click('[data-action="resume"]');
@@ -118,8 +118,8 @@ const waitPhase = (page, phase, timeout = 8000) =>
 
   await page.reload({ waitUntil: 'load' });
   await page.waitForFunction(() => window.__pacman);
-  const persisted = await game(page, () => ({ s: window.__pacman.data.scores[0], crt: window.__pacman.settings.crt, sound: window.__pacman.settings.sound }));
-  check('scores and settings survive a reload', persisted.s && persisted.s.score === 12340 && persisted.crt === false && persisted.sound === false, JSON.stringify(persisted));
+  const persisted = await game(page, () => ({ s: window.__pacman.data.scores[0], lighting: window.__pacman.settings.lighting, sound: window.__pacman.settings.sound }));
+  check('scores and settings survive a reload', persisted.s && persisted.s.score === 12340 && persisted.lighting === false && persisted.sound === false, JSON.stringify(persisted));
   await page.click('[data-open="scores"]');
   const rows = await page.$$eval('#score-table li', (li) => li.map((x) => x.textContent));
   check('high-score screen lists the entry', rows.length === 1 && rows[0].includes('QZ9') && rows[0].includes('12,340'), rows.join('|'));
