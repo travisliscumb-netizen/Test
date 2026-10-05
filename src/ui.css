@@ -151,11 +151,24 @@ kbd {
 .lives canvas, .shelf canvas { width: 20px; height: 20px; }
 .lives canvas { animation: pop-in 0.35s var(--spring) both; }
 .level-chip {
+  position: relative; overflow: hidden; isolation: isolate;
   padding: 6px 14px; border-radius: 999px;
   border: 1px solid var(--line-strong); background: var(--glass); box-shadow: var(--glass-hi);
   font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
 }
 .level-chip b { color: #fff; font-weight: 700; margin-left: 4px; }
+.chip-fill {
+  position: absolute; inset: 0; z-index: -1; transform-origin: left center; transform: scaleX(var(--p, 0));
+  background: linear-gradient(90deg, rgba(255, 217, 59, 0.12), rgba(255, 217, 59, 0.38));
+  transition: transform 0.3s var(--ease);
+}
+.chip-text { position: relative; }
+.lives { gap: 8px; }
+.lives-count { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: 0.02em; }
+.lives-count small { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 1px; }
+.lives.refill canvas { animation: pop-in 0.5s var(--spring); }
+.lives.refill .lives-count { animation: glow-pulse 1.2s var(--ease); }
+@keyframes glow-pulse { 0%, 100% { text-shadow: none; } 30% { text-shadow: 0 0 14px rgba(255, 217, 59, 0.95); color: #fff4c2; } }
 /* Side layout: the HUD lives in the left gutter. */
 .hud.side .hud-top { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 12px; }
 .hud.side .stat {
@@ -283,6 +296,15 @@ kbd {
 .g-blinky { --c: var(--blinky); } .g-pinky { --c: var(--pinky); } .g-inky { --c: var(--inky); } .g-clyde { --c: var(--clyde); }
 
 .actions { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.mode-chip {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: -8px; min-height: 44px; padding: 0 16px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 500;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.mode-chip:hover { border-color: var(--line-strong); color: var(--text); }
+.mode-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--yellow); }
+.mode-dot { width: 8px; height: 8px; border-radius: 50%; background: #5ff4a8; box-shadow: 0 0 8px rgba(95, 244, 168, 0.8); }
+.mode-chip.arcade .mode-dot { background: var(--blinky); box-shadow: 0 0 8px rgba(255, 61, 79, 0.8); }
 .menu-row { display: flex; justify-content: center; gap: 18px; width: 100%; }
 .hint { margin: 0; font-size: 13px; color: var(--faint); }
 .hint kbd { height: 22px; min-width: 22px; font-size: 11px; }

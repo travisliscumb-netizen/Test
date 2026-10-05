@@ -178,6 +178,14 @@ export class Renderer {
 
   buildSky() {
     const W = this.canvas.width, H = this.canvas.height;
+    /* A sparse starfield, fixed per resize; it twinkles as the cached
+       background refreshes. Seeded so it doesn't reshuffle on every resize. */
+    let seed = 1337;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const count = Math.round((W * H) / (9000 * this.dpr * this.dpr));
+    this.stars = Array.from({ length: count }, () => ({
+      x: rnd() * W, y: rnd() * H, r: (0.4 + rnd() * 0.9) * this.dpr, a: 0.25 + rnd() * 0.55, ph: rnd() * 6.28, sp: 0.6 + rnd() * 1.4
+    }));
     const k = 6;
     this.sky = makeCanvas(W / k, H / k);
     this.skyK = k;
@@ -237,6 +245,15 @@ export class Renderer {
     if (this.staticAt < 0 || time - this.staticAt > 0.5 || time < this.staticAt) {
       const g = this.staticLayer.getContext('2d');
       this.drawSky(time, g);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = '#dfe6ff';
+      for (const st of this.stars) {
+        g.globalAlpha = st.a * (0.55 + 0.45 * Math.sin(time * st.sp + st.ph));
+        g.beginPath();
+        g.arc(st.x, st.y, st.r, 0, TAU);
+        g.fill();
+      }
+      g.globalAlpha = 1;
       this.blitSlab(this.floor, g);
       this.blitSlab(this.walls, g);
       this.staticAt = time;
@@ -565,13 +582,31 @@ export class Renderer {
       wash = game.frightFlashWhite ? '#c9d2ff' : FRIGHT_LIGHT; washA = 0.28;
     }
     if (fx.wallFlash > 0) { wash = fx.wallFlashColor; washA = Math.max(washA, fx.wallFlash * 0.8); }
-    if (high || wash) {
+    /* At the start of a level a beam of light sweeps across the maze. */
+    let sweep = -1;
+    if (phase === 'ready' && !view.demo) {
+      const total = this.isIntro(game) ? 252 : 120;
+      sweep = clamp01(1 - game.phaseTimer / total);
+    }
+    if (high || wash || sweep >= 0) {
       const L = this.light, lg = L.g, ls = this.lightScale;
       lg.save();
       lg.setTransform(1, 0, 0, 1, 0, 0);
       lg.globalCompositeOperation = 'source-over';
       lg.clearRect(0, 0, L.c.width, L.c.height);
       if (wash) { lg.globalAlpha = washA; lg.fillStyle = wash; lg.fillRect(0, 0, L.c.width, L.c.height); }
+      if (sweep >= 0 && sweep < 1) {
+        const w = L.c.width, h = L.c.height;
+        const cx = -0.4 * w + sweep * 1.8 * w;
+        const band = lg.createLinearGradient(cx - w * 0.22, h * 0.15, cx + w * 0.22, h * 0.85);
+        band.addColorStop(0, 'rgba(255,255,255,0)');
+        band.addColorStop(0.5, `rgba(${this.theme.bevel}, 0.95)`);
+        band.addColorStop(1, 'rgba(255,255,255,0)');
+        lg.globalAlpha = 1;
+        lg.globalCompositeOperation = 'lighter';
+        lg.fillStyle = band;
+        lg.fillRect(0, 0, w, h);
+      }
       lg.globalCompositeOperation = 'lighter';
       if (high) {
         for (const [x, y, col, r, k] of lights) {
@@ -649,9 +684,12 @@ export class Renderer {
 
     this.boardSpace();
     if (intro) this.banner('PLAYER ONE', 11 * 8 + 4, '#7fefff', 1 - game.phaseTimer / 252, 7);
-    else if (phase === 'ready' && !view.demo) this.pill(`LEVEL ${game.level}  ·  ${game.maze.name.toUpperCase()}`, 11 * 8 + 4);
+    else if (phase === 'ready' && !view.demo) this.levelCard(game, 1 - game.phaseTimer / 120);
     if (phase === 'ready') this.banner('READY!', 17 * 8 + 4, '#ffe14a', 1 - game.phaseTimer / (intro ? 252 : 120), 9);
     if (phase === 'gameover' && !view.demo) this.banner('GAME OVER', 17 * 8 + 4, '#ff4d5e', 1, 9);
+    if (game.frightActive && game.spec.frightFrames > 0 && !view.demo) {
+      this.powerMeter(game.frightTimer / game.spec.frightFrames, game.frightFlashWhite);
+    }
   }
 
   drawPellets(game, view) {
@@ -797,22 +835,62 @@ export class Renderer {
     this.text(str, BOARD_W / 2, y, { size, color, spacing: size * 0.16, scale: 0.6 + 0.4 * easeOutBack(t), alpha: clamp01(t * 2) });
   }
 
-  pill(str, y) {
+  /* Glass card announcing the level, the maze and the lives in hand. */
+  levelCard(game, p) {
     const ctx = this.ctx;
+    const t = clamp01(p * 5);
+    const sc = 0.7 + 0.3 * easeOutBack(t);
+    const fade = clamp01(t * 2) * clamp01((1 - p) * 6);
+    /* Sits in the upper maze, clear of Blinky's spot above the house. */
+    const w = 96, h = 25, y = 5 * 8 + 4;
     ctx.save();
-    ctx.font = `700 5.5px ${FONT}`;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.8px';
-    const w = ctx.measureText(str).width + 10;
-    roundRectPath(ctx, BOARD_W / 2 - w / 2, y - 4.5, w, 9, 4.5);
-    ctx.fillStyle = 'rgba(14, 20, 64, 0.85)';
+    ctx.globalAlpha = fade;
+    ctx.translate(BOARD_W / 2, y);
+    ctx.scale(sc, sc);
+    roundRectPath(ctx, -w / 2, -h / 2, w, h, 7);
+    const bg = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+    bg.addColorStop(0, 'rgba(36, 42, 104, 0.94)');
+    bg.addColorStop(1, 'rgba(14, 17, 48, 0.96)');
+    ctx.fillStyle = bg;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 4 * this.T.s;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(127, 239, 255, 0.55)';
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `rgba(${this.theme.bevel}, 0.45)`;
     ctx.lineWidth = 0.45;
     ctx.stroke();
-    ctx.fillStyle = '#bff7ff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(str, BOARD_W / 2, y + 0.3);
+    ctx.font = `800 9px ${FONT}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`Level ${game.level}`, 0, -3.6);
+    ctx.font = `600 4.6px ${FONT}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '1.2px';
+    ctx.fillStyle = this.theme.rim;
+    const lives = game.lives + 1;
+    ctx.fillText(`${game.maze.name.toUpperCase()}  ·  ${lives} ${lives === 1 ? 'LIFE' : 'LIVES'}`, 0, 6.4);
+    ctx.restore();
+  }
+
+  /* Draining bar along the top of the board while the ghosts are blue. */
+  powerMeter(k, flash) {
+    const ctx = this.ctx;
+    const w = 120, h = 2.2, x = BOARD_W / 2 - w / 2, y = -SLAB_PAD / 2 - h / 2;
+    ctx.save();
+    roundRectPath(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.fill();
+    const fw = Math.max(h, w * clamp01(k));
+    roundRectPath(ctx, x + (w - fw) / 2, y, fw, h, h / 2);
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, flash ? '#ffffff' : '#5b6bff');
+    g.addColorStop(0.5, flash ? '#ffffff' : '#a9b6ff');
+    g.addColorStop(1, flash ? '#ffffff' : '#5b6bff');
+    ctx.fillStyle = g;
+    ctx.shadowColor = flash ? 'rgba(255,255,255,0.9)' : 'rgba(91, 107, 255, 0.95)';
+    ctx.shadowBlur = 3 * this.T.s;
+    ctx.fill();
     ctx.restore();
   }
 

@@ -58,7 +58,7 @@
   </div>
   <div class="hud-bottom" id="hud-bottom">
     <div class="lives" id="hud-lives" aria-label="Lives"></div>
-    <div class="level-chip">Level <b id="hud-level">1</b></div>
+    <div class="level-chip" id="hud-chip"><span class="chip-fill" id="hud-progress"></span><span class="chip-text">Level <b id="hud-level">1</b></span></div>
     <div class="shelf" id="hud-fruit" aria-label="Fruit collected"></div>
   </div>
 </div>
@@ -96,6 +96,7 @@
       <button id="btn-play" class="btn btn-primary btn-xl" type="button">
         <svg aria-hidden="true"><use href="#i-play"/></svg><span>Play</span>
       </button>
+      <button class="mode-chip" id="mode-chip" type="button" data-open="settings" aria-label="Difficulty, open settings"><span class="mode-dot"></span><span id="mode-text">Easy · 8 lives every level</span></button>
       <nav class="menu-row" aria-label="Menu">
         <button class="tile" type="button" data-open="scores" aria-label="High scores"><span class="tile-icon"><svg aria-hidden="true"><use href="#i-trophy"/></svg></span><span class="tile-label">Scores</span></button>
         <button class="tile" type="button" data-open="settings" aria-label="Settings"><span class="tile-icon"><svg aria-hidden="true"><use href="#i-gear"/></svg></span><span class="tile-label">Settings</span></button>

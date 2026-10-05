@@ -56,14 +56,15 @@ export function fruitForLevel(level) {
    Elroy, and a ghost only catches Pac-Man when the two actually overlap. */
 export const DIFFICULTY = {
   arcade: {
-    label: 'Arcade', lives: 2, extraLifeEvery: 0, ghostScale: 1, frightScale: 1, frightMinSec: 0,
+    label: 'Arcade', lives: 2, refillLives: false, extraLifeEvery: 0, pacScale: 1, ghostScale: 1, frightScale: 1, frightMinSec: 0,
     houseLimits: null, idleSec: null, globalRelease: [7, 17, 32], reviveHoldSec: 0, elroy: true,
     modes: null, catchRadius: 0
   },
   easy: {
-    label: 'Easy', lives: 4, extraLifeEvery: 10000, ghostScale: 0.85, frightScale: 1.6, frightMinSec: 4,
-    houseLimits: [20, 50, 90], idleSec: 7, globalRelease: [15, 40, 70], reviveHoldSec: 5, elroy: false,
-    modes: [9, 15, 9, 15, 8, 15, 8, Infinity], catchRadius: 6
+    /* Eight lives (seven in reserve), topped back up at the start of every level. */
+    label: 'Easy', lives: 7, refillLives: true, extraLifeEvery: 10000, pacScale: 1.05, ghostScale: 0.75,
+    frightScale: 2, frightMinSec: 6, houseLimits: [30, 70, 120], idleSec: 9, globalRelease: [20, 50, 90],
+    reviveHoldSec: 7, elroy: false, modes: [12, 12, 12, 12, 10, 12, 10, Infinity], catchRadius: 5
   }
 };
 
@@ -75,6 +76,8 @@ export function levelSpec(level, rules = DIFFICULTY.arcade) {
   else s = { pac: 0.90, pacF: 0.90, ghost: 0.95, ghostF: 0.60, tunnel: 0.50, elroy1: 1.00, elroy2: 1.05 };
 
   for (const k of ['ghost', 'ghostF', 'tunnel', 'elroy1', 'elroy2']) s[k] *= rules.ghostScale;
+  s.pac *= rules.pacScale;
+  s.pacF *= rules.pacScale;
 
   const [baseFright, baseFlashes] = FRIGHT[level - 1] || [0, 0];
   const frightSec = Math.max(baseFright * rules.frightScale, rules.frightMinSec);
@@ -282,6 +285,12 @@ export class Game {
 
   nextLevel() {
     this.level++;
+    /* Easy refills the reserve at every new level; bonus lives above the
+       full complement are kept. */
+    if (this.rules.refillLives && this.lives < this.rules.lives) {
+      this.lives = this.rules.lives;
+      this.emit('livesRefilled', { lives: this.lives + 1 });
+    }
     this.startLevel(false);
   }
 
