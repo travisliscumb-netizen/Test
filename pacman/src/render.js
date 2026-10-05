@@ -14,6 +14,7 @@
    is interpolated between simulation frames so it stays smooth at 120 Hz. */
 
 import * as M from './maze.js';
+import { MAZES } from './maze.js';
 import { buildWallLoops, traceLoops } from './mazeshape.js';
 import { drawPac, drawPacDeath, drawGhost, drawFruit, drawShadow, COLORS, rgba } from './sprites.js';
 
@@ -30,6 +31,15 @@ const easeOutBack = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + 
 const easeOut = (t) => 1 - (1 - t) ** 3;
 
 const GHOST_COLOR = COLORS.ghost;
+
+/* One colour theme per maze: glass body, inner glow, bevel, neon rim, and a
+   faint tint for the floor beneath. */
+export const THEMES = [
+  { body: ['#1b2470', '#10164d'], inner: [90, 130, 255], bevel: '190, 210, 255', rim: '#6f8fff', core: '#dbe5ff', glow: '70, 110, 255', floor: ['#0c1236', '#090d28', '#06091c'] },
+  { body: ['#3a1a72', '#220e4a'], inner: [190, 110, 255], bevel: '235, 205, 255', rim: '#c27bff', core: '#f4e2ff', glow: '175, 80, 255', floor: ['#160c38', '#0f0829', '#09051c'] },
+  { body: ['#0c4a5e', '#062b3a'], inner: [60, 215, 210], bevel: '190, 255, 248', rim: '#3fe0d0', core: '#d9fffa', glow: '30, 200, 190', floor: ['#071d2c', '#051622', '#030e17'] },
+  { body: ['#5e2512', '#36140a'], inner: [255, 150, 90], bevel: '255, 220, 190', rim: '#ff9a52', core: '#ffeedd', glow: '255, 120, 50', floor: ['#1f0f0c', '#170b09', '#0f0706'] }
+];
 const FRIGHT_LIGHT = '#5b6bff';
 
 function makeCanvas(w, h) {
@@ -140,8 +150,8 @@ export class Renderer {
   constructor(el) {
     this.canvas = el;
     this.ctx = el.getContext('2d', { alpha: false });
-    this.wallPath = new Path2D();
-    traceLoops(this.wallPath, buildWallLoops());
+    this.wallPaths = new Map();
+    this.mazeIndex = 0;
     this.fx = new Effects();
     this.glowCache = new Map();
     this.trail = [];
@@ -157,8 +167,8 @@ export class Renderer {
     this.bx = Math.round(board.x * dpr);
     this.by = Math.round(board.y * dpr);
     this.buildSky();
-    this.buildFloor();
-    this.buildWalls();
+    this.builtFor = -1;
+    this.ensureMaze(this.mazeIndex, true);
     this.buildPellets();
     this.trail = [];
     this.staticAt = -1;
@@ -244,6 +254,29 @@ export class Renderer {
     return { c, g, pad };
   }
 
+  /* Wall outlines are traced once per maze and kept; the rasterised layers
+     are rebuilt whenever the maze or the screen size changes. */
+  wallPathFor(index) {
+    let p = this.wallPaths.get(index);
+    if (!p) {
+      p = new Path2D();
+      traceLoops(p, buildWallLoops(MAZES[index]));
+      this.wallPaths.set(index, p);
+    }
+    return p;
+  }
+
+  ensureMaze(index, force = false) {
+    if (!force && index === this.builtFor) return;
+    this.mazeIndex = index;
+    this.builtFor = index;
+    this.wallPath = this.wallPathFor(index);
+    this.theme = THEMES[index % THEMES.length];
+    this.buildFloor();
+    this.buildWalls();
+    this.staticAt = -1;
+  }
+
   buildFloor() {
     const { c, g, pad } = this.slabCanvas();
     const s = this.s;
@@ -254,9 +287,10 @@ export class Renderer {
     g.shadowOffsetY = 1.5 * s;
     roundRectPath(g, x, y, w, h, r);
     const fl = g.createLinearGradient(0, y, 0, y + h);
-    fl.addColorStop(0, '#0c1236');
-    fl.addColorStop(0.5, '#090d28');
-    fl.addColorStop(1, '#06091c');
+    const [f0, f1, f2] = this.theme.floor;
+    fl.addColorStop(0, f0);
+    fl.addColorStop(0.5, f1);
+    fl.addColorStop(1, f2);
     g.fillStyle = fl;
     g.fill();
     g.restore();
@@ -294,11 +328,13 @@ export class Renderer {
 
   buildWalls() {
     const s = this.s;
+    const th = this.theme;
+    const [ir, ig, ib] = th.inner;
     const P = this.wallPath;
     const { c, g, pad } = this.slabCanvas();
     g.save();
     g.beginPath();
-    g.rect(-1, -6, BOARD_W + 2, BOARD_H + 12);
+    g.rect(0, -6, BOARD_W, BOARD_H + 12);
     g.clip();
 
     /* Drop shadow: the walls stand off the floor. */
@@ -312,18 +348,18 @@ export class Renderer {
 
     /* Body: dark glass with a cool gradient. */
     const body = g.createLinearGradient(0, 0, BOARD_W * 0.4, BOARD_H);
-    body.addColorStop(0, '#1b2470');
-    body.addColorStop(1, '#10164d');
+    body.addColorStop(0, th.body[0]);
+    body.addColorStop(1, th.body[1]);
     g.fillStyle = body;
     g.fill(P, 'evenodd');
 
     /* Inner edge glow, clipped so only the inside half of each stroke shows. */
     g.save();
     g.clip(P, 'evenodd');
-    g.strokeStyle = 'rgba(90, 130, 255, 0.22)';
+    g.strokeStyle = `rgba(${ir}, ${ig}, ${ib}, 0.22)`;
     g.lineWidth = 3.4;
     g.stroke(P);
-    g.strokeStyle = 'rgba(120, 160, 255, 0.35)';
+    g.strokeStyle = `rgba(${Math.min(255, ir + 30)}, ${Math.min(255, ig + 30)}, ${ib}, 0.35)`;
     g.lineWidth = 1.5;
     g.stroke(P);
     g.restore();
@@ -341,18 +377,18 @@ export class Renderer {
       g.drawImage(t.c, 0, 0);
       g.restore();
     };
-    bevel(0.85, 'rgba(190, 210, 255, 0.55)');
+    bevel(0.85, `rgba(${th.bevel}, 0.55)`);
     bevel(-0.85, 'rgba(0, 0, 20, 0.55)');
 
     /* Rim: the neon edge, with a tight bloom. */
     g.lineJoin = 'round';
-    g.shadowColor = 'rgba(70, 110, 255, 0.95)';
+    g.shadowColor = `rgba(${th.glow}, 0.95)`;
     g.shadowBlur = 3 * s;
-    g.strokeStyle = '#6f8fff';
+    g.strokeStyle = th.rim;
     g.lineWidth = 0.7;
     g.stroke(P);
     g.shadowBlur = 0;
-    g.strokeStyle = '#dbe5ff';
+    g.strokeStyle = th.core;
     g.lineWidth = 0.26;
     g.stroke(P);
 
@@ -427,6 +463,7 @@ export class Renderer {
 
   draw(game, alpha, view) {
     const ctx = this.ctx;
+    this.ensureMaze(game.maze ? game.maze.index : 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
 
@@ -612,7 +649,7 @@ export class Renderer {
 
     this.boardSpace();
     if (intro) this.banner('PLAYER ONE', 11 * 8 + 4, '#7fefff', 1 - game.phaseTimer / 252, 7);
-    else if (phase === 'ready' && !view.demo) this.pill(`LEVEL ${game.level}`, 11 * 8 + 4);
+    else if (phase === 'ready' && !view.demo) this.pill(`LEVEL ${game.level}  ·  ${game.maze.name.toUpperCase()}`, 11 * 8 + 4);
     if (phase === 'ready') this.banner('READY!', 17 * 8 + 4, '#ffe14a', 1 - game.phaseTimer / (intro ? 252 : 120), 9);
     if (phase === 'gameover' && !view.demo) this.banner('GAME OVER', 17 * 8 + 4, '#ff4d5e', 1, 9);
   }

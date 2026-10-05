@@ -132,6 +132,14 @@
       <span class="head-spacer"></span>
     </header>
     <div class="group">
+      <p class="group-label">Difficulty</p>
+      <div class="segmented" role="radiogroup" aria-label="Difficulty">
+        <label><input type="radio" name="difficulty" value="easy" data-setting="difficulty"><span><b>Easy</b><small>More lives, slower ghosts</small></span></label>
+        <label><input type="radio" name="difficulty" value="arcade" data-setting="difficulty"><span><b>Arcade</b><small>The original rules</small></span></label>
+      </div>
+      <p class="group-note" id="difficulty-note">Applies from your next game.</p>
+    </div>
+    <div class="group">
       <p class="group-label">Audio</p>
       <label class="row"><span>Sound</span><input type="checkbox" class="switch" data-setting="sound"></label>
       <label class="row row-range"><span>Volume</span><input type="range" min="0" max="100" step="5" data-setting="volume" aria-label="Volume"></label>
@@ -174,7 +182,7 @@
       <div class="tip"><i class="tip-dot"></i><p><b>Clear every pellet</b> to finish the maze. Touching a ghost costs a life.</p></div>
       <div class="tip"><i class="tip-power"></i><p>A <b>power pellet</b> turns the ghosts blue. Chain them for <b>200 · 400 · 800 · 1600</b>.</p></div>
       <div class="tip"><i class="tip-ghosts"></i><p><b class="c-blinky">Blinky</b> chases, <b class="c-pinky">Pinky</b> cuts you off, <b class="c-inky">Inky</b> flanks, and <b class="c-clyde">Clyde</b> loses his nerve up close.</p></div>
-      <div class="tip"><i class="tip-star"></i><p>Extra life at <b>10,000</b>. Ghosts slow in the side tunnels, and turning early around a corner is faster.</p></div>
+      <div class="tip"><i class="tip-star"></i><p>Extra life every <b>10,000</b> on Easy (once, on Arcade). A new maze every three levels. Ghosts slow in the side tunnels, and turning early around a corner is faster.</p></div>
       <dl class="keys">
         <dt>Move</dt><dd><span class="hint-key"><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or <kbd>WASD</kbd></span><span class="hint-touch">Swipe anywhere, or the D-pad</span></dd>
         <dt>Pause</dt><dd><span class="hint-key"><kbd>P</kbd> or <kbd>Esc</kbd></span><span class="hint-touch">The pause button, top right</span></dd>

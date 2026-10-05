@@ -124,7 +124,7 @@ function startGame() {
   finalizeEntry();
   sound.unlock();
   state.mode = 'game';
-  state.game = new Game({ seed: seed() });
+  state.game = new Game({ seed: seed(), difficulty: settings.difficulty });
   state.stack = [];
   state.overIn = -1;
   state.acc = 0;
@@ -178,7 +178,7 @@ function openGameOver() {
   /* A qualifying score is stored immediately, so closing the tab can't lose
      it; entering initials only renames the stored row. */
   if (Save.qualifies(data.scores, g.score)) {
-    const row = { name: (data.lastName || 'YOU').padEnd(3, ' '), score: g.score, level: g.level };
+    const row = { name: (data.lastName || 'YOU').padEnd(3, ' '), score: g.score, level: g.level, mode: g.difficulty };
     const { scores, rank } = Save.insertScore(data.scores, row);
     data.scores = scores;
     persist();
@@ -367,6 +367,7 @@ function syncSettings() {
   for (const el of $$('[data-setting]')) {
     const k = el.dataset.setting;
     if (el.type === 'checkbox') el.checked = !!settings[k];
+    else if (el.type === 'radio') el.checked = settings[k] === el.value;
     else {
       el.value = String(Math.round(settings[k] * 100));
       el.style.setProperty('--fill', `${el.value}%`);
@@ -377,7 +378,7 @@ function syncSettings() {
 for (const el of $$('[data-setting]')) {
   el.addEventListener(el.type === 'range' ? 'input' : 'change', () => {
     const k = el.dataset.setting;
-    setSetting(k, el.type === 'checkbox' ? el.checked : Number(el.value) / 100);
+    setSetting(k, el.type === 'checkbox' ? el.checked : el.type === 'radio' ? el.value : Number(el.value) / 100);
     if (k === 'sound' && el.checked) { sound.unlock(); sound.click(); }
   });
 }
@@ -407,7 +408,7 @@ function renderScores() {
     pts.textContent = s.score.toLocaleString('en-US');
     const lvl = document.createElement('small');
     lvl.className = 'lvl';
-    lvl.textContent = `Level ${s.level}`;
+    lvl.textContent = `Level ${s.level} · ${s.mode === 'arcade' ? 'Arcade' : 'Easy'}`;
     pts.append(lvl);
     li.append(rank, who, pts);
     list.append(li);

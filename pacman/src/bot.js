@@ -12,7 +12,9 @@ const first = new Int8Array(N);
 const queue = new Int16Array(N);
 
 const norm = (c, r) => (r === M.TUNNEL_ROW ? ((c % M.COLS) + M.COLS) % M.COLS : c);
-const ok = (c, r) => c >= 0 && c < M.COLS && r >= 0 && r < M.ROWS && M.walkable(c, r);
+/* The maze being searched; set at the top of each botDirection call. */
+let maze = M.MAZES[0];
+const ok = (c, r) => c >= 0 && c < M.COLS && r >= 0 && r < M.ROWS && maze.walkable(c, r);
 
 function dangerMap(game) {
   const danger = new Uint8Array(N);
@@ -59,6 +61,7 @@ function search(game, sc, sr, danger, goal) {
 }
 
 export function botDirection(game) {
+  maze = game.maze;
   const p = game.pac;
   const sc = norm(M.tileOf(p.x), M.tileOf(p.y)), sr = M.tileOf(p.y);
   if (!ok(sc, sr)) return p.dir;

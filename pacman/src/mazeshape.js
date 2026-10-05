@@ -8,7 +8,7 @@
    larger radius than concave ones, which keeps the two lines of every double
    wall concentric through its bends. */
 
-import { COLS, ROWS, TILE, isWall } from './maze.js';
+import { COLS, ROWS, TILE, MAZES } from './maze.js';
 
 export const WALL_HALF = 1.25;                 // half-thickness of a 1-tile wall, in units
 export const INSET = TILE / 2 - WALL_HALF;     // how far outlines sit inside the wall tiles
@@ -20,9 +20,11 @@ const PAD = 1;                                 // tiles of margin outside the ma
 
 /* The two walls bounding each tunnel continue off-screen so their outlines run
    out of the frame instead of closing in a cap at the screen edge. */
-function solid(c, r) {
-  if (c < 0 || c >= COLS) return (r === 13 || r === 15) && c >= -1 && c <= COLS;
-  return isWall(c, r);
+function solidIn(maze) {
+  return (c, r) => {
+    if (c < 0 || c >= COLS) return (r === 13 || r === 15) && c >= -1 && c <= COLS;
+    return maze.isWall(c, r);
+  };
 }
 
 /* Which sub-cells of a wall tile survive the erosion depends only on which of
@@ -53,7 +55,8 @@ function erodedTile(mask) {
 }
 
 /* Returns closed loops of corner points, each with a per-corner radius. */
-export function buildWallLoops() {
+export function buildWallLoops(maze = MAZES[0]) {
+  const solid = solidIn(maze);
   const x0 = -PAD * TILE, y0 = 0;
   const nx = Math.round(((COLS + PAD * 2) * TILE) / STEP);
   const ny = Math.round((ROWS * TILE) / STEP);

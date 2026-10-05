@@ -16,16 +16,10 @@ export const TUNNEL_ROW = 14;
 export const TUNNEL_EXTRA = 2;
 export const WRAP_SPAN = (COLS + TUNNEL_EXTRA * 2) * TILE;
 
-export const LAYOUT = [
-  '############################',
-  '#............##............#',
-  '#.####.#####.##.#####.####.#',
-  '#o####.#####.##.#####.####o#',
-  '#.####.#####.##.#####.####.#',
-  '#..........................#',
-  '#.####.##.########.##.####.#',
-  '#.####.##.########.##.####.#',
-  '#......##....##....##......#',
+/* Every maze shares the middle band -- ghost house, side tunnels and the
+   fruit corridor -- so ghost-house logic, tunnels and spawn points hold for
+   all of them. Only the top and bottom sections differ. */
+const MIDDLE = [
   '######.##### ## #####.######',
   '     #.##### ## #####.#     ',
   '     #.##          ##.#     ',
@@ -37,17 +31,113 @@ export const LAYOUT = [
   '     #.##          ##.#     ',
   '     #.## ######## ##.#     ',
   '######.## ######## ##.######',
-  '#............##............#',
-  '#.####.#####.##.#####.####.#',
-  '#.####.#####.##.#####.####.#',
-  '#o..##.......  .......##..o#',
-  '###.##.##.########.##.##.###',
-  '###.##.##.########.##.##.###',
-  '#......##....##....##......#',
-  '#.##########.##.##########.#',
-  '#.##########.##.##########.#',
-  '#..........................#',
-  '############################'
+];
+
+const LAYOUTS = [
+  {
+    name: 'Classic',
+    rows: [
+      '############################',
+      '#............##............#',
+      '#.####.#####.##.#####.####.#',
+      '#o####.#####.##.#####.####o#',
+      '#.####.#####.##.#####.####.#',
+      '#..........................#',
+      '#.####.##.########.##.####.#',
+      '#.####.##.########.##.####.#',
+      '#......##....##....##......#',
+      ...MIDDLE,
+      '#............##............#',
+      '#.####.#####.##.#####.####.#',
+      '#.####.#####.##.#####.####.#',
+      '#o..##.......  .......##..o#',
+      '###.##.##.########.##.##.###',
+      '###.##.##.########.##.##.###',
+      '#......##....##....##......#',
+      '#.##########.##.##########.#',
+      '#.##########.##.##########.#',
+      '#..........................#',
+      '############################',
+    ]
+  },
+  {
+    name: 'Orchid',
+    rows: [
+      '############################',
+      '#o........................o#',
+      '#.####.##.########.##.####.#',
+      '#.####.##.########.##.####.#',
+      '#..........................#',
+      '#.##.####.##.##.##.####.##.#',
+      '#.##.####.##.##.##.####.##.#',
+      '#.##.####.##.##.##.####.##.#',
+      '#............##............#',
+      ...MIDDLE,
+      '#............##............#',
+      '#.##.####.##.##.##.####.##.#',
+      '#.##.####.##.##.##.####.##.#',
+      '#o...........  ...........o#',
+      '###.##.##.########.##.##.###',
+      '###.##.##.########.##.##.###',
+      '#............##............#',
+      '#.####.##.##.##.##.##.####.#',
+      '#.####.##.##.##.##.##.####.#',
+      '#..........................#',
+      '############################',
+    ]
+  },
+  {
+    name: 'Lagoon',
+    rows: [
+      '############################',
+      '#....##..............##....#',
+      '#.##.##.####.##.####.##.##.#',
+      '#o##.##.####.##.####.##.##o#',
+      '#..........................#',
+      '#.##.#####.######.#####.##.#',
+      '#.##.#####.######.#####.##.#',
+      '#.##.#####.######.#####.##.#',
+      '#............##............#',
+      ...MIDDLE,
+      '#............##............#',
+      '#.###.##.###.##.###.##.###.#',
+      '#.###.##.###.##.###.##.###.#',
+      '#o...........  ...........o#',
+      '####.##.###.####.###.##.####',
+      '####.##.###.####.###.##.####',
+      '#...........####...........#',
+      '#.####.####.####.####.####.#',
+      '#.####.####.####.####.####.#',
+      '#..........................#',
+      '############################',
+    ]
+  },
+  {
+    name: 'Ember',
+    rows: [
+      '############################',
+      '#........##......##........#',
+      '#.###.##.##.####.##.##.###.#',
+      '#o###.##.##.####.##.##.###o#',
+      '#..........................#',
+      '###.###.##.######.##.###.###',
+      '###.###.##.######.##.###.###',
+      '###.###.##.######.##.###.###',
+      '###..........##..........###',
+      ...MIDDLE,
+      '#..........######..........#',
+      '#.#####.##.######.##.#####.#',
+      '#.#####.##.######.##.#####.#',
+      '#o...........  ...........o#',
+      '##.###.##.########.##.###.##',
+      '##.###.##.########.##.###.##',
+      '#............##............#',
+      '#.###.##.###.##.###.##.###.#',
+      '#.###.##.###.##.###.##.###.#',
+      '#..........................#',
+      '############################',
+    ]
+  },
 ];
 
 export const T = { PATH: 0, WALL: 1, DOOR: 2, HOUSE: 3, VOID: 4 };
@@ -62,15 +152,15 @@ export const FRUIT_POS = { x: 14 * TILE, y: 17 * TILE + 4 };
 /* Ghosts may not turn upward on these tiles while scattering or chasing. */
 export const RED_ZONES = new Set(['12,11', '15,11', '12,23', '15,23']);
 
-function parse() {
-  if (LAYOUT.length !== ROWS || LAYOUT.some((r) => r.length !== COLS)) {
+function parse(layout) {
+  if (layout.length !== ROWS || layout.some((r) => r.length !== COLS)) {
     throw new Error('maze layout has the wrong dimensions');
   }
   const tiles = new Uint8Array(COLS * ROWS);
   const items = new Uint8Array(COLS * ROWS);
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const ch = LAYOUT[r][c];
+      const ch = layout[r][c];
       const i = r * COLS + c;
       tiles[i] = ch === '#' ? T.WALL : ch === '-' ? T.DOOR : T.VOID;
       if (ch === '.') { tiles[i] = T.PATH; items[i] = ITEM.DOT; }
@@ -97,22 +187,50 @@ function parse() {
   return { tiles, items };
 }
 
-const PARSED = parse();
-export const BASE_TILES = PARSED.tiles;
-export const BASE_ITEMS = PARSED.items;
-export const TOTAL_DOTS = BASE_ITEMS.reduce((n, v) => n + (v ? 1 : 0), 0);
-
-export function tileAt(c, r) {
-  if (r === TUNNEL_ROW && (c < 0 || c >= COLS)) {
-    const span = COLS + TUNNEL_EXTRA * 2;
-    const n = (((c + TUNNEL_EXTRA) % span) + span) % span - TUNNEL_EXTRA;
-    return n < 0 || n >= COLS ? T.PATH : BASE_TILES[r * COLS + n];
+export class Maze {
+  constructor(index, { name, rows }) {
+    const { tiles, items } = parse(rows);
+    this.index = index;
+    this.name = name;
+    this.layout = rows;
+    this.tiles = tiles;
+    this.items = items;
+    this.totalDots = items.reduce((n, v) => n + (v ? 1 : 0), 0);
   }
-  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return T.VOID;
-  return BASE_TILES[r * COLS + c];
+
+  tileAt(c, r) {
+    if (r === TUNNEL_ROW && (c < 0 || c >= COLS)) {
+      const span = COLS + TUNNEL_EXTRA * 2;
+      const n = (((c + TUNNEL_EXTRA) % span) + span) % span - TUNNEL_EXTRA;
+      return n < 0 || n >= COLS ? T.PATH : this.tiles[r * COLS + n];
+    }
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return T.VOID;
+    return this.tiles[r * COLS + c];
+  }
+
+  walkable(c, r) { return this.tileAt(c, r) === T.PATH; }
+
+  isWall(c, r) {
+    return c >= 0 && c < COLS && r >= 0 && r < ROWS && this.tiles[r * COLS + c] === T.WALL;
+  }
 }
 
-export const walkable = (c, r) => tileAt(c, r) === T.PATH;
-export const isWall = (c, r) => c >= 0 && c < COLS && r >= 0 && r < ROWS && BASE_TILES[r * COLS + c] === T.WALL;
+export const MAZES = LAYOUTS.map((l, i) => new Maze(i, l));
+
+/* Three levels per maze, then the next; the cycle repeats indefinitely. */
+export const LEVELS_PER_MAZE = 3;
+export function mazeForLevel(level) {
+  return MAZES[Math.floor((Math.max(1, level) - 1) / LEVELS_PER_MAZE) % MAZES.length];
+}
+
+/* The classic maze, kept as plain exports for callers that only need it. */
+const CLASSIC = MAZES[0];
+export const LAYOUT = CLASSIC.layout;
+export const BASE_TILES = CLASSIC.tiles;
+export const BASE_ITEMS = CLASSIC.items;
+export const TOTAL_DOTS = CLASSIC.totalDots;
+export const tileAt = (c, r) => CLASSIC.tileAt(c, r);
+export const walkable = (c, r) => CLASSIC.walkable(c, r);
+export const isWall = (c, r) => CLASSIC.isWall(c, r);
 export const tileOf = (v) => Math.floor(v / TILE);
 export const centerOf = (t) => t * TILE + 4;

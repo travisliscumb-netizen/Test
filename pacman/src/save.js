@@ -6,6 +6,7 @@ const KEY = 'pacman.save.v1';
 export const TABLE_SIZE = 5;
 
 export const DEFAULT_SETTINGS = Object.freeze({
+  difficulty: 'easy',
   sound: true,
   volume: 0.7,
   lighting: true,
@@ -22,13 +23,15 @@ function clean(raw) {
     if (typeof s[k] === typeof DEFAULT_SETTINGS[k]) out.settings[k] = s[k];
   }
   out.settings.volume = Math.min(1, Math.max(0, Number(out.settings.volume) || 0));
+  if (out.settings.difficulty !== 'arcade') out.settings.difficulty = 'easy';
   if (Array.isArray(raw.scores)) {
     out.scores = raw.scores
       .filter((e) => e && Number.isFinite(e.score) && e.score > 0)
       .map((e) => ({
         name: String(e.name || '???').toUpperCase().replace(/[^A-Z0-9 ]/g, '').slice(0, 3).padEnd(3, ' '),
         score: Math.floor(e.score),
-        level: Math.max(1, Math.floor(e.level) || 1)
+        level: Math.max(1, Math.floor(e.level) || 1),
+        mode: e.mode === 'arcade' ? 'arcade' : 'easy'
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, TABLE_SIZE);
