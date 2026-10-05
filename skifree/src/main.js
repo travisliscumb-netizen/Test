@@ -3,6 +3,7 @@
 import { CONFIG, METER, toKmh } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
+import { Renderer3D } from './render3d.js';
 import { Sound } from './audio.js';
 import { Input } from './input.js';
 import { Save } from './save.js';
@@ -13,7 +14,39 @@ import { drawYeti } from './characters.js';
 const $ = (s) => document.querySelector(s);
 const canvas = $('#game');
 const save = new Save();
-const renderer = new Renderer(canvas);
+// Real-time 3D, with the 2D renderer as a fallback (no WebGL, or ?2d).
+function makeRenderer() {
+  if (!/[?&]2d\b/.test(location.search) && save.settings.graphics !== '2d') {
+    try {
+      return new Renderer3D(canvas, document.querySelector('#overlay'));
+    } catch (err) {
+      console.warn('3D unavailable, using 2D:', err && err.message);
+    }
+  }
+  document.querySelector('#overlay').style.display = 'none';
+  return new Renderer(canvas);
+}
+let renderer = makeRenderer();
+
+// Last resort for weak devices: if 3D is still slow with shadows off, swap
+// to the 2D renderer on the fly. The WebGL canvas stays (invisible) on top as
+// the touch/mouse surface so input wiring doesn't change.
+function downgradeTo2D() {
+  const c2 = document.createElement('canvas');
+  c2.id = 'game2d';
+  c2.setAttribute('aria-hidden', 'true');
+  canvas.before(c2);
+  canvas.style.opacity = '0';
+  document.querySelector('#overlay').style.display = 'none';
+  const r2 = new Renderer(c2);
+  r2.reducedMotion = renderer.reducedMotion;
+  r2.effects = renderer.effects;
+  r2.hud = renderer.hud;
+  renderer = r2;
+  for (const g of [game, demo]) if (g) g.sideSpawn = undefined;
+  resize();
+  needsDraw = true;
+}
 const sound = new Sound();
 const input = new Input(window, canvas);
 
@@ -33,11 +66,15 @@ let botDriver = null; // test hook: an autopilot driving the live run
 // drop to the lite snow renderer. One-way per session, so it can't oscillate.
 const perf = { ema: 1 / 60, slow: 0 };
 function watchPerformance(dt) {
-  if (renderer.lite || dt <= 0 || document.hidden) return;
+  if (dt <= 0 || document.hidden) return;
+  if (renderer.lite && !renderer.is3D) return; // nothing lighter left
   perf.ema += (dt - perf.ema) * 0.05;
   perf.slow = perf.ema > 1 / 45 ? perf.slow + dt : 0;
-  if (perf.slow > 2) {
-    renderer.lite = true;
+  if (perf.slow > (renderer.lite ? 4 : 2)) {
+    if (renderer.lite) downgradeTo2D(); // 3D without shadows still too slow
+    else renderer.lite = true;
+    perf.slow = 0;
+    perf.ema = 1 / 60;
     needsDraw = true;
   }
 }
@@ -307,9 +344,18 @@ function step(g, dt, inp, live) {
 function aimAt(sx, sy) {
   const g = game;
   if (!g) return null;
-  const v = g.view;
-  const z = renderer.zoom / g.zoomMul;
-  const wx = v.x0 + sx / z, wy = v.y0 + sy / z;
+  let wx, wy;
+  if (renderer.screenToWorld) {
+    const w = renderer.screenToWorld(sx, sy);
+    if (!w) return null;
+    wx = w.x;
+    wy = w.y;
+  } else {
+    const v = g.view;
+    const z = renderer.zoom / g.zoomMul;
+    wx = v.x0 + sx / z;
+    wy = v.y0 + sy / z;
+  }
   const p = g.player;
   const dx = wx - p.x, dy = wy - (p.y - 12);
   if (dy <= 6) return Math.sign(dx || 1) * Math.PI / 2;
@@ -498,6 +544,7 @@ function applySettings() {
   if (game) game.assist = s.assist;
   $('#opt-touch').value = s.touch;
   $('#opt-steer').value = s.touchSteer;
+  $('#opt-graphics').value = s.graphics;
   $('#opt-seed-mode').value = s.seedMode;
   $('#opt-seed').value = s.seed;
   $('#seed-row').classList.toggle('hidden', s.seedMode !== 'fixed');
@@ -521,6 +568,11 @@ function bindOptions() {
   $('#opt-assist').addEventListener('change', (e) => change({ assist: e.target.checked }));
   $('#opt-touch').addEventListener('change', (e) => change({ touch: e.target.value }));
   $('#opt-steer').addEventListener('change', (e) => change({ touchSteer: e.target.value }));
+  // Switching renderer needs a fresh page (a canvas can't change context).
+  $('#opt-graphics').addEventListener('change', (e) => {
+    change({ graphics: e.target.value });
+    location.reload();
+  });
   $('#opt-seed-mode').addEventListener('change', (e) => {
     const patch = { seedMode: e.target.value };
     // Switching to a fixed mountain with no number yet: pick one to start from.

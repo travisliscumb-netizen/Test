@@ -97,12 +97,16 @@ skifree/
     palette.js     colours and outfits
     sprites.js     scenery vector art, cached per zoom level
     characters.js  skier / boarder / dog / yeti / chairlift, drawn live
-    render.js      snow, tracks, particles, y-sorted scene, overlays
+    render3d.js    default renderer: real-time 3D (three.js) — lit low-poly
+                   scenery, shadows, fog, articulated characters, spray
+    render.js      2D fallback: snow, tracks, particles, y-sorted scene
     audio.js       synthesised SFX, skiing loops, calm + chase music
     input.js       keyboard, mouse steering, touch buttons
     save.js        versioned, validated localStorage
     main.js        loop, screens, HUD, glue
     styles.css
+  vendor/
+    three.min.js   three.js r186, bundled + minified (MIT, see three.LICENSE)
   tests/
     sim.mjs        headless: determinism, spacing, pathing, physics, yeti, save
     playtest.mjs   end-to-end in Chromium: desktop, phones, touch, soak
@@ -111,6 +115,12 @@ skifree/
     shots.mjs      captures a scripted run
     moments.mjs    stages poses, eating frames, landmarks and phone layouts
 ```
+
+**3D with a 2D safety net.** The game renders in WebGL 3D by default. If
+WebGL is unavailable it falls back to the 2D canvas renderer; if 3D stays
+slow even after dropping to lite mode (no shadows, 1x pixels) it switches to
+2D mid-run. Options → Visuals → Graphics forces either, and `?2d` in the URL
+forces 2D. The simulation is identical in both: only the drawing changes.
 
 Everything marked *pure* imports nothing from the DOM. The tests drive exactly
 the code the game runs.

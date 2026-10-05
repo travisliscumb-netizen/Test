@@ -462,7 +462,9 @@ export class Game {
     if (!this.yeti && !this.demo && p.state !== 'caught') {
       const reason = this.yetiReason(dt);
       if (reason) {
-        this.yeti = new Yeti(p, this.world, this.rng, this.stats.yetiEncounters, (this.viewW * this.zoomMul) / 2, c);
+        // The 3D renderer sees a wider footprint than the screen edge, so it
+      // tells us where 'just off to the side' is.
+      this.yeti = new Yeti(p, this.world, this.rng, this.stats.yetiEncounters, this.sideSpawn ?? (this.viewW * this.zoomMul) / 2, c);
         this.stats.yetiEncounters++;
         this.stallTime = 0;
         this.stallWarned = false;

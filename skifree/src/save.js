@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   touch: 'auto', // auto | on | off
   touchSteer: 'finger', // finger: skier follows your finger | pad: on-screen arrows
   assist: true, // steering assist: nudges you around obstacles
+  graphics: '3d', // 3d (best looking) | 2d (fastest)
   seedMode: 'random', // random | fixed
   seed: '',
 };
@@ -54,6 +55,7 @@ export function sanitize(raw) {
     touch: ['auto', 'on', 'off'].includes(st.touch) ? st.touch : d.touch,
     touchSteer: ['finger', 'pad'].includes(st.touchSteer) ? st.touchSteer : d.touchSteer,
     assist: typeof st.assist === 'boolean' ? st.assist : d.assist,
+    graphics: ['3d', '2d'].includes(st.graphics) ? st.graphics : d.graphics,
     seedMode: ['random', 'fixed'].includes(st.seedMode) ? st.seedMode : d.seedMode,
     seed: typeof st.seed === 'string' ? st.seed.slice(0, 24) : d.seed,
   };

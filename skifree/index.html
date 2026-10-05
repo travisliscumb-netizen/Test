@@ -20,6 +20,7 @@
 </head>
 <body>
   <canvas id="game" aria-label="SkiFree game view"></canvas>
+  <canvas id="overlay" aria-hidden="true"></canvas>
 
   <!-- In-run HUD -->
   <div id="hud" class="hidden" aria-live="off">
@@ -113,6 +114,12 @@
         </fieldset>
         <fieldset>
           <legend>Visuals</legend>
+          <label>Graphics
+            <select id="opt-graphics">
+              <option value="3d">3D (best looking)</option>
+              <option value="2d">2D (fastest, for older phones)</option>
+            </select>
+          </label>
           <label class="check"><input type="checkbox" id="opt-motion"> Reduced motion <small>No camera wobble or speed streaks; calmer snowfall. Also follows your system setting.</small></label>
           <label class="check"><input type="checkbox" id="opt-effects"> Snow effects <small>Spray, bursts, snowfall and sparkle.</small></label>
         </fieldset>

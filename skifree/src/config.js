@@ -194,7 +194,7 @@ export const CONFIG = {
 
   // ---------------------------------------------------------------- engine
   SIM_STEP: 1 / 120,
-  MAX_FRAME_DT: 0.1,
+  MAX_FRAME_DT: 0.25,                // slow frames still advance in real time (in sub-steps)
 };
 
 // Converts a world-unit speed to the km/h shown in the HUD.
