@@ -79,16 +79,25 @@ export const CONFIG = {
   MOGUL_WIPEOUT_CHANCE: 0.12,
 
   // ------------------------------------------------------------------ yeti
+  // Classic mode: the original's single 2000 m arrival, nearly your speed.
   YETI_TRIGGER_DISTANCE: 2000,       // metres downhill before the first yeti
   YETI_RETURN_DISTANCE: 700,         // metres after an escape before it returns
+  // Modern mode: it turns up at every 1000 m mark and gets a little faster
+  // each time you lose it. Super slow at first; from about the fifth escape
+  // it out-runs plain cruising and you need turbo (which it never out-runs).
+  YETI_INTERVAL: 1000,               // metres between scheduled arrivals
+  YETI_MIN_GAP: 150,                 // ...but never sooner than this after an escape
+  YETI_LEVEL_SPEED_START: 9 * M,     // first chase: well under cruising (15 m/s)
+  YETI_LEVEL_SPEED_STEP: 1.2 * M,    // added per escape
+  YETI_LEVEL_SPEED_MAX: 23 * M,      // capped under turbo (25 m/s)
   // Like the original, dawdling or leaving the mountain also summons it.
   YETI_STALL_TIME: 40,               // seconds without real downhill progress...
   YETI_STALL_PROGRESS: 20,           // ...of at least this many metres
   YETI_STALL_WARN: 28,               // a distant roar this long into a stall
   YETI_WANDER_X: 900 * M,            // this far sideways from the lodge
   YETI_STALL_GRACE_METERS: 40,       // no stall clock at the trailhead
-  YETI_SPEED: 14.2 * M,              // a touch under cruising: ski clean and you stay ahead
-  YETI_SPEED_STEP: 0.03,             // +3% every time it comes back
+  YETI_SPEED: 14.2 * M,              // classic: a touch under cruising
+  YETI_SPEED_STEP: 0.03,             // classic: +3% every time it comes back
   YETI_SPEED_STEP_MAX: 0.09,
   YETI_ACCELERATION: 10 * M,
   YETI_TURN_RATE: 4.2,
@@ -194,7 +203,7 @@ export const CONFIG = {
 
   // ---------------------------------------------------------------- engine
   SIM_STEP: 1 / 120,
-  MAX_FRAME_DT: 0.25,                // slow frames still advance in real time (in sub-steps)
+  MAX_FRAME_DT: 0.1,
 };
 
 // Converts a world-unit speed to the km/h shown in the HUD.

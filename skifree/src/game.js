@@ -48,7 +48,7 @@ export class Game {
       gates: 0,
       tricks: 0,
     };
-    this.nextYetiAt = cfg.YETI_TRIGGER_DISTANCE;
+    this.nextYetiAt = modern ? cfg.YETI_INTERVAL : cfg.YETI_TRIGGER_DISTANCE;
     // Stall watch: the yeti also comes for skiers who stop making progress.
     this.progressMark = 0;
     this.stallTime = 0;
@@ -449,6 +449,8 @@ export class Game {
         this.awardStyle(n, names.length ? names.join(' + ') : 'Big air', e.x, e.y);
       } else if (e.type === 'escape') {
         this.stats.yetiEscapes++;
+        // Booked now, not when it has trudged off, so the toast is right.
+        this.nextYetiAt = this.yetiReturnAt();
         this.awardStyle(c.STYLE_ESCAPE, 'Escaped!', this.player.x, this.player.y);
       }
     }
@@ -462,14 +464,13 @@ export class Game {
     if (!this.yeti && !this.demo && p.state !== 'caught') {
       const reason = this.yetiReason(dt);
       if (reason) {
-        // The 3D renderer sees a wider footprint than the screen edge, so it
-      // tells us where 'just off to the side' is.
-      this.yeti = new Yeti(p, this.world, this.rng, this.stats.yetiEncounters, this.sideSpawn ?? (this.viewW * this.zoomMul) / 2, c);
+        this.yeti = new Yeti(p, this.world, this.rng, this.stats.yetiEncounters, (this.viewW * this.zoomMul) / 2, c, this.modern ? this.yetiTopSpeed() : null);
+        this.yeti.level = this.yetiLevel;
         this.stats.yetiEncounters++;
         this.stallTime = 0;
         this.stallWarned = false;
         this.wanderTime = 0;
-        this.events.push({ type: 'yeti', x: this.yeti.x, y: this.yeti.y, approach: this.yeti.approach, reason });
+        this.events.push({ type: 'yeti', x: this.yeti.x, y: this.yeti.y, approach: this.yeti.approach, reason, level: this.yetiLevel });
       }
     }
     const y = this.yeti;
@@ -486,11 +487,30 @@ export class Game {
     if (y.state === 'eat' && !y.victim && y.eatTime >= c.YETI_EAT_TIME) this.finish();
     if (y.state === 'gone') {
       this.yeti = null;
-      // Never pull the classic 2000 m arrival forward after an early escape.
-      this.nextYetiAt = Math.max(this.nextYetiAt, this.stats.distance + c.YETI_RETURN_DISTANCE);
       this.progressMark = this.stats.distance;
       this.stallTime = 0;
     }
+  }
+
+  // Where the yeti comes back if you lose it now (metres): the next 1000 m
+  // mark in modern mode, a fixed distance on in classic. Never pulls a
+  // scheduled arrival forward (e.g. after escaping an early stall yeti).
+  yetiReturnAt() {
+    const c = this.cfg;
+    const d = this.stats.distance;
+    const next = this.modern ? Math.ceil((d + c.YETI_MIN_GAP) / c.YETI_INTERVAL) * c.YETI_INTERVAL : d + c.YETI_RETURN_DISTANCE;
+    return Math.max(this.nextYetiAt, next);
+  }
+
+  // Modern mode: 1 for the first chase, +1 for every escape so far.
+  get yetiLevel() {
+    return this.modern ? this.stats.yetiEscapes + 1 : 0;
+  }
+
+  // Modern mode: slow at first, a little faster after every escape.
+  yetiTopSpeed(level = this.yetiLevel) {
+    const c = this.cfg;
+    return Math.min(c.YETI_LEVEL_SPEED_MAX, c.YETI_LEVEL_SPEED_START + (level - 1) * c.YETI_LEVEL_SPEED_STEP);
   }
 
   // Why the yeti should come now, or null. Distance is the classic trigger;

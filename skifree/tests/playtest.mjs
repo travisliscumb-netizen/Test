@@ -13,9 +13,6 @@ function check(name, ok, detail = '') {
 
 const { server, url } = await serve(ROOT);
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--enable-precise-memory-info'] });
-// SwiftShader gives headless Chromium a (software) WebGL so the 3D renderer
-// runs; a separate browser so it doesn't slow the 2D gameplay suite.
-const browser3d = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const errors = [];
 const watch = (page, label) => {
   // Web fonts are progressive enhancement (system fonts stand in) and the
@@ -42,7 +39,7 @@ async function until(page, expr, ms = 8000) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await ctx.newPage();
   watch(page, 'desktop');
-  await page.goto(url + '/?2d'); // gameplay suite: fast 2D frames, identical simulation
+  await page.goto(url);
   await wait(page, 500);
   check('boots to the title screen', (await S(page, 'S.mode')) === 'title' && (await page.isVisible('#title')));
   check('attract mode is skiing behind the menu', (await S(page, 'S.demo.player.y')) > 0);
@@ -131,7 +128,7 @@ async function until(page, expr, ms = 8000) {
   await wait(page, 200);
   check('the yeti appears', (await S(page, 'S.game.yeti && S.game.yeti.state')) === 'chase');
   check('music switches to the chase theme', (await S(page, 'S.sound.mode')) === 'chase');
-  check('HUD shows the yeti alert with its distance', (await page.isVisible('#hud-yeti')) && /YETI · \d+m/.test(await page.textContent('#hud-yeti')), await page.textContent('#hud-yeti'));
+  check('HUD shows the yeti alert with its level and distance', (await page.isVisible('#hud-yeti')) && /YETI Lv \d+ · \d+m/.test(await page.textContent('#hud-yeti')), await page.textContent('#hud-yeti'));
   await page.keyboard.down('ArrowLeft');
   const caughtIn = await until(page, "S.game.yeti && S.game.yeti.state === 'eat'", 30000);
   await page.keyboard.up('ArrowLeft');
@@ -222,7 +219,7 @@ for (const vp of [{ name: 'iphone-landscape', width: 844, height: 390 }, { name:
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
   const page = await ctx.newPage();
   watch(page, vp.name);
-  await page.goto(url + '/?2d'); // gameplay suite: fast 2D frames, identical simulation
+  await page.goto(url);
   await wait(page, 400);
   await page.tap('[data-action="play"]');
   await wait(page, 300);
@@ -283,61 +280,8 @@ for (const vp of [{ name: 'iphone-landscape', width: 844, height: 390 }, { name:
   await ctx.close();
 }
 
-// ------------------------------------------------------------------ 3D
-// The default renderer. Headless WebGL is software (slow), so waits are
-// generous and checks are about correctness, not frame rate.
-{
-  const ctx = await browser3d.newContext({ viewport: { width: 960, height: 540 } });
-  const page = await ctx.newPage();
-  watch(page, '3d');
-  await page.goto(url);
-  await wait(page, 1500);
-  check('3D: the WebGL renderer is in use by default', await S(page, '!!S.renderer.is3D'));
-  await S(page, '(S.start(1991), 0)');
-  await wait(page, 2500);
-  check('3D: a run skis downhill', (await S(page, 'S.game.stats.distance')) > 5);
-  const px = await S(page, '(() => { const r = S.renderer, p = S.game.player; const a = r.project(p.x, p.y), b = r.project(p.x, p.y, 28); return Math.abs(a.y - b.y); })()');
-  check('3D: the skier is drawn at a readable size', px > 18, `${px.toFixed(0)} px tall`);
-  // Pointer steering raycasts onto the snow: point to the right of the skier.
-  await S(page, 'S.game.player.grace = 60');
-  const pt = await S(page, '(() => { const r = S.renderer, p = S.game.player; return r.project(p.x + 160, p.y + 220); })()');
-  await page.mouse.move(pt.x - 40, pt.y);
-  await page.mouse.move(pt.x, pt.y, { steps: 4 });
-  const steered = await until(page, 'S.game.player.heading > 0.3', 6000);
-  check('3D: mouse steering points the skier at the cursor', steered >= 0);
-  const w = await S(page, '(() => { const r = S.renderer, p = S.game.player, s = r.project(p.x, p.y); const w = r.screenToWorld(s.x, s.y); return Math.hypot(w.x - p.x, w.y - p.y); })()');
-  check('3D: screen <-> world mapping round-trips', w < 3, `${w.toFixed(2)} units off`);
-  // The yeti renders and the eating scene plays out.
-  await S(page, '(S.game.nextYetiAt = 0, S.game.player.grace = 0, 0)');
-  const appeared = await until(page, '!!S.game.yeti', 6000);
-  check('3D: the yeti appears', appeared >= 0);
-  await S(page, '(S.game.yeti.x = S.game.player.x, S.game.yeti.y = S.game.player.y - 10, 0)');
-  const over = await until(page, "S.mode === 'over'", 20000);
-  check('3D: getting eaten ends the run', over >= 0);
-  await ctx.close();
-}
-{
-  // Phone-sized 3D: finger steering via raycast.
-  const ctx = await browser3d.newContext({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
-  const page = await ctx.newPage();
-  watch(page, '3d-phone');
-  await page.goto(url);
-  await wait(page, 1200);
-  await page.tap('[data-action="play"]');
-  await wait(page, 1500);
-  await S(page, 'S.game.player.grace = 60');
-  const pt = await S(page, '(() => { const r = S.renderer, p = S.game.player; return r.project(p.x + 160, p.y + 220); })()');
-  const cdp = await ctx.newCDPSession(page);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: pt.x, y: pt.y, id: 3 }] });
-  const ok = await until(page, 'S.game.player.heading > 0.3', 6000);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  check('3D phone: the skier follows your finger', ok >= 0);
-  await ctx.close();
-}
-
 check('no console errors, page errors or failed requests', errors.length === 0, errors.slice(0, 5).join(' | '));
 await browser.close();
-await browser3d.close();
 server.close();
 console.log(`\n${failures ? failures + ' FAILED' : 'ALL PASSED'}`);
 process.exit(failures ? 1 : 0);

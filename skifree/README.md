@@ -65,8 +65,14 @@ build command empty.
 - **Collisions** are comic and short. Trees and big rocks put you on your face,
   stumps, small rocks and dogs make you tumble, snowmen explode, and slalom
   flags just fall over. You're back up in about a second.
-- **The Yeti** arrives after **2000 m**, or sooner if you dawdle (30 s without
-  real downhill progress, with a warning roar at 20 s) or wander off the side
+- **The Yeti** comes out at **every 1000 m mark** (Classic mode: once, at
+  2000 m, at its original pace). The first one is slow and plain skiing loses
+  it; every time you get away it comes back a little faster (9 m/s, +1.2 per
+  escape, capped at 23). Around the sixth chase it matches your cruising
+  speed and from then on you need turbo. The HUD shows its level, and after
+  an escape a toast tells you which mark it's coming back at. It also comes
+  sooner if you dawdle (40 s without
+  real downhill progress, with a warning roar at 28 s) or wander off the side
   of the mountain, just like the original. From behind, from the side, or from
   ahead; a HUD alert shows how far behind it is. It predicts where you're going, steers around trees it sees coming,
   and is faster than you at cruising speed. On `F` you are faster than it, but
@@ -97,16 +103,12 @@ skifree/
     palette.js     colours and outfits
     sprites.js     scenery vector art, cached per zoom level
     characters.js  skier / boarder / dog / yeti / chairlift, drawn live
-    render3d.js    default renderer: real-time 3D (three.js) — lit low-poly
-                   scenery, shadows, fog, articulated characters, spray
-    render.js      2D fallback: snow, tracks, particles, y-sorted scene
+    render.js      snow, tracks, particles, y-sorted scene, overlays
     audio.js       synthesised SFX, skiing loops, calm + chase music
     input.js       keyboard, mouse steering, touch buttons
     save.js        versioned, validated localStorage
     main.js        loop, screens, HUD, glue
     styles.css
-  vendor/
-    three.min.js   three.js r186, bundled + minified (MIT, see three.LICENSE)
   tests/
     sim.mjs        headless: determinism, spacing, pathing, physics, yeti, save
     playtest.mjs   end-to-end in Chromium: desktop, phones, touch, soak
@@ -115,12 +117,6 @@ skifree/
     shots.mjs      captures a scripted run
     moments.mjs    stages poses, eating frames, landmarks and phone layouts
 ```
-
-**3D with a 2D safety net.** The game renders in WebGL 3D by default. If
-WebGL is unavailable it falls back to the 2D canvas renderer; if 3D stays
-slow even after dropping to lite mode (no shadows, 1x pixels) it switches to
-2D mid-run. Options → Visuals → Graphics forces either, and `?2d` in the URL
-forces 2D. The simulation is identical in both: only the drawing changes.
 
 Everything marked *pure* imports nothing from the DOM. The tests drive exactly
 the code the game runs.
@@ -135,10 +131,11 @@ any angle between the two scrubs speed and throws spray. That lag is the whole
 "snow is slippery" feel: crisp carving when slow, long sliding arcs on turbo.
 Turn rate also falls with speed and is roughly halved again on `F`.
 
-**The F key is the escape, by construction.** Cruising tops out at 54 km/h,
-the Yeti runs at about 62, turbo reaches 90. So skiing well without `F` is
-never enough, and `F` is always enough if you can keep it off the trees. The
-Yeti gets a mild catch-up boost when far behind, but never against turbo.
+**The Yeti ramps; turbo always wins.** Cruising tops out at 54 km/h and turbo
+at 90. The Yeti starts at 32 km/h and gains about 4 km/h per escape, so
+early chases are won just by skiing, later ones only on `F`. It is capped at
+83 km/h, so `F` is always enough if you keep it off the trees. It gets a mild
+catch-up boost when far behind, but never against turbo.
 
 **Nothing can wall you in.** Scatter places at most one object per 64u grid
 cell, with jitter confined so that neighbouring centres are at least 42u apart.
@@ -189,8 +186,10 @@ is clear, and path existence. It also checks generation and step cost, bot
 runs that must never stall with bounded memory, top speed and turbo, that
 turning gets harder with speed, stopping and sidestepping, braking, hop height,
 no bunny-hopping, that you can't be trapped by one tree, and crash recovery
-time. For the Yeti it checks that a stopped skier is eaten, that a cruising
-skier is usually caught, that turbo can escape, that it returns, that it never
+time. For the Yeti it checks that a stopped skier is eaten, that cruising loses
+the first one but not a level-9 one, that turbo still escapes at level 9,
+that its pace rises with every escape and stays under turbo, that it is due
+at every 1000 m mark (2000 m in Classic) and returns at the next mark, that it never
 spawns inside an obstacle, that its approach varies, and that you can jump
 over it. It also covers save sanitisation, persistence and blocked storage.
 

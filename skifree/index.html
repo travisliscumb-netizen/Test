@@ -20,7 +20,6 @@
 </head>
 <body>
   <canvas id="game" aria-label="SkiFree game view"></canvas>
-  <canvas id="overlay" aria-hidden="true"></canvas>
 
   <!-- In-run HUD -->
   <div id="hud" class="hidden" aria-live="off">
@@ -91,7 +90,7 @@
           <tr><td>Mouse</td><td>The skier heads toward the pointer. Click to hop.</td></tr>
           <tr><td>Touch</td><td>Touch and hold anywhere: the skier heads for your finger. Flick up or down for tricks. HOP and TURBO on the right (arrow buttons in Options if you prefer).</td></tr>
         </table>
-        <p class="small">The three courses at the top are timed: ski through the START arch, thread the gates (each miss costs 5 s) and cross FINISH. Big air and landed tricks earn style. And keep moving: the Abominable Snow Monster doesn't like dawdlers.</p>
+        <p class="small">The three courses at the top are timed: ski through the START arch, thread the gates (each miss costs 5 s) and cross FINISH. Big air and landed tricks earn style. Every 1000 m the Abominable Snow Monster comes out. It starts slow, but every time you lose it, it comes back faster: later on, only turbo will do. And keep moving: it doesn't like dawdlers either.</p>
         <div class="row-end"><button class="btn" data-action="back">OK</button></div>
       </div>
     </div>
@@ -114,12 +113,6 @@
         </fieldset>
         <fieldset>
           <legend>Visuals</legend>
-          <label>Graphics
-            <select id="opt-graphics">
-              <option value="3d">3D (best looking)</option>
-              <option value="2d">2D (fastest, for older phones)</option>
-            </select>
-          </label>
           <label class="check"><input type="checkbox" id="opt-motion"> Reduced motion <small>No camera wobble or speed streaks; calmer snowfall. Also follows your system setting.</small></label>
           <label class="check"><input type="checkbox" id="opt-effects"> Snow effects <small>Spray, bursts, snowfall and sparkle.</small></label>
         </fieldset>

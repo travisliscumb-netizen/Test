@@ -282,45 +282,70 @@ const finite = (g) => [g.player.x, g.player.y, g.player.speed, g.player.heading,
 }
 
 // -------------------------------------------------------------- the yeti
-function yetiTrial(seed, brain, at = 30) {
+function yetiTrial(seed, brain, at = 30, level = 1) {
   const g = new Game({ seed });
   g.setViewSize(1100, 640);
-  g.nextYetiAt = at; // skip the 2 km warm-up
+  g.nextYetiAt = at; // skip the 1 km warm-up
+  g.stats.yetiEscapes = level - 1; // modern mode: escapes so far set its pace
   let spawnT = null, caughtT = null;
   const log = run(g, 120, (gg, i) => brain(gg, i));
   for (const e of log) {
     if (e.type === 'yeti' && spawnT === null) spawnT = e.t;
     if (e.type === 'caught') caughtT = e.t;
   }
-  return { g, log, spawnT, caughtT, escapes: g.stats.yetiEscapes };
+  return { g, log, spawnT, caughtT, escapes: g.stats.yetiEscapes - (level - 1) };
 }
 {
   const seeds = QUICK ? [31, 32, 33, 34] : [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42];
-  // 1. Standing still: eaten fast.
+  // 1. Standing still: eaten fast, even by the slow first yeti.
   const still = seeds.map((s) => yetiTrial(s, () => ({ left: true }), 0));
   const stillOk = still.every((r) => r.caughtT !== null && r.caughtT - r.spawnT < 25);
   check('a skier who stops gets eaten', stillOk, still.map((r) => (r.caughtT === null ? 'never' : (r.caughtT - r.spawnT).toFixed(1) + 's')).join(' '));
   check('eating ends the run', still.every((r) => r.g.over));
 
-  // 2. Good skiing at cruising speed: the yeti catches up eventually.
-  const cruise = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'never' })));
-  // Tuned to be friendly: clean cruising keeps you ahead; dawdling doesn't.
-  const caught = cruise.filter((r) => r.caughtT !== null);
-  check('clean cruising keeps you ahead of the yeti (mostly)', caught.length <= Math.floor(seeds.length * 0.34), `${caught.length}/${seeds.length} caught`);
-  const slow = seeds.map((s) => yetiTrial(s, (g, i) => ({ ...autopilot(g, { turbo: 'never' }), down: i % 10 < 4 }), 0));
-  check('a skier who keeps braking gets caught', slow.filter((r) => r.caughtT !== null).length >= Math.ceil(seeds.length * 0.75), `${slow.filter((r) => r.caughtT !== null).length}/${seeds.length}`);
+  // 2. The first yeti is easy: plain cruising loses it.
+  const easy = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'never' })));
+  const easyCaught = easy.filter((r) => r.caughtT !== null).length;
+  const easyEsc = easy.filter((r) => r.escapes > 0).length;
+  check('level 1: cruising (no turbo) loses the yeti', easyCaught === 0 && easyEsc >= Math.ceil(seeds.length * 0.75), `${easyEsc}/${seeds.length} escaped, ${easyCaught} eaten`);
 
-  // 3. Turbo is the escape.
-  const turbo = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'yeti' })));
+  // 3. After many escapes it out-runs cruising: you need turbo.
+  const hard = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'never' }), 30, 9));
+  const hardCaught = hard.filter((r) => r.caughtT !== null).length;
+  check('level 9: cruising alone gets caught', hardCaught >= Math.ceil(seeds.length * 0.75), `${hardCaught}/${seeds.length} eaten`);
+  const turbo = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'yeti' }), 30, 9));
   const escaped = turbo.filter((r) => r.escapes > 0).length;
-  check('with turbo you can escape (sometimes, not always)', escaped >= Math.ceil(seeds.length * 0.3), `${escaped}/${seeds.length} escaped at least once; ${turbo.filter((r) => r.caughtT !== null).length} eaten`);
+  check('level 9: with turbo you can still escape', escaped >= Math.ceil(seeds.length * 0.3), `${escaped}/${seeds.length} escaped; ${turbo.filter((r) => r.caughtT !== null).length} eaten`);
 
-  // 4. It returns after an escape.
+  // 4. The pace ramp: slow, a little faster per escape, capped under turbo.
+  const g0 = new Game({ seed: 1 });
+  const tops = Array.from({ length: 20 }, (_, i) => g0.yetiTopSpeed(i + 1));
+  const rising = tops.every((v, i) => i === 0 || v >= tops[i - 1]);
+  check('yeti pace rises with every escape, from slow to under-turbo', rising && tops[0] < CONFIG.PLAYER_SPEED * 0.7 && tops[19] < CONFIG.TURBO_SPEED && tops.some((v) => v > CONFIG.PLAYER_SPEED),
+    tops.filter((_, i) => i % 3 === 0).map((v) => (v / METER).toFixed(1)).join(' ') + ' m/s');
+  const live = turbo.find((r) => r.g.yeti) || turbo[0];
+  if (live.g.yeti) check('a spawned yeti takes the pace for its level', Math.abs(live.g.yeti.topSpeed - live.g.yetiTopSpeed(9 + live.escapes)) < 1e-6);
+
+  // 5. Schedule: every 1000 m mark; an escape books the next mark at least
+  // YETI_MIN_GAP ahead; classic keeps the original 2000 m.
+  const sched = new Game({ seed: 2 });
+  const marks = [];
+  check('modern: the first yeti is due at 1000 m', new Game({ seed: 2 }).nextYetiAt === 1000);
+  check('classic: the first yeti is due at 2000 m', new Game({ seed: 2, modern: false }).nextYetiAt === CONFIG.YETI_TRIGGER_DISTANCE);
+  for (const d of [1450, 1900, 2300]) {
+    sched.stats.distance = d;
+    sched.nextYetiAt = Math.min(sched.nextYetiAt, d); // the arrival has passed
+    marks.push(sched.yetiReturnAt());
+  }
+  check('after an escape it returns at the next 1000 m mark', marks.join() === '2000,3000,3000', marks.join(', '));
+  const stallEsc = new Game({ seed: 2 });
+  stallEsc.stats.distance = 100; // escaped an early stall yeti
+  check('an early escape keeps the 1000 m arrival', stallEsc.yetiReturnAt() === 1000, String(stallEsc.yetiReturnAt()));
   const back = turbo.filter((r) => r.log.filter((e) => e.type === 'yeti').length > 1).length;
-  const firstEsc = turbo.find((r) => r.escapes > 0);
+  const firstEsc = easy.find((r) => r.escapes > 0);
   if (firstEsc) {
     const g = firstEsc.g;
-    check('after an escape the yeti comes back later', back > 0 || g.nextYetiAt > g.stats.distance || g.over, `${back} runs saw a second yeti`);
+    check('a live escape books the next 1000 m mark ahead', g.nextYetiAt % CONFIG.YETI_INTERVAL === 0 && (g.yeti || g.nextYetiAt > g.stats.distance || back > 0), `next at ${g.nextYetiAt} m, now ${g.stats.distance.toFixed(0)} m; ${back} turbo runs saw a second yeti`);
   }
 
   // 5. Spawn is never inside an obstacle, approach varies.
@@ -374,18 +399,6 @@ function yetiTrial(seed, brain, at = 30) {
   const wlog = run(walk, 45, (gg) => (gg.player.x > CONFIG.TREE_SLALOM_X ? { left: true } : { up: true }));
   check('walking over to Tree Slalom does not summon the yeti', !wlog.some((e) => e.type === 'yeti' || e.type === 'yetiwarn'), `x ${(walk.player.x / METER).toFixed(0)} m`);
 
-  // Escaping an early (stall) yeti never pulls the 2000 m one forward.
-  const esc = new Game({ seed: 60 });
-  esc.setViewSize(1100, 640);
-  esc.stats.distance = 100;
-  esc.progressMark = 100;
-  esc.stallTime = CONFIG.YETI_STALL_TIME; // a real stall spawn, not a forced one
-  run(esc, 0.01, () => ({}));
-  if (!esc.yeti) throw new Error('stall yeti did not spawn');
-  esc.yeti.state = 'gone';
-  run(esc, 0.01, () => ({}));
-  check('an early escape keeps the 2000 m arrival', esc.nextYetiAt >= CONFIG.YETI_TRIGGER_DISTANCE, `next at ${esc.nextYetiAt} m`);
-
   // Wandering off the side of the mountain summons it too.
   const w = new Game({ seed: 51 });
   w.setViewSize(1100, 640);
@@ -397,8 +410,8 @@ function yetiTrial(seed, brain, at = 30) {
   // Skiing normally does not trigger it early.
   const n = new Game({ seed: 52 });
   n.setViewSize(1100, 640);
-  const early = run(n, 60, (gg) => autopilot(gg, { turbo: 'never' })).some((e) => e.type === 'yeti');
-  check('normal skiing does not summon the yeti early', !early && n.stats.distance < CONFIG.YETI_TRIGGER_DISTANCE, `${n.stats.distance.toFixed(0)} m in 60 s`);
+  const early = run(n, 40, (gg) => autopilot(gg, { turbo: 'never' })).some((e) => e.type === 'yeti');
+  check('normal skiing does not summon the yeti early', !early && n.stats.distance < CONFIG.YETI_INTERVAL, `${n.stats.distance.toFixed(0)} m in 40 s`);
 }
 {
   // Air tricks off a ramp.

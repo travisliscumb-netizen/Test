@@ -15,10 +15,12 @@ export const YETI_RADIUS = 12;
 
 export class Yeti {
   // encounter: 0 for the first appearance, 1 for the second...
-  constructor(player, world, rng, encounter, viewHalfWidth, cfg = CONFIG) {
+  // top: its top speed this time (modern mode's level ramp); omitted, it uses
+  // the classic per-encounter step.
+  constructor(player, world, rng, encounter, viewHalfWidth, cfg = CONFIG, top = null) {
     this.cfg = cfg;
     this.encounter = encounter;
-    this.boost = Math.min(cfg.YETI_SPEED_STEP_MAX, encounter * cfg.YETI_SPEED_STEP);
+    this.top = top ?? cfg.YETI_SPEED * (1 + Math.min(cfg.YETI_SPEED_STEP_MAX, encounter * cfg.YETI_SPEED_STEP));
     this.state = 'chase'; // chase | stumble | eat | giveup | gone
     this.timer = 0;
     this.anim = 0;
@@ -54,11 +56,11 @@ export class Yeti {
       this.y -= 20;
     }
     this.heading = Math.atan2(player.x - this.x, player.y - this.y);
-    this.speed = Math.max(player.speed * 0.9, cfg.YETI_SPEED * 0.5);
+    this.speed = Math.min(this.top, Math.max(player.speed * 0.9, this.top * 0.5));
   }
 
   get topSpeed() {
-    return this.cfg.YETI_SPEED * (1 + this.boost);
+    return this.top;
   }
 
   distanceTo(p) {
