@@ -155,6 +155,8 @@ export function stepPlayer(p: Player, c: Controls, grid: SolidGrid, minX: number
   if (p.onGround) {
     p.airFrames = 0;
     p.tier = tierFor(p.vx);
+    // Walking off a ledge keeps the cap of the current ground speed, not the last jump's.
+    p.airMax = Math.max(PLAYER.walkMax, Math.min(PLAYER.runMax, Math.abs(p.vx)));
     p.stride += Math.abs(p.vx);
   } else {
     p.airFrames++;

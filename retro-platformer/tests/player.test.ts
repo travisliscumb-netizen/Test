@@ -224,6 +224,32 @@ describe("horizontal movement", () => {
     expect(p.vx).toBe(vx);
   });
 
+  it("walking off a ledge after a running jump does not keep the running speed cap", () => {
+    const LEDGE = grid([
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "..............................................",
+      "##########################....................",
+    ]);
+    const p = createPlayer(1, 9);
+    run(p, LEDGE, 80, ctl({ right: true, run: true }));
+    stepPlayer(p, ctl({ right: true, run: true, jump: true, jumpPressed: true }), LEDGE, -Infinity);
+    run(p, LEDGE, 80, ctl({ right: true, run: true }));
+    expect(p.onGround).toBe(true);
+    // Slow to walking pace, then walk off the edge without run.
+    run(p, LEDGE, 60, ctl({ right: true }));
+    while (p.onGround) stepPlayer(p, ctl({ right: true }), LEDGE, -Infinity);
+    run(p, LEDGE, 20, ctl({ right: true }));
+    expect(p.vx).toBeLessThanOrEqual(PLAYER.walkMax);
+  });
+
   it("cannot move left past the camera wall", () => {
     const p = createPlayer(5, 9);
     for (let i = 0; i < 60; i++) stepPlayer(p, ctl({ left: true }), FLAT, 4 * TILE);

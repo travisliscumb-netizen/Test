@@ -183,6 +183,24 @@ describe("shells", () => {
     expect(w.session.score).toBe(SCORE.shellChain[0] + SCORE.shellChain[1]);
   });
 
+  it("a shell kicked far off the right of the screen is removed", () => {
+    const w = makeWorld([".S" + ".".repeat(60) + "F...T."]);
+    const s = place(w, createShellback(0, 0), 10 * TILE);
+    s.state = "slide";
+    s.h = ENEMY.shell.shellHeight;
+    s.y = 12 * TILE - s.h;
+    s.dir = 1;
+    run(w, 200);
+    expect(w.enemies).not.toContain(s);
+  });
+
+  it("enemies just past the right edge are kept", () => {
+    const w = makeWorld([".S" + ".".repeat(60) + "F...T."]);
+    const g = place(w, createWalker(0, 0), w.camera.x + w.camera.width + ENEMY.activateMargin);
+    run(w, 5);
+    expect(w.enemies).toContain(g);
+  });
+
   it("stomping a sliding shell stops it", () => {
     const w = FLAT();
     const s = place(w, createShellback(0, 0), 10 * TILE);

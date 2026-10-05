@@ -23,11 +23,11 @@ export interface TouchLayout {
 }
 
 /** Fraction of the pad's half-width around the centre that does nothing. */
-export const PAD_DEAD_ZONE = 0.12;
+const PAD_DEAD_ZONE = 0.12;
 /** Pushing past this fraction of the pad's half-width also holds run. */
-export const PAD_RUN_ZONE = 0.78;
+const PAD_RUN_ZONE = 0.78;
 /** Buttons accept touches a little outside their drawn circle; where A and B zones overlap, both are held. */
-export const BUTTON_REACH = 1.3;
+const BUTTON_REACH = 1.3;
 /** The pad's live area extends this far beyond its drawn bounds (fraction of its height). */
 const PAD_SLOP = 0.6;
 

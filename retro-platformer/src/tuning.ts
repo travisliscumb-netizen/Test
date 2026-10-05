@@ -7,7 +7,7 @@
  */
 
 export const TILE = 32;
-export const FIXED_HZ = 60;
+const FIXED_HZ = 60;
 export const FIXED_DT_MS = 1000 / FIXED_HZ;
 /** Longest real-time gap the loop will try to catch up on (avoids a spiral of death after a stall). */
 export const MAX_FRAME_MS = 250;
@@ -16,7 +16,7 @@ export const VIEW_HEIGHT = 480; // 15 tiles
 export const VIEW_MIN_WIDTH = 512; // 16 tiles
 export const VIEW_MAX_WIDTH = 960; // 30 tiles
 
-export function msToFrames(ms: number): number {
+function msToFrames(ms: number): number {
   return Math.round(ms / FIXED_DT_MS);
 }
 

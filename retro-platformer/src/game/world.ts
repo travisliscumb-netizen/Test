@@ -37,7 +37,7 @@ export type Phase = "play" | "transform" | "dying" | "pole" | "walkOut" | "tally
 export type DeathCause = "hit" | "pit" | "time";
 
 /** Music for each theme. */
-export const THEME_SONG: Readonly<Record<LevelData["theme"], Song>> = {
+const THEME_SONG: Readonly<Record<LevelData["theme"], Song>> = {
   meadow: "meadow",
   cavern: "cavern",
   dusk: "dusk",
@@ -208,10 +208,12 @@ export class World {
   }
 
   private stepEffects(): void {
+    const popups: Effect[] = [];
     for (const e of this.effects) {
-      if (stepEffect(e, this.levelBottom)) this.effects.push(scorePopup(String(SCORE.coin), e.x + 4, e.y));
+      if (stepEffect(e, this.levelBottom)) popups.push(scorePopup(String(SCORE.coin), e.x + 4, e.y));
     }
     prune(this.effects);
+    this.effects.push(...popups);
   }
 
   private activateSpawns(): void {
@@ -224,8 +226,11 @@ export class World {
 
   private despawn(): void {
     const left = this.camera.x - ENEMY.despawnMargin;
-    for (const e of this.enemies) if (e.x + e.w < left) e.remove = true;
-    for (const s of this.items) if (s.x + s.w < left) s.remove = true;
+    // Wider than the activation margin, so nothing is culled right after spawning.
+    const right = this.camera.x + this.camera.width + ENEMY.activateMargin + ENEMY.despawnMargin;
+    const gone = (a: { x: number; w: number }): boolean => a.x + a.w < left || a.x > right;
+    for (const e of this.enemies) if (gone(e)) e.remove = true;
+    for (const s of this.items) if (gone(s)) s.remove = true;
     prune(this.enemies);
     prune(this.items);
   }

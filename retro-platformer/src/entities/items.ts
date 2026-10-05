@@ -67,7 +67,7 @@ export type Effect =
   | { kind: "dust"; x: number; y: number; prevX: number; prevY: number; age: number; remove: boolean };
 
 /** Lifetime of score popups and dust puffs, in frames. */
-export const SCORE_POPUP_FRAMES = 48;
+const SCORE_POPUP_FRAMES = 48;
 export const DUST_FRAMES = 18;
 
 export function coinPop(tx: number, ty: number): Effect {

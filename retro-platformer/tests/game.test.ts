@@ -29,6 +29,14 @@ describe("game flow", () => {
     expect(g.events).toContainEqual({ type: "music", song: "title" });
   });
 
+  it("animates the title backdrop without simulating it", () => {
+    const g = new Game(levels, 640, 0);
+    const x = g.backdrop.player.x;
+    for (let i = 0; i < 10; i++) g.step(ctl({ right: true }));
+    expect(g.backdrop.frame).toBe(10);
+    expect(g.backdrop.player.x).toBe(x);
+  });
+
   it("jump also starts the game from the title", () => {
     const g = new Game(levels, 640, 0);
     g.step(ctl({ jumpPressed: true }));

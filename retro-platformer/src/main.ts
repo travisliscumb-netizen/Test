@@ -55,11 +55,18 @@ function start(): void {
 
   const levels = loadLevels();
   const renderer = new Renderer(bakeAssets());
-  let game: Game | null = null;
-  const display = new Display(canvas, (w) => game?.setViewWidth(w));
-  const g = new Game(levels, display.viewWidth, loadHighScore());
-  game = g;
-  let savedHighScore = g.highScore;
+  // The display reports its first width during construction, before the game exists.
+  let g: Game | undefined;
+  const display = new Display(canvas, (w) => g?.setViewWidth(w));
+  const game = new Game(levels, display.viewWidth, loadHighScore());
+  g = game;
+  let savedHighScore = game.highScore;
+  const persistHighScore = (): void => {
+    if (game.highScore > savedHighScore) {
+      savedHighScore = game.highScore;
+      saveHighScore(savedHighScore);
+    }
+  };
 
   const audio = new AudioEngine();
   const unlock = (): void => audio.unlock();
@@ -67,46 +74,44 @@ function start(): void {
     window.addEventListener(type, unlock, { passive: true });
   }
 
-  attachTouch(hub, touchRoot, () => (g.touchMode = true));
+  attachTouch(hub, touchRoot, () => (game.touchMode = true));
 
-  const pauseIfPlaying = (): void => {
-    if (g.mode === "play") g.requestPause();
-  };
   document.addEventListener("visibilitychange", () => {
     audio.setHidden(document.hidden);
     hub.releaseAll();
-    if (document.hidden) pauseIfPlaying();
+    if (document.hidden) {
+      game.requestPause();
+      persistHighScore();
+    }
   });
-  window.addEventListener("blur", pauseIfPlaying);
+  window.addEventListener("blur", () => game.requestPause());
 
   window.__sproutQuest = {
     snapshot: () => ({
-      mode: g.mode,
-      phase: g.world?.phase ?? null,
-      level: g.session.levelIndex,
-      score: g.session.score,
-      coins: g.session.coins,
-      lives: g.session.lives,
-      player: g.world ? { x: g.world.player.x, y: g.world.player.y, form: g.world.player.form } : null,
+      mode: game.mode,
+      phase: game.world?.phase ?? null,
+      level: game.session.levelIndex,
+      score: game.session.score,
+      coins: game.session.coins,
+      lives: game.session.lives,
+      player: game.world ? { x: game.world.player.x, y: game.world.player.y, form: game.world.player.form } : null,
     }),
   };
 
-  if (import.meta.env.DEV) devWarp(g, levels);
+  if (import.meta.env.DEV) devWarp(game, levels);
 
   runLoop(
     () => {
       const c = hub.sample();
       if (c.mutePressed) audio.toggleMute();
-      g.step(c);
-      for (const e of g.events) audio.handle(e);
-      g.events.length = 0;
-      if (g.highScore > savedHighScore && g.mode !== "play") {
-        savedHighScore = g.highScore;
-        saveHighScore(savedHighScore);
-      }
+      game.step(c);
+      for (const e of game.events) audio.handle(e);
+      game.events.length = 0;
+      // Persist between runs, not every frame of play.
+      if (game.mode !== "play") persistHighScore();
     },
     (alpha) => {
-      renderer.render(display.ctx, g, display.viewWidth, alpha);
+      renderer.render(display.ctx, game, display.viewWidth, alpha);
       display.present();
       audio.pump();
     },

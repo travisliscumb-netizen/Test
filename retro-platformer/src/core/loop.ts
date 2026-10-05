@@ -30,35 +30,25 @@ export class FixedStep {
   }
 }
 
-/** Drives a FixedStep from requestAnimationFrame. */
-export function runLoop(update: () => void, render: (alpha: number) => void): () => void {
+/** Drives a FixedStep from requestAnimationFrame for the life of the page. */
+export function runLoop(update: () => void, render: (alpha: number) => void): void {
   const clock = new FixedStep();
   let last = performance.now();
-  let handle = 0;
-  let stopped = false;
 
   const frame = (now: number): void => {
-    if (stopped) return;
     const { steps, alpha } = clock.advance(now - last);
     last = now;
     for (let i = 0; i < steps; i++) update();
     render(alpha);
-    handle = requestAnimationFrame(frame);
+    requestAnimationFrame(frame);
   };
 
-  const onVisibility = (): void => {
-    // Never try to catch up on time spent hidden.
+  // Never try to catch up on time spent hidden.
+  document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       last = performance.now();
       clock.reset();
     }
-  };
-  document.addEventListener("visibilitychange", onVisibility);
-  handle = requestAnimationFrame(frame);
-
-  return () => {
-    stopped = true;
-    cancelAnimationFrame(handle);
-    document.removeEventListener("visibilitychange", onVisibility);
-  };
+  });
+  requestAnimationFrame(frame);
 }

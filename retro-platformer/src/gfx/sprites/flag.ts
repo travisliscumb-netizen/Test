@@ -25,7 +25,7 @@ const PALETTE = [
 
 /** Pole occupies columns 14..17 of each 32 px tile. */
 export const POLE_LEFT = 14;
-export const POLE_WIDTH = 4;
+const POLE_WIDTH = 4;
 
 function pole(): IndexedImage {
   const pc = new PixelCanvas(32, 32);

@@ -75,11 +75,11 @@ time: 400
 | `X` | stone block | `o` | coin |
 | `< >` | pipe top, left/right | `[ ]` | pipe body, left/right |
 
-The parser rejects malformed files with the line and column of the problem. `npm test` then checks that every level can still be finished, from its start and from every checkpoint, using the real physics.
+The parser rejects malformed files and names the map row and column of the problem. `npm test` then checks that every level can still be finished, from its start and from every checkpoint, using the real physics.
 
 ## Swapping in your own art
 
-Every sprite module returns a `SpriteSheet`: a palette (index 0 is transparent) plus named frames of palette indices. The quickest way to replace one is with text rows:
+Every sprite module returns a `SpriteSheet`: a palette (index 0 is transparent) plus named frames of palette indices. The quickest way to replace one is with text rows (this sketch shows the format; real Sprout frames are 32×32):
 
 ```ts
 // src/gfx/sprites/sprout.ts

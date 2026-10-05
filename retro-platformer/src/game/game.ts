@@ -55,6 +55,8 @@ export class Game {
     this.timer++;
     switch (this.mode) {
       case "title":
+        // Animate the backdrop (drifting clouds, shimmering blocks) without simulating it.
+        this.backdrop.frame++;
         if (c.startPressed || c.jumpPressed) {
           this.session = newSession();
           this.enter("intro");

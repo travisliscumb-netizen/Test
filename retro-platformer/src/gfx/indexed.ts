@@ -71,12 +71,6 @@ export class PixelCanvas {
     this.pixels = new Uint8Array(width * height);
   }
 
-  static from(img: IndexedImage): PixelCanvas {
-    const pc = new PixelCanvas(img.width, img.height);
-    pc.pixels.set(img.pixels);
-    return pc;
-  }
-
   get(x: number, y: number): number {
     const ix = Math.floor(x);
     const iy = Math.floor(y);
@@ -172,16 +166,6 @@ export class PixelCanvas {
       xs.sort((a, b) => a - b);
       for (let k = 0; k + 1 < xs.length; k += 2) {
         for (let x = Math.round(xs[k]!); x < Math.round(xs[k + 1]!); x++) this.set(x, y, c);
-      }
-    }
-    return this;
-  }
-
-  /** Recolours pixels currently equal to `from` wherever `where` returns true. */
-  recolor(from: number, to: number, where: (x: number, y: number) => boolean = () => true): this {
-    for (let y = 0; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        if (this.get(x, y) === from && where(x, y)) this.set(x, y, to);
       }
     }
     return this;
