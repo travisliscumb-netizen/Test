@@ -69,6 +69,7 @@ tools/
   serve.mjs   static server that mirrors the production headers
   shots.mjs   screenshots of every screen at five viewports
   icons.mjs   renders the icon set from the game's own sprites
+  bundle.mjs  single self-contained HTML file (needs esbuild)
 ```
 
 ## Verifying
