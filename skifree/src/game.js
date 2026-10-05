@@ -6,7 +6,7 @@ import { OBJECTS } from './objects.js';
 import { Rng, hash } from './rng.js';
 import { World, courses } from './world.js';
 import { Player } from './player.js';
-import { spawnActors } from './actors.js';
+import { spawnActors, avoidance } from './actors.js';
 import { Yeti } from './yeti.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -18,8 +18,10 @@ export class Game {
   //   viewW/H = visible world size, so the first actors spawn off-screen
   //   modern = the expanded game (poop, bears, yeti retargeting, panic);
   //            false plays like the 1991 original
-  constructor({ seed, cfg = CONFIG, demo = false, viewW = 900, viewH = 640, modern = true } = {}) {
+  //   assist = steering assist (gentle automatic nudge around obstacles)
+  constructor({ seed, cfg = CONFIG, demo = false, viewW = 900, viewH = 640, modern = true, assist = false } = {}) {
     this.cfg = cfg;
+    this.assist = assist;
     this.seed = seed >>> 0;
     this.demo = demo;
     this.modern = modern;
@@ -108,6 +110,8 @@ export class Game {
     this.hopWasDown = !!input.jump;
 
     p.update(dt, input, this.events);
+    // After the player's own steering, so a held tuck can't cancel it out.
+    this.steeringAssist(dt);
     this.collidePlayer(prevY);
 
     for (const a of this.actors) {
@@ -122,6 +126,19 @@ export class Game {
     this.updateCamera(dt);
     this.refreshWorld();
     for (const o of this.decals) o.age += dt;
+  }
+
+  // Looks a fraction of a second down the skier's line; if something solid is
+  // about to be hit, eases the skis off to the clearer side. Gentle enough
+  // that the player is still the one skiing.
+  steeringAssist(dt) {
+    const p = this.player;
+    const c = this.cfg;
+    if (!this.assist || p.state !== 'ski' || p.grace > 0 || p.speed < 40) return;
+    const reach = 12 + p.speed * c.ASSIST_LOOKAHEAD;
+    const nudge = avoidance(this.world, p.x, p.y, Math.sin(p.travel), Math.cos(p.travel), reach, c.COLLISION_RADIUS + 3);
+    if (!nudge) return;
+    p.heading = clamp(p.heading + nudge * c.ASSIST_STRENGTH * dt, -Math.PI / 2, Math.PI / 2);
   }
 
   updateStats(dt) {

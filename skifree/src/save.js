@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   effects: CONFIG.SNOW_EFFECTS,
   touch: 'auto', // auto | on | off
   touchSteer: 'finger', // finger: skier follows your finger | pad: on-screen arrows
+  assist: true, // steering assist: nudges you around obstacles
   seedMode: 'random', // random | fixed
   seed: '',
 };
@@ -52,6 +53,7 @@ export function sanitize(raw) {
     effects: typeof st.effects === 'boolean' ? st.effects : d.effects,
     touch: ['auto', 'on', 'off'].includes(st.touch) ? st.touch : d.touch,
     touchSteer: ['finger', 'pad'].includes(st.touchSteer) ? st.touchSteer : d.touchSteer,
+    assist: typeof st.assist === 'boolean' ? st.assist : d.assist,
     seedMode: ['random', 'fixed'].includes(st.seedMode) ? st.seedMode : d.seedMode,
     seed: typeof st.seed === 'string' ? st.seed.slice(0, 24) : d.seed,
   };

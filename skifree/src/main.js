@@ -169,7 +169,7 @@ function startRun(seed = pickSeed(), classic = classicMode) {
   classicMode = classic;
   sound.unlock();
   sound.resume();
-  game = new Game({ seed, viewW: renderer.viewW, viewH: renderer.viewH, modern: !classic });
+  game = new Game({ seed, viewW: renderer.viewW, viewH: renderer.viewH, modern: !classic, assist: save.settings.assist });
   renderer.reset();
   mode = 'playing';
   input.capture = true;
@@ -224,7 +224,7 @@ function gameOver() {
   };
   const broke = save.recordRun(run);
   $('#over-dist').textContent = fmtInt(run.distance) + 'm';
-  $('#over-score').textContent = fmtInt(run.score);
+  countUp($('#over-score'), run.score);
   $('#over-speed').textContent = run.maxSpeed + ' km/h';
   $('#over-escapes').textContent = String(run.escapes);
   $('#over-escapes-row').classList.toggle('hidden', run.escapes === 0);
@@ -442,6 +442,22 @@ const fmtInt = (n) => Math.floor(n).toLocaleString('en-US');
 const buzz = (p) => {
   if (touchSeen && !renderer.reducedMotion) navigator.vibrate?.(p);
 };
+// Score ticks up on the results card (instant under reduced motion).
+function countUp(el, target) {
+  if (renderer.reducedMotion || target <= 0) {
+    el.textContent = fmtInt(target);
+    return;
+  }
+  const t0 = performance.now(), dur = 700;
+  const tick = (t) => {
+    const k = Math.min(1, (t - t0) / dur);
+    el.textContent = fmtInt(target * (1 - Math.pow(1 - k, 3)));
+    if (k < 1 && mode === 'over') requestAnimationFrame(tick);
+    else el.textContent = fmtInt(target);
+  };
+  requestAnimationFrame(tick);
+}
+
 const fmtTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
 
 // A small yeti waving from the corner of the logo.
@@ -478,6 +494,8 @@ function applySettings() {
   $('#opt-sfx').value = s.sfx;
   $('#opt-motion').checked = s.reducedMotion;
   $('#opt-effects').checked = s.effects;
+  $('#opt-assist').checked = s.assist;
+  if (game) game.assist = s.assist;
   $('#opt-touch').value = s.touch;
   $('#opt-steer').value = s.touchSteer;
   $('#opt-seed-mode').value = s.seedMode;
@@ -500,6 +518,7 @@ function bindOptions() {
   });
   $('#opt-motion').addEventListener('change', (e) => change({ reducedMotion: e.target.checked }));
   $('#opt-effects').addEventListener('change', (e) => change({ effects: e.target.checked }));
+  $('#opt-assist').addEventListener('change', (e) => change({ assist: e.target.checked }));
   $('#opt-touch').addEventListener('change', (e) => change({ touch: e.target.value }));
   $('#opt-steer').addEventListener('change', (e) => change({ touchSteer: e.target.value }));
   $('#opt-seed-mode').addEventListener('change', (e) => {

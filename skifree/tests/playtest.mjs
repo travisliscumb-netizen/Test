@@ -15,6 +15,9 @@ const { server, url } = await serve(ROOT);
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--enable-precise-memory-info'] });
 const errors = [];
 const watch = (page, label) => {
+  // Web fonts are progressive enhancement (system fonts stand in) and the
+  // test sandbox can't reach Google Fonts: serve an empty stylesheet.
+  page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   page.on('console', (m) => m.type() === 'error' && errors.push(`[${label}] ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`[${label}] ${e}`));
   page.on('requestfailed', (r) => errors.push(`[${label}] request failed ${r.url()}`));

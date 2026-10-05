@@ -184,6 +184,8 @@ export function drawStatic(ctx, o) {
 function pine(ctx, w, h, tiers, snowy, v) {
   const rng = new Rng(1000 + v * 17 + w);
   shadow(ctx, w * 0.14, 1, w * 0.55, w * 0.19);
+  // Snow drifted up around the base, with a little ambient occlusion.
+  ellipse(ctx, 0, 0.5, w * 0.3, w * 0.09, 'rgba(70, 100, 150, 0.22)');
   // Trunk, rounded by a gradient.
   const tg = ctx.createLinearGradient(-w * 0.07, 0, w * 0.07, 0);
   tg.addColorStop(0, '#8a5a32');
@@ -245,6 +247,20 @@ function pine(ctx, w, h, tiers, snowy, v) {
       ellipse(ctx, cx - hw * 0.55, yb - 1.8, hw * 0.28, 1.4, '#ffffff');
     }
   }
+  // Drift heaped against the trunk, in front of the lowest needles.
+  const dg = ctx.createLinearGradient(0, -5, 0, 2);
+  dg.addColorStop(0, '#ffffff');
+  dg.addColorStop(1, '#dde8f4');
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.2, 1.5);
+  ctx.quadraticCurveTo(-w * 0.1, -h * 0.05, 0, -h * 0.045);
+  ctx.quadraticCurveTo(w * 0.12, -h * 0.06, w * 0.22, 1.5);
+  ctx.closePath();
+  ctx.fillStyle = dg;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120, 150, 195, 0.6)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
 }
 
 function deadTree(ctx, v) {

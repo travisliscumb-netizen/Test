@@ -12,10 +12,10 @@ export const CONFIG = {
   PLAYER_SPEED: 15 * M,              // top cruising speed pointed straight down
   PLAYER_ACCELERATION: 5.2 * M,      // speed gained per second below target
   PLAYER_FRICTION: 6 * M,            // speed lost per second above target
-  PLAYER_TURN_RATE: 3.4,             // rad/s of heading change at walking pace
+  PLAYER_TURN_RATE: 4.1,             // rad/s of heading change at walking pace
   PLAYER_TURN_SPEED_REF: 13 * M,     // turning halves around this speed
-  PLAYER_MIN_TURN_RATE: 1.25,        // turning never drops below this
-  PLAYER_GRIP: 7.5,                  // rad/s the travel direction chases the skis
+  PLAYER_MIN_TURN_RATE: 1.7,        // turning never drops below this
+  PLAYER_GRIP: 9,                  // rad/s the travel direction chases the skis
   PLAYER_GRIP_SPEED_REF: 16 * M,     // grip halves around this speed
   PLAYER_SKID_DECEL: 11 * M,         // speed scrubbed per second when fully sideways
   PLAYER_STOP_ANGLE: 78 * DEG,       // skis past this are "across the hill" and stop
@@ -24,13 +24,17 @@ export const CONFIG = {
   PLAYER_TUCK_TURN_RATE: 2.6,        // rad/s the skis swing downhill while holding up
   PLAYER_BRAKE_DECEL: 13 * M,        // speed lost per second while braking
   PLAYER_START_PUSH: 3 * M,          // initial shove so the run starts moving
-  COLLISION_RADIUS: 6,               // the skier's footprint
+  COLLISION_RADIUS: 5,
+  // Steering assist: a gentle automatic nudge around obstacles you're about
+  // to hit. On by default; switch off in Options for the raw feel.
+  ASSIST_LOOKAHEAD: 0.42,            // seconds of travel it watches
+  ASSIST_STRENGTH: 4,                // rad/s of correction at most               // the skier's footprint
 
   // ----------------------------------------------------------------- turbo
   TURBO_SPEED: 25 * M,
   TURBO_ACCELERATION: 11 * M,
-  TURBO_TURN_MULT: 0.55,             // turning while on the F key
-  TURBO_GRIP_MULT: 0.6,              // and it slides more
+  TURBO_TURN_MULT: 0.72,             // turning while on the F key
+  TURBO_GRIP_MULT: 0.75,              // and it slides more
 
   // ------------------------------------------------------------------ jump
   GRAVITY_AIR: 1450,                 // u/s^2 pulling an airborne skier down
@@ -39,7 +43,7 @@ export const CONFIG = {
   RAMP_VELOCITY_MIN: 360,
   RAMP_VELOCITY_PER_SPEED: 1.35,     // extra launch per u/s of ground speed
   AIR_TURN_MULT: 0.45,
-  LAND_SAFE_ANGLE: 62 * DEG,         // landing more sideways than this is a wipeout
+  LAND_SAFE_ANGLE: 78 * DEG,         // landing more sideways than this is a wipeout
   STYLE_PER_AIR_SECOND: 60,
   STYLE_RAMP_BONUS: 20,
   STYLE_GATE: 10,
@@ -60,41 +64,41 @@ export const CONFIG = {
   COURSE_LANE_HALF: 40 * M,          // stray further than this and the run is void
 
   // ------------------------------------------------------------ collisions
-  CRASH_TIME_BASE: 0.55,             // seconds face-down after a hard hit
+  CRASH_TIME_BASE: 0.4,             // seconds face-down after a hard hit
   CRASH_TIME_PER_SPEED: 0.0016,      // + this per u/s at impact
-  CRASH_TIME_MAX: 1.3,
-  TUMBLE_TIME: 0.45,                 // lighter trips (stumps, dogs, moguls)
-  RECOVER_TIME: 0.32,                // getting back up
-  GRACE_TIME: 0.8,                   // ghost through obstacles after standing up
+  CRASH_TIME_MAX: 0.85,
+  TUMBLE_TIME: 0.32,                 // lighter trips (stumps, dogs, moguls)
+  RECOVER_TIME: 0.24,                // getting back up
+  GRACE_TIME: 1.3,                   // ghost through obstacles after standing up
   CRASH_KNOCKBACK: 90,               // u/s sideways shove off a hard obstacle
   CRASH_SPEED_KEEP: 0.08,
   TUMBLE_SPEED_KEEP: 0.45,
   MOGUL_BOUNCE: 150,
   MOGUL_SPEED_LOSS: 0.1,
   MOGUL_WIPEOUT_SPEED: 21 * M,       // above this a mogul can take you down
-  MOGUL_WIPEOUT_CHANCE: 0.35,
+  MOGUL_WIPEOUT_CHANCE: 0.12,
 
   // ------------------------------------------------------------------ yeti
   YETI_TRIGGER_DISTANCE: 2000,       // metres downhill before the first yeti
   YETI_RETURN_DISTANCE: 700,         // metres after an escape before it returns
   // Like the original, dawdling or leaving the mountain also summons it.
-  YETI_STALL_TIME: 30,               // seconds without real downhill progress...
+  YETI_STALL_TIME: 40,               // seconds without real downhill progress...
   YETI_STALL_PROGRESS: 20,           // ...of at least this many metres
-  YETI_STALL_WARN: 20,               // a distant roar this long into a stall
+  YETI_STALL_WARN: 28,               // a distant roar this long into a stall
   YETI_WANDER_X: 900 * M,            // this far sideways from the lodge
   YETI_STALL_GRACE_METERS: 40,       // no stall clock at the trailhead
-  YETI_SPEED: 17.2 * M,              // beats cruising, loses to turbo
-  YETI_SPEED_STEP: 0.04,             // +4% every time it comes back
-  YETI_SPEED_STEP_MAX: 0.16,
-  YETI_ACCELERATION: 14 * M,
+  YETI_SPEED: 14.2 * M,              // a touch under cruising: ski clean and you stay ahead
+  YETI_SPEED_STEP: 0.03,             // +3% every time it comes back
+  YETI_SPEED_STEP_MAX: 0.09,
+  YETI_ACCELERATION: 10 * M,
   YETI_TURN_RATE: 4.2,
-  YETI_START_DISTANCE: 520,          // u behind the player when it appears
-  YETI_CATCH_RADIUS: 20,
+  YETI_START_DISTANCE: 680,          // u behind the player when it appears
+  YETI_CATCH_RADIUS: 16,
   YETI_REACH_HEIGHT: 34,             // a skier higher than this sails over its arms
-  YETI_ESCAPE_DISTANCE: 1150,        // u of separation that counts as losing it...
-  YETI_ESCAPE_TIME: 2.5,             // ...held this long
+  YETI_ESCAPE_DISTANCE: 950,        // u of separation that counts as losing it...
+  YETI_ESCAPE_TIME: 2,             // ...held this long
   YETI_LEAD_TIME: 0.7,               // max seconds it predicts ahead
-  YETI_CATCHUP_BONUS: 0.1,           // mild pace boost while far behind (not vs turbo)
+  YETI_CATCHUP_BONUS: 0.04,           // mild pace boost while far behind (not vs turbo)
   YETI_CATCHUP_DISTANCE: 750,
   YETI_STUMBLE_TIME: 0.75,
   YETI_STUMBLE_SPEED_KEEP: 0.3,
@@ -145,7 +149,7 @@ export const CONFIG = {
   // yeti (24u). That guarantee is checked by tests/sim.mjs.
   CELL_MARGIN: 21,
   REGION_CHUNKS: 6,                  // biome patches are this many chunks square
-  OBJECT_DENSITY: 1,                 // global multiplier on every biome
+  OBJECT_DENSITY: 0.82,                 // global multiplier on every biome
   DENSITY_RAMP_METERS: 1600,         // density grows to full over this distance
   START_CLEAR_RADIUS: 34 * M,
   START_EASY: 260 * M,               // lighter biomes for the opening stretch

@@ -722,6 +722,10 @@ export class Renderer {
       ctx.translate(o.x, o.y);
       if (it.k === 2) {
         playerIndex = i;
+        ctx.restore();
+        this.drawTrail(ctx, o);
+        ctx.save();
+        ctx.translate(o.x, o.y);
         this.drawPlayer(ctx, o);
       } else if (it.k === 1) {
         if (o.kind === 'dog') drawDog(ctx, o);
@@ -741,6 +745,25 @@ export class Renderer {
       ctx.globalAlpha = 0.45;
       ctx.translate(p.x, p.y);
       this.drawPlayer(ctx, p);
+      ctx.restore();
+    }
+  }
+
+  // Speed trail: faint afterimages behind the skier on turbo.
+  drawTrail(ctx, p) {
+    if (this.reducedMotion || !p.turbo || p.speed < this.cfg.PLAYER_SPEED * 1.15 || p.state !== 'ski') {
+      this.trail = [];
+      return;
+    }
+    this.trail = this.trail || [];
+    this.trail.push({ x: p.x, y: p.y, heading: p.heading });
+    if (this.trail.length > 10) this.trail.shift();
+    for (let i = 0; i < this.trail.length - 2; i += 3) {
+      const t = this.trail[i];
+      ctx.save();
+      ctx.globalAlpha = 0.1 + i * 0.025;
+      ctx.translate(t.x, t.y);
+      drawSkier(ctx, { ...p, heading: t.heading, outfit: 0 });
       ctx.restore();
     }
   }
@@ -837,6 +860,24 @@ export class Renderer {
         this.vignette = cv;
       }
       ctx.drawImage(this.vignette, 0, 0, W, H);
+      // Colour grade: warm low sun from the upper left, cool sky-shade
+      // toward the lower right. Baked once, stretched to the screen.
+      if (!this.grade) {
+        const cv = makeCanvas(64, 64);
+        const g2 = cv.getContext('2d');
+        const warm = g2.createRadialGradient(0, 0, 0, 0, 0, 70);
+        warm.addColorStop(0, 'rgba(255, 214, 160, 0.16)');
+        warm.addColorStop(1, 'rgba(255, 214, 160, 0)');
+        g2.fillStyle = warm;
+        g2.fillRect(0, 0, 64, 64);
+        const cool = g2.createRadialGradient(64, 64, 0, 64, 64, 80);
+        cool.addColorStop(0, 'rgba(90, 130, 210, 0.12)');
+        cool.addColorStop(1, 'rgba(90, 130, 210, 0)');
+        g2.fillStyle = cool;
+        g2.fillRect(0, 0, 64, 64);
+        this.grade = cv;
+      }
+      ctx.drawImage(this.grade, 0, 0, W, H);
     }
 
     // Turbo: faint speed streaks racing up the screen.

@@ -17,8 +17,9 @@
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --display: 'Arial Black', 'Segoe UI Black', 'Helvetica Neue', system-ui, sans-serif;
+  /* Rounded, friendly type; system fonts stand in until (or unless) they load. */
+  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --display: 'Fredoka', 'Nunito', 'Arial Black', system-ui, sans-serif;
   --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
 
@@ -75,9 +76,13 @@ body.mouse-aim #game { cursor: crosshair; }
   grid-template-columns: auto auto;
   gap: 2px 16px;
   padding: 9px 12px 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 253, 0.92));
-  border: 1.5px solid rgba(29, 37, 51, 0.85);
-  border-radius: 12px;
+  /* Frosted glass over the slope. */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(240, 246, 253, 0.62));
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  outline: 1px solid rgba(29, 37, 51, 0.12);
+  border-radius: 16px;
   box-shadow: var(--shadow);
   min-width: 190px;
 }
@@ -88,7 +93,7 @@ body.mouse-aim #game { cursor: crosshair; }
   text-transform: uppercase;
   color: var(--ink-soft);
 }
-#hud .stat b { font: 800 16px/1.2 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#hud .stat b { font: 800 17px/1.2 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap; }
 #speedo {
   grid-column: 1 / -1;
   margin-top: 5px;
@@ -221,6 +226,7 @@ body.touch-ui .toast {
 
 .logo {
   position: relative;
+  font-weight: 700 !important;
   display: inline-block;
   margin: 0 0 2px;
   font-family: var(--display);
@@ -234,6 +240,8 @@ body.touch-ui .toast {
   animation: logo-bob 4s ease-in-out infinite;
 }
 @keyframes logo-bob { 50% { transform: rotate(-3deg) translateY(-4px); } }
+#title .peaks .far { animation: drift 40s ease-in-out infinite alternate; }
+@keyframes drift { to { transform: translateX(-60px); } }
 .logo span {
   -webkit-text-stroke: 0.05em var(--ink);
   /* drop-shadow, not text-shadow: text-shadow paints over clipped gradients. */
@@ -397,7 +405,7 @@ kbd {
 .over-head h2 { margin: 0; font: 900 26px/1.1 var(--display); font-style: italic; }
 .score-big { display: grid; justify-items: center; margin: 2px 0 10px; }
 .score-big span { font: 800 11px/1.2 var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
-.score-big b { font: 900 44px/1.05 var(--mono); font-variant-numeric: tabular-nums; }
+.score-big b { font: 700 48px/1.05 var(--display); font-variant-numeric: tabular-nums; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin: 0 0 14px; }
 .tiles div { background: #f3f7fc; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; text-align: center; }
 .tiles dt { font: 800 9.5px/1.2 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
@@ -522,7 +530,7 @@ body.touch-ui .desktop-only { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .toast, .card { animation: none; }
-  .logo, .chip.yeti { animation: none; }
+  .logo, .chip.yeti, #title .peaks .far { animation: none; }
   .btn { transition: none; }
 }
 

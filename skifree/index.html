@@ -13,6 +13,9 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
@@ -48,7 +51,7 @@
       </defs>
       <rect width="1200" height="260" fill="url(#sky)"/>
       <circle cx="930" cy="70" r="34" fill="#fff6d6" opacity="0.9"/>
-      <path d="M0 200 L90 120 L150 160 L260 70 L360 150 L430 110 L540 175 L640 90 L760 160 L850 100 L980 170 L1080 105 L1200 160 L1200 260 L0 260Z" fill="url(#far)"/>
+      <g class="far"><path d="M0 200 L90 120 L150 160 L260 70 L360 150 L430 110 L540 175 L640 90 L760 160 L850 100 L980 170 L1080 105 L1200 160 L1200 260 L0 260Z" fill="url(#far)"/></g>
       <path d="M0 230 L120 150 L200 190 L320 120 L420 200 L520 150 L600 205 L720 140 L840 210 L960 150 L1060 200 L1200 150 L1200 260 L0 260Z" fill="url(#near)" stroke="#c9d8ea" stroke-width="2"/>
       <path d="M320 120 L300 138 L318 134 L332 146 L340 133 Z M720 140 L700 158 L716 155 L730 164 L738 152 Z M120 150 L104 164 L120 160 L130 168 Z" fill="#dbe7f5"/>
     </svg>
@@ -103,6 +106,10 @@
           <label>Master volume <input type="range" id="opt-master" min="0" max="1" step="0.05"></label>
           <label>Music <input type="range" id="opt-music" min="0" max="1" step="0.05"></label>
           <label>Sound effects <input type="range" id="opt-sfx" min="0" max="1" step="0.05"></label>
+        </fieldset>
+        <fieldset>
+          <legend>Gameplay</legend>
+          <label class="check"><input type="checkbox" id="opt-assist"> Steering assist <small>Gently eases you around trees and rocks you're about to hit.</small></label>
         </fieldset>
         <fieldset>
           <legend>Visuals</legend>

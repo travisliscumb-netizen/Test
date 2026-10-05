@@ -304,8 +304,11 @@ function yetiTrial(seed, brain, at = 30) {
 
   // 2. Good skiing at cruising speed: the yeti catches up eventually.
   const cruise = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'never' })));
+  // Tuned to be friendly: clean cruising keeps you ahead; dawdling doesn't.
   const caught = cruise.filter((r) => r.caughtT !== null);
-  check('cruising without turbo, the yeti catches you (mostly)', caught.length >= Math.ceil(seeds.length * 0.75), `${caught.length}/${seeds.length} caught; median ${median(caught.map((r) => r.caughtT - r.spawnT)).toFixed(1)} s`);
+  check('clean cruising keeps you ahead of the yeti (mostly)', caught.length <= Math.floor(seeds.length * 0.34), `${caught.length}/${seeds.length} caught`);
+  const slow = seeds.map((s) => yetiTrial(s, (g, i) => ({ ...autopilot(g, { turbo: 'never' }), down: i % 10 < 4 }), 0));
+  check('a skier who keeps braking gets caught', slow.filter((r) => r.caughtT !== null).length >= Math.ceil(seeds.length * 0.75), `${slow.filter((r) => r.caughtT !== null).length}/${seeds.length}`);
 
   // 3. Turbo is the escape.
   const turbo = seeds.map((s) => yetiTrial(s, (g) => autopilot(g, { turbo: 'yeti' })));
@@ -358,11 +361,11 @@ function yetiTrial(seed, brain, at = 30) {
   g.player.grace = 999;
   run(g, 0.01, () => ({}));
   g.player.y = 80 * METER; // below the trailhead grace zone
-  const slog = run(g, 40, () => ({ left: true }));
+  const slog = run(g, CONFIG.YETI_STALL_TIME + 10, () => ({ left: true }));
   const warnT = slog.find((e) => e.type === 'yetiwarn')?.t ?? null;
   const ye = slog.find((e) => e.type === 'yeti');
   const yetiT = ye?.t ?? null, reason = ye?.reason ?? null;
-  check('stalling summons the yeti after ~30 s, with a warning first', reason === 'stall' && warnT !== null && warnT < yetiT && Math.abs(yetiT - CONFIG.YETI_STALL_TIME) < 3, `warn ${warnT?.toFixed(1)} s, yeti ${yetiT?.toFixed(1)} s (${reason})`);
+  check('stalling summons the yeti, with a warning first', reason === 'stall' && warnT !== null && warnT < yetiT && Math.abs(yetiT - CONFIG.YETI_STALL_TIME) < 3, `warn ${warnT?.toFixed(1)} s, yeti ${yetiT?.toFixed(1)} s (${reason})`);
 
   // Walking across the trailhead to Tree Slalom is not dawdling.
   const walk = new Game({ seed: 12345 });
@@ -486,6 +489,24 @@ function yetiTrial(seed, brain, at = 30) {
     return { up: true };
   });
   check('leaving the course voids the run', log.some((e) => e.type === 'courseabort'));
+}
+
+// ------------------------------------------------------- steering assist
+{
+  // Ski straight down with no input through real terrain: assist should
+  // avoid most of what an unassisted skier hits.
+  const crashes = (assist) => {
+    let n = 0;
+    for (const seed of [91, 92, 93, 94]) {
+      const g = new Game({ seed, demo: true, assist });
+      g.player.x = -3500 + seed * 400; // well away from the courses and lift
+      g.player.y = 6000; // past the friendly start, into real terrain
+      n += run(g, 40, () => ({ up: true })).filter((e) => e.type === 'hit').length;
+    }
+    return n;
+  };
+  const off = crashes(false), on = crashes(true);
+  check('steering assist avoids most crashes for a hands-off skier', on < off * 0.5, `${off} crashes without, ${on} with`);
 }
 
 // ------------------------------------------------------- modern systems
