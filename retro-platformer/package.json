@@ -1,0 +1,23 @@
+{
+  "name": "retro-platformer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sprout Quest: an original side-scrolling platformer with classic 8-bit game feel.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "vite-plugin-singlefile": "2.3.3",
+    "vitest": "5.0.3"
+  }
+}

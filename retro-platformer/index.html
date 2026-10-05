@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sprout Quest" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Sprout Quest: an original side-scrolling platformer with classic 8-bit game feel." />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='10' r='5' fill='%23e89a2a'/%3E%3Cellipse cx='5' cy='4' rx='3' ry='1.6' fill='%233fa34d'/%3E%3Cellipse cx='11' cy='3.5' rx='3' ry='1.6' fill='%2386dd6c'/%3E%3Crect x='7.5' y='3.5' width='1' height='3' fill='%2324693a'/%3E%3C/svg%3E"
+    />
+    <title>Sprout Quest</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-text-size-adjust: 100%;
+      }
+      #screen {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      #safe-probe {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        padding-top: env(safe-area-inset-top, 0px);
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #touch {
+        position: fixed;
+        inset: 0;
+        display: none;
+        touch-action: none;
+        --btn: min(17vmin, 96px);
+        --edge: max(16px, env(safe-area-inset-left, 0px));
+        --edge-r: max(16px, env(safe-area-inset-right, 0px));
+        --edge-b: max(14px, env(safe-area-inset-bottom, 0px));
+      }
+      #touch.active {
+        display: block;
+      }
+      #touch .zone {
+        position: absolute;
+        box-sizing: border-box;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        background: rgba(20, 16, 36, 0.28);
+        color: rgba(255, 255, 255, 0.8);
+        font: 700 20px/1 ui-monospace, Menlo, monospace;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+      #touch .zone.down {
+        background: rgba(255, 255, 255, 0.28);
+        border-color: rgba(255, 255, 255, 0.7);
+      }
+      #touch .pad {
+        left: var(--edge);
+        bottom: var(--edge-b);
+        width: min(46vmin, 260px);
+        height: min(20vmin, 112px);
+        border-radius: 22px;
+        justify-content: space-between;
+        padding: 0 14px;
+        font-size: 26px;
+      }
+      #touch .pad .run {
+        opacity: 0.55;
+      }
+      #touch .btn {
+        width: var(--btn);
+        height: var(--btn);
+        border-radius: 50%;
+        font-size: 24px;
+      }
+      #touch .jump {
+        right: var(--edge-r);
+        bottom: calc(var(--edge-b) + var(--btn) * 0.32);
+      }
+      #touch .runbtn {
+        right: calc(var(--edge-r) + var(--btn) * 1.1);
+        bottom: var(--edge-b);
+      }
+      #touch .small {
+        top: max(10px, env(safe-area-inset-top, 0px));
+        width: 44px;
+        height: 36px;
+        border-radius: 10px;
+        font-size: 15px;
+      }
+      #touch .pause {
+        right: var(--edge-r);
+      }
+      #touch .mute {
+        right: calc(var(--edge-r) + 54px);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="screen" aria-label="Sprout Quest game screen"></canvas>
+    <div id="safe-probe"></div>
+    <div id="touch" aria-hidden="true">
+      <div class="zone pad" data-zone="pad"><span class="run">«</span><span>◀</span><span></span><span>▶</span><span class="run">»</span></div>
+      <div class="zone btn runbtn" data-zone="run">B</div>
+      <div class="zone btn jump" data-zone="jump">A</div>
+      <div class="zone small mute" data-zone="mute">♪</div>
+      <div class="zone small pause" data-zone="pause">II</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
