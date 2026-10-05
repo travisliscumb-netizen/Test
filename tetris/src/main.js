@@ -943,7 +943,8 @@ async function boot() {
   goTitle();
   requestAnimationFrame((t) => { last = t; loop(t); });
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  // The single-file build (tools/single.mjs) has no sw.js next to it.
+  if (!window.__SINGLE_FILE__ && 'serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }

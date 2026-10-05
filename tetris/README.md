@@ -18,6 +18,8 @@ cd tetris && node tools/serve.mjs 8080
 
 Then open <http://localhost:8080/>. WebGL 2 is required.
 
+**One-file version.** `npm run single` writes `dist/tetris-3d.html`: the whole game (three.js, code, styles, fonts, icon) in a single ~820 KB HTML file that runs on its own: double-clicked from disk, attached to a message, or inside a sandboxed preview. It needs `npm install` first (for esbuild). In that build saved records and settings only persist where the host page allows storage.
+
 ## Tests
 
 ```
@@ -93,7 +95,7 @@ tetris/
   vendor/three.js   tree-shaken three.js r186 + addons (generated: npm run vendor)
   fonts/            Orbitron + Exo 2, SIL OFL (generated: npm run vendor)
   icons/            icon.svg + PNGs (generated: npm run icons)
-  tools/            vendor bundler, icon renderer, static server
+  tools/            vendor bundler, one-file builder, icon renderer, static server
   tests/            engine.test.mjs (node --test), e2e.mjs (Playwright)
 ```
 

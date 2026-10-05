@@ -9,7 +9,8 @@
     "icons": "node tools/icons.mjs",
     "test": "node --test tests/engine.test.mjs",
     "test:e2e": "node tests/e2e.mjs",
-    "serve": "node tools/serve.mjs"
+    "serve": "node tools/serve.mjs",
+    "single": "node tools/single.mjs"
   },
   "devDependencies": {
     "@fontsource/exo-2": "5.3.0",
