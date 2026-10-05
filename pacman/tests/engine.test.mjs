@@ -201,18 +201,19 @@ test('every maze is sound: sealed, connected, no dead ends, fixed house and spaw
 test('easy mode: more lives, repeating extra lives, slower ghosts, longer fright everywhere', () => {
   const easy = new Game({ difficulty: 'easy' });
   const arcade = new Game();
-  assert.equal(easy.lives, 4);
+  assert.equal(easy.lives + 1, 8, 'eight lives on easy');
   assert.equal(arcade.lives, 2);
   easy.addScore(10000);
   easy.addScore(10000);
-  assert.equal(easy.lives, 6, 'a life at 10k and again at 20k');
+  assert.equal(easy.lives, 9, 'a life at 10k and again at 20k');
   arcade.addScore(10000);
   arcade.addScore(10000);
   assert.equal(arcade.lives, 3, 'arcade awards only one');
   for (let level = 1; level <= 25; level++) {
     const e = levelSpec(level, DIFFICULTY.easy), a = levelSpec(level);
     assert.ok(e.speed.ghost < a.speed.ghost, `ghosts slower on level ${level}`);
-    assert.ok(e.frightFrames >= 4 * 60, `fright at least 4 s on level ${level}`);
+    assert.ok(e.frightFrames >= 6 * 60, `fright at least 6 s on level ${level}`);
+    assert.ok(e.speed.pac > a.speed.pac, 'pac a little faster');
     assert.ok(e.frightFrames >= a.frightFrames);
     assert.equal(e.elroy1Dots, -1, 'no cruise elroy');
     assert.ok(e.houseLimits[1] > a.houseLimits[1] && e.idleLimit > a.idleLimit, 'slower release');
@@ -231,7 +232,7 @@ test('easy mode: an eaten ghost rests in the house before coming back out', () =
     if (blinky.state === 'leaving') left = true;
   }
   assert.ok(left, 'eventually leaves');
-  assert.ok(restFrames >= 5 * 60 - 1, `rested ${restFrames} frames`);
+  assert.ok(restFrames >= 7 * 60 - 1, `rested ${restFrames} frames`);
 });
 
 test('easy mode: a dangerous ghost must overlap Pac-Man, not merely share a tile', () => {
@@ -240,7 +241,7 @@ test('easy mode: a dangerous ghost must overlap Pac-Man, not merely share a tile
   const gh = g.ghosts[0];
   gh.state = 'active';
   g.pac.x = 9 * 8 + 1; g.pac.y = 5 * 8 + 4;
-  gh.x = 9 * 8 + 7; gh.y = 5 * 8 + 4;                   // same tile, 6 apart
+  gh.x = 9 * 8 + 7; gh.y = 5 * 8 + 4;                   // same tile, 6 apart (radius 5)
   assert.equal(g.checkCollisions(), false);
   gh.x = 9 * 8 + 5;                                     // 4 apart: real overlap
   assert.equal(g.checkCollisions(), true);
@@ -267,4 +268,20 @@ test('easy autopilot gets much further than arcade and reaches every maze', () =
   }
   assert.ok(easy >= arcade * 2, `easy reached ${easy / 4} on average vs arcade ${arcade / 4}`);
   assert.ok(seen.size >= 3, `easy runs visited ${[...seen].join(', ')}`);
+});
+
+test('easy mode refills to eight lives at every new level; arcade does not', () => {
+  const g = new Game({ difficulty: 'easy' });
+  g.lives = 1;
+  g.drainEvents();
+  g.nextLevel();
+  assert.equal(g.lives + 1, 8);
+  assert.ok(g.drainEvents().some((e) => e.type === 'livesRefilled'));
+  g.lives = 11;
+  g.nextLevel();
+  assert.equal(g.lives, 11, 'bonus lives above eight are kept');
+  const a = new Game();
+  a.lives = 0;
+  a.nextLevel();
+  assert.equal(a.lives, 0);
 });

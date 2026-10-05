@@ -41,6 +41,7 @@ const ui = {
   best: $('#hud-best'),
   level: $('#hud-level'),
   lives: $('#hud-lives'),
+  progress: $('#hud-progress'),
   fruit: $('#hud-fruit'),
   dpad: $('#dpad'),
   toast: $('#toast'),
@@ -129,7 +130,7 @@ function startGame() {
   state.overIn = -1;
   state.acc = 0;
   renderer.fx.reset();
-  state.hud = { shown: 0, best: -1, lives: -1, level: -1 };
+  state.hud = { shown: 0, best: -1, lives: -1, level: -1, progress: -1 };
   refreshScreens();
   document.activeElement?.blur?.();
 }
@@ -250,6 +251,9 @@ function handleEvents(g) {
       case 'extraLife':
         if (live) { sound.extraLife(); toast('Extra life!'); }
         break;
+      case 'livesRefilled':
+        if (live) toast(`Lives restored · ${e.lives}`);
+        break;
       case 'death':
         if (settings.shake && !reducedMotion.matches) fx.shake = 1.6;
         if (live) buzz([50, 40, 110]);
@@ -359,6 +363,7 @@ function setSetting(key, value) {
   if (key === 'sound') sound.setEnabled(value);
   if (key === 'volume') sound.setVolume(value);
   if (key === 'lighting') renderer.quality = value ? 'high' : 'low';
+  if (key === 'difficulty') refreshModeChip();
   if (key === 'dpad') layout();
   syncSettings();
 }
@@ -626,11 +631,25 @@ function updateHud(dt) {
   }
   const best = Math.max(highScore(), g.score);
   if (h.best !== best) { h.best = best; ui.best.textContent = best.toLocaleString('en-US'); }
+  /* Lives: one icon and a count, so eight (or more) never crowd the bar. */
   if (h.lives !== g.lives) {
+    const gained = h.lives >= 0 && g.lives > h.lives;
     h.lives = g.lives;
-    ui.lives.replaceChildren(...Array.from({ length: Math.min(g.lives, 6) }, () =>
-      iconCanvas(20, (c) => drawPac(c, 8, 8, 6.6, 0.6, 1))));
+    const count = document.createElement('span');
+    count.className = 'lives-count';
+    const x = document.createElement('small');
+    x.textContent = '×';
+    count.append(x, String(g.lives + (g.phase === 'gameover' ? 0 : 1)));
+    ui.lives.replaceChildren(iconCanvas(22, (c) => drawPac(c, 8, 8, 6.8, 0.6, 3)), count);
+    ui.lives.setAttribute('aria-label', `${g.lives + 1} lives`);
+    if (gained) {
+      ui.lives.classList.remove('refill');
+      void ui.lives.offsetWidth;
+      ui.lives.classList.add('refill');
+    }
   }
+  const p = Math.round((g.dotsEaten / g.maze.totalDots) * 100) / 100;
+  if (h.progress !== p) { h.progress = p; ui.progress.style.setProperty('--p', String(p)); }
   if (h.level !== g.level) {
     h.level = g.level;
     ui.level.textContent = String(g.level);
@@ -747,6 +766,12 @@ function frame(now) {
 
 /* --------------------------------------------------------------- boot */
 
+function refreshModeChip() {
+  const arcade = settings.difficulty === 'arcade';
+  $('#mode-chip').classList.toggle('arcade', arcade);
+  $('#mode-text').textContent = arcade ? 'Arcade · the original rules' : 'Easy · 8 lives every level';
+}
+
 function refreshTitleBest() {
   const best = highScore();
   $('#title-best').hidden = !best;
@@ -756,6 +781,7 @@ function refreshTitleBest() {
 async function boot() {
   newDemo();
   refreshTitleBest();
+  refreshModeChip();
   syncSettings();
   layout();
   try {
