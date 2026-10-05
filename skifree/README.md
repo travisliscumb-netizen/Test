@@ -75,10 +75,10 @@ build command empty.
   real downhill progress, with a warning roar at 28 s) or wander off the side
   of the mountain, just like the original. From behind, from the side, or from
   ahead; a HUD alert shows how far behind it is. It predicts where you're going, steers around trees it sees coming,
-  and is faster than you at cruising speed. On `F` you are faster than it, but
-  you steer like a shopping trolley. Trees it doesn't dodge knock it flat. Stay
-  far enough ahead for long enough and it gives up (+500 style). It comes back
-  700 m later, a little faster each time. If it catches you it eats you.
+  and on `F` you are always faster than it, but you steer like a shopping
+  trolley. Trees it doesn't dodge knock it flat. Stay far enough ahead for long
+  enough and it gives up (+500 style) until the next mark. If it catches you
+  it eats you.
 - **Score** = metres travelled + style (air time, ramp jumps, slalom gates,
   Yeti escapes). Best score, longest run and top speed are saved locally.
 
