@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { maxIndex, type IndexedImage } from "../src/gfx/indexed";
 import type { SpriteSheet } from "../src/gfx/palette";
 import { BACKGROUNDS } from "../src/gfx/backgrounds";
@@ -138,8 +140,15 @@ describe("font", () => {
     }
   });
 
-  it("covers everything the game prints", () => {
-    const strings = ["SCORE", "COINS", "LEVEL", "TIME", "PAUSED", "GAME OVER", "SPROUT QUEST", "THANK YOU FOR PLAYING!", "0123456789", "×", "/", ":", "1UP"];
-    for (const s of strings) for (const ch of s) expect(FONT_CHARS).toContain(ch.toUpperCase());
+  it("covers every string literal the renderer draws", () => {
+    // Scan the renderer's source for quoted and template literals and check each character.
+    const src = readFileSync(resolve(__dirname, "../src/render/renderer.ts"), "utf8");
+    const literals = [...src.matchAll(/"([^"\n]*)"|`([^`\n]*)`/g)]
+      .map((m) => (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, ""))
+      .filter((s) => /^[A-Z0-9 ×:/().!?'&+-]*$/.test(s) && /[A-Z]/.test(s));
+    expect(literals.length).toBeGreaterThan(10);
+    for (const text of [...literals, "0123456789", "1UP"]) {
+      for (const ch of text) expect(FONT_CHARS, `'${ch}' in "${text}"`).toContain(ch.toUpperCase());
+    }
   });
 });

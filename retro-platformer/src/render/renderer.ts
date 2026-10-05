@@ -12,9 +12,12 @@ import type { Game } from "../game/game";
 import type { World } from "../game/world";
 import { FLAG_TOP_ROW } from "../world/level";
 import { Tile } from "../world/tiles";
-import { TILE, VIEW_HEIGHT } from "../tuning";
+import { RULES, TILE, VIEW_HEIGHT } from "../tuning";
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+/** View pixels kept clear at the HUD's right end for the on-screen mute and pause buttons. */
+const HUD_TOUCH_RESERVE = 150;
 
 /** Draws the game into the low-resolution frame. */
 export class Renderer {
@@ -242,20 +245,23 @@ export class Renderer {
 
   private drawHud(ctx: CanvasRenderingContext2D, game: Game, world: World, viewW: number): void {
     const s = game.session;
-    const cols = [16, viewW * 0.3, viewW * 0.52, viewW * 0.72];
     const t = this.text;
-    t.draw(ctx, "SCORE", cols[0]!, 10);
-    t.draw(ctx, String(s.score).padStart(7, "0"), cols[0]!, 30);
-    t.draw(ctx, "COINS", cols[1]!, 10);
-    ctx.drawImage(this.assets.hud.coin, Math.round(cols[1]!), 30, 18, 18);
-    t.draw(ctx, `×${String(s.coins).padStart(2, "0")}`, cols[1]! + 22, 30);
-    t.draw(ctx, "LEVEL", cols[2]!, 10);
-    t.draw(ctx, `${s.levelIndex + 1}/${game.levelCount}`, cols[2]!, 30);
-    t.draw(ctx, "TIME", cols[3]!, 10);
-    const hurry = world.time <= 100 && Math.floor(world.frame / 15) % 2 === 0;
-    t.draw(ctx, String(world.time).padStart(3, "0"), cols[3]!, 30, { color: hurry ? "#ff8a6a" : WHITE });
-    ctx.drawImage(this.assets.hud.life, viewW - 74, 28, 18, 18);
-    t.draw(ctx, `×${s.lives}`, viewW - 52, 30);
+    // Five even columns; on touch screens the top-right corner holds the mute and pause buttons.
+    const right = viewW - (game.touchMode ? HUD_TOUCH_RESERVE : 16);
+    const col = (i: number): number => Math.round(16 + ((right - 16) / 5) * i);
+    t.draw(ctx, "SCORE", col(0), 10);
+    t.draw(ctx, String(s.score).padStart(7, "0"), col(0), 30);
+    t.draw(ctx, "COINS", col(1), 10);
+    ctx.drawImage(this.assets.hud.coin, col(1), 30, 18, 18);
+    t.draw(ctx, `×${String(s.coins).padStart(2, "0")}`, col(1) + 22, 30);
+    t.draw(ctx, "LEVEL", col(2), 10);
+    t.draw(ctx, `${s.levelIndex + 1}/${game.levelCount}`, col(2), 30);
+    t.draw(ctx, "TIME", col(3), 10);
+    const hurry = world.time <= RULES.hurryAt && Math.floor(world.frame / 15) % 2 === 0;
+    t.draw(ctx, String(world.time).padStart(3, "0"), col(3), 30, { color: hurry ? "#ff8a6a" : WHITE });
+    t.draw(ctx, "LIVES", col(4), 10);
+    ctx.drawImage(this.assets.hud.life, col(4), 28, 18, 18);
+    t.draw(ctx, `×${s.lives}`, col(4) + 22, 30);
   }
 
   private drawTitle(ctx: CanvasRenderingContext2D, game: Game, viewW: number): void {

@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": [
-      "node"
+      "node",
+      "vite/client"
     ],
     "lib": [
       "ES2022",
@@ -10,6 +11,7 @@
     ]
   },
   "include": [
+    "tests",
     "e2e",
     "vite.config.ts",
     "playwright.config.ts"
