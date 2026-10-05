@@ -18,15 +18,15 @@ export function buildCavern(): Background {
     });
   }
 
-  const pillars = new PixelCanvas(W, 300);
+  const pillars = new PixelCanvas(W, 350);
   const r2 = seededRandom(61);
   for (let i = 0; i < 7; i++) {
     const x = Math.floor((i / 7) * W + r2() * 40);
     const w = 24 + Math.floor(r2() * 30);
     wrapped(W, (o) => {
-      pillars.rect(x + o, 0, w, 300, 1);
-      pillars.rect(x + o + Math.floor(w * 0.6), 0, Math.ceil(w * 0.4), 300, 2);
-      pillars.vline(x + o + 3, 0, 299, 3);
+      pillars.rect(x + o, 0, w, pillars.height, 1);
+      pillars.rect(x + o + Math.floor(w * 0.6), 0, Math.ceil(w * 0.4), pillars.height, 2);
+      pillars.vline(x + o + 3, 0, pillars.height - 1, 3);
     });
   }
   ridge(pillars, (x) => 200 + periodicNoise(W, 71, [[3, 20], [8, 8]])(x), 1, 2, 3);

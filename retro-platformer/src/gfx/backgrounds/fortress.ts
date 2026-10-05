@@ -5,10 +5,11 @@ import { periodicNoise, ridge, wrapped, type Background } from "./layers";
 export function buildFortress(): Background {
   const W = 720;
 
-  const stars = new PixelCanvas(W, 240);
+  // Wider than any view so only one moon is ever on screen.
+  const stars = new PixelCanvas(1600, 240);
   const rnd = seededRandom(111);
-  for (let i = 0; i < 90; i++) {
-    const x = Math.floor(rnd() * W);
+  for (let i = 0; i < 200; i++) {
+    const x = Math.floor(rnd() * stars.width);
     const y = Math.floor(rnd() * 240);
     stars.set(x, y, rnd() < 0.2 ? 2 : 1);
     if (rnd() < 0.08) {
@@ -39,7 +40,7 @@ export function buildFortress(): Background {
     });
   }
 
-  const ramparts = new PixelCanvas(W, 160);
+  const ramparts = new PixelCanvas(W, 180);
   ridge(ramparts, (x) => 70 + periodicNoise(W, 131, [[3, 10], [7, 4]])(x), 1);
   for (let x = 0; x < W; x += 24) {
     const t = Math.round(70 + periodicNoise(W, 131, [[3, 10], [7, 4]])(x));

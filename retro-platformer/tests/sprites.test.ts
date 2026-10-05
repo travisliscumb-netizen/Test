@@ -19,7 +19,7 @@ import { buildPipe } from "../src/gfx/sprites/tiles/pipe";
 import { buildStone } from "../src/gfx/sprites/tiles/stone";
 import { THEME_COLORS } from "../src/gfx/themes";
 import { THEMES } from "../src/world/level";
-import { PLAYER } from "../src/tuning";
+import { PLAYER, VIEW_HEIGHT, VIEW_MAX_WIDTH } from "../src/tuning";
 
 function opaque(img: IndexedImage): number {
   return img.pixels.reduce((n, p) => n + (p ? 1 : 0), 0);
@@ -109,6 +109,22 @@ describe("backgrounds", () => {
       let same = 0;
       for (let y = 0; y < height; y++) if (pixels[y * width] === pixels[y * width + width - 1]) same++;
       expect(same / height).toBeGreaterThan(0.85);
+    }
+  });
+
+  it.each(THEMES)("%s: an opaque layer covers the bottom of the view, so pits never show sky", (theme) => {
+    const covers = BACKGROUNDS[theme]().layers.some(({ image, y }) => {
+      if (y + image.height < VIEW_HEIGHT) return false;
+      const row = VIEW_HEIGHT - 1 - y;
+      for (let x = 0; x < image.width; x++) if (image.pixels[row * image.width + x] === 0) return false;
+      return true;
+    });
+    expect(covers).toBe(true);
+  });
+
+  it("layers holding a single landmark (sun, moon) are wider than the widest view", () => {
+    for (const theme of ["dusk", "fortress"] as const) {
+      expect(BACKGROUNDS[theme]().layers[0]!.image.width).toBeGreaterThan(VIEW_MAX_WIDTH);
     }
   });
 });

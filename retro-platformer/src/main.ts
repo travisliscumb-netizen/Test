@@ -7,6 +7,9 @@ import { Game } from "./game/game";
 import { bakeAssets } from "./gfx/assets";
 import { loadLevels } from "./levels";
 import { Renderer } from "./render/renderer";
+import { World } from "./game/world";
+import type { LevelData } from "./world/level";
+import { TILE } from "./tuning";
 
 const HIGH_SCORE_KEY = "sprout-quest:high-score";
 
@@ -88,6 +91,8 @@ function start(): void {
     }),
   };
 
+  if (import.meta.env.DEV) devWarp(g, levels);
+
   runLoop(
     () => {
       const c = hub.sample();
@@ -106,6 +111,27 @@ function start(): void {
       audio.pump();
     },
   );
+}
+
+/**
+ * Development only (stripped from production builds): `?level=2&x=40` jumps
+ * straight into level 2 with the hero dropped at column 40.
+ */
+function devWarp(g: Game, levels: readonly LevelData[]): void {
+  const params = new URLSearchParams(location.search);
+  const level = params.get("level");
+  if (level === null) return;
+  const index = Math.min(levels.length, Math.max(1, Number(level))) - 1;
+  g.session.levelIndex = index;
+  g.world = new World(levels[index]!, g.session, g.backdrop.camera.width);
+  g.mode = "play";
+  const tx = Number(params.get("x") ?? NaN);
+  if (Number.isFinite(tx)) {
+    const p = g.world.player;
+    p.x = p.prevX = tx * TILE;
+    p.y = p.prevY = 0;
+    g.world.camera.snapTo(p.x);
+  }
 }
 
 start();

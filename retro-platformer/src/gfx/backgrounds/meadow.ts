@@ -26,7 +26,7 @@ export function buildMeadow(): Background {
     if (t < 56) mountains.vline(x, t, Math.min(56, t + 6), 4);
   }
 
-  const hills = new PixelCanvas(W, 170);
+  const hills = new PixelCanvas(W, 230);
   const hillTop = periodicNoise(W, 17, [[3, 26], [6, 10]]);
   ridge(hills, (x) => 60 + hillTop(x), 2, 3, 3);
   ridge(hills, (x) => 110 + periodicNoise(W, 23, [[4, 14], [9, 5]])(x), 1, 2, 2);

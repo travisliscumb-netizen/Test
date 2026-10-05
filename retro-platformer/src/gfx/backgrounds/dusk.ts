@@ -5,7 +5,8 @@ import { cloud, periodicNoise, ridge, wrapped, type Background } from "./layers"
 export function buildDusk(): Background {
   const W = 800;
 
-  const sun = new PixelCanvas(W, 120);
+  // Wider than any view so only one sun is ever on screen.
+  const sun = new PixelCanvas(2048, 120);
   sun.ellipse(520, 10, 100, 100, 1);
   sun.ellipse(530, 18, 80, 80, 2);
   for (const y of [70, 80, 88, 95]) sun.rect(500, y, 140, y > 85 ? 3 : 2, 0);
@@ -28,7 +29,7 @@ export function buildDusk(): Background {
     mesas.vline(x, t, t + 1, 2);
   }
 
-  const trees = new PixelCanvas(W, 200);
+  const trees = new PixelCanvas(W, 240);
   ridge(trees, (x) => 150 + periodicNoise(W, 19, [[5, 8], [13, 3]])(x), 1);
   const r2 = seededRandom(101);
   for (let i = 0; i < 22; i++) {
@@ -36,9 +37,10 @@ export function buildDusk(): Background {
     const h = 50 + Math.floor(r2() * 70);
     const w = 18 + Math.floor(r2() * 16);
     wrapped(W, (o) => {
-      trees.rect(x + o + w / 2 - 2, 200 - h, 4, h, 1);
-      trees.polygon([x + o, 200 - h + 30, x + o + w / 2, 200 - h - 20, x + o + w, 200 - h + 30], 1);
-      trees.polygon([x + o - 4, 200 - h + 55, x + o + w / 2, 200 - h + 5, x + o + w + 4, 200 - h + 55], 1);
+      const base = 200;
+      trees.rect(x + o + w / 2 - 2, base - h, 4, h, 1);
+      trees.polygon([x + o, base - h + 30, x + o + w / 2, base - h - 20, x + o + w, base - h + 30], 1);
+      trees.polygon([x + o - 4, base - h + 55, x + o + w / 2, base - h + 5, x + o + w + 4, base - h + 55], 1);
     });
   }
 
