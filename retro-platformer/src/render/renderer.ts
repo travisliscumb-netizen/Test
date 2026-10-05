@@ -1,3 +1,4 @@
+import type { SafeInsets } from "../core/display";
 import type { Assets, ThemeAssets } from "../gfx/assets";
 import type { Canvas } from "../gfx/bake";
 import { INK, WHITE } from "../gfx/palette";
@@ -25,7 +26,7 @@ export class Renderer {
 
   constructor(private readonly assets: Assets) {}
 
-  render(ctx: CanvasRenderingContext2D, game: Game, viewW: number, alpha: number): void {
+  render(ctx: CanvasRenderingContext2D, game: Game, viewW: number, alpha: number, insets: SafeInsets): void {
     ctx.imageSmoothingEnabled = false;
     switch (game.mode) {
       case "title":
@@ -39,7 +40,7 @@ export class Renderer {
       case "paused":
         if (game.world) {
           this.drawWorld(ctx, game.world, viewW, game.mode === "paused" ? 1 : alpha, false);
-          this.drawHud(ctx, game, game.world, viewW);
+          this.drawHud(ctx, game, game.world, viewW, insets);
           if (game.mode === "paused") this.drawPaused(ctx, viewW);
         }
         break;
@@ -243,12 +244,14 @@ export class Renderer {
 
   // ── HUD and screens ─────────────────────────────────────────────────────
 
-  private drawHud(ctx: CanvasRenderingContext2D, game: Game, world: World, viewW: number): void {
+  private drawHud(ctx: CanvasRenderingContext2D, game: Game, world: World, viewW: number, insets: SafeInsets): void {
     const s = game.session;
     const t = this.text;
-    // Five even columns; on touch screens the top-right corner holds the mute and pause buttons.
-    const right = viewW - (game.touchMode ? HUD_TOUCH_RESERVE : 16);
-    const col = (i: number): number => Math.round(16 + ((right - 16) / 5) * i);
+    // Five even columns, clear of any notch; on touch screens the top-right corner holds the mute and pause buttons.
+    const left = 16 + Math.ceil(insets.left);
+    const reserve = game.touchMode && insets.underTopButtons ? HUD_TOUCH_RESERVE : 16;
+    const right = viewW - Math.ceil(insets.right) - reserve;
+    const col = (i: number): number => Math.round(left + ((right - left) / 5) * i);
     t.draw(ctx, "SCORE", col(0), 10);
     t.draw(ctx, String(s.score).padStart(7, "0"), col(0), 30);
     t.draw(ctx, "COINS", col(1), 10);

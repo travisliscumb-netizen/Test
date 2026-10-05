@@ -43,8 +43,26 @@
         width: 0;
         height: 0;
         padding-top: env(safe-area-inset-top, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
         visibility: hidden;
         pointer-events: none;
+      }
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 60%;
+        text-align: center;
+        color: rgba(255, 255, 255, 0.7);
+        font: 600 15px/1.4 -apple-system, system-ui, sans-serif;
+        pointer-events: none;
+      }
+      @media (orientation: portrait) and (pointer: coarse) {
+        #rotate-hint {
+          display: block;
+        }
       }
       #touch {
         position: fixed;
@@ -120,6 +138,7 @@
   <body>
     <canvas id="screen" aria-label="Sprout Quest game screen"></canvas>
     <div id="safe-probe"></div>
+    <div id="rotate-hint">↻ Turn your phone sideways<br />to see more of the level</div>
     <div id="touch" aria-hidden="true">
       <div class="zone pad" data-zone="pad"><span class="run">«</span><span>◀</span><span></span><span>▶</span><span class="run">»</span></div>
       <div class="zone btn runbtn" data-zone="run">B</div>

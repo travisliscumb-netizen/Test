@@ -33,6 +33,8 @@ function saveHighScore(score: number): void {
 /** Read-only state for automated tests and debugging. */
 export interface Snapshot {
   mode: Game["mode"];
+  /** Logical view width in pixels (32 per tile). */
+  viewWidth: number;
   phase: string | null;
   level: number;
   score: number;
@@ -89,6 +91,7 @@ function start(): void {
   window.__sproutQuest = {
     snapshot: () => ({
       mode: game.mode,
+      viewWidth: display.viewWidth,
       phase: game.world?.phase ?? null,
       level: game.session.levelIndex,
       score: game.session.score,
@@ -111,7 +114,7 @@ function start(): void {
       if (game.mode !== "play") persistHighScore();
     },
     (alpha) => {
-      renderer.render(display.ctx, game, display.viewWidth, alpha);
+      renderer.render(display.ctx, game, display.viewWidth, alpha, display.insets);
       display.present();
       audio.pump();
     },

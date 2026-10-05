@@ -12,6 +12,7 @@ export function buildUrl(): string {
 
 export interface Snapshot {
   mode: string;
+  viewWidth: number;
   phase: string | null;
   level: number;
   score: number;

@@ -1,11 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { placeView, viewWidthFor } from "../src/core/display";
+import { frameInsets, placeView, viewWidthFor } from "../src/core/display";
 import { VIEW_HEIGHT, VIEW_MAX_WIDTH, VIEW_MIN_WIDTH } from "../src/tuning";
 
 describe("viewWidthFor", () => {
   it("follows the aspect ratio at a fixed height", () => {
     expect(viewWidthFor(1280, 720)).toBe(854);
     expect(viewWidthFor(640, 480)).toBe(640);
+  });
+
+  it.each([
+    ["iPhone SE", 667, 375],
+    ["iPhone 15", 852, 393],
+    ["iPhone 15 Pro Max", 932, 430],
+    ["Android 20:9", 915, 412],
+  ])("a %s held sideways fills the whole screen (no side bars)", (_name, w, h) => {
+    const view = viewWidthFor(w, h);
+    expect(view).toBeLessThan(VIEW_MAX_WIDTH);
+    const p = placeView(view, VIEW_HEIGHT, w * 3, h * 3, 0);
+    expect(p.width).toBeGreaterThanOrEqual(w * 3 - 3);
+    expect(p.height).toBe(h * 3);
+  });
+
+  it("shows about twice as much level sideways as upright", () => {
+    expect(viewWidthFor(852, 393) / viewWidthFor(393, 852)).toBeGreaterThan(1.9);
   });
 
   it("clamps to the supported range and stays even", () => {
@@ -32,10 +49,33 @@ describe("placeView", () => {
     expect(p.x).toBe(Math.floor((4000 - p.width) / 2));
   });
 
-  it("pins the game near the top in portrait, below the safe-area inset", () => {
+  it("pins the game near the top in portrait, below the top buttons", () => {
     const p = placeView(VIEW_MIN_WIDTH, VIEW_HEIGHT, 1170, 2532, 141);
     expect(p.width).toBe(1170);
     expect(p.y).toBeGreaterThanOrEqual(141);
     expect(p.y + p.height).toBeLessThan(2532 * 0.6);
+  });
+});
+
+describe("frameInsets", () => {
+  it("converts a notch inset into view pixels when the frame reaches under it", () => {
+    const p = { x: 0, y: 0, width: 2556, height: 1179, scale: 1179 / 480 };
+    const insets = frameInsets(p, 2556, 59 * 3, 59 * 3, 138);
+    expect(insets.left).toBeCloseTo((59 * 3) / p.scale);
+    expect(insets.right).toBeCloseTo((59 * 3) / p.scale);
+    expect(insets.underTopButtons).toBe(true);
+  });
+
+  it.each([
+    ["notched iPhone", 1179, 2556, 177 + 138],
+    ["iPhone SE", 750, 1334, 20 + 92],
+  ])("an upright %s game sits below the top buttons", (_name, w, h, buttonsBottom) => {
+    const p = placeView(512, 480, w, h, buttonsBottom);
+    expect(frameInsets(p, w, 0, 0, buttonsBottom).underTopButtons).toBe(false);
+  });
+
+  it("is zero when the frame is letterboxed clear of the notch", () => {
+    const p = { x: 300, y: 0, width: 1956, height: 1179, scale: 1179 / 480 };
+    expect(frameInsets(p, 2556, 177, 177, 138)).toEqual({ left: 0, right: 0, underTopButtons: true });
   });
 });

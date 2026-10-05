@@ -14,7 +14,7 @@ Everything is made in code: palette-indexed sprites, text-file levels, and a Web
 | Pause | Enter, Esc or P | II |
 | Mute | M | ♪ |
 
-Landscape is best on phones.
+Turn your phone sideways to play the long way: the view widens to fill the screen (about 34 tiles of level instead of 16), and you can rotate at any time, even mid-level.
 
 ## Develop
 
