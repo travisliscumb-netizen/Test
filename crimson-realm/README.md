@@ -79,10 +79,11 @@ crimson-realm/
     save.js / main.js / icon.js / ui.css
 ```
 
-Graphics are drawn at the screen's native resolution (up to 1080p backing),
-with stage-tinted key and rim lighting on every limb, floor reflections,
-additive glows, motion afterimages, and 60 fps simulation. If a device can't
-hold 60 fps, resolution steps down automatically and the choice is remembered.
+Graphics are painted at runtime, not drawn from sprites:
+
+- **Fighters:** every arm and leg is one swept shape that bends smoothly through the joint, with an anatomical profile on each side. That covers deltoid, biceps/triceps, forearm, glutes/quads, knee, calf and ankle. Shading is painted in soft bands that follow the limb's curve. Torso and head are smooth contours with muscle, cheekbone and contact-shadow detail. Each fighter is painted to its own layer, then gets a backlit rim light from the stage's colour, a soft dark edge and a brush-grain texture.
+- **Stages:** each stage has a painted perspective floor texture (stone, planks, iron grate, wet slate, moss, obsidian) drawn in depth slices, with its seams as true perspective lines. Background layers get atmospheric distance blur and grain, plus light rays from the sun, moon or fire.
+- **Effects:** floor reflections, additive glows and motion afterimages, at a 60 fps simulation. If a device can't hold 60 fps, resolution steps down automatically, and the lowest step also drops the costliest fighter effects.
 
 ## Tests
 

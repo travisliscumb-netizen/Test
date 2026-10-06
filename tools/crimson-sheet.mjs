@@ -42,7 +42,9 @@ const data = await page.evaluate(async (only) => {
       g.translate(col * cw + cw / 2, row * ch + ch - 30);
       g.strokeStyle = '#555'; g.beginPath(); g.moveTo(-cw / 2, 0); g.lineTo(cw / 2, 0); g.stroke();
       drawShadow(g, f, light);
-      for (let i = 0; i < 40; i++) drawFighter(g, f, light, { time: i / 60 });
+      const warm = document.createElement('canvas').getContext('2d');
+      for (let i = 0; i < 40; i++) drawFighter(warm, f, light, { time: i / 60 });   // settle hair & cloth
+      drawFighter(g, f, light, { time: 40 / 60, chains: false });
       g.restore();
       g.fillStyle = '#fff'; g.font = '14px sans-serif';
       g.fillText(id + ' ' + name, col * cw + 6, row * ch + 16);

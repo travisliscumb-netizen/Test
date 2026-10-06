@@ -237,7 +237,8 @@ export const STAGE_ART = {
       } }
     ],
     lights: [{ f: 0.7, every: 900, start: 160, y: HORIZON - 150, color: '#ffae5a', r: 70, flame: true }, { f: 0.7, every: 900, start: 440, y: HORIZON - 150, color: '#ffae5a', r: 70, flame: true }],
-    weather: 'petals'
+    weather: 'petals',
+    rays: { x: 0.62, y: 400, a0: -2.9, a1: -0.25, n: 9, color: '#ffb070', alpha: 0.12 }
   },
 
   bridge: {
@@ -298,7 +299,8 @@ export const STAGE_ART = {
       } }
     ],
     lights: [{ f: 0.72, every: 600, start: 60, y: HORIZON - 172, color: '#ffd28a', r: 46, flame: true }],
-    weather: 'mist'
+    weather: 'mist',
+    rays: { x: 0.3, y: 190, a0: 0.6, a1: 2.4, n: 7, color: '#b8ccff', alpha: 0.07 }
   },
 
   forge: {
@@ -345,7 +347,8 @@ export const STAGE_ART = {
       } }
     ],
     lights: [{ f: 0.75, every: 520, start: 200, y: HORIZON - 90, color: '#ff8a2a', r: 90, flame: true }],
-    weather: 'embers'
+    weather: 'embers',
+    rays: { x: 0.5, y: 760, a0: -2.6, a1: -0.55, n: 8, color: '#ff6a20', alpha: 0.08 }
   },
 
   spire: {
@@ -465,65 +468,294 @@ export const STAGE_ART = {
       } }
     ],
     lights: [{ f: 0.76, every: 560, start: 460, y: HORIZON - 40, color: '#c04dff', r: 110, flame: true, brazier: true }],
-    weather: 'ash'
+    weather: 'ash',
+    rays: { x: 0.5, y: 120, a0: 0.9, a1: 2.25, n: 7, color: '#c04dff', alpha: 0.07 }
   }
 };
 
-/* --------------------------------------------------------- the floor */
-export function drawFloor(g, art, viewW, camX, camY, t) {
-  const fl = art.floor;
-  const y0 = HORIZON + camY, y1 = 720 + camY * 0.2;
-  g.fillStyle = vgrad(g, y0, 720, [[0, fl.back], [0.35, mix(fl.back, fl.front, 0.45)], [1, fl.front]]);
-  g.fillRect(0, y0, viewW, 720 - y0 + 4);
-  const sc = (y) => 1 + (y - GROUND_Y - camY) * 0.0029;
-  const sx = (wx, y) => viewW / 2 + (wx - camX) * sc(y);
-  // seams across the depth
-  g.strokeStyle = fl.seam;
-  g.lineWidth = fl.planks ? 1.5 : 2;
-  const T = fl.tile;
-  const left = camX - viewW, right = camX + viewW;
-  g.beginPath();
-  for (let x = Math.floor(left / T) * T; x < right; x += T) {
-    g.moveTo(sx(x, y0), y0);
-    g.lineTo(sx(x, 720), 720);
-  }
-  // seams along the depth, spaced in perspective
-  const rows = fl.planks ? 9 : fl.rows;
-  for (let i = 1; i <= rows; i++) {
-    const k = Math.pow(i / (rows + 1), 1.6);
-    const y = y0 + (720 - y0) * k;
-    g.moveTo(0, y);
-    g.lineTo(viewW, y);
-  }
-  g.stroke();
-  if (fl.grate) {
-    g.strokeStyle = 'rgba(0,0,0,0.6)';
-    g.lineWidth = 3;
-    g.beginPath();
-    for (let x = Math.floor(left / 23) * 23; x < right; x += 23) { g.moveTo(sx(x, y0), y0); g.lineTo(sx(x, 720), 720); }
-    g.stroke();
-    const p = 0.5 + 0.5 * Math.sin(t * 2);
-    g.fillStyle = vgrad(g, y0, 720, [[0, `rgba(255,90,20,${0.12 + p * 0.08})`], [1, 'rgba(255,60,10,0)']]);
-    g.fillRect(0, y0, viewW, 720 - y0);
-  }
-  if (fl.moss) {
-    const r = rng32(5);
-    g.fillStyle = 'rgba(90,160,90,0.18)';
-    for (let i = 0; i < 26; i++) {
-      const wx = r() * 2600, yy = y0 + r() * (720 - y0);
-      g.beginPath(); g.ellipse(sx(wx, yy), yy, 60 * sc(yy), 10 * sc(yy), 0, 0, 7); g.fill();
+/* --------------------------------------------------------- the floor
+   Each stage paints a floor texture once: x is world x, y is depth (row 0
+   is the back edge). It is drawn every frame as horizontal slices, each
+   scaled for its depth -- true perspective, so slabs, planks and grates
+   converge correctly and scroll at the right speed at every depth.      */
+const FX = -700, FW = 4000, FS = 0.55;     // texture covers world x in [FX, FX+FW] at FS px/unit
+const FD = 300;                             // depth rows
+const floorTex = new Map();
+
+function paintFloor(id, art) {
+  const seams = [];                         // vertical seams, drawn per frame as vectors: [worldX, depth0, depth1, kind]
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(FW * FS);
+  c.height = FD;
+  const g = c.getContext('2d');
+  const r = rng32(id.length * 7919 + 13);
+  const W = c.width, fl = art.floor;
+  const X = (wx) => (wx - FX) * FS;
+  g.fillStyle = vgrad(g, 0, FD, [[0, fl.back], [0.5, mix(fl.back, fl.front, 0.4)], [1, fl.front]]);
+  g.fillRect(0, 0, W, FD);
+  const mottle = (n, size, col, a) => {
+    for (let i = 0; i < n; i++) {
+      const x = r() * W, y = r() * FD, rr = size * (0.4 + r());
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr);
+      gr.addColorStop(0, rgba(col, a * (0.4 + r() * 0.6)));
+      gr.addColorStop(1, rgba(col, 0));
+      g.fillStyle = gr;
+      g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
     }
+  };
+  const rows = (bands) => {                 // depth rows of slabs: [y0, y1] pairs
+    const out = [];
+    let y = 0;
+    for (const h of bands) { out.push([y, y + h]); y += h; }
+    return out;
+  };
+  const slab = (x0, x1, y0, y1, base, seam, chip = 0.4) => {
+    const shadeK = (r() - 0.5) * 0.07;
+    g.fillStyle = shadeK > 0 ? mix(base, '#ffffff', shadeK * 0.5) : mix(base, '#000000', -shadeK);
+    g.fillRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2);
+    // bevel: light on the far edge, dark on the near edge
+    g.fillStyle = 'rgba(255,240,220,0.10)';
+    g.fillRect(x0 + 1, y0 + 1, x1 - x0 - 2, 2);
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    g.fillRect(x0 + 1, y1 - 3, x1 - x0 - 2, 2);
+    g.fillStyle = seam;
+    g.fillRect(x0, y0, x1 - x0, 1.2);
+    seams.push([x0 / FS + FX, y0 / FD, y1 / FD, 0]);
+    if (r() < chip) {                       // cracks and chips
+      g.strokeStyle = 'rgba(0,0,0,0.35)';
+      g.lineWidth = 1;
+      g.beginPath();
+      let x = x0 + r() * (x1 - x0), y = y0 + 2;
+      g.moveTo(x, y);
+      while (y < y1 - 3) { x += (r() - 0.5) * 14; y += 4 + r() * 8; g.lineTo(x, y); }
+      g.stroke();
+    }
+  };
+  switch (id) {
+    case 'temple': {
+      for (const [y0, y1] of rows([34, 46, 62, 76, 82])) {
+        let x = r() * -120;
+        while (x < W) { const w = (150 + r() * 120) * FS * (0.7 + y0 / FD); slab(x, x + w, y0, y1, '#6e4034', 'rgba(25,8,10,0.6)', 0.5); x += w; }
+      }
+      mottle(220, 30, '#2a0e0c', 0.18);
+      mottle(140, 22, '#ffb27a', 0.08);
+      break;
+    }
+    case 'bridge': {
+      for (let x = 0; x < W; ) {
+        const w = (38 + r() * 14) * FS;
+        g.fillStyle = mix('#4e3c30', '#2a1e18', r() * 0.6);
+        g.fillRect(x + 1, 0, w - 2, FD);
+        g.strokeStyle = 'rgba(20,10,6,0.35)';
+        g.lineWidth = 1;
+        for (let k = 0; k < 4; k++) {        // wood grain along each plank
+          const gx = x + 3 + r() * (w - 6);
+          g.beginPath(); g.moveTo(gx, 0);
+          for (let y = 0; y <= FD; y += 20) g.lineTo(gx + Math.sin(y * 0.05 + k) * 2, y);
+          g.stroke();
+        }
+        seams.push([x / FS + FX, 0, 1, 0]);
+        if (r() < 0.35) { g.fillStyle = 'rgba(30,20,14,0.9)'; g.beginPath(); g.ellipse(x + w / 2, 30 + r() * 240, 3, 4, 0, 0, 7); g.fill(); }
+        x += w;
+      }
+      g.fillStyle = 'rgba(160,190,240,0.06)'; g.fillRect(0, 0, W, FD);
+      mottle(120, 40, '#000000', 0.2);
+      break;
+    }
+    case 'forge': {
+      for (const [y0, y1] of rows([60, 70, 80, 90])) {
+        for (let x = 0; x < W; x += 110 * FS) {
+          slab(x, x + 110 * FS, y0, y1, '#3a2a24', 'rgba(0,0,0,0.7)', 0.15);
+          for (let k = 1; k < 5; k++) seams.push([(x + k * 22 * FS) / FS + FX, (y0 + 6) / FD, (y1 - 6) / FD, 1]);
+          g.fillStyle = '#6a5040';
+          for (const [ax, ay] of [[4, 4], [110 * FS - 6, 4], [4, y1 - y0 - 6], [110 * FS - 6, y1 - y0 - 6]]) { g.beginPath(); g.arc(x + ax, y0 + ay, 2, 0, 7); g.fill(); }
+        }
+      }
+      mottle(160, 34, '#ff5a1a', 0.07);
+      mottle(160, 26, '#000000', 0.25);
+      break;
+    }
+    case 'spire': {
+      for (const [y0, y1] of rows([40, 54, 64, 70, 72])) {
+        let x = r() * -80;
+        while (x < W) { const w = (120 + r() * 160) * FS; slab(x, x + w, y0, y1, '#3a4c52', 'rgba(0,0,0,0.6)', 0.3); x += w; }
+      }
+      for (let i = 0; i < 70; i++) {         // puddles
+        const x = r() * W, y = r() * FD, rw = 20 + r() * 60;
+        g.fillStyle = 'rgba(160,220,240,0.10)';
+        g.beginPath(); g.ellipse(x, y, rw, rw * 0.3, 0, 0, 7); g.fill();
+      }
+      break;
+    }
+    case 'grove': {
+      for (const [y0, y1] of rows([40, 56, 66, 70, 68])) {
+        let x = r() * -80;
+        while (x < W) { const w = (90 + r() * 120) * FS; slab(x, x + w, y0, y1, '#2e4434', 'rgba(5,15,8,0.7)', 0.35); x += w; }
+      }
+      mottle(260, 30, '#4f8a3a', 0.28);
+      for (let i = 0; i < 500; i++) {         // grass tufts in the seams
+        const x = r() * W, y = r() * FD;
+        g.strokeStyle = rgba(r() < 0.5 ? '#3f7a3a' : '#2a5a2a', 0.6);
+        g.lineWidth = 1;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 6, y - 4 - r() * 6); g.stroke();
+      }
+      break;
+    }
+    case 'throne': {
+      for (const [y0, y1] of rows([70, 100, 130])) {
+        for (let x = 0; x < W; x += 210 * FS) slab(x, x + 210 * FS, y0, y1, '#1c0c18', 'rgba(200,80,255,0.35)', 0);
+      }
+      g.strokeStyle = 'rgba(190,80,255,0.16)';
+      g.lineWidth = 1.2;
+      for (let i = 0; i < 60; i++) {          // marble veins
+        g.beginPath();
+        let x = r() * W, y = r() * FD;
+        g.moveTo(x, y);
+        for (let k = 0; k < 8; k++) { x += 10 + r() * 30; y += (r() - 0.5) * 20; g.lineTo(x, y); }
+        g.stroke();
+      }
+      mottle(80, 50, '#ff3060', 0.06);
+      break;
+    }
+  }
+  // painterly grain
+  const img = g.getImageData(0, 0, W, FD);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (r() - 0.5) * 16;
+    d[i] += n; d[i + 1] += n; d[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+  return { c, seams };
+}
+
+export function drawFloor(g, art, viewW, camX, camY, t, id) {
+  const fl = art.floor;
+  const y0 = HORIZON + camY;
+  let ft = floorTex.get(id);
+  if (!ft) { ft = paintFloor(id, art); floorTex.set(id, ft); }
+  const tex = ft.c;
+  const sc = (y) => 1 + (y - GROUND_Y - camY) * 0.0029;
+  // slices: thin near the horizon (where perspective changes fastest)
+  const N = 72;
+  for (let i = 0; i < N; i++) {
+    const a = i / N, b = (i + 1) / N;
+    const ya = y0 + (720 - y0) * a * a, yb = y0 + (720 - y0) * b * b;
+    if (yb - ya < 0.2) continue;
+    const ym = (ya + yb) / 2;
+    const k = sc(ym);
+    const wxL = camX - viewW / 2 / k;
+    const sx = (wxL - FX) * FS, sw = (viewW / k) * FS;
+    // depth row of this slice: linear in 1/scale-ish, matched to the slab rows
+    const da = Math.pow(a * a, 0.62), db = Math.pow(b * b, 0.62);
+    const sy = da * (FD - 1), sh = Math.max(1, (db - da) * (FD - 1));
+    g.drawImage(tex, sx, sy, sw, sh, 0, ya, viewW, yb - ya + 0.6);
+  }
+  // vertical seams as true perspective vectors (slicing would stair-step them)
+  const yOf = (d) => y0 + (720 - y0) * Math.pow(d, 1 / 0.62);
+  const xOf = (wx, y) => viewW / 2 + (wx - camX) * sc(y);
+  const half = viewW / 2 / 0.75 + 200;
+  const seamPath = [new Path2D(), new Path2D()];
+  for (const [wx, d0, d1, kind] of ft.seams) {
+    if (Math.abs(wx - camX) > half) continue;
+    const ya = yOf(d0), yb = yOf(d1);
+    seamPath[kind].moveTo(xOf(wx, ya), ya);
+    seamPath[kind].lineTo(xOf(wx, yb), yb);
+  }
+  g.save();
+  g.lineCap = 'round';
+  g.strokeStyle = fl.seam;
+  g.lineWidth = 2.6;
+  g.stroke(seamPath[0]);
+  g.strokeStyle = 'rgba(255,235,210,0.07)';
+  g.lineWidth = 1;
+  g.translate(1.6, 0);
+  g.stroke(seamPath[0]);
+  g.translate(-1.6, 0);
+  g.strokeStyle = 'rgba(0,0,0,0.8)';
+  g.lineWidth = 4;
+  g.stroke(seamPath[1]);
+  g.strokeStyle = 'rgba(255,110,30,0.5)';
+  g.lineWidth = 1.6;
+  g.stroke(seamPath[1]);
+  g.restore();
+  if (fl.grate) {
+    const p = 0.5 + 0.5 * Math.sin(t * 2);
+    g.fillStyle = vgrad(g, y0, 720, [[0, `rgba(255,90,20,${0.1 + p * 0.08})`], [1, 'rgba(255,60,10,0)']]);
+    g.fillRect(0, y0, viewW, 720 - y0);
   }
   // key-light pool on the floor
   const gr = g.createRadialGradient(viewW / 2, GROUND_Y + camY, 10, viewW / 2, GROUND_Y + camY, viewW * 0.6);
-  gr.addColorStop(0, rgba(fl.spot, 0.22));
+  gr.addColorStop(0, rgba(fl.spot, 0.2));
   gr.addColorStop(1, rgba(fl.spot, 0));
   g.fillStyle = gr;
   g.fillRect(0, y0, viewW, 720 - y0);
-  // horizon contact shadow
-  g.fillStyle = vgrad(g, y0, y0 + 26, [[0, 'rgba(0,0,0,0.55)'], [1, 'rgba(0,0,0,0)']]);
-  g.fillRect(0, y0, viewW, 26);
-  return y1;
+  // depth fog toward the back edge, contact shadow under the wall
+  g.fillStyle = vgrad(g, y0, y0 + 80, [[0, rgba(fl.back, 0.55)], [1, rgba(fl.back, 0)]]);
+  g.fillRect(0, y0, viewW, 80);
+  g.fillStyle = vgrad(g, y0, y0 + 22, [[0, 'rgba(0,0,0,0.6)'], [1, 'rgba(0,0,0,0)']]);
+  g.fillRect(0, y0, viewW, 22);
+  // near-camera darkening
+  g.fillStyle = vgrad(g, 640, 720, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.45)']]);
+  g.fillRect(0, 640, viewW, 80);
+}
+
+/* Post-process for the pre-rendered parallax layers: distance blur where
+   the browser supports canvas filters, then painterly grain. Done once per
+   stage load, so it costs nothing per frame. */
+export function paintPostLayer(canvas, depth) {
+  const g = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  if (depth > 0 && 'filter' in g) {
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const t = tmp.getContext('2d');
+    t.filter = `blur(${depth}px)`;
+    t.drawImage(canvas, 0, 0);
+    if (t.filter !== 'none') {
+      g.clearRect(0, 0, w, h);
+      g.drawImage(tmp, 0, 0);
+    }
+    tmp.width = tmp.height = 0;
+  }
+  const r = rng32(w * 31 + h);
+  g.save();
+  g.globalCompositeOperation = 'source-atop';
+  for (let i = 0; i < (w * h) / 900; i++) {
+    g.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.035)';
+    const x = r() * w, y = r() * h, l = 4 + r() * 16;
+    g.fillRect(x, y, l, 1 + r() * 2);
+  }
+  g.restore();
+}
+
+/* Static light rays from the stage's key light, rendered once. */
+export function paintRays(canvas, art, viewW) {
+  const g = canvas.getContext('2d');
+  const R = art.rays;
+  if (!R) return false;
+  g.save();
+  g.scale(canvas.width / viewW, canvas.height / 720);
+  g.globalCompositeOperation = 'lighter';
+  const ox = viewW * R.x, oy = R.y;
+  const rr = rng32(viewW);
+  for (let i = 0; i < R.n; i++) {
+    const a = R.a0 + (R.a1 - R.a0) * (i / (R.n - 1)) + (rr() - 0.5) * 0.05;
+    const w = 0.02 + rr() * 0.05;
+    const len = 900;
+    const gr = g.createLinearGradient(ox, oy, ox + Math.cos(a) * len, oy + Math.sin(a) * len);
+    gr.addColorStop(0, rgba(R.color, R.alpha));
+    gr.addColorStop(1, rgba(R.color, 0));
+    g.fillStyle = gr;
+    g.beginPath();
+    g.moveTo(ox, oy);
+    g.lineTo(ox + Math.cos(a - w) * len, oy + Math.sin(a - w) * len);
+    g.lineTo(ox + Math.cos(a + w) * len, oy + Math.sin(a + w) * len);
+    g.closePath();
+    g.fill();
+  }
+  g.restore();
+  return true;
 }
 
 /* ------------------------------------------------ animated light sources */

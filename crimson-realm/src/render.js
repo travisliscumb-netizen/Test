@@ -7,7 +7,7 @@
    logical space scaled by R.                                            */
 
 import { GROUND_Y, STAGE_W, STAGES, FIGHTERS, MAX_HP, clamp, VIEW_H } from './config.js';
-import { STAGE_ART, drawFloor, drawLights, drawWeather, HORIZON } from './stages.js';
+import { STAGE_ART, drawFloor, drawLights, drawWeather, HORIZON, paintPostLayer, paintRays } from './stages.js';
 import { drawFighter, drawShadow } from './fighter-art.js';
 import { POSES, solve, scaledBody, groundOffset } from './skeleton.js';
 import { rgba, mix, shade, tint, glowSprite, puffSprite } from './color.js';
@@ -42,6 +42,8 @@ export class Renderer {
 
   resize(cssW, cssH, dpr, maxH = QUALITY[0]) {
     const backingH = Math.max(360, Math.min(maxH, Math.round(cssH * dpr)));
+    // the lowest quality step also drops the costliest fighter effects
+    this.lite = maxH <= QUALITY[QUALITY.length - 1];
     this.R = backingH / VIEW_H;
     this.viewW = Math.round((cssW / cssH) * VIEW_H);
     this.canvas.width = Math.round(this.viewW * this.R);
@@ -61,10 +63,18 @@ export class Renderer {
     this.reflect = st.reflect;
     const vw = this.viewW;
     this.sky = makeLayer(vw, 1, this.R * 0.75, (g) => this.art.sky(g, vw));
-    this.layers = this.art.layers.map((L) => {
+    this.layers = this.art.layers.map((L, i) => {
       const w = Math.ceil(vw + (STAGE_W - vw) * L.f);
-      return { f: L.f, w, ...makeLayer(w, 1, this.R * L.q, (g) => L.draw(g, w)) };
+      const layer = { f: L.f, w, ...makeLayer(w, 1, this.R * L.q, (g) => L.draw(g, w)) };
+      // farther layers get more atmospheric blur
+      paintPostLayer(layer.canvas, [2.2, 1.0, 0][i] * this.R * L.q);
+      return layer;
     });
+    paintPostLayer(this.sky.canvas, 0.8 * this.R);
+    if (this.rays) { this.rays.width = 0; this.rays = null; }
+    const rc = document.createElement('canvas');
+    rc.width = Math.ceil(vw * this.R * 0.5); rc.height = Math.ceil(VIEW_H * this.R * 0.5);
+    if (paintRays(rc, this.art, vw)) this.rays = rc;
     this.splats.length = 0;
   }
 
@@ -253,10 +263,17 @@ export class Renderer {
       g.fillRect(0, 0, vw, VIEW_H);
     }
     drawLights(g, this.art, vw, cam.x - shx, camY, STAGE_W, t);
+    if (this.rays) {
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.85 + 0.15 * Math.sin(t * 0.7);
+      g.drawImage(this.rays, 0, 0, vw, VIEW_H);
+      g.restore();
+    }
 
     g.save();
     g.translate(shx, shy);
-    drawFloor(g, this.art, vw, cam.x, camY, t);
+    drawFloor(g, this.art, vw, cam.x, camY, t, this.stageId);
     g.restore();
 
     // world space
@@ -269,7 +286,7 @@ export class Renderer {
     if (this.reflect > 0) {
       g.save();
       g.scale(1, -0.86);
-      for (const f of order) if (!f.hidden) drawFighter(g, f, this.light, { time: t, alpha: this.reflect, chains: false });
+      for (const f of order) if (!f.hidden) drawFighter(g, f, this.light, { time: t, alpha: this.reflect, reuse: true });
       g.restore();
       g.fillStyle = 'rgba(0,0,0,0.15)';
     }
@@ -280,7 +297,7 @@ export class Renderer {
         const tr = f.trail[i];
         drawFighter(g, { ...f, skel: tr.skel, x: tr.x, y: tr.y, facing: tr.facing, alpha: 1 }, this.light, { silhouette: rgba(f.def.element.glow, 0.5), alpha: 0.35 * (1 - i / f.trail.length), chains: false });
       }
-      drawFighter(g, f, this.light, { time: t });
+      drawFighter(g, f, this.light, { time: t, lite: this.lite });
     }
     this.drawPieces(g, dt);
     this.drawProjectiles(g, match, t);

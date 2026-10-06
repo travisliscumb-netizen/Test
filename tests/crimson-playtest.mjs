@@ -76,9 +76,10 @@ const tap = async (page, cdp, sel) => {
 
   await tap(page, cdp, '#ladderGo');
   await page.waitForSelector('#vs.show');
-  await frames(page, 30);
+  await frames(page, 6);
   await page.screenshot({ path: path.join(SHOTS, '05-vs.png') });
-  await tap(page, cdp, '#vs');
+  // the VS screen auto-advances after 2.6 s; on a slow machine it may already have
+  if (await page.evaluate(() => window.__crimson.mode === 'vs')) await tap(page, cdp, '#vs');
   await page.waitForFunction(() => window.__crimson.mode === 'fight');
   check('controls visible in fight', await page.locator('#controls').isVisible());
   await page.waitForFunction(() => window.__crimson.match.phase === 'fight', null, { timeout: 6000 });
