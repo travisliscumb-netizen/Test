@@ -2463,6 +2463,8 @@ function stateFor(f) {
     st = {
       hair: makeChain(8), tail: makeChain(5), sash: makeChain(6), cape: makeChain(7), flap: makeChain(4), flapB: makeChain(4),
       lay: document.createElement('canvas'), sil: document.createElement('canvas'), rim: document.createElement('canvas'),
+      gc: document.createElement('canvas'), mh: document.createElement('canvas'), dh: document.createElement('canvas'),
+      sh: document.createElement('canvas'), lh: document.createElement('canvas'),
       ready: false
     };
     stateOf.set(f, st);
@@ -2694,7 +2696,87 @@ function buildGeometry(f, st, withChains = true) {
   return geo;
 }
 
-/* ------------------------------------------------------- the painting */
+/* ------------------------------------------------------- the painting
+   One body, not parts. Each depth group (far arm, far leg, the core body,
+   near arm) is first laid in as FLAT colour, so overlapping parts of the
+   same group merge into a single silhouette with no internal edges. The
+   group is then shaded as a whole: blurred copies of its silhouette,
+   shifted along the key light, give soft form shadow on the side away
+   from the light and a lit edge on the side toward it. Because shading
+   never sees where one part ends and the next begins, hips, neck and
+   shoulders have no seams. Only true overlaps (an arm crossing in front
+   of the chest) keep an edge, softened by a contact shadow.             */
+
+const SHADE_RES = 4;                         // the light map is soft, so it is computed at 1/4 size
+
+function inflate(st, W, H, pxe, Lv, s, light, back) {
+  const hw = Math.ceil(W / SHADE_RES), hh = Math.ceil(H / SHADE_RES);
+  const mg = st.mh.getContext('2d');
+  mg.setTransform(1, 0, 0, 1, 0, 0);
+  mg.globalCompositeOperation = 'source-over';
+  mg.shadowColor = 'transparent';
+  mg.clearRect(0, 0, st.mh.width, st.mh.height);
+  mg.drawImage(st.gc, 0, 0, W, H, 0, 0, hw, hh);
+  const u = pxe / SHADE_RES;
+  const dg = st.dh.getContext('2d');
+  // passes accumulate into two small maps (shadow, light); each map is then
+  // blended up onto the full-size group ONCE -- the full-size blend is the
+  // expensive step, the small maps are nearly free
+  const acc = (c) => {
+    const x = c.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.globalCompositeOperation = 'source-over';
+    x.globalAlpha = 1;
+    x.shadowColor = 'transparent';
+    x.clearRect(0, 0, c.width, c.height);
+    return x;
+  };
+  const sh = acc(st.sh), lt = acc(st.lh);
+  const pass = (into, color, blurU, offU, alpha) => {
+    dg.setTransform(1, 0, 0, 1, 0, 0);
+    dg.shadowColor = 'transparent';
+    dg.globalCompositeOperation = 'source-over';
+    dg.clearRect(0, 0, st.dh.width, st.dh.height);
+    dg.drawImage(st.mh, 0, 0);
+    dg.globalCompositeOperation = 'source-in';
+    dg.fillStyle = color;
+    dg.fillRect(0, 0, hw, hh);
+    // erase where a blurred, light-shifted copy of the silhouette covers:
+    // what remains fades in from the edges facing away from (or, with a
+    // negative offset, toward) the light
+    dg.globalCompositeOperation = 'destination-out';
+    dg.shadowColor = '#000';
+    dg.shadowBlur = Math.max(1, blurU * u);
+    dg.shadowOffsetX = 5000 + Lv[0] * offU * u;
+    dg.shadowOffsetY = Lv[1] * offU * u;
+    dg.drawImage(st.mh, -5000, 0);
+    dg.shadowColor = 'transparent';
+    dg.globalCompositeOperation = 'source-over';
+    into.globalAlpha = alpha;
+    into.drawImage(st.dh, 0, 0);
+  };
+  const shadowC = mix(back ? '#140c12' : '#40242a', light.ambient, 0.4);
+  if (back) {
+    pass(sh, shadowC, 12 * s, 10 * s, 1);           // far limbs sit in the body's shadow
+  } else {
+    pass(sh, shadowC, 20 * s, 16 * s, 1);           // broad form shadow
+    pass(sh, shadowC, 7 * s, 5.5 * s, 0.75);        // core shadow that defines the limbs
+    pass(lt, mix(light.key, '#ffffff', 0.25), 12 * s, -9 * s, 1);   // light wrapping the lit side
+  }
+  const gg = st.gc.getContext('2d');
+  gg.save();
+  gg.setTransform(1, 0, 0, 1, 0, 0);
+  // source-atop keeps the upscaled maps strictly inside the full-res silhouette
+  gg.globalCompositeOperation = 'source-atop';
+  gg.globalAlpha = 0.82;
+  gg.drawImage(st.sh, 0, 0, hw, hh, 0, 0, W, H);
+  if (!back) {
+    gg.globalAlpha = 0.3;
+    gg.drawImage(st.lh, 0, 0, hw, hh, 0, 0, W, H);
+  }
+  gg.restore();
+}
+
 function paintLayer(f, st, light, px, time, lite) {
   const geo = buildGeometry(f, st, true);
   const P = geo.P;
@@ -2714,18 +2796,27 @@ function paintLayer(f, st, light, px, time, lite) {
   let pxe = px;
   const cap = 1400;
   if (W > cap || H > cap) { pxe = px * cap / Math.max(W, H); W = Math.ceil((x1 - x0) * pxe); H = Math.ceil((y1 - y0) * pxe); }
-  ensure(st.lay, W, H); ensure(st.sil, W, H); ensure(st.rim, W, H);
+  for (const c of [st.lay, st.sil, st.rim, st.gc]) ensure(c, W, H);
+  ensure(st.mh, Math.ceil(W / SHADE_RES) + 2, Math.ceil(H / SHADE_RES) + 2);
+  for (const c of [st.dh, st.sh, st.lh]) ensure(c, Math.ceil(W / SHADE_RES) + 2, Math.ceil(H / SHADE_RES) + 2);
   st.w = W; st.h = H; st.px = pxe; st.ox = x0 * pxe; st.oy = y0 * pxe;
 
-  const g = st.lay.getContext('2d');
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.globalCompositeOperation = 'source-over';
-  g.globalAlpha = 1;
-  g.clearRect(0, 0, W + 2, H + 2);
-  g.setTransform(pxe, 0, 0, pxe, -x0 * pxe, -y0 * pxe);
+  const lay = st.lay.getContext('2d');
+  const gc = st.gc.getContext('2d');
+  const world = (ctx) => ctx.setTransform(pxe, 0, 0, pxe, -x0 * pxe, -y0 * pxe);
+  const reset = (ctx) => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = 'transparent';
+    ctx.clearRect(0, 0, W + 2, H + 2);
+  };
+  reset(lay);
+  world(lay);
 
   const T = (c, back = false, skin = false) => makeTones(flash ? mix(c, '#ffffff', flash) : c, light, back, skin);
-  const skinT = T(L.skin, false, !L.stone), skinTB = T(L.skin, true, !L.stone);
+  const B = (c, back = false) => T(c, back).base;               // flat albedo
+  const skinT = T(L.skin, false, !L.stone);
   const legC = L.stone ? L.skin : L.pants;
   const armC = L.sleeve === 'long' ? L.topColor : L.skin;
   const armBC = L.top === 'robe' || L.sleeve === 'long' || L.top === 'plate' ? L.topColor : L.skin;
@@ -2733,25 +2824,49 @@ function paintLayer(f, st, light, px, time, lite) {
   const fistC = L.gloves || L.wraps || L.skin;
   const bootC = L.boots || L.skin;
   const isSkin = (c) => c === L.skin && !L.stone;
-  const ao = rgba(mix(light.ambient, '#000000', 0.6), 0.55);
+  const ao = rgba(mix(light.ambient, '#000000', 0.65), 0.6);
+  const pr = profilesFor(f);
+  const flat = (g, path, color) => { if (path) { g.fillStyle = color; g.fill(path.path || path); } };
 
-  const occlude = (path, blur, dx, dy) => {
-    if (lite) return;
-    // soft contact shadow cast by `path` onto what is already painted
-    g.save();
-    g.shadowColor = ao;
-    g.shadowBlur = blur * pxe;
-    g.shadowOffsetX = 10000 + dx * pxe;
-    g.shadowOffsetY = dy * pxe;
-    g.translate(-10000 / pxe, 0);
-    g.fillStyle = '#000';
-    g.fill(path);
-    g.restore();
+  const group = (back, albedo, details, opts = {}) => {
+    reset(gc);
+    world(gc);
+    albedo(gc);
+    // lite: every group uses the single-pass shading of the far limbs
+    inflate(st, W, H, pxe, Lv, s, light, back || lite);
+    world(gc);
+    gc.globalCompositeOperation = 'source-atop';
+    if (details) details(gc);
+    gc.globalCompositeOperation = 'source-over';
+    if (opts.after) opts.after(gc);
+    lay.save();
+    lay.setTransform(1, 0, 0, 1, 0, 0);
+    if (opts.ao && !lite) {
+      // soft contact shadow this group casts on what is already painted,
+      // blurred at the light map's quarter resolution (st.mh is this group's mask)
+      const hw = Math.ceil(W / SHADE_RES), hh = Math.ceil(H / SHADE_RES);
+      const ag = st.dh.getContext('2d');
+      ag.setTransform(1, 0, 0, 1, 0, 0);
+      ag.globalCompositeOperation = 'source-over';
+      ag.globalAlpha = 1;
+      ag.clearRect(0, 0, st.dh.width, st.dh.height);
+      ag.shadowColor = ao;
+      ag.shadowBlur = Math.max(1, 10 * s * pxe / SHADE_RES);
+      ag.shadowOffsetX = 5000 - Lv[0] * 3 * s * pxe / SHADE_RES;
+      ag.shadowOffsetY = (-Lv[1] * 3 * s + 2 * s) * pxe / SHADE_RES;
+      ag.drawImage(st.mh, -5000, 0);
+      ag.shadowColor = 'transparent';
+      lay.globalCompositeOperation = 'source-atop';
+      lay.drawImage(st.dh, 0, 0, hw, hh, 0, 0, W, H);
+      lay.globalCompositeOperation = 'source-over';
+    }
+    lay.drawImage(st.gc, 0, 0);
+    lay.restore();
   };
 
-  /* ---- cloth behind ---- */
+  /* ---- cloth behind (shaded as cloth, on the layer) ---- */
   const C = geo.chains;
-  const clothPaint = (pts, w0, w1, color, back, sheen = 0.25) => {
+  const clothPaint = (g, pts, w0, w1, color, back, sheen = 0.25) => {
     if (!pts) return;
     const path = ribbonPath(pts, w0, w1);
     const t = T(color, back);
@@ -2764,87 +2879,90 @@ function paintLayer(f, st, light, px, time, lite) {
     g.restore();
   };
   if (C.cape) {
-    clothPaint(C.cape, 36 * s, 74 * s, L.cape, true, 0.2);
-    g.save();
-    g.clip(ribbonPath(C.cape, 36 * s, 74 * s));
+    clothPaint(lay, C.cape, 36 * s, 74 * s, L.cape, true, 0.2);
+    lay.save();
+    lay.clip(ribbonPath(C.cape, 36 * s, 74 * s));
     const ct = T(L.cape, true);
     for (const o of [-0.32, -0.1, 0.14, 0.34]) {
-      softLine(g, C.cape.map((q, j) => {
-        const w = (36 + 38 * j / (C.cape.length - 1)) * s;
-        return [q[0] + o * w, q[1]];
-      }), o > 0 ? ct.hi : ct.dark, 3 * s, 0.4);
+      softLine(lay, C.cape.map((q, j) => [q[0] + o * (36 + 38 * j / (C.cape.length - 1)) * s, q[1]]), o > 0 ? ct.hi : ct.dark, 3 * s, 0.4);
     }
-    g.restore();
+    lay.restore();
   }
-  if (C.sash) clothPaint(C.sash, 9 * s, 4 * s, L.sash, true);
-  if (C.tail) clothPaint(C.tail, 5 * s, 2 * s, L.band, true);
+  if (C.sash) clothPaint(lay, C.sash, 9 * s, 4 * s, L.sash, true);
+  if (C.tail) clothPaint(lay, C.tail, 5 * s, 2 * s, L.band, true);
   if (C.hair && L.hair.style !== 'mask') {
     const w0 = (L.hair.style === 'long' ? 22 : 13) * s;
-    clothPaint(C.hair, w0, 3 * s, L.hair.color, false, 0.35);
-    g.save();
-    g.clip(ribbonPath(C.hair, w0, 3 * s));
+    clothPaint(lay, C.hair, w0, 3 * s, L.hair.color, false, 0.35);
+    lay.save();
+    lay.clip(ribbonPath(C.hair, w0, 3 * s));
     const ht = T(L.hair.color);
     for (let i = -2; i <= 2; i++) {
-      softLine(g, C.hair.map((q, j) => [q[0] + i * w0 * 0.16 * (1 - j / C.hair.length), q[1]]), i % 2 ? ht.hi : ht.dark, 1.3 * s, 0.5);
+      softLine(lay, C.hair.map((q, j) => [q[0] + i * w0 * 0.16 * (1 - j / C.hair.length), q[1]]), i % 2 ? ht.hi : ht.dark, 1.3 * s, 0.5);
     }
-    g.restore();
+    lay.restore();
   }
-  if (C.hair && L.hair.style === 'mask') clothPaint(C.hair, 6 * s, 2 * s, L.mask, true);
-  if (C.flapB) clothPaint(C.flapB, 20 * s * k, 9 * s * k, L.top === 'stone' ? L.belt : L.top === 'plate' ? L.topColor : L.topColor2, true, 0.12);
+  if (C.hair && L.hair.style === 'mask') clothPaint(lay, C.hair, 6 * s, 2 * s, L.mask, true);
+  if (C.flapB) clothPaint(lay, C.flapB, 20 * s * k, 9 * s * k, L.top === 'stone' ? L.belt : L.top === 'plate' ? L.topColor : L.topColor2, true, 0.12);
 
-  /* ---- back arm & leg ---- */
-  const arm = (side, back) => {
+  /* ---- limb albedo + details ---- */
+  const armAlbedo = (side, back) => (g) => {
+    const sw = side === 'F' ? geo.armF : geo.armB;
+    const fs = side === 'F' ? geo.fistF : geo.fistB;
+    const base = back ? armBC : armC;
+    flat(g, sw, B(base, back));
+    if (foreC !== base) flat(g, sweep([P['sh' + side], P['el' + side], side === 'F' ? P.hf : P.hb], pr.arm, 1.03, [1.12, 2]), B(foreC, back));
+    flat(g, fs, B(fistC, back));
+  };
+  const armDetails = (side, back) => (g) => {
     const sw = side === 'F' ? geo.armF : geo.armB;
     const fs = side === 'F' ? geo.fistF : geo.fistB;
     const el = P['el' + side], hd = side === 'F' ? P.hf : P.hb;
-    if (!back) occlude(sw.path, 10 * s, Lv[0] * -4 * s, Lv[1] * -4 * s);
     const base = back ? armBC : armC;
-    paintSweep(g, sw, T(base, back, isSkin(base)), Lv, isSkin(base) ? 0.18 : 0.1);
-    if (foreC !== base) {
-      const fsw = sweep([P['sh' + side], el, hd], profilesFor(f).arm, 1.03, [1.12, 2]);
-      paintSweep(g, fsw, T(foreC, back, isSkin(foreC)), Lv, 0.12);
-      if (L.wraps && !L.gloves && fsw) {
-        g.save(); g.clip(fsw.path);
+    if (L.wraps && !L.gloves) {
+      const fsw = sweep([P['sh' + side], el, hd], pr.arm, 1.03, [1.12, 2]);
+      if (fsw) {
         const wt = T(L.wraps, back);
         for (let i = 0; i < 7; i++) {
           const c = fsw.cs[Math.floor((i + 0.5) / 7 * fsw.cs.length)];
           const r = (fsw.A[0] + fsw.B[0]) * 0.6;
-          softLine(g, [[c.x + c.nx * r, c.y + c.ny * r + 2 * s], [c.x - c.nx * r, c.y - c.ny * r - 1 * s]], wt.dark, 1.2 * s, 0.45);
+          softLine(g, [[c.x + c.nx * r, c.y + c.ny * r + 2 * s], [c.x - c.nx * r, c.y - c.ny * r - 1 * s]], wt.dark, 1.2 * s, 0.4);
         }
-        g.restore();
       }
+    } else if (L.gloves) {
+      const fsw = sweep([P['sh' + side], el, hd], pr.arm, 1.04, [1.12, 1.2]);
+      if (fsw) flat(g, fsw, rgba(T(L.gloves, back).hi, 0.5));          // bracer rim
     }
     if (!back && isSkin(base)) {
-      // bicep and deltoid highlights
-      const mid = sw.cs[Math.floor(sw.cs.length * 0.22)];
-      spot(g, mid.x + Lv[0] * 4 * s, mid.y + Lv[1] * 4 * s, 9 * s * k, 5 * s * k, tint(skinT.hi, 0.3), 0.35, Math.atan2(mid.ny, mid.nx) + Math.PI / 2);
+      const mid = sw.cs[Math.floor(sw.cs.length * 0.24)];
+      spot(g, mid.x + Lv[0] * 4 * s, mid.y + Lv[1] * 4 * s, 10 * s * k, 5 * s * k, skinT.hi, 0.3, Math.atan2(mid.ny, mid.nx) + Math.PI / 2);
+      // the line between biceps and triceps, very soft
+      const pts = sw.cs.filter((c) => c.u > 0.2 && c.u < 0.85).map((c) => [c.x - c.nx * 2 * s, c.y - c.ny * 2 * s]);
+      if (pts.length > 2) softLine(g, pts, skinT.dark, 1.4 * s, 0.18);
     }
-    paintSweep(g, fs, T(fistC, back, isSkin(fistC)), Lv, 0.2);
-    // knuckles
     const kc = fs.cs[Math.floor(fs.cs.length * 0.78)];
-    for (let i = -1; i <= 2; i++) {
-      const o = i * 3.2 * s;
-      spot(g, kc.x + kc.nx * o, kc.y + kc.ny * o, 2.6 * s, 2.2 * s, T(fistC, back).hi, 0.45);
-    }
-    if (L.top === 'armor' || L.top === 'plate') pauldron(g, P['sh' + side], el, back);
+    const kt = T(fistC, back);
+    for (let i = -1; i <= 2; i++) spot(g, kc.x + kc.nx * i * 3.2 * s, kc.y + kc.ny * i * 3.2 * s, 2.8 * s, 2.3 * s, kt.hi, 0.4);
+    // thumb crease
+    const tc = fs.cs[Math.floor(fs.cs.length * 0.35)];
+    softLine(g, [[tc.x + tc.nx * 4 * s, tc.y + tc.ny * 4 * s], [tc.x - tc.nx * 5 * s, tc.y - tc.ny * 5 * s]], kt.dark, 1.2 * s, 0.4);
   };
-
-  const pauldron = (gg, sh, el, back) => {
+  const pauldron = (g, side, back) => {
+    if (L.top !== 'armor' && L.top !== 'plate') return;
+    const sh = P['sh' + side], el = P['el' + side];
     const ang = Math.atan2(el[1] - sh[1], el[0] - sh[0]);
     const r = 17 * s * k;
     const path = new Path2D();
     path.ellipse(r * 0.22, 0, r * 1.08, r * 0.96, 0, -Math.PI * 0.95, Math.PI * 0.95);
     path.closePath();
     const wp = rotPath(path, sh, ang);
-    const base = L.top === 'armor' ? L.trim : L.topColor;
-    paintShape(gg, wp, sh[0], sh[1], r, Lv, T(base, back));
-    gg.save();
-    gg.lineWidth = 1.8 * s;
-    gg.strokeStyle = rgba(T(L.trim || '#c9a227', back).hi, 0.9);
-    gg.stroke(wp);
+    paintShape(g, wp, sh[0], sh[1], r, Lv, T(L.top === 'armor' ? L.trim : L.topColor, back));
+    g.save();
+    g.lineWidth = 1.8 * s;
+    g.strokeStyle = rgba(T(L.trim || '#c9a227', back).hi, 0.9);
+    g.stroke(wp);
     if (L.top === 'plate') {
-      gg.translate(sh[0], sh[1]);
-      gg.rotate(ang);
+      g.translate(sh[0], sh[1]);
+      g.rotate(ang);
       const tt = T(L.trim, back);
       for (let i = -1; i <= 1; i++) {
         const sp = new Path2D();
@@ -2852,316 +2970,318 @@ function paintLayer(f, st, light, px, time, lite) {
         sp.quadraticCurveTo(i * r * 0.5 - r * 0.35, -r * 1.2, i * r * 0.5 - r * 0.28, -r * 1.6 + Math.abs(i) * r * 0.25);
         sp.quadraticCurveTo(i * r * 0.5, -r * 1.1, i * r * 0.5 + 5 * s, -r * 0.76);
         sp.closePath();
-        paintShape(gg, sp, i * r * 0.5, -r, r * 0.5, Lv, tt);
+        paintShape(g, sp, i * r * 0.5, -r, r * 0.5, Lv, tt);
       }
     }
-    gg.restore();
+    g.restore();
   };
 
-  const leg = (side, back) => {
+  const legAlbedo = (side, back) => (g) => {
     const sw = side === 'F' ? geo.legF : geo.legB;
     const ft = side === 'F' ? geo.footF : geo.footB;
-    if (!back) occlude(sw.path, 12 * s, -Lv[0] * 4 * s, -Lv[1] * 4 * s);
-    paintSweep(g, ft, T(bootC, back, isSkin(bootC)), Lv, 0.14);
-    paintSweep(g, sw, T(legC, back, isSkin(legC)), Lv, isSkin(legC) ? 0.14 : 0.08);
+    flat(g, ft, B(bootC, back));
+    flat(g, sw, B(legC, back));
+    const J = [P['hip' + side], P['kn' + side], P['an' + side]];
+    if (L.boots) flat(g, sweep(J, pr.leg, 1.05, [1.42, 2]), B(L.boots, back));
+    else if (L.pantsStyle === 'gi') flat(g, sweep(J, pr.leg, 0.62, [1.86, 2]), B(L.wraps || L.skin, back));
+  };
+  const legDetails = (side, back) => (g) => {
+    const sw = side === 'F' ? geo.legF : geo.legB;
+    const J = [P['hip' + side], P['kn' + side], P['an' + side]];
     if (L.boots) {
-      const bsw = sweep([P['hip' + side], P['kn' + side], P['an' + side]], profilesFor(f).leg, 1.05, [1.42, 2]);
-      paintSweep(g, bsw, T(L.boots, back), Lv, 0.22);
+      const bsw = sweep(J, pr.leg, 1.05, [1.42, 2]);
       if (bsw) {
         const c = bsw.cs[0];
-        softLine(g, [[c.x + c.nx * bsw.A[0], c.y + c.ny * bsw.A[0]], [c.x - c.nx * bsw.B[0], c.y - c.ny * bsw.B[0]]], T(L.boots, back).hi, 1.6 * s, 0.6);
+        softLine(g, [[c.x + c.nx * bsw.A[0], c.y + c.ny * bsw.A[0]], [c.x - c.nx * bsw.B[0], c.y - c.ny * bsw.B[0]]], T(L.boots, back).hi, 1.8 * s, 0.6);
       }
-    } else if (L.pantsStyle === 'gi') {
-      // ankle wraps on barefoot fighters
-      const wsw = sweep([P['hip' + side], P['kn' + side], P['an' + side]], profilesFor(f).leg, 0.62, [1.86, 2]);
-      paintSweep(g, wsw, T(L.wraps || L.skin, back), Lv, 0.1);
     }
     if (!L.stone && L.pantsStyle === 'gi') {
-      // fabric folds: soft creases that follow the bend of the leg
-      g.save();
-      g.clip(sw.path);
       const tt = T(legC, back);
-      const cs = sw.cs;
       for (const [u0, u1, o] of [[0.3, 0.95, 0.35], [1.05, 1.6, -0.3], [1.5, 1.95, 0.4], [0.6, 1.25, -0.5]]) {
-        const pts = cs.filter((c) => c.u >= u0 && c.u <= u1).map((c) => {
-          const [ra] = profilesFor(f).leg(c.u);
+        const pts = sw.cs.filter((c) => c.u >= u0 && c.u <= u1).map((c) => {
+          const [ra] = pr.leg(c.u);
           return [c.x + c.nx * ra * o, c.y + c.ny * ra * o];
         });
-        if (pts.length > 2) softLine(g, pts, tt.dark, 2.2 * s, 0.4);
+        if (pts.length > 2) softLine(g, pts, tt.dark, 2.2 * s, 0.32);
       }
-      g.restore();
     }
-    if (L.stone || isSkin(legC)) {
-      const kn = P['kn' + side];
-      spot(g, kn[0] + Lv[0] * 3 * s, kn[1] + Lv[1] * 3 * s, 8 * s * k, 6 * s * k, T(legC, back).hi, 0.3);
-    }
+    const kn = P['kn' + side];
+    spot(g, kn[0] + Lv[0] * 3 * s, kn[1] + Lv[1] * 3 * s, 8 * s * k, 6 * s * k, T(legC, back).hi, L.stone || isSkin(legC) ? 0.3 : 0.15);
   };
 
-  arm('B', true);
-  leg('B', true);
+  /* ---- far arm, far leg ---- */
+  group(true, armAlbedo('B', true), armDetails('B', true), { after: (g) => pauldron(g, 'B', true) });
+  group(true, legAlbedo('B', true), legDetails('B', true));
 
-  /* ---- torso ---- */
+  /* ---- the core body: torso, hips, near leg, neck, head, shoulder caps ---- */
   const tLen = geo.tLen;
   const kk = s * k;
-  const bare = L.top === 'robe' || L.top === 'stone' || L.top === 'gi';
-  g.save();
-  g.translate(P.hip[0], P.hip[1]);
-  g.rotate(geo.tAng);
-  const Lt = [Lv[0] * Math.cos(-geo.tAng) - Lv[1] * Math.sin(-geo.tAng), Lv[0] * Math.sin(-geo.tAng) + Lv[1] * Math.cos(-geo.tAng)];
-  const tp = geo.torsoLocal;
   const wT = 27 * kk;
-  paintShape(g, tp, 0, -tLen * 0.55, wT * 1.4, Lt, bare ? skinT : T(L.topColor));
-  g.save();
-  g.clip(tp);
-  if (bare && !L.stone) {
-    // anatomy: pec shelf, abdominal blocks, serratus, oblique
-    spot(g, wT * 0.55, -tLen * 0.7, wT * 0.55, tLen * 0.12, skinT.hi, 0.35);
-    softLine(g, [[wT * 1.05, -tLen * 0.6], [wT * 0.45, -tLen * 0.53], [-wT * 0.1, -tLen * 0.62]], skinT.dark, 2.6 * s, 0.4);
-    for (let i = 0; i < 3; i++) {
-      const y = -tLen * (0.24 + i * 0.1);
-      spot(g, wT * 0.62, y, wT * 0.22, tLen * 0.045, skinT.hi, 0.32);
-      softLine(g, [[wT * 0.4, y + tLen * 0.05], [wT * 0.88, y + tLen * 0.045]], skinT.dark, 1.4 * s, 0.32);
-    }
-    softLine(g, [[wT * 0.42, -tLen * 0.58], [wT * 0.4, -tLen * 0.15]], skinT.dark, 1.3 * s, 0.3);
-    for (let i = 0; i < 3; i++) softLine(g, [[wT * 0.2, -tLen * (0.42 + i * 0.05)], [wT * 0.02, -tLen * (0.38 + i * 0.05)]], skinT.dark, 1.2 * s, 0.25);
-    spot(g, -wT * 0.6, -tLen * 0.78, wT * 0.5, tLen * 0.14, skinT.dark, 0.3);
-  }
-  const cT = T(L.topColor), cT2 = T(L.topColor2 || L.topColor);
-  const region = (pts, tones, size = wT * 1.4) => {
+  const bare = L.top === 'robe' || L.top === 'stone' || L.top === 'gi';
+  const inTorso = (g, fn) => {
+    g.save();
+    g.translate(P.hip[0], P.hip[1]);
+    g.rotate(geo.tAng);
+    fn(g);
+    g.restore();
+  };
+  const inHead = (g, fn) => {
+    g.save();
+    g.translate(P.head[0], P.head[1]);
+    g.rotate(geo.hAng);
+    fn(g);
+    g.restore();
+  };
+  const poly = (pts) => {
     const p = new Path2D();
     p.moveTo(pts[0][0], pts[0][1]);
     for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]);
     p.closePath();
-    paintShape(g, p, 0, -tLen * 0.55, size, Lt, tones);
     return p;
   };
-  if (L.top === 'gi') {
-    region([[-wT * 1.5, 8], [-wT * 1.5, -tLen * 1.1], [wT * 0.05, -tLen * 1.1], [wT * 0.62, -tLen * 0.42], [wT * 1.5, -tLen * 0.42], [wT * 1.5, 8]], cT);
-    softLine(g, [[wT * 0.05, -tLen * 1.08], [wT * 0.62, -tLen * 0.42]], cT.hi, 2.4 * s, 0.6);
-    for (let i = 0; i < 3; i++) softLine(g, [[-wT * (1.0 - i * 0.3), -tLen * 0.95], [-wT * (0.7 - i * 0.3), -tLen * 0.5], [-wT * (0.8 - i * 0.3), -tLen * 0.1]], cT.dark, 2 * s, 0.35);
-  } else if (L.top === 'robe') {
-    region([[-wT * 1.5, 8], [-wT * 1.5, -tLen * 1.1], [-wT * 0.25, -tLen * 1.1], [wT * 1.5, -tLen * 0.34], [wT * 1.5, 8]], cT);
-    for (let i = 0; i < 4; i++) softLine(g, [[-wT * (0.9 - i * 0.35), -tLen * (0.95 - i * 0.05)], [-wT * (0.4 - i * 0.3), -tLen * 0.5], [-wT * (0.6 - i * 0.4), -tLen * 0.05]], cT2.dark, 2 * s, 0.4);
-    softLine(g, [[-wT * 0.25, -tLen * 1.08], [wT * 1.4, -tLen * 0.36]], cT.hi, 2.6 * s, 0.6);
-  } else if (L.top === 'armor') {
-    const pl = region([[-wT * 1.5, -tLen * 0.18], [-wT * 1.5, -tLen * 0.98], [wT * 1.5, -tLen * 0.98], [wT * 1.5, -tLen * 0.18]], cT);
-    g.lineWidth = 2.2 * s; g.strokeStyle = rgba(T(L.trim).hi, 0.85); g.stroke(pl);
-    for (const y of [0.42, 0.62, 0.8]) softLine(g, [[-wT * 1.4, -tLen * y], [wT * 0.2, -tLen * (y + 0.04)], [wT * 1.4, -tLen * y]], cT2.dark, 1.6 * s, 0.6);
-    spot(g, wT * 0.5, -tLen * 0.68, wT * 0.6, tLen * 0.14, cT.hi, 0.35);
-    softLine(g, [[wT * 0.62, -tLen * 0.82], [wT * 0.36, -tLen * 0.64], [wT * 0.62, -tLen * 0.62], [wT * 0.34, -tLen * 0.42]], f.def.element.glow, 2.4 * s, 0.95);
-  } else if (L.top === 'wrap') {
-    for (let i = -3; i < 7; i++) softLine(g, [[-wT * 1.4, -tLen * (0.08 + i * 0.12)], [wT * 1.4, -tLen * (0.26 + i * 0.12)]], cT2.dark, 2 * s, 0.6);
-    for (let i = -3; i < 7; i++) softLine(g, [[-wT * 1.4, -tLen * (0.12 + i * 0.12)], [wT * 1.4, -tLen * (0.3 + i * 0.12)]], cT.hi, 0.9 * s, 0.25);
-    softLine(g, [[-wT * 1.2, -tLen * 1.0], [wT * 1.2, -tLen * 0.25]], T(L.trim).base, 3.2 * s, 0.85);
-  } else if (L.top === 'stone') {
-    const pulse = 0.55 + 0.45 * Math.sin(time * 3 + f.side);
-    for (const pts of [[[0.2, 0.9], [-0.3, 0.7], [0.1, 0.5], [-0.1, 0.38]], [[0.8, 0.3], [0.4, 0.5], [0.9, 0.7]], [[-0.6, 0.2], [-0.2, 0.4], [-0.7, 0.6]]]) {
-      const q = pts.map(([a, c]) => [wT * a, -tLen * c]);
-      softLine(g, q, L.cracks, 2.6 * s, 0.35 + pulse * 0.45);
-      softLine(g, q, '#fff1c4', 0.9 * s, 0.25 + pulse * 0.4);
-    }
-    spot(g, -wT * 0.6, -tLen * 0.92, wT * 0.8, tLen * 0.14, L.moss, 0.7, 0.2);
-    spot(g, wT * 0.3, -tLen * 0.3, wT * 0.4, tLen * 0.08, L.moss, 0.4);
-    for (let i = 0; i < 9; i++) spot(g, wT * (((i * 37) % 17) / 8.5 - 1), -tLen * (((i * 23) % 13) / 13), 3 * s, 3 * s, skinT.dark, 0.35);
-  } else if (L.top === 'plate') {
-    for (let i = 0; i < 4; i++) softLine(g, [[-wT * 1.4, -tLen * (0.14 + i * 0.1)], [wT * 0.3, -tLen * (0.2 + i * 0.1)], [wT * 1.4, -tLen * (0.14 + i * 0.1)]], T(L.trim).base, 1.6 * s, 0.75);
-    const cp = new Path2D();
-    cp.moveTo(wT * 1.4, -tLen * 0.98);
-    cp.quadraticCurveTo(wT * 0.1, -tLen * 0.82, wT * 0.4, -tLen * 0.56);
-    cp.quadraticCurveTo(wT * 0.8, -tLen * 0.48, wT * 1.4, -tLen * 0.52);
-    cp.closePath();
-    paintShape(g, cp, wT * 0.8, -tLen * 0.75, wT, Lt, cT2);
-    g.lineWidth = 2 * s; g.strokeStyle = rgba(T(L.trim).hi, 0.9); g.stroke(cp);
-    spot(g, wT * 0.62, -tLen * 0.74, 9 * s, 9 * s, f.def.element.glow, 0.9);
-  }
-  // belt / waistband and the trunks below it
-  if (L.belt) {
-    const bt = T(L.belt);
-    const band = new Path2D();
-    band.rect(-wT * 1.6, -tLen * 0.17, wT * 3.2, tLen * 0.12);
-    paintShape(g, band, 0, -tLen * 0.11, wT, Lt, bt);
-    softLine(g, [[-wT * 1.6, -tLen * 0.05], [wT * 1.6, -tLen * 0.05]], bt.dark, 1.6 * s, 0.6);
-  }
-  if (!L.stone) {
-    const pants = new Path2D();
-    pants.rect(-wT * 1.6, -tLen * 0.05, wT * 3.2, tLen * 0.4);
-    paintShape(g, pants, 0, 0, wT, Lt, T(legC));
-  }
-  // occlusion where the torso meets the neck and the hips
-  spot(g, 0, -tLen * 0.98, wT * 0.7, tLen * 0.08, skinT.dark, 0.35);
-  g.restore();
-  if (L.beads) {
-    for (let i = 0; i <= 10; i++) {
-      const t = i / 10;
-      const x = wT * (0.12 + 0.62 * Math.sin(t * Math.PI)) - wT * 0.12;
-      const y = -tLen * (0.98 - 0.44 * Math.sin(t * Math.PI * 0.5 + 0.2) * (t < 0.5 ? t * 2 : 1));
-      const bp = new Path2D();
-      bp.arc(x, y, 3.7 * s, 0, Math.PI * 2);
-      paintShape(g, bp, x, y, 3.7 * s, Lt, T(i === 5 ? '#d9a441' : L.beads));
-    }
-  }
-  g.restore();
-
-  /* ---- front leg, flaps ---- */
-  leg('F', false);
-  if (C.flap) clothPaint(C.flap, 21 * s * k, 9 * s * k, L.top === 'stone' ? L.belt : L.topColor, false, 0.18);
-
-  /* ---- head ---- */
-  occlude(geo.head, 12 * s, 0, 5 * s);
-  const neckC = L.stone ? L.skin : L.hair.style === 'mask' ? L.mask : L.skin;
-  paintSweep(g, geo.neck, T(neckC, false, isSkin(neckC)), Lv, 0);
   const r = b.head;
-  g.save();
-  g.translate(P.head[0], P.head[1]);
-  g.rotate(geo.hAng);
-  const Lh = [Lv[0] * Math.cos(-geo.hAng) - Lv[1] * Math.sin(-geo.hAng), Lv[0] * Math.sin(-geo.hAng) + Lv[1] * Math.cos(-geo.hAng)];
-  const hp = geo.headLocal;
   const style = L.hair.style;
-  const faceT = style === 'mask' ? T(L.mask) : skinT;
-  paintShape(g, hp, 0.1 * r, -0.1 * r, r * 1.3, Lh, faceT);
-  g.save();
-  g.clip(hp);
-  // jaw shadow and cheekbone
-  spot(g, 0.25 * r, 0.78 * r, 0.7 * r, 0.25 * r, faceT.dark, 0.55);
-  if (style !== 'mask') spot(g, 0.55 * r, 0.12 * r, 0.3 * r, 0.18 * r, tint(faceT.hi, 0.2), 0.35);
+  const neckC = L.stone ? L.skin : style === 'mask' ? L.mask : L.skin;
+  const faceC = style === 'mask' ? L.mask : L.skin;
 
-  const eye = (glow) => {
-    spot(g, 0.6 * r, -0.12 * r, 0.26 * r, 0.16 * r, faceT.dark, style === 'mask' ? 0 : 0.6);
-    if (glow) {
-      g.save();
-      g.globalCompositeOperation = 'lighter';
-      g.drawImage(glowSprite(glow, 64), 0.62 * r - 11 * s, -0.12 * r - 11 * s, 22 * s, 22 * s);
-      g.restore();
-      const e = new Path2D();
-      e.ellipse(0.64 * r, -0.12 * r, 0.17 * r, 0.06 * r, -0.1, 0, Math.PI * 2);
-      g.fillStyle = tint(glow, 0.55);
-      g.fill(e);
-      return;
-    }
-    const e = new Path2D();
-    e.moveTo(0.48 * r, -0.12 * r);
-    e.quadraticCurveTo(0.62 * r, -0.2 * r, 0.76 * r, -0.12 * r);
-    e.quadraticCurveTo(0.62 * r, -0.06 * r, 0.48 * r, -0.12 * r);
-    g.fillStyle = '#e9dfd2';
-    g.fill(e);
-    g.fillStyle = '#2a1a10';
-    g.beginPath(); g.arc(0.68 * r, -0.125 * r, 0.05 * r, 0, Math.PI * 2); g.fill();
-    softLine(g, [[0.46 * r, -0.15 * r], [0.62 * r, -0.21 * r], [0.78 * r, -0.14 * r]], '#1a0c08', 1.3 * s, 0.85);
-    // brow
-    softLine(g, [[0.42 * r, -0.3 * r], [0.66 * r, -0.36 * r], [0.86 * r, -0.28 * r]], style === 'long' ? '#b9b9c4' : L.hair.color === '#000' ? '#2a1a14' : shade(L.hair.color, 0.2), 2.6 * s, 0.85);
-    // mouth and nostril
-    softLine(g, [[0.72 * r, 0.47 * r], [0.86 * r, 0.47 * r]], '#4a1a14', 1.3 * s, 0.7);
-    spot(g, 0.94 * r, 0.22 * r, 0.06 * r, 0.04 * r, '#3a120c', 0.6);
+  const coreAlbedo = (g) => {
+    // near leg and hips first: the torso and trunks lie over their tops
+    legAlbedo('F', false)(g);
+    inTorso(g, (t) => {
+      const tp = geo.torsoLocal;
+      t.fillStyle = B(bare ? L.skin : L.topColor);
+      t.fill(tp);
+      t.save();
+      t.clip(tp);
+      if (L.top === 'gi') { t.fillStyle = B(L.topColor); t.fill(poly([[-wT * 1.5, 8], [-wT * 1.5, -tLen * 1.1], [wT * 0.05, -tLen * 1.1], [wT * 0.62, -tLen * 0.42], [wT * 1.5, -tLen * 0.42], [wT * 1.5, 8]])); }
+      if (L.top === 'robe') { t.fillStyle = B(L.topColor); t.fill(poly([[-wT * 1.5, 8], [-wT * 1.5, -tLen * 1.1], [-wT * 0.25, -tLen * 1.1], [wT * 1.5, -tLen * 0.34], [wT * 1.5, 8]])); }
+      if (L.top === 'armor') { t.fillStyle = B(L.topColor); t.fill(poly([[-wT * 1.5, -tLen * 0.18], [-wT * 1.5, -tLen * 0.98], [wT * 1.5, -tLen * 0.98], [wT * 1.5, -tLen * 0.18]])); }
+      if (L.belt) { t.fillStyle = B(L.belt); t.fillRect(-wT * 1.6, -tLen * 0.17, wT * 3.2, tLen * 0.12); }
+      if (!L.stone) { t.fillStyle = B(legC); t.fillRect(-wT * 1.6, -tLen * 0.05, wT * 3.2, tLen * 0.4); }
+      t.restore();
+    });
+    // shoulder cap: the arm grows out of this, so the shoulder is body, not seam
+    const capR = 12.5 * s * k * 1.12;
+    g.fillStyle = B(armC);
+    g.beginPath();
+    g.arc(P.shF[0], P.shF[1], capR, 0, Math.PI * 2);
+    g.fill();
+    flat(g, geo.neck, B(neckC));
+    inHead(g, (h) => {
+      h.fillStyle = B(faceC);
+      h.fill(geo.headLocal);
+      if (style !== 'mask' && style !== 'horns' && !L.stone) {
+        h.fillStyle = B(L.skin);
+        h.beginPath(); h.ellipse(-0.12 * r, 0.02 * r, 0.16 * r, 0.24 * r, 0.15, 0, Math.PI * 2); h.fill();
+      }
+      h.save();
+      h.clip(geo.headLocal);
+      if (style === 'long' || style === 'ponytail') { h.fillStyle = B(L.hair.color); h.fill(hairCapPath(r)); }
+      if (style === 'mask') { h.fillStyle = B(L.skin); h.fill(poly([[0.2 * r, -0.3 * r], [1.1 * r, -0.36 * r], [1.1 * r, 0.02 * r], [0.2 * r, 0.04 * r]])); }
+      if (style === 'horns') { h.fillStyle = B(L.topColor); h.fill(helmPath(r)); }
+      if (style === 'none') { h.fillStyle = B(shade(L.skin, 0.15)); h.fill(poly([[0.05 * r, -0.52 * r], [1.06 * r, -0.42 * r], [1.06 * r, -0.2 * r], [0.05 * r, -0.28 * r]])); }
+      if (L.band) { h.fillStyle = B(L.band); h.fill(poly([[-1.15 * r, -0.44 * r], [0.95 * r, -0.52 * r], [0.95 * r, -0.34 * r], [-1.15 * r, -0.22 * r]])); }
+      h.restore();
+    });
   };
 
-  const hairCap = (color) => {
-    const hc = new Path2D();
-    hc.moveTo(0.74 * r, -0.56 * r);
-    hc.quadraticCurveTo(0.5 * r, -1.22 * r, -0.4 * r, -1.1 * r);
-    hc.quadraticCurveTo(-1.18 * r, -0.66 * r, -0.98 * r, 0.52 * r);
-    hc.lineTo(-0.36 * r, 0.24 * r);
-    hc.quadraticCurveTo(-0.2 * r, -0.32 * r, 0.24 * r, -0.5 * r);
-    hc.closePath();
-    const ht = T(color);
-    paintShape(g, hc, -0.2 * r, -0.5 * r, r, Lh, ht);
-    g.save();
-    g.clip(hc);
-    for (let i = 0; i < 9; i++) {
-      const t = i / 8;
-      softLine(g, [[0.6 * r - t * 0.3 * r, -0.62 * r - t * 0.1 * r], [-0.1 * r - t * 0.3 * r, -1.0 * r + t * 0.2 * r], [-0.9 * r + t * 0.1 * r, -0.2 * r + t * 0.5 * r]], i % 2 ? ht.hi : ht.dark, 1.1 * s, 0.45);
-    }
-    g.restore();
+  const coreDetails = (g) => {
+    legDetails('F', false)(g);
+    inTorso(g, (t) => {
+      const cT = T(L.topColor), cT2 = T(L.topColor2 || L.topColor);
+      if (bare && !L.stone) {
+        spot(t, wT * 0.55, -tLen * 0.7, wT * 0.55, tLen * 0.12, skinT.hi, 0.3);
+        softLine(t, [[wT * 1.05, -tLen * 0.6], [wT * 0.45, -tLen * 0.53], [-wT * 0.1, -tLen * 0.62]], skinT.dark, 2.4 * s, 0.32);
+        for (let i = 0; i < 3; i++) {
+          const y = -tLen * (0.24 + i * 0.1);
+          spot(t, wT * 0.62, y, wT * 0.22, tLen * 0.045, skinT.hi, 0.26);
+          softLine(t, [[wT * 0.4, y + tLen * 0.05], [wT * 0.88, y + tLen * 0.045]], skinT.dark, 1.3 * s, 0.24);
+        }
+        softLine(t, [[wT * 0.42, -tLen * 0.58], [wT * 0.4, -tLen * 0.15]], skinT.dark, 1.2 * s, 0.22);
+        for (let i = 0; i < 3; i++) softLine(t, [[wT * 0.2, -tLen * (0.42 + i * 0.05)], [wT * 0.02, -tLen * (0.38 + i * 0.05)]], skinT.dark, 1.1 * s, 0.2);
+      }
+      if (L.top === 'gi') {
+        softLine(t, [[wT * 0.05, -tLen * 1.08], [wT * 0.62, -tLen * 0.42]], cT.hi, 2.4 * s, 0.55);
+        for (let i = 0; i < 3; i++) softLine(t, [[-wT * (1.0 - i * 0.3), -tLen * 0.95], [-wT * (0.7 - i * 0.3), -tLen * 0.5], [-wT * (0.8 - i * 0.3), -tLen * 0.1]], cT.dark, 2 * s, 0.3);
+      } else if (L.top === 'robe') {
+        for (let i = 0; i < 4; i++) softLine(t, [[-wT * (0.9 - i * 0.35), -tLen * (0.95 - i * 0.05)], [-wT * (0.4 - i * 0.3), -tLen * 0.5], [-wT * (0.6 - i * 0.4), -tLen * 0.05]], cT2.dark, 2 * s, 0.35);
+        softLine(t, [[-wT * 0.25, -tLen * 1.08], [wT * 1.4, -tLen * 0.36]], cT.hi, 2.6 * s, 0.55);
+      } else if (L.top === 'armor') {
+        softLine(t, [[-wT * 1.4, -tLen * 0.18], [wT * 1.4, -tLen * 0.18]], T(L.trim).hi, 2.2 * s, 0.8);
+        softLine(t, [[-wT * 1.4, -tLen * 0.98], [wT * 1.4, -tLen * 0.98]], T(L.trim).hi, 2.2 * s, 0.8);
+        for (const y of [0.42, 0.62, 0.8]) softLine(t, [[-wT * 1.4, -tLen * y], [wT * 0.2, -tLen * (y + 0.04)], [wT * 1.4, -tLen * y]], cT2.dark, 1.6 * s, 0.55);
+        spot(t, wT * 0.5, -tLen * 0.68, wT * 0.6, tLen * 0.14, cT.hi, 0.3);
+        softLine(t, [[wT * 0.62, -tLen * 0.82], [wT * 0.36, -tLen * 0.64], [wT * 0.62, -tLen * 0.62], [wT * 0.34, -tLen * 0.42]], f.def.element.glow, 2.4 * s, 0.95);
+      } else if (L.top === 'wrap') {
+        for (let i = -3; i < 7; i++) softLine(t, [[-wT * 1.4, -tLen * (0.08 + i * 0.12)], [wT * 1.4, -tLen * (0.26 + i * 0.12)]], cT2.dark, 2 * s, 0.5);
+        for (let i = -3; i < 7; i++) softLine(t, [[-wT * 1.4, -tLen * (0.12 + i * 0.12)], [wT * 1.4, -tLen * (0.3 + i * 0.12)]], cT.hi, 0.9 * s, 0.2);
+        softLine(t, [[-wT * 1.2, -tLen * 1.0], [wT * 1.2, -tLen * 0.25]], T(L.trim).base, 3.2 * s, 0.85);
+      } else if (L.top === 'stone') {
+        const pulse = 0.55 + 0.45 * Math.sin(time * 3 + f.side);
+        for (const pts of [[[0.2, 0.9], [-0.3, 0.7], [0.1, 0.5], [-0.1, 0.38]], [[0.8, 0.3], [0.4, 0.5], [0.9, 0.7]], [[-0.6, 0.2], [-0.2, 0.4], [-0.7, 0.6]]]) {
+          const q = pts.map(([a, c]) => [wT * a, -tLen * c]);
+          softLine(t, q, L.cracks, 2.6 * s, 0.35 + pulse * 0.45);
+          softLine(t, q, '#fff1c4', 0.9 * s, 0.25 + pulse * 0.4);
+        }
+        spot(t, -wT * 0.6, -tLen * 0.92, wT * 0.8, tLen * 0.14, L.moss, 0.7, 0.2);
+        spot(t, wT * 0.3, -tLen * 0.3, wT * 0.4, tLen * 0.08, L.moss, 0.4);
+        for (let i = 0; i < 9; i++) spot(t, wT * (((i * 37) % 17) / 8.5 - 1), -tLen * (((i * 23) % 13) / 13), 3 * s, 3 * s, skinT.dark, 0.3);
+      } else if (L.top === 'plate') {
+        for (let i = 0; i < 4; i++) softLine(t, [[-wT * 1.4, -tLen * (0.14 + i * 0.1)], [wT * 0.3, -tLen * (0.2 + i * 0.1)], [wT * 1.4, -tLen * (0.14 + i * 0.1)]], T(L.trim).base, 1.6 * s, 0.75);
+        const cp = new Path2D();
+        cp.moveTo(wT * 1.4, -tLen * 0.98);
+        cp.quadraticCurveTo(wT * 0.1, -tLen * 0.82, wT * 0.4, -tLen * 0.56);
+        cp.quadraticCurveTo(wT * 0.8, -tLen * 0.48, wT * 1.4, -tLen * 0.52);
+        cp.closePath();
+        t.fillStyle = rgba(T(L.topColor2).base, 0.85);
+        t.fill(cp);
+        t.lineWidth = 2 * s; t.strokeStyle = rgba(T(L.trim).hi, 0.9); t.stroke(cp);
+        spot(t, wT * 0.62, -tLen * 0.74, 9 * s, 9 * s, f.def.element.glow, 0.9);
+      }
+      if (L.belt) {
+        softLine(t, [[-wT * 1.6, -tLen * 0.165], [wT * 1.6, -tLen * 0.165]], T(L.belt).hi, 1.3 * s, 0.45);
+        softLine(t, [[-wT * 1.6, -tLen * 0.05], [wT * 1.6, -tLen * 0.05]], T(L.belt).dark, 1.6 * s, 0.55);
+      }
+    });
+    // face
+    inHead(g, (h) => {
+      const faceT = T(faceC);
+      spot(h, 0.25 * r, 0.82 * r, 0.7 * r, 0.22 * r, faceT.dark, 0.45);
+      if (style !== 'mask') spot(h, 0.55 * r, 0.12 * r, 0.3 * r, 0.18 * r, tint(faceT.hi, 0.2), 0.3);
+      const eye = (glow) => {
+        spot(h, 0.6 * r, -0.12 * r, 0.26 * r, 0.16 * r, faceT.dark, style === 'mask' ? 0 : 0.55);
+        if (glow) {
+          h.save();
+          h.globalCompositeOperation = 'lighter';
+          h.drawImage(glowSprite(glow, 64), 0.62 * r - 11 * s, -0.12 * r - 11 * s, 22 * s, 22 * s);
+          h.restore();
+          h.fillStyle = tint(glow, 0.55);
+          h.beginPath(); h.ellipse(0.64 * r, -0.12 * r, 0.17 * r, 0.06 * r, -0.1, 0, Math.PI * 2); h.fill();
+          return;
+        }
+        const e = new Path2D();
+        e.moveTo(0.48 * r, -0.12 * r);
+        e.quadraticCurveTo(0.62 * r, -0.2 * r, 0.76 * r, -0.12 * r);
+        e.quadraticCurveTo(0.62 * r, -0.06 * r, 0.48 * r, -0.12 * r);
+        h.fillStyle = '#e4d8ca';
+        h.fill(e);
+        h.fillStyle = '#2a1a10';
+        h.beginPath(); h.arc(0.68 * r, -0.125 * r, 0.05 * r, 0, Math.PI * 2); h.fill();
+        softLine(h, [[0.46 * r, -0.15 * r], [0.62 * r, -0.21 * r], [0.78 * r, -0.14 * r]], '#1a0c08', 1.3 * s, 0.8);
+        softLine(h, [[0.42 * r, -0.3 * r], [0.66 * r, -0.36 * r], [0.86 * r, -0.28 * r]], style === 'long' ? '#b9b9c4' : L.hair.color === '#000' ? '#2a1a14' : shade(L.hair.color, 0.2), 2.6 * s, 0.8);
+        softLine(h, [[0.72 * r, 0.47 * r], [0.86 * r, 0.47 * r]], '#4a1a14', 1.3 * s, 0.65);
+        spot(h, 0.94 * r, 0.22 * r, 0.06 * r, 0.04 * r, '#3a120c', 0.55);
+      };
+      if (style !== 'mask' && style !== 'horns' && !L.stone) softLine(h, [[-0.08 * r, -0.12 * r], [-0.18 * r, 0.02 * r], [-0.1 * r, 0.16 * r]], skinT.dark, 1.2 * s, 0.55);
+      if (style === 'long' || style === 'ponytail') {
+        eye(null);
+        const ht = T(L.hair.color);
+        h.save();
+        h.clip(hairCapPath(r));
+        for (let i = 0; i < 9; i++) {
+          const tt = i / 8;
+          softLine(h, [[0.6 * r - tt * 0.3 * r, -0.62 * r - tt * 0.1 * r], [-0.1 * r - tt * 0.3 * r, -1.0 * r + tt * 0.2 * r], [-0.9 * r + tt * 0.1 * r, -0.2 * r + tt * 0.5 * r]], i % 2 ? ht.hi : ht.dark, 1.1 * s, 0.45);
+        }
+        h.restore();
+        if (style === 'ponytail') softLine(h, [[-0.6 * r, -0.64 * r], [0.2 * r, -0.72 * r], [0.88 * r, -0.66 * r]], L.trim || '#d4a940', 2.4 * s, 0.95);
+        if (L.scar) softLine(h, [[0.46 * r, -0.4 * r], [0.58 * r, -0.1 * r], [0.7 * r, 0.14 * r]], '#7a1e1e', 1.5 * s, 0.7);
+      } else if (style === 'bald') {
+        eye(null);
+        spot(h, -0.1 * r, -0.66 * r, 0.5 * r, 0.24 * r, '#fff1dc', 0.28, -0.3);
+        spot(h, 0.1 * r, -0.72 * r, 0.18 * r, 0.08 * r, '#ffffff', 0.32, -0.3);
+        if (L.mark) spot(h, 0.62 * r, -0.56 * r, 0.1 * r, 0.1 * r, L.mark, 0.95);
+      } else if (style === 'mask') {
+        for (let i = 0; i < 5; i++) softLine(h, [[-r, (0.16 + i * 0.17) * r], [0.2 * r, (0.12 + i * 0.16) * r], [r, (0.08 + i * 0.17) * r]], faceT.dark, 1.5 * s, 0.42);
+        for (let i = 0; i < 3; i++) softLine(h, [[-r, (-0.5 - i * 0.18) * r], [r, (-0.52 - i * 0.16) * r]], faceT.dark, 1.4 * s, 0.38);
+        eye(L.glowEyes);
+      } else if (style === 'none') {
+        spot(h, 0.6 * r, -0.08 * r, 0.3 * r, 0.12 * r, '#000000', 0.5);
+        eye(L.glowEyes);
+        softLine(h, [[-0.5 * r, -0.9 * r], [-0.2 * r, -0.4 * r], [-0.5 * r, 0.1 * r]], L.cracks, 2 * s, 0.85);
+        spot(h, -0.4 * r, -0.6 * r, 0.4 * r, 0.2 * r, L.moss, 0.5);
+      } else if (style === 'horns') {
+        h.lineWidth = 1.8 * s; h.strokeStyle = rgba(T(L.trim).hi, 0.9); h.stroke(helmPath(r));
+        eye(L.glowEyes);
+      }
+    });
   };
 
-  // ear
-  if (style !== 'mask' && style !== 'horns' && !L.stone) {
-    const ear = new Path2D();
-    ear.ellipse(-0.12 * r, 0.02 * r, 0.16 * r, 0.24 * r, 0.15, 0, Math.PI * 2);
-    paintShape(g, ear, -0.12 * r, 0.02 * r, 0.2 * r, Lh, skinT);
-    softLine(g, [[-0.08 * r, -0.12 * r], [-0.18 * r, 0.02 * r], [-0.1 * r, 0.16 * r]], skinT.dark, 1.2 * s, 0.6);
-  }
+  const coreAfter = (g) => {
+    // accessories that sit on the body but are not the body
+    inTorso(g, (t) => {
+      if (L.beads) {
+        for (let i = 0; i <= 10; i++) {
+          const tt = i / 10;
+          const x = wT * (0.12 + 0.62 * Math.sin(tt * Math.PI)) - wT * 0.12;
+          const y = -tLen * (0.98 - 0.44 * Math.sin(tt * Math.PI * 0.5 + 0.2) * (tt < 0.5 ? tt * 2 : 1));
+          const bp = new Path2D();
+          bp.arc(x, y, 3.7 * s, 0, Math.PI * 2);
+          paintShape(t, bp, x, y, 3.7 * s, [0, -1], T(i === 5 ? '#d9a441' : L.beads));
+        }
+      }
+    });
+    if (C.flap) clothPaint(g, C.flap, 21 * s * k, 9 * s * k, L.top === 'stone' ? L.belt : L.topColor, false, 0.18);
+    inHead(g, (h) => {
+      if (style === 'horns') {
+        const beard = new Path2D();
+        beard.moveTo(0.35 * r, 0.55 * r);
+        beard.quadraticCurveTo(0.65 * r, 1.25 * r, 0.1 * r, 1.42 * r);
+        beard.quadraticCurveTo(-0.1 * r, 1.0 * r, -0.2 * r, 0.7 * r);
+        beard.closePath();
+        paintShape(h, beard, 0.2 * r, 0.9 * r, 0.4 * r, [0, -1], T('#2a2420'));
+        for (const [ox, back] of [[-0.15 * r, true], [0.3 * r, false]]) {
+          const hn = new Path2D();
+          hn.moveTo(ox - 0.18 * r, -0.85 * r);
+          hn.bezierCurveTo(ox - 0.9 * r, -1.3 * r, ox - 1.25 * r, -2.0 * r, ox - 0.55 * r, -2.55 * r);
+          hn.bezierCurveTo(ox - 0.85 * r, -1.95 * r, ox - 0.45 * r, -1.35 * r, ox + 0.25 * r, -0.95 * r);
+          hn.closePath();
+          const ht = T(L.hair.color, back);
+          paintShape(h, hn, ox - 0.5 * r, -1.6 * r, 0.9 * r, [-0.4, -0.9], ht);
+          h.save();
+          h.clip(hn);
+          for (let i = 0; i < 6; i++) softLine(h, [[ox - 0.6 * r - i * 0.06 * r, -1.0 * r - i * 0.25 * r], [ox - 0.2 * r - i * 0.08 * r, -1.0 * r - i * 0.24 * r]], ht.dark, 1.4 * s, 0.6);
+          h.restore();
+        }
+      }
+    });
+  };
 
-  if (style === 'long' || style === 'ponytail') {
-    eye(null);
-    hairCap(L.hair.color);
-    if (L.band) {
-      const bp = new Path2D();
-      bp.moveTo(-1.15 * r, -0.44 * r); bp.lineTo(0.95 * r, -0.52 * r); bp.lineTo(0.95 * r, -0.34 * r); bp.lineTo(-1.15 * r, -0.22 * r); bp.closePath();
-      paintShape(g, bp, 0, -0.38 * r, r, Lh, T(L.band));
-    }
-    if (style === 'ponytail') softLine(g, [[-0.6 * r, -0.64 * r], [0.2 * r, -0.72 * r], [0.88 * r, -0.66 * r]], L.trim || '#d4a940', 2.4 * s, 0.95);
-    if (L.scar) softLine(g, [[0.46 * r, -0.4 * r], [0.58 * r, -0.1 * r], [0.7 * r, 0.14 * r]], '#7a1e1e', 1.5 * s, 0.75);
-  } else if (style === 'bald') {
-    eye(null);
-    spot(g, -0.1 * r, -0.66 * r, 0.5 * r, 0.24 * r, '#fff1dc', 0.3, -0.3);
-    spot(g, 0.1 * r, -0.72 * r, 0.18 * r, 0.08 * r, '#ffffff', 0.35, -0.3);
-    if (L.mark) spot(g, 0.62 * r, -0.56 * r, 0.1 * r, 0.1 * r, L.mark, 0.95);
-  } else if (style === 'mask') {
-    const band = new Path2D();
-    band.moveTo(0.2 * r, -0.3 * r); band.lineTo(1.1 * r, -0.36 * r); band.lineTo(1.1 * r, 0.02 * r); band.lineTo(0.2 * r, 0.04 * r); band.closePath();
-    paintShape(g, band, 0.6 * r, -0.15 * r, 0.5 * r, Lh, skinT);
-    for (let i = 0; i < 5; i++) softLine(g, [[-r, (0.16 + i * 0.17) * r], [0.2 * r, (0.12 + i * 0.16) * r], [r, (0.08 + i * 0.17) * r]], faceT.dark, 1.5 * s, 0.45);
-    for (let i = 0; i < 3; i++) softLine(g, [[-r, (-0.5 - i * 0.18) * r], [r, (-0.52 - i * 0.16) * r]], faceT.dark, 1.4 * s, 0.4);
-    eye(L.glowEyes);
-  } else if (style === 'none') {
-    const brow = new Path2D();
-    brow.moveTo(0.05 * r, -0.52 * r); brow.lineTo(1.06 * r, -0.42 * r); brow.lineTo(1.06 * r, -0.2 * r); brow.lineTo(0.05 * r, -0.28 * r); brow.closePath();
-    paintShape(g, brow, 0.5 * r, -0.36 * r, 0.5 * r, Lh, T(shade(L.skin, 0.15)));
-    spot(g, 0.6 * r, -0.08 * r, 0.3 * r, 0.12 * r, '#000000', 0.5);
-    eye(L.glowEyes);
-    softLine(g, [[-0.5 * r, -0.9 * r], [-0.2 * r, -0.4 * r], [-0.5 * r, 0.1 * r]], L.cracks, 2 * s, 0.85);
-    spot(g, -0.4 * r, -0.6 * r, 0.4 * r, 0.2 * r, L.moss, 0.5);
-  } else if (style === 'horns') {
-    const helm = new Path2D();
-    helm.moveTo(-1.1 * r, -0.2 * r);
-    helm.quadraticCurveTo(-0.9 * r, -1.25 * r, 0.2 * r, -1.1 * r);
-    helm.lineTo(0.95 * r, -0.4 * r); helm.lineTo(0.95 * r, -0.08 * r); helm.lineTo(0.3 * r, -0.2 * r);
-    helm.lineTo(0.2 * r, 0.6 * r); helm.lineTo(-1.1 * r, 0.6 * r); helm.closePath();
-    paintShape(g, helm, -0.2 * r, -0.4 * r, r, Lh, T(L.topColor));
-    g.lineWidth = 1.8 * s; g.strokeStyle = rgba(T(L.trim).hi, 0.9); g.stroke(helm);
-    eye(L.glowEyes);
-    const beard = new Path2D();
-    beard.moveTo(0.35 * r, 0.55 * r);
-    beard.quadraticCurveTo(0.65 * r, 1.25 * r, 0.1 * r, 1.42 * r);
-    beard.quadraticCurveTo(-0.1 * r, 1.0 * r, -0.2 * r, 0.7 * r);
-    beard.closePath();
-    paintShape(g, beard, 0.2 * r, 0.9 * r, 0.4 * r, Lh, T('#2a2420'));
-  }
-  g.restore();                                   // unclip
-  if (style === 'horns') {
-    for (const [ox, back] of [[-0.15 * r, true], [0.3 * r, false]]) {
-      const hn = new Path2D();
-      hn.moveTo(ox - 0.18 * r, -0.85 * r);
-      hn.bezierCurveTo(ox - 0.9 * r, -1.3 * r, ox - 1.25 * r, -2.0 * r, ox - 0.55 * r, -2.55 * r);
-      hn.bezierCurveTo(ox - 0.85 * r, -1.95 * r, ox - 0.45 * r, -1.35 * r, ox + 0.25 * r, -0.95 * r);
-      hn.closePath();
-      const ht = T(L.hair.color, back);
-      paintShape(g, hn, ox - 0.5 * r, -1.6 * r, 0.9 * r, Lh, ht);
+  group(false, coreAlbedo, coreDetails, { ao: true, after: coreAfter });
+
+  /* ---- near arm: grows out of the shoulder cap ---- */
+  group(false, armAlbedo('F', false), armDetails('F', false), {
+    ao: true,
+    after: (g) => {
+      // feather the top of the arm into the shoulder cap beneath it
+      const sh = P.shF;
+      const R = 13 * s * k;
       g.save();
-      g.clip(hn);
-      for (let i = 0; i < 6; i++) softLine(g, [[ox - 0.6 * r - i * 0.06 * r, -1.0 * r - i * 0.25 * r], [ox - 0.2 * r - i * 0.08 * r, -1.0 * r - i * 0.24 * r]], ht.dark, 1.4 * s, 0.6);
+      g.globalCompositeOperation = 'destination-out';
+      const gr = g.createRadialGradient(sh[0], sh[1], 0, sh[0], sh[1], R);
+      gr.addColorStop(0, 'rgba(0,0,0,0.9)');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr;
+      g.fillRect(sh[0] - R, sh[1] - R, R * 2, R * 2);
       g.restore();
+      pauldron(g, 'F', false);
     }
-  }
-  g.restore();                                   // head frame
-
-  /* ---- front arm ---- */
-  arm('F', false);
+  });
 
   /* ---- elemental charge on the hands during specials ---- */
   if (f.state === 'special' && f.def.element) {
     const el = f.def.element;
-    g.save();
-    g.globalCompositeOperation = 'lighter';
+    lay.save();
+    lay.globalCompositeOperation = 'lighter';
     const pulse = 0.75 + 0.25 * Math.sin(time * 30);
     for (const q of [P.hf, P.hb]) {
       const R = 60 * s * pulse;
-      g.drawImage(glowSprite(el.glow, 128), q[0] - R, q[1] - R, R * 2, R * 2);
+      lay.drawImage(glowSprite(el.glow, 128), q[0] - R, q[1] - R, R * 2, R * 2);
     }
-    g.restore();
+    lay.restore();
   }
 
   /* ---- layer post: rim light, grain, silhouette ---- */
+  const g = lay;
   const rim = st.rim.getContext('2d');
   const rimPass = (wpx, alpha) => {
     rim.setTransform(1, 0, 0, 1, 0, 0);
@@ -3171,8 +3291,8 @@ function paintLayer(f, st, light, px, time, lite) {
     rim.globalCompositeOperation = 'source-in';
     rim.fillStyle = tint(light.rim, 0.25);
     rim.fillRect(0, 0, W, H);
-    rim.globalCompositeOperation = 'destination-out';
     // remove every pixel whose neighbour toward the key light is inside: what remains is the far edge
+    rim.globalCompositeOperation = 'destination-out';
     rim.drawImage(st.lay, Lv[0] * wpx, Lv[1] * wpx);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalCompositeOperation = 'source-atop';
@@ -3180,10 +3300,9 @@ function paintLayer(f, st, light, px, time, lite) {
     g.drawImage(st.rim, 0, 0);
   };
   if (!lite) rimPass(Math.max(1.5, 3.2 * s * pxe), 0.85);
-  // painterly grain, only where the fighter is
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.globalCompositeOperation = 'source-atop';
-  g.globalAlpha = 0.09;
+  g.globalAlpha = 0.08;
   g.fillStyle = g.createPattern(grainCanvas(), 'repeat');
   g.fillRect(0, 0, W, H);
   g.globalAlpha = 1;
@@ -3199,6 +3318,26 @@ function paintLayer(f, st, light, px, time, lite) {
   sg.fillRect(0, 0, W, H);
   sg.globalCompositeOperation = 'source-over';
   st.ready = true;
+}
+
+function hairCapPath(r) {
+  const hc = new Path2D();
+  hc.moveTo(0.74 * r, -0.56 * r);
+  hc.quadraticCurveTo(0.5 * r, -1.22 * r, -0.4 * r, -1.1 * r);
+  hc.quadraticCurveTo(-1.18 * r, -0.66 * r, -0.98 * r, 0.52 * r);
+  hc.lineTo(-0.36 * r, 0.24 * r);
+  hc.quadraticCurveTo(-0.2 * r, -0.32 * r, 0.24 * r, -0.5 * r);
+  hc.closePath();
+  return hc;
+}
+
+function helmPath(r) {
+  const p = new Path2D();
+  p.moveTo(-1.1 * r, -0.2 * r);
+  p.quadraticCurveTo(-0.9 * r, -1.25 * r, 0.2 * r, -1.1 * r);
+  p.lineTo(0.95 * r, -0.4 * r); p.lineTo(0.95 * r, -0.08 * r); p.lineTo(0.3 * r, -0.2 * r);
+  p.lineTo(0.2 * r, 0.6 * r); p.lineTo(-1.1 * r, 0.6 * r); p.closePath();
+  return p;
 }
 
 function drawShadow(g, f) {
