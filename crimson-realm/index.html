@@ -31,6 +31,12 @@
 <link rel="stylesheet" href="src/ui.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-fist" viewBox="0 0 24 24"><path d="M6.2 9.4c0-1.3 1-2.2 2.2-2.2h.6c.4-1 1.3-1.6 2.3-1.6s1.9.6 2.3 1.6h.3c.4-.9 1.3-1.5 2.3-1.5 1.4 0 2.5 1.1 2.5 2.5v5.6c0 3.5-2.7 6.3-6.2 6.3H11c-2.7 0-4.8-2.2-4.8-4.8z"/><path d="M4 11.2c0-.9.7-1.6 1.6-1.6h2.1v4.6H5.6c-.9 0-1.6-.7-1.6-1.6z"/></symbol>
+  <symbol id="i-foot" viewBox="0 0 24 24"><path d="M7.4 3h4.2l.6 8.2 6.4 3.1c1.6.8 2.4 2.1 2.4 3.6v.9c0 1-.8 1.8-1.8 1.8H6.8c-1.4 0-2.4-1.1-2.4-2.4 0-.5.1-1 .4-1.4L7.2 13z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.4 20 5.6v6.1c0 4.9-3.3 8.5-8 10-4.7-1.5-8-5.1-8-10V5.6z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 1.8c.8 4.6 2.6 7.1 7.4 8.4-4.8 1.3-6.6 3.8-7.4 8.4-.8-4.6-2.6-7.1-7.4-8.4C9.4 8.9 11.2 6.4 12 1.8z"/><circle cx="19" cy="19" r="2"/><circle cx="5" cy="19.5" r="1.4"/></symbol>
+</defs></svg>
 <div id="app">
   <canvas id="stage"></canvas>
   <div id="vignette"></div>
@@ -39,13 +45,13 @@
   <div id="controls" class="hidden">
     <div id="stickZone">
       <div id="stickBase"><div id="stickKnob"></div></div>
-      <span class="zone-hint">MOVE · JUMP · CROUCH</span>
+      <span class="zone-hint">MOVE · JUMP · CROUCH · FLICK TWICE TO DASH</span>
     </div>
     <div id="btnZone">
-      <button class="pad pad-s" data-k="s" aria-label="Special"><b>SPECIAL</b></button>
-      <button class="pad pad-b" data-k="b" aria-label="Block"><b>BLOCK</b></button>
-      <button class="pad pad-p" data-k="p" aria-label="Punch"><b>PUNCH</b></button>
-      <button class="pad pad-k" data-k="k" aria-label="Kick"><b>KICK</b></button>
+      <button class="pad pad-s" data-k="s" aria-label="Special: tap, or swipe forward, up or down"><svg class="ico"><use href="#i-spark"/></svg><b>SPECIAL</b><i class="chev u"></i><i class="chev l"></i><i class="chev r"></i><i class="chev d"></i><span class="pips"><em></em><em></em><em></em></span></button>
+      <button class="pad pad-p" data-k="p" aria-label="Punch: tap, swipe, or hold to charge"><svg class="ico"><use href="#i-fist"/></svg><b>PUNCH</b><i class="chev u"></i><i class="chev l"></i><i class="chev r"></i><i class="chev d"></i><span class="ring"></span></button>
+      <button class="pad pad-k" data-k="k" aria-label="Kick: tap, swipe, or hold to charge"><svg class="ico"><use href="#i-foot"/></svg><b>KICK</b><i class="chev u"></i><i class="chev l"></i><i class="chev r"></i><i class="chev d"></i><span class="ring"></span></button>
+      <button class="pad pad-b" data-k="b" aria-label="Block (hold)"><svg class="ico"><use href="#i-shield"/></svg><b>BLOCK</b></button>
     </div>
     <button id="pauseBtn" class="pause-btn" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2"/></svg></button>
   </div>
@@ -93,7 +99,7 @@
         <div class="sel-title" id="selTitle"></div>
         <p class="sel-bio" id="selBio"></p>
         <div class="stats" id="selStats"></div>
-        <div class="sel-special"><span>SPECIAL</span><b id="selSpecial"></b></div>
+        <div class="sel-specials" id="selSpecials"></div>
         <button id="selGo" class="btn btn-primary">FIGHT</button>
       </div>
     </div>
@@ -152,16 +158,18 @@
     <div class="panel wide">
       <h2>MOVE LIST</h2>
       <div class="moves">
-        <div><b>PUNCH</b><span>Fast jab. Tap 3 times for a 3-hit string.</span></div>
-        <div><b>KICK</b><span>Long-range kick. Tap twice for a knockdown roundhouse.</span></div>
-        <div><b>PUNCH, PUNCH, KICK</b><span>Mixed string.</span></div>
-        <div><b>DOWN + PUNCH</b><span>Uppercut. Launches. Stops jump-ins.</span></div>
-        <div><b>DOWN + KICK</b><span>Sweep. Hits low &mdash; must be blocked crouching.</span></div>
-        <div><b>UP</b><span>Jump. Up-forward / up-back to flip. Punch or kick in the air.</span></div>
-        <div><b>HOLD BLOCK</b><span>Stops highs &amp; mids. Hold DOWN too to stop sweeps. Jump-ins beat a crouching block.</span></div>
-        <div><b>SPECIAL</b><span>Your fighter's signature move. Short cooldown.</span></div>
-        <div><b>EXECUTE!</b><span>When the loser is dazed, press SPECIAL to finish them.</span></div>
+        <div><b>TAP PUNCH · TAP KICK</b><span>Jab and kick. Tap fast to chain: P,P,P &middot; P,P,K &middot; K,K.</span></div>
+        <div><b>SWIPE TOWARD FOE</b><span>Punch: lunging cross. Kick: roundhouse launcher. Works mid-combo.</span></div>
+        <div><b>SWIPE UP</b><span>Punch: uppercut. Kick: rising high kick. Both launch for juggles.</span></div>
+        <div><b>SWIPE DOWN</b><span>Punch: low jab. Kick: sweep. Lows must be blocked crouching.</span></div>
+        <div><b>HOLD, THEN RELEASE</b><span>Charged punch or kick. Smashes through a block.</span></div>
+        <div><b>SPECIAL</b><span>Tap, swipe toward the foe, or swipe up/down: three specials per fighter.</span></div>
+        <div><b>SPECIAL CANCEL</b><span>Land any hit, then hit SPECIAL: the special cuts the recovery and combos.</span></div>
+        <div><b>STICK</b><span>Up jumps (up-forward flips). Down crouches. Flick twice to dash or back-dash.</span></div>
+        <div><b>HOLD BLOCK</b><span>Stops highs &amp; mids. Hold down too to stop lows. Jump-ins beat a crouching block.</span></div>
+        <div><b>EXECUTE!</b><span>When the loser is dazed, press SPECIAL: every fighter has their own execution.</span></div>
       </div>
+      <div class="kit" id="kit"></div>
       <button class="btn btn-primary" data-close>Got it</button>
     </div>
   </section>
@@ -176,6 +184,7 @@
         <label class="sw"><input type="checkbox" data-set="voice"><span>Announcer voice</span></label>
         <label class="sw"><input type="checkbox" data-set="blood"><span>Blood &amp; gore</span></label>
         <label class="sw"><input type="checkbox" data-set="haptics"><span>Vibration</span></label>
+        <label class="sw"><input type="checkbox" data-set="lefty"><span>Left-handed controls</span></label>
         <label class="range"><span>Button size</span><input type="range" min="0.8" max="1.3" step="0.05" data-set="size"></label>
         <label class="range"><span>Control opacity</span><input type="range" min="0.3" max="1" step="0.05" data-set="opacity"></label>
       </div>

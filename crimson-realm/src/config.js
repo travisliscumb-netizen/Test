@@ -24,20 +24,26 @@ export const lerp = (a, b, t) => a + (b - a) * t;
    level: 'high' and 'mid' are stopped by a standing block, 'low' needs a
    crouching block, 'overhead' (jump-ins) needs a standing block.          */
 export const MOVES = {
-  jab:   { pose: 'jab',   base: 'stance', startup: 4, active: 4, recovery: 9,  dmg: 42, stun: 15, bstun: 10, knock: 3.2, fx: 'hf', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'jab2', k: 'kick' } },
-  jab2:  { pose: 'jab2',  base: 'stance', startup: 4, active: 4, recovery: 10, dmg: 46, stun: 16, bstun: 10, knock: 3.6, fx: 'hb', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'cross', k: 'kick' } },
-  cross: { pose: 'cross', base: 'stance', startup: 6, active: 4, recovery: 16, dmg: 72, stun: 22, bstun: 13, knock: 9,   fx: 'hf', r: 30, level: 'high', hitstop: 8, sfx: 'heavy', step: 3.5, chain: { k: 'spin' } },
-  kick:  { pose: 'kick',  base: 'stance', startup: 8, active: 5, recovery: 16, dmg: 78, stun: 20, bstun: 12, knock: 7,   fx: 'ff', r: 30, level: 'mid',  hitstop: 7, sfx: 'heavy', chain: { k: 'spin' } },
+  jab:   { pose: 'jab',   base: 'stance', startup: 4, active: 4, recovery: 9,  dmg: 42, stun: 15, bstun: 10, knock: 3.2, fx: 'hf', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'jab2', k: 'kick', pf: 'cross', kf: 'spin', pu: 'upper', ku: 'highkick', kd: 'sweep' } },
+  jab2:  { pose: 'jab2',  base: 'stance', startup: 4, active: 4, recovery: 10, dmg: 46, stun: 16, bstun: 10, knock: 3.6, fx: 'hb', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'cross', k: 'kick', pf: 'cross', kf: 'spin', pu: 'upper', ku: 'highkick', kd: 'sweep' } },
+  cross: { pose: 'cross', base: 'stance', startup: 6, active: 4, recovery: 16, dmg: 72, stun: 22, bstun: 13, knock: 9,   fx: 'hf', r: 30, level: 'high', hitstop: 8, sfx: 'heavy', step: 3.5, chain: { k: 'spin', kf: 'spin', ku: 'highkick', pu: 'upper', kd: 'sweep' } },
+  kick:  { pose: 'kick',  base: 'stance', startup: 8, active: 5, recovery: 16, dmg: 78, stun: 20, bstun: 12, knock: 7,   fx: 'ff', r: 30, level: 'mid',  hitstop: 7, sfx: 'heavy', chain: { k: 'spin', p: 'cross', kf: 'spin', ku: 'highkick', pu: 'upper' } },
   spin:  { pose: 'spin',  base: 'stance', startup: 9, active: 5, recovery: 22, dmg: 96, stun: 0,  bstun: 15, knock: 10,  fx: 'fb', r: 32, level: 'mid',  hitstop: 10, sfx: 'heavy', knockdown: true, launch: 9 },
   upper: { pose: 'upper', base: 'crouch', end: 'stance', startup: 7, active: 6, recovery: 24, dmg: 118, stun: 0, bstun: 16, knock: 3.5, fx: 'hf', r: 32, level: 'mid', hitstop: 11, sfx: 'crush', knockdown: true, launch: 17.5 },
   sweep: { pose: 'sweep', base: 'crouch', end: 'crouch', startup: 7, active: 6, recovery: 22, dmg: 66, stun: 0, bstun: 13, knock: 3, fx: 'ff', r: 30, level: 'low', hitstop: 7, sfx: 'heavy', knockdown: true, launch: 4.5 },
+  lowpunch: { pose: 'lowpunch', base: 'crouch', end: 'crouch', startup: 4, active: 4, recovery: 9, dmg: 34, stun: 15, bstun: 9, knock: 2.6, fx: 'hf', r: 24, level: 'low', hitstop: 5, sfx: 'light', chain: { p: 'upper', pu: 'upper', k: 'sweep', kd: 'sweep', kf: 'sweep' } },
+  highkick: { pose: 'highkick', base: 'stance', startup: 9, active: 5, recovery: 20, dmg: 86, stun: 0, bstun: 14, knock: 4, fx: 'ff', r: 32, level: 'mid', hitstop: 10, sfx: 'heavy', knockdown: true, launch: 15 },
+  // charged (hold the button, release): breaks a block
+  cpunch: { pose: 'cross', base: 'stance', startup: 7, active: 4, recovery: 18, dmg: 108, stun: 0, bstun: 22, knock: 12, fx: 'hf', r: 32, level: 'mid', hitstop: 12, sfx: 'crush', step: 6, guardBreak: true, knockdown: true, launch: 7, charged: true },
+  ckick: { pose: 'spin', base: 'stance', startup: 9, active: 5, recovery: 22, dmg: 118, stun: 0, bstun: 22, knock: 12, fx: 'fb', r: 34, level: 'mid', hitstop: 13, sfx: 'crush', step: 3, guardBreak: true, knockdown: true, launch: 11, charged: true },
   apunch:{ pose: 'apunch', base: 'jump', air: true, startup: 4, active: 99, recovery: 0, dmg: 66, stun: 18, bstun: 12, knock: 5, fx: 'hf', r: 28, level: 'overhead', hitstop: 7, sfx: 'heavy' },
   akick: { pose: 'akick', base: 'jump', air: true, startup: 5, active: 99, recovery: 0, dmg: 82, stun: 20, bstun: 13, knock: 6.5, fx: 'ff', r: 30, level: 'overhead', hitstop: 8, sfx: 'heavy' }
 };
 
 /* ---------------------------------------------------------------- fighters
    body: segment lengths before `scale`. look: everything the renderer needs
-   to dress the skeleton. special: the one-button signature move.          */
+   to dress the skeleton. specials: three per fighter -- tap, swipe
+   forward, swipe up/down on SPECIAL. finisher: their unique execution.          */
 const BODY = { torso: 106, neck: 11, head: 23, upperArm: 53, foreArm: 50, thigh: 68, shin: 66, foot: 27, bulk: 1 };
 
 export const FIGHTERS = {
@@ -46,7 +52,12 @@ export const FIGHTERS = {
     bio: 'A swordsman who swore off the sword. His kicks still cut.',
     hp: 1000, power: 1.0, speed: 1.0, scale: 1.06,
     body: { ...BODY, torso: 108, thigh: 70, shin: 68 },
-    special: { type: 'rising', name: 'Crescent Rise', dmg: 120, cooldown: 60 },
+    specials: [
+      { name: 'Wind Blade', type: 'projectile', kind: 'blade', speed: 12.5, dmg: 78, cooldown: 70, role: 'zone' },
+      { name: 'Gale Step', type: 'dash', speed: 18, dur: 14, dmg: 92, cooldown: 64, role: 'rush' },
+      { name: 'Crescent Rise', type: 'rising', dmg: 112, cooldown: 60, role: 'anti' }
+    ],
+    finisher: { name: 'THOUSAND CUTS', type: 'cuts' },
     element: { core: '#f2f8ff', glow: '#8fc2ff', deep: '#2c5fae', name: 'steel' },
     look: {
       skin: '#e2b48f', top: 'gi', topColor: '#2e3550', topColor2: '#1b1f31', sleeve: 'none',
@@ -59,7 +70,12 @@ export const FIGHTERS = {
     bio: 'Keeper of a temple fire that has burned for nine hundred years.',
     hp: 1000, power: 1.0, speed: 1.02, scale: 1.02,
     body: { ...BODY, bulk: 1.02 },
-    special: { type: 'projectile', name: 'Flame Palm', dmg: 92, cooldown: 72, speed: 10.5, kind: 'fire' },
+    specials: [
+      { name: 'Flame Palm', type: 'projectile', kind: 'fire', speed: 10.5, dmg: 92, cooldown: 72, role: 'zone' },
+      { name: 'Ember Rush', type: 'dash', speed: 14.5, dur: 20, dmg: 98, cooldown: 70, role: 'rush' },
+      { name: 'Phoenix Rise', type: 'rising', dmg: 108, cooldown: 66, role: 'anti' }
+    ],
+    finisher: { name: 'FUNERAL PYRE', type: 'pyre' },
     element: { core: '#fff3c4', glow: '#ff9a2e', deep: '#c2410c', name: 'fire' },
     look: {
       skin: '#c98b5e', top: 'robe', topColor: '#e8771a', topColor2: '#b4500d', sleeve: 'none',
@@ -72,7 +88,12 @@ export const FIGHTERS = {
     bio: 'Sworn to the Spire. She arrives a moment before the thunder.',
     hp: 960, power: 0.97, speed: 1.12, scale: 1.0,
     body: { ...BODY, torso: 102, upperArm: 52, foreArm: 49, thigh: 70, shin: 68, bulk: 0.88 },
-    special: { type: 'dash', name: 'Thunder Lance', dmg: 104, cooldown: 66 },
+    specials: [
+      { name: 'Ball Lightning', type: 'projectile', kind: 'bolt', speed: 14, dmg: 76, cooldown: 64, role: 'zone' },
+      { name: 'Thunder Lance', type: 'dash', speed: 15.5, dur: 20, dmg: 104, cooldown: 66, role: 'rush' },
+      { name: 'Sky Strike', type: 'dive', dmg: 96, cooldown: 70, role: 'anti' }
+    ],
+    finisher: { name: 'STORM VERDICT', type: 'storm' },
     element: { core: '#f0fffe', glow: '#5ff0ff', deep: '#1f7a9a', name: 'lightning' },
     look: {
       skin: '#f0c7a6', top: 'armor', topColor: '#1d8a99', topColor2: '#0c4a55', trim: '#e2b64a', sleeve: 'none',
@@ -85,7 +106,12 @@ export const FIGHTERS = {
     bio: 'Carved from a mountain and woken by a war no one remembers.',
     hp: 1080, power: 1.07, speed: 0.86, scale: 1.14,
     body: { ...BODY, torso: 110, neck: 7, head: 23, upperArm: 56, foreArm: 54, thigh: 64, shin: 60, bulk: 1.34 },
-    special: { type: 'slam', name: 'Fault Line', dmg: 104, cooldown: 80 },
+    specials: [
+      { name: 'Fault Line', type: 'slam', dmg: 104, cooldown: 80, role: 'zone' },
+      { name: 'Boulder Charge', type: 'dash', speed: 11.5, dur: 26, dmg: 112, cooldown: 84, armor: 1, role: 'rush' },
+      { name: 'Rock Toss', type: 'projectile', kind: 'rock', speed: 8.5, arc: 11, dmg: 96, cooldown: 76, role: 'anti' }
+    ],
+    finisher: { name: "MOUNTAIN'S FALL", type: 'mountain' },
     element: { core: '#ffe7b0', glow: '#ff8a3c', deep: '#7a3a12', name: 'stone' },
     look: {
       skin: '#7d7a73', stone: true, top: 'stone', topColor: '#6c6962', topColor2: '#46443f', sleeve: 'none',
@@ -98,7 +124,12 @@ export const FIGHTERS = {
     bio: 'An assassin from a clan that left no records. Not even her name is real.',
     hp: 940, power: 1.0, speed: 1.08, scale: 1.0,
     body: { ...BODY, torso: 104, upperArm: 52, foreArm: 49, thigh: 69, shin: 67, bulk: 0.9 },
-    special: { type: 'teleport', name: 'Shadow Step', dmg: 90, cooldown: 70 },
+    specials: [
+      { name: 'Kunai', type: 'projectile', kind: 'kunai', speed: 16, dmg: 62, cooldown: 50, role: 'zone' },
+      { name: 'Shadow Step', type: 'teleport', dmg: 90, cooldown: 70, role: 'rush' },
+      { name: 'Shadow Dive', type: 'dive', dmg: 88, cooldown: 64, role: 'anti' }
+    ],
+    finisher: { name: 'SWALLOWED', type: 'swallow' },
     element: { core: '#e9ffd6', glow: '#7dff8a', deep: '#14532d', name: 'shadow' },
     look: {
       skin: '#d7b199', top: 'wrap', topColor: '#22262b', topColor2: '#121417', trim: '#3f8f5a', sleeve: 'long',
@@ -111,7 +142,12 @@ export const FIGHTERS = {
     bio: 'He built the tournament. He has never lost it.',
     hp: 1180, power: 1.06, speed: 0.95, scale: 1.24,
     body: { ...BODY, torso: 110, neck: 10, head: 23, upperArm: 56, foreArm: 53, thigh: 70, shin: 68, bulk: 1.2 },
-    special: { type: 'sovereign', name: 'Ashfall', dmg: 98, cooldown: 64, speed: 11.5, kind: 'void' },
+    specials: [
+      { name: 'Ashfall', type: 'projectile', kind: 'void', speed: 11.5, dmg: 98, cooldown: 64, role: 'zone' },
+      { name: 'Void Step', type: 'teleport', dmg: 96, cooldown: 72, role: 'rush' },
+      { name: 'Soul Pillar', type: 'pillar', dmg: 104, cooldown: 84, role: 'anti' }
+    ],
+    finisher: { name: 'UNMAKING', type: 'unmaking' },
     element: { core: '#ffe2f6', glow: '#c04dff', deep: '#4c0f6e', name: 'void' },
     look: {
       skin: '#a46a62', top: 'plate', topColor: '#2a1418', topColor2: '#14090c', trim: '#c9a227', sleeve: 'none',
@@ -144,7 +180,7 @@ export const MERCY_MAX = 1.4;
 /* Curve shape: d = x^gamma over `ramp` levels. gamma < 1 front-loads the
    (still trivial) opening levels and keeps every later step small, which
    is where a step decides fights. Tuned by tests/crimson-balance.mjs.  */
-export const CURVE = { ramp: 34, gamma: 0.55, boss: -0.12 };
+export const CURVE = { ramp: 40, gamma: 0.52, boss: -0.04 };
 
 export function difficultyFor(level, losses = 0, boss = false) {
   const mercy = Math.min(MERCY_MAX, losses * MERCY_STEP);

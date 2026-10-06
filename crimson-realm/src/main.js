@@ -41,7 +41,15 @@ let vsUntil = 0;
 let selId = state.fighter || 'kael';
 let tutorial = null;
 let installPrompt = null;
+let cpuFrozen = false;                // test hook only
 const inBuf = blankInput();
+const GESTURES = ['TAP', 'SWIPE \u2192 FOE', 'SWIPE \u2191\u2193'];
+
+function kitHtml(id) {
+  const d = FIGHTERS[id];
+  return d.specials.map((sp, i) => `<span>${GESTURES[i]}</span><b>${sp.name}</b>`).join('') +
+    `<span>EXECUTE</span><b class="fin">${d.finisher.name}</b>`;
+}
 
 /* Adaptive resolution: if this device cannot hold 60 fps in a fight, step
    the canvas resolution down (and remember it). Strong phones keep the full
@@ -132,7 +140,7 @@ function refreshSelect() {
   $('selName').textContent = d.name;
   $('selTitle').textContent = d.title;
   $('selBio').textContent = d.bio;
-  $('selSpecial').textContent = d.special.name;
+  $('selSpecials').innerHTML = kitHtml(selId).replace('<b class="fin">', '<b class="fin" style="color:#ff7a7a">');
   const stat = (label, v) => `<span>${label}</span><i><b style="width:${Math.round(Math.min(1, v) * 100)}%"></b></i>`;
   $('selStats').innerHTML =
     stat('POWER', (d.power - 0.8) / 0.4) + stat('SPEED', (d.speed - 0.75) / 0.45) + stat('HEALTH', (d.hp - 850) / 350);
@@ -228,7 +236,7 @@ function setControls(on) {
 function stepFight() {
   const p1 = match.fighters[0];
   const i1 = pilot ? pilot.update(p1, match) : input.sample(inBuf);
-  const i2 = cpu.update(match.fighters[1], match);
+  const i2 = cpuFrozen ? blankInput() : cpu.update(match.fighters[1], match);
   match.update(i1, i2);
   const evs = match.drain();
   renderer.handle(evs, match);
@@ -241,32 +249,49 @@ function onEvent(e, m, real) {
   const s = state.settings;
   switch (e.type) {
     case 'hit':
-      sound.play(e.sfx || 'heavy', { power: e.dmg / 100 });
+      sound.play(e.armor ? 'block' : (e.sfx || 'heavy'), { power: e.dmg / 100 });
+      if (e.att === player) { player.lastAttackHit = m.tick; }
       if (real && s.haptics && navigator.vibrate && (e.f === player || e.att === player)) navigator.vibrate(e.heavy ? 28 : 14);
       if (real && e.att === player) current.maxCombo = Math.max(current.maxCombo, e.combo);
       break;
     case 'block': sound.play('block'); if (real && tutorial && e.f === player) tutorial.did('block'); break;
-    case 'whoosh': sound.play('whoosh', { heavy: e.heavy }); if (real && tutorial && e.f === player) tutorial.did(e.f.moveId); break;
+    case 'whoosh':
+      sound.play('whoosh', { heavy: e.heavy });
+      if (real && tutorial && e.f === player) tutorial.did(e.f.moveId);
+      if (e.f.move && e.f.move.charged) sound.play('heavy');
+      break;
+    case 'dash': sound.play('jump'); break;
+    case 'guardbreak': sound.play('crush'); sound.play('block'); if (real && s.haptics && navigator.vibrate) navigator.vibrate(30); break;
+    case 'proj-land': sound.play(e.p.kind === 'rock' ? 'thud' : 'explode'); break;
+    case 'fin-slash': sound.play('block'); sound.play('whoosh', { heavy: true }); break;
+    case 'fin-pyre': sound.play('fire'); sound.play('quake'); break;
+    case 'fin-fire': if (Math.random() < 0.25) sound.play('fire'); break;
+    case 'fin-bolt': sound.play('zap'); if (e.big) sound.play('ko'); break;
+    case 'fin-pillar': sound.play('quake'); break;
+    case 'fin-boulder': sound.play('thud', { power: 1 }); break;
+    case 'fin-tendrils': sound.play('void'); break;
+    case 'fin-tendril': if (Math.random() < 0.2) sound.play('teleport'); break;
+    case 'fin-void': sound.play('void'); break;
     case 'jump': sound.play('jump'); if (real && tutorial && e.f === player) tutorial.did('jump'); break;
     case 'land': sound.play('land'); break;
     case 'thud': sound.play('thud', { power: e.power }); break;
-    case 'proj': sound.play(e.p.kind === 'void' ? 'void' : 'fire'); break;
+    case 'proj': sound.play({ void: 'void', bolt: 'zap', kunai: 'whoosh', blade: 'rise', rock: 'heavy', pillar: 'void' }[e.p.kind] || 'fire'); break;
     case 'proj-hit': case 'clash': sound.play('explode'); break;
     case 'special':
       if (e.kind === 'dash') sound.play('zap');
       else if (e.kind === 'teleport') sound.play('teleport');
       else if (e.kind === 'rising') sound.play('rise');
-      if (real && tutorial && e.f === player) tutorial.did('special');
+      if (real && tutorial && e.f === player) tutorial.did(m.tick - (player.lastAttackHit || -99) < 24 ? 'cancel' : 'special');
       break;
     case 'quake': sound.play('quake'); break;
     case 'ko': sound.play('ko'); if (real && s.haptics && navigator.vibrate) navigator.vibrate([40, 30, 80]); break;
     case 'finisher': sound.play('gong'); break;
     case 'shatter':
-      sound.play(s.blood ? 'gore' : 'explode');
+      sound.play(s.blood && e.style !== 'sink' && e.style !== 'ash' ? 'gore' : 'explode');
       if (real && e.att === player) state.stats.executions++;
       break;
     case 'announce':
-      if (real) setTimeout(() => sound.say(e.text.replace('!', '')), (e.delay || 0) * STEP);
+      if (real) setTimeout(() => sound.say((e.sub ? `${e.text}. ${e.sub}` : e.text).replace(/!/g, '')), (e.delay || 0) * STEP);
       if (real && e.kind === 'perfect' && m.koWinner === player) state.stats.perfects++;
       break;
     case 'matchover':
@@ -322,13 +347,15 @@ function showResult() {
    Level 1 only: one prompt at a time, each cleared by doing it.         */
 function makeTutorial() {
   const steps = [
-    { text: 'Tap PUNCH three times fast for a combo', done: (k) => k === 'cross' },
+    { text: 'Tap PUNCH three times fast for a combo', done: (k) => k === 'jab2' || k === 'cross' },
+    { text: 'SWIPE PUNCH toward your foe: lunging cross', done: (k) => k === 'cross' },
     { text: 'Hold BLOCK when they swing at you', done: (k) => k === 'block' },
-    { text: 'Stick DOWN + PUNCH = Uppercut', done: (k) => k === 'upper' },
-    { text: 'Stick DOWN + KICK = Sweep (hits low)', done: (k) => k === 'sweep' },
-    { text: 'Push the stick UP to jump. Kick in the air!', done: (k) => k === 'jump' || k === 'akick' },
-    { text: 'Tap SPECIAL for your signature move', done: (k) => k === 'special' }
+    { text: 'SWIPE PUNCH UP: uppercut  \u00b7  SWIPE KICK DOWN: sweep', done: (k) => k === 'upper' || k === 'sweep' },
+    { text: 'HOLD KICK, then let go: breaks their guard', done: (k) => k === 'ckick' || k === 'cpunch' },
+    { text: 'Tap SPECIAL. Swipe it for your other two specials', done: (k) => k === 'special' },
+    { text: 'Land a hit, then SPECIAL: a special-cancel combo', done: (k) => k === 'cancel' }
   ];
+
   let i = 0, shownAt = 0, ticks = 0;
   const tip = $('tip');
   const showStep = () => {
@@ -431,6 +458,8 @@ function syncPads() {
   sBtn.classList.toggle('urge', urge);
   sBtn.classList.toggle('ready', !urge && match.phase === 'fight' && p.cooldown === 0);
   sBtn.classList.toggle('cooling', !urge && p.cooldown > 0);
+  const pips = sBtn.querySelectorAll('.pips em');
+  for (let i = 0; i < 3; i++) pips[i].classList.toggle('on', p.cools[i] === 0);
 }
 
 /* ============================================================== plumbing */
@@ -480,6 +509,8 @@ function applySettings() {
   renderer.blood = s.blood;
   document.documentElement.style.setProperty('--pad-size', s.size);
   document.documentElement.style.setProperty('--pad-opacity', s.opacity);
+  $('controls').classList.toggle('lefty', !!s.lefty);
+  input.sizeK = s.size;
   for (const el of document.querySelectorAll('[data-set]')) {
     const k = el.dataset.set;
     if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k];
@@ -507,7 +538,12 @@ function wire() {
   });
   $('continueBtn').onclick = () => { sound.play('ui'); goLadder(); };
   $('newBtn').onclick = () => { sound.play('ui'); goSelect(); };
-  $('howBtn').onclick = () => { sound.play('ui'); overlay('how', true); };
+  const showHow = () => {
+    const id = (state.run && state.run.fighter) || selId;
+    $('kit').innerHTML = `<b>${FIGHTERS[id].name}</b><div class="sel-specials">${kitHtml(id)}</div>`;
+    overlay('how', true);
+  };
+  $('howBtn').onclick = () => { sound.play('ui'); showHow(); };
   $('settingsBtn').onclick = () => { sound.play('ui'); overlay('settings', true); };
   $('selGo').onclick = () => {
     sound.play('select');
@@ -527,7 +563,7 @@ function wire() {
   $('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); pause(); });
   $('resumeBtn').onclick = resume;
   $('restartBtn').onclick = () => { startLevel(true); };
-  $('pauseHowBtn').onclick = () => overlay('how', true);
+  $('pauseHowBtn').onclick = showHow;
   $('pauseSettingsBtn').onclick = () => overlay('settings', true);
   $('quitBtn').onclick = () => { save(state); goTitle(); };
   $('resNext').onclick = () => { overlay('result', false); goLadder(); };
@@ -600,6 +636,7 @@ window.__crimson = {
   showResultNow() { showResult(); },
   /* feed synthetic frame times to the adaptive-resolution governor */
   simulateFrames(ms, n) { for (let i = 0; i < n; i++) watchFrameRate(ms); return { quality: state.quality || 0, backingH: renderer.canvas.height }; },
+  freezeCpu(v) { cpuFrozen = !!v; },
   setQuality(q) { state.quality = q; perf.frames = 0; perf.sum = 0; onResize(); return renderer.canvas.height; },
   pause, resume
 };

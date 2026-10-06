@@ -4,7 +4,7 @@
 const KEY = 'crimson-realm:v1';
 
 export const DEFAULTS = {
-  settings: { sound: true, music: true, voice: true, blood: true, haptics: true, size: 1, opacity: 0.85 },
+  settings: { sound: true, music: true, voice: true, blood: true, haptics: true, size: 1, opacity: 0.85, lefty: false },
   run: null,                 // { fighter, level, losses }
   best: 0,                   // highest level cleared
   champion: false,           // beat the boss at least once

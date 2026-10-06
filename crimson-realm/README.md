@@ -25,20 +25,35 @@ ES modules need a real origin, so `file://` will not work.
 
 ## Controls
 
-| Input | Touch | Keyboard | Gamepad |
-|---|---|---|---|
-| Move / jump / crouch | floating stick, left half | Arrows / WASD | D-pad / left stick |
-| Punch | PUNCH | J | X / □ |
-| Kick | KICK | K | A / ✕ |
-| Block (hold) | BLOCK | L / Shift | B / ○, bumpers |
-| Special | SPECIAL | I / Space | Y / △ |
-| Pause | ‖ (bottom centre) | Esc / P | — |
+**Touch (made for phones).** The left thumb works a floating stick; the right thumb works four buttons, and each attack button reads a *gesture*:
 
-Moves: P,P,P and P,P,K strings · K,K knockdown · ↓+P uppercut · ↓+K sweep (low) ·
-air punch/kick · flip jumps · hold ↓+BLOCK against sweeps. When the loser is
-dazed and **EXECUTE!** appears, press SPECIAL from anywhere.
+| | Tap | Swipe toward foe | Swipe up | Swipe down | Hold, release |
+|---|---|---|---|---|---|
+| **PUNCH** | jab | lunging cross | uppercut | low jab | charged guard-breaker |
+| **KICK** | kick | roundhouse launcher | rising high kick | sweep | charged guard-breaker |
+| **SPECIAL** | special 1 | special 2 | special 3 | special 3 | — |
+| **BLOCK** | hold to block (with stick down: crouch block) | | | | |
 
----
+- **Taps have no lag.** A tap fires the instant the thumb lands. If the thumb then swipes, the move is upgraded in place.
+- **Timing is judged by the finger, not the frame rate.** Swipes and charges use the touch events' own timestamps, so a hitch can never turn a tap into a charge or swallow a swipe.
+- **Stick:** up jumps (up-forward flips), down crouches, and a double-flick dashes (back-dash is briefly invulnerable).
+- **Combos:** P,P,P · P,P,K · K,K, plus swipe variants mid-string. Launchers (uppercut, high kick, roundhouse) set up juggles. **Special cancel:** any normal that connects can be cancelled straight into a special.
+- **Settings:** button size, opacity, and a mirrored left-handed layout.
+
+**Keyboard:** arrows/WASD move (double-tap to dash) · J punch · K kick · L block · I special · U / O punch / kick toward the foe · Y / H up / forward special · hold J or K to charge · Esc pause. **Gamepad:** standard mapping.
+
+## Fighters
+
+| Fighter | Tap special | Forward special | Up/down special | Execution |
+|---|---|---|---|---|
+| Kael | Wind Blade | Gale Step | Crescent Rise | **Thousand Cuts:** steel flashes, then the body comes apart |
+| Ember | Flame Palm | Ember Rush | Phoenix Rise | **Funeral Pyre:** charred in a fire column, crumbles to ash |
+| Volta | Ball Lightning | Thunder Lance | Sky Strike (dive) | **Storm Verdict:** repeated lightning strikes, then a burst |
+| Granite | Fault Line | Boulder Charge (absorbs a hit) | Rock Toss (arcing) | **Mountain's Fall:** a stone pillar launches, a boulder crushes |
+| Shade | Kunai | Shadow Step | Shadow Dive | **Swallowed:** shadow tendrils drag the victim into the floor |
+| Malrath (boss) | Ashfall | Void Step | Soul Pillar | **Unmaking:** lifted into a void sphere that implodes |
+
+When **EXECUTE!** appears, press SPECIAL from anywhere; the executioner closes the distance. With blood turned off, every execution plays a gore-free version.
 
 ## Difficulty
 
@@ -52,9 +67,12 @@ both sides. See `difficultyFor()` in `src/config.js`.
 - **Past level 10** the ladder is endless and keeps climbing until level 34, then adds damage only.
 - **Mercy:** each loss on the same level eases that level slightly, up to about 1.4 levels.
 
-`tests/crimson-balance.mjs` proves this: a fixed-skill reference player wins 100% at
-level 1, its win rate declines steadily with no cliff larger than 25 points
-between neighbouring levels, and it wins at most 35% at level 16.
+`tests/crimson-balance.mjs` proves this. A fixed-skill reference player:
+
+- wins 100% of the time at level 1;
+- sees its win rate decline steadily, with no cliff larger than 25 points between neighbouring levels;
+- wins at most 35% at level 16;
+- ends each fight with a health margin that shrinks every level (rank correlation better than −0.85), even over the opening levels, where it still always wins.
 
 ---
 
@@ -92,4 +110,6 @@ node tests/crimson-balance.mjs     # difficulty curve, ~40 s
 node tests/crimson-playtest.mjs    # full touch-driven browser run + screenshots in .shots/crimson
 node tools/crimson-sheet.mjs       # every pose x every fighter contact sheet
 node tools/crimson-icons.mjs       # regenerate icons and launch images
+node tools/crimson-finishers.mjs   # capture every execution at fixed moments
+node tools/crimson-single.mjs      # build the one-file crimson-realm.html
 ```

@@ -204,27 +204,75 @@ html, body {
 #stickZone.active .zone-hint { display: none; }
 
 #btnZone {
-  position: absolute; right: calc(14px + var(--sr)); bottom: calc(14px + var(--sb));
-  width: calc(228px * var(--pad-size)); height: calc(200px * var(--pad-size)); pointer-events: auto; touch-action: none;
+  position: absolute; right: calc(12px + var(--sr)); bottom: calc(10px + var(--sb));
+  width: calc(300px * var(--pad-size)); height: calc(232px * var(--pad-size)); pointer-events: auto; touch-action: none;
 }
 .pad {
-  position: absolute; width: calc(84px * var(--pad-size)); height: calc(84px * var(--pad-size)); border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35); color: #fff; padding: 0; cursor: pointer; pointer-events: none;
-  display: flex; align-items: center; justify-content: center; font: 900 calc(11px * var(--pad-size)) var(--font); letter-spacing: 0.06em;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.25);
-  transition: transform 0.05s;
+  position: absolute; border-radius: 50%; color: #fff; padding: 0; cursor: pointer; pointer-events: none;
+  border: 2px solid rgba(255, 255, 255, 0.32);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  font: 900 calc(10px * var(--pad-size)) var(--font); letter-spacing: 0.08em;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.28), inset 0 -6px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.05s, filter 0.05s;
 }
-.pad b { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
-.pad.down { transform: scale(0.9); filter: brightness(1.45); }
-.pad-p { left: 0; bottom: 0; background: radial-gradient(circle at 35% 30%, #ff8a7a, #c4122f 55%, #5a0610); }
-.pad-k { right: 0; bottom: calc(18px * var(--pad-size)); background: radial-gradient(circle at 35% 30%, #ffd27a, #d9661a 55%, #6a2a08); }
-.pad-b { right: calc(6px * var(--pad-size)); top: 0; width: calc(72px * var(--pad-size)); height: calc(72px * var(--pad-size)); background: radial-gradient(circle at 35% 30%, #a8d8ff, #2a6aa8 55%, #0a2240); }
-.pad-s { left: calc(14px * var(--pad-size)); top: calc(6px * var(--pad-size)); width: calc(72px * var(--pad-size)); height: calc(72px * var(--pad-size)); background: radial-gradient(circle at 35% 30%, #f0b8ff, #8a2ac0 55%, #2a0640); }
+.pad b { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); }
+.pad .ico { width: 42%; height: 42%; fill: rgba(255, 255, 255, 0.95); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6)); }
+.pad.down { transform: scale(0.92); filter: brightness(1.35); }
+.pad-p { left: 0; bottom: calc(14px * var(--pad-size)); width: calc(98px * var(--pad-size)); height: calc(98px * var(--pad-size));
+  background: radial-gradient(circle at 35% 28%, #ff9a8a, #c4122f 55%, #4e0610); }
+.pad-k { left: calc(110px * var(--pad-size)); bottom: 0; width: calc(98px * var(--pad-size)); height: calc(98px * var(--pad-size));
+  background: radial-gradient(circle at 35% 28%, #ffd890, #d9661a 55%, #5e2406); }
+.pad-s { left: calc(62px * var(--pad-size)); bottom: calc(124px * var(--pad-size)); width: calc(86px * var(--pad-size)); height: calc(86px * var(--pad-size));
+  background: radial-gradient(circle at 35% 28%, #f2c4ff, #8a2ac0 55%, #24043a); }
+.pad-b { right: 0; bottom: calc(22px * var(--pad-size)); width: calc(72px * var(--pad-size)); height: calc(150px * var(--pad-size)); border-radius: calc(36px * var(--pad-size));
+  background: linear-gradient(180deg, #a8d8ff, #2a6aa8 50%, #0a2240); }
+/* swipe hints: four small chevrons on the rim */
+.chev { position: absolute; width: 0; height: 0; border: calc(5px * var(--pad-size)) solid transparent; opacity: 0.55; }
+.chev.u { top: calc(3px * var(--pad-size)); left: 50%; margin-left: calc(-5px * var(--pad-size)); border-bottom-color: #fff; border-top-width: 0; }
+.chev.d { bottom: calc(3px * var(--pad-size)); left: 50%; margin-left: calc(-5px * var(--pad-size)); border-top-color: #fff; border-bottom-width: 0; }
+.chev.l { left: calc(3px * var(--pad-size)); top: 50%; margin-top: calc(-5px * var(--pad-size)); border-right-color: #fff; border-left-width: 0; }
+.chev.r { right: calc(3px * var(--pad-size)); top: 50%; margin-top: calc(-5px * var(--pad-size)); border-left-color: #fff; border-right-width: 0; }
+.pad[class*="swipe-"] .chev { opacity: 0.15; }
+.pad.swipe-u .chev.u, .pad.swipe-d .chev.d, .pad.swipe-l .chev.l, .pad.swipe-r .chev.r { opacity: 1; filter: drop-shadow(0 0 6px #fff); transform: scale(1.8); }
+.pad.swipe-u { animation: nudge-u 0.26s; } .pad.swipe-d { animation: nudge-d 0.26s; }
+.pad.swipe-l { animation: nudge-l 0.26s; } .pad.swipe-r { animation: nudge-r 0.26s; }
+@keyframes nudge-u { 40% { transform: translateY(-8px) scale(0.95); } }
+@keyframes nudge-d { 40% { transform: translateY(8px) scale(0.95); } }
+@keyframes nudge-l { 40% { transform: translateX(-8px) scale(0.95); } }
+@keyframes nudge-r { 40% { transform: translateX(8px) scale(0.95); } }
+/* charge ring: fills while held, turns gold when the charged blow is ready */
+.ring { position: absolute; inset: -6px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(rgba(255, 220, 140, 0.95) var(--fill, 0%), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%); mask: radial-gradient(circle, transparent 62%, #000 64%);
+  opacity: 0; }
+@property --fill { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
+.pad.charging .ring { opacity: 1; --fill: 100%; transition: --fill 0.38s linear; }
+.pad.charged .ring { background: conic-gradient(#ffd25a 100%, transparent 0); box-shadow: 0 0 18px 4px rgba(255, 210, 90, 0.7); }
+.pad.charged { filter: brightness(1.5); }
+.pad.release { animation: release 0.26s; }
+@keyframes release { 30% { transform: scale(1.15); filter: brightness(2); } }
+/* special readiness: one pip per special slot */
+.pips { position: absolute; bottom: calc(-12px * var(--pad-size)); display: flex; gap: 4px; }
+.pips em { width: 7px; height: 7px; border-radius: 50%; background: #3a2a44; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3); }
+.pips em.on { background: #e6a6ff; box-shadow: 0 0 6px #c04dff; }
 .pad-s.ready { animation: ready 1s ease-in-out infinite; }
-.pad-s.cooling { filter: saturate(0.3) brightness(0.7); }
+.pad-s.cooling { filter: saturate(0.35) brightness(0.75); }
 .pad-s.urge { animation: urge 0.5s ease-in-out infinite; }
-@keyframes ready { 50% { box-shadow: 0 0 0 4px rgba(220, 140, 255, 0.35), 0 6px 16px rgba(0, 0, 0, 0.55); } }
+@keyframes ready { 50% { box-shadow: 0 0 0 4px rgba(220, 140, 255, 0.35), 0 7px 18px rgba(0, 0, 0, 0.55); } }
 @keyframes urge { 50% { transform: scale(1.18); box-shadow: 0 0 30px 8px rgba(255, 80, 80, 0.8); } }
+
+/* left-handed: stick on the right, buttons on the left (mirrored) */
+#controls.lefty #stickZone { left: auto; right: 0; padding-left: 0; padding-right: var(--sr); }
+#controls.lefty #btnZone { right: auto; left: calc(12px + var(--sl)); transform: scaleX(-1); }
+#controls.lefty .pad .ico, #controls.lefty .pad b { transform: scaleX(-1); }
+#controls.lefty .zone-hint { left: auto; right: calc(var(--sr) + 20px); }
+
+.kit { margin-top: 6px; display: grid; gap: 4px; font-size: 13px; color: var(--dim); }
+.kit b { color: var(--gold-hi); }
+.sel-specials { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0 10px; font-size: 13px; align-items: center; }
+.sel-specials span { color: var(--dim); font-weight: 800; letter-spacing: 0.1em; font-size: 10px; }
+.sel-specials b { color: var(--gold-hi); }
+.sel-specials .fin b { color: #ff7a7a; }
 
 .pause-btn {
   position: absolute; left: 50%; bottom: calc(10px + var(--sb)); transform: translateX(-50%); width: 46px; height: 46px; border-radius: 50%;
@@ -251,6 +299,12 @@ html, body {
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-fist" viewBox="0 0 24 24"><path d="M6.2 9.4c0-1.3 1-2.2 2.2-2.2h.6c.4-1 1.3-1.6 2.3-1.6s1.9.6 2.3 1.6h.3c.4-.9 1.3-1.5 2.3-1.5 1.4 0 2.5 1.1 2.5 2.5v5.6c0 3.5-2.7 6.3-6.2 6.3H11c-2.7 0-4.8-2.2-4.8-4.8z"/><path d="M4 11.2c0-.9.7-1.6 1.6-1.6h2.1v4.6H5.6c-.9 0-1.6-.7-1.6-1.6z"/></symbol>
+  <symbol id="i-foot" viewBox="0 0 24 24"><path d="M7.4 3h4.2l.6 8.2 6.4 3.1c1.6.8 2.4 2.1 2.4 3.6v.9c0 1-.8 1.8-1.8 1.8H6.8c-1.4 0-2.4-1.1-2.4-2.4 0-.5.1-1 .4-1.4L7.2 13z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.4 20 5.6v6.1c0 4.9-3.3 8.5-8 10-4.7-1.5-8-5.1-8-10V5.6z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 1.8c.8 4.6 2.6 7.1 7.4 8.4-4.8 1.3-6.6 3.8-7.4 8.4-.8-4.6-2.6-7.1-7.4-8.4C9.4 8.9 11.2 6.4 12 1.8z"/><circle cx="19" cy="19" r="2"/><circle cx="5" cy="19.5" r="1.4"/></symbol>
+</defs></svg>
 <div id="app">
   <canvas id="stage"></canvas>
   <div id="vignette"></div>
@@ -259,13 +313,13 @@ html, body {
   <div id="controls" class="hidden">
     <div id="stickZone">
       <div id="stickBase"><div id="stickKnob"></div></div>
-      <span class="zone-hint">MOVE · JUMP · CROUCH</span>
+      <span class="zone-hint">MOVE · JUMP · CROUCH · FLICK TWICE TO DASH</span>
     </div>
     <div id="btnZone">
-      <button class="pad pad-s" data-k="s" aria-label="Special"><b>SPECIAL</b></button>
-      <button class="pad pad-b" data-k="b" aria-label="Block"><b>BLOCK</b></button>
-      <button class="pad pad-p" data-k="p" aria-label="Punch"><b>PUNCH</b></button>
-      <button class="pad pad-k" data-k="k" aria-label="Kick"><b>KICK</b></button>
+      <button class="pad pad-s" data-k="s" aria-label="Special: tap, or swipe forward, up or down"><svg class="ico"><use href="#i-spark"/></svg><b>SPECIAL</b><i class="chev u"></i><i class="chev l"></i><i class="chev r"></i><i class="chev d"></i><span class="pips"><em></em><em></em><em></em></span></button>
+      <button class="pad pad-p" data-k="p" aria-label="Punch: tap, swipe, or hold to charge"><svg class="ico"><use href="#i-fist"/></svg><b>PUNCH</b><i class="chev u"></i><i class="chev l"></i><i class="chev r"></i><i class="chev d"></i><span class="ring"></span></button>
+      <button class="pad pad-k" data-k="k" aria-label="Kick: tap, swipe, or hold to charge"><svg class="ico"><use href="#i-foot"/></svg><b>KICK</b><i class="chev u"></i><i class="chev l"></i><i class="chev r"></i><i class="chev d"></i><span class="ring"></span></button>
+      <button class="pad pad-b" data-k="b" aria-label="Block (hold)"><svg class="ico"><use href="#i-shield"/></svg><b>BLOCK</b></button>
     </div>
     <button id="pauseBtn" class="pause-btn" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2"/></svg></button>
   </div>
@@ -313,7 +367,7 @@ html, body {
         <div class="sel-title" id="selTitle"></div>
         <p class="sel-bio" id="selBio"></p>
         <div class="stats" id="selStats"></div>
-        <div class="sel-special"><span>SPECIAL</span><b id="selSpecial"></b></div>
+        <div class="sel-specials" id="selSpecials"></div>
         <button id="selGo" class="btn btn-primary">FIGHT</button>
       </div>
     </div>
@@ -372,16 +426,18 @@ html, body {
     <div class="panel wide">
       <h2>MOVE LIST</h2>
       <div class="moves">
-        <div><b>PUNCH</b><span>Fast jab. Tap 3 times for a 3-hit string.</span></div>
-        <div><b>KICK</b><span>Long-range kick. Tap twice for a knockdown roundhouse.</span></div>
-        <div><b>PUNCH, PUNCH, KICK</b><span>Mixed string.</span></div>
-        <div><b>DOWN + PUNCH</b><span>Uppercut. Launches. Stops jump-ins.</span></div>
-        <div><b>DOWN + KICK</b><span>Sweep. Hits low &mdash; must be blocked crouching.</span></div>
-        <div><b>UP</b><span>Jump. Up-forward / up-back to flip. Punch or kick in the air.</span></div>
-        <div><b>HOLD BLOCK</b><span>Stops highs &amp; mids. Hold DOWN too to stop sweeps. Jump-ins beat a crouching block.</span></div>
-        <div><b>SPECIAL</b><span>Your fighter's signature move. Short cooldown.</span></div>
-        <div><b>EXECUTE!</b><span>When the loser is dazed, press SPECIAL to finish them.</span></div>
+        <div><b>TAP PUNCH · TAP KICK</b><span>Jab and kick. Tap fast to chain: P,P,P &middot; P,P,K &middot; K,K.</span></div>
+        <div><b>SWIPE TOWARD FOE</b><span>Punch: lunging cross. Kick: roundhouse launcher. Works mid-combo.</span></div>
+        <div><b>SWIPE UP</b><span>Punch: uppercut. Kick: rising high kick. Both launch for juggles.</span></div>
+        <div><b>SWIPE DOWN</b><span>Punch: low jab. Kick: sweep. Lows must be blocked crouching.</span></div>
+        <div><b>HOLD, THEN RELEASE</b><span>Charged punch or kick. Smashes through a block.</span></div>
+        <div><b>SPECIAL</b><span>Tap, swipe toward the foe, or swipe up/down: three specials per fighter.</span></div>
+        <div><b>SPECIAL CANCEL</b><span>Land any hit, then hit SPECIAL: the special cuts the recovery and combos.</span></div>
+        <div><b>STICK</b><span>Up jumps (up-forward flips). Down crouches. Flick twice to dash or back-dash.</span></div>
+        <div><b>HOLD BLOCK</b><span>Stops highs &amp; mids. Hold down too to stop lows. Jump-ins beat a crouching block.</span></div>
+        <div><b>EXECUTE!</b><span>When the loser is dazed, press SPECIAL: every fighter has their own execution.</span></div>
       </div>
+      <div class="kit" id="kit"></div>
       <button class="btn btn-primary" data-close>Got it</button>
     </div>
   </section>
@@ -396,6 +452,7 @@ html, body {
         <label class="sw"><input type="checkbox" data-set="voice"><span>Announcer voice</span></label>
         <label class="sw"><input type="checkbox" data-set="blood"><span>Blood &amp; gore</span></label>
         <label class="sw"><input type="checkbox" data-set="haptics"><span>Vibration</span></label>
+        <label class="sw"><input type="checkbox" data-set="lefty"><span>Left-handed controls</span></label>
         <label class="range"><span>Button size</span><input type="range" min="0.8" max="1.3" step="0.05" data-set="size"></label>
         <label class="range"><span>Control opacity</span><input type="range" min="0.3" max="1" step="0.05" data-set="opacity"></label>
       </div>
@@ -443,20 +500,26 @@ const lerp = (a, b, t) => a + (b - a) * t;
    level: 'high' and 'mid' are stopped by a standing block, 'low' needs a
    crouching block, 'overhead' (jump-ins) needs a standing block.          */
 const MOVES = {
-  jab:   { pose: 'jab',   base: 'stance', startup: 4, active: 4, recovery: 9,  dmg: 42, stun: 15, bstun: 10, knock: 3.2, fx: 'hf', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'jab2', k: 'kick' } },
-  jab2:  { pose: 'jab2',  base: 'stance', startup: 4, active: 4, recovery: 10, dmg: 46, stun: 16, bstun: 10, knock: 3.6, fx: 'hb', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'cross', k: 'kick' } },
-  cross: { pose: 'cross', base: 'stance', startup: 6, active: 4, recovery: 16, dmg: 72, stun: 22, bstun: 13, knock: 9,   fx: 'hf', r: 30, level: 'high', hitstop: 8, sfx: 'heavy', step: 3.5, chain: { k: 'spin' } },
-  kick:  { pose: 'kick',  base: 'stance', startup: 8, active: 5, recovery: 16, dmg: 78, stun: 20, bstun: 12, knock: 7,   fx: 'ff', r: 30, level: 'mid',  hitstop: 7, sfx: 'heavy', chain: { k: 'spin' } },
+  jab:   { pose: 'jab',   base: 'stance', startup: 4, active: 4, recovery: 9,  dmg: 42, stun: 15, bstun: 10, knock: 3.2, fx: 'hf', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'jab2', k: 'kick', pf: 'cross', kf: 'spin', pu: 'upper', ku: 'highkick', kd: 'sweep' } },
+  jab2:  { pose: 'jab2',  base: 'stance', startup: 4, active: 4, recovery: 10, dmg: 46, stun: 16, bstun: 10, knock: 3.6, fx: 'hb', r: 26, level: 'high', hitstop: 5, sfx: 'light', chain: { p: 'cross', k: 'kick', pf: 'cross', kf: 'spin', pu: 'upper', ku: 'highkick', kd: 'sweep' } },
+  cross: { pose: 'cross', base: 'stance', startup: 6, active: 4, recovery: 16, dmg: 72, stun: 22, bstun: 13, knock: 9,   fx: 'hf', r: 30, level: 'high', hitstop: 8, sfx: 'heavy', step: 3.5, chain: { k: 'spin', kf: 'spin', ku: 'highkick', pu: 'upper', kd: 'sweep' } },
+  kick:  { pose: 'kick',  base: 'stance', startup: 8, active: 5, recovery: 16, dmg: 78, stun: 20, bstun: 12, knock: 7,   fx: 'ff', r: 30, level: 'mid',  hitstop: 7, sfx: 'heavy', chain: { k: 'spin', p: 'cross', kf: 'spin', ku: 'highkick', pu: 'upper' } },
   spin:  { pose: 'spin',  base: 'stance', startup: 9, active: 5, recovery: 22, dmg: 96, stun: 0,  bstun: 15, knock: 10,  fx: 'fb', r: 32, level: 'mid',  hitstop: 10, sfx: 'heavy', knockdown: true, launch: 9 },
   upper: { pose: 'upper', base: 'crouch', end: 'stance', startup: 7, active: 6, recovery: 24, dmg: 118, stun: 0, bstun: 16, knock: 3.5, fx: 'hf', r: 32, level: 'mid', hitstop: 11, sfx: 'crush', knockdown: true, launch: 17.5 },
   sweep: { pose: 'sweep', base: 'crouch', end: 'crouch', startup: 7, active: 6, recovery: 22, dmg: 66, stun: 0, bstun: 13, knock: 3, fx: 'ff', r: 30, level: 'low', hitstop: 7, sfx: 'heavy', knockdown: true, launch: 4.5 },
+  lowpunch: { pose: 'lowpunch', base: 'crouch', end: 'crouch', startup: 4, active: 4, recovery: 9, dmg: 34, stun: 15, bstun: 9, knock: 2.6, fx: 'hf', r: 24, level: 'low', hitstop: 5, sfx: 'light', chain: { p: 'upper', pu: 'upper', k: 'sweep', kd: 'sweep', kf: 'sweep' } },
+  highkick: { pose: 'highkick', base: 'stance', startup: 9, active: 5, recovery: 20, dmg: 86, stun: 0, bstun: 14, knock: 4, fx: 'ff', r: 32, level: 'mid', hitstop: 10, sfx: 'heavy', knockdown: true, launch: 15 },
+  // charged (hold the button, release): breaks a block
+  cpunch: { pose: 'cross', base: 'stance', startup: 7, active: 4, recovery: 18, dmg: 108, stun: 0, bstun: 22, knock: 12, fx: 'hf', r: 32, level: 'mid', hitstop: 12, sfx: 'crush', step: 6, guardBreak: true, knockdown: true, launch: 7, charged: true },
+  ckick: { pose: 'spin', base: 'stance', startup: 9, active: 5, recovery: 22, dmg: 118, stun: 0, bstun: 22, knock: 12, fx: 'fb', r: 34, level: 'mid', hitstop: 13, sfx: 'crush', step: 3, guardBreak: true, knockdown: true, launch: 11, charged: true },
   apunch:{ pose: 'apunch', base: 'jump', air: true, startup: 4, active: 99, recovery: 0, dmg: 66, stun: 18, bstun: 12, knock: 5, fx: 'hf', r: 28, level: 'overhead', hitstop: 7, sfx: 'heavy' },
   akick: { pose: 'akick', base: 'jump', air: true, startup: 5, active: 99, recovery: 0, dmg: 82, stun: 20, bstun: 13, knock: 6.5, fx: 'ff', r: 30, level: 'overhead', hitstop: 8, sfx: 'heavy' }
 };
 
 /* ---------------------------------------------------------------- fighters
    body: segment lengths before `scale`. look: everything the renderer needs
-   to dress the skeleton. special: the one-button signature move.          */
+   to dress the skeleton. specials: three per fighter -- tap, swipe
+   forward, swipe up/down on SPECIAL. finisher: their unique execution.          */
 const BODY = { torso: 106, neck: 11, head: 23, upperArm: 53, foreArm: 50, thigh: 68, shin: 66, foot: 27, bulk: 1 };
 
 const FIGHTERS = {
@@ -465,7 +528,12 @@ const FIGHTERS = {
     bio: 'A swordsman who swore off the sword. His kicks still cut.',
     hp: 1000, power: 1.0, speed: 1.0, scale: 1.06,
     body: { ...BODY, torso: 108, thigh: 70, shin: 68 },
-    special: { type: 'rising', name: 'Crescent Rise', dmg: 120, cooldown: 60 },
+    specials: [
+      { name: 'Wind Blade', type: 'projectile', kind: 'blade', speed: 12.5, dmg: 78, cooldown: 70, role: 'zone' },
+      { name: 'Gale Step', type: 'dash', speed: 18, dur: 14, dmg: 92, cooldown: 64, role: 'rush' },
+      { name: 'Crescent Rise', type: 'rising', dmg: 112, cooldown: 60, role: 'anti' }
+    ],
+    finisher: { name: 'THOUSAND CUTS', type: 'cuts' },
     element: { core: '#f2f8ff', glow: '#8fc2ff', deep: '#2c5fae', name: 'steel' },
     look: {
       skin: '#e2b48f', top: 'gi', topColor: '#2e3550', topColor2: '#1b1f31', sleeve: 'none',
@@ -478,7 +546,12 @@ const FIGHTERS = {
     bio: 'Keeper of a temple fire that has burned for nine hundred years.',
     hp: 1000, power: 1.0, speed: 1.02, scale: 1.02,
     body: { ...BODY, bulk: 1.02 },
-    special: { type: 'projectile', name: 'Flame Palm', dmg: 92, cooldown: 72, speed: 10.5, kind: 'fire' },
+    specials: [
+      { name: 'Flame Palm', type: 'projectile', kind: 'fire', speed: 10.5, dmg: 92, cooldown: 72, role: 'zone' },
+      { name: 'Ember Rush', type: 'dash', speed: 14.5, dur: 20, dmg: 98, cooldown: 70, role: 'rush' },
+      { name: 'Phoenix Rise', type: 'rising', dmg: 108, cooldown: 66, role: 'anti' }
+    ],
+    finisher: { name: 'FUNERAL PYRE', type: 'pyre' },
     element: { core: '#fff3c4', glow: '#ff9a2e', deep: '#c2410c', name: 'fire' },
     look: {
       skin: '#c98b5e', top: 'robe', topColor: '#e8771a', topColor2: '#b4500d', sleeve: 'none',
@@ -491,7 +564,12 @@ const FIGHTERS = {
     bio: 'Sworn to the Spire. She arrives a moment before the thunder.',
     hp: 960, power: 0.97, speed: 1.12, scale: 1.0,
     body: { ...BODY, torso: 102, upperArm: 52, foreArm: 49, thigh: 70, shin: 68, bulk: 0.88 },
-    special: { type: 'dash', name: 'Thunder Lance', dmg: 104, cooldown: 66 },
+    specials: [
+      { name: 'Ball Lightning', type: 'projectile', kind: 'bolt', speed: 14, dmg: 76, cooldown: 64, role: 'zone' },
+      { name: 'Thunder Lance', type: 'dash', speed: 15.5, dur: 20, dmg: 104, cooldown: 66, role: 'rush' },
+      { name: 'Sky Strike', type: 'dive', dmg: 96, cooldown: 70, role: 'anti' }
+    ],
+    finisher: { name: 'STORM VERDICT', type: 'storm' },
     element: { core: '#f0fffe', glow: '#5ff0ff', deep: '#1f7a9a', name: 'lightning' },
     look: {
       skin: '#f0c7a6', top: 'armor', topColor: '#1d8a99', topColor2: '#0c4a55', trim: '#e2b64a', sleeve: 'none',
@@ -504,7 +582,12 @@ const FIGHTERS = {
     bio: 'Carved from a mountain and woken by a war no one remembers.',
     hp: 1080, power: 1.07, speed: 0.86, scale: 1.14,
     body: { ...BODY, torso: 110, neck: 7, head: 23, upperArm: 56, foreArm: 54, thigh: 64, shin: 60, bulk: 1.34 },
-    special: { type: 'slam', name: 'Fault Line', dmg: 104, cooldown: 80 },
+    specials: [
+      { name: 'Fault Line', type: 'slam', dmg: 104, cooldown: 80, role: 'zone' },
+      { name: 'Boulder Charge', type: 'dash', speed: 11.5, dur: 26, dmg: 112, cooldown: 84, armor: 1, role: 'rush' },
+      { name: 'Rock Toss', type: 'projectile', kind: 'rock', speed: 8.5, arc: 11, dmg: 96, cooldown: 76, role: 'anti' }
+    ],
+    finisher: { name: "MOUNTAIN'S FALL", type: 'mountain' },
     element: { core: '#ffe7b0', glow: '#ff8a3c', deep: '#7a3a12', name: 'stone' },
     look: {
       skin: '#7d7a73', stone: true, top: 'stone', topColor: '#6c6962', topColor2: '#46443f', sleeve: 'none',
@@ -517,7 +600,12 @@ const FIGHTERS = {
     bio: 'An assassin from a clan that left no records. Not even her name is real.',
     hp: 940, power: 1.0, speed: 1.08, scale: 1.0,
     body: { ...BODY, torso: 104, upperArm: 52, foreArm: 49, thigh: 69, shin: 67, bulk: 0.9 },
-    special: { type: 'teleport', name: 'Shadow Step', dmg: 90, cooldown: 70 },
+    specials: [
+      { name: 'Kunai', type: 'projectile', kind: 'kunai', speed: 16, dmg: 62, cooldown: 50, role: 'zone' },
+      { name: 'Shadow Step', type: 'teleport', dmg: 90, cooldown: 70, role: 'rush' },
+      { name: 'Shadow Dive', type: 'dive', dmg: 88, cooldown: 64, role: 'anti' }
+    ],
+    finisher: { name: 'SWALLOWED', type: 'swallow' },
     element: { core: '#e9ffd6', glow: '#7dff8a', deep: '#14532d', name: 'shadow' },
     look: {
       skin: '#d7b199', top: 'wrap', topColor: '#22262b', topColor2: '#121417', trim: '#3f8f5a', sleeve: 'long',
@@ -530,7 +618,12 @@ const FIGHTERS = {
     bio: 'He built the tournament. He has never lost it.',
     hp: 1180, power: 1.06, speed: 0.95, scale: 1.24,
     body: { ...BODY, torso: 110, neck: 10, head: 23, upperArm: 56, foreArm: 53, thigh: 70, shin: 68, bulk: 1.2 },
-    special: { type: 'sovereign', name: 'Ashfall', dmg: 98, cooldown: 64, speed: 11.5, kind: 'void' },
+    specials: [
+      { name: 'Ashfall', type: 'projectile', kind: 'void', speed: 11.5, dmg: 98, cooldown: 64, role: 'zone' },
+      { name: 'Void Step', type: 'teleport', dmg: 96, cooldown: 72, role: 'rush' },
+      { name: 'Soul Pillar', type: 'pillar', dmg: 104, cooldown: 84, role: 'anti' }
+    ],
+    finisher: { name: 'UNMAKING', type: 'unmaking' },
     element: { core: '#ffe2f6', glow: '#c04dff', deep: '#4c0f6e', name: 'void' },
     look: {
       skin: '#a46a62', top: 'plate', topColor: '#2a1418', topColor2: '#14090c', trim: '#c9a227', sleeve: 'none',
@@ -563,7 +656,7 @@ const MERCY_MAX = 1.4;
 /* Curve shape: d = x^gamma over `ramp` levels. gamma < 1 front-loads the
    (still trivial) opening levels and keeps every later step small, which
    is where a step decides fights. Tuned by tests/crimson-balance.mjs.  */
-const CURVE = { ramp: 34, gamma: 0.55, boss: -0.12 };
+const CURVE = { ramp: 40, gamma: 0.52, boss: -0.04 };
 
 function difficultyFor(level, losses = 0, boss = false) {
   const mercy = Math.min(MERCY_MAX, losses * MERCY_STEP);
@@ -719,6 +812,30 @@ const POSES = {
   vanish: P({ t: 20, h: 10, fau: 70, fal: 120, bau: 60, bal: 126, flu: 40, fll: -60, blu: -30, bll: -40 }),
   strike: P({ t: 18, h: -4, fau: 98, fal: 0, bau: -20, bal: 50, flu: 40, fll: -28, blu: -40, bll: -6, x: 12 }),
   exec_c: P({ t: -10, h: -20, fau: 160, fal: 30, bau: 150, bal: 30, flu: 16, fll: -20, blu: -20, bll: -10 }),
+
+  // gesture normals
+  lowpunch: P({ t: 26, h: -10, fau: 82, fal: 4, bau: 20, bal: 116, ...CROUCH_LEGS }),
+  lowpunch_c: P({ t: 30, h: -14, fau: 40, fal: 100, bau: 24, bal: 116, ...CROUCH_LEGS }),
+  highkick: P({ t: -34, h: 12, fau: 40, fal: 96, bau: -30, bal: 70, flu: 150, fll: -4, blu: -8, bll: -4 }),
+  highkick_c: P({ t: -14, h: 4, fau: 44, fal: 100, bau: -14, bal: 90, flu: 118, fll: -120, blu: -8, bll: -6 }),
+  // movement
+  dashf: P({ t: 28, h: -14, fau: 50, fal: 96, bau: 10, bal: 110, flu: 60, fll: -40, blu: -46, bll: -20, x: 6 }),
+  dashb: P({ t: -16, h: 6, fau: 36, fal: 110, bau: 20, bal: 120, flu: 30, fll: -50, blu: -10, bll: -60 }),
+  dive: P({ t: 20, h: 10, fau: 40, fal: 110, bau: -30, bal: 60, flu: 40, fll: -4, blu: -20, bll: -100, y: 10, rot: 30 }),
+  summon_c: P({ t: 20, h: 10, fau: 20, fal: 90, bau: 10, bal: 100, flu: 30, fll: -40, blu: -26, bll: -20 }),
+  summon: P({ t: -12, h: -24, fau: 170, fal: 10, bau: 160, bal: 16, flu: 20, fll: -10, blu: -20, bll: -8 }),
+
+  // finishers: executioner
+  slash_a: P({ t: 24, h: -6, fau: 124, fal: 8, bau: 104, bal: 16, flu: 44, fll: -30, blu: -40, bll: -6, x: 16 }),
+  slash_b: P({ t: 36, h: -4, fau: 40, fal: 0, bau: 30, bal: 6, flu: 52, fll: -52, blu: -46, bll: -10, x: 24 }),
+  sheath: P({ t: 2, h: -8, fau: 10, fal: 120, bau: -10, bal: 110, flu: 10, fll: -4, blu: -10, bll: -4 }),
+  stomp_c: P({ t: -10, h: -6, fau: 60, fal: 90, bau: 40, bal: 100, flu: 100, fll: -110, blu: -10, bll: -6 }),
+  stomp: P({ t: 30, h: -10, fau: 70, fal: 20, bau: 60, bal: 20, flu: 60, fll: -70, blu: -30, bll: -30 }),
+  grip: P({ t: -6, h: -12, fau: 150, fal: 10, bau: 20, bal: 100, flu: 14, fll: -6, blu: -14, bll: -6 }),
+  // finishers: victim
+  lifted: P({ t: 6, h: 40, fau: 6, fal: 10, bau: -4, bal: 8, flu: 6, fll: -14, blu: -6, bll: -10, y: 10 }),
+  writhe: P({ t: -18, h: -36, fau: 120, fal: -10, bau: 100, bal: -10, flu: 20, fll: -10, blu: -20, bll: -10 }),
+  kneel: P({ t: 14, h: 30, fau: 10, fal: 20, bau: 0, bal: 20, flu: 80, fll: -100, blu: 0, bll: -96 }),
   exec: P({ t: 30, h: -6, fau: 92, fal: 0, bau: 88, bal: 4, flu: 44, fll: -36, blu: -44, bll: -4, x: 18 })
 };
 
@@ -893,9 +1010,15 @@ function rng32(seed) {
   };
 }
 
+/* held: stick + buttons. pressed: edges since the last tick. mods: how a
+   press was made -- a swipe ('l','r','u','d'), relative ('f','b'), a
+   charged release ('c') or forced neutral ('n'). dash: 'l'/'r'/'f'/'b'. */
 const blankInput = () => ({
   held: { l: false, r: false, u: false, d: false, p: false, k: false, b: false, s: false },
-  pressed: { p: false, k: false, s: false, u: false }
+  pressed: { p: false, k: false, s: false, u: false },
+  mods: { p: null, k: null, s: null },
+  upg: { p: false, k: false, s: false },
+  dash: null
 });
 
 const NEUTRAL = new Set(['idle', 'walk', 'crouch', 'block', 'cblock']);
@@ -931,13 +1054,18 @@ class Fighter {
     this.facing = facing;
     this.state = 'intro'; this.st = 0;
     this.move = null; this.moveId = null; this.hitDone = false;
-    this.buf = { p: 0, k: 0, s: 0, u: 0 };
+    this.buf = { p: 0, k: 0, s: 0, u: 0, dash: 0 };
+    this.bmod = { p: null, k: null, s: null };
+    this.bdash = null;
+    this.cools = [0, 0, 0];
+    this.moveKey = null; this.moveMod = null;
+    this.finPose = 'stance'; this.tint = null; this.sink = 0;
     this.stunFor = 0; this.hitKind = 'high'; this.bType = 'stand';
-    this.hitstop = 0; this.cooldown = 0; this.invuln = 0;
+    this.hitstop = 0; this.invuln = 0;
     this.comboTaken = 0; this.flash = 0; this.alpha = 1; this.hidden = false;
     this.airUsed = false; this.flip = 0; this.landFor = 5;
     this.ko = false; this.koRise = false; this.spec = null;
-    this.serial = 0; this.pose = null; this.prevPose = null; this.blendT = BLEND;
+    this.serial = 0; this.pose = null; this.prevPose = null; this.blendT = BLEND; this.blendLen = BLEND;
     this.trail.length = 0;
     this.lastState = 'intro';
   }
@@ -945,6 +1073,66 @@ class Fighter {
   get opp() { return this.match.fighters[1 - this.side]; }
   get air() { return this.y > 0 || AIRBORNE.has(this.state) || (this.spec && this.spec.air); }
   get neutral() { return NEUTRAL.has(this.state); }
+  /* ready when any special is off cooldown (HUD, AI) */
+  get cooldown() { return Math.min(this.cools[0], this.cools[1], this.cools[2]); }
+
+  relMod(mod) {
+    if (!mod) return null;
+    if (mod === 'l' || mod === 'r') return (mod === 'r') === (this.facing > 0) ? 'f' : 'b';
+    return mod;
+  }
+
+  normalFor(key, r, h) {
+    if (key === 'p') {
+      if (r === 'c') return 'cpunch';
+      if (r === 'f') return 'cross';
+      if (r === 'u') return 'upper';
+      if (r === 'd') return 'lowpunch';
+      return h && h.d ? 'upper' : 'jab';
+    }
+    if (r === 'c') return 'ckick';
+    if (r === 'f') return 'spin';
+    if (r === 'u') return 'highkick';
+    if (r === 'd') return 'sweep';
+    return h && h.d ? 'sweep' : 'kick';
+  }
+
+  /* tap = 0, forward = 1, up/down = 2; with no swipe the stick decides */
+  slotFor(r, h, fwd) {
+    if (r === 'f') return 1;
+    if (r === 'u' || r === 'd') return 2;
+    if (r === 'n' || r === 'b' || r === 'c') return 0;
+    return fwd ? 1 : h && h.d ? 2 : 0;
+  }
+
+  /* A swipe is recognised a few frames after the touch that already fired
+     the tap version. Inside the startup window that move is upgraded in
+     place -- swipes cost no input lag. */
+  tryUpgrade(key, mod, upg) {
+    const r = this.relMod(mod);
+    if (r === 'c' || r === 'n') return false;
+    // `upg`: the input layer saw this swipe begin on the same touch as the tap
+    // (by finger time); then the whole startup+active window qualifies
+    // a proven same-touch swipe is honoured for the whole move unless it has
+    // already connected; frame hitches must never eat a gesture
+    if (key !== 's' && this.state === 'attack' && this.moveKey === key && !this.moveMod && !this.hitDone && !this.move.air && (upg || this.st <= 5)) {
+      const id = this.normalFor(key, r, null);
+      if (id !== this.moveId) this.startMove(id, false, key, r);
+      else this.moveMod = r;
+      return true;
+    }
+    // judged by the special's own phase, not a tick count: still winding up?
+    if (key === 's' && this.state === 'special' && this.spec && this.spec.slot === 0 && !this.hitDone &&
+        (upg ? this.spec.phase === 'startup' : this.st <= 4)) {
+      const slot = this.slotFor(r, null, false);
+      if (slot !== 0 && this.cools[slot] === 0 && this.canSpecial(slot)) {
+        this.cools[0] = 0;
+        this.startSpecial(slot);
+        return true;
+      }
+    }
+    return false;
+  }
 
   set(state) {
     if (this.state !== state) { this.state = state; this.st = 0; }
@@ -958,11 +1146,20 @@ class Fighter {
 
   /* ------------------------------------------------------------- update */
   update(inp) {
-    for (const key of ['p', 'k', 's', 'u']) if (inp.pressed[key]) this.buf[key] = BUFFER;
+    for (const key of ['p', 'k', 's', 'u']) {
+      if (!inp.pressed[key]) continue;
+      const mod = (inp.mods && inp.mods[key]) || null;
+      const upg = !!(inp.upg && inp.upg[key]);
+      if (mod && this.tryUpgrade(key, mod, upg)) continue;
+      // a swipe that arrived too late to upgrade is queued longer, never dropped
+      this.buf[key] = upg || mod === 'c' ? BUFFER * 3 : BUFFER;
+      if (key !== 'u') this.bmod[key] = mod;
+    }
+    if (inp.dash) { this.buf.dash = BUFFER; this.bdash = inp.dash; }
     if (this.hitstop > 0) { this.hitstop--; return; }
     for (const key in this.buf) if (this.buf[key] > 0) this.buf[key]--;
     this.st++;
-    if (this.cooldown > 0) this.cooldown--;
+    for (let i = 0; i < 3; i++) if (this.cools[i] > 0) this.cools[i]--;
     if (this.invuln > 0) this.invuln--;
     if (this.flash > 0) this.flash--;
 
@@ -987,7 +1184,7 @@ class Fighter {
           const key = this.buf.p ? 'p' : 'k';
           this.buf[key] = 0;
           this.airUsed = true;
-          this.startMove(key === 'p' ? 'apunch' : 'akick', true);
+          this.startMove(key === 'p' ? 'apunch' : 'akick', true, key, null);
         }
         if (this.airStep()) this.landing(4);
         break;
@@ -998,7 +1195,17 @@ class Fighter {
         if (this.st >= this.landFor) { this.set('idle'); this.doNeutral(h, fwd, back); }
         break;
 
-      case 'attack': this.doAttack(h); break;
+      case 'attack': this.doAttack(h, fwd); break;
+
+      case 'dash':
+        this.vx *= 0.88; this.x += this.vx;
+        if ((this.st >= 5 && (this.buf.p || this.buf.k || this.buf.s)) || this.st >= 14) { this.set('idle'); this.doNeutral(h, fwd, back); }
+        break;
+
+      case 'bdash':
+        this.vx *= 0.86; this.x += this.vx;
+        if (this.st >= 16) { this.set('idle'); this.doNeutral(h, fwd, back); }
+        break;
 
       case 'hit':
         this.vx *= 0.86; this.x += this.vx;
@@ -1040,10 +1247,8 @@ class Fighter {
 
       case 'special': this.doSpecial(h); break;
 
-      case 'exec':
+      case 'exec': case 'finished':          // driven by Match.finStep()
         this.vx *= 0.8; this.x += this.vx;
-        if (this.st === 34) m.execute(this, this.opp);
-        if (this.st >= 70) this.set('victory');
         break;
     }
   }
@@ -1066,9 +1271,20 @@ class Fighter {
       m.beginFinisher(this);
       return;
     }
-    if (this.buf.s && this.cooldown === 0 && this.canSpecial()) return this.startSpecial();
-    if (this.buf.p) { this.buf.p = 0; return this.startMove(h.d ? 'upper' : 'jab'); }
-    if (this.buf.k) { this.buf.k = 0; return this.startMove(h.d ? 'sweep' : 'kick'); }
+    if (this.buf.s) {
+      const slot = this.slotFor(this.relMod(this.bmod.s), h, fwd);
+      if (this.cools[slot] === 0 && this.canSpecial(slot)) return this.startSpecial(slot);
+    }
+    if (this.buf.dash) {
+      this.buf.dash = 0;
+      return this.startDash(this.relMod(this.bdash) === 'f');
+    }
+    for (const key of ['p', 'k']) {
+      if (!this.buf[key]) continue;
+      this.buf[key] = 0;
+      const r = this.relMod(this.bmod[key]);
+      return this.startMove(this.normalFor(key, r, h), false, key, r === 'n' || r === 'b' ? null : r);
+    }
     if (this.buf.u || h.u) { this.buf.u = 0; return this.startJump(fwd ? 1 : back ? -1 : 0); }
     if (h.b) { this.set(h.d ? 'cblock' : 'block'); this.bType = h.d ? 'crouch' : 'stand'; this.vx = 0; return; }
     if (h.d) { this.set('crouch'); this.vx = 0; return; }
@@ -1079,6 +1295,14 @@ class Fighter {
       return;
     }
     this.set('idle'); this.vx = 0;
+  }
+
+  startDash(forward) {
+    this.set(forward ? 'dash' : 'bdash');
+    this.vx = (forward ? 11.5 : -10) * Math.sqrt(this.speedMul) * this.facing;
+    if (!forward) this.invuln = Math.max(this.invuln, 9);
+    this.serial = serialSeq++;
+    this.match.emit({ type: 'dash', f: this, back: !forward });
   }
 
   startJump(dir) {
@@ -1108,9 +1332,11 @@ class Fighter {
     this.match.emit({ type: 'land', f: this });
   }
 
-  startMove(id, air = false) {
+  startMove(id, air = false, key = null, mod = null) {
     this.move = MOVES[id];
     this.moveId = id;
+    this.moveKey = key;
+    this.moveMod = mod;
     this.hitDone = false;
     this.serial = serialSeq++;
     this.state = 'attack';
@@ -1139,7 +1365,7 @@ class Fighter {
     return null;
   }
 
-  doAttack(h) {
+  doAttack(h, fwd) {
     const mv = this.move;
     if (mv.air) {
       if (this.airStep()) this.landing(6);
@@ -1151,13 +1377,23 @@ class Fighter {
     this.x += this.vx;
     if (mv.chain && this.st >= s) {
       for (const key of ['p', 'k']) {
-        const next = mv.chain[key];
-        if (next && this.buf[key] && (this.hitDone || this.st >= s + a)) {
+        if (!this.buf[key]) continue;
+        let r = this.relMod(this.bmod[key]);
+        if (r === 'c') continue;              // a charged blow waits for the move to end; it never chains as a plain one
+        if (r === 'n' || r === 'b') r = null;
+        // a swipe chains only into its own variant, never into the plain follow-up
+        const next = r ? mv.chain[key + r] : mv.chain[key];
+        if (next && (this.hitDone || this.st >= s + a)) {
           this.buf[key] = 0;
-          this.startMove(next);
+          this.startMove(next, false, key, r);
           return;
         }
       }
+    }
+    // special cancel: any normal that connected can cut straight into a special
+    if (this.hitDone && this.buf.s && this.st >= s) {
+      const slot = this.slotFor(this.relMod(this.bmod.s), h, fwd);
+      if (this.cools[slot] === 0 && this.canSpecial(slot)) { this.startSpecial(slot); return; }
     }
     if (this.st >= s + a + mv.recovery) {
       this.move = null;
@@ -1166,38 +1402,32 @@ class Fighter {
   }
 
   /* ----------------------------------------------------------- specials */
-  canSpecial() {
-    const sp = this.def.special;
-    if (sp.type === 'projectile' || (sp.type === 'sovereign' && this.sovereignMode() === 'proj')) {
-      return !this.match.projectiles.some((p) => p.owner === this && !p.dead && p.kind !== 'quake');
-    }
+  canSpecial(slot) {
+    const sp = this.def.specials[slot];
+    const mine = (kind) => this.match.projectiles.some((p) => p.owner === this && !p.dead && p.kind === kind);
+    if (sp.type === 'projectile') return !mine(sp.kind);
+    if (sp.type === 'pillar') return !mine('pillar');
     return true;
   }
 
-  sovereignMode() {
-    return Math.abs(this.opp.x - this.x) > 360 ? 'proj' : 'slam';
-  }
-
-  startSpecial() {
-    const sp = this.def.special;
+  startSpecial(slot) {
+    const sp = this.def.specials[slot];
     this.buf.s = 0;
-    this.cooldown = sp.cooldown;
+    this.cools[slot] = sp.cooldown;
     this.hitDone = false;
     this.serial = serialSeq++;
     this.move = null;
-    let type = sp.type;
-    if (type === 'sovereign') type = this.sovereignMode() === 'proj' ? 'projectile' : 'slam';
-    this.spec = { type, phase: 'startup', active: false, air: false };
+    this.spec = { slot, def: sp, type: sp.type, phase: 'startup', active: false, air: false, armor: sp.armor || 0 };
     this.state = 'special'; this.st = 0; this.vx = 0;
-    this.match.emit({ type: 'special', f: this, kind: type });
+    this.match.emit({ type: 'special', f: this, kind: sp.type, name: sp.name, slot });
   }
 
   specialHit() {
-    const sp = this.def.special;
+    const sp = this.spec.def;
     const t = this.spec.type;
     return {
-      dmg: sp.dmg, stun: 22, bstun: 16, knock: t === 'dash' ? 11 : 8, level: 'mid',
-      knockdown: t !== 'teleport', launch: t === 'rising' ? 14 : 9, hitstop: 11,
+      dmg: sp.dmg, stun: 22, bstun: 16, knock: t === 'dash' ? 11 : 8, level: t === 'dive' ? 'overhead' : 'mid',
+      knockdown: t !== 'teleport', launch: t === 'rising' ? 14 : t === 'dive' ? 7 : 9, hitstop: 11,
       sfx: 'crush', special: true
     };
   }
@@ -1213,10 +1443,11 @@ class Fighter {
         sp.phase = st < 14 ? 'startup' : 'recovery';
         if (st === 14) {
           const hand = this.worldPoint('hf');
-          const def = this.def.special;
+          const def = sp.def;
           m.spawn({
-            owner: this, kind: def.kind, x: hand[0] + this.facing * 20, y: Math.max(120, hand[1]),
-            vx: def.speed * this.facing, r: 30, dmg: def.dmg, level: 'mid'
+            owner: this, kind: def.kind, x: hand[0] + this.facing * 20, y: def.arc ? Math.max(150, hand[1]) : Math.max(120, hand[1]),
+            vx: def.speed * this.facing, vy: def.arc || 0, grav: def.arc ? 0.42 : 0,
+            r: def.kind === 'kunai' ? 20 : def.kind === 'rock' ? 32 : 30, dmg: def.dmg, level: 'mid'
           });
         }
         this.vx *= 0.8; this.x += this.vx;
@@ -1224,11 +1455,12 @@ class Fighter {
         break;
       }
       case 'dash': {
+        const dur = sp.def.dur || 20;
         if (st < 10) { sp.phase = 'startup'; this.vx = -1.2 * this.facing; }
-        else if (st < 30 && !this.hitDone) { sp.phase = 'active'; sp.active = true; this.vx = 15.5 * this.facing; }
+        else if (st < 10 + dur && !this.hitDone) { sp.phase = 'active'; sp.active = true; this.vx = (sp.def.speed || 15.5) * this.facing; }
         else { sp.phase = 'recovery'; sp.active = false; this.vx *= 0.78; }
         this.x += this.vx;
-        if (st >= 50 || (this.hitDone && st >= sp.hitAt + 16)) done();
+        if (st >= 30 + dur || (this.hitDone && st >= sp.hitAt + 16)) done();
         break;
       }
       case 'teleport': {
@@ -1265,11 +1497,43 @@ class Fighter {
         if (st === 9) { this.vy = 10.5; this.vx = 2.2 * this.facing; this.y = 0.01; sp.air = true; }
         sp.phase = 'startup';
         if (this.airStep()) {
-          const def = this.def.special;
+          const def = sp.def;
           m.spawn({ owner: this, kind: 'quake', x: this.x + this.facing * 70, y: 14, vx: 9.5 * this.facing, r: 34, dmg: def.dmg, level: 'low', life: 80 });
           m.emit({ type: 'quake', f: this, x: this.x + this.facing * 60 });
           this.landing(20);
         }
+        break;
+      }
+      case 'dive': {
+        if (st < 6) { sp.phase = 'startup'; break; }
+        if (st === 6) { this.faceOpp(); this.vy = 14; this.vx = 4.5 * this.facing; this.y = 0.01; sp.air = true; }
+        if (!sp.diving && !sp.bounced && (this.vy < 3 || st > 22)) {
+          sp.diving = true;
+          this.faceOpp();
+          this.vy = -13;
+          this.vx = 11 * this.facing;
+        }
+        if (sp.diving) {
+          this.x += this.vx;
+          this.y += this.vy;
+          sp.active = !this.hitDone;
+          sp.phase = sp.active ? 'active' : 'recovery';
+          if (this.y <= 0) { this.y = 0; this.landing(16); }
+        } else {
+          sp.active = false;
+          sp.phase = 'recovery';
+          if (this.airStep()) this.landing(8);
+        }
+        break;
+      }
+      case 'pillar': {
+        sp.phase = st < 12 ? 'startup' : 'recovery';
+        if (st === 12) {
+          const o = this.opp;
+          m.spawn({ owner: this, kind: 'pillar', x: o.x, y: 70, vx: 0, r: 58, dmg: sp.def.dmg, level: 'mid', delay: 26, life: 44 });
+        }
+        this.vx *= 0.8; this.x += this.vx;
+        if (st >= 40) done();
         break;
       }
     }
@@ -1343,7 +1607,18 @@ class Fighter {
       }
       case 'victory': p = track([['victory_c'], ['victory', 16, 'out']], st); break;
       case 'gone': p = track([['down'], ['down', 1]], 0); break;
-      case 'exec': p = track([['stance'], ['exec_c', 24, 'out'], ['exec', 8, 'out'], ['exec', 40]], st); break;
+      case 'dash': p = track([['stance'], ['dashf', 3, 'out'], ['dashf', 8], ['stance', 4]], st); break;
+      case 'bdash': p = track([['stance'], ['dashb', 3, 'out'], ['dashb', 9], ['stance', 4]], st); break;
+      case 'exec': case 'finished': {
+        if (this.finPose === 'dizzy') {
+          const k = (Math.sin(this.match.tick * 0.07) + 1) / 2;
+          p = lerpPose(POSES.dizzy, POSES.dizzy2, k);
+        } else {
+          p = lerpPose(POSES[this.finPose], POSES[this.finPose], 0);
+        }
+        if (this.y > 0) grounded = false;
+        break;
+      }
       case 'special': {
         const sp = this.spec;
         switch (sp && sp.type) {
@@ -1358,6 +1633,11 @@ class Fighter {
             if (sp.air) { grounded = false; p = track([['slam_up'], ['slam_up', 8], ['slam', 8, 'in']], st - 9); }
             else p = track([['stance'], ['slam_up', 9, 'out']], st);
             break;
+          case 'dive':
+            if (!sp.air) p = track([['stance'], ['land', 6, 'out']], st);
+            else { grounded = false; p = sp.diving ? lerpPose(POSES.dive, POSES.dive, 0) : track([['jump'], ['tuck', 8, 'out']], st - 6); }
+            break;
+          case 'pillar': p = track([['stance'], ['summon_c', 8, 'out'], ['summon', 6, 'out'], ['summon', 16], ['stance', 10]], st); break;
           default: p = lerpPose(POSES.stance, POSES.stance, 0);
         }
         break;
@@ -1370,24 +1650,28 @@ class Fighter {
 
   updatePose() {
     const target = this.targetPose();
-    const key = this.state === 'attack' || this.state === 'special' ? this.state + this.serial : this.state;
+    const key = this.state === 'attack' || this.state === 'special' ? this.state + this.serial
+      : this.state === 'exec' || this.state === 'finished' ? this.state + this.finPose : this.state;
     if (key !== this.lastState) {
       // states that must read instantly (impacts) skip the cross-fade
       const snap = this.state === 'hit' || this.state === 'air' || this.state === 'bstun';
       this.prevPose = this.pose;
-      this.blendT = snap || !this.prevPose ? BLEND : 0;
+      // finisher poses glide; everything else snaps in BLEND ticks
+      this.blendLen = this.state === 'exec' || this.state === 'finished' ? 9 : BLEND;
+      this.blendT = snap || !this.prevPose ? this.blendLen : 0;
       this.lastState = key;
     }
-    if (this.blendT < BLEND && this.prevPose) {
+    if (this.blendT < this.blendLen && this.prevPose) {
       this.blendT++;
-      const k = this.blendT / BLEND;
+      const k = this.blendT / this.blendLen;
       this.pose = lerpPose(this.prevPose, target, k * (2 - k));
       if (Math.abs(target.rot - this.prevPose.rot) > 180) this.pose.rot = target.rot;
     } else {
       this.pose = target;
     }
     solve(this.pose, this.body, this.skel);
-    if (this.state === 'special' && this.spec && (this.spec.type === 'dash' || this.spec.type === 'teleport' || this.spec.type === 'rising')) {
+    const streak = (this.state === 'special' && this.spec && ['dash', 'teleport', 'rising', 'dive'].includes(this.spec.type)) || this.state === 'dash' || this.state === 'bdash';
+    if (streak) {
       this.trail.unshift({ skel: cloneSkel(this.skel), x: this.x, y: this.y, facing: this.facing, life: 1 });
       if (this.trail.length > 6) this.trail.pop();
     } else if (this.trail.length) {
@@ -1568,8 +1852,10 @@ class Match {
         break;
       }
       case 'finisher': {
-        if (t === 150) this.emit({ type: 'announce', text: 'EXECUTION', kind: 'exec' });
-        if (t >= 250) this.setPhase('roundover');
+        this.finStep();
+        const F = this.fin;
+        if (F.end && F.t === F.end + 36) this.emit({ type: 'announce', text: 'EXECUTION', sub: F.name, kind: 'exec' });
+        if ((F.end && F.t >= F.end + 160) || t > 700) this.setPhase('roundover');
         break;
       }
       case 'timeup': {
@@ -1587,7 +1873,7 @@ class Match {
             this.emit({ type: 'announce', text: 'DRAW', kind: 'wins' });
           }
         }
-        if (w && t === 20 && w.state !== 'victory' && w.state !== 'exec') w.set('victory');
+        if (w && t === 20 && w.state !== 'victory') { w.set('victory'); w.alpha = 1; }
         if (t >= 170) {
           const champ = this.fighters.find((f) => f.wins >= ROUNDS_TO_WIN);
           if (champ || this.round >= 7) {
@@ -1632,7 +1918,7 @@ class Match {
     } else {
       info = att.specialHit();
       const t = att.spec.type;
-      fx = t === 'rising' ? 'ff' : 'hf';
+      fx = t === 'rising' || t === 'dive' ? 'ff' : 'hf';
       r = (t === 'dash' ? 42 : 36) * att.body.scale;
     }
     const pt = att.worldPoint(fx);
@@ -1640,6 +1926,12 @@ class Match {
       att.hitDone = true;
       if (att.spec) att.spec.hitAt = att.st;
       this.applyHit(att, def, info, pt);
+      if (att.spec && att.spec.type === 'dive') {       // bounce off the target
+        att.spec.diving = false;
+        att.spec.bounced = true;
+        att.vy = 9;
+        att.vx = -3 * att.facing;
+      }
     }
   }
 
@@ -1667,7 +1959,11 @@ class Match {
     const crouchBlock = (def.state === 'cblock' || (def.state === 'bstun' && def.bType === 'crouch')) && lvl !== 'overhead';
     const dizzy = def.state === 'dizzy';
 
-    if (!dizzy && (standBlock || crouchBlock)) {
+    let crushed = false;
+    if (!dizzy && (standBlock || crouchBlock) && info.guardBreak) {
+      crushed = true;                                    // charged attacks smash through a block
+      this.emit({ type: 'guardbreak', x: pt[0], y: pt[1], f: def, att });
+    } else if (!dizzy && (standBlock || crouchBlock)) {
       const chip = info.special ? Math.round(info.dmg * 0.14 * att.dmgOut * def.dmgIn) : 0;
       def.hp = Math.max(1, def.hp - chip);
       def.bType = crouchBlock && !standBlock ? 'crouch' : 'stand';
@@ -1681,7 +1977,16 @@ class Match {
     }
 
     const scaling = Math.max(0.4, 1 - 0.12 * def.comboTaken);
-    const dmg = Math.max(1, Math.round(info.dmg * att.def.power * att.dmgOut * def.dmgIn * scaling));
+    const dmg = Math.max(1, Math.round(info.dmg * att.def.power * att.dmgOut * def.dmgIn * scaling * (crushed ? 0.75 : 1)));
+    // armour (Boulder Charge): absorb the hit and keep going
+    if (!dizzy && def.state === 'special' && def.spec && def.spec.armor > 0 && def.hp - dmg > 0) {
+      def.spec.armor--;
+      def.hp -= dmg;
+      def.flash = 6;
+      def.hitstop = att.hitstop = Math.min(8, info.hitstop);
+      this.emit({ type: 'hit', x: pt[0], y: pt[1], dmg, dir, f: def, att, sfx: 'block', heavy: false, special: !!info.special, combo: 0, armor: true });
+      return true;
+    }
     def.hp = Math.max(0, def.hp - dmg);
     def.comboTaken++;
     const wasAir = def.y > 0 || def.state === 'air';
@@ -1738,13 +2043,117 @@ class Match {
   }
 
   beginFinisher(w) {
+    const l = w.opp;
     this.setPhase('finisher');
-    this.emit({ type: 'finisher', f: w });
+    this.projectiles.length = 0;
+    this.fin = { type: w.def.finisher.type, name: w.def.finisher.name, w, l, t: 0, end: 0, vy: 0, landed: false };
+    w.state = 'exec'; w.st = 0; w.finPose = 'stance'; w.vx = 0; w.spec = null; w.move = null;
+    l.state = 'finished'; l.st = 0; l.finPose = 'dizzy'; l.vx = 0; l.vy = 0; l.tint = null;
+    this.emit({ type: 'finisher', f: w, kind: this.fin.type });
   }
 
-  execute(w, l) {
-    l.state = 'gone'; l.st = 0; l.hidden = true;
-    this.emit({ type: 'shatter', f: l, att: w, element: w.def.element.name });
+  /* Each fighter's execution is a short scripted timeline: poses for both
+     fighters, motion for the victim, and events the renderer turns into
+     fire, lightning, stone, shadow or void. */
+  finStep() {
+    const F = this.fin;
+    const t = ++F.t;
+    const { w, l } = F;
+    const at = (n) => t === n;
+    const every = (a, b, k) => t >= a && t <= b && (t - a) % k === 0;
+    const mid = () => l.y + 150 * l.body.scale;
+    switch (F.type) {
+      case 'cuts': {                                  // Kael: Thousand Cuts
+        if (at(1)) w.finPose = 'sheath';
+        if (every(26, 62, 6)) {
+          const k = (t - 26) / 6;
+          w.finPose = k % 2 ? 'slash_b' : 'slash_a';
+          if (k === 3) {                              // passes clean through to the other side
+            const from = w.x;
+            w.x = clamp(l.x + (l.x - w.x), WALL, STAGE_W - WALL);
+            w.faceOpp();
+            this.emit({ type: 'teleport', f: w, from, to: w.x });
+          }
+          l.finPose = k % 2 ? 'hit_high' : 'hit_low';
+          l.flash = 3;
+          this.emit({ type: 'fin-slash', x: l.x, y: l.y + (80 + ((k * 37) % 140)) * l.body.scale, ang: (((k * 53) % 160) - 80) * Math.PI / 180, f: l });
+        }
+        if (at(70)) { w.finPose = 'sheath'; l.finPose = 'dizzy'; }
+        if (at(98)) this.shatter(l, w, 'slice');
+        break;
+      }
+      case 'pyre': {                                  // Ember: Funeral Pyre
+        if (at(1)) w.finPose = 'summon_c';
+        if (at(18)) w.finPose = 'summon';
+        if (at(22)) { l.finPose = 'writhe'; this.emit({ type: 'fin-pyre', x: l.x, f: l }); }
+        if (every(22, 108, 3)) this.emit({ type: 'fin-fire', x: l.x, f: l });
+        if (t >= 22) l.tint = { color: '#140a06', amt: Math.min(0.92, (t - 22) / 70) };
+        if (at(80)) l.finPose = 'kneel';
+        if (at(112)) this.shatter(l, w, 'ash');
+        break;
+      }
+      case 'storm': {                                 // Volta: Storm Verdict
+        if (at(1)) w.finPose = 'summon_c';
+        if (at(16)) w.finPose = 'summon';
+        const strikes = [26, 40, 52, 62, 70, 76, 82, 86];
+        const i = strikes.indexOf(t);
+        if (i >= 0) {
+          l.finPose = i % 2 ? 'hit_high' : 'writhe';
+          l.flash = 4;
+          this.emit({ type: 'fin-bolt', x: l.x, y: mid(), f: l, big: i === strikes.length - 1 });
+        }
+        if (t >= 26 && t < 92) l.tint = { color: '#d8fcff', amt: t % 4 < 2 ? 0.55 : 0.12 };
+        if (at(92)) this.shatter(l, w, 'burst');
+        break;
+      }
+      case 'mountain': {                              // Granite: Mountain's Fall
+        if (at(1)) w.finPose = 'stomp_c';
+        if (at(20)) {
+          w.finPose = 'stomp';
+          this.emit({ type: 'fin-pillar', x: l.x, f: l });
+          this.emit({ type: 'quake', x: l.x, f: w });
+          l.finPose = 'launched';
+          F.vy = 23;
+        }
+        if (t > 20 && !F.landed) {
+          l.y = Math.max(0, l.y + F.vy);
+          F.vy -= t > 44 ? 1.7 : 0.9;
+          if (at(40)) this.emit({ type: 'fin-boulder', x: l.x, f: l });
+          if (t > 46) l.finPose = 'falling';
+          if (l.y <= 0 && t > 24) { F.landed = true; this.shatter(l, w, 'crush'); }
+        }
+        break;
+      }
+      case 'swallow': {                               // Shade: Swallowed
+        if (at(1)) w.finPose = 'vanish';
+        if (t <= 20) w.alpha = 1 - (t / 20) * 0.85;
+        if (at(20)) this.emit({ type: 'fin-tendrils', x: l.x, f: l });
+        if (every(20, 128, 4)) this.emit({ type: 'fin-tendril', x: l.x + (((t * 37) % 160) - 80), f: l });
+        if (at(40)) l.finPose = 'kneel';
+        if (t > 40 && !F.end) l.y = -Math.min(1, (t - 40) / 88) * 300 * l.body.scale;   // dragged under
+        if (at(130)) this.shatter(l, w, 'sink');
+        if (t > 136) { w.alpha = Math.min(1, w.alpha + 0.06); w.finPose = 'sheath'; }
+        break;
+      }
+      case 'unmaking': {                              // Malrath: Unmaking
+        if (at(1)) w.finPose = 'summon_c';
+        if (at(14)) { w.finPose = 'grip'; l.finPose = 'lifted'; }
+        if (t > 14 && t <= 50) l.y = 150 * (1 - Math.pow(1 - (t - 14) / 36, 3));
+        if (t > 14 && !F.end) l.tint = { color: '#6a1aa0', amt: Math.min(0.6, (t - 14) / 60) };
+        if (at(30)) this.emit({ type: 'fin-void', x: l.x, y: 150 + 150 * l.body.scale, f: l });
+        if (t > 50 && t < 96) l.x += Math.sin(t * 1.7) * 1.6;
+        if (at(96)) this.shatter(l, w, 'implode');
+        break;
+      }
+      default:
+        if (at(34)) this.shatter(l, w, 'slice');
+    }
+  }
+
+  shatter(l, w, style) {
+    this.fin.end = this.fin.t;
+    this.emit({ type: 'shatter', f: l, att: w, style, element: w.def.element.name });
+    l.state = 'gone'; l.st = 0; l.hidden = true; l.tint = null;
   }
 
   atWall(f) { return f.x <= WALL + 2 || f.x >= STAGE_W - WALL - 2; }
@@ -1755,18 +2164,28 @@ class Match {
     for (const p of ps) {
       if (p.dead) continue;
       p.age++;
-      p.x += p.vx;
       if (--p.life <= 0 || p.x < -100 || p.x > STAGE_W + 100) { p.dead = true; continue; }
+      if (p.delay && p.age < p.delay) continue;          // a pillar's warning glow, not yet live
+      p.x += p.vx;
+      if (p.grav) {
+        p.vy -= p.grav;
+        p.y += p.vy;
+        if (p.y < 14) { p.dead = true; this.emit({ type: 'proj-land', p }); continue; }
+      }
       const target = p.owner.opp;
       if (this.hittable(target) && this.overlaps(target, p.x, p.y, p.r)) {
         p.dead = true;
-        const info = { dmg: p.dmg, stun: 22, bstun: 16, knock: 7, level: p.level, knockdown: p.kind !== 'fire', launch: 8, hitstop: 9, sfx: 'crush', special: true };
+        const light = p.kind === 'fire' || p.kind === 'kunai' || p.kind === 'bolt' || p.kind === 'blade';
+        const info = {
+          dmg: p.dmg, stun: 22, bstun: 16, knock: p.kind === 'kunai' ? 4 : 7, level: p.level, knockdown: !light,
+          launch: p.kind === 'pillar' ? 16 : 8, hitstop: 9, sfx: 'crush', special: true
+        };
         if (!this.applyHit(p.owner, target, info, [p.x, p.y])) p.dead = false;
         else this.emit({ type: 'proj-hit', p });
         continue;
       }
       for (const q of ps) {
-        if (q === p || q.dead || q.owner === p.owner) continue;
+        if (q === p || q.dead || q.owner === p.owner || p.kind === 'pillar' || q.kind === 'pillar') continue;
         if (Math.abs(q.x - p.x) < p.r + q.r && Math.abs(q.y - p.y) < p.r + q.r) {
           p.dead = q.dead = true;
           this.emit({ type: 'clash', x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
@@ -1860,7 +2279,17 @@ class AI {
     };
   }
 
-  press(key) { this.out.pressed[key] = true; }
+  press(key, mod = null) {
+    this.out.pressed[key] = true;
+    if (key in this.out.mods) this.out.mods[key] = mod;
+  }
+
+  /* the special slot that plays a role ('zone', 'rush', 'anti'), if ready */
+  slot(me, role) {
+    const i = me.def.specials.findIndex((s) => s.role === role);
+    return i >= 0 && me.cools[i] === 0 && me.canSpecial(i) ? i : -1;
+  }
+  special(i) { this.press('s', ['n', 'f', 'u'][i]); }
 
   hold(h, ticks, now) { this.plan = { hold: h, until: now + ticks }; }
 
@@ -1871,6 +2300,8 @@ class AI {
     const out = this.out;
     for (const k in out.pressed) out.pressed[k] = false;
     for (const k in out.held) out.held[k] = false;
+    for (const k in out.mods) out.mods[k] = null;
+    out.dash = null;
 
     this.hist.push(this.snapshot(o));
     if (this.hist.length > 80) this.hist.shift();
@@ -1888,9 +2319,15 @@ class AI {
     if (me.state === 'attack' && me.move && me.move.chain && me.serial !== this.chainSerial) {
       if (me.st >= me.move.startup) {
         this.chainSerial = me.serial;
+        if (me.hitDone && this.roll(P.combo * 0.45)) {
+          // cancel the string into a special
+          const i = [this.slot(me, 'rush'), this.slot(me, 'zone'), this.slot(me, 'anti')].find((x) => x >= 0);
+          if (i !== undefined) { this.special(i); return out; }
+        }
         if (this.roll(P.combo) && (me.hitDone || this.roll(0.3))) {
           const keys = Object.keys(me.move.chain);
-          this.press(keys[Math.floor(this.rng() * keys.length)]);
+          const k = keys[Math.floor(this.rng() * keys.length)];
+          this.press(k[0], k[1] || null);
         }
       }
       return out;
@@ -1936,6 +2373,9 @@ class AI {
       this.antiAired = v.serial || -now;
       if (this.roll(P.antiAir)) {
         this.plan = null;
+        const anti = this.slot(me, 'anti');
+        if (anti >= 0 && this.roll(0.35)) { this.special(anti); return out; }
+        if (this.roll(0.3)) { this.press('k', 'u'); return out; }
         out.held.d = true; this.press('p');
         return out;
       }
@@ -1969,28 +2409,32 @@ class AI {
       if (this.roll(0.5)) this.press(this.roll(0.5) ? 'p' : 'k');
       return out;
     }
-    const sp = me.def.special.type;
-    const ranged = sp === 'projectile' || (sp === 'sovereign' && dist > 360);
-    const canS = me.cooldown === 0 && me.canSpecial();
+    const zone = this.slot(me, 'zone'), rush = this.slot(me, 'rush'), anti = this.slot(me, 'anti');
+    const zoneDef = zone >= 0 ? me.def.specials[zone] : null;
+    const ranged = zoneDef && zoneDef.type === 'projectile';
     const a = P.aggression;
 
     if (dist > 400) {
-      if (ranged && canS && this.roll(P.special * 2.2)) { this.press('s'); return out; }
-      if ((sp === 'teleport' || sp === 'dash') && canS && dist < 620 && this.roll(P.special)) { this.press('s'); return out; }
+      if (zone >= 0 && (ranged || dist < 560) && this.roll(P.special * 2.2)) { this.special(zone); return out; }
+      if (rush >= 0 && dist < 620 && this.roll(P.special)) { this.special(rush); return out; }
+      if (this.roll(a * 0.25)) { out.dash = o.x > me.x ? 'r' : 'l'; return out; }
       if (this.roll(a + 0.2)) this.hold({ toward: true }, 20 + Math.floor(this.rng() * 30), now);
       else if (this.roll(0.3)) this.hold({ away: true }, 12, now);
       return out;
     }
     if (dist > reach.kick + 20) {
-      if (canS && (sp === 'dash' || sp === 'teleport' || ranged) && this.roll(P.special)) { this.press('s'); return out; }
+      if (rush >= 0 && this.roll(P.special)) { this.special(rush); return out; }
+      if (zone >= 0 && this.roll(P.special * 0.6)) { this.special(zone); return out; }
       if (this.roll(a * 0.3)) { this.press('u'); out.held[toward] = true; return out; }
+      if (this.roll(a * 0.35)) { out.dash = o.x > me.x ? 'r' : 'l'; return out; }
       if (this.roll(a + 0.15)) { this.plan = { hold: { toward: true }, until: now + 40, attackAt: reach.kick - 10 }; return out; }
       if (this.roll(0.35)) this.hold({ b: true }, 16, now);
       return out;
     }
     // close range
     if (this.roll(a)) { this.attackIn(me, o, dist, out); return out; }
-    if (canS && (sp === 'slam' || sp === 'rising' || sp === 'sovereign') && this.roll(P.special * 0.6)) { this.press('s'); return out; }
+    if (zone >= 0 && !ranged && this.roll(P.special * 0.6)) { this.special(zone); return out; }
+    if (this.roll(0.12 * (1 - a))) { out.dash = o.x > me.x ? 'l' : 'r'; return out; }   // back-dash out
     if (this.roll(0.45)) this.hold({ b: true, d: this.roll(P.lows) }, 14 + Math.floor(this.rng() * 14), now);
     else this.hold({ away: true }, 10 + Math.floor(this.rng() * 12), now);
     return out;
@@ -2002,19 +2446,26 @@ class AI {
     const crouching = o.state === 'crouch' || o.state === 'cblock';
     const opts = [];
     if (dist < r.jab + 12 && !crouching) opts.push(['jab', 3]);
+    if (dist < r.cross + 8 && !crouching) opts.push(['cross', 1.2]);
     if (dist < r.kick + 12) opts.push(['kick', 2]);
+    if (dist < r.spin + 8) opts.push(['spin', 1]);
+    if (dist < r.lowpunch + 8) opts.push(['lowpunch', blocking ? 2 * this.p.lows * 4 : 0.6]);
     if (dist < r.sweep + 8) opts.push(['sweep', blocking ? 4 * this.p.lows * 4 : crouching ? 3 : this.p.lows * 3]);
     if (dist < r.upper + 15) opts.push(['upper', crouching ? 3 : 1.5]);
+    if (blocking && dist < r.cpunch + 8) opts.push(['cpunch', 3 * this.p.lows * 3]);   // break the guard
+    if (blocking && dist < r.ckick + 8) opts.push(['ckick', 2 * this.p.lows * 3]);
     if (!opts.length) { out.held[o.x > me.x ? 'r' : 'l'] = true; return; }
     let sum = 0;
     for (const [, w] of opts) sum += w;
     let pick = this.rng() * sum;
     let id = opts[0][0];
     for (const [m, w] of opts) { pick -= w; if (pick <= 0) { id = m; break; } }
-    if (id === 'jab') this.press('p');
-    else if (id === 'kick') this.press('k');
-    else if (id === 'sweep') { out.held.d = true; this.press('k'); }
-    else { out.held.d = true; this.press('p'); }
+    const MAP = {
+      jab: ['p', null], cross: ['p', 'f'], kick: ['k', null], spin: ['k', 'f'], lowpunch: ['p', 'd'],
+      sweep: ['k', 'd'], upper: ['p', 'u'], cpunch: ['p', 'c'], ckick: ['k', 'c']
+    };
+    const [key, mod] = MAP[id];
+    this.press(key, mod);
   }
 
   finish(me, o, toward, dist, now) {
@@ -2027,8 +2478,7 @@ class AI {
     }
     if (now < this.finishAt) return out;
     if (this.wantsExec) {
-      if (dist > 260) { out.held[toward] = true; return out; }
-      this.press('s');
+      this.press('s', 'n');
     } else {
       if (dist > me.reach.kick) { out.held[toward] = true; return out; }
       this.press('k');
@@ -2814,7 +3264,11 @@ function paintLayer(f, st, light, px, time, lite) {
   reset(lay);
   world(lay);
 
-  const T = (c, back = false, skin = false) => makeTones(flash ? mix(c, '#ffffff', flash) : c, light, back, skin);
+  const tnt = f.tint && f.tint.amt > 0 ? f.tint : null;
+  const T = (c, back = false, skin = false) => {
+    if (tnt) c = mix(c, tnt.color, tnt.amt);
+    return makeTones(flash ? mix(c, '#ffffff', flash) : c, light, back, skin);
+  };
   const B = (c, back = false) => T(c, back).base;               // flat albedo
   const skinT = T(L.skin, false, !L.stone);
   const legC = L.stone ? L.skin : L.pants;
@@ -4302,6 +4756,7 @@ class Renderer {
     this.parts = [];
     this.splats = [];
     this.pieces = [];
+    this.fx = [];              // finisher set pieces: pyre, stone pillar, boulder, void, abyss
     this.trauma = 0;
     this.flash = 0;
     this.flashColor = '#ffffff';
@@ -4389,20 +4844,74 @@ class Renderer {
           this.smoke(e.to, 140, e.f.def.element.glow);
           break;
         case 'quake': this.shake(0.45); this.dust(e.x, 22, 1.4); break;
-        case 'special': if (e.kind === 'dash') this.flashScreen(0.18, e.f.def.element.glow); break;
+        case 'special': {
+          if (e.kind === 'dash') this.flashScreen(0.18, e.f.def.element.glow);
+          const f = e.f;
+          this.add({ kind: 'label', text: e.name.toUpperCase(), x: f.x, y: f.y + 330 * f.body.scale, vy: 1.1, life: 52, max: 52, color: f.def.element.glow });
+          break;
+        }
+        case 'dash': this.dust(e.f.x - e.f.facing * (e.back ? -20 : 20), 6, 0.6); break;
+        case 'guardbreak':
+          this.burst(e.x, e.y, 26, { color: '#ffe08a', speed: 13, life: 18, kind: 'spark' });
+          this.ring(e.x, e.y, '#ffe08a', 140);
+          this.flashScreen(0.3, '#ffd27a');
+          this.shake(0.5);
+          this.add({ kind: 'label', text: 'GUARD BREAK', x: e.f.x, y: e.f.y + 320 * e.f.body.scale, vy: 1.2, life: 50, max: 50, color: '#ffd25a' });
+          break;
+        case 'proj-land':
+          if (e.p.kind === 'rock') {
+            this.dust(e.p.x, 14, 1.1);
+            for (let i = 0; i < 12; i++) this.add({ kind: 'shard', x: e.p.x, y: 12, vx: (Math.random() - 0.5) * 12, vy: 4 + Math.random() * 9, life: 60, max: 60, size: 5 + Math.random() * 8, color: '#6a5a48', ang: 0, g: 0.6 });
+            this.shake(0.25);
+          } else this.explode(e.p.x, Math.max(20, e.p.y), projColor(e.p.kind));
+          break;
+        case 'fin-slash': {
+          this.add({ kind: 'slash', x: e.x, y: e.y, ang: e.ang, size: 300, life: 14, max: 14, color: '#bfe0ff' });
+          this.burst(e.x, e.y, 10, { color: '#ffffff', speed: 12, life: 10, kind: 'spark' });
+          if (this.blood) this.bleed(e.x, e.y, 10, Math.random() < 0.5 ? 1 : -1, 0.9);
+          this.flashScreen(0.18, '#dfefff');
+          this.shake(0.22);
+          break;
+        }
+        case 'fin-pyre': this.fx.push({ kind: 'pyre', x: e.x, t: 0, life: 100 }); this.flashScreen(0.3, '#ff8a2a'); this.shake(0.5); break;
+        case 'fin-fire':
+          for (let i = 0; i < 4; i++) {
+            // flames lick up the sides of the body rather than covering it
+            const side = Math.random() < 0.5 ? -1 : 1;
+            this.add({ kind: 'flame', x: e.x + side * (30 + Math.random() * 45), y: Math.random() * 50, vx: -side * 0.4, vy: 3 + Math.random() * 5, life: 30 + Math.random() * 18, max: 48, size: 0.9 + Math.random() * 0.9 });
+          }
+          if (Math.random() < 0.35) this.add({ kind: 'glow', x: e.x + (Math.random() - 0.5) * 60, y: 60 + Math.random() * 200, vx: (Math.random() - 0.5) * 6, vy: 3 + Math.random() * 4, life: 30, max: 30, color: '#ffd27a', size: 0.5 });
+          break;
+        case 'fin-bolt':
+          this.add({ kind: 'skybolt', x: e.x, y: e.y, life: e.big ? 18 : 11, max: e.big ? 18 : 11, color: '#7ff4ff', seed: Math.random() * 1e6, size: e.big ? 1.6 : 1 });
+          this.burst(e.x, e.y, e.big ? 30 : 14, { color: '#bffaff', speed: 12, life: 14, kind: 'spark' });
+          this.flashScreen(e.big ? 0.45 : 0.22, '#e8fdff');
+          this.shake(e.big ? 0.8 : 0.35);
+          break;
+        case 'fin-pillar':
+          this.fx.push({ kind: 'rockpillar', x: e.x, t: 0, life: 150 });
+          for (let i = 0; i < 26; i++) this.add({ kind: 'shard', x: e.x + (Math.random() - 0.5) * 90, y: 10, vx: (Math.random() - 0.5) * 10, vy: 10 + Math.random() * 14, life: 80, max: 80, size: 6 + Math.random() * 12, color: '#5e564c', ang: Math.random() * 6, g: 0.6 });
+          this.dust(e.x, 26, 1.6);
+          break;
+        case 'fin-boulder': this.fx.push({ kind: 'boulder', x: e.x, y: 1100, follow: e.f, t: 0, life: 9999, rot: 0 }); break;
+        case 'fin-tendrils': this.fx.push({ kind: 'abyss', x: e.x, t: 0, life: 160 }); this.darkTarget = 0.78; break;
+        case 'fin-tendril':
+          this.add({ kind: 'tendril', x: e.x, y: 0, life: 44, max: 44, size: 170 + Math.random() * 140, seed: Math.random() * 6.28, ang: (Math.random() - 0.5) * 0.6 });
+          break;
+        case 'fin-void': this.fx.push({ kind: 'voidsphere', x: e.x, y: e.y, t: 0, life: 70 }); this.flashScreen(0.3, '#c04dff'); break;
         case 'ko':
           this.shake(0.9);
           this.flashScreen(0.7, '#ffffff');
           if (this.blood) this.bleed(e.f.x, e.f.y + 170 * e.f.body.scale, 40, Math.sign(e.f.x - e.att.x) || 1, 1.4);
           break;
         case 'finisher': this.darkTarget = 0.62; break;
-        case 'shatter': this.shatter(e.f, e.att); break;
+        case 'shatter': this.shatter(e.f, e.att, e.style); break;
         case 'announce':
           // a banner that could not be shown in time (a stall, a backgrounded tab) is stale: drop it
           this.announce = this.announce.filter((a) => this.time - a.at < 2.5);
-          this.announce.push({ text: e.text, kind: e.kind, t: -(e.delay || 0), at: this.time });
+          this.announce.push({ text: e.text, sub: e.sub, kind: e.kind, t: -(e.delay || 0), at: this.time });
           break;
-        case 'round': this.darkTarget = 0; this.dark = 0; this.pieces.length = 0; break;
+        case 'round': this.darkTarget = 0; this.dark = 0; this.pieces.length = 0; this.fx.length = 0; break;
       }
     }
   }
@@ -4475,8 +4984,9 @@ class Renderer {
     for (let i = 0; i < 4; i++) this.add({ kind: 'bolt', x, y, life: 10, max: 10, color, size: 90 + Math.random() * 80, seed: Math.random() * 1e6 });
   }
 
-  /* Dismantles the loser's last pose into flying body pieces. */
-  shatter(f, att) {
+  /* Dismantles the loser's last pose. Each execution style breaks the body
+     differently; with blood off, the body dissolves instead.            */
+  shatter(f, att, style = 'slice') {
     const W = (k) => [f.x + f.skel[k][0] * f.facing, f.y + f.skel[k][1]];
     const segs = [
       ['hip', 'neck', 26, 'torso'], ['neck', 'head', f.body.head, 'head'],
@@ -4486,32 +4996,55 @@ class Renderer {
     const el = att.def.element;
     const L = f.def.look;
     const dir = Math.sign(f.x - att.x) || 1;
-    this.flashScreen(0.9, el.glow);
-    this.shake(1);
-    if (this.blood) {
+    const cy = f.y + 150 * f.body.scale;
+    this.flashScreen(style === 'sink' ? 0.3 : 0.9, el.glow);
+    this.shake(style === 'sink' ? 0.4 : 1);
+    const gore = this.blood && style !== 'sink';
+    if (gore) {
       for (const [a, b, r, part] of segs) {
         const A = W(a), B = W(b);
-        const cx = (A[0] + B[0]) / 2, cy = (A[1] + B[1]) / 2;
-        const color = part === 'head' ? (L.hair.style === 'mask' ? L.mask : L.skin) : part === 'torso' ? (L.top === 'robe' || L.top === 'gi' || L.top === 'stone' ? L.skin : L.topColor) : part === 'leg' ? (L.stone ? L.skin : L.pants) : part === 'fore' ? (L.wraps || L.gloves || L.skin) : (L.sleeve === 'long' ? L.topColor : L.skin);
+        let color = part === 'head' ? (L.hair.style === 'mask' ? L.mask : L.skin) : part === 'torso' ? (L.top === 'robe' || L.top === 'gi' || L.top === 'stone' ? L.skin : L.topColor) : part === 'leg' ? (L.stone ? L.skin : L.pants) : part === 'fore' ? (L.wraps || L.gloves || L.skin) : (L.sleeve === 'long' ? L.topColor : L.skin);
+        if (style === 'ash') color = mix(color, '#140c08', 0.85);
+        if (style === 'implode') color = mix(color, '#3a0a52', 0.35);
+        let vx = dir * (1.5 + Math.random() * 5) + (Math.random() - 0.5) * 5, vy = 6 + Math.random() * 13;
+        if (style === 'burst' || style === 'implode') {
+          const ang = Math.random() * Math.PI * 2, sp = 10 + Math.random() * 12;
+          vx = Math.cos(ang) * sp; vy = Math.abs(Math.sin(ang)) * sp + 4;
+        }
+        if (style === 'crush') { vx = (Math.random() - 0.5) * 9; vy = 1 + Math.random() * 3; }
+        if (style === 'ash') { vx *= 0.3; vy = 2 + Math.random() * 3; }
         this.pieces.push({
-          x: cx, y: cy, len: Math.hypot(B[0] - A[0], B[1] - A[1]), r: r * f.body.scale,
-          ang: Math.atan2(B[1] - A[1], B[0] - A[0]), va: (Math.random() - 0.5) * 0.5,
-          vx: dir * (1.5 + Math.random() * 5) + (Math.random() - 0.5) * 5, vy: 6 + Math.random() * 13,
-          color, head: part === 'head', rest: 0
+          x: (A[0] + B[0]) / 2, y: style === 'implode' ? cy : (A[1] + B[1]) / 2, len: Math.hypot(B[0] - A[0], B[1] - A[1]), r: r * f.body.scale,
+          ang: Math.atan2(B[1] - A[1], B[0] - A[0]), va: (Math.random() - 0.5) * (style === 'burst' ? 0.9 : 0.5),
+          vx, vy, color, head: part === 'head', rest: 0, ash: style === 'ash', flat: style === 'crush' ? 0.55 : 1,
+          hold: style === 'implode' ? 8 : 0, age: 0
         });
       }
-      this.bleed(f.x, f.y + 150, 90, dir, 1.6);
-      this.bleed(f.x, f.y + 150, 60, -dir, 1.2);
+      if (style !== 'ash') {
+        const n = style === 'crush' ? 140 : style === 'burst' ? 120 : 90;
+        this.bleed(f.x, cy, n, dir, style === 'crush' ? 1.2 : 1.6);
+        this.bleed(f.x, cy, Math.round(n * 0.6), -dir, 1.2);
+      }
+      if (style === 'crush') for (let i = 0; i < 18; i++) this.splats.push({ x: f.x + (Math.random() - 0.5) * 220, r: 10 + Math.random() * 30, a: 0.75, dark: Math.random() < 0.5 });
     }
     // the element itself
-    for (let i = 0; i < 70; i++) {
+    const glowN = this.blood ? 70 : 140;
+    for (let i = 0; i < glowN; i++) {
       const y = f.y + Math.random() * 280 * f.body.scale;
-      this.add({ kind: 'glow', x: f.x + (Math.random() - 0.5) * 120, y, vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 8, life: 50 + Math.random() * 40, max: 90, color: el.glow, size: 1.6 });
+      this.add({ kind: 'glow', x: f.x + (Math.random() - 0.5) * 120, y: Math.max(0, y), vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 8, life: 50 + Math.random() * 40, max: 90, color: el.glow, size: 1.6 });
     }
-    if (el.name === 'lightning' || el.name === 'void') this.bolts(f.x, f.y + 150, el.glow);
-    if (el.name === 'stone') for (let i = 0; i < 26; i++) this.add({ kind: 'shard', x: f.x + (Math.random() - 0.5) * 80, y: 10, vx: (Math.random() - 0.5) * 12, vy: 8 + Math.random() * 14, life: 80, max: 80, size: 8 + Math.random() * 12, color: '#5a554e', ang: Math.random() * 6, g: 0.6 });
-    if (el.name === 'shadow') this.smoke(f.x, 260, '#1c2a20');
-    this.ring(f.x, f.y + 150, el.glow, 260);
+    if (style === 'ash') {
+      for (let i = 0; i < 40; i++) this.add({ kind: 'smoke', x: f.x + (Math.random() - 0.5) * 80, y: Math.random() * 260, vx: (Math.random() - 0.5) * 2, vy: 1 + Math.random() * 2, life: 80, max: 80, size: 30 + Math.random() * 30, color: '#3a3430' });
+      this.burst(f.x, cy, 40, { color: '#ffb03a', speed: 9, life: 40, kind: 'glow', size: 0.5 });
+    }
+    if (style === 'burst' || style === 'implode' || el.name === 'lightning' || el.name === 'void') this.bolts(f.x, cy, el.glow);
+    if (style === 'implode') this.ring(f.x, cy, '#c04dff', 360);
+    if (style === 'crush') for (let i = 0; i < 26; i++) this.add({ kind: 'shard', x: f.x + (Math.random() - 0.5) * 80, y: 10, vx: (Math.random() - 0.5) * 12, vy: 8 + Math.random() * 14, life: 80, max: 80, size: 8 + Math.random() * 12, color: '#5a554e', ang: Math.random() * 6, g: 0.6 });
+    if (style === 'sink') {
+      this.smoke(f.x, 120, '#14261a');
+      if (this.blood) for (let i = 0; i < 10; i++) this.splats.push({ x: f.x + (Math.random() - 0.5) * 160, r: 14 + Math.random() * 26, a: 0.8, dark: true });
+    }
+    this.ring(f.x, cy, el.glow, 260);
   }
 
   /* ------------------------------------------------------------- frame */
@@ -4570,14 +5103,25 @@ class Renderer {
       g.fillStyle = 'rgba(0,0,0,0.15)';
     }
     for (const f of fs) if (f.state !== 'gone') drawShadow(g, f, this.light);
+    this.drawFx(g, t, dt, 'back');
     for (const f of order) {
       if (f.hidden) continue;
+      if (f.y < 0) {                       // being dragged under: nothing below the floor shows
+        g.save();
+        g.beginPath();
+        g.rect(cam.x - 3000, -3000, 6000, 3000);
+        g.clip();
+        drawFighter(g, f, this.light, { time: t, lite: this.lite });
+        g.restore();
+        continue;
+      }
       for (let i = f.trail.length - 1; i >= 1; i--) {
         const tr = f.trail[i];
         drawFighter(g, { ...f, skel: tr.skel, x: tr.x, y: tr.y, facing: tr.facing, alpha: 1 }, this.light, { silhouette: rgba(f.def.element.glow, 0.5), alpha: 0.35 * (1 - i / f.trail.length), chains: false });
       }
       drawFighter(g, f, this.light, { time: t, lite: this.lite });
     }
+    this.drawFx(g, t, dt, 'front');
     this.drawPieces(g, dt);
     this.drawProjectiles(g, match, t);
     this.drawParticles(g, dt);
@@ -4605,6 +5149,123 @@ class Renderer {
       this.flash = Math.max(0, this.flash - dt * 3.2);
     }
     if (hud) this.drawHud(g, match, hud, dt);
+  }
+
+  drawFx(g, t, dt, layer) {
+    const k = dt * 60;
+    for (const e of this.fx) {
+      const back = e.kind === 'abyss' || e.kind === 'rockpillar' || e.kind === 'pyre';
+      if ((layer === 'back') !== back) continue;
+      e.t += k;
+      const u = e.t;
+      g.save();
+      switch (e.kind) {
+        case 'pyre': {                      // a roaring column of fire
+          const a = Math.min(1, u / 8) * Math.min(1, (e.life - u) / 20);
+          if (a <= 0) break;
+          g.globalCompositeOperation = 'lighter';
+          const h = 420 * Math.min(1, u / 10);
+          const gr = g.createLinearGradient(0, 0, 0, -h);
+          gr.addColorStop(0, `rgba(255,170,70,${0.42 * a})`);
+          gr.addColorStop(0.4, `rgba(230,80,20,${0.3 * a})`);
+          gr.addColorStop(1, 'rgba(255,60,10,0)');
+          g.fillStyle = gr;
+          for (let i = 0; i < 3; i++) {
+            const w = 90 - i * 22, wv = Math.sin(t * 9 + i) * 10;
+            g.beginPath();
+            g.moveTo(e.x - w, 0);
+            g.quadraticCurveTo(e.x - w * 0.6 + wv, -h * 0.5, e.x + wv * 0.5, -h);
+            g.quadraticCurveTo(e.x + w * 0.6 + wv, -h * 0.5, e.x + w, 0);
+            g.fill();
+          }
+          g.globalAlpha = 0.55 * a;
+          g.drawImage(glowSprite('#ff6a1a', 128), e.x - 200, -300, 400, 400);
+          break;
+        }
+        case 'rockpillar': {               // erupts from the floor, holds, sinks back
+          const rise = Math.min(1, u / 8), sink = Math.max(0, (u - 110) / 30);
+          const h = 300 * rise * (1 - sink);
+          if (h <= 1) break;
+          const w = 70;
+          const gr = g.createLinearGradient(e.x - w, 0, e.x + w, 0);
+          gr.addColorStop(0, '#2a241e'); gr.addColorStop(0.35, '#7a6e60'); gr.addColorStop(0.6, '#5a5046'); gr.addColorStop(1, '#1e1a16');
+          g.fillStyle = gr;
+          g.beginPath();
+          g.moveTo(e.x - w, 2);
+          g.lineTo(e.x - w * 0.8, -h * 0.6); g.lineTo(e.x - w * 0.55, -h); g.lineTo(e.x - w * 0.1, -h - 18); g.lineTo(e.x + w * 0.4, -h + 6);
+          g.lineTo(e.x + w * 0.85, -h * 0.55); g.lineTo(e.x + w, 2);
+          g.closePath();
+          g.fill();
+          g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2;
+          for (let i = 1; i < 5; i++) { g.beginPath(); g.moveTo(e.x - w * 0.7, -h * i / 5); g.lineTo(e.x + w * 0.5, -h * i / 5 - 10); g.stroke(); }
+          g.globalCompositeOperation = 'lighter';
+          g.strokeStyle = 'rgba(255,138,60,0.6)'; g.lineWidth = 3;
+          g.beginPath(); g.moveTo(e.x - 10, 0); g.lineTo(e.x + 4, -h * 0.4); g.lineTo(e.x - 6, -h * 0.8); g.stroke();
+          break;
+        }
+        case 'boulder': {                  // falls with the victim, then rests
+          const f = e.follow;
+          const target = f && !f.hidden ? f.y + 260 * f.body.scale : 70;
+          e.y = Math.max(target, e.y - 24 * k);
+          if (f && f.hidden) e.y = Math.max(70, e.y - 30 * k);
+          e.rot += 0.05 * k;
+          const r = 80;
+          g.translate(e.x, -e.y);
+          g.rotate(e.rot);
+          const gr = g.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r * 1.1);
+          gr.addColorStop(0, '#8a7e70'); gr.addColorStop(0.6, '#4e463e'); gr.addColorStop(1, '#1c1814');
+          g.fillStyle = gr;
+          g.beginPath();
+          for (let i = 0; i < 9; i++) {
+            const a = (i / 9) * Math.PI * 2, rr = r * (0.82 + 0.18 * Math.sin(i * 2.3));
+            g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          }
+          g.closePath();
+          g.fill();
+          g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 3;
+          g.beginPath(); g.moveTo(-r * 0.4, -r * 0.2); g.lineTo(r * 0.1, r * 0.1); g.lineTo(r * 0.3, r * 0.5); g.stroke();
+          break;
+        }
+        case 'abyss': {                    // a pool of living shadow
+          const a = Math.min(1, u / 15) * Math.min(1, (e.life - u) / 20);
+          if (a <= 0) break;
+          g.translate(e.x, -2);
+          g.scale(1, 0.2);
+          const gr = g.createRadialGradient(0, 0, 0, 0, 0, 200);
+          gr.addColorStop(0, `rgba(0,0,0,${0.95 * a})`);
+          gr.addColorStop(0.7, `rgba(10,30,16,${0.7 * a})`);
+          gr.addColorStop(1, 'rgba(10,30,16,0)');
+          g.fillStyle = gr;
+          g.beginPath(); g.arc(0, 0, 200, 0, Math.PI * 2); g.fill();
+          g.globalCompositeOperation = 'lighter';
+          g.strokeStyle = `rgba(80,255,140,${0.25 * a})`; g.lineWidth = 6;
+          g.beginPath(); g.arc(0, 0, 150 + Math.sin(t * 4) * 10, 0, Math.PI * 2); g.stroke();
+          break;
+        }
+        case 'voidsphere': {               // swells around the victim, then collapses
+          const grow = Math.min(1, u / 30), fall = Math.max(0, (u - 58) / 12);
+          const r = 170 * grow * (1 - fall) + 10;
+          if (u > e.life) break;
+          g.translate(e.x, -e.y);
+          const gr = g.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+          gr.addColorStop(0, 'rgba(10,0,20,0.85)');
+          gr.addColorStop(0.75, 'rgba(70,10,110,0.55)');
+          gr.addColorStop(1, 'rgba(192,77,255,0)');
+          g.fillStyle = gr;
+          g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+          g.globalCompositeOperation = 'lighter';
+          g.strokeStyle = 'rgba(210,120,255,0.7)'; g.lineWidth = 3;
+          for (let i = 0; i < 3; i++) {
+            g.beginPath();
+            g.ellipse(0, 0, r * (0.9 - i * 0.12), r * (0.3 + i * 0.1), t * (1.5 + i) + i, 0, Math.PI * 2);
+            g.stroke();
+          }
+          break;
+        }
+      }
+      g.restore();
+    }
+    if (layer === 'front') this.fx = this.fx.filter((e) => e.t < e.life);
   }
 
   drawSplats(g) {
@@ -4700,6 +5361,92 @@ class Renderer {
           g.restore();
           break;
         }
+        case 'slash': {
+          const L = p.size * (0.6 + 0.4 * a);
+          g.save();
+          g.globalCompositeOperation = 'lighter';
+          g.translate(p.x, -p.y);
+          g.rotate(p.ang);
+          g.strokeStyle = rgba(p.color, a * 0.6);
+          g.lineWidth = 14 * a;
+          g.beginPath(); g.moveTo(-L / 2, 0); g.lineTo(L / 2, 0); g.stroke();
+          g.strokeStyle = `rgba(255,255,255,${a})`;
+          g.lineWidth = 3 * a + 1;
+          g.beginPath(); g.moveTo(-L / 2, 0); g.lineTo(L / 2, 0); g.stroke();
+          g.restore();
+          break;
+        }
+        case 'flame': {
+          p.vx *= 0.97;
+          const R = 30 * p.size * (0.3 + a);
+          const col = a > 0.6 ? '#ffb04a' : a > 0.3 ? '#ff6a14' : '#a0200a';
+          g.save();
+          g.globalCompositeOperation = 'lighter';
+          g.globalAlpha = Math.min(0.8, a);
+          g.drawImage(glowSprite(col, 64), p.x - R, -p.y - R * 1.3, R * 2, R * 2.6);
+          g.restore();
+          break;
+        }
+        case 'skybolt': {
+          let r = p.seed;
+          const rnd = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+          g.save();
+          g.globalCompositeOperation = 'lighter';
+          for (const [w, c] of [[16 * p.size, rgba(p.color, 0.35 * a)], [5 * p.size, `rgba(255,255,255,${a})`]]) {
+            g.strokeStyle = c;
+            g.lineWidth = w;
+            g.beginPath();
+            let x = p.x + (rnd() - 0.5) * 200, y = -1100;
+            g.moveTo(x, y);
+            const steps = 14;
+            for (let s = 1; s <= steps; s++) {
+              const t2 = s / steps;
+              x = x + (p.x - x) * (t2 * 0.5) + (rnd() - 0.5) * 70 * (1 - t2);
+              y = -1100 + (1100 - p.y) * t2;
+              g.lineTo(x, y);
+            }
+            g.stroke();
+          }
+          g.drawImage(glowSprite(p.color, 128), p.x - 160, -p.y - 160, 320, 320);
+          g.restore();
+          break;
+        }
+        case 'tendril': {
+          const prog = 1 - a;
+          const h = p.size * Math.sin(Math.PI * Math.min(1, prog * 1.2));
+          if (h <= 2) break;
+          g.save();
+          g.translate(p.x, 0);
+          g.rotate(p.ang);
+          const seg = 10;
+          for (let pass = 0; pass < 2; pass++) {
+            g.strokeStyle = pass ? 'rgba(10,22,14,0.95)' : 'rgba(80,255,140,0.22)';
+            g.lineCap = 'round';
+            for (let s2 = 0; s2 < seg; s2++) {
+              const t0 = s2 / seg, t1 = (s2 + 1) / seg;
+              const x0 = Math.sin(p.seed + t0 * 6 + this.time * 5) * 16 * t0, x1 = Math.sin(p.seed + t1 * 6 + this.time * 5) * 16 * t1;
+              g.lineWidth = (pass ? 14 : 22) * (1 - t0 * 0.85);
+              g.beginPath(); g.moveTo(x0, -h * t0); g.lineTo(x1, -h * t1); g.stroke();
+            }
+          }
+          g.restore();
+          break;
+        }
+        case 'label': {
+          g.save();
+          g.globalAlpha = Math.min(1, a * 2);
+          g.font = `italic 900 26px ${FONT}`;
+          g.textAlign = 'center';
+          g.textBaseline = 'middle';
+          g.lineJoin = 'round';
+          g.lineWidth = 6;
+          g.strokeStyle = 'rgba(8,2,4,0.9)';
+          g.strokeText(p.text, p.x, -p.y);
+          g.fillStyle = tint(p.color, 0.45);
+          g.fillText(p.text, p.x, -p.y);
+          g.restore();
+          break;
+        }
         case 'bolt': {
           let r = p.seed;
           const rnd = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
@@ -4729,6 +5476,16 @@ class Renderer {
   drawPieces(g, dt) {
     const k = dt * 60;
     for (const p of this.pieces) {
+      p.age = (p.age || 0) + k;
+      if (p.hold && p.age < p.hold) {
+        // implosion: everything collapses to the centre for a moment first
+        continue;
+      }
+      if (p.ash && p.rest >= 1) {
+        p.fade = (p.fade || 1) - 0.012 * k;
+        if (Math.random() < 0.3) this.add({ kind: 'smoke', x: p.x, y: p.y, vx: (Math.random() - 0.5), vy: 1 + Math.random(), life: 40, max: 40, size: 14, color: '#3a3430' });
+        if (p.fade <= 0) continue;
+      }
       if (p.rest < 1) {
         p.vy -= 0.62 * k;
         p.x += p.vx * k;
@@ -4742,11 +5499,13 @@ class Renderer {
           p.va *= 0.5;
           if (Math.abs(p.vy) < 1.2) { p.vy = 0; p.rest += 0.05 * k; }
         }
-        if (this.blood && Math.random() < 0.3) this.add({ kind: 'blood', x: p.x, y: p.y, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 2, life: 60, max: 60, size: 1.6 + Math.random() * 2, g: 0.5 });
+        if (this.blood && !p.ash && Math.random() < 0.3) this.add({ kind: 'blood', x: p.x, y: p.y, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 2, life: 60, max: 60, size: 1.6 + Math.random() * 2, g: 0.5 });
       }
       g.save();
       g.translate(p.x, -p.y);
+      if (p.fade != null) g.globalAlpha = Math.max(0, p.fade);
       g.rotate(-p.ang);
+      if (p.flat && p.flat < 1) g.scale(1, p.flat);
       if (p.head) {
         g.beginPath(); g.arc(0, 0, p.r, 0, Math.PI * 2);
         g.fillStyle = p.color; g.fill();
@@ -4764,7 +5523,7 @@ class Renderer {
         g.fillStyle = gr;
         g.fill();
         // the wound
-        g.fillStyle = '#7a0410';
+        g.fillStyle = p.ash ? '#ff6a1a' : '#7a0410';
         g.beginPath(); g.ellipse(hl + p.r * 0.5, 0, p.r * 0.3, p.r * 0.8, 0, 0, Math.PI * 2); g.fill();
       }
       g.restore();
@@ -4774,6 +5533,105 @@ class Renderer {
   drawProjectiles(g, match, t) {
     for (const p of match.projectiles) {
       const col = projColor(p.kind);
+      const dir = Math.sign(p.vx) || 1;
+      if (p.kind === 'pillar') {
+        g.save();
+        g.globalCompositeOperation = 'lighter';
+        if (p.age < p.delay) {             // the warning: a glyph burning on the floor
+          const pulse = 0.5 + 0.5 * Math.sin(p.age * 0.6);
+          g.translate(p.x, -2);
+          g.scale(1, 0.22);
+          g.drawImage(glowSprite(col, 128), -110, -110, 220, 220);
+          g.strokeStyle = rgba(col, 0.4 + pulse * 0.5);
+          g.lineWidth = 8;
+          g.beginPath(); g.arc(0, 0, 70 + pulse * 10, 0, Math.PI * 2); g.stroke();
+        } else {
+          const live = (p.age - p.delay) / (p.life + p.age - p.delay || 1);
+          const h = 340 * Math.min(1, (p.age - p.delay) / 4);
+          const gr = g.createLinearGradient(p.x - 60, 0, p.x + 60, 0);
+          gr.addColorStop(0, rgba(col, 0)); gr.addColorStop(0.5, rgba('#f0d0ff', 0.9 - live * 0.4)); gr.addColorStop(1, rgba(col, 0));
+          g.fillStyle = gr;
+          g.fillRect(p.x - 60, -h, 120, h);
+          g.drawImage(glowSprite(col, 128), p.x - 150, -h * 0.6 - 150, 300, 300);
+          if (Math.random() < 0.8) this.add({ kind: 'glow', x: p.x + (Math.random() - 0.5) * 70, y: Math.random() * h, vx: 0, vy: 5, life: 20, max: 20, color: col, size: 0.8 });
+        }
+        g.restore();
+        continue;
+      }
+      if (p.kind === 'blade') {             // a spinning crescent of wind-steel
+        g.save();
+        g.translate(p.x, -p.y);
+        g.scale(dir, 1);
+        for (let i = 3; i >= 0; i--) {
+          g.save();
+          g.translate(-i * 22, 0);
+          g.globalAlpha = i ? 0.25 / i : 1;
+          g.globalCompositeOperation = 'lighter';
+          g.beginPath();
+          g.arc(0, 0, 38, -1.2, 1.2);
+          g.arc(-14, 0, 32, 1.05, -1.05, true);
+          g.closePath();
+          const gr = g.createLinearGradient(-20, 0, 38, 0);
+          gr.addColorStop(0, rgba(col, 0.2)); gr.addColorStop(1, '#ffffff');
+          g.fillStyle = gr;
+          g.fill();
+          g.restore();
+        }
+        g.globalCompositeOperation = 'lighter';
+        g.drawImage(glowSprite(col, 64), -60, -60, 120, 120);
+        g.restore();
+        continue;
+      }
+      if (p.kind === 'kunai') {
+        g.save();
+        g.translate(p.x, -p.y);
+        g.scale(dir, 1);
+        g.globalCompositeOperation = 'lighter';
+        const tr = g.createLinearGradient(-110, 0, 0, 0);
+        tr.addColorStop(0, rgba(col, 0)); tr.addColorStop(1, rgba(col, 0.6));
+        g.fillStyle = tr;
+        g.fillRect(-110, -3, 110, 6);
+        g.globalCompositeOperation = 'source-over';
+        g.fillStyle = '#2a3036';
+        g.beginPath(); g.moveTo(26, 0); g.lineTo(4, -7); g.lineTo(-14, -2); g.lineTo(-14, 2); g.lineTo(4, 7); g.closePath(); g.fill();
+        g.strokeStyle = '#9aa6b0'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(24, 0); g.lineTo(-10, 0); g.stroke();
+        g.fillStyle = '#3f8f5a'; g.fillRect(-26, -2.5, 12, 5);
+        g.restore();
+        continue;
+      }
+      if (p.kind === 'rock') {
+        g.save();
+        g.translate(p.x, -p.y);
+        g.rotate(p.age * 0.22 * dir);
+        const r = 30;
+        const gr = g.createRadialGradient(-r * 0.3, -r * 0.35, 2, 0, 0, r * 1.1);
+        gr.addColorStop(0, '#9a8e7e'); gr.addColorStop(0.6, '#5a5046'); gr.addColorStop(1, '#221e1a');
+        g.fillStyle = gr;
+        g.beginPath();
+        for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, rr = r * (0.8 + 0.2 * Math.sin(i * 2.7)); g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        g.closePath();
+        g.fill();
+        g.restore();
+        if (Math.random() < 0.4) this.add({ kind: 'dust', x: p.x, y: p.y, vx: 0, vy: 0, life: 20, max: 20, size: 12, color: '#7a6a5a' });
+        continue;
+      }
+      if (p.kind === 'bolt') {
+        g.save();
+        g.globalCompositeOperation = 'lighter';
+        g.drawImage(glowSprite(col, 128), p.x - 70, -p.y - 70, 140, 140);
+        g.drawImage(glowSprite('#ffffff', 64), p.x - 18, -p.y - 18, 36, 36);
+        g.strokeStyle = rgba('#e8fdff', 0.9);
+        g.lineWidth = 2;
+        for (let i = 0; i < 4; i++) {
+          let x = p.x, y = -p.y;
+          const a0 = Math.random() * Math.PI * 2;
+          g.beginPath(); g.moveTo(x, y);
+          for (let s2 = 0; s2 < 4; s2++) { x += Math.cos(a0) * 10 + (Math.random() - 0.5) * 12; y += Math.sin(a0) * 10 + (Math.random() - 0.5) * 12; g.lineTo(x, y); }
+          g.stroke();
+        }
+        g.restore();
+        continue;
+      }
       if (p.kind === 'quake') {
         if (Math.random() < 0.7) this.add({ kind: 'shard', x: p.x + (Math.random() - 0.5) * 30, y: 6, vx: (Math.random() - 0.5) * 4, vy: 5 + Math.random() * 7, life: 40, max: 40, size: 5 + Math.random() * 8, color: '#5a4a3c', ang: 0, g: 0.6 });
         if (Math.random() < 0.5) this.dust(p.x, 1, 0.8);
@@ -4789,7 +5647,6 @@ class Renderer {
         }
         continue;
       }
-      const dir = Math.sign(p.vx);
       for (let i = 0; i < 2; i++) this.add({ kind: 'glow', x: p.x - dir * 10, y: p.y + (Math.random() - 0.5) * 20, vx: -dir * (1 + Math.random() * 2), vy: (Math.random() - 0.5) * 1.5, life: 22, max: 22, color: col, size: 0.9 });
       g.save();
       g.globalCompositeOperation = 'lighter';
@@ -4891,6 +5748,14 @@ class Renderer {
         g.shadowColor = colA;
         g.shadowBlur = 24;
         g.fillText(an.text, 0, 0);
+        if (an.sub) {
+          g.font = `italic 900 ${Math.round(size * 0.42)}px ${FONT}`;
+          g.shadowBlur = 0;
+          g.lineWidth = 8;
+          g.strokeText(an.sub, 0, size * 0.78);
+          g.fillStyle = '#ffd25a';
+          g.fillText(an.sub, 0, size * 0.78);
+        }
         g.restore();
         if (k >= dur) this.announce.shift();
       }
@@ -4944,7 +5809,7 @@ class Renderer {
 }
 
 function projColor(kind) {
-  return kind === 'fire' ? '#ff9a2e' : kind === 'void' ? '#c04dff' : '#ff8a3c';
+  return { fire: '#ff9a2e', void: '#c04dff', blade: '#cfe6ff', bolt: '#5ff0ff', kunai: '#7dff8a', rock: '#a08a70', pillar: '#c04dff' }[kind] || '#ff8a3c';
 }
 
 function makeLayer(w, _unused, scale, draw, transparent = false) {
@@ -5353,11 +6218,17 @@ __mods["input"] = (() => {
 
 /* Touch-first input.
 
-   Left thumb: a floating joystick -- it is centred wherever the thumb lands
-   in the left zone, so there is no "missing the stick". Right thumb: four
-   buttons that are hit-tested on every move, so a thumb can roll from
-   PUNCH to KICK without lifting. Presses are latched between simulation
-   ticks so a tap shorter than one frame is never lost.
+   Left thumb: a floating joystick -- centred wherever the thumb lands, so
+   there is no "missing the stick". Double-flick it to dash.
+
+   Right thumb: four buttons, and each attack button reads a GESTURE:
+     tap            the basic move -- fires the instant the thumb lands
+     swipe          up / down / toward / away: a different move. The swipe is
+                    recognised a few frames later and the engine upgrades the
+                    move in place, so gestures cost no input lag
+     hold, release  a charged, guard-breaking attack (a ring fills on the button)
+   Presses are latched between simulation ticks so a tap shorter than one
+   frame is never lost.
 
    Keyboard and standard gamepads also work (desktop / controller play).  */
 
@@ -5370,6 +6241,13 @@ class Input {
     this.keys = { l: false, r: false, u: false, d: false, p: false, k: false, b: false, s: false };
     this.pad = { l: false, r: false, u: false, d: false, p: false, k: false, b: false, s: false };
     this.latch = { p: false, k: false, s: false, u: false };
+    this.mods = { p: null, k: null, s: null };
+    this.upg = { p: false, k: false, s: false };   // this swipe belongs to a tap that already fired
+    this.dashLatch = null;
+    this.lastFlick = { l: -1e9, r: -1e9 };
+    this.keyTap = { l: -1e9, r: -1e9 };
+    this.keyDown = {};
+    this.sizeK = 1;
     this.enabled = true;
     this.onPress = onPress || (() => {});
     this.stickZone = stickZone;
@@ -5389,7 +6267,7 @@ class Input {
     const z = this.stickZone;
     const R = () => Math.max(46, this.stickBase.offsetWidth * 0.42);
     let ox = 0, oy = 0;
-    const update = (x, y) => {
+    const update = (x, y, ts) => {
       let dx = x - ox, dy = y - oy;
       const r = R();
       const len = Math.hypot(dx, dy);
@@ -5398,14 +6276,18 @@ class Input {
       const dead = r * 0.3;
       const nx = len > dead ? dx / Math.max(len, 1) : 0;
       const ny = len > dead ? dy / Math.max(len, 1) : 0;
-      const prevU = this.touch.u;
+      const prevU = this.touch.u, prevL = this.touch.l, prevR = this.touch.r;
       this.touch.l = nx < -0.42;
       this.touch.r = nx > 0.42;
+      this.flick('l', prevL, this.touch.l, ts);
+      this.flick('r', prevR, this.touch.r, ts);
       this.touch.u = ny < -0.62;
       this.touch.d = ny > 0.5;
       if (this.touch.u && !prevU) { this.latch.u = true; }
     };
-    const release = () => {
+    const release = (ts) => {
+      if (this.touch.l) this.lastFlick.l = ts;
+      if (this.touch.r) this.lastFlick.r = ts;
       this.stickId = null;
       for (const d of DIRS) this.touch[d] = false;
       this.stickKnob.style.transform = '';
@@ -5423,62 +6305,103 @@ class Input {
       this.stickBase.style.left = (ox - rect.left) + 'px';
       this.stickBase.style.top = (oy - rect.top) + 'px';
       z.classList.add('active');
-      update(ox, oy);
+      update(ox, oy, e.timeStamp);
     });
     z.addEventListener('pointermove', (e) => {
       if (e.pointerId !== this.stickId) return;
       e.preventDefault();
-      update(e.clientX, e.clientY);
+      update(e.clientX, e.clientY, e.timeStamp);
     });
     for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-      z.addEventListener(ev, (e) => { if (e.pointerId === this.stickId) release(); });
+      z.addEventListener(ev, (e) => { if (e.pointerId === this.stickId) release(e.timeStamp); });
     }
-    this.releaseStick = release;
+    this.releaseStick = () => release(-1e9);
+  }
+
+  /* a quick out-in-out on one side within 260 ms is a dash that way */
+  flick(dir, was, now, t) {
+    if (now && !was) {
+      if (t - this.lastFlick[dir] < 260) { this.dashLatch = dir; this.lastFlick[dir] = -1e9; }
+    } else if (was && !now) {
+      this.lastFlick[dir] = t;
+    }
   }
 
   /* --------------------------------------------------------- buttons */
   bindButtons() {
     const zone = this.buttons[0].el.parentElement;
+    const SWIPE = 24, CHARGE_MS = 380;
     const hit = (x, y) => {
       let best = null, bd = Infinity;
       for (const b of this.buttons) {
         const r = b.el.getBoundingClientRect();
         const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-        const d = Math.hypot(x - cx, y - cy);
-        // generous: the touch target is 1.25x the drawn button
-        if (d < r.width * 0.62 && d < bd) { bd = d; best = b.key; }
+        // distance to the button's own shape, generous by 25%
+        const dx = Math.max(0, Math.abs(x - cx) - r.width / 2), dy = Math.max(0, Math.abs(y - cy) - r.height / 2);
+        const d = Math.hypot(dx, dy) / Math.min(r.width, r.height);
+        if (d < 0.25 && d < bd) { bd = d; best = b; }
       }
       return best;
     };
-    const set = (id, key) => {
-      const prev = this.btnPointers.get(id);
-      if (prev === key) return;
-      if (key) this.btnPointers.set(id, key); else this.btnPointers.delete(id);
-      this.syncButtons();
-      if (key && key !== prev) {
-        if (key !== 'b') this.latch[key] = true;
-        this.onPress(key);
-      }
+    const flash = (el, cls) => {
+      el.classList.remove(cls);
+      void el.offsetWidth;
+      el.classList.add(cls);
+      setTimeout(() => el.classList.remove(cls), 260);
     };
     zone.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;
       e.preventDefault();
+      const b = hit(e.clientX, e.clientY);
+      if (!b) return;
       try { zone.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-      set(e.pointerId, hit(e.clientX, e.clientY));
+      // e.timeStamp is when the finger actually landed, not when this handler
+      // got to run -- a janky frame must never turn a tap into a charge
+      const ptr = { key: b.key, el: b.el, x0: e.clientX, y0: e.clientY, t0: e.timeStamp, swiped: false };
+      this.btnPointers.set(e.pointerId, ptr);
+      if (b.key !== 'b') { this.latch[b.key] = true; this.mods[b.key] = null; }
+      if (b.key === 'p' || b.key === 'k') {
+        b.el.classList.add('charging');
+        ptr.timer = setTimeout(() => { if (!ptr.swiped) b.el.classList.add('charged'); }, CHARGE_MS);
+      }
+      this.syncButtons();
+      this.onPress(b.key);
     });
     zone.addEventListener('pointermove', (e) => {
-      if (!this.btnPointers.has(e.pointerId) && e.pointerType === 'mouse' && !e.buttons) return;
-      if (!this.enabled) return;
-      const k = hit(e.clientX, e.clientY);
-      if (k || this.btnPointers.has(e.pointerId)) set(e.pointerId, k);
+      const ptr = this.btnPointers.get(e.pointerId);
+      if (!ptr || ptr.swiped || ptr.key === 'b' || !this.enabled) return;
+      const dx = e.clientX - ptr.x0, dy = e.clientY - ptr.y0;
+      if (Math.hypot(dx, dy) < SWIPE * this.sizeK) return;
+      ptr.swiped = true;
+      const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'd' : 'u');
+      this.latch[ptr.key] = true;
+      this.mods[ptr.key] = dir;
+      // judged by finger time, so a slow frame can never make a swipe "late"
+      this.upg[ptr.key] = ptr.key !== 'b' && e.timeStamp - ptr.t0 < 150;
+      clearTimeout(ptr.timer);
+      ptr.el.classList.remove('charging', 'charged');
+      flash(ptr.el, 'swipe-' + dir);
+      this.onPress(ptr.key);
     });
-    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-      zone.addEventListener(ev, (e) => set(e.pointerId, null));
-    }
+    const end = (e) => {
+      const ptr = this.btnPointers.get(e.pointerId);
+      if (!ptr) return;
+      clearTimeout(ptr.timer);
+      if ((ptr.key === 'p' || ptr.key === 'k') && !ptr.swiped && e.timeStamp - ptr.t0 >= CHARGE_MS && this.enabled) {
+        this.latch[ptr.key] = true;                 // the charged release
+        this.mods[ptr.key] = 'c';
+        flash(ptr.el, 'release');
+        this.onPress(ptr.key);
+      }
+      ptr.el.classList.remove('charging', 'charged');
+      this.btnPointers.delete(e.pointerId);
+      this.syncButtons();
+    };
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) zone.addEventListener(ev, end);
   }
 
   syncButtons() {
-    const held = new Set(this.btnPointers.values());
+    const held = new Set([...this.btnPointers.values()].map((p) => p.key));
     for (const b of this.buttons) {
       this.touch[b.key] = held.has(b.key);
       b.el.classList.toggle('down', held.has(b.key));
@@ -5491,16 +6414,36 @@ class Input {
       ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd',
       KeyJ: 'p', KeyK: 'k', KeyL: 'b', ShiftLeft: 'b', KeyI: 's', Space: 's'
     };
+    // gesture shortcuts: U / O = punch / kick toward the foe, Y = up-special, H = forward-special
+    const gest = { KeyU: ['p', 'f'], KeyO: ['k', 'f'], KeyY: ['s', 'u'], KeyH: ['s', 'f'] };
     window.addEventListener('keydown', (e) => {
+      if (gest[e.code]) {
+        e.preventDefault();
+        if (!e.repeat) { const [k, m] = gest[e.code]; this.latch[k] = true; this.mods[k] = m; }
+        return;
+      }
       const k = map[e.code];
       if (!k) return;
       e.preventDefault();
-      if (!e.repeat && (k in this.latch)) this.latch[k] = true;
+      if (!e.repeat) {
+        if (k in this.latch) { this.latch[k] = true; if (k in this.mods) this.mods[k] = null; }
+        if (k === 'l' || k === 'r') {
+          const now = performance.now();
+          if (e.timeStamp - this.keyTap[k] < 260) this.dashLatch = k;
+          this.keyTap[k] = e.timeStamp;
+        }
+        this.keyDown[k] = e.timeStamp;
+      }
       this.keys[k] = true;
     });
     window.addEventListener('keyup', (e) => {
       const k = map[e.code];
-      if (k) this.keys[k] = false;
+      if (!k) return;
+      this.keys[k] = false;
+      if ((k === 'p' || k === 'k') && e.timeStamp - (this.keyDown[k] || 0) >= 380) {
+        this.latch[k] = true;                       // held and released: charged
+        this.mods[k] = 'c';
+      }
     });
     window.addEventListener('blur', () => this.clear());
   }
@@ -5525,6 +6468,10 @@ class Input {
     for (const k in this.keys) this.keys[k] = false;
     for (const k in this.touch) this.touch[k] = false;
     for (const k in this.latch) this.latch[k] = false;
+    for (const k in this.mods) this.mods[k] = null;
+    for (const k in this.upg) this.upg[k] = false;
+    this.dashLatch = null;
+    for (const p of this.btnPointers.values()) { clearTimeout(p.timer); p.el.classList.remove('charging', 'charged'); }
     this.btnPointers.clear();
     for (const b of this.buttons) b.el.classList.remove('down');
     if (this.releaseStick) this.releaseStick();
@@ -5537,9 +6484,16 @@ class Input {
     // left and right together cancel out
     if (out.held.l && out.held.r) out.held.l = out.held.r = false;
     for (const k in this.latch) { out.pressed[k] = this.latch[k]; this.latch[k] = false; }
+    if (!out.mods) out.mods = { p: null, k: null, s: null };
+    for (const k in this.mods) { out.mods[k] = this.mods[k]; this.mods[k] = null; }
+    if (!out.upg) out.upg = { p: false, k: false, s: false };
+    for (const k in this.upg) { out.upg[k] = this.upg[k]; this.upg[k] = false; }
+    out.dash = this.dashLatch;
+    this.dashLatch = null;
     if (!this.enabled) {
       for (const k in out.held) out.held[k] = false;
       for (const k in out.pressed) out.pressed[k] = false;
+      out.dash = null;
     }
     return out;
   }
@@ -5557,7 +6511,7 @@ __mods["save"] = (() => {
 const KEY = 'crimson-realm:v1';
 
 const DEFAULTS = {
-  settings: { sound: true, music: true, voice: true, blood: true, haptics: true, size: 1, opacity: 0.85 },
+  settings: { sound: true, music: true, voice: true, blood: true, haptics: true, size: 1, opacity: 0.85, lefty: false },
   run: null,                 // { fighter, level, losses }
   best: 0,                   // highest level cleared
   champion: false,           // beat the boss at least once
@@ -5776,7 +6730,15 @@ let vsUntil = 0;
 let selId = state.fighter || 'kael';
 let tutorial = null;
 let installPrompt = null;
+let cpuFrozen = false;                // test hook only
 const inBuf = blankInput();
+const GESTURES = ['TAP', 'SWIPE \u2192 FOE', 'SWIPE \u2191\u2193'];
+
+function kitHtml(id) {
+  const d = FIGHTERS[id];
+  return d.specials.map((sp, i) => `<span>${GESTURES[i]}</span><b>${sp.name}</b>`).join('') +
+    `<span>EXECUTE</span><b class="fin">${d.finisher.name}</b>`;
+}
 
 /* Adaptive resolution: if this device cannot hold 60 fps in a fight, step
    the canvas resolution down (and remember it). Strong phones keep the full
@@ -5867,7 +6829,7 @@ function refreshSelect() {
   $('selName').textContent = d.name;
   $('selTitle').textContent = d.title;
   $('selBio').textContent = d.bio;
-  $('selSpecial').textContent = d.special.name;
+  $('selSpecials').innerHTML = kitHtml(selId).replace('<b class="fin">', '<b class="fin" style="color:#ff7a7a">');
   const stat = (label, v) => `<span>${label}</span><i><b style="width:${Math.round(Math.min(1, v) * 100)}%"></b></i>`;
   $('selStats').innerHTML =
     stat('POWER', (d.power - 0.8) / 0.4) + stat('SPEED', (d.speed - 0.75) / 0.45) + stat('HEALTH', (d.hp - 850) / 350);
@@ -5963,7 +6925,7 @@ function setControls(on) {
 function stepFight() {
   const p1 = match.fighters[0];
   const i1 = pilot ? pilot.update(p1, match) : input.sample(inBuf);
-  const i2 = cpu.update(match.fighters[1], match);
+  const i2 = cpuFrozen ? blankInput() : cpu.update(match.fighters[1], match);
   match.update(i1, i2);
   const evs = match.drain();
   renderer.handle(evs, match);
@@ -5976,32 +6938,49 @@ function onEvent(e, m, real) {
   const s = state.settings;
   switch (e.type) {
     case 'hit':
-      sound.play(e.sfx || 'heavy', { power: e.dmg / 100 });
+      sound.play(e.armor ? 'block' : (e.sfx || 'heavy'), { power: e.dmg / 100 });
+      if (e.att === player) { player.lastAttackHit = m.tick; }
       if (real && s.haptics && navigator.vibrate && (e.f === player || e.att === player)) navigator.vibrate(e.heavy ? 28 : 14);
       if (real && e.att === player) current.maxCombo = Math.max(current.maxCombo, e.combo);
       break;
     case 'block': sound.play('block'); if (real && tutorial && e.f === player) tutorial.did('block'); break;
-    case 'whoosh': sound.play('whoosh', { heavy: e.heavy }); if (real && tutorial && e.f === player) tutorial.did(e.f.moveId); break;
+    case 'whoosh':
+      sound.play('whoosh', { heavy: e.heavy });
+      if (real && tutorial && e.f === player) tutorial.did(e.f.moveId);
+      if (e.f.move && e.f.move.charged) sound.play('heavy');
+      break;
+    case 'dash': sound.play('jump'); break;
+    case 'guardbreak': sound.play('crush'); sound.play('block'); if (real && s.haptics && navigator.vibrate) navigator.vibrate(30); break;
+    case 'proj-land': sound.play(e.p.kind === 'rock' ? 'thud' : 'explode'); break;
+    case 'fin-slash': sound.play('block'); sound.play('whoosh', { heavy: true }); break;
+    case 'fin-pyre': sound.play('fire'); sound.play('quake'); break;
+    case 'fin-fire': if (Math.random() < 0.25) sound.play('fire'); break;
+    case 'fin-bolt': sound.play('zap'); if (e.big) sound.play('ko'); break;
+    case 'fin-pillar': sound.play('quake'); break;
+    case 'fin-boulder': sound.play('thud', { power: 1 }); break;
+    case 'fin-tendrils': sound.play('void'); break;
+    case 'fin-tendril': if (Math.random() < 0.2) sound.play('teleport'); break;
+    case 'fin-void': sound.play('void'); break;
     case 'jump': sound.play('jump'); if (real && tutorial && e.f === player) tutorial.did('jump'); break;
     case 'land': sound.play('land'); break;
     case 'thud': sound.play('thud', { power: e.power }); break;
-    case 'proj': sound.play(e.p.kind === 'void' ? 'void' : 'fire'); break;
+    case 'proj': sound.play({ void: 'void', bolt: 'zap', kunai: 'whoosh', blade: 'rise', rock: 'heavy', pillar: 'void' }[e.p.kind] || 'fire'); break;
     case 'proj-hit': case 'clash': sound.play('explode'); break;
     case 'special':
       if (e.kind === 'dash') sound.play('zap');
       else if (e.kind === 'teleport') sound.play('teleport');
       else if (e.kind === 'rising') sound.play('rise');
-      if (real && tutorial && e.f === player) tutorial.did('special');
+      if (real && tutorial && e.f === player) tutorial.did(m.tick - (player.lastAttackHit || -99) < 24 ? 'cancel' : 'special');
       break;
     case 'quake': sound.play('quake'); break;
     case 'ko': sound.play('ko'); if (real && s.haptics && navigator.vibrate) navigator.vibrate([40, 30, 80]); break;
     case 'finisher': sound.play('gong'); break;
     case 'shatter':
-      sound.play(s.blood ? 'gore' : 'explode');
+      sound.play(s.blood && e.style !== 'sink' && e.style !== 'ash' ? 'gore' : 'explode');
       if (real && e.att === player) state.stats.executions++;
       break;
     case 'announce':
-      if (real) setTimeout(() => sound.say(e.text.replace('!', '')), (e.delay || 0) * STEP);
+      if (real) setTimeout(() => sound.say((e.sub ? `${e.text}. ${e.sub}` : e.text).replace(/!/g, '')), (e.delay || 0) * STEP);
       if (real && e.kind === 'perfect' && m.koWinner === player) state.stats.perfects++;
       break;
     case 'matchover':
@@ -6057,13 +7036,15 @@ function showResult() {
    Level 1 only: one prompt at a time, each cleared by doing it.         */
 function makeTutorial() {
   const steps = [
-    { text: 'Tap PUNCH three times fast for a combo', done: (k) => k === 'cross' },
+    { text: 'Tap PUNCH three times fast for a combo', done: (k) => k === 'jab2' || k === 'cross' },
+    { text: 'SWIPE PUNCH toward your foe: lunging cross', done: (k) => k === 'cross' },
     { text: 'Hold BLOCK when they swing at you', done: (k) => k === 'block' },
-    { text: 'Stick DOWN + PUNCH = Uppercut', done: (k) => k === 'upper' },
-    { text: 'Stick DOWN + KICK = Sweep (hits low)', done: (k) => k === 'sweep' },
-    { text: 'Push the stick UP to jump. Kick in the air!', done: (k) => k === 'jump' || k === 'akick' },
-    { text: 'Tap SPECIAL for your signature move', done: (k) => k === 'special' }
+    { text: 'SWIPE PUNCH UP: uppercut  \u00b7  SWIPE KICK DOWN: sweep', done: (k) => k === 'upper' || k === 'sweep' },
+    { text: 'HOLD KICK, then let go: breaks their guard', done: (k) => k === 'ckick' || k === 'cpunch' },
+    { text: 'Tap SPECIAL. Swipe it for your other two specials', done: (k) => k === 'special' },
+    { text: 'Land a hit, then SPECIAL: a special-cancel combo', done: (k) => k === 'cancel' }
   ];
+
   let i = 0, shownAt = 0, ticks = 0;
   const tip = $('tip');
   const showStep = () => {
@@ -6166,6 +7147,8 @@ function syncPads() {
   sBtn.classList.toggle('urge', urge);
   sBtn.classList.toggle('ready', !urge && match.phase === 'fight' && p.cooldown === 0);
   sBtn.classList.toggle('cooling', !urge && p.cooldown > 0);
+  const pips = sBtn.querySelectorAll('.pips em');
+  for (let i = 0; i < 3; i++) pips[i].classList.toggle('on', p.cools[i] === 0);
 }
 
 /* ============================================================== plumbing */
@@ -6215,6 +7198,8 @@ function applySettings() {
   renderer.blood = s.blood;
   document.documentElement.style.setProperty('--pad-size', s.size);
   document.documentElement.style.setProperty('--pad-opacity', s.opacity);
+  $('controls').classList.toggle('lefty', !!s.lefty);
+  input.sizeK = s.size;
   for (const el of document.querySelectorAll('[data-set]')) {
     const k = el.dataset.set;
     if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k];
@@ -6242,7 +7227,12 @@ function wire() {
   });
   $('continueBtn').onclick = () => { sound.play('ui'); goLadder(); };
   $('newBtn').onclick = () => { sound.play('ui'); goSelect(); };
-  $('howBtn').onclick = () => { sound.play('ui'); overlay('how', true); };
+  const showHow = () => {
+    const id = (state.run && state.run.fighter) || selId;
+    $('kit').innerHTML = `<b>${FIGHTERS[id].name}</b><div class="sel-specials">${kitHtml(id)}</div>`;
+    overlay('how', true);
+  };
+  $('howBtn').onclick = () => { sound.play('ui'); showHow(); };
   $('settingsBtn').onclick = () => { sound.play('ui'); overlay('settings', true); };
   $('selGo').onclick = () => {
     sound.play('select');
@@ -6262,7 +7252,7 @@ function wire() {
   $('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); pause(); });
   $('resumeBtn').onclick = resume;
   $('restartBtn').onclick = () => { startLevel(true); };
-  $('pauseHowBtn').onclick = () => overlay('how', true);
+  $('pauseHowBtn').onclick = showHow;
   $('pauseSettingsBtn').onclick = () => overlay('settings', true);
   $('quitBtn').onclick = () => { save(state); goTitle(); };
   $('resNext').onclick = () => { overlay('result', false); goLadder(); };
@@ -6335,6 +7325,7 @@ window.__crimson = {
   showResultNow() { showResult(); },
   /* feed synthetic frame times to the adaptive-resolution governor */
   simulateFrames(ms, n) { for (let i = 0; i < n; i++) watchFrameRate(ms); return { quality: state.quality || 0, backingH: renderer.canvas.height }; },
+  freezeCpu(v) { cpuFrozen = !!v; },
   setQuality(q) { state.quality = q; perf.frames = 0; perf.sum = 0; onResize(); return renderer.canvas.height; },
   pause, resume
 };

@@ -91,6 +91,30 @@ export const POSES = {
   vanish: P({ t: 20, h: 10, fau: 70, fal: 120, bau: 60, bal: 126, flu: 40, fll: -60, blu: -30, bll: -40 }),
   strike: P({ t: 18, h: -4, fau: 98, fal: 0, bau: -20, bal: 50, flu: 40, fll: -28, blu: -40, bll: -6, x: 12 }),
   exec_c: P({ t: -10, h: -20, fau: 160, fal: 30, bau: 150, bal: 30, flu: 16, fll: -20, blu: -20, bll: -10 }),
+
+  // gesture normals
+  lowpunch: P({ t: 26, h: -10, fau: 82, fal: 4, bau: 20, bal: 116, ...CROUCH_LEGS }),
+  lowpunch_c: P({ t: 30, h: -14, fau: 40, fal: 100, bau: 24, bal: 116, ...CROUCH_LEGS }),
+  highkick: P({ t: -34, h: 12, fau: 40, fal: 96, bau: -30, bal: 70, flu: 150, fll: -4, blu: -8, bll: -4 }),
+  highkick_c: P({ t: -14, h: 4, fau: 44, fal: 100, bau: -14, bal: 90, flu: 118, fll: -120, blu: -8, bll: -6 }),
+  // movement
+  dashf: P({ t: 28, h: -14, fau: 50, fal: 96, bau: 10, bal: 110, flu: 60, fll: -40, blu: -46, bll: -20, x: 6 }),
+  dashb: P({ t: -16, h: 6, fau: 36, fal: 110, bau: 20, bal: 120, flu: 30, fll: -50, blu: -10, bll: -60 }),
+  dive: P({ t: 20, h: 10, fau: 40, fal: 110, bau: -30, bal: 60, flu: 40, fll: -4, blu: -20, bll: -100, y: 10, rot: 30 }),
+  summon_c: P({ t: 20, h: 10, fau: 20, fal: 90, bau: 10, bal: 100, flu: 30, fll: -40, blu: -26, bll: -20 }),
+  summon: P({ t: -12, h: -24, fau: 170, fal: 10, bau: 160, bal: 16, flu: 20, fll: -10, blu: -20, bll: -8 }),
+
+  // finishers: executioner
+  slash_a: P({ t: 24, h: -6, fau: 124, fal: 8, bau: 104, bal: 16, flu: 44, fll: -30, blu: -40, bll: -6, x: 16 }),
+  slash_b: P({ t: 36, h: -4, fau: 40, fal: 0, bau: 30, bal: 6, flu: 52, fll: -52, blu: -46, bll: -10, x: 24 }),
+  sheath: P({ t: 2, h: -8, fau: 10, fal: 120, bau: -10, bal: 110, flu: 10, fll: -4, blu: -10, bll: -4 }),
+  stomp_c: P({ t: -10, h: -6, fau: 60, fal: 90, bau: 40, bal: 100, flu: 100, fll: -110, blu: -10, bll: -6 }),
+  stomp: P({ t: 30, h: -10, fau: 70, fal: 20, bau: 60, bal: 20, flu: 60, fll: -70, blu: -30, bll: -30 }),
+  grip: P({ t: -6, h: -12, fau: 150, fal: 10, bau: 20, bal: 100, flu: 14, fll: -6, blu: -14, bll: -6 }),
+  // finishers: victim
+  lifted: P({ t: 6, h: 40, fau: 6, fal: 10, bau: -4, bal: 8, flu: 6, fll: -14, blu: -6, bll: -10, y: 10 }),
+  writhe: P({ t: -18, h: -36, fau: 120, fal: -10, bau: 100, bal: -10, flu: 20, fll: -10, blu: -20, bll: -10 }),
+  kneel: P({ t: 14, h: 30, fau: 10, fal: 20, bau: 0, bal: 20, flu: 80, fll: -100, blu: 0, bll: -96 }),
   exec: P({ t: 30, h: -6, fau: 92, fal: 0, bau: 88, bal: 4, flu: 44, fll: -36, blu: -44, bll: -4, x: 18 })
 };
 

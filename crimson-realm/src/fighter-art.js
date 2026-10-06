@@ -675,7 +675,11 @@ function paintLayer(f, st, light, px, time, lite) {
   reset(lay);
   world(lay);
 
-  const T = (c, back = false, skin = false) => makeTones(flash ? mix(c, '#ffffff', flash) : c, light, back, skin);
+  const tnt = f.tint && f.tint.amt > 0 ? f.tint : null;
+  const T = (c, back = false, skin = false) => {
+    if (tnt) c = mix(c, tnt.color, tnt.amt);
+    return makeTones(flash ? mix(c, '#ffffff', flash) : c, light, back, skin);
+  };
   const B = (c, back = false) => T(c, back).base;               // flat albedo
   const skinT = T(L.skin, false, !L.stone);
   const legC = L.stone ? L.skin : L.pants;

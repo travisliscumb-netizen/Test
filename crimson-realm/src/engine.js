@@ -18,9 +18,15 @@ export function rng32(seed) {
   };
 }
 
+/* held: stick + buttons. pressed: edges since the last tick. mods: how a
+   press was made -- a swipe ('l','r','u','d'), relative ('f','b'), a
+   charged release ('c') or forced neutral ('n'). dash: 'l'/'r'/'f'/'b'. */
 export const blankInput = () => ({
   held: { l: false, r: false, u: false, d: false, p: false, k: false, b: false, s: false },
-  pressed: { p: false, k: false, s: false, u: false }
+  pressed: { p: false, k: false, s: false, u: false },
+  mods: { p: null, k: null, s: null },
+  upg: { p: false, k: false, s: false },
+  dash: null
 });
 
 const NEUTRAL = new Set(['idle', 'walk', 'crouch', 'block', 'cblock']);
@@ -56,13 +62,18 @@ export class Fighter {
     this.facing = facing;
     this.state = 'intro'; this.st = 0;
     this.move = null; this.moveId = null; this.hitDone = false;
-    this.buf = { p: 0, k: 0, s: 0, u: 0 };
+    this.buf = { p: 0, k: 0, s: 0, u: 0, dash: 0 };
+    this.bmod = { p: null, k: null, s: null };
+    this.bdash = null;
+    this.cools = [0, 0, 0];
+    this.moveKey = null; this.moveMod = null;
+    this.finPose = 'stance'; this.tint = null; this.sink = 0;
     this.stunFor = 0; this.hitKind = 'high'; this.bType = 'stand';
-    this.hitstop = 0; this.cooldown = 0; this.invuln = 0;
+    this.hitstop = 0; this.invuln = 0;
     this.comboTaken = 0; this.flash = 0; this.alpha = 1; this.hidden = false;
     this.airUsed = false; this.flip = 0; this.landFor = 5;
     this.ko = false; this.koRise = false; this.spec = null;
-    this.serial = 0; this.pose = null; this.prevPose = null; this.blendT = BLEND;
+    this.serial = 0; this.pose = null; this.prevPose = null; this.blendT = BLEND; this.blendLen = BLEND;
     this.trail.length = 0;
     this.lastState = 'intro';
   }
@@ -70,6 +81,66 @@ export class Fighter {
   get opp() { return this.match.fighters[1 - this.side]; }
   get air() { return this.y > 0 || AIRBORNE.has(this.state) || (this.spec && this.spec.air); }
   get neutral() { return NEUTRAL.has(this.state); }
+  /* ready when any special is off cooldown (HUD, AI) */
+  get cooldown() { return Math.min(this.cools[0], this.cools[1], this.cools[2]); }
+
+  relMod(mod) {
+    if (!mod) return null;
+    if (mod === 'l' || mod === 'r') return (mod === 'r') === (this.facing > 0) ? 'f' : 'b';
+    return mod;
+  }
+
+  normalFor(key, r, h) {
+    if (key === 'p') {
+      if (r === 'c') return 'cpunch';
+      if (r === 'f') return 'cross';
+      if (r === 'u') return 'upper';
+      if (r === 'd') return 'lowpunch';
+      return h && h.d ? 'upper' : 'jab';
+    }
+    if (r === 'c') return 'ckick';
+    if (r === 'f') return 'spin';
+    if (r === 'u') return 'highkick';
+    if (r === 'd') return 'sweep';
+    return h && h.d ? 'sweep' : 'kick';
+  }
+
+  /* tap = 0, forward = 1, up/down = 2; with no swipe the stick decides */
+  slotFor(r, h, fwd) {
+    if (r === 'f') return 1;
+    if (r === 'u' || r === 'd') return 2;
+    if (r === 'n' || r === 'b' || r === 'c') return 0;
+    return fwd ? 1 : h && h.d ? 2 : 0;
+  }
+
+  /* A swipe is recognised a few frames after the touch that already fired
+     the tap version. Inside the startup window that move is upgraded in
+     place -- swipes cost no input lag. */
+  tryUpgrade(key, mod, upg) {
+    const r = this.relMod(mod);
+    if (r === 'c' || r === 'n') return false;
+    // `upg`: the input layer saw this swipe begin on the same touch as the tap
+    // (by finger time); then the whole startup+active window qualifies
+    // a proven same-touch swipe is honoured for the whole move unless it has
+    // already connected; frame hitches must never eat a gesture
+    if (key !== 's' && this.state === 'attack' && this.moveKey === key && !this.moveMod && !this.hitDone && !this.move.air && (upg || this.st <= 5)) {
+      const id = this.normalFor(key, r, null);
+      if (id !== this.moveId) this.startMove(id, false, key, r);
+      else this.moveMod = r;
+      return true;
+    }
+    // judged by the special's own phase, not a tick count: still winding up?
+    if (key === 's' && this.state === 'special' && this.spec && this.spec.slot === 0 && !this.hitDone &&
+        (upg ? this.spec.phase === 'startup' : this.st <= 4)) {
+      const slot = this.slotFor(r, null, false);
+      if (slot !== 0 && this.cools[slot] === 0 && this.canSpecial(slot)) {
+        this.cools[0] = 0;
+        this.startSpecial(slot);
+        return true;
+      }
+    }
+    return false;
+  }
 
   set(state) {
     if (this.state !== state) { this.state = state; this.st = 0; }
@@ -83,11 +154,20 @@ export class Fighter {
 
   /* ------------------------------------------------------------- update */
   update(inp) {
-    for (const key of ['p', 'k', 's', 'u']) if (inp.pressed[key]) this.buf[key] = BUFFER;
+    for (const key of ['p', 'k', 's', 'u']) {
+      if (!inp.pressed[key]) continue;
+      const mod = (inp.mods && inp.mods[key]) || null;
+      const upg = !!(inp.upg && inp.upg[key]);
+      if (mod && this.tryUpgrade(key, mod, upg)) continue;
+      // a swipe that arrived too late to upgrade is queued longer, never dropped
+      this.buf[key] = upg || mod === 'c' ? BUFFER * 3 : BUFFER;
+      if (key !== 'u') this.bmod[key] = mod;
+    }
+    if (inp.dash) { this.buf.dash = BUFFER; this.bdash = inp.dash; }
     if (this.hitstop > 0) { this.hitstop--; return; }
     for (const key in this.buf) if (this.buf[key] > 0) this.buf[key]--;
     this.st++;
-    if (this.cooldown > 0) this.cooldown--;
+    for (let i = 0; i < 3; i++) if (this.cools[i] > 0) this.cools[i]--;
     if (this.invuln > 0) this.invuln--;
     if (this.flash > 0) this.flash--;
 
@@ -112,7 +192,7 @@ export class Fighter {
           const key = this.buf.p ? 'p' : 'k';
           this.buf[key] = 0;
           this.airUsed = true;
-          this.startMove(key === 'p' ? 'apunch' : 'akick', true);
+          this.startMove(key === 'p' ? 'apunch' : 'akick', true, key, null);
         }
         if (this.airStep()) this.landing(4);
         break;
@@ -123,7 +203,17 @@ export class Fighter {
         if (this.st >= this.landFor) { this.set('idle'); this.doNeutral(h, fwd, back); }
         break;
 
-      case 'attack': this.doAttack(h); break;
+      case 'attack': this.doAttack(h, fwd); break;
+
+      case 'dash':
+        this.vx *= 0.88; this.x += this.vx;
+        if ((this.st >= 5 && (this.buf.p || this.buf.k || this.buf.s)) || this.st >= 14) { this.set('idle'); this.doNeutral(h, fwd, back); }
+        break;
+
+      case 'bdash':
+        this.vx *= 0.86; this.x += this.vx;
+        if (this.st >= 16) { this.set('idle'); this.doNeutral(h, fwd, back); }
+        break;
 
       case 'hit':
         this.vx *= 0.86; this.x += this.vx;
@@ -165,10 +255,8 @@ export class Fighter {
 
       case 'special': this.doSpecial(h); break;
 
-      case 'exec':
+      case 'exec': case 'finished':          // driven by Match.finStep()
         this.vx *= 0.8; this.x += this.vx;
-        if (this.st === 34) m.execute(this, this.opp);
-        if (this.st >= 70) this.set('victory');
         break;
     }
   }
@@ -191,9 +279,20 @@ export class Fighter {
       m.beginFinisher(this);
       return;
     }
-    if (this.buf.s && this.cooldown === 0 && this.canSpecial()) return this.startSpecial();
-    if (this.buf.p) { this.buf.p = 0; return this.startMove(h.d ? 'upper' : 'jab'); }
-    if (this.buf.k) { this.buf.k = 0; return this.startMove(h.d ? 'sweep' : 'kick'); }
+    if (this.buf.s) {
+      const slot = this.slotFor(this.relMod(this.bmod.s), h, fwd);
+      if (this.cools[slot] === 0 && this.canSpecial(slot)) return this.startSpecial(slot);
+    }
+    if (this.buf.dash) {
+      this.buf.dash = 0;
+      return this.startDash(this.relMod(this.bdash) === 'f');
+    }
+    for (const key of ['p', 'k']) {
+      if (!this.buf[key]) continue;
+      this.buf[key] = 0;
+      const r = this.relMod(this.bmod[key]);
+      return this.startMove(this.normalFor(key, r, h), false, key, r === 'n' || r === 'b' ? null : r);
+    }
     if (this.buf.u || h.u) { this.buf.u = 0; return this.startJump(fwd ? 1 : back ? -1 : 0); }
     if (h.b) { this.set(h.d ? 'cblock' : 'block'); this.bType = h.d ? 'crouch' : 'stand'; this.vx = 0; return; }
     if (h.d) { this.set('crouch'); this.vx = 0; return; }
@@ -204,6 +303,14 @@ export class Fighter {
       return;
     }
     this.set('idle'); this.vx = 0;
+  }
+
+  startDash(forward) {
+    this.set(forward ? 'dash' : 'bdash');
+    this.vx = (forward ? 11.5 : -10) * Math.sqrt(this.speedMul) * this.facing;
+    if (!forward) this.invuln = Math.max(this.invuln, 9);
+    this.serial = serialSeq++;
+    this.match.emit({ type: 'dash', f: this, back: !forward });
   }
 
   startJump(dir) {
@@ -233,9 +340,11 @@ export class Fighter {
     this.match.emit({ type: 'land', f: this });
   }
 
-  startMove(id, air = false) {
+  startMove(id, air = false, key = null, mod = null) {
     this.move = MOVES[id];
     this.moveId = id;
+    this.moveKey = key;
+    this.moveMod = mod;
     this.hitDone = false;
     this.serial = serialSeq++;
     this.state = 'attack';
@@ -264,7 +373,7 @@ export class Fighter {
     return null;
   }
 
-  doAttack(h) {
+  doAttack(h, fwd) {
     const mv = this.move;
     if (mv.air) {
       if (this.airStep()) this.landing(6);
@@ -276,13 +385,23 @@ export class Fighter {
     this.x += this.vx;
     if (mv.chain && this.st >= s) {
       for (const key of ['p', 'k']) {
-        const next = mv.chain[key];
-        if (next && this.buf[key] && (this.hitDone || this.st >= s + a)) {
+        if (!this.buf[key]) continue;
+        let r = this.relMod(this.bmod[key]);
+        if (r === 'c') continue;              // a charged blow waits for the move to end; it never chains as a plain one
+        if (r === 'n' || r === 'b') r = null;
+        // a swipe chains only into its own variant, never into the plain follow-up
+        const next = r ? mv.chain[key + r] : mv.chain[key];
+        if (next && (this.hitDone || this.st >= s + a)) {
           this.buf[key] = 0;
-          this.startMove(next);
+          this.startMove(next, false, key, r);
           return;
         }
       }
+    }
+    // special cancel: any normal that connected can cut straight into a special
+    if (this.hitDone && this.buf.s && this.st >= s) {
+      const slot = this.slotFor(this.relMod(this.bmod.s), h, fwd);
+      if (this.cools[slot] === 0 && this.canSpecial(slot)) { this.startSpecial(slot); return; }
     }
     if (this.st >= s + a + mv.recovery) {
       this.move = null;
@@ -291,38 +410,32 @@ export class Fighter {
   }
 
   /* ----------------------------------------------------------- specials */
-  canSpecial() {
-    const sp = this.def.special;
-    if (sp.type === 'projectile' || (sp.type === 'sovereign' && this.sovereignMode() === 'proj')) {
-      return !this.match.projectiles.some((p) => p.owner === this && !p.dead && p.kind !== 'quake');
-    }
+  canSpecial(slot) {
+    const sp = this.def.specials[slot];
+    const mine = (kind) => this.match.projectiles.some((p) => p.owner === this && !p.dead && p.kind === kind);
+    if (sp.type === 'projectile') return !mine(sp.kind);
+    if (sp.type === 'pillar') return !mine('pillar');
     return true;
   }
 
-  sovereignMode() {
-    return Math.abs(this.opp.x - this.x) > 360 ? 'proj' : 'slam';
-  }
-
-  startSpecial() {
-    const sp = this.def.special;
+  startSpecial(slot) {
+    const sp = this.def.specials[slot];
     this.buf.s = 0;
-    this.cooldown = sp.cooldown;
+    this.cools[slot] = sp.cooldown;
     this.hitDone = false;
     this.serial = serialSeq++;
     this.move = null;
-    let type = sp.type;
-    if (type === 'sovereign') type = this.sovereignMode() === 'proj' ? 'projectile' : 'slam';
-    this.spec = { type, phase: 'startup', active: false, air: false };
+    this.spec = { slot, def: sp, type: sp.type, phase: 'startup', active: false, air: false, armor: sp.armor || 0 };
     this.state = 'special'; this.st = 0; this.vx = 0;
-    this.match.emit({ type: 'special', f: this, kind: type });
+    this.match.emit({ type: 'special', f: this, kind: sp.type, name: sp.name, slot });
   }
 
   specialHit() {
-    const sp = this.def.special;
+    const sp = this.spec.def;
     const t = this.spec.type;
     return {
-      dmg: sp.dmg, stun: 22, bstun: 16, knock: t === 'dash' ? 11 : 8, level: 'mid',
-      knockdown: t !== 'teleport', launch: t === 'rising' ? 14 : 9, hitstop: 11,
+      dmg: sp.dmg, stun: 22, bstun: 16, knock: t === 'dash' ? 11 : 8, level: t === 'dive' ? 'overhead' : 'mid',
+      knockdown: t !== 'teleport', launch: t === 'rising' ? 14 : t === 'dive' ? 7 : 9, hitstop: 11,
       sfx: 'crush', special: true
     };
   }
@@ -338,10 +451,11 @@ export class Fighter {
         sp.phase = st < 14 ? 'startup' : 'recovery';
         if (st === 14) {
           const hand = this.worldPoint('hf');
-          const def = this.def.special;
+          const def = sp.def;
           m.spawn({
-            owner: this, kind: def.kind, x: hand[0] + this.facing * 20, y: Math.max(120, hand[1]),
-            vx: def.speed * this.facing, r: 30, dmg: def.dmg, level: 'mid'
+            owner: this, kind: def.kind, x: hand[0] + this.facing * 20, y: def.arc ? Math.max(150, hand[1]) : Math.max(120, hand[1]),
+            vx: def.speed * this.facing, vy: def.arc || 0, grav: def.arc ? 0.42 : 0,
+            r: def.kind === 'kunai' ? 20 : def.kind === 'rock' ? 32 : 30, dmg: def.dmg, level: 'mid'
           });
         }
         this.vx *= 0.8; this.x += this.vx;
@@ -349,11 +463,12 @@ export class Fighter {
         break;
       }
       case 'dash': {
+        const dur = sp.def.dur || 20;
         if (st < 10) { sp.phase = 'startup'; this.vx = -1.2 * this.facing; }
-        else if (st < 30 && !this.hitDone) { sp.phase = 'active'; sp.active = true; this.vx = 15.5 * this.facing; }
+        else if (st < 10 + dur && !this.hitDone) { sp.phase = 'active'; sp.active = true; this.vx = (sp.def.speed || 15.5) * this.facing; }
         else { sp.phase = 'recovery'; sp.active = false; this.vx *= 0.78; }
         this.x += this.vx;
-        if (st >= 50 || (this.hitDone && st >= sp.hitAt + 16)) done();
+        if (st >= 30 + dur || (this.hitDone && st >= sp.hitAt + 16)) done();
         break;
       }
       case 'teleport': {
@@ -390,11 +505,43 @@ export class Fighter {
         if (st === 9) { this.vy = 10.5; this.vx = 2.2 * this.facing; this.y = 0.01; sp.air = true; }
         sp.phase = 'startup';
         if (this.airStep()) {
-          const def = this.def.special;
+          const def = sp.def;
           m.spawn({ owner: this, kind: 'quake', x: this.x + this.facing * 70, y: 14, vx: 9.5 * this.facing, r: 34, dmg: def.dmg, level: 'low', life: 80 });
           m.emit({ type: 'quake', f: this, x: this.x + this.facing * 60 });
           this.landing(20);
         }
+        break;
+      }
+      case 'dive': {
+        if (st < 6) { sp.phase = 'startup'; break; }
+        if (st === 6) { this.faceOpp(); this.vy = 14; this.vx = 4.5 * this.facing; this.y = 0.01; sp.air = true; }
+        if (!sp.diving && !sp.bounced && (this.vy < 3 || st > 22)) {
+          sp.diving = true;
+          this.faceOpp();
+          this.vy = -13;
+          this.vx = 11 * this.facing;
+        }
+        if (sp.diving) {
+          this.x += this.vx;
+          this.y += this.vy;
+          sp.active = !this.hitDone;
+          sp.phase = sp.active ? 'active' : 'recovery';
+          if (this.y <= 0) { this.y = 0; this.landing(16); }
+        } else {
+          sp.active = false;
+          sp.phase = 'recovery';
+          if (this.airStep()) this.landing(8);
+        }
+        break;
+      }
+      case 'pillar': {
+        sp.phase = st < 12 ? 'startup' : 'recovery';
+        if (st === 12) {
+          const o = this.opp;
+          m.spawn({ owner: this, kind: 'pillar', x: o.x, y: 70, vx: 0, r: 58, dmg: sp.def.dmg, level: 'mid', delay: 26, life: 44 });
+        }
+        this.vx *= 0.8; this.x += this.vx;
+        if (st >= 40) done();
         break;
       }
     }
@@ -468,7 +615,18 @@ export class Fighter {
       }
       case 'victory': p = track([['victory_c'], ['victory', 16, 'out']], st); break;
       case 'gone': p = track([['down'], ['down', 1]], 0); break;
-      case 'exec': p = track([['stance'], ['exec_c', 24, 'out'], ['exec', 8, 'out'], ['exec', 40]], st); break;
+      case 'dash': p = track([['stance'], ['dashf', 3, 'out'], ['dashf', 8], ['stance', 4]], st); break;
+      case 'bdash': p = track([['stance'], ['dashb', 3, 'out'], ['dashb', 9], ['stance', 4]], st); break;
+      case 'exec': case 'finished': {
+        if (this.finPose === 'dizzy') {
+          const k = (Math.sin(this.match.tick * 0.07) + 1) / 2;
+          p = lerpPose(POSES.dizzy, POSES.dizzy2, k);
+        } else {
+          p = lerpPose(POSES[this.finPose], POSES[this.finPose], 0);
+        }
+        if (this.y > 0) grounded = false;
+        break;
+      }
       case 'special': {
         const sp = this.spec;
         switch (sp && sp.type) {
@@ -483,6 +641,11 @@ export class Fighter {
             if (sp.air) { grounded = false; p = track([['slam_up'], ['slam_up', 8], ['slam', 8, 'in']], st - 9); }
             else p = track([['stance'], ['slam_up', 9, 'out']], st);
             break;
+          case 'dive':
+            if (!sp.air) p = track([['stance'], ['land', 6, 'out']], st);
+            else { grounded = false; p = sp.diving ? lerpPose(POSES.dive, POSES.dive, 0) : track([['jump'], ['tuck', 8, 'out']], st - 6); }
+            break;
+          case 'pillar': p = track([['stance'], ['summon_c', 8, 'out'], ['summon', 6, 'out'], ['summon', 16], ['stance', 10]], st); break;
           default: p = lerpPose(POSES.stance, POSES.stance, 0);
         }
         break;
@@ -495,24 +658,28 @@ export class Fighter {
 
   updatePose() {
     const target = this.targetPose();
-    const key = this.state === 'attack' || this.state === 'special' ? this.state + this.serial : this.state;
+    const key = this.state === 'attack' || this.state === 'special' ? this.state + this.serial
+      : this.state === 'exec' || this.state === 'finished' ? this.state + this.finPose : this.state;
     if (key !== this.lastState) {
       // states that must read instantly (impacts) skip the cross-fade
       const snap = this.state === 'hit' || this.state === 'air' || this.state === 'bstun';
       this.prevPose = this.pose;
-      this.blendT = snap || !this.prevPose ? BLEND : 0;
+      // finisher poses glide; everything else snaps in BLEND ticks
+      this.blendLen = this.state === 'exec' || this.state === 'finished' ? 9 : BLEND;
+      this.blendT = snap || !this.prevPose ? this.blendLen : 0;
       this.lastState = key;
     }
-    if (this.blendT < BLEND && this.prevPose) {
+    if (this.blendT < this.blendLen && this.prevPose) {
       this.blendT++;
-      const k = this.blendT / BLEND;
+      const k = this.blendT / this.blendLen;
       this.pose = lerpPose(this.prevPose, target, k * (2 - k));
       if (Math.abs(target.rot - this.prevPose.rot) > 180) this.pose.rot = target.rot;
     } else {
       this.pose = target;
     }
     solve(this.pose, this.body, this.skel);
-    if (this.state === 'special' && this.spec && (this.spec.type === 'dash' || this.spec.type === 'teleport' || this.spec.type === 'rising')) {
+    const streak = (this.state === 'special' && this.spec && ['dash', 'teleport', 'rising', 'dive'].includes(this.spec.type)) || this.state === 'dash' || this.state === 'bdash';
+    if (streak) {
       this.trail.unshift({ skel: cloneSkel(this.skel), x: this.x, y: this.y, facing: this.facing, life: 1 });
       if (this.trail.length > 6) this.trail.pop();
     } else if (this.trail.length) {
@@ -693,8 +860,10 @@ export class Match {
         break;
       }
       case 'finisher': {
-        if (t === 150) this.emit({ type: 'announce', text: 'EXECUTION', kind: 'exec' });
-        if (t >= 250) this.setPhase('roundover');
+        this.finStep();
+        const F = this.fin;
+        if (F.end && F.t === F.end + 36) this.emit({ type: 'announce', text: 'EXECUTION', sub: F.name, kind: 'exec' });
+        if ((F.end && F.t >= F.end + 160) || t > 700) this.setPhase('roundover');
         break;
       }
       case 'timeup': {
@@ -712,7 +881,7 @@ export class Match {
             this.emit({ type: 'announce', text: 'DRAW', kind: 'wins' });
           }
         }
-        if (w && t === 20 && w.state !== 'victory' && w.state !== 'exec') w.set('victory');
+        if (w && t === 20 && w.state !== 'victory') { w.set('victory'); w.alpha = 1; }
         if (t >= 170) {
           const champ = this.fighters.find((f) => f.wins >= ROUNDS_TO_WIN);
           if (champ || this.round >= 7) {
@@ -757,7 +926,7 @@ export class Match {
     } else {
       info = att.specialHit();
       const t = att.spec.type;
-      fx = t === 'rising' ? 'ff' : 'hf';
+      fx = t === 'rising' || t === 'dive' ? 'ff' : 'hf';
       r = (t === 'dash' ? 42 : 36) * att.body.scale;
     }
     const pt = att.worldPoint(fx);
@@ -765,6 +934,12 @@ export class Match {
       att.hitDone = true;
       if (att.spec) att.spec.hitAt = att.st;
       this.applyHit(att, def, info, pt);
+      if (att.spec && att.spec.type === 'dive') {       // bounce off the target
+        att.spec.diving = false;
+        att.spec.bounced = true;
+        att.vy = 9;
+        att.vx = -3 * att.facing;
+      }
     }
   }
 
@@ -792,7 +967,11 @@ export class Match {
     const crouchBlock = (def.state === 'cblock' || (def.state === 'bstun' && def.bType === 'crouch')) && lvl !== 'overhead';
     const dizzy = def.state === 'dizzy';
 
-    if (!dizzy && (standBlock || crouchBlock)) {
+    let crushed = false;
+    if (!dizzy && (standBlock || crouchBlock) && info.guardBreak) {
+      crushed = true;                                    // charged attacks smash through a block
+      this.emit({ type: 'guardbreak', x: pt[0], y: pt[1], f: def, att });
+    } else if (!dizzy && (standBlock || crouchBlock)) {
       const chip = info.special ? Math.round(info.dmg * 0.14 * att.dmgOut * def.dmgIn) : 0;
       def.hp = Math.max(1, def.hp - chip);
       def.bType = crouchBlock && !standBlock ? 'crouch' : 'stand';
@@ -806,7 +985,16 @@ export class Match {
     }
 
     const scaling = Math.max(0.4, 1 - 0.12 * def.comboTaken);
-    const dmg = Math.max(1, Math.round(info.dmg * att.def.power * att.dmgOut * def.dmgIn * scaling));
+    const dmg = Math.max(1, Math.round(info.dmg * att.def.power * att.dmgOut * def.dmgIn * scaling * (crushed ? 0.75 : 1)));
+    // armour (Boulder Charge): absorb the hit and keep going
+    if (!dizzy && def.state === 'special' && def.spec && def.spec.armor > 0 && def.hp - dmg > 0) {
+      def.spec.armor--;
+      def.hp -= dmg;
+      def.flash = 6;
+      def.hitstop = att.hitstop = Math.min(8, info.hitstop);
+      this.emit({ type: 'hit', x: pt[0], y: pt[1], dmg, dir, f: def, att, sfx: 'block', heavy: false, special: !!info.special, combo: 0, armor: true });
+      return true;
+    }
     def.hp = Math.max(0, def.hp - dmg);
     def.comboTaken++;
     const wasAir = def.y > 0 || def.state === 'air';
@@ -863,13 +1051,117 @@ export class Match {
   }
 
   beginFinisher(w) {
+    const l = w.opp;
     this.setPhase('finisher');
-    this.emit({ type: 'finisher', f: w });
+    this.projectiles.length = 0;
+    this.fin = { type: w.def.finisher.type, name: w.def.finisher.name, w, l, t: 0, end: 0, vy: 0, landed: false };
+    w.state = 'exec'; w.st = 0; w.finPose = 'stance'; w.vx = 0; w.spec = null; w.move = null;
+    l.state = 'finished'; l.st = 0; l.finPose = 'dizzy'; l.vx = 0; l.vy = 0; l.tint = null;
+    this.emit({ type: 'finisher', f: w, kind: this.fin.type });
   }
 
-  execute(w, l) {
-    l.state = 'gone'; l.st = 0; l.hidden = true;
-    this.emit({ type: 'shatter', f: l, att: w, element: w.def.element.name });
+  /* Each fighter's execution is a short scripted timeline: poses for both
+     fighters, motion for the victim, and events the renderer turns into
+     fire, lightning, stone, shadow or void. */
+  finStep() {
+    const F = this.fin;
+    const t = ++F.t;
+    const { w, l } = F;
+    const at = (n) => t === n;
+    const every = (a, b, k) => t >= a && t <= b && (t - a) % k === 0;
+    const mid = () => l.y + 150 * l.body.scale;
+    switch (F.type) {
+      case 'cuts': {                                  // Kael: Thousand Cuts
+        if (at(1)) w.finPose = 'sheath';
+        if (every(26, 62, 6)) {
+          const k = (t - 26) / 6;
+          w.finPose = k % 2 ? 'slash_b' : 'slash_a';
+          if (k === 3) {                              // passes clean through to the other side
+            const from = w.x;
+            w.x = clamp(l.x + (l.x - w.x), WALL, STAGE_W - WALL);
+            w.faceOpp();
+            this.emit({ type: 'teleport', f: w, from, to: w.x });
+          }
+          l.finPose = k % 2 ? 'hit_high' : 'hit_low';
+          l.flash = 3;
+          this.emit({ type: 'fin-slash', x: l.x, y: l.y + (80 + ((k * 37) % 140)) * l.body.scale, ang: (((k * 53) % 160) - 80) * Math.PI / 180, f: l });
+        }
+        if (at(70)) { w.finPose = 'sheath'; l.finPose = 'dizzy'; }
+        if (at(98)) this.shatter(l, w, 'slice');
+        break;
+      }
+      case 'pyre': {                                  // Ember: Funeral Pyre
+        if (at(1)) w.finPose = 'summon_c';
+        if (at(18)) w.finPose = 'summon';
+        if (at(22)) { l.finPose = 'writhe'; this.emit({ type: 'fin-pyre', x: l.x, f: l }); }
+        if (every(22, 108, 3)) this.emit({ type: 'fin-fire', x: l.x, f: l });
+        if (t >= 22) l.tint = { color: '#140a06', amt: Math.min(0.92, (t - 22) / 70) };
+        if (at(80)) l.finPose = 'kneel';
+        if (at(112)) this.shatter(l, w, 'ash');
+        break;
+      }
+      case 'storm': {                                 // Volta: Storm Verdict
+        if (at(1)) w.finPose = 'summon_c';
+        if (at(16)) w.finPose = 'summon';
+        const strikes = [26, 40, 52, 62, 70, 76, 82, 86];
+        const i = strikes.indexOf(t);
+        if (i >= 0) {
+          l.finPose = i % 2 ? 'hit_high' : 'writhe';
+          l.flash = 4;
+          this.emit({ type: 'fin-bolt', x: l.x, y: mid(), f: l, big: i === strikes.length - 1 });
+        }
+        if (t >= 26 && t < 92) l.tint = { color: '#d8fcff', amt: t % 4 < 2 ? 0.55 : 0.12 };
+        if (at(92)) this.shatter(l, w, 'burst');
+        break;
+      }
+      case 'mountain': {                              // Granite: Mountain's Fall
+        if (at(1)) w.finPose = 'stomp_c';
+        if (at(20)) {
+          w.finPose = 'stomp';
+          this.emit({ type: 'fin-pillar', x: l.x, f: l });
+          this.emit({ type: 'quake', x: l.x, f: w });
+          l.finPose = 'launched';
+          F.vy = 23;
+        }
+        if (t > 20 && !F.landed) {
+          l.y = Math.max(0, l.y + F.vy);
+          F.vy -= t > 44 ? 1.7 : 0.9;
+          if (at(40)) this.emit({ type: 'fin-boulder', x: l.x, f: l });
+          if (t > 46) l.finPose = 'falling';
+          if (l.y <= 0 && t > 24) { F.landed = true; this.shatter(l, w, 'crush'); }
+        }
+        break;
+      }
+      case 'swallow': {                               // Shade: Swallowed
+        if (at(1)) w.finPose = 'vanish';
+        if (t <= 20) w.alpha = 1 - (t / 20) * 0.85;
+        if (at(20)) this.emit({ type: 'fin-tendrils', x: l.x, f: l });
+        if (every(20, 128, 4)) this.emit({ type: 'fin-tendril', x: l.x + (((t * 37) % 160) - 80), f: l });
+        if (at(40)) l.finPose = 'kneel';
+        if (t > 40 && !F.end) l.y = -Math.min(1, (t - 40) / 88) * 300 * l.body.scale;   // dragged under
+        if (at(130)) this.shatter(l, w, 'sink');
+        if (t > 136) { w.alpha = Math.min(1, w.alpha + 0.06); w.finPose = 'sheath'; }
+        break;
+      }
+      case 'unmaking': {                              // Malrath: Unmaking
+        if (at(1)) w.finPose = 'summon_c';
+        if (at(14)) { w.finPose = 'grip'; l.finPose = 'lifted'; }
+        if (t > 14 && t <= 50) l.y = 150 * (1 - Math.pow(1 - (t - 14) / 36, 3));
+        if (t > 14 && !F.end) l.tint = { color: '#6a1aa0', amt: Math.min(0.6, (t - 14) / 60) };
+        if (at(30)) this.emit({ type: 'fin-void', x: l.x, y: 150 + 150 * l.body.scale, f: l });
+        if (t > 50 && t < 96) l.x += Math.sin(t * 1.7) * 1.6;
+        if (at(96)) this.shatter(l, w, 'implode');
+        break;
+      }
+      default:
+        if (at(34)) this.shatter(l, w, 'slice');
+    }
+  }
+
+  shatter(l, w, style) {
+    this.fin.end = this.fin.t;
+    this.emit({ type: 'shatter', f: l, att: w, style, element: w.def.element.name });
+    l.state = 'gone'; l.st = 0; l.hidden = true; l.tint = null;
   }
 
   atWall(f) { return f.x <= WALL + 2 || f.x >= STAGE_W - WALL - 2; }
@@ -880,18 +1172,28 @@ export class Match {
     for (const p of ps) {
       if (p.dead) continue;
       p.age++;
-      p.x += p.vx;
       if (--p.life <= 0 || p.x < -100 || p.x > STAGE_W + 100) { p.dead = true; continue; }
+      if (p.delay && p.age < p.delay) continue;          // a pillar's warning glow, not yet live
+      p.x += p.vx;
+      if (p.grav) {
+        p.vy -= p.grav;
+        p.y += p.vy;
+        if (p.y < 14) { p.dead = true; this.emit({ type: 'proj-land', p }); continue; }
+      }
       const target = p.owner.opp;
       if (this.hittable(target) && this.overlaps(target, p.x, p.y, p.r)) {
         p.dead = true;
-        const info = { dmg: p.dmg, stun: 22, bstun: 16, knock: 7, level: p.level, knockdown: p.kind !== 'fire', launch: 8, hitstop: 9, sfx: 'crush', special: true };
+        const light = p.kind === 'fire' || p.kind === 'kunai' || p.kind === 'bolt' || p.kind === 'blade';
+        const info = {
+          dmg: p.dmg, stun: 22, bstun: 16, knock: p.kind === 'kunai' ? 4 : 7, level: p.level, knockdown: !light,
+          launch: p.kind === 'pillar' ? 16 : 8, hitstop: 9, sfx: 'crush', special: true
+        };
         if (!this.applyHit(p.owner, target, info, [p.x, p.y])) p.dead = false;
         else this.emit({ type: 'proj-hit', p });
         continue;
       }
       for (const q of ps) {
-        if (q === p || q.dead || q.owner === p.owner) continue;
+        if (q === p || q.dead || q.owner === p.owner || p.kind === 'pillar' || q.kind === 'pillar') continue;
         if (Math.abs(q.x - p.x) < p.r + q.r && Math.abs(q.y - p.y) < p.r + q.r) {
           p.dead = q.dead = true;
           this.emit({ type: 'clash', x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });

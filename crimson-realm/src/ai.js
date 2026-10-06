@@ -32,7 +32,17 @@ export class AI {
     };
   }
 
-  press(key) { this.out.pressed[key] = true; }
+  press(key, mod = null) {
+    this.out.pressed[key] = true;
+    if (key in this.out.mods) this.out.mods[key] = mod;
+  }
+
+  /* the special slot that plays a role ('zone', 'rush', 'anti'), if ready */
+  slot(me, role) {
+    const i = me.def.specials.findIndex((s) => s.role === role);
+    return i >= 0 && me.cools[i] === 0 && me.canSpecial(i) ? i : -1;
+  }
+  special(i) { this.press('s', ['n', 'f', 'u'][i]); }
 
   hold(h, ticks, now) { this.plan = { hold: h, until: now + ticks }; }
 
@@ -43,6 +53,8 @@ export class AI {
     const out = this.out;
     for (const k in out.pressed) out.pressed[k] = false;
     for (const k in out.held) out.held[k] = false;
+    for (const k in out.mods) out.mods[k] = null;
+    out.dash = null;
 
     this.hist.push(this.snapshot(o));
     if (this.hist.length > 80) this.hist.shift();
@@ -60,9 +72,15 @@ export class AI {
     if (me.state === 'attack' && me.move && me.move.chain && me.serial !== this.chainSerial) {
       if (me.st >= me.move.startup) {
         this.chainSerial = me.serial;
+        if (me.hitDone && this.roll(P.combo * 0.45)) {
+          // cancel the string into a special
+          const i = [this.slot(me, 'rush'), this.slot(me, 'zone'), this.slot(me, 'anti')].find((x) => x >= 0);
+          if (i !== undefined) { this.special(i); return out; }
+        }
         if (this.roll(P.combo) && (me.hitDone || this.roll(0.3))) {
           const keys = Object.keys(me.move.chain);
-          this.press(keys[Math.floor(this.rng() * keys.length)]);
+          const k = keys[Math.floor(this.rng() * keys.length)];
+          this.press(k[0], k[1] || null);
         }
       }
       return out;
@@ -108,6 +126,9 @@ export class AI {
       this.antiAired = v.serial || -now;
       if (this.roll(P.antiAir)) {
         this.plan = null;
+        const anti = this.slot(me, 'anti');
+        if (anti >= 0 && this.roll(0.35)) { this.special(anti); return out; }
+        if (this.roll(0.3)) { this.press('k', 'u'); return out; }
         out.held.d = true; this.press('p');
         return out;
       }
@@ -141,28 +162,32 @@ export class AI {
       if (this.roll(0.5)) this.press(this.roll(0.5) ? 'p' : 'k');
       return out;
     }
-    const sp = me.def.special.type;
-    const ranged = sp === 'projectile' || (sp === 'sovereign' && dist > 360);
-    const canS = me.cooldown === 0 && me.canSpecial();
+    const zone = this.slot(me, 'zone'), rush = this.slot(me, 'rush'), anti = this.slot(me, 'anti');
+    const zoneDef = zone >= 0 ? me.def.specials[zone] : null;
+    const ranged = zoneDef && zoneDef.type === 'projectile';
     const a = P.aggression;
 
     if (dist > 400) {
-      if (ranged && canS && this.roll(P.special * 2.2)) { this.press('s'); return out; }
-      if ((sp === 'teleport' || sp === 'dash') && canS && dist < 620 && this.roll(P.special)) { this.press('s'); return out; }
+      if (zone >= 0 && (ranged || dist < 560) && this.roll(P.special * 2.2)) { this.special(zone); return out; }
+      if (rush >= 0 && dist < 620 && this.roll(P.special)) { this.special(rush); return out; }
+      if (this.roll(a * 0.25)) { out.dash = o.x > me.x ? 'r' : 'l'; return out; }
       if (this.roll(a + 0.2)) this.hold({ toward: true }, 20 + Math.floor(this.rng() * 30), now);
       else if (this.roll(0.3)) this.hold({ away: true }, 12, now);
       return out;
     }
     if (dist > reach.kick + 20) {
-      if (canS && (sp === 'dash' || sp === 'teleport' || ranged) && this.roll(P.special)) { this.press('s'); return out; }
+      if (rush >= 0 && this.roll(P.special)) { this.special(rush); return out; }
+      if (zone >= 0 && this.roll(P.special * 0.6)) { this.special(zone); return out; }
       if (this.roll(a * 0.3)) { this.press('u'); out.held[toward] = true; return out; }
+      if (this.roll(a * 0.35)) { out.dash = o.x > me.x ? 'r' : 'l'; return out; }
       if (this.roll(a + 0.15)) { this.plan = { hold: { toward: true }, until: now + 40, attackAt: reach.kick - 10 }; return out; }
       if (this.roll(0.35)) this.hold({ b: true }, 16, now);
       return out;
     }
     // close range
     if (this.roll(a)) { this.attackIn(me, o, dist, out); return out; }
-    if (canS && (sp === 'slam' || sp === 'rising' || sp === 'sovereign') && this.roll(P.special * 0.6)) { this.press('s'); return out; }
+    if (zone >= 0 && !ranged && this.roll(P.special * 0.6)) { this.special(zone); return out; }
+    if (this.roll(0.12 * (1 - a))) { out.dash = o.x > me.x ? 'l' : 'r'; return out; }   // back-dash out
     if (this.roll(0.45)) this.hold({ b: true, d: this.roll(P.lows) }, 14 + Math.floor(this.rng() * 14), now);
     else this.hold({ away: true }, 10 + Math.floor(this.rng() * 12), now);
     return out;
@@ -174,19 +199,26 @@ export class AI {
     const crouching = o.state === 'crouch' || o.state === 'cblock';
     const opts = [];
     if (dist < r.jab + 12 && !crouching) opts.push(['jab', 3]);
+    if (dist < r.cross + 8 && !crouching) opts.push(['cross', 1.2]);
     if (dist < r.kick + 12) opts.push(['kick', 2]);
+    if (dist < r.spin + 8) opts.push(['spin', 1]);
+    if (dist < r.lowpunch + 8) opts.push(['lowpunch', blocking ? 2 * this.p.lows * 4 : 0.6]);
     if (dist < r.sweep + 8) opts.push(['sweep', blocking ? 4 * this.p.lows * 4 : crouching ? 3 : this.p.lows * 3]);
     if (dist < r.upper + 15) opts.push(['upper', crouching ? 3 : 1.5]);
+    if (blocking && dist < r.cpunch + 8) opts.push(['cpunch', 3 * this.p.lows * 3]);   // break the guard
+    if (blocking && dist < r.ckick + 8) opts.push(['ckick', 2 * this.p.lows * 3]);
     if (!opts.length) { out.held[o.x > me.x ? 'r' : 'l'] = true; return; }
     let sum = 0;
     for (const [, w] of opts) sum += w;
     let pick = this.rng() * sum;
     let id = opts[0][0];
     for (const [m, w] of opts) { pick -= w; if (pick <= 0) { id = m; break; } }
-    if (id === 'jab') this.press('p');
-    else if (id === 'kick') this.press('k');
-    else if (id === 'sweep') { out.held.d = true; this.press('k'); }
-    else { out.held.d = true; this.press('p'); }
+    const MAP = {
+      jab: ['p', null], cross: ['p', 'f'], kick: ['k', null], spin: ['k', 'f'], lowpunch: ['p', 'd'],
+      sweep: ['k', 'd'], upper: ['p', 'u'], cpunch: ['p', 'c'], ckick: ['k', 'c']
+    };
+    const [key, mod] = MAP[id];
+    this.press(key, mod);
   }
 
   finish(me, o, toward, dist, now) {
@@ -199,8 +231,7 @@ export class AI {
     }
     if (now < this.finishAt) return out;
     if (this.wantsExec) {
-      if (dist > 260) { out.held[toward] = true; return out; }
-      this.press('s');
+      this.press('s', 'n');
     } else {
       if (dist > me.reach.kick) { out.held[toward] = true; return out; }
       this.press('k');

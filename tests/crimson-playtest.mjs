@@ -43,11 +43,22 @@ const center = async (page, sel) => {
   const b = await page.locator(sel).boundingBox();
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 };
-const touch = (cdp, type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
+/* Touches carry explicit timestamps, as a real finger's do, so hold-to-charge
+   is judged by real finger time and not by how fast this machine renders. */
+let clock = 0;
+const touch = async (cdp, type, points, dt = 0.03) => {
+  // a new contact starts "now"; moves and lifts are timed from the contact,
+  // never from how long this slow machine took to deliver the previous event.
+  // Like a real finger, an event is never stamped in the future: wait it out.
+  clock = type === 'touchStart' ? Math.max(clock + dt, Date.now() / 1000) : clock + dt;
+  const wait = clock * 1000 - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  return cdp.send('Input.dispatchTouchEvent', { type, timestamp: clock, touchPoints: points.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
+};
 const tap = async (page, cdp, sel) => {
   const c = await center(page, sel);
   await touch(cdp, 'touchStart', [c]);
-  await touch(cdp, 'touchEnd', []);
+  await touch(cdp, 'touchEnd', [], 0.05);
 };
 
 /* ---------------------------------------------------- 1. menus by touch */
@@ -79,10 +90,13 @@ const tap = async (page, cdp, sel) => {
   await frames(page, 6);
   await page.screenshot({ path: path.join(SHOTS, '05-vs.png') });
   // the VS screen auto-advances after 2.6 s; on a slow machine it may already have
-  if (await page.evaluate(() => window.__crimson.mode === 'vs')) await tap(page, cdp, '#vs');
+  if (await page.evaluate(() => window.__crimson.mode === 'vs')) {
+    await tap(page, cdp, '#vs').catch(() => {});   // it may advance between the check and the tap
+  }
   await page.waitForFunction(() => window.__crimson.mode === 'fight');
   check('controls visible in fight', await page.locator('#controls').isVisible());
   await page.waitForFunction(() => window.__crimson.match.phase === 'fight', null, { timeout: 6000 });
+  await page.evaluate(() => window.__crimson.freezeCpu(true));   // control checks must not depend on what the AI does
 
   // ---- touch: punch button
   const before = await page.evaluate(() => window.__crimson.match.fighters[0].serial);
@@ -135,6 +149,7 @@ const tap = async (page, cdp, sel) => {
   await tap(page, cdp, '#resumeBtn');
   check('resume', !(await page.evaluate(() => window.__crimson.paused)));
 
+  await page.evaluate(() => window.__crimson.freezeCpu(false));
   // ---- finish the match on autopilot and check progression
   await page.evaluate(() => window.__crimson.start('volta', 1, 0, true));
   const over = await page.evaluate(() => window.__crimson.fastForward(60 * 60 * 8));
@@ -212,6 +227,127 @@ const tap = async (page, cdp, sel) => {
   await frames(page, 30);
   check('body pieces and blood rendered', await page.evaluate(() => window.__crimson.renderer.pieces.length >= 8));
   await page.screenshot({ path: path.join(SHOTS, '11-execution.png') });
+  await ctx.close();
+}
+
+/* ------------------------------------------ 3. gestures, specials, finishers */
+{
+  const { ctx, page, cdp } = await newPage({ width: 844, height: 390 });
+  await page.evaluate(() => { window.__crimson.start('kael', 3, 0, false, 'ember'); window.__crimson.freezeCpu(true); });
+  await page.waitForFunction(() => window.__crimson.match.phase === 'fight', null, { timeout: 8000 });
+  // record what actually happened, so a fast-finishing move cannot be missed
+  const hook = () => page.evaluate(() => {
+    const m = window.__crimson.match;
+    if (m.__hooked) return;
+    m.__hooked = true;
+    window.__ev = [];
+    const orig = m.emit.bind(m);
+    m.emit = (e) => {
+      const me = m.fighters[0];
+      if (e.f === me && e.type === 'whoosh') window.__ev.push({ id: me.moveId });
+      if (e.f === me && e.type === 'special') window.__ev.push({ spec: e.slot });
+      if (e.f === me && e.type === 'dash') window.__ev.push({ dash: !e.back });
+      if (e.type === 'shatter') window.__shatter = e.style;
+      orig(e);
+    };
+  });
+  const P = () => page.evaluate(() => {
+    const ev = window.__ev || [];
+    const last = (k) => { for (let i = ev.length - 1; i >= 0; i--) if (k in ev[i]) return ev[i][k]; return null; };
+    return { id: last('id'), spec: last('spec'), dash: last('dash') };
+  });
+  const settle = async () => {
+    await hook();
+    await page.evaluate(() => { window.__ev = []; });
+    await page.evaluate(() => { const m = window.__crimson.match; m.projectiles.length = 0; m.fighters[1].x = Math.min(2500, m.fighters[0].x + 600); });
+    await page.waitForFunction(() => window.__crimson.match.fighters[0].neutral, null, { timeout: 5000 });
+  };
+  const gesture = async (sel, dx, dy, hold = 0.05) => {
+    const c = await center(page, sel);
+    await touch(cdp, 'touchStart', [{ ...c, id: 5 }]);
+    if (dx || dy) {
+      await touch(cdp, 'touchMove', [{ x: c.x + dx * 0.5, y: c.y + dy * 0.5, id: 5 }], 0.02);
+      await touch(cdp, 'touchMove', [{ x: c.x + dx, y: c.y + dy, id: 5 }], 0.02);
+    }
+    await touch(cdp, 'touchEnd', [], hold);
+    await frames(page, 6);
+  };
+  const towardFoe = await page.evaluate(() => (window.__crimson.match.fighters[0].facing > 0 ? 1 : -1));
+
+  await settle();
+  await gesture('.pad-p', 60 * towardFoe, 0);
+  let r = await P();
+  check('swipe PUNCH toward foe = lunging cross', r.id === 'cross', JSON.stringify(r));
+
+  await settle();
+  await gesture('.pad-p', 0, -60);
+  r = await P();
+  check('swipe PUNCH up = uppercut', r.id === 'upper', JSON.stringify(r));
+
+  await settle();
+  await gesture('.pad-k', 0, 60);
+  r = await P();
+  check('swipe KICK down = sweep', r.id === 'sweep', JSON.stringify(r));
+
+  await settle();
+  await gesture('.pad-p', 0, 0, 0.5);              // hold half a second, release
+  r = await P();
+  check('hold + release PUNCH = charged guard-breaker', r.id === 'cpunch', JSON.stringify(r));
+
+  await settle();
+  await page.evaluate(() => { window.__crimson.match.fighters[0].cools = [0, 0, 0]; });
+  await gesture('.pad-s', 0, -60);
+  r = await P();
+  check('swipe SPECIAL up = third special', r.spec === 2, JSON.stringify(r));
+
+  await settle();
+  await page.evaluate(() => { window.__crimson.match.fighters[0].cools = [0, 0, 0]; });
+  await gesture('.pad-s', 60 * towardFoe, 0);
+  r = await P();
+  check('swipe SPECIAL toward foe = second special', r.spec === 1, JSON.stringify(r));
+
+  await settle();
+  const zone = await page.locator('#stickZone').boundingBox();
+  const o = { x: zone.x + zone.width * 0.4, y: zone.y + zone.height * 0.6, id: 7 };
+  const side = { ...o, x: o.x + 60 * towardFoe };
+  await touch(cdp, 'touchStart', [o]);
+  await touch(cdp, 'touchMove', [side], 0.03);
+  await touch(cdp, 'touchMove', [o], 0.05);
+  await touch(cdp, 'touchMove', [side], 0.05);
+  await frames(page, 3);
+  r = await P();
+  await touch(cdp, 'touchEnd', [], 0.05);
+  check('double-flick the stick = dash', r.dash === true, JSON.stringify(r));
+
+  await page.evaluate(() => window.__crimson.freezeCpu(false));
+  // every fighter's execution, in the real renderer
+  const finishers = { kael: 'slice', ember: 'ash', volta: 'burst', granite: 'crush', shade: 'sink', malrath: 'implode' };
+  for (const [id, style] of Object.entries(finishers)) {
+    await page.evaluate(([id]) => window.__crimson.start(id, 5, 0, true, id === 'kael' ? 'shade' : 'kael'), [id]);
+    await hook();
+    await page.evaluate(() => { window.__shatter = null; });
+    const got = await page.evaluate(async () => {
+      const c = window.__crimson, m = c.match;
+      m.fighters[0].wins = 1;
+      for (let i = 0; i < 60 * 60 * 3; i++) {
+        if (m.phase === 'fight' && m.fighters[1].hp > 30) m.fighters[1].hp = 30;
+        if (m.phase === 'fight' && m.fighters[0].hp < 400) m.fighters[0].hp = 900;
+        if (m.phase === 'finish' && m.koWinner === m.fighters[0]) m.fighters[0].buf.s = 9;
+        c.fastForward(1);
+        if (m.phase === 'finisher' && m.fin.t === 60) break;
+        if (m.over) break;
+      }
+      return { phase: m.phase, type: m.fin && m.fin.type };
+    });
+    await frames(page, 24);
+    await page.screenshot({ path: path.join(SHOTS, `20-finisher-${id}.png`) });
+    const end = await page.evaluate(async () => {
+      const c = window.__crimson;
+      for (let i = 0; i < 400 && !window.__shatter; i++) c.fastForward(1);
+      return window.__shatter;
+    });
+    check(`${id}: unique execution plays (${got.type})`, got.phase === 'finisher' && end === style, `${JSON.stringify(got)} -> ${end}`);
+  }
   await ctx.close();
 }
 
