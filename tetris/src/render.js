@@ -21,7 +21,7 @@ import {
 } from '../vendor/three.js';
 import { SHAPES, TYPES, COLORS, BOX, idType } from './pieces.js';
 import { COLS, VISIBLE, LINE_CLEAR_DELAY, LOCK_DELAY, GREY } from './engine.js';
-import { MESSAGE, messageAlpha } from './joke.js';
+import { MESSAGE, messageAlpha, enabled as drewEnabled } from './joke.js';
 
 const DRAW_ROWS = 24;                 // matrix rows ever drawn (20 visible + spawn area)
 const TAU = Math.PI * 2;
@@ -634,8 +634,9 @@ export class Renderer {
     this.boardTex.colorSpace = SRGBColorSpace;
     this.boardTex.needsUpdate = true;
     this.panel.material.uniforms.uBoard.value = this.boardTex;
-    this.msgEnabled = typeof window !== 'undefined' && !!window.__DREW__;
+    this.msgEnabled = drewEnabled();
     this.msgAlpha = 0;
+    this.msgForce = null;   // set during the win sequence to override the level-based opacity
     this.panel.material.uniforms.uMsg.value = this.messageTexture();
 
     const metal = new MeshPhysicalMaterial({ color: 0x1b2034, metalness: 0.9, roughness: 0.28, clearcoat: 0.8, clearcoatRoughness: 0.15 });
@@ -839,6 +840,7 @@ export class Renderer {
     c.width = 512;
     c.height = 1024;
     const tex = new CanvasTexture(c);
+    this.msgCanvas = c;
     const draw = () => {
       const g = c.getContext('2d');
       g.fillStyle = '#000';
@@ -859,6 +861,32 @@ export class Renderer {
     draw();
     if (this.msgEnabled && document.fonts) document.fonts.ready.then(draw);
     return tex;
+  }
+
+  /* Bursts the back-wall message into glowing shards, sampled from the
+     letters themselves so the explosion has their shape. */
+  explodeMessage() {
+    const c = this.msgCanvas;
+    if (!c) return;
+    const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const col = this.tmpColor;
+    const palette = Object.values(this.palette);
+    let n = 0;
+    for (let y = 0; y < c.height && n < this.particles.max; y += 14) {
+      for (let x = 0; x < c.width && n < this.particles.max; x += 14) {
+        if (data[(y * c.width + x) * 4] < 128) continue;
+        const bx = (x / c.width - 0.5) * COLS, by = (0.5 - y / c.height) * VISIBLE;
+        const a = Math.atan2(by, bx) + (Math.random() - 0.5) * 0.8;
+        const s = 6 + Math.random() * 14;
+        col.copy(palette[n % palette.length]).lerp(this.white, 0.5).multiplyScalar(2.2);
+        this.particles.spawn(bx, by, -0.4 + Math.random() * 0.6, Math.cos(a) * s, Math.sin(a) * s + 4, 6 + Math.random() * 10,
+          1.2 + Math.random() * 1.2, 0.16 + Math.random() * 0.16, col, -9, 0.6);
+        n++;
+      }
+    }
+    this.addShake(0.8);
+    this.pulse = 0.8;
+    this.ring(0, this.white, 3);
   }
 
   /* ---------- settings ---------- */
@@ -1561,8 +1589,11 @@ export class Renderer {
     pu.uDanger.value = this.danger;
     pu.uGrid.value = this.showGrid ? 1 : 0;
     pu.uWave.value = this.overT >= 0 ? Math.min(1, this.overT) * 0.7 : 0;
-    const msgTarget = this.msgEnabled && game && !this.calm ? messageAlpha(game.level) : 0;
-    this.msgAlpha = damp(this.msgAlpha, msgTarget, 1.5, dt);   // fades in over a second or two on level-up
+    const msgTarget = this.msgForce != null ? this.msgForce
+      : this.msgEnabled && game && !this.calm ? messageAlpha(game.level) : 0;
+    if (this.msgForce === 0) this.msgAlpha = 0;                // it exploded: gone at once
+    else if (this.msgForce === 1) this.msgAlpha = Math.min(1, this.msgAlpha + dt / 0.8);  // to exactly 100%
+    else this.msgAlpha = damp(this.msgAlpha, msgTarget, 1.5, dt);
     pu.uMsgAlpha.value = this.msgAlpha;
     this.ghostMat.uniforms.uTime.value = this.time;
 

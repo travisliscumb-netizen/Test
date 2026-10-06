@@ -195,6 +195,18 @@ svg { width: 1em; height: 1em; fill: currentColor; }
 #countdown span.go { color: var(--accent); text-shadow: 0 0 20px #fff, 0 0 80px var(--accent); letter-spacing: 0.1em; }
 @keyframes count { 0% { opacity: 0; transform: scale(2.4); } 30% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(0.7); } }
 
+/* Drew edition win sequence. */
+#confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 40; }
+#drew-banner {
+  position: fixed; inset: 0; z-index: 41; display: grid; place-items: center; text-align: center; pointer-events: none;
+  font-family: var(--display); font-weight: 900; font-size: clamp(44px, 12vw, 120px); line-height: 1.05; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #fff;
+  text-shadow: 0 0 24px rgba(var(--accent-rgb), 0.8), 0 6px 0 rgba(0, 0, 0, 0.45);
+  background: radial-gradient(ellipse at center, rgba(3, 4, 14, 0.55), transparent 70%);
+  opacity: 0; transform: scale(0.6); transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+#drew-banner.show { opacity: 1; transform: none; }
+
 /* ============================ touch controls ============================ */
 
 #touch {

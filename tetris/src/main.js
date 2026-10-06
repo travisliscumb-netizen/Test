@@ -6,6 +6,7 @@ import { Bot, helpfulPiece } from './ai.js';
 import { Audio } from './audio.js';
 import { Store, DEFAULT_BINDINGS } from './save.js';
 import { COLORS } from './pieces.js';
+import { enabled as drewEdition, celebrate } from './joke.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -121,6 +122,7 @@ function back() {
 }
 
 function goTitle() {
+  endCelebration();
   app = 'title';
   $('#hud').hidden = true;
   setTouchVisible(false);
@@ -137,6 +139,7 @@ function goTitle() {
 /* ---------------- game lifecycle ---------------- */
 
 function startGame(mode) {
+  endCelebration();
   currentMode = mode;
   audio.unlock();
   audio.play('uiSelect');
@@ -230,7 +233,25 @@ function endGame(finished) {
   const rank = store.addRecord(lastSummary);
   audio.stopMusic();
   audio.play(finished ? 'win' : 'over');
+  // Drew edition: winning Marathon (all 20 levels) gets the full send-off.
+  if (drewEdition() && finished && game.mode === 'marathon') {
+    const s = stageRect;
+    stopCelebration = celebrate({
+      renderer,
+      canvas: $('#confetti'),
+      banner: $('#drew-banner'),
+      origin: { x: s.x + s.w / 2, y: s.y + s.h * 0.45 },
+      sound: () => { audio.play('tetris'); audio.play('perfect'); },
+      onDone: () => showResults(lastSummary, rank)
+    });
+    return;
+  }
   resultsTimer = setTimeout(() => showResults(lastSummary, rank), finished ? 1300 : 1700);
+}
+
+let stopCelebration = null;
+function endCelebration() {
+  if (stopCelebration) { stopCelebration(); stopCelebration = null; }
 }
 
 /* ---------------- event handling ---------------- */
