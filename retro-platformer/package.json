@@ -14,6 +14,7 @@
     "test:e2e": "npm run build && playwright test"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "1.0.10",
     "@playwright/test": "1.56.1",
     "@types/node": "22.20.5",
     "typescript": "7.0.2",

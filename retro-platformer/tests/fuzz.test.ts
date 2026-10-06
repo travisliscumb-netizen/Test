@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NO_CONTROLS, type Controls } from "../src/core/input";
-import { seededRandom } from "../src/gfx/indexed";
+import { seededRandom } from "../src/gfx/paint";
 import { World } from "../src/game/world";
 import { newSession } from "../src/game/session";
 import { LEVEL_SOURCES, loadLevels } from "../src/levels";

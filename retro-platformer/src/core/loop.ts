@@ -31,15 +31,16 @@ export class FixedStep {
 }
 
 /** Drives a FixedStep from requestAnimationFrame for the life of the page. */
-export function runLoop(update: () => void, render: (alpha: number) => void): void {
+export function runLoop(update: () => void, render: (alpha: number, intervalMs: number) => void): void {
   const clock = new FixedStep();
   let last = performance.now();
 
   const frame = (now: number): void => {
-    const { steps, alpha } = clock.advance(now - last);
+    const interval = now - last;
+    const { steps, alpha } = clock.advance(interval);
     last = now;
     for (let i = 0; i < steps; i++) update();
-    render(alpha);
+    render(alpha, interval);
     requestAnimationFrame(frame);
   };
 

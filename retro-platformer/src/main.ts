@@ -1,10 +1,10 @@
 import { AudioEngine } from "./audio/engine";
 import { Display } from "./core/display";
 import { InputHub, attachKeyboard } from "./core/input";
+import { FrameBudget } from "./core/frameBudget";
 import { runLoop } from "./core/loop";
 import { attachTouch } from "./core/touch";
 import { Game } from "./game/game";
-import { bakeAssets } from "./gfx/assets";
 import { loadLevels } from "./levels";
 import { Renderer } from "./render/renderer";
 import { World } from "./game/world";
@@ -33,6 +33,8 @@ function saveHighScore(score: number): void {
 /** Read-only state for automated tests and debugging. */
 export interface Snapshot {
   mode: Game["mode"];
+  /** Device pixels per logical pixel the game is rendering at. */
+  renderScale: number;
   /** Logical view width in pixels (32 per tile). */
   viewWidth: number;
   phase: string | null;
@@ -56,7 +58,7 @@ function start(): void {
   attachKeyboard(hub);
 
   const levels = loadLevels();
-  const renderer = new Renderer(bakeAssets());
+  const renderer = new Renderer();
   // The display reports its first width during construction, before the game exists.
   let g: Game | undefined;
   const display = new Display(canvas, (w) => g?.setViewWidth(w));
@@ -91,6 +93,7 @@ function start(): void {
   window.__sproutQuest = {
     snapshot: () => ({
       mode: game.mode,
+      renderScale: display.placement.scale,
       viewWidth: display.viewWidth,
       phase: game.world?.phase ?? null,
       level: game.session.levelIndex,
@@ -102,6 +105,7 @@ function start(): void {
   };
 
   if (import.meta.env.DEV) devWarp(game, levels);
+  const budget = new FrameBudget();
 
   runLoop(
     () => {
@@ -113,9 +117,18 @@ function start(): void {
       // Persist between runs, not every frame of play.
       if (game.mode !== "play") persistHighScore();
     },
-    (alpha) => {
-      renderer.render(display.ctx, game, display.viewWidth, alpha, display.insets);
-      display.present();
+    (alpha, interval) => {
+      const lower = budget.record(interval);
+      if (lower !== null) display.limitDensity(lower);
+      renderer.render(game, {
+        ctx: display.ctx,
+        placement: display.placement,
+        canvasWidth: display.ctx.canvas.width,
+        canvasHeight: display.ctx.canvas.height,
+        viewW: display.viewWidth,
+        insets: display.insets,
+        alpha,
+      });
       audio.pump();
     },
   );

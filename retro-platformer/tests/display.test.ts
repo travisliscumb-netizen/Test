@@ -17,8 +17,7 @@ describe("viewWidthFor", () => {
     const view = viewWidthFor(w, h);
     expect(view).toBeLessThan(VIEW_MAX_WIDTH);
     const p = placeView(view, VIEW_HEIGHT, w * 3, h * 3, 0);
-    expect(p.width).toBeGreaterThanOrEqual(w * 3 - 3);
-    expect(p.height).toBe(h * 3);
+    expect(p.clip).toEqual({ x: 0, y: 0, width: w * 3, height: h * 3 });
   });
 
   it("shows about twice as much level sideways as upright", () => {
@@ -45,13 +44,27 @@ describe("placeView", () => {
 
   it("letterboxes a too-wide screen and centres horizontally", () => {
     const p = placeView(VIEW_MAX_WIDTH, VIEW_HEIGHT, 4000, 1000, 0);
-    expect(p.height).toBe(1000);
     expect(p.x).toBe(Math.floor((4000 - p.width) / 2));
+    expect(p.clip.x).toBe(p.x);
+    expect(p.clip.width).toBe(p.width);
+  });
+
+  it("makes every tile a whole number of device pixels", () => {
+    for (const [w, h] of [
+      [2532, 1170],
+      [1920, 1080],
+      [1366, 768],
+      [750, 1334],
+    ] as const) {
+      const p = placeView(viewWidthFor(w / 2, h / 2), VIEW_HEIGHT, w, h, 0);
+      expect(Number.isInteger(32 * p.scale)).toBe(true);
+    }
   });
 
   it("pins the game near the top in portrait, below the top buttons", () => {
     const p = placeView(VIEW_MIN_WIDTH, VIEW_HEIGHT, 1170, 2532, 141);
-    expect(p.width).toBe(1170);
+    expect(p.clip.width).toBe(1170);
+    expect(p.clip.height).toBe(p.height);
     expect(p.y).toBeGreaterThanOrEqual(141);
     expect(p.y + p.height).toBeLessThan(2532 * 0.6);
   });
@@ -59,7 +72,7 @@ describe("placeView", () => {
 
 describe("frameInsets", () => {
   it("converts a notch inset into view pixels when the frame reaches under it", () => {
-    const p = { x: 0, y: 0, width: 2556, height: 1179, scale: 1179 / 480 };
+    const p = { x: 0, y: 0, width: 2556, scale: 1179 / 480 };
     const insets = frameInsets(p, 2556, 59 * 3, 59 * 3, 138);
     expect(insets.left).toBeCloseTo((59 * 3) / p.scale);
     expect(insets.right).toBeCloseTo((59 * 3) / p.scale);
@@ -75,7 +88,7 @@ describe("frameInsets", () => {
   });
 
   it("is zero when the frame is letterboxed clear of the notch", () => {
-    const p = { x: 300, y: 0, width: 1956, height: 1179, scale: 1179 / 480 };
+    const p = { x: 300, y: 0, width: 1956, scale: 1179 / 480 };
     expect(frameInsets(p, 2556, 177, 177, 138)).toEqual({ left: 0, right: 0, underTopButtons: true });
   });
 });

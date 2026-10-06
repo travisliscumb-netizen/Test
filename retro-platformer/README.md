@@ -2,7 +2,7 @@
 
 An original side-scrolling platformer with the mechanics and game feel of a 1985 console classic. Guide **Moss** through four gardens, stomp **Grubs**, kick **Shellback** shells, grow with **Sprouts**, and reach the flag.
 
-Everything is made in code: palette-indexed sprites, text-file levels, and a WebAudio chiptune synth. The build is **one self-contained `index.html` (about 100 KB)** that runs from disk, including on an iPhone from Dropbox.
+Everything is made in code: smooth hand-painted-style vector art drawn at your screen's native resolution, text-file levels, and a WebAudio chiptune synth. The build is **one self-contained `index.html`** that runs from disk, including on an iPhone from Dropbox.
 
 ## Play
 
@@ -28,7 +28,7 @@ npm run test:e2e     # builds, then runs Playwright against dist/index.html
 
 Dev-only pages served by `npm run dev`:
 
-- `/tools/sheet.html`: every sprite, tile and theme palette, zoomed.
+- `/tools/art.html?scale=4`: every character pose, tile and world material, painted large.
 - `/tools/levels.html?level=2`: a whole level rendered in one image.
 
 ## Layout
@@ -41,10 +41,8 @@ src/
   world/             tiles, collision, level parser, camera
   entities/          hero physics, enemies, items and effects
   game/              World (one level's rules), Game (title, lives, flow), events
-  gfx/               indexed images, baking, palettes, themes, font
-    sprites/         one module per sprite (hero, enemies, items, tiles, HUD)
-    backgrounds/     one module per world's parallax layers
-  render/            draws the game into the low-resolution frame
+  gfx/               painting toolkit, art cache, art/ (one module per piece), backdrops/
+  render/            draws the game straight onto the screen at native resolution
   audio/             notation, songs, synth voices, sequencer, SFX, engine
   levels/            level-1.txt … level-4.txt (+ test-room.txt used by tests)
 tests/               unit tests
@@ -79,25 +77,31 @@ The parser rejects malformed files and names the map row and column of the probl
 
 ## Swapping in your own art
 
-Every sprite module returns a `SpriteSheet`: a palette (index 0 is transparent) plus named frames of palette indices. The quickest way to replace one is with text rows (this sketch shows the format; real Sprout frames are 32×32):
+All art is painted in code with Canvas 2D (paths, gradients, outlines), one module per piece, in `src/gfx/art/`. Every module draws in *logical* pixels (1 tile = 32 units). The renderer scales the canvas to the screen, so art stays sharp at any resolution.
+
+| Module | Draws | Coordinate frame |
+|---|---|---|
+| `hero.ts` (+ `heroPose.ts`) | Moss, posed from joint angles | origin at the feet, facing right |
+| `grub.ts`, `shellback.ts`, `sprout.ts` | enemies and the power-up | origin at the feet, facing right |
+| `coin.ts`, `flag.ts`, `goalTower.ts` | coin spin, flagpole, goal tower | see each file |
+| `tiles/*.ts` | ground, brick, stone, blocks, pipes | a 32×32 cell |
+| `materials.ts` | each world's colours | — |
+| `../backdrops/*.ts` | each world's parallax layers | layer box, tiles horizontally |
+
+To use your own image instead, keep the function's signature and draw the image in that frame. For example, to replace the power-up:
 
 ```ts
-// src/gfx/sprites/sprout.ts
-import { imageFromRows } from "../indexed";
-import type { SpriteSheet } from "../palette";
+// src/gfx/art/sprout.ts
+import type { Ctx } from "../paint";
+import sproutUrl from "./my-sprout.png"; // bundled into the single file by the build
 
-export type SproutFrame = "sprout0" | "sprout1";
+const image = new Image();
+image.src = sproutUrl;
 
-export function buildSprout(): SpriteSheet<SproutFrame> {
-  const key = ".kgGy"; // position in the key = palette index
-  const palette = ["transparent", "#1b1424", "#24693a", "#3fa34d", "#efb10c"];
-  const frame = imageFromRows([
-    "..gg..",
-    ".gGGg.",
-    "..yy..",
-  ], key);
-  return { palette, frames: { sprout0: frame, sprout1: frame } };
+/** Origin at the base; about 24 units wide. */
+export function drawSprout(ctx: Ctx, _time: number): void {
+  if (image.complete) ctx.drawImage(image, -12, -24, 24, 24);
 }
 ```
 
-Keep the frame names and sizes (the hero is 32×32 small and 32×48 big, with feet on the bottom row; `npm test` checks these). Preview the result at `/tools/sheet.html`.
+Preview every piece, at any zoom, at `/tools/art.html?scale=4`. `npm test` renders all art and checks that it paints and stays inside its box.

@@ -57,3 +57,39 @@ Tests that guard the fixes and the brief's requirements:
 
 - The completability proof plays as a small hero with no enemies. It proves the geometry can be traversed, not that a particular run with enemies is survivable. That is covered by play-testing and the rules tests.
 - The e2e suite runs Chromium. Mobile Safari specifics (audio unlock, the silent switch, safe areas) are handled in code following WebKit's documented behaviour, but no real iPhone was available in this environment to test on.
+
+## Second round: jump fix and hi-res art overhaul
+
+**Jump.** Measured the problem before changing anything: a held standing jump peaked at 3.88 tiles, but level 1 has two 4-tile pipes and block tops 4 tiles up, so they could only be reached with a running start. Jump velocity was raised (standing ≈ 5.2 tiles; running still highest). New tests:
+- a 4-tile pipe can be climbed from a standstill without running;
+- walking jumps go at least as high as standing ones;
+- **every level can be finished without ever pressing run** (the solver run with the run button disabled).
+
+**Art.** The pixel pipeline (indexed images, palettes, bitmap font, low-res buffer, sharp-bilinear scaling) was replaced by painted vector art drawn at native resolution.
+
+| Found during the rewrite | Fix | Proof |
+|---|---|---|
+| Snapping the scale to whole-pixel tiles brought back thin bars on phones | Paint the snapping slack (extra backdrop, ground continued past the map edges) | Display tests require the painted area to cover the whole screen on four phone sizes; the rotation e2e test checks both screen edges |
+| Title, level card and pause overlays didn't cover the slack, leaving visible borders | Overlays fill the whole painted area | Screenshot review |
+| Ground tiles painted lazily the first time they scrolled into view caused 100–150 ms hitches | Paint every ground variant up front; warm the next level's art during the level card | p95 frame interval 117 ms → 50 ms; worst frame 150 → 67 ms |
+| 40 radial gradients created per frame for ambient particles | One pre-painted glow sprite, drawn with `drawImage` | Same measurement |
+| CPU-only rendering at 3× density ran at ~30 fps | Adaptive resolution (`FrameBudget`): steps down 3× → 2× → 1.5× when the median frame is slower than 22 ms | Unit tests for the policy; in the test browser it settles at 2× and a 16.7 ms median |
+| Grub's single mandible read as a cigarette; Shellback's peeking eyes were hidden behind its shell; raised arms crossed the hero's face | Redrawn | Art preview at `/tools/art.html` |
+| Oversized clouds, busy soil texture, slab-like snow caps | Retuned | Screenshot review of all four worlds |
+| `paint.bake` left unused once the art cache replaced it | Deleted | Dead-code scan |
+
+**Testing the art for real.** `@napi-rs/canvas` gives the unit tests a real Canvas 2D:
+- `art.test.ts` paints every hero pose (both forms), each enemy state, the items, the flag and the tower, and checks each paints and stays inside its box;
+- it checks that every tile is a whole number of pixels at three scales, and that ground fills are solid with matching edges between variants (no seams);
+- it checks that every backdrop's nearest layer covers the bottom of the view (pits never show bare sky);
+- `render.test.ts` renders the title, intro, pause, game over, ending, every level along its whole length, and every hero phase.
+
+**Re-verification:**
+
+```
+npm test             15 files, 214 tests passed
+npm run build        type-check clean; dist/index.html = 111,741 bytes
+npx playwright test  5 passed (rotation, smoke, pause, touch, touch pause)
+```
+
+**Limit:** frame-rate figures come from headless Chromium rasterising on the CPU. The adaptive resolution is the safeguard for real devices; it has not been measured on an iPhone.

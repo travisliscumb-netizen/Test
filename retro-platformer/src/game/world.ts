@@ -71,6 +71,9 @@ export class World {
   playerHidden = false;
   /** Global animation counter. */
   frame = 0;
+  /** Frames on which the hero last landed and last jumped (for squash-and-stretch). */
+  landFrame = -1000;
+  jumpFrame = -1000;
 
   private readonly pending: Spawn[];
   /** Cell index → frames left before a coin brick runs dry (0 = next hit is the last). */
@@ -160,8 +163,14 @@ export class World {
   private stepPlay(c: Controls): void {
     const p = this.player;
     const r = stepPlayer(p, c, this.map, this.camera.x);
-    if (r.jumped) this.sfx(p.form === "big" ? "jumpBig" : "jump");
-    if (r.landed) this.stompChain = 0;
+    if (r.jumped) {
+      this.jumpFrame = this.frame;
+      this.sfx(p.form === "big" ? "jumpBig" : "jump");
+    }
+    if (r.landed) {
+      this.landFrame = this.frame;
+      this.stompChain = 0;
+    }
     if (r.bumped) this.bumpBlock(r.bumped.tx, r.bumped.ty);
     if (p.skidding && this.frame % 4 === 0) {
       this.effects.push(dustPuff(p.x + (p.vx > 0 ? p.w : 0) - 6, p.y + p.h - 12));
