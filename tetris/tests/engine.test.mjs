@@ -387,10 +387,10 @@ test('helpful pieces: varied, never three in a row, and still very easy', async 
   assert.ok(g.lines >= 1500 * 0.4 * 0.95, `cleared ${g.lines} lines`);
 });
 
-test('Drew edition: message is 0 on level 1, then 0.1% per level up to 2% at 20', async () => {
+test('Drew edition: message is 0 on level 1, then 0.3% per level up to 6% at 20', async () => {
   const { messageAlpha } = await import('../src/joke.js');
   assert.equal(messageAlpha(1), 0);
-  for (let l = 2; l <= 20; l++) assert.ok(Math.abs(messageAlpha(l) - l / 1000) < 1e-12, `level ${l}`);
-  assert.equal(messageAlpha(2), 0.002);
-  assert.equal(messageAlpha(20), 0.02);
+  for (let l = 2; l <= 20; l++) assert.ok(Math.abs(messageAlpha(l) - l * 0.003) < 1e-12, `level ${l}`);
+  assert.ok(Math.abs(messageAlpha(2) - 0.006) < 1e-12);
+  assert.ok(Math.abs(messageAlpha(20) - 0.06) < 1e-12);
 });

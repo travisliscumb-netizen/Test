@@ -8,11 +8,13 @@
 export const MESSAGE = ['DREW', 'SUCKS'];
 export const enabled = () => typeof window !== 'undefined' && !!window.__DREW__;
 
-/* Opacity per level, exactly as asked: none on level 1, then 0.1% per level
-   (0.2% on level 2, 0.3% on level 3 ... 2.0% on level 20). */
+/* Opacity per level: none on level 1, then 0.3% per level (0.6% on
+   level 2, 0.9% on level 3 ... 6% on level 20). Tripled from 0.1% per
+   level, which turned out to be invisible even on level 20. */
+export const PER_LEVEL = 0.003;
 export function messageAlpha(level) {
   if (level <= 1) return 0;
-  return Math.min(level, 20) / 1000;
+  return Math.min(level, 20) * PER_LEVEL;
 }
 
 const PALETTE = ['#21e5f0', '#2f6bff', '#ff8a1f', '#ffd81f', '#3dff6e', '#b44bff', '#ff2d55', '#ffffff'];
