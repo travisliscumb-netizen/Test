@@ -15,7 +15,7 @@ function makeWorld(air: string[], opts: { session?: Session; time?: number } = {
   const width = Math.max(16, ...air.map((r) => r.length));
   const padded = air.map((r) => r.padEnd(width, "."));
   const rows = [...Array(12 - air.length).fill(".".repeat(width)), ...padded, "#".repeat(width), "#".repeat(width), "#".repeat(width)];
-  const level = parseLevel(`name: T\ntheme: meadow\ntime: ${opts.time ?? 300}\n---\n${rows.join("\n")}`);
+  const level = parseLevel(`name: T\ntheme: street\ntime: ${opts.time ?? 300}\n---\n${rows.join("\n")}`);
   return new World(level, opts.session ?? newSession(), 512);
 }
 
@@ -91,7 +91,8 @@ describe("getting hurt", () => {
     const w = FLAT();
     const g = place(w, createWalker(0, 0), w.player.x + w.player.w + 1);
     g.dir = -1;
-    run(w, 3);
+    // It walks 1 px per step; contact hurts once it is deeper than the forgiveness inset.
+    run(w, 3 + ENEMY.hurtInset);
     expect(w.phase).toBe("dying");
     expect(w.deathCause).toBe("hit");
   });
@@ -100,7 +101,7 @@ describe("getting hurt", () => {
     const w = FLAT();
     setForm(w.player, "big");
     place(w, createWalker(0, 0), w.player.x + w.player.w + 1).dir = -1;
-    run(w, 3);
+    run(w, 3 + ENEMY.hurtInset);
     expect(w.phase).toBe("transform");
     expect(w.player.form).toBe("small");
     run(w, PLAYER.transformFrames);
@@ -108,6 +109,18 @@ describe("getting hurt", () => {
     run(w, 30);
     expect(w.phase).toBe("play");
     expect(w.invuln).toBeGreaterThan(0);
+  });
+
+  it("grazing a critter's edge is forgiven; real contact is not", () => {
+    // Walking away from the hero, so the overlap only shrinks.
+    const graze = FLAT();
+    place(graze, createWalker(0, 0), graze.player.x + graze.player.w - ENEMY.hurtInset).dir = 1;
+    run(graze, 10);
+    expect(graze.phase).toBe("play");
+    const hit = FLAT();
+    place(hit, createWalker(0, 0), hit.player.x + hit.player.w - ENEMY.hurtInset - 3).dir = 1;
+    run(hit, 1);
+    expect(hit.phase).toBe("dying");
   });
 
   it("dying ends in the dead outcome and resets the carried form", () => {
@@ -359,5 +372,27 @@ describe("goal and checkpoints", () => {
     expect(session.checkpoint).toBe(0);
     const again = makeWorld([".S......C.................F...T....."], { session });
     expect(again.player.x).toBe(8 * TILE + (TILE - again.player.w) / 2);
+  });
+});
+
+describe("critter skins", () => {
+  it("number each enemy among its kind across the level, the same after a checkpoint respawn", () => {
+    const air = [
+      ".S...g...k...g..........................C.....g...k...g.........................F...T.....",
+    ];
+    const width = air[0]!.length;
+    const rows = [...Array(11).fill(".".repeat(width)), air[0], "#".repeat(width), "#".repeat(width), "#".repeat(width)];
+    const level = parseLevel(`name: T\ntheme: street\ntime: 300\n---\n${rows.join("\n")}`);
+    const variants = (w: World): string[] => {
+      run(w, 1);
+      return w.enemies.map((e) => `${e.kind}@${Math.round(e.x / TILE)}:${e.variant}`);
+    };
+    const fresh = new World(level, newSession(), 2000);
+    expect(variants(fresh)).toEqual(["walker@5:0", "shell@9:0", "walker@13:1", "walker@46:2", "shell@50:1", "walker@54:3"]);
+    const session = newSession();
+    session.checkpoint = 0;
+    const respawned = new World(level, session, 512);
+    // Only enemies past the checkpoint come back (those in range so far), each with the same number and so the same look.
+    expect(variants(respawned)).toEqual(["walker@46:2", "shell@50:1"]);
   });
 });

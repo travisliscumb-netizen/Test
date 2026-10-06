@@ -50,7 +50,7 @@ describe("songs", () => {
   });
 
   it("level themes and the title loop; jingles do not", () => {
-    for (const id of ["title", "meadow", "cavern", "dusk", "fortress", "ending"] as const) expect(getSong(id).loop).toBe(true);
+    for (const id of ["title", "street", "park", "construction", "downtown", "ending"] as const) expect(getSong(id).loop).toBe(true);
     for (const id of ["clear", "death", "gameOver"] as const) expect(getSong(id).loop).toBe(false);
   });
 });

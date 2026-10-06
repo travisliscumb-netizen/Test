@@ -1,9 +1,11 @@
 import type { GameEvent, Song as SongId } from "../game/events";
+import { readStored, writeStored } from "../core/storage";
 import { Sequencer } from "./sequencer";
 import { playSfx } from "./sfx";
 import { getSong } from "./songs";
 
-const MUTE_KEY = "sprout-quest:muted";
+const MUTE_KEY = "buds-takeover:muted";
+const LEGACY_MUTE_KEY = "sprout-quest:muted";
 
 type AudioContextCtor = typeof AudioContext;
 
@@ -106,17 +108,9 @@ export class AudioEngine {
 }
 
 function readMuted(): boolean {
-  try {
-    return localStorage.getItem(MUTE_KEY) === "1";
-  } catch {
-    return false;
-  }
+  return readStored(MUTE_KEY, LEGACY_MUTE_KEY) === "1";
 }
 
 function writeMuted(muted: boolean): void {
-  try {
-    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
-  } catch {
-    // Storage can be unavailable (private mode, file://); muting still works for this session.
-  }
+  writeStored(MUTE_KEY, muted ? "1" : "0");
 }

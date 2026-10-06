@@ -5,7 +5,7 @@ import testRoom from "../src/levels/test-room.txt?raw";
 import { LEVEL_SOURCES, loadLevels } from "../src/levels";
 import { GOAL } from "../src/tuning";
 
-function level(rows: string[], header = "name: T\ntheme: meadow\ntime: 300"): string {
+function level(rows: string[], header = "name: T\ntheme: street\ntime: 300"): string {
   return `${header}\n---\n${rows.join("\n")}\n`;
 }
 
@@ -67,7 +67,7 @@ describe("parseLevel", () => {
 
   it("rejects bad headers", () => {
     expect(() => parseLevel(level(okRows, "name: T\ntheme: lava\ntime: 300"))).toThrow(/theme/);
-    expect(() => parseLevel(level(okRows, "name: T\ntheme: meadow\ntime: -1"))).toThrow(/time/);
+    expect(() => parseLevel(level(okRows, "name: T\ntheme: street\ntime: -1"))).toThrow(/time/);
     expect(() => parseLevel(okRows.join("\n"))).toThrow(/separator/);
   });
 });

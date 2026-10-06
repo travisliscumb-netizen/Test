@@ -54,17 +54,30 @@ for (const form of ["big", "small"] as const) {
 }
 document.body.dataset.ready = "1";
 
-import { drawGrub } from "../src/gfx/art/grub";
-import { drawShellback } from "../src/gfx/art/shellback";
+import { ROSTERS, SHELL_SKINS, WALKER_SKINS } from "../src/gfx/art/critters";
 import { drawSprout } from "../src/gfx/art/sprout";
 import { drawCoin } from "../src/gfx/art/coin";
+for (const skin of Object.values(WALKER_SKINS)) {
+  const row = section(`Walker: ${skin.name}`);
+  for (const step of [0, 0.8, 1.6, 2.4, 3.2]) cell(row, `walk ${step}`, 44, 36, (ctx) => skin.draw(ctx, step, false), 22, 32);
+  cell(row, "squashed", 44, 36, (ctx) => skin.draw(ctx, 0, true), 22, 32);
+}
+for (const skin of Object.values(SHELL_SKINS)) {
+  const row = section(`Shell type: ${skin.name}`);
+  for (const step of [0, 1.2, 2.4]) cell(row, `walk ${step}`, 50, 40, (ctx) => skin.draw(ctx, "walk", step, 0), 22, 36);
+  for (const spin of [0, 1, 2]) cell(row, `shell spin ${spin}`, 50, 40, (ctx) => skin.draw(ctx, "shell", 0, spin), 22, 36);
+  cell(row, "peek", 50, 40, (ctx) => skin.draw(ctx, "peek", 0, 0), 22, 36);
+}
 {
-  const row = section("Enemies, items");
-  for (const step of [0, 1.5, 3]) cell(row, `grub ${step}`, 34, 30, (ctx) => drawGrub(ctx, { step, state: "walk" }), 17, 27);
-  cell(row, "grub squashed", 34, 30, (ctx) => drawGrub(ctx, { step: 0, state: "squashed" }), 17, 27);
-  for (const step of [0, 2]) cell(row, `shellback ${step}`, 40, 34, (ctx) => drawShellback(ctx, { state: "walk", step, spin: 0 }), 18, 31);
-  cell(row, "shell", 30, 30, (ctx) => drawShellback(ctx, { state: "shell", step: 0, spin: 1 }), 15, 27);
-  cell(row, "peek", 30, 30, (ctx) => drawShellback(ctx, { state: "peek", step: 0, spin: 0 }), 15, 27);
+  const row = section("Rosters");
+  for (const [theme, r] of Object.entries(ROSTERS)) {
+    const p = document.createElement("p");
+    p.textContent = `${theme}: walkers ${r.walkers.map((w) => w.name).join(", ")}; shell types ${r.shells.map((w) => w.name).join(", ")}`;
+    row.append(p);
+  }
+}
+{
+  const row = section("Items");
   cell(row, "sprout", 36, 34, (ctx) => drawSprout(ctx, 0), 18, 31);
   for (const s of [0, 0.15, 0.25, 0.4]) cell(row, `coin ${s}`, 24, 24, (ctx) => drawCoin(ctx, s), 12, 12);
 }

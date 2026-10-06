@@ -18,7 +18,7 @@ export const SFX = [
 ] as const;
 export type Sfx = (typeof SFX)[number];
 
-export const SONGS = ["title", "meadow", "cavern", "dusk", "fortress", "clear", "death", "gameOver", "ending"] as const;
+export const SONGS = ["title", "street", "park", "construction", "downtown", "clear", "death", "gameOver", "ending"] as const;
 export type Song = (typeof SONGS)[number];
 
 export type GameEvent =

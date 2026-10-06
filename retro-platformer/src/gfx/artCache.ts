@@ -8,7 +8,7 @@ import { GROUND_PAD, drawGround, type GroundShape } from "./art/tiles/ground";
 import { drawPipe, type PipePiece } from "./art/tiles/pipe";
 import { drawStone } from "./art/tiles/stone";
 import { BACKDROPS } from "./backdrops";
-import type { Ambient } from "./backdrops/types";
+import type { Ambient, PaintedLayer } from "./backdrops/types";
 import { context, makeSurface, radial, rgba, type Ctx, type Stops, type Surface } from "./paint";
 import type { ThemeName } from "../world/level";
 import { TILE } from "../tuning";
@@ -126,13 +126,14 @@ export class ArtCache {
       },
       sky: backdrop.sky,
       ambient: backdrop.ambient,
-      layers: backdrop.layers.map((layer) => {
-        const surface = makeSurface(layer.width * bgScale, layer.height * bgScale);
-        const ctx = context(surface);
-        ctx.setTransform(bgScale, 0, 0, bgScale, 0, 0);
-        layer.paint(ctx);
-        return { surface, scale: bgScale, width: layer.width, y: layer.y, factor: layer.factor, drift: layer.drift ?? 0 };
-      }),
+      layers: backdrop.layers.map((layer) => ({
+        surface: bakeLayer(layer, bgScale),
+        scale: bgScale,
+        width: layer.width,
+        y: layer.y,
+        factor: layer.factor,
+        drift: layer.drift ?? 0,
+      })),
     };
   }
 
@@ -160,4 +161,25 @@ export class ArtCache {
     draw(ctx);
     return surface;
   }
+}
+
+/**
+ * Paints a backdrop layer at `scale` device pixels per logical pixel. When the
+ * scaled height is fractional the surface is rounded up, and its last row would
+ * be only partly covered (translucent); that row is replaced by a copy of the
+ * last whole row, so a layer that reaches the bottom of the view stays opaque
+ * there (the renderer stretches that row into any slack below the view).
+ */
+export function bakeLayer(layer: PaintedLayer, scale: number): Surface {
+  const surface = makeSurface(layer.width * scale, layer.height * scale);
+  const ctx = context(surface);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  layer.paint(ctx);
+  const whole = Math.floor(layer.height * scale);
+  if (whole > 0 && whole < surface.height) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, whole, surface.width, surface.height - whole);
+    ctx.drawImage(surface, 0, whole - 1, surface.width, 1, 0, whole, surface.width, surface.height - whole);
+  }
+  return surface;
 }

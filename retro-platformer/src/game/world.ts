@@ -26,7 +26,7 @@ import {
 } from "../entities/items";
 import { bounce, createPlayer, setForm, stepPlayer, type Form, type Player } from "../entities/player";
 import { Camera } from "../world/camera";
-import { firstCell, lastCell, overlaps } from "../world/collision";
+import { firstCell, lastCell, overlaps, overlapsInset } from "../world/collision";
 import { FLAG_TOP_ROW, TileMap, type LevelData, type Spawn } from "../world/level";
 import { Tile, isBumpable } from "../world/tiles";
 import { ENEMY, GOAL, ITEM, PLAYER, RULES, SCORE, TILE } from "../tuning";
@@ -36,12 +36,15 @@ import type { Session } from "./session";
 export type Phase = "play" | "transform" | "dying" | "pole" | "walkOut" | "tally" | "cleared" | "dead";
 export type DeathCause = "hit" | "pit" | "time";
 
+/** How long the hero flickers after God mode lifts it out of a pit. */
+const GOD_RESCUE_FLICKER_FRAMES = 60;
+
 /** Music for each theme. */
 const THEME_SONG: Readonly<Record<LevelData["theme"], Song>> = {
-  meadow: "meadow",
-  cavern: "cavern",
-  dusk: "dusk",
-  fortress: "fortress",
+  street: "street",
+  park: "park",
+  construction: "construction",
+  downtown: "downtown",
 };
 
 /** One play-through of one level: the hero, the map, its inhabitants and the rules between them. */
@@ -63,6 +66,8 @@ export class World {
   time: number;
   /** Frames left of post-hurt invulnerability. */
   invuln = 0;
+  /** Where the hero last stood on solid ground (God mode returns it here from a pit). */
+  private safeGround: { x: number; y: number };
   /** While transforming, the form being changed from (for the flicker). */
   transformFrom: Form | null = null;
   /** The pennant's top edge in world pixels. */
@@ -90,6 +95,7 @@ export class World {
     this.map = new TileMap(level);
     const spawnAt = session.checkpoint >= 0 ? level.checkpoints[session.checkpoint]! : level.start;
     this.player = createPlayer(spawnAt.tx, spawnAt.ty, session.form);
+    this.safeGround = { x: this.player.x, y: this.player.y };
     this.camera = new Camera(viewWidth, level.width * TILE);
     this.camera.snapTo(this.player.x + this.player.w / 2);
     this.time = level.time;
@@ -177,10 +183,14 @@ export class World {
     }
     this.collectTileCoins();
     if (this.invuln > 0) this.invuln--;
+    if (p.onGround) this.safeGround = { x: p.x, y: p.y };
 
     if (p.y > this.levelBottom) {
-      this.killPlayer("pit");
-      return;
+      if (this.session.god) this.rescueFromPit();
+      else {
+        this.killPlayer("pit");
+        return;
+      }
     }
 
     this.activateSpawns();
@@ -229,7 +239,9 @@ export class World {
     const edge = this.camera.x + this.camera.width + ENEMY.activateMargin;
     while (this.pending.length > 0 && this.pending[0]!.tx * TILE < edge) {
       const s = this.pending.shift()!;
-      this.enemies.push(s.kind === "walker" ? createWalker(s.tx, s.ty) : createShellback(s.tx, s.ty));
+      // Numbered among its kind across the whole level, so a respawn after a checkpoint keeps its look.
+      const variant = this.level.spawns.filter((o) => o.kind === s.kind).indexOf(s);
+      this.enemies.push(s.kind === "walker" ? createWalker(s.tx, s.ty, variant) : createShellback(s.tx, s.ty, variant));
     }
   }
 
@@ -253,7 +265,7 @@ export class World {
       this.sfx("hurry");
       this.events.push({ type: "tempo", scale: 1.3 });
     }
-    if (this.time === 0) this.killPlayer("time");
+    if (this.time === 0 && !this.session.god) this.killPlayer("time");
   }
 
   private updateCheckpoint(): void {
@@ -410,6 +422,7 @@ export class World {
         continue;
       }
       if (!isDangerous(e)) continue;
+      if (!overlapsInset(p, e, ENEMY.hurtInset)) continue;
       if (e.kind === "shell" && e.state === "slide" && e.kickGrace > 0) continue;
       if (this.invuln > 0) continue;
       this.hurtPlayer();
@@ -429,12 +442,24 @@ export class World {
   }
 
   private hurtPlayer(): void {
+    if (this.session.god) return;
     if (this.player.form === "big") {
       this.transform("small");
       this.invuln = PLAYER.hurtInvulnFrames;
     } else {
       this.killPlayer("hit");
     }
+  }
+
+  /** God mode: instead of dying in a pit, the hero is put back where it last stood, with a moment of flicker. */
+  private rescueFromPit(): void {
+    const p = this.player;
+    p.x = p.prevX = this.safeGround.x;
+    p.y = p.prevY = this.safeGround.y;
+    p.vx = 0;
+    p.vy = 0;
+    this.invuln = GOD_RESCUE_FLICKER_FRAMES;
+    this.camera.follow(p.x + p.w / 2);
   }
 
   private transform(to: Form): void {

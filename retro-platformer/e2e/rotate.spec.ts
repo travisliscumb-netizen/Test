@@ -18,7 +18,7 @@ async function pixel(page: Page, x: number, y: number): Promise<number[]> {
 test("turning the phone sideways mid-game shows more of the level and fills the screen", async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto(buildUrl());
-  await page.waitForFunction(() => window.__sproutQuest !== undefined);
+  await page.waitForFunction(() => window.__budsTakeover !== undefined);
   await expect(page.locator("#rotate-hint")).toBeVisible();
   await page.keyboard.press("Enter");
   await waitForMode(page, "play");

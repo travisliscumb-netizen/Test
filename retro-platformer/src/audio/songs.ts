@@ -1,7 +1,7 @@
 import type { Song as SongId } from "../game/events";
 import { compileSong, type Song, type SongSpec } from "./notation";
 
-/** Original compositions for Sprout Quest. One bar per string, 16 sixteenths each. */
+/** Original compositions for Bud's Takeover. One bar per string, 16 sixteenths each. */
 const SPECS: Readonly<Record<SongId, SongSpec>> = {
   title: {
     bpm: 120,
@@ -25,7 +25,7 @@ const SPECS: Readonly<Record<SongId, SongSpec>> = {
     bass: { volume: 0.32, pattern: "R/4 F/4 O/4 F/4", octave: 2 },
   },
 
-  meadow: {
+  street: {
     bpm: 140,
     loop: true,
     chords: ["C", "Am", "F", "G", "C", "Am", "F", "C", "F", "G", "Em", "Am", "F", "G", "C", "G"],
@@ -56,7 +56,7 @@ const SPECS: Readonly<Record<SongId, SongSpec>> = {
     drums: { volume: 0.18, pattern: "k/2 h/2 s/2 h/2 k/2 k/2 s/2 h/2" },
   },
 
-  cavern: {
+  downtown: {
     bpm: 112,
     loop: true,
     chords: ["Am", "Am", "F", "E", "Am", "G", "F", "E"],
@@ -79,7 +79,7 @@ const SPECS: Readonly<Record<SongId, SongSpec>> = {
     drums: { volume: 0.12, pattern: "k/4 -/2 h/2 s/4 -/2 h/2" },
   },
 
-  dusk: {
+  park: {
     bpm: 128,
     loop: true,
     chords: ["D", "Bm", "G", "A", "D", "F#m", "G", "A", "Em", "G", "D", "A", "G", "A", "D", "D"],
@@ -110,7 +110,7 @@ const SPECS: Readonly<Record<SongId, SongSpec>> = {
     drums: { volume: 0.14, pattern: "k/4 h/2 h/2 s/4 h/2 h/2" },
   },
 
-  fortress: {
+  construction: {
     bpm: 150,
     loop: true,
     chords: ["Em", "Em", "C", "D", "Em", "Em", "C", "B"],

@@ -15,7 +15,7 @@ async function touch(cdp: CDPSession, type: "touchStart" | "touchMove" | "touchE
 test("on-screen controls start the game and drive the hero (iPhone landscape)", async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto(buildUrl());
-  await page.waitForFunction(() => window.__sproutQuest !== undefined);
+  await page.waitForFunction(() => window.__budsTakeover !== undefined);
   await expect(page.locator("#touch")).toBeVisible();
 
   const cdp = await page.context().newCDPSession(page);
@@ -46,7 +46,7 @@ test("on-screen controls start the game and drive the hero (iPhone landscape)", 
 
 test("the pause button pauses", async ({ page }) => {
   await page.goto(buildUrl());
-  await page.waitForFunction(() => window.__sproutQuest !== undefined);
+  await page.waitForFunction(() => window.__budsTakeover !== undefined);
   const cdp = await page.context().newCDPSession(page);
   const jump = await centre(page, '[data-zone="jump"]');
   await touch(cdp, "touchStart", [{ ...jump, id: 1 }]);

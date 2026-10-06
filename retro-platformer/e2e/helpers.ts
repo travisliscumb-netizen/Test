@@ -14,16 +14,18 @@ export interface Snapshot {
   mode: string;
   renderScale: number;
   viewWidth: number;
+  placement: { x: number; y: number; scale: number };
   phase: string | null;
   level: number;
   score: number;
   coins: number;
   lives: number;
+  god: { armed: boolean; active: boolean };
   player: { x: number; y: number; form: string } | null;
 }
 
 export function snapshot(page: Page): Promise<Snapshot> {
-  return page.evaluate(() => window.__sproutQuest!.snapshot());
+  return page.evaluate(() => window.__budsTakeover!.snapshot());
 }
 
 /** Collects console errors and uncaught exceptions. */
@@ -42,6 +44,19 @@ export async function waitForMode(page: Page, mode: string): Promise<void> {
 
 declare global {
   interface Window {
-    __sproutQuest?: { snapshot(): Snapshot };
+    __budsTakeover?: { snapshot(): Snapshot };
   }
+}
+
+/** Converts a point in logical view coordinates to page (CSS) coordinates. */
+export async function viewToPage(page: Page, x: number, y: number): Promise<{ x: number; y: number }> {
+  const s = await snapshot(page);
+  return page.evaluate(
+    ({ x, y, p }) => {
+      const canvas = document.getElementById("screen") as HTMLCanvasElement;
+      const r = canvas.getBoundingClientRect();
+      return { x: r.left + ((p.x + x * p.scale) * r.width) / canvas.width, y: r.top + ((p.y + y * p.scale) * r.height) / canvas.height };
+    },
+    { x, y, p: s.placement },
+  );
 }

@@ -5,7 +5,7 @@ test("holding right and pressing jump for 5 seconds moves the hero, with no cons
   const errors = trackErrors(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(buildUrl());
-  await page.waitForFunction(() => window.__sproutQuest !== undefined);
+  await page.waitForFunction(() => window.__budsTakeover !== undefined);
   await waitForMode(page, "title");
 
   await page.keyboard.press("Enter");
@@ -33,7 +33,7 @@ test("holding right and pressing jump for 5 seconds moves the hero, with no cons
 test("pause stops the simulation and resumes it", async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto(buildUrl());
-  await page.waitForFunction(() => window.__sproutQuest !== undefined);
+  await page.waitForFunction(() => window.__budsTakeover !== undefined);
   await page.keyboard.press("Enter");
   await waitForMode(page, "play");
   await page.keyboard.press("Enter");

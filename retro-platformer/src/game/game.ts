@@ -2,6 +2,7 @@ import type { Controls } from "../core/input";
 import type { LevelData } from "../world/level";
 import { RULES } from "../tuning";
 import type { GameEvent } from "./events";
+import { hitsGodBlock } from "./godBlock";
 import { newSession, type Session } from "./session";
 import { World } from "./world";
 
@@ -22,6 +23,10 @@ export class Game {
   highScore: number;
   /** Set once any touch input is seen; switches on-screen hints. */
   touchMode = false;
+  /** God mode, toggled by the title screen's hidden block; applies to the next run started. */
+  godMode = false;
+  /** {@link timer} value when God mode was last toggled (drives the block's flash), or null. */
+  godToggledAt: number | null = null;
   readonly events: GameEvent[] = [];
   private viewWidth: number;
 
@@ -58,7 +63,7 @@ export class Game {
         // Animate the backdrop (drifting clouds, shimmering blocks) without simulating it.
         this.backdrop.frame++;
         if (c.startPressed || c.jumpPressed) {
-          this.session = newSession();
+          this.session = newSession(this.godMode);
           this.enter("intro");
           this.events.push({ type: "music", song: null });
         }
@@ -85,6 +90,18 @@ export class Game {
         if (this.timer >= ENDING_LOCK_FRAMES && (c.startPressed || c.jumpPressed)) this.toTitle();
         break;
     }
+  }
+
+  /**
+   * A tap or click at (x, y) in logical view coordinates. On the title screen,
+   * hitting the lone block toggles God mode. Returns whether the tap was used.
+   */
+  tap(x: number, y: number): boolean {
+    if (this.mode !== "title" || !hitsGodBlock(this.viewWidth, x, y)) return false;
+    this.godMode = !this.godMode;
+    this.godToggledAt = this.timer;
+    this.events.push({ type: "sfx", id: this.godMode ? "oneUp" : "bump" });
+    return true;
   }
 
   /** Pauses from outside the simulation (the page was hidden or lost focus). */

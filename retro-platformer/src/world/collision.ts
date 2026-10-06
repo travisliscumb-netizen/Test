@@ -145,3 +145,8 @@ function rowSolids(grid: SolidGrid, ty: number, c0: number, c1: number): Cell[] 
 export function overlaps(a: Body, b: Body): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
+
+/** Whether `a` overlaps `b` shrunk by `inset` on every side. */
+export function overlapsInset(a: Body, b: Body, inset: number): boolean {
+  return overlaps(a, { x: b.x + inset, y: b.y + inset, w: b.w - inset * 2, h: b.h - inset * 2 });
+}

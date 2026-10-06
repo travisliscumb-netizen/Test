@@ -67,27 +67,66 @@ export function drawGround(ctx: Ctx, m: Material, shape: GroundShape, variant: n
 
 function drawSurface(ctx: Ctx, m: Material, rnd: () => number): void {
   const [dark, mid, light] = m.top;
-  const depth = m.topKind === "slab" ? 7 : 9;
-  // Shadow cast into the soil by the surface layer.
+  const depth = m.topKind === "grass" ? 9 : m.topKind === "gravel" ? 8 : 7;
+  // Shadow cast into the ground by the surface layer.
   ctx.fillStyle = linear(ctx, 0, depth, 0, depth + 5, [
     [0, rgba(m.soil[0], 0.65)],
     [1, rgba(m.soil[0], 0)],
   ]);
   ctx.fillRect(0, depth, 32, 5);
 
-  if (m.topKind === "slab") {
-    // Cut stone capping with bevelled joints.
+  if (m.topKind === "sidewalk" || m.topKind === "slab") {
+    // Paving: a lit top edge, joints between slabs, and a few stains.
     ctx.fillStyle = linear(ctx, 0, 0, 0, depth, [
       [0, light],
-      [0.25, mid],
+      [0.3, mid],
       [1, dark],
     ]);
     ctx.fillRect(0, 0, 32, depth);
-    ctx.fillStyle = rgba("#ffffff", 0.35);
+    ctx.fillStyle = rgba("#ffffff", m.topKind === "slab" ? 0.45 : 0.3);
     ctx.fillRect(0, 0, 32, 0.9);
-    ctx.fillStyle = rgba(OUTLINE, 0.6);
-    ctx.fillRect(15.5, 0, 1, depth);
+    ctx.fillStyle = rgba(OUTLINE, 0.55);
+    ctx.fillRect(m.topKind === "slab" ? 15.5 : 31.2, 0, 0.8, depth);
     ctx.fillRect(0, depth - 0.8, 32, 0.8);
+    for (let i = 0; i < 3; i++) {
+      ellipse(ctx, 4 + rnd() * 24, 2.5 + rnd() * (depth - 4), 1 + rnd() * 2, 0.6 + rnd() * 0.6);
+      ctx.fillStyle = rgba(dark, 0.35);
+      ctx.fill();
+    }
+    if (m.topKind === "slab") {
+      // Polished granite catches a sheen.
+      ctx.fillStyle = linear(ctx, 0, 0, 32, depth, [
+        [0, "rgba(255, 255, 255, 0)"],
+        [0.5, "rgba(255, 255, 255, 0.18)"],
+        [1, "rgba(255, 255, 255, 0)"],
+      ]);
+      ctx.fillRect(0, 1, 32, depth - 2);
+    }
+    return;
+  }
+
+  if (m.topKind === "gravel") {
+    // Packed site dirt topped with loose gravel.
+    ctx.fillStyle = linear(ctx, 0, 0, 0, depth, [
+      [0, light],
+      [0.4, mid],
+      [1, dark],
+    ]);
+    ctx.beginPath();
+    ctx.moveTo(0, surfaceY(0));
+    for (let x = 1; x <= 32; x++) ctx.lineTo(x, surfaceY(x));
+    ctx.lineTo(32, depth);
+    ctx.lineTo(0, depth);
+    ctx.closePath();
+    ctx.fill();
+    for (let i = 0; i < 14; i++) {
+      const x = 1 + rnd() * 30;
+      const y = surfaceY(x) + 0.5 + rnd() * (depth - 3);
+      const r = 0.6 + rnd() * 1.1;
+      ellipse(ctx, x, y, r * 1.3, r);
+      ctx.fillStyle = rnd() < 0.5 ? m.pebble[2] : m.pebble[1];
+      ctx.fill();
+    }
     return;
   }
 
@@ -104,7 +143,7 @@ function drawSurface(ctx: Ctx, m: Material, rnd: () => number): void {
     [1, dark],
   ]);
   ctx.fill();
-  // Drips of moss/roots hanging into the soil.
+  // Roots hanging into the soil.
   for (let i = 0; i < 4; i++) {
     const x = 3 + rnd() * 26;
     const len = 2 + rnd() * 4;
@@ -137,34 +176,26 @@ function drawSurface(ctx: Ctx, m: Material, rnd: () => number): void {
     else ctx.lineTo(x, surfaceY(x) + 0.6);
   }
   ctx.stroke();
-  // Theme flourishes.
-  const decor = m.topKind === "blossom" ? 3 : m.topKind === "moss" ? 2 : rnd() < 0.5 ? 1 : 0;
-  for (let i = 0; i < decor; i++) {
+  // The odd park flower.
+  if (rnd() < 0.5) {
     const x = 4 + rnd() * 24;
     const y = surfaceY(x) - 1;
-    if (m.topKind === "moss") {
-      // Glowing spores.
-      ctx.fillStyle = rgba("#c8fff0", 0.9);
-      ellipse(ctx, x, y + 2, 0.8, 0.8);
-      ctx.fill();
-    } else {
-      const petal = m.topKind === "blossom" ? "#ffe4f6" : rnd() < 0.5 ? "#fff6c8" : "#ffd0e0";
-      ctx.strokeStyle = shade(m.top[0], -0.2);
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.moveTo(x, y + 2);
-      ctx.lineTo(x, y - 1.5);
-      ctx.stroke();
-      for (let k = 0; k < 5; k++) {
-        const a = (k / 5) * Math.PI * 2;
-        ellipse(ctx, x + Math.cos(a) * 1.1, y - 2 + Math.sin(a) * 1.1, 0.9, 0.9);
-        ctx.fillStyle = petal;
-        ctx.fill();
-      }
-      ellipse(ctx, x, y - 2, 0.6, 0.6);
-      ctx.fillStyle = "#ffcc33";
+    const petal = rnd() < 0.5 ? "#fff6c8" : "#ffd0e0";
+    ctx.strokeStyle = shade(m.top[0], -0.2);
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 2);
+    ctx.lineTo(x, y - 1.5);
+    ctx.stroke();
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2;
+      ellipse(ctx, x + Math.cos(a) * 1.1, y - 2 + Math.sin(a) * 1.1, 0.9, 0.9);
+      ctx.fillStyle = petal;
       ctx.fill();
     }
+    ellipse(ctx, x, y - 2, 0.6, 0.6);
+    ctx.fillStyle = "#ffcc33";
+    ctx.fill();
   }
 }
 
@@ -183,7 +214,7 @@ function drawCliff(ctx: Ctx, m: Material, top: boolean, side: -1 | 1): void {
   ctx.moveTo(edge, top ? 4 : 0);
   ctx.lineTo(edge, 32);
   ctx.stroke();
-  if (top && m.topKind !== "slab") {
+  if (top && m.topKind === "grass") {
     // Grass lip rolling over the edge.
     ctx.beginPath();
     ctx.moveTo(edge - side * 4, surfaceY(edge - side * 4));

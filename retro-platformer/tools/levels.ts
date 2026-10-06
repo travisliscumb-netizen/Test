@@ -1,6 +1,7 @@
-// Dev page: renders a whole level as stacked segments. Usage: tools/levels.html?level=1&rows=4&scale=0.5
+// Dev page: renders a whole level as stacked segments. Usage: tools/levels.html?level=1&rows=4&scale=0.5[&enemies=1]
 import { Renderer } from "../src/render/renderer";
 import { World } from "../src/game/world";
+import { createShellback, createWalker } from "../src/entities/enemies";
 import { newSession } from "../src/game/session";
 import { loadLevels } from "../src/levels";
 import { TILE, VIEW_HEIGHT } from "../src/tuning";
@@ -13,6 +14,13 @@ const segW = Math.ceil((level.width * TILE) / rows);
 
 const renderer = new Renderer();
 const world = new World(level, newSession(), segW);
+if (params.get("enemies") === "1") {
+  // Every enemy at its spawn, numbered the way the game numbers them.
+  for (const s of level.spawns) {
+    const variant = level.spawns.filter((o) => o.kind === s.kind).indexOf(s);
+    world.enemies.push(s.kind === "walker" ? createWalker(s.tx, s.ty, variant) : createShellback(s.tx, s.ty, variant));
+  }
+}
 const out = document.createElement("canvas");
 out.width = Math.round(segW * scale);
 out.height = Math.round(VIEW_HEIGHT * scale * rows);

@@ -178,7 +178,7 @@ describe("every level can be completed", () => {
 describe("the solver is not trivially satisfied", () => {
   function level(air: string, ground: string): LevelData {
     const rows = [...Array(11).fill(".".repeat(air.length)), air, ground, ground, ground];
-    return parseLevel(`name: T\ntheme: meadow\ntime: 300\n---\n${rows.join("\n")}`);
+    return parseLevel(`name: T\ntheme: street\ntime: 300\n---\n${rows.join("\n")}`);
   }
 
   it("finds a path over a jumpable 4-tile pit", () => {
@@ -193,6 +193,6 @@ describe("the solver is not trivially satisfied", () => {
   it("proves a wall taller than any jump impossible", () => {
     const wall = "........X...............";
     const rows = [...Array<string>(11).fill(wall), ".S......X.......F...T...", ...Array<string>(3).fill("#".repeat(24))];
-    expect(solve(parseLevel(`name: T\ntheme: meadow\ntime: 300\n---\n${rows.join("\n")}`))).toMatchObject({ reached: false, exhausted: true });
+    expect(solve(parseLevel(`name: T\ntheme: street\ntime: 300\n---\n${rows.join("\n")}`))).toMatchObject({ reached: false, exhausted: true });
   }, 60_000);
 });

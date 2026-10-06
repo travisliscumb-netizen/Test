@@ -23,14 +23,16 @@ export interface HeroPose {
   backLeg: Limb;
   frontArm: Limb;
   backArm: Limb;
-  /** Scarf tail animation phase and how far it streams out horizontally (0..1). */
-  scarfPhase: number;
-  scarfLift: number;
+  /** Bandana flutter phase and how far it streams out behind (0..1). */
+  bandanaPhase: number;
+  bandanaLift: number;
+  /** Front hand tucked in the hoodie pocket (strolling, standing). */
+  pocket: boolean;
   /** 0 = eyes open, 1 = shut. */
   blink: number;
   dizzy: boolean;
-  /** Sway of the sprout on the hood, radians. */
-  sprout: number;
+  /** Head tilt in radians (a cocky lean of the chin). */
+  tilt: number;
   /** True when standing on the ground: the lowest foot is planted at y = 0. */
   planted: boolean;
 }
@@ -53,6 +55,8 @@ export interface HeroState {
 }
 
 const STRIDE_LENGTH = 52;
+/** At or below this speed Bud strolls with a hand in his pocket; above it he runs. */
+const STROLL_SPEED = 3.2;
 const TAU = Math.PI * 2;
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
@@ -69,11 +73,12 @@ export function heroPose(s: HeroState): HeroPose {
     backLeg: { swing: -0.12, bend: 0.1 },
     frontArm: { swing: 0.15, bend: 0.35 },
     backArm: { swing: -0.1, bend: 0.3 },
-    scarfPhase: s.frame * 0.12,
-    scarfLift: 0.1,
+    bandanaPhase: s.frame * 0.12,
+    bandanaLift: 0.1,
+    pocket: true,
     blink,
     dizzy: false,
-    sprout: Math.sin(s.frame * 0.05) * 0.12,
+    tilt: 0,
     planted: s.onGround,
   };
 
@@ -86,7 +91,8 @@ export function heroPose(s: HeroState): HeroPose {
       backLeg: { swing: -0.4, bend: 0.6 },
       blink: 0,
       dizzy: true,
-      scarfLift: 0.6,
+      pocket: false,
+      bandanaLift: 0.6,
       planted: false,
     };
   }
@@ -98,7 +104,8 @@ export function heroPose(s: HeroState): HeroPose {
       backArm: { swing: 1.7, bend: 0.3 },
       frontLeg: { swing: 0.9, bend: 1.5 },
       backLeg: { swing: 0.5, bend: 1.2 },
-      scarfLift: 0.3,
+      pocket: false,
+      bandanaLift: 0.3,
       planted: false,
     };
   }
@@ -114,9 +121,10 @@ export function heroPose(s: HeroState): HeroPose {
       frontLeg: { swing: 0.75 + rise * 0.25, bend: 1.1 + rise * 0.4 },
       backLeg: { swing: -0.35 - rise * 0.1, bend: 0.25 },
       frontArm: rise > 0 ? { swing: 2.05, bend: 0.15 } : { swing: 1.4, bend: 0.2 },
+      pocket: false,
       backArm: { swing: -0.9, bend: 0.4 },
-      scarfLift: 0.5 + Math.min(0.5, speed / 8),
-      scarfPhase: s.frame * 0.25,
+      bandanaLift: 0.5 + Math.min(0.5, speed / 8),
+      bandanaPhase: s.frame * 0.25,
       planted: false,
     };
   }
@@ -132,8 +140,9 @@ export function heroPose(s: HeroState): HeroPose {
       backLeg: { swing: 0.1, bend: 0.9 },
       frontArm: { swing: 1.6, bend: 0.2 },
       backArm: { swing: -1.2, bend: 0.3 },
-      scarfLift: 0.8,
-      scarfPhase: s.frame * 0.3,
+      pocket: false,
+      bandanaLift: 0.8,
+      bandanaPhase: s.frame * 0.3,
     };
   }
 
@@ -141,26 +150,32 @@ export function heroPose(s: HeroState): HeroPose {
     const breathe = Math.sin(s.frame * 0.06);
     return {
       ...base,
+      // Standing easy: leaning back a touch, chin up, one hand in the pocket.
+      lean: -0.05,
+      tilt: -0.06 + breathe * 0.02,
       stretch: squash * (1 + breathe * 0.012),
       frontArm: { swing: 0.15 + breathe * 0.04, bend: 0.35 },
-      backArm: { swing: -0.1 - breathe * 0.04, bend: 0.3 },
+      backArm: { swing: -0.05 - breathe * 0.04, bend: 0.2 },
     };
   }
 
-  // Run cycle: amplitude grows with speed.
+  // Walking is a stroll (hand stays in the pocket, a little bounce); running pumps both arms.
   const phase = (s.stride / STRIDE_LENGTH) * TAU;
   const amp = clamp(0.35 + speed * 0.12, 0.35, 0.95);
   const sw = Math.sin(phase);
   const cw = Math.cos(phase);
+  const strolling = speed <= STROLL_SPEED;
   return {
     ...base,
-    lean: 0.06 + speed * 0.025,
+    lean: strolling ? -0.02 : 0.06 + speed * 0.025,
+    tilt: strolling ? -0.05 + Math.abs(sw) * 0.04 : 0,
     stretch: squash,
     frontLeg: { swing: sw * amp, bend: 0.2 + Math.max(0, -cw) * 1.3 * amp },
     backLeg: { swing: -sw * amp, bend: 0.2 + Math.max(0, cw) * 1.3 * amp },
     frontArm: { swing: -sw * amp * 1.1, bend: 0.7 + amp * 0.5 },
-    backArm: { swing: sw * amp * 1.1, bend: 0.7 + amp * 0.5 },
-    scarfLift: clamp(speed / 5, 0.2, 1),
-    scarfPhase: s.frame * (0.15 + speed * 0.05),
+    backArm: { swing: sw * amp * (strolling ? 0.6 : 1.1), bend: strolling ? 0.3 : 0.7 + amp * 0.5 },
+    pocket: strolling,
+    bandanaLift: clamp(speed / 5, 0.2, 1),
+    bandanaPhase: s.frame * (0.15 + speed * 0.05),
   };
 }

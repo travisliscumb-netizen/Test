@@ -3,7 +3,8 @@ import type { SolidGrid } from "./collision";
 
 export const LEVEL_ROWS = 15;
 
-export const THEMES = ["meadow", "cavern", "dusk", "fortress"] as const;
+/** Background themes in level order: bright and open first, grittier and later at night after. */
+export const THEMES = ["street", "park", "construction", "downtown"] as const;
 export type ThemeName = (typeof THEMES)[number];
 
 export type SpawnKind = "walker" | "shell";
@@ -67,8 +68,8 @@ export class LevelFormatError extends Error {
  * Parses a level file:
  *
  * ```
- * name: Meadow Run
- * theme: meadow
+ * name: Main Street
+ * theme: street
  * time: 400
  * ---
  * <15 rows of equal width>

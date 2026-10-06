@@ -1,5 +1,5 @@
 name: Test Room
-theme: meadow
+theme: street
 time: 400
 ---
 ................................................

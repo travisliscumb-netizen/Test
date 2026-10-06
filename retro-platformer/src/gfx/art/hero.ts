@@ -2,34 +2,41 @@ import { OUTLINE, capsule, ellipse, fillStroke, linear, radial, roundRect, type 
 import type { HeroPose, Limb } from "./heroPose";
 
 /**
- * Moss, the hero: a gardener in a leaf hood with a sprout on top and a long
- * orange scarf. Drawn facing right with the origin at the feet (y up is
+ * Bud, the hero: a confident chibi kid in a black cap, a black hoodie with
+ * his name across the front, headphones round his neck, a red bandana and
+ * white sneakers. Drawn facing right with the origin at the feet (y up is
  * negative), in logical pixels. Mirror the context to face left.
+ *
+ * Everything here is original: the cap carries Bud's own "B", and the shoes
+ * have no brand marks.
  */
 
 export const HERO_COLORS = {
-  leafDark: "#1f5a30",
-  leaf: "#3d9a48",
-  leafLight: "#8fdc6a",
-  sprout: "#a8ec74",
-  skin: "#f2b48c",
-  skinShade: "#c97a5a",
-  blush: "#ff8a7a",
-  scarf: "#f2742e",
-  scarfDark: "#a83a1a",
-  scarfLight: "#ffb470",
-  tunic: "#3f63b8",
-  tunicDark: "#22346e",
-  tunicLight: "#7397e6",
-  boot: "#6a3d22",
-  bootDark: "#3a2012",
-  belt: "#5a3420",
-  gold: "#ffd24a",
-  eye: "#2a1a30",
+  skin: "#e9ebf0",
+  skinShade: "#b4b9c4",
+  skinDeep: "#8e94a2",
+  brow: "#4a4c56",
+  eye: "#141418",
+  cap: "#18181e",
+  capLight: "#3a3a46",
+  hoodie: "#1c1c22",
+  hoodieDark: "#0e0e12",
+  hoodieLight: "#3c3c48",
+  print: "#f4f4f6",
+  pants: "#18181c",
+  pantsLight: "#34343e",
+  shoe: "#f2f3f6",
+  shoeShade: "#c4c8d2",
+  sole: "#dfe2e8",
+  bandana: "#d42a26",
+  bandanaDark: "#8a1414",
+  bandanaLight: "#ff6a5a",
+  phones: "#1a1a20",
+  phonesLight: "#4a4a58",
 } as const;
 
 const C = HERO_COLORS;
-const LINE = 1.15;
+const LINE = 1.1;
 
 interface Build {
   thigh: number;
@@ -42,12 +49,14 @@ interface Build {
   headR: number;
   torsoW: number;
   limbR: number;
+  /** Height of the sneakers. */
+  shoeH: number;
 }
 
-/** Body proportions: small is chibi (big head, short limbs); big is taller and leaner. */
+/** Body proportions: both forms are chibi (a big head); the big form has a longer body and legs. */
 export const BUILDS: Readonly<Record<HeroPose["form"], Build>> = {
-  small: { thigh: 4.2, shin: 4.2, upperArm: 4, forearm: 3.6, hipY: -9.6, shoulderY: -15.5, headY: -21.5, headR: 8.2, torsoW: 9, limbR: 1.9 },
-  big: { thigh: 7.2, shin: 7.2, upperArm: 6.4, forearm: 5.8, hipY: -16.4, shoulderY: -29.5, headY: -37.5, headR: 9, torsoW: 11, limbR: 2.4 },
+  small: { thigh: 3.6, shin: 3.6, upperArm: 3.8, forearm: 3.4, hipY: -9.2, shoulderY: -14.8, headY: -21.6, headR: 8.6, torsoW: 10, limbR: 2, shoeH: 2.4 },
+  big: { thigh: 6.6, shin: 6.4, upperArm: 6.2, forearm: 5.6, hipY: -16, shoulderY: -28.4, headY: -37, headR: 9.8, torsoW: 12.5, limbR: 2.5, shoeH: 3 },
 };
 
 interface Point {
@@ -78,185 +87,288 @@ export function drawHero(ctx: Ctx, pose: HeroPose): void {
   ctx.lineCap = "round";
   // Squash and stretch about the feet.
   ctx.scale(1 / Math.sqrt(pose.stretch), pose.stretch);
-  // Keep a standing hero's lowest boot on the ground.
-  const bootH = pose.form === "big" ? 2.6 : 2;
-  const hipY = pose.planted ? -(lowestFoot(pose) + bootH) : b.hipY;
+  // Keep a standing hero's lowest shoe on the ground.
+  const hipY = pose.planted ? -(lowestFoot(pose) + b.shoeH * 0.6) : b.hipY;
   const lift = hipY - b.hipY;
   const hip = { x: 0, y: hipY };
-  const shoulder = { x: Math.sin(pose.lean) * (b.hipY - b.shoulderY) * -1, y: b.shoulderY + lift };
-  const head = { x: shoulder.x + Math.sin(pose.lean) * 6 + 0.5, y: b.headY + lift };
+  const shoulder = { x: -Math.sin(pose.lean) * (b.hipY - b.shoulderY), y: b.shoulderY + lift };
+  const head = { x: shoulder.x + Math.sin(pose.lean) * 6 + 0.6, y: b.headY + lift };
 
-  drawScarfTail(ctx, head, b, pose);
-  drawArm(ctx, { x: shoulder.x - 1.2, y: shoulder.y + 1 }, pose.backArm, b, true);
-  drawLeg(ctx, { x: hip.x - 1.6, y: hip.y }, pose.backLeg, b, bootH, true);
-  drawTorso(ctx, hip, shoulder, b);
-  drawLeg(ctx, { x: hip.x + 1.4, y: hip.y }, pose.frontLeg, b, bootH, false);
+  // The front shoulder sits at the leading edge of the torso so the arm doesn't hide the print.
+  const front = { x: shoulder.x + b.torsoW * 0.4, y: shoulder.y + 1.4 };
+  drawArm(ctx, { x: shoulder.x - 1.4, y: shoulder.y + 1.2 }, pose.backArm, b, true);
+  drawLeg(ctx, { x: hip.x - 1.8, y: hip.y }, pose.backLeg, b, true);
+  drawBandana(ctx, { x: hip.x - b.torsoW * 0.36, y: hip.y + 0.6 }, b, pose);
+  drawTorso(ctx, hip, shoulder, b, pose.form);
+  drawLeg(ctx, { x: hip.x + 1.6, y: hip.y }, pose.frontLeg, b, false);
+  drawHood(ctx, head, shoulder, b);
   drawHead(ctx, head, b.headR, pose);
-  drawScarfWrap(ctx, head, b);
-  drawArm(ctx, { x: shoulder.x + 1.3, y: shoulder.y + 1.2 }, pose.frontArm, b, false);
+  drawHeadphones(ctx, head, b);
+  if (pose.pocket) drawPocketArm(ctx, front, hip, b);
+  else drawArm(ctx, front, pose.frontArm, b, false);
   ctx.restore();
 }
 
-function drawLeg(ctx: Ctx, hip: Point, limb: Limb, b: Build, bootH: number, back: boolean): void {
+function drawLeg(ctx: Ctx, hip: Point, limb: Limb, b: Build, back: boolean): void {
   const { joint, end } = solveLimb(hip.x, hip.y, limb, b.thigh, b.shin, true);
   const r = b.limbR;
-  const cloth = back ? C.tunicDark : C.tunic;
-  ctx.save();
-  capsule(ctx, hip.x, hip.y, joint.x, joint.y, r * 1.15, r);
+  const cloth = back ? C.hoodieDark : C.pants;
+  capsule(ctx, hip.x, hip.y, joint.x, joint.y, r * 1.2, r * 1.05);
   fillStroke(ctx, cloth, OUTLINE, LINE);
-  capsule(ctx, joint.x, joint.y, end.x, end.y, r, r * 0.9);
+  capsule(ctx, joint.x, joint.y, end.x, end.y, r * 1.05, r * 1.0);
   fillStroke(ctx, cloth, OUTLINE, LINE);
-  // Boot, toe pointing forward.
-  const len = r * 3.2;
-  roundRect(ctx, end.x - r * 1.1, end.y - bootH * 0.4, len, bootH * 1.4, bootH * 0.7);
-  fillStroke(ctx, linear(ctx, 0, end.y - bootH, 0, end.y + bootH, [
-    [0, back ? C.bootDark : "#8a5430"],
-    [1, back ? "#24140c" : C.bootDark],
-  ]), OUTLINE, LINE);
   if (!back) {
-    ctx.fillStyle = "rgba(255, 220, 180, 0.35)";
-    ctx.fillRect(end.x - r * 0.6, end.y - bootH * 0.25, len * 0.55, 0.6);
-  }
-  ctx.restore();
-}
-
-function drawArm(ctx: Ctx, shoulder: Point, limb: Limb, b: Build, back: boolean): void {
-  const { joint, end } = solveLimb(shoulder.x, shoulder.y, limb, b.upperArm, b.forearm, false);
-  const r = b.limbR * 0.85;
-  capsule(ctx, shoulder.x, shoulder.y, joint.x, joint.y, r * 1.2, r);
-  fillStroke(ctx, back ? C.tunicDark : C.tunicLight, OUTLINE, LINE);
-  capsule(ctx, joint.x, joint.y, end.x, end.y, r * 0.95, r * 0.85);
-  fillStroke(ctx, back ? C.skinShade : C.skin, OUTLINE, LINE);
-  ellipse(ctx, end.x, end.y, r * 1.25, r * 1.25);
-  fillStroke(ctx, back ? C.skinShade : radial(ctx, end.x - 0.4, end.y - 0.5, r * 1.4, [
-    [0, "#ffd9bf"],
-    [1, C.skin],
-  ]), OUTLINE, LINE);
-}
-
-function drawTorso(ctx: Ctx, hip: Point, shoulder: Point, b: Build): void {
-  const w = b.torsoW;
-  const top = shoulder.y - 1.5;
-  const bottom = hip.y + 1.5;
-  ctx.beginPath();
-  ctx.moveTo(shoulder.x - w * 0.42, top);
-  ctx.quadraticCurveTo(shoulder.x, top - 1.2, shoulder.x + w * 0.42, top);
-  ctx.quadraticCurveTo(hip.x + w * 0.62, (top + bottom) / 2, hip.x + w * 0.5, bottom);
-  ctx.quadraticCurveTo(hip.x, bottom + 1.4, hip.x - w * 0.5, bottom);
-  ctx.quadraticCurveTo(hip.x - w * 0.62, (top + bottom) / 2, shoulder.x - w * 0.42, top);
-  ctx.closePath();
-  fillStroke(ctx, linear(ctx, hip.x - w / 2, 0, hip.x + w / 2, 0, [
-    [0, C.tunicDark],
-    [0.45, C.tunic],
-    [0.8, C.tunicLight],
-    [1, C.tunic],
-  ]), OUTLINE, LINE);
-  // Belt and buckle.
-  const beltY = bottom - 2.6;
-  ctx.fillStyle = C.belt;
-  ctx.fillRect(hip.x - w * 0.52, beltY, w * 1.04, 1.5);
-  roundRect(ctx, hip.x + w * 0.12, beltY - 0.4, 2.2, 2.3, 0.5);
-  fillStroke(ctx, C.gold, OUTLINE, 0.5);
-  // Overall straps.
-  ctx.strokeStyle = C.tunicDark;
-  ctx.lineWidth = 0.8;
-  for (const dx of [-w * 0.22, w * 0.22]) {
+    // A soft highlight down the front of the joggers and a gathered cuff.
+    ctx.strokeStyle = C.pantsLight;
+    ctx.lineWidth = 0.7;
     ctx.beginPath();
-    ctx.moveTo(shoulder.x + dx, top + 0.6);
-    ctx.lineTo(hip.x + dx, beltY);
+    ctx.moveTo(hip.x + r * 0.5, hip.y + 1);
+    ctx.lineTo(joint.x + r * 0.5, joint.y);
     ctx.stroke();
   }
+  ctx.strokeStyle = back ? "#202026" : C.pantsLight;
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(end.x - r, end.y - b.shoeH * 0.55);
+  ctx.lineTo(end.x + r, end.y - b.shoeH * 0.55);
+  ctx.stroke();
+  drawShoe(ctx, end, b, back);
+}
+
+/** Chunky white sneaker, toe forward, with a thick sole and laces. No brand marks. */
+function drawShoe(ctx: Ctx, at: Point, b: Build, back: boolean): void {
+  const h = b.shoeH;
+  const len = b.limbR * 4.2;
+  const x = at.x - b.limbR * 1.3;
+  const y = at.y - h * 0.4;
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y);
+  ctx.quadraticCurveTo(x + len * 0.35, y - h * 0.55, x + len * 0.62, y + h * 0.05);
+  ctx.quadraticCurveTo(x + len, y + h * 0.15, x + len, y + h * 0.8);
+  ctx.lineTo(x + len, y + h);
+  ctx.closePath();
+  fillStroke(ctx, linear(ctx, 0, y - h * 0.5, 0, y + h, [
+    [0, back ? C.shoeShade : "#ffffff"],
+    [1, back ? "#9aa0ac" : C.shoeShade],
+  ]), OUTLINE, LINE);
+  // Sole.
+  ctx.fillStyle = back ? "#b0b4be" : C.sole;
+  ctx.fillRect(x + 0.4, y + h * 0.62, len - 0.8, h * 0.34);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(x + 0.4, y + h * 0.62);
+  ctx.lineTo(x + len - 0.4, y + h * 0.62);
+  ctx.stroke();
+  if (!back) {
+    // Laces.
+    ctx.strokeStyle = "#a8aebc";
+    ctx.lineWidth = 0.45;
+    for (let i = 0; i < 3; i++) {
+      const lx = x + len * (0.3 + i * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(lx, y - h * 0.1 + i * 0.15);
+      ctx.lineTo(lx + len * 0.06, y + h * 0.15 + i * 0.1);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawArm(ctx: Ctx, shoulder: Point, limb: Limb, b: Build, back: boolean): Point {
+  const { joint, end } = solveLimb(shoulder.x, shoulder.y, limb, b.upperArm, b.forearm, false);
+  const r = b.limbR;
+  const sleeve = back ? C.hoodieDark : C.hoodie;
+  capsule(ctx, shoulder.x, shoulder.y, joint.x, joint.y, r * 1.25, r * 1.1);
+  fillStroke(ctx, sleeve, OUTLINE, LINE);
+  capsule(ctx, joint.x, joint.y, end.x, end.y, r * 1.1, r * 1.05);
+  fillStroke(ctx, sleeve, OUTLINE, LINE);
+  if (!back) {
+    ctx.strokeStyle = C.hoodieLight;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(shoulder.x + 0.6, shoulder.y - r * 0.6);
+    ctx.lineTo(joint.x + 0.6, joint.y - r * 0.5);
+    ctx.stroke();
+  }
+  ellipse(ctx, end.x, end.y, r * 1.15, r * 1.15);
+  fillStroke(ctx, back ? C.skinShade : radial(ctx, end.x - 0.4, end.y - 0.5, r * 1.4, [
+    [0, "#ffffff"],
+    [1, C.skin],
+  ]), OUTLINE, LINE);
+  return end;
+}
+
+/** The front arm bent with the hand tucked into the hoodie's pocket. */
+function drawPocketArm(ctx: Ctx, shoulder: Point, hip: Point, b: Build): void {
+  const r = b.limbR;
+  const elbow = { x: shoulder.x + r * 0.5, y: (shoulder.y + hip.y) / 2 + 0.5 };
+  const hand = { x: hip.x + b.torsoW * 0.3, y: hip.y - 2.2 };
+  capsule(ctx, shoulder.x, shoulder.y, elbow.x, elbow.y, r * 1.25, r * 1.1);
+  fillStroke(ctx, C.hoodie, OUTLINE, LINE);
+  capsule(ctx, elbow.x, elbow.y, hand.x, hand.y, r * 1.1, r * 1.0);
+  fillStroke(ctx, C.hoodie, OUTLINE, LINE);
+  ctx.strokeStyle = C.hoodieLight;
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(shoulder.x + 0.6, shoulder.y - r * 0.6);
+  ctx.lineTo(elbow.x + 0.8, elbow.y - r * 0.4);
+  ctx.stroke();
+}
+
+function drawTorso(ctx: Ctx, hip: Point, shoulder: Point, b: Build, form: HeroPose["form"]): void {
+  const w = b.torsoW;
+  const top = shoulder.y - 1.6;
+  const bottom = hip.y + 1.8;
+  ctx.beginPath();
+  ctx.moveTo(shoulder.x - w * 0.44, top);
+  ctx.quadraticCurveTo(shoulder.x, top - 1.4, shoulder.x + w * 0.44, top);
+  ctx.quadraticCurveTo(hip.x + w * 0.62, (top + bottom) / 2, hip.x + w * 0.52, bottom);
+  ctx.quadraticCurveTo(hip.x, bottom + 1, hip.x - w * 0.52, bottom);
+  ctx.quadraticCurveTo(hip.x - w * 0.64, (top + bottom) / 2, shoulder.x - w * 0.44, top);
+  ctx.closePath();
+  fillStroke(ctx, linear(ctx, hip.x - w / 2, 0, hip.x + w / 2, 0, [
+    [0, C.hoodieDark],
+    [0.5, C.hoodie],
+    [0.85, C.hoodieLight],
+    [1, C.hoodie],
+  ]), OUTLINE, LINE);
+  // Ribbed hem.
+  ctx.fillStyle = C.hoodieDark;
+  ctx.fillRect(hip.x - w * 0.5, bottom - 1.6, w, 1.3);
+  // His name across the front, turned three-quarters with the body.
+  const cx = (shoulder.x + hip.x) / 2 - w * 0.1;
+  const cy = top + (bottom - top) * 0.5;
+  const size = form === "big" ? 5.2 : 3.8;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(0.86, 1);
+  ctx.font = `900 ${size}px "Arial Black", "Helvetica Neue", Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = C.print;
+  ctx.fillText("BUD", 0, 0);
+  ctx.restore();
+  // Kangaroo pocket.
+  if (form === "big") {
+    ctx.strokeStyle = C.hoodieLight;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(hip.x - w * 0.32, bottom - 2.2);
+    ctx.lineTo(hip.x - w * 0.22, bottom - 6);
+    ctx.lineTo(hip.x + w * 0.34, bottom - 6);
+    ctx.lineTo(hip.x + w * 0.44, bottom - 2.2);
+    ctx.stroke();
+  }
+}
+
+/** The hood bunched behind the neck. */
+function drawHood(ctx: Ctx, h: Point, shoulder: Point, b: Build): void {
+  const R = b.headR;
+  ellipse(ctx, shoulder.x - R * 0.62, h.y + R * 0.92, R * 0.55, R * 0.36, -0.3);
+  fillStroke(ctx, linear(ctx, 0, h.y + R * 0.5, 0, h.y + R * 1.4, [
+    [0, C.hoodieLight],
+    [1, C.hoodieDark],
+  ]), OUTLINE, LINE);
 }
 
 function drawHead(ctx: Ctx, h: Point, R: number, pose: HeroPose): void {
-  const { x, y } = h;
-  // Sprout growing from the crown.
   ctx.save();
-  ctx.translate(x + R * 0.05, y - R * 1.05);
-  ctx.rotate(pose.sprout);
-  ctx.strokeStyle = C.leafDark;
-  ctx.lineWidth = 1.1;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.quadraticCurveTo(R * 0.1, -R * 0.35, R * 0.05, -R * 0.55);
-  ctx.stroke();
-  for (const dir of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(R * 0.05, -R * 0.5);
-    ctx.bezierCurveTo(dir * R * 0.25, -R * 0.95, dir * R * 0.7, -R * 0.8, dir * R * 0.65, -R * 0.55);
-    ctx.bezierCurveTo(dir * R * 0.5, -R * 0.42, dir * R * 0.2, -R * 0.42, R * 0.05, -R * 0.5);
-    fillStroke(ctx, dir < 0 ? C.leaf : C.sprout, OUTLINE, 0.8);
-  }
-  ctx.restore();
-
-  // Leaf hood with a trailing, curling tip.
-  ctx.beginPath();
-  ctx.moveTo(x + R * 0.95, y + R * 0.3);
-  ctx.bezierCurveTo(x + R * 1.15, y - R * 0.95, x - R * 0.25, y - R * 1.4, x - R * 0.95, y - R * 0.65);
-  ctx.bezierCurveTo(x - R * 1.45, y - R * 0.35, x - R * 1.95, y + R * 0.1, x - R * 2.05, y + R * 0.45);
-  ctx.quadraticCurveTo(x - R * 1.35, y + R * 0.2, x - R * 0.95, y + R * 0.85);
-  ctx.bezierCurveTo(x - R * 0.3, y + R * 1.15, x + R * 0.65, y + R * 1.0, x + R * 0.95, y + R * 0.3);
-  ctx.closePath();
-  fillStroke(ctx, linear(ctx, x, y - R * 1.3, x - R * 0.3, y + R, [
-    [0, C.leafLight],
-    [0.45, C.leaf],
-    [1, C.leafDark],
-  ]), OUTLINE, LINE);
-  // Leaf vein and a glossy highlight.
-  ctx.strokeStyle = "rgba(20, 60, 30, 0.55)";
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(x + R * 0.1, y - R * 1.0);
-  ctx.quadraticCurveTo(x - R * 0.9, y - R * 0.55, x - R * 1.85, y + R * 0.35);
-  ctx.stroke();
-  for (let i = 1; i <= 3; i++) {
-    const t = i / 4;
-    const vx = x + R * 0.1 + (-R * 1.95) * t;
-    const vy = y - R * 1.0 + R * 1.3 * t * t;
-    ctx.beginPath();
-    ctx.moveTo(vx, vy);
-    ctx.lineTo(vx + R * 0.15, vy + R * 0.4);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(255, 255, 220, 0.5)";
-  ctx.lineWidth = 1.1;
-  ctx.beginPath();
-  ctx.arc(x + R * 0.05, y - R * 0.05, R * 0.95, -Math.PI * 0.82, -Math.PI * 0.55);
-  ctx.stroke();
-
-  // Face in the hood's opening.
-  const fx = x + R * 0.38;
-  const fy = y + R * 0.18;
-  ellipse(ctx, fx, fy, R * 0.68, R * 0.66);
-  fillStroke(ctx, radial(ctx, fx + R * 0.15, fy - R * 0.2, R * 0.9, [
-    [0, "#ffd8bc"],
-    [0.7, C.skin],
+  ctx.translate(h.x, h.y);
+  ctx.rotate(pose.tilt);
+  // Ear on the far side of the face (we see Bud three-quarters).
+  ellipse(ctx, -R * 0.62, R * 0.12, R * 0.3, R * 0.38);
+  fillStroke(ctx, radial(ctx, -R * 0.6, R * 0.1, R * 0.4, [
+    [0, C.skin],
     [1, C.skinShade],
   ]), OUTLINE, LINE);
-  // Hood brim shading the forehead.
+  ellipse(ctx, -R * 0.6, R * 0.14, R * 0.14, R * 0.2);
+  ctx.fillStyle = C.skinDeep;
+  ctx.fill();
+  // Big round head.
+  ellipse(ctx, 0, 0, R, R * 0.98);
+  fillStroke(ctx, radial(ctx, R * 0.25, -R * 0.15, R * 1.25, [
+    [0, "#ffffff"],
+    [0.55, C.skin],
+    [1, C.skinShade],
+  ], R * 0.35, -R * 0.3), OUTLINE, LINE);
+  // Cheek shading toward the back of the head.
+  ellipse(ctx, -R * 0.3, R * 0.35, R * 0.4, R * 0.3);
+  ctx.fillStyle = "rgba(140, 146, 162, 0.25)";
+  ctx.fill();
+  // Cap: crown, band and a brim pointing forward.
   ctx.beginPath();
-  ctx.moveTo(x - R * 0.2, y - R * 0.3);
-  ctx.quadraticCurveTo(x + R * 0.5, y - R * 0.72, x + R * 1.08, y - R * 0.18);
-  ctx.quadraticCurveTo(x + R * 0.5, y - R * 0.42, x - R * 0.2, y - R * 0.05);
+  ctx.moveTo(-R * 1.0, -R * 0.08);
+  ctx.bezierCurveTo(-R * 1.05, -R * 1.2, R * 1.0, -R * 1.25, R * 1.02, -R * 0.12);
+  ctx.quadraticCurveTo(0, -R * 0.3, -R * 1.0, -R * 0.08);
   ctx.closePath();
-  fillStroke(ctx, C.leafDark, OUTLINE, 0.6);
-  // Blush.
-  ctx.fillStyle = radial(ctx, fx + R * 0.32, fy + R * 0.28, R * 0.28, [
-    [0, "rgba(255, 120, 110, 0.55)"],
-    [1, "rgba(255, 120, 110, 0)"],
-  ]);
-  ctx.fillRect(fx, fy, R * 0.7, R * 0.6);
+  fillStroke(ctx, radial(ctx, R * 0.1, -R * 0.75, R * 1.2, [
+    [0, C.capLight],
+    [0.6, C.cap],
+    [1, "#08080a"],
+  ], R * 0.25, -R * 0.9), OUTLINE, LINE);
+  // Panel seams and the top button.
+  ctx.strokeStyle = "rgba(90, 90, 110, 0.6)";
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(R * 0.05, -R * 1.0);
+  ctx.quadraticCurveTo(R * 0.5, -R * 0.6, R * 0.55, -R * 0.2);
+  ctx.moveTo(R * 0.05, -R * 1.0);
+  ctx.quadraticCurveTo(-R * 0.4, -R * 0.6, -R * 0.45, -R * 0.15);
+  ctx.stroke();
+  ellipse(ctx, R * 0.05, -R * 1.02, R * 0.1, R * 0.06);
+  ctx.fillStyle = C.cap;
+  ctx.fill();
+  // Brim.
+  ctx.beginPath();
+  ctx.moveTo(R * 0.45, -R * 0.32);
+  ctx.quadraticCurveTo(R * 1.35, -R * 0.42, R * 1.62, -R * 0.12);
+  ctx.quadraticCurveTo(R * 1.25, -R * 0.02, R * 0.5, -R * 0.1);
+  ctx.closePath();
+  fillStroke(ctx, linear(ctx, 0, -R * 0.42, 0, -R * 0.02, [
+    [0, C.capLight],
+    [1, "#06060a"],
+  ]), OUTLINE, LINE);
+  // Bud's own mark on the cap: a bold B.
+  ctx.save();
+  ctx.translate(R * 0.42, -R * 0.62);
+  ctx.rotate(0.12);
+  ctx.scale(0.8, 1);
+  ctx.font = `900 ${R * 0.62}px Georgia, "Times New Roman", serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = R * 0.08;
+  ctx.strokeStyle = "#08080a";
+  ctx.strokeText("B", 0, 0);
+  ctx.fillStyle = "#f2f2f4";
+  ctx.fillText("B", 0, 0);
+  ctx.restore();
 
-  // Eyes (three-quarter view: the far eye is narrower).
-  for (const [ex, scale] of [
-    [fx - R * 0.2, 0.75],
-    [fx + R * 0.3, 1],
+  // Thick, confident brows angled down toward the nose.
+  ctx.fillStyle = C.brow;
+  for (const [x0, dir, s] of [
+    [R * 0.08, 1, 0.75],
+    [R * 0.55, 1, 1],
   ] as const) {
-    const ey = fy - R * 0.02;
+    ctx.beginPath();
+    ctx.moveTo(x0 - R * 0.2 * s, -R * 0.12);
+    ctx.quadraticCurveTo(x0, -R * 0.24, x0 + R * 0.24 * s * dir, -R * 0.06);
+    ctx.lineTo(x0 + R * 0.22 * s * dir, R * 0.0);
+    ctx.quadraticCurveTo(x0, -R * 0.14, x0 - R * 0.2 * s, -R * 0.05);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Eyes: big, glossy and heavy-lidded (three-quarter view: the far eye is narrower).
+  for (const [ex, scale] of [
+    [R * 0.12, 0.72],
+    [R * 0.58, 1],
+  ] as const) {
+    const ey = R * 0.18;
     if (pose.dizzy) {
       ctx.strokeStyle = C.eye;
       ctx.lineWidth = 0.9;
-      const s = R * 0.14 * scale;
+      const s = R * 0.13 * scale;
       ctx.beginPath();
       ctx.moveTo(ex - s, ey - s);
       ctx.lineTo(ex + s, ey + s);
@@ -270,98 +382,117 @@ function drawHead(ctx: Ctx, h: Point, R: number, pose: HeroPose): void {
       ctx.strokeStyle = C.eye;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.moveTo(ex - R * 0.13 * scale, ey);
-      ctx.quadraticCurveTo(ex, ey + R * 0.08, ex + R * 0.13 * scale, ey);
+      ctx.moveTo(ex - R * 0.14 * scale, ey);
+      ctx.quadraticCurveTo(ex, ey + R * 0.06, ex + R * 0.14 * scale, ey);
       ctx.stroke();
       continue;
     }
-    ellipse(ctx, ex, ey, R * 0.15 * scale, R * 0.21 * open);
+    ellipse(ctx, ex, ey, R * 0.17 * scale, R * 0.2 * open);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
-    ellipse(ctx, ex + R * 0.03, ey + R * 0.02, R * 0.11 * scale, R * 0.17 * open);
-    ctx.fillStyle = radial(ctx, ex + R * 0.03, ey + R * 0.05, R * 0.17, [
-      [0, "#6a3a2a"],
+    ellipse(ctx, ex + R * 0.03, ey + R * 0.02, R * 0.13 * scale, R * 0.17 * open);
+    ctx.fillStyle = radial(ctx, ex, ey, R * 0.18, [
+      [0, "#3a3a44"],
       [1, C.eye],
     ]);
     ctx.fill();
-    ellipse(ctx, ex + R * 0.07, ey - R * 0.07 * open, R * 0.045, R * 0.05 * open);
+    ellipse(ctx, ex + R * 0.07 * scale, ey - R * 0.06 * open, R * 0.05, R * 0.055 * open);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
-  }
-  // Smile.
-  ctx.strokeStyle = "#8a3a30";
-  ctx.lineWidth = 0.75;
-  ctx.beginPath();
-  if (pose.dizzy) ctx.ellipse(fx + R * 0.15, fy + R * 0.42, R * 0.1, R * 0.13, 0, 0, Math.PI * 2);
-  else ctx.arc(fx + R * 0.1, fy + R * 0.25, R * 0.2, Math.PI * 0.2, Math.PI * 0.75);
-  ctx.stroke();
-}
-
-function drawScarfWrap(ctx: Ctx, h: Point, b: Build): void {
-  const R = b.headR;
-  const y = h.y + R * 0.92;
-  roundRect(ctx, h.x - R * 0.75, y - R * 0.2, R * 1.75, R * 0.48, R * 0.24);
-  fillStroke(ctx, linear(ctx, 0, y - R * 0.2, 0, y + R * 0.28, [
-    [0, C.scarfLight],
-    [0.5, C.scarf],
-    [1, C.scarfDark],
-  ]), OUTLINE, LINE);
-  // Knitted ridges.
-  ctx.strokeStyle = "rgba(120, 30, 10, 0.35)";
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i < 5; i++) {
-    const sx = h.x - R * 0.55 + i * R * 0.33;
+    // Heavy upper lid: a flat, knowing look.
+    ctx.fillStyle = C.skinShade;
+    ctx.fillRect(ex - R * 0.19 * scale, ey - R * 0.22, R * 0.38 * scale, R * 0.1);
+    ctx.strokeStyle = C.eye;
+    ctx.lineWidth = 0.7;
     ctx.beginPath();
-    ctx.moveTo(sx, y - R * 0.12);
-    ctx.lineTo(sx, y + R * 0.2);
+    ctx.moveTo(ex - R * 0.19 * scale, ey - R * 0.12);
+    ctx.lineTo(ex + R * 0.2 * scale, ey - R * 0.1);
     ctx.stroke();
   }
-}
-
-/** The scarf's free end streams behind as a tapered, waving ribbon. */
-function drawScarfTail(ctx: Ctx, h: Point, b: Build, pose: HeroPose): void {
-  const R = b.headR;
-  const startX = h.x - R * 0.55;
-  const startY = h.y + R * 1.0;
-  const segments = 6;
-  const length = R * 2.1;
-  const pts: Point[] = [];
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const droop = (1 - pose.scarfLift) * t * t * R * 1.6;
-    const wave = Math.sin(pose.scarfPhase - t * 4.2) * R * 0.28 * t;
-    pts.push({ x: startX - t * length * (0.45 + pose.scarfLift * 0.55), y: startY + droop + wave });
-  }
-  const left: Point[] = [];
-  const right: Point[] = [];
-  for (let i = 0; i <= segments; i++) {
-    const p = pts[i]!;
-    const q = pts[Math.min(segments, i + 1)]!;
-    const o = pts[Math.max(0, i - 1)]!;
-    const dx = q.x - o.x;
-    const dy = q.y - o.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const half = R * 0.24 * (1 - (i / segments) * 0.45);
-    left.push({ x: p.x - (dy / len) * half, y: p.y + (dx / len) * half });
-    right.push({ x: p.x + (dy / len) * half, y: p.y - (dx / len) * half });
-  }
-  ctx.beginPath();
-  ctx.moveTo(left[0]!.x, left[0]!.y);
-  for (const p of left.slice(1)) ctx.lineTo(p.x, p.y);
-  for (const p of right.reverse()) ctx.lineTo(p.x, p.y);
-  ctx.closePath();
-  fillStroke(ctx, linear(ctx, startX, 0, startX - length, 0, [
-    [0, C.scarf],
-    [1, C.scarfDark],
-  ]), OUTLINE, LINE);
-  // Fringe at the end.
-  const end = pts[segments]!;
-  ctx.strokeStyle = C.scarfLight;
+  // Small nose.
+  ctx.strokeStyle = C.skinDeep;
   ctx.lineWidth = 0.6;
-  for (let i = -1; i <= 1; i++) {
+  ctx.beginPath();
+  ctx.moveTo(R * 0.86, R * 0.28);
+  ctx.quadraticCurveTo(R * 0.98, R * 0.38, R * 0.84, R * 0.44);
+  ctx.stroke();
+  // The smirk: one corner lifted.
+  ctx.strokeStyle = "#4a4c56";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  if (pose.dizzy) {
+    ctx.ellipse(R * 0.45, R * 0.62, R * 0.09, R * 0.12, 0, 0, Math.PI * 2);
+  } else {
+    ctx.moveTo(R * 0.2, R * 0.58);
+    ctx.quadraticCurveTo(R * 0.5, R * 0.7, R * 0.78, R * 0.5);
+  }
+  ctx.stroke();
+  if (!pose.dizzy) {
     ctx.beginPath();
-    ctx.moveTo(end.x, end.y + i * R * 0.12);
-    ctx.lineTo(end.x - R * 0.3, end.y + i * R * 0.18);
+    ctx.moveTo(R * 0.74, R * 0.47);
+    ctx.lineTo(R * 0.8, R * 0.53);
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Over-ear headphones resting around the neck. */
+function drawHeadphones(ctx: Ctx, h: Point, b: Build): void {
+  const R = b.headR;
+  const y = h.y + R * 0.95;
+  ctx.strokeStyle = C.phones;
+  ctx.lineWidth = R * 0.16;
+  ctx.beginPath();
+  ctx.ellipse(h.x + R * 0.05, y, R * 0.62, R * 0.2, 0, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+  // Far cup peeking behind, near cup in front.
+  for (const [cx, near] of [
+    [h.x - R * 0.48, false],
+    [h.x + R * 0.58, true],
+  ] as const) {
+    roundRect(ctx, cx - R * 0.2, y - R * 0.22, R * 0.4, R * 0.5, R * 0.16);
+    fillStroke(ctx, linear(ctx, cx - R * 0.2, 0, cx + R * 0.2, 0, [
+      [0, near ? C.phonesLight : "#2a2a32"],
+      [1, C.phones],
+    ]), OUTLINE, LINE * 0.8);
+    if (near) {
+      ellipse(ctx, cx - R * 0.02, y + R * 0.02, R * 0.08, R * 0.13);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.fill();
+    }
+  }
+}
+
+/** A red bandana tucked into the back pocket, hanging under the hoodie's hem and flapping with motion. */
+function drawBandana(ctx: Ctx, pocket: Point, b: Build, pose: HeroPose): void {
+  const r = b.limbR;
+  const len = r * (3.4 + pose.bandanaLift * 1.4);
+  const steps = 6;
+  const pts: Point[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const wave = Math.sin(pose.bandanaPhase - t * 3.4) * r * 0.55 * t;
+    pts.push({
+      x: pocket.x - t * len * (0.12 + pose.bandanaLift * 0.8) + wave * pose.bandanaLift,
+      y: pocket.y + t * len * (1 - pose.bandanaLift * 0.7) + wave * (1 - pose.bandanaLift),
+    });
+  }
+  // A folded cloth that narrows to its loose corner.
+  ctx.beginPath();
+  ctx.moveTo(pts[0]!.x - r * 1.1, pts[0]!.y);
+  for (let i = 1; i <= steps; i++) ctx.lineTo(pts[i]!.x - r * 1.1 * (1 - i / (steps + 1)), pts[i]!.y);
+  for (let i = steps; i >= 0; i--) ctx.lineTo(pts[i]!.x + r * 1.1 * (1 - i / (steps + 1)), pts[i]!.y + i * 0.1);
+  ctx.closePath();
+  fillStroke(ctx, linear(ctx, pocket.x, pocket.y, pts[steps]!.x, pts[steps]!.y, [
+    [0, C.bandanaDark],
+    [0.3, C.bandana],
+    [1, C.bandanaLight],
+  ]), OUTLINE, LINE * 0.9);
+  // Paisley-style flecks.
+  ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+  for (let i = 1; i < steps; i++) {
+    const p = pts[i]!;
+    ellipse(ctx, p.x + (i % 2 ? 0.35 : -0.35) * r, p.y, r * 0.17, r * 0.11, i);
+    ctx.fill();
   }
 }

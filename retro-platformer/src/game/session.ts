@@ -11,8 +11,10 @@ export interface Session {
   checkpoint: number;
   /** The hero's form carries over between levels (but not deaths). */
   form: Form;
+  /** God mode (the title screen's hidden block): no damage, no death; pits put the hero back on solid ground. */
+  god: boolean;
 }
 
-export function newSession(): Session {
-  return { score: 0, coins: 0, lives: RULES.startLives, levelIndex: 0, checkpoint: -1, form: "small" };
+export function newSession(god = false): Session {
+  return { score: 0, coins: 0, lives: RULES.startLives, levelIndex: 0, checkpoint: -1, form: "small", god };
 }

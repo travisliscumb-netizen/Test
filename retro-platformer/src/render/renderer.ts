@@ -1,11 +1,10 @@
 import type { Placement, SafeInsets } from "../core/display";
 import { drawCoin } from "../gfx/art/coin";
 import { drawPennant } from "../gfx/art/flag";
-import { drawGrub } from "../gfx/art/grub";
+import { ROSTERS, pick, type Roster } from "../gfx/art/critters";
 import { drawHero } from "../gfx/art/hero";
 import { heroPose, type HeroState } from "../gfx/art/heroPose";
 import { MATERIALS } from "../gfx/art/materials";
-import { drawShellback } from "../gfx/art/shellback";
 import { drawSprout } from "../gfx/art/sprout";
 import { drawBrickChunk } from "../gfx/art/tiles/brick";
 import { MYSTERY_FRAMES } from "../gfx/art/tiles/blocks";
@@ -15,6 +14,7 @@ import { OUTLINE, ellipse, groundShadow, linear, radial, rgba, roundRect, seeded
 import { shellWaking, type Enemy } from "../entities/enemies";
 import { DUST_FRAMES, type Effect, type Sprout } from "../entities/items";
 import type { Game } from "../game/game";
+import { godBlockRect } from "../game/godBlock";
 import type { World } from "../game/world";
 import { FLAG_TOP_ROW } from "../world/level";
 import { Tile } from "../world/tiles";
@@ -111,7 +111,7 @@ export class Renderer {
     this.drawTiles(f, world, theme, camDev);
     this.drawFlag(f, world, cam);
     for (const sp of world.items) if (sp.state === "move") this.drawSprout(f, sp, cam, alpha, world.frame);
-    for (const e of world.enemies) this.drawEnemy(f, e, cam, alpha, world.frame);
+    for (const e of world.enemies) this.drawEnemy(f, e, cam, alpha, world.frame, ROSTERS[world.level.theme]);
     if (!hidePlayer && !world.playerHidden) this.drawPlayer(f, world, cam, alpha);
     for (const fx of world.effects) this.drawEffect(f, fx, world, cam, alpha);
   }
@@ -128,8 +128,16 @@ export class Renderer {
       const offset = (cam * layer.factor + frame * layer.drift) * p.scale;
       let x = p.x - (((offset % w) + w) % w);
       while (x > c.x) x -= w;
+      const top = Math.round(p.y + layer.y * p.scale);
+      const bottom = top + Math.round(h);
+      // A layer reaching the view's bottom continues into any slack below it, so pits stay dark all the way down.
+      const extend = layer.y + layer.surface.height / layer.scale >= VIEW_HEIGHT && c.y + c.height > bottom ? c.y + c.height - bottom : 0;
       for (; x < c.x + c.width; x += w) {
-        ctx.drawImage(layer.surface, Math.round(x), Math.round(p.y + layer.y * p.scale), Math.ceil(w) + 1, Math.round(h));
+        ctx.drawImage(layer.surface, Math.round(x), top, Math.ceil(w) + 1, Math.round(h));
+        if (extend > 0) {
+          const sh = layer.surface.height;
+          ctx.drawImage(layer.surface, 0, sh - 1, layer.surface.width, 1, Math.round(x), bottom - 1, Math.ceil(w) + 1, extend + 1);
+        }
       }
     }
     this.drawAmbient(f, theme, cam, frame);
@@ -270,34 +278,36 @@ export class Renderer {
     drawSprout(f.ctx, frame);
   }
 
-  private drawEnemy(f: Frame, e: Enemy, cam: number, alpha: number, frame: number): void {
+  private drawEnemy(f: Frame, e: Enemy, cam: number, alpha: number, frame: number, roster: Roster): void {
     const ctx = f.ctx;
     const x = lerp(e.prevX, e.x, alpha) + e.w / 2;
     const y = lerp(e.prevY, e.y, alpha) + e.h;
+    const walker = e.kind === "walker" ? pick(roster.walkers, e.variant) : null;
+    const shell = e.kind === "shell" ? pick(roster.shells, e.variant) : null;
     if (e.state === "flipped") {
       // Knocked out: drawn upside down about its middle.
       this.atFeet(f, x, y - e.h / 2, cam, e.dir);
       ctx.scale(1, -1);
       ctx.translate(0, -e.h / 2);
-      if (e.kind === "walker") drawGrub(ctx, { step: 0, state: "walk" });
-      else drawShellback(ctx, { state: "shell", step: 0, spin: frame * 0.2 });
+      walker?.draw(ctx, 0, false);
+      shell?.draw(ctx, "shell", 0, frame * 0.2);
       return;
     }
     this.atFeet(f, x, y, cam, e.dir);
     if (e.onGround) groundShadow(ctx, 0, 0, e.kind === "walker" ? 13 : 14);
     if (e.kind === "walker") {
-      drawGrub(ctx, { step: e.stride * 0.35, state: e.state === "squashed" ? "squashed" : "walk" });
+      walker!.draw(ctx, e.stride * 0.35, e.state === "squashed");
       return;
     }
     if (e.state === "walk") {
-      drawShellback(ctx, { state: "walk", step: e.stride * 0.3, spin: 0 });
+      shell!.draw(ctx, "walk", e.stride * 0.3, 0);
     } else if (e.state === "slide") {
       // Mirrored when moving left, so spinning "forward" is always the same sign here.
-      drawShellback(ctx, { state: "shell", step: 0, spin: (e.x * e.dir) / 11 });
+      shell!.draw(ctx, "shell", 0, (e.x * e.dir) / 11);
     } else {
       const waking = shellWaking(e);
       if (waking) ctx.translate(Math.sin(frame * 1.3) * 0.9, 0);
-      drawShellback(ctx, { state: waking ? "peek" : "shell", step: 0, spin: 0 });
+      shell!.draw(ctx, waking ? "peek" : "shell", 0, 0);
     }
   }
 
@@ -323,6 +333,16 @@ export class Renderer {
     };
     this.atFeet(f, x, y, cam, dead ? 1 : p.facing);
     if (p.onGround && !dead) groundShadow(ctx, 0, 0, form === "big" ? 13 : 11);
+    if (world.session.god && !dead) {
+      // God mode: a faint golden aura, the only sign of it in play.
+      const h = form === "big" ? 44 : 28;
+      const pulse = 0.16 + 0.06 * Math.sin(world.frame * 0.08);
+      ctx.fillStyle = radial(ctx, 0, -h / 2, h * 0.75, [
+        [0, rgba("#ffe27a", pulse)],
+        [1, rgba("#ffe27a", 0)],
+      ]);
+      ctx.fillRect(-h, -h * 1.3, h * 2, h * 1.6);
+    }
     // Flicker while invulnerable.
     if (world.invuln > 0) ctx.globalAlpha = Math.floor(world.frame / 3) % 2 === 0 ? 0.35 : 0.9;
     drawHero(ctx, heroPose(state));
@@ -453,20 +473,21 @@ export class Renderer {
       [0, "rgba(10, 6, 30, 0)"],
       [1, "rgba(10, 6, 30, 0.55)"],
     ]));
+    this.drawGodBlock(f, game);
     this.viewTransform(f);
     const bob = Math.sin(game.timer * 0.04) * 3;
     ctx.save();
     ctx.translate(cx, 112 + bob);
     ctx.rotate(-0.03);
-    this.text(ctx, "Sprout", 0, -32, 76, linear(ctx, 0, -70, 0, 6, [
-      [0, "#d8ffb0"],
-      [0.5, "#6fd05a"],
-      [1, "#2a8a3a"],
+    this.text(ctx, "Bud's", 0, -32, 76, linear(ctx, 0, -70, 0, 6, [
+      [0, "#ffffff"],
+      [0.55, "#d8dce6"],
+      [1, "#8a90a2"],
     ]), "center");
-    this.text(ctx, "Quest", 0, 42, 76, linear(ctx, 0, 4, 0, 80, [
-      [0, "#fff6b0"],
-      [0.5, "#ffc830"],
-      [1, "#d07a00"],
+    this.text(ctx, "Takeover", 0, 42, 76, linear(ctx, 0, 4, 0, 80, [
+      [0, "#ff8a7a"],
+      [0.5, "#e8322a"],
+      [1, "#9a1414"],
     ]), "center");
     ctx.restore();
     ctx.globalAlpha = 0.8 + 0.2 * Math.sin(game.timer * 0.08);
@@ -475,6 +496,38 @@ export class Renderer {
     const hints = game.touchMode ? ["Pad: move (push to the edge to run)", "A: jump   B: run"] : ["Arrows: move   Z: jump   X: run", "Enter: pause   M: mute"];
     hints.forEach((h, i) => this.text(ctx, h, cx, 318 + i * 22, 14, "rgba(255, 255, 255, 0.95)", "center"));
     this.text(ctx, `Best  ${String(game.highScore).padStart(7, "0")}`, cx, 372, 16, "#ffe25a", "center");
+  }
+
+  /**
+   * The lone block floating in the title sky: an ordinary-looking brick from
+   * the backdrop's theme. Tapping it toggles God mode (no label, by design);
+   * when on it carries a faint golden glow, and each toggle flashes it.
+   */
+  private drawGodBlock(f: Frame, game: Game): void {
+    const ctx = f.ctx;
+    const p = f.placement;
+    const r = godBlockRect(f.viewW);
+    const tile = this.art!.theme(game.backdrop.level.theme).brick;
+    const size = this.art!.tilePx;
+    const x = Math.round(p.x + r.x * p.scale);
+    const y = Math.round(p.y + r.y * p.scale);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (game.godMode) {
+      const pulse = 0.22 + 0.08 * Math.sin(game.timer * 0.06);
+      ctx.fillStyle = radial(ctx, x + size / 2, y + size / 2, size * 1.1, [
+        [0, rgba("#ffd84a", pulse)],
+        [1, rgba("#ffd84a", 0)],
+      ]);
+      ctx.fillRect(x - size, y - size, size * 3, size * 3);
+    }
+    ctx.drawImage(tile, x, y);
+    if (game.godToggledAt !== null) {
+      const t = (game.timer - game.godToggledAt) / 24;
+      if (t < 1) {
+        ctx.fillStyle = rgba(game.godMode ? "#fff4c0" : "#ffffff", 0.85 * (1 - t));
+        ctx.fillRect(x, y, size, size);
+      }
+    }
   }
 
   private drawIntro(f: Frame, game: Game): void {
@@ -493,7 +546,7 @@ export class Renderer {
   }
 
   private drawEnding(f: Frame, game: Game): void {
-    this.drawCard(f, game, "The gardens bloom again!", "Thank you for playing", "#86dd6c");
+    this.drawCard(f, game, "Bud runs this town now!", "Thank you for playing", "#ff5a4a");
     this.text(f.ctx, `Final score  ${String(game.session.score).padStart(7, "0")}`, f.viewW / 2, 320, 20, "#ffe25a", "center");
   }
 

@@ -1,6 +1,6 @@
-# Sprout Quest
+# Bud's Takeover
 
-An original side-scrolling platformer with the mechanics and game feel of a 1985 console classic. Guide **Moss** through four gardens, stomp **Grubs**, kick **Shellback** shells, grow with **Sprouts**, and reach the flag.
+An original side-scrolling platformer with the mechanics and game feel of a 1985 console classic. Take **Bud** (black cap, black hoodie with his name on it, headphones round his neck, red bandana, white sneakers) across four parts of town: Main Street, Corner Park, a construction site and downtown. Stomp the local critters, kick the ones that tuck into shells, cans and hard hats, grow with **Sprouts**, and reach the flag.
 
 Everything is made in code: smooth hand-painted-style vector art drawn at your screen's native resolution, text-file levels, and a WebAudio chiptune synth. The build is **one self-contained `index.html`** that runs from disk, including on an iPhone from Dropbox.
 
@@ -28,8 +28,8 @@ npm run test:e2e     # builds, then runs Playwright against dist/index.html
 
 Dev-only pages served by `npm run dev`:
 
-- `/tools/art.html?scale=4`: every character pose, tile and world material, painted large.
-- `/tools/levels.html?level=2`: a whole level rendered in one image.
+- `/tools/art.html?scale=4`: every pose of Bud, every critter, tile and world material, painted large.
+- `/tools/levels.html?level=2&enemies=1`: a whole level rendered in one image (`enemies=1` places every critter at its spawn).
 
 ## Layout
 
@@ -55,9 +55,9 @@ tools/               dev pages and a screenshot helper
 Each level is a text file: a short header, then exactly 15 rows of equal width.
 
 ```
-name: Meadow Run
-theme: meadow        # meadow | cavern | dusk | fortress
-time: 400
+name: Main Street
+theme: street        # street | park | construction | downtown
+time: 450
 ---
 <15 rows>
 ```
@@ -66,8 +66,8 @@ time: 400
 |---|---|---|---|
 | `.` | empty | `S` | hero start (must be directly above solid ground) |
 | `#` | ground | `C` | checkpoint (likewise) |
-| `B` | brick | `g` | Grub |
-| `M` | brick that pays coins | `k` | Shellback |
+| `B` | brick | `g` | ground-walker (critter from the theme's roster) |
+| `M` | brick that pays coins | `k` | shell type (tucks in when stomped, then kicks) |
 | `?` | mystery block (coin) | `F` | flagpole (the cell is its stone base) |
 | `P` | mystery block (Sprout) | `T` | goal tower, bottom-left cell (4×6 tiles) |
 | `X` | stone block | `o` | coin |
@@ -81,8 +81,9 @@ All art is painted in code with Canvas 2D (paths, gradients, outlines), one modu
 
 | Module | Draws | Coordinate frame |
 |---|---|---|
-| `hero.ts` (+ `heroPose.ts`) | Moss, posed from joint angles | origin at the feet, facing right |
-| `grub.ts`, `shellback.ts`, `sprout.ts` | enemies and the power-up | origin at the feet, facing right |
+| `hero.ts` (+ `heroPose.ts`) | Bud, posed from joint angles | origin at the feet, facing right |
+| `critters/*.ts` | the ten critters, one file each; `critters/index.ts` lists which live in which theme | origin at the feet, facing right |
+| `sprout.ts` | the power-up | origin at the base |
 | `coin.ts`, `flag.ts`, `goalTower.ts` | coin spin, flagpole, goal tower | see each file |
 | `tiles/*.ts` | ground, brick, stone, blocks, pipes | a 32×32 cell |
 | `materials.ts` | each world's colours | — |

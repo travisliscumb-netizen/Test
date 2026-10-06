@@ -68,7 +68,8 @@ export const PLAYER = {
   stompBounce: 8,
   stompBounceHeld: 10,
 
-  hurtInvulnFrames: msToFrames(2000),
+  /** Bud's Takeover difficulty tweak: 2000 → 2500 ms of mercy after a hit. */
+  hurtInvulnFrames: msToFrames(2500),
   transformFrames: msToFrames(800),
   deathPauseFrames: msToFrames(500),
   deathLaunchSpeed: 10,
@@ -85,8 +86,16 @@ export const ENEMY = {
   activateMargin: TILE * 2,
   /** Discard entities that fall this far behind the left edge of the view. */
   despawnMargin: TILE * 4,
-  /** A falling player counts as stomping if its bottom was within this distance below the enemy top last frame. */
-  stompTolerance: 12,
+  /**
+   * A falling player counts as stomping if its bottom was within this distance below the enemy top last frame.
+   * Bud's Takeover difficulty tweak: 12 → 16, so late stomps count more often.
+   */
+  stompTolerance: 16,
+  /**
+   * Bud's Takeover difficulty tweak: contact hurts only when the player overlaps the enemy's box shrunk by this
+   * much on each side, so grazing a critter's edge is forgiven. Stomps and shell kicks still use the full box.
+   */
+  hurtInset: 3,
 
   walker: { width: 24, height: 24, speed: 256 / 256, squashFrames: msToFrames(500) },
   shell: {

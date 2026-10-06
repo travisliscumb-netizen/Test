@@ -2,9 +2,11 @@ import type { SolidGrid } from "../world/collision";
 import { ENEMY } from "../tuning";
 import { fallThrough, ledgeAhead, makeActor, resizeKeepingFeet, walkPhysics, type Actor } from "./actor";
 
-/** Grub: walks, turns at walls, walks off ledges. Stomp squashes it. */
+/** Ground-walker: walks, turns at walls, walks off ledges. Stomp squashes it. */
 export interface Walker extends Actor {
   kind: "walker";
+  /** Cosmetic only: which critter of the level's roster draws it. */
+  variant: number;
   state: "walk" | "squashed" | "flipped";
   timer: number;
   /** Distance walked, drives the animation. */
@@ -12,12 +14,14 @@ export interface Walker extends Actor {
 }
 
 /**
- * Shellback: walks and turns at ledges. Stomp → shell; touching or stomping a
+ * Shell type: walks and turns at ledges. Stomp → shell; touching or stomping a
  * still shell kicks it; a sliding shell knocks out other enemies; stomping a
  * sliding shell stops it. A still shell eventually wakes up.
  */
 export interface Shellback extends Actor {
   kind: "shell";
+  /** Cosmetic only: which critter of the level's roster draws it. */
+  variant: number;
   state: "walk" | "shell" | "slide" | "flipped";
   /** Frames spent in the current state. */
   timer: number;
@@ -30,14 +34,14 @@ export interface Shellback extends Actor {
 
 export type Enemy = Walker | Shellback;
 
-export function createWalker(tx: number, ty: number): Walker {
+export function createWalker(tx: number, ty: number, variant = 0): Walker {
   const a = makeActor(tx, ty, ENEMY.walker.width, ENEMY.walker.height);
-  return { ...a, kind: "walker", state: "walk", timer: 0, stride: 0 };
+  return { ...a, kind: "walker", variant, state: "walk", timer: 0, stride: 0 };
 }
 
-export function createShellback(tx: number, ty: number): Shellback {
+export function createShellback(tx: number, ty: number, variant = 0): Shellback {
   const a = makeActor(tx, ty, ENEMY.shell.width, ENEMY.shell.walkHeight);
-  return { ...a, kind: "shell", state: "walk", timer: 0, kickGrace: 0, chain: 0, stride: 0 };
+  return { ...a, kind: "shell", variant, state: "walk", timer: 0, kickGrace: 0, chain: 0, stride: 0 };
 }
 
 /** Knocked out (by a shell or a block from below): flips over and falls off the screen. */

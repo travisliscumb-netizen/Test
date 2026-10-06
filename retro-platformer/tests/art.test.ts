@@ -3,13 +3,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { drawCoin } from "../src/gfx/art/coin";
 import { drawFinial, drawPennant, drawPole } from "../src/gfx/art/flag";
 import { TOWER_HEIGHT, TOWER_WIDTH, drawGoalTower } from "../src/gfx/art/goalTower";
-import { drawGrub } from "../src/gfx/art/grub";
+import { ROSTERS, SHELL_SKINS, WALKER_SKINS } from "../src/gfx/art/critters";
 import { BUILDS, drawHero, lowestFoot } from "../src/gfx/art/hero";
 import { heroPose, type HeroState } from "../src/gfx/art/heroPose";
-import { drawShellback } from "../src/gfx/art/shellback";
 import { drawSprout } from "../src/gfx/art/sprout";
-import { ArtCache, COIN_FRAMES, GROUND_VARIANTS } from "../src/gfx/artCache";
+import { ArtCache, COIN_FRAMES, GROUND_VARIANTS, bakeLayer } from "../src/gfx/artCache";
 import { BACKDROPS } from "../src/gfx/backdrops";
+import { tint } from "../src/gfx/backdrops/shapes";
 import { context, makeSurface, setSurfaceFactory, type Ctx, type Surface } from "../src/gfx/paint";
 import { THEMES } from "../src/world/level";
 import { VIEW_HEIGHT, VIEW_MAX_WIDTH } from "../src/tuning";
@@ -91,7 +91,7 @@ describe("hero", () => {
   it("produces finite poses for any input", () => {
     for (let i = 0; i < 300; i++) {
       const pose = heroPose({ ...base, onGround: i % 2 === 0, vx: (i % 13) - 6, vy: (i % 21) - 10, stride: i * 3.7, frame: i * 11, sinceLanding: i % 9, sinceJump: i % 7, skidding: i % 5 === 0 });
-      for (const v of [pose.lean, pose.stretch, pose.frontLeg.swing, pose.backArm.bend, pose.scarfLift]) expect(Number.isFinite(v)).toBe(true);
+      for (const v of [pose.lean, pose.stretch, pose.frontLeg.swing, pose.backArm.bend, pose.bandanaLift, pose.tilt]) expect(Number.isFinite(v)).toBe(true);
     }
   });
 
@@ -101,16 +101,32 @@ describe("hero", () => {
 });
 
 describe("enemies, items and goal", () => {
-  it("Grub walks and squashes within its box", () => {
-    for (const step of [0, 1, 2, 3]) expect(paint(40, 34, 20, 30, (ctx) => drawGrub(ctx, { step, state: "walk" })).edgeOpaque).toBe(0);
-    expect(paint(40, 34, 20, 30, (ctx) => drawGrub(ctx, { step: 0, state: "squashed" })).opaque).toBeGreaterThan(200);
+  it.each(Object.entries(WALKER_SKINS))("walker %s walks and squashes within its box", (_k, skin) => {
+    for (const step of [0, 0.7, 1.5, 2.3, 3.1, 4.4]) {
+      const r = paint(40, 34, 20, 30, (ctx) => skin.draw(ctx, step, false));
+      expect(r.opaque, `step ${step}`).toBeGreaterThan(400);
+      expect(r.edgeOpaque, `step ${step}`).toBe(0);
+    }
+    const squashed = paint(40, 34, 20, 30, (ctx) => skin.draw(ctx, 0, true));
+    expect(squashed.opaque).toBeGreaterThan(200);
+    expect(squashed.edgeOpaque).toBe(0);
   });
 
-  it("Shellback walks, hides and peeks within its box", () => {
+  it.each(Object.entries(SHELL_SKINS))("shell type %s walks, hides and peeks within its box", (_k, skin) => {
     for (const state of ["walk", "shell", "peek"] as const) {
-      const r = paint(50, 40, 22, 36, (ctx) => drawShellback(ctx, { state, step: 1, spin: 2 }));
-      expect(r.opaque, state).toBeGreaterThan(500);
-      expect(r.edgeOpaque, state).toBe(0);
+      for (const [step, spin] of [[0, 0], [1, 2], [2.5, 4]] as const) {
+        const r = paint(50, 40, 22, 36, (ctx) => skin.draw(ctx, state, step, spin));
+        expect(r.opaque, state).toBeGreaterThan(500);
+        expect(r.edgeOpaque, state).toBe(0);
+      }
+    }
+  });
+
+  it("every theme has at least three critters, all ground-based kinds from the two enemy types", () => {
+    for (const r of Object.values(ROSTERS)) {
+      expect(new Set([...r.walkers, ...r.shells]).size).toBeGreaterThanOrEqual(3);
+      expect(r.walkers.length).toBeGreaterThan(0);
+      expect(r.shells.length).toBeGreaterThan(0);
     }
   });
 
@@ -171,10 +187,9 @@ describe("backdrops", () => {
     for (const layer of b.layers) {
       expect(layer.factor).toBeGreaterThanOrEqual(0);
       expect(layer.factor).toBeLessThan(1);
-      const s = makeSurface(layer.width / 4, layer.height / 4);
+      // A quarter scale, which leaves some layers a fractional number of pixels tall.
+      const s = bakeLayer(layer, 0.25);
       const ctx = context(s);
-      ctx.setTransform(0.25, 0, 0, 0.25, 0, 0);
-      layer.paint(ctx);
       if (layer.y + layer.height >= VIEW_HEIGHT) {
         const row = ctx.getImageData(0, s.height - 1, s.width, 1).data;
         let solid = 0;
@@ -185,8 +200,20 @@ describe("backdrops", () => {
     expect(bottomCovered).toBe(true);
   });
 
+  it("tint() hazes only what is painted, leaving a layer's transparent sky clear", () => {
+    const s = makeSurface(20, 20);
+    const ctx = context(s);
+    ctx.fillStyle = "#336699";
+    ctx.fillRect(0, 10, 20, 10);
+    tint(ctx, "rgba(0, 0, 0, 0.5)", 20, 20);
+    expect(ctx.getImageData(5, 2, 1, 1).data[3]).toBe(0);
+    const below = ctx.getImageData(5, 15, 1, 1).data;
+    expect(below[3]).toBe(255);
+    expect(below[2]).toBeLessThan(0x99);
+  });
+
   it("layers holding a single sun or moon are wider than the widest view", () => {
-    for (const theme of ["meadow", "dusk", "fortress"] as const) {
+    for (const theme of ["street", "construction", "downtown"] as const) {
       expect(BACKDROPS[theme]().layers[0]!.width).toBeGreaterThan(VIEW_MAX_WIDTH);
     }
   });

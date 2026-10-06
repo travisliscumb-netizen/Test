@@ -3,6 +3,7 @@ import { Display } from "./core/display";
 import { InputHub, attachKeyboard } from "./core/input";
 import { FrameBudget } from "./core/frameBudget";
 import { runLoop } from "./core/loop";
+import { readStored, writeStored } from "./core/storage";
 import { attachTouch } from "./core/touch";
 import { Game } from "./game/game";
 import { loadLevels } from "./levels";
@@ -11,23 +12,16 @@ import { World } from "./game/world";
 import type { LevelData } from "./world/level";
 import { TILE } from "./tuning";
 
-const HIGH_SCORE_KEY = "sprout-quest:high-score";
+const HIGH_SCORE_KEY = "buds-takeover:high-score";
+const LEGACY_HIGH_SCORE_KEY = "sprout-quest:high-score";
 
 function loadHighScore(): number {
-  try {
-    const n = Number(localStorage.getItem(HIGH_SCORE_KEY));
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  } catch {
-    return 0;
-  }
+  const n = Number(readStored(HIGH_SCORE_KEY, LEGACY_HIGH_SCORE_KEY));
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
 
 function saveHighScore(score: number): void {
-  try {
-    localStorage.setItem(HIGH_SCORE_KEY, String(score));
-  } catch {
-    // Storage may be unavailable (private browsing, file://); the score just won't persist.
-  }
+  writeStored(HIGH_SCORE_KEY, String(score));
 }
 
 /** Read-only state for automated tests and debugging. */
@@ -37,17 +31,21 @@ export interface Snapshot {
   renderScale: number;
   /** Logical view width in pixels (32 per tile). */
   viewWidth: number;
+  /** Where the logical view sits on the canvas, in canvas pixels. */
+  placement: { x: number; y: number; scale: number };
   phase: string | null;
   level: number;
   score: number;
   coins: number;
   lives: number;
+  /** God mode as armed on the title screen, and whether the current run has it. */
+  god: { armed: boolean; active: boolean };
   player: { x: number; y: number; form: string } | null;
 }
 
 declare global {
   interface Window {
-    __sproutQuest?: { snapshot(): Snapshot };
+    __budsTakeover?: { snapshot(): Snapshot };
   }
 }
 
@@ -80,6 +78,16 @@ function start(): void {
 
   attachTouch(hub, touchRoot, () => (game.touchMode = true));
 
+  // Taps and clicks on the picture (mouse or finger; pointer events still fire under the touch overlay).
+  window.addEventListener("pointerdown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const p = display.placement;
+    const px = ((e.clientX - rect.left) * canvas.width) / rect.width;
+    const py = ((e.clientY - rect.top) * canvas.height) / rect.height;
+    game.tap((px - p.x) / p.scale, (py - p.y) / p.scale);
+  });
+
   document.addEventListener("visibilitychange", () => {
     audio.setHidden(document.hidden);
     hub.releaseAll();
@@ -90,16 +98,18 @@ function start(): void {
   });
   window.addEventListener("blur", () => game.requestPause());
 
-  window.__sproutQuest = {
+  window.__budsTakeover = {
     snapshot: () => ({
       mode: game.mode,
       renderScale: display.placement.scale,
       viewWidth: display.viewWidth,
+      placement: { x: display.placement.x, y: display.placement.y, scale: display.placement.scale },
       phase: game.world?.phase ?? null,
       level: game.session.levelIndex,
       score: game.session.score,
       coins: game.session.coins,
       lives: game.session.lives,
+      god: { armed: game.godMode, active: game.session.god },
       player: game.world ? { x: game.world.player.x, y: game.world.player.y, form: game.world.player.form } : null,
     }),
   };

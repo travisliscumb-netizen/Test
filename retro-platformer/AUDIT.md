@@ -93,3 +93,78 @@ npx playwright test  5 passed (rotation, smoke, pause, touch, touch pause)
 ```
 
 **Limit:** frame-rate figures come from headless Chromium rasterising on the CPU. The adaptive resolution is the safeguard for real devices; it has not been measured on an iPhone.
+
+## Third round: Bud's Takeover reskin
+
+A reskin, a light difficulty tweak, a hidden Easter egg and a bug sweep. Not a rebuild: no level geometry, platform position or enemy mechanic changed.
+
+### Proof that what had to stay the same did
+
+- **Level maps:** byte-identical to the previous commit in all four levels (`cmp` of the 15 map rows); only the name, theme and time header lines changed.
+- **Golden test** (`tests/golden.test.ts`): hashes recorded from the previous commit cover:
+  - every tile, the start, flag, goal and checkpoints;
+  - every enemy spawn;
+  - a 900-frame patrol of every enemy;
+  - a 1,500-frame scripted run of the hero.
+
+  All four levels match. Mutation checks: changing one tile in level 2 fails that level, and changing `maxFallSpeed` by 0.01 fails all four.
+- **Reachability:** every level can still be finished from its start and every checkpoint, with and without the run button.
+
+### Bugs found and fixed
+
+| # | Found | Fix | Proof |
+|---|---|---|---|
+| 1 | A backdrop layer whose scaled height isn't a whole number of pixels has a half-painted last row. The renderer stretches that row into any slack below the view, so it could show as a pale strip under pits | `bakeLayer` replaces the partial row with a copy of the last whole one | The backdrop test now bakes with the real `bakeLayer` at a scale that leaves fractional heights; it failed before the fix |
+| 2 | The full-layer haze fills (5 layers across 3 themes) also tinted the transparent sky around the scenery, leaving a faint rectangular band | New `tint()` paints only over pixels already drawn (`source-atop`) | Unit test: a tinted layer's empty pixels stay fully transparent |
+| 3 | The street's shop fronts (awnings, windows, signs) sat 6–64 px below the ground line: hidden behind the ground, visible only at the bottom of pits | Raised the layer so the shop fronts end at the ground line | Screenshots of Main Street before and after |
+| 4 | Bud's chest print was hidden by his arms and hood in most poses; his bandana, trailing from his hand, read as a blade | Front shoulder moved to the torso's leading edge, print lowered, hood smaller; bandana moved to the back pocket | Art preview of every pose |
+| 5 | `BUILDS.small` had a garbled `headY` entry, and `drawArm` an unused parameter | Corrected; removed | Type-check; art tests |
+| 6 | Three critters (rat, squirrel, spider) poked out of their art boxes on some frames | Trimmed tail, whiskers and leg reach | The art test checks every critter, every walk phase and state, stays in its box |
+| 7 | The rebar spider was nearly invisible on the downtown night sky | Lighter body and legs, with legs drawn behind the body | Downtown screenshot |
+| 8 | Docs and comments still described Moss, Grubs, Shellbacks and the old level names and themes | Updated README, DECISIONS, the level-format comment and the debug hook's name | Search for old names: only the legacy storage keys remain, kept on purpose so saved high scores and the mute setting carry over |
+
+### Every change
+
+- **Rename to Bud's Takeover:** title screen, page title, metadata, `package.json`, favicon (a cap), the ending text and the debug hook (`window.__budsTakeover`). Stored high score and mute setting migrate from the old keys.
+- **Bud:** new hero art posed by the existing skeleton:
+  - black cap with his own "B";
+  - black hoodie with "BUD" across the front;
+  - headphones round his neck, red bandana in his back pocket, chunky white sneakers;
+  - heavy-lidded eyes and a smirk.
+
+  He walks with a hand in his pocket, leans back when idle, and pumps both arms when running. His hitbox and physics are unchanged.
+- **Themes and backdrops:** see the sub-list below.
+- **Critters:** ten original ground-based critters, one module each in `src/gfx/art/critters/`, assigned per theme (rosters in DECISIONS). Grub and Shellback art were deleted. Enemies gained a cosmetic `variant` number, fixed by their order among their kind in the level file.
+- **Difficulty:**
+  - invulnerability after a hit 2.0 → 2.5 s;
+  - stomp window 12 → 16 px;
+  - side contact forgiven up to 3 px;
+  - each level's clock +50 s.
+
+  No enemy speeds or physics changed (`tests/difficulty.test.ts`).
+- **God mode:** the title screen's lone floating brick toggles it, with a flash and a sound; it glows faintly while armed. It means no damage, no time-out, a rescue from pits to the last ground stood on, and a faint aura on Bud. There is no on-screen label.
+- **Tools:**
+  - `tools/art.html` shows every critter and the rosters;
+  - `tools/levels.html?enemies=1` shows every critter at its spawn.
+
+**Themes and backdrops.** The first four of the requested theme order are used, each with its own tiles and music:
+
+1. Street: sidewalk, red brick, a shop row with awnings and invented signs, lamps and trees.
+2. Park: grass, mossy stone, ponds, benches, flower hedges.
+3. Construction: gravel, cinder block, yellow stone, orange pipes, tower cranes, a steel frame, a fence and hazard barriers, at golden hour.
+4. Downtown: granite, steel blue, night towers, invented billboards and neon OPEN signs.
+
+The other fifteen themes are unused (listed in DECISIONS).
+
+### Re-verification
+
+```
+npm run build        type-check (both configs) clean
+                     dist/index.html = 137,419 bytes (was 111,741; +25,678, from the new art)
+                     only URL inside: the SVG namespace in the inlined favicon (nothing is fetched)
+npm test             18 files, 246 tests passed
+npx playwright test  8 passed: God-mode click (desktop) and tap (phone), the no-God-mode control,
+                     rotation, smoke (no console errors), pause, touch, touch pause
+```
+
+**Limits.** God mode's pit rescue is proven by unit tests (a real fall and rescue) rather than in the browser run, which stops at the first pipe without jumping. As before, no real iPhone was available.
