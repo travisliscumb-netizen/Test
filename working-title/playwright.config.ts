@@ -50,18 +50,18 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
-      testMatch: 'smoke.spec.ts',
+      testMatch: ['smoke.spec.ts', 'single-file.spec.ts'],
       use: { ...devices['Desktop Chrome'], baseURL: PREVIEW_URL },
     },
     {
       name: 'desktop-webgpu',
-      testMatch: ['smoke.spec.ts', 'webgpu.spec.ts'],
+      testMatch: ['smoke.spec.ts', 'webgpu.spec.ts', 'single-file.spec.ts'],
       metadata: { expectedAutoRenderer: 'webgpu' } satisfies ProjectMetadata,
       use: { ...devices['Desktop Chrome'], baseURL: PREVIEW_URL, launchOptions: webgpuLaunch },
     },
     {
       name: 'mobile-chromium',
-      testMatch: 'smoke.spec.ts',
+      testMatch: ['smoke.spec.ts', 'single-file.spec.ts'],
       use: { ...devices['Pixel 7 landscape'], baseURL: PREVIEW_URL },
     },
     {
@@ -72,9 +72,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // Smoke tests run against a production build made for this run. Never reuse a running
+      // Smoke tests run against production builds made for this run. Never reuse a running
       // preview server: it would serve whatever stale dist/ it was started with.
-      command: 'npm run build && npm run preview',
+      command: 'npm run build && npm run build:single && npm run preview',
       url: PREVIEW_URL,
       reuseExistingServer: false,
       timeout: 180_000,

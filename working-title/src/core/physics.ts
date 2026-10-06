@@ -14,6 +14,31 @@ export interface PhysicsWorld {
   step(stepSeconds: number): void;
 }
 
+const BASE64_DATA_URL = /^data:[^;,]*;base64,/;
+
+/**
+ * In the single-file build the wasm is inlined as a data: URL. It is decoded here and handed
+ * over as bytes, so loading physics makes no network request at all (strict CSPs block
+ * fetches, including of data: URLs). Normal builds let Havok fetch the emitted file.
+ */
+function havokModuleOptions(
+  wasmUrl: string,
+): { wasmBinary: ArrayBuffer } | { locateFile: () => string } {
+  if (!wasmUrl.startsWith('data:')) {
+    return { locateFile: () => wasmUrl };
+  }
+  const prefix = BASE64_DATA_URL.exec(wasmUrl);
+  if (prefix === null) {
+    throw new Error('Inlined Havok wasm is not a base64 data URL.');
+  }
+  const binary = atob(wasmUrl.slice(prefix[0].length));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return { wasmBinary: bytes.buffer };
+}
+
 /**
  * Loads Havok and attaches it to `scene` with automatic stepping disabled.
  *
@@ -22,7 +47,7 @@ export interface PhysicsWorld {
  * once per fixed tick instead. Babylon's before/after physics observables still fire.
  */
 export async function createPhysicsWorld(scene: Scene, gravityY: number): Promise<PhysicsWorld> {
-  const havok = await HavokPhysics({ locateFile: () => havokWasmUrl });
+  const havok = await HavokPhysics(havokModuleOptions(havokWasmUrl));
   // useDeltaForWorldStep: Havok integrates the delta we pass rather than its own constant.
   const plugin = new HavokPlugin(true, havok);
   if (!scene.enablePhysics(new Vector3(0, gravityY, 0), plugin)) {

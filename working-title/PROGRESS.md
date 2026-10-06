@@ -27,6 +27,15 @@
 - `src/ui/fatalError.ts` shows a readable error screen when boot fails (e.g. no WebGL2).
 - Dev builds turn on Babylon 9's missing side-effect import warnings, and the dev e2e fails on any of them. Background: Babylon 9 replaces methods whose side-effect import is missing with silent stubs. That hid a real bug here: `scene.enablePhysics` silently returned `undefined` until `Physics/joinedPhysicsEngineComponent` was imported.
 
+## Single-file build (for sandboxed hosts)
+
+`npm run build:single` writes `dist-single/index.html`, one self-contained 4.6 MiB file (1.3 MiB gzip). All JS, CSS, the icon and the Havok wasm are inlined, and it makes **no network requests**. This is the build published as a claude.ai artifact so the game can be tried in chat.
+
+- Havok loads from inlined bytes (`wasmBinary`), never a fetch. Havok's own default wasm URL is stripped in this mode; otherwise Vite would inline a second 2 MiB copy.
+- With code splitting off, Vite 8 leaves its `__VITE_PRELOAD__` marker unreplaced in Babylon's inlined lazy imports, which broke every shader at runtime. The plugin substitutes "no deps", and `check-bundle` now fails any build that still contains the marker.
+- An e2e test (`single-file.spec.ts`, on desktop WebGL2, desktop WebGPU and mobile) serves the file under a strict CSP (`default-src 'none'`, inline scripts plus `wasm-unsafe-eval` only), aborts every request, and requires zero attempted requests and zero CSP violations.
+- Risk: if a host's CSP does not allow `wasm-unsafe-eval`, Havok cannot compile and the page shows its error screen.
+
 ## Verification (2026-10-06, this container)
 
 | Command             | Result                                                              |

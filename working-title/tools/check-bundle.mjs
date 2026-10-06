@@ -5,7 +5,10 @@ import { extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-const distDir = fileURLToPath(new URL('../dist', import.meta.url));
+// Usage: node tools/check-bundle.mjs [dist|dist-single]
+const target = process.argv[2] ?? 'dist';
+const distDir = fileURLToPath(new URL(`../${target}`, import.meta.url));
+const singleFile = target === 'dist-single';
 
 /** Strings that only exist in dev-only modules. Any hit means tree-shaking failed. */
 const FORBIDDEN_MARKERS = [
@@ -13,6 +16,10 @@ const FORBIDDEN_MARKERS = [
   { marker: '@babylonjs/inspector', reason: 'Babylon Inspector package' },
   { marker: '@fluentui/', reason: 'Inspector UI dependency' },
   { marker: 'installInspectorToggle', reason: 'dev inspector toggle' },
+  {
+    marker: '__VITE_PRELOAD__',
+    reason: 'unreplaced Vite preload marker (ReferenceError at runtime)',
+  },
 ];
 
 function walk(dir) {
@@ -41,7 +48,18 @@ for (const file of shipped.filter((f) => ['.js', '.html'].includes(extname(f))))
   }
 }
 
-if (!shipped.some((f) => extname(f) === '.wasm')) {
+if (singleFile) {
+  if (shipped.length !== 1 || !shipped[0].endsWith('index.html')) {
+    violations.push(
+      `Expected only index.html, found: ${shipped.map((f) => relative(distDir, f)).join(', ')}`,
+    );
+  }
+  const html = readFileSync(join(distDir, 'index.html'), 'utf8');
+  const wasmCopies = html.split('data:application/wasm;base64,').length - 1;
+  if (wasmCopies !== 1) {
+    violations.push(`Expected exactly one inlined Havok wasm, found ${String(wasmCopies)}.`);
+  }
+} else if (!shipped.some((f) => extname(f) === '.wasm')) {
   violations.push('No .wasm file emitted; Havok physics would fail to load.');
 }
 
