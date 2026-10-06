@@ -49,10 +49,14 @@ export const PLAYER = {
   airRunAccel: 28 / 256,
   airReverseAccel: 40 / 256,
 
+  /**
+   * A held jump from a standstill clears about 5.2 tiles, so every 4-tile pipe
+   * and block top is reachable without a running start; running adds height.
+   */
   jumpTiers: [
-    { belowSpeed: 512 / 256, velocity: 8, holdGravity: 64 / 256, fallGravity: 224 / 256 },
-    { belowSpeed: 1180 / 256, velocity: 8, holdGravity: 60 / 256, fallGravity: 192 / 256 },
-    { belowSpeed: Infinity, velocity: 10, holdGravity: 80 / 256, fallGravity: 288 / 256 },
+    { belowSpeed: 512 / 256, velocity: 2368 / 256, holdGravity: 64 / 256, fallGravity: 224 / 256 },
+    { belowSpeed: 1180 / 256, velocity: 2368 / 256, holdGravity: 60 / 256, fallGravity: 192 / 256 },
+    { belowSpeed: Infinity, velocity: 2816 / 256, holdGravity: 80 / 256, fallGravity: 288 / 256 },
   ] as readonly JumpTier[],
   maxFallSpeed: 9,
 

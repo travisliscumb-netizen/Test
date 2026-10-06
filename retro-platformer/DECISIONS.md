@@ -28,15 +28,7 @@ Choices made while building Sprout Quest, with the reasoning. Newest concerns ar
 ## Game feel (all values in `src/tuning.ts`)
 
 - **Units are px/frame at 60 Hz, as exact multiples of 1/256**, so the simulation is bit-for-bit deterministic and tests can assert exact positions.
-- **The constants start from the classic 16-px-tile values doubled for 32-px tiles**, then were checked by measurement. Measured from the real code:
-
-  | | Height | Length | Airtime |
-  |---|---|---|---|
-  | Standing jump (held) | 3.9 tiles | — | 51 frames |
-  | Walking jump | 4.1 tiles | 5.4 tiles | 55 frames |
-  | Running jump | 4.8 tiles | 8.5 tiles | 53 frames |
-
-  Reaching walk speed takes 40 frames (0.67 s) and run speed 47 frames (0.78 s).
+- **The constants started from the classic 16-px-tile values doubled for 32-px tiles.** Play-testing showed that was too low: a standing jump peaked at 3.9 tiles while level 1 has 4-tile pipes and 4-tile-high block tops, so they needed a running start. Jump velocity was raised so a held standing jump clears about 5.2 tiles. Tests now require that a 4-tile pipe can be climbed from a standstill, and that every level can be finished without pressing run.
 - **Three jump tiers by take-off speed**, each with a light "held" gravity and a heavy gravity for falling or after releasing the button. That split is what produces variable jump height and the snappy fall.
 - **Air control works like the original:** facing is fixed in the air, momentum is kept with no input, and the airborne speed cap is set at take-off (or raised by holding run).
 - **Coyote time and jump buffering are exact 6-frame (100 ms) windows**, defined as "steps since leaving the ground" and "steps since the press", and tested at their boundaries.

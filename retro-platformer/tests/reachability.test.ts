@@ -86,7 +86,7 @@ interface SolveResult {
   bestX: number;
 }
 
-function solve(level: LevelData, budget = 600_000): SolveResult {
+function solve(level: LevelData, budget = 600_000, allowRun = true): SolveResult {
   const map = new TileMap(level);
   const poleX = level.flag.tx * TILE + TILE / 2;
   const baseTop = level.flag.baseTy * TILE;
@@ -103,6 +103,7 @@ function solve(level: LevelData, budget = 600_000): SolveResult {
     const node = open.pop();
     expansions++;
     for (const act of ACTIONS) {
+      if (act.run && !allowRun) continue;
       const p: Player = { ...node.p };
       let camX = node.camX;
       let alive = true;
@@ -148,6 +149,15 @@ describe("every level can be completed", () => {
       const level = levels[i]!;
       const r = solve(level);
       expect(r.reached, `stuck near column ${Math.floor(r.bestX / TILE)} after ${r.expansions} expansions`).toBe(true);
+    },
+    60_000,
+  );
+
+  it.each(LEVEL_SOURCES.map(([name], i) => [name, i] as const))(
+    "%s: can be finished without ever pressing run",
+    (_name, i) => {
+      const r = solve(levels[i]!, 600_000, false);
+      expect(r.reached, `walking only: stuck near column ${Math.floor(r.bestX / TILE)}`).toBe(true);
     },
     60_000,
   );

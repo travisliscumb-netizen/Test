@@ -49,10 +49,39 @@ function jumpPeak(holdFrames: number, startSpeed = 0): number {
 }
 
 describe("variable jump height", () => {
-  it("full hold from standstill reaches about four tiles", () => {
+  it("full hold from standstill clears a 4-tile pipe with a tile to spare", () => {
     const h = jumpPeak(999);
-    expect(h).toBeGreaterThan(3.7 * TILE);
-    expect(h).toBeLessThan(4.3 * TILE);
+    expect(h).toBeGreaterThan(5 * TILE);
+    expect(h).toBeLessThan(5.6 * TILE);
+  });
+
+  it("walking jumps go at least as high as standing ones", () => {
+    expect(jumpPeak(999, PLAYER.walkMax)).toBeGreaterThanOrEqual(jumpPeak(999));
+  });
+
+  it("can hop onto a 4-tile pipe from a standstill right next to it, without running", () => {
+    // Pipe occupying columns 4-5, rows 6-9 (4 tiles tall), floor at row 10.
+    const PIPE = grid([
+      "..........",
+      "..........",
+      "..........",
+      "..........",
+      "..........",
+      "..........",
+      "....##....",
+      "....##....",
+      "....##....",
+      "....##....",
+      "##########",
+    ]);
+    const p = createPlayer(3, 9);
+    p.x = 4 * TILE - p.w; // pressed against the pipe
+    let landedOnTop = false;
+    for (let i = 0; i < 90 && !landedOnTop; i++) {
+      stepPlayer(p, ctl({ right: true, jump: i < 40, jumpPressed: i === 0 }), PIPE, -Infinity);
+      landedOnTop = p.onGround && p.y + p.h === 6 * TILE;
+    }
+    expect(landedOnTop).toBe(true);
   });
 
   it("a tap gives a short hop, well under half of a full jump", () => {
