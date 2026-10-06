@@ -38,13 +38,14 @@
 
 ## Verification (2026-10-06, this container)
 
-| Command             | Result                                                              |
-| ------------------- | ------------------------------------------------------------------- |
-| `npm run typecheck` | pass (app + node projects, `skipLibCheck: false`)                   |
-| `npm run lint`      | pass (typescript-eslint `strictTypeChecked` + Prettier, 0 warnings) |
-| `npm run test`      | 37/37 pass                                                          |
-| `npm run build`     | pass, bundle guard OK                                               |
-| `npm run test:e2e`  | 21/21 pass                                                          |
+| Command                | Result                                                              |
+| ---------------------- | ------------------------------------------------------------------- |
+| `npm run typecheck`    | pass (app + node projects, `skipLibCheck: false`)                   |
+| `npm run lint`         | pass (typescript-eslint `strictTypeChecked` + Prettier, 0 warnings) |
+| `npm run test`         | 37/37 pass                                                          |
+| `npm run build`        | pass, bundle guard OK                                               |
+| `npm run build:single` | pass, bundle guard OK                                               |
+| `npm run test:e2e`     | 24/24 pass                                                          |
 
 E2E projects:
 
