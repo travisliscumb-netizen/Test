@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<title>Crimson Realm</title>
+<meta name="description" content="A brutal one-on-one tournament fighter built for your phone. Six fighters, executions, and a ladder that gets harder every level.">
+<meta name="theme-color" content="#0a0103">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crimson Realm">
+<meta name="format-detection" content="telephone=no">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Crimson Realm">
+<meta property="og:description" content="A brutal one-on-one tournament fighter built for your phone.">
+<meta property="og:image" content="icons/og-cover.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<link rel="apple-touch-startup-image" href="icons/splash-2796x1290.png" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3) and (orientation:landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-2556x1179.png" media="(device-width:393px) and (device-height:852px) and (-webkit-device-pixel-ratio:3) and (orientation:landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-2532x1170.png" media="(device-width:390px) and (device-height:844px) and (-webkit-device-pixel-ratio:3) and (orientation:landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-2778x1284.png" media="(device-width:428px) and (device-height:926px) and (-webkit-device-pixel-ratio:3) and (orientation:landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-2436x1125.png" media="(device-width:375px) and (device-height:812px) and (-webkit-device-pixel-ratio:3) and (orientation:landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-1792x828.png" media="(device-width:414px) and (device-height:896px) and (-webkit-device-pixel-ratio:2) and (orientation:landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-1334x750.png" media="(device-width:375px) and (device-height:667px) and (-webkit-device-pixel-ratio:2) and (orientation:landscape)">
+<link rel="stylesheet" href="src/ui.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="stage"></canvas>
+  <div id="vignette"></div>
+
+  <!-- touch controls -->
+  <div id="controls" class="hidden">
+    <div id="stickZone">
+      <div id="stickBase"><div id="stickKnob"></div></div>
+      <span class="zone-hint">MOVE · JUMP · CROUCH</span>
+    </div>
+    <div id="btnZone">
+      <button class="pad pad-s" data-k="s" aria-label="Special"><b>SPECIAL</b></button>
+      <button class="pad pad-b" data-k="b" aria-label="Block"><b>BLOCK</b></button>
+      <button class="pad pad-p" data-k="p" aria-label="Punch"><b>PUNCH</b></button>
+      <button class="pad pad-k" data-k="k" aria-label="Kick"><b>KICK</b></button>
+    </div>
+    <button id="pauseBtn" class="pause-btn" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2"/></svg></button>
+  </div>
+  <div id="tip" class="tip hidden"></div>
+
+  <!-- boot -->
+  <section id="boot" class="screen show">
+    <div class="center">
+      <canvas id="bootIcon" width="320" height="320" class="logo-icon"></canvas>
+      <h1 class="logo">CRIMSON<span>REALM</span></h1>
+      <p class="blink">TAP TO ENTER THE TOURNAMENT</p>
+    </div>
+  </section>
+
+  <!-- title -->
+  <section id="title" class="screen">
+    <div class="title-wrap">
+      <div class="title-left">
+        <h1 class="logo">CRIMSON<span>REALM</span></h1>
+        <p class="tag">Ten fights. One throne. No mercy.</p>
+      </div>
+      <div class="menu">
+        <button id="continueBtn" class="btn btn-primary hidden"><span id="continueLabel">Continue</span><small id="continueSub"></small></button>
+        <button id="newBtn" class="btn"><span>New Tournament</span><small>Choose your fighter</small></button>
+        <div class="row">
+          <button id="howBtn" class="btn btn-sm">How to Play</button>
+          <button id="settingsBtn" class="btn btn-sm">Settings</button>
+        </div>
+        <p class="install-hint" id="installHint"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- character select -->
+  <section id="select" class="screen">
+    <header class="bar">
+      <button class="back" data-back="title" aria-label="Back">‹</button>
+      <h2>CHOOSE YOUR FIGHTER</h2>
+      <span></span>
+    </header>
+    <div class="select-body">
+      <canvas id="selPreview" class="sel-preview" width="520" height="640"></canvas>
+      <div class="sel-info">
+        <div class="sel-name" id="selName"></div>
+        <div class="sel-title" id="selTitle"></div>
+        <p class="sel-bio" id="selBio"></p>
+        <div class="stats" id="selStats"></div>
+        <div class="sel-special"><span>SPECIAL</span><b id="selSpecial"></b></div>
+        <button id="selGo" class="btn btn-primary">FIGHT</button>
+      </div>
+    </div>
+    <div class="roster" id="roster"></div>
+  </section>
+
+  <!-- ladder -->
+  <section id="ladder" class="screen">
+    <header class="bar">
+      <button class="back" data-back="title" aria-label="Back">‹</button>
+      <h2 id="ladderTitle">THE LADDER</h2>
+      <span></span>
+    </header>
+    <div class="ladder-strip" id="ladderStrip"></div>
+    <div class="ladder-foot">
+      <p id="ladderInfo"></p>
+      <button id="ladderGo" class="btn btn-primary">BEGIN</button>
+    </div>
+  </section>
+
+  <!-- versus -->
+  <section id="vs" class="screen">
+    <div class="vs-wrap">
+      <div class="vs-side left"><canvas id="vsA" width="400" height="520"></canvas><div class="vs-name" id="vsAName"></div></div>
+      <div class="vs-mid"><div class="vs-text">VS</div><div class="vs-stage" id="vsStage"></div><div class="vs-level" id="vsLevel"></div></div>
+      <div class="vs-side right"><canvas id="vsB" width="400" height="520"></canvas><div class="vs-name" id="vsBName"></div></div>
+    </div>
+  </section>
+
+  <!-- pause -->
+  <section id="pause" class="screen dim">
+    <div class="panel">
+      <h2>PAUSED</h2>
+      <button id="resumeBtn" class="btn btn-primary">Resume</button>
+      <button id="restartBtn" class="btn">Restart Fight</button>
+      <button id="pauseHowBtn" class="btn">Move List</button>
+      <button id="pauseSettingsBtn" class="btn">Settings</button>
+      <button id="quitBtn" class="btn btn-ghost">Quit to Title</button>
+    </div>
+  </section>
+
+  <!-- result -->
+  <section id="result" class="screen dim">
+    <div class="panel">
+      <h2 id="resTitle">VICTORY</h2>
+      <p id="resSub"></p>
+      <div class="res-stats" id="resStats"></div>
+      <button id="resNext" class="btn btn-primary">Next Level</button>
+      <button id="resRetry" class="btn">Retry</button>
+      <button id="resQuit" class="btn btn-ghost">Title</button>
+    </div>
+  </section>
+
+  <!-- how to play -->
+  <section id="how" class="screen dim">
+    <div class="panel wide">
+      <h2>MOVE LIST</h2>
+      <div class="moves">
+        <div><b>PUNCH</b><span>Fast jab. Tap 3 times for a 3-hit string.</span></div>
+        <div><b>KICK</b><span>Long-range kick. Tap twice for a knockdown roundhouse.</span></div>
+        <div><b>PUNCH, PUNCH, KICK</b><span>Mixed string.</span></div>
+        <div><b>DOWN + PUNCH</b><span>Uppercut. Launches. Stops jump-ins.</span></div>
+        <div><b>DOWN + KICK</b><span>Sweep. Hits low &mdash; must be blocked crouching.</span></div>
+        <div><b>UP</b><span>Jump. Up-forward / up-back to flip. Punch or kick in the air.</span></div>
+        <div><b>HOLD BLOCK</b><span>Stops highs &amp; mids. Hold DOWN too to stop sweeps. Jump-ins beat a crouching block.</span></div>
+        <div><b>SPECIAL</b><span>Your fighter's signature move. Short cooldown.</span></div>
+        <div><b>EXECUTE!</b><span>When the loser is dazed, press SPECIAL to finish them.</span></div>
+      </div>
+      <button class="btn btn-primary" data-close>Got it</button>
+    </div>
+  </section>
+
+  <!-- settings -->
+  <section id="settings" class="screen dim">
+    <div class="panel wide">
+      <h2>SETTINGS</h2>
+      <div class="settings">
+        <label class="sw"><input type="checkbox" data-set="sound"><span>Sound effects</span></label>
+        <label class="sw"><input type="checkbox" data-set="music"><span>Music</span></label>
+        <label class="sw"><input type="checkbox" data-set="voice"><span>Announcer voice</span></label>
+        <label class="sw"><input type="checkbox" data-set="blood"><span>Blood &amp; gore</span></label>
+        <label class="sw"><input type="checkbox" data-set="haptics"><span>Vibration</span></label>
+        <label class="range"><span>Button size</span><input type="range" min="0.8" max="1.3" step="0.05" data-set="size"></label>
+        <label class="range"><span>Control opacity</span><input type="range" min="0.3" max="1" step="0.05" data-set="opacity"></label>
+      </div>
+      <div class="row">
+        <button class="btn btn-primary" data-close>Done</button>
+        <button id="resetBtn" class="btn btn-ghost">Reset progress</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="rotate" class="rotate">
+    <div class="phone"></div>
+    <p>Turn your phone sideways to fight</p>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
