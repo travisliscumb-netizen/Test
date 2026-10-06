@@ -12,7 +12,9 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'dist', 'tetris-3d.html');
+// `--drew` builds the joke edition (DREW SUCKS fades in on the back wall).
+const DREW = process.argv.includes('--drew');
+const OUT = path.join(ROOT, 'dist', DREW ? 'tetris-3d-drew.html' : 'tetris-3d.html');
 const read = (rel, enc) => fs.readFileSync(path.join(ROOT, rel), enc);
 const dataUri = (rel, mime) => `data:${mime};base64,${read(rel).toString('base64')}`;
 
@@ -40,10 +42,10 @@ html = html.replace(/<link rel="preload"[^>]*>\n/g, '').replace(/<link rel="modu
 swap('<link rel="stylesheet" href="src/ui.css">', () => `<style>\n${css}\n</style>`);
 // Escape any "</script" inside the bundle so it cannot end the inline tag early.
 const inline = js.replace(/<\/script/gi, '<\\/script');
-swap('<script type="module" src="src/main.js"></script>', () => `<script>window.__SINGLE_FILE__ = true;</script>\n<script type="module">\n${inline}\n</script>`);
+swap('<script type="module" src="src/main.js"></script>', () => `<script>window.__SINGLE_FILE__ = true;${DREW ? ' window.__DREW__ = true;' : ''}</script>\n<script type="module">\n${inline}\n</script>`);
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);
 const left = [...html.matchAll(/(?:src|href)="(?!data:|#|https?:)([^"]+)"/g)].map((m) => m[1]);
 if (left.length) throw new Error(`external references left in the single file: ${left.join(', ')}`);
-console.log(`dist/tetris-3d.html  ${(fs.statSync(OUT).size / 1024).toFixed(0)} KB, no external files`);
+console.log(`${path.relative(ROOT, OUT)}  ${(fs.statSync(OUT).size / 1024).toFixed(0)} KB, no external files`);

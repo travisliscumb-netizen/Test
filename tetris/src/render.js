@@ -21,6 +21,7 @@ import {
 } from '../vendor/three.js';
 import { SHAPES, TYPES, COLORS, BOX, idType } from './pieces.js';
 import { COLS, VISIBLE, LINE_CLEAR_DELAY, LOCK_DELAY, GREY } from './engine.js';
+import { MESSAGE, messageAlpha } from './joke.js';
 
 const DRAW_ROWS = 24;                 // matrix rows ever drawn (20 visible + spawn area)
 const TAU = Math.PI * 2;
@@ -271,13 +272,15 @@ function panelMaterial() {
     uniforms: {
       uBoard: { value: null }, uAccent: { value: new Color() }, uTime: { value: 0 }, uDanger: { value: 0 },
       uGrid: { value: 1 }, uCol: { value: new Vector2(-9, -9) }, uLightColor: { value: new Color(0, 0, 0) },
-      uLightPos: { value: new Vector2(0, 30) }, uWave: { value: 0 }
+      uLightPos: { value: new Vector2(0, 30) }, uWave: { value: 0 },
+      uMsg: { value: null }, uMsgAlpha: { value: 0 }
     },
     vertexShader: /* glsl */`
       varying vec2 vUv;
       void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: /* glsl */`
-      uniform sampler2D uBoard;
+      uniform sampler2D uBoard, uMsg;
+      uniform float uMsgAlpha;
       uniform vec3 uAccent, uLightColor;
       uniform float uTime, uDanger, uGrid, uWave;
       uniform vec2 uCol, uLightPos;
@@ -294,6 +297,11 @@ function panelMaterial() {
         col += uAccent * dots * 0.06 * uGrid;
 
         if (cell.x >= uCol.x && cell.x <= uCol.y) col += uAccent * 0.012;
+
+        // Back-wall message (Drew edition). Painted on the wall itself, so
+        // blocks, their glow and their shadows all sit in front of it.
+        float msg = texture2D(uMsg, vUv).r * uMsgAlpha;
+        col = mix(col, vec3(0.62, 0.66, 0.85), msg);
 
         vec2 texel = vec2(0.1, 1.0 / 40.0);
         vec2 tuv = vec2(cell.x * 0.1, cell.y / 40.0);
@@ -626,6 +634,9 @@ export class Renderer {
     this.boardTex.colorSpace = SRGBColorSpace;
     this.boardTex.needsUpdate = true;
     this.panel.material.uniforms.uBoard.value = this.boardTex;
+    this.msgEnabled = typeof window !== 'undefined' && !!window.__DREW__;
+    this.msgAlpha = 0;
+    this.panel.material.uniforms.uMsg.value = this.messageTexture();
 
     const metal = new MeshPhysicalMaterial({ color: 0x1b2034, metalness: 0.9, roughness: 0.28, clearcoat: 0.8, clearcoatRoughness: 0.15 });
     this.neonMat = new MeshBasicMaterial({ color: 0xffffff });
@@ -819,6 +830,35 @@ export class Renderer {
     this.floor.renderOrder = -5;
     this.scene.add(this.floor);
     this.reflectScale = q.reflect;
+  }
+
+  /* White-on-black mask of MESSAGE sized to the 10x20 back wall. Redrawn
+     once the display font has loaded so it never shows a fallback face. */
+  messageTexture() {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 1024;
+    const tex = new CanvasTexture(c);
+    const draw = () => {
+      const g = c.getContext('2d');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, c.width, c.height);
+      if (!this.msgEnabled) { tex.needsUpdate = true; return; }
+      g.fillStyle = '#fff';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      MESSAGE.forEach((word, i) => {
+        let size = 200;
+        g.font = `900 ${size}px Orbitron, "Arial Black", Impact, sans-serif`;
+        size = Math.floor(size * Math.min(1, (c.width * 0.86) / g.measureText(word).width));
+        g.font = `900 ${size}px Orbitron, "Arial Black", Impact, sans-serif`;
+        g.fillText(word, c.width / 2, c.height * (0.36 + i * 0.26));
+      });
+      tex.needsUpdate = true;
+    };
+    draw();
+    if (this.msgEnabled && document.fonts) document.fonts.ready.then(draw);
+    return tex;
   }
 
   /* ---------- settings ---------- */
@@ -1521,6 +1561,9 @@ export class Renderer {
     pu.uDanger.value = this.danger;
     pu.uGrid.value = this.showGrid ? 1 : 0;
     pu.uWave.value = this.overT >= 0 ? Math.min(1, this.overT) * 0.7 : 0;
+    const msgTarget = this.msgEnabled && game && !this.calm ? messageAlpha(game.level) : 0;
+    this.msgAlpha = damp(this.msgAlpha, msgTarget, 1.5, dt);   // fades in over a second or two on level-up
+    pu.uMsgAlpha.value = this.msgAlpha;
     this.ghostMat.uniforms.uTime.value = this.time;
 
     this.syncPreviews(game, previewRects, dt);

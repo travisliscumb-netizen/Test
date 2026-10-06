@@ -18,7 +18,7 @@ cd tetris && node tools/serve.mjs 8080
 
 Then open <http://localhost:8080/>. WebGL 2 is required.
 
-**One-file version.** `npm run single` writes `dist/tetris-3d.html`: the whole game (three.js, code, styles, fonts, icon) in a single ~820 KB HTML file that runs on its own: double-clicked from disk, attached to a message, or inside a sandboxed preview. It needs `npm install` first (for esbuild). In that build saved records and settings only persist where the host page allows storage.
+**One-file version.** `npm run single` writes `dist/tetris-3d.html`: the whole game (three.js, code, styles, fonts, icon) in a single ~820 KB HTML file that runs on its own: double-clicked from disk, attached to a message, or inside a sandboxed preview. It needs `npm install` first (for esbuild). `npm run single -- --drew` builds the joke "Drew edition" (`dist/tetris-3d-drew.html`): identical, except DREW SUCKS fades in on the back wall of the well, invisible on level 1 and fully solid by level 20 (see `src/joke.js`). In that build saved records and settings only persist where the host page allows storage.
 
 ## Tests
 

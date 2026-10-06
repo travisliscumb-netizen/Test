@@ -2,7 +2,7 @@
    serve cache-first, refresh the cache in the background. Bump VERSION on
    every release so old caches are dropped. tests/e2e.mjs checks that this
    list matches the files on disk. */
-const VERSION = 'tetris3d-v1';
+const VERSION = 'tetris3d-v2';
 const FILES = [
   './',
   'index.html',
@@ -16,6 +16,7 @@ const FILES = [
   'src/audio.js',
   'src/save.js',
   'src/render.js',
+  'src/joke.js',
   'vendor/three.js',
   'fonts/orbitron-latin-500-normal.woff2',
   'fonts/orbitron-latin-700-normal.woff2',

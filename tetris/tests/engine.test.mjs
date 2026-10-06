@@ -386,3 +386,11 @@ test('helpful pieces: varied, never three in a row, and still very easy', async 
   assert.ok(g.stats.pieces >= 1500, `survived ${g.stats.pieces} pieces`);
   assert.ok(g.lines >= 1500 * 0.4 * 0.95, `cleared ${g.lines} lines`);
 });
+
+test('Drew edition: message invisible on level 1, faint on 2, solid by 20', async () => {
+  const { messageAlpha } = await import('../src/joke.js');
+  assert.equal(messageAlpha(1), 0);
+  assert.ok(messageAlpha(2) > 0 && messageAlpha(2) <= 0.03, `level 2 alpha ${messageAlpha(2)}`);
+  for (let l = 3; l <= 20; l++) assert.ok(messageAlpha(l) > messageAlpha(l - 1), `rises at level ${l}`);
+  assert.equal(messageAlpha(20), 1);
+});
