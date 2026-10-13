@@ -51,6 +51,9 @@ const health = () => ev(() => {
     parts: g.fx.smoke.n + g.fx.glow.n, debris: g.fx.debris.length, markers: g.missions.markers.items.filter(m => m.used).length, opps: uw.S.opps.length, pickups: uw.pickups.list.length,
     pending: g.police.pending.length, units: g.police.units.length, cops: g.police.cops.length, heap: performance.memory ? performance.memory.usedJSHeapSize : 0,
     geo: mem.geometries, tex: mem.textures, scene: g.scene.children.length, listeners: window.__lst.size, intervals: window.__ivl.size, timeouts: window.__tmo.size,
+    vl: g.vehicles.list.filter(v => v.homeBlock === undefined || v.touched).map(v => `${v.type}:${Math.round(Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z))}${v.driver ? ':' + v.driver : ''}${v.mission ? ':m=' + (typeof v.mission === 'string' ? v.mission : 'obj') : ''}${v.owned ? ':own' : ''}${v.touched ? ':t' : ''}${v === p.lastVehicle ? ':last' : ''}${v.mode !== 'phys' ? ':' + v.mode : ''}${v.burnt ? ':burnt' : ''}${v.fac ? ':' + v.fac : ''}`).join(' '),
+    orphans: g.vehicles.list.filter(v => (v.uwGroup && !uw.gangs.groups.has(v.uwGroup)) || ((v.mission === 'squad' || v.mission === 'shipment') && ![...uw.gangs.groups.values()].some(gr => (gr.cars || []).includes(v)))).length,
+    loose: g.vehicles.list.filter(v => (v.homeBlock === undefined || v.touched) && !v.ai).length,
     sur: g.player.pose.surrender || 0, state: g.player.state, gs: g.state, day: uw.S.day, voices: g.audio.voices || 0, news: g.save.messages.length, phoneQ: g.content.phoneQ.length, toasts: document.getElementById('toasts').children.length
   };
 });
@@ -106,13 +109,20 @@ for (let c = 0; c < CYCLES; c++) {
   hist.push({ cost: +cost.toFixed(0), ...h });
   if (!base) { base = h; cost0 = cost; }
   check(`cycle ${c + 1}: world intact`, h.bad.length === 0 && h.peds < 90 && h.veh < 130 && h.groups <= 14 && h.gang <= 22 && h.markers < 40 && h.pending < 8 && h.sur === 0 && h.gs === 'playing' && h.voices < 60 && h.parts < 2000 && h.debris < 400 && h.pickups <= 51 && h.toasts < 12 && h.news <= 60 && h.phoneQ < 30, JSON.stringify(h));
-  check(`cycle ${c + 1}: no listener / timer / GPU-resource growth`, h.listeners <= base.listeners + 4 && h.intervals <= base.intervals + 1 && h.timeouts < 120 && h.geo <= base.geo * 1.25 + 40 && h.tex <= base.tex * 1.25 + 10 && h.scene <= base.scene + 12,
-    `listeners ${base.listeners}->${h.listeners} intervals ${base.intervals}->${h.intervals} timeouts ${h.timeouts} geo ${base.geo}->${h.geo} tex ${base.tex}->${h.tex} scene ${base.scene}->${h.scene}`);
+  check(`cycle ${c + 1}: no listener / timer growth, no orphaned or piling-up cars`, h.listeners <= base.listeners + 4 && h.intervals <= base.intervals + 1 && h.timeouts < 120 && h.orphans === 0 && h.loose <= 14,
+    `listeners ${base.listeners}->${h.listeners} intervals ${base.intervals}->${h.intervals} timeouts ${h.timeouts} orphans ${h.orphans} loose cars ${h.loose}`);
 }
 const last = hist[hist.length - 1];
+// GPU resources track what is on screen (car types, wreck geometry, interiors visited); they must
+// plateau, not climb: the late third of the session may not exceed the middle third's peak by much
+const third = Math.max(1, Math.floor(hist.length / 3));
+const mid = hist.slice(third, 2 * third), late = hist.slice(2 * third);
+const peak = (arr, k) => Math.max(...arr.map(q => q[k]));
+for (const k of ['geo', 'tex', 'scene', 'veh']) check(`${k} plateaus (late peak <= mid peak x1.15 + 15)`, peak(late, k) <= peak(mid, k) * 1.15 + 15, `mid peak ${peak(mid, k)}, late peak ${peak(late, k)}, all ${hist.map(q => q[k]).join(',')}`);
 const lateCost = hist.slice(-3).reduce((a, q) => a + q.cost, 0) / Math.min(3, hist.length), earlyCost = hist.slice(0, 3).reduce((a, q) => a + q.cost, 0) / Math.min(3, hist.length);
 check('frame cost late in the session ~ early in the session (<= 1.5x)', lateCost <= earlyCost * 1.5, `early ${earlyCost.toFixed(0)} ms/frame, late ${lateCost.toFixed(0)} ms/frame (SwiftShader)`);
 check('heap stays bounded over the session', !base.heap || last.heap < base.heap * 1.6, `${(base.heap / 1e6).toFixed(1)}MB -> ${(last.heap / 1e6).toFixed(1)}MB`);
+for (const q of hist) console.log('vehicles:', q.veh, q.vl);
 console.log('per-cycle:', JSON.stringify(hist.map(q => ({ cost: q.cost, heap: +(q.heap / 1e6).toFixed(1), peds: q.peds, veh: q.veh, traffic: q.traffic, geo: q.geo, tex: q.tex, lst: q.listeners, tmo: q.timeouts, parts: q.parts }))));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'soak');

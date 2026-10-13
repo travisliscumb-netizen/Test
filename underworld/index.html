@@ -42979,7 +42979,7 @@ class GangManager {
     const g = this.g;
     for (const gr of this.groups.values()) this.removeGroup(gr, true);
     this.groups.clear();
-    this.riding = [];
+    this.riding = []; this.ship = null;
     if (g.peds) g.peds.peds = g.peds.peds.filter(p => p.kind !== 'gang' && p.kind !== 'crew' && p.kind !== 'buyer');
   }
   count() { let n = 0; for (const gr of this.groups.values()) n += gr.members.length; return n; }
@@ -43028,6 +43028,24 @@ class GangManager {
     for (const m of gr.members) { const i = g.peds.peds.indexOf(m); if (i >= 0) g.peds.peds.splice(i, 1); }
     gr.members.length = 0;
     this.groups.delete(gr.key);
+    // the group's cars go back to being ordinary cars, so the world cleanup can recycle them
+    if (gr.cars) for (const v of gr.cars) this.releaseCar(v);
+    if (gr.car) this.releaseCar(gr.car);
+    if (this.ship === gr) this.ship = null;
+  }
+  releaseCar(v) {
+    const g = this.g, p = g.player;
+    if (!v || !g.vehicles.list.includes(v)) return;
+    v.uwGroup = null;
+    if (v.mission === 'squad' || v.mission === 'shipment' || v.mission === 'event') v.mission = null;
+    if (v === p.vehicle || v === p.lastVehicle || v.driver !== 'npc' || !v.drive) return;
+    // a driver with nothing left to do heads off across town instead of hunting the player
+    v.drive.target = null; v.drive.targetRef = null; v.drive.wait = 0; v.drive.mode = 'cruise'; v.drive.cruise = rand(12, 16);
+    const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z);
+  }
+  // safety net: a car that still belongs to a group that no longer exists (reloads, resets, jail)
+  sweepOrphans() {
+    for (const v of this.g.vehicles.list) if (v.uwGroup && !this.groups.has(v.uwGroup)) this.releaseCar(v);
   }
   // is a live (spawned, fighting) war happening on this turf right now?
   warLive(i) { const gr = this.groups.get('warA' + i); return !!(gr && gr.members.some(m => m.state !== 'down')); }
@@ -43102,6 +43120,7 @@ class GangManager {
       }
       this.updateBodyguards();
       this.updateShipment();
+      this.sweepOrphans();
     }
     this.updateSquads(dt);
   }
@@ -43196,6 +43215,7 @@ class GangManager {
     v.drive.target = () => { const d = Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z); return { x: p.pos.x, z: p.pos.z, speed: d < 30 ? Math.max(0, d - 12) * 0.8 : 22, direct: d < 40 }; };
     v.drive.targetRef = p;
     const gr = { key: 'squad' + (this._sq = (this._sq || 0) + 1), kind: 'squad', fid, x: c.x, z: c.z, members: [], hostile: true, cars: [v], car: v, n: randi(2, 3), life: 0 };
+    v.uwGroup = gr.key;
     this.groups.set(gr.key, gr);
     if (why === 'hit') g.ui.toast(`${S.factions[fid].boss} sent a crew after you.`, 'warn');
   }
@@ -43211,7 +43231,7 @@ class GangManager {
         const d = Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z);
         if ((d < 26 && v.speed < 3) || (d < 14)) {
           // bail out and fight
-          v.drive = null; v.driver = null; v.ctl.throttle = 0; v.ctl.handbrake = true; v.mission = null;
+          v.drive = null; v.driver = null; v.ctl.throttle = 0; v.ctl.handbrake = true; v.mission = null; v.uwGroup = null;
           for (let k = 0; k < gr.n; k++) { const w = v.toWorld((k % 2 ? -1 : 1) * (v.spec.w / 2 + 0.7), (k - 1) * 1.2); const m = this.makeMember(gr, factionLook(gr.fid), 'soldier', w.x, w.z, v.h); m.x = w.x; m.z = w.z; m.gun = m.gun || Math.random() < 0.5; m.courage = rand(0.6, 1); }
           g.audio.play('door', { x: v.pos.x, z: v.pos.z });
         }
@@ -43237,7 +43257,7 @@ class GangManager {
     const gr = { key: 'raid' + i, kind: 'raid', fid, x: t.hang.x, z: t.hang.z, members: [], hostile: false, cars: [] };
     this.groups.set(gr.key, gr);
     const c = curbNear(t.hang.x, t.hang.z);
-    for (let k = 0; k < 2; k++) { const v = g.vehicles.spawn('police', c.x + Math.sin(c.h) * k * 6.5, c.z + Math.cos(c.h) * k * 6.5, c.h + rand(-0.3, 0.3), { parked: true }); v.siren = true; v.touched = true; v.mission = 'event'; gr.cars.push(v); }
+    for (let k = 0; k < 2; k++) { const v = g.vehicles.spawn('police', c.x + Math.sin(c.h) * k * 6.5, c.z + Math.cos(c.h) * k * 6.5, c.h + rand(-0.3, 0.3), { parked: true }); v.siren = true; v.touched = true; v.mission = 'event'; v.uwGroup = gr.key; gr.cars.push(v); }
     for (let k = 0; k < 3; k++) {
       const q = g.peds.make('gang', factionLook(fid)); q.x = t.hang.x + rand(-2, 2); q.z = t.hang.z + rand(-2, 2); q.y = groundY(q.x, q.z);
       q.state = 'free'; q.keep = true; q.fac = fid; q.group = gr; q.brain = (c2, dt) => { c2.state = 'free'; c2.vx = 0; c2.vz = 0; c2.pose.surrender = Math.min(1, (c2.pose.surrender || 0) + dt * 3); c2.pose.crouch = 0.25; };
@@ -43257,6 +43277,7 @@ class GangManager {
     esc.mission = 'shipment'; esc.touched = true; esc.fac = 'tidewater';
     esc.drive = new DriveAI(esc, g, 'cruise'); esc.drive.cruise = 12; esc.drive.target = () => ({ x: van.pos.x, z: van.pos.z, speed: 12 });
     const gr = { key: 'ship' + sh.at, kind: 'ship', fid: 'tidewater', x: c.x, z: c.z, members: [], hostile: false, cars: [van, esc], van, hq };
+    van.uwGroup = esc.uwGroup = gr.key;
     this.groups.set(gr.key, gr);
     this.ship = gr;
     uw.opps.add({ kind: 'shipment', title: 'Tidewater van rolling', text: 'The boat is unloaded and the van is heading for their HQ with an escort. This is your window.', x: c.x, z: c.z, hours: 2, follow: 'van', urgent: true });
@@ -43282,7 +43303,7 @@ class GangManager {
     if (!gr.stolen && dist2(van.pos.x, van.pos.z, gr.hq.x, gr.hq.z) < 22 * 22) {
       uw.S.factions.tidewater.stock += units(van.trunk);
       this.ship = null; gr.life = 999;
-      for (const v of gr.cars) if (v.drive) { v.drive.mode = 'cruise'; v.mission = null; }
+      for (const v of gr.cars) this.releaseCar(v);
     }
   }
   // ---------------------------------------------------------------- bodyguards (player's crew that follows)
