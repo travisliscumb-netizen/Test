@@ -39,6 +39,7 @@ const bm = await page.evaluate(() => {
 });
 check('big map opens', bm.open);
 check('big map status line is filled and never covers the map', bm.text.length > 10 && !bm.overlap && bm.stat.w > 0, JSON.stringify(bm));
+check('big map fits entirely on screen (480x270)', bm.canvas.t >= 0 && bm.canvas.l >= 0 && bm.canvas.b <= 270 && bm.canvas.r <= 480 && bm.stat.b <= 270, JSON.stringify(bm.canvas));
 const col = await page.evaluate(() => {
   const { FACTIONS } = window.__pv; const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const pc = hex('#ffb547'), d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -89,6 +90,9 @@ await frames(tp, 10);
 const cdp = await t.ctx.newCDPSession(tp);
 const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
 const stickWalk = async () => {
+  // from the middle of a crossroads, so a wall can never be what stops the walk
+  await tp.evaluate(() => { const g = window.game; g.resetPlayerState(6 * 80, 6 * 80, 0); g.cam.yaw = 0; });
+  await frames(tp, 3);
   const a = await tp.evaluate(() => ({ x: window.game.player.pos.x, z: window.game.player.pos.z }));
   await touch('touchStart', [{ x: 120, y: 300, id: 1 }]);
   await touch('touchMove', [{ x: 120, y: 240, id: 1 }]);
@@ -102,12 +106,15 @@ check('touch controls are shown on a touch device', await tp.evaluate(() => !doc
 const s0 = await stickWalk();
 check('touch stick moves the player', s0.d > 0.5 && !s0.stick, JSON.stringify(s0));
 const tapBtn = async sel => { const r = await tp.evaluate(s => { const q = document.querySelector(s).getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; }, sel); await touch('touchStart', [{ x: r.x, y: r.y, id: 7 }]); await frames(tp, 2); await touch('touchEnd', []); await frames(tp, 3); };
-// open the map while the stick is held, then close it by tapping outside the map
+// open the map with a second finger while the stick is still held, then close it by tapping outside
+const mb = await tp.evaluate(() => { const q = document.querySelector('#touch .tbtn[data-act="map"]').getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
 await touch('touchStart', [{ x: 120, y: 300, id: 2 }]); await touch('touchMove', [{ x: 120, y: 250, id: 2 }]); await frames(tp, 4);
-await tapBtn('#touch .tbtn[data-act="map"]');
+await touch('touchStart', [{ x: 120, y: 250, id: 2 }, { x: mb.x, y: mb.y, id: 3 }]); await frames(tp, 4);
 const tmap = await tp.evaluate(() => ({ open: window.game.mapOpen, stick: window.game.input.stick.active }));
-await touch('touchEnd', []);
+await touch('touchEnd', []); await frames(tp, 3);
 check('Map button opens the map and releases the held stick', tmap.open && !tmap.stick, JSON.stringify(tmap));
+const fit = await tp.evaluate(() => { const r = document.getElementById('bigmapCanvas').getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right, w: innerWidth, h: innerHeight }; });
+check('big map fits on a landscape phone screen (800x400)', fit.t >= 0 && fit.b <= fit.h && fit.l >= 0 && fit.r <= fit.w && fit.b - fit.t > 200, JSON.stringify(fit));
 await tp.mouse.click(6, 6); await frames(tp, 4); // a tap on the dark backdrop
 check('tapping outside the map closes it on touch', await tp.evaluate(() => !window.game.mapOpen));
 const s1 = await stickWalk();

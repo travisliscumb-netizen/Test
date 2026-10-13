@@ -75,7 +75,9 @@ const crew = await ev(() => {
   const ra = c ? uw.crew.assign(c.id, 'dealer', tgt) : 'none';
   uw.S.storage.flop = { green: 30 };
   const before = units(uw.S.storage.flop);
-  uw.tickDay();
+  // pin randomness for this one day: stash robberies, skimming and busts are tested elsewhere
+  const r0 = Math.random; Math.random = () => 0.99;
+  try { uw.tickDay(); } finally { Math.random = r0; }
   return { r, ra, role: c && c.role, before, after: units(uw.S.storage.flop), income: uw.S.lastLedger && uw.S.lastLedger.inc.dealers, wages: uw.S.lastLedger && uw.S.lastLedger.exp.wages, status: c && c.status };
   function units(o) { let n = 0; for (const k in o) n += o[k]; return n; }
 });
