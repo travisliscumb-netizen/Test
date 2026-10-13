@@ -105,7 +105,7 @@ await page.keyboard.down('KeyD'); await frames(page, 10); await page.keyboard.pr
 check('dodge triggers', await page.evaluate(() => window.game.player.dodgeT > 0 || window.game.player.invuln > 0));
 await page.keyboard.up('KeyD'); await frames(page, 20);
 await page.evaluate(() => { const g = window.game, p = g.player; const q = g.peds.make('dummy'); q.x = p.pos.x + Math.sin(p.h) * 1.0; q.z = p.pos.z + Math.cos(p.h) * 1.0; q.y = p.pos.y; q.state = 'free'; q.keep = true; q.health = 500; q.brain = (c) => { c.vx = 0; c.vz = 0; }; g.peds.peds.push(q); g.__dummy = q; });
-for (let i = 0; i < 3; i++) { await page.mouse.down(); await frames(page, 1); await page.mouse.up(); await frames(page, 14); }
+for (let i = 0; i < 3; i++) { await page.mouse.down(); await frames(page, 1); await page.mouse.up(); await frames(page, 9); }
 await frames(page, 20);
 const combo = await page.evaluate(() => ({ hp: window.game.__dummy.health }));
 check('three-hit combo lands (light, light, kick finisher)', combo.hp < 500 - 35, JSON.stringify(combo));

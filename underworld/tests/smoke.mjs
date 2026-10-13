@@ -30,6 +30,15 @@ const menus = await page.evaluate(() => {
 });
 const bad = Object.entries(menus).filter(([k, v]) => v !== true);
 check('every street menu renders', bad.length === 0, JSON.stringify(bad));
+// street locations never sit on top of each other or of an existing building door
+const clash = await page.evaluate(() => {
+  const g = window.game, out = [];
+  const pts = g.uw.locs.filter(L => L.kind !== 'deal').map(L => ({ n: L.kind + ':' + L.id, x: L.x, z: L.z, place: L.def && L.def.place }));
+  for (const id in g.world.places) { const d = g.world.places[id].door; if (d && !g.world.places[id].hidden) pts.push({ n: 'door:' + id, x: d.x, z: d.z }); }
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) if (!(pts[j].n === 'door:' + pts[i].place) && Math.hypot(pts[i].x - pts[j].x, pts[i].z - pts[j].z) < 6) out.push(pts[i].n + '~' + pts[j].n);
+  return out;
+});
+check('street locations and doors are at least 6m apart', clash.length === 0, JSON.stringify(clash));
 // strategic days
 const days = await page.evaluate(() => { const g = window.game; for (let i = 0; i < 6; i++) { g.uw.tickHours(24, 12); g.uw.tickDay(); } return { day: g.uw.S.day, opps: g.uw.S.opps.length, ledger: !!g.uw.S.lastLedger }; });
 check('six strategic days tick', days.day === 7, JSON.stringify(days));
