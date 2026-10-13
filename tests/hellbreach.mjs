@@ -373,6 +373,94 @@ await page.tap('#btn-next');
 await page.waitForFunction(() => window.__hellbreach.mode === 'play');
 check('next deck loads with carried weapons and no keys', await api(page, () => { const P = window.__hellbreach.P; return window.__hellbreach.L.idx === 1 && P.weapons.ion && !P.keys.red; }));
 
+/* level dressing never blocks a route, a secret, or a door */
+const dressing = await api(page, () => {
+  const h = window.__hellbreach, out = [];
+  for (let li = 0; li < h.LEVELS.length; li++) {
+    h.start(li); const L = h.L, MW = L.MW, MH = L.MH, rows = h.LEVELS[li].map;
+    const pass = (i) => { const t = L.grid[i]; return !L.flowBlock[i] && (t === 0 || t >= 10); };
+    const start = (h.P.y | 0) * MW + (h.P.x | 0), seen = new Uint8Array(MW * MH), q = [start]; seen[start] = 1;
+    while (q.length) { const i = q.pop(); for (const d of [1, -1, MW, -MW]) { const j = i + d; if (!seen[j] && pass(j)) { seen[j] = 1; q.push(j); } } }
+    const stranded = L.items.filter((it) => !seen[(it.y | 0) * MW + (it.x | 0)]).map((it) => `${it.type}@${it.x | 0},${it.y | 0}`);
+    const isWall = (t) => t > 0 && t < 8, at = (x, y) => L.grid[y * MW + x];
+    const decor = L.props.filter((p) => p.decor);
+    const badGap = decor.filter((p) => { const x = p.x | 0, y = p.y | 0; return (isWall(at(x - 1, y)) && isWall(at(x + 1, y))) || (isWall(at(x, y - 1)) && isWall(at(x, y + 1))); }).length;
+    const unpathed = decor.filter((p) => !L.flowBlock[(p.y | 0) * MW + (p.x | 0)]).length;
+    const loudSecret = L.doors.filter((d) => d.secret).some((d) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => L.wtex[(d.y + dy) * MW + d.x + dx]));
+    const wrongWall = L.wtex.some((t, i) => t && ![1, 2, 4].includes(L.grid[i]));
+    out.push({ level: li + 1, decor: decor.length, stranded, badGap, unpathed, loudSecret, wrongWall });
+  }
+  return out;
+});
+for (const d of dressing) {
+  check(`level ${d.level}: decorations leave every pickup reachable`, d.stranded.length === 0, `${d.decor} props ${d.stranded.join(' ')}`);
+  check(`level ${d.level}: no decoration plugs a one-tile gap`, d.badGap === 0, String(d.badGap));
+  check(`level ${d.level}: monsters path around decorations`, d.unpathed === 0, String(d.unpathed));
+  check(`level ${d.level}: secret walls match their neighbours`, !d.loudSecret);
+  check(`level ${d.level}: detail panels only on tech, brick and metal walls`, !d.wrongWall);
+}
+const closet = await api(page, () => {
+  const h = window.__hellbreach; h.start(0); const L = h.L; h.P.god = true;
+  for (const e of L.enemies) e.state = 'dead';
+  L.doors.find((d) => d.secret).trig = true; L.doors.find((d) => d.secret).open = 1;
+  h.teleport(26.5, 8.5, 0); h.P.health = 50; h.input.stick.y = 1; h.sim(3); h.input.stick.y = 0;
+  return L.items.find((i) => i.x === 30.5 && i.y === 8.5).taken;
+});
+check('Hangar 9 secret closet can be walked to the end', closet);
+
+/* saves: checkpoint round trip, practice protection, corrupt saves rejected */
+const saves = await api(page, () => {
+  const h = window.__hellbreach; h.start(1); h.give(); const L = h.L, P = h.P;
+  h.teleport(5.5, 9.5, 1.0); h.sim(1);
+  L.enemies[0].hp = 7; L.doors[0].open = 1; L.doors[0].state = 'open';
+  const ok = h.saveCheckpoint(true), snap = { x: P.x, y: P.y, hp: L.enemies[0].hp, ammo: JSON.stringify(P.ammo) };
+  P.x = 2; L.enemies[0].hp = 99; h.sim(0.5);
+  const restored = h.restoreCheckpoint(h.save.checkpoint);
+  const same = Math.abs(h.P.x - snap.x) < 1e-6 && h.L.enemies[0].hp === snap.hp && JSON.stringify(h.P.ammo) === snap.ammo && h.L.doors[0].open === 1;
+  const bytes = localStorage.getItem('hellbreach.v3').length;
+  const before = localStorage.getItem('hellbreach.v3');
+  h.beginPractice(2); h.sim(9); h.saveCheckpoint(true);
+  const protectedSave = localStorage.getItem('hellbreach.v3') === before;
+  const rejects = h.restoreCheckpoint({ version: 3, level: 9 }) === false;
+  return { ok, restored, same, bytes, protectedSave, rejects };
+});
+check('manual save writes a checkpoint', saves.ok);
+check('loading a checkpoint restores position, ammo, monsters and doors', saves.restored && saves.same, JSON.stringify(saves));
+check('practice never overwrites the campaign save', saves.protectedSave);
+check('a corrupt save is rejected instead of crashing', saves.rejects);
+check('a checkpoint stays small', saves.bytes < 60000, `${saves.bytes} bytes`);
+
+/* arsenal wheel and quick swap */
+await api(page, () => { const h = window.__hellbreach; h.start(0); h.give(); h.select('pistol'); });
+await page.waitForTimeout(100);
+const swapBox = await page.locator('#btn-swap').boundingBox();
+await touch(cdp, 'touchStart', [{ x: swapBox.x + swapBox.width / 2, y: swapBox.y + swapBox.height / 2, id: 11 }]);
+await page.waitForTimeout(450);
+await touch(cdp, 'touchEnd', []);
+check('holding SWAP opens the arsenal wheel', await page.isVisible('#wheel'));
+await page.screenshot({ path: path.join(SHOTS, '10-wheel.png') });
+await page.tap('#wheel-grid [data-pick="breacher"]');
+await page.waitForTimeout(450);
+check('picking from the wheel equips it and resumes', await api(page, () => window.__hellbreach.mode === 'play' && window.__hellbreach.P.cur === 'breacher'));
+await touch(cdp, 'touchStart', [{ x: swapBox.x + swapBox.width / 2, y: swapBox.y + swapBox.height / 2, id: 12 }]);
+await touch(cdp, 'touchEnd', []);
+await page.waitForTimeout(450);
+check('a quick tap on SWAP returns to the previous weapon', await api(page, () => window.__hellbreach.P.cur === 'pistol'));
+
+/* the Warden's rift pulse leaves a gap that is not always where you stand */
+const nova = await api(page, () => {
+  const h = window.__hellbreach; h.start(3); const B = h.L.boss; h.P.god = true;
+  const gaps = new Set();
+  for (let n = 0; n < 12; n++) {
+    h.L.projs.length = 0; B.phase = 3; B.attackCount = 2; h.startAttack(B, 'ranged'); B.atkT = 5; B.shot = 0;
+    h.updateEnemy(B, 1 / 60);
+    const rel = h.L.projs.map((p) => ((Math.round((Math.atan2(p.vy, p.vx) - B.aimA) / (Math.PI / 6)) % 12) + 12) % 12);
+    for (let k = 0; k < 12; k++) if (!rel.includes(k)) { gaps.add(k); break; }
+  }
+  return [...gaps];
+});
+check('rift pulse gap moves around instead of always sparing you', nova.length > 2, JSON.stringify(nova));
+
 /* stability soak */
 for (let li = 0; li < 4; li++) {
   const r = await api(page, (li) => {
@@ -435,11 +523,11 @@ await ctx.close();
   check('portrait: stick moves the player', (await api(page, () => window.__hellbreach.P.x)) - before > 0.6);
   const overlap = await api(page, () => {
     const r = (s) => document.querySelector(s).getBoundingClientRect();
-    const a = r('.hud-l'), b = r('.hud-r'), c = r('.hud-top');
+    const a = r('.hud-l'), b = r('.hud-r'), c = r('.hud-top'), m = r('#mission');
     const hit = (p, q) => !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top);
-    return { lr: hit(a, b), lt: hit(a, c), rt: hit(b, c), rightEdge: b.right <= innerWidth };
+    return { lr: hit(a, b), lt: hit(a, c), rt: hit(b, c), mr: hit(m, b), mt: hit(m, c), rightEdge: b.right <= innerWidth };
   });
-  check('portrait: HUD blocks do not overlap or overflow', !overlap.lr && !overlap.lt && !overlap.rt && overlap.rightEdge, JSON.stringify(overlap));
+  check('portrait: HUD blocks and mission line do not overlap or overflow', !overlap.lr && !overlap.lt && !overlap.rt && !overlap.mr && !overlap.mt && overlap.rightEdge, JSON.stringify(overlap));
   await page.waitForTimeout(800);
   await page.screenshot({ path: path.join(SHOTS, '09-portrait-play.png') });
   check('no console errors or page exceptions (portrait)', errors.length === 0, errors.join(' | '));
