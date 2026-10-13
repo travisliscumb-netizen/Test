@@ -177,11 +177,33 @@ const audit = await ev(() => {
   if (uw.owner.length !== 36) bad.push('owner len');
   if ((p.pose.surrender || 0) > 0 || p.blocking || p.knockT > 0 || g.mapOpen || g.ui.modal || g.police.bust) bad.push('stale player/ui');
   if (g.input.down.size) bad.push('stuck keys');
-  const scan = (o, path, d) => { if (d > 12 || !o || typeof o !== 'object') return; for (const k in o) { const v = o[k]; if (typeof v === 'number' && !Number.isFinite(v)) bad.push('save ' + path + '.' + k); else if (typeof v === 'object') scan(v, path + '.' + k, d + 1); } };
+  // the save must be plain data: no NaN / Infinity and no live objects (vehicles, meshes, vectors)
+  const scan = (o, path, d) => {
+    if (d > 14 || !o || typeof o !== 'object' || bad.length > 8) return;
+    for (const k in o) {
+      const v = o[k];
+      if (typeof v === 'number' && !Number.isFinite(v)) bad.push('save NaN ' + path + '.' + k);
+      else if (v && typeof v === 'object') {
+        const pr = Object.getPrototypeOf(v);
+        if (!Array.isArray(v) && pr !== Object.prototype && pr !== null) { bad.push('save holds a live ' + ((v.constructor && v.constructor.name) || 'object') + ' at ' + path + '.' + k); continue; }
+        scan(v, path + '.' + k, d + 1);
+      }
+    }
+  };
   scan(g.save, 'save', 0);
+  try { JSON.stringify(g.save); } catch (e) { bad.push('save does not serialise: ' + e.message); }
   return bad;
 });
 check('session: no corrupted state anywhere after the stretch of play', audit.length === 0, audit.join(', '));
+// rare-car opportunity: its car spawns next to the player and a save must still work
+const rare = await ev(() => {
+  const g = window.game, uw = g.uw, p = g.player, now = uw.opps.absHour();
+  const o = { id: 'rt' + Date.now(), kind: 'rarecar', title: 'test', text: 'test', type: 'supercar', x: p.pos.x + 12, z: p.pos.z, h: 0, until: now + 5 };
+  uw.S.opps.push(o); return o.id;
+});
+await frames(page, 6);
+const rareSave = await ev(id => { const g = window.game; const car = g.uw.opps.cars.get(id); const ok = g.saveGame(true); const raw = localStorage.getItem('pvunderworld.save.v1') || ''; const o = JSON.parse(raw).uw.opps.find(x => x.id === id); return { spawned: !!car, ok, err: window.__pv.SaveSystem.lastError, carInSave: !!(o && o.car), size: raw.length }; }, rare);
+check('a save works while a rare-car opportunity has its car on the street', rareSave.spawned && rareSave.ok && !rareSave.carInSave && rareSave.size < 1.5e6, JSON.stringify(rareSave));
 // ---------------------------------------------------------------- 12. save + reload
 const before = await ev(() => { const g = window.game, uw = g.uw; g.police.enabled = true; g.resetPlayerState(5 * 80 + 40, 5 * 80, 0); const ok = g.saveGame(true); return { ok, money: g.save.money, crew: uw.S.crew.length, own: uw.owner.filter(o => o === 'pc').length, flop: uw.props.owned('flop'), kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, day: uw.S.day }; });
 await page.reload();

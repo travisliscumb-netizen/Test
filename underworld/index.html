@@ -32736,8 +32736,13 @@ const SaveSystem = {
     if (d.home !== null && typeof d.home !== 'string') d.home = null;
     d.version = SAVE_VERSION;
   },
+  // saves hold plain data only: anything that is a class instance (a live vehicle, a mesh, a
+  // vector) is dropped instead of breaking the whole save with a circular-structure error
+  _plain(k, v) { if (v && typeof v === 'object' && !Array.isArray(v)) { const pr = Object.getPrototypeOf(v); if (pr !== Object.prototype && pr !== null) return undefined; } return v; },
   save(data) {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); this.saveSettings(data.settings); return true; } catch { return false; }
+    this.lastError = null;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data, this._plain)); this.saveSettings(data.settings); return true; }
+    catch (e) { this.lastError = (e && e.name) || 'error'; console.warn('Save failed: ' + ((e && e.message) || e)); return false; }
   },
   wipe() { try { localStorage.removeItem(SAVE_KEY); } catch { /* storage blocked */ } }
 };
@@ -44324,7 +44329,8 @@ class Prison {
    ===================================================================== */
 const OPP_ICON = { scarcity: '▲', demand: '$', shipment: '⚓', instability: '◆', war: '⚔', rarecar: '★', bounty: '✚', contract: '☎', race: '⚑', raidwarn: '!', taskforce: '!', coalition: '!', retaliate: '⚔' };
 class OppFeed {
-  constructor(uw) { this.uw = uw; this.mk = new Map(); this.carT = 0; }
+  // live cars for opportunities are kept here, never in the saved state
+  constructor(uw) { this.uw = uw; this.mk = new Map(); this.cars = new Map(); this.carT = 0; }
   get S() { return this.uw.S; }
   absHour() { return this.S.day * 24 + Math.floor(this.uw.g.env.time); }
   add(o) {
@@ -44400,13 +44406,15 @@ class OppFeed {
       // rare cars appear on the street when the player is near
       if (o.kind === 'rarecar' && !o.taken) {
         const d2 = dist2(o.x, o.z, p.pos.x, p.pos.z);
-        if (!o.car && d2 < 200 * 200 && !p.interior) { const v = g.vehicles.spawn(o.type, o.x, o.z, o.h, { parked: true }); v.touched = true; v.rareOpp = o.id; o.car = v; }
-        if (o.car && !g.vehicles.list.includes(o.car)) o.car = null;
-        if (o.car && p.vehicle === o.car) { o.taken = true; o.until = now; g.ui.toast(`You got the ${o.car.spec.name}. The chop shop will pay well; a garage will keep it.`, 'money'); }
+        let car = this.cars.get(o.id);
+        if (car && (!g.vehicles.list.includes(car) || car.rareOpp !== o.id)) { this.cars.delete(o.id); car = null; }
+        if (!car && d2 < 200 * 200 && !p.interior) { car = g.vehicles.spawn(o.type, o.x, o.z, o.h, { parked: true }); car.touched = true; car.rareOpp = o.id; this.cars.set(o.id, car); }
+        if (car && p.vehicle === car) { o.taken = true; o.until = now; this.cars.delete(o.id); g.ui.toast(`You got the ${car.spec.name}. The chop shop will pay well; a garage will keep it.`, 'money'); }
       }
     }
     // world markers for the nearest few located opportunities
     this.carT -= dt; if (this.carT > 0) return; this.carT = 0.5;
+    for (const [id, v] of this.cars) if (!g.vehicles.list.includes(v) || v.rareOpp !== id) this.cars.delete(id);
     const want = this.active().filter(o => o.x !== undefined && !o.taken && dist2(o.x, o.z, p.pos.x, p.pos.z) < 220 * 220).slice(0, 4);
     for (const [id, m] of this.mk) if (!want.find(o => o.id === id)) { g.missions.markers.release(m); this.mk.delete(id); }
     for (const o of want) if (!this.mk.has(o.id) && !p.interior) { const m = g.missions.markers.get(o.urgent ? 0xff4d5e : 0xd28cff, 2.2, true); m.g.position.set(o.x, groundY(o.x, o.z), o.z); this.mk.set(o.id, m); }
@@ -45770,6 +45778,7 @@ class Game {
   // stable (no wanted level, no fight, no job, not mid-transition) unless forced by a manual
   // save point or a state the game controls (jail, a new career). Settings save on their own.
   saveGame(force) {
+    SaveSystem.lastError = null;
     if (!this.env || this.wiped) return false;
     SaveSystem.saveSettings(this.save.settings);
     if (!force && (this.state === 'menu' || this.state === 'loading')) return false;
@@ -45786,7 +45795,13 @@ class Game {
     if (ok) this.lastSave = performance.now();
     return ok;
   }
-  autosave(reason) { if (this.state !== 'playing') return; if (this.saveGame(false)) { this.ui.toast('Autosaved · ' + reason); } else this.pendingAutosave = reason; }
+  autosave(reason) {
+    if (this.state !== 'playing') return;
+    if (this.saveGame(false)) { this.ui.toast('Autosaved · ' + reason); this.pendingAutosave = null; return; }
+    if (SaveSystem.lastError) { this.pendingAutosave = null; this.saveFailToast(); return; } // storage refused: don't retry every frame
+    this.pendingAutosave = reason; // not a stable moment yet: retried when things calm down
+  }
+  saveFailToast() { if (performance.now() - (this._saveFailT || -1e9) > 20000) { this._saveFailT = performance.now(); this.ui.toast('Could not save: browser storage is full or blocked.', 'warn'); } }
   canQuickSave() {
     const p = this.player, v = p.state === 'vehicle' ? p.vehicle : null;
     return !!(this.uw && this.uw.isStable() && v && (v.garageUid || v.owned) && v.speed < 2 && !this.uw.S.jail);
@@ -45798,7 +45813,11 @@ class Game {
     if (v.speed >= 2) return 'Stop the car first';
     return 'Not during a fight or job';
   }
-  quickSave() { if (!this.canQuickSave()) { this.ui.toast('Quick save: ' + this.quickSaveWhy(), 'warn'); this.audio.play('deny'); return; } this.saveGame(true); this.ui.toast('Quick saved in your car.', 'money'); this.audio.play('confirm'); }
+  quickSave() {
+    if (!this.canQuickSave()) { this.ui.toast('Quick save: ' + this.quickSaveWhy(), 'warn'); this.audio.play('deny'); return; }
+    if (this.saveGame(true)) { this.ui.toast('Quick saved in your car.', 'money'); this.audio.play('confirm'); }
+    else { this.saveFailToast(); this.audio.play('deny'); }
+  }
   ach(id) { this.content.ach(id); }
   // a delayed call that is dropped if the player quits or starts a new career meanwhile
   later(ms, fn) { const s = this.session; setTimeout(() => { if (s === this.session && this.state !== 'menu' && this.state !== 'loading') fn(); }, ms); }
