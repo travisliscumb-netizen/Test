@@ -47,7 +47,12 @@ check('chop shop buys the stolen car', chop.gone && chop.after > chop.before && 
 await ev(() => { window.game.save.money += 20000; window.game.save.rep = 150; });
 const prop = await ev(() => { const g = window.game, uw = g.uw, L = uw.loc('prop', 'flop'); g.resetPlayerState(L.x, L.z, 0); const a = uw.findAction(); const r = uw.props.buy('flop'); return { label: a && a.label, r, owned: uw.props.owned('flop'), saved: (localStorage.getItem('pvunderworld.save.v1') || '').includes('"flop":{"owned":true') }; });
 check('buy a safehouse in person', prop.owned && prop.r === '' && /for sale/.test(prop.label || ''), JSON.stringify(prop));
-check('purchase autosaves', prop.saved);
+// autosaves only commit in a stable moment (the mugging above may still count as a fight):
+// the purchase must be saved now or queued and committed as soon as things calm down
+const queued = await ev(() => window.game.pendingAutosave);
+let saved = prop.saved;
+for (let k = 0; k < 60 && !saved; k++) { await frames(page, 5); saved = await ev(() => (localStorage.getItem('pvunderworld.save.v1') || '').includes('"flop":{"owned":true')); }
+check('purchase autosaves (at once or when stable)', saved, `immediate ${prop.saved} queued ${queued}`);
 // ---------------------------------------------------------------- 5. supply -> stash -> street deal
 const buy = await ev(() => { const g = window.game, uw = g.uw, L = uw.loc('spot', 'sully'); g.resetPlayerState(L.x, L.z, 0); uw.ui.openSpot(L); g.content._svcAct('buy:smokes:5'); g.content._svcAct('buy:smokes:5'); const n = uw.S.inv.smokes | 0; while (g.ui.stack.length) g.ui.back(); return n; });
 check('bought smokes wholesale from Sully', buy === 10, 'carrying ' + buy);

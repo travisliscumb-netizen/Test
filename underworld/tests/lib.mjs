@@ -1,16 +1,15 @@
 /* Shared helpers for the Underworld test suites (headless Chromium + SwiftShader).
-   Offline: set THREE_DIR to an unpacked three@0.160.0 package; requests to the CDN are
-   then served from disk. */
+   Every suite runs fully offline: the browser context is put offline and every non-file
+   request is aborted and reported as an error, so a hidden network dependency fails the
+   suite's "no console errors" check. */
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 let playwright;
 try { playwright = require('playwright'); } catch { playwright = createRequire(path.join(process.execPath, '../../lib/node_modules/'))('playwright'); }
 export const { chromium } = playwright;
 export const FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'index.html');
-const THREE_DIR = process.env.THREE_DIR;
 const IGNORE = /GPU stall|swiftshader|WebGL-|Automatic fallback to software WebGL|GroupMarkerNotSet/i;
 export let failures = 0;
 export const results = [];
@@ -22,18 +21,16 @@ export function check(name, ok, detail = '') {
 export const launch = () => chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 export async function open(browser, ctxOpts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 480, height: 270 }, ...ctxOpts });
-  if (THREE_DIR) await ctx.route('https://cdn.jsdelivr.net/npm/three@0.160.0/**', route => {
-    const fp = path.join(THREE_DIR, route.request().url().replace('https://cdn.jsdelivr.net/npm/three@0.160.0/', ''));
-    if (!fs.existsSync(fp)) return route.fulfill({ status: 404, body: 'not found' });
-    route.fulfill({ status: 200, body: fs.readFileSync(fp), headers: { 'content-type': 'text/javascript', 'access-control-allow-origin': '*' } });
-  });
   // no pointer lock in tests: synthetic mouse moves must not turn the camera
   await ctx.addInitScript(() => { HTMLCanvasElement.prototype.requestPointerLock = function () { return Promise.reject(new Error('disabled in tests')); }; });
-  const page = await ctx.newPage(), errors = [];
+  const page = await ctx.newPage(), errors = [], net = [];
+  await ctx.setOffline(true);
+  await ctx.route(u => !u.href.startsWith('file:') && !u.href.startsWith('data:') && !u.href.startsWith('blob:'), route => { net.push(route.request().url()); errors.push('NETWORK request blocked: ' + route.request().url()); route.abort(); });
+  page.on('requestfailed', r => { const u = r.url(); if (!u.startsWith('data:') && !u.startsWith('blob:') && !net.includes(u)) { net.push(u); errors.push('REQUEST FAILED: ' + u + ' ' + (r.failure() && r.failure().errorText)); } });
   page.on('pageerror', e => errors.push('PAGEERROR ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n')));
   page.on('console', m => { if ((m.type() === 'error' || m.type() === 'warning') && !IGNORE.test(m.text())) errors.push(m.type() + ': ' + m.text()); });
   await page.goto('file://' + FILE);
-  return { ctx, page, errors };
+  return { ctx, page, errors, net };
 }
 export const frames = async (page, n) => { const f0 = await page.evaluate(() => window.game.frame); await page.waitForFunction(t => window.game.frame >= t, f0 + n, { timeout: 240000, polling: 50 }); };
 export async function boot(page, low = true) {
