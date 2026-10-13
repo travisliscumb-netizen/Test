@@ -43422,10 +43422,19 @@ function gangAttack(p, t, dt) {
   const reach = p.bat ? 1.6 : 1.25;
   if (d > reach * 0.9) {
     const sp = p.fleeT > 0 ? 0 : 4.8 + p.skill;
-    p.vx = damp(p.vx, dx / d * sp, 8, dt); p.vz = damp(p.vz, dz / d * sp, 8, dt);
-    p.h = dampAngle(p.h, Math.atan2(dx, dz), 9, dt);
+    // not gaining ground (a parked car, a bench, a corner in the way): swing round it,
+    // alternating sides, instead of pushing straight into it forever
+    const moved = p.lastX !== undefined ? Math.hypot(p.x - p.lastX, p.z - p.lastZ) : sp * dt;
+    p.stuckT = (sp > 0 && dt > 0 && moved < sp * dt * 0.25) ? (p.stuckT || 0) + dt : 0;
+    p.lastX = p.x; p.lastZ = p.z;
+    if (p.stuckT > 0.45) { p.stuckT = 0; p.sideT = 0.8; p.sideDir = p.sideDir ? -p.sideDir : ((p.id | 0) % 2 ? 1 : -1); }
+    let ax = dx / d, az = dz / d;
+    if (p.sideT > 0) { p.sideT -= dt; const a = 1.25 * p.sideDir, c = Math.cos(a), sn = Math.sin(a); const rx = ax * c - az * sn, rz = ax * sn + az * c; ax = rx; az = rz; }
+    p.vx = damp(p.vx, ax * sp, 8, dt); p.vz = damp(p.vz, az * sp, 8, dt);
+    p.h = dampAngle(p.h, Math.atan2(p.vx, p.vz), 9, dt);
     return;
   }
+  p.stuckT = 0; p.lastX = undefined; p.sideT = 0;
   p.vx = damp(p.vx, 0, 10, dt); p.vz = damp(p.vz, 0, 10, dt);
   p.h = dampAngle(p.h, Math.atan2(dx, dz), 9, dt);
   // read the player's attack and block it now and then

@@ -94,11 +94,11 @@ for (let c = 0; c < CYCLES; c++) {
   }
   if (c % 2 === 0) {
     // save, quit to the menu and continue: the save must round-trip exactly
-    const sv = await ev(() => { const g = window.game; g.police.clear(); g.saveGame(true); g.quitToMenu(); return { money: g.save.money, day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; });
+    const sv = await ev(() => { const g = window.game; g.police.clear(); const ok = g.saveGame(true); const r = { ok, money: g.save.money, day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; g.quitToMenu(); return r; });
     await frames(page, 4);
     await page.click('#btnContinue');
     await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
-    const ld = await ev(() => { const g = window.game; return { money: g.save.money, day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; });
+    const ld = await ev(() => { const g = window.game; return { ok: true, money: g.save.money, day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; });
     check(`cycle ${c + 1}: save round-trips through quit + continue`, JSON.stringify(sv) === JSON.stringify(ld), JSON.stringify([sv, ld]).slice(0, 300));
   }
   // let one-shot timers (voices, toasts, fades) settle before measuring

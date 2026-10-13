@@ -94,7 +94,8 @@ check('a Vipers crew stands on their corner', grp >= 2, 'members ' + grp);
 await ev(i => { const g = window.game, gr = g.uw.gangs.groups.get('hang' + i), m = gr.members[0]; g.uw.onPedHit(m, 'light', 5); }, gangTurf);
 let attacked = false;
 for (let k = 0; k < 60 && !attacked; k++) { await frames(page, 2); attacked = await ev(i => { const gr = window.game.uw.gangs.groups.get('hang' + i); return !!gr && gr.hostile && gr.members.some(m => m.target && m.target.isPlayer && (m.pendHit !== undefined || m.pose.aim > 0 || Math.hypot(m.x - window.game.player.pos.x, m.z - window.game.player.pos.z) < 2)); }, gangTurf); }
-check('provoked gang members come for the player', attacked);
+const atkInfo = await ev(i => { const g = window.game, gr = g.uw.gangs.groups.get('hang' + i), p = g.player; if (!gr) return { group: false }; return { hostile: gr.hostile, att: g.uw.attitude(gr.fid), members: gr.members.map(m => ({ st: m.state, tgt: m.target ? (m.target.isPlayer ? 'player' : m.target.kind) : null, d: +Math.hypot(m.x - p.pos.x, m.z - p.pos.z).toFixed(1), hp: m.health, flee: m.fleeT > 0, aim: m.pose.aim, stag: m.stagger > 0 })) }; }, gangTurf);
+check('provoked gang members come for the player', attacked, JSON.stringify(atkInfo));
 const ko = await ev(i => { const g = window.game, uw = g.uw, gr = uw.gangs.groups.get('hang' + i); const before = uw.S.turfs[i].inf.vipers || 0; const m = gr.members.find(x => x.state !== 'down'); m.health = 1; g.peds.knock(m, 1, 1, 5, true, 'melee'); return { ko: m.ko, before, after: uw.S.turfs[i].inf.vipers || 0, drops: uw.pickups.list.length, rel: uw.S.factions.vipers.rel }; }, gangTurf);
 check('knocking out a gang member weakens their hold', ko.ko && ko.after < ko.before, JSON.stringify(ko));
 await ev(() => { window.game.debug.god = false; window.game.player.health = 100; });
