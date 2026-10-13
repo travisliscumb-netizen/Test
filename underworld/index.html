@@ -41886,7 +41886,7 @@ const FACTIONS = {
     member: { shirt: [0x7a2b6e, 0x2a0f2e, 0x111111], jacket: 0x111111, shades: true, pants: [0x111111, 0x22262c] }
   },
   bellcourt: {
-    name: 'Bellcourt Family', short: 'Bellcourt', col: '#ff6470', hex: 0xb8323c, archetype: 'Old organized crime', home: 'm',
+    name: 'Bellcourt Family', short: 'Bellcourt', col: '#ec1c4c', hex: 0xb0163a, archetype: 'Old organized crime', home: 'm',
     goods: ['smokes', 'hardware', 'hot'], cars: ['luxury', 'sedan'], carCol: [0x111111, 0x1c2833], gun: 0.5, aggression: 0.5, start: { strength: 65, money: 60000 },
     boss: { name: 'Don Aurelio Bellcourt', title: 'Don', pers: 'honor', look: { shirt: 0xe8e8e8, jacket: 0x1b1b1e, tie: 0x8a2f3a, chain: null, build: 1.2, hair: 0xd8d8d8, hairStyle: 1 } },
     lts: ['Sal Bellcourt', 'Vito “The Ledger” Amato', 'Rosa Tedeschi', 'Nicky Two-Times'],
@@ -43028,8 +43028,13 @@ class GangManager {
   update(dt) {
     const g = this.g, uw = this.uw, S = uw.S, p = g.player;
     this.t -= dt;
-    // prune knocked-out / despawned members
-    for (const gr of this.groups.values()) gr.members = gr.members.filter(m => g.peds.peds.includes(m));
+    // prune despawned members (in place, one shared lookup set: no per-frame allocations)
+    if (this.groups.size) {
+      const live = this._live || (this._live = new Set()); live.clear();
+      for (const q of g.peds.peds) live.add(q);
+      for (const gr of this.groups.values()) { const M = gr.members; let n = 0; for (let k = 0; k < M.length; k++) if (live.has(M[k])) M[n++] = M[k]; M.length = n; }
+      live.clear();
+    }
     if (this.t <= 0) {
       this.t = 0.6;
       const px = p.pos.x, pz = p.pos.z, inside = !!p.interior;
@@ -43185,7 +43190,8 @@ class GangManager {
   }
   updateSquads(dt) {
     const g = this.g, p = g.player;
-    for (const gr of [...this.groups.values()]) {
+    // (deleting the current entry while iterating a Map is safe: no per-frame copy needed)
+    for (const gr of this.groups.values()) {
       if (gr.kind !== 'squad') continue;
       const v = gr.car;
       gr.life += dt;
@@ -43449,7 +43455,8 @@ function gangBrain(p, dt) {
     return;
   }
   if (gr && onFoot && (att === 'territorial' || att === 'hostile') && uw.owner[turfAt(p.x, p.z)] === p.fac && gr.kind !== 'war') {
-    if (att === 'hostile' && dp < 16 && g.world.grid.lineOfSight(p.x, p.y + 1.5, p.z, pl.pos.x, pl.pos.y + 1.4, pl.pos.z)) { gr.hostile = true; uw.gangs.say(p, pick(LINES.provoked)); return; }
+    // line of sight is a raycast: refresh it a few times a second, not every frame
+    if (att === 'hostile' && dp < 16 && ((p.losT = (p.losT || 0) - dt) > 0 ? p.los : (p.losT = 0.3, p.los = g.world.grid.lineOfSight(p.x, p.y + 1.5, p.z, pl.pos.x, pl.pos.y + 1.4, pl.pos.z)))) { gr.hostile = true; uw.gangs.say(p, pick(LINES.provoked)); return; }
     if (dp < 5.5) {
       if (!gr.warned) { gr.warned = g.time; uw.gangs.say(p, pick(uw.stage >= 2 ? LINES.warnKnown : LINES.warn)); }
       else if (gr.kind === 'hang' && g.time - gr.warned > 9 && dp < 3.5 && att === 'territorial' && uw.stage < 2) { gr.hostile = true; uw.gangs.say(p, 'I told you once.'); return; }
@@ -45177,6 +45184,7 @@ class UIManager {
     this.show('bigmap', on);
     this.g.mapOpen = on;
     if (on) { this.drawBigMap(); this.g.input.releaseAll(); }
+    else $('turfInfo').classList.add('hidden');
   }
   renderStats() {
     const s = this.g.save.stats;

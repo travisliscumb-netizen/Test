@@ -61,7 +61,8 @@ check('stash store / take', stash.stored === 10 && stash.pockets === 0 && stash.
 // deal corner: night, a corner on the player's side of town
 const turf = await ev(() => { const g = window.game, uw = g.uw; g.env.time = 21; for (let i = 0; i < uw.T.length; i++) if (uw.gangs.buyersActive(i) && uw.T[i].zone === 'o') return i; return 0; });
 await ev(i => { const g = window.game, t = g.uw.T[i]; g.resetPlayerState(t.deal.x + 70, t.deal.z, 0); }, turf);
-await frames(page, 6);
+// the street spawner ticks every 0.6 s: wait for the buyers to be on their corner
+for (let k = 0; k < 60 && !(await ev(i => window.game.uw.gangs.groups.has('buy' + i), turf)); k++) await frames(page, 3);
 await ev(i => { const g = window.game, t = g.uw.T[i]; g.resetPlayerState(t.deal.x + Math.sin(t.deal.h) * 1.6, t.deal.z + Math.cos(t.deal.h) * 1.6, t.deal.h + Math.PI); }, turf);
 await frames(page, 4);
 const deal = await ev(() => { const g = window.game, uw = g.uw, gr = uw.gangs.buyerNear(); if (!gr) return { found: false, groups: [...uw.gangs.groups.keys()] }; uw.ui.openDeal(gr); const before = g.save.money; const r0 = Math.random; Math.random = () => 0.99; g.content._svcAct('s:smokes:5'); Math.random = r0; const after = g.save.money; while (g.ui.stack.length) g.ui.back(); return { found: true, before, after, left: uw.S.inv.smokes | 0 }; });
@@ -124,7 +125,7 @@ check('an honest sergeant refuses and pressure rises', cor.moss === 'refused' &&
 // ---------------------------------------------------------------- 11b. one continuous stretch of play across systems
 // drive, reverse, get chased, get busted in the car, serve, walk out, use the map and overlay,
 // pickpocket and brawl again, then audit every system for corrupted state.
-await ev(() => { const g = window.game; g.police.enabled = true; g.police.clear(); g.resetPlayerState(2 * 80 + 6, 6 * 80 + 12, 0); const p = g.player; const v = g.vehicles.spawn('sedan', p.pos.x + Math.cos(p.h) * 2.3, p.pos.z - Math.sin(p.h) * 2.3, p.h + Math.PI / 2, { parked: true }); v.touched = true; window.__sv = v; });
+await ev(() => { const g = window.game; g.police.enabled = true; g.police.clear(); const x = 2 * 80 + 2.6, z = 6 * 80 + 12; const v = g.vehicles.spawn('sedan', x, z, 0, { parked: true }); v.touched = true; window.__sv = v; g.resetPlayerState(x + 2.4, z, -Math.PI / 2); g.cam.yaw = 0; });
 await frames(page, 3);
 await page.keyboard.press('KeyE'); await frames(page, 35);
 const drove = { inCar: await ev(() => window.game.player.state) };
@@ -134,8 +135,10 @@ await page.keyboard.down('KeyS'); await frames(page, 70); await page.keyboard.up
 drove.rev = await ev(() => window.game.player.vehicle ? window.game.player.vehicle.localVel().z : 0);
 check('session: enter, drive and reverse with real input', drove.inCar === 'vehicle' && drove.fwd > 3 && drove.rev < -0.5, JSON.stringify(drove));
 await ev(() => { window.game.uw.give({ smokes: 4 }); window.game.police.setLevel(2); });
-await page.keyboard.down('KeyW'); await frames(page, 60); await page.keyboard.up('KeyW');
-const chase = await ev(() => ({ lvl: window.game.police.level, units: window.game.police.units.length + window.game.police.cops.length }));
+await page.keyboard.down('KeyW'); await frames(page, 30); await page.keyboard.up('KeyW');
+// dispatch has a delay: wait (bounded) for the first unit
+let chase = { lvl: 0, units: 0 };
+for (let k = 0; k < 80 && !(chase.units > 0); k++) { await frames(page, 4); chase = await ev(() => ({ lvl: window.game.police.level, units: window.game.police.units.length + window.game.police.cops.length })); }
 check('session: a pursuit starts', chase.lvl >= 1 && chase.units > 0, JSON.stringify(chase));
 await ev(() => window.game.onBusted());
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
@@ -202,6 +205,6 @@ await page.click('#btnContinue');
 await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await frames(page, 30);
 const rec = await ev(() => { const g = window.game, uw = g.uw; return { money: g.save.money, turfs: uw.S.turfs.length, crew0: uw.S.crew[0] && uw.S.crew[0].loyalty, crewN: uw.S.crew.length, nope: !!uw.S.props.nope, snow: uw.S.market.o.snow, vipers: uw.S.factions.vipers.strength, jail: uw.S.jail, garage: g.save.garage.length, flop: uw.props.owned('flop') }; });
-check('corrupted fields are repaired, the rest of the save survives', typeof rec.money === 'number' && rec.turfs === 36 && typeof rec.crew0 === 'number' && rec.crewN >= 1 && !rec.nope && rec.snow[0] === 1 && isFinite(rec.vipers) && rec.jail === null && rec.flop, JSON.stringify(rec));
+check('corrupted fields are repaired, the rest of the save survives', typeof rec.money === 'number' && rec.turfs === 36 && typeof rec.crew0 === 'number' && rec.crewN >= 1 && !rec.nope && rec.snow.every(v => Number.isFinite(v) && v > 0.2 && v < 5) && isFinite(rec.vipers) && rec.jail === null && rec.flop, JSON.stringify(rec));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'session');

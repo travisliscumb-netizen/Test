@@ -105,8 +105,11 @@ await page.keyboard.down('KeyD'); await frames(page, 10); await page.keyboard.pr
 check('dodge triggers', await page.evaluate(() => window.game.player.dodgeT > 0 || window.game.player.invuln > 0));
 await page.keyboard.up('KeyD'); await frames(page, 20);
 await page.evaluate(() => { const g = window.game, p = g.player; const q = g.peds.make('dummy'); q.x = p.pos.x + Math.sin(p.h) * 1.0; q.z = p.pos.z + Math.cos(p.h) * 1.0; q.y = p.pos.y; q.state = 'free'; q.keep = true; q.health = 500; q.brain = (c) => { c.vx = 0; c.vz = 0; }; g.peds.peds.push(q); g.__dummy = q; });
+// light hits have a small random knock-down chance; fix it so the combo itself is what's tested
+await page.evaluate(() => { window.__rnd = Math.random; Math.random = () => 0.5; });
 for (let i = 0; i < 3; i++) { await page.mouse.down(); await frames(page, 1); await page.mouse.up(); await frames(page, 9); }
 await frames(page, 20);
+await page.evaluate(() => { Math.random = window.__rnd; });
 const combo = await page.evaluate(() => ({ hp: window.game.__dummy.health }));
 check('three-hit combo lands (light, light, kick finisher)', combo.hp < 500 - 35, JSON.stringify(combo));
 await page.evaluate(() => { window.game.peds.peds.length = 0; });
@@ -137,7 +140,9 @@ const punchTrack = async (idx, n = 12) => {
   await reset(0, 0); await clearDummies();
   const i0 = await mkDummy(0, 1.0);
   const hp = [500];
+  await page.evaluate(() => { window.__rnd = Math.random; Math.random = () => 0.5; });
   for (let i = 0; i < 3; i++) { await page.mouse.down(); await frames(page, 1); await page.mouse.up(); await frames(page, 9); hp.push(await page.evaluate(i => window.game.__ds[i].health, i0)); }
+  await page.evaluate(() => { Math.random = window.__rnd; });
   const hitsLanded = hp.slice(1).filter((h, i) => h < hp[i]).length;
   check('combo stress: each of the three combo hits connects', hitsLanded === 3, JSON.stringify(hp));
   // step-in toward a target 2.2 m away: short, and never through the target
