@@ -121,6 +121,62 @@ const cor = await ev(() => {
 });
 check('a dirty patrol cop can be bought', cor.kerr === 'paid' && cor.perk, JSON.stringify(cor));
 check('an honest sergeant refuses and pressure rises', cor.moss === 'refused' && cor.pUp > 5, JSON.stringify(cor));
+// ---------------------------------------------------------------- 11b. one continuous stretch of play across systems
+// drive, reverse, get chased, get busted in the car, serve, walk out, use the map and overlay,
+// pickpocket and brawl again, then audit every system for corrupted state.
+await ev(() => { const g = window.game; g.police.enabled = true; g.police.clear(); g.resetPlayerState(2 * 80 + 6, 6 * 80 + 12, 0); const p = g.player; const v = g.vehicles.spawn('sedan', p.pos.x + Math.cos(p.h) * 2.3, p.pos.z - Math.sin(p.h) * 2.3, p.h + Math.PI / 2, { parked: true }); v.touched = true; window.__sv = v; });
+await frames(page, 3);
+await page.keyboard.press('KeyE'); await frames(page, 35);
+const drove = { inCar: await ev(() => window.game.player.state) };
+await page.keyboard.down('KeyW'); await frames(page, 45); await page.keyboard.up('KeyW');
+drove.fwd = await ev(() => window.game.player.vehicle ? window.game.player.vehicle.speed : 0);
+await page.keyboard.down('KeyS'); await frames(page, 70); await page.keyboard.up('KeyS');
+drove.rev = await ev(() => window.game.player.vehicle ? window.game.player.vehicle.localVel().z : 0);
+check('session: enter, drive and reverse with real input', drove.inCar === 'vehicle' && drove.fwd > 3 && drove.rev < -0.5, JSON.stringify(drove));
+await ev(() => { window.game.uw.give({ smokes: 4 }); window.game.police.setLevel(2); });
+await page.keyboard.down('KeyW'); await frames(page, 60); await page.keyboard.up('KeyW');
+const chase = await ev(() => ({ lvl: window.game.police.level, units: window.game.police.units.length + window.game.police.cops.length }));
+check('session: a pursuit starts', chase.lvl >= 1 && chase.units > 0, JSON.stringify(chase));
+await ev(() => window.game.onBusted());
+await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
+const jailed = await ev(() => ({ inv: Object.keys(window.game.uw.S.inv).length, interior: window.game.player.interior && window.game.player.interior.id, veh: window.game.player.vehicle }));
+check('session: busted in the car -> jail, product confiscated', jailed.interior === 'prison' && jailed.inv === 0 && !jailed.veh, JSON.stringify(jailed));
+await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 20; window.game.uw.prison.setSpeed(20); });
+await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000 });
+await frames(page, 6);
+await page.keyboard.press('KeyM'); await frames(page, 3);
+await page.keyboard.press('KeyT'); await frames(page, 2); await page.keyboard.press('KeyT'); await frames(page, 2);
+await ev(() => window.game.uw.ui.mapClick(4 * 80 + 40, 4 * 80 + 40));
+await page.keyboard.press('KeyM'); await frames(page, 3);
+check('session: map + overlay after release', await ev(() => !window.game.mapOpen && window.game.uw.mapOverlay !== undefined));
+// pickpocket + brawl after release
+await ev(() => { const g = window.game, p = g.player; const c = g.peds.make('civ'); c.x = p.pos.x + Math.sin(p.h) * 0.9; c.z = p.pos.z + Math.cos(p.h) * 0.9; c.y = p.pos.y; c.h = p.h; c.state = 'idle'; c.timer = 99; c.keep = true; g.peds.peds.push(c); window.__m2 = c; });
+await frames(page, 2);
+const pp = await ev(() => { const a = window.game.uw.findAction(); return a && a.label; });
+await page.mouse.down(); await frames(page, 1); await page.mouse.up(); await frames(page, 14);
+const hitM = await ev(() => window.__m2.health < 100 || window.__m2.state === 'down' || window.__m2.state === 'flee');
+check('session: street interactions still work after release (prompt + punch)', pp === 'Pickpocket' && hitM, `${pp} ${hitM}`);
+await ev(() => window.game.police.clear('session'));
+await frames(page, 10);
+const audit = await ev(() => {
+  const g = window.game, p = g.player, uw = g.uw, bad = [];
+  if (![p.pos.x, p.pos.y, p.pos.z, p.vel.x, p.vel.z, p.h, p.health, g.cam.yaw, g.cam.pitch].every(Number.isFinite)) bad.push('player/cam NaN');
+  for (const v of g.vehicles.list) if (![v.pos.x, v.pos.y, v.pos.z, v.vel.x, v.h, v.health].every(Number.isFinite)) { bad.push('veh NaN'); break; }
+  for (const q of g.peds.peds) if (![q.x, q.y, q.z, q.health].every(Number.isFinite)) { bad.push('ped NaN'); break; }
+  if (!Number.isFinite(g.save.money) || g.save.money < 0) bad.push('money ' + g.save.money);
+  for (const t of uw.S.turfs) for (const k in t.inf) if (!Number.isFinite(t.inf[k]) || t.inf[k] < 0) bad.push('inf');
+  for (const z in uw.S.market) for (const k in uw.S.market[z]) if (!uw.S.market[z][k].every(Number.isFinite)) bad.push('market');
+  for (const id in uw.S.factions) { const F = uw.S.factions[id]; if (!Number.isFinite(F.strength) || !Number.isFinite(F.money) || !Number.isFinite(F.rel)) bad.push('faction ' + id); }
+  for (const c of uw.S.crew) if (![c.loyalty, c.fear, c.pay].every(Number.isFinite)) bad.push('crew');
+  if (!Number.isFinite(uw.S.pressure)) bad.push('pressure');
+  if (uw.owner.length !== 36) bad.push('owner len');
+  if ((p.pose.surrender || 0) > 0 || p.blocking || p.knockT > 0 || g.mapOpen || g.ui.modal || g.police.bust) bad.push('stale player/ui');
+  if (g.input.down.size) bad.push('stuck keys');
+  const scan = (o, path, d) => { if (d > 12 || !o || typeof o !== 'object') return; for (const k in o) { const v = o[k]; if (typeof v === 'number' && !Number.isFinite(v)) bad.push('save ' + path + '.' + k); else if (typeof v === 'object') scan(v, path + '.' + k, d + 1); } };
+  scan(g.save, 'save', 0);
+  return bad;
+});
+check('session: no corrupted state anywhere after the stretch of play', audit.length === 0, audit.join(', '));
 // ---------------------------------------------------------------- 12. save + reload
 const before = await ev(() => { const g = window.game, uw = g.uw; g.police.enabled = true; g.resetPlayerState(5 * 80 + 40, 5 * 80, 0); const ok = g.saveGame(true); return { ok, money: g.save.money, crew: uw.S.crew.length, own: uw.owner.filter(o => o === 'pc').length, flop: uw.props.owned('flop'), kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, day: uw.S.day }; });
 await page.reload();

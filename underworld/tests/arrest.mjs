@@ -16,7 +16,7 @@ const stale = () => page.evaluate(() => {
   const z = (k, v) => { if (v) bad.push(k + '=' + (typeof v === 'number' ? v.toFixed(2) : v)); };
   z('surrender', (ps.surrender || 0) > 0.001); z('crouch', (ps.crouch || 0) > 0.001); z('down', (ps.down || 0) > 0.001);
   z('block', (ps.block || 0) > 0.05); z('kick', (ps.kick || 0) > 0.05); z('heavy', (ps.heavy || 0) > 0.05); z('hit', (ps.hit || 0) > 0.05); z('dodge', (ps.dodge || 0) > 0.05);
-  z('blocking', p.blocking); z('dodgeT', p.dodgeT > 0); z('knockT', p.knockT > 0); z('attackT', p.attackT > 0); z('lungeT', p.lungeT > 0); z('combo', p.combo); z('trans', !!p.trans);
+  z('blocking', p.blocking); z('dodgeT', p.dodgeT > 0); z('knockT', p.knockT > 0); z('attackT', p.attackT > 0); z('lungeLeft', p.lungeLeft > 0); z('combo', p.combo); z('trans', !!p.trans);
   z('interior', !!p.interior); z('aiming', !!p.aiming); z('vehicle', !!p.vehicle); z('reloadT', p.reloadT > 0);
   z('bust', g.police.bust); z('wanted', g.police.level); z('jail', !!g.uw.S.jail); z('fading', !!g.fading); z('state', g.state !== 'playing' && g.state);
   z('mapOpen', g.mapOpen); z('modal', g.ui.modal); z('bigmapVisible', !document.getElementById('bigmap').classList.contains('hidden'));

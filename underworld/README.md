@@ -10,9 +10,19 @@ From there you can work up to City Kingpin.
 
 ## Run it
 
-Open `underworld/index.html` in a desktop or mobile browser. Three.js 0.160 loads from
-`cdn.jsdelivr.net`, the same way the master template does. The first load needs a network
-connection. Everything else is inline.
+Open `underworld/index.html` in a desktop or mobile browser. It's fully self-contained and works
+offline. Three.js r160 and the postprocessing addons the game uses (EffectComposer, RenderPass,
+UnrealBloomPass, OutputPass, ShaderPass, FXAAShader) are bundled unmodified with esbuild. The bundle
+is inlined in a `<script type="module" id="threeInline">` block and exposed as `window.__PV_THREE`.
+There's no CDN, no import map, and no external asset. The bundle adds about 1.2 MB to the file.
+
+To rebuild the bundle:
+
+```
+npm install esbuild@0.24.2 three@0.160.0
+npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es2020 --legal-comments=inline --charset=utf8 --outfile=three-bundle.js
+# then replace the body of <script type="module" id="threeInline"> with three-bundle.js
+```
 
 ## Controls (keyboard / mouse)
 
@@ -54,19 +64,20 @@ and written only in a stable state. Settings are stored under a separate key.
 
 ## Tests
 
-The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. When the
-CDN is unreachable, set `THREE_DIR` to an unpacked `three@0.160.0` package and the tests serve
-Three.js from it.
+The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
+suite runs with the browser context offline. Any non-file request is aborted and counted as an
+error, so a hidden network dependency fails the suite.
 
 ```
-npm pack three@0.160.0 && tar xzf three-0.160.0.tgz      # once, offline copy
-export THREE_DIR=$PWD/package
 node underworld/tests/smoke.mjs     # boot, $0 start, every menu, map overlay, location layout
-node underworld/tests/core.mjs      # melee facing in 8 directions, 180° turns, post-exit punch, combo, reverse speed/camera
-node underworld/tests/arrest.mjs    # 6 arrest situations -> sentencing -> jail -> release -> full movement set
-node underworld/tests/session.mjs   # $0 -> first money -> property -> crew -> turf -> corruption -> save/reload/repair
-CYCLES=8 node underworld/tests/soak.mjs   # long session: bounded entities, no NaN, flat heap
+node underworld/tests/core.mjs      # melee facing (8 dirs, 180°, post-exit), combo + step-in stress, reverse speed, reverse-camera transitions
+node underworld/tests/arrest.mjs    # 9 arrest situations (idle/walk/sprint/fight/vehicle exit/pursuit/map open/repeated) -> jail -> release -> stale-state audit; death respawns
+node underworld/tests/session.mjs   # $0 -> first money -> property -> crew -> turf -> corruption -> drive/chase/bust/release -> save/reload/repair
+node underworld/tests/ui.mjs        # minimap labels upright, big map layout, colours, input leaks, overlays, touch controls
+node underworld/tests/offline.mjs   # no network at all: load, render, play, UI, vehicles, police, combat, map
+CYCLES=10 node underworld/tests/soak.mjs  # long session: entities, listeners, timers, GPU memory, frame cost, heap, save round-trip
 node underworld/tests/shots.mjs     # screenshots for visual review
+node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
 ```
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.

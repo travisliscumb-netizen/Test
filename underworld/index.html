@@ -36399,7 +36399,7 @@ class Player {
     this.vel.set(0, 0, 0); this.onGround = true; this.trans = null; this.airTime = 0; this.lastY = this.pos.y;
     this.aim = 0; this.aiming = false; this.attackT = 0; this.reloadT = 0; this.swingT = 0; this.punchT = 0; this.attackFacing = 0;
     this.invuln = 0; this.hitCooldown = 0; this.regenDelay = 0; this.boostT = 0;
-    this.combo = 0; this.comboT = 0; this.lungeT = 0; this.attackH = null; this.blockH = null; this.blocking = false; this.dodgeT = 0; this.dodgeCD = 0;
+    this.combo = 0; this.comboT = 0; this.lungeLeft = 0; this.lungeStop = false; this.attackH = null; this.blockH = null; this.blocking = false; this.dodgeT = 0; this.dodgeCD = 0;
     this.hitT = 0; this.knockT = 0; this.kickT = 0; this.heavyT = 0; this.moveKind = null; this.atkHold = 0; this.moveDir = null; this.hitDone = false;
     const ps = this.pose;
     for (const k of ['amp', 'crouch', 'surrender', 'down', 'downDir', 'lean', 'air', 'sit', 'twist', 'punch', 'swing', 'aim', 'aimPitch', 'headPitch', 'kick', 'block', 'heavy', 'hit', 'dodge', 'punchArm']) ps[k] = 0;
@@ -36464,7 +36464,18 @@ class Player {
     if (stunned) { tvx = 0; tvz = 0; }
     let acc = this.onGround ? (mv.mag > 0.05 ? 16 : 22) : 3.5;
     if (this.dodgeT > 0) { this.dodgeT -= dt; tvx = Math.sin(this.dodgeH) * 7.8; tvz = Math.cos(this.dodgeH) * 7.8; acc = 40; }
-    else if (this.lungeT > 0 && !stunned) { this.lungeT -= dt; tvx = Math.sin(this.attackH) * this.lungeV; tvz = Math.cos(this.attackH) * this.lungeV; acc = 45; }
+    // melee step-in: covers an exact, capped distance and stops dead (no coasting past it)
+    if (this.lungeStop) {
+      this.lungeStop = false;
+      const vm = Math.hypot(this.vel.x, this.vel.z), cap = mv.mag > 0.05 ? speed : 0;
+      if (vm > cap) { const k = cap / vm; this.vel.x *= k; this.vel.z *= k; }
+    }
+    if (this.dodgeT > 0 || stunned) this.lungeLeft = 0;
+    if (this.dodgeT <= 0 && this.lungeLeft > 0 && !stunned && dt > 0) {
+      const step = Math.min(this.lungeLeft, this.lungeV * dt); this.lungeLeft -= step;
+      tvx = Math.sin(this.attackH) * step / dt; tvz = Math.cos(this.attackH) * step / dt; acc = 1e4;
+      if (this.lungeLeft <= 1e-4) { this.lungeLeft = 0; this.lungeStop = true; }
+    }
     this.vel.x = damp(this.vel.x, tvx, acc, dt);
     this.vel.z = damp(this.vel.z, tvz, acc, dt);
     if (stunned) {
@@ -38861,9 +38872,9 @@ class CombatSystem {
     if (bat && kind === 'heavy') { p.heavyT = 0; p.swingT = p.swingDur = 0.6; }
     p.attackT = dur; p.attackFacing = dur;
     // step in: close the gap to a soft target that a previous hit shoved just out of reach
-    p.lungeT = 0;
+    p.lungeLeft = 0;
     const tg = this.meleeTarget;
-    if (tg) { const gap = Math.hypot(tg.x - p.pos.x, tg.z - p.pos.z) - (range - 0.35); if (gap > 0.05) { p.lungeT = hitAt + 0.05; p.lungeV = Math.min(7, Math.min(gap, 0.9) / p.lungeT); } }
+    if (tg) { const gap = Math.hypot(tg.x - p.pos.x, tg.z - p.pos.z) - (range - 0.35); if (gap > 0.05) { p.lungeLeft = Math.min(gap, 0.85); p.lungeV = Math.min(7, p.lungeLeft / (hitAt + 0.05)); } }
     this.pendingHits.push({ t: hitAt, w, kind });
     g.audio.play('swing', { gain: kind === 'heavy' || bat ? 0.75 : 0.4 });
   }

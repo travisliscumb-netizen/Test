@@ -19,8 +19,9 @@ export function check(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  -- ' + detail : ''}`);
 }
 export const launch = () => chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
-export async function open(browser, ctxOpts = {}) {
+export async function open(browser, ctxOpts = {}, init = null) {
   const ctx = await browser.newContext({ viewport: { width: 480, height: 270 }, ...ctxOpts });
+  if (init) await ctx.addInitScript(init);
   // no pointer lock in tests: synthetic mouse moves must not turn the camera
   await ctx.addInitScript(() => { HTMLCanvasElement.prototype.requestPointerLock = function () { return Promise.reject(new Error('disabled in tests')); }; });
   const page = await ctx.newPage(), errors = [], net = [];
