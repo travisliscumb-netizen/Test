@@ -118,7 +118,7 @@ async function reverseRun(type) {
     const g = window.game, p = g.player;
     const x = 2 * 80 + 2.6, z = 6 * 80 + 12; // long straight north-south road
     const v = g.vehicles.spawn(type, x, z, 0, { parked: true }); v.touched = true;
-    g.resetPlayerState(x + 2.5, z, 0); g.completeEnter(v);
+    g.resetPlayerState(x + 2.5, z, 0); g.completeEnter(v); g.cam.yaw = v.h;
   }, type);
   await frames(page, 4);
   await page.keyboard.down('KeyS');
