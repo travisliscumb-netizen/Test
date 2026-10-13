@@ -46,7 +46,7 @@ const playing = page => page.waitForFunction(() => game.state === 'playing', nul
 
 /* ---------------- desktop ---------------- */
 {
-  const { page, errors } = await openGame();
+  const { ctx, page, errors } = await openGame();
   check('main menu shown', await page.isVisible('#mainMenu'));
   await page.click('#btnNew'); await playing(page); await frames(page, 3);
   check('HUD shown in game', await page.isVisible('#hud'));
@@ -109,6 +109,7 @@ const playing = page => page.waitForFunction(() => game.state === 'playing', nul
   await page.click('#btnNew'); await page.click('#confirmYes'); await playing(page);
   check('confirm starts a fresh career', await page.evaluate(() => game.save.money === 500 && game.save.missionsCompleted === 0));
   check('desktop: no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
+  await ctx.close(); // free the CPU for the phone run (software WebGL is slow)
 }
 
 /* ---------------- phone (touch) ---------------- */
