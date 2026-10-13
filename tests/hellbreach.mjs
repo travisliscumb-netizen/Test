@@ -187,6 +187,20 @@ const gunInfo = await api(page, () => {
 const sizes = Object.values(gunInfo).map((g) => g.px);
 check('every gun sprite covers a real share of the screen', sizes.every((n) => n > 2000), JSON.stringify(gunInfo));
 check('all six gun sprites have distinct shapes', new Set(sizes).size === 6);
+/* every gun frame is framed on screen: nothing clipped at the top, arms reach the bottom edge, muzzle inside the view */
+const framing = await api(page, () => {
+  const h = window.__hellbreach, G = h.GUN, bad = [];
+  const frames = { fist: 3, pistol: 2, shotgun: 3, shredder: 3, breacher: 2, ion: 2 };
+  for (const [w, n] of Object.entries(frames)) for (let f = 0; f < n; f++) {
+    const s = h.gunFrame(w, f);
+    if (s.oy <= 0) bad.push(`${w}:${f} clipped at top`);
+    if (s.oy + s.h < G.H - 1) bad.push(`${w}:${f} floats above the bottom edge`);
+    if (s.mx !== undefined && (s.ox + s.mx < 0 || s.ox + s.mx > G.W || s.oy + s.my < 0)) bad.push(`${w}:${f} muzzle off screen`);
+  }
+  return bad;
+});
+check('every gun and fist frame is framed on screen (landscape)', framing.length === 0, framing.join(', '));
+
 const fired = await api(page, () => {
   const h = window.__hellbreach, r = {};
   for (const w of ['fist', 'pistol', 'shotgun', 'shredder', 'breacher', 'ion']) {
@@ -521,6 +535,16 @@ await ctx.close();
   await page.waitForTimeout(500);
   await touch(cdp, 'touchEnd', []);
   check('portrait: stick moves the player', (await api(page, () => window.__hellbreach.P.x)) - before > 0.6);
+  const pframing = await api(page, () => {
+    const h = window.__hellbreach, G = h.GUN, bad = [];
+    for (const [w, n] of Object.entries({ fist: 3, pistol: 2, shotgun: 3, shredder: 3, breacher: 2, ion: 2 })) for (let f = 0; f < n; f++) {
+      const s = h.gunFrame(w, f);
+      if (s.oy <= 0 || s.oy + s.h < G.H - 1) bad.push(`${w}:${f}`);
+      if (s.h < G.H * 0.3) bad.push(`${w}:${f} too small`);
+    }
+    return bad;
+  });
+  check('portrait: every gun and fist frame is framed on screen and readable', pframing.length === 0, pframing.join(', '));
   const overlap = await api(page, () => {
     const r = (s) => document.querySelector(s).getBoundingClientRect();
     const a = r('.hud-l'), b = r('.hud-r'), c = r('.hud-top'), m = r('#mission');

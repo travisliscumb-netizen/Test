@@ -720,9 +720,9 @@ MT.wHorn = mat('#2c221d', { spec: 0.35, noise: 0.1, ns: [4, 30, 4] });
 MT.wood = mat('#7a4a28', { noise: 0.26, ns: [36, 36, 3] });
 MT.woodDk = mat('#4e2d18', { noise: 0.2, ns: [36, 36, 3] });
 MT.brass = mat('#caa24a', { spec: 0.65, shin: 22, noise: 0.04 });
-MT.glove = mat('#3e2c21', { noise: 0.16, ns: 22 });
+MT.glove = mat('#5a4231', { noise: 0.16, ns: 22, rim: 0.18 });
 MT.gloveP = mat('#6d7075', { spec: 0.55, shin: 26, noise: 0.05 });
-MT.sleeve = mat('#46553b', { noise: 0.2, ns: 14 });
+MT.sleeve = mat('#58673f', { noise: 0.22, ns: 14, rim: 0.16 });
 MT.red = mat('#b8231c', { noise: 0.08, spec: 0.2 });
 MT.white = mat('#e6e1d6', { noise: 0.05 });
 MT.yellow = mat('#e2b21f', { noise: 0.06 });
@@ -1391,37 +1391,39 @@ function grip(m, flip = 1) {
   m.push().at(flip * 0.026, 0.002, 0.012).box(0.01, 0.055, 0.03, MT.gloveP).pop();
   chain(m, [[-flip * 0.016, 0.026, 0.012], [-flip * 0.02, 0.038, -0.01], [-flip * 0.012, 0.042, -0.03]], 0.01, 0.008, MT.glove);
 }
+/* Sleeve from wrist to elbow, a leather glove cuff, and a narrow guard plate just above the cuff. */
 function forearm(m, wrist, elbow) {
-  m.cap(wrist, elbow, 0.036, 0.05, MT.sleeve, 10);
-  m.cap(lerp3(wrist, elbow, 0.05), lerp3(wrist, elbow, 0.35), 0.04, 0.045, MT.gloveP, 10);
+  m.cap(lerp3(wrist, elbow, 0.12), elbow, 0.03, 0.046, MT.sleeve, 10);
+  m.cap(wrist, lerp3(wrist, elbow, 0.14), 0.026, 0.031, MT.glove, 10);
+  m.cap(lerp3(wrist, elbow, 0.16), lerp3(wrist, elbow, 0.24), 0.033, 0.035, MT.gloveP, 10);
 }
 /* Where each gun sits in front of the camera: offset, yaw, pitch, roll, scale. */
 const GV = {
-  pistol: [0.085, -0.105, -0.3, 0.16, 0.06, -0.04, 1.0],
-  shotgun: [0.075, -0.1, -0.27, 0.12, 0.05, -0.03, 0.9],
-  shredder: [0.07, -0.108, -0.3, 0.1, 0.05, 0, 0.85],
-  breacher: [0.12, -0.085, -0.25, 0.12, 0.04, -0.04, 0.85],
-  ion: [0.075, -0.105, -0.29, 0.12, 0.05, 0, 0.9],
+  pistol: [0.08, -0.09, -0.3, 0.22, 0.07, -0.05, 1.05],
+  shotgun: [0.08, -0.095, -0.27, 0.18, 0.06, -0.03, 0.9],
+  shredder: [0.085, -0.095, -0.3, 0.3, 0.06, 0, 0.85],
+  breacher: [0.115, -0.08, -0.25, 0.2, 0.05, -0.04, 0.85],
+  ion: [0.08, -0.095, -0.29, 0.22, 0.06, 0, 0.9],
 };
 function fpBegin(m, name) { const g = GV[name]; m.push().at(g[0], g[1], g[2]).ry(g[3]).rx(g[4]).rz(g[5]).sc(g[6]); }
 const GUN_PUSH = 0.5;
 const GUNS = {
   fist: { frames: 3, build(m, f, fp = true) {
+    /* Knuckles toward the target, wrist dropping below the fist so the forearm never hides it. */
     const fistAt = (x, y, z, sd, tilt) => {
-      m.push().at(x, y, z).rz(sd * 0.25).rx(tilt);
-      m.ell(0.046, 0.042, 0.05, MT.glove);
-      for (let i = 0; i < 4; i++) m.push().at(-0.03 + i * 0.02, 0.012, -0.045).ell(0.012, 0.016, 0.014, MT.glove).pop();
-      m.push().at(0, 0.014, -0.058).box(0.088, 0.02, 0.012, MT.brass).pop();
-      for (let i = 0; i < 4; i++) m.cap([-0.03 + i * 0.02, 0.024, -0.062], [-0.03 + i * 0.02, 0.028, -0.078], 0.007, 0.001, MT.brass, 6);
-      chain(m, [[sd * 0.04, -0.01, -0.01], [sd * 0.035, -0.024, -0.04], [sd * 0.01, -0.02, -0.055]], 0.012, 0.01, MT.glove);
-      m.push().at(0, 0.0, 0.05).box(0.075, 0.06, 0.05, MT.gloveP).pop();
+      m.push().at(x, y, z).rz(sd * 0.2).rx(tilt);
+      m.ell(0.044, 0.04, 0.046, MT.glove);
+      for (let i = 0; i < 4; i++) m.push().at(-0.03 + i * 0.02, 0.016, -0.036).ell(0.012, 0.014, 0.013, MT.glove).pop();
+      m.push().at(0, 0.02, -0.046).box(0.086, 0.016, 0.012, MT.brass).pop();
+      for (let i = 0; i < 4; i++) m.cap([-0.03 + i * 0.02, 0.028, -0.05], [-0.03 + i * 0.02, 0.034, -0.064], 0.006, 0.001, MT.brass, 6);
+      chain(m, [[sd * 0.04, -0.004, -0.004], [sd * 0.036, -0.016, -0.032], [sd * 0.012, -0.012, -0.046]], 0.012, 0.01, MT.glove);
       m.pop();
-      forearm(m, [x, y - 0.01, z + 0.06], [x + sd * 0.07, y - 0.2, z + 0.3]);
+      forearm(m, [x + sd * 0.008, y - 0.04, z + 0.035], [x + sd * 0.09, y - 0.27, z + 0.24]);
     };
-    fistAt(-0.115, -0.118, -0.32, -1, 0.35);
-    if (f === 0) fistAt(0.115, -0.118, -0.32, 1, 0.35);
-    else if (f === 1) fistAt(0.06, -0.095, -0.4, 1, 0.15);
-    else fistAt(0.015, -0.075, -0.5, 1, -0.05);
+    fistAt(-0.12, -0.1, -0.34, -1, 0.5);
+    if (f === 0) fistAt(0.12, -0.1, -0.34, 1, 0.5);
+    else if (f === 1) fistAt(0.07, -0.08, -0.42, 1, 0.4);
+    else fistAt(0.025, -0.06, -0.52, 1, 0.3);
   } },
   pistol: { frames: 2, build(m, f, fp = true) {
     const sb = f === 1 ? 0.035 : 0;
@@ -1481,7 +1483,7 @@ const GUNS = {
     m.push().at(0, 0, 0.04).cyl(0.038, 0.038, 0.016, MT.gunDk, 14).pop();
     m.push().at(0, 0, 0.27).cyl(0.036, 0.036, 0.014, MT.gunDk, 14).pop();
     m.pop();
-    m.push().at(-0.085, 0.0, -0.02).ry(Math.PI / 2).cyl(0.05, 0.05, 0.035, MT.olive, 14).pop();
+    m.push().at(-0.075, -0.035, 0.03).ry(Math.PI / 2).cyl(0.038, 0.038, 0.03, MT.olive, 14).pop();
     for (let i = 0; i < 4; i++) m.push().at(-0.06 + i * 0.012, -0.035 + i * 0.006, -0.04).box(0.008, 0.012, 0.02, MT.brass).pop();
     for (const z of [0.0, -0.08]) m.push().at(0, 0.075, z).box(0.012, 0.03, 0.012, MT.gun).pop();
     m.push().at(0, 0.093, -0.04).box(0.016, 0.014, 0.11, MT.gun).pop();
@@ -1498,9 +1500,10 @@ const GUNS = {
   breacher: { frames: 2, build(m, f, fp = true) {
     const rc = f === 1 ? 0.04 : 0;
     if (fp) { fpBegin(m, 'breacher'); m.at(0, 0, rc); }
-    m.push().at(0, 0.0, 0.14).ry(Math.PI).cyl(0.046, 0.046, 0.62, MT.olive, 16).pop();
+    m.push().at(0, 0.0, 0.04).ry(Math.PI).cyl(0.046, 0.046, 0.52, MT.olive, 16).pop();
     m.push().at(0, 0.0, -0.46).ry(Math.PI).cyl(0.056, 0.056, 0.04, MT.gunDk, 16).pop();
-    m.push().at(0, 0.0, 0.12).ry(Math.PI).tor(0.047, 0.008, MT.gunDk, 16, 5).pop();
+    m.push().at(0, 0.0, 0.035).ry(Math.PI).tor(0.047, 0.01, MT.gunDk, 16, 5).pop();
+    m.push().at(0, 0.0, 0.0425).ry(Math.PI).cyl(0.041, 0.041, 0.002, MT.void, 16).pop();
     m.push().at(0, 0.0, -0.2).tor(0.047, 0.008, MT.gunDk, 16, 5).pop();
     m.push().at(0, 0.047, -0.18).box(0.022, 0.003, 0.09, MT.void).pop();
     if (f === 0) m.push().at(0, 0.044, -0.2).up().cyl(0.009, 0.0, 0.008, MT.red, 8).pop();
@@ -2427,7 +2430,7 @@ function playerDie() {
 }
 function spawnProj(type, x, y, z, a, owner, dmg) {
   const d = PDEF[type];
-  L.projs.push({ type, x, y, z, a, vx: Math.cos(a) * d.speed, vy: Math.sin(a) * d.speed, r: d.r, owner, dmg, t: 0, dead: false, trailT: 0 });
+  L.projs.push({ type, x, y, z, a, vx: Math.cos(a) * d.speed, vy: Math.sin(a) * d.speed, r: d.r, owner, dmg, t: 0, dead: false, trailT: owner === 'player' ? 0.09 : 0 });
 }
 function addFx(type, x, y, z, dur) { L.fx.push({ type, x, y, z, t: 0, dur, light: 0 }); }
 
@@ -2824,8 +2827,8 @@ function resize() {
   V.img = ctx.createImageData(W, H); V.buf = new Uint32Array(V.img.data.buffer);
   V.zbuf = new Float32Array(W); V.wtop = new Int32Array(W); V.wbot = new Int32Array(W); V.skyCol = new Int32Array(W);
   ctx.imageSmoothingEnabled = false;
-  const U = Math.min(H, W * 0.6);
-  GUN.W = W; GUN.H = Math.round(Math.min(H * 0.82, U * 1.05)); GUN.f = U * 1.06; GUN.cy = GUN.H - H * 0.5;
+  const U = Math.min(H, W * 0.82);   /* gun scale: screen height in landscape, most of the width in portrait */
+  GUN.W = W; GUN.H = Math.round(Math.min(H * 0.82, U * 1.05)); GUN.f = U * 1.06; GUN.cy = GUN.H - U * 0.5;   /* the gun camera's centre sits U/2 above the screen bottom: mid-screen in landscape, low in portrait */
   GUN.cache.clear(); GUN.warm = [];
   for (const w of WORDER) for (let fr = 0; fr < GUNS[w].frames; fr++) GUN.warm.push(w + ':' + fr);
   if (MELT.on && (MELT.W !== W || MELT.H !== H)) MELT.on = false;
@@ -2960,7 +2963,11 @@ function render(now) {
       push(p.x, p.y, 0, SPR.prop[p.type === 'corpse' ? 'corpse' : p.type]);
       if (p.type === 'brazier') push(p.x, p.y, 0.33, SPR.flame[((now / 90) | 0) % 3], 0, true);
     }
-    for (const p of L.projs) { const fr = SPR.proj[p.type]; push(p.x, p.y, p.z, fr[((p.t * 12) | 0) % fr.length], 0, true); }
+    for (const p of L.projs) {
+      if (p.owner === 'player' && p.t < 0.05) continue;   /* hidden under the muzzle flash, not drawn at point-blank */
+      const fr = SPR.proj[p.type];
+      push(p.x, p.y, p.z, fr[((p.t * 12) | 0) % fr.length], 0, true);
+    }
     for (const fx of L.fx) {
       const fr = SPR.fx[fx.type], k = Math.min(fr.length - 1, (fx.t / fx.dur * fr.length) | 0);
       push(fx.x, fx.y, fx.type === 'boom' ? 0.42 : fx.z, fr[k], 0, true);
@@ -3055,11 +3062,11 @@ function drawWeapon(now) {
   const name = P.cur, w = WDEF[name];
   let fr = 0, flash = false;
   if (name === 'fist') fr = P.fireT < 0.08 ? 1 : P.fireT < 0.22 ? 2 : P.fireT < 0.3 ? 1 : 0;
-  else if (name === 'pistol') { fr = P.fireT < 0.06 ? 1 : 0; flash = P.fireT < 0.05; }
-  else if (name === 'shotgun') { fr = P.fireT > 0.34 && P.fireT < 0.5 ? 1 : P.fireT >= 0.5 && P.fireT < 0.68 ? 2 : P.fireT >= 0.68 && P.fireT < 0.8 ? 1 : 0; flash = P.fireT < 0.07; }
-  else if (name === 'shredder') { fr = ((P.barrel | 0) % 3 + 3) % 3; flash = P.fireT < 0.045; }
-  else if (name === 'breacher') { fr = P.fireT < 0.3 ? 1 : 0; flash = P.fireT < 0.08; }
-  else if (name === 'ion') { fr = P.fireT < 0.06 ? 1 : 0; flash = P.fireT < 0.05; }
+  else if (name === 'pistol') { fr = P.fireT < 0.07 ? 1 : 0; flash = P.fireT < 0.07; }
+  else if (name === 'shotgun') { fr = P.fireT > 0.34 && P.fireT < 0.5 ? 1 : P.fireT >= 0.5 && P.fireT < 0.68 ? 2 : P.fireT >= 0.68 && P.fireT < 0.8 ? 1 : 0; flash = P.fireT < 0.09; }
+  else if (name === 'shredder') { fr = ((P.barrel | 0) % 3 + 3) % 3; flash = P.fireT < 0.06; }
+  else if (name === 'breacher') { fr = P.fireT < 0.3 ? 1 : 0; flash = P.fireT < 0.1; }
+  else if (name === 'ion') { fr = P.fireT < 0.07 ? 1 : 0; flash = P.fireT < 0.06; }
   const spr = gunFrame(name, fr);
   const U = GUN.H, bobA = reduceMotion ? 0 : P.bobAmt * settings.bob;
   let ox = Math.sin(P.bob * 0.5) * 0.05 * U * bobA + P.sway * U * 0.22;
