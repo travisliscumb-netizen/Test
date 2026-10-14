@@ -311,6 +311,46 @@ body:not(.driving) #touch .car{display:none}
 .card.locked{opacity:.55}
 .card .bar{position:relative}.card .bar i.up{position:absolute;left:0;top:0;background:var(--amber);opacity:.5}
 .svcTop{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--dim);margin-bottom:12px}.svcTop b{color:var(--text)}.svcTop b.money{color:var(--money)}
+#svcBody>.btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0}#svcBody>.btns .sbtn{padding:10px 14px}
+#confetti{position:fixed;inset:0;z-index:60;pointer-events:none;display:none}
+.gres{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--panel2);text-align:center;font-weight:800;font-size:15px;letter-spacing:.03em;min-height:20px}
+.gres.small{color:var(--green)}.gres.medium{color:#ffd84d;box-shadow:0 0 0 1px rgba(255,216,77,.4)}.gres.large{color:#ffd84d;background:linear-gradient(90deg,#3a2a08,#5a3e0a,#3a2a08);font-size:18px}
+.gres.jackpot{color:#1b1206;background:linear-gradient(90deg,#ffbf5c,#ffd84d,#ffbf5c);font-size:22px;letter-spacing:.08em}.gres.none{color:var(--dim)}
+.gres.pulse{animation:gpulse .9s ease-out 2}@keyframes gpulse{0%{transform:scale(1)}30%{transform:scale(1.06)}100%{transform:scale(1)}}
+.scard{margin:12px auto;max-width:360px;border-radius:14px;padding:12px;background:linear-gradient(160deg,var(--sc),#1b1f28 70%);box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.sct{font-weight:900;font-size:17px;color:#10131a;margin-bottom:8px}.sct small{font-size:12px;opacity:.7}
+.scgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;touch-action:none;user-select:none}
+.scc{height:58px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;cursor:pointer;background:repeating-linear-gradient(45deg,#b8bcc4,#b8bcc4 6px,#a4a8b0 6px,#a4a8b0 12px);color:#10131a;transition:background .15s}
+.scc.open{background:#f4f2ee;cursor:default}.scc.hit{background:#ffd84d;box-shadow:0 0 0 2px #ff8a3d inset}
+.slotm{display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0;padding:12px;border-radius:16px;background:linear-gradient(180deg,#3a1a4a,#1a0e24);box-shadow:0 0 0 3px #d8a227 inset}
+.reels{display:flex;gap:6px;padding:8px;border-radius:10px;background:#0c0a10}
+.reel{display:flex;flex-direction:column;gap:4px;width:66px}.slotm.five .reel{width:48px}
+.reel .cell{height:62px;border-radius:8px;background:linear-gradient(180deg,#d8d4cc,#f8f6f2 40%,#d8d4cc);display:flex;align-items:center;justify-content:center}
+.slotm.five .reel .cell{height:44px}
+.reel .sym{font-weight:900;font-size:30px;text-shadow:0 1px 0 rgba(0,0,0,.25)}.slotm.five .sym{font-size:21px}.reel .sym:only-child{line-height:1}
+.reel.spin .cell{filter:blur(1.5px);animation:rspin .09s linear infinite}@keyframes rspin{0%{transform:translateY(-6px)}100%{transform:translateY(6px)}}
+.reel .cell.win{box-shadow:0 0 0 3px #ffd84d inset,0 0 14px rgba(255,216,77,.7)}
+.lever{position:relative;width:26px;height:120px;cursor:pointer}.lever i{position:absolute;left:10px;top:18px;width:6px;height:90px;background:linear-gradient(90deg,#888,#eee,#888);border-radius:3px;transform-origin:50% 100%;transition:transform .25s}
+.lever b{position:absolute;left:3px;top:6px;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff8a8a,#d23a2a);transition:top .25s}
+.lever.pulled i{transform:scaleY(.25)}.lever.pulled b{top:84px}
+.paytbl{margin:8px 0;font-size:13px}.paytbl summary{cursor:pointer;color:var(--amber);font-weight:700;margin-bottom:6px}.paytbl .sym{font-weight:900;margin-right:2px}
+.pcard{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:40px;height:56px;margin:2px;border-radius:6px;background:#f8f6f2;color:#10131a;font-weight:900;font-size:17px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pcard small{font-size:15px}.pcard.red{color:#d23a2a}.pcard.back{background:repeating-linear-gradient(45deg,#7a1a2a,#7a1a2a 5px,#5a1020 5px,#5a1020 10px);border:2px solid #f8f6f2}
+.felt{border-radius:16px;padding:10px 12px;background:radial-gradient(ellipse at center,#1f6a3e,#0f3a22);box-shadow:0 0 0 3px #5a3e1a inset}
+.felt .who{font-size:13px;font-weight:700;color:#d8f0dc;margin-top:6px}.felt .who.cur{color:#ffd84d}.felt .cards{min-height:60px}
+.felt.poker .board{text-align:center;min-height:60px}.felt.poker .pot{text-align:center;font-weight:800;color:#ffd84d;margin:2px 0 6px}
+.seats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.seat{background:rgba(0,0,0,.22);border-radius:10px;padding:4px 8px}.seat .pcard{width:32px;height:46px;font-size:14px}
+.seat.cur{box-shadow:0 0 0 2px #ffd84d inset}.seat.out{opacity:.5}.seat.won{box-shadow:0 0 0 2px #7fe08f inset}.seat .d{font-size:12px;color:#d8f0dc}.seat .act{font-size:11px;color:#ffd84d;min-height:14px;text-transform:uppercase;letter-spacing:.06em}
+.seat .btn{display:inline-block;background:#f8f6f2;color:#10131a;border-radius:50%;width:16px;height:16px;font-size:10px;text-align:center;line-height:16px}.seat small{color:#9ad0a8;font-weight:400}
+.rwheel{display:flex;align-items:center;gap:12px;margin:6px 0}.rball{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:26px;color:#fff;background:#2a2d33;box-shadow:0 0 0 4px #d8a227}
+.rball.r{background:#c0282e}.rball.b{background:#15171c}.rball.g{background:#1f8a4a}.rwheel.spin .rball{animation:gpulse .25s linear infinite}
+.rhist{display:flex;flex-wrap:wrap;gap:3px}.rhist span{min-width:22px;padding:2px 4px;border-radius:4px;font-size:11px;font-weight:800;text-align:center;color:#fff}.rhist .r{background:#c0282e}.rhist .b{background:#15171c}.rhist .g{background:#1f8a4a}
+.rtable{display:flex;gap:4px;padding:6px;border-radius:10px;background:#0f3a22}.rnums{flex:1;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(3,1fr);grid-auto-flow:column;gap:3px}
+.rc{position:relative;display:flex;align-items:center;justify-content:center;min-height:34px;border-radius:5px;font-weight:800;font-size:13px;color:#fff;background:#1f6a3e;cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.18)}
+.rc.r{background:#a8242a}.rc.b{background:#15171c}.rc.g{background:#1f8a4a}.rc.zero{width:30px}.rc.on{box-shadow:0 0 0 2px #ffd84d inset}
+.rc i{position:absolute;right:1px;bottom:1px;font-style:normal;font-size:9px;background:#ffd84d;color:#10131a;border-radius:6px;padding:0 3px}
+.rout{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:4px}
+@media (max-width:520px){.rnums{grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(6,1fr);grid-auto-flow:row}.rc{min-height:30px;font-size:12px}.reel{width:56px}.slotm.five .reel{width:42px}.lever{height:100px}}
 .swatches{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
 .sw{width:30px;height:30px;border-radius:8px;border:2px solid rgba(255,255,255,.18);cursor:pointer;padding:0}
 .sw.on{border-color:var(--amber);box-shadow:0 0 0 2px rgba(255,181,71,.35)}.sw:disabled{opacity:.35;cursor:default}
@@ -32941,6 +32981,15 @@ const SaveSystem = {
     const gd = this.defaults().gamble;
     if (!d.gamble || typeof d.gamble !== 'object') d.gamble = gd;
     for (const grp in gd) { if (!d.gamble[grp] || typeof d.gamble[grp] !== 'object') d.gamble[grp] = { ...gd[grp] }; for (const k in gd[grp]) { const v = d.gamble[grp][k]; d.gamble[grp][k] = typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0; } }
+    // progressive pools and an unfinished blackjack hand (stood on load; a malformed one is refunded)
+    const pools = d.gamble.casino.pools; d.gamble.casino.pools = {};
+    for (const id in SLOT_DEFS) { const pr = SLOT_DEFS[id].progressive; if (pr) d.gamble.casino.pools[id] = pools && typeof pools === 'object' && isFinite(pools[id]) ? clamp(pools[id], pr.seed, 5e7) : pr.seed; }
+    const T = d.gamble.table, okCard = c => c && typeof c === 'object' && Number.isInteger(c.r) && c.r >= 2 && c.r <= 14 && Number.isInteger(c.s) && c.s >= 0 && c.s <= 3;
+    if (T && typeof T === 'object') {
+      const tier = CASINO_TIERS[T.tier], hands = Array.isArray(T.hands) ? T.hands : [];
+      const ok = T.game === 'bj' && tier && hands.length >= 1 && hands.length <= 2 && hands.every(h => h && Array.isArray(h.cards) && h.cards.length >= 1 && h.cards.length <= 12 && h.cards.every(okCard) && isFinite(h.bet) && h.bet > 0 && h.bet <= tier.max * 2) && Array.isArray(T.dealer) && T.dealer.length === 2 && T.dealer.every(okCard);
+      if (!ok) { let back = 0; for (const h of hands) if (h && isFinite(h.bet) && h.bet > 0) back += Math.min(h.bet, 2e5); d.money += back; d.gamble.table = null; }
+    } else d.gamble.table = null;
     for (const e of d.garage) e.vtier = typeof e.vtier === 'string' && TIER_LOOK[e.vtier] ? e.vtier : VEHICLES[e.type].tier;
     if (!d.pos || typeof d.pos !== 'object' || !isFinite(d.pos.x) || !isFinite(d.pos.z) || !isFinite(d.pos.h)) d.pos = null;
     else { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
@@ -33357,6 +33406,15 @@ class AudioSystem {
       case 'confirm': this._tone(out, t, 'triangle', 660, 660, 0.08, 0.2); this._tone(out, t + 0.07, 'triangle', 990, 990, 0.12, 0.2); break;
       case 'deny': this._tone(out, t, 'square', 220, 180, 0.18, 0.12); break;
       case 'cash': for (let i = 0; i < 3; i++) this._tone(out, t + i * 0.06, 'triangle', 1400 + i * 300, 1400 + i * 300, 0.12, 0.18); break;
+      case 'win1': this._tone(out, t, 'triangle', 988, 988, 0.1, 0.2); this._tone(out, t + 0.08, 'triangle', 1319, 1319, 0.16, 0.2); break;
+      case 'win2': [784, 988, 1175, 1568].forEach((f, i) => this._tone(out, t + i * 0.07, 'triangle', f, f, 0.18, 0.22)); for (let i = 0; i < 4; i++) this._tone(out, t + 0.3 + i * 0.05, 'triangle', 1800 + i * 250, 1800 + i * 250, 0.09, 0.12); break;
+      case 'win3': [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => { this._tone(out, t + i * 0.08, 'triangle', f, f, 0.3, 0.24); this._tone(out, t + i * 0.08, 'sine', f / 2, f / 2, 0.3, 0.15); }); for (let i = 0; i < 10; i++) this._tone(out, t + 0.5 + i * 0.045, 'triangle', 1400 + (i % 3) * 300, 1400 + (i % 3) * 300, 0.08, 0.14); break;
+      case 'jackpot': for (let r = 0; r < 3; r++) [523, 659, 784, 1047].forEach((f, i) => { this._tone(out, t + r * 0.5 + i * 0.09, 'triangle', f * (1 + r * 0.25), f * (1 + r * 0.25), 0.32, 0.24); this._tone(out, t + r * 0.5 + i * 0.09, 'square', f / 2, f / 2, 0.25, 0.06); }); for (let i = 0; i < 24; i++) this._tone(out, t + 1.5 + i * 0.04, 'triangle', 1500 + Math.random() * 1500, 1500 + Math.random() * 1500, 0.07, 0.12); break;
+      case 'scratch': this._noiseBurst(out, t, 0.09, 'bandpass', 3500, 1.5, 0.005, 0.35); break;
+      case 'reelstop': this._noiseBurst(out, t, 0.06, 'lowpass', 1400, 1, 0.002, 0.6); this._tone(out, t, 'square', 420, 300, 0.05, 0.14); break;
+      case 'lever': this._noiseBurst(out, t, 0.25, 'lowpass', 800, 1, 0.01, 0.5); this._tone(out, t + 0.05, 'sawtooth', 160, 90, 0.22, 0.12); for (let i = 0; i < 6; i++) this._tone(out, t + 0.25 + i * 0.09, 'square', 1100 + (i % 2) * 220, 1100 + (i % 2) * 220, 0.04, 0.05); break;
+      case 'card': this._noiseBurst(out, t, 0.07, 'highpass', 2500, 0.8, 0.003, 0.3); break;
+      case 'chip': this._tone(out, t, 'triangle', 2400, 2200, 0.04, 0.16); this._tone(out, t + 0.03, 'triangle', 2700, 2500, 0.04, 0.12); break;
       case 'checkpoint': this._tone(out, t, 'triangle', 784, 784, 0.1, 0.3); this._tone(out, t + 0.08, 'triangle', 1175, 1175, 0.18, 0.3); break;
       case 'pickup': this._tone(out, t, 'sine', 600, 1200, 0.18, 0.3); break;
       case 'pass': {
@@ -36122,6 +36180,57 @@ Object.assign(World.prototype, {
   const base2 = World.prototype.generate;
   World.prototype.generate = function () { base2.call(this); this._placesGen(); };
 }
+/* ---------------------------------------------------------------------
+   The Valen Royale: the casino on the Nightlife Strip, a block south of Club Neon.
+   A plum-and-gold gaming hall with a glass hotel tower over it, a lit porte-cochère and a
+   valet forecourt on the Strip. The gaming floor is an interior built when you walk in.
+   --------------------------------------------------------------------- */
+Object.assign(LANDMARK_BLOCKS, {
+  '5,9': { gen: '_genCasino', name: 'The Valen Royale', icon: '♦', ground: 'K', mapCat: 'casino', sub: 'Casino · slots, blackjack, roulette, Hold’em · open all night' }
+});
+Object.assign(World.prototype, {
+  _genCasino(b, rng) {
+    this._sidewalk(b, rng, { trees: 0.35, benches: true, news: false, park: 0 });
+    const cx = b.cx, cz = b.cz;
+    const hall = this._bld(b, b.x0 + 4, b.z0 + 4, b.x1 - 4, b.z0 + 32, 12, STYLE.DECO, 0x3a2346, 6, 6, { gtype: 2, exactH: true });
+    this._ring(b, hall, hall.y0 + hall.h - 0.5, 0.9, 0.6, C(0xd8a227));
+    this._ring(b, hall, hall.y0 + 5.6, 0.35, 0.3, C(0xb8902a));
+    this._rooftop(b, hall, rng, 'mid');
+    // hotel tower set back on the podium: three stepped glass tiers with gold crowns
+    let y = hall.y0 + hall.h;
+    for (const [w, d, h] of [[26, 16, 22], [22, 13, 16], [16, 10, 9]]) {
+      const t = this._bld(b, cx - w / 2, b.z0 + 9, cx + w / 2, b.z0 + 9 + d, h, STYLE.GLASS, 0x2e2440, 3.4, 3.2, { y0: y, oy: CURB_H, noCol: true, far: true, exactH: true });
+      b.fx.push({ type: 'crown', x0: t.x0, x1: t.x1, z0: t.z0, z1: t.z1, y: y + h - 1.2 });
+      this._ring(b, t, y + h - 0.3, 0.6, 0.4, C(0xd8a227));
+      y += h;
+    }
+    b.fx.push({ type: 'beacon', x: cx, y: y + 3.2, z: b.z0 + 14 });
+    this._det(b, 'cyl', cx, y + 1.5, b.z0 + 14, 0.25, 3, 0x8c949c);
+    // porte-cochère: gold canopy on four columns over the drop-off, a red carpet to the doors
+    const fz = hall.z1;
+    this._det(b, 'box', cx, CURB_H + 5.4, fz + 4.5, 22, 0.7, 9, C(0x2a1a36));
+    this._det(b, 'box', cx, CURB_H + 5.85, fz + 4.5, 22.4, 0.2, 9.4, C(0xd8a227));
+    for (const k of [-9.5, -3.5, 3.5, 9.5]) this._det(b, 'cyl', cx + k, CURB_H + 2.6, fz + 8.4, 0.35, 5.2, 0xe8dcc0, null, { x: cx + k, z: fz + 8.4, r: 0.4, y0: 0, y1: 5.2, kind: 'det' });
+    b.fx.push({ type: 'canopy', x: cx, y: CURB_H + 5.0, z: fz + 4.5, w: 20, d: 8 });
+    this._det(b, 'box', cx, CURB_H + 0.02, fz + 3, 3.2, 0.03, 6, C(0x9a1a2a));
+    // glass doors, neon marquee and trim
+    b.fx.push({ type: 'neon', x: cx, y: CURB_H + 1.4, z: fz + 0.08, w: 6, h: 2.8, d: 0.06, c: 0xffe2a0 });
+    b.fx.push({ type: 'neon', x: cx, y: CURB_H + 9.6, z: fz + 0.5, w: 30, h: 0.18, d: 0.12, c: 0xe056fd });
+    b.fx.push({ type: 'neon', x: cx, y: CURB_H + 6.3, z: fz + 9.25, w: 22.4, h: 0.16, d: 0.1, c: 0xffd84d });
+    for (const s of [-1, 1]) { b.fx.push({ type: 'neon', x: cx + s * 15.2, y: CURB_H + 6, z: fz + 0.12, w: 0.25, h: 11, d: 0.12, c: s < 0 ? 0xe056fd : 0x46d4c4 }); b.fx.push({ type: 'neon', x: cx + s * 20, y: CURB_H + 3.2, z: fz + 0.12, w: 5, h: 0.2, d: 0.12, c: 0xffd84d }); }
+    b.signs.push({ text: 'THE VALEN ROYALE', x: cx, y: CURB_H + 8.0, z: fz + 0.3, ry: 0, w: 22, h: 2.6, bg: '#1a0e24', fg: '#ffd84d' });
+    b.signs.push({ text: 'CASINO · OPEN ALL NIGHT', x: cx, y: CURB_H + 6.6, z: fz + 9.3, ry: 0, w: 12, h: 0.9, bg: '#1a0e24', fg: '#e056fd' });
+    for (let i = 0; i < 4; i++) b.signs.push({ x: hall.x0 + 5 + i * 3.6 + (i > 1 ? 30 : 0), y: CURB_H + 3.2, z: fz + 0.06, ry: 0, w: 3, h: 1.6, ad: (i * 5 + 2) % 8 });
+    // valet stand, planters, the lot out front (stall rows match the ground shader)
+    this._det(b, 'box', cx + 6, CURB_H + 0.6, fz + 6.5, 1.0, 1.2, 0.6, C(0x2a1a36), 0, true);
+    for (const k of [-12.5, 12.5]) { this._det(b, 'box', cx + k, CURB_H + 0.45, fz + 1.4, 2.4, 0.9, 1.2, C(0x5a4a3a), 0, true); this._det(b, 'box', cx + k, CURB_H + 1.2, fz + 1.4, 2.0, 0.7, 0.9, C(0x2f6a3a)); }
+    for (const [rz, ry] of [[13.4, 0], [19.0, Math.PI]]) for (let k = 0; k < 18; k++) if (Math.abs(k - 8.5) > 2.6 && rng.chance(0.6)) b.parked.push({ x: cx - 26 + 1.4 + k * 2.8, z: cz + rz, h: ry, cls: null });
+    for (const [lx, lz] of [[-18, 11], [18, 11], [0, 25]]) this._prop(b, 'lotlamp', cx + lx, cz + lz, 0);
+    // two hidden spots, as the city block that stood here had (keeps the package draw stable)
+    b.secrets.push({ x: hall.x1 + 2, z: hall.z0 + 2 }, { x: hall.x0 - 2, z: hall.z0 + 2 });
+    b.place = { id: 'casino', name: 'The Valen Royale', kind: 'landmark', door: { x: cx, z: fz + 1.1, h: 0 }, under: { x: cx, z: cz } };
+  }
+});
 /* =====================================================================
    [CONTENT] CITY v2: local roads, superblocks, districts and the homes registry
    The lattice of arterial streets is broken up by superblocks and threaded with local
@@ -37299,6 +37408,7 @@ class ChunkManager {
         gl.add(TPL.box, M(f.x1 + 0.02, y, (f.z0 + f.z1) / 2, 0.08, t, f.z1 - f.z0), c);
       } else if (f.type === 'beacon') bc.add(TPL.sphere0, M(f.x, f.y, f.z, 0.35, 0.35, 0.35), C(0xffffff));
       else if (f.type === 'canopy') { gl.add(TPL.box, M(f.x, f.y, f.z, f.w * 0.9, 0.05, 0.25), C(0xfff2dc)); gl.add(TPL.box, M(f.x, f.y, f.z, 0.25, 0.05, f.d * 0.9), C(0xfff2dc)); for (const k of [-0.33, 0.33]) gl.add(TPL.box, M(f.x + f.w * k, f.y, f.z, 0.2, 0.05, f.d * 0.8), C(0xfff2dc)); }
+      else if (f.type === 'neon') gl.add(TPL.box, M(f.x, f.y, f.z, f.w, f.h, f.d, f.ry || 0), C(f.c));
       else if (f.type === 'docklight') { for (let k = -1; k <= 1; k++) gl.add(TPL.box, M(f.x + k * f.w / 3, f.y, f.z, 0.6, 0.18, 0.18), C(0xffe0a8)); }
       else if (f.type === 'flood') gl.add(TPL.box, M(f.x, f.y, f.z, 3.6, 2.0, 0.6, f.ry), C(0xf0f4ff));
       else if (f.type === 'rooflamp') gl.add(TPL.sphere0, M(f.x, f.y, f.z, 0.35, 0.18, 0.35), C(0xffe6c0));
@@ -38160,8 +38270,13 @@ const TIER_LOOK = {
   nice: { flake: 0.5, gloss: 0.62, wear: 0.05, rim: 1, label: 'NICE', col: '#7fb2ff', value: 1 },
   sport: { flake: 0.7, gloss: 0.78, wear: 0, rim: 2, label: 'SPORT', col: '#ff8a3d', value: 1 },
   luxury: { flake: 0.85, gloss: 0.92, wear: 0, rim: 3, label: 'LUXURY', col: '#e8d28a', value: 1 },
-  rare: { flake: 1.0, gloss: 1.0, wear: 0, rim: 3, label: 'RARE', col: '#d28cff', value: 1 }
+  rare: { flake: 1.0, gloss: 1.0, wear: 0, rim: 3, label: 'RARE', col: '#d28cff', value: 1.3 }
 };
+// collectibles: rare models turn up parked in the wealthy districts (deterministic per stall, so a
+// street you know keeps its find until somebody takes it); collectors pay a premium for them
+const RARE_TYPES = ['coupe', 'classic', 'supercar', 'offroad'];
+const RARE_ZONES = { u: 0.035, c: 0.02, p: 0.02, g: 0.008 };
+const tierChip = t => { const L = TIER_LOOK[t] || TIER_LOOK.common; return `<span class="chip" style="--c:${L.col}">${L.label}</span>`; };
 // a common car parked or driving in a poor district is often an old beater
 const BEATER_ZONES = { o: 0.38, s: 0.42, h: 0.35, w: 0.42, r: 0.5, m: 0.12, l: 0.06, a: 0.1, g: 0.08, p: 0.08 };
 function beaterRoll(type, x, z, seed) {
@@ -38746,6 +38861,7 @@ class VehicleManager {
         const hh = hash2i(bi, k, 31);
         let type = p.cls || (b.t === 'I' ? (hh < 0.5 ? 'van' : 'pickup') : b.t === 'H' ? CIVIL_TYPES[Math.floor(hh * 8)] : CIVIL_TYPES[Math.floor(hh * CIVIL_TYPES.length)]);
         if (!p.cls && hh > 0.985) type = 'muscle';
+        if (!p.cls && hash2i(bi, k, 35) < (RARE_ZONES[zoneKey(p.x, p.z)] || 0)) type = RARE_TYPES[Math.floor(hash2i(bi, k, 34) * RARE_TYPES.length)];
         if (Math.hypot(p.x - px, p.z - pz) < 6) return;
         // skip if something already occupies the slot
         for (const v of this.list) if (dist2(v.pos.x, v.pos.z, p.x, p.z) < 9) return;
@@ -41570,8 +41686,16 @@ const INTERIOR_DEFS = {
       k.box(4.6, 0, 3.4, 1.2, 0.02, 0.5, 0x2a2a2e); k.box(5.2, 0, -1.0, 0.5, 1.9, 2.4, 0x5c5e62, { col: true });
       for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) k.box(4.94, 0.3 + r * 0.42, -2 + c * 0.38, 0.04, 0.3, 0.3, pal[(r * 3 + c) % pal.length]);
       k.glow(3.4, 2.2, 3.96, 2.4, 0.5, 0.03, 0xd23a2a, 1.4);
+      // the Lucky Pump slot cabinet against the west wall: marquee, three reel windows, coin tray and a pull handle
+      k.box(-5.1, 0, 0.9, 0.7, 1.72, 0.9, 0x3a1a4a, { col: true }); k.box(-5.1, 0.7, 0.9, 0.78, 0.06, 0.94, 0xd8a227);
+      k.glow(-5.1, 1.74, 0.9, 0.62, 0.32, 0.86, 0xffd84d, 1.9);
+      k.glow(-4.745, 0.95, 0.9, 0.02, 0.52, 0.76, 0x1a0e24, 1);
+      for (let i = 0; i < 3; i++) k.glow(-4.73, 1.04, 0.66 + i * 0.24, 0.02, 0.32, 0.2, 0xf4f2ee, 1.5);
+      k.glow(-4.73, 1.42, 0.9, 0.02, 0.08, 0.7, 0xff4d5e, 2.2);
+      k.box(-4.78, 0.42, 0.9, 0.1, 0.12, 0.5, 0x2a2a2e);
+      k.box(-5.0, 0.95, 1.38, 0.06, 0.62, 0.06, 0xb0b0b0); k.box(-5.0, 1.57, 1.38, 0.15, 0.15, 0.15, 0xd23a2a);
     },
-    spots: [{ id: 'clerk', x: 3.3, z: 1.0, r: 1.3, label: 'Shop' }],
+    spots: [{ id: 'clerk', x: 3.3, z: 1.0, r: 1.3, label: 'Shop' }, { id: 'slot', x: -4.25, z: 0.9, r: 1.0, label: 'Play the Lucky Pump slot' }],
     npcs: [{ id: 'clerk', x: 3.6, z: 2.75, h: Math.PI, look: { shirt: 0xd23a2a, pants: 0x2a2a2e, cap: 0xd23a2a } }]
   },
   police: {
@@ -41890,6 +42014,82 @@ function interiorLighting(g) {
     I.sky.lit.opacity = clamp(env.night * 1.2, 0, 1);
   }
 }
+// The Valen Royale gaming floor: lobby with cashier and bar, slot banks, three rows of tables by
+// limit (LOW, STANDARD, HIGH) and the VIP room behind a rope. Built on entry, disposed on exit.
+const CASINO_GAMES = [['bj', 'Blackjack'], ['roul', 'Roulette'], ['poker', 'Hold’em']];
+const CASINO_FELT = [0x1f6a3e, 0x1d4f8a, 0x7a1a2a, 0x141418];
+const CASINO_TRIM = [0x7fe08f, 0x7fb2ff, 0xff4d5e, 0xffd84d];
+function casinoInteriorDef() {
+  const W = 40, D = 28, H = 6;
+  const tables = [];
+  CASINO_GAMES.forEach(([g], gi) => { for (let t = 0; t < 3; t++) tables.push({ g, t, x: -2 + gi * 7, z: 4.5 - t * 4 }); tables.push({ g, t: 3, x: -2 + gi * 7, z: -10.5 }); });
+  const slots = [['classic', -16, 3.5], ['video', -11, 3.5], ['volatile', -16, -1.5], ['prog', -11, -1.5], ['vip', -14, -10.5]];
+  const spots = [
+    { id: 'g:cashier', x: 15.2, z: 9.6, r: 1.5, label: 'Cashier · records & table access' },
+    { id: 'g:bar', x: -14.5, z: 9.6, r: 1.6, label: 'Royale Bar · drink $40' }
+  ];
+  for (const T of tables) spots.push({ id: `g:${T.g}:${T.t}`, x: T.x, z: T.z + 1.35, r: 1.25, label: `${CASINO_GAMES.find(c => c[0] === T.g)[1]} · ${CASINO_TIERS[T.t].name} ${fmtMoney(CASINO_TIERS[T.t].min)}–${fmtMoney(CASINO_TIERS[T.t].max)}` });
+  for (const [id, x, z] of slots) spots.push({ id: 'g:slot:' + id, x, z: z + 1.2, r: 1.2, label: `${SLOT_DEFS[id].name} · ${SLOT_DEFS[id].kind}` });
+  const npcs = [
+    { id: 'cashier', x: 15.2, z: 11.6, h: Math.PI, look: { shirt: 0x1a1a1e, pants: 0x1a1a1e, cap: 0xd8a227 } },
+    { id: 'bartender', x: -14.5, z: 11.6, h: Math.PI, look: { shirt: 0xf4f2ee, pants: 0x1a1a1e } },
+    { id: 'bouncer', x: -0.4, z: -6.1, h: 0, look: { shirt: 0x111111, pants: 0x111111 } }
+  ];
+  tables.forEach((T, i) => npcs.push({ id: 'dealer' + i, x: T.x, z: T.z - 1.15, h: 0, look: { shirt: 0xf4f2ee, pants: 0x1a1a1e, cap: CASINO_TRIM[T.t] } }));
+  [[-16.6, 5.0], [-10.4, 5.0], [-15.4, 0.0], [3.6, 6.2], [10.2, 2.2], [-1.2, -9.0], [0.5, 9.5], [8, 9.8]].forEach(([x, z], i) => npcs.push({ id: 'patron' + i, x, z, h: rand(-Math.PI, Math.PI) }));
+  return {
+    id: 'casino', place: 'casino', name: 'The Valen Royale', dynamic: true, w: W, d: D, h: H,
+    exit: { x: 0, z: D / 2 - 0.9 }, spawnH: Math.PI, exitLabel: 'Leave the casino', spots, npcs,
+    build(k) {
+      k.room(W, D, H, { floor: 0x5a1420, wall: 0x2a1a36, ceil: 0x1a1022, trim: 0xd8a227, band: [3.6, 0.2], bandC: 0xd8a227, lights: [5, 4], lightC: 0xffe6b8 });
+      k.tiles(W, D, 0x5a1420, 0x6a1c2a, 2);
+      k.door(0, D / 2 - 0.02, 0, 0x1a0e24, 0xffd84d);
+      // lobby: marble strip at the doors, cashier cage (east), bar (west), a gold fountain-sculpture between
+      k.box(0, -0.004, D / 2 - 3, 12, 0.012, 6, 0xe8e2d4, { flat: true });
+      k.box(15.2, 0, 10.6, 6, 1.15, 0.8, 0x2a1a36, { col: true }); k.box(15.2, 1.15, 10.6, 6.1, 0.06, 0.9, 0xd8a227);
+      for (let i = 0; i < 7; i++) k.box(12.4 + i * 0.93, 1.21, 10.6, 0.05, 1.6, 0.05, 0xd8a227);
+      k.glow(15.2, 2.9, 10.3, 5.6, 0.35, 0.05, 0xffd84d, 2.2);
+      k.box(-14.5, 0, 10.6, 6, 1.1, 0.8, 0x3a2416, { col: true }); k.box(-14.5, 1.1, 10.6, 6.2, 0.06, 1.0, 0x1a1a1e);
+      k.box(-14.5, 0, 13.4, 6.4, 2.6, 0.5, 0x1a1a1e, { col: true });
+      for (let i = 0; i < 14; i++) k.glow(-17.3 + i * 0.42, 1.2 + (i % 2) * 0.55, 13.1, 0.1, 0.3, 0.1, [0xffb547, 0x46d4c4, 0xd28cff, 0x7fe08f][i % 4], 1.5);
+      for (const x of [-16.5, -14.5, -12.5]) { k.box(x, 0, 9.4, 0.45, 0.75, 0.45, 0xd8a227, { col: true }); }
+      k.box(0, 0, 7.6, 1.6, 0.6, 1.6, 0xd8a227, { col: true }); k.glow(0, 0.6, 7.6, 0.6, 2.2, 0.6, 0xffe2a0, 1.6);
+      // slot banks: a cabinet row per machine type, marquee colour by type
+      const sc = { classic: 0xff4d5e, video: 0x46d4c4, volatile: 0xd28cff, prog: 0xffd84d, vip: 0xf4f2ee };
+      for (const [id, x, z] of slots) for (let i = -1; i <= 1; i++) {
+        const cx = x + i * 1.0;
+        k.box(cx, 0, z, 0.9, 1.75, 0.7, id === 'vip' ? 0x141418 : 0x2a1a36, { col: true });
+        k.glow(cx, 1.78, z, 0.86, 0.3, 0.62, sc[id], 1.9);
+        k.glow(cx, 0.95, z + 0.36, 0.7, 0.55, 0.02, 0x1a0e24, 1);
+        for (let r = 0; r < 3; r++) k.glow(cx - 0.22 + r * 0.22, 1.03, z + 0.37, 0.18, 0.32, 0.02, 0xf4f2ee, 1.4);
+        k.box(cx, 0, z + 0.85, 0.45, 0.55, 0.45, 0x1a1a1e);
+      }
+      // tables: felt by limit, a lit sign above each
+      for (const T of tables) {
+        const felt = CASINO_FELT[T.t], trim = CASINO_TRIM[T.t];
+        if (T.g === 'roul') {
+          k.box(T.x, 0, T.z, 3.0, 0.85, 1.3, 0x3a2416, { col: true }); k.box(T.x, 0.85, T.z, 3.1, 0.05, 1.4, felt);
+          k.box(T.x - 1.0, 0.9, T.z, 0.9, 0.12, 0.9, 0x5a3a1a); k.box(T.x - 1.0, 1.02, T.z, 0.6, 0.04, 0.6, 0xd8a227); k.box(T.x - 1.0, 1.06, T.z, 0.12, 0.18, 0.12, 0xd8a227);
+          for (let i = 0; i < 12; i++) k.box(T.x - 0.3 + (i % 6) * 0.3, 0.9, T.z - 0.3 + Math.floor(i / 6) * 0.45, 0.24, 0.01, 0.36, i % 2 ? 0xa8242a : 0x15171c);
+        } else if (T.g === 'poker') {
+          k.box(T.x, 0, T.z, 3.2, 0.82, 1.8, 0x3a2416, { col: true }); k.box(T.x, 0.82, T.z, 3.3, 0.08, 1.9, 0x1a1a1e); k.box(T.x, 0.84, T.z, 2.9, 0.07, 1.5, felt);
+          for (const [dx, dz] of [[-1.9, 0], [1.9, 0], [-0.8, 1.3], [0.8, 1.3], [0, -1.3]]) k.box(T.x + dx, 0, T.z + dz, 0.45, 0.5, 0.45, 0x1a1a1e);
+        } else {
+          k.box(T.x, 0, T.z, 2.8, 0.85, 1.25, 0x3a2416, { col: true }); k.box(T.x, 0.85, T.z, 2.9, 0.06, 1.35, felt);
+          for (let i = 0; i < 5; i++) k.box(T.x - 1.1 + i * 0.55, 0, T.z + 1.0, 0.42, 0.62, 0.42, 0x1a1a1e);
+          k.box(T.x + 0.9, 0.91, T.z - 0.35, 0.35, 0.18, 0.25, 0x5a3a1a);
+        }
+        k.glow(T.x, 3.1, T.z - 0.1, 2.4, 0.4, 0.08, trim, 1.8);
+      }
+      // the VIP room: a gold-trimmed wall with a roped opening and a bouncer
+      k.box(-12, 0, -7, 16, H, 0.3, 0x1a1022, { col: true }); k.box(9.5, 0, -7, 21, H, 0.3, 0x1a1022, { col: true });
+      k.box(-12, 2.6, -6.83, 16, 0.12, 0.04, 0xd8a227); k.box(9.5, 2.6, -6.83, 21, 0.12, 0.04, 0xd8a227);
+      for (const x of [-3.8, -1.2]) { k.box(x, 0, -6.7, 0.18, 1.0, 0.18, 0xd8a227); k.box(x + (x < -2.5 ? -0.3 : 0.3), 0.8, -6.7, 0.6, 0.05, 0.05, 0x9a1a2a); }
+      k.glow(-2.5, 3.1, -6.82, 3.4, 0.5, 0.05, 0xffd84d, 2.4);
+      k.box(0, -0.003, -10.5, W, 0.012, 7, 0x141418, { flat: true });
+    }
+  };
+}
 class InteriorManager {
   constructor(game) {
     this.g = game; this.cur = null; this.defs = INTERIOR_DEFS; this.list = [];
@@ -42065,7 +42265,7 @@ const STORE_ITEMS = [
   { id: 'medkit', name: 'First-Aid Kit', desc: 'Patches you up on the spot: restores 180 health.', price: 90 },
   { id: 'drink', name: 'Volt Energy', desc: 'Unlimited sprint for a minute.', price: 25 },
   { id: 'vest', name: 'Kevlar Vest', desc: 'A 150-point armour layer that soaks 75% of every hit until it is spent.', price: 450, rep: 2 },
-  { id: 'ticket', name: 'Scratch Card', desc: 'One in eight wins something. Probably.', price: 10 },
+  { id: 'scratch', name: 'Scratch Cards', desc: 'Five cards from $5 to $100. Top prize $1,000,000. Most lose.', price: 5 },
   { id: 'map', name: 'Collector’s Map', desc: 'Someone marked five hidden packages on a tourist map.', price: 1200 }
 ];
 const ORIGIN_CHIP = { bought: ['OWNED', '#7fe08f'], stolen: ['STOLEN', '#ff4d5e'], reward: ['SPECIAL', '#d28cff'], found: ['FOUND', '#46d4c4'] };
@@ -42099,7 +42299,7 @@ const SECRETS = [
   { id: 'gold', name: 'The Golden Corsair', cash: 0 },
   { id: 'pitch', name: 'Pitch Invader', cash: 800 }
 ];
-const FAST_POINTS = ['safehouse', 'tower', 'motorworks', 'dealer', 'store', 'police', 'mall', 'stadium', 'garageRoof', 'plant', 'hospital'];
+const FAST_POINTS = ['safehouse', 'tower', 'motorworks', 'dealer', 'store', 'police', 'mall', 'stadium', 'garageRoof', 'plant', 'hospital', 'casino'];
 const SERVICE_PLACES = ['motorworks', 'dealer', 'store', 'police', 'tower'];
 const POSTS = [
   { place: 'police', dx: -3.2, dz: -1.5 }, { place: 'police', dx: 3.4, dz: -1.2 },
@@ -42365,6 +42565,7 @@ class ContentManager {
     body.addEventListener('change', e => { const s = e.target.closest('select[data-sel]'); if (s && this._svcAct) this._svcAct(s.dataset.sel + ':' + s.value); });
   }
   openSvc(title, hint, render, act) {
+    if (this._svcClose) { const f = this._svcClose; this._svcClose = null; f(); }
     $('svcTitle').textContent = title; $('svcHint').textContent = hint;
     this._svcRender = render; this._svcAct = act;
     $('svcBody').innerHTML = render();
@@ -42390,7 +42591,7 @@ class ContentManager {
       const tuneLv = TUNE.map(t => e.tune[t.id]).reduce((a, b) => a + b, 0);
       const loc = e.at ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'In storage (no free space)';
       const move = !here && PM.freeBay(def) ? `<button class="sbtn" data-act="out:${e.uid}">${e.at ? 'Move here' : 'Park here'}</button>` : '';
-      return `<div class="card"><div class="t">${v.name} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}${e.out ? ' · out on the street' : ''}</div>${this._bars(e.type, e.tune)}
+      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}${e.out ? ' · out on the street' : ''}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="btns">${here ? `<button class="sbtn gold" data-act="out:${e.uid}" ${wrecked ? 'disabled' : ''}>${wrecked ? 'Wrecked' : 'Where is it?'}</button>` : move}
@@ -42399,7 +42600,10 @@ class ContentManager {
     };
     const render = () => {
       const here = s.garage.filter(e => e.at && e.at.p === def.id), other = s.garage.filter(e => !(e.at && e.at.p === def.id));
+      const col = this.collection(), rank = ['beater', 'common', 'nice', 'sport', 'luxury', 'rare'];
+      here.sort((a, b) => rank.indexOf(b.vtier) - rank.indexOf(a.vtier));
       return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span></div>
+        <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
         <div class="grid2">${here.map(e => card(e, true)).join('') || '<div class="hint">Nothing parked here. Drive a car into a free space and stop to park it.</div>'}</div>
         ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}`;
     };
@@ -42425,7 +42629,15 @@ class ContentManager {
     const base = (DEALER.find(d => d.type === e.type) || { price: VEHICLES[e.type].price || 8000 }).price;
     const k = e.origin === 'bought' ? 0.5 : e.origin === 'stolen' ? 0.22 : 0.35;
     const tuneV = TUNE.reduce((a, t) => a + t.prices.slice(0, e.tune[t.id]).reduce((x, y) => x + y, 0), 0);
-    return Math.round((base * k + tuneV * 0.3) * (1 - e.dmg / 200) / 10) * 10;
+    const tv = (TIER_LOOK[e.vtier] || TIER_LOOK.common).value;
+    return Math.round((base * k * tv + tuneV * 0.3) * (1 - e.dmg / 200) / 10) * 10;
+  }
+  // the garage as a collection: models owned of every model there is, rare finds, what it is all worth
+  collection() {
+    const s = this.g.save, models = new Set(s.garage.map(e => e.type)), all = Object.keys(VEHICLES).filter(k => !VEHICLES[k].police && k !== 'gangcar');
+    const rare = s.garage.filter(e => e.vtier === 'rare'), byTier = {};
+    for (const e of s.garage) byTier[e.vtier || VEHICLES[e.type].tier] = (byTier[e.vtier || VEHICLES[e.type].tier] || 0) + 1;
+    return { models: models.size, of: all.length, rare: rare.length, rareModels: new Set(rare.map(e => e.type)).size, rareOf: RARE_TYPES.length, value: s.garage.reduce((a, e) => a + this.sellPrice(e), 0), byTier };
   }
   classK(type) { const p = (DEALER.find(d => d.type === type) || { price: VEHICLES[type].price || 20000 }).price; return 0.8 + Math.min(1.4, p / 30000); }
   repairCost(type, health) { return Math.max(60, Math.round((100 - health) * 9 * this.classK(type) / 10) * 10); }
@@ -42522,7 +42734,7 @@ class ContentManager {
       if (id === 'medkit') { if (p.health >= p.maxHealth) { this.refreshSvc('Nothing to patch up.'); return; } p.health = Math.min(p.maxHealth, p.health + 180); msg = 'Gauze, tape and something that stings. Better.'; }
       if (id === 'drink') { p.boostT = 60; msg = 'Your heart is now a drum solo. Sprint as much as you like for a minute.'; }
       if (id === 'vest') { if (p.vest >= VEST_MAX * 0.95) { this.refreshSvc('You’re already wearing a fresh one.'); return; } p.vest = VEST_MAX; msg = 'Strapped in. It’ll take the edge off.'; }
-      if (id === 'ticket') { const r = Math.random(); const win = r < 0.01 ? 2500 : r < 0.05 ? 250 : r < 0.125 ? 25 : 0; this.spend(it.price); if (win) g.addMoney(win, true); this.refreshSvc(win ? `Winner! ${fmtMoney(win)}.` : 'Nothing. The clerk doesn’t even look up.'); g.audio.play(win ? 'cash' : 'deny'); return; }
+      if (id === 'scratch') { g.gamble.openScratch(); return; }
       if (id === 'map') {
         const left = g.world.packages.filter(pk => !s.packages[pk.id] && !s.hints[pk.id]);
         if (!left.length) { this.refreshSvc('Every spot on the map is already crossed out.'); return; }
@@ -42701,6 +42913,8 @@ class ContentManager {
     if (Math.hypot(p.pos.x - bay.x, p.pos.z - bay.z) < 4) return { label: 'Ask Dex about your car', act: () => this.openService() };
     const hd = this.nearHomeDoor(p);
     if (hd) return hd;
+    const cd = pl.casino && pl.casino.door;
+    if (cd && Math.hypot(p.pos.x - cd.x, p.pos.z - cd.z) < 2.2) return { label: 'Enter The Valen Royale', act: () => this.enterCasino() };
     const def = I.nearDoor(p);
     if (def) {
       const why = this.canEnter(def);
@@ -42711,6 +42925,12 @@ class ContentManager {
     return null;
   }
   deny(why) { this.g.ui.toast(why, 'warn'); this.g.audio.play('deny'); }
+  enterCasino() {
+    const g = this.g;
+    if (g.police.level > 0) { this.deny('Security steps in front of the doors. “Not with the police on you.”'); return; }
+    const def = this.interiors.addDynamic(casinoInteriorDef());
+    this.interiors.enter(def.id);
+  }
   // a house front door within reach: enterable homes are the ladder's and about a third of the rest
   nearHomeDoor(p) {
     const g = this.g;
@@ -42735,6 +42955,7 @@ class ContentManager {
   }
   spotAct(id) {
     const g = this.g, p = g.player, I = this.interiors;
+    if (id.startsWith('g:')) { g.gamble.spot(id); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;
@@ -42751,6 +42972,7 @@ class ContentManager {
       case 'wardrobe': this.openWardrobe(); break;
       case 'garage': if (I.cur && I.cur.dynamic) this.toGarage(I.cur); else this.openGarage(this.garagePoints()[0]); break;
       case 'clerk': this.openStore(); break;
+      case 'slot': g.gamble.openSlot('fuel'); break;
       case 'counter': this.openService(); break;
       case 'board': this.openTipLine(); break;
       case 'desk': this.say('moss', g.police.level > 0 ? 'Not now.' : pick(['Desk sergeant’s on break. Take a number.', 'If you’re here to confess, the line’s around the block.', 'Port Valen PD. How can we help?'])); break;
@@ -44952,7 +45174,7 @@ class Underworld {
   // ---------------------------------------------------------------- earning from zero
   rollChopList() { const pool = ['suv', 'sports', 'pickup', 'van', 'muscle', 'luxury', 'sedan', 'coupe', 'classic', 'gangcar', 'offroad']; this.S.chopWanted = pickN(pool, 3); }
   chopValue(v) {
-    const base = CHOP_VALUE[v.type] || 300;
+    const base = (CHOP_VALUE[v.type] || 300) * (TIER_LOOK[v.vtier] || TIER_LOOK.common).value;
     const cond = clamp(v.health / 100, 0.15, 1);
     const want = this.S.chopWanted.includes(v.type) ? 1.6 : 1;
     return Math.round(base * (0.35 + cond * 0.65) * want / 10) * 10;
@@ -47786,6 +48008,712 @@ class EmpireUI {
 }
 
 /* =====================================================================
+   [UNDERWORLD] GAMBLING: Fuel & Go scratch cards and slot machine, and the
+   Valen Royale casino (slot floor, blackjack, roulette, Texas Hold'em).
+   Every bet is settled the moment it is placed: stake out and any win in,
+   in one step, before the reels spin or the card is scratched. The show is
+   only a reveal, so closing a screen, double-tapping, a state change or a
+   reload can never duplicate or lose money (a blackjack hand you walk away
+   from is stood; a poker stack is cashed out). Every game keeps a house
+   edge: expected return is below the stake, verified by exact enumeration.
+   ===================================================================== */
+const SCRATCH_CARDS = {
+  5: { name: 'Lucky Fives', col: '#7fe08f', prizes: [[5, 0.21], [10, 0.08], [20, 0.03], [50, 0.006], [100, 0.002], [500, 0.0002], [2500, 0.00002], [12500, 0.0000025]] },
+  10: { name: 'Double Dime', col: '#46d4c4', prizes: [[10, 0.2], [20, 0.08], [40, 0.03], [100, 0.007], [250, 0.002], [1000, 0.0002], [5000, 0.00002], [25000, 0.0000025]] },
+  20: { name: 'Gold Rush', col: '#ffd84d', prizes: [[20, 0.19], [40, 0.075], [100, 0.025], [250, 0.006], [1000, 0.0012], [5000, 0.00008], [20000, 0.00001], [75000, 0.0000015]] },
+  50: { name: 'Diamond Deluxe', col: '#7fb2ff', prizes: [[50, 0.18], [100, 0.07], [250, 0.022], [500, 0.008], [2500, 0.001], [10000, 0.00008], [50000, 0.000008], [250000, 0.000001]] },
+  100: { name: 'Millionaire Royale', col: '#ff8a3d', prizes: [[100, 0.17], [200, 0.065], [500, 0.02], [1000, 0.007], [5000, 0.0008], [25000, 0.00006], [100000, 0.000005], [1000000, 0.0000005]] }
+};
+for (const d in SCRATCH_CARDS) SCRATCH_CARDS[d].grand = SCRATCH_CARDS[d].prizes[SCRATCH_CARDS[d].prizes.length - 1][0];
+function scratchRTP(den) { const c = SCRATCH_CARDS[den]; return c.prizes.reduce((a, [x, p]) => a + x * p, 0) / den; }
+// win size class: drives the celebration (small, medium, large, jackpot)
+function winClass(win, stake, top) { if (!(win > 0)) return 'none'; if (top && win >= top) return 'jackpot'; const m = win / stake; return m >= 50 ? 'large' : m >= 5 ? 'medium' : 'small'; }
+// ---- slot machines. Symbols, weights per reel stop, pay tables (multiples of the bet / line bet).
+const SLOT_SYMS = ['seven', 'crown', 'diamond', 'cash', 'car', 'shoe', 'skull'];
+const SLOT_GLYPH = { seven: ['7', '#ff4d5e'], crown: ['♛', '#ffd84d'], diamond: ['♦', '#46d4c4'], cash: ['$', '#7fe08f'], car: ['CAR', '#7fb2ff'], shoe: ['Ω', '#d8a26a'], skull: ['☠', '#9aa3b2'] };
+const SLOT_W_FUEL = { seven: 0.8, crown: 6.2, diamond: 8, cash: 17, car: 12, shoe: 24, skull: 32 };
+const SLOT_LINES5 = [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2]];
+const SLOT_DEFS = {
+  // the Fuel & Go machine: bigger bets play bigger tables; the $100 jackpot is $3,000,000 at about 1 in 1.95 million
+  fuel: { name: 'Lucky Pump', where: 'Fuel & Go', reels: 3, bets: [10, 25, 50, 100], w: SLOT_W_FUEL, table: {
+    10: { three: { seven: 2500, crown: 226, diamond: 90, car: 45, cash: 23, shoe: 11 }, two: { seven: 23, crown: 9, diamond: 5, car: 3.5, cash: 2.5, shoe: 2 }, one: { shoe: 1 } },
+    25: { three: { seven: 4000, crown: 228, diamond: 91, car: 46, cash: 23, shoe: 11 }, two: { seven: 23, crown: 9, diamond: 5, car: 3.5, cash: 2.5, shoe: 2 }, one: { shoe: 1 } },
+    50: { three: { seven: 10000, crown: 230, diamond: 92, car: 46, cash: 23, shoe: 11 }, two: { seven: 23, crown: 9, diamond: 6, car: 3.5, cash: 3, shoe: 2 }, one: { shoe: 1 } },
+    100: { three: { seven: 30000, crown: 232, diamond: 93, car: 46, cash: 23, shoe: 11 }, two: { seven: 23, crown: 9, diamond: 6, car: 3.5, cash: 3, shoe: 2 }, one: { shoe: 1 } } } },
+  classic: { name: 'Classic Sevens', kind: 'CLASSIC 3-REEL · LOW BET', reels: 3, bets: [2, 5, 10, 25], tier: 0, w: { seven: 1.5, crown: 5, diamond: 8, cash: 14, car: 14, shoe: 26, skull: 31.5 },
+    all: { three: { seven: 500, crown: 146, diamond: 78, car: 39, cash: 24, shoe: 12 }, two: { seven: 19, crown: 10, diamond: 6, car: 4, cash: 3, shoe: 2 }, one: { shoe: 1 } } },
+  video: { name: 'Neon Nights', kind: '5-REEL VIDEO · 5 LINES', reels: 5, rows: 3, lines: SLOT_LINES5, bets: [5, 10, 25, 50], tier: 0, w: { seven: 1, crown: 3, diamond: 6, cash: 12, car: 16, shoe: 30, skull: 32 },
+    pays: { seven: [230, 1148, 5738], crown: [86, 344, 1434], diamond: [52, 172, 689], cash: [26, 86, 344], car: [20, 63, 230], shoe: [13, 34, 115], skull: [0, 0, 0] } },
+  volatile: { name: 'Thunder Vault', kind: 'HIGH VOLATILITY', reels: 3, bets: [25, 50, 100, 250], tier: 1, w: { seven: 1.2, crown: 4, diamond: 6, cash: 10, car: 10, shoe: 20, skull: 48.8 },
+    all: { three: { seven: 5000, crown: 936, diamond: 374, car: 156, cash: 94, shoe: 37 }, two: { seven: 37, crown: 19, diamond: 9, car: 3.5, cash: 2.5, shoe: 2 }, one: {} } },
+  prog: { name: 'Royale Millions', kind: 'PROGRESSIVE JACKPOT', reels: 3, bets: [10, 25, 50], tier: 1, progressive: { seed: 250000, rate: 0.02, maxOnly: true }, w: { seven: 0.7, crown: 5, diamond: 8, cash: 15, car: 12, shoe: 26, skull: 33.3 },
+    all: { three: { seven: 0, crown: 186, diamond: 84, car: 42, cash: 23, shoe: 11 }, two: { seven: 19, crown: 8, diamond: 6, car: 3.5, cash: 3, shoe: 2 }, one: { shoe: 1 } } },
+  vip: { name: 'Black Diamond', kind: 'VIP · HIGH LIMIT', reels: 3, bets: [500, 1000, 2500, 5000], tier: 3, w: { seven: 1.2, crown: 5, diamond: 8, cash: 15, car: 12, shoe: 25, skull: 33.8 },
+    all: { three: { seven: 1110, crown: 306, diamond: 153, car: 61, cash: 31, shoe: 14.5 }, two: { seven: 31, crown: 12, diamond: 7.8, car: 5, cash: 3.3, shoe: 1.65 }, one: { shoe: 0.55 } } }
+};
+function slotTable(def, bet) { return def.table ? def.table[bet] : def.all; }
+function slotTop(def, bet, pool) { if (def.reels === 5) return def.pays.seven[2] * bet / def.lines.length; if (def.progressive) return pool || def.progressive.seed; return slotTable(def, bet).three.seven * bet; }
+// exact expected return per unit staked (3-reel: one line; 5-reel: per line, lines are independent draws)
+function slotRTP(def, bet) {
+  const W = SLOT_SYMS.reduce((a, s) => a + def.w[s], 0);
+  let ev = 0, hit = 0, jp = 0;
+  if (def.reels === 3) {
+    const t = slotTable(def, bet || def.bets[0]);
+    for (const a of SLOT_SYMS) for (const b of SLOT_SYMS) for (const c of SLOT_SYMS) {
+      const p = def.w[a] / W * def.w[b] / W * def.w[c] / W;
+      const x = a === b && b === c ? t.three[a] || 0 : a === b ? (t.two[a] || 0) : (t.one[a] || 0);
+      ev += p * x; if (x > 0) hit += p; if (a === 'seven' && b === 'seven' && c === 'seven') jp = p;
+    }
+  } else {
+    const rec = (k, arr, p) => {
+      if (k === 5) { let n = 1; while (n < 5 && arr[n] === arr[0]) n++; const pay = n >= 3 ? (def.pays[arr[0]] || [0, 0, 0])[n - 3] : 0; ev += p * pay; if (pay) hit += p; return; }
+      for (const s of SLOT_SYMS) { arr[k] = s; rec(k + 1, arr, p * def.w[s] / W); }
+    };
+    rec(0, [], 1);
+  }
+  return { rtp: ev, hit, jp };
+}
+function slotDraw(def) { const W = SLOT_SYMS.reduce((a, s) => a + def.w[s], 0); let r = Math.random() * W; for (const s of SLOT_SYMS) { r -= def.w[s]; if (r <= 0) return s; } return 'skull'; }
+// one spin: the grid (reels x rows) and what it pays
+function slotSpin(def, bet, pool) {
+  const rows = def.rows || 1, grid = [];
+  for (let r = 0; r < def.reels; r++) { const col = []; for (let k = 0; k < rows; k++) col.push(slotDraw(def)); grid.push(col); }
+  let win = 0, lines = [], jackpot = false;
+  if (def.reels === 3) {
+    const t = slotTable(def, bet), [a, b, c] = grid.map(col => col[0]);
+    let x = a === b && b === c ? t.three[a] || 0 : a === b ? (t.two[a] || 0) : (t.one[a] || 0);
+    if (a === 'seven' && b === 'seven' && c === 'seven') { jackpot = true; if (def.progressive) x = 0; }
+    win = Math.round(x * bet);
+    if (jackpot && def.progressive && (!def.progressive.maxOnly || bet === def.bets[def.bets.length - 1])) win = Math.round(pool);
+    if (win) lines.push(0);
+  } else {
+    const lb = bet / def.lines.length;
+    def.lines.forEach((L, li) => { const s = L.map((row, r) => grid[r][row]); let n = 1; while (n < 5 && s[n] === s[0]) n++; if (n >= 3) { const x = def.pays[s[0]][n - 3]; if (x) { win += x * lb; lines.push(li); if (s[0] === 'seven' && n === 5) jackpot = true; } } });
+    win = Math.round(win);
+  }
+  return { grid, win, lines, jackpot };
+}
+// casino access: table limits open up with wealth, reputation, influence and progress
+const CASINO_TIERS = [
+  { id: 'low', name: 'LOW', min: 10, max: 100, need: 'Anyone with cash' },
+  { id: 'std', name: 'STANDARD', min: 100, max: 1000, need: '400 reputation, or $10,000 in your pocket' },
+  { id: 'high', name: 'HIGH LIMIT', min: 1000, max: 10000, need: 'Crew Leader stage, or $100,000' },
+  { id: 'vip', name: 'VIP', min: 10000, max: 100000, need: 'Influence 500, a penthouse or mansion, or $1,000,000' }
+];
+// ---- cards (rank 2..14, suit 0..3: ♠ ♥ ♦ ♣)
+const SUITS = ['♠', '♥', '♦', '♣'], RANKS_TXT = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+function makeDeck(decks = 1) { const d = []; for (let k = 0; k < decks; k++) for (let s = 0; s < 4; s++) for (let r = 2; r <= 14; r++) d.push({ r, s }); for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = d[i]; d[i] = d[j]; d[j] = t; } return d; }
+function cardHTML(c, hidden) { if (hidden) return '<span class="pcard back"></span>'; const red = c.s === 1 || c.s === 2; return `<span class="pcard${red ? ' red' : ''}">${RANKS_TXT[c.r] || c.r}<small>${SUITS[c.s]}</small></span>`; }
+function bjValue(cards) { let t = 0, aces = 0; for (const c of cards) { if (c.r === 14) { aces++; t += 11; } else t += Math.min(10, c.r); } while (t > 21 && aces) { t -= 10; aces--; } return { total: t, soft: aces > 0 }; }
+// poker: score any 5 cards as one comparable number (category first, then kickers)
+const HAND_NAMES = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
+function rank5(cs) {
+  const r = cs.map(c => c.r).sort((a, b) => b - a), flush = cs.every(c => c.s === cs[0].s);
+  const cnt = {}; for (const x of r) cnt[x] = (cnt[x] || 0) + 1;
+  const groups = Object.entries(cnt).map(([k, n]) => [n, +k]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  let uniq = [...new Set(r)], straightHi = 0;
+  if (uniq.length === 5) { if (uniq[0] - uniq[4] === 4) straightHi = uniq[0]; else if (uniq.join() === '14,5,4,3,2') straightHi = 5; }
+  let cat, ks;
+  if (straightHi && flush) { cat = 8; ks = [straightHi]; }
+  else if (groups[0][0] === 4) { cat = 7; ks = [groups[0][1], groups[1][1]]; }
+  else if (groups[0][0] === 3 && groups[1][0] === 2) { cat = 6; ks = [groups[0][1], groups[1][1]]; }
+  else if (flush) { cat = 5; ks = r; }
+  else if (straightHi) { cat = 4; ks = [straightHi]; }
+  else if (groups[0][0] === 3) { cat = 3; ks = groups.map(g => g[1]); }
+  else if (groups[0][0] === 2 && groups[1][0] === 2) { cat = 2; ks = groups.map(g => g[1]); }
+  else if (groups[0][0] === 2) { cat = 1; ks = groups.map(g => g[1]); }
+  else { cat = 0; ks = r; }
+  let v = cat; for (let i = 0; i < 5; i++) v = v * 15 + (ks[i] || 0);
+  return v;
+}
+const _C7 = []; for (let a = 0; a < 7; a++) for (let b = a + 1; b < 7; b++) _C7.push([a, b]);
+function best7(cs) { let best = -1; const five = []; for (const [a, b] of _C7) { five.length = 0; for (let i = 0; i < cs.length; i++) if (i !== a && i !== b) five.push(cs[i]); const v = rank5(five); if (v > best) best = v; } return best; }
+function bestOf(cs) { if (cs.length === 5) return rank5(cs); if (cs.length === 6) { let b = -1; for (let i = 0; i < 6; i++) b = Math.max(b, rank5(cs.filter((_, j) => j !== i))); return b; } return best7(cs); }
+function handCat(v) { return Math.floor(v / 759375); } // 15^5
+// a quick equity estimate against n random hands (the AI's read of its own cards)
+function pokerEquity(hole, board, nOpp, iters = 120) {
+  const known = new Set([...hole, ...board].map(c => c.r * 4 + c.s));
+  const pool = []; for (let s = 0; s < 4; s++) for (let r = 2; r <= 14; r++) if (!known.has(r * 4 + s)) pool.push({ r, s });
+  let win = 0;
+  for (let it = 0; it < iters; it++) {
+    for (let i = pool.length - 1; i > pool.length - 1 - (5 - board.length + nOpp * 2) && i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+    let k = pool.length - 1; const b = board.slice(); while (b.length < 5) b.push(pool[k--]);
+    const me = bestOf([...hole, ...b]); let best = true, tie = 0;
+    for (let o = 0; o < nOpp; o++) { const v = bestOf([pool[k--], pool[k--], ...b]); if (v > me) { best = false; break; } if (v === me) tie++; }
+    if (best) win += tie ? 1 / (tie + 1) : 1;
+  }
+  return win / iters;
+}
+const POKER_AI = [
+  { name: 'Marguerite', pers: 'cautious', tight: 0.62, aggr: 0.25, bluff: 0.02, loose: 0.0, desc: 'Cautious: folds a lot, bets only real hands' },
+  { name: 'Big Sal', pers: 'aggressive', tight: 0.5, aggr: 0.75, bluff: 0.08, loose: 0.05, desc: 'Aggressive: raises whenever he likes it' },
+  { name: 'Lucky Lou', pers: 'loose', tight: 0.34, aggr: 0.35, bluff: 0.05, loose: 0.25, desc: 'Loose: calls with anything' },
+  { name: 'Vivian Kade', pers: 'bluffer', tight: 0.45, aggr: 0.55, bluff: 0.22, loose: 0.1, desc: 'Bluff-heavy: never believe her' }
+];
+class Gamble {
+  constructor(g) {
+    this.g = g; this.busy = false; this.view = null; this.token = 0;
+    this.shoe = []; this.bj = null; this.roul = null; this.pk = null;
+    const cv = document.createElement('canvas'); cv.id = 'confetti'; document.body.appendChild(cv); this.cv = cv; this.parts = [];
+  }
+  get G() { return this.g.save.gamble; }
+  get money() { return this.g.save.money; }
+  // a new session or another save: in-memory tables are dropped; anything that matters is already in the save and recover() settles it
+  reset() { this.token++; this.busy = false; this.bj = null; this.pk = null; this.sc = null; this.roul = null; this.slotState = {}; this.game = null; }
+  // ------------------------------------------------------------- money: one atomic step per bet
+  // stake leaves and the win arrives together; stats are updated in the same breath
+  settle(group, stake, win, extra) {
+    const s = this.g.save, G = this.G;
+    const pre = !!(extra && extra.prepaid);
+    if (!(stake >= 0) || !(win >= 0) || (!pre && stake > s.money + 1e-6)) return false;
+    s.money = s.money - (pre ? 0 : stake) + win; s.stats.spent += stake; if (win > 0) s.stats.earned += win;
+    if (group === 'scratch') { const S = G.scratch; S.bought++; S.spent += stake; S.won += win; if (win > 0) S.wins++; S.biggest = Math.max(S.biggest, win); }
+    else if (group === 'slots') { const S = G.slots; S.spins++; S.wagered += stake; S.won += win; S.biggest = Math.max(S.biggest, win); if (extra && extra.jackpot) S.jackpots++; }
+    else { const S = G.casino; S.wagered += stake; S.won += win; S.lost += Math.max(0, stake - win); S.biggest = Math.max(S.biggest, win - stake); if (extra) { if (extra.slot) { S.slotSpins++; S.biggestSlot = Math.max(S.biggestSlot, win); } if (extra.bj) { S.bjHands++; if (win > stake) S.bjWins++; } if (extra.roul) S.rouletteSpins++; } }
+    return true;
+  }
+  // ------------------------------------------------------------- celebration, scaled to the win
+  celebrate(cls, amount, title) {
+    const g = this.g;
+    if (cls === 'none') { g.audio.play('deny', { gain: 0.5 }); return; }
+    if (cls === 'small') g.audio.play('win1');
+    else if (cls === 'medium') { g.audio.play('win2'); this.pulse(); }
+    else if (cls === 'large') { g.audio.play('win3'); this.pulse(); this.confetti(90); }
+    else { g.audio.play('jackpot'); this.pulse(); this.confetti(320); g.ui.banner(title || 'JACKPOT', fmtMoney(amount), 'pass', 5); const f = $('flash'); f.style.transition = 'none'; f.style.background = 'radial-gradient(ellipse at center,rgba(255,216,77,.55),rgba(255,140,40,.25))'; f.style.opacity = 0.9; void f.offsetWidth; f.style.transition = 'opacity 1.6s'; f.style.opacity = 0; setTimeout(() => { f.style.background = ''; }, 1700); }
+    this.lastCelebration = { cls, amount, t: performance.now() };
+  }
+  pulse() { const el = document.querySelector('#svcBody .gres'); if (el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); } }
+  confetti(n) {
+    const cv = this.cv, W = cv.width = innerWidth, H = cv.height = innerHeight, cols = ['#ffd84d', '#ff4d5e', '#46d4c4', '#7fe08f', '#d28cff', '#ffffff', '#ff8a3d'];
+    for (let i = 0; i < n; i++) this.parts.push({ x: W / 2 + rand(-W * 0.25, W * 0.25), y: H * 0.35 + rand(-40, 40), vx: rand(-260, 260), vy: rand(-520, -160), r: rand(0, 6), vr: rand(-8, 8), s: rand(5, 10), c: pick(cols), t: rand(2.2, 3.4) });
+    cv.style.display = 'block';
+    if (!this._raf) { let last = performance.now(); const step = (now) => { const dt = Math.min(0.05, (now - last) / 1000); last = now; this.drawConfetti(dt); if (this.parts.length) this._raf = requestAnimationFrame(step); else { this._raf = 0; cv.style.display = 'none'; } }; this._raf = requestAnimationFrame(step); }
+  }
+  drawConfetti(dt) {
+    const c = this.cv.getContext('2d'); c.clearRect(0, 0, this.cv.width, this.cv.height);
+    for (let i = this.parts.length - 1; i >= 0; i--) {
+      const p = this.parts[i]; p.t -= dt; if (p.t <= 0 || p.y > this.cv.height + 20) { this.parts.splice(i, 1); continue; }
+      p.vy += 520 * dt; p.vx *= 1 - 0.8 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
+      c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.globalAlpha = Math.min(1, p.t); c.fillStyle = p.c; c.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); c.restore();
+    }
+  }
+  // the screen may close mid-reveal: reveals check this token and quietly stop
+  // switching screens or closing one leaves the table cleanly: a blackjack hand is stood, a poker stack is cashed out
+  open(title, hint, render, act, game) {
+    if (this.game && this.game !== game) this.leaveTable();
+    this.token++; this.busy = false; this.view = title; this.game = game || null;
+    this.stopSpins();
+    this.g.content.openSvc(title, hint, render, a => { if (this.busy && a !== 'close') return; act(a); });
+    this.g.content._svcClose = () => { this.token++; this.busy = false; this.stopSpins(); this.leaveTable(); this.game = null; };
+  }
+  // a reveal cut short by leaving: the money moved when the bet was placed, only the show is skipped
+  stopSpins() {
+    for (const id in this.slotState || {}) { const sl = this.slotState[id]; if (sl.spinning) { sl.spinning = false; if (sl.res) sl.grid = sl.res.grid; } }
+    if (this.roul && this.roul.spinning) this.roul.spinning = null;
+    if (this.bj && this.bj.revealing) { this.bj.revealing = false; this.bj.shown = 99; }
+  }
+  later(ms, fn) { const tk = this.token; setTimeout(() => { if (tk === this.token && this.g.ui.modal === 'svcScreen') fn(); }, ms); }
+  refresh(h) { this.g.content.refreshSvc(h); }
+  statsHTML(kind) {
+    const G = this.G;
+    if (kind === 'scratch') { const S = G.scratch; return `<div class="stats"><span>Cards bought</span><span>${S.bought}</span><span>Spent</span><span>${fmtMoney(S.spent)}</span><span>Won</span><span>${fmtMoney(S.won)}</span><span>Biggest win</span><span>${fmtMoney(S.biggest)}</span></div>`; }
+    if (kind === 'slots') { const S = G.slots; return `<div class="stats"><span>Spins</span><span>${S.spins}</span><span>Wagered</span><span>${fmtMoney(S.wagered)}</span><span>Won</span><span>${fmtMoney(S.won)}</span><span>Biggest win</span><span>${fmtMoney(S.biggest)}</span><span>Jackpots</span><span>${S.jackpots}</span></div>`; }
+    const S = G.casino; return `<div class="stats"><span>Wagered</span><span>${fmtMoney(S.wagered)}</span><span>Won</span><span>${fmtMoney(S.won)}</span><span>Lost</span><span>${fmtMoney(S.lost)}</span><span>Largest win</span><span>${fmtMoney(S.biggest)}</span><span>Largest slot win</span><span>${fmtMoney(S.biggestSlot)}</span><span>Blackjack hands won</span><span>${S.bjWins} / ${S.bjHands}</span><span>Poker hands won</span><span>${S.pokerWins} / ${S.pokerHands}</span><span>Roulette spins</span><span>${S.rouletteSpins}</span></div>`;
+  }
+  // ------------------------------------------------------------- scratch cards (Fuel & Go)
+  scratchDraw(den) { const c = SCRATCH_CARDS[den]; let r = Math.random(); for (const [x, p] of c.prizes) { r -= p; if (r < 0) return x; } return 0; }
+  // nine panels; three matching amounts win that amount
+  scratchPanels(den, win) {
+    const c = SCRATCH_CARDS[den], amounts = c.prizes.map(p => p[0]), cells = [];
+    if (win) { for (let i = 0; i < 3; i++) cells.push(win); }
+    const pool = amounts.filter(a => a !== win);
+    const count = {}; if (win) count[win] = 3;
+    while (cells.length < 9) { const a = pick(pool.length ? pool : amounts); if ((count[a] || 0) >= 2) continue; count[a] = (count[a] || 0) + 1; cells.push(a); }
+    for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = cells[i]; cells[i] = cells[j]; cells[j] = t; }
+    return cells;
+  }
+  openScratch() {
+    if (this.sc && this.sc.done) this.sc = null;
+    const render = () => {
+      const s = this.g.save, sc = this.sc;
+      let h = `<div class="svcTop"><span>Cash <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
+      h += '<div class="grid2">' + Object.keys(SCRATCH_CARDS).map(d => { const c = SCRATCH_CARDS[d]; return `<div class="card" style="border-left:4px solid ${c.col}"><div class="t">${c.name} · $${d}</div><div class="d">Top prize ${fmtMoney(c.grand)} · wins about 1 in ${Math.round(1 / c.prizes.reduce((a, p) => a + p[1], 0))}</div><button class="sbtn gold" data-act="buy:${d}" ${s.money < +d || (sc && !sc.done) ? 'disabled' : ''}>Buy · $${d}</button></div>`; }).join('') + '</div>';
+      if (sc) {
+        h += `<div class="scard" style="--sc:${SCRATCH_CARDS[sc.den].col}"><div class="sct">${SCRATCH_CARDS[sc.den].name} <small>$${sc.den}</small></div><div class="scgrid">${sc.cells.map((a, i) => `<div class="scc${sc.open[i] ? ' open' : ''}${sc.done && sc.win && a === sc.win ? ' hit' : ''}" data-act="sc:${i}">${sc.open[i] ? fmtMoney(a) : ''}</div>`).join('')}</div>
+          ${sc.done ? `<div class="gres ${sc.cls}">${sc.win ? `WINNER · ${fmtMoney(sc.win)}` : 'No match. Better luck next time.'}</div>` : `<div class="btns"><button class="sbtn gold" data-act="scratch">SCRATCH</button></div><div class="hint">Drag across the panels or tap SCRATCH.</div>`}</div>`;
+      }
+      return h + '<h3>Your scratch-card record</h3>' + this.statsHTML('scratch');
+    };
+    this.open('Scratch Cards', 'Clerk: “Good luck. Most people don’t have any.”', render, a => {
+      const [k, x] = a.split(':');
+      if (k === 'buy') this.scratchBuy(+x);
+      else if (k === 'scratch') this.scratchReveal();
+      else if (k === 'sc') this.scratchCell(+x);
+    }, 'scratch');
+    this.bindScratchDrag();
+  }
+  // wins already paid but not yet revealed stay out of the cash shown on the game screens
+  get pendingWin() { let w = 0; if (this.sc && !this.sc.done) w += this.sc.win; for (const id in this.slotState || {}) { const sl = this.slotState[id]; if (sl.spinning && sl.res) w += sl.res.win; } if (this.bj && this.bj.revealing) w += this.bj.revealWin; if (this.roul && this.roul.spinning) w += this.roul.spinning.win; return w; }
+  shownMoney() { return this.g.save.money - this.pendingWin; }
+  scratchBuy(den) {
+    if (this.sc && !this.sc.done) return;
+    const win = this.scratchDraw(den);
+    if (!this.settle('scratch', den, win)) return;
+   
+    this.sc = { den, win, cells: this.scratchPanels(den, win), open: new Array(9).fill(false), done: false, cls: winClass(win, den, SCRATCH_CARDS[den].grand) };
+    this.g.audio.play('cash', { gain: 0.5 }); this.g.saveGame(); this.refresh('Scratch it.');
+  }
+  scratchCell(i) { const sc = this.sc; if (!sc || sc.done || sc.open[i]) return; sc.open[i] = true; this.g.audio.play('scratch', { gain: 0.5 }); if (sc.open.every(Boolean)) this.scratchDone(); else this.refresh(); }
+  scratchReveal() {
+    const sc = this.sc; if (!sc || sc.done || this.busy) return;
+    this.busy = true;
+    const order = sc.open.map((o, i) => o ? -1 : i).filter(i => i >= 0);
+    // about 2.2 seconds for a full card: panel by panel, the last one held a beat
+    order.forEach((i, n) => this.later(200 + n * 230 + (n === order.length - 1 ? 180 : 0), () => { sc.open[i] = true; this.g.audio.play('scratch', { gain: 0.35 }); if (n === order.length - 1) { this.busy = false; this.scratchDone(); } else this.refresh(); }));
+    if (!order.length) { this.busy = false; this.scratchDone(); }
+  }
+  scratchDone() { const sc = this.sc; if (!sc || sc.done) return; sc.done = true; sc.open.fill(true); this.refresh(sc.win ? `You won ${fmtMoney(sc.win)}!` : 'Nothing this time.'); this.celebrate(sc.cls, sc.win, 'SCRATCH JACKPOT'); this.g.saveGame(); }
+  bindScratchDrag() {
+    if (this._scd) return; this._scd = true;
+    const body = $('svcBody'); let down = false;
+    body.addEventListener('pointerdown', e => { if (e.target.closest('.scc')) { down = true; const c = e.target.closest('.scc'); this.g.content._svcAct && this.g.content._svcAct(c.dataset.act); } });
+    window.addEventListener('pointerup', () => { down = false; });
+    body.addEventListener('pointermove', e => { if (!down) return; const el = document.elementFromPoint(e.clientX, e.clientY); const c = el && el.closest && el.closest('.scc'); if (c && !c.classList.contains('open') && this.g.content._svcAct) this.g.content._svcAct(c.dataset.act); });
+  }
+  // ------------------------------------------------------------- slot machines (Fuel & Go and the casino floor)
+  pool(id) { const c = this.G.casino; c.pools = c.pools && typeof c.pools === 'object' ? c.pools : {}; const def = SLOT_DEFS[id]; if (def.progressive && !(c.pools[id] >= def.progressive.seed)) c.pools[id] = def.progressive.seed; return c.pools[id] || 0; }
+  // a spot on the casino floor
+  spot(id) {
+    const [, kind, arg] = id.split(':');
+    if (kind === 'bj') this.openBlackjack(+arg);
+    else if (kind === 'roul') this.openRoulette(+arg);
+    else if (kind === 'poker') this.openPoker(+arg);
+    else if (kind === 'slot' && SLOT_DEFS[arg] && arg !== 'fuel') this.openSlot(arg);
+    else if (kind === 'cashier') this.openCashier();
+    else if (kind === 'bar') this.barDrink();
+  }
+  barDrink() {
+    const g = this.g, p = g.player;
+    if (g.save.money < 40) { g.content.deny('The bartender waits. Drinks are $40.'); return; }
+    g.save.money -= 40; g.save.stats.spent += 40;
+    p.health = Math.min(p.maxHealth, p.health + 25 * HP_SCALE);
+    g.audio.play('pickup'); g.ui.toast(pick(['An old fashioned, on the rocks. +75 health.', 'Something with a cherry in it. +75 health.', 'Top-shelf rye. +75 health.']), 'money');
+  }
+  openCashier() {
+    const render = () => {
+      const tier = this.casinoTier(), s = this.g.save;
+      let h = `<div class="svcTop"><span>Cash <b class="money">${fmtMoney(s.money)}</b></span><span>Your tables <b>${CASINO_TIERS[tier].name}</b> and below</span></div>`;
+      h += '<div class="jobs">' + CASINO_TIERS.map((t, i) => `<div class="job ${i <= tier ? 'done' : 'locked'}"><i>${i <= tier ? '✓' : '✕'}</i><div><b>${t.name} · ${fmtMoney(t.min)}–${fmtMoney(t.max)}</b><span>${i <= tier ? 'Open to you' : 'Needs ' + t.need}</span></div></div>`).join('') + '</div>';
+      h += '<div class="hint">Blackjack, roulette and Hold’em tables sit in rows by limit; the VIP room is behind the rope. Every game keeps a house edge: roulette 2.7%, blackjack about 0.5% with good play, slots 6–14%, poker a 5% rake.</div>';
+      h += '<h3>Casino record</h3>' + this.statsHTML('casino') + '<h3>Fuel & Go slot</h3>' + this.statsHTML('slots') + '<h3>Scratch cards</h3>' + this.statsHTML('scratch');
+      return h;
+    };
+    this.open('Cashier', 'Cashier: “Chips, records, credit lines. Mostly records.”', render, () => {}, 'cashier');
+  }
+  openSlot(id) {
+    const def = SLOT_DEFS[id]; const st = this.slotState || (this.slotState = {});
+    if (def.tier !== undefined && !this.canSit(def.tier)) return;
+    const sl = st[id] || (st[id] = { bet: def.bets[0], grid: null, res: null, spinning: false, stopped: 0 });
+    if (!def.bets.includes(sl.bet)) sl.bet = def.bets[0];
+    const rows = def.rows || 1;
+    const sym = s => { const [t, c] = SLOT_GLYPH[s]; return `<span class="sym" style="color:${c}">${t}</span>`; };
+    const render = () => {
+      const s = this.g.save, pool = def.progressive ? this.pool(id) : 0;
+      const grid = sl.grid || Array.from({ length: def.reels }, () => Array.from({ length: rows }, () => pick(SLOT_SYMS)));
+      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Cash <b class="money">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="money">${fmtMoney(pool)}</b></span>` : ''}</div>`;
+      h += `<div class="slotm${def.reels === 5 ? ' five' : ''}"><div class="reels">${grid.map((col, r) => `<div class="reel${sl.spinning && r >= sl.stopped ? ' spin' : ''}">${col.map((s2, k) => `<div class="cell${sl.res && !sl.spinning && sl.res.lines.length && (def.reels === 3 || sl.res.lines.some(li => def.lines[li][r] === k)) ? ' win' : ''}">${sym(s2)}</div>`).join('')}</div>`).join('')}</div>
+        <div class="lever${sl.spinning ? ' pulled' : ''}" data-act="spin"><i></i><b></b></div></div>`;
+      h += `<div class="gres ${sl.res && !sl.spinning ? sl.res.cls : ''}">${sl.spinning ? '…' : sl.res ? (sl.res.win ? `WIN ${fmtMoney(sl.res.win)}${sl.res.jackpot ? ' · JACKPOT' : ''}` : 'No win') : 'Pick a bet and spin'}</div>`;
+      h += `<div class="btns">${def.bets.map(b => `<button class="sbtn${sl.bet === b ? ' gold' : ''}" data-act="bet:${b}" ${sl.spinning ? 'disabled' : ''}>$${b}</button>`).join('')}<button class="sbtn gold" data-act="spin" ${sl.spinning || s.money < sl.bet ? 'disabled' : ''} style="min-width:110px">SPIN · $${sl.bet}</button></div>`;
+      const t = def.reels === 3 ? slotTable(def, sl.bet) : null;
+      h += `<details class="paytbl"><summary>Pay table at $${sl.bet}</summary>${def.reels === 3 ? `<div class="stats">${['seven', 'crown', 'diamond', 'car', 'cash', 'shoe'].map(k => `<span>${sym(k)}${sym(k)}${sym(k)}</span><span>${k === 'seven' && def.progressive ? 'PROGRESSIVE' + (def.progressive.maxOnly ? ' (max bet)' : '') : fmtMoney(t.three[k] * sl.bet)}</span>`).join('')}${Object.keys(t.two).map(k => `<span>${sym(k)}${sym(k)} ·</span><span>${fmtMoney(t.two[k] * sl.bet)}</span>`).join('')}${Object.keys(t.one).map(k => `<span>${sym(k)} · ·</span><span>${fmtMoney(t.one[k] * sl.bet)}</span>`).join('')}</div>` : `<div class="stats">${['seven', 'crown', 'diamond', 'cash', 'car', 'shoe'].map(k => `<span>${sym(k)} ×3 / ×4 / ×5</span><span>${def.pays[k].map(x => fmtMoney(x * sl.bet / def.lines.length)).join(' / ')}</span>`).join('')}<span>Lines</span><span>5 (left to right)</span></div>`}<div class="hint">Return to player over time: ${(slotRTP(def, sl.bet).rtp * 100).toFixed(1)}%${def.progressive ? ' plus the progressive pool' : ''}. The house always wins in the end.</div></details>`;
+      return h + `<h3>${id === 'fuel' ? 'Slot record' : 'Casino record'}</h3>` + this.statsHTML(id === 'fuel' ? 'slots' : 'casino');
+    };
+    this.open(def.name, id === 'fuel' ? 'A battered cabinet next to the ice cream fridge. Pull the handle or press SPIN.' : 'Lights, bells and terrible odds.', render, a => {
+      const [k, x] = a.split(':');
+      if (k === 'bet') { if (!sl.spinning && def.bets.includes(+x)) { sl.bet = +x; this.refresh(); } }
+      else if (k === 'spin') this.slotGo(id, sl);
+    }, 'slot');
+  }
+  slotGo(id, sl) {
+    const def = SLOT_DEFS[id]; if (sl.spinning || this.busy) return;
+    const bet = sl.bet, s = this.g.save; if (s.money < bet) { this.refresh('Not enough cash.'); return; }
+    let pool = 0;
+    if (def.progressive) { pool = this.pool(id); }
+    const r = slotSpin(def, bet, pool);
+    if (def.progressive) { const c = this.G.casino; if (r.jackpot && r.win > 0) c.pools[id] = def.progressive.seed; else c.pools[id] = pool + bet * def.progressive.rate; }
+    if (!this.settle(id === 'fuel' ? 'slots' : 'casino', bet, r.win, { slot: true, jackpot: r.jackpot && r.win > 0 })) return;
+    r.cls = winClass(r.win, bet, r.jackpot ? r.win : slotTop(def, bet, pool));
+    if (r.jackpot && r.win > 0) r.cls = 'jackpot';
+    this.busy = true;
+    sl.spinning = true; sl.stopped = 0; sl.res = r;
+    this.g.audio.play('lever'); this.g.saveGame();
+    const spinFx = () => { if (!sl.spinning) return; sl.grid = r.grid.map((col, i) => i < sl.stopped ? col : col.map(() => pick(SLOT_SYMS))); this.refresh(); this.later(90, spinFx); };
+    sl.grid = r.grid.map(col => col.map(() => pick(SLOT_SYMS))); this.refresh(); this.later(90, spinFx);
+    const stopAt = (i) => this.later(650 + i * 330, () => { sl.stopped = i + 1; this.g.audio.play('reelstop', { gain: 0.6 }); if (i === def.reels - 1) { sl.spinning = false; sl.grid = r.grid; this.busy = false; this.refresh(r.win ? `Win: ${fmtMoney(r.win)}` : 'No win.'); this.celebrate(r.cls, r.win, def.progressive ? 'PROGRESSIVE JACKPOT' : 'JACKPOT'); } });
+    for (let i = 0; i < def.reels; i++) stopAt(i);
+  }
+  // ------------------------------------------------------------- casino access and shared table helpers
+  casinoTier() {
+    const s = this.g.save, uw = this.g.uw, m = s.money;
+    const stage = uw ? uw.stage | 0 : 0, infl = uw ? uw.influence || 0 : 0;
+    const home = !!(uw && uw.props && (uw.props.owned('penthouse') || uw.props.owned('mansion')));
+    if (infl >= 500 || home || m >= 1e6) return 3;
+    if (stage >= 3 || m >= 1e5) return 2;
+    if ((s.rep || 0) >= 400 || m >= 1e4) return 1;
+    return 0;
+  }
+  chips(tier) { const t = CASINO_TIERS[tier]; return [t.min, t.min * 2.5, t.min * 5, t.max].filter((v, i, a) => v <= t.max && a.indexOf(v) === i); }
+  tierTag(tier) { const t = CASINO_TIERS[tier]; return `${t.name} · ${fmtMoney(t.min)}–${fmtMoney(t.max)}`; }
+  // the pit boss turns you away from tables above your standing
+  canSit(tier) {
+    if (tier <= this.casinoTier()) return true;
+    this.g.ui.toast(`Pit boss: “${CASINO_TIERS[tier].name} tables are for known faces.” Needs ${CASINO_TIERS[tier].need}.`, 'warn'); this.g.audio.play('deny');
+    return false;
+  }
+  debit(n) { const s = this.g.save; if (!(n > 0) || n > s.money) return false; s.money -= n; return true; }
+  leaveTable() {
+    if (this.bj && this.bj.phase === 'play') this.bjAutoStand(true);
+    if (this.pk) this.pokerLeave();
+  }
+  // a hand or a stack left behind by a closed page is settled on the next load
+  recover() {
+    const s = this.g.save, G = s.gamble, msgs = [];
+    if (G.table && G.table.game === 'bj') { this.bj = { tier: G.table.tier, bet: G.table.bet, hands: G.table.hands, dealer: G.table.dealer, phase: 'play', cur: 0 }; const w = this.bjAutoStand(true); msgs.push(`Your unfinished blackjack hand was stood: ${w ? 'paid ' + fmtMoney(w) : 'lost'}.`); this.bj = null; }
+    G.table = null;
+    if (G.casino.chips > 0) { s.money += G.casino.chips; msgs.push(`${fmtMoney(G.casino.chips)} in poker chips cashed out.`); G.casino.chips = 0; }
+    this.pk = null;
+    return msgs;
+  }
+  // ------------------------------------------------------------- blackjack: six decks, dealer stands on soft 17, blackjack pays 3:2,
+  // double on any two cards, one split (split aces take one card each). Dealer checks for blackjack first.
+  draw() { if (this.shoe.length < 78) { this.shoe = makeDeck(6); this.g.audio.play('card', { gain: 0.6 }); } return this.shoe.pop(); }
+  openBlackjack(tier) {
+    if (!this.canSit(tier)) return;
+    const t = CASINO_TIERS[tier];
+    if (this.bj && this.bj.phase === 'play' && this.bj.tier !== tier) this.bjAutoStand(true);
+    if (!this.bj || this.bj.tier !== tier || this.bj.phase !== 'play') this.bj = { tier, bet: t.min, hands: [], dealer: [], phase: 'bet', cur: 0, msg: '' };
+    const render = () => {
+      const bj = this.bj, s = this.g.save, play = bj.phase === 'play', hideHole = play || (bj.revealing && bj.shown < 2);
+      const dShown = bj.revealing ? bj.dealer.slice(0, Math.max(2, bj.shown)) : bj.dealer;
+      let h = `<div class="svcTop"><span>${this.tierTag(tier)}</span><span>Cash <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>Shoe ${this.shoe.length || 312}</span></div>`;
+      h += `<div class="felt"><div class="who">Dealer${bj.dealer.length && !hideHole ? ' · ' + bjValue(dShown).total : ''}</div><div class="cards">${dShown.map((c, i) => cardHTML(c, hideHole && i === 1)).join('')}</div>`;
+      h += bj.hands.map((hd, i) => { const v = bjValue(hd.cards); return `<div class="who${play && i === bj.cur ? ' cur' : ''}">You${bj.hands.length > 1 ? ' · hand ' + (i + 1) : ''} · ${v.total}${v.soft && v.total < 21 ? ' soft' : ''} · bet ${fmtMoney(hd.bet)}${hd.out ? ' · ' + hd.out : ''}</div><div class="cards">${hd.cards.map(c => cardHTML(c)).join('')}</div>`; }).join('');
+      h += '</div>';
+      h += `<div class="gres ${bj.revealing ? '' : bj.cls || ''}">${bj.revealing ? '…' : bj.msg || (play ? 'Your move.' : 'Place your bet.')}</div>`;
+      if (play) {
+        const hd = bj.hands[bj.cur], two = hd && hd.cards.length === 2;
+        const canSplit = two && bj.hands.length === 1 && Math.min(10, hd.cards[0].r === 14 ? 11 : hd.cards[0].r) === Math.min(10, hd.cards[1].r === 14 ? 11 : hd.cards[1].r) && s.money >= hd.bet;
+        h += `<div class="btns"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && s.money >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
+      } else {
+        h += `<div class="btns">${this.chips(tier).map(c => `<button class="sbtn${bj.bet === c ? ' gold' : ''}" data-act="bet:${c}" ${bj.revealing ? 'disabled' : ''}>${fmtMoney(c)}</button>`).join('')}</div><div class="btns"><button class="sbtn gold" data-act="deal" style="min-width:140px" ${s.money < bj.bet || bj.revealing ? 'disabled' : ''}>DEAL · ${fmtMoney(bj.bet)}</button></div>`;
+      }
+      return h + '<div class="hint">Dealer stands on all 17s · Blackjack pays 3:2 · Double on any two cards · One split · Walking away mid-hand stands every hand.</div><h3>Casino record</h3>' + this.statsHTML('casino');
+    };
+    this.open(`Blackjack · ${t.name}`, 'Dealer: “Place your bets.”', render, a => {
+      const [k, x] = a.split(':'), bj = this.bj;
+      if (k === 'bet') { if (bj.phase !== 'play' && this.chips(tier).includes(+x)) { bj.bet = +x; this.refresh(); } }
+      else if (k === 'deal') this.bjDeal();
+      else if (bj.phase === 'play' && ['hit', 'stand', 'double', 'split'].includes(k)) this.bjAction(k);
+    }, 'bj');
+  }
+  bjPersist() { const bj = this.bj, G = this.G; G.table = bj && bj.phase === 'play' ? { game: 'bj', tier: bj.tier, bet: bj.bet, hands: bj.hands.map(h => ({ cards: h.cards.slice(), bet: h.bet, done: !!h.done, split: !!h.split })), dealer: bj.dealer.slice() } : null; }
+  bjDeal() {
+    const bj = this.bj; if (bj.phase === 'play' || bj.revealing) return;
+    const t = CASINO_TIERS[bj.tier]; if (bj.bet < t.min || bj.bet > t.max) return;
+    if (!this.debit(bj.bet)) { this.refresh('Not enough cash.'); return; }
+    bj.hands = [{ cards: [this.draw(), this.draw()], bet: bj.bet }]; bj.dealer = [this.draw(), this.draw()];
+    bj.phase = 'play'; bj.cur = 0; bj.msg = ''; bj.cls = '';
+    this.g.audio.play('card');
+    const d = bjValue(bj.dealer).total, p = bjValue(bj.hands[0].cards).total;
+    if (d === 21 || p === 21) { bj.hands[0].done = true; this.bjFinish(); return; }
+    this.bjPersist(); this.g.saveGame(); this.refresh('Dealer shows ' + (RANKS_TXT[bj.dealer[0].r] || bj.dealer[0].r) + '.');
+  }
+  bjAction(k) {
+    const bj = this.bj, hd = bj.hands[bj.cur]; if (!hd || hd.done) return;
+    if (k === 'hit') { hd.cards.push(this.draw()); this.g.audio.play('card'); const v = bjValue(hd.cards).total; if (v >= 21) { hd.done = true; if (v > 21) hd.out = 'BUST'; } }
+    else if (k === 'stand') hd.done = true;
+    else if (k === 'double') { if (hd.cards.length !== 2 || !this.debit(hd.bet)) return; hd.bet *= 2; hd.cards.push(this.draw()); hd.done = true; this.g.audio.play('chip'); if (bjValue(hd.cards).total > 21) hd.out = 'BUST'; }
+    else if (k === 'split') {
+      const a = hd.cards[0], b = hd.cards[1], val = c => c.r === 14 ? 11 : Math.min(10, c.r);
+      if (hd.cards.length !== 2 || bj.hands.length !== 1 || val(a) !== val(b) || !this.debit(hd.bet)) return;
+      const aces = a.r === 14;
+      bj.hands = [{ cards: [a, this.draw()], bet: hd.bet, split: true, done: aces }, { cards: [b, this.draw()], bet: hd.bet, split: true, done: aces }];
+      this.g.audio.play('chip');
+    }
+    while (bj.cur < bj.hands.length && bj.hands[bj.cur].done) bj.cur++;
+    if (bj.cur >= bj.hands.length) { this.bjFinish(); return; }
+    this.bjPersist(); this.g.saveGame(); this.refresh();
+  }
+  bjAutoStand(silent) { const bj = this.bj; if (!bj || bj.phase !== 'play') return 0; for (const h of bj.hands) h.done = true; return this.bjFinish(silent); }
+  // the dealer plays out and every hand is paid in one step; the cards are then revealed one by one
+  bjFinish(silent) {
+    const bj = this.bj, d = bj.dealer;
+    const live = bj.hands.some(h => bjValue(h.cards).total <= 21);
+    const natural = h => !h.split && h.cards.length === 2 && bjValue(h.cards).total === 21;
+    const dealerBJ = d.length === 2 && bjValue(d).total === 21;
+    if (live && !dealerBJ && !(bj.hands.length === 1 && natural(bj.hands[0]))) while (bjValue(d).total < 17) d.push(this.draw());
+    const dv = bjValue(d).total;
+    let stake = 0, win = 0;
+    for (const h of bj.hands) {
+      const v = bjValue(h.cards).total; stake += h.bet; let w = 0;
+      if (v > 21) { h.out = 'BUST'; }
+      else if (natural(h) && !dealerBJ) { w = h.bet * 2.5; h.out = 'BLACKJACK'; }
+      else if (dealerBJ) { w = natural(h) ? h.bet : 0; h.out = natural(h) ? 'PUSH' : 'DEALER BLACKJACK'; }
+      else if (dv > 21 || v > dv) { w = h.bet * 2; h.out = 'WIN'; }
+      else if (v === dv) { w = h.bet; h.out = 'PUSH'; }
+      else h.out = 'LOSE';
+      win += w;
+    }
+    win = Math.round(win);
+    this.settle('casino', stake, win, { prepaid: true, bj: true });
+    bj.phase = 'done'; this.G.table = null;
+    bj.cls = win > stake ? winClass(win - stake, stake, 0) : 'none';
+    bj.msg = win > stake ? `You win ${fmtMoney(win - stake)}` : win === stake ? 'Push. Your bet comes back.' : `Dealer wins${dv > 21 ? '' : ' with ' + dv}.`;
+    this.g.saveGame();
+    if (silent) return win;
+    // reveal: hole card, then each dealer draw
+    bj.revealing = true; bj.revealWin = win; bj.shown = 1; this.busy = true; this.refresh();
+    const steps = d.length;
+    for (let i = 2; i <= steps; i++) this.later(450 * (i - 1), () => { bj.shown = i; this.g.audio.play('card'); this.refresh(); });
+    this.later(450 * (steps - 1) + 350, () => { bj.revealing = false; bj.shown = 99; this.busy = false; this.refresh(bj.msg); if (bj.cls !== 'none') this.celebrate(bj.cls, win - stake); else this.g.audio.play(win === stake ? 'chip' : 'deny', { gain: 0.5 }); });
+    return win;
+  }
+  // ------------------------------------------------------------- roulette: European single zero (house edge 2.7%)
+  openRoulette(tier) {
+    if (!this.canSit(tier)) return;
+    const t = CASINO_TIERS[tier];
+    if (!this.roul || this.roul.tier !== tier) this.roul = { tier, chip: t.min, bets: {}, hist: [], res: null, spinning: null, last: null };
+    const R = this.roul, red = n => ROUL_RED.has(n);
+    const total = () => Object.values(R.bets).reduce((a, b) => a + b, 0);
+    const cell = (key, label, cls) => `<div class="rc ${cls || ''}${R.bets[key] ? ' on' : ''}" data-act="rb:${key}">${label}${R.bets[key] ? `<i>${fmtShort(R.bets[key])}</i>` : ''}</div>`;
+    const render = () => {
+      const s = this.g.save, spinning = !!R.spinning;
+      let h = `<div class="svcTop"><span>${this.tierTag(tier)}</span><span>Cash <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>On the table <b>${fmtMoney(total())}</b></span></div>`;
+      const shown = spinning ? R.spinning.ticker : R.res ? R.res.n : null;
+      h += `<div class="rwheel${spinning ? ' spin' : ''}"><div class="rball ${shown === null ? '' : shown === 0 ? 'g' : red(shown) ? 'r' : 'b'}">${shown === null ? '–' : shown}</div><div class="rhist">${R.hist.slice(-12).map(n => `<span class="${n === 0 ? 'g' : red(n) ? 'r' : 'b'}">${n}</span>`).join('')}</div></div>`;
+      h += `<div class="gres ${!spinning && R.res ? R.res.cls : ''}">${spinning ? 'No more bets…' : R.res ? `${R.res.n} ${R.res.n === 0 ? 'GREEN' : red(R.res.n) ? 'RED' : 'BLACK'} · ${R.res.win ? 'paid ' + fmtMoney(R.res.win) : 'no win'}` : 'Tap the layout to place chips.'}</div>`;
+      h += `<div class="rtable">${cell('n:0', '0', 'g zero')}<div class="rnums">${Array.from({ length: 36 }, (_, i) => i + 1).map(n => cell('n:' + n, n, red(n) ? 'r' : 'b')).join('')}</div></div>`;
+      h += `<div class="rout">${cell('d1', '1st 12')}${cell('d2', '2nd 12')}${cell('d3', '3rd 12')}${cell('c1', 'Col 1')}${cell('c2', 'Col 2')}${cell('c3', 'Col 3')}${cell('low', '1–18')}${cell('even', 'EVEN')}${cell('red', 'RED', 'r')}${cell('black', 'BLACK', 'b')}${cell('odd', 'ODD')}${cell('high', '19–36')}</div>`;
+      h += `<div class="btns">${this.chips(tier).map(c => `<button class="sbtn${R.chip === c ? ' gold' : ''}" data-act="chip:${c}">${fmtMoney(c)}</button>`).join('')}</div>`;
+      h += `<div class="btns"><button class="sbtn" data-act="clear" ${spinning || !total() ? 'disabled' : ''}>CLEAR</button><button class="sbtn" data-act="rebet" ${spinning || !R.last || total() ? 'disabled' : ''}>REBET</button><button class="sbtn gold" data-act="rspin" style="min-width:120px" ${spinning || !total() || total() > s.money ? 'disabled' : ''}>SPIN · ${fmtMoney(total())}</button></div>`;
+      return h + `<div class="hint">Straight up 35:1 · Dozens and columns 2:1 · Red/black, odd/even, 1–18/19–36 1:1 · Table maximum ${fmtMoney(t.max)} per spin.</div><h3>Casino record</h3>` + this.statsHTML('casino');
+    };
+    this.open(`Roulette · ${t.name}`, 'Croupier: “Faites vos jeux.”', render, a => {
+      const [k, x, y] = a.split(':');
+      if (R.spinning) return;
+      if (k === 'chip') { if (this.chips(tier).includes(+x)) { R.chip = +x; this.refresh(); } }
+      else if (k === 'rb') { const key = y !== undefined ? x + ':' + y : x; if (!ROUL_KEYS.has(key)) return; if (total() + R.chip > t.max) { this.refresh(`Table maximum is ${fmtMoney(t.max)} a spin.`); return; } if (total() + R.chip > this.g.save.money) { this.refresh('Not enough cash for another chip.'); return; } R.bets[key] = (R.bets[key] || 0) + R.chip; R.res = null; this.g.audio.play('chip', { gain: 0.6 }); this.refresh(); }
+      else if (k === 'clear') { R.bets = {}; this.refresh(); }
+      else if (k === 'rebet') { const sum = Object.values(R.last).reduce((a2, b) => a2 + b, 0); if (sum <= this.g.save.money && sum <= t.max) { R.bets = { ...R.last }; this.refresh(); } }
+      else if (k === 'rspin') this.roulSpin();
+    }, 'roul');
+  }
+  roulSpin() {
+    const R = this.roul, t = CASINO_TIERS[R.tier], stake = Object.values(R.bets).reduce((a, b) => a + b, 0);
+    if (R.spinning || !stake || stake > t.max || stake < t.min) { if (stake && stake < t.min) this.refresh(`Table minimum is ${fmtMoney(t.min)} a spin.`); return; }
+    const n = Math.floor(Math.random() * 37), win = roulettePayout(R.bets, n);
+    if (!this.settle('casino', stake, win, { roul: true })) { this.refresh('Not enough cash.'); return; }
+    R.last = { ...R.bets }; R.bets = {};
+    R.spinning = { n, win, ticker: Math.floor(Math.random() * 37) }; R.res = null; this.busy = true;
+    this.g.audio.play('lever', { gain: 0.5 }); this.g.saveGame(); this.refresh();
+    let delay = 60, at = 0;
+    const tick = () => { if (!R.spinning) return; R.spinning.ticker = ROUL_WHEEL[(ROUL_WHEEL.indexOf(R.spinning.ticker) + 1) % 37]; this.g.audio.play('reelstop', { gain: 0.15 }); this.refresh(); };
+    while (at < 2300) { this.later(at, tick); at += delay; delay *= 1.09; }
+    this.later(at + 150, () => {
+      R.hist.push(n); R.spinning = null; this.busy = false;
+      R.res = { n, win, cls: win > stake ? winClass(win - stake, stake, 0) : win ? 'small' : 'none' };
+      this.refresh(win ? `${n} pays ${fmtMoney(win)}.` : `${n}. The house takes it.`);
+      if (win) this.celebrate(R.res.cls, win); else this.g.audio.play('deny', { gain: 0.4 });
+    });
+  }
+  // ------------------------------------------------------------- Texas Hold'em, fixed limit, four-handed against AI regulars.
+  // The house takes a rake (5% of the pot, capped at three big blinds, only once a flop is dealt).
+  // Chips live in the save while you sit; leaving the table, closing the screen or reloading cashes them out.
+  // A hand you walk away from is played out check/fold.
+  openPoker(tier) {
+    if (!this.canSit(tier)) return;
+    const t = CASINO_TIERS[tier], bb = t.min;
+    if (!this.pk || this.pk.tier !== tier) this.pk = null;
+    const render = () => {
+      const pk = this.pk, s = this.g.save;
+      let h = `<div class="svcTop"><span>${this.tierTag(tier)} · blinds ${fmtMoney(bb / 2)}/${fmtMoney(bb)}</span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span>${pk ? `<span>Chips <b class="money">${fmtMoney(pk.seats[0].stack)}</b></span>` : ''}</div>`;
+      if (!pk) {
+        const ins = [20, 50, 100].map(m => m * bb);
+        h += `<div class="hint">Fixed limit: bets and raises are one big blind before the turn and two after it, four bets a round at most.</div><div class="grid2">${POKER_AI.map(a => `<div class="card"><div class="t">${a.name}</div><div class="d">${a.desc}</div></div>`).join('')}</div>`;
+        h += `<div class="btns">${ins.map(v => `<button class="sbtn gold" data-act="sit:${v}" ${s.money < v ? 'disabled' : ''}>Buy in ${fmtMoney(v)}</button>`).join('')}</div>`;
+        return h + '<h3>Casino record</h3>' + this.statsHTML('casino');
+      }
+      const showAll = pk.phase === 'show';
+      h += `<div class="felt poker"><div class="board">${pk.board.map(c => cardHTML(c)).join('') || '<span class="hint">—</span>'}</div><div class="pot">Pot ${fmtMoney(pk.pot + pk.seats.reduce((a, x) => a + x.put, 0))}</div>`;
+      h += `<div class="seats">${pk.seats.map((x, i) => `<div class="seat${i === pk.toAct && pk.phase === 'play' ? ' cur' : ''}${x.folded ? ' out' : ''}${x.won ? ' won' : ''}"><div class="who">${i === pk.btn ? '<b class="btn">D</b> ' : ''}${esc(x.name)}${x.isP ? '' : ` <small>${x.pers}</small>`}</div><div class="cards">${x.hole.map(c => cardHTML(c, !x.isP && !(showAll && !x.folded))).join('')}</div><div class="d">${fmtMoney(x.stack)}${x.put ? ' · bet ' + fmtMoney(x.put) : ''}${x.allin ? ' · ALL IN' : ''}</div><div class="act">${esc(x.last || '')}</div></div>`).join('')}</div></div>`;
+      h += `<div class="gres ${pk.cls || ''}">${esc(pk.msg || '')}</div>`;
+      const me = pk.seats[0];
+      if (pk.phase === 'play' && pk.toAct === 0) {
+        const toCall = pk.curBet - me.put, size = this.pkSize();
+        h += `<div class="btns"><button class="sbtn" data-act="fold">FOLD</button><button class="sbtn gold" data-act="call">${toCall ? 'CALL ' + fmtMoney(Math.min(toCall, me.stack)) : 'CHECK'}</button><button class="sbtn gold" data-act="raise" ${pk.raises >= 4 || me.stack <= toCall ? 'disabled' : ''}>${pk.curBet ? 'RAISE' : 'BET'} ${fmtMoney(Math.min(me.stack, toCall + size))}</button></div>`;
+      } else if (pk.phase !== 'play') {
+        h += `<div class="btns"><button class="sbtn gold" data-act="deal" ${me.stack < bb ? 'disabled' : ''}>NEXT HAND</button><button class="sbtn" data-act="topup" ${s.money < bb * 20 || me.stack >= bb * 100 ? 'disabled' : ''}>ADD ${fmtMoney(bb * 20)}</button><button class="sbtn" data-act="leave">CASH OUT</button></div>`;
+      } else h += '<div class="btns"><button class="sbtn" disabled>…</button></div>';
+      return h + '<h3>Casino record</h3>' + this.statsHTML('casino');
+    };
+    this.open(`Hold'em · ${t.name}`, 'Dealer: “Blinds are up. Good luck.”', render, a => {
+      const [k, x] = a.split(':'), pk = this.pk;
+      if (k === 'sit') { if (!pk) this.pokerSit(tier, +x); }
+      else if (!pk) return;
+      else if (k === 'deal') { if (pk.phase !== 'play') this.pokerHand(); }
+      else if (k === 'topup') { if (pk.phase !== 'play' && pk.seats[0].stack < bb * 100 && this.debit(bb * 20)) { pk.seats[0].stack += bb * 20; this.G.casino.chips = pk.seats[0].stack; this.g.saveGame(); this.refresh(); } }
+      else if (k === 'leave') { if (pk.phase !== 'play') { this.pokerLeave(); this.refresh('Chips cashed out.'); } }
+      else if (pk.phase === 'play' && pk.toAct === 0 && ['fold', 'call', 'raise'].includes(k)) { this.pokerAct(0, k); this.pokerRun(); }
+    }, 'poker');
+  }
+  pokerSit(tier, buyin) {
+    const t = CASINO_TIERS[tier], bb = t.min;
+    if (![20, 50, 100].some(m => m * bb === buyin) || !this.debit(buyin)) { this.refresh('Not enough cash.'); return; }
+    const ai = pickN(POKER_AI, 3);
+    this.pk = { tier, bb, seats: [{ name: 'You', isP: true, stack: buyin, hole: [], put: 0, total: 0 }, ...ai.map(a => ({ ...a, name: a.name, stack: bb * 50, hole: [], put: 0, total: 0 }))], btn: Math.floor(Math.random() * 4), board: [], pot: 0, phase: 'idle', msg: 'You take a seat.', toAct: -1 };
+    this.G.casino.chips = buyin; this.g.audio.play('chip'); this.g.saveGame();
+    this.pokerHand();
+  }
+  pokerLeave() {
+    const pk = this.pk; if (!pk) return;
+    if (pk.phase === 'play') { pk.walk = true; let guard = 0; while (pk.phase === 'play' && guard++ < 400) { if (pk.toAct === 0) this.pokerAct(0, pk.curBet > pk.seats[0].put ? 'fold' : 'call'); else this.pokerAct(pk.toAct, this.pokerAI(pk.toAct, true)); } }
+    const st = pk.seats[0].stack;
+    this.g.save.money += st; this.G.casino.chips = 0; this.pk = null; this.g.saveGame();
+    if (st) this.g.ui.toast(`Cashed out ${fmtMoney(st)} in chips.`, 'money');
+  }
+  pkSize() { const pk = this.pk; return pk.street >= 2 ? pk.bb * 2 : pk.bb; }
+  pkActive() { return this.pk.seats.filter(x => !x.folded && !x.sitout); }
+  pokerHand() {
+    const pk = this.pk, bb = pk.bb, n = pk.seats.length;
+    for (const x of pk.seats) if (!x.isP && x.stack < bb * 2) { const fresh = pick(POKER_AI.filter(a => !pk.seats.some(y => y.name === a.name))) || POKER_AI[0]; Object.assign(x, { ...fresh, stack: bb * 50 }); }
+    const me = pk.seats[0];
+    if (me.stack < bb) { pk.phase = 'idle'; this.refresh('You need more chips to play a hand.'); return; }
+    pk.deck = makeDeck(1); pk.board = []; pk.pot = 0; pk.street = 0; pk.cls = ''; pk.msg = '';
+    for (const x of pk.seats) { x.hole = [pk.deck.pop(), pk.deck.pop()]; x.put = 0; x.total = 0; x.folded = false; x.allin = false; x.last = ''; x.won = false; x.sitout = false; }
+    pk.btn = (pk.btn + 1) % n;
+    const post = (i, amt) => { const x = pk.seats[i], a = Math.min(amt, x.stack); x.stack -= a; x.put += a; x.total += a; if (!x.stack) x.allin = true; x.last = a === bb ? 'big blind' : 'small blind'; };
+    post((pk.btn + 1) % n, bb / 2); post((pk.btn + 2) % n, bb);
+    pk.curBet = bb; pk.raises = 1;
+    pk.pending = new Set(pk.seats.map((x, i) => i).filter(i => !pk.seats[i].allin));
+    pk.toAct = (pk.btn + 3) % n; pk.phase = 'play';
+    this.G.casino.chips = me.stack; this.g.audio.play('card'); this.g.saveGame();
+    this.pokerAdvanceTo();
+    this.pokerRun();
+  }
+  // move toAct to the next seat that still has to act
+  pokerAdvanceTo() {
+    const pk = this.pk, n = pk.seats.length;
+    for (let k = 0; k < n; k++) { const i = (pk.toAct + k) % n; if (pk.pending.has(i)) { pk.toAct = i; return; } }
+    pk.toAct = -1;
+  }
+  pokerAct(i, kind) {
+    const pk = this.pk, x = pk.seats[i], n = pk.seats.length;
+    if (pk.phase !== 'play' || pk.toAct !== i) return;
+    const toCall = Math.max(0, pk.curBet - x.put);
+    if (kind === 'fold' && toCall === 0) kind = 'call';
+    if (kind === 'raise' && (pk.raises >= 4 || x.stack <= toCall)) kind = 'call';
+    if (kind === 'fold') { x.folded = true; x.last = 'fold'; }
+    else if (kind === 'call') { const a = Math.min(toCall, x.stack); x.stack -= a; x.put += a; x.total += a; x.last = toCall ? (a < toCall ? 'all in' : 'call') : 'check'; if (!x.stack) x.allin = true; }
+    else { const target = pk.curBet + this.pkSize(), a = Math.min(target - x.put, x.stack); x.stack -= a; x.put += a; x.total += a; x.last = (pk.curBet ? 'raise' : 'bet') + (x.stack ? '' : ' (all in)'); if (!x.stack) x.allin = true; if (x.put > pk.curBet) { pk.curBet = x.put; pk.raises++; pk.pending = new Set(pk.seats.map((y, j) => j).filter(j => j !== i && !pk.seats[j].folded && !pk.seats[j].allin)); } }
+    pk.pending.delete(i);
+    if (i === 0) { this.G.casino.chips = x.stack; this.g.audio.play(kind === 'fold' ? 'ui' : 'chip', { gain: 0.6 }); }
+    const live = pk.seats.filter(y => !y.folded);
+    if (live.length === 1) { this.pokerShowdown(); return; }
+    if (!pk.pending.size) { this.pokerStreet(); return; }
+    pk.toAct = (i + 1) % n; this.pokerAdvanceTo();
+  }
+  pokerStreet() {
+    const pk = this.pk, n = pk.seats.length;
+    for (const x of pk.seats) { pk.pot += x.put; x.put = 0; if (!x.folded) x.last = x.allin ? 'all in' : ''; }
+    pk.curBet = 0; pk.raises = 0;
+    if (pk.street === 3) { this.pokerShowdown(); return; }
+    pk.street++;
+    pk.deck.pop(); if (pk.street === 1) pk.board.push(pk.deck.pop(), pk.deck.pop(), pk.deck.pop()); else pk.board.push(pk.deck.pop());
+    const canAct = pk.seats.map((x, j) => j).filter(j => !pk.seats[j].folded && !pk.seats[j].allin);
+    if (canAct.length < 2) { while (pk.board.length < 5) { pk.deck.pop(); pk.board.push(pk.deck.pop()); } pk.street = 3; this.pokerShowdown(); return; }
+    pk.pending = new Set(canAct); pk.toAct = (pk.btn + 1) % n; this.pokerAdvanceTo();
+  }
+  // main and side pots by contribution level; ties split; rake from the main pot
+  pokerShowdown() {
+    const pk = this.pk, bb = pk.bb;
+    for (const x of pk.seats) { pk.pot += x.put; x.put = 0; }
+    const live = pk.seats.filter(x => !x.folded);
+    const score = new Map(live.map(x => [x, live.length > 1 ? bestOf([...x.hole, ...pk.board]) : 0]));
+    let rake = pk.board.length >= 3 ? Math.min(Math.floor(pk.pot * 0.05), bb * 3) : 0;
+    const levels = [...new Set(pk.seats.map(x => x.total).filter(v => v > 0))].sort((a, b) => a - b);
+    let prev = 0; const paid = new Map();
+    for (const L of levels) {
+      let part = 0; for (const x of pk.seats) part += Math.max(0, Math.min(x.total, L) - prev);
+      const elig = live.filter(x => x.total >= L);
+      prev = L; if (!part) continue;
+      if (rake) { const r = Math.min(rake, part); part -= r; rake -= r; }
+      // nobody still in the hand put this much in: it goes to the deepest live player(s)
+      if (!elig.length) { const top = Math.max(...live.map(x => x.total)); elig.push(...live.filter(x => x.total === top)); }
+      const best = Math.max(...elig.map(x => score.get(x))), winners = elig.filter(x => score.get(x) === best);
+      const share = Math.floor(part / winners.length); let odd = part - share * winners.length;
+      for (const w of winners) { paid.set(w, (paid.get(w) || 0) + share + (odd > 0 ? 1 : 0)); odd--; }
+    }
+    for (const [x, v] of paid) { x.stack += Math.round(v); if (v > 0 && !x.folded) x.won = true; }
+    const me = pk.seats[0], put = me.total, got = Math.round(paid.get(me) || 0);
+    const C = this.G.casino; C.pokerHands++; C.wagered += put; C.won += got; C.lost += Math.max(0, put - got); C.biggest = Math.max(C.biggest, got - put); if (got > put) C.pokerWins++;
+    this.G.casino.chips = me.stack;
+    const win = pk.seats.filter(x => x.won);
+    const name = x => live.length > 1 ? HAND_NAMES[handCat(score.get(x))] : '';
+    pk.msg = win.map(x => `${x.isP ? 'You win' : x.name + ' wins'} ${fmtMoney(paid.get(x))}${name(x) ? ' with ' + name(x).toLowerCase() : ''}`).join(' · ');
+    pk.cls = me.won ? winClass(got - put, Math.max(put, bb), 0) : '';
+    pk.phase = live.length > 1 ? 'show' : 'done'; pk.toAct = -1; pk.pot = 0;
+    this.g.saveGame();
+    if (!pk.walk) { if (me.won && got > put) this.celebrate(pk.cls, got - put); this.refresh(); }
+  }
+  // AI turns play out with a short pause each, so the table reads like a table
+  pokerRun() {
+    const pk = this.pk; if (!pk) return;
+    this.refresh();
+    if (pk.phase !== 'play' || pk.toAct === 0) return;
+    this.busy = true;
+    this.later(rand(450, 800), () => { if (this.pk !== pk || pk.phase !== 'play' || pk.toAct <= 0) { this.busy = false; this.refresh(); return; } this.pokerAct(pk.toAct, this.pokerAI(pk.toAct)); this.busy = pk.phase === 'play' && pk.toAct !== 0; if (this.busy) this.pokerRun(); else this.refresh(); });
+  }
+  pokerAI(i, quick) {
+    const pk = this.pk, x = pk.seats[i], opp = pk.seats.filter((y, j) => j !== i && !y.folded).length;
+    const toCall = Math.max(0, pk.curBet - x.put), size = this.pkSize();
+    const pot = pk.pot + pk.seats.reduce((a, y) => a + y.put, 0);
+    let eq = pokerEquity(x.hole, pk.board, Math.max(1, opp), quick ? 40 : 110);
+    eq += x.loose * 0.12 * (pk.street === 0 ? 1 : 0.5);
+    const fair = 1 / (opp + 1), odds = toCall / (pot + toCall || 1);
+    const bluff = Math.random() < x.bluff * (pk.street >= 1 ? 1 : 0.4);
+    const rThresh = fair * (1.75 - x.aggr * 0.75) + x.tight * 0.08;
+    if ((eq > rThresh || bluff) && pk.raises < 4 && x.stack > toCall && Math.random() < 0.55 + x.aggr * 0.4) return 'raise';
+    if (toCall === 0) return 'call';
+    if (eq >= odds * (1 + x.tight * 0.7) + (pk.street === 0 ? x.tight * 0.06 : 0) || (toCall <= size && Math.random() < x.loose)) return 'call';
+    return 'fold';
+  }
+}
+const ROUL_RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const ROUL_WHEEL = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+const ROUL_KEYS = new Set([...Array.from({ length: 37 }, (_, n) => 'n:' + n), 'red', 'black', 'odd', 'even', 'low', 'high', 'd1', 'd2', 'd3', 'c1', 'c2', 'c3']);
+// total returned (stake included) for a set of bets on number n
+function roulettePayout(bets, n) {
+  let w = 0;
+  for (const key in bets) {
+    const a = bets[key]; let m = 0;
+    if (key.startsWith('n:')) m = +key.slice(2) === n ? 36 : 0;
+    else if (n === 0) m = 0;
+    else if (key === 'red') m = ROUL_RED.has(n) ? 2 : 0;
+    else if (key === 'black') m = ROUL_RED.has(n) ? 0 : 2;
+    else if (key === 'odd') m = n % 2 ? 2 : 0;
+    else if (key === 'even') m = n % 2 ? 0 : 2;
+    else if (key === 'low') m = n <= 18 ? 2 : 0;
+    else if (key === 'high') m = n >= 19 ? 2 : 0;
+    else if (key[0] === 'd') m = Math.ceil(n / 12) === +key[1] ? 3 : 0;
+    else if (key[0] === 'c') m = ((n - 1) % 3) + 1 === +key[1] ? 3 : 0;
+    w += a * m;
+  }
+  return w;
+}
+const fmtShort = v => v >= 1e6 ? (v / 1e6).toFixed(v % 1e6 ? 1 : 0) + 'M' : v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k' : String(v);
+
+/* =====================================================================
    [CORE] UI MANAGER (HUD, menus, minimap, map, shop, toasts, banners)
    ===================================================================== */
 const $ = id => document.getElementById(id);
@@ -48112,6 +49040,7 @@ class UIManager {
   }
   back() {
     const id = this.stack.pop(); if (id) this.show(id, false);
+    if (id === 'svcScreen' && this.g.content._svcClose) { const f = this.g.content._svcClose; this.g.content._svcClose = null; f(); }
     this.modal = this.stack.length ? this.stack[this.stack.length - 1] : null;
     if ((id === 'svcScreen' || id === 'progressScreen' || id === 'empireScreen') && this.g.state === 'playing' && !this.modal) this.g.relock();
   }
@@ -48440,7 +49369,8 @@ const MAP_CATS = {
   hospital: { name: 'Hospital', icon: '+', col: '#ff7aa8', layer: 'locations' },
   contact: { name: 'Job contacts', icon: '!', col: '#46d4c4', layer: 'locations' },
   street: { name: 'Street contacts', icon: '◆', col: '#d28cff', layer: 'locations' },
-  cab: { name: 'Cab stops', icon: 'T', col: '#f4c20d', layer: 'locations' }
+  cab: { name: 'Cab stops', icon: 'T', col: '#f4c20d', layer: 'locations' },
+  casino: { name: 'Casino', icon: '♦', col: '#ffd84d', layer: 'landmarks' }
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
@@ -48926,6 +49856,7 @@ class Game {
     this.blobs = new ShadowBlobs(this.scene);
     this.combat = new CombatSystem(this);
     this.content = new ContentManager(this);
+    this.gamble = new Gamble(this);
     this.doors = new DoorSystem(this);
     this.vspaces = new VSpaces(this);
     this.campaign = new Campaign(this);
@@ -49017,7 +49948,9 @@ class Game {
     this.audio.init();
     this.audio.setVolumes({ master: this.save.settings.volume, music: this.save.settings.music, sfx: this.save.settings.sfx });
     this.fade(() => {
+      this.gamble.reset();
       this.ui.closeAll();
+      const gmsg = this.gamble.recover();
       this.ui.show('mainMenu', false); this.ui.show('hud', true);
       this.ui.show('touch', IS_TOUCH);
       this.police.clear(); if (this.missions.active) this.missions.end();
@@ -49044,6 +49977,8 @@ class Game {
       } else {
         this.ui.toast(this.uw.S.jail ? 'You’re still inside. Serve your time or work the system.' : 'Back on the street.');
       }
+      for (const m of gmsg) this.ui.toast(m, 'money');
+      if (gmsg.length) this.saveGame();
     }, true);
   }
   pause() {
@@ -49678,7 +50613,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
+    window.__pv = Object.freeze({ SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
     await game.init(progress);
   } catch (e) {
     console.error(e);

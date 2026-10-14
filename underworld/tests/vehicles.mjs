@@ -160,8 +160,9 @@ await ev(() => {
 });
 const park = async (pts, maxFrames) => {
   await ev(pts => { window.game.__drv = { pts, i: 0, done: false, minHp: 100 }; }, pts);
-  for (let k = 0; k < maxFrames; k++) { await frames(page, 4); if (await ev(() => window.game.__drv.done && window.game.player.vehicle.speed < 0.3)) break; }
+  const trace = []; for (let k = 0; k < maxFrames; k++) { await frames(page, 4); trace.push(await ev(() => { const g = window.game, v = g.player.vehicle, d = g.__drv; return v ? [Math.round(v.pos.x * 10) / 10, Math.round(v.pos.z * 10) / 10, d.i, d.done ? 1 : 0, Math.round(v.speed * 10) / 10, v.id] : ['none', g.player.state]; })); if (await ev(() => window.game.__drv.done && window.game.player.vehicle.speed < 0.3)) break; }
   const r = await ev(() => { const g = window.game, d = g.__drv, v = g.player.vehicle; g.__drv = null; const i = g.input; i.stick.active = false; i.stick.x = 0; i.down.delete('gas'); i.down.delete('brake'); return { x: v.pos.x, z: v.pos.z, h: v.h, done: d.done, minHp: d.minHp }; });
+  r.trace = trace.filter((x, k) => k % 4 === 0 || k > trace.length - 5);
   return r;
 };
 // single garage: from the street, turn in and stop in the bay
@@ -181,7 +182,7 @@ const sg = await ev(() => {
 await frames(page, 30);
 const r1 = await park([sg.mid, sg.front, sg.bay], 260);
 const e1 = Math.hypot(r1.x - sg.bay.x, r1.z - sg.bay.z);
-check('single garage: turn in from the street and stop in the bay', r1.done && e1 < 1.0, `off ${e1.toFixed(2)} m, done ${r1.done}`);
+check('single garage: turn in from the street and stop in the bay', r1.done && e1 < 1.0, `off ${e1.toFixed(2)} m, done ${r1.done}` + (e1 < 1 ? '' : ' ' + JSON.stringify(r1.trace)));
 check('single garage: no wall scraped on the way in', r1.minHp > 99, `health low ${r1.minHp.toFixed(1)}`);
 // mansion: the motor court ramp, then a bay in the underground garage
 const mc = await ev(() => {
@@ -201,11 +202,33 @@ check('mansion: the ramp takes the car down into the motor court', mb.inside, JS
 if (mb.inside) {
   const r2 = await park([mb.pre, mb.pre2, mb.bay], 260);
   const e2 = Math.hypot(r2.x - mb.bay.x, r2.z - mb.bay.z);
-  check('mansion garage: manoeuvre into a bay among the pillars', r2.done && e2 < 1.0, `off ${e2.toFixed(2)} m`);
+  check('mansion garage: manoeuvre into a bay among the pillars', r2.done && e2 < 1.0, `off ${e2.toFixed(2)} m` + (e2 < 1 ? '' : ' ' + JSON.stringify(r2.trace)));
   check('mansion garage: no pillar or wall hit', r2.minHp > 99, r2.minHp.toFixed(1));
 }
 
 console.log('turning radii', JSON.stringify(R));
 console.log('stopping distances', JSON.stringify(STOP));
+// ---------------------------------------------------------------- 8. collectibles: rare finds, tier value, the garage as a collection
+const col = await page.evaluate(() => {
+  const g = window.game, w = g.world, P = window.__pv, out = { rich: 0, poor: 0, stalls: { rich: 0, poor: 0 } };
+  // stream the Crestmoor/Financial blocks and the Old Quarter, count rare-tier parked cars
+  const count = (bx0, bz0, bx1, bz1) => { let r = 0, n = 0; for (let bz = bz0; bz <= bz1; bz++) for (let bx = bx0; bx <= bx1; bx++) { const b = w.block(bx, bz); g.vehicles.updateParked(b.cx, b.cz, 40); const cars = g.vehicles.parkedBlocks.get(b.i) || []; for (const v of cars) { n++; if (v.vtier === 'rare' && !v.rareFind) r++; } } return { r, n }; };
+  out.richC = count(4, 2, 8, 6); out.poorC = count(0, 4, 2, 6);
+  // value by tier: the same model as a beater, as stock, and a rare model
+  const G = g.content, e = (type, vtier) => ({ type, vtier, origin: 'stolen', tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, dmg: 0 });
+  out.price = { beater: G.sellPrice(e('sedan', 'beater')), common: G.sellPrice(e('sedan', 'common')), rare: G.sellPrice(e('supercar', 'rare')), rareBase: G.sellPrice(e('supercar', 'sport')) };
+  const v = g.vehicles.spawn('sedan', 300, 300, 0, { parked: true, vtier: 'beater' }); out.chopBeater = g.uw.chopValue(v); v.setTier('common'); out.chopCommon = g.uw.chopValue(v); g.vehicles.despawn(v);
+  // the collection summary
+  const s = g.save; const keep = s.garage.slice();
+  s.garage.push({ ...e('supercar', 'rare'), uid: 9901, color: 0xffffff, at: null, out: false, trunk: {} }, { ...e('classic', 'rare'), uid: 9902, color: 0xffffff, at: null, out: false, trunk: {} }, { ...e('sedan', 'beater'), uid: 9903, color: 0xffffff, at: null, out: false, trunk: {} });
+  out.col = G.collection();
+  s.garage.length = 0; s.garage.push(...keep);
+  out.types = P.VEHICLES ? Object.keys(P.VEHICLES).filter(k => P.VEHICLES[k].tier === 'rare') : [];
+  return out;
+});
+check('rare models turn up parked in the wealthy districts, not in the Old Quarter (placed secrets like the rooftop Zephyr aside)', col.richC.r >= 1 && col.poorC.r === 0, JSON.stringify([col.richC, col.poorC]));
+check('car value follows tier: beater < stock, rare finds carry a collector premium', col.price.beater < col.price.common && col.price.rare > col.price.rareBase && col.chopBeater < col.chopCommon, JSON.stringify([col.price, col.chopBeater, col.chopCommon]));
+check('garage collection: models owned, rare finds counted, total value', col.col.rare === 2 && col.col.rareModels === 2 && col.col.rareOf === 4 && col.col.byTier.rare === 2 && col.col.byTier.beater === 1 && col.col.value > col.price.rare, JSON.stringify(col.col));
+
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'vehicles');
