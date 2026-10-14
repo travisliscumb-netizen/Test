@@ -37835,7 +37835,7 @@ const WEAPONS = [
 // handgun body hit does 24-30, so about 10-12 hits kill from full health; vests are a separate
 // 150-point layer that soaks most of each hit before health. Environmental damage scales with HP.
 const HP_BASE = 300, HP_PER_LEVEL = 60, HP_SCALE = 3, VEST_MAX = 150, VEST_SOAK = 0.75;
-const NPC_GUN = { pistol: [24, 30], smg: [12, 16], shotgun: [36, 54] };
+const NPC_GUN = { pistol: [25, 29], smg: [12, 16], shotgun: [36, 54] };
 function npcGunDamage(kind = 'pistol', d = 10) {
   const r = NPC_GUN[kind] || NPC_GUN.pistol;
   // shotgun falls off hard with distance; pistols and SMGs barely
@@ -40830,15 +40830,17 @@ class CombatSystem {
     const d = Math.hypot(tx - ox, tz - oz);
     if (!g.world.grid.lineOfSight(ox, oy, oz, tx, ty, tz)) return;
     const moving = p.state === 'vehicle' ? (p.vehicle ? p.vehicle.speed : 0) : Math.hypot(p.vel.x, p.vel.z);
-    // retuned with the 3x health pool: fewer, heavier hits (a sprinting player is hard to hit)
-    const pHit = clamp(0.4 - d * 0.011 - moving * 0.03 + g.police.level * 0.035, 0.06, 0.62);
+    // retuned with the 3x health pool: a pistol hit is ~9% of your health (11 to kill at 3 stars) and,
+    // against the original fire model, police fire takes about three times as long to kill you at every
+    // wanted level. A running player is harder to hit.
+    const pHit = clamp(0.292 - d * 0.011 - moving * 0.012 + g.police.level * 0.037, 0.04, 0.55);
     const hit = Math.random() < pHit;
     const mx = hit ? tx : tx + rand(-2, 2), my = hit ? ty : ty + rand(-0.5, 1.5), mz = hit ? tz : tz + rand(-2, 2);
     g.fx.muzzleFlash(ox, oy, oz); g.fx.tracer(ox, oy, oz, mx, my, mz);
     g.audio.play('copgun', { x: ox, z: oz, gain: 0.8 });
     if (hit) {
       if (p.state === 'vehicle' && p.vehicle) { p.vehicle.hurt(2.5, 'gun'); g.fx.sparks(mx, my, mz, 4); if (Math.random() < 0.3) p.damage(npcGunDamage('pistol', d) * 0.45, 'police'); }
-      else p.damage(npcGunDamage(g.police.level >= 4 ? 'smg' : 'pistol', d) * (1 + (g.police.level - 3) * 0.08), 'police');
+      else p.damage(npcGunDamage('pistol', d) * (1 + (g.police.level - 3) * 0.08), 'police');
     } else if (Math.random() < 0.4) g.audio.play('ricochet', { x: mx, z: mz, gain: 0.4 });
   }
   vehicleHitsPlayer(v, rel) {
@@ -46061,14 +46063,18 @@ function gangAttack(p, t, dt) {
     p.pose.hold = 'gun'; p.pose.aim = 1;
     p.fireT -= dt;
     if (p.fireT <= 0) {
-      p.fireT = rand(1.3, 2.2) / (0.7 + p.skill * 0.5);
+      // against the player: slower, less accurate, heavier hits (a pistol needs ~11 hits to kill and a
+      // gunfight lasts about three times as long as it used to). Against other NPCs: the original model,
+      // so turf wars between crews play out as before.
+      const smg = t.isPlayer && (p.role === 'boss' || p.role === 'guard');
+      p.fireT = t.isPlayer ? rand(1.3, 2.2) / (0.7 + p.skill * 0.5) : rand(0.9, 1.6) / (0.6 + p.skill * 0.6);
       const ox = p.x + Math.sin(p.h) * 0.5, oy = p.y + 1.38, oz = p.z + Math.cos(p.h) * 0.5;
       const ty = (t.isPlayer ? pl.pos.y : t.y) + 1.1;
       if (!g.world.grid.lineOfSight(ox, oy, oz, tx, ty, tz)) { p.fireT = 0.4; return; }
       const moving = t.isPlayer ? (inCar ? pl.vehicle.speed : Math.hypot(pl.vel.x, pl.vel.z)) : 0;
-      // fewer, heavier hits against the 3x player health pool: a lone pistol gangster needs ~11 hits
-      const hitP = clamp(0.4 + p.skill * 0.2 - d * 0.013 - moving * 0.03, 0.05, 0.64);
-      const hit = Math.random() < hitP;
+      const hitP = t.isPlayer ? clamp(0.2 + p.skill * 0.25 - d * 0.013 - moving * 0.012, 0.03, 0.5) : clamp(0.5 + p.skill * 0.25 - d * 0.014 - moving * 0.02, 0.06, 0.82);
+      // an SMG (bosses and guards) fires a two-round burst: two separate chances to hit
+      const hit = Math.random() < hitP || (smg && Math.random() < hitP);
       const mx = hit ? tx : tx + rand(-2, 2), my = hit ? ty : ty + rand(-0.5, 1.4), mz = hit ? tz : tz + rand(-2, 2);
       g.fx.muzzleFlash(ox, oy, oz); g.fx.tracer(ox, oy, oz, mx, my, mz);
       g.audio.play('gangshot', { x: ox, z: oz, gain: 0.8 });
