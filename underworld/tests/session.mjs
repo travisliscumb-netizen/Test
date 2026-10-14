@@ -86,7 +86,8 @@ check('crew dealer sells stored product overnight', (crew.after < crew.before &&
 check('wages are paid', crew.wages > 0, JSON.stringify(crew));
 // ---------------------------------------------------------------- 7. gang fight on a rival corner
 const gangTurf = await ev(() => { const g = window.game, uw = g.uw; const i = uw.owner.findIndex((o, k) => o === 'vipers' && uw.T[k].zone === 'o'); const t = uw.T[i]; g.resetPlayerState(t.hang.x + 75, t.hang.z, 0); g.player.health = 100000; return i; });
-await frames(page, 6);
+// the street spawner ticks every 0.6 s and never spawns in plain view up close: wait for the crew from 75 m
+for (let k = 0; k < 60 && !(await ev(i => { const gr = window.game.uw.gangs.groups.get('hang' + i); return !!(gr && gr.members.length); }, gangTurf)); k++) await frames(page, 3);
 await ev(i => { const g = window.game, t = g.uw.T[i]; g.resetPlayerState(t.hang.x + Math.sin(t.hang.h) * 5, t.hang.z + Math.cos(t.hang.h) * 5, t.hang.h + Math.PI); g.player.health = 100000; g.debug.god = true; }, gangTurf);
 await frames(page, 4);
 const grp = await ev(i => { const gr = window.game.uw.gangs.groups.get('hang' + i); return gr ? gr.members.length : 0; }, gangTurf);

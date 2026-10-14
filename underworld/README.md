@@ -1,6 +1,8 @@
-# Port Valen: Underworld
+# The Underworld
 
-A free-roam systemic crime sandbox in one HTML file (`index.html`). It was built from a copy of
+A free-roam systemic crime sandbox set in the city of Port Valen, in one HTML file (`index.html`).
+The player-facing title is "The Underworld". Folder names, the save key and the code tags still say
+`underworld` / Port Valen so existing saves keep loading. It was built from a copy of
 `port-valen/templates/master-template-1.0-stable.html`. The master template has not been changed.
 
 You start with $0, no car, no weapon, no property, no crew and no reputation. There is no scripted
@@ -35,13 +37,18 @@ npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es202
 | E / F | Interact, steal or enter a car, talk, deal, pickpocket |
 | 1–5, Q | Weapons |
 | Tab / I | Empire screen: overview, territory, crew, assets, market, stash, factions, police, feed |
-| M, then T | Big map, then the territory overlay (tap a turf for details) |
+| M | Big map: wheel / pinch to zoom (1×–8×), drag to pan, Places index with search and categories, layer filters, tap a place for its card and "Track location" |
+| T (map open) | Territory overlay (also a map layer; tap a turf for details) |
 | B (in a car) | Look back |
 | F5 | Quick save (only when it is safe) |
 | Esc / P | Pause |
 
 Touch: there is a stick, plus a tap for a light hit, a hold for a heavy hit, Blk to block,
-Blk plus the stick to dodge, and a Phone button that opens the Empire screen.
+Blk plus the stick to dodge. The top bar holds Map, Phone (Empire screen), Cam, Radio (in a car) and
+Pause in one row that never covers the location label. In a car, Gas and Brake are large thumb
+buttons at the bottom right with Drift and Horn above them. The speedometer, prompts and toasts are
+placed by a layout pass (`HudLayout`) so they never sit under a control. That holds down to
+320 px widths, in portrait and landscape.
 
 ## Where things live in the code
 
@@ -59,6 +66,30 @@ The new layer, tagged `[UNDERWORLD]`, sits just before `[CORE] UI MANAGER`:
 - `Prison`: arrest and sentencing. The jail block is playable and has its own accelerated clock (1 real minute ≈ 1 year at 1×). The street clock stays frozen while you serve
 - `OppFeed`, `EmpireUI`, `NeonSigns`
 
+City and property layer (this pass):
+
+- `RoadNet` and `SUPERBLOCKS`: the 12×12 lattice with segments closed inside superblocks (estate,
+  park, stadium, terminal, fields). Traffic, GPS, races, police routing, peds and the ground shader
+  read it. There are no dead ends and every node stays connected. Local lanes, drives, lots and
+  paths are painted into a separate raster (`localRoadAt` / `localSurfaceAt`).
+- `CITY v2` generators: suburbs (cul-de-sacs, crescents, street lots, low-rise), Crestmoor Heights
+  (wealthy), the Crestmoor estate, Greenway Park, the Stadium District (bowl, lot, tunnel onto
+  the pitch), the ferry terminal, Cedar Fields (the country edge), the multi-level parkade and the
+  Saltworks drive-in chop shop.
+- Prop sanity pass (`_propSanity` / `auditPlacement`): every pole, lamp, hydrant, bench, bin, sign,
+  tree and shelter is checked against roads, lanes and driveways. A prop in the way slides to a
+  clear spot or is removed, and the wires follow moved poles.
+- `HOME_LADDER` / `defineHomeProps` (21 homes over six tiers), `PropertyManager` bays and capacity
+  (street 1, carport/lot 1–2, single 1, double 2, triple 3, mansion 10 underground, penthouse 1
+  outdoor + 4 underground), `GarageDisplay` (stored cars stand in their bays), `DoorSystem` (garage
+  and service doors that open for whoever is allowed), `VSpaces` (underground garages at y = -30)
+  and on-demand house interiors (`houseInteriorDef`, loaded on entry and unloaded on exit).
+- Valen Tower: street lobby, elevator (Penthouse / Lobby / Garage), the penthouse at the real tower
+  top with a terrace view (wide chunk streaming while you are up there), and the residents' garage.
+- `MapView`: the vector big map with zoom-dependent labels, the Places index, layers (Locations,
+  Properties, Businesses, Factions, Territory, Police, Garages, Landmarks), the property card and
+  tracking. `MAP_CATS` gives one symbol per category on the big map, the index and the minimap.
+
 The save key is `pvunderworld.save.v1` and the schema version is 3. Saves are versioned, sanitized
 and written only in a stable state. Settings are stored under a separate key.
 
@@ -75,6 +106,12 @@ node underworld/tests/arrest.mjs    # 9 arrest situations (idle/walk/sprint/figh
 node underworld/tests/session.mjs   # $0 -> first money -> property -> crew -> turf -> corruption -> drive/chase/bust/release -> save/reload/repair
 node underworld/tests/ui.mjs        # minimap labels upright, big map layout, colours, input leaks, overlays, touch controls
 node underworld/tests/offline.mjs   # no network at all: load, render, play, UI, vehicles, police, combat, map
+node underworld/tests/phone.mjs     # phone layouts (8 sizes, 320–932 px, portrait + landscape): top bar, jail, driving HUD, menus
+node underworld/tests/map.mjs       # pinch/pan/wheel zoom, limits, labels by zoom, index search, tap to centre, tracking, layers, cards
+node underworld/tests/city.mjs      # road network (no dead ends, connected), prop placement, buildings, districts, landmarks, stadium, parkade
+node underworld/tests/property.mjs  # 21 homes / 6 tiers, parking capacity, garage doors, bays, save/reload, mansion, penthouse, interiors
+node underworld/tests/stress.mjs    # realistic phone session across every new system, HUD overlap audit after each step
+node underworld/tests/cityshots.mjs # screenshots of the new districts for visual review (.shots/city)
 CYCLES=10 node underworld/tests/soak.mjs  # long session: entities, listeners, timers, GPU memory, frame cost, heap, save round-trip
 node underworld/tests/shots.mjs     # screenshots for visual review
 node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
@@ -82,28 +119,39 @@ node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
 
-## Validation record (build `939c6f4592d8`, 2,202,929 bytes)
+## Validation record (this build, 2,388,719 bytes, sha256 `97bcd75e06f1`)
 
-These numbers come from the final build, with every suite run offline:
+Every suite was run offline against the final file:
 
 | Suite | Result |
 | --- | --- |
 | smoke | 16 / 16 |
 | core (melee facing, combo + step-in stress, reverse speed, reverse-camera transitions) | 64 / 64 |
 | arrest (9 situations, stale-state audit, death respawns) | 126 / 126 |
-| session (run twice) | 33 / 33, 33 / 33 |
+| session | 33 / 33 |
 | ui (map / minimap / touch) | 23 / 23 |
 | offline | 14 / 14 |
-| soak (12 cycles) | 37 / 37 |
-| original template playtest (`port-valen/tests/playtest.mjs`) | 36 / 36 |
+| soak (12 cycles: no listener/timer growth, heap 91.7 → 91.7 MB, frame cost flat) | 37 / 37 |
+| phone (8 phone sizes) | 71 / 71 |
+| map | 22 / 22 |
+| city | 25 / 25 |
+| property | 33 / 33 |
+| stress (realistic phone session) | 29 / 29 |
 | master checksum (`sha256sum -c master-template-1.0-stable.sha256`) | OK |
 
-Performance comes from `tests/perf.mjs` in SwiftShader. Wall ms/frame there is GPU-emulation-bound, so
-it's only useful for comparing builds:
+`port-valen/tests/playtest.mjs` (the original template's playtest) needs the jsDelivr CDN to boot the
+template. It can't boot in an offline sandbox, before or after this pass.
 
-| | template | underworld |
+Performance comes from `tests/perf.mjs` (SwiftShader, two runs per build, compared with the previous build):
+
+| | previous build | this build |
 | --- | --- | --- |
-| desktop, low: game-logic update | 0.30–0.62 ms | 0.62 ms |
-| desktop, low: draw calls / triangles | 95–97 / 327k | 111 / 274–353k |
-| phone profile (4× CPU throttle, 800×400, quality 1): update | 2.8–3.4 ms | 2.6–3.4 ms |
-| phone profile: draw calls / triangles | 194–201 / 782–794k | 202–240 / 642–868k |
+| desktop, low: game-logic update | 0.80–1.01 ms | 0.73–1.15 ms |
+| desktop, low: draw calls / triangles | 110–113 / 272–355k | 107–113 / 293–348k |
+| phone profile (4× CPU throttle, 800×400, quality 1): update | 4.0–6.5 ms | 4.7–8.9 ms |
+| phone profile: draw calls / triangles | 199–243 / 648–868k | 210–237 / 676–871k |
+| wall ms/frame (desktop / phone) | 320–364 / 1333–1600 | 276–348 / 1333–1601 |
+
+The update ranges overlap. A per-subsystem profile (300 updates under 4× throttle) puts both builds
+at 9.4–12.2 ms in total. The only new per-frame cost found there was the HUD layout pass. It now runs
+on change (cheap fingerprint plus ResizeObserver) with a 1 s safety timer, instead of every 0.1 s.

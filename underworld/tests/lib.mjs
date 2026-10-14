@@ -40,7 +40,10 @@ export async function boot(page, low = true) {
 }
 export async function startNew(page) {
   await boot(page);
-  await page.click('#btnNew');
+  // the loading screen fades out after the first rendered frames; with several software-GL
+  // pages at once that can take longer than a click's default 30 s, so wait for it explicitly
+  await page.waitForFunction(() => { const l = document.getElementById('loading'); return !l || l.style.display === 'none' || l.classList.contains('hidden') || getComputedStyle(l).opacity === '0' || !l.isConnected; }, null, { timeout: 180000, polling: 200 });
+  await page.click('#btnNew', { timeout: 120000 });
   await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000, polling: 100 });
   await frames(page, 3);
 }
