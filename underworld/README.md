@@ -31,8 +31,9 @@ npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es202
 | Key | Action |
 | --- | --- |
 | WASD, Shift, Ctrl/Alt | Move, sprint, walk |
-| LMB / G / V | Light combo (third hit is a kick finisher) / heavy / kick |
-| RMB (fists) | Block |
+| LMB / G / V | Light combo (third hit is a kick finisher) / heavy / kick. With a gun: LMB fires along the crosshair, V or G is a quick melee |
+| RMB | Fists: block. Gun: aim down sights (tighter spread, closer camera, slower walk) |
+| R (gun drawn, on foot) | Reload (R is the radio in a car) |
 | X | Dodge |
 | E / F | Interact, steal or enter a car, talk, deal, pickpocket |
 | 1–5, Q | Weapons |
@@ -43,7 +44,14 @@ npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es202
 | F5 | Quick save (only when it is safe) |
 | Esc / P | Pause |
 
-Touch: there is a stick, plus a tap for a light hit, a hold for a heavy hit, Blk to block,
+Touch with a gun drawn uses a three-finger layout: the left thumb moves, the right side of the
+screen aims, and a large FIRE button fires (drag from FIRE to keep aiming while you shoot). ADS,
+RELOAD and a contextual MELEE button (shown when someone is within reach) sit around FIRE, and the
+crosshair opens with the real spread and turns red over an enemy. Aim assist (Settings: off / low /
+medium / high, touch and gamepad only) adds a little friction and a capped pull toward a visible
+target in a narrow cone in front of you, never behind you or through walls.
+
+Touch with fists: there is a stick, plus a tap for a light hit, a hold for a heavy hit, Blk to block,
 Blk plus the stick to dodge. The top bar holds Map, Phone (Empire screen), Cam, Radio (in a car) and
 Pause in one row that never covers the location label. In a car, Gas and Brake are large thumb
 buttons at the bottom right with Drift and Horn above them. The speedometer, prompts and toasts are
@@ -90,7 +98,43 @@ City and property layer (this pass):
   Properties, Businesses, Factions, Territory, Police, Garages, Landmarks), the property card and
   tracking. `MAP_CATS` gives one symbol per category on the big map, the index and the minimap.
 
-The save key is `pvunderworld.save.v1` and the schema version is 3. Saves are versioned, sanitized
+Gameplay pass (this build):
+
+- Shooting (`CombatSystem`, `CameraRig`): every shot is a ray from the rendered camera through the
+  crosshair, traced again from the muzzle so walls in between still stop it. Per-weapon hip/ADS/
+  moving spread, bloom and recovery, recoil that kicks the view up and settles back, reloads,
+  headshots, hit markers. Gun stance levels the camera when you draw a weapon.
+- Survivability: 300 health at the start (+60 per Constitution level). A body vest is a separate
+  layer (150 points) that takes 75% of each hit until it is spent. A lone pistol needs 10-12 body
+  hits. NPC fire against the player is slower and less accurate than before, so a gunfight with
+  three gangsters lasts about three times as long (17-18 s before, ~53 s now, same setup).
+- Vehicles: speed-sensitive steering (tight at parking speed, calm at speed), stronger brakes with
+  class differences and weight transfer, better reverse steering, twice the durability with seven
+  damage stages (normal, light, damaged, smoking, heavily damaged, critical, destroyed). Visual
+  tiers BEATER / COMMON / NICE / SPORT / LUXURY / RARE (paint finish, trim, rims, lights) with LOD
+  meshes. Rare models park in the wealthy districts; the garage screen is a collection view.
+- Inventory (`Inv`, `Armory`): product is counted by weight or pieces with a cost basis in every
+  location (on you, vehicle trunks, safehouse, property, warehouse). Market value, unrealised and
+  realised profit. Guns are single items that live on you or in a stash; ammo is counted; the
+  Armorer has Buy weapons / Buy ammo / Buy armor / Loadout / Stash tabs.
+- `DeliveryManager`: crew runners move product between your locations for a fee, with a success
+  chance from the runner and the route, and outcomes from SUCCESS to BETRAYAL, reported afterwards.
+- `RoyaltySystem`: rival crews operating on your turf pay royalties that grow with your influence.
+- `Gamble` (`[UNDERWORLD] GAMBLING`): Fuel & Go scratch cards ($5-$100, grand prizes $12,500 to
+  $1,000,000) and the Lucky Pump slot; the Valen Royale casino on the Nightlife Strip (block 5,9)
+  with a cashier, bar, slot floor (classic, 5-reel video, high-volatility, progressive, VIP),
+  blackjack, European roulette and fixed-limit Hold'em against four AI personalities, with LOW /
+  STANDARD / HIGH / VIP limits by standing. Every bet is settled in one step before its reveal; an
+  open blackjack hand and poker chips survive a reload. Every game keeps a house edge.
+- Roads (`splinePts`, `Links`, `GPS`): Greenway Park Drive and the Cedar Fields road are smooth
+  curved through-roads. One polyline feeds the ground shader, both maps, traffic (which turns off
+  onto them and merges back) and the GPS. The lattice graph is unchanged. District road styles
+  (`ROAD_STYLE`) for the Old Quarter, Financial District, industrial areas, residential hills and
+  the Strip.
+- Map: tap open ground for a district card (police, turf, territory tax, property, street prices),
+  tap a curved road for its card, and a Street prices layer.
+
+The save key is `pvunderworld.save.v1` and the schema version is 4 (v3 saves migrate on load). Saves are versioned, sanitized
 and written only in a stable state. Settings are stored under a separate key.
 
 ## Tests
@@ -114,6 +158,12 @@ node underworld/tests/stress.mjs    # realistic phone session across every new s
 node underworld/tests/cityshots.mjs # screenshots of the new districts for visual review (.shots/city)
 CYCLES=10 node underworld/tests/soak.mjs  # long session: entities, listeners, timers, GPU memory, frame cost, heap, save round-trip
 node underworld/tests/shots.mjs     # screenshots for visual review
+node underworld/tests/shooting.mjs  # crosshair alignment, walls, hip fire, recoil, ADS, reload, aim assist, 3-touch layout
+node underworld/tests/survival.mjs  # health pool, hits to kill, vest layer, regeneration, real AI gunfights
+node underworld/tests/vehicles.mjs  # turning, reverse, braking, durability, damage stages, tiers, LOD, parking, collectibles
+node underworld/tests/inventory.mjs # located inventory, cost basis, armory, deliveries, royalties, v3 migration
+node underworld/tests/gambling.mjs  # scratch cards, slots, casino games, limits, records, no money duplication
+node underworld/tests/roads.mjs     # curved roads, traffic on curves, GPS, road styles, interactive map
 node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
 ```
 
