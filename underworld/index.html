@@ -47260,9 +47260,10 @@ class Prison {
     const cur = S.rap.cur || {};
     for (const k in cur) if (CRIME_DAYS[k] && cur[k] > 0) { const d = CRIME_DAYS[k] * Math.min(cur[k], 6); days += d; lines.push([`${({ hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person' })[k] || k} ×${cur[k]}`, d]); }
     const carried = uw.carried();
-    for (const k in carried) { const d = TIERS[GOODS[k].tier].charge * carried[k]; if (d) { days += d; lines.push([`Possession: ${carried[k]} ${GOODS[k].name}`, d]); } }
-    const w = g.save.weapons;
-    if (w.pistol || w.smg || w.shotgun) { const d = (w.pistol ? 30 : 0) + (w.smg ? 90 : 0) + (w.shotgun ? 60 : 0); days += d; lines.push(['Unlicensed firearms', d]); }
+    // only what is on you (or in the car you were caught by): goods by lot, guns you were carrying
+    for (const k of GOOD_IDS) { const n = carried[k] | 0; const d = TIERS[GOODS[k].tier].charge * n; if (d) { days += d; lines.push([`Possession: ${fmtQty(k, n)} ${GOODS[k].name}`, d]); } }
+    const on = id => g.player.carries(id);
+    if (on('pistol') || on('smg') || on('shotgun')) { const d = (on('pistol') ? 30 : 0) + (on('smg') ? 90 : 0) + (on('shotgun') ? 60 : 0); days += d; lines.push(['Unlicensed firearms', d]); }
     const pv = g.player.lastVehicle;
     if (pv && !pv.owned && !pv.garageUid && g.player.state === 'busted' && pv.stolenBefore) { days += 20; lines.push(['Possession of a stolen vehicle', 20]); }
     const mul = (1 + S.rap.priors * 0.12) * uw.cops.sentenceMul();

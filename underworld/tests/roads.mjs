@@ -54,7 +54,7 @@ const trafficOn = await ev(async () => {
       } else if (v.ai.mode !== 'path') T.merged = true;
     }
     if (g.time - t0 > 70 || track.every(T => T.merged)) { clearInterval(iv); res(); } }, 80); });
-  out.n = track.length; out.cars = track.map(T => ({ off: +T.maxOff.toFixed(2), merged: T.merged, w: T.link.w }));
+  out.n = track.length; out.cars = track.map(T => ({ off: +T.maxOff.toFixed(2), merged: T.merged, w: T.link.w, ...(T.merged ? {} : { alive: g.vehicles.list.includes(T.v), d: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.d), len: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.len), v: T.v.ai && +T.v.ai.speed.toFixed(1), blockT: T.v.ai && T.v.ai.blockT }) }));
   return out;
 });
 check('cars spawn on the curved roads', trafficOn.n >= 2, String(trafficOn.n));
@@ -70,6 +70,8 @@ const turnOff = await ev(async () => {
   let v = null; for (let k = 0; k < 60 && !v; k++) { v = tr.trySpawn(); if (v && (v.patrol || v.ai.mode !== 'lane')) { g.vehicles.despawn(v); v = null; } }
   if (!v) return { err: 'spawn' };
   Object.assign(v.ai, { i: e.line, j: e.seg, dx: 0, dz: 1, s: e.along - 30, mode: 'lane', next: null, linkSeen: 0, speed: 8 });
+  // move the car to that lane now: its stale spawn spot may be far off-screen and get it despawned
+  const lp = tr.lanePt(e.line, e.seg, 0, 1, e.along - 30); v.pos.x = lp[0]; v.pos.z = lp[1]; v.h = 0;
   tr.target = 1; tr.linkChance = 1; // no other spawns (and no thinning); this car always takes the turn
   let took = false; const t0 = g.time;
   try { await new Promise(res => { const iv = setInterval(() => { if (v.ai && v.ai.mode === 'path') took = true; if (took || g.time - t0 > 15 || !v.ai) { clearInterval(iv); res(); } }, 30); }); } finally { tr.linkChance = 0.4; tr.target = 18; }

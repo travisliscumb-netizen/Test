@@ -101,19 +101,24 @@ if (wall) {
 
 // ---------------------------------------------------------------- 3. hip fire: bullet follows the spread ray, every pitch and facing
 await ads(false); await frames(page, 10);
-let worst = 0, n = 0, grounded = 0;
+let worst = 0, n = 0, grounded = 0, occluded = 0;
 for (let k = 0; k < 8; k++) for (const pitch of [-0.35, -0.1, 0.05, 0.3]) {
   await ev(([k, pitch]) => { const g = window.game; g.cam.yaw = k / 8 * Math.PI * 2; g.cam.pitch = pitch; g.player.mag.pistol = 12; g.player.attackT = 0; }, [k, pitch]);
   await frames(page, 3);
   const shot = await fire(); if (!shot) continue;
   n++;
   // the bullet ends where the camera ray (with its spread) met the world: muzzle and crosshair agree
-  const dd = dist3(shot.hit, shot.aim); worst = Math.max(worst, dd);
+  // something that stepped into the line of fire (a passer-by, a passing car, a corner by the muzzle)
+  // stops the bullet on the muzzle -> aim-point segment: correct. Anywhere else is a misalignment.
+  const segD = (q, a, b) => { const vx = b.x - a.x, vy = b.y - a.y, vz = b.z - a.z, l2 = vx * vx + vy * vy + vz * vz || 1; const t = Math.max(0, Math.min(1, ((q.x - a.x) * vx + (q.y - a.y) * vy + (q.z - a.z) * vz) / l2)); return Math.hypot(q.x - a.x - vx * t, q.y - a.y - vy * t, q.z - a.z - vz * t); };
+  let dd = dist3(shot.hit, shot.aim);
+  if (dd >= 0.6 && shot.muzzle && segD(shot.hit, shot.muzzle, shot.aim) < 0.3) { occluded++; dd = 0; }
+  worst = Math.max(worst, dd);
   const cosA = await ev(s => { const c = window.game.camera; const d = c.getWorldDirection(new (c.position.constructor)()); const l = Math.hypot(s.dir.x, s.dir.y, s.dir.z); return (d.x * s.dir.x + d.y * s.dir.y + d.z * s.dir.z) / l; }, shot);
   if (pitch > -0.05 && shot.ground) grounded++;
   if (Math.acos(Math.min(1, cosA)) > 0.09) worst = 99; // shot ray far outside the reticle cone
 }
-check('hip fire at 8 facings x 4 pitches: every bullet lands on its crosshair ray (muzzle-to-aim-point)', n >= 28 && worst < 0.6, `n ${n} worst ${worst.toFixed(2)} m`);
+check('hip fire at 8 facings x 4 pitches: every bullet lands on its crosshair ray (muzzle-to-aim-point)', n >= 28 && worst < 0.6, `n ${n} worst ${worst.toFixed(2)} m, stopped by something in the line of fire ${occluded}`);
 check('hip fire aimed level or up never goes into the ground', grounded === 0, `${grounded} ground hits`);
 
 // ---------------------------------------------------------------- 4. default camera: drawing a gun levels the view
