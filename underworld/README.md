@@ -81,3 +81,29 @@ node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE
 ```
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
+
+## Validation record (build `939c6f4592d8`, 2,202,929 bytes)
+
+These numbers come from the final build, with every suite run offline:
+
+| Suite | Result |
+| --- | --- |
+| smoke | 16 / 16 |
+| core (melee facing, combo + step-in stress, reverse speed, reverse-camera transitions) | 64 / 64 |
+| arrest (9 situations, stale-state audit, death respawns) | 126 / 126 |
+| session (run twice) | 33 / 33, 33 / 33 |
+| ui (map / minimap / touch) | 23 / 23 |
+| offline | 14 / 14 |
+| soak (12 cycles) | 37 / 37 |
+| original template playtest (`port-valen/tests/playtest.mjs`) | 36 / 36 |
+| master checksum (`sha256sum -c master-template-1.0-stable.sha256`) | OK |
+
+Performance comes from `tests/perf.mjs` in SwiftShader. Wall ms/frame there is GPU-emulation-bound, so
+it's only useful for comparing builds:
+
+| | template | underworld |
+| --- | --- | --- |
+| desktop, low: game-logic update | 0.30–0.62 ms | 0.62 ms |
+| desktop, low: draw calls / triangles | 95–97 / 327k | 111 / 274–353k |
+| phone profile (4× CPU throttle, 800×400, quality 1): update | 2.8–3.4 ms | 2.6–3.4 ms |
+| phone profile: draw calls / triangles | 194–201 / 782–794k | 202–240 / 642–868k |
