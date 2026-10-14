@@ -32804,6 +32804,56 @@ const RoadNet = {
 };
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 RoadNet.init();
+/* ---------------- curved links: through-roads that leave the lattice ----------------
+   A link is a curved local road whose two ends meet lattice roads side-on (T-junctions part way
+   along a segment): Greenway Park Drive, the Cedar Fields road. The lattice graph itself never
+   changes (saves, races, missions and police routing all rely on it); links are layered on top:
+   traffic turns off onto them and merges back, and the GPS routes through them. */
+const Links = {
+  list: [], idx: new Map(),
+  key(axis, line, seg) { return axis + ':' + line + ':' + seg; },
+  // which lattice segment an end of a link meets, and where along it
+  attach(E) {
+    const i = Math.round(E[0] / P), j = Math.round(E[1] / P), dV = Math.abs(E[0] - i * P), dH = Math.abs(E[1] - j * P);
+    let a;
+    if (dV <= dH) { const seg = clamp(Math.floor(E[1] / P), 0, N - 1); a = { axis: 0, line: i, seg, along: E[1] - seg * P, C: { x: i * P, z: E[1] }, d: dV }; }
+    else { const seg = clamp(Math.floor(E[0] / P), 0, N - 1); a = { axis: 1, line: j, seg, along: E[0] - seg * P, C: { x: E[0], z: j * P }, d: dH }; }
+    return a.d <= ROAD_HALF + 1.5 && a.along > TURN_IN + 4 && a.along < P - TURN_IN - 4 && RoadNet.segOpen(a.axis, a.line, a.seg) ? a : null;
+  },
+  build(world) {
+    this.list = []; this.idx.clear();
+    for (const r of world.localRoads) {
+      if (!r.link || r.k !== 'line') continue;
+      const a = this.attach(r.pts[0]), b = this.attach(r.pts[r.pts.length - 1]);
+      if (!a || !b) continue;
+      const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
+      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r };
+      this.list.push(L);
+      L.ends.forEach((e, k) => { const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
+    }
+    world.links = this.list;
+  },
+  // the lane polyline from end `from` to the other end, offset to the right-hand side of travel
+  lane(L, from) {
+    const c = from === 0 ? L.pts : L.pts.slice().reverse(), off = L.lane, out = [];
+    for (let k = 0; k < c.length; k++) {
+      const a = c[Math.max(0, k - 1)], b = c[Math.min(c.length - 1, k + 1)];
+      let tx = b[0] - a[0], tz = b[1] - a[1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      out.push([c[k][0] - tz * off, c[k][1] + tx * off]);
+    }
+    return out;
+  },
+  // nearest point on any link: { link, k (segment), x, z, d, along (metres from end 0) }
+  nearest(x, z) {
+    let best = null;
+    for (const L of this.list) for (let k = 0; k < L.pts.length - 1; k++) {
+      const a = L.pts[k], b = L.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+      const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+      if (!best || d < best.d) best = { link: L, k, x: px, z: pz, d, along: L.cum[k] + Math.sqrt(l2) * t };
+    }
+    return best;
+  }
+};
 /* ---------------- local roads: streets that are not part of the lattice ----------------
    Cul-de-sacs, crescents, the stadium ring road, container lanes, park drives and farm tracks.
    They are drawn into one raster (about 0.7 m per texel, the same footprint as the AO map):
@@ -33971,6 +34021,21 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
             float along = rx ? dr.y : dr.x;
             float alongS = rx ? so.y : so.x;
             float aoff = abs(off);
+            vec2 sbi = rx ? vec2(clamp(ri.x, 0.0, 11.0), clamp(floor(p.y / 80.0), 0.0, 11.0)) : vec2(clamp(floor(p.x / 80.0), 0.0, 11.0), clamp(ri.y, 0.0, 11.0));
+            float rstyle = inCity ? floor(texture2D(uBlock, (sbi + 0.5) / 12.0).g * 255.0 + 0.5) : 0.0;
+            float paint = 1.0;
+            if (rstyle > 0.5 && rstyle < 1.5) {
+              col *= vec3(1.06, 1.0, 0.92);
+              if (aoff > 4.35) { vec2 cq = vec2(alongS / 0.62, (aoff - 4.35) / 0.42); vec2 cf = fract(cq + vec2(0.5 * step(0.5, fract(cq.y * 0.5)), 0.0)); float grout = max(1.0 - smoothstep(0.0, 0.09, min(cf.x, 1.0 - cf.x)), 1.0 - smoothstep(0.0, 0.12, min(cf.y, 1.0 - cf.y))); col = mix(vec3(0.36, 0.33, 0.3) * (0.78 + 0.4 * pvh(floor(cq))), vec3(0.1), grout * 0.7); rough = 0.75; hgt += (1.0 - grout) * 0.01; }
+            } else if (rstyle > 1.5 && rstyle < 2.5) { col *= 0.82; rough = 0.8; }
+            else if (rstyle > 2.5 && rstyle < 3.5) {
+              float slab = pvh(vec2(floor(alongS / 6.0), floor(off / 3.0) + roadIdx * 7.0));
+              col = mix(col, vec3(0.2, 0.197, 0.19) * (0.86 + 0.18 * n1) * (0.88 + 0.24 * slab) + (grain - 0.5) * 0.03, 0.9);
+              float jf = abs(fract(alongS / 6.0) - 0.5) * 6.0; // 3 at a slab joint
+              float joint = max(smoothstep(2.82, 2.95, jf), lineAA(abs(aoff - 3.0), 0.05));
+              col *= 1.0 - joint * 0.5; hgt -= joint * 0.012; paint = 0.5; rough = 0.92;
+            } else if (rstyle > 3.5 && rstyle < 4.5) { col *= 1.08; rough = 0.82; }
+            else if (rstyle > 4.5) { col *= 0.78; rough = 0.62; col += vec3(0.16, 0.03, 0.14) * uNight * (0.08 + 0.25 * uWet) * (0.6 + 0.4 * pvf(p * 0.07)); }
             // tyre wear in the wheel paths
             float wear = blvd ? smoothstep(0.8, 0.0, abs(aoff - 1.0)) + smoothstep(0.8, 0.0, abs(aoff - 2.5)) + smoothstep(0.8, 0.0, abs(aoff - 3.85)) + smoothstep(0.8, 0.0, abs(aoff - 5.35))
                               : smoothstep(0.9, 0.0, abs(aoff - 3.4)) + smoothstep(0.9, 0.0, abs(aoff - 1.8));
@@ -33981,7 +34046,8 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
             float mk = 0.0; vec3 mc = vec3(0.86);
             if (along > 10.0 || junc < 0.5) {
               float y = lineAA(abs(aoff - 0.17), 0.075);
-              col = mix(col, vec3(0.86, 0.66, 0.16) * 0.9, y * 0.92);
+              if (rstyle > 0.5 && rstyle < 1.5 && !blvd) { y = 0.0; mk = max(mk, lineAA(aoff, 0.07) * step(0.55, fract(alongS / 4.5)) * 0.9); }
+              col = mix(col, vec3(0.86, 0.66, 0.16) * 0.9, y * 0.92 * paint);
               if (blvd) {
                 float dash = step(0.45, fract(alongS / 6.0));
                 mk = max(mk, lineAA(abs(aoff - 3.18), 0.07) * dash);
@@ -33990,7 +34056,8 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
                 mk = max(mk, lineAA(abs(aoff - 4.05), 0.06) * 0.9);
                 // parking bay ticks along the shoulder
                 float tick = lineAA(abs(fract((alongS + 2.0) / 6.5 + 0.5) - 0.5) * 6.5, 0.05) * step(4.05, aoff) * step(aoff, 4.7);
-                mk = max(mk, tick * 0.8);
+                float tickOn = rstyle < 0.5 || (rstyle > 1.5 && rstyle < 3.5) ? 1.0 : 0.0; // no bays in the Old Quarter, the hills or on the Strip
+                mk = max(mk, tick * 0.8 * tickOn);
               }
             }
             if (junc > 0.5 && along > 6.6 && along < 9.8 && aoff < 5.6) mk = max(mk, step(0.5, fract(off / 1.1 + 0.25)) * 0.95);
@@ -34015,7 +34082,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
             float drain = boxAA(vec2(aoff - 5.6, mod(along, 40.0) - 20.0), vec2(0.22, 0.45));
             float slots = drain * step(0.5, fract(along * 7.0));
             col = mix(col, vec3(0.06), drain * (0.6 + 0.4 * slots)); hgt -= drain * 0.03;
-            col = mix(col, mc * (0.9 + 0.1 * n2), mk * (0.86 - 0.28 * n1) * (1.0 - manhole));
+            col = mix(col, mc * (0.9 + 0.1 * n2), mk * (0.86 - 0.28 * n1) * (1.0 - manhole) * paint);
             hgt += mk * 0.002;
             // grime gathers along the kerb
             col *= 1.0 - 0.18 * smoothstep(5.3, 6.0, aoff);
@@ -36178,7 +36245,7 @@ Object.assign(World.prototype, {
 });
 {
   const base2 = World.prototype.generate;
-  World.prototype.generate = function () { base2.call(this); this._placesGen(); };
+  World.prototype.generate = function () { base2.call(this); this._placesGen(); Links.build(this); };
 }
 /* ---------------------------------------------------------------------
    The Valen Royale: the casino on the Nightlife Strip, a block south of Club Neon.
@@ -36259,11 +36326,28 @@ function pointInPoly(x, z, pts) {
   return inside;
 }
 // points along a circular arc (centre cx,cz, radius r, from angle a0 to a1, n steps)
+// Catmull-Rom through the control points, resampled about every `step` metres. A curved road is
+// stored once as this polyline: the ground shader paints it, both maps draw it and traffic and the
+// GPS follow it, so all four always agree.
+function splinePts(pts, step = 2.5) {
+  if (pts.length < 3) return pts.map(q => [q[0], q[1]]);
+  const out = [[pts[0][0], pts[0][1]]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3);
+      out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  return out;
+}
 function arcPts(cx, cz, r, a0, a1, n = 8) { const out = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return out; }
 
 Object.assign(World.prototype, {
   // ---------------------------------------------------------------- local road shapes
-  _road(pts, w, st = 'asphalt') { const r = { k: 'line', pts, w, st }; this.localRoads.push(r); return r; },
+  _road(pts, w, st = 'asphalt', o) { const r = { k: 'line', pts: o && o.smooth ? splinePts(pts) : pts, w, st }; if (o && o.link) r.link = o.link; this.localRoads.push(r); return r; },
   _areaS(pts, st = 'concrete') { const r = { k: 'poly', pts, st }; this.localRoads.push(r); return r; },
   _rectS(x0, z0, x1, z1, st = 'concrete') { return this._areaS([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], st); },
   _discS(x, z, r, st = 'asphalt') { const s = { k: 'disc', x, z, r, st }; this.localRoads.push(s); return s; },
@@ -36757,7 +36841,7 @@ Object.assign(World.prototype, {
     for (const s of [-8.3, 8.3]) this._road([[sb.x0 + 1.5, 240 + s], [sb.x1 - 1.5, 240 + s]], 3, 'gravel');
     // the scenic drive through the park, with a car park by the west gate
     const drive = [[165.6, 293], [192, 293], [214, 291], [236, 278], [252, 258], [266, 236], [288, 220], [318, 212], [352, 206], [394.4, 204]];
-    this._road(drive, 6);
+    this._road(drive, 6, 'asphalt', { smooth: true, link: 'Greenway Park Drive' });
     this._rectS(176, 297, 210, 309, 'asphalt');
     for (let k = 0; k < 11; k++) { const x = 178 + k * 3; this._det(b, 'box', x, CURB_H + 0.02, 305, 0.12, 0.02, 5, C(0xe8e8e8)); if (rng.chance(0.45)) b.parked.push({ x: x + 1.5, z: 305, h: 0, cls: null }); }
     // the pond, its rocky shore and a boardwalk overlook
@@ -36943,7 +37027,7 @@ Object.assign(World.prototype, {
   _genFields(a, sb, rng) {
     this._sbSidewalks(sb, rng, { trees: 0.8, park: 0 });
     const b = a, zr = 920;
-    this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt');
+    this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt', { smooth: true, link: 'Cedar Fields Road' });
     this._road([[150, zr], [150, 906]], 4.2, 'dirt');
     this._road([[60, zr], [60, 938]], 4.2, 'dirt');
     // the farm: house, red barn, silo, paddock
@@ -37498,12 +37582,19 @@ class ChunkManager {
 /* =====================================================================
    [CONTENT] STATIC SCENERY (ground, sidewalk slabs, seawall, railing, water, bridge)
    ===================================================================== */
+// district road styles: 0 standard, 1 Old Quarter (warm worn asphalt, granite setts at the kerb,
+// dashed white centre line), 2 Financial District (dark fresh asphalt, crisp markings),
+// 3 industrial (concrete slabs with joints, faded paint), 4 residential hills (pale smooth asphalt,
+// no parking ticks), 5 Nightlife Strip (dark glossy asphalt that catches the neon at night)
+const ROAD_STYLE = { o: 1, c: 2, s: 3, w: 3, h: 3, u: 4, l: 4, p: 5 };
 function buildStaticScenery(scene, world) {
   // block-type lookup texture for the ground shader
   const data = new Uint8Array(N * N * 4);
   for (const b of world.blocks) {
     const t = b.special === 'hospital' || b.special === 'police' ? DTYPE.C : DTYPE[b.ground || (b.landmark && b.landmark.ground) || b.t] || DTYPE.C;
     data[b.i * 4] = t; data[b.i * 4 + 3] = 255;
+    // road style of the district (the road on a block's east and south sides takes it)
+    data[b.i * 4 + 1] = ROAD_STYLE[zoneKey(b.cx, b.cz)] || 0;
   }
   const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
   tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
@@ -39367,7 +39458,7 @@ function zoneVehicle(x, z) {
 }
 class TrafficManager {
   constructor(game) {
-    this.g = game; this.cars = []; this.enabled = true; this.target = 18; this._near = [];
+    this.g = game; this.cars = []; this.enabled = true; this.target = 18; this._near = []; this.linkChance = 0.4;
   }
   release(v) { const i = this.cars.indexOf(v); if (i >= 0) this.cars.splice(i, 1); }
   // danger nearby: a few cars break out of their lanes and flee (the rest brake via normal AI)
@@ -39381,8 +39472,77 @@ class TrafficManager {
     }
   }
   validDir(i, j, dx, dz) { const a = i + dx, b = j + dz; return i >= 0 && j >= 0 && i <= N && j <= N && a >= 0 && b >= 0 && a <= N && b <= N && RoadNet.open(i, j, dx, dz); }
+  // ---------------------------------------------------------------- curved links
+  segKey(ai) { return ai.dx ? Links.key(1, ai.j, Math.min(ai.i, ai.i + ai.dx)) : Links.key(0, ai.i, Math.min(ai.j, ai.j + ai.dz)); }
+  lanePt(i, j, dx, dz, s, off = LANE) { return [i * P + dx * s - dz * off, j * P + dz * s + dx * off]; }
+  alongOf(ai, C) { return ai.dx ? (C.x - ai.i * P) * ai.dx : (C.z - ai.j * P) * ai.dz; }
+  qbez(a, c, b, n) { const out = []; for (let k = 1; k <= n; k++) { const t = k / n, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]); } return out; }
+  // the lattice lane a car joins at a link end, heading either way along that road
+  exitState(e, sgn) {
+    if (e.axis === 0) return sgn > 0 ? { i: e.line, j: e.seg, dx: 0, dz: 1, s: e.along } : { i: e.line, j: e.seg + 1, dx: 0, dz: -1, s: P - e.along };
+    return sgn > 0 ? { i: e.seg, j: e.line, dx: 1, dz: 0, s: e.along } : { i: e.seg + 1, j: e.line, dx: -1, dz: 0, s: P - e.along };
+  }
+  // follow `lane` (link lane points) then merge onto the lattice at the far end of link L
+  linkPath(v, start, lane, L, farEnd) {
+    const x = this.exitState(L.ends[farEnd], Math.random() < 0.5 ? 1 : -1);
+    const xs = Math.min(x.s + 10, P - TURN_IN - 0.5), ctl = this.lanePt(x.i, x.j, x.dx, x.dz, x.s), tgt = this.lanePt(x.i, x.j, x.dx, x.dz, xs);
+    const pts = [...start, ...lane], mergeK = pts.length - 1;
+    pts.push(...this.qbez(lane[lane.length - 1], ctl, tgt, 8));
+    const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+    // corner speed from the local radius (two points either side): v = sqrt(a_lat * R)
+    const lim = pts.map((q, k) => {
+      const a = pts[Math.max(0, k - 2)], b = pts[Math.min(pts.length - 1, k + 2)];
+      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), aq = Math.hypot(q[0] - a[0], q[1] - a[1]), qb = Math.hypot(b[0] - q[0], b[1] - q[1]);
+      const cr = Math.abs((q[0] - a[0]) * (b[1] - a[1]) - (q[1] - a[1]) * (b[0] - a[0]));
+      const R = cr < 1e-6 ? 1e6 : ab * aq * qb / (2 * cr);
+      return clamp(Math.sqrt(3.2 * R), 4.5, 40);
+    });
+    const ai = v.ai;
+    ai.path = { pts, cum, lim, len: cum[cum.length - 1], d: 0, k: 0, exit: { ...x, s: xs }, abeam: x.s, mergeD: cum[mergeK], link: L.id };
+    ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
+  }
+  // a lattice car reaching a link junction: some turn off onto the curved road
+  maybeTakeLink(v) {
+    const ai = v.ai, ends = Links.idx.get(this.segKey(ai)); if (!ends || ai.linkSeen) return;
+    for (const en of ends) {
+      const sc = this.alongOf(ai, en.end.C);
+      if (ai.s > sc - 18 && ai.s < sc - 10) {
+        ai.linkSeen = 1;
+        if (v.mission || v.patrol || Math.random() > this.linkChance) return;
+        const lane = Links.lane(en.link, en.e), q0 = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, ai.s), qc = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, sc);
+        this.linkPath(v, [q0, ...this.qbez(q0, qc, lane[0], 8).slice(0, -1)], lane, en.link, 1 - en.e);
+        return;
+      }
+    }
+  }
+  // is a lattice car about to pass the merge point in the lane we are joining?
+  mergeBlocked(v) {
+    const x = v.ai.path.exit;
+    for (const c of this.cars) {
+      const ca = c.ai; if (!ca || c === v) continue;
+      if (ca.mode === 'lane' && ca.i === x.i && ca.j === x.j && ca.dx === x.dx && ca.dz === x.dz && ca.s > v.ai.path.abeam - 30 && ca.s < v.ai.path.abeam + 6) return true;
+    }
+    return false;
+  }
+  trySpawnLink() {
+    const g = this.g, px = g.focus.x, pz = g.focus.z, L = pick(Links.list); if (!L) return null;
+    const from = Math.random() < 0.5 ? 0 : 1, lane = Links.lane(L, from);
+    const k = Math.floor(rand(0.1, 0.8) * lane.length), [x, z] = lane[k];
+    const d = Math.hypot(x - px, z - pz);
+    if (d < 75 || d > 230 || (d < 160 && g.inView(x, 1, z, 3))) return null;
+    for (const v of g.vehicles.list) if (dist2(v.pos.x, v.pos.z, x, z) < 15 * 15) return null;
+    const type = zoneVehicle(x, z), b = lane[Math.min(lane.length - 1, k + 1)];
+    const v = g.vehicles.spawn(type, x, z, Math.atan2(b[0] - x, b[1] - z), { kinematic: true, driver: 'npc' });
+    const r0 = Math.random(), pers = r0 < 0.25 ? 0 : r0 < 0.8 ? 1 : 2, pk = [[0.85, 1.5, 0.3, 1.4], [1, 1, 1, 1], [1.15, 0.55, 2.5, 0.6]][pers];
+    v.ai = { i: 0, j: 0, dx: 1, dz: 0, s: 0, mode: 'path', t: 0, len: 1, speed: 8, pers, gapK: pk[3], runK: pk[2], maxV: rand(11, 14.5) * pk[0] * (type === 'truck' ? 0.8 : 1), react: rand(0.25, 1.1) * pk[1], reactT: 0, runLight: null, next: null, blockT: 0, honkT: rand(0, 2) * pk[1], laneOff: 0, overtake: 0, creepT: 0, p0: null, linkSeen: 1 };
+    this.linkPath(v, [], lane.slice(k), L, 1 - from);
+    v.patrol = false;
+    this.cars.push(v);
+    return v;
+  }
   trySpawn() {
     const g = this.g, px = g.focus.x, pz = g.focus.z;
+    if (Links.list.length && Math.random() < 0.18) { const v = this.trySpawnLink(); if (v) return v; }
     for (let tries = 0; tries < 14; tries++) {
       const i = clamp(Math.round(px / P) + randi(-3, 3), 0, N), j = clamp(Math.round(pz / P) + randi(-3, 3), 0, N);
       const [dx, dz] = pick(DIRS);
@@ -39506,8 +39666,20 @@ class TrafficManager {
     const g = this.g, ai = v.ai, s = v.spec;
     let vAllow = ai.maxV * (g.env.rain > 0.5 ? 0.85 : 1);
     let lightStop = false;
+    if (ai.mode === 'lane') this.maybeTakeLink(v);
     const Bi = ai.i + ai.dx, Bj = ai.j + ai.dz;
-    if (ai.mode === 'lane') {
+    if (ai.mode === 'path') {
+      // curved road: brake ahead of bends, wait for a gap before merging back onto the lattice
+      const pa = ai.path;
+      vAllow = Math.min(vAllow, ai.maxV * 0.92);
+      for (let k = pa.k; k < pa.pts.length && pa.cum[k] - pa.d < 45; k++) { const va = Math.sqrt(pa.lim[k] * pa.lim[k] + 2 * 4.5 * Math.max(0, pa.cum[k] - pa.d)); if (va < vAllow) vAllow = va; }
+      // a car stopped in the merge zone (a queue at a light) must not hold us forever: after a few
+      // seconds we nose out anyway and the obstacle check keeps us off its bumper
+      if (pa.d < pa.mergeD && pa.mergeD - pa.d < 24 && (pa.waitT || 0) < 6 && this.mergeBlocked(v)) {
+        const va = Math.sqrt(2 * 5 * Math.max(0, pa.mergeD - pa.d - 1.5)); if (va < vAllow) { vAllow = va; lightStop = true; }
+        if (ai.speed < 0.5) pa.waitT = (pa.waitT || 0) + dt;
+      }
+    } else if (ai.mode === 'lane') {
       const remain = P - TURN_IN - ai.s;
       if (!ai.next && remain < 35) ai.next = this.chooseNext(ai);
       if (ai.next && ai.next.type !== 0 && remain < 28) vAllow = Math.min(vAllow, 6.5 + remain * 0.32);
@@ -39591,12 +39763,25 @@ class TrafficManager {
       if (ai.t >= 1) {
         const over = (ai.t - 1) * ai.len;
         ai.i = Bi; ai.j = Bj; ai.dx = ai.next.d[0]; ai.dz = ai.next.d[1];
-        ai.s = TURN_IN + over; ai.mode = 'lane'; ai.next = null; ai.runLight = null;
+        ai.s = TURN_IN + over; ai.mode = 'lane'; ai.next = null; ai.runLight = null; ai.linkSeen = 0;
       }
+    }
+    if (ai.mode === 'path') {
+      const pa = ai.path;
+      pa.d += ai.speed * dt;
+      while (pa.k < pa.pts.length - 2 && pa.cum[pa.k + 1] <= pa.d) pa.k++;
+      if (pa.d >= pa.len) { const x = pa.exit; ai.i = x.i; ai.j = x.j; ai.dx = x.dx; ai.dz = x.dz; ai.s = x.s; ai.mode = 'lane'; ai.path = null; ai.next = null; ai.laneOff = 0; ai.linkSeen = 1; v._lo = undefined; }
     }
     // resolve pose
     let x, z, h, steer = 0;
-    if (ai.mode === 'lane') {
+    if (ai.mode === 'path') {
+      const pa = ai.path, a = pa.pts[pa.k], b = pa.pts[pa.k + 1], t = clamp((pa.d - pa.cum[pa.k]) / Math.max(1e-6, pa.cum[pa.k + 1] - pa.cum[pa.k]), 0, 1);
+      x = a[0] + (b[0] - a[0]) * t; z = a[1] + (b[1] - a[1]) * t;
+      // heading blends toward the next segment so the car turns smoothly through each vertex
+      const c = pa.pts[Math.min(pa.pts.length - 1, pa.k + 2)], h0 = Math.atan2(b[0] - a[0], b[1] - a[1]), h1 = Math.atan2(c[0] - b[0], c[1] - b[1]);
+      h = h0 + wrapPi(h1 - h0) * t;
+      steer = clamp(wrapPi(h1 - h0) * 3, -0.45, 0.45);
+    } else if (ai.mode === 'lane') {
       const off = LANE + ai.laneOff;
       x = ai.i * P + ai.dx * ai.s - ai.dz * off; z = ai.j * P + ai.dz * ai.s + ai.dx * off;
       const latV = (ai.laneOff - (v._lo === undefined ? ai.laneOff : v._lo)) / Math.max(dt, 1e-3);
@@ -49380,9 +49565,13 @@ const MAP_CATS = {
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
-  ['factions', 'Faction HQs'], ['territory', 'Territory'], ['police', 'Police'], ['garages', 'Garages & parking']
+  ['factions', 'Faction HQs'], ['territory', 'Territory'], ['police', 'Police'], ['garages', 'Garages & parking'], ['economy', 'Street prices']
 ];
-const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true };
+const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false };
+// centre of each named district (average of its blocks), for map labels and cards
+const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
+// the street good paying furthest over its base price in a district right now
+function econBest(uw, z) { let best = null; for (const k of GOOD_IDS) { if (GOODS[k].fence || GOODS[k].arms || !DEMAND[z]) continue; const r = uw.market.ratio(z, k); if (!best || r > best.r) best = { k, r, price: uw.market.price(z, k) }; } return best; }
 // draw one map badge (rounded square, letter) at screen position x,y with size r (half side)
 function drawMapBadge(c, x, y, r, col, icon, ring) {
   c.beginPath();
@@ -49591,11 +49780,59 @@ class MapView {
   tap(sx, sy) {
     const hit = this.hitTest(sx, sy);
     if (hit) { this.select(hit, false); return; }
+    const hadCard = !$('mapCard').classList.contains('hidden');
     this.hideCard();
     const [wx, wz] = this.screenToWorld(sx, sy);
     const g = this.g;
     if (g.uw && g.uw.ui.mapClick(wx, wz)) return;
     $('turfInfo').classList.add('hidden');
+    // a tap on open map: the curved road under the finger, else the district (a tap with a card open just closes it)
+    if (hadCard) return;
+    if (!isFinite(wx) || !isFinite(wz)) return;
+    // the finger's width (about 9 css px) in metres at the current zoom
+    const en = this.roadEntry(wx, wz, 9 / Math.max(1e-6, this.scale * this.ui.mapK)) || this.districtEntry(wx, wz);
+    if (en) { this.sel = en; this.showCard(en); this.dirty = true; }
+  }
+  roadEntry(x, z, r) {
+    const ln = Links.nearest(x, z); if (!ln || ln.d > Math.max(6, r)) return null;
+    const L = ln.link, zone = ZONES[zoneKey(ln.x, ln.z)];
+    return { key: 'road:' + L.id, name: L.name, cat: 'landmark', catName: 'Road', icon: '≈', col: '#c8ccd2', x: ln.x, z: ln.z, district: zone.name,
+      extra: `<div class="stats"><span>Length</span><span>${fmtDist(L.len)}</span><span>Surface</span><span>${L.road.st === 'dirt' ? 'Dirt track' : 'Asphalt'}</span><span>Joins</span><span>${L.ends.map(e => e.axis === 0 ? STREET_NAMES_X[e.line] : STREET_NAMES_Z[e.line]).join(' · ')}</span></div><div class="hint" style="margin:6px 0 0">A winding through-road. Traffic and your GPS use it.</div>` };
+  }
+  districtEntry(x, z) {
+    const g = this.g, uw = g.uw; if (x < 0 || z < 0 || x >= CITY || z >= CITY) return null;
+    const zk = zoneKey(x, z), Z = ZONES[zk], cen = ZONE_CENTRE[zk];
+    const lvl = v => v >= 1.4 ? 'Heavy' : v >= 1.0 ? 'Normal' : v >= 0.6 ? 'Light' : 'Rare';
+    let h = `<div class="hint" style="margin:6px 0 0">${esc(Z.tag)}</div><div class="stats"><span>Police presence</span><span>${lvl(Z.cops)}</span><span>Foot traffic</span><span>${lvl(Z.ped)}</span><span>Nightlife</span><span>${lvl(Z.night)}</span>`;
+    if (uw) {
+      const turfs = uw.T.map((t, i) => ({ t, i })).filter(o => o.t.zone === zk);
+      const mine = turfs.filter(o => uw.owner[o.i] === 'pc'), fac = {};
+      for (const o of turfs) { const own = uw.owner[o.i]; if (own && own !== 'pc' && FACTIONS[own]) fac[FACTIONS[own].short] = (fac[FACTIONS[own].short] || 0) + 1; }
+      const tax = mine.reduce((a, o) => a + uw.royalty.owed(o.i), 0);
+      const props = uw.locs.filter(L => L.kind === 'prop' && zoneKey(L.x, L.z) === zk);
+      h += `<span>Turf</span><span>${turfs.length ? `${mine.length} of ${turfs.length} yours${Object.keys(fac).length ? ' · ' + Object.entries(fac).map(([f, n]) => `${esc(f)} ${n}`).join(', ') : ''}` : 'none'}</span>`;
+      if (mine.length) h += `<span>Territory tax</span><span>${fmtMoney(tax)}/day</span>`;
+      h += `<span>Property</span><span>${props.filter(L => uw.props.owned(L.def.id)).length} owned · ${props.filter(L => !uw.props.owned(L.def.id)).length} for sale</span></div>`;
+      if (DEMAND[zk]) {
+        h += '<div class="mdGroup" style="margin-top:8px">Street prices now</div><div class="stats">';
+        for (const k of GOOD_IDS) { if (GOODS[k].fence || GOODS[k].arms) continue; const r = uw.market.ratio(zk, k); h += `<span>${esc(GOODS[k].name)}</span><span style="color:${r > 1.12 ? 'var(--green)' : r < 0.88 ? 'var(--red)' : 'inherit'}">${fmtPerUnit(k, uw.market.price(zk, k))} ${r > 1.12 ? '▲' : r < 0.88 ? '▼' : ''}</span>`; }
+        h += '</div>';
+      }
+    } else h += '</div>';
+    return { key: 'dist:' + zk, name: Z.name, cat: 'landmark', catName: 'District', icon: '◎', col: Z.col, x: cen.x, z: cen.z, district: Z.name, extra: h };
+  }
+  // economy layer: in every district, the street good paying furthest over its base price
+  drawEconomy(c) {
+    const uw = this.g.uw, ui = this.g.ui, k = 1 / Math.max(0.6, this.zoom);
+    c.textAlign = 'center';
+    for (const zk in ZONE_CENTRE) {
+      const b = econBest(uw, zk); if (!b) continue;
+      const cen = ZONE_CENTRE[zk], [mx, mz] = ui._mapXY(cen.x, cen.z + 40);
+      const txt = `${GOODS[b.k].name} ${fmtPerUnit(b.k, b.price)}`, up = b.r > 1.12, dn = b.r < 0.88;
+      c.font = `bold ${Math.round(13 * k * 1.4)}px Arial`; const w = c.measureText(txt).width + 14 * k;
+      c.fillStyle = 'rgba(10,12,18,0.82)'; c.fillRect(mx - w / 2, mz - 12 * k, w, 22 * k);
+      c.fillStyle = up ? '#7fe08f' : dn ? '#ff7a85' : '#ffd84d'; c.fillText(txt + (up ? ' ▲' : dn ? ' ▼' : ''), mx, mz + 4 * k);
+    }
   }
   hitTest(sx, sy) {
     let best = null, bd = 24;
@@ -49627,7 +49864,7 @@ class MapView {
       if (def.desc) stats += `<div class="hint" style="margin:8px 0 0">${esc(def.desc)}</div>`;
     }
     const cab = en.fast || (en.place && ct.fastPoints().find(f => f.id === en.place));
-    $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${en.icon}</span><div><b>${esc(en.name)}</b><small>${esc(MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}
+    $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${en.icon}</span><div><b>${esc(en.name)}</b><small>${esc(en.catName || MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}${en.extra || ''}
       <div class="btns">${tracked ? '<button class="sbtn" data-act="untrack">Stop tracking</button>' : '<button class="sbtn gold" data-act="track">Track location</button>'}${cab ? '<button class="sbtn" data-act="cab">Cab here · $40</button>' : ''}</div>`;
     $('mapCard').classList.remove('hidden');
   }
@@ -49656,6 +49893,7 @@ class MapView {
     if (this.zoom < 1.35) c.drawImage(ui.mapImg, 0, 0, 1024, 1024);
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
+    if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
     // route to the tracked place
     const wp = g.content.waypoint, m = g.missions.active, tgt = (m && m.target) || wp;
     if (tgt) {
@@ -49730,6 +49968,62 @@ class MapView {
   }
 }
 function fmtDist(d) { return d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'; }
+// GPS over the lattice plus the curved links. Nodes: the 13x13 lattice nodes, then each link end
+// (a T-junction part way along a lattice segment), then the start and goal. A link edge carries
+// its polyline, so the route drawn on the maps bends with the road.
+const GPS = {
+  _g: null,
+  graph() {
+    if (this._g && this._g.n === Links.list.length) return this._g;
+    const W2 = N + 1, nodes = [], adj = [], id = (i, j) => i * W2 + j;
+    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) { nodes[id(i, j)] = { x: i * P, z: j * P }; adj[id(i, j)] = []; }
+    const edge = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); adj[b].push({ to: a, w, poly: poly ? poly.slice().reverse() : null }); };
+    const ends = new Map(); // segment key -> [{ along, node }]
+    for (const L of Links.list) {
+      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
+      const poly = L.pts.map(q => ({ x: q[0], z: q[1] }));
+      edge(L.gps[0], L.gps[1], L.len + 2 * ROAD_HALF, poly);
+    }
+    for (const [a, len] of [[0, N], [1, N]]) for (let line = 0; line <= N; line++) for (let seg = 0; seg < len; seg++) {
+      if (!RoadNet.segOpen(a, line, seg)) continue;
+      const n0 = a === 0 ? id(line, seg) : id(seg, line), n1 = a === 0 ? id(line, seg + 1) : id(seg + 1, line);
+      const mids = (ends.get(Links.key(a, line, seg)) || []).slice().sort((p, q) => p.along - q.along);
+      let prev = n0, at = 0;
+      for (const m of mids) { edge(prev, m.node, m.along - at, null); prev = m.node; at = m.along; }
+      edge(prev, n1, P - at, null);
+    }
+    this._g = { nodes, adj, n: Links.list.length };
+    return this._g;
+  },
+  route(fx, fz, i, j, tx, tz, gi, gj) {
+    const G = this.graph(), W2 = N + 1, nodes = G.nodes.slice(), adj = G.adj.slice();
+    const src = i * W2 + j;
+    // the goal: the nearest lattice node, or a point on a link when the target sits on (or by) one
+    let dst = gi * W2 + gj;
+    const ln = Links.nearest(tx, tz);
+    if (ln && ln.d < Math.hypot(tx - gi * P, tz - gj * P) && ln.d < 40) {
+      dst = nodes.length; nodes.push({ x: ln.x, z: ln.z }); adj.push([]);
+      const L = ln.link, toA = L.pts.slice(0, ln.k + 1).map(q => ({ x: q[0], z: q[1] })), toB = L.pts.slice(ln.k + 1).map(q => ({ x: q[0], z: q[1] }));
+      // walk from each end of the link to the goal point (polylines oriented end -> goal)
+      adj[L.gps[0]] = adj[L.gps[0]].concat([{ to: dst, w: ln.along + ROAD_HALF, poly: [...toA, { x: ln.x, z: ln.z }] }]);
+      adj[L.gps[1]] = adj[L.gps[1]].concat([{ to: dst, w: L.len - ln.along + ROAD_HALF, poly: [...toB.slice().reverse(), { x: ln.x, z: ln.z }] }]);
+    }
+    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
+    dist[src] = 0;
+    for (;;) {
+      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
+      if (u < 0 || u === dst) break;
+      done[u] = 1;
+      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
+    }
+    if (!isFinite(dist[dst])) return null;
+    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
+    chain.reverse();
+    const out = [];
+    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
+    return { pts: out, cost: dist[dst], onLink: dst >= G.nodes.length };
+  }
+};
 function gpsRoute(fx, fz, tx, tz) {
   const pts = [{ x: fx, z: fz }];
   let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
@@ -49738,7 +50032,9 @@ function gpsRoute(fx, fz, tx, tz) {
   if (onV && !onH) { j = Math.abs(gj * P - fz) < Math.abs(fz - j * P) ? j : (gj * P > fz ? Math.ceil(fz / P) : Math.floor(fz / P)); }
   if (RoadNet.degree(i, j) === 0) [i, j] = RoadNet.nearNode(fx, fz);
   pts.push({ x: i * P, z: onH ? fz : j * P });
-  for (const [a, b] of RoadNet.path(i, j, gi, gj).slice(1)) pts.push({ x: a * P, z: b * P });
+  const viaLinks = Links.list.length ? GPS.route(fx, fz, i, j, tx, tz, gi, gj) : null;
+  if (viaLinks) for (const q of viaLinks.pts) pts.push(q);
+  else for (const [a, b] of RoadNet.path(i, j, gi, gj).slice(1)) pts.push({ x: a * P, z: b * P });
   pts.push({ x: tx, z: tz });
   return pts;
 }
@@ -50619,7 +50915,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
+    window.__pv = Object.freeze({ Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
     await game.init(progress);
   } catch (e) {
     console.error(e);
