@@ -103,7 +103,7 @@ check('jail: the map opens over the jail HUD', jm.open && jm.w > 100, JSON.strin
 await page.evaluate(() => window.game.ui.toggleMap(false)); await setSize(844, 390);
 const m2 = await measure();
 check('jail after map + rotation: still no overlaps', overlaps(m2, TOP).length === 0, overlaps(m2, TOP).join(' '));
-await page.evaluate(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 20); window.game.uw.prison.setSpeed(20); });
+await page.evaluate(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
 await settle();
 const m3 = await measure();

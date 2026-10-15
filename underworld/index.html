@@ -167,6 +167,9 @@ button{font-family:var(--font)}
 #gameover.dead .gt{color:#ff5c5c}#gameover.busted .gt{color:#6fa8ff}
 #bustbar{position:absolute;left:50%;top:58%;transform:translateX(-50%);width:220px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.2em;color:#9cc2ff;text-shadow:0 1px 2px #000}
 #bustbar .bar{margin-top:5px;height:6px}#bustbar .bar i{background:#6fa8ff}
+#chanBar{position:absolute;left:50%;top:52%;transform:translateX(-50%);width:240px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.14em;color:#ffd84d;text-shadow:0 1px 2px #000;pointer-events:none}
+#chanBar .bar{margin-top:5px;height:7px}#chanBar .bar i{background:#ffd84d;transition:none}
+#chanBar small{display:block;font-size:10px;letter-spacing:.08em;color:var(--dim);font-weight:600;margin-top:4px}
 #confirmScreen{z-index:46}
 #confirmScreen .panel{width:min(440px,94vw)}
 #bigmap{position:fixed;inset:0;z-index:38;background:rgba(5,7,10,.9);display:flex;align-items:stretch;flex-direction:column;gap:6px;padding:calc(6px + var(--safe-t)) calc(8px + var(--safe-r)) calc(6px + var(--safe-b)) calc(8px + var(--safe-l));box-sizing:border-box;overflow:hidden}
@@ -429,6 +432,14 @@ body.touch.driving #speedo .vh{margin:6px auto 0}
 @media (max-height:430px){.menu{gap:4px}.menu .logo{font-size:34px;margin-bottom:2px}.mbtn{padding:6px 14px;font-size:13px}}
 
 /* ---------- underworld ---------- */
+/* +/- money feed: every change to cash, stacked under the money / wanted cluster, above menus */
+#moneyFeed{position:fixed;z-index:47;pointer-events:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;right:calc(18px + var(--safe-r));top:calc(120px + var(--safe-t))}
+#moneyFeed b{font-size:17px;font-weight:900;letter-spacing:.02em;font-variant-numeric:tabular-nums;padding:1px 8px;border-radius:7px;background:rgba(6,9,14,.55);text-shadow:0 1px 2px #000;animation:mfIn .18s ease-out;transition:opacity .35s,transform .35s;white-space:nowrap}
+#moneyFeed b.up{color:#6fe08a}#moneyFeed b.dn{color:#ff5d6c}
+#moneyFeed b.big{font-size:20px}
+#moneyFeed b.out{opacity:0;transform:translateY(-6px)}
+@keyframes mfIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@media (max-width:820px),(max-height:520px){#moneyFeed b{font-size:14px}#moneyFeed b.big{font-size:16px}}
 #carry:empty{display:none}
 #carry{font-size:12px;font-weight:800;letter-spacing:.08em;color:#d28cff;text-shadow:0 1px 3px #000}
 #carry.hot{color:var(--red)}
@@ -457,8 +468,8 @@ body.touch.driving #speedo .vh{margin:6px auto 0}
 #jailHud{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);background:var(--panel);border:1px solid rgba(216,118,42,.6);border-top:3px solid #d8762a;border-radius:12px;padding:10px 14px;min-width:260px;text-align:center;pointer-events:auto}
 #jailHud small{display:block;font-size:10px;letter-spacing:.24em;color:#d8762a;font-weight:900}#jailHud b{font-size:22px;font-weight:900;display:block}#jailHud span{font-size:12px;color:var(--dim)}
 #jailHud .bar{margin:6px 0}#jailHud .bar i{background:#d8762a}
-#jailSpeed{display:flex;gap:4px;justify-content:center;margin-top:4px}#jailSpeed button,#jailEmpire{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);border-radius:7px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px}
-#jailSpeed button.on{background:#d8762a;color:#1a1206;border-color:#d8762a}
+#jailLife,#jailEmpire{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);border-radius:7px;padding:6px 10px;font-weight:800;cursor:pointer;font-size:13px;min-height:36px}
+#jailHud .jbtns{display:flex;gap:6px}
 #jailHud .jrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
 body[data-gs="paused"] #jailHud{display:none}
 @media (max-width:820px),(max-height:520px){
@@ -489,6 +500,7 @@ body[data-gs="paused"] #jailHud{display:none}
 </div>
 
 <!-- HUD -->
+<div id="moneyFeed" aria-live="polite"></div>
 <div id="hud" class="hidden">
   <div id="toasts"></div>
   <div id="objective" class="hidden"><span class="ot"></span><span class="otm hidden"></span></div>
@@ -530,11 +542,11 @@ body[data-gs="paused"] #jailHud{display:none}
   <div id="prompt" class="hidden"></div>
   <div id="offer" class="hidden"></div>
   <div id="bustbar" class="hidden">ARREST IN PROGRESS<div class="bar"><i style="width:0"></i></div></div>
+  <div id="chanBar" class="hidden"><span class="cl"></span><div class="bar"><i style="width:0"></i></div><small>Stay close · moving away stops it</small></div>
   <div id="jailHud" class="hidden">
-    <small>COUNTY JAIL · BLOCK C</small><b id="jailDays">Day 0</b><span id="jailLeft"></span>
+    <small>COUNTY JAIL · BLOCK C</small><b id="jailDays">0 days left</b><span id="jailLeft"></span>
     <div class="bar"><i id="jailBar" style="width:0"></i></div>
-    <div id="jailSpeed"><button data-sp="1">1×</button><button data-sp="5">5×</button><button data-sp="20">20×</button></div>
-    <div class="jrow"><span id="jailPhone">No phone</span><button id="jailEmpire">Empire</button></div>
+    <div class="jrow"><span id="jailPhone">No phone</span><span class="jbtns"><button id="jailLife">Prison life</button><button id="jailEmpire">Empire</button></span></div>
   </div>
 </div>
 <div id="flash"></div>
@@ -32876,11 +32888,17 @@ function localSurfaceAt(x, z) {
   return d[o] > 150 ? 1 : d[o + 1] > 150 ? 2 : d[o + 2] > 150 ? 3 : 0;
 }
 // Ground height: road surface 0, raised sidewalks/blocks at CURB_H.
-function groundY(x, z, y) {
+// step: how far above the reference height y a surface may be and still count as ground (people
+// climb 1.25 m onto a deck edge; a car's wheel only rides up CAR_STEP and treats anything higher as a wall)
+// After a call SURF.gx / SURF.gz hold the slope of the ground that was found (dh/dx, dh/dz).
+function groundY(x, z, y, step) {
+  SURF.gx = 0; SURF.gz = 0;
   if (y !== undefined && y < -12 && typeof vspaceFloor === 'function') { const f = vspaceFloor(x, z, y); if (f !== null) return f; }
   const b = groundBase(x, z);
-  const s = surfaceY(x, z, y);
-  return s > b ? s : b;
+  const s = surfaceY(x, z, y, step);
+  if (s > b) return s;
+  SURF.gx = 0; SURF.gz = 0;
+  return b;
 }
 function groundBase(x, z) {
   if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
@@ -32910,7 +32928,10 @@ const SAVE_KEY = 'pvunderworld.save.v1';
 const SETTINGS_KEY = 'pvunderworld.settings.v1';
 // v4: worn vest, where each owned gun is (carried or a property stash), gambling statistics.
 // Older saves load unchanged: every gun counts as carried, no vest, empty stats.
-const SAVE_VERSION = 4;
+// v5: prison runs its own sentence clock (the street moves a day per week served); the days a v4 jail
+// stay added to the street calendar are taken back out of the calendar shown (uw.dayOffset). Taxi rides,
+// tutorial progress and burglary records are new fields with safe defaults.
+const SAVE_VERSION = 5;
 const SaveSystem = {
   defaults() {
     return {
@@ -32982,6 +33003,13 @@ const SaveSystem = {
     if (st) this.mergeInto(d.settings, st);
     this.sanitize(d);
     // v3 -> v4: nothing to convert (new fields default sensibly); remember that it happened
+    // v4 -> v5: every day served used to be a whole street day. The calendar shown keeps only a day per
+    // week served (internal day numbers stay as they are, so no timer or truce shifts)
+    if (oldVersion < 5 && d.uw && typeof d.uw === 'object' && d.uw.st && d.uw.st.jailDays > 0) {
+      const jd = Math.floor(+d.uw.st.jailDays || 0), infl = jd - Math.round(jd / 7);
+      d.uw.dayOffset = clamp((+d.uw.dayOffset || 0) + infl, 0, Math.max(0, (+d.uw.day || 1) - 1));
+    }
+    if (d.uw && d.uw.jail && typeof d.uw.jail === 'object') delete d.uw.jail.speed;
     const migrated = oldVersion < SAVE_VERSION;
     if (migrated) { d.flags.migratedFrom = oldVersion; }
     return { data: d, existed: true, migrated };
@@ -33070,6 +33098,31 @@ const SaveSystem = {
     catch (e) { this.lastError = (e && e.name) || 'error'; console.warn('Save failed: ' + ((e && e.message) || e)); return false; }
   },
   wipe() { try { localStorage.removeItem(SAVE_KEY); } catch { /* storage blocked */ } }
+};
+/* Money feedback. The save's money field is an accessor: every write to it, from any system (addMoney,
+   spend, expenses, the market, gambling, raids, fines, taxi fares, deliveries...), records the change
+   here, and the UI shows it as a green "+$n" or red "-$n" under the money display. One hook, no
+   per-system calls. Changes within a short burst in the same direction are merged into one line. */
+const MoneyFeed = {
+  live: false, sink: null, last: null,
+  bind(save) {
+    if (!save || typeof save !== 'object') return save;
+    const d = Object.getOwnPropertyDescriptor(save, 'money');
+    if (d && d.get && d.get.__moneyFeed) return save;
+    let v = +save.money; if (!isFinite(v)) v = 0;
+    const get = function () { return v; }; get.__moneyFeed = true;
+    Object.defineProperty(save, 'money', {
+      enumerable: true, configurable: true, get,
+      set(n) { n = +n; if (!isFinite(n)) return; const delta = n - v; v = n; if (MoneyFeed.live && Math.abs(delta) >= 0.5) MoneyFeed.push(delta); }
+    });
+    return save;
+  },
+  push(delta) {
+    const now = performance.now(), L = this.last;
+    if (L && L.el && L.el.isConnected && Math.sign(L.d) === Math.sign(delta) && now - L.t < 150) { L.d += delta; L.t = now; if (this.sink) this.sink(L, true); return; }
+    this.last = { d: delta, t: now, el: null };
+    if (this.sink) this.sink(this.last, false);
+  }
 };
 
 /* =====================================================================
@@ -35596,10 +35649,10 @@ const IRON = 0x2a2c30, CONCRETE = 0x9c978e;
 // drivable surfaces (ramps, rooftops, parking decks) consulted by groundY(). With a reference
 // height y only surfaces at most SURF_STEP above it count, so a car on the ground floor of a
 // parking structure drives under the decks instead of snapping onto the roof.
-const SURF = { lists: null };
+const SURF = { lists: null, gx: 0, gz: 0 };
 const SURF_STEP = 1.25;
-function surfaceY(x, z, y) {
-  const maxH = y === undefined ? Infinity : y + SURF_STEP;
+function surfaceY(x, z, y, step = SURF_STEP) {
+  const maxH = y === undefined ? Infinity : y + step;
   const L = SURF.lists;
   if (!L) return -1e9;
   const bx = Math.floor(x / P), bz = Math.floor(z / P);
@@ -35616,7 +35669,12 @@ function surfaceY(x, z, y) {
       if (s.dir < 0) t = 1 - t;
       h = s.h0 + (s.h1 - s.h0) * t;
     }
-    if (h > best && h <= maxH) best = h;
+    if (h > best && h <= maxH) {
+      best = h;
+      // gradient of the winning surface (a ramp's slope; 0 for flat decks)
+      if (s.h !== undefined) { SURF.gx = 0; SURF.gz = 0; }
+      else { const k = (s.h1 - s.h0) / (s.axis === 'x' ? s.x1 - s.x0 : s.z1 - s.z0) * (s.dir < 0 ? -1 : 1); SURF.gx = s.axis === 'x' ? k : 0; SURF.gz = s.axis === 'x' ? 0 : k; }
+    }
   }
   return best;
 }
@@ -35862,6 +35920,7 @@ Object.assign(World.prototype, {
   // ---------- drivable surfaces ----------
   _ramp(b, x0, z0, x1, z1, axis, dir, h0, h1, opts = {}) {
     const s = { x0, z0, x1, z1, axis, dir, h0, h1, block: b.i, unique: !!opts.unique, id: opts.id };
+    const d0 = b.det.length;
     (this.surfaces || (this.surfaces = [])).push(s);
     const len = axis === 'x' ? x1 - x0 : z1 - z0, wid = axis === 'x' ? z1 - z0 : x1 - x0;
     const ang = Math.atan2(h1 - h0, len), slen = Math.hypot(len, h1 - h0);
@@ -35880,7 +35939,89 @@ Object.assign(World.prototype, {
       if (axis === 'x') { c.x0 = Math.min(hx, hx - dir * 0.4); c.x1 = Math.max(hx, hx - dir * 0.4); }
       else { c.z0 = Math.min(hz, hz - dir * 0.4); c.z1 = Math.max(hz, hz - dir * 0.4); }
     }
+    this._rampSides(b, s, opts);
+    for (let k = d0; k < b.det.length; k++) b.det[k].ramp = s;
     return s;
+  },
+  // A stunt jump needs a straight run-up and somewhere to come down. Ground-level clutter (pallets,
+  // piles, containers, parked cars, props) in the lane before the ramp and in the landing zone after
+  // it is removed, and a fence across the lane gets a gate. Buildings are left alone.
+  _clearJumpLane(s, run = 30, land = 24) {
+    const ax = s.axis === 'x', lo = ax ? s.x0 : s.z0, hi = ax ? s.x1 : s.z1;
+    const aLow = s.dir > 0 ? lo : hi, aHigh = s.dir > 0 ? hi : lo, c = ax ? (s.z0 + s.z1) / 2 : (s.x0 + s.x1) / 2;
+    const lanes = [[aLow, aHigh, (ax ? s.z1 - s.z0 : s.x1 - s.x0) / 2 + 0.6], [aHigh, aHigh + s.dir * land, 3.6]];
+    if (run > 0) lanes.push([aLow - s.dir * run, aLow, 3.2]);
+    const grid = this.grid;
+    for (const [a0, a1, hw] of lanes) {
+      const R = ax ? { x0: Math.min(a0, a1), x1: Math.max(a0, a1), z0: c - hw, z1: c + hw } : { x0: c - hw, x1: c + hw, z0: Math.min(a0, a1), z1: Math.max(a0, a1) };
+      const hitBox = (x0, z0, x1, z1) => x0 < R.x1 && x1 > R.x0 && z0 < R.z1 && z1 > R.z0;
+      for (const b of this.blocks) {
+        if (b.x1 + 12 < R.x0 || b.x0 - 12 > R.x1 || b.z1 + 12 < R.z0 || b.z0 - 12 > R.z1) continue;
+        const keep = [];
+        for (const d of b.det) {
+          if (d.ramp) { keep.push(d); continue; }
+          const k = d.col;
+          let ex;
+          if (k && k.r !== undefined) ex = [k.x - k.r, k.z - k.r, k.x + k.r, k.z + k.r];
+          else if (k) ex = [k.x0, k.z0, k.x1, k.z1];
+          else ex = [d.x - d.sx / 2, d.z - d.sz / 2, d.x + d.sx / 2, d.z + d.sz / 2];
+          const bottom = k ? k.y0 : d.y - d.sy / 2, top = k ? k.y1 : d.y + d.sy / 2;
+          // only things standing on the ground in the way (not decals, overhead wires, high signs)
+          if (!hitBox(...ex) || top < CURB_H + 0.3 || bottom > CURB_H + 2.5 || (!k && d.sy < 0.25)) { keep.push(d); continue; }
+          const fence = k && k.r === undefined && (ax ? (k.x1 - k.x0 < 1.2 && k.z1 - k.z0 > hw * 2) : (k.z1 - k.z0 < 1.2 && k.x1 - k.x0 > hw * 2));
+          if (k && grid && k.on !== undefined) grid.remove(k);
+          if (fence) {
+            // cut a gate: keep the two ends of the fence either side of the lane
+            for (const [p0, p1] of ax ? [[k.z0, R.z0], [R.z1, k.z1]] : [[k.x0, R.x0], [R.x1, k.x1]]) {
+              if (p1 - p0 < 0.3) continue;
+              const nd = { ...d }, nc = { ...k };
+              delete nc.stamp; delete nc.on; delete nc.__reg;
+              if (ax) { nc.z0 = p0; nc.z1 = p1; nd.z = (p0 + p1) / 2; nd.sz = p1 - p0; } else { nc.x0 = p0; nc.x1 = p1; nd.x = (p0 + p1) / 2; nd.sx = p1 - p0; }
+              nd.col = nc; keep.push(nd); if (grid && k.on !== undefined) { grid.add(nc); nc.__reg = true; }
+            }
+          }
+        }
+        b.det = keep;
+        b.props = b.props.filter(p => { const r = p.col && p.col.r !== undefined ? p.col.r : 0.6; const out = !hitBox(p.x - r, p.z - r, p.x + r, p.z + r); if (!out && p.col && grid) grid.remove(p.col); return out; });
+        b.parked = b.parked.filter(p => !hitBox(p.x - 2.6, p.z - 2.6, p.x + 2.6, p.z + 2.6));
+      }
+    }
+  },
+  // The long sides of a ramp. A car beside a ramp used to climb its side as if it were a kerb (up
+  // to 1.25 m in one step) and pop up onto it. Now, wherever the ramp stands more than a kerb above
+  // the ground it was built on, its sides are solid: a closed skirt (kickers, dirt ramps) or a guard
+  // wall that also keeps cars on the ramp ('guard': parking ramps). The low end and the lip stay open.
+  _rampSides(b, s, opts) {
+    const mode = opts.sides || 'skirt';
+    if (mode === 'none') return;
+    const along = s.axis === 'x' ? s.x1 - s.x0 : s.z1 - s.z0, base = opts.base !== undefined ? opts.base : Math.min(s.h0, s.h1);
+    const hAt = t => s.dir > 0 ? s.h0 + (s.h1 - s.h0) * t : s.h1 - (s.h1 - s.h0) * t; // t: 0..1 from the axis minimum
+    const n = Math.max(1, Math.ceil(along / 2)), col = C(opts.sideColor || (mode === 'guard' ? 0xa8a296 : 0x55524c)), th = mode === 'guard' ? 0.25 : 0.2;
+    if (mode === 'guard') {
+      // one sloped wall per side, 1 m above the ramp surface, with stepped colliders under it
+      const len = along, ang = Math.atan2(s.h1 - s.h0, len), slen = Math.hypot(len, s.h1 - s.h0), cy = (s.h0 + s.h1) / 2 + 0.5;
+      for (const side of [0, 1]) {
+        if (opts.guardSides && !opts.guardSides.includes(side)) continue;
+        if (s.axis === 'z') { const x = side ? s.x1 - th / 2 : s.x0 + th / 2; b.det.push({ kind: 'box', x, y: cy, z: (s.z0 + s.z1) / 2, sx: th, sy: 1.0, sz: slen, color: col, ry: 0, rx: -ang * s.dir, rz: 0 }); }
+        else { const z = side ? s.z1 - th / 2 : s.z0 + th / 2; b.det.push({ kind: 'box', x: (s.x0 + s.x1) / 2, y: cy, z, sx: slen, sy: 1.0, sz: th, color: col, ry: 0, rx: 0, rz: ang * s.dir }); }
+      }
+    }
+    for (let k = 0; k < n; k++) {
+      const ta = k / n, tb = (k + 1) / n, ha = hAt(ta), hb = hAt(tb), lo = Math.min(ha, hb), hi = Math.max(ha, hb);
+      if (mode === 'skirt' && lo - base < 0.45) continue; // low end: a kerb a wheel can ride onto
+      const a0 = (s.axis === 'x' ? s.x0 : s.z0) + along * ta, a1 = (s.axis === 'x' ? s.x0 : s.z0) + along * tb;
+      for (const side of [0, 1]) {
+        if (mode === 'guard' && opts.guardSides && !opts.guardSides.includes(side)) continue;
+        const y0 = base - 0.3, y1 = mode === 'guard' ? hi + 1.0 : lo - 0.04;
+        let c;
+        if (s.axis === 'z') { const xa = side ? s.x1 - (mode === 'guard' ? th : 0) : s.x0 - (mode === 'guard' ? 0 : th), xb = xa + th; c = { x0: xa, x1: xb, z0: a0, z1: a1, y0, y1, kind: 'det' }; }
+        else { const za = side ? s.z1 - (mode === 'guard' ? th : 0) : s.z0 - (mode === 'guard' ? 0 : th), zb = za + th; c = { x0: a0, x1: a1, z0: za, z1: zb, y0, y1, kind: 'det' }; }
+        // a skirt is also drawn: the dark side of the wedge down to the ground
+        const ix = s.axis === 'z' ? (side ? -th : th) : 0, iz = s.axis === 'x' ? (side ? -th : th) : 0; // drawn just inside the edge, under the deck
+        const vis = mode === 'skirt' ? { kind: 'box', x: (c.x0 + c.x1) / 2 + ix, y: (base + lo) / 2, z: (c.z0 + c.z1) / 2 + iz, sx: c.x1 - c.x0, sy: lo - base, sz: c.z1 - c.z0, color: col, ry: 0 } : { kind: 'box', x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, color: col, ry: 0 };
+        vis.col = c; b.det.push(vis);
+      }
+    }
   },
   _platform(b, x0, z0, x1, z1, h) { (this.surfaces || (this.surfaces = [])).push({ x0, z0, x1, z1, h, block: b.i }); },
   _kicker(b, x, z, axis, dir, len = 7, h = 1.5, unique = false) {
@@ -35964,29 +36105,37 @@ Object.assign(World.prototype, {
   },
   _genGarage(b, rng) {
     this._sidewalk(b, rng, { trees: 0.3, park: 0.2 });
-    // three-level open parking structure; drive up the side ramp to the roof
+    // three-level open parking structure; drive up the side ramp to a landing level with the roof,
+    // then turn onto the roof through the opening in its barrier
     const x0 = b.x0 + 2, z0 = b.z0 + 2, x1 = b.x1 - 12, z1 = b.z1 - 4;
     const H = 10;
     const g = this._bld(b, x0, z0, x1, z1, H, STYLE.PARKING, 0xb3ada2, 3.33, 4.5, { exactH: true });
     const top = g.y0 + g.h;
     this._platform(b, x0, z0, x1, z1, top);
-    // roof barriers (with an opening where the ramp arrives)
+    const rx0 = x1 + 0.4, rx1 = x1 + 7.8, land0 = z0 + 2, land1 = z0 + 14;
+    // roof barriers, open along the landing where the ramp arrives
     const bc = C(0xc8c2b6);
-    const wall = (ax0, az0, ax1, az1) => this._det(b, 'box', (ax0 + ax1) / 2, top + 0.55, (az0 + az1) / 2, Math.max(0.3, ax1 - ax0), 1.1, Math.max(0.3, az1 - az0), bc, 0, { x0: ax0, z0: az0, x1: ax1, z1: az1, y0: top, y1: top + 1.1, kind: 'det' });
+    const wall = (ax0, az0, ax1, az1, y = top) => this._det(b, 'box', (ax0 + ax1) / 2, y + 0.55, (az0 + az1) / 2, Math.max(0.3, ax1 - ax0), 1.1, Math.max(0.3, az1 - az0), bc, 0, { x0: ax0, z0: az0, x1: ax1, z1: az1, y0: y - 0.3, y1: y + 1.1, kind: 'det' });
     wall(x0, z0, x1, z0 + 0.3); wall(x0, z1 - 0.3, x1, z1); wall(x0, z0, x0 + 0.3, z1);
-    wall(x1 - 0.3, z0, x1, z1 - 8);
-    // ramp along the east side, rising toward the north
-    this._ramp(b, x1 + 0.4, z0 + 2, x1 + 7.8, z1, 'z', -1, CURB_H, top, { color: 0x8a857c, stripes: false });
-    this._det(b, 'box', x1 + 8.0, CURB_H + 0.6, (z0 + z1) / 2, 0.25, 1.2, z1 - z0 - 4, C(0xc8c2b6));
+    wall(x1 - 0.3, land1, x1, z1);
+    // ramp along the east side, rising toward the north, guard walls on both sides
+    this._ramp(b, rx0, land1, rx1, z1, 'z', -1, CURB_H, top, { color: 0x8a857c, stripes: false, sides: 'guard', base: CURB_H });
+    // the landing: flat, level with the roof, railed on its outer and north edges
+    this._platform(b, x1 - 0.2, land0, rx1, land1, top);
+    this._det(b, 'box', (x1 + rx1) / 2, top - 0.17, (land0 + land1) / 2, rx1 - x1, 0.34, land1 - land0, C(0x8a857c), 0, { x0: x1, x1: rx1, z0: land0, z1: land1, y0: top - 0.34, y1: top - 0.06, kind: 'det' });
+    wall(x1, land0, rx1, land0 + 0.3); wall(rx1 - 0.3, land0, rx1, land1);
+    for (const [px, pz] of [[rx0 + 0.6, land0 + 0.6], [rx1 - 0.6, land0 + 0.6], [rx1 - 0.6, land1 - 0.6]]) this._det(b, 'box', px, (top - 0.34 + CURB_H) / 2, pz, 0.6, top - 0.34 - CURB_H, 0.6, C(0x8a857c), 0, true);
+    b.signs.push({ text: 'ROOF PARKING →', x: rx1 - 0.35, y: top + 1.7, z: (land0 + land1) / 2, ry: -Math.PI / 2, w: 3.8, h: 0.6, bg: '#1d4fa0', fg: '#ffffff' });
     b.signs.push({ text: 'P  QUARTER GARAGE', x: (x0 + x1) / 2, y: CURB_H + 7.6, z: z1 + 0.04, ry: 0, w: 12, h: 1.4, bg: '#1d4fa0', fg: '#ffffff' });
-    for (let k = 0; k < 4; k++) b.parked.push({ x: x0 + 6 + k * 6, z: z0 + 6, h: 0, cls: null, y: top });
-    b.parked.push({ x: x1 - 8, z: z1 - 8, h: Math.PI, cls: 'supercar', y: top, rare: true });
+    for (let k = 0; k < 4; k++) b.parked.push({ x: x0 + 14 + k * 6, z: z0 + 6, h: 0, cls: null, y: top }); // clear of the roof kicker's run-up
+    b.parked.push({ x: x1 - 12, z: z1 - 8, h: Math.PI, cls: 'supercar', y: top, rare: true });
     b.lampsRoof = [[x0 + 4, z0 + 4], [x1 - 4, z1 - 4], [x0 + 4, z1 - 4], [x1 - 4, z0 + 4]];
     for (const [lx, lz] of b.lampsRoof) this._det(b, 'cyl', lx, top + 2.5, lz, 0.09, 5, 0x2c3035);
     for (const [lx, lz] of b.lampsRoof) b.fx.push({ type: 'rooflamp', x: lx, y: top + 5.0, z: lz });
     this.packageSpots.push({ x: x0 + 3, y: top, z: z1 - 3 });
-    // drop-off jump off the north roof edge? no: a kicker at the far end of the roof launches you over the street
+    // a kicker at the far end of the roof launches you over the street
     this._ramp(b, x0 + 2, z0 + 0.4, x0 + 7, z0 + 7, 'z', -1, top, top + 1.4, { unique: true, id: 'garage_leap', color: 0x6c6f74 });
+    this.quarterGarage = { x0, z0, x1, z1, top, rx0, rx1, land0, land1 };
   },
   _genMall(b, rng) {
     this._sidewalk(b, rng, { trees: 0.4, benches: true, news: true, park: 0 });
@@ -36079,6 +36228,9 @@ Object.assign(World.prototype, {
       if (b.t === 'X') this._ramp(b, b.cx - 6, b.z1 - 16, b.cx + 4, b.z1 - 11, 'x', 1, CURB_H, 2.6, { unique: true, id: 'dirt' + b.i, color: 0x6b5b45 });
       if (b.t === 'I' && rng.chance(0.3)) this._kicker(b, b.cx + 18, b.cz + 22, 'z', -1, 8, 1.6, true);
     }
+    // every stunt jump at ground level gets a clear run-up and landing (rooftop leaps are laid out by hand)
+    // rooftop leaps keep their decks as built and only get the street below their flight path cleared
+    for (const s of this.surfaces || []) if (s.unique) { const roof = Math.min(s.h0, s.h1) > 1; this._clearJumpLane(s, roof ? 0 : 30, roof ? 30 : 24); }
     SURF.lists = new Array(N * N).fill(null);
     // a surface is listed in every block it overlaps (superblock decks and ramps cross block lines)
     for (const s of this.surfaces || []) {
@@ -37051,43 +37203,85 @@ Object.assign(World.prototype, {
     sb.name = 'Cedar Fields';
   },
   // ------------------------------------------------ Central Parkade (downtown, multi-level)
+  // Ground floor, levels 1-2 and the roof (level 3), joined by 8 m two-way ramps that alternate
+  // sides: east (ground -> 1), west (1 -> 2), east (2 -> roof). Every ramp is walled on both sides
+  // and opens only at its two ends; it starts on an aisle and ends on an aisle 12 m deep, so a car
+  // turns off the top of one ramp, runs along the aisle and turns into the next. The hole each
+  // ramp comes up through is railed at deck level. Parking bays sit in the middle of each deck, off
+  // the aisles. A kicker on the north edge of the roof is the parkade jump.
   _genParkade(b, rng) {
     this._sidewalk(b, rng, { trees: 0.3, benches: true, news: true, park: 0 });
     const x0 = b.x0 + 4, x1 = b.x1 - 4, z0 = b.z0 + 4, z1 = b.z1 - 4;
     const L = [CURB_H, CURB_H + 3.4, CURB_H + 6.8, CURB_H + 10.2];
-    const eS = [x1 - 8, x1], wS = [x0, x0 + 8], rz0 = z0 + 12, rz1 = z1 - 12;
-    const conc = C(0xb3ada2), dark = C(0x8c877e);
-    // entrance from the north street
-    this._road([[(x0 + x1) / 2, b.z0 - 4.6], [(x0 + x1) / 2, z0 + 2]], 8);
-    // ramps: up the east side, across, up the west side, across, up the east side to the roof
-    this._ramp(b, eS[0], rz0, eS[1], rz1, 'z', 1, L[0], L[1], { color: 0x8a857c, stripes: false, support: false });
-    this._ramp(b, wS[0], rz0, wS[1], rz1, 'z', -1, L[1], L[2], { color: 0x8a857c, stripes: false, support: false });
-    this._ramp(b, eS[0], rz0, eS[1], rz1, 'z', 1, L[2], L[3], { color: 0x8a857c, stripes: false, support: false });
+    const RW = 8, eS = [x1 - RW, x1], wS = [x0, x0 + RW], rz0 = z0 + 12, rz1 = z1 - 12, xm = (x0 + x1) / 2;
+    const conc = C(0xb3ada2), dark = C(0x8c877e), wallC = 0xa8a296;
+    // entrance from the north street, with a clearance bar
+    this._road([[xm, b.z0 - 4.6], [xm, z0 + 2]], 8);
+    for (const sx of [-1, 1]) this._det(b, 'box', xm + sx * 4.6, CURB_H + 1.4, z0 - 0.6, 0.25, 2.8, 0.25, C(0x2c3035), 0, true);
+    this._det(b, 'box', xm, CURB_H + 2.7, z0 - 0.6, 9.4, 0.22, 0.2, C(0xf2c230));
+    b.signs.push({ text: 'CLEARANCE 2.6 m', x: xm, y: CURB_H + 3.1, z: z0 - 0.75, ry: Math.PI, w: 3.4, h: 0.45, bg: '#f2c230', fg: '#111' });
+    // ramps (two-way), each walled on both sides from the deck it starts on to 1 m above its top
+    const ramps = [
+      { xs: eS, dir: 1, a: 0 }, // ground -> level 1, rising south
+      { xs: wS, dir: -1, a: 1 }, // level 1 -> level 2, rising north
+      { xs: eS, dir: 1, a: 2 } // level 2 -> roof, rising south
+    ];
+    for (const r of ramps) {
+      this._ramp(b, r.xs[0], rz0, r.xs[1], rz1, 'z', r.dir, L[r.a], L[r.a + 1], { color: 0x8a857c, stripes: false, support: false, sides: 'none' });
+      for (const wx of [r.xs[0], r.xs[1]]) {
+        const inner = wx === r.xs[0] ? r.xs[0] + 0.125 : r.xs[1] - 0.125, y0 = L[r.a] - 0.2, y1 = L[r.a + 1] + 1.0;
+        this._det(b, 'box', inner, (y0 + y1) / 2, (rz0 + rz1) / 2, 0.25, y1 - y0, rz1 - rz0, C(wallC), 0, { x0: inner - 0.125, x1: inner + 0.125, z0: rz0, z1: rz1, y0, y1, kind: 'det' });
+      }
+      // painted arrows up the ramp
+      for (let k = 1; k <= 3; k++) {
+        const t = k / 4, zc = rz0 + (rz1 - rz0) * t, yc = r.dir > 0 ? L[r.a] + 3.4 * t : L[r.a + 1] - 3.4 * t, ang = Math.atan2(3.4, rz1 - rz0);
+        b.det.push({ kind: 'box', x: (r.xs[0] + r.xs[1]) / 2 + 1.8, y: yc + 0.02, z: zc, sx: 0.35, sy: 0.02, sz: 2.2, color: C(0xf2f2f0), ry: 0, rx: -ang * r.dir, rz: 0 });
+        b.det.push({ kind: 'box', x: (r.xs[0] + r.xs[1]) / 2 - 1.8, y: yc + 0.02, z: zc, sx: 0.35, sy: 0.02, sz: 2.2, color: C(0xf2f2f0), ry: 0, rx: -ang * r.dir, rz: 0 });
+      }
+      const foot = r.dir > 0 ? rz0 : rz1, head = r.dir > 0 ? rz1 : rz0;
+      b.signs.push({ text: r.a === 2 ? 'UP ↑ ROOF' : 'UP ↑ LEVEL ' + (r.a + 1), x: (r.xs[0] + r.xs[1]) / 2, y: L[r.a] + 2.6, z: foot - r.dir * 0.05, ry: r.dir > 0 ? Math.PI : 0, w: 4.2, h: 0.55, bg: '#1d4fa0', fg: '#ffffff' });
+      b.signs.push({ text: r.a === 0 ? 'DOWN ↓ EXIT' : 'DOWN ↓ LEVEL ' + r.a, x: (r.xs[0] + r.xs[1]) / 2, y: L[r.a + 1] + 2.6, z: head + r.dir * 0.05, ry: r.dir > 0 ? 0 : Math.PI, w: 4.2, h: 0.55, bg: '#2c3035', fg: '#f2c230' });
+    }
     // decks with an opening over the ramp that arrives from below
     const slab = (y, ax0, az0, ax1, az1) => {
       this._platform(b, ax0, az0, ax1, az1, y);
       this._det(b, 'box', (ax0 + ax1) / 2, y - 0.17, (az0 + az1) / 2, ax1 - ax0, 0.34, az1 - az0, conc, 0, { x0: ax0, x1: ax1, z0: az0, z1: az1, y0: y - 0.34, y1: y - 0.06, kind: 'det' });
     };
+    const rail = (y, ax0, az0, ax1, az1) => this._det(b, 'box', (ax0 + ax1) / 2, y + 0.5, (az0 + az1) / 2, ax1 - ax0, 1.0, az1 - az0, dark, 0, { x0: ax0, x1: ax1, z0: az0, z1: az1, y0: y - 0.3, y1: y + 1.0, kind: 'det' });
     for (let k = 1; k <= 3; k++) {
-      const hole = k === 2 ? wS : eS;
+      const arrive = ramps[k - 1], hole = arrive.xs;
       slab(L[k], x0, z0, x1, rz0); slab(L[k], x0, rz1, x1, z1);
       if (hole === eS) slab(L[k], x0, rz0, eS[0], rz1); else slab(L[k], wS[1], rz0, x1, rz1);
-      // parapets (the ground floor stays open to the street)
+      // the far (low) end of the hole is railed at deck level; its sides are the ramp's walls
+      const lowEnd = arrive.dir > 0 ? rz0 : rz1;
+      rail(L[k], hole[0], arrive.dir > 0 ? lowEnd - 0.3 : lowEnd, hole[1], arrive.dir > 0 ? lowEnd : lowEnd + 0.3);
+      // parapets on the outside edges (the ground floor stays open to the street)
       for (const [ax0, az0, ax1, az1] of [[x0, z0, x1, z0 + 0.3], [x0, z1 - 0.3, x1, z1], [x0, z0, x0 + 0.3, z1], [x1 - 0.3, z0, x1, z1]]) this._det(b, 'box', (ax0 + ax1) / 2, L[k] + 0.55, (az0 + az1) / 2, ax1 - ax0, 1.1, az1 - az0, dark, 0, { x0: ax0, x1: ax1, z0: az0, z1: az1, y0: L[k], y1: L[k] + 1.1, kind: 'det' });
-      // edge stripe and level number
-      b.signs.push({ text: 'LEVEL ' + k, x: (x0 + x1) / 2, y: L[k] + 2.1, z: z0 + 0.4, ry: 0, w: 3.2, h: 0.6, bg: '#1d4fa0', fg: '#ffffff' });
+      b.signs.push({ text: k === 3 ? 'ROOF' : 'LEVEL ' + k, x: xm, y: L[k] + 2.1, z: z0 + 0.4, ry: 0, w: 3.2, h: 0.6, bg: '#1d4fa0', fg: '#ffffff' });
     }
-    // columns clear of the turning bays at each end
-    for (const cx2 of [x0 + 16, (x0 + x1) / 2, x1 - 16]) for (const cz2 of [rz0 + 6, rz1 - 6]) this._det(b, 'box', cx2, (L[3] - 0.3) / 2, cz2, 0.7, L[3] - 0.3, 0.7, conc, 0, { x: cx2, z: cz2, r: 0.45, y0: 0, y1: L[3], kind: 'det' });
-    // roof: lamps, a kicker off the north edge, the package, a few cars on every level
+    // ceiling lights over the aisles
+    for (let k = 0; k < 3; k++) for (const zz of [(z0 + rz0) / 2, (rz1 + z1) / 2]) for (const xx of [x0 + 16, xm, x1 - 16]) b.fx.push({ type: 'docklight', x: xx, y: L[k + 1] - 0.42, z: zz, w: 3 });
+    // columns in the parking area, clear of the aisles and the ramps
+    for (const cx2 of [x0 + 16, xm, x1 - 16]) for (const cz2 of [rz0 + 6, rz1 - 6]) this._det(b, 'box', cx2, (L[3] - 0.3) / 2, cz2, 0.7, L[3] - 0.3, 0.7, conc, 0, { x: cx2, z: cz2, r: 0.45, y0: 0, y1: L[3] - 0.06, kind: 'det' });
+    // roof: lamps, the kicker off the north edge, the package
     for (const [lx, lz] of [[x0 + 4, z0 + 4], [x1 - 4, z1 - 4], [x0 + 4, z1 - 4], [x1 - 4, z0 + 4]]) { this._det(b, 'cyl', lx, L[3] + 2.5, lz, 0.09, 5, 0x2c3035); b.fx.push({ type: 'rooflamp', x: lx, y: L[3] + 5, z: lz }); }
-    this._ramp(b, (x0 + x1) / 2 - 2.4, z0 + 1, (x0 + x1) / 2 + 2.4, z0 + 8, 'z', -1, L[3], L[3] + 1.4, { unique: true, id: 'parkade_leap', color: 0x6c6f74, support: false });
+    this._ramp(b, xm - 2.4, z0 + 1, xm + 2.4, z0 + 8, 'z', -1, L[3], L[3] + 1.4, { unique: true, id: 'parkade_leap', color: 0x6c6f74, support: false });
     this.packageSpots.push({ x: x1 - 6, y: L[3], z: z1 - 6 });
-    for (let k = 0; k <= 3; k++) for (let i = 0; i < 4; i++) if (rng.chance(0.55)) b.parked.push({ x: x0 + 14 + i * 4.2, z: k % 2 ? rz1 + 4 : rz0 - 4, h: k % 2 ? Math.PI : 0, cls: null, y: L[k] });
-    b.signs.push({ text: 'P  CENTRAL PARKADE · OPEN 24H', x: (x0 + x1) / 2, y: L[1] - 0.9, z: z0 - 0.06, ry: Math.PI, w: 14, h: 1.3, bg: '#1d4fa0', fg: '#ffffff' });
+    // parking bays: nose-in rows facing the aisles, inside the middle of each deck
+    const cols = [x0 + 16, xm, x1 - 16];
+    for (let k = 0; k <= 3; k++) {
+      const bx0 = (k === 1 || k === 2 ? wS[1] : x0) + 2.5, bx1 = eS[0] - 2.5;
+      for (const [zz, hh] of [[rz0 + 2.8, Math.PI], [rz1 - 2.8, 0]]) for (let x = bx0 + 1.4; x <= bx1 - 1.4; x += 3.2) {
+        if (cols.some(c => Math.abs(c - x) < 1.6)) continue;
+        if (k === 3 && Math.abs(x - xm) < 6) continue; // the roof's run-up to the jump stays clear
+        if (rng.chance(0.4)) b.parked.push({ x, z: zz, h: hh, cls: null, y: L[k] });
+      }
+    }
+    for (let k = 0; k <= 3; k++) for (const zz of [rz0 + 0.6, rz1 - 0.6]) b.det.push({ kind: 'box', x: ((k === 1 || k === 2 ? wS[1] : x0) + eS[0]) / 2, y: L[k] + 0.012, z: zz, sx: eS[0] - (k === 1 || k === 2 ? wS[1] : x0) - 4, sy: 0.02, sz: 0.12, color: C(0xe8e4d8), ry: 0 });
+    b.signs.push({ text: 'P  CENTRAL PARKADE · OPEN 24H', x: xm, y: L[1] - 0.9, z: z0 - 0.06, ry: Math.PI, w: 14, h: 1.3, bg: '#1d4fa0', fg: '#ffffff' });
     // a solid silhouette for the far skyline only (the near chunk shows the open decks)
     const far = this._bld(b, x0, z0, x1, z1, L[3] + 1.1 - CURB_H, STYLE.PARKING, 0xb3ada2, 3.4, 4.5, { exactH: true, noCol: true }); far.farOnly = true;
-    this.parkade = { x0, z0, x1, z1, L, entrance: { x: (x0 + x1) / 2, z: b.z0 - 2 } };
+    this.parkade = { x0, z0, x1, z1, L, rz0, rz1, eS, wS, entrance: { x: xm, z: b.z0 - 2 } };
     b.secrets.push({ x: x0 + 3, z: z1 - 3 });
   }
 });
@@ -37966,7 +38160,7 @@ class Player {
     l.shirt = C(o.shirt); l.pants = C(o.pants); l.shoes = C(o.shoes); l.hair = C(o.hair);
     l.cap = o.cap >= 0 ? C(o.cap) : null;
   }
-  get maxHealth() { return HP_BASE + this.game.save.upgrades.health * HP_PER_LEVEL; }
+  get maxHealth() { const fit = this.game.uw && this.game.uw.S ? (this.game.uw.S.fit | 0) : 0; return Math.round((HP_BASE + this.game.save.upgrades.health * HP_PER_LEVEL) * (1 + fit * 0.03)); }
   get armor() { return this.game.save.upgrades.armor * 0.12; }
   spawn(x, z, h = 0) {
     this.pos.set(x, groundY(x, z), z); this.h = h; this.state = 'foot'; this.vehicle = null;
@@ -38089,7 +38283,7 @@ class Player {
       if (vn < 0) { this.vel.x -= vn * r.nx; this.vel.z -= vn * r.nz; }
     }
     // vehicles: push out; stand on roofs (interiors have their own floor and no traffic)
-    let gy = this.interior ? this.interior.floor : groundY(this.pos.x, this.pos.z, this.pos.y);
+    let gy = this.interior ? this.interior.floor + interiorLevel(this.interior, this.pos.x, this.pos.z, this.pos.y) : groundY(this.pos.x, this.pos.z, this.pos.y);
     if (!this.interior || this.interior.vspace) for (const v of g.vehicles.nearby(this.pos.x, this.pos.z, 6)) {
       if (Math.abs(v.pos.y - this.pos.y) > 3) continue; // a car on another level
       const lp = v.toLocal(this.pos.x, this.pos.z);
@@ -38256,7 +38450,7 @@ class CameraRig {
       const hit = g.world.grid.raycast(ox, t.y, oz, -dx, -dy, -dz, dist + 0.3, 0);
       if (hit) d = Math.max(0.6, hit.t - 0.35);
       this.pos.set(ox - dx * d, t.y - dy * d, oz - dz * d);
-      const gy = (p.interior && !v ? p.interior.floor : groundY(this.pos.x, this.pos.z, (v ? v.pos.y : p.pos.y) + 1.5)) + 0.35;
+      const gy = (p.interior && !v ? p.interior.floor + interiorLevel(p.interior, this.pos.x, this.pos.z, p.pos.y + 0.5) : groundY(this.pos.x, this.pos.z, (v ? v.pos.y : p.pos.y) + 1.5)) + 0.35;
       if (this.pos.y < gy) this.pos.y = gy;
       this.cam.position.copy(this.pos);
       // landing dip spring
@@ -38608,6 +38802,11 @@ let VEH_ID = 1;
 const LOD_D = 72; // metres: beyond this, cars draw their light LOD mesh
 const VEH_DUR = 2; // durability factor: every car withstands about twice the punishment it used to
 const BRAKE_K = 1.35; // service-brake strength over the old tables (~25% shorter stopping distance)
+const LAT_G = 1.45;     // cornering grip in g per unit of spec grip (arcade: a little above a real road car)
+const REV_DELAY = 0.4;  // a held brake at a standstill waits this long before it becomes reverse
+const CAR_STEP = 0.6;   // the highest ledge a wheel rides up onto; anything taller is a wall, not ground
+// suspension travel around the wheel's rest height (local y = wheelR): up into the arch / down (droop)
+const SUSP_UP = 0.07, SUSP_DOWN = 0.22;
 // health is a percentage (0-100). Damage thresholds, retuned for the doubled durability:
 // light (scuffs) below 85, moderate (dents, loose panels) below 65, smoke below 45,
 // heavy (dark smoke, sparks, power loss) below 28, critical (flames, misfires) below 12, destroyed at 0.
@@ -38639,7 +38838,8 @@ class Vehicle {
     this.siren = false; this.sirenPhase = Math.random() * 10; this.headOn = false; this.alarmT = 0;
     this.ctl.throttle = 0; this.ctl.steer = 0; this.ctl.handbrake = !!opts.parked;
     this.deformed = 0; this.smokeT = 0; this.mission = null; this.lastHitBy = null; this.honkT = 0;
-    this.airborne = false; this.airT = 0; this.airPitch = 0; this.gvMax = 0; this._lastG = undefined; this.broken = 0; this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
+    this.airborne = false; this.airT = 0; this.pitchG = 0; this.rollG = 0; this.pitchGV = 0; this.bodyOff = 0; this.bodyV = 0; this.planeOff = 0; this.slopeF = 0; this.hitT = 0; this.brakeP = 0; this.landT = 0; this.broken = 0;
+    this._wy = this._wy || [0, 0, 0, 0]; this._wl = this._wl || [0, 0, 0, 0]; this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
     this._safe = null; this.recycle = false; this.tune = null; this.garageUid = 0; this.locked = false; this.origin = null; this.rareFind = false; this.critical = false;
     this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.free = false; this.goldCar = false; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
     const col = opts.color !== undefined ? opts.color : pick(s.colors);
@@ -38684,10 +38884,14 @@ class Vehicle {
   step(dt, game) {
     const s = this.spec;
     if (this.sleep) return;
+    if (this.hitT > 0) this.hitT -= dt;
     if (this.airborne) {
-      // ballistic: no tyre forces, mild air drag, rotation keeps its momentum
+      // ballistic: no tyre forces, mild air drag. Spin from the launch dies away instead of
+      // building up; a little air control (steer yaws the car slowly). Only a collision in the air
+      // (hitT) can leave it spinning faster than that.
       this.vel.x *= 1 - 0.05 * dt; this.vel.y *= 1 - 0.05 * dt;
-      this.yawRate *= 1 - 0.6 * dt;
+      const cap = this.hitT > 0 ? 4 : 1.2;
+      this.yawRate = clamp(this.yawRate * Math.exp(-2.4 * dt) + clamp(this.ctl.steer, -1, 1) * 0.7 * dt, -cap, cap);
       this.h += this.yawRate * dt;
       this.pos.x += this.vel.x * dt; this.pos.z += this.vel.y * dt;
       this.steer = damp(this.steer, this.ctl.steer * s.steer, 9, dt);
@@ -38714,7 +38918,7 @@ class Vehicle {
     const maxSteer = lerp(lowLock, hiLock, smoothstep(2.5, 20, av));
     this.maxSteerNow = maxSteer;
     // the wheel turns quicker at parking speeds and when reversing
-    this.steer = damp(this.steer, (ctl.steer + this.align) * maxSteer, av < 6 || vf < 0 ? 13 : 9, dt);
+    this.steer = damp(this.steer, (ctl.steer + this.align) * maxSteer, av < 6 || vf < 0 ? 14 : 11, dt);
     // longitudinal
     let F = 0, brake = 0; this.braking = false; this.reversing = false;
     if (thr > 0.01) {
@@ -38727,22 +38931,27 @@ class Vehicle {
         this.revHold = (this.revHold || 0) + dt;
         const revMax = s.vmax * (s.rev || 0.4) * (tn ? 1 + tn.engine * 0.02 : 1);
         // short clutch-in delay from a standstill so a held brake doesn't lurch straight backwards
-        if (this.revHold > 0.12 || vf < -0.5) { F = s.power * 0.78 * hpK * thr * clamp(1 - Math.pow(Math.min(0, vf) / revMax, 2), 0, 1); this.reversing = true; }
+        if (this.revHold > REV_DELAY || vf < -0.5) { F = s.power * 0.78 * hpK * thr * clamp(1 - Math.pow(Math.min(0, vf) / revMax, 2), 0, 1); this.reversing = true; }
         else { brake = s.brake * 0.6; this.braking = true; }
       }
     } else this.revHold = 0;
-    // stronger service brakes (shorter stops), still ordered by class: sports > sedan > SUV > van > truck
-    if (brake > 0 && this.braking) brake *= BRAKE_K;
+    // stronger service brakes (shorter stops), still ordered by class: sports > sedan > SUV > van > truck.
+    // Pressure builds over ~0.15 s, so a tap scrubs speed and a held pedal stops hard.
+    this.brakeP = this.braking ? Math.min(1, this.brakeP + dt / 0.15) : 0;
+    if (brake > 0 && this.braking) brake *= BRAKE_K * (0.45 + 0.55 * this.brakeP);
     // a critically damaged engine misfires: short power cuts under throttle
     if (this.health < VEH_T.critical && !disabled) { this.misT = (this.misT || 0) - dt; if (this.misT < -0.6 && thr > 0.3 && Math.random() < dt * 1.2) this.misT = 0.28; if (this.misT > 0) F *= 0.12; }
     if (tn && brake > 0) brake *= 1 + tn.brakes * 0.14;
     if (hb) { brake = Math.max(brake, s.brake * (disabled ? 0.8 : 0.55)); }
     let acc = F / s.mass;
+    // gravity along a slope (uphill slows you, a car left in neutral rolls back down)
+    const gSlope = 9.81 * clamp(this.slopeF || 0, -0.5, 0.5);
     // traction limit: excess power turns into wheelspin instead of acceleration
     const tractionCap = grip * 9.81 * 0.92;
     let spin = false;
     if (acc > tractionCap) { spin = acc > tractionCap * 1.08 && vf < 22; acc = tractionCap; }
     acc -= 0.00042 * vf * Math.abs(vf);
+    acc -= gSlope;
     vf += acc * dt;
     const decel = brake + (Math.abs(thr) < 0.01 ? 1.0 : 0) + 0.12;
     if (Math.abs(vf) <= decel * dt) vf = 0; else vf -= Math.sign(vf) * decel * dt;
@@ -38751,16 +38960,20 @@ class Vehicle {
     this.wt = damp(this.wt || 0, wtT, 8, dt);
     // yaw
     const wb = s.l * 0.6;
-    let yawT = vf * Math.tan(this.steer) / wb * (1 + this.wt * 0.3);
-    const maxLat = grip * 9.81;
-    if (!hb) { const lim = maxLat * 1.08 * (1 + Math.max(0, this.wt) * 0.12) / Math.max(1, Math.abs(vf)); yawT = clamp(yawT, -lim, lim); }
+    let yawT = vf * Math.tan(this.steer) / wb * (1 + this.wt * 0.2);
+    const maxLat = grip * 9.81 * LAT_G;
+    // the yaw a tyre can sustain is limited by the car's whole speed (not just its forward part,
+    // which shrinks in a slide and used to let the yaw run away into a spin) and sits just under
+    // the lateral grip, so a car at the limit runs a little wide instead of swapping ends
+    const spd = Math.hypot(vf, vl);
+    if (!hb) { const lim = maxLat * 0.94 * (1 + Math.max(0, this.wt) * 0.06) / Math.max(1, spd); yawT = clamp(yawT, -lim, lim); }
     else yawT *= 1.5;
     this.yawRate = damp(this.yawRate, yawT, hb ? 3.2 : (vf < 0 ? 11 : 9) * grip, dt);
     // lateral grip
     // power oversteer: hard throttle unloads the rear tyres (strongest on the muscle car)
     const powerSlide = thr > 0.5 && vf > 6 ? 1 - (s.drift || 0) * thr * clamp(Math.abs(this.steer) / maxSteer, 0, 1) : 1;
     if (powerSlide < 1) this.yawRate += Math.sign(this.steer) * (1 - powerSlide) * 1.6 * dt;
-    const latCap = maxLat * (hb ? 0.32 : 1) * (Math.abs(vf) < 3 ? 2 : 1) * powerSlide * (1 - Math.max(0, this.wt) * 0.12);
+    const latCap = maxLat * (hb ? 0.32 : 1) * (Math.abs(vf) < 3 ? 2 : 1) * powerSlide * (1 - Math.max(0, this.wt) * 0.06);
     const want = -vl * Math.min(1, 16 * dt);
     vl += clamp(want, -latCap * dt, latCap * dt);
     const burn = (spin || (thr > 0.85 && vf < 6 && vf >= 0 && s.power / s.mass > 8)) && !hb;
@@ -38787,49 +39000,101 @@ class Vehicle {
       this.restT = (this.restT || 0) + dt; if (this.restT > 3) { this.sleep = true; this.vel.set(0, 0); this.yawRate = 0; }
     } else this.restT = 0;
   }
-  // ground following + visual transforms
-  syncMesh(dt) {
-    const s = this.spec, vg = this.vg;
-    const c = Math.cos(this.h), sn = Math.sin(this.h);
-    let gsum = 0, gf = 0, gr = 0, gl = 0, grr = 0;
-    this._wy = this._wy || [0, 0, 0, 0];
-    for (let i = 0; i < 4; i++) {
-      const [lx, lz] = vg.wheels[i];
-      const wx = this.pos.x + lx * c + lz * sn, wz = this.pos.z - lx * sn + lz * c;
-      const y = groundY(wx, wz, this.pos.y); this._wy[i] = y; gsum += y;
-      if (lz > 0) gf += y; else gr += y;
-      if (lx > 0) gl += y; else grr += y;
-    }
-    const gy = gsum / 4;
-    const gPitch = Math.atan2((gr - gf) / 2, s.l * 0.6);
-    const gRoll = Math.atan2((gl - grr) / 2, s.w);
-    if (dt > 0) {
-      if (this.airborne) {
-        this.yVel -= GRAVITY * dt; this.pos.y += this.yVel * dt; this.airT += dt;
-        this.airPitch = damp(this.airPitch, 0.25, 0.6, dt);
-        if (this.pos.y <= gy) {
-          const imp = -this.yVel;
-          this.pos.y = gy; this.airborne = false; this.yVel = 0; this.pv -= Math.min(imp, 14) * 0.035;
-          this.vm.onLand(this, imp, this.airT);
-        }
-      } else {
-        const gv = this._lastG === undefined ? 0 : (gy - this._lastG) / dt;
-        this._lastG = gy;
-        this.gvMax = Math.max(gv, this.gvMax * Math.exp(-dt * 6));
-        if (gy < this.pos.y - 0.32 && this.speed > 5 && this.mode === 'phys') {
-          this.airborne = true; if (this.vm.onLaunch) this.vm.onLaunch(this); this.airT = 0; this.yVel = Math.max(0, Math.min(this.gvMax, 14)); this.airPitch = this._gp || 0; this._lastG = undefined;
-        } else {
-          this.yVel += ((gy - this.pos.y) * 160 - this.yVel * 14) * dt;
-          this.pos.y += this.yVel * dt;
-          if (Math.abs(this.pos.y - gy) > 0.6) { this.pos.y = gy; this.yVel = 0; }
-        }
-      }
-    } else this.pos.y = Math.max(gy, this.airborne ? this.pos.y : gy);
-    this._gp = gPitch;
-    this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
-    if (this.airborne) this.mesh.rotation.set(this.pitch + this.airPitch, this.h, this.roll * 0.5);
-    else this.mesh.rotation.set(this.pitch + gPitch, this.h, this.roll + gRoll);
+  // wheel ground heights: a wheel only rides up CAR_STEP (a kerb, a ramp lip), anything taller is a wall
+  _sampleWheels(ref) {
+    const W = this.vg.wheels, c = Math.cos(this.h), sn = Math.sin(this.h), wy = this._wy;
+    for (let i = 0; i < 4; i++) { const lx = W[i][0], lz = W[i][1]; wy[i] = groundY(this.pos.x + lx * c + lz * sn, this.pos.z - lx * sn + lz * c, ref, CAR_STEP); }
+    return wy;
   }
+  // Vertical physics: ground contact, ramps, decks, launches, flight and landings. Driven cars run it
+  // in the physics update (every substep); kinematic traffic and placement go through syncMesh().
+  // pos.y is the ground level under the car's centre while it is on the ground. The chassis attitude
+  // (pitchG / rollG) comes from the four wheel contacts; the body adds a small cosmetic spring
+  // (bodyOff) and weight-transfer tilt on top, and the wheels are drawn at their contact points but
+  // never further than the suspension travel from their arches (see VehicleManager.render).
+  ground(dt) {
+    const W = this.vg.wheels, wbase = W[0][1] - W[2][1], track = W[0][0] - W[1][0];
+    const ref = this.pos.y;
+    const h = this._sampleWheels(ref);
+    // the surface under the centre and its slope: the car's centre follows exactly this
+    const gc = groundY(this.pos.x, this.pos.z, ref, CAR_STEP), gx = SURF.gx, gz = SURF.gz;
+    const c = Math.cos(this.h), sn = Math.sin(this.h);
+    // a wheel more than half a metre off the plane of the centre's surface is hanging over a drop
+    // (or the lip of a ramp): it takes the plane's height for the chassis attitude
+    const sup = this._wl;
+    for (let i = 0; i < 4; i++) {
+      const lx = W[i][0], lz = W[i][1], p = gc + gx * (lx * c + lz * sn) + gz * (-lx * sn + lz * c);
+      sup[i] = Math.abs(h[i] - p) < 0.5 ? h[i] : p;
+    }
+    const hf = (sup[0] + sup[1]) / 2, hr = (sup[2] + sup[3]) / 2, hl = (sup[0] + sup[2]) / 2, hrr = (sup[1] + sup[3]) / 2;
+    const gPitch = Math.atan2(hr - hf, wbase), gRoll = Math.atan2(hl - hrr, track);
+    // the slope the car is standing on along its heading (for gravity in step())
+    this.slopeF = this.airborne ? 0 : gx * sn + gz * c;
+    // where the four contacts put the body relative to the centre's ground: at a crease (the foot or
+    // the head of a ramp) the plane through the wheels sits above or below the centre point
+    const planeT = clamp((hf + hr) / 2 - gc, -0.35, 0.35);
+    if (!(dt > 0)) { // placement: sit exactly on the ground
+      this.pos.y = gc; this.airborne = false; this.yVel = 0; this.pitchG = gPitch; this.rollG = gRoll; this.pitchGV = 0; this.bodyOff = 0; this.bodyV = 0; this.planeOff = planeT;
+      return;
+    }
+    if (this.mode !== 'phys') { // kinematic traffic: glued to the road
+      this.pos.y = gc; this.airborne = false; this.yVel = 0;
+      this.pitchG = damp(this.pitchG, gPitch, 14, dt); this.rollG = damp(this.rollG, gRoll, 14, dt); this.planeOff = damp(this.planeOff || 0, planeT, 14, dt);
+      return;
+    }
+    // vertical speed of a car that follows the surface under it (exact on a ramp, 0 over a kerb step)
+    const vyS = this.vel.x * gx + this.vel.y * gz;
+    const wasAir = this.airborne;
+    this.yVel -= GRAVITY * dt; this.pos.y += this.yVel * dt;
+    if (this.pos.y <= gc) {
+      // contact. The ground pushes the car up to the surface; a launch happens on its own when the
+      // ground stops rising (ramp lip) or drops away (deck edge) and the car keeps its vertical speed
+      const imp = Math.max(0, vyS - this.yVel);
+      const step = gc - this.pos.y;
+      if (!wasAir && step > 0.03) this.bodyOff -= Math.min(step, 0.3) * 0.6; // kerb: the springs take it
+      this.pos.y = gc; this.yVel = vyS;
+      if (wasAir) {
+        this.airborne = false; this.landT = 0.25;
+        this.bodyV -= Math.min(imp, 16) * 0.05;
+        // the attitude snaps toward the landing surface through the spring, not instantly
+        this.pitchGV += clamp((gPitch - this.pitchG) * 6, -6, 6);
+        this.vm.onLand(this, imp, this.airT);
+      }
+    } else if (!wasAir && this.pos.y > gc + 0.2) {
+      // the car left the ground: a ramp lip, a crest taken fast, a deck edge
+      this.airborne = true; this.airT = 0;
+      if (this.vm.onLaunch) this.vm.onLaunch(this);
+    }
+    if (this.airborne) {
+      this.airT += dt;
+      // the nose follows the arc (up off the lip, down as it falls); roll levels out
+      const vf = Math.max(4, Math.abs(this.vel.x * sn + this.vel.y * c));
+      const want = clamp(-Math.atan2(this.yVel, vf) * 0.7, -0.5, 0.55);
+      this.pitchGV += ((want - this.pitchG) * 9 - this.pitchGV * 4.5) * dt;
+      this.pitchG += this.pitchGV * dt;
+      this.rollG = damp(this.rollG, 0, 1.6, dt);
+    } else {
+      // on (or settling onto) the ground: stiff, well-damped spring toward the contact plane
+      this.pitchGV += ((gPitch - this.pitchG) * 900 - this.pitchGV * 58) * dt;
+      this.pitchG += this.pitchGV * dt;
+      if (Math.abs(this.pitchG - gPitch) > 0.6) { this.pitchG = gPitch; this.pitchGV = 0; }
+      this.rollG = damp(this.rollG, gRoll, 16, dt);
+      if (this.landT > 0) this.landT -= dt;
+    }
+    this.planeOff = this.airborne ? damp(this.planeOff || 0, 0, 6, dt) : damp(this.planeOff || 0, planeT, 22, dt);
+    // cosmetic body bounce (kerbs, landings), kept inside the wheel-arch clearance
+    this.bodyV += (-this.bodyOff * 260 - this.bodyV * 24) * dt;
+    this.bodyOff = clamp(this.bodyOff + this.bodyV * dt, -0.09, 0.05);
+    this.pitchG = clamp(this.pitchG, -0.9, 0.9);
+  }
+  // body transform from the physics state (render only; no simulation here)
+  pose() {
+    this.mesh.position.set(this.pos.x, this.pos.y + this.bodyOff + (this.planeOff || 0), this.pos.z);
+    // weight transfer adds a little dive / squat and lean on top of the chassis attitude; small
+    // enough that the arches always clear the tyres
+    this.mesh.rotation.set(this.pitchG + clamp(this.pitch, -0.04, 0.04), this.h, this.rollG + clamp(this.roll, -0.055, 0.055) * (this.airborne ? 0.4 : 1));
+  }
+  syncMesh(dt) { this.ground(dt); this.pose(); }
   updateMaterial(night, t) {
     const u = this.mat.userData.u;
     const alive = !this.burnt;
@@ -38905,7 +39170,8 @@ class VehicleManager {
       const ok2 = isFinite(s.x) && isFinite(s.z);
       const x = ok2 ? s.x : CITY / 2, z = ok2 ? s.z : CITY / 2;
       v.pos.set(x, groundY(x, z), z); v.h = isFinite(s.h) ? s.h : 0; v.vel.set(0, 0); v.yawRate = 0;
-      v.airborne = false; v.yVel = 0; v.pitch = 0; v.roll = 0; v.pv = 0; v.rv = 0; v.steer = 0;
+      v.airborne = false; v.yVel = 0; v.pitch = 0; v.roll = 0; v.pv = 0; v.rv = 0; v.steer = 0; v.pitchG = 0; v.rollG = 0; v.pitchGV = 0; v.bodyOff = 0; v.bodyV = 0;
+      v.syncMesh(0);
       if (!isFinite(v.health)) v.health = 50;
       return;
     }
@@ -38973,8 +39239,8 @@ class VehicleManager {
     for (const v of this.list) {
       if (v.mode === 'phys') {
         if (v.drive) v.drive.update(dt);
-        const steps = v.speed > 25 ? 2 : 1;
-        for (let k = 0; k < steps; k++) v.step(dt / steps, g);
+        const steps = v.speed > 25 || v.airborne ? 2 : 1;
+        for (let k = 0; k < steps; k++) { v.step(dt / steps, g); if (!v.sleep) v.ground(dt / steps); }
         this.sanitize(v);
       }
       if (v.mode === 'phys' && !v.sleep) this.collideStatic(v);
@@ -38991,9 +39257,13 @@ class VehicleManager {
   collideStatic(v) {
     const g = this.game, s = v.spec, r = s.w / 2;
     const cs = v.circleCenters(this._circA);
-    const res = this._res;
-    for (const c of cs) {
-      g.world.grid.resolveCircle(c.x, c.z, r, v.pos.y + 0.3, v.pos.y + s.h, res);
+    const res = this._res, n = cs.length, span = s.l - s.w, sp = Math.sin(v.pitchG || 0);
+    for (let ci = 0; ci < n; ci++) {
+      const c = cs[ci];
+      // on a slope the nose is higher than the centre (and the tail lower): each circle's height
+      // band follows the chassis pitch, so a car climbing a steep ramp doesn't catch the deck edge
+      const dy = n > 1 ? -(-span / 2 + span * ci / (n - 1)) * sp : 0;
+      g.world.grid.resolveCircle(c.x, c.z, r, v.pos.y + dy + 0.3, v.pos.y + dy + s.h, res);
       if (!res.hit) continue;
       const nx = res.nx, nz = res.nz, d = res.depth;
       v.pos.x += nx * d; v.pos.z += nz * d;
@@ -39034,6 +39304,7 @@ class VehicleManager {
     const g = this.game;
     if (speed < 2) return;
     v.wake();
+    if (v.airborne) v.hitT = 0.6; // a hit in the air may leave it spinning
     // progressive crash damage: parking bumps barely scratch, a 50 km/h hit matters, 90+ km/h is
     // dangerous. (hurt() halves it again for the doubled durability.)
     // raw: 7 m/s ~0.5, 10 m/s ~5, 15 m/s ~18, 20 m/s ~37, 25 m/s ~60, 30 m/s ~87, 40 m/s ~150
@@ -39103,7 +39374,7 @@ class VehicleManager {
     const RM = this.rims, cnt = [0, 0, 0, 0]; let nb = 0;
     const camPos = camera.position;
     for (const v of this.list) {
-      if (v.mode === 'phys' || dt === 0) v.syncMesh(dt);
+      if (v.mode === 'phys') v.pose();
       v.headOn = night > 0.25 || this.game.env.rain > 0.5;
       v.updateMaterial(night, t);
       if (v.alarmT > 0) { v.alarmT -= dt; v.mat.userData.u.uLights.value.x = (Math.sin(t * 10) > 0) ? 1.5 : 0; if (Math.random() < dt * 3) this.game.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.2, gain: 0.6 }); }
@@ -39120,10 +39391,14 @@ class VehicleManager {
       if (n + 4 <= W.instanceMatrix.count && d2 < 160 * 160) {
         const s = v.spec, R = s.wheelR;
         v.mesh.updateMatrix();
+        const e = v.mesh.matrix.elements, upY = Math.max(0.5, e[5]);
         for (let i = 0; i < 4; i++) {
           const [lx, lz] = v.vg.wheels[i];
           const steerA = lz > 0 ? v.steer : 0;
-          const wy = (v._wy ? v._wy[i] - v.pos.y : 0) + R;
+          // the wheel sits on its contact point, measured in the body's own frame, but never moves
+          // further than the suspension allows: up into the arch by SUSP_UP, down (droop) by SUSP_DOWN
+          const restY = e[1] * lx + e[5] * R + e[9] * lz + e[13];
+          const wy = R + clamp((v._wy[i] + R - restY) / upY, -SUSP_DOWN, SUSP_UP);
           this._e.set(v.spin, steerA, 0, 'YXZ'); this._q.setFromEuler(this._e);
           this._m.compose(this._p.set(lx, wy, lz), this._q, this._s.set(0.24, R, R));
           this._m.premultiply(v.mesh.matrix);
@@ -40293,7 +40568,7 @@ function copLook() {
    [CORE] POLICE MANAGER (heat levels, perception, pursuit, search, arrests)
    ===================================================================== */
 const HEAT_LEVELS = [0, 1, 4, 10, 20, 34];
-const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1 };
+const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5 };
 const UNITS_PER_LEVEL = [0, 2, 3, 5, 7, 9];
 class PoliceManager {
   constructor(game) {
@@ -41961,26 +42236,511 @@ Object.assign(INTERIOR_DEFS, {
     spots: [{ id: 'elevator', x: -4, z: -4.6, r: 1.6, label: 'Elevator' }, { id: 'concierge', x: 4.5, z: 1.6, r: 1.3, label: 'Concierge' }]
   }
 });
-// the penthouse: a glass room on the top tier of Valen Tower, a terrace all the way round
+/* ---------------- interior building kit: oriented furniture, walls with doorways, upper floors ----------------
+   Furniture is placed by its centre on the floor (x, y, z) and the way it faces (o: 0 +z, 1 +x, 2 -z,
+   3 -x). Local x runs across the piece, local z from its back (-) to its front (+). Interiors with an
+   upper storey list their walkable decks and stairs in def.levels; the player, the camera and the
+   interaction spots read the floor height from there (intFloorY), with the same step limit as a
+   person on the street, so walking under a balcony keeps you on the ground floor. */
+function FB(k, cx, cy, cz, o, lx, ly, lz, w, h, d, col, opt) {
+  let x, z, sw, sd;
+  switch (o & 3) {
+    case 0: x = lx; z = lz; sw = w; sd = d; break;
+    case 1: x = lz; z = -lx; sw = d; sd = w; break;
+    case 2: x = -lx; z = -lz; sw = w; sd = d; break;
+    default: x = -lz; z = lx; sw = d; sd = w;
+  }
+  k.box(cx + x, cy + ly, cz + z, sw, h, sd, col, opt);
+}
+const FG = (k, cx, cy, cz, o, lx, ly, lz, w, h, d, col, g = 2) => FB(k, cx, cy, cz, o, lx, ly, lz, w, h, d, col, { glow: g });
+function intFloorY(def, lx, lz, ly) {
+  let best = 0;
+  for (const s of def.levels) {
+    if (lx < s.x0 || lx > s.x1 || lz < s.z0 || lz > s.z1) continue;
+    let h = s.h;
+    if (h === undefined) { let t = s.axis === 'x' ? (lx - s.x0) / (s.x1 - s.x0) : (lz - s.z0) / (s.z1 - s.z0); if (s.dir < 0) t = 1 - t; h = s.h0 + (s.h1 - s.h0) * t; }
+    if (h > best && h <= ly + 0.75) best = h;
+  }
+  return best;
+}
+// local floor height of the interior the player is in, at world (x, z), for a body at world height y
+function interiorLevel(int, x, z, y) { const d = int && int.def; return d && d.levels ? intFloorY(d, x - d.ox, z - d.oz, y - int.floor) : 0; }
+const DOOR_H = 2.3;
+// a wall along x (at z) or along z (at x) from a to b, with doorway gaps [g0, g1]; colliders on every piece
+function iwall(k, along, c, a, b, y0, h, col, gaps = [], t = 0.15) {
+  const seg = (s0, s1, yy, hh) => {
+    if (s1 - s0 < 0.02 || hh <= 0.01) return;
+    if (along === 'x') k.box((s0 + s1) / 2, yy, c, s1 - s0, hh, t, col, { col: true });
+    else k.box(c, yy, (s0 + s1) / 2, t, hh, s1 - s0, col, { col: true });
+  };
+  const gs = gaps.slice().sort((p, q) => p[0] - q[0]);
+  let s = a;
+  for (const [g0, g1] of gs) {
+    seg(s, g0, y0, h); seg(g0, g1, y0 + DOOR_H, h - DOOR_H);
+    // a dark frame round the opening
+    const fc = 0x2a2420, mid = (g0 + g1) / 2;
+    if (along === 'x') { k.box(g0 + 0.04, y0, c, 0.08, DOOR_H, t + 0.06, fc); k.box(g1 - 0.04, y0, c, 0.08, DOOR_H, t + 0.06, fc); k.box(mid, y0 + DOOR_H - 0.08, c, g1 - g0, 0.08, t + 0.06, fc); }
+    else { k.box(c, y0, g0 + 0.04, t + 0.06, DOOR_H, 0.08, fc); k.box(c, y0, g1 - 0.04, t + 0.06, DOOR_H, 0.08, fc); k.box(c, y0 + DOOR_H - 0.08, mid, t + 0.06, 0.08, g1 - g0, fc); }
+    s = g1;
+  }
+  seg(s, b, y0, h);
+}
+const FURN = {
+  rug(k, x, y, z, w, d, col, col2) { k.box(x, y - 0.004, z, w, 0.012, d, col, { flat: true }); if (col2 !== undefined) k.box(x, y, z, w - 0.3, 0.014, d - 0.3, col2, { flat: true }); },
+  bed(k, x, y, z, o, w = 1.9, l = 2.2, sheet = 0x2f5d8a, frame = 0x3a2a20) {
+    FB(k, x, y, z, o, 0, 0, 0, w, 0.42, l, frame, { col: true });
+    FB(k, x, y, z, o, 0, 0.42, 0.02, w - 0.08, 0.2, l - 0.1, 0xeeeae2);
+    FB(k, x, y, z, o, 0, 0.6, l * 0.16, w - 0.04, 0.08, l * 0.62, sheet);
+    for (const s of w > 1.4 ? [-0.45, 0.45] : [0]) FB(k, x, y, z, o, s * (w / 1.9), 0.62, -l / 2 + 0.35, w > 1.4 ? 0.7 : 0.8, 0.14, 0.42, 0xf6f4f0);
+    FB(k, x, y, z, o, 0, 0, -l / 2 - 0.05, w + 0.1, 1.15, 0.1, frame);
+  },
+  nightstand(k, x, y, z, o, col = 0x4a3a2a, lamp = true) {
+    FB(k, x, y, z, o, 0, 0, 0, 0.5, 0.55, 0.45, col, { col: true });
+    FB(k, x, y, z, o, 0, 0.3, 0.226, 0.42, 0.015, 0.01, 0x1a1410); FB(k, x, y, z, o, 0, 0.42, 0.23, 0.08, 0.025, 0.02, 0xc9a66b);
+    if (lamp) { FB(k, x, y, z, o, 0, 0.55, 0, 0.06, 0.3, 0.06, 0x2a2a2a); FG(k, x, y, z, o, 0, 0.82, 0, 0.26, 0.2, 0.26, 0xffd8a0, 1.8); }
+  },
+  dresser(k, x, y, z, o, w = 1.4, col = 0x5a3e2b, mirror = false) {
+    FB(k, x, y, z, o, 0, 0, 0, w, 0.85, 0.5, col, { col: true });
+    for (let r = 0; r < 3; r++) { FB(k, x, y, z, o, 0, 0.18 + r * 0.24, 0.252, w - 0.08, 0.012, 0.01, 0x1a1410); FB(k, x, y, z, o, 0, 0.27 + r * 0.24, 0.26, 0.12, 0.025, 0.02, 0xc9a66b); }
+    if (mirror) { FB(k, x, y, z, o, 0, 0.9, -0.2, w * 0.7, 0.9, 0.04, 0x3a2a20); FG(k, x, y, z, o, 0, 0.95, -0.17, w * 0.62, 0.8, 0.01, 0xb8c8d8, 0.8); }
+  },
+  wardrobe(k, x, y, z, o, w = 1.4, col = 0x5a3e2b) {
+    FB(k, x, y, z, o, 0, 0, 0, w, 2.1, 0.62, col, { col: true });
+    FB(k, x, y, z, o, 0, 0.05, 0.312, 0.012, 2.0, 0.01, 0x1a1410);
+    for (const s of [-0.08, 0.08]) FB(k, x, y, z, o, s, 1.0, 0.32, 0.03, 0.22, 0.03, 0xc9a66b);
+  },
+  sofa(k, x, y, z, o, w = 2.4, col = 0x4a5a6a) {
+    const dk = new THREE.Color(col).multiplyScalar(0.88).getHex();
+    FB(k, x, y, z, o, 0, 0, 0, w, 0.44, 0.95, col, { col: true });
+    FB(k, x, y, z, o, 0, 0.44, -0.37, w, 0.5, 0.22, dk);
+    for (const s of [-1, 1]) FB(k, x, y, z, o, s * (w / 2 - 0.11), 0.44, 0, 0.22, 0.22, 0.95, dk);
+    for (let i = 0; i < Math.max(2, Math.round(w / 0.9)); i++) { const n = Math.max(2, Math.round(w / 0.9)), cw = (w - 0.5) / n; FB(k, x, y, z, o, -w / 2 + 0.25 + cw * (i + 0.5), 0.44, 0.08, cw - 0.04, 0.1, 0.62, col); }
+  },
+  armchair(k, x, y, z, o, col = 0x6a4a3a) { FURN.sofa(k, x, y, z, o, 1.0, col); },
+  coffeeTable(k, x, y, z, o, w = 1.3, d = 0.7, col = 0x5a3e2b) { FB(k, x, y, z, o, 0, 0, 0, w, 0.38, d, col, { col: true }); FB(k, x, y, z, o, 0.2, 0.38, 0, 0.3, 0.04, 0.2, 0xd23a2a); },
+  tv(k, x, y, z, o, w = 1.6, stand = true) {
+    if (stand) FB(k, x, y, z, o, 0, 0, 0, w + 0.4, 0.5, 0.45, 0x22201e, { col: true });
+    const by = stand ? 0.56 : 0.9, hh = w * 0.56;
+    FB(k, x, y, z, o, 0, by, stand ? -0.08 : -0.02, w, hh, 0.06, 0x111111);
+    FG(k, x, y, z, o, 0, by + 0.04, stand ? -0.045 : 0.012, w - 0.08, hh - 0.08, 0.01, 0x4a78b8, 1.4);
+  },
+  diningSet(k, x, y, z, o, seats = 4, col = 0x5a3e2b) {
+    const len = seats <= 4 ? 1.5 : seats <= 6 ? 2.2 : 3.2, per = Math.ceil(seats / 2);
+    FB(k, x, y, z, o, 0, 0, 0, len, 0.75, 0.95, col, { col: true });
+    FB(k, x, y, z, o, 0, 0.75, 0, len + 0.04, 0.04, 0.99, new THREE.Color(col).multiplyScalar(1.15).getHex());
+    for (let i = 0; i < per; i++) for (const s of [-1, 1]) { const cx = -len / 2 + (i + 0.5) * len / per; FB(k, x, y, z, o, cx, 0, s * 0.75, 0.42, 0.45, 0.42, 0x3a2a20); FB(k, x, y, z, o, cx, 0.45, s * 0.94, 0.42, 0.5, 0.06, 0x3a2a20); }
+  },
+  // a run of kitchen cabinets against a wall: worktop, upper cabinets, a sink, a hob and optionally a fridge at the left end
+  kitchenRun(k, x, y, z, o, len = 3, opt = {}) {
+    const base = opt.base || 0x6a4a32, top = opt.top || 0xb8b4ac, fridge = opt.fridge !== false;
+    const runL = fridge ? len - 0.9 : len, off = fridge ? 0.45 : 0;
+    FB(k, x, y, z, o, off, 0, 0, runL, 0.9, 0.6, base, { col: true });
+    FB(k, x, y, z, o, off, 0.9, 0.02, runL + 0.04, 0.05, 0.64, top);
+    for (let i = 0; i < Math.floor(runL / 0.6); i++) FB(k, x, y, z, o, off - runL / 2 + 0.3 + i * 0.6, 0.45, 0.302, 0.5, 0.012, 0.01, 0x1a1410);
+    FB(k, x, y, z, o, off - runL / 4, 0.92, 0.05, 0.6, 0.04, 0.42, 0x9aa0a6); // sink
+    FB(k, x, y, z, o, off - runL / 4, 0.95, -0.22, 0.04, 0.3, 0.04, 0xb0b0b0);
+    FB(k, x, y, z, o, off + runL / 4, 0.95, 0, 0.6, 0.02, 0.5, 0x1a1a1c); // hob
+    for (const s of [-0.15, 0.15]) FG(k, x, y, z, o, off + runL / 4 + s, 0.965, s * 0.6, 0.18, 0.005, 0.18, 0xff6a3a, 0.7);
+    if (opt.upper !== false) FB(k, x, y, z, o, off, 1.5, -0.12, runL, 0.7, 0.36, opt.upperC || base);
+    if (opt.hood) FB(k, x, y, z, o, off + runL / 4, 1.6, -0.05, 0.8, 0.5, 0.5, 0x9aa0a6);
+    if (fridge) { FB(k, x, y, z, o, -len / 2 + 0.4, 0, -0.02, 0.8, 1.9, 0.66, opt.fridgeC || 0xe8eaec, { col: true }); FB(k, x, y, z, o, -len / 2 + 0.72, 0.8, 0.32, 0.03, 0.5, 0.04, 0x9a9a9a); }
+  },
+  island(k, x, y, z, o, len = 2.2, col = 0x2a2c30, top = 0xe8e4dc, stools = 3) {
+    FB(k, x, y, z, o, 0, 0, 0, len, 0.92, 0.9, col, { col: true });
+    FB(k, x, y, z, o, 0, 0.92, 0.1, len + 0.1, 0.05, 1.15, top);
+    for (let i = 0; i < stools; i++) { const sx = -len / 2 + (i + 0.5) * len / stools; FB(k, x, y, z, o, sx, 0, 0.95, 0.06, 0.66, 0.06, 0x2a2a2a); FB(k, x, y, z, o, sx, 0.66, 0.95, 0.38, 0.06, 0.38, 0x3a2a20); }
+  },
+  toilet(k, x, y, z, o) { FB(k, x, y, z, o, 0, 0, 0.05, 0.4, 0.42, 0.55, 0xf2f2f0, { col: true }); FB(k, x, y, z, o, 0, 0.42, -0.22, 0.42, 0.4, 0.18, 0xf2f2f0); },
+  vanity(k, x, y, z, o, w = 0.9, col = 0xe8e4dc) {
+    FB(k, x, y, z, o, 0, 0, 0, w, 0.85, 0.5, col, { col: true }); FB(k, x, y, z, o, 0, 0.86, 0.02, w * 0.6, 0.04, 0.34, 0xf8f8f8);
+    FB(k, x, y, z, o, 0, 1.15, -0.23, w * 0.9, 0.85, 0.03, 0x8a9096); FG(k, x, y, z, o, 0, 1.18, -0.21, w * 0.84, 0.78, 0.01, 0xcfe0ec, 0.9);
+  },
+  tub(k, x, y, z, o, l = 1.7) { FB(k, x, y, z, o, 0, 0, 0, 0.8, 0.55, l, 0xf2f2f0, { col: true }); FB(k, x, y, z, o, 0, 0.5, 0, 0.62, 0.06, l - 0.18, 0xa8c8d8); },
+  shower(k, x, y, z, o, s = 1.0) { FB(k, x, y, z, o, 0, 0, 0, s, 0.06, s, 0xd8dcdc); FB(k, x, y, z, o, 0, 0, s / 2, s, 2.0, 0.03, 0xa8c8d8); FB(k, x, y, z, o, s / 2, 0, 0, 0.03, 2.0, s, 0xa8c8d8); FB(k, x, y, z, o, -s * 0.3, 1.9, -s * 0.3, 0.2, 0.04, 0.2, 0x9aa0a6); },
+  desk(k, x, y, z, o, w = 1.4, laptop = true, col = 0x6a4a32) {
+    FB(k, x, y, z, o, 0, 0, 0, w, 0.74, 0.7, col, { col: true });
+    if (laptop) { FB(k, x, y, z, o, 0, 0.74, 0.05, 0.42, 0.03, 0.3, 0x222428); FB(k, x, y, z, o, 0, 0.77, -0.1, 0.42, 0.28, 0.03, 0x222428); FG(k, x, y, z, o, 0, 0.79, -0.08, 0.38, 0.24, 0.01, 0x7fd0ff, 1.6); }
+    FB(k, x, y, z, o, 0, 0, 0.72, 0.5, 0.48, 0.5, 0x2a2a2e); FB(k, x, y, z, o, 0, 0.48, 0.95, 0.5, 0.5, 0.08, 0x2a2a2e);
+  },
+  bookshelf(k, x, y, z, o, w, rng, h = 2.0) {
+    FB(k, x, y, z, o, 0, 0, 0, w, h, 0.35, 0x4a3a2a, { col: true });
+    const pal = [0x8a2f3a, 0x2f5d8a, 0x3a7a4a, 0xd8a227, 0x6a3a8a, 0xe8e4dc, 0x2a2a2e];
+    for (let r = 0; r < 4; r++) { const yy = 0.15 + r * (h - 0.2) / 4; let px = -w / 2 + 0.08; while (px < w / 2 - 0.12) { const bw = 0.04 + rng() * 0.06, bh = 0.2 + rng() * 0.18; FB(k, x, y, z, o, px + bw / 2, yy, 0.05, bw, bh, 0.22, pal[Math.floor(rng() * pal.length)]); px += bw + 0.005; } }
+  },
+  safe(k, x, y, z, o) { FB(k, x, y, z, o, 0, 0, 0, 0.75, 0.9, 0.7, 0x3a3e44, { col: true }); FB(k, x, y, z, o, 0, 0.3, 0.355, 0.2, 0.2, 0.02, 0x9aa0a6); FB(k, x, y, z, o, 0.22, 0.4, 0.36, 0.05, 0.22, 0.03, 0xc8c8c8); },
+  poolTable(k, x, y, z, o) {
+    FB(k, x, y, z, o, 0, 0, 0, 1.45, 0.7, 2.6, 0x3a2416, { col: true });
+    FB(k, x, y, z, o, 0, 0.7, 0, 1.45, 0.1, 2.6, 0x4a2c1a); FB(k, x, y, z, o, 0, 0.72, 0, 1.2, 0.09, 2.35, 0x1f6a3e);
+    const bc = [0xf4f4f0, 0xf2c230, 0x2a5f9e, 0xd23a2a, 0x6a3a8a, 0xe67e22, 0x1e8449, 0x7a1a1a, 0x111111];
+    for (let i = 0; i < bc.length; i++) FB(k, x, y, z, o, (i % 3 - 1) * 0.07 + (i === 0 ? 0.1 : 0), 0.81, i === 0 ? 0.7 : -0.5 - Math.floor(i / 3) * 0.07, 0.055, 0.055, 0.055, bc[i]);
+    FB(k, x, y, z, o, 0.55, 0.82, 0.2, 0.025, 0.025, 1.4, 0xd8b48a);
+  },
+  plant(k, x, y, z, s = 1) { k.box(x, y, z, 0.5 * s, 0.45 * s, 0.5 * s, 0xd8d0c0, { col: true }); k.box(x, y + 0.45 * s, z, 0.7 * s, 1.0 * s, 0.7 * s, 0x2f6a3a); k.box(x, y + 1.2 * s, z, 0.45 * s, 0.5 * s, 0.45 * s, 0x3a7a4a); },
+  lamp(k, x, y, z) { k.box(x, y, z, 0.3, 0.04, 0.3, 0x2a2a2a); k.box(x, y, z, 0.04, 1.5, 0.04, 0x2a2a2a); k.glow(x, y + 1.45, z, 0.36, 0.3, 0.36, 0xffe0b0, 1.9); },
+  art(k, x, y, z, o, w = 1.2, h = 0.8, col = 0x2a5f9e) { FB(k, x, y, z, o, 0, 0, 0, w + 0.08, h + 0.08, 0.03, 0x1a1410); FB(k, x, y, z, o, 0, 0.04, 0.012, w, h, 0.02, col); FB(k, x, y, z, o, -w * 0.15, h * 0.3, 0.024, w * 0.4, h * 0.35, 0.01, new THREE.Color(col).offsetHSL(0.3, 0, 0.15).getHex()); },
+  bar(k, x, y, z, o, len = 3, stools = 4, top = 0xd8c8a0, col = 0x1a1c20) {
+    FB(k, x, y, z, o, 0, 0, 0, len, 1.05, 0.7, col, { col: true }); FB(k, x, y, z, o, 0, 1.05, 0, len + 0.1, 0.05, 0.8, top);
+    for (let i = 0; i < stools; i++) { const sx = -len / 2 + (i + 0.5) * len / stools; FB(k, x, y, z, o, sx, 0, 0.75, 0.06, 0.74, 0.06, 0x8a8a8a); FB(k, x, y, z, o, sx, 0.74, 0.75, 0.4, 0.06, 0.4, 0x2a2a2e); }
+    // the back bar: shelves of bottles behind the counter
+    FB(k, x, y, z, o, 0, 0, -1.1, len, 0.9, 0.45, col, { col: true });
+    for (let i = 0; i < Math.round(len / 0.35); i++) FG(k, x, y, z, o, -len / 2 + 0.2 + i * 0.35, 1.25, -1.15, 0.09, 0.3, 0.09, [0xffb547, 0x46d4c4, 0xd28cff, 0x7fe08f][i % 4], 1.3);
+    FB(k, x, y, z, o, 0, 1.2, -1.28, len, 0.03, 0.25, 0x8a8a8a); FB(k, x, y, z, o, 0, 1.65, -1.28, len, 0.03, 0.25, 0x8a8a8a);
+  },
+  fireplace(k, x, y, z, o, w = 1.8) { FB(k, x, y, z, o, 0, 0, 0, w, 1.2, 0.5, 0xb8b0a0, { col: true }); FB(k, x, y, z, o, 0, 0.15, 0.2, w * 0.55, 0.6, 0.12, 0x111111); FG(k, x, y, z, o, 0, 0.18, 0.24, w * 0.4, 0.3, 0.05, 0xff8a3d, 2.2); FB(k, x, y, z, o, 0, 1.2, 0.02, w + 0.2, 0.08, 0.6, 0x8a8478); },
+  chandelier(k, x, y, z) { k.box(x, y + 0.5, z, 0.04, 1.0, 0.04, 0x8a7a5a); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; k.glow(x + Math.cos(a) * 0.55, y, z + Math.sin(a) * 0.55, 0.12, 0.2, 0.12, 0xfff0c0, 2.6); } k.glow(x, y - 0.1, z, 0.3, 0.3, 0.3, 0xfff0c0, 2.4); },
+  ceilingLight(k, x, y, z, w = 1.1) { k.box(x, y - 0.05, z, w + 0.15, 0.05, 0.5, 0xd8d8d8); k.glow(x, y - 0.07, z, w, 0.03, 0.38, 0xfff1d6, 2.6); },
+  arcade(k, x, y, z, o, col = 0x6a3a8a) { FB(k, x, y, z, o, 0, 0, 0, 0.7, 1.75, 0.75, col, { col: true }); FG(k, x, y, z, o, 0, 1.0, 0.3, 0.55, 0.45, 0.02, 0x46d4c4, 1.6); FG(k, x, y, z, o, 0, 1.6, 0.36, 0.6, 0.12, 0.02, 0xffd84d, 2); FB(k, x, y, z, o, 0, 0.8, 0.42, 0.6, 0.06, 0.3, 0x2a2a2e); },
+  window(def, x, y, z, w, h, ry) { (def.windows || (def.windows = [])).push({ x, y, z, w, h, ry }); }
+};
+
+/* ---------------- loot: what a stranger's drawers hold ----------------
+   Every container is rolled from a seeded table (house, container, the week), so a house you come
+   back to the next week has been restocked but searching the same drawer twice gives nothing. Most
+   of it is small; safes are rare and slow. */
+const LOOT_KIND = {
+  nightstand: { label: 'nightstand', w: [['none', 45], ['cash', 30], ['val', 18], ['ammo', 4], ['gun', 3]] },
+  dresser: { label: 'dresser drawers', w: [['none', 40], ['cash', 26], ['val', 28], ['prod', 6]] },
+  wardrobe: { label: 'wardrobe', w: [['none', 50], ['cash', 16], ['val', 26], ['rare', 6], ['gun', 2]] },
+  desk: { label: 'desk drawers', w: [['none', 42], ['cash', 36], ['val', 16], ['ammo', 6]] },
+  kitchen: { label: 'kitchen cupboards', w: [['none', 66], ['cash', 26], ['prod', 8]] },
+  bath: { label: 'bathroom cabinet', w: [['none', 70], ['pills', 30]] },
+  bed: { label: 'under the mattress', w: [['none', 64], ['cash', 34], ['gun', 2]] },
+  closet: { label: 'hall closet', w: [['none', 58], ['cash', 18], ['ammo', 12], ['val', 12]] },
+  jewel: { label: 'jewellery box', w: [['none', 20], ['val', 55], ['rare', 25]] },
+  safe: { label: 'wall safe', w: [['big', 100]], slow: 4.5 }
+};
+const LOOT_CASH = [25, 45, 90, 170, 320, 650];
+function rollLoot(kind, tier, rng) {
+  const K = LOOT_KIND[kind] || LOOT_KIND.dresser;
+  let tot = 0; for (const [, w] of K.w) tot += w;
+  let r = rng() * tot, pick = 'none'; for (const [id, w] of K.w) { r -= w; if (r <= 0) { pick = id; break; } }
+  const c = LOOT_CASH[clamp(tier, 1, 6) - 1];
+  switch (pick) {
+    case 'cash': return { cash: Math.round(c * (0.4 + rng() * 1.2)) };
+    case 'val': return { goods: { hot: 1 + (rng() < 0.3 ? 1 : 0) } };
+    case 'rare': return { goods: { hot: 3 + Math.floor(rng() * 3) }, rare: true };
+    case 'ammo': return { ammo: 8 + Math.floor(rng() * 16) };
+    case 'gun': return { gun: 'pistol', ammo: 6 };
+    case 'prod': return { goods: { green: 1 } };
+    case 'pills': return { goods: { pills: 1 } };
+    case 'big': return { cash: Math.round(c * (6 + rng() * 8)), goods: rng() < 0.7 ? { hot: 2 + Math.floor(rng() * 3) } : null, gun: rng() < 0.15 ? 'pistol' : null, ammo: rng() < 0.3 ? 12 : 0 };
+    default: return {};
+  }
+}
+// tier of a home that is not one of the player's properties (a break-in), from what it is and where
+function homeTier(home, prop) {
+  if (prop && prop.tier) return prop.tier;
+  if (home.type === 'mansion') return 6;
+  if (home.district === 'u') return home.garage === 'triple' ? 5 : 4;
+  if (home.type === 'apartment' || home.type === 'semi') return home.district === 'l' ? 2 : 1;
+  if (home.garage === 'triple') return 5;
+  if (home.garage === 'double') return 4;
+  if (home.garage === 'single' || home.type === 'farm') return 3;
+  return 2;
+}
+
+/* ---------------- house interiors by tier ----------------
+   1 a studio: bed, small TV, kitchenette, a shower room
+   2 one bedroom: living room, kitchen and table, bedroom, bathroom
+   3 a house: living room, kitchen-diner, two bedrooms, bathroom off a hallway
+   4 a family home: bigger rooms, island kitchen, dining for six, three bedrooms, two bathrooms
+   5 a luxury home: open plan with a bar and a media wall, master suite with ensuite, office, art
+   6 the Crestmoor mansion: two storeys (mansionInteriorDef) */
+function houseInteriorDef(home, prop) {
+  if (home.type === 'mansion') return mansionInteriorDef(home, prop);
+  const tier = homeTier(home, prop);
+  const dims = [[9.5, 7.5, 2.9], [11.5, 9, 2.9], [13.5, 10.5, 3.0], [15.5, 11.5, 3.1], [19, 12.5, 3.4]][clamp(tier, 1, 5) - 1];
+  const W = dims[0], D = dims[1], H = dims[2];
+  const seed = Math.abs(Math.floor(home.x0 * 13 + home.z0 * 7));
+  const conts = [];
+  const C = (kind, x, z, r = 1.1) => { conts.push({ kind, x, z, r }); };
+  const def = {
+    id: 'h:' + home.id, dynamic: true, name: prop ? prop.name : (home.type === 'apartment' ? 'An apartment' : 'Somebody’s house'), w: W, d: D, h: H, seed, tier,
+    exit: { x: -W / 2 + 1.6, z: D / 2 - 0.6 }, spawnH: Math.PI, place: null, at: { x: (home.x0 + home.x1) / 2, z: (home.z0 + home.z1) / 2 },
+    door: { x: home.door.x, z: home.door.z, h: home.door.h }, home: home.id, propId: prop ? prop.id : null, owned: !!prop,
+    build(k, rng) {
+      conts.length = 0;
+      const pals = tier >= 5 ? [{ floor: 0xd8d2c4, wall: 0xf0ece4, ceil: 0xf8f6f0, acc: 0x1a1c20 }, { floor: 0x5a4030, wall: 0xe8e2d4, ceil: 0xf4f0e6, acc: 0x2a3a52 }]
+        : tier >= 3 ? [{ floor: 0x7a5a3c, wall: 0xd8cfbf, ceil: 0xeeeae2, acc: 0x2a4a6a }, { floor: 0x9a8a72, wall: 0xc9d4d8, ceil: 0xeeeae2, acc: 0x5a3a2a }, { floor: 0x6b4f3a, wall: 0xe0d6c4, ceil: 0xe8e4dc, acc: 0x3a5a3a }]
+          : [{ floor: 0x8a7a62, wall: 0xc8bfa8, ceil: 0xe0dcd2, acc: 0x6a4a3a }, { floor: 0x6a6a64, wall: 0xb8c0b4, ceil: 0xdcdcd4, acc: 0x3a4a5a }];
+      const pal = pals[Math.floor(rng() * pals.length)];
+      const sheet = [0x2f5d8a, 0x7a2a3a, 0x3a6a4a, 0xd8c8a0, 0x5a4a7a][Math.floor(rng() * 5)];
+      const sofaC = [0x4a5a6a, 0x6a4a3a, 0x3a3f46, 0x8a7a62, 0x2a3a52][Math.floor(rng() * 5)];
+      k.room(W, D, H, { floor: pal.floor, wall: pal.wall, ceil: pal.ceil, trim: 0x3a2a20, lights: tier >= 4 ? [3, 2] : [2, 1] });
+      if (tier >= 5) k.tiles(W, D, pal.floor, new THREE.Color(pal.floor).multiplyScalar(0.94).getHex(), 1.2);
+      else k.planks(W, D, pal.floor, new THREE.Color(pal.floor).multiplyScalar(0.92).getHex(), Math.round(W * 1.4));
+      k.door(-W / 2 + 1.6, D / 2 - 0.02, 0);
+      const hw = W / 2, hd = D / 2, wc = pal.wall;
+      if (tier === 1) {
+        // studio: one room, a shower room in the back-right corner
+        iwall(k, 'z', 2, -hd, -0.8, 0, H, wc); iwall(k, 'x', -0.8, 2, hw, 0, H, wc, [[2.4, 3.4]]);
+        FURN.toilet(k, 4.25, 0, -3.3, 0); FURN.vanity(k, 2.75, 0, -3.45, 0, 0.8); FURN.shower(k, 4.2, 0, -1.4, 3, 1.0); C('bath', 2.75, -2.6);
+        FURN.bed(k, -3.4, 0, -2.6, 0, 1.5, 2.1, sheet); FURN.nightstand(k, -2.25, 0, -3.45, 0); C('nightstand', -2.25, -2.6); C('bed', -3.4, -1.2);
+        FURN.dresser(k, -0.6, 0, -3.48, 0, 1.1); C('dresser', -0.6, -2.7);
+        FURN.kitchenRun(k, 4.4, 0, 1.6, 3, 2.6, { upper: true }); C('kitchen', 3.5, 1.9);
+        FURN.diningSet(k, 1.6, 0, 1.4, 1, 2);
+        FURN.tv(k, -1.3, 0, 3.45, 2, 1.0); FURN.armchair(k, -1.3, 0, 1.4, 0, sofaC); FURN.rug(k, -1.3, 0, 1.9, 2.4, 2.0, 0x8a3a2a);
+        FURN.wardrobe(k, -4.42, 0, 0.6, 1, 1.2);
+        FURN.plant(k, -4.3, 0, 3.3, 0.8);
+        def.slots = { bed: [-3.4, -1.0], wardrobe: [-3.6, 0.6], fridge: [3.5, 0.6], tv: [-1.3, 2.4], stash: [-4.0, 2.4], garage: [hw - 0.9, hd - 2.4] };
+      } else if (tier === 2) {
+        // living room at the front, kitchen + table at the back left, bathroom in the middle, bedroom back right
+        iwall(k, 'z', 1, -hd, 0, 0, H, wc); iwall(k, 'x', 0, 1, hw, 0, H, wc, [[1.4, 2.5]]);
+        iwall(k, 'z', -1.8, -hd, -1.8, 0, H, wc); iwall(k, 'x', -1.8, -1.8, 1, 0, H, wc, [[-1.4, -0.4]]);
+        FURN.kitchenRun(k, -3.75, 0, -hd + 0.35, 0, 3.6, { upper: true }); C('kitchen', -3.4, -3.3);
+        FURN.diningSet(k, -3.8, 0, -1.4, 0, 2);
+        FURN.toilet(k, 0.6, 0, -4.0, 0); FURN.vanity(k, -0.8, 0, -4.2, 0, 0.8); FURN.tub(k, 0.5, 0, -2.75, 0, 1.5); C('bath', -0.8, -3.2);
+        FURN.bed(k, 3.4, 0, -3.3, 0, 1.8, 2.1, sheet); FURN.nightstand(k, 2.15, 0, -4.15, 0); FURN.nightstand(k, 4.65, 0, -4.15, 0); C('nightstand', 2.15, -3.4); C('bed', 3.4, -1.9);
+        FURN.wardrobe(k, 5.4, 0, -1.2, 3, 1.4); FURN.dresser(k, 1.35, 0, -2.0, 1, 1.1); C('dresser', 1.95, -2.0, 0.9); C('wardrobe', 4.7, -1.2, 0.9);
+        FURN.sofa(k, -1.2, 0, 1.6, 0, 2.4, sofaC); FURN.coffeeTable(k, -1.2, 0, 2.7, 0); FURN.tv(k, -1.2, 0, hd - 0.3, 2, 1.4); FURN.rug(k, -1.2, 0, 2.4, 3.2, 2.4, 0x2a4a6a, 0x3a5a7a);
+        FURN.armchair(k, 2.5, 0, 2.4, 3, sofaC); FURN.bookshelf(k, 4.6, 0, hd - 0.2, 2, 1.6, rng); FURN.plant(k, 5.2, 0, 1.2, 0.9); FURN.lamp(k, -3.4, 0, 1.0);
+        FURN.art(k, -0.4, 1.5, -1.72, 0, 1.1, 0.7, pal.acc); k.box(-5.45, 0, 2.6, 0.55, 2.1, 1.2, 0x5a4a3a, { col: true }); C('closet', -4.9, 2.6, 0.9);
+        def.slots = { bed: [3.4, -1.7], wardrobe: [4.6, -1.2], fridge: [-5.0, -3.3], tv: [-1.2, 3.6], stash: [-5.2, 3.2], garage: [hw - 0.9, hd - 2.4] };
+      } else {
+        // a house: open living / kitchen on the left, a hallway, then bedrooms and bathrooms on the right
+        const rx = hw - (tier >= 5 ? 7.4 : tier === 4 ? 6.4 : 5.25), hall = rx + 1.4; // rooms start after the hallway strip
+        const zA = tier >= 4 ? -1.0 : -1.2, zB = tier >= 4 ? 1.3 : 1.2;
+        iwall(k, 'z', hall, -hd, hd, 0, H, wc, [[zA - 1.5, zA - 0.3], [(zA + zB) / 2 - 0.55, (zA + zB) / 2 + 0.55], [(zB + hd) / 2 - 0.6, (zB + hd) / 2 + 0.6]]);
+        iwall(k, 'x', zA, hall, hw, 0, H, wc); iwall(k, 'x', zB, hall, hw, 0, H, wc);
+        const rc = (hall + hw) / 2;
+        // master bedroom (back)
+        const bw = tier >= 4 ? 2.0 : 1.8;
+        FURN.bed(k, rc, 0, -hd + 1.25, 0, bw, 2.2, sheet); FURN.nightstand(k, rc - bw / 2 - 0.4, 0, -hd + 0.4, 0); FURN.nightstand(k, rc + bw / 2 + 0.4, 0, -hd + 0.4, 0);
+        C('nightstand', rc - bw / 2 - 0.4, -hd + 1.2); C('bed', rc, -hd + 2.8);
+        FURN.wardrobe(k, hw - 0.4, 0, zA - 2.2, 3, 1.4); C('wardrobe', hw - 1.1, zA - 2.2);
+        FURN.dresser(k, rc - 0.2, 0, zA - 0.35, 2, 1.2, 0x5a3e2b, tier >= 4); C('dresser', rc - 0.2, zA - 1.05, 0.8);
+        if (tier >= 5) { k.box(rc + 0.2, 0.86, zA - 0.4, 0.3, 0.15, 0.22, 0x6a1a2a); C('jewel', rc + 0.9, zA - 1.0, 0.7); }
+        // bathroom (middle)
+        FURN.toilet(k, hw - 0.5, 0, zB - 0.45, 3); FURN.vanity(k, rc - 0.4, 0, zA + 0.32, 0, 0.8); FURN.shower(k, hw - 0.6, 0, zA + 0.6, 3, 1.0);
+        if (tier >= 4) FURN.tub(k, rc - 0.9, 0, zB - 0.45, 1, 1.5);
+        C('bath', rc - 0.4, zA + 1.1, 0.9);
+        // second bedroom (front)
+        FURN.bed(k, rc + 0.3, 0, hd - 1.25, 2, tier >= 4 ? 1.6 : 1.4, 2.1, [0x3a6a4a, 0xd8a227, 0x8a3a5a][Math.floor(rng() * 3)]);
+        FURN.desk(k, hall + 1.0, 0, hd - 0.45, 2, 1.2, true); C('desk', hall + 1.0, hd - 1.6, 0.9);
+        FURN.nightstand(k, rc + 0.3 - (tier >= 4 ? 1.2 : 1.1), 0, hd - 0.35, 2); C('nightstand', rc - 0.8, hd - 1.2);
+        // left: kitchen at the back, dining in the middle, living room at the front
+        const lw = rx + hw; // width of the open area
+        const kl = Math.min(lw - 1.2, tier >= 4 ? 5.2 : 4.2);
+        FURN.kitchenRun(k, -hw + 0.3 + kl / 2, 0, -hd + 0.35, 0, kl, { upper: true, hood: tier >= 4, base: tier >= 5 ? 0x2a2c30 : 0x6a4a32, top: tier >= 5 ? 0xe8e4dc : 0xb8b4ac, fridgeC: tier >= 5 ? 0xb8bcc2 : 0xe8eaec }); C('kitchen', -hw + 1.8, -hd + 1.4);
+        if (tier >= 4) FURN.island(k, -hw + 0.3 + kl / 2, 0, -hd + 2.6, 0, Math.min(2.6, kl - 1.2), tier >= 5 ? 0x1a1c20 : 0x4a3a2a, 0xe8e4dc, 3);
+        const dz = tier >= 4 ? 0.0 : -1.4;
+        FURN.diningSet(k, -hw + lw * 0.55, 0, dz, 0, tier >= 4 ? 6 : 4, tier >= 5 ? 0x2a2620 : 0x5a3e2b);
+        if (tier >= 4) FURN.ceilingLight(k, -hw + lw * 0.55, H, dz, 1.4);
+        const sx = -hw + lw * 0.42, tvW = tier >= 5 ? 2.8 : tier >= 4 ? 2.1 : 1.6;
+        FURN.sofa(k, sx, 0, hd - 3.2, 0, tier >= 4 ? 3.0 : 2.4, sofaC); FURN.coffeeTable(k, sx, 0, hd - 2.0, 0, 1.4);
+        FURN.tv(k, sx, 0, hd - 0.3, 2, tvW, tier < 5); if (tier >= 5) k.box(sx, 0, hd - 0.25, tvW + 1.6, 0.45, 0.4, 0x1a1c20, { col: true });
+        FURN.rug(k, sx, 0, hd - 2.4, tier >= 4 ? 4.2 : 3.2, 2.8, [0x8a3a2a, 0x2a4a6a, 0x5a6a3a][Math.floor(rng() * 3)], 0xc8bca8);
+        FURN.armchair(k, -hw + 0.6, 0, hd - 2.2, 1, sofaC); FURN.lamp(k, -hw + 0.5, 0, hd - 3.6);
+        FURN.plant(k, rx - 0.6, 0, hd - 0.6); FURN.art(k, sx, 1.4, -hd + 0.02, 0, 1.4, 0.9, pal.acc);
+        FURN.bookshelf(k, rx - 0.3, 0, -0.4, 3, 1.6, rng);
+        if (tier >= 5) {
+          FURN.bar(k, -hw + 1.6, 0, -0.9, 1, 2.4, 3); FURN.art(k, -hw + 0.02, 1.4, -3.4, 1, 1.6, 1.0, 0x8a2f3a);
+          for (const [lx, lz] of [[-hw + lw * 0.3, -hd + 2.0], [-hw + lw * 0.75, hd - 2.5]]) FURN.ceilingLight(k, lx, H, lz, 1.2);
+        }
+        if (tier >= 4) FURN.fireplace(k, -hw + 0.3, 0, hd - 4.6, 1, 1.6);
+        C('closet', -hw + 0.7, hd - 0.8);
+        if (rng() < [0, 0, 0.18, 0.35, 0.6][tier - 1]) { FURN.safe(k, hw - 0.45, 0, zA - 2.6, 3); C('safe', hw - 1.3, zA - 2.6, 0.9); }
+        def.slots = { bed: [rc, -hd + 3.0], wardrobe: [hw - 1.2, zA - 2.2], fridge: [-hw + 1.0, -hd + 1.4], tv: [sx, hd - 1.5], stash: [hall + 1.0, zA - 0.9], garage: [hw - 0.9, hd - 2.4], laptop: [hall + 1.0, hd - 1.5] };
+        if (tier >= 5) def.slots.bar = [-hw + 2.6, -0.9];
+      }
+      if (home.garageRect) { k.box(hw - 0.05, 0, hd - 2.4, 0.08, 2.2, 1.2, 0x6f7378); k.glow(hw - 0.1, 2.3, hd - 2.4, 0.03, 0.15, 0.6, 0x8fe39b, 2.2); }
+      def.containers = conts.map((c, i) => ({ ...c, i }));
+    }
+  };
+  // build once to learn the spot positions (the kit is cheap; the real build happens on install)
+  def.build(new InteriorKit(H), mulberry32(seed * 977 + 13));
+  const sl = def.slots, spots = [{ id: 'exit', x: def.exit.x, z: def.exit.z, r: 1.3, label: 'Leave' }];
+  if (prop) {
+    spots.push({ id: 'bed', x: sl.bed[0], z: sl.bed[1], r: 1.5, label: 'Sleep & save' });
+    spots.push({ id: 'wardrobe', x: sl.wardrobe[0], z: sl.wardrobe[1], r: 1.2, label: 'Wardrobe' });
+    spots.push({ id: 'fridge', x: sl.fridge[0], z: sl.fridge[1], r: 1.3, label: 'Grab a snack' });
+    spots.push({ id: 'tv', x: sl.tv[0], z: sl.tv[1], r: 1.3, label: 'Watch the news' });
+    spots.push({ id: 'stash', x: sl.stash[0], z: sl.stash[1], r: 1.3, label: 'Stash & property' });
+    if (sl.laptop) spots.push({ id: 'laptop', x: sl.laptop[0], z: sl.laptop[1], r: 1.1, label: 'Run your empire' });
+    if (sl.bar) spots.push({ id: 'bar', x: sl.bar[0], z: sl.bar[1], r: 1.2, label: 'Mix a drink' });
+    if (home.garageRect) spots.push({ id: 'garage', x: sl.garage[0], z: sl.garage[1], r: 1.2, label: 'Into the garage' });
+  } else for (const c of def.containers) spots.push({ id: 'c:' + c.i, x: c.x, z: c.z, r: c.r, label: (c.kind === 'safe' ? 'Crack the ' : 'Search the ') + LOOT_KIND[c.kind].label, kind: c.kind });
+  def.spots = spots;
+  def.noExit = true; // the exit is a spot (so it carries the right label)
+  return def;
+}
+
+/* ---------------- the Crestmoor mansion: two storeys ----------------
+   Ground floor (y 0): a double-height foyer with a grand staircase up the middle, living room with a
+   media wall and fireplace, a kitchen with an island, a dining room under the gallery, an office with
+   the safe, a bar lounge, a powder room and the stairs down to the motor court.
+   Upper floor (y 4.2): a gallery that looks down into the foyer, the master suite with an ensuite,
+   two more bedrooms, a second bathroom and a game room with a pool table and a big screen. */
+const MANSION_H1 = 4.2;
+function mansionInteriorDef(home, prop) {
+  const W = 28, D = 20, H1 = MANSION_H1, H2 = 3.9, H = H1 + H2, hw = W / 2, hd = D / 2;
+  const owned = !!prop;
+  const def = {
+    id: 'h:' + home.id, dynamic: true, name: prop ? prop.name : 'Crestmoor Estate', w: W, d: D, h: H, seed: 7171, tier: 6,
+    exit: { x: 0, z: hd - 0.7 }, spawnH: Math.PI, place: null, at: { x: (home.x0 + home.x1) / 2, z: (home.z0 + home.z1) / 2 },
+    door: { x: home.door.x, z: home.door.z, h: home.door.h }, home: home.id, propId: prop ? prop.id : null, owned,
+    // walkable decks and the grand stair: the upper floor is everything but the void over the foyer
+    levels: [
+      { x0: -hw, x1: hw, z0: -hd, z1: -2.2, h: H1 },
+      { x0: -hw, x1: -2.6, z0: -2.2, z1: hd, h: H1 },
+      { x0: 2.6, x1: hw, z0: -2.2, z1: hd, h: H1 },
+      { x0: -1.25, x1: 1.25, z0: -2.2, z1: 6.0, axis: 'z', dir: -1, h0: 0, h1: H1 }
+    ],
+    build(k, rng) {
+      def.windows = [];
+      const wall = 0xe8e2d4, wall2 = 0xdcd4c2, marble = 0xe8e4dc, marble2 = 0xd8d2c4, wood = 0x5a3e2b, gold = 0xd8b04a;
+      k.room(W, D, H, { floor: marble, wall, wall2, ceil: 0xf4f0e6, trim: 0x2a2620, lights: [4, 3], lightC: 0xfff4dc });
+      k.tiles(W, D, marble, marble2, 1.25);
+      k.door(0, hd - 0.02, 0, 0x3a2a1e, gold);
+      // ----- the upper floor slab (ceiling of the ground floor), with the foyer left open
+      const slab = (x0, z0, x1, z1) => { k.box((x0 + x1) / 2, H1 - 0.3, (z0 + z1) / 2, x1 - x0, 0.3, z1 - z0, 0xf4f0e6, { col: true }); k.box((x0 + x1) / 2, H1 - 0.012, (z0 + z1) / 2, x1 - x0 - 0.02, 0.014, z1 - z0 - 0.02, 0x6b4f3a, { flat: true }); };
+      slab(-hw, -hd, hw, -2.2); slab(-hw, -2.2, -2.6, hd); slab(2.6, -2.2, hw, hd);
+      for (let i = 0; i < 18; i++) k.box(-hw + (i + 0.5) * W / 18, H1 - 0.005, -hd / 2 - 1.1, W / 18 - 0.02, 0.008, hd - 2.3, i % 2 ? 0x6b4f3a : 0x634834, { flat: true });
+      // ----- grand staircase: 24 steps rising north from the foyer, solid underneath, banisters
+      const st0 = 6.0, st1 = -2.2, n = 24, run = (st0 - st1) / n;
+      for (let i = 0; i < n; i++) { const z = st0 - (i + 0.5) * run, top = (i + 1) * H1 / n; k.box(0, 0, z, 2.5, top, run + 0.01, marble); k.box(0, top - 0.02, z + run / 2 - 0.03, 2.5, 0.025, 0.06, 0x8a7a5a); }
+      FURN.rug(k, 0, 0, st0 + 1.4, 2.6, 2.2, 0x7a1a2a, 0x9a2a3a);
+      for (let i = 0; i < 12; i++) {
+        const za = st0 - i * (st0 - st1) / 12, zb = st0 - (i + 1) * (st0 - st1) / 12, ha = (st0 - za) / (st0 - st1) * H1, hb = (st0 - zb) / (st0 - st1) * H1;
+        // underside volume (you can't walk under the stair) and the banisters (you can't step off it)
+        if (ha > 0.4) k.cols.push({ x0: -1.25, x1: 1.25, z0: zb, z1: za, y0: 0, y1: ha - 0.05 });
+        for (const sx of [-1.33, 1.33]) { k.cols.push({ x0: sx - 0.08, x1: sx + 0.08, z0: zb, z1: za, y0: Math.max(0, ha - 0.3), y1: hb + 1.0 }); k.box(sx, ha + 0.9, (za + zb) / 2, 0.08, 0.08, za - zb + 0.02, 0x3a2a1e); k.box(sx, ha, (za + zb) / 2, 0.03, 0.9, 0.03, gold); }
+      }
+      k.box(-1.33, 0, st0 + 0.05, 0.25, 1.1, 0.25, 0x3a2a1e); k.box(1.33, 0, st0 + 0.05, 0.25, 1.1, 0.25, 0x3a2a1e);
+      // gallery railing round the void (glass, a polished rail), open where the stair arrives
+      const rail = (x0, z0, x1, z1) => { const ax = Math.abs(x1 - x0) > 0.1, len = ax ? x1 - x0 : z1 - z0; k.box((x0 + x1) / 2, H1, (z0 + z1) / 2, ax ? len : 0.05, 1.0, ax ? 0.05 : len, 0xa8c8d8); k.box((x0 + x1) / 2, H1 + 1.0, (z0 + z1) / 2, ax ? len : 0.1, 0.06, ax ? 0.1 : len, 0x3a2a1e); k.cols.push({ x0: Math.min(x0, x1) - 0.06, x1: Math.max(x0, x1) + 0.06, z0: Math.min(z0, z1) - 0.06, z1: Math.max(z0, z1) + 0.06, y0: H1, y1: H1 + 1.1 }); };
+      rail(-2.6, -2.2, -2.6, hd - 0.2); rail(2.6, -2.2, 2.6, hd - 0.2); rail(-2.6, -2.2, -1.35, -2.2); rail(1.35, -2.2, 2.6, -2.2);
+      FURN.chandelier(k, 0, H - 1.6, 4.5); FURN.chandelier(k, 0, H - 1.6, 8.0);
+      // ----- ground floor walls
+      const G = H1 - 0.3;
+      iwall(k, 'z', -4, -hd, hd, 0, G, wall, [[-6.8, -5.2], [1.0, 4.0]]); // foyer|living (wide), dining|kitchen
+      iwall(k, 'x', -2, -hw, -4, 0, G, wall2, [[-9.6, -8.4]]); // kitchen|living
+      iwall(k, 'z', 4, -hd, hd, 0, G, wall, [[-6.8, -5.2], [-1.0, 2.0], [6.4, 7.6]]); // dining|office, foyer|bar, foyer|powder
+      iwall(k, 'x', -3, 4, hw, 0, G, wall2); // office|bar
+      iwall(k, 'x', 4, 4, hw, 0, G, wall2, [[12.2, 13.4]]); // bar|motor-court stair (clear of the back bar)
+      iwall(k, 'z', 8, 4, hd, 0, G, wall2); // powder|stair
+      // foyer: console, plants, art, a statue on a plinth
+      k.box(-3.5, 0, 8.5, 0.5, 0.85, 2.0, wood, { col: true }); k.box(-3.5, 0.85, 8.5, 0.55, 0.04, 2.05, marble2);
+      FURN.plant(k, -3.4, 0, 9.4, 1.1); FURN.plant(k, 3.4, 0, 9.4, 1.1); FURN.art(k, -3.92, 1.4, 4.6, 1, 1.6, 1.1, 0x8a2f3a);
+      k.box(3.2, 0, 4.5, 0.8, 1.0, 0.8, marble2, { col: true }); k.box(3.2, 1.0, 4.5, 0.4, 0.9, 0.4, gold);
+      // living room: sectional, media wall, fireplace, rug, armchairs, lamps
+      FURN.rug(k, -9, 0, 4.5, 6.5, 4.8, 0x2a3a52, 0x3a4a62);
+      FURN.sofa(k, -9, 0, 3.2, 0, 3.6, 0x3a3f46); FURN.sofa(k, -11.6, 0, 5.4, 1, 2.4, 0x3a3f46);
+      FURN.coffeeTable(k, -9, 0, 5.0, 0, 1.8, 0.9, 0x1a1c20);
+      k.box(-9, 0, hd - 0.35, 5.0, 0.5, 0.5, 0x1a1c20, { col: true }); FURN.tv(k, -9, 0.4, hd - 0.2, 2, 3.4, false);
+      FURN.fireplace(k, -hw + 0.3, 0, 4.5, 1, 2.0); FURN.armchair(k, -5.2, 0, 6.6, 3, 0x6a4a3a); FURN.lamp(k, -13.4, 0, 1.0); FURN.lamp(k, -4.6, 0, 1.0);
+      FURN.art(k, -hw + 0.02, 1.6, 1.0, 1, 1.4, 1.0, 0x2a5f9e); FURN.plant(k, -13.3, 0, 9.3);
+      // kitchen: a long run with a range hood on the back wall, an island with stools, a second fridge
+      FURN.kitchenRun(k, -9.0, 0, -hd + 0.35, 0, 8.6, { upper: true, hood: true, base: 0x2a2c30, top: 0xe8e4dc, fridgeC: 0xb8bcc2 });
+      FURN.island(k, -9.0, 0, -6.2, 0, 3.4, 0x1a1c20, 0xe8e4dc, 4);
+      FURN.kitchenRun(k, -hw + 0.35, 0, -4.0, 1, 2.6, { upper: false, fridge: false, base: 0x2a2c30, top: 0xe8e4dc });
+      for (const lx of [-10.2, -7.8]) FURN.ceilingLight(k, lx, G + 0.3, -6.2, 1.0);
+      // dining room under the gallery: a table for ten, a sideboard, pendant lights
+      FURN.diningSet(k, 0, 0, -6.0, 1, 10, 0x2a2620); FURN.ceilingLight(k, 0, G + 0.3, -7.2, 1.2); FURN.ceilingLight(k, 0, G + 0.3, -4.8, 1.2);
+      k.box(0, 0, -hd + 0.35, 3.0, 0.9, 0.5, wood, { col: true }); FURN.art(k, 0, 1.5, -hd + 0.02, 0, 2.2, 1.2, 0x5a3a7a);
+      // office: desk with the laptop, bookshelves, the safe, a map on the wall
+      FURN.desk(k, 9.5, 0, -7.0, 0, 2.0, true, 0x3a2a1e); k.box(9.5, 0, -8.4, 0.9, 1.15, 0.12, 0x2a2a2e);
+      FURN.bookshelf(k, hw - 0.25, 0, -6.5, 3, 3.0, rng, 2.4); FURN.bookshelf(k, 6.0, 0, -hd + 0.25, 0, 3.0, rng, 2.4);
+      FURN.safe(k, hw - 0.45, 0, -3.6, 3); FURN.armchair(k, 6.0, 0, -4.2, 1, 0x4a2a1a);
+      k.box(4.1, 1.2, -8.7, 0.04, 1.3, 1.6, 0xc8b88a); for (let i = 0; i < 8; i++) k.box(4.12, 1.3 + (i % 3) * 0.4, -9.3 + i * 0.16, 0.01, 0.06, 0.06, 0xd23a2a);
+      // bar lounge
+      FURN.bar(k, 9.5, 0, 2.6, 2, 4.0, 4); FURN.sofa(k, 6.4, 0, -1.6, 0, 2.4, 0x5a1a2a); FURN.armchair(k, 12.6, 0, -1.6, 0, 0x5a1a2a); FURN.coffeeTable(k, 8.8, 0, -0.6, 0, 1.2, 0.7, 0x1a1c20);
+      FURN.rug(k, 9, 0, -0.8, 5.5, 3.0, 0x3a1a1a, 0x5a2a22);
+      // powder room
+      FURN.toilet(k, 7.4, 0, 9.4, 2); FURN.vanity(k, 5.2, 0, 9.5, 2, 0.8, 0x2a2c30);
+      // stairs down to the motor court
+      for (let i = 0; i < 6; i++) k.box(11, -0.02, 6.0 + i * 0.6, 3.6, 0.03, 0.55, i % 2 ? 0x3a3d42 : 0x44474d, { flat: true });
+      k.box(11, 0, 9.6, 3.6, 2.4, 0.1, 0x2a2c30); k.glow(11, 2.5, 9.5, 2.4, 0.18, 0.04, 0x8fe39b, 2.4);
+      k.box(9.2, 0, 7.8, 0.12, 1.0, 3.6, 0x3a3d42); k.box(12.8, 0, 7.8, 0.12, 1.0, 3.6, 0x3a3d42);
+      // ground floor lights under the slab
+      for (const [lx, lz] of [[-9, 1.5], [-9, 6.5], [9.5, -6.5], [9.5, 0.5], [6, 7], [11, 7]]) FURN.ceilingLight(k, lx, G + 0.3, lz, 1.2);
+      // ----- upper floor walls (from H1 up)
+      iwall(k, 'z', -4, -hd, hd, H1, H2, wall, [[-6.6, -5.4], [5.4, 6.6]]); // hall|master, gallery|bed2
+      iwall(k, 'z', 4, -hd, hd, H1, H2, wall, [[-6.6, -5.4], [5.4, 6.6]]); // hall|game, gallery|bed3
+      iwall(k, 'x', 1, -hw, -4, H1, H2, wall2, [[-11.6, -10.4]]); // master|ensuite
+      iwall(k, 'z', -8, 1, hd, H1, H2, wall2); // ensuite|bed2
+      iwall(k, 'x', 1, 4, hw, H1, H2, wall2, [[10.9, 12.1]]); // game|bath2
+      iwall(k, 'z', 9, 1, hd, H1, H2, wall2); // bed3|bath2
+      const U = H1;
+      // gallery and hall: bench, art, plants, a rug
+      FURN.rug(k, 0, U, -6.0, 6.0, 5.0, 0x7a1a2a, 0x9a2a3a); FURN.sofa(k, 0, U, -hd + 0.6, 0, 2.6, 0xe6e2da);
+      FURN.art(k, 0, U + 1.4, -hd + 0.02, 0, 2.4, 1.3, 0x2a5f9e); FURN.plant(k, -3.4, U, -hd + 0.5); FURN.plant(k, 3.4, U, -hd + 0.5);
+      FURN.plant(k, -3.3, U, hd - 0.6, 0.9); FURN.plant(k, 3.3, U, hd - 0.6, 0.9);
+      // master suite
+      FURN.rug(k, -9.5, U, -5.0, 5.0, 4.2, 0xc8bca8, 0xd8ccb8);
+      FURN.bed(k, -9.5, U, -hd + 1.35, 0, 2.2, 2.4, 0x6a3a8a, 0x1a1c20); FURN.nightstand(k, -11.1, U, -hd + 0.4, 0); FURN.nightstand(k, -7.9, U, -hd + 0.4, 0);
+      FURN.wardrobe(k, -hw + 0.35, U, -3.0, 1, 2.0, 0x2c2e33); FURN.dresser(k, -5.0, U, -3.2, 3, 1.6, 0x2c2e33, true);
+      FURN.sofa(k, -9.5, U, -1.0, 2, 2.2, 0xe6e2da); FURN.tv(k, -4.6, U, -8.4, 3, 1.8);
+      FURN.lamp(k, -12.8, U, -1.0);
+      // ensuite
+      FURN.tub(k, -12.6, U, 6.0, 1, 1.8); FURN.vanity(k, -11.0, U, hd - 0.35, 2, 1.6, 0x2a2c30); FURN.shower(k, -9.2, U, 2.2, 0, 1.2); FURN.toilet(k, -13.3, U, 2.0, 1);
+      // bedroom 2
+      FURN.bed(k, -6.0, U, hd - 1.3, 2, 1.6, 2.1, 0x2f5d8a); FURN.nightstand(k, -7.4, U, hd - 0.35, 2); FURN.desk(k, -6.0, U, 1.5, 0, 1.2, false); FURN.wardrobe(k, -7.6, U, 4.0, 1, 1.2);
+      // bedroom 3
+      FURN.bed(k, 6.5, U, hd - 1.3, 2, 1.6, 2.1, 0x3a6a4a); FURN.nightstand(k, 7.9, U, hd - 0.35, 2); FURN.dresser(k, 6.5, U, 1.5, 0, 1.4); FURN.wardrobe(k, 8.6, U, 4.2, 3, 1.2);
+      // bathroom 2
+      FURN.shower(k, 13.4, U, 2.0, 3, 1.1); FURN.toilet(k, 13.4, U, 6.0, 3); FURN.vanity(k, 11.5, U, hd - 0.35, 2, 1.0);
+      // game room: pool table, big screen with a sectional, arcade cabinets, a card table, a drinks cart
+      FURN.poolTable(k, 9.0, U, -6.0, 1); FURN.ceilingLight(k, 9.0, H, -6.0, 1.6);
+      k.box(hw - 0.35, U, -2.0, 0.5, 0.5, 4.0, 0x1a1c20, { col: true }); FURN.tv(k, hw - 0.2, U + 0.4, -2.0, 3, 3.2, false);
+      FURN.sofa(k, 9.6, U, -1.6, 1, 3.0, 0x2a3a52);
+      FURN.arcade(k, 5.0, U, -hd + 0.5, 0, 0x6a3a8a); FURN.arcade(k, 6.0, U, -hd + 0.5, 0, 0xd23a2a);
+      FURN.diningSet(k, 12.2, U, -8.4, 0, 4, 0x1f6a3e); k.box(4.5, U, -1.0, 0.6, 0.9, 0.5, 0x8a8a8a, { col: true });
+      for (let i = 0; i < 4; i++) k.glow(4.5 - 0.18 + i * 0.12, U + 0.92, -1.0, 0.08, 0.26, 0.08, [0xffb547, 0x46d4c4, 0xd28cff, 0x7fe08f][i], 1.3);
+      FURN.rug(k, 9.0, U, -6.0, 4.4, 5.0, 0x2a2a2e);
+      // upper ceiling lights in the rooms (the room() grid covers the rest)
+      for (const [lx, lz] of [[-9.5, -4.5], [-6, 5.5], [6.5, 5.5], [-11, 5.5], [11.5, 5.5]]) FURN.ceilingLight(k, lx, H, lz, 1.0);
+      // windows: the skyline behind glass, both floors
+      for (const [x, z, ry, w] of [[-9, -hd + 0.06, 0, 3.0], [9.5, -hd + 0.06, 0, 2.4], [-hw + 0.06, -6.0, Math.PI / 2, 2.8], [hw - 0.06, 0.5, -Math.PI / 2, 2.2]]) FURN.window(def, x, 1.1, z, w, 1.6, ry);
+      for (const [x, z, ry, w] of [[-9.5, -hd + 0.06, 0, 3.0], [9.0, -hd + 0.06, 0, 2.6], [-6.0, hd - 0.06, Math.PI, 2.2], [6.5, hd - 0.06, Math.PI, 2.2], [-hw + 0.06, -4.0, Math.PI / 2, 2.4]]) FURN.window(def, x, H1 + 1.0, z, w, 1.6, ry);
+    }
+  };
+  const U = H1;
+  def.spots = [
+    { id: 'exit', x: 0, z: hd - 0.7, r: 1.3, label: 'Leave' },
+    { id: 'upstairs', x: 0, z: 6.9, r: 1.1, label: 'Grand staircase · walk up to the bedrooms and the game room', hint: true }
+  ];
+  if (owned) def.spots.push(
+    { id: 'tv', x: -9, z: 6.6, r: 1.4, label: 'Watch the news' },
+    { id: 'fridge', x: -12.2, z: -hd + 1.4, r: 1.3, label: 'Grab a snack' },
+    { id: 'laptop', x: 9.5, z: -5.6, r: 1.3, label: 'Run your empire' },
+    { id: 'stash', x: hw - 1.3, z: -3.6, r: 1.3, label: 'Safe · stash & property' },
+    { id: 'bar', x: 9.5, z: 1.4, r: 1.3, label: 'Mix a drink' },
+    { id: 'motorcourt', x: 11, z: 6.8, r: 1.6, label: 'Down to the motor court' },
+    { id: 'bed', x: -9.5, y: U, z: -hd + 3.2, r: 1.6, label: 'Sleep & save' },
+    { id: 'wardrobe', x: -hw + 1.2, y: U, z: -3.0, r: 1.3, label: 'Wardrobe' },
+    { id: 'pool', x: 7.6, y: U, z: -6.0, r: 1.3, label: 'Shoot some pool' },
+    { id: 'tv', x: 11.6, y: U, z: -2.0, r: 1.3, label: 'Big screen · watch the news' }
+  );
+  // the 'upstairs' marker is only a hint, not an action
+  def.spots = def.spots.filter(s => !s.hint);
+  def.noExit = true;
+  return def;
+}
+
+// the penthouse: a glass apartment on the top tier of Valen Tower with a terrace all the way round.
+// Back: master suite (ensuite, safe), the elevator hall, a guest room with its own shower room.
+// Front, open plan: a lounge with a sectional and a wall screen, a study corner, a kitchen with an
+// island, dining for six and a bar; the terrace door in the middle; a hot tub outside.
 Object.assign(INTERIOR_DEFS.penthouse, {
-  w: 16, d: 14, h: 3.6, exit: { x: -6.2, z: -5.6 }, spawn: { x: -6.2, z: -4.2 }, spawnH: 0, noDoor: true, noExit: true, realView: true, windows: null,
-  build(k) {
-    const W = 16, D = 14, H = 3.6, T = 12; // T: terrace half-width (the tier below)
+  w: 16, d: 14, h: 3.6, exit: { x: 0, z: -5.6 }, spawn: { x: 0, z: -5.2 }, spawnH: 0, noDoor: true, noExit: true, realView: true, windows: null,
+  build(k, rng) {
+    const W = 16, D = 14, H = 3.6, T = 12, hw = W / 2, hd = D / 2;
     k.box(0, -0.25, 0, T * 2 + 0.4, 0.25, T * 2 + 0.4, 0xb8b0a0, { flat: true });
     k.tiles(W, D, 0x2a2c30, 0x34363c, 1.5);
     k.box(0, H, 0, W + 0.6, 0.3, D + 0.6, 0xeeeae2, { flat: true });
     // glass walls: mullions, a sill and a head beam; colliders all round except the terrace door
     const frame = 0x1a1c20;
-    for (const [x0, z0, x1, z1] of [[-W / 2, -D / 2, W / 2, -D / 2], [-W / 2, D / 2, W / 2, D / 2], [-W / 2, -D / 2, -W / 2, D / 2], [W / 2, -D / 2, W / 2, D / 2]]) {
+    for (const [x0, z0, x1, z1] of [[-hw, -hd, hw, -hd], [-hw, hd, hw, hd], [-hw, -hd, -hw, hd], [hw, -hd, hw, hd]]) {
       const len = Math.hypot(x1 - x0, z1 - z0), ax = Math.abs(x1 - x0) > 0.1, n = Math.round(len / 2);
       for (let i = 0; i <= n; i++) { const t = i / n; k.box(x0 + (x1 - x0) * t, 0, z0 + (z1 - z0) * t, 0.12, H, 0.12, frame); }
       k.box((x0 + x1) / 2, 0, (z0 + z1) / 2, ax ? len : 0.14, 0.3, ax ? 0.14 : len, frame);
       k.box((x0 + x1) / 2, H - 0.3, (z0 + z1) / 2, ax ? len : 0.14, 0.3, ax ? 0.14 : len, frame);
     }
-    const wall = (x0, z0, x1, z1) => k.cols.push({ x0: Math.min(x0, x1) - 0.08, x1: Math.max(x0, x1) + 0.08, z0: Math.min(z0, z1) - 0.08, z1: Math.max(z0, z1) + 0.08, y0: 0, y1: H });
-    wall(-W / 2, -D / 2, W / 2, -D / 2); wall(-W / 2, -D / 2, -W / 2, D / 2); wall(W / 2, -D / 2, W / 2, D / 2);
-    wall(-W / 2, D / 2, -1.6, D / 2); wall(1.6, D / 2, W / 2, D / 2);
-    // terrace: decking, planters, a lounger pair, a glass railing round the edge
+    const gl = (x0, z0, x1, z1) => k.cols.push({ x0: Math.min(x0, x1) - 0.08, x1: Math.max(x0, x1) + 0.08, z0: Math.min(z0, z1) - 0.08, z1: Math.max(z0, z1) + 0.08, y0: 0, y1: H });
+    gl(-hw, -hd, hw, -hd); gl(-hw, -hd, -hw, hd); gl(hw, -hd, hw, hd);
+    gl(-hw, hd, -1.6, hd); gl(1.6, hd, hw, hd);
+    // terrace: decking, planters, loungers, a hot tub, an outdoor lounge, a glass railing round the edge
     k.box(0, -0.02, 0, T * 2, 0.03, T * 2, 0x8a6a4a, { flat: true });
     for (const [x0, z0, x1, z1] of [[-T, -T, T, -T], [-T, T, T, T], [-T, -T, -T, T], [T, -T, T, T]]) {
       const ax = Math.abs(x1 - x0) > 0.1, len = ax ? x1 - x0 : z1 - z0;
@@ -41990,88 +42750,49 @@ Object.assign(INTERIOR_DEFS.penthouse, {
     }
     for (const [x, z] of [[-10, 10], [10, 10], [10, -10], [-10, -10]]) { k.box(x, 0, z, 1.2, 0.7, 1.2, 0x5a5e62, { col: true }); k.box(x, 0.7, z, 1.0, 1.4, 1.0, 0x2f6a3a); }
     for (const x of [-2.4, 2.4]) { k.box(x, 0, 10, 0.8, 0.35, 2.0, 0xf2f0ec, { col: true }); }
-    // inside: lounge, bed, bar, desk, wardrobe, elevator
-    k.box(-6.2, 0, -6.94, 1.9, 2.5, 0.08, 0x9ea4aa); k.glow(-6.2, 2.65, -6.88, 0.7, 0.16, 0.03, 0xffd84d, 2.5);
-    k.box(2.5, -0.004, 0.5, 6, 0.014, 4, 0xc8bca8, { flat: true });
-    k.box(2.5, 0, 1.7, 4.2, 0.42, 1.0, 0xe6e2da, { col: true }); k.box(2.5, 0.42, 2.12, 4.2, 0.55, 0.22, 0xdcd8d0);
-    k.box(2.5, 0, -0.2, 1.8, 0.35, 0.9, 0x111214, { col: true }); k.glow(2.5, 0.36, -0.2, 0.3, 0.02, 0.3, 0xffb547, 1.4);
-    k.box(-5, 0, 3.6, 2.4, 0.4, 2.6, 0x1a1c20, { col: true }); k.box(-5, 0.4, 3.6, 2.3, 0.22, 2.5, 0xf2f0ec); k.box(-5, 0.58, 4.1, 2.34, 0.08, 1.6, 0x6a3a8a);
-    k.box(-7.6, 0, -1, 0.62, 2.4, 2.4, 0x2c2e33, { col: true });
-    k.box(5.5, 0, -5.4, 3.2, 1.05, 0.7, 0x1a1c20, { col: true }); k.box(5.5, 1.05, -5.4, 3.3, 0.05, 0.8, 0xd8c8a0);
-    for (let i = 0; i < 6; i++) k.glow(4.3 + i * 0.48, 1.1, -5.55, 0.1, 0.3, 0.1, [0xffb547, 0x46d4c4, 0xd28cff][i % 3], 1.3);
-    k.box(6.6, 0, 4, 1.6, 0.75, 0.8, 0x2c2e33, { col: true }); k.glow(6.6, 0.95, 3.8, 0.5, 0.3, 0.03, 0x7fd0ff, 1.8);
+    k.box(-10.0, 0, 1.0, 2.6, 0.8, 2.6, 0xd8d4cc, { col: true }); k.glow(-10.0, 0.75, 1.0, 2.2, 0.04, 2.2, 0x46d4c4, 1.1);
+    FURN.sofa(k, 9.6, 0, 1.5, 3, 2.6, 0xe6e2da); FURN.coffeeTable(k, 8.4, 0, 1.5, 3, 1.2, 0.7, 0x8a6a4a);
+    // partitions (painted), the hall and the elevator
+    const wc = 0xd8d4cc;
+    iwall(k, 'z', -2, -hd, -1.5, 0, H, wc, [[-3.6, -2.4]]); iwall(k, 'z', 2, -hd, -1.5, 0, H, wc, [[-3.6, -2.4]]);
+    iwall(k, 'x', -1.5, -hw, -2, 0, H, wc); iwall(k, 'x', -1.5, 2, hw, 0, H, wc);
+    iwall(k, 'z', -6.2, -hd, -4.2, 0, H, wc); iwall(k, 'x', -4.2, -hw, -6.2, 0, H, wc, [[-7.6, -6.6]]); // master ensuite
+    iwall(k, 'z', 6.2, -hd, -4.2, 0, H, wc); iwall(k, 'x', -4.2, 6.2, hw, 0, H, wc, [[6.6, 7.6]]); // guest shower room
+    k.box(0, 0, -hd + 0.06, 1.9, 2.5, 0.08, 0x9ea4aa); k.box(0, 0, -hd + 0.1, 0.03, 2.4, 0.04, 0x55595e); k.glow(0, 2.65, -hd + 0.12, 0.7, 0.16, 0.03, 0xffd84d, 2.5);
+    FURN.art(k, -1.92, 1.3, -4.6, 1, 1.0, 1.3, 0x8a2f3a); FURN.art(k, 1.92, 1.3, -4.6, 3, 1.0, 1.3, 0x2a5f9e); FURN.plant(k, 1.5, 0, -6.4, 0.8);
+    // master suite
+    FURN.rug(k, -4.2, 0, -4.2, 3.6, 2.6, 0xc8bca8);
+    FURN.bed(k, -4.4, 0, -5.75, 0, 2.0, 2.4, 0x6a3a8a, 0x1a1c20); FURN.nightstand(k, -5.75, 0, -6.75, 0); FURN.nightstand(k, -3.05, 0, -6.75, 0);
+    FURN.wardrobe(k, -7.65, 0, -2.6, 1, 1.8, 0x2c2e33); FURN.safe(k, -2.45, 0, -6.3, 3);
+    FURN.tub(k, -7.4, 0, -6.0, 0, 1.7); FURN.vanity(k, -6.55, 0, -5.7, 3, 0.9, 0x2a2c30);
+    // guest room
+    FURN.bed(k, 4.4, 0, -5.75, 0, 1.6, 2.1, 0x2f5d8a); FURN.nightstand(k, 3.3, 0, -6.75, 0); FURN.dresser(k, 4.4, 0, -1.85, 2, 1.4, 0x2c2e33);
+    FURN.shower(k, 7.4, 0, -6.4, 3, 1.0); FURN.toilet(k, 7.55, 0, -5.0, 3);
+    // lounge: media wall on the master's front wall, a sectional facing it, a reading chair
+    k.box(-5.0, 0, -1.2, 4.4, 0.45, 0.4, 0x1a1c20, { col: true }); FURN.tv(k, -5.0, 0.3, -1.38, 0, 3.0, false);
+    FURN.sofa(k, -5.0, 0, 1.7, 2, 3.6, 0xe6e2da); FURN.sofa(k, -7.4, 0, 0.3, 1, 2.2, 0xe6e2da); FURN.coffeeTable(k, -5.0, 0, 0.35, 0, 1.6, 0.8, 0x111214);
+    FURN.rug(k, -5.0, 0, 0.9, 5.0, 3.6, 0xc8bca8, 0xd4c8b4); FURN.lamp(k, -2.6, 0, 0.0);
+    // study corner
+    FURN.desk(k, -6.6, 0, 6.35, 2, 1.6, true, 0x2c2e33); FURN.armchair(k, -3.9, 0, 6.0, 2, 0x4a2a1a); FURN.plant(k, -7.4, 0, 3.4, 0.9);
+    // kitchen, dining, bar
+    FURN.kitchenRun(k, 5.0, 0, -1.15, 0, 5.6, { upper: true, hood: true, base: 0x1a1c20, top: 0xd8d4cc, fridgeC: 0xb8bcc2, upperC: 0x2c2e33 });
+    FURN.island(k, 5.0, 0, 1.2, 0, 2.6, 0x1a1c20, 0xe8e4dc, 3);
+    FURN.diningSet(k, 3.0, 0, 4.6, 0, 6, 0x2a2620); FURN.ceilingLight(k, 3.0, H, 4.6, 1.4);
+    FURN.bar(k, 6.6, 0, 4.5, 3, 3.0, 3);
     for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) k.glow(-4 + i * 4, H - 0.08, -3 + j * 6, 1.1, 0.03, 0.4, 0xfff6e8, 2.4);
   },
   spots: [
-    { id: 'elevator', x: -6.2, z: -5.8, r: 1.4, label: 'Elevator' },
-    { id: 'bed', x: -5, z: 1.8, r: 1.5, label: 'Sleep & save' },
-    { id: 'tv', x: 2.5, z: 1.0, r: 1.2, label: 'Watch the news' },
-    { id: 'laptop', x: 6.6, z: 3.2, r: 1.1, label: 'Run your empire' },
-    { id: 'wardrobe', x: -6.9, z: -1, r: 1.2, label: 'Wardrobe' },
-    { id: 'bar', x: 5.5, z: -4.6, r: 1.2, label: 'Mix a drink' },
+    { id: 'elevator', x: 0, z: -5.8, r: 1.3, label: 'Elevator' },
+    { id: 'bed', x: -4.4, z: -3.9, r: 1.3, label: 'Sleep & save' },
+    { id: 'stash', x: -2.95, z: -5.1, r: 0.9, label: 'Safe · stash & property' },
+    { id: 'wardrobe', x: -6.7, z: -2.6, r: 1.1, label: 'Wardrobe' },
+    { id: 'tv', x: -5.0, z: 2.9, r: 1.3, label: 'Watch the news' },
+    { id: 'laptop', x: -6.6, z: 5.1, r: 1.2, label: 'Run your empire' },
+    { id: 'fridge', x: 2.9, z: -0.3, r: 1.1, label: 'Grab a snack' },
+    { id: 'bar', x: 5.3, z: 4.5, r: 1.2, label: 'Mix a drink' },
     { id: 'view', x: 0, z: 10.5, r: 1.8, label: 'Take in the view' }
   ]
 });
-// a house interior built from its footprint: rooms, doorways, furniture by room type
-function houseInteriorDef(home, prop) {
-  const big = home.type === 'mansion', apt = home.type === 'apartment';
-  const W = big ? 26 : clamp(Math.round((home.x1 - home.x0 + home.z1 - home.z0) / 2 + 2), 10, 15), D = big ? 16 : apt ? 9 : 9.5, H = big ? 4.2 : 2.9;
-  const seed = Math.abs(Math.floor(home.x0 * 13 + home.z0 * 7));
-  const def = {
-    id: 'h:' + home.id, dynamic: true, name: prop ? prop.name : (apt ? 'An apartment' : 'Somebody’s house'), w: W, d: D, h: H, seed,
-    exit: { x: -W / 2 + 1.6, z: D / 2 - 0.6 }, spawnH: Math.PI, place: null, at: { x: (home.x0 + home.x1) / 2, z: (home.z0 + home.z1) / 2 },
-    door: { x: home.door.x, z: home.door.z, h: home.door.h }, home: home.id, propId: prop ? prop.id : null, owned: !!prop,
-    build(k, rng) {
-      const pal = big ? { floor: 0x5a3e2b, wall: 0xe8e2d4, ceil: 0xf4f0e6 } : [{ floor: 0x7a5a3c, wall: 0xd8cfbf, ceil: 0xeeeae2 }, { floor: 0x9a8a72, wall: 0xc9d4d8, ceil: 0xeeeae2 }, { floor: 0x6b4f3a, wall: 0xe0d6c4, ceil: 0xe8e4dc }][Math.floor(rng() * 3)];
-      k.room(W, D, H, { floor: pal.floor, wall: pal.wall, ceil: pal.ceil, trim: 0x3a2a20, lights: big ? [4, 2] : [2, 1] });
-      k.planks(W, D, pal.floor, new THREE.Color(pal.floor).multiplyScalar(0.92).getHex(), Math.round(W * 1.4));
-      k.door(-W / 2 + 1.6, D / 2 - 0.02, 0);
-      // partition walls with doorways split the plan into rooms
-      const cuts = big ? [-W / 2 + 8, W / 2 - 8] : [-W / 2 + W * (0.42 + rng() * 0.12)];
-      for (const x of cuts) {
-        k.box(x, 0, -D / 2 + (D - 1.4) / 4, 0.15, H, (D - 1.4) / 2, pal.wall, { col: true });
-        k.box(x, 0, D / 2 - (D - 1.4) / 4, 0.15, H, (D - 1.4) / 2, pal.wall, { col: true });
-        k.box(x, 2.2, 0, 0.16, H - 2.2, 1.4, pal.wall);
-      }
-      const L0 = -W / 2, R0 = cuts[0];
-      // living room in the first part: sofa, coffee table, TV, rug
-      k.box((L0 + R0) / 2, -0.004, 0, Math.min(4, R0 - L0 - 1), 0.012, 2.6, [0x8a3a2a, 0x2a4a6a, 0x5a6a3a][Math.floor(rng() * 3)], { flat: true });
-      k.box((L0 + R0) / 2, 0, -D / 2 + 1.6, Math.min(3, R0 - L0 - 1.5), 0.45, 0.95, [0x4a5a6a, 0x6a4a3a, 0x3a3f46][Math.floor(rng() * 3)], { col: true });
-      k.box((L0 + R0) / 2, 0, D / 2 - 1.3, 1.9, 0.5, 0.45, 0x22201e, { col: true }); k.box((L0 + R0) / 2, 0.55, D / 2 - 1.2, 1.6, 0.9, 0.06, 0x111111); k.glow((L0 + R0) / 2, 0.6, D / 2 - 1.24, 1.46, 0.78, 0.02, 0x4a78b8, 1.4);
-      // kitchen strip on the far wall of the next room, then a bedroom
-      const K0 = R0, K1 = cuts[1] || W / 2;
-      k.box((K0 + K1) / 2, 0, -D / 2 + 0.4, Math.min(5, K1 - K0 - 0.6), 0.9, 0.6, 0x6a4a32, { col: true }); k.box((K0 + K1) / 2, 0.9, -D / 2 + 0.4, Math.min(5, K1 - K0 - 0.6) + 0.04, 0.05, 0.64, 0xb8b4ac);
-      k.box(K1 - 0.9, 0, -D / 2 + 0.45, 0.8, 1.85, 0.66, 0xe8eaec, { col: true });
-      k.box((K0 + K1) / 2, 0, 0.6, 1.4, 0.75, 0.9, 0x5a3e2b, { col: true });
-      const B0 = big ? cuts[1] : K0, B1 = W / 2;
-      const bx = big ? (B0 + B1) / 2 : K1 - 1.6;
-      k.box(bx, 0, D / 2 - 1.8, 2.0, 0.42, 2.4, 0x3a2a20, { col: true }); k.box(bx, 0.42, D / 2 - 1.8, 1.9, 0.22, 2.3, 0xe8e4dc); k.box(bx, 0.6, D / 2 - 2.2, 1.94, 0.09, 1.5, [0x2f5d8a, 0x7a2a3a, 0x3a6a4a][Math.floor(rng() * 3)]);
-      k.box(W / 2 - 0.35, 0, -0.5, 0.6, 2.0, 1.6, 0x5a3e2b, { col: true });
-      if (big) {
-        // the mansion's grand hall: chandelier, a staircase that goes nowhere useful, art and a bar
-        for (let i = 0; i < 3; i++) k.glow(i * 3 - 3, H - 0.6, 0, 0.5, 0.5, 0.5, 0xfff0c0, 2.4);
-        for (let i = 0; i < 8; i++) k.box(-2.5 + i * 0.6, 0, -D / 2 + 1.2 + 0.0, 0.6, 0.25 + i * 0.4, 2.2, 0xf4f0e6, { col: i < 3 });
-        k.box(-W / 2 + 0.6, 1.2, -2, 0.04, 2.2, 3.4, 0x2a3a52); k.glow(-W / 2 + 0.64, 1.4, -2, 0.02, 1.8, 3.0, 0xd8b04a, 0.8);
-        k.box(-W / 2 + 4, 0, D / 2 - 1.2, 3.4, 1.05, 0.7, 0x1a1c20, { col: true }); k.box(-W / 2 + 4, 1.05, D / 2 - 1.2, 3.5, 0.05, 0.8, 0xd8c8a0);
-        k.box(W / 2 - 4, 0, -D / 2 + 1, 2.6, 0.75, 1.2, 0x3a2a20, { col: true }); k.glow(W / 2 - 4, 0.95, -D / 2 + 1.3, 0.5, 0.3, 0.03, 0x7fd0ff, 1.8);
-      }
-      if (home.garageRect) { k.box(W / 2 - 0.05, 0, D / 2 - 2.4, 0.08, 2.2, 1.2, 0x6f7378); k.glow(W / 2 - 0.1, 2.3, D / 2 - 2.4, 0.03, 0.15, 0.6, 0x8fe39b, 2.2); }
-    }
-  };
-  const spots = [{ id: 'exit', x: def.exit.x, z: def.exit.z, r: 1.3, label: 'Leave' }];
-  if (prop) {
-    spots.push({ id: 'bed', x: big ? 9 : W / 2 - 3.2, z: D / 2 - 3.6, r: 1.5, label: 'Sleep & save' });
-    spots.push({ id: 'wardrobe', x: W / 2 - 1.2, z: -0.5, r: 1.2, label: 'Wardrobe' });
-    spots.push({ id: 'fridge', x: (big ? -W / 2 + 8 : -W / 2 + W * 0.5) + 2, z: -D / 2 + 1.4, r: 1.3, label: 'Grab a snack' });
-    spots.push({ id: 'tv', x: big ? -W / 2 + 4 : -W / 2 + 2.5, z: D / 2 - 2.4, r: 1.3, label: 'Watch the news' });
-    spots.push({ id: 'stash', x: big ? 9 : W / 2 - 3.2, z: -D / 2 + 1.8, r: 1.3, label: 'Stash & property' });
-    if (big) spots.push({ id: 'laptop', x: W / 2 - 4, z: -D / 2 + 2.4, r: 1.2, label: 'Run your empire' }, { id: 'motorcourt', x: 0, z: -D / 2 + 2.6, r: 1.6, label: 'Down to the motor court' }, { id: 'bar', x: -W / 2 + 4, z: D / 2 - 2.2, r: 1.2, label: 'Mix a drink' });
-    else if (home.garageRect) spots.push({ id: 'garage', x: W / 2 - 0.9, z: D / 2 - 2.4, r: 1.2, label: 'Into the garage' });
-  } else spots.push({ id: 'loot', x: W / 2 - 1.2, z: -0.5, r: 1.4, label: 'Search the place' });
-  def.spots = spots;
-  def.noExit = true; // the exit is a spot (so it carries the right label)
-  return def;
-}
 
 /* ---------------- drive-in garages under the street ----------------
    The mansion's ten-car motor court and the penthouse's four-car residents' garage. You drive
@@ -42387,6 +43108,7 @@ class InteriorManager {
   update(dt) {
     const g = this.g, def = this.cur; if (!def) return;
     if (!def.realView) interiorLighting(g);
+    if (def.id === 'prison' && g.uw && g.uw.prison.esc) { g.env.hemi.intensity = 0.42; g.renderer.toneMappingExposure = 0.75; }
     for (const c of def.chars) { c.pose.phase += dt; }
     if (!this.guards.length) return;
     // depot guards walk their loops and raise the alarm if they see you
@@ -42396,16 +43118,16 @@ class InteriorManager {
       const dx = tx - gd.x, dz = tz - gd.z, d = Math.hypot(dx, dz);
       if (gd.wait > 0) { gd.wait -= dt; gd.pose.amp = damp(gd.pose.amp, 0, 6, dt); }
       else if (d < 0.3) { gd.i = (gd.i + 1) % gd.route.length; gd.wait = 1.6; }
-      else { const sp = gd.alert > 0 ? 3.6 : 1.3; gd.x += dx / d * sp * dt; gd.z += dz / d * sp * dt; gd.h = dampAngle(gd.h, Math.atan2(dx, dz), 6, dt); gd.pose.amp = damp(gd.pose.amp, sp > 2 ? 1 : 0.6, 6, dt); gd.pose.phase += sp / 1.4 * Math.PI * dt; }
+      else { const sp = (gd.alert > 0 ? 3.6 : 1.3) / (gd.slow || 1); gd.x += dx / d * sp * dt; gd.z += dz / d * sp * dt; gd.h = dampAngle(gd.h, Math.atan2(dx, dz), 6, dt); gd.pose.amp = damp(gd.pose.amp, sp > 2 ? 1 : 0.6, 6, dt); gd.pose.phase += sp / 1.4 * Math.PI * dt; }
       const px = p.pos.x - gd.x, pz = p.pos.z - gd.z, pd = Math.hypot(px, pz);
       const facing = (px * Math.sin(gd.h) + pz * Math.cos(gd.h)) / (pd || 1);
       const sees = pd < 11 && facing > 0.45 && g.world.grid.lineOfSight(gd.x, IY + 1.6, gd.z, p.pos.x, IY + 1.3, p.pos.z);
-      if (sees || pd < 1.6) { gd.alert += dt; if (gd.alert > 0.7 && !this.alarm) { this.alarm = true; g.content.onAlarm(); } }
+      if (sees || pd < 1.6) { gd.alert += dt; if (gd.alert > 0.7 && !this.alarm) { this.alarm = true; if (this.onAlarm) this.onAlarm(); else g.content.onAlarm(); } }
     }
   }
   drawChars(cr) {
     const def = this.cur; if (!def) return;
-    for (const c of def.chars) cr.draw(c);
+    for (const c of def.chars) if (!c.hidden) cr.draw(c);
     for (const gd of this.guards) cr.draw(gd);
   }
   // street door prompts and interior spot prompts
@@ -42419,7 +43141,9 @@ class InteriorManager {
   nearSpot(p) {
     const def = this.cur; if (!def) return null;
     if (!def.noExit && Math.hypot(p.pos.x - (def.ox + def.exit.x), p.pos.z - (def.oz + def.exit.z)) < 1.3) return { id: 'exit', label: def.exitLabel || 'Leave' };
-    for (const s of def.spots) if (Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return s;
+    // spots on an upper floor only answer to someone standing on that floor
+    const ly = p.pos.y - def.fy;
+    for (const s of def.spots) if (Math.abs(ly - (s.y || 0)) < 1.6 && Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return s;
     return null;
   }
 }
@@ -43145,6 +43869,7 @@ class ContentManager {
   spotAct(id) {
     const g = this.g, p = g.player, I = this.interiors;
     if (id.startsWith('g:')) { g.gamble.spot(id); return; }
+    if (id.startsWith('c:')) { this.searchContainer(+id.slice(2)); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;
@@ -43154,6 +43879,7 @@ class ContentManager {
       case 'stash': if (I.cur && I.cur.propId) g.uw.ui.openProp(I.cur.propId); break;
       case 'motorcourt': g.vspaces.enter(g.vspaces.byProp('mansion'), null); break;
       case 'loot': this.burgle(); break;
+      case 'pool': g.audio.play('ui'); g.ui.toast(pick(['You break and sink two. The rest is a mess.', 'Bank shot off the cushion. Nobody saw it.', 'You clear the table in four. A shame nobody was watching.'])); break;
       case 'fridge': case 'bar':
         p.health = Math.min(p.maxHealth, p.health + 30 * HP_SCALE); g.audio.play('pickup'); g.ui.toast(id === 'bar' ? 'Something amber over ice. +90 health.' : 'Cold pizza. +90 health.'); break;
       case 'tv': g.uw.ui.open('feed'); break;
@@ -43207,22 +43933,87 @@ class ContentManager {
     this.interiors.exit(true);
     g.fade(() => { g.player.pos.set(x, groundY(x, z), z); g.player.h = home.door.h; g.cam.init = false; });
   }
-  // breaking into a house that isn't yours: a little hot property, a chance someone calls it in
+  // ------------------------------------------------------------ timed actions
+  // An action that takes a few seconds of standing still (cracking a safe, a prison shift). Moving
+  // away, taking a hit, a menu or an arrest cancels it. One at a time.
+  channel(label, secs, done, opt = {}) {
+    const p = this.g.player;
+    if (this.chan) return false;
+    this.chan = { label, secs, t: 0, done, x: p.pos.x, z: p.pos.z, hp: p.health, cancel: opt.cancel || null, r: opt.r || 1.6 };
+    const el = $('chanBar'); el.querySelector('.cl').textContent = label; el.classList.remove('hidden');
+    return true;
+  }
+  cancelChannel(why) {
+    const c = this.chan; if (!c) return;
+    this.chan = null; $('chanBar').classList.add('hidden');
+    if (c.cancel) c.cancel(why);
+    if (why) this.g.ui.toast(why, 'warn');
+  }
+  _updateChannel(dt) {
+    const c = this.chan; if (!c) return;
+    const g = this.g, p = g.player;
+    if (g.state !== 'playing' || p.state !== 'foot') { this.cancelChannel(null); return; }
+    if (Math.hypot(p.pos.x - c.x, p.pos.z - c.z) > c.r) { this.cancelChannel('Stopped: you walked away.'); return; }
+    if (p.health < c.hp - 1) { this.cancelChannel('Stopped: you were hit.'); return; }
+    if (dt > 0) c.t += dt;
+    $('chanBar').querySelector('.bar i').style.width = Math.min(100, c.t / c.secs * 100) + '%';
+    if (c.t >= c.secs) { this.chan = null; $('chanBar').classList.add('hidden'); c.done(); }
+  }
+  // ------------------------------------------------------------ burglary
+  // A house that isn't yours: its drawers, wardrobes and the odd safe are searched one at a time. Each
+  // container is rolled from a seeded loot table for this house and this week; searched containers stay
+  // empty until the week turns. Every search makes a little noise; a neighbour may call it in.
+  burgleState(def) {
+    const fl = this.g.save.flags.burgled || (this.g.save.flags.burgled = {}), week = Math.floor(this.g.uw.S.day / 7);
+    let st = fl[def.home];
+    if (!st || typeof st !== 'object' || st.w !== week) st = fl[def.home] = { w: week, s: [] };
+    return st;
+  }
+  // what a container holds (deterministic for the house, the container and the week); at least one
+  // container in every house has some cash in it
+  containerLoot(def, i) {
+    const week = Math.floor(this.g.uw.S.day / 7), tier = def.tier || 2;
+    const rolls = def.containers.map(c => rollLoot(c.kind, tier, mulberry32((def.seed + 1) * 7919 + c.i * 104729 + week * 31)));
+    if (!rolls.some(r => r.cash > 0)) { const j = def.containers.findIndex(c => c.kind !== 'bath' && c.kind !== 'safe'); if (j >= 0) rolls[j] = { cash: Math.round(LOOT_CASH[clamp(tier, 1, 6) - 1] * 0.8) }; }
+    return rolls[i];
+  }
+  searchContainer(i) {
+    const g = this.g, def = this.interiors.cur; if (!def || !def.containers || def.owned) return;
+    const c = def.containers[i]; if (!c) return;
+    const st = this.burgleState(def);
+    if (st.s.includes(i)) { g.ui.toast(`You already went through the ${LOOT_KIND[c.kind].label}.`, 'warn'); return; }
+    const K = LOOT_KIND[c.kind];
+    const finish = () => {
+      const st2 = this.burgleState(def); if (st2.s.includes(i)) return;
+      st2.s.push(i);
+      const L = this.containerLoot(def, i), got = [];
+      if (L.cash > 0) { g.addMoney(L.cash, true); got.push(fmtMoney(L.cash)); }
+      if (L.goods) { const r = g.uw.give(L.goods, 'burglary'); if (r) got.push(goodsList(r)); }
+      if (L.ammo > 0) { g.save.ammo.pistol = (g.save.ammo.pistol || 0) + L.ammo; got.push(`${L.ammo} pistol rounds`); }
+      if (L.gun && !g.save.weapons[L.gun]) { g.save.weapons[L.gun] = true; if (g.save.wloc) g.save.wloc[L.gun] = null; got.push('a ' + (WEAPONS.find(w => w.id === L.gun) || { name: L.gun }).name); }
+      if (got.length) { g.audio.play('pickup'); g.ui.toast(`${K.label[0].toUpperCase() + K.label.slice(1)}: ${got.join(', ')}.`, 'money'); }
+      else { g.audio.play('ui'); g.ui.toast(pick(['Nothing worth taking.', 'Old receipts and a dead phone charger.', 'Empty.', 'Socks. Just socks.'])); }
+      g.save.stats.burglaries = (g.save.stats.burglaries || 0) + 1;
+      // noise: a neighbour hears it; a safe is loud
+      const noise = c.kind === 'safe' ? 0.35 : 0.07 + st2.s.length * 0.015;
+      if (Math.random() < noise) { const d = def.door; g.police.crime('theft', d.x, d.z); g.ui.toast('A neighbour heard something and is calling it in. Get out.', 'warn'); }
+    };
+    if (K.slow) this.channel(`CRACKING THE ${K.label.toUpperCase()}`, K.slow, finish);
+    else { g.audio.play('ui'); finish(); }
+  }
+  // the old one-button search: the nearest container not searched yet
   burgle() {
-    const g = this.g, I = this.interiors, def = I.cur; if (!def) return;
-    const fl = g.save.flags.burgled || (g.save.flags.burgled = {}), day = g.uw.S.day;
-    if (fl[def.home] === day) { g.ui.toast('Nothing left worth carrying.', 'warn'); return; }
-    fl[def.home] = day;
-    const n = 1 + Math.floor(Math.random() * 3), cash = 20 + Math.floor(Math.random() * 110);
-    g.addMoney(cash, true); const got = g.uw.give({ hot: n }, 'burglary');
-    g.ui.toast(`Found ${fmtMoney(cash)}${got ? ' and ' + goodsList(got) : ''}.`, 'money');
-    g.audio.play('pickup');
-    if (Math.random() < 0.35) { const d = def.door; g.police.crime('theft', d.x, d.z); g.ui.toast('A neighbour saw the light come on. Somebody is calling it in.', 'warn'); }
+    const g = this.g, def = this.interiors.cur; if (!def || !def.containers) return;
+    const st = this.burgleState(def), left = def.containers.filter(c => !st.s.includes(c.i) && LOOT_KIND[c.kind] && !LOOT_KIND[c.kind].slow);
+    if (!left.length) { g.ui.toast('Nothing left worth carrying.', 'warn'); return; }
+    const p = g.player; left.sort((a, b) => Math.hypot(p.pos.x - def.ox - a.x, p.pos.z - def.oz - a.z) - Math.hypot(p.pos.x - def.ox - b.x, p.pos.z - def.oz - b.z));
+    this.searchContainer(left[0].i);
   }
   // ------------------------------------------------------------ per frame
   update(dt, rdt) {
     const g = this.g;
     this._updateComms(rdt);
+    this._updateChannel(dt);
     if (g.state !== 'playing') return;
     this.interiors.update(dt);
     this._updatePackages(dt);
@@ -43302,6 +44093,9 @@ class StuntTracker {
     return null;
   }
   launched(v) { this.launch = { x: v.pos.x, z: v.pos.z, y: v.pos.y, t: this.g.time, jump: this.findJump(v.pos.x, v.pos.z), hp: v.health }; }
+  // street furniture flattened by the player's car (it was called but never defined: driving through a
+  // lamp post or hydrant threw and cut that frame's update short)
+  destroyed(type) { const st = this.g.save.stats; st.smashed = (st.smashed || 0) + 1; void type; }
   landed(v, airT, imp) {
     const L = this.launch, g = this.g, s = g.save; this.launch = null;
     if (!L || airT < 0.6 || g.state !== 'playing') return;
@@ -44395,9 +45189,6 @@ const OFFICERS = [
   { id: 'vale', name: 'Deputy Chief Corinne Vale', rank: 'Headquarters', stage: 5, fee: 50000, honest: 0.5, perks: 'Halves the pressure your turfs generate and cuts every sentence in half.' }
 ];
 const OFFICER_BY_ID = Object.fromEntries(OFFICERS.map(o => [o.id, o]));
-// jail: one real minute is about one year; the normal world clock stands still
-const JAIL_DAYS_PER_SEC = 365 / 60;
-const SENTENCE_BASE = [10, 20, 60, 180, 365, 730]; // days by wanted level at arrest
 const CRIME_PRESSURE = { hitped: 2, assault: 1.2, shoot: 1.5, carjack: 1.6, stealcop: 5, ramcop: 2.5, hitcop: 4, shootcop: 6, copcar: 7, explosion: 3, koped: 2.5, theft: 0.8, deal: 1.5, pickpocket: 0.6 };
 function turfAt(x, z) {
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
@@ -44413,13 +45204,7 @@ function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
     default: return { x: x0, z: z0 + L - u, h: -Math.PI / 2 };
   }
 }
-function fmtDays(d) {
-  d = Math.max(0, Math.round(d));
-  const y = Math.floor(d / 365), r = d % 365;
-  if (y && r) return `${y} yr ${r} d`;
-  if (y) return `${y} year${y > 1 ? 's' : ''}`;
-  return `${d} day${d === 1 ? '' : 's'}`;
-}
+function fmtDays(d) { return fmtSentence(d); }
 function factionLook(fid, rng = Math.random) {
   const F = FACTIONS[fid], m = F.member, L = randomLook(rng);
   const p = a => Array.isArray(a) ? a[Math.floor(rng() * a.length)] : a;
@@ -45122,12 +45907,13 @@ class Underworld {
     S.opps = arr(S.opps, []).filter(o => o && typeof o === 'object' && typeof o.title === 'string').slice(-30); S.nextOpp = num(S.nextOpp, 1, 1);
     S.ledger = obj(S.ledger, { inc: {}, exp: {} }); S.ledger.inc = obj(S.ledger.inc, {}); S.ledger.exp = obj(S.ledger.exp, {}); S.lastLedger = obj(S.lastLedger, null);
     if (S.jail && typeof S.jail === 'object') {
-      const j = S.jail; j.total = Math.floor(num(j.total, 30, 1, 36500)); j.served = num(j.served, 0, 0, j.total); j.speed = [1, 5, 20].includes(j.speed) ? j.speed : 1;
-      j.call = num(j.call, 0, 0, 1e6); j.appealed = !!j.appealed; j.bribed = !!j.bribed; j.charges = typeof j.charges === 'string' ? j.charges : '';
+      Prison.sanitize(S.jail, num);
     } else S.jail = null;
     S.jailPhone = !!S.jailPhone; S.taskforce = num(S.taskforce, 0, 0, 60); S.crackdown = num(S.crackdown, 0, 0, 60);
     S.redirect = FACTIONS[S.redirect] ? S.redirect : null; S.pikeCD = num(S.pikeCD, 0, 0, 60); S.hiPressDays = num(S.hiPressDays, 0, 0, 999); S.warHours = num(S.warHours, 0, 0, 1e5);
     S.decisions = arr(S.decisions, []).filter(x => x && typeof x === 'object' && typeof x.text === 'string').slice(-6);
+    S.dayOffset = Math.floor(num(S.dayOffset, 0, 0, Math.max(0, S.day - 1))); S.fit = Math.floor(num(S.fit, 0, 0, 5));
+    S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, 0, 1e9);
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
@@ -45252,6 +46038,9 @@ class Underworld {
   factionTurfs(fid) { let n = 0; for (const o of this.owner) if (o === fid) n++; return n; }
   // ---------------------------------------------------------------- player power
   get influence() { return this._infl; }
+  // the career calendar shown to the player (internal day numbers keep counting from day 1; a v4 jail
+  // inflated them, and that inflation is not shown)
+  get calDay() { return Math.max(1, this.S.day - (this.S.dayOffset || 0)); }
   get stage() { return this._stage; }
   computeInfluence() {
     const S = this.S;
@@ -45495,7 +46284,7 @@ class Underworld {
     this.recompute(); this.computeInfluence();
     const L = S.ledger, inc = Object.values(L.inc).reduce((a, b) => a + b, 0), exp = Object.values(L.exp).reduce((a, b) => a + b, 0);
     S.lastLedger = { day: S.day - 1, inc: { ...L.inc }, exp: { ...L.exp } };
-    if ((inc || exp) && !S.jail) g.ui.toast(`Day ${S.day - 1} books: +${fmtMoney(inc)} / −${fmtMoney(exp)}`, inc >= exp ? 'money' : 'warn');
+    if ((inc || exp) && !S.jail) g.ui.toast(`Day ${this.calDay - 1} books: +${fmtMoney(inc)} / −${fmtMoney(exp)}`, inc >= exp ? 'money' : 'warn');
   }
   income(cat, n) { if (!(n > 0)) return; this.g.addMoney(n, true); this.S.ledger.inc[cat] = (this.S.ledger.inc[cat] || 0) + Math.round(n); }
   expense(cat, n) { if (!(n > 0)) return 0; const s = this.g.save; const paid = Math.min(s.money, n); s.money -= paid; s.stats.spent += paid; this.S.ledger.exp[cat] = (this.S.ledger.exp[cat] || 0) + Math.round(paid); return paid; }
@@ -47064,7 +47853,8 @@ class GarageDisplay {
    police presence, dirty officers with real limits, honest officers who
    cannot be bought, outside task forces and political crackdowns.
    ===================================================================== */
-const CRIME_DAYS = { hitped: 10, assault: 6, shoot: 15, carjack: 20, stealcop: 60, ramcop: 25, hitcop: 45, shootcop: 120, copcar: 90, explosion: 40, koped: 30, theft: 8, deal: 25, pickpocket: 4 };
+// days added per offence (capped at six counts each); ordinary early mistakes stay short
+const CRIME_DAYS = { hitped: 5, assault: 3, shoot: 8, carjack: 10, stealcop: 30, ramcop: 12, hitcop: 22, shootcop: 60, copcar: 45, explosion: 20, koped: 15, theft: 4, deal: 12, pickpocket: 2, robbery: 20, burglary: 6 };
 class PressureSystem {
   constructor(uw) { this.uw = uw; }
   get S() { return this.uw.S; }
@@ -47197,6 +47987,13 @@ class PressureSystem {
    keeps running; payphone and smuggled phone; appeal and paperwork bribes.
    ===================================================================== */
 const JAIL_LOOK = { shirt: 0xd8762a, pants: 0xd8762a, shoes: 0xe8e8e8, cap: -1, hair: 0x1a1410 };
+// the people in Block C you can get to know (each helps once per sentence when they trust you)
+const INMATES = {
+  inmate1: { name: 'Marcus "Deacon" Hale', blurb: 'Ran collections for half the Old Quarter. Still has friends out there.', gift: 'word', giftText: 'Put in a word with a crew outside' },
+  inmate2: { name: 'Tito Reyes', blurb: 'Knows every supplier who ever sold him short.', gift: 'contact', giftText: 'Pass on a supplier contact' },
+  inmate3: { name: 'Big Lou', blurb: 'Two hundred pounds of patience. Getting out the same month as you, maybe.', gift: 'recruit', giftText: 'Work for you when you’re both out' },
+  inmate4: { name: 'Kenji "Wire" Sato', blurb: 'Fixed the block’s cameras once. Knows when the night guard walks.', gift: 'ally', giftText: 'Help with a way out' }
+};
 INTERIOR_DEFS.prison = {
   name: 'Port Valen County Jail · Block C', place: 'prison', w: 26, d: 18, h: 4.6, exit: { x: 0, z: 99 }, spawnH: 0, noExit: true, noDoor: true,
   build(k, rng) {
@@ -47222,9 +48019,22 @@ INTERIOR_DEFS.prison = {
       k.box(tx, 0, tz, 2.4, 0.78, 1.0, 0x9aa0a6, { col: true });
       for (const s of [-1, 1]) k.box(tx, 0, tz + s * 0.95, 2.4, 0.45, 0.32, 0x8a9096);
     }
+    // cards on the middle table
+    for (let i = 0; i < 5; i++) k.box(-0.6 + i * 0.25, 0.79, 0.4 + (i % 2) * 0.12, 0.16, 0.01, 0.22, i % 2 ? 0xf4f2ee : 0xd23a2a);
+    k.box(0.6, 0.79, 0.6, 0.1, 0.1, 0.1, 0xf4f2ee); k.box(0.78, 0.79, 0.5, 0.1, 0.1, 0.1, 0xf4f2ee);
     k.box(-12.6, 1.6, 2, 0.08, 1.0, 1.6, 0x111111); k.glow(-12.55, 1.65, 2, 0.02, 0.9, 1.5, 0x6a8ab0, 1.3);
     k.box(12.7, 0.9, 3.5, 0.2, 0.7, 0.4, 0x2a2c30); k.box(12.6, 1.25, 3.5, 0.12, 0.25, 0.18, 0x111111); k.glow(12.58, 1.45, 3.5, 0.02, 0.1, 0.15, 0x7fe08f, 1.4);
     k.box(9, 0, 7, 5, 1.1, 0.4, 0x3a3e44, { col: true }); k.glow(9, 1.1, 7, 4.8, 1.4, 0.04, 0x8fb4c8, 0.5); k.box(9, 0, 8.2, 5, 1.0, 1.4, 0x4a4e54);
+    // visitation booth (lawyers) on the east wall: a counter, a glass screen, a stool, a handset
+    k.box(12.45, 0, -2.6, 0.9, 1.0, 2.2, 0x5a5e62, { col: true }); k.glow(12.5, 1.0, -2.6, 0.03, 1.4, 2.0, 0x8fb4c8, 0.5);
+    k.box(11.4, 0, -2.6, 0.45, 0.6, 0.45, 0x3a3e44); k.box(12.0, 1.05, -2.0, 0.08, 0.25, 0.1, 0x111111);
+    k.box(12.8, 2.4, -2.6, 0.04, 0.4, 1.6, 0x2f4a6a); k.glow(12.77, 2.45, -2.6, 0.02, 0.28, 1.4, 0xe8f4ff, 1.2);
+    // work board, laundry carts and a mop bucket on the west wall
+    k.box(-12.82, 1.3, -2.4, 0.04, 1.0, 1.4, 0xb59a6a); for (let i = 0; i < 6; i++) k.box(-12.78, 1.4 + (i % 2) * 0.4, -2.9 + Math.floor(i / 2) * 0.45, 0.02, 0.3, 0.32, 0xf4f2ee);
+    for (const z of [-0.9, 0.3]) { k.box(-11.8, 0.2, z, 0.9, 0.7, 0.9, 0x6a7a8a, { col: true }); k.box(-11.8, 0.85, z, 0.8, 0.15, 0.8, 0xe8e4dc); }
+    k.box(-11.2, 0, -3.6, 0.5, 0.45, 0.5, 0xd8a227, { col: true }); k.box(-11.2, 0.45, -3.6, 0.04, 1.0, 0.04, 0x8a6a4a);
+    // the maintenance hatch: a grate low on the west wall
+    k.box(-12.92, 0.15, 4.0, 0.06, 0.8, 1.1, 0x3a3e44); for (let i = 0; i < 6; i++) k.box(-12.88, 0.2 + i * 0.13, 4.0, 0.03, 0.04, 1.0, 0x22252a);
     // workout corner
     k.box(-9, 0, 6.2, 0.5, 0.45, 1.6, 0x2a2a2e, { col: true }); k.box(-9, 0.95, 6.0, 1.6, 0.06, 0.06, 0x9a9a9a);
     for (const s of [-1, 1]) k.box(-9 + s * 0.75, 0.95, 6.0, 0.08, 0.35, 0.35, 0x222222);
@@ -47233,12 +48043,20 @@ INTERIOR_DEFS.prison = {
     for (let i = 0; i < 5; i++) k.glow(-10 + i * 5, 3.7, 8.96, 2.0, 0.5, 0.03, 0xcfe0ff, 1.2);
   },
   spots: [
-    { id: 'bunk', x: -2, z: -7.2, r: 1.4, label: 'Bunk · time & empire' },
+    { id: 'bunk', x: -2, z: -7.2, r: 1.4, label: 'Bunk · sentence & empire' },
     { id: 'payphone', x: 12.0, z: 3.5, r: 1.3, label: 'Payphone' },
-    { id: 'smokey', x: 6.2, z: -1.4, r: 1.5, label: 'Talk to Smokey' },
+    { id: 'smokey', x: 6.2, z: -1.4, r: 1.5, label: 'Smokey · contraband' },
     { id: 'guard', x: 9, z: 6.3, r: 1.6, label: 'Guard post' },
+    { id: 'visit', x: 11.0, z: -2.6, r: 1.2, label: 'Visitation booth · lawyers' },
+    { id: 'work', x: -11.4, z: -2.4, r: 1.3, label: 'Work board · laundry, kitchen, cleaning' },
+    { id: 'cards', x: 0, z: 1.8, r: 1.1, label: 'Cards & dice' },
+    { id: 'hatch', x: -12.1, z: 4.0, r: 1.1, label: 'Maintenance hatch' },
     { id: 'weights', x: -9, z: 5.4, r: 1.3, label: 'Work out' },
-    { id: 'tv', x: -11.4, z: 2, r: 1.6, label: 'Watch the news' }
+    { id: 'tv', x: -11.4, z: 2, r: 1.2, label: 'Watch the news' },
+    { id: 'inmate:inmate1', x: -6, z: 1.9, r: 1.0, label: 'Talk to Deacon' },
+    { id: 'inmate:inmate2', x: -5.2, z: -1.8, r: 1.0, label: 'Talk to Tito' },
+    { id: 'inmate:inmate3', x: 1.0, z: 2.6, r: 1.0, label: 'Talk to Big Lou' },
+    { id: 'inmate:inmate4', x: -9.4, z: 4.2, r: 1.0, label: 'Talk to Wire' }
   ],
   npcs: [
     { id: 'smokey', x: 6.2, z: -0.6, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a, cap: 0x2a2a2e } },
@@ -47247,10 +48065,27 @@ INTERIOR_DEFS.prison = {
     { id: 'inmate3', x: 1.0, z: 1.5, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
     { id: 'inmate4', x: -9.4, z: 5.2, h: 0.4, look: { shirt: 0xd8762a, pants: 0xd8762a } },
     { id: 'guard', x: 9, z: 7.6, h: Math.PI, look: 'cop' }
-  ]
+  ],
+  // the night guard's walk during an escape (lights out): along the cells, past the tables, round the hatch side
+  guards: [[[-10.5, -3.6], [10.5, -3.6], [10.5, 3.2], [-4, 3.2], [-4, 6.0], [-10.6, 6.0], [-10.6, 0.6], [-6, -2.6]]]
 };
+// Sentencing: a sentence day passes every two real seconds while you are in the block (menus stop it).
+// The street does not stand still, but it moves a day for every week inside, so a long sentence costs
+// the empire weeks, not years, and the career calendar stays readable. There is no fast-forward.
+const JAIL_SEC_PER_DAY = 2;
+const JAIL_STREET_RATIO = 7;
+const SENTENCE_BASE = [5, 7, 14, 30, 75, 150]; // days by wanted level at arrest
+const SENTENCE_MAX = 3 * 365;
+// a sentence in readable form: "45 days", "1 year 74 days", "3 years"
+function fmtSentence(d) {
+  d = Math.max(0, Math.round(d));
+  const y = Math.floor(d / 365), r = d % 365;
+  const dd = n => `${n} day${n === 1 ? '' : 's'}`;
+  if (!y) return dd(d);
+  return `${y} year${y > 1 ? 's' : ''}${r ? ' ' + dd(r) : ''}`;
+}
 class Prison {
-  constructor(uw) { this.uw = uw; this.callT = 0; this.ambT = 0; }
+  constructor(uw) { this.uw = uw; this.callT = 0; this.ambT = 0; this.esc = null; }
   get S() { return this.uw.S; }
   get j() { return this.uw.S.jail; }
   charges() {
@@ -47260,16 +48095,17 @@ class Prison {
     let days = SENTENCE_BASE[clamp(lvl, 1, 5)];
     lines.push([`Resisting arrest / evading (${lvl}★)`, days]);
     const cur = S.rap.cur || {};
-    for (const k in cur) if (CRIME_DAYS[k] && cur[k] > 0) { const d = CRIME_DAYS[k] * Math.min(cur[k], 6); days += d; lines.push([`${({ hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person' })[k] || k} ×${cur[k]}`, d]); }
+    for (const k in cur) if (CRIME_DAYS[k] && cur[k] > 0) { const d = CRIME_DAYS[k] * Math.min(cur[k], 6); days += d; lines.push([`${({ hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person', robbery: 'Armed robbery', burglary: 'Burglary' })[k] || k} ×${cur[k]}`, d]); }
     const carried = uw.carried();
     // only what is on you (or in the car you were caught by): goods by lot, guns you were carrying
-    for (const k of GOOD_IDS) { const n = carried[k] | 0; const d = TIERS[GOODS[k].tier].charge * n; if (d) { days += d; lines.push([`Possession: ${fmtQty(k, n)} ${GOODS[k].name}`, d]); } }
+    for (const k of GOOD_IDS) { const n = carried[k] | 0; const d = Math.round(TIERS[GOODS[k].tier].charge * n * 0.5); if (d) { days += d; lines.push([`Possession: ${fmtQty(k, n)} ${GOODS[k].name}`, d]); } }
     const on = id => g.player.carries(id);
-    if (on('pistol') || on('smg') || on('shotgun')) { const d = (on('pistol') ? 30 : 0) + (on('smg') ? 90 : 0) + (on('shotgun') ? 60 : 0); days += d; lines.push(['Unlicensed firearms', d]); }
+    if (on('pistol') || on('smg') || on('shotgun')) { const d = (on('pistol') ? 14 : 0) + (on('smg') ? 45 : 0) + (on('shotgun') ? 30 : 0); days += d; lines.push(['Unlicensed firearms', d]); }
     const pv = g.player.lastVehicle;
-    if (pv && !pv.owned && !pv.garageUid && g.player.state === 'busted' && pv.stolenBefore) { days += 20; lines.push(['Possession of a stolen vehicle', 20]); }
-    const mul = (1 + S.rap.priors * 0.12) * uw.cops.sentenceMul();
-    const total = clamp(Math.round(days * mul), 7, 15 * 365);
+    if (pv && !pv.owned && !pv.garageUid && g.player.state === 'busted' && pv.stolenBefore) { days += 10; lines.push(['Possession of a stolen vehicle', 10]); }
+    if (S.fugitive && S.fugitive.left > 0) { const d = S.fugitive.left + 60; days += d; lines.push(['Escaped custody (the rest of your last sentence + 60 days)', d]); }
+    const mul = Math.min(1.8, 1 + S.rap.priors * 0.08) * uw.cops.sentenceMul();
+    const total = clamp(Math.round(days * mul), 5, SENTENCE_MAX);
     return { total, lines, mul };
   }
   // called once the arrest animation has played: sentence, confiscate, lock up
@@ -47291,14 +48127,39 @@ class Prison {
     for (const k in g.save.ammo) g.save.ammo[k] = 0;
     p.mag = { pistol: 0, smg: 0, shotgun: 0 }; p.weapon = 0; p.vest = 0; g.save.vest = 0;
     if (kept) uw.news('pv', `The police took what you carried. The ${kept === 1 ? 'gun' : kept + ' guns'} in your stash ${kept === 1 ? 'is' : 'are'} still there.`);
-    S.rap.priors++; S.rap.cur = {}; S.rap.maxLvl = 0;
-    S.jail = { total: ch.total, served: 0, speed: 1, call: 0, appealed: false, bribed: false, charges: ch.lines.map(l => `${l[0]}: ${fmtDays(l[1])}`).join(' · ') + (ch.mul > 1.01 ? ` · ×${ch.mul.toFixed(2)} record & pressure` : ch.mul < 0.99 ? ` · ×${ch.mul.toFixed(2)} (friends at the precinct)` : '') };
+    S.rap.priors++; S.rap.cur = {}; S.rap.maxLvl = 0; S.fugitive = null;
+    S.jail = Prison.fresh(ch);
     this.acc = 0;
     this.enter();
-    g.ui.banner('Sentenced', fmtDays(ch.total), 'fail', 3.5);
-    uw.news('pv', `Sentenced to ${fmtDays(ch.total)}. ${S.jailPhone ? 'Your phone is still taped under the bunk.' : 'You’ll need a phone to run anything from in here.'}`);
+    g.ui.banner('Sentenced', fmtSentence(ch.total), 'fail', 3.5);
+    uw.news('pv', `Sentenced to ${fmtSentence(ch.total)}. ${S.jailPhone ? 'Your phone is still taped under the bunk.' : 'You’ll need a phone to run anything from in here.'} Time passes while you’re out of your bunk: work, train, make friends, hire a lawyer, or find a way out.`);
     g.saveGame(true);
   }
+  static fresh(ch) {
+    return {
+      total: ch.total, served: 0, call: 0, appealed: false, bribed: false, credit: 0, standing: 10, susp: 0, intel: 0, tool: false, ally: false,
+      lockUntil: 0, inm: {}, lastJob: -9, lastBribe: -99, lastStudy: -9, lastLawyer: -99, lawyers: [], escapes: 0, streetAcc: 0, workouts: 0, gifts: [],
+      charges: ch.lines.map(l => `${l[0]}: ${fmtSentence(l[1])}`).join(' · ') + (ch.mul > 1.01 ? ` · ×${ch.mul.toFixed(2)} record & pressure` : ch.mul < 0.99 ? ` · ×${ch.mul.toFixed(2)} (friends at the precinct)` : '')
+    };
+  }
+  // fills in anything a saved sentence is missing (older saves had a speed setting and fewer fields)
+  static sanitize(j, num) {
+    const d = Prison.fresh({ total: 30, lines: [], mul: 1 });
+    j.total = Math.floor(num(j.total, 30, 1, 36500));
+    j.served = num(j.served, 0, 0, j.total);
+    delete j.speed;
+    for (const k of ['credit', 'standing', 'susp', 'intel', 'workouts', 'escapes', 'streetAcc', 'call']) j[k] = num(j[k], d[k], 0, 1e6);
+    for (const k of ['lastJob', 'lastBribe', 'lastStudy', 'lastLawyer', 'lockUntil']) j[k] = num(j[k], d[k], -999, 1e6);
+    j.standing = clamp(j.standing, 0, 100); j.susp = clamp(j.susp, 0, 100); j.intel = clamp(j.intel, 0, 3);
+    j.appealed = !!j.appealed; j.bribed = !!j.bribed; j.tool = !!j.tool; j.ally = !!j.ally;
+    j.lawyers = Array.isArray(j.lawyers) ? j.lawyers.filter(x => typeof x === 'string').slice(0, 3) : [];
+    j.gifts = Array.isArray(j.gifts) ? j.gifts.filter(x => INMATES[x]).slice(0, 4) : [];
+    j.inm = j.inm && typeof j.inm === 'object' ? j.inm : {};
+    for (const k in j.inm) { if (!INMATES[k]) delete j.inm[k]; else j.inm[k] = clamp(num(j.inm[k], 0), 0, 100); }
+    j.charges = typeof j.charges === 'string' ? j.charges : '';
+    return j;
+  }
+  get left() { const j = this.j; return j ? Math.max(0, j.total - j.served) : 0; }
   enter() {
     const uw = this.uw, g = uw.g, p = g.player;
     const def = INTERIOR_DEFS.prison;
@@ -47313,13 +48174,17 @@ class Prison {
     const uw = this.uw, S = this.S, g = uw.g, j = S.jail;
     if (!j) return;
     if (this.callT > 0) this.callT -= rdt;
-    // the jail clock: seconds are days. it stops while a menu is open (dt is 0 then).
-    if (dt > 0 && g.state === 'playing') {
-      this.acc = (this.acc || 0) + dt * JAIL_DAYS_PER_SEC * j.speed;
+    if (this.esc) this.updateEscape(dt);
+    // the sentence clock: two real seconds a day while you're in the block (a menu or the map stops it).
+    // The street moves a day for every week served.
+    else if (dt > 0 && g.state === 'playing') {
+      this.acc = (this.acc || 0) + dt / JAIL_SEC_PER_DAY;
       let n = 0;
-      while (this.acc >= 1 && j.served < j.total && n < 40) {
+      while (this.acc >= 1 && j.served < j.total && n < 5) {
         this.acc -= 1; j.served++; n++; S.st.jailDays++;
-        for (let q = 0; q < 4; q++) uw.tickHours(6, q * 6); uw.tickDay();
+        j.susp = Math.max(0, j.susp - 1.5);
+        j.streetAcc += 1 / JAIL_STREET_RATIO;
+        if (j.streetAcc >= 1) { j.streetAcc -= 1; for (let q = 0; q < 4; q++) uw.tickHours(6, q * 6); uw.tickDay(); }
       }
       if (j.served >= j.total) this.release();
     }
@@ -47328,12 +48193,18 @@ class Prison {
     if (this.ambT <= 0) { this.ambT = rand(3, 9); g.audio.play(Math.random() < 0.8 ? 'clank' : 'buzzer', { gain: rand(0.15, 0.4) }); }
     uw.ui.updateJail();
   }
-  setSpeed(k) { if (this.S.jail && [1, 5, 20].includes(k)) this.S.jail.speed = k; }
-  release() {
+  // time off for work and good behaviour: at most a fifth of the sentence
+  earnCredit(days) {
+    const j = this.j; if (!j) return 0;
+    const cap = Math.floor(j.total * 0.2), d = Math.max(0, Math.min(days, cap - j.credit, j.total - j.served - 1));
+    if (d > 0) { j.credit += d; j.total -= d; }
+    return d;
+  }
+  release(how) {
     const uw = this.uw, S = this.S, g = uw.g;
     if (!S.jail) return;
     const served = S.jail.served;
-    S.jail = null;
+    S.jail = null; this.esc = null;
     uw.ui.showJail(false);
     g.fade(() => {
       g.content.interiors.exit(true);
@@ -47343,58 +48214,329 @@ class Prison {
       g.police.clear();
       S.pressure = clamp(S.pressure * 0.65, 0, 100);
       S.lastHour = Math.floor(g.env.time);
-      g.ui.banner('Released', `Served ${fmtDays(served)}`, 'info', 3.5);
-      g.ui.toast('Released from County. Check your empire (Tab / Phone) — a lot can change inside.');
+      g.ui.banner('Released', `Served ${fmtSentence(served)}`, 'info', 3.5);
+      g.ui.toast('Released from County. Your record is clean of this one. Check your empire (Phone): the street moved on without you.');
       g.saveGame(true);
     }, true);
+    void how;
   }
   findAction() {
     const g = this.uw.g, p = g.player, def = INTERIOR_DEFS.prison;
+    if (this.esc) {
+      if (Math.hypot(p.pos.x - (def.ox - 12.1), p.pos.z - (def.oz + 4.0)) < 1.2) return { label: 'Unscrew the grate', act: () => this.escapeHatch() };
+      return null;
+    }
     for (const s of def.spots) if (Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return { label: s.label, act: () => this.spot(s.id) };
     return null;
   }
+  // ------------------------------------------------------------------ the block
+  say(who, t) { this.uw.g.content.say(who, t, 3.5); }
+  locked() { const j = this.j; return j && j.served < j.lockUntil ? j.lockUntil - j.served : 0; }
   spot(id) {
     const uw = this.uw, S = this.S, g = uw.g, j = S.jail;
     if (!j) return;
-    const say = (who, t) => g.content.say(who, t, 3.5);
+    const lock = this.locked();
+    if (lock && !['bunk', 'tv'].includes(id)) { this.say('Guard', `Lockdown. You stay by your bunk for ${fmtSentence(lock)} more.`); g.audio.play('deny'); return; }
+    if (id.startsWith('inmate:')) { this.openInmate(id.slice(7)); return; }
     switch (id) {
-      case 'bunk': uw.ui.open('overview'); break;
+      case 'bunk': this.openLife(); break;
       case 'tv': uw.ui.open('feed'); break;
       case 'payphone': {
-        if (S.jailPhone) { say('pv', 'You have your own phone. Use it.'); uw.ui.open('overview'); break; }
-        if (j.served - j.call < 30 && j.call > 0) { say('Guard', `One call a month. Next call in ${30 - (j.served - j.call)} days.`); break; }
+        if (S.jailPhone) { this.say('pv', 'You have your own phone. Use it.'); uw.ui.open('overview'); break; }
+        if (j.served - j.call < 30 && j.call > 0) { this.say('Guard', `One call a month. Next call in ${30 - (j.served - j.call)} days.`); break; }
         j.call = Math.max(1, j.served); this.callT = 75;
-        say('pv', 'You get one call. Make it count: you have about a minute.');
+        this.say('pv', 'You get one call. Make it count: you have about a minute.');
         uw.ui.open('crew');
         break;
       }
-      case 'smokey': {
-        if (S.jailPhone) { say('Smokey', 'Keep that phone under the mattress, yeah?'); break; }
-        const free = uw.influence >= 400;
-        const price = free ? 0 : 2500;
-        if (free) { S.jailPhone = true; say('Smokey', 'Your people sent this in with the laundry. Didn’t even have to ask.'); g.audio.play('pickup'); break; }
-        if (g.save.money < price) { say('Smokey', `A phone? ${fmtMoney(price)}, wired to my cousin. You don’t have it.`); break; }
-        g.ui.ask('Buy a smuggled phone?', `${fmtMoney(price)} to Smokey’s cousin. Full access to your empire from your cell, now and next time.`, 'Buy', () => { g.content.spend(price); S.jailPhone = true; g.audio.play('cash'); say('Smokey', 'Pleasure doing business.'); });
+      case 'smokey': this.openSmokey(); break;
+      case 'guard': this.openGuard(); break;
+      case 'visit': this.openLawyer(); break;
+      case 'work': this.openWork(); break;
+      case 'cards': this.openCards(); break;
+      case 'hatch': this.openHatch(); break;
+      case 'weights': {
+        g.content.channel('WORKING OUT', 5, () => {
+          const p = g.player; p.health = Math.min(p.maxHealth, p.health + 25 * HP_SCALE); p.stamina = 1; j.workouts++;
+          const fit = S.fit | 0;
+          if (j.workouts % 6 === 0 && fit < 5) { S.fit = fit + 1; this.say('pv', `Stronger. (+${S.fit * 3}% health for good — conditioning ${S.fit}/5)`); }
+          else this.say('pv', pick(['Twenty minutes on the bench.', 'Pull-ups till the arms give out.', 'Somebody spots you. Respect.']));
+          j.standing = clamp(j.standing + 1, 0, 100);
+        });
         break;
       }
-      case 'guard': {
-        const left = j.total - j.served;
-        if (!j.bribed && (uw.cops.perk('okoro') || uw.cops.perk('vale'))) {
-          g.ui.ask('Lose some paperwork?', `Your friends at the precinct can make a quarter of your remaining ${fmtDays(left)} disappear. Costs ${fmtMoney(left * 20)}.`, 'Do it', () => {
-            if (g.save.money < left * 20) { say('Guard', 'Money first.'); return; }
-            g.content.spend(left * 20); j.bribed = true; j.total = j.served + Math.ceil(left * 0.75); say('Guard', 'Funny. Your file seems to be missing a page.');
-          });
-        } else if (!j.appealed) {
-          const fee = Math.max(1500, left * 30);
-          g.ui.ask('Hire an appeals lawyer?', `${fmtMoney(fee)}. A good lawyer knocks about 30% off the remaining ${fmtDays(left)}. Once per sentence.`, 'Hire', () => {
-            if (g.save.money < fee) { say('Guard', 'Lawyers want money up front.'); return; }
-            g.content.spend(fee); j.appealed = true; j.total = j.served + Math.ceil(left * 0.7); say('pv', 'Appeal granted on a technicality.');
-          });
-        } else say('Guard', pick(['Back to your table.', 'Nothing for you here.', 'Count’s at six.']));
-        break;
-      }
-      case 'weights': { g.player.health = Math.min(g.player.maxHealth, g.player.health + 15 * HP_SCALE); g.player.stamina = 1; say('pv', 'Twenty minutes on the bench. Time goes faster.'); j.served = Math.min(j.total, j.served + 2); break; }
     }
+  }
+  // an overview of the sentence and of what the block offers; opened from the bunk or the HUD
+  openLife() {
+    const uw = this.uw, g = uw.g, S = this.S, j = this.j; if (!j) return;
+    const lock = this.locked();
+    const row = (a, b) => `<span>${a}</span><span>${b}</span>`;
+    const yes = (b, t) => b ? `<b style="color:var(--green)">✓ ${t}</b>` : `<span style="color:var(--dim)">✗ ${t}</span>`;
+    const render = () => `<div class="stats">${row('Sentence', '<b>' + fmtSentence(j.total) + '</b>')}${row('Served', fmtSentence(j.served))}${row('Remaining', '<b>' + fmtSentence(j.total - j.served) + '</b>')}${row('Good-time credit', fmtSentence(j.credit) + ' off (max ' + fmtSentence(Math.floor((j.total + j.credit) * 0.2)) + ')')}${row('Standing with the block', Math.round(j.standing) + ' / 100')}${row('Guard suspicion', `<span style="color:${j.susp > 60 ? 'var(--red)' : j.susp > 30 ? 'var(--amber)' : 'var(--green)'}">${Math.round(j.susp)} / 100</span>`)}${row('Street calendar', 'a day passes outside for every week in here')}</div>
+      ${lock ? `<div class="hint" style="color:var(--red)">Lockdown: ${fmtSentence(lock)} confined to your bunk.</div>` : ''}
+      <h3>Charges</h3><div class="hint" style="font-size:12px">${esc(j.charges || '—')}</div>
+      <h3>A way out</h3><div class="stats">${row('Guard rota', yes(j.intel >= 2, `known (${j.intel}/2)`))}${row('Tool for the grate', yes(j.tool, 'have one'))}${row('Someone to cover you', yes(j.ally, 'Wire (optional)'))}</div>
+      <h3>The block</h3><div class="hint" style="font-size:12px;line-height:1.5">
+        <b>Visitation booth</b> (east wall): hire a lawyer. · <b>Guard post</b>: bribes, and the night rota if you watch long enough. ·
+        <b>Work board</b> (west wall): laundry, kitchen, cleaning — commissary money and time off. · <b>Cards & dice</b> at the middle table. ·
+        <b>Weights</b>: conditioning that stays with you. · <b>Inmates</b>: get to know Deacon, Tito, Big Lou and Wire. ·
+        <b>Smokey</b>: a phone, a tool, anything for a price. · <b>Payphone</b>: one call a month. · <b>Maintenance hatch</b>: if you’re ready.</div>
+      <div class="btns"><button class="sbtn gold" data-act="empire">Empire (phone)</button><button class="sbtn" data-act="feed">News</button></div>`;
+    g.content.openSvc('County Jail · Block C', 'Time only passes while you’re out of this screen.', render, a => {
+      if (a === 'empire') { g.ui.back(); uw.ui.open('overview'); }
+      if (a === 'feed') { g.ui.back(); uw.ui.open('feed'); }
+    });
+  }
+  // ---- lawyers: one hearing a month; each firm once per sentence; never a sure thing
+  lawyerTiers() {
+    const left = this.left;
+    return [
+      { id: 'pd', name: 'Public defender', fee: 300, cut: [0.1, 0.2], base: 0.45, desc: 'Overworked, but he read your file. Probably.' },
+      { id: 'firm', name: 'Castellan & Ward', fee: Math.max(2500, left * 40), cut: [0.2, 0.35], base: 0.6, desc: 'A real criminal defence firm.' },
+      { id: 'silk', name: 'Adrienne Voss, QC', fee: Math.max(15000, left * 160), cut: [0.35, 0.55], base: 0.74, desc: 'Judges listen when she talks. She knows it.' }
+    ];
+  }
+  caseOdds(base) {
+    const S = this.S, j = this.j;
+    let p = base - S.rap.priors * 0.03 - (/firearm|Shooting|officer/i.test(j.charges) ? 0.08 : 0) - (/Possession/.test(j.charges) ? 0.05 : 0);
+    return clamp(p, 0.15, 0.9);
+  }
+  openLawyer() {
+    const uw = this.uw, g = uw.g, j = this.j;
+    const wait = Math.max(0, 30 - (j.served - j.lastLawyer));
+    const render = () => `<div class="hint">Your case: ${esc(j.charges || '—')}</div><div class="hint">Remaining: <b>${fmtSentence(this.left)}</b> · Cash <b class="money">${fmtMoney(g.save.money)}</b>${wait ? ` · next hearing in ${fmtSentence(wait)}` : ''}</div>
+      <div class="jobs">${this.lawyerTiers().map(t => { const used = j.lawyers.includes(t.id), odds = this.caseOdds(t.base); return `<div class="job"><div style="flex:1"><b>${t.name}</b><span>${t.desc} · cuts ${Math.round(t.cut[0] * 100)}–${Math.round(t.cut[1] * 100)}% off what’s left · about ${Math.round(odds * 100)}% chance with your case</span></div><button class="sbtn ${used ? '' : 'gold'}" data-act="hire:${t.id}" ${used || wait || this.left < 4 || g.save.money < t.fee ? 'disabled' : ''}>${used ? 'Used' : fmtMoney(t.fee)}</button></div>`; }).join('')}</div>
+      <div class="hint">A lawyer is paid whether the appeal works or not. Each firm takes your case once per sentence.</div>`;
+    g.content.openSvc('Visitation booth', 'Lawyers', render, a => {
+      const t = this.lawyerTiers().find(x => 'hire:' + x.id === a); if (!t) return;
+      if (j.lawyers.includes(t.id) || this.left < 4 || g.save.money < t.fee || Math.max(0, 30 - (j.served - j.lastLawyer)) > 0) return;
+      g.content.spend(t.fee); j.lawyers.push(t.id); j.lastLawyer = j.served; if (t.id === 'firm' || t.id === 'silk') j.appealed = true;
+      const ok = Math.random() < this.caseOdds(t.base);
+      if (ok) { const left = this.left, cut = Math.ceil(left * rand(t.cut[0], t.cut[1])); j.total -= cut; g.audio.play('pass'); g.content.refreshSvc(`Appeal granted. ${fmtSentence(cut)} off. ${fmtSentence(this.left)} to go.`); g.ui.banner('Appeal granted', `−${fmtSentence(cut)}`, 'pass', 2.5); }
+      else { g.audio.play('deny'); g.content.refreshSvc(pick(['The judge didn’t buy it. The fee stays paid.', 'Appeal denied on every count.', 'Your lawyer “did everything possible”. The sentence stands.'])); }
+    });
+  }
+  // ---- the guard post: bribes (privileges or paperwork) and studying the night rota
+  bribeOdds(kind) {
+    const uw = this.uw, j = this.j, friends = uw.cops.perk('okoro') || uw.cops.perk('vale');
+    const base = kind === 'perk' ? 0.62 : 0.4;
+    const ok = clamp(base + (friends ? 0.25 : 0) - j.susp / 220, 0.1, 0.9);
+    const back = clamp(0.12 + j.susp / 300 - (friends ? 0.06 : 0), 0.05, 0.5);
+    return { ok, back: Math.min(back, 1 - ok), refuse: Math.max(0, 1 - ok - back) };
+  }
+  openGuard() {
+    const uw = this.uw, g = uw.g, j = this.j;
+    const paperFee = Math.max(2000, this.left * 30);
+    const bwait = Math.max(0, 10 - (j.served - j.lastBribe)), swait = Math.max(0, 5 - (j.served - j.lastStudy));
+    const o1 = this.bribeOdds('perk'), o2 = this.bribeOdds('paper');
+    const odds = o => `${Math.round(o.ok * 100)}% yes · ${Math.round(o.refuse * 100)}% no · <span style="color:var(--red)">${Math.round(o.back * 100)}% it goes wrong</span>`;
+    const render = () => `<div class="hint">Suspicion <b style="color:${j.susp > 60 ? 'var(--red)' : 'var(--text)'}">${Math.round(j.susp)}</b> / 100 · Cash <b class="money">${fmtMoney(g.save.money)}</b>${bwait ? ` · the guard won’t take another offer for ${fmtSentence(bwait)}` : ''}</div>
+      <div class="jobs">
+      <div class="job"><div style="flex:1"><b>Slip him $500</b><span>Privileges: the payphone whenever you want it this month, and nobody looks in your bunk. ${odds(o1)}</span></div><button class="sbtn gold" data-act="perk" ${bwait || g.save.money < 500 ? 'disabled' : ''}>$500</button></div>
+      <div class="job"><div style="flex:1"><b>Lose some paperwork</b><span>A quarter of what’s left disappears from your file. ${odds(o2)}</span></div><button class="sbtn gold" data-act="paper" ${bwait || j.bribed || this.left < 8 || g.save.money < paperFee ? 'disabled' : ''}>${j.bribed ? 'Done' : fmtMoney(paperFee)}</button></div>
+      <div class="job"><div style="flex:1"><b>Watch the night rota</b><span>Stand around and learn when the night guard walks (${j.intel}/2 known). Raises suspicion a little.</span></div><button class="sbtn" data-act="study" ${swait || j.intel >= 2 ? 'disabled' : ''}>${j.intel >= 2 ? 'Known' : swait ? 'In ' + fmtSentence(swait) : 'Watch'}</button></div>
+      </div><div class="hint">If a bribe goes wrong you lose the money, get extra time and a lockdown, and the guards watch you closely.</div>`;
+    g.content.openSvc('Guard post', 'Officer Bright, nights and weekends', render, a => {
+      if (a === 'study') {
+        if (j.intel >= 2 || Math.max(0, 5 - (j.served - j.lastStudy)) > 0) return;
+        g.ui.back();
+        g.content.channel('WATCHING THE GUARD ROTA', 6, () => { j.intel = Math.min(2, j.intel + 1); j.lastStudy = j.served; j.susp = clamp(j.susp + 6, 0, 100); this.say('pv', j.intel >= 2 ? 'Midnight count, then twelve minutes of nothing on the west side. That’s the window.' : 'Count at ten, count at midnight. Need to see a night or two more.'); });
+        return;
+      }
+      if (Math.max(0, 10 - (j.served - j.lastBribe)) > 0) return;
+      const kind = a === 'paper' ? 'paper' : 'perk', fee = kind === 'paper' ? paperFee : 500;
+      if (g.save.money < fee || (kind === 'paper' && (j.bribed || this.left < 8))) return;
+      j.lastBribe = j.served;
+      const o = this.bribeOdds(kind), r = Math.random();
+      if (r < o.ok) {
+        g.content.spend(fee); g.audio.play('cash');
+        if (kind === 'paper') { const cut = Math.ceil(this.left * 0.25); j.total -= cut; j.bribed = true; g.content.refreshSvc(`Funny. Your file seems to be missing a page. −${fmtSentence(cut)}.`); }
+        else { j.call = 0; this.callT = 0; j.susp = Math.max(0, j.susp - 15); g.content.refreshSvc('He pockets it. The payphone is yours whenever, and your bunk stays unsearched.'); }
+      } else if (r < o.ok + o.refuse) { g.audio.play('deny'); j.susp = clamp(j.susp + 8, 0, 100); g.content.refreshSvc('He looks at the money, then at you. “Put that away.” Nothing lost but face.'); }
+      else {
+        g.content.spend(fee); g.audio.play('wanted');
+        const add = Math.max(10, Math.round(this.left * 0.1)); j.total += add; j.susp = clamp(j.susp + 35, 0, 100); j.lockUntil = j.served + 5; j.standing = clamp(j.standing - 5, 0, 100);
+        g.content.refreshSvc(`It was a setup. Bribing an officer: +${fmtSentence(add)}, five days of lockdown, and the money’s evidence now.`);
+        g.ui.banner('Bribe backfired', `+${fmtSentence(add)}`, 'fail', 2.5);
+      }
+    });
+  }
+  // ---- Smokey: the phone, a tool, smokes for standing
+  openSmokey() {
+    const uw = this.uw, g = uw.g, S = this.S, j = this.j;
+    const phonePrice = uw.influence >= 400 ? 0 : 2500;
+    const render = () => `<div class="hint">Cash <b class="money">${fmtMoney(g.save.money)}</b> · “Anything comes in with the laundry, for a price.”</div><div class="jobs">
+      <div class="job"><div style="flex:1"><b>Smuggled phone</b><span>Full access to your empire from your cell, now and next time.</span></div><button class="sbtn gold" data-act="phone" ${S.jailPhone || g.save.money < phonePrice ? 'disabled' : ''}>${S.jailPhone ? 'Have one' : phonePrice ? fmtMoney(phonePrice) : 'Free'}</button></div>
+      <div class="job"><div style="flex:1"><b>A screwdriver, filed down</b><span>Fits the screws on a maintenance grate. Don’t get caught with it.</span></div><button class="sbtn gold" data-act="tool" ${j.tool || g.save.money < 1500 ? 'disabled' : ''}>${j.tool ? 'Have one' : '$1,500'}</button></div>
+      <div class="job"><div style="flex:1"><b>Cartons for the block</b><span>Hand out smokes: +10 standing with everyone.</span></div><button class="sbtn" data-act="smokes" ${g.save.money < 200 ? 'disabled' : ''}>$200</button></div></div>`;
+    g.content.openSvc('Smokey', 'Contraband', render, a => {
+      if (a === 'phone' && !S.jailPhone && g.save.money >= phonePrice) { if (phonePrice) g.content.spend(phonePrice); S.jailPhone = true; g.audio.play('pickup'); g.content.refreshSvc(phonePrice ? 'Pleasure doing business. It’s taped under your bunk.' : 'Your people sent this in with the laundry. Didn’t even have to ask.'); }
+      if (a === 'tool' && !j.tool && g.save.money >= 1500) { g.content.spend(1500); j.tool = true; j.susp = clamp(j.susp + 5, 0, 100); g.audio.play('pickup'); g.content.refreshSvc('In your sock. Don’t sit funny.'); }
+      if (a === 'smokes' && g.save.money >= 200) { g.content.spend(200); j.standing = clamp(j.standing + 10, 0, 100); g.audio.play('cash'); g.content.refreshSvc('Word gets around that you’re good people.'); }
+    });
+  }
+  // ---- prison work: a shift is a few seconds of standing at the board; pays commissary money, earns
+  // good time, raises standing; the laundry sometimes turns up something useful
+  openWork() {
+    const uw = this.uw, g = uw.g, j = this.j;
+    const wait = Math.max(0, 2 - (j.served - j.lastJob));
+    const render = () => `<div class="hint">One shift every couple of days. A shift pays commissary money and earns good time (a day off now and then, up to a fifth of the sentence).${wait ? ` Next shift in ${fmtSentence(wait)}.` : ''}</div><div class="jobs">
+      <div class="job"><div style="flex:1"><b>Laundry</b><span>Hot, boring. Things get left in pockets.</span></div><button class="sbtn gold" data-act="laundry" ${wait ? 'disabled' : ''}>Work</button></div>
+      <div class="job"><div style="flex:1"><b>Kitchen</b><span>Better pay; the cooks trade cigarettes.</span></div><button class="sbtn gold" data-act="kitchen" ${wait ? 'disabled' : ''}>Work</button></div>
+      <div class="job"><div style="flex:1"><b>Cleaning</b><span>Mop the block. The guards notice who does.</span></div><button class="sbtn gold" data-act="clean" ${wait ? 'disabled' : ''}>Work</button></div></div>`;
+    g.content.openSvc('Work board', 'Prison jobs', render, a => {
+      if (!['laundry', 'kitchen', 'clean'].includes(a) || Math.max(0, 2 - (j.served - j.lastJob)) > 0) return;
+      g.ui.back();
+      g.content.channel(a === 'laundry' ? 'LAUNDRY SHIFT' : a === 'kitchen' ? 'KITCHEN SHIFT' : 'MOPPING THE BLOCK', 6, () => {
+        j.lastJob = j.served;
+        const pay = a === 'kitchen' ? randi(25, 45) : randi(15, 30); g.addMoney(pay, true);
+        const off = Math.random() < (a === 'clean' ? 0.75 : 0.55) ? this.earnCredit(1) : 0;
+        j.standing = clamp(j.standing + (a === 'kitchen' ? 3 : 2), 0, 100);
+        if (a === 'clean') j.susp = Math.max(0, j.susp - 6);
+        let extra = '';
+        if (a === 'laundry' && !j.tool && Math.random() < 0.1) { j.tool = true; extra = ' Something hard in a pocket: a screwdriver, filed down. You keep it.'; }
+        if (a === 'kitchen' && Math.random() < 0.3) { j.standing = clamp(j.standing + 4, 0, 100); extra = ' The cooks slip you a carton to share.'; }
+        this.say('pv', `${fmtMoney(pay)} commissary${off ? ', one day off for good behaviour' : ''}.${extra}`);
+      });
+    });
+  }
+  // ---- cards & dice: two dice each against an inmate; the higher total wins, ties go to the house
+  openCards() {
+    const uw = this.uw, g = uw.g, j = this.j;
+    this._dice = this._dice || null;
+    const d = this._dice;
+    const render = () => `<div class="hint">High dice: you and Shorty roll two each. Higher total wins even money; a tie is his. Cash <b class="money">${fmtMoney(g.save.money)}</b></div>
+      ${d ? `<div class="card"><div class="t">You ${d.a.join(' + ')} = <b>${d.a[0] + d.a[1]}</b> · Shorty ${d.b.join(' + ')} = <b>${d.b[0] + d.b[1]}</b></div><div class="d" style="color:${d.win ? 'var(--green)' : 'var(--red)'}">${d.win ? 'You win ' + fmtMoney(d.bet) : 'You lose ' + fmtMoney(d.bet)}</div></div>` : ''}
+      <div class="btns">${[20, 100, 500].map(b => `<button class="sbtn gold" data-act="bet:${b}" ${g.save.money < b ? 'disabled' : ''}>Bet ${fmtMoney(b)}</button>`).join('')}</div>`;
+    g.content.openSvc('Cards & dice', 'The middle table', render, a => {
+      const bet = +a.split(':')[1]; if (!(bet > 0) || g.save.money < bet) return;
+      const r6 = () => 1 + Math.floor(Math.random() * 6), A = [r6(), r6()], B = [r6(), r6()], win = A[0] + A[1] > B[0] + B[1];
+      if (win) g.addMoney(bet, true); else g.content.spend(bet);
+      this._dice = { a: A, b: B, win, bet }; j.standing = clamp(j.standing + 1, 0, 100);
+      g.audio.play(win ? 'cash' : 'ui');
+      g.content._svcRender = () => { const dd = this._dice; return render.call(null).replace(/^/, '') && `<div class="hint">High dice: you and Shorty roll two each. Higher total wins even money; a tie is his. Cash <b class="money">${fmtMoney(g.save.money)}</b></div><div class="card"><div class="t">You ${dd.a.join(' + ')} = <b>${dd.a[0] + dd.a[1]}</b> · Shorty ${dd.b.join(' + ')} = <b>${dd.b[0] + dd.b[1]}</b></div><div class="d" style="color:${dd.win ? 'var(--green)' : 'var(--red)'}">${dd.win ? 'You win ' + fmtMoney(dd.bet) : 'You lose ' + fmtMoney(dd.bet)}</div></div><div class="btns">${[20, 100, 500].map(b => `<button class="sbtn gold" data-act="bet:${b}" ${g.save.money < b ? 'disabled' : ''}>Bet ${fmtMoney(b)}</button>`).join('')}</div>`; };
+      g.content.refreshSvc();
+    });
+  }
+  // ---- inmates: chat, favours; once they trust you (40+), each can do one thing for you per sentence
+  openInmate(id) {
+    const uw = this.uw, g = uw.g, j = this.j, I = INMATES[id]; if (!I) return;
+    const rel = () => j.inm[id] | 0;
+    const render = () => {
+      const r = rel(), given = j.gifts.includes(id);
+      return `<div class="card"><div class="t">${esc(I.name)}</div><div class="d">${esc(I.blurb)}</div><div class="stat"><span>Trust</span><span>${r} / 100</span></div><div class="bar"><i style="width:${r}%"></i></div></div>
+      <div class="btns"><button class="sbtn" data-act="chat">Talk</button><button class="sbtn gold" data-act="favour">Do him a favour</button><button class="sbtn gold" data-act="gift" ${r < 40 || given ? 'disabled' : ''}>${given ? 'Done' : esc(I.giftText)}${r < 40 && !given ? ' (trust 40)' : ''}</button></div>`;
+    };
+    g.content.openSvc(I.name, 'Block C', render, a => {
+      if (a === 'chat') {
+        j.inm[id] = clamp(rel() + (j.standing > 40 ? 4 : 2), 0, 100);
+        const rumour = Math.random() < 0.35 ? this.rumour() : null;
+        g.content.refreshSvc(rumour || pick(['He talks about his kids. You listen.', '“Food’s worse than last year. Hard to believe.”', 'He nods at you. It’s something.']));
+      }
+      if (a === 'favour') {
+        g.ui.back();
+        g.content.channel('RUNNING AN ERRAND ON THE BLOCK', 4, () => { j.inm[id] = clamp(rel() + 12, 0, 100); j.standing = clamp(j.standing + 2, 0, 100); if (Math.random() < 0.2) { j.susp = clamp(j.susp + 6, 0, 100); this.say('Guard', 'What are you carrying there? …Fine. Move along.'); } else this.say(I.name.split(' ')[0], 'Appreciate it.'); });
+        return;
+      }
+      if (a === 'gift' && rel() >= 40 && !j.gifts.includes(id)) { j.gifts.push(id); g.content.refreshSvc(this.gift(id)); g.audio.play('pass'); }
+    });
+  }
+  rumour() {
+    const uw = this.uw, S = this.S;
+    const facs = FAC_IDS.filter(f => !S.factions[f].broken);
+    const f = pick(facs), F2 = FACTIONS[f];
+    return pick([`“${F2.short} are short on product this week. Prices will jump.”`, `“Heard ${F2.short} are moving a shipment through the docks soon.”`, `“Somebody in ${F2.short} is talking to the cops. Watch who you trust.”`, `“The task force is looking at the Strip. Don’t deal there for a while.”`]);
+  }
+  gift(id) {
+    const uw = this.uw, g = uw.g, S = this.S, j = this.j;
+    if (id === 'inmate1') { const facs = FAC_IDS.filter(f => !S.factions[f].broken); const f = facs.sort((a, b) => S.factions[a].rel - S.factions[b].rel)[0]; if (f) { S.factions[f].rel = clamp(S.factions[f].rel + 15, -100, 100); return `Deacon makes a call. The ${FACTIONS[f].short} think a little better of you (+15).`; } return 'Deacon shrugs: nobody left worth calling.'; }
+    if (id === 'inmate2') { const k = SPOTS.find(s => s.rep && g.save.rep < s.rep && !(S.flags.intro && S.flags.intro[s.id])); if (k) { (S.flags.intro || (S.flags.intro = {}))[k.id] = true; uw.news('unknown', `Tito’s cousin: “${k.name} will deal with you now. Tell them Tito sent you.”`); return `Tito gives you a name: ${k.name} (${k.role}). They’ll sell to you without the reputation.`; } return 'Tito: “You already know everybody I know.”'; }
+    if (id === 'inmate3') { const c = uw.crew.genCandidate(); c.name = 'Lou Brannigan'; c.nick = 'Big Lou'; c.skill = Math.max(c.skill, 55); c.loyalty = Math.max(c.loyalty, 78); c.fee = Math.round(c.fee * 0.5 / 10) * 10; S.cand.unshift(c); S.candDay = S.day; return 'Big Lou is in. He’ll be on your recruit list (half his usual fee) when you’re both out.'; }
+    if (id === 'inmate4') { j.ally = true; j.intel = Math.max(j.intel, 2); return 'Wire leans in: “Midnight count, then the night guard walks the cells and sits down by the door. I’ll make some noise at the far end when you go.” (Guard rota known; Wire will cover you.)'; }
+    return '';
+  }
+  // ---- the escape: a tool for the grate, the night rota, then lights-out. Get from your bunk to the
+  // maintenance hatch and unscrew it while the night guard walks his route. If he sees you, it's over.
+  openHatch() {
+    const uw = this.uw, g = uw.g, j = this.j;
+    const ready = j.tool && j.intel >= 2;
+    const render = () => `<div class="hint">A grate low on the west wall. Behind it, a crawlspace to the storm drains.</div><div class="stats">
+      <span>A tool for the screws</span><span>${j.tool ? '<b style="color:var(--green)">✓ in your sock</b>' : '✗ Smokey sells one; the laundry turns one up sometimes'}</span>
+      <span>The night guard’s rota</span><span>${j.intel >= 2 ? '<b style="color:var(--green)">✓ known</b>' : `✗ ${j.intel}/2 — watch the guard post, or ask Wire`}</span>
+      <span>Cover</span><span>${j.ally ? '<b style="color:var(--green)">✓ Wire makes noise at the far end</b>' : 'none (optional)'}</span></div>
+      <div class="hint">At lights-out you start at your bunk. Reach the grate without the night guard seeing you, then hold still while you unscrew it. Caught: months more, lockdown, and you lose the tool. Out: you’re a fugitive with every cop looking for you.</div>
+      <div class="btns"><button class="sbtn gold" data-act="go" ${ready ? '' : 'disabled'}>Wait for lights-out</button></div>`;
+    g.content.openSvc('Maintenance hatch', 'A way out', render, a => { if (a === 'go' && j.tool && j.intel >= 2) { g.ui.back(); this.startEscape(); } });
+  }
+  startEscape() {
+    const uw = this.uw, g = uw.g, j = this.j, I = g.content.interiors, def = INTERIOR_DEFS.prison, p = g.player;
+    j.escapes++;
+    g.fade(() => {
+      p.pos.set(def.ox - 2, IY, def.oz - 6.6); p.h = 0; g.cam.yaw = 0; g.cam.init = false;
+      this.esc = { t: 60, caught: false };
+      I.guards = def.guards.map((route, i) => ({ route, i: 1, x: def.ox + route[0][0], z: def.oz + route[0][1], h: 0, alert: 0, look: copLook(), pose: { phase: i * 2, amp: 0 }, flash: 0, y: IY, wait: 0, slow: j.ally ? 1.6 : 1 }));
+      I.alarm = false;
+      I.onAlarm = () => this.escapeCaught();
+      // the day guard and the inmates are asleep: they leave the common area
+      for (const c of def.chars) c.hidden = true;
+      g.ui.banner('Lights out', j.ally ? 'Wire starts banging on his bars at the far end' : 'Reach the grate on the west wall', 'info', 2.5);
+      g.audio.play('buzzer', { gain: 0.6 });
+    });
+  }
+  updateEscape(dt) {
+    const e = this.esc, g = this.uw.g;
+    if (!e || e.done) return;
+    if (dt > 0) e.t -= dt;
+    if (e.t <= 0 && !e.done) { this.escapeCaught('Morning count. You’re out of your bunk and the hatch is still shut.'); }
+  }
+  escapeHatch() {
+    const g = this.uw.g, e = this.esc; if (!e || e.done) return;
+    g.content.channel('UNSCREWING THE GRATE', 4, () => { if (this.esc && !this.esc.done) this.escapeOut(); });
+  }
+  endEscape() {
+    const g = this.uw.g, I = g.content.interiors;
+    I.guards = []; I.onAlarm = null; I.alarm = false;
+    for (const c of INTERIOR_DEFS.prison.chars || []) c.hidden = false;
+    if (g.content.chan) g.content.cancelChannel(null);
+    this.esc = null;
+  }
+  escapeCaught(why) {
+    const uw = this.uw, g = uw.g, j = this.j; if (!this.esc || this.esc.done) return;
+    this.esc.done = true;
+    g.audio.play('wanted');
+    g.fade(() => {
+      this.endEscape();
+      if (!this.j) return;
+      const add = Math.max(30, Math.round(this.left * 0.3));
+      j.total += add; j.tool = false; j.intel = 0; j.susp = 100; j.lockUntil = j.served + 10; j.standing = clamp(j.standing + 5, 0, 100);
+      const def = INTERIOR_DEFS.prison, p = g.player; p.pos.set(def.ox - 2, IY, def.oz - 6.6); p.h = 0; g.cam.init = false;
+      g.ui.banner('Caught', `Attempted escape: +${fmtSentence(add)}`, 'fail', 3);
+      this.say('Guard', why || 'Got you. Back in your box. You’ll be here a while longer now.');
+      g.saveGame(true);
+    });
+  }
+  escapeOut() {
+    const uw = this.uw, g = uw.g, S = this.S, j = this.j; if (!j || !this.esc) return;
+    this.esc.done = true;
+    const left = this.left;
+    g.fade(() => {
+      this.endEscape();
+      S.jail = null; uw.ui.showJail(false);
+      S.fugitive = { left, day: S.day };
+      g.content.interiors.exit(true);
+      g.player.applyOutfit(g.save.outfit);
+      // the storm drain comes out by the harbour wall, a few blocks from County
+      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CITY / 2, pl.z - CITY / 2);
+      const x = clamp(pl.x + Math.sin(ang) * 140, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * 140, 20, CITY - 20);
+      g.resetPlayerState(x, z, ang);
+      S.lastHour = Math.floor(g.env.time);
+      g.police.setLevel(3); g.police.crime('escape', x, z);
+      S.pressure = clamp(S.pressure + 15, 0, 100);
+      g.ui.banner('Escaped', 'Every cop in Port Valen has your picture', 'fail', 3.5);
+      uw.news('radio', `All units: inmate escaped from County Block C. Considered dangerous. ${fmtSentence(left)} left on the sentence.`);
+      g.saveGame(true);
+    });
   }
 }
 
@@ -47527,7 +48669,7 @@ class EmpireUI {
       const wx = mx / ui.mapK - ui.mapE, wz = mz / ui.mapK - ui.mapE;
       if (wx >= 0 && wz >= 0 && wx < CITY && wz < CITY) { this.selTurf = turfAt(wx, wz); this.render(); }
     });
-    $('jailSpeed').addEventListener('click', e => { const b = e.target.closest('[data-sp]'); if (!b) return; this.uw.prison.setSpeed(+b.dataset.sp); this.uw.g.audio.play('ui'); this.updateJail(true); });
+    $('jailLife').addEventListener('click', () => { if (this.uw.S.jail) this.uw.prison.openLife(); });
     $('jailEmpire').addEventListener('click', () => this.open('overview'));
     $('ovBtn').addEventListener('click', e => { e.stopPropagation(); this.toggleOverlay(); });
     $('turfInfo').addEventListener('click', e => e.stopPropagation());
@@ -47548,7 +48690,7 @@ class EmpireUI {
     uw.computeInfluence();
     document.querySelectorAll('#empTabs .etab').forEach(b => b.classList.toggle('on', b.dataset.tab === this.tab));
     const st = STAGES[uw.stage];
-    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span><span>Rep <b>${g.save.rep}</b></span><span>Influence <b>${uw.influence}</b></span><span>Pressure <b style="color:${S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)'}">${Math.round(S.pressure)}</b></span><span>Day <b>${S.day}</b></span>${S.jail ? `<span class="chipS red">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</span>` : ''}`;
+    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span><span>Rep <b>${g.save.rep}</b></span><span>Influence <b>${uw.influence}</b></span><span>Pressure <b style="color:${S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)'}">${Math.round(S.pressure)}</b></span><span>Day <b>${uw.calDay}</b></span>${S.jail ? `<span class="chipS red">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</span>` : ''}`;
     let h = '';
     if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; Smokey can get you a phone of your own.</div>`;
     else h = this['t_' + this.tab]();
@@ -47583,7 +48725,7 @@ class EmpireUI {
     }
     const today = S.ledger;
     if (Object.keys(today.inc).length || Object.keys(today.exp).length) h += `<h3>Today so far</h3><div class="stats">${Object.keys(today.inc).map(k => `<span>+ ${esc(k)}</span><span>${fmtMoney(today.inc[k])}</span>`).join('')}${Object.keys(today.exp).map(k => `<span>− ${esc(k)}</span><span>${fmtMoney(today.exp[k])}</span>`).join('')}</div>`;
-    if (S.jail) h += `<h3>Sentence</h3><div class="hint">${esc(S.jail.charges)}</div><div class="stats"><span>Served</span><span>${fmtDays(S.jail.served)} of ${fmtDays(S.jail.total)}</span></div>`;
+    if (S.jail) h += `<h3>Sentence</h3><div class="hint">${esc(S.jail.charges)}</div><div class="stats"><span>Sentence</span><span>${fmtSentence(S.jail.total)}</span><span>Served</span><span>${fmtSentence(S.jail.served)}</span><span>Remaining</span><span><b>${fmtSentence(S.jail.total - S.jail.served)}</b></span></div>`;
     h += `<h3>Record</h3><div class="stats"><span>Turfs taken / lost</span><span>${S.st.turfsTaken} / ${S.st.turfsLost}</span><span>Bosses beaten</span><span>${S.st.bossesBeaten}</span><span>Lots sold</span><span>${S.st.sold}</span><span>Realised profit</span><span>${fmtMoney(S.st.realized || 0)}</span><span>Deliveries (clean / sent)</span><span>${S.st.runsOk || 0} / ${S.st.runs || 0}</span><span>Cars chopped</span><span>${S.st.chopped}</span><span>Prior convictions</span><span>${S.rap.priors}</span><span>Days served</span><span>${S.st.jailDays}</span></div>`;
     return h;
   }
@@ -47961,7 +49103,7 @@ class EmpireUI {
     const z = L.zone;
     const stock = S.supply[s.id] || (S.supply[s.id] = {});
     for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
-    const locked = g.save.rep < (s.rep || 0);
+    const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
     const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${units(uw.nearVehicle().trunk)}/${TRUNK_CAP[uw.nearVehicle().type]}</b>` : ''}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>` +
       (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} reputation)</div>` : '<div class="jobs">' + s.sells.map(k => {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
@@ -48181,10 +49323,10 @@ class EmpireUI {
     const S = this.uw.S, j = S.jail; if (!j) return;
     this._jt = (this._jt || 0) - 1;
     if (!force && this._jt > 0) return; this._jt = 6;
-    $('jailDays').textContent = `Day ${j.served} of ${j.total}`;
-    $('jailLeft').textContent = fmtDays(j.total - j.served) + ' left';
-    $('jailBar').style.width = (j.served / j.total * 100) + '%';
-    document.querySelectorAll('#jailSpeed [data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === j.speed));
+    const esc2 = this.uw.prison.esc;
+    $('jailDays').textContent = esc2 ? `LIGHTS OUT · ${Math.max(0, Math.ceil(esc2.t))}s to the morning count` : `${fmtSentence(j.total - j.served)} left`;
+    $('jailLeft').textContent = `Sentence ${fmtSentence(j.total)} · served ${fmtSentence(j.served)}${j.credit ? ` · ${fmtSentence(j.credit)} good time` : ''}`;
+    $('jailBar').style.width = (j.served / Math.max(1, j.total) * 100) + '%';
     $('jailPhone').textContent = S.jailPhone ? 'Smuggled phone: full access' : this.uw.prison.callT > 0 ? `On the payphone: ${Math.ceil(this.uw.prison.callT)}s` : 'No phone';
   }
   // ---------------------------------------------------------------- HUD bits
@@ -48931,7 +50073,7 @@ class HudLayout {
     window.addEventListener('resize', size); window.addEventListener('orientationchange', size);
     if (window.ResizeObserver) { this.ro = new ResizeObserver(mark); for (const id of ['tbar', 'jailHud', 'objective', 'toasts', 'speedo']) { const el = $(id); if (el) this.ro.observe(el); } const tr = document.querySelector('#hud .tr'); if (tr) this.ro.observe(tr); }
   }
-  static WATCH = ['touch', 'minimapWrap', 'zone', 'objective', 'jailHud', 'speedo', 'phone', 'zoneCard', 'prompt'];
+  static WATCH = ['touch', 'minimapWrap', 'zone', 'objective', 'jailHud', 'speedo', 'phone', 'zoneCard', 'prompt', 'moneyFeed'];
   get active() { return document.body.classList.contains('touch') || this.mq.matches; }
   safe() { const cs = getComputedStyle($('safeProbe')); return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 }; }
   set(el, props) {
@@ -49017,6 +50159,9 @@ class HudLayout {
       }
       placed.push(out); return out;
     };
+    // the money feed hangs under the money cluster while it shows: right-hand cards drop below it
+    const mf = $('moneyFeed');
+    if (tr && mf && mf.classList.contains('on')) placed.push({ l: tr.l, r: tr.r, t: tr.b, b: tr.b + 4 + 4 * 22, w: tr.w, h: 92 });
     drop($('jailHud'), 'center');
     drop($('objective'), 'center');
     drop($('raceHud'), 'right');
@@ -49090,6 +50235,7 @@ class UIManager {
     this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false);
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
+    this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
     this._bind();
   }
   // labels = false draws no text: the rotating minimap and the zoomable big map draw labels on top
@@ -49361,8 +50507,38 @@ class UIManager {
     g.audio.play('cash'); g.saveGame(); this.renderShop();
   }
   // --------- per-frame HUD ---------
+  // one line in the +/- money feed (new lines on top, at most four, each shown ~2 s)
+  moneyPop(e, merged) {
+    const box = $('moneyFeed'); if (!box) return;
+    const txt = (e.d > 0 ? '+' : '−') + fmtMoney(Math.abs(Math.round(e.d)));
+    if (merged && e.el) { e.el.textContent = txt; e.el.className = (e.d > 0 ? 'up' : 'dn') + (Math.abs(e.d) >= 10000 ? ' big' : ''); e.ttl = 2.2; return; }
+    const el = document.createElement('b'); el.className = (e.d > 0 ? 'up' : 'dn') + (Math.abs(e.d) >= 10000 ? ' big' : ''); el.textContent = txt;
+    e.el = el; e.ttl = 2.2;
+    box.prepend(el); this.feed.unshift(e);
+    while (this.feed.length > 4) { const o = this.feed.pop(); if (o.el) o.el.remove(); }
+    this.placeFeed();
+  }
+  // under the money / wanted / clock cluster when the HUD is up, else the top-right corner (menus)
+  placeFeed() {
+    const box = $('moneyFeed'), tr = document.querySelector('#hud .tr');
+    const hudUp = !this.hud.classList.contains('hidden') && !this.modal && !this.g.mapOpen;
+    const r = hudUp && tr ? tr.getBoundingClientRect() : null;
+    const top = r && r.height > 0 ? Math.round(r.bottom + 4) + 'px' : 'calc(10px + var(--safe-t))';
+    if (box.style.top !== top) box.style.top = top;
+    box.classList.toggle('on', this.feed.length > 0);
+  }
+  tickFeed(dt) {
+    if (!this.feed.length) return;
+    for (let i = this.feed.length - 1; i >= 0; i--) {
+      const e = this.feed[i]; e.ttl -= dt;
+      if (e.ttl <= 0.35 && e.el && !e.el.classList.contains('out')) e.el.classList.add('out');
+      if (e.ttl <= 0) { if (e.el) e.el.remove(); this.feed.splice(i, 1); if (MoneyFeed.last === e) MoneyFeed.last = null; }
+    }
+    if (!this.feed.length) $('moneyFeed').classList.remove('on');
+  }
   update(dt) {
     const g = this.g, p = g.player, s = g.save;
+    this.tickFeed(dt);
     if (this.bannerUntil && performance.now() > this.bannerUntil) { this.bannerUntil = 0; this.show('banner', false); }
     if (g.state !== 'playing' && g.state !== 'dead' && g.state !== 'busted') return;
     // money
@@ -49967,7 +51143,7 @@ class MapView {
     // scale bar
     const mPerPx = 1 / (s * k), bar = [50, 100, 200, 500].find(v => v / mPerPx > 60) || 500, bw = bar / mPerPx;
     c.fillStyle = 'rgba(14,17,24,0.8)'; c.fillRect(8, H - 26, bw + 16, 18); c.fillStyle = '#fff'; c.fillRect(16, H - 14, bw, 3); c.font = '700 10px Arial'; c.textAlign = 'left'; c.fillText(bar + ' m', 16, H - 17);
-    if (g.uw) $('mapStat').textContent = `${STAGES[g.uw.stage].name} · ${g.uw.playerTurfs()} turfs · influence ${g.uw.influence} · rep ${g.save.rep} · pressure ${Math.round(g.uw.S.pressure)} · day ${g.uw.S.day}`;
+    if (g.uw) $('mapStat').textContent = `${STAGES[g.uw.stage].name} · ${g.uw.playerTurfs()} turfs · influence ${g.uw.influence} · rep ${g.save.rep} · pressure ${Math.round(g.uw.S.pressure)} · day ${g.uw.calDay}`;
   }
 }
 function fmtDist(d) { return d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'; }
@@ -50112,6 +51288,9 @@ const GradeShader = {
    ===================================================================== */
 let game = null;
 class Game {
+  // the save object is swapped on load / new career / quit; whichever is current reports money changes
+  get save() { return this._save; }
+  set save(v) { this._save = MoneyFeed.bind(v); }
   constructor() {
     const loaded = SaveSystem.load();
     this.save = loaded.data; this.hasSave = loaded.existed && loaded.data.stats.playTime > 3; this.migrated = !!loaded.migrated;
@@ -50228,12 +51407,12 @@ class Game {
   inView(x, y, z, r) { this._sph.center.set(x, y, z); this._sph.radius = r; return this.frustum.intersectsSphere(this._sph); }
   // ---------------- state flow ----------------
   showMenu() {
-    this.state = 'menu';
+    this.state = 'menu'; MoneyFeed.live = false;
     $('loading').style.opacity = 0; setTimeout(() => $('loading').classList.add('hidden'), 600);
     this.ui.show('mainMenu', true); this.ui.show('hud', false); this.ui.show('touch', false); this.ui.show('pauseMenu', false);
     $('btnContinue').disabled = !this.hasSave;
     const uw = this.save.uw;
-    $('continueSub').textContent = this.hasSave ? `${fmtMoney(this.save.money)} · ${uw && uw.jail ? 'in County Jail' : 'day ' + (uw ? uw.day : 1)} · ${this.uw ? STAGES[Math.min(6, (uw && uw.stageMax) || 0)].name : ''}` : 'No saved career yet';
+    $('continueSub').textContent = this.hasSave ? `${fmtMoney(this.save.money)} · ${uw && uw.jail ? 'in County Jail' : 'day ' + (uw ? Math.max(1, uw.day - (uw.dayOffset || 0)) : 1)} · ${this.uw ? STAGES[Math.min(6, (uw && uw.stageMax) || 0)].name : ''}` : 'No saved career yet';
     window.__pvBooted = true;
   }
   newGame() {
@@ -50255,6 +51434,7 @@ class Game {
     this.fade(() => {
       this.gamble.reset();
       this.ui.closeAll();
+      MoneyFeed.live = true;
       const gmsg = this.gamble.recover();
       this.ui.show('mainMenu', false); this.ui.show('hud', true);
       this.ui.show('touch', IS_TOUCH);
@@ -50901,7 +52081,7 @@ const GAME_CONFIG = Object.freeze({
   economy: { upgrades: UPGRADES, arms: ARMS, dealer: DEALER, tuning: TUNE, tuningRep: TUNE_REP, store: STORE_ITEMS, reputation: REP_LEVELS },
   underworld: { goods: GOODS, tiers: TIERS, demand: DEMAND, nightDemand: NIGHT_DEMAND, turfNames: TURF_NAMES, factions: FACTIONS, startOwner: START_OWNER, stages: STAGES,
     properties: PROPS, spots: SPOTS, hqs: HQS, chopValue: CHOP_VALUE, trunkCap: TRUNK_CAP, crewRoles: CREW_ROLES, ranks: RANKS, promoCost: PROMO_COST, traits: TRAITS,
-    officers: OFFICERS, jailDaysPerSec: JAIL_DAYS_PER_SEC, sentenceBase: SENTENCE_BASE, crimeDays: CRIME_DAYS, crimePressure: CRIME_PRESSURE },
+    officers: OFFICERS, jailSecPerDay: JAIL_SEC_PER_DAY, jailStreetRatio: JAIL_STREET_RATIO, sentenceBase: SENTENCE_BASE, sentenceMax: SENTENCE_MAX, inmates: INMATES, crimeDays: CRIME_DAYS, crimePressure: CRIME_PRESSURE },
   content: { contacts: CONTACTS, sideJobNames: MISSION_NAMES, arcs: ARCS, campaign: CAMPAIGN, races: RACES, events: EVENT_TYPES,
     interiors: INTERIOR_DEFS, outfits: OUTFITS, achievements: ACHIEVEMENTS, secrets: SECRETS, fastTravel: FAST_POINTS, policePosts: POSTS }
 });
@@ -50918,7 +52098,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
+    window.__pv = Object.freeze({ intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
     await game.init(progress);
   } catch (e) {
     console.error(e);

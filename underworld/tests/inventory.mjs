@@ -131,7 +131,7 @@ await ev(() => { const g = window.game; g.saveGame(true); g.police.enabled = tru
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const jailed = await ev(() => { const s = window.game.save, uw = window.game.uw; return { pistol: s.weapons.pistol, where: s.wloc.pistol, smg: s.weapons.smg, smgAmmo: s.ammo.smg, stashAmmo: uw.S.wstash.linden.ammo.pistol, vests: uw.S.wstash.linden.vests.length, inv: Object.keys(uw.S.inv).length }; });
 check('arrest: carried guns and rounds confiscated, the stashed pistol, its rounds and the spare vest stay', jailed.pistol && jailed.where === 'linden' && !jailed.smg && jailed.smgAmmo === 0 && jailed.stashAmmo === 24 && jailed.vests === 1 && jailed.inv === 0, JSON.stringify(jailed));
-await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); window.game.uw.prison.setSpeed(20); });
+await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
 await ev(() => { const g = window.game; g.police.clear(); g.police.enabled = false; g.save.money = 2e6; });
 

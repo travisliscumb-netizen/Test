@@ -51,7 +51,7 @@ async function arrestAndServe(tag, setup, opts = {}) {
   const c1 = await page.evaluate(() => ({ x: window.game.player.pos.x, z: window.game.player.pos.z }));
   check(`${tag}: can walk around inside`, Math.hypot(c1.x - c0.x, c1.z - c0.z) > 0.3);
   // serve fast: 20x and a short remaining sentence
-  await page.evaluate(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 40); window.game.uw.prison.setSpeed(20); });
+  await page.evaluate(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
   await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
   await frames(page, 6);
   const after = await page.evaluate(() => ({ t: window.game.env.time, day: window.game.uw.S.day }));

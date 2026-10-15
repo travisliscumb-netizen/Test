@@ -148,7 +148,7 @@ await ev(() => window.game.onBusted());
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
 const jailed = await ev(() => ({ inv: Object.keys(window.game.uw.S.inv).length, interior: window.game.player.interior && window.game.player.interior.id, veh: window.game.player.vehicle }));
 check('session: busted in the car -> jail, product confiscated', jailed.interior === 'prison' && jailed.inv === 0 && !jailed.veh, JSON.stringify(jailed));
-await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 20; window.game.uw.prison.setSpeed(20); });
+await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 2; });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000 });
 await frames(page, 6);
 await page.keyboard.press('KeyM'); await frames(page, 3);

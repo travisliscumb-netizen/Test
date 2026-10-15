@@ -87,7 +87,7 @@ await hudCheck('in jail');
 await tap('#tbar .tbtn[data-act="map"]');
 check('the map opens in jail', await ev(() => window.game.mapOpen));
 await tap('#mapClose'); await hudCheck('jail after the map');
-await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 15); window.game.uw.prison.setSpeed(20); });
+await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
 await ev(() => { window.game.police.enabled = false; window.game.save.money = 2e6; });
 // 6. reverse

@@ -117,8 +117,9 @@ await ev(() => window.game.content.spotAct('exit')); await waitFade();
 check('leaving unloads the interior', await ev(() => !Object.keys(window.game.content.interiors.defs).some(k => k.startsWith('h:'))));
 const brk = await ev(() => { const g = window.game; const h = g.world.homes.find(x => !x.propId && x.type !== 'farm' && window.__pv && Math.abs(Math.sin(x.x0 * 7)) >= 0 && g.content.nearHomeDoor({ pos: { x: x.door.x, z: x.door.z } })); if (!h) return null; g.resetPlayerState(h.door.x, h.door.z, 0); g.player.pos.x = h.door.x; g.player.pos.z = h.door.z; const a = g.content.findAction(); const l = a && a.label; if (a) a.act(); return l; });
 await waitFade(); await frames(page, 5);
-const loot = await ev(() => { const g = window.game, c = g.content.interiors.cur; if (!c) return null; const m0 = g.save.money; g.content.spotAct('loot'); return { id: c.id, gained: g.save.money - m0 }; });
-check('some other houses can be broken into and searched', /Break in|Slip into/.test(brk || '') && loot && loot.gained > 0, JSON.stringify({ brk, loot }));
+// every drawer, nightstand and wardrobe is searched in turn (the safe takes time and is skipped here)
+const loot = await ev(() => { const g = window.game, c = g.content.interiors.cur; if (!c) return null; const m0 = g.save.money, i0 = JSON.stringify(g.uw.S.inv), a0 = g.save.ammo.pistol; for (const ct of c.containers) if (ct.kind !== 'safe') g.content.spotAct('c:' + ct.i); return { id: c.id, n: c.containers.length, gained: g.save.money - m0, goods: JSON.stringify(g.uw.S.inv) !== i0, ammo: g.save.ammo.pistol - a0 }; });
+check('some other houses can be broken into and searched', /Break in|Slip into/.test(brk || '') && loot && loot.n >= 4 && (loot.gained > 0 || loot.goods || loot.ammo > 0), JSON.stringify({ brk, loot }));
 await ev(() => window.game.content.spotAct('exit')); await waitFade();
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'property');

@@ -85,7 +85,7 @@ for (let c = 0; c < CYCLES; c++) {
   if (c % 2 === 1) {
     await ev(() => { const g = window.game; g.police.setLevel(1); g.onBusted(); });
     await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
-    await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 25; window.game.uw.prison.setSpeed(20); });
+    await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 2; });
     await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000 });
   }
   if (c % 3 === 2) {
