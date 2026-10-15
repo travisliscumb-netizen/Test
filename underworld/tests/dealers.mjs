@@ -101,6 +101,17 @@ const insp = await ev(() => {
 });
 check('walking up to a used car offers to inspect it with its price and condition', /^Inspect .+ · \$[\d,]+ · (excellent|good|fair|rough)$/.test(insp.label), insp.label);
 check('the inspection shows price, condition, mileage and performance', /Condition/.test(insp.body) && /Mileage/.test(insp.body) && /Top speed/.test(insp.body) && /Buy/.test(insp.body), insp.body);
+// the same panel on a phone held sideways (844 × 390): nothing runs off the side, the Buy button is thumb-sized
+await page.setViewportSize({ width: 844, height: 390 });
+await frames(page, 10);
+const phone = await ev(i => {
+  const g = window.game; g.content.openLotCar('used', i);
+  const body = document.getElementById('svcBody'), btn = body.querySelector('button[data-act="buy"]'), r = btn.getBoundingClientRect();
+  const out = { overflow: body.scrollWidth > body.clientWidth + 1, btnH: Math.round(r.height), btnIn: r.right <= window.innerWidth && r.left >= 0 };
+  g.ui.closeAll(); return out;
+}, insp.i);
+await page.setViewportSize({ width: 480, height: 270 });
+check('on a phone the inspection panel fits and the Buy button is thumb-sized', !phone.overflow && phone.btnH >= 36 && phone.btnIn, JSON.stringify(phone));
 const buy = await ev(i => {
   const g = window.game, DL = g.dealers, s = g.save, c = DL.state('used').cars[i], v = DL.carAt('used', i);
   const m0 = s.money, n0 = s.garage.length;

@@ -9,7 +9,8 @@ const require = createRequire(import.meta.url);
 let playwright;
 try { playwright = require('playwright'); } catch { playwright = createRequire(path.join(process.execPath, '../../lib/node_modules/'))('playwright'); }
 export const { chromium } = playwright;
-export const FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'index.html');
+// UW_FILE runs a suite against another build (a staged copy, or an older build for comparisons)
+export const FILE = process.env.UW_FILE ? path.resolve(process.env.UW_FILE) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'index.html');
 const IGNORE = /GPU stall|swiftshader|WebGL-|Automatic fallback to software WebGL|GroupMarkerNotSet/i;
 export let failures = 0;
 export const results = [];
