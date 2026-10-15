@@ -169,9 +169,9 @@ node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
 
-## Validation record (this build, 2,388,719 bytes, sha256 `97bcd75e06f1`)
+## Validation record (this build, 2,590,386 bytes, sha256 `51dd45212692`)
 
-Every suite was run offline against the final file:
+Every suite was run offline against this pass (headless Chromium, SwiftShader):
 
 | Suite | Result |
 | --- | --- |
@@ -181,27 +181,40 @@ Every suite was run offline against the final file:
 | session | 33 / 33 |
 | ui (map / minimap / touch) | 23 / 23 |
 | offline | 14 / 14 |
-| soak (12 cycles: no listener/timer growth, heap 91.7 → 91.7 MB, frame cost flat) | 37 / 37 |
 | phone (8 phone sizes) | 71 / 71 |
 | map | 22 / 22 |
 | city | 25 / 25 |
-| property | 33 / 33 |
+| property | 33 / 33 (one intermittent failure of the motor-court exit drive in 1 of 4 runs; see below) |
 | stress (realistic phone session) | 29 / 29 |
+| soak (12 cycles: no listener/timer growth, heap 91.7 → 91.7 MB, frame cost 116 → 95 ms) | 37 / 37 |
+| shooting (new) | 37 / 37 |
+| survival (new) | 9 / 9 |
+| vehicles (new) | 39 / 39 |
+| inventory (new: located inventory, armory, deliveries, royalties, v3 migration) | 58 / 58 |
+| gambling (new) | 57 / 57 |
+| roads (new: curved roads, traffic, GPS, styles, map) | 18 / 18 |
 | master checksum (`sha256sum -c master-template-1.0-stable.sha256`) | OK |
+
+Known intermittent: property's "drive into the exit lane: back out on the estate drive" (a
+timing-driven drive out of the mansion motor court) failed once in four runs and passed on the
+other three. The parking test in the vehicles suite also failed once during development and has
+passed in every run since; its failure output now includes a position trace.
 
 `port-valen/tests/playtest.mjs` (the original template's playtest) needs the jsDelivr CDN to boot the
 template. It can't boot in an offline sandbox, before or after this pass.
 
-Performance comes from `tests/perf.mjs` (SwiftShader, two runs per build, compared with the previous build):
+Performance from `tests/perf.mjs` (SwiftShader), the original build of this pass against this build:
 
-| | previous build | this build |
+| | original build | this build |
 | --- | --- | --- |
-| desktop, low: game-logic update | 0.80–1.01 ms | 0.73–1.15 ms |
-| desktop, low: draw calls / triangles | 110–113 / 272–355k | 107–113 / 293–348k |
-| phone profile (4× CPU throttle, 800×400, quality 1): update | 4.0–6.5 ms | 4.7–8.9 ms |
-| phone profile: draw calls / triangles | 199–243 / 648–868k | 210–237 / 676–871k |
-| wall ms/frame (desktop / phone) | 320–364 / 1333–1600 | 276–348 / 1333–1601 |
+| desktop, low: game-logic update (calm / busy) | 1.07 / 0.76 ms | 0.72 / 0.76 ms |
+| desktop, low: draw calls / triangles (calm) | 111 / 348k | 113 / 354k |
+| phone profile (4x CPU throttle, 800x400): update (calm / busy) | 3.75 / 3.05 ms | 3.44 / 3.01 ms |
+| phone profile: draw calls / triangles (calm) | 232 / 877k | 241 / 883k |
+| wall ms/frame, phone busy (GPU-bound in SwiftShader, noisy) | 889 | 1000 |
 
-The update ranges overlap. A per-subsystem profile (300 updates under 4× throttle) puts both builds
-at 9.4–12.2 ms in total. The only new per-frame cost found there was the HUD layout pass. It now runs
-on change (cheap fingerprint plus ResizeObserver) with a 1 s safety timer, instead of every 0.1 s.
+The first-drive hitch reported on phones could not be reproduced here: both builds show the same
+first-play pattern, shader programs already compile behind the start-of-play fade, and the frame
+where you get into a car costs under 100 ms of script even at 4x CPU throttle. A warm-up pass behind
+the fade was tried and measured worse (it draws the whole streaming radius at once), so it was not
+kept. An on-device profile is needed to find the cause.
