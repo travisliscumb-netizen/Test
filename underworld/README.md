@@ -244,52 +244,67 @@ node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
 
-## Validation record (this build, 2,590,386 bytes, sha256 `51dd45212692`)
+## Validation record (this pass)
 
-Every suite was run offline against this pass (headless Chromium, SwiftShader):
+Every suite runs offline in headless Chromium with SwiftShader. Results below are for the final
+build of this pass (`index.html`, 2,767,364 bytes, schema 5). A full run of all 26 suites, two at
+a time, passed everything except four timing-sensitive checks. Each of those passed when its suite
+was re-run on its own:
 
 | Suite | Result |
 | --- | --- |
 | smoke | 16 / 16 |
-| core (melee facing, combo + step-in stress, reverse speed, reverse-camera transitions) | 64 / 64 |
-| arrest (9 situations, stale-state audit, death respawns) | 126 / 126 |
+| core (melee facing, combo stress, reverse speed and camera) | 64 / 64 |
+| arrest (9 situations, stale-state audit, death respawns, jail calendar) | 126 / 126 |
 | session | 33 / 33 |
-| ui (map / minimap / touch) | 23 / 23 |
+| ui | 23 / 23 |
 | offline | 14 / 14 |
 | phone (8 phone sizes) | 71 / 71 |
 | map | 22 / 22 |
 | city | 25 / 25 |
-| property | 33 / 33 (one intermittent failure of the motor-court exit drive in 1 of 4 runs; see below) |
-| stress (realistic phone session) | 29 / 29 |
-| soak (12 cycles: no listener/timer growth, heap 91.7 → 91.7 MB, frame cost 116 → 95 ms) | 37 / 37 |
-| shooting (new) | 37 / 37 |
-| survival (new) | 9 / 9 |
-| vehicles (new) | 39 / 39 |
-| inventory (new: located inventory, armory, deliveries, royalties, v3 migration) | 58 / 58 |
-| gambling (new) | 57 / 57 |
-| roads (new: curved roads, traffic, GPS, styles, map) | 18 / 18 |
-| master checksum (`sha256sum -c master-template-1.0-stable.sha256`) | OK |
+| property | 33 / 33 |
+| stress | 29 / 29 |
+| soak (12 cycles: listeners 209 → 209, no timer growth, heap 91.7 → 91.7 MB, frame cost 197 → 208 ms) | 37 / 37 |
+| shooting (now including the camera-tilted-down draw that failed before this pass) | 37 / 37 |
+| survival | 9 / 9 |
+| vehicles | 39 / 39 |
+| inventory | 58 / 58 |
+| gambling | 57 / 57 |
+| roads (now with the four suburb bends) | 20 / 20 |
+| ramps (new) | 21 / 21 |
+| interiors (new) | 22 / 22 |
+| prison (new) | 28 / 28 |
+| stations (new) | 17 / 17 |
+| taxi (new) | 20 / 20 |
+| phoneapps (new) | 19 / 19 |
+| kingpin (new) | 6 / 6 |
+| tutorial (new) | 13 / 13 |
+| money (new) | 10 / 10 |
+| master checksum (`port-valen/templates/master-template-1.0-stable.html`) | unchanged |
 
-Known intermittent: property's "drive into the exit lane: back out on the estate drive" (a
-timing-driven drive out of the mansion motor court) failed once in four runs and passed on the
-other three. The parking test in the vehicles suite also failed once during development and has
-passed in every run since; its failure output now includes a position trace.
+Timing-sensitive under load (they passed on their own, and stress's frame-stall check also failed
+on the original build before this pass): stress "no frame stall over 2.5 s", gambling "casino
+renders without a frame-rate collapse" and "the three reels stop one after another", arrest
+"hands-up arrest pose plays" (map open).
 
 `port-valen/tests/playtest.mjs` (the original template's playtest) needs the jsDelivr CDN to boot the
-template. It can't boot in an offline sandbox, before or after this pass.
+template. It can't boot in an offline sandbox.
 
-Performance from `tests/perf.mjs` (SwiftShader), the original build of this pass against this build:
+Performance from `tests/perf.mjs` (desktop profile, low quality, SwiftShader), three runs each,
+the build at the start of this pass against this build:
 
-| | original build | this build |
+| | start of pass | this build |
 | --- | --- | --- |
-| desktop, low: game-logic update (calm / busy) | 1.07 / 0.76 ms | 0.72 / 0.76 ms |
-| desktop, low: draw calls / triangles (calm) | 111 / 348k | 113 / 354k |
-| phone profile (4x CPU throttle, 800x400): update (calm / busy) | 3.75 / 3.05 ms | 3.44 / 3.01 ms |
-| phone profile: draw calls / triangles (calm) | 232 / 877k | 241 / 883k |
-| wall ms/frame, phone busy (GPU-bound in SwiftShader, noisy) | 889 | 1000 |
+| game-logic update, calm (ms/frame) | 1.11 / 1.09 / 0.79 | 2.00 / 1.43 / 1.02 |
+| game-logic update, busy (ms/frame) | 1.23 / 1.30 / 0.97 | 1.26 / ~1.3 / ~1.0 |
+| draw calls (calm) | 113-115 | 117-119 |
+| triangles (calm) | 352k-356k | 361k-365k |
 
-The first-drive hitch reported on phones could not be reproduced here: both builds show the same
-first-play pattern, shader programs already compile behind the start-of-play fade, and the frame
-where you get into a car costs under 100 ms of script even at 4x CPU throttle. A warm-up pass behind
-the fade was tried and measured worse (it draws the whole streaming radius at once), so it was not
-kept. An on-device profile is needed to find the cause.
+The extra draw calls are the city-wide entrance meshes and the door ring. Logic update is about
+0.3 ms a frame higher in a calm scene (taxi service, tutorial, entrance ring, the vehicle ground
+pass per physics substep), inside the run-to-run noise of this probe. Wall-clock frame times in
+SwiftShader are GPU-bound and too noisy to compare.
+
+The first-drive hitch on phones could not be reproduced in headless software rendering. Instead of
+a speculative warm-up, this build records it: Settings › Diagnostics › Show hitch log lists every
+frame over 120 ms with what happened just before it.
