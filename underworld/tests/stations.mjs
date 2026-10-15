@@ -39,8 +39,9 @@ const rob = await ev(() => {
   g.save.weapons.pistol = true; g.save.ammo.pistol = 30; p.weapon = 2; if (p.equip) p.equip(2);
   const R = Math.random; Math.random = () => 0.5;
   const m0 = g.save.money; p.pos.set(d.ox + 2.4, d.fy, d.oz + 3.5);
-  g.content.spotAct('register'); Math.random = R;
-  for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60);
+  // the dice stay fixed until the till is emptied: the clerk's 75% silent alarm is the branch under test
+  g.content.spotAct('register');
+  try { for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60); } finally { Math.random = R; }
   return { gained: g.save.money - m0, open: d.staffOpen, lvl: g.police.level, armed: !!(p.wep && !p.wep.melee) };
 });
 check('robbing the register with a gun: a few hundred dollars, the clerk hands over the back-office key', rob.gained >= 150 && rob.open, JSON.stringify(rob));

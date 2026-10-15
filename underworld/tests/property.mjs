@@ -18,7 +18,7 @@ const lad = await ev(() => {
   return L;
 });
 const tiers = [1, 2, 3, 4, 5, 6].map(t => lad.filter(x => x.tier === t));
-check('about twenty purchasable homes', lad.length >= 19 && lad.length <= 24, lad.length + ' homes');
+check('forty-five purchasable homes (v6 ladder)', lad.length === 45, lad.length + ' homes');
 check('every tier from cheap rental to endgame has homes', tiers.every(t => t.length >= 1), tiers.map(t => t.length).join(','));
 check('every home has its own name and its own building', new Set(lad.map(x => x.name)).size === lad.length && new Set(lad.filter(x => x.home).map(x => x.home)).size === lad.filter(x => x.home).length);
 const T = id => lad.find(x => x.id === id) || { k: {}, cap: 0 };

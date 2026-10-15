@@ -136,6 +136,6 @@ const jail = await ev(() => {
   while (g.ui.stack.length) g.ui.back(); uw.S.jail = null;
   return { locked, blocked: t.includes('can’t reach anyone') };
 });
-check('in jail without a phone, apps other than Empire and Feed are greyed out and locked', jail.locked.includes('Market') && !jail.locked.includes('Empire') && !jail.locked.includes('Feed') && jail.blocked, JSON.stringify(jail));
+check('in jail without a phone, every app but Feed (Empire included) is greyed out and locked', jail.locked.includes('Market') && jail.locked.includes('Empire') && !jail.locked.includes('Feed') && jail.blocked, JSON.stringify(jail));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'phoneapps');

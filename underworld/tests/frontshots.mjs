@@ -29,13 +29,18 @@ const doors = await ev(() => {
   const g = window.game, W = g.world, out = {};
   const pl = W.places; out.casino = pl.casino.door;
   for (const k in pl) { const p = pl[k]; if (!p || !p.door) continue; if (/station|fuel/i.test(k) && !out.station) out.station = p.door; if (k === 'dealer' || /dealer/.test(k)) out.dealer = out.dealer || p.door; if (k === 'motorworks') out.motorworks = p.door; }
-  const P = window.__pv.PROPS || []; const biz = P.find(x => x.kind === 'front' || x.biz); if (biz && biz.door) out.business = biz.door;
-  const homes = P.filter(x => x.home && x.door); if (homes[0]) out.house = homes[0].door; const apt = homes.find(x => /apt|apartment/i.test(x.id + x.name)); if (apt) out.apartment = apt.door;
-  const man = P.find(x => x.id === 'mansion'); if (man && man.door) out.mansion = man.door;
+  // property doors come from the underworld's locations (homes, businesses, the mansion)
+  const L = g.uw.locs.filter(x => x.kind === 'prop'), D = x => ({ x: x.x, z: x.z, h: x.h });
+  const biz = L.find(x => x.def.kind === 'business' && x.def.cat); if (biz) out.business = D(biz);
+  const house = L.find(x => x.def.kind === 'safehouse' && x.def.tier === 3); if (house) out.house = D(house);
+  const apt = L.find(x => x.def.kind === 'safehouse' && x.def.tier === 2); if (apt) out.apartment = D(apt);
+  const man = L.find(x => x.def.id === 'mansion'); if (man) out.mansion = D(man);
+  for (const k of ['usedlot', 'prestige']) if (pl[k]) out[k] = pl[k].door;
   return out;
 });
 await look('casino', doors.casino, 22, 6);
 await look('casino-close', doors.casino, 9, 2.2, 3);
 for (const k of ['station', 'business', 'house', 'apartment', 'dealer', 'motorworks', 'mansion']) if (doors[k]) await look(k, doors[k], 11, 3.2, 2);
+for (const k of ['dealer', 'usedlot', 'prestige']) if (doors[k]) await look(k + '-lot', doors[k], 38, 12, 0);
 console.log(JSON.stringify(Object.keys(doors)));
 await b.close();
