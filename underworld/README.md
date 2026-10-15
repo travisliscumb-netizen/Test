@@ -37,9 +37,10 @@ npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es202
 | X | Dodge |
 | E / F | Interact, steal or enter a car, talk, deal, pickpocket |
 | 1–5, Q | Weapons |
-| Tab / I | Empire screen: overview, territory, crew, assets, market, stash, factions, police, feed |
+| Tab / I | Phone: a home screen of apps (Empire, Market, Street Connect, Inventory, Stashes, Crew, Property, Garage, Armory, Police, Feed, Map, Cabline) |
 | M | Big map: wheel / pinch to zoom (1×–8×), drag to pan, Places index with search and categories, layer filters, tap a place for its card and "Track location" |
 | T (map open) | Territory overlay (also a map layer; tap a turf for details) |
+| E at a taxi / Taxi on the map | Hire the cab (or carjack it), pick a street on the map, see the fare, ride; Skip / Change / Get out on the ride panel |
 | B (in a car) | Look back |
 | F5 | Quick save (only when it is safe) |
 | Esc / P | Pause |
@@ -71,7 +72,7 @@ The new layer, tagged `[UNDERWORLD]`, sits just before `[CORE] UI MANAGER`:
 - `FactionSim` and `GangManager`: five rival factions that run on their own, plus street crews, HQ guards, squads, buyers and brawls
 - `CrewManager` and `PropertyManager`: the crew (roles, ranks, loyalty, fear and betrayal), plus safehouses, garages, warehouses and fronts
 - `PressureSystem`: police pressure, corruption, honest officers and outside investigations
-- `Prison`: arrest and sentencing. The jail block is playable and has its own accelerated clock (1 real minute ≈ 1 year at 1×). The street clock stays frozen while you serve
+- `Prison`: arrest and sentencing, and the playable jail block (see "This pass" for how time works now)
 - `OppFeed`, `EmpireUI`, `NeonSigns`
 
 City and property layer (this pass):
@@ -134,7 +135,71 @@ Gameplay pass (this build):
 - Map: tap open ground for a district card (police, turf, territory tax, property, street prices),
   tap a curved road for its card, and a Street prices layer.
 
-The save key is `pvunderworld.save.v1` and the schema version is 4 (v3 saves migrate on load). Saves are versioned, sanitized
+## This pass (polish, fixes, expansion, mobile gameplay)
+
+- Vehicle physics: vertical motion is a physics step (`Vehicle.ground`), the mesh pose is render
+  only. Wheels are drawn at their ground contact inside the suspension limits (no wheel through the
+  hood), the body pitches and rolls to the surface under it, slopes pull with gravity, collision
+  height follows the pitch on ramps. Jumps launch, fly (capped air yaw, a little air control) and
+  land with a damped compression. Steering is limited by total grip (no spin-outs at full lock),
+  brakes ramp in over 0.15 s, reverse engages after 0.4 s stopped. Every stunt ramp has side
+  skirts or guards and a cleared run-up and landing (`_rampSides`, `_clearJumpLane`).
+- Central Parkade rebuilt: walled two-way 8 m ramps between four decks, rails at the openings,
+  bays off the aisles, level signs and a clearance bar; the Quarter Garage has a top landing.
+- Money feedback (`MoneyFeed`): every change to `save.money`, from any system, shows a +/−
+  popup under the money readout; quick same-sign changes merge, at most four lines stack.
+- Interiors: a two-storey mansion (foyer with a grand staircase, living room, kitchen, study, bar,
+  an upstairs gallery, master suite, game room with a pool table and big screen), a new penthouse layout, and house interiors by tier (1-5) with
+  real furniture (`FURN`) and searchable containers.
+- Burglary: drawers, nightstands, wardrobes and safes each searched once (`burgleState`), loot by
+  house tier; breaking in is a crime, and every search (a safe most of all) is noise a neighbour
+  may call in.
+- Fuel & Go: five stations spread over the city, each with its own shop, staff door, back office
+  (desk, stockroom, safe) and the Lucky Pump; rob the till with a gun, force the staff door, crack
+  the safe; once a day for the till, once a week for the safe; silent alarm and police.
+- Entrances (`EntranceDressing`): every usable door gets a framed contrasting leaf with a handle,
+  a wall lamp that brightens after dark, a canopy over shop and public doors and a mat; a faint
+  ground ring shows only when you are close.
+- Taxis (`TaxiService`): a real cab drives to you (or hail one in traffic); hire it or carjack it;
+  choose any street on the map and see the distance and fare first ($6 + $22/km); the AI drives
+  you on the roads; Skip (short fade, agreed fare), Change destination, Get out (the cab pulls
+  over, you pay the meter); no cab while wanted, thrown out if the police show up, stuck cabs
+  reroute then take a shortcut. The old flat $40 cab is gone.
+- Phone (`EmpireUI`): an app home screen in three groups with a back button and sub-pages.
+  Market › My stock shows per product the quantity, average paid, cost basis, the price where you
+  stand, the best known price, value now, unrealised and realised profit (per product) and where
+  each lot is. Street Connect lists who sells each product to you and who buys it from you, with
+  prices, districts and bust risk; suppliers stay unknown below their reputation and undiscovered
+  districts stay hidden; Waypoint sets normal GPS tracking. Stashes and Garage say what is where.
+- Map: separate BUY (suppliers, teal ↓) and SELL (street buyers per discovered district and the
+  fence, gold $) layers; a place card sits beside the Places drawer instead of under it.
+- Shooting: drawing a gun levels the view all the way (it used to stop at a pitch that put the
+  crosshair on the pavement ~13 m out); a gun held with the view resting on the ground drifts
+  back up when nobody is under the reticle.
+- Factions: the player's power deters attacks. A crew outweighed 2.5:1 never starts a war with
+  the kingpin; others only move as part of a coalition, one push at a time; rivals on a kingpin's
+  turf pay their cut 88-97% of the time.
+- Roads: four Linden Hills blocks have a curved lane that cuts the corner between two streets
+  (Hawthorn Bend, Kestrel Curve, Millrace Lane, Willow Bend). They are real links for traffic,
+  the GPS, taxis and the map. Home-ladder houses are pinned to their doors so layout changes
+  never move a home someone owns.
+- Tutorial (`Tutorial`): short contextual tips, each once (moving, prompts, first money, map,
+  phone, driving, product, stash, first gun, police, property, garage, taxi, jail); switch them off
+  or show them again in Settings.
+- Jail: no speed buttons. A sentence day passes every two real seconds in the block (menus stop
+  it); the street calendar moves a day per week served, so the career calendar stays readable.
+  Sentences read "45 days" or "1 year 74 days" and start short (5-150 days by wanted level, capped
+  at 3 years). Activities: lawyers (three tiers, odds shown), guard bribes that can backfire,
+  shifts in the laundry or kitchen, cards, the yard workout (up to +15% health for good), inmates
+  who become connections, Smokey's smuggled phone, the payphone, and a real escape at lights out.
+- Diagnostics (`HitchLog`): frames over 120 ms are recorded with what happened just before them
+  (getting into a car, an interior, a cab, the map) and renderer counters; Settings › Diagnostics
+  shows the log and copies it. `window.__pvHitches` has it in the console.
+- Vehicles: A- and C-pillars, roof rails, window seals and a cowl frame the glasshouse; dark
+  bezels keep head and tail lamps readable on any paint.
+
+The save key is `pvunderworld.save.v1` and the schema version is 5 (v3 and v4 saves migrate on
+load; v4 → v5 moves the old jail-inflated day count into a calendar offset and drops the jail speed). Saves are versioned, sanitized
 and written only in a stable state. Settings are stored under a separate key.
 
 ## Tests
@@ -164,6 +229,16 @@ node underworld/tests/vehicles.mjs  # turning, reverse, braking, durability, dam
 node underworld/tests/inventory.mjs # located inventory, cost basis, armory, deliveries, royalties, v3 migration
 node underworld/tests/gambling.mjs  # scratch cards, slots, casino games, limits, records, no money duplication
 node underworld/tests/roads.mjs     # curved roads, traffic on curves, GPS, road styles, interactive map
+node underworld/tests/ramps.mjs     # parkade up/down, Quarter Garage, every stunt jump at three speeds, ramp sides, slopes per class
+node underworld/tests/interiors.mjs # reachability walk-search, mansion stairs, penthouse, house tiers, burglary, loot tables
+node underworld/tests/prison.mjs    # no speed buttons, sentence clock and calendar, lawyers, bribes, work, cards, escape, save/reload, v4 migration
+node underworld/tests/stations.mjs  # five stations, doors, interiors, robbery, back office, once-only rules, police
+node underworld/tests/taxi.mjs      # call, hire, map pick, fare, AI ride, change, get out, skip, arrival, police, stuck recovery, carjack
+node underworld/tests/phoneapps.mjs # app home screen, every app at 390 px, back navigation, Market P/L, Street Connect, BUY/SELL layers, jail lock
+node underworld/tests/kingpin.mjs   # rivals' wars and royalties for an ordinary boss vs a kingpin on the same turf map
+node underworld/tests/tutorial.mjs  # contextual tips once each, one at a time, settings off/on, saved
+node underworld/tests/money.mjs     # +/- money popups from every path, merging, stacking, fading, placement
+node underworld/tests/qashots.mjs   # visual-QA screenshots (.shots/qa): interiors, cars, doors, parkade, station, casino, phone, taxi, jail, districts
 node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
 ```
 
