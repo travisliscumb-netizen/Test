@@ -98,8 +98,10 @@ for (const [w, h] of SIZES) {
   check(`${w}x${h} jail: jail panel, Map button and top HUD do not overlap`, !!m.items.jailHud && !!m.items['btn:map'] && ov.length === 0 && onScreen(m, 'jailHud'), ov.join(' '));
 }
 await page.evaluate(() => window.game.ui.toggleMap(true)); await settle();
+const jm0 = await page.evaluate(() => window.game.mapOpen);
+await page.evaluate(() => { window.game.uw.S.jail.phone = true; window.game.ui.toggleMap(true); }); await settle();
 const jm = await page.evaluate(() => { const r = document.getElementById('bigmapCanvas').getBoundingClientRect(); return { open: window.game.mapOpen, w: r.width, h: r.height }; });
-check('jail: the map opens over the jail HUD', jm.open && jm.w > 100, JSON.stringify(jm));
+check('jail: no map without a phone; with a smuggled phone the map opens over the jail HUD', !jm0 && jm.open && jm.w > 100, JSON.stringify({ jm0, jm }));
 await page.evaluate(() => window.game.ui.toggleMap(false)); await setSize(844, 390);
 const m2 = await measure();
 check('jail after map + rotation: still no overlaps', overlaps(m2, TOP).length === 0, overlaps(m2, TOP).join(' '));

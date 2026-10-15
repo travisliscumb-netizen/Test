@@ -85,7 +85,10 @@ await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLev
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 await hudCheck('in jail');
 await tap('#tbar .tbtn[data-act="map"]');
-check('the map opens in jail', await ev(() => window.game.mapOpen));
+check('in jail without a phone the map stays closed (no phone, no map)', await ev(() => !window.game.mapOpen));
+await ev(() => { window.game.uw.S.jail.phone = true; });
+await tap('#tbar .tbtn[data-act="map"]');
+check('with a smuggled phone the map opens in jail', await ev(() => window.game.mapOpen));
 await tap('#mapClose'); await hudCheck('jail after the map');
 await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });

@@ -118,7 +118,8 @@ const sent = await page.evaluate(() => {
   uw.S.inv = {}; g.save.weapons.pistol = false;
   return { clean, loaded, priors: uw.S.rap.priors };
 });
-check('carried product and guns lengthen the sentence (more than double, and by over a month)', sent.loaded > sent.clean * 2 && sent.loaded > sent.clean + 30, JSON.stringify(sent));
+// v6 halves every final sentence, so 'over a month' on the old scale is over a fortnight now
+check('carried product and guns lengthen the sentence (more than double, and by over two weeks)', sent.loaded > sent.clean * 2 && sent.loaded > sent.clean + 15, JSON.stringify(sent));
 check('nine priors on record', sent.priors === 9, JSON.stringify(sent));
 // jail persists through save + reload
 await page.evaluate(() => { const g = window.game; g.police.setLevel(1); g.onBusted(); });
