@@ -168,6 +168,11 @@ button{font-family:var(--font)}
 #bustbar{position:absolute;left:50%;top:58%;transform:translateX(-50%);width:220px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.2em;color:#9cc2ff;text-shadow:0 1px 2px #000}
 #bustbar .bar{margin-top:5px;height:6px}#bustbar .bar i{background:#6fa8ff}
 #taxiHud{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);background:var(--panel);border:1px solid rgba(244,194,13,.6);border-top:3px solid #f4c20d;border-radius:12px;padding:8px 12px;min-width:250px;max-width:min(360px,92vw);text-align:center;pointer-events:auto}
+#tip{position:absolute;left:50%;top:calc(64px + var(--safe-t));transform:translateX(-50%);max-width:min(440px,92vw);background:var(--panel);border:1px solid var(--line);border-left:4px solid #46d4c4;border-radius:10px;padding:8px 40px 8px 12px;pointer-events:none;animation:tipIn .25s ease}
+#tip small{display:block;font-size:10px;letter-spacing:.22em;color:#46d4c4;font-weight:900}#tip span{display:block;font-size:13px;line-height:1.35}
+#tip i{position:absolute;right:4px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--dim);font-size:16px;min-width:36px;min-height:36px;display:grid;place-items:center;pointer-events:auto;cursor:pointer}
+@keyframes tipIn{from{opacity:0;margin-top:-8px}to{opacity:1;margin-top:0}}
+body[data-gs="paused"] #tip{display:none}
 #taxiHud small{display:block;font-size:10px;letter-spacing:.24em;color:#f4c20d;font-weight:900}#taxiHud b{display:block;font-size:16px;font-weight:900;margin:2px 0}#taxiHud .tm{font-size:12px;color:var(--dim)}
 #taxiHud .tbtns{display:flex;gap:6px;justify-content:center;margin-top:6px}#taxiHud button{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);border-radius:8px;padding:8px 10px;min-height:40px;font-weight:800;font-size:13px;cursor:pointer}
 body.passenger #touch .car{display:none!important}
@@ -561,6 +566,7 @@ body[data-gs="paused"] #jailHud{display:none}
   <div id="reloadRing" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="4"/><circle id="reloadArc" cx="20" cy="20" r="16" fill="none" stroke="#ffd84d" stroke-width="4" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 20 20)"/></svg><span>RELOAD</span></div>
   <div id="objArrow" class="hidden"><svg viewBox="0 0 34 34"><path d="M17 2 L31 30 L17 23 L3 30 Z" fill="#ffb547" stroke="#1a1206" stroke-width="2" stroke-linejoin="round"/></svg><span></span></div>
   <div id="prompt" class="hidden"></div>
+  <div id="tip" class="hidden" role="status"><small>TIP</small><span></span><i aria-label="Dismiss">✕</i></div>
   <div id="offer" class="hidden"></div>
   <div id="bustbar" class="hidden">ARREST IN PROGRESS<div class="bar"><i style="width:0"></i></div></div>
   <div id="taxiHud" class="hidden"><small>CABLINE · TAXI</small><b class="td">—</b><span class="tm"></span><div class="tbtns"><button data-tx="skip">Skip ride</button><button data-tx="change">Change</button><button data-tx="out">Get out</button></div></div>
@@ -657,7 +663,10 @@ body[data-gs="paused"] #jailHud{display:none}
     <div class="row"><label>Traffic density</label><input type="range" id="setTraffic" min="0.3" max="1.5" step="0.05"><span class="val" id="setTrafficV"></span></div>
     <div class="row"><label>Pedestrian density</label><input type="range" id="setPeds" min="0.3" max="1.5" step="0.05"><span class="val" id="setPedsV"></span></div>
     <h3>Gameplay</h3>
-    <div class="row"><label>Starting hints</label><div class="toggle" id="setGuide"></div></div>
+    <div class="row"><label>Tutorial hints</label><div class="toggle" id="setGuide"></div></div>
+    <div class="row"><label>Tutorial</label><button class="sbtn" id="btnTips">Show the tips again</button></div>
+    <h3>Diagnostics</h3>
+    <div class="row"><label>Long frames (hitches)</label><button class="sbtn" id="btnHitch">Show hitch log</button></div>
     <div class="actions"><button class="sbtn danger" id="btnReset">Erase save data</button><button class="sbtn gold" data-close>Done</button></div>
   </div>
 </div>
@@ -32990,7 +32999,7 @@ const SaveSystem = {
       jumps: {},
       races: {},
       outfit: { shirt: 0x26323f, pants: 0x2b3448, shoes: 0x151515, cap: -1, hair: 0x1a1410 },
-      messages: [],
+      messages: [], tips: {},
       settings: {
         quality: 'auto', post: true, shadows: true, fov: 70, showFps: false,
         sens: 1, invertY: false, volume: 0.8, music: 0.55, sfx: 0.9, dayLength: 30, weather: true,
@@ -33097,6 +33106,8 @@ const SaveSystem = {
     else { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
     if (typeof d.rep !== 'number' || !isFinite(d.rep) || d.rep < 0) d.rep = 0;
     if (!(d.nextUid > maxUid)) d.nextUid = maxUid + 1;
+    if (!d.tips || typeof d.tips !== 'object' || Array.isArray(d.tips)) d.tips = {};
+    for (const k in d.tips) if (!TUTORIAL.some(L => L.id === k)) delete d.tips[k]; else d.tips[k] = 1;
     if (!Array.isArray(d.messages)) d.messages = [];
     d.messages = d.messages.filter(m => m && typeof m.text === 'string').slice(-60);
     if (typeof d.rep !== 'number' || !isFinite(d.rep)) d.rep = 0;
@@ -36783,12 +36794,17 @@ Object.assign(World.prototype, {
     return { s, u, v, to: (a, c) => [b.cx + u[0] * a + v[0] * c, b.cz + u[1] * a + v[1] * c], face: (da, dc) => faceOf(u[0] * da + v[0] * dc, u[1] * da + v[1] * dc) };
   }
 });
+// suburb blocks that get a corner-cutting curved lane (a real through road between two streets).
+// Picked so no property on the home ladder moves: those houses are chosen by order of generation.
+const BEND_BLOCKS = [[0, 7, 'Hawthorn Bend'], [0, 8, 'Kestrel Curve'], [1, 8, 'Millrace Lane'], [2, 10, 'Willow Bend']];
 // ---------------------------------------------------------------- Linden Hills (standard suburbs)
 Object.assign(World.prototype, {
   _genSuburb(b, rng) {
     this._sidewalk(b, rng, { trees: 0.75, park: 0.3 });
     const v = rng.int(0, 3);
-    if (v === 0) this._culdesac(b, rng);
+    const bend = this._bendSide(b);
+    if (bend !== null) this._bendLane(b, rng, bend);
+    else if (v === 0) this._culdesac(b, rng);
     else if (v === 1) this._crescent(b, rng);
     else if (v === 2) this._streetLots(b, rng);
     else this._lowrise(b, rng);
@@ -36847,6 +36863,46 @@ Object.assign(World.prototype, {
     this._prop(b, 'parklamp', ...F.to(-6.5, -12)); this._prop(b, 'parklamp', ...F.to(-12, 9));
     b.secrets.push({ x: (b.x0 + b.x1) / 2 + 8, z: (b.z0 + b.z1) / 2 + 8 });
     b.roadKind = 'culdesac';
+  },
+  // which side a corner-cutting bend could enter from, or null. Chosen blocks only (BEND_BLOCKS):
+  // never a block that hosts the safehouse, a property, a contact or a gang HQ, and
+  // only where both streets it joins are open (so it is a real through road, not decoration)
+  _bendSide(b) {
+    if (b.special || b.superblock || !BEND_BLOCKS.some(([x, z]) => x === b.bx && z === b.bz)) return null;
+    const used = (at) => at && at[0] === b.bx && at[1] === b.bz;
+    if (PROPS.some(d => used(d.at)) || SPOTS.some(d => used(d.at)) || Object.values(HQS).some(used)) return null;
+    const s0 = Math.floor(hash2i(b.bx, b.bz, 917) * 4);
+    for (let k = 0; k < 4; k++) {
+      const F = this._frame(b, (s0 + k) % 4), [pts] = [this._bendPts(F)];
+      if (Links.attach(pts[0]) && Links.attach(pts[pts.length - 1])) return (s0 + k) % 4;
+    }
+    return null;
+  },
+  // a quarter-circle lane round the inside of the block corner between side s and the side to its right
+  _bendPts(F) {
+    const R = 26, t0 = Math.asin(5.4 / R), t1 = Math.PI / 2 - t0, out = [];
+    for (let i = 0; i <= 12; i++) { const t = t0 + (t1 - t0) * i / 12; out.push(F.to(40 - R * Math.cos(t), -40 + R * Math.sin(t))); }
+    return out;
+  },
+  _bendLane(b, rng, side) {
+    const F = this._frame(b, side), pts = this._bendPts(F);
+    const name = BEND_BLOCKS.find(([x, z]) => x === b.bx && z === b.bz)[2];
+    this._road(pts, 7, 'asphalt', { smooth: true, link: name });
+    const H = () => this._pickHouse(rng, false);
+    // homes in the big part of the block, facing the three other streets
+    this._placeLocal(b, rng, F, [
+      [-22, -22, 0, -1, Object.assign(H(), { w: 10 })],
+      [-22, 20, -1, 0, Object.assign(H(), { w: 10 })],
+      [16, 22, 0, 1, Object.assign(H(), { w: 10 })],
+      [-2, 0, 1, 0, Object.assign(H(), { w: 9, garage: 'carport' })]
+    ]);
+    // the corner inside the bend: a pocket green with trees, a bench and a lamp
+    const [gx, gz] = F.to(31, -31);
+    this._prop(b, 'bench', gx, gz, 0); b.seats.push({ x: gx, z: gz, ry: 0 });
+    for (const [a, c] of [[27, -35], [35, -27], [34, -34]]) { const [tx, tz] = F.to(a, c); this._prop(b, 'tree', tx, tz, rng.range(0, 6), rng.range(0.9, 1.15)); }
+    const [lx, lz] = F.to(40 - 26 * Math.cos(Math.PI / 4) - 4.6, -40 + 26 * Math.sin(Math.PI / 4) + 4.6); this._prop(b, 'parklamp', lx, lz, 0);
+    this._yardTrees(b, rng, b.x0 + 1, b.z0 + 1, b.x1 - 1, b.z1 - 1, 7);
+    b.roadKind = 'bend';
   },
   _crescent(b, rng) {
     // a U-shaped lane: in on one side, around a green, out on the same side
@@ -38685,6 +38741,23 @@ function vehicleGeometry(type) {
     g.box(0, cabTop + 0.03, (cabF + cabR) / 2 - 0.05, W * 0.72, 0.06, roofL, null, 0, { part: 0 });
     // B-pillar
     for (const sx of [-1, 1]) g.box(sx * glassW * 0.43, (belt + cabTop) / 2, (cabF + cabR) / 2 + 0.05, 0.05, cabTop - belt, 0.16, null, 0, { part: 2 });
+    // A- and C-pillars along the glasshouse edges, following its inward taper, so the cabin reads as
+    // framed windows instead of one dark block; blacked out on sports cars, body colour otherwise
+    const cy = pr.cabin.map(q => q[1]), cy0 = Math.min(...cy), cy1 = Math.max(...cy), taper = 0.16;
+    const hwAt = y => (glassW / 2 + 0.05) * (1 - taper * clamp((y - cy0) / (cy1 - cy0), 0, 1)) + 0.012;
+    const pp = s.profile === 'super' || s.profile === 'sports' || s.profile === 'coupe' ? 2 : 0;
+    const strut = (za, ya, zb, yb, sx, w2, d2, part) => {
+      const xa = sx * hwAt(ya), xb = sx * hwAt(yb), dx = xb - xa, dy = yb - ya, dz = zb - za, L3 = Math.hypot(dx, dy, dz);
+      g.add(TPL.box, M((xa + xb) / 2, (ya + yb) / 2, (za + zb) / 2, w2, L3, d2, 0, Math.atan2(dz, dy), -Math.asin(clamp(dx / L3, -1, 1))), null, { part });
+    };
+    const [c0, c1, c2, c3] = pr.cabin;
+    for (const sx of [-1, 1]) {
+      strut(c0[0], c0[1], c1[0], c1[1], sx, 0.06, 0.1, pp);   // A-pillar
+      strut(c2[0], c2[1], c3[0], c3[1], sx, 0.06, 0.16, pp);  // C-pillar
+      strut(c1[0], c1[1] - 0.02, c2[0], c2[1] - 0.02, sx, 0.05, 0.06, pp); // roof rail
+      g.box(sx * (hwAt(belt) - 0.005), belt + 0.01, (cabF + cabR) / 2, 0.025, 0.035, cabF - cabR - 0.05, null, 0, { part: 2 }); // window seal
+    }
+    g.box(0, belt + 0.02, cabF - 0.04, glassW * 0.86, 0.04, 0.1, null, 0, { part: 2 }); // cowl under the windscreen
   } else {
     for (const sx of [-1, 1]) g.box(sx * (W / 2 + 0.005), s.profile === 'truck' ? 2.0 : 1.65, s.profile === 'truck' ? 2.9 : 0.9, 0.04, 0.6, s.profile === 'truck' ? 0.7 : 1.1, null, 0, { part: 1 });
   }
@@ -38707,6 +38780,9 @@ function vehicleGeometry(type) {
   }
   // lights, indicators, plates, exhausts, mirrors
   for (const sx of [-1, 1]) {
+    // dark bezels behind the lamps so head and tail lights read on any paint, light or dark
+    g.box(sx * (W / 2 - 0.3), frontTop - 0.13, zf + 0.05, 0.43, 0.19, 0.05, null, 0, { part: 14 });
+    g.box(sx * (W / 2 - 0.25), rearTop - 0.14, zr - 0.05, 0.47, 0.2, 0.05, null, 0, { part: 14 });
     g.box(sx * (W / 2 - 0.3), frontTop - 0.13, zf + 0.07, 0.36, 0.13, 0.05, null, 0, { part: 4 });
     g.box(sx * (W / 2 - 0.1), frontTop - 0.13, zf + 0.06, 0.1, 0.1, 0.05, null, 0, { part: 12 });
     g.box(sx * (W / 2 - 0.25), rearTop - 0.14, zr - 0.07, 0.4, 0.14, 0.05, null, 0, { part: 5 });
@@ -39844,7 +39920,11 @@ class TrafficManager {
     return false;
   }
   trySpawnLink() {
-    const g = this.g, px = g.focus.x, pz = g.focus.z, L = pick(Links.list); if (!L) return null;
+    const g = this.g, px = g.focus.x, pz = g.focus.z;
+    // only curved roads within spawning range: with several links in the city, a random pick would
+    // almost never be the one near the player
+    const near = Links.list.filter(L => L.pts.some(q => { const d = Math.hypot(q[0] - px, q[1] - pz); return d > 75 && d < 230; }));
+    const L = pick(near); if (!L) return null;
     const from = Math.random() < 0.5 ? 0 : 1, lane = Links.lane(L, from);
     const k = Math.floor(rand(0.1, 0.8) * lane.length), [x, z] = lane[k];
     const d = Math.hypot(x - px, z - pz);
@@ -43160,6 +43240,7 @@ class InteriorManager {
   // world-space position of a local point in an interior
   wp(id, lx, lz) { const d = this.defs[id]; return { x: d.ox + lx, z: d.oz + lz }; }
   enter(id, quiet) {
+    HitchLog.mark('entered ' + id);
     const g = this.g, p = g.player, def = this.defs[id];
     if (!def || p.state !== 'foot') return false;
     const go = () => {
@@ -43232,7 +43313,7 @@ class InteriorManager {
   nearDoor(p) {
     for (const def of this.list) {
       if (def.noDoor) continue;
-      const d = def.door; if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) < 1.8) return def;
+      const d = def.door; if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) < 2.3) return def;
     }
     return null;
   }
@@ -43909,7 +43990,7 @@ class ContentManager {
     const hd = this.nearHomeDoor(p);
     if (hd) return hd;
     const cd = pl.casino && pl.casino.door;
-    if (cd && Math.hypot(p.pos.x - cd.x, p.pos.z - cd.z) < 2.2) return { label: 'Enter The Valen Royale', act: () => this.enterCasino() };
+    if (cd && Math.hypot(p.pos.x - cd.x, p.pos.z - cd.z) < 2.6) return { label: 'Enter The Valen Royale', act: () => this.enterCasino() };
     const def = I.nearDoor(p);
     if (def) {
       const why = this.canEnter(def);
@@ -43929,7 +44010,7 @@ class ContentManager {
   // a house front door within reach: enterable homes are the ladder's and about a third of the rest
   nearHomeDoor(p) {
     const g = this.g;
-    let best = null, bd = 1.7;
+    let best = null, bd = 2.0;
     for (const h of g.world.homes) { const d = Math.hypot(p.pos.x - h.door.x, p.pos.z - h.door.z); if (d < bd) { bd = d; best = h; } }
     if (!best || best.propId === 'linden') return null;
     if (best.propId) return null; // the ladder's doors are property locations (Underworld handles them)
@@ -47853,9 +47934,19 @@ const HOME_LADDER = [
 ];
 // existing safehouses join the ladder too
 const LADDER_EXTRA = { flop: { tier: 1, type: 'Rented room', street: 1 }, linden: { tier: 3, type: 'Detached house' }, loft: { tier: 3, type: 'Loft apartment', street: 2 }, penthouse: { tier: 6, type: 'Penthouse', under: 4, outdoor: 1 } };
+// where each ladder home has always been (its front door). Layout changes elsewhere in the city
+// (a new lane, a different house in some block) must never move a home someone already owns, so
+// the ladder takes the pinned house when it still exists and only falls back to the filter.
+const LADDER_PIN = { semi: [105.2, 734.3], apt: [127.4, 854], bungalow: [27.4, 852], starter: [42, 739.9], cottage: [60, 938.9], single1: [121.8, 734.9], single2: [20.2, 740.1], farm: [150, 903.1], double1: [43.8, 779.9], double2: [21.9, 192.1], double3: [112.1, 101.9], triple1: [208.2, 139.1], triple2: [191.8, 100.9], triple3: [59.1, 208.2], mansion: [80, 50.2] };
 function defineHomeProps(world) {
   const H = world.homes, used = new Set();
-  const take = (f, id) => { const c = H.filter(h => (!h.reserved || h.reserved === id) && !used.has(h.id) && f(h)); if (!c.length) return null; const h = c[Math.floor(c.length * 0.5)]; used.add(h.id); return h; };
+  const take = (f, id) => {
+    const pin = LADDER_PIN[id], ok = h => (!h.reserved || h.reserved === id) && !used.has(h.id);
+    const pinned = pin && H.find(h => ok(h) && Math.hypot(h.door.x - pin[0], h.door.z - pin[1]) < 1.5);
+    if (pinned) { used.add(pinned.id); return pinned; }
+    const c = H.filter(h => ok(h) && f(h) && !Object.values(LADDER_PIN).some(q => Math.hypot(h.door.x - q[0], h.door.z - q[1]) < 1.5)); if (!c.length) return null;
+    const h = c[Math.floor(c.length * 0.5)]; used.add(h.id); return h;
+  };
   const streetN = {};
   const nameFor = h => { const list = HOME_STREETS[h.district] || HOME_STREETS.l, k = streetN[h.district] = (streetN[h.district] || 0) + 1; return `${(k * 7 + h.block % 9) * 2 + 1} ${list[(h.block + k) % list.length]}`; };
   for (const L of HOME_LADDER) {
@@ -50527,7 +50618,7 @@ class TaxiService {
     const g = this.g, p = g.player, v = this.cab; if (!v || !g.vehicles.list.includes(v)) return;
     this.dest = { x, z, name: q.name }; this.quote = q.fare; this.driven = 0; this.state = 'riding'; this.leaving = false; this.t = 0; this.best = 1e9; this.stall = 0; this.recov = 0;
     this.lastPos = { x: v.pos.x, z: v.pos.z };
-    p.state = 'vehicle'; p.vehicle = v; p.passenger = true; p.trans = null; p.vel.set(0, 0, 0);
+    p.state = 'vehicle'; p.vehicle = v; p.passenger = true; p.trans = null; p.vel.set(0, 0, 0); HitchLog.mark('boarded a cab');
     v.ctl.handbrake = false; v.drive.setGoal(x, z);
     g.cam.yaw = v.h; g.cam.revT = 0;
     g.audio.play('door');
@@ -50638,6 +50729,191 @@ class TaxiService {
 }
 
 /* =====================================================================
+   ENTRANCES: every door you can actually use gets the same believable dress -
+   a contrasting door leaf in a light frame with a handle, a wall lamp above it
+   (warm, brighter after dark), a canopy over shop and public doors and a mat on
+   the pavement. A faint ring appears on the ground only when you are close.
+   One merged mesh for the whole city plus one for the lamps, so it costs two
+   draw calls.
+   ===================================================================== */
+const ENTRANCE_STYLE = {
+  home: { leaf: 0x5a3220, frame: 0xefe9dc, handle: 0xd8b04a, canopy: null },
+  shop: { leaf: 0x1d2b36, frame: 0xb8bec6, handle: 0xdfe3e8, canopy: 'accent' },
+  public: { leaf: 0x26303a, frame: 0xd8dde3, handle: 0xdfe3e8, canopy: 0x2b5f9c },
+  works: { leaf: 0x3a3f46, frame: 0xf2c230, handle: 0xdfe3e8, canopy: null }
+};
+class EntranceDressing {
+  constructor(g) {
+    this.g = g; this.doors = [];
+    const w = g.world, I = g.content.interiors, add = (x, z, h, kind, id) => {
+      if (!isFinite(x) || !isFinite(z) || !isFinite(h)) return;
+      if (this.doors.some(d => Math.hypot(d.x - x, d.z - z) < 2.2)) return;
+      this.doors.push({ x, z, h, kind, id });
+    };
+    // interiors with a street door (shops, the tower lobby, police, stations ...)
+    for (const def of I.list) {
+      if (def.noDoor || !def.door || def.id === 'prison') continue;
+      const pl = w.places[def.place] || {}, kind = def.store || pl.kind === 'shop' ? 'shop' : pl.kind === 'public' ? 'public' : pl.kind === 'home' || pl.kind === 'home2' ? 'home' : 'shop';
+      add(def.door.x, def.door.z, def.door.h || 0, kind, def.id);
+    }
+    // property for sale or owned (homes, businesses, warehouses)
+    if (g.uw) for (const L of g.uw.locs) if (L.kind === 'prop' && L.def.kind !== 'garage') add(L.x, L.z, L.h || 0, L.def.kind === 'home' ? 'home' : L.def.kind === 'warehouse' ? 'works' : 'shop', L.def.id);
+    // houses you can break into look like houses you can walk into
+    for (const hm of w.homes) {
+      if (hm.propId || hm.type === 'farm' || hash2i(hm.x0 | 0, hm.z0 | 0, 61) > 0.38) continue;
+      add(hm.door.x, hm.door.z, hm.door.h, 'home', hm.id);
+    }
+    this.build();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.renderOrder = 2; ring.visible = false; g.scene.add(ring); this.ring = ring;
+  }
+  build() {
+    const g = this.g, grid = g.world.grid, gb = new GeoBuilder(), lb = new GeoBuilder();
+    for (const d of this.doors) {
+      const fx = Math.sin(d.h), fz = Math.cos(d.h), y0 = groundY(d.x, d.z, CURB_H + 1);
+      // find the facade behind the door point (the door point stands on the pavement)
+      const hit = grid.raycast(d.x, y0 + 1.2, d.z, -fx, 0, -fz, 4.5, 0.6);
+      d.wall = hit ? hit.t : null;
+      const S = ENTRANCE_STYLE[d.kind] || ENTRANCE_STYLE.shop;
+      const rx = Math.cos(d.h), rz = -Math.sin(d.h); // to the right, along the facade
+      const at = (side, out, y) => [d.x - fx * (d.wall - out) + rx * side, y0 + y, d.z - fz * (d.wall - out) + rz * side];
+      const box = (b, side, out, y, w2, h2, dd, col) => { const [x, yy, z] = at(side, out, y); b.box(x, yy, z, w2, h2, dd, C(col), d.h); };
+      // mat on the pavement in front of the door
+      const mx = d.x - fx * ((d.wall || 1.4) - 0.75), mz = d.z - fz * ((d.wall || 1.4) - 0.75);
+      gb.box(mx, groundY(mx, mz, y0 + 0.5) + 0.012, mz, 1.25, 0.024, 0.75, C(0x2a2622), d.h);
+      gb.box(mx, groundY(mx, mz, y0 + 0.5) + 0.026, mz, 1.05, 0.006, 0.55, C(d.kind === 'home' ? 0x7a3a2a : 0x3a4048), d.h);
+      if (d.wall === null) continue;
+      // door leaf, frame (two jambs and a head), handle, threshold step
+      box(gb, 0, 0.035, 1.12, 1.16, 2.24, 0.06, S.leaf);
+      if (d.kind === 'shop' || d.kind === 'public') box(gb, 0, 0.07, 1.45, 0.9, 1.05, 0.02, 0x8fb3c8); // glazed panel
+      else for (const yy of [0.55, 1.5]) box(gb, 0, 0.07, yy, 0.86, 0.62, 0.02, S.leaf === 0x5a3220 ? 0x4a2818 : S.leaf); // raised panels
+      for (const sx of [-1, 1]) box(gb, sx * 0.66, 0.05, 1.18, 0.14, 2.36, 0.1, S.frame);
+      box(gb, 0, 0.05, 2.38, 1.46, 0.16, 0.1, S.frame);
+      box(gb, 0.42, 0.1, 1.05, 0.05, 0.22, 0.05, S.handle);
+      box(gb, 0, 0.18, 0.04, 1.5, 0.08, 0.36, 0xb8b2a6);
+      // canopy over shop and public doors
+      if (S.canopy) {
+        const col = S.canopy === 'accent' ? PAL.awning[(hash2i(d.x | 0, d.z | 0, 7) * PAL.awning.length) | 0] : S.canopy;
+        box(gb, 0, 0.55, 2.78, 2.1, 0.1, 1.1, col);
+        box(gb, 0, 1.08, 2.66, 2.1, 0.22, 0.04, col);
+      }
+      // the lamp: a dark bracket and a warm lens
+      box(gb, 0, 0.09, 2.62, 0.22, 0.1, 0.18, 0x22252a);
+      box(lb, 0, 0.16, 2.54, 0.3, 0.12, 0.14, 0xffffff);
+    }
+    this.mesh = new THREE.Mesh(gb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.05 }));
+    this.mesh.receiveShadow = true; this.mesh.frustumCulled = false; g.scene.add(this.mesh);
+    this.lampMat = new THREE.MeshStandardMaterial({ color: 0xfff1d6, emissive: 0xffc070, emissiveIntensity: 0.4, roughness: 0.4 });
+    this.lamps = new THREE.Mesh(lb.build(), this.lampMat); this.lamps.frustumCulled = false; g.scene.add(this.lamps);
+  }
+  // the nearest dressed door to (x, z) and its distance
+  nearest(x, z) { let best = null, bd = 1e9; for (const d of this.doors) { const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd) { bd = dd; best = d; } } return best ? { d: best, dist: bd } : null; }
+  update(dt) {
+    const g = this.g, p = g.player, env = g.env;
+    this.lampMat.emissiveIntensity = 0.35 + (env.night || 0) * 2.2 + (env.dark || 0) * 0.8;
+    const show = p.state === 'foot' && !p.interior && g.state === 'playing';
+    const n = show ? this.nearest(p.pos.x, p.pos.z) : null;
+    const ring = this.ring;
+    if (!n || n.dist > 7) { ring.visible = false; return; }
+    const d = n.d, fx = Math.sin(d.h), fz = Math.cos(d.h), back = d.wall === null ? 0.9 : d.wall - 0.75;
+    const x = d.x - fx * back, z = d.z - fz * back;
+    ring.position.set(x, groundY(x, z, p.pos.y + 1) + 0.04, z);
+    this.t = (this.t || 0) + dt;
+    ring.material.opacity = clamp((7 - n.dist) / 4, 0, 1) * (0.32 + 0.12 * Math.sin(this.t * 3));
+    ring.visible = true;
+  }
+}
+
+/* =====================================================================
+   HITCH LOG: a lightweight diagnostic for long frames on real devices (the
+   first-drive hitch could not be reproduced in headless software rendering).
+   Every frame over 120 ms is recorded with what happened just before it
+   (getting into a car, an interior, a cab, the map) and the renderer's
+   counters. Settings › Diagnostics shows it and copies it as text.
+   ===================================================================== */
+const HitchLog = {
+  list: [], marks: [],
+  mark(label) { this.marks.push({ label, at: performance.now() }); if (this.marks.length > 24) this.marks.shift(); },
+  frame(g, ms, script) {
+    if (ms < 120 || g.state === 'loading' || document.hidden) return;
+    const now = performance.now(), info = g.renderer.info;
+    this.list.push({ t: Math.round(g.save.stats.playTime), ms: Math.round(ms), script: Math.round(script), on: g.player.state, recent: this.marks.filter(m => now - m.at < 1500).map(m => m.label), progs: info.programs ? info.programs.length : 0, calls: info.render.calls, tris: info.render.triangles, q: g.quality ? g.quality.mode : null });
+    if (this.list.length > 40) this.list.shift();
+  },
+  text() {
+    const ua = navigator.userAgent, head = `The Underworld hitch log · ${new Date().toISOString()} · ${innerWidth}x${innerHeight} @${devicePixelRatio} · ${ua}`;
+    return [head, ...this.list.map(e => `t=${e.t}s frame ${e.ms} ms (script ${e.script} ms) ${e.on}${e.recent.length ? ' after: ' + e.recent.join(', ') : ''} · shaders ${e.progs} · calls ${e.calls} · tris ${e.tris} · quality ${e.q}`)].join('\n');
+  }
+};
+window.__pvHitches = HitchLog;
+
+/* =====================================================================
+   TUTORIAL: short contextual tips, each shown once, when it becomes useful -
+   never a forced opening mission. Seen tips live in save.tips; Settings can
+   switch them off and bring them back.
+   ===================================================================== */
+const touchUI = g => IS_TOUCH && g.input.usingTouch;
+const TUTORIAL = [
+  { id: 'move', when: g => g.player.state === 'foot' && g.save.stats.playTime > 3,
+    text: g => touchUI(g) ? 'Left thumb moves you. Drag anywhere on the right half of the screen to look around.' : 'WASD moves you, the mouse looks around. Shift sprints, Space jumps.' },
+  { id: 'interact', when: g => !$('prompt').classList.contains('hidden'),
+    text: g => `When a prompt appears, ${touchUI(g) ? 'tap USE' : 'press E'} to do it: doors, people, cars, shops.` },
+  { id: 'money', when: g => g.uw && g.uw.stage === 0 && g.save.stats.playTime > 25,
+    text: () => 'First money: steal a car and sell it at the Saltworks Chop Shop, or buy cheap smokes from Dockside Sully and sell them to street buyers. Street Connect (phone) shows who buys and who sells.' },
+  { id: 'map', when: g => g.save.stats.playTime > 50,
+    text: g => `The Map (${touchUI(g) ? 'the map button' : 'M'}) shows places, BUY ↓ and SELL $ points and your territory. Tap a place to track it or take a cab there.` },
+  { id: 'phone', when: g => g.save.stats.playTime > 100,
+    text: g => `Your phone (${touchUI(g) ? 'the phone button' : 'Tab'}) has apps: Market shows what your stock cost and what it’s worth, Street Connect finds dealers, Inventory and Stashes show what’s where.` },
+  { id: 'drive', when: g => g.player.state === 'vehicle' && !g.player.passenger,
+    text: g => touchUI(g) ? 'Steer with the left stick; GAS and BRAKE on the right (hold BRAKE to reverse). HB is the handbrake for tight turns. USE gets you out.' : 'W/S to drive and brake (hold S to reverse), A/D to steer, Space for the handbrake, E to get out.' },
+  { id: 'product', when: g => g.uw && units(g.uw.carried()) > 0,
+    text: () => 'You’re carrying product. Sell it to street buyers (map SELL layer) or stash it at a property you own: carried goods are seized if you’re arrested.' },
+  { id: 'stash', when: g => g.uw && units(g.uw.carried()) > 0 && g.uw.props.ownedList().some(d => d.storage),
+    text: () => 'Your property has a stash. Open its menu at the door to deposit or withdraw product, guns and ammo, or send a crew runner (Crew › Deliveries).' },
+  { id: 'gun', when: g => g.player.state === 'foot' && g.player.wep && !g.player.wep.melee,
+    text: g => touchUI(g) ? 'Gun out: right thumb aims, hold FIRE to shoot (you can move, aim and fire at once). The bullet goes where the crosshair is. ADS steadies your aim.' : 'Gun out: the mouse aims, left click fires, right click aims down the sights. The bullet goes where the crosshair is.' },
+  { id: 'police', when: g => g.police.level > 0,
+    text: () => 'Stars mean the police are after you. Break line of sight and stay out of view until they fade. No cab will stop while you’re wanted.' },
+  { id: 'property', when: g => /for sale/.test($('prompt').textContent),
+    text: () => 'Property is bought in person. Homes are safehouses with a stash and parking; businesses pay every day and launder your name.' },
+  { id: 'garage', when: g => /Garage|garage/.test($('prompt').textContent),
+    text: () => 'Drive a car you own into a free space and stop to park it. Cars you leave around town get towed home. The Garage app lists them all.' },
+  { id: 'taxi', when: g => /Taxi/.test($('prompt').textContent),
+    text: () => 'Hire the cab, pick any street on the map and see the fare first. Ride along, skip the drive, change destination or get out early.' },
+  { id: 'jail', when: g => g.uw && g.uw.inJail,
+    text: () => 'Inside, time passes as you do things: work shifts, play cards, train, make friends. A lawyer can cut your sentence; a bribe can backfire. Open “Jail life” for everything.' }
+];
+class Tutorial {
+  constructor(g) {
+    this.g = g; this.cur = null; this.t = 0; this.cool = 3; this.chk = 0;
+    $('tip').querySelector('i').addEventListener('click', e => { e.stopPropagation(); this.dismiss(); });
+  }
+  get seen() { const s = this.g.save; return s.tips || (s.tips = {}); }
+  get on() { return this.g.save.settings.guide !== false; }
+  show(L) {
+    const g = this.g, el = $('tip');
+    this.seen[L.id] = 1; this.cur = L;
+    const text = L.text(g);
+    el.querySelector('span').textContent = text;
+    el.classList.remove('hidden');
+    this.t = clamp(text.length / 13, 7, 13);
+  }
+  hide() { $('tip').classList.add('hidden'); this.cur = null; }
+  dismiss() { if (!this.cur) return; this.hide(); this.cool = 8; }
+  reset() { this.g.save.tips = {}; this.hide(); this.cool = 2; }
+  update(dt) {
+    const g = this.g;
+    if (g.state !== 'playing' || !this.on) { if (this.cur) this.hide(); return; }
+    if (this.cur) { this.t -= dt; if (this.t <= 0) this.dismiss(); return; }
+    this.cool -= dt; if (this.cool > 0) return;
+    if (g.ui.modal || g.mapOpen || g.fading || (g.missions.active && g.police.level === 0)) return;
+    this.chk -= dt; if (this.chk > 0) return; this.chk = 0.5;
+    const seen = this.seen;
+    for (const L of TUTORIAL) if (!seen[L.id] && L.when(g)) { this.show(L); return; }
+  }
+}
+
+/* =====================================================================
    [CORE] UI MANAGER (HUD, menus, minimap, map, shop, toasts, banners)
    ===================================================================== */
 const $ = id => document.getElementById(id);
@@ -50661,7 +50937,7 @@ class HudLayout {
     window.addEventListener('resize', size); window.addEventListener('orientationchange', size);
     if (window.ResizeObserver) { this.ro = new ResizeObserver(mark); for (const id of ['tbar', 'jailHud', 'objective', 'toasts', 'speedo']) { const el = $(id); if (el) this.ro.observe(el); } const tr = document.querySelector('#hud .tr'); if (tr) this.ro.observe(tr); }
   }
-  static WATCH = ['touch', 'minimapWrap', 'zone', 'objective', 'jailHud', 'taxiHud', 'speedo', 'phone', 'zoneCard', 'prompt', 'moneyFeed'];
+  static WATCH = ['touch', 'minimapWrap', 'zone', 'objective', 'tip', 'jailHud', 'taxiHud', 'speedo', 'phone', 'zoneCard', 'prompt', 'moneyFeed'];
   get active() { return document.body.classList.contains('touch') || this.mq.matches; }
   safe() { const cs = getComputedStyle($('safeProbe')); return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 }; }
   set(el, props) {
@@ -50753,6 +51029,7 @@ class HudLayout {
     drop($('jailHud'), 'center');
     drop($('taxiHud'), 'center');
     drop($('objective'), 'center');
+    drop($('tip'), 'center');
     drop($('raceHud'), 'right');
     drop($('phone'), 'right');
     drop($('zoneCard'), 'center');
@@ -50941,7 +51218,13 @@ class UIManager {
     bindToggle('setInvert', 'invertY');
     bindToggle('setFps', 'showFps');
     bindToggle('setWeather', 'weather');
-    bindToggle('setGuide', 'guide');
+    bindToggle('setGuide', 'guide', () => { if (!s.guide && g.tutorial) g.tutorial.hide(); });
+    $('btnHitch').addEventListener('click', () => {
+      const txt = HitchLog.text(), n = HitchLog.list.length;
+      g.audio.play('ui');
+      this.ask(`Hitch log · ${n} long frame${n === 1 ? '' : 's'}`, n ? 'Frames over 120 ms this session, with what happened just before. Copy it and send it with a description of what you were doing.' : 'No frame over 120 ms so far this session.', n ? 'Copy' : 'OK', () => { try { navigator.clipboard.writeText(txt).then(() => this.toast('Hitch log copied.'), () => this.toast('Copy failed: the log is in the browser console.')); } catch { this.toast('Copy failed: the log is in the browser console.'); } console.info(txt); });
+    });
+    $('btnTips').addEventListener('click', () => { g.tutorial.reset(); s.guide = true; $('setGuide').classList.add('on'); g.audio.play('ui'); g.saveGame(); this.toast('Tips will show again as you play.'); });
     bindRange('setTraffic', 'traffic', pct);
     bindRange('setPeds', 'peds', pct);
     const aa = $('setAssist'); aa.value = String(s.aimAssist);
@@ -51416,7 +51699,7 @@ class MapView {
   toggle(force) {
     const g = this.g, on = force !== undefined ? force : $('bigmap').classList.contains('hidden');
     this.ui.show('bigmap', on);
-    g.mapOpen = on;
+    g.mapOpen = on; HitchLog.mark(on ? 'opened the map' : 'closed the map');
     if (on) {
       this.buildIndex(); this.fit();
       const p = g.player, [px, pz] = this.ui._mapXY(p.pos.x, p.pos.z);
@@ -52002,6 +52285,8 @@ class Game {
     this.ui = new UIManager(this);
     this.uw = new Underworld(this);
     this.garageDisplay = new GarageDisplay(this);
+    this.entrances = new EntranceDressing(this);
+    this.tutorial = new Tutorial(this);
     progress(0.68, 'Fueling vehicles'); await nextFrame();
     this.quality.apply();
     const sh = this.missions.safe; this.player.spawn(sh.x + 3.2, sh.z + 0.6, Math.PI / 2);
@@ -52362,6 +52647,7 @@ class Game {
     p.vehicle = v; p.lastVehicle = v; p.state = 'vehicle'; p.trans = null;
     this.audio.play('door');
     this.cam.yaw = v.h;
+    HitchLog.mark('got into a ' + v.type);
   }
   exitVehicle(force) {
     const p = this.player, v = p.vehicle; if (!v) return;
@@ -52452,6 +52738,7 @@ class Game {
   }
   // ---------------- main loop ----------------
   tick(now) {
+    const rawMs = now - this.last, t0 = performance.now();
     let dt = (now - this.last) / 1000; this.last = now;
     if (!(dt > 0)) dt = 0.016;
     dt = Math.min(dt, 0.05);
@@ -52477,6 +52764,7 @@ class Game {
     this.update(simDt, dt);
     this.render(simDt, dt);
     inp.endFrame();
+    HitchLog.frame(this, rawMs, performance.now() - t0);
   }
   update(dt, rdt) {
     const p = this.player;
@@ -52564,7 +52852,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.garageDisplay.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.garageDisplay.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);

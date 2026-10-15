@@ -1,4 +1,5 @@
-/* Roads and the map: curved through-roads (Greenway Park Drive, the Cedar Fields road) are smooth
+/* Roads and the map: curved through-roads (Greenway Park Drive, the Cedar Fields road, the suburb
+   bends that cut the corner between two streets) are smooth
    splines; the ground, both maps, traffic and the GPS all use the same polyline; the lattice graph
    that saves, races and police routing depend on is unchanged; traffic turns off onto the curves,
    follows them inside the lane and merges back; the GPS routes along them; districts have their own
@@ -29,8 +30,9 @@ const geo = await ev(() => {
   out.offRaster = off;
   return out;
 });
-check('two curved through-roads: Greenway Park Drive and the Cedar Fields road', geo.links.length === 2 && geo.links.map(l => l.name).join() === 'Greenway Park Drive,Cedar Fields Road', JSON.stringify(geo.links.map(l => l.name)));
-check('they are smooth splines (no kink sharper than 10° between 2.5 m samples)', geo.links.every(l => l.n > 60 && l.maxTurn < 0.175), JSON.stringify(geo.links.map(l => [l.n, +l.maxTurn.toFixed(3)])));
+const names = geo.links.map(l => l.name);
+check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].every(n => names.includes(n)) && new Set(names).size === names.length, JSON.stringify(names));
+check('they are smooth splines (samples every ~2.5 m, no kink sharper than 10°)', geo.links.every(l => l.n >= l.len / 3 && l.maxTurn < 0.175), JSON.stringify(geo.links.map(l => [l.name, l.n, Math.round(l.len), +l.maxTurn.toFixed(3)])));
 check('one polyline: what the ground paints and the maps draw is what traffic and GPS follow', geo.links.every(l => l.same) && geo.offRaster === 0, JSON.stringify(geo.offRaster));
 check('each end meets an open lattice road', geo.links.every(l => l.ends.every(Boolean)));
 check('the lattice graph is unchanged (only superblock closures)', geo.closed === geo.expect && geo.path > 1, JSON.stringify([geo.closed, geo.expect, geo.path]));
@@ -78,6 +80,42 @@ const turnOff = await ev(async () => {
   return { took, alive: !!v.ai };
 });
 check('lattice traffic turns off onto the curved road at its junction', turnOff.took, JSON.stringify(turnOff));
+// every suburb bend is a real road: a lattice car turns in, drives it in lane and merges out the far end
+const bends = await ev(async () => {
+  const g = window.game, w = g.world, tr = g.traffic, out = [];
+  for (const L of w.links.filter(L => /Bend|Curve|Lane/.test(L.name))) {
+    for (const v of tr.cars.slice()) g.vehicles.despawn(v);
+    const e = L.ends[0];
+    g.resetPlayerState(e.C.x + (e.axis === 0 ? 30 : 0), e.C.z + (e.axis === 1 ? 30 : 0), 0);
+    await new Promise(r => { const f0 = g.frame; const iv = setInterval(() => { if (g.frame > f0 + 5) { clearInterval(iv); r(); } }, 20); });
+    let v = null; for (let k = 0; k < 80 && !v; k++) { v = tr.trySpawn(); if (v && (v.patrol || v.ai.mode !== 'lane')) { g.vehicles.despawn(v); v = null; } }
+    if (!v) { out.push({ name: L.name, err: 'spawn' }); continue; }
+    const dir = e.axis === 0 ? [0, 1] : [1, 0];
+    Object.assign(v.ai, { i: e.axis === 0 ? e.line : e.seg, j: e.axis === 0 ? e.seg : e.line, dx: dir[0], dz: dir[1], s: e.along - 32, mode: 'lane', next: null, linkSeen: 0, speed: 8 });
+    const lp = tr.lanePt(v.ai.i, v.ai.j, dir[0], dir[1], e.along - 32); v.pos.x = lp[0]; v.pos.z = lp[1]; v.h = Math.atan2(dir[0], dir[1]);
+    tr.target = 1; tr.linkChance = 1;
+    let took = false, merged = false, maxOff = 0; const t0 = g.time;
+    try {
+      await new Promise(res => { const iv = setInterval(() => {
+        if (!v.ai) { clearInterval(iv); res(); return; }
+        if (v.ai.mode === 'path') {
+          took = true; const pa = v.ai.path;
+          if (pa.d > pa.mergeD - L.len + 3 && pa.d < pa.mergeD - 3) { let best = 1e9; for (let k = 0; k < L.pts.length - 1; k++) { const a = L.pts[k], c = L.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); best = Math.min(best, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); } maxOff = Math.max(maxOff, best); }
+        } else if (took) merged = true;
+        if (merged || g.time - t0 > 30) { clearInterval(iv); res(); }
+      }, 30); });
+    } finally { tr.linkChance = 0.4; tr.target = 18; }
+    out.push({ name: L.name, took, merged, off: +maxOff.toFixed(2), w: L.w, ...(merged ? {} : { mode: v.ai && v.ai.mode, d: v.ai && v.ai.path && Math.round(v.ai.path.d), mergeD: v.ai && v.ai.path && Math.round(v.ai.path.mergeD), len: v.ai && v.ai.path && Math.round(v.ai.path.len), sp: +(v.ai ? v.ai.speed : -1).toFixed(1), blockT: v.ai && v.ai.blockT, pos: [Math.round(v.pos.x), Math.round(v.pos.z)] }) });
+  }
+  return out;
+});
+check('every suburb bend is driven by traffic: in at one street, along the curve in lane, out onto the other', bends.length === 4 && bends.every(b => b.took && b.merged && b.off < b.w / 2), JSON.stringify(bends));
+const bendGps = await ev(() => {
+  const g = window.game, P = window.__pv, out = [];
+  for (const L of g.world.links.filter(L => /Bend|Curve|Lane/.test(L.name))) { const q = L.pts[Math.floor(L.pts.length / 2)], r = P.gpsRoute(q[0] + 200, q[1] + 200, q[0], q[1]), end = r[r.length - 1]; out.push({ name: L.name, end: +Math.hypot(end.x - q[0], end.z - q[1]).toFixed(2), on: r.filter(p => L.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)).length }); }
+  return out;
+});
+check('the GPS (and so taxis and the map) routes onto each bend', bendGps.every(b => b.end < 0.01 && b.on >= 3), JSON.stringify(bendGps));
 
 // ---------------------------------------------------------------- 3. GPS along the curve
 const gps = await ev(() => {
