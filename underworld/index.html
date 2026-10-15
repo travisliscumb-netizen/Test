@@ -35638,7 +35638,12 @@ Object.assign(World.prototype, {
    ===================================================================== */
 const LANDMARK_BLOCKS = {
   '6,5': { gen: '_genLandmark', name: 'Valen Tower', icon: 'T', ground: 'D' },
-  '10,4': { gen: '_genGasStation', name: 'Fuel & Go', icon: 'G', ground: 'K' },
+  '10,4': { gen: '_genGasStation', name: 'Fuel & Go', icon: 'G', ground: 'K', station: 1, short: 'Harbor Road' },
+  // more Fuel & Go stations spread over the city: never far from fuel, scratch cards or a quick robbery
+  '5,1': { gen: '_genGasStation', name: 'Fuel & Go · Northgate', icon: 'G', ground: 'K', station: 2, short: 'Northgate', mirror: true, accent: 0x2a6ac8 },
+  '3,7': { gen: '_genGasStation', name: 'Fuel & Go · Westside', icon: 'G', ground: 'K', station: 3, short: 'Westside', accent: 0x2f8a4a },
+  '9,7': { gen: '_genGasStation', name: 'Fuel & Go · Eastgate', icon: 'G', ground: 'K', station: 4, short: 'Eastgate', mirror: true, accent: 0xd8a227 },
+  '5,10': { gen: '_genGasStation', name: 'Fuel & Go · Southbank', icon: 'G', ground: 'K', station: 5, short: 'Southbank', accent: 0x8a3ad2 },
   '2,5': { gen: '_genGarage', name: 'Quarter Garage', icon: 'P', ground: 'K' },
   '6,8': { gen: '_genMall', name: 'Harborview Mall', icon: 'M', ground: 'K' },
   '10,1': { gen: '_genPlant', name: 'Saltworks Plant', icon: 'I', ground: 'I' },
@@ -36072,13 +36077,16 @@ Object.assign(World.prototype, {
     this.towerDrive = { x: cx + 14, z: b.z1 - 4.5, h: 0, y: CURB_H };
     b.secrets.push({ x: b.x0 + 3, z: b.z0 + 3 });
   },
+  // a Fuel & Go: canopy over four pump islands, the shop (its interior is under it), a price pylon.
+  // Variants (LANDMARK_BLOCKS: station, mirror, accent) flip the plot and change the trim colour.
   _genGasStation(b, rng) {
+    const V = LANDMARK_BLOCKS[b.bx + ',' + b.bz] || {}, n = V.station || 1;
+    const mx = x => V.mirror ? b.x0 + b.x1 - x : x, ry = r => V.mirror ? -r : r, acc = V.accent || 0xd23a2a, accHex = '#' + new THREE.Color(acc).getHexString();
     this._sidewalk(b, rng, { trees: 0.2, park: 0 });
     const cx = b.cx, cz = b.cz;
-    // canopy over four pump islands
     const cw = 26, cd = 16, cy = CURB_H + 5.2;
     this._det(b, 'box', cx, cy, cz + 6, cw, 0.7, cd, C(0xf4f4f2));
-    this._det(b, 'box', cx, cy + 0.36, cz + 6, cw + 0.1, 0.18, cd + 0.1, C(0xd23a2a));
+    this._det(b, 'box', cx, cy + 0.36, cz + 6, cw + 0.1, 0.18, cd + 0.1, C(acc));
     this._det(b, 'box', cx, cy - 0.38, cz + 6, cw - 1, 0.04, cd - 1, C(0xe8e8e8));
     b.fx.push({ type: 'canopy', x: cx, y: cy - 0.42, z: cz + 6, w: cw - 2, d: cd - 2 });
     for (const [ix, iz] of [[-6.5, 2.5], [6.5, 2.5], [-6.5, 9.5], [6.5, 9.5]]) {
@@ -36087,21 +36095,26 @@ Object.assign(World.prototype, {
       for (const k of [-1.5, 1.5]) this._prop(b, 'pump', cx + ix, cz + iz + k, 0);
     }
     // convenience store
-    const st = this._bld(b, b.x0 + 4, b.z0 + 3, b.x0 + 30, b.z0 + 17, 4.6, STYLE.SHOP, 0xe9e4d8, 4.6, 3.2, { gtype: 1, exactH: true });
-    this._ring(b, st, st.y0 + st.h - 0.3, 0.6, 0.3, C(0xd23a2a));
+    const sx0 = Math.min(mx(b.x0 + 4), mx(b.x0 + 30)), sx1 = Math.max(mx(b.x0 + 4), mx(b.x0 + 30));
+    const st = this._bld(b, sx0, b.z0 + 3, sx1, b.z0 + 17, 4.6, STYLE.SHOP, n % 2 ? 0xe9e4d8 : 0xdde4e8, 4.6, 3.2, { gtype: 1, exactH: true });
+    this._ring(b, st, st.y0 + st.h - 0.3, 0.6, 0.3, C(acc));
     this._rooftop(b, st, rng, 'mid');
-    b.signs.push({ text: 'FUEL & GO  ·  24 HRS', x: (st.x0 + st.x1) / 2, y: CURB_H + 4.0, z: st.z1 + 0.04, ry: 0, w: 14, h: 1.2, bg: '#d23a2a', fg: '#ffffff' });
+    b.signs.push({ text: n > 1 ? `FUEL & GO · ${V.short.toUpperCase()}` : 'FUEL & GO  ·  24 HRS', x: (st.x0 + st.x1) / 2, y: CURB_H + 4.0, z: st.z1 + 0.04, ry: 0, w: 14, h: 1.2, bg: accHex, fg: '#ffffff' });
     // price pylon
-    const px = b.x1 - 3, pz = b.z1 - 4;
+    const px = mx(b.x1 - 3), pz = b.z1 - 4;
     this._det(b, 'box', px, CURB_H + 3, pz, 0.4, 6, 0.4, C(0x555a60), 0, { x: px, z: pz, r: 0.4, y0: 0, y1: 6, kind: 'det' });
-    b.signs.push({ text: '3.49  3.79  4.05', x: px, y: CURB_H + 6.6, z: pz + 0.25, ry: 0, w: 3.6, h: 1.6, bg: '#101418', fg: '#ffd84d' });
-    b.signs.push({ text: 'FUEL & GO', x: px, y: CURB_H + 8.0, z: pz + 0.25, ry: 0, w: 3.6, h: 1.0, bg: '#d23a2a', fg: '#fff' });
-    for (let i = 0; i < 3; i++) this._prop(b, 'bags', b.x0 + 32 + i * 0.8, b.z0 + 4, rng.range(0, 6));
-    this._prop(b, 'dumpster', b.x0 + 36, b.z0 + 4, 0);
-    this._prop(b, 'vending', st.x1 + 0.8, st.z1 - 1.2, Math.PI / 2);
-    b.parked.push({ x: b.x0 + 10, z: b.z0 + 22, h: Math.PI, cls: null }, { x: b.x0 + 16, z: b.z0 + 22, h: Math.PI, cls: null });
-    b.secrets.push({ x: b.x0 + 34, z: b.z0 + 2.5 });
-    this._kicker(b, b.x1 - 10, b.z0 + 12, 'z', 1, 7, 1.4, true);
+    b.signs.push({ text: ['3.49  3.79  4.05', '3.45  3.75  3.99', '3.55  3.85  4.09', '3.39  3.69  3.95', '3.59  3.89  4.15'][(n - 1) % 5], x: px, y: CURB_H + 6.6, z: pz + 0.25, ry: 0, w: 3.6, h: 1.6, bg: '#101418', fg: '#ffd84d' });
+    b.signs.push({ text: 'FUEL & GO', x: px, y: CURB_H + 8.0, z: pz + 0.25, ry: 0, w: 3.6, h: 1.0, bg: accHex, fg: '#fff' });
+    for (let i = 0; i < 3; i++) this._prop(b, 'bags', mx(b.x0 + 32 + i * 0.8), b.z0 + 4, rng.range(0, 6));
+    this._prop(b, 'dumpster', mx(b.x0 + 36), b.z0 + 4, 0);
+    this._prop(b, 'vending', V.mirror ? st.x0 - 0.8 : st.x1 + 0.8, st.z1 - 1.2, ry(Math.PI / 2));
+    b.parked.push({ x: mx(b.x0 + 10), z: b.z0 + 22, h: Math.PI, cls: null }, { x: mx(b.x0 + 16), z: b.z0 + 22, h: Math.PI, cls: null });
+    b.secrets.push({ x: mx(b.x0 + 34), z: b.z0 + 2.5 });
+    if (n === 1) this._kicker(b, b.x1 - 10, b.z0 + 12, 'z', 1, 7, 1.4, true);
+    // every station after the first registers its own place (the first is 'store', set in _placesGen)
+    const door = { x: (st.x0 + st.x1) / 2, z: st.z1 + 1.1, h: 0 };
+    if (n > 1) b.place = { id: 'store' + n, name: V.name, kind: 'shop', door, under: { x: (st.x0 + st.x1) / 2, z: (st.z0 + st.z1) / 2 }, station: n };
+    (this.stations || (this.stations = [])).push({ id: n > 1 ? 'store' + n : 'store', name: V.name || 'Fuel & Go', door, block: b.i });
   },
   _genGarage(b, rng) {
     this._sidewalk(b, rng, { trees: 0.3, park: 0.2 });
@@ -42021,6 +42034,68 @@ const OUTFITS = {
   hair: [0x1a1410, 0x5a3a22, 0xc9a66b, 0x6a6a6a, 0x7a2e1a]
 };
 
+// Fuel & Go: the shop at the front (aisles, drinks fridges, the counter and the Lucky Pump), a locked
+// staff door behind the counter, and the back: an office (desk, CCTV, the safe) and a stockroom.
+// Every station uses this layout; each has its own interior under its own building.
+function storeInteriorDef(id, name) {
+  return {
+    name, place: id, w: 12, d: 11, h: 3.2, exit: { x: -3.5, z: 4.6 }, spawnH: Math.PI, store: true,
+    build(k, rng, def) {
+      const W = 12, D = 11, hw = W / 2, hd = D / 2;
+      k.room(W, D, 3.2, { floor: 0xd9d6cf, wall: 0xe8e4da, ceil: 0xf4f2ee, trim: 0xd23a2a, band: [2.5, 0.35], bandC: 0xd23a2a, lights: [3, 3], lightC: 0xf4fbff });
+      k.tiles(W, D, 0xd9d6cf, 0xbdb9b0, 0.5);
+      k.door(-3.5, hd - 0.02, 0, 0x9ab4c4, 0x7fe08f);
+      const pal = [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0x8e44ad, 0xecf0f1, 0x1abc9c];
+      // partition between the shop and the back, with the staff door behind the counter
+      iwall(k, 'x', -1.8, -hw, hw, 0, 3.2, 0xe0dcd2, [[2.6, 3.8]]);
+      iwall(k, 'z', 0, -hd, -1.8, 0, 3.2, 0xd8d4ca, [[-3.6, -2.6]]);
+      // the staff door itself: a collider that the robbery opens (its panel is a separate mesh)
+      def.staffCol = k.cols.length; k.cols.push({ x0: 2.6, x1: 3.8, z0: -1.9, z1: -1.7, y0: 0, y1: 2.3 });
+      k.box(3.2, 2.35, -1.7, 1.3, 0.22, 0.04, 0xd23a2a); k.glow(3.2, 2.38, -1.67, 1.1, 0.14, 0.01, 0xffffff, 1.6);
+      // shop: two aisles, drinks fridges against the partition, the counter, snacks, the slot cabinet
+      k.shelfUnit(-1.9, 1.7, 0.7, 3.4, 1.6, 3, rng, pal); k.shelfUnit(0.5, 1.7, 0.7, 3.4, 1.6, 3, rng, pal);
+      for (let i = 0; i < 3; i++) {
+        const x = -5.2 + i * 1.3;
+        k.box(x, 0, -1.4, 1.2, 2.2, 0.7, 0xdfe3e6, { col: true }); k.glow(x, 0.15, -1.04, 1.05, 1.95, 0.02, 0xcfe8ff, 1.25);
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 6; c++) k.box(x - 0.45 + c * 0.18, 0.25 + r * 0.38, -1.06, 0.1, 0.24, 0.02, pal[(r + c + i) % pal.length]);
+      }
+      k.box(3.6, 0, 2.6, 2.8, 1.0, 0.8, 0xd23a2a, { col: true }); k.box(3.6, 1.0, 2.6, 2.9, 0.05, 0.9, 0xe8e4da);
+      k.box(2.7, 1.05, 2.6, 0.45, 0.3, 0.38, 0x2a2a2e); k.glow(2.7, 1.2, 2.82, 0.3, 0.12, 0.02, 0x7fe08f, 1.6);
+      k.box(4.6, 1.05, 2.6, 0.7, 0.45, 0.3, 0x2a5f9e); for (let i = 0; i < 5; i++) k.box(4.32 + i * 0.14, 1.12, 2.76, 0.1, 0.32, 0.01, pal[i]);
+      k.box(hw - 0.3, 0, 0.0, 0.5, 1.9, 2.4, 0x5c5e62, { col: true });
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) k.box(hw - 0.56, 0.3 + r * 0.42, -1.0 + c * 0.38, 0.04, 0.3, 0.3, pal[(r * 3 + c) % pal.length]);
+      k.glow(3.6, 2.2, hd - 0.04, 2.4, 0.5, 0.03, 0xd23a2a, 1.4);
+      k.box(-5.6, 0, 2.4, 0.7, 1.72, 0.9, 0x3a1a4a, { col: true }); k.box(-5.6, 0.7, 2.4, 0.78, 0.06, 0.94, 0xd8a227);
+      k.glow(-5.6, 1.74, 2.4, 0.62, 0.32, 0.86, 0xffd84d, 1.9); k.glow(-5.245, 0.95, 2.4, 0.02, 0.52, 0.76, 0x1a0e24, 1);
+      for (let i = 0; i < 3; i++) k.glow(-5.23, 1.04, 2.16 + i * 0.24, 0.02, 0.32, 0.2, 0xf4f2ee, 1.5);
+      k.glow(-5.23, 1.42, 2.4, 0.02, 0.08, 0.7, 0xff4d5e, 2.2); k.box(-5.5, 0.95, 2.88, 0.06, 0.62, 0.06, 0xb0b0b0); k.box(-5.5, 1.57, 2.88, 0.15, 0.15, 0.15, 0xd23a2a);
+      // back office: desk, chair, CCTV monitors, the safe
+      FURN.desk(k, 3.0, 0, -4.9, 0, 1.4, false, 0x5a5e62); k.box(2.7, 0.74, -5.05, 0.5, 0.35, 0.05, 0x111111); k.glow(2.7, 0.78, -5.02, 0.44, 0.28, 0.01, 0x6a9a7a, 1.2);
+      k.box(3.4, 0.74, -5.05, 0.5, 0.35, 0.05, 0x111111); k.glow(3.4, 0.78, -5.02, 0.44, 0.28, 0.01, 0x6a8ab0, 1.2);
+      FURN.safe(k, 5.45, 0, -4.7, 3); k.box(hw - 0.05, 1.4, -3.4, 0.04, 0.9, 1.2, 0xb59a6a);
+      // stockroom: steel racking with boxes and cartons
+      for (const sx of [-5.3, -2.0]) k.shelfUnit(sx, -3.8, 0.7, 2.6, 2.0, 4, rng, [0x8a6a4a, 0x7a5a3a, 0x9a7a5a, 0xd8c8a0]);
+      k.crate(-3.6, -5.0, 0.55, 0x8a6a4a, 2); k.crate(-0.8, -5.0, 0.5, 0x6a7a8a, 1);
+    },
+    // the staff door panel: a mesh of its own so it can swing open
+    afterInstall(grp, def) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.2, 0.06), new THREE.MeshBasicMaterial({ color: 0x6a7076, fog: false }));
+      m.position.set(3.2, 1.1, -1.8); grp.add(m); def.staffMesh = m;
+    },
+    spots: [
+      { id: 'clerk', x: 4.4, z: 3.5, r: 1.0, label: 'Shop' },
+      { id: 'register', x: 2.4, z: 3.5, r: 0.8, label: 'Rob the register' },
+      { id: 'slot', x: -4.75, z: 2.4, r: 1.0, label: 'Play the Lucky Pump slot' },
+      { id: 'staff', x: 3.2, z: -1.0, r: 0.9, label: 'Staff only · force the door' },
+      { id: 'safe', x: 4.6, z: -4.4, r: 0.9, label: 'Crack the office safe' },
+      { id: 'desk', x: 3.0, z: -3.6, r: 0.8, label: 'Search the desk' },
+      { id: 'stock', x: -3.6, z: -3.3, r: 1.1, label: 'Search the stockroom' },
+      { id: 'exit', x: -3.5, z: 4.6, r: 1.1, label: 'Leave' }
+    ],
+    noExit: true,
+    npcs: [{ id: 'clerk', x: 3.6, z: 1.8, h: 0, look: { shirt: 0xd23a2a, pants: 0x2a2a2e, cap: 0xd23a2a } }]
+  };
+}
 // local layouts: x/z relative to the room centre, door/exit on the +z wall unless stated
 const INTERIOR_DEFS = {
   safehouse: {
@@ -42130,38 +42205,11 @@ const INTERIOR_DEFS = {
     spots: [{ id: 'counter', x: -3.2, z: 3.2, r: 1.3, label: 'Service desk' }],
     npcs: [{ id: 'mechanic', x: 5.5, z: 1.5, h: -Math.PI / 2, look: { shirt: 0x34495e, pants: 0x2c3e50, cap: 0xd23a2a } }]
   },
-  store: {
-    name: 'Fuel & Go', place: 'store', w: 11, d: 8, h: 3.2, exit: { x: -3.5, z: 3.1 }, spawnH: Math.PI,
-    build(k, rng) {
-      k.room(11, 8, 3.2, { floor: 0xd9d6cf, wall: 0xe8e4da, ceil: 0xf4f2ee, trim: 0xd23a2a, band: [2.5, 0.35], bandC: 0xd23a2a, lights: [3, 2], lightC: 0xf4fbff });
-      k.tiles(11, 8, 0xd9d6cf, 0xbdb9b0, 0.5);
-      k.door(-3.5, 3.98, 0, 0x9ab4c4, 0x7fe08f);
-      const pal = [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0x8e44ad, 0xecf0f1, 0x1abc9c];
-      k.shelfUnit(-1.6, -0.8, 0.7, 3.6, 1.6, 3, rng, pal); k.shelfUnit(0.9, -0.8, 0.7, 3.6, 1.6, 3, rng, pal);
-      // drinks fridges along the back wall
-      for (let i = 0; i < 4; i++) {
-        const x = -4.2 + i * 1.3;
-        k.box(x, 0, -3.65, 1.2, 2.2, 0.7, 0xdfe3e6, { col: true }); k.glow(x, 0.15, -3.29, 1.05, 1.95, 0.02, 0xcfe8ff, 1.25);
-        for (let r = 0; r < 5; r++) for (let c = 0; c < 6; c++) k.box(x - 0.45 + c * 0.18, 0.25 + r * 0.38, -3.32, 0.1, 0.24, 0.02, pal[(r + c + i) % pal.length]);
-      }
-      // counter with register, snacks rack and lottery stand
-      k.box(3.4, 0, 1.9, 2.6, 1.0, 0.8, 0xd23a2a, { col: true }); k.box(3.4, 1.0, 1.9, 2.7, 0.05, 0.9, 0xe8e4da);
-      k.box(2.7, 1.05, 1.9, 0.45, 0.3, 0.38, 0x2a2a2e); k.glow(2.7, 1.2, 1.7, 0.3, 0.12, 0.02, 0x7fe08f, 1.6);
-      k.box(4.6, 0, 3.4, 1.2, 0.02, 0.5, 0x2a2a2e); k.box(5.2, 0, -1.0, 0.5, 1.9, 2.4, 0x5c5e62, { col: true });
-      for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) k.box(4.94, 0.3 + r * 0.42, -2 + c * 0.38, 0.04, 0.3, 0.3, pal[(r * 3 + c) % pal.length]);
-      k.glow(3.4, 2.2, 3.96, 2.4, 0.5, 0.03, 0xd23a2a, 1.4);
-      // the Lucky Pump slot cabinet against the west wall: marquee, three reel windows, coin tray and a pull handle
-      k.box(-5.1, 0, 0.9, 0.7, 1.72, 0.9, 0x3a1a4a, { col: true }); k.box(-5.1, 0.7, 0.9, 0.78, 0.06, 0.94, 0xd8a227);
-      k.glow(-5.1, 1.74, 0.9, 0.62, 0.32, 0.86, 0xffd84d, 1.9);
-      k.glow(-4.745, 0.95, 0.9, 0.02, 0.52, 0.76, 0x1a0e24, 1);
-      for (let i = 0; i < 3; i++) k.glow(-4.73, 1.04, 0.66 + i * 0.24, 0.02, 0.32, 0.2, 0xf4f2ee, 1.5);
-      k.glow(-4.73, 1.42, 0.9, 0.02, 0.08, 0.7, 0xff4d5e, 2.2);
-      k.box(-4.78, 0.42, 0.9, 0.1, 0.12, 0.5, 0x2a2a2e);
-      k.box(-5.0, 0.95, 1.38, 0.06, 0.62, 0.06, 0xb0b0b0); k.box(-5.0, 1.57, 1.38, 0.15, 0.15, 0.15, 0xd23a2a);
-    },
-    spots: [{ id: 'clerk', x: 3.3, z: 1.0, r: 1.3, label: 'Shop' }, { id: 'slot', x: -4.25, z: 0.9, r: 1.0, label: 'Play the Lucky Pump slot' }],
-    npcs: [{ id: 'clerk', x: 3.6, z: 2.75, h: Math.PI, look: { shirt: 0xd23a2a, pants: 0x2a2a2e, cap: 0xd23a2a } }]
-  },
+  store: storeInteriorDef('store', 'Fuel & Go'),
+  store2: storeInteriorDef('store2', 'Fuel & Go · Northgate'),
+  store3: storeInteriorDef('store3', 'Fuel & Go · Westside'),
+  store4: storeInteriorDef('store4', 'Fuel & Go · Eastgate'),
+  store5: storeInteriorDef('store5', 'Fuel & Go · Southbank'),
   police: {
     name: 'Police HQ Lobby', place: 'police', w: 14, d: 10, h: 3.6, exit: { x: 0, z: 4.1 }, spawnH: Math.PI,
     build(k, rng) {
@@ -43021,6 +43069,7 @@ class InteriorManager {
     const grp = new THREE.Group(); grp.position.set(ox, fy, oz);
     grp.add(parts.main); if (parts.glow) grp.add(parts.glow);
     if (def.windows) for (const w of def.windows) grp.add(this._window(w));
+    if (def.afterInstall) def.afterInstall(grp, def);
     grp.visible = false;
     game.scene.add(grp);
     def.group = grp;
@@ -43077,6 +43126,7 @@ class InteriorManager {
       p.vel.set(0, 0, 0); p.h = def.spawnH; p.onGround = true;
       g.cam.yaw = def.spawnH; g.cam.pitch = -0.12; g.cam.init = false;
       if (id === 'depot') this.spawnGuards(def);
+      if (def.store) g.content.openStaffDoor(def, false);
       g.audio.play('door');
       g.content.onInterior(id, true);
     };
@@ -43886,7 +43936,8 @@ class ContentManager {
       case 'laptop': g.uw.ui.open('overview'); break;
       case 'wardrobe': this.openWardrobe(); break;
       case 'garage': if (I.cur && I.cur.dynamic) this.toGarage(I.cur); else this.openGarage(this.garagePoints()[0]); break;
-      case 'clerk': this.openStore(); break;
+      case 'clerk': if (I.cur && I.cur.store && this.storeState(I.cur).reg === this.g.uw.S.day) { this.say('pv', 'The clerk is shaking too hard to ring anything up. Come back another day.'); break; } this.openStore(); break;
+      case 'register': case 'staff': case 'safe': case 'desk': case 'stock': this.storeHeist(id); break;
       case 'slot': g.gamble.openSlot('fuel'); break;
       case 'counter': this.openService(); break;
       case 'board': this.openTipLine(); break;
@@ -44001,6 +44052,73 @@ class ContentManager {
     if (K.slow) this.channel(`CRACKING THE ${K.label.toUpperCase()}`, K.slow, finish);
     else { g.audio.play('ui'); finish(); }
   }
+  // ------------------------------------------------------------ robbing a Fuel & Go
+  // The register (once a day per station), the staff door behind the counter, and the back office:
+  // the desk, the stockroom and the safe (once a week each). The clerk hits the silent alarm more often
+  // than not; a safe's alarm brings more police. A robbed clerk hands over the back-office key.
+  storeState(def) {
+    const fl = this.g.save.flags.storeHit || (this.g.save.flags.storeHit = {}), week = Math.floor(this.g.uw.S.day / 7);
+    let st = fl[def.id]; if (!st || typeof st !== 'object' || st.w !== week) st = fl[def.id] = { w: week, reg: -1, safe: false, desk: false, stock: false };
+    return st;
+  }
+  openStaffDoor(def, open) {
+    def.staffOpen = open;
+    const c = def.cols && def.cols[def.staffCol]; if (c) c.on = !open;
+    if (def.staffMesh) { def.staffMesh.position.x = open ? 3.2 + 0.55 : 3.2; def.staffMesh.position.z = open ? -1.8 - 0.55 : -1.8; def.staffMesh.rotation.y = open ? Math.PI / 2 : 0; }
+  }
+  // the clerk's silent alarm: the police are told about the robbery at this station
+  silentAlarm(def, stars) {
+    const g = this.g, d = def.door;
+    g.police.crime('robbery', d.x, d.z);
+    if (g.police.level < stars) g.police.setLevel(stars);
+    g.ui.toast('Silent alarm. The police are on their way.', 'warn');
+  }
+  storeHeist(id) {
+    const g = this.g, def = this.interiors.cur; if (!def || !def.store) return;
+    const st = this.storeState(def), S = g.uw.S, armed = g.player.wep && !g.player.wep.melee;
+    const area = ({ u: 1.4, c: 1.3, p: 1.25, a: 1.1, m: 1.1, l: 1.0, g: 1.0, o: 0.85, s: 0.85, w: 0.85, r: 0.8, h: 0.9 })[zoneKey(def.door.x, def.door.z)] || 1;
+    if (id === 'register') {
+      if (st.reg === S.day) { g.ui.toast('The till is empty. They dropped it in the safe after the last guy.', 'warn'); return; }
+      if (!armed && Math.random() < 0.4) { st.reg = S.day; this.say('Clerk', 'Not today, pal. *slams the alarm*'); this.silentAlarm(def, 1); return; }
+      this.channel(armed ? 'THE CLERK EMPTIES THE TILL' : 'LEANING ON THE CLERK', 3, () => {
+        st.reg = S.day;
+        const cash = Math.round((armed ? randi(180, 460) : randi(60, 200)) * area);
+        g.addMoney(cash, true); g.audio.play('cash');
+        g.save.stats.robberies = (g.save.stats.robberies || 0) + 1;
+        this.say('Clerk', pick(['Take it, take it! The back office key too, just go!', 'Okay! Okay. Here. And the key to the back. Please.']));
+        this.openStaffDoor(def, true);
+        if (Math.random() < 0.75) this.silentAlarm(def, armed ? 2 : 1); else g.police.crime('robbery', def.door.x, def.door.z);
+      });
+      return;
+    }
+    if (id === 'staff') {
+      if (def.staffOpen) { g.ui.toast('The back office is open.'); return; }
+      this.channel('FORCING THE STAFF DOOR', 3.5, () => {
+        this.openStaffDoor(def, true); g.audio.play('clank');
+        if (st.reg !== S.day && Math.random() < 0.6) { this.say('Clerk', 'Hey! You can’t go back there! *picks up the phone*'); this.silentAlarm(def, 1); }
+      });
+      return;
+    }
+    if (st[id]) { g.ui.toast(id === 'safe' ? 'The safe is already empty. Cash pickup comes on Mondays.' : 'Already gone through it.', 'warn'); return; }
+    const grab = () => {
+      st[id] = true;
+      if (id === 'safe') {
+        const cash = Math.round(randi(1400, 4200) * area); g.addMoney(cash, true); g.audio.play('cash');
+        const got = Math.random() < 0.35 ? g.uw.give({ hot: 1 + randi(0, 2) }, 'robbery') : null;
+        g.ui.toast(`The safe: ${fmtMoney(cash)}${got ? ' and ' + goodsList(got) : ''}.`, 'money');
+        if (Math.random() < 0.45) { g.audio.play('buzzer'); this.silentAlarm(def, 3); } else g.police.crime('robbery', def.door.x, def.door.z);
+      } else if (id === 'desk') {
+        if (Math.random() < 0.6) { const c = randi(40, 220); g.addMoney(c, true); g.ui.toast(`Petty cash in the desk: ${fmtMoney(c)}.`, 'money'); }
+        else if (Math.random() < 0.5) { g.save.ammo.pistol = (g.save.ammo.pistol || 0) + 12; g.ui.toast('A box of pistol rounds in the drawer: 12 rounds.', 'money'); }
+        else g.ui.toast('Invoices and a stale doughnut.');
+      } else {
+        const got = g.uw.give(Math.random() < 0.6 ? { smokes: randi(2, 5) } : { hot: randi(1, 2) }, 'robbery');
+        g.ui.toast(got ? `From the stockroom: ${goodsList(got)}.` : 'Nothing you can carry right now.', got ? 'money' : 'warn');
+      }
+    };
+    if (!def.staffOpen) { g.ui.toast('That’s behind the staff door.', 'warn'); return; }
+    if (id === 'safe') this.channel('CRACKING THE OFFICE SAFE', 6, grab); else { g.audio.play('pickup'); grab(); }
+  }
   // the old one-button search: the nearest container not searched yet
   burgle() {
     const g = this.g, def = this.interiors.cur; if (!def || !def.containers) return;
@@ -44015,7 +44133,7 @@ class ContentManager {
     this._updateComms(rdt);
     this._updateChannel(dt);
     if (g.state !== 'playing') return;
-    this.interiors.update(dt);
+    // (interiors.update runs once per frame from Game.update; calling it here too doubled guard speed)
     this._updatePackages(dt);
     this.checkT -= rdt;
     if (this.checkT <= 0) {
@@ -50701,6 +50819,8 @@ class UIManager {
     // nearby services and hinted packages
     const svc = g.world.places;
     for (const id of ['motorworks', 'dealer', 'store', 'police']) if (g.save.discovered.places[id]) blip(svc[id].door.x, svc[id].door.z, '#e8eef6', 4, false, 'sq');
+    // every Fuel & Go is on the minimap (public, signposted, 24 hours)
+    for (const id of ['store', 'store2', 'store3', 'store4', 'store5']) if (svc[id]) blip(svc[id].door.x, svc[id].door.z, '#ffd84d', 3.5, false, 'sq');
     for (const pk of g.world.packages) if (g.save.hints[pk.id] && !g.save.packages[pk.id]) blip(pk.x, pk.z, '#7fe08f', 4);
     if (g.events && g.events.ev && !m && !g.events.ev.done) blip(g.events.ev.x, g.events.ev.z, '#e8eef6', 4.5, false);
     if (!m && g.content && g.content.guideTarget) { const gt2 = g.content.guideTarget; if (gt2.icon) { const at = badge(gt2.x, gt2.z, gt2.col || '#7fe08f', gt2.icon, bs * 1.25, true); if (at) { c.strokeStyle = '#7fe08f'; c.lineWidth = 3; c.beginPath(); c.arc(at[0], at[1], bs * 1.25 + 4, 0, 7); c.stroke(); } } else blip(gt2.x, gt2.z, '#7fe08f', 6, true); }
@@ -50776,7 +50896,8 @@ class MapView {
     const g = this.g, w = g.world, pl = w.places, uw = g.uw, out = [], seen = new Set();
     const add = (e) => { if (!e || !isFinite(e.x) || !isFinite(e.z) || seen.has(e.key)) return; seen.add(e.key); const C2 = MAP_CATS[e.cat]; e.icon = e.icon || C2.icon; e.col = e.col || C2.col; e.district = e.district || districtNameAt(e.x, e.z); out.push(e); };
     const P2 = (id) => pl[id] && pl[id].door;
-    const svc = { motorworks: ['W', 'Repairs, tuning and respray'], dealer: ['V', 'New and used cars'], store: ['$', 'Snacks, vests, scratch cards'], mall: ['M', 'Shopping mall'] };
+    const svc = { motorworks: ['W', 'Repairs, tuning and respray'], dealer: ['V', 'New and used cars'], store: ['$', 'Fuel & Go · snacks, vests, scratch cards, slot'], mall: ['M', 'Shopping mall'] };
+    for (const id of ['store2', 'store3', 'store4', 'store5']) svc[id] = ['$', 'Fuel & Go · snacks, vests, scratch cards, slot'];
     for (const id in svc) if (P2(id)) add({ key: 'pl:' + id, name: pl[id].name, cat: id === 'mall' ? 'landmark' : 'service', icon: svc[id][0], sub: svc[id][1], x: pl[id].door.x, z: pl[id].door.z, place: id });
     if (P2('chopshop')) add({ key: 'pl:chopshop', name: pl.chopshop.name, cat: 'chop', sub: 'Sells stolen cars · drive in and park', x: pl.chopshop.door.x, z: pl.chopshop.door.z, place: 'chopshop' });
     if (P2('police')) add({ key: 'pl:police', name: pl.police.name, cat: 'police', sub: 'Lobby, tip line board, front desk', x: pl.police.door.x, z: pl.police.door.z, place: 'police' });
@@ -52098,7 +52219,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
+    window.__pv = Object.freeze({ fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
     await game.init(progress);
   } catch (e) {
     console.error(e);
