@@ -202,6 +202,52 @@ The save key is `pvunderworld.save.v1` and the schema version is 5 (v3 and v4 sa
 load; v4 → v5 moves the old jail-inflated day count into a calendar offset and drops the jail speed). Saves are versioned, sanitized
 and written only in a stable state. Settings are stored under a separate key.
 
+## v6 pass (schema 6)
+
+Save key unchanged (`pvunderworld.save.v1`); schema 5 saves load and migrate (new fields default, jail
+phone moves into the sentence, business levels start at 1, dealership stock starts empty and stocks
+itself). The master template is untouched. Free roam stays free roam.
+
+- **Homes (45):** six tiers from rented rooms to the estate, a signature home per neighbourhood; each
+  home lists storage, parking, crew room, security, finish and its neighbourhood perk. Houses get seeded
+  multi-room plans (`housePlan`: tier 2 four rooms, tier 3 five, tier 4 seven-eight, tier 5 ten, signature
+  eleven, mansion more), built only when you walk in (`interiors.addDynamic`). A home for sale can be
+  viewed, bought, or broken into; drawers hold named valuables that scale with the tier and feed the hot-goods
+  market. Homes you own hold your bed, wardrobe, fridge and stash, not burglary containers. The Property app
+  filters by owned / for sale, district, tier, parking and storage, and sorts and searches.
+- **Businesses (50):** 30 kinds (`BIZ_CATS`), each with its own benefit (laundering, recruits, legal,
+  fencing, crew room, storage, cheaper property, more income...). Three levels with a price, a name and a
+  real change in income, running costs and benefit. A business manager raises income, cuts costs and
+  strengthens the benefit. The Business app lists, filters, searches, sorts and upgrades; storefronts carry
+  name boards that light up when improved.
+- **Pickpocketing:** who you meet depends on the district (`PED_TYPES`); pockets follow a skewed curve,
+  with rare $10K / $40K / $100K scores (the $100K one only in the richest districts).
+- **Casino:** no table limits, quick bets to $1B plus MAX and custom; roulette multi-bet with a net
+  result; one no-limit Hold'em table; ~60/40 player-favoured games (one constant each in `CASINO`); the
+  Royale Billions slot with a $10K-$1B jackpot ladder and saved drought pressure. Fuel & Go slots stay small.
+- **Jail:** sentences halved; every day inside is a street day; good-behaviour chores unlock 2x and 3x
+  time; no phone or map unless you bribe a guard for one; release bribes with a real three-way roll.
+- **On foot and camera:** auto-follow behind you while walking, fan-ray occlusion with a damped recovery,
+  faster sprint with twice the stamina.
+- **Police:** patrols, staffed parked cruisers and foot officers join a live chase (chase, intercept and
+  flank roles, a capped unit count, no teleporting).
+- **Cars (29 civilian models):** 13 new models with their own silhouettes (`PROFILES`) and details
+  (wings, scoops, rails, light bars, intakes, louvres). One list price per model (`CAR_MSRP`).
+- **Dealerships:** Saltworks Used Autos across the street from the chop shop (condition, mileage,
+  bargains, stock turns over every two days), Meridian Motors (the practical new line-up, sold cars
+  replaced overnight), Valen Prestige Motors (a glass showroom, six cars, rotating flagships, a turntable).
+  The stock stands on the lot as real locked cars (`DealerLots`): walk up, inspect, buy, drive it off.
+  Each has its own map category.
+- **Entrances:** the casino forecourt; doors set back from the pavement move to the real facade and get
+  a paved walk; parked cars are cleared from every door.
+- **App icon:** `tools/icon.svg` → `icons/` (1024 master, 512, 192, Apple touch 180, favicon 32) via
+  `node underworld/tools/make-icons.mjs`; `manifest.webmanifest` is linked only over http(s) (browsers
+  refuse a manifest from `file://`, and the game must open offline from a file).
+
+New suites: `casino`, `camera`, `police`, `homes`, `business`, `dealers`, `street`, `pwa`. Visual QA
+scripts: `frontshots.mjs` (entrances by day, night and rain), `carshots.mjs` (every model side-on and from
+above), `contact.mjs` (labelled contact sheets). `UW_FILE=path` runs any suite against another build.
+
 ## Tests
 
 The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
@@ -218,7 +264,7 @@ node underworld/tests/offline.mjs   # no network at all: load, render, play, UI,
 node underworld/tests/phone.mjs     # phone layouts (8 sizes, 320–932 px, portrait + landscape): top bar, jail, driving HUD, menus
 node underworld/tests/map.mjs       # pinch/pan/wheel zoom, limits, labels by zoom, index search, tap to centre, tracking, layers, cards
 node underworld/tests/city.mjs      # road network (no dead ends, connected), prop placement, buildings, districts, landmarks, stadium, parkade
-node underworld/tests/property.mjs  # 21 homes / 6 tiers, parking capacity, garage doors, bays, save/reload, mansion, penthouse, interiors
+node underworld/tests/property.mjs  # 45 homes / 6 tiers, parking capacity, garage doors, bays, save/reload, mansion, penthouse, interiors
 node underworld/tests/stress.mjs    # realistic phone session across every new system, HUD overlap audit after each step
 node underworld/tests/cityshots.mjs # screenshots of the new districts for visual review (.shots/city)
 CYCLES=10 node underworld/tests/soak.mjs  # long session: entities, listeners, timers, GPU memory, frame cost, heap, save round-trip
@@ -239,6 +285,14 @@ node underworld/tests/kingpin.mjs   # rivals' wars and royalties for an ordinary
 node underworld/tests/tutorial.mjs  # contextual tips once each, one at a time, settings off/on, saved
 node underworld/tests/money.mjs     # +/- money popups from every path, merging, stacking, fading, placement
 node underworld/tests/qashots.mjs   # visual-QA screenshots (.shots/qa): interiors, cars, doors, parkade, station, casino, phone, taxi, jail, districts
+node underworld/tests/casino.mjs    # no limits, MAX/custom wagers, roulette multi-bet, Hold'em, 60/40 sims, Royale Billions ladder
+node underworld/tests/camera.mjs    # on-foot follow, occlusion fan and recovery, sprint and stamina
+node underworld/tests/police.mjs    # patrols, parked cruisers and foot cops join a chase; roles; unit cap
+node underworld/tests/homes.mjs     # 45 homes, plans per tier, reachability, viewing, burglary, loot, Property app
+node underworld/tests/business.mjs  # 50 businesses, levels, manager, perks, Business app, name boards, migration
+node underworld/tests/dealers.mjs   # roster, three lots, stock, rotation, inspect/buy, showroom glass, drive-out, save
+node underworld/tests/street.mjs    # pickpocket wealth curve, archetypes by district, jackpot rarity
+node underworld/tests/pwa.mjs       # icons at every size, manifest over http, nothing requested from file://
 node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
 ```
 
