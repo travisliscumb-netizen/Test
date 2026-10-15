@@ -50571,10 +50571,13 @@ class TaxiService {
     if (!cands.length) for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) if (RoadNet.degree(i, j)) { const d = Math.hypot(i * P - x, j * P - z); if (d > 60) cands.push({ i, j, d }); }
     if (!cands.length) return null;
     cands.sort((a, b) => a.d - b.d);
-    const c = cands[0], nx = c.i * P, nz = c.j * P;
-    const h = Math.atan2(x - nx, z - nz);
-    for (const v of g.vehicles.nearby(nx, nz, 6)) if (Math.hypot(v.pos.x - nx, v.pos.z - nz) < 5) return null;
-    return g.vehicles.spawn('taxi', nx + LANE * Math.cos(h), nz - LANE * Math.sin(h), h, {});
+    // the nearest node with nobody standing on it (a car parked on one node shouldn't mean "no cabs")
+    for (const c of cands.slice(0, 8)) {
+      const nx = c.i * P, nz = c.j * P, h = Math.atan2(x - nx, z - nz);
+      if (g.vehicles.nearby(nx, nz, 6).some(v => Math.hypot(v.pos.x - nx, v.pos.z - nz) < 5)) continue;
+      return g.vehicles.spawn('taxi', nx + LANE * Math.cos(h), nz - LANE * Math.sin(h), h, {});
+    }
+    return null;
   }
   adopt(v) {
     const g = this.g;
