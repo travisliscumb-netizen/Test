@@ -50,8 +50,8 @@ async function arrestAndServe(tag, setup, opts = {}) {
   await page.keyboard.down('KeyW'); await frames(page, 12); await page.keyboard.up('KeyW');
   const c1 = await page.evaluate(() => ({ x: window.game.player.pos.x, z: window.game.player.pos.z }));
   check(`${tag}: can walk around inside`, Math.hypot(c1.x - c0.x, c1.z - c0.z) > 0.3);
-  // serve fast: 20x and a short remaining sentence
-  await page.evaluate(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
+  // serve the rest quickly: 15 more days (30 s at two seconds a day; the street moves a day per week served)
+  await page.evaluate(() => { const j = window.game.uw.S.jail; j.total = j.served + 15; });
   await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
   await frames(page, 6);
   const after = await page.evaluate(() => ({ t: window.game.env.time, day: window.game.uw.S.day }));
@@ -118,7 +118,7 @@ const sent = await page.evaluate(() => {
   uw.S.inv = {}; g.save.weapons.pistol = false;
   return { clean, loaded, priors: uw.S.rap.priors };
 });
-check('carried product and guns lengthen the sentence', sent.loaded > sent.clean + 60, JSON.stringify(sent));
+check('carried product and guns lengthen the sentence (more than double, and by over a month)', sent.loaded > sent.clean * 2 && sent.loaded > sent.clean + 30, JSON.stringify(sent));
 check('nine priors on record', sent.priors === 9, JSON.stringify(sent));
 // jail persists through save + reload
 await page.evaluate(() => { const g = window.game; g.police.setLevel(1); g.onBusted(); });
