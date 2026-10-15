@@ -12,7 +12,7 @@ const b = await launch();
 const { page, errors } = await open(b, { viewport: { width: 640, height: 400 }, deviceScaleFactor: 1 });
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
-await ev(q => { const g = window.game; g.quality.setMode(q); g.events.cool = 1e9; g.police.enabled = false; g.save.money = 2e6; window.__hideHud = on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? 'hidden' : ''; } };
+await ev(q => { const g = window.game; g.quality.setMode(q); g.save.settings.guide = false; g.events.cool = 1e9; g.police.enabled = false; g.save.money = 2e6; window.__hideTip = () => { const t = document.getElementById('tip'); if (t) t.style.visibility = 'hidden'; }; window.__hideHud = on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? 'hidden' : ''; } };
   // a free camera for photos: after the rig updates, put the lens where window.__freeCam says
   const U = g.cam.update.bind(g.cam); g.cam.update = (...a) => { U(...a); const f = window.__freeCam; if (f) { g.camera.position.set(f.x, f.y, f.z); g.camera.lookAt(f.lx, f.ly, f.lz); } }; }, +(process.env.QA_Q || 1));
 const shot = async (name) => { await frames(page, 8); await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('shot', name); };
@@ -32,7 +32,7 @@ if (want('mansion')) {
 if (want('penthouse')) {
   await ev(() => { const g = window.game; g.uw.S.props.penthouse = { owned: true, dmg: 0, since: 1 }; g.save.owns.penthouse = true; g.content.interiors.enter('penthouse', true); });
   await at(0, 0, -4.0, 0.0, -0.12); await shot('penthouse-living');
-  await at(-2.8, 0, -2.6, -2.6, -0.2); await shot('penthouse-master');
+  { const sp = await ev(() => { const d = window.game.content.interiors.cur, q = d.spots.find(x => /Sleep/i.test(x.label)) || d.spots[0]; return { x: q.x, z: q.z }; }); await at(sp.x + 1.2, 0, sp.z + 1.6, Math.atan2(-1.2, -1.6), -0.25); await shot('penthouse-master'); }
   await at(1.0, 0, 0.5, 2.3, -0.15); await shot('penthouse-kitchen-bar');
   await ev(() => window.game.content.interiors.exit(true));
 }
@@ -101,7 +101,7 @@ if (want('station')) {
   await ev(() => window.game.content.interiors.exit(true));
 }
 if (want('casino')) {
-  await ev(() => { const g = window.game; g.save.rep = 2000; g.content.interiors.enter('casino', true); });
+  await ev(() => { const g = window.game; g.save.rep = 2000; g.police.clear(); g.content.enterCasino(); }); await fadeDone(); await page.waitForFunction(() => window.game.content.interiors.cur, null, { timeout: 30000 });
   await at(0, 0, 11, Math.PI, -0.1); await shot('casino-floor');
   await at(-12, 0, 6, -2.4, -0.15); await shot('casino-slots');
   await ev(() => window.game.content.interiors.exit(true));
