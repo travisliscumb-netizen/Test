@@ -167,6 +167,12 @@ button{font-family:var(--font)}
 #gameover.dead .gt{color:#ff5c5c}#gameover.busted .gt{color:#6fa8ff}
 #bustbar{position:absolute;left:50%;top:58%;transform:translateX(-50%);width:220px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.2em;color:#9cc2ff;text-shadow:0 1px 2px #000}
 #bustbar .bar{margin-top:5px;height:6px}#bustbar .bar i{background:#6fa8ff}
+#taxiHud{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);background:var(--panel);border:1px solid rgba(244,194,13,.6);border-top:3px solid #f4c20d;border-radius:12px;padding:8px 12px;min-width:250px;max-width:min(360px,92vw);text-align:center;pointer-events:auto}
+#taxiHud small{display:block;font-size:10px;letter-spacing:.24em;color:#f4c20d;font-weight:900}#taxiHud b{display:block;font-size:16px;font-weight:900;margin:2px 0}#taxiHud .tm{font-size:12px;color:var(--dim)}
+#taxiHud .tbtns{display:flex;gap:6px;justify-content:center;margin-top:6px}#taxiHud button{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);border-radius:8px;padding:8px 10px;min-height:40px;font-weight:800;font-size:13px;cursor:pointer}
+body.passenger #touch .car{display:none!important}
+#mapPick{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;width:min(380px,calc(100% - 16px));background:var(--panel2);border:1px solid var(--line);border-top:3px solid #f4c20d;border-radius:12px;padding:10px 12px}
+#mapPick b{font-size:15px}#mapPick .stats{margin-top:6px}#mapPick .btns{display:flex;gap:8px;margin-top:8px}#mapPick .btns .sbtn{flex:1;min-height:44px}
 #chanBar{position:absolute;left:50%;top:52%;transform:translateX(-50%);width:240px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.14em;color:#ffd84d;text-shadow:0 1px 2px #000;pointer-events:none}
 #chanBar .bar{margin-top:5px;height:7px}#chanBar .bar i{background:#ffd84d;transition:none}
 #chanBar small{display:block;font-size:10px;letter-spacing:.08em;color:var(--dim);font-weight:600;margin-top:4px}
@@ -209,6 +215,8 @@ button{font-family:var(--font)}
 #mapCard .stats{margin-top:8px;font-size:13px;gap:3px 12px}
 #mapCard .btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}#mapCard .btns .sbtn{flex:1;min-height:44px}
 #mapCard .x{position:absolute;right:6px;top:6px;min-width:36px;height:36px;font-size:15px}
+/* with the Places drawer open the card sits beside it, never underneath */
+#mapDrawer:not(.hidden) ~ #mapCard{left:calc(min(340px,86%) + 8px);transform:none;width:min(380px,calc(100% - min(340px,86%) - 16px))}
 #turfInfo{position:absolute;right:16px;top:16px;width:min(340px,90vw);max-height:80vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;z-index:6}
 @media (max-height:460px){
   #bigmap{gap:4px}
@@ -449,6 +457,19 @@ body.touch.driving #speedo .vh{margin:6px auto 0}
 .tabs{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0 10px}
 .etab{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--dim);padding:7px 11px;border-radius:8px;font-weight:800;font-size:12px;letter-spacing:.05em;cursor:pointer}
 .etab.on{background:rgba(255,181,71,.2);border-color:var(--amber);color:#fff}
+/* phone: app home screen, app bar with back + sub-pages */
+.appHome h4{margin:14px 2px 6px;font-size:10px;letter-spacing:.22em;color:var(--dim);font-weight:900}.appHome h4:first-child{margin-top:2px}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.app{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:14px;padding:10px 6px 8px;min-height:96px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;font:inherit;position:relative}
+.app:active{transform:scale(.97)}.app.locked{opacity:.38}
+.app i{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-style:normal;font-size:24px;background:var(--c);box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+.app b{font-size:12px;font-weight:800;text-align:center;line-height:1.15}.app small{font-size:10px;color:var(--dim);text-align:center;line-height:1.2}
+.app em{position:absolute;top:5px;right:6px;background:var(--red);color:#fff;font-style:normal;font-size:10px;font-weight:900;border-radius:9px;padding:1px 6px;min-width:18px}
+#empTabs.hidden{display:none}#empTabs{align-items:center}
+#empTabs .etab{min-height:40px}#empTabs .etab.back{min-height:44px;min-width:64px;color:var(--text);background:rgba(255,255,255,.1)}
+.ccChips{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}.ccChips .etab{min-height:36px}
+.ccGood{margin-top:12px}.ccGood>b{font-size:16px}.ccRole{font-size:10px;letter-spacing:.2em;font-weight:900;margin:8px 0 4px}.ccRole.buy{color:#46d4c4}.ccRole.sell{color:#ffd84d}
+.pnl .stats{font-size:12px}.pnl .up{color:var(--green)}.pnl .dn{color:var(--red)}
 .empMsg{background:rgba(255,181,71,.12);border-left:3px solid var(--amber);padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:13px}
 .grid4{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .tile{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
@@ -542,6 +563,7 @@ body[data-gs="paused"] #jailHud{display:none}
   <div id="prompt" class="hidden"></div>
   <div id="offer" class="hidden"></div>
   <div id="bustbar" class="hidden">ARREST IN PROGRESS<div class="bar"><i style="width:0"></i></div></div>
+  <div id="taxiHud" class="hidden"><small>CABLINE · TAXI</small><b class="td">—</b><span class="tm"></span><div class="tbtns"><button data-tx="skip">Skip ride</button><button data-tx="change">Change</button><button data-tx="out">Get out</button></div></div>
   <div id="chanBar" class="hidden"><span class="cl"></span><div class="bar"><i style="width:0"></i></div><small>Stay close · moving away stops it</small></div>
   <div id="jailHud" class="hidden">
     <small>COUNTY JAIL · BLOCK C</small><b id="jailDays">0 days left</b><span id="jailLeft"></span>
@@ -755,8 +777,10 @@ body[data-gs="paused"] #jailHud{display:none}
       <button class="mtb" id="mapZoomIn" aria-label="Zoom in">+</button>
       <button class="mtb" id="mapZoomOut" aria-label="Zoom out">&minus;</button>
       <button class="mtb" id="mapMe" aria-label="Centre on me">&#9678;</button>
+      <button class="mtb wide" id="mapTaxiBtn" aria-label="Call a taxi">&#128661; Taxi</button>
       <button class="mtb" id="mapClose" aria-label="Close map">&#10005;</button>
     </div>
+    <div id="mapPick" class="hidden"></div>
     <div id="mapLayers" class="mapPop hidden"></div>
     <div id="mapDrawer" class="hidden">
       <div class="mdHead"><input id="mapSearch" type="search" placeholder="Search places, e.g. chop shop" autocomplete="off" spellcheck="false"><button class="mtb" id="mapDrawerClose" aria-label="Close index">&#10005;</button></div>
@@ -770,7 +794,7 @@ body[data-gs="paused"] #jailHud{display:none}
 </div>
 <div id="empireScreen" class="screen center hidden">
   <div class="panel wide emp">
-    <div class="empHead"><h2>Empire</h2><div class="empStats" id="empStats"></div></div>
+    <div class="empHead"><h2 id="empTitle">Phone</h2><div class="empStats" id="empStats"></div></div>
     <div class="tabs" id="empTabs"></div>
     <div id="empBody"></div>
     <div class="actions"><button class="sbtn gold" data-close>Close</button></div>
@@ -38431,9 +38455,14 @@ class CameraRig {
       if (p.aim > 0.01) { dist = lerp(dist, 2.1, p.aim); sideOff = lerp(sideOff, 0.66, p.aim); fovAdd = -14 * p.aim; }
       // drawing a gun while the camera stares at the pavement: ease the view up to a level aim,
       // unless the player is steering the camera themselves
+      // (it used to stop at -0.1, which still put the crosshair on the pavement ~13 m out: every shot hit the ground)
+      const lookIdle = performance.now() - g.input.lastLookInput;
       if (this.levelT > 0) {
         this.levelT -= dt;
-        if (performance.now() - g.input.lastLookInput > 600 && this.pitch < -0.1) this.pitch = damp(this.pitch, -0.05, 9, dt);
+        if (lookIdle > 600 && this.pitch < -0.03) this.pitch = damp(this.pitch, -0.02, 9, dt);
+      } else if (gun && p.aim < 0.01 && lookIdle > 2000 && this.pitch < -0.14 && !(g.combat && g.combat.assist)) {
+        // a gun held with the view resting on the ground and nobody under the reticle: drift slowly back up
+        this.pitch = damp(this.pitch, -0.05, 1.5, dt);
       }
       const sp = Math.hypot(p.vel.x, p.vel.z);
       fovAdd += clamp((sp - 5) * 1.2, 0, 5);
@@ -40126,6 +40155,13 @@ class DriveAI {
       if (nxt) { const dx = nxt[0] - a, dz = nxt[1] - b; x += -dz * LANE * 0.7; z += dx * LANE * 0.7; }
       this.path.push({ x, z, node: true });
     }
+    // a goal part-way along the last street: stop there instead of running on to the far junction and U-turning back
+    for (let guard = 0; guard < 2 && this.path.length >= 1; guard++) {
+      const B = this.path[this.path.length - 1], A = this.path.length >= 2 ? this.path[this.path.length - 2] : v.pos;
+      const abx = B.x - A.x, abz = B.z - A.z, L2 = abx * abx + abz * abz; if (L2 < 1) break;
+      const t = ((tx - A.x) * abx + (tz - A.z) * abz) / L2, off = Math.abs((tx - A.x) * abz - (tz - A.z) * abx) / Math.sqrt(L2);
+      if (t > 0.02 && t < 0.98 && off < 14) this.path.pop(); else break;
+    }
     this.path.push({ x: tx, z: tz, node: false });
     this.pi = 0;
   }
@@ -40180,16 +40216,28 @@ class DriveAI {
     const probe = 5 + v.speed * 0.55;
     const hit = g.world.grid.raycast(v.pos.x + fx * v.spec.l * 0.5, v.pos.y + 0.8, v.pos.z + fz * v.spec.l * 0.5, fx, 0, fz, probe, 0.5);
     if (hit && !this.direct) { desired = Math.min(desired, Math.max(3, hit.t * 0.9)); steer += (hit.nx * Math.cos(v.h) - hit.nz * Math.sin(v.h)) > 0 ? 0.5 : -0.5; }
-    // traffic ahead
+    // traffic ahead. Two cars that each wait for the other (nose to nose, or one parked across the
+    // lane) would sit forever: after a few seconds stopped behind something that isn't moving
+    // either, the driver pulls round it at walking pace.
+    const fwd = v.localVel().z;
+    let blocker = null, bl2 = null, slowed = desired;
     for (const e of g.dyn.query(v.pos.x + fx * 7, v.pos.z + fz * 7, 8, this._n || (this._n = []))) {
       if (e.ref === v || (this.direct && e.ref === this.targetRef)) continue;
+      if (e.ref === g.player && g.player.passenger) continue;
       const l2 = v.toLocal(e.x, e.z);
       if (l2.z > 0 && l2.z < 12 && Math.abs(l2.x) < 2.2) {
         if (this.mode === 'pursue') steer += l2.x > 0 ? -0.6 : 0.6;
-        else desired = Math.min(desired, Math.max(0, (l2.z - 4) * 1.2));
+        else { const lim = Math.max(0, (l2.z - 4) * 1.2); if (lim < slowed) { slowed = lim; blocker = e.ref; bl2 = l2; } }
       }
     }
-    const fwd = v.localVel().z;
+    if (blocker && slowed < 1 && Math.abs(fwd) < 0.6) {
+      const still = !(blocker.speed > 0.8) && !(blocker.vel && Math.hypot(blocker.vel.x, blocker.vel.y || 0, blocker.vel.z || 0) > 0.8);
+      this.blockT = still ? (this.blockT || 0) + dt : 0;
+    } else if (!blocker) this.blockT = Math.max(0, (this.blockT || 0) - dt * 2);
+    // queued traffic at a light clears by itself: wait longer behind kinematic traffic
+    const patience = blocker && blocker.mode === 'kin' ? 7 : 2.5;
+    if (blocker && this.blockT > patience) { desired = Math.min(desired, 4); steer += bl2.x > 0 ? -0.8 : 0.8; }
+    else desired = slowed;
     if (this.rev > 0) { this.rev -= dt; ctl.throttle = -1; ctl.steer = -this.revSteer; return; }
     if (ctl.throttle > 0.3 && Math.abs(fwd) < 0.8 && desired > 2) { this.stuck += dt; this.stuckTotal = (this.stuckTotal || 0) + dt; if (this.stuck > 1.4) { this.rev = 1.3; this.revSteer = Math.sign(steer) || 1; this.stuck = 0; } }
     else { this.stuck = Math.max(0, this.stuck - dt); if (fwd > 4) this.stuckTotal = 0; }
@@ -43262,7 +43310,6 @@ const SECRETS = [
   { id: 'gold', name: 'The Golden Corsair', cash: 0 },
   { id: 'pitch', name: 'Pitch Invader', cash: 800 }
 ];
-const FAST_POINTS = ['safehouse', 'tower', 'motorworks', 'dealer', 'store', 'police', 'mall', 'stadium', 'garageRoof', 'plant', 'hospital', 'casino'];
 const SERVICE_PLACES = ['motorworks', 'dealer', 'store', 'police', 'tower'];
 const POSTS = [
   { place: 'police', dx: -3.2, dz: -1.5 }, { place: 'police', dx: 3.4, dz: -1.2 },
@@ -43736,32 +43783,10 @@ class ContentManager {
     });
   }
   setWaypoint(x, z, label) { this.waypoint = { x, z, label }; this.g.audio.play('ui'); }
-  // ------------------------------------------------------------ fast travel (big map)
-  fastPoints() {
-    const s = this.g.save, pl = this.g.world.places;
-    const uw = this.g.uw;
-    return FAST_POINTS.filter(id => pl[id] && (id === 'safehouse' ? uw && uw.props.owned('linden') : id === 'tower' ? s.owns.penthouse || s.discovered.places[id] : s.discovered.places[id])).map(id => ({ id, name: pl[id].name, x: pl[id].door.x, z: pl[id].door.z, h: pl[id].door.h }));
-  }
-  fastTravel(pt) {
-    const g = this.g, p = g.player, s = g.save;
-    if (g.police.level > 0) { g.ui.toast('No cab will stop for you with the police on your tail.', 'warn'); g.audio.play('deny'); return; }
-    if (g.missions.active) { g.ui.toast('Finish or abandon the current job first.', 'warn'); g.audio.play('deny'); return; }
-    if (s.money < 40) { g.ui.toast('A cab costs $40.', 'warn'); g.audio.play('deny'); return; }
-    g.ui.toggleMap(false);
-    g.fade(() => {
-      this.spend(40); s.stats.fastTravels++;
-      const x = pt.x + Math.sin(pt.h) * 2.2, z = pt.z + Math.cos(pt.h) * 2.2, hp = p.health;
-      g.resetPlayerState(x, z, pt.h); p.health = Math.max(hp, 1);
-      g.env.time = (g.env.time + 0.4) % 24;
-      for (let k = 0; k < 4; k++) g.chunks.update(x, z, g.frame);
-      g.ui.toast(`Cabline dropped you at ${pt.name}. $40.`, 'money');
-    });
-  }
   mapClick(x, z) {
     const g = this.g;
     let best = null, bd = 30;
-    for (const pt of this.fastPoints()) { const d = Math.hypot(pt.x - x, pt.z - z); if (d < bd) { bd = d; best = pt; } }
-    if (best) { g.ui.ask(`Take a cab to ${best.name}?`, 'Cabline fare: $40. About twenty minutes in-game. Not available while wanted or on a job.', 'Ride', () => this.fastTravel(best)); return true; }
+    void best; void bd;
     for (const ct of g.missions.contacts) if (Math.hypot(ct.x - x, ct.z - z) < 30) { this.setWaypoint(ct.x, ct.z, ct.name); g.ui.toast(`Waypoint set: ${ct.name}.`); g.ui.toggleMap(false); return true; }
     return false;
   }
@@ -43786,7 +43811,7 @@ class ContentManager {
       const pl = g.world.places[id];
       if (Math.hypot(p.pos.x - pl.door.x, p.pos.z - pl.door.z) < 40) {
         s.discovered.places[id] = 1;
-        if (id !== 'safehouse') g.ui.toast(`Discovered: ${pl.name}${FAST_POINTS.includes(id) ? ' — cab stop added to the map' : ''}.`);
+        if (id !== 'safehouse') g.ui.toast(`Discovered: ${pl.name}.`);
         if (SERVICE_PLACES.every(k => s.discovered.places[k])) this.ach('regular');
       }
     }
@@ -43858,6 +43883,7 @@ class ContentManager {
       return { label: sp.label, act: () => this.spotAct(sp.id) };
     }
     if (p.state === 'vehicle') {
+      if (p.passenger) return null;
       const v = p.vehicle;
       if (v.speed < 3) {
         const gp = this.nearGarage(v.pos.x, v.pos.z, 4.2);
@@ -43868,6 +43894,12 @@ class ContentManager {
       return null;
     }
     if (p.state !== 'foot') return null;
+    // a taxi at the kerb (your called cab, or one stopped in traffic): hire or carjack
+    if (!p.interior) for (const v of g.vehicles.nearby(p.pos.x, p.pos.z, 5)) {
+      if (v.type !== 'taxi' || v.burnt || v.speed > 2.5 || !(v.mode === 'kin' || g.taxi.isCab(v)) || (g.taxi.isCab(v) && g.taxi.state === 'riding')) continue;
+      const lp = v.toLocal(p.pos.x, p.pos.z), d = Math.hypot(Math.max(0, Math.abs(lp.x) - v.spec.w / 2), Math.max(0, Math.abs(lp.z) - v.spec.l / 2));
+      if (d < 1.6) return { label: 'Taxi · hire or carjack', act: () => g.taxi.approach(v) };
+    }
     const gp = this.nearGarage(p.pos.x, p.pos.z, 3.2);
     if (gp) return { label: 'Garage', act: () => this.openGarage(gp) };
     const dl = pl.dealer.desk;
@@ -43909,7 +43941,7 @@ class ContentManager {
     const g = this.g, s = g.save;
     if (this.repLevel < 4) { this.deny('The concierge looks you up and down. “The penthouse is for Operators, not errand runners.” (Operator reputation)'); return; }
     if (s.money < 25000) { this.deny('The penthouse costs $25,000. Come back with the money.'); return; }
-    g.ui.ask('Buy the Valen Tower penthouse?', '$25,000. A second safehouse with a skyline view, four more garage slots at the tower and a cab stop at the door.', 'Buy', () => {
+    g.ui.ask('Buy the Valen Tower penthouse?', '$25,000. A second safehouse with a skyline view, and four more garage slots at the tower.', 'Buy', () => {
       this.spend(25000); s.owns.penthouse = true; s.home = 'penthouse';
       g.audio.play('pass'); g.ui.banner('Moving Up', 'Valen Tower Penthouse', 'pass', 3.5);
       this.ach('home'); this.phone('pv', 'Valen Courier: mystery buyer snaps up the Valen Tower penthouse. Neighbours "intrigued".');
@@ -45777,7 +45809,7 @@ class RoyaltySystem {
     let p = 0.32 + clamp((ratio - 1) * 0.22, -0.2, 0.45) + uw.influence / 1000 * 0.35 + (uw.crew.onTurf(i).length ? 0.12 : 0);
     if (att === 'fearful' || att === 'friendly') p += 0.25;
     if (att === 'hostile') p -= 0.2;
-    if (uw.stage >= 6 || uw.influence >= 800) p = Math.max(p, ratio > 1.5 ? 0.97 : 0.88); // the city knows who runs it
+    if (uw.kingpin()) p = Math.max(p, ratio > 1.5 ? 0.97 : 0.88); // the city knows who runs it
     return clamp(p, 0.08, 0.99);
   }
   tickDay() {
@@ -45977,7 +46009,7 @@ class Underworld {
       cops: {}, rap: { priors: 0, cops: 0, copcars: 0, kills: 0 },
       opps: [], nextOpp: 1, ledger: { inc: {}, exp: {} }, lastLedger: null,
       jail: null, jailPhone: false, taskforce: 0, crackdown: 0, redirect: null, pikeCD: 0, hiPressDays: 0, warHours: 0,
-      decisions: [], flags: {}, st: { sold: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, mugs: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
+      decisions: [], flags: {}, realBy: {}, st: { sold: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, mugs: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
       slept: false, shipment: null,
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {}
@@ -46032,7 +46064,8 @@ class Underworld {
     S.decisions = arr(S.decisions, []).filter(x => x && typeof x === 'object' && typeof x.text === 'string').slice(-6);
     S.dayOffset = Math.floor(num(S.dayOffset, 0, 0, Math.max(0, S.day - 1))); S.fit = Math.floor(num(S.fit, 0, 0, 5));
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
-    S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, 0, 1e9);
+    S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
+    S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
     S.wstash = obj(S.wstash, {});
@@ -46205,6 +46238,8 @@ class Underworld {
     return 'territorial';
   }
   powerRatio(fid) { const f = this.S.factions[fid]; return this._infl / (f.strength * 5 + this.factionTurfs(fid) * 40 + 20); }
+  // the top of the ladder: everybody on the street knows who runs the city
+  kingpin() { return this.stage >= 6 || this.influence >= 800; }
   // ---------------------------------------------------------------- inventory
   get pockets() { return this.S.inv; }
   pocketFree() { return POCKET_CAP - units(this.S.inv); }
@@ -46265,7 +46300,12 @@ class Underworld {
     return `Cargo unloaded (${before})${pid ? ' into ' + PROP_BY_ID[pid].name : ' into your pockets'}${left ? '. No room for ' + left + ': it went with the car' : ''}.`;
   }
   // record a sale: proceeds against the cost basis that just left (feeds the realised P/L stat)
-  realize(proceeds) { this.S.st.realized = (this.S.st.realized || 0) + proceeds - (this.lastCost || 0); this.lastCost = 0; }
+  realize(proceeds, k) {
+    const S = this.S, d = proceeds - (this.lastCost || 0);
+    S.st.realized = (S.st.realized || 0) + d;
+    if (k && GOODS[k]) { const rb = S.realBy || (S.realBy = {}); rb[k] = Math.round((rb[k] || 0) + d); }
+    this.lastCost = 0;
+  }
   carryHeat() { let h = 0; const o = this.carried(); for (const k of GOOD_IDS) if (o[k] > 0) h += o[k] * GOODS[k].heat; return h; }
   // ---------------------------------------------------------------- earning from zero
   rollChopList() { const pool = ['suv', 'sports', 'pickup', 'van', 'muscle', 'luxury', 'sedan', 'coupe', 'classic', 'gangcar', 'offroad']; this.S.chopWanted = pickN(pool, 3); }
@@ -46605,7 +46645,7 @@ class FactionSim {
       if (f.bossDown > 0) { f.bossDown--; if (f.bossDown === 0) { f.boss = D.lts[f.lt % D.lts.length]; f.lt++; uw.news('unknown', `${f.boss} has taken over the ${D.short}. The new boss is still finding their feet.`); } }
       // aggression: pick a fight on a border
       let aggr = D.aggression * (f.strength / 60) * (f.bossDown > 0 ? 0.3 : 1);
-      if (coalition) aggr *= 1.6;
+      if (coalition && !uw.kingpin()) aggr *= 1.6;
       if (Math.random() < aggr * 0.32) this.chooseWar(id, coalition);
       // relations drift back toward neutral unless they're fresh
       f.rel += (0 - f.rel) * 0.03; f.fear = Math.max(0, f.fear - 1);
@@ -46629,13 +46669,22 @@ class FactionSim {
   }
   chooseWar(id, coalition) {
     const uw = this.uw, S = this.S, f = this.F(id);
-    const cands = [];
+    const cands = [], pcWar = S.turfs.some(t => t.war && t.war.d === 'pc');
     for (let i = 0; i < uw.T.length; i++) {
       if (uw.owner[i] !== id) continue;
       for (const j of uw.turfNeighbors(i)) {
         const o = uw.owner[j]; if (o === id || S.turfs[j].war) continue;
         let score = 50 + Math.random() * 30;
-        if (o === 'pc') { if (f.truce > S.day) continue; score += f.rel < -20 ? 30 : -15; if (coalition) score += 45; score -= this.playerDefense(j) * 0.6; }
+        if (o === 'pc') {
+          if (f.truce > S.day) continue;
+          // power is a deterrent: the more the player outweighs them, the less they dare. Against the
+          // city's kingpin a crew moves only out of a real grudge, or as part of a coalition when it
+          // isn't hopelessly outmatched, and the coalition makes one push at a time.
+          const ratio = uw.powerRatio(id), kp = uw.kingpin();
+          if (kp && (pcWar || (ratio > 1.5 && f.rel > -60 && (!coalition || ratio > 2.5)))) continue;
+          score += f.rel < -20 ? 30 : -15; if (coalition) score += kp ? 10 : 45; score -= this.playerDefense(j) * 0.6;
+          score -= clamp((ratio - 1) * 35, 0, 90);
+        }
         else if (o && this.F(o)) { if (this.F(o).truce > S.day && f.truce > S.day) continue; score -= this.F(o).strength * 0.5; }
         else score += 25; // neutral ground is cheap
         cands.push([j, score]);
@@ -47519,7 +47568,7 @@ class CrewManager {
       if (!stock.length) { if (Math.random() < 0.3) uw.news(c.name.split(' ')[0], 'I’ve got customers and nothing to sell. Stock the stash.'); return null; }
       stock.sort((a, b) => uw.market.price(z, b.k) - uw.market.price(z, a.k));
       let left = n, cash = 0, sold = 0;
-      for (const s of stock) { if (left <= 0) break; const take = this.takeStored(s.k, Math.min(left, s.n)); if (!take) continue; const pr = uw.market.price(z, s.k) * 0.72 * (uw.owner[i] === 'pc' ? 1.1 : 1); cash += pr * take; sold += take; S.st.realized = (S.st.realized || 0) + pr * take - (this.lastCost || 0); left -= take; uw.market.sold(z, s.k, take); S.pressure = clamp(S.pressure + take * GOODS[s.k].heat * 0.05, 0, 100); }
+      for (const s of stock) { if (left <= 0) break; const take = this.takeStored(s.k, Math.min(left, s.n)); if (!take) continue; const pr = uw.market.price(z, s.k) * 0.72 * (uw.owner[i] === 'pc' ? 1.1 : 1); cash += pr * take; sold += take; S.st.realized = (S.st.realized || 0) + pr * take - (this.lastCost || 0); S.realBy = S.realBy || {}; S.realBy[s.k] = Math.round((S.realBy[s.k] || 0) + pr * take - (this.lastCost || 0)); left -= take; uw.market.sold(z, s.k, take); S.pressure = clamp(S.pressure + take * GOODS[s.k].heat * 0.05, 0, 100); }
       S.turfs[i].police = clamp(S.turfs[i].police + 1.5 + sold * 0.1, 0, 100);
       uw.addInf(i, 'pc', 2.5);
       // skimming happens in disloyalty(); getting caught happens here
@@ -47733,7 +47782,7 @@ class PropertyManager {
       for (const fid of FAC_IDS) {
         const f = S.factions[fid]; if (f.broken || f.truce > S.day) continue;
         if (!(f.rel < -35 || coalition) || ![...near].some(j => uw.owner[j] === fid)) continue;
-        let p = 0.06 + (coalition ? 0.06 : 0) + (f.rel < -70 ? 0.05 : 0);
+        let p = (0.06 + (coalition ? 0.06 : 0) + (f.rel < -70 ? 0.05 : 0)) * clamp(1.4 - uw.powerRatio(fid) * 0.35, 0.08, 1);
         if (uw.crew.onTurf(i).some(id => { const c = uw.crew.find(id); return c && c.role === 'enforcer'; })) p *= 0.4;
         if (Math.random() < p) {
           o.dmg = 1;
@@ -48766,14 +48815,30 @@ function uw_toastOnce(uw, text) { const g = uw.g; if (g.time - (uw._lastT || 0) 
    territory overlay for the big map and the jail HUD. The HUD itself stays
    clean: money, health, wanted level, prompt, weapon, speed.
    ===================================================================== */
+// the phone: apps on a home screen, each with one or a few pages (tabs). 'go' apps leave the phone.
+const PHONE_APPS = [
+  { id: 'empire', name: 'Empire', icon: '👑', col: '#ffb547', cat: 'BUSINESS', sub: 'turf · rivals', tabs: [['overview', 'Overview'], ['map', 'Territory'], ['factions', 'Factions']] },
+  { id: 'market', name: 'Market', icon: '📈', col: '#7fe08f', cat: 'BUSINESS', sub: 'cost · profit', tabs: [['pnl', 'My stock'], ['market', 'Prices']] },
+  { id: 'connect', name: 'Street Connect', icon: '🤝', col: '#d28cff', cat: 'BUSINESS', sub: 'buy · sell', tabs: [['connect', 'Contacts']] },
+  { id: 'inventory', name: 'Inventory', icon: '🎒', col: '#46d4c4', cat: 'BUSINESS', sub: 'carried · stored', tabs: [['stash', 'All product']] },
+  { id: 'stashes', name: 'Stashes', icon: '📦', col: '#c9a46b', cat: 'BUSINESS', sub: 'what is where', tabs: [['stashes', 'Stashes']] },
+  { id: 'crew', name: 'Crew', icon: '👥', col: '#7fb2ff', cat: 'OPERATIONS', sub: 'people · runs', tabs: [['crew', 'Crew'], ['runs', 'Deliveries']] },
+  { id: 'property', name: 'Property', icon: '🏠', col: '#8fe39b', cat: 'OPERATIONS', sub: 'owned · for sale', tabs: [['assets', 'Property']] },
+  { id: 'garage', name: 'Garage', icon: '🚗', col: '#9ec5ff', cat: 'OPERATIONS', sub: 'your cars', tabs: [['garage', 'Cars']] },
+  { id: 'armory', name: 'Armory', icon: '🎯', col: '#ff8a3d', cat: 'OPERATIONS', sub: 'guns · ammo', tabs: [['loadout', 'Weapons']] },
+  { id: 'police', name: 'Police', icon: '🚨', col: '#4d8dff', cat: 'CITY', sub: 'heat · payroll', tabs: [['police', 'Police']] },
+  { id: 'feed', name: 'Feed', icon: '📰', col: '#e8eef6', cat: 'CITY', sub: 'news · messages', tabs: [['feed', 'Feed']] },
+  { id: 'map', name: 'Map', icon: '🗺️', col: '#46d4c4', cat: 'CITY', sub: 'city map', go: 'map' },
+  { id: 'taxi', name: 'Cabline', icon: '🚕', col: '#f4c20d', cat: 'CITY', sub: 'call a cab', go: 'taxi' }
+];
+const APP_OF_TAB = {}; for (const a of PHONE_APPS) for (const [t] of a.tabs || []) APP_OF_TAB[t] = a;
 const EMP_TABS = [['overview', 'Overview'], ['map', 'Territory'], ['crew', 'Crew'], ['runs', 'Deliveries'], ['assets', 'Assets'], ['market', 'Market'], ['stash', 'Inventory'], ['loadout', 'Loadout'], ['factions', 'Factions'], ['police', 'Police'], ['feed', 'Feed']];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 class EmpireUI {
   constructor(uw) {
-    this.uw = uw; this.tab = 'overview'; this.selTurf = null; this.msg = '';
+    this.uw = uw; this.tab = 'home'; this.selTurf = null; this.msg = ''; this.cc = { good: 'all', role: 'both' }; this.pnlSel = null;
     const tabs = $('empTabs');
-    tabs.innerHTML = EMP_TABS.map(([k, n]) => `<button class="etab" data-tab="${k}">${n}</button>`).join('');
-    tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; this.uw.g.audio.play('ui'); this.tab = b.dataset.tab; this.msg = ''; this.render(); });
+    tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; this.uw.g.audio.play('ui'); this.tab = b.dataset.tab; this.msg = ''; this.render(); $('empBody').scrollTop = 0; });
     const body = $('empBody');
     body.addEventListener('click', e => {
       const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
@@ -48796,28 +48861,181 @@ class EmpireUI {
   get g() { return this.uw.g; }
   open(tab) {
     const g = this.g;
-    if (tab) this.tab = tab;
+    this.tab = tab && (tab === 'home' || APP_OF_TAB[tab]) ? tab : 'home';
+    this.msg = '';
     if (g.state !== 'playing' && g.state !== 'paused') return;
     this.render();
     if (g.ui.modal !== 'empireScreen') g.ui.open('empire');
     if (document.pointerLockElement) document.exitPointerLock();
   }
-  locked() { return this.uw.inJail && !this.uw.prison.phone() && !['overview', 'feed'].includes(this.tab); }
+  locked(tab = this.tab) { return this.uw.inJail && !this.uw.prison.phone() && !['home', 'overview', 'feed'].includes(tab); }
   render() {
     const uw = this.uw, S = uw.S, g = this.g;
     uw.computeInfluence();
-    document.querySelectorAll('#empTabs .etab').forEach(b => b.classList.toggle('on', b.dataset.tab === this.tab));
+    const app = this.tab === 'home' ? null : APP_OF_TAB[this.tab], tabs = $('empTabs');
+    $('empTitle').textContent = app ? app.name : 'Phone';
+    tabs.classList.toggle('hidden', !app);
+    tabs.innerHTML = app ? `<button class="etab back" data-tab="home" aria-label="Back to the home screen">‹ Apps</button>${app.tabs.length > 1 ? app.tabs.map(([k, n]) => `<button class="etab${k === this.tab ? ' on' : ''}" data-tab="${k}">${esc(n)}</button>`).join('') : ''}` : '';
     const st = STAGES[uw.stage];
     $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span><span>Rep <b>${g.save.rep}</b></span><span>Influence <b>${uw.influence}</b></span><span>Pressure <b style="color:${S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)'}">${Math.round(S.pressure)}</b></span><span>Day <b>${uw.calDay}</b></span>${S.jail ? `<span class="chipS red">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</span>` : ''}`;
     let h = '';
-    if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; Smokey can get you a phone of your own.</div>`;
+    if (this.tab === 'home') h = this.t_home();
+    else if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; Smokey can get you a phone of your own.</div>`;
     else h = this['t_' + this.tab]();
     if (this.msg) h = `<div class="empMsg">${esc(this.msg)}</div>` + h;
     $('empBody').innerHTML = h;
     if (this.tab === 'map' && !this.locked()) this.drawMap();
   }
   bar(v, max, col) { return `<div class="bar"><i style="width:${clamp(v / max, 0, 1) * 100}%;background:${col || 'var(--teal)'}"></i></div>`; }
-  wpBtn(x, z, label) { return `<button class="sbtn" data-act="wp:${Math.round(x)}:${Math.round(z)}:${encodeURIComponent(label)}">Waypoint</button>`; }
+  wpBtn(x, z, label, key, text = 'Waypoint') { return `<button class="sbtn" data-act="wp:${Math.round(x)}:${Math.round(z)}:${encodeURIComponent(label)}:${encodeURIComponent(key || '')}">${esc(text)}</button>`; }
+  // ---------------------------------------------------------------- home screen
+  badge(id) {
+    const uw = this.uw, S = uw.S;
+    if (id === 'feed') return uw.opps.active().filter(o => o.urgent && !o.taken).length + S.decisions.length;
+    if (id === 'crew') return S.decisions.length;
+    return 0;
+  }
+  t_home() {
+    const cats = [...new Set(PHONE_APPS.map(a => a.cat))];
+    return '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
+      const n = this.badge(a.id), locked = a.tabs ? this.locked(a.tabs[0][0]) : this.uw.inJail;
+      return `<button class="app${locked ? ' locked' : ''}" data-act="app:${a.id}" style="--c:${a.col}" aria-label="${esc(a.name)}"><i>${a.icon}</i><b>${esc(a.name)}</b><small>${esc(a.sub)}</small>${n ? `<em>${n}</em>` : ''}</button>`;
+    }).join('') + '</div>').join('') + '</div>';
+  }
+  openApp(id) {
+    const g = this.g, a = PHONE_APPS.find(x => x.id === id); if (!a) return;
+    if (a.go) {
+      if (this.uw.inJail) { this.msg = 'Not from in here.'; this.render(); return; }
+      g.ui.closeAll();
+      if (a.go === 'map') g.ui.toggleMap(true); else g.taxi.call();
+      return;
+    }
+    this.tab = a.tabs[0][0]; this.msg = ''; this.render(); $('empBody').scrollTop = 0;
+  }
+  // where each good can be sold, best price first (street corners by district, the fence, the armorer)
+  sellQuotes(k) {
+    const uw = this.uw, S = uw.S, M = uw.market, g = this.g, G = GOODS[k], out = [];
+    if (G.fence) {
+      const L = uw.loc('prop', 'pawn'), owned = uw.props.owned('pawn');
+      out.push({ name: 'Lucky’s Pawn (fence)', zone: L.zone, price: Math.round(M.price('o', k) * (k === 'hot' ? (owned ? 1.0 : 0.85) : 0.7)), x: L.x, z: L.z, key: 'prop:pawn', known: true, note: 'never calls the police' });
+    }
+    if (G.arms) { const L = uw.loc('spot', 'armorer'); out.push({ name: 'The Armorer', zone: L.zone, price: Math.round(M.price(L.zone, k) * 0.9), x: L.x, z: L.z, key: 'spot:armorer', known: true, note: 'only arms buyers deal in it' }); }
+    if (!G.fence && !G.arms) for (const z of Object.keys(DEMAND)) {
+      const turfs = uw.T.filter(t => t.zone === z); if (!turfs.length) continue;
+      const known = !!g.save.discovered.zones[z];
+      const p = g.player.pos; let best = turfs[0], bd = 1e18; for (const t of turfs) { const d = dist2(t.deal.x, t.deal.z, p.x, p.z); if (d < bd) { bd = d; best = t; } }
+      const mine = turfs.filter(t => uw.owner[t.i] === 'pc').length, hostile = turfs.filter(t => uw.owner[t.i] && uw.owner[t.i] !== 'pc' && FACTIONS[uw.owner[t.i]] && uw.attitude(uw.owner[t.i]) === 'hostile').length;
+      const risk = turfs.reduce((a, t) => a + uw.ui.dealRisk(t.i), 0) / turfs.length;
+      const allDay = ['o', 'h', 'w', 's'].includes(z);
+      out.push({ name: `Street buyers · ${ZONES[z].name}`, zone: z, price: M.price(z, k), x: best.deal.x, z: best.deal.z, key: 'deal:' + best.i, known, risk, note: `${allDay ? 'day and night' : 'after dark'}${mine ? ` · +10% on your ${mine} turf${mine > 1 ? 's' : ''}` : ''}${hostile ? ` · ${hostile} hostile turf${hostile > 1 ? 's' : ''}` : ''}` });
+    }
+    return out.sort((a, b) => b.price - a.price);
+  }
+  buyQuotes(k) {
+    const uw = this.uw, S = uw.S, M = uw.market, g = this.g, out = [];
+    for (const s of SPOTS) {
+      if (!s.sells || !s.sells.includes(k)) continue;
+      const L = uw.loc('spot', s.id), known = g.save.rep >= (s.rep || 0) || !!(S.flags.intro && S.flags.intro[s.id]);
+      out.push({ name: s.name, zone: L.zone, price: M.wholesale(L.zone, k), x: L.x, z: L.z, key: 'spot:' + s.id, known, need: s.rep, note: s.role });
+    }
+    for (const fid of FAC_IDS) {
+      const sells = fid === 'tidewater' ? ['snow', 'hardware', 'smokes'] : fid === 'velvet' ? ['pills'] : fid === 'vipers' ? ['green'] : [];
+      const f = S.factions[fid]; if (!sells.includes(k) || f.broken) continue;
+      const L = uw.loc('hq', fid), ok = g.save.rep >= 300 && f.rel > -20;
+      out.push({ name: `${FACTIONS[fid].short} wholesale (${f.boss})`, zone: L.zone, price: Math.round(M.wholesale(FACTIONS[fid].home, k) * (1.05 - clamp(f.rel, -20, 60) / 300)), x: L.x, z: L.z, key: 'hq:' + fid, known: true, gated: !ok, note: ok ? `bulk orders · ${uw.attitude(fid)}` : `needs 300 reputation and their respect (${uw.attitude(fid)})` });
+    }
+    return out.sort((a, b) => a.price - b.price);
+  }
+  // MARKET · MY STOCK: what I paid, what it is worth, what I can get for it, am I making money
+  t_pnl() {
+    const uw = this.uw, S = uw.S, M = uw.market, g = this.g;
+    const here = zoneKey(g.player.pos.x, g.player.pos.z), locs = uw.locations({ all: true }), agg = {};
+    for (const L of locs) for (const r of holdings(L.o, L.zone, M)) { const a = agg[r.k] || (agg[r.k] = { n: 0, cost: 0, value: 0, at: [] }); a.n += r.n; a.cost += r.cost; a.value += r.value; a.at.push({ L, r }); }
+    const rb = S.realBy || {}, ks = GOOD_IDS.filter(k => agg[k] || rb[k]);
+    let tv = 0, tc = 0; for (const k in agg) { tv += agg[k].value; tc += agg[k].cost; }
+    const sign = v => `<b class="${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v))}</b>`;
+    let h = `<div class="grid4"><div class="tile"><small>Worth now</small><b class="money">${fmtMoney(tv)}</b><span>at street prices where it sits</span></div><div class="tile"><small>You paid</small><b>${fmtMoney(tc)}</b><span>cost basis</span></div><div class="tile"><small>Unrealised</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b><span>if sold at those prices</span></div><div class="tile"><small>Realised</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b><span>banked from sales</span></div></div>`;
+    if (!ks.length) return h + '<div class="hint">You hold no product. Buy from a supplier (Street Connect shows who sells what), then check back here: every lot remembers what you paid.</div>';
+    h += '<div class="grid2 pnl">' + ks.map(k => {
+      const a = agg[k], G = GOODS[k], best = this.sellQuotes(k).find(q => q.known), sellHere = !G.fence && !G.arms && DEMAND[here] ? M.price(here, k) : null;
+      const top = `<div class="t"><b style="color:${TIERS[G.tier].col}">■</b> ${esc(G.name)}${a ? ` · ${fmtQty(k, a.n)}` : ''}</div>`;
+      if (!a) return `<div class="card">${top}<div class="stats"><span>Holding</span><span>none</span><span>Realised P/L</span><span>${sign(rb[k] || 0)}</span></div></div>`;
+      const pl = a.value - a.cost, open = this.pnlSel === k;
+      return `<div class="card">${top}<div class="stats">
+        <span>Average paid</span><span>${a.cost ? fmtPerUnit(k, a.cost / a.n) : 'free'}</span>
+        <span>Cost basis</span><span>${fmtMoney(a.cost)}</span>
+        <span>Sells here (${esc(ZONES[here] ? ZONES[here].name : 'out of town')})</span><span>${sellHere ? fmtPerUnit(k, sellHere) : '—'}</span>
+        <span>Best known price</span><span>${best ? `${fmtPerUnit(k, best.price)} · ${esc(ZONES[best.zone].name)}` : '—'}</span>
+        <span>Worth now</span><span class="money">${fmtMoney(a.value)}</span>
+        <span>Unrealised P/L</span><span>${sign(pl)}${a.cost ? ` <small>(${pl >= 0 ? '+' : '−'}${Math.abs(Math.round(pl / a.cost * 100))}%)</small>` : ''}</span>
+        <span>Realised P/L</span><span>${sign(rb[k] || 0)}</span></div>
+        <div class="btns"><button class="sbtn" data-act="pk:${k}">${open ? 'Hide locations' : `Where is it? (${a.at.length})`}</button>${best ? this.wpBtn(best.x, best.z, best.name, best.key, 'Best buyer') : ''}</div>
+        ${open ? a.at.map(({ L, r }) => `<div class="stat" style="font-size:12px"><span>${esc(L.name)} · ${fmtQty(k, r.n)} @ ${r.cost ? fmtPerUnit(k, r.avg) : 'free'}</span><span>${fmtMoney(r.value)} ${sign(r.pl)}</span></div>`).join('') : ''}</div>`;
+    }).join('') + '</div>';
+    return h + '<div class="hint">Worth now values every lot at the street price of the district it sits in, so a rising market shows up here straight away. Selling moves the matching cost basis out with it.</div>';
+  }
+  // STREET CONNECT: who sells each product to you and who buys it from you
+  t_connect() {
+    const uw = this.uw, cc = this.cc, carried = uw.carried();
+    const chip = (key, v, label) => `<button class="etab${cc[key] === v ? ' on' : ''}" data-act="cc:${key}:${v}">${esc(label)}</button>`;
+    let h = `<div class="ccChips">${chip('role', 'both', 'Buy & sell')}${chip('role', 'buy', 'Buy from')}${chip('role', 'sell', 'Sell to')}</div><div class="ccChips">${chip('good', 'all', 'All products')}${GOOD_IDS.map(k => chip('good', k, GOODS[k].name)).join('')}</div>`;
+    const row = (q, buy) => {
+      if (!q.known) return `<div class="job locked"><i>?</i><div><b>${buy ? 'Unknown supplier' : 'Undiscovered district'}</b><span>${buy ? `Word is someone in ${esc(ZONES[q.zone].name)} deals it. They won’t talk to anyone under ${q.need} reputation.` : `Go to ${esc(ZONES[q.zone].name)} to learn what buyers there pay.`}</span></div></div>`;
+      return `<div class="job${q.gated ? ' locked' : ''}"><i style="color:${buy ? '#46d4c4' : '#ffd84d'}">${buy ? '↓' : '$'}</i><div><b>${esc(q.name)}</b><span>${fmtPerUnit(q.k, q.price)} · ${esc(ZONES[q.zone].name)}${q.risk !== undefined ? ` · bust risk ${Math.round(q.risk * 100)}%` : ''}${q.note ? ' · ' + esc(q.note) : ''}</span></div>${this.wpBtn(q.x, q.z, q.name, q.key)}</div>`;
+    };
+    for (const k of GOOD_IDS) {
+      if (cc.good !== 'all' && cc.good !== k) continue;
+      const G = GOODS[k];
+      h += `<div class="ccGood"><b style="color:${TIERS[G.tier].col}">${esc(G.name)}</b> <small>${esc(TIERS[G.tier].name)} · per ${unitName(k)}${carried[k] ? ` · you carry ${fmtQty(k, carried[k])}` : ''}</small>`;
+      if (cc.role !== 'sell') { const b = this.buyQuotes(k).map(q => ({ ...q, k })); h += `<div class="ccRole buy">BUY FROM</div><div class="jobs">${b.length ? b.map(q => row(q, true)).join('') : '<div class="hint">Nobody sells it: it is stolen from the street (pickpocketing, burglary, cars).</div>'}</div>`; }
+      if (cc.role !== 'buy') {
+        const all = this.sellQuotes(k).map(q => ({ ...q, k })), known = all.filter(q => q.known), unk = all.length - known.length;
+        const show = cc.good === 'all' ? known.slice(0, 3) : known;
+        h += `<div class="ccRole sell">SELL TO</div><div class="jobs">${show.map(q => row(q, false)).join('')}${!known.length ? '<div class="hint">You haven’t found anywhere to sell it yet.</div>' : ''}</div>${cc.good === 'all' && known.length > 3 ? `<div class="hint">${known.length - 3} more buyer district(s): pick ${esc(G.name)} above to see them all.</div>` : ''}${unk ? `<div class="hint">${unk} district(s) not discovered yet: explore to learn their prices.</div>` : ''}`;
+      }
+      h += '</div>';
+    }
+    return h + '<div class="hint">Waypoint sets normal GPS tracking to the contact. Street buyers stand on deal corners; prices move every day.</div>';
+  }
+  // STASHES: what is kept at each property (product, guns, rounds, vests)
+  t_stashes() {
+    const uw = this.uw, S = uw.S, M = uw.market, s = this.g.save;
+    const own = uw.props.ownedList().filter(d => d.storage);
+    let h = '<div class="hint">Deposit and withdraw in person at the property (walk up and open its menu) or send a crew runner (Crew › Deliveries). Stashed goods stay put unless a raid finds them; carried goods are seized if you’re arrested.</div>';
+    if (!own.length) return h + '<div class="hint">No property with storage yet. The Property app lists what’s for sale.</div>';
+    h += '<div class="grid2">' + own.map(d => {
+      const L = uw.loc('prop', d.id), o = S.storage[d.id] || {}, rows = holdings(o, L.zone, M), ws = S.wstash[d.id];
+      const guns = ARMORY_GUNS.filter(gid => s.weapons[gid] && s.wloc[gid] === d.id).map(gid => WEAPONS.find(w => w.id === gid).name);
+      const ammo = ws ? Object.keys(ws.ammo).filter(k => ws.ammo[k] > 0).map(k => `${ws.ammo[k]} ${WEAPONS.find(w => w.id === k).ammoName}`) : [];
+      return `<div class="card"><div class="t">${esc(d.name)} <span class="chip" style="--c:#c9a46b">${LOC_CLASS[d.kind] || 'PROPERTY'}</span></div><div class="d">${esc(ZONES[L.zone].name)}</div>
+        <div class="stat"><span>Space</span><span>${units(o)} / ${d.storage}</span></div>${this.bar(units(o), d.storage)}
+        ${rows.length ? rows.map(r => `<div class="stat"><span>${GOODS[r.k].name} · ${fmtQty(r.k, r.n)}</span><span>${fmtMoney(r.value)}</span></div>`).join('') : '<div class="d">No product.</div>'}
+        <div class="stat"><span>Guns</span><span>${guns.length ? esc(guns.join(', ')) : 'none'}</span></div>
+        <div class="stat"><span>Rounds</span><span>${ammo.length ? esc(ammo.join(' · ')) : 'none'}</span></div>
+        <div class="stat"><span>Spare vests</span><span>${ws ? ws.vests.length : 0}</span></div>
+        <div class="btns">${this.wpBtn(L.x, L.z, d.name, 'prop:' + d.id)}</div></div>`;
+    }).join('') + '</div>';
+    return h;
+  }
+  // GARAGE: every car you own, where it is and what is in its trunk
+  t_garage() {
+    const g = this.g, s = g.save, uw = this.uw;
+    let h = `<div class="svcTop"><span>Cars <b>${s.garage.length} / ${g.content.garageCap}</b></span><span>Spaces come with property: garages, homes and the parkade.</span></div>`;
+    if (!s.garage.length) return h + '<div class="hint">You don’t own a car. Buy one at the dealership, or drive a car into a free space at your property and stop: it’s yours to keep.</div>';
+    h += '<div class="grid2">' + s.garage.map(e => {
+      const V = VEHICLES[e.type], live = g.vehicles.list.find(v => v.garageUid === e.uid && !v.burnt);
+      const out = e.out && live, at = e.at && PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p] : null, L = at ? uw.loc('prop', at.id) : null;
+      const where = out ? (g.player.vehicle === live ? 'You’re driving it' : `Out · ${fmtDist(Math.hypot(live.pos.x - g.player.pos.x, live.pos.z - g.player.pos.z))} away`) : at ? `Parked at ${at.name}` : 'In storage';
+      const tune = e.tune ? Object.keys(e.tune).filter(k => e.tune[k] > 0).map(k => `${k} ${e.tune[k]}`).join(', ') : '';
+      const wx = out ? live.pos.x : L ? L.x : null, wz = out ? live.pos.z : L ? L.z : null;
+      return `<div class="card"><div class="t">${esc(V.name)} ${tierChip(e.vtier)}</div><div class="d">${esc(where)}</div>
+        <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : e.dmg > 20 ? 'var(--amber)' : 'var(--green)'}">${Math.round(100 - (e.dmg || 0))}%</span></div>
+        ${tune ? `<div class="stat"><span>Upgrades</span><span>${esc(tune)}</span></div>` : ''}
+        <div class="stat"><span>Trunk</span><span>${e.trunk && units(e.trunk) ? esc(goodsList(e.trunk)) : 'empty'}</span></div>
+        <div class="btns">${wx !== null ? this.wpBtn(wx, wz, V.name, out ? null : 'prop:' + at.id) : ''}</div></div>`;
+    }).join('') + '</div>';
+    return h;
+  }
   // ---------------------------------------------------------------- tabs
   t_overview() {
     const uw = this.uw, S = uw.S, g = this.g;
@@ -49091,11 +49309,14 @@ class EmpireUI {
   // ---------------------------------------------------------------- empire actions
   act(a, el) {
     const uw = this.uw, g = this.g, S = uw.S;
-    const [k, x, y, z] = a.split(':');
+    const [k, x, y, z, w] = a.split(':');
     let r = '';
+    if (k === 'app') { this.openApp(x); return; }
     if (this.locked()) return;
     switch (k) {
-      case 'wp': g.content.setWaypoint(+x, +y, decodeURIComponent(z || 'Waypoint')); r = 'Waypoint set.'; break;
+      case 'wp': { const label = decodeURIComponent(z || 'Waypoint'), key = decodeURIComponent(w || ''); g.content.setWaypoint(+x, +y, label); if (key) g.content.waypoint.key = key; r = `Waypoint set: ${label}. Follow the arrow or the GPS line.`; break; }
+      case 'pk': this.pnlSel = this.pnlSel === x ? null : x; this.render(); return;
+      case 'cc': if (x === 'good' || x === 'role') this.cc[x] = y; this.render(); return;
       case 'hire': r = uw.crew.hire(+x); break;
       case 'promo': r = uw.crew.promote(+x); break;
       case 'bonus': r = uw.crew.bonus(+x); break;
@@ -49206,7 +49427,7 @@ class EmpireUI {
     const render = () => { const c = uw.carried(); return `<div class="svcTop"><span>Lucky’s Pawn${owned ? ' (yours)' : ''}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div><div class="jobs">` + goods.map(k => `<div class="job"><i>■</i><div><b>${GOODS[k].name}</b><span>${c[k] | 0} carried · ${fmtMoney(price(k))} each</span></div><button class="sbtn gold" data-act="sell:${k}" ${(c[k] | 0) ? '' : 'disabled'}>Sell all</button></div>`).join('') + '</div><div class="hint">No questions asked. Fences pay less than the street but never call the police.</div>'; };
     g.content.openSvc('Fence', 'Lucky: “Let’s see what you’ve got.”', render, a => {
       const k = a.split(':')[1], n = uw.carried()[k] | 0; if (!n) return;
-      uw.take(k, n); const cash = price(k) * n; g.addMoney(cash, true); uw.realize(cash); uw.market.sold('o', k, n); uw.S.st.sold += n;
+      uw.take(k, n); const cash = price(k) * n; g.addMoney(cash, true); uw.realize(cash, k); uw.market.sold('o', k, n); uw.S.st.sold += n;
       if (n >= 5) uw.addRep(Math.min(20, n), null);
       g.audio.play('cash'); g.saveGame(); g.content.refreshSvc(`Sold ${n} for ${fmtMoney(cash)}.`);
     });
@@ -49303,7 +49524,7 @@ class EmpireUI {
         const n = Math.min(+id, stock.hardware | 0, Math.floor(s.money / hw)); const got = n > 0 ? uw.give({ hardware: n }, 'buy', { hardware: hw }) : null;
         if (!got) r = 'No room to carry it.'; else { g.content.spend(got.hardware * hw); stock.hardware -= got.hardware; r = `Bought ${fmtQty('hardware', got.hardware)} hardware.`; }
       } else if (k === 'hs') {
-        const n = uw.carried().hardware | 0; if (n) { uw.take('hardware', n); g.addMoney(n * hs, true); uw.realize(n * hs); uw.market.sold(z, 'hardware', n); uw.S.st.sold += n; r = `Sold ${fmtQty('hardware', n)} for ${fmtMoney(n * hs)}.`; uw.addRep(n * 4, null); }
+        const n = uw.carried().hardware | 0; if (n) { uw.take('hardware', n); g.addMoney(n * hs, true); uw.realize(n * hs, 'hardware'); uw.market.sold(z, 'hardware', n); uw.S.st.sold += n; r = `Sold ${fmtQty('hardware', n)} for ${fmtMoney(n * hs)}.`; uw.addRep(n * 4, null); }
       } else { const ar = A.act(a, null); if (ar === null) return; r = ar; g.content.refreshSvc(r); g.saveGame(); return; }
       g.audio.play('cash'); g.saveGame(); g.content.refreshSvc(r);
     });
@@ -49329,7 +49550,7 @@ class EmpireUI {
       // the risk roll happens once per handoff
       const risk = this.dealRisk(i);
       if (Math.random() < risk) {
-        uw.take(k, n); uw.realize(0); S.st.seized += n;
+        uw.take(k, n); uw.realize(0, k); S.st.seized += n;
         g.ui.back();
         g.ui.banner('Undercover!', 'It was a setup', 'fail', 2.5);
         g.police.addHeat(4, g.player.pos.x, g.player.pos.z); uw.cops.crime('deal', 2, true, g.player.pos.x, g.player.pos.z);
@@ -49337,7 +49558,7 @@ class EmpireUI {
         return;
       }
       uw.take(k, n); q[k] -= n;
-      const cash = price(k) * n; g.addMoney(cash, true); uw.realize(cash); S.st.sold += n; S.st.earnedDeals += cash;
+      const cash = price(k) * n; g.addMoney(cash, true); uw.realize(cash, k); S.st.sold += n; S.st.earnedDeals += cash;
       uw.market.sold(z, k, n); uw.addRep(Math.max(1, Math.round(n * (GOODS[k].tier + 1) * 0.8)), null);
       uw.addInf(i, 'pc', n * 0.25);
       S.pressure = clamp(S.pressure + n * GOODS[k].heat * 0.06, 0, 100); S.turfs[i].police = clamp(S.turfs[i].police + n * 0.2, 0, 100);
@@ -50168,6 +50389,255 @@ function roulettePayout(bets, n) {
 const fmtShort = v => v >= 1e6 ? (v / 1e6).toFixed(v % 1e6 ? 1 : 0) + 'M' : v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k' : String(v);
 
 /* =====================================================================
+   [UNDERWORLD] TAXIS: Cabline cabs are real cars. Taxis drive in traffic everywhere; call one (phone,
+   or from the map) and the nearest free cab comes to you, or one is sent from round the corner.
+   At the cab: hire it or carjack it. Hiring opens the map: tap any road, see the distance and the fare,
+   confirm. You ride in the back while the driver takes the roads (the same routing as police and
+   traffic); the HUD shows where to, how far and the fare, with Skip (fade to the destination, full
+   fare), Change destination (meter so far + a new quote) and Get out (pay the meter). A driver who gets
+   stuck backs up, reroutes, and as a last resort takes the short way round (a quick fade).
+   ===================================================================== */
+const FARE_BASE = 6, FARE_PER_KM = 22, CAB_SPEED = 13;
+function fareFor(m) { return Math.max(8, Math.round(FARE_BASE + m / 1000 * FARE_PER_KM)); }
+function routeLen(x0, z0, x1, z1) { const r = gpsRoute(x0, z0, x1, z1); let d = 0, px = x0, pz = z0; for (const q of r) { d += Math.hypot(q.x - px, q.z - pz); px = q.x; pz = q.z; } return d + Math.hypot(x1 - px, z1 - pz); }
+// the nearest point on a street that exists (the lattice and the curved through-roads), in the kerb lane
+function nearestRoadPoint(x, z) {
+  let best = null, bd = 1e9;
+  const tryP = (px, pz, h) => { const d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = { x: px, z: pz, h }; } };
+  for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) {
+    if (RoadNet.segOpen(0, i, j)) { const zz = clamp(z, j * P + 6, (j + 1) * P - 6), side = x >= i * P ? 1 : -1; tryP(i * P + side * LANE, zz, side > 0 ? 0 : Math.PI); }
+    if (RoadNet.segOpen(1, i, j)) { const xx = clamp(x, j * P + 6, (j + 1) * P - 6), side = z >= i * P ? 1 : -1; tryP(xx, i * P + side * LANE, side > 0 ? -Math.PI / 2 : Math.PI / 2); }
+  }
+  const ln = Links.nearest(x, z); if (ln && ln.d < bd) tryP(ln.x, ln.z, 0);
+  return best ? { ...best, d: bd } : null;
+}
+function placeNameAt(x, z) {
+  const g = game; let best = null, bd = 60;
+  const pl = g.world.places;
+  for (const id in pl) { const d = pl[id].door; if (pl[id].hidden) continue; const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd) { bd = dd; best = pl[id].name; } }
+  if (!best && g.uw) for (const L of g.uw.locs) if (L.kind === 'prop') { const dd = Math.hypot(L.x - x, L.z - z); if (dd < bd) { bd = dd; best = L.def.name; } }
+  const vi = Math.round(x / P), hj = Math.round(z / P);
+  const street = Math.abs(x - vi * P) < Math.abs(z - hj * P) ? STREET_NAMES_X[clamp(vi, 0, N)] : STREET_NAMES_Z[clamp(hj, 0, N)];
+  return best ? `${best}` : `${street}, ${districtNameAt(x, z)}`;
+}
+class TaxiService {
+  constructor(g) {
+    this.g = g; this.cab = null; this.state = 'idle'; this.dest = null; this.quote = 0; this.meter = 0; this.driven = 0; this.preset = null; this.t = 0;
+    const el = $('taxiHud');
+    if (el) el.addEventListener('click', e => {
+      const b = e.target.closest('[data-tx]'); if (!b || this.state !== 'riding') return;
+      e.stopPropagation();
+      const k = b.dataset.tx;
+      if (k === 'skip') this.skip(); else if (k === 'change') this.choose(true); else if (k === 'out') this.getOut();
+    });
+  }
+  // a cab that belongs to the service (dispatched or hired); traffic taxis become one when hired
+  isCab(v) { return v && v === this.cab; }
+  canHail() {
+    const g = this.g, p = g.player;
+    if (g.police.level > 0) return 'No cab will stop for you with the police on your tail.';
+    if (g.missions.active) return 'Finish or abandon the current job first.';
+    if (p.interior) return 'Step outside first.';
+    if (p.state === 'vehicle') return p.passenger ? 'You’re already in a cab.' : 'Get out of the car first.';
+    if (g.uw && g.uw.S.jail) return 'Not from in here.';
+    return null;
+  }
+  // call a cab: the nearest free taxi in traffic turns round for you, else one is sent from out of sight
+  call(preset) {
+    const g = this.g, p = g.player, why = this.canHail();
+    if (why) { g.ui.toast(why, 'warn'); g.audio.play('deny'); return false; }
+    this.preset = preset || null;
+    if (this.cab && (this.state === 'coming' || this.state === 'waiting')) { g.ui.toast(this.state === 'waiting' ? 'Your cab is waiting.' : 'Your cab is on its way.'); return true; }
+    const pick = nearestRoadPoint(p.pos.x, p.pos.z); if (!pick) return false;
+    let v = null, bd = 220;
+    for (const c of g.vehicles.list) if (c.type === 'taxi' && c.mode === 'kin' && !c.burnt && c.health > 50) { const d = Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z); if (d < bd && d > 25) { bd = d; v = c; } }
+    if (v) { g.traffic.release(v); v.mode = 'phys'; v.ai = null; v.vel.set(Math.sin(v.h) * 6, Math.cos(v.h) * 6); }
+    else v = this.spawnCab(p.pos.x, p.pos.z);
+    if (!v) { g.ui.toast('Cabline: “All our drivers are busy. Try again in a minute.”', 'warn'); return false; }
+    this.adopt(v);
+    this.state = 'coming'; this.pick = pick; this.t = 0; this.best = 1e9; this.stall = 0;
+    v.drive.setGoal(pick.x, pick.z);
+    g.ui.toast(`Cabline: a car is on its way (${fmtDist(Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z))}). Wait by the road.`);
+    g.audio.play('ui');
+    return true;
+  }
+  // a cab on a road node out of sight, 110-220 m away
+  spawnCab(x, z) {
+    const g = this.g, cands = [];
+    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+      if (!RoadNet.degree(i, j)) continue;
+      const nx = i * P, nz = j * P, d = Math.hypot(nx - x, nz - z);
+      if (d < 110 || d > 220) continue;
+      if (g.inView(nx, 1, nz, 4)) continue;
+      cands.push({ i, j, d });
+    }
+    if (!cands.length) for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) if (RoadNet.degree(i, j)) { const d = Math.hypot(i * P - x, j * P - z); if (d > 60) cands.push({ i, j, d }); }
+    if (!cands.length) return null;
+    cands.sort((a, b) => a.d - b.d);
+    const c = cands[0], nx = c.i * P, nz = c.j * P;
+    const h = Math.atan2(x - nx, z - nz);
+    for (const v of g.vehicles.nearby(nx, nz, 6)) if (Math.hypot(v.pos.x - nx, v.pos.z - nz) < 5) return null;
+    return g.vehicles.spawn('taxi', nx + LANE * Math.cos(h), nz - LANE * Math.sin(h), h, {});
+  }
+  adopt(v) {
+    const g = this.g;
+    if (this.cab && this.cab !== v) this.release();
+    this.cab = v; v.taxiCab = true; v.driver = 'npc'; v.mode = 'phys'; v.sleep = false; v.parked = false; v.legit = true; v.locked = false;
+    v.drive = new DriveAI(v, g, 'taxi'); v.drive.cruise = CAB_SPEED;
+  }
+  // the cab goes back to cruising and is recycled like any car once it is far away
+  release() {
+    const v = this.cab; this.cab = null; this.state = 'idle'; this.dest = null;
+    if (!v || !this.g.vehicles.list.includes(v)) return;
+    v.taxiCab = false;
+    if (v.driver === 'npc' && v.health > 0) { v.drive = new DriveAI(v, this.g, 'cruise'); const c = this.g.world.randomCurbSpot(v.pos.x, v.pos.z, 250, 700); v.drive.setGoal(c.x, c.z); }
+  }
+  // at the cab: hire it or carjack it
+  approach(v) {
+    const g = this.g;
+    if (!this.isCab(v)) { if (v.mode === 'kin') { g.traffic.release(v); v.mode = 'phys'; v.ai = null; v.vel.set(0, 0); } this.adopt(v); this.state = 'waiting'; }
+    v.ctl.throttle = 0; v.ctl.handbrake = true;
+    const render = () => `<div class="hint">Cabline · ${fmtMoney(FARE_BASE)} plus ${fmtMoney(FARE_PER_KM)} a kilometre. You pick the destination on the map.</div>
+      <div class="btns" style="display:flex;flex-direction:column;gap:8px"><button class="sbtn gold" data-act="hire">Hire the cab</button><button class="sbtn" data-act="jack">Carjack it (a crime)</button><button class="sbtn" data-act="no">Never mind</button></div>`;
+    g.content.openSvc('Taxi', 'The driver looks up.', render, a => {
+      g.ui.back();
+      if (a === 'hire') this.choose(false);
+      else if (a === 'jack') { this.cab = null; this.state = 'idle'; v.taxiCab = false; v.drive = null; g.beginEnter(v); }
+    });
+  }
+  // the map in destination mode
+  choose(changing) {
+    const g = this.g, mv = g.ui.mapView;
+    const from = () => { const v = this.cab || g.player; return v.pos; };
+    mv.startPick({
+      title: changing ? 'Change destination' : 'Where to?',
+      preset: this.preset,
+      quote: (x, z) => { const f = from(), m = routeLen(f.x, f.z, x, z); return { m, fare: changing ? Math.round(this.meterFare() + fareFor(m) - FARE_BASE) : fareFor(m), name: placeNameAt(x, z), from: { x: f.x, z: f.z } }; },
+      confirm: (x, z, q) => {
+        if (g.save.money < q.fare) { g.ui.toast(`The fare is ${fmtMoney(q.fare)}. You have ${fmtMoney(g.save.money)}.`, 'warn'); g.audio.play('deny'); return false; }
+        if (changing) this.reroute(x, z, q); else this.board(x, z, q);
+        return true;
+      },
+      cancel: () => { if (!changing && this.state === 'waiting') g.ui.toast('The cab waits a little longer.'); }
+    });
+    this.preset = null;
+  }
+  meterFare() { return fareFor(this.driven); }
+  board(x, z, q) {
+    const g = this.g, p = g.player, v = this.cab; if (!v || !g.vehicles.list.includes(v)) return;
+    this.dest = { x, z, name: q.name }; this.quote = q.fare; this.driven = 0; this.state = 'riding'; this.leaving = false; this.t = 0; this.best = 1e9; this.stall = 0; this.recov = 0;
+    this.lastPos = { x: v.pos.x, z: v.pos.z };
+    p.state = 'vehicle'; p.vehicle = v; p.passenger = true; p.trans = null; p.vel.set(0, 0, 0);
+    v.ctl.handbrake = false; v.drive.setGoal(x, z);
+    g.cam.yaw = v.h; g.cam.revT = 0;
+    g.audio.play('door');
+    this.showHud(true);
+    g.ui.toast(`To ${q.name}: ${fmtDist(q.m)}, ${fmtMoney(q.fare)}.`);
+  }
+  reroute(x, z, q) {
+    const v = this.cab; if (!v) return;
+    this.dest = { x, z, name: q.name }; this.quote = q.fare; this.best = 1e9; this.stall = 0;
+    v.drive.setGoal(x, z); this.g.ui.toast(`New destination: ${q.name}. Fare now ${fmtMoney(q.fare)}.`);
+  }
+  // remaining route length from the cab to the destination
+  remaining() { const v = this.cab; return v && this.dest ? routeLen(v.pos.x, v.pos.z, this.dest.x, this.dest.z) : 0; }
+  // end of the ride: pay and step out on the kerb
+  finish(paid, msg) {
+    const g = this.g, p = g.player, v = this.cab;
+    this.showHud(false);
+    if (paid > 0) { const m = Math.min(paid, g.save.money); g.content.spend(m); g.save.stats.fastTravels = (g.save.stats.fastTravels || 0) + 1; }
+    if (v && p.vehicle === v) {
+      g.exitVehicle(true);
+      v.driver = 'npc';
+    }
+    p.passenger = false;
+    if (msg) g.ui.toast(msg, 'money');
+    this.release();
+  }
+  // ask the driver to stop: the cab pulls over, then you step out and pay what the meter shows
+  getOut() {
+    if (this.state !== 'riding') return;
+    const v = this.cab;
+    if (v && v.speed > 1.5) { if (!this.leaving) { this.leaving = true; this.g.ui.toast('“Pulling over.”'); } return; }
+    this.leaving = false;
+    const fare = Math.min(this.quote, this.meterFare());
+    this.finish(fare, `You get out. Meter: ${fmtMoney(fare)}.`);
+  }
+  // skip the drive: the screen dips and you arrive; the full agreed fare
+  skip() {
+    const g = this.g, v = this.cab; if (this.state !== 'riding' || !v || !this.dest || g.fading) return;
+    const left = this.remaining(), fare = this.quote, d = this.dest;
+    g.fade(() => {
+      const kp = nearestRoadPoint(d.x, d.z) || d;
+      v.pos.set(kp.x, groundY(kp.x, kp.z), kp.z); v.h = kp.h || v.h; v.vel.set(0, 0); v.yawRate = 0; v.syncMesh(0);
+      g.player.pos.set(v.pos.x, v.pos.y, v.pos.z);
+      for (let k = 0; k < 4; k++) g.chunks.update(kp.x, kp.z, g.frame);
+      g.env.time = (g.env.time + left / CAB_SPEED / (g.save.settings.dayLength * 60) * 24) % 24;
+      this.finish(fare, `Cabline dropped you at ${d.name}. ${fmtMoney(fare)}.`);
+    });
+  }
+  showHud(on) {
+    const el = $('taxiHud'); if (!el) return;
+    el.classList.toggle('hidden', !on);
+    document.body.classList.toggle('passenger', !!on);
+    this._hudT = 0;
+  }
+  update(dt) {
+    const g = this.g, p = g.player, v = this.cab;
+    if (!v) return;
+    if (!g.vehicles.list.includes(v) || v.burnt || v.health <= 0) {
+      if (this.state === 'riding') this.finish(Math.min(this.quote, this.meterFare()), 'The cab is wrecked. You climb out.');
+      else { this.cab = null; this.state = 'idle'; }
+      return;
+    }
+    if (dt <= 0) return;
+    this.t += dt;
+    if (this.state === 'coming') {
+      const d = Math.hypot(v.pos.x - this.pick.x, v.pos.z - this.pick.z);
+      if (d < 8 && v.speed < 1.5) { this.state = 'waiting'; this.t = 0; v.ctl.handbrake = true; g.ui.toast('Your cab is here. Walk up to it.'); g.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.3, gain: 0.7 }); }
+      else this.watch(dt, d, () => { this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); });
+      // the player wandered off: follow them (re-aim every few seconds)
+      if (this.t > 4 && Math.hypot(p.pos.x - this.pick.x, p.pos.z - this.pick.z) > 25) { this.t = 0; this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); }
+      if (g.police.level > 0) { g.ui.toast('The cab turns off. Not with the police around.', 'warn'); this.release(); }
+    } else if (this.state === 'waiting') {
+      v.ctl.throttle = 0; v.ctl.handbrake = true; v.drive.wait = 0.5;
+      if (this.t > 90 || Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z) > 120) { g.ui.toast('Your cab gave up waiting.'); this.release(); }
+    } else if (this.state === 'riding') {
+      if (p.vehicle !== v) { this.showHud(false); p.passenger = false; this.release(); return; }
+      this.driven += Math.hypot(v.pos.x - this.lastPos.x, v.pos.z - this.lastPos.z); this.lastPos.x = v.pos.x; this.lastPos.z = v.pos.z;
+      const d = Math.hypot(v.pos.x - this.dest.x, v.pos.z - this.dest.z);
+      if (g.police.level > 0) { this.finish(Math.min(this.quote, this.meterFare()), 'The driver pulls over: “Out. I don’t need that kind of trouble.”'); return; }
+      if (this.leaving) { v.drive.wait = 0.5; v.ctl.throttle = 0; v.ctl.handbrake = true; if (v.speed <= 1.5) this.getOut(); return; }
+      if ((v.drive.arrived || d < 9) && v.speed < 1.2) { this.finish(this.quote, `You’ve arrived at ${this.dest.name}. ${fmtMoney(this.quote)}.`); return; }
+      this.watch(dt, d, () => this.recover());
+      this._hudT = (this._hudT || 0) - dt;
+      if (this._hudT <= 0) { this._hudT = 0.5; this.renderHud(); }
+    }
+  }
+  // progress watchdog: no real progress for a while -> recover
+  watch(dt, d, recover) {
+    if (d < this.best - 3) { this.best = d; this.stall = 0; }
+    else this.stall += dt;
+    if (this.stall > 14) { this.stall = 0; this.best = d; recover(); }
+  }
+  // a driver who can't get through: reroute first, then take the short way (a short fade to the next junction)
+  recover() {
+    const g = this.g, v = this.cab; if (!v || !this.dest || g.fading) return;
+    this.recov = (this.recov || 0) + 1;
+    if (this.recov === 1) { v.drive.rev = 1.2; v.drive.route(this.dest.x, this.dest.z); return; }
+    if (this.recov >= 4) { g.ui.toast('The driver gives up on the traffic and takes you straight there.'); this.skip(); return; }
+    const path = v.drive.path, nxt = path[Math.min(path.length - 1, v.drive.pi + 1)] || this.dest;
+    g.fade(() => { const kp = nearestRoadPoint(nxt.x, nxt.z) || nxt; v.pos.set(kp.x, groundY(kp.x, kp.z), kp.z); v.vel.set(0, 0); v.yawRate = 0; v.h = Math.atan2(this.dest.x - kp.x, this.dest.z - kp.z); v.syncMesh(0); v.drive.route(this.dest.x, this.dest.z); g.ui.toast('“Shortcut,” says the driver.'); });
+  }
+  renderHud() {
+    const el = $('taxiHud'); if (!el || !this.dest) return;
+    const left = this.remaining();
+    el.querySelector('.td').textContent = this.dest.name;
+    el.querySelector('.tm').textContent = `${fmtDist(left)} to go · fare ${fmtMoney(this.quote)} · meter ${fmtMoney(Math.min(this.quote, this.meterFare()))}`;
+  }
+}
+
+/* =====================================================================
    [CORE] UI MANAGER (HUD, menus, minimap, map, shop, toasts, banners)
    ===================================================================== */
 const $ = id => document.getElementById(id);
@@ -50191,7 +50661,7 @@ class HudLayout {
     window.addEventListener('resize', size); window.addEventListener('orientationchange', size);
     if (window.ResizeObserver) { this.ro = new ResizeObserver(mark); for (const id of ['tbar', 'jailHud', 'objective', 'toasts', 'speedo']) { const el = $(id); if (el) this.ro.observe(el); } const tr = document.querySelector('#hud .tr'); if (tr) this.ro.observe(tr); }
   }
-  static WATCH = ['touch', 'minimapWrap', 'zone', 'objective', 'jailHud', 'speedo', 'phone', 'zoneCard', 'prompt', 'moneyFeed'];
+  static WATCH = ['touch', 'minimapWrap', 'zone', 'objective', 'jailHud', 'taxiHud', 'speedo', 'phone', 'zoneCard', 'prompt', 'moneyFeed'];
   get active() { return document.body.classList.contains('touch') || this.mq.matches; }
   safe() { const cs = getComputedStyle($('safeProbe')); return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 }; }
   set(el, props) {
@@ -50281,6 +50751,7 @@ class HudLayout {
     const mf = $('moneyFeed');
     if (tr && mf && mf.classList.contains('on')) placed.push({ l: tr.l, r: tr.r, t: tr.b, b: tr.b + 4 + 4 * 22, w: tr.w, h: 92 });
     drop($('jailHud'), 'center');
+    drop($('taxiHud'), 'center');
     drop($('objective'), 'center');
     drop($('raceHud'), 'right');
     drop($('phone'), 'right');
@@ -50707,7 +51178,7 @@ class UIManager {
       const vs = vehStage(pv.health);
       const vn = pv.spec.name + (vs[1] !== 'NORMAL' ? ' · ' + vs[1] : '');
       if ($('vehName').textContent !== vn) { $('vehName').textContent = vn; $('vehName').style.color = vs[1] === 'NORMAL' ? '' : vs[2]; }
-      const own = pv.mission === 'story' || pv.mission === 'race' ? ['MISSION', '#ffd84d'] : pv.garageUid ? (VEHICLES[pv.type].special ? ['SPECIAL', '#d28cff'] : ORIGIN_CHIP[pv.origin] || ORIGIN_CHIP.bought) : pv.type === 'police' ? ['POLICE', '#4d8dff'] : pv.fac ? ['FACTION', FACTIONS[pv.fac] ? FACTIONS[pv.fac].col : '#d28cff'] : pv.origin === 'found' ? ORIGIN_CHIP.found : ['STOLEN', '#ff4d5e'];
+      const own = p.passenger ? ['TAXI', '#f4c20d'] : pv.mission === 'story' || pv.mission === 'race' ? ['MISSION', '#ffd84d'] : pv.garageUid ? (VEHICLES[pv.type].special ? ['SPECIAL', '#d28cff'] : ORIGIN_CHIP[pv.origin] || ORIGIN_CHIP.bought) : pv.type === 'police' ? ['POLICE', '#4d8dff'] : pv.fac ? ['FACTION', FACTIONS[pv.fac] ? FACTIONS[pv.fac].col : '#d28cff'] : pv.origin === 'found' ? ORIGIN_CHIP.found : ['STOLEN', '#ff4d5e'];
       const vo = $('vehOwn'); if (vo.textContent !== own[0]) { vo.textContent = own[0]; vo.style.background = own[1]; }
       $('vhp').style.width = clamp(pv.health, 0, 100) + '%';
     }
@@ -50858,15 +51329,16 @@ const MAP_CATS = {
   police: { name: 'Police', icon: 'P', col: '#4d8dff', layer: 'police' },
   hospital: { name: 'Hospital', icon: '+', col: '#ff7aa8', layer: 'locations' },
   contact: { name: 'Job contacts', icon: '!', col: '#46d4c4', layer: 'locations' },
-  street: { name: 'Street contacts', icon: '◆', col: '#d28cff', layer: 'locations' },
-  cab: { name: 'Cab stops', icon: 'T', col: '#f4c20d', layer: 'locations' },
+  buy: { name: 'Buy product · suppliers', icon: '↓', col: '#46d4c4', layer: 'buy' },
+  sell: { name: 'Sell product · buyers', icon: '$', col: '#ffd84d', layer: 'sell' },
   casino: { name: 'Casino', icon: '♦', col: '#ffd84d', layer: 'landmarks' }
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
-  ['factions', 'Faction HQs'], ['territory', 'Territory'], ['police', 'Police'], ['garages', 'Garages & parking'], ['economy', 'Street prices']
+  ['factions', 'Faction HQs'], ['territory', 'Territory'], ['police', 'Police'], ['garages', 'Garages & parking'], ['economy', 'Street prices'],
+  ['buy', '↓ Buy product (suppliers)'], ['sell', '$ Sell product (buyers)']
 ];
-const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false };
+const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true };
 // centre of each named district (average of its blocks), for map labels and cards
 const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
 // the street good paying furthest over its base price in a district right now
@@ -50917,11 +51389,25 @@ class MapView {
         const d = L.def, own = uw.props.owned(d.id);
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
         add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
-      } else if (L.kind === 'spot') add({ key: 'spot:' + L.id, name: L.def.name, cat: L.def.chop ? 'chop' : 'street', icon: L.def.chop ? 'C' : L.def.arms ? 'A' : '◆', col: '#' + new THREE.Color(L.col).getHexString(), x: L.x, z: L.z, sub: L.def.role });
+      } else if (L.kind === 'spot') {
+        // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
+        if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
+        else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `BUY ${L.def.sells.map(k => GOODS[k].name).join(', ')}${L.def.arms ? ' · guns · also buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
+      }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });
     }
+    if (uw) {
+      const p = g.player.pos;
+      for (const z of Object.keys(DEMAND)) {
+        if (!g.save.discovered.zones[z]) continue;
+        const turfs = uw.T.filter(t => t.zone === z); if (!turfs.length) continue;
+        let best = turfs[0], bd = 1e18; for (const t of turfs) { const d = dist2(t.deal.x, t.deal.z, p.x, p.z); if (d < bd) { bd = d; best = t; } }
+        const top = GOOD_IDS.filter(k => !GOODS[k].fence && !GOODS[k].arms).map(k => ({ k, r: uw.market.ratio(z, k) })).sort((a, b) => b.r - a.r).slice(0, 2);
+        add({ key: 'deal:' + z, name: `Street buyers · ${ZONES[z].name}`, cat: 'sell', x: best.deal.x, z: best.deal.z, sub: `SELL here · best now: ${top.map(o => GOODS[o.k].name).join(', ')}${['o', 'h', 'w', 's'].includes(z) ? ' · day and night' : ' · after dark'}` });
+      }
+      const pw = uw.loc('prop', 'pawn'); if (pw) add({ key: 'sell:pawn', name: 'Lucky’s Pawn · fence', cat: 'sell', x: pw.x + 1.5, z: pw.z + 1.5, sub: 'SELL hot goods and smokes · no questions asked' });
+    }
     for (const ct of g.missions.contacts) if (ct.visible !== false && !ct.interior && (!ct.storyOnly || ct.marker.g.visible)) add({ key: 'ct:' + ct.id, name: ct.name, cat: 'contact', col: '#' + new THREE.Color(ct.color).getHexString(), x: ct.x, z: ct.z, sub: ct.role });
-    for (const pt of g.content.fastPoints()) add({ key: 'cab:' + pt.id, name: 'Cab stop · ' + pt.name, cat: 'cab', x: pt.x + Math.sin(pt.h) * 3, z: pt.z + Math.cos(pt.h) * 3, fast: pt, sub: 'Cabline fare $40' });
     this.entries = out;
     return out;
   }
@@ -50940,6 +51426,7 @@ class MapView {
     } else {
       $('turfInfo').classList.add('hidden'); this.closeDrawer(); this.hideCard(); $('mapLayers').classList.add('hidden'); this.ptrs.clear();
       if (document.activeElement === $('mapSearch')) $('mapSearch').blur();
+      if (this.pickMode) this.endPick(false);
     }
   }
   fit() {
@@ -51033,18 +51520,25 @@ class MapView {
     $('mapLayers').addEventListener('click', e => e.stopPropagation());
     $('mapSearch').addEventListener('input', () => this.renderList());
     $('mapCats').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-cat]'); if (!b) return; this.cat = b.dataset.cat; this.renderList(); });
-    $('mapList').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-key]'); if (!b) return; const en = this.entries.find(x => x.key === b.dataset.key); if (en) this.select(en, true); });
+    $('mapList').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-key]'); if (!b) return; const en = this.entries.find(x => x.key === b.dataset.key); if (!en) return; if (this.W < 700) this.closeDrawer(); this.select(en, true); });
     $('mapCard').addEventListener('click', e => {
       e.stopPropagation(); const b = e.target.closest('[data-act]'); if (!b || !this.sel) return;
       const en = this.sel, act = b.dataset.act, ct = this.g.content;
       this.g.audio.play('ui');
       if (act === 'track') { ct.setWaypoint(en.x, en.z, en.name); Object.assign(ct.waypoint, { key: en.key, icon: en.icon, col: en.col }); this.g.ui.toast(`Tracking ${en.name}.`); }
       else if (act === 'untrack') { ct.waypoint = null; this.g.ui.toast('Tracking stopped.'); }
-      else if (act === 'cab') { const pt = en.fast || ct.fastPoints().find(f => f.id === en.place); if (pt) this.g.ui.ask(`Take a cab to ${pt.name}?`, 'Cabline fare: $40. About twenty minutes in-game. Not available while wanted or on a job.', 'Ride', () => ct.fastTravel(pt)); }
+      else if (act === 'taxi') { const g = this.g, kp = nearestRoadPoint(en.x, en.z); this.toggle(false); if (kp) g.taxi.call({ x: kp.x, z: kp.z }); return; }
       else if (act === 'close') { this.hideCard(); return; }
       this.showCard(en); this.dirty = true;
     });
     $('mapDrawer').addEventListener('click', e => e.stopPropagation());
+    $('mapPick').addEventListener('click', e => {
+      e.stopPropagation(); const b = e.target.closest('[data-pk]'); if (!b || !this.pickMode) return; this.g.audio.play('ui');
+      const o = this.pickMode;
+      if (b.dataset.pk === 'cancel') { this.endPick(false); this.toggle(false); return; }
+      if (o.dest && o.q && o.confirm(o.dest.x, o.dest.z, o.q)) { this.pickMode = null; $('mapPick').classList.add('hidden'); this.toggle(false); }
+    });
+    btn('mapTaxiBtn', () => { if (this.pickMode) return; this.toggle(false); this.g.taxi.call(); });
   }
   syncTools() { $('mapLayBtn').classList.toggle('on', !$('mapLayers').classList.contains('hidden')); $('mapIdxBtn').classList.toggle('on', !$('mapDrawer').classList.contains('hidden')); }
   renderLayers() {
@@ -51076,8 +51570,34 @@ class MapView {
     }
     $('mapList').innerHTML = h || '<div class="hint" style="padding:12px">Nothing matches that search.</div>';
   }
+  // ---------------------------------------------------------------- destination picking (taxi)
+  // A tap anywhere picks the nearest street point; the panel shows where, how far and the fare.
+  startPick(o) {
+    this.pickMode = o; o.dest = null; o.q = null;
+    if (!this.g.mapOpen) this.toggle(true);
+    this.hideCard(); this.closeDrawer();
+    $('mapPick').classList.remove('hidden');
+    if (o.preset) { this.setPick(o.preset.x, o.preset.z); this.centerOn(o.preset.x, o.preset.z, 2.2); }
+    else { const p = this.g.player; this.centerOn(p.pos.x, p.pos.z, 2.2); }
+    this.renderPick();
+  }
+  setPick(wx, wz) {
+    const o = this.pickMode; if (!o) return;
+    const kp = nearestRoadPoint(wx, wz);
+    if (!kp || kp.d > 140 || wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
+    o.dest = { x: kp.x, z: kp.z }; o.q = o.quote(kp.x, kp.z);
+    this.renderPick(); this.dirty = true;
+  }
+  renderPick() {
+    const o = this.pickMode; if (!o) return;
+    const q = o.q, money = this.g.save.money;
+    $('mapPick').innerHTML = `<b>${esc(o.title)}</b>${q ? `<div class="stats"><span>Destination</span><span><b>${esc(q.name)}</b></span><span>Distance</span><span>${fmtDist(q.m)}</span><span>Fare</span><span><b style="color:${q.fare > money ? 'var(--red)' : 'var(--money)'}">${fmtMoney(q.fare)}</b></span></div>` : '<div class="hint" style="margin-top:4px">Tap any street on the map. The orange arrow is you.</div>'}
+      <div class="btns"><button class="sbtn" data-pk="cancel">Cancel</button><button class="sbtn gold" data-pk="ok" ${q && q.fare <= money ? '' : 'disabled'}>${q ? 'Ride · ' + fmtMoney(q.fare) : 'Pick a place'}</button></div>`;
+  }
+  endPick(ok) { const o = this.pickMode; if (!o) return; this.pickMode = null; $('mapPick').classList.add('hidden'); if (!ok && o.cancel) o.cancel(); this.dirty = true; }
   // ---------------------------------------------------------------- selection
   tap(sx, sy) {
+    if (this.pickMode) { const [wx, wz] = this.screenToWorld(sx, sy); this.setPick(wx, wz); return; }
     const hit = this.hitTest(sx, sy);
     if (hit) { this.select(hit, false); return; }
     const hadCard = !$('mapCard').classList.contains('hidden');
@@ -51163,9 +51683,9 @@ class MapView {
       stats = `<div class="stats"><span>Status</span><span>${own ? 'Owned' : 'For sale'}</span><span>Price</span><span>${fmtMoney(uw.props.price(def))}</span><span>Type</span><span>${esc(kind)}</span><span>Parking</span><span>${esc(uw.props.parkingText ? uw.props.parkingText(def) : (cap ? cap + ' spaces' : 'none'))}</span><span>District</span><span>${esc(en.district)}</span>${feats.length ? `<span>Features</span><span>${esc(feats.join(' · '))}</span>` : ''}</div>`;
       if (def.desc) stats += `<div class="hint" style="margin:8px 0 0">${esc(def.desc)}</div>`;
     }
-    const cab = en.fast || (en.place && ct.fastPoints().find(f => f.id === en.place));
+    const cab = !g.player.interior && g.player.state === 'foot';
     $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${en.icon}</span><div><b>${esc(en.name)}</b><small>${esc(en.catName || MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}${en.extra || ''}
-      <div class="btns">${tracked ? '<button class="sbtn" data-act="untrack">Stop tracking</button>' : '<button class="sbtn gold" data-act="track">Track location</button>'}${cab ? '<button class="sbtn" data-act="cab">Cab here · $40</button>' : ''}</div>`;
+      <div class="btns">${tracked ? '<button class="sbtn" data-act="untrack">Stop tracking</button>' : '<button class="sbtn gold" data-act="track">Track location</button>'}${cab ? '<button class="sbtn" data-act="taxi">&#128661; Taxi here</button>' : ''}</div>`;
     $('mapCard').classList.remove('hidden');
   }
   // ---------------------------------------------------------------- per frame
@@ -51196,7 +51716,13 @@ class MapView {
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
     // route to the tracked place
     const wp = g.content.waypoint, m = g.missions.active, tgt = (m && m.target) || wp;
-    if (tgt) {
+    const pk = this.pickMode && this.pickMode.dest ? this.pickMode : null;
+    if (pk) {
+      const f = pk.q.from, route = gpsRoute(f.x, f.z, pk.dest.x, pk.dest.z);
+      c.strokeStyle = 'rgba(244,194,13,0.95)'; c.lineWidth = Math.max(3, 6 / this.zoom) * 1.3; c.lineJoin = 'round'; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(...ui._mapXY(f.x, f.z)); route.forEach(q => c.lineTo(...ui._mapXY(q.x, q.z))); c.lineTo(...ui._mapXY(pk.dest.x, pk.dest.z)); c.stroke();
+    }
+    if (tgt && !pk) {
       const route = gpsRoute(g.player.pos.x, g.player.pos.z, tgt.x, tgt.z);
       c.strokeStyle = m ? 'rgba(255,216,77,0.9)' : 'rgba(127,224,143,0.9)'; c.lineWidth = Math.max(3, 6 / this.zoom) * 1.2; c.lineJoin = 'round'; c.lineCap = 'round';
       c.beginPath(); route.forEach((q, i) => { const [x, z] = ui._mapXY(q.x, q.z); i ? c.lineTo(x, z) : c.moveTo(x, z); }); c.stroke();
@@ -51233,7 +51759,7 @@ class MapView {
       const e = dd.en, imp = e.cat === 'landmark' || e.cat === 'chop' || e.cat === 'owned' || e.cat === 'police' || e.cat === 'hospital' || (this.sel && this.sel.key === e.key);
       if (z < 1.6 && !imp) continue;
       if (z < 2.6 && !imp && e.cat !== 'service' && e.cat !== 'garage') continue;
-      text(e.name.replace(/^Cab stop · /, 'Cab · '), dd.sx, dd.sy + R + 14, 12, '#ffffff', 700);
+      text(e.name, dd.sx, dd.sy + R + 14, 12, '#ffffff', 700);
     }
     // street names when close
     if (z >= 3.2) {
@@ -51257,6 +51783,8 @@ class MapView {
     for (const pk of g.world.packages) if (g.save.hints[pk.id] && !g.save.packages[pk.id]) { const [sx, sy] = this.worldToScreen(pk.x, pk.z); c.strokeStyle = '#7fe08f'; c.lineWidth = 3; c.beginPath(); c.moveTo(sx - 6, sy - 6); c.lineTo(sx + 6, sy + 6); c.moveTo(sx + 6, sy - 6); c.lineTo(sx - 6, sy + 6); c.stroke(); }
     if (m && m.target) dot(m.target.x, m.target.z, '#ffd84d', 9);
     if (wp && !wp.key) dot(wp.x, wp.z, '#7fe08f', 8);
+    if (this.pickMode && this.pickMode.dest) { const [sx, sy] = this.worldToScreen(this.pickMode.dest.x, this.pickMode.dest.z); c.fillStyle = '#f4c20d'; c.strokeStyle = '#1a1206'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(sx, sy); c.arc(sx, sy - 18, 9, Math.PI * 0.8, Math.PI * 2.2); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#1a1206'; c.beginPath(); c.arc(sx, sy - 18, 3.5, 0, 7); c.fill(); }
+    if (g.taxi && g.taxi.cab && g.taxi.state !== 'idle') dot(g.taxi.cab.pos.x, g.taxi.cab.pos.z, '#f4c20d', 6);
     if (this.sel && this.hl > 0) { const [sx, sy] = this.worldToScreen(this.sel.x, this.sel.z); const ph = (2.5 - this.hl) % 0.8 / 0.8; c.strokeStyle = `rgba(255,216,77,${1 - ph})`; c.lineWidth = 3; c.beginPath(); c.arc(sx, sy, R + 6 + ph * 22, 0, 7); c.stroke(); }
     const p = g.player, [px, py] = this.worldToScreen(p.pos.x, p.pos.z);
     c.save(); c.translate(px, py); c.rotate(-(p.state === 'vehicle' && p.vehicle ? p.vehicle.h : p.h) + Math.PI);
@@ -51462,6 +51990,7 @@ class Game {
     this.combat = new CombatSystem(this);
     this.content = new ContentManager(this);
     this.gamble = new Gamble(this);
+    this.taxi = new TaxiService(this);
     this.doors = new DoorSystem(this);
     this.vspaces = new VSpaces(this);
     this.campaign = new Campaign(this);
@@ -51860,7 +52389,7 @@ class Game {
     this.audio.play('door');
   }
   onVehicleCollision(A, B, sp) {
-    const pv = this.player.state === 'vehicle' ? this.player.vehicle : null;
+    const pv = this.player.state === 'vehicle' && !this.player.passenger ? this.player.vehicle : null;
     if (!pv || sp < 4) return;
     const other = A === pv ? B : B === pv ? A : null;
     if (!other) return;
@@ -51869,6 +52398,8 @@ class Game {
   driveControl(dt) {
     const p = this.player, v = p.vehicle, inp = this.input;
     if (!v) return;
+    // in the back of a cab: the driver drives, you ride
+    if (p.passenger) { p.pos.set(v.pos.x, v.pos.y, v.pos.z); p.h = v.h; p.regen(dt); if (inp.pressed('horn')) this.audio.play('ui'); return; }
     const blocked = this.state !== 'playing' || this.ui.modal || this.mapOpen;
     let thr = (inp.isDown('up') ? 1 : 0) - (inp.isDown('down') ? 1 : 0) + (inp.isDown('gas') ? 1 : 0) - (inp.isDown('brake') ? 1 : 0);
     let steer = (inp.isDown('left') ? 1 : 0) - (inp.isDown('right') ? 1 : 0);
@@ -51889,12 +52420,13 @@ class Game {
   }
   interact() {
     const p = this.player, m = this.missions;
+    if (p.passenger) { this.taxi.getOut(); return; }
     const u = this.uw.findAction(); if (u) { u.act(); return; }
     if (this.uw.S.jail) return;
     if (m.offer && !m.active) { m.start(m.offer); return; }
     const a = this.content.findAction();
     if (a) { a.act(); return; }
-    if (p.state === 'vehicle') { this.exitVehicle(false); return; }
+    if (p.state === 'vehicle') { if (p.passenger) this.taxi.getOut(); else this.exitVehicle(false); return; }
     if (p.state !== 'foot' || (p.interior && !p.interior.vspace)) return;
     const v = this.nearestVehicle(1.8);
     if (v) {
@@ -52007,6 +52539,7 @@ class Game {
     }
     if (dt > 0) {
       this.traffic.update(dt, this.frame);
+      if (this.state === 'playing') this.taxi.update(dt);
       this.vehicles.update(dt);
       this.peds.update(dt, this.frame);
       if (this.state === 'playing') { this.police.update(dt); this.missions.update(dt); this.combat.update(dt); this.stunts.update(dt); this.events.update(dt); }
@@ -52014,8 +52547,8 @@ class Game {
       this.fx.update(dt);
       // free agents far away get recycled
       for (const v of this.vehicles.list.slice()) {
-        if (v.recycle && !v.mission && v.driver !== 'player' && v !== p.lastVehicle && !v.owned) { this.vehicles.despawn(v); continue; }
-        if (v.mode !== 'phys' || v.driver === 'player' || v.mission || v === p.lastVehicle || v.owned || v.homeBlock !== undefined && !v.touched) continue;
+        if (v.recycle && !v.mission && !v.taxiCab && v.driver !== 'player' && v !== p.lastVehicle && !v.owned) { this.vehicles.despawn(v); continue; }
+        if (v.mode !== 'phys' || v.driver === 'player' || v.mission || v.taxiCab || v === p.lastVehicle || v.owned || v.homeBlock !== undefined && !v.touched) continue;
         if (this.police.units.some(u => u.v === v)) continue;
         if (this.police.roadblocks.some(rb => rb.cars.includes(v))) continue;
         const d = Math.hypot(v.pos.x - this.focus.x, v.pos.z - this.focus.z);
@@ -52204,7 +52737,7 @@ const GAME_CONFIG = Object.freeze({
     properties: PROPS, spots: SPOTS, hqs: HQS, chopValue: CHOP_VALUE, trunkCap: TRUNK_CAP, crewRoles: CREW_ROLES, ranks: RANKS, promoCost: PROMO_COST, traits: TRAITS,
     officers: OFFICERS, jailSecPerDay: JAIL_SEC_PER_DAY, jailStreetRatio: JAIL_STREET_RATIO, sentenceBase: SENTENCE_BASE, sentenceMax: SENTENCE_MAX, inmates: INMATES, crimeDays: CRIME_DAYS, crimePressure: CRIME_PRESSURE },
   content: { contacts: CONTACTS, sideJobNames: MISSION_NAMES, arcs: ARCS, campaign: CAMPAIGN, races: RACES, events: EVENT_TYPES,
-    interiors: INTERIOR_DEFS, outfits: OUTFITS, achievements: ACHIEVEMENTS, secrets: SECRETS, fastTravel: FAST_POINTS, policePosts: POSTS }
+    interiors: INTERIOR_DEFS, outfits: OUTFITS, achievements: ACHIEVEMENTS, secrets: SECRETS, policePosts: POSTS }
 });
 
 /* =====================================================================
@@ -52219,7 +52752,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO_TIERS, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom });
     await game.init(progress);
   } catch (e) {
     console.error(e);

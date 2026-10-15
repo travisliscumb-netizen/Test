@@ -9,10 +9,12 @@ fs.mkdirSync(OUT, { recursive: true });
 const only = process.argv.slice(2);
 const want = n => !only.length || only.some(o => n.startsWith(o));
 const b = await launch();
-const { page, errors } = await open(b, { viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
+const { page, errors } = await open(b, { viewport: { width: 1100, height: 520 }, deviceScaleFactor: 1 });
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
-await ev(() => { const g = window.game; g.quality.setMode(2); g.events.cool = 1e9; g.police.enabled = false; g.save.money = 2e6; window.__hideHud = on => { document.getElementById('hud').style.visibility = on ? 'hidden' : ''; document.getElementById('touch').style.visibility = on ? 'hidden' : ''; }; });
+await ev(() => { const g = window.game; g.quality.setMode(2); g.events.cool = 1e9; g.police.enabled = false; g.save.money = 2e6; window.__hideHud = on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? 'hidden' : ''; } };
+  // a free camera for photos: after the rig updates, put the lens where window.__freeCam says
+  const U = g.cam.update.bind(g.cam); g.cam.update = (...a) => { U(...a); const f = window.__freeCam; if (f) { g.camera.position.set(f.x, f.y, f.z); g.camera.lookAt(f.lx, f.ly, f.lz); } }; });
 const shot = async (name) => { await frames(page, 8); await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('shot', name); };
 const fadeDone = () => page.waitForFunction(() => !window.game.fading, null, { timeout: 30000, polling: 100 });
 // place the player inside the current interior at local (x, y, z), facing yaw, camera pitch
@@ -42,6 +44,25 @@ if (want('house')) {
     await at(-d.w / 2 + 1.0, 0, d.d / 2 - 1.0, Math.PI * 0.82, -0.32); await shot(`house-tier${d.tier}-${id}`);
     await ev(() => window.game.content.interiors.exit(true));
   }
+}
+if (want('cars')) {
+  // a line-up of every class on a quiet street, three-quarter front and rear views
+  const types = await ev(() => Object.keys(window.__pv.VEHICLES).filter(t => !['police', 'truck', 'utility', 'unmarked'].includes(t)));
+  await ev(() => { const g = window.game; g.traffic.enabled = false; g.peds.enabled = false; for (const v of g.vehicles.list.slice()) g.vehicles.despawn(v); g.env.time = 13; });
+  for (let i = 0; i < types.length; i += 4) {
+    const grp = types.slice(i, i + 4);
+    await ev(grp => {
+      const g = window.game, x0 = 6 * 80 + 14, z0 = 3 * 80 + 4;
+      for (const v of g.vehicles.list.slice()) g.vehicles.despawn(v);
+      grp.forEach((t, k) => { g.vehicles.spawn(t, x0 + k * 6.2, z0, 0.35, { parked: true }); });
+      g.resetPlayerState(x0 + 9, z0 - 30, 0); window.__hideHud(true);
+      window.__freeCam = { x: x0 + 13, y: 2.6, z: z0 + 9.5, lx: x0 + 7, ly: 0.7, lz: z0 };
+    }, grp);
+    await frames(page, 20); await shot('cars-' + grp.join('-'));
+    await ev(() => { const x0 = 6 * 80 + 14, z0 = 3 * 80 + 4; window.__freeCam = { x: x0 + 1, y: 2.4, z: z0 - 8.5, lx: x0 + 8, ly: 0.7, lz: z0 }; });
+    await frames(page, 20); await shot('cars-rear-' + grp.join('-'));
+  }
+  await ev(() => { window.__hideHud(false); window.__freeCam = null; });
 }
 console.log('errors', errors.slice(0, 5));
 await b.close();
