@@ -40314,8 +40314,14 @@ class DriveAI {
       const still = !(blocker.speed > 0.8) && !(blocker.vel && Math.hypot(blocker.vel.x, blocker.vel.y || 0, blocker.vel.z || 0) > 0.8);
       this.blockT = still ? (this.blockT || 0) + dt : 0;
     } else if (!blocker) this.blockT = Math.max(0, (this.blockT || 0) - dt * 2);
-    // queued traffic at a light clears by itself: wait longer behind kinematic traffic
-    const patience = blocker && blocker.mode === 'kin' ? 7 : 2.5;
+    // queued traffic clears by itself: wait longer behind kinematic traffic, and much longer when the
+    // queue stands at a junction (a red light), so an AI car never overtakes a light queue
+    let patience = 2.5;
+    if (blocker && blocker.mode === 'kin') {
+      const bx = blocker.pos ? blocker.pos.x : v.pos.x, bz = blocker.pos ? blocker.pos.z : v.pos.z;
+      const nearNode = Math.hypot(bx - Math.round(bx / P) * P, bz - Math.round(bz / P) * P) < 26;
+      patience = nearNode ? 25 : 7;
+    }
     if (blocker && this.blockT > patience) { desired = Math.min(desired, 4); steer += bl2.x > 0 ? -0.8 : 0.8; }
     else desired = slowed;
     if (this.rev > 0) { this.rev -= dt; ctl.throttle = -1; ctl.steer = -this.revSteer; return; }
