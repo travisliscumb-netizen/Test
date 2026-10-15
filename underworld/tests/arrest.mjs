@@ -44,7 +44,7 @@ async function arrestAndServe(tag, setup, opts = {}) {
   let s = await pose();
   check(`${tag}: in the jail block with a clean pose`, s.jail && s.interior === 'prison' && s.sur === 0 && s.down === 0 && s.state === 'foot', JSON.stringify(s));
   const jail = await page.evaluate(() => ({ total: window.game.uw.S.jail.total, ch: window.game.uw.S.jail.charges }));
-  check(`${tag}: sentenced`, jail.total >= 7, `${jail.total} days · ${jail.ch.slice(0, 80)}`);
+  check(`${tag}: sentenced (halved since v6: at least 3 days)`, jail.total >= 3, `${jail.total} days · ${jail.ch.slice(0, 80)}`);
   // walk in the cell block
   const c0 = await page.evaluate(() => ({ x: window.game.player.pos.x, z: window.game.player.pos.z }));
   await page.keyboard.down('KeyW'); await frames(page, 12); await page.keyboard.up('KeyW');
