@@ -247,7 +247,7 @@ Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any ch
 ## Validation record (this pass)
 
 Every suite runs offline in headless Chromium with SwiftShader. Results below are for the final
-build of this pass (`index.html`, 2,767,364 bytes, schema 5). A full run of all 26 suites, two at
+build of this pass (`index.html`, 2767538 bytes, schema 5). A full run of all 26 suites, two at
 a time, passed everything except four timing-sensitive checks. Each of those passed when its suite
 was re-run on its own:
 

@@ -50913,6 +50913,8 @@ class Tutorial {
   update(dt) {
     const g = this.g;
     if (g.state !== 'playing' || !this.on) { if (this.cur) this.hide(); return; }
+    // a fade (arrest, interior, cab skip) moves you somewhere else: a tip about the old situation goes
+    if (this.cur && g.fading) { this.hide(); this.cool = 4; return; }
     if (this.cur) { this.t -= dt; if (this.t <= 0) this.dismiss(); return; }
     this.cool -= dt; if (this.cool > 0) return;
     if (g.ui.modal || g.mapOpen || g.fading || (g.missions.active && g.police.level === 0)) return;
