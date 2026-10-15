@@ -228,7 +228,7 @@ const col = await page.evaluate(() => {
 });
 check('rare models turn up parked in the wealthy districts, not in the Old Quarter (placed secrets like the rooftop Zephyr aside)', col.richC.r >= 1 && col.poorC.r === 0, JSON.stringify([col.richC, col.poorC]));
 check('car value follows tier: beater < stock, rare finds carry a collector premium', col.price.beater < col.price.common && col.price.rare > col.price.rareBase && col.chopBeater < col.chopCommon, JSON.stringify([col.price, col.chopBeater, col.chopCommon]));
-check('garage collection: models owned, rare finds counted, total value', col.col.rare === 2 && col.col.rareModels === 2 && col.col.rareOf === 4 && col.col.byTier.rare === 2 && col.col.byTier.beater === 1 && col.col.value > col.price.rare, JSON.stringify(col.col));
+check('garage collection: models owned, rare finds counted, total value', col.col.rare === 2 && col.col.rareModels === 2 && col.col.rareOf === 7 /* v6: Revenant 72, Valkyr V9 and Obsidian X joined the rare list */ && col.col.byTier.rare === 2 && col.col.byTier.beater === 1 && col.col.value > col.price.rare, JSON.stringify(col.col));
 
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'vehicles');
