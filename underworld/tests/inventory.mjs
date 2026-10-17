@@ -283,7 +283,7 @@ await page.reload(); await page.waitForFunction(() => window.__pvBooted === true
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 const mig = await ev(() => { const g = window.game, s = g.save, S = g.uw.S; return { v: s.version, from: s.flags.migratedFrom, money: s.money, inv: { ...S.inv }, flop: { ...S.storage.flop }, pistol: s.weapons.pistol, where: s.wloc.pistol, draw: g.player.ownedWeapons().map(w => w.id), ammo: s.ammo.pistol, vest: s.vest, gamble: !!s.gamble && s.gamble.scratch.bought === 0, runs: Array.isArray(S.runs), car: s.garage[0] && s.garage[0].trunk.pills, tier: s.garage[0] && s.garage[0].vtier }; });
-check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 6 && mig.from === 3, JSON.stringify(mig));
+check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 7 && mig.from === 3, JSON.stringify(mig));
 check('v3 save: money, pockets, stash and trunk exactly as they were', mig.money === 4321 && mig.inv.green === 7 && mig.inv.snow === 3 && mig.flop.smokes === 12 && mig.flop.hardware === 2 && mig.car === 4, JSON.stringify(mig));
 check('v3 save: guns are carried and drawable, ammo kept, no vest, empty stats', mig.pistol && mig.where === null && mig.draw.includes('pistol') && mig.draw.includes('shotgun') && mig.ammo === 36 && mig.vest === 0 && mig.gamble && mig.runs, JSON.stringify(mig));
 check('v3 save: cars get their visual tier', mig.tier === 'common', mig.tier);

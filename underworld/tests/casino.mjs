@@ -187,8 +187,10 @@ const indep = await ev(() => {
   out.twice = [a.win, b2.win]; out.hits = jp.hits.m1b; out.pressureAfter = jp.pr.m1b;
   // the first spin of a fresh save can hit the top prize (it is eligible from spin one)
   out.firstEligible = P.royaleChances(1e7)[0] > 0;
-  // the chance grows with the bet and is the same at any point (no schedule)
-  const ch = [1e4, 1e6, 1e7, 1e8].map(bet => P.royaleChances(bet)[0]); out.ch = ch;
+  // v7: full odds from $1,000 (scaled down below it), flat up to about $1M, then the high-roller share rule makes
+  // it grow again; it never drops for betting more, and it is the same at any point (no schedule)
+  const ch = [100, 1e3, 1e4, 1e5, 1e7, 1e8].map(bet => P.royaleChances(bet)[0]); out.ch = ch;
+  out.every = P.royaleEvery(1e3).map(n => n / P.ROYALE.sph);
   // drought pressure: a tier that has not hit builds pressure, a hit resets only that tier
   const j2 = { pr: {}, hits: {} }; let rolls = 0; const rnd = () => { rolls++; return 0.999999; };
   for (let i = 0; i < 500; i++) P.royaleSpin(1e7, j2, rnd);
@@ -199,7 +201,8 @@ const indep = await ev(() => {
   return out;
 });
 check('jackpot: two $1B jackpots back to back are possible (independent rolls, no cooldown)', indep.twice[0] === 1e9 && indep.twice[1] === 1e9 && indep.hits === 2 && indep.pressureAfter === 0, JSON.stringify(indep));
-check('jackpot: eligible from the first spin; the chance grows with the bet', indep.firstEligible && indep.ch[0] < indep.ch[1] && indep.ch[1] < indep.ch[2] && indep.ch[2] < indep.ch[3], JSON.stringify(indep.ch));
+check('jackpot: eligible from the first spin; $100 gets a tenth of full odds; flat $1K-$100K; grows again for high rollers; never drops', indep.firstEligible && Math.abs(indep.ch[0] * 10 - indep.ch[1]) < 1e-15 && indep.ch[1] === indep.ch[2] && indep.ch[2] === indep.ch[3] && indep.ch[3] < indep.ch[4] && indep.ch[4] < indep.ch[5], JSON.stringify(indep.ch));
+check('jackpot: at full odds the $1B lands on average every 30 h of play, $1M every ~14 h, $10K every ~40 min', Math.abs(indep.every[0] - 30) < 0.01 && Math.abs(indep.every[7] - 1 / 0.07) < 0.01 && Math.abs(indep.every[13] * 60 - 40) < 0.1, JSON.stringify(indep.every.map(x => +x.toFixed(2))));
 check('jackpot drought: pressure builds on every miss, a hit resets only that tier', indep.pr500.m1b > 0.1 && indep.reset.m250m === 0 && indep.reset.m1bKept, JSON.stringify(indep));
 const jsim = await ev(() => {
   const P = window.__pv, firsts = [];
@@ -226,7 +229,10 @@ const ry = await ev(async () => {
   out.spinning = body.querySelectorAll('.ryr.spin').length;
   await new Promise(r => { const iv = setInterval(() => { if (!G.ry.spinning) { clearInterval(iv); r(); } }, 20); });
   out.after = s.money === m0 - 1e6 + res.win; out.cab = body.querySelector('#rylCab').className;
+  // the spin cycle in the real UI: SPIN until SPIN can be pressed again (the cadence the jackpot rates assume adds a tap)
+  { G.setWager('royale', 1e3); G.ry.bet = 1e3; G.refresh(); const cyc = []; for (let i = 0; i < 4; i++) { const t0 = performance.now(); g.content._svcAct('ry:spin'); await new Promise(r => { const iv = setInterval(() => { const b = body.querySelector('.rylSpin'); if (!G.ry.spinning && b && !b.disabled) { clearInterval(iv); r(); } }, 10); }); cyc.push(performance.now() - t0); } out.cycle = cyc.map(x => Math.round(x)); }
   g.content._svcAct('ry:info'); out.info = /Line pays/.test(body.textContent) && /Jackpots/.test(body.textContent) && body.querySelectorAll('.rylInfo .stats span').length > 20;
+  out.infoTime = /on average every 30 h of play/.test(body.textContent) && /never a schedule/.test(body.textContent);
   out.overflow = body.scrollWidth > body.clientWidth + 1;
   // a forced billion: the full spectacle
   const P = window.__pv, keep = Math.random; let k = 0; Math.random = () => (k++ === 0 ? 0 : keep());
@@ -248,6 +254,9 @@ const ry = await ev(async () => {
 check('slot screen: BALANCE, BET, WIN, SPIN and MAX JACKPOT $1,000,000,000 on the main view; a big SPIN button', ry.main && ry.spinH >= 52, JSON.stringify(ry));
 check('slot: a $1M spin is settled (money and jackpot pressure) before the reels stop; spam spins once; win hidden till the reveal', ry.hidden && ry.settled && ry.prChanged && ry.spinning === 5 && ry.after, JSON.stringify(ry));
 check('slot: INFO / PAYTABLE panel holds the rules, pays and jackpots; nothing overflows at 390 px', ry.info && !ry.overflow, JSON.stringify(ry));
+check('slot INFO: jackpots shown as average play time at your bet, and said to be a long-run average, never a schedule', ry.infoTime, JSON.stringify(ry.infoTime));
+const minCyc = Math.min(...ry.cycle);
+check('spin cadence: a spin settles and SPIN re-arms in ~1.95 s (the 1,300 spins/hour design assumes ~0.8 s more to tap again)', minCyc > 1800 && minCyc < 2700 && 3600000 / (minCyc + 800) > 1150 && 3600000 / (minCyc + 800) < 1500, `${ry.cycle.join(' / ')} ms → ${Math.round(3600000 / (minCyc + 800))} spins/h`);
 check('slot: a billion-dollar jackpot pays $1,000,000,000 once with the full spectacle', ry.billion.major === 0 && ry.billion.paid === 1e9 - 1e7 && ry.billion.cls === 'billion' && ry.banner && ry.confetti > 200 && ry.jpHits >= 1, JSON.stringify(ry.billion));
 check('slot: closing the machine mid-spin settles once; reopening shows the true balance', ry.closed.delta === ry.closed.expect && !ry.closed.spinning && ry.reopen, JSON.stringify(ry.closed));
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });

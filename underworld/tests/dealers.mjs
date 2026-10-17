@@ -193,7 +193,7 @@ const bad = await ev(() => {
   return { keys: Object.keys(d), cars: d.used && d.used.cars, day: d.used && d.used.d, v5: r5.data.version, v5d: JSON.stringify(r5.data.dealers) };
 });
 check('a damaged dealership save is repaired (bad cars dropped, condition clamped, unknown lots removed)', JSON.stringify(bad.keys) === '["used"]' && bad.cars[0] === null && bad.cars[1] === null && bad.cars[2].cond === 100 && bad.cars[3] === null && bad.day === -999, JSON.stringify(bad));
-check('a v5 save loads with empty lots that stock themselves', bad.v5 === 6 && bad.v5d === '{}', JSON.stringify(bad));
+check('a v5 save loads with empty lots that stock themselves', bad.v5 === 7 && bad.v5d === '{}', JSON.stringify(bad));
 
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 void mapIdx;

@@ -380,6 +380,11 @@ body:not(.driving) #touch .car{display:none}
 .wager{margin:8px 0;padding:8px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
 .wtop{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:4px 8px;margin-bottom:6px}.wtop span{min-width:0;display:flex;flex-direction:column;font-size:10px;letter-spacing:.12em;color:var(--dim);font-weight:700}.wtop b{font-size:16px;letter-spacing:.01em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wtop b.money{color:var(--money)}
 .wq{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.wq .sbtn{flex:1 1 56px;min-height:44px;padding:6px 8px;font-size:13px}
+/* inventory transfers (v7): reachable containers are bright and tappable, remote ones are a dimmed read-only ledger */
+.xsel{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.xsel .sbtn{flex:1 1 130px;min-height:44px;padding:6px 10px;font-size:12px;text-align:left;line-height:1.25}.xsel .sbtn small{display:block;font-weight:600;opacity:.75;letter-spacing:0}
+.xrow{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}.xrow .xh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}.xrow .xh small{opacity:.75}
+.xq{display:flex;gap:6px;margin-top:8px}.xq .sbtn{flex:1 1 0;min-height:46px;padding:6px 4px;font-size:13px}
+.card.remote{opacity:.5;filter:saturate(.35)}.card.reach{box-shadow:0 0 0 1px #46d4c4 inset}
 .wq.wc{flex-wrap:nowrap}.wq.wc .sbtn{flex:0 0 48px;padding:6px 4px}.wq.wc .sbtn.gold{flex:0 0 62px}.wagerIn{flex:1 1 0;min-width:0;min-height:44px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text);font-size:16px;padding:0 10px;font-weight:700}
 #svcBody>.btns.big .sbtn{min-height:52px;font-size:16px;flex:1 1 120px;max-width:260px}
 .rmode .sbtn{min-height:44px;font-size:12px}
@@ -33013,7 +33018,7 @@ const SETTINGS_KEY = 'pvunderworld.settings.v1';
 // v6: no casino table limits (tables are seats, not tiers), Royale Billions jackpot pressure (gamble.jp) and
 // bet preferences (gamble.pref); jail good-behaviour points and contraband phone state; 45 homes and 50
 // businesses with business levels; dealership lots. Every new field defaults safely, so v5 saves load as they are.
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 const SaveSystem = {
   defaults() {
     return {
@@ -33096,6 +33101,10 @@ const SaveSystem = {
       d.uw.dayOffset = clamp((+d.uw.dayOffset || 0) + infl, 0, Math.max(0, (+d.uw.day || 1) - 1));
     }
     // (v4 kept a 1×/5×/20× jail speed; Prison.sanitize turns anything but an unlocked 1×/2×/3× back into 1×)
+    // v6 -> v7: trunks are weighed in pounds now, but their contents stay as they were (whole lots, cost basis
+    // intact): every v6 load weighs far less than its car's new capacity, so nothing is moved or dropped. Faction
+    // aggression (aggro, trouble) is new and starts calm; Royale pressure keeps its meaning (owed hits per tier).
+    if (oldVersion < 7 && d.gamble && d.gamble.jp) d.gamble.jp.pr = {};
     const migrated = oldVersion < SAVE_VERSION;
     if (migrated) { d.flags.migratedFrom = oldVersion; }
     return { data: d, existed: true, migrated };
@@ -44421,6 +44430,7 @@ class ContentManager {
       return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}${e.out ? ' · out on the street' : ''}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
+        <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
         <div class="btns">${here ? `<button class="sbtn gold" data-act="out:${e.uid}" ${wrecked ? 'disabled' : ''}>${wrecked ? 'Wrecked' : 'Where is it?'}</button>` : move}
         ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${s.money < rcost ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
         <button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button></div></div>`;
@@ -44439,6 +44449,8 @@ class ContentManager {
       if (k === 'out') { this.takeOut(uid, gp); g.ui.back(); return; }
       if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (s.money < c) return; this.spend(c); e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (dv) { dv.health = 100; dv.burnt = false; } }
       if (k === 'sell') {
+        const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
+        if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
         g.ui.ask(`Sell the ${VEHICLES[e.type].name}?`, `You'll get ${fmtMoney(this.sellPrice(e))}. ${e.origin === 'reward' || e.origin === 'found' ? 'Special cars can’t be bought back.' : ''}`, 'Sell', () => {
           const i = s.garage.indexOf(e); if (i < 0) return;
           for (const v of g.vehicles.list.slice()) if (v.garageUid === e.uid && v !== g.player.vehicle) g.vehicles.despawn(v);
@@ -44481,7 +44493,7 @@ class ContentManager {
       h += `<div class="hint" style="margin:6px 0">${cars.filter(Boolean).length} cars on the lot · ${lot === 'new' ? 'sold cars are replaced overnight' : `new stock ${next ? `in ${next} day${next > 1 ? 's' : ''}` : 'tomorrow'}`}. Walk up to a car to inspect it and buy it where it stands.</div><div class="grid2">`;
       h += cars.map((c, i) => c ? `<div class="card"><div class="t">${esc(VEHICLES[c.type].name)} ${tierChip(c.vtier)}${c.bargain ? '<span class="chip" style="--c:#7fe08f">BARGAIN</span>' : ''}</div>
         <div class="d">${esc(CAR_CLASS[c.type] || '')}${lot === 'used' ? ` · ${condLabel(c.cond)[0]} (${c.cond}%) · ${c.km.toLocaleString()} km` : ''}</div>
-        <div class="stat"><span>Price</span><span class="money">${fmtMoney(c.price)}</span></div><div class="btns"><button class="sbtn" data-act="show:${i}">Show me</button></div></div>` : '').join('');
+        <div class="stat"><span>Price</span><span class="money">${fmtMoney(c.price)}</span></div><div class="stat"><span>Cargo Capacity</span><span>${fmtLb(cargoCapC(c.type))}</span></div><div class="btns"><button class="sbtn" data-act="show:${i}">Show me</button></div></div>` : '').join('');
       return h + '</div>';
     };
     this.openSvc(D.name, D.pitch, render, act => {
@@ -44503,6 +44515,7 @@ class ContentManager {
         ${lot === 'used' ? `<div class="stat"><span>Condition</span><span style="color:${cl[1]}"><b>${cl[0]}</b> · ${c.cond}%</span></div><div class="bar"><i style="width:${c.cond}%;background:${cl[1]}"></i></div><div class="stat"><span>Mileage</span><span>${c.km.toLocaleString()} km</span></div>` : '<div class="stat"><span>Condition</span><span style="color:var(--green)"><b>New</b> · 0 km</span></div>'}
         ${this._bars(c.type)}
         <div class="stat"><span>Weight · seats</span><span>${V.mass.toLocaleString()} kg · ${V.profile === 'roadster' || V.profile === 'mid' || V.profile === 'wedge' ? 2 : V.profile === 'van' || V.profile === 'truck' || V.profile === 'minivan' ? 3 : 4}</span></div>
+        <div class="stat cargoCap"><span>Cargo Capacity</span><span><b>${fmtLb(cargoCapC(c.type))}</b></span></div>
         <div class="btns"><button class="sbtn gold" data-act="buy" ${why ? 'disabled' : ''}>${why ? esc(why) : 'Buy · ' + fmtMoney(c.price)}</button></div></div>`;
     };
     const c0 = DL.state(lot).cars[i];
@@ -46358,7 +46371,25 @@ function lookFrom(o, rng = Math.random) {
    of day and random events, and drift back toward normal over time.
    ===================================================================== */
 const POCKET_CAP = 12;
-const TRUNK_CAP = { compact: 10, sedan: 18, taxi: 16, sports: 8, suv: 28, van: 70, pickup: 40, police: 0, muscle: 12, supercar: 4, classic: 14, coupe: 8, offroad: 24, unmarked: 16, truck: 140, luxury: 20, gangcar: 16, utility: 36 };
+// ---- cargo (v7): a vehicle carries product by weight. Every model has its own capacity in pounds, set by its
+// body: a sports car trades the boot for speed, a box truck out-hauls a pickup five times over. Police cruisers
+// carry nothing (the cage and the radio rack fill the boot). Pockets and property stashes keep their space units.
+const CARGO_LB = {
+  supercar: 50, valkyr: 50, tempest: 60, obsidian: 70, sports: 80, coupe: 100, metro: 110, monarch: 120, apex: 140,
+  compact: 150, gangcar: 180, revenant: 180, hellion: 190, muscle: 200, classic: 220, taxi: 230, sedan: 250, unmarked: 250,
+  regent: 260, luxury: 300, crest: 380, estate: 400, offroad: 450, kodiak: 450, suv: 500, pickup: 1000, utility: 1250,
+  courier: 1500, van: 2000, truck: 5000, police: 0
+};
+// cargo weight of one lot of each good, in hundredths of a pound (integers, so totals never drift): a hot-goods
+// item or a carton of smokes about a pound, a hardware unit (cased) five; Green, Pharma and Snow weigh what they are
+const GOOD_CLB = { hot: 100, smokes: 100, green: 50, pills: 25, snow: 10, hardware: 500 };
+// weight of a container's goods in hundredths of a pound, and a vehicle model's capacity in the same unit
+function cargoC(o) { let c = 0; if (o) for (const k in o) if (GOOD_CLB[k]) c += (o[k] | 0) * GOOD_CLB[k]; return c; }
+function cargoCapC(type) { return (CARGO_LB[type] || 0) * 100; }
+// how many lots of good k still fit in a vehicle of this type holding o
+function cargoFit(type, o, k) { return GOOD_CLB[k] ? Math.max(0, Math.floor((cargoCapC(type) - cargoC(o)) / GOOD_CLB[k])) : 0; }
+// "312 lb", "12.5 lb", "0.25 lb", "1,250 lb" from hundredths of a pound
+function fmtLb(c) { c = Math.max(0, Math.round(c)); const lb = c / 100; return (c % 100 === 0 ? Math.round(lb).toLocaleString('en-US') : c % 10 === 0 ? lb.toFixed(1) : lb.toFixed(2)) + ' lb'; }
 const ZONE_WEALTH = { c: 2.2, m: 1.3, o: 0.9, l: 1.5, s: 0.8, h: 0.9, g: 1.0, p: 1.4, w: 0.8, u: 2.6, a: 1.1, r: 0.7 };
 // ---- street theft (v6): who you rob matters. A pedestrian's type is drawn from how wealthy the district is, and
 // what they carry follows a strongly skewed curve: mostly small, sometimes good, now and then big, very rarely a
@@ -47059,7 +47090,7 @@ class Underworld {
     for (const id of FAC_IDS) {
       const f = S.factions[id] = obj(S.factions[id], d.factions[id]), df = d.factions[id];
       f.strength = num(f.strength, df.strength, 0, 120); f.money = num(f.money, df.money, 0, 1e8); f.stock = num(f.stock, 60, 0, 1e5); f.heat = num(f.heat, 20, 0, 100);
-      f.rel = num(f.rel, 0, -100, 100); f.truce = num(f.truce, 0, 0, 1e6); f.tribute = num(f.tribute, 0, 0, 1e5); f.bossDown = num(f.bossDown, 0, 0, 60);
+      f.rel = num(f.rel, 0, -100, 100); f.aggro = num(f.aggro, 0, 0, 100); f.trouble = num(f.trouble, 0, 0, 10); f.truce = num(f.truce, 0, 0, 1e6); f.tribute = num(f.tribute, 0, 0, 1e5); f.bossDown = num(f.bossDown, 0, 0, 60);
       f.lt = Math.floor(num(f.lt, 0, 0, 99)); f.broken = num(f.broken, 0, 0, 1e6); f.fear = num(f.fear, 0, 0, 100); f.hits = num(f.hits, 0, 0, 1e6);
       if (typeof f.boss !== 'string' || !f.boss) f.boss = FACTIONS[id].boss.name;
     }
@@ -47271,25 +47302,94 @@ class Underworld {
   // ---------------------------------------------------------------- inventory
   get pockets() { return this.S.inv; }
   pocketFree() { return POCKET_CAP - units(this.S.inv); }
-  // every place goods can be, with its location class, capacity and the district it is valued in
+  // every place goods can be, with its location class, capacity and the district it is valued in. here = within
+  // reach right now (goods can be moved by hand); everything else is listed read-only (opts.all) and only crew runners
+  // move it. Vehicles measure cargo in pounds (lb: true, capC in hundredths of a pound); the rest in space units.
   locations(opts = {}) {
-    const S = this.S, g = this.g, out = [], pz = zoneKey(g.player.pos.x, g.player.pos.z);
+    const S = this.S, g = this.g, out = [], pz = zoneKey(g.player.pos.x, g.player.pos.z), acc = this.access(), seen = new Set();
     out.push({ key: 'inv', cls: 'ON PERSON', name: 'Pockets', o: S.inv, cap: POCKET_CAP, zone: pz, here: true });
-    const v = this.nearVehicle();
-    if (v) out.push({ key: 'veh', cls: 'VEHICLE', name: `${v.spec.name} trunk`, o: v.trunk, cap: TRUNK_CAP[v.type] || 0, zone: zoneKey(v.pos.x, v.pos.z), here: true, veh: v });
-    if (opts.all) for (const e of g.save.garage) if (e.trunk && units(e.trunk) && !(v && v.garageUid === e.uid)) out.push({ key: 'car:' + e.uid, cls: 'VEHICLE', name: `${VEHICLES[e.type].name} trunk${e.at && PROP_BY_ID[e.at.p] ? ' · ' + PROP_BY_ID[e.at.p].name : ''}`, o: e.trunk, cap: TRUNK_CAP[e.type] || 0, zone: e.at && this.loc('prop', e.at.p) ? this.loc('prop', e.at.p).zone : pz, here: false });
-    for (const d of this.props.ownedList()) if (d.storage) { const L = this.loc('prop', d.id); out.push({ key: 'p:' + d.id, cls: LOC_CLASS[d.kind] || 'PROPERTY', name: d.name, o: S.storage[d.id] || (S.storage[d.id] = {}), cap: d.storage, zone: L ? L.zone : pz, prop: d.id, here: false }); }
-    out.sort((a, b) => LOC_ORDER.indexOf(a.cls) - LOC_ORDER.indexOf(b.cls));
+    for (const t of acc.trunks) { seen.add(t.o); out.push({ key: t.key, cls: 'VEHICLE', name: `${VEHICLES[t.type].name} trunk${t.where ? ' · ' + t.where : ''}`, o: t.o, lb: true, type: t.type, capC: cargoCapC(t.type), zone: t.zone, here: true, veh: t.v || null, uid: t.uid || 0 }); }
+    if (opts.all) for (const e of g.save.garage) if (e.trunk && units(e.trunk) && !seen.has(e.trunk)) { seen.add(e.trunk); const at = e.at && PROP_BY_ID[e.at.p]; out.push({ key: 'car:' + e.uid, cls: 'VEHICLE', name: `${VEHICLES[e.type].name} trunk${at ? ' · ' + at.name : ''}`, o: e.trunk, lb: true, type: e.type, capC: cargoCapC(e.type), zone: at && this.loc('prop', at.id) ? this.loc('prop', at.id).zone : pz, here: false, uid: e.uid }); }
+    // a car you are not keeping (a stolen hauler) that you walked away from: its cargo is still yours, out there
+    const lv = g.player.lastVehicle;
+    if (opts.all && lv && lv.trunk && units(lv.trunk) && !seen.has(lv.trunk) && !lv.burnt && g.vehicles.list.includes(lv)) { seen.add(lv.trunk); out.push({ key: 'last', cls: 'VEHICLE', name: `${lv.spec.name} trunk · where you left it`, o: lv.trunk, lb: true, type: lv.type, capC: cargoCapC(lv.type), zone: zoneKey(lv.pos.x, lv.pos.z), here: false, veh: lv }); }
+    for (const d of this.props.ownedList()) {
+      const cap = this.props.storageCap(d.id), here = acc.props.has(d.id); if (!cap || (!here && !opts.all)) continue;
+      const L = this.loc('prop', d.id);
+      out.push({ key: 'p:' + d.id, cls: LOC_CLASS[d.kind] || 'PROPERTY', name: d.name, o: S.storage[d.id] || (S.storage[d.id] = {}), cap, zone: L ? L.zone : pz, prop: d.id, here });
+    }
+    out.sort((a, b) => LOC_ORDER.indexOf(a.cls) - LOC_ORDER.indexOf(b.cls) || (b.here - a.here));
     return out;
   }
+  // where the player is for reach purposes: the street outside when in a house, the spot itself otherwise
+  anchor() {
+    const p = this.g.player, I = p.interior;
+    if (I && I.vspace) { const D = this.g.vspaces && this.g.vspaces.cur; return { x: p.pos.x, z: p.pos.z, y: p.pos.y, prop: D ? D.prop : null, under: true }; }
+    if (I && I.def && I.def.door) { const pd = I.def.propId || (PROPS.find(d => d.interior === I.id) || {}).id || null; return { x: I.def.door.x, z: I.def.door.z, y: groundY(I.def.door.x, I.def.door.z), prop: pd, inside: true }; }
+    return { x: p.pos.x, z: p.pos.z, y: p.pos.y, prop: null };
+  }
+  // what is within reach right now: owned stashes you are at, the car you are in or beside, and the cars in that
+  // property's own bays (its garage). A car outside a house counts while you are indoors; nothing across town does.
+  access() {
+    const g = this.g, p = g.player, A = this.anchor(), props = new Set(), trunks = [], seen = new Set();
+    const PM = this.props;
+    if (A.prop && PM.owned(A.prop)) props.add(A.prop);
+    if (!A.inside && !A.under) for (const d of PM.ownedList()) {
+      if (props.has(d.id) || !PM.storageCap(d.id)) continue;
+      const L = this.loc('prop', d.id);
+      if (L && dist2(L.x, L.z, A.x, A.z) < 12 * 12) { props.add(d.id); continue; }
+      for (const b of PM.bays(d)) if (b.kind !== 'under' && dist2(b.x, b.z, A.x, A.z) < 9 * 9 && Math.abs((b.y || 0) - A.y) < 4) { props.add(d.id); break; }
+    }
+    const zone = (x, z) => zoneKey(x, z);
+    const addV = (v, why) => {
+      if (!v || v.burnt || !g.vehicles.list.includes(v) || !(CARGO_LB[v.type] > 0) || v.dealer) return;
+      if (!v.trunk) v.trunk = {};
+      if (seen.has(v.trunk)) return; seen.add(v.trunk);
+      trunks.push({ key: v.garageUid ? 'car:' + v.garageUid : 'veh', o: v.trunk, type: v.type, v, uid: v.garageUid || 0, zone: zone(v.pos.x, v.pos.z), where: why || '' });
+    };
+    const reach = A.inside ? 24 : 14;
+    const cur = p.state === 'vehicle' ? p.vehicle : null;
+    if (cur && !A.inside) addV(cur);
+    const lv = p.lastVehicle;
+    if (lv && lv !== cur && dist2(lv.pos.x, lv.pos.z, A.x, A.z) < reach * reach && Math.abs(lv.pos.y - A.y) < 6) addV(lv);
+    // your own cars parked beside you (or out front while you are inside)
+    for (const v of g.vehicles.nearby(A.x, A.z, reach)) if (v.garageUid && v !== cur && Math.abs(v.pos.y - A.y) < 6) addV(v);
+    // cars stored in the bays of a property you are at: its garage is part of the house
+    for (const e of g.save.garage) {
+      if (!e.at || e.out || !props.has(e.at.p) || !(CARGO_LB[e.type] > 0) || e.dmg >= 100) continue;
+      if (!e.trunk) e.trunk = {};
+      if (seen.has(e.trunk)) continue; seen.add(e.trunk);
+      const L = this.loc('prop', e.at.p);
+      trunks.push({ key: 'car:' + e.uid, o: e.trunk, type: e.type, v: null, uid: e.uid, zone: L ? L.zone : zone(A.x, A.z), where: PROP_BY_ID[e.at.p].name });
+    }
+    return { props, trunks, anchor: A };
+  }
+  // the one car "with you" for buying and selling on the street: the one you are in, or the last one you drove
+  // when it is beside you
   nearVehicle(r = 14) {
     const p = this.g.player, v = p.state === 'vehicle' ? p.vehicle : p.lastVehicle;
-    if (!v || v.burnt || !this.g.vehicles.list.includes(v) || !(TRUNK_CAP[v.type] > 0)) return null;
+    if (!v || v.burnt || !this.g.vehicles.list.includes(v) || !(CARGO_LB[v.type] > 0)) return null;
     if (p.state !== 'vehicle' && dist2(v.pos.x, v.pos.z, p.pos.x, p.pos.z) > r * r) return null;
     if (!v.trunk) v.trunk = {};
     return v;
   }
-  trunkFree(v) { return (TRUNK_CAP[v.type] || 0) - units(v.trunk); }
+  // lots of good k that still fit in a vehicle's trunk (cargo is weighed in pounds)
+  trunkFit(v, k) { return cargoFit(v.type, v.trunk, k); }
+  // lots of good k that fit in a location from locations()
+  fitIn(L, k) {
+    if (L.lb) return cargoFit(L.type, L.o, k);
+    const free = L.key === 'inv' ? this.pocketFree() : L.prop ? this.props.storageFree(L.prop) : L.cap - units(L.o);
+    return Math.max(0, Math.floor(free / GOODS[k].size));
+  }
+  // move up to n lots of good k between two reachable locations (by key). Never creates or destroys product:
+  // the amount is capped by what the source holds and what fits; the cost basis travels with the goods.
+  transfer(fromKey, toKey, k, n) {
+    if (!GOODS[k] || fromKey === toKey) return 0;
+    const locs = this.locations(), A = locs.find(L => L.key === fromKey && L.here), B = locs.find(L => L.key === toKey && L.here);
+    if (!A || !B || A.o === B.o) return 0;
+    const m = Math.min(Math.floor(n), Inv.has(A.o, k), this.fitIn(B, k)); if (!(m > 0)) return 0;
+    return Inv.move(A.o, B.o, k, m);
+  }
   // put goods on the player: pockets first, then a nearby trunk. returns what fit.
   // unitCost: dollars paid per lot (purchases); found / stolen goods come in at zero cost.
   give(goods, why, unitCost) {
@@ -47298,7 +47398,7 @@ class Underworld {
       let n = goods[k] | 0; if (n <= 0) continue;
       const sz = GOODS[k].size, uc = unitCost && unitCost[k] > 0 ? unitCost[k] : 0;
       const a = Math.min(n, Math.floor(this.pocketFree() / sz)); if (a > 0) { Inv.add(inv, k, a, a * uc); n -= a; got[k] = (got[k] | 0) + a; }
-      if (n > 0 && v) { const b = Math.min(n, Math.floor(this.trunkFree(v) / sz)); if (b > 0) { Inv.add(v.trunk, k, b, b * uc); n -= b; got[k] = (got[k] | 0) + b; } }
+      if (n > 0 && v) { const b = Math.min(n, this.trunkFit(v, k)); if (b > 0) { Inv.add(v.trunk, k, b, b * uc); n -= b; got[k] = (got[k] | 0) + b; } }
       if (n > 0 && why === 'pickup') this.g.ui.toast(`No room for ${fmtQty(k, n)} more ${GOODS[k].name}.`, 'warn');
     }
     return units(got) ? got : null;
@@ -47315,10 +47415,24 @@ class Underworld {
     this.lastCost = c;
     return n === 0;
   }
+  // what of a stored car's cargo would not fit in its property's stash and your pockets ('' when it all fits).
+  // The garage sale refuses while anything would be left over, so a sale never throws product away.
+  unloadLeftover(e) {
+    const src = e.trunk, left = {};
+    const pid = e.at && PROP_BY_ID[e.at.p] && this.props.owned(e.at.p) && this.props.storageCap(e.at.p) ? e.at.p : null;
+    let room = pid ? Math.max(0, this.props.storageFree(pid)) : 0, pocket = Math.max(0, this.pocketFree());
+    for (const k of GOOD_IDS) {
+      const sz = GOODS[k].size; let n = Inv.has(src, k);
+      const a = Math.min(n, Math.floor(room / sz)); n -= a; room -= a * sz;
+      const b = Math.min(n, Math.floor(pocket / sz)); n -= b; pocket -= b * sz;
+      if (n > 0) left[k] = n;
+    }
+    return units(left) ? goodsList(left) : '';
+  }
   // a car being sold out of a garage: its cargo goes into that property's stash, then your pockets
   unloadTrunk(e) {
     const S = this.S, src = e.trunk, before = goodsList(src);
-    const pid = e.at && PROP_BY_ID[e.at.p] && this.props.owned(e.at.p) && PROP_BY_ID[e.at.p].storage ? e.at.p : null;
+    const pid = e.at && PROP_BY_ID[e.at.p] && this.props.owned(e.at.p) && this.props.storageCap(e.at.p) ? e.at.p : null;
     for (const k of GOOD_IDS) {
       if (pid) Inv.move(src, S.storage[pid] || (S.storage[pid] = {}), k, Inv.has(src, k), this.props.storageFree(pid));
       Inv.move(src, S.inv, k, Inv.has(src, k), this.pocketFree());
@@ -47343,11 +47457,12 @@ class Underworld {
     const want = this.S.chopWanted.includes(v.type) ? 1.6 : 1;
     return Math.round(base * (0.35 + cond * 0.65) * want / 10) * 10;
   }
-  sellCar(v) {
+  sellCar(v, withCargo) {
     const g = this.g, S = this.S;
     if (g.police.level > 0) { g.content.deny('The chop shop rolls the door down. “Not with cops on you.”'); return; }
     if (v.garageUid || v.owned) { g.content.deny('That one’s registered to you. Sell it from your garage.'); return; }
     if (v.type === 'police' || v.type === 'unmarked') { g.content.deny('“A cop car? Get that out of here.”'); return; }
+    if (!withCargo && units(v.trunk)) { g.ui.ask('Sell it with the cargo?', `The trunk still holds ${goodsList(v.trunk)} (${fmtLb(cargoC(v.trunk))}). The chop shop keeps whatever is in it.`, 'Sell with cargo', () => this.sellCar(v, true)); return; }
     const pay = this.chopValue(v), wanted = S.chopWanted.includes(v.type);
     const lost = units(v.trunk);
     g.exitVehicle(true); g.vehicles.despawn(v);
@@ -47814,6 +47929,17 @@ class FactionSim {
    the player and dissolve when out of range; the strategic state persists.
    ===================================================================== */
 const GANG_CAP = 18;
+// ---- gang aggression (v7). The long-term relationship (f.rel) says who dislikes you; f.aggro (0-100, saved) is how
+// hard a faction is actively after you right now. Only hostile acts raise it (repeat trouble raises it faster), and it
+// cools whenever none of their people can see you, so getting away works: pursuit stops, groups stand down, and the
+// hit squads stop coming. Gangs only know where you are from a sighting (they drive to where you were last seen).
+const GANG_AGGRO = { hit: 4, bossHit: 15, ko: 12, guardKo: 14, bossKo: 40, car: 8, ship: 35, war: 40,
+  cool: 0.35,            // aggro lost per second while no member of the faction sees you
+  hot: 15,               // at or above: any member anywhere recognises you on sight (on foot or in a slow car)
+  squad: 35,             // at or above: they send cars to where you were last seen
+  memory: 150,           // a sighting older than this (s) no longer tells them where to look
+  calm: 12, calmK: 0.25  // a hostile group stands down after losing you for calm + aggro × calmK seconds
+};
 const LINES = {
   warn: ['This corner’s taken. Keep walking.', 'You lost? This is our block.', 'Walk on, friend. Nothing for you here.', 'Wrong street. Turn around.'],
   warnKnown: ['We know who you are. Don’t start nothing here.', 'Easy. We don’t want a problem with you.'],
@@ -47822,10 +47948,57 @@ const LINES = {
   friendly: ['Boss.', 'Everything’s quiet here.', 'Good to see you.']
 };
 class GangManager {
-  constructor(uw) { this.uw = uw; this.groups = new Map(); this.t = 0; this._near = []; }
+  constructor(uw) { this.uw = uw; this.groups = new Map(); this.t = 0; this._near = []; this.seen = {}; }
   get g() { return this.uw.g; }
+  // a hostile act against faction fid at (x, z): active aggression rises (faster with repeated trouble) and they know
+  // where it happened. The long-term relationship is handled by the caller as before.
+  provoke(fid, amount, x, z) {
+    const f = this.uw.S.factions[fid]; if (!f || !FACTIONS[fid]) return;
+    f.trouble = Math.min(10, (f.trouble || 0) + 1);
+    f.aggro = Math.min(100, (f.aggro || 0) + amount * (1 + f.trouble * 0.1));
+    if (x !== undefined) this.sighting(fid, x, z);
+  }
+  // one of their people has eyes on the player (or saw the incident): the last known position, and no cooling meanwhile
+  sighting(fid, x, z) { const g = this.g; this.seen[fid] = { x: x === undefined ? g.player.pos.x : x, z: z === undefined ? g.player.pos.z : z, t: g.time }; }
+  lastSeen(fid) { const s = this.seen[fid]; return s && this.g.time - s.t < GANG_AGGRO.memory ? s : null; }
+  aggro(fid) { const f = this.uw.S.factions[fid]; return f ? f.aggro || 0 : 0; }
+  // per frame: aggression cools for every faction that cannot see you right now; the trouble count fades slowly
+  coolDown(dt) {
+    const S = this.uw.S, now = this.g.time;
+    for (const fid of FAC_IDS) {
+      const f = S.factions[fid]; if (!f) continue;
+      const s = this.seen[fid], watching = s && now - s.t < 1.5;
+      if (f.aggro > 0 && !watching) f.aggro = Math.max(0, f.aggro - GANG_AGGRO.cool * dt);
+      if (f.trouble > 0) f.trouble = Math.max(0, f.trouble - dt / 120);
+    }
+  }
+  // can this member see the player from here?
+  canSee(m, range) {
+    const g = this.g, pl = g.player;
+    if (m.state === 'down' || pl.interior || pl.state === 'dead') return false;
+    if (dist2(m.x, m.z, pl.pos.x, pl.pos.z) > range * range) return false;
+    return g.world.grid.lineOfSight(m.x, (m.y || 0) + 1.5, m.z, pl.pos.x, pl.pos.y + 1.4, pl.pos.z);
+  }
+  // hostile groups that have lost the player stand down (twice a second, one sight check per group)
+  updateHostility(step) {
+    const g = this.g, pl = g.player;
+    for (const gr of this.groups.values()) {
+      if (!gr.hostile || gr.crew || gr.kind === 'war' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'body' || !gr.fid) continue;
+      if (gr.kind === 'squad' && !gr.members.length) continue; // still in the car: the squad logic handles it
+      let near = null, nd = Infinity;
+      for (const m of gr.members) { if (m.state === 'down') continue; const d = dist2(m.x, m.z, pl.pos.x, pl.pos.z); if (d < nd) { nd = d; near = m; } }
+      const sees = near && this.canSee(near, 45);
+      if (sees) { gr.lostT = 0; this.sighting(gr.fid); continue; }
+      gr.lostT = (gr.lostT || 0) + step;
+      if (gr.lostT > GANG_AGGRO.calm + this.aggro(gr.fid) * GANG_AGGRO.calmK) {
+        gr.hostile = false; gr.lostT = 0; gr.warned = 0; gr.calledBackup = false;
+        for (const m of gr.members) { m.alertT = 0; m.spotT = 0; m.target = null; m.tT = 0; }
+      }
+    }
+  }
   reset() {
     const g = this.g;
+    this.seen = {};
     for (const gr of this.groups.values()) this.removeGroup(gr, true);
     this.groups.clear();
     this.riding = []; this.ship = null;
@@ -47906,6 +48079,7 @@ class GangManager {
   update(dt) {
     const g = this.g, uw = this.uw, S = uw.S, p = g.player;
     this.t -= dt;
+    this.coolDown(dt);
     // prune despawned members (in place, one shared lookup set: no per-frame allocations)
     if (this.groups.size) {
       const live = this._live || (this._live = new Set()); live.clear();
@@ -47969,6 +48143,7 @@ class GangManager {
         const far = gr.members.every(m => dist2(m.x, m.z, px, pz) > 160 * 160) || inside;
         if ((gr.life > 120 && far) || (gr.kind === 'raid' && gr.life > 240)) { this.removeGroup(gr); if (gr.cars) for (const v of gr.cars) if (g.vehicles.list.includes(v) && v !== p.vehicle && v !== p.lastVehicle && !g.inView(v.pos.x, 1, v.pos.z, 3)) g.vehicles.despawn(v); else if (g.vehicles.list.includes(v)) v.mission = null; }
       }
+      this.updateHostility(0.6);
       this.updateBodyguards();
       this.updateShipment();
       this.sweepOrphans();
@@ -48018,6 +48193,8 @@ class GangManager {
       const gr = c.group;
       if (!gr.hostile) { gr.hostile = true; this.say(c, pick(LINES.provoked)); }
       const f = S.factions[c.fac]; if (f) { f.rel = Math.max(-100, f.rel - (c.role === 'boss' ? 12 : 3)); f.hits++; }
+      if (FACTIONS[c.fac]) this.provoke(c.fac, c.role === 'boss' ? GANG_AGGRO.bossHit : GANG_AGGRO.hit, c.x, c.z);
+      gr.lostT = 0;
       for (const m of gr.members) m.alertT = 6;
       // nearby groups of the same faction join in, and a strong faction calls for backup
       for (const o of this.groups.values()) if (o !== gr && o.fid === gr.fid && !o.crew && o.members.some(m => dist2(m.x, m.z, c.x, c.z) < 30 * 30)) o.hostile = true;
@@ -48030,6 +48207,7 @@ class GangManager {
     if (byPlayer && p.group && p.kind === 'gang' && !p.group.hostile) { p.group.hostile = true; uw.combatT = 8; }
     if (p.kind === 'gang' && p.fac && FACTIONS[p.fac]) {
       const i = turfAt(p.x, p.z), f = S.factions[p.fac];
+      if ((byPlayer || p.lastHitBy === 'pc') && ko) this.provoke(p.fac, p.role === 'boss' ? GANG_AGGRO.bossKo : p.role === 'guard' ? GANG_AGGRO.guardKo : GANG_AGGRO.ko, p.x, p.z);
       if (byPlayer || (p.lastHitBy === 'pc')) {
         uw.addInf(i, p.fac, -(ko ? 4 : 2));
         if (uw.g.save.rep >= 100 || uw.owner[i] === 'pc') uw.addInf(i, 'pc', ko ? 2.5 : 1);
@@ -48056,16 +48234,23 @@ class GangManager {
     if (!FACTIONS[fid] || S.factions[fid].broken || p.interior || S.jail || g.state !== 'playing') return;
     if ([...this.groups.values()].some(gr => gr.kind === 'squad')) return;
     if (this.count() > GANG_CAP - 3) return;
-    const c = g.world.randomCurbSpot(p.pos.x, p.pos.z, 90, 150);
-    if (g.inView(c.x, 1, c.z, 4)) { const c2 = g.world.randomCurbSpot(p.pos.x, p.pos.z, 110, 170); c.x = c2.x; c.z = c2.z; c.h = c2.h; }
+    // they only know where you were last seen: no sighting, no squad
+    const ls = this.lastSeen(fid); if (!ls) return;
+    const goal = { x: ls.x, z: ls.z };
+    const c = g.world.randomCurbSpot(goal.x, goal.z, 90, 150);
+    if (g.inView(c.x, 1, c.z, 4)) { const c2 = g.world.randomCurbSpot(goal.x, goal.z, 110, 170); c.x = c2.x; c.z = c2.z; c.h = c2.h; }
     const F = FACTIONS[fid];
-    const v = g.vehicles.spawn(pick(F.cars.filter(t => TRUNK_CAP[t] !== undefined)), c.x, c.z, c.h, { driver: 'npc', speed: 8 });
+    const v = g.vehicles.spawn(pick(F.cars.filter(t => CARGO_LB[t] !== undefined)), c.x, c.z, c.h, { driver: 'npc', speed: 8 });
     v.fac = fid; v.touched = true; v.mission = 'squad';
     v.colorHex = pick(F.carCol); v.mat.userData.u.uPaint.value.setHex(v.colorHex); v.mat.userData.u.uPaint2.value.setHex(F.hex);
     v.drive = new DriveAI(v, g, 'pursue'); v.drive.cruise = 22;
-    v.drive.target = () => { const d = Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z); return { x: p.pos.x, z: p.pos.z, speed: d < 30 ? Math.max(0, d - 12) * 0.8 : 22, direct: d < 40 }; };
-    v.drive.targetRef = p;
-    const gr = { key: 'squad' + (this._sq = (this._sq || 0) + 1), kind: 'squad', fid, x: c.x, z: c.z, members: [], hostile: true, cars: [v], car: v, n: randi(2, 3), life: 0 };
+    const gr = { key: 'squad' + (this._sq = (this._sq || 0) + 1), kind: 'squad', fid, x: c.x, z: c.z, members: [], hostile: true, cars: [v], car: v, n: randi(2, 3), life: 0, goal, locked: false, search: 0 };
+    // heading for the last known position until they actually spot you; then they come for you
+    v.drive.target = () => {
+      if (!gr.locked) { const d = Math.hypot(gr.goal.x - v.pos.x, gr.goal.z - v.pos.z); return { x: gr.goal.x, z: gr.goal.z, speed: d < 25 ? 6 : 20, direct: d < 30 }; }
+      const d = Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z); return { x: p.pos.x, z: p.pos.z, speed: d < 30 ? Math.max(0, d - 12) * 0.8 : 22, direct: d < 40 };
+    };
+    v.drive.targetRef = null;
     v.uwGroup = gr.key;
     this.groups.set(gr.key, gr);
     if (why === 'hit') g.ui.toast(`${S.factions[fid].boss} sent a crew after you.`, 'warn');
@@ -48080,7 +48265,19 @@ class GangManager {
       if (!g.vehicles.list.includes(v) || v.burnt) { if (!gr.members.length) this.removeGroup(gr); continue; }
       if (!gr.members.length && v.driver === 'npc') {
         const d = Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z);
-        if ((d < 26 && v.speed < 3) || (d < 14)) {
+        // spotting from the car: close, or in clear sight (checked a few times a second)
+        if (!gr.locked && (gr.spotT = (gr.spotT || 0) - dt) <= 0) {
+          gr.spotT = 0.4;
+          if (!p.interior && (d < 12 || (d < 34 && g.world.grid.lineOfSight(v.pos.x, v.pos.y + 1.4, v.pos.z, p.pos.x, p.pos.y + 1.4, p.pos.z)))) { gr.locked = true; v.drive.targetRef = p; this.sighting(gr.fid); }
+        }
+        if (gr.locked && d < 60 && (gr.seeT = (gr.seeT || 0) - dt) <= 0) { gr.seeT = 0.5; if (!p.interior && g.world.grid.lineOfSight(v.pos.x, v.pos.y + 1.4, v.pos.z, p.pos.x, p.pos.y + 1.4, p.pos.z)) this.sighting(gr.fid); }
+        if (!gr.locked) {
+          // nobody where you were last seen: a short look round, then they give up and drive off
+          if (Math.hypot(gr.goal.x - v.pos.x, gr.goal.z - v.pos.z) < 18) gr.search += dt;
+          const ls = this.lastSeen(gr.fid); if (ls && (ls.x !== gr.goal.x || ls.z !== gr.goal.z) && g.time - ls.t < 5) { gr.goal = { x: ls.x, z: ls.z }; gr.search = 0; }
+          if (gr.search > 18 || gr.life > 75) { this.removeGroup(gr); continue; }
+        }
+        if (gr.locked && ((d < 26 && v.speed < 3) || (d < 14))) {
           // bail out and fight
           v.drive = null; v.driver = null; v.ctl.throttle = 0; v.ctl.handbrake = true; v.mission = null; v.uwGroup = null;
           for (let k = 0; k < gr.n; k++) { const w = v.toWorld((k % 2 ? -1 : 1) * (v.spec.w / 2 + 0.7), (k - 1) * 1.2); const m = this.makeMember(gr, factionLook(gr.fid), 'soldier', w.x, w.z, v.h); m.x = w.x; m.z = w.z; m.gun = m.gun || Math.random() < 0.5; m.courage = rand(0.6, 1); }
@@ -48091,12 +48288,13 @@ class GangManager {
         if (!gr.members.some(m => g.inView(m.x, 1, m.z, 1))) this.removeGroup(gr);
       }
     }
-    // a faction that hates you sends people looking for you
-    this.hitT = (this.hitT || rand(120, 220)) - dt;
+    // a faction that is actively after you (aggression high, and someone saw you recently) sends a car to where
+    // you were last seen. Once their aggression cools, or nobody has seen you for a while, the squads stop.
+    this.hitT = (this.hitT || rand(60, 120)) - dt;
     if (this.hitT <= 0) {
-      this.hitT = rand(150, 300);
+      this.hitT = rand(120, 240);
       const S = this.uw.S;
-      const angry = FAC_IDS.filter(f => !S.factions[f].broken && S.factions[f].rel < -55 && S.factions[f].truce <= S.day && this.uw.attitude(f) === 'hostile');
+      const angry = FAC_IDS.filter(f => !S.factions[f].broken && (S.factions[f].aggro || 0) >= GANG_AGGRO.squad && S.factions[f].truce <= S.day && this.lastSeen(f) && this.uw.attitude(f) !== 'fearful');
       if (angry.length && this.uw.stage >= 2 && g.police.level === 0) this.sendSquad(pick(angry), 'hit');
     }
   }
@@ -48140,7 +48338,7 @@ class GangManager {
     if (!g.vehicles.list.includes(van) || van.burnt) { this.ship = null; return; }
     if (van.driver === 'player') {
       if (!gr.stolen) {
-        gr.stolen = true; const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); f.stock = Math.max(0, f.stock - units(van.trunk));
+        gr.stolen = true; const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - units(van.trunk));
         g.ui.banner('Shipment Stolen', goodsList(van.trunk), 'pass', 3); uw.addRep(80, null);
         uw.news('unknown', 'Holm: “You took something of mine. I will be taking something of yours.”');
         g.police.crime('carjack', van.pos.x, van.pos.z);
@@ -48346,6 +48544,18 @@ function gangBrain(p, dt) {
   const dh = Math.hypot(home.x - p.x, home.z - p.z);
   const dp = Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z);
   const onFoot = pl.state === 'foot' && !pl.interior;
+  // recognising the player takes a real look: line of sight, in range, held for a moment. A faction that is actively
+  // after you (aggro hot) knows your face anywhere, on foot or slowing past in a car; otherwise only an enemy faction
+  // on its own turf picks you out, close up and on foot.
+  if (gr && !gr.hostile && gr.kind !== 'war' && !pl.interior && pl.state !== 'dead' && att !== 'fearful' && FACTIONS[p.fac]) {
+    const ag = uw.gangs.aggro(p.fac), hot = ag >= GANG_AGGRO.hot;
+    const inCar = pl.state === 'vehicle', slow = !inCar || (pl.vehicle && Math.abs(pl.vehicle.speed) < 10);
+    const range = hot ? (inCar ? 9 : 20) : (att === 'hostile' && onFoot && uw.owner[turfAt(p.x, p.z)] === p.fac ? 12 : 0);
+    let looking = false;
+    if (range > 0 && slow && dp < range) looking = (p.losT = (p.losT || 0) - dt) > 0 ? p.los : (p.losT = 0.3, p.los = g.world.grid.lineOfSight(p.x, p.y + 1.5, p.z, pl.pos.x, pl.pos.y + 1.4, pl.pos.z));
+    p.spotT = looking ? (p.spotT || 0) + dt : Math.max(0, (p.spotT || 0) - dt * 2);
+    if (p.spotT > (hot ? 0.5 : 1.2)) { p.spotT = 0; gr.hostile = true; gr.lostT = 0; uw.gangs.sighting(p.fac); uw.gangs.say(p, pick(LINES.provoked)); return; }
+  }
   if (gr && gr.kind !== 'hq' && onFoot && dp < 5 && att === 'fearful' && p.role !== 'boss') {
     const dx = p.x - pl.pos.x, dz = p.z - pl.pos.z;
     p.vx = damp(p.vx, dx / dp * 1.6, 4, dt); p.vz = damp(p.vz, dz / dp * 1.6, 4, dt);
@@ -48354,8 +48564,6 @@ function gangBrain(p, dt) {
     return;
   }
   if (gr && onFoot && (att === 'territorial' || att === 'hostile') && uw.owner[turfAt(p.x, p.z)] === p.fac && gr.kind !== 'war') {
-    // line of sight is a raycast: refresh it a few times a second, not every frame
-    if (att === 'hostile' && dp < 16 && ((p.losT = (p.losT || 0) - dt) > 0 ? p.los : (p.losT = 0.3, p.los = g.world.grid.lineOfSight(p.x, p.y + 1.5, p.z, pl.pos.x, pl.pos.y + 1.4, pl.pos.z)))) { gr.hostile = true; uw.gangs.say(p, pick(LINES.provoked)); return; }
     if (dp < 5.5) {
       if (!gr.warned) { gr.warned = g.time; uw.gangs.say(p, pick(uw.stage >= 2 ? LINES.warnKnown : LINES.warn)); }
       else if (gr.kind === 'hang' && g.time - gr.warned > 9 && dp < 3.5 && att === 'territorial' && uw.stage < 2) { gr.hostile = true; uw.gangs.say(p, 'I told you once.'); return; }
@@ -48846,6 +49054,8 @@ class PropertyManager {
     g.fade(() => {
       g.env.time = g.env.time < 7 ? 8 : (g.env.time < 19 ? 20 : 8);
       g.player.health = g.player.maxHealth; S.slept = true;
+      for (const fid of FAC_IDS) if (uw.S.factions[fid]) { uw.S.factions[fid].aggro = 0; uw.S.factions[fid].trouble = 0; }
+      uw.gangs.seen = {};
       S.pressure = clamp(S.pressure - 2, 0, 100);
       g.saveGame(true);
       g.ui.toast('Slept. Lying low cools things down. Game saved.', 'money');
@@ -50517,7 +50727,8 @@ class EmpireUI {
       return `<div class="card"><div class="t">${esc(V.name)} ${tierChip(e.vtier)}</div><div class="d">${esc(where)}</div>
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : e.dmg > 20 ? 'var(--amber)' : 'var(--green)'}">${Math.round(100 - (e.dmg || 0))}%</span></div>
         ${tune ? `<div class="stat"><span>Upgrades</span><span>${esc(tune)}</span></div>` : ''}
-        <div class="stat"><span>Trunk</span><span>${e.trunk && units(e.trunk) ? esc(goodsList(e.trunk)) : 'empty'}</span></div>
+        <div class="stat"><span>Cargo Capacity</span><span>${fmtLb(cargoCapC(e.type))}</span></div>
+        <div class="stat"><span>Trunk</span><span>${e.trunk && units(e.trunk) ? esc(goodsList(e.trunk)) + ' · ' + fmtLb(cargoC(e.trunk)) : 'empty'}</span></div>
         <div class="btns">${wx !== null ? this.wpBtn(wx, wz, V.name, out ? null : 'prop:' + at.id) : ''}</div></div>`;
     }).join('') + '</div>';
     return h;
@@ -50730,26 +50941,52 @@ class EmpireUI {
     h += `<h3>Where to buy</h3><div class="stats">${SPOTS.filter(s => s.sells).map(s => { const L = uw.loc('spot', s.id); return `<span>${esc(s.name)} · ${s.sells.map(k => GOODS[k].name).join(', ')}</span><span>${esc(ZONES[L.zone].name)}${s.rep ? ' · rep ' + s.rep : ''}</span>`; }).join('')}<span>Tidewater Syndicate (Captain Holm)</span><span>Snow, hardware, smokes · talk at their HQ</span><span>Lucky’s Pawn (fence)</span><span>Hot goods, smokes</span></div>`;
     return h;
   }
-  // INVENTORY: every location with what is in it, what it cost and what it is worth right now
+  // INVENTORY: a live transfer screen for whatever is within reach (pockets, the car you are in or beside, the stash
+  // and garage of the property you are at), over a citywide ledger of everything you own. Remote places are shown
+  // dimmed and read-only: product only crosses town with a crew runner (Deliveries).
   t_stash() {
     const uw = this.uw, S = uw.S, M = uw.market;
-    const locs = uw.locations({ all: true });
-    let tv = 0, tc = 0;
-    let h = '';
+    const locs = uw.locations({ all: true }), near = locs.filter(L => L.here);
+    const ek = k => k.replace(/:/g, '~');
+    const spaceTxt = L => L.lb ? `${fmtLb(cargoC(L.o))} / ${fmtLb(L.capC)}` : `${units(L.o)} / ${L.cap} space`;
+    let tv = 0, tc = 0, h = '';
+    // ---- transfers
+    const X = this.xfer || (this.xfer = { from: 'inv', to: '' });
+    if (!near.some(L => L.key === X.from)) X.from = 'inv';
+    if (!near.some(L => L.key === X.to) || X.to === X.from) { const t = near.find(L => L.key !== X.from); X.to = t ? t.key : ''; }
+    h += `<h3>Within reach <small>${near.length > 1 ? 'tap where from and where to, then an amount' : ''}</small></h3>`;
+    if (near.length < 2) h += '<div class="hint">Only your pockets are within reach. Sit in or stand beside a car to use its trunk; at a property you own, its stash and the cars in its garage join in. Product across town moves with a crew runner (Crew › Deliveries).</div>';
+    else {
+      const A = near.find(L => L.key === X.from), B = near.find(L => L.key === X.to);
+      const chips = (which, cur, skip) => `<div class="xsel">${near.filter(L => L.key !== skip).map(L => `<button class="sbtn${L.key === cur ? ' gold' : ''}" data-act="xf:${which}:${ek(L.key)}">${esc(L.name)}<small>${esc(L.cls)} · ${spaceTxt(L)}</small></button>`).join('')}</div>`;
+      h += `<div class="stat"><span>From</span></div>${chips('from', X.from, '')}<div class="stat"><span>To</span><span><button class="sbtn" data-act="xf:swap" style="min-height:40px;padding:6px 12px">⇅ Swap</button></span></div>${chips('to', X.to, X.from)}`;
+      const goods = GOOD_IDS.filter(k => Inv.has(A.o, k) > 0);
+      if (!goods.length) h += `<div class="hint">${esc(A.name)} is empty.</div>`;
+      else h += goods.map(k => {
+        const have = Inv.has(A.o, k), fit = uw.fitIn(B, k), lb = GOOD_UNIT[k][2] < 1;
+        const amt = [1, 5, 10].map(q => [lb ? q + ' lb' : String(q), lotsFor(k, q)]);
+        const wt = A.lb || B.lb ? ` · ${fmtLb(have * GOOD_CLB[k])}` : '';
+        return `<div class="xrow"><div class="xh"><span><b style="color:${TIERS[GOODS[k].tier].col}">■</b> <b>${GOODS[k].name}</b> · ${fmtQty(k, have)}${wt}</span><small>${esc(B.name)} has ${fmtQty(k, Inv.has(B.o, k))} · room for ${fmtQty(k, fit)}</small></div>
+          <div class="xq">${amt.map(([t, n]) => `<button class="sbtn" data-act="xm:${k}:${n}" ${fit < 1 ? 'disabled' : ''}>${t}</button>`).join('')}<button class="sbtn gold" data-act="xm:${k}:-1" ${fit < 1 ? 'disabled' : ''}>Max</button></div></div>`;
+      }).join('');
+    }
+    // ---- the ledger: every location you own goods in
+    h += '<h3>Everything you own</h3>';
     for (const cls of LOC_ORDER) {
       const list = locs.filter(L => L.cls === cls);
-      h += `<h3>${cls}</h3>`;
-      if (!list.length) { h += `<div class="hint">${cls === 'VEHICLE' ? 'No car with you. Stand near your car (or sit in it) to use its trunk.' : cls === 'ON PERSON' ? '' : cls === 'WAREHOUSE' ? 'No warehouse yet: the biggest storage in the game (600-900 space). For sale on the Assets tab.' : 'None owned.'}</div>`; continue; }
+      h += `<h3 style="font-size:12px;opacity:.85">${cls}</h3>`;
+      if (!list.length) { h += `<div class="hint">${cls === 'VEHICLE' ? 'No car with you. Stand near your car (or sit in it) to use its trunk.' : cls === 'ON PERSON' ? '' : cls === 'WAREHOUSE' ? 'No warehouse yet: the biggest storage in the game (600-900 space). For sale on the Property app.' : 'None owned.'}</div>`; continue; }
       h += '<div class="grid2">' + list.map(L => {
         const rows = holdings(L.o, L.zone, M); let v = 0, c = 0; for (const r of rows) { v += r.value; c += r.cost; }
         tv += v; tc += c;
+        const used = L.lb ? cargoC(L.o) : units(L.o), cap = L.lb ? L.capC : L.cap;
         const body = rows.length ? rows.map(r => `<div class="stat"><span><b style="color:${TIERS[GOODS[r.k].tier].col}">■</b> ${GOODS[r.k].name} · ${fmtQty(r.k, r.n)}</span><span>${fmtMoney(r.value)}</span></div><div class="stat" style="font-size:11px"><span>bought @ ${r.cost ? fmtPerUnit(r.k, r.avg) : 'free'} · now ${fmtPerUnit(r.k, r.lot)}</span><span style="color:${r.pl >= 0 ? 'var(--green)' : 'var(--red)'}">${r.pl >= 0 ? '+' : '−'}${fmtMoney(Math.abs(r.pl))}</span></div>`).join('') : '<div class="d">empty</div>';
-        return `<div class="card"><div class="t">${esc(L.name)}</div><div class="d">${esc(ZONES[L.zone] ? ZONES[L.zone].name : '')} prices</div>${body}<div class="stat"><span>Space</span><span>${units(L.o)} / ${L.cap}</span></div>${this.bar(units(L.o), Math.max(1, L.cap))}</div>`;
+        return `<div class="card ${L.here ? 'reach' : 'remote'}" data-loc="${esc(L.key)}"><div class="t">${esc(L.name)} ${L.here ? '<span class="chip" style="--c:#46d4c4">IN REACH</span>' : '<span class="chip" style="--c:#8a93a3">REMOTE</span>'}</div><div class="d">${esc(ZONES[L.zone] ? ZONES[L.zone].name : '')} prices${L.here ? '' : ' · read-only: send a runner to move it'}</div>${body}<div class="stat"><span>${L.lb ? 'Cargo' : 'Space'}</span><span>${spaceTxt(L)}</span></div>${this.bar(used, Math.max(1, cap))}</div>`;
       }).join('') + '</div>';
     }
     const runs = S.runs.reduce((a, r) => a + r.cost, 0);
     const head = `<div class="grid4"><div class="tile"><small>Product value now</small><b class="money">${fmtMoney(tv)}</b><span>at local street prices</span></div><div class="tile"><small>Cost basis</small><b>${fmtMoney(tc)}</b><span>what you paid</span></div><div class="tile"><small>Unrealised P/L</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b></div><div class="tile"><small>Realised P/L (all time)</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b>${S.runs.length ? `<span>${S.runs.length} run(s) in transit (cost ${fmtMoney(runs)})</span>` : ''}</div></div>`;
-    return head + h + '<div class="hint">Move product in person at any property you own (open its menu), or send a crew runner from the Deliveries tab. Prices move; quantities and what you paid never do. Carried product adds to your sentence if you’re arrested.</div>';
+    return head + h + '<div class="hint">Moves happen by hand, only between places within reach. Prices move; quantities and what you paid never do. Carried product adds to your sentence if you’re arrested.</div>';
   }
   t_loadout() {
     const uw = this.uw;
@@ -50800,6 +51037,7 @@ class EmpireUI {
       const status = f.broken ? 'BROKEN' : f.bossDown > 0 ? 'LEADERLESS' : f.truce > S.day ? (f.tribute ? 'PAYS YOU TRIBUTE' : 'TRUCE ' + (f.truce - S.day) + 'd') : S.turfs.some(t => t.war && (t.war.a === id || t.war.d === id)) ? 'AT WAR' : '';
       return `<div class="card" style="border-left:3px solid ${F.col}"><div class="t">${esc(F.name)} ${status ? `<span class="chip" style="--c:${F.col}">${status}</span>` : ''}</div><div class="d">${esc(F.archetype)} · ${f.broken ? '—' : esc(f.boss)}${f.bossDown > 0 && !f.broken ? ' (succession)' : ''}<br>${esc(F.blurb)}</div>
         <div class="stat"><span>Strength</span><span>${Math.round(f.strength)}</span></div>${this.bar(f.strength, 110, F.col)}
+        ${f.broken ? '' : `<div class="stat"><span>Right now</span><span style="color:${(f.aggro || 0) >= GANG_AGGRO.squad ? 'var(--red)' : (f.aggro || 0) >= GANG_AGGRO.hot ? 'var(--amber)' : 'inherit'}">${(f.aggro || 0) >= GANG_AGGRO.squad ? 'hunting for you' : (f.aggro || 0) >= GANG_AGGRO.hot ? 'on the lookout' : (f.aggro || 0) > 0.5 ? 'cooling off' : 'not looking for you'}</span></div>`}
         <div class="stat"><span>Turfs</span><span>${n}</span></div>
         <div class="stat"><span>Wealth</span><span>${f.money > 80000 ? 'Rich' : f.money > 20000 ? 'Comfortable' : f.money > 5000 ? 'Tight' : 'Broke'}</span></div>
         <div class="stat"><span>Toward you</span><span>${att} (${Math.round(f.rel)})</span></div>${this.bar(f.rel + 100, 200, f.rel < -30 ? '#ff4d5e' : f.rel > 30 ? '#7fe08f' : '#ffb547')}
@@ -50847,6 +51085,8 @@ class EmpireUI {
     switch (k) {
       case 'wp': { const label = decodeURIComponent(z || 'Waypoint'), key = decodeURIComponent(w || ''); g.content.setWaypoint(+x, +y, label); if (key) g.content.waypoint.key = key; r = `Waypoint set: ${label}. Follow the arrow or the GPS line.`; break; }
       case 'pk': this.pnlSel = this.pnlSel === x ? null : x; this.render(); return;
+      case 'xf': { const X = this.xfer || (this.xfer = { from: 'inv', to: '' }), key = (y || '').replace(/~/g, ':'); if (x === 'swap') { const t = X.from; X.from = X.to || t; X.to = t; } else if (x === 'from') { if (X.to === key) X.to = X.from; X.from = key; } else if (x === 'to') X.to = key; this.render(); return; }
+      case 'xm': { const X = this.xfer || {}, n = +y, src = uw.locations().find(L => L.key === X.from && L.here); if (!GOODS[x] || !src) break; const moved = uw.transfer(X.from, X.to, x, n < 0 ? Inv.has(src.o, x) : n); const dst = uw.locations().find(L => L.key === X.to); r = moved ? `Moved ${fmtQty(x, moved)} ${GOODS[x].name} to ${dst ? dst.name : 'there'}.` : 'No room there.'; break; }
       case 'cc': if (x === 'good' || x === 'role') this.cc[x] = y; this.render(); return;
       case 'pf': if (this.pf && x in this.pf) { this.pf[x] = y; this.render(); } return;
       case 'bf': if (this.bf && x in this.bf) { this.bf[x] = y; this.render(); } return;
@@ -50910,7 +51150,7 @@ class EmpireUI {
     const uw = this.uw, S = uw.S, v = uw.nearVehicle(), st = S.storage[id] || (S.storage[id] = {}), d = PROP_BY_ID[id];
     const L = uw.loc('prop', id), z = L ? L.zone : 'm';
     const rows = GOOD_IDS.filter(k => Inv.has(S.inv, k) + (v ? Inv.has(v.trunk, k) : 0) + Inv.has(st, k) > 0);
-    let h = `<h3>Product stash <small>${esc(LOC_CLASS[d.kind] || 'PROPERTY')} · here ${units(st)}/${d.storage} space · pockets ${units(S.inv)}/${POCKET_CAP}${v ? ` · ${esc(v.spec.name)} trunk ${units(v.trunk)}/${TRUNK_CAP[v.type]}` : ' · no car nearby'}</small></h3>`;
+    let h = `<h3>Product stash <small>${esc(LOC_CLASS[d.kind] || 'PROPERTY')} · here ${units(st)}/${uw.props.storageCap(id)} space · pockets ${units(S.inv)}/${POCKET_CAP}${v ? ` · ${esc(v.spec.name)} trunk ${fmtLb(cargoC(v.trunk))} of ${fmtLb(cargoCapC(v.type))}` : ' · no car nearby'}</small></h3>`;
     if (!rows.length) h += '<div class="hint">Nothing to move. Product you buy goes in your pockets, then the trunk of a car parked nearby.</div>';
     else h += '<div class="jobs">' + rows.map(k => {
       const here = Inv.has(st, k), lot = uw.market.price(z, k), val = here * lot, cost = Inv.cost(st, k), pl = val - cost;
@@ -50954,7 +51194,7 @@ class EmpireUI {
           if (v && (want < 0 || n < want)) n += Inv.move(v.trunk, st, good, want < 0 ? Inv.has(v.trunk, good) : want - n, uw.props.storageFree(id));
           r = n ? `Stored ${fmtQty(good, n)} ${GOODS[good].name}.` : 'No room here.';
         } else if (k === 'tk') { n = Inv.move(st, S.inv, good, all(Inv.has(st, good)), uw.pocketFree()); r = n ? `Took ${fmtQty(good, n)}.` : 'Your pockets are full.'; }
-        else if (v) { n = Inv.move(st, v.trunk, good, all(Inv.has(st, good)), uw.trunkFree(v)); r = n ? `Loaded ${fmtQty(good, n)} into the trunk.` : 'The trunk is full.'; }
+        else if (v) { n = Inv.move(st, v.trunk, good, Math.min(all(Inv.has(st, good)), uw.trunkFit(v, good))); r = n ? `Loaded ${fmtQty(good, n)} into the trunk.` : 'The trunk is full.'; }
         break;
       }
       default: { const ar = uw.armory.act(a, id); if (ar !== null) r = ar; }
@@ -50985,7 +51225,7 @@ class EmpireUI {
     const stock = S.supply[s.id] || (S.supply[s.id] = {});
     for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
     const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
-    const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${units(uw.nearVehicle().trunk)}/${TRUNK_CAP[uw.nearVehicle().type]}</b>` : ''}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>` +
+    const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>` +
       (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} reputation)</div>` : '<div class="jobs">' + s.sells.map(k => {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
         const qs = lb ? [1, 2, 5] : [1, 5, 20];
@@ -51166,7 +51406,7 @@ class EmpireUI {
         }
         case 'turf': { const n0 = uw.playerTurfs(); uw.factions.cedeTurf(fid); uw.recompute(); f.rel -= 20; r = uw.playerTurfs() > n0 ? 'A turf changes hands.' : 'There’s nothing next to yours to give.'; break; }
         case 'break': f.truce = 0; f.tribute = 0; f.rel -= 25; r = 'The truce is over.'; break;
-        case 'war': f.rel = -80; f.truce = 0; f.tribute = 0; uw.factions.chooseWar(fid, true); r = 'War it is.'; for (const gg of uw.gangs.groups.values()) if (gg.fid === fid) gg.hostile = true; g.ui.back(); g.saveGame(); return;
+        case 'war': f.rel = -80; f.truce = 0; f.tribute = 0; uw.gangs.provoke(fid, GANG_AGGRO.war, g.player.pos.x, g.player.pos.z); uw.factions.chooseWar(fid, true); r = 'War it is.'; for (const gg of uw.gangs.groups.values()) if (gg.fid === fid) gg.hostile = true; g.ui.back(); g.saveGame(); return;
       }
       g.saveGame(); g.content.refreshSvc(r);
     });
@@ -51221,9 +51461,9 @@ class EmpireUI {
     const uw = this.uw, g = this.g;
     if (g.state !== 'playing' && g.state !== 'dead' && g.state !== 'busted') return;
     const c = units(uw.S.inv);
-    const v = uw.nearVehicle(); const tr = v ? units(v.trunk) : 0;
+    const v = uw.nearVehicle(); const tr = v ? cargoC(v.trunk) : 0;
     const el = $('carry');
-    const txt = c || tr ? `▣ ${c}${tr ? ' · trunk ' + tr : ''}` : '';
+    const txt = c || tr ? `▣ ${c}${tr ? ' · trunk ' + fmtLb(tr) : ''}` : '';
     if (el.textContent !== txt) { el.textContent = txt; el.classList.toggle('hot', uw.carryHeat() > 6); }
     if (g.ui.modal === 'empireScreen' && uw.inJail) { this._rt = (this._rt || 0) - 1; if (this._rt <= 0) { this._rt = 4; this.render(); } }
   }
@@ -51340,20 +51580,27 @@ const ROYALE_SYM_W = { shoe: 9, cash: 38, car: 26, diamond: 13, crown: 8, seven:
 const ROYALE_N_W = [0.9, 0.085, 0.015]; // 3, 4, 5 in a row
 // base game (measured, 1M spins): return 98.4%, 56% of spins pay more than the bet, 4.4% pay it back exactly
 const ROYALE_BASE_RTP = 0.984;
-// the major prize ladder. A prize is in play when it is at least 5× the bet; the majors in play share 12% of the
-// stake as expected return (split by w), so the chance of a prize is proportional to the bet. Drought pressure:
-// each spin without a hit adds that spin's base chance to the tier's pressure P; the live chance is
-// base × (1 + 4·P²). A hit resets that tier only, and the next spin is again at its base chance.
+// the major prize ladder (v7: tuned to play time). A prize is in play when it is at least 5× the bet. perH is how often
+// it lands on average per hour of play at a bet of ROYALE.fullBet or more (ROYALE.sph spins an hour: a spin takes
+// 1.95 s to settle and about 0.8 s to tap again); below fullBet the chance scales down with the bet. Those rates are
+// long-run averages, not a schedule: every spin rolls every tier in play independently, a hit only resets that tier's
+// pressure, and nothing caps how often a tier can land. High rollers keep the old rule as a floor: the tiers in play
+// share 12% of the stake as expected return (split by w), so the chance never drops for betting more.
+// Drought pressure: each spin without a hit adds that spin's base chance to the tier's pressure P (P = hits you were
+// "owed"); the live chance is base × (1 + 4·P²), so a long dry run gets steadily more likely to end. The base chance
+// is divided by ROYALE_DROUGHT_K so that the long-run average, pressure included, is exactly perH.
 const ROYALE_MAJORS = [
-  { id: 'm1b', prize: 1e9, w: 0.25, name: 'BILLION DOLLAR JACKPOT' }, { id: 'm250m', prize: 2.5e8, w: 0.1, name: 'GRAND JACKPOT' },
-  { id: 'm100m', prize: 1e8, w: 0.1, name: 'MEGA JACKPOT' }, { id: 'm50m', prize: 5e7, w: 0.08, name: 'SUPER JACKPOT' },
-  { id: 'm25m', prize: 2.5e7, w: 0.08, name: 'ROYAL JACKPOT' }, { id: 'm10m', prize: 1e7, w: 0.07, name: 'GOLD JACKPOT' },
-  { id: 'm5m', prize: 5e6, w: 0.06, name: 'SILVER JACKPOT' }, { id: 'm1m', prize: 1e6, w: 0.05, name: 'MILLION' },
-  { id: 'm500k', prize: 5e5, w: 0.04, name: 'MAJOR' }, { id: 'm250k', prize: 2.5e5, w: 0.04, name: 'MAJOR' },
-  { id: 'm100k', prize: 1e5, w: 0.04, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, name: 'MINOR' },
-  { id: 'm25k', prize: 2.5e4, w: 0.03, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, name: 'BONUS' }
+  { id: 'm1b', prize: 1e9, w: 0.25, perH: 1 / 30, name: 'BILLION DOLLAR JACKPOT' }, { id: 'm250m', prize: 2.5e8, w: 0.1, perH: 0.036, name: 'GRAND JACKPOT' },
+  { id: 'm100m', prize: 1e8, w: 0.1, perH: 0.038, name: 'MEGA JACKPOT' }, { id: 'm50m', prize: 5e7, w: 0.08, perH: 0.04, name: 'SUPER JACKPOT' },
+  { id: 'm25m', prize: 2.5e7, w: 0.08, perH: 0.042, name: 'ROYAL JACKPOT' }, { id: 'm10m', prize: 1e7, w: 0.07, perH: 0.045, name: 'GOLD JACKPOT' },
+  { id: 'm5m', prize: 5e6, w: 0.06, perH: 0.05, name: 'SILVER JACKPOT' }, { id: 'm1m', prize: 1e6, w: 0.05, perH: 0.07, name: 'MILLION' },
+  { id: 'm500k', prize: 5e5, w: 0.04, perH: 0.15, name: 'MAJOR' }, { id: 'm250k', prize: 2.5e5, w: 0.04, perH: 0.25, name: 'MAJOR' },
+  { id: 'm100k', prize: 1e5, w: 0.04, perH: 0.45, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, perH: 0.7, name: 'MINOR' },
+  { id: 'm25k', prize: 2.5e4, w: 0.03, perH: 1.0, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, perH: 1.5, name: 'BONUS' }
 ];
-const ROYALE = { share: 0.12, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9 };
+const ROYALE = { share: 0.12, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, fullBet: 1000, sph: 1300 };
+// mean of the pressured wait in units of the unpressured one: ∫₀^∞ exp(−(x + c·x³/3)) dx (0.536 for c = 4)
+const ROYALE_DROUGHT_K = (() => { const c = ROYALE.drought, dx = 1e-3; let sum = 0; for (let x = dx / 2; x < 16; x += dx) sum += Math.exp(-(x + c * x * x * x / 3)) * dx; return sum; })();
 function royaleEval(grid) {
   let mult = 0; const lines = [];
   SLOT_LINES5.forEach((L, li) => { const s = L.map((row, r) => grid[r][row]); if (!ROYALE_PAY[s[0]]) return; let n = 1; while (n < 5 && s[n] === s[0]) n++; if (n >= 3) { mult += ROYALE_PAY[s[0]][n - 3]; lines.push({ li, n, sym: s[0], x: ROYALE_PAY[s[0]][n - 3] }); } });
@@ -51387,24 +51634,48 @@ function royaleBlank(rnd = Math.random) {
   for (let t = 0; t < 20; t++) { const g = [0, 1, 2, 3, 4].map(() => [0, 1, 2].map(() => ROYALE_FILL[Math.floor(Math.random() * ROYALE_FILL.length)])); if (!royaleEval(g).lines.length) return { grid: g, mult: 0, lines: [] }; }
   void rnd; return { grid: [0, 1, 2, 3, 4].map(r => [0, 1, 2].map(w => (r + w) % 2 ? 'skull' : ROYALE_SYMS[(r * 2 + w) % 6])), mult: 0, lines: [] };
 }
-// the majors in play at this bet and their base chance per spin
+// the majors in play at this bet and their base chance per spin (before drought pressure)
+// (memoised per bet: the table is constant, so the last bet's array is reused; callers never mutate it)
+let _royaleChBet = NaN, _royaleCh = null;
 function royaleChances(bet) {
-  const el = ROYALE_MAJORS.filter(m => bet >= CASINO.minBet && m.prize >= ROYALE.minRatio * bet), sw = el.reduce((a, m) => a + m.w, 0);
-  return ROYALE_MAJORS.map(m => el.includes(m) ? Math.min(ROYALE.maxP, ROYALE.share * m.w / sw * bet / m.prize) : 0);
+  if (bet === _royaleChBet && _royaleCh) return _royaleCh;
+  _royaleChBet = bet; return (_royaleCh = royaleChancesRaw(bet));
 }
+function royaleChancesRaw(bet) {
+  const el = ROYALE_MAJORS.filter(m => bet >= CASINO.minBet && m.prize >= ROYALE.minRatio * bet), sw = el.reduce((a, m) => a + m.w, 0);
+  const k = Math.min(1, bet / ROYALE.fullBet);
+  return ROYALE_MAJORS.map(m => el.includes(m) ? Math.min(ROYALE.maxP, Math.max(m.perH / ROYALE.sph * ROYALE_DROUGHT_K * k, ROYALE.share * m.w / sw * bet / m.prize)) : 0);
+}
+// long-run average spins between hits of each tier at this bet, pressure included (0 = not in play)
+function royaleEvery(bet) { return royaleChances(bet).map(p => p > 0 ? ROYALE_DROUGHT_K / p : 0); }
+// a pressure value drawn from the steady state: the time since the last hit (in owed hits) of a player who has been
+// spinning for ever has density ∝ exp(−(x + c·x³/3)) (rejection sampling; about six tries)
+function royaleSeedPressure(rnd = Math.random) {
+  const c = ROYALE.drought;
+  for (let i = 0; i < 200; i++) { const x = rnd() * 4; if (rnd() < Math.exp(-(x + c * x * x * x / 3))) return x; }
+  return 0;
+}
+// the live chance of each tier on the next spin, with the pressure this player has built up
+function royaleLive(bet, jp) { return royaleChances(bet).map((b, t) => { if (!b) return 0; const P = +(jp && jp.pr && jp.pr[ROYALE_MAJORS[t].id]) || 0; return Math.min(ROYALE.maxP, b * (1 + ROYALE.drought * P * P)); }); }
 // when no major is in play (a bet over a fifth of the top prize) the base game pays its share instead, so the
 // expected return never drops for betting big
 function royaleBaseScale(bet) { return royaleChances(bet).some(p => p > 0) ? 1 : (ROYALE_BASE_RTP + ROYALE.share) / ROYALE_BASE_RTP; }
+// the major roll of one spin: every tier in play is rolled, the biggest that hits is paid. Updates jp in place
+// (pressure and hit counts) and returns the tier index or -1. Shared by royaleSpin and the simulations.
+function royaleRollMajor(bet, jp, rnd = Math.random) {
+  const base = royaleChances(bet); jp.pr = jp.pr || {}; jp.hits = jp.hits || {};
+  // a tier you have never played starts at a random point of a typical dry spell, not at "just hit": with the drought
+  // pressure, starting from zero would make a new player's first hours rarer than the long-run average
+  for (let t = 0; t < ROYALE_MAJORS.length; t++) if (base[t] && !(ROYALE_MAJORS[t].id in jp.pr)) jp.pr[ROYALE_MAJORS[t].id] = royaleSeedPressure(rnd);
+  const live = royaleLive(bet, jp);
+  let major = -1;
+  for (let t = 0; t < ROYALE_MAJORS.length; t++) { if (!base[t]) continue; if (rnd() < live[t] && major < 0) major = t; }
+  for (let t = 0; t < ROYALE_MAJORS.length; t++) { if (!base[t]) continue; const id = ROYALE_MAJORS[t].id; if (t === major) { jp.pr[id] = 0; jp.hits[id] = (jp.hits[id] || 0) + 1; } else jp.pr[id] = (+jp.pr[id] || 0) + base[t]; }
+  return major;
+}
 // one spin. jp = { pr: {tier: pressure}, hits: {tier: n} } is updated in place (the caller saves it with the money)
 function royaleSpin(bet, jp, rnd = Math.random) {
-  const base = royaleChances(bet); jp.pr = jp.pr || {}; jp.hits = jp.hits || {};
-  let major = -1;
-  for (let t = 0; t < ROYALE_MAJORS.length; t++) {
-    if (!base[t]) continue;
-    const P = +jp.pr[ROYALE_MAJORS[t].id] || 0, p = Math.min(ROYALE.maxP, base[t] * (1 + ROYALE.drought * P * P));
-    if (rnd() < p && major < 0) major = t; // every tier is rolled every spin; the biggest one that hits is paid
-  }
-  for (let t = 0; t < ROYALE_MAJORS.length; t++) { if (!base[t]) continue; const id = ROYALE_MAJORS[t].id; if (t === major) { jp.pr[id] = 0; jp.hits[id] = (jp.hits[id] || 0) + 1; } else jp.pr[id] = (+jp.pr[id] || 0) + base[t]; }
+  const major = royaleRollMajor(bet, jp, rnd);
   let b;
   if (major >= 0) {
     b = royaleBuild(0, rnd) || royaleBlank();
@@ -52116,11 +52387,11 @@ class Gamble {
     h += this.wagerHTML('royale', bet, { lock: ry.spinning, noTop: true });
     h += `<div class="btns"><button class="sbtn${ry.info ? ' gold' : ''}" data-act="ry:info">${ry.info ? 'HIDE INFO' : 'INFO / PAYTABLE'}</button></div>`;
     if (ry.info) {
-      const ch = royaleChances(bet), sc = royaleBaseScale(bet), nm = { seven: 'seven', crown: 'crown', diamond: 'diamond', car: 'car', cash: 'cash', shoe: 'horseshoe' };
+      const ch = royaleChances(bet), every = royaleEvery(bet), live = royaleLive(bet, J), sc = royaleBaseScale(bet), hrs = n => { const h = n / ROYALE.sph; return h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 100 ? `${h < 10 ? h.toFixed(1) : Math.round(h)} h` : `${Math.round(h).toLocaleString('en-US')} h`; }, nm = { seven: 'seven', crown: 'crown', diamond: 'diamond', car: 'car', cash: 'cash', shoe: 'horseshoe' };
       h += `<div class="rylInfo"><h3>Line pays at ${fmtMoney(bet)}</h3><div class="stats">${ROYALE_SYMS.map(k => `<span>${this.royaleCell(k, ' mini')} ${nm[k]} ×3 / ×4 / ×5</span><span>${ROYALE_PAY[k].map(x => fmtMoney(Math.round(x * sc * bet))).join(' / ')}</span>`).join('')}</div>
         <div class="hint">Five lines: the three rows and two V shapes, read from the left reel. Every winning line on a spin is paid.</div>
-        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.prize)}</span><span>${ch[t] ? 'about 1 in ' + Math.round(1 / ch[t]).toLocaleString('en-US') + ' spins' : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
-        <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them (even twice in a row). The chance grows with your bet. Bets above ${fmtMoney(ROYALE.top / ROYALE.minRatio)} play the line pays a little richer instead.</div>
+        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.prize)}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
+        <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them, even twice in a row. These are long-run averages at about ${ROYALE.sph.toLocaleString('en-US')} spins an hour, never a schedule. Full odds from a ${fmtMoney(ROYALE.fullBet)} bet; smaller bets get a proportionally smaller chance, and very big bets a bigger one. A jackpot that hasn’t landed for a while gets more likely (“due”) until it does. Bets above ${fmtMoney(ROYALE.top / ROYALE.minRatio)} play the line pays a little richer instead.</div>
         <h3>Your record</h3><div class="stats"><span>Spins</span><span>${(J.spins || 0).toLocaleString('en-US')}</span><span>Biggest win</span><span>${fmtMoney(J.biggest || 0)}</span>${ROYALE_MAJORS.filter(m => J.hits[m.id]).map(m => `<span>${fmtMoney(m.prize)} hits</span><span>${J.hits[m.id]}</span>`).join('')}</div></div>`;
     }
     return h;
@@ -54473,7 +54744,7 @@ class Game {
     }
     if (this.uw) {
       if (v.parked && !v.owned && !v.garageUid) this.uw.lootCar(v);
-      if (v.fac && FACTIONS[v.fac] && !v.garageUid) { const f = this.uw.S.factions[v.fac]; f.rel = Math.max(-100, f.rel - 6); this.ui.toast(`That was a ${FACTIONS[v.fac].short} car. They’ll hear about it.`, 'warn'); }
+      if (v.fac && FACTIONS[v.fac] && !v.garageUid) { const f = this.uw.S.factions[v.fac]; f.rel = Math.max(-100, f.rel - 6); this.uw.gangs.provoke(v.fac, GANG_AGGRO.car, v.pos.x, v.pos.z); this.ui.toast(`That was a ${FACTIONS[v.fac].short} car. They’ll hear about it.`, 'warn'); }
     }
     v.driver = 'player'; v.drive = null; v.ai = null; v.mode = 'phys'; v.sleep = false; v.parked = false; v.touched = true;
     v.ctl.handbrake = false; v.siren = false;
@@ -54855,7 +55126,7 @@ const GAME_CONFIG = Object.freeze({
   props: PROP_DEFS,
   economy: { upgrades: UPGRADES, arms: ARMS, dealer: DEALER, tuning: TUNE, tuningRep: TUNE_REP, store: STORE_ITEMS, reputation: REP_LEVELS },
   underworld: { goods: GOODS, tiers: TIERS, demand: DEMAND, nightDemand: NIGHT_DEMAND, turfNames: TURF_NAMES, factions: FACTIONS, startOwner: START_OWNER, stages: STAGES,
-    properties: PROPS, spots: SPOTS, hqs: HQS, chopValue: CHOP_VALUE, trunkCap: TRUNK_CAP, crewRoles: CREW_ROLES, ranks: RANKS, promoCost: PROMO_COST, traits: TRAITS,
+    properties: PROPS, spots: SPOTS, hqs: HQS, chopValue: CHOP_VALUE, trunkCap: CARGO_LB, cargoLb: CARGO_LB, goodClb: GOOD_CLB, crewRoles: CREW_ROLES, ranks: RANKS, promoCost: PROMO_COST, traits: TRAITS,
     officers: OFFICERS, jailSecPerDay: JAIL_SEC_PER_DAY, jailStreetRatio: JAIL_STREET_RATIO, jailSpeeds: JAIL_SPEEDS, sentenceFactor: SENTENCE_FACTOR, chorePts: CHORE_PTS, sentenceBase: SENTENCE_BASE, sentenceMax: SENTENCE_MAX, inmates: INMATES, crimeDays: CRIME_DAYS, crimePressure: CRIME_PRESSURE },
   content: { contacts: CONTACTS, sideJobNames: MISSION_NAMES, arcs: ARCS, campaign: CAMPAIGN, races: RACES, events: EVENT_TYPES,
     interiors: INTERIOR_DEFS, outfits: OUTFITS, achievements: ACHIEVEMENTS, secrets: SECRETS, policePosts: POSTS }
@@ -54873,7 +55144,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, royaleSpin, royaleChances, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

@@ -118,7 +118,7 @@ check('Property app fits a phone (no sideways scroll, 44 px controls)', !app.ove
 
 // save, reload and a v5 save with owned homes
 const sv = await ev(() => { const g = window.game; g.uw.S.props.sig_crest = { owned: true, dmg: 0, since: 1, lvl: 1 }; g.saveGame(true); const d = window.__pv.SaveSystem.load().data; return { owns: !!(d.uw.props.sig_crest && d.uw.props.sig_crest.owned) && !!d.uw.props.double5.owned, v: d.version }; });
-check('owned homes survive save and reload', sv.owns && sv.v === 6, JSON.stringify(sv));
+check('owned homes survive save and reload', sv.owns && sv.v === 7, JSON.stringify(sv));
 const mig = await ev(() => {
   const SS = window.__pv.SaveSystem, raw = JSON.parse(localStorage.getItem('pvunderworld.save.v1'));
   raw.version = 5; raw.uw.props = { linden: { owned: true, dmg: 0, since: 3 }, semi: { owned: true, dmg: 0, since: 4 }, triple2: { owned: true, dmg: 0, since: 9 } };

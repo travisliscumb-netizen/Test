@@ -248,6 +248,57 @@ New suites: `casino`, `camera`, `police`, `homes`, `business`, `dealers`, `stree
 scripts: `frontshots.mjs` (entrances by day, night and rain), `carshots.mjs` (every model side-on and from
 above), `contact.mjs` (labelled contact sheets). `UW_FILE=path` runs any suite against another build.
 
+## v7 pass (schema 7): cargo, inventory transfers, casino balance, gang cooldown
+
+Save key unchanged; v6 saves load and migrate (see below). The master template is untouched.
+
+- **Cargo by weight (`CARGO_LB`, `GOOD_CLB`, `cargoC` / `cargoFit` / `fmtLb`):** every model has its own capacity
+  in pounds, set by its body: supercar/Valkyr 50, Tempest 60, Obsidian 70, Vireo GT 80, Aurel RS 100, Rook Metro
+  110, Monarch 120, Apex 140, Pico 150, Lowline/Revenant 180, Hellion 190, Brakken 200, Corsair 220, Cabline 230,
+  sedans 250-300, Crest 380, Marrow Estate 400, Mesa Trail/Kodiak 450, Bastion SUV 500, Ridgeback pickup 1,000,
+  Workhorse utility 1,250, Vanta Courier 1,500, Haulmark van 2,000, Boxline box truck 5,000. Police cruisers carry
+  nothing. The 13 v6 models used to have no trunk at all. Goods weigh what they are: Green 0.5 lb a lot, Pharma 0.25,
+  Snow 0.1, a hot-goods item or a carton of smokes 1 lb, a hardware unit 5 lb. Weight is counted in hundredths of a
+  pound (integers), so mixed loads never drift, and lots stay whole. Pockets and property stashes keep their space
+  units (the warehouse overhaul is a later pass). Cargo capacity shows on every dealership inspect screen and dealer
+  list, in the garage menu and in the Garage app.
+- **Inventory as a transfer screen (`Underworld.access` / `locations` / `transfer`, `EmpireUI.t_stash`):** the
+  Inventory app shows what is within reach (pockets, the car you are in or beside, the stash of the property you are
+  at, the cars in that property's own garage, a car out front while you are indoors) as bright From/To chips with
+  1 / 5 / 10 / Max buttons in the product's own units (lb or pieces), 46 px tall. Everything else you own is listed
+  below as a dimmed read-only ledger (a stolen car you walked away from shows as "where you left it"). A move is capped
+  by what the source holds and what fits, the cost basis moves with the goods, and a direct move to a place out of reach
+  is refused. Crew runners stay the way to move product across town. A garage sale that would lose cargo is refused
+  with the reason; the chop shop asks before keeping a loaded trunk.
+- **Royale Billions (`ROYALE_MAJORS[].perH`, `ROYALE.fullBet` / `sph`, `royaleRollMajor`, `royaleSeedPressure`):**
+  jackpot odds are tuned to play time (1,300 spins an hour: a spin settles in 1.95 s, measured, plus a tap). At a bet of
+  $1,000 or more the tiers land on average: $10K 1.5/h, $25K 1.0/h, $50K 0.7/h, $100K 0.45/h, $250K 0.25/h,
+  $500K 0.15/h, $1M every 14 h, $5M 20 h, $10M 22 h, $25M 24 h, $50M 25 h, $100M 26 h, $250M 28 h, $1B 30 h.
+  Smaller bets get a proportionally smaller chance ($100 a tenth); very big bets keep the old 12%-of-stake rule as a
+  floor, so the chance never drops for betting more. Every spin rolls every tier in play; nothing caps or schedules a
+  win. The drought pressure is kept (chance × (1 + 4P²)), the base chance is divided by its mean factor so the
+  averages above hold with the pressure included, and a never-played tier starts from a random point of a typical dry
+  spell, so a new save gets the long-run rate from its first hour. The pressure is saved per tier. The INFO panel
+  shows each tier as "on average every X of play" and marks a tier that is due. Line pays, presentation, tables and
+  statistics are unchanged.
+- **Gang aggression (`GANG_AGGRO`, `GangManager.provoke` / `sighting` / `coolDown` / `updateHostility`):** the long-term
+  relationship (`f.rel`) and short-term aggression (`f.aggro`, 0-100, saved) are separate. Only hostile acts raise
+  aggression (a hit, a knock-out, a boss, a stolen faction car or shipment, declaring war), repeat trouble raises it
+  faster, and it cools at 0.35 a second whenever none of that faction's people can see you (a punch cools in ~13 s,
+  a downed boss and three soldiers take ~4-5 minutes). Recognition takes a held look with line of sight: when cold,
+  only an enemy on its own turf, on foot, within 12 m; when hot, any member within 20 m on foot or 9 m in a slow car.
+  Hit squads need high aggression and a sighting in the last 2.5 minutes, spawn near and drive to where you were last
+  seen, lock on only when they spot you, and give up after a short search. A hostile group that has lost you stands down
+  after 12-37 s. A night's sleep clears aggression, never the relationship. The Factions screen says who is hunting you.
+- **Save (schema 7):** faction `aggro` / `trouble` are new (default 0). Trunk contents are unchanged lots with their
+  cost basis (the largest v6 load weighs far less than its car's new capacity). Royale pressure from v6 was counted
+  against the old bet-proportional chances, so it is reset and seeded from the steady state on the next spin;
+  spins, wins, hits and the biggest win are kept.
+
+New suites: `cargo` (capacities, weight, dealership/garage display, reach, transfers, fuzzed conservation, sales,
+save/reload, v6 migration), `gangs` (aggression and cooling, squads and sightings, standing down, recognition, save,
+sleep), `royale-sim` (Monte Carlo of the real slot code in Node, no browser).
+
 ## Tests
 
 The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
@@ -293,12 +344,52 @@ node underworld/tests/business.mjs  # 50 businesses, levels, manager, perks, Bus
 node underworld/tests/dealers.mjs   # roster, three lots, stock, rotation, inspect/buy, showroom glass, drive-out, save
 node underworld/tests/street.mjs    # pickpocket wealth curve, archetypes by district, jackpot rarity
 node underworld/tests/pwa.mjs       # icons at every size, manifest over http, nothing requested from file://
+node underworld/tests/cargo.mjs     # cargo by weight, dealership/garage capacity, reach-based transfers, conservation fuzz, sales, v6 migration
+node underworld/tests/gangs.mjs     # aggression vs relationship, cooling, sightings, squads to last-seen, standing down, recognition, save
+node underworld/tests/royale-sim.mjs # Royale Billions Monte Carlo on the real slot code (Node, 4 workers, ~6 min; QUICK=1 for a short run)
 node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
 ```
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
 
-## Validation record (this pass)
+## Validation record (v7 pass)
+
+Final build `index.html` (schema 7). Every suite runs offline in headless Chromium (SwiftShader), two at a time.
+
+| Suite | Result |
+| --- | --- |
+| cargo (new) | 36 / 36 |
+| gangs (new) | 23 / 23 |
+| royale-sim (new, Node) | 23 / 23 |
+| casino (Royale checks updated for v7) | 39 / 39 |
+| gambling | 57 / 57 alone; 56 / 57 two-at-a-time (the casino fps check, which fails the same way on the v6 build under that load) |
+| inventory | 58 / 58 |
+| arrest 126, business 40, camera 20, city 25, core 64, dealers 34, homes 26, interiors 22, kingpin 6, map 22, money 10, offline 14, phone 71, phoneapps 19, police 13, prison 47, property 33, pwa 5, ramps 21, roads 20, session 33, shooting 37, smoke 16, soak 22 (CYCLES=6), stations 17, street 11, stress 30, survival 9, taxi 20, tutorial 13, ui 23, vehicles 39 | all passed |
+
+Timing-sensitive checks seen once under load (both pass on a re-run, and neither touches code changed here): gambling
+"casino interior renders without a frame-rate collapse", gambling "reload at the poker table" (asserts at most one
+blind was posted before the save; seat rotation sometimes posts two), casino "poker: ~60-68% of played hands win"
+(a 1,500-hand random sample; 58.3% once, 63.9-64.5% on re-runs of both builds).
+
+Royale Billions, measured (`royale-sim`, 208M spins of the jackpot roll at $1,000 plus 11.7M full spins):
+
+| | measured |
+| --- | --- |
+| $1B | every 29.9 h on average (5,359 hits in 160,000 h); median gap 26.8 h; 99th percentile 74 h |
+| 30 h of play | no $1B 25.3% · one 53.1% · two 17.6% · three or more 3.9%; a fresh save's first 30 h average 0.995 |
+| 7 h of play | no $1M+ 6.8% · one 20.0% · two 27.2% · three or more 46.0% |
+| $1M+ / $10M+ / $100M+ | every 2.8 h / 4.3 h / 9.3 h |
+| 1-hour session at $1,000 | median +$301K, mean +$51.5M; 93.5% profitable; 39.2% of spins pay nothing; line game alone 98.0%; a $10K-$500K prize in 99.6% of sessions |
+| 1-hour session at $100 | median +$1.8K; 56.7% profitable; a $10K-$500K prize in 35.1% of sessions |
+| seen, not forced | $1B in the first hour (8 of 400 players), two $1B in the same hour (49), on consecutive days (77), a $250M within an hour after a $1B (203), jackpots on back-to-back spins (87 sessions) |
+| droughts | no $1B for 30 / 60 / 90 h: 25.4% / 1.8% / <0.1% (without the pressure: 35.6% / 12.7% / 4.5%) |
+
+Performance (`tests/perf.mjs`, desktop profile, low quality, four runs per build): game-logic update in a calm scene
+0.84-1.08 ms (v6) and 0.98-1.30 ms (v7), inside the probe's run-to-run noise; draw calls 116-120 on both. The new
+per-frame work is a five-faction aggression decay; sight checks run at most every 0.3-0.6 s; `royaleChances` is now
+memoised per bet (cheaper than before).
+
+## Validation record (schema 5 pass)
 
 Every suite runs offline in headless Chromium with SwiftShader. Results below are for the final
 build of this pass (`index.html`, 2767538 bytes, schema 5). A full run of all 26 suites, two at
