@@ -56,17 +56,23 @@ check('lawyer: one hearing a month, each firm once per sentence', law.waiting.pa
 // bribes: success, refusal, backfire
 const bribe = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, R = Math.random, out = {};
-  g.money.W.dirty.me = Math.max(g.money.W.dirty.me, 50000); // the arrest took the cash you carried; bribes are Dirty Cash
-  const go = (r, act) => { j.lastBribe = -99; P.openGuard(); const m0 = g.money.total(), t0 = j.total, s0 = j.susp; Math.random = () => r; g.content._svcAct(act); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.money.total(), days: j.total - t0, susp: j.susp - s0, lock: P.locked() }; };
+  // the arrest took the cash you carried. Outside Dirty Cash reaches a guard only through a courier from your crew;
+  // the $500 favour comes from the commissary (§45.22)
+  g.money.W.dirty.me = Math.max(g.money.W.dirty.me, 50000); j.commissary = 1000;
+  const go = (r, act) => { j.lastBribe = -99; P.openGuard(); const m0 = g.money.total(), c0 = j.commissary, t0 = j.total, s0 = j.susp; Math.random = () => r; g.content._svcAct(act); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.money.total(), fromCommissary: c0 - j.commissary, days: j.total - t0, susp: j.susp - s0, lock: P.locked() }; };
+  g.uw.S.crew = g.uw.S.crew.filter(c => c.status !== 'active');
+  j.susp = 0; out.noCourier = go(0.01, 'paper');
+  const c = g.uw.crew.genCandidate(); c.id = g.uw.S.nextCrew++; g.uw.S.crew.push(c); out.courier = c.name;
   j.susp = 0; out.ok = go(0.01, 'paper');
   j.susp = 0; out.refuse = go(P.bribeOdds('perk').ok + 0.01, 'perk');
   j.susp = 0; out.back = go(0.999, 'perk');
   j.lockUntil = 0;
   return out;
 });
-check('bribe: lost paperwork takes time off what is left', bribe.ok.paid > 0 && bribe.ok.days < 0, JSON.stringify(bribe));
+check('bribe: with no crew on the street, outside money cannot reach the guard', bribe.noCourier.paid === 0 && bribe.noCourier.days === 0, JSON.stringify(bribe.noCourier));
+check('bribe: lost paperwork, paid with outside money a crew member brings in, takes time off what is left', bribe.ok.paid > 0 && bribe.ok.days < 0 && !!bribe.courier, JSON.stringify(bribe));
 check('bribe: refusal costs nothing but raises suspicion', bribe.refuse.paid === 0 && bribe.refuse.days === 0 && bribe.refuse.susp > 0, JSON.stringify(bribe));
-check('bribe: backfire loses the money, adds time and a lockdown', bribe.back.paid === 500 && bribe.back.days > 0 && bribe.back.susp >= 30 && bribe.back.lock > 0, JSON.stringify(bribe));
+check('bribe: the $500 favour comes from the commissary; a backfire loses it, adds time and a lockdown', bribe.back.paid === 0 && bribe.back.fromCommissary === 500 && bribe.back.days > 0 && bribe.back.susp >= 30 && bribe.back.lock > 0, JSON.stringify(bribe));
 
 // work, cards, inmates (time passes during these)
 const work = await ev(() => {
@@ -134,7 +140,7 @@ check('misbehaviour costs points and drops the speed tier (50→25: 2×, →5: 1
 const ph = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, R = Math.random, out = {};
   P.openSmokey(); out.smokey = !/data-act="phone"/.test(document.getElementById('svcBody').innerHTML); while (g.ui.stack.length) g.ui.back();
-  j.susp = 0; const o = P.bribeOdds('phone'); out.odds = o; g.money.W.clean = g.money.W.dirty.me = Math.max(g.money.total(), 100000);
+  if (!P.courier()) { const c = g.uw.crew.genCandidate(); c.id = g.uw.S.nextCrew++; g.uw.S.crew.push(c); } j.susp = 0; const o = P.bribeOdds('phone'); out.odds = o; g.money.W.clean = g.money.W.dirty.me = Math.max(g.money.total(), 100000);
   const go = r => { j.lastBribe = -99; j.lockUntil = 0; P.openGuard(); const m0 = g.money.total(), t0 = j.total, gb = j.gbp; Math.random = () => r; g.content._svcAct('phone'); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.money.total(), days: j.total - t0, phone: j.phone, gbp: j.gbp - gb, lock: P.locked() }; };
   j.gbp = 40; j.susp = 0; out.refuse = go(o.ok + 0.01);
   j.susp = 0; out.caught = go(0.999);
@@ -151,7 +157,7 @@ check('the odds are a real three-way split (success, refusal, caught all possibl
 // the walk-out bribe
 const rb = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, out = {};
-  j.total = j.served + 200; j.floor = 1; (g.money.W.clean = g.money.W.dirty.me = 1e6); const base = P.releaseBase();
+  if (!P.courier()) { const c = g.uw.crew.genCandidate(); c.id = g.uw.S.nextCrew++; g.uw.S.crew.push(c); } j.total = j.served + 200; j.floor = 1; (g.money.W.clean = g.money.W.dirty.me = 1e6); const base = P.releaseBase();
   out.at1 = P.releaseOdds(base); out.at4 = P.releaseOdds(base * 4); out.half = P.releaseOdds(base / 2);
   const offer = 50000;
   j.lastRelease = -99; P.openGuard(); let m0 = g.money.total(), t0 = j.total; let r = P.releaseBribe(offer, () => P.releaseOdds(offer).ok + 0.01);
@@ -202,7 +208,7 @@ check('serve the time and you walk out: back on the street, no jail panel, no fu
 // a walk-out that works: released at once, the offer paid
 await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(2); g.onBusted(); });
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
-const walk = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; (g.money.W.clean = g.money.W.dirty.me = 200000); j.lastRelease = -99; j.lockUntil = 0; const m0 = g.money.total(); const r = P.releaseBribe(20000, () => 0); return { r, paid: m0 - g.money.total(), phone: j.phone }; });
+const walk = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; if (!P.courier()) { const c = g.uw.crew.genCandidate(); c.id = g.uw.S.nextCrew++; g.uw.S.crew.push(c); } (g.money.W.clean = g.money.W.dirty.me = 200000); j.lastRelease = -99; j.lockUntil = 0; const m0 = g.money.total(); const r = P.releaseBribe(20000, () => 0); return { r, paid: m0 - g.money.total(), phone: j.phone }; });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 check('walk-out bribe: success pays the offer and releases you at once (a new sentence starts with no phone)', walk.r === 'release' && walk.paid === 20000 && walk.phone === false, JSON.stringify(walk));
 

@@ -22,15 +22,18 @@ There are two currencies (`src/game/035-core-money.js`, the `Money` ledger, the 
 
 - **Dirty Cash** is physical. It is on you, in a car, in a safehouse stash or in a warehouse vault, and you move it by
   hand in the phone's Inventory (pockets ↔ car ↔ stash, within reach). Crime pays it to you; empire income (dealers,
-  territory tax, tribute, bounties) is delivered to your warehouse vault or safehouse. An arrest takes the cash on you
+  territory tax, tribute, bounties) is delivered to the operation's warehouse, else your Treasury Warehouse, else
+  your home safehouse, and only then to you. Selling a stolen car pays Dirty Cash. An arrest takes the cash on you
   and in the car you were caught in; stashes, vaults and the bank are safe.
 - **Clean Bank** is business income, legal car sales, stunt cash (capped at $1,500 a day for repeatable stunts) and
   casino winnings. Property, licensed dealers and garages, shop goods, Training, lawyers and the casino are paid from
-  it. A hospital bill the bank can't cover becomes medical debt (at most one bill), repaid from the next Clean income.
+  it. The hospital bill is 10% of the bank (at least $1,000, at most $25,000); what the bank can't cover becomes
+  medical debt (at most one bill), repaid from the next Clean income.
 
-Wages, crew fees, police payroll and jail bribes come out of Dirty Cash in this order: warehouse vaults, safehouses,
-then what you carry, never the bank (Crew shows the reserve and days covered). Jail work and the jail dice table use
-a separate commissary account. `MONEY_SOURCES` maps every source of income and every cost to its currency; the HUD
+Wages, crew fees and police payroll come out of Dirty Cash in this order: warehouse vaults, safehouses, then what you
+carry, never the bank (Crew shows the reserve and days covered). In jail, the commissary account (earned by jail work
+and the dice table) pays small favours and contraband; bigger bribes need outside money brought in by a crew member
+still on the street. `MONEY_SOURCES` maps every source of income and every cost to its currency; the HUD
 shows cash on you and `BANK` beneath it. The save key is unchanged; schema 8 moves an older save's single balance
 into Clean Bank.
 

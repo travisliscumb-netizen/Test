@@ -48,7 +48,7 @@ Money does not buy Rank, Reputation, turf, contacts, crew loyalty, or political 
 
 ## 2. MONEY — DIRTY CASH + CLEAN BANK
 
-> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17-§45.21 (classifications, stunt cap, medical debt, payroll).
+> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17-§45.21 (classifications, stunt cap, medical debt, payroll), §45.22 (remote income routing, hospital bill, jail money, stolen-car sale).
 
 
 Replace the single-money model.
@@ -212,7 +212,7 @@ This does not make it immune to exceptional threats such as a special gang-war a
 
 ## 7. WAREHOUSE DIRTY-CASH VAULT
 
-> Amended by §45.1 (no carry cap).
+> Amended by §45.1 (no carry cap) and §45.22 (operation warehouse and Treasury Warehouse receive remote Dirty income).
 
 
 The player can deposit/withdraw Dirty Cash at warehouses.
@@ -548,7 +548,7 @@ Active pursuit is separate from longer investigative case/heat.
 
 ## 24. COURT / LEGAL / JAIL
 
-> Amended by §45.8 (jail income farming prevented through operational efficiency).
+> Amended by §45.8 (jail income farming prevented through operational efficiency) and §45.22 (commissary for jail spending; outside money only through a plausible channel).
 
 
 Police handles arrest/evidence/charges. Court handles outcome/sentence/legal defense/corruption.
@@ -652,7 +652,7 @@ Casino expands into multi-room complex: central floor, sportsbook, VIP/high-roll
 
 ## 26. BUSINESSES / LAUNDERING
 
-> Amended by §45.6 (early laundering fixer) and §45.7 (gradual influence).
+> Amended by §45.6 (early laundering fixer) and §45.7 (gradual influence); §45.22 moves the fixer to immediately after Session 2.
 
 
 Businesses produce Clean Bank, have operating costs, may act as laundering fronts, may use managers, and continue operating while player is jailed.
@@ -1126,3 +1126,22 @@ Where these conflict with an earlier section, **this section wins**. Each affect
     Clean → Dirty conversion: Clean money does not become dirty merely because it is withdrawn. Crew wages remain
     Dirty Cash with no silent Clean fallback. A front/business payroll mechanism for covering criminal wages from
     Clean Bank, if it would improve the game, must be raised as a design challenge, not added silently.
+22. **Session 1 follow-up (DC-22, DC-23, DC-24).**
+    - **Remote Dirty income routing (DC-22, approved with refinement).** Dirty income the player does not collect
+      in person lands, in order: (1) the warehouse assigned to the operation that produced it, where applicable;
+      (2) the player-designated **Treasury Warehouse**; (3) the primary safehouse/home; (4) carried cash, only as
+      the last fallback. "First warehouse purchased" is not a treasury rule. The player must be able to designate
+      (and change) the Treasury Warehouse; that designation UI lands with the warehouse rebuild.
+    - **Early laundering fixer timing (DC-23, approved).** The §45.6 fixer is built immediately after Session 2,
+      before the warehouse and vehicle sessions. Stolen-car resale is not a laundering route: a known-stolen car
+      sold before HOT exists pays Dirty Cash (or is blocked), never Clean Bank.
+    - **In-person criminal purchases (DC-24, approved).** The Armorer and suppliers take carried Dirty Cash only.
+    - **Phone-placed crew expenses (DC-24, approved).** Hiring, promotions, bonuses, police payroll and delivery
+      fees draw Dirty Cash in the §45.21 payroll order.
+    - **Hospital bill (DC-24, revised).** The bill is max($1,000, 10% of Clean Bank), capped at $25,000. §45.20
+      still applies: Clean Bank only, the shortfall becomes medical debt capped at one outstanding bill.
+    - **Money in jail (DC-24, outside-stash access rejected).** Jail bribes and contraband do not draw freely on
+      the player's outside stashes. The commissary balance pays ordinary jail spending (small guard favours,
+      contraband from inmates, jail gambling). Outside Dirty Cash reaches the jail only through a plausible
+      channel: a crew member, contact, guard, inmate favour or smuggling route; with no such channel, outside
+      money is unavailable.

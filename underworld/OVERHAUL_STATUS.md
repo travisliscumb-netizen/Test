@@ -11,9 +11,44 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **1 — Save schema + money foundation** (handoff phase 2), following §45.1–§45.21.
-- Commit/base revision: `53370ad` (final classification rulings) → the Session 1 commit on `claude/practical-lamport-zld81y`.
+- Session: **1 — Save schema + money foundation** (handoff phase 2), following §45.1–§45.22, including the
+  Session 1 follow-up commit for the DC-22 / DC-23 / DC-24 rulings (§45.22).
+- Commit/base revision: `53370ad` (final classification rulings) → `a14aae0` (Session 1) → the Session 1 follow-up
+  commit on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-20
+
+## Session 1 follow-up (§45.22: DC-22, DC-23, DC-24 rulings)
+
+- **Remote Dirty income routing (DC-22).** `Money.stashFor(op)` now routes, in order: the warehouse assigned to the
+  operation (`opts.op`, where the caller knows it), the designated Treasury Warehouse (`wallet.treasury`), the
+  primary safehouse (`save.home` if it is an owned safehouse, else the most valuable owned safehouse), and only
+  then cash on you. "First warehouse owned" is gone. `Money.treasury` / `Money.setTreasury(id | null)` validate that
+  the id is a warehouse you own; selling it clears the designation (sanitize drops any id that is not an owned
+  warehouse). **Not built yet:** the player-facing control to designate the Treasury Warehouse, which lands with the
+  warehouse rebuild (Session 3), and per-operation warehouse assignment, which needs supply chains (Session 3).
+  Until then, with no treasury set, remote Dirty income goes to the primary safehouse.
+- **Stolen-car sale (DC-23).** Selling a garage car whose origin is `stolen` now pays Dirty Cash on you (new
+  source `stolenCarSale`), not Clean Bank; the confirm text says so. Bought, reward, found and mission cars still
+  sell to Clean Bank. This closes the interim Dirty → Clean loophole noted in Session 1.
+- **Hospital bill (DC-24, revised).** `Money.hospitalBill(discount)` = max($1,000, 10% of Clean Bank), capped at
+  $25,000, then the Medic perk discount. Config: `CONFIG.hospital { min, max, share }` (replaces
+  `medicalDebtCap`). Medical debt is still capped at one outstanding bill (§45.20), now up to $25,000.
+- **Money in jail (DC-24).** The commissary (`uw.jail.commissary`, earned by jail work and the dice table) pays
+  ordinary jail spending: the $500 guard favour, Smokey's filed screwdriver ($1,500) and cartons ($200). Outside
+  Dirty Cash reaches the jail only through a courier, a crew member still on the street (Bodyguard, else
+  Lieutenant, else any active crew); it is drawn in payroll order. The paperwork bribe, the smuggled phone and the
+  release offer need a courier; with no crew outside they are disabled, and the guard screen says why. The
+  `contraband` source tag is removed. Contacts, guards, inmate favours and smuggling routes as further channels
+  belong to the jail rebuild (Session 8).
+- **Unchanged and approved:** Armorer and suppliers take carried Dirty Cash only; phone-placed crew expenses use
+  the payroll order.
+- **Session order:** the early laundering fixer is now **Session 2.5**, immediately after Session 2 and before the
+  warehouse and vehicle sessions (prompt added to `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`).
+- **Tests:** `ledger` 51 checks (new: treasury routing and validation, the hospital formula at the floor, mid-range
+  and cap, the stolen-car garage sale paying Dirty, commissary favour, paperwork refused with no courier and paid
+  through one); `prison` 48 checks (crew courier set up for the outside-money bribes; Smokey from the commissary).
+  Re-run on the follow-up build: ledger 51/51, prison 48/48, property 33/33, homes 26/26, session 34/34, smoke
+  16/16, money 10/10, static-money 7/7, build 5/5.
 
 ## Completed this session (1)
 
@@ -42,7 +77,8 @@ The mapping stays exact until a session changes the code above that line; after 
     contraband): warehouse vaults → safehouses → cash on you, never the bank (§45.21). The Crew screen shows daily
     payroll, payroll reserve, days covered and the sources in order.
   - Crew theft takes Dirty Cash only from stashes and vaults, never your pockets or the bank (§45.18).
-  - Hospital bill: Clean Bank; the shortfall becomes medical debt, capped at one bill ($1,500), repaid from
+  - Hospital bill: Clean Bank; the shortfall becomes medical debt, capped at one bill ($1,500; revised in the
+    follow-up to max($1,000, 10% of bank) capped at $25,000), repaid from
     incoming Clean first, never touching Dirty Cash, never blocking respawn (§45.20). Shown in the HUD and phone.
   - Stunt cash: Clean Bank; repeatable stunts capped at $1,500 per in-game day; a first unique jump's $500 pays in
     full (§45.19). Repeat-farming Rep diminishing returns are not built yet (deferred, "if needed").
@@ -191,9 +227,13 @@ string compare for the HUD bank line.
 
 ## Known bugs / risks (1)
 
-- **Interim Clean Bank bootstrap is thin until the laundering fixer exists** (DC-23): early Clean comes from
-  capped stunt cash and from selling a car you park (any garage car counts as legal until HOT arrives in
-  Session 5, which is a small temporary Dirty → Clean route).
+- **Interim Clean Bank bootstrap is thin until the laundering fixer exists** (DC-23, now Session 2.5): early Clean
+  comes from capped stunt cash and from selling bought, reward or found cars. The stolen-car loophole is closed in
+  the follow-up (a stolen car sells for Dirty).
+- **A garage car's origin is the only "known stolen" signal before HOT.** Entries from older saves without an
+  origin are sanitized to `bought` (pre-existing rule), so a stolen car parked before the origin field existed
+  would still sell Clean. Development saves only; production starts a fresh career (§45.2).
+- **No Treasury Warehouse control yet** (DC-22): the API exists, the UI lands in Session 3.
 - **The day-length setting still scales per-real-hour income** (§45.9, DC-06): not addressed in Session 1; the
   ledger is world-time agnostic, so the fix lands with the income systems (Sessions 3 and 9).
 - The casino still says "No table limits" and keeps its player-favoured odds; only its currency changed.
@@ -205,7 +245,7 @@ string compare for the HUD bank line.
 **Session 2 — Rank / Reputation / core progression** (prompt Session 2, handoff phase 3), with DC-04/§45.7
 (business influence only once established), DC-10/§45.13 (authoritative turf owner, explicit takeover), removal of
 the `REP_LEVELS` ladder and the Handling / Cooldown / old Armor upgrades (§45.12), and a Nobody → City Kingpin
-dependency test. Before it starts, rule on DC-22 and DC-23 (below).
+dependency test. Then **Session 2.5 — the early laundering fixer** (§45.22).
 
 ## Working tree / commit state (1)
 
@@ -825,7 +865,7 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
    buildings or the Fuel & Go stores).
 7. **Severity:** RECOMMENDED. **Blocks:** Session 1 (payroll source order and the withdrawal API).
 
-### DC-22 · Where passive criminal income is delivered — RECOMMENDED (implemented as a default in Session 1; needs a ruling)
+### DC-22 · Where passive criminal income is delivered — APPROVED WITH REFINEMENT (§45.22; implemented in the Session 1 follow-up)
 
 1. **Current specification:** §2 says criminal activity produces Dirty Cash and where it can be kept; §8 describes
    the mature loop ending in "cash"; nothing says where income you don't collect in person (dealer sales, territory
@@ -842,7 +882,11 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
 6. **Tradeoffs / risks:** a player with no property still receives it on their person (nowhere else to go).
 7. **Severity:** RECOMMENDED. **Blocks:** nothing now; confirm before Session 3.
 
-### DC-23 · Bring the laundering fixer forward — RECOMMENDED (follows from Session 1)
+**Disposition:** approved with refinement (§45.22). Order: the operation's assigned warehouse → the player-designated
+Treasury Warehouse → the primary safehouse/home → carried cash as the last fallback. "First warehouse purchased" is
+not a treasury rule. Treasury designation UI: Session 3.
+
+### DC-23 · Bring the laundering fixer forward — APPROVED (§45.22; scheduled as Session 2.5)
 
 1. **Current specification:** §45.6 adds an early laundering fixer at ~30–35%; the session plan puts laundering in
    Session 9.
@@ -860,7 +904,10 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
 6. **Tradeoffs / risks:** pulls a small piece of Session 9 forward; Session 9 then adds fronts and supersedes it.
 7. **Severity:** RECOMMENDED. **Blocks:** nothing; best done before Session 5.
 
-### DC-24 · Implementation choices in Session 1 that change feel slightly — OPTIONAL (for review, all reversible in one table entry)
+**Disposition:** approved (§45.22). The fixer comes immediately after Session 2, before warehouses and vehicles.
+Stolen-car resale must not launder: a known-stolen car sold before HOT pays Dirty (done in the follow-up).
+
+### DC-24 · Implementation choices in Session 1 that change feel slightly — RULED (§45.22; two approved, one revised, one rejected)
 
 - **In-person criminal purchases take only the cash on you.** The Armorer, suppliers, race buy-ins and boss
   envelopes don't reach into the car beside you; move the cash first (one tap in Inventory). Alternative: let them
@@ -872,6 +919,11 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
 - **Jail bribes and contraband are paid from your stash outside** (the arrest emptied your pockets), in payroll
   order. Alternative: commissary only, which would make most of them unaffordable.
 
+**Disposition (§45.22):** carried-only Armorer/suppliers: approved. Payroll order for phone crew expenses:
+approved. Hospital bill: revised to max($1,000, 10% of Clean Bank), capped at $25,000. Jail spending from the
+outside stash: rejected as free access; the commissary pays ordinary jail spending, and outside Dirty Cash comes
+in only through a plausible channel (implemented: a crew courier; more channels in Session 8).
+
 ## Owner decisions (Session 0 review)
 
 The owner's decisions are recorded as authoritative amendments in `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md` §45
@@ -882,7 +934,7 @@ The owner's decisions are recorded as authoritative amendments in `docs/THE_UNDE
 - Q3 → §45.6: laundering fixer at ~30–35%.
 - Q4 → §45.2: dev-save money migrates to Clean Bank.
 - Q5 → §45.3: Session 0.5 module split, done before Session 1.
-- Q6 → §45.14: still open. The classification table (Appendix B) must be reviewed before any income behavior changes.
+- Q6 → §45.14, closed by §45.17–§45.21; Session 1 follow-ups by §45.22. (At Session 0 it was still open: the Appendix B table had to be reviewed before any income behavior changed.)
 
 ## Open questions for the owner (original, kept for the record)
 
@@ -1290,3 +1342,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | — | 0 | no change |
 | — | 0.5 | no change (source split only; `index.html` byte-identical) |
 | 8 | 1 | `money` → `wallet` (Clean Bank, medical debt, Dirty Cash by place, stunt cap counter); pre-merge migration of a dev save's balance into Clean Bank; `uw.jail.commissary`; `uw.st.seizedCash`; `uw.st.mugs` no longer created |
+| 8 | 1 follow-up | `wallet.treasury` (warehouse id or null; sanitized to an owned warehouse); medical debt cap follows `CONFIG.hospital.max` ($25,000) |

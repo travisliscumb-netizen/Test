@@ -55,7 +55,7 @@ const bad = await ev(() => { const g = window.game, M = g.money, before = JSON.s
   return r; });
 check('negative, NaN, infinite, absurd and zero amounts are refused and change nothing', bad.earn.every(x => x === 0) && bad.pay.every(x => x === 0) && bad.same, JSON.stringify(bad));
 check('an unknown money source is a programming error, not a silent write', bad.threw === 2, String(bad.threw));
-check('a corrupt wallet loads clean: negatives, NaN, infinities, unknown places dropped', bad.sane === JSON.stringify({ v: 1, clean: 0, debt: 0, dirty: { me: 0, veh: { 8: 100 }, prop: { linden: 40 } }, stunt: { day: -1, paid: 0 } }), bad.sane);
+check('a corrupt wallet loads clean: negatives, NaN, infinities, unknown places dropped', bad.sane === JSON.stringify({ v: 1, clean: 0, debt: 0, treasury: null, dirty: { me: 0, veh: { 8: 100 }, prop: { linden: 40 } }, stunt: { day: -1, paid: 0 } }), bad.sane);
 
 // ---------------------------------------------------------------- 5. deposit, withdraw and transfer at a safehouse (through the phone's Inventory)
 await ev(() => { const g = window.game, M = g.money; M.W.clean = 1e6; M.W.dirty.me = 50000; M.W.dirty.prop = {}; g.save.rep = 500; g.uw.computeInfluence(); const r = g.uw.props.buy('flop'); window.__flop = r; const L = g.uw.loc('prop', 'flop'); g.resetPlayerState(L.x, L.z, 0); });
@@ -102,12 +102,18 @@ const jail = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S
   r.commissary0 = j.commissary; j.lastJob = -99; P.openWork(); g.content._svcAct('laundry');
   for (let n = 0; n < 60 * 8; n++) g.update(1 / 60, 1 / 60);
   r.commissary1 = j.commissary; r.street = M.dirtyTotal() + M.clean;
-  // a guard bribe is paid from your stash outside (the arrest emptied your pockets)
-  j.lastBribe = -99; j.lockUntil = 0; P.openGuard(); const st0 = M.dirtyAtProp('flop'); const R = Math.random; Math.random = () => 0.01; g.content._svcAct('perk'); Math.random = R; while (g.ui.stack.length) g.ui.back();
-  r.bribeFromStash = st0 - M.dirtyAtProp('flop');
+  // everyday jail spending is the commissary; outside Dirty Cash only through a courier from your crew (§45.22)
+  const R = Math.random, act = k => { j.lastBribe = -99; j.lockUntil = 0; P.openGuard(); Math.random = () => 0.01; g.content._svcAct(k); Math.random = R; while (g.ui.stack.length) g.ui.back(); };
+  j.commissary = 600; const st0 = M.dirtyAtProp('flop'); act('perk');
+  r.perk = { commissary: j.commissary, stash: st0 - M.dirtyAtProp('flop') };
+  g.uw.S.crew = []; j.total = j.served + 60; const t0 = j.total; act('paper'); /* lost paperwork needs 8+ days left */ r.noCourier = { stash: st0 - M.dirtyAtProp('flop'), days: t0 - j.total };
+  const c = g.uw.crew.genCandidate(); c.id = g.uw.S.nextCrew++; g.uw.S.crew.push(c); j.bribed = false; act('paper');
+  r.courier = { stash: st0 - M.dirtyAtProp('flop'), days: t0 - j.total, me: M.onMe };
   P.release(); return r; });
 check('jail work pays the commissary account, not street money (§45.18)', jail.commissary0 === 0 && jail.commissary1 > 0, JSON.stringify(jail));
-check('a guard bribe in jail comes out of your Dirty Cash stash', jail.bribeFromStash === 500, JSON.stringify(jail));
+check('the $500 guard favour is paid from the commissary, not from your stash', jail.perk.commissary === 100 && jail.perk.stash === 0, JSON.stringify(jail.perk));
+check('with nobody from your crew on the street, outside money cannot reach a guard', jail.noCourier.stash === 0 && jail.noCourier.days === 0, JSON.stringify(jail.noCourier));
+check('a crew member outside can carry a paperwork bribe in from your stash', jail.courier.stash >= 2000 && jail.courier.days > 0 && jail.courier.me === 0, JSON.stringify(jail.courier));
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 
 // ---------------------------------------------------------------- 7. payroll order and crew theft (§45.18, §45.21)
@@ -116,14 +122,19 @@ const pay = await ev(() => { const g = window.game, uw = g.uw, M = g.money, S = 
   M.W.dirty.prop = { whse_w: 300, flop: 400 }; M.W.dirty.me = 500; M.W.clean = 9999;
   r.sources = M.payrollSources().map(s => s.key);
   r.paid = M.pay(1000, 'wages', { partial: true }); r.after = { ...M.W.dirty.prop, me: M.onMe, clean: M.clean };
-  r.passive = (M.earn(250, 'royalty'), M.dirtyAtProp('whse_w'));
+  r.passive = { noTreasury: (M.earn(250, 'royalty'), [M.dirtyAtProp('whse_w'), M.dirtyAtProp('flop')]) };
+  r.passive.badTreasury = M.setTreasury('flop'); r.passive.setOk = M.setTreasury('whse_w');
+  r.passive.treasury = (M.earn(100, 'tribute'), M.dirtyAtProp('whse_w'));
+  M.setTreasury(null); r.passive.op = (M.earn(40, 'dealers', { op: 'whse_w' }), M.dirtyAtProp('whse_w'));
   M.W.dirty.prop = { whse_w: 1000, flop: 1000 }; M.W.dirty.me = 777; M.W.clean = 555;
   r.theft = M.crewTheft(0.12, 0, 60000); r.afterTheft = { ...M.W.dirty.prop, me: M.onMe, clean: M.clean };
   // the Crew screen shows payroll, reserve, days covered and the sources
   uw.ui.open('crew'); const body = document.getElementById('empBody').innerHTML; r.ui = ['Daily payroll', 'Payroll reserve', 'Days covered', 'Paid from, in order'].every(t => body.includes(t));
   return r; });
 check('payroll draws warehouse vaults, then safehouses, then your pockets, and never the bank', pay.sources.join() === 'p:whse_w,p:flop,me' && pay.paid === 1000 && pay.after.whse_w === undefined && pay.after.flop === undefined && pay.after.me === 200 && pay.after.clean === 9999, JSON.stringify(pay));
-check('passive criminal income goes to the warehouse vault', pay.passive === 250, JSON.stringify(pay));
+check('remote income with no Treasury designated goes to your primary safehouse, not to a warehouse you merely own', pay.passive.noTreasury[0] === 0 && pay.passive.noTreasury[1] === 250, JSON.stringify(pay.passive));
+check('only a warehouse can be the Treasury; once designated, remote income goes there', pay.passive.badTreasury !== '' && pay.passive.setOk === '' && pay.passive.treasury === 100, JSON.stringify(pay.passive));
+check('income from an operation goes to the warehouse running it first', pay.passive.op === 140, JSON.stringify(pay.passive));
 check('crew theft only takes Dirty Cash from stashes, never your pockets or the bank', pay.theft === 240 && pay.afterTheft.me === 777 && pay.afterTheft.clean === 555 && pay.afterTheft.whse_w + pay.afterTheft.flop === 1760, JSON.stringify(pay));
 check('the Crew screen shows daily payroll, reserve, days covered and the sources', pay.ui, '');
 
@@ -134,12 +145,14 @@ const med = await ev(() => { const g = window.game, M = g.money, r = {};
   r.capped = (M.pay(1500, 'hospital'), M.debt);
   M.earn(1000, 'business'); r.repaid = [M.debt, M.clean];
   for (let n = 0; n < 5; n++) g.update(1 / 60, 1 / 60); r.hud = document.getElementById('bank').textContent;
+  const keep = M.W.clean; r.bills = [0, 50000, 1e9].map(v => { M.W.clean = v; return M.hospitalBill(); }); M.W.clean = keep;
   M.W.stunt = { day: -1, paid: 0 }; r.stunt = [M.earn(1000, 'stunt'), M.earn(1000, 'stunt'), M.earn(1000, 'stunt'), M.earn(500, 'stuntMilestone')];
   return r; });
 check('a hospital bill the bank cannot cover becomes medical debt; Dirty Cash is never touched', med.paid === 300 && med.state[0] === 0 && med.state[1] === 1200 && med.state[2] === 5000, JSON.stringify(med));
 check('medical debt is capped at one bill', med.capped === 1500, JSON.stringify(med));
 check('incoming Clean income repays the debt first', med.repaid[0] === 500 && med.repaid[1] === 0, JSON.stringify(med));
 check('the HUD shows the debt next to the bank', /DEBT \$500/.test(med.hud), med.hud);
+check('the hospital bill is max($1,000, 10% of the bank), capped at $25,000', med.bills.join() === '1000,5000,25000', JSON.stringify(med.bills));
 check('repeatable stunt cash is capped per day ($1,500); a milestone pays in full', med.stunt.join() === '1000,500,0,500', JSON.stringify(med.stunt));
 
 // ---------------------------------------------------------------- 8b. cash in a car you own lives in the wallet by garage uid
@@ -151,6 +164,15 @@ const owned = await ev(() => { const g = window.game, M = g.money, r = {};
 check('a stolen car you park keeps its cash, now saved with the car in your garage', owned.adopted[0] === 650 && owned.adopted[1] === false, JSON.stringify(owned));
 check('caught in a car you own: its cash is seized with yours', owned.seized === 750 && owned.after[0] === 0 && owned.after[1] === 0, JSON.stringify(owned));
 check('selling a car you own hands you the cash in it first', owned.sold === 300 && owned.afterSale[0] === 300 && owned.afterSale[1] === 0, JSON.stringify(owned));
+
+// ---------------------------------------------------------------- 8c. selling from your garage: a stolen car pays Dirty Cash, a legal one Clean
+const sale = await ev(() => { const g = window.game, C = g.content, M = g.money, r = {};
+  const gp = C.garagePoints()[0]; if (!gp) return { gp: false };
+  const ask = g.ui.ask; g.ui.ask = (t, d, ok, fn) => fn();
+  const sell = origin => { const e = C.addToGarage('sedan', origin, undefined, true); const price = C.sellPrice(e), d0 = M.onMe, c0 = M.clean; C.openGarage(gp); C._svcAct('sell:' + e.uid); while (g.ui.stack.length) g.ui.back(); return { price, dirty: M.onMe - d0, clean: M.clean - c0 }; };
+  r.stolen = sell('stolen'); r.bought = sell('bought'); g.ui.ask = ask; r.gp = true; return r; });
+check('a stolen car sold from your garage pays Dirty Cash, never Clean Bank (§45.22)', sale.gp && sale.stolen.dirty === sale.stolen.price && sale.stolen.clean === 0, JSON.stringify(sale));
+check('a car you bought sells into your bank', sale.gp && sale.bought.clean === sale.bought.price && sale.bought.dirty === 0, JSON.stringify(sale));
 
 // ---------------------------------------------------------------- 9. save, reload, and no duplication
 const saved = await ev(() => { const g = window.game, M = g.money; M.W.debt = 0; M.W.dirty.me = 1234; M.W.clean = 5678; M.W.dirty.prop = { flop: 4000, whse_w: 2000 }; g.police.clear(); const ok = g.saveGame(true); return { ok, w: JSON.parse(JSON.stringify(M.W)) }; });

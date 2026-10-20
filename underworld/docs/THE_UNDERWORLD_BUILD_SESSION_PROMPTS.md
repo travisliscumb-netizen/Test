@@ -57,6 +57,10 @@ Required tests: transfer/deposit/withdraw, arrest seizure, stash survival, vehic
 
 Implement the seven player-facing Rank titles and numeric Reputation as separate concepts. Remove the old visible Reputation title ladder and obsolete text/gates. Ensure money cannot buy Rank/Rep/turf/contacts/loyalty/influence. Validate the full Nobody→City Kingpin dependency chain has no circular requirements.
 
+## SESSION 2.5 — EARLY LAUNDERING FIXER (added by owner amendment §45.22)
+
+Build the §45.6 early laundering fixer immediately after Session 2: a contact who converts carried Dirty Cash to Clean Bank at roughly 30–35%, with a low capacity and a delay, so the first Clean Bank needs no circular requirement. Fronts in Session 9 supersede it. Stolen-car resale must not act as laundering. Required tests: fee and capacity, delay and delivery across save/reload, arrest while money is in transit, no Clean from a known-stolen car sale.
+
 ## SESSION 3 — WAREHOUSES / VAULT / LOGISTICS
 
 Build the new warehouse model: 15 assignment slots, Driver logistics role, Dealer supply, Lieutenant automation, Dirty Cash vault/capacity, five physical security levels, four security upgrade categories, visual persistence, authorized automatic gate, route-risk model and max-security normal-rival immunity with minimum staffing. Remove the old passive car-stealing Driver behavior and old small warehouse assumptions.

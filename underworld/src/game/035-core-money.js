@@ -9,8 +9,8 @@
    MONEY_SOURCES fixes each tag's currency and where it lands or comes from, so a ruling changes one table entry,
    never a code path. Listeners (the +/- popups, the HUD) hear every change from here.
    ===================================================================== */
-// Where income lands: 'me' (in your hands), 'stash' (passive criminal income: a warehouse vault, else your home,
-// else any safehouse, else on you), 'clean' (the bank). How a cost is paid: 'dirty' (cash on you), 'payroll'
+// Where income lands: 'me' (in your hands), 'stash' (remote criminal income, §45.22: the warehouse running that
+// operation, else your Treasury Warehouse, else your primary safehouse, else on you), 'clean' (the bank). How a cost is paid: 'dirty' (cash on you), 'payroll'
 // (§45.21 order: warehouse vaults, then safehouse stashes, then cash on you), 'clean' (the bank), 'either' (cash
 // on you first, then the bank), 'medical' (the bank; any shortfall becomes medical debt, §45.20).
 // book: the line it adds to the empire's daily books (Empire › Overview), for the running of the operation only.
@@ -22,12 +22,17 @@ const MONEY_SOURCES = {
   bounty: { earn: 'stash', book: 'bounties' }, dealers: { earn: 'stash', book: 'dealers' }, royalty: { earn: 'stash', book: 'territory tax' }, tribute: { earn: 'stash', book: 'tribute' },
   // ---- Clean income
   business: { earn: 'clean', book: 'businesses' }, carSale: { earn: 'clean' }, casino: { earn: 'clean' },
+  // a car you stole is not a legal sale even from your own garage until HOT/clean titles exist (§45.22, Session 5)
+  stolenCarSale: { earn: 'me' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
   // ---- Dirty costs
   armorer: { pay: 'dirty' }, supplier: { pay: 'dirty' }, raceBuyIn: { pay: 'dirty' }, respect: { pay: 'dirty' },
   truce: { pay: 'dirty' }, payAndSpray: { pay: 'dirty' }, usedLot: { pay: 'either' },
   wages: { pay: 'payroll', book: 'wages' }, crewFee: { pay: 'payroll' }, delivery: { pay: 'payroll', book: 'deliveries' }, protection: { pay: 'payroll', book: 'protection' },
-  bribe: { pay: 'payroll', book: 'bribes' }, jailBribe: { pay: 'payroll' }, contraband: { pay: 'payroll' },
+  bribe: { pay: 'payroll', book: 'bribes' },
+  // big jail bribes paid with outside money, only through a courier on the street (§45.22); everyday jail spending
+  // is the commissary account on the sentence, not this ledger
+  jailBribe: { pay: 'payroll' },
   // ---- Clean costs
   property: { pay: 'clean' }, upkeep: { pay: 'clean', book: 'upkeep' }, garage: { pay: 'clean' }, shop: { pay: 'clean' },
   dealer: { pay: 'clean' }, training: { pay: 'clean' }, casinoStake: { pay: 'clean' }, lawyer: { pay: 'clean' },
@@ -38,14 +43,15 @@ const MONEY_SOURCES = {
   debug: { earn: 'me' }
 };
 const STUNT_DAILY_CAP = 1500;
-const MEDICAL_DEBT_CAP = 1500;    // one outstanding hospital bill at most (§45.20); the largest bill is $1,500      // repeatable stunt cash per in-game day (§45.19); milestones are uncapped
+// hospital bill (§45.22): max($1,000, 10% of Clean Bank), capped; medical debt never exceeds one bill (§45.20)
+const HOSPITAL_MIN = 1000, HOSPITAL_MAX = 25000, HOSPITAL_SHARE = 0.1;      // repeatable stunt cash per in-game day (§45.19); milestones are uncapped
 const MONEY_MAX = 1e15;            // anything larger is refused as corrupt input
 const DIRTY_PROP_KINDS = new Set(['safehouse', 'warehouse']); // where Dirty Cash can be kept (§2)
 const okAmount = n => typeof n === 'number' && isFinite(n) && n > 0 && n < MONEY_MAX;
 const Money = {
   g: null, listeners: [], lastStunt: 0,
   bind(game) { this.g = game; },
-  fresh() { return { v: 1, clean: 0, debt: 0, dirty: { me: 0, veh: {}, prop: {} }, stunt: { day: -1, paid: 0 } }; },
+  fresh() { return { v: 1, clean: 0, debt: 0, treasury: null, dirty: { me: 0, veh: {}, prop: {} }, stunt: { day: -1, paid: 0 } }; },
   // every number finite, non-negative, whole cents; unknown places dropped
   sanitize(w) {
     const d = this.fresh(), num = v => typeof v === 'number' && isFinite(v) && v > 0 ? Math.min(Math.round(v * 100) / 100, MONEY_MAX) : 0;
@@ -53,7 +59,8 @@ const Money = {
     const D = w.dirty && typeof w.dirty === 'object' && !Array.isArray(w.dirty) ? w.dirty : {};
     const map = (o, keyOk) => { const out = {}; if (o && typeof o === 'object' && !Array.isArray(o)) for (const k in o) { const v = num(o[k]); if (v > 0 && keyOk(k)) out[k] = v; } return out; };
     return {
-      v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), MEDICAL_DEBT_CAP),
+      v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX),
+      treasury: typeof w.treasury === 'string' && PROP_BY_ID[w.treasury] && PROP_BY_ID[w.treasury].kind === 'warehouse' ? w.treasury : null,
       dirty: { me: num(D.me), veh: map(D.veh, k => /^\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
       stunt: { day: w.stunt && Number.isFinite(w.stunt.day) ? Math.floor(w.stunt.day) : -1, paid: w.stunt ? num(w.stunt.paid) : 0 }
     };
@@ -85,15 +92,36 @@ const Money = {
   // the payroll sources in draw order, with what each holds (for the Crew screen)
   payrollSources() { return this.payrollOrder().map(k => ({ key: k, name: k === 'me' ? 'Cash on you' : PROP_BY_ID[k.slice(2)].name, kind: k === 'me' ? 'you' : PROP_BY_ID[k.slice(2)].kind, amt: this._get(k) })); },
   payrollReserve() { let t = 0; for (const k of this.payrollOrder()) t += this._get(k); return t; },
-  // where passive criminal income is delivered: a warehouse vault, else your home, else any safehouse, else you
-  stashFor() {
+  // where remote criminal income is delivered (§45.22): the warehouse running that operation (op), else the
+  // Treasury Warehouse you designated, else your primary safehouse, else into your hands as a last resort.
+  // Owning a warehouse does not make it the treasury: only a designation does (never "the first one bought").
+  stashFor(op) {
     const uw = this.uw; if (!uw) return 'me';
-    const owned = uw.props.ownedList();
-    const wh = owned.find(d => d.kind === 'warehouse'); if (wh) return 'p:' + wh.id;
-    const home = this.g.save.home && owned.find(d => d.id === this.g.save.home && d.kind === 'safehouse'); if (home) return 'p:' + home.id;
-    const sh = owned.find(d => d.kind === 'safehouse'); if (sh) return 'p:' + sh.id;
+    const isWh = id => !!(id && PROP_BY_ID[id] && PROP_BY_ID[id].kind === 'warehouse' && uw.props.owned(id));
+    if (isWh(op)) return 'p:' + op;
+    if (isWh(this.W.treasury)) return 'p:' + this.W.treasury;
+    const home = this.primarySafehouse(); if (home) return 'p:' + home;
     return 'me';
   },
+  // your home if you own it; otherwise the most expensive safehouse you own (never purchase order)
+  primarySafehouse() {
+    const uw = this.uw; if (!uw) return null;
+    const sh = uw.props.ownedList().filter(d => d.kind === 'safehouse');
+    const home = this.g.save.home && sh.find(d => d.id === this.g.save.home); if (home) return home.id;
+    sh.sort((a, b) => (b.price || 0) - (a.price || 0) || (a.id < b.id ? -1 : 1));
+    return sh.length ? sh[0].id : null;
+  },
+  get treasury() { const id = this.W.treasury; return id && this.uw && this.uw.props.owned(id) ? id : null; },
+  // designate (or clear, with null) the Treasury Warehouse; returns '' or why not
+  setTreasury(id) {
+    if (id === null) { this.W.treasury = null; return ''; }
+    const d = PROP_BY_ID[id];
+    if (!d || d.kind !== 'warehouse') return 'Only a warehouse can be the treasury.';
+    if (!this.uw || !this.uw.props.owned(id)) return 'You don’t own it.';
+    this.W.treasury = id; return '';
+  },
+  // a hospital bill: max($1,000, 10% of the bank), capped (§45.22), less any medic discount
+  hospitalBill(discount = 0) { return Math.round(Math.min(HOSPITAL_MAX, Math.max(HOSPITAL_MIN, this.W.clean * HOSPITAL_SHARE)) * (1 - discount)); },
   _get(key, v) {
     const D = this.W.dirty;
     if (key === 'me') return D.me;
@@ -152,7 +180,7 @@ const Money = {
       if (toDebt > 0) this._emit('debt', -toDebt, src);
       return n;
     }
-    const key = opts.at && (opts.at === 'me' || (opts.at.startsWith('p:') && this.canHoldCash(opts.at.slice(2)))) ? opts.at : S.earn === 'stash' ? this.stashFor() : 'me';
+    const key = opts.at && (opts.at === 'me' || (opts.at.startsWith('p:') && this.canHoldCash(opts.at.slice(2)))) ? opts.at : S.earn === 'stash' ? this.stashFor(opts.op) : 'me';
     this._set(key, this._get(key) + n);
     this._book(src, n, true); if (key === 'me') this._emit('dirty', n, src);
     return n;
@@ -167,7 +195,8 @@ const Money = {
     if (S.pay === 'medical') {
       const fromBank = Math.min(W.clean, n), owed = n - fromBank;
       W.clean = Math.round((W.clean - fromBank) * 100) / 100;
-      const add = Math.min(owed, Math.max(0, MEDICAL_DEBT_CAP - W.debt));
+      // one outstanding bill at most: the debt never grows past the larger of what is owed and this bill
+      const add = Math.max(0, Math.min(owed, Math.max(W.debt, n) - W.debt));
       W.debt = Math.round((W.debt + add) * 100) / 100;
       if (fromBank > 0) { this._book(src, fromBank, false); this._emit('clean', -fromBank, src); }
       if (add > 0) this._emit('debt', add, src);

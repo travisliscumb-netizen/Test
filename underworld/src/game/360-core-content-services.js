@@ -409,14 +409,15 @@ class ContentManager {
       if (k === 'sell') {
         const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
         if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
-        g.ui.ask(`Sell the ${VEHICLES[e.type].name}?`, `You'll get ${fmtMoney(this.sellPrice(e))}. ${e.origin === 'reward' || e.origin === 'found' ? 'Special cars can’t be bought back.' : ''}`, 'Sell', () => {
+        g.ui.ask(`Sell the ${VEHICLES[e.type].name}?`, `You'll get ${fmtMoney(this.sellPrice(e))}${e.origin === 'stolen' ? ' in cash: it’s stolen, so nobody legit will pay you for it' : ' into your bank'}. ${e.origin === 'reward' || e.origin === 'found' ? 'Special cars can’t be bought back.' : ''}`, 'Sell', () => {
           const i = s.garage.indexOf(e); if (i < 0) return;
           for (const v of g.vehicles.list.slice()) if (v.garageUid === e.uid && v !== g.player.vehicle) g.vehicles.despawn(v);
           if (g.garageDisplay) g.garageDisplay.cars.delete(e.uid);
           if (g.garageCar && g.garageCar.garageUid === e.uid) g.garageCar = null;
           if (e.trunk && units(e.trunk) && g.uw) { const r = g.uw.unloadTrunk(e); if (r) g.ui.toast(r, 'money'); }
           Money.emptyCar(e.uid); // cash kept in its trunk comes out with you
-          s.garage.splice(i, 1); Money.earn(this.sellPrice(e), 'carSale'); g.audio.play('cash'); g.saveGame(); this.refreshSvc();
+          // a car you stole sells for Dirty Cash; only a legally owned car is a Clean sale (§45.17, §45.22)
+          s.garage.splice(i, 1); Money.earn(this.sellPrice(e), e.origin === 'stolen' ? 'stolenCarSale' : 'carSale'); g.audio.play('cash'); g.saveGame(); this.refreshSvc();
         });
         return;
       }

@@ -294,8 +294,8 @@ class Game {
     this.player.state = 'dead'; this.player.pose.downDir = 1;
     this.slowT = 2;
     const go = $('gameover'); go.className = 'dead'; go.querySelector('.gt').textContent = 'Hospitalized';
-    // a Clean Bank bill (§45.17): a tenth of the bank, $100-$1,500; whatever the bank can't cover becomes medical debt
-    const fee = Math.round(Math.min(1500, Math.max(100, Math.round(Money.clean * 0.1))) * (1 - (this.uw ? this.uw.props.perk('medic') : 0)));
+    // a Clean Bank bill (§45.17, §45.22): max($1,000, 10% of the bank), capped; what the bank can't cover is medical debt
+    const fee = Money.hospitalBill(this.uw ? this.uw.props.perk('medic') : 0);
     const owed = Math.max(0, fee - Money.clean);
     go.querySelector('.gs').textContent = `Medical bills: ${fmtMoney(fee)}${owed > 0 ? ` · ${fmtMoney(owed)} goes on your tab (medical debt, paid from your bank later)` : ' from your bank'}`;
     const token = ++this.lifeToken;
