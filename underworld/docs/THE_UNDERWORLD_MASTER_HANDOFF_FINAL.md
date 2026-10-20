@@ -48,7 +48,7 @@ Money does not buy Rank, Reputation, turf, contacts, crew loyalty, or political 
 
 ## 2. MONEY — DIRTY CASH + CLEAN BANK
 
-> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review).
+> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17 (locked classifications).
 
 
 Replace the single-money model.
@@ -275,7 +275,7 @@ Never silently reset/despawn remaining raid loot.
 
 ## 10. GANG WARS / THREATS
 
-> Amended by §45.10 (real-time threat timer: ~2 min to THREAT IMMINENT, ~60 s more to execution).
+> Amended by §45.10 (real-time threat timer: ~2 min to THREAT IMMINENT, ~60 s more to execution) and §45.16 (when it runs, freezes, and jail resolution).
 
 
 Gang war escalates due to actual player pressure: turf grabs, warehouse hits, shipment theft, killings, etc.
@@ -413,7 +413,7 @@ No respawn while owned.
 
 ## 17. WEAPONS / ARMOR
 
-> Amended by §45.11 (three shared ammo pools).
+> Amended by §45.11 (three shared ammo pools) and §45.15 (caps: Handgun 240, Shotgun 96, Rifle/SMG 480).
 
 
 Weapons:
@@ -1087,3 +1087,21 @@ Where these conflict with an earlier section, **this section wins**. Each affect
     showdown success changes ownership (this applies to rivals as well as to the player).
 14. **Income classification review (§2).** Before income behavior changes, the Dirty/Clean classification of every
     income source (OVERHAUL_STATUS.md Appendix B) is presented for review, with genuinely ambiguous sources flagged.
+15. **Ammo reserve caps (§17, DC-17).** Shared reserve caps are authoritative: Handgun 240, Shotgun 96,
+    Rifle/SMG 480. Individual weapons keep their own magazine capacities. Contradictory per-weapon reserve caps are
+    removed.
+16. **Threat countdown rules (§10, DC-18).** The real-time threat countdown runs during active gameplay. The pause
+    menu freezes it. The phone and map do not. App/browser suspension, backgrounding, an inactive tab and genuine
+    loading states freeze it. While the player is jailed, outside threats do not wait for release: assigned crew
+    and Lieutenants resolve the defense automatically, using the asset's actual security and crew state.
+17. **Locked income/expense classifications (§2, §45.14).**
+    - Hidden-package cash → Dirty Cash.
+    - Stunt bonuses → Clean Bank.
+    - Sale of a legally owned / clean vehicle → Clean Bank.
+    - Sale of a HOT / stolen vehicle through a criminal channel → Dirty Cash.
+    - Hospital bill → Clean Bank expense, with no silent Dirty Cash fallback; insufficient Clean funds must not
+      create a soft lock.
+    - Crew wages → Dirty Cash expense by default, with no silent Clean Bank fallback.
+
+    The remaining ambiguous sources (OVERHAUL_STATUS.md Appendix B review table) must be approved before Session 1
+    converts money behavior.
