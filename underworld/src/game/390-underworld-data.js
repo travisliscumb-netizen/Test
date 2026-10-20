@@ -95,7 +95,7 @@ const START_OWNER = { o: 'vipers', g: 'vipers', h: 'tidewater', s: 'tidewater', 
 const PLAYER_COL = '#ffb547', PLAYER_HEX = 0xffb547;
 // progression stages: the world reads these, the HUD never shows them as a meter
 const STAGES = [
-  { name: 'Nobody', hint: 'Make your first money: pickpocket, mug, steal cars for the chop shop, fence hot goods.' },
+  { name: 'Nobody', hint: 'Make your first money: pickpocket, steal cars for the chop shop, fence hot goods.' },
   { name: 'Street Hustler', hint: 'Reach 400 reputation: deals, races, scores and escapes all count.' },
   { name: 'Known Operator', hint: 'Hire at least two crew (Empire → Crew) and keep them paid.' },
   { name: 'Crew Leader', hint: 'Take a turf: beat a rival crew on their own corner and put your people there.' },
@@ -264,7 +264,7 @@ const CREW_ROLES = {
   bodyguard: { name: 'Bodyguard', desc: 'Follows you and fights for you. Two at most.', max: 2 },
   manager: { name: 'Business manager', desc: 'Runs one of your businesses: more income, less suspicion.', biz: true },
   scout: { name: 'Scout', desc: 'Watches a district: warns of raids and reports rival moves.', zone: true },
-  driver: { name: 'Driver', desc: 'Steals cars to order every day and gets your bodyguards around.' }
+  driver: { name: 'Driver', desc: 'Transport and logistics. Moving product between your places arrives with the warehouse rebuild; for now a Driver gets your bodyguards around.' }
 };
 const RANKS = ['Associate', 'Crew Member', 'Enforcer', 'Captain', 'Lieutenant'];
 const PROMO_COST = [0, 1500, 4000, 10000, 25000];

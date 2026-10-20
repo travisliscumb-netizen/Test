@@ -23,7 +23,7 @@ const instrument = () => {
 const b = await launch();
 const { page, errors } = await open(b, {}, instrument);
 await startNew(page);
-await page.evaluate(() => { const g = window.game; g.input.wantLock = false; g.input.noLock = true; g.save.money = 200000; g.save.rep = 900; });
+await page.evaluate(() => { const g = window.game; g.input.wantLock = false; g.input.noLock = true; (g.money.W.clean = g.money.W.dirty.me = 200000); g.save.rep = 900; });
 await page.mouse.move(240, 135);
 const ev = (fn, a) => page.evaluate(fn, a);
 // average frame cost over N rendered frames (wall clock) for the degradation check
@@ -37,7 +37,7 @@ const health = () => ev(() => {
     if (v.pos.y < -4 || v.pos.y > 80 || v.speed > 120) { bad.push(`veh unstable ${v.type} y=${v.pos.y.toFixed(1)} v=${v.speed.toFixed(1)}`); break; }
   }
   for (const q of g.peds.peds) if (![q.x, q.y, q.z].every(Number.isFinite)) { bad.push('ped ' + q.kind); break; }
-  if (!Number.isFinite(g.save.money)) bad.push('money');
+  if (!Number.isFinite(g.money.total())) bad.push('money');
   for (const t of uw.S.turfs) for (const k in t.inf) if (!Number.isFinite(t.inf[k])) bad.push('inf');
   for (const z in uw.S.market) for (const k in uw.S.market[z]) if (!uw.S.market[z][k].every(Number.isFinite)) bad.push('market');
   // camera: finite, pitch inside its limits, looking at the player (no drift away)
@@ -94,11 +94,11 @@ for (let c = 0; c < CYCLES; c++) {
   }
   if (c % 2 === 0) {
     // save, quit to the menu and continue: the save must round-trip exactly
-    const sv = await ev(() => { const g = window.game; g.police.clear(); const ok = g.saveGame(true); const r = { ok, money: g.save.money, day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; g.quitToMenu(); return r; });
+    const sv = await ev(() => { const g = window.game; g.police.clear(); const ok = g.saveGame(true); const r = { ok, money: g.money.total(), day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; g.quitToMenu(); return r; });
     await frames(page, 4);
     await page.click('#btnContinue');
     await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
-    const ld = await ev(() => { const g = window.game; return { ok: true, money: g.save.money, day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; });
+    const ld = await ev(() => { const g = window.game; return { ok: true, money: g.money.total(), day: g.uw.S.day, crew: g.uw.S.crew.length, own: g.uw.owner.join() }; });
     check(`cycle ${c + 1}: save round-trips through quit + continue`, JSON.stringify(sv) === JSON.stringify(ld), JSON.stringify([sv, ld]).slice(0, 300));
   }
   // let one-shot timers (voices, toasts, fades) settle before measuring

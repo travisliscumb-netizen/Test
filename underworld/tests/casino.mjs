@@ -17,7 +17,7 @@ const report = {};
 const w = await ev(() => {
   const g = window.game, G = g.gamble, s = g.save, P = window.__pv, out = {};
   out.parse = ['5000', '250k', '2.5m', '$1,000,000', '1b', 'abc'].map(P.parseMoney);
-  s.money = 3e8;
+  window.game.money.W.clean = 3e8;
   G.openBlackjack(0);
   const html = document.getElementById('svcBody').innerHTML;
   out.quick = [...document.querySelectorAll('#svcBody .wq [data-act^="w:q:"]')].map(b => +b.dataset.act.split(':')[2]);
@@ -59,7 +59,7 @@ check('roulette: covering the board is not free money (35 numbers, both colours,
 check('roulette: the odds do not change with the size of the bet ($10 vs $10,000,000)', Math.abs(rsim.small.netPos - rsim.huge.netPos) < 0.02, JSON.stringify([rsim.small, rsim.huge]));
 const rtab = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
-  s.money = 5e7; G.roul = null; G.openRoulette(0);
+  window.game.money.W.clean = 5e7; G.roul = null; G.openRoulette(0);
   G.setWager('roul', 1e6);
   for (const k of ['red', 'n:17', 'n:17', 'd2', 'c1', 'odd', 'n:0', 'high', 'low', 'even', 'n:32']) g.content._svcAct('rb:' + k);
   out.total = Object.values(G.roul.bets).reduce((a, x) => a + x, 0); out.n17 = G.roul.bets['n:17']; out.bets = Object.keys(G.roul.bets).length;
@@ -67,10 +67,10 @@ const rtab = await ev(async () => {
   g.content._svcAct('mode:remove'); g.content._svcAct('rb:n:17'); out.afterRemove = G.roul.bets['n:17']; g.content._svcAct('mode:add');
   out.list = document.querySelectorAll('#svcBody .rbi').length;
   out.chipH = Math.min(...[...document.querySelectorAll('#svcBody .rc')].map(e => e.getBoundingClientRect().height));
-  const stake = Object.values(G.roul.bets).reduce((a, x) => a + x, 0), m0 = s.money, bets = { ...G.roul.bets };
+  const stake = Object.values(G.roul.bets).reduce((a, x) => a + x, 0), m0 = window.game.money.clean, bets = { ...G.roul.bets };
   G.roulSpin(); const n = G.roul.spinning.n;
   await new Promise(r => { const iv = setInterval(() => { if (!G.roul.spinning) { clearInterval(iv); r(); } }, 20); });
-  out.net = s.money - m0; out.expectNet = window.__pv.roulettePayout(bets, n) - stake; out.stake = stake;
+  out.net = window.game.money.clean - m0; out.expectNet = window.__pv.roulettePayout(bets, n) - stake; out.stake = stake;
   out.msg = document.querySelector('#svcBody .gres').textContent;
   while (g.ui.stack.length) g.ui.back();
   return out;
@@ -83,24 +83,24 @@ check('roulette chips are tappable on a phone (cells ≥ 28 px)', rtab.chipH >= 
 // ---------------------------------------------------------------- blackjack 60/40 (basic strategy)
 const bsim = await ev(() => {
   const g = window.game, G = g.gamble, bjv = window.__pv.bjValue, keepSave = g.saveGame, keepRef = G.refresh;
-  g.saveGame = () => {}; G.refresh = () => {}; g.save.money = 1e13;
+  g.saveGame = () => {}; G.refresh = () => {}; (g.money.W.clean = g.money.W.dirty.me = 1e13);
   const run = (bet, N) => {
     let w = 0, l = 0, p = 0, ev = 0;
     G.bj = { seat: 0, bet, hands: [], dealer: [], phase: 'bet', cur: 0 };
     for (let i = 0; i < N; i++) {
       const bj = G.bj; bj.phase = 'bet'; bj.revealing = false; G.busy = false; bj.bet = bet;
-      const m0 = g.save.money; G.bjDeal(); let guard = 0;
+      const m0 = g.money.total(); G.bjDeal(); let guard = 0;
       while (bj.phase === 'play' && guard++ < 30) {
         const hd = bj.hands[bj.cur], v = bjv(hd.cards), d = Math.min(10, bj.dealer[0].r === 14 ? 11 : bj.dealer[0].r);
         let a; if (v.soft) a = v.total <= 17 ? 'hit' : 'stand'; else if (v.total <= 8) a = 'hit'; else if (v.total <= 11) a = hd.cards.length === 2 && d < v.total - 1 ? 'double' : 'hit'; else if (v.total <= 16) a = d >= 7 ? 'hit' : (v.total === 12 && d <= 3 ? 'hit' : 'stand'); else a = 'stand';
         G.bjAction(a); bj.revealing = false; G.busy = false;
       }
-      const net = g.save.money - m0; ev += net; if (net > 0) w++; else if (net < 0) l++; else p++;
+      const net = g.money.total() - m0; ev += net; if (net > 0) w++; else if (net < 0) l++; else p++;
     }
     return { hands: N, win: w / N, lose: l / N, push: p / N, decided: w / (w + l), ev: ev / N / bet };
   };
   const out = { small: run(10, 15000), huge: run(1e7, 15000) };
-  g.saveGame = keepSave; G.refresh = keepRef; G.bj = null; G.busy = false; g.save.money = 1e7;
+  g.saveGame = keepSave; G.refresh = keepRef; G.bj = null; G.busy = false; (g.money.W.clean = g.money.W.dirty.me = 1e7);
   return out;
 });
 report.blackjack = bsim;
@@ -112,14 +112,14 @@ check('blackjack: still has losing hands and pushes (40%-ish lose, pushes happen
 // ---------------------------------------------------------------- Hold'em: stakes and 60/40
 const psim = await ev(() => {
   const g = window.game, G = g.gamble, keepSave = g.saveGame, keepRef = G.refresh, out = {};
-  g.saveGame = () => {}; G.refresh = () => {}; g.save.money = 1e13;
+  g.saveGame = () => {}; G.refresh = () => {}; (g.money.W.clean = g.money.W.dirty.me = 1e13);
   // a $1,000,000 buy-in: the regulars bring stacks in the same range; the blinds follow from the depth
   G.pk = null; G.pokerSit(1e6, 50); const pk = G.pk; pk.sim = true;
   out.stacks = pk.seats.map(x => x.stack + x.put); out.bb = pk.bb;
   out.opts = (() => { pk.phase = pk.phase; return null; })();
   let pw = 0, pl = 0, pn = 0, folds = 0, ev = 0, allins = 0, raiseOpts = null;
   for (let h = 0; h < 1500; h++) {
-    if (pk.seats[0].stack < pk.bb * 20) { const need = pk.buy - pk.seats[0].stack; g.save.money -= need; pk.seats[0].stack += need; }
+    if (pk.seats[0].stack < pk.bb * 20) { const need = pk.buy - pk.seats[0].stack; (g.money.W.clean -= need); pk.seats[0].stack += need; }
     if (pk.phase !== 'play') G.pokerHand();
     let guard = 0;
     while (pk.phase === 'play' && guard++ < 200) {
@@ -135,7 +135,7 @@ const psim = await ev(() => {
   }
   out.sim = { hands: pn + folds, played: pn, folded: folds, win: pw / pn, lose: pl / pn, decided: pw / (pw + pl), evBB: ev / (pn + folds) / pk.bb, aiAllIns: allins };
   out.raiseOpts = raiseOpts;
-  G.pk = null; G.G.casino.chips = 0; g.saveGame = keepSave; G.refresh = keepRef; G.busy = false; g.save.money = 1e7;
+  G.pk = null; G.G.casino.chips = 0; g.saveGame = keepSave; G.refresh = keepRef; G.busy = false; (g.money.W.clean = g.money.W.dirty.me = 1e7);
   return out;
 });
 report.poker = psim.sim;
@@ -146,7 +146,7 @@ check('poker: of the hands you play, ~60–68% are net wins over 1,500 hands, wi
 check('poker: still has losing hands, folds and all-ins (believable play)', psim.sim.lose > 0.25 && psim.sim.folded > 100 && psim.sim.aiAllIns > 0, JSON.stringify(psim.sim));
 const pkUI = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
-  s.money = 2e8; G.pk = null; G.openPoker();
+  window.game.money.W.clean = 2e8; G.pk = null; G.openPoker();
   out.depths = [...document.querySelectorAll('#svcBody [data-act^="depth:"]')].length;
   G.setWager('pokerBuy', 1e8); g.content._svcAct('depth:100'); g.content._svcAct('sit');
   out.bb = G.pk.bb; out.chips = s.gamble.casino.chips;
@@ -217,18 +217,18 @@ check('the $1B jackpot is realistically seen: at $10M a spin, within 4,000 spins
 // UI: a spin, its reveal, the meter, INFO, and the save of the pressure
 const ry = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
-  s.money = 5e7; G.ry = null; G.spot('g:slot:royale');
+  window.game.money.W.clean = 5e7; G.ry = null; G.spot('g:slot:royale');
   const body = document.getElementById('svcBody');
   out.main = ['BALANCE', 'BET', 'WIN', 'SPIN', 'MAX JACKPOT', '$1,000,000,000'].every(k => body.textContent.includes(k));
   out.spinH = body.querySelector('.rylSpin').getBoundingClientRect().height;
   G.setWager('royale', 1e6); G.ry.bet = 1e6; G.refresh();
-  const m0 = s.money, pr0 = JSON.stringify(s.gamble.jp.pr);
+  const m0 = window.game.money.clean, pr0 = JSON.stringify(s.gamble.jp.pr);
   g.content._svcAct('ry:spin'); g.content._svcAct('ry:spin');
-  const res = G.ry.res; out.hidden = G.shownMoney() === m0 - 1e6; out.settled = s.money === m0 - 1e6 + res.win;
+  const res = G.ry.res; out.hidden = G.shownMoney() === m0 - 1e6; out.settled = window.game.money.clean === m0 - 1e6 + res.win;
   out.prChanged = JSON.stringify(s.gamble.jp.pr) !== pr0;
   out.spinning = body.querySelectorAll('.ryr.spin').length;
   await new Promise(r => { const iv = setInterval(() => { if (!G.ry.spinning) { clearInterval(iv); r(); } }, 20); });
-  out.after = s.money === m0 - 1e6 + res.win; out.cab = body.querySelector('#rylCab').className;
+  out.after = window.game.money.clean === m0 - 1e6 + res.win; out.cab = body.querySelector('#rylCab').className;
   // the spin cycle in the real UI: SPIN until SPIN can be pressed again (the cadence the jackpot rates assume adds a tap)
   { G.setWager('royale', 1e3); G.ry.bet = 1e3; G.refresh(); const cyc = []; for (let i = 0; i < 4; i++) { const t0 = performance.now(); g.content._svcAct('ry:spin'); await new Promise(r => { const iv = setInterval(() => { const b = body.querySelector('.rylSpin'); if (!G.ry.spinning && b && !b.disabled) { clearInterval(iv); r(); } }, 10); }); cyc.push(performance.now() - t0); } out.cycle = cyc.map(x => Math.round(x)); }
   g.content._svcAct('ry:info'); out.info = /Line pays/.test(body.textContent) && /Jackpots/.test(body.textContent) && body.querySelectorAll('.rylInfo .stats span').length > 20;
@@ -237,16 +237,16 @@ const ry = await ev(async () => {
   // a forced billion: the full spectacle
   const P = window.__pv, keep = Math.random; let k = 0; Math.random = () => (k++ === 0 ? 0 : keep());
   G.ry.info = false; G.setWager('royale', 1e7); G.ry.bet = 1e7; G.refresh();
-  const m1 = s.money; g.content._svcAct('ry:spin'); Math.random = keep;
-  out.billion = { major: G.ry.res.major, win: G.ry.res.win, cls: G.ry.res.cls, paid: s.money - m1 };
+  const m1 = window.game.money.clean; g.content._svcAct('ry:spin'); Math.random = keep;
+  out.billion = { major: G.ry.res.major, win: G.ry.res.win, cls: G.ry.res.cls, paid: window.game.money.clean - m1 };
   await new Promise(r => { const iv = setInterval(() => { if (!G.ry.spinning) { clearInterval(iv); r(); } }, 20); });
   out.banner = !document.getElementById('banner').classList.contains('hidden'); out.confetti = G.parts.length;
   out.jpHits = s.gamble.jp.hits.m1b; void P;
   // close the machine mid-spin: settled once, the reels show the result when you come back
-  const m2 = s.money; g.content._svcAct('ry:spin'); const w2 = G.ry.res.win; g.ui.back();
+  const m2 = window.game.money.clean; g.content._svcAct('ry:spin'); const w2 = G.ry.res.win; g.ui.back();
   await new Promise(r => setTimeout(r, 400));
-  out.closed = { delta: s.money - m2, expect: w2 - 1e7, spinning: G.ry.spinning };
-  G.spot('g:slot:royale'); out.reopen = G.shownMoney() === s.money; g.ui.back();
+  out.closed = { delta: window.game.money.clean - m2, expect: w2 - 1e7, spinning: G.ry.spinning };
+  G.spot('g:slot:royale'); out.reopen = G.shownMoney() === window.game.money.clean; g.ui.back();
   out.pr = JSON.stringify(s.gamble.jp.pr);
   s.stats.playTime = Math.max(s.stats.playTime, 120); g.saveGame(true);
   return out;

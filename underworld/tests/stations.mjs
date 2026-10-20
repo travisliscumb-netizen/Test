@@ -31,33 +31,33 @@ check('the staff door starts locked', inside.door === false, JSON.stringify(insi
 const shop = await ev(() => { const g = window.game; g.content.spotAct('clerk'); const a = document.getElementById('svcTitle').textContent; while (g.ui.stack.length) g.ui.back(); g.content.spotAct('slot'); const b2 = !!g.ui.modal; while (g.ui.stack.length) g.ui.back(); return { a, slot: b2 }; });
 check('the clerk sells and the Lucky Pump plays at every station', shop.a.length > 0 && shop.slot, JSON.stringify(shop));
 // back office behind the locked door
-const locked = await ev(() => { const g = window.game, m0 = g.save.money; g.content.spotAct('safe'); return { m: g.save.money - m0, chan: !!g.content.chan }; });
+const locked = await ev(() => { const g = window.game, m0 = g.money.total(); g.content.spotAct('safe'); return { m: g.money.total() - m0, chan: !!g.content.chan }; });
 check('the safe can’t be reached while the staff door is locked', locked.m === 0 && !locked.chan, JSON.stringify(locked));
 // rob the register with a gun drawn
 const rob = await ev(() => {
   const g = window.game, p = g.player, d = g.content.interiors.cur;
   g.save.weapons.pistol = true; g.save.ammo.pistol = 30; p.weapon = 2; if (p.equip) p.equip(2);
   const R = Math.random; Math.random = () => 0.5;
-  const m0 = g.save.money; p.pos.set(d.ox + 2.4, d.fy, d.oz + 3.5);
+  const m0 = g.money.total(); p.pos.set(d.ox + 2.4, d.fy, d.oz + 3.5);
   // the dice stay fixed until the till is emptied: the clerk's 75% silent alarm is the branch under test
   g.content.spotAct('register');
   try { for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60); } finally { Math.random = R; }
-  return { gained: g.save.money - m0, open: d.staffOpen, lvl: g.police.level, armed: !!(p.wep && !p.wep.melee) };
+  return { gained: g.money.total() - m0, open: d.staffOpen, lvl: g.police.level, armed: !!(p.wep && !p.wep.melee) };
 });
 check('robbing the register with a gun: a few hundred dollars, the clerk hands over the back-office key', rob.gained >= 150 && rob.open, JSON.stringify(rob));
 check('the clerk’s silent alarm (or a witness) brings the police', rob.lvl >= 1, JSON.stringify(rob));
-const again = await ev(() => { const g = window.game, m0 = g.save.money; g.content.spotAct('register'); for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60); return g.save.money - m0; });
+const again = await ev(() => { const g = window.game, m0 = g.money.total(); g.content.spotAct('register'); for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60); return g.money.total() - m0; });
 check('the same till can’t be robbed twice in a day', again === 0, again);
 // the back office: safe (slow), desk, stockroom
 const back = await ev(() => {
   const g = window.game, p = g.player, d = g.content.interiors.cur, out = {};
   const R = Math.random; Math.random = () => 0.9;
-  p.pos.set(d.ox + 4.6, d.fy, d.oz - 4.4); let m0 = g.save.money; g.content.spotAct('safe');
+  p.pos.set(d.ox + 4.6, d.fy, d.oz - 4.4); let m0 = g.money.total(); g.content.spotAct('safe');
   for (let n = 0; n < 60 * 7; n++) g.update(1 / 60, 1 / 60);
-  out.safe = g.save.money - m0;
-  m0 = g.save.money; g.content.spotAct('safe'); for (let n = 0; n < 60 * 7; n++) g.update(1 / 60, 1 / 60); out.safeAgain = g.save.money - m0;
+  out.safe = g.money.total() - m0;
+  m0 = g.money.total(); g.content.spotAct('safe'); for (let n = 0; n < 60 * 7; n++) g.update(1 / 60, 1 / 60); out.safeAgain = g.money.total() - m0;
   const inv0 = JSON.stringify(g.uw.S.inv); p.pos.set(d.ox - 3.6, d.fy, d.oz - 3.3); g.content.spotAct('stock'); out.stock = JSON.stringify(g.uw.S.inv) !== inv0;
-  Math.random = () => 0.1; m0 = g.save.money; p.pos.set(d.ox + 3.0, d.fy, d.oz - 3.6); g.content.spotAct('desk'); out.desk = g.save.money - m0;
+  Math.random = () => 0.1; m0 = g.money.total(); p.pos.set(d.ox + 3.0, d.fy, d.oz - 3.6); g.content.spotAct('desk'); out.desk = g.money.total() - m0;
   Math.random = R;
   return out;
 });

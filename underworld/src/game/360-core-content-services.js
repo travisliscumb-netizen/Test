@@ -52,12 +52,14 @@ const TUNE = [
 ];
 const TUNE_REP = [0, 3, 4];
 const STORE_ITEMS = [
-  { id: 'snack', name: 'Hot Roll & Coffee', desc: 'Restores 120 health.', price: 12 },
-  { id: 'medkit', name: 'First-Aid Kit', desc: 'Patches you up on the spot: restores 180 health.', price: 90 },
-  { id: 'drink', name: 'Volt Energy', desc: 'Unlimited sprint for a minute.', price: 25 },
-  { id: 'vest', name: 'Kevlar Vest', desc: 'A 150-point armour layer that soaks 75% of every hit until it is spent.', price: 450, rep: 2 },
-  { id: 'scratch', name: 'Scratch Cards', desc: 'Five cards from $5 to $100. Top prize $1,000,000. Most lose.', price: 5 },
-  { id: 'map', name: 'Collector’s Map', desc: 'Someone marked five hidden packages on a tourist map.', price: 1200 }
+// pay: how each is paid (MONEY_SOURCES): food and first aid with cash or the bank, shop goods from the bank,
+// scratch cards (a lottery) from the bank only, at the card counter (§45.5, §45.18)
+  { id: 'snack', name: 'Hot Roll & Coffee', desc: 'Restores 120 health.', price: 12, pay: 'food' },
+  { id: 'medkit', name: 'First-Aid Kit', desc: 'Patches you up on the spot: restores 180 health.', price: 90, pay: 'food' },
+  { id: 'drink', name: 'Volt Energy', desc: 'Unlimited sprint for a minute.', price: 25, pay: 'food' },
+  { id: 'vest', name: 'Kevlar Vest', desc: 'A 150-point armour layer that soaks 75% of every hit until it is spent.', price: 450, rep: 2, pay: 'shop' },
+  { id: 'scratch', name: 'Scratch Cards', desc: 'Five cards from $5 to $100. Top prize $1,000,000. Most lose. Bank only.', price: 5, pay: 'casinoStake' },
+  { id: 'map', name: 'Collector’s Map', desc: 'Someone marked five hidden packages on a tourist map.', price: 1200, pay: 'shop' }
 ];
 const ORIGIN_CHIP = { bought: ['OWNED', '#7fe08f'], stolen: ['STOLEN', '#ff4d5e'], reward: ['SPECIAL', '#d28cff'], found: ['FOUND', '#46d4c4'] };
 const ACHIEVEMENTS = [
@@ -188,7 +190,7 @@ class ContentManager {
     const d = SECRETS.find(x => x.id === id); if (!d) return;
     s.secrets[id] = 1;
     this.g.ui.banner('Secret Found', d.name + (d.cash ? ' · ' + fmtMoney(d.cash) : ''), 'info', 3.5);
-    if (d.cash) this.g.addMoney(d.cash, true);
+    if (d.cash) this.g.earn(d.cash, 'secret');
     this.addRep(25);
     this.g.audio.play('pass');
     if (Object.keys(s.secrets).length >= 4) this.ach('secrets4');
@@ -256,13 +258,13 @@ class ContentManager {
     if (s.packages[pk.id]) return;
     s.packages[pk.id] = 1; delete s.hints[pk.id];
     const n = Object.keys(s.packages).length; s.stats.packagesFound = n;
-    g.addMoney(250, true); this.addRep(10);
+    g.earn(250, 'package'); this.addRep(10);
     g.audio.play('pickup'); g.fx.flashLight(pk.x, pk.y + 1, pk.z, 6, 0.4, 0x7fe08f);
     g.ui.banner('Hidden Package', `${n} of 30 · $250`, 'info', 2.2);
-    if (n === 10) { g.addMoney(2500, true); s.ammo.pistol += 48; this.phone('unknown', 'Ten already? Keep looking. There’s a pistol crate on its way to your safehouse.'); s.weapons.pistol = true; this.ach('pack10'); }
+    if (n === 10) { g.earn(2500, 'package'); s.ammo.pistol += 48; this.phone('unknown', 'Ten already? Keep looking. There’s a pistol crate on its way to your safehouse.'); s.weapons.pistol = true; this.ach('pack10'); }
     if (n === 15) { this.phone('unknown', 'You like finding things. Harbor Row, the alley behind the depot — someone left something golden there.'); s.flags.goldHint = true; }
-    if (n === 20) { g.addMoney(5000, true); s.weapons.smg = true; s.ammo.smg += 120; this.phone('unknown', 'Twenty. An SMG is waiting in your stash. Don’t make me regret it.'); }
-    if (n === 30) { g.addMoney(15000, true); this.ach('pack30'); this.phone('unknown', 'All thirty. You know this island better than I do now.'); }
+    if (n === 20) { g.earn(5000, 'package'); s.weapons.smg = true; s.ammo.smg += 120; this.phone('unknown', 'Twenty. An SMG is waiting in your stash. Don’t make me regret it.'); }
+    if (n === 30) { g.earn(15000, 'package'); this.ach('pack30'); this.phone('unknown', 'All thirty. You know this island better than I do now.'); }
     g.saveGame();
   }
   _spawnGold() {
@@ -303,6 +305,7 @@ class ContentManager {
     if (!e) {
       const origin = v.goldCar ? 'found' : v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
       e = this.addToGarage(v.type, origin, v.colorHex, true, { p: def.id, i: bay.i });
+      Money.adoptCar(v, e.uid); // cash left in the car is now kept with it in your garage
       e.vtier = v.vtier || VEHICLES[v.type].tier;
       g.ui.toast(`${v.spec.name} parked at ${def.name}. It’s yours now${origin === 'stolen' ? ' — just don’t show it to the original owner' : ''}.`, 'money');
       if (v.rareFind) this.secret('rooftop');
@@ -387,14 +390,14 @@ class ContentManager {
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
         <div class="btns">${here ? `<button class="sbtn gold" data-act="out:${e.uid}" ${wrecked ? 'disabled' : ''}>${wrecked ? 'Wrecked' : 'Where is it?'}</button>` : move}
-        ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${s.money < rcost ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
+        ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${!Money.can(rcost, 'garage') ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
         <button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button></div></div>`;
     };
     const render = () => {
       const here = s.garage.filter(e => e.at && e.at.p === def.id), other = s.garage.filter(e => !(e.at && e.at.p === def.id));
       const col = this.collection(), rank = ['beater', 'common', 'nice', 'sport', 'luxury', 'rare'];
       here.sort((a, b) => rank.indexOf(b.vtier) - rank.indexOf(a.vtier));
-      return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span></div>
+      return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html('garage')}</span></div>
         <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
         <div class="grid2">${here.map(e => card(e, true)).join('') || '<div class="hint">Nothing parked here. Drive a car into a free space and stop to park it.</div>'}</div>
         ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}`;
@@ -402,7 +405,7 @@ class ContentManager {
     this.openSvc(def.name, 'Stored cars stand in their spaces: get in and drive off to use one. Drive into a free space and stop to park. Cars you leave around town are towed home.', render, act => {
       const [k, id] = act.split(':'), uid = +id, e = s.garage.find(x => x.uid === uid); if (!e) return;
       if (k === 'out') { this.takeOut(uid, gp); g.ui.back(); return; }
-      if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (s.money < c) return; this.spend(c); e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (dv) { dv.health = 100; dv.burnt = false; } }
+      if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (dv) { dv.health = 100; dv.burnt = false; } }
       if (k === 'sell') {
         const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
         if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
@@ -412,7 +415,8 @@ class ContentManager {
           if (g.garageDisplay) g.garageDisplay.cars.delete(e.uid);
           if (g.garageCar && g.garageCar.garageUid === e.uid) g.garageCar = null;
           if (e.trunk && units(e.trunk) && g.uw) { const r = g.uw.unloadTrunk(e); if (r) g.ui.toast(r, 'money'); }
-          s.garage.splice(i, 1); g.addMoney(this.sellPrice(e), false); g.audio.play('cash'); g.saveGame(); this.refreshSvc();
+          Money.emptyCar(e.uid); // cash kept in its trunk comes out with you
+          s.garage.splice(i, 1); Money.earn(this.sellPrice(e), 'carSale'); g.audio.play('cash'); g.saveGame(); this.refreshSvc();
         });
         return;
       }
@@ -436,7 +440,6 @@ class ContentManager {
   classK(type) { return 0.8 + Math.min(1.4, carMsrp(type) / 30000); }
   repairCost(type, health) { const d = this.g.uw ? this.g.uw.props.perk('repair') : 0; return Math.max(60, Math.round((100 - health) * 9 * this.classK(type) * (1 - d) / 10) * 10); }
   tunePrice(t, lv, type) { const d = this.g.uw ? this.g.uw.props.perk('repair') : 0; return Math.round(t.prices[lv] * this.classK(type) * (1 - d) / 10) * 10; }
-  spend(n) { const s = this.g.save; s.money = Math.max(0, s.money - n); s.stats.spent += n; }
   // the salesperson at a dealership's desk: what is on the lot, where it stands, and when new stock arrives
   openDealer(lot = 'new') {
     const g = this.g, s = g.save, D = DEALERSHIPS[lot], DL = g.dealers; if (!D || !DL) return;
@@ -444,7 +447,7 @@ class ContentManager {
     const render = () => {
       const st = DL.state(lot), cars = st.cars;
       const next = Math.max(0, st.d + D.every - DL.day);
-      let h = `<div class="svcTop"><span>Reputation <b>${this.repName}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span></div>`;
+      let h = `<div class="svcTop"><span>Reputation <b>${this.repName}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html(lot === 'used' ? 'usedLot' : 'dealer')}</span></div>`;
       h += `<div class="hint" style="margin:6px 0">${cars.filter(Boolean).length} cars on the lot · ${lot === 'new' ? 'sold cars are replaced overnight' : `new stock ${next ? `in ${next} day${next > 1 ? 's' : ''}` : 'tomorrow'}`}. Walk up to a car to inspect it and buy it where it stands.</div><div class="grid2">`;
       h += cars.map((c, i) => c ? `<div class="card"><div class="t">${esc(VEHICLES[c.type].name)} ${tierChip(c.vtier)}${c.bargain ? '<span class="chip" style="--c:#7fe08f">BARGAIN</span>' : ''}</div>
         <div class="d">${esc(CAR_CLASS[c.type] || '')}${lot === 'used' ? ` · ${condLabel(c.cond)[0]} (${c.cond}%) · ${c.km.toLocaleString()} km` : ''}</div>
@@ -463,7 +466,7 @@ class ContentManager {
       const c = DL.state(lot).cars[i]; if (!c) return '<div class="hint">Sold.</div>';
       const V = VEHICLES[c.type], why = DL.cantBuy(lot, c);
       const cl = condLabel(c.cond);
-      return `<div class="svcTop"><span>Reputation <b>${this.repName}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span></div>
+      return `<div class="svcTop"><span>Reputation <b>${this.repName}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html(lot === 'used' ? 'usedLot' : 'dealer')}</span></div>
         <div class="card"><div class="t">${esc(V.name)} ${tierChip(c.vtier)}${c.bargain ? '<span class="chip" style="--c:#7fe08f">BARGAIN</span>' : ''}</div>
         <div class="d">${esc(CAR_CLASS[c.type] || '')} · ${esc(V.blurb)}</div>
         <div class="stat"><span>Price</span><span class="money"><b>${fmtMoney(c.price)}</b>${lot === 'used' ? ` <small style="color:var(--dim)">new ${fmtMoney(carMsrp(c.type))}</small>` : ''}</span></div>
@@ -504,16 +507,16 @@ class ContentManager {
     const render = () => {
       const rc = this.repairCost(v.type, v.health), dmg = v.health < 99.5 || v.broken || v.deformed > 0.05;
       const heat = g.police.level > 0, rp = heat ? 600 : 250;
-      let h = `<div class="svcTop"><span>${v.spec.name} ${ent ? this.chip(ent.origin) : this.chip(v.origin || 'stolen')}</span><span>Condition <b>${Math.max(0, Math.round(v.health))}%</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span></div><div class="grid2">`;
-      h += `<div class="card"><div class="t">Repair</div><div class="d">Body, glass, lights and alignment. Good as new.</div><button class="sbtn gold" data-act="repair" ${!dmg || s.money < rc ? 'disabled' : ''}>${dmg ? fmtMoney(rc) : 'No damage'}</button></div>`;
-      h += `<div class="card"><div class="t">Respray${heat ? ' & new plates' : ''}</div><div class="d">${heat ? 'Fresh paint and plates. If no cop is watching right now, they lose your description.' : 'Pick a colour.'}</div><div class="swatches">${COLORS.map(c => `<button class="sw" data-act="paint:${c}" style="background:#${c.toString(16).padStart(6, '0')}" ${s.money < rp ? 'disabled' : ''}></button>`).join('')}</div><div class="stat"><span>Cost</span><span>${fmtMoney(rp)}</span></div></div>`;
+      let h = `<div class="svcTop"><span>${v.spec.name} ${ent ? this.chip(ent.origin) : this.chip(v.origin || 'stolen')}</span><span>Condition <b>${Math.max(0, Math.round(v.health))}%</b></span><span>${Money.html('either')}</span></div><div class="grid2">`;
+      h += `<div class="card"><div class="t">Repair</div><div class="d">Body, glass, lights and alignment. Good as new.</div><button class="sbtn gold" data-act="repair" ${!dmg || !Money.can(rc, 'garage') ? 'disabled' : ''}>${dmg ? fmtMoney(rc) : 'No damage'}</button></div>`;
+      h += `<div class="card"><div class="t">Respray${heat ? ' & new plates' : ''}</div><div class="d">${heat ? 'Fresh paint and plates. If no cop is watching right now, they lose your description.' : 'Pick a colour.'}</div><div class="swatches">${COLORS.map(c => `<button class="sw" data-act="paint:${c}" style="background:#${c.toString(16).padStart(6, '0')}" ${!Money.can(rp, heat ? 'payAndSpray' : 'garage') ? 'disabled' : ''}></button>`).join('')}</div><div class="stat"><span>Cost</span><span>${fmtMoney(rp)}</span></div></div>`;
       h += '</div><h3>Tuning</h3>';
       if (!ent) h += `<div class="hint">Dex only tunes cars that are registered to you. Store this one in your garage first.</div>`;
       else {
         h += '<div class="grid2">' + TUNE.map(t => {
           const lv = ent.tune[t.id], max = lv >= 3, price = max ? 0 : this.tunePrice(t, lv, v.type), need = TUNE_REP[lv] || 0;
           const locked = !max && this.repLevel < need;
-          return `<div class="card"><div class="t">${t.name}</div><div class="d">${t.desc}</div><div class="pips">${[0, 1, 2].map(i => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn gold" data-act="tune:${t.id}" ${max || locked || s.money < price ? 'disabled' : ''}>${max ? 'Maxed' : locked ? 'Needs ' + REP_LEVELS[need].name : 'Stage ' + (lv + 1) + ' · ' + fmtMoney(price)}</button></div>`;
+          return `<div class="card"><div class="t">${t.name}</div><div class="d">${t.desc}</div><div class="pips">${[0, 1, 2].map(i => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn gold" data-act="tune:${t.id}" ${max || locked || !Money.can(price, 'garage') ? 'disabled' : ''}>${max ? 'Maxed' : locked ? 'Needs ' + REP_LEVELS[need].name : 'Stage ' + (lv + 1) + ' · ' + fmtMoney(price)}</button></div>`;
         }).join('') + '</div>';
       }
       return h;
@@ -522,18 +525,18 @@ class ContentManager {
     this.openSvc('Okafor Motor Works', hint, render, act => {
       const [k, a] = act.split(':');
       if (k === 'repair') {
-        const c = this.repairCost(v.type, v.health); if (s.money < c) return;
-        this.spend(c); this.repair(v); s.stats.repairs++; g.audio.play('cash');
+        const c = this.repairCost(v.type, v.health); if (!Money.pay(c, 'garage')) return;
+        this.repair(v); s.stats.repairs++; g.audio.play('cash');
         if (ent) ent.dmg = 0;
       } else if (k === 'paint') {
-        const heat = g.police.level > 0, c = heat ? 600 : 250; if (s.money < c) return;
-        this.spend(c); v.colorHex = +a; v.mat.userData.u.uPaint.value.setHex(+a); if (ent) ent.color = +a;
+        // a respray that sheds a live police description is Pay & Spray work, paid in Dirty Cash; a plain colour
+        // change is ordinary licensed garage work, paid from the bank (§45.18)
+        const heat = g.police.level > 0, c = heat ? 600 : 250; if (!Money.pay(c, heat ? 'payAndSpray' : 'garage')) return; v.colorHex = +a; v.mat.userData.u.uPaint.value.setHex(+a); if (ent) ent.color = +a;
         g.audio.play('cash');
         if (heat) { if (!g.police.visible) { g.police.clear('New paint, new plates. The police lost your description.'); } else g.ui.toast('A cop is watching the shop — the paint won’t fool them.', 'warn'); }
       } else if (k === 'tune' && ent) {
         const t = TUNE.find(x => x.id === a), lv = ent.tune[a]; if (lv >= 3) return;
-        const price = this.tunePrice(t, lv, v.type); if (s.money < price || this.repLevel < (TUNE_REP[lv] || 0)) return;
-        this.spend(price); ent.tune[a] = lv + 1; v.tune = ent.tune; g.audio.play('cash');
+        const price = this.tunePrice(t, lv, v.type); if (this.repLevel < (TUNE_REP[lv] || 0) || !Money.pay(price, 'garage')) return; ent.tune[a] = lv + 1; v.tune = ent.tune; g.audio.play('cash');
         if (TUNE.every(x => ent.tune[x.id] >= 3)) this.ach('tuned');
       }
       g.saveGame(); this.refreshSvc();
@@ -547,12 +550,12 @@ class ContentManager {
   // Fuel & Go
   openStore() {
     const g = this.g, s = g.save, p = g.player;
-    const render = () => `<div class="svcTop"><span>Health <b>${Math.round(p.health)} / ${p.maxHealth}</b></span><span>Vest <b>${Math.round(p.vest)}</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span></div><div class="grid2">` + STORE_ITEMS.map(it => {
+    const render = () => `<div class="svcTop"><span>Health <b>${Math.round(p.health)} / ${p.maxHealth}</b></span><span>Vest <b>${Math.round(p.vest)}</b></span><span>${Money.html('either')}</span></div><div class="grid2">` + STORE_ITEMS.map(it => {
       const locked = it.rep && this.repLevel < it.rep;
-      return `<div class="card"><div class="t">${it.name}</div><div class="d">${it.desc}</div><button class="sbtn gold" data-act="${it.id}" ${locked || s.money < it.price ? 'disabled' : ''}>${locked ? 'Needs ' + REP_LEVELS[it.rep].name : fmtMoney(it.price)}</button></div>`;
+      return `<div class="card"><div class="t">${it.name}</div><div class="d">${it.desc}</div><button class="sbtn gold" data-act="${it.id}" ${locked || !Money.can(it.price, it.pay) ? 'disabled' : ''}>${locked ? 'Needs ' + REP_LEVELS[it.rep].name : fmtMoney(it.price)}</button></div>`;
     }).join('') + '</div>';
     this.openSvc('Fuel & Go', 'Clerk: “Pumps are self-serve. Everything else, you pay me.”', render, id => {
-      const it = STORE_ITEMS.find(x => x.id === id); if (!it || s.money < it.price) return;
+      const it = STORE_ITEMS.find(x => x.id === id); if (!it || !Money.can(it.price, it.pay)) return;
       let msg = '';
       if (id === 'snack') { if (p.health >= p.maxHealth) { this.refreshSvc('You’re not hungry.'); return; } p.health = Math.min(p.maxHealth, p.health + 40 * HP_SCALE); msg = 'Warm, greasy, perfect.'; }
       if (id === 'medkit') { if (p.health >= p.maxHealth) { this.refreshSvc('Nothing to patch up.'); return; } p.health = Math.min(p.maxHealth, p.health + 180); msg = 'Gauze, tape and something that stings. Better.'; }
@@ -565,7 +568,7 @@ class ContentManager {
         left.sort(() => Math.random() - 0.5).slice(0, 5).forEach(pk => { s.hints[pk.id] = 1; });
         msg = 'Five green crosses on the map. Open it with M.';
       }
-      this.spend(it.price); g.audio.play('cash'); g.saveGame(); this.refreshSvc(msg);
+      Money.pay(it.price, it.pay); g.audio.play('cash'); g.saveGame(); this.refreshSvc(msg);
     });
   }
   openWardrobe() {
@@ -579,12 +582,12 @@ class ContentManager {
   openTipLine() {
     const g = this.g, s = g.save;
     const left = g.world.packages.filter(pk => !s.packages[pk.id] && !s.hints[pk.id]).length;
-    const render = () => `<div class="hint">A corkboard of community notices, missing cats and a laminated sheet: “CRIME STOPPERS — information about contraband stashes rewarded.” Someone has scribbled under it: <i>“or bought.”</i></div><div class="grid2"><div class="card"><div class="t">Buy a tip</div><div class="d">Marks three unfound hidden packages on your map.</div><button class="sbtn gold" data-act="tip" ${!left || s.money < 500 ? 'disabled' : ''}>${left ? '$500' : 'Nothing left to tell'}</button></div></div>`;
+    const render = () => `<div class="hint">A corkboard of community notices, missing cats and a laminated sheet: “CRIME STOPPERS — information about contraband stashes rewarded.” Someone has scribbled under it: <i>“or bought.”</i></div><div class="grid2"><div class="card"><div class="t">Buy a tip</div><div class="d">Marks three unfound hidden packages on your map.</div><button class="sbtn gold" data-act="tip" ${!left || !Money.can(500, 'tipLine') ? 'disabled' : ''}>${left ? '$500' : 'Nothing left to tell'}</button></div></div>`;
     this.openSvc('Tip line', `${30 - Object.keys(s.packages).length} packages are still out there.`, render, () => {
-      if (s.money < 500) return;
+      if (!Money.can(500, 'tipLine')) return;
       const l = g.world.packages.filter(pk => !s.packages[pk.id] && !s.hints[pk.id]);
       l.sort((a, b) => dist2(a.x, a.z, g.player.pos.x, g.player.pos.z) - dist2(b.x, b.z, g.player.pos.x, g.player.pos.z)).slice(0, 3).forEach(pk => { s.hints[pk.id] = 1; });
-      this.spend(500); g.audio.play('cash'); g.saveGame(); this.refreshSvc('Three locations marked on your map.');
+      Money.pay(500, 'tipLine'); g.audio.play('cash'); g.saveGame(); this.refreshSvc('Three locations marked on your map.');
     });
   }
   openLaptop() {
@@ -758,9 +761,9 @@ class ContentManager {
   offerPenthouse() {
     const g = this.g, s = g.save;
     if (this.repLevel < 4) { this.deny('The concierge looks you up and down. “The penthouse is for Operators, not errand runners.” (Operator reputation)'); return; }
-    if (s.money < 25000) { this.deny('The penthouse costs $25,000. Come back with the money.'); return; }
+    if (!Money.can(25000, 'property')) { this.deny('The penthouse costs $25,000 from your bank. Come back with clean money.'); return; }
     g.ui.ask('Buy the Valen Tower penthouse?', '$25,000. A second safehouse with a skyline view, and four more garage slots at the tower.', 'Buy', () => {
-      this.spend(25000); s.owns.penthouse = true; s.home = 'penthouse';
+      Money.pay(25000, 'property'); s.owns.penthouse = true; s.home = 'penthouse';
       g.audio.play('pass'); g.ui.banner('Moving Up', 'Valen Tower Penthouse', 'pass', 3.5);
       this.ach('home'); this.phone('pv', 'Valen Courier: mystery buyer snaps up the Valen Tower penthouse. Neighbours "intrigued".');
       g.saveGame();
@@ -890,7 +893,7 @@ class ContentManager {
       const st2 = this.burgleState(def); if (st2.s.includes(i)) return;
       st2.s.push(i);
       const L = this.containerLoot(def, i), got = [];
-      if (L.cash > 0) { g.addMoney(L.cash, true); got.push(fmtMoney(L.cash)); }
+      if (L.cash > 0) { g.earn(L.cash, 'burglary'); got.push(fmtMoney(L.cash)); }
       if (L.goods) { const r = g.uw.give(L.goods, 'burglary'); if (r) got.push(L.name ? `${L.name} (${goodsList(r)})` : goodsList(r)); }
       if (L.ammo > 0) { g.save.ammo.pistol = (g.save.ammo.pistol || 0) + L.ammo; got.push(`${L.ammo} pistol rounds`); }
       if (L.gun && !g.save.weapons[L.gun]) { g.save.weapons[L.gun] = true; if (g.save.wloc) g.save.wloc[L.gun] = null; got.push('a ' + (WEAPONS.find(w => w.id === L.gun) || { name: L.gun }).name); }
@@ -935,7 +938,7 @@ class ContentManager {
       this.channel(armed ? 'THE CLERK EMPTIES THE TILL' : 'LEANING ON THE CLERK', 3, () => {
         st.reg = S.day;
         const cash = Math.round((armed ? randi(180, 460) : randi(60, 200)) * area);
-        g.addMoney(cash, true); g.audio.play('cash');
+        g.earn(cash, 'heist'); g.audio.play('cash');
         g.save.stats.robberies = (g.save.stats.robberies || 0) + 1;
         this.say('Clerk', pick(['Take it, take it! The back office key too, just go!', 'Okay! Okay. Here. And the key to the back. Please.']));
         this.openStaffDoor(def, true);
@@ -955,12 +958,12 @@ class ContentManager {
     const grab = () => {
       st[id] = true;
       if (id === 'safe') {
-        const cash = Math.round(randi(1400, 4200) * area); g.addMoney(cash, true); g.audio.play('cash');
+        const cash = Math.round(randi(1400, 4200) * area); g.earn(cash, 'heist'); g.audio.play('cash');
         const got = Math.random() < 0.35 ? g.uw.give({ hot: 1 + randi(0, 2) }, 'robbery') : null;
         g.ui.toast(`The safe: ${fmtMoney(cash)}${got ? ' and ' + goodsList(got) : ''}.`, 'money');
         if (Math.random() < 0.45) { g.audio.play('buzzer'); this.silentAlarm(def, 3); } else g.police.crime('robbery', def.door.x, def.door.z);
       } else if (id === 'desk') {
-        if (Math.random() < 0.6) { const c = randi(40, 220); g.addMoney(c, true); g.ui.toast(`Petty cash in the desk: ${fmtMoney(c)}.`, 'money'); }
+        if (Math.random() < 0.6) { const c = randi(40, 220); g.earn(c, 'heist'); g.ui.toast(`Petty cash in the desk: ${fmtMoney(c)}.`, 'money'); }
         else if (Math.random() < 0.5) { g.save.ammo.pistol = (g.save.ammo.pistol || 0) + 12; g.ui.toast('A box of pistol rounds in the drawer: 12 rounds.', 'money'); }
         else g.ui.toast('Invoices and a stale doughnut.');
       } else {

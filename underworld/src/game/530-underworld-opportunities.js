@@ -68,7 +68,7 @@ class OppFeed {
     for (const o of this.S.opps) if (o.kind === 'bounty' && p.fac === o.target && turfAt(p.x, p.z) === o.turf) {
       o.got++;
       if (o.got >= o.need) {
-        const uw = this.uw; uw.income('bounties', o.reward); uw.S.factions[o.payer].rel = clamp(uw.S.factions[o.payer].rel + 15, -100, 100); uw.S.factions[o.target].rel -= 10;
+        const uw = this.uw; Money.earn(o.reward, 'bounty'); uw.S.factions[o.payer].rel = clamp(uw.S.factions[o.payer].rel + 15, -100, 100); uw.S.factions[o.target].rel -= 10;
         uw.g.ui.toast(`Bounty paid by the ${FACTIONS[o.payer].short}: ${fmtMoney(o.reward)}.`, 'money'); uw.addRep(30, null);
         this.remove(o);
       } else uw_toastOnce(this.uw, `Bounty: ${o.got} / ${o.need}`);

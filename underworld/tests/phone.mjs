@@ -9,7 +9,7 @@ const b = await launch();
 const t = await open(b, { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 const page = t.page;
 await startNew(page);
-await page.evaluate(() => { const g = window.game; g.events.cool = 1e9; g.save.money = 1234567; g.resetPlayerState(5 * 80 + 40, 5 * 80 + 2, 0); });
+await page.evaluate(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = g.money.W.dirty.me = 1234567); g.resetPlayerState(5 * 80 + 40, 5 * 80 + 2, 0); });
 await frames(page, 10);
 
 // every visible HUD rect we care about, measured in the page

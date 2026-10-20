@@ -79,8 +79,8 @@ class DeliveryManager {
     if (n <= 0) return 'There is none of that at the pickup.';
     if (this.freeAt(to) < n * GOODS[good].size) return `Not enough room at ${PROP_BY_ID[to].name} (with other runs on the way).`;
     const a = this.assess(c, from, to, good, n); if (!a) return 'No route.';
-    if (g.save.money < a.fee) return `The runner wants ${fmtMoney(a.fee)} up front.`;
-    uw.expense('deliveries', a.fee);
+    if (!Money.can(a.fee, 'delivery')) return `The runner wants ${fmtMoney(a.fee)} up front, from your Dirty Cash.`;
+    Money.pay(a.fee, 'delivery');
     const cost = Inv.remove(src, good, n);
     const now = this.absHour();
     const r = { id: S.nextRun++, crew: c.id, name: uw.crew.displayName(c), from, to, good, n, cost, fee: a.fee, start: now, eta: now + a.hours, chance: a.p, dist: a.dist };

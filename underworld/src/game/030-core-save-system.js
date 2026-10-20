@@ -11,12 +11,15 @@ const SETTINGS_KEY = 'pvunderworld.settings.v1';
 // v6: no casino table limits (tables are seats, not tiers), Royale Billions jackpot pressure (gamble.jp) and
 // bet preferences (gamble.pref); jail good-behaviour points and contraband phone state; 45 homes and 50
 // businesses with business levels; dealership lots. Every new field defaults safely, so v5 saves load as they are.
-const SAVE_VERSION = 7;
+// v8 (overhaul Session 1): the single `money` number is gone. Money lives in `wallet` (Dirty Cash by place, Clean
+// Bank, medical debt; see Money). A development save's old balance moves into Clean Bank (§45.2) before the merge,
+// because merge() would silently drop a field whose type changed. Production starts a fresh save generation.
+const SAVE_VERSION = 8;
 const SaveSystem = {
   defaults() {
     return {
       version: SAVE_VERSION,
-      money: 0,
+      wallet: Money.fresh(),
       upgrades: { stamina: 0, health: 0, handling: 0, cooldown: 0, armor: 0, engine: 0, brakes: 0, durability: 0 },
       weapons: { bat: false, pistol: false, smg: false, shotgun: false },
       ammo: { pistol: 0, smg: 0, shotgun: 0 },
@@ -75,6 +78,9 @@ const SaveSystem = {
     const st = this.loadSettings();
     if (!data || typeof data !== 'object') { if (st) { this.mergeInto(d.settings, st); this.sanitize(d); } return { data: d, existed: false }; }
     const oldVersion = typeof data.version === 'number' ? data.version : 1;
+    // v7 -> v8: the old single balance becomes Clean Bank (§45.2). Read raw, before merge() could drop it.
+    if (oldVersion < 8 && !(data.wallet && typeof data.wallet === 'object')) data.wallet = { clean: typeof data.money === 'number' && isFinite(data.money) && data.money > 0 ? data.money : 0 };
+    delete data.money;
     // deep-merge so new fields added in later versions get defaults
     const merge = (dst, src) => {
       for (const k in src) {
@@ -105,23 +111,9 @@ const SaveSystem = {
   mergeInto(dst, src) { if (!src || typeof src !== 'object') return; for (const k in dst) if (src[k] !== undefined && typeof src[k] === typeof dst[k]) dst[k] = src[k]; },
   loadSettings() { try { const r = localStorage.getItem(SETTINGS_KEY); const o = r ? JSON.parse(r) : null; return o && typeof o === 'object' ? o : null; } catch { return null; } },
   saveSettings(s) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } },
-  // v1 saves kept owned cars as a {type: true} map and had no campaign; carry everything over.
-  migrateV1(d, old) {
-    d.garage = [];
-    let uid = 1;
-    const owned = old.vehicles && typeof old.vehicles === 'object' ? old.vehicles : { compact: true };
-    for (const type of Object.keys(owned)) if (owned[type] && VEHICLES[type]) d.garage.push({ uid: uid++, type, color: VEHICLES[type].colors[0], origin: 'bought', dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 } });
-    if (!d.garage.length) d.garage.push({ uid: uid++, type: 'compact', color: 0x2e86c1, origin: 'bought', dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 } });
-    d.nextUid = uid;
-    const done = Math.max(0, old.missionsCompleted | 0);
-    d.rep = Math.min(600, done * 25);
-    // veterans skip the day-one tutorial
-    if (done >= 1) { d.story.r1 = 1; d.flags.introDone = true; d.flags.garageTip = true; }
-    d.stats.sideDone = done;
-    d.version = SAVE_VERSION;
-    d.flags.migratedFromV1 = true;
-  },
   sanitize(d) {
+    d.wallet = Money.sanitize(d.wallet);
+    delete d.money;
     if (!Array.isArray(d.garage)) d.garage = [];
     d.garage = d.garage.filter(e => e && typeof e === 'object' && VEHICLES[e.type]);
     // v6 dealership stock: anything malformed is dropped (that stall restocks); a broken lot starts over
@@ -172,7 +164,7 @@ const SaveSystem = {
       // (v5 hands carried a limit tier instead of a seat; both load, there is no table maximum to check now)
       const hands = Array.isArray(T.hands) ? T.hands : [];
       const ok = T.game === 'bj' && hands.length >= 1 && hands.length <= 2 && hands.every(h => h && Array.isArray(h.cards) && h.cards.length >= 1 && h.cards.length <= 12 && h.cards.every(okCard) && isFinite(h.bet) && h.bet > 0 && h.bet < 1e15) && Array.isArray(T.dealer) && T.dealer.length === 2 && T.dealer.every(okCard);
-      if (!ok) { let back = 0; for (const h of hands) if (h && isFinite(h.bet) && h.bet > 0) back += Math.min(h.bet, 1e15); d.money += back; d.gamble.table = null; }
+      if (!ok) { let back = 0; for (const h of hands) if (h && isFinite(h.bet) && h.bet > 0) back += Math.min(h.bet, 1e15); d.wallet.clean += Math.min(back, MONEY_MAX); d.gamble.table = null; }
       else T.seat = Number.isInteger(T.seat) && T.seat >= 0 && T.seat < 8 ? T.seat : 0;
     } else d.gamble.table = null;
     for (const e of d.garage) e.vtier = typeof e.vtier === 'string' && TIER_LOOK[e.vtier] ? e.vtier : VEHICLES[e.type].tier;
@@ -194,7 +186,6 @@ const SaveSystem = {
     if (S.quality !== 'auto' && !(S.quality >= 0 && S.quality <= 3)) S.quality = 'auto';
     if (!isFinite(d.timeOfDay)) d.timeOfDay = 9.5; d.timeOfDay = ((d.timeOfDay % 24) + 24) % 24;
     for (const k in d.upgrades) d.upgrades[k] = clamp(d.upgrades[k] | 0, 0, 3);
-    if (typeof d.money !== 'number' || !isFinite(d.money)) d.money = 0;
     if (d.home !== null && typeof d.home !== 'string') d.home = null;
     d.version = SAVE_VERSION;
   },
@@ -208,29 +199,16 @@ const SaveSystem = {
   },
   wipe() { try { localStorage.removeItem(SAVE_KEY); } catch { /* storage blocked */ } }
 };
-/* Money feedback. The save's money field is an accessor: every write to it, from any system (addMoney,
-   spend, expenses, the market, gambling, raids, fines, taxi fares, deliveries...), records the change
-   here, and the UI shows it as a green "+$n" or red "-$n" under the money display. One hook, no
-   per-system calls. Changes within a short burst in the same direction are merged into one line. */
+/* Money feedback: every change to the money you hold (cash on you, the bank) pops a green "+$n" or red "-$n"
+   under the readout. It listens to Money, the one place money changes, so no system needs its own call. Changes
+   within a short burst, in the same currency and direction, merge into one line. */
 const MoneyFeed = {
   live: false, sink: null, last: null,
-  bind(save) {
-    if (!save || typeof save !== 'object') return save;
-    const d = Object.getOwnPropertyDescriptor(save, 'money');
-    if (d && d.get && d.get.__moneyFeed) return save;
-    let v = +save.money; if (!isFinite(v)) v = 0;
-    const get = function () { return v; }; get.__moneyFeed = true;
-    Object.defineProperty(save, 'money', {
-      enumerable: true, configurable: true, get,
-      set(n) { n = +n; if (!isFinite(n)) return; const delta = n - v; v = n; if (MoneyFeed.live && Math.abs(delta) >= 0.5) MoneyFeed.push(delta); }
-    });
-    return save;
-  },
-  push(delta) {
+  init() { Money.on(e => { if (this.live && (e.cur === 'dirty' || e.cur === 'clean') && Math.abs(e.d) >= 0.5) this.push(e.d, e.cur); }); },
+  push(delta, cur = 'dirty') {
     const now = performance.now(), L = this.last;
-    if (L && L.el && L.el.isConnected && Math.sign(L.d) === Math.sign(delta) && now - L.t < 150) { L.d += delta; L.t = now; if (this.sink) this.sink(L, true); return; }
-    this.last = { d: delta, t: now, el: null };
+    if (L && L.el && L.el.isConnected && L.cur === cur && Math.sign(L.d) === Math.sign(delta) && now - L.t < 150) { L.d += delta; L.t = now; if (this.sink) this.sink(L, true); return; }
+    this.last = { d: delta, cur, t: now, el: null };
     if (this.sink) this.sink(this.last, false);
   }
 };
-

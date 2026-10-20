@@ -22,18 +22,21 @@ class StuntTracker {
   // street furniture flattened by the player's car (it was called but never defined: driving through a
   // lamp post or hydrant threw and cut that frame's update short)
   destroyed(type) { const st = this.g.save.stats; st.smashed = (st.smashed || 0) + 1; void type; }
+  // "+$120 bank", or a note once the day's stunt cash is used up
+  cashText(paid) { return paid > 0 ? `+${fmtMoney(paid)} bank` : 'daily stunt cash reached'; }
   landed(v, airT, imp) {
     const L = this.launch, g = this.g, s = g.save; this.launch = null;
     if (!L || airT < 0.6 || g.state !== 'playing') return;
     const dist = Math.hypot(v.pos.x - L.x, v.pos.z - L.z);
     if (dist < 8) return;
     const clean = imp < 9 && v.health > 0 && Math.abs(v.roll || 0) < 0.5;
-    let cash = Math.round((dist * 4 + airT * 70) * (clean ? 1.5 : 1) / 5) * 5;
+    // repeatable stunt cash is Clean but capped per in-game day; a first unique jump pays its bonus in full (§45.19)
+    let cash = Math.round((dist * 4 + airT * 70) * (clean ? 1.5 : 1) / 5) * 5, milestone = 0;
     s.stats.stuntJumps++;
     s.stats.bestJump = Math.max(s.stats.bestJump, dist); s.stats.bestAir = Math.max(s.stats.bestAir, airT);
     let title = clean ? 'CLEAN LANDING' : 'STUNT JUMP';
     if (L.jump && L.jump.unique && dist > 12 && airT > 0.8 && !s.jumps[L.jump.id]) {
-      s.jumps[L.jump.id] = 1; cash += 500;
+      s.jumps[L.jump.id] = 1; milestone = 500;
       const n = Object.keys(s.jumps).length, tot = g.world.jumps.length;
       title = `UNIQUE JUMP ${n} / ${tot}`;
       g.content.addRep(15);
@@ -43,8 +46,8 @@ class StuntTracker {
       }
       if (n >= tot) g.ach('jumpall');
     }
-    g.addMoney(cash, true);
-    this.pop(title, `${Math.round(dist)} m · ${airT.toFixed(1)} s · +${fmtMoney(cash)}`, 'jump');
+    const paid = g.earn(cash, 'stunt') + (milestone ? g.earn(milestone, 'stuntMilestone') : 0);
+    this.pop(title, `${Math.round(dist)} m · ${airT.toFixed(1)} s · ${this.cashText(paid)}`, 'jump');
     g.audio.play('stunt');
     if (dist > 40) g.slowT = Math.max(g.slowT, 0.25);
   }
@@ -70,8 +73,8 @@ class StuntTracker {
           const wet = g.env.wet > 0.4 ? 1.5 : 1;
           const cash = Math.round(d.score / 12 * wet / 5) * 5;
           s.stats.bestDrift = Math.max(s.stats.bestDrift, Math.round(d.score));
-          g.addMoney(cash, true);
-          this.pop(wet > 1 ? 'WET DRIFT' : 'DRIFT', `${Math.round(d.score).toLocaleString('en-US')} · +${fmtMoney(cash)}`);
+          const paid = g.earn(cash, 'stunt');
+          this.pop(wet > 1 ? 'WET DRIFT' : 'DRIFT', `${Math.round(d.score).toLocaleString('en-US')} · ${this.cashText(paid)}`);
           if (d.score >= 2000) g.ach('drift');
         }
         d.score = 0;
@@ -93,8 +96,8 @@ class StuntTracker {
           if (v.health >= e.hp - 0.5) {
             this.combo++; this.comboT = 4; s.stats.nearMisses++;
             const cash = 10 * Math.min(this.combo, 8);
-            g.addMoney(cash, false);
-            this.pop(this.combo > 1 ? `NEAR MISS ×${this.combo}` : 'NEAR MISS', '+' + fmtMoney(cash), 'nm');
+            const paid = Money.earn(cash, 'stunt');
+            this.pop(this.combo > 1 ? `NEAR MISS ×${this.combo}` : 'NEAR MISS', this.cashText(paid), 'nm');
             g.audio.play('ui', { gain: 0.4 });
             if (s.stats.nearMisses >= 50) g.ach('near50');
           }
@@ -485,7 +488,7 @@ class EventManager {
       case 'drop': {
         if (!ev.done && p.state === 'foot' && Math.hypot(p.pos.x - ev.bag.x, p.pos.z - ev.bag.z) < 1.5) {
           ev.done = true; g.missions.markers.release(ev.mk); ev.mk = null; g.audio.play('pickup');
-          if (Math.random() < 0.7) { const cash = randi(20, 50) * 10; g.addMoney(cash, true); g.ui.toast(`The bag is stuffed with cash: ${fmtMoney(cash)}.`, 'money'); }
+          if (Math.random() < 0.7) { const cash = randi(20, 50) * 10; g.earn(cash, 'event'); g.ui.toast(`The bag is stuffed with cash: ${fmtMoney(cash)}.`, 'money'); }
           else { g.ui.toast('Evidence bags. Someone saw you take it…', 'warn'); g.police.addHeat(2, p.pos.x, p.pos.z); }
           s.stats.eventsDone++;
         }
@@ -497,7 +500,7 @@ class EventManager {
     if (far || ev.t > 150 && !ev.ride || (ev.done && d > 80 && ev.t > 10)) this.finish();
   }
   reward(cash, rep, line) {
-    const g = this.g; g.addMoney(cash, true); g.content.addRep(rep); g.save.stats.eventsDone++;
+    const g = this.g; g.earn(cash, 'event'); g.content.addRep(rep); g.save.stats.eventsDone++;
     g.ui.toast(`${line} +${fmtMoney(cash)}`, 'money'); g.audio.play('confirm');
     if (g.save.stats.eventsDone >= 5) g.ach('samaritan');
   }

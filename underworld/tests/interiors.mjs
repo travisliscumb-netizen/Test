@@ -42,7 +42,7 @@ await ev(() => {
 });
 
 // ---------------------------------------------------------------- the mansion
-await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; g.save.money = 1e6; g.content.enterHome('mansion'); });
+await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; (g.money.W.clean = g.money.W.dirty.me = 1e6); g.content.enterHome('mansion'); });
 await waitFade(); await frames(page, 4);
 const mz = await ev(() => { const g = window.game, d = g.content.interiors.cur; return { id: d.id, levels: (d.levels || []).length, r: window.__reach(d), spots: d.spots.map(s => s.id + (s.y ? '@up' : '')) }; });
 check('mansion: an interior with an upper floor (decks and a grand staircase)', mz.id === 'h:mansion' && mz.levels === 4, JSON.stringify(mz.spots));
@@ -109,7 +109,7 @@ const brk = await ev(() => {
 await waitFade(); await frames(page, 4);
 const loot = await ev(() => {
   const g = window.game, c = g.content, d = c.interiors.cur, p = g.player;
-  const m0 = g.save.money, inv0 = JSON.stringify(g.uw.S.inv), ammo0 = g.save.ammo.pistol;
+  const m0 = g.money.total(), inv0 = JSON.stringify(g.uw.S.inv), ammo0 = g.save.ammo.pistol;
   const res = [];
   for (const ct of d.containers) {
     p.pos.set(d.ox + ct.x, d.fy, d.oz + ct.z);
@@ -118,10 +118,10 @@ const loot = await ev(() => {
     else c.spotAct('c:' + ct.i);
     res.push({ kind: ct.kind, spot: s && s.id });
   }
-  const m1 = g.save.money, inv1 = JSON.stringify(g.uw.S.inv);
+  const m1 = g.money.total(), inv1 = JSON.stringify(g.uw.S.inv);
   // second pass: everything already searched
   for (const ct of d.containers) c.spotAct('c:' + ct.i);
-  const m2 = g.save.money, inv2 = JSON.stringify(g.uw.S.inv);
+  const m2 = g.money.total(), inv2 = JSON.stringify(g.uw.S.inv);
   return { n: d.containers.length, kinds: res.map(r => r.kind), spotsMatch: res.every((r, i) => r.spot === 'c:' + d.containers[i].i || r.spot === 'exit'), gained: m1 - m0, goods: inv1 !== inv0, ammo: g.save.ammo.pistol - ammo0, again: m2 - m1, againGoods: inv2 !== inv1, searched: c.burgleState(d).s.length };
 });
 check('break-in: the front door offers a break-in and it is a crime', /Break in|Slip into/.test(brk && brk.l || ''), JSON.stringify(brk));

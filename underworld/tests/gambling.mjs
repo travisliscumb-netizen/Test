@@ -11,7 +11,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 await startNew(page);
 const quiet = () => ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; });
 await quiet();
-await ev(() => { window.game.save.money = 5e6; });
+await ev(() => { (window.game.money.W.clean = window.game.money.W.dirty.me = 5e6); });
 
 // ---------------------------------------------------------------- 1. the maths: Fuel & Go keeps a house edge; roulette's pay table is the standard one
 const maths = await ev(() => {
@@ -40,16 +40,16 @@ const sc = await ev(async () => {
   g.content._svcAct('scratch');
   const title = document.getElementById('svcTitle').textContent;
   for (const d of [5, 10, 20, 50, 100]) {
-    const m0 = s.money, st0 = { ...s.gamble.scratch };
+    const m0 = window.game.money.clean, st0 = { ...s.gamble.scratch };
     g.content._svcAct('buy:' + d);
     const win = G.sc.win, hidden = G.shownMoney() === m0 - d;
     g.content._svcAct('buy:' + d); // a second buy while the card is unscratched is refused
-    const once = s.money === m0 - d + win;
+    const once = window.game.money.clean === m0 - d + win;
     const t0 = performance.now(); g.content._svcAct('scratch');
     await new Promise(r => { const iv = setInterval(() => { if (G.sc.done) { clearInterval(iv); r(); } }, 20); });
     const dur = performance.now() - t0;
     const st = s.gamble.scratch;
-    out.push({ d, win, hidden, once, dur, shownAfter: G.shownMoney() === s.money, stats: st.bought === st0.bought + 1 && st.spent === st0.spent + d && st.won === st0.won + win, cells: G.sc.cells.length, match: win ? G.sc.cells.filter(c => c === win).length === 3 : Object.values(G.sc.cells.reduce((a, c) => (a[c] = (a[c] || 0) + 1, a), {})).every(n => n < 3) });
+    out.push({ d, win, hidden, once, dur, shownAfter: G.shownMoney() === window.game.money.clean, stats: st.bought === st0.bought + 1 && st.spent === st0.spent + d && st.won === st0.won + win, cells: G.sc.cells.length, match: win ? G.sc.cells.filter(c => c === win).length === 3 : Object.values(G.sc.cells.reduce((a, c) => (a[c] = (a[c] || 0) + 1, a), {})).every(n => n < 3) });
   }
   // drag-scratch: panels opened one at a time by touch
   g.content._svcAct('buy:5'); for (let i = 0; i < 9; i++) g.content._svcAct('sc:' + i);
@@ -78,11 +78,11 @@ check('win classes: none / small / medium / large / jackpot', cel.classes.join()
 // a forced grand prize: jackpot class, banner and confetti
 const grand = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save;
-  G.openScratch(); const m0 = s.money; const old = G.scratchDraw; G.scratchDraw = den => window.__pv.SCRATCH_CARDS[den].grand;
+  G.openScratch(); const m0 = window.game.money.clean; const old = G.scratchDraw; G.scratchDraw = den => window.__pv.SCRATCH_CARDS[den].grand;
   g.content._svcAct('buy:100'); G.scratchDraw = old;
   g.content._svcAct('scratch');
   await new Promise(r => { const iv = setInterval(() => { if (G.sc.done) { clearInterval(iv); r(); } }, 20); });
-  const r = { paid: s.money - m0, cls: G.sc.cls, confetti: G.parts.length, banner: !document.getElementById('banner').classList.contains('hidden'), biggest: s.gamble.scratch.biggest };
+  const r = { paid: window.game.money.clean - m0, cls: G.sc.cls, confetti: G.parts.length, banner: !document.getElementById('banner').classList.contains('hidden'), biggest: s.gamble.scratch.biggest };
   G.parts.length = 0; return r;
 });
 check('scratch grand prize: $1,000,000 paid once, jackpot celebration, record kept', grand.paid === 1e6 - 100 && grand.cls === 'jackpot' && grand.confetti > 100 && grand.banner && grand.biggest === 1e6, JSON.stringify(grand));
@@ -97,7 +97,7 @@ const sl = await ev(async () => {
   const res = [];
   for (const bet of [10, 25, 50, 100]) {
     g.content._svcAct('bet:' + bet);
-    const m0 = s.money, sp0 = s.gamble.slots.spins;
+    const m0 = window.game.money.clean, sp0 = s.gamble.slots.spins;
     g.content._svcAct('spin'); g.content._svcAct('spin'); G.slotGo('fuel', G.slotState.fuel); // spam: one spin only
     const st = G.slotState.fuel, r = st.res, hid = G.shownMoney() === m0 - bet;
     // each reel-stop clunk is recorded with the reel count at that moment (event-driven, not polled)
@@ -105,7 +105,7 @@ const sl = await ev(async () => {
     g.audio.play = function (n, o) { if (n === 'reelstop') stops.push([st.stopped, Math.round(performance.now() - t0)]); return play.call(this, n, o); };
     await new Promise(done => { const iv = setInterval(() => { if (!st.spinning) { clearInterval(iv); done(); } }, 15); });
     g.audio.play = play;
-    res.push({ bet, win: r.win, once: s.money === m0 - bet + r.win && s.gamble.slots.spins === sp0 + 1, hid, stops, grid: r.grid.map(c => c[0]) });
+    res.push({ bet, win: r.win, once: window.game.money.clean === m0 - bet + r.win && s.gamble.slots.spins === sp0 + 1, hid, stops, grid: r.grid.map(c => c[0]) });
   }
   // the payout matches the pay table for the symbols shown
   const P = window.__pv, def = P.SLOT_DEFS.fuel; let bad = 0;
@@ -119,11 +119,11 @@ check('slot: win hidden until the last reel stops', sl.res.every(r => r.hid));
 check('slot: 4,000 spins all pay exactly what the pay table says', sl.bad === 0, String(sl.bad));
 const jp = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, st = G.slotState.fuel;
-  g.content._svcAct('bet:100'); const m0 = s.money, j0 = s.gamble.slots.jackpots;
+  g.content._svcAct('bet:100'); const m0 = window.game.money.clean, j0 = s.gamble.slots.jackpots;
   const rnd = Math.random; Math.random = () => 0; // every reel lands on 7
   try { G.slotGo('fuel', st); } finally { Math.random = rnd; }
   await new Promise(done => { const iv = setInterval(() => { if (!st.spinning) { clearInterval(iv); done(); } }, 20); });
-  const r = { paid: s.money - m0, cls: st.res.cls, jackpots: s.gamble.slots.jackpots - j0, confetti: G.parts.length, biggest: s.gamble.slots.biggest };
+  const r = { paid: window.game.money.clean - m0, cls: st.res.cls, jackpots: s.gamble.slots.jackpots - j0, confetti: G.parts.length, biggest: s.gamble.slots.biggest };
   G.parts.length = 0; while (g.ui.stack.length) g.ui.back(); return r;
 });
 check('slot jackpot (forced 7-7-7 at $100): $3,000,000 paid once, jackpot celebration, counted', jp.paid === 3e6 - 100 && jp.cls === 'jackpot' && jp.jackpots === 1 && jp.confetti > 100 && jp.biggest === 3e6, JSON.stringify(jp));
@@ -150,9 +150,9 @@ check('casino interior renders without a frame-rate collapse', fps > 3, fps.toFi
 // ---------------------------------------------------------------- 6. no table limits: every table takes any stake the bankroll covers
 const lim = await ev(() => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
-  const keep = s.money; s.money = 500;
+  const keep = window.game.money.clean; window.game.money.W.clean = 500;
   out.open = []; for (const k of ['g:bj:0', 'g:bj:3', 'g:roul:3', 'g:poker:0', 'g:slot:royale']) { G.spot(k); out.open.push(document.getElementById('svcTitle').textContent); while (g.ui.stack.length) g.ui.back(); }
-  s.money = keep;
+  window.game.money.W.clean = keep;
   return out;
 });
 check('a nobody can sit at every table (no limit tiers, no pit boss)', lim.open.every(t => t && !/VIP|LOW|STANDARD/.test(t)) && lim.open.length === 5, JSON.stringify(lim.open));
@@ -168,24 +168,24 @@ const bj = await ev(async () => {
   const out = {};
   G.openBlackjack(0); g.content._svcAct('w:q:100');
   // natural blackjack pays 3:2
-  let m0 = s.money; deal([C(14), C(13), C(9), C(7)]); G.bjDeal(); await wait(); out.natural = s.money - m0;
+  let m0 = window.game.money.clean; deal([C(14), C(13), C(9), C(7)]); G.bjDeal(); await wait(); out.natural = window.game.money.clean - m0;
   // dealer stands on soft 17 (A,6): player 18 wins
-  m0 = s.money; deal([C(10), C(8), C(14), C(6)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.s17 = { won: s.money - m0, dealer: G.bj.dealer.length };
+  m0 = window.game.money.clean; deal([C(10), C(8), C(14), C(6)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.s17 = { won: window.game.money.clean - m0, dealer: G.bj.dealer.length };
   // double: 11 + 10 = 21 against dealer 10,7
-  m0 = s.money; deal([C(5), C(6), C(10), C(7), C(10)]); G.bjDeal(); G.bjAction('double'); await wait(); out.double = s.money - m0;
+  m0 = window.game.money.clean; deal([C(5), C(6), C(10), C(7), C(10)]); G.bjDeal(); G.bjAction('double'); await wait(); out.double = window.game.money.clean - m0;
   // split eights: each hand gets a card, both stand, dealer busts (10,6 then 10)
-  m0 = s.money; deal([C(8), C(8, 1), C(10), C(6), C(3), C(2), C(10)]); G.bjDeal(); G.bjAction('split'); const hands = G.bj.hands.length; G.bjAction('stand'); G.bjAction('stand'); await wait(); out.split = { hands, won: s.money - m0 };
+  m0 = window.game.money.clean; deal([C(8), C(8, 1), C(10), C(6), C(3), C(2), C(10)]); G.bjDeal(); G.bjAction('split'); const hands = G.bj.hands.length; G.bjAction('stand'); G.bjAction('stand'); await wait(); out.split = { hands, won: window.game.money.clean - m0 };
   // bust loses the bet
-  m0 = s.money; deal([C(10), C(6), C(10), C(7), C(10)]); G.bjDeal(); G.bjAction('hit'); await wait(); out.bust = s.money - m0;
+  m0 = window.game.money.clean; deal([C(10), C(6), C(10), C(7), C(10)]); G.bjDeal(); G.bjAction('hit'); await wait(); out.bust = window.game.money.clean - m0;
   // push returns the bet
-  m0 = s.money; deal([C(10), C(8), C(10), C(8)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.push = s.money - m0;
+  m0 = window.game.money.clean; deal([C(10), C(8), C(10), C(8)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.push = window.game.money.clean - m0;
   // spam: deal twice charges once
-  m0 = s.money; deal([C(10), C(9), C(10), C(5), C(9)]); G.bjDeal(); G.bjDeal(); out.spam = m0 - s.money;
+  m0 = window.game.money.clean; deal([C(10), C(9), C(10), C(5), C(9)]); G.bjDeal(); G.bjDeal(); out.spam = m0 - window.game.money.clean;
   // walking away mid-hand stands it and pays (dealer 15 draws 9 and busts)
-  g.ui.back(); out.walk = { won: s.money - m0, table: s.gamble.table, phase: G.bj.phase };
+  g.ui.back(); out.walk = { won: window.game.money.clean - m0, table: s.gamble.table, phase: G.bj.phase };
   out.stats = { hands: s.gamble.casino.bjHands, wins: s.gamble.casino.bjWins };
   // a $5,000,000 hand: no $100 cap any more
-  s.money = Math.max(s.money, 2e7); G.openBlackjack(1); G.setWager('bj', 5e6); G.bj.bet = 5e6; m0 = s.money; deal([C(10), C(9), C(10), C(7)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.big = s.money - m0;
+  window.game.money.W.clean = Math.max(window.game.money.clean, 2e7); G.openBlackjack(1); G.setWager('bj', 5e6); G.bj.bet = 5e6; m0 = window.game.money.clean; deal([C(10), C(9), C(10), C(7)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.big = window.game.money.clean - m0;
   K.bjSaveBust = keepK[0]; K.bjDealerRedo = keepK[1];
   while (g.ui.stack.length) g.ui.back();
   return out;
@@ -208,12 +208,12 @@ const rl = await ev(async () => {
   out.many = Object.values(G.roul.bets).reduce((a, b2) => a + b2, 0);
   g.content._svcAct('clear');
   G.setWager('roul', 25); g.content._svcAct('rb:red'); g.content._svcAct('rb:n:17'); g.content._svcAct('rb:d2');
-  const m0 = s.money, spins0 = s.gamble.casino.rouletteSpins;
+  const m0 = window.game.money.clean, spins0 = s.gamble.casino.rouletteSpins;
   g.content._svcAct('rspin'); g.content._svcAct('rspin'); G.roulSpin();
   const n = G.roul.spinning.n, expect = window.__pv.roulettePayout({ red: 25, 'n:17': 25, d2: 25 }, n);
   out.hidden = G.shownMoney() === m0 - 75;
   await new Promise(r => { const iv = setInterval(() => { if (!G.roul.spinning) { clearInterval(iv); r(); } }, 20); });
-  out.paid = s.money - m0; out.expect = expect - 75; out.spins = s.gamble.casino.rouletteSpins - spins0; out.n = n;
+  out.paid = window.game.money.clean - m0; out.expect = expect - 75; out.spins = s.gamble.casino.rouletteSpins - spins0; out.n = n;
   out.rebet = (g.content._svcAct('rebet'), Object.values(G.roul.bets).reduce((a, b2) => a + b2, 0));
   out.cells = document.querySelectorAll('#svcBody .rc').length;
   while (g.ui.stack.length) g.ui.back();
@@ -230,9 +230,9 @@ const pk = await ev(async () => {
   out.ranks = [v([C(14, 0), C(13, 0), C(12, 0), C(11, 0), C(10, 0)]), v([C(9, 0), C(9, 1), C(9, 2), C(9, 3), C(2, 0)]), v([C(9, 0), C(9, 1), C(9, 2), C(4, 3), C(4, 0)]), v([C(2, 0), C(7, 0), C(9, 0), C(11, 0), C(4, 0)]), v([C(14, 1), C(2, 0), C(3, 2), C(4, 0), C(5, 3)]), v([C(9, 0), C(9, 1), C(9, 2), C(4, 3), C(2, 0)]), v([C(9, 0), C(9, 1), C(4, 2), C(4, 3), C(2, 0)]), v([C(9, 0), C(9, 1), C(3, 2), C(4, 3), C(2, 0)]), v([C(14, 0), C(9, 1), C(3, 2), C(4, 3), C(2, 0)])];
   out.kicker = P.rank5([C(14, 0), C(14, 1), C(13, 2), C(4, 3), C(2, 0)]) > P.rank5([C(14, 2), C(14, 3), C(12, 2), C(4, 1), C(2, 1)]);
   out.wheelLow = P.rank5([C(14, 1), C(2, 0), C(3, 2), C(4, 0), C(5, 3)]) < P.rank5([C(6, 1), C(2, 0), C(3, 2), C(4, 0), C(5, 3)]);
-  G.pk = null; G.openPoker(); const m0 = s.money;
+  G.pk = null; G.openPoker(); const m0 = window.game.money.clean;
   G.setWager('pokerBuy', 500); g.content._svcAct('sit'); G.token++; // stop the table's own pacing; this test drives the hands
-  out.sit = { cash: m0 - s.money, chips: s.gamble.casino.chips, seats: G.pk.seats.length, pers: G.pk.seats.slice(1).map(x => x.pers) };
+  out.sit = { cash: m0 - window.game.money.clean, chips: s.gamble.casino.chips, seats: G.pk.seats.length, pers: G.pk.seats.slice(1).map(x => x.pers) };
   const total = () => G.pk.seats.reduce((a, x) => a + x.stack + x.put, 0) + G.pk.pot;
   const play = () => { let guard = 0; while (G.pk.phase === 'play' && guard++ < 500) { if (G.pk.toAct === 0) { const o = G.pkRaiseOptions(); if (o.length && Math.random() < 0.3) G.pokerAct(0, 'raise', pick(o).to); else G.pokerAct(0, 'call'); } else { const d = G.pokerAI(G.pk.toAct, true); G.pokerAct(G.pk.toAct, d.kind, d.to); } } return guard; };
   const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -255,8 +255,8 @@ const pk = await ev(async () => {
   G.pokerShowdown();
   out.side = pk2.seats.map((x, i) => x.stack - st0[i]);
   G.busy = false;
-  const chips = G.pk.seats[0].stack, m1 = s.money; g.content._svcAct('leave');
-  out.leave = { back: s.money - m1, chips, saved: s.gamble.casino.chips, pk: !!G.pk };
+  const chips = G.pk.seats[0].stack, m1 = window.game.money.clean; g.content._svcAct('leave');
+  out.leave = { back: window.game.money.clean - m1, chips, saved: s.gamble.casino.chips, pk: !!G.pk };
   out.ai = P.POKER_AI.map(a => a.pers);
   while (g.ui.stack.length) g.ui.back();
   return out;
@@ -272,11 +272,11 @@ check('poker: cashing out returns every chip once', pk.leave.back === pk.leave.c
 const floor = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
   G.spot('g:slot:royale'); g.content._svcAct('w:q:100');
-  const m0 = s.money, sp0 = s.gamble.casino.slotSpins;
+  const m0 = window.game.money.clean, sp0 = s.gamble.casino.slotSpins;
   g.content._svcAct('ry:spin'); g.content._svcAct('ry:spin'); g.content._svcAct('ry:spin');
   const win = G.ry.res.win;
   await new Promise(r => { const iv = setInterval(() => { if (!G.ry.spinning) { clearInterval(iv); r(); } }, 20); });
-  out.ok = s.money === m0 - 100 + win; out.spins = s.gamble.casino.slotSpins - sp0; out.reels = G.ry.grid.length; out.rows = G.ry.grid[0].length;
+  out.ok = window.game.money.clean === m0 - 100 + win; out.spins = s.gamble.casino.slotSpins - sp0; out.reels = G.ry.grid.length; out.rows = G.ry.grid[0].length;
   while (g.ui.stack.length) g.ui.back();
   return out;
 });
@@ -285,15 +285,15 @@ check('Royale Billions: 5 reels × 3 rows; SPIN spammed settles one $100 spin on
 // ---------------------------------------------------------------- 11. close mid-reveal, reload mid-hand: no duplication, no loss
 const midClose = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
-  G.openSlot('fuel'); g.content._svcAct('bet:10'); const m0 = s.money; g.content._svcAct('spin'); const win = G.slotState.fuel.res.win;
+  G.openSlot('fuel'); g.content._svcAct('bet:10'); const m0 = window.game.money.clean; g.content._svcAct('spin'); const win = G.slotState.fuel.res.win;
   g.ui.back(); // closed while the reels spin
   await new Promise(r => setTimeout(r, 1800));
-  out.slot = { delta: s.money - m0, expect: win - 10, spinning: G.slotState.fuel.spinning };
-  G.openSlot('fuel'); out.reopenShown = G.shownMoney() === s.money; g.ui.back();
-  G.openScratch(); const m1 = s.money; g.content._svcAct('buy:10'); const w2 = G.sc.win; g.ui.back();
+  out.slot = { delta: window.game.money.clean - m0, expect: win - 10, spinning: G.slotState.fuel.spinning };
+  G.openSlot('fuel'); out.reopenShown = G.shownMoney() === window.game.money.clean; g.ui.back();
+  G.openScratch(); const m1 = window.game.money.clean; g.content._svcAct('buy:10'); const w2 = G.sc.win; g.ui.back();
   G.openScratch(); out.scratchKept = !!G.sc && !G.sc.done && G.shownMoney() === m1 - 10; g.content._svcAct('scratch');
   await new Promise(r => { const iv = setInterval(() => { if (G.sc.done) { clearInterval(iv); r(); } }, 20); });
-  out.scratch = s.money - m1 === w2 - 10;
+  out.scratch = window.game.money.clean - m1 === w2 - 10;
   g.ui.back();
   return out;
 });
@@ -315,7 +315,7 @@ const pre = await ev(() => {
   const table = JSON.parse(JSON.stringify(s.gamble.table));
   s.stats.playTime = Math.max(s.stats.playTime, 120);
   g.saveGame(true);
-  return { money: s.money, table, hands: s.gamble.casino.bjHands, afterSwitch };
+  return { money: window.game.money.clean, table, hands: s.gamble.casino.bjHands, afterSwitch };
 });
 check('switching tables mid-hand stands and settles the blackjack hand', pre.afterSwitch.table === null && pre.afterSwitch.bj === 'done', JSON.stringify(pre.afterSwitch));
 check('an open blackjack hand is written to the save with its stake already paid', pre.table && pre.table.game === 'bj' && pre.table.hands[0].bet === 250, JSON.stringify(pre.table));
@@ -323,22 +323,22 @@ await page.reload(); await page.waitForFunction(() => window.__pvBooted === true
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await quiet();
-const post = await ev(() => { const s = window.game.save; return { money: s.money, table: s.gamble.table, hands: s.gamble.casino.bjHands }; });
+const post = await ev(() => { const s = window.game.save; return { money: window.game.money.clean, table: s.gamble.table, hands: s.gamble.casino.bjHands }; });
 check('reload mid-hand: the hand is stood (20 v 17) and paid exactly once', post.table === null && post.money === pre.money + 500 && post.hands === pre.hands + 1, JSON.stringify([pre.money, post]));
 // poker chips across a reload
-const pkPre = await ev(() => { const g = window.game, G = g.gamble, s = g.save; G.openPoker(); G.setWager('pokerBuy', 1000); g.content._svcAct('sit'); G.token++; s.stats.playTime = Math.max(s.stats.playTime, 120); g.saveGame(true); return { money: s.money, chips: s.gamble.casino.chips }; });
+const pkPre = await ev(() => { const g = window.game, G = g.gamble, s = g.save; G.openPoker(); G.setWager('pokerBuy', 1000); g.content._svcAct('sit'); G.token++; s.stats.playTime = Math.max(s.stats.playTime, 120); g.saveGame(true); return { money: window.game.money.clean, chips: s.gamble.casino.chips }; });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await quiet();
-const pkPost = await ev(() => { const s = window.game.save; return { money: s.money, chips: s.gamble.casino.chips }; });
+const pkPost = await ev(() => { const s = window.game.save; return { money: window.game.money.clean, chips: s.gamble.casino.chips }; });
 check('reload at the poker table: chips cashed out once (the blind in the pot is forfeit, like a fold)', pkPost.chips === 0 && pkPost.money === pkPre.money + pkPre.chips && pkPre.chips >= 990, JSON.stringify([pkPre, pkPost]));
 // records persist
 const rec = await ev(() => JSON.stringify(window.game.save.gamble));
 check('gambling records survive save and reload', /"bought":\d+/.test(rec) && JSON.parse(rec).scratch.bought >= 7 && JSON.parse(rec).slots.jackpots >= 1 && JSON.parse(rec).casino.bjHands >= 9, rec.slice(0, 300));
 // a damaged pending hand in a save is refunded, not lost or duplicated
-const bad = await ev(() => { const SS = window.__pv.SaveSystem, g = window.game; const d = JSON.parse(JSON.stringify(g.save)); d.gamble.table = { game: 'bj', tier: 0, hands: [{ cards: 'junk', bet: 80 }], dealer: [] }; const m = d.money; const r = SS.sanitize ? SS.sanitize(d) : null; return { m, after: (r || d).money, table: (r || d).gamble.table, has: !!SS.sanitize }; });
-check('a malformed saved hand is refunded on load', !bad.has || (bad.after === bad.m + 80 && bad.table === null), JSON.stringify(bad));
+const bad = await ev(() => { const SS = window.__pv.SaveSystem, g = window.game; const d = JSON.parse(JSON.stringify(g.save)); d.gamble.table = { game: 'bj', tier: 0, hands: [{ cards: 'junk', bet: 80 }], dealer: [] }; const m = d.wallet.clean; const r = SS.sanitize ? SS.sanitize(d) : null; return { m, after: (r || d).wallet.clean, table: (r || d).gamble.table, has: !!SS.sanitize }; });
+check('a malformed saved hand is refunded to Clean Bank on load', !bad.has || (bad.after === bad.m + 80 && bad.table === null), JSON.stringify(bad));
 
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'gambling');

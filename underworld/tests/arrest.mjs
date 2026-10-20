@@ -7,7 +7,7 @@ import { launch, open, check, frames, startNew, summary, finish } from './lib.mj
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
-await page.evaluate(() => { const g = window.game; g.events.cool = 1e9; g.input.wantLock = false; g.input.noLock = true; g.save.money = 50000; });
+await page.evaluate(() => { const g = window.game; g.events.cool = 1e9; g.input.wantLock = false; g.input.noLock = true; (g.money.W.clean = g.money.W.dirty.me = 50000); });
 await page.mouse.move(240, 135);
 const pose = () => page.evaluate(() => { const g = window.game, p = g.player, ps = p.pose; return { sur: +(ps.surrender || 0).toFixed(3), crouch: +(ps.crouch || 0).toFixed(3), down: +(ps.down || 0).toFixed(3), block: +(ps.block || 0).toFixed(2), state: p.state, gs: g.state, trans: !!p.trans, knock: p.knockT, bust: g.police.bust, lvl: g.police.level, jail: !!g.uw.S.jail, interior: p.interior ? p.interior.id : null }; });
 // every transient flag that has ever leaked out of an arrest in this codebase

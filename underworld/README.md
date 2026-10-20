@@ -6,7 +6,7 @@ The player-facing title is "The Underworld". Folder names, the save key and the 
 `port-valen/templates/master-template-1.0-stable.html`. The master template has not been changed.
 
 You start with $0, no car, no weapon, no property, no crew and no reputation. There is no scripted
-opening. Your first money can come from pickpocketing, mugging, glovebox loot, the chop shop, fencing,
+opening. Your first money can come from pickpocketing, robbing gang members, glovebox loot, the chop shop, fencing,
 street races (with a buy-in), dealing, street-fight bystander rewards, robbing criminals or a feed tip.
 From there you can work up to City Kingpin.
 
@@ -15,6 +15,24 @@ From there you can work up to City Kingpin.
 The game is being overhauled against `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md`, one scoped session at a time
 (`docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`). `OVERHAUL_STATUS.md` records the current phase, the code map,
 design challenges, the deprecation list and the exact next task. Read it before changing anything.
+
+## Money (overhaul Session 1, schema 8)
+
+There are two currencies (`src/game/035-core-money.js`, the `Money` ledger, the only code that touches money):
+
+- **Dirty Cash** is physical. It is on you, in a car, in a safehouse stash or in a warehouse vault, and you move it by
+  hand in the phone's Inventory (pockets ↔ car ↔ stash, within reach). Crime pays it to you; empire income (dealers,
+  territory tax, tribute, bounties) is delivered to your warehouse vault or safehouse. An arrest takes the cash on you
+  and in the car you were caught in; stashes, vaults and the bank are safe.
+- **Clean Bank** is business income, legal car sales, stunt cash (capped at $1,500 a day for repeatable stunts) and
+  casino winnings. Property, licensed dealers and garages, shop goods, Training, lawyers and the casino are paid from
+  it. A hospital bill the bank can't cover becomes medical debt (at most one bill), repaid from the next Clean income.
+
+Wages, crew fees, police payroll and jail bribes come out of Dirty Cash in this order: warehouse vaults, safehouses,
+then what you carry, never the bank (Crew shows the reserve and days covered). Jail work and the jail dice table use
+a separate commissary account. `MONEY_SOURCES` maps every source of income and every cost to its currency; the HUD
+shows cash on you and `BANK` beneath it. The save key is unchanged; schema 8 moves an older save's single balance
+into Clean Bank.
 
 ## Run it
 
@@ -174,8 +192,9 @@ Gameplay pass (this build):
   skirts or guards and a cleared run-up and landing (`_rampSides`, `_clearJumpLane`).
 - Central Parkade rebuilt: walled two-way 8 m ramps between four decks, rails at the openings,
   bays off the aisles, level signs and a clearance bar; the Quarter Garage has a top landing.
-- Money feedback (`MoneyFeed`): every change to `save.money`, from any system, shows a +/−
-  popup under the money readout; quick same-sign changes merge, at most four lines stack.
+- Money feedback (`MoneyFeed`): every change to the money you hold, from any system, shows a +/−
+  popup under the money readout (since Session 1 it listens to the `Money` ledger; bank changes read "+$n bank");
+  quick same-sign changes merge, at most four lines stack.
 - Interiors: a two-storey mansion (foyer with a grand staircase, living room, kitchen, study, bar,
   an upstairs gallery, master suite, game room with a pool table and big screen), a new penthouse layout, and house interiors by tier (1-5) with
   real furniture (`FURN`) and searchable containers.
@@ -335,7 +354,8 @@ error, so a hidden network dependency fails the suite.
 
 ```
 node underworld/tests/build.mjs     # Node only: index.html matches what src/ builds, manifest complete, both module scripts parse
-node underworld/tests/static-money.mjs # Node only: every read/write of the player's money by function; fails on a new direct write
+node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
+node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/smoke.mjs     # boot, $0 start, every menu, map overlay, location layout
 node underworld/tests/core.mjs      # melee facing (8 dirs, 180°, post-exit), combo + step-in stress, reverse speed, reverse-camera transitions
 node underworld/tests/arrest.mjs    # 9 arrest situations (idle/walk/sprint/fight/vehicle exit/pursuit/map open/repeated) -> jail -> release -> stale-state audit; death respawns
@@ -364,7 +384,7 @@ node underworld/tests/taxi.mjs      # call, hire, map pick, fare, AI ride, chang
 node underworld/tests/phoneapps.mjs # app home screen, every app at 390 px, back navigation, Market P/L, Street Connect, BUY/SELL layers, jail lock
 node underworld/tests/kingpin.mjs   # rivals' wars and royalties for an ordinary boss vs a kingpin on the same turf map
 node underworld/tests/tutorial.mjs  # contextual tips once each, one at a time, settings off/on, saved
-node underworld/tests/money.mjs     # +/- money popups from every path, merging, stacking, fading, placement
+node underworld/tests/money.mjs     # +/- money popups (cash on you and bank) from every path, merging, stacking, fading, placement
 node underworld/tests/qashots.mjs   # visual-QA screenshots (.shots/qa): interiors, cars, doors, parkade, station, casino, phone, taxi, jail, districts
 node underworld/tests/casino.mjs    # no limits, MAX/custom wagers, roulette multi-bet, Hold'em, 60/40 sims, Royale Billions ladder
 node underworld/tests/camera.mjs    # on-foot follow, occlusion fan and recovery, sprint and stamina
@@ -383,6 +403,9 @@ node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
 
 ## Validation record (v7 pass)
+
+Since the overhaul began, every session's test results, performance probes and flake analysis are recorded in
+`OVERHAUL_STATUS.md`. The records below are for the pre-overhaul builds.
 
 Final build `index.html` (schema 7). Every suite runs offline in headless Chromium (SwiftShader), two at a time.
 

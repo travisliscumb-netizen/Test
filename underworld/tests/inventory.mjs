@@ -11,7 +11,7 @@ const t = await open(b, {});
 const page = t.page;
 const ev = (f, a) => page.evaluate(f, a);
 await startNew(page);
-await ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; g.save.money = 2e6; g.save.rep = 2500; });
+await ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 2e6); g.save.rep = 2500; });
 
 // every lot of every good, everywhere it can be, plus what is on the road: the conservation total
 const census = () => ev(() => {
@@ -32,10 +32,10 @@ const buy1 = await ev(() => {
   const g = window.game, uw = g.uw, L = uw.loc('spot', 'gus'), z = L.zone, p = uw.market.wholesale(z, 'green');
   uw.ui.openSpot(L);
   const btns = [...document.querySelectorAll('#svcBody [data-act^="buy:green"]')].map(b => b.textContent.trim());
-  const m0 = g.save.money;
+  const m0 = g.money.total();
   g.content._svcAct('buy:green:' + window.__pv.lotsFor('green', 1)); // 1 lb
   g.content._svcAct('buy:green:' + window.__pv.lotsFor('green', 2)); // 2 lb
-  const r = { btns, lots: uw.S.inv.green | 0, cost: uw.S.inv.$cb && uw.S.inv.$cb.green, paid: m0 - g.save.money, unit: p };
+  const r = { btns, lots: uw.S.inv.green | 0, cost: uw.S.inv.$cb && uw.S.inv.$cb.green, paid: m0 - g.money.total(), unit: p };
   while (g.ui.stack.length) g.ui.back();
   return r;
 });
@@ -133,7 +133,7 @@ const jailed = await ev(() => { const s = window.game.save, uw = window.game.uw;
 check('arrest: carried guns and rounds confiscated, the stashed pistol, its rounds and the spare vest stay', jailed.pistol && jailed.where === 'linden' && !jailed.smg && jailed.smgAmmo === 0 && jailed.stashAmmo === 24 && jailed.vests === 1 && jailed.inv === 0, JSON.stringify(jailed));
 await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
-await ev(() => { const g = window.game; g.police.clear(); g.police.enabled = false; g.save.money = 2e6; });
+await ev(() => { const g = window.game; g.police.clear(); g.police.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 2e6); });
 
 // ---------------------------------------------------------------- 5. crew deliveries
 const crewSetup = await ev(() => {
@@ -155,7 +155,7 @@ const runA = await ev(id => {
   c.skill = 65; out.exp = R.assess(c, 'flop', 'linden', 'green', 10).why[0][1];
   c.skill = 92; out.elite = R.assess(c, 'flop', 'linden', 'green', 10).why[0][1];
   const a = R.assess(c, 'flop', 'linden', 'green', 10); out.fee = a.fee; out.p = a.p; out.factors = a.why.length;
-  const m0 = g.save.money; out.err = R.dispatch(id, 'flop', 'linden', 'green', 10); out.paid = m0 - g.save.money;
+  const m0 = g.money.total(); out.err = R.dispatch(id, 'flop', 'linden', 'green', 10); out.paid = m0 - g.money.total();
   out.flop = S.storage.flop.green; out.linden = S.storage.linden.green | 0; out.runs = S.runs.length;
   return out;
 }, crewSetup[0]);
@@ -244,7 +244,7 @@ const roy = await ev(() => {
   uw._infl = 900; uw._stage = 6; out.late = uw.royalty.compliance(i, fid);
   // a day's collection with both
   const r0 = Math.random; Math.random = () => 0.01;
-  const m0 = g.save.money; out.paid = uw.royalty.tickDay(); out.gain = g.save.money - m0; out.status = S.roy[i].status;
+  const m0 = g.money.total(); out.paid = uw.royalty.tickDay(); out.gain = g.money.total() - m0; out.status = S.roy[i].status;
   Math.random = () => 0.999; uw._infl = 40; uw._stage = 3;
   uw.royalty.tickDay(); out.status2 = S.roy[i].status;
   Math.random = r0;
@@ -275,16 +275,16 @@ await ev(() => {
   raw.weapons = { pistol: true, smg: false, shotgun: true, bat: false }; raw.ammo = { pistol: 36, smg: 0, shotgun: 12 };
   delete raw.uw.wstash; delete raw.uw.runs; delete raw.uw.runLog; delete raw.uw.nextRun; delete raw.uw.roy;
   raw.uw.inv = { green: 7, snow: 3 }; raw.uw.storage = { flop: { smokes: 12, hardware: 2 } }; raw.uw.props.flop = { owned: true, dmg: 0, since: 1 };
-  raw.money = 4321; raw.garage = [{ uid: 5, type: 'sedan', color: 1, origin: 'bought', dmg: 0, tune: { engine: 1, brakes: 0, grip: 0, armor: 0 }, trunk: { pills: 4 } }];
+  delete raw.wallet; raw.money = 4321; raw.garage = [{ uid: 5, type: 'sedan', color: 1, origin: 'bought', dmg: 0, tune: { engine: 1, brakes: 0, grip: 0, armor: 0 }, trunk: { pills: 4 } }];
   localStorage.setItem('pvunderworld.save.v1', JSON.stringify(raw));
   window.game.wiped = true; // no save-on-unload: the crafted v3 save must be what loads
 });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
-const mig = await ev(() => { const g = window.game, s = g.save, S = g.uw.S; return { v: s.version, from: s.flags.migratedFrom, money: s.money, inv: { ...S.inv }, flop: { ...S.storage.flop }, pistol: s.weapons.pistol, where: s.wloc.pistol, draw: g.player.ownedWeapons().map(w => w.id), ammo: s.ammo.pistol, vest: s.vest, gamble: !!s.gamble && s.gamble.scratch.bought === 0, runs: Array.isArray(S.runs), car: s.garage[0] && s.garage[0].trunk.pills, tier: s.garage[0] && s.garage[0].vtier }; });
-check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 7 && mig.from === 3, JSON.stringify(mig));
-check('v3 save: money, pockets, stash and trunk exactly as they were', mig.money === 4321 && mig.inv.green === 7 && mig.inv.snow === 3 && mig.flop.smokes === 12 && mig.flop.hardware === 2 && mig.car === 4, JSON.stringify(mig));
+const mig = await ev(() => { const g = window.game, s = g.save, S = g.uw.S; return { v: s.version, from: s.flags.migratedFrom, money: g.money.clean, dirty: g.money.dirtyTotal(), legacy: 'money' in s, inv: { ...S.inv }, flop: { ...S.storage.flop }, pistol: s.weapons.pistol, where: s.wloc.pistol, draw: g.player.ownedWeapons().map(w => w.id), ammo: s.ammo.pistol, vest: s.vest, gamble: !!s.gamble && s.gamble.scratch.bought === 0, runs: Array.isArray(S.runs), car: s.garage[0] && s.garage[0].trunk.pills, tier: s.garage[0] && s.garage[0].vtier }; });
+check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 8 && mig.from === 3, JSON.stringify(mig));
+check('v3 save: its money is now Clean Bank (§45.2), pockets, stash and trunk exactly as they were', mig.money === 4321 && mig.dirty === 0 && mig.legacy === false && mig.inv.green === 7 && mig.inv.snow === 3 && mig.flop.smokes === 12 && mig.flop.hardware === 2 && mig.car === 4, JSON.stringify(mig));
 check('v3 save: guns are carried and drawable, ammo kept, no vest, empty stats', mig.pistol && mig.where === null && mig.draw.includes('pistol') && mig.draw.includes('shotgun') && mig.ammo === 36 && mig.vest === 0 && mig.gamble && mig.runs, JSON.stringify(mig));
 check('v3 save: cars get their visual tier', mig.tier === 'common', mig.tier);
 

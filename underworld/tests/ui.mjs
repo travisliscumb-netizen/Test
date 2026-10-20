@@ -58,7 +58,7 @@ if (!ov2) { await page.keyboard.press('KeyT'); await frames(page, 2); }
 const info = await page.evaluate(() => { const ok = window.game.uw.ui.mapClick(5 * 80 + 40, 5 * 80 + 40); return { ok, shown: !document.getElementById('turfInfo').classList.contains('hidden'), html: document.getElementById('turfInfo').textContent.slice(0, 60) }; });
 check('tapping a turf with the overlay on shows its details', info.ok && info.shown && /Controlled by/.test(await page.evaluate(() => document.getElementById('turfInfo').textContent)), JSON.stringify(info));
 // no input leak while the map is open
-const leak0 = await page.evaluate(() => ({ x: window.game.player.pos.x, z: window.game.player.pos.z, h: window.game.player.h, st: window.game.player.state, money: window.game.save.money }));
+const leak0 = await page.evaluate(() => ({ x: window.game.player.pos.x, z: window.game.player.pos.z, h: window.game.player.h, st: window.game.player.state, money: window.game.money.total() }));
 await page.keyboard.down('KeyW'); await frames(page, 15);
 await page.keyboard.press('Space'); await page.keyboard.press('KeyE'); await page.keyboard.press('KeyV'); await page.keyboard.press('KeyG');
 await frames(page, 10); await page.keyboard.up('KeyW');

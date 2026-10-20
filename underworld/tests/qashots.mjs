@@ -12,7 +12,7 @@ const b = await launch();
 const { page, errors } = await open(b, { viewport: { width: 640, height: 400 }, deviceScaleFactor: 1 });
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
-await ev(q => { const g = window.game; g.quality.setMode(q); g.save.settings.guide = false; g.events.cool = 1e9; g.police.enabled = false; g.save.money = 2e6; window.__hideTip = () => { const t = document.getElementById('tip'); if (t) t.style.visibility = 'hidden'; }; window.__hideHud = on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? 'hidden' : ''; } };
+await ev(q => { const g = window.game; g.quality.setMode(q); g.save.settings.guide = false; g.events.cool = 1e9; g.police.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 2e6); window.__hideTip = () => { const t = document.getElementById('tip'); if (t) t.style.visibility = 'hidden'; }; window.__hideHud = on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? 'hidden' : ''; } };
   // a free camera for photos: after the rig updates, put the lens where window.__freeCam says
   const U = g.cam.update.bind(g.cam); g.cam.update = (...a) => { U(...a); const f = window.__freeCam; if (f) { g.camera.position.set(f.x, f.y, f.z); g.camera.lookAt(f.lx, f.ly, f.lz); } }; }, +(process.env.QA_Q || 1));
 const shot = async (name) => { await frames(page, 8); await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('shot', name); };

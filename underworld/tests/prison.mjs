@@ -18,7 +18,7 @@ const fmt = await ev(() => { const f = window.__pv.fmtSentence; return [f(1), f(
 check('sentences read as days or years + days', fmt.join('|') === '1 day|45 days|1 year|1 year 74 days|2 years 70 days', fmt.join('|'));
 
 // an early-game arrest: one star, a pickpocketing
-await ev(() => { const g = window.game; g.events.cool = 1e9; g.save.money = 50000; g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = g.money.W.dirty.me = 50000); g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.onBusted(); });
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const s0 = await ev(() => { const g = window.game, j = g.uw.S.jail; return { total: j.total, day: g.uw.S.day, hud: document.getElementById('jailDays').textContent + ' / ' + document.getElementById('jailLeft').textContent }; });
 check('an early mistake gets a short sentence (a pickpocketing at one star: under two weeks)', s0.total >= 3 && s0.total <= 12, JSON.stringify(s0));
@@ -40,12 +40,12 @@ check('time does not pass while a prison menu is open', menuStop.a === menuStop.
 const law = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, R = Math.random, out = {};
   P.openLawyer();
-  j.lastLawyer = -99; let m0 = g.save.money, t0 = j.total; Math.random = () => 0.01; g.content._svcAct('hire:pd'); Math.random = R;
-  out.ok = { paid: m0 - g.save.money, cut: t0 - j.total };
-  j.lastLawyer = -99; m0 = g.save.money; t0 = j.total; Math.random = () => 0.99; g.content._svcAct('hire:firm'); Math.random = R;
-  out.fail = { paid: m0 - g.save.money, cut: t0 - j.total };
-  m0 = g.save.money; g.content._svcAct('hire:silk'); out.waiting = { paid: m0 - g.save.money };
-  j.lastLawyer = -99; m0 = g.save.money; g.content._svcAct('hire:pd'); out.again = { paid: m0 - g.save.money };
+  j.lastLawyer = -99; let m0 = g.money.total(), t0 = j.total; Math.random = () => 0.01; g.content._svcAct('hire:pd'); Math.random = R;
+  out.ok = { paid: m0 - g.money.total(), cut: t0 - j.total };
+  j.lastLawyer = -99; m0 = g.money.total(); t0 = j.total; Math.random = () => 0.99; g.content._svcAct('hire:firm'); Math.random = R;
+  out.fail = { paid: m0 - g.money.total(), cut: t0 - j.total };
+  m0 = g.money.total(); g.content._svcAct('hire:silk'); out.waiting = { paid: m0 - g.money.total() };
+  j.lastLawyer = -99; m0 = g.money.total(); g.content._svcAct('hire:pd'); out.again = { paid: m0 - g.money.total() };
   while (g.ui.stack.length) g.ui.back();
   return out;
 });
@@ -56,7 +56,8 @@ check('lawyer: one hearing a month, each firm once per sentence', law.waiting.pa
 // bribes: success, refusal, backfire
 const bribe = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, R = Math.random, out = {};
-  const go = (r, act) => { j.lastBribe = -99; P.openGuard(); const m0 = g.save.money, t0 = j.total, s0 = j.susp; Math.random = () => r; g.content._svcAct(act); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.save.money, days: j.total - t0, susp: j.susp - s0, lock: P.locked() }; };
+  g.money.W.dirty.me = Math.max(g.money.W.dirty.me, 50000); // the arrest took the cash you carried; bribes are Dirty Cash
+  const go = (r, act) => { j.lastBribe = -99; P.openGuard(); const m0 = g.money.total(), t0 = j.total, s0 = j.susp; Math.random = () => r; g.content._svcAct(act); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.money.total(), days: j.total - t0, susp: j.susp - s0, lock: P.locked() }; };
   j.susp = 0; out.ok = go(0.01, 'paper');
   j.susp = 0; out.refuse = go(P.bribeOdds('perk').ok + 0.01, 'perk');
   j.susp = 0; out.back = go(0.999, 'perk');
@@ -70,14 +71,14 @@ check('bribe: backfire loses the money, adds time and a lockdown', bribe.back.pa
 // work, cards, inmates (time passes during these)
 const work = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, c = g.content;
-  j.lastJob = -99; const m0 = g.save.money, st0 = j.standing;
+  j.lastJob = -99; const m0 = j.commissary || 0, st0 = j.standing;
   P.openWork(); c._svcAct('kitchen');
   for (let n = 0; n < 60 * 7; n++) g.update(1 / 60, 1 / 60);
-  return { earned: g.save.money - m0, standing: j.standing - st0, chan: !!c.chan };
+  return { earned: (j.commissary || 0) - m0, street: g.money.total(), standing: j.standing - st0, chan: !!c.chan };
 });
-check('a prison shift (stand at the board a few seconds) pays commissary money and standing', work.earned > 0 && work.standing > 0 && !work.chan, JSON.stringify(work));
-const cards = await ev(() => { const g = window.game, P = g.uw.prison; P.openCards(); const m0 = g.save.money; for (let i = 0; i < 40; i++) g.content._svcAct('bet:20'); while (g.ui.stack.length) g.ui.back(); return { net: g.save.money - m0 }; });
-check('cards & dice settle real bets', cards.net !== 0 && Math.abs(cards.net) <= 800, JSON.stringify(cards));
+check('a prison shift (stand at the board a few seconds) pays commissary money (not street money) and standing', work.earned > 0 && work.standing > 0 && !work.chan, JSON.stringify(work));
+const cards = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; j.commissary = 1000; P.openCards(); const m0 = j.commissary, s0 = g.money.total(); for (let i = 0; i < 40; i++) g.content._svcAct('bet:20'); while (g.ui.stack.length) g.ui.back(); return { net: j.commissary - m0, street: g.money.total() - s0 }; });
+check('cards & dice settle real bets on the commissary account, never street money', cards.net !== 0 && Math.abs(cards.net) <= 800 && cards.street === 0, JSON.stringify(cards));
 const dice = await ev(() => { let w = 0; for (let a = 1; a <= 6; a++) for (let b2 = 1; b2 <= 6; b2++) for (let c = 1; c <= 6; c++) for (let d = 1; d <= 6; d++) if (a + b2 > c + d) w++; return w / 1296; });
 check('dice keep a house edge (ties go to the house)', dice < 0.5, dice.toFixed(3));
 const inm = await ev(() => {
@@ -133,8 +134,8 @@ check('misbehaviour costs points and drops the speed tier (50→25: 2×, →5: 1
 const ph = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, R = Math.random, out = {};
   P.openSmokey(); out.smokey = !/data-act="phone"/.test(document.getElementById('svcBody').innerHTML); while (g.ui.stack.length) g.ui.back();
-  j.susp = 0; const o = P.bribeOdds('phone'); out.odds = o; g.save.money = Math.max(g.save.money, 100000);
-  const go = r => { j.lastBribe = -99; j.lockUntil = 0; P.openGuard(); const m0 = g.save.money, t0 = j.total, gb = j.gbp; Math.random = () => r; g.content._svcAct('phone'); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.save.money, days: j.total - t0, phone: j.phone, gbp: j.gbp - gb, lock: P.locked() }; };
+  j.susp = 0; const o = P.bribeOdds('phone'); out.odds = o; g.money.W.clean = g.money.W.dirty.me = Math.max(g.money.total(), 100000);
+  const go = r => { j.lastBribe = -99; j.lockUntil = 0; P.openGuard(); const m0 = g.money.total(), t0 = j.total, gb = j.gbp; Math.random = () => r; g.content._svcAct('phone'); Math.random = R; while (g.ui.stack.length) g.ui.back(); return { paid: m0 - g.money.total(), days: j.total - t0, phone: j.phone, gbp: j.gbp - gb, lock: P.locked() }; };
   j.gbp = 40; j.susp = 0; out.refuse = go(o.ok + 0.01);
   j.susp = 0; out.caught = go(0.999);
   j.susp = 0; out.ok = go(0.001);
@@ -150,13 +151,13 @@ check('the odds are a real three-way split (success, refusal, caught all possibl
 // the walk-out bribe
 const rb = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, out = {};
-  j.total = j.served + 200; j.floor = 1; g.save.money = 1e6; const base = P.releaseBase();
+  j.total = j.served + 200; j.floor = 1; (g.money.W.clean = g.money.W.dirty.me = 1e6); const base = P.releaseBase();
   out.at1 = P.releaseOdds(base); out.at4 = P.releaseOdds(base * 4); out.half = P.releaseOdds(base / 2);
   const offer = 50000;
-  j.lastRelease = -99; P.openGuard(); let m0 = g.save.money, t0 = j.total; let r = P.releaseBribe(offer, () => P.releaseOdds(offer).ok + 0.01);
-  out.refuse = { r, paid: m0 - g.save.money, days: j.total - t0 };
-  j.lastRelease = -99; j.lockUntil = 0; m0 = g.save.money; t0 = j.total; const expect = P.releaseBackfireDays(); r = P.releaseBribe(offer, () => 0.9999);
-  out.back = { r, paid: m0 - g.save.money, days: j.total - t0, expect };
+  j.lastRelease = -99; P.openGuard(); let m0 = g.money.total(), t0 = j.total; let r = P.releaseBribe(offer, () => P.releaseOdds(offer).ok + 0.01);
+  out.refuse = { r, paid: m0 - g.money.total(), days: j.total - t0 };
+  j.lastRelease = -99; j.lockUntil = 0; m0 = g.money.total(); t0 = j.total; const expect = P.releaseBackfireDays(); r = P.releaseBribe(offer, () => 0.9999);
+  out.back = { r, paid: m0 - g.money.total(), days: j.total - t0, expect };
   out.cool = P.releaseBribe(offer, () => 0) === null;
   while (g.ui.stack.length) g.ui.back();
   return out;
@@ -169,7 +170,7 @@ check('walk-out bribe: one attempt a week', rb.cool, JSON.stringify(rb));
 
 // save and reload in jail
 const sv = await ev(() => { const g = window.game; g.uw.S.jail.gbp = 22; g.uw.S.jail.speed = 2; g.saveGame(true); const d = window.__pv.SaveSystem.load().data; return { v: d.version, jail: !!d.uw.jail, served: d.uw.jail.served, ally: d.uw.jail.ally, speed: d.uw.jail.speed, gbp: d.uw.jail.gbp, phone: d.uw.jail.phone }; });
-check('save in jail: current schema; the sentence, progress, good behaviour, speed and phone survive a reload', sv.v === 7 && sv.jail && sv.served > 0 && sv.ally && sv.speed === 2 && sv.gbp === 22 && sv.phone === true, JSON.stringify(sv));
+check('save in jail: current schema; the sentence, progress, good behaviour, speed and phone survive a reload', sv.v === 8 && sv.jail && sv.served > 0 && sv.ally && sv.speed === 2 && sv.gbp === 22 && sv.phone === true, JSON.stringify(sv));
 
 // the escape: caught
 const caught = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; j.tool = true; j.intel = 2; window.__t0 = j.total; P.startEscape(); return true; });
@@ -201,7 +202,7 @@ check('serve the time and you walk out: back on the street, no jail panel, no fu
 // a walk-out that works: released at once, the offer paid
 await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(2); g.onBusted(); });
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
-const walk = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; g.save.money = 200000; j.lastRelease = -99; j.lockUntil = 0; const m0 = g.save.money; const r = P.releaseBribe(20000, () => 0); return { r, paid: m0 - g.save.money, phone: j.phone }; });
+const walk = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; (g.money.W.clean = g.money.W.dirty.me = 200000); j.lastRelease = -99; j.lockUntil = 0; const m0 = g.money.total(); const r = P.releaseBribe(20000, () => 0); return { r, paid: m0 - g.money.total(), phone: j.phone }; });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 check('walk-out bribe: success pays the offer and releases you at once (a new sentence starts with no phone)', walk.r === 'release' && walk.paid === 20000 && walk.phone === false, JSON.stringify(walk));
 
@@ -224,6 +225,6 @@ const mig5 = await ev(() => {
   const d = SS.load(); const g = window.game; g.save = d.data; g.uw.bind(g.save);
   return { phone: g.uw.S.jailPhone, migrated: d.migrated, v: g.save.version };
 });
-check('migration v5 → current: the old phone taped under the bunk is gone', mig5.phone === false && mig5.migrated && mig5.v === 7, JSON.stringify(mig5));
+check('migration v5 → current: the old phone taped under the bunk is gone', mig5.phone === false && mig5.migrated && mig5.v === 8, JSON.stringify(mig5));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'prison');

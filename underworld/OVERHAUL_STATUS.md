@@ -11,6 +11,212 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
+- Session: **1 — Save schema + money foundation** (handoff phase 2), following §45.1–§45.21.
+- Commit/base revision: `53370ad` (final classification rulings) → the Session 1 commit on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-20
+
+## Completed this session (1)
+
+- **One money authority.** `src/game/035-core-money.js` (`Money`) is the only code that holds or changes the
+  player's money. State lives in `save.wallet`: Clean Bank (`clean`), medical debt (`debt`), Dirty Cash by place
+  (`dirty.me`, `dirty.veh[garage uid]`, `dirty.prop[property id]`; a car you don't own carries `v.cash` like its
+  trunk). API: `earn(n, src)`, `pay(n, src, {partial})`, `can`, `available`, `move(A, B, n)`, `seize(car)`,
+  `wager(stake, win)`, `crewTheft`, `adoptCar` / `emptyCar`, `payrollOrder` / `payrollSources` /
+  `payrollReserve`, `html(src)` for displays.
+- **Source table.** `MONEY_SOURCES` gives each of 51 source tags its currency and where it lands or is paid
+  from (`me`, `stash`, `clean` / `dirty`, `payroll`, `clean`, `either`, `medical`), exactly as Appendix B and
+  §45.17–§45.18 rule. Changing a ruling is one table entry. An unknown tag throws (a programming error, never a
+  silent write); `tests/static-money.mjs` checks every tag used anywhere exists and every tag is used.
+- **Every write path converted.** The 14 direct writes and 85 funnel calls inventoried in Session 0, and all 133
+  reads, now go through the ledger with a source tag. `Game.addMoney`, `ContentManager.spend`,
+  `Underworld.income` / `expense` and the `save.money` accessor are gone.
+- **Rulings implemented:**
+  - Dirty income lands on you; passive criminal income (dealers, territory tax, tribute, bounties) lands in a stash
+    (see DC-22); business income is Clean Bank.
+  - Property, licensed dealers and garages, Fuel & Go shop goods, Training, the lawyer, the penthouse: Clean Bank.
+    Armorer, suppliers, street-race buy-ins, respect/truce envelopes, Pay & Spray: Dirty Cash on you. Saltworks
+    Used Autos, taxi, bar, food, first aid, the tip line: either, Dirty first.
+  - Casino wagers, chips and scratch cards: Clean Bank only; winnings Clean Bank (§45.5). Odds are unchanged until
+    Session 9.
+  - Payroll and remote Dirty costs (wages, crew fees, deliveries, protection, police bribes, jail bribes,
+    contraband): warehouse vaults → safehouses → cash on you, never the bank (§45.21). The Crew screen shows daily
+    payroll, payroll reserve, days covered and the sources in order.
+  - Crew theft takes Dirty Cash only from stashes and vaults, never your pockets or the bank (§45.18).
+  - Hospital bill: Clean Bank; the shortfall becomes medical debt, capped at one bill ($1,500), repaid from
+    incoming Clean first, never touching Dirty Cash, never blocking respawn (§45.20). Shown in the HUD and phone.
+  - Stunt cash: Clean Bank; repeatable stunts capped at $1,500 per in-game day; a first unique jump's $500 pays in
+    full (§45.19). Repeat-farming Rep diminishing returns are not built yet (deferred, "if needed").
+  - Jail work and the dice table use a commissary balance on the sentence (`uw.jail.commissary`) (§45.18).
+  - Lieutenant and Driver stipends removed; the Driver no longer steals cars or risks an arrest for it (§45.18,
+    §37 #2). The Driver description says logistics arrive with the warehouse rebuild.
+  - Civilian knock-down cash and valuables drops removed; gang/criminal drops stay (§45.18). Mugging wording
+    removed from the stage hint and the new-career tip.
+- **Arrest seizure (§2).** `Prison.arrest` seizes Dirty Cash on you and in the caught car (garage-owned or not).
+  Stashes, vaults and the bank survive. The news line says how much was taken; `uw.st.seizedCash` counts it.
+- **Cash moves by hand (§2, §7).** The phone's Inventory transfer screen has a Dirty Cash row ($1k / $10k /
+  $100k / All) between any two places within reach that can hold cash (pockets, a car, a safehouse stash, a
+  warehouse vault), using the same reach rules as product. Every location card shows its cash.
+- **Displays.** HUD: cash on you on the money line, `BANK $x` (and `DEBT $y`) beneath. Popups mark bank changes
+  "+$n bank". Every shop and service shows the balance that pays for it (`Money.html`). Empire overview: cash on
+  you, Dirty in stashes, Bank (and debt). Main menu continue line: Dirty · Bank.
+- **Removed (§45.12):** the hidden legacy `ARMS` shop, its `#shopArms` / `#shopCars` markup and buy handler; the
+  never-called `SaveSystem.migrateV1`.
+- **Schema 8** with the pre-merge migration: a development save's old balance becomes Clean Bank (§45.2), its
+  `money` field is deleted, and `Money.sanitize` repairs any wallet (negative / NaN / infinite / unknown places).
+- **The empire's daily books** (Empire › Overview) still list only the running of the operation (dealers,
+  territory tax, tribute, bounties, businesses, upkeep, protection, wages, bribes, deliveries) under their old
+  labels; personal spending is not booked there, as before.
+
+## Files / systems changed (1)
+
+- New: `src/game/035-core-money.js` (the ledger; added to `src/manifest.json` after the save system),
+  `tests/ledger.mjs` (44 checks).
+- Changed game files: `030-core-save-system.js` (schema 8, migration, wallet sanitize, MoneyFeed listens to the
+  ledger), `340-core-missions.js`, `360-core-content-services.js`, `370-core-activities.js`,
+  `390-underworld-data.js`, `430-underworld-crew-deliveries.js`, `440-underworld-territory-royalties.js`,
+  `450-underworld-core.js`, `460-underworld-factions.js`, `480-underworld-crew.js`, `490-underworld-property.js`,
+  `500-underworld-homes-parking.js`, `510-underworld-police-pressure.js`, `520-underworld-prison.js`,
+  `530-underworld-opportunities.js`, `540-underworld-empire-ui.js`, `550-underworld-gambling.js`,
+  `560-underworld-taxis.js`, `600-core-ui-manager.js`, `630-core-game.js`, `640-core-game-config.js`;
+  `shell/10-body.html` (`#bank`, ARMS markup removed); `styles/main.css` (`#bank`, bank popups).
+- Tests: `static-money.mjs` rewritten (the old balance must not exist; wallet only in the ledger and save system;
+  every source tag valid and used); 24 suites moved off `save.money`; `money.mjs` rewritten for two currencies;
+  `session.mjs` step 2 now tests that civilians drop nothing and a gang dealer drops Dirty Cash, and its Sully
+  step no longer depends on pocket space left by the pickpocket step (the pre-existing flake from Session 0.5);
+  `prison.mjs` work and dice measure the commissary; schema expectations 7 → 8.
+- `index.html` rebuilt from `src/`.
+
+## Save/schema changes (1)
+
+- **Schema 7 → 8.** `money` (number) removed; `wallet` added (`{ v, clean, debt, dirty: { me, veh, prop }, stunt:
+  { day, paid } }`). `uw.jail.commissary` (number, per sentence). `uw.st.seizedCash` (number). `uw.st.mugs`
+  dropped from new saves. `uw.ledger` keys unchanged for the books.
+- Migration (development saves only, §45.2): before merge, `wallet = { clean: old money }` and `money` is
+  deleted. A malformed saved blackjack hand is refunded to Clean Bank.
+
+## Tests run (1)
+
+All 41 browser and Node suites ran against the Session 1 build, two at a time; every suite with a failure was
+re-run alone. Every suite was then green, apart from known flakes that predate Session 1:
+
+| Suite | Session 0.5 build (2 in parallel) | Session 1 build (2 in parallel) | Session 1, solo re-run |
+| --- | --- | --- | --- |
+| ledger | new | 43 / 43 |  |
+| prison | 47 / 47 | 47 / 47 |  |
+| business | 40 / 40 | 40 / 40 |  |
+| homes | 26 / 26 | 26 / 26 |  |
+| inventory | 58 / 58 | 57 / 58 | 58 / 58 |
+| gambling | 57 / 57 | 55 / 57 | 57 / 57 |
+| session | 33 / 33 | 33 / 34 | 34 / 34 |
+| casino | 38 / 39 | 39 / 39 |  |
+| taxi | 18 / 20 | 20 / 20 |  |
+| dealers | 34 / 34 | 34 / 34 |  |
+| stations | 17 / 17 | 17 / 17 |  |
+| interiors | 22 / 22 | 22 / 22 |  |
+| cargo | 36 / 36 | 36 / 36 |  |
+| property | 33 / 33 | 33 / 33 |  |
+| phone | 71 / 71 | 71 / 71 |  |
+| ui | 23 / 23 | 23 / 23 |  |
+| smoke | 16 / 16 | 16 / 16 |  |
+| money | 10 / 10 | 10 / 10 |  |
+| stress | 29 / 30 | 29 / 30 | 30 / 30 |
+| arrest | 126 / 126 | 126 / 126 |  |
+| vehicles | 39 / 39 | 39 / 39 |  |
+| ramps | 21 / 21 | 21 / 21 |  |
+| city | 25 / 25 | 25 / 25 |  |
+| soak | 22 / 22 | 22 / 22 |  |
+| map | 22 / 22 | 22 / 22 |  |
+| roads | 20 / 20 | 20 / 20 |  |
+| shooting | 37 / 37 | 37 / 37 |  |
+| survival | 9 / 9 | 9 / 9 |  |
+| offline | 14 / 14 | 14 / 14 |  |
+| street | 11 / 11 | 11 / 11 |  |
+| pwa | 5 / 5 | 5 / 5 |  |
+| camera | 20 / 20 | 20 / 20 |  |
+| police | 13 / 13 | 13 / 13 |  |
+| gangs | 23 / 23 | 23 / 23 |  |
+| kingpin | 6 / 6 | 6 / 6 |  |
+| tutorial | 13 / 13 | 13 / 13 |  |
+| phoneapps | 19 / 19 | 19 / 19 |  |
+| static-money | 11 / 11 | 7 / 7 |  |
+| build | 5 / 5 | 5 / 5 |  |
+| core | 64 / 64 | 64 / 64 |  |
+| royale-sim | 23 / 23 | 23 / 23 |  |
+
+How to read the failures in the parallel run:
+
+- **inventory "v3 save … money is now Clean Bank"**, **gambling "malformed saved hand is refunded"** and
+  **session "walking over the drop collects it"** were test-code mistakes in the first conversion (a v3 fixture
+  built from a save that already had a wallet; a check still reading the old field; collecting a fresh drop before
+  its 0.45 s settle time). Fixed in the tests; all pass alone.
+- **gambling "reload at the poker table"** asserts at least $990 in chips after one blind; the seat rotation
+  sometimes posts two blinds (the README lists this as timing-sensitive). The cash-out arithmetic was exact (+$980).
+- **stress "no frame stall over 2.5 s"** is the software-GL stall check the README lists as load-sensitive; it
+  failed the same way on the Session 0.5 build under load and passes alone.
+
+New and rewritten suites: `ledger` (44 checks, new; 43 in the table run, one added after review, below), `static-money` (7 checks, rewritten), `money` (10, rewritten
+for two currencies), `session` (34, one check added: civilians drop nothing). Screenshot scripts (`shots`, `cityshots`, `qashots`,
+`frontshots`, `carshots`, `contact`): all ran to completion (exit 0); the casino and HUD shots show the cash line
+with `BANK` beneath it.
+
+Performance (`tests/perf.mjs`, run alone, four alternating runs per build, desktop SwiftShader, low quality):
+
+| | original `3be344e` | Session 1 |
+| --- | --- | --- |
+| update ms/frame, calm | 1.15 / 1.00 / 1.00 / 0.88 | 0.90 / 1.14 / 1.03 / 1.11 |
+| update ms/frame, busy | 0.93 / 0.91 / 0.96 / 1.02 | 1.06 / 1.35 / 1.01 / 1.29 |
+| draw calls, calm | 119-122 | 116-120 |
+| console errors | 0 | 0 |
+
+**Bug found in the pre-commit review of the diff and fixed:** the Armorer's "buy 5 hardware" button had been
+converted to `!Money.can(hw, 'armorer') * 5` (the regex used for the phone screens captured `hw` instead of
+`hw * 5`), so it was enabled when you could afford one unit, not five. No suite covered it. Fixed to
+`!Money.can(hw * 5, 'armorer')`, and `ledger` gained a check that fails on the bugged build (verified) and passes
+on the fix. The original source was searched for every other `money < <expression with an operator>`; the only
+other one (`p * lots`) had been converted by hand correctly. `inventory`, `phoneapps`, `ledger` and `smoke` were
+re-run on the fixed build: all pass.
+
+Calm-scene logic cost is unchanged. The busy samples sit a little higher (median 1.18 vs 0.95 ms) but inside the
+range the identical Session 0.5 file produced (0.97-1.48 ms). The only per-frame addition is two balance reads and a
+string compare for the HUD bank line.
+
+## Deprecated / removed code (1)
+
+- Removed: `save.money` and the `MoneyFeed.bind` accessor; `Game.addMoney`; `ContentManager.spend`;
+  `Underworld.income` / `expense`; `SaveSystem.migrateV1`; `ARMS` + `#shopArms` / `#shopCars` + `UIManager.buy('arm')`;
+  civilian knock-down drops and `st.mugs`; Driver car-stealing payout and arrest roll; Lieutenant stipend;
+  `MONEY_SOURCES` never carries an unused tag (checked).
+- Still present, scheduled: Handling / Cooldown / old Armor upgrades (Session 2, §45.12); the casino's no-limit
+  player-favoured odds (Session 9).
+
+## Known bugs / risks (1)
+
+- **Interim Clean Bank bootstrap is thin until the laundering fixer exists** (DC-23): early Clean comes from
+  capped stunt cash and from selling a car you park (any garage car counts as legal until HOT arrives in
+  Session 5, which is a small temporary Dirty → Clean route).
+- **The day-length setting still scales per-real-hour income** (§45.9, DC-06): not addressed in Session 1; the
+  ledger is world-time agnostic, so the fix lands with the income systems (Sessions 3 and 9).
+- The casino still says "No table limits" and keeps its player-favoured odds; only its currency changed.
+- Dirty Cash in a car you don't own is lost with the car when it despawns, like its cargo (as designed for
+  stolen cars; the transfer row warns nothing about it yet).
+
+## Exact next recommended task
+
+**Session 2 — Rank / Reputation / core progression** (prompt Session 2, handoff phase 3), with DC-04/§45.7
+(business influence only once established), DC-10/§45.13 (authoritative turf owner, explicit takeover), removal of
+the `REP_LEVELS` ladder and the Handling / Cooldown / old Armor upgrades (§45.12), and a Nobody → City Kingpin
+dependency test. Before it starts, rule on DC-22 and DC-23 (below).
+
+## Working tree / commit state (1)
+
+- Clean after the Session 1 commit; see `git log` on `claude/practical-lamport-zld81y`.
+
+---
+
+# Session 0.5 record (source split)
+
+## Session 0.5: phase
+
 - Session: **0.5 — Source module split** (owner amendment §45.3). Behavior-preserving; no gameplay change.
 - Commit/base revision: `aedb83f` (Session 0 amendments) → the Session 0.5 commit on
   `claude/practical-lamport-zld81y`.
@@ -157,7 +363,7 @@ runs per build. The built file is byte-identical, so any difference is run-to-ru
   suite's pocket-space assumption (Session 1), the taxi 25-second drive check, and the four load- or
   sample-sensitive checks above. A full-suite run should be judged with a solo re-run of anything that fails.
 
-## Exact next recommended task
+## Session 0.5: next task (done)
 
 **Session 1 — Save schema + money foundation**, following the plan under "Exact next recommended task
 (Session 1 plan)" below, now as edits to `src/game/030-core-save-system.js`, `450-underworld-core.js`,
@@ -619,6 +825,53 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
    buildings or the Fuel & Go stores).
 7. **Severity:** RECOMMENDED. **Blocks:** Session 1 (payroll source order and the withdrawal API).
 
+### DC-22 · Where passive criminal income is delivered — RECOMMENDED (implemented as a default in Session 1; needs a ruling)
+
+1. **Current specification:** §2 says criminal activity produces Dirty Cash and where it can be kept; §8 describes
+   the mature loop ending in "cash"; nothing says where income you don't collect in person (dealer sales, territory
+   tax, tribute, bounties) physically arrives.
+2. **Problem observed:** landing it "on you" (the old behavior) makes the arrest penalty arbitrary: a day of empire
+   income teleports into your pockets wherever you are and is seized at the next bust, and it ignores the
+   warehouse's role as the empire's cash hub (§5, §7).
+3. **Proposed improvement (implemented as the default):** passive Dirty income goes to your first warehouse vault,
+   else your home safehouse, else any safehouse, else to you (`Money.stashFor`). In Session 3 this becomes "the
+   vault of the warehouse that supplies that turf", once supply chains exist.
+4. **Why it is better:** consistent with payroll drawing from the same places (§45.21), keeps the arrest rule about
+   what you choose to carry, and gives stashing a reason before warehouses exist.
+5. **Systems affected:** `MONEY_SOURCES` (`earn: 'stash'` on dealers, royalty, tribute, bounty), Session 3 logistics.
+6. **Tradeoffs / risks:** a player with no property still receives it on their person (nowhere else to go).
+7. **Severity:** RECOMMENDED. **Blocks:** nothing now; confirm before Session 3.
+
+### DC-23 · Bring the laundering fixer forward — RECOMMENDED (follows from Session 1)
+
+1. **Current specification:** §45.6 adds an early laundering fixer at ~30–35%; the session plan puts laundering in
+   Session 9.
+2. **Problem observed:** since Session 1, property, licensed cars, garage work, shop goods and the casino need Clean
+   Bank. Until Session 9 a new player's Clean comes only from capped stunt cash ($1,500/day) and from selling a car
+   from their garage. The second is a stop-gap Dirty → Clean route: until HOT exists (Session 5), a stolen car
+   parked in your bay is legally yours and sells for Clean. Playtesting the next eight sessions on that economy
+   gives misleading feedback, and the loophole could become load-bearing.
+3. **Proposed improvement:** implement the fixer (a contact, ~30–35% fee, low daily cap, time delay) as a small
+   self-contained addition at the start of Session 2 or Session 3. The ledger already has everything it needs (a
+   Dirty `pay` from you and a Clean `earn` after the delay; the `launder` queue field is reserved in the plan).
+4. **Why it is better:** the intended early economy exists from now on, and the car-sale loophole can be closed in
+   Session 5 without leaving players with no Clean source.
+5. **Systems affected:** ledger (new sources `launderIn` / `launderOut`), contacts, a phone screen.
+6. **Tradeoffs / risks:** pulls a small piece of Session 9 forward; Session 9 then adds fronts and supersedes it.
+7. **Severity:** RECOMMENDED. **Blocks:** nothing; best done before Session 5.
+
+### DC-24 · Implementation choices in Session 1 that change feel slightly — OPTIONAL (for review, all reversible in one table entry)
+
+- **In-person criminal purchases take only the cash on you.** The Armorer, suppliers, race buy-ins and boss
+  envelopes don't reach into the car beside you; move the cash first (one tap in Inventory). Alternative: let them
+  draw from a trunk within reach.
+- **Phone-placed crew costs (hiring, promotions, bonuses, police payroll, delivery fees) use the payroll order**
+  (vaults → safehouses → you), like wages. Alternative: cash on you only.
+- **The hospital bill is 10% of the bank** ($100–$1,500), where it was 10% of all money. Alternative: 10% of
+  bank + Dirty, still paid from the bank.
+- **Jail bribes and contraband are paid from your stash outside** (the arrest emptied your pockets), in payroll
+  order. Alternative: commissary only, which would make most of them unaffordable.
+
 ## Owner decisions (Session 0 review)
 
 The owner's decisions are recorded as authoritative amendments in `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md` §45
@@ -787,6 +1040,10 @@ implementation, old one deleted in the same phase · REMOVE = delete.
 
 # Appendix B — Player money access inventory
 
+> Historical: this is the Session 0 inventory of the old single balance at `3be344e`, kept with its rulings.
+> Since Session 1 the live inventory is `LIST=1 node underworld/tests/static-money.mjs` (every ledger call by
+> function and source tag), and the rulings are encoded in `MONEY_SOURCES`.
+
 Generated by `LIST=1 node underworld/tests/static-money.mjs` at `3be344e`. **Default class** is the proposed
 Dirty/Clean rule for Session 1. The ambiguous rows are ruled on in the review table below.
 
@@ -950,7 +1207,7 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 
 | Field (today) | Change | Session | Risk |
 | --- | --- | --- | --- |
-| `money` (number, accessor) | ledger object, Dirty by location, Clean, laundering queue | 1 | `merge()` drops a type-changed field silently (DC-14) |
+| `money` (number, accessor) | **done in S1:** `wallet` (Dirty by place, Clean, debt); the laundering queue arrives with the fixer (DC-23) | 1 | handled by the pre-merge migration |
 | `upgrades.{handling,cooldown,armor,engine,brakes,durability}` | delete (keep stamina, health) | 2 | `sanitize` clamps every key; delete keys explicitly |
 | `rep`, `uw.stageMax` | Rep numeric stays; Rank state explicit (max reached plus current) | 2 | Rank must never go below stageMax for display |
 | `uw.turfs[i].inf` (owner derived) | add authoritative `owner`, `contest` state | 2/4 | migration derives owner once from current influence |
@@ -1002,16 +1259,16 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 
 | Item | Where | Removed in | Status |
 | --- | --- | --- | --- |
-| `save.money` scalar + `MoneyFeed` accessor | 33223 | S1 | open |
-| `Game.addMoney`, `ContentManager.spend`, `Underworld.income/expense` as raw writers | 54604, 44485, 47594 | S1 | open |
-| `SaveSystem.migrateV1` (never called) | 33117 | S1 | open |
+| `save.money` scalar + `MoneyFeed` accessor | 33223 | S1 | **removed** |
+| `Game.addMoney`, `ContentManager.spend`, `Underworld.income/expense` as raw writers | 54604, 44485, 47594 | S1 | **removed** |
+| `SaveSystem.migrateV1` (never called) | 33117 | S1 | **removed** |
 | `DEALER` table (dead) | 44060 | S2 | open |
 | `REP_LEVELS`, `repLevel`, `repName`, `_repHud` named ladder | 44052, 44169 | S2 | open |
 | `UPGRADES` handling/cooldown/armor + reads; `upgrades.engine/brakes/durability` fields | 53182, 38523, 39438, 41154 | S2 | open |
-| `ARMS` + hidden `#shopArms` / `#shopCars` + `UIManager.buy('arm')` | 53189, 783-790, 53473 | S2 | open |
-| mugging: civ spill in `onKnock`, `st.mugs`, hint/tip text | 47530, 47058, 46133, 54500 | S2 text / S10 mechanic | open |
-| Driver car-stealing branch and role text | 48838, 46302 | S3 | open |
-| Lieutenant stipend | 48832 | S3 (DC-09) | proposed |
+| `ARMS` + hidden `#shopArms` / `#shopCars` + `UIManager.buy('arm')` | 53189, 783-790, 53473 | S1 (hidden money path) | **removed** |
+| mugging: civ spill in `onKnock`, `st.mugs`, hint/tip text | 47530, 47058, 46133, 54500 | S1 (§45.18) | **removed** |
+| Driver car-stealing branch and role text | 48838, 46302 | S1 (§45.18) | **removed** (logistics role itself: S3) |
+| Lieutenant stipend | 48832 | S1 (§45.18) | **removed** |
 | `DeliveryManager` abstract runners | 46697 | S3 | open |
 | `PropertyManager` class-body `garagePoints/garageCap/garageActionVehicle` (shadowed) | 49017-49034 | S3/S5 | open |
 | garage overflow (`at = null`) + "waits in storage" toasts | 44328, 49299, 49408 | S5 | open |
@@ -1032,3 +1289,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | 7 | pre-overhaul (v7 pass) | baseline: faction `aggro`/`trouble`, cargo by weight, Royale pressure reset |
 | — | 0 | no change |
 | — | 0.5 | no change (source split only; `index.html` byte-identical) |
+| 8 | 1 | `money` → `wallet` (Clean Bank, medical debt, Dirty Cash by place, stunt cap counter); pre-merge migration of a dev save's balance into Clean Bank; `uw.jail.commissary`; `uw.st.seizedCash`; `uw.st.mugs` no longer created |

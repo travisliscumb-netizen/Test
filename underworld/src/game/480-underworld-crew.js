@@ -61,8 +61,8 @@ class CrewManager {
     if (!c) return 'Gone.';
     if (!this.canRecruit()) return 'Nobody works for a nobody. Earn 100 reputation first.';
     if (this.active().length >= this.cap()) return `You can only run ${this.cap()} people right now. More property means more room.`;
-    if (g.save.money < c.fee) return `${c.name} wants ${fmtMoney(c.fee)} up front.`;
-    g.content.spend(c.fee);
+    if (!Money.can(c.fee, 'crewFee')) return `${c.name} wants ${fmtMoney(c.fee)} up front, in Dirty Cash.`;
+    Money.pay(c.fee, 'crewFee');
     c.id = S.nextCrew++; c.days = 0; S.crew.push(c); S.cand.splice(idx, 1);
     uw.news('pv', `${this.displayName(c)} is on your payroll at ${fmtMoney(c.pay)} a day.`);
     g.audio.play('cash');
@@ -70,6 +70,9 @@ class CrewManager {
     return '';
   }
   find(id) { return this.S.crew.find(c => c.id === id); }
+  // what the whole active crew costs per day, and how many days the Dirty reserve covers (§45.21)
+  payroll() { return this.active().reduce((a, c) => a + this.dailyPay(c), 0); }
+  payrollDays() { const w = this.payroll(); return w > 0 ? Math.floor(Money.payrollReserve() / w) : Infinity; }
   dailyPay(c) { return Math.round(c.pay * (1 + c.rank * 0.35) * (c.role === 'bodyguard' ? 1.2 : 1)); }
   fire(id) {
     const c = this.find(id); if (!c) return;
@@ -81,9 +84,9 @@ class CrewManager {
   promote(id) {
     const g = this.uw.g, c = this.find(id); if (!c || c.rank >= 4) return 'Already at the top.';
     const cost = PROMO_COST[c.rank + 1];
-    if (g.save.money < cost) return `Promotion costs ${fmtMoney(cost)}.`;
+    if (!Money.can(cost, 'crewFee')) return `Promotion costs ${fmtMoney(cost)} in Dirty Cash.`;
     if (c.days < c.rank * 2) return `${c.name.split(' ')[0]} hasn’t been around long enough (${c.rank * 2} days).`;
-    g.content.spend(cost);
+    Money.pay(cost, 'crewFee');
     c.rank++; c.loyalty = clamp(c.loyalty + 15, 0, 100); c.power = clamp(c.power + 12, 0, 100); c.skill = clamp(c.skill + 4, 0, 99);
     g.audio.play('confirm');
     return '';
@@ -91,8 +94,8 @@ class CrewManager {
   bonus(id) {
     const g = this.uw.g, c = this.find(id); if (!c) return '';
     const amt = this.dailyPay(c) * 3;
-    if (g.save.money < amt) return `A bonus costs ${fmtMoney(amt)}.`;
-    g.content.spend(amt); c.loyalty = clamp(c.loyalty + 12, 0, 100); c.unpaid = 0; g.audio.play('cash');
+    if (!Money.can(amt, 'crewFee')) return `A bonus costs ${fmtMoney(amt)} in Dirty Cash.`;
+    Money.pay(amt, 'crewFee'); c.loyalty = clamp(c.loyalty + 12, 0, 100); c.unpaid = 0; g.audio.play('cash');
     return '';
   }
   discipline(id) {
@@ -145,9 +148,9 @@ class CrewManager {
       if (c.status === 'hurt' || c.status === 'jailed') { c.out--; if (c.out <= 0) { const was = c.status; c.status = 'active'; uw.news('pv', `${c.name} is ${was === 'jailed' ? 'out of county' : 'back on their feet'} and reporting for work.`); } else if (c.status === 'jailed') c.loyalty = clamp(c.loyalty - 0.8, 0, 100); }
     }
     const act = this.active();
-    // payroll
-    const wages = act.reduce((a, c) => a + this.dailyPay(c), 0);
-    const paid = uw.expense('wages', wages);
+    // payroll: Dirty Cash only, from warehouse vaults, then safehouses, then your pockets (§45.17, §45.21)
+    const wages = this.payroll();
+    const paid = Money.pay(wages, 'wages', { partial: true });
     const short = wages > 0 && paid < wages - 0.5;
     const stage = uw.stage;
     let dealt = 0, dealIncome = 0;
@@ -173,7 +176,7 @@ class CrewManager {
       // ---- disloyalty, from mild to catastrophic
       this.disloyalty(c, rival);
     }
-    if (dealIncome > 0) uw.income('dealers', dealIncome);
+    if (dealIncome > 0) Money.earn(dealIncome, 'dealers');
     if (short) uw.news('pv', `Payroll came up ${fmtMoney(wages - paid)} short. The crew noticed.`);
     // leadership challenge: an ambitious, powerful lieutenant wants more
     for (const c of act) if (c.status === 'active' && c.rank >= 3 && c.power > 60 && c.traits.includes('ambitious') && !S.decisions.some(d => d.crew === c.id) && Math.random() < 0.08) {
@@ -217,16 +220,13 @@ class CrewManager {
     }
     if (c.role === 'lieutenant' && typeof c.assign === 'string') {
       let n = 0;
+      // a Lieutenant strengthens your hold on the district; there is no flat stipend (§45.18)
       for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === c.assign && uw.owner[i] === 'pc') { uw.addInf(i, 'pc', 2 + skill * 2); n++; }
-      if (n) uw.income('lieutenants', n * (150 + c.skill * 2));
       return null;
     }
-    if (c.role === 'driver') {
-      const cash = Math.round(120 + skill * 330 + c.rank * 60);
-      uw.income('drivers', cash); S.pressure = clamp(S.pressure + 0.25, 0, 100);
-      if (Math.random() < 0.008 + S.pressure / 3000) this.arrest(c, 'a stolen car at a checkpoint');
-      return null;
-    }
+    // a Driver no longer steals cars for a daily payout (§37 #2, §45.18); Driver logistics arrive with the
+    // warehouse rebuild (Session 3)
+    if (c.role === 'driver') return null;
     if (c.role === 'manager') { if (!(S.props[c.assign] && S.props[c.assign].owned)) c.role = 'idle'; return null; }
     return null;
   }
@@ -246,8 +246,8 @@ class CrewManager {
     const why = `loyalty ${Math.round(L)}${c.unpaid ? `, unpaid ${c.unpaid} day${c.unpaid > 1 ? 's' : ''}` : ''}${F < 25 ? ', not afraid of you' : ''}`;
     // 1. skimming: greedy or unhappy people steal a little
     if (L < 45 && (c.traits.includes('greedy') || Math.random() < 0.4) && Math.random() < 0.25) {
-      const amt = Math.min(Math.round(g.save.money * 0.03 + 80), 4000);
-      if (amt > 0 && g.save.money > amt) { g.save.money -= amt; S.ledger.exp.theft = (S.ledger.exp.theft || 0) + amt; uw.news('pv', `The count is ${fmtMoney(amt)} short. ${c.name} has been skimming (${why}).`); }
+      const amt = Money.crewTheft(0.03, 80, 4000);
+      if (amt > 0) uw.news('pv', `The count is ${fmtMoney(amt)} short. ${c.name} has been skimming from the stash (${why}).`);
       return;
     }
     // 2. desertion
@@ -268,7 +268,7 @@ class CrewManager {
       const to = rival || this.bestRival() || FAC_IDS.find(id => !S.factions[id].broken);
       let n = 0;
       for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === z && uw.owner[i] === 'pc') { uw.addInf(i, 'pc', -45); if (to) uw.addInf(i, to, 40); n++; }
-      const stolen = Math.min(Math.round(g.save.money * 0.12), 60000); g.save.money -= stolen;
+      const stolen = Money.crewTheft(0.12, 0, 60000);
       c.status = 'gone'; c.role = 'idle';
       if (to) S.factions[to].strength = Math.min(110, S.factions[to].strength + 10);
       for (const o of this.active()) o.loyalty = clamp(o.loyalty - 6, 0, 100);

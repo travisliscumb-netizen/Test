@@ -129,7 +129,7 @@ class FactionSim {
       if (coalition && f.rel > -30) f.rel -= 2;
       // tribute & concessions when the player towers over them
       const ratio = uw.powerRatio(id);
-      if (f.tribute > 0) { if (ratio < 1.6 || f.rel < -50) { f.tribute = 0; uw.news('unknown', `The ${D.short} stopped paying. They don’t think you can make them anymore.`); } else { const paid = Math.min(f.money, f.tribute); f.money -= paid; uw.income('tribute', paid); } }
+      if (f.tribute > 0) { if (ratio < 1.6 || f.rel < -50) { f.tribute = 0; uw.news('unknown', `The ${D.short} stopped paying. They don’t think you can make them anymore.`); } else { const paid = Math.min(f.money, f.tribute); f.money -= paid; Money.earn(paid, 'tribute'); } }
       if (ratio > 3.6 && f.rel > -40 && !f.tribute && Math.random() < 0.25) this.cedeTurf(id);
       // police raids: their heat, a city crackdown, or a dirty lieutenant pointing the way
       let rp = 0.025 + f.heat / 500 + (S.crackdown > 0 ? 0.08 : 0);

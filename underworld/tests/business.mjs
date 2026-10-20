@@ -8,7 +8,7 @@ const b = await launch();
 const { page, errors } = await open(b, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
-await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; g.save.money = 5e7; g.save.rep = 5000; });
+await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 5e7); g.save.rep = 5000; });
 
 // 1. the roster
 const ros = await ev(() => {
@@ -54,10 +54,10 @@ const dev = await ev(() => {
   out.preLevel = PM.level(d.id);
   out.buy = PM.buy(d.id); out.l1 = PM.level(d.id);
   const day = [PM.bizDay(d)], perk = [PM.perk('launder')];
-  const m0 = g.save.money, c1 = PM.upgradeCost(d.id);
-  out.up1 = PM.upgrade(d.id); out.paid1 = m0 - g.save.money; out.c1 = c1; day.push(PM.bizDay(d)); perk.push(PM.perk('launder'));
-  const c2 = PM.upgradeCost(d.id), m1 = g.save.money;
-  out.up2 = PM.upgrade(d.id); out.paid2 = m1 - g.save.money; out.c2 = c2; day.push(PM.bizDay(d)); perk.push(PM.perk('launder'));
+  const m0 = g.money.total(), c1 = PM.upgradeCost(d.id);
+  out.up1 = PM.upgrade(d.id); out.paid1 = m0 - g.money.total(); out.c1 = c1; day.push(PM.bizDay(d)); perk.push(PM.perk('launder'));
+  const c2 = PM.upgradeCost(d.id), m1 = g.money.total();
+  out.up2 = PM.upgrade(d.id); out.paid2 = m1 - g.money.total(); out.c2 = c2; day.push(PM.bizDay(d)); perk.push(PM.perk('launder'));
   out.up3 = PM.upgrade(d.id); out.l3 = PM.level(d.id); out.cost3 = PM.upgradeCost(d.id);
   out.gross = day.map(x => Math.round(x.gross)); out.upkeep = day.map(x => Math.round(x.upkeep)); out.net = day.map(x => Math.round(x.net)); out.perk = perk.map(x => +x.toFixed(2));
   // not owned: no upgrade
@@ -66,7 +66,7 @@ const dev = await ev(() => {
   // damaged: no upgrade, half the benefit
   uw.S.props[st.id].dmg = 1; const law = P.PROPS.find(x => x.kind === 'business' && x.cat === 'law'); PM.buy(law.id); const legal = PM.perk('legal'); uw.S.props[law.id].dmg = 1; out.legalDmg = [legal, PM.perk('legal')]; out.dmgUp = PM.upgrade(law.id); uw.S.props[law.id].dmg = 0; uw.S.props[st.id].dmg = 0;
   // poor: no upgrade, no money taken
-  g.save.money = 10; out.poor = PM.upgrade(law.id); out.poorMoney = g.save.money; g.save.money = 5e7;
+  (g.money.W.clean = g.money.W.dirty.me = 10); out.poor = PM.upgrade(law.id); out.poorMoney = g.money.total(); (g.money.W.clean = g.money.W.dirty.me = 5e7);
   return out;
 });
 check('a new business starts at level 1', dev.preLevel === 0 && dev.buy === '' && dev.l1 === 1, JSON.stringify(dev));
@@ -76,7 +76,7 @@ check('income grows at each level, and so do the running costs', dev.gross[0] < 
 check('every level still nets more than the one before', dev.net[0] > 0 && dev.net[0] < dev.net[1] && dev.net[1] < dev.net[2], JSON.stringify(dev.net));
 check('the laundromat launders more heat at each level', dev.perk[0] > 0 && dev.perk[0] < dev.perk[1] && dev.perk[1] < dev.perk[2], JSON.stringify(dev.perk));
 check('a storage facility holds more at each level', dev.cap[0] > 0 && dev.cap[0] < dev.cap[1] && dev.cap[1] < dev.cap[2], JSON.stringify(dev.cap));
-check('you can’t upgrade what you don’t own, a damaged business, or without the money', dev.notOwned !== '' && dev.dmgUp !== '' && dev.poor !== '' && dev.poorMoney === 10, JSON.stringify([dev.notOwned, dev.dmgUp, dev.poor]));
+check('you can’t upgrade what you don’t own, a damaged business, or without the money', dev.notOwned !== '' && dev.dmgUp !== '' && dev.poor !== '' && dev.poorMoney === 20, JSON.stringify([dev.notOwned, dev.dmgUp, dev.poor]));
 check('a damaged business gives half its benefit', Math.abs(dev.legalDmg[1] - dev.legalDmg[0] / 2) < 1e-6 && dev.legalDmg[0] > 0, JSON.stringify(dev.legalDmg));
 
 // 4. the business manager
@@ -182,7 +182,7 @@ const mig = await ev(() => {
   const lv = d => { window.game.uw.sanitize(d.uw); return Object.values(d.uw.props).filter(o => o.owned).map(o => o.lvl); };
   return { ok: !!(a && a.data), v: a && a.data.version, lv: lv(a.data), bad: lv(c.data) };
 });
-check('a v5 save (no levels) loads as the current schema with every business at level 1', mig.ok && mig.v === 7 && mig.lv.every(x => x === 1), JSON.stringify(mig));
+check('a v5 save (no levels) loads as the current schema with every business at level 1', mig.ok && mig.v === 8 && mig.lv.every(x => x === 1), JSON.stringify(mig));
 check('a corrupted level is clamped to 1..3', mig.bad.every(x => x >= 1 && x <= 3), JSON.stringify(mig.bad));
 
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));

@@ -57,7 +57,7 @@ class RoyaltySystem {
       }
       if (r.status === 'refused' && fid) uw.opps.add({ kind: 'retaliate', title: `${FACTIONS[fid].short} won’t pay`, text: `They stopped paying their cut on ${uw.T[i].name}. Lean on their crew there and the money starts again.`, fid, turf: i, x: uw.T[i].hang.x, z: uw.T[i].hang.z, hours: 30 });
     }
-    if (total > 0) { uw.income('territory tax', total); S.st.royalties = (S.st.royalties || 0) + total; }
+    if (total > 0) { Money.earn(total, 'royalty'); S.st.royalties = (S.st.royalties || 0) + total; }
     if (refused && uw.influence < 600) uw.news('pv', `${refused} crew${refused > 1 ? 's' : ''} refused to pay their cut on your turf.`);
     return total;
   }

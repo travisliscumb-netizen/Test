@@ -127,7 +127,7 @@ class TaxiService {
       preset: this.preset,
       quote: (x, z) => { const f = from(), m = routeLen(f.x, f.z, x, z); return { m, fare: changing ? Math.round(this.meterFare() + fareFor(m) - FARE_BASE) : fareFor(m), name: placeNameAt(x, z), from: { x: f.x, z: f.z } }; },
       confirm: (x, z, q) => {
-        if (g.save.money < q.fare) { g.ui.toast(`The fare is ${fmtMoney(q.fare)}. You have ${fmtMoney(g.save.money)}.`, 'warn'); g.audio.play('deny'); return false; }
+        if (!Money.can(q.fare, 'taxi')) { g.ui.toast(`The fare is ${fmtMoney(q.fare)}. You have ${fmtMoney(Money.available('taxi'))} (cash on you and in the bank).`, 'warn'); g.audio.play('deny'); return false; }
         if (changing) this.reroute(x, z, q); else this.board(x, z, q);
         return true;
       },
@@ -158,7 +158,7 @@ class TaxiService {
   finish(paid, msg) {
     const g = this.g, p = g.player, v = this.cab;
     this.showHud(false);
-    if (paid > 0) { const m = Math.min(paid, g.save.money); g.content.spend(m); g.save.stats.fastTravels = (g.save.stats.fastTravels || 0) + 1; }
+    if (paid > 0) { Money.pay(paid, 'taxi', { partial: true }); g.save.stats.fastTravels = (g.save.stats.fastTravels || 0) + 1; }
     if (v && p.vehicle === v) {
       g.exitVehicle(true);
       v.driver = 'npc';

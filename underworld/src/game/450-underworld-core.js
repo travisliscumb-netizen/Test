@@ -47,7 +47,7 @@ class CashPickups {
   }
   collect(it) {
     const g = this.g, uw = g.uw;
-    if (it.cash > 0) { g.addMoney(it.cash, true); }
+    if (it.cash > 0) { g.earn(it.cash, 'pickup'); }
     let got = '';
     if (it.goods) { const t = uw.give(it.goods, 'pickup'); got = t ? ' + ' + goodsList(t) : ''; }
     g.audio.play('pickup', { gain: 0.6 });
@@ -158,7 +158,7 @@ class Underworld {
       cops: {}, rap: { priors: 0, cops: 0, copcars: 0, kills: 0 },
       opps: [], nextOpp: 1, ledger: { inc: {}, exp: {} }, lastLedger: null,
       jail: null, jailPhone: false, taskforce: 0, crackdown: 0, redirect: null, pikeCD: 0, hiPressDays: 0, warHours: 0,
-      decisions: [], flags: {}, realBy: {}, st: { sold: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, mugs: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
+      decisions: [], flags: {}, realBy: {}, st: { sold: 0, seizedCash: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
       slept: false, shipment: null,
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {}
@@ -494,6 +494,14 @@ class Underworld {
     const m = Math.min(Math.floor(n), Inv.has(A.o, k), this.fitIn(B, k)); if (!(m > 0)) return 0;
     return Inv.move(A.o, B.o, k, m);
   }
+  // move Dirty Cash between two places within reach (§2): your pockets, a trunk, a safehouse stash or a warehouse
+  // vault. n < 0 moves all of it. Places across town are out of reach, exactly as for product.
+  transferCash(fromKey, toKey, n) {
+    if (fromKey === toKey) return 0;
+    const locs = this.locations(), A = locs.find(L => L.key === fromKey && L.here), B = locs.find(L => L.key === toKey && L.here);
+    if (!A || !B) return 0;
+    return Money.move(A, B, n < 0 ? Money.cashAt(A) : n);
+  }
   // put goods on the player: pockets first, then a nearby trunk. returns what fit.
   // unitCost: dollars paid per lot (purchases); found / stolen goods come in at zero cost.
   give(goods, why, unitCost) {
@@ -569,8 +577,9 @@ class Underworld {
     if (!withCargo && units(v.trunk)) { g.ui.ask('Sell it with the cargo?', `The trunk still holds ${goodsList(v.trunk)} (${fmtLb(cargoC(v.trunk))}). The chop shop keeps whatever is in it.`, 'Sell with cargo', () => this.sellCar(v, true)); return; }
     const pay = this.chopValue(v), wanted = S.chopWanted.includes(v.type);
     const lost = units(v.trunk);
+    Money.emptyCar(0, v); // cash left in a stolen car comes out with you; the cargo stays with the car
     g.exitVehicle(true); g.vehicles.despawn(v);
-    g.addMoney(pay, true); S.st.chopped++; this.addRep(wanted ? 25 : 10, null);
+    g.earn(pay, 'chop'); S.st.chopped++; this.addRep(wanted ? 25 : 10, null);
     if (wanted) S.chopWanted = S.chopWanted.filter(t => t !== v.type);
     g.ui.toast(`Chop shop paid ${fmtMoney(pay)} for the ${v.spec.name}${wanted ? ' (on the wanted list)' : ''}.${lost ? ' Whatever was in the trunk is theirs now.' : ''}`, 'money');
     g.audio.play('cash');
@@ -581,7 +590,7 @@ class Underworld {
     if (v.looted || v.owned || v.garageUid || v.mission) return;
     v.looted = true;
     const r = Math.random(), g = this.g, z = zoneKey(v.pos.x, v.pos.z), w = ZONE_WEALTH[z] || 1;
-    if (r < 0.32) { const c = Math.round(rand(15, 110) * w); g.addMoney(c, true); g.ui.toast(`Found ${fmtMoney(c)} in the glovebox.`, 'money'); }
+    if (r < 0.32) { const c = Math.round(rand(15, 110) * w); g.earn(c, 'glovebox'); g.ui.toast(`Found ${fmtMoney(c)} in the glovebox.`, 'money'); }
     else if (r < 0.5) { const t = this.give({ hot: randi(1, 3) }); if (t) g.ui.toast(`Glovebox: ${goodsList(t)}. A fence will take it.`, 'money'); }
     else if (r < 0.54 && !g.save.weapons.pistol) { g.save.weapons.pistol = true; g.save.ammo.pistol += 12; g.ui.toast('There’s a pistol under the seat. Twelve rounds.', 'money'); }
     else if (r < 0.6) { const k = pick(['green', 'smokes', 'pills']); const t = this.give({ [k]: randi(1, 4) }); if (t) g.ui.toast(`Someone left ${goodsList(t)} under the seat.`, 'money'); }
@@ -607,7 +616,7 @@ class Underworld {
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
       const L = pocketLoot(q, z), cash = L.cash;
-      g.addMoney(cash, true); S.st.picks++;
+      g.earn(cash, 'pickpocket'); S.st.picks++;
       let extra = '';
       if (L.hot) { const t = this.give({ hot: L.hot }); if (t) extra = ` and ${L.item}${L.hot > 1 ? ` (+${L.hot - 1} more)` : ''}`; }
       if (L.jackpot) { g.ui.banner(L.type === 'courier' ? 'Payroll envelope' : 'Big score', fmtMoney(cash), 'pass', 2.6); g.audio.play('win2'); }
@@ -621,19 +630,16 @@ class Underworld {
       g.police.crime('pickpocket', q.x, q.z);
     }
   }
-  // the engine reports every knockdown; mugging, robbing gang members and their drops live here
+  // the engine reports every knockdown; robbing gang members and their drops live here
   onKnock(p, byPlayer, ko) {
     if (!byPlayer) return;
-    const z = zoneKey(p.x, p.z), w = ZONE_WEALTH[z] || 1, S = this.S;
-    // whatever they carried spills out on the far side of them, away from the attacker
-    const pl = this.g.player.pos, ax = p.x - pl.x, az = p.z - pl.z, al = Math.hypot(ax, az) || 1;
-    const dx = p.x + ax / al * 0.9, dz = p.z + az / al * 0.9;
-    if (p.kind === 'civ' && !p.dropped) {
+    // knocking a civilian down is assault, not a way to earn: nothing drops (mugging is cut, §20, §45.18).
+    // Pickpocketing is the civilian-theft verb. Criminals still drop their Dirty Cash and product.
+    if (p.kind === 'gang' && !p.dropped && (ko || Math.random() < 0.6)) {
       p.dropped = true;
-      // a mugging spills about half of what a clean lift would have got (and their valuables)
-      if (Math.random() < 0.75) { S.st.mugs++; const L = pocketLoot(p, z); this.pickups.drop(dx, dz, Math.max(5, L.cash * 0.5) + rand(0, 10) * w, L.hot ? { hot: L.hot } : Math.random() < 0.12 ? { hot: 1 } : null); }
-    } else if (p.kind === 'gang' && !p.dropped && (ko || Math.random() < 0.6)) {
-      p.dropped = true;
+      // whatever they carried spills out on the far side of them, away from the attacker
+      const pl = this.g.player.pos, ax = p.x - pl.x, az = p.z - pl.z, al = Math.hypot(ax, az) || 1;
+      const dx = p.x + ax / al * 0.9, dz = p.z + az / al * 0.9;
       const F = FACTIONS[p.fac];
       const goods = Math.random() < 0.6 && F ? { [pick(F.goods)]: randi(1, p.role === 'dealer' ? 6 : 3) } : null;
       this.pickups.drop(dx, dz, (p.role === 'boss' ? rand(1500, 4000) : rand(40, 190)) * (p.role === 'dealer' ? 1.6 : 1), goods);
@@ -694,8 +700,6 @@ class Underworld {
     S.lastLedger = { day: S.day - 1, inc: { ...L.inc }, exp: { ...L.exp } };
     if ((inc || exp) && !S.jail) g.ui.toast(`Day ${this.calDay - 1} books: +${fmtMoney(inc)} / −${fmtMoney(exp)}`, inc >= exp ? 'money' : 'warn');
   }
-  income(cat, n) { if (!(n > 0)) return; this.g.addMoney(n, true); this.S.ledger.inc[cat] = (this.S.ledger.inc[cat] || 0) + Math.round(n); }
-  expense(cat, n) { if (!(n > 0)) return 0; const s = this.g.save; const paid = Math.min(s.money, n); s.money -= paid; s.stats.spent += paid; this.S.ledger.exp[cat] = (this.S.ledger.exp[cat] || 0) + Math.round(paid); return paid; }
   news(from, text) { if (this.g.content) this.g.content.phone(from, text, { silent: !!this.S.jail && !(this.S.jail.phone || (this.prison && this.prison.callT > 0)) }); }
   // ---------------------------------------------------------------- stability (saving rules)
   // a powerful player is recognised: people stop and stare, some say something

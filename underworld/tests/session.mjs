@@ -1,5 +1,5 @@
 /* Underworld session test: the zero-to-kingpin loop end to end.
-   First money (pickpocket, mugging, glovebox, chop shop) -> property -> supply -> street
+   First money (pickpocket, a gang drop, glovebox, chop shop) -> property -> supply -> street
    deals -> crew dealer income -> gang fight -> turf takeover -> rivals acting alone ->
    police raid supply shock -> corruption (bought and honest cops) -> save / reload ->
    corrupted save recovery. */
@@ -12,7 +12,7 @@ await page.mouse.move(240, 135);
 const ev = (fn, a) => page.evaluate(fn, a);
 const stubRandom = v => ev(v => { window.__rnd = window.__rnd || Math.random; Math.random = () => v; }, v);
 const unstub = () => ev(() => { if (window.__rnd) Math.random = window.__rnd; });
-const money = () => ev(() => window.game.save.money);
+const money = () => ev(() => window.game.money.total());
 // a quiet spot away from every street location
 const quiet = await ev(() => { const g = window.game; for (let k = 0; k < 400; k++) { const x = 40 + Math.random() * 880, z = 40 + Math.random() * 880; if (g.uw.locs.every(L => Math.hypot(L.x - x, L.z - z) > 25) && Math.abs(((x % 80) + 80) % 80 - 40) < 30 === false) return { x, z }; } return { x: 6 * 80, z: 6 * 80 }; });
 // ---------------------------------------------------------------- 1. pickpocket
@@ -25,36 +25,41 @@ const m0 = await money();
 await ev(() => { const a = window.game.uw.findAction(); if (a) a.act(); });
 await unstub();
 check('pickpocket pays the first dollars', (await money()) > m0, `${m0} -> ${await money()}`);
-// ---------------------------------------------------------------- 2. mugging: knock down -> cash drop -> pick it up
+// ---------------------------------------------------------------- 2. no mugging: a knocked-down civilian drops nothing (§20, §45.18);
+// a knocked-out gang dealer drops Dirty Cash you can pick up
 await ev(() => { const g = window.game, p = g.player, c = window.__mark; c.picked = false; c.dropped = false; c.state = 'idle'; c.health = 4; c.x = p.pos.x + Math.sin(p.h) * 0.9; c.z = p.pos.z + Math.cos(p.h) * 0.9; });
 await stubRandom(0.1);
 await page.mouse.down(); await frames(page, 1); await page.mouse.up(); await frames(page, 14);
 await unstub();
-const drop = await ev(() => window.game.uw.pickups.list.length);
-check('mugging drops cash', drop > 0, 'pickups ' + drop);
+const civDrop = await ev(() => ({ n: window.game.uw.pickups.list.length, down: window.__mark.state }));
+check('knocking a civilian down drops nothing (mugging is cut)', civDrop.n === 0, JSON.stringify(civDrop));
+const drop = await ev(() => { const g = window.game, p = g.player; g.uw.onKnock({ kind: 'gang', fac: 'vipers', role: 'dealer', x: p.pos.x + 1.2, z: p.pos.z, dropped: false }, true, true); return g.uw.pickups.list.length; });
+check('a knocked-out gang dealer drops cash', drop > 0, 'pickups ' + drop);
+await frames(page, 40); // a drop can be picked up once it has settled (0.45 s)
 const m1 = await money();
 await ev(() => { const g = window.game, it = g.uw.pickups.list[0]; if (it) { g.player.pos.x = it.x; g.player.pos.z = it.z; } });
 await frames(page, 4);
-check('walking over the drop collects it', (await money()) > m1, `${m1} -> ${await money()}`);
+check('walking over the drop collects it as Dirty Cash on you', (await money()) > m1, `${m1} -> ${await money()}`);
 // ---------------------------------------------------------------- 3. glovebox + chop shop
 await stubRandom(0.1);
-const gl = await ev(q => { const g = window.game, p = g.player; g.resetPlayerState(q.x, q.z, 0); const v = g.vehicles.spawn('suv', p.pos.x + 3, p.pos.z, 0, { parked: true }); v.touched = true; const m = g.save.money; g.completeEnter(v); return { before: m, after: g.save.money, looted: v.looted }; }, quiet);
+const gl = await ev(q => { const g = window.game, p = g.player; g.resetPlayerState(q.x, q.z, 0); const v = g.vehicles.spawn('suv', p.pos.x + 3, p.pos.z, 0, { parked: true }); v.touched = true; const m = g.money.total(); g.completeEnter(v); return { before: m, after: g.money.total(), looted: v.looted }; }, quiet);
 await unstub();
 check('first time in a parked car: glovebox', gl.looted && gl.after > gl.before, JSON.stringify(gl));
-const chop = await ev(() => { const g = window.game, L = g.uw.loc('spot', 'chop'), v = g.player.vehicle; v.pos.set(L.x, 0, L.z); v.vel.set(0, 0); v.health = 90; const a = g.uw.findAction(); const before = g.save.money; if (a) a.act(); return { label: a && a.label, before, after: g.save.money, gone: !g.vehicles.list.includes(v), state: g.player.state }; });
+const chop = await ev(() => { const g = window.game, L = g.uw.loc('spot', 'chop'), v = g.player.vehicle; v.pos.set(L.x, 0, L.z); v.vel.set(0, 0); v.health = 90; const a = g.uw.findAction(); const before = g.money.total(); if (a) a.act(); return { label: a && a.label, before, after: g.money.total(), gone: !g.vehicles.list.includes(v), state: g.player.state }; });
 check('chop shop buys the stolen car', chop.gone && chop.after > chop.before && chop.state === 'foot', JSON.stringify(chop));
 // ---------------------------------------------------------------- 4. property
-await ev(() => { window.game.save.money += 20000; window.game.save.rep = 150; });
+await ev(() => { (window.game.money.W.clean += 20000, window.game.money.W.dirty.me += 20000); window.game.save.rep = 150; });
 const prop = await ev(() => { const g = window.game, uw = g.uw, L = uw.loc('prop', 'flop'); g.resetPlayerState(L.x, L.z, 0); const a = uw.findAction(); const r = uw.props.buy('flop'); return { label: a && a.label, r, owned: uw.props.owned('flop'), saved: (localStorage.getItem('pvunderworld.save.v1') || '').includes('"flop":{"owned":true') }; });
 check('buy a safehouse in person', prop.owned && prop.r === '' && /for sale/.test(prop.label || ''), JSON.stringify(prop));
-// autosaves only commit in a stable moment (the mugging above may still count as a fight):
+// autosaves only commit in a stable moment (the knockdown above may still count as a fight):
 // the purchase must be saved now or queued and committed as soon as things calm down
 const queued = await ev(() => window.game.pendingAutosave);
 let saved = prop.saved;
 for (let k = 0; k < 60 && !saved; k++) { await frames(page, 5); saved = await ev(() => (localStorage.getItem('pvunderworld.save.v1') || '').includes('"flop":{"owned":true')); }
 check('purchase autosaves (at once or when stable)', saved, `immediate ${prop.saved} queued ${queued}`);
 // ---------------------------------------------------------------- 5. supply -> stash -> street deal
-const buy = await ev(() => { const g = window.game, uw = g.uw, L = uw.loc('spot', 'sully'); g.resetPlayerState(L.x, L.z, 0); uw.ui.openSpot(L); g.content._svcAct('buy:smokes:5'); g.content._svcAct('buy:smokes:5'); const n = uw.S.inv.smokes | 0; while (g.ui.stack.length) g.ui.back(); return n; });
+// empty pockets first: whatever the pickpocket step left in them (hot goods) must not limit the purchase
+const buy = await ev(() => { const g = window.game, uw = g.uw, L = uw.loc('spot', 'sully'); uw.S.inv = {}; g.resetPlayerState(L.x, L.z, 0); uw.ui.openSpot(L); g.content._svcAct('buy:smokes:5'); g.content._svcAct('buy:smokes:5'); const n = uw.S.inv.smokes | 0; while (g.ui.stack.length) g.ui.back(); return n; });
 check('bought smokes wholesale from Sully', buy === 10, 'carrying ' + buy);
 const stash = await ev(() => { const g = window.game, uw = g.uw; uw.ui.openProp('flop'); g.content._svcAct('st:smokes'); const stored = uw.S.storage.flop.smokes | 0, pockets = uw.S.inv.smokes | 0; g.content._svcAct('tk:smokes'); while (g.ui.stack.length) g.ui.back(); return { stored, pockets, back: uw.S.inv.smokes | 0 }; });
 check('stash store / take', stash.stored === 10 && stash.pockets === 0 && stash.back === 10, JSON.stringify(stash));
@@ -65,7 +70,7 @@ await ev(i => { const g = window.game, t = g.uw.T[i]; g.resetPlayerState(t.deal.
 for (let k = 0; k < 60 && !(await ev(i => window.game.uw.gangs.groups.has('buy' + i), turf)); k++) await frames(page, 3);
 await ev(i => { const g = window.game, t = g.uw.T[i]; g.resetPlayerState(t.deal.x + Math.sin(t.deal.h) * 1.6, t.deal.z + Math.cos(t.deal.h) * 1.6, t.deal.h + Math.PI); }, turf);
 await frames(page, 4);
-const deal = await ev(() => { const g = window.game, uw = g.uw, gr = uw.gangs.buyerNear(); if (!gr) return { found: false, groups: [...uw.gangs.groups.keys()] }; uw.ui.openDeal(gr); const before = g.save.money; const r0 = Math.random; Math.random = () => 0.99; g.content._svcAct('s:smokes:5'); Math.random = r0; const after = g.save.money; while (g.ui.stack.length) g.ui.back(); return { found: true, before, after, left: uw.S.inv.smokes | 0 }; });
+const deal = await ev(() => { const g = window.game, uw = g.uw, gr = uw.gangs.buyerNear(); if (!gr) return { found: false, groups: [...uw.gangs.groups.keys()] }; uw.ui.openDeal(gr); const before = g.money.total(); const r0 = Math.random; Math.random = () => 0.99; g.content._svcAct('s:smokes:5'); Math.random = r0; const after = g.money.total(); while (g.ui.stack.length) g.ui.back(); return { found: true, before, after, left: uw.S.inv.smokes | 0 }; });
 check('street buyers at a deal corner buy product', deal.found && deal.after > deal.before && deal.left === 5, JSON.stringify(deal));
 // ---------------------------------------------------------------- 6. crew dealer income
 const crew = await ev(() => {
@@ -118,7 +123,7 @@ const shock = await ev(() => { const g = window.game, uw = g.uw; uw.S.factions.v
 check('a police raid makes their product scarce and pricier', shock.after > shock.before * 1.2 && shock.opp, JSON.stringify(shock));
 // ---------------------------------------------------------------- 11. corruption
 const cor = await ev(() => {
-  const g = window.game, uw = g.uw; g.save.money += 100000; g.save.rep = 600; uw.S.taskforce = 0;
+  const g = window.game, uw = g.uw; (g.money.W.clean += 100000, g.money.W.dirty.me += 100000); g.save.rep = 600; uw.S.taskforce = 0;
   uw.crew.refreshCandidates(true); uw.crew.hire(0); uw.computeInfluence();
   const r0 = Math.random; Math.random = () => 0.99; const a = uw.cops.approach('kerr'); Math.random = r0;
   const p0 = uw.S.pressure; const b = uw.cops.approach('moss');
@@ -170,7 +175,7 @@ const audit = await ev(() => {
   if (![p.pos.x, p.pos.y, p.pos.z, p.vel.x, p.vel.z, p.h, p.health, g.cam.yaw, g.cam.pitch].every(Number.isFinite)) bad.push('player/cam NaN');
   for (const v of g.vehicles.list) if (![v.pos.x, v.pos.y, v.pos.z, v.vel.x, v.h, v.health].every(Number.isFinite)) { bad.push('veh NaN'); break; }
   for (const q of g.peds.peds) if (![q.x, q.y, q.z, q.health].every(Number.isFinite)) { bad.push('ped NaN'); break; }
-  if (!Number.isFinite(g.save.money) || g.save.money < 0) bad.push('money ' + g.save.money);
+  if (!Number.isFinite(g.money.total()) || g.money.total() < 0) bad.push('money ' + g.money.total());
   for (const t of uw.S.turfs) for (const k in t.inf) if (!Number.isFinite(t.inf[k]) || t.inf[k] < 0) bad.push('inf');
   for (const z in uw.S.market) for (const k in uw.S.market[z]) if (!uw.S.market[z][k].every(Number.isFinite)) bad.push('market');
   for (const id in uw.S.factions) { const F = uw.S.factions[id]; if (!Number.isFinite(F.strength) || !Number.isFinite(F.money) || !Number.isFinite(F.rel)) bad.push('faction ' + id); }
@@ -207,14 +212,14 @@ await frames(page, 6);
 const rareSave = await ev(id => { const g = window.game; const car = g.uw.opps.cars.get(id); const ok = g.saveGame(true); const raw = localStorage.getItem('pvunderworld.save.v1') || ''; const o = JSON.parse(raw).uw.opps.find(x => x.id === id); return { spawned: !!car, ok, err: window.__pv.SaveSystem.lastError, carInSave: !!(o && o.car), size: raw.length }; }, rare);
 check('a save works while a rare-car opportunity has its car on the street', rareSave.spawned && rareSave.ok && !rareSave.carInSave && rareSave.size < 1.5e6, JSON.stringify(rareSave));
 // ---------------------------------------------------------------- 12. save + reload
-const before = await ev(() => { const g = window.game, uw = g.uw; g.police.enabled = true; g.resetPlayerState(5 * 80 + 40, 5 * 80, 0); const ok = g.saveGame(true); return { ok, money: g.save.money, crew: uw.S.crew.length, own: uw.owner.filter(o => o === 'pc').length, flop: uw.props.owned('flop'), kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, day: uw.S.day }; });
+const before = await ev(() => { const g = window.game, uw = g.uw; g.police.enabled = true; g.resetPlayerState(5 * 80 + 40, 5 * 80, 0); const ok = g.saveGame(true); return { ok, money: g.money.total(), crew: uw.S.crew.length, own: uw.owner.filter(o => o === 'pc').length, flop: uw.props.owned('flop'), kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, day: uw.S.day }; });
 await page.reload();
 await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await page.evaluate(() => window.game.quality.setMode(0));
 await page.click('#btnContinue');
 await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await frames(page, 5);
-const after = await ev(() => { const g = window.game, uw = g.uw; return { money: g.save.money, crew: uw.S.crew.length, own: uw.owner.filter(o => o === 'pc').length, flop: uw.props.owned('flop'), kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, day: uw.S.day, pos: [Math.round(g.player.pos.x), Math.round(g.player.pos.z)] }; });
+const after = await ev(() => { const g = window.game, uw = g.uw; return { money: g.money.total(), crew: uw.S.crew.length, own: uw.owner.filter(o => o === 'pc').length, flop: uw.props.owned('flop'), kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, day: uw.S.day, pos: [Math.round(g.player.pos.x), Math.round(g.player.pos.z)] }; });
 check('everything persists through save + reload', before.ok && after.money === before.money && after.crew === before.crew && after.own === before.own && after.flop && after.kerr === 'paid' && after.day === before.day, JSON.stringify([before, after]));
 check('continue puts you where you saved', Math.abs(after.pos[0] - (5 * 80 + 40)) < 3 && Math.abs(after.pos[1] - 5 * 80) < 3, JSON.stringify(after.pos));
 // ---------------------------------------------------------------- 13. a corrupted save never breaks the game
@@ -230,7 +235,7 @@ await page.evaluate(() => window.game.quality.setMode(0));
 await page.click('#btnContinue');
 await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await frames(page, 30);
-const rec = await ev(() => { const g = window.game, uw = g.uw; return { money: g.save.money, turfs: uw.S.turfs.length, crew0: uw.S.crew[0] && uw.S.crew[0].loyalty, crewN: uw.S.crew.length, nope: !!uw.S.props.nope, snow: uw.S.market.o.snow, vipers: uw.S.factions.vipers.strength, jail: uw.S.jail, garage: g.save.garage.length, flop: uw.props.owned('flop') }; });
+const rec = await ev(() => { const g = window.game, uw = g.uw; return { money: g.money.total(), turfs: uw.S.turfs.length, crew0: uw.S.crew[0] && uw.S.crew[0].loyalty, crewN: uw.S.crew.length, nope: !!uw.S.props.nope, snow: uw.S.market.o.snow, vipers: uw.S.factions.vipers.strength, jail: uw.S.jail, garage: g.save.garage.length, flop: uw.props.owned('flop') }; });
 check('corrupted fields are repaired, the rest of the save survives', typeof rec.money === 'number' && rec.turfs === 36 && typeof rec.crew0 === 'number' && rec.crewN >= 1 && !rec.nope && rec.snow.every(v => Number.isFinite(v) && v > 0.2 && v < 5) && isFinite(rec.vipers) && rec.jail === null && rec.flop, JSON.stringify(rec));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'session');

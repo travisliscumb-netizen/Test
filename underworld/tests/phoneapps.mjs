@@ -7,7 +7,7 @@ const b = await launch();
 const { page, errors } = await open(b, { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
-await ev(() => { const g = window.game; g.events.cool = 1e9; g.save.money = 250000; g.save.rep = 50; });
+await ev(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = g.money.W.dirty.me = 250000); g.save.rep = 50; });
 
 // home screen
 const home = await ev(() => {
@@ -66,7 +66,7 @@ const mk = await ev(() => {
   const after = read();
   const val = uw.locations({ all: true }).reduce((a, Lc) => a + P.holdings(Lc.o, Lc.zone).filter(r => r.k === 'smokes').reduce((x, r) => x + r.value, 0), 0);
   // sell two lots at a known price: realised P/L by product
-  uw.take('smokes', 2); const cash = 2 * Math.round(pr * 1.4); g.addMoney(cash, true); uw.realize(cash, 'smokes');
+  uw.take('smokes', 2); const cash = 2 * Math.round(pr * 1.4); g.earn(cash, 'deal'); uw.realize(cash, 'smokes');
   const sold = read();
   for (const zz in old) S.market[zz].smokes[1] = old[zz];
   return { val0: Math.round(val0), lots, cost, before: before.slice(0, 900), after: after.slice(0, 900), hasCost: before.includes('Cost basis') && before.includes('Average paid') && before.includes('Unrealised P/L') && before.includes('Realised P/L') && before.includes('Worth now'), costShown: before.includes('$' + cost.toLocaleString('en-US')), val: Math.round(val), cost2: cost, realBy: S.realBy.smokes, soldTxt: sold.includes('Realised') };

@@ -68,9 +68,9 @@ class PropertyManager {
     if (!d || d.kind !== 'business' || !this.owned(id)) return 'You don’t own it.';
     const lv = this.level(id); if (lv >= 3) return 'Already fully developed.';
     const cost = this.upgradeCost(id);
-    if (g.save.money < cost) return `The work costs ${fmtMoney(cost)}.`;
+    if (!Money.can(cost, 'property')) return `The work costs ${fmtMoney(cost)} from your bank.`;
     if (o.dmg) return 'Repair it first.';
-    g.content.spend(cost); o.lvl = lv + 1;
+    Money.pay(cost, 'property'); o.lvl = lv + 1;
     uw.addRep(15 * lv, null); uw.computeInfluence();
     g.ui.banner(`${d.name}`, `${BIZ_LEVEL_NAME[lv]} · level ${lv + 1}`, 'pass', 2.6); g.audio.play('pass');
     if (g.bizSigns) g.bizSigns.refresh();
@@ -92,11 +92,11 @@ class PropertyManager {
     const uw = this.uw, g = uw.g, S = this.S, def = PROP_BY_ID[id];
     if (this.owned(id)) return 'You already own it.';
     const price = this.price(def);
-    if (g.save.money < price) return `It costs ${fmtMoney(price)}.`;
+    if (!Money.can(price, 'property')) return `It costs ${fmtMoney(price)} from your bank (property is bought with Clean Bank).`;
     if (def.kind === 'business' && g.save.rep < 300 && def.price > 20000) return 'The owner won’t sell to an unknown. (300 reputation)';
     if (def.luxury && uw.stage < 4) return 'The building board turns you down. Come back when you’re somebody. (Territory Holder)';
     if (g.police.level > 0) return 'Not with the police on you.';
-    g.content.spend(price);
+    Money.pay(price, 'property');
     S.props[id] = { owned: true, dmg: 0, since: S.day, lvl: 1 };
     if (!S.storage[id]) S.storage[id] = {};
     const L = uw.loc('prop', id), own = L ? uw.owner[turfAt(L.x, L.z)] : null;
@@ -163,10 +163,10 @@ class PropertyManager {
     for (const def of this.ownedList()) {
       if (def.kind !== 'business') continue;
       const B = this.bizDay(def);
-      uw.income('businesses', B.gross * rand(0.9, 1.1));
-      uw.expense('upkeep', Math.round(B.upkeep));
+      Money.earn(B.gross * rand(0.9, 1.1), 'business');
+      Money.pay(Math.round(B.upkeep), 'upkeep', { partial: true });
       // protection money when it sits on someone else's turf (an accountant makes it smaller)
-      if (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful') { const fee = Math.round(def.income * 0.12 * (1 - this.perk('allIncome'))); const p = uw.expense('protection', fee); S.factions[B.own].money += p; }
+      if (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful') { const fee = Math.round(def.income * 0.12 * (1 - this.perk('allIncome'))); const p = Money.pay(fee, 'protection', { partial: true }); S.factions[B.own].money += p; }
       if (B.mgr) S.pressure = clamp(S.pressure - 0.2, 0, 100);
     }
     // laundering and quiet funerals take the heat down; homes in the Old Quarter keep your name on the street
@@ -199,7 +199,7 @@ class PropertyManager {
     }
   }
   repairCost(def) { return Math.round(def.price * 0.12 / 10) * 10; }
-  repair(id) { const g = this.uw.g, def = PROP_BY_ID[id], o = this.S.props[id]; if (!o || !o.dmg) return ''; const c = this.repairCost(def); if (g.save.money < c) return `Repairs cost ${fmtMoney(c)}.`; g.content.spend(c); o.dmg = 0; g.audio.play('cash'); return ''; }
+  repair(id) { const g = this.uw.g, def = PROP_BY_ID[id], o = this.S.props[id]; if (!o || !o.dmg) return ''; const c = this.repairCost(def); if (!Money.can(c, 'property')) return `Repairs cost ${fmtMoney(c)} from your bank.`; Money.pay(c, 'property'); o.dmg = 0; g.audio.play('cash'); return ''; }
   policeRaids() {
     const uw = this.uw, S = this.S;
     for (const def of this.ownedList()) {

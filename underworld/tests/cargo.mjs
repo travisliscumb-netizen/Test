@@ -15,7 +15,7 @@ const page = t.page;
 const ev = (f, a) => page.evaluate(f, a);
 const fadeDone = () => page.waitForFunction(() => !window.game.fading, null, { timeout: 30000, polling: 100 });
 await startNew(page);
-await ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; g.save.money = 5e6; g.save.rep = 3000; if (g.tutorial) g.tutorial.off = true; });
+await ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 5e6); g.save.rep = 3000; if (g.tutorial) g.tutorial.off = true; });
 
 // every lot of every good everywhere (pockets, stashes, every trunk, runs), with its cost basis
 const census = () => ev(() => {
@@ -258,7 +258,7 @@ await page.reload(); await page.waitForFunction(() => window.__pvBooted === true
 await ev(() => window.game.quality.setMode(0));
 await page.waitForFunction(() => { const b = document.getElementById('btnContinue'); return b && !b.disabled && b.offsetParent; }, null, { timeout: 120000 }); await ev(() => document.getElementById('btnContinue').click()); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 const mig = await ev(uid => { const g = window.game, e = g.save.garage.find(x => x.uid === uid), P = window.__pv; return { v: g.save.version, from: g.save.flags.migratedFrom, t: { hardware: e.trunk.hardware, hot: e.trunk.hot, cb: e.trunk.$cb && e.trunk.$cb.hardware }, lb: P.fmtLb(P.cargoC(e.trunk)), aggro: Object.values(g.uw.S.factions).map(f => f.aggro), pr: g.save.gamble.jp.pr }; }, garageUI.uid);
-check('a v6 save loads as v7 with its trunk to the lot and its cost basis (now weighed: 90 lb)', mig.v === 7 && mig.from === 6 && mig.t.hardware === 12 && mig.t.hot === 30 && mig.t.cb === 10800 && mig.lb === '90 lb', JSON.stringify(mig));
+check('a v6 save loads as the current schema (v8) with its trunk to the lot and its cost basis (now weighed: 90 lb)', mig.v === 8 && mig.from === 6 && mig.t.hardware === 12 && mig.t.hot === 30 && mig.t.cb === 10800 && mig.lb === '90 lb', JSON.stringify(mig));
 check('v6 → v7: factions start calm; old jackpot pressure (old units) is reset to start fresh from the steady state', mig.aggro.every(a => a === 0) && JSON.stringify(mig.pr) === '{}', JSON.stringify(mig));
 
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));

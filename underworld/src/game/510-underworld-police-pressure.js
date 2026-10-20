@@ -77,7 +77,7 @@ class PressureSystem {
     for (const id in S.cops) {
       const c = S.cops[id], O = OFFICER_BY_ID[id];
       if (c.st === 'paid' && S.day >= c.due) {
-        if (g.save.money >= O.fee) { uw.expense('bribes', O.fee); c.due = S.day + 7; }
+        if (Money.pay(O.fee, 'bribe')) c.due = S.day + 7;
         else { c.st = 'burned'; c.until = S.day + 14; S.pressure = clamp(S.pressure + 8, 0, 100); uw.news('unknown', `${O.name} wasn’t paid and stopped answering. Pressure is up.`); }
       }
       if (c.st === 'burned' && S.day >= c.until) delete S.cops[id];
@@ -107,14 +107,14 @@ class PressureSystem {
     if (c) return 'They won’t take your call.';
     if (!this.canApproach(O)) return `You’re not big enough for ${O.name} to risk it. (${STAGES[O.stage].name})`;
     if (S.taskforce > 0) return 'Nobody at the precinct will touch your money while the task force is here.';
-    if (g.save.money < O.fee) return `The first envelope is ${fmtMoney(O.fee)}.`;
+    if (!Money.can(O.fee, 'bribe')) return `The first envelope is ${fmtMoney(O.fee)} in Dirty Cash.`;
     if (Math.random() < O.honest) {
       S.cops[id] = { st: 'refused', due: 0, until: 0 };
       S.pressure = clamp(S.pressure + (O.honest >= 1 ? 15 : 9), 0, 100);
       uw.news('unknown', O.honest >= 1 ? `${O.name} reported the bribe attempt. Internal Affairs opened a file on you.` : `${O.name} turned you down flat — and mentioned it to a colleague.`);
       return O.honest >= 1 ? `${O.name} is honest. That was a mistake.` : `${O.name} said no.`;
     }
-    uw.expense('bribes', O.fee);
+    Money.pay(O.fee, 'bribe');
     S.cops[id] = { st: 'paid', due: S.day + 7, until: 0 };
     uw.news('unknown', `${O.name}: “Same time every week. Don’t call me at the station.”`);
     g.audio.play('cash');

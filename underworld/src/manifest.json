@@ -10,6 +10,7 @@
   "game/010-core-utilities.js",
   "game/020-content-world-constants.js",
   "game/030-core-save-system.js",
+  "game/035-core-money.js",
   "game/040-core-input-manager.js",
   "game/050-core-audio-system.js",
   "game/060-core-materials-textures.js",

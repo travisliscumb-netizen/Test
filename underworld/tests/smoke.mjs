@@ -4,7 +4,7 @@ import { launch, open, check, frames, startNew, summary, finish } from './lib.mj
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
-const st = await page.evaluate(() => { const g = window.game; return { money: g.save.money, garage: g.save.garage.length, weapons: Object.keys(g.save.weapons).filter(k => g.save.weapons[k]), turfs: g.uw.T.length, own: g.uw.owner.filter(Boolean).length, stage: g.uw.stage, state: g.state }; });
+const st = await page.evaluate(() => { const g = window.game; return { money: g.money.total(), garage: g.save.garage.length, weapons: Object.keys(g.save.weapons).filter(k => g.save.weapons[k]), turfs: g.uw.T.length, own: g.uw.owner.filter(Boolean).length, stage: g.uw.stage, state: g.state }; });
 check('starts with $0, no car, no weapon', st.money === 0 && st.garage === 0 && st.weapons.length === 0, JSON.stringify(st));
 check('36 turfs, most owned by factions', st.turfs === 36 && st.own > 20, JSON.stringify(st));
 await frames(page, 60);

@@ -9,7 +9,7 @@ const { page, errors } = await open(b);
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
 const waitFade = async () => { await page.waitForFunction(() => !window.game.fading, null, { timeout: 30000 }); await frames(page, 5); };
-await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; g.save.money = 5e6; });
+await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 5e6); });
 
 // 1. the ladder
 const lad = await ev(() => {
@@ -70,7 +70,7 @@ const mig = await ev(() => { const g = window.game; g.save.garage.push({ uid: 90
 check('a car from an old save (no bay) is given a free bay or waits in storage', mig.at === null || (mig.at && typeof mig.at.p === 'string'), JSON.stringify(mig));
 
 // 4. the mansion: drive into the motor court, park, take the stairs up, come back, drive out
-await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; g.uw.S.props.penthouse = { owned: true, dmg: 0, since: 1 }; g.save.owns.penthouse = true; g.save.money = 5e6; const D = g.vspaces.byProp('mansion'), S = D.street; g.resetPlayerState(S.x + 3, S.z + 14, 0); const v = g.vehicles.spawn('sports', S.x, S.z + 14, Math.PI, { parked: true }); v.touched = true; g.completeEnter(v); });
+await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; g.uw.S.props.penthouse = { owned: true, dmg: 0, since: 1 }; g.save.owns.penthouse = true; (g.money.W.clean = g.money.W.dirty.me = 5e6); const D = g.vspaces.byProp('mansion'), S = D.street; g.resetPlayerState(S.x + 3, S.z + 14, 0); const v = g.vehicles.spawn('sports', S.x, S.z + 14, Math.PI, { parked: true }); v.touched = true; g.completeEnter(v); });
 for (let k = 0; k < 140; k++) { await ev(() => window.game.input.down.add('gas')); await frames(page, 2); if (await ev(() => !!(window.game.player.interior && window.game.player.interior.vspace))) break; }
 await ev(() => window.game.input.down.delete('gas')); await waitFade();
 const m1 = await ev(() => { const g = window.game, p = g.player; return { vs: p.interior && p.interior.vspace, y: +p.vehicle.pos.y.toFixed(1), bays: g.vspaces.byProp('mansion').bays.length }; });
@@ -118,7 +118,7 @@ check('leaving unloads the interior', await ev(() => !Object.keys(window.game.co
 const brk = await ev(() => { const g = window.game; const h = g.world.homes.find(x => !x.propId && x.type !== 'farm' && window.__pv && Math.abs(Math.sin(x.x0 * 7)) >= 0 && g.content.nearHomeDoor({ pos: { x: x.door.x, z: x.door.z } })); if (!h) return null; g.resetPlayerState(h.door.x, h.door.z, 0); g.player.pos.x = h.door.x; g.player.pos.z = h.door.z; const a = g.content.findAction(); const l = a && a.label; if (a) a.act(); return l; });
 await waitFade(); await frames(page, 5);
 // every drawer, nightstand and wardrobe is searched in turn (the safe takes time and is skipped here)
-const loot = await ev(() => { const g = window.game, c = g.content.interiors.cur; if (!c) return null; const m0 = g.save.money, i0 = JSON.stringify(g.uw.S.inv), a0 = g.save.ammo.pistol; for (const ct of c.containers) if (ct.kind !== 'safe') g.content.spotAct('c:' + ct.i); return { id: c.id, n: c.containers.length, gained: g.save.money - m0, goods: JSON.stringify(g.uw.S.inv) !== i0, ammo: g.save.ammo.pistol - a0 }; });
+const loot = await ev(() => { const g = window.game, c = g.content.interiors.cur; if (!c) return null; const m0 = g.money.total(), i0 = JSON.stringify(g.uw.S.inv), a0 = g.save.ammo.pistol; for (const ct of c.containers) if (ct.kind !== 'safe') g.content.spotAct('c:' + ct.i); return { id: c.id, n: c.containers.length, gained: g.money.total() - m0, goods: JSON.stringify(g.uw.S.inv) !== i0, ammo: g.save.ammo.pistol - a0 }; });
 check('some other houses can be broken into and searched', /Break in|Slip into/.test(brk || '') && loot && loot.n >= 4 && (loot.gained > 0 || loot.goods || loot.ammo > 0), JSON.stringify({ brk, loot }));
 await ev(() => window.game.content.spotAct('exit')); await waitFade();
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));

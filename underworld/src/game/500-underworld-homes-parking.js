@@ -252,7 +252,8 @@ class DealerLots {
     const g = this.g, s = g.save, C2 = g.content;
     if (lot !== 'used' && C2.repLevel < (CAR_REP[c.type] || 0)) return `Needs ${REP_LEVELS[CAR_REP[c.type]].name} reputation`;
     if (s.garage.length >= C2.garageCap) return C2.garageCap ? 'Garage full' : 'You need a place with parking';
-    if (s.money < c.price) return `Costs ${fmtMoney(c.price)}`;
+    // Saltworks is a shady lot that takes cash or the bank; the licensed dealers take the bank only (§13)
+    if (!Money.can(c.price, lot === 'used' ? 'usedLot' : 'dealer')) return `Costs ${fmtMoney(c.price)}${lot === 'used' ? '' : ' from your bank'}`;
     if (lot !== 'used' && g.police.level > 0) return 'Not with the police on you';
     return '';
   }
@@ -260,7 +261,7 @@ class DealerLots {
     const g = this.g, s = g.save, C2 = g.content, st = this.state(lot), c = st.cars[i];
     if (!c) return 'Sold.';
     const why = this.cantBuy(lot, c); if (why) return why;
-    C2.spend(c.price); s.stats.carsBought = (s.stats.carsBought || 0) + 1;
+    Money.pay(c.price, lot === 'used' ? 'usedLot' : 'dealer'); s.stats.carsBought = (s.stats.carsBought || 0) + 1;
     const e = C2.addToGarage(c.type, 'bought', c.color, true);
     e.dmg = clamp(100 - c.cond, 0, 100); e.vtier = c.vtier;
     st.cars[i] = null;

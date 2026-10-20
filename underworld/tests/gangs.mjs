@@ -14,7 +14,7 @@ const t = await open(b, {});
 const page = t.page;
 const ev = (f, a) => page.evaluate(f, a);
 await startNew(page);
-await ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; g.save.money = 1e6; if (g.tutorial) g.tutorial.off = true; });
+await ev(() => { const g = window.game; g.quality.setMode(0); g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 1e6); if (g.tutorial) g.tutorial.off = true; });
 
 // a faction that holds a turf, and a spot near its hangout with a clear view of it
 const setup = await ev(() => {

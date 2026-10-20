@@ -282,16 +282,19 @@ class Gamble {
     const cv = document.createElement('canvas'); cv.id = 'confetti'; document.body.appendChild(cv); this.cv = cv; this.parts = [];
   }
   get G() { return this.g.save.gamble; }
-  get money() { return this.g.save.money; }
+  // the casino plays from the bank only (§45.5): wagers, chips and lottery tickets are Clean Bank, so are winnings
+  get money() { return Money.clean; }
   // a new session or another save: in-memory tables are dropped; anything that matters is already in the save and recover() settles it
   reset() { this.token++; this.busy = false; this.bj = null; this.pk = null; this.sc = null; this.roul = null; this.ry = null; this.slotState = {}; this.game = null; }
   // ------------------------------------------------------------- money: one atomic step per bet
   // stake leaves and the win arrives together; stats are updated in the same breath
   settle(group, stake, win, extra) {
-    const s = this.g.save, G = this.G;
+    const G = this.G;
     const pre = !!(extra && extra.prepaid);
-    if (!(stake >= 0) || !(win >= 0) || (!pre && stake > s.money + 1e-6)) return false;
-    s.money = s.money - (pre ? 0 : stake) + win; s.stats.spent += stake; if (win > 0) s.stats.earned += win;
+    if (!(stake >= 0) || !(win >= 0) || stake >= MONEY_MAX || win >= MONEY_MAX || (!pre && stake > Money.clean + 1e-6)) return false;
+    // a prepaid stake (blackjack, poker) already left the bank through debit(); the ledger books stakes and wins
+    if (!pre && stake > 0) Money.pay(stake, 'casinoStake');
+    if (win > 0) Money.earn(win, 'casino');
     if (group === 'scratch') { const S = G.scratch; S.bought++; S.spent += stake; S.won += win; if (win > 0) S.wins++; S.biggest = Math.max(S.biggest, win); }
     else if (group === 'slots') { const S = G.slots; S.spins++; S.wagered += stake; S.won += win; S.biggest = Math.max(S.biggest, win); if (extra && extra.jackpot) S.jackpots++; }
     else { const S = G.casino; S.wagered += stake; S.won += win; S.lost += Math.max(0, stake - win); S.biggest = Math.max(S.biggest, win - stake); if (extra) { if (extra.slot) { S.slotSpins++; S.biggestSlot = Math.max(S.biggestSlot, win); } if (extra.bj) { S.bjHands++; if (win > stake) S.bjWins++; } if (extra.roul) S.rouletteSpins++; } }
@@ -367,8 +370,8 @@ class Gamble {
     if (this.sc && this.sc.done) this.sc = null;
     const render = () => {
       const s = this.g.save, sc = this.sc;
-      let h = `<div class="svcTop"><span>Cash <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
-      h += '<div class="grid2">' + Object.keys(SCRATCH_CARDS).map(d => { const c = SCRATCH_CARDS[d]; return `<div class="card" style="border-left:4px solid ${c.col}"><div class="t">${c.name} · $${d}</div><div class="d">Top prize ${fmtMoney(c.grand)} · wins about 1 in ${Math.round(1 / c.prizes.reduce((a, p) => a + p[1], 0))}</div><button class="sbtn gold" data-act="buy:${d}" ${s.money < +d || (sc && !sc.done) ? 'disabled' : ''}>Buy · $${d}</button></div>`; }).join('') + '</div>';
+      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
+      h += '<div class="grid2">' + Object.keys(SCRATCH_CARDS).map(d => { const c = SCRATCH_CARDS[d]; return `<div class="card" style="border-left:4px solid ${c.col}"><div class="t">${c.name} · $${d}</div><div class="d">Top prize ${fmtMoney(c.grand)} · wins about 1 in ${Math.round(1 / c.prizes.reduce((a, p) => a + p[1], 0))}</div><button class="sbtn gold" data-act="buy:${d}" ${Money.clean < +d || (sc && !sc.done) ? 'disabled' : ''}>Buy · $${d}</button></div>`; }).join('') + '</div>';
       if (sc) {
         h += `<div class="scard" style="--sc:${SCRATCH_CARDS[sc.den].col}"><div class="sct">${SCRATCH_CARDS[sc.den].name} <small>$${sc.den}</small></div><div class="scgrid">${sc.cells.map((a, i) => `<div class="scc${sc.open[i] ? ' open' : ''}${sc.done && sc.win && a === sc.win ? ' hit' : ''}" data-act="sc:${i}">${sc.open[i] ? fmtMoney(a) : ''}</div>`).join('')}</div>
           ${sc.done ? `<div class="gres ${sc.cls}">${sc.win ? `WINNER · ${fmtMoney(sc.win)}` : 'No match. Better luck next time.'}</div>` : `<div class="btns"><button class="sbtn gold" data-act="scratch">SCRATCH</button></div><div class="hint">Drag across the panels or tap SCRATCH.</div>`}</div>`;
@@ -385,7 +388,7 @@ class Gamble {
   }
   // wins already paid but not yet revealed stay out of the cash shown on the game screens
   get pendingWin() { let w = 0; if (this.sc && !this.sc.done) w += this.sc.win; for (const id in this.slotState || {}) { const sl = this.slotState[id]; if (sl.spinning && sl.res) w += sl.res.win; } if (this.bj && this.bj.revealing) w += this.bj.revealWin; if (this.roul && this.roul.spinning) w += this.roul.spinning.win; if (this.ry && this.ry.spinning && this.ry.res) w += this.ry.res.win; return w; }
-  shownMoney() { return this.g.save.money - this.pendingWin; }
+  shownMoney() { return Money.clean - this.pendingWin; }
   scratchBuy(den) {
     if (this.sc && !this.sc.done) return;
     const win = this.scratchDraw(den);
@@ -425,15 +428,14 @@ class Gamble {
   }
   barDrink() {
     const g = this.g, p = g.player;
-    if (g.save.money < 40) { g.content.deny('The bartender waits. Drinks are $40.'); return; }
-    g.save.money -= 40; g.save.stats.spent += 40;
+    if (!Money.pay(40, 'bar')) { g.content.deny('The bartender waits. Drinks are $40.'); return; }
     p.health = Math.min(p.maxHealth, p.health + 25 * HP_SCALE);
     g.audio.play('pickup'); g.ui.toast(pick(['An old fashioned, on the rocks. +75 health.', 'Something with a cherry in it. +75 health.', 'Top-shelf rye. +75 health.']), 'money');
   }
   openCashier() {
     const render = () => {
       const s = this.g.save, J = this.G.jp;
-      let h = `<div class="svcTop"><span>Cash <b class="money">${fmtMoney(s.money)}</b></span><span>No table limits: bet anything from ${fmtMoney(CASINO.minBet)} up to your whole bankroll</span></div>`;
+      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>No table limits: bet anything from ${fmtMoney(CASINO.minBet)} up to your whole bankroll</span></div>`;
       h += '<div class="hint">The Valen Royale is a player’s house: across its games about six decided rounds in ten go your way. Losing streaks still happen, and nothing changes with the size of your bet.</div>';
       h += `<h3>Royale Billions jackpots</h3><div class="stats">${ROYALE_MAJORS.slice(0, 8).map(m => `<span>${fmtMoney(m.prize)}</span><span>${(J.hits[m.id] || 0)} hit${(J.hits[m.id] || 0) === 1 ? '' : 's'}</span>`).join('')}</div>`;
       h += '<h3>Casino record</h3>' + this.statsHTML('casino') + '<h3>Fuel & Go slot</h3>' + this.statsHTML('slots') + '<h3>Scratch cards</h3>' + this.statsHTML('scratch');
@@ -451,11 +453,11 @@ class Gamble {
     const render = () => {
       const s = this.g.save, pool = def.progressive ? this.pool(id) : 0;
       const grid = sl.grid || Array.from({ length: def.reels }, () => Array.from({ length: rows }, () => pick(SLOT_SYMS)));
-      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Cash <b class="money">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="money">${fmtMoney(pool)}</b></span>` : ''}</div>`;
+      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Bank <b class="money">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="money">${fmtMoney(pool)}</b></span>` : ''}</div>`;
       h += `<div class="slotm${def.reels === 5 ? ' five' : ''}"><div class="reels">${grid.map((col, r) => `<div class="reel${sl.spinning && r >= sl.stopped ? ' spin' : ''}">${col.map((s2, k) => `<div class="cell${sl.res && !sl.spinning && sl.res.lines.length && (def.reels === 3 || sl.res.lines.some(li => def.lines[li][r] === k)) ? ' win' : ''}">${sym(s2)}</div>`).join('')}</div>`).join('')}</div>
         <div class="lever${sl.spinning ? ' pulled' : ''}" data-act="spin"><i></i><b></b></div></div>`;
       h += `<div class="gres ${sl.res && !sl.spinning ? sl.res.cls : ''}">${sl.spinning ? '…' : sl.res ? (sl.res.win ? `WIN ${fmtMoney(sl.res.win)}${sl.res.jackpot ? ' · JACKPOT' : ''}` : 'No win') : 'Pick a bet and spin'}</div>`;
-      h += `<div class="btns">${def.bets.map(b => `<button class="sbtn${sl.bet === b ? ' gold' : ''}" data-act="bet:${b}" ${sl.spinning ? 'disabled' : ''}>$${b}</button>`).join('')}<button class="sbtn gold" data-act="spin" ${sl.spinning || s.money < sl.bet ? 'disabled' : ''} style="min-width:110px">SPIN · $${sl.bet}</button></div>`;
+      h += `<div class="btns">${def.bets.map(b => `<button class="sbtn${sl.bet === b ? ' gold' : ''}" data-act="bet:${b}" ${sl.spinning ? 'disabled' : ''}>$${b}</button>`).join('')}<button class="sbtn gold" data-act="spin" ${sl.spinning || Money.clean < sl.bet ? 'disabled' : ''} style="min-width:110px">SPIN · $${sl.bet}</button></div>`;
       const t = def.reels === 3 ? slotTable(def, sl.bet) : null;
       h += `<details class="paytbl"><summary>Pay table at $${sl.bet}</summary>${def.reels === 3 ? `<div class="stats">${['seven', 'crown', 'diamond', 'car', 'cash', 'shoe'].map(k => `<span>${sym(k)}${sym(k)}${sym(k)}</span><span>${k === 'seven' && def.progressive ? 'PROGRESSIVE' + (def.progressive.maxOnly ? ' (max bet)' : '') : fmtMoney(t.three[k] * sl.bet)}</span>`).join('')}${Object.keys(t.two).map(k => `<span>${sym(k)}${sym(k)} ·</span><span>${fmtMoney(t.two[k] * sl.bet)}</span>`).join('')}${Object.keys(t.one).map(k => `<span>${sym(k)} · ·</span><span>${fmtMoney(t.one[k] * sl.bet)}</span>`).join('')}</div>` : `<div class="stats">${['seven', 'crown', 'diamond', 'cash', 'car', 'shoe'].map(k => `<span>${sym(k)} ×3 / ×4 / ×5</span><span>${def.pays[k].map(x => fmtMoney(x * sl.bet / def.lines.length)).join(' / ')}</span>`).join('')}<span>Lines</span><span>5 (left to right)</span></div>`}<div class="hint">Return to player over time: ${(slotRTP(def, sl.bet).rtp * 100).toFixed(1)}%${def.progressive ? ' plus the progressive pool' : ''}. The house always wins in the end.</div></details>`;
       return h + `<h3>${id === 'fuel' ? 'Slot record' : 'Casino record'}</h3>` + this.statsHTML(id === 'fuel' ? 'slots' : 'casino');
@@ -468,7 +470,7 @@ class Gamble {
   }
   slotGo(id, sl) {
     const def = SLOT_DEFS[id]; if (sl.spinning || this.busy) return;
-    const bet = sl.bet, s = this.g.save; if (s.money < bet) { this.refresh('Not enough cash.'); return; }
+    const bet = sl.bet, s = this.g.save; if (Money.clean < bet) { this.refresh('Not enough cash.'); return; }
     let pool = 0;
     if (def.progressive) { pool = this.pool(id); }
     const r = slotSpin(def, bet, pool);
@@ -500,7 +502,7 @@ class Gamble {
   // a bet-bar action → the new wager (null when the action is not one); cap is what can still be staked
   wagerAct(game, a, cur, cap) {
     const [k, sub, x] = a.split(':'); if (k !== 'w') return null;
-    const m = Math.floor(cap !== undefined ? cap : this.g.save.money);
+    const m = Math.floor(cap !== undefined ? cap : Money.clean);
     let v = cur;
     if (sub === 'q') v = +x; else if (sub === 'max') v = m; else if (sub === 'half') v = Math.floor(cur / 2); else if (sub === 'dbl') v = cur * 2;
     else if (sub === 'set') { const el = document.getElementById('wagerIn'); const n = parseMoney(el && el.value); if (!(n > 0)) { this.refresh('Type an amount like 7500, 250k, 2.5m or 1b.'); return cur; } v = n; }
@@ -508,7 +510,7 @@ class Gamble {
     if (v > m) { v = m; if (sub === 'set' || sub === 'dbl') this.g.ui.toast(`That is more than you have. Set to ${fmtMoney(Math.max(CASINO.minBet, m))}.`, 'warn'); }
     return this.setWager(game, Math.max(CASINO.minBet, v));
   }
-  debit(n) { const s = this.g.save; if (!(n > 0) || n > s.money) return false; s.money -= n; return true; }
+  debit(n) { return Money.can(n, 'casinoStake') && Money.pay(n, 'casinoStake') > 0; }
   leaveTable() {
     if (this.bj && this.bj.phase === 'play') this.bjAutoStand(true);
     if (this.pk) this.pokerLeave();
@@ -518,7 +520,7 @@ class Gamble {
     const s = this.g.save, G = s.gamble, msgs = [];
     if (G.table && G.table.game === 'bj') { this.bj = { seat: G.table.seat | 0, bet: G.table.bet, hands: G.table.hands, dealer: G.table.dealer, phase: 'play', cur: 0 }; const w = this.bjAutoStand(true); msgs.push(`Your unfinished blackjack hand was stood: ${w ? 'paid ' + fmtMoney(w) : 'lost'}.`); this.bj = null; }
     G.table = null;
-    if (G.casino.chips > 0) { s.money += G.casino.chips; msgs.push(`${fmtMoney(G.casino.chips)} in poker chips cashed out.`); G.casino.chips = 0; }
+    if (G.casino.chips > 0) { Money.earn(G.casino.chips, 'casino'); msgs.push(`${fmtMoney(G.casino.chips)} in poker chips cashed out.`); G.casino.chips = 0; }
     this.pk = null;
     return msgs;
   }
@@ -540,12 +542,12 @@ class Gamble {
       h += `<div class="gres ${bj.revealing ? '' : bj.cls || ''}">${bj.revealing ? '…' : bj.msg || (play ? 'Your move.' : 'Set your bet and deal.')}</div>`;
       if (play) {
         const hd = bj.hands[bj.cur], two = hd && hd.cards.length === 2;
-        const canSplit = two && bj.hands.length === 1 && Math.min(10, hd.cards[0].r === 14 ? 11 : hd.cards[0].r) === Math.min(10, hd.cards[1].r === 14 ? 11 : hd.cards[1].r) && s.money >= hd.bet;
+        const canSplit = two && bj.hands.length === 1 && Math.min(10, hd.cards[0].r === 14 ? 11 : hd.cards[0].r) === Math.min(10, hd.cards[1].r === 14 ? 11 : hd.cards[1].r) && Money.clean >= hd.bet;
         h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
-        h += `<div class="btns big"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && s.money >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
+        h += `<div class="btns big"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && Money.clean >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
       } else {
         h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(bj.bet * 2.5), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
-        h += `<div class="btns big"><button class="sbtn gold" data-act="deal" style="min-width:160px" ${s.money < bj.bet || bj.revealing ? 'disabled' : ''}>DEAL · ${fmtMoney(bj.bet)}</button></div>`;
+        h += `<div class="btns big"><button class="sbtn gold" data-act="deal" style="min-width:160px" ${Money.clean < bj.bet || bj.revealing ? 'disabled' : ''}>DEAL · ${fmtMoney(bj.bet)}</button></div>`;
       }
       return h + '<div class="hint">Dealer stands on all 17s · Blackjack pays 3:2 · Double on any two cards · One split · No table maximum · Walking away mid-hand stands every hand.</div><h3>Casino record</h3>' + this.statsHTML('casino');
     };
@@ -643,26 +645,26 @@ class Gamble {
       // what the layout can do: best and worst outcome over the 37 pockets
       let best = 0, worst = Infinity, bestN = 0; if (tot) for (let n = 0; n <= 36; n++) { const p = roulettePayout(R.bets, n); if (p > best) { best = p; bestN = n; } worst = Math.min(worst, p); }
       h += `<div class="btns rmode"><button class="sbtn${R.mode === 'add' ? ' gold' : ''}" data-act="mode:add" ${spinning ? 'disabled' : ''}>＋ ADD CHIPS</button><button class="sbtn${R.mode === 'remove' ? ' gold' : ''}" data-act="mode:remove" ${spinning || !tot ? 'disabled' : ''}>－ REMOVE</button><button class="sbtn" data-act="undo" ${spinning || !R.stack.length ? 'disabled' : ''}>UNDO</button><button class="sbtn" data-act="clear" ${spinning || !tot ? 'disabled' : ''}>CLEAR ALL</button></div>`;
-      h += this.wagerHTML('roul', chip, { label: 'CHIP', avail: s.money - tot, lock: spinning, pays: tot ? fmtMoney(best) : '', paysLabel: tot ? `BEST CASE (${bestN})` : '' });
+      h += this.wagerHTML('roul', chip, { label: 'CHIP', avail: Money.clean - tot, lock: spinning, pays: tot ? fmtMoney(best) : '', paysLabel: tot ? `BEST CASE (${bestN})` : '' });
       if (tot) h += `<div class="rbets"><div class="rbt"><span>${Object.keys(R.bets).length} bet${Object.keys(R.bets).length === 1 ? '' : 's'} · total <b>${fmtMoney(tot)}</b></span><span>worst case ${worst ? 'pays ' + fmtMoney(worst) : 'loses it all'}</span></div>${Object.entries(R.bets).map(([k2, a2]) => `<span class="rbi">${roulLabel(k2)} <b>${fmtMoney(a2)}</b> <small>pays ${fmtMoney(a2 * roulMult(k2))}</small></span>`).join('')}</div>`;
-      h += `<div class="btns big"><button class="sbtn" data-act="rebet" ${spinning || !R.last || tot ? 'disabled' : ''}>REBET</button><button class="sbtn gold" data-act="rspin" style="min-width:140px" ${spinning || !tot || tot > s.money ? 'disabled' : ''}>SPIN · ${fmtMoney(tot)}</button></div>`;
+      h += `<div class="btns big"><button class="sbtn" data-act="rebet" ${spinning || !R.last || tot ? 'disabled' : ''}>REBET</button><button class="sbtn gold" data-act="rspin" style="min-width:140px" ${spinning || !tot || tot > Money.clean ? 'disabled' : ''}>SPIN · ${fmtMoney(tot)}</button></div>`;
       return h + `<div class="hint">Straight up 35:1 · Dozens and columns 2:1 · Red/black, odd/even, 1–18/19–36 1:1 · Cover as much of the table as you like; the only limit is your cash.</div><h3>Casino record</h3>` + this.statsHTML('casino');
     };
     this.open(`Roulette · Table ${seat + 1}`, 'Croupier: “Faites vos jeux.”', render, a => {
       const [k, x, y] = a.split(':');
       if (R.spinning) return;
-      if (k === 'w') { const v = this.wagerAct('roul', a, this.wager('roul', 100), Math.max(CASINO.minBet, this.g.save.money - total())); if (v !== null) this.refresh(); }
+      if (k === 'w') { const v = this.wagerAct('roul', a, this.wager('roul', 100), Math.max(CASINO.minBet, Money.clean - total())); if (v !== null) this.refresh(); }
       else if (k === 'mode') { R.mode = x === 'remove' ? 'remove' : 'add'; this.refresh(); }
       else if (k === 'rb') {
         const key = y !== undefined ? x + ':' + y : x; if (!ROUL_KEYS.has(key)) return;
         const chip = this.wager('roul', 100);
         if (R.mode === 'remove') { const cur = R.bets[key] || 0; if (!cur) return; const d = Math.min(cur, chip); if (cur - d > 0) R.bets[key] = cur - d; else delete R.bets[key]; R.stack.push([key, -d]); if (!total()) R.mode = 'add'; this.g.audio.play('chip', { gain: 0.4 }); this.refresh(); return; }
-        if (total() + chip > this.g.save.money) { this.refresh('Not enough cash for another chip of that size.'); return; }
+        if (total() + chip > Money.clean) { this.refresh('Not enough cash for another chip of that size.'); return; }
         R.bets[key] = (R.bets[key] || 0) + chip; R.stack.push([key, chip]); R.res = null; this.g.audio.play('chip', { gain: 0.6 }); this.refresh();
       }
       else if (k === 'undo') { const u = R.stack.pop(); if (u) { const [key, d] = u, v = (R.bets[key] || 0) - d; if (v > 0) R.bets[key] = v; else delete R.bets[key]; this.refresh(); } }
       else if (k === 'clear') { R.bets = {}; R.stack = []; R.mode = 'add'; this.refresh(); }
-      else if (k === 'rebet') { const sum = Object.values(R.last).reduce((a2, b) => a2 + b, 0); if (sum <= this.g.save.money) { R.bets = { ...R.last }; R.stack = Object.entries(R.bets); this.refresh(); } else this.refresh('Not enough cash to repeat that layout.'); }
+      else if (k === 'rebet') { const sum = Object.values(R.last).reduce((a2, b) => a2 + b, 0); if (sum <= Money.clean) { R.bets = { ...R.last }; R.stack = Object.entries(R.bets); this.refresh(); } else this.refresh('Not enough cash to repeat that layout.'); }
       else if (k === 'rspin') this.roulSpin();
     }, 'roul');
   }
@@ -698,11 +700,11 @@ class Gamble {
         h += this.wagerHTML('pokerBuy', buy, { label: 'BUY-IN', pays: `${fmtMoney(bb / 2)} / ${fmtMoney(bb)}`, paysLabel: 'BLINDS' });
         h += `<div class="btns">${[[100, 'DEEP · 100 big blinds'], [50, 'STANDARD · 50'], [20, 'SHORT · 20']].map(([d, l]) => `<button class="sbtn${depth === d ? ' gold' : ''}" data-act="depth:${d}">${l}</button>`).join('')}</div>`;
         h += `<div class="grid2">${POKER_AI.map(a => `<div class="card"><div class="t">${a.name}</div><div class="d">${a.desc}</div></div>`).join('')}</div>`;
-        h += `<div class="btns big"><button class="sbtn gold" data-act="sit" style="min-width:170px" ${s.money < buy || buy < 200 ? 'disabled' : ''}>TAKE A SEAT · ${fmtMoney(buy)}</button></div>${buy < 200 ? '<div class="hint">The minimum buy-in is $200.</div>' : ''}`;
+        h += `<div class="btns big"><button class="sbtn gold" data-act="sit" style="min-width:170px" ${Money.clean < buy || buy < 200 ? 'disabled' : ''}>TAKE A SEAT · ${fmtMoney(buy)}</button></div>${buy < 200 ? '<div class="hint">The minimum buy-in is $200.</div>' : ''}`;
         return h + '<h3>Casino record</h3>' + this.statsHTML('casino');
       }
       const showAll = pk.phase === 'show';
-      let h = `<div class="svcTop"><span>Blinds <b>${fmtMoney(pk.bb / 2)} / ${fmtMoney(pk.bb)}</b></span><span>Cash <b class="money">${fmtMoney(s.money)}</b></span><span>Your chips <b class="money">${fmtMoney(pk.seats[0].stack)}</b></span></div>`;
+      let h = `<div class="svcTop"><span>Blinds <b>${fmtMoney(pk.bb / 2)} / ${fmtMoney(pk.bb)}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Your chips <b class="money">${fmtMoney(pk.seats[0].stack)}</b></span></div>`;
       h += `<div class="felt poker"><div class="board">${pk.board.map(c => cardHTML(c)).join('') || '<span class="hint">—</span>'}</div><div class="pot">Pot ${fmtMoney(pk.pot + pk.seats.reduce((a, x) => a + x.put, 0))}</div>`;
       h += `<div class="seats">${pk.seats.map((x, i) => `<div class="seat${i === pk.toAct && pk.phase === 'play' ? ' cur' : ''}${x.folded ? ' out' : ''}${x.won ? ' won' : ''}"><div class="who">${i === pk.btn ? '<b class="btn">D</b> ' : ''}${esc(x.name)}${x.isP ? '' : ` <small>${x.pers}</small>`}</div><div class="cards">${x.hole.map(c => cardHTML(c, !x.isP && !(showAll && !x.folded))).join('')}</div><div class="d">$${fmtShort(x.stack)}${x.put ? ' · bet $' + fmtShort(x.put) : ''}${x.allin ? ' · ALL IN' : ''}</div><div class="act">${esc(x.last || '')}</div></div>`).join('')}</div></div>`;
       h += `<div class="gres ${pk.cls || ''}">${esc(pk.msg || '')}</div>`;
@@ -712,7 +714,7 @@ class Gamble {
         h += `<div class="btns big"><button class="sbtn" data-act="fold">FOLD</button><button class="sbtn gold" data-act="call">${toCall ? 'CALL ' + fmtMoney(Math.min(toCall, me.stack)) : 'CHECK'}</button></div>`;
         h += `<div class="btns pkr">${opts.map(o => `<button class="sbtn${o.allin ? ' danger' : ''}" data-act="raise:${o.to}">${o.label}<small>${fmtMoney(o.to - me.put)}</small></button>`).join('') || '<span class="hint">No raise possible.</span>'}</div>`;
       } else if (pk.phase !== 'play') {
-        h += `<div class="btns big"><button class="sbtn gold" data-act="deal" ${me.stack < pk.bb ? 'disabled' : ''}>NEXT HAND</button><button class="sbtn" data-act="topup" ${s.money < 1 || me.stack >= pk.buy ? 'disabled' : ''}>REBUY TO ${fmtMoney(pk.buy)}</button><button class="sbtn" data-act="leave">CASH OUT</button></div>`;
+        h += `<div class="btns big"><button class="sbtn gold" data-act="deal" ${me.stack < pk.bb ? 'disabled' : ''}>NEXT HAND</button><button class="sbtn" data-act="topup" ${Money.clean < 1 || me.stack >= pk.buy ? 'disabled' : ''}>REBUY TO ${fmtMoney(pk.buy)}</button><button class="sbtn" data-act="leave">CASH OUT</button></div>`;
       } else h += '<div class="btns"><button class="sbtn" disabled>…</button></div>';
       return h + '<h3>Casino record</h3>' + this.statsHTML('casino');
     };
@@ -725,7 +727,7 @@ class Gamble {
         return;
       }
       if (k === 'deal') { if (pk.phase !== 'play') this.pokerHand(); }
-      else if (k === 'topup') { const need = Math.min(pk.buy - pk.seats[0].stack, Math.floor(this.g.save.money)); if (pk.phase !== 'play' && need > 0 && this.debit(need)) { pk.seats[0].stack += need; this.G.casino.chips = pk.seats[0].stack; this.g.saveGame(); this.refresh(); } }
+      else if (k === 'topup') { const need = Math.min(pk.buy - pk.seats[0].stack, Math.floor(Money.clean)); if (pk.phase !== 'play' && need > 0 && this.debit(need)) { pk.seats[0].stack += need; this.G.casino.chips = pk.seats[0].stack; this.g.saveGame(); this.refresh(); } }
       else if (k === 'leave') { if (pk.phase !== 'play') { this.pokerLeave(); this.refresh('Chips cashed out.'); } }
       else if (pk.phase === 'play' && pk.toAct === 0 && ['fold', 'call', 'raise'].includes(k)) { this.pokerAct(0, k, +x); this.pokerRun(); }
     }, 'poker');
@@ -743,7 +745,7 @@ class Gamble {
     const pk = this.pk; if (!pk) return;
     if (pk.phase === 'play') { pk.walk = true; let guard = 0; while (pk.phase === 'play' && guard++ < 400) { if (pk.toAct === 0) this.pokerAct(0, pk.curBet > pk.seats[0].put ? 'fold' : 'call'); else { const d = this.pokerAI(pk.toAct, true); this.pokerAct(pk.toAct, d.kind, d.to); } } }
     const st = pk.seats[0].stack;
-    this.g.save.money += st; this.G.casino.chips = 0; this.pk = null; this.g.saveGame();
+    if (st > 0) Money.earn(st, 'casino'); this.G.casino.chips = 0; this.pk = null; this.g.saveGame();
     if (st) this.g.ui.toast(`Cashed out ${fmtMoney(st)} in chips.`, 'money');
   }
   pkActive() { return this.pk.seats.filter(x => !x.folded && !x.sitout); }
@@ -892,7 +894,7 @@ class Gamble {
   // ------------------------------------------------------------- Royale Billions: the casino's slot
   royaleBetStep(bet, dir) {
     const L = []; for (let e = 1; e <= 12; e++) for (const m of [1, 2, 5]) L.push(m * Math.pow(10, e)); // $10 .. $5T
-    const m = Math.floor(this.g.save.money);
+    const m = Math.floor(Money.clean);
     if (dir > 0) { const n = L.find(v => v > bet); return Math.max(CASINO.minBet, Math.min(n || bet, Math.max(CASINO.minBet, m))); }
     let n = CASINO.minBet; for (const v of L) if (v < bet) n = v; return n;
   }
@@ -912,7 +914,7 @@ class Gamble {
       <div class="rylGlass"><div class="rylReels" id="rylReels">${grid.map((col, r) => `<div class="ryr" data-r="${r}"><div class="rys">${col.map((sy, w) => this.royaleCell(sy, hitCells.has(r + ':' + w) ? ' hit' : '')).join('')}</div></div>`).join('')}</div><svg class="rylLines" viewBox="0 0 500 300" preserveAspectRatio="none">${lines}</svg></div>
       <div class="rylBulbs">${bulbs(18)}</div></div></div>`;
     h += `<div class="rylBar"><div><span>BALANCE</span><b class="money" id="rylBal">${fmtFit(this.shownMoney())}</b></div><div><span>BET</span><b>${fmtFit(bet)}</b></div><div><span>WIN</span><b class="money" id="rylLast">${res && res.win ? fmtFit(res.win) : '$0'}</b></div></div>`;
-    h += `<div class="btns rylCtl"><button class="sbtn" data-act="ry:down" ${ry.spinning ? 'disabled' : ''} aria-label="Lower bet">−</button><button class="sbtn gold rylSpin" data-act="ry:spin" ${ry.spinning || s.money < bet ? 'disabled' : ''}>SPIN</button><button class="sbtn" data-act="ry:up" ${ry.spinning ? 'disabled' : ''} aria-label="Raise bet">+</button></div>`;
+    h += `<div class="btns rylCtl"><button class="sbtn" data-act="ry:down" ${ry.spinning ? 'disabled' : ''} aria-label="Lower bet">−</button><button class="sbtn gold rylSpin" data-act="ry:spin" ${ry.spinning || Money.clean < bet ? 'disabled' : ''}>SPIN</button><button class="sbtn" data-act="ry:up" ${ry.spinning ? 'disabled' : ''} aria-label="Raise bet">+</button></div>`;
     h += this.wagerHTML('royale', bet, { lock: ry.spinning, noTop: true });
     h += `<div class="btns"><button class="sbtn${ry.info ? ' gold' : ''}" data-act="ry:info">${ry.info ? 'HIDE INFO' : 'INFO / PAYTABLE'}</button></div>`;
     if (ry.info) {
@@ -941,7 +943,7 @@ class Gamble {
   royaleGo() {
     const ry = this.ry, s = this.g.save, bet = ry.bet, J = this.G.jp;
     if (!ry || ry.spinning || this.busy || !(bet >= CASINO.minBet)) return;
-    if (s.money < bet) { this.refresh('Not enough cash for that bet.'); return; }
+    if (Money.clean < bet) { this.refresh('Not enough cash for that bet.'); return; }
     const r = royaleSpin(bet, J);
     if (!this.settle('casino', bet, r.win, { slot: true, jackpot: r.major >= 0 })) return;
     J.spins = (J.spins || 0) + 1; J.wagered = (J.wagered || 0) + bet; J.won = (J.won || 0) + r.win; J.biggest = Math.max(J.biggest || 0, r.win);

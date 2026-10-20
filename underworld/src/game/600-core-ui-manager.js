@@ -171,12 +171,6 @@ const UPGRADES = [
   { id: 'cooldown', name: 'Low Profile', desc: 'Police lose track of you faster.', prices: [1500, 3200, 6400] },
   { id: 'armor', name: 'Body Armor', desc: 'Take 12% less damage per level.', prices: [2000, 4000, 8000] }
 ];
-const ARMS = [
-  { id: 'pistol', name: 'Pistol', desc: 'Reliable sidearm. Includes 48 rounds.', price: 1500, ammo: 48 },
-  { id: 'smg', name: 'SMG', desc: 'Fully automatic. Includes 120 rounds.', price: 6000, ammo: 120 },
-  { id: 'ammo_pistol', name: 'Pistol ammo ×48', desc: 'Restock your pistol.', price: 200, ammoFor: 'pistol', ammo: 48 },
-  { id: 'ammo_smg', name: 'SMG ammo ×120', desc: 'Restock your SMG.', price: 450, ammoFor: 'smg', ammo: 120 }
-];
 class UIManager {
   constructor(game) {
     this.g = game; this.modal = null; this.stack = [];
@@ -437,39 +431,31 @@ class UIManager {
   }
   renderShop() {
     const g = this.g, s = g.save;
-    $('shopMoney').textContent = fmtMoney(s.money);
+    $('shopMoney').textContent = fmtMoney(Money.clean);
     $('shopUp').innerHTML = UPGRADES.map(u => {
       const lvl = s.upgrades[u.id] || 0, max = lvl >= u.prices.length, price = max ? 0 : u.prices[lvl];
-      return `<div class="card"><div class="t">${u.name}</div><div class="d">${u.desc}</div><div class="pips">${u.prices.map((_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn gold" data-buy="up:${u.id}" ${max || s.money < price ? 'disabled' : ''}>${max ? 'Maxed' : fmtMoney(price)}</button></div>`;
+      return `<div class="card"><div class="t">${u.name}</div><div class="d">${u.desc}</div><div class="pips">${u.prices.map((_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn gold" data-buy="up:${u.id}" ${max || !Money.can(price, 'training') ? 'disabled' : ''}>${max ? 'Maxed' : fmtMoney(price)}</button></div>`;
     }).join('');
-    $('shopArms').innerHTML = ARMS.map(a => {
-      const owned = !a.ammoFor && s.weapons[a.id];
-      const locked = a.ammoFor && !s.weapons[a.ammoFor];
-      const ammo = a.ammoFor ? `<div class="stat"><span>Carrying</span><span>${s.ammo[a.ammoFor] + (g.player.mag[a.ammoFor] || 0)}</span></div>` : '';
-      return `<div class="card"><div class="t">${a.name}</div><div class="d">${a.desc}</div>${ammo}<button class="sbtn gold" data-buy="arm:${a.id}" ${owned || locked || s.money < a.price ? 'disabled' : ''}>${owned ? 'Owned' : locked ? 'Need weapon' : fmtMoney(a.price)}</button></div>`;
-    }).join('');
-    $('shopCars').innerHTML = `<div class="card"><div class="t">Meridian Motors</div><div class="d">Cars are sold in person at the Meridian Motors lot in Midtown (the $ icon on your map). Okafor Motor Works in Harbor Row repairs and tunes the cars you own. You have ${s.garage.length} vehicle${s.garage.length === 1 ? '' : 's'}.</div></div>`;
     document.querySelectorAll('#shopScreen [data-buy]').forEach(b => b.addEventListener('click', () => this.buy(b.dataset.buy)));
   }
   buy(key) {
     const g = this.g, s = g.save, [kind, id] = key.split(':');
     let price = 0;
-    if (kind === 'up') { const u = UPGRADES.find(x => x.id === id); price = u.prices[s.upgrades[id] || 0]; if (price === undefined || s.money < price) return; s.money -= price; s.upgrades[id] = (s.upgrades[id] || 0) + 1; if (id === 'health') g.player.health = g.player.maxHealth; }
-    if (kind === 'arm') {
-      const a = ARMS.find(x => x.id === id); price = a.price; if (s.money < price) return;
-      s.money -= price;
-      if (a.ammoFor) s.ammo[a.ammoFor] += a.ammo;
-      else { s.weapons[a.id] = true; s.ammo[a.id] += a.ammo; g.player.selectWeapon(WEAPONS.findIndex(w => w.id === a.id)); }
-    }
+    if (kind !== 'up') return;
+    const u = UPGRADES.find(x => x.id === id); price = u && u.prices[s.upgrades[id] || 0];
+    if (price === undefined || !Money.pay(price, 'training')) return;
+    s.upgrades[id] = (s.upgrades[id] || 0) + 1; if (id === 'health') g.player.health = g.player.maxHealth;
     g.audio.play('cash'); g.saveGame(); this.renderShop();
   }
   // --------- per-frame HUD ---------
   // one line in the +/- money feed (new lines on top, at most four, each shown ~2 s)
   moneyPop(e, merged) {
     const box = $('moneyFeed'); if (!box) return;
-    const txt = (e.d > 0 ? '+' : '−') + fmtMoney(Math.abs(Math.round(e.d)));
-    if (merged && e.el) { e.el.textContent = txt; e.el.className = (e.d > 0 ? 'up' : 'dn') + (Math.abs(e.d) >= 10000 ? ' big' : ''); e.ttl = 2.2; return; }
-    const el = document.createElement('b'); el.className = (e.d > 0 ? 'up' : 'dn') + (Math.abs(e.d) >= 10000 ? ' big' : ''); el.textContent = txt;
+    // cash on you shows as "+$250"; the bank as "+$250 bank"
+    const txt = (e.d > 0 ? '+' : '−') + fmtMoney(Math.abs(Math.round(e.d))) + (e.cur === 'clean' ? ' bank' : '');
+    const cls = (e.d > 0 ? 'up' : 'dn') + (Math.abs(e.d) >= 10000 ? ' big' : '') + (e.cur === 'clean' ? ' bank' : '');
+    if (merged && e.el) { e.el.textContent = txt; e.el.className = cls; e.ttl = 2.2; return; }
+    const el = document.createElement('b'); el.className = cls; el.textContent = txt;
     e.el = el; e.ttl = 2.2;
     box.prepend(el); this.feed.unshift(e);
     while (this.feed.length > 4) { const o = this.feed.pop(); if (o.el) o.el.remove(); }
@@ -498,9 +484,11 @@ class UIManager {
     this.tickFeed(dt);
     if (this.bannerUntil && performance.now() > this.bannerUntil) { this.bannerUntil = 0; this.show('banner', false); }
     if (g.state !== 'playing' && g.state !== 'dead' && g.state !== 'busted') return;
-    // money
-    const m = Math.floor(s.money);
+    // money: Dirty Cash on you (what an arrest would take) and the bank
+    const m = Math.floor(Money.onMe);
     if (m !== this.lastMoney) { const el = $('money'); el.textContent = fmtMoney(m); if (this.lastMoney >= 0 && m > this.lastMoney) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); } this.lastMoney = m; }
+    const bk = Math.floor(Money.clean) + '/' + Math.floor(Money.debt);
+    if (bk !== this.lastBank) { this.lastBank = bk; $('bank').textContent = `BANK ${fmtMoney(Money.clean)}${Money.debt > 0 ? ' · DEBT ' + fmtMoney(Money.debt) : ''}`; $('bank').classList.toggle('debt', Money.debt > 0); }
     // health ring
     $('hpArc').setAttribute('stroke-dasharray', `${clamp(p.health / p.maxHealth, 0, 1) * 100} 100`);
     const low = p.health / p.maxHealth < 0.3;
@@ -962,7 +950,7 @@ class MapView {
   }
   renderPick() {
     const o = this.pickMode; if (!o) return;
-    const q = o.q, money = this.g.save.money;
+    const q = o.q, money = Money.available('taxi');
     $('mapPick').innerHTML = `<b>${esc(o.title)}</b>${q ? `<div class="stats"><span>Destination</span><span><b>${esc(q.name)}</b></span><span>Distance</span><span>${fmtDist(q.m)}</span><span>Fare</span><span><b style="color:${q.fare > money ? 'var(--red)' : 'var(--money)'}">${fmtMoney(q.fare)}</b></span></div>` : '<div class="hint" style="margin-top:4px">Tap any street on the map. The orange arrow is you.</div>'}
       <div class="btns"><button class="sbtn" data-pk="cancel">Cancel</button><button class="sbtn gold" data-pk="ok" ${q && q.fare <= money ? '' : 'disabled'}>${q ? 'Ride · ' + fmtMoney(q.fare) : 'Pick a place'}</button></div>`;
   }

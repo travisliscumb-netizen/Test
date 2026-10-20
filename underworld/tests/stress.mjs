@@ -14,7 +14,7 @@ const ev = (f, a) => page.evaluate(f, a);
 const cdp = await t.ctx.newCDPSession(page);
 const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
 const waitFade = async () => { await page.waitForFunction(() => !window.game.fading, null, { timeout: 60000 }); await frames(page, 6); };
-await ev(() => { const g = window.game; g.events.cool = 1e9; g.save.money = 2e6; g.police.enabled = false;
+await ev(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = g.money.W.dirty.me = 2e6); g.police.enabled = false;
   // frame-time recorder: worst gap between rendered frames per step
   window.__ft = { last: performance.now(), worst: 0 }; const loop = () => { const n = performance.now(); window.__ft.worst = Math.max(window.__ft.worst, n - window.__ft.last); window.__ft.last = n; requestAnimationFrame(loop); }; requestAnimationFrame(loop); });
 const stalls = [];
@@ -92,7 +92,7 @@ check('with a smuggled phone the map opens in jail', await ev(() => window.game.
 await tap('#mapClose'); await hudCheck('jail after the map');
 await ev(() => { const j = window.game.uw.S.jail; j.total = Math.min(j.total, j.served + 2); });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000, polling: 100 });
-await ev(() => { window.game.police.enabled = false; window.game.save.money = 2e6; });
+await ev(() => { window.game.police.enabled = false; (window.game.money.W.clean = window.game.money.W.dirty.me = 2e6); });
 // 6. reverse
 await spawnCar('compact', 4 * 80 + 2.6, 4 * 80 + 40, 0);
 await drive(50, 0, true);

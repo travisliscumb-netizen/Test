@@ -8,7 +8,7 @@ const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
 const ev = (f, a) => page.evaluate(f, a);
-await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; g.save.money = 5e6; g.save.rep = 50; });
+await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 5e6); g.save.rep = 50; });
 
 // 1. the roster
 const ros = await ev(() => {
@@ -114,10 +114,10 @@ await page.setViewportSize({ width: 480, height: 270 });
 check('on a phone the inspection panel fits and the Buy button is thumb-sized', !phone.overflow && phone.btnH >= 36 && phone.btnIn, JSON.stringify(phone));
 const buy = await ev(i => {
   const g = window.game, DL = g.dealers, s = g.save, c = DL.state('used').cars[i], v = DL.carAt('used', i);
-  const m0 = s.money, n0 = s.garage.length;
+  const m0 = window.game.money.total(), n0 = s.garage.length;
   const r = DL.buy('used', i);
   const e = s.garage[s.garage.length - 1];
-  return { r, paid: m0 - s.money, price: c.price, n: s.garage.length - n0, dmg: e.dmg, cond: c.cond, sameCar: v.garageUid === e.uid, locked: v.locked, owned: v.owned, slot: DL.state('used').cars[i] };
+  return { r, paid: m0 - window.game.money.total(), price: c.price, n: s.garage.length - n0, dmg: e.dmg, cond: c.cond, sameCar: v.garageUid === e.uid, locked: v.locked, owned: v.owned, slot: DL.state('used').cars[i] };
 }, insp.i);
 check('buying takes the price and puts that very car in your garage, unlocked and yours', buy.r === '' && buy.paid === buy.price && buy.n === 1 && buy.sameCar && !buy.locked && buy.owned, JSON.stringify(buy));
 check('a used car keeps its condition (garage damage = 100 − condition)', buy.dmg === 100 - buy.cond, JSON.stringify([buy.dmg, buy.cond]));
@@ -133,7 +133,7 @@ await frames(page, 30);
 const deny = await ev(() => {
   const g = window.game, DL = g.dealers, s = g.save, lux = DL.state('lux').cars, c = lux.find(x => x && ['supercar', 'valkyr', 'obsidian', 'coupe'].includes(x.type)) || lux[0];
   s.rep = 0; const rep = DL.cantBuy('lux', c);
-  s.rep = 99999; const m = s.money; s.money = 10; const cash = DL.cantBuy('lux', c); s.money = m;
+  s.rep = 99999; const W = window.game.money.W, m = [W.clean, W.dirty.me]; W.clean = W.dirty.me = 10; const cash = DL.cantBuy('lux', c); [W.clean, W.dirty.me] = m;
   const usedC = DL.state('used').cars.find(Boolean); s.rep = 0; const usedRep = DL.cantBuy('used', usedC);
   const g0 = s.garage.slice(); while (s.garage.length < g.content.garageCap) s.garage.push({ ...g0[0], uid: 9000 + s.garage.length, at: null }); const full = DL.cantBuy('used', usedC); s.garage = g0;
   s.rep = 99999;
@@ -193,7 +193,7 @@ const bad = await ev(() => {
   return { keys: Object.keys(d), cars: d.used && d.used.cars, day: d.used && d.used.d, v5: r5.data.version, v5d: JSON.stringify(r5.data.dealers) };
 });
 check('a damaged dealership save is repaired (bad cars dropped, condition clamped, unknown lots removed)', JSON.stringify(bad.keys) === '["used"]' && bad.cars[0] === null && bad.cars[1] === null && bad.cars[2].cond === 100 && bad.cars[3] === null && bad.day === -999, JSON.stringify(bad));
-check('a v5 save loads with empty lots that stock themselves', bad.v5 === 7 && bad.v5d === '{}', JSON.stringify(bad));
+check('a v5 save loads with empty lots that stock themselves', bad.v5 === 8 && bad.v5d === '{}', JSON.stringify(bad));
 
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 void mapIdx;

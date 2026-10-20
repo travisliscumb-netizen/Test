@@ -17,7 +17,7 @@ check('the fare is a base plus a per-kilometre rate (no flat $40)', fares.f0 >= 
 // put the player on a pavement next to a straight road, then call a cab
 const call = await ev(() => {
   const g = window.game, P = window.__pv;
-  g.save.money = 5000; g.police.clear();
+  (g.money.W.clean = g.money.W.dirty.me = 5000); g.police.clear();
   const kp = P.nearestRoadPoint(4 * 80 + 40, 6 * 80);
   g.resetPlayerState(kp.x, kp.z + 0, 0);
   const ok = g.taxi.call();
@@ -51,9 +51,9 @@ const pick = await ev(() => {
   mv.setPick(tx, tz);
   const q = mv.pickMode.q, html = document.getElementById('mapPick').textContent;
   const crow = Math.hypot(tx - v.pos.x, tz - v.pos.z);
-  const m0 = g.save.money;
+  const m0 = g.money.total();
   document.querySelector('#mapPick [data-pk="ok"]').click();
-  return { m: Math.round(q.m), crow: Math.round(crow), fare: q.fare, expect: P.fareFor(q.m), name: q.name, shown: html.includes(q.name) && html.includes('$'), state: g.taxi.state, passenger: !!g.player.passenger, inCab: g.player.vehicle === v, paidNow: m0 - g.save.money, hud: !document.getElementById('taxiHud').classList.contains('hidden'), mapOpen: !!g.mapOpen };
+  return { m: Math.round(q.m), crow: Math.round(crow), fare: q.fare, expect: P.fareFor(q.m), name: q.name, shown: html.includes(q.name) && html.includes('$'), state: g.taxi.state, passenger: !!g.player.passenger, inCab: g.player.vehicle === v, paidNow: m0 - g.money.total(), hud: !document.getElementById('taxiHud').classList.contains('hidden'), mapOpen: !!g.mapOpen };
 });
 check('the pick panel shows the place, distance and the fare before you ride', pick.shown && pick.fare === pick.expect && pick.m >= pick.crow * 0.95, JSON.stringify(pick));
 check('confirming puts you in the back of the cab (not driving) with the ride HUD up', pick.state === 'riding' && pick.passenger && pick.inCab && pick.hud && !pick.mapOpen && pick.paidNow === 0, JSON.stringify(pick));
@@ -87,10 +87,10 @@ await step(4);
 
 // get out: the cab pulls over first, then the meter is charged (never more than the quote)
 const out = await ev(() => {
-  const g = window.game, T = g.taxi, v = T.cab, m0 = g.save.money, sp0 = v.speed, meter = Math.min(T.quote, T.meterFare());
+  const g = window.game, T = g.taxi, v = T.cab, m0 = g.money.total(), sp0 = v.speed, meter = Math.min(T.quote, T.meterFare());
   document.querySelector('#taxiHud [data-tx="out"]').click();
   let t = 0; while (T.state === 'riding' && t < 15 * 60) { g.update(1 / 60, 1 / 60); t++; }
-  return { sp0: +sp0.toFixed(1), secs: +(t / 60).toFixed(1), paid: m0 - g.save.money, meter, state: T.state, foot: g.player.state === 'foot', passenger: !!g.player.passenger, cls: document.body.classList.contains('passenger'), hud: document.getElementById('taxiHud').classList.contains('hidden'), hp: g.player.health };
+  return { sp0: +sp0.toFixed(1), secs: +(t / 60).toFixed(1), paid: m0 - g.money.total(), meter, state: T.state, foot: g.player.state === 'foot', passenger: !!g.player.passenger, cls: document.body.classList.contains('passenger'), hud: document.getElementById('taxiHud').classList.contains('hidden'), hp: g.player.health };
 });
 check('“Get out”: the cab pulls over, you step out and pay the meter', out.state === 'idle' && out.foot && !out.passenger && !out.cls && out.hud && out.paid > 0 && Math.abs(out.paid - out.meter) <= 2, JSON.stringify(out));
 
@@ -104,12 +104,12 @@ const skipSet = await ev(() => {
   T.approach(v); document.querySelector('#svcBody [data-act="hire"]').click();
   const pl = g.world.places.casino || g.world.places.mall; g.ui.mapView.setPick(pl.door.x, pl.door.z);
   const q = g.ui.mapView.pickMode.q; document.querySelector('#mapPick [data-pk="ok"]').click();
-  window.__skip = { m0: g.save.money, fare: q.fare, x: T.dest.x, z: T.dest.z };
+  window.__skip = { m0: g.money.total(), fare: q.fare, x: T.dest.x, z: T.dest.z };
   document.querySelector('#taxiHud [data-tx="skip"]').click();
   return { state: T.state, fare: q.fare };
 });
 await waitFade();
-const skip = await ev(() => { const g = window.game, s = window.__skip || {}; return { paid: s.m0 - g.save.money, fare: s.fare, d: Math.round(Math.hypot(g.player.pos.x - s.x, g.player.pos.z - s.z)), state: g.taxi.state, foot: g.player.state === 'foot' }; });
+const skip = await ev(() => { const g = window.game, s = window.__skip || {}; return { paid: s.m0 - g.money.total(), fare: s.fare, d: Math.round(Math.hypot(g.player.pos.x - s.x, g.player.pos.z - s.z)), state: g.taxi.state, foot: g.player.state === 'foot' }; });
 check('“Skip ride”: a short fade, you arrive, the agreed fare is charged', skip.state === 'idle' && skip.foot && skip.paid === skip.fare && skip.d < 20, JSON.stringify({ skipSet, skip }));
 
 // a short ride all the way: the cab arrives by itself and charges the quote
@@ -124,10 +124,10 @@ const full = await ev(() => {
   // a destination about two blocks away along the streets
   const tx = v.pos.x + Math.sin(v.h) * 170, tz = v.pos.z + Math.cos(v.h) * 170;
   g.ui.mapView.setPick(tx, tz); const q = g.ui.mapView.pickMode.q; const dest = g.ui.mapView.pickMode.dest;
-  const m0 = g.save.money; document.querySelector('#mapPick [data-pk="ok"]').click();
+  const m0 = g.money.total(); document.querySelector('#mapPick [data-pk="ok"]').click();
   const trace = [[Math.round(v.pos.x), Math.round(v.pos.z), +v.h.toFixed(2)], [Math.round(dest.x), Math.round(dest.z)], v.drive.path.map(q => [Math.round(q.x), Math.round(q.z)])];
   t = 0; while (T.state === 'riding' && t < 120 * 60) { g.update(1 / 60, 1 / 60); t++; if (t % 120 === 0) trace.push([Math.round(v.pos.x), Math.round(v.pos.z), +v.speed.toFixed(1), v.drive.pi, T.recov || 0]); if (t === 30 * 60) { const fx = Math.sin(v.h), fz = Math.cos(v.h); trace.push({ ctl: v.ctl, wait: v.drive.wait, rev: v.drive.rev, driver: v.driver, mode: v.mode, sleep: v.sleep, ahead: g.dyn.query(v.pos.x + fx * 7, v.pos.z + fz * 7, 8, []).filter(e => e.ref !== v).map(e => { const l = v.toLocal(e.x, e.z); return [e.kind || (e.ref && e.ref.type) || (e.ref === g.player ? 'player' : '?'), +l.x.toFixed(1), +l.z.toFixed(1), e.ref && e.ref.parked, e.ref && e.ref.mode]; }) }); } }
-  return { trace: T.state === 'riding' ? trace : null, secs: Math.round(t / 60), paid: m0 - g.save.money, fare: q.fare, m: Math.round(q.m), d: Math.round(Math.hypot(p.pos.x - dest.x, p.pos.z - dest.z)), state: T.state, recov: T.recov || 0, foot: p.state === 'foot' };
+  return { trace: T.state === 'riding' ? trace : null, secs: Math.round(t / 60), paid: m0 - g.money.total(), fare: q.fare, m: Math.round(q.m), d: Math.round(Math.hypot(p.pos.x - dest.x, p.pos.z - dest.z)), state: T.state, recov: T.recov || 0, foot: p.state === 'foot' };
 });
 check('a full ride: the cab reaches the destination by road and you pay the quoted fare', full.state === 'idle' && full.foot && full.paid === full.fare && full.d < 20 && full.secs < 100, JSON.stringify(full));
 

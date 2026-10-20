@@ -3,10 +3,11 @@
    ===================================================================== */
 let game = null;
 class Game {
-  // the save object is swapped on load / new career / quit; whichever is current reports money changes
+  // the save object is swapped on load / new career / quit; Money always reads the current one
   get save() { return this._save; }
-  set save(v) { this._save = MoneyFeed.bind(v); }
+  set save(v) { this._save = v; }
   constructor() {
+    Money.bind(this); MoneyFeed.init(); this.money = Money; // tests and diagnostics reach the ledger as game.money
     const loaded = SaveSystem.load();
     this.save = loaded.data; this.hasSave = loaded.existed && loaded.data.stats.playTime > 3; this.migrated = !!loaded.migrated;
     this.canvas = $('game');
@@ -131,7 +132,7 @@ class Game {
     this.ui.show('mainMenu', true); this.ui.show('hud', false); this.ui.show('touch', false); this.ui.show('pauseMenu', false);
     $('btnContinue').disabled = !this.hasSave;
     const uw = this.save.uw;
-    $('continueSub').textContent = this.hasSave ? `${fmtMoney(this.save.money)} · ${uw && uw.jail ? 'in County Jail' : 'day ' + (uw ? Math.max(1, uw.day - (uw.dayOffset || 0)) : 1)} · ${this.uw ? STAGES[Math.min(6, (uw && uw.stageMax) || 0)].name : ''}` : 'No saved career yet';
+    $('continueSub').textContent = this.hasSave ? `Dirty ${fmtMoney(Money.dirtyTotal())} · Bank ${fmtMoney(Money.clean)} · ${uw && uw.jail ? 'in County Jail' : 'day ' + (uw ? Math.max(1, uw.day - (uw.dayOffset || 0)) : 1)} · ${this.uw ? STAGES[Math.min(6, (uw && uw.stageMax) || 0)].name : ''}` : 'No saved career yet';
     window.__pvBooted = true;
   }
   newGame() {
@@ -172,11 +173,11 @@ class Game {
       this.state = 'playing';
       if (this.uw.S.jail) this.uw.prison.enter(); else this.uw.ui.showJail(false);
       this.input.wantLock = !IS_TOUCH; this.relock();
-      this.ui.lastMoney = -1;
+      this.ui.lastMoney = -1; this.ui.lastBank = null;
       if (fresh) {
         this.ui.banner('Port Valen', 'Old Quarter \u00b7 $0 \u00b7 nobody knows your name', 'info', 3.5);
         this.later(1400, () => this.ui.toast(IS_TOUCH ? 'Left stick moves. Drag on the right to look around. PHONE opens your empire.' : 'WASD moves, mouse looks. Shift sprints, Space jumps. Tab opens your empire.'));
-        this.later(5200, () => this.ui.toast('Ideas: lift a wallet from behind (E), mug someone, break into a parked car, or sell a stolen one at the chop shop.'));
+        this.later(5200, () => this.ui.toast('Ideas: lift a wallet from behind (E), break into a parked car, or sell a stolen one at the chop shop.'));
         this.later(9000, () => this.content.phone('unknown', 'Heard you’re new and broke. Lucky’s Pawn on Ninth Street buys whatever falls into your pockets. No questions.'));
       } else {
         this.ui.toast(this.uw.S.jail ? 'You’re still inside. Serve your time or work the system.' : 'Back on the street.');
@@ -280,10 +281,8 @@ class Game {
   ach(id) { this.content.ach(id); }
   // a delayed call that is dropped if the player quits or starts a new career meanwhile
   later(ms, fn) { const s = this.session; setTimeout(() => { if (s === this.session && this.state !== 'menu' && this.state !== 'loading') fn(); }, ms); }
-  addMoney(n, earned) {
-    this.save.money = Math.max(0, this.save.money + n);
-    if (earned && n > 0) { this.save.stats.earned += n; this.audio.play('cash'); }
-  }
+  // income through the ledger, with the cash sound (n is the amount, src a MONEY_SOURCES tag)
+  earn(n, src, opts) { const got = Money.earn(n, src, opts); if (got > 0) this.audio.play('cash'); return got; }
   // ---------------- death / arrest ----------------
   onPlayerDeath(src) {
     if (this.mapOpen) this.ui.toggleMap(false);
@@ -295,8 +294,10 @@ class Game {
     this.player.state = 'dead'; this.player.pose.downDir = 1;
     this.slowT = 2;
     const go = $('gameover'); go.className = 'dead'; go.querySelector('.gt').textContent = 'Hospitalized';
-    const fee = Math.round(Math.min(1500, Math.max(100, Math.round(this.save.money * 0.1))) * (1 - (this.uw ? this.uw.props.perk('medic') : 0)));
-    go.querySelector('.gs').textContent = `Medical bills: ${fmtMoney(fee)}`;
+    // a Clean Bank bill (§45.17): a tenth of the bank, $100-$1,500; whatever the bank can't cover becomes medical debt
+    const fee = Math.round(Math.min(1500, Math.max(100, Math.round(Money.clean * 0.1))) * (1 - (this.uw ? this.uw.props.perk('medic') : 0)));
+    const owed = Math.max(0, fee - Money.clean);
+    go.querySelector('.gs').textContent = `Medical bills: ${fmtMoney(fee)}${owed > 0 ? ` · ${fmtMoney(owed)} goes on your tab (medical debt, paid from your bank later)` : ' from your bank'}`;
     const token = ++this.lifeToken;
     setTimeout(() => { if (token === this.lifeToken && this.state === 'dead') go.classList.remove('hidden'); }, 900);
     setTimeout(() => { if (token === this.lifeToken) this.respawn('hospital', fee); }, 4200);
@@ -366,7 +367,7 @@ class Game {
     this.fade(() => {
       if (token !== this.lifeToken || (this.state !== 'dead' && this.state !== 'busted')) return;
       $('gameover').classList.add('hidden');
-      this.addMoney(-fee);
+      if (fee > 0) Money.pay(fee, 'hospital');
       if (where === 'hospital' && this.uw) { const inv = this.uw.S.inv, before = goodsList(inv); const lost = Inv.lose(inv, 0.5); if (lost) this.later(1500, () => this.ui.toast(`You woke up lighter: half of what you carried (${before}) went missing at the hospital.`, 'warn')); }
       if (where === 'hospital') { this.player.vest = 0; this.save.vest = 0; }
       const sentenceNow = where === 'jail';
@@ -745,7 +746,7 @@ class Game {
     $('dbgTime').addEventListener('input', e => { this.env.timeScale = parseFloat(e.target.value); });
     document.querySelectorAll('#debug [data-w]').forEach(b => b.addEventListener('click', () => this.env.setWeather(b.dataset.w, true)));
     document.querySelectorAll('#debug [data-t]').forEach(b => b.addEventListener('click', () => { this.env.time = parseFloat(b.dataset.t); }));
-    $('dbgCash').addEventListener('click', () => this.addMoney(5000, false));
+    $('dbgCash').addEventListener('click', () => Money.earn(5000, 'debug'));
     $('dbgHeat').addEventListener('click', () => { if (this.state === 'playing') this.police.setLevel(Math.min(5, this.police.level + 1)); });
     $('dbgClear').addEventListener('click', () => this.police.clear('Heat cleared (debug).'));
     $('dbgCar').addEventListener('click', () => { const p = this.player; const v = this.vehicles.spawn(pick(Object.keys(VEHICLES)), p.pos.x + Math.sin(p.h) * 5, p.pos.z + Math.cos(p.h) * 5, p.h + Math.PI / 2, { parked: true }); v.touched = true; });

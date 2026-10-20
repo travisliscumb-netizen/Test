@@ -144,9 +144,13 @@ class Prison {
     const uw = this.uw, S = this.S, g = uw.g, p = g.player;
     const pend = this.pending || { ch: this.charges(), veh: null }; this.pending = null;
     const ch = pend.ch;
-    // confiscation: everything carried, the trunk of the car you were in, every firearm
+    // confiscation: everything carried, the trunk of the car you were in, every firearm, and the Dirty Cash on you
+    // and in that car (§2). Cash in stashes and vaults, and the bank, are not touched by an ordinary arrest.
     S.st.seized += units(S.inv); Inv.clear(S.inv);
     const v = pend.veh;
+    const cash = Money.seize(v && g.vehicles.list.includes(v) ? v : null);
+    S.st.seizedCash = (S.st.seizedCash || 0) + cash;
+    if (cash > 0) uw.news('pv', `The police took ${fmtMoney(cash)} in cash from you and the car. Whatever you stashed is still where you left it.`);
     if (v && g.vehicles.list.includes(v)) {
       if (v.trunk) Inv.clear(v.trunk);
       if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { if (e.trunk) Inv.clear(e.trunk); e.dmg = Math.max(e.dmg, 100 - v.health); } uw.news('pv', `Your ${v.spec.name} was impounded and released to your garage. The trunk was searched.`); }
@@ -173,6 +177,8 @@ class Prison {
       // v6: good-behaviour points and the speed chosen; time off (lawyers, paperwork, good time) never takes the
       // sentence under half of what it started at; the smuggled phone (if a guard brings one) is for this sentence only
       gbp: 0, speed: 1, floor: Math.max(2, Math.ceil(ch.total * 0.5)), phone: false, lastPhone: -99, lastRelease: -99, chores: 0,
+      // the jail commissary account: prison wages and the dice table, kept apart from street money (§45.18)
+      commissary: 0,
       charges: ch.lines.map(l => `${l[0]}: ${fmtSentence(l[1])}`).join(' · ') + (ch.mul > 1.01 ? ` · ×${ch.mul.toFixed(2)} record & pressure` : ch.mul < 0.99 ? ` · ×${ch.mul.toFixed(2)} (friends at the precinct)` : '') + (ch.full ? ` · halved: ${fmtSentence(ch.full)} → ${fmtSentence(ch.total)}` : '')
     };
   }
@@ -182,6 +188,7 @@ class Prison {
     j.total = Math.floor(num(j.total, 30, 1, 36500));
     j.served = num(j.served, 0, 0, j.total);
     for (const k of ['credit', 'standing', 'susp', 'intel', 'workouts', 'escapes', 'streetAcc', 'call', 'chores']) j[k] = num(j[k], d[k], 0, 1e6);
+    j.commissary = Math.floor(num(j.commissary, 0, 0, 1e6));
     for (const k of ['lastJob', 'lastBribe', 'lastStudy', 'lastLawyer', 'lockUntil', 'lastPhone', 'lastRelease']) j[k] = num(j[k], d[k], -999, 1e6);
     j.gbp = clamp(num(j.gbp, 0, 0, GBP_MAX), 0, GBP_MAX);
     j.speed = JAIL_SPEEDS.some(sp => sp.x === j.speed) ? j.speed : 1;
@@ -477,13 +484,13 @@ class Prison {
   openLawyer() {
     const uw = this.uw, g = uw.g, j = this.j;
     const wait = Math.max(0, 30 - (j.served - j.lastLawyer));
-    const render = () => `<div class="hint">Your case: ${esc(j.charges || '—')}</div><div class="hint">Remaining: <b>${fmtSentence(this.left)}</b> · Cash <b class="money">${fmtMoney(g.save.money)}</b>${wait ? ` · next hearing in ${fmtSentence(wait)}` : ''}</div>
-      <div class="jobs">${this.lawyerTiers().map(t => { const used = j.lawyers.includes(t.id), odds = this.caseOdds(t.base); return `<div class="job"><div style="flex:1"><b>${t.name}</b><span>${t.desc} · cuts ${Math.round(t.cut[0] * 100)}–${Math.round(t.cut[1] * 100)}% off what’s left · about ${Math.round(odds * 100)}% chance with your case</span></div><button class="sbtn ${used ? '' : 'gold'}" data-act="hire:${t.id}" ${used || wait || this.left < 4 || g.save.money < t.fee ? 'disabled' : ''}>${used ? 'Used' : fmtMoney(t.fee)}</button></div>`; }).join('')}</div>
+    const render = () => `<div class="hint">Your case: ${esc(j.charges || '—')}</div><div class="hint">Remaining: <b>${fmtSentence(this.left)}</b> · ${Money.html('lawyer')}${wait ? ` · next hearing in ${fmtSentence(wait)}` : ''}</div>
+      <div class="jobs">${this.lawyerTiers().map(t => { const used = j.lawyers.includes(t.id), odds = this.caseOdds(t.base); return `<div class="job"><div style="flex:1"><b>${t.name}</b><span>${t.desc} · cuts ${Math.round(t.cut[0] * 100)}–${Math.round(t.cut[1] * 100)}% off what’s left · about ${Math.round(odds * 100)}% chance with your case</span></div><button class="sbtn ${used ? '' : 'gold'}" data-act="hire:${t.id}" ${used || wait || this.left < 4 || !Money.can(t.fee, 'lawyer') ? 'disabled' : ''}>${used ? 'Used' : fmtMoney(t.fee)}</button></div>`; }).join('')}</div>
       <div class="hint">A lawyer is paid whether the appeal works or not. Each firm takes your case once per sentence. No appeal takes the sentence under ${fmtSentence(j.floor || 1)} (half of what you were given).</div>`;
     g.content.openSvc('Visitation booth', 'Lawyers', render, a => {
       const t = this.lawyerTiers().find(x => 'hire:' + x.id === a); if (!t) return;
-      if (j.lawyers.includes(t.id) || this.left < 4 || g.save.money < t.fee || Math.max(0, 30 - (j.served - j.lastLawyer)) > 0) return;
-      g.content.spend(t.fee); j.lawyers.push(t.id); j.lastLawyer = j.served; if (t.id === 'firm' || t.id === 'silk') j.appealed = true;
+      if (j.lawyers.includes(t.id) || this.left < 4 || !Money.can(t.fee, 'lawyer') || Math.max(0, 30 - (j.served - j.lastLawyer)) > 0) return;
+      Money.pay(t.fee, 'lawyer'); j.lawyers.push(t.id); j.lastLawyer = j.served; if (t.id === 'firm' || t.id === 'silk') j.appealed = true;
       const ok = Math.random() < this.caseOdds(t.base);
       if (ok) { const left = this.left, cut = this.cutDays(Math.ceil(left * rand(t.cut[0], t.cut[1]))); g.audio.play('pass'); g.content.refreshSvc(`Appeal granted. ${fmtSentence(cut)} off. ${fmtSentence(this.left)} to go.`); g.ui.banner('Appeal granted', `−${fmtSentence(cut)}`, 'pass', 2.5); }
       else { g.audio.play('deny'); g.content.refreshSvc(pick(['The judge didn’t buy it. The fee stays paid.', 'Appeal denied on every count.', 'Your lawyer “did everything possible”. The sentence stands.'])); }
@@ -518,19 +525,19 @@ class Prison {
       const bwait = Math.max(0, 10 - (j.served - j.lastBribe)), swait = Math.max(0, 5 - (j.served - j.lastStudy)), rwait = Math.max(0, 7 - (j.served - j.lastRelease)), lock = this.locked();
       const o1 = this.bribeOdds('perk'), o2 = this.bribeOdds('paper'), o3 = this.bribeOdds('phone'), base = this.releaseBase(), ro = this.releaseOdds(this._offer);
       const mults = [0.5, 1, 2, 4, 8].map(m => Math.round(base * m / 1000) * 1000);
-      return `<div class="hint">Suspicion <b style="color:${j.susp > 60 ? 'var(--red)' : 'var(--text)'}">${Math.round(j.susp)}</b> / 100 · Cash <b class="money">${fmtMoney(g.save.money)}</b> · ${fmtSentence(this.left)} left${bwait ? ` · no small favours for ${fmtSentence(bwait)}` : ''}</div>
+      return `<div class="hint">Suspicion <b style="color:${j.susp > 60 ? 'var(--red)' : 'var(--text)'}">${Math.round(j.susp)}</b> / 100 · ${Money.html('jailBribe')} <small>(your crew brings it in)</small> · ${fmtSentence(this.left)} left${bwait ? ` · no small favours for ${fmtSentence(bwait)}` : ''}</div>
       <div class="jobs">
-      <div class="job"><div style="flex:1"><b>Slip him $500</b><span>Privileges: the payphone whenever you want it this month, and nobody looks in your bunk. ${odds(o1)}</span></div><button class="sbtn gold" data-act="perk" ${bwait || lock || g.save.money < 500 ? 'disabled' : ''}>$500</button></div>
-      <div class="job"><div style="flex:1"><b>Lose some paperwork</b><span>15% of what’s left disappears from your file. ${odds(o2)}</span></div><button class="sbtn gold" data-act="paper" ${bwait || lock || j.bribed || this.left < 8 || g.save.money < paperFee ? 'disabled' : ''}>${j.bribed ? 'Done' : fmtMoney(paperFee)}</button></div>
-      <div class="job"><div style="flex:1"><b>Smuggle in a phone</b><span>Your empire, the map and your crew from the cell, until you’re out. It goes with the sentence. ${j.phone ? '<b style="color:var(--green)">You have one.</b>' : odds(o3) + ' (caught: more time, lockdown, −25 good behaviour; you lose the money)'}</span></div><button class="sbtn gold" data-act="phone" ${j.phone || bwait || lock || g.save.money < phoneFee ? 'disabled' : ''}>${j.phone ? 'Have one' : fmtMoney(phoneFee)}</button></div>
+      <div class="job"><div style="flex:1"><b>Slip him $500</b><span>Privileges: the payphone whenever you want it this month, and nobody looks in your bunk. ${odds(o1)}</span></div><button class="sbtn gold" data-act="perk" ${bwait || lock || !Money.can(500, 'jailBribe') ? 'disabled' : ''}>$500</button></div>
+      <div class="job"><div style="flex:1"><b>Lose some paperwork</b><span>15% of what’s left disappears from your file. ${odds(o2)}</span></div><button class="sbtn gold" data-act="paper" ${bwait || lock || j.bribed || this.left < 8 || !Money.can(paperFee, 'jailBribe') ? 'disabled' : ''}>${j.bribed ? 'Done' : fmtMoney(paperFee)}</button></div>
+      <div class="job"><div style="flex:1"><b>Smuggle in a phone</b><span>Your empire, the map and your crew from the cell, until you’re out. It goes with the sentence. ${j.phone ? '<b style="color:var(--green)">You have one.</b>' : odds(o3) + ' (caught: more time, lockdown, −25 good behaviour; you lose the money)'}</span></div><button class="sbtn gold" data-act="phone" ${j.phone || bwait || lock || !Money.can(phoneFee, 'jailBribe') ? 'disabled' : ''}>${j.phone ? 'Have one' : fmtMoney(phoneFee)}</button></div>
       <div class="job"><div style="flex:1"><b>Watch the night rota</b><span>Stand around and learn when the night guard walks (${j.intel}/2 known). Raises suspicion a little.</span></div><button class="sbtn" data-act="study" ${swait || j.intel >= 2 ? 'disabled' : ''}>${j.intel >= 2 ? 'Known' : swait ? 'In ' + fmtSentence(swait) : 'Watch'}</button></div>
       </div>
       <h3>Walk out today</h3>
       <div class="hint">Make Officer Bright an offer to lose you on the next transfer. The going rate for ${fmtSentence(this.left)} is about <b>${fmtMoney(base)}</b>; more money buys better odds. A refusal costs nothing. If it goes wrong he takes half the offer as “evidence”, you keep the other half, and a judge adds ${fmtSentence(this.releaseBackfireDays())}.</div>
-      <div class="btns">${mults.map(v => `<button class="sbtn${this._offer === v ? ' gold' : ''}" data-act="offer:${v}" ${g.save.money < v ? 'disabled' : ''}>$${fmtShort(v)}</button>`).join('')}</div>
+      <div class="btns">${mults.map(v => `<button class="sbtn${this._offer === v ? ' gold' : ''}" data-act="offer:${v}" ${!Money.can(v, 'jailBribe') ? 'disabled' : ''}>$${fmtShort(v)}</button>`).join('')}</div>
       <div class="wq wc" style="max-width:420px;margin:0 auto"><input id="wagerIn" class="wagerIn" type="text" inputmode="decimal" autocomplete="off" placeholder="Other amount, e.g. 750k" aria-label="Offer amount"><button class="sbtn gold" data-act="offer:custom">SET</button></div>
       <div class="stats"><span>Your offer</span><span><b class="money">${fmtMoney(this._offer)}</b></span><span>Walk out</span><span><b style="color:var(--green)">${Math.round(ro.ok * 100)}%</b></span><span>He says no (no cost)</span><span>${Math.round(ro.refuse * 100)}%</span><span>It goes wrong</span><span style="color:var(--red)">${Math.round(ro.back * 100)}% · −${fmtMoney(Math.ceil(this._offer / 2))}, +${fmtSentence(this.releaseBackfireDays())}</span></div>
-      <div class="btns big"><button class="sbtn danger" data-act="release" ${rwait || lock || g.save.money < this._offer || this._offer < 1000 ? 'disabled' : ''}>${rwait ? `Try again in ${fmtSentence(rwait)}` : lock ? 'Not during lockdown' : 'MAKE THE OFFER · ' + fmtMoney(this._offer)}</button></div>`;
+      <div class="btns big"><button class="sbtn danger" data-act="release" ${rwait || lock || !Money.can(this._offer, 'jailBribe') || this._offer < 1000 ? 'disabled' : ''}>${rwait ? `Try again in ${fmtSentence(rwait)}` : lock ? 'Not during lockdown' : 'MAKE THE OFFER · ' + fmtMoney(this._offer)}</button></div>`;
     };
     g.content.openSvc('Guard post', 'Officer Bright, nights and weekends', render, a => {
       const [k, v] = a.split(':');
@@ -545,17 +552,17 @@ class Prison {
       if (Math.max(0, 10 - (j.served - j.lastBribe)) > 0 || this.locked()) return;
       const kind = a === 'paper' ? 'paper' : a === 'phone' ? 'phone' : a === 'perk' ? 'perk' : null; if (!kind) return;
       const fee = kind === 'paper' ? paperFee : kind === 'phone' ? phoneFee : 500;
-      if (g.save.money < fee || (kind === 'paper' && (j.bribed || this.left < 8)) || (kind === 'phone' && j.phone)) return;
+      if (!Money.can(fee, 'jailBribe') || (kind === 'paper' && (j.bribed || this.left < 8)) || (kind === 'phone' && j.phone)) return;
       j.lastBribe = j.served; if (kind === 'phone') j.lastPhone = j.served;
       const o = this.bribeOdds(kind), r = Math.random();
       if (r < o.ok) {
-        g.content.spend(fee); g.audio.play('cash');
+        Money.pay(fee, 'jailBribe'); g.audio.play('cash');
         if (kind === 'paper') { const cut = this.cutDays(Math.ceil(this.left * 0.15)); j.bribed = true; g.content.refreshSvc(`Funny. Your file seems to be missing a page. −${fmtSentence(cut)}.`); }
         else if (kind === 'phone') { j.phone = true; g.audio.play('pickup'); g.content.refreshSvc('Next morning there is a phone in your laundry, charged. Keep it out of sight. It goes back in the bin the day you walk out.'); this.uw.ui.updateJail(true); }
         else { j.call = 0; this.callT = 0; j.susp = Math.max(0, j.susp - 15); g.content.refreshSvc('He pockets it. The payphone is yours whenever, and your bunk stays unsearched.'); }
       } else if (r < o.ok + o.refuse) { g.audio.play('deny'); j.susp = clamp(j.susp + 8, 0, 100); g.content.refreshSvc('He looks at the money, then at you. “Put that away.” Nothing lost but face.'); }
       else {
-        g.content.spend(fee); g.audio.play('wanted');
+        Money.pay(fee, 'jailBribe'); g.audio.play('wanted');
         const add = kind === 'phone' ? Math.max(5, Math.round(this.left * 0.1)) : Math.max(10, Math.round(this.left * 0.1)); j.total += add; j.susp = clamp(j.susp + 35, 0, 100); j.lockUntil = j.served + (kind === 'phone' ? 3 : 5); j.standing = clamp(j.standing - 5, 0, 100);
         this.misbehave(kind === 'phone' ? 25 : 15, kind === 'phone' ? 'Caught with contraband' : 'Bribing an officer');
         g.content.refreshSvc(kind === 'phone' ? `A shakedown the same night. The phone is evidence, the money is gone: +${fmtSentence(add)} and lockdown.` : `It was a setup. Bribing an officer: +${fmtSentence(add)}, five days of lockdown, and the money’s evidence now.`);
@@ -568,18 +575,18 @@ class Prison {
   releaseBribe(offer, rnd = Math.random) {
     const uw = this.uw, g = uw.g, j = this.j; if (!j) return null;
     offer = Math.floor(offer);
-    if (!(offer >= 1000) || g.save.money < offer || this.locked() || Math.max(0, 7 - (j.served - j.lastRelease)) > 0) return null;
+    if (!(offer >= 1000) || !Money.can(offer, 'jailBribe') || this.locked() || Math.max(0, 7 - (j.served - j.lastRelease)) > 0) return null;
     j.lastRelease = j.served;
     const o = this.releaseOdds(offer), r = rnd();
     if (r < o.ok) {
-      g.content.spend(offer); g.audio.play('cash');
+      Money.pay(offer, 'jailBribe'); g.audio.play('cash');
       g.ui.back(); uw.news('pv', `${fmtMoney(offer)} well spent. Officer Bright “lost” you on a transfer.`);
       this.release('bribe');
       return 'release';
     }
     if (r < o.ok + o.refuse) { g.audio.play('deny'); j.susp = clamp(j.susp + 5, 0, 100); g.content.refreshSvc('“I didn’t hear that.” He walks off. Your money is still yours.'); return 'refuse'; }
     const half = Math.ceil(offer / 2), add = this.releaseBackfireDays();
-    g.content.spend(half); g.audio.play('wanted');
+    Money.pay(half, 'jailBribe'); g.audio.play('wanted');
     j.total += add; j.susp = clamp(j.susp + 30, 0, 100); j.lockUntil = j.served + 3; j.standing = clamp(j.standing - 5, 0, 100);
     this.misbehave(30, 'Attempted bribery');
     g.content.refreshSvc(`He took the money and called it in. ${fmtMoney(half)} is evidence now (you kept ${fmtMoney(offer - half)}): +${fmtSentence(add)} and three days of lockdown.`);
@@ -590,12 +597,12 @@ class Prison {
   openSmokey() {
     const uw = this.uw, g = uw.g, S = this.S, j = this.j;
     void S;
-    const render = () => `<div class="hint">Cash <b class="money">${fmtMoney(g.save.money)}</b> · “Phones? Not since the shakedown. You want a phone, you talk to a guard, and you better pick the right one.”</div><div class="jobs">
-      <div class="job"><div style="flex:1"><b>A screwdriver, filed down</b><span>Fits the screws on a maintenance grate. Don’t get caught with it.</span></div><button class="sbtn gold" data-act="tool" ${j.tool || g.save.money < 1500 ? 'disabled' : ''}>${j.tool ? 'Have one' : '$1,500'}</button></div>
-      <div class="job"><div style="flex:1"><b>Cartons for the block</b><span>Hand out smokes: +10 standing with everyone.</span></div><button class="sbtn" data-act="smokes" ${g.save.money < 200 ? 'disabled' : ''}>$200</button></div></div>`;
+    const render = () => `<div class="hint">${Money.html('contraband')} <small>(paid from your stash outside)</small> · “Phones? Not since the shakedown. You want a phone, you talk to a guard, and you better pick the right one.”</div><div class="jobs">
+      <div class="job"><div style="flex:1"><b>A screwdriver, filed down</b><span>Fits the screws on a maintenance grate. Don’t get caught with it.</span></div><button class="sbtn gold" data-act="tool" ${j.tool || !Money.can(1500, 'contraband') ? 'disabled' : ''}>${j.tool ? 'Have one' : '$1,500'}</button></div>
+      <div class="job"><div style="flex:1"><b>Cartons for the block</b><span>Hand out smokes: +10 standing with everyone.</span></div><button class="sbtn" data-act="smokes" ${!Money.can(200, 'contraband') ? 'disabled' : ''}>$200</button></div></div>`;
     g.content.openSvc('Smokey', 'Contraband', render, a => {
-      if (a === 'tool' && !j.tool && g.save.money >= 1500) { g.content.spend(1500); j.tool = true; j.susp = clamp(j.susp + 5, 0, 100); g.audio.play('pickup'); g.content.refreshSvc('In your sock. Don’t sit funny.'); }
-      if (a === 'smokes' && g.save.money >= 200) { g.content.spend(200); j.standing = clamp(j.standing + 10, 0, 100); g.audio.play('cash'); g.content.refreshSvc('Word gets around that you’re good people.'); }
+      if (a === 'tool' && !j.tool && Money.pay(1500, 'contraband')) { j.tool = true; j.susp = clamp(j.susp + 5, 0, 100); g.audio.play('pickup'); g.content.refreshSvc('In your sock. Don’t sit funny.'); }
+      if (a === 'smokes' && Money.pay(200, 'contraband')) { j.standing = clamp(j.standing + 10, 0, 100); g.audio.play('cash'); g.content.refreshSvc('Word gets around that you’re good people.'); }
     });
   }
   // ---- prison work: a shift is a few seconds of standing at the board; pays commissary money, earns
@@ -612,7 +619,8 @@ class Prison {
       g.ui.back();
       g.content.channel(a === 'laundry' ? 'LAUNDRY SHIFT' : a === 'kitchen' ? 'KITCHEN SHIFT' : 'MOPPING THE BLOCK', 6, () => {
         j.lastJob = j.served;
-        const pay = a === 'kitchen' ? randi(25, 45) : randi(15, 30); g.addMoney(pay, true);
+        // wages go on your commissary account, not into street money (§24, §45.18)
+        const pay = a === 'kitchen' ? randi(25, 45) : randi(15, 30); j.commissary = (j.commissary || 0) + pay; g.audio.play('cash');
         const off = Math.random() < (a === 'clean' ? 0.75 : 0.55) ? this.earnCredit(1) : 0;
         j.standing = clamp(j.standing + (a === 'kitchen' ? 3 : 2), 0, 100);
         if (a === 'clean') j.susp = Math.max(0, j.susp - 6);
@@ -629,16 +637,16 @@ class Prison {
     const uw = this.uw, g = uw.g, j = this.j;
     this._dice = this._dice || null;
     const d = this._dice;
-    const render = () => `<div class="hint">High dice: you and Shorty roll two each. Higher total wins even money; a tie is his. Cash <b class="money">${fmtMoney(g.save.money)}</b></div>
+    const render = () => `<div class="hint">High dice: you and Shorty roll two each. Higher total wins even money; a tie is his. Commissary <b class="money">${fmtMoney(j.commissary || 0)}</b></div>
       ${d ? `<div class="card"><div class="t">You ${d.a.join(' + ')} = <b>${d.a[0] + d.a[1]}</b> · Shorty ${d.b.join(' + ')} = <b>${d.b[0] + d.b[1]}</b></div><div class="d" style="color:${d.win ? 'var(--green)' : 'var(--red)'}">${d.win ? 'You win ' + fmtMoney(d.bet) : 'You lose ' + fmtMoney(d.bet)}</div></div>` : ''}
-      <div class="btns">${[20, 100, 500].map(b => `<button class="sbtn gold" data-act="bet:${b}" ${g.save.money < b ? 'disabled' : ''}>Bet ${fmtMoney(b)}</button>`).join('')}</div>`;
+      <div class="btns">${[20, 100, 500].map(b => `<button class="sbtn gold" data-act="bet:${b}" ${(j.commissary || 0) < b ? 'disabled' : ''}>Bet ${fmtMoney(b)}</button>`).join('')}</div>`;
     g.content.openSvc('Cards & dice', 'The middle table', render, a => {
-      const bet = +a.split(':')[1]; if (!(bet > 0) || g.save.money < bet) return;
+      const bet = +a.split(':')[1]; if (!(bet > 0) || (j.commissary || 0) < bet) return;
       const r6 = () => 1 + Math.floor(Math.random() * 6), A = [r6(), r6()], B = [r6(), r6()], win = A[0] + A[1] > B[0] + B[1];
-      if (win) g.addMoney(bet, true); else g.content.spend(bet);
+      j.commissary = (j.commissary || 0) + (win ? bet : -bet); // jail gambling is on the commissary account (§45.18)
       this._dice = { a: A, b: B, win, bet }; j.standing = clamp(j.standing + 1, 0, 100);
       g.audio.play(win ? 'cash' : 'ui');
-      g.content._svcRender = () => { const dd = this._dice; return render.call(null).replace(/^/, '') && `<div class="hint">High dice: you and Shorty roll two each. Higher total wins even money; a tie is his. Cash <b class="money">${fmtMoney(g.save.money)}</b></div><div class="card"><div class="t">You ${dd.a.join(' + ')} = <b>${dd.a[0] + dd.a[1]}</b> · Shorty ${dd.b.join(' + ')} = <b>${dd.b[0] + dd.b[1]}</b></div><div class="d" style="color:${dd.win ? 'var(--green)' : 'var(--red)'}">${dd.win ? 'You win ' + fmtMoney(dd.bet) : 'You lose ' + fmtMoney(dd.bet)}</div></div><div class="btns">${[20, 100, 500].map(b => `<button class="sbtn gold" data-act="bet:${b}" ${g.save.money < b ? 'disabled' : ''}>Bet ${fmtMoney(b)}</button>`).join('')}</div>`; };
+      g.content._svcRender = () => { const dd = this._dice; return render.call(null).replace(/^/, '') && `<div class="hint">High dice: you and Shorty roll two each. Higher total wins even money; a tie is his. Commissary <b class="money">${fmtMoney(j.commissary || 0)}</b></div><div class="card"><div class="t">You ${dd.a.join(' + ')} = <b>${dd.a[0] + dd.a[1]}</b> · Shorty ${dd.b.join(' + ')} = <b>${dd.b[0] + dd.b[1]}</b></div><div class="d" style="color:${dd.win ? 'var(--green)' : 'var(--red)'}">${dd.win ? 'You win ' + fmtMoney(dd.bet) : 'You lose ' + fmtMoney(dd.bet)}</div></div><div class="btns">${[20, 100, 500].map(b => `<button class="sbtn gold" data-act="bet:${b}" ${(j.commissary || 0) < b ? 'disabled' : ''}>Bet ${fmtMoney(b)}</button>`).join('')}</div>`; };
       g.content.refreshSvc();
     });
   }

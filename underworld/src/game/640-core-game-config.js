@@ -13,7 +13,7 @@ const GAME_CONFIG = Object.freeze({
   police: { heatLevels: HEAT_LEVELS, crimes: CRIMES, unitsPerLevel: UNITS_PER_LEVEL },
   vehicles: { specs: VEHICLES, civilianMix: CIVIL_TYPES },
   props: PROP_DEFS,
-  economy: { upgrades: UPGRADES, arms: ARMS, dealer: DEALER, tuning: TUNE, tuningRep: TUNE_REP, store: STORE_ITEMS, reputation: REP_LEVELS },
+  economy: { upgrades: UPGRADES, dealer: DEALER, money: MONEY_SOURCES, stuntDailyCap: STUNT_DAILY_CAP, medicalDebtCap: MEDICAL_DEBT_CAP, tuning: TUNE, tuningRep: TUNE_REP, store: STORE_ITEMS, reputation: REP_LEVELS },
   underworld: { goods: GOODS, tiers: TIERS, demand: DEMAND, nightDemand: NIGHT_DEMAND, turfNames: TURF_NAMES, factions: FACTIONS, startOwner: START_OWNER, stages: STAGES,
     properties: PROPS, spots: SPOTS, hqs: HQS, chopValue: CHOP_VALUE, trunkCap: CARGO_LB, cargoLb: CARGO_LB, goodClb: GOOD_CLB, crewRoles: CREW_ROLES, ranks: RANKS, promoCost: PROMO_COST, traits: TRAITS,
     officers: OFFICERS, jailSecPerDay: JAIL_SEC_PER_DAY, jailStreetRatio: JAIL_STREET_RATIO, jailSpeeds: JAIL_SPEEDS, sentenceFactor: SENTENCE_FACTOR, chorePts: CHORE_PTS, sentenceBase: SENTENCE_BASE, sentenceMax: SENTENCE_MAX, inmates: INMATES, crimeDays: CRIME_DAYS, crimePressure: CRIME_PRESSURE },

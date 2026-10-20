@@ -184,7 +184,7 @@ class MissionManager {
   start(spec) {
     const g = this.g;
     if (spec.locked) { g.ui.toast(spec.locked, 'warn'); g.audio.play('deny'); return; }
-    if (spec.fee) { if (g.save.money < spec.fee) { g.ui.toast(`The buy-in is ${fmtMoney(spec.fee)}.`, 'warn'); g.audio.play('deny'); return; } g.content.spend(spec.fee); }
+    if (spec.fee) { if (!Money.pay(spec.fee, 'raceBuyIn')) { g.ui.toast(`The buy-in is ${fmtMoney(spec.fee)} in cash.`, 'warn'); g.audio.play('deny'); return; } }
     if (g.player.interior && spec.type !== 'story') { g.ui.toast('Step outside first.', 'warn'); return; }
     this.offer = null; g.ui.hideOffer();
     if (g.events) g.events.clear();
@@ -229,7 +229,8 @@ class MissionManager {
       if (!best || used < best) { g.save.best[s.type] = used; if (best) extra = ' · NEW RECORD'; }
     }
     const pay = Math.max(0, s.reward + (m.bonus || 0));
-    g.addMoney(pay, true);
+    // contracts are criminal work: Dirty Cash in hand; an illegal street race pays Dirty too (§45.18)
+    g.earn(pay, s.type === 'race' ? 'streetRace' : 'contract');
     this.lastFailed = null;
     g.save.missionsCompleted++; g.save.stats.missionsPassed++;
     g.audio.play('pass');

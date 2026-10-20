@@ -44,9 +44,9 @@ const lift = await ev(() => {
   const g = window.game, uw = g.uw, P = window.__pv;
   const toasts = []; const T = g.ui.toast.bind(g.ui); g.ui.toast = (m, t) => { toasts.push(m); return T(m, t); };
   const R = Math.random; Math.random = () => 0.01; // they never feel it
-  const m0 = g.save.money, q = { id: 4242, x: 7 * 80 + 40, z: 4 * 80 + 40, h: 0, state: 'walk' };
+  const m0 = g.money.total(), q = { id: 4242, x: 7 * 80 + 40, z: 4 * 80 + 40, h: 0, state: 'walk' };
   try { uw.pickpocket(q); } finally { Math.random = R; g.ui.toast = T; }
-  return { got: g.save.money - m0, toast: toasts.join(' | '), best: uw.S.st.bestPick, picks: uw.S.st.picks, picked: q.picked };
+  return { got: g.money.total() - m0, toast: toasts.join(' | '), best: uw.S.st.bestPick, picks: uw.S.st.picks, picked: q.picked };
 });
 check('a lift pays out, says from whom, and counts', lift.got > 0 && /^Lifted \$[\d,]+.* from (a|an) /.test(lift.toast) && lift.best >= lift.got && lift.picks >= 1 && lift.picked, JSON.stringify(lift));
 
