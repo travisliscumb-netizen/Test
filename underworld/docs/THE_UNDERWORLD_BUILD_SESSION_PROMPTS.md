@@ -43,6 +43,10 @@ At the end:
 
 ---
 
+## SESSION 0.5 — SOURCE MODULE SPLIT (added by owner amendment §45.3)
+
+Split the single-file source into maintainable source modules with a build step that produces the deployable game. Behavior-preserving only: run the complete existing regression suite before and after, compare behavior and performance against the original build, and do not combine any gameplay change with the split. Leave a clean commit.
+
 ## SESSION 1 — SAVE SCHEMA + MONEY FOUNDATION
 
 Work only on the new save foundation and money architecture: Dirty Cash, Clean Bank, cash stored by location, transaction APIs/source tagging, arrest seizure rules, and safe development migration. Find and eliminate hidden writes to the old single-money state. Do not rebalance all payouts yet.

@@ -27,7 +27,7 @@ search by the quoted name if a line has moved.
   drew the dependency graph (Appendix D), listed save breakpoints (Appendix E), regression hotspots and the tests
   each risky refactor needs (Appendix F), hidden coupling (Appendix G), and started the deprecation list
   (Appendix H) and schema changelog (Appendix I).
-- Raised 16 DESIGN CHALLENGES (below). Five are IMPORTANT (DC-01 to DC-05); DC-02, DC-03 and DC-04 shape the
+- Raised 16 DESIGN CHALLENGES (below; DC-17 and DC-18 were added after the owner's review). Five are IMPORTANT (DC-01 to DC-05); DC-02, DC-03 and DC-04 shape the
   Session 1-2 work.
 - Added one test scaffold: `underworld/tests/static-money.mjs` (Node, no browser). It inventories money access
   by function and fails if a direct `save.money` write appears outside today's allowlist. Session 1 shrinks the
@@ -96,6 +96,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-01 · Casino is a guaranteed money printer, and its winnings become Clean Bank — IMPORTANT
 
+**Disposition (owner):** ACCEPTED as §45.4. Ordinary casino economics with a modest house edge for routine play; the huge progressive, the $10,000 qualifying wager, the anti-drought system and career-changing jackpots stay. Session 9.
+
 1. **Current specification:** §25: casino winnings are Clean Bank; gambling is optional acceleration; big wins
    genuinely help; "do not secretly punish the player for luck". Session 13: "no safe repeatable loop dominates
    everything". §25 also says a $10,000 max bet qualifies for the progressive.
@@ -120,6 +122,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-02 · Dirty Cash → casino chips → Clean winnings is an unlimited instant laundromat — IMPORTANT (contradiction)
 
+**Disposition (owner):** ACCEPTED as §45.5. Wagers, chips and lottery purchases are Clean Bank only; winnings are Clean Bank; no Dirty route through the casino. The ledger's payment policy must express "Clean only" (Session 1).
+
 1. **Current specification:** §2 "No unlimited instant laundering"; §25 "Casino winnings are Clean Bank". The spec
    doesn't say what currency buys chips.
 2. **Problem observed:** if chips (or scratch cards, $1M grand prize on a $100 card) can be bought with Dirty Cash
@@ -135,6 +139,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** Session 1 (the payment-policy API must express "Clean only" / "Dirty capped"), Session 9.
 
 ### DC-03 · First-clean-dollar bootstrap can soft-lock laundering — IMPORTANT (circular requirement)
+
+**Disposition (owner):** ACCEPTED as §45.6. An early, low-capacity laundering fixer at ~30–35%; proper fronts supersede it. Dirty-purchasable starter fronts were not adopted (the fixer alone breaks the circle).
 
 1. **Current specification:** major legitimate assets use Clean Bank (§2); laundering needs a front business
    (§2, §26); legal fees use Clean Bank (§24).
@@ -155,6 +161,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-04 · "Money can't buy influence" contradicts "influence comes from businesses" — IMPORTANT (contradiction)
 
+**Disposition (owner):** ACCEPTED as §45.7. No instant Influence or Rank from buying a business; gradual Influence once it is operating and established. Session 2.
+
 1. **Current specification:** §1 money does not buy Rank, Rep, turf, contacts, loyalty or political influence,
    but a rich player may buy any legitimate asset. §30 influence comes from empire position, turf, **businesses**,
    crew, contacts and corruption.
@@ -171,6 +179,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** Session 2.
 
 ### DC-05 · Jail fast-forward plus unified world time turns arrest into an income time-machine — IMPORTANT
+
+**Disposition (owner):** ACCEPTED as §45.8, with the owner's mechanism: 1:1 world time stays; managed legitimate businesses can stay strong, unmanaged operations decline, criminal logistics/distribution suffer substantially without Lieutenants or appropriate crew. Sessions 3/8/9.
 
 1. **Current specification:** §24: every jail day equals an outside day; businesses earn and crew keep working;
    speeds 1×/3×/5×/7×. Gym benefits are capped "to prevent arrest farming".
@@ -189,6 +199,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-06 · Player-configurable day length scales the whole economy — RECOMMENDED
 
+**Disposition (owner):** ACCEPTED as §45.9. Economic simulation decoupled/normalized from the day-length setting. Owning session: Session 1 defines the world clock the ledger and laundering use; per-day income normalization lands with each income system (Sessions 3, 9) and is verified in Session 13.
+
 1. **Current specification:** §33 time of day matters; everything persistent is world-time based (§25, §35).
 2. **Problem observed:** Settings › Day length is 4-60 real minutes (`settings.dayLength`, index.html:42014,
    33201). Business income, wages, royalties, laundering and the progressive are per world day, so a 4-minute day
@@ -201,6 +213,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** Session 13 (no impact on Session 1 if the ledger is world-time agnostic).
 
 ### DC-07 · "5 in-game minutes" threat timer is ~6 real seconds — RECOMMENDED (unit contradiction)
+
+**Disposition (owner):** ACCEPTED as §45.10. Real-time timer: ~2 min to THREAT IMMINENT, then ~60 s to execution, independent of world-clock speed. Session 4.
 
 1. **Current specification:** §10: an unopened threat warning escalates after about 5 in-game minutes. §9 raid
    windows of 4.5 / 7-10 minutes give no unit.
@@ -215,6 +229,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** Session 4.
 
 ### DC-08 · Dirty Cash has no physical form — RECOMMENDED (owner decision)
+
+**Disposition (owner):** REJECTED in favour of the simpler model (§45.1). No weight, no carry cap; arrest exposure is the penalty.
 
 1. **Current specification:** §2 Dirty Cash is carried, stashed and vaulted; §7 "carrying $5,000,000" is fine; the
    vault has capacity that grows with upgrades; arrest seizes carried and in-vehicle cash.
@@ -232,6 +248,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-09 · Lieutenant cash stipend is money from nothing — RECOMMENDED
 
+**Disposition (owner):** not ruled on directly. §45.8's operational-efficiency model gives Lieutenants their value; removing the flat stipend is consistent with it and stays a Session 3 proposal for the owner to confirm with the Appendix B review.
+
 1. **Current specification:** §5 the Lieutenant manages warehouse/district, automates dispatch, coordinates defense.
 2. **Problem observed:** `CrewManager.work` pays `150 + 2·skill` per held turf per day for each Lieutenant, with no
    product, customers or risk (index.html:48832-48836).
@@ -243,6 +261,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** Session 3.
 
 ### DC-10 · Off-screen turf changes need a rule — RECOMMENDED (clarification)
+
+**Disposition (owner):** ACCEPTED as §45.13. Only explicit Take Turf / showdown success changes ownership, for anyone. The off-screen auto-resolved showdown rule is the proposed implementation (Sessions 2/4).
 
 1. **Current specification:** §4 "No silent ownership flips from background influence"; explicit Take Turf and a
    showdown. §10 rivals do coordinated turf takebacks.
@@ -262,6 +282,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-11 · Knock-down loot is mugging under another name — RECOMMENDED (clarification)
 
+**Disposition:** open; decided with the Appendix B review (§45.14) before Session 10.
+
 1. **Current specification:** §20 "Dedicated mugging subsystem is cut. Attack = assault/combat."
 2. **Problem observed:** `Underworld.onKnock` (index.html:47522) makes 75% of knocked-down civilians spill about
    half their pocket loot. That is the mugging loop with no prompt.
@@ -273,6 +295,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** Session 10 (wording removal in Session 2/12).
 
 ### DC-12 · Ammo categories vs per-weapon reserves — OPTIONAL (contradiction)
+
+**Disposition (owner):** RESOLVED as §45.11. Three shared reserve pools (Handgun, Shotgun, Rifle/SMG); per-weapon magazine sizes; no per-weapon reserve limits. See DC-17 for the pool caps.
 
 1. **Current specification:** §17 ammo categories Handgun / Shotgun / Rifle; reserves Pistol 240, Heavy 144,
    SMG 480, Rifle 360.
@@ -286,6 +310,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 7. **Blocks:** whichever session rebuilds weapons (not scheduled explicitly; propose Session 10).
 
 ### DC-13 · Single-file source is a maintainability hazard for a 16-session overhaul — RECOMMENDED (engineering)
+
+**Disposition (owner):** ACCEPTED as §45.3: Session 0.5, behavior-preserving, full regression before and after, no gameplay changes in the same commit.
 
 1. **Current specification:** none (the build is one offline `index.html`; README requires that it opens from
    `file://`).
@@ -304,6 +330,8 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-14 · Save generation: new key now, migration only for development — RECOMMENDED (engineering + persistence)
 
+**Disposition (owner):** ACCEPTED as §45.2. Dev-save money migrates to Clean Bank; production uses a fresh career and a new schema.
+
 1. **Current specification:** §35 final production uses a clean new save generation; dev saves may migrate.
 2. **Problem observed:** `SaveSystem.load`'s `merge()` keeps a saved value only when its type matches the default
    (index.html:33087). Turning `money` from a number into an object would silently drop the old balance to the
@@ -318,16 +346,61 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-15 · Burglary report chance stacks per container — RECOMMENDED (spec conformance, noted early)
 
+**Disposition:** spec conformance, no decision needed. Session 10.
+
 `ContentManager.searchContainer` (index.html:44947) rolls 7%+1.5%/search per drawer and 35% per safe, so a full
 house search is reported far more often than the spec's ~17-18% overall. Session 10 should roll one report
 budget per break-in (weighted by noise) instead. Spec-aligned; listed so it isn't missed.
 
 ### DC-16 · Taxi with carried product — OPTIONAL (clarification)
 
+**Disposition:** open; confirm in Session 11. Under §45.1 there is no cash pocket limit, so the cash condition becomes "carrying Dirty Cash is allowed in a cab, at the usual arrest risk".
+
 §27 says the taxi must not bypass cargo shipments or logistics. Pocket-sized product in a cab seems fine; major
 shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a hire. Confirm in Session 11.
 
-## Open questions for the owner (answers change Session 1)
+### DC-17 · Shared ammo pools need one cap each — OPTIONAL (follows from §45.11)
+
+1. **Current specification:** §45.11: three shared reserve pools (Handgun, Shotgun, Rifle/SMG); §17's old per-weapon
+   reserves (Pistol 240, Heavy 144, SMG 480, Rifle 360) are removed.
+2. **Problem observed:** the pools still need a cap each, and the old numbers disagree inside a pool (SMG 480 vs
+   Rifle 360; Pistol 240 vs Heavy 144).
+3. **Proposed improvement:** Handgun 240, Shotgun 96, Rifle/SMG 480. Each is the largest old reserve in its pool, so
+   no weapon gets less reserve than before. Stashes are uncapped per pool (they are storage, not carry).
+4. **Why it is better:** one number per pool in the HUD, the Armorer and stash UIs.
+5. **Systems affected:** `Armory`, `WEAPONS`, save ammo fields, arrest seizure of carried ammo.
+6. **Tradeoffs / risks:** the heavy pistol shares the 240 Handgun pool with the pistol, so heavy-pistol users get more
+   effective reserve than §17 intended. Tune in Session 13 if needed.
+7. **Severity:** OPTIONAL. **Blocks:** the weapons rebuild (Session 10).
+
+### DC-18 · The real-time threat timer needs pause and absence rules — RECOMMENDED (follows from §45.10)
+
+1. **Current specification:** §45.10: ~2 min to THREAT IMMINENT, ~60 s to execution, independent of world-clock speed.
+2. **Problem observed:** the spec doesn't say whether the timer runs while the game is paused, in the phone or map,
+   during a cab skip, in an interior, or while the player is jailed (where 7× time compresses the world).
+3. **Proposed improvement:** the timer counts real seconds of *active play* only: it stops while the pause menu is
+   open or the app is backgrounded, keeps running with the phone or map open (the player is choosing how to respond)
+   and during interiors. A cab skip doesn't advance it. In jail, threats skip the warning chain and resolve at once
+   through automatic crew defense (§10) with a Critical message, because the player can't respond.
+4. **Why it is better:** no free time from menus, no unwinnable timers while jailed, and §39 #34/#35/#36 behave
+   predictably.
+5. **Systems affected:** threats/messages (Session 4), prison (Session 8), `TaxiService`.
+6. **Tradeoffs / risks:** the phone counting toward the timer could feel strict; playtest it.
+7. **Severity:** RECOMMENDED. **Blocks:** Session 4.
+
+## Owner decisions (Session 0 review)
+
+The owner's decisions are recorded as authoritative amendments in `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md` §45
+(§45.1–§45.14) and as a disposition line under each design challenge above. Answers to the Session 0 questions:
+
+- Q1 → §45.1: no weight, no carry cap.
+- Q2 → §45.4/§45.5: modest house edge for routine play; Clean Bank only.
+- Q3 → §45.6: laundering fixer at ~30–35%.
+- Q4 → §45.2: dev-save money migrates to Clean Bank.
+- Q5 → §45.3: Session 0.5 module split, done before Session 1.
+- Q6 → §45.14: still open. The classification table (Appendix B) must be reviewed before any income behavior changes.
+
+## Open questions for the owner (original, kept for the record)
 
 - **Q1 (DC-08):** Dirty Cash physical (weight, pocket cap, bag item) or abstract unlimited carry?
 - **Q2 (DC-01/02):** honest-odds casino with limits and Clean-only chips, or keep the no-limit 60/40 casino?

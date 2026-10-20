@@ -3,6 +3,7 @@
 > Transcribed into the repository in the orientation session (Session 0) from the brief the owner
 > supplied, so later sessions do not depend on conversation history. Wording is unchanged; only the
 > layout was converted to Markdown. If the owner supplies a newer revision, replace this file.
+> §45 records the owner's Session 0 amendments; it overrides the sections it names.
 
 ## Purpose
 
@@ -15,6 +16,9 @@ Final production should use a new clean save generation/schema. Legacy saves may
 ---
 
 ## 1. CORE DESIGN
+
+> Amended by §45.7 (business influence).
+
 
 Primary progression loop:
 
@@ -43,6 +47,9 @@ Money does not buy Rank, Reputation, turf, contacts, crew loyalty, or political 
 ---
 
 ## 2. MONEY — DIRTY CASH + CLEAN BANK
+
+> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review).
+
 
 Replace the single-money model.
 
@@ -97,6 +104,9 @@ Most products should become obtainable by Known Operator in small, expensive, ri
 ---
 
 ## 4. TURF / TERRITORY
+
+> Amended by §45.13 (no silent flips, rivals included).
+
 
 Use the full Map in Turf/Territory mode.
 
@@ -202,6 +212,9 @@ This does not make it immune to exceptional threats such as a special gang-war a
 
 ## 7. WAREHOUSE DIRTY-CASH VAULT
 
+> Amended by §45.1 (no carry cap).
+
+
 The player can deposit/withdraw Dirty Cash at warehouses.
 Example: if carrying $5,000,000 Dirty Cash, the player can store it at a warehouse before doing risky work.
 
@@ -261,6 +274,9 @@ Never silently reset/despawn remaining raid loot.
 ---
 
 ## 10. GANG WARS / THREATS
+
+> Amended by §45.10 (real-time threat timer: ~2 min to THREAT IMMINENT, ~60 s more to execution).
+
 
 Gang war escalates due to actual player pressure: turf grabs, warehouse hits, shipment theft, killings, etc.
 
@@ -397,6 +413,9 @@ No respawn while owned.
 
 ## 17. WEAPONS / ARMOR
 
+> Amended by §45.11 (three shared ammo pools).
+
+
 Weapons:
 
 - Fists
@@ -430,6 +449,9 @@ Armor tiers: Light 50, Standard 100, Reinforced 150, Heavy 200. Higher tiers abs
 ---
 
 ## 18. PLAYER HEALTH / UPGRADES
+
+> Amended by §45.12 (removal timing).
+
 
 Health about 300 base to ~480 top.
 Partial delayed regen to about 65%; none while wanted.
@@ -526,6 +548,9 @@ Active pursuit is separate from longer investigative case/heat.
 
 ## 24. COURT / LEGAL / JAIL
 
+> Amended by §45.8 (jail income farming prevented through operational efficiency).
+
+
 Police handles arrest/evidence/charges. Court handles outcome/sentence/legal defense/corruption.
 Evidence quality matters. Weak evidence helps the player.
 
@@ -591,6 +616,9 @@ Guard bribe should require the right guard/opportunity/influence/resources/risk,
 
 ## 25. CASINO / GAMBLING
 
+> Amended by §45.4 (modest house edge for routine play) and §45.5 (Clean Bank only).
+
+
 Casino winnings are Clean Bank.
 Gambling is optional acceleration. Big wins genuinely make the game financially easier; do not secretly punish the player for luck.
 
@@ -623,6 +651,9 @@ Casino expands into multi-room complex: central floor, sportsbook, VIP/high-roll
 ---
 
 ## 26. BUSINESSES / LAUNDERING
+
+> Amended by §45.6 (early laundering fixer) and §45.7 (gradual influence).
+
 
 Businesses produce Clean Bank, have operating costs, may act as laundering fronts, may use managers, and continue operating while player is jailed.
 
@@ -679,6 +710,9 @@ Dashboard evolves personal → crew/turf → automation/strategy.
 
 ## 30. BANKING / LOANS / INFLUENCE / POLITICS
 
+> Amended by §45.7.
+
+
 Loans belong to banking, not dealers. Use Clean Bank/payment structure. No infinite-money exploit; repayment/interest understandable rather than micromanagement-heavy.
 
 Influence/corruption may affect police, legal outcomes, information and pressure. Influence cannot be bought directly with raw cash; it comes from empire position, turf, businesses, crew, contacts and corruption network.
@@ -703,6 +737,9 @@ Secrets/collectibles reward exploration and can reveal hidden-car intel, unique 
 ---
 
 ## 33. WORLD / DISTRICTS / TIME / WEATHER
+
+> Amended by §45.9 (economy independent of the day-length setting).
+
 
 District identities should matter for wealth, police density, target value, gangs, businesses, races, hidden-car clues and terrain.
 
@@ -732,6 +769,9 @@ Final signoff requires real iPhone testing.
 ---
 
 ## 35. SAVE / PERSISTENCE
+
+> Amended by §45.2 (dev-save money → Clean Bank).
+
 
 Final production uses a clean new save generation/schema.
 
@@ -780,6 +820,9 @@ Contextual mentor/friend messages can notice repeated mistakes and suggest syste
 
 ## 37. CURRENT-BUILD CONFLICTS THAT MUST BE REMOVED
 
+> Amended by §45.12.
+
+
 Claude must deliberately search for and replace these conflicts in index 16(2).html:
 
 1. single save.money model → Dirty Cash + Clean Bank
@@ -800,6 +843,9 @@ Do not leave hidden fallback code paths that still mutate obsolete state.
 ---
 
 ## 38. DEVELOPMENT ORDER
+
+> Amended by §45.3 (Session 0.5 module split before Session 1).
+
 
 Claude should receive this entire specification every major session, but work on only one scoped phase at a time.
 
@@ -999,3 +1045,45 @@ Graphics audit order:
 14. adaptive quality presets and real-device performance
 
 The graphics pass may improve art direction aggressively, but it must preserve collision, gameplay readability, interaction locations, GPS/world geometry assumptions and save identity. Any geometry change affecting gameplay must be regression-tested.
+
+---
+
+## 45. SESSION 0 OWNER AMENDMENTS (authoritative)
+
+Decided by the owner after the Session 0 design-challenge review (see OVERHAUL_STATUS.md, DC-01 to DC-16).
+Where these conflict with an earlier section, **this section wins**. Each affected section carries an
+"Amended by §45.n" note.
+
+1. **Dirty Cash carry (§2, §7).** Dirty Cash has no weight and no hard carry cap. Arrest exposure is the carrying
+   penalty: everything carried and everything in the caught vehicle is seized.
+2. **Development-save migration (§35).** Money in an existing development save migrates to Clean Bank. Final
+   production still uses a fresh career and a new save generation/schema.
+3. **Session 0.5 architecture refactor (§38, §43).** Before Session 1, split the single-file source into
+   maintainable source modules with a build step that produces the deployable game. The split must be
+   behavior-preserving, verified by the complete existing regression suite before and after, and must not be
+   combined with gameplay changes.
+4. **Casino economics (§25).** Routine casino play must not have strongly positive expected value: use ordinary
+   casino economics with a modest house edge. Preserve the huge progressive, the $10,000 qualifying wager, the
+   anti-drought excitement system and career-changing jackpot potential.
+5. **Casino currency (§2, §25).** Casino wagers, chips and lottery purchases use Clean Bank only. Casino winnings
+   are Clean Bank. The casino must not work as a Dirty Cash laundering route.
+6. **Laundering bootstrap (§2, §26, §11).** Add an early, low-capacity laundering fixer charging roughly 30–35%, so
+   the player can get their first Clean Bank without circular requirements. Proper fronts supersede the fixer later.
+7. **Business influence (§1, §30).** Buying a business does not instantly grant Influence or Rank. Businesses may
+   contribute Influence gradually, only after operating and establishing themselves.
+8. **Jail and world time (§24).** Keep 1:1 prison/outside world-time progression. Prevent jail income farming
+   through operational efficiency: managed legitimate businesses can stay strong; unmanaged operations decline;
+   criminal logistics and distribution suffer substantially without Lieutenants or appropriate crew.
+9. **Day length (§33).** Economic accrual must not be exploitable through the configurable visual day-length
+   setting. Decouple or normalize the economic simulation from the user-selected day duration.
+10. **Threat timing (§10).** Replace "about 5 in-game minutes" with a real-time response timer independent of
+    world-clock speed: about 2 minutes from the first warning to THREAT IMMINENT, then about another 60 seconds to
+    execution, subject to playtest tuning.
+11. **Ammo (§17).** Ammo uses three authoritative shared reserve pools: Handgun, Shotgun, Rifle/SMG. Magazine sizes
+    stay per weapon. The contradictory per-weapon reserve limits are removed.
+12. **Obsolete money paths and upgrades (§18, §37).** Remove obsolete hidden-money paths, including the superseded
+    ARMS shop, and the obsolete Handling / Cooldown / old Armor player upgrades when their replacement phase lands.
+13. **Turf ownership (§4).** Turf ownership never flips silently from influence. Only an explicit Take Turf /
+    showdown success changes ownership (this applies to rivals as well as to the player).
+14. **Income classification review (§2).** Before income behavior changes, the Dirty/Clean classification of every
+    income source (OVERHAUL_STATUS.md Appendix B) is presented for review, with genuinely ambiguous sources flagged.
