@@ -48,7 +48,7 @@ Money does not buy Rank, Reputation, turf, contacts, crew loyalty, or political 
 
 ## 2. MONEY — DIRTY CASH + CLEAN BANK
 
-> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17 (locked classifications).
+> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17-§45.21 (classifications, stunt cap, medical debt, payroll).
 
 
 Replace the single-money model.
@@ -1105,3 +1105,24 @@ Where these conflict with an earlier section, **this section wins**. Each affect
 
     The remaining ambiguous sources (OVERHAUL_STATUS.md Appendix B review table) must be approved before Session 1
     converts money behavior.
+18. **Remaining income/expense classifications (§2, §45.14).** Approved, which clears the review:
+    - Illegal street races use and pay Dirty Cash. Legitimate motorsport-complex events use and pay Clean Bank.
+    - Crew theft can only take Dirty Cash from locations the crew member can plausibly access. Never Clean Bank.
+    - Licensed garages and shops use Clean Bank. The Chop Shop and Pay & Spray use Dirty Cash.
+    - Everyday low-level purchases may use either currency, Dirty Cash first.
+    - Jail work and jail gambling use a separate commissary balance.
+    - Generic civilian cash drops are removed. Gang/criminal drops may remain Dirty Cash.
+    - Protection money is a Dirty Cash expense.
+    - Passive Lieutenant and Driver stipends are removed.
+19. **Stunt cash (DC-19).** One-time stunt/achievement milestones may pay full Clean rewards. Repeatable stunt cash is
+    capped per in-game day. Rep can continue after the cash cap, with diminishing returns for repeatedly farming
+    the same stunt/location if needed.
+20. **Medical debt (DC-20).** Unpaid hospital cost becomes visible, interest-free medical debt, capped at one
+    outstanding bill, automatically repaid from future Clean Bank income. It never touches Dirty Cash and never
+    blocks respawning.
+21. **Payroll (DC-21, partially approved).** Payroll draws Dirty Cash in this order: (1) the assigned warehouse's
+    Dirty Cash vault, (2) other warehouse vaults, (3) safehouse Dirty Cash, (4) carried Dirty Cash. The Crew UI
+    shows daily payroll, available payroll reserve, days covered and source locations. There is **no** ATM or
+    Clean → Dirty conversion: Clean money does not become dirty merely because it is withdrawn. Crew wages remain
+    Dirty Cash with no silent Clean fallback. A front/business payroll mechanism for covering criminal wages from
+    Clean Bank, if it would improve the game, must be raised as a design challenge, not added silently.

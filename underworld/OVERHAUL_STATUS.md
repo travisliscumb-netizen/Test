@@ -563,6 +563,8 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
 
 ### DC-19 · Clean Bank stunt bonuses are a repeatable Clean faucet — RECOMMENDED (follows from §45.17)
 
+**Disposition (owner):** APPROVED as §45.19, plus diminishing Rep returns for farming the same stunt/location if needed.
+
 1. **Current specification:** §45.17: stunt bonuses → Clean Bank. §45.6: the laundering fixer is the intended
    bootstrap for a player's first Clean Bank.
 2. **Problem observed:** every stunt pays cash with no cap and can be repeated: any jump pays `(4·distance +
@@ -580,6 +582,8 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
 
 ### DC-20 · The hospital bill needs a shortfall rule — RECOMMENDED (follows from §45.17)
 
+**Disposition (owner):** APPROVED as §45.20.
+
 1. **Current specification:** §45.17: hospital bill → Clean Bank expense, no silent Dirty fallback, insufficient
    Clean must not soft-lock.
 2. **Problem observed:** early players often have $0 Clean Bank. Something must happen to the unpaid part.
@@ -594,6 +598,8 @@ shipments, HOT cars and Dirty Cash above the pocket limit (DC-08) should block a
 7. **Severity:** RECOMMENDED. **Blocks:** Session 1 (the ledger owns the field).
 
 ### DC-21 · Which Dirty Cash pays the crew, and a Clean-rich player can't pay them — RECOMMENDED (follows from §45.17)
+
+**Disposition (owner):** PARTIALLY APPROVED as §45.21: the payroll order and Crew UI are approved; the ATM Clean → Dirty withdrawal is **rejected**. Wages stay Dirty with no Clean fallback; a front/business payroll mechanism would need its own design challenge.
 
 1. **Current specification:** §45.17: crew wages → Dirty Cash, no silent Clean fallback. §45.1: Dirty Cash is held
    by location (On Me, vehicle, safehouse, warehouse vault).
@@ -830,24 +836,24 @@ Dirty/Clean rule for Session 1. The ambiguous rows are ruled on in the review ta
 
 ## For owner review before any income behavior changes (§45.14, §45.17)
 
-The 13 genuinely ambiguous sources. Rows marked **LOCKED** were ruled on by the owner (§45.17); the other 8 are
-**AWAITING APPROVAL**. Session 1 converts no money behavior until they are approved.
+The 13 genuinely ambiguous sources. Rows marked LOCKED were ruled on in §45.17; the other 8 were approved as recommended in §45.18. The review is
+closed: every money source and sink now has an authoritative treatment.
 
 | # | Status | Income / expense source | Recommended treatment | Alternative | Rationale |
 | --- | --- | --- | --- | --- | --- |
 | A1 | LOCKED | Hidden-package cash (`collectPackage`, `secret`) | Dirty Cash | — | owner ruling: smuggler stashes |
 | A2 | LOCKED | Stunt bonuses: jumps, drifts, near misses (`StuntTracker`) | Clean Bank | — | owner ruling; see DC-19 on capping the repeatable part |
-| A3 | AWAITING | Street-race winnings and buy-ins (`MissionManager` race contracts) | Dirty Cash (winnings and buy-in) | Clean Bank | illegal street races; legal track events at the motorsport complex (Session 6) will pay Clean |
+| A3 | APPROVED (§45.18) | Street-race winnings and buy-ins (`MissionManager` race contracts) | Dirty Cash (winnings and buy-in) | Clean Bank | illegal street races; legal track events at the motorsport complex (Session 6) will pay Clean |
 | A4 | LOCKED | Vehicle sales | legally owned/clean car → Clean Bank; HOT/stolen car through a criminal channel (chop shop) → Dirty Cash | — | owner ruling; until HOT exists (Session 5) every garage car counts as legally owned |
 | A5 | LOCKED | Hospital bill (`respawn`) | Clean Bank expense, no silent Dirty fallback, never a soft lock | — | owner ruling; see DC-20 for the shortfall mechanism |
 | A6 | LOCKED | Crew wages (`CrewManager.tickDay`) | Dirty Cash expense, no silent Clean fallback | — | owner ruling; see DC-21 for which Dirty location pays |
-| A7 | AWAITING | Crew theft: skimming and betrayal (`CrewManager.disloyalty`) | taken from Dirty Cash in stashes and vaults the thief can reach; a Lieutenant's betrayal can also hit the vault they manage; never Clean Bank | from total wealth incl. Clean Bank | a crew member has your keys, not your bank login |
-| A8 | AWAITING | Vehicle services: repair, respray, tuning, store items (`openService`, `openStore`, `propAct`) | licensed garages and shops: Clean Bank; chop shop and Pay & Spray: Dirty Cash | either currency everywhere, Dirty first | matches §13's licensed-vs-shady split and keeps Dirty useful early |
-| A9 | AWAITING | Everyday purchases: taxi fares, bar drinks, food, medkits | either currency, Dirty Cash first | Clean Bank only | ordinary cash purchases; Clean-only would make a cab ride a banking decision |
-| A10 | AWAITING | Jail work pay and jail dice (`Prison.openWork`, `openCards`) | a separate jail commissary balance (new save field in Session 8); dice stakes from commissary | street Dirty Cash | §24 "Work → commissary"; keeps jail earnings out of the street economy |
-| A11 | AWAITING | Cash spilled by knocked-down civilians (`Underworld.onKnock`) | removed (no drop) | Dirty Cash | §20 cuts mugging; gang members, dealers and bosses keep their Dirty drops |
-| A12 | AWAITING | Protection money a business pays to a rival faction (`PropertyManager.tickDay`) | Dirty Cash expense | Clean Bank expense | an illegal payment, even though the business is legitimate |
-| A13 | AWAITING | Lieutenant and Driver daily stipends (`CrewManager.work`) | removed | kept, paid as Dirty Cash | money from nothing (DC-09, §37 #2); their value comes from logistics and §45.8 efficiency in Session 3 |
+| A7 | APPROVED (§45.18) | Crew theft: skimming and betrayal (`CrewManager.disloyalty`) | taken from Dirty Cash in stashes and vaults the thief can reach; a Lieutenant's betrayal can also hit the vault they manage; never Clean Bank | from total wealth incl. Clean Bank | a crew member has your keys, not your bank login |
+| A8 | APPROVED (§45.18) | Vehicle services: repair, respray, tuning, store items (`openService`, `openStore`, `propAct`) | licensed garages and shops: Clean Bank; chop shop and Pay & Spray: Dirty Cash | either currency everywhere, Dirty first | matches §13's licensed-vs-shady split and keeps Dirty useful early |
+| A9 | APPROVED (§45.18) | Everyday purchases: taxi fares, bar drinks, food, medkits | either currency, Dirty Cash first | Clean Bank only | ordinary cash purchases; Clean-only would make a cab ride a banking decision |
+| A10 | APPROVED (§45.18) | Jail work pay and jail dice (`Prison.openWork`, `openCards`) | a separate jail commissary balance (new save field in Session 8); dice stakes from commissary | street Dirty Cash | §24 "Work → commissary"; keeps jail earnings out of the street economy |
+| A11 | APPROVED (§45.18) | Cash spilled by knocked-down civilians (`Underworld.onKnock`) | removed (no drop) | Dirty Cash | §20 cuts mugging; gang members, dealers and bosses keep their Dirty drops |
+| A12 | APPROVED (§45.18) | Protection money a business pays to a rival faction (`PropertyManager.tickDay`) | Dirty Cash expense | Clean Bank expense | an illegal payment, even though the business is legitimate |
+| A13 | APPROVED (§45.18) | Lieutenant and Driver daily stipends (`CrewManager.work`) | removed | kept, paid as Dirty Cash | money from nothing (DC-09, §37 #2); their value comes from logistics and §45.8 efficiency in Session 3 |
 
 ## Reads (133 in 67 functions)
 
