@@ -28,9 +28,30 @@ To rebuild the bundle:
 
 ```
 npm install esbuild@0.24.2 three@0.160.0
-npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es2020 --legal-comments=inline --charset=utf8 --outfile=three-bundle.js
-# then replace the body of <script type="module" id="threeInline"> with three-bundle.js
+npx esbuild underworld/tools/three-entry.js --bundle --format=esm --target=es2020 --legal-comments=inline --charset=utf8 --outfile=underworld/src/vendor/three-r160-bundle.js
+node underworld/tools/build.mjs
 ```
+
+## Source layout and the build (Session 0.5)
+
+`index.html` is the deployable game and it stays one self-contained offline file, but it is **generated**. The
+source of truth is `underworld/src/`:
+
+| Path | What |
+| --- | --- |
+| `src/manifest.json` | build order: every file below, listed exactly once |
+| `src/shell/*.html` | the page around the scripts: `<head>` (including the `build-version` meta tag deployments bump), the HUD/menu markup, the small boot scripts, closing tags |
+| `src/styles/main.css` | all CSS (the body of the page's `<style>` block) |
+| `src/vendor/three-r160-bundle.js` | the unmodified three.js r160 + addons bundle (see above) |
+| `src/game/NNN-*.js` | the game module, one file per subsystem in load order (`000-prologue.js` … `650-core-boot.js`) |
+
+`node underworld/tools/build.mjs` concatenates the parts byte for byte (no transforms) and syntax-checks both
+module scripts; a syntax error is reported as `src/<file>:<line>`. `--check` verifies without writing, and
+`node underworld/tests/build.mjs` fails if `index.html` was edited by hand or `src/` changed without a rebuild.
+All `game/` files share one `<script type="module">` scope exactly as before, so top-level names are visible
+across files and the order in the manifest is the load order. The numbers leave gaps (`010`, `020`, …) so a new
+subsystem can be inserted without renaming. Edit `src/`, rebuild, then run the tests: they load the built
+`index.html`.
 
 ## Controls (keyboard / mouse)
 
@@ -67,7 +88,8 @@ placed by a layout pass (`HudLayout`) so they never sit under a control. That ho
 
 ## Where things live in the code
 
-The engine sections from the template (`[CORE] ...`) are still there and have been patched in place:
+Each section below is now its own file in `src/game/` (named after its `[CORE]` / `[CONTENT]` / `[UNDERWORLD]`
+header). The engine sections from the template (`[CORE] ...`) are still there and have been patched in place:
 melee facing, the combat moveset, reverse speed and reverse camera, vehicle damage stages,
 witnesses and the investigation, the zero-start save schema, and the district map.
 The new layer, tagged `[UNDERWORLD]`, sits just before `[CORE] UI MANAGER`:
@@ -312,6 +334,7 @@ suite runs with the browser context offline. Any non-file request is aborted and
 error, so a hidden network dependency fails the suite.
 
 ```
+node underworld/tests/build.mjs     # Node only: index.html matches what src/ builds, manifest complete, both module scripts parse
 node underworld/tests/static-money.mjs # Node only: every read/write of the player's money by function; fails on a new direct write
 node underworld/tests/smoke.mjs     # boot, $0 start, every menu, map overlay, location layout
 node underworld/tests/core.mjs      # melee facing (8 dirs, 180°, post-exit), combo + step-in stress, reverse speed, reverse-camera transitions
