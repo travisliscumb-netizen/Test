@@ -10,6 +10,12 @@ opening. Your first money can come from pickpocketing, mugging, glovebox loot, t
 street races (with a buy-in), dealing, street-fight bystander rewards, robbing criminals or a feed tip.
 From there you can work up to City Kingpin.
 
+## Overhaul in progress
+
+The game is being overhauled against `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md`, one scoped session at a time
+(`docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`). `OVERHAUL_STATUS.md` records the current phase, the code map,
+design challenges, the deprecation list and the exact next task. Read it before changing anything.
+
 ## Run it
 
 Open `underworld/index.html` in a desktop or mobile browser. It's fully self-contained and works
@@ -306,6 +312,7 @@ suite runs with the browser context offline. Any non-file request is aborted and
 error, so a hidden network dependency fails the suite.
 
 ```
+node underworld/tests/static-money.mjs # Node only: every read/write of the player's money by function; fails on a new direct write
 node underworld/tests/smoke.mjs     # boot, $0 start, every menu, map overlay, location layout
 node underworld/tests/core.mjs      # melee facing (8 dirs, 180°, post-exit), combo + step-in stress, reverse speed, reverse-camera transitions
 node underworld/tests/arrest.mjs    # 9 arrest situations (idle/walk/sprint/fight/vehicle exit/pursuit/map open/repeated) -> jail -> release -> stale-state audit; death respawns
