@@ -61,7 +61,7 @@ Baseline on the unmodified build, headless Chromium + SwiftShader, offline, run 
 | `node underworld/tests/smoke.mjs` | 16 / 16 |
 | `node underworld/tests/money.mjs` | 10 / 10 |
 | `node underworld/tests/cargo.mjs` | 36 / 36 |
-| `node underworld/tests/arrest.mjs` | 118 / 118 checks passed before a 900 s runner timeout cut the run off (suite has 126); full re-run in progress at commit time |
+| `node underworld/tests/arrest.mjs` | 126 / 126 |
 | `node underworld/tests/prison.mjs` | 47 / 47 |
 | `node underworld/tests/session.mjs` | 33 / 33 |
 
@@ -407,8 +407,8 @@ redesign (Session 11; Session 1 only shows Dirty and Bank where "Cash" is shown 
 ## Working tree / commit state
 
 - Clean? Yes, after the commit below.
-- Commit hash/message: see `git log -1` on `claude/practical-lamport-zld81y` ("Underworld overhaul Session 0:
-  orientation, OVERHAUL_STATUS, spec docs, static money guard").
+- Commit hash/message: see `git log -1` on `claude/practical-lamport-zld81y` (`12e2856` "Underworld overhaul Session 0: orientation,
+  OVERHAUL_STATUS, spec docs, static money guard", then a results-only follow-up commit).
 
 ---
 
