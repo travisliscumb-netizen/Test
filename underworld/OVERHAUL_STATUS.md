@@ -85,6 +85,67 @@ The mapping stays exact until a session changes the code above that line; after 
 
 - None. The compound follows `uw.whse[id].up`; breaches are not saved (they are mended by the end of the day anyway).
 
+## Tests run (3B)
+
+New `tests/compound.mjs`: **56 / 56**, both warehouses. Each requirement from §45.25 and what proves it:
+
+| Requirement (§45.25) | Proof in `compound.mjs` |
+| --- | --- |
+| Every security tier visually changes | Every perimeter, access and surveillance step gives a different mesh signature and the expected feature set; every vault tier gives different rooms; all five levels differ; a bought upgrade rebuilds at once |
+| Tier state survives save/reload | Mixed tiers on both warehouses: identical signature and status after a reload |
+| The gate opens for the player, authorized crew, Drivers and delivery vehicles | The player on foot and driving; an assigned Enforcer walks through to the door; a Driver's van docks and leaves; a manifest-only vehicle reaches the dock |
+| The gate rejects rivals and unauthorized NPCs | Rejected and kept outside: crew of another warehouse, fired crew, an expired delivery, and a hostile rival crew with their car plus ordinary traffic (at security 5 and 2) |
+| Vehicles enter and leave without clipping | Vans and the player's own car, in and out at both warehouses: zero contacts with any compound collider, zero damage, zero stalls |
+| Loading bay | The dock door opens for you, the prompt moves trunk cargo into storage, and a stranger's car doesn't open it |
+| All interior areas reachable; no blocked doors, stairs or interactions | Flood fill with the player's radius, floor heights and step limit, at 8 tier mixes × 2 warehouses: exit, mezzanine and every point reachable; interaction points open the right tabs |
+| Maximum Security supports its defense | Perimeter closed on foot; gate and fence hold against 22 m/s rams; the wedge stops a tailgater; cameras cover 100% by day and night; immunity only at level 5 |
+| Lower tiers don't inherit it | Open lot / no gate / no fence let people in; basic and motorised gates and chain-link break at 16 m/s (but hold a 4 m/s push); camera coverage below 100%, worse at night, rising per tier |
+| Mobile performance within budget | Compound update 0.005 ms a frame, 7 draw calls, about 12.5k triangles (budget 0.35 ms / 8 / 40k) |
+
+Bugs this suite caught and that are fixed:
+- A rebuild without a wedge kept a stale wedge reference.
+- A street lamp stood in Cannery Row's driveway (the gate was moved 4.5 m east).
+- Reversing out of a bay steered the wrong way.
+- Departed vans stayed authorized.
+- A guard posted by the booth held the gate open for everyone.
+- Gates carried no ram threshold (any touch broke a basic gate).
+- A ram where two panels meet broke only one.
+
+Full regression against the 3B build, three suites at a time:
+- **All checks pass:** every other assertion suite. That includes warehouse 29, kingpin 6, inventory 58, property 33,
+  interiors 22, homes 26, arrest 126, core 64, ledger 54, progression 33, fixer 17, carmoney 10 and static-money 8.
+- **Load-sensitive, pass alone:** stress 29 / 30 → **30 / 30 alone** and gambling 56 / 57 → **57 / 57 alone**
+  (the known timing checks). police 12 / 13 → **13 / 13 alone**.
+- **city 24 / 25 → 25 / 25:** test code. It read `world.terminalShed`, which this session removed; it now reads
+  Shed 4's compound.
+- **pwa:** fails only against a staged copy without the icon files next to it; **5 / 5** against the real build.
+- **Screenshot suites** (cityshots, qashots, frontshots, carshots, contact) run with no errors.
+
+Phone performance (`PHONE=1 tests/perf.mjs`: 4× CPU throttle, 800×400, alternating builds, two runs each):
+- pre-3B update 6.48 / 3.98 ms calm and 4.29 / 4.77 busy;
+- 3B update 4.92 / 4.75 calm and 4.06 / 3.46 busy;
+- draw calls 244-246 against 248-251, triangles within ±1%.
+
+No change beyond noise.
+
+## Known bugs / risks (3B)
+
+- Abstract rival raids (`rivalAttacks`) still don't use the physical breaches or guards; Session 4's raids should.
+- Breaches are not saved: a reload mends them early (they mend by the end of the day anyway).
+- Driver vans appear only for runs that start or end while you are near. Runs elsewhere stay abstract, as before.
+- Block 7,10 lost its procedural buildings, and a few terminal containers are gone (deliberate, DC-32).
+
+## Exact next recommended task
+
+Owner review of DC-32. Then **Session 4** (shipments, raids and gang wars), which can now stage warehouse raids
+against the physical compound.
+
+## Working tree (3B)
+
+- Clean after the final Session 3B commit; see `git log` on `claude/practical-lamport-zld81y`.
+
+---
+
 # Session 3A record (warehouse systems)
 
 ## Completed this session (3A)
