@@ -24,6 +24,8 @@ const MONEY_SOURCES = {
   business: { earn: 'clean', book: 'businesses' }, carSale: { earn: 'clean' }, casino: { earn: 'clean' },
   // a car you stole is not a legal sale even from your own garage until HOT/clean titles exist (§45.22, Session 5)
   stolenCarSale: { earn: 'me' },
+  // the laundering fixer: Dirty Cash handed over in person, Clean Bank when she delivers
+  launderIn: { pay: 'dirty' }, launderOut: { earn: 'clean' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
   // ---- Dirty costs
   armorer: { pay: 'dirty' }, supplier: { pay: 'dirty' }, raceBuyIn: { pay: 'dirty' }, respect: { pay: 'dirty' },

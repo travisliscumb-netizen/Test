@@ -11,6 +11,105 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
+- Session: **2.5 — Early laundering fixer** (§45.6, §45.22; prompt "Session 2.5").
+- Commit/base revision: `36d9a47` (Session 2 follow-up) → the Session 2.5 commit on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-21
+- Precondition met: the unexplained ledger cash was traced and fixed before the fixer was added (Session 2 follow-up,
+  below).
+
+## Completed this session (2.5)
+
+- **The fixer** (`src/game/535-underworld-fixer.js`, `LaunderFixer`; state `save.uw.fixer`). Dina Vance, in the Old
+  Quarter (spot `fixer`, `[3, 1, 3, 30]`, the block of Spin City Laundromat), open to anyone from a fresh career
+  (no Rep gate, so the first Clean dollar has no circular requirement, §41). You hand her **Dirty Cash you carry**
+  (never a stash or the bank) in $500 / $1,000 / $2,500 amounts or "as much as she'll take"; she keeps **32%**
+  (`FIXER_FEE`) and pays the rest into **Clean Bank 12 economic hours later** (`FIXER_DELAY`), at most **$5,000 of
+  Dirty Cash per economic day** (`FIXER_DAY_CAP`), at least $100 a time. The screen shows the cash on you, what she
+  will still take today, the fee, a quote for the next hand-over, the batches with her and when each lands, and
+  the running total washed and paid in fees. A phone message says when a batch has landed. Ledger sources
+  `launderIn` (pay, Dirty on you) and `launderOut` (earn, Clean; it repays medical debt first like any Clean
+  income). On the map she is a contact ("L") with her fee and limit.
+- **Money with her is not on you.** An arrest seizes only what you carry and the caught car (§2); a batch with the
+  fixer survives it and still lands while you are in jail. You can't hand her anything from a cell.
+- **The economic clock** (`uw.S.econH`, `Underworld.econRate`). §45.9 forbids economic accrual that speeds up with
+  the day-length setting, and a per-world-day cap would have done exactly that (a 4-minute day would wash 7.5×
+  more per hour of play). Each world hour adds `dayLength / 30` economic hours outside jail, so an economic day is
+  30 real minutes of play at any setting; in jail (world time 1:1, §45.8) one world hour is one economic hour. Taxi
+  time skips move it in proportion. Sessions 3 and 9 can put other per-day economics on this clock (DC-06).
+- **Stolen cars give no Clean Bank** (§45.22): checked through the garage screen and the chop shop.
+- **Not done, raised instead:** the Saltworks used lot is a better laundering route than the fixer and can make
+  money (DC-29, measured). No car pricing or classification was changed.
+
+## Files / systems changed (2.5)
+
+- New `src/game/535-underworld-fixer.js` (in `src/manifest.json` after the opportunities feed), `tests/fixer.mjs`
+  (17 checks).
+- Tests: `tests/kingpin.mjs` (one shared snapshot for all seeds), `tests/casino.mjs` (seeded three-seed poker
+  simulation).
+- `390-underworld-data.js` (the spot; `FIXER_*`, `ECON_REF_DAY`), `035-core-money.js` (`launderIn`, `launderOut`),
+  `450-underworld-core.js` (`econH`, `fixer` state, `econRate`, the clock and delivery in `tickHours`),
+  `540-underworld-empire-ui.js` (`openFixer`, map icon, "Rep" wording on suppliers), `600-core-ui-manager.js` (map
+  index entry), `650-core-boot.js` (`LaunderFixer` exposed to tests).
+
+## Save/schema changes (2.5)
+
+- `uw.econH` (number, economic hours) and `uw.fixer` (`{ day, used, batches: [{ id, dirty, clean, due }], next,
+  washed, fees }`), both sanitized with defaults: a batch is clamped to the daily cap and can never pay out more
+  than the fee allows. Schema stays 9 (new fields only, defaults on load).
+
+## Tests run (2.5)
+
+Every assertion suite ran against the Session 2.5 build, three at a time; the failures were re-run alone:
+
+| Result (3 in parallel) | Suites |
+| --- | --- |
+| all checks pass | soak 22, interiors 22, homes 26, prison 48, session 35, ramps 21, vehicles 39, inventory 58, cargo 36, arrest 126, city 25, phone 71, stations 17, map 22, roads 20, shooting 37, ui 23, offline 14, smoke 16, money 10, business 40, survival 9, street 11, pwa 5, camera 20, police 13, dealers 34, tutorial 13, phoneapps 19, static-money 8, build 5, gangs 23, ledger 53, progression 33, **fixer 17 (new)**, royale-sim 23, core 64 |
+| stress 29 / 30 → **30 / 30 alone** | the software-GL frame-stall check (load-sensitive, as before) |
+| gambling 54 / 57 → **57 / 57 alone** | scratch-card timing and casino frame rate under load |
+| property 32 / 33 → **33 / 33 alone** | the timed motor-court drive (as in Session 2) |
+| taxi 18 / 20 → **20 / 20 alone** | the cab drive and skip timing (as before) |
+| kingpin 5 / 6 → **6 / 6, three runs alone** | see below: the three-seed version was not deterministic |
+| casino 38 / 39 → **39 / 39** | see below: the poker edge check was a flaky test |
+
+Two flaky tests found and fixed in this session (test code only):
+
+- **kingpin:** the three-seed comparison added in the Session 2 follow-up took a fresh snapshot of the live game for
+  each seed, and the game keeps running between calls at a pace that depends on load, so the seeds did not start
+  from the same state (0.53 in the parallel run). All seeds now start from one shared snapshot: 124 / 324, 121 / 319,
+  124 / 324 (0.38) in three solo runs.
+- **casino poker:** "a small positive edge" (EV > -0.5 big blinds) was judged on one unseeded 1,500-hand run. With
+  the same seed both builds give identical results (EV +2.36), so the game code is not involved; across 8 seeds EV
+  ranged from -0.88 to +2.63 and 3 of 8 failed the bar, so the check failed about a third of the time on any
+  build (the earlier passes were luck). It now uses three fixed seeds judged together: EV +0.50, 63% of decided
+  hands won.
+
+Performance (`tests/perf.mjs`, alone, alternating builds): update 0.72 / 1.31 ms (follow-up) vs 1.16 / 0.99 ms
+(2.5) calm, 1.46 / 1.06 vs 0.96 / 0.99 busy, draw calls 118-123: no change beyond noise. The fixer adds work only
+once per world hour.
+
+## Known bugs / risks (2.5)
+
+- **DC-29:** used cars bought with Dirty Cash and sold from the garage launder better than the fixer, and a quarter
+  of them return a profit. Needs a ruling; until then early-economy playtests will route around the fixer.
+- The economic clock is used only by the fixer so far; every other per-day economy still runs on world days (DC-06,
+  Sessions 3, 9 and 13).
+
+## Exact next recommended task
+
+**Session 3 — Warehouses / vault / logistics** (prompt Session 3, handoff phase 4), including the Treasury Warehouse
+designation control (§45.22) and Kingpin's infrastructure condition (DC-25). Rule on DC-29 first if the early
+economy is to be playtested.
+
+## Working tree (2.5)
+
+- Clean after the Session 2.5 commit; see `git log` on `claude/practical-lamport-zld81y`.
+
+---
+
+# Session 2 record (Rank, Reputation, turf)
+
+## Session 2: phase
+
 - Session: **2 — Rank / Reputation / core progression** (handoff phase 3), following §1, §4, §18, §31, §45.7,
   §45.12, §45.13, and the Session 2 follow-up for the DC-25 to DC-28 rulings (§45.23).
 - Commit/base revision: `804850c` (Session 1 follow-up) → `4e707fb` (Session 2) → the Session 2 follow-up commit
@@ -187,7 +286,7 @@ Screenshot scripts: `frontshots`, `carshots` and `contact` completed in the para
   Session 4 (gang wars / threats) deepens it, including the jail-time Critical messages (§45.16).
 - The intermittent `ledger` flake is explained and fixed (see the follow-up above).
 
-## Exact next recommended task
+## Session 2: next task (done)
 
 **Session 2.5 — the early laundering fixer** (§45.22, `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`).
 
@@ -804,7 +903,7 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-06 · Player-configurable day length scales the whole economy — RECOMMENDED
 
-**Disposition (owner):** ACCEPTED as §45.9. Economic simulation decoupled/normalized from the day-length setting. Owning session: Session 1 defines the world clock the ledger and laundering use; per-day income normalization lands with each income system (Sessions 3, 9) and is verified in Session 13.
+**Disposition (owner):** ACCEPTED as §45.9. Economic simulation decoupled/normalized from the day-length setting. Owning session: Session 1 defines the world clock the ledger and laundering use; per-day income normalization lands with each income system (Sessions 3, 9) and is verified in Session 13. **Session 2.5:** the economic clock exists (`uw.S.econH`: `dayLength / 30` economic hours per world hour outside jail, 1 in jail); the fixer is the first system on it.
 
 1. **Current specification:** §33 time of day matters; everything persistent is world-time based (§25, §35).
 2. **Problem observed:** Settings › Day length is 4-60 real minutes (`settings.dayLength`, index.html:42014,
@@ -1181,6 +1280,32 @@ in only through a plausible channel (implemented: a crew courier; more channels 
 5. **Systems affected:** `Underworld.computeInfluence`, the Empire overview.
 6. **Tradeoffs / risks:** a betrayal can cost a Rank, which may feel harsh.
 7. **Severity:** OPTIONAL. **Blocks:** nothing.
+
+### DC-29 · Saltworks used cars launder Dirty Cash better than the fixer, and can make money — IMPORTANT (needs a ruling)
+
+1. **Current specification:** §13 / §45.18: Saltworks Used Autos takes cash or the bank (Dirty first); §45.17: the
+   sale of a legally owned vehicle pays Clean Bank; §45.6 / §45.22: the early fixer launders at ~30–35% with a
+   low daily cap; §2: no unlimited instant laundering. DC-03 had noted that the used-lot resale spread must stay
+   worse than the fixer's fee.
+2. **Problem observed (measured in Session 2.5):** a car bought at Saltworks with Dirty Cash is a legally owned
+   car, and selling it from your garage pays Clean Bank. Over 400 generated used-lot cars, the garage sale returns a
+   median 0.86× the Dirty Cash paid; 82% return more than the fixer's 0.68; 28.5% sell for more than they cost
+   (up to 1.82×: a young car in good condition, or a "bargain", is priced at 0.26-0.41 × list, and the garage pays
+   0.5 × list × condition). So the used lot is an uncapped, instant Dirty → Clean route with a negative fee on a
+   quarter of the stock, and a money source. It makes the fixer's 32% fee and $5,000 cap pointless.
+3. **Proposed improvement:** (a) money keeps its colour through what it buys: a car bought with Dirty Cash (fully or
+   in part) is recorded as such, and its garage sale pays Dirty Cash for that share, like a stolen car (§45.22);
+   only a car bought with Clean Bank sells for Clean. (b) Independently, a car's resale value never exceeds what you
+   paid for it, minus a dealer spread (for example at most 85%), so no car makes money by buying and selling it.
+4. **Why it is better:** one laundering rule (fronts and the fixer), no money creation, and the locked "legal sale →
+   Clean" rule keeps its meaning for cars bought with clean money.
+5. **Systems affected:** `DealerLots.buy` (record what paid), garage entries (a `paidDirty` share), `sellPrice`,
+   `MONEY_SOURCES` (`carSale` vs `stolenCarSale` routing), the `dealers` and `ledger` suites; Session 5 (vehicle
+   ownership) is the natural home for the full provenance model.
+6. **Tradeoffs / risks:** (a) changes how a locked classification applies (a Dirty-bought car is "legally owned"
+   but its sale would pay Dirty), so it needs the owner's ruling; (b) is a balance change.
+7. **Severity:** IMPORTANT. **Blocks:** nothing in code; until ruled, playtesting the early economy will route around
+   the fixer. Nothing was changed in Session 2.5.
 
 ## Owner decisions (Session 0 review)
 
@@ -1606,3 +1731,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | 8 | 1 follow-up | `wallet.treasury` (warehouse id or null; sanitized to an owned warehouse); medical debt cap follows `CONFIG.hospital.max` ($25,000) |
 | 9 | 2 | `uw.turfs[i].own` (authoritative owner: `'pc'`, a faction id or null; derived once from influence for older saves) and `uw.turfs[i].offer` (`{ fid, until }` for a ceded turf); `uw.stageMax` → `uw.rankMax`; `upgrades` keeps only `stamina` and `health`, removed levels refunded to Clean Bank; turf wars may have `a: 'pc'` (a showdown the player called) |
 | 9 | 2 follow-up | crew members gain `morale` (0-10), `boosts` (recent bonuses, fading) and `raiseLoyal` (0-10); sanitized with defaults, no version bump |
+| 9 | 2.5 | `uw.econH` (economic clock, hours) and `uw.fixer` (laundering batches, daily use, totals); defaults on load, no version bump |

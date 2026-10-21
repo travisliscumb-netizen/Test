@@ -141,6 +141,7 @@ class Underworld {
     this.cops = new PressureSystem(this);
     this.prison = new Prison(this);
     this.opps = new OppFeed(this);
+    this.fixer = new LaunderFixer(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -172,7 +173,9 @@ class Underworld {
       decisions: [], flags: {}, realBy: {}, st: { sold: 0, seizedCash: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
       slept: false, shipment: null,
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
-      wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {}
+      wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {},
+      // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
+      econH: 0, fixer: LaunderFixer.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -234,6 +237,7 @@ class Underworld {
     S.dayOffset = Math.floor(num(S.dayOffset, 0, 0, Math.max(0, S.day - 1))); S.fit = Math.floor(num(S.fit, 0, 0, 5));
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
+    S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
@@ -732,7 +736,12 @@ class Underworld {
     }
     this.ui.update(rdt);
   }
+  // how many economic hours one world hour is: the reference day length over the chosen one, so a short day doesn't
+  // speed up the economy per hour of play (§45.9); in jail world time is 1:1 (§45.8) and so is the clock
+  econRate() { return this.S.jail ? 1 : this.g.save.settings.dayLength / ECON_REF_DAY; }
   tickHours(h, hour) {
+    this.S.econH += h * this.econRate();
+    this.fixer.tick();
     this.market.tick(h);
     this.runs.tickHours();
     this.factions.tickHours(h, hour);

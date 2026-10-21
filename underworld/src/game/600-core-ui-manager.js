@@ -749,6 +749,7 @@ class MapView {
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
         if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
+        else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_DAY_CAP)} a day` });
         else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `BUY ${L.def.sells.map(k => GOODS[k].name).join(', ')}${L.def.arms ? ' · guns · also buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });

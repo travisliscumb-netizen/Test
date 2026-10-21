@@ -332,7 +332,7 @@ class EmpireUI {
     for (const L of uw.locs) {
       if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : 'W');
       else if (L.kind === 'hq' && !S.factions[L.id].broken) icon(L.x, L.z, FACTIONS[L.id].col, '♛');
-      else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : 'S');
+      else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : L.def.fixer ? 'L' : 'S');
     }
     const pd = this.g.world.places.police.door; icon(pd.x, pd.z, '#4d8dff', 'P');
   }
@@ -740,15 +740,38 @@ class EmpireUI {
     const uw = this.uw, g = this.g;
     g.content.openSvc('Saltworks Chop Shop', 'Drive a stolen car into the yard and stop to sell it. Wanted cars pay 60% more.', () => `<div class="hint">On the wanted list today: <b>${uw.S.chopWanted.map(t => VEHICLES[t].name).join(', ')}</b>.</div><div class="stats">${Object.keys(CHOP_VALUE).filter(t => VEHICLES[t]).map(t => `<span>${VEHICLES[t].name}</span><span>${fmtMoney(CHOP_VALUE[t])}</span>`).join('')}</div>`, () => {});
   }
+  // the laundering fixer (§45.6): carried Dirty Cash in, Clean Bank FIXER_DELAY economic hours later, minus her fee
+  openFixer(L) {
+    const uw = this.uw, g = this.g, FX = uw.fixer, F = uw.S.fixer;
+    const amounts = [500, 1000, 2500, FIXER_DAY_CAP];
+    const render = () => {
+      const cap = FX.capacityLeft(), have = Money.available('launderIn');
+      const pend = F.batches.map(b => `<span>${fmtMoney(b.dirty)} → ${fmtMoney(b.clean)}</span><span>in about ${Math.max(1, Math.ceil(FX.hoursLeft(b)))} h</span>`).join('');
+      return `<div class="svcTop"><span>Cash on you <b class="money">${fmtMoney(have)}</b></span><span>She’ll take today <b class="money">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
+        <div class="hint">Dirty Cash you hand her lands in your bank, minus her cut, about ${Math.round(FIXER_DELAY / uw.econRate())} hours later. Once it’s with her it isn’t on you: the police can’t take it off you. A front business (later) will wash more, for less.</div>
+        <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_DAY_CAP ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_DAY_CAP ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
+        ${(() => { const l = FX.limit(FIXER_DAY_CAP); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
+        ${F.batches.length ? `<h3>With her now</h3><div class="stats">${pend}</div>` : ''}
+        ${F.washed ? `<div class="hint">Washed so far: ${fmtMoney(F.washed)} for ${fmtMoney(F.fees)} in fees.</div>` : ''}`;
+    };
+    g.content.openSvc(L.def.name, '“Cash. Counted in front of me. Your bank gets it tomorrow, give or take.”', render, a => {
+      const [k, v] = a.split(':'); if (k !== 'wash') return;
+      const r = FX.hand(+v);
+      if (typeof r === 'string') { g.content.refreshSvc(r); return; }
+      g.audio.play('cash');
+      g.content.refreshSvc(`She counts ${fmtMoney(r.dirty)} twice. ${fmtMoney(r.clean)} will be in your bank in about ${Math.round(FIXER_DELAY / uw.econRate())} hours.`);
+    });
+  }
   openSpot(L) {
     const uw = this.uw, g = this.g, S = uw.S, s = L.def;
     if (s.arms) { this.openArmorer(L); return; }
+    if (s.fixer) { this.openFixer(L); return; }
     const z = L.zone;
     const stock = S.supply[s.id] || (S.supply[s.id] = {});
     for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
     const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
     const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>${Money.html('supplier')}</span></div>` +
-      (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} reputation)</div>` : '<div class="jobs">' + s.sells.map(k => {
+      (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} Rep)</div>` : '<div class="jobs">' + s.sells.map(k => {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
         const qs = lb ? [1, 2, 5] : [1, 5, 20];
         return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, p)} · ${fmtQty(k, n)} available · ${TIERS[GOODS[k].tier].name} · street price here ${fmtPerUnit(k, uw.market.price(z, k))}</span></div><div class="btns">${qs.map(q => { const lots = lotsFor(k, q); return `<button class="sbtn" data-act="buy:${k}:${lots}" ${n < lots || !Money.can(p * lots, 'supplier') ? 'disabled' : ''}>${lb ? q + ' lb' : '×' + q} · ${fmtMoney(p * lots)}</button>`; }).join('')}</div></div>`;

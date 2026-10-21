@@ -113,11 +113,16 @@ check('blackjack: still has losing hands and pushes (40%-ish lose, pushes happen
 const psim = await ev(() => {
   const g = window.game, G = g.gamble, keepSave = g.saveGame, keepRef = G.refresh, out = {};
   g.saveGame = () => {}; G.refresh = () => {}; (g.money.W.clean = g.money.W.dirty.me = 1e13);
+  // three fixed seeds, 1,500 hands each, judged together: one unseeded run's EV ranged from -0.9 to +2.6 big blinds
+  // a hand (8 seeds measured in Session 2.5), so a single run failed the edge check about a third of the time
+  const R0 = Math.random;
+  let pw = 0, pl = 0, pn = 0, folds = 0, ev = 0, allins = 0, raiseOpts = null, pk = null, bbSum = 0;
+  for (const seed0 of [101, 202, 303]) {
+  let sd = seed0; Math.random = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
   // a $1,000,000 buy-in: the regulars bring stacks in the same range; the blinds follow from the depth
-  G.pk = null; G.pokerSit(1e6, 50); const pk = G.pk; pk.sim = true;
-  out.stacks = pk.seats.map(x => x.stack + x.put); out.bb = pk.bb;
-  out.opts = (() => { pk.phase = pk.phase; return null; })();
-  let pw = 0, pl = 0, pn = 0, folds = 0, ev = 0, allins = 0, raiseOpts = null;
+  G.pk = null; G.pokerSit(1e6, 50); pk = G.pk; pk.sim = true;
+  if (!out.stacks) { out.stacks = pk.seats.map(x => x.stack + x.put); out.bb = pk.bb; }
+  const ev0 = ev, n0 = pn + folds;
   for (let h = 0; h < 1500; h++) {
     if (pk.seats[0].stack < pk.bb * 20) { const need = pk.buy - pk.seats[0].stack; (g.money.W.clean -= need); pk.seats[0].stack += need; }
     if (pk.phase !== 'play') G.pokerHand();
@@ -133,7 +138,10 @@ const psim = await ev(() => {
     }
     ev += pk.lastNet; if (pk.lastFolded) folds++; else { pn++; if (pk.lastNet > 0) pw++; else if (pk.lastNet < 0) pl++; }
   }
-  out.sim = { hands: pn + folds, played: pn, folded: folds, win: pw / pn, lose: pl / pn, decided: pw / (pw + pl), evBB: ev / (pn + folds) / pk.bb, aiAllIns: allins };
+  bbSum += (ev - ev0) / pk.bb; void n0;
+  }
+  Math.random = R0;
+  out.sim = { seeds: 3, hands: pn + folds, played: pn, folded: folds, win: pw / pn, lose: pl / pn, decided: pw / (pw + pl), evBB: bbSum / (pn + folds), aiAllIns: allins };
   out.raiseOpts = raiseOpts;
   G.pk = null; G.G.casino.chips = 0; g.saveGame = keepSave; G.refresh = keepRef; G.busy = false; (g.money.W.clean = g.money.W.dirty.me = 1e7);
   return out;
@@ -142,8 +150,8 @@ report.poker = psim.sim;
 console.log('POKER SIM', JSON.stringify(psim));
 check('poker: $1M buy-in; NPC stacks in the same range ($600k–$1.6M), blinds from the depth', psim.stacks[0] === 1e6 && psim.stacks.slice(1).every(v => v >= 6e5 - psim.bb && v <= 1.6e6 + psim.bb) && psim.bb === 20000, JSON.stringify(psim));
 check('poker: bet sizes offered (min, ½ pot, pot, all in)', psim.raiseOpts && psim.raiseOpts.includes('ALL IN') && psim.raiseOpts.length >= 2, JSON.stringify(psim.raiseOpts));
-check('poker: of the hands you play, ~60–68% are net wins over 1,500 hands, with a small positive edge', psim.sim.decided > 0.57 && psim.sim.decided < 0.72 && psim.sim.evBB > -0.5, JSON.stringify(psim.sim));
-check('poker: still has losing hands, folds and all-ins (believable play)', psim.sim.lose > 0.25 && psim.sim.folded > 100 && psim.sim.aiAllIns > 0, JSON.stringify(psim.sim));
+check('poker: of the hands you play, ~60–68% are net wins over 3 × 1,500 seeded hands, with a small positive edge', psim.sim.decided > 0.57 && psim.sim.decided < 0.72 && psim.sim.evBB > -0.5, JSON.stringify(psim.sim));
+check('poker: still has losing hands, folds and all-ins (believable play)', psim.sim.lose > 0.25 && psim.sim.folded > 300 && psim.sim.aiAllIns > 0, JSON.stringify(psim.sim));
 const pkUI = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
   window.game.money.W.clean = 2e8; G.pk = null; G.openPoker();

@@ -261,8 +261,16 @@ const SPOTS = [
   { id: 'gus', name: 'Greenhouse Gus', role: 'Supplier · green', at: [1, 1, 1, 30], sells: ['green'], rep: 100, col: 0x7fe08f },
   { id: 'feld', name: 'Doc Feld', role: 'Supplier · pharma', at: [4, 4, 2, 50], sells: ['pills'], rep: 300, col: 0xffd84d },
   { id: 'armorer', name: 'The Armorer', role: 'Weapons & hardware', at: [8, 11, 0, 30], sells: ['hardware'], arms: true, rep: 0, col: 0xff8a3d },
-  { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b }
+  { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b },
+  { id: 'fixer', name: 'Dina Vance', role: 'Laundering fixer · Dirty Cash in, Clean Bank out', at: [3, 1, 3, 30], fixer: true, rep: 0, col: 0x8fe39b }
 ];
+// the early laundering fixer (§45.6, §45.22): she takes Dirty Cash you hand her in person and puts it in your bank
+// FIXER_DELAY economic hours later, minus FIXER_FEE, at most FIXER_DAY_CAP a day. Time runs on the economic clock
+// (Underworld.econH), so the day-length setting doesn't change how much she washes per hour of play (§45.9).
+// Fronts (Session 9) supersede her.
+const FIXER_FEE = 0.32, FIXER_DAY_CAP = 5000, FIXER_DELAY = 12, FIXER_MIN = 100;
+// the economic clock runs at the reference day length outside jail, and at world time in jail (1:1, §45.8)
+const ECON_REF_DAY = 30;
 // faction headquarters (the boss and guards stand here)
 const HQS = { vipers: [1, 6, 1, 40], tidewater: [11, 7, 3, 40], velvet: [6, 9, 0, 30], bellcourt: [8, 1, 3, 40], glasshouse: [7, 6, 1, 40] };
 // chop shop prices per class (before condition and the wanted list)

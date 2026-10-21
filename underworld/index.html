@@ -33254,6 +33254,8 @@ const MONEY_SOURCES = {
   business: { earn: 'clean', book: 'businesses' }, carSale: { earn: 'clean' }, casino: { earn: 'clean' },
   // a car you stole is not a legal sale even from your own garage until HOT/clean titles exist (§45.22, Session 5)
   stolenCarSale: { earn: 'me' },
+  // the laundering fixer: Dirty Cash handed over in person, Clean Bank when she delivers
+  launderIn: { pay: 'dirty' }, launderOut: { earn: 'clean' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
   // ---- Dirty costs
   armorer: { pay: 'dirty' }, supplier: { pay: 'dirty' }, raceBuyIn: { pay: 'dirty' }, respect: { pay: 'dirty' },
@@ -46535,8 +46537,16 @@ const SPOTS = [
   { id: 'gus', name: 'Greenhouse Gus', role: 'Supplier · green', at: [1, 1, 1, 30], sells: ['green'], rep: 100, col: 0x7fe08f },
   { id: 'feld', name: 'Doc Feld', role: 'Supplier · pharma', at: [4, 4, 2, 50], sells: ['pills'], rep: 300, col: 0xffd84d },
   { id: 'armorer', name: 'The Armorer', role: 'Weapons & hardware', at: [8, 11, 0, 30], sells: ['hardware'], arms: true, rep: 0, col: 0xff8a3d },
-  { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b }
+  { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b },
+  { id: 'fixer', name: 'Dina Vance', role: 'Laundering fixer · Dirty Cash in, Clean Bank out', at: [3, 1, 3, 30], fixer: true, rep: 0, col: 0x8fe39b }
 ];
+// the early laundering fixer (§45.6, §45.22): she takes Dirty Cash you hand her in person and puts it in your bank
+// FIXER_DELAY economic hours later, minus FIXER_FEE, at most FIXER_DAY_CAP a day. Time runs on the economic clock
+// (Underworld.econH), so the day-length setting doesn't change how much she washes per hour of play (§45.9).
+// Fronts (Session 9) supersede her.
+const FIXER_FEE = 0.32, FIXER_DAY_CAP = 5000, FIXER_DELAY = 12, FIXER_MIN = 100;
+// the economic clock runs at the reference day length outside jail, and at world time in jail (1:1, §45.8)
+const ECON_REF_DAY = 30;
 // faction headquarters (the boss and guards stand here)
 const HQS = { vipers: [1, 6, 1, 40], tidewater: [11, 7, 3, 40], velvet: [6, 9, 0, 30], bellcourt: [8, 1, 3, 40], glasshouse: [7, 6, 1, 40] };
 // chop shop prices per class (before condition and the wanted list)
@@ -47293,6 +47303,7 @@ class Underworld {
     this.cops = new PressureSystem(this);
     this.prison = new Prison(this);
     this.opps = new OppFeed(this);
+    this.fixer = new LaunderFixer(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -47324,7 +47335,9 @@ class Underworld {
       decisions: [], flags: {}, realBy: {}, st: { sold: 0, seizedCash: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
       slept: false, shipment: null,
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
-      wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {}
+      wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {},
+      // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
+      econH: 0, fixer: LaunderFixer.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -47386,6 +47399,7 @@ class Underworld {
     S.dayOffset = Math.floor(num(S.dayOffset, 0, 0, Math.max(0, S.day - 1))); S.fit = Math.floor(num(S.fit, 0, 0, 5));
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
+    S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
@@ -47884,7 +47898,12 @@ class Underworld {
     }
     this.ui.update(rdt);
   }
+  // how many economic hours one world hour is: the reference day length over the chosen one, so a short day doesn't
+  // speed up the economy per hour of play (§45.9); in jail world time is 1:1 (§45.8) and so is the clock
+  econRate() { return this.S.jail ? 1 : this.g.save.settings.dayLength / ECON_REF_DAY; }
   tickHours(h, hour) {
+    this.S.econH += h * this.econRate();
+    this.fixer.tick();
     this.market.tick(h);
     this.runs.tickHours();
     this.factions.tickHours(h, hour);
@@ -50889,6 +50908,80 @@ class OppFeed {
 function uw_toastOnce(uw, text) { const g = uw.g; if (g.time - (uw._lastT || 0) > 1.5) { uw._lastT = g.time; g.ui.toast(text); } }
 
 /* =====================================================================
+   [UNDERWORLD] LAUNDERING FIXER (§45.6, §45.22): the early, low-capacity
+   way to turn Dirty Cash into Clean Bank before you own a front. You hand
+   Dina Vance cash in person; she keeps her fee and puts the rest in your
+   bank half an economic day later, at most so much a day. Money with her
+   is not on you: an arrest can't seize it, and it still arrives while you
+   are inside. State lives in save.uw.fixer; time is the economic clock.
+   ===================================================================== */
+class LaunderFixer {
+  constructor(uw) { this.uw = uw; }
+  get S() { return this.uw.S; }
+  get F() { return this.S.fixer; }
+  static fresh() { return { day: 0, used: 0, batches: [], next: 1, washed: 0, fees: 0 }; }
+  static sanitize(f, num) {
+    const d = LaunderFixer.fresh();
+    if (!f || typeof f !== 'object') return d;
+    const out = { day: Math.floor(num(f.day, 0, 0, 1e7)), used: num(f.used, 0, 0, FIXER_DAY_CAP), next: Math.floor(num(f.next, 1, 1, 1e9)), washed: num(f.washed, 0, 0, 1e15), fees: num(f.fees, 0, 0, 1e15), batches: [] };
+    for (const b of Array.isArray(f.batches) ? f.batches : []) {
+      if (!b || typeof b !== 'object') continue;
+      // never more out than her fee allows for what went in
+      const dirty = Math.floor(num(b.dirty, 0, 0, FIXER_DAY_CAP)), clean = num(b.clean, 0, 0, LaunderFixer.quote(dirty).clean);
+      if (!(clean > 0)) continue;
+      out.batches.push({ id: Math.floor(num(b.id, 0, 0, 1e9)), dirty, clean, due: num(b.due, 0, 0, 1e9) });
+    }
+    out.batches = out.batches.slice(0, 20);
+    out.next = Math.max(out.next, ...out.batches.map(b => b.id + 1), 1);
+    return out;
+  }
+  // the economic day the capacity counts against (24 economic hours)
+  econDay() { return Math.floor(this.S.econH / 24); }
+  capacityLeft() { const F = this.F; return F.day === this.econDay() ? Math.max(0, FIXER_DAY_CAP - F.used) : FIXER_DAY_CAP; }
+  // what you would get for n and when, without doing it
+  static quote(n) { const fee = Math.round(n * FIXER_FEE); return { dirty: n, fee, clean: n - fee }; }
+  quote(n) { return LaunderFixer.quote(n); }
+  // how much of n she would take right now, and why not more
+  limit(n) {
+    const have = Money.available('launderIn'), cap = this.capacityLeft();
+    const take = Math.floor(Math.min(n, have, cap));
+    if (cap < FIXER_MIN) return { take: 0, why: 'That’s all she’ll wash today. Come back tomorrow.' };
+    if (have < FIXER_MIN) return { take: 0, why: `She doesn’t get out of bed for less than ${fmtMoney(FIXER_MIN)}. Bring cash, on you.` };
+    if (take < FIXER_MIN) return { take: 0, why: `At least ${fmtMoney(FIXER_MIN)}.` };
+    return { take, why: '' };
+  }
+  // hand her cash. Returns the batch, or a reason string
+  hand(n) {
+    const uw = this.uw, F = this.F;
+    if (uw.inJail) return 'Not from a cell.';
+    const L = this.limit(n);
+    if (!L.take) return L.why;
+    const q = this.quote(L.take);
+    if (Money.pay(q.dirty, 'launderIn') !== q.dirty) return 'You don’t have it on you.';
+    const day = this.econDay(); if (F.day !== day) { F.day = day; F.used = 0; }
+    F.used += q.dirty;
+    const b = { id: F.next++, dirty: q.dirty, clean: q.clean, due: this.S.econH + FIXER_DELAY };
+    F.batches.push(b);
+    uw.g.autosave('Cash with the fixer');
+    return b;
+  }
+  // economic hours until a batch arrives, shown as world hours at the current pace
+  hoursLeft(b) { return Math.max(0, (b.due - this.S.econH) / this.uw.econRate()); }
+  pending() { return this.F.batches.reduce((a, b) => a + b.clean, 0); }
+  // called from Underworld.tickHours after the economic clock moves
+  tick() {
+    const uw = this.uw, F = this.F, now = this.S.econH;
+    const due = F.batches.filter(b => b.due <= now + 1e-9);
+    if (!due.length) return;
+    F.batches = F.batches.filter(b => b.due > now + 1e-9);
+    for (const b of due) {
+      const got = Money.earn(b.clean, 'launderOut');
+      F.washed += b.dirty; F.fees += b.dirty - b.clean;
+      uw.news('Dina', `It’s done. ${fmtMoney(got)} is in your bank, clean as a whistle. Pleasure doing business.`);
+    }
+  }
+}
+/* =====================================================================
    [UNDERWORLD] EMPIRE UI: the phone (overview, territory map, crew, assets,
    market, stash, factions, police, feed), every street menu (property,
    supplier, armorer, fence, deal corner, boss sit-down, chop shop), the
@@ -51222,7 +51315,7 @@ class EmpireUI {
     for (const L of uw.locs) {
       if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : 'W');
       else if (L.kind === 'hq' && !S.factions[L.id].broken) icon(L.x, L.z, FACTIONS[L.id].col, '♛');
-      else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : 'S');
+      else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : L.def.fixer ? 'L' : 'S');
     }
     const pd = this.g.world.places.police.door; icon(pd.x, pd.z, '#4d8dff', 'P');
   }
@@ -51630,15 +51723,38 @@ class EmpireUI {
     const uw = this.uw, g = this.g;
     g.content.openSvc('Saltworks Chop Shop', 'Drive a stolen car into the yard and stop to sell it. Wanted cars pay 60% more.', () => `<div class="hint">On the wanted list today: <b>${uw.S.chopWanted.map(t => VEHICLES[t].name).join(', ')}</b>.</div><div class="stats">${Object.keys(CHOP_VALUE).filter(t => VEHICLES[t]).map(t => `<span>${VEHICLES[t].name}</span><span>${fmtMoney(CHOP_VALUE[t])}</span>`).join('')}</div>`, () => {});
   }
+  // the laundering fixer (§45.6): carried Dirty Cash in, Clean Bank FIXER_DELAY economic hours later, minus her fee
+  openFixer(L) {
+    const uw = this.uw, g = this.g, FX = uw.fixer, F = uw.S.fixer;
+    const amounts = [500, 1000, 2500, FIXER_DAY_CAP];
+    const render = () => {
+      const cap = FX.capacityLeft(), have = Money.available('launderIn');
+      const pend = F.batches.map(b => `<span>${fmtMoney(b.dirty)} → ${fmtMoney(b.clean)}</span><span>in about ${Math.max(1, Math.ceil(FX.hoursLeft(b)))} h</span>`).join('');
+      return `<div class="svcTop"><span>Cash on you <b class="money">${fmtMoney(have)}</b></span><span>She’ll take today <b class="money">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
+        <div class="hint">Dirty Cash you hand her lands in your bank, minus her cut, about ${Math.round(FIXER_DELAY / uw.econRate())} hours later. Once it’s with her it isn’t on you: the police can’t take it off you. A front business (later) will wash more, for less.</div>
+        <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_DAY_CAP ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_DAY_CAP ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
+        ${(() => { const l = FX.limit(FIXER_DAY_CAP); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
+        ${F.batches.length ? `<h3>With her now</h3><div class="stats">${pend}</div>` : ''}
+        ${F.washed ? `<div class="hint">Washed so far: ${fmtMoney(F.washed)} for ${fmtMoney(F.fees)} in fees.</div>` : ''}`;
+    };
+    g.content.openSvc(L.def.name, '“Cash. Counted in front of me. Your bank gets it tomorrow, give or take.”', render, a => {
+      const [k, v] = a.split(':'); if (k !== 'wash') return;
+      const r = FX.hand(+v);
+      if (typeof r === 'string') { g.content.refreshSvc(r); return; }
+      g.audio.play('cash');
+      g.content.refreshSvc(`She counts ${fmtMoney(r.dirty)} twice. ${fmtMoney(r.clean)} will be in your bank in about ${Math.round(FIXER_DELAY / uw.econRate())} hours.`);
+    });
+  }
   openSpot(L) {
     const uw = this.uw, g = this.g, S = uw.S, s = L.def;
     if (s.arms) { this.openArmorer(L); return; }
+    if (s.fixer) { this.openFixer(L); return; }
     const z = L.zone;
     const stock = S.supply[s.id] || (S.supply[s.id] = {});
     for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
     const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
     const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>${Money.html('supplier')}</span></div>` +
-      (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} reputation)</div>` : '<div class="jobs">' + s.sells.map(k => {
+      (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} Rep)</div>` : '<div class="jobs">' + s.sells.map(k => {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
         const qs = lb ? [1, 2, 5] : [1, 5, 20];
         return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, p)} · ${fmtQty(k, n)} available · ${TIERS[GOODS[k].tier].name} · street price here ${fmtPerUnit(k, uw.market.price(z, k))}</span></div><div class="btns">${qs.map(q => { const lots = lotsFor(k, q); return `<button class="sbtn" data-act="buy:${k}:${lots}" ${n < lots || !Money.can(p * lots, 'supplier') ? 'disabled' : ''}>${lb ? q + ' lb' : '×' + q} · ${fmtMoney(p * lots)}</button>`; }).join('')}</div></div>`;
@@ -54178,6 +54294,7 @@ class MapView {
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
         if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
+        else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_DAY_CAP)} a day` });
         else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `BUY ${L.def.sells.map(k => GOODS[k].name).join(', ')}${L.def.arms ? ' · guns · also buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });
@@ -55546,7 +55663,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

@@ -14,9 +14,10 @@ const once = sd => page.evaluate(seed0 => {
   let seed = seed0; const R0 = Math.random; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   // the same 18 turfs in both runs: the middle of the map
   const mine = uw.T.map(t => t.i).filter(i => { const t = uw.T[i]; const cx = t.deal.x / 80, cz = t.deal.z / 80; return cx > 1 && cx < 11 && cz > 1 && cz < 11; }).slice(0, 24);
-  const snap = JSON.stringify({ turfs: S.turfs, factions: S.factions, infamy: S.infamy, props: S.props });
+  // every seed starts from the same state: the game keeps running between calls, at a pace that depends on load
+  const snap = window.__kpSnap || (window.__kpSnap = JSON.stringify({ turfs: S.turfs, factions: S.factions, infamy: S.infamy, props: S.props, day: S.day }));
   const run = (infamy, days) => {
-    const base = JSON.parse(snap); S.turfs = base.turfs; S.factions = base.factions; S.props = base.props; S.infamy = infamy;
+    const base = JSON.parse(snap); S.turfs = base.turfs; S.factions = base.factions; S.props = base.props; S.infamy = infamy; S.day = base.day;
     // the top Rank needs the whole empire (§31): Rep, crew, two Lieutenants, 16 turfs and 800 influence. Both runs
     // have the same people; only infamy (and so influence) differs
     g.save.rep = 2500; S.crew = [1, 2].map(n => uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: null }));
