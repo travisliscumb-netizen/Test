@@ -26,7 +26,7 @@ class CrewManager {
   reset() { this._bg = null; }
   active() { return this.S.crew.filter(c => c.status === 'active'); }
   cap() {
-    let n = 2 + Math.min(4, this.uw.stage);
+    let n = 2 + Math.min(4, this.uw.rank);
     for (const id in this.S.props) if (this.S.props[id].owned && PROP_BY_ID[id]) n += PROP_BY_ID[id].crew || 0;
     n += Math.round(this.uw.props.perk('crewRoom'));
     return Math.min(40, n);
@@ -34,7 +34,7 @@ class CrewManager {
   roster() { return this.S.crew.filter(c => c.status !== 'gone' && c.status !== 'dead'); }
   displayName(c) { return c.nick ? `${c.name.split(' ')[0]} “${c.nick}” ${c.name.split(' ').slice(1).join(' ')}` : c.name; }
   genCandidate() {
-    const st = this.uw.stage, rng = Math.random;
+    const st = this.uw.rank, rng = Math.random;
     const traits = pickN(Object.keys(TRAITS), rng() < 0.4 ? 2 : 1);
     let skill = clamp(18 + st * 8 + rng() * 40 + (traits.includes('veteran') ? 15 : 0), 5, 99);
     const greedy = traits.includes('greedy');
@@ -50,12 +50,12 @@ class CrewManager {
     if (!force && S.cand.length && S.day - S.candDay < 2) return;
     S.candDay = S.day;
     const PM = this.uw.props, hoodR = PM.ownedList().some(d => d.kind === 'safehouse' && PM.hoodOf(d) && PM.hoodOf(d).recruit) ? 1 : 0;
-    const extra = Math.round(PM.perk('recruit')) + hoodR, n = (this.uw.stage >= 1 ? 3 + Math.min(3, this.uw.stage) : 2) + extra;
+    const extra = Math.round(PM.perk('recruit')) + hoodR, n = (this.uw.rank >= 1 ? 3 + Math.min(3, this.uw.rank) : 2) + extra;
     S.cand = Array.from({ length: n }, () => this.genCandidate());
     // tattoo studios, bars and clubs bring in harder people
     if (extra) for (const c of S.cand) c.skill = clamp(c.skill + extra * 2, 0, 99);
   }
-  canRecruit() { return this.uw.g.save.rep >= 100 || this.uw.stage >= 1; }
+  canRecruit() { return this.uw.g.save.rep >= 100 || this.uw.rank >= 1; }
   hire(idx) {
     const uw = this.uw, S = this.S, g = uw.g, c = S.cand[idx];
     if (!c) return 'Gone.';
@@ -107,7 +107,7 @@ class CrewManager {
   assign(id, role, target) {
     const c = this.find(id); if (!c || c.status !== 'active') return 'Not available.';
     const R = CREW_ROLES[role]; if (!R) return 'Unknown role.';
-    if (R.minRank && c.rank < R.minRank) return `${R.name} needs ${RANKS[R.minRank]} rank.`;
+    if (R.minRank && c.rank < R.minRank) return `${R.name} needs ${CREW_RANKS[R.minRank]} rank.`;
     if (role === 'bodyguard' && this.active().filter(o => o.role === 'bodyguard' && o !== c).length >= 2) return 'Two bodyguards at most.';
     if (R.biz && !(this.S.props[target] && this.S.props[target].owned && PROP_BY_ID[target].kind === 'business')) return 'Pick one of your businesses.';
     if (role === 'manager' && this.active().some(o => o !== c && o.role === 'manager' && o.assign === target)) return 'That business already has a manager.';
@@ -152,13 +152,13 @@ class CrewManager {
     const wages = this.payroll();
     const paid = Money.pay(wages, 'wages', { partial: true });
     const short = wages > 0 && paid < wages - 0.5;
-    const stage = uw.stage;
+    const rank = uw.rank;
     let dealt = 0, dealIncome = 0;
     for (const c of act) {
       c.days++;
       const t = c.traits;
       // ---- loyalty, with the reasons that move it
-      let dl = 0.4 + stage * 0.3;
+      let dl = 0.4 + rank * 0.3;
       if (short) { c.unpaid++; dl -= 7 + c.unpaid * 3; } else c.unpaid = 0;
       if (t.includes('loyal')) dl += 1; if (t.includes('greedy')) dl -= 0.6;
       if (c.wins > 0) { dl += Math.min(4, c.wins); c.wins = 0; }
@@ -168,7 +168,7 @@ class CrewManager {
       const rival = this.bestRival();
       if (rival && (t.includes('greedy') || c.loyalty < 45) && Math.random() < 0.15) { dl -= 3; c.offer = rival; }
       c.loyalty = clamp(c.loyalty + dl, 0, 100);
-      c.fear += ((stage * 8) - c.fear) * 0.05;
+      c.fear += ((rank * 8) - c.fear) * 0.05;
       c.power = clamp(c.power + c.rank * 0.35 + (t.includes('ambitious') ? 0.6 : 0) + (c.role === 'lieutenant' ? 0.9 : 0), 0, 100);
       // ---- role work (a runner out on a delivery skips their usual job that day)
       const res = S.runs.some(r => r.crew === c.id) ? null : this.work(c);
@@ -267,14 +267,16 @@ class CrewManager {
       const z = c.role === 'lieutenant' ? c.assign : uw.T[typeof c.assign === 'number' ? c.assign : 0].zone;
       const to = rival || this.bestRival() || FAC_IDS.find(id => !S.factions[id].broken);
       let n = 0;
-      for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === z && uw.owner[i] === 'pc') { uw.addInf(i, 'pc', -45); if (to) uw.addInf(i, to, 40); n++; }
+      // the turfs aren't handed over: the rival they sold you to moves on them at once, with everything the traitor
+      // knows (§45.13). The showdowns decide who keeps them.
+      for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === z && uw.owner[i] === 'pc') { uw.addInf(i, 'pc', -45); if (to) { uw.addInf(i, to, 40); uw.factions.startWar(to, i, 'Betrayal.', { force: true }); } n++; }
       const stolen = Money.crewTheft(0.12, 0, 60000);
       c.status = 'gone'; c.role = 'idle';
       if (to) S.factions[to].strength = Math.min(110, S.factions[to].strength + 10);
       for (const o of this.active()) o.loyalty = clamp(o.loyalty - 6, 0, 100);
       uw.recompute();
       g.ui.banner('Betrayed', `${c.name} turned on you`, 'fail', 4);
-      uw.news('unknown', `${this.displayName(c)} sold you out: ${n} turf${n === 1 ? '' : 's'} in ${ZONES[z] ? ZONES[z].name : 'the city'} flipped${to ? ' to the ' + FACTIONS[to].short : ''} and ${fmtMoney(stolen)} went with them. Why: ${why}, power ${Math.round(c.power)}.`);
+      uw.news('unknown', `${this.displayName(c)} sold you out: ${n} turf${n === 1 ? '' : 's'} in ${ZONES[z] ? ZONES[z].name : 'the city'} ${n === 1 ? 'is' : 'are'} ${to ? 'under attack from the ' + FACTIONS[to].short : 'exposed'}, and ${fmtMoney(stolen)} went with them. Why: ${why}, power ${Math.round(c.power)}.`);
     }
   }
   decide(did, yes) {

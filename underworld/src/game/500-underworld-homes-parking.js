@@ -23,11 +23,11 @@ const HOME_LADDER = [
   { id: 'single2', name: null, tier: 3, type: 'Detached house', price: 23500, home: h => h.district === 'l' && h.garage === 'single', storage: 80, crew: 1, desc: 'Corner of the court, a single garage and a big back garden.' },
   { id: 'farm', name: 'Cedar Farmhouse', tier: 4, sig: 'r', type: 'Farmhouse', price: 52000, home: h => h.name === 'Cedar Farmhouse', yard: 1, storage: 200, crew: 2, desc: 'The Cedar Fields signature house: fields, a barn, a spot in the yard and ten rooms. The quietest address you can buy.' },
   { id: 'double1', name: null, tier: 4, type: 'Family home', price: 34000, home: h => h.district === 'l' && h.garage === 'double', storage: 100, crew: 1, desc: 'A double garage, a long drive and neighbours who mind their own business.' },
-  { id: 'double2', name: null, tier: 4, type: 'Upscale house', price: 52000, home: h => h.district === 'u' && h.garage === 'double', fb: h => h.garage === 'double', storage: 110, crew: 2, infl: 5, desc: 'Crestmoor Heights: gated drive, double garage, a pool.' },
-  { id: 'double3', name: null, tier: 4, type: 'Upscale house', price: 61000, home: h => h.district === 'u' && h.garage === 'double', fb: h => h.garage === 'double', storage: 120, crew: 2, infl: 5, desc: 'Hedges, a gate and a double garage on the quietest drive in Crestmoor.' },
-  { id: 'triple1', name: null, tier: 5, type: 'Luxury home', price: 88000, home: h => h.garage === 'triple', storage: 140, crew: 2, infl: 10, luxury: true, desc: 'A triple garage, a curved drive and a view of the sea.' },
-  { id: 'triple2', name: null, tier: 5, type: 'Luxury home', price: 104000, home: h => h.garage === 'triple', storage: 150, crew: 2, infl: 10, luxury: true, desc: 'Three garage doors, a pool terrace and a gate that knows your car.' },
-  { id: 'triple3', name: null, tier: 5, type: 'Luxury home', price: 126000, home: h => h.garage === 'triple', fb: h => h.district === 'u', storage: 160, crew: 2, infl: 12, luxury: true, desc: 'The biggest house on Crestmoor Drive that isn’t a mansion.' },
+  { id: 'double2', name: null, tier: 4, type: 'Upscale house', price: 52000, home: h => h.district === 'u' && h.garage === 'double', fb: h => h.garage === 'double', storage: 110, crew: 2, desc: 'Crestmoor Heights: gated drive, double garage, a pool.' },
+  { id: 'double3', name: null, tier: 4, type: 'Upscale house', price: 61000, home: h => h.district === 'u' && h.garage === 'double', fb: h => h.garage === 'double', storage: 120, crew: 2, desc: 'Hedges, a gate and a double garage on the quietest drive in Crestmoor.' },
+  { id: 'triple1', name: null, tier: 5, type: 'Luxury home', price: 88000, home: h => h.garage === 'triple', storage: 140, crew: 2, luxury: true, desc: 'A triple garage, a curved drive and a view of the sea.' },
+  { id: 'triple2', name: null, tier: 5, type: 'Luxury home', price: 104000, home: h => h.garage === 'triple', storage: 150, crew: 2, luxury: true, desc: 'Three garage doors, a pool terrace and a gate that knows your car.' },
+  { id: 'triple3', name: null, tier: 5, type: 'Luxury home', price: 126000, home: h => h.garage === 'triple', fb: h => h.district === 'u', storage: 160, crew: 2, luxury: true, desc: 'The biggest house on Crestmoor Drive that isn’t a mansion.' },
   // ---- v6: 24 more homes (45 in all), spread over every residential market
   { id: 'pier_room', name: 'Pier Street Room', tier: 1, type: 'Rented room', price: 2900, at: [11, 6, 0, 56], street: 1, storage: 20, desc: 'A room over a chandler’s on the docks. Gulls, diesel and nobody asking.' },
   { id: 'neon_studio', name: 'Neon Row Studio', tier: 1, type: 'Studio flat', price: 4300, at: [5, 11, 3, 16], street: 1, storage: 30, desc: 'A studio above a karaoke bar on the Strip. Sleep is optional.' },
@@ -38,22 +38,22 @@ const HOME_LADDER = [
   { id: 'bung2', name: null, tier: 2, type: 'Bungalow', price: 11000, home: h => h.type === 'bungalow' && h.garage === 'street', storage: 55, desc: 'A tidy bungalow with kerbside parking and a back gate.' },
   { id: 'bung3', name: null, tier: 2, type: 'Bungalow', price: 13200, home: h => h.type === 'bungalow' && h.garage === 'carport', storage: 60, desc: 'Single storey, a carport and a shed out back.' },
   { id: 'cul2', name: null, tier: 2, type: 'Small detached', price: 15600, home: h => h.district === 'l' && h.type === 'house' && h.garage === 'carport', storage: 70, desc: 'A starter house at the end of a cul-de-sac. One way in, one way out.' },
-  { id: 'canal_loft', name: 'Canal Street Loft', tier: 4, sig: 'o', type: 'Warehouse loft', price: 64000, at: [5, 0, 0, 56], street: 2, storage: 160, crew: 2, infl: 8, desc: 'The Old Quarter signature home: a converted bonded warehouse, ten rooms behind a steel door.' },
+  { id: 'canal_loft', name: 'Canal Street Loft', tier: 4, sig: 'o', type: 'Warehouse loft', price: 64000, at: [5, 0, 0, 56], street: 2, storage: 160, crew: 2, desc: 'The Old Quarter signature home: a converted bonded warehouse, ten rooms behind a steel door.' },
   { id: 'single3', name: null, tier: 3, type: 'Detached house', price: 21500, home: h => h.district === 'l' && h.type === 'house' && h.garage === 'single', storage: 80, crew: 1, desc: 'Brick, a single garage and a long back garden.' },
   { id: 'single4', name: null, tier: 3, type: 'Detached bungalow', price: 18500, home: h => h.district === 'l' && h.type === 'bungalow' && h.garage === 'single', storage: 75, crew: 1, desc: 'A wide bungalow with a garage and a hedge for privacy.' },
   { id: 'family1', name: null, tier: 3, type: 'Family house', price: 24500, home: h => h.district === 'l' && h.type === 'house' && h.garage === 'single', storage: 90, crew: 1, desc: 'Four bedrooms upstairs, a garage, and a street full of kids on bikes.' },
   { id: 'family2', name: null, tier: 3, type: 'Family bungalow', price: 20500, home: h => h.district === 'l' && h.type === 'bungalow' && h.garage === 'single', storage: 85, crew: 1, desc: 'Room for everyone on one floor and a garage for the car.' },
   { id: 'single5', name: null, tier: 3, type: 'Detached house', price: 26500, home: h => h.district === 'l' && h.type === 'house' && h.garage === 'single', storage: 90, crew: 1, desc: 'A corner plot, a garage and a view down the hill.' },
   { id: 'double4', name: null, tier: 4, type: 'Family home', price: 39000, home: h => h.district === 'l' && h.garage === 'double', storage: 105, crew: 1, desc: 'A double garage and a drive long enough for a party.' },
-  { id: 'double5', name: null, tier: 4, type: 'Upscale house', price: 58000, home: h => h.district === 'u' && h.garage === 'double', storage: 115, crew: 2, infl: 5, desc: 'Crestmoor: a gated drive, a double garage and a pool cover nobody lifts.' },
-  { id: 'double6', name: null, tier: 4, type: 'Upscale house', price: 66000, home: h => h.district === 'u' && h.garage === 'double', storage: 120, crew: 2, infl: 6, desc: 'Big windows facing the sea and a double garage facing the street.' },
-  { id: 'double7', name: null, tier: 4, type: 'Upscale house', price: 48000, home: h => h.district === 'u' && h.type === 'house' && h.garage === 'double', fb: h => h.garage === 'double', storage: 110, crew: 2, infl: 4, desc: 'The smallest house in Crestmoor, which still has a double garage.' },
-  { id: 'harbour_condo', name: 'Harbourview Condo', tier: 4, type: 'Condominium', price: 46000, at: [8, 4, 1, 16], street: 2, storage: 100, crew: 1, infl: 6, desc: 'A Financial District condo with a doorman and two reserved spaces.' },
-  { id: 'triple4', name: null, tier: 5, type: 'Luxury home', price: 118000, home: h => h.garage === 'triple', storage: 155, crew: 2, infl: 11, luxury: true, desc: 'Three garages, a tennis court and a gate with a camera on it.' },
-  { id: 'sig_linden', name: 'Linden Manor', tier: 5, sig: 'l', type: 'Manor house', price: 82000, home: h => h.district === 'l' && h.garage === 'double', storage: 150, crew: 3, infl: 10, desc: 'The Linden Hills signature home: the biggest house on the hill, ten rooms and a double garage.' },
-  { id: 'skyline', name: 'Skyline Residence', tier: 5, sig: 'c', type: 'Sky residence', price: 134000, at: [5, 7, 1, 32], street: 2, storage: 150, crew: 2, infl: 20, luxury: true, desc: 'The Financial District signature home: a full floor in a glass tower, eleven rooms and a private lift.' },
-  { id: 'sig_crest', name: 'Highcliff House', tier: 5, sig: 'u', type: 'Signature villa', price: 142000, home: h => h.garage === 'triple', fb: h => h.district === 'u', storage: 180, crew: 3, infl: 25, luxury: true, desc: 'The Crestmoor signature home: a cliff-top villa with a games room, a bar and three garages.' },
-  { id: 'mansion', name: 'Crestmoor Estate', tier: 6, type: 'Mansion', price: 380000, home: h => h.id === 'mansion', under: 10, storage: 400, crew: 4, infl: 60, luxury: true, desc: 'The estate on the point: grounds, a portico, a pool, and a ten-car motor court under the lawn.' }
+  { id: 'double5', name: null, tier: 4, type: 'Upscale house', price: 58000, home: h => h.district === 'u' && h.garage === 'double', storage: 115, crew: 2, desc: 'Crestmoor: a gated drive, a double garage and a pool cover nobody lifts.' },
+  { id: 'double6', name: null, tier: 4, type: 'Upscale house', price: 66000, home: h => h.district === 'u' && h.garage === 'double', storage: 120, crew: 2, desc: 'Big windows facing the sea and a double garage facing the street.' },
+  { id: 'double7', name: null, tier: 4, type: 'Upscale house', price: 48000, home: h => h.district === 'u' && h.type === 'house' && h.garage === 'double', fb: h => h.garage === 'double', storage: 110, crew: 2, desc: 'The smallest house in Crestmoor, which still has a double garage.' },
+  { id: 'harbour_condo', name: 'Harbourview Condo', tier: 4, type: 'Condominium', price: 46000, at: [8, 4, 1, 16], street: 2, storage: 100, crew: 1, desc: 'A Financial District condo with a doorman and two reserved spaces.' },
+  { id: 'triple4', name: null, tier: 5, type: 'Luxury home', price: 118000, home: h => h.garage === 'triple', storage: 155, crew: 2, luxury: true, desc: 'Three garages, a tennis court and a gate with a camera on it.' },
+  { id: 'sig_linden', name: 'Linden Manor', tier: 5, sig: 'l', type: 'Manor house', price: 82000, home: h => h.district === 'l' && h.garage === 'double', storage: 150, crew: 3, desc: 'The Linden Hills signature home: the biggest house on the hill, ten rooms and a double garage.' },
+  { id: 'skyline', name: 'Skyline Residence', tier: 5, sig: 'c', type: 'Sky residence', price: 134000, at: [5, 7, 1, 32], street: 2, storage: 150, crew: 2, luxury: true, desc: 'The Financial District signature home: a full floor in a glass tower, eleven rooms and a private lift.' },
+  { id: 'sig_crest', name: 'Highcliff House', tier: 5, sig: 'u', type: 'Signature villa', price: 142000, home: h => h.garage === 'triple', fb: h => h.district === 'u', storage: 180, crew: 3, luxury: true, desc: 'The Crestmoor signature home: a cliff-top villa with a games room, a bar and three garages.' },
+  { id: 'mansion', name: 'Crestmoor Estate', tier: 6, type: 'Mansion', price: 380000, home: h => h.id === 'mansion', under: 10, storage: 400, crew: 4, luxury: true, desc: 'The estate on the point: grounds, a portico, a pool, and a ten-car motor court under the lawn.' }
 ];
 // existing safehouses join the ladder too
 const LADDER_EXTRA = { flop: { tier: 1, type: 'Rented room', street: 1 }, linden: { tier: 3, type: 'Detached house' }, loft: { tier: 3, type: 'Loft apartment', street: 2 }, penthouse: { tier: 6, type: 'Penthouse', under: 4, outdoor: 1 } };
@@ -74,7 +74,7 @@ function defineHomeProps(world) {
   const nameFor = h => { const list = HOME_STREETS[h.district] || HOME_STREETS.l, k = streetN[h.district] = (streetN[h.district] || 0) + 1; return `${(k * 7 + h.block % 9) * 2 + 1} ${list[(h.block + k) % list.length]}`; };
   for (const L of HOME_LADDER) {
     if (PROP_BY_ID[L.id]) continue;
-    const def = { id: L.id, name: L.name, kind: 'safehouse', tier: L.tier, type: L.type, price: L.price, storage: L.storage, crew: L.crew || 0, infl: L.infl || 0, luxury: !!L.luxury, desc: L.desc, garage: 0, sig: L.sig || null };
+    const def = { id: L.id, name: L.name, kind: 'safehouse', tier: L.tier, type: L.type, price: L.price, storage: L.storage, crew: L.crew || 0, luxury: !!L.luxury, desc: L.desc, garage: 0, sig: L.sig || null };
     if (L.home) {
       const h = take(L.home, L.id) || (L.fb && take(L.fb, L.id));
       if (!h) continue; // a layout without a match simply has one home fewer
@@ -250,7 +250,7 @@ class DealerLots {
   despawnSlot(lot, i) { const v = this.carAt(lot, i); if (v && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.cars.delete(lot + ':' + i); }
   cantBuy(lot, c) {
     const g = this.g, s = g.save, C2 = g.content;
-    if (lot !== 'used' && C2.repLevel < (CAR_REP[c.type] || 0)) return `Needs ${REP_LEVELS[CAR_REP[c.type]].name} reputation`;
+    if (lot !== 'used' && s.rep < (CAR_REP[c.type] || 0)) return `Needs ${CAR_REP[c.type]} Rep`;
     if (s.garage.length >= C2.garageCap) return C2.garageCap ? 'Garage full' : 'You need a place with parking';
     // Saltworks is a shady lot that takes cash or the bank; the licensed dealers take the bank only (§13)
     if (!Money.can(c.price, lot === 'used' ? 'usedLot' : 'dealer')) return `Costs ${fmtMoney(c.price)}${lot === 'used' ? '' : ' from your bank'}`;

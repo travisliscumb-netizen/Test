@@ -20,6 +20,9 @@ class PropertyManager {
   // ---- v6 business levels and perks
   level(id) { const o = this.S.props[id]; return o && o.owned ? clamp((o.lvl | 0) || 1, 1, 3) : 0; }
   manager(id) { return this.uw.crew.active().find(c => c.role === 'manager' && c.assign === id) || null; }
+  // how established a business is, 0..1 (§45.7): nothing for its first BIZ_EST_DAYS days, then rising to full over
+  // BIZ_EST_RAMP days. Only influence reads it; income and the other perks start on day one.
+  established(id) { const o = this.S.props[id]; return o && o.owned ? clamp((this.S.day - o.since - BIZ_EST_DAYS) / BIZ_EST_RAMP, 0, 1) : 0; }
   // what every business you own of a kind adds up to (its level's value; damaged ones half; a manager +10%)
   perk(name) {
     let v = 0;
@@ -34,6 +37,7 @@ class PropertyManager {
       if (name === 'infl' && def.cat === 'hotel') x += 8 * lv;
       if (name === 'infl' && def.cat === 'nightclub') x += 5 * (lv - 1);
       if (!x) continue;
+      if (name === 'infl') x *= this.established(def.id);
       if (this.S.props[def.id].dmg) x *= 0.5;
       if (this.manager(def.id)) x *= 1.1;
       v += x;
@@ -71,7 +75,7 @@ class PropertyManager {
     if (!Money.can(cost, 'property')) return `The work costs ${fmtMoney(cost)} from your bank.`;
     if (o.dmg) return 'Repair it first.';
     Money.pay(cost, 'property'); o.lvl = lv + 1;
-    uw.addRep(15 * lv, null); uw.computeInfluence();
+    uw.computeInfluence();
     g.ui.banner(`${d.name}`, `${BIZ_LEVEL_NAME[lv]} · level ${lv + 1}`, 'pass', 2.6); g.audio.play('pass');
     if (g.bizSigns) g.bizSigns.refresh();
     g.autosave('Business upgraded');
@@ -93,16 +97,15 @@ class PropertyManager {
     if (this.owned(id)) return 'You already own it.';
     const price = this.price(def);
     if (!Money.can(price, 'property')) return `It costs ${fmtMoney(price)} from your bank (property is bought with Clean Bank).`;
-    if (def.kind === 'business' && g.save.rep < 300 && def.price > 20000) return 'The owner won’t sell to an unknown. (300 reputation)';
-    if (def.luxury && uw.stage < 4) return 'The building board turns you down. Come back when you’re somebody. (Territory Holder)';
+    if (def.kind === 'business' && g.save.rep < 300 && def.price > 20000) return 'The owner won’t sell to an unknown. (300 Rep)';
+    if (def.luxury && uw.rank < 4) return `The building board turns you down. Come back when you’re somebody. (${RANKS[4].name})`;
     if (g.police.level > 0) return 'Not with the police on you.';
     Money.pay(price, 'property');
     S.props[id] = { owned: true, dmg: 0, since: S.day, lvl: 1 };
     if (!S.storage[id]) S.storage[id] = {};
     const L = uw.loc('prop', id), own = L ? uw.owner[turfAt(L.x, L.z)] : null;
     if (own && own !== 'pc' && FACTIONS[own]) { S.factions[own].rel -= 8; uw.news('unknown', `The ${FACTIONS[own].short} heard you bought ${def.name} on their turf. They’re not pleased.`); }
-    if (L) uw.addInf(turfAt(L.x, L.z), 'pc', 10);
-    uw.addRep(def.kind === 'business' ? 40 : 20, null);
+    // a purchase buys no Rep, no influence and no hold on the turf (§1, §45.7)
     if (def.id === 'penthouse') { g.save.owns.penthouse = true; g.content.ach('home'); }
     g.ui.banner('Property Acquired', def.name, 'pass', 3); g.audio.play('pass');
     uw.computeInfluence();
@@ -169,9 +172,8 @@ class PropertyManager {
       if (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful') { const fee = Math.round(def.income * 0.12 * (1 - this.perk('allIncome'))); const p = Money.pay(fee, 'protection', { partial: true }); S.factions[B.own].money += p; }
       if (B.mgr) S.pressure = clamp(S.pressure - 0.2, 0, 100);
     }
-    // laundering and quiet funerals take the heat down; homes in the Old Quarter keep your name on the street
+    // laundering and quiet funerals take the heat down
     S.pressure = clamp(S.pressure - this.perk('launder') - this.perk('heat'), 0, 100);
-    for (const def of this.ownedList()) if (def.kind === 'safehouse') { const h = this.hoodOf(def); if (h && h.rep) uw.addRep(h.rep, null); }
     if (this.perk('loyalty') > 0) for (const c of uw.crew.active()) c.loyalty = clamp(c.loyalty + this.perk('loyalty'), 0, 100);
     this.policeRaids();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);

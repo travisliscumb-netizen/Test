@@ -73,7 +73,7 @@ class EmpireUI {
     $('empTitle').textContent = app ? app.name : 'Phone';
     tabs.classList.toggle('hidden', !app);
     tabs.innerHTML = app ? `<button class="etab back" data-tab="home" aria-label="Back to the home screen">‹ Apps</button>${app.tabs.length > 1 ? app.tabs.map(([k, n]) => `<button class="etab${k === this.tab ? ' on' : ''}" data-tab="${k}">${esc(n)}</button>`).join('') : ''}` : '';
-    const st = STAGES[uw.stage];
+    const st = RANKS[uw.rank];
     $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Rep <b>${g.save.rep}</b></span><span>Influence <b>${uw.influence}</b></span><span>Pressure <b style="color:${S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)'}">${Math.round(S.pressure)}</b></span><span>Day <b>${uw.calDay}</b></span>${S.jail ? `<span class="chipS red">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</span>` : ''}`;
     let h = '';
     if (this.tab === 'home') h = this.t_home();
@@ -238,10 +238,11 @@ class EmpireUI {
   t_overview() {
     const uw = this.uw, S = uw.S, g = this.g;
     const crew = uw.crew.active(), biz = uw.props.ownedList();
-    const nxt = STAGES[Math.min(6, uw.stage + 1)];
+    const nxt = RANKS[Math.min(RANK_MAX, uw.rank + 1)], miss = uw.rankMissing();
     let h = `<div class="grid4">
       <div class="tile"><small>Cash on you</small><b class="money">${fmtMoney(Money.onMe)}</b></div><div class="tile"><small>Dirty in stashes</small><b class="money">${fmtMoney(Money.dirtyTotal() - Money.onMe)}</b></div><div class="tile"><small>Bank</small><b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? `<small>medical debt ${fmtMoney(Money.debt)}</small>` : ''}</div>
-      <div class="tile"><small>Reputation</small><b>${g.save.rep}</b><span>${esc(STAGES[uw.stage].name)}</span></div>
+      <div class="tile"><small>Rank</small><b>${esc(RANKS[uw.rank].name)}</b><span>${uw.rank + 1} of ${RANKS.length}</span></div>
+      <div class="tile"><small>Reputation</small><b>${g.save.rep}</b><span>who knows you</span></div>
       <div class="tile"><small>Influence</small><b>${uw.influence}</b>${this.bar(uw.influence, 1000, '#d28cff')}</div>
       <div class="tile"><small>Police pressure</small><b>${Math.round(S.pressure)}</b>${this.bar(S.pressure, 100, S.pressure > 66 ? '#ff4d5e' : '#ffb547')}</div>
       <div class="tile"><small>Turfs held</small><b>${uw.playerTurfs()} / ${uw.T.length}</b></div>
@@ -250,7 +251,7 @@ class EmpireUI {
       <div class="tile"><small>Product value</small><b class="money">${fmtMoney(uw.locations({ all: true }).reduce((a, L) => a + holdings(L.o, L.zone, uw.market).reduce((x, r) => x + r.value, 0), 0))}</b><span>${units(S.inv)} space carried${S.runs.length ? ' · ' + S.runs.length + ' on the road' : ''}</span></div>
       <div class="tile"><small>Territory tax</small><b class="money">${fmtMoney(uw.T.reduce((a, t, i) => a + (uw.owner[i] === 'pc' ? uw.royalty.owed(i) : 0), 0))}</b><span>expected per day · ${fmtMoney(S.st.royalties || 0)} collected</span></div>
     </div>`;
-    h += `<h3>Next step</h3><div class="hint">${uw.stage < 6 ? esc(STAGES[uw.stage].hint) : 'You run the city. Rivals will form coalitions, lieutenants will get ambitious and the state will send investigators. Hold on to it.'}</div>`;
+    h += `<h3>Next step</h3><div class="hint">${uw.rank < RANK_MAX ? esc(RANKS[uw.rank].hint) + (miss.length ? `<br><small>${esc(nxt.name)} still needs: ${esc(miss.join(' · '))}</small>` : '') : 'You run the city. Rivals will form coalitions, lieutenants will get ambitious and the state will send investigators. Hold on to it.'}</div>`;
     if (S.decisions.length) h += `<h3>Waiting on you</h3>` + S.decisions.map(d => `<div class="job open"><i>?</i><div><b>${esc(d.text)}</b></div><button class="sbtn gold" data-act="dec:${d.id}:1">Agree</button><button class="sbtn" data-act="dec:${d.id}:0">Refuse</button></div>`).join('');
     const L = S.lastLedger;
     if (L) {
@@ -290,8 +291,16 @@ class EmpireUI {
       <span>Local demand</span><span>${dem.map(k => `${GOODS[k].name} ${fmtMoney(uw.market.price(t.zone, k))}`).join(', ')}</span>
       <span>Local risk</span><span>${risk}%</span>
       ${(() => { const rc = uw.royalty.card(i); if (!rc) return ''; const st = ROY_STATUS[rc.status] || ROY_STATUS.none; return `<span>Territory revenue</span><span>${fmtMoney(rc.expected)}/day expected · last ${fmtMoney(rc.last)}</span><span>Who pays</span><span>${rc.payer ? esc(FACTIONS[rc.payer].short) + ' · ' + Math.round(rc.compliance * 100) + '% likely to pay' : 'your own street businesses'}</span><span>Tax status</span><span style="color:${st[1]}">${st[0]}</span>`; })()}
-      ${T.war ? `<span>War</span><span style="color:var(--red)">${FACTIONS[T.war.a].short} vs ${T.war.d === 'pc' ? 'you' : T.war.d ? FACTIONS[T.war.d].short : 'locals'} · ${Math.ceil(T.war.hrs)}h</span>` : ''}</div>
+      ${T.war ? `<span>${T.war.a === 'pc' ? 'Showdown' : 'War'}</span><span style="color:var(--red)">${T.war.a === 'pc' ? 'You' : FACTIONS[T.war.a].short} vs ${T.war.d === 'pc' ? 'you' : T.war.d ? FACTIONS[T.war.d].short : 'locals'} · ${Math.ceil(T.war.hrs)}h</span>` : ''}</div>
+      ${this.takeRow(i)}
       <div class="btns">${this.wpBtn(t.hang.x, t.hang.z, t.name)}</div></div>`;
+  }
+  // Take Turf (§4): inspect, weaken, reach the threshold, call the showdown. Ownership changes only when it is won.
+  takeRow(i) {
+    const uw = this.uw, T = uw.S.turfs[i]; if (uw.owner[i] === 'pc') return '';
+    const c = uw.takeCheck(i);
+    const why = c.ok ? (c.offered ? `The ${FACTIONS[T.offer.fid].short} are stepping aside: take it without a fight.` : 'Your hold is strong enough. Calling it starts a showdown: be there, or your Enforcers on the turf fight it out.') : c.why;
+    return `<div class="hint">${esc(why)}</div><div class="btns"><button class="sbtn ${c.ok ? 'gold' : ''}" data-act="take:${i}" ${c.ok ? '' : 'disabled'}>TAKE TURF</button></div>`;
   }
   drawMap() {
     const cv = $('empMap'); if (!cv) return;
@@ -350,7 +359,7 @@ class EmpireUI {
       const roleSel = c.status === 'active' ? `<select data-sel="role:${c.id}">${Object.keys(CREW_ROLES).map(k => `<option value="${k}" ${c.role === k ? 'selected' : ''} ${CREW_ROLES[k].minRank && c.rank < CREW_ROLES[k].minRank ? 'disabled' : ''}>${CREW_ROLES[k].name}</option>`).join('')}</select>` : '';
       const status = c.status === 'active' ? '' : `<span class="chip" style="--c:${c.status === 'jailed' ? '#4d8dff' : '#ff8a3d'}">${c.status === 'jailed' ? 'IN JAIL' : 'HURT'} · ${c.out}d</span>`;
       const promo = c.rank < 4 ? `<button class="sbtn" data-act="promo:${c.id}" ${!Money.can(PROMO_COST[c.rank + 1], 'crewFee') ? 'disabled' : ''}>Promote ${fmtMoney(PROMO_COST[c.rank + 1])}</button>` : '';
-      return `<div class="card"><div class="t">${esc(CM.displayName(c))} ${status}</div><div class="d">${RANKS[c.rank]} · ${esc(R.name)}${c.assign !== null && c.assign !== undefined ? ' · ' + esc(typeof c.assign === 'number' ? uw.T[c.assign].name : ZONES[c.assign] ? ZONES[c.assign].name : PROP_BY_ID[c.assign] ? PROP_BY_ID[c.assign].name : '') : ''}<br>${c.traits.map(t => `<span class="chip" style="--c:#9aa3b2" title="${esc(TRAITS[t].desc)}">${TRAITS[t].name}</span>`).join('')} ${fmtMoney(CM.dailyPay(c))}/day${c.unpaid ? ` · <b style="color:var(--red)">unpaid ${c.unpaid}d</b>` : ''}</div>
+      return `<div class="card"><div class="t">${esc(CM.displayName(c))} ${status}</div><div class="d">${CREW_RANKS[c.rank]} · ${esc(R.name)}${c.assign !== null && c.assign !== undefined ? ' · ' + esc(typeof c.assign === 'number' ? uw.T[c.assign].name : ZONES[c.assign] ? ZONES[c.assign].name : PROP_BY_ID[c.assign] ? PROP_BY_ID[c.assign].name : '') : ''}<br>${c.traits.map(t => `<span class="chip" style="--c:#9aa3b2" title="${esc(TRAITS[t].desc)}">${TRAITS[t].name}</span>`).join('')} ${fmtMoney(CM.dailyPay(c))}/day${c.unpaid ? ` · <b style="color:var(--red)">unpaid ${c.unpaid}d</b>` : ''}</div>
         <div class="stat"><span>Skill</span><span>${Math.round(c.skill)}</span></div>${this.bar(c.skill, 100)}
         <div class="stat"><span>Loyalty</span><span>${Math.round(c.loyalty)}</span></div>${this.bar(c.loyalty, 100, c.loyalty < 30 ? '#ff4d5e' : c.loyalty < 50 ? '#ffb547' : '#7fe08f')}
         <div class="stat"><span>Fear</span><span>${Math.round(c.fear)}</span></div>${this.bar(c.fear, 100, '#9aa3b2')}
@@ -567,7 +576,7 @@ class EmpireUI {
       <h3>People on the force</h3><div class="grid2">`;
     for (const O of OFFICERS) {
       const c = S.cops[O.id], can = CS.canApproach(O);
-      const st = c ? (c.st === 'paid' ? `ON PAYROLL · next ${fmtMoney(O.fee)} in ${Math.max(0, c.due - S.day)}d` : c.st === 'refused' ? 'REFUSED' : 'BURNED') : can ? '' : 'needs ' + STAGES[O.stage].name;
+      const st = c ? (c.st === 'paid' ? `ON PAYROLL · next ${fmtMoney(O.fee)} in ${Math.max(0, c.due - S.day)}d` : c.st === 'refused' ? 'REFUSED' : 'BURNED') : can ? '' : 'needs ' + RANKS[O.minRank].name;
       h += `<div class="card${can ? '' : ' locked'}"><div class="t">${esc(O.name)}</div><div class="d">${esc(O.rank)}<br>${esc(O.perks)}</div><div class="stat"><span>${esc(st)}</span><span>${fmtMoney(O.fee)}/week</span></div>
         ${c && c.st === 'paid' ? `<button class="sbtn" data-act="cdrop:${O.id}">Stop paying</button>` : !c ? `<button class="sbtn gold" data-act="cbribe:${O.id}" ${!can || !Money.can(O.fee, 'bribe') ? 'disabled' : ''}>Approach</button>` : ''}</div>`;
     }
@@ -602,6 +611,7 @@ class EmpireUI {
       case 'pf': if (this.pf && x in this.pf) { this.pf[x] = y; this.render(); } return;
       case 'bf': if (this.bf && x in this.bf) { this.bf[x] = y; this.render(); } return;
       case 'bup': { r = uw.props.upgrade(x); if (!r) { const d = PROP_BY_ID[x]; r = `${d.name}: level ${uw.props.level(x)}.`; } break; }
+      case 'take': r = uw.takeTurf(+x) || (uw.owner[+x] === 'pc' ? `${uw.T[+x].name} is yours.` : `Showdown called for ${uw.T[+x].name}.`); break;
       case 'hire': r = uw.crew.hire(+x); break;
       case 'promo': r = uw.crew.promote(+x); break;
       case 'bonus': r = uw.crew.bonus(+x); break;
@@ -805,10 +815,10 @@ class EmpireUI {
         s.weapons[it.id] = true; s.wloc[it.id] = null; if (it.ammo) s.ammo[it.id] += it.ammo; g.player.selectWeapon(WEAPONS.findIndex(w => w.id === it.id));
         Money.pay(it.price, 'armorer'); r = `${it.name} — yours. It’s in your hand.`;
       } else if (k === 'a') {
-        const bx = BOXES[+id]; if (!bx || !s.weapons[bx.gun] || !Money.can(bx.price), 'armorer') return;
+        const bx = BOXES[+id]; if (!bx || !s.weapons[bx.gun] || !Money.can(bx.price, 'armorer')) return;
         s.ammo[bx.gun] += bx.n; Money.pay(bx.price, 'armorer'); r = `+${bx.n} ${WEAPONS.find(x => x.id === bx.gun).ammoName}.`;
       } else if (k === 'vest') {
-        if (g.player.vest >= VEST_MAX * 0.95 || s.rep < 100 || !Money.can(450), 'armorer') return;
+        if (g.player.vest >= VEST_MAX * 0.95 || s.rep < 100 || !Money.can(450, 'armorer')) return;
         g.player.vest = VEST_MAX; s.vest = VEST_MAX; Money.pay(450, 'armorer'); r = 'Strapped in.';
       } else if (k === 'vspare') {
         const pid = this.vestTo && uw.props.owned(this.vestTo) ? this.vestTo : owned[0] && owned[0].id; if (!pid || !Money.can(480, 'armorer') || s.rep < 100) return;
@@ -907,7 +917,7 @@ class EmpireUI {
           if (!accept) { r = 'They laugh at the offer.'; f.rel -= 3; break; }
           if (cost > 0 && !Money.pay(cost, 'truce')) { r = 'You don’t have the cash on you.'; break; }
           f.truce = S.day + 14; f.rel = clamp(f.rel + 20, -100, 100);
-          for (const t of S.turfs) if (t.war && ((t.war.a === fid && t.war.d === 'pc'))) t.war = null;
+          for (const t of S.turfs) if (t.war && ((t.war.a === fid && t.war.d === 'pc') || (t.war.a === 'pc' && t.war.d === fid))) t.war = null;
           r = 'Agreed. Two weeks of peace.'; break;
         }
         case 'tribute': {

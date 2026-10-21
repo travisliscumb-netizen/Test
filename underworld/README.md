@@ -37,6 +37,23 @@ still on the street. `MONEY_SOURCES` maps every source of income and every cost 
 shows cash on you and `BANK` beneath it. The save key is unchanged; schema 8 moves an older save's single balance
 into Clean Bank.
 
+## Rank, Reputation and turf (overhaul Session 2, schema 9)
+
+- **Rank** is how powerful you are: Nobody, Street Hustler, Known Operator, Crew Leader, Territory Holder,
+  Underworld Power, City Kingpin (`RANKS`, read only by `Underworld.rankOf`). Each Rank needs everything below it:
+  100 / 400 Rep, then two active crew, one turf, then 8 turfs with a Lieutenant and 450 influence, then 16 turfs with
+  two Lieutenants and 800 influence. The Empire overview says what the next Rank still needs.
+- **Reputation** is a plain number (who knows you). It gates dealers, tuning, contacts and stock; there is no named
+  ladder any more.
+- **Money buys no power.** A purchase gives no Rep, no influence and no hold on a turf. A business adds influence
+  only once established (nothing for 7 days, full after 21). Homes and neighbourhoods add none.
+- **Turf ownership is saved state** and never changes from influence alone. Weaken a rival's hold until you lead it
+  (40 influence and 8 more than the owner; 32 on neutral ground), then **Take Turf** on the Turf map card: that calls
+  a showdown, fought live if you are there, otherwise by your people on the turf. Rivals change hands the same way
+  (wars). A rival that cedes a turf only offers it; a betraying Lieutenant starts showdowns rather than flipping turf.
+- Personal upgrades are Stamina and Health only. Schema 9 refunds a development save's Handling, Low Profile and
+  Body Armor levels to Clean Bank and derives each turf's owner once from its saved influence.
+
 ## Run it
 
 Open `underworld/index.html` in a desktop or mobile browser. It's fully self-contained and works
@@ -115,9 +132,9 @@ melee facing, the combat moveset, reverse speed and reverse camera, vehicle dama
 witnesses and the investigation, the zero-start save schema, and the district map.
 The new layer, tagged `[UNDERWORLD]`, sits just before `[CORE] UI MANAGER`:
 
-- Data tables: goods and risk tiers, factions and bosses, stages, properties, contacts, officers, crew roles and traits
+- Data tables: goods and risk tiers, factions and bosses, Ranks, properties, contacts, officers, crew roles and traits
 - `Market`: prices per district, plus supply shocks and the night/day demand split
-- `Underworld`: the strategic clock, influence, stage and inventory/storage. Its save lives in `save.uw`
+- `Underworld`: the strategic clock, influence, Rank, turf ownership (`transferTurf`, `takeTurf`) and inventory/storage. Its save lives in `save.uw`
 - `FactionSim` and `GangManager`: five rival factions that run on their own, plus street crews, HQ guards, squads, buyers and brawls
 - `CrewManager` and `PropertyManager`: the crew (roles, ranks, loyalty, fear and betrayal), plus safehouses, garages, warehouses and fronts
 - `PressureSystem`: police pressure, corruption, honest officers and outside investigations
@@ -359,10 +376,11 @@ error, so a hidden network dependency fails the suite.
 node underworld/tests/build.mjs     # Node only: index.html matches what src/ builds, manifest complete, both module scripts parse
 node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
+node underworld/tests/progression.mjs # seven Ranks, Nobody -> Kingpin chain, money buys no power, turf only by showdown, schema 9
 node underworld/tests/smoke.mjs     # boot, $0 start, every menu, map overlay, location layout
 node underworld/tests/core.mjs      # melee facing (8 dirs, 180°, post-exit), combo + step-in stress, reverse speed, reverse-camera transitions
 node underworld/tests/arrest.mjs    # 9 arrest situations (idle/walk/sprint/fight/vehicle exit/pursuit/map open/repeated) -> jail -> release -> stale-state audit; death respawns
-node underworld/tests/session.mjs   # $0 -> first money -> property -> crew -> turf -> corruption -> drive/chase/bust/release -> save/reload/repair
+node underworld/tests/session.mjs   # $0 -> first money -> property -> crew -> Take Turf showdown -> corruption -> drive/chase/bust/release -> save/reload/repair
 node underworld/tests/ui.mjs        # minimap labels upright, big map layout, colours, input leaks, overlays, touch controls
 node underworld/tests/offline.mjs   # no network at all: load, render, play, UI, vehicles, police, combat, map
 node underworld/tests/phone.mjs     # phone layouts (8 sizes, 320–932 px, portrait + landscape): top bar, jail, driving HUD, menus

@@ -10,6 +10,8 @@ class FactionSim {
   F(id) { return this.S.factions[id]; }
   absHour() { return this.S.day * 24 + Math.floor(this.uw.g.env.time); }
   zonesOf(fid) { const out = new Set(); this.uw.owner.forEach((o, i) => { if (o === fid) out.add(this.uw.T[i].zone); }); return [...out]; }
+  // the player's fighting strength on a turf, defending it or calling a showdown for it: the hold already there,
+  // overall influence, crew on the turf and the district's Lieutenant, owned property there and the player in person
   playerDefense(i) {
     const uw = this.uw, S = this.S, t = uw.T[i], g = uw.g;
     let d = 8 + (S.turfs[i].inf.pc || 0) * 0.25 + uw.influence / 25;
@@ -52,11 +54,13 @@ class FactionSim {
     const sh = S.shipment;
     if (sh && !sh.done && this.absHour() >= sh.at) this.landShipment();
   }
+  // a turf war is the showdown (§4, §45.13): it ends with the attacker taking the turf or going home. The player
+  // can be either side; a war the player called is w.a === 'pc'.
   warStep(i, h) {
-    const uw = this.uw, S = this.S, T = S.turfs[i], w = T.war, A = this.F(w.a);
-    if (!A || A.broken) { T.war = null; return; }
+    const uw = this.uw, S = this.S, T = S.turfs[i], w = T.war, pcA = w.a === 'pc', A = pcA ? null : this.F(w.a);
+    if (!pcA && (!A || A.broken)) { T.war = null; return; }
     S.warHours += h;
-    const powA = A.strength * (0.6 + Math.random() * 0.8);
+    const powA = pcA ? this.playerDefense(i) * (0.6 + Math.random() * 0.8) : A.strength * (0.6 + Math.random() * 0.8);
     const powD = w.d === 'pc' ? this.playerDefense(i) * (0.6 + Math.random() * 0.8) : w.d && this.F(w.d) && !this.F(w.d).broken ? this.F(w.d).strength * (0.7 + Math.random() * 0.8) * 1.15 : 6;
     // a fight the player is physically in is decided by the bodies on the ground, not the dice
     const live = uw.gangs.warLive(i);
@@ -64,31 +68,39 @@ class FactionSim {
     const delta = clamp((powA - powD) / 60, -1.5, 1.5) * 3 * h * k;
     uw.addInf(i, w.a, delta);
     if (w.d) uw.addInf(i, w.d, -delta * 0.9);
-    A.strength = Math.max(0, A.strength - 0.22 * h * Math.random());
+    if (A) A.strength = Math.max(0, A.strength - 0.22 * h * Math.random());
     if (w.d && w.d !== 'pc' && this.F(w.d)) this.F(w.d).strength = Math.max(0, this.F(w.d).strength - 0.2 * h * Math.random());
-    if (w.d === 'pc') uw.crew.warAttrition(i, h);
+    if (w.d === 'pc' || pcA) uw.crew.warAttrition(i, h);
     T.police = clamp(T.police + 1.1 * h, 0, 100);
-    A.heat = clamp(A.heat + 0.3 * h, 0, 100);
+    if (A) A.heat = clamp(A.heat + 0.3 * h, 0, 100); else S.pressure = clamp(S.pressure + 0.15 * h, 0, 100);
     w.hrs -= h;
     const ia = T.inf[w.a] || 0, id = w.d ? (T.inf[w.d] || 0) : 0;
     if (w.hrs <= 0 || ia > id + 30 || ia < 5) {
       T.war = null;
-      const won = ia > id;
+      const won = ia > id, t = uw.T[i], aName = pcA ? 'you' : FACTIONS[w.a].short;
       if (w.d === 'pc') {
-        uw.news('pv', won ? `The ${FACTIONS[w.a].short} pushed your people off ${uw.T[i].name}.` : `Your crew held ${uw.T[i].name} against the ${FACTIONS[w.a].short}.`);
+        uw.news('pv', won ? `The ${aName} pushed your people off ${t.name}.` : `Your crew held ${t.name} against the ${aName}.`);
         if (!won) { uw.addRep(30, null); this.F(w.a).rel -= 5; }
       }
+      if (pcA && !won) {
+        uw.news('pv', `Your push on ${t.name} failed${w.d ? '. The ' + FACTIONS[w.d].short + ' held it' : ''}.`);
+        if (w.d && this.F(w.d)) this.F(w.d).rel -= 5;
+      }
+      if (won) uw.transferTurf(i, w.a, 'showdown');
       // a beaten attacker leaves a weak spot for somebody else
-      if (!won) uw.opps.add({ kind: 'instability', title: `${FACTIONS[w.a].short} bloodied`, text: `The ${FACTIONS[w.a].short} lost their push on ${uw.T[i].name} and are short of soldiers.`, turf: i, x: uw.T[i].hang.x, z: uw.T[i].hang.z, hours: 24 });
+      else if (!pcA) uw.opps.add({ kind: 'instability', title: `${aName} bloodied`, text: `The ${aName} lost their push on ${t.name} and are short of soldiers.`, turf: i, x: t.hang.x, z: t.hang.z, hours: 24 });
     }
   }
-  startWar(att, i, why) {
+  // a rival calls a showdown for a turf. opts.force ignores truces (a betrayal, a crew coming back from the dead)
+  startWar(att, i, why, opts = {}) {
     const uw = this.uw, S = this.S, T = S.turfs[i];
     if (T.war) return false;
     const d = uw.owner[i];
     if (d === att) return false;
-    if (d && d !== 'pc' && this.F(d) && this.F(d).truce > S.day && this.F(att).truce > S.day) return false;
-    if (d === 'pc' && this.F(att).truce > S.day) return false;
+    if (!opts.force) {
+      if (d && d !== 'pc' && this.F(d) && this.F(d).truce > S.day && this.F(att).truce > S.day) return false;
+      if (d === 'pc' && this.F(att).truce > S.day) return false;
+    }
     T.war = { a: att, d, hrs: 14 + Math.random() * 30 };
     uw.addInf(i, att, 12);
     const t = uw.T[i], A = FACTIONS[att];
@@ -175,8 +187,11 @@ class FactionSim {
     for (let i = 0; i < uw.T.length; i++) {
       if (uw.owner[i] !== id) continue;
       if (!uw.turfNeighbors(i).some(j => uw.owner[j] === 'pc')) continue;
-      const T = this.S.turfs[i]; T.inf.pc = Math.max(T.inf.pc || 0, 55); T.inf[id] = Math.min(T.inf[id] || 0, 20);
-      uw.news('unknown', `${this.F(id).boss}: “Take ${uw.T[i].name}. Consider it a gesture.” The ${D.short} are backing off.`);
+      // an offer, not a handover: the turf is yours when you Take Turf there within three days (§45.13)
+      const T = this.S.turfs[i]; if (T.war || T.offer) continue;
+      T.offer = { fid: id, until: this.S.day + 3 }; T.inf[id] = Math.min(T.inf[id] || 0, 20);
+      uw.news('unknown', `${this.F(id).boss}: “Take ${uw.T[i].name}. Consider it a gesture.” The ${D.short} are backing off. (Take Turf there within three days.)`);
+      uw.opps.add({ kind: 'instability', title: `${D.short} offer ${uw.T[i].name}`, text: `The ${D.short} will step aside from ${uw.T[i].name}. Take Turf there (Empire → Turf map) within three days and it is yours without a fight.`, turf: i, x: uw.T[i].hang.x, z: uw.T[i].hang.z, hours: 72 });
       uw.recompute();
       return;
     }
@@ -218,12 +233,14 @@ class FactionSim {
     const uw = this.uw, S = this.S, f = this.F(id), D = FACTIONS[id];
     // regroup on neutral ground in their home district if there is any
     let spot = -1;
-    for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === D.home && uw.owner[i] !== 'pc') { spot = i; break; }
-    if (spot < 0) for (let i = 0; i < uw.T.length; i++) if (!uw.owner[i]) { spot = i; break; }
+    for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === D.home && uw.owner[i] !== 'pc' && !S.turfs[i].war) { spot = i; break; }
+    if (spot < 0) for (let i = 0; i < uw.T.length; i++) if (!uw.owner[i] && !S.turfs[i].war) { spot = i; break; }
     if (spot < 0) { f.broken = S.day; return; }
     f.broken = 0; f.strength = 22; f.money = 8000; f.stock = 20; f.rel = -30; f.boss = D.lts[f.lt % D.lts.length]; f.lt++; f.bossDown = 0;
     uw.addInf(spot, id, 55);
-    uw.news('unknown', `The ${D.short} are back, under ${f.boss}. They’ve set up in ${uw.T[spot].name} and they remember you.`);
+    // they come back by fighting for the ground, like anyone else (§45.13)
+    this.startWar(id, spot, 'They are back.', { force: true });
+    uw.news('unknown', `The ${D.short} are back, under ${f.boss}. They’re fighting for ${uw.T[spot].name} and they remember you.`);
   }
   scheduleShipment() {
     const uw = this.uw, S = this.S;

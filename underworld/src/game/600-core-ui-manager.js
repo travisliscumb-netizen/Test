@@ -167,10 +167,8 @@ const MAP_LAND_COLS = { D: '#4a505c', C: '#545a63', R: '#5c514a', H: '#4d5c47', 
 const UPGRADES = [
   { id: 'stamina', name: 'Lungs', desc: 'Sprint longer and slightly faster.', prices: [800, 1600, 3200] },
   { id: 'health', name: 'Constitution', desc: '+60 maximum health per level (300 at the start, 480 at the top).', prices: [1000, 2200, 4400] },
-  { id: 'handling', name: 'Wheelman', desc: 'Better grip and handling in every vehicle.', prices: [1200, 2600, 5200] },
-  { id: 'cooldown', name: 'Low Profile', desc: 'Police lose track of you faster.', prices: [1500, 3200, 6400] },
-  { id: 'armor', name: 'Body Armor', desc: 'Take 12% less damage per level.', prices: [2000, 4000, 8000] }
 ];
+// §18: personal upgrades are Stamina and Health only (Handling, Low Profile and Body Armor were removed, §45.12)
 class UIManager {
   constructor(game) {
     this.g = game; this.modal = null; this.stack = [];
@@ -1152,7 +1150,7 @@ class MapView {
     // scale bar
     const mPerPx = 1 / (s * k), bar = [50, 100, 200, 500].find(v => v / mPerPx > 60) || 500, bw = bar / mPerPx;
     c.fillStyle = 'rgba(14,17,24,0.8)'; c.fillRect(8, H - 26, bw + 16, 18); c.fillStyle = '#fff'; c.fillRect(16, H - 14, bw, 3); c.font = '700 10px Arial'; c.textAlign = 'left'; c.fillText(bar + ' m', 16, H - 17);
-    if (g.uw) $('mapStat').textContent = `${STAGES[g.uw.stage].name} · ${g.uw.playerTurfs()} turfs · influence ${g.uw.influence} · rep ${g.save.rep} · pressure ${Math.round(g.uw.S.pressure)} · day ${g.uw.calDay}`;
+    if (g.uw) $('mapStat').textContent = `${RANKS[g.uw.rank].name} · ${g.uw.playerTurfs()} turfs · influence ${g.uw.influence} · rep ${g.save.rep} · pressure ${Math.round(g.uw.S.pressure)} · day ${g.uw.calDay}`;
   }
 }
 function fmtDist(d) { return d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'; }

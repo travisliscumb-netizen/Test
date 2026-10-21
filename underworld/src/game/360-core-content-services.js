@@ -3,19 +3,6 @@
    dealership, repair shop, store, wardrobe), collectibles, secrets,
    achievements, fast travel, police posts and on-screen guidance.
    ===================================================================== */
-const REP_LEVELS = [
-  { at: 0, name: 'Nobody', unlock: 'Odd jobs for Rosa' },
-  { at: 150, name: 'Courier', unlock: 'Meridian Motors sells you sedans and vans · Ines Varga takes your calls' },
-  { at: 400, name: 'Runner', unlock: 'Tull’s street races · SUVs, pickups and trucks · Kevlar at Fuel & Go' },
-  { at: 800, name: 'Wheelman', unlock: 'Sgt. Moss wants a word · Sports cars · Stage 2 tuning' },
-  { at: 1300, name: 'Operator', unlock: 'The Ferryman’s job · Valen Tower penthouse · Muscle cars · Stage 3 tuning' },
-  { at: 2000, name: 'Legend', unlock: 'The Zephyr is for sale · The city knows your name' }
-];
-const DEALER = [
-  { type: 'compact', price: 1800, rep: 0 }, { type: 'sedan', price: 3200, rep: 1 }, { type: 'taxi', price: 3600, rep: 1 }, { type: 'van', price: 4200, rep: 1 },
-  { type: 'pickup', price: 6500, rep: 2 }, { type: 'suv', price: 8200, rep: 2 }, { type: 'truck', price: 9500, rep: 2 },
-  { type: 'sports', price: 19500, rep: 3 }, { type: 'muscle', price: 26000, rep: 4 }, { type: 'supercar', price: 72000, rep: 5 }
-];
 // list price of every model new (dealer sticker); sale, repair and tuning values all scale from it
 const CAR_MSRP = { compact: 1800, sedan: 3200, taxi: 3600, van: 4200, pickup: 6500, suv: 8200, truck: 9500, sports: 19500, muscle: 26000, supercar: 72000,
   classic: 30000, coupe: 46000, offroad: 22000, luxury: 52000, gangcar: 14000, utility: 7000, police: 40000, unmarked: 20000,
@@ -36,9 +23,10 @@ const DEALERSHIPS = {
     pitch: '“Take your time. Every car here is the only one of its kind on the island this week.”',
     flagship: ['supercar', 'coupe', 'valkyr', 'obsidian', 'classic', 'revenant'], core: ['sports', 'muscle', 'hellion', 'tempest', 'luxury', 'kodiak', 'monarch'] }
 };
-// reputation each model needs at a licensed dealer (the used lot sells to anyone with cash)
-const CAR_REP = { metro: 0, compact: 0, sedan: 1, estate: 1, crest: 1, courier: 1, van: 1, utility: 1, apex: 2, pickup: 2, suv: 2, truck: 2, sports: 3, tempest: 3, luxury: 3,
-  muscle: 4, hellion: 4, kodiak: 4, monarch: 4, classic: 4, revenant: 4, coupe: 5, supercar: 5, valkyr: 5, obsidian: 5 };
+// Rep each model needs at a licensed dealer (the used lot sells to anyone with cash). Reputation is a number
+// (§1); there is no named ladder.
+const CAR_REP = { metro: 0, compact: 0, sedan: 150, estate: 150, crest: 150, courier: 150, van: 150, utility: 150, apex: 400, pickup: 400, suv: 400, truck: 400, sports: 800, tempest: 800, luxury: 800,
+  muscle: 1300, hellion: 1300, kodiak: 1300, monarch: 1300, classic: 1300, revenant: 1300, coupe: 2000, supercar: 2000, valkyr: 2000, obsidian: 2000 };
 const CAR_CLASS = { metro: 'City car', compact: 'Hatchback', apex: 'Hot hatch', sedan: 'Sedan', regent: 'Sedan', estate: 'Estate', crest: 'Crossover', suv: 'SUV', kodiak: 'Performance SUV',
   pickup: 'Pickup', utility: 'Work truck', truck: 'Box truck', van: 'Van', courier: 'Panel van', taxi: 'Ex-taxi', sports: 'Sports car', tempest: 'Lightweight sports car',
   muscle: 'Muscle car', hellion: 'Modern muscle', gangcar: 'Lowrider', classic: 'Classic muscle', revenant: 'Classic fastback', coupe: 'Grand tourer', monarch: 'Luxury GT',
@@ -50,14 +38,15 @@ const TUNE = [
   { id: 'grip', name: 'Tyres & suspension', desc: 'More grip in every corner.', prices: [1200, 2800, 5600] },
   { id: 'armor', name: 'Reinforced body', desc: 'Takes less damage from crashes.', prices: [1000, 2400, 5000] }
 ];
-const TUNE_REP = [0, 3, 4];
+// Rep a tuning stage needs (stage 1, 2, 3)
+const TUNE_REP = [0, 800, 1300];
 const STORE_ITEMS = [
 // pay: how each is paid (MONEY_SOURCES): food and first aid with cash or the bank, shop goods from the bank,
 // scratch cards (a lottery) from the bank only, at the card counter (§45.5, §45.18)
   { id: 'snack', name: 'Hot Roll & Coffee', desc: 'Restores 120 health.', price: 12, pay: 'food' },
   { id: 'medkit', name: 'First-Aid Kit', desc: 'Patches you up on the spot: restores 180 health.', price: 90, pay: 'food' },
   { id: 'drink', name: 'Volt Energy', desc: 'Unlimited sprint for a minute.', price: 25, pay: 'food' },
-  { id: 'vest', name: 'Kevlar Vest', desc: 'A 150-point armour layer that soaks 75% of every hit until it is spent.', price: 450, rep: 2, pay: 'shop' },
+  { id: 'vest', name: 'Kevlar Vest', desc: 'A 150-point armour layer that soaks 75% of every hit until it is spent.', price: 450, rep: 400, pay: 'shop' },
   { id: 'scratch', name: 'Scratch Cards', desc: 'Five cards from $5 to $100. Top prize $1,000,000. Most lose. Bank only.', price: 5, pay: 'casinoStake' },
   { id: 'map', name: 'Collector’s Map', desc: 'Someone marked five hidden packages on a tourist map.', price: 1200, pay: 'shop' }
 ];
@@ -121,24 +110,11 @@ class ContentManager {
     this._buildPackages();
     this._bindUI();
   }
-  // ------------------------------------------------------------ reputation
-  get repLevel() { const r = this.g.save.rep; let l = 0; for (let i = 0; i < REP_LEVELS.length; i++) if (r >= REP_LEVELS[i].at) l = i; return l; }
-  get repName() { return REP_LEVELS[this.repLevel].name; }
+  // ------------------------------------------------------------ reputation (a number: who knows you, §1)
   addRep(n, why) {
     if (!(n > 0)) return;
-    const s = this.g.save, before = this.repLevel;
-    s.rep += Math.round(n);
-    const after = this.repLevel;
+    this.g.save.rep += Math.round(n);
     if (why) this.g.ui.toast(`+${Math.round(n)} REP · ${why}`, 'money');
-    void before; void after;
-    this._repHud(true);
-  }
-  _repHud(flash) {
-    const s = this.g.save, l = this.repLevel, cur = REP_LEVELS[l].at, nxt = REP_LEVELS[l + 1];
-    const el = $('rep'); if (!el || el.classList.contains('hidden')) return;
-    el.querySelector('.rn').textContent = REP_LEVELS[l].name.toUpperCase() + ' · ' + s.rep;
-    el.querySelector('i').style.width = (nxt ? clamp((s.rep - cur) / (nxt.at - cur), 0, 1) * 100 : 100) + '%';
-    if (flash) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
   }
   // ------------------------------------------------------------ phone + subtitles
   phone(from, text, opts = {}) {
@@ -448,7 +424,7 @@ class ContentManager {
     const render = () => {
       const st = DL.state(lot), cars = st.cars;
       const next = Math.max(0, st.d + D.every - DL.day);
-      let h = `<div class="svcTop"><span>Reputation <b>${this.repName}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html(lot === 'used' ? 'usedLot' : 'dealer')}</span></div>`;
+      let h = `<div class="svcTop"><span>Rep <b>${s.rep}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html(lot === 'used' ? 'usedLot' : 'dealer')}</span></div>`;
       h += `<div class="hint" style="margin:6px 0">${cars.filter(Boolean).length} cars on the lot · ${lot === 'new' ? 'sold cars are replaced overnight' : `new stock ${next ? `in ${next} day${next > 1 ? 's' : ''}` : 'tomorrow'}`}. Walk up to a car to inspect it and buy it where it stands.</div><div class="grid2">`;
       h += cars.map((c, i) => c ? `<div class="card"><div class="t">${esc(VEHICLES[c.type].name)} ${tierChip(c.vtier)}${c.bargain ? '<span class="chip" style="--c:#7fe08f">BARGAIN</span>' : ''}</div>
         <div class="d">${esc(CAR_CLASS[c.type] || '')}${lot === 'used' ? ` · ${condLabel(c.cond)[0]} (${c.cond}%) · ${c.km.toLocaleString()} km` : ''}</div>
@@ -467,7 +443,7 @@ class ContentManager {
       const c = DL.state(lot).cars[i]; if (!c) return '<div class="hint">Sold.</div>';
       const V = VEHICLES[c.type], why = DL.cantBuy(lot, c);
       const cl = condLabel(c.cond);
-      return `<div class="svcTop"><span>Reputation <b>${this.repName}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html(lot === 'used' ? 'usedLot' : 'dealer')}</span></div>
+      return `<div class="svcTop"><span>Rep <b>${s.rep}</b></span><span>Garage <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html(lot === 'used' ? 'usedLot' : 'dealer')}</span></div>
         <div class="card"><div class="t">${esc(V.name)} ${tierChip(c.vtier)}${c.bargain ? '<span class="chip" style="--c:#7fe08f">BARGAIN</span>' : ''}</div>
         <div class="d">${esc(CAR_CLASS[c.type] || '')} · ${esc(V.blurb)}</div>
         <div class="stat"><span>Price</span><span class="money"><b>${fmtMoney(c.price)}</b>${lot === 'used' ? ` <small style="color:var(--dim)">new ${fmtMoney(carMsrp(c.type))}</small>` : ''}</span></div>
@@ -516,8 +492,8 @@ class ContentManager {
       else {
         h += '<div class="grid2">' + TUNE.map(t => {
           const lv = ent.tune[t.id], max = lv >= 3, price = max ? 0 : this.tunePrice(t, lv, v.type), need = TUNE_REP[lv] || 0;
-          const locked = !max && this.repLevel < need;
-          return `<div class="card"><div class="t">${t.name}</div><div class="d">${t.desc}</div><div class="pips">${[0, 1, 2].map(i => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn gold" data-act="tune:${t.id}" ${max || locked || !Money.can(price, 'garage') ? 'disabled' : ''}>${max ? 'Maxed' : locked ? 'Needs ' + REP_LEVELS[need].name : 'Stage ' + (lv + 1) + ' · ' + fmtMoney(price)}</button></div>`;
+          const locked = !max && s.rep < need;
+          return `<div class="card"><div class="t">${t.name}</div><div class="d">${t.desc}</div><div class="pips">${[0, 1, 2].map(i => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn gold" data-act="tune:${t.id}" ${max || locked || !Money.can(price, 'garage') ? 'disabled' : ''}>${max ? 'Maxed' : locked ? 'Needs ' + need + ' Rep' : 'Stage ' + (lv + 1) + ' · ' + fmtMoney(price)}</button></div>`;
         }).join('') + '</div>';
       }
       return h;
@@ -537,7 +513,7 @@ class ContentManager {
         if (heat) { if (!g.police.visible) { g.police.clear('New paint, new plates. The police lost your description.'); } else g.ui.toast('A cop is watching the shop — the paint won’t fool them.', 'warn'); }
       } else if (k === 'tune' && ent) {
         const t = TUNE.find(x => x.id === a), lv = ent.tune[a]; if (lv >= 3) return;
-        const price = this.tunePrice(t, lv, v.type); if (this.repLevel < (TUNE_REP[lv] || 0) || !Money.pay(price, 'garage')) return; ent.tune[a] = lv + 1; v.tune = ent.tune; g.audio.play('cash');
+        const price = this.tunePrice(t, lv, v.type); if (s.rep < (TUNE_REP[lv] || 0) || !Money.pay(price, 'garage')) return; ent.tune[a] = lv + 1; v.tune = ent.tune; g.audio.play('cash');
         if (TUNE.every(x => ent.tune[x.id] >= 3)) this.ach('tuned');
       }
       g.saveGame(); this.refreshSvc();
@@ -552,11 +528,11 @@ class ContentManager {
   openStore() {
     const g = this.g, s = g.save, p = g.player;
     const render = () => `<div class="svcTop"><span>Health <b>${Math.round(p.health)} / ${p.maxHealth}</b></span><span>Vest <b>${Math.round(p.vest)}</b></span><span>${Money.html('either')}</span></div><div class="grid2">` + STORE_ITEMS.map(it => {
-      const locked = it.rep && this.repLevel < it.rep;
-      return `<div class="card"><div class="t">${it.name}</div><div class="d">${it.desc}</div><button class="sbtn gold" data-act="${it.id}" ${locked || !Money.can(it.price, it.pay) ? 'disabled' : ''}>${locked ? 'Needs ' + REP_LEVELS[it.rep].name : fmtMoney(it.price)}</button></div>`;
+      const locked = it.rep && s.rep < it.rep;
+      return `<div class="card"><div class="t">${it.name}</div><div class="d">${it.desc}</div><button class="sbtn gold" data-act="${it.id}" ${locked || !Money.can(it.price, it.pay) ? 'disabled' : ''}>${locked ? 'Needs ' + it.rep + ' Rep' : fmtMoney(it.price)}</button></div>`;
     }).join('') + '</div>';
     this.openSvc('Fuel & Go', 'Clerk: “Pumps are self-serve. Everything else, you pay me.”', render, id => {
-      const it = STORE_ITEMS.find(x => x.id === id); if (!it || !Money.can(it.price, it.pay)) return;
+      const it = STORE_ITEMS.find(x => x.id === id); if (!it || (it.rep && s.rep < it.rep) || !Money.can(it.price, it.pay)) return;
       let msg = '';
       if (id === 'snack') { if (p.health >= p.maxHealth) { this.refreshSvc('You’re not hungry.'); return; } p.health = Math.min(p.maxHealth, p.health + 40 * HP_SCALE); msg = 'Warm, greasy, perfect.'; }
       if (id === 'medkit') { if (p.health >= p.maxHealth) { this.refreshSvc('Nothing to patch up.'); return; } p.health = Math.min(p.maxHealth, p.health + 180); msg = 'Gauze, tape and something that stings. Better.'; }
@@ -665,7 +641,7 @@ class ContentManager {
       if (Math.hypot(p.pos.x - this.waypoint.x, p.pos.z - this.waypoint.z) < 12) { this.waypoint = null; g.ui.toast('Waypoint reached.'); }
       else { this.guideTarget = this.waypoint; this.guideArrow = true; g.ui.setObjective('▸ ' + this.waypoint.label + ' · ' + fmtDist(Math.hypot(p.pos.x - this.waypoint.x, p.pos.z - this.waypoint.z)), null, true); return; }
     }
-    if (s.settings.guide && g.uw && !p.interior && g.uw.stage === 0 && s.stats.playTime < 240 && !g.uw.inJail) { g.ui.setObjective('$0 to your name. ' + STAGES[0].hint, null, true); return; }
+    if (s.settings.guide && g.uw && !p.interior && g.uw.rank === 0 && s.stats.playTime < 240 && !g.uw.inJail) { g.ui.setObjective('$0 to your name. ' + RANKS[0].hint, null, true); return; }
     g.ui.setObjective(null);
   }
   // ------------------------------------------------------------ interaction hooks
@@ -761,7 +737,7 @@ class ContentManager {
   }
   offerPenthouse() {
     const g = this.g, s = g.save;
-    if (this.repLevel < 4) { this.deny('The concierge looks you up and down. “The penthouse is for Operators, not errand runners.” (Operator reputation)'); return; }
+    if (this.g.save.rep < 1300) { this.deny('The concierge looks you up and down. “The penthouse is for people with a name, not errand runners.” (1300 Rep)'); return; }
     if (!Money.can(25000, 'property')) { this.deny('The penthouse costs $25,000 from your bank. Come back with clean money.'); return; }
     g.ui.ask('Buy the Valen Tower penthouse?', '$25,000. A second safehouse with a skyline view, and four more garage slots at the tower.', 'Buy', () => {
       Money.pay(25000, 'property'); s.owns.penthouse = true; s.home = 'penthouse';
@@ -994,7 +970,7 @@ class ContentManager {
     this.checkT -= rdt;
     if (this.checkT <= 0) {
       this.checkT = 0.5;
-      this._discover(); this._checkSecrets(); this._guide(); this._spawnGold(); this._repHud(false);
+      this._discover(); this._checkSecrets(); this._guide(); this._spawnGold();
       const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
       if (pv && pv.goldCar) this.secret('gold');
       if (pv && pv.rareFind && !g.save.flags.zephyrSeen) { g.save.flags.zephyrSeen = true; g.ui.toast('A Zephyr, just sitting up here. Store it in your garage to keep it.'); }
@@ -1028,7 +1004,7 @@ class ContentManager {
   renderProgress() {
     const g = this.g, s = g.save, c = g.campaign;
     const pct = c.percent();
-    let h = `<div class="svcTop"><span>Completion <b>${pct}%</b></span><span>Reputation <b>${this.repName} · ${s.rep}</b></span><span>Story <b>${c.doneCount()} / ${CAMPAIGN.length}</b></span></div>`;
+    let h = `<div class="svcTop"><span>Completion <b>${pct}%</b></span><span>${g.uw ? `Rank <b>${esc(RANKS[g.uw.rank].name)}</b></span><span>` : ''}Rep <b>${s.rep}</b></span><span>Story <b>${c.doneCount()} / ${CAMPAIGN.length}</b></span></div>`;
     h += c.arcsHTML();
     const jumps = g.world.jumps.length, jd = Object.keys(s.jumps).length;
     const races = RACES.filter(r => !r.storyOnly);

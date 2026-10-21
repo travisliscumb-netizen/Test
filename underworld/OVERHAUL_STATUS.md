@@ -11,6 +11,153 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
+- Session: **2 — Rank / Reputation / core progression** (handoff phase 3), following §1, §4, §18, §31, §45.7,
+  §45.12, §45.13.
+- Commit/base revision: `804850c` (Session 1 follow-up) → the Session 2 commit on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-21
+
+## Completed this session (2)
+
+- **One Rank authority.** `RANKS` (`390-underworld-data.js`) holds the seven titles and what each needs;
+  `Underworld.rankOf(power())` is the only reader; `uw.rank` replaces `uw.stage`, `S.rankMax` replaces
+  `S.stageMax`. Each Rank needs everything below it: Street Hustler 100 Rep · Known Operator 400 Rep · Crew Leader
+  + 2 active crew · Territory Holder + 1 turf · Underworld Power 8 turfs, 1 Lieutenant running a district, 450
+  influence · City Kingpin 16 turfs, 2 Lieutenants, 800 influence (Lieutenant conditions are new, DC-25).
+  `kingpin()` is now "Rank is City Kingpin" (it was "Rank 6 **or** 800 influence", a single number, against §31).
+  The Empire overview shows Rank and Rep as separate tiles and lists what the next Rank still needs.
+- **Reputation is a number** (§1). `REP_LEVELS` (Courier/Runner/Wheelman/Operator/Legend), `repLevel`, `repName`,
+  `_repHud` and the hidden `#rep` HUD meter are removed. Every gate is a numeric threshold with the same value as
+  before: dealer models (`CAR_REP` 0/150/400/800/1300/2000), tuning stages (`TUNE_REP` 0/800/1300), the Kevlar vest
+  (400), the penthouse (1300); mission pay keeps its +6 % steps at the same Rep marks. Texts read "Needs 800 Rep".
+  The dead `DEALER` table is removed; the Fuel & Go handler now enforces the Rep gate the button showed.
+- **Money buys no power** (§1, §45.7). Removed: Rep for buying (+40 business / +20 property) and upgrading
+  (+15×level) property; +10 turf influence for buying on a turf; influence from homes, the loft and penthouse,
+  neighbourhoods (Crestmoor, Financial District) and the Old Quarter's +2 Rep a day. A business adds influence only
+  once established (`PropertyManager.established`: nothing for 7 world days, linear to full by day 21, `BIZ_INFL` 15
+  + its own prestige); the hotel/restaurant influence perks follow the same ramp. The test buys and upgrades every
+  property with $100M: Rep, influence, turf hold and Rank are unchanged.
+- **Turf ownership is saved state** (§4, §45.13, DC-10). `uw.turfs[i].own` is authoritative; `uw.owner` is its
+  read view. `Underworld.recompute` no longer changes owners; it only marks turfs contested. The only writer is
+  `Underworld.transferTurf`, called when a showdown is won:
+  - **Take Turf** (Empire → Turf map card): needs a weakened hold (40 influence and 8 more than the owner; 32 on
+    neutral ground), no truce with the owner, not in jail. It starts a war with the player as attacker
+    (`war.a === 'pc'`), played live if the player is there (the owner's people turn on the player, the player's
+    Enforcers on the turf join), otherwise auto-resolved by `FactionSim.warStep` from the player's force on the
+    turf (`playerDefense`). Win → the turf is yours; lose → it stays theirs.
+  - **Rival wars** end with `transferTurf` to the winner (the ownership change the influence threshold used to make
+    silently).
+  - **Ceding** (`cedeTurf`) is now an offer (`uw.turfs[i].offer`, 3 days): Take Turf there and it changes hands
+    without a fight.
+  - **A betraying Lieutenant** moves influence and starts showdowns for those turfs instead of flipping them.
+  - **A revived faction** fights for its regroup turf instead of appearing on it.
+- **Removed upgrades** (§18, §45.12): Handling ("Wheelman"), Cooldown ("Low Profile"), Body Armor, and the dead
+  `upgrades.engine/brakes/durability`. Their reads (grip, police escape time, damage reduction) are gone. Training
+  sells Stamina and Health only.
+- **Session 1 regression fixed:** the Armorer's "wear a vest now" and every ammo box had refused all purchases since
+  Session 1 (`!Money.can(450), 'armorer')`: a misplaced parenthesis left the source outside the call, and the comma
+  expression was always truthy). Both fixed; `ledger` checks them (verified failing on the Session 1 build);
+  `static-money` now fails any ledger call that has no source argument.
+
+## Files / systems changed (2)
+
+- Game: `030-core-save-system.js` (schema 9, upgrade refund), `190-core-player.js`, `230-core-vehicle.js`,
+  `310-core-police-manager.js` (removed upgrade reads), `340-core-missions.js`, `360-core-content-services.js`,
+  `380-core-campaign.js`, `500-underworld-homes-parking.js` (numeric Rep gates; home influence removed),
+  `390-underworld-data.js` (`RANKS`, `CREW_RANKS` (renamed from the crew's `RANKS`), officer `minRank`, business
+  establishment constants, hood perks), `450-underworld-core.js` (turf authority, Take Turf, Rank),
+  `460-underworld-factions.js` (wars resolve ownership, cede offers, revive by war, `startWar` force option),
+  `470-underworld-gangs.js` (player-called showdown groups, `warLive`), `480-underworld-crew.js` (coup by war,
+  `uw.rank`), `490-underworld-property.js` (no purchase Rep/influence, `established`), `510`, `530`, `540`
+  (Rank tile, Take Turf, Armorer fixes, truce ends your showdown too), `590`, `600` (upgrades), `630` (main-menu
+  Rank line), `640`, `650`;
+  `shell/10-body.html` and `styles/main.css` (`#rep` removed).
+- Tests: new `tests/progression.mjs` (22 checks); `ledger` +1 (Armorer purchases); `static-money` +1 (sourceless
+  calls); `session` turf step rewritten for Take Turf (+1 check: a dominant hold alone doesn't flip); `kingpin` sets
+  up a real Kingpin (Rep, two Lieutenants, owned turfs); `gangs`, `inventory`, `homes` use `rank`; `dealers`
+  expects "Needs N Rep"; schema expectations 8 → 9 in 7 suites.
+- `README.md` (Rank, Reputation and turf section; architecture and test list).
+
+## Save/schema changes (2)
+
+- **Schema 8 → 9.** `uw.turfs[i].own` and `uw.turfs[i].offer` added; a save without `own` takes the owner its
+  influence showed (the old rule, broken factions excluded), once. `uw.stageMax` → `uw.rankMax`. `upgrades` is
+  `{ stamina, health }`; levels of the removed upgrades are refunded to Clean Bank at their prices
+  (Handling 1,200/2,600/5,200, Low Profile 1,500/3,200/6,400, Body Armor 2,000/4,000/8,000). A war may have
+  `a: 'pc'`. Save key unchanged.
+
+## Tests run (2)
+
+Every browser and Node suite ran against the Session 2 build, three at a time; each suite with a failure was then re-run alone on the in-repo build:
+
+| Result (3 in parallel) | Suites |
+| --- | --- |
+| all checks pass | stress 30, gambling 57, soak 22, casino 39, homes 26, interiors 22, prison 48, session 35, ramps 21, vehicles 39, inventory 58, cargo 36, city 25, arrest 126, stations 17, map 22, roads 20, shooting 37, ui 23, offline 14, smoke 16, money 10, business 40, survival 9, street 11, camera 20, police 13, kingpin 6, gangs 23, tutorial 13, static-money 8, phoneapps 19, build 5, **progression 21 (new; 22 after the menu check below)**, ledger 52, core 64, royale-sim 23 |
+| property 32 / 33 → **33 / 33 alone** | "drive into the exit lane" (a timed drive in the mansion motor court, load-sensitive) |
+| phone 70 / 71 → **71 / 71 alone** | the 568×320 jail overlap check under load |
+| taxi 18 / 20 → **20 / 20 alone** | the 25-second cab drive (also 18 / 20 on the Session 0.5 build in parallel) |
+| dealers 33 / 34 → **34 / 34** | test expected the word "reputation"; it now expects "Needs N Rep" (wording change, test updated) |
+| pwa 0 / 1 → **5 / 5** | the runner served a copy of the build without its icons and manifest; run on the in-repo file |
+
+The `ledger` suite also ran three times during development: once with the intermittent +$167 (Known bugs), twice
+clean. The Armorer check was run against the Session 1 follow-up build to prove it catches the bug (fails there:
+vest 0, rounds 0) and passes on Session 2.
+
+Performance (`tests/perf.mjs`, alone, alternating builds, desktop SwiftShader, low quality):
+
+| | Session 1 follow-up | Session 2 |
+| --- | --- | --- |
+| update ms/frame, calm | 1.05 / 1.07 | 1.01 / 0.91 |
+| update ms/frame, busy | 1.06 / 1.05 | 1.21 / 1.25 |
+| draw calls | 118-121 | 118-124 |
+
+Calm-scene logic cost is unchanged. The busy samples are higher but inside the spread the identical Session 0.5
+build produced (0.97-1.48 ms); the per-second `recompute` is now cheaper (no ownership derivation), and nothing
+new runs per frame.
+
+Found in the pre-commit diff review and fixed: the main menu's continue line read `uw.stageMax`, which schema 9
+removes, so it would always have said "Nobody"; it reads `uw.rankMax` now, and `progression` checks the line
+(22 / 22, `smoke` 16 / 16 re-run on the fixed build).
+
+Screenshot scripts: `frontshots`, `carshots` and `contact` completed in the parallel run; `shots`, `cityshots` and
+`qashots` timed out under that load (the runner also hit its two-hour limit during `qashots`) and completed alone
+(exit 0, no page errors).
+
+## Deprecated / removed code (2)
+
+- Removed: `REP_LEVELS`, `repLevel`, `repName`, `_repHud`, `#rep`; `DEALER`; `STAGES`, `uw.stage`, `S.stageMax`
+  (renamed, no alias); influence-derived ownership in `recompute`; the handover in `cedeTurf` and the flip in the
+  coup; purchase Rep/influence; home/hood influence and Old Quarter Rep; `UPGRADES` handling/cooldown/armor and their
+  reads; dead `upgrades.engine/brakes/durability`.
+
+## Known bugs / risks (2)
+
+- **Influence marks are steep without purchased influence** (DC-25): 800 for Kingpin now needs infamy from bosses
+  or established businesses on top of 16 turfs. Re-tune in Session 13.
+- **Money still buys crew loyalty** (DC-26): bonuses, raises and the loyalty business perk. Not changed; needs a
+  ruling before Session 3.
+- **The showdown is the existing war machinery.** It is explicit and announced, but not yet a staged encounter;
+  Session 4 (gang wars / threats) deepens it, including the jail-time Critical messages (§45.16).
+- **Intermittent `ledger` flake:** in one of three runs on the Session 2 build, $167 of Dirty Cash appeared on the
+  player between the "across town" step and the car step, failing the four car/arrest checks that follow (they
+  expect exactly $15,000). A run with a ledger-event log attached passed, so the source is not identified yet; a
+  ground cash pickup (a gang drop near the teleport spot) fits the amount. It did not show in the Session 1 runs. Next session:
+  attach the event log to that step permanently and make the steps independent of stray pickups.
+
+## Exact next recommended task
+
+**Session 2.5 — the early laundering fixer** (§45.22, `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`). Before
+Session 3, rule on DC-25 (Lieutenant gates, influence marks) and DC-26 (money and crew loyalty).
+
+## Working tree (2)
+
+- Clean after the Session 2 commit; see `git log` on `claude/practical-lamport-zld81y`.
+
+---
+
+# Session 1 record (money foundation)
+
+## Session 1: phase
+
 - Session: **1 — Save schema + money foundation** (handoff phase 2), following §45.1–§45.22, including the
   Session 1 follow-up commit for the DC-22 / DC-23 / DC-24 rulings (§45.22).
 - Commit/base revision: `53370ad` (final classification rulings) → `a14aae0` (Session 1) → the Session 1 follow-up
@@ -240,7 +387,7 @@ string compare for the HUD bank line.
 - Dirty Cash in a car you don't own is lost with the car when it despawns, like its cargo (as designed for
   stolen cars; the transfer row warns nothing about it yet).
 
-## Exact next recommended task
+## Session 1: next task (done)
 
 **Session 2 — Rank / Reputation / core progression** (prompt Session 2, handoff phase 3), with DC-04/§45.7
 (business influence only once established), DC-10/§45.13 (authoritative turf owner, explicit takeover), removal of
@@ -576,7 +723,7 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-04 · "Money can't buy influence" contradicts "influence comes from businesses" — IMPORTANT (contradiction)
 
-**Disposition (owner):** ACCEPTED as §45.7. No instant Influence or Rank from buying a business; gradual Influence once it is operating and established. Session 2.
+**Disposition (owner):** ACCEPTED as §45.7. No instant Influence or Rank from buying a business; gradual Influence once it is operating and established. Session 2. **Implemented in Session 2:** no Rep, influence or turf hold from any purchase; a business counts after 7 days, fully after 21 (`PropertyManager.established`).
 
 1. **Current specification:** §1 money does not buy Rank, Rep, turf, contacts, loyalty or political influence,
    but a rich player may buy any legitimate asset. §30 influence comes from empire position, turf, **businesses**,
@@ -677,7 +824,7 @@ Each needs an owner decision before the session named in "Blocks". Nothing below
 
 ### DC-10 · Off-screen turf changes need a rule — RECOMMENDED (clarification)
 
-**Disposition (owner):** ACCEPTED as §45.13. Only explicit Take Turf / showdown success changes ownership, for anyone. The off-screen auto-resolved showdown rule is the proposed implementation (Sessions 2/4).
+**Disposition (owner):** ACCEPTED as §45.13. Only explicit Take Turf / showdown success changes ownership, for anyone. The off-screen auto-resolved showdown rule is the proposed implementation (Sessions 2/4). **Implemented in Session 2:** `uw.turfs[i].own` is saved state; `Underworld.transferTurf` is its only writer, called when a war (the showdown, live or auto-resolved by `FactionSim.warStep`) is won, or when the player takes up a ceded turf; the player calls a showdown with Take Turf. Session 4 deepens the showdown itself (staged encounter, reinforcements, jail-time Critical messages).
 
 1. **Current specification:** §4 "No silent ownership flips from background influence"; explicit Take Turf and a
    showdown. §10 rivals do coordinated turf takebacks.
@@ -923,6 +1070,74 @@ Stolen-car resale must not launder: a known-stolen car sold before HOT pays Dirt
 approved. Hospital bill: revised to max($1,000, 10% of Clean Bank), capped at $25,000. Jail spending from the
 outside stash: rejected as free access; the commissary pays ordinary jail spending, and outside Dirty Cash comes
 in only through a plausible channel (implemented: a crew courier; more channels in Session 8).
+
+### DC-25 · Rank gates after purchased influence was removed — RECOMMENDED (implemented as proposed; needs a ruling)
+
+1. **Current specification:** §1 seven Ranks, money buys none of them; §31 Kingpin needs turf, organization,
+   infrastructure and influence/control; §45.7 businesses add influence only once established. The thresholds are
+   not specified.
+2. **Problem observed:** the inherited gates (Underworld Power: 8 turfs + 450 influence; Kingpin: 16 turfs + 800)
+   were calibrated when property bought influence (penthouse 40, Club Neon 30, luxury homes 5-60, every business
+   +15 on purchase, neighbourhood bonuses). With those removed, 16 turfs alone give 352; the rest has to come from
+   infamy (12 per turf taken, 60 per boss put down, capped at 400), crew and Lieutenants, paid police and
+   established businesses. The dependency test reaches Kingpin, but only after putting bosses down (or with
+   established businesses). The old gates also had no "organization" condition at all.
+3. **Proposed improvement (implemented):** keep 450 / 800 for now, and add an organization condition: Underworld
+   Power needs one Lieutenant running a district, City Kingpin two. "Infrastructure" (a staffed warehouse) is added
+   to Kingpin in Session 3, when warehouses exist. Re-tune the influence marks with the economy pass (Session 13),
+   from playtest data.
+4. **Why it is better:** Rank reads only power that is earned (§1), Kingpin is multi-system (§31), and the
+   thresholds are not re-guessed twice.
+5. **Systems affected:** `RANKS` (one table), `Underworld.rankOf`, Rank hints, `progression` suite.
+6. **Tradeoffs / risks:** until Session 13 the 800 mark may feel steep for a player who avoids boss fights.
+   Alternative: lower it now (for example 450 → 380, 800 → 680) at the cost of a second change later.
+7. **Severity:** RECOMMENDED. **Blocks:** nothing; confirm the Lieutenant conditions before Session 3.
+
+### DC-26 · Money still buys crew loyalty — IMPORTANT (contradiction with §1; not changed, needs a ruling)
+
+1. **Current specification:** §1 "Money does not buy … crew loyalty".
+2. **Problem observed:** a crew Bonus (3 days' pay, Dirty Cash) gives +12 loyalty at any time; a raise gives +15;
+   a promotion (Dirty Cash) gives +15; convenience stores, groceries, coffee shops and diners add loyalty to the
+   whole crew every day from the day they are bought. A rich player can hold every crew member at 100 loyalty, which
+   disables the whole betrayal system (skimming, desertion, leaks, defection, coups).
+3. **Proposed improvement:** money only repairs what money broke. A bonus or raise restores loyalty lost to unpaid
+   or under-market pay, up to a ceiling (for example the member's starting loyalty); loyalty above that comes from
+   wins, time served together, Rank, fear and traits. A promotion's loyalty comes from the trust, not the fee
+   (keep it, it is gated by days served). Business loyalty perks count only once the business is established,
+   like influence.
+4. **Why it is better:** honours §1 and keeps betrayal a live risk at every wealth level.
+5. **Systems affected:** `CrewManager.bonus` / `decide('raise')` / `promote`, `PropertyManager.perk('loyalty')`,
+   the crew UI text.
+6. **Tradeoffs / risks:** fewer levers for a player in trouble with an unhappy crew; it is a change to how crew
+   feel, so it is not made silently.
+7. **Severity:** IMPORTANT. **Blocks:** Session 3 (crew assignment and Lieutenant automation build on loyalty).
+
+### DC-27 · Owned property steadies a turf hold — OPTIONAL (kept; for review)
+
+1. **Current specification:** §1 money does not buy turf.
+2. **Problem observed:** owning a property on a turf stops your influence there decaying and adds +6 to your side
+   of a showdown (`FactionSim.playerDefense`, `PropertyManager.presence`). It does not create influence or let you
+   Take Turf, but it is a purchased advantage in holding ground.
+3. **Proposed improvement:** keep it: a building you own is a physical foothold, and it never changes ownership by
+   itself. Alternative: count presence only for an operating (established) business or a staffed property.
+4. **Why it is better:** the effect is small and spatial, which fits the free-roam empire.
+5. **Systems affected:** `playerDefense`, influence decay in `FactionSim.tickHours`.
+6. **Tradeoffs / risks:** a very rich player can buy footholds across the map.
+7. **Severity:** OPTIONAL. **Blocks:** nothing.
+
+### DC-28 · Can Rank fall? — OPTIONAL (implemented as "Rank is current power")
+
+1. **Current specification:** §1 Rank = how powerful you are; §18 death never removes rank progression.
+2. **Problem observed:** the spec doesn't say whether losing turf or Lieutenants lowers Rank.
+3. **Proposed improvement (implemented):** Rank is recomputed from current power, so losing turfs or a Lieutenant
+   can lower it; the peak (`uw.rankMax`) is remembered and promotion banners fire only on a new peak. Death,
+   arrest and jail change none of Rank's inputs, so they never lower it. Alternative: Rank never falls below its
+   peak.
+4. **Why it is better:** Rank stays an honest reading of power, and holding the empire after Kingpin (§31) means
+   something.
+5. **Systems affected:** `Underworld.computeInfluence`, the Empire overview.
+6. **Tradeoffs / risks:** a betrayal can cost a Rank, which may feel harsh.
+7. **Severity:** OPTIONAL. **Blocks:** nothing.
 
 ## Owner decisions (Session 0 review)
 
@@ -1314,9 +1529,12 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | `save.money` scalar + `MoneyFeed` accessor | 33223 | S1 | **removed** |
 | `Game.addMoney`, `ContentManager.spend`, `Underworld.income/expense` as raw writers | 54604, 44485, 47594 | S1 | **removed** |
 | `SaveSystem.migrateV1` (never called) | 33117 | S1 | **removed** |
-| `DEALER` table (dead) | 44060 | S2 | open |
-| `REP_LEVELS`, `repLevel`, `repName`, `_repHud` named ladder | 44052, 44169 | S2 | open |
-| `UPGRADES` handling/cooldown/armor + reads; `upgrades.engine/brakes/durability` fields | 53182, 38523, 39438, 41154 | S2 | open |
+| `DEALER` table (dead) | 44060 | S2 | removed |
+| `REP_LEVELS`, `repLevel`, `repName`, `_repHud` named ladder, the hidden `#rep` HUD meter | 44052, 44169 | S2 | removed |
+| `UPGRADES` handling/cooldown/armor + reads; `upgrades.engine/brakes/durability` fields | 53182, 38523, 39438, 41154 | S2 | removed (refunded on load) |
+| influence-derived turf ownership (`recompute` flipping owners), `cedeTurf` handover, coup flip | `Underworld.recompute`, `FactionSim.cedeTurf`, `CrewManager.disloyalty` | S2 | removed |
+| purchase Rep / influence / turf influence; home, penthouse, loft and neighbourhood influence; Old Quarter daily Rep | `PropertyManager.buy/upgrade/tickDay`, `HOOD`, `PROPS`, `HOMES` | S2 | removed |
+| `STAGES` / `uw.stage` / `S.stageMax` (renamed, not parallel) | data, core | S2 | replaced by `RANKS` / `uw.rank` / `S.rankMax` |
 | `ARMS` + hidden `#shopArms` / `#shopCars` + `UIManager.buy('arm')` | 53189, 783-790, 53473 | S1 (hidden money path) | **removed** |
 | mugging: civ spill in `onKnock`, `st.mugs`, hint/tip text | 47530, 47058, 46133, 54500 | S1 (§45.18) | **removed** |
 | Driver car-stealing branch and role text | 48838, 46302 | S1 (§45.18) | **removed** (logistics role itself: S3) |
@@ -1343,3 +1561,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | — | 0.5 | no change (source split only; `index.html` byte-identical) |
 | 8 | 1 | `money` → `wallet` (Clean Bank, medical debt, Dirty Cash by place, stunt cap counter); pre-merge migration of a dev save's balance into Clean Bank; `uw.jail.commissary`; `uw.st.seizedCash`; `uw.st.mugs` no longer created |
 | 8 | 1 follow-up | `wallet.treasury` (warehouse id or null; sanitized to an owned warehouse); medical debt cap follows `CONFIG.hospital.max` ($25,000) |
+| 9 | 2 | `uw.turfs[i].own` (authoritative owner: `'pc'`, a faction id or null; derived once from influence for older saves) and `uw.turfs[i].offer` (`{ fid, until }` for a ceded turf); `uw.stageMax` → `uw.rankMax`; `upgrades` keeps only `stamina` and `health`, removed levels refunded to Clean Bank; turf wars may have `a: 'pc'` (a showdown the player called) |

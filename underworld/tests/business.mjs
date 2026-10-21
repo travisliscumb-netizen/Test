@@ -182,7 +182,7 @@ const mig = await ev(() => {
   const lv = d => { window.game.uw.sanitize(d.uw); return Object.values(d.uw.props).filter(o => o.owned).map(o => o.lvl); };
   return { ok: !!(a && a.data), v: a && a.data.version, lv: lv(a.data), bad: lv(c.data) };
 });
-check('a v5 save (no levels) loads as the current schema with every business at level 1', mig.ok && mig.v === 8 && mig.lv.every(x => x === 1), JSON.stringify(mig));
+check('a v5 save (no levels) loads as the current schema with every business at level 1', mig.ok && mig.v === 9 && mig.lv.every(x => x === 1), JSON.stringify(mig));
 check('a corrupted level is clamped to 1..3', mig.bad.every(x => x >= 1 && x <= 3), JSON.stringify(mig.bad));
 
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));

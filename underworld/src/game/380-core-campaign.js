@@ -26,7 +26,7 @@ class Campaign {
   // why a mission can't start right now ('' when it can, null when its prerequisites aren't met)
   blocker(def) {
     if (!def.after.every(a => this.isDone(a))) return null;
-    if (def.minRep && this.g.content.repLevel < def.minRep) return `Needs ${REP_LEVELS[def.minRep].name} reputation (${REP_LEVELS[def.minRep].at}).`;
+    if (def.minRep && this.g.save.rep < def.minRep) return `Needs ${def.minRep} Rep.`;
     const t = this.g.env.time;
     if (def.night && !(t >= 20 || t < 5)) return 'This job only happens after dark (20:00–05:00).';
     return '';

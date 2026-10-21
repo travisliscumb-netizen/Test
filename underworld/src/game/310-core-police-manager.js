@@ -29,7 +29,7 @@ class PoliceManager {
     this.heli = { g, active: false, x: 0, z: 0, y: 60, vx: 0, vz: 0 };
     this.g.scene.add(g);
   }
-  get escapeTime() { return [0, 12, 16, 21, 26, 32][this.level] * (1 - this.g.save.upgrades.cooldown * 0.12) * (this.g.uw ? this.g.uw.cops.escapeMul() : 1); }
+  get escapeTime() { return [0, 12, 16, 21, 26, 32][this.level] * (this.g.uw ? this.g.uw.cops.escapeMul() : 1); }
   get searchRadius() { return 35 + this.seenT * 5; }
   crime(type, x, z) {
     const g = this.g;

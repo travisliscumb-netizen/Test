@@ -176,7 +176,7 @@ check('walk-out bribe: one attempt a week', rb.cool, JSON.stringify(rb));
 
 // save and reload in jail
 const sv = await ev(() => { const g = window.game; g.uw.S.jail.gbp = 22; g.uw.S.jail.speed = 2; g.saveGame(true); const d = window.__pv.SaveSystem.load().data; return { v: d.version, jail: !!d.uw.jail, served: d.uw.jail.served, ally: d.uw.jail.ally, speed: d.uw.jail.speed, gbp: d.uw.jail.gbp, phone: d.uw.jail.phone }; });
-check('save in jail: current schema; the sentence, progress, good behaviour, speed and phone survive a reload', sv.v === 8 && sv.jail && sv.served > 0 && sv.ally && sv.speed === 2 && sv.gbp === 22 && sv.phone === true, JSON.stringify(sv));
+check('save in jail: current schema; the sentence, progress, good behaviour, speed and phone survive a reload', sv.v === 9 && sv.jail && sv.served > 0 && sv.ally && sv.speed === 2 && sv.gbp === 22 && sv.phone === true, JSON.stringify(sv));
 
 // the escape: caught
 const caught = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; j.tool = true; j.intel = 2; window.__t0 = j.total; P.startEscape(); return true; });
@@ -231,6 +231,6 @@ const mig5 = await ev(() => {
   const d = SS.load(); const g = window.game; g.save = d.data; g.uw.bind(g.save);
   return { phone: g.uw.S.jailPhone, migrated: d.migrated, v: g.save.version };
 });
-check('migration v5 → current: the old phone taped under the bunk is gone', mig5.phone === false && mig5.migrated && mig5.v === 8, JSON.stringify(mig5));
+check('migration v5 → current: the old phone taped under the bunk is gone', mig5.phone === false && mig5.migrated && mig5.v === 9, JSON.stringify(mig5));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'prison');

@@ -55,7 +55,7 @@ class PressureSystem {
   witnessCallMul(x, z) {
     const uw = this.uw, i = turfAt(x, z);
     let k = 1;
-    if (uw.owner[i] === 'pc') k *= uw.stage >= 4 ? 0.35 : 0.7;
+    if (uw.owner[i] === 'pc') k *= uw.rank >= 4 ? 0.35 : 0.7;
     k *= 1 - Math.min(0.4, uw.influence / 2000);
     return k;
   }
@@ -98,14 +98,14 @@ class PressureSystem {
     else if (S.warHours > 70) { S.crackdown = 3; S.pressure = clamp(S.pressure + 5, 0, 100); uw.news('pv', 'Valen Courier: the mayor orders a crackdown after a week of gang violence. Extra patrols on every street.'); }
     S.warHours = 0;
   }
-  canApproach(O) { return this.uw.stage >= O.stage; }
+  canApproach(O) { return this.uw.rank >= O.minRank; }
   approach(id) {
     const uw = this.uw, S = this.S, g = uw.g, O = OFFICER_BY_ID[id];
     if (!O) return '';
     const c = S.cops[id];
     if (c && c.st === 'paid') return 'Already on your payroll.';
     if (c) return 'They won’t take your call.';
-    if (!this.canApproach(O)) return `You’re not big enough for ${O.name} to risk it. (${STAGES[O.stage].name})`;
+    if (!this.canApproach(O)) return `You’re not big enough for ${O.name} to risk it. (${RANKS[O.minRank].name})`;
     if (S.taskforce > 0) return 'Nobody at the precinct will touch your money while the task force is here.';
     if (!Money.can(O.fee, 'bribe')) return `The first envelope is ${fmtMoney(O.fee)} in Dirty Cash.`;
     if (Math.random() < O.honest) {

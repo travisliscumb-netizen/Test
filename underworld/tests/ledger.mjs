@@ -12,7 +12,7 @@ const W = () => ev(() => JSON.parse(JSON.stringify(window.game.save.wallet)));
 
 // ---------------------------------------------------------------- 1. a fresh career
 const fresh = await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = false; if (g.tutorial) g.tutorial.off = true; for (let n = 0; n < 5; n++) g.update(1 / 60, 1 / 60); return { w: g.save.wallet, legacy: 'money' in g.save, v: g.save.version, hud: [document.getElementById('money').textContent, document.getElementById('bank').textContent] }; });
-check('a new career starts with $0 Dirty Cash, $0 Clean Bank, no debt, schema 8, and no old single balance', fresh.w.clean === 0 && fresh.w.debt === 0 && fresh.w.dirty.me === 0 && !Object.keys(fresh.w.dirty.prop).length && fresh.legacy === false && fresh.v === 8, JSON.stringify(fresh));
+check('a new career starts with $0 Dirty Cash, $0 Clean Bank, no debt, schema 9, and no old single balance', fresh.w.clean === 0 && fresh.w.debt === 0 && fresh.w.dirty.me === 0 && !Object.keys(fresh.w.dirty.prop).length && fresh.legacy === false && fresh.v === 9, JSON.stringify(fresh));
 check('the HUD shows the cash on you and the bank on separate lines', fresh.hud[0] === '$0' && fresh.hud[1] === 'BANK $0', JSON.stringify(fresh.hud));
 
 // ---------------------------------------------------------------- 2. income lands where the rules say
@@ -44,6 +44,15 @@ const arm = await ev(() => { const g = window.game, uw = g.uw, M = g.money, L = 
   const btn = n => { const b = document.querySelector(`#svcBody [data-act="hb:${n}"]`); return b ? !b.disabled : null; };
   const r = { hw, one: btn(1), five: btn(5) }; while (g.ui.stack.length) g.ui.back(); M.W.dirty.me = keep; g.save.rep = rep; return r; });
 check('Armorer hardware (500 Rep): with cash for two units, ×1 is enabled and ×5 is not', arm.one === true && arm.five === false, JSON.stringify(arm));
+// buying a vest to wear and a box of rounds actually goes through (Session 1 shipped both handlers always refusing:
+// Money.can(450) without its source is always false)
+const armBuy = await ev(() => { const g = window.game, uw = g.uw, M = g.money, s = g.save, p = g.player, L = uw.loc('spot', 'armorer');
+  const keep = M.W.dirty.me, rep = s.rep, pistol = s.weapons.pistol; s.rep = 600; s.weapons.pistol = true; p.vest = 0; M.W.dirty.me = 5000;
+  uw.ui.openSpot(L); const act = g.content._svcAct;
+  const a0 = s.ammo.pistol, d0 = M.W.dirty.me; act('vest'); const vest = { worn: p.vest, paid: d0 - M.W.dirty.me };
+  const d1 = M.W.dirty.me; act('a:0'); const box = { rounds: s.ammo.pistol - a0, paid: d1 - M.W.dirty.me };
+  while (g.ui.stack.length) g.ui.back(); M.W.dirty.me = keep; s.rep = rep; s.weapons.pistol = pistol; return { vest, box }; });
+check('the Armorer sells a vest to wear and a box of rounds, paid in Dirty Cash', armBuy.vest.worn > 0 && armBuy.vest.paid === 450 && armBuy.box.rounds > 0 && armBuy.box.paid > 0, JSON.stringify(armBuy));
 
 // ---------------------------------------------------------------- 4. invalid and negative amounts
 const bad = await ev(() => { const g = window.game, M = g.money, before = JSON.stringify(M.W), r = {};
@@ -198,7 +207,7 @@ await page.reload(); await page.waitForFunction(() => window.__pvBooted === true
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 const mig = await ev(() => { const g = window.game; return { v: g.save.version, from: g.save.flags.migratedFrom, w: g.save.wallet, legacy: 'money' in g.save, saved: (g.saveGame(true), JSON.parse(localStorage.getItem('pvunderworld.save.v1'))) }; });
-check('a v7 save migrates: its old money is Clean Bank, nothing is Dirty, no old field remains', mig.v === 8 && mig.from === 7 && mig.w.clean === 4321 && mig.w.dirty.me === 0 && !Object.keys(mig.w.dirty.prop).length && mig.legacy === false && !('money' in mig.saved), JSON.stringify({ v: mig.v, from: mig.from, w: mig.w }));
+check('a v7 save migrates: its old money is Clean Bank, nothing is Dirty, no old field remains', mig.v === 9 && mig.from === 7 && mig.w.clean === 4321 && mig.w.dirty.me === 0 && !Object.keys(mig.w.dirty.prop).length && mig.legacy === false && !('money' in mig.saved), JSON.stringify({ v: mig.v, from: mig.from, w: mig.w }));
 
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'ledger');

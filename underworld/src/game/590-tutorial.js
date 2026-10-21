@@ -9,7 +9,7 @@ const TUTORIAL = [
     text: g => touchUI(g) ? 'Left thumb moves you. Drag anywhere on the right half of the screen to look around.' : 'WASD moves you, the mouse looks around. Shift sprints, Space jumps.' },
   { id: 'interact', when: g => !$('prompt').classList.contains('hidden'),
     text: g => `When a prompt appears, ${touchUI(g) ? 'tap USE' : 'press E'} to do it: doors, people, cars, shops.` },
-  { id: 'money', when: g => g.uw && g.uw.stage === 0 && g.save.stats.playTime > 25,
+  { id: 'money', when: g => g.uw && g.uw.rank === 0 && g.save.stats.playTime > 25,
     text: () => 'First money: steal a car and sell it at the Saltworks Chop Shop, or buy cheap smokes from Dockside Sully and sell them to street buyers. Street Connect (phone) shows who buys and who sells.' },
   { id: 'map', when: g => g.save.stats.playTime > 50,
     text: g => `The Map (${touchUI(g) ? 'the map button' : 'M'}) shows places, BUY ↓ and SELL $ points and your territory. Tap a place to track it or take a cab there.` },

@@ -4,6 +4,17 @@
    locations, cash/loot pickups and every hook the engine calls into.
    ===================================================================== */
 const UW_VERSION = 1;
+// who leads a turf by influence: the rule that used to decide ownership every second. Since §45.13 it only seeds a
+// new career's map and the owner of a save from before owners were saved; ownership itself changes only through
+// a showdown (Underworld.transferTurf).
+function turfLeader(inf, factions) {
+  let a = null, av = 0, b = 0;
+  for (const k in inf) { if (k !== 'pc' && factions && factions[k] && factions[k].broken) continue; const v = inf[k]; if (v > av) { b = av; av = v; a = k; } else if (v > b) b = v; }
+  return av >= 40 && av - b >= 8 ? a : av >= 25 && b >= 25 ? a : av >= 32 ? a : null;
+}
+// Take Turf (§4): your hold on a turf must reach this much influence, and lead the owner's by the margin, before
+// you can call the showdown. Neutral ground needs less.
+const TAKE_INF = 40, TAKE_LEAD = 8, TAKE_INF_NEUTRAL = 32;
 class CashPickups {
   constructor(g) {
     this.g = g; this.list = [];
@@ -133,7 +144,7 @@ class Underworld {
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
-    this._infl = 0; this._stage = 0;
+    this._infl = 0; this._rank = 0;
     this.bind(game.save);
   }
   get S() { return this.g.save.uw; }
@@ -146,12 +157,12 @@ class Underworld {
       if (own) inf[own] = 62 + Math.random() * 18;
       if (t.zone === 'w') { inf.vipers = 44 + Math.random() * 6; inf.tidewater = 44 + Math.random() * 6; }
       if (t.zone === 'l') { inf.bellcourt = 12 + Math.random() * 10; }
-      return { inf, police: 15 + Math.random() * 15, war: null };
+      return { inf, police: 15 + Math.random() * 15, war: null, own: turfLeader(inf, null), offer: null };
     });
     const factions = {};
     for (const id of FAC_IDS) { const F = FACTIONS[id]; factions[id] = { strength: F.start.strength, money: F.start.money, stock: 60, heat: 20, rel: id === 'vipers' ? -5 : 0, truce: 0, tribute: 0, boss: F.boss.name, bossDown: 0, lt: 0, broken: 0, fear: 0, hits: 0 }; }
     return {
-      v: UW_VERSION, day: 1, lastHour: -1, infamy: 0, pressure: 8, stageMax: 0,
+      v: UW_VERSION, day: 1, lastHour: -1, infamy: 0, pressure: 8, rankMax: 0,
       market: Market.fresh(), marketPrev: null, supply: {}, dealQ: {}, chopWanted: [],
       inv: {}, storage: {}, props: {}, turfs, factions,
       crew: [], nextCrew: 1, cand: [], candDay: 0,
@@ -172,7 +183,7 @@ class Underworld {
     const arr = (v, def) => Array.isArray(v) ? v : def;
     S.v = UW_VERSION;
     S.day = Math.floor(num(S.day, 1, 1, 1e6)); S.lastHour = Math.floor(num(S.lastHour, -1, -1, 23));
-    S.infamy = num(S.infamy, 0, 0, 400); S.pressure = num(S.pressure, 8, 0, 100); S.stageMax = Math.floor(num(S.stageMax, 0, 0, 6));
+    S.infamy = num(S.infamy, 0, 0, 400); S.pressure = num(S.pressure, 8, 0, 100); S.rankMax = Math.floor(num(S.rankMax !== undefined ? S.rankMax : S.stageMax, 0, 0, RANK_MAX)); delete S.stageMax;
     S.market = obj(S.market, d.market);
     for (const z in DEMAND) { S.market[z] = obj(S.market[z], d.market[z]); for (const k of GOOD_IDS) { const m = S.market[z][k]; S.market[z][k] = Array.isArray(m) && m.length === 2 ? [num(m[0], 1, 0.25, 2.6), num(m[1], 1, 0.5, 1.8)] : [1, 1]; } }
     S.marketPrev = obj(S.marketPrev, null);
@@ -187,8 +198,12 @@ class Underworld {
       t = obj(t, d.turfs[i]);
       const inf = {}; const src = obj(t.inf, {});
       for (const k in src) if ((FACTIONS[k] || k === 'pc')) { const v = num(src[k], 0, 0, 100); if (v > 0.01) inf[k] = v; }
-      const w = t.war && typeof t.war === 'object' && (FACTIONS[t.war.a]) ? { a: t.war.a, d: t.war.d === 'pc' || FACTIONS[t.war.d] ? t.war.d : null, hrs: num(t.war.hrs, 12, 0, 200) } : null;
-      return { inf, police: num(t.police, 15, 0, 100), war: w };
+      const w = t.war && typeof t.war === 'object' && (FACTIONS[t.war.a] || t.war.a === 'pc') ? { a: t.war.a, d: t.war.d === 'pc' || FACTIONS[t.war.d] ? t.war.d : null, hrs: num(t.war.hrs, 12, 0, 200) } : null;
+      // the owner is saved state (§45.13). A save from before it was (schema < 9) takes the owner its influence
+      // showed at the time, once, by the old rule; after that only a showdown changes it.
+      const own = t.own === 'pc' || FACTIONS[t.own] || t.own === null ? t.own : undefined;
+      const offer = t.offer && typeof t.offer === 'object' && FACTIONS[t.offer.fid] ? { fid: t.offer.fid, until: num(t.offer.until, 0, 0, 1e6) } : null;
+      return { inf, police: num(t.police, 15, 0, 100), war: w && w.a !== w.d ? w : null, own, offer };
     });
     S.factions = obj(S.factions, d.factions);
     for (const id of FAC_IDS) {
@@ -198,6 +213,8 @@ class Underworld {
       f.lt = Math.floor(num(f.lt, 0, 0, 99)); f.broken = num(f.broken, 0, 0, 1e6); f.fear = num(f.fear, 0, 0, 100); f.hits = num(f.hits, 0, 0, 1e6);
       if (typeof f.boss !== 'string' || !f.boss) f.boss = FACTIONS[id].boss.name;
     }
+    // owners missing from an older save: derived once, now that faction state (broken or not) is known
+    for (const t of S.turfs) if (t.own === undefined) t.own = turfLeader(t.inf, S.factions);
     S.crew = arr(S.crew, []).filter(c => c && typeof c === 'object' && typeof c.name === 'string').map(c => this.crew.sanitizeMember(c));
     S.nextCrew = Math.max(num(S.nextCrew, 1, 1), ...S.crew.map(c => c.id + 1), 1);
     S.cand = arr(S.cand, []).filter(c => c && typeof c.name === 'string').map(c => this.crew.sanitizeMember(c)); S.candDay = num(S.candDay, 0);
@@ -308,21 +325,55 @@ class Underworld {
   }
   loc(kind, id) { return this.locById[kind + ':' + id]; }
   // ---------------------------------------------------------------- territory
+  // ownership is saved state (S.turfs[i].own, §45.13); `owner` is its read view, refreshed here and by
+  // transferTurf. Influence never changes the owner: it only shows how firm the hold is (contested) and decides
+  // when a challenger may call a showdown.
   recompute() {
     const S = this.S;
     for (let i = 0; i < this.T.length; i++) {
-      const inf = S.turfs[i].inf;
-      let a = null, av = 0, b = 0;
-      for (const k in inf) { if (k !== 'pc' && FACTIONS[k] && S.factions[k].broken) continue; const v = inf[k]; if (v > av) { b = av; av = v; a = k; } else if (v > b) b = v; }
-      const prev = this.owner[i];
-      let own = null, cont = false;
-      if (av >= 40 && av - b >= 8) own = a;
-      else if (av >= 25 && b >= 25) { own = a; cont = true; }
-      else if (av >= 32) own = a;
-      this.owner[i] = own; this.contested[i] = cont || !!S.turfs[i].war;
-      if (prev !== own && this._ready) this.onTurfChange(i, prev, own);
+      const T = S.turfs[i], own = T.own, inf = T.inf, mine = own ? inf[own] || 0 : 0;
+      this.owner[i] = own;
+      let cont = !!T.war;
+      if (!cont) for (const k in inf) if (k !== own && (k === 'pc' || (S.factions[k] && !S.factions[k].broken)) && inf[k] >= 25 && inf[k] >= mine - TAKE_LEAD) { cont = true; break; }
+      this.contested[i] = cont;
+      if (T.offer && (T.offer.until < S.day || T.offer.fid !== own)) T.offer = null;
     }
-    this._ready = true;
+  }
+  // the one place a turf changes hands: the end of a showdown the challenger won, or a turf its owner handed you
+  // when you took it up on the offer
+  transferTurf(i, to, cause) {
+    const T = this.S.turfs[i], prev = T.own;
+    if (to === prev || !(to === 'pc' || FACTIONS[to] || to === null)) return false;
+    T.own = to; T.offer = null; this.owner[i] = to;
+    this.recompute();
+    this.onTurfChange(i, prev, to, cause);
+    return true;
+  }
+  // can the player call Take Turf here? { ok, why, offered }
+  takeCheck(i) {
+    const S = this.S, T = S.turfs[i]; if (!T) return { ok: false, why: 'No such turf.' };
+    const own = T.own, f = own && own !== 'pc' ? S.factions[own] : null, pc = T.inf.pc || 0, theirs = own ? T.inf[own] || 0 : 0;
+    if (own === 'pc') return { ok: false, why: 'It’s already yours.' };
+    if (this.inJail) return { ok: false, why: 'Not from a cell.' };
+    if (T.war) return { ok: false, why: T.war.a === 'pc' ? 'Your showdown is already on.' : 'There’s already a war on here. Let it settle.' };
+    if (T.offer && T.offer.fid === own) return { ok: true, offered: true, why: '' };
+    if (f && f.truce > S.day) return { ok: false, why: `You have a truce with the ${FACTIONS[own].short}.` };
+    const need = own ? Math.max(TAKE_INF, theirs + TAKE_LEAD) : TAKE_INF_NEUTRAL;
+    if (pc < need) return { ok: false, need, why: `Weaken their hold first: you need ${Math.ceil(need)} influence here (you have ${Math.floor(pc)}). Beat their people on this turf or send an Enforcer to lean on it.` };
+    return { ok: true, offered: false, why: '' };
+  }
+  // Take Turf (§4): call the showdown. Played live if you are there, otherwise your people on the turf fight it
+  // out (FactionSim.warStep). A turf its owner offered you changes hands without a fight.
+  takeTurf(i) {
+    const c = this.takeCheck(i); if (!c.ok) return c.why;
+    const S = this.S, T = S.turfs[i], t = this.T[i], own = T.own;
+    if (c.offered) { this.transferTurf(i, 'pc', 'ceded'); return ''; }
+    T.war = { a: 'pc', d: own, hrs: 6 + Math.random() * 4 };
+    this.recompute();
+    this.opps.add({ kind: 'war', title: `Showdown for ${t.name}`, text: `You called it: ${own ? 'the ' + FACTIONS[own].short + ' have to hold ' + t.name + ' or lose it' : t.name + ' is up for grabs'}. Be there to fight it yourself, or your Enforcers on the turf handle it.`, turf: i, x: t.hang.x, z: t.hang.z, hours: Math.ceil(T.war.hrs), urgent: true });
+    this.news('pv', `You made your move on ${t.name}${own ? '. The ' + FACTIONS[own].short + ' know it' : ''}.`);
+    this.g.audio.play('wanted');
+    return '';
   }
   onTurfChange(i, prev, own) {
     const g = this.g, t = this.T[i], S = this.S;
@@ -330,7 +381,7 @@ class Underworld {
     if (own === 'pc') {
       S.st.turfsTaken++; this.addRep(60, null); S.infamy = Math.min(400, S.infamy + 12);
       g.ui.banner('Turf Taken', `${t.name} · ${ZONES[t.zone].name}`, 'pass', 3.2); g.audio.play('pass');
-      this.news('pv', `Word is ${t.name} answers to you now${prev ? ', not the ' + FACTIONS[prev].short : ''}.`);
+      this.news('pv', `Word is ${t.name} answers to you now${prev ? ', not the ' + FACTIONS[prev].short : ''}. Put an Enforcer and a Dealer on it (Empire → Crew) and keep it supplied.`);
       g.autosave('Territory taken');
     } else if (prev === 'pc') {
       S.st.turfsLost++;
@@ -354,36 +405,46 @@ class Underworld {
   // the career calendar shown to the player (internal day numbers keep counting from day 1; a v4 jail
   // inflated them, and that inflation is not shown)
   get calDay() { return Math.max(1, this.S.day - (this.S.dayOffset || 0)); }
-  get stage() { return this._stage; }
+  get rank() { return this._rank; }
+  // the measures Rank reads (RANKS[n].need): nothing here can be bought (§1, §45.7)
+  power() {
+    const S = this.S, crew = S.crew.filter(c => c.status === 'active');
+    return { rep: this.g.save.rep, crew: crew.length, lts: crew.filter(c => c.role === 'lieutenant').length, turfs: this.playerTurfs(), infl: this._infl };
+  }
+  // the highest Rank whose conditions, and every lower Rank's, are all met
+  rankOf(pw) {
+    let r = 0;
+    for (let n = 1; n <= RANK_MAX; n++) { const need = RANKS[n].need; if (Object.keys(need).every(k => (pw[k] || 0) >= need[k])) r = n; else break; }
+    return r;
+  }
+  // what the next Rank still needs, as text
+  rankMissing(pw = this.power()) {
+    const n = Math.min(RANK_MAX, this._rank + 1), need = RANKS[n].need;
+    return Object.keys(need).filter(k => (pw[k] || 0) < need[k]).map(k => RANK_NEED_TEXT[k](need[k]));
+  }
   computeInfluence() {
     const S = this.S;
     const turfs = this.playerTurfs();
-    let biz = 0, propInfl = 0;
-    for (const id in S.props) if (S.props[id].owned) { const d = PROP_BY_ID[id]; if (!d) continue; if (d.kind === 'business') biz++; propInfl += d.infl || 0; if (d.kind === 'safehouse') { const h = this.props.hoodOf(d); if (h && h.infl) propInfl += h.infl; } }
-    propInfl += this.props.perk('infl');
+    // a business adds influence only once it is established (§45.7); homes and their neighbourhoods add none,
+    // because a purchase never buys influence (§1)
+    let bizInfl = 0;
+    for (const id in S.props) if (S.props[id].owned) { const d = PROP_BY_ID[id]; if (d && d.kind === 'business') bizInfl += (BIZ_INFL + (d.infl || 0)) * this.props.established(id); }
+    bizInfl += this.props.perk('infl');
     const crew = S.crew.filter(c => c.status === 'active');
     const lts = crew.filter(c => c.rank >= 3).length;
     const cops = Object.values(S.cops).filter(c => c.st === 'paid').length;
-    this._infl = Math.round(clamp(turfs * 22 + biz * 15 + propInfl + crew.length * 5 + lts * 12 + cops * 8 + S.infamy, 0, 1000));
-    const rep = this.g.save.rep;
-    let st = 0;
-    if (rep >= 100) st = 1;
-    if (rep >= 400) st = 2;
-    if (st >= 2 && crew.length >= 2) st = 3;
-    if (st >= 3 && turfs >= 1) st = 4;
-    if (st >= 4 && turfs >= 8 && this._infl >= 450) st = 5;
-    if (st >= 5 && turfs >= 16 && this._infl >= 800) st = 6;
-    this._stage = st;
-    if (st > S.stageMax) {
-      S.stageMax = st;
+    this._infl = Math.round(clamp(turfs * 22 + bizInfl + crew.length * 5 + lts * 12 + cops * 8 + S.infamy, 0, 1000));
+    const r = this._rank = this.rankOf(this.power());
+    if (r > S.rankMax) {
+      S.rankMax = r;
       if (this._booted) {
-        this.g.later(1200, () => { this.g.ui.banner(STAGES[st].name, st < 6 ? 'Next: ' + STAGES[st].hint : 'The city is yours. Hold it.', 'pass', 4.5); this.g.audio.play('pass'); });
-        this.news('pv', this.stageLine(st));
+        this.g.later(1200, () => { this.g.ui.banner(RANKS[r].name, r < RANK_MAX ? 'Next: ' + RANKS[r].hint : 'The city is yours. Hold it.', 'pass', 4.5); this.g.audio.play('pass'); });
+        this.news('pv', this.rankLine(r));
       }
     }
     this._booted = true;
   }
-  stageLine(st) {
+  rankLine(st) {
     return ['', 'Street talk: a new face is hustling around the Old Quarter.', 'Your name is coming up in back rooms. People know who to call.', 'You run a crew now. The gangs have noticed.', 'You hold ground. Rival bosses are asking who you are.', 'Half the underworld answers to you. The rest are scared.', 'Port Valen has a new kingpin. Everyone knows it.'][st] || '';
   }
   addRep(n, why) { if (this.g.content) this.g.content.addRep(n, why); }
@@ -397,12 +458,12 @@ class Underworld {
     if (f.rel <= -40) return ratio > 2.2 ? 'fearful' : 'hostile';
     if (ratio > 2.2) return 'fearful';
     if (f.rel >= 40) return 'friendly';
-    if (this._stage >= 2 && ratio > 0.8) return 'wary';
+    if (this._rank >= 2 && ratio > 0.8) return 'wary';
     return 'territorial';
   }
   powerRatio(fid) { const f = this.S.factions[fid]; return this._infl / (f.strength * 5 + this.factionTurfs(fid) * 40 + 20); }
-  // the top of the ladder: everybody on the street knows who runs the city
-  kingpin() { return this.stage >= 6 || this.influence >= 800; }
+  // the top Rank: everybody on the street knows who runs the city (§31: a multi-system state, not a number)
+  kingpin() { return this._rank >= RANK_MAX; }
   // ---------------------------------------------------------------- inventory
   get pockets() { return this.S.inv; }
   pocketFree() { return POCKET_CAP - units(this.S.inv); }
@@ -612,7 +673,7 @@ class Underworld {
   pickpocket(q) {
     const g = this.g, S = this.S, z = zoneKey(q.x, q.z);
     q.picked = true;
-    const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._stage * 0.02) - (q.state === 'sit' ? 0.15 : 0);
+    const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0);
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
       const L = pocketLoot(q, z), cash = L.cash;
@@ -705,9 +766,9 @@ class Underworld {
   // a powerful player is recognised: people stop and stare, some say something
   streetFame() {
     const g = this.g, p = g.player;
-    if (this._stage < 4 || p.interior) return;
+    if (this._rank < 4 || p.interior) return;
     const pv = p.state === 'vehicle' ? p.vehicle : null;
-    const flashy = (pv && (pv.type === 'luxury' || pv.type === 'supercar' || pv.type === 'coupe')) || this.crew.bodyguards().length > 0 || this._stage >= 5;
+    const flashy = (pv && (pv.type === 'luxury' || pv.type === 'supercar' || pv.type === 'coupe')) || this.crew.bodyguards().length > 0 || this._rank >= 5;
     if (!flashy) return;
     this.fameT -= 1;
     for (const q of g.peds.peds) {

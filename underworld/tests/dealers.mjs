@@ -139,7 +139,7 @@ const deny = await ev(() => {
   s.rep = 99999;
   return { rep, cash, usedRep, full };
 });
-check('prestige cars need the reputation; the cash lot sells to anyone', /reputation/i.test(deny.rep) && deny.usedRep === '', JSON.stringify(deny));
+check('prestige cars need the reputation; the cash lot sells to anyone', /^Needs \d+ Rep$/.test(deny.rep) && deny.usedRep === '', JSON.stringify(deny));
 check('no sale without the money or a free parking space', /Costs/.test(deny.cash) && /Garage full/.test(deny.full), JSON.stringify(deny));
 
 // 7. the showroom: walk in through the glass front, the camera sees through glass, cars have room
@@ -193,7 +193,7 @@ const bad = await ev(() => {
   return { keys: Object.keys(d), cars: d.used && d.used.cars, day: d.used && d.used.d, v5: r5.data.version, v5d: JSON.stringify(r5.data.dealers) };
 });
 check('a damaged dealership save is repaired (bad cars dropped, condition clamped, unknown lots removed)', JSON.stringify(bad.keys) === '["used"]' && bad.cars[0] === null && bad.cars[1] === null && bad.cars[2].cond === 100 && bad.cars[3] === null && bad.day === -999, JSON.stringify(bad));
-check('a v5 save loads with empty lots that stock themselves', bad.v5 === 8 && bad.v5d === '{}', JSON.stringify(bad));
+check('a v5 save loads with empty lots that stock themselves', bad.v5 === 9 && bad.v5d === '{}', JSON.stringify(bad));
 
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 void mapIdx;

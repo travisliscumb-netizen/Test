@@ -14,13 +14,18 @@ const SETTINGS_KEY = 'pvunderworld.settings.v1';
 // v8 (overhaul Session 1): the single `money` number is gone. Money lives in `wallet` (Dirty Cash by place, Clean
 // Bank, medical debt; see Money). A development save's old balance moves into Clean Bank (§45.2) before the merge,
 // because merge() would silently drop a field whose type changed. Production starts a fresh save generation.
-const SAVE_VERSION = 8;
+// v8 -> v9 (Session 2): turf ownership is saved state (save.uw.turfs[i].own, set once from influence by
+// Underworld.sanitize); the Rank peak is uw.rankMax; the removed personal upgrades (Handling, Low Profile, Body
+// Armor, §18 / §45.12) and the dead engine/brakes/durability fields go, and what was paid for the removed levels
+// is refunded to Clean Bank.
+const SAVE_VERSION = 9;
+const REMOVED_UPGRADE_PRICES = { handling: [1200, 2600, 5200], cooldown: [1500, 3200, 6400], armor: [2000, 4000, 8000] };
 const SaveSystem = {
   defaults() {
     return {
       version: SAVE_VERSION,
       wallet: Money.fresh(),
-      upgrades: { stamina: 0, health: 0, handling: 0, cooldown: 0, armor: 0, engine: 0, brakes: 0, durability: 0 },
+      upgrades: { stamina: 0, health: 0 },
       weapons: { bat: false, pistol: false, smg: false, shotgun: false },
       ammo: { pistol: 0, smg: 0, shotgun: 0 },
       wloc: { bat: null, pistol: null, smg: null, shotgun: null },
@@ -81,6 +86,12 @@ const SaveSystem = {
     // v7 -> v8: the old single balance becomes Clean Bank (§45.2). Read raw, before merge() could drop it.
     if (oldVersion < 8 && !(data.wallet && typeof data.wallet === 'object')) data.wallet = { clean: typeof data.money === 'number' && isFinite(data.money) && data.money > 0 ? data.money : 0 };
     delete data.money;
+    if (oldVersion < 9 && data.upgrades && typeof data.upgrades === 'object') {
+      let refund = 0;
+      for (const k in REMOVED_UPGRADE_PRICES) { const lv = clamp(Math.floor(+data.upgrades[k] || 0), 0, 3); for (let n = 0; n < lv; n++) refund += REMOVED_UPGRADE_PRICES[k][n]; }
+      for (const k of ['handling', 'cooldown', 'armor', 'engine', 'brakes', 'durability']) delete data.upgrades[k];
+      if (refund > 0) { if (!data.wallet || typeof data.wallet !== 'object') data.wallet = {}; data.wallet.clean = (isFinite(data.wallet.clean) && data.wallet.clean > 0 ? data.wallet.clean : 0) + refund; }
+    }
     // deep-merge so new fields added in later versions get defaults
     const merge = (dst, src) => {
       for (const k in src) {

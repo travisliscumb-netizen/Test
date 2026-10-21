@@ -15,12 +15,15 @@ const res = await page.evaluate(() => {
   const snap = JSON.stringify({ turfs: S.turfs, factions: S.factions, infamy: S.infamy, props: S.props });
   const run = (infamy, days) => {
     const base = JSON.parse(snap); S.turfs = base.turfs; S.factions = base.factions; S.props = base.props; S.infamy = infamy;
+    // the top Rank needs the whole empire (§31): Rep, crew, two Lieutenants, 16 turfs and 800 influence. Both runs
+    // have the same people; only infamy (and so influence) differs
+    g.save.rep = 2500; S.crew = [1, 2].map(n => uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: null }));
     let wars = 0, over = 0, ratios = [], hits = 0, comp = [], refused = 0, paid = 0, kp = 0;
     const SW = uw.factions.startWar.bind(uw.factions);
     uw.factions.startWar = (att, i, why) => { const ok = SW(att, i, why); if (ok && S.turfs[i].war && S.turfs[i].war.d === 'pc') { wars++; const r = uw.powerRatio(att); ratios.push(+r.toFixed(2)); if (r > 2.5) over++; } return ok; };
     for (let d = 0; d < days; d++) {
       // the map holds still: your turfs stay yours, rivals keep a toe-hold to pay royalties from
-      for (const i of mine) { const T = S.turfs[i]; for (const k in T.inf) if (k !== 'pc') T.inf[k] = Math.min(T.inf[k], 20); T.inf.pc = 90; }
+      for (const i of mine) { const T = S.turfs[i]; for (const k in T.inf) if (k !== 'pc') T.inf[k] = Math.min(T.inf[k], 20); T.inf.pc = 90; T.own = 'pc'; }
       for (const fid in S.factions) { const f = S.factions[fid]; f.strength = Math.max(f.strength, 40); f.broken = 0; f.truce = 0; f.rel = Math.max(-50, Math.min(10, f.rel)); }
       S.infamy = infamy; uw.recompute(); uw.computeInfluence();
       if (uw.kingpin()) kp++;

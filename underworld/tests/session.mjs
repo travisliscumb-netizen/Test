@@ -106,8 +106,18 @@ const ko = await ev(i => { const g = window.game, uw = g.uw, gr = uw.gangs.group
 check('knocking out a gang member weakens their hold', ko.ko && ko.after < ko.before, JSON.stringify(ko));
 await ev(() => { window.game.debug.god = false; window.game.player.health = 100; });
 // ---------------------------------------------------------------- 8. turf takeover
-const take = await ev(i => { const g = window.game, uw = g.uw, T = uw.S.turfs[i]; for (const k in T.inf) T.inf[k] = 8; T.inf.pc = 70; T.war = null; uw.recompute(); uw.computeInfluence(); return { owner: uw.owner[i], taken: uw.S.st.turfsTaken, stage: uw.stage, infl: uw.influence }; }, gangTurf);
-check('taking a turf makes it yours', take.owner === 'pc' && take.taken >= 1, JSON.stringify(take));
+const take = await ev(i => {
+  const g = window.game, uw = g.uw, T = uw.S.turfs[i], prev = uw.owner[i];
+  // weaken their hold until yours dominates: on its own that changes nothing (§45.13)
+  for (const k in T.inf) T.inf[k] = 8; T.inf.pc = 70; T.war = null; uw.recompute(); uw.computeInfluence();
+  const silent = uw.owner[i];
+  // Take Turf calls the showdown; the war's hours decide it
+  const why = uw.takeTurf(i), war = T.war && { a: T.war.a, d: T.war.d };
+  for (let h = 0; h < 24 && T.war; h++) uw.factions.warStep(i, 1);
+  return { prev, silent, why, war, owner: uw.owner[i], taken: uw.S.st.turfsTaken, rank: uw.rank, infl: uw.influence };
+}, gangTurf);
+check('a dominant hold alone does not flip a turf (no silent ownership change)', take.prev !== 'pc' && take.silent === take.prev, JSON.stringify(take));
+check('Take Turf calls a showdown, and winning it makes the turf yours', take.why === '' && take.war && take.war.a === 'pc' && take.war.d === take.prev && take.owner === 'pc' && take.taken >= 1, JSON.stringify(take));
 // ---------------------------------------------------------------- 9. the city moves without the player
 const sim = await ev(() => {
   const g = window.game, uw = g.uw;
@@ -127,7 +137,7 @@ const cor = await ev(() => {
   uw.crew.refreshCandidates(true); uw.crew.hire(0); uw.computeInfluence();
   const r0 = Math.random; Math.random = () => 0.99; const a = uw.cops.approach('kerr'); Math.random = r0;
   const p0 = uw.S.pressure; const b = uw.cops.approach('moss');
-  return { stage: uw.stage, a, kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, b, moss: uw.S.cops.moss && uw.S.cops.moss.st, pUp: uw.S.pressure - p0, perk: uw.cops.perk('kerr') };
+  return { rank: uw.rank, a, kerr: uw.S.cops.kerr && uw.S.cops.kerr.st, b, moss: uw.S.cops.moss && uw.S.cops.moss.st, pUp: uw.S.pressure - p0, perk: uw.cops.perk('kerr') };
 });
 check('a dirty patrol cop can be bought', cor.kerr === 'paid' && cor.perk, JSON.stringify(cor));
 check('an honest sergeant refuses and pressure rises', cor.moss === 'refused' && cor.pUp > 5, JSON.stringify(cor));

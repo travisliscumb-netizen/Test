@@ -56,7 +56,6 @@ class Player {
     l.cap = o.cap >= 0 ? C(o.cap) : null;
   }
   get maxHealth() { const fit = this.game.uw && this.game.uw.S ? (this.game.uw.S.fit | 0) : 0; return Math.round((HP_BASE + this.game.save.upgrades.health * HP_PER_LEVEL) * (1 + fit * 0.03)); }
-  get armor() { return this.game.save.upgrades.armor * 0.12; }
   spawn(x, z, h = 0) {
     this.pos.set(x, groundY(x, z), z); this.h = h; this.state = 'foot'; this.vehicle = null;
     this.health = this.maxHealth; this.stamina = 1;
@@ -64,7 +63,6 @@ class Player {
   }
   damage(amount, src) {
     if (this.state === 'dead' || this.game.debug.god || this.invuln > 0) return;
-    amount *= 1 - this.armor;
     // the vest is its own layer: it soaks most of each hit until its points run out
     let soaked = 0;
     if (this.vest > 0) { soaked = Math.min(this.vest, amount * VEST_SOAK); this.vest -= soaked; amount -= soaked; if (this.vest < 0.5) { this.vest = 0; this.game.ui.toast('Your vest is shot through.', 'warn'); } }

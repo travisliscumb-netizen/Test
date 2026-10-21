@@ -19,6 +19,7 @@ const MISSION_NAMES = {
   chase: ['Runaway', 'Catch & Crush', 'Debt Collector'],
   survive: ['Hold the Line', 'Stand Your Ground', 'Siege Night']
 };
+const MISSION_REP_MARKS = [150, 400, 800, 1300, 2000];
 class MarkerPool {
   constructor(scene) {
     this.scene = scene; this.items = [];
@@ -94,7 +95,8 @@ class MissionManager {
     this.time = 0;
   }
   get difficulty() { return Math.min(3.2, 1 + this.g.save.missionsCompleted * 0.12); }
-  get repK() { return 1 + (this.g.content ? this.g.content.repLevel : 0) * 0.06; }
+  // mission pay grows 6% at each of these Rep marks (unchanged from the old ladder's steps)
+  get repK() { const r = this.g.save.rep; return 1 + MISSION_REP_MARKS.filter(m => r >= m).length * 0.06; }
   generate(contact) {
     const type = pick(contact.types), d = this.difficulty, g = this.g;
     const title = pick(MISSION_NAMES[type]);

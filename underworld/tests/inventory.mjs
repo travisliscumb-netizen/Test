@@ -234,18 +234,18 @@ check('crew deliveries: every lot accounted for (start - reported losses)', true
 const roy = await ev(() => {
   const g = window.game, uw = g.uw, S = uw.S, out = {};
   // hand the player a vipers turf where the vipers still operate
-  const i = uw.owner.findIndex(o => o === 'vipers'); S.turfs[i].inf = { pc: 70, vipers: 30 }; uw.recompute();
+  const i = uw.owner.findIndex(o => o === 'vipers'); S.turfs[i].inf = { pc: 70, vipers: 30 }; S.turfs[i].own = 'pc'; uw.recompute();
   out.owner = uw.owner[i];
   out.expected = uw.royalty.owed(i);
   const fid = uw.royalty.payer(i); out.payer = fid;
   // early game: weak influence
-  uw._infl = 60; uw._stage = 3; out.early = uw.royalty.compliance(i, fid);
+  uw._infl = 60; uw._rank = 3; out.early = uw.royalty.compliance(i, fid);
   // endgame: the city answers to you
-  uw._infl = 900; uw._stage = 6; out.late = uw.royalty.compliance(i, fid);
+  uw._infl = 900; uw._rank = 6; out.late = uw.royalty.compliance(i, fid);
   // a day's collection with both
   const r0 = Math.random; Math.random = () => 0.01;
   const m0 = g.money.total(); out.paid = uw.royalty.tickDay(); out.gain = g.money.total() - m0; out.status = S.roy[i].status;
-  Math.random = () => 0.999; uw._infl = 40; uw._stage = 3;
+  Math.random = () => 0.999; uw._infl = 40; uw._rank = 3;
   uw.royalty.tickDay(); out.status2 = S.roy[i].status;
   Math.random = r0;
   out.card = uw.royalty.card(i);
@@ -283,7 +283,7 @@ await page.reload(); await page.waitForFunction(() => window.__pvBooted === true
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 const mig = await ev(() => { const g = window.game, s = g.save, S = g.uw.S; return { v: s.version, from: s.flags.migratedFrom, money: g.money.clean, dirty: g.money.dirtyTotal(), legacy: 'money' in s, inv: { ...S.inv }, flop: { ...S.storage.flop }, pistol: s.weapons.pistol, where: s.wloc.pistol, draw: g.player.ownedWeapons().map(w => w.id), ammo: s.ammo.pistol, vest: s.vest, gamble: !!s.gamble && s.gamble.scratch.bought === 0, runs: Array.isArray(S.runs), car: s.garage[0] && s.garage[0].trunk.pills, tier: s.garage[0] && s.garage[0].vtier }; });
-check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 8 && mig.from === 3, JSON.stringify(mig));
+check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 9 && mig.from === 3, JSON.stringify(mig));
 check('v3 save: its money is now Clean Bank (§45.2), pockets, stash and trunk exactly as they were', mig.money === 4321 && mig.dirty === 0 && mig.legacy === false && mig.inv.green === 7 && mig.inv.snow === 3 && mig.flop.smokes === 12 && mig.flop.hardware === 2 && mig.car === 4, JSON.stringify(mig));
 check('v3 save: guns are carried and drawable, ammo kept, no vest, empty stats', mig.pistol && mig.where === null && mig.draw.includes('pistol') && mig.draw.includes('shotgun') && mig.ammo === 36 && mig.vest === 0 && mig.gamble && mig.runs, JSON.stringify(mig));
 check('v3 save: cars get their visual tier', mig.tier === 'common', mig.tier);

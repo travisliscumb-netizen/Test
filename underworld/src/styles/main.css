@@ -279,9 +279,6 @@ body.driving #weapon{display:none}
 body:not(.driving) #touch .car{display:none}
 
 /* ---------- pass 4: world, story and retention HUD ---------- */
-#rep{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:10px;font-weight:800;letter-spacing:.16em;color:#d28cff;text-shadow:0 1px 2px #000}
-#rep .rb{width:110px;height:3px;background:rgba(255,255,255,.14);border-radius:2px;overflow:hidden}#rep .rb i{display:block;height:100%;width:0;background:#d28cff;transition:width .6s}
-#rep.flash{animation:moneyFlash .6s}
 #objective.guide .ot{border-left-color:var(--green);background:rgba(10,12,18,.45);font-size:13px;color:#d9e6dc}
 #objArrow.guide svg path{fill:var(--green)}
 #zoneCard{position:absolute;left:calc(18px + var(--safe-l));bottom:calc(250px + var(--safe-b));--zc:#fff;animation:slideUp .5s ease;transition:opacity .6s}
@@ -428,7 +425,6 @@ body:not(.driving) #touch .car{display:none}
   #zoneCard{bottom:auto;top:calc(150px + var(--safe-t));left:calc(150px + var(--safe-l))}#zoneCard b{font-size:22px}
   #raceHud{top:calc(150px + var(--safe-t))}#raceHud b{font-size:16px}
   #stunt{top:30%}
-  #rep .rb{width:80px}
 }
 
 /* menus must never clip on short (landscape phone) screens */

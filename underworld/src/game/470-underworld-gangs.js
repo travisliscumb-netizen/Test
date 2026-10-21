@@ -146,7 +146,8 @@ class GangManager {
     for (const v of this.g.vehicles.list) if (v.uwGroup && !this.groups.has(v.uwGroup)) this.releaseCar(v);
   }
   // is a live (spawned, fighting) war happening on this turf right now?
-  warLive(i) { const gr = this.groups.get('warA' + i); return !!(gr && gr.members.some(m => m.state !== 'down')); }
+  // is the showdown being fought in front of the player? (the rival side is on the street and standing)
+  warLive(i) { const w = this.uw.S.turfs[i].war, gr = this.groups.get((w && w.a === 'pc' ? 'warD' : 'warA') + i); return !!(gr && gr.members.some(m => m.state !== 'down')); }
   threatNear(r) {
     const p = this.g.player;
     for (const gr of this.groups.values()) if (gr.hostile && !gr.crew) for (const m of gr.members) if (m.state !== 'down' && dist2(m.x, m.z, p.pos.x, p.pos.z) < r * r) return true;
@@ -173,6 +174,14 @@ class GangManager {
           const own = uw.owner[i], war = S.turfs[i].war;
           if (war && dist2(t.cx, t.cz, px, pz) < 170 * 170) {
             want.add('warA' + i); if (war.d) want.add('warD' + i);
+            if (war.a === 'pc') {
+              // your showdown: your people on the turf against the owner's, who are out for you
+              if (!this.groups.has('warA' + i)) { const ids = uw.crew.onTurf(i).slice(0, 3); if (ids.length) { const gr = this.spawnGroup('warA' + i, 'war', 'pc', { x: t.hang.x + 6, z: t.hang.z + 6, h: t.hang.h }, ids.length, { turf: i, enemy: war.d, crewIds: ids }); if (gr) gr.hostileTo = war.d; } }
+              if (war.d && !this.groups.has('warD' + i)) { const D = S.factions[war.d]; this.spawnGroup('warD' + i, 'war', war.d, t.hang, clamp(Math.round(2 + D.strength / 35), 2, 4), { turf: i, enemy: 'pc' }); }
+              const gd = this.groups.get('warD' + i); if (gd) { gd.enemy = 'pc'; gd.hostile = true; }
+              const ga = this.groups.get('warA' + i); if (ga) ga.enemy = war.d || 'none';
+              continue;
+            }
             const A = S.factions[war.a];
             if (!this.groups.has('warA' + i)) this.spawnGroup('warA' + i, 'war', war.a, { x: t.hang.x + 6, z: t.hang.z + 6, h: t.hang.h }, clamp(Math.round(2 + A.strength / 30), 2, 5), { turf: i, enemy: war.d });
             if (war.d && !this.groups.has('warD' + i)) {
@@ -371,7 +380,7 @@ class GangManager {
       this.hitT = rand(120, 240);
       const S = this.uw.S;
       const angry = FAC_IDS.filter(f => !S.factions[f].broken && (S.factions[f].aggro || 0) >= GANG_AGGRO.squad && S.factions[f].truce <= S.day && this.lastSeen(f) && this.uw.attitude(f) !== 'fearful');
-      if (angry.length && this.uw.stage >= 2 && g.police.level === 0) this.sendSquad(pick(angry), 'hit');
+      if (angry.length && this.uw.rank >= 2 && g.police.level === 0) this.sendSquad(pick(angry), 'hit');
     }
   }
   // ---------------------------------------------------------------- scenes
@@ -641,8 +650,8 @@ function gangBrain(p, dt) {
   }
   if (gr && onFoot && (att === 'territorial' || att === 'hostile') && uw.owner[turfAt(p.x, p.z)] === p.fac && gr.kind !== 'war') {
     if (dp < 5.5) {
-      if (!gr.warned) { gr.warned = g.time; uw.gangs.say(p, pick(uw.stage >= 2 ? LINES.warnKnown : LINES.warn)); }
-      else if (gr.kind === 'hang' && g.time - gr.warned > 9 && dp < 3.5 && att === 'territorial' && uw.stage < 2) { gr.hostile = true; uw.gangs.say(p, 'I told you once.'); return; }
+      if (!gr.warned) { gr.warned = g.time; uw.gangs.say(p, pick(uw.rank >= 2 ? LINES.warnKnown : LINES.warn)); }
+      else if (gr.kind === 'hang' && g.time - gr.warned > 9 && dp < 3.5 && att === 'territorial' && uw.rank < 2) { gr.hostile = true; uw.gangs.say(p, 'I told you once.'); return; }
       p.h = dampAngle(p.h, Math.atan2(pl.pos.x - p.x, pl.pos.z - p.z), 5, dt);
       p.vx = damp(p.vx, 0, 6, dt); p.vz = damp(p.vz, 0, 6, dt);
       return;

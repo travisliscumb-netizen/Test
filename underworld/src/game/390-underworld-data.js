@@ -93,22 +93,28 @@ const FAC_IDS = Object.keys(FACTIONS);
 // zone -> faction that starts in control (l: nobody; w: contested)
 const START_OWNER = { o: 'vipers', g: 'vipers', h: 'tidewater', s: 'tidewater', p: 'velvet', m: 'bellcourt', c: 'glasshouse', a: 'velvet' };
 const PLAYER_COL = '#ffb547', PLAYER_HEX = 0xffb547;
-// progression stages: the world reads these, the HUD never shows them as a meter
-const STAGES = [
-  { name: 'Nobody', hint: 'Make your first money: pickpocket, steal cars for the chop shop, fence hot goods.' },
-  { name: 'Street Hustler', hint: 'Reach 400 reputation: deals, races, scores and escapes all count.' },
-  { name: 'Known Operator', hint: 'Hire at least two crew (Empire → Crew) and keep them paid.' },
-  { name: 'Crew Leader', hint: 'Take a turf: beat a rival crew on their own corner and put your people there.' },
-  { name: 'Territory Holder', hint: 'Hold 8 turfs and grow your influence past 450.' },
-  { name: 'Underworld Power', hint: 'Hold 16 turfs with influence past 800 to run the city.' },
-  { name: 'City Kingpin', hint: 'You run Port Valen. Now keep it.' }
+// the seven player-facing Ranks (§1): how powerful you are, where Reputation (save.rep) is who knows you. Each Rank
+// needs everything the Ranks below it need. Every condition is power money cannot buy (§1, §45.7): Reputation,
+// active crew, Lieutenants running districts, turf held (it changes hands only through a showdown, §45.13) and
+// influence (in which a business counts only once it is established). Underworld.rankOf is the one reader.
+const RANKS = [
+  { name: 'Nobody', need: {}, hint: 'Make your first money: pickpocket, steal cars for the chop shop, fence hot goods.' },
+  { name: 'Street Hustler', need: { rep: 100 }, hint: 'Reach 400 Rep: deals, races, scores and escapes all count.' },
+  { name: 'Known Operator', need: { rep: 400 }, hint: 'Hire at least two crew (Empire → Crew) and keep them paid.' },
+  { name: 'Crew Leader', need: { rep: 400, crew: 2 }, hint: 'Take a turf: weaken a rival’s hold until you can Take Turf (Empire → Turf map), then win the showdown.' },
+  { name: 'Territory Holder', need: { rep: 400, crew: 2, turfs: 1 }, hint: 'Hold 8 turfs, put a Lieutenant in charge of a district and grow your influence past 450.' },
+  { name: 'Underworld Power', need: { rep: 400, crew: 2, turfs: 8, lts: 1, infl: 450 }, hint: 'Hold 16 turfs with two Lieutenants and influence past 800 to run the city.' },
+  { name: 'City Kingpin', need: { rep: 400, crew: 2, turfs: 16, lts: 2, infl: 800 }, hint: 'You run Port Valen. Now keep it.' }
 ];
+const RANK_MAX = RANKS.length - 1;
+// what each Rank condition is called when the UI explains what is missing
+const RANK_NEED_TEXT = { rep: n => `${n} Rep`, crew: n => `${n} active crew`, turfs: n => `${n} turf${n === 1 ? '' : 's'} held`, lts: n => `${n} Lieutenant${n === 1 ? '' : 's'} running a district`, infl: n => `${n} influence` };
 // purchasable property. at: [bx, bz, side, along] (side 0 N, 1 E, 2 S, 3 W) or place: existing world place
 const PROPS = [
   { id: 'flop', name: 'Old Quarter Flop', kind: 'safehouse', price: 2500, at: [1, 4, 1, 40], storage: 40, garage: 0, crew: 0, desc: 'A room over a laundromat. A bed, a lock and somewhere to stash things.' },
   { id: 'linden', name: 'Linden Hills House', kind: 'safehouse', price: 14000, place: 'safehouse', interior: 'safehouse', storage: 90, garage: 2, crew: 1, desc: 'Quiet street, nosy neighbours, a real garage.' },
-  { id: 'loft', name: 'Downtown Loft', kind: 'safehouse', price: 38000, at: [5, 2, 2, 30], storage: 120, garage: 3, crew: 1, infl: 10, desc: 'Exposed brick, a freight lift and a view of everybody else’s business.' },
-  { id: 'penthouse', name: 'Valen Tower Penthouse', kind: 'safehouse', price: 150000, place: 'tower', interior: 'penthouse', storage: 160, garage: 6, crew: 2, infl: 40, luxury: true, desc: 'The top of the tallest tower on the island. People notice who lives here.' },
+  { id: 'loft', name: 'Downtown Loft', kind: 'safehouse', price: 38000, at: [5, 2, 2, 30], storage: 120, garage: 3, crew: 1, desc: 'Exposed brick, a freight lift and a view of everybody else’s business.' },
+  { id: 'penthouse', name: 'Valen Tower Penthouse', kind: 'safehouse', price: 150000, place: 'tower', interior: 'penthouse', storage: 160, garage: 6, crew: 2, luxury: true, desc: 'The top of the tallest tower on the island. People notice who lives here.' },
   { id: 'qgarage', name: 'Quarter Garage Lock-ups', kind: 'garage', price: 8000, place: 'garageRoof', storage: 20, garage: 4, crew: 0, desc: 'Four lock-ups and a mechanic who doesn’t ask. Repairs, respray and tuning at cost.' },
   { id: 'docklock', name: 'Pier 9 Lock-up', kind: 'garage', price: 6000, at: [10, 9, 3, 30], storage: 60, garage: 2, crew: 0, desc: 'A rusted roll door near the water. Cheap, private and close to the boats.' },
   { id: 'whse_w', name: 'Cannery Row Warehouse', kind: 'warehouse', price: 32000, at: [7, 10, 0, 40], storage: 600, garage: 1, crew: 2, desc: 'Bulk storage. Enough room to sit on product until the price is right.' },
@@ -229,13 +235,16 @@ const BIZ_IDS = PROPS.filter(p => p.kind === 'business').map(p => p.id);
 function bizUpgradeCost(def, lvl) { return lvl === 1 ? Math.round(def.price * 0.9 / 500) * 500 : lvl === 2 ? Math.round(def.price * 2.2 / 500) * 500 : 0; }
 // daily running costs (staff, rent, stock) at each level, as a share of the base income
 const BIZ_UPKEEP = [0.18, 0.24, 0.3];
+// §45.7: buying a business buys no influence. It starts to count after BIZ_EST_DAYS world days of operation and
+// reaches its full weight (BIZ_INFL plus its own prestige, def.infl) over the next BIZ_EST_RAMP days
+const BIZ_INFL = 15, BIZ_EST_DAYS = 7, BIZ_EST_RAMP = 14;
 // ---- v6: neighbourhoods give a home a little extra (stash safety, standing, recruiting) on top of the house itself
 const HOOD = {
   l: { name: 'Linden Hills', perk: 'Quiet streets: stashes here are raided 30% less', raid: 0.7 },
-  u: { name: 'Crestmoor Heights', perk: 'Gated and lawyered: raids 50% less, +influence', raid: 0.5, infl: 5 },
+  u: { name: 'Crestmoor Heights', perk: 'Gated and lawyered: raids 50% less', raid: 0.5 },
   r: { name: 'Cedar Fields', perk: 'Nobody out here: raids 60% less', raid: 0.4 },
-  o: { name: 'Old Quarter', perk: 'Street credibility: +2 reputation a day while you own it', raid: 1.0, rep: 2 },
-  c: { name: 'Financial District', perk: 'Prestige address: +influence', raid: 0.85, infl: 6 },
+  o: { name: 'Old Quarter', perk: '', raid: 1.0 },
+  c: { name: 'Financial District', perk: 'Prestige address: stashes raided 15% less', raid: 0.85 },
   m: { name: 'Downtown', perk: 'Central: crew deliveries from here are safer', raid: 0.95 },
   h: { name: 'Docklands', perk: 'Close to the boats: stashes hold 25% more', raid: 1.15, store: 1.25 },
   p: { name: 'Nightlife Strip', perk: 'The scene: one more recruit on offer', raid: 1.05, recruit: 1 }
@@ -266,7 +275,7 @@ const CREW_ROLES = {
   scout: { name: 'Scout', desc: 'Watches a district: warns of raids and reports rival moves.', zone: true },
   driver: { name: 'Driver', desc: 'Transport and logistics. Moving product between your places arrives with the warehouse rebuild; for now a Driver gets your bodyguards around.' }
 };
-const RANKS = ['Associate', 'Crew Member', 'Enforcer', 'Captain', 'Lieutenant'];
+const CREW_RANKS = ['Associate', 'Crew Member', 'Enforcer', 'Captain', 'Lieutenant'];
 const PROMO_COST = [0, 1500, 4000, 10000, 25000];
 const TRAITS = {
   loyal: { name: 'Loyal', desc: 'Slow to turn, whatever happens.' },
@@ -282,14 +291,14 @@ const LAST_NAMES = ['Moreno', 'Kowalski', 'Achebe', 'Lindqvist', 'Navarro', 'Doy
 const NICKS = ['Smiles', 'Wheels', 'Two-Tone', 'Bricks', 'Ghost', 'Lucky', 'Professor', 'Tiny', 'Saint', 'Spider', 'Ice', 'Hammer'];
 // police contacts. honest officers cannot be bought (and remember you tried)
 const OFFICERS = [
-  { id: 'kerr', name: 'Ofc. Dale Kerr', rank: 'Patrol, Old Quarter', stage: 1, fee: 1500, zone: 'o', honest: 0.1, perks: 'Tip-offs before raids on your stashes. Heat in the Old Quarter fades faster.' },
-  { id: 'park', name: 'Ofc. Nina Park', rank: 'Patrol, Docklands', stage: 1, fee: 1800, zone: 'h', honest: 0.25, perks: 'Docklands patrols arrive late. Warns you about port surveillance.' },
-  { id: 'okoro', name: 'Det. Sam Okoro', rank: 'Narcotics', stage: 2, fee: 5000, honest: 0.3, perks: 'Evidence goes missing: sentences 15% shorter, better odds with the guards. Leaks upcoming raids on rivals.' },
-  { id: 'moss', name: 'Sgt. Lena Moss', rank: 'Desk sergeant, Police HQ', stage: 2, fee: 6000, honest: 1, perks: 'Straight as an arrow. Trying to buy her is a mistake.' },
-  { id: 'pike', name: 'Lt. Harlan Pike', rank: 'Watch commander', stage: 3, fee: 12000, honest: 0.35, perks: 'Slower dispatch at low wanted levels, faster escapes, and he can point a raid at a rival (every 3 days).' },
-  { id: 'lindqvist', name: 'Det. Rae Lindqvist', rank: 'Internal Affairs', stage: 3, fee: 20000, honest: 1, perks: 'Investigates dirty cops. Cannot be bought.' },
-  { id: 'bramford', name: 'Capt. Wes Bramford', rank: 'Precinct captain', stage: 4, fee: 25000, honest: 0.4, perks: 'Selective enforcement: fewer patrols in your turfs, police pressure decays faster.' },
-  { id: 'vale', name: 'Deputy Chief Corinne Vale', rank: 'Headquarters', stage: 5, fee: 50000, honest: 0.5, perks: 'Halves the pressure your turfs generate and takes 30% off every sentence.' }
+  { id: 'kerr', name: 'Ofc. Dale Kerr', rank: 'Patrol, Old Quarter', minRank: 1, fee: 1500, zone: 'o', honest: 0.1, perks: 'Tip-offs before raids on your stashes. Heat in the Old Quarter fades faster.' },
+  { id: 'park', name: 'Ofc. Nina Park', rank: 'Patrol, Docklands', minRank: 1, fee: 1800, zone: 'h', honest: 0.25, perks: 'Docklands patrols arrive late. Warns you about port surveillance.' },
+  { id: 'okoro', name: 'Det. Sam Okoro', rank: 'Narcotics', minRank: 2, fee: 5000, honest: 0.3, perks: 'Evidence goes missing: sentences 15% shorter, better odds with the guards. Leaks upcoming raids on rivals.' },
+  { id: 'moss', name: 'Sgt. Lena Moss', rank: 'Desk sergeant, Police HQ', minRank: 2, fee: 6000, honest: 1, perks: 'Straight as an arrow. Trying to buy her is a mistake.' },
+  { id: 'pike', name: 'Lt. Harlan Pike', rank: 'Watch commander', minRank: 3, fee: 12000, honest: 0.35, perks: 'Slower dispatch at low wanted levels, faster escapes, and he can point a raid at a rival (every 3 days).' },
+  { id: 'lindqvist', name: 'Det. Rae Lindqvist', rank: 'Internal Affairs', minRank: 3, fee: 20000, honest: 1, perks: 'Investigates dirty cops. Cannot be bought.' },
+  { id: 'bramford', name: 'Capt. Wes Bramford', rank: 'Precinct captain', minRank: 4, fee: 25000, honest: 0.4, perks: 'Selective enforcement: fewer patrols in your turfs, police pressure decays faster.' },
+  { id: 'vale', name: 'Deputy Chief Corinne Vale', rank: 'Headquarters', minRank: 5, fee: 50000, honest: 0.5, perks: 'Halves the pressure your turfs generate and takes 30% off every sentence.' }
 ];
 const OFFICER_BY_ID = Object.fromEntries(OFFICERS.map(o => [o.id, o]));
 const CRIME_PRESSURE = { hitped: 2, assault: 1.2, shoot: 1.5, carjack: 1.6, stealcop: 5, ramcop: 2.5, hitcop: 4, shootcop: 6, copcar: 7, explosion: 3, koped: 2.5, theft: 0.8, deal: 1.5, pickpocket: 0.6 };

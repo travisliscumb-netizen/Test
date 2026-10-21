@@ -111,7 +111,7 @@ class Vehicle {
     const hpK = this.health > VEH_T.smoke ? 1 : this.health > VEH_T.heavy ? 0.92 : this.health > VEH_T.critical ? 0.76 : 0.55;
     const isPlayer = this.driver === 'player';
     const tn = this.tune;
-    let grip = s.grip * game.env.gripMul * (isPlayer ? 1 + game.save.upgrades.handling * 0.07 : 1) * (tn ? 1 + tn.grip * 0.06 : 1);
+    let grip = s.grip * game.env.gripMul * (tn ? 1 + tn.grip * 0.06 : 1);
     if (this.health <= VEH_T.critical) grip *= 0.86; else if (this.health <= VEH_T.heavy) grip *= 0.95;
     const hb = ctl.handbrake || disabled;
     // speed-sensitive steering: a big lock for parking, alleys and three-point turns that fades

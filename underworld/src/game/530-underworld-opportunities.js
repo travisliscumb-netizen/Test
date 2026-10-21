@@ -49,10 +49,10 @@ class OppFeed {
     }
     // bounties: a faction at war pays you to hurt their enemy
     for (let i = 0; i < uw.T.length; i++) {
-      const w = S.turfs[i].war; if (!w || !w.d || w.d === 'pc' || Math.random() > 0.5) continue;
+      const w = S.turfs[i].war; if (!w || !w.d || w.d === 'pc' || w.a === 'pc' || Math.random() > 0.5) continue;
       const payer = w.a, target = w.d;
       if (uw.attitude(payer) === 'hostile' || S.opps.some(o => o.kind === 'bounty' && o.turf === i)) continue;
-      this.add({ kind: 'bounty', title: `${FACTIONS[payer].short} bounty on the ${FACTIONS[target].short}`, text: `${S.factions[payer].boss} pays ${fmtMoney(1500 + uw.stage * 600)} if you put three ${FACTIONS[target].short} soldiers on the ground in ${uw.T[i].name}.`, turf: i, payer, target, need: 3, got: 0, reward: 1500 + uw.stage * 600, x: uw.T[i].hang.x, z: uw.T[i].hang.z, hours: 30 });
+      this.add({ kind: 'bounty', title: `${FACTIONS[payer].short} bounty on the ${FACTIONS[target].short}`, text: `${S.factions[payer].boss} pays ${fmtMoney(1500 + uw.rank * 600)} if you put three ${FACTIONS[target].short} soldiers on the ground in ${uw.T[i].name}.`, turf: i, payer, target, need: 3, got: 0, reward: 1500 + uw.rank * 600, x: uw.T[i].hang.x, z: uw.T[i].hang.z, hours: 30 });
       break;
     }
     // underground races and contact work, so the player hears about them

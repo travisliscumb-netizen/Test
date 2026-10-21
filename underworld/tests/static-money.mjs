@@ -62,7 +62,7 @@ function args(L, from) {
   }
   return out;
 }
-const legacy = [], old = [], wallet = [], unknown = [], calls = {}, bySrc = {}, dynamic = [];
+const legacy = [], old = [], wallet = [], unknown = [], unsourced = [], calls = {}, bySrc = {}, dynamic = [];
 for (let i = start; i < lines.length; i++) {
   const L = lines[i];
   if (inMoney(i)) continue;
@@ -74,7 +74,8 @@ for (let i = start; i < lines.length; i++) {
     if (fn === 'earn' && m[0].startsWith('g.') === false && A.length === 1) continue;
     // the source is the only argument of html/available, the second of earn/pay/can
     const expr = (fn === 'html' || fn === 'available' ? A[0] : A[1]) || '';
-    if (!expr) continue;
+    // a call without its source is a bug, not a default: Money.can(450) is always false (Session 1 shipped one)
+    if (!expr) { unsourced.push(`${owner(i)}: ${m[0]}${A.join(', ')}) (line ${i + 1})`); continue; }
     const lits = [...expr.matchAll(/(?<![=!]==\s*)'([A-Za-z]+)'/g)].map(x => x[1]); // not the literals a ternary compares against
     if (!/^'[A-Za-z]+'$/.test(expr)) dynamic.push(`${owner(i)} ${fn}(… ${expr})`);
     if (!lits.length) continue;
@@ -90,6 +91,7 @@ for (let i = start; i < lines.length; i++) {
 out(!legacy.length, `nothing reads or writes the old single balance (save.money)${legacy.length ? ': ' + legacy.join(', ') : ''}`);
 out(!old.length, `no call to the removed raw writers (addMoney, content.spend, uw.income, uw.expense)${old.length ? ': ' + old.join(', ') : ''}`);
 out(!wallet.length, `only the ledger and the save system touch the wallet${wallet.length ? ': ' + wallet.join(', ') : ''}`);
+out(!unsourced.length, `every ledger call names its source${unsourced.length ? ': ' + unsourced.join(', ') : ''}`);
 out(!unknown.length, `every money source named in a call exists in MONEY_SOURCES${unknown.length ? ': ' + unknown.join(', ') : ''}`);
 const unused = [...SOURCES].filter(k => !bySrc[k]);
 out(!unused.length, `every source in MONEY_SOURCES is used somewhere${unused.length ? ' (unused: ' + unused.join(', ') + ')' : ''}`);

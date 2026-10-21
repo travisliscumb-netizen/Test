@@ -132,7 +132,7 @@ class Game {
     this.ui.show('mainMenu', true); this.ui.show('hud', false); this.ui.show('touch', false); this.ui.show('pauseMenu', false);
     $('btnContinue').disabled = !this.hasSave;
     const uw = this.save.uw;
-    $('continueSub').textContent = this.hasSave ? `Dirty ${fmtMoney(Money.dirtyTotal())} · Bank ${fmtMoney(Money.clean)} · ${uw && uw.jail ? 'in County Jail' : 'day ' + (uw ? Math.max(1, uw.day - (uw.dayOffset || 0)) : 1)} · ${this.uw ? STAGES[Math.min(6, (uw && uw.stageMax) || 0)].name : ''}` : 'No saved career yet';
+    $('continueSub').textContent = this.hasSave ? `Dirty ${fmtMoney(Money.dirtyTotal())} · Bank ${fmtMoney(Money.clean)} · ${uw && uw.jail ? 'in County Jail' : 'day ' + (uw ? Math.max(1, uw.day - (uw.dayOffset || 0)) : 1)} · ${this.uw ? RANKS[Math.min(RANK_MAX, (uw && uw.rankMax) || 0)].name : ''}` : 'No saved career yet';
     window.__pvBooted = true;
   }
   newGame() {

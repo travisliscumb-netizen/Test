@@ -90,14 +90,14 @@ const sq = await G(fid => {
   const g2 = squads()[0];
   if (g2) { const v = g2.car; v.pos.set(p.pos.x + 8, v.pos.y, p.pos.z); g2.spotT = 0; gm.updateSquads(0.1); out.locked = g2.locked; const tg = v.drive && v.drive.target ? v.drive.target() : null; out.lockTarget = g2.members.length > 0 || (tg ? Math.hypot(tg.x - p.pos.x, tg.z - p.pos.z) < 0.01 : false); gm.removeGroup(g2); if (g.vehicles.list.includes(v)) g.vehicles.despawn(v); }
   // the periodic hit squads: long-term hatred alone (rel −80, aggression cold) sends nobody any more
-  Object.defineProperty(uw, 'stage', { value: 3, configurable: true });
+  Object.defineProperty(uw, 'rank', { value: 3, configurable: true });
   f.aggro = 0; gm.sighting(fid); gm.hitT = 0.01; gm.updateSquads(0.1); out.coldHit = squads().length;
   // actively after you, with a fresh sighting: they come (to where you were seen)
   f.aggro = 60; gm.sighting(fid); gm.hitT = 0.01; gm.updateSquads(0.1); out.hotHit = squads().length;
   for (const gr3 of squads()) { const v = gr3.car; gm.removeGroup(gr3); if (g.vehicles.list.includes(v)) g.vehicles.despawn(v); }
   // …but not when the last sighting is old news
   f.aggro = 60; gm.seen[fid].t = g.time - 1000; gm.hitT = 0.01; gm.updateSquads(0.1); out.staleHit = squads().length;
-  delete uw.stage; f.aggro = 0; gm.seen = {};
+  delete uw.rank; f.aggro = 0; gm.seen = {};
   return out;
 }, setup.fid);
 check('no sighting, no squad: they cannot find you without seeing you', sq.noSighting === 0, JSON.stringify(sq));
