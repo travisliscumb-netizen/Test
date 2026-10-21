@@ -50282,10 +50282,10 @@ class CompoundSystem {
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     if (!p.interior) {
       const ax = pv ? pv.pos.x : p.pos.x, az = pv ? pv.pos.z : p.pos.z;
-      if (Math.hypot(ax - G.x, az - G.z) < (pv ? reach(pv) : 4.5) && this.allows(id, p)) return true;
+      if (Math.hypot(ax - G.x, az - G.z) < (pv ? reach(pv) : 4.5) && this.allows(id, p)) { R.gate.by = 'player'; return true; }
     }
-    for (const v of g.vehicles.nearby(G.x, G.z, 36)) { if (v === pv || v.burnt) continue; if (Math.hypot(v.pos.x - G.x, v.pos.z - G.z) < reach(v) && this.allows(id, v)) return true; }
-    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !q.crewId) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) return true; }
+    for (const v of g.vehicles.nearby(G.x, G.z, 36)) { if (v === pv || v.burnt) continue; if (Math.hypot(v.pos.x - G.x, v.pos.z - G.z) < reach(v) && this.allows(id, v)) { R.gate.by = v.wh && v.wh.crew ? 'crew vehicle' : 'delivery'; return true; } }
+    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !q.crewId) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
     return false;
   }
   // a dock door opens for an authorized vehicle in its bay (a controlled gate also wants it stopped first)
@@ -50299,12 +50299,13 @@ class CompoundSystem {
   // ---------------------------------------------------------------- contacts and breaches
   contact(R, c, v, imp) {
     if (imp > 0.4) { R.contacts = R.contacts || []; R.contacts.push({ t: this.g.time, imp: +imp.toFixed(2), kind: c.kind, wh: !!v.wh, player: v === this.g.player.vehicle }); if (R.contacts.length > 30) R.contacts.shift(); }
-    if (c.part) this.ram(R.id, c.part, imp);
+    if (c.part) this.ram(R.id, c.part, imp, v);
   }
-  ram(id, part, imp) {
+  ram(id, part, imp, v) {
     if (part.broken || imp < part.ram) return;
     const R = this.R[id], g = this.g;
     part.broken = true; part.col.on = false;
+    if (part !== R.gate && v) for (const q of R.panels) if (!q.broken && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) { q.broken = true; q.col.on = false; }
     if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true;
     g.audio.play('crash', { x: part.x || R.C.gate.x, z: part.z || R.C.gate.z });
     this.events.push({ t: g.time, id, kind: 'breach', what: part === R.gate ? 'gate' : 'fence' });
@@ -50483,7 +50484,7 @@ class CompoundSystem {
       if (V.phase === 'unload' && V.t > 20) { V.phase = 'out'; V.t = 0; v.wh.until = g.time + 240; v.drive = new LaneDriver(v, g, this.R[V.id].C.lanes.out[V.dock], { speed: 6, onDone: () => { V.stalls += v.drive.stalls; V.phase = 'gone'; V.t = 0; } }); }
       if (V.phase === 'gone') {
         // out on the street: an ordinary car again, gone once nobody is looking
-        if (!(v.drive instanceof DriveAI)) { v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
+        if (!(v.drive instanceof DriveAI)) { v.wh = null; v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
         const d = Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z);
         if (d > 200 || (d > 90 && !g.inView(v.pos.x, 1, v.pos.z, 3))) { g.vehicles.despawn(v); return false; }
       }

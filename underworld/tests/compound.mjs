@@ -173,8 +173,11 @@ await ev(() => {
 
 // ---------------------------------------------------------------- 4. who the gate opens for
 // run the game for n frames and report the gate's widest opening (and the wedge's)
-const watch = async (id, n) => { await ev(id => { const R = window.game.uw.compounds.R[id]; window.__gmax = 0; window.__wmax = 0; window.__gw = () => { window.__gmax = Math.max(window.__gmax, R.gate ? R.gate.open : 0); window.__wmax = Math.max(window.__wmax, R.wedge ? R.wedge.down : 0); }; }, id); for (let k = 0; k < n; k += 5) { await frames(page, 5); await ev(() => window.__gw()); } return ev(() => ({ gate: +window.__gmax.toFixed(2), wedge: +window.__wmax.toFixed(2) })); };
+// clear the compounds of every car but the player's (vans that left, test cars), so each scenario starts alone
+const clearCars = () => ev(() => { const g = window.game; for (const V of g.uw.compounds.vans) V.v.wh = null; g.uw.compounds.vans = []; for (const v of g.vehicles.list.slice()) { if (v === g.player.vehicle) continue; for (const id in g.world.compounds) { const c = g.world.compounds[id].center; if (Math.hypot(v.pos.x - c.x, v.pos.z - c.z) < 90) { g.vehicles.despawn(v); break; } } } });
+const watch = async (id, n) => { await ev(id => { const R = window.game.uw.compounds.R[id]; window.__gmax = 0; window.__wmax = 0; window.__gby = new Set(); window.__gw = () => { if (R.gate && R.gate.want) window.__gby.add(R.gate.by); window.__gmax = Math.max(window.__gmax, R.gate ? R.gate.open : 0); window.__wmax = Math.max(window.__wmax, R.wedge ? R.wedge.down : 0); }; }, id); for (let k = 0; k < n; k += 5) { await frames(page, 5); await ev(() => window.__gw()); } return ev(() => ({ gate: +window.__gmax.toFixed(2), wedge: +window.__wmax.toFixed(2), by: [...window.__gby] })); };
 for (const id of IDS) {
+  await clearCars();
   await ev(id => { window.__T(id, { perimeter: 2, surveillance: 2, access: 4, vault: 0 }); window.__away(id); }, id);
   await frames(page, 30);
   // the player on foot, then in a car
@@ -213,6 +216,7 @@ for (const id of IDS) {
 
   // a vehicle with a delivery for this warehouse (and nobody of yours at the wheel) is let in; an expired one isn't
   const del = async (until) => {
+    await clearCars();
     await ev(([id, until]) => { const g = window.game, C = g.world.compounds[id], lane = C.lanes.in[0], a = lane[0], b2 = lane[1]; window.__away(id); const v = g.vehicles.spawn('van', a.x, a.z, Math.atan2(b2.x - a.x, b2.z - a.z), { driver: 'npc', color: 0x5a3a2a }); v.touched = true; v.mission = 'test'; v.wh = { id, to: id, until: g.time + until }; v.drive = new window.__pv.LaneDriver(v, g, lane, { speed: 6 }); window.__dv = v; }, [id, until]);
     const w = await watch(id, 420);
     const r = await ev(id => { const v = window.__dv, b = window.game.world.compounds[id].docks[0].bay; const o = { inside: window.__lot(id, v.pos.x, v.pos.z), bay: +Math.hypot(v.pos.x - b.x, v.pos.z - b.z).toFixed(1) }; window.game.vehicles.despawn(v); return o; }, id);
@@ -224,6 +228,7 @@ for (const id of IDS) {
 
 // rival gangsters on foot and in a car, and ordinary traffic, at the Maximum Security gate and at a basic one
 for (const [id, T] of [['whse_w', 4], ['whse_d', 1]]) {
+  await clearCars();
   await ev(([id, T]) => {
     const g = window.game, uw = g.uw, C = g.world.compounds[id], gs = uw.gangs;
     window.__T(id, T);
@@ -338,6 +343,7 @@ for (const id of IDS) {
 }
 // ramming: a car driven hard at the gate (and at the fence away from the gate)
 const ram = async (id, T, target, speed) => {
+  await clearCars();
   await ev(([id, T, target, speed]) => {
     const g = window.game, C = g.world.compounds[id], R = g.uw.compounds.R[id];
     window.__T(id, T); window.__away(id);
@@ -351,7 +357,7 @@ const ram = async (id, T, target, speed) => {
     }
     const sx = tx - nx * 9, sz = tz - nz * 9, h = Math.atan2(nx, nz);
     const v = g.vehicles.spawn('pickup', sx, sz, h, { driver: 'npc' }); v.touched = true; v.mission = 'test'; v.health = 1e6;
-    v.vel.set(Math.sin(h) * speed, Math.cos(h) * speed); v.drive = { update() { v.ctl.throttle = 1; v.ctl.steer = 0; v.ctl.handbrake = false; } };
+    v.vel.set(Math.sin(h) * speed, Math.cos(h) * speed); const thr = speed > 6 ? 1 : 0; v.drive = { update() { v.ctl.throttle = thr; v.ctl.steer = 0; v.ctl.handbrake = false; } };
     window.__rv = v; window.__rt = { tx, tz, nx, nz };
   }, [id, T, target, speed]);
   await frames(page, 60);
@@ -364,6 +370,7 @@ for (const id of IDS) {
   check(`${id}: a chain-link fence gives way to a car; behind anti-ram barriers (and at Maximum Security) the line holds`, f1.broke && f1.past > 0 && !f3.broke && f3.past < 0 && !f4.broke && f4.past < 0, JSON.stringify({ f1, f3, f4 }));
 }
 // the wedge: even with the gate leaf held open (a tailgater), a car nobody admitted is stopped
+await clearCars();
 const wedge = await ev(() => {
   const g = window.game, id = 'whse_w', C = g.world.compounds[id], R = g.uw.compounds.R[id];
   window.__T(id, 4); window.__away(id);

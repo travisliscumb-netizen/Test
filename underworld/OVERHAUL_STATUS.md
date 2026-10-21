@@ -11,10 +11,81 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **3A — Warehouses / vault / logistics: the systems** (prompt Session 3, handoff phase 4, §5-§8, §45.22).
-  The physical side of Session 3 is split out as **Session 3B** (DC-30).
-- Commit/base revision: `c2cfb20` (Session 2.5 follow-up) → the Session 3A commit on `claude/practical-lamport-zld81y`.
+- Session: **3B — Warehouses: the functional physical layer** (DC-30 approved, §45.25).
+- Commit/base revision: Session 3 rulings commit → the Session 3B commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-21
+
+## Completed this session (3B)
+
+- **Two compounds** (`world.compounds`, laid out once by `_whCompound` in `110-content-places.js`):
+  - **Cannery Row** takes the whole of block 7,10, which is now a landmark block. It has a 58 × 58 m lot, a
+    48 × 26 m building with two raised loading docks, painted bays, yard parking and a personnel door. The property
+    door moved off the pavement into the yard. The gate sits 4.5 m east of the block centre: a street lamp stands in
+    front of the centre, and it blocked both the vans and the gate camera.
+  - **Tidewater Shed 4** got a 46 × 40 m yard in the terminal's south-west corner, with its gate on the east side
+    off the z = 916 lane. Containers inside the yard and the clutter there were removed, and lane paint trimmed.
+  - Both compounds record their lot, gate, docks, bays, parking, door, booth spot, perimeter segments and drive
+    lanes (in and out, with reverse legs).
+- **`CompoundSystem`** (`src/game/497-underworld-compounds.js`) builds what the saved tiers buy and keeps it working.
+  - **Rebuilds:** the build runs on every change of tiers or ownership (checked each frame), immediately on an
+    upgrade, and on load.
+  - **Perimeter:** open lot → chain-link 2.2 m → tall fence 3.2 m with bollards on the traffic sides → anti-climb
+    3.6 m behind jersey barriers → hardened 2.6 m wall with fencing to 4.4 m. Fence panels have colliders, and mesh
+    panels let sight lines through. Chain-link (7 m/s) and tall fence (11 m/s) panels break when a car rams them
+    hard enough; a hit where panels meet takes both. The barrier tiers never break.
+  - **Access:** gap → basic sliding gate (rammable at 7 m/s) → motorised gate (12 m/s, controlled loading) →
+    reinforced gate and guard booth (unrammable) → massive gate, booth, access posts and a rising wedge barrier. The
+    wedge only drops for someone the gate admits.
+  - **Who gets in:** one rule, `why()` / `allows()`:
+    - the player, on foot or driving;
+    - an active crew member assigned to this warehouse, or one escorting the player;
+    - a vehicle driven by such a crew member;
+    - a vehicle with an unexpired delivery manifest for this warehouse.
+    Everyone else is denied by default, rivals and traffic included. The gate never holds open for an unadmitted
+    vehicle, and a Driver's van loses its authorization once it has left. Gates open on approach with the same
+    speed-scaled reach as `DoorSystem`.
+  - **Surveillance:** 0 / 2 / 4 / 6 / 10 cameras. They are mounted on the yard-face corners, then the gate posts
+    (looking out and in), then yard poles, then corner domes. Each has a field of view, a range of 18 → 32 m and a
+    line-of-sight test. Lighting shortens the range at night (65% → 100% kept, `WH_SURV`). The same test drives
+    `coverage()` (the security tab and the tests) and the intruder alarm (a news message and a toast; the raid odds
+    are unchanged). Wall packs, floodlight poles and ground light pools follow the same tiers.
+  - **Dock doors:** each dock has a roll-up (`DoorSystem` gained a per-door `want` hook). It opens for an authorized
+    vehicle in its bay; from the motorised gate up, the vehicle must also have stopped.
+  - **Loading bay:** stopping your car in a dock bay prompts "Loading bay". It opens the warehouse's product tab
+    with the trunk in reach (`access()` treats the dock bay as being at the warehouse).
+  - **Guards:** Enforcers assigned to the warehouse stand at posts in the yard while you are within 150 m. They are a
+    crew group kept by the gang presence system, so they fight hostiles with the usual crew brain.
+  - **Drivers:** when a run starts from or ends at a warehouse while you are near, a van drives the lane: in, nose
+    to the dock, back out, out through the gate, then into traffic. `LaneDriver` follows the lane points, reversing
+    where a point is marked for it.
+  - **Inside:** the interior is built from the tiers when you walk in (`warehouseInteriorDef`):
+    - a loading area behind the dock doors;
+    - racking, caged from vault tier 1;
+    - back rooms by vault tier: a cash box → a safe → a cash room → a vault and an armory → a large vault, a product
+      vault and a ready room;
+    - a mezzanine up a 16-step stair with the Lieutenant's office and the CCTV desk, which becomes a security room
+      and then a command room.
+    Each room has an interaction point that opens its tab. Buying an upgrade while inside rebuilds the rooms around
+    you.
+  - **Breaches:** rammed panels and gates are runtime state, mended by the end-of-day tick (`mend()`).
+- **Security tab** shows what is on site: fence, gate, camera count with day and night coverage, lights, breaches.
+- **Fixed:** the delivery report still printed a "Fee" (DC-31 leftover), and comments still mentioned run fees.
+
+## Files / systems changed (3B)
+
+- New `src/game/497-underworld-compounds.js`, `tests/compound.mjs`.
+- `090` (`world.compounds`), `110-content-places.js` (Cannery Row landmark, `_whCompound`, shed4 place),
+  `120-content-city-v2.js` (Shed 4 yard in the terminal; `DoorSystem` `want` hook), `240` (collider `onHit` on
+  impact), `390` (`WH_FENCE`, `WH_GATE`, `WH_SURV`; Cannery Row is a place), `430` (van hooks, report text), `450`
+  (system, update, end-of-day mend, loading bay action and access), `470` (guard groups), `490` (warehouse door →
+  Enter), `495` (upgrade rebuilds), `500` (yard parking), `360` (`w:` interior points), `540` (security tab), `640`,
+  `650`, `manifest.json`.
+
+## Save/schema changes (3B)
+
+- None. The compound follows `uw.whse[id].up`; breaches are not saved (they are mended by the end of the day anyway).
+
+# Session 3A record (warehouse systems)
 
 ## Completed this session (3A)
 
@@ -98,7 +169,7 @@ world day (automation) or on player action.
   automatic gate (Session 3B, DC-30).
 - Cartel/major shipments still land as before (Session 4 brings shipments, raids and gang wars).
 
-## Exact next recommended task
+## Session 3A: next task (done in 3B)
 
 **Session 3B — warehouse presentation** (DC-30): the five security levels as visible exterior and interior changes
 for each category tier, the authorized automatic gate (player, crew, Drivers and delivery vehicles open it; rivals
@@ -1467,6 +1538,36 @@ flipping loses money; special/unique/prize cars may get explicit custom rules la
 - ~~A Driver on the payroll still charges the per-run fee~~ — removed (§45.25): Drivers are salaried; runs cost payroll,
   product, losses and risk. More logistics pressure later would be a transparent operating-overhead design challenge.
 - Route hijack risk per stretch 0.2% / 1% / 3% / 7% / 12% (`ROUTE_RISK`).
+
+### DC-32 · Session 3B physical-security choices — OPEN (owner review; nothing blocks on it)
+
+1. **Current specification:** DC-30 / §45.25 asks for visible tiers, an authorized automatic gate (player, crew,
+   Drivers, delivery vehicles in; rivals and unauthorized NPCs out), a functional interior, and Maximum Security
+   geometry that "actually supports its defensive behavior", without inheritance by lower tiers. It doesn't say how
+   a lower tier is weaker in practice, or exactly who counts as authorized.
+2. **Problem observed:** without a concrete rule, "lower tiers don't inherit protection" can't be tested.
+3. **What 3B implements** (each item is a constant or one rule, easy to change):
+   - **Ramming.** A car ramming at 7 m/s or more breaks a chain-link panel or a basic gate. 11 m/s breaks a tall
+     fence panel (from inside: bollards guard its street side). 12 m/s breaks a motorised gate. Reinforced and
+     massive gates, and the barrier tiers, never break.
+   - **Breaches** aren't saved and are mended by the end-of-day tick.
+   - **Authorization:**
+     - the player;
+     - active crew assigned to *this* warehouse, or walking with the player (your Dealer is refused at the gate);
+     - vehicles those crew drive;
+     - vehicles with an unexpired delivery manifest.
+     Everything else is denied by default. The gate closes on an unadmitted tailgater, and at Maximum Security the
+     wedge still stops it.
+   - **Unowned compounds** show tier 0: an open lot, so you can walk to the door and buy.
+   - **Camera alarms** raise news and a toast only. The abstract rival-raid odds (`defense()`) are unchanged.
+   - **Map change:** Cannery Row replaced block 7,10's procedural buildings. Shed 4's yard removed terminal
+     containers.
+4. **Why it is better:** each tier's difference shows up in play and in tests (fill tests, ram tests, camera
+   coverage), not only in a number.
+5. **Systems affected:** compounds, gates, the vehicle collision hook, and warehouse access.
+6. **Tradeoffs / risks:** ramming creates a new way to break in. Abstract raids still ignore the physical breaches
+   (Session 4's raids could use them).
+7. **Severity:** OPTIONAL. **Blocks:** nothing. Please confirm, or rule on any item.
 
 ## Owner decisions (Session 0 review)
 
