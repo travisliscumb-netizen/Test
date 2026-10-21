@@ -50148,7 +50148,7 @@ class CompoundSystem {
       const leaf = lk.build(); leaf.position.set(G.x, 0, G.z); g.scene.add(leaf); R.gateGrp = leaf;
       const gc = col(ns(G.side) ? { x0: G.x - hw, x1: G.x + hw, z0: G.z - th / 2 - 0.1, z1: G.z + th / 2 + 0.1, y0: 0, y1: Y + A.h, kind: 'gate' } : { x0: G.x - th / 2 - 0.1, x1: G.x + th / 2 + 0.1, z0: G.z - hw, z1: G.z + hw, y0: 0, y1: Y + A.h, kind: 'gate' });
       gc.wh = id;
-      R.gate = { def: A, open: keepGate ? keepGate.open : 0, broken: keepGate ? keepGate.broken : false, col: gc, want: false, lat, hw };
+      R.gate = { def: A, ram: A.ram, open: keepGate ? keepGate.open : 0, broken: keepGate ? keepGate.broken : false, col: gc, want: false, lat, hw };
       if (A.ram < Infinity) gc.part = R.gate;
       if (A.booth && C.booth) {
         const b0 = C.booth; k.box(b0.x, Y, b0.z, b0.w, 2.6, b0.d, 0xd8d0c0); k.box(b0.x, Y + 2.6, b0.z, b0.w + 0.5, 0.18, b0.d + 0.5, 0x3a3f44);
@@ -50285,7 +50285,8 @@ class CompoundSystem {
       if (Math.hypot(ax - G.x, az - G.z) < (pv ? reach(pv) : 4.5) && this.allows(id, p)) { R.gate.by = 'player'; return true; }
     }
     for (const v of g.vehicles.nearby(G.x, G.z, 36)) { if (v === pv || v.burnt) continue; if (Math.hypot(v.pos.x - G.x, v.pos.z - G.z) < reach(v) && this.allows(id, v)) { R.gate.by = v.wh && v.wh.crew ? 'crew vehicle' : 'delivery'; return true; } }
-    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !q.crewId) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
+    // people on foot: crew on their way in or out (a guard standing their post doesn't hold the gate open)
+    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !q.crewId || (q.group && q.group.kind === 'whguard')) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
     return false;
   }
   // a dock door opens for an authorized vehicle in its bay (a controlled gate also wants it stopped first)
