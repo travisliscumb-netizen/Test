@@ -18,7 +18,7 @@ class FactionSim {
     for (const c of S.crew) {
       if (c.status !== 'active') continue;
       if ((c.role === 'enforcer' || c.role === 'dealer') && c.assign === i) d += c.role === 'enforcer' ? 14 + c.skill / 6 : 5;
-      if (c.role === 'lieutenant' && c.assign === t.zone) d += 10 + c.skill / 10;
+      if (uw.crew.ltZone(c) === t.zone) d += 10 + c.skill / 10;
     }
     d += uw.props.presenceDefense(i);
     if (dist2(g.player.pos.x, g.player.pos.z, t.cx, t.cz) < 110 * 110 && !g.player.interior) d += 30;

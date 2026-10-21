@@ -11,6 +11,110 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
+- Session: **3A — Warehouses / vault / logistics: the systems** (prompt Session 3, handoff phase 4, §5-§8, §45.22).
+  The physical side of Session 3 is split out as **Session 3B** (DC-30).
+- Commit/base revision: `c2cfb20` (Session 2.5 follow-up) → the Session 3A commit on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-21
+
+## Completed this session (3A)
+
+- **Warehouse model** (`src/game/495-underworld-warehouses.js`, `WarehouseSystem`; state `save.uw.whse[id]`).
+  - Four security categories (§6): Perimeter, Surveillance, Access control, Vault and interior, each bought up
+    through four tiers named after the §6 level descriptions, paid from Clean Bank (15% / 30% / 60% / 120% of the
+    warehouse's price, to the $500). The **security level** (1 Basic … 5 Maximum Security) is 1 + the weakest
+    category, so a level means every part of the warehouse is that good.
+  - **Dirty Cash vault** (§7): capacity by vault tier, $100k / $500k / $2.5M / $10M / $50M; product storage grows
+    with it (×1 … ×2). The ledger enforces it: a deposit stops at capacity, and remote income that finds the vault
+    full passes on down the §45.22 order (operation warehouse → Treasury → home safehouse → you), none lost.
+  - **Treasury Warehouse** designated (and cleared) on the warehouse's Dirty Cash tab (§45.22).
+  - **15 crew slots** (§5): up to 10 Enforcers (guarding it), 4 Drivers (based there), 1 Lieutenant. A warehouse
+    adds 15 to your crew capacity (it added 2). A crew member's post there is `assign = 'w:<id>'`.
+  - **Lieutenants** run either a district (as before) or a warehouse, which means its district too
+    (`CrewManager.ltZone`, the one reader for every Lieutenant effect: influence, defense, royalties, business
+    income, betrayal).
+- **Logistics** (§5, §8):
+  - **Dealers sell only the stock on their corner** (`uw.turfStock[i]`, up to 60 units). Before you have Drivers you
+    hand it over yourself: the corner is an Inventory location when you stand at the turf's deal spot (product only,
+    no hot goods or hardware). The takings go to the warehouse that supplies the Dealer (linked in the Crew card,
+    default the nearest), else the Treasury, home or you. Dealers no longer sell from any stash in the city.
+  - **Only Drivers make deliveries** (Runner and Driver merged). Runs now also go to a Dealer's corner and come
+    from a supplier: a **supply run** buys at the supplier's wholesale price with the vault's cash (payroll order,
+    the destination warehouse first), and the product is on the road until it arrives.
+  - **Route risk** (§8): each of the route's three stretches is own / friendly / neutral / rival / hostile-or-war,
+    with hijack risk 0.2% / 1% / 3% / 7% / 12% per stretch; police risk (pressure, patrols, task force, crackdown)
+    is counted and shown separately, and each weighs its own failure outcome (hijack vs police stop).
+  - **Lieutenant automation**: each day a warehouse with a Lieutenant (setting on, default) sends free Drivers to
+    top up its Dealers' corners to 40 from its stock, and, when its sellable stock falls under 60 units of space,
+    sends one to the best-margin supplier who deals with you for a lot of up to 80.
+- **Defense and immunity** (§6): a rival raid on a warehouse is less likely the higher its defense (level ×10, each
+  Enforcer and the Lieutenant). At Maximum Security with at least 4 Enforcers and a Lieutenant on site, an ordinary
+  raid can't knock it off (it turns back at the gate). Police raids and exceptional threats are unaffected.
+- **City Kingpin needs an operating warehouse** (a Lieutenant and at least one Driver) (DC-25's infrastructure).
+- **Warehouse screen**: an owned warehouse's property screen has Product, Weapons, Dirty Cash, Security, Crew and
+  Logistics tabs (§7).
+- **Bug found and fixed (Session 1 follow-up):** the Treasury designation was lost on every reload (the save merge
+  won't copy a string over a `null` default). Caught by the new save/reload check.
+
+## Files / systems changed (3A)
+
+- New `src/game/495-underworld-warehouses.js` (in `src/manifest.json` after the property manager),
+  `tests/warehouse.mjs` (29 checks).
+- `390-underworld-data.js` (warehouse, route-risk and corner constants; crew role texts; warehouses `crew: 15`;
+  Kingpin `wh`), `035-core-money.js` (`roomAt`, `stashOrder`, overflowing income, capped moves, `supplyRun`),
+  `030-core-save-system.js` (treasury on load), `410` (corner location class), `430-underworld-crew-deliveries.js`
+  (Drivers only, places, supply runs, route tiers), `450-underworld-core.js` (state, corner locations, daily
+  automation, `power().wh`), `460`, `440`, `480-underworld-crew.js` (warehouse posts, `ltZone`, corner sales,
+  dead `storedStock` / `takeStored` removed), `490-underworld-property.js` (warehouse storage, raid defense),
+  `540-underworld-empire-ui.js` (warehouse panel, crew targets, runs screen), `640`, `650`.
+- Tests: `inventory` (couriers are Drivers; the elite-runner check over your own turf), `session` (the dealer
+  sells corner stock, not the stash), `progression` and `kingpin` (Kingpin's operating warehouse).
+
+## Save/schema changes (3A)
+
+- `uw.whse` (`{ [id]: { up: { perimeter, surveillance, access, vault }, auto } }`) and `uw.turfStock` (corner
+  stock per turf), crew `from` (a Dealer's supplying warehouse) and `assign` values `'w:<id>'`; runs may carry
+  `rival`, `police`, `auto`, a `from` of `'spot:<id>'` and a `to` of `'turf:<i>'`. Defaults on load; schema stays 9.
+
+## Tests run (3A)
+
+Every assertion suite ran against the Session 3A build, three at a time; failures were re-run alone:
+
+| Result (3 in parallel) | Suites |
+| --- | --- |
+| all checks pass | soak 22, interiors 22, homes 26, casino 39, prison 48, session 35, property 33, ramps 21, vehicles 39, cargo 36, city 25, arrest 126, phone 71, taxi 20, stations 17, map 22, roads 20, shooting 37, ui 23, survival 9, smoke 16, money 10, offline 14, business 40, street 11, pwa 5, camera 20, police 13, dealers 34, tutorial 13, phoneapps 19, static-money 8, build 5, gangs 23, ledger 54, progression 33, fixer 17, carmoney 10, **warehouse 29 (new)**, royale-sim 23, core 64 |
+| stress 29 / 30 → **30 / 30 alone** | the software-GL frame-stall check (load-sensitive, as before) |
+| gambling 56 / 57 → **57 / 57 alone** | scratch-card timing under load (as before) |
+| inventory: stopped at 41 → **58 / 58** | test code: the delivery loops left a runner "idle" after a betrayal, and only Drivers deliver now; the loops restore the Driver role. Its "elite runner" check is now stated over your own turf (93% observed against 93.5% quoted, 300 runs): over the Old Quarter (rival ground) the rate is lower by design (§8) |
+| kingpin 2 / 6 → **6 / 6** | test code: City Kingpin now needs an operating warehouse, so the test's empire gets one (a Lieutenant and a Driver at Cannery Row); deterrence 128 / 332 over three seeds |
+
+Performance (`tests/perf.mjs`, alone, alternating builds): update 0.78 / 0.82 ms (2.5 follow-up) vs 0.76 / 1.15 ms
+(3A) calm, 1.33 / 0.96 vs 1.18 / 1.21 busy, draw calls 117-123: no change beyond noise. The new work runs once per
+world day (automation) or on player action.
+
+## Known bugs / risks (3A)
+
+- Existing development saves: Dealers sell nothing until their corners are stocked (by hand, or a Driver).
+- The warehouse is not yet physical: levels have no visible fence, gate, cameras or interior, and there is no
+  automatic gate (Session 3B, DC-30).
+- Cartel/major shipments still land as before (Session 4 brings shipments, raids and gang wars).
+
+## Exact next recommended task
+
+**Session 3B — warehouse presentation** (DC-30): the five security levels as visible exterior and interior changes
+for each category tier, the authorized automatic gate (player, crew, Drivers and delivery vehicles open it; rivals
+don't), and the interior layout (vault, product cages, Lieutenant office, security room, ready room), with
+persistence of what was bought. Then Session 4.
+
+## Working tree (3A)
+
+- Clean after the Session 3A commit; see `git log` on `claude/practical-lamport-zld81y`.
+
+---
+
+# Session 2.5 record (laundering fixer, vehicle provenance)
+
+## Session 2.5: phase
+
 - Session: **2.5 — Early laundering fixer** (§45.6, §45.22; prompt "Session 2.5"), and its follow-up for the DC-29
   ruling (§45.24, vehicle provenance).
 - Commit/base revision: `36d9a47` (Session 2 follow-up) → `7f78d30` (Session 2.5) → the Session 2.5 follow-up
@@ -122,7 +226,7 @@ once per world hour.
 - The economic clock is used only by the fixer so far; every other per-day economy still runs on world days (DC-06,
   Sessions 3, 9 and 13).
 
-## Exact next recommended task
+## Session 2.5: next task (done)
 
 **Session 3 — Warehouses / vault / logistics** (prompt Session 3, handoff phase 4), including the Treasury Warehouse
 designation control (§45.22) and Kingpin's infrastructure condition (DC-25).
@@ -1338,6 +1442,32 @@ in only through a plausible channel (implemented: a crew courier; more channels 
 channels pay Dirty; provenance is separate from HOT; ordinary resale never exceeds the recorded purchase price, so
 flipping loses money; special/unique/prize cars may get explicit custom rules later.
 
+### DC-30 · Session 3 is two sessions: systems (3A) and presentation (3B) — RECOMMENDED (proceeding as proposed)
+
+1. **Current specification:** prompt Session 3 lists the warehouse model, slots, Driver logistics, Dealer supply,
+   Lieutenant automation, the vault, five physical security levels, four upgrade categories, visual persistence,
+   the authorized automatic gate, route risk and max-security immunity, all in one session.
+2. **Problem observed:** half of that is simulation and half is 3D work (fences, gates, cameras, lights, an interior
+   with a vault and rooms, a gate that opens for the right vehicles). Doing both at once means a very large change
+   that is hard to review and to regression-test, against the "one scoped session" rule.
+3. **Proposed improvement (done):** Session 3A builds and tests the systems (this session). Session 3B builds the
+   presentation on top of the saved category tiers, which already exist, so nothing in 3A changes when 3B lands.
+4. **Why it is better:** two reviewable steps; the economy and logistics can be playtested now.
+5. **Systems affected:** session plan only.
+6. **Tradeoffs / risks:** until 3B, security upgrades are only visible in the warehouse screen.
+7. **Severity:** RECOMMENDED. **Blocks:** nothing. Please confirm, or ask for 3B to be folded into a later session.
+
+### DC-31 · Session 3A tuning choices — OPTIONAL (for review; each is one constant)
+
+- Upgrade prices 15% / 30% / 60% / 120% of the warehouse's price per tier (Cannery Row: $288,000 from Basic to
+  Maximum Security in all four categories); vault $100k → $50M; storage ×1 → ×2 (`WH_TIER_COST`, `WH_VAULT`,
+  `WH_STORE_MUL`).
+- Immunity at level 5 with 4 Enforcers and a Lieutenant (the spec's "roughly 4-6 Enforcers"; `WH_IMMUNE`).
+- Corners hold 60 units; the Lieutenant tops them up to 40 and reorders at 60 units of space, 80 at a time.
+- A Driver on the payroll still charges the per-run fee (fuel, wear, a few envelopes); the alternative is fee-free
+  runs for Drivers since they are paid daily.
+- Route hijack risk per stretch 0.2% / 1% / 3% / 7% / 12% (`ROUTE_RISK`).
+
 ## Owner decisions (Session 0 review)
 
 The owner's decisions are recorded as authoritative amendments in `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md` §45
@@ -1734,6 +1864,7 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | influence-derived turf ownership (`recompute` flipping owners), `cedeTurf` handover, coup flip | `Underworld.recompute`, `FactionSim.cedeTurf`, `CrewManager.disloyalty` | S2 | removed |
 | purchase Rep / influence / turf influence; home, penthouse, loft and neighbourhood influence; Old Quarter daily Rep | `PropertyManager.buy/upgrade/tickDay`, `HOOD`, `PROPS`, `HOMES` | S2 | removed |
 | `STAGES` / `uw.stage` / `S.stageMax` (renamed, not parallel) | data, core | S2 | replaced by `RANKS` / `uw.rank` / `S.rankMax` |
+| dealers selling from any stash in the city (`CrewManager.storedStock` / `takeStored`); any crew member as a delivery runner; warehouses as small storage adding 2 crew | crew, deliveries, data | S3A | removed (corner stock, Drivers only, 15-slot warehouses) |
 | `ARMS` + hidden `#shopArms` / `#shopCars` + `UIManager.buy('arm')` | 53189, 783-790, 53473 | S1 (hidden money path) | **removed** |
 | mugging: civ spill in `onKnock`, `st.mugs`, hint/tip text | 47530, 47058, 46133, 54500 | S1 (§45.18) | **removed** |
 | Driver car-stealing branch and role text | 48838, 46302 | S1 (§45.18) | **removed** (logistics role itself: S3) |
@@ -1764,3 +1895,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | 9 | 2 follow-up | crew members gain `morale` (0-10), `boosts` (recent bonuses, fading) and `raiseLoyal` (0-10); sanitized with defaults, no version bump |
 | 9 | 2.5 | `uw.econH` (economic clock, hours) and `uw.fixer` (laundering batches, daily use, totals); defaults on load, no version bump |
 | 9 | 2.5 follow-up | garage entries of bought cars gain `prov` (`{ dirty, clean }` put into the car); a bought entry without it becomes Dirty-origin at 50% of list; other origins carry none; no version bump |
+| 9 | 3A | `uw.whse` (warehouse category tiers, automation flag), `uw.turfStock` (dealer corner stock), crew `from` and `'w:<id>'` posts, run fields `rival` / `police` / `auto` and `spot:` / `turf:` endpoints; defaults on load, no version bump |

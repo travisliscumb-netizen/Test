@@ -19,7 +19,7 @@ await ev(() => { const g = window.game; g.events.cool = 1e9; g.debug.god = true;
 const titles = await ev(() => { const P = window.__pv, g = window.game; return { names: P.RANKS.map(r => r.name), keys: [...new Set(P.RANKS.flatMap(r => Object.keys(r.need)))], ladder: 'repLevel' in g.content || 'repName' in g.content, hud: !!document.getElementById('rep'), cfg: Object.keys(window.__pv.GAME_CONFIG.economy).includes('reputation') }; });
 check('exactly the seven Rank titles, in order', JSON.stringify(titles.names) === JSON.stringify(['Nobody', 'Street Hustler', 'Known Operator', 'Crew Leader', 'Territory Holder', 'Underworld Power', 'City Kingpin']), JSON.stringify(titles.names));
 check('the old Reputation title ladder is gone (no repLevel/repName, no ladder HUD, no config entry)', !titles.ladder && !titles.hud && !titles.cfg, JSON.stringify(titles));
-check('Rank reads only power money cannot buy: Rep, crew, Lieutenants, turf, influence', titles.keys.every(k => ['rep', 'crew', 'lts', 'turfs', 'infl'].includes(k)), JSON.stringify(titles.keys));
+check('Rank reads only power money cannot buy: Rep, crew, Lieutenants, turf, influence, an operating warehouse', titles.keys.every(k => ['rep', 'crew', 'lts', 'turfs', 'infl', 'wh'].includes(k)), JSON.stringify(titles.keys));
 
 // ---------------------------------------------------------------- 2. money buys no power
 const rich = await ev(() => {
@@ -78,7 +78,10 @@ const chain = await ev(() => {
   for (const fid of Object.keys(S.factions)) uw.factions.bossDown(fid, true);
   takeN(8); note('eight turfs, one Lieutenant: ' + (lt1 || 'ok'));
   const lt2 = lt(crew[1]);
-  takeN(16); note('sixteen turfs, two Lieutenants: ' + (lt2 || 'ok'));
+  // City Kingpin's infrastructure (Session 3): a warehouse run by a Lieutenant, with a Driver
+  if (!uw.props.owned('whse_w')) { g.money.W.clean += 40000; uw.props.buy('whse_w'); }
+  const whLt = uw.crew.assign(crew[1].id, 'lieutenant', 'w:whse_w'), whDrv = uw.crew.assign(crew[2].id, 'driver', 'w:whse_w');
+  takeN(16); note('sixteen turfs, two Lieutenants, an operating warehouse: ' + [lt2, whLt, whDrv].map(x => x || 'ok').join('/'));
   return { steps, fails: fails.slice(0, 5), lts: uw.crew.active().filter(c => c.role === 'lieutenant').length, kingpin: uw.kingpin(), rankMax: S.rankMax };
 });
 const ranks = chain.steps.map(s => s.rank);
@@ -86,7 +89,7 @@ check('the chain climbs one Rank at a time, never skipping or falling back', JSO
 check('City Kingpin is reached through play alone (showdowns all won, Lieutenants promoted)', chain.kingpin && chain.rankMax === 6 && chain.lts >= 2 && !chain.fails.length, JSON.stringify({ fails: chain.fails, lts: chain.lts, rankMax: chain.rankMax }));
 check('each step names exactly what the next Rank still needs', chain.steps.slice(0, -1).every(s => s.missing.length >= 1) && chain.steps[6].missing.length === 0, JSON.stringify(chain.steps.map(s => s.missing)));
 const gates = await ev(() => {
-  const P = window.__pv, need = P.RANKS.map(r => r.need), keys = ['rep', 'crew', 'lts', 'turfs', 'infl'];
+  const P = window.__pv, need = P.RANKS.map(r => r.need), keys = ['rep', 'crew', 'lts', 'turfs', 'infl', 'wh'];
   // each Rank needs at least what the one below it needs (so the order is a chain, not a loop)
   const mono = need.every((n, i) => i === 0 || keys.every(k => (n[k] || 0) >= (need[i - 1][k] || 0)));
   // what each input is gated by, if anything: hiring needs 100 Rep, Lieutenant needs crew rank 3 (time + Dirty Cash)

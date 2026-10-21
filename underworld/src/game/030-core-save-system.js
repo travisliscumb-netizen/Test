@@ -101,6 +101,7 @@ const SaveSystem = {
     };
     merge(d, data);
     if (data.wloc && typeof data.wloc === 'object' && !Array.isArray(data.wloc)) d.wloc = { ...data.wloc }; // null defaults would block string values in merge()
+    if (data.wallet && typeof data.wallet.treasury === 'string') d.wallet.treasury = data.wallet.treasury; // same: the Treasury Warehouse id (validated by Money.sanitize)
     if (st) this.mergeInto(d.settings, st);
     this.sanitize(d);
     // v3 -> v4: nothing to convert (new fields default sensibly); remember that it happened

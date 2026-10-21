@@ -20,7 +20,11 @@ const once = sd => page.evaluate(seed0 => {
     const base = JSON.parse(snap); S.turfs = base.turfs; S.factions = base.factions; S.props = base.props; S.infamy = infamy; S.day = base.day;
     // the top Rank needs the whole empire (§31): Rep, crew, two Lieutenants, 16 turfs and 800 influence. Both runs
     // have the same people; only infamy (and so influence) differs
-    g.save.rep = 2500; S.crew = [1, 2].map(n => uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: null }));
+    g.save.rep = 2500;
+    // ...and an operating warehouse (Session 3): one of the Lieutenants runs Cannery Row, with a Driver
+    S.props.whse_w = { owned: true, dmg: 0, since: 1, lvl: 1 };
+    S.crew = [1, 2].map(n => uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: n === 1 ? 'w:whse_w' : null }));
+    S.crew.push(uw.crew.sanitizeMember({ id: 903, name: 'Test Driver', role: 'driver', rank: 1, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: 'w:whse_w' }));
     let wars = 0, over = 0, ratios = [], hits = 0, comp = [], refused = 0, paid = 0, kp = 0;
     const SW = uw.factions.startWar.bind(uw.factions);
     uw.factions.startWar = (att, i, why) => { const ok = SW(att, i, why); if (ok && S.turfs[i].war && S.turfs[i].war.d === 'pc') { wars++; const r = uw.powerRatio(att); ratios.push(+r.toFixed(2)); if (r > 2.5) over++; } return ok; };

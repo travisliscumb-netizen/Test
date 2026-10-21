@@ -142,6 +142,7 @@ class Underworld {
     this.prison = new Prison(this);
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
+    this.whse = new WarehouseSystem(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -175,7 +176,9 @@ class Underworld {
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {},
       // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
-      econH: 0, fixer: LaunderFixer.fresh()
+      econH: 0, fixer: LaunderFixer.fresh(),
+      // Session 3: warehouse security and settings, and each turf's dealer stock on the corner
+      whse: {}, turfStock: {}
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -238,6 +241,8 @@ class Underworld {
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
+    S.whse = WarehouseSystem.sanitize(S.whse, num);
+    S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
@@ -413,7 +418,7 @@ class Underworld {
   // the measures Rank reads (RANKS[n].need): nothing here can be bought (§1, §45.7)
   power() {
     const S = this.S, crew = S.crew.filter(c => c.status === 'active');
-    return { rep: this.g.save.rep, crew: crew.length, lts: crew.filter(c => c.role === 'lieutenant').length, turfs: this.playerTurfs(), infl: this._infl };
+    return { rep: this.g.save.rep, crew: crew.length, lts: crew.filter(c => c.role === 'lieutenant').length, turfs: this.playerTurfs(), infl: this._infl, wh: this.whse.operatingCount() };
   }
   // the highest Rank whose conditions, and every lower Rank's, are all met
   rankOf(pw) {
@@ -487,6 +492,15 @@ class Underworld {
       const L = this.loc('prop', d.id);
       out.push({ key: 'p:' + d.id, cls: LOC_CLASS[d.kind] || 'PROPERTY', name: d.name, o: S.storage[d.id] || (S.storage[d.id] = {}), cap, zone: L ? L.zone : pz, prop: d.id, here });
     }
+    // a dealer's corner (§4, §8): stock you hand over in person there, for your Dealers on that turf to sell. Before
+    // you have a warehouse and Drivers, this is how a turf is supplied.
+    const p = g.player, inside = !!p.interior;
+    for (let i = 0; i < this.T.length; i++) {
+      if (!this.whse.dealersOn(i).length) continue;
+      const t = this.T[i], here = !inside && dist2(t.deal.x, t.deal.z, p.pos.x, p.pos.z) < 7 * 7, o = this.whse.turfStock(i);
+      if (!here && !(opts.all && units(o))) continue;
+      out.push({ key: 'turf:' + i, cls: 'CORNER', name: `Dealer’s corner · ${t.name}`, o, cap: TURF_STOCK_CAP, zone: t.zone, turf: i, here });
+    }
     out.sort((a, b) => LOC_ORDER.indexOf(a.cls) - LOC_ORDER.indexOf(b.cls) || (b.here - a.here));
     return out;
   }
@@ -556,6 +570,7 @@ class Underworld {
     if (!GOODS[k] || fromKey === toKey) return 0;
     const locs = this.locations(), A = locs.find(L => L.key === fromKey && L.here), B = locs.find(L => L.key === toKey && L.here);
     if (!A || !B || A.o === B.o) return 0;
+    if (B.turf !== undefined && (GOODS[k].fence || GOODS[k].arms)) return 0; // dealers sell product, not hot goods or hardware
     const m = Math.min(Math.floor(n), Inv.has(A.o, k), this.fitIn(B, k)); if (!(m > 0)) return 0;
     return Inv.move(A.o, B.o, k, m);
   }
@@ -757,6 +772,8 @@ class Underworld {
     this.props.tickDay();
     this.royalty.tickDay();
     this.crew.tickDay();
+    // Lieutenants send Drivers to restock the corners for tomorrow (§5, §8)
+    this.whse.automate();
     this.factions.tickDay();
     this.cops.tickDay();
     this.opps.tickDay();

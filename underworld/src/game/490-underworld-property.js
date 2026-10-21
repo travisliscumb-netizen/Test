@@ -16,6 +16,8 @@ class PropertyManager {
   storageCap(id) {
     const d = PROP_BY_ID[id]; if (!d) return 0;
     if (d.kind === 'business' && d.cat && BIZ_CATS[d.cat].perk === 'storage') return BIZ_CATS[d.cat].lv[Math.max(1, this.level(id)) - 1];
+    // a warehouse's floor grows with its vault and interior tier (§7)
+    if (d.kind === 'warehouse') return Math.round((d.storage || 0) * (this.owned(id) ? this.uw.whse.storeMul(id) : 1));
     const hood = d.kind === 'safehouse' ? this.hoodOf(d) : null;
     return Math.round((d.storage || 0) * (hood && hood.store ? hood.store : 1));
   }
@@ -54,7 +56,7 @@ class PropertyManager {
     let k = own === 'pc' ? 1.25 : !own ? 1 : uw.contested[i] ? 0.6 : 0.78;
     const mgr = this.manager(def.id);
     if (mgr) k *= 1.15 + mgr.skill / 400;
-    for (const c of uw.crew.active()) if (c.role === 'lieutenant' && L && c.assign === L.zone) k *= 1.1;
+    for (const c of uw.crew.active()) if (L && uw.crew.ltZone(c) === L.zone) k *= 1.1;
     if (o && o.dmg > 0) k *= 0.4;
     if (S.pressure > 70) k *= 0.85;
     if (def.id === 'club' || def.id === 'motel') { const v = S.factions.velvet; if (!v.broken && v.rel < -40) k *= 0.8; }
@@ -196,6 +198,12 @@ class PropertyManager {
         if (!(f.rel < -35 || coalition) || ![...near].some(j => uw.owner[j] === fid)) continue;
         let p = (0.06 + (coalition ? 0.06 : 0) + (f.rel < -70 ? 0.05 : 0)) * clamp(1.4 - uw.powerRatio(fid) * 0.35, 0.08, 1);
         if (uw.crew.onTurf(i).some(id => { const c = uw.crew.find(id); return c && c.role === 'enforcer'; })) p *= 0.4;
+        // a warehouse defends itself: its security level and the people guarding it (§6). At Maximum Security with
+        // minimum staffing an ordinary raid can't succeed; exceptional threats (Session 4) are another matter.
+        if (def.kind === 'warehouse') {
+          if (uw.whse.immune(def.id)) { if (Math.random() < p) uw.news('pv', `The ${FACTIONS[fid].short} came at ${def.name} last night and turned back at the gate. Nobody got in.`); break; }
+          p *= clamp(1 - uw.whse.defense(def.id) / 150, 0.1, 1);
+        }
         if (Math.random() < p) {
           o.dmg = 1;
           const stash = S.storage[def.id], lost = units(stash) ? Inv.lose(stash, 0.3) : 0;

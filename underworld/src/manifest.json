@@ -57,6 +57,7 @@
   "game/470-underworld-gangs.js",
   "game/480-underworld-crew.js",
   "game/490-underworld-property.js",
+  "game/495-underworld-warehouses.js",
   "game/500-underworld-homes-parking.js",
   "game/510-underworld-police-pressure.js",
   "game/520-underworld-prison.js",

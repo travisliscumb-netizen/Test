@@ -20,6 +20,7 @@ class CrewManager {
     if (typeof c.nick !== 'string') c.nick = '';
     if (c.assign !== null && c.assign !== undefined && typeof c.assign !== 'number' && typeof c.assign !== 'string') c.assign = null;
     if (c.assign === undefined) c.assign = null;
+    if (c.from !== undefined && !(typeof c.from === 'string' && PROP_BY_ID[c.from] && PROP_BY_ID[c.from].kind === 'warehouse')) delete c.from; // a dealer's supplying warehouse
     c.fee = Math.round(num(c.fee, c.pay * 3, 0, 1e6));
     c.run = null; // runs reference crew ids; the crew never holds run state itself
     return c;
@@ -116,11 +117,22 @@ class CrewManager {
     if (role === 'bodyguard' && this.active().filter(o => o.role === 'bodyguard' && o !== c).length >= 2) return 'Two bodyguards at most.';
     if (R.biz && !(this.S.props[target] && this.S.props[target].owned && PROP_BY_ID[target].kind === 'business')) return 'Pick one of your businesses.';
     if (role === 'manager' && this.active().some(o => o !== c && o.role === 'manager' && o.assign === target)) return 'That business already has a manager.';
-    c.role = role; c.assign = R.turf ? (typeof target === 'number' ? target : null) : R.zone ? (ZONES[target] ? target : null) : R.biz ? target : null;
-    if ((R.turf || R.zone) && c.assign === null) { c.role = 'idle'; return 'Pick a place.'; }
+    // a warehouse target ('w:<id>') for its Enforcers, Drivers and Lieutenant (§5); a Driver works only from one
+    const wh = WarehouseSystem.idOf(target);
+    if (wh) { if (!R.wh) return `A ${R.name} doesn’t work out of a warehouse.`; const why = this.uw.whse.canAssign(c, role, wh); if (why) return why; }
+    else if (role === 'driver') return 'A Driver is based at one of your warehouses. Buy one first.';
+    c.role = role; c.assign = wh ? target : R.turf ? (typeof target === 'number' ? target : null) : R.zone ? (ZONES[target] ? target : null) : R.biz ? target : null;
+    if (role !== 'dealer') delete c.from;
+    if ((R.turf || R.zone || R.wh) && c.assign === null) { c.role = 'idle'; return 'Pick a place.'; }
     return '';
   }
-  presence(i) { const z = this.uw.T[i].zone; for (const c of this.S.crew) if (c.status === 'active' && (((c.role === 'dealer' || c.role === 'enforcer') && c.assign === i) || (c.role === 'lieutenant' && c.assign === z && this.uw.owner[i] === 'pc'))) return true; return false; }
+  // the district a Lieutenant runs: the one they were given, or the district of the warehouse they run
+  ltZone(c) {
+    if (!c || c.role !== 'lieutenant') return null;
+    const wh = WarehouseSystem.idOf(c.assign); if (wh) { const L = this.uw.loc('prop', wh); return L ? L.zone : null; }
+    return typeof c.assign === 'string' && ZONES[c.assign] ? c.assign : null;
+  }
+  presence(i) { const z = this.uw.T[i].zone; for (const c of this.S.crew) if (c.status === 'active' && (((c.role === 'dealer' || c.role === 'enforcer') && c.assign === i) || (c.role === 'lieutenant' && this.ltZone(c) === z && this.uw.owner[i] === 'pc'))) return true; return false; }
   onTurf(i) { return this.S.crew.filter(c => c.status === 'active' && (c.role === 'dealer' || c.role === 'enforcer') && c.assign === i).map(c => c.id); }
   bodyguards() { const runs = this.S.runs || []; return this.active().filter(c => c.role === 'bodyguard' && !runs.some(r => r.crew === c.id)).slice(0, 2).map(c => c.id); }
   hurt(id, why) {
@@ -136,17 +148,6 @@ class CrewManager {
   }
   tickHours() { }
   update(dt) { }
-  storedStock() {
-    // every unit sitting in owned storage, with where it is
-    const S = this.S, out = [];
-    for (const id in S.storage) if (S.props[id] && S.props[id].owned) for (const k of GOOD_IDS) if (S.storage[id][k] > 0) out.push({ id, k, n: S.storage[id][k] });
-    return out;
-  }
-  takeStored(good, n) {
-    const S = this.S; let got = 0; this.lastCost = 0;
-    for (const id in S.storage) { if (!(S.props[id] && S.props[id].owned)) continue; const st = S.storage[id]; const a = Math.min(n - got, Inv.has(st, good)); if (a > 0) { this.lastCost += Inv.remove(st, good, a); got += a; } if (got >= n) break; }
-    return got;
-  }
   tickDay() {
     const uw = this.uw, S = this.S, g = uw.g;
     for (const c of S.crew) {
@@ -183,7 +184,7 @@ class CrewManager {
       // ---- disloyalty, from mild to catastrophic
       this.disloyalty(c, rival);
     }
-    if (dealIncome > 0) Money.earn(dealIncome, 'dealers');
+    void dealIncome; // each dealer's takings were banked where they belong as they came in
     if (short) uw.news('pv', `Payroll came up ${fmtMoney(wages - paid)} short. The crew noticed.`);
     // leadership challenge: an ambitious, powerful lieutenant wants more
     for (const c of act) if (c.status === 'active' && c.rank >= 3 && c.power > 60 && c.traits.includes('ambitious') && !S.decisions.some(d => d.crew === c.id) && Math.random() < 0.08) {
@@ -203,36 +204,47 @@ class CrewManager {
     if (c.role === 'dealer' && typeof c.assign === 'number') {
       const i = c.assign, t = uw.T[i], z = t.zone;
       const n = Math.floor(4 + skill * 8 + c.rank * 2);
-      // sell the most valuable sellable product in storage that this district wants
-      const stock = this.storedStock().filter(s => !GOODS[s.k].fence && !GOODS[s.k].arms);
-      if (!stock.length) { if (Math.random() < 0.3) uw.news(c.name.split(' ')[0], 'I’ve got customers and nothing to sell. Stock the stash.'); return null; }
+      // sell from the stock on this corner only (§5, §8): what you or a Driver brought. The most valuable product
+      // this district wants goes first.
+      const corner = uw.whse.turfStock(i);
+      const stock = GOOD_IDS.filter(k => Inv.has(corner, k) > 0 && !GOODS[k].fence && !GOODS[k].arms).map(k => ({ k, n: Inv.has(corner, k) }));
+      if (!stock.length) { if (Math.random() < 0.3) uw.news(c.name.split(' ')[0], `I’ve got customers on ${t.name} and nothing to sell. Bring stock to the corner, or have a Driver run it.`); return null; }
       stock.sort((a, b) => uw.market.price(z, b.k) - uw.market.price(z, a.k));
       let left = n, cash = 0, sold = 0;
-      for (const s of stock) { if (left <= 0) break; const take = this.takeStored(s.k, Math.min(left, s.n)); if (!take) continue; const pr = uw.market.price(z, s.k) * 0.72 * (uw.owner[i] === 'pc' ? 1.1 : 1); cash += pr * take; sold += take; S.st.realized = (S.st.realized || 0) + pr * take - (this.lastCost || 0); S.realBy = S.realBy || {}; S.realBy[s.k] = Math.round((S.realBy[s.k] || 0) + pr * take - (this.lastCost || 0)); left -= take; uw.market.sold(z, s.k, take); S.pressure = clamp(S.pressure + take * GOODS[s.k].heat * 0.05, 0, 100); }
+      for (const s of stock) {
+        if (left <= 0) break;
+        const take = Math.min(left, s.n), cost = Inv.remove(corner, s.k, take); if (!take) continue;
+        const pr = uw.market.price(z, s.k) * 0.72 * (uw.owner[i] === 'pc' ? 1.1 : 1);
+        cash += pr * take; sold += take; S.st.realized = (S.st.realized || 0) + pr * take - cost; S.realBy = S.realBy || {}; S.realBy[s.k] = Math.round((S.realBy[s.k] || 0) + pr * take - cost);
+        left -= take; uw.market.sold(z, s.k, take); S.pressure = clamp(S.pressure + take * GOODS[s.k].heat * 0.05, 0, 100);
+      }
       S.turfs[i].police = clamp(S.turfs[i].police + 1.5 + sold * 0.1, 0, 100);
       uw.addInf(i, 'pc', 2.5);
       // skimming happens in disloyalty(); getting caught happens here
       const own = uw.owner[i];
       if (own && own !== 'pc' && uw.attitude(own) !== 'friendly') { S.factions[own].rel -= 2; if (Math.random() < 0.06) this.hurt(c.id, `beating from the ${FACTIONS[own].short} on their turf`); }
       const risk = 0.012 + S.turfs[i].police / 900 + S.pressure / 1600 - (c.traits.includes('cautious') ? 0.01 : 0) - skill * 0.008 - (uw.cops.perk('kerr') && z === 'o' ? 0.006 : 0);
-      if (Math.random() < risk) { this.arrest(c, `selling on ${t.name}`); return { units: sold, cash: cash * 0.5 }; }
+      if (Math.random() < risk) { this.arrest(c, `selling on ${t.name}`); if (cash > 0) Money.earn(Math.round(cash * 0.5), 'dealers', { op: uw.whse.supplierOf(c) }); return { units: sold, cash: cash * 0.5 }; }
       c.wins += sold > 6 ? 1 : 0;
       S.st.sold += sold;
+      // the takings go to the warehouse that supplies this corner (§45.22), else the treasury, home or you
+      if (cash > 0) Money.earn(Math.round(cash), 'dealers', { op: uw.whse.supplierOf(c) });
       return { units: sold, cash: Math.round(cash) };
     }
+    if (c.role === 'enforcer' && WarehouseSystem.idOf(c.assign)) return null; // guarding a warehouse (its defense)
     if (c.role === 'enforcer' && typeof c.assign === 'number') {
       const i = c.assign; uw.addInf(i, 'pc', 3 + skill * 4 + c.rank);
       const own = uw.owner[i]; if (own && own !== 'pc') { uw.addInf(i, own, -(1.5 + skill * 2)); S.factions[own].rel -= 1.5; if (Math.random() < 0.05 * (1 - skill)) this.hurt(c.id, `scrap with the ${FACTIONS[own].short}`); }
       return null;
     }
-    if (c.role === 'lieutenant' && typeof c.assign === 'string') {
-      let n = 0;
+    if (c.role === 'lieutenant' && this.ltZone(c)) {
+      let n = 0; const zone = this.ltZone(c);
       // a Lieutenant strengthens your hold on the district; there is no flat stipend (§45.18)
-      for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === c.assign && uw.owner[i] === 'pc') { uw.addInf(i, 'pc', 2 + skill * 2); n++; }
+      for (let i = 0; i < uw.T.length; i++) if (uw.T[i].zone === zone && uw.owner[i] === 'pc') { uw.addInf(i, 'pc', 2 + skill * 2); n++; }
       return null;
     }
-    // a Driver no longer steals cars for a daily payout (§37 #2, §45.18); Driver logistics arrive with the
-    // warehouse rebuild (Session 3)
+    // a Driver no longer steals cars (§37 #2, §45.18): Drivers make the deliveries (DeliveryManager), dispatched by
+    // you or by the warehouse's Lieutenant
     if (c.role === 'driver') return null;
     if (c.role === 'manager') { if (!(S.props[c.assign] && S.props[c.assign].owned)) c.role = 'idle'; return null; }
     return null;
@@ -272,7 +284,7 @@ class CrewManager {
     }
     // 5. betrayal: a powerful lieutenant stages a coup in their district
     if (c.rank >= 3 && c.power > 40 && L < 30 && F < 45 && Math.random() < 0.25) {
-      const z = c.role === 'lieutenant' ? c.assign : uw.T[typeof c.assign === 'number' ? c.assign : 0].zone;
+      const z = c.role === 'lieutenant' ? this.ltZone(c) : uw.T[typeof c.assign === 'number' ? c.assign : 0].zone;
       const to = rival || this.bestRival() || FAC_IDS.find(id => !S.factions[id].broken);
       let n = 0;
       // the turfs aren't handed over: the rival they sold you to moves on them at once, with everything the traitor

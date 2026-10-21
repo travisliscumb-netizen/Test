@@ -278,7 +278,7 @@ class EmpireUI {
     const ownName = own === 'pc' ? 'You' : own ? FACTIONS[own].name : 'Nobody (neutral)';
     const rivals = Object.keys(T.inf).filter(k => k !== 'pc').sort((a, b) => T.inf[b] - T.inf[a]);
     const props = uw.props.ownedList().filter(p => { const L = uw.loc('prop', p.id); return L && turfAt(L.x, L.z) === i; });
-    const crew = uw.crew.active().filter(c => c.assign === i || (c.role === 'lieutenant' && c.assign === t.zone));
+    const crew = uw.crew.active().filter(c => c.assign === i || uw.crew.ltZone(c) === t.zone);
     const dem = GOOD_IDS.filter(k => !GOODS[k].fence).sort((a, b) => uw.market.ratio(t.zone, b) - uw.market.ratio(t.zone, a)).slice(0, 2);
     const risk = Math.round(clamp(T.police * 0.6 + S.pressure * 0.4 + (own && own !== 'pc' && uw.attitude(own) === 'hostile' ? 25 : 0), 0, 100));
     return `<div class="turfCard"><b>${esc(t.name)}</b><small>${esc(ZONES[t.zone].name)}</small>
@@ -348,12 +348,18 @@ class EmpireUI {
     const turfOpts = sel => uw.T.map(t => `<option value="${t.i}" ${sel === t.i ? 'selected' : ''}>${esc(t.name)} · ${uw.owner[t.i] === 'pc' ? 'yours' : uw.owner[t.i] ? FACTIONS[uw.owner[t.i]].short : 'neutral'}</option>`).join('');
     const zoneOpts = sel => Object.keys(ZONES).map(z => `<option value="${z}" ${sel === z ? 'selected' : ''}>${esc(ZONES[z].name)}</option>`).join('');
     const bizOpts = sel => uw.props.ownedList().filter(p => p.kind === 'business').map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+    // a warehouse as the target ('w:<id>'), with how full it is
+    const whOpts = sel => uw.whse.list().map(p => `<option value="w:${p.id}" ${sel === 'w:' + p.id ? 'selected' : ''}>${esc(p.name)} · ${uw.whse.slotsUsed(p.id)}/${WH_SLOTS}</option>`).join('');
     h += '<div class="grid2">' + ros.map(c => {
       const R = CREW_ROLES[c.role];
       let target = '';
       if (c.status === 'active') {
-        if (R.turf) target = `<select data-sel="tgt:${c.id}">${turfOpts(c.assign)}</select>`;
-        else if (R.zone) target = `<select data-sel="tgt:${c.id}">${zoneOpts(c.assign)}</select>`;
+        const whs = R.wh ? whOpts(c.assign) : '';
+        if (c.role === 'driver') target = `<select data-sel="tgt:${c.id}">${whs || '<option value="">— buy a warehouse —</option>'}</select>`;
+        else if (R.turf) target = `<select data-sel="tgt:${c.id}">${whs ? `<optgroup label="Guard a warehouse">${whs}</optgroup><optgroup label="Hold a turf">` : ''}${turfOpts(c.assign)}${whs ? '</optgroup>' : ''}</select>`;
+        else if (R.zone) target = `<select data-sel="tgt:${c.id}">${whs ? `<optgroup label="Run a warehouse">${whs}</optgroup><optgroup label="Run a district">` : ''}${zoneOpts(c.assign)}${whs ? '</optgroup>' : ''}</select>`;
+        // a Dealer's corner is supplied from one warehouse (the nearest unless you pick)
+        if (c.role === 'dealer' && typeof c.assign === 'number' && uw.whse.list().length) { const cur = uw.whse.supplierOf(c); target += `<select data-sel="from:${c.id}">${uw.whse.list().map(p => `<option value="${p.id}" ${cur === p.id ? 'selected' : ''}>Supplied by ${esc(p.name)}</option>`).join('')}</select><div class="d">On the corner: ${units(uw.whse.turfStock(c.assign))}/${TURF_STOCK_CAP}</div>`; }
         else if (R.biz) target = `<select data-sel="tgt:${c.id}"><option value="">— business —</option>${bizOpts(c.assign)}</select>`;
       }
       const roleSel = c.status === 'active' ? `<select data-sel="role:${c.id}">${Object.keys(CREW_ROLES).map(k => `<option value="${k}" ${c.role === k ? 'selected' : ''} ${CREW_ROLES[k].minRank && c.rank < CREW_ROLES[k].minRank ? 'disabled' : ''}>${CREW_ROLES[k].name}</option>`).join('')}</select>` : '';
@@ -517,12 +523,17 @@ class EmpireUI {
     const uw = this.uw, S = uw.S, g = this.g, R = uw.runs;
     const d = this.runDraft || (this.runDraft = { from: '', to: '', good: '', n: 0, crew: 0 });
     const stashes = uw.props.ownedList().filter(p => p.storage);
-    const origins = [['inv', 'Your pockets (runner meets you)'], ...stashes.map(p => ['' + p.id, p.name])].filter(([id]) => units(R.container(id)) > 0);
+    // pickups: you, your stashes and the suppliers who deal with you (a supply run buys there, from the vault);
+    // destinations: your stashes and the corners of turfs where you have Dealers (§8)
+    const spots = SPOTS.filter(sp => sp.sells && sp.sells.length && (g.save.rep >= (sp.rep || 0) || (S.flags.intro && S.flags.intro[sp.id])));
+    const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = S.supply[sp.id] || {}; const o = {}; for (const k of sp.sells) o[k] = st[k] !== undefined ? st[k] : 0; return o; };
+    const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
     if (!origins.some(o => o[0] === d.from)) d.from = origins.length ? origins[0][0] : '';
-    const dests = stashes.filter(p => p.id !== d.from);
+    const corners = uw.T.filter(t => uw.whse.dealersOn(t.i).length).map(t => ({ id: 'turf:' + t.i, name: `Dealer’s corner · ${t.name}` }));
+    const dests = [...stashes.map(p => ({ id: p.id, name: p.name })), ...corners].filter(p => p.id !== d.from);
     if (!dests.some(p => p.id === d.to)) d.to = dests.length ? dests[0].id : '';
-    const src = d.from ? R.container(d.from) : {};
-    const goods = GOOD_IDS.filter(k => Inv.has(src, k) > 0);
+    const src = d.from ? (d.from.startsWith('spot:') ? supplyOf(d.from) : R.container(d.from)) : {};
+    const goods = GOOD_IDS.filter(k => Inv.has(src, k) > 0 && !(d.to && d.to.startsWith('turf:') && (GOODS[k].fence || GOODS[k].arms)));
     if (!goods.includes(d.good)) d.good = goods[0] || '';
     const have = d.good ? Inv.has(src, d.good) : 0;
     const amounts = d.good ? [...new Set([lotsFor(d.good, 1), lotsFor(d.good, 2), lotsFor(d.good, 5), lotsFor(d.good, 10), have].filter(n => n > 0 && n <= have))].sort((a, b) => a - b) : [];
@@ -530,23 +541,23 @@ class EmpireUI {
     const crew = R.available();
     if (!crew.some(c => c.id === d.crew)) d.crew = crew.length ? crew[0].id : 0;
     const sel = (key, opts, cur) => `<select data-sel="run:${key}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
-    let h = `<div class="hint">A runner carries product between your stashes while you do something else. They charge a fee up front; the chance of a clean run depends on who you send and the streets in between.</div>`;
-    if (!stashes.length || crew.length + S.runs.length === 0) h += `<div class="hint">You need ${!stashes.length ? 'at least one property with a stash' : ''}${!stashes.length && !uw.crew.active().length ? ' and ' : ''}${!uw.crew.active().length ? 'crew on the payroll (Crew tab)' : ''}.</div>`;
+    let h = `<div class="hint">A Driver carries product between your places, from a supplier to a warehouse, or to a Dealer’s corner, while you do something else. The fee (and anything bought) comes out of Dirty Cash, the warehouse’s vault first; the chance of a clean run depends on who you send and who holds the streets in between. A warehouse’s Lieutenant keeps its Dealers’ corners stocked by itself.</div>`;
+    if (!stashes.length || crew.length + S.runs.length === 0) h += `<div class="hint">You need ${!stashes.length ? 'at least one property with a stash' : ''}${!stashes.length && !uw.crew.active().some(c => c.role === 'driver') ? ' and ' : ''}${!uw.crew.active().some(c => c.role === 'driver') ? 'a Driver (Crew tab: a crew member with the Driver role, based at a warehouse)' : ''}.</div>`;
     else {
       const a = d.crew && d.from && d.to && d.good && d.n ? R.assess(uw.crew.find(d.crew), d.from, d.to, d.good, d.n) : null;
       const room = d.to ? R.freeAt(d.to) : 0;
       h += `<div class="card"><div class="t">New delivery</div>
         <div class="stat"><span>Pickup</span></div>${origins.length ? sel('from', origins, d.from) : '<div class="d">No stash has product in it.</div>'}
-        <div class="stat"><span>Destination</span><span>${d.to ? `${room} space free` : ''}</span></div>${dests.length ? sel('to', dests.map(p => [p.id, p.name]), d.to) : '<div class="d">You need a second property with a stash.</div>'}
+        <div class="stat"><span>Destination</span><span>${d.to ? `${room} space free` : ''}</span></div>${dests.length ? sel('to', dests.map(p => [p.id, p.name]), d.to) : '<div class="d">You need a second property with a stash, or a Dealer on a turf.</div>'}
         <div class="stat"><span>Product</span></div>${goods.length ? sel('good', goods.map(k => [k, `${GOODS[k].name} · ${fmtQty(k, Inv.has(src, k))} there`]), d.good) : '<div class="d">—</div>'}
         <div class="stat"><span>Quantity</span></div>${amounts.length ? sel('n', amounts.map(n => [n, fmtQty(d.good, n) + (n === have ? ' (all)' : '')]), d.n) : '<div class="d">—</div>'}
-        <div class="stat"><span>Runner</span></div>${crew.length ? sel('crew', crew.map(c => [c.id, `${uw.crew.displayName(c)} · ${R.band(c)[1]} · skill ${Math.round(c.skill)} · loyalty ${Math.round(c.loyalty)}`]), d.crew) : '<div class="d">Everyone is busy.</div>'}
+        <div class="stat"><span>Driver</span></div>${crew.length ? sel('crew', crew.map(c => [c.id, `${uw.crew.displayName(c)} · ${R.band(c)[1]} · skill ${Math.round(c.skill)} · loyalty ${Math.round(c.loyalty)}`]), d.crew) : '<div class="d">No Driver free.</div>'}
         ${a ? `<div class="stat"><span>Chance of a clean run</span><span style="color:${a.p > 0.8 ? 'var(--green)' : a.p > 0.65 ? 'var(--amber)' : 'var(--red)'}">${Math.round(a.p * 100)}%</span></div><div class="d" style="font-size:11px">${a.why.map(([t, v], i) => i ? `${esc(t)} ${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v * 100))}%` : `${esc(t)} ${Math.round(v * 100)}%`).join(' · ')}</div>
         <div class="stat"><span>Cargo value</span><span>${fmtMoney(a.value)}</span></div><div class="stat"><span>Fee (paid now)</span><span class="money">${fmtMoney(a.fee)}</span></div><div class="stat"><span>Time on the road</span><span>about ${a.hours} h</span></div>` : ''}
-        <div class="btns"><button class="sbtn gold" data-act="rungo" ${a && Money.can(a.fee, 'delivery') && room >= d.n * GOODS[d.good].size ? '' : 'disabled'}>${a ? `Send ${esc(uw.crew.find(d.crew).name.split(' ')[0])} · ${fmtMoney(a.fee)}` : 'Send'}</button></div></div>`;
+        <div class="btns"><button class="sbtn gold" data-act="rungo" ${a && Money.payrollReserve() >= a.fee + (d.from.startsWith('spot:') ? Math.round(uw.market.wholesale(uw.loc('spot', d.from.slice(5)).zone, d.good) * d.n) : 0) && room >= d.n * GOODS[d.good].size ? '' : 'disabled'}>${a ? `Send ${esc(uw.crew.find(d.crew).name.split(' ')[0])} · ${fmtMoney(a.fee)}` : 'Send'}</button></div></div>`;
     }
     const now = R.absHour();
-    h += `<h3>On the road <small>${S.runs.length}</small></h3>` + (S.runs.length ? '<div class="jobs">' + S.runs.map(r => `<div class="job"><i>⇢</i><div><b>${esc(r.name)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name}</b><span>${esc(r.from === 'inv' ? 'from you' : PROP_BY_ID[r.from].name)} → ${esc(PROP_BY_ID[r.to].name)} · ${Math.round(r.chance * 100)}% · arrives in ~${Math.max(0, r.eta - now)}h · fee ${fmtMoney(r.fee)}</span></div></div>`).join('') + '</div>' : '<div class="hint">No runs out right now.</div>');
+    h += `<h3>On the road <small>${S.runs.length}</small></h3>` + (S.runs.length ? '<div class="jobs">' + S.runs.map(r => `<div class="job"><i>⇢</i><div><b>${esc(r.name)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name}</b><span>${esc(r.from === 'inv' ? 'from you' : R.placeName(r.from))} → ${esc(R.placeName(r.to))} · ${Math.round(r.chance * 100)}% · arrives in ~${Math.max(0, r.eta - now)}h · fee ${fmtMoney(r.fee)}</span></div></div>`).join('') + '</div>' : '<div class="hint">No runs out right now.</div>');
     h += `<h3>Reports</h3>` + (S.runLog.length ? '<div class="msgs">' + S.runLog.slice().reverse().map(r => { const [t, col] = r.outcome === 'success' ? ['SUCCESS', '#7fe08f'] : r.outcome === 'partial' ? ['PARTIAL LOSS', '#ffd84d'] : [RUN_OUTCOMES[r.outcome] || r.outcome, '#ff8a3d']; return `<div class="msg"><i style="background:${col}">${r.outcome === 'success' ? '✓' : '!'}</i><div><b>${t} · ${esc(r.name)}</b><small>day ${r.day}</small><p>${esc(r.from)} → ${esc(r.to)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} · delivered ${fmtQty(r.good, r.delivered)}${r.lost ? ' · lost ' + fmtQty(r.good, r.lost) : ''}${r.returned ? ' · returned ' + fmtQty(r.good, r.returned) : ''} · fee ${fmtMoney(r.fee)}${r.text ? '<br>' + esc(r.text) : ''}</p></div></div>`; }).join('') + '</div>' : '<div class="hint">No runs finished yet.</div>');
     return h;
   }
@@ -618,8 +629,9 @@ class EmpireUI {
       case 'bonus': r = uw.crew.bonus(+x); break;
       case 'disc': uw.crew.discipline(+x); r = 'They got the message. So did everyone watching.'; break;
       case 'fire': { const c = uw.crew.find(+x); g.ui.ask(`Let ${c ? c.name : 'them'} go?`, 'They leave the crew for good. Unhappy senior people may talk.', 'Let go', () => { uw.crew.fire(+x); this.render(); }); return; }
-      case 'role': { const c = uw.crew.find(+x); if (!c) break; const R = CREW_ROLES[y]; const tgt = R.turf ? (typeof c.assign === 'number' ? c.assign : turfAt(g.player.pos.x, g.player.pos.z)) : R.zone ? (ZONES[c.assign] ? c.assign : zoneKey(g.player.pos.x, g.player.pos.z)) : R.biz ? ((uw.props.ownedList().find(p => p.kind === 'business') || {}).id) : null; r = uw.crew.assign(+x, y, tgt); break; }
-      case 'tgt': { const c = uw.crew.find(+x); if (!c) break; const R = CREW_ROLES[c.role]; r = uw.crew.assign(+x, c.role, R.turf ? +y : y); break; }
+      case 'role': { const c = uw.crew.find(+x); if (!c) break; const R = CREW_ROLES[y], wh0 = uw.whse.list()[0]; const tgt = y === 'driver' ? (wh0 ? 'w:' + wh0.id : null) : R.turf ? (typeof c.assign === 'number' ? c.assign : turfAt(g.player.pos.x, g.player.pos.z)) : R.zone ? (ZONES[c.assign] ? c.assign : zoneKey(g.player.pos.x, g.player.pos.z)) : R.biz ? ((uw.props.ownedList().find(p => p.kind === 'business') || {}).id) : null; r = uw.crew.assign(+x, y, tgt); break; }
+      case 'tgt': { const c = uw.crew.find(+x); if (!c) break; const R = CREW_ROLES[c.role], v = a.split(':').slice(2).join(':'); r = uw.crew.assign(+x, c.role, v.startsWith('w:') ? v : R.turf ? +v : v); break; }
+      case 'from': { const c = uw.crew.find(+x); if (c && c.role === 'dealer' && PROP_BY_ID[y] && PROP_BY_ID[y].kind === 'warehouse' && uw.props.owned(y)) { c.from = y; r = `${c.name.split(' ')[0]}’s corner is supplied from ${PROP_BY_ID[y].name}.`; } break; }
       case 'repair': r = uw.props.repair(x); break;
       case 'dec': uw.crew.decide(+x, y === '1'); break;
       case 'cbribe': r = uw.cops.approach(x); break;
@@ -656,10 +668,48 @@ class EmpireUI {
       if (d.respray || id === 'qgarage') h += `<button class="sbtn" data-act="respray">Respray car · ${fmtMoney(Math.round(300 * (1 - uw.props.perk('respray')) / 10) * 10)}</button><button class="sbtn" data-act="carfix">Repair car</button>`;
       if (o.dmg) h += `<button class="sbtn gold" data-act="repair">Repair damage · ${fmtMoney(PM.repairCost(d))}</button>`;
       h += '</div>';
-      if (PM.storageCap(id)) h += this.stashTable(id);
+      if (d.kind === 'warehouse') h += this.whPanel(id);
+      else if (PM.storageCap(id)) h += this.stashTable(id);
       return h;
     };
     g.content.openSvc(d.name, PM.owned(id) ? 'Your property.' : 'For sale.', render, a => this.propAct(id, a));
+  }
+  // a warehouse you own (§7): Product, Weapons/Ammo, Dirty Cash, Security, Crew, Logistics
+  whPanel(id) {
+    const uw = this.uw, W = uw.whse, S = uw.S, d = PROP_BY_ID[id], tab = this.whTab || 'product';
+    const tabs = [['product', 'Product'], ['weapons', 'Weapons'], ['cash', 'Dirty Cash'], ['security', 'Security'], ['crew', 'Crew'], ['logistics', 'Logistics']];
+    let h = `<div class="stats"><span>Security</span><span>Level ${W.level(id)} · ${esc(W.levelName(id))}${W.immune(id) ? ' · <b style="color:var(--green)">ordinary raids can’t touch it</b>' : ''}</span><span>Crew</span><span>${W.slotsUsed(id)} / ${WH_SLOTS}</span><span>Vault</span><span class="money">${fmtMoney(Money.dirtyAtProp(id))} / ${fmtMoney(W.vaultCap(id))}</span></div>`;
+    h += `<div class="btns">${tabs.map(([k, n]) => `<button class="etab${k === tab ? ' on' : ''}" data-act="wt:${k}">${n}</button>`).join('')}</div>`;
+    if (tab === 'product') return h + this.stashTable(id, false);
+    if (tab === 'weapons') return h + this.uw.armory.stashHTML(id);
+    if (tab === 'cash') {
+      const here = uw.locations().some(L => L.key === 'p:' + id && L.here), me = Money.onMe, vault = Money.dirtyAtProp(id), room = Money.roomAt('p:' + id), tr = Money.treasury === id;
+      h += `<div class="hint">The vault keeps Dirty Cash safe from an ordinary arrest (§2). It holds ${fmtMoney(W.vaultCap(id))} at this vault tier; better vault work holds more. Moving cash in or out needs you here.</div>`;
+      h += here ? `<div class="btns">${[1e4, 1e5, 1e6].map(n => `<button class="sbtn" data-act="wcash:in:${n}" ${me < n || room < n ? 'disabled' : ''}>Deposit ${fmtMoney(n)}</button>`).join('')}<button class="sbtn gold" data-act="wcash:in:-1" ${me <= 0 || room <= 0 ? 'disabled' : ''}>Deposit all</button></div><div class="btns">${[1e4, 1e5, 1e6].map(n => `<button class="sbtn" data-act="wcash:out:${n}" ${vault < n ? 'disabled' : ''}>Withdraw ${fmtMoney(n)}</button>`).join('')}<button class="sbtn" data-act="wcash:out:-1" ${vault <= 0 ? 'disabled' : ''}>Withdraw all</button></div>` : '<div class="hint">Come here in person to move cash.</div>';
+      h += `<h3>Treasury</h3><div class="hint">${tr ? `${esc(d.name)} is your Treasury Warehouse: income that no operation’s warehouse takes comes here (§45.22).` : 'Make this the Treasury Warehouse: income that no operation’s warehouse takes comes here instead of your home safehouse.'}</div><div class="btns"><button class="sbtn${tr ? '' : ' gold'}" data-act="wtreas">${tr ? 'Stop being the treasury' : 'Make it the treasury'}</button></div>`;
+      return h;
+    }
+    if (tab === 'security') {
+      h += '<div class="jobs">' + WH_CAT_IDS.map(k => { const t = W.tier(id, k), C = WH_CATS[k], cost = W.upgradeCost(id, k); return `<div class="job"><i>${'■'.repeat(t)}${'□'.repeat(4 - t)}</i><div><b>${esc(C.name)}</b><span>${esc(C.tiers[t])}${t < 4 ? ` · next: ${esc(C.tiers[t + 1])}` : ''}</span></div><button class="sbtn gold" data-act="wup:${k}" ${t >= 4 || !Money.can(cost, 'property') ? 'disabled' : ''}>${t >= 4 ? 'Done' : fmtMoney(cost)}</button></div>`; }).join('') + '</div>';
+      const enf = W.crewAt(id, 'enforcer').length, lt = W.crewAt(id, 'lieutenant').length;
+      h += `<div class="hint">The security level is set by the weakest of the four. At ${WH_LEVEL_NAME[4]} with at least ${WH_IMMUNE.enforcers} Enforcers and a Lieutenant on site, ordinary rival raids can’t knock it off (now: level ${W.level(id)}, ${enf} Enforcer${enf === 1 ? '' : 's'}, ${lt ? 'a Lieutenant' : 'no Lieutenant'}). A gang-war assault, the police, betrayal or sabotage are another matter. Defense ${Math.round(W.defense(id))}.</div>`;
+      return h;
+    }
+    if (tab === 'crew') {
+      const here = uw.crew.active().filter(c => c.assign === 'w:' + id), idle = uw.crew.active().filter(c => c.role === 'idle');
+      h += here.length ? '<div class="jobs">' + here.map(c => `<div class="job"><i>●</i><div><b>${esc(uw.crew.displayName(c))}</b><span>${CREW_ROLES[c.role].name} · skill ${Math.round(c.skill)} · loyalty ${Math.round(c.loyalty)}</span></div></div>`).join('') + '</div>' : '<div class="hint">Nobody works here yet.</div>';
+      h += `<div class="hint">Up to ${WH_MAX.enforcer} Enforcers guard it, up to ${WH_MAX.driver} Drivers run its logistics and one Lieutenant runs it and its district. ${WH_SLOTS} people at most.</div>`;
+      if (idle.length) h += '<h3>Unassigned crew</h3><div class="jobs">' + idle.map(c => `<div class="job"><i>○</i><div><b>${esc(uw.crew.displayName(c))}</b><span>skill ${Math.round(c.skill)} · ${CREW_RANKS[c.rank]}</span></div><div class="btns">${['enforcer', 'driver', 'lieutenant'].map(r => `<button class="sbtn" data-act="wcrew:${c.id}:${r}" ${W.canAssign(c, r, id) || (CREW_ROLES[r].minRank && c.rank < CREW_ROLES[r].minRank) ? 'disabled' : ''}>${CREW_ROLES[r].name}</button>`).join('')}</div></div>`).join('') + '</div>';
+      return h;
+    }
+    // logistics
+    const drivers = W.crewAt(id, 'driver'), lt = W.crewAt(id, 'lieutenant')[0], st = W.st(id);
+    const dealers = uw.crew.active().filter(c => c.role === 'dealer' && typeof c.assign === 'number' && W.supplierOf(c) === id);
+    h += `<div class="stats"><span>Drivers</span><span>${drivers.length ? drivers.map(c => esc(c.name.split(' ')[0]) + (S.runs.some(r => r.crew === c.id) ? ' (out)' : '')).join(', ') : 'none'}</span><span>Lieutenant</span><span>${lt ? esc(lt.name) : 'none'}</span><span>Dealers supplied</span><span>${dealers.length ? dealers.map(c => `${esc(uw.T[c.assign].name)} ${units(W.turfStock(c.assign))}/${TURF_STOCK_CAP}`).join(', ') : 'none'}</span></div>`;
+      h += `<div class="hint">${lt ? (st.auto ? `${esc(lt.name.split(' ')[0])} sends free Drivers each day to keep the corners of the Dealers this warehouse supplies at ${TURF_STOCK_TARGET}.` : 'Automatic resupply is off: send runs yourself (Empire → Deliveries).') : 'With a Lieutenant here, free Drivers keep the Dealers’ corners stocked automatically. Until then, send runs yourself (Empire → Deliveries).'}</div><div class="btns"><button class="sbtn" data-act="wauto" ${lt ? '' : 'disabled'}>${st.auto ? 'Turn automatic resupply off' : 'Turn automatic resupply on'}</button></div>`;
+    const runs = S.runs.filter(r => r.from === id || r.to === id);
+    if (runs.length) h += '<h3>On the road</h3><div class="jobs">' + runs.map(r => `<div class="job"><i>⇢</i><div><b>${esc(r.name)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name}</b><span>${esc(uw.runs.placeName(r.from))} → ${esc(uw.runs.placeName(r.to))}</span></div></div>`).join('') + '</div>';
+    return h;
   }
   // quantity buttons for a good: 1 / 5 lb and everything (or x1 / x5 / all for pieces)
   qtyBtns(prefix, k, max, label = '') {
@@ -668,7 +718,7 @@ class EmpireUI {
     const opts = [[lb ? '1 lb' : '×1', one], [lb ? '5 lb' : '×5', five], ['All', -1]];
     return opts.map(([t, n]) => `<button class="sbtn" data-act="${prefix}:${k}:${n}" ${max < 1 ? 'disabled' : ''}>${label}${t}</button>`).join('');
   }
-  stashTable(id) {
+  stashTable(id, armory = true) {
     const uw = this.uw, S = uw.S, v = uw.nearVehicle(), st = S.storage[id] || (S.storage[id] = {}), d = PROP_BY_ID[id];
     const L = uw.loc('prop', id), z = L ? L.zone : 'm';
     const rows = GOOD_IDS.filter(k => Inv.has(S.inv, k) + (v ? Inv.has(v.trunk, k) : 0) + Inv.has(st, k) > 0);
@@ -679,13 +729,23 @@ class EmpireUI {
       return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:180px"><b>${GOODS[k].name}</b><span>on you ${fmtQty(k, Inv.has(S.inv, k))}${v ? ' · trunk ' + fmtQty(k, Inv.has(v.trunk, k)) : ''} · <b>here ${fmtQty(k, here)}</b>${here ? ` · avg cost ${fmtPerUnit(k, cost / here)} · worth ${fmtPerUnit(k, lot)} here = ${fmtMoney(val)} <b style="color:${pl >= 0 ? 'var(--green)' : 'var(--red)'}">${pl >= 0 ? '+' : '−'}${fmtMoney(Math.abs(pl))}</b>` : ''}</span></div>
         <div class="btns" style="flex-basis:100%">${this.qtyBtns('st', k, Inv.has(S.inv, k) + (v ? Inv.has(v.trunk, k) : 0), 'Store ')}${this.qtyBtns('tk', k, here, 'Take ')}${v ? this.qtyBtns('ld', k, here, 'Load ') : ''}</div></div>`;
     }).join('') + '</div>';
-    h += this.uw.armory.stashHTML(id);
+    if (armory) h += this.uw.armory.stashHTML(id);
     return h;
   }
   propAct(id, a) {
     const uw = this.uw, g = this.g, S = uw.S, d = PROP_BY_ID[id];
     const [k, good] = a.split(':');
     let r = '';
+    // the warehouse panel
+    if (d.kind === 'warehouse') {
+      const parts = a.split(':');
+      if (k === 'wt') { this.whTab = parts[1]; g.content.refreshSvc(); return; }
+      if (k === 'wup') { g.content.refreshSvc(uw.whse.upgrade(id, parts[1]) || `${WH_CATS[parts[1]].name}: ${WH_CATS[parts[1]].tiers[uw.whse.tier(id, parts[1])]}.`); return; }
+      if (k === 'wtreas') { const on = Money.treasury === id, e = Money.setTreasury(on ? null : id); g.saveGame(); g.content.refreshSvc(e || (on ? 'No Treasury Warehouse: income goes to your home safehouse.' : `${d.name} is now your Treasury Warehouse.`)); return; }
+      if (k === 'wauto') { const st = uw.whse.st(id); st.auto = !st.auto; g.saveGame(); g.content.refreshSvc(st.auto ? 'Automatic resupply is on.' : 'Automatic resupply is off.'); return; }
+      if (k === 'wcash') { const n = +parts[2], m = parts[1] === 'in' ? uw.transferCash('inv', 'p:' + id, n) : uw.transferCash('p:' + id, 'inv', n); g.saveGame(); g.content.refreshSvc(m ? `${parts[1] === 'in' ? 'Deposited' : 'Withdrew'} ${fmtMoney(m)}.` : 'Nothing moved.'); return; }
+      if (k === 'wcrew') { const e = uw.crew.assign(+parts[1], parts[2], 'w:' + id); g.saveGame(); g.content.refreshSvc(e || `${uw.crew.find(+parts[1]).name.split(' ')[0]} works here now (${CREW_ROLES[parts[2]].name}).`); return; }
+    }
     const st = S.storage[id] || (S.storage[id] = {});
     switch (k) {
       case 'buy': g.ui.ask(`Buy ${d.name}?`, `${fmtMoney(uw.props.price(d))}. ${d.desc}`, 'Buy', () => { const e = uw.props.buy(id); g.content.refreshSvc(e || 'It’s yours.'); }); return;

@@ -62,7 +62,7 @@ const Inv = {
 };
 // the five kinds of place goods can be (Part 14 of the design): property kind -> location class
 const LOC_CLASS = { safehouse: 'SAFEHOUSE', business: 'PROPERTY', garage: 'PROPERTY', warehouse: 'WAREHOUSE' };
-const LOC_ORDER = ['ON PERSON', 'VEHICLE', 'SAFEHOUSE', 'PROPERTY', 'WAREHOUSE'];
+const LOC_ORDER = ['ON PERSON', 'VEHICLE', 'SAFEHOUSE', 'PROPERTY', 'WAREHOUSE', 'CORNER'];
 // valuation of one container at a district's street price: per good qty, cost, value, P/L
 function holdings(o, zone, market) {
   const rows = [];

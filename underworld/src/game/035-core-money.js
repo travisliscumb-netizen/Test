@@ -28,6 +28,8 @@ const MONEY_SOURCES = {
   dirtyCarSale: { earn: 'me' },
   // the laundering fixer: Dirty Cash handed over in person, Clean Bank when she delivers
   launderIn: { pay: 'dirty' }, launderOut: { earn: 'clean' },
+  // a Driver buying product at a supplier for a warehouse: paid from the vault first (payroll order)
+  supplyRun: { pay: 'payroll' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
   // ---- Dirty costs
   armorer: { pay: 'dirty' }, supplier: { pay: 'dirty' }, raceBuyIn: { pay: 'dirty' }, respect: { pay: 'dirty' },
@@ -81,6 +83,8 @@ const Money = {
   total() { return this.dirtyTotal() + this.W.clean; },
   // cash in a live vehicle: an owned car keeps it in the wallet (saved), any other car on the vehicle itself
   carCash(v) { return v ? (v.garageUid ? this.dirtyInCar(v.garageUid) : (+v.cash || 0)) : 0; },
+  // room left for Dirty Cash at a place: a warehouse vault is limited by its vault tier (§7); a safehouse stash isn't
+  roomAt(key) { if (!key.startsWith('p:')) return Infinity; const id = key.slice(2), d = PROP_BY_ID[id]; return d && d.kind === 'warehouse' && this.uw && this.uw.whse ? Math.max(0, this.uw.whse.vaultCap(id) - this._get(key)) : Infinity; },
   canHoldCash(id) { const d = PROP_BY_ID[id]; return !!(d && DIRTY_PROP_KINDS.has(d.kind) && this.uw && this.uw.props.owned(id)); },
   // the places payroll and other remote Dirty costs draw from, in §45.21 order (warehouse vaults, safehouses, you)
   payrollOrder(first) {
@@ -99,13 +103,17 @@ const Money = {
   // where remote criminal income is delivered (§45.22): the warehouse running that operation (op), else the
   // Treasury Warehouse you designated, else your primary safehouse, else into your hands as a last resort.
   // Owning a warehouse does not make it the treasury: only a designation does (never "the first one bought").
-  stashFor(op) {
-    const uw = this.uw; if (!uw) return 'me';
+  stashFor(op) { return this.stashOrder(op)[0]; },
+  // the whole order, for income that overflows a full vault (it goes on to the next place, ending with you)
+  stashOrder(op) {
+    const uw = this.uw; if (!uw) return ['me'];
     const isWh = id => !!(id && PROP_BY_ID[id] && PROP_BY_ID[id].kind === 'warehouse' && uw.props.owned(id));
-    if (isWh(op)) return 'p:' + op;
-    if (isWh(this.W.treasury)) return 'p:' + this.W.treasury;
-    const home = this.primarySafehouse(); if (home) return 'p:' + home;
-    return 'me';
+    const out = [];
+    if (isWh(op)) out.push('p:' + op);
+    if (isWh(this.W.treasury) && this.W.treasury !== op) out.push('p:' + this.W.treasury);
+    const home = this.primarySafehouse(); if (home) out.push('p:' + home);
+    out.push('me');
+    return out;
   },
   // your home if you own it; otherwise the most expensive safehouse you own (never purchase order)
   primarySafehouse() {
@@ -184,9 +192,17 @@ const Money = {
       if (toDebt > 0) this._emit('debt', -toDebt, src);
       return n;
     }
-    const key = opts.at && (opts.at === 'me' || (opts.at.startsWith('p:') && this.canHoldCash(opts.at.slice(2)))) ? opts.at : S.earn === 'stash' ? this.stashFor(opts.op) : 'me';
-    this._set(key, this._get(key) + n);
-    this._book(src, n, true); if (key === 'me') this._emit('dirty', n, src);
+    const key = opts.at && (opts.at === 'me' || (opts.at.startsWith('p:') && this.canHoldCash(opts.at.slice(2)))) ? opts.at : S.earn === 'stash' ? null : 'me';
+    // remote income fills the first place with room in the routing order; a full vault passes the rest on
+    const order = key ? [key] : this.stashOrder(opts.op);
+    let left = n;
+    for (let k = 0; k < order.length && left > 0; k++) {
+      const at = order[k], put = k === order.length - 1 ? left : Math.min(left, this.roomAt(at));
+      if (!(put > 0)) continue;
+      this._set(at, this._get(at) + put); left = Math.round((left - put) * 100) / 100;
+      if (at === 'me') this._emit('dirty', put, src);
+    }
+    this._book(src, n, true);
     return n;
   },
   // a cost. All or nothing unless opts.partial (payroll pays what it can). Returns what was paid.
@@ -231,7 +247,7 @@ const Money = {
   move(A, B, n) {
     const ka = this.keyOf(A), kb = this.keyOf(B);
     if (!ka || !kb || (ka === kb && (ka !== 'live' || A.veh === B.veh)) || !okAmount(n)) return 0;
-    const m = Math.min(Math.round(n * 100) / 100, this._get(ka, A.veh)); if (!(m > 0)) return 0;
+    const m = Math.min(Math.round(n * 100) / 100, this._get(ka, A.veh), this.roomAt(kb)); if (!(m > 0)) return 0;
     this._set(ka, this._get(ka, A.veh) - m, A.veh); this._set(kb, this._get(kb, B.veh) + m, B.veh);
     if (ka === 'me' || kb === 'me') this._emit('dirty', kb === 'me' ? m : -m, 'move');
     return m;

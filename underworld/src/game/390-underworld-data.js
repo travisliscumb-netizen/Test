@@ -103,12 +103,12 @@ const RANKS = [
   { name: 'Known Operator', need: { rep: 400 }, hint: 'Hire at least two crew (Empire → Crew) and keep them paid.' },
   { name: 'Crew Leader', need: { rep: 400, crew: 2 }, hint: 'Take a turf: weaken a rival’s hold until you can Take Turf (Empire → Turf map), then win the showdown.' },
   { name: 'Territory Holder', need: { rep: 400, crew: 2, turfs: 1 }, hint: 'Hold 8 turfs, put a Lieutenant in charge of a district and grow your influence past 450.' },
-  { name: 'Underworld Power', need: { rep: 400, crew: 2, turfs: 8, lts: 1, infl: 450 }, hint: 'Hold 16 turfs with two Lieutenants and influence past 800 to run the city.' },
-  { name: 'City Kingpin', need: { rep: 400, crew: 2, turfs: 16, lts: 2, infl: 800 }, hint: 'You run Port Valen. Now keep it.' }
+  { name: 'Underworld Power', need: { rep: 400, crew: 2, turfs: 8, lts: 1, infl: 450 }, hint: 'Hold 16 turfs with two Lieutenants, influence past 800 and a warehouse running (a Lieutenant and a Driver) to run the city.' },
+  { name: 'City Kingpin', need: { rep: 400, crew: 2, turfs: 16, lts: 2, infl: 800, wh: 1 }, hint: 'You run Port Valen. Now keep it.' }
 ];
 const RANK_MAX = RANKS.length - 1;
 // what each Rank condition is called when the UI explains what is missing
-const RANK_NEED_TEXT = { rep: n => `${n} Rep`, crew: n => `${n} active crew`, turfs: n => `${n} turf${n === 1 ? '' : 's'} held`, lts: n => `${n} Lieutenant${n === 1 ? '' : 's'} running a district`, infl: n => `${n} influence` };
+const RANK_NEED_TEXT = { rep: n => `${n} Rep`, crew: n => `${n} active crew`, turfs: n => `${n} turf${n === 1 ? '' : 's'} held`, lts: n => `${n} Lieutenant${n === 1 ? '' : 's'} running a district`, infl: n => `${n} influence`, wh: n => `${n} operating warehouse${n === 1 ? '' : 's'} (a Lieutenant and a Driver)` };
 // purchasable property. at: [bx, bz, side, along] (side 0 N, 1 E, 2 S, 3 W) or place: existing world place
 const PROPS = [
   { id: 'flop', name: 'Old Quarter Flop', kind: 'safehouse', price: 2500, at: [1, 4, 1, 40], storage: 40, garage: 0, crew: 0, desc: 'A room over a laundromat. A bed, a lock and somewhere to stash things.' },
@@ -117,8 +117,8 @@ const PROPS = [
   { id: 'penthouse', name: 'Valen Tower Penthouse', kind: 'safehouse', price: 150000, place: 'tower', interior: 'penthouse', storage: 160, garage: 6, crew: 2, luxury: true, desc: 'The top of the tallest tower on the island. People notice who lives here.' },
   { id: 'qgarage', name: 'Quarter Garage Lock-ups', kind: 'garage', price: 8000, place: 'garageRoof', storage: 20, garage: 4, crew: 0, desc: 'Four lock-ups and a mechanic who doesn’t ask. Repairs, respray and tuning at cost.' },
   { id: 'docklock', name: 'Pier 9 Lock-up', kind: 'garage', price: 6000, at: [10, 9, 3, 30], storage: 60, garage: 2, crew: 0, desc: 'A rusted roll door near the water. Cheap, private and close to the boats.' },
-  { id: 'whse_w', name: 'Cannery Row Warehouse', kind: 'warehouse', price: 32000, at: [7, 10, 0, 40], storage: 600, garage: 1, crew: 2, desc: 'Bulk storage. Enough room to sit on product until the price is right.' },
-  { id: 'whse_d', name: 'Tidewater Shed 4', kind: 'warehouse', price: 48000, place: 'shed4', storage: 900, garage: 2, crew: 2, desc: 'A bonded shed on the docks. Shipments land on your doorstep.' },
+  { id: 'whse_w', name: 'Cannery Row Warehouse', kind: 'warehouse', price: 32000, at: [7, 10, 0, 40], storage: 600, garage: 1, crew: 15, desc: 'Bulk storage. Enough room to sit on product until the price is right.' },
+  { id: 'whse_d', name: 'Tidewater Shed 4', kind: 'warehouse', price: 48000, place: 'shed4', storage: 900, garage: 2, crew: 15, desc: 'A bonded shed on the docks. Shipments land on your doorstep.' },
   { id: 'pawn', name: 'Lucky’s Pawn', kind: 'business', price: 18000, at: [2, 6, 0, 30], income: 420, storage: 60, crew: 2, fence: true, desc: 'The Old Quarter’s fence. Buy it and every hot watch in the city comes through your door.' },
   { id: 'bar', name: 'The Rusty Anchor', kind: 'business', price: 24000, at: [11, 6, 3, 25], income: 560, storage: 40, crew: 2, recruit: true, desc: 'A dockside bar full of people looking for work. Good for recruiting.' },
   { id: 'diner', name: 'Rosie’s Diner', kind: 'business', price: 26000, at: [6, 1, 3, 40], income: 620, storage: 30, crew: 2, desc: 'Coffee, pie and a back booth for meetings.' },
@@ -241,6 +241,31 @@ const BIZ_INFL = 15, BIZ_EST_DAYS = 7, BIZ_EST_RAMP = 14;
 // owned property on a turf is local presence (§45.23): showdown strength 6 for one, diminishing to at most 12 however
 // many you own there, and your hold fades at PROP_PRESENCE_DECAY of the rate it would without anyone on the ground
 const PROP_PRESENCE = 6, PROP_PRESENCE_MAX = 12, PROP_PRESENCE_DECAY = 0.5;
+// ---- warehouses (§5-§8, Session 3): the empire's hub. 15 crew slots (up to 10 Enforcers, 4 Drivers, 1 Lieutenant);
+// four security categories, each bought up through four tiers; the warehouse's security level (1-5) is 1 + its
+// weakest category, so a level means every part of it is that good. The vault and interior tier sets how much Dirty
+// Cash the vault holds and how much product the floor takes.
+const WH_SLOTS = 15, WH_MAX = { enforcer: 10, driver: 4, lieutenant: 1 };
+const WH_CATS = {
+  perimeter: { name: 'Perimeter', tiers: ['Open lot', 'Chain-link fence', 'Tall fence and bollards', 'Anti-climb fencing and anti-ram barriers', 'Hardened wall-and-fence perimeter'] },
+  surveillance: { name: 'Surveillance', tiers: ['Weak lighting', 'Cameras and stronger lights', 'More cameras and floodlights', 'Dense cameras and a security room', 'Full coverage and a command room'] },
+  access: { name: 'Access control', tiers: ['Plain roll-up door', 'Basic gate', 'Motorised gate, controlled loading', 'Reinforced powered gate and guard booth', 'Massive gate, access posts, protected approach'] },
+  vault: { name: 'Vault and interior', tiers: ['Exposed storage', 'Lockable cages and a small safe', 'Product cage and a cash room', 'Proper vault, hardened storage, armory', 'Large vault, product vaults, ready room'] }
+};
+const WH_CAT_IDS = Object.keys(WH_CATS);
+const WH_TIER_COST = [0.15, 0.3, 0.6, 1.2]; // tier 1-4 price, × the warehouse's price, paid from Clean Bank
+const WH_LEVEL_NAME = ['Basic', 'Reinforced', 'Secured', 'Fortified', 'Maximum Security'];
+const WH_VAULT = [100000, 500000, 2500000, 10000000, 50000000]; // Dirty Cash the vault holds, by vault tier
+const WH_STORE_MUL = [1, 1.25, 1.5, 1.75, 2];                     // product storage, by vault tier
+// §6: at Maximum Security with at least 4 Enforcers and a Lieutenant, ordinary rival raids can't knock it off
+const WH_IMMUNE = { level: 5, enforcers: 4, lieutenants: 1 };
+// a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
+const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;
+// a warehouse with a Lieutenant reorders from a supplier when its sellable stock falls below this much space, a lot at a time
+const WH_REORDER = 60, WH_REORDER_LOT = 80;
+// route risk (§8): chance of a rival hijack for each stretch of the route, by who holds the turf; police risk is
+// separate (pressure and patrols)
+const ROUTE_RISK = { own: 0.002, friendly: 0.01, neutral: 0.03, rival: 0.07, hostile: 0.12 };
 // ---- v6: neighbourhoods give a home a little extra (stash safety, standing, recruiting) on top of the house itself
 const HOOD = {
   l: { name: 'Linden Hills', perk: 'Quiet streets: stashes here are raided 30% less', raid: 0.7 },
@@ -278,13 +303,13 @@ const CHOP_VALUE = { compact: 260, sedan: 420, taxi: 300, van: 480, pickup: 520,
   metro: 220, regent: 340, estate: 460, courier: 440, crest: 600, apex: 1400, hellion: 2300, tempest: 2000, revenant: 3000, kodiak: 3200, monarch: 3800, valkyr: 5600, obsidian: 6200 };
 const CREW_ROLES = {
   idle: { name: 'Unassigned', desc: 'Waiting for orders. Still on the payroll.' },
-  dealer: { name: 'Dealer', desc: 'Sells your stored product on a turf every day. Raises local heat.', turf: true },
-  enforcer: { name: 'Enforcer', desc: 'Holds a turf: grows your influence and defends it from rivals.', turf: true },
-  lieutenant: { name: 'Lieutenant', desc: 'Runs every turf you hold in a district. Needs Captain rank. Gains power over time.', zone: true, minRank: 3 },
+  dealer: { name: 'Dealer', desc: 'Sells product on a turf every day from the stock on the corner, which you or a Driver bring. Raises local heat.', turf: true },
+  enforcer: { name: 'Enforcer', desc: 'Holds a turf (grows your influence, defends it from rivals) or guards a warehouse.', turf: true, wh: true },
+  lieutenant: { name: 'Lieutenant', desc: 'Runs a warehouse and every turf you hold in its district (or a district on its own): automates supply runs and coordinates defense. Needs Captain rank. Gains power over time.', zone: true, wh: true, minRank: 3 },
   bodyguard: { name: 'Bodyguard', desc: 'Follows you and fights for you. Two at most.', max: 2 },
   manager: { name: 'Business manager', desc: 'Runs one of your businesses: more income, less suspicion.', biz: true },
   scout: { name: 'Scout', desc: 'Watches a district: warns of raids and reports rival moves.', zone: true },
-  driver: { name: 'Driver', desc: 'Transport and logistics. Moving product between your places arrives with the warehouse rebuild; for now a Driver gets your bodyguards around.' }
+  driver: { name: 'Driver', desc: 'Logistics, based at a warehouse: runs product from suppliers to the warehouse and from the warehouse to your Dealers. Only Drivers make deliveries.', wh: true }
 };
 const CREW_RANKS = ['Associate', 'Crew Member', 'Enforcer', 'Captain', 'Lieutenant'];
 const PROMO_COST = [0, 1500, 4000, 10000, 25000];

@@ -78,16 +78,18 @@ const crew = await ev(() => {
   uw.crew.refreshCandidates(true); const r = uw.crew.hire(0);
   const c = uw.S.crew[0]; const tgt = uw.T.findIndex((t, i) => uw.owner[i] === 'vipers');
   const ra = c ? uw.crew.assign(c.id, 'dealer', tgt) : 'none';
+  // a Dealer sells only what is on their corner (§5, §8): you hand it over there, or a Driver brings it
+  const corner = uw.whse.turfStock(tgt); for (const k in corner) delete corner[k]; window.__pv.Inv.add(corner, 'green', 30, 30 * 120);
   uw.S.storage.flop = { green: 30 };
-  const before = units(uw.S.storage.flop);
+  const before = units(corner), stash0 = units(uw.S.storage.flop);
   // pin randomness for this one day: stash robberies, skimming and busts are tested elsewhere
   const r0 = Math.random; Math.random = () => 0.99;
   try { uw.tickDay(); } finally { Math.random = r0; }
-  return { r, ra, role: c && c.role, before, after: units(uw.S.storage.flop), income: uw.S.lastLedger && uw.S.lastLedger.inc.dealers, wages: uw.S.lastLedger && uw.S.lastLedger.exp.wages, status: c && c.status };
-  function units(o) { let n = 0; for (const k in o) n += o[k]; return n; }
+  return { r, ra, role: c && c.role, before, after: units(corner), stashAfter: units(uw.S.storage.flop), stash0, income: uw.S.lastLedger && uw.S.lastLedger.inc.dealers, wages: uw.S.lastLedger && uw.S.lastLedger.exp.wages, status: c && c.status };
+  function units(o) { let n = 0; for (const k in o) if (k !== '$cb') n += o[k]; return n; }
 });
 check('hire a crew member', crew.r === '' && crew.role === 'dealer', JSON.stringify(crew));
-check('crew dealer sells stored product overnight', (crew.after < crew.before && crew.income > 0) || crew.status === 'jailed', JSON.stringify(crew));
+check('a crew dealer sells the stock on their corner overnight, and nothing from your stash', ((crew.after < crew.before && crew.income > 0) || crew.status === 'jailed') && crew.stashAfter === crew.stash0, JSON.stringify(crew));
 check('wages are paid', crew.wages > 0, JSON.stringify(crew));
 // ---------------------------------------------------------------- 7. gang fight on a rival corner
 const gangTurf = await ev(() => { const g = window.game, uw = g.uw; const i = uw.owner.findIndex((o, k) => o === 'vipers' && uw.T[k].zone === 'o'); const t = uw.T[i]; g.resetPlayerState(t.hang.x + 75, t.hang.z, 0); g.player.health = 100000; return i; });

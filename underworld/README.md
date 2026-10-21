@@ -37,6 +37,20 @@ still on the street. `MONEY_SOURCES` maps every source of income and every cost 
 shows cash on you and `BANK` beneath it. The save key is unchanged; schema 8 moves an older save's single balance
 into Clean Bank.
 
+## Warehouses and logistics (overhaul Session 3A)
+
+A warehouse is the empire's hub. Four security categories (Perimeter, Surveillance, Access control, Vault and
+interior) are bought up in four tiers from Clean Bank; the security level (1 Basic … 5 Maximum Security) is 1 + the
+weakest. The vault holds $100k of Dirty Cash at the start and $50M at the top tier; income that finds it full goes
+on to the Treasury, your home or you. It has 15 crew slots: up to 10 Enforcers, 4 Drivers and a Lieutenant, who runs
+the warehouse and its district. Dealers sell only what is on their corner: hand it over yourself at the turf's deal
+spot, or have a Driver run it. Only Drivers make deliveries, including supply runs that buy at a supplier with the
+vault's cash; route risk depends on who holds each stretch (own, friendly, neutral, rival, hostile), police risk
+separately. A warehouse's Lieutenant keeps its Dealers' corners stocked and reorders from suppliers by itself. At
+Maximum Security with 4 Enforcers and a Lieutenant, ordinary rival raids can't take it down. City Kingpin needs an
+operating warehouse. The property screen of a warehouse has Product, Weapons, Dirty Cash, Security, Crew and
+Logistics tabs. (The physical fences, gates and interior come in Session 3B.)
+
 ## The laundering fixer (overhaul Session 2.5)
 
 Dina Vance in the Old Quarter (map icon "L") washes Dirty Cash you carry into Clean Bank: 32% fee, the money lands
@@ -393,6 +407,7 @@ error, so a hidden network dependency fails the suite.
 node underworld/tests/build.mjs     # Node only: index.html matches what src/ builds, manifest complete, both module scripts parse
 node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
+node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
 node underworld/tests/carmoney.mjs   # car provenance: Dirty/Clean-bought resale, stolen cars, no resale above price, no laundering loop, save/reload
 node underworld/tests/fixer.mjs      # laundering fixer: fee, minimum, daily cap, delay, day-length pace, arrest in transit, save/reload, stolen cars
 node underworld/tests/progression.mjs # seven Ranks, Nobody -> Kingpin chain, money buys no power, turf only by showdown, schema 9

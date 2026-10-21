@@ -139,7 +139,8 @@ await ev(() => { const g = window.game; g.police.clear(); g.police.enabled = fal
 const crewSetup = await ev(() => {
   const g = window.game, uw = g.uw, S = uw.S;
   uw.crew.refreshCandidates(true); uw.crew.hire(0); uw.crew.refreshCandidates(true); uw.crew.hire(0);
-  const cs = uw.crew.active(); for (const c of cs) { c.loyalty = 80; c.traits = []; c.role = 'idle'; c.assign = null; }
+  // only Drivers make deliveries (§5, Session 3)
+  const cs = uw.crew.active(); for (const c of cs) { c.loyalty = 80; c.traits = []; c.role = 'driver'; c.assign = null; }
   S.storage.flop = {}; window.__pv.Inv.add(S.storage.flop, 'green', 40, 40 * 130);
   S.storage.linden = {};
   return cs.map(c => c.id);
@@ -183,7 +184,7 @@ check('a delivery report names runner, origin, destination, cargo, quantity, fee
 const outcomes = await ev(ids => {
   const g = window.game, uw = g.uw, S = uw.S, R = uw.runs, out = {};
   for (const kind of ['partial', 'robbed', 'seized', 'abandoned']) {
-    const c = uw.crew.find(ids[1]); c.status = 'active'; c.loyalty = 80;
+    const c = uw.crew.find(ids[1]); c.status = 'active'; c.role = 'driver'; c.loyalty = 80;
     window.__pv.Inv.add(S.storage.flop, 'green', 10, 1300);
     const p0 = S.pressure, before = { flop: S.storage.flop.green, linden: S.storage.linden.green | 0 };
     R.dispatch(c.id, 'flop', 'linden', 'green', 10);
@@ -201,20 +202,33 @@ const betr = await ev(ids => {
   const uw = window.game.uw, S = uw.S, R = uw.runs, c = uw.crew.find(ids[1]); const count = { hi: 0, lo: 0 };
   const r0 = Math.random;
   for (const [lv, key] of [[85, 'hi'], [15, 'lo']]) for (let k = 0; k < 120; k++) {
-    c.status = 'active'; c.loyalty = lv; c.traits = []; window.__pv.Inv.clear(S.storage.linden);
+    c.status = 'active'; c.role = 'driver'; c.loyalty = lv; c.traits = []; window.__pv.Inv.clear(S.storage.linden);
     window.__pv.Inv.add(S.storage.flop, 'green', 2, 260); R.dispatch(c.id, 'flop', 'linden', 'green', 2);
     const r = S.runs[S.runs.length - 1]; const rep = R.resolve(r, 0.999); if (rep.outcome === 'betrayal') count[key]++;
   }
-  c.status = 'active'; c.loyalty = 80;
+  c.status = 'active'; c.role = 'driver'; c.loyalty = 80;
   return count;
 }, crewSetup);
 check('betrayal never happens with a loyal runner, but does with a disloyal one', betr.hi === 0 && betr.lo > 5, JSON.stringify(betr));
 // negative outcomes are not over-triggered: an elite, loyal runner on your own turf mostly succeeds
-const rate = await ev(ids => { const uw = window.game.uw, S = uw.S, R = uw.runs, c = uw.crew.find(ids[0]); let ok = 0, n = 0; for (let k = 0; k < 200; k++) { c.skill = 92; c.loyalty = 90; c.status = 'active'; window.__pv.Inv.clear(S.storage.linden); window.__pv.Inv.add(S.storage.flop, 'green', 2, 260); if (R.dispatch(c.id, 'flop', 'linden', 'green', 2)) continue; n++; const r = S.runs[S.runs.length - 1]; if (R.resolve(r).outcome === 'success') ok++; } return n ? ok / n : 0; }, crewSetup);
-check('an elite, loyal runner gets through most of the time', rate > 0.7, rate.toFixed(2));
+// an elite, loyal Driver on your own ground: the route's turfs are made yours for the test (§8: own turf has almost
+// no hijack risk), then given back; the observed rate should also match the chance the run was quoted
+const rate = await ev(ids => {
+  const uw = window.game.uw, S = uw.S, R = uw.runs, c = uw.crew.find(ids[0]); let ok = 0, n = 0, quoted = 0;
+  const keep = S.turfs.map(t => t.own); for (const t of S.turfs) t.own = 'pc'; uw.recompute();
+  for (let k = 0; k < 300; k++) {
+    c.skill = 92; c.loyalty = 90; c.status = 'active'; c.role = 'driver';
+    window.__pv.Inv.clear(S.storage.linden); window.__pv.Inv.add(S.storage.flop, 'green', 2, 260);
+    if (R.dispatch(c.id, 'flop', 'linden', 'green', 2)) continue;
+    n++; const r = S.runs[S.runs.length - 1]; quoted += r.chance; if (R.resolve(r).outcome === 'success') ok++;
+  }
+  S.turfs.forEach((t, i) => { t.own = keep[i]; }); uw.recompute();
+  return { rate: n ? ok / n : 0, quoted: n ? quoted / n : 0, n };
+}, crewSetup);
+check('an elite, loyal Driver on your own turf gets through almost every time, at the chance quoted', rate.n >= 250 && rate.rate > 0.8 && Math.abs(rate.rate - rate.quoted) < 0.07, JSON.stringify(rate));
 // destination capacity
 const cap = await ev(ids => {
-  const g = window.game, uw = g.uw, S = uw.S, R = uw.runs, c = uw.crew.find(ids[0]); c.status = 'active';
+  const g = window.game, uw = g.uw, S = uw.S, R = uw.runs, c = uw.crew.find(ids[0]); c.status = 'active'; c.role = 'driver';
   const d = window.__pv.PROP_BY_ID.flop; S.storage.linden = {}; window.__pv.Inv.add(S.storage.linden, 'green', 30, 0);
   // flop has 40 space; fill it to 35, then try to send 10 lots (10 space) into it: refused
   S.storage.flop = {}; window.__pv.Inv.add(S.storage.flop, 'smokes', 35, 0);

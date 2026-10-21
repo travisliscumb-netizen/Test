@@ -21,7 +21,7 @@ class RoyaltySystem {
     const wealth = ZONE_WEALTH[t.zone] || 1;
     const activity = clamp(0.25 + rival / 60 + biz * 0.2, 0.25, 2.2);
     const grip = clamp((inf.pc || 0) / 80, 0.3, 1.2);
-    const enforce = 1 + (uw.crew.onTurf(i).length ? 0.35 : 0) + (uw.crew.active().some(c => c.role === 'lieutenant' && c.assign === t.zone) ? 0.2 : 0);
+    const enforce = 1 + (uw.crew.onTurf(i).length ? 0.35 : 0) + (uw.crew.active().some(c => uw.crew.ltZone(c) === t.zone) ? 0.2 : 0);
     return Math.round(260 * wealth * activity * grip * enforce / 10) * 10;
   }
   // how likely a payer is to pay in full and on time
