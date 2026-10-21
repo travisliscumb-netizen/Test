@@ -17,7 +17,7 @@ Final production should use a new clean save generation/schema. Legacy saves may
 
 ## 1. CORE DESIGN
 
-> Amended by §45.7 (business influence).
+> Amended by §45.7 (business influence) and §45.23 (Rank gates, money and crew loyalty, non-destructive downranking).
 
 
 Primary progression loop:
@@ -105,7 +105,7 @@ Most products should become obtainable by Known Operator in small, expensive, ri
 
 ## 4. TURF / TERRITORY
 
-> Amended by §45.13 (no silent flips, rivals included).
+> Amended by §45.13 (no silent flips, rivals included) and §45.23 (property presence capped).
 
 
 Use the full Map in Turf/Territory mode.
@@ -297,6 +297,8 @@ Messages deep-link to the threatened asset.
 ---
 
 ## 11. CREW / CONTACTS
+
+> Amended by §45.23 (money buys capped, temporary morale, never betrayal-proof loyalty).
 
 Crew roles include Dealer, Enforcer, Driver, Lieutenant, Bodyguard, Business Manager, Scout and Unassigned.
 Crew can be paid, hurt, arrested, loyal/disloyal and delegated meaningful work.
@@ -1145,3 +1147,21 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       contraband from inmates, jail gambling). Outside Dirty Cash reaches the jail only through a plausible
       channel: a crew member, contact, guard, inmate favour or smuggling route; with no such channel, outside
       money is unavailable.
+23. **Session 2 rulings (DC-25 to DC-28).**
+    - **Rank gates (DC-25, approved as implemented).** Underworld Power needs one Lieutenant running a district and
+      City Kingpin two; the influence marks stay 450 / 800. Do not lower them before the Session 13 economy pass,
+      when influence, business, turf and warehouse systems are all in place.
+    - **Money and crew loyalty (DC-26, revised).** Money may affect morale/satisfaction but may not buy permanent
+      loyalty or remove betrayal risk. On-time wages prevent loyalty decay; raises may give a modest long-term
+      loyalty benefit; bonuses give a temporary morale/loyalty boost; repeated money-based boosts have diminishing
+      returns and a ceiling. Traits, history, treatment, promotions, fear/respect, mission outcomes and betrayal
+      pressure still matter. No amount of bonus-spamming may make every crew member effectively betrayal-proof.
+    - **Property presence on a turf (DC-27, approved with cap).** Owning property on a turf may modestly stabilize
+      the player's hold there as local presence. It never grants ownership or Influence, never replaces Enforcers or
+      crew, and several properties on one turf have a capped, diminishing effect: property stacking cannot make a
+      turf invincible.
+    - **Downranking (DC-28, approved with a non-destructive rule).** Rank reflects current power and may fall when
+      turf, Lieutenants or other required conditions are lost. Falling never deletes or disables what was built:
+      owned properties, vehicles, warehouses, upgrades and businesses remain, Lieutenants and crew assignments
+      remain, and automation keeps running. The current Rank may restrict new expansion, promotions and unlocks
+      until it is regained, but must not dismantle earlier systems or create a downward spiral.

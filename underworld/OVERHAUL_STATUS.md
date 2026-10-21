@@ -12,9 +12,59 @@ The mapping stays exact until a session changes the code above that line; after 
 ## Current phase
 
 - Session: **2 — Rank / Reputation / core progression** (handoff phase 3), following §1, §4, §18, §31, §45.7,
-  §45.12, §45.13.
-- Commit/base revision: `804850c` (Session 1 follow-up) → the Session 2 commit on `claude/practical-lamport-zld81y`.
+  §45.12, §45.13, and the Session 2 follow-up for the DC-25 to DC-28 rulings (§45.23).
+- Commit/base revision: `804850c` (Session 1 follow-up) → `4e707fb` (Session 2) → the Session 2 follow-up commit
+  on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-21
+
+## Session 2 follow-up (§45.23: DC-25 to DC-28 rulings, and the ledger flake)
+
+- **The $167 ledger flake: explained and fixed (test contamination by a designed game event).** Instrumented runs
+  (every ledger call wrapped and logged with its call stack) reproduced it in 7 of 18 runs. Each time the extra cash
+  was a `glovebox` earn from `Underworld.lootCar` ← `Game.completeEnter`: the test spawns a parked sedan and gets
+  in, and entering a stranger's parked car searches its glovebox, which pays $15–110 × district wealth 32% of the
+  time ($45, $72, $100, $130, $175 logged). Every other positive change in those runs was a deliberate test call.
+  The same game code and the same test step were in the Session 1 commit, so this was a latent defect in a test I
+  wrote in Session 1 (its passes were luck), not new money creation. Fix: the step marks the glovebox searched and
+  now records every ledger event during the step, asserting the $5,000 move is the only one. Verified: the fixed
+  suite passed 6 of 6 runs (53 / 53); a variant with the glovebox left unsearched fails the new check by name in 2
+  of 3 (`glovebox` +$241, +$84). No money is created outside the ledger.
+- **Money and crew loyalty (DC-26, revised).** Money now buys **morale**, which is temporary and capped; it never
+  buys loyalty out of betrayal:
+  - a bonus settles back pay and adds morale: 8 for the first, then 8 / (1 + recent bonuses), the count fading 15%
+    a day, never above `MORALE_CAP` 10; morale fades 1.5 a day;
+  - a raise adds 5 lasting loyalty, at most 10 over a member's career;
+  - diner, coffee shop, grocery and convenience-store perks put a capped floor under morale (perk × 10, at most 10)
+    instead of adding loyalty every day;
+  - wages paid on time stop decay; loyalty still grows with time together and the respect of the peak Rank, and
+    traits, wins, fear, promotions, rival offers and unpaid days move it as before;
+  - every betrayal check reads loyalty + morale, so money shifts the thresholds by at most 10: a disloyal Lieutenant
+    with full morale still stages a coup (tested). The crew card shows morale.
+- **Property presence capped (DC-27).** Showdown strength from owned property on a turf is 6 for one, 9 for two,
+  approaching and never above 12 (`PropertyManager.presenceDefense`), where it was +6 per property without limit.
+  Property no longer stops your hold fading: with no crew on the turf it fades at half the rate. It never grants
+  ownership or influence.
+- **Non-destructive downranking (DC-28).** Rank stays current power. Losing Rank deletes or disables nothing (no code
+  did; now tested: properties, cars, upgrades, crew roles and assignments and paid officers all survive losing every
+  turf). The two effects that could feed a spiral now read the peak Rank (`uw.rankMax`): crew loyalty growth and
+  fear, and witnesses' reluctance on turfs you still hold. Expansion waits for the current Rank (crew cap and
+  candidates, luxury purchases, approaching new officers).
+- **DC-25 approved as implemented** (Lieutenant gates; 450 / 800 kept until Session 13).
+- Tests: `progression` 33 checks (+11: bonuses diminish, cap and never touch loyalty; betrayal still possible at full
+  morale; raises capped; morale fades and paid wages keep loyalty; the business morale floor; presence 0/6/9/… ≤ 12;
+  property halves decay; a downrank lowers Rank and keeps the peak; nothing dismantled; loyalty grows at the peak
+  rate; luxury refused); `ledger` 53 (+1: the car step's only money event is the move).
+- `kingpin` now compares three seeds' totals. After the presence cap, its single seed (12345) gave 45 kingpin wars
+  against 96 ordinary (0.47, over the 0.45 bar). Six further seeds on each build showed the bar sits inside the seed
+  spread on the Session 2 build too (0.31-0.45) and that the follow-up deters slightly more, not less (mean 0.36
+  against 0.40). Over three seeds: 138 / 328 = 0.42. The other kingpin checks hold on every seed.
+- Re-run on the follow-up build: progression 33 / 33, ledger 53 / 53, kingpin 6 / 6, inventory 58, session 35,
+  business 40, gangs 23, homes 26, property 33, prison 48, phoneapps 19, tutorial 13, dealers 34, smoke 16, money 10,
+  static-money 8, build 5.
+- Files: `390-underworld-data.js` (morale and presence constants, perk texts), `460-underworld-factions.js`,
+  `480-underworld-crew.js`, `490-underworld-property.js`, `510-underworld-police-pressure.js`,
+  `540-underworld-empire-ui.js`; `tests/progression.mjs`, `tests/ledger.mjs`, `tests/kingpin.mjs`; `README.md`; handoff §45.23
+  (and a §11 note).
 
 ## Completed this session (2)
 
@@ -133,20 +183,13 @@ Screenshot scripts: `frontshots`, `carshots` and `contact` completed in the para
 
 - **Influence marks are steep without purchased influence** (DC-25): 800 for Kingpin now needs infamy from bosses
   or established businesses on top of 16 turfs. Re-tune in Session 13.
-- **Money still buys crew loyalty** (DC-26): bonuses, raises and the loyalty business perk. Not changed; needs a
-  ruling before Session 3.
 - **The showdown is the existing war machinery.** It is explicit and announced, but not yet a staged encounter;
   Session 4 (gang wars / threats) deepens it, including the jail-time Critical messages (§45.16).
-- **Intermittent `ledger` flake:** in one of three runs on the Session 2 build, $167 of Dirty Cash appeared on the
-  player between the "across town" step and the car step, failing the four car/arrest checks that follow (they
-  expect exactly $15,000). A run with a ledger-event log attached passed, so the source is not identified yet; a
-  ground cash pickup (a gang drop near the teleport spot) fits the amount. It did not show in the Session 1 runs. Next session:
-  attach the event log to that step permanently and make the steps independent of stray pickups.
+- The intermittent `ledger` flake is explained and fixed (see the follow-up above).
 
 ## Exact next recommended task
 
-**Session 2.5 — the early laundering fixer** (§45.22, `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`). Before
-Session 3, rule on DC-25 (Lieutenant gates, influence marks) and DC-26 (money and crew loyalty).
+**Session 2.5 — the early laundering fixer** (§45.22, `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`).
 
 ## Working tree (2)
 
@@ -1071,7 +1114,7 @@ approved. Hospital bill: revised to max($1,000, 10% of Clean Bank), capped at $2
 outside stash: rejected as free access; the commissary pays ordinary jail spending, and outside Dirty Cash comes
 in only through a plausible channel (implemented: a crew courier; more channels in Session 8).
 
-### DC-25 · Rank gates after purchased influence was removed — RECOMMENDED (implemented as proposed; needs a ruling)
+### DC-25 · Rank gates after purchased influence was removed — APPROVED AS IMPLEMENTED (§45.23)
 
 1. **Current specification:** §1 seven Ranks, money buys none of them; §31 Kingpin needs turf, organization,
    infrastructure and influence/control; §45.7 businesses add influence only once established. The thresholds are
@@ -1093,7 +1136,7 @@ in only through a plausible channel (implemented: a crew courier; more channels 
    Alternative: lower it now (for example 450 → 380, 800 → 680) at the cost of a second change later.
 7. **Severity:** RECOMMENDED. **Blocks:** nothing; confirm the Lieutenant conditions before Session 3.
 
-### DC-26 · Money still buys crew loyalty — IMPORTANT (contradiction with §1; not changed, needs a ruling)
+### DC-26 · Money still buys crew loyalty — REVISED BY OWNER (§45.23; implemented in the Session 2 follow-up)
 
 1. **Current specification:** §1 "Money does not buy … crew loyalty".
 2. **Problem observed:** a crew Bonus (3 days' pay, Dirty Cash) gives +12 loyalty at any time; a raise gives +15;
@@ -1112,7 +1155,7 @@ in only through a plausible channel (implemented: a crew courier; more channels 
    feel, so it is not made silently.
 7. **Severity:** IMPORTANT. **Blocks:** Session 3 (crew assignment and Lieutenant automation build on loyalty).
 
-### DC-27 · Owned property steadies a turf hold — OPTIONAL (kept; for review)
+### DC-27 · Owned property steadies a turf hold — APPROVED WITH CAP (§45.23; implemented in the Session 2 follow-up)
 
 1. **Current specification:** §1 money does not buy turf.
 2. **Problem observed:** owning a property on a turf stops your influence there decaying and adds +6 to your side
@@ -1125,7 +1168,7 @@ in only through a plausible channel (implemented: a crew courier; more channels 
 6. **Tradeoffs / risks:** a very rich player can buy footholds across the map.
 7. **Severity:** OPTIONAL. **Blocks:** nothing.
 
-### DC-28 · Can Rank fall? — OPTIONAL (implemented as "Rank is current power")
+### DC-28 · Can Rank fall? — APPROVED WITH NON-DESTRUCTIVE DOWNRANK RULE (§45.23; implemented in the Session 2 follow-up)
 
 1. **Current specification:** §1 Rank = how powerful you are; §18 death never removes rank progression.
 2. **Problem observed:** the spec doesn't say whether losing turf or Lieutenants lowers Rank.
@@ -1562,3 +1605,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | 8 | 1 | `money` → `wallet` (Clean Bank, medical debt, Dirty Cash by place, stunt cap counter); pre-merge migration of a dev save's balance into Clean Bank; `uw.jail.commissary`; `uw.st.seizedCash`; `uw.st.mugs` no longer created |
 | 8 | 1 follow-up | `wallet.treasury` (warehouse id or null; sanitized to an owned warehouse); medical debt cap follows `CONFIG.hospital.max` ($25,000) |
 | 9 | 2 | `uw.turfs[i].own` (authoritative owner: `'pc'`, a faction id or null; derived once from influence for older saves) and `uw.turfs[i].offer` (`{ fid, until }` for a ceded turf); `uw.stageMax` → `uw.rankMax`; `upgrades` keeps only `stamina` and `health`, removed levels refunded to Clean Bank; turf wars may have `a: 'pc'` (a showdown the player called) |
+| 9 | 2 follow-up | crew members gain `morale` (0-10), `boosts` (recent bonuses, fading) and `raiseLoyal` (0-10); sanitized with defaults, no version bump |

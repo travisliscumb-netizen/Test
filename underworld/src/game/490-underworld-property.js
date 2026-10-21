@@ -8,6 +8,9 @@ class PropertyManager {
   get S() { return this.uw.S; }
   owned(id) { const o = this.S.props[id]; return !!(o && o.owned); }
   ownedList() { return PROPS.filter(p => this.owned(p.id)); }
+  // what owned property on a turf adds to your side of a showdown there: 6 for the first, half as much again for each
+  // further one, never more than PROP_PRESENCE_MAX (§45.23: stacking property can't make a turf invincible)
+  presenceDefense(i) { let n = 0; for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) n++; } return n ? Math.min(PROP_PRESENCE_MAX, PROP_PRESENCE * (2 - Math.pow(0.5, n - 1))) : 0; }
   presence(i) { for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) return true; } return false; }
   // stash space: a storage business grows with its level; a home in the Docklands holds a quarter more
   storageCap(id) {
@@ -174,7 +177,10 @@ class PropertyManager {
     }
     // laundering and quiet funerals take the heat down
     S.pressure = clamp(S.pressure - this.perk('launder') - this.perk('heat'), 0, 100);
-    if (this.perk('loyalty') > 0) for (const c of uw.crew.active()) c.loyalty = clamp(c.loyalty + this.perk('loyalty'), 0, 100);
+    // a decent meal and a place to sit keep the crew's morale up: a floor under it, capped like any money-bought
+    // boost (§45.23), never loyalty itself
+    const floor = Math.min(MORALE_CAP, this.perk('loyalty') * 10);
+    if (floor > 0) for (const c of uw.crew.active()) c.morale = Math.max(c.morale, floor);
     this.policeRaids();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);
   }

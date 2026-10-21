@@ -6,10 +6,12 @@ import { launch, open, check, startNew, finish } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
-const res = await page.evaluate(() => {
+// one seeded simulation per call; the checks use three seeds' totals, because a single seed's war count sits
+// within a few wars of the threshold either way (the spread between seeds is about ±15%)
+const once = sd => page.evaluate(seed0 => {
   const g = window.game, uw = g.uw, S = uw.S;
   g.events.cool = 1e9;
-  let seed = 12345; const R0 = Math.random; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  let seed = seed0; const R0 = Math.random; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   // the same 18 turfs in both runs: the middle of the map
   const mine = uw.T.map(t => t.i).filter(i => { const t = uw.T[i]; const cx = t.deal.x / 80, cz = t.deal.z / 80; return cx > 1 && cx < 11 && cz > 1 && cz < 11; }).slice(0, 24);
   const snap = JSON.stringify({ turfs: S.turfs, factions: S.factions, infamy: S.infamy, props: S.props });
@@ -48,9 +50,18 @@ const res = await page.evaluate(() => {
   const strong = run(0, 120), king = run(400, 120);
   Math.random = R0;
   return { strong, king, mine: mine.length };
-});
+}, sd);
+const runs = [];
+for (const sd of [12345, 101, 202]) { await page.evaluate(() => { const S = window.game.uw.S; for (const T of S.turfs) T.war = null; }); runs.push(await once(sd)); }
+const sum = (side, k) => runs.reduce((a, r) => a + r[side][k], 0);
+const res = {
+  mine: Math.min(...runs.map(r => r.mine)), seeds: runs.length,
+  strong: { wars: sum('strong', 'wars'), kingpin: runs.some(r => r.strong.kingpin), compAvg: +(runs.reduce((a, r) => a + r.strong.compAvg, 0) / runs.length).toFixed(2), refused: sum('strong', 'refused') },
+  king: { wars: sum('king', 'wars'), kingpin: runs.every(r => r.king.kingpin), over: sum('king', 'over'), rmax: Math.max(...runs.map(r => r.king.rmax)), compMin: Math.min(...runs.map(r => r.king.compMin)), refused: sum('king', 'refused'), paid: sum('king', 'paid') },
+  perSeed: runs.map(r => [r.strong.wars, r.king.wars])
+};
 check('the comparison is fair: same turfs, one ordinary boss and one kingpin', res.mine >= 20 && !res.strong.kingpin && res.king.kingpin, JSON.stringify(res));
-check('as kingpin, rival crews start far fewer wars on your turf (well under half as many)', res.strong.wars >= 10 && res.king.wars <= res.strong.wars * 0.45, JSON.stringify({ ordinary: res.strong.wars, kingpin: res.king.wars }));
+check('as kingpin, rival crews start far fewer wars on your turf (well under half as many, over three seeds)', res.strong.wars >= 30 && res.king.wars <= res.strong.wars * 0.45, JSON.stringify({ ordinary: res.strong.wars, kingpin: res.king.wars, perSeed: res.perSeed }));
 check('a crew the kingpin outweighs 2.5 to 1 never starts a war with him (no suicidal challenges)', res.king.over === 0, JSON.stringify({ over: res.king.over, ratioOfAttackers: res.king.rmax }));
 check('rivals doing business on a kingpin’s turf pay their cut (compliance ≥ 88%, refusals rare)', res.king.compMin >= 0.88 && res.king.refused <= res.king.paid * 0.12, JSON.stringify(res.king));
 check('lower down the ladder they still test you (it is not free money)', res.strong.compAvg < 0.85 && res.strong.refused > 0, JSON.stringify(res.strong));

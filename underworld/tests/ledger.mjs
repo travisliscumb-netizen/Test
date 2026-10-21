@@ -93,11 +93,18 @@ const far = await ev(() => { const g = window.game, uw = g.uw, M = g.money; g.re
 check('across town the stash is out of reach: no transfer', far.moved === 0 && far.at === 30000, JSON.stringify(far));
 
 // ---------------------------------------------------------------- 6. a car's trunk, then an arrest in that car
-const car = await ev(() => { const g = window.game, uw = g.uw, M = g.money, p = g.player;
-  const v = g.vehicles.spawn('sedan', p.pos.x + 2.5, p.pos.z, 0, { parked: true }); v.touched = true; g.completeEnter(v);
+// every ledger event in this step is recorded: the only one may be the move. (Entering a stranger's parked car
+// searches its glovebox, which pays 'glovebox' cash 32% of the time; until Session 2 this step didn't account for it
+// and failed about one run in three. The glovebox is marked searched: this step is about cash riding in a car.)
+const car = await ev(() => { const g = window.game, uw = g.uw, M = g.money, p = g.player, log = [];
+  const v = g.vehicles.spawn('sedan', p.pos.x + 2.5, p.pos.z, 0, { parked: true }); v.touched = true; v.looted = true;
+  const off = e => log.push({ src: e.src, d: e.d, cur: e.cur }); M.on(off);
+  g.completeEnter(v);
   const moved = uw.transferCash('inv', 'veh', 5000);
-  return { inCar: p.state === 'vehicle', moved, car: M.carCash(v), me: M.onMe }; });
+  M.listeners.splice(M.listeners.indexOf(off), 1);
+  return { inCar: p.state === 'vehicle', moved, car: M.carCash(v), me: M.onMe, log }; });
 check('cash can ride in a car (a stolen one keeps it on the car itself)', car.inCar && car.moved === 5000 && car.car === 5000 && car.me === 15000, JSON.stringify(car));
+check('getting in and moving the cash is the only money event (nothing else pays or charges)', car.log.length === 1 && car.log[0].src === 'move' && car.log[0].d === -5000, JSON.stringify(car.log));
 const pre = await W();
 await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.onBusted(); });
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });

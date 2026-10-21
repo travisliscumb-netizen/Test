@@ -51,6 +51,11 @@ into Clean Bank.
   (40 influence and 8 more than the owner; 32 on neutral ground), then **Take Turf** on the Turf map card: that calls
   a showdown, fought live if you are there, otherwise by your people on the turf. Rivals change hands the same way
   (wars). A rival that cedes a turf only offers it; a betraying Lieutenant starts showdowns rather than flipping turf.
+- **Crew and money:** a bonus buys morale (8, then less for each recent bonus, at most 10, fading 1.5 a day); a raise
+  adds a little lasting loyalty (at most 10 per member); diners and coffee shops keep a capped floor under morale.
+  Betrayal reads loyalty + morale, so money never makes the crew betrayal-proof.
+- Owned property on a turf adds to a showdown there (6, 9, … never more than 12) and halves how fast your hold fades
+  without crew; it never grants ownership or influence. Losing Rank dismantles nothing you built.
 - Personal upgrades are Stamina and Health only. Schema 9 refunds a development save's Handling, Low Profile and
   Body Armor levels to Clean Bank and derives each turf's owner once from its saved influence.
 

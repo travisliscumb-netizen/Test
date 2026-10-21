@@ -20,7 +20,7 @@ class FactionSim {
       if ((c.role === 'enforcer' || c.role === 'dealer') && c.assign === i) d += c.role === 'enforcer' ? 14 + c.skill / 6 : 5;
       if (c.role === 'lieutenant' && c.assign === t.zone) d += 10 + c.skill / 10;
     }
-    for (const id in S.props) if (S.props[id].owned) { const L = uw.loc('prop', id); if (L && turfAt(L.x, L.z) === i) d += 6; }
+    d += uw.props.presenceDefense(i);
     if (dist2(g.player.pos.x, g.player.pos.z, t.cx, t.cz) < 110 * 110 && !g.player.interior) d += 30;
     return d;
   }
@@ -45,8 +45,9 @@ class FactionSim {
         else T.inf[k] = Math.max(0, T.inf[k] - 0.12 * h);
         if (T.inf[k] < 0.05) delete T.inf[k];
       }
-      // the player's hold fades without people on the ground
-      if (T.inf.pc) { if (!uw.crew.presence(i) && !uw.props.presence(i)) { T.inf.pc = Math.max(0, T.inf.pc - 0.1 * h); if (T.inf.pc < 0.05) delete T.inf.pc; } }
+      // the player's hold fades without people on the ground; property you own there only slows it (§45.23: a
+      // building is presence, not a crew)
+      if (T.inf.pc && !uw.crew.presence(i)) { T.inf.pc = Math.max(0, T.inf.pc - 0.1 * h * (uw.props.presence(i) ? PROP_PRESENCE_DECAY : 1)); if (T.inf.pc < 0.05) delete T.inf.pc; }
       T.police = clamp(T.police - 0.18 * h, 0, 100);
       if (T.war) this.warStep(i, h);
     }

@@ -46412,11 +46412,11 @@ const BIZ_CATS = {
   barber: { name: 'Barber shop', icon: '💈', col: '#ff8a3d', perk: 'intel', lv: [0.08, 0.15, 0.24], inc: [1, 1.5, 2.1], up: ['A back room where men talk', 'Half the precinct gets a shave here'], benefit: v => `${Math.round(v * 100)}% better chance of a raid tip-off` },
   salon: { name: 'Hair salon', icon: '✂', col: '#ff7ab8', perk: 'intel', lv: [0.08, 0.15, 0.24], inc: [1, 1.55, 2.2], up: ['Spa chairs and the gossip that comes with them', 'The salon the wives of the city council use'], benefit: v => `${Math.round(v * 100)}% better chance of a raid tip-off` },
   gym: { name: 'Gym', icon: '🏋', col: '#7fe08f', perk: 'stamina', lv: [0.1, 0.2, 0.3], inc: [1, 1.5, 2.0], up: ['A boxing ring and coaches', 'A fight gym with a name: your crew trains here'], benefit: v => `you sprint ${Math.round(v * 100)}% longer; +1 crew room per level` },
-  convenience: { name: 'Convenience store', icon: '🏪', col: '#46d4c4', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.4, 1.85], up: ['Open all night, lottery counter', 'A second shop front and a delivery van'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
-  grocery: { name: 'Grocery store', icon: '🥬', col: '#8fe39b', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.45, 1.95], up: ['A deli counter and a bakery', 'Supplying half the restaurants in the district'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
+  convenience: { name: 'Convenience store', icon: '🏪', col: '#46d4c4', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.4, 1.85], up: ['Open all night, lottery counter', 'A second shop front and a delivery van'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
+  grocery: { name: 'Grocery store', icon: '🥬', col: '#8fe39b', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.45, 1.95], up: ['A deli counter and a bakery', 'Supplying half the restaurants in the district'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
   pharmacy: { name: 'Pharmacy', icon: '✚', col: '#7fe08f', perk: 'medic', lv: [0.25, 0.45, 0.65], inc: [1, 1.45, 2.0], up: ['A clinic room with a nurse', 'A doctor who doesn’t write anything down'], benefit: v => `hospital bills ${Math.round(v * 100)}% lower; you heal faster` },
-  coffee: { name: 'Coffee shop', icon: '☕', col: '#c9a46b', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.55, 2.2], up: ['Roasting on site, queues out the door', 'Three more branches and a back room for meetings'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
-  diner: { name: 'Diner', icon: '🍳', col: '#ffb547', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.5, 2.0], up: ['Open 24 hours, booths in the back', 'A diner every cop and crook in town eats at'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
+  coffee: { name: 'Coffee shop', icon: '☕', col: '#c9a46b', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.55, 2.2], up: ['Roasting on site, queues out the door', 'Three more branches and a back room for meetings'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
+  diner: { name: 'Diner', icon: '🍳', col: '#ffb547', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.5, 2.0], up: ['Open 24 hours, booths in the back', 'A diner every cop and crook in town eats at'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
   pizza: { name: 'Pizzeria', icon: '🍕', col: '#ff4d5e', perk: 'delivery', lv: [0.04, 0.08, 0.12], inc: [1, 1.5, 2.1], up: ['A delivery fleet of scooters', 'Delivery drivers who know every back street'], benefit: v => `crew deliveries ${Math.round(v * 100)}% more likely to arrive` },
   restaurant: { name: 'Restaurant', icon: '🍽', col: '#d8a227', perk: 'infl', lv: [5, 12, 22], inc: [1, 1.6, 2.4], up: ['A chef with a reputation and a wine list', 'The private dining room where deals get made'], benefit: v => `+${v} influence (people come to you)` },
   bar: { name: 'Bar', icon: '🍺', col: '#ffb547', perk: 'recruit', lv: [1, 2, 3], inc: [1, 1.5, 2.1], up: ['A pool room and a back door', 'A live music night that pulls the whole district'], benefit: v => `${v} more recruit${v > 1 ? 's' : ''} on offer` },
@@ -46512,6 +46512,9 @@ const BIZ_UPKEEP = [0.18, 0.24, 0.3];
 // §45.7: buying a business buys no influence. It starts to count after BIZ_EST_DAYS world days of operation and
 // reaches its full weight (BIZ_INFL plus its own prestige, def.infl) over the next BIZ_EST_RAMP days
 const BIZ_INFL = 15, BIZ_EST_DAYS = 7, BIZ_EST_RAMP = 14;
+// owned property on a turf is local presence (§45.23): showdown strength 6 for one, diminishing to at most 12 however
+// many you own there, and your hold fades at PROP_PRESENCE_DECAY of the rate it would without anyone on the ground
+const PROP_PRESENCE = 6, PROP_PRESENCE_MAX = 12, PROP_PRESENCE_DECAY = 0.5;
 // ---- v6: neighbourhoods give a home a little extra (stash safety, standing, recruiting) on top of the house itself
 const HOOD = {
   l: { name: 'Linden Hills', perk: 'Quiet streets: stashes here are raided 30% less', raid: 0.7 },
@@ -46551,6 +46554,10 @@ const CREW_ROLES = {
 };
 const CREW_RANKS = ['Associate', 'Crew Member', 'Enforcer', 'Captain', 'Lieutenant'];
 const PROMO_COST = [0, 1500, 4000, 10000, 25000];
+// money and crew loyalty (§45.23): money buys morale, which is temporary and capped, and never makes anyone
+// betrayal-proof. Wages paid on time stop loyalty decaying; a bonus adds morale (less for each recent one); a raise
+// adds a little lasting loyalty, at most RAISE_LOYALTY_CAP over a career. Disloyalty reads loyalty + morale.
+const MORALE_CAP = 10, MORALE_DECAY = 1.5, BONUS_MORALE = 8, BOOST_FADE = 0.85, RAISE_LOYALTY = 5, RAISE_LOYALTY_CAP = 10;
 const TRAITS = {
   loyal: { name: 'Loyal', desc: 'Slow to turn, whatever happens.' },
   greedy: { name: 'Greedy', desc: 'Wants more money. Skims when unhappy.' },
@@ -48003,7 +48010,7 @@ class FactionSim {
       if ((c.role === 'enforcer' || c.role === 'dealer') && c.assign === i) d += c.role === 'enforcer' ? 14 + c.skill / 6 : 5;
       if (c.role === 'lieutenant' && c.assign === t.zone) d += 10 + c.skill / 10;
     }
-    for (const id in S.props) if (S.props[id].owned) { const L = uw.loc('prop', id); if (L && turfAt(L.x, L.z) === i) d += 6; }
+    d += uw.props.presenceDefense(i);
     if (dist2(g.player.pos.x, g.player.pos.z, t.cx, t.cz) < 110 * 110 && !g.player.interior) d += 30;
     return d;
   }
@@ -48028,8 +48035,9 @@ class FactionSim {
         else T.inf[k] = Math.max(0, T.inf[k] - 0.12 * h);
         if (T.inf[k] < 0.05) delete T.inf[k];
       }
-      // the player's hold fades without people on the ground
-      if (T.inf.pc) { if (!uw.crew.presence(i) && !uw.props.presence(i)) { T.inf.pc = Math.max(0, T.inf.pc - 0.1 * h); if (T.inf.pc < 0.05) delete T.inf.pc; } }
+      // the player's hold fades without people on the ground; property you own there only slows it (§45.23: a
+      // building is presence, not a crew)
+      if (T.inf.pc && !uw.crew.presence(i)) { T.inf.pc = Math.max(0, T.inf.pc - 0.1 * h * (uw.props.presence(i) ? PROP_PRESENCE_DECAY : 1)); if (T.inf.pc < 0.05) delete T.inf.pc; }
       T.police = clamp(T.police - 0.18 * h, 0, 100);
       if (T.war) this.warStep(i, h);
     }
@@ -48965,6 +48973,7 @@ class CrewManager {
     c.id = Math.floor(num(c.id, 0, 0, 1e7)); c.seed = Math.floor(num(c.seed, Math.random() * 1e6, 0, 1e9));
     c.role = CREW_ROLES[c.role] ? c.role : 'idle'; c.rank = Math.floor(num(c.rank, 0, 0, 4));
     c.skill = num(c.skill, 30, 1, 100); c.loyalty = num(c.loyalty, 60, 0, 100); c.fear = num(c.fear, 10, 0, 100);
+    c.morale = num(c.morale, 0, 0, MORALE_CAP); c.boosts = num(c.boosts, 0, 0, 50); c.raiseLoyal = num(c.raiseLoyal, 0, 0, RAISE_LOYALTY_CAP);
     c.pay = Math.round(num(c.pay, 100, 10, 5000)); c.power = num(c.power, 0, 0, 100); c.days = num(c.days, 0, 0, 1e6);
     c.traits = Array.isArray(c.traits) ? c.traits.filter(t => TRAITS[t]).slice(0, 3) : [];
     c.status = ['active', 'jailed', 'hurt', 'gone', 'dead'].includes(c.status) ? c.status : 'active';
@@ -49044,12 +49053,16 @@ class CrewManager {
     g.audio.play('confirm');
     return '';
   }
+  // a bonus settles any back pay and lifts morale for a while; each recent bonus counts for less (§45.23)
   bonus(id) {
     const g = this.uw.g, c = this.find(id); if (!c) return '';
     const amt = this.dailyPay(c) * 3;
     if (!Money.can(amt, 'crewFee')) return `A bonus costs ${fmtMoney(amt)} in Dirty Cash.`;
-    Money.pay(amt, 'crewFee'); c.loyalty = clamp(c.loyalty + 12, 0, 100); c.unpaid = 0; g.audio.play('cash');
-    return '';
+    Money.pay(amt, 'crewFee'); c.unpaid = 0; g.audio.play('cash');
+    const gain = Math.min(BONUS_MORALE / (1 + c.boosts), MORALE_CAP - c.morale);
+    c.morale += gain; c.boosts += 1;
+    const who = c.name.split(' ')[0];
+    return gain >= 1 ? `${who} is happy with it (morale +${Math.round(gain)}). It wears off in a few days.` : `${who} takes the money. It doesn’t change much any more.`;
   }
   discipline(id) {
     const c = this.find(id); if (!c) return;
@@ -49105,12 +49118,13 @@ class CrewManager {
     const wages = this.payroll();
     const paid = Money.pay(wages, 'wages', { partial: true });
     const short = wages > 0 && paid < wages - 0.5;
-    const rank = uw.rank;
+    const rank = uw.S.rankMax;
     let dealt = 0, dealIncome = 0;
     for (const c of act) {
       c.days++;
       const t = c.traits;
-      // ---- loyalty, with the reasons that move it
+      // ---- loyalty, with the reasons that move it. Paid on time, it doesn't decay: it grows a little with time
+      // together and with the respect your standing commands (the peak Rank: losing Rank doesn't sour the crew, §45.23)
       let dl = 0.4 + rank * 0.3;
       if (short) { c.unpaid++; dl -= 7 + c.unpaid * 3; } else c.unpaid = 0;
       if (t.includes('loyal')) dl += 1; if (t.includes('greedy')) dl -= 0.6;
@@ -49122,6 +49136,7 @@ class CrewManager {
       if (rival && (t.includes('greedy') || c.loyalty < 45) && Math.random() < 0.15) { dl -= 3; c.offer = rival; }
       c.loyalty = clamp(c.loyalty + dl, 0, 100);
       c.fear += ((rank * 8) - c.fear) * 0.05;
+      c.morale = Math.max(0, c.morale - MORALE_DECAY); c.boosts *= BOOST_FADE;
       c.power = clamp(c.power + c.rank * 0.35 + (t.includes('ambitious') ? 0.6 : 0) + (c.role === 'lieutenant' ? 0.9 : 0), 0, 100);
       // ---- role work (a runner out on a delivery skips their usual job that day)
       const res = S.runs.some(r => r.crew === c.id) ? null : this.work(c);
@@ -49195,7 +49210,8 @@ class CrewManager {
   disloyalty(c, rival) {
     const uw = this.uw, S = this.S, g = uw.g;
     if (c.status !== 'active') return;
-    const L = c.loyalty, F = c.fear, guard = L + F * 0.45;
+    // morale (what money bought) counts, but at most MORALE_CAP: it never buys anyone out of betrayal (§45.23)
+    const L = c.loyalty + c.morale, F = c.fear, guard = L + F * 0.45;
     const why = `loyalty ${Math.round(L)}${c.unpaid ? `, unpaid ${c.unpaid} day${c.unpaid > 1 ? 's' : ''}` : ''}${F < 25 ? ', not afraid of you' : ''}`;
     // 1. skimming: greedy or unhappy people steal a little
     if (L < 45 && (c.traits.includes('greedy') || Math.random() < 0.4) && Math.random() < 0.25) {
@@ -49237,7 +49253,7 @@ class CrewManager {
     S.decisions = S.decisions.filter(x => x !== d);
     const c = this.find(d.crew); if (!c || c.status === 'gone' || c.status === 'dead') return;
     if (d.kind === 'raise') {
-      if (yes) { c.pay = Math.round(c.pay * 1.5); c.loyalty = clamp(c.loyalty + 15, 0, 100); uw.news(c.name.split(' ')[0], 'Smart. You won’t regret it.'); }
+      if (yes) { const add = Math.min(RAISE_LOYALTY, RAISE_LOYALTY_CAP - c.raiseLoyal); c.pay = Math.round(c.pay * 1.5); c.loyalty = clamp(c.loyalty + add, 0, 100); c.raiseLoyal += add; uw.news(c.name.split(' ')[0], 'Smart. You won’t regret it.'); }
       else { c.loyalty = clamp(c.loyalty - 25, 0, 100); c.fear = clamp(c.fear + 5, 0, 100); uw.news(c.name.split(' ')[0], 'Fine. I’ll remember this.'); }
     }
   }
@@ -49253,6 +49269,9 @@ class PropertyManager {
   get S() { return this.uw.S; }
   owned(id) { const o = this.S.props[id]; return !!(o && o.owned); }
   ownedList() { return PROPS.filter(p => this.owned(p.id)); }
+  // what owned property on a turf adds to your side of a showdown there: 6 for the first, half as much again for each
+  // further one, never more than PROP_PRESENCE_MAX (§45.23: stacking property can't make a turf invincible)
+  presenceDefense(i) { let n = 0; for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) n++; } return n ? Math.min(PROP_PRESENCE_MAX, PROP_PRESENCE * (2 - Math.pow(0.5, n - 1))) : 0; }
   presence(i) { for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) return true; } return false; }
   // stash space: a storage business grows with its level; a home in the Docklands holds a quarter more
   storageCap(id) {
@@ -49419,7 +49438,10 @@ class PropertyManager {
     }
     // laundering and quiet funerals take the heat down
     S.pressure = clamp(S.pressure - this.perk('launder') - this.perk('heat'), 0, 100);
-    if (this.perk('loyalty') > 0) for (const c of uw.crew.active()) c.loyalty = clamp(c.loyalty + this.perk('loyalty'), 0, 100);
+    // a decent meal and a place to sit keep the crew's morale up: a floor under it, capped like any money-bought
+    // boost (§45.23), never loyalty itself
+    const floor = Math.min(MORALE_CAP, this.perk('loyalty') * 10);
+    if (floor > 0) for (const c of uw.crew.active()) c.morale = Math.max(c.morale, floor);
     this.policeRaids();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);
   }
@@ -49897,7 +49919,7 @@ class PressureSystem {
   witnessCallMul(x, z) {
     const uw = this.uw, i = turfAt(x, z);
     let k = 1;
-    if (uw.owner[i] === 'pc') k *= uw.rank >= 4 ? 0.35 : 0.7;
+    if (uw.owner[i] === 'pc') k *= uw.S.rankMax >= 4 ? 0.35 : 0.7; // the peak Rank: fear outlasts a downrank (§45.23)
     k *= 1 - Math.min(0.4, uw.influence / 2000);
     return k;
   }
@@ -51230,6 +51252,7 @@ class EmpireUI {
       return `<div class="card"><div class="t">${esc(CM.displayName(c))} ${status}</div><div class="d">${CREW_RANKS[c.rank]} · ${esc(R.name)}${c.assign !== null && c.assign !== undefined ? ' · ' + esc(typeof c.assign === 'number' ? uw.T[c.assign].name : ZONES[c.assign] ? ZONES[c.assign].name : PROP_BY_ID[c.assign] ? PROP_BY_ID[c.assign].name : '') : ''}<br>${c.traits.map(t => `<span class="chip" style="--c:#9aa3b2" title="${esc(TRAITS[t].desc)}">${TRAITS[t].name}</span>`).join('')} ${fmtMoney(CM.dailyPay(c))}/day${c.unpaid ? ` · <b style="color:var(--red)">unpaid ${c.unpaid}d</b>` : ''}</div>
         <div class="stat"><span>Skill</span><span>${Math.round(c.skill)}</span></div>${this.bar(c.skill, 100)}
         <div class="stat"><span>Loyalty</span><span>${Math.round(c.loyalty)}</span></div>${this.bar(c.loyalty, 100, c.loyalty < 30 ? '#ff4d5e' : c.loyalty < 50 ? '#ffb547' : '#7fe08f')}
+        <div class="stat"><span>Morale</span><span>${c.morale >= 0.5 ? '+' + Math.round(c.morale) : '—'}</span></div>
         <div class="stat"><span>Fear</span><span>${Math.round(c.fear)}</span></div>${this.bar(c.fear, 100, '#9aa3b2')}
         <div class="stat"><span>Power</span><span>${Math.round(c.power)}</span></div>${this.bar(c.power, 100, '#d28cff')}
         ${roleSel}${target}

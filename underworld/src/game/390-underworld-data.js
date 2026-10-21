@@ -138,11 +138,11 @@ const BIZ_CATS = {
   barber: { name: 'Barber shop', icon: '💈', col: '#ff8a3d', perk: 'intel', lv: [0.08, 0.15, 0.24], inc: [1, 1.5, 2.1], up: ['A back room where men talk', 'Half the precinct gets a shave here'], benefit: v => `${Math.round(v * 100)}% better chance of a raid tip-off` },
   salon: { name: 'Hair salon', icon: '✂', col: '#ff7ab8', perk: 'intel', lv: [0.08, 0.15, 0.24], inc: [1, 1.55, 2.2], up: ['Spa chairs and the gossip that comes with them', 'The salon the wives of the city council use'], benefit: v => `${Math.round(v * 100)}% better chance of a raid tip-off` },
   gym: { name: 'Gym', icon: '🏋', col: '#7fe08f', perk: 'stamina', lv: [0.1, 0.2, 0.3], inc: [1, 1.5, 2.0], up: ['A boxing ring and coaches', 'A fight gym with a name: your crew trains here'], benefit: v => `you sprint ${Math.round(v * 100)}% longer; +1 crew room per level` },
-  convenience: { name: 'Convenience store', icon: '🏪', col: '#46d4c4', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.4, 1.85], up: ['Open all night, lottery counter', 'A second shop front and a delivery van'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
-  grocery: { name: 'Grocery store', icon: '🥬', col: '#8fe39b', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.45, 1.95], up: ['A deli counter and a bakery', 'Supplying half the restaurants in the district'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
+  convenience: { name: 'Convenience store', icon: '🏪', col: '#46d4c4', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.4, 1.85], up: ['Open all night, lottery counter', 'A second shop front and a delivery van'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
+  grocery: { name: 'Grocery store', icon: '🥬', col: '#8fe39b', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.45, 1.95], up: ['A deli counter and a bakery', 'Supplying half the restaurants in the district'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
   pharmacy: { name: 'Pharmacy', icon: '✚', col: '#7fe08f', perk: 'medic', lv: [0.25, 0.45, 0.65], inc: [1, 1.45, 2.0], up: ['A clinic room with a nurse', 'A doctor who doesn’t write anything down'], benefit: v => `hospital bills ${Math.round(v * 100)}% lower; you heal faster` },
-  coffee: { name: 'Coffee shop', icon: '☕', col: '#c9a46b', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.55, 2.2], up: ['Roasting on site, queues out the door', 'Three more branches and a back room for meetings'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
-  diner: { name: 'Diner', icon: '🍳', col: '#ffb547', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.5, 2.0], up: ['Open 24 hours, booths in the back', 'A diner every cop and crook in town eats at'], benefit: v => `crew loyalty +${v.toFixed(1)} a day` },
+  coffee: { name: 'Coffee shop', icon: '☕', col: '#c9a46b', perk: 'loyalty', lv: [0.1, 0.2, 0.3], inc: [1, 1.55, 2.2], up: ['Roasting on site, queues out the door', 'Three more branches and a back room for meetings'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
+  diner: { name: 'Diner', icon: '🍳', col: '#ffb547', perk: 'loyalty', lv: [0.15, 0.3, 0.45], inc: [1, 1.5, 2.0], up: ['Open 24 hours, booths in the back', 'A diner every cop and crook in town eats at'], benefit: v => `crew morale never below +${Math.round(v * 10)} (capped at ${MORALE_CAP})` },
   pizza: { name: 'Pizzeria', icon: '🍕', col: '#ff4d5e', perk: 'delivery', lv: [0.04, 0.08, 0.12], inc: [1, 1.5, 2.1], up: ['A delivery fleet of scooters', 'Delivery drivers who know every back street'], benefit: v => `crew deliveries ${Math.round(v * 100)}% more likely to arrive` },
   restaurant: { name: 'Restaurant', icon: '🍽', col: '#d8a227', perk: 'infl', lv: [5, 12, 22], inc: [1, 1.6, 2.4], up: ['A chef with a reputation and a wine list', 'The private dining room where deals get made'], benefit: v => `+${v} influence (people come to you)` },
   bar: { name: 'Bar', icon: '🍺', col: '#ffb547', perk: 'recruit', lv: [1, 2, 3], inc: [1, 1.5, 2.1], up: ['A pool room and a back door', 'A live music night that pulls the whole district'], benefit: v => `${v} more recruit${v > 1 ? 's' : ''} on offer` },
@@ -238,6 +238,9 @@ const BIZ_UPKEEP = [0.18, 0.24, 0.3];
 // §45.7: buying a business buys no influence. It starts to count after BIZ_EST_DAYS world days of operation and
 // reaches its full weight (BIZ_INFL plus its own prestige, def.infl) over the next BIZ_EST_RAMP days
 const BIZ_INFL = 15, BIZ_EST_DAYS = 7, BIZ_EST_RAMP = 14;
+// owned property on a turf is local presence (§45.23): showdown strength 6 for one, diminishing to at most 12 however
+// many you own there, and your hold fades at PROP_PRESENCE_DECAY of the rate it would without anyone on the ground
+const PROP_PRESENCE = 6, PROP_PRESENCE_MAX = 12, PROP_PRESENCE_DECAY = 0.5;
 // ---- v6: neighbourhoods give a home a little extra (stash safety, standing, recruiting) on top of the house itself
 const HOOD = {
   l: { name: 'Linden Hills', perk: 'Quiet streets: stashes here are raided 30% less', raid: 0.7 },
@@ -277,6 +280,10 @@ const CREW_ROLES = {
 };
 const CREW_RANKS = ['Associate', 'Crew Member', 'Enforcer', 'Captain', 'Lieutenant'];
 const PROMO_COST = [0, 1500, 4000, 10000, 25000];
+// money and crew loyalty (§45.23): money buys morale, which is temporary and capped, and never makes anyone
+// betrayal-proof. Wages paid on time stop loyalty decaying; a bonus adds morale (less for each recent one); a raise
+// adds a little lasting loyalty, at most RAISE_LOYALTY_CAP over a career. Disloyalty reads loyalty + morale.
+const MORALE_CAP = 10, MORALE_DECAY = 1.5, BONUS_MORALE = 8, BOOST_FADE = 0.85, RAISE_LOYALTY = 5, RAISE_LOYALTY_CAP = 10;
 const TRAITS = {
   loyal: { name: 'Loyal', desc: 'Slow to turn, whatever happens.' },
   greedy: { name: 'Greedy', desc: 'Wants more money. Skims when unhappy.' },

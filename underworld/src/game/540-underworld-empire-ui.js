@@ -362,6 +362,7 @@ class EmpireUI {
       return `<div class="card"><div class="t">${esc(CM.displayName(c))} ${status}</div><div class="d">${CREW_RANKS[c.rank]} · ${esc(R.name)}${c.assign !== null && c.assign !== undefined ? ' · ' + esc(typeof c.assign === 'number' ? uw.T[c.assign].name : ZONES[c.assign] ? ZONES[c.assign].name : PROP_BY_ID[c.assign] ? PROP_BY_ID[c.assign].name : '') : ''}<br>${c.traits.map(t => `<span class="chip" style="--c:#9aa3b2" title="${esc(TRAITS[t].desc)}">${TRAITS[t].name}</span>`).join('')} ${fmtMoney(CM.dailyPay(c))}/day${c.unpaid ? ` · <b style="color:var(--red)">unpaid ${c.unpaid}d</b>` : ''}</div>
         <div class="stat"><span>Skill</span><span>${Math.round(c.skill)}</span></div>${this.bar(c.skill, 100)}
         <div class="stat"><span>Loyalty</span><span>${Math.round(c.loyalty)}</span></div>${this.bar(c.loyalty, 100, c.loyalty < 30 ? '#ff4d5e' : c.loyalty < 50 ? '#ffb547' : '#7fe08f')}
+        <div class="stat"><span>Morale</span><span>${c.morale >= 0.5 ? '+' + Math.round(c.morale) : '—'}</span></div>
         <div class="stat"><span>Fear</span><span>${Math.round(c.fear)}</span></div>${this.bar(c.fear, 100, '#9aa3b2')}
         <div class="stat"><span>Power</span><span>${Math.round(c.power)}</span></div>${this.bar(c.power, 100, '#d28cff')}
         ${roleSel}${target}

@@ -156,7 +156,89 @@ const coup = await ev(() => {
 });
 check('a betrayal starts showdowns for the traitor’s turfs instead of flipping them', coup.n > 0 && coup.gone === 'gone' && coup.stillMine === coup.n && coup.wars === coup.n, JSON.stringify(coup));
 
-// ---------------------------------------------------------------- 5. save, reload, migration
+// ---------------------------------------------------------------- 5. money and crew loyalty (§45.23, DC-26)
+const morale = await ev(() => {
+  const g = window.game, uw = g.uw, CM = uw.crew, M = g.money, P = window.__pv.GAME_CONFIG.underworld;
+  M.W.dirty.me = 1e7;
+  const c = CM.active().find(x => x.role !== 'lieutenant'); c.loyalty = 40; c.morale = 0; c.boosts = 0; c.raiseLoyal = 0; c.traits = []; c.rank = Math.min(c.rank, 2);
+  const gains = []; for (let n = 0; n < 30; n++) { const m0 = c.morale; CM.bonus(c.id); gains.push(+(c.morale - m0).toFixed(2)); }
+  const afterSpam = { loyalty: c.loyalty, morale: c.morale };
+  // betrayal still reads loyalty: a low-loyalty lieutenant with full morale can still stage a coup
+  const lt = CM.active().find(x => x !== c && x.role === 'lieutenant') || CM.active().find(x => x !== c); const ltWas = { role: lt.role, rank: lt.rank };
+  lt.loyalty = 18; lt.fear = 10; lt.power = 90; lt.rank = 3; lt.traits = []; lt.offer = null; lt.morale = 0; lt.boosts = 0;
+  for (let n = 0; n < 30; n++) CM.bonus(lt.id);
+  const ltMorale = lt.morale;
+  const r0 = Math.random; let k = 0; Math.random = () => (k++ === 0 ? 0.9 : 0.01);
+  try { CM.disloyalty(lt, null); } finally { Math.random = r0; }
+  const betrayed = lt.status === 'gone';
+  // raises: a little lasting loyalty, capped over a career
+  const raises = [];
+  for (let n = 0; n < 3; n++) { const l0 = c.loyalty; uw.S.decisions.push({ id: 9000 + n, kind: 'raise', crew: c.id, text: 'raise', day: uw.S.day }); CM.decide(9000 + n, true); raises.push(+(c.loyalty - l0).toFixed(2)); }
+  // morale wears off; wages paid on time keep loyalty from falling
+  const l1 = c.loyalty, r1 = Math.random; Math.random = () => 0.99;
+  try { for (let d = 0; d < 8; d++) CM.tickDay(); } finally { Math.random = r1; }
+  const faded = c.morale, lAfter = c.loyalty;
+  // the diner-type businesses put a floor under morale, never loyalty
+  c.morale = 0; const l2 = c.loyalty; uw.props.tickDay(); const floor = Math.min(10, uw.props.perk('loyalty') * 10);
+  return { gains: gains.slice(0, 6), last: gains[29], afterSpam, ltMorale, betrayed, ltWas, raises, faded, l1, lAfter, floorMorale: c.morale, floor, l2, l3: c.loyalty, cap: 10 };
+});
+check('bonuses lift morale, each recent one less, never past the cap, and never touch loyalty', morale.gains[0] === 8 && morale.gains.every((x, i, a) => i === 0 || x <= a[i - 1]) && morale.afterSpam.morale <= morale.cap && morale.afterSpam.loyalty === 40, JSON.stringify(morale));
+check('no amount of bonuses makes a crew member betrayal-proof: a disloyal Lieutenant with full morale still turns', morale.ltMorale <= morale.cap && morale.betrayed, JSON.stringify(morale));
+check('a raise adds a little lasting loyalty, capped over a career (5, 5, then nothing)', JSON.stringify(morale.raises) === JSON.stringify([5, 5, 0]), JSON.stringify(morale.raises));
+check('morale wears off within days, and paid wages keep loyalty from falling', morale.faded === 0 && morale.lAfter >= morale.l1, JSON.stringify(morale));
+check('food-and-coffee businesses keep a floor under morale (capped), not under loyalty', morale.floor > 0 && morale.floorMorale >= morale.floor && morale.floorMorale <= morale.cap && morale.l3 === morale.l2, JSON.stringify(morale));
+
+// ---------------------------------------------------------------- 6. property presence is capped (§45.23, DC-27)
+const pres = await ev(() => {
+  const g = window.game, uw = g.uw, S = uw.S, P = window.__pv.PROPS, PM = uw.props;
+  // the turf with the most properties for sale
+  const by = {}; for (const d of P) { const L = uw.loc('prop', d.id); if (L) (by[window.__pv.turfAt(L.x, L.z)] || (by[window.__pv.turfAt(L.x, L.z)] = [])).push(d.id); }
+  const [ti, ids] = Object.entries(by).sort((a, b) => b[1].length - a[1].length)[0]; const i = +ti;
+  const keep = ids.map(id => S.props[id] && S.props[id].owned);
+  for (const id of ids) if (S.props[id]) S.props[id].owned = false;
+  const seq = [PM.presenceDefense(i)];
+  for (const id of ids) { (S.props[id] || (S.props[id] = { dmg: 0, since: S.day, lvl: 1 })).owned = true; seq.push(+PM.presenceDefense(i).toFixed(2)); }
+  // decay of your hold: none with crew on the turf, half with only property, full with neither
+  const crewThere = S.crew.filter(c => c.status === 'active' && c.assign === i);
+  for (const c of crewThere) c.assign = null;
+  const T = S.turfs[i]; T.war = null;
+  const step = () => { T.inf.pc = 50; uw.factions.tickHours(1, 3); return +(50 - (T.inf.pc || 0)).toFixed(3); };
+  const propOnly = step();
+  for (const id of ids) S.props[id].owned = false; const none = step();
+  ids.forEach((id, n) => { S.props[id].owned = keep[n]; });
+  return { n: ids.length, seq, propOnly, none };
+});
+check('several properties on one turf add less and less to a showdown, never more than 12', pres.n >= 2 && pres.seq[0] === 0 && pres.seq[1] === 6 && pres.seq[2] === 9 && pres.seq.every((x, i, a) => i === 0 || x >= a[i - 1]) && Math.max(...pres.seq) <= 12, JSON.stringify(pres));
+check('property only slows your hold fading (half); it does not replace people on the ground', pres.propOnly > 0 && Math.abs(pres.propOnly - pres.none / 2) < 0.01, JSON.stringify(pres));
+
+// ---------------------------------------------------------------- 7. downranking is non-destructive (§45.23, DC-28)
+const down = await ev(() => {
+  const g = window.game, uw = g.uw, S = uw.S, CM = uw.crew;
+  // a full empire to fall from: two Lieutenants running districts, and the turfs held now
+  for (const n of [1, 2]) S.crew.push(CM.sanitizeMember({ id: 700 + n, name: 'Down Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 300, traits: [], status: 'active', assign: uw.T[0].zone }));
+  uw.computeInfluence();
+  const before = { rank: uw.rank, peak: S.rankMax, props: uw.props.ownedList().length, garage: g.save.garage.length, crew: CM.active().map(c => c.id + ':' + c.role + ':' + c.assign).join(','), up: JSON.stringify(g.save.upgrades), cops: Object.keys(S.cops).filter(k => S.cops[k].st === 'paid').join(',') };
+  // every turf lost in showdowns
+  for (let i = 0; i < uw.T.length; i++) if (S.turfs[i].own === 'pc') uw.transferTurf(i, 'vipers', 'test');
+  uw.computeInfluence();
+  const after = { rank: uw.rank, peak: S.rankMax, props: uw.props.ownedList().length, garage: g.save.garage.length, crew: CM.active().map(c => c.id + ':' + c.role + ':' + c.assign).join(','), up: JSON.stringify(g.save.upgrades), cops: Object.keys(S.cops).filter(k => S.cops[k].st === 'paid').join(',') };
+  // a day passes: crew loyalty doesn't sour for the lost Rank, paid officers stay paid, automation keeps running
+  g.money.W.dirty.me = 1e7;
+  const c = CM.active().find(x => x.rank < 3) || CM.active()[0]; c.traits = []; c.unpaid = 0; c.wins = 0; c.offer = null; c.loyalty = 50; c.fear = 0;
+  const r0 = Math.random; Math.random = () => 0.99;
+  try { CM.tickDay(); uw.cops.tickDay(); } finally { Math.random = r0; }
+  const dl = +(c.loyalty - 50).toFixed(2);
+  // new expansion waits for the Rank: a luxury home is refused
+  const lux = window.__pv.PROPS.find(d => d.luxury && !uw.props.owned(d.id));
+  const luxR = lux ? uw.props.buy(lux.id) : 'none for sale';
+  return { before, after, dl, expect: +(0.4 + S.rankMax * 0.3).toFixed(2), cops: Object.keys(S.cops).filter(k => S.cops[k].st === 'paid').join(','), luxR };
+});
+check('losing every turf lowers the Rank; the peak is remembered', down.before.rank >= 5 && down.after.rank < down.before.rank && down.after.rank <= 3 && down.after.peak === down.before.peak, JSON.stringify({ before: down.before.rank, after: down.after.rank, peak: down.after.peak }));
+check('a downrank dismantles nothing: properties, cars, upgrades, crew roles and assignments, paid officers all remain', ['props', 'garage', 'crew', 'up', 'cops'].every(k => down.after[k] === down.before[k]) && down.cops === down.before.cops, JSON.stringify(down));
+check('no downward spiral: crew loyalty still grows at the peak Rank’s rate', down.dl === down.expect, JSON.stringify({ dl: down.dl, expect: down.expect }));
+check('new expansion waits for the Rank (a luxury home is refused at the lower Rank)', /Territory Holder|Come back/.test(down.luxR) || down.luxR === 'none for sale', down.luxR);
+
+// ---------------------------------------------------------------- 8. save, reload, migration
 const pre = await ev(() => { const g = window.game; g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.uw.computeInfluence(); g.saveGame(true); return { own: g.uw.S.turfs.map(t => t.own), rank: g.uw.rank, rankMax: g.uw.S.rankMax }; });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 const menuLine = await ev(() => document.getElementById('continueSub').textContent);

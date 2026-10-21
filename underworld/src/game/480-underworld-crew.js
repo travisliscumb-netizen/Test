@@ -12,6 +12,7 @@ class CrewManager {
     c.id = Math.floor(num(c.id, 0, 0, 1e7)); c.seed = Math.floor(num(c.seed, Math.random() * 1e6, 0, 1e9));
     c.role = CREW_ROLES[c.role] ? c.role : 'idle'; c.rank = Math.floor(num(c.rank, 0, 0, 4));
     c.skill = num(c.skill, 30, 1, 100); c.loyalty = num(c.loyalty, 60, 0, 100); c.fear = num(c.fear, 10, 0, 100);
+    c.morale = num(c.morale, 0, 0, MORALE_CAP); c.boosts = num(c.boosts, 0, 0, 50); c.raiseLoyal = num(c.raiseLoyal, 0, 0, RAISE_LOYALTY_CAP);
     c.pay = Math.round(num(c.pay, 100, 10, 5000)); c.power = num(c.power, 0, 0, 100); c.days = num(c.days, 0, 0, 1e6);
     c.traits = Array.isArray(c.traits) ? c.traits.filter(t => TRAITS[t]).slice(0, 3) : [];
     c.status = ['active', 'jailed', 'hurt', 'gone', 'dead'].includes(c.status) ? c.status : 'active';
@@ -91,12 +92,16 @@ class CrewManager {
     g.audio.play('confirm');
     return '';
   }
+  // a bonus settles any back pay and lifts morale for a while; each recent bonus counts for less (§45.23)
   bonus(id) {
     const g = this.uw.g, c = this.find(id); if (!c) return '';
     const amt = this.dailyPay(c) * 3;
     if (!Money.can(amt, 'crewFee')) return `A bonus costs ${fmtMoney(amt)} in Dirty Cash.`;
-    Money.pay(amt, 'crewFee'); c.loyalty = clamp(c.loyalty + 12, 0, 100); c.unpaid = 0; g.audio.play('cash');
-    return '';
+    Money.pay(amt, 'crewFee'); c.unpaid = 0; g.audio.play('cash');
+    const gain = Math.min(BONUS_MORALE / (1 + c.boosts), MORALE_CAP - c.morale);
+    c.morale += gain; c.boosts += 1;
+    const who = c.name.split(' ')[0];
+    return gain >= 1 ? `${who} is happy with it (morale +${Math.round(gain)}). It wears off in a few days.` : `${who} takes the money. It doesn’t change much any more.`;
   }
   discipline(id) {
     const c = this.find(id); if (!c) return;
@@ -152,12 +157,13 @@ class CrewManager {
     const wages = this.payroll();
     const paid = Money.pay(wages, 'wages', { partial: true });
     const short = wages > 0 && paid < wages - 0.5;
-    const rank = uw.rank;
+    const rank = uw.S.rankMax;
     let dealt = 0, dealIncome = 0;
     for (const c of act) {
       c.days++;
       const t = c.traits;
-      // ---- loyalty, with the reasons that move it
+      // ---- loyalty, with the reasons that move it. Paid on time, it doesn't decay: it grows a little with time
+      // together and with the respect your standing commands (the peak Rank: losing Rank doesn't sour the crew, §45.23)
       let dl = 0.4 + rank * 0.3;
       if (short) { c.unpaid++; dl -= 7 + c.unpaid * 3; } else c.unpaid = 0;
       if (t.includes('loyal')) dl += 1; if (t.includes('greedy')) dl -= 0.6;
@@ -169,6 +175,7 @@ class CrewManager {
       if (rival && (t.includes('greedy') || c.loyalty < 45) && Math.random() < 0.15) { dl -= 3; c.offer = rival; }
       c.loyalty = clamp(c.loyalty + dl, 0, 100);
       c.fear += ((rank * 8) - c.fear) * 0.05;
+      c.morale = Math.max(0, c.morale - MORALE_DECAY); c.boosts *= BOOST_FADE;
       c.power = clamp(c.power + c.rank * 0.35 + (t.includes('ambitious') ? 0.6 : 0) + (c.role === 'lieutenant' ? 0.9 : 0), 0, 100);
       // ---- role work (a runner out on a delivery skips their usual job that day)
       const res = S.runs.some(r => r.crew === c.id) ? null : this.work(c);
@@ -242,7 +249,8 @@ class CrewManager {
   disloyalty(c, rival) {
     const uw = this.uw, S = this.S, g = uw.g;
     if (c.status !== 'active') return;
-    const L = c.loyalty, F = c.fear, guard = L + F * 0.45;
+    // morale (what money bought) counts, but at most MORALE_CAP: it never buys anyone out of betrayal (§45.23)
+    const L = c.loyalty + c.morale, F = c.fear, guard = L + F * 0.45;
     const why = `loyalty ${Math.round(L)}${c.unpaid ? `, unpaid ${c.unpaid} day${c.unpaid > 1 ? 's' : ''}` : ''}${F < 25 ? ', not afraid of you' : ''}`;
     // 1. skimming: greedy or unhappy people steal a little
     if (L < 45 && (c.traits.includes('greedy') || Math.random() < 0.4) && Math.random() < 0.25) {
@@ -284,7 +292,7 @@ class CrewManager {
     S.decisions = S.decisions.filter(x => x !== d);
     const c = this.find(d.crew); if (!c || c.status === 'gone' || c.status === 'dead') return;
     if (d.kind === 'raise') {
-      if (yes) { c.pay = Math.round(c.pay * 1.5); c.loyalty = clamp(c.loyalty + 15, 0, 100); uw.news(c.name.split(' ')[0], 'Smart. You won’t regret it.'); }
+      if (yes) { const add = Math.min(RAISE_LOYALTY, RAISE_LOYALTY_CAP - c.raiseLoyal); c.pay = Math.round(c.pay * 1.5); c.loyalty = clamp(c.loyalty + add, 0, 100); c.raiseLoyal += add; uw.news(c.name.split(' ')[0], 'Smart. You won’t regret it.'); }
       else { c.loyalty = clamp(c.loyalty - 25, 0, 100); c.fear = clamp(c.fear + 5, 0, 100); uw.news(c.name.split(' ')[0], 'Fine. I’ll remember this.'); }
     }
   }

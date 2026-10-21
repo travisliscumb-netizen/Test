@@ -55,7 +55,7 @@ class PressureSystem {
   witnessCallMul(x, z) {
     const uw = this.uw, i = turfAt(x, z);
     let k = 1;
-    if (uw.owner[i] === 'pc') k *= uw.rank >= 4 ? 0.35 : 0.7;
+    if (uw.owner[i] === 'pc') k *= uw.S.rankMax >= 4 ? 0.35 : 0.7; // the peak Rank: fear outlasts a downrank (§45.23)
     k *= 1 - Math.min(0.4, uw.influence / 2000);
     return k;
   }
