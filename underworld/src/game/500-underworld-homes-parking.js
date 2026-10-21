@@ -261,8 +261,11 @@ class DealerLots {
     const g = this.g, s = g.save, C2 = g.content, st = this.state(lot), c = st.cars[i];
     if (!c) return 'Sold.';
     const why = this.cantBuy(lot, c); if (why) return why;
+    // record what paid for it, by currency (Saltworks takes Dirty Cash first, then the bank): its provenance (§45.24)
+    const me0 = Money.onMe, cl0 = Money.clean;
     Money.pay(c.price, lot === 'used' ? 'usedLot' : 'dealer'); s.stats.carsBought = (s.stats.carsBought || 0) + 1;
     const e = C2.addToGarage(c.type, 'bought', c.color, true);
+    e.prov = { dirty: Math.round((me0 - Money.onMe) * 100) / 100, clean: Math.round((cl0 - Money.clean) * 100) / 100 };
     e.dmg = clamp(100 - c.cond, 0, 100); e.vtier = c.vtier;
     st.cars[i] = null;
     // the car on the stall becomes yours: unlocked, keys in it

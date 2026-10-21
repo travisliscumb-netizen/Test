@@ -45,6 +45,10 @@ doesn't take it and it still lands while you are in jail. The economic clock run
 whatever the day-length setting (in jail, at world time), so a short day doesn't wash more per hour of play. Front
 businesses (Session 9) will supersede her.
 
+Cars keep the colour of the money that bought them (§45.24): a car bought with cash at Saltworks resells for cash, one
+bought from the bank for Clean Bank (a mixed purchase splits), a stolen car only ever for cash, and no ordinary car
+resells for more than 85% of what you put into it, so the used lot is no laundering route.
+
 ## Rank, Reputation and turf (overhaul Session 2, schema 9)
 
 - **Rank** is how powerful you are: Nobody, Street Hustler, Known Operator, Crew Leader, Territory Holder,
@@ -389,6 +393,7 @@ error, so a hidden network dependency fails the suite.
 node underworld/tests/build.mjs     # Node only: index.html matches what src/ builds, manifest complete, both module scripts parse
 node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
+node underworld/tests/carmoney.mjs   # car provenance: Dirty/Clean-bought resale, stolen cars, no resale above price, no laundering loop, save/reload
 node underworld/tests/fixer.mjs      # laundering fixer: fee, minimum, daily cap, delay, day-length pace, arrest in transit, save/reload, stolen cars
 node underworld/tests/progression.mjs # seven Ranks, Nobody -> Kingpin chain, money buys no power, turf only by showdown, schema 9
 node underworld/tests/smoke.mjs     # boot, $0 start, every menu, map overlay, location layout

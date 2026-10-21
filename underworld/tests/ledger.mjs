@@ -185,10 +185,11 @@ check('selling a car you own hands you the cash in it first', owned.sold === 300
 const sale = await ev(() => { const g = window.game, C = g.content, M = g.money, r = {};
   const gp = C.garagePoints()[0]; if (!gp) return { gp: false };
   const ask = g.ui.ask; g.ui.ask = (t, d, ok, fn) => fn();
-  const sell = origin => { const e = C.addToGarage('sedan', origin, undefined, true); const price = C.sellPrice(e), d0 = M.onMe, c0 = M.clean; C.openGarage(gp); C._svcAct('sell:' + e.uid); while (g.ui.stack.length) g.ui.back(); return { price, dirty: M.onMe - d0, clean: M.clean - c0 }; };
-  r.stolen = sell('stolen'); r.bought = sell('bought'); g.ui.ask = ask; r.gp = true; return r; });
+  const sell = (origin, prov) => { const e = C.addToGarage('sedan', origin, undefined, true); if (prov) e.prov = prov; const price = C.sellPrice(e), d0 = M.onMe, c0 = M.clean; C.openGarage(gp); C._svcAct('sell:' + e.uid); while (g.ui.stack.length) g.ui.back(); return { price, dirty: M.onMe - d0, clean: M.clean - c0 }; };
+  r.stolen = sell('stolen'); r.bought = sell('bought', { dirty: 0, clean: 3200 }); r.unrecorded = sell('bought'); g.ui.ask = ask; r.gp = true; return r; });
 check('a stolen car sold from your garage pays Dirty Cash, never Clean Bank (§45.22)', sale.gp && sale.stolen.dirty === sale.stolen.price && sale.stolen.clean === 0, JSON.stringify(sale));
-check('a car you bought sells into your bank', sale.gp && sale.bought.clean === sale.bought.price && sale.bought.dirty === 0, JSON.stringify(sale));
+check('a car you bought with Clean Bank sells into your bank (§45.24)', sale.gp && sale.bought.price > 0 && sale.bought.clean === sale.bought.price && sale.bought.dirty === 0, JSON.stringify(sale));
+check('a bought car with no record of what paid for it sells for Dirty Cash (not stolen is not clean)', sale.unrecorded.price > 0 && sale.unrecorded.dirty === sale.unrecorded.price && sale.unrecorded.clean === 0, JSON.stringify(sale));
 
 // ---------------------------------------------------------------- 9. save, reload, and no duplication
 const saved = await ev(() => { const g = window.game, M = g.money; M.W.debt = 0; M.W.dirty.me = 1234; M.W.clean = 5678; M.W.dirty.prop = { flop: 4000, whse_w: 2000 }; g.police.clear(); const ok = g.saveGame(true); return { ok, w: JSON.parse(JSON.stringify(M.W)) }; });

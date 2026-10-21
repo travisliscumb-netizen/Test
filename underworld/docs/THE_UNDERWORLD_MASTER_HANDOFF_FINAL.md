@@ -48,7 +48,7 @@ Money does not buy Rank, Reputation, turf, contacts, crew loyalty, or political 
 
 ## 2. MONEY — DIRTY CASH + CLEAN BANK
 
-> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17-§45.21 (classifications, stunt cap, medical debt, payroll), §45.22 (remote income routing, hospital bill, jail money, stolen-car sale).
+> Amended by §45.1 (no carry cap), §45.5 (casino currency), §45.6 (laundering fixer), §45.14 (classification review), §45.17-§45.21 (classifications, stunt cap, medical debt, payroll), §45.22 (remote income routing, hospital bill, jail money, stolen-car sale), §45.24 (vehicle provenance and resale).
 
 
 Replace the single-money model.
@@ -323,6 +323,8 @@ No fuel/tire/gearbox maintenance simulation.
 
 ## 13. DEALERSHIPS
 
+> Amended by §45.24 (a car resells in the currency it was bought with, never above its price).
+
 Keep identities:
 
 - Saltworks Used Autos
@@ -342,6 +344,8 @@ Rules:
 ---
 
 ## 14. GARAGES / PARKING / HOT / IMPOUND
+
+> Amended by §45.24 (vehicle provenance is tracked separately from HOT status).
 
 Every permanent owned vehicle requires an actual physical slot at an owned compatible property.
 No magical overflow storage.
@@ -1165,3 +1169,15 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       owned properties, vehicles, warehouses, upgrades and businesses remain, Lieutenants and crew assignments
       remain, and automation keeps running. The current Rank may restrict new expansion, promotions and unlocks
       until it is regained, but must not dismantle earlier systems or create a downward spiral.
+24. **Vehicle provenance and resale (DC-29, approved with provenance tracking).**
+    - A car bought with Dirty Cash is a Dirty-origin vehicle and resells for Dirty Cash; a car bought with Clean Bank
+      is a Clean-origin vehicle and resells for Clean Bank.
+    - Stolen / HOT vehicles sold through criminal channels pay Dirty Cash.
+    - Vehicle provenance is tracked separately from HOT status: "not stolen" does not mean "clean-origin".
+    - Normal resale never exceeds the player's recorded purchase price after depreciation, condition, market and
+      dealer-spread rules. Ordinary dealer flipping has negative expected value and can't work as laundering or
+      arbitrage.
+    - Special, unique and prize vehicles may later get explicitly defined custom resale rules; ordinary stock never
+      bypasses the money system.
+    - Regression tests: Dirty-bought → Dirty resale; Clean-bought → Clean resale; stolen/HOT → Dirty criminal resale;
+      no ordinary resale above purchase price; save/reload keeps provenance; no used-car laundering loop.

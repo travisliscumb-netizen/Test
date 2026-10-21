@@ -143,6 +143,12 @@ const SaveSystem = {
       maxUid = Math.max(maxUid, e.uid);
       if (typeof e.color !== 'number') e.color = VEHICLES[e.type].colors[0];
       if (!e.origin) e.origin = 'bought';
+      // provenance (§45.24): what was put into a bought car, by currency. A car bought before it was recorded is
+      // treated as Dirty-origin at its old resale base (development saves only): "not stolen" is not "clean"
+      if (e.origin === 'bought') {
+        const p = e.prov && typeof e.prov === 'object' ? e.prov : null, ok = v => Number.isFinite(v) && v >= 0 && v < 1e9;
+        e.prov = p && ok(p.dirty) && ok(p.clean) && p.dirty + p.clean > 0 ? { dirty: p.dirty, clean: p.clean } : { dirty: Math.round(carMsrp(e.type) * 0.5), clean: 0 };
+      } else delete e.prov;
       e.dmg = clamp(+e.dmg || 0, 0, 100);
       e.tune = Object.assign({ engine: 0, brakes: 0, grip: 0, armor: 0 }, e.tune || {});
       for (const k in e.tune) e.tune[k] = clamp(e.tune[k] | 0, 0, 3);

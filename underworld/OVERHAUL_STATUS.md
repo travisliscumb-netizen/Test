@@ -11,11 +11,40 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **2.5 — Early laundering fixer** (§45.6, §45.22; prompt "Session 2.5").
-- Commit/base revision: `36d9a47` (Session 2 follow-up) → the Session 2.5 commit on `claude/practical-lamport-zld81y`.
+- Session: **2.5 — Early laundering fixer** (§45.6, §45.22; prompt "Session 2.5"), and its follow-up for the DC-29
+  ruling (§45.24, vehicle provenance).
+- Commit/base revision: `36d9a47` (Session 2 follow-up) → `7f78d30` (Session 2.5) → the Session 2.5 follow-up
+  commit on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-21
 - Precondition met: the unexplained ledger cash was traced and fixed before the fixer was added (Session 2 follow-up,
   below).
+
+## Session 2.5 follow-up (§45.24: vehicle provenance, DC-29)
+
+- **Provenance is recorded at purchase.** `DealerLots.buy` measures what actually paid (Saltworks takes Dirty Cash
+  first, then the bank; Meridian and the prestige lot take the bank only) into the garage entry: `e.prov = { dirty,
+  clean }`. Tuning paid from the bank adds to `prov.clean`. Provenance is separate from `e.origin` (how the car was
+  acquired) and from HOT (Session 5): a car that isn't stolen is not assumed clean.
+- **Resale follows the money** (`ContentManager.saleOf(e)` → `{ total, dirty, clean }`): an ordinary bought car pays
+  each currency in proportion to what went in (all Dirty, all Clean, or split for a mixed purchase); a stolen car
+  pays Dirty Cash through the garage or the chop shop; found, reward and mission cars, which were never paid for,
+  follow their own explicit rule in `CAR_RESALE` (Clean, as before, for review in Session 5). New ledger source
+  `dirtyCarSale` (the Dirty share, to you).
+- **Never above the price.** An ordinary car's resale is the old value formula capped at `RESALE_CAP` 85% of what
+  was put into it (purchase + tuning; repairs are upkeep and don't count), so buying and selling always loses at
+  least 15%: no arbitrage, no laundering loop.
+- **Older saves:** a bought car with no record of what paid for it is Dirty-origin at its old resale base (50% of
+  list), both on load and if any code creates one without a record. Development saves only (§45.2).
+- The sale confirmation says which currency (or the split) you'll get.
+- Tests: new `tests/carmoney.mjs` (10 checks, all purchases through `DealerLots.buy` and sales through the garage
+  screen): Dirty-bought → Dirty; Clean-bought → Clean; mixed $500 cash + $1,500 bank → the same 1:3 split; stolen →
+  Dirty (garage and chop shop); 300 real used-lot stalls bought with Dirty and sold back each return ≤ 85% and no
+  Clean; a 25-round buy-sell loop only loses Dirty and makes no Clean; a Clean-bought new car resells below its
+  price; save/reload keeps provenance and the split. Run against the Session 2.5 build it fails (no provenance, Clean
+  out of a Dirty purchase), passes on the follow-up. `ledger` 54 (+1: a bought car with no record sells for Dirty).
+- Files: `035-core-money.js`, `360-core-content-services.js` (`CAR_RESALE`, `RESALE_CAP`, `saleOf`, sale routing,
+  tuning provenance), `500-underworld-homes-parking.js` (record at purchase), `030-core-save-system.js` (provenance
+  sanitize); handoff §45.24 with notes in §2, §13 and §14.
 
 ## Completed this session (2.5)
 
@@ -89,16 +118,14 @@ once per world hour.
 
 ## Known bugs / risks (2.5)
 
-- **DC-29:** used cars bought with Dirty Cash and sold from the garage launder better than the fixer, and a quarter
-  of them return a profit. Needs a ruling; until then early-economy playtests will route around the fixer.
+- DC-29 is resolved (§45.24, follow-up above).
 - The economic clock is used only by the fixer so far; every other per-day economy still runs on world days (DC-06,
   Sessions 3, 9 and 13).
 
 ## Exact next recommended task
 
 **Session 3 — Warehouses / vault / logistics** (prompt Session 3, handoff phase 4), including the Treasury Warehouse
-designation control (§45.22) and Kingpin's infrastructure condition (DC-25). Rule on DC-29 first if the early
-economy is to be playtested.
+designation control (§45.22) and Kingpin's infrastructure condition (DC-25).
 
 ## Working tree (2.5)
 
@@ -1281,7 +1308,7 @@ in only through a plausible channel (implemented: a crew courier; more channels 
 6. **Tradeoffs / risks:** a betrayal can cost a Rank, which may feel harsh.
 7. **Severity:** OPTIONAL. **Blocks:** nothing.
 
-### DC-29 · Saltworks used cars launder Dirty Cash better than the fixer, and can make money — IMPORTANT (needs a ruling)
+### DC-29 · Saltworks used cars launder Dirty Cash better than the fixer, and can make money — APPROVED WITH PROVENANCE TRACKING (§45.24; implemented in the Session 2.5 follow-up)
 
 1. **Current specification:** §13 / §45.18: Saltworks Used Autos takes cash or the bank (Dirty first); §45.17: the
    sale of a legally owned vehicle pays Clean Bank; §45.6 / §45.22: the early fixer launders at ~30–35% with a
@@ -1306,6 +1333,10 @@ in only through a plausible channel (implemented: a crew courier; more channels 
    but its sale would pay Dirty), so it needs the owner's ruling; (b) is a balance change.
 7. **Severity:** IMPORTANT. **Blocks:** nothing in code; until ruled, playtesting the early economy will route around
    the fixer. Nothing was changed in Session 2.5.
+
+**Disposition (owner, §45.24):** a car resells in the currency it was bought with; stolen/HOT cars through criminal
+channels pay Dirty; provenance is separate from HOT; ordinary resale never exceeds the recorded purchase price, so
+flipping loses money; special/unique/prize cars may get explicit custom rules later.
 
 ## Owner decisions (Session 0 review)
 
@@ -1732,3 +1763,4 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | 9 | 2 | `uw.turfs[i].own` (authoritative owner: `'pc'`, a faction id or null; derived once from influence for older saves) and `uw.turfs[i].offer` (`{ fid, until }` for a ceded turf); `uw.stageMax` → `uw.rankMax`; `upgrades` keeps only `stamina` and `health`, removed levels refunded to Clean Bank; turf wars may have `a: 'pc'` (a showdown the player called) |
 | 9 | 2 follow-up | crew members gain `morale` (0-10), `boosts` (recent bonuses, fading) and `raiseLoyal` (0-10); sanitized with defaults, no version bump |
 | 9 | 2.5 | `uw.econH` (economic clock, hours) and `uw.fixer` (laundering batches, daily use, totals); defaults on load, no version bump |
+| 9 | 2.5 follow-up | garage entries of bought cars gain `prov` (`{ dirty, clean }` put into the car); a bought entry without it becomes Dirty-origin at 50% of list; other origins carry none; no version bump |
