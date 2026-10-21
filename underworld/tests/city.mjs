@@ -87,7 +87,7 @@ check('suburban street patterns vary (cul-de-sacs, crescents, street lots, low-r
 // 4. districts
 const dz = await ev(() => { const g = window.game, Z = window.__pv.ZONES; const need = ['c', 'm', 'o', 'l', 'u', 's', 'h', 'w', 'g', 'p', 'a', 'r']; const zm = window.__pv.GAME_CONFIG.world.zoneMap.join(''); return { missing: need.filter(k => !Z[k] || !zm.includes(k)), names: need.map(k => Z[k] && Z[k].name) }; });
 check('every district exists on the map (downtown, industrial, port, suburbs, wealthy, park, stadium, old quarter, country, nightlife)', dz.missing.length === 0, JSON.stringify(dz));
-const lm = await ev(() => { const w = window.game.world; return { stadium: !!w.stadium, parkade: !!w.parkade, tower: !!w.towerTop, terminal: !!w.terminalShed, mapPlaces: w.mapPlaces.map(m => m.id) }; });
+const lm = await ev(() => { const w = window.game.world; return { stadium: !!w.stadium, parkade: !!w.parkade, tower: !!w.towerTop, terminal: !!(w.compounds && w.compounds.whse_d), mapPlaces: w.mapPlaces.map(m => m.id) }; });
 check('the landmarks are generated (stadium, parkade, tower top, terminal, park, estate, farm)', lm.stadium && lm.parkade && lm.tower && lm.terminal && ['greenway', 'estate', 'farm', 'terminal', 'stadium'].every(k => lm.mapPlaces.includes(k)), JSON.stringify(lm));
 
 // 5. locations on real sidewalks
