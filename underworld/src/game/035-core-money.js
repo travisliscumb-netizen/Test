@@ -34,7 +34,7 @@ const MONEY_SOURCES = {
   // ---- Dirty costs
   armorer: { pay: 'dirty' }, supplier: { pay: 'dirty' }, raceBuyIn: { pay: 'dirty' }, respect: { pay: 'dirty' },
   truce: { pay: 'dirty' }, payAndSpray: { pay: 'dirty' }, usedLot: { pay: 'either' },
-  wages: { pay: 'payroll', book: 'wages' }, crewFee: { pay: 'payroll' }, delivery: { pay: 'payroll', book: 'deliveries' }, protection: { pay: 'payroll', book: 'protection' },
+  wages: { pay: 'payroll', book: 'wages' }, crewFee: { pay: 'payroll' }, protection: { pay: 'payroll', book: 'protection' },
   bribe: { pay: 'payroll', book: 'bribes' },
   // big jail bribes paid with outside money, only through a courier on the street (§45.22); everyday jail spending
   // is the commissary account on the sentence, not this ledger

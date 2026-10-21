@@ -130,7 +130,7 @@ const runs = await ev(arg => {
   const st0 = Inv.has(S.storage.whse_w, 'smokes'), v0 = M.dirtyAtProp('whse_w');
   out.supply = R.dispatch(drv.id, 'spot:sully', 'whse_w', 'smokes', 10);
   const run = S.runs.find(r => r.crew === drv.id);
-  out.paid = v0 - M.dirtyAtProp('whse_w'); out.cost = run && run.cost; out.fee = run && run.fee;
+  out.paid = v0 - M.dirtyAtProp('whse_w'); out.cost = run && run.cost; out.fee = run ? run.fee : 'none';
   out.inTransit = Inv.has(S.storage.whse_w, 'smokes') === st0;
   const rep = run ? R.resolve(run, 0) : null; out.outcome = rep && rep.outcome;
   out.arrived = Inv.has(S.storage.whse_w, 'smokes') - st0; out.basis = Math.round(Inv.cost(S.storage.whse_w, 'smokes'));
@@ -142,7 +142,7 @@ const runs = await ev(arg => {
   return out;
 }, { turf: sell.turf });
 check('only a Driver makes deliveries', /Driver/.test(runs.notDriver), runs.notDriver);
-check('a supply run buys at the supplier with the vault’s cash; the product is on the road, then arrives with its cost basis', runs.supply === '' && runs.paid === runs.cost + runs.fee && runs.inTransit && runs.outcome === 'success' && runs.arrived === 10 && runs.basis >= runs.cost, JSON.stringify(runs));
+check('a supply run buys at the supplier with the vault’s cash; the product is on the road, then arrives with its cost basis', runs.supply === '' && runs.paid === runs.cost && runs.fee === undefined && runs.inTransit && runs.outcome === 'success' && runs.arrived === 10 && runs.basis >= runs.cost, JSON.stringify(runs));
 check('route risk tiers rise from own turf to hostile ground (own < friendly < neutral < rival < hostile)', runs.tiers.every((x, i, a) => typeof x === 'number' && (i === 0 || x > a[i - 1])), JSON.stringify(runs.tiers));
 const routes = await ev(() => {
   const g = window.game, uw = g.uw, R = uw.runs, S = uw.S, out = {};

@@ -162,7 +162,7 @@ const runA = await ev(id => {
 }, crewSetup[0]);
 check('runner bands: rookie 50-60%, decent 60-75%, experienced 75-85%, elite 85-90% (before route factors)', runA.rookie >= 0.5 && runA.rookie <= 0.6 && runA.decent >= 0.6 && runA.decent <= 0.75 && runA.exp >= 0.75 && runA.exp <= 0.85 && runA.elite >= 0.85 && runA.elite <= 0.9, JSON.stringify(runA));
 check('the chance is built from several factors, not a bare roll', runA.factors >= 4, String(runA.factors));
-check('delivery fee is small but real ($150-$600) and paid up front', runA.fee >= 150 && runA.fee <= 600 && runA.paid === runA.fee, JSON.stringify(runA));
+check('a Driver is salaried: a run between your own stashes costs no fee (§45.25)', runA.fee === undefined && runA.paid === 0, JSON.stringify(runA));
 check('dispatch: the goods leave the pickup and are on the road', runA.err === '' && runA.flop === 30 && runA.linden === 0 && runA.runs === 1, JSON.stringify(runA));
 const cRun = await census();
 check('goods on the road are still counted exactly once', cRun.tot.green === cPre.tot.green && cRun.cost.green === cPre.cost.green, JSON.stringify([cPre, cRun]));
@@ -179,7 +179,7 @@ check('save/reload mid-delivery: the run survives, nothing duplicated or lost', 
 // make it arrive: success
 const ok1 = await ev(() => { const uw = window.game.uw, r = uw.S.runs[0]; const rep = uw.runs.resolve(r, 0); return { rep, linden: uw.S.storage.linden.green | 0, cost: uw.S.storage.linden.$cb && uw.S.storage.linden.$cb.green, runs: uw.S.runs.length, log: uw.S.runLog.length }; });
 check('successful delivery: all 5 lb arrive with their cost basis', ok1.rep.outcome === 'success' && ok1.linden === 10 && Math.abs(ok1.cost - 1300) < 0.01 && ok1.runs === 0, JSON.stringify(ok1));
-check('a delivery report names runner, origin, destination, cargo, quantity, fee and outcome', ok1.rep.name && ok1.rep.from && ok1.rep.to && ok1.rep.good === 'green' && ok1.rep.n === 10 && ok1.rep.fee > 0 && ok1.log >= 1, JSON.stringify(ok1.rep));
+check('a delivery report names runner, origin, destination, cargo, quantity and outcome', ok1.rep.name && ok1.rep.from && ok1.rep.to && ok1.rep.good === 'green' && ok1.rep.n === 10 && !('fee' in ok1.rep) && ok1.log >= 1, JSON.stringify(ok1.rep));
 // each failure type, deterministic
 const outcomes = await ev(ids => {
   const g = window.game, uw = g.uw, S = uw.S, R = uw.runs, out = {};

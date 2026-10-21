@@ -1442,7 +1442,7 @@ in only through a plausible channel (implemented: a crew courier; more channels 
 channels pay Dirty; provenance is separate from HOT; ordinary resale never exceeds the recorded purchase price, so
 flipping loses money; special/unique/prize cars may get explicit custom rules later.
 
-### DC-30 · Session 3 is two sessions: systems (3A) and presentation (3B) — RECOMMENDED (proceeding as proposed)
+### DC-30 · Session 3 is two sessions: systems (3A) and presentation (3B) — APPROVED (§45.25; 3B is the functional physical layer, now)
 
 1. **Current specification:** prompt Session 3 lists the warehouse model, slots, Driver logistics, Dealer supply,
    Lieutenant automation, the vault, five physical security levels, four upgrade categories, visual persistence,
@@ -1457,15 +1457,15 @@ flipping loses money; special/unique/prize cars may get explicit custom rules la
 6. **Tradeoffs / risks:** until 3B, security upgrades are only visible in the warehouse screen.
 7. **Severity:** RECOMMENDED. **Blocks:** nothing. Please confirm, or ask for 3B to be folded into a later session.
 
-### DC-31 · Session 3A tuning choices — OPTIONAL (for review; each is one constant)
+### DC-31 · Session 3A tuning choices — RULED (§45.25): Driver per-run fee REMOVED; the other constants stand for now
 
 - Upgrade prices 15% / 30% / 60% / 120% of the warehouse's price per tier (Cannery Row: $288,000 from Basic to
   Maximum Security in all four categories); vault $100k → $50M; storage ×1 → ×2 (`WH_TIER_COST`, `WH_VAULT`,
   `WH_STORE_MUL`).
 - Immunity at level 5 with 4 Enforcers and a Lieutenant (the spec's "roughly 4-6 Enforcers"; `WH_IMMUNE`).
 - Corners hold 60 units; the Lieutenant tops them up to 40 and reorders at 60 units of space, 80 at a time.
-- A Driver on the payroll still charges the per-run fee (fuel, wear, a few envelopes); the alternative is fee-free
-  runs for Drivers since they are paid daily.
+- ~~A Driver on the payroll still charges the per-run fee~~ — removed (§45.25): Drivers are salaried; runs cost payroll,
+  product, losses and risk. More logistics pressure later would be a transparent operating-overhead design challenge.
 - Route hijack risk per stretch 0.2% / 1% / 3% / 7% / 12% (`ROUTE_RISK`).
 
 ## Owner decisions (Session 0 review)

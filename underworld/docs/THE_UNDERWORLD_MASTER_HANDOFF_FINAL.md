@@ -128,6 +128,8 @@ First turf can happen before warehouse; player manually resupplies early.
 
 ## 5. WAREHOUSES — FULL REBUILD
 
+> Amended by §45.25 (Session 3B builds the physical warehouse; Drivers charge no per-run fee).
+
 Warehouses become core empire infrastructure:
 
 - bulk product storage
@@ -163,6 +165,8 @@ Manages warehouse/district, automates dispatch, coordinates defense.
 ---
 
 ## 6. WAREHOUSE FIVE-LEVEL SECURITY PATH
+
+> Amended by §45.25 (functional physical layer in Session 3B, its regression tests).
 
 ### Level 1 — Basic
 
@@ -1181,3 +1185,25 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       bypasses the money system.
     - Regression tests: Dirty-bought → Dirty resale; Clean-bought → Clean resale; stolen/HOT → Dirty criminal resale;
       no ordinary resale above purchase price; save/reload keeps provenance; no used-car laundering loop.
+25. **Session 3 rulings (mixed provenance, DC-30, DC-31).**
+    - **Mixed vehicle purchases (approved as implemented).** A legal purchase paid partly in Dirty Cash and partly from
+      Clean Bank resells split in the same recorded proportions; the whole vehicle is not Dirty because some Dirty
+      Cash was used. Payment provenance stays separate from HOT/acquisition status; stolen vehicles resell Dirty;
+      ordinary resale stays capped below the invested cost; prize/found/mission vehicles keep explicit custom rules.
+    - **Session 3B (DC-30, approved).** The functional physical warehouse is built now, not deferred to the late
+      graphics pass, because raids and gang wars need it: visible security progression for levels 1-5 (fences and
+      walls, gates, cameras, lighting and floodlights, bollards, barriers and a guard booth where appropriate,
+      protected loading areas), the automatic authorized gate (rivals stay locked out), the interior and its
+      functional rooms, and correct collision, navigation and access paths. Functional art and gameplay
+      readability only; the cinematic/material/texture/lighting overhaul stays in the dedicated graphics session.
+      Regression tests: every tier visibly changes; tier state survives save/reload; the gate opens for the player,
+      authorized crew, Drivers and delivery vehicles and rejects rivals and unauthorized NPCs; vehicles enter and
+      leave without clipping; the loading bay works; every interior gameplay area is reachable; no blocked doors,
+      stairs or interactions; Maximum Security geometry actually supports its defensive behavior; lower tiers do
+      not inherit Maximum Security protection; mobile performance stays within budget.
+    - **Driver per-run fee removed (DC-31).** Drivers are salaried crew; their normal logistics runs carry no separate
+      labour fee. Logistics costs the player through Driver payroll, product purchases, cargo losses, route/rival/
+      police risk and vehicle consequences. If logistics needs more economic pressure later, raise a design
+      challenge for transparent warehouse/fleet operating overhead; never quietly restore per-run fees.
+    - **Development saves.** Dealer corners starting empty is acceptable; no complicated migration for old
+      development careers (a small dev-only convenience may be proposed for testing).

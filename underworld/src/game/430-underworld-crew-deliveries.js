@@ -22,7 +22,7 @@ class DeliveryManager {
     if (!r || typeof r !== 'object' || !GOODS[r.good] || !this.placeOk(r.to) || r.to === 'inv' || this.isSpot(r.to)) return null;
     if (!this.placeOk(r.from) || this.isTurf(r.from)) return null;
     const n = Math.floor(num(r.n, 0, 0, 1e5)); if (!(n > 0)) return null;
-    return { id: Math.floor(num(r.id, 0, 0, 1e7)), crew: Math.floor(num(r.crew, 0, 0, 1e7)), from: r.from, to: r.to, good: r.good, n, cost: num(r.cost, 0, 0, 1e9), fee: Math.round(num(r.fee, 0, 0, 1e6)), start: num(r.start, 0, 0, 1e8), eta: num(r.eta, 0, 0, 1e8), chance: num(r.chance, 0.7, 0.05, 0.99), dist: num(r.dist, 200, 0, 5000), name: typeof r.name === 'string' ? r.name : 'Runner' };
+    return { id: Math.floor(num(r.id, 0, 0, 1e7)), crew: Math.floor(num(r.crew, 0, 0, 1e7)), from: r.from, to: r.to, good: r.good, n, cost: num(r.cost, 0, 0, 1e9), start: num(r.start, 0, 0, 1e8), eta: num(r.eta, 0, 0, 1e8), chance: num(r.chance, 0.7, 0.05, 0.99), dist: num(r.dist, 200, 0, 5000), name: typeof r.name === 'string' ? r.name : 'Runner' };
   }
   band(c) { let b = RUNNER_BANDS[0]; for (const x of RUNNER_BANDS) if (c.skill >= x[0]) b = x; return b; }
   // places a run can start or end: 'inv' (you), a property id, 'turf:<i>' (a dealer's corner), 'spot:<id>' (a supplier)
@@ -85,9 +85,10 @@ class DeliveryManager {
     if (uw.props.perk('delivery') > 0) add('your couriers and drivers', uw.props.perk('delivery'));
     p = clamp(p, 0.3, 0.95);
     const dist = Math.hypot(A.x - B.x, A.z - B.z);
-    const fee = Math.round((150 + dist * 0.3 + Math.min(value * 0.025, 2500) + (1 - p) * 350) * (0.8 + c.skill / 100 * 0.6) / 10) * 10;
+    // Drivers are salaried crew: a run has no labour fee of its own (§45.25). It costs payroll, any product bought,
+    // and whatever the route takes in losses.
     const hours = clamp(Math.round(dist / 220) + 1, 1, 6);
-    return { p, why, fee, hours, dist, value, rival, police: policeRisk, kinds };
+    return { p, why, hours, dist, value, rival, police: policeRisk, kinds };
   }
   // start a run: the goods leave the origin now
   // opts.auto: sent by a warehouse's Lieutenant (fees and purchases come out of that warehouse's vault first)
@@ -116,13 +117,12 @@ class DeliveryManager {
     if (n <= 0) return 'There is none of that at the pickup.';
     if (this.freeAt(to) < n * GOODS[good].size) return `Not enough room at ${this.placeName(to)} (with other runs on the way).`;
     const a = this.assess(c, from, to, good, n); if (!a) return 'No route.';
-    if (Money.payrollReserve() < a.fee + buy) return `The run needs ${fmtMoney(a.fee + buy)} in Dirty Cash${buy ? ` (${fmtMoney(buy)} for the product)` : ''}.`;
-    Money.pay(a.fee, 'delivery', { first });
+    if (buy && Money.payrollReserve() < buy) return `The product costs ${fmtMoney(buy)} in Dirty Cash, from the vault first.`;
     let cost;
     if (buy) { Money.pay(buy, 'supplyRun', { first }); S.supply[from.slice(5)][good] -= n; cost = buy; }
     else cost = Inv.remove(this.container(from), good, n);
     const now = this.absHour();
-    const r = { id: S.nextRun++, crew: c.id, name: uw.crew.displayName(c), from, to, good, n, cost, fee: a.fee, start: now, eta: now + a.hours, chance: a.p, dist: a.dist, rival: a.rival, police: a.police };
+    const r = { id: S.nextRun++, crew: c.id, name: uw.crew.displayName(c), from, to, good, n, cost, start: now, eta: now + a.hours, chance: a.p, dist: a.dist, rival: a.rival, police: a.police };
     if (opts.auto) r.auto = true;
     S.runs.push(r); S.st.runs = (S.st.runs || 0) + 1;
     if (!opts.auto) g.audio.play('confirm');
@@ -171,7 +171,7 @@ class DeliveryManager {
     }
     if (c && c.status === 'active') { if (outcome === 'success') { c.wins = (c.wins || 0) + 1; c.skill = clamp(c.skill + 0.6, 0, 100); } }
     if (outcome === 'success' || outcome === 'partial') S.st.runsOk = (S.st.runsOk || 0) + 1;
-    const rep = { id: r.id, day: S.day, name: r.name, from: srcName, to: this.placeName(r.to), good: r.good, n: r.n, delivered, returned, lost, fee: r.fee, outcome, text: extra.trim(), chance: r.chance };
+    const rep = { id: r.id, day: S.day, name: r.name, from: srcName, to: this.placeName(r.to), good: r.good, n: r.n, delivered, returned, lost, outcome, text: extra.trim(), chance: r.chance };
     S.runLog.push(rep); if (S.runLog.length > 20) S.runLog.splice(0, S.runLog.length - 20);
     const g = this.g, title = RUN_OUTCOMES[outcome];
     uw.news(r.name.split(' ')[0], `${title}: ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} ${srcName} → ${this.placeName(r.to)}. ${delivered ? 'Delivered ' + fmtQty(r.good, delivered) + '.' : 'Nothing delivered.'}${lost ? ' Lost ' + fmtQty(r.good, lost) + '.' : ''} Fee ${fmtMoney(r.fee)}. ${rep.text}`);
