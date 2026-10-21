@@ -143,6 +143,7 @@ class Underworld {
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
+    this.compounds = new CompoundSystem(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -265,6 +266,7 @@ class Underworld {
     this.owner = new Array(this.T.length).fill(null); this.contested = new Array(this.T.length).fill(false);
     this.recompute();
     this.gangs.reset(); this.crew.reset(); this.pickups.clear(); this.opps.rebuildMarkers();
+    if (this.compounds) this.compounds.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -517,6 +519,8 @@ class Underworld {
     const g = this.g, p = g.player, A = this.anchor(), props = new Set(), trunks = [], seen = new Set();
     const PM = this.props;
     if (A.prop && PM.owned(A.prop)) props.add(A.prop);
+    // a car in one of a warehouse's dock bays is at the warehouse (the loading bay)
+    if (!A.inside && !A.under) { const wd = this.compounds.dockAt(A.x, A.z); if (wd && PM.owned(wd)) props.add(wd); }
     if (!A.inside && !A.under) for (const d of PM.ownedList()) {
       if (props.has(d.id) || !PM.storageCap(d.id)) continue;
       const L = this.loc('prop', d.id);
@@ -746,6 +750,7 @@ class Underworld {
     }
     if (dt > 0) {
       this.pickups.update(dt);
+      this.compounds.update(dt);
       if (!S.jail) { this.gangs.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
       this.combatT = Math.max(0, this.combatT - dt);
     }
@@ -774,6 +779,8 @@ class Underworld {
     this.crew.tickDay();
     // Lieutenants send Drivers to restock the corners for tomorrow (§5, §8)
     this.whse.automate();
+    // the compound crews mend whatever was rammed (§6)
+    this.compounds.mend();
     this.factions.tickDay();
     this.cops.tickDay();
     this.opps.tickDay();
@@ -843,6 +850,7 @@ class Underworld {
       if (v.speed < 3) {
         const ch = this.loc('spot', 'chop');
         if (ch && dist2(v.pos.x, v.pos.z, ch.x, ch.z) < 9 * 9 && !v.owned && !v.garageUid) return { label: `Sell ${v.spec.name} to the chop shop (${fmtMoney(this.chopValue(v))})`, act: () => this.sellCar(v) };
+        const lb = this.compounds.bayAction(v); if (lb) return lb;
         const ga = this.props.garageActionVehicle(v); if (ga) return ga;
       }
       return null;

@@ -692,6 +692,13 @@ class EmpireUI {
     if (tab === 'security') {
       h += '<div class="jobs">' + WH_CAT_IDS.map(k => { const t = W.tier(id, k), C = WH_CATS[k], cost = W.upgradeCost(id, k); return `<div class="job"><i>${'■'.repeat(t)}${'□'.repeat(4 - t)}</i><div><b>${esc(C.name)}</b><span>${esc(C.tiers[t])}${t < 4 ? ` · next: ${esc(C.tiers[t + 1])}` : ''}</span></div><button class="sbtn gold" data-act="wup:${k}" ${t >= 4 || !Money.can(cost, 'property') ? 'disabled' : ''}>${t >= 4 ? 'Done' : fmtMoney(cost)}</button></div>`; }).join('') + '</div>';
       const enf = W.crewAt(id, 'enforcer').length, lt = W.crewAt(id, 'lieutenant').length;
+      // what the compound physically has right now (Session 3B): it is what you see on site
+      if (uw.compounds.R[id]) {
+        const P = uw.compounds.status(id), pct = f => Math.round(f * 100) + '%';
+        const FN = { none: 'open lot', chain: 'chain-link fence', tall: 'tall fence behind bollards', anticlimb: 'anti-climb fence behind anti-ram barriers', wall: 'hardened wall and fence' };
+        const GN = { none: 'an open gap', basic: 'a basic gate', motor: 'a motorised gate', reinforced: 'a reinforced gate and guard booth', massive: 'a massive gate, wedge barrier, access posts and booth' };
+        h += `<h3>On site</h3><div class="stats"><span>Perimeter</span><span>${FN[P.fence]}</span><span>Way in</span><span>${GN[P.gate]}</span><span>Cameras</span><span>${P.cams ? `${P.cams} · cover ${pct(P.day)} of the yard by day, ${pct(P.night)} at night` : 'none'}</span><span>Lights</span><span>${P.lights} fixture${P.lights === 1 ? '' : 's'}</span>${P.breaches ? `<span>Damage</span><span style="color:var(--red)">${P.breaches} breach${P.breaches === 1 ? '' : 'es'} · mended at the end of the day</span>` : ''}</div>`;
+      }
       h += `<div class="hint">The security level is set by the weakest of the four. At ${WH_LEVEL_NAME[4]} with at least ${WH_IMMUNE.enforcers} Enforcers and a Lieutenant on site, ordinary rival raids can’t knock it off (now: level ${W.level(id)}, ${enf} Enforcer${enf === 1 ? '' : 's'}, ${lt ? 'a Lieutenant' : 'no Lieutenant'}). A gang-war assault, the police, betrayal or sabotage are another matter. Defense ${Math.round(W.defense(id))}.</div>`;
       return h;
     }

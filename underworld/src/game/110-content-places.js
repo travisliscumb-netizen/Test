@@ -8,7 +8,9 @@ Object.assign(LANDMARK_BLOCKS, {
   // v6: a used-car lot across the street from the chop shop, and a performance & luxury showroom downtown
   '10,5': { gen: '_genUsedLot', name: 'Saltworks Used Autos', icon: 'U', ground: 'K', mapCat: 'carsUsed', sub: 'Used cars · condition varies · bargains · stock changes every two days' },
   '8,5': { gen: '_genShowroom', name: 'Valen Prestige Motors', icon: '★', ground: 'D', mapCat: 'carsLux', sub: 'Performance & luxury · glass showroom · rare cars rotate' },
-  '11,8': { gen: '_genDepot', name: 'Harbor Row Depot', icon: 'D', ground: 'I' }
+  '11,8': { gen: '_genDepot', name: 'Harbor Row Depot', icon: 'D', ground: 'I' },
+  // Session 3B: the Cannery Row warehouse compound takes the whole block (yard, fence line, gate, loading docks)
+  '7,10': { gen: '_genCannery', name: 'Cannery Row Warehouse', icon: 'W', ground: 'I' }
 });
 
 Object.assign(World.prototype, {
@@ -221,6 +223,98 @@ Object.assign(World.prototype, {
       under: { x: (wh.x0 + wh.x1) / 2, z: (wh.z0 + wh.z1) / 2 }
     };
   },
+  /* Warehouse compounds (§5-§6, Session 3B). The world builds only what never changes: the yard, the
+     building, its loading docks and doors, painted bays. Everything security buys (fence or wall, gate, booth,
+     barriers, cameras, lights) is built at runtime from the saved tiers by CompoundSystem, from the spec this
+     records in world.compounds[propId]: the lot rectangle, the gate, the dock bays, the drive lanes in and out,
+     the yard parking and the personnel door. Sides are 'n' (low z), 's', 'w' (low x), 'e'. */
+  _genCannery(b, rng) {
+    this._sidewalk(b, rng, { trees: 0, park: 0 });
+    // the gate sits in the clear stretch of pavement between the middle street lamp and the next utility pole
+    const cx = b.cx, gx = cx + 4.5;
+    this._whCompound(b, rng, {
+      id: 'whse_w', place: 'cannery', name: 'Cannery Row Warehouse', color: 0x8a6f58, sign: 'CANNERY ROW', sub: 'COLD STORE · BONDED · NO ADMITTANCE',
+      lot: { x0: b.x0 + 1, z0: b.z0 + 1, x1: b.x1 - 1, z1: b.z1 - 1 },
+      gate: { side: 'n', at: gx, w: 8 },
+      bld: { x0: b.x0 + 6, z0: b.z0 + 30, x1: b.x1 - 6, z1: b.z1 - 4, h: 10 }, face: 'n',
+      docks: [cx - 9, cx + 9], door: b.x0 + 9,
+      park: [{ x: b.x1 - 4, z: b.z0 + 16, h: Math.PI }],
+      booth: { x: gx + 8.5, z: b.z0 + 4.5, w: 3, d: 3 },
+      front: ['n', 's', 'w', 'e'], apron: { x0: gx - 4, z0: b.z0 - 4, x1: gx + 4, z1: b.z0 },
+      lanes: {
+        in: [[[gx, b.z0 - 9], [gx, b.z0 - 4], [gx, b.z0 + 1], [gx, b.z0 + 6], [cx - 5, b.z0 + 13], [cx - 9, b.z0 + 19], [cx - 9, b.z0 + 25]],
+             [[gx, b.z0 - 9], [gx, b.z0 - 4], [gx, b.z0 + 1], [gx, b.z0 + 6], [cx + 7.5, b.z0 + 13], [cx + 9, b.z0 + 19], [cx + 9, b.z0 + 25]]],
+        out: [[[cx - 9, b.z0 + 19, 1], [cx - 14, b.z0 + 13, 1], [cx - 3, b.z0 + 9], [gx, b.z0 + 4], [gx, b.z0 + 1], [gx, b.z0 - 5], [gx, b.z0 - 10]],
+              [[cx + 9, b.z0 + 19, 1], [cx + 14, b.z0 + 13, 1], [cx + 9, b.z0 + 9], [gx, b.z0 + 4], [gx, b.z0 + 1], [gx, b.z0 - 5], [gx, b.z0 - 10]]]
+      }
+    });
+  },
+  _whCompound(b, rng, s) {
+    const L = s.lot, B = s.bld, Y = CURB_H;
+    const SV = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
+    const edge = (side) => side === 'n' ? L.z0 : side === 's' ? L.z1 : side === 'w' ? L.x0 : L.x1;
+    const ns = (side) => side === 'n' || side === 's';
+    this._rectS(L.x0, L.z0, L.x1, L.z1, 'concrete');
+    // the building, its name on the yard face, a parapet ring
+    const wh = this._bld(b, B.x0, B.z0, B.x1, B.z1, B.h, STYLE.WARE, s.color, 4.5, 6, { gtype: 3, exactH: true });
+    this._ring(b, wh, wh.y0 + wh.h - 0.25, 0.5, 0.2, C(0x6f767c));
+    this._rooftop(b, wh, rng, 'ind');
+    const fo = SV[s.face], fz = s.face === 'n' ? B.z0 : s.face === 's' ? B.z1 : null, fx = s.face === 'w' ? B.x0 : s.face === 'e' ? B.x1 : null;
+    const onFace = (a, out) => ns(s.face) ? [a, fz + fo[1] * out] : [fx + fo[0] * out, a];
+    const ry = Math.atan2(fo[0], fo[1]);
+    const mid = ns(s.face) ? (B.x0 + B.x1) / 2 : (B.z0 + B.z1) / 2;
+    { const [x, z] = onFace(mid, 0.06); b.signs.push({ text: s.sign, x, y: Y + B.h - 2.2, z, ry, w: 11, h: 1.4, bg: '#14181c', fg: '#e8c04a' }); }
+    { const [x, z] = onFace(mid, 0.06); b.signs.push({ text: s.sub, x, y: Y + B.h - 3.4, z, ry, w: 11, h: 0.55, bg: '#b03a2e', fg: '#ffffff' }); }
+    // loading docks: a raised platform with bumpers in front of each dock door, a dock light, painted bays
+    const docks = [];
+    for (const a of s.docks) {
+      const [px, pz] = onFace(a, 1.0), sx = ns(s.face) ? 6 : 2, sz = ns(s.face) ? 2 : 6;
+      this._det(b, 'box', px, Y + 0.6, pz, sx, 1.2, sz, C(CONCRETE), 0, true);
+      for (const k of [-1.6, 1.6]) { const [qx, qz] = onFace(a + k, 2.06); this._det(b, 'box', qx, Y + 0.75, qz, ns(s.face) ? 0.45 : 0.12, 0.45, ns(s.face) ? 0.12 : 0.45, C(0x151515)); }
+      { const [qx, qz] = onFace(a, 0.03); this._det(b, 'box', qx, Y + 1.2 + 1.8, qz, ns(s.face) ? 4.4 : 0.1, 3.8, ns(s.face) ? 0.1 : 4.4, C(0x1a1c20)); }
+      { const [qx, qz] = onFace(a, 0.3); b.fx.push({ type: 'docklight', x: qx, y: Y + 5.4, z: qz, w: 3 }); }
+      // the bay a van backs into or noses up to: two side lines and a stop bar
+      const bayOut = 2.0 + 0.4 + 2.6, [bx, bz] = onFace(a, bayOut);
+      for (const k of [-1.7, 1.7]) { const [qx, qz] = onFace(a + k, bayOut + 0.6); this._det(b, 'box', qx, Y + 0.012, qz, ns(s.face) ? 0.14 : 6.6, 0.02, ns(s.face) ? 6.6 : 0.14, C(0xe8c04a)); }
+      { const [qx, qz] = onFace(a, bayOut + 3.9); this._det(b, 'box', qx, Y + 0.012, qz, ns(s.face) ? 3.4 : 0.14, 0.02, ns(s.face) ? 0.14 : 3.4, C(0xe8c04a)); }
+      const [dx, dz] = onFace(a, 0.16);
+      docks.push({ x: dx, z: dz, y: Y + 1.2, w: 3.6, h: 3.4, axis: ns(s.face) ? 'x' : 'z', face: s.face, bay: { x: bx, z: bz, h: Math.atan2(-fo[0], -fo[1]) } });
+    }
+    // the personnel door (the property's door: you walk in here)
+    const [ddx, ddz] = onFace(s.door, 0.08);
+    this._det(b, 'box', ddx, Y + 1.2, ddz, ns(s.face) ? 1.3 : 0.12, 2.4, ns(s.face) ? 0.12 : 1.3, C(0x2a2e33));
+    { const [qx, qz] = onFace(s.door, 0.6); b.fx.push({ type: 'canopy', x: qx, y: Y + 2.9, z: qz, w: ns(s.face) ? 1.6 : 1, d: ns(s.face) ? 1 : 1.6 }); }
+    const [px0, pz0] = onFace(s.door, 1.1), door = { x: px0, z: pz0, h: ry };
+    // yard parking paint
+    for (const pk of s.park) { const al = Math.abs(Math.sin(pk.h)) > 0.5; this._det(b, 'box', pk.x, Y + 0.012, pk.z, al ? 5.6 : 2.6, 0.02, al ? 2.6 : 5.6, C(0x3a3e44)); }
+    // a dark apron across the pavement where the trucks come in
+    if (s.apron) this._det(b, 'box', (s.apron.x0 + s.apron.x1) / 2, Y + 0.006, (s.apron.z0 + s.apron.z1) / 2, s.apron.x1 - s.apron.x0, 0.01, s.apron.z1 - s.apron.z0, C(0x2c2f34));
+    // the perimeter line: the lot's four sides, less the gate opening and any stretch the building wall closes
+    const G = s.gate, gn = SV[G.side].map(v => -v), gx = ns(G.side) ? G.at : edge(G.side), gz = ns(G.side) ? edge(G.side) : G.at;
+    const perim = [];
+    for (const side of ['n', 's', 'w', 'e']) {
+      const e0 = edge(side), a0 = ns(side) ? L.x0 : L.z0, a1 = ns(side) ? L.x1 : L.z1;
+      let cuts = [];
+      if (side === G.side) cuts.push([G.at - G.w / 2, G.at + G.w / 2]);
+      const bE = side === 'n' ? B.z0 : side === 's' ? B.z1 : side === 'w' ? B.x0 : B.x1;
+      if (Math.abs(bE - e0) < 0.05) cuts.push(ns(side) ? [B.x0, B.x1] : [B.z0, B.z1]);
+      cuts.sort((p, q) => p[0] - q[0]);
+      let a = a0;
+      for (const [c0, c1] of cuts) { if (c0 - a > 0.3) perim.push({ side, a0: a, a1: c0, e: e0 }); a = Math.max(a, c1); }
+      if (a1 - a > 0.3) perim.push({ side, a0: a, a1, e: e0 });
+    }
+    const lane = pts => pts.map(p => ({ x: p[0], z: p[1], rev: !!p[2] }));
+    const yard = { x0: L.x0, z0: L.z0, x1: L.x1, z1: L.z1 };
+    b.place = { id: s.place, name: s.name, kind: 'landmark', door, garage: s.park[0], under: { x: (B.x0 + B.x1) / 2, z: (B.z0 + B.z1) / 2 } };
+    this.compounds[s.id] = {
+      id: s.id, place: s.place, name: s.name, block: b.i, lot: { ...L }, yard, bld: { ...B }, face: s.face,
+      gate: { side: G.side, x: gx, z: gz, w: G.w, axis: ns(G.side) ? 'x' : 'z', n: gn },
+      docks, door, park: s.park.map(p => ({ ...p })), booth: s.booth, front: s.front.slice(), perim,
+      lanes: { in: s.lanes.in.map(lane), out: s.lanes.out.map(lane) },
+      center: { x: (L.x0 + L.x1) / 2, z: (L.z0 + L.z1) / 2 }
+    };
+    return wh;
+  },
   // collect every door and service point after the whole city is built
   _placesGen() {
     const P2 = this.places = {};
@@ -240,7 +334,6 @@ Object.assign(World.prototype, {
     P2.mall = { id: 'mall', name: 'Harborview Mall', kind: 'landmark', door: { x: mb.cx, z: mb.z0 + 31, h: 0 } };
     const sd = this.stadium;
     P2.stadium = { id: 'stadium', name: 'Valen Stadium', kind: 'landmark', door: { x: sd.cx, z: sd.cz + sd.B + 18, h: 0 }, center: { x: sd.cx, z: sd.cz }, tunnel: sd.tunnel };
-    P2.shed4 = { id: 'shed4', name: 'Tidewater Shed 4', kind: 'landmark', door: { x: this.terminalShed.x, z: this.terminalShed.z, h: this.terminalShed.h } };
     if (this.parkade) P2.parkade = { id: 'parkade', name: 'Central Parkade', kind: 'landmark', door: { x: this.parkade.entrance.x, z: this.parkade.entrance.z, h: Math.PI } };
     const qg = this.block(2, 5);
     P2.garageRoof = { id: 'garageRoof', name: 'Quarter Garage', kind: 'landmark', door: { x: qg.x1 - 8, z: qg.z1 + 1, h: 0 }, roof: { x: (qg.x0 + 2 + qg.x1 - 12) / 2, z: (qg.z0 + 2 + qg.z1 - 4) / 2, y: CURB_H + 10 } };

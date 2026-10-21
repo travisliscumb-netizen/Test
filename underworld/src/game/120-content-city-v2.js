@@ -735,21 +735,34 @@ Object.assign(World.prototype, {
     for (const rz of rows) {
       for (let x = 838; x < 944; x += 6.4) {
         if (Math.abs(x - 880) < 8) continue; // the cross lane
+        if (x - 3.1 < 862 && rz + 2.6 > 906) continue; // Shed 4's yard (its own fenced compound since Session 3B)
         const h = rng.int(1, 4);
         for (const dz of [-1.3, 1.3]) for (let s = 0; s < h; s++) this._det(b, 'box', x, CURB_H + 1.3 + s * 2.6, rz + dz, 6.1, 2.6, 2.5, rng.pick(PAL.container));
         b.det.push({ kind: 'box', x, y: 0, z: rz, sx: 0.01, sy: 0.01, sz: 0.01, color: C(0x000000), ry: 0, col: { x0: x - 3.1, x1: x + 3.1, z0: rz - 2.6, z1: rz + 2.6, y0: 0, y1: CURB_H + 2.6 * h, kind: 'det' } });
       }
     }
     // lane markings, truck staging, a reach stacker's worth of clutter, tall lights
-    for (const z of [847, 869, 891, 913, 935]) this._det(b, 'box', 891, CURB_H + 0.02, z, 104, 0.02, 0.15, C(0xe8c04a));
+    for (const z of [847, 869, 891, 913, 935]) { const x0 = z > 906 ? 862 : 839; this._det(b, 'box', (x0 + 943) / 2, CURB_H + 0.02, z, 943 - x0, 0.02, 0.15, C(0xe8c04a)); }
     for (let k = 0; k < 6; k++) b.parked.push({ x: 822, z: 830 + k * 9, h: Math.PI / 2, cls: k % 3 ? 'truck' : 'van' });
     for (const [lx, lz] of [[860, 847], [910, 847], [860, 913], [910, 913], [830, 891]]) this._prop(b, 'lotlamp', lx, lz, 0);
-    for (let k = 0; k < 6; k++) this._prop(b, k % 2 ? 'barrel' : 'pallet', 826 + rng.range(-3, 3), 915 + k * 2.4, rng.range(0, 3));
-    // Shed 4: the bonded store in the south-west corner
-    const shed = this._bld(b, 814, 930, 846, 948, 9, STYLE.WARE, 0x6f7a80, 4.5, 6, { gtype: 3, exactH: true });
-    this._dressBox(b, shed, rng, 'warehouse'); this._rooftop(b, shed, rng, 'ind');
-    b.signs.push({ text: 'TIDEWATER · SHED 4', x: 830, y: CURB_H + 7, z: 929.95, ry: Math.PI, w: 9, h: 1.2, bg: '#1f8a92', fg: '#ffffff' });
-    this.terminalShed = { x: 830, z: 928.6, h: Math.PI };
+    for (let k = 0; k < 6; k++) this._prop(b, k % 2 ? 'barrel' : 'pallet', 826 + rng.range(-3, 3), 880 + k * 2.4, rng.range(0, 3));
+    // Shed 4: the bonded store in the south-west corner, in its own yard (gate on the east side, off the lane at z 916)
+    this._whCompound(b, rng, {
+      id: 'whse_d', place: 'shed4', name: 'Tidewater Shed 4', color: 0x6f7a80, sign: 'TIDEWATER · SHED 4', sub: 'BONDED STORE · CUSTOMS SEAL',
+      lot: { x0: 812, z0: 908, x1: 858, z1: 948 },
+      gate: { side: 'e', at: 916, w: 8 },
+      bld: { x0: 814, z0: 930, x1: 846, z1: 948, h: 9 }, face: 'n',
+      docks: [822, 838], door: 830,
+      park: [{ x: 826, z: 910.4, h: Math.PI / 2 }, { x: 832.5, z: 910.4, h: Math.PI / 2 }],
+      booth: { x: 854.5, z: 909.8, w: 3, d: 2.4 },
+      front: ['n', 'e'],
+      lanes: {
+        in: [[[868, 916], [862, 916], [858, 916], [852, 916], [832, 916.5], [825, 919], [822, 925]],
+             [[868, 916], [862, 916], [858, 916], [852, 916], [845, 916.5], [840, 919.5], [838, 925]]],
+        out: [[[822, 919.5, 1], [818, 915, 1], [830, 914.5], [846, 915.5], [852, 916], [858, 916], [864, 916], [870, 916]],
+              [[838, 919.5, 1], [833, 915, 1], [842, 915], [852, 916], [858, 916], [864, 916], [870, 916]]]
+      }
+    });
     // ship-to-shore cranes on the quay and a ship alongside
     const yc = C(0xd8a227);
     for (const qz of [840, 880, 920]) {
@@ -925,7 +938,7 @@ class DoorSystem {
     const reach = pv ? clamp(13 + pv.vel.length() * 1.2, 13, 40) : 4.5;
     for (const e of this.list) {
       const d = e.d, near = Math.hypot(ax - d.x, az - d.z) < reach && Math.abs(ay - d.y) < 4 && !p.interior;
-      e.want = (near && this.allowed(d)) || e.force ? 1 : 0;
+      e.want = (d.want ? d.want(g, e) : near && this.allowed(d)) || e.force ? 1 : 0;
       const prev = e.open;
       e.open = clamp(e.open + (e.want ? 1 : -1) * dt / 1.4, 0, 1);
       if (e.want && prev === 0 && e.open > 0) g.audio.play('door', { x: d.x, z: d.z });

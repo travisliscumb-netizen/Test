@@ -91,7 +91,7 @@ class DeliveryManager {
     return { p, why, hours, dist, value, rival, police: policeRisk, kinds };
   }
   // start a run: the goods leave the origin now
-  // opts.auto: sent by a warehouse's Lieutenant (fees and purchases come out of that warehouse's vault first)
+  // opts.auto: sent by a warehouse's Lieutenant (a supply run's purchase comes out of that warehouse's vault first)
   dispatch(crewId, from, to, good, n, opts = {}) {
     const uw = this.uw, S = this.S, g = this.g, c = uw.crew.find(crewId);
     if (!c || c.status !== 'active' || S.runs.some(r => r.crew === c.id)) return 'That crew member is not available.';
@@ -125,6 +125,7 @@ class DeliveryManager {
     const r = { id: S.nextRun++, crew: c.id, name: uw.crew.displayName(c), from, to, good, n, cost, start: now, eta: now + a.hours, chance: a.p, dist: a.dist, rival: a.rival, police: a.police };
     if (opts.auto) r.auto = true;
     S.runs.push(r); S.st.runs = (S.st.runs || 0) + 1;
+    if (uw.compounds) uw.compounds.onRun('depart', r);
     if (!opts.auto) g.audio.play('confirm');
     return '';
   }
@@ -173,8 +174,9 @@ class DeliveryManager {
     if (outcome === 'success' || outcome === 'partial') S.st.runsOk = (S.st.runsOk || 0) + 1;
     const rep = { id: r.id, day: S.day, name: r.name, from: srcName, to: this.placeName(r.to), good: r.good, n: r.n, delivered, returned, lost, outcome, text: extra.trim(), chance: r.chance };
     S.runLog.push(rep); if (S.runLog.length > 20) S.runLog.splice(0, S.runLog.length - 20);
+    if (delivered > 0 && uw.compounds) uw.compounds.onRun('arrive', r);
     const g = this.g, title = RUN_OUTCOMES[outcome];
-    uw.news(r.name.split(' ')[0], `${title}: ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} ${srcName} → ${this.placeName(r.to)}. ${delivered ? 'Delivered ' + fmtQty(r.good, delivered) + '.' : 'Nothing delivered.'}${lost ? ' Lost ' + fmtQty(r.good, lost) + '.' : ''} Fee ${fmtMoney(r.fee)}. ${rep.text}`);
+    uw.news(r.name.split(' ')[0], `${title}: ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} ${srcName} → ${this.placeName(r.to)}. ${delivered ? 'Delivered ' + fmtQty(r.good, delivered) + '.' : 'Nothing delivered.'}${lost ? ' Lost ' + fmtQty(r.good, lost) + '.' : ''} ${rep.text}`);
     if (!S.jail && g.state === 'playing') g.ui.toast(`Delivery ${title.toLowerCase()}: ${r.name.split(' ')[0]} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} → ${this.placeName(r.to)}`, outcome === 'success' ? 'money' : 'warn');
     return rep;
   }

@@ -144,6 +144,7 @@ class VehicleManager {
       const vn = vcx * nx + vcz * nz;
       if (vn >= 0) continue;
       const col = res.col;
+      if (col && col.onHit) col.onHit(v, -vn);
       // breakable props get knocked away instead of stopping the car
       const pdef = col && col.prop ? PROP_DEFS[col.prop.type] : null;
       if (pdef && col.breakable && v.speed > (pdef.breakSpeed || 3)) {

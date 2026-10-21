@@ -768,6 +768,7 @@ class ContentManager {
     const g = this.g, p = g.player, I = this.interiors;
     if (id.startsWith('g:')) { g.gamble.spot(id); return; }
     if (id.startsWith('c:')) { this.searchContainer(+id.slice(2)); return; }
+    if (id.startsWith('w:')) { g.uw.compounds.spot(id.slice(2)); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;

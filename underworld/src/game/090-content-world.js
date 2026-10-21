@@ -40,7 +40,7 @@ class World {
       for (const k in SPECIAL) if (SPECIAL[k].bx === bx && SPECIAL[k].bz === bz) b.special = k;
       this.blocks.push(b);
     }
-    this.localRoads = []; this.homes = []; this.mapPlaces = [];
+    this.localRoads = []; this.homes = []; this.mapPlaces = []; this.compounds = {};
     for (const b of this.blocks) { const sb = superblockAt(b.bx, b.bz); if (sb) { b.superblock = sb; b.noPeds = !sb.peds; b.ground = sb.ground; } }
     for (const b of this.blocks) this._genBlock(b);
     this._genPerimeter();

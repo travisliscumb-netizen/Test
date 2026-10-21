@@ -7,7 +7,8 @@
    vault whose capacity grows with the vault tier, and product storage.
    Dealers on turf sell only the stock on their corner, which the player
    brings by hand or a Driver brings from the warehouse that supplies them.
-   State: save.uw.whse[id]. Physical presentation is Session 3B.
+   State: save.uw.whse[id]. The compound you can walk and drive (fence, gate,
+   cameras, rooms) is built from these tiers by CompoundSystem (Session 3B).
    ===================================================================== */
 class WarehouseSystem {
   constructor(uw) { this.uw = uw; }
@@ -40,6 +41,7 @@ class WarehouseSystem {
     if (!Money.can(cost, 'property')) return `The work costs ${fmtMoney(cost)} from your bank.`;
     Money.pay(cost, 'property');
     const lv0 = this.level(id); this.st(id).up[cat] = t + 1; const lv1 = this.level(id);
+    if (uw.compounds) { uw.compounds.build(id); uw.compounds.refreshInterior(id); }
     uw.g.ui.banner(d.name, lv1 > lv0 ? `Security level ${lv1} · ${this.levelName(id)}` : `${WH_CATS[cat].name}: ${WH_CATS[cat].tiers[t + 1]}`, 'pass', 2.6);
     uw.g.audio.play('pass'); uw.g.autosave('Warehouse upgraded');
     return '';
@@ -84,7 +86,7 @@ class WarehouseSystem {
   turfFree(i) { return TURF_STOCK_CAP - units(this.turfStock(i)); }
   dealersOn(i) { return this.uw.crew.active().filter(c => c.role === 'dealer' && c.assign === i); }
   // ---- Lieutenant automation (daily): each warehouse with a Lieutenant sends its idle Drivers to top up the
-  // corners of the dealers it supplies, from its own storage, paying the run fees from its vault first
+  // corners of the dealers it supplies, from its own storage (a supply run's purchase comes from its vault first)
   automate() {
     const uw = this.uw, S = this.S, DM = uw.runs, out = [];
     for (const d of this.list()) {

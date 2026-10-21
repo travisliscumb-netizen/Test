@@ -147,6 +147,7 @@ class PropertyManager {
     if (this.owned(def.id)) {
       if (def.interior) return null; // the interior door is handled by the interiors kit
       if (def.home) return { label: `Enter ${def.name}`, act: () => uw.g.content.enterHome(def.id) };
+      if (def.kind === 'warehouse' && uw.compounds.R[def.id]) return { label: `Enter ${def.name}`, act: () => uw.compounds.enter(def.id) };
       return { label: def.name, act: () => uw.ui.openProp(def.id) };
     }
     return { label: `${def.name} · for sale ${fmtMoney(this.price(def))}`, act: () => uw.ui.openProp(def.id) };

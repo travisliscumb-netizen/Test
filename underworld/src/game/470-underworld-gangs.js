@@ -207,6 +207,7 @@ class GangManager {
           const dl = t.deal, dd = dist2(dl.x, dl.z, px, pz);
           if (dd < 80 * 80 && this.buyersActive(i)) { want.add('buy' + i); if (!this.groups.has('buy' + i) && (dd > 35 * 35 || !g.inView(dl.x, 1, dl.z, 2))) this.spawnBuyers(i); }
         }
+        if (uw.compounds) uw.compounds.wantGroups(want, px, pz);
         for (const fid of FAC_IDS) {
           const L = uw.loc('hq', fid); if (!L || S.factions[fid].broken) continue;
           if (dist2(L.x, L.z, px, pz) < 120 * 120) { want.add('hq' + fid); if (!this.groups.has('hq' + fid) && (dist2(L.x, L.z, px, pz) > 40 * 40 || !g.inView(L.x, 1, L.z, 3))) this.spawnGroup('hq' + fid, 'hq', fid, L, clamp(Math.round(1 + S.factions[fid].strength / 40), 1, 3)); }

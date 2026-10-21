@@ -117,7 +117,7 @@ const PROPS = [
   { id: 'penthouse', name: 'Valen Tower Penthouse', kind: 'safehouse', price: 150000, place: 'tower', interior: 'penthouse', storage: 160, garage: 6, crew: 2, luxury: true, desc: 'The top of the tallest tower on the island. People notice who lives here.' },
   { id: 'qgarage', name: 'Quarter Garage Lock-ups', kind: 'garage', price: 8000, place: 'garageRoof', storage: 20, garage: 4, crew: 0, desc: 'Four lock-ups and a mechanic who doesn’t ask. Repairs, respray and tuning at cost.' },
   { id: 'docklock', name: 'Pier 9 Lock-up', kind: 'garage', price: 6000, at: [10, 9, 3, 30], storage: 60, garage: 2, crew: 0, desc: 'A rusted roll door near the water. Cheap, private and close to the boats.' },
-  { id: 'whse_w', name: 'Cannery Row Warehouse', kind: 'warehouse', price: 32000, at: [7, 10, 0, 40], storage: 600, garage: 1, crew: 15, desc: 'Bulk storage. Enough room to sit on product until the price is right.' },
+  { id: 'whse_w', name: 'Cannery Row Warehouse', kind: 'warehouse', price: 32000, place: 'cannery', storage: 600, garage: 1, crew: 15, desc: 'Bulk storage. Enough room to sit on product until the price is right.' },
   { id: 'whse_d', name: 'Tidewater Shed 4', kind: 'warehouse', price: 48000, place: 'shed4', storage: 900, garage: 2, crew: 15, desc: 'A bonded shed on the docks. Shipments land on your doorstep.' },
   { id: 'pawn', name: 'Lucky’s Pawn', kind: 'business', price: 18000, at: [2, 6, 0, 30], income: 420, storage: 60, crew: 2, fence: true, desc: 'The Old Quarter’s fence. Buy it and every hot watch in the city comes through your door.' },
   { id: 'bar', name: 'The Rusty Anchor', kind: 'business', price: 24000, at: [11, 6, 3, 25], income: 560, storage: 40, crew: 2, recruit: true, desc: 'A dockside bar full of people looking for work. Good for recruiting.' },
@@ -259,6 +259,20 @@ const WH_VAULT = [100000, 500000, 2500000, 10000000, 50000000]; // Dirty Cash th
 const WH_STORE_MUL = [1, 1.25, 1.5, 1.75, 2];                     // product storage, by vault tier
 // §6: at Maximum Security with at least 4 Enforcers and a Lieutenant, ordinary rival raids can't knock it off
 const WH_IMMUNE = { level: 5, enforcers: 4, lieutenants: 1 };
+// Session 3B: what each tier physically builds (CompoundSystem). ram: the impact speed (m/s) a car needs to break
+// through; Infinity holds against any car. Fences and gates below the anti-ram tiers can be rammed open.
+const WH_FENCE = [null,
+  { kind: 'chain', h: 2.2, ram: 7 },
+  { kind: 'tall', h: 3.2, ram: 11, bollards: true },
+  { kind: 'anticlimb', h: 3.6, ram: Infinity, barriers: true },
+  { kind: 'wall', h: 4.4, wall: 2.6, ram: Infinity, barriers: true }];
+const WH_GATE = [null,
+  { kind: 'basic', h: 2.2, open: 2.4, ram: 7 },
+  { kind: 'motor', h: 2.6, open: 1.4, ram: 12, controlled: true },
+  { kind: 'reinforced', h: 3.0, open: 1.6, ram: Infinity, controlled: true, booth: true },
+  { kind: 'massive', h: 3.8, open: 1.8, ram: Infinity, controlled: true, booth: true, posts: true, wedge: true }];
+// cameras by surveillance tier; light is the share of a camera's range it keeps at night under that tier's lighting
+const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;
 // a warehouse with a Lieutenant reorders from a supplier when its sellable stock falls below this much space, a lot at a time

@@ -134,6 +134,7 @@ Object.assign(PropertyManager.prototype, {
     if (home) for (const b of home.bays) out.push({ ...b });
     if (home && def.yard) { const f = FACE_V[home.face]; for (let k = 0; k < def.yard; k++) out.push({ x: home.door.x + f[0] * 9 + (home.face < 2 ? (k * 3.4 + 8) : 0), z: home.door.z + f[1] * 9 + (home.face < 2 ? 0 : (k * 3.4 + 8)), h: Math.atan2(-f[0], -f[1]), kind: 'yard', y: CURB_H }); }
     if (def.id === 'penthouse' && w.towerDrive) out.push({ ...w.towerDrive, kind: 'outdoor' });
+    if (def.kind === 'warehouse' && w.compounds[def.id]) for (const p of w.compounds[def.id].park) out.push({ x: p.x, z: p.z, h: p.h, kind: 'yard', y: CURB_H });
     if (def.under && g.vspaces) { const vs = g.vspaces.byProp(def.id); if (vs) for (const b of vs.bays) out.push({ ...b, kind: 'under', space: vs.id }); }
     // kerbside spaces for flats, lock-ups and businesses without a drive
     const want = home ? 0 : (def.street || def.garage || 0);

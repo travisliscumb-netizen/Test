@@ -51,6 +51,34 @@ Maximum Security with 4 Enforcers and a Lieutenant, ordinary rival raids can't t
 operating warehouse. The property screen of a warehouse has Product, Weapons, Dirty Cash, Security, Crew and
 Logistics tabs. (The physical fences, gates and interior come in Session 3B.)
 
+## Warehouse compounds (overhaul Session 3B)
+
+Both warehouses stand in their own compounds: Cannery Row takes a whole block of the Industrial Belt, and Tidewater
+Shed 4 has a fenced yard inside the container terminal. You walk or drive in through the gate, and the door leads
+inside. What security buys is built on site from the saved tiers, and rebuilds the moment you buy an upgrade:
+- **Perimeter:** an open lot, then chain-link, a tall fence behind bollards, an anti-climb fence behind anti-ram barriers, and
+  a hardened wall with fencing on top. A car can break a chain-link fence, or a tall one rammed from inside, if it
+  hits hard enough. The anti-ram tiers hold.
+- **Access:** an open gap, then a basic gate, a motorised one, a reinforced gate with a guard booth, and a massive gate with a
+  rising wedge barrier and access posts.
+  - The gate opens for you, on foot or driving, and for crew who work there or walk with you.
+  - It opens for vehicles those crew drive, and for a vehicle carrying a delivery for the warehouse.
+  - It stays shut for everyone else, and closes on a tailgater.
+  - Basic and motorised gates break when rammed hard; the reinforced and massive gates don't.
+  - Damage is mended at the end of the day.
+- **Surveillance:** cameras (2 / 4 / 6 / 10) with a field of view, a range and line of sight, wall lights and
+  floodlights. At night the lighting decides how far a camera sees. Maximum Security covers the whole yard and the
+  gate approach, day and night. Anyone in the yard the gate wouldn't admit raises the alarm.
+- **Vault and interior:** the rooms change with the tier: a cash box, then a safe and caged racking, a cash room,
+  a vault and an armory, and finally a large vault, a product vault and a ready room. A mezzanine up a stair holds the
+  Lieutenant's office and the CCTV desk, which becomes a security room and then a command room.
+  - Each room's interaction point opens its part of the warehouse screen.
+
+A Driver's van drives in, docks and leaves through the gate when a run starts or ends while you are nearby. Drive
+your own car into a loading bay to move cargo between the trunk and the warehouse. Enforcers who work there stand
+guard at their posts. Module: `src/game/497-underworld-compounds.js` (`CompoundSystem`); world layout:
+`_whCompound` in `110-content-places.js`.
+
 ## The laundering fixer (overhaul Session 2.5)
 
 Dina Vance in the Old Quarter (map icon "L") washes Dirty Cash you carry into Clean Bank: 32% fee, the money lands
@@ -408,6 +436,7 @@ node underworld/tests/build.mjs     # Node only: index.html matches what src/ bu
 node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
+node underworld/tests/compound.mjs   # warehouse compounds: every tier visible, save/reload, gate authorization (player, crew, Drivers, deliveries vs rivals, traffic), drive-through with no contacts, loading bay, interior reachability, Maximum Security geometry, mobile budget
 node underworld/tests/carmoney.mjs   # car provenance: Dirty/Clean-bought resale, stolen cars, no resale above price, no laundering loop, save/reload
 node underworld/tests/fixer.mjs      # laundering fixer: fee, minimum, daily cap, delay, day-length pace, arrest in transit, save/reload, stolen cars
 node underworld/tests/progression.mjs # seven Ranks, Nobody -> Kingpin chain, money buys no power, turf only by showdown, schema 9
