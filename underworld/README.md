@@ -51,6 +51,28 @@ Maximum Security with 4 Enforcers and a Lieutenant, ordinary rival raids can't t
 operating warehouse. The property screen of a warehouse has Product, Weapons, Dirty Cash, Security, Crew and
 Logistics tabs. (The physical fences, gates and interior come in Session 3B.)
 
+## Raiding rivals, shipments and imports (overhaul Session 4B)
+
+Each gang keeps its product and cash in a physical warehouse compound with its own gate, cameras and guards. What
+is on their shelves is saved world state: the rooms inside are drawn from it, and what you take stays gone until
+a delivery actually arrives. Get in by ramming the gate or fence, or by forcing the door (5 s). Loot the stock from
+inside, or into a car backed into their loading bay, and crack the safe (15 s) for Dirty Cash.
+
+When they notice you (cameras, a ram, the door, the safe, missing stock) a raid starts on a real-time clock. For
+about 4.5 minutes there are only the guards. Then reinforcements arrive, an armed response follows from 7 minutes,
+and at 10 minutes a van backs onto the dock to evacuate what is left. Steal that van and the load is yours. Walk
+away and the raid winds down. A reload never resets or stacks any of it.
+
+Every load on the road is one saved shipment: a gang's daily restock from its HQ, and the Tidewater boat from the
+piers to their warehouse. Out of sight they simply arrive. Within about 380 m of either end you see a real van
+(the boat's has an escort), and you can take it.
+
+From Territory Holder up you can order an import: a whole load of Green, Pharma or Snow at about half the
+supplier's price, paid up front. It lands at the pier by Shed 4 and waits a day. Only a Driver run from the quay
+or you in a van or box truck can bring it to a warehouse. Order from Empire → Drivers → Imports. Modules:
+`src/game/547-underworld-rivalwh.js` (`RivalWarehouses`) and `src/game/549-underworld-shipments.js`
+(`ShipmentSystem`).
+
 ## Threats against your empire (overhaul Session 4A)
 
 Gangs hold a grievance against you that grows only from what you do to them. Taking their turf, knocking their
@@ -457,6 +479,8 @@ node underworld/tests/static-money.mjs # Node only: no old single balance anywhe
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
 node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
+node underworld/tests/raid.mjs       # rival warehouses: sites and gates, interior never regenerates stock, exact take-only transfers, remainder persists, save/reload, raid clock 4.5/7/9/10 min without stacking, pause freeze, evacuation van, wind-down, restock only by delivery, safe
+node underworld/tests/shipment.mjs   # shipments: restock on the road not the shelves, reload while due, arrival, a real van carrying the record's cargo, docking, hijack, wreck, reload with a van on the road (once), the boat and its migration, imports (rank, price, landing, truck only, Driver run, expiry, customs, reload)
 node underworld/tests/breach.mjs     # warehouse breaches persist through reload, stay open unstaffed, crew patch then repair from the vault, on-site patch, contractors, upgrades replace; task passes
 node underworld/tests/compound.mjs   # warehouse compounds: every tier visible, save/reload, gate authorization (player, crew, Drivers, deliveries vs rivals, traffic), drive-through with no contacts, loading bay, interior reachability, Maximum Security geometry, mobile budget
 node underworld/tests/carmoney.mjs   # car provenance: Dirty/Clean-bought resale, stolen cars, no resale above price, no laundering loop, save/reload

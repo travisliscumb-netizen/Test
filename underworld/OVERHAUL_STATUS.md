@@ -11,10 +11,88 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **4A — Defending the player's empire** (prompt Session 4, split by DC-33 / §45.27; 4B is rival
-  warehouses and offensive logistics, after 4A is regression-tested).
-- Commit/base revision: Session 3B follow-up `954267e` → the Session 4A commit on `claude/practical-lamport-zld81y`.
+- Session: **4B — Rival warehouses and offensive logistics** (prompt Session 4, second half per DC-33 / §45.27).
+  4A was completed and regression-tested first.
+- Commit/base revision: Session 4A `62782c4` → the Session 4B commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-22
+
+## Completed this session (4B)
+
+- **Rival warehouses** (`src/game/547-underworld-rivalwh.js`, `RivalWarehouses`; state `save.uw.rivals[fid]`).
+  Details and numbers are in DC-34.
+  - **Sites.** Five compounds, one per gang (`RIVAL_WH`), generated in world gen with Cannery Row's layout on the
+    block's first open road (`_genRivalWh`). They are built by the same `CompoundSystem` in rival mode, with ids
+    `rwh_<fid>`:
+    - tiers come from their own state;
+    - the gate admits only their people and vehicles;
+    - a ram raises their alarm, and so do their cameras when you are in the yard.
+  - **Authoritative stock.** Their stock is one saved inventory:
+    - the interior (`rivalInteriorDef`) draws its racks from it and never writes it;
+    - their stock is a transfer location (`rival:<fid>`) you can take from but never put into, reachable from
+      inside or from a car in their loading bay;
+    - every take raises the alarm.
+  - **Raids.** A saved real-time clock (the threat clock's rules: own wall time, frozen when paused, hidden or
+    suspended). Guards, then a squad at 270 s, armed squads at 420 s and 540 s, and an evacuation van at 600 s.
+    Squads are keyed per stage, so a reload never stacks them. Leaving for 90 s winds the raid down, and an alert day
+    follows.
+  - **Evacuation.** The van loads lots off the shelves into a saved van load (`w.evac`) and drives to their HQ.
+    Stolen, it's yours; wrecked, lost; arrived, back to their street stock.
+  - **The safe** takes 15 s and pays Dirty (`heist`). Breaches on their compound mend after 24 econ hours.
+- **Shipments** (`src/game/549-underworld-shipments.js`, `ShipmentSystem`; state `save.uw.ships`). This is the
+  one implementation for every load on the road:
+  - **Rival restocks.** `RivalWarehouses.tickDay` puts the load on the road; it is no longer added directly.
+  - **The Tidewater boat.** Moved out of FactionAI/GangManager.
+  - **Your imports.**
+  - **One cargo, one place.** The record holds the cargo, a physical van's trunk *is* that object, and a theft
+    moves it into the van for good. A reload resolves a rolling van once (it arrived) and redraws a landed import's
+    crates.
+  - **Hijack, wreck, overflow, seizure:** see DC-34.
+- **Imports.**
+  - **Ordering:** rank-gated (Territory Holder), one at a time, paid up front (vault first, `importOrder`), 8–16 h
+    lead.
+  - **At the docks:** crates on the quay at the pier by Shed 4. Customs may seize the load. It is impounded after
+    24 h.
+  - **Collecting:** by a Driver run from `import:<id>` (to a warehouse only), or by you in a van or box truck
+    ("Load your import"). On foot or in a car you can't take it.
+  - **UI:** Empire → Drivers → Imports.
+- **Removed:** `FactionAI.scheduleShipment` and `landShipment`, `GangManager.spawnShipment`, `updateShipment` and
+  `.ship`, and the abstract restock fallback. Convoy groups are kind `convoy`, owned by `ShipmentSystem`.
+
+## Files / systems changed (4B)
+
+- New: `src/game/547-underworld-rivalwh.js`, `src/game/549-underworld-shipments.js`, `tests/raid.mjs`,
+  `tests/shipment.mjs`.
+- `110-content-places.js`: `_genRivalWh` and the rival flag on the compound spec.
+- `390-underworld-data.js`: `RIVAL_WH`, plus landmark-block registration for the rival blocks (it lives here because
+  the data loads before world generation).
+- `497-underworld-compounds.js`:
+  - rival mode (`rival()`, `why()`, ram and camera alarms);
+  - `spawnVan(…, { v })` adopts a van already on the road;
+  - `V.goal`.
+- `450-underworld-core.js`:
+  - state `rivals` and `ships`, with migration;
+  - construction, per-frame updates, the hourly and daily ticks;
+  - `findAction`;
+  - rival locations in `locations()` / `transfer()`.
+- `460-underworld-factions.js`: the boat goes through `uw.shipments.scheduleBoat()`.
+- `470-underworld-gangs.js`: the single-convoy code is removed, `convoy` groups are skipped by culling, and the
+  want set covers raid squads and guards.
+- `430-underworld-crew-deliveries.js`: `import:<id>` pickups (warehouse destinations only, no return to the quay).
+- `540-underworld-empire-ui.js`: `openRivalStock` and the Imports card.
+- `360-core-content-services.js`: the `rv:` interior spots.
+- `035-core-money.js`: the `importOrder` source.
+- `650-core-boot.js`: exports. `manifest.json`: 547 and 549.
+
+## Save/schema changes (4B)
+
+- `save.uw.rivals[fid]`, sanitized; a missing entry is fresh:
+  - `{ up, breach, stock, cash, raid: { t, away, evacDone, start } | null, evac, alert, resupplied }`.
+- `save.uw.ships = { list, next, log }`, sanitized:
+  - each record is `{ id, kind: supply | boat | import, fid, cargo, state: due | rolling | landed, at, until?, from,
+    to, n0, paid }`;
+  - finished records leave the list, and the log keeps the last 12.
+- `save.uw.shipment` (the old single boat) migrates to a boat record and is deleted.
+- There is no schema version bump: every addition is defaulted by sanitize.
 
 ## Completed this session (4A)
 
@@ -1823,6 +1901,106 @@ into raid detection, odds and physical raids.
 5. **Systems affected:** the session plan only.
 6. **Tradeoffs / risks:** rival warehouses aren't raidable until 4B.
 7. **Severity:** RECOMMENDED. **Blocks:** nothing. Please confirm, or ask for 4B to be folded back into one session.
+
+**Disposition (owner, §45.27):** approved. 4A first, regression-tested, then 4B. Threat state must survive
+save/load without resetting, duplicating or stacking. Rival warehouse inventory is authoritative world state, never
+regenerated by the interior. Timing targets: about 4.5 minutes, a stronger response at 7–10 minutes, then a physical
+evacuation. Save/reload duplication protection from the start. (4A done; 4B done, see DC-34.)
+
+### DC-34 · Session 4B implementation choices: rival sites, raid rules, shipments and imports — FOR RULING
+
+1. **Current specification:** §9 and §45.27 ask for physical rival warehouses with persistent, authoritative loot,
+   reinforcement at about 4.5 minutes, a stronger response at 7–10 minutes and a physical evacuation. §8 asks for
+   cartel/major shipments that land at the docks and become warehouse stock only once a Driver or the player
+   brings them in by box/cube truck, and for rival shipments the player can hijack. §3 says Rank unlocks
+   cartel/import shipments. None of this fixes sites, entry methods, numbers or who may collect what.
+2. **Problem observed:** without concrete rules these can't be tested, and a few of them are design calls.
+3. **What 4B implements** (each item is a constant or one rule, easy to change):
+   - **Sites (`RIVAL_WH`).** One compound per gang, using Cannery Row's layout, facing its block's first open
+     road:
+     - Vipers, block 3,6;
+     - Velvet, 6,10;
+     - Glasshouse, 9,4;
+     - Bellcourt, 9,1;
+     - Tidewater, 11,9.
+
+     Their security tiers are fixed per gang, with perimeter and access at most 2, so a gate or fence can always
+     be rammed or got round. Surveillance goes up to 3 and vault up to 2. Capacity is 120–220 units, with
+     $30k–$100k in the safe.
+   - **Entry.**
+     - The gate never admits you (only the gang's own people and vehicles). The DC-32 ram thresholds apply.
+     - On foot, "Force the door" takes 5 s.
+     - In a car, their loading bay gives trunk access to the stock.
+     - The safe takes 15 s of standing at it and pays Dirty Cash (`heist`).
+   - **What starts a raid:**
+     - their cameras seeing you in the yard;
+     - a ram on their gate or fence (saved as their breach, which they mend after 24 econ hours);
+     - forcing the door;
+     - the safe;
+     - stock leaving their shelves.
+
+     A raid adds +35 grievance (pressure) and makes their gang hostile.
+   - **Raid clock** (real active play, saved, frozen by the pause menu or a hidden tab):
+     - guards only (2–6 at their posts, more the day after a raid) until 270 s;
+     - one reinforcement squad at 270 s, unarmed;
+     - an armed squad at 420 s and another at 540 s;
+     - at 600 s, an evacuation van.
+
+     Each squad is sent once per raid, so a reload never stacks them. 90 s away (320 m) winds the raid down. The
+     next day they are on alert: no restock, extra guards.
+   - **Evacuation.**
+     - The van docks and loads 18 units every 8 s, off the shelves into a saved van load, then drives to their HQ.
+     - Steal it and the load is yours (+20 pressure). Wreck it and the load is lost. If it gets there, the load
+       goes to the gang's street stock, not back on the shelves.
+   - **Restock.**
+     - Once a day, up to 80% of capacity from half the gang's street stock.
+     - Only as a shipment that arrives: never during a raid or on the alert day, and at most one per gang on the
+       road.
+   - **Shipments** (`ShipmentSystem`, `save.uw.ships`). One record per load, holding the cargo the whole way.
+     - It is a real van only if you are within 380 m of either end when it is due (not inside, not jailed).
+       Otherwise it simply arrives.
+     - The van's trunk is the record's cargo object.
+     - **Taking the van:** +30 grievance and −25 relations (the boat: −45, +80 Rep). The escort chases you.
+     - **Wrecking the van:** +30 if you were close; the load is lost.
+     - **Reload:** a reload with a van on the road resolves it once, as arrived.
+     - **Overflow:** what doesn't fit on their shelves goes to their street stock.
+   - **The Tidewater boat** is now one of these records. It is delivered to their warehouse; before, it went into
+     their abstract street stock. Customs still seize it about 12% of the time, more in a crackdown. An old save's
+     `save.uw.shipment` migrates to a boat record.
+   - **Your imports.**
+     - **Ordering:** from Territory Holder up (Rank 4), with a warehouse, one at a time. A load is 240 Green, 180
+       Pharma or 120 Snow at 55% of the supplier's wholesale, paid up front (vault first, `importOrder`).
+     - **Landing:** 8–16 h later at the pier nearest Shed 4, as a stack of crates. Customs open 8% (+12% in a
+       crackdown, +8% with the task force), with no refund.
+     - **Waiting:** the port holds it 24 h, then impounds it.
+     - **Bringing it in:** only a Driver run from the quay (to a warehouse only, with the usual route odds), or you
+       in a van or Boxline truck. Not on foot, not in a car.
+
+     The cost basis travels with the goods.
+4. **Why it is better:**
+   - Every rule shows up in play and in tests (`raid.mjs`, `shipment.mjs`).
+   - Every lot is in exactly one place, so no save or reload can duplicate or lose it silently:
+     - shelves;
+     - van load;
+     - shipment record;
+     - trunk;
+     - run;
+     - warehouse.
+5. **Systems affected:**
+   - world generation (five compounds);
+   - CompoundSystem (rival mode, adopting an arriving van);
+   - FactionAI (the boat);
+   - GangManager (the old single-convoy code removed);
+   - DeliveryManager (`import:<id>` pickups);
+   - the Drivers tab (Imports);
+   - the ledger (`importOrder`).
+6. **Tradeoffs / risks:**
+   - As with any trunk, goods in a stolen van that isn't stored in a garage aren't saved. The load is lost on
+     reload, not duplicated: unload it or store the van first.
+   - A restock or boat out of sight is abstract.
+   - The rank gate and the import price are first guesses for balance.
+   - Rival shipments don't yet use the §8 route-risk tiers, and hardware isn't importable.
+7. **Severity:** OPTIONAL. **Blocks:** nothing. Please confirm, or rule on any item.
 
 ## Owner decisions (Session 0 review)
 

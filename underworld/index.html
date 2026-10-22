@@ -53050,7 +53050,7 @@ class ShipmentSystem {
     uw.gangs.groups.set(gr.key, gr);
     r.state = 'rolling';
     this.live.set(r.id, { r, van, gr, t: 0, V: null, after: 0 });
-    uw.opps.add({ kind: 'shipment', title: r.kind === 'boat' ? 'Tidewater van rolling' : `${FACTIONS[r.fid].short} van rolling`, text: `${r.kind === 'boat' ? 'The boat is unloaded and the van is heading for their warehouse with an escort.' : `A ${FACTIONS[r.fid].short} van is taking ${goodsList(r.cargo)} to ${RIVAL_WH[r.fid].name}.`} This is your window.`, x: c.x, z: c.z, hours: 2, follow: 'van', urgent: true });
+    uw.opps.add({ kind: 'shipment', title: r.kind === 'boat' ? 'Tidewater van rolling' : `${FACTIONS[r.fid].short} van rolling`, text: `${r.kind === 'boat' ? 'The boat is unloaded and the van is heading for their warehouse with an escort.' : `A ${FACTIONS[r.fid].short} van is taking ${goodsList(r.cargo)} to ${RIVAL_WH[r.fid].name}.`} This is your window.`, x: c.x, z: c.z, hours: 2, urgent: true });
     g.ui.toast(r.kind === 'boat' ? 'The Tidewater van is on the move.' : `A ${FACTIONS[r.fid].short} van is on the move.`, 'radio');
     return true;
   }
@@ -53115,8 +53115,8 @@ class ShipmentSystem {
   // ---------------------------------------------------------------- saves and resets
   // after a load nothing is on the road: a van that was rolling arrived (once); a landed import's pile is redrawn
   reset() {
-    for (const grp of this.crates.values()) { if (this.g.scene) this.g.scene.remove(grp); }
-    this.crates.clear(); this.live.clear(); this._ip = null;
+    for (const id of [...this.crates.keys()]) this.dropCrate({ id });
+    this.live.clear(); this._ip = null;
     if (!this.uw.S) return;
     for (const r of this.D.list.slice()) {
       if (r.state === 'rolling') this.arrive(r);
