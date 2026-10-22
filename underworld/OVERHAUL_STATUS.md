@@ -130,6 +130,7 @@ Regression against the 5A build:
   - `compound` and `threat`: they release their own test cars through the registry. A stolen car you drove now
     persists, and one test car left by the gate was touched by the delivery van.
 - **Performance** (`perf.mjs`) under parallel load: the same order as Session 4.
+- **Screenshot suites** (shots, cityshots, qashots, frontshots, carshots) and contact run with no errors.
 
 ## Known bugs / risks (5A)
 
