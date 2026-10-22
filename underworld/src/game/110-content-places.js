@@ -254,6 +254,15 @@ Object.assign(World.prototype, {
   // turned to whichever street the block actually has
   _genRivalWh(b, rng) {
     const fid = Object.keys(RIVAL_WH).find(k => RIVAL_WH[k].at[0] === b.bx && RIVAL_WH[k].at[1] === b.bz), R = RIVAL_WH[fid], F = FACTIONS[fid];
+    this._genYard(b, rng, { id: 'rwh_' + fid, rival: fid, name: R.name, color: 0x6a6258, sign: F.short.toUpperCase(), sub: 'PRIVATE · KEEP OUT' });
+  },
+  // the police impound lot (Session 5B): the same yard plan, the building as its office and garage, and a row of
+  // numbered spaces where seized cars wait (front row first, then the back row)
+  _genImpound(b, rng) {
+    this._genYard(b, rng, { id: IMPOUND.id, impound: true, name: IMPOUND.name, color: 0x55606a, sign: 'POLICE IMPOUND', sub: 'RELEASES AT THE WINDOW',
+      slots: (W, hd) => [[17, 12], [20.4, 12], [23.8, 12], [27.2, 12], [-27.2, 10], [-23.8, 10], [17, 24], [20.4, 24], [23.8, 24], [27.2, 24]].map(([u, v]) => ({ x: W(u, v)[0], z: W(u, v)[1], h: hd(0, -1) })) });
+  },
+  _genYard(b, rng, M) {
     this._sidewalk(b, rng, { trees: 0, park: 0 });
     const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
     const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
@@ -267,7 +276,8 @@ Object.assign(World.prototype, {
     const gu = 4.5, bld = rect(-24, 30, 24, 56);
     const [bx0, bz0] = W(13, 4.5);
     this._whCompound(b, rng, {
-      id: 'rwh_' + fid, rival: fid, place: 'rwh_' + fid, name: R.name, color: 0x6a6258, sign: F.short.toUpperCase(), sub: 'PRIVATE · KEEP OUT',
+      id: M.id, rival: M.rival || null, impound: !!M.impound, place: M.id, name: M.name, color: M.color, sign: M.sign, sub: M.sub,
+      slots: M.slots ? M.slots(W, hd) : null,
       lot: rect(-29, 1, 29, 59), gate: { side, at: along(gu, 1), w: 8 },
       bld: { ...bld, h: 9 }, face: side,
       docks: [along(-9, 30), along(9, 30)], door: along(-21, 30),
@@ -341,7 +351,7 @@ Object.assign(World.prototype, {
     const yard = { x0: L.x0, z0: L.z0, x1: L.x1, z1: L.z1 };
     b.place = { id: s.place, name: s.name, kind: 'landmark', door, garage: s.park[0], under: { x: (B.x0 + B.x1) / 2, z: (B.z0 + B.z1) / 2 } };
     this.compounds[s.id] = {
-      id: s.id, place: s.place, name: s.name, block: b.i, rival: s.rival || null, lot: { ...L }, yard, bld: { ...B }, face: s.face,
+      id: s.id, place: s.place, name: s.name, block: b.i, rival: s.rival || null, impound: !!s.impound, slots: s.slots || null, lot: { ...L }, yard, bld: { ...B }, face: s.face,
       gate: { side: G.side, x: gx, z: gz, w: G.w, axis: ns(G.side) ? 'x' : 'z', n: gn },
       docks, door, park: s.park.map(p => ({ ...p })), booth: s.booth, front: s.front.slice(), perim,
       lanes: { in: s.lanes.in.map(lane), out: s.lanes.out.map(lane) },

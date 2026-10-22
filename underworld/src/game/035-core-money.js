@@ -32,6 +32,10 @@ const MONEY_SOURCES = {
   supplyRun: { pay: 'payroll' },
   // your bulk import, paid up front when ordered (Session 4B): from the vault first (payroll order)
   importOrder: { pay: 'payroll' },
+  // the police impound's release fee, at the window (Session 5B): licensed, from the bank
+  impoundFee: { pay: 'clean' },
+  // Chop Shop work on a stolen car (clean the title, repair, paint, tune): cash in hand
+  chopWork: { pay: 'dirty' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },

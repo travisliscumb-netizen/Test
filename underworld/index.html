@@ -33047,6 +33047,8 @@ const SaveSystem = {
       garage: [],
       // the vehicle registry (Session 5A): stolen cars kept track of, cars waiting for a space, what happened to cars
       tracked: [], nextTrack: 0, pendingCars: [], vlog: [],
+      // the police impound lot's own state (Session 5B): breaches in its fence and gate
+      impoundLot: { breach: {} },
       dealers: {},
       nextUid: 1,
       pos: null,
@@ -33272,6 +33274,10 @@ const MONEY_SOURCES = {
   supplyRun: { pay: 'payroll' },
   // your bulk import, paid up front when ordered (Session 4B): from the vault first (payroll order)
   importOrder: { pay: 'payroll' },
+  // the police impound's release fee, at the window (Session 5B): licensed, from the bank
+  impoundFee: { pay: 'clean' },
+  // Chop Shop work on a stolen car (clean the title, repair, paint, tune): cash in hand
+  chopWork: { pay: 'dirty' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
@@ -36954,6 +36960,15 @@ Object.assign(World.prototype, {
   // turned to whichever street the block actually has
   _genRivalWh(b, rng) {
     const fid = Object.keys(RIVAL_WH).find(k => RIVAL_WH[k].at[0] === b.bx && RIVAL_WH[k].at[1] === b.bz), R = RIVAL_WH[fid], F = FACTIONS[fid];
+    this._genYard(b, rng, { id: 'rwh_' + fid, rival: fid, name: R.name, color: 0x6a6258, sign: F.short.toUpperCase(), sub: 'PRIVATE · KEEP OUT' });
+  },
+  // the police impound lot (Session 5B): the same yard plan, the building as its office and garage, and a row of
+  // numbered spaces where seized cars wait (front row first, then the back row)
+  _genImpound(b, rng) {
+    this._genYard(b, rng, { id: IMPOUND.id, impound: true, name: IMPOUND.name, color: 0x55606a, sign: 'POLICE IMPOUND', sub: 'RELEASES AT THE WINDOW',
+      slots: (W, hd) => [[17, 12], [20.4, 12], [23.8, 12], [27.2, 12], [-27.2, 10], [-23.8, 10], [17, 24], [20.4, 24], [23.8, 24], [27.2, 24]].map(([u, v]) => ({ x: W(u, v)[0], z: W(u, v)[1], h: hd(0, -1) })) });
+  },
+  _genYard(b, rng, M) {
     this._sidewalk(b, rng, { trees: 0, park: 0 });
     const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
     const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
@@ -36967,7 +36982,8 @@ Object.assign(World.prototype, {
     const gu = 4.5, bld = rect(-24, 30, 24, 56);
     const [bx0, bz0] = W(13, 4.5);
     this._whCompound(b, rng, {
-      id: 'rwh_' + fid, rival: fid, place: 'rwh_' + fid, name: R.name, color: 0x6a6258, sign: F.short.toUpperCase(), sub: 'PRIVATE · KEEP OUT',
+      id: M.id, rival: M.rival || null, impound: !!M.impound, place: M.id, name: M.name, color: M.color, sign: M.sign, sub: M.sub,
+      slots: M.slots ? M.slots(W, hd) : null,
       lot: rect(-29, 1, 29, 59), gate: { side, at: along(gu, 1), w: 8 },
       bld: { ...bld, h: 9 }, face: side,
       docks: [along(-9, 30), along(9, 30)], door: along(-21, 30),
@@ -37041,7 +37057,7 @@ Object.assign(World.prototype, {
     const yard = { x0: L.x0, z0: L.z0, x1: L.x1, z1: L.z1 };
     b.place = { id: s.place, name: s.name, kind: 'landmark', door, garage: s.park[0], under: { x: (B.x0 + B.x1) / 2, z: (B.z0 + B.z1) / 2 } };
     this.compounds[s.id] = {
-      id: s.id, place: s.place, name: s.name, block: b.i, rival: s.rival || null, lot: { ...L }, yard, bld: { ...B }, face: s.face,
+      id: s.id, place: s.place, name: s.name, block: b.i, rival: s.rival || null, impound: !!s.impound, slots: s.slots || null, lot: { ...L }, yard, bld: { ...B }, face: s.face,
       gate: { side: G.side, x: gx, z: gz, w: G.w, axis: ns(G.side) ? 'x' : 'z', n: gn },
       docks, door, park: s.park.map(p => ({ ...p })), booth: s.booth, front: s.front.slice(), perim,
       lanes: { in: s.lanes.in.map(lane), out: s.lanes.out.map(lane) },
@@ -44785,9 +44801,12 @@ class ContentManager {
     if (!e) {
       const origin = v.goldCar ? 'found' : v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
       e = this.addToGarage(v.type, origin, v.colorHex, true, { p: def.id, i: bay.i });
+      if (!e) { g.ui.toast('No free parking space.', 'warn'); g.audio.play('deny'); return false; }
+      // a stolen car parked in your space is still stolen: HOT until the Chop Shop cleans it (§45.30)
+      e.hot = g.vreg.isHot(v) || origin === 'stolen'; if (v.trackId) { const r = g.vreg.rec(v.trackId); if (r && r.tune) e.tune = { ...r.tune }; }
       Money.adoptCar(v, e.uid); // cash left in the car is now kept with it in your garage
       e.vtier = v.vtier || VEHICLES[v.type].tier;
-      g.ui.toast(`${v.spec.name} parked at ${def.name}. It’s yours now${origin === 'stolen' ? ' — just don’t show it to the original owner' : ''}.`, 'money');
+      g.ui.toast(`${v.spec.name} parked at ${def.name}.${e.hot ? ' It is still HOT: the Chop Shop can clean its papers.' : ''}`, 'money');
       if (v.rareFind) this.secret('rooftop');
     } else { e.at = { p: def.id, i: bay.i }; g.ui.toast(`${v.spec.name} parked at ${def.name} · ${PARK_LABEL[bay.kind] || 'space'} ${bay.i + 1}.`, 'money'); }
     e.out = false; e.loc = null; e.dmg = clamp(100 - v.health, 0, 100); e.color = v.colorHex;
@@ -44860,8 +44879,8 @@ class ContentManager {
       const tuneLv = TUNE.map(t => e.tune[t.id]).reduce((a, b) => a + b, 0);
       // its home space, and where it actually is (the street, if that's where you left it)
       const home = e.at && PROP_BY_ID[e.at.p] ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'No space of its own: buy more parking';
-      const w = g.vreg.where(e), loc = e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
-      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
+      const w = g.vreg.where(e), loc = e.imp ? `In the ${IMPOUND.name} (space ${e.imp.slot + 1}) · release ${fmtMoney(e.imp.fee)}${e.imp.paid ? ' paid: drive it out' : ' at the window'} · its space: ${home}` : e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
+      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}${e.hot ? ' <span class="chip" style="--c:#ff4d5e">HOT</span>' : ''}${e.imp ? ' <span class="chip" style="--c:#ffb547">IMPOUNDED</span>' : ''}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
@@ -44964,10 +44983,11 @@ class ContentManager {
         ${this._bars(c.type)}
         <div class="stat"><span>Weight · seats</span><span>${V.mass.toLocaleString()} kg · ${V.profile === 'roadster' || V.profile === 'mid' || V.profile === 'wedge' ? 2 : V.profile === 'van' || V.profile === 'truck' || V.profile === 'minivan' ? 3 : 4}</span></div>
         <div class="stat cargoCap"><span>Cargo Capacity</span><span><b>${fmtLb(cargoCapC(c.type))}</b></span></div>
-        <div class="btns"><button class="sbtn gold" data-act="buy" ${why ? 'disabled' : ''}>${why ? esc(why) : 'Buy · ' + fmtMoney(c.price)}</button></div></div>`;
+        <div class="btns"><button class="sbtn gold" data-act="buy" ${why ? 'disabled' : ''}>${why ? esc(why) : 'Buy · ' + fmtMoney(c.price)}</button><button class="sbtn" data-act="steal">Steal it · ${DEALER_THEFT[lot]}★</button></div></div>`;
     };
     const c0 = DL.state(lot).cars[i];
     this.openSvc(`${D.name}`, lot === 'used' ? 'Sold as seen. Condition is what Dex would charge to put right.' : 'Full warranty. Keys in the ignition.', render, act => {
+      if (act === 'steal') { g.ui.ask(`Steal the ${VEHICLES[DL.state(lot).cars[i].type].name}?`, `The alarm goes the moment you open it: about ${DEALER_THEFT[lot]}★. It stays stolen (HOT) after you lose them.`, 'Steal it', () => { const r = DL.steal(lot, i); if (r) { this.refreshSvc(r); return; } g.ui.closeAll(); }); return; }
       if (act !== 'buy') return;
       const c = DL.state(lot).cars[i]; if (!c || c !== c0 || DL.cantBuy(lot, c)) { this.refreshSvc(); return; }
       g.ui.ask(`Buy the ${VEHICLES[c.type].name}?`, `${fmtMoney(c.price)}. It’s yours where it stands: drive it off the lot.`, 'Buy', () => {
@@ -44977,7 +44997,9 @@ class ContentManager {
       });
     });
   }
-  // Okafor Motor Works: repair, respray (clears heat if unseen) and per-car tuning
+  // Okafor Motor Works, the Pay & Spray (§45.30): repair, respray, and with the police after you a fresh coat that
+  // loses them if no cop is watching. It never cleans HOT and never makes a car legally yours; tuning is for cars
+  // that are legally yours
   serviceVehicle() {
     const g = this.g, p = g.player, bay = g.world.places.motorworks.bay;
     if (p.state === 'vehicle' && Math.hypot(p.vehicle.pos.x - bay.x, p.vehicle.pos.z - bay.z) < 7) return p.vehicle;
@@ -45000,8 +45022,9 @@ class ContentManager {
       let h = `<div class="svcTop"><span>${v.spec.name} ${ent ? this.chip(ent.origin) : this.chip(v.origin || 'stolen')}</span><span>Condition <b>${Math.max(0, Math.round(v.health))}%</b></span><span>${Money.html('either')}</span></div><div class="grid2">`;
       h += `<div class="card"><div class="t">Repair</div><div class="d">Body, glass, lights and alignment. Good as new.</div><button class="sbtn gold" data-act="repair" ${!dmg || !Money.can(rc, 'garage') ? 'disabled' : ''}>${dmg ? fmtMoney(rc) : 'No damage'}</button></div>`;
       h += `<div class="card"><div class="t">Respray${heat ? ' & new plates' : ''}</div><div class="d">${heat ? 'Fresh paint and plates. If no cop is watching right now, they lose your description.' : 'Pick a colour.'}</div><div class="swatches">${COLORS.map(c => `<button class="sw" data-act="paint:${c}" style="background:#${c.toString(16).padStart(6, '0')}" ${!Money.can(rp, heat ? 'payAndSpray' : 'garage') ? 'disabled' : ''}></button>`).join('')}</div><div class="stat"><span>Cost</span><span>${fmtMoney(rp)}</span></div></div>`;
+      if (heat) h += `<div class="card"><div class="t">Pay &amp; Spray · ${fmtMoney(600 + rc)}</div><div class="d">Repair and a new coat in one go. Loses a pursuit if no cop sees you come in. Stolen stays stolen: the plates still say what it is.</div><button class="sbtn gold" data-act="pns" ${!Money.can(600 + rc, 'payAndSpray') ? 'disabled' : ''}>Pay &amp; Spray</button></div>`;
       h += '</div><h3>Tuning</h3>';
-      if (!ent) h += `<div class="hint">Dex only tunes cars that are registered to you. Store this one in your garage first.</div>`;
+      if (!ent || ent.hot) h += `<div class="hint">${ent ? 'Dex won’t tune a car with hot plates. The Chop Shop will, or get its papers cleaned first.' : 'Dex only tunes cars that are registered to you. Store this one in your garage first.'}</div>`;
       else {
         h += '<div class="grid2">' + TUNE.map(t => {
           const lv = ent.tune[t.id], max = lv >= 3, price = max ? 0 : this.tunePrice(t, lv, v.type), need = TUNE_REP[lv] || 0;
@@ -45024,7 +45047,14 @@ class ContentManager {
         const heat = g.police.level > 0, c = heat ? 600 : 250; if (!Money.pay(c, heat ? 'payAndSpray' : 'garage')) return; v.colorHex = +a; v.mat.userData.u.uPaint.value.setHex(+a); if (ent) ent.color = +a;
         g.audio.play('cash');
         if (heat) { if (!g.police.visible) { g.police.clear('New paint, new plates. The police lost your description.'); } else g.ui.toast('A cop is watching the shop — the paint won’t fool them.', 'warn'); }
-      } else if (k === 'tune' && ent) {
+      } else if (k === 'pns') {
+        // repair + respray + (unseen) the pursuit lost; HOT untouched
+        const c = 600 + this.repairCost(v.type, v.health); if (g.police.level <= 0 || !Money.pay(c, 'payAndSpray')) return;
+        this.repair(v); if (ent) ent.dmg = 0;
+        const col = COLORS[Math.floor(Math.random() * COLORS.length)]; v.colorHex = col; v.mat.userData.u.uPaint.value.setHex(col); if (ent) ent.color = col;
+        g.audio.play('cash');
+        if (!g.police.visible) g.police.clear('Pay & Spray: new paint. The police lost your description.'); else g.ui.toast('A cop is watching the shop — the paint won’t fool them.', 'warn');
+      } else if (k === 'tune' && ent && !ent.hot) {
         const t = TUNE.find(x => x.id === a), lv = ent.tune[a]; if (lv >= 3) return;
         const price = this.tunePrice(t, lv, v.type); if (s.rep < (TUNE_REP[lv] || 0) || !Money.pay(price, 'garage')) return; if (ent.prov) ent.prov.clean += price; ent.tune[a] = lv + 1; v.tune = ent.tune; g.audio.play('cash');
         if (TUNE.every(x => ent.tune[x.id] >= 3)) this.ach('tuned');
@@ -46783,6 +46813,14 @@ const RIVAL_WH = {
 };
 // their blocks are landmarks laid out by World._genRivalWh (before the world is generated: this file loads first)
 for (const fid in RIVAL_WH) LANDMARK_BLOCKS[RIVAL_WH[fid].at.join(',')] = { gen: '_genRivalWh', name: RIVAL_WH[fid].name, icon: 'W', ground: 'I', rival: fid };
+// the police impound lot (Session 5B, §14, §45.30): a fenced yard with a motorised gate and cameras, near the
+// precinct. fee: the Clean Bank release fee, a share of the car's value within [min, max]; stars: the heat of
+// getting a car out without paying (picking the gate, ramming it, driving out unpaid)
+// the stars a theft off a dealer's lot starts at (§13): the cash lot, the licensed dealer, the prestige showroom
+const DEALER_THEFT = { used: 1, new: 3, lux: 5 };
+const IMPOUND = { id: 'impound', at: [4, 7], name: 'Port Valen Police Impound', tiers: { perimeter: 2, surveillance: 2, access: 2, vault: 0 },
+  fee: { min: 300, k: 0.06, max: 25000 }, pick: 8, open: 12, stars: { pick: 2, ram: 3, drive: 2, seen: 2 }, office: 3.5 };
+LANDMARK_BLOCKS[IMPOUND.at.join(',')] = { gen: '_genImpound', name: IMPOUND.name, icon: 'P', ground: 'I', impound: true };
 const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;
@@ -48363,11 +48401,13 @@ class Underworld {
     if (p.interior && !p.interior.vspace) return S.jail ? this.prison.findAction() : this.props.interiorAction();
     const ra = this.rivalwh.findAction(); if (ra) return ra;
     const sa = this.shipments.findAction(); if (sa) return sa;
+    const ia = g.impound.findAction(); if (ia) return ia;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       if (v.speed < 3) {
         const ch = this.loc('spot', 'chop');
-        if (ch && dist2(v.pos.x, v.pos.z, ch.x, ch.z) < 9 * 9 && !v.owned && !v.garageUid) return { label: `Sell ${v.spec.name} to the chop shop (${fmtMoney(this.chopValue(v))})`, act: () => this.sellCar(v) };
+        // the chop shop works on any car that isn't legally yours: a stolen one, or a HOT one in your fleet (§45.30)
+        if (ch && dist2(v.pos.x, v.pos.z, ch.x, ch.z) < 9 * 9 && g.chop.car(v)) return { label: `Chop shop · ${v.spec.name}${g.vreg.isHot(v) ? ' (HOT)' : ''}`, act: () => g.chop.open(v) };
         const lb = this.compounds.bayAction(v); if (lb) return lb;
         const ga = this.props.garageActionVehicle(v); if (ga) return ga;
       }
@@ -50072,21 +50112,23 @@ class CompoundSystem {
   C(id) { return this.g.world.compounds[id]; }
   // a rival gang's compound (Session 4B): its faction id, else null
   rival(id) { const R = this.R[id]; return R && R.C.rival || null; }
+  // the police impound lot (Session 5B): fixed tiers, the gate rule is the lot's (ImpoundLot.why)
+  impound(id) { const R = this.R[id]; return !!(R && R.C.impound); }
   // the tiers the compound shows: what you have bought (or nothing while it is for sale); a rival's, theirs
   tiers(id) {
-    const W = this.uw.whse, fid = this.rival(id), o = !fid && this.uw.props.owned(id);
-    const t = {}; for (const k of WH_CAT_IDS) t[k] = fid ? this.uw.rivalwh.st(fid).up[k] | 0 : o ? W.tier(id, k) : 0;
+    const W = this.uw.whse, fid = this.rival(id), o = !fid && this.uw.props.owned(id), imp = this.impound(id);
+    const t = {}; for (const k of WH_CAT_IDS) t[k] = imp ? IMPOUND.tiers[k] | 0 : fid ? this.uw.rivalwh.st(fid).up[k] | 0 : o ? W.tier(id, k) : 0;
     return t;
   }
   // rebuild a compound when its tiers changed (upgrade, purchase, load) or a breach was mended
   sync(force) { for (const id in this.R) this.build(id, force); }
   build(id, force) {
-    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.rival(id) ? 'r' : this.uw.props.owned(id) ? 'o' : '-');
+    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.rival(id) ? 'r' : this.impound(id) ? 'i' : this.uw.props.owned(id) ? 'o' : '-');
     if (!force && sig === R.sig && !R.dirty) return;
     const g = this.g, grid = g.world.grid, C = R.C;
     const keepOpen = R.sig === sig && R.gate ? R.gate.open : 0;
     // what is breached (saved): entries from a tier that has since been replaced are gone with it
-    const br = this.rival(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
+    const br = this.rival(id) || this.impound(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
     for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
     for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -50287,6 +50329,7 @@ class CompoundSystem {
   // returns '' when allowed, or why not. a: the player, a vehicle, or a person on foot
   why(id, a) {
     const g = this.g, uw = this.uw, p = g.player, fid = this.rival(id);
+    if (this.impound(id)) return g.impound ? g.impound.why(a) : 'closed';
     // a rival's compound lets in its own people and its own vehicles, and never you
     if (fid) { if (a && a.spec && a.ctl) return a.fac === fid && a !== p.vehicle ? '' : 'not one of theirs'; return a && a !== p && a.fac === fid && a.kind === 'gang' ? '' : 'not one of theirs'; }
     if (!uw.props.owned(id)) return 'not yours';
@@ -50319,6 +50362,8 @@ class CompoundSystem {
   // is anyone the gate should open for near it? (vehicles get a longer reach at speed, as DoorSystem does)
   gateWant(R) {
     const g = this.g, p = g.player, G = R.C.gate, id = R.id;
+    // a gate whose lock was picked stands open for a while (the impound lot, Session 5B)
+    if (R.forceT > g.time) { R.gate.by = 'forced'; return true; }
     const reach = v => clamp(12 + v.speed * 1.2, 12, 36);
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     if (!p.interior) {
@@ -50351,6 +50396,8 @@ class CompoundSystem {
     const crewHere = this.uw.crew.active().some(c => c.assign === WarehouseSystem.key(id));
     const hit = q => { q.state = 'broken'; q.col.on = false; br[q.key] = { s: 'broken', t: now, tier: q === R.gate ? R.t.access : R.t.perimeter }; if (crewHere) br[q.key].w = now; };
     // a rival's compound rammed: that is a raid starting (Session 4B)
+    // the impound lot rammed: the police know at once (Session 5B); the lot mends itself a day later
+    if (this.impound(id)) { hit(part); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle && g.impound) g.impound.onRam(); return; }
     if (this.rival(id)) { hit(part); if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle) this.uw.rivalwh.alarm(this.rival(id), 'rammed'); return; }
     hit(part);
     if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q);
@@ -50370,7 +50417,10 @@ class CompoundSystem {
   }
   // the saved breach list of a warehouse: { [part key]: { s: 'broken' | 'patched', t: econ hour of the breach, tier,
   // w: econ hour the crew started on it (absent while nobody works here) } }
-  breaches(id) { const fid = this.rival(id), st = fid ? this.uw.rivalwh.st(fid) : this.uw.whse.st(id); return st.breach || (st.breach = {}); }
+  breaches(id) {
+    if (this.impound(id)) { const s = this.g.save, L = s.impoundLot || (s.impoundLot = { breach: {} }); return L.breach || (L.breach = {}); }
+    const fid = this.rival(id), st = fid ? this.uw.rivalwh.st(fid) : this.uw.whse.st(id); return st.breach || (st.breach = {});
+  }
   // what mending a part costs: a patch is a flat price, a full repair scales with the tier being restored
   patchCost(key) { return key === 'gate' ? WH_BREACH.patchGate : WH_BREACH.patchPanel; }
   repairCost(id, key) { const d = PROP_BY_ID[id], b = this.breaches(id)[key]; return Math.round(d.price * (key === 'gate' ? WH_BREACH.repairGate : WH_BREACH.repairPanel) * Math.max(1, b ? b.tier : 1) / 10) * 10; }
@@ -50475,7 +50525,12 @@ class CompoundSystem {
       }
       if (R.dirty) this.build(id, true);
       // the cameras watch the yard: anyone in it the gate wouldn't let in raises the alarm
-      if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
+      if (this.impound(id) && (R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length) {
+        // the impound's cameras: you in the yard with no release on any car of yours is a break-in
+        R.watchT = 0.5;
+        const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;
+        if (!p.interior && this.inYard(id, pp.x, pp.z) && this.seen(id, pp.x, pp.y + 1.2, pp.z, night) && g.impound) g.impound.onSeen();
+      } else if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
         // a rival's cameras watch for you: you in their yard is a raid starting
         R.watchT = 0.5;
         const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;
@@ -51016,6 +51071,24 @@ class DealerLots {
     g.saveGame(true);
     return '';
   }
+  // steal a car off the lot (§13, §45.30): the alarm brings about 1★ at the cash lot, 3★ at Meridian, 5★ at the
+  // showroom, and the car is HOT for good (tracked by the vehicle registry from the moment you drive it)
+  steal(lot, i) {
+    const g = this.g, st = this.state(lot), c = st.cars[i]; if (!c) return 'Gone.';
+    let v = this.carAt(lot, i); this.cars.delete(lot + ':' + i);
+    const sl = this.place(lot).slots[i];
+    if (!v) v = g.vehicles.spawn(c.type, sl.x, sl.z, sl.h, { parked: true, color: c.color, vtier: c.vtier });
+    st.cars[i] = null;
+    v.locked = false; v.dealer = null; v.display = false; v.touched = true; v.looted = true; v.health = Math.max(1, c.cond);
+    v.stolenBefore = true; v.origin = 'stolen'; v.dealerStolen = lot; v.trunk = {};
+    const p = g.player;
+    if (p.state === 'foot') { p.pos.x = v.pos.x; p.pos.z = v.pos.z; g.completeEnter(v); }
+    g.vreg.track(v);
+    g.police.addHeat(Math.max(0.01, HEAT_LEVELS[DEALER_THEFT[lot]] - g.police.heat), v.pos.x, v.pos.z);
+    g.save.stats.stolen++;
+    g.ui.toast(`Alarm! The ${DEALERSHIPS[lot].name} lot has your description.`, 'warn');
+    return '';
+  }
   // the lot car the player is standing next to
   nearCar(p) {
     let best = null, bd = 1.7;
@@ -51091,11 +51164,15 @@ class VehicleRegistry {
   day() { return this.g.uw ? this.g.uw.S.day : 0; }
   // a line in the vehicle log: what happened to which car (and what went with it)
   note(what, type, extra = {}) { const L = this.log; L.push({ day: this.day(), what, type, ...extra }); if (L.length > 20) L.splice(0, L.length - 20); }
+  // HOT (Session 5B): a tracked stolen car's r.hot or a fleet car's e.hot, saved with it; only a Chop Shop clean
+  // takes it off
+  isHot(v) { if (!v) return false; if (v.garageUid) { const e = this.entryOf(v); return !!(e && e.hot); } if (v.trackId) { const r = this.rec(v.trackId); return !!(r && r.hot); } return false; }
   // ---------------------------------------------------------------- the fleet
   entryOf(v) { return v && v.garageUid ? this.s.garage.find(e => e.uid === v.garageUid) : null; }
   bayPos(e) { const def = e.at && PROP_BY_ID[e.at.p]; return def ? this.PM.bays(def)[e.at.i] || null : null; }
   // where a fleet car is: its bay, or where you left it
   where(e) {
+    if (e.imp && this.g.impound) { const sp = this.g.impound.slotPos(e); if (sp) return { x: sp.x, z: sp.z, name: `${IMPOUND.name} · space ${e.imp.slot + 1}`, street: false, imp: true }; }
     if (e.out && e.loc) return { x: e.loc.x, z: e.loc.z, name: placeNameAt(e.loc.x, e.loc.z) || 'the street', street: true };
     const b = this.bayPos(e), def = e.at && PROP_BY_ID[e.at.p];
     return b ? { x: b.x, z: b.z, name: `${def.name} · ${PARK_LABEL[b.kind] || 'space'} ${b.i + 1}`, street: false } : null;
@@ -51137,21 +51214,26 @@ class VehicleRegistry {
     const g = this.g, s = this.s, p = g.player, px = p.pos.x, pz = p.pos.z, py = p.pos.y;
     if (s.garage.some(e => !e.at)) this.house(); // a car still waiting for a space takes one as soon as it frees
     for (const e of s.garage) {
+      // a car in the police impound is the impound lot's to show and to let go of (Session 5B)
+      if (e.imp) continue;
       const v = this.live(e);
       if (!v) this.cars.delete(e.uid); else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});
       const b = this.bayPos(e);
       if (v) {
         // leaving its bay takes it out; from then on it is saved wherever it stands
-        if (!e.out && b && (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3)) { e.out = true; v.display = false; e.loc = this.here(v); g.autosave('Vehicle taken out'); }
+        if (!e.out && b && (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3)) { e.out = true; v.display = false; e.loc = this.here(v); e.seen = this.econ(); g.autosave('Vehicle taken out'); }
         if (e.out) {
           e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100);
           const d = Math.hypot(v.pos.x - px, v.pos.z - pz), mine = v === p.vehicle || v === p.lastVehicle;
+          if (v === p.vehicle || d < VREG.attend) e.seen = this.econ();
           // a wreck left behind: your people tow it home to its bay (a recovery, not a police matter)
           if (e.dmg >= 100 && v !== p.vehicle && b && d > VREG.towWreck && !g.inView(v.pos.x, 1, v.pos.z, 3)) { this.towHome(e, v); continue; }
           if (d > VREG.keep && !mine && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
           continue;
         }
       }
+      // a day out on the street with nobody near it: police tow it to the impound (§45.30); a wreck goes home
+      if (e.out && e.loc && e.dmg < 100 && this.econ() - (e.seen ?? this.econ()) >= VREG.recover && (!v || (v !== p.vehicle && !(g.inView(v.pos.x, 1, v.pos.z, 3) && Math.hypot(v.pos.x - px, v.pos.z - pz) < VREG.attend))) && g.impound) { g.impound.seize(e, 'abandoned'); continue; }
       const at = e.out ? e.loc : b; if (!at) continue;
       const bay = !e.out && b;
       const near = Math.hypot(at.x - px, at.z - pz) < VREG.near && Math.abs((at.y ?? 0) - py) < (bay && b.kind === 'under' ? 20 : 60) && (bay && b.kind === 'under' ? p.interior && p.interior.vspace === b.space : !(p.interior && p.interior.vspace));
@@ -51187,24 +51269,33 @@ class VehicleRegistry {
   rec(id) { return this.tracked.find(r => r.id === id) || null; }
   liveT(r) { const v = this.trk.get(r.id); return v && this.g.vehicles.list.includes(v) && v.trackId === r.id ? v : null; }
   track(v) {
-    const s = this.s; if (!this.eligible(v) || v.trackId) return null;
-    if (this.tracked.length >= VREG.max) this.makeRoom(v);
+    const s = this.s; if (!this.eligible(v) || v.trackId || v.untracked) return null;
+    // full, and every car kept holds your goods or cash: nothing of yours is dropped to make room (§45.30). This
+    // car stays usable while you use it, but it can't be remembered: you are told so, plainly.
+    if (this.tracked.length >= VREG.max && !this.makeRoom(v)) { v.untracked = true; this.g.ui.toast(`Too many stolen cars with your things in them: this ${v.spec.name} can’t be kept track of. Leave it and it, and anything you put in it, won’t be safe.`, 'warn'); return null; }
     const id = s.nextTrack = (s.nextTrack || 0) + 1;
-    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ() };
+    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.dealerStolen ? 'dealer' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ(), tune: v.tune ? { ...v.tune } : null };
     this.tracked.push(r);
     v.trackId = id; v.stolenBefore = v.stolenBefore || r.hot; v.touched = true;
     Money.adoptCar(v, 't' + id); // its cash is kept in the wallet now (saved with the car)
     this.trk.set(id, v);
     return r;
   }
-  // the registry is full: the oldest car with nothing of yours in it gives way first (rare ones last); one with your
-  // cargo or cash in it is recovered by police like any other (logged), never just dropped
+  // the registry is full: the oldest car with nothing of yours in it gives way (rare ones last). A car with your cargo
+  // or cash in it never gives way (§45.30): with only those left, there is no room (false)
   makeRoom(keep) {
     const p = this.g.player, mine = r => units(r.trunk) > 0 || Money.dirtyInCar('t' + r.id) > 0;
-    const cands = this.tracked.filter(r => { const v = this.liveT(r); return !(v && (v === p.vehicle || v === keep)); });
-    cands.sort((a, b) => (mine(a) - mine(b)) || ((a.rare ? 1 : 0) - (b.rare ? 1 : 0)) || (a.seen - b.seen));
-    const r = cands[0]; if (!r) return;
-    if (mine(r)) this.recover(r, 'full'); else this.release(r);
+    const cands = this.tracked.filter(r => { const v = this.liveT(r); return !mine(r) && !(v && (v === p.vehicle || v === keep)); });
+    cands.sort((a, b) => ((a.rare ? 1 : 0) - (b.rare ? 1 : 0)) || (a.seen - b.seen));
+    const r = cands[0]; if (!r) return false;
+    this.release(r); return true;
+  }
+  // leaving a car the registry couldn't keep: say so if there is anything of yours in it
+  warnUntracked(v) {
+    if (!v || !v.untracked || v.warned || v.trackId) return;
+    if (!(units(v.trunk) > 0 || +v.cash > 0)) return;
+    v.warned = true;
+    this.g.ui.toast(`Warning: this ${v.spec.name} isn’t being kept track of (8 stolen cars already hold your things). What you leave in it can be lost.`, 'warn');
   }
   // let a tracked car go back to being any car (nothing of yours in it)
   release(r) {
@@ -51246,7 +51337,7 @@ class VehicleRegistry {
     const g = this.g;
     for (const o of g.vehicles.nearby(r.x, r.z, 4)) if (o !== g.player.vehicle && !o.garageUid && !o.trackId && !o.mission && Math.hypot(o.pos.x - r.x, o.pos.z - r.z) < 3) g.vehicles.despawn(o);
     const v = g.vehicles.spawn(r.type, r.x, r.z, r.h, { parked: true, color: r.color, y: r.y, vtier: r.vtier });
-    v.trackId = r.id; v.trunk = r.trunk; v.health = r.hp; v.touched = true; v.looted = true; v.stolenBefore = r.hot; v.fac = null;
+    v.trackId = r.id; v.trunk = r.trunk; v.health = r.hp; v.touched = true; v.looted = true; v.stolenBefore = r.hot; v.fac = null; v.tune = r.tune || null;
     if (r.origin === 'found') v.origin = 'found';
     if (r.hp <= 0) { v.health = 0; v.burnt = false; }
     this.trk.set(r.id, v);
@@ -51258,7 +51349,10 @@ class VehicleRegistry {
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     if (pv && !pv.trackId && this.eligible(pv)) this.track(pv);
     const lv = p.lastVehicle;
+    // room again (a car recovered, sold, parked): a car that couldn't be kept is kept now
+    if (lv && lv.untracked && this.tracked.length < VREG.max) { lv.untracked = false; lv.warned = false; }
     if (lv && lv !== pv && !lv.trackId && this.eligible(lv) && (units(lv.trunk) > 0 || +lv.cash > 0)) this.track(lv);
+    if (lv && lv !== pv) this.warnUntracked(lv);
     for (const r of this.tracked.slice()) {
       const v = this.liveT(r);
       if (!v) this.trk.delete(r.id);
@@ -51310,20 +51404,266 @@ class VehicleRegistry {
     this.cars.clear(); this.trk.clear();
   }
   // a save (re)loaded: records are the truth, live cars are rebuilt from them as you come near
-  reset() { this.clearAll(); this.t = 0; if (this.g.uw && this.s && this.s.garage) this.house(); }
+  reset() { this.clearAll(); this.t = 0; if (this.g.uw && this.s && this.s.garage) this.house(); if (this.g.impound) this.g.impound.reset(); }
   // sanitize the records in a save (SaveSystem): positions finite, trunks clean, the registry bounded
   static sanitize(d) {
     const ok = v => typeof v === 'number' && isFinite(v), num = (v, def, lo, hi) => ok(v) ? clamp(v, lo, hi) : def;
     const pt = o => o && typeof o === 'object' && ok(o.x) && ok(o.z) ? { x: o.x, z: o.z, h: ok(o.h) ? o.h : 0, y: ok(o.y) ? o.y : 0 } : null;
-    for (const e of d.garage) { e.loc = pt(e.loc); e.out = !!e.loc; }
+    for (const e of d.garage) {
+      e.loc = pt(e.loc); e.out = !!e.loc;
+      // HOT and the impound (Session 5B): a stolen car stays HOT until a Chop Shop clean; an impounded car keeps its fee
+      e.hot = e.hot === undefined ? e.origin === 'stolen' && !e.cleaned : !!e.hot; e.cleaned = !!e.cleaned;
+      e.seen = num(e.seen, 0, 0, 1e9);
+      const I = e.imp && typeof e.imp === 'object' ? e.imp : null;
+      e.imp = I ? { why: ['arrest', 'abandoned', 'pursuit'].includes(I.why) ? I.why : 'abandoned', since: num(I.since, 0, 0, 1e9), fee: Math.round(num(I.fee, IMPOUND.fee.min, IMPOUND.fee.min, IMPOUND.fee.max)), slot: Math.floor(num(I.slot, 0, 0, 40)), paid: !!I.paid } : null;
+      if (e.imp) { e.out = false; e.loc = null; }
+    }
     let next = Number.isInteger(d.nextTrack) && d.nextTrack >= 0 ? d.nextTrack : 0;
     d.tracked = (Array.isArray(d.tracked) ? d.tracked : []).filter(r => r && typeof r === 'object' && VEHICLES[r.type] && Number.isInteger(r.id) && r.id > 0 && pt(r)).slice(-VREG.max).map(r => {
       next = Math.max(next, r.id);
-      return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9) };
+      const tune = r.tune && typeof r.tune === 'object' ? { engine: num(r.tune.engine, 0, 0, 3) | 0, brakes: num(r.tune.brakes, 0, 0, 3) | 0, grip: num(r.tune.grip, 0, 0, 3) | 0, armor: num(r.tune.armor, 0, 0, 3) | 0 } : null;
+      return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found', 'dealer'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9), tune };
     });
     d.nextTrack = next;
     d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));
     d.vlog = (Array.isArray(d.vlog) ? d.vlog : []).filter(x => x && typeof x === 'object' && typeof x.what === 'string' && VEHICLES[x.type]).slice(-20);
+  }
+}
+/* =====================================================================
+   [UNDERWORLD] VEHICLES AND THE LAW (§13, §14, §45.30; Session 5B)
+   - HOT. A stolen car is HOT: the flag lives on its record in the
+     VehicleRegistry (a tracked car's r.hot, a fleet car's e.hot), so it
+     survives pursuits, parking and save/reload. Only the Chop Shop's
+     Clean takes it away. Police recognise a HOT car only by looking at
+     it: a unit or cop that can see it within HOT_T.range may run the
+     plates (about a 1-star response). Nothing knows citywide.
+   - Pay & Spray (Okafor Motor Works) sheds a live pursuit when no cop is
+     watching, repairs and resprays; it never cleans HOT or makes a car
+     legally yours.
+   - The Chop Shop buys HOT cars (Dirty Cash), cleans their title (one
+     time, a real free parking space required), repairs, resprays and
+     tunes them. Never with the police on you.
+   - The impound lot: a physical yard (a CompoundSystem compound in
+     impound mode). Your car goes there when seized at an arrest, found
+     abandoned on the street for about a day of the economic clock, or
+     recovered by police in a pursuit. It waits in a numbered space,
+     still in your fleet (its home bay kept), until you drive it out:
+     legally, after paying the release fee at the window (Clean Bank,
+     scaled by value, fixed when it was seized), or not, by picking the
+     gate lock or ramming the gate, which the police hear about. A car
+     taken out unpaid is HOT from then on (they know its plates).
+   ===================================================================== */
+const HOT_T = { range: 26, chance: 0.28, tick: 0.5, cool: 30, pursuit: 50, pursuitSeen: 28 };
+class HotWatch {
+  constructor(g) { this.g = g; this.t = 0; this.cool = 0; }
+  update(dt) {
+    const g = this.g, P = g.police, p = g.player;
+    if (!g.uw || g.state !== 'playing' || !P.enabled || g.uw.S.jail) return;
+    if (P.level > 0) { this.cool = HOT_T.cool; return; }
+    if ((this.cool -= dt) > 0) return;
+    if ((this.t -= dt) > 0) return; this.t = HOT_T.tick;
+    const v = p.state === 'vehicle' ? p.vehicle : null;
+    if (!v || !g.vreg.isHot(v)) return;
+    // a cop has to actually be looking: a unit or an officer with a line of sight, close enough to read the plates
+    if (!P.copCanSee(v.pos.x, v.pos.z, HOT_T.range) || Math.random() >= HOT_T.chance) return;
+    P.addHeat(HEAT_LEVELS[1], v.pos.x, v.pos.z);
+    g.ui.toast(`Dispatch: plates on a ${v.spec.name} come back stolen. Unit in pursuit.`, 'radio');
+    g.vreg.note('recognised (HOT)', v.type, {});
+  }
+}
+
+class ImpoundLot {
+  constructor(g) { this.g = g; this.pick = null; this.seenT = -99; }
+  get id() { return IMPOUND.id; }
+  get C() { return this.g.world.compounds[IMPOUND.id]; }
+  get CS() { return this.g.uw.compounds; }
+  econ() { return this.g.uw ? this.g.uw.S.econH : 0; }
+  // the release fee: a share of what the car is worth, fixed when it is seized
+  fee(e) { const F = IMPOUND.fee, val = carMsrp(e.type) * (TIER_LOOK[e.vtier] || TIER_LOOK.common).value; return Math.round(clamp(val * F.k, F.min, F.max) / 10) * 10; }
+  held() { return this.g.save.garage.filter(e => e.imp); }
+  slots() { return (this.C && this.C.slots) || []; }
+  freeSlot() { const used = new Set(this.held().map(e => e.imp.slot)); const n = this.slots().length; for (let i = 0; i < n; i++) if (!used.has(i)) return i; return n ? n - 1 : 0; }
+  slotPos(e) { const S = this.slots(); return S[clamp(e.imp.slot, 0, S.length - 1)] || null; }
+  // your car is taken to the lot: why is 'arrest', 'abandoned' or 'pursuit'
+  seize(e, why) {
+    const g = this.g, R = g.vreg, v = R.live(e);
+    if (v && v !== g.player.vehicle) g.vehicles.despawn(v);
+    R.cars.delete(e.uid);
+    e.imp = { why, since: this.econ(), fee: this.fee(e), slot: this.freeSlot(), paid: false };
+    e.out = false; e.loc = null;
+    R.note('impounded', e.type, { uid: e.uid, why, fee: e.imp.fee });
+    const what = { arrest: 'seized when you were arrested', abandoned: 'found abandoned on the street', pursuit: 'recovered by the police after the chase' }[why] || 'impounded';
+    if (!g.uw.S.jail || why === 'arrest') g.uw.news('pv', `Your ${VEHICLES[e.type].name} was ${what} and taken to the ${IMPOUND.name}. Release fee ${fmtMoney(e.imp.fee)} at the window, from your bank.`);
+    return e.imp;
+  }
+  // ---------------------------------------------------------------- who the gate opens for (CompoundSystem.why)
+  why(a) {
+    const g = this.g, p = g.player, CS = this.CS;
+    if (a && a.spec && a.ctl) {
+      if (a.type === 'police' || a.type === 'unmarked' || a.towTruck) return '';
+      if (a === p.vehicle && p.state === 'vehicle') { const e = g.vreg.entryOf(a); return e && e.imp && e.imp.paid ? '' : 'not released'; }
+      return 'no business here';
+    }
+    if (a === p) {
+      // anyone already inside is let out on foot; from the street, only to collect a car that has been released
+      if (CS.inYard(this.id, p.pos.x, p.pos.z)) return '';
+      return this.held().some(e => e.imp.paid) ? '' : 'closed to the public';
+    }
+    return 'no business here';
+  }
+  entitled() { const g = this.g, p = g.player, v = p.state === 'vehicle' ? p.vehicle : null; const e = v && g.vreg.entryOf(v); return v ? !!(e && e.imp && e.imp.paid) : this.held().some(e2 => e2.imp.paid); }
+  // ---------------------------------------------------------------- break-ins
+  heat(stars, why) {
+    const P = this.g.police; if (!P.enabled) return;
+    if (P.level < stars) P.addHeat(Math.max(0.01, HEAT_LEVELS[stars] - P.heat), this.C.gate.x, this.C.gate.z);
+    this.g.ui.toast(`Impound alarm: ${why}. The precinct is next door.`, 'warn');
+  }
+  onRam() { this.heat(IMPOUND.stars.ram, 'the gate rammed'); }
+  onSeen() {
+    const g = this.g; if (this.entitled() || g.time - this.seenT < 60) return;
+    this.seenT = g.time; this.heat(IMPOUND.stars.seen, 'someone in the yard');
+  }
+  // the gate's control box: a few seconds' work on foot opens it for a while (and trips the alarm)
+  updatePick(dt) {
+    const g = this.g, p = g.player, G = this.C.gate; if (!this.pick) return;
+    if (p.state !== 'foot' || Math.hypot(p.pos.x - G.x, p.pos.z - G.z) > 4.2) { this.pick = null; return; }
+    if ((this.pick.t += dt) < IMPOUND.pick) return;
+    this.pick = null;
+    const R = this.CS.R[this.id]; R.forceT = g.time + IMPOUND.open;
+    g.audio.play('door');
+    this.heat(IMPOUND.stars.pick, 'the gate lock forced');
+  }
+  // ---------------------------------------------------------------- the window
+  openOffice() {
+    const g = this.g, s = g.save;
+    const render = () => {
+      const list = this.held();
+      return `<div class="svcTop"><span>${esc(IMPOUND.name)}</span><span>${Money.html('impoundFee')}</span></div>` + `<div class="btns"><button class="sbtn" data-act="pick:0">Pick the gate lock instead (the alarm will go)</button></div>` + (list.length ? '<div class="jobs">' + list.map(e => `<div class="job"><i>🚧</i><div><b>${esc(VEHICLES[e.type].name)} · space ${e.imp.slot + 1}</b><span>${esc({ arrest: 'Seized at your arrest', abandoned: 'Abandoned on the street', pursuit: 'Recovered after a pursuit' }[e.imp.why] || 'Impounded')} · fee ${fmtMoney(e.imp.fee)}${e.imp.paid ? ' · released: drive it out' : ''}</span></div>${e.imp.paid ? '' : `<button class="sbtn gold" data-act="pay:${e.uid}" ${Money.can(e.imp.fee, 'impoundFee') ? '' : 'disabled'}>Pay ${fmtMoney(e.imp.fee)}</button>`}</div>`).join('') + '</div>' : '<div class="hint">Nothing of yours in here.</div>');
+    };
+    g.content.openSvc('Impound window', 'Clerk: “Paperwork, then the fee, then you drive it out yourself. The gate opens for a released car.”', render, act => {
+      const [k, id] = act.split(':');
+      if (k === 'pick') { g.ui.back(); this.pick = { t: 0 }; g.ui.toast('Working on the lock… stay at the gate.', 'radio'); return; }
+      if (k !== 'pay') return;
+      const e = s.garage.find(x => x.uid === +id); if (!e || !e.imp || e.imp.paid) return;
+      if (!Money.pay(e.imp.fee, 'impoundFee')) { g.content.refreshSvc('Not enough in the bank.'); return; }
+      e.imp.paid = true; g.vreg.note('release paid', e.type, { uid: e.uid, fee: e.imp.fee });
+      g.audio.play('cash'); g.saveGame(); g.content.refreshSvc(`Released. It’s in space ${e.imp.slot + 1}: the gate opens for it.`);
+    });
+  }
+  findAction() {
+    const g = this.g, p = g.player, C = this.C; if (!C || p.interior || p.state !== 'foot') return null;
+    const G = C.gate, ox = G.x - G.n[0] * 3, oz = G.z - G.n[1] * 3;
+    if (Math.hypot(p.pos.x - ox, p.pos.z - oz) < IMPOUND.office) {
+      if (this.pick) return { label: `Picking the gate lock… ${Math.ceil(IMPOUND.pick - this.pick.t)} s`, act: () => {} };
+      return { label: `Impound window · ${IMPOUND.name}`, act: () => this.openOffice() };
+    }
+    // from inside the yard, the control box on the gate post
+    if (this.CS.inYard(this.id, p.pos.x, p.pos.z) && Math.hypot(p.pos.x - G.x, p.pos.z - G.z) < 4) {
+      if (this.pick) return { label: `Picking the gate lock… ${Math.ceil(IMPOUND.pick - this.pick.t)} s`, act: () => {} };
+      if (!this.entitled()) return { label: 'Pick the gate lock', act: () => { this.pick = { t: 0 }; } };
+    }
+    return null;
+  }
+  // ---------------------------------------------------------------- the cars in the lot, and the way out
+  update(dt) {
+    const g = this.g, R = g.vreg, p = g.player, P = g.police;
+    if (!g.uw || g.state !== 'playing' || !this.C) return;
+    this.updatePick(dt);
+    const near = !(p.interior && !p.interior.vspace) && Math.hypot(p.pos.x - this.C.center.x, p.pos.z - this.C.center.z) < VREG.near;
+    for (const e of g.save.garage) {
+      if (!e.imp) {
+        // recovered by police in a chase: an owned car left near a cop who can see it while they're after you
+        if (e.out && P.level > 0) { const v = R.live(e); if (v && v !== p.vehicle && Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z) > HOT_T.pursuit && P.copCanSee(v.pos.x, v.pos.z, HOT_T.pursuitSeen)) this.seize(e, 'pursuit'); }
+        continue;
+      }
+      let v = R.live(e);
+      if (!v && near) { const sp = this.slotPos(e); if (sp) { v = R.spawnFor(e, { x: sp.x, z: sp.z, h: sp.h, y: CURB_H }); v.display = false; v.locked = false; v.impounded = true; } }
+      else if (v && !near && v !== p.vehicle && v !== p.lastVehicle) { g.vehicles.despawn(v); R.cars.delete(e.uid); continue; }
+      if (!v) continue;
+      // out of the yard and away from the gate: retrieved (paid), or taken back (not)
+      const inYard = this.CS.inYard(this.id, v.pos.x, v.pos.z), dG = Math.hypot(v.pos.x - this.C.gate.x, v.pos.z - this.C.gate.z);
+      if (!inYard && dG > 10) this.retrieved(e, v);
+    }
+  }
+  retrieved(e, v) {
+    const g = this.g, R = g.vreg, paid = e.imp.paid;
+    e.imp = null; e.out = true; e.loc = R.here(v); e.seen = this.econ(); v.impounded = false;
+    if (paid) { R.note('retrieved', e.type, { uid: e.uid }); g.ui.toast(`Your ${VEHICLES[e.type].name} is out of the impound.`, 'money'); g.autosave('Vehicle retrieved'); return; }
+    // taken back without paying: the fee is moot, the plate is wanted
+    e.hot = true;
+    R.note('taken back from the impound', e.type, { uid: e.uid });
+    this.heat(IMPOUND.stars.drive, 'a car driven out unreleased');
+  }
+  reset() { this.pick = null; this.seenT = -99; }
+}
+
+// the Chop Shop's work on a stolen car in its yard (sell is UnderWorld.sellCar)
+const CHOP_WORK = { clean: 0.12, cleanMin: 400, repair: 1.1, paint: 350 };
+class ChopShop {
+  constructor(g) { this.g = g; }
+  // a car the chop shop will work on: one you don't own legally (tracked stolen, or a HOT car in your fleet)
+  car(v) { const R = this.g.vreg; return !!v && !v.burnt && (v.trackId ? !!R.rec(v.trackId) : v.garageUid ? !!(R.entryOf(v) && R.entryOf(v).hot) : !v.owned); }
+  cleanPrice(v) { return Math.max(CHOP_WORK.cleanMin, Math.round(carMsrp(v.type) * CHOP_WORK.clean * (TIER_LOOK[v.vtier] || TIER_LOOK.common).value / 10) * 10); }
+  // why it can't be cleaned ('' when it can)
+  cleanBlock(v) {
+    const g = this.g, R = g.vreg;
+    if (g.police.level > 0) return 'Not with the police on you.';
+    if (v.garageUid) { const e = R.entryOf(v); if (!e || !e.hot) return 'Already clean.'; }
+    else {
+      const r = v.trackId && R.rec(v.trackId); if (!r) return 'They need to know where it came from.';
+      if (!r.hot) return 'Already clean.';
+      // a clean title is a legal car of yours: it needs a real space of its own (§45.30)
+      if (!R.freeBays() || g.save.garage.length >= g.content.garageCap) return 'No free parking space for it: a clean car needs a space of its own.';
+    }
+    if (!Money.can(this.cleanPrice(v), 'chopWork')) return `Costs ${fmtMoney(this.cleanPrice(v))} in cash.`;
+    return '';
+  }
+  // new papers: HOT gone, a legal car of yours (into your fleet if it wasn't), exactly once
+  clean(v) {
+    const g = this.g, R = g.vreg, why = this.cleanBlock(v); if (why) return why;
+    Money.pay(this.cleanPrice(v), 'chopWork');
+    if (v.garageUid) { const e = R.entryOf(v); e.hot = false; e.cleaned = true; R.note('cleaned', e.type, { uid: e.uid }); }
+    else {
+      const r = R.rec(v.trackId), e = g.content.addToGarage(v.type, 'stolen', v.colorHex, true);
+      if (!e) return 'No free parking space.';
+      e.hot = false; e.cleaned = true; e.vtier = v.vtier || VEHICLES[v.type].tier; e.dmg = clamp(100 - v.health, 0, 100);
+      e.tune = r.tune ? { ...r.tune } : e.tune;
+      e.trunk = r.trunk; v.trunk = e.trunk;
+      e.out = true; e.loc = R.here(v); e.seen = R.econ();
+      v.owned = true; v.garageUid = e.uid; v.origin = 'stolen'; v.tune = e.tune;
+      R.forget(v, 'owned'); R.cars.set(e.uid, v);
+      R.note('cleaned', e.type, { uid: e.uid });
+    }
+    g.audio.play('cash'); g.autosave('Car cleaned');
+    return '';
+  }
+  open(v) {
+    const g = this.g, uw = g.uw, R = g.vreg, C2 = g.content;
+    if (g.police.level > 0) { C2.deny('The chop shop rolls the door down. “Not with cops on you.”'); return; }
+    const COLORS = [0xc0392b, 0x1c2833, 0xecf0f1, 0x2471a3, 0xf1c40f, 0x27ae60, 0x8e44ad, 0xd35400, 0x566573, 0x1abc9c];
+    const ent = () => R.entryOf(v), rec = () => v.trackId ? R.rec(v.trackId) : null;
+    const tuneOf = () => { const e = ent(), r = rec(); return e ? e.tune : r ? (r.tune || (r.tune = { engine: 0, brakes: 0, grip: 0, armor: 0 })) : null; };
+    const render = () => {
+      if (!g.vehicles.list.includes(v) || v.burnt) return '<div class="hint">Gone.</div>';
+      const hot = R.isHot(v), cb = this.cleanBlock(v), cp = this.cleanPrice(v), rc = Math.round(C2.repairCost(v.type, v.health) * CHOP_WORK.repair / 10) * 10, t = tuneOf();
+      let h = `<div class="svcTop"><span>${esc(v.spec.name)} ${hot ? '<span class="chip" style="--c:#ff4d5e">HOT</span>' : '<span class="chip" style="--c:#7fe08f">CLEAN PAPERS</span>'}</span><span>Condition <b>${Math.round(v.health)}%</b></span><span>${Money.html('chopWork')}</span></div><div class="grid2">`;
+      if (!v.garageUid) h += `<div class="card"><div class="t">Sell</div><div class="d">They strip it for parts. Cash only.</div><button class="sbtn gold" data-act="sell">${fmtMoney(uw.chopValue(v))}</button></div>`;
+      h += `<div class="card"><div class="t">Clean the title</div><div class="d">New plates, new papers: it stops being HOT and becomes a legal car of yours, in a space of its own. It still resells as a stolen car.</div><button class="sbtn gold" data-act="clean" ${cb ? 'disabled' : ''}>${cb ? esc(cb) : fmtMoney(cp)}</button></div>`;
+      h += `<div class="card"><div class="t">Repair</div><div class="d">No questions about the dents.</div><button class="sbtn" data-act="repair" ${v.health >= 99.5 || !Money.can(rc, 'chopWork') ? 'disabled' : ''}>${v.health >= 99.5 ? 'No damage' : fmtMoney(rc)}</button></div>`;
+      h += `<div class="card"><div class="t">Respray · ${fmtMoney(CHOP_WORK.paint)}</div><div class="d">Paint only: the plates still say what it is.</div><div class="swatches">${COLORS.map(c => `<button class="sw" data-act="paint:${c}" style="background:#${c.toString(16).padStart(6, '0')}" ${Money.can(CHOP_WORK.paint, 'chopWork') ? '' : 'disabled'}></button>`).join('')}</div></div>`;
+      h += '</div><h3>Upgrade</h3><div class="grid2">' + (t ? TUNE.map(T => { const lv = t[T.id], max = lv >= 3, price = max ? 0 : C2.tunePrice(T, lv, v.type), need = TUNE_REP[lv] || 0, locked = !max && g.save.rep < need; return `<div class="card"><div class="t">${T.name}</div><div class="pips">${[0, 1, 2].map(i => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div><button class="sbtn" data-act="tune:${T.id}" ${max || locked || !Money.can(price, 'chopWork') ? 'disabled' : ''}>${max ? 'Maxed' : locked ? 'Needs ' + need + ' Rep' : fmtMoney(price)}</button></div>`; }).join('') : '<div class="hint">They only tune a car they know.</div>') + '</div>';
+      return h;
+    };
+    C2.openSvc('Saltworks Chop Shop', 'Knuckles: “Sell it, clean it, fix it, paint it, make it faster. Pick.”', render, act => {
+      if (g.police.level > 0) { C2.refreshSvc('“Not with cops on you.”'); return; }
+      const [k, a] = act.split(':');
+      if (k === 'sell') { g.ui.back(); uw.sellCar(v); return; }
+      if (k === 'clean') { const r = this.clean(v); C2.refreshSvc(r || 'New papers. It’s a legal car of yours now, in a space of its own.'); return; }
+      if (k === 'repair') { const c = Math.round(C2.repairCost(v.type, v.health) * CHOP_WORK.repair / 10) * 10; if (!Money.pay(c, 'chopWork')) return; C2.repair(v); const e = ent(); if (e) e.dmg = 0; g.audio.play('cash'); }
+      if (k === 'paint') { if (!Money.pay(CHOP_WORK.paint, 'chopWork')) return; v.colorHex = +a; v.mat.userData.u.uPaint.value.setHex(+a); const e = ent(), r = rec(); if (e) e.color = +a; if (r) r.color = +a; g.audio.play('cash'); }
+      if (k === 'tune') { const t = tuneOf(), T = TUNE.find(x => x.id === a); if (!t || !T || t[a] >= 3) return; const price = C2.tunePrice(T, t[a], v.type); if (g.save.rep < (TUNE_REP[t[a]] || 0) || !Money.pay(price, 'chopWork')) return; t[a]++; v.tune = t; g.audio.play('cash'); }
+      g.saveGame(); C2.refreshSvc();
+    });
   }
 }
 /* =====================================================================
@@ -51616,8 +51956,11 @@ class Prison {
     if (cash > 0) uw.news('pv', `The police took ${fmtMoney(cash)} in cash from you and the car. Whatever you stashed is still where you left it.`);
     if (v && g.vehicles.list.includes(v)) {
       if (v.trunk) Inv.clear(v.trunk);
-      if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { if (e.trunk) Inv.clear(e.trunk); e.dmg = Math.max(e.dmg, 100 - v.health); } uw.news('pv', `Your ${v.spec.name} was impounded and released to your garage. The trunk was searched.`); }
-      if (g.player.vehicle !== v) g.vehicles.despawn(v);
+      // the car itself: yours goes to the impound lot, still yours (§45.30), emptied of what the police took above;
+      // a stolen one you were in is recovered (logged)
+      if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { if (e.trunk) Inv.clear(e.trunk); e.dmg = Math.max(e.dmg, 100 - v.health); if (g.player.vehicle === v) g.exitVehicle(true); g.impound.seize(e, 'arrest'); } }
+      else if (v.trackId) { const r = g.vreg.rec(v.trackId); if (r) { if (g.player.vehicle === v) g.exitVehicle(true); g.vreg.recover(r, 'arrest'); } }
+      if (g.vehicles.list.includes(v) && g.player.vehicle !== v) g.vehicles.despawn(v);
     }
     // only what you had on you is evidence: guns, rounds and armour left in a stash stay there
     const ws = g.save.weapons, wl = g.save.wloc; let kept = 0;
@@ -57524,6 +57867,8 @@ class Game {
     this.ui = new UIManager(this);
     this.uw = new Underworld(this);
     this.vreg = new VehicleRegistry(this);
+    // Session 5B: HOT recognition, the police impound lot, the Chop Shop's work
+    this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -58093,7 +58438,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -58281,7 +58626,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, CHOP_WORK, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

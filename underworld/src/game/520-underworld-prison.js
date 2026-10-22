@@ -153,8 +153,11 @@ class Prison {
     if (cash > 0) uw.news('pv', `The police took ${fmtMoney(cash)} in cash from you and the car. Whatever you stashed is still where you left it.`);
     if (v && g.vehicles.list.includes(v)) {
       if (v.trunk) Inv.clear(v.trunk);
-      if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { if (e.trunk) Inv.clear(e.trunk); e.dmg = Math.max(e.dmg, 100 - v.health); } uw.news('pv', `Your ${v.spec.name} was impounded and released to your garage. The trunk was searched.`); }
-      if (g.player.vehicle !== v) g.vehicles.despawn(v);
+      // the car itself: yours goes to the impound lot, still yours (§45.30), emptied of what the police took above;
+      // a stolen one you were in is recovered (logged)
+      if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { if (e.trunk) Inv.clear(e.trunk); e.dmg = Math.max(e.dmg, 100 - v.health); if (g.player.vehicle === v) g.exitVehicle(true); g.impound.seize(e, 'arrest'); } }
+      else if (v.trackId) { const r = g.vreg.rec(v.trackId); if (r) { if (g.player.vehicle === v) g.exitVehicle(true); g.vreg.recover(r, 'arrest'); } }
+      if (g.vehicles.list.includes(v) && g.player.vehicle !== v) g.vehicles.despawn(v);
     }
     // only what you had on you is evidence: guns, rounds and armour left in a stash stay there
     const ws = g.save.weapons, wl = g.save.wloc; let kept = 0;

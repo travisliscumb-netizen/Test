@@ -34,11 +34,15 @@ class VehicleRegistry {
   day() { return this.g.uw ? this.g.uw.S.day : 0; }
   // a line in the vehicle log: what happened to which car (and what went with it)
   note(what, type, extra = {}) { const L = this.log; L.push({ day: this.day(), what, type, ...extra }); if (L.length > 20) L.splice(0, L.length - 20); }
+  // HOT (Session 5B): a tracked stolen car's r.hot or a fleet car's e.hot, saved with it; only a Chop Shop clean
+  // takes it off
+  isHot(v) { if (!v) return false; if (v.garageUid) { const e = this.entryOf(v); return !!(e && e.hot); } if (v.trackId) { const r = this.rec(v.trackId); return !!(r && r.hot); } return false; }
   // ---------------------------------------------------------------- the fleet
   entryOf(v) { return v && v.garageUid ? this.s.garage.find(e => e.uid === v.garageUid) : null; }
   bayPos(e) { const def = e.at && PROP_BY_ID[e.at.p]; return def ? this.PM.bays(def)[e.at.i] || null : null; }
   // where a fleet car is: its bay, or where you left it
   where(e) {
+    if (e.imp && this.g.impound) { const sp = this.g.impound.slotPos(e); if (sp) return { x: sp.x, z: sp.z, name: `${IMPOUND.name} · space ${e.imp.slot + 1}`, street: false, imp: true }; }
     if (e.out && e.loc) return { x: e.loc.x, z: e.loc.z, name: placeNameAt(e.loc.x, e.loc.z) || 'the street', street: true };
     const b = this.bayPos(e), def = e.at && PROP_BY_ID[e.at.p];
     return b ? { x: b.x, z: b.z, name: `${def.name} · ${PARK_LABEL[b.kind] || 'space'} ${b.i + 1}`, street: false } : null;
@@ -80,21 +84,26 @@ class VehicleRegistry {
     const g = this.g, s = this.s, p = g.player, px = p.pos.x, pz = p.pos.z, py = p.pos.y;
     if (s.garage.some(e => !e.at)) this.house(); // a car still waiting for a space takes one as soon as it frees
     for (const e of s.garage) {
+      // a car in the police impound is the impound lot's to show and to let go of (Session 5B)
+      if (e.imp) continue;
       const v = this.live(e);
       if (!v) this.cars.delete(e.uid); else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});
       const b = this.bayPos(e);
       if (v) {
         // leaving its bay takes it out; from then on it is saved wherever it stands
-        if (!e.out && b && (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3)) { e.out = true; v.display = false; e.loc = this.here(v); g.autosave('Vehicle taken out'); }
+        if (!e.out && b && (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3)) { e.out = true; v.display = false; e.loc = this.here(v); e.seen = this.econ(); g.autosave('Vehicle taken out'); }
         if (e.out) {
           e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100);
           const d = Math.hypot(v.pos.x - px, v.pos.z - pz), mine = v === p.vehicle || v === p.lastVehicle;
+          if (v === p.vehicle || d < VREG.attend) e.seen = this.econ();
           // a wreck left behind: your people tow it home to its bay (a recovery, not a police matter)
           if (e.dmg >= 100 && v !== p.vehicle && b && d > VREG.towWreck && !g.inView(v.pos.x, 1, v.pos.z, 3)) { this.towHome(e, v); continue; }
           if (d > VREG.keep && !mine && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
           continue;
         }
       }
+      // a day out on the street with nobody near it: police tow it to the impound (§45.30); a wreck goes home
+      if (e.out && e.loc && e.dmg < 100 && this.econ() - (e.seen ?? this.econ()) >= VREG.recover && (!v || (v !== p.vehicle && !(g.inView(v.pos.x, 1, v.pos.z, 3) && Math.hypot(v.pos.x - px, v.pos.z - pz) < VREG.attend))) && g.impound) { g.impound.seize(e, 'abandoned'); continue; }
       const at = e.out ? e.loc : b; if (!at) continue;
       const bay = !e.out && b;
       const near = Math.hypot(at.x - px, at.z - pz) < VREG.near && Math.abs((at.y ?? 0) - py) < (bay && b.kind === 'under' ? 20 : 60) && (bay && b.kind === 'under' ? p.interior && p.interior.vspace === b.space : !(p.interior && p.interior.vspace));
@@ -130,24 +139,33 @@ class VehicleRegistry {
   rec(id) { return this.tracked.find(r => r.id === id) || null; }
   liveT(r) { const v = this.trk.get(r.id); return v && this.g.vehicles.list.includes(v) && v.trackId === r.id ? v : null; }
   track(v) {
-    const s = this.s; if (!this.eligible(v) || v.trackId) return null;
-    if (this.tracked.length >= VREG.max) this.makeRoom(v);
+    const s = this.s; if (!this.eligible(v) || v.trackId || v.untracked) return null;
+    // full, and every car kept holds your goods or cash: nothing of yours is dropped to make room (§45.30). This
+    // car stays usable while you use it, but it can't be remembered: you are told so, plainly.
+    if (this.tracked.length >= VREG.max && !this.makeRoom(v)) { v.untracked = true; this.g.ui.toast(`Too many stolen cars with your things in them: this ${v.spec.name} can’t be kept track of. Leave it and it, and anything you put in it, won’t be safe.`, 'warn'); return null; }
     const id = s.nextTrack = (s.nextTrack || 0) + 1;
-    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ() };
+    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.dealerStolen ? 'dealer' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ(), tune: v.tune ? { ...v.tune } : null };
     this.tracked.push(r);
     v.trackId = id; v.stolenBefore = v.stolenBefore || r.hot; v.touched = true;
     Money.adoptCar(v, 't' + id); // its cash is kept in the wallet now (saved with the car)
     this.trk.set(id, v);
     return r;
   }
-  // the registry is full: the oldest car with nothing of yours in it gives way first (rare ones last); one with your
-  // cargo or cash in it is recovered by police like any other (logged), never just dropped
+  // the registry is full: the oldest car with nothing of yours in it gives way (rare ones last). A car with your cargo
+  // or cash in it never gives way (§45.30): with only those left, there is no room (false)
   makeRoom(keep) {
     const p = this.g.player, mine = r => units(r.trunk) > 0 || Money.dirtyInCar('t' + r.id) > 0;
-    const cands = this.tracked.filter(r => { const v = this.liveT(r); return !(v && (v === p.vehicle || v === keep)); });
-    cands.sort((a, b) => (mine(a) - mine(b)) || ((a.rare ? 1 : 0) - (b.rare ? 1 : 0)) || (a.seen - b.seen));
-    const r = cands[0]; if (!r) return;
-    if (mine(r)) this.recover(r, 'full'); else this.release(r);
+    const cands = this.tracked.filter(r => { const v = this.liveT(r); return !mine(r) && !(v && (v === p.vehicle || v === keep)); });
+    cands.sort((a, b) => ((a.rare ? 1 : 0) - (b.rare ? 1 : 0)) || (a.seen - b.seen));
+    const r = cands[0]; if (!r) return false;
+    this.release(r); return true;
+  }
+  // leaving a car the registry couldn't keep: say so if there is anything of yours in it
+  warnUntracked(v) {
+    if (!v || !v.untracked || v.warned || v.trackId) return;
+    if (!(units(v.trunk) > 0 || +v.cash > 0)) return;
+    v.warned = true;
+    this.g.ui.toast(`Warning: this ${v.spec.name} isn’t being kept track of (8 stolen cars already hold your things). What you leave in it can be lost.`, 'warn');
   }
   // let a tracked car go back to being any car (nothing of yours in it)
   release(r) {
@@ -189,7 +207,7 @@ class VehicleRegistry {
     const g = this.g;
     for (const o of g.vehicles.nearby(r.x, r.z, 4)) if (o !== g.player.vehicle && !o.garageUid && !o.trackId && !o.mission && Math.hypot(o.pos.x - r.x, o.pos.z - r.z) < 3) g.vehicles.despawn(o);
     const v = g.vehicles.spawn(r.type, r.x, r.z, r.h, { parked: true, color: r.color, y: r.y, vtier: r.vtier });
-    v.trackId = r.id; v.trunk = r.trunk; v.health = r.hp; v.touched = true; v.looted = true; v.stolenBefore = r.hot; v.fac = null;
+    v.trackId = r.id; v.trunk = r.trunk; v.health = r.hp; v.touched = true; v.looted = true; v.stolenBefore = r.hot; v.fac = null; v.tune = r.tune || null;
     if (r.origin === 'found') v.origin = 'found';
     if (r.hp <= 0) { v.health = 0; v.burnt = false; }
     this.trk.set(r.id, v);
@@ -201,7 +219,10 @@ class VehicleRegistry {
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     if (pv && !pv.trackId && this.eligible(pv)) this.track(pv);
     const lv = p.lastVehicle;
+    // room again (a car recovered, sold, parked): a car that couldn't be kept is kept now
+    if (lv && lv.untracked && this.tracked.length < VREG.max) { lv.untracked = false; lv.warned = false; }
     if (lv && lv !== pv && !lv.trackId && this.eligible(lv) && (units(lv.trunk) > 0 || +lv.cash > 0)) this.track(lv);
+    if (lv && lv !== pv) this.warnUntracked(lv);
     for (const r of this.tracked.slice()) {
       const v = this.liveT(r);
       if (!v) this.trk.delete(r.id);
@@ -253,16 +274,25 @@ class VehicleRegistry {
     this.cars.clear(); this.trk.clear();
   }
   // a save (re)loaded: records are the truth, live cars are rebuilt from them as you come near
-  reset() { this.clearAll(); this.t = 0; if (this.g.uw && this.s && this.s.garage) this.house(); }
+  reset() { this.clearAll(); this.t = 0; if (this.g.uw && this.s && this.s.garage) this.house(); if (this.g.impound) this.g.impound.reset(); }
   // sanitize the records in a save (SaveSystem): positions finite, trunks clean, the registry bounded
   static sanitize(d) {
     const ok = v => typeof v === 'number' && isFinite(v), num = (v, def, lo, hi) => ok(v) ? clamp(v, lo, hi) : def;
     const pt = o => o && typeof o === 'object' && ok(o.x) && ok(o.z) ? { x: o.x, z: o.z, h: ok(o.h) ? o.h : 0, y: ok(o.y) ? o.y : 0 } : null;
-    for (const e of d.garage) { e.loc = pt(e.loc); e.out = !!e.loc; }
+    for (const e of d.garage) {
+      e.loc = pt(e.loc); e.out = !!e.loc;
+      // HOT and the impound (Session 5B): a stolen car stays HOT until a Chop Shop clean; an impounded car keeps its fee
+      e.hot = e.hot === undefined ? e.origin === 'stolen' && !e.cleaned : !!e.hot; e.cleaned = !!e.cleaned;
+      e.seen = num(e.seen, 0, 0, 1e9);
+      const I = e.imp && typeof e.imp === 'object' ? e.imp : null;
+      e.imp = I ? { why: ['arrest', 'abandoned', 'pursuit'].includes(I.why) ? I.why : 'abandoned', since: num(I.since, 0, 0, 1e9), fee: Math.round(num(I.fee, IMPOUND.fee.min, IMPOUND.fee.min, IMPOUND.fee.max)), slot: Math.floor(num(I.slot, 0, 0, 40)), paid: !!I.paid } : null;
+      if (e.imp) { e.out = false; e.loc = null; }
+    }
     let next = Number.isInteger(d.nextTrack) && d.nextTrack >= 0 ? d.nextTrack : 0;
     d.tracked = (Array.isArray(d.tracked) ? d.tracked : []).filter(r => r && typeof r === 'object' && VEHICLES[r.type] && Number.isInteger(r.id) && r.id > 0 && pt(r)).slice(-VREG.max).map(r => {
       next = Math.max(next, r.id);
-      return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9) };
+      const tune = r.tune && typeof r.tune === 'object' ? { engine: num(r.tune.engine, 0, 0, 3) | 0, brakes: num(r.tune.brakes, 0, 0, 3) | 0, grip: num(r.tune.grip, 0, 0, 3) | 0, armor: num(r.tune.armor, 0, 0, 3) | 0 } : null;
+      return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found', 'dealer'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9), tune };
     });
     d.nextTrack = next;
     d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));

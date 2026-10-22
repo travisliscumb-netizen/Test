@@ -128,21 +128,23 @@ class CompoundSystem {
   C(id) { return this.g.world.compounds[id]; }
   // a rival gang's compound (Session 4B): its faction id, else null
   rival(id) { const R = this.R[id]; return R && R.C.rival || null; }
+  // the police impound lot (Session 5B): fixed tiers, the gate rule is the lot's (ImpoundLot.why)
+  impound(id) { const R = this.R[id]; return !!(R && R.C.impound); }
   // the tiers the compound shows: what you have bought (or nothing while it is for sale); a rival's, theirs
   tiers(id) {
-    const W = this.uw.whse, fid = this.rival(id), o = !fid && this.uw.props.owned(id);
-    const t = {}; for (const k of WH_CAT_IDS) t[k] = fid ? this.uw.rivalwh.st(fid).up[k] | 0 : o ? W.tier(id, k) : 0;
+    const W = this.uw.whse, fid = this.rival(id), o = !fid && this.uw.props.owned(id), imp = this.impound(id);
+    const t = {}; for (const k of WH_CAT_IDS) t[k] = imp ? IMPOUND.tiers[k] | 0 : fid ? this.uw.rivalwh.st(fid).up[k] | 0 : o ? W.tier(id, k) : 0;
     return t;
   }
   // rebuild a compound when its tiers changed (upgrade, purchase, load) or a breach was mended
   sync(force) { for (const id in this.R) this.build(id, force); }
   build(id, force) {
-    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.rival(id) ? 'r' : this.uw.props.owned(id) ? 'o' : '-');
+    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.rival(id) ? 'r' : this.impound(id) ? 'i' : this.uw.props.owned(id) ? 'o' : '-');
     if (!force && sig === R.sig && !R.dirty) return;
     const g = this.g, grid = g.world.grid, C = R.C;
     const keepOpen = R.sig === sig && R.gate ? R.gate.open : 0;
     // what is breached (saved): entries from a tier that has since been replaced are gone with it
-    const br = this.rival(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
+    const br = this.rival(id) || this.impound(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
     for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
     for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -343,6 +345,7 @@ class CompoundSystem {
   // returns '' when allowed, or why not. a: the player, a vehicle, or a person on foot
   why(id, a) {
     const g = this.g, uw = this.uw, p = g.player, fid = this.rival(id);
+    if (this.impound(id)) return g.impound ? g.impound.why(a) : 'closed';
     // a rival's compound lets in its own people and its own vehicles, and never you
     if (fid) { if (a && a.spec && a.ctl) return a.fac === fid && a !== p.vehicle ? '' : 'not one of theirs'; return a && a !== p && a.fac === fid && a.kind === 'gang' ? '' : 'not one of theirs'; }
     if (!uw.props.owned(id)) return 'not yours';
@@ -375,6 +378,8 @@ class CompoundSystem {
   // is anyone the gate should open for near it? (vehicles get a longer reach at speed, as DoorSystem does)
   gateWant(R) {
     const g = this.g, p = g.player, G = R.C.gate, id = R.id;
+    // a gate whose lock was picked stands open for a while (the impound lot, Session 5B)
+    if (R.forceT > g.time) { R.gate.by = 'forced'; return true; }
     const reach = v => clamp(12 + v.speed * 1.2, 12, 36);
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     if (!p.interior) {
@@ -407,6 +412,8 @@ class CompoundSystem {
     const crewHere = this.uw.crew.active().some(c => c.assign === WarehouseSystem.key(id));
     const hit = q => { q.state = 'broken'; q.col.on = false; br[q.key] = { s: 'broken', t: now, tier: q === R.gate ? R.t.access : R.t.perimeter }; if (crewHere) br[q.key].w = now; };
     // a rival's compound rammed: that is a raid starting (Session 4B)
+    // the impound lot rammed: the police know at once (Session 5B); the lot mends itself a day later
+    if (this.impound(id)) { hit(part); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle && g.impound) g.impound.onRam(); return; }
     if (this.rival(id)) { hit(part); if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle) this.uw.rivalwh.alarm(this.rival(id), 'rammed'); return; }
     hit(part);
     if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q);
@@ -426,7 +433,10 @@ class CompoundSystem {
   }
   // the saved breach list of a warehouse: { [part key]: { s: 'broken' | 'patched', t: econ hour of the breach, tier,
   // w: econ hour the crew started on it (absent while nobody works here) } }
-  breaches(id) { const fid = this.rival(id), st = fid ? this.uw.rivalwh.st(fid) : this.uw.whse.st(id); return st.breach || (st.breach = {}); }
+  breaches(id) {
+    if (this.impound(id)) { const s = this.g.save, L = s.impoundLot || (s.impoundLot = { breach: {} }); return L.breach || (L.breach = {}); }
+    const fid = this.rival(id), st = fid ? this.uw.rivalwh.st(fid) : this.uw.whse.st(id); return st.breach || (st.breach = {});
+  }
   // what mending a part costs: a patch is a flat price, a full repair scales with the tier being restored
   patchCost(key) { return key === 'gate' ? WH_BREACH.patchGate : WH_BREACH.patchPanel; }
   repairCost(id, key) { const d = PROP_BY_ID[id], b = this.breaches(id)[key]; return Math.round(d.price * (key === 'gate' ? WH_BREACH.repairGate : WH_BREACH.repairPanel) * Math.max(1, b ? b.tier : 1) / 10) * 10; }
@@ -531,7 +541,12 @@ class CompoundSystem {
       }
       if (R.dirty) this.build(id, true);
       // the cameras watch the yard: anyone in it the gate wouldn't let in raises the alarm
-      if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
+      if (this.impound(id) && (R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length) {
+        // the impound's cameras: you in the yard with no release on any car of yours is a break-in
+        R.watchT = 0.5;
+        const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;
+        if (!p.interior && this.inYard(id, pp.x, pp.z) && this.seen(id, pp.x, pp.y + 1.2, pp.z, night) && g.impound) g.impound.onSeen();
+      } else if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
         // a rival's cameras watch for you: you in their yard is a raid starting
         R.watchT = 0.5;
         const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;

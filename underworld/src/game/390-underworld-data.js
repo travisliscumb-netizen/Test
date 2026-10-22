@@ -296,6 +296,14 @@ const RIVAL_WH = {
 };
 // their blocks are landmarks laid out by World._genRivalWh (before the world is generated: this file loads first)
 for (const fid in RIVAL_WH) LANDMARK_BLOCKS[RIVAL_WH[fid].at.join(',')] = { gen: '_genRivalWh', name: RIVAL_WH[fid].name, icon: 'W', ground: 'I', rival: fid };
+// the police impound lot (Session 5B, §14, §45.30): a fenced yard with a motorised gate and cameras, near the
+// precinct. fee: the Clean Bank release fee, a share of the car's value within [min, max]; stars: the heat of
+// getting a car out without paying (picking the gate, ramming it, driving out unpaid)
+// the stars a theft off a dealer's lot starts at (§13): the cash lot, the licensed dealer, the prestige showroom
+const DEALER_THEFT = { used: 1, new: 3, lux: 5 };
+const IMPOUND = { id: 'impound', at: [4, 7], name: 'Port Valen Police Impound', tiers: { perimeter: 2, surveillance: 2, access: 2, vault: 0 },
+  fee: { min: 300, k: 0.06, max: 25000 }, pick: 8, open: 12, stars: { pick: 2, ram: 3, drive: 2, seen: 2 }, office: 3.5 };
+LANDMARK_BLOCKS[IMPOUND.at.join(',')] = { gen: '_genImpound', name: IMPOUND.name, icon: 'P', ground: 'I', impound: true };
 const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;

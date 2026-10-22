@@ -293,9 +293,12 @@ class ContentManager {
     if (!e) {
       const origin = v.goldCar ? 'found' : v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
       e = this.addToGarage(v.type, origin, v.colorHex, true, { p: def.id, i: bay.i });
+      if (!e) { g.ui.toast('No free parking space.', 'warn'); g.audio.play('deny'); return false; }
+      // a stolen car parked in your space is still stolen: HOT until the Chop Shop cleans it (§45.30)
+      e.hot = g.vreg.isHot(v) || origin === 'stolen'; if (v.trackId) { const r = g.vreg.rec(v.trackId); if (r && r.tune) e.tune = { ...r.tune }; }
       Money.adoptCar(v, e.uid); // cash left in the car is now kept with it in your garage
       e.vtier = v.vtier || VEHICLES[v.type].tier;
-      g.ui.toast(`${v.spec.name} parked at ${def.name}. It’s yours now${origin === 'stolen' ? ' — just don’t show it to the original owner' : ''}.`, 'money');
+      g.ui.toast(`${v.spec.name} parked at ${def.name}.${e.hot ? ' It is still HOT: the Chop Shop can clean its papers.' : ''}`, 'money');
       if (v.rareFind) this.secret('rooftop');
     } else { e.at = { p: def.id, i: bay.i }; g.ui.toast(`${v.spec.name} parked at ${def.name} · ${PARK_LABEL[bay.kind] || 'space'} ${bay.i + 1}.`, 'money'); }
     e.out = false; e.loc = null; e.dmg = clamp(100 - v.health, 0, 100); e.color = v.colorHex;
@@ -368,8 +371,8 @@ class ContentManager {
       const tuneLv = TUNE.map(t => e.tune[t.id]).reduce((a, b) => a + b, 0);
       // its home space, and where it actually is (the street, if that's where you left it)
       const home = e.at && PROP_BY_ID[e.at.p] ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'No space of its own: buy more parking';
-      const w = g.vreg.where(e), loc = e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
-      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
+      const w = g.vreg.where(e), loc = e.imp ? `In the ${IMPOUND.name} (space ${e.imp.slot + 1}) · release ${fmtMoney(e.imp.fee)}${e.imp.paid ? ' paid: drive it out' : ' at the window'} · its space: ${home}` : e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
+      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}${e.hot ? ' <span class="chip" style="--c:#ff4d5e">HOT</span>' : ''}${e.imp ? ' <span class="chip" style="--c:#ffb547">IMPOUNDED</span>' : ''}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
@@ -472,10 +475,11 @@ class ContentManager {
         ${this._bars(c.type)}
         <div class="stat"><span>Weight · seats</span><span>${V.mass.toLocaleString()} kg · ${V.profile === 'roadster' || V.profile === 'mid' || V.profile === 'wedge' ? 2 : V.profile === 'van' || V.profile === 'truck' || V.profile === 'minivan' ? 3 : 4}</span></div>
         <div class="stat cargoCap"><span>Cargo Capacity</span><span><b>${fmtLb(cargoCapC(c.type))}</b></span></div>
-        <div class="btns"><button class="sbtn gold" data-act="buy" ${why ? 'disabled' : ''}>${why ? esc(why) : 'Buy · ' + fmtMoney(c.price)}</button></div></div>`;
+        <div class="btns"><button class="sbtn gold" data-act="buy" ${why ? 'disabled' : ''}>${why ? esc(why) : 'Buy · ' + fmtMoney(c.price)}</button><button class="sbtn" data-act="steal">Steal it · ${DEALER_THEFT[lot]}★</button></div></div>`;
     };
     const c0 = DL.state(lot).cars[i];
     this.openSvc(`${D.name}`, lot === 'used' ? 'Sold as seen. Condition is what Dex would charge to put right.' : 'Full warranty. Keys in the ignition.', render, act => {
+      if (act === 'steal') { g.ui.ask(`Steal the ${VEHICLES[DL.state(lot).cars[i].type].name}?`, `The alarm goes the moment you open it: about ${DEALER_THEFT[lot]}★. It stays stolen (HOT) after you lose them.`, 'Steal it', () => { const r = DL.steal(lot, i); if (r) { this.refreshSvc(r); return; } g.ui.closeAll(); }); return; }
       if (act !== 'buy') return;
       const c = DL.state(lot).cars[i]; if (!c || c !== c0 || DL.cantBuy(lot, c)) { this.refreshSvc(); return; }
       g.ui.ask(`Buy the ${VEHICLES[c.type].name}?`, `${fmtMoney(c.price)}. It’s yours where it stands: drive it off the lot.`, 'Buy', () => {
@@ -485,7 +489,9 @@ class ContentManager {
       });
     });
   }
-  // Okafor Motor Works: repair, respray (clears heat if unseen) and per-car tuning
+  // Okafor Motor Works, the Pay & Spray (§45.30): repair, respray, and with the police after you a fresh coat that
+  // loses them if no cop is watching. It never cleans HOT and never makes a car legally yours; tuning is for cars
+  // that are legally yours
   serviceVehicle() {
     const g = this.g, p = g.player, bay = g.world.places.motorworks.bay;
     if (p.state === 'vehicle' && Math.hypot(p.vehicle.pos.x - bay.x, p.vehicle.pos.z - bay.z) < 7) return p.vehicle;
@@ -508,8 +514,9 @@ class ContentManager {
       let h = `<div class="svcTop"><span>${v.spec.name} ${ent ? this.chip(ent.origin) : this.chip(v.origin || 'stolen')}</span><span>Condition <b>${Math.max(0, Math.round(v.health))}%</b></span><span>${Money.html('either')}</span></div><div class="grid2">`;
       h += `<div class="card"><div class="t">Repair</div><div class="d">Body, glass, lights and alignment. Good as new.</div><button class="sbtn gold" data-act="repair" ${!dmg || !Money.can(rc, 'garage') ? 'disabled' : ''}>${dmg ? fmtMoney(rc) : 'No damage'}</button></div>`;
       h += `<div class="card"><div class="t">Respray${heat ? ' & new plates' : ''}</div><div class="d">${heat ? 'Fresh paint and plates. If no cop is watching right now, they lose your description.' : 'Pick a colour.'}</div><div class="swatches">${COLORS.map(c => `<button class="sw" data-act="paint:${c}" style="background:#${c.toString(16).padStart(6, '0')}" ${!Money.can(rp, heat ? 'payAndSpray' : 'garage') ? 'disabled' : ''}></button>`).join('')}</div><div class="stat"><span>Cost</span><span>${fmtMoney(rp)}</span></div></div>`;
+      if (heat) h += `<div class="card"><div class="t">Pay &amp; Spray · ${fmtMoney(600 + rc)}</div><div class="d">Repair and a new coat in one go. Loses a pursuit if no cop sees you come in. Stolen stays stolen: the plates still say what it is.</div><button class="sbtn gold" data-act="pns" ${!Money.can(600 + rc, 'payAndSpray') ? 'disabled' : ''}>Pay &amp; Spray</button></div>`;
       h += '</div><h3>Tuning</h3>';
-      if (!ent) h += `<div class="hint">Dex only tunes cars that are registered to you. Store this one in your garage first.</div>`;
+      if (!ent || ent.hot) h += `<div class="hint">${ent ? 'Dex won’t tune a car with hot plates. The Chop Shop will, or get its papers cleaned first.' : 'Dex only tunes cars that are registered to you. Store this one in your garage first.'}</div>`;
       else {
         h += '<div class="grid2">' + TUNE.map(t => {
           const lv = ent.tune[t.id], max = lv >= 3, price = max ? 0 : this.tunePrice(t, lv, v.type), need = TUNE_REP[lv] || 0;
@@ -532,7 +539,14 @@ class ContentManager {
         const heat = g.police.level > 0, c = heat ? 600 : 250; if (!Money.pay(c, heat ? 'payAndSpray' : 'garage')) return; v.colorHex = +a; v.mat.userData.u.uPaint.value.setHex(+a); if (ent) ent.color = +a;
         g.audio.play('cash');
         if (heat) { if (!g.police.visible) { g.police.clear('New paint, new plates. The police lost your description.'); } else g.ui.toast('A cop is watching the shop — the paint won’t fool them.', 'warn'); }
-      } else if (k === 'tune' && ent) {
+      } else if (k === 'pns') {
+        // repair + respray + (unseen) the pursuit lost; HOT untouched
+        const c = 600 + this.repairCost(v.type, v.health); if (g.police.level <= 0 || !Money.pay(c, 'payAndSpray')) return;
+        this.repair(v); if (ent) ent.dmg = 0;
+        const col = COLORS[Math.floor(Math.random() * COLORS.length)]; v.colorHex = col; v.mat.userData.u.uPaint.value.setHex(col); if (ent) ent.color = col;
+        g.audio.play('cash');
+        if (!g.police.visible) g.police.clear('Pay & Spray: new paint. The police lost your description.'); else g.ui.toast('A cop is watching the shop — the paint won’t fool them.', 'warn');
+      } else if (k === 'tune' && ent && !ent.hot) {
         const t = TUNE.find(x => x.id === a), lv = ent.tune[a]; if (lv >= 3) return;
         const price = this.tunePrice(t, lv, v.type); if (s.rep < (TUNE_REP[lv] || 0) || !Money.pay(price, 'garage')) return; if (ent.prov) ent.prov.clean += price; ent.tune[a] = lv + 1; v.tune = ent.tune; g.audio.play('cash');
         if (TUNE.every(x => ent.tune[x.id] >= 3)) this.ach('tuned');

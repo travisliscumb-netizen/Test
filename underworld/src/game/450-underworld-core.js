@@ -877,11 +877,13 @@ class Underworld {
     if (p.interior && !p.interior.vspace) return S.jail ? this.prison.findAction() : this.props.interiorAction();
     const ra = this.rivalwh.findAction(); if (ra) return ra;
     const sa = this.shipments.findAction(); if (sa) return sa;
+    const ia = g.impound.findAction(); if (ia) return ia;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       if (v.speed < 3) {
         const ch = this.loc('spot', 'chop');
-        if (ch && dist2(v.pos.x, v.pos.z, ch.x, ch.z) < 9 * 9 && !v.owned && !v.garageUid) return { label: `Sell ${v.spec.name} to the chop shop (${fmtMoney(this.chopValue(v))})`, act: () => this.sellCar(v) };
+        // the chop shop works on any car that isn't legally yours: a stolen one, or a HOT one in your fleet (§45.30)
+        if (ch && dist2(v.pos.x, v.pos.z, ch.x, ch.z) < 9 * 9 && g.chop.car(v)) return { label: `Chop shop · ${v.spec.name}${g.vreg.isHot(v) ? ' (HOT)' : ''}`, act: () => g.chop.open(v) };
         const lb = this.compounds.bayAction(v); if (lb) return lb;
         const ga = this.props.garageActionVehicle(v); if (ga) return ga;
       }

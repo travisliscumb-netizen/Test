@@ -272,6 +272,24 @@ class DealerLots {
     g.saveGame(true);
     return '';
   }
+  // steal a car off the lot (§13, §45.30): the alarm brings about 1★ at the cash lot, 3★ at Meridian, 5★ at the
+  // showroom, and the car is HOT for good (tracked by the vehicle registry from the moment you drive it)
+  steal(lot, i) {
+    const g = this.g, st = this.state(lot), c = st.cars[i]; if (!c) return 'Gone.';
+    let v = this.carAt(lot, i); this.cars.delete(lot + ':' + i);
+    const sl = this.place(lot).slots[i];
+    if (!v) v = g.vehicles.spawn(c.type, sl.x, sl.z, sl.h, { parked: true, color: c.color, vtier: c.vtier });
+    st.cars[i] = null;
+    v.locked = false; v.dealer = null; v.display = false; v.touched = true; v.looted = true; v.health = Math.max(1, c.cond);
+    v.stolenBefore = true; v.origin = 'stolen'; v.dealerStolen = lot; v.trunk = {};
+    const p = g.player;
+    if (p.state === 'foot') { p.pos.x = v.pos.x; p.pos.z = v.pos.z; g.completeEnter(v); }
+    g.vreg.track(v);
+    g.police.addHeat(Math.max(0.01, HEAT_LEVELS[DEALER_THEFT[lot]] - g.police.heat), v.pos.x, v.pos.z);
+    g.save.stats.stolen++;
+    g.ui.toast(`Alarm! The ${DEALERSHIPS[lot].name} lot has your description.`, 'warn');
+    return '';
+  }
   // the lot car the player is standing next to
   nearCar(p) {
     let best = null, bd = 1.7;

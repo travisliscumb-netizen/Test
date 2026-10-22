@@ -42,6 +42,8 @@ const SaveSystem = {
       garage: [],
       // the vehicle registry (Session 5A): stolen cars kept track of, cars waiting for a space, what happened to cars
       tracked: [], nextTrack: 0, pendingCars: [], vlog: [],
+      // the police impound lot's own state (Session 5B): breaches in its fence and gate
+      impoundLot: { breach: {} },
       dealers: {},
       nextUid: 1,
       pos: null,
