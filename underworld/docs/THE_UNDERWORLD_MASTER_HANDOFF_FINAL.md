@@ -1301,3 +1301,39 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       acceptable, but destruction must not feel like ordinary police seizure. Legal retrieval uses Clean Bank, with
       a release fee that scales with vehicle value. Illegal retrieval through the physical impound lot is allowed
       and creates police heat.
+30. **Session 5A approved and locked; Session 5B scope.**
+    - **Full registry, protected cargo (additional 5A rule).** If the 8-slot stolen-vehicle registry is full and
+      every tracked vehicle holds protected player cargo or cash, never evict one to make room. A newly stolen
+      vehicle may stay active while the player is using it; if it is abandoned without a free persistence slot,
+      warn the player clearly rather than deleting protected state.
+    - **HOT vehicles:**
+      - stolen vehicles stay HOT after a pursuit ends; HOT survives save/reload; parking does not clean it;
+      - nearby police recognition can trigger about a 1-star response, by proximity, observation and plate or
+        vehicle recognition;
+      - no citywide detection.
+    - **Dealer Buy / Steal:**
+      - every dealer vehicle can be bought or stolen;
+      - theft response: about 1 star for the cheap used lot, 3 for the normal dealer, 5 for prestige;
+      - after escape the car stays HOT;
+      - licensed new/prestige purchases use Clean Bank; Saltworks keeps its Dirty/Clean rules and provenance.
+    - **Chop Shop:**
+      - sell a stolen/HOT vehicle (Dirty Cash), clean its identity/title, repair, respray, upgrade;
+      - cleaning HOT creates a legal owned vehicle and needs a valid physical parking slot, with no bypass of fleet
+        capacity;
+      - no service during an active pursuit.
+    - **Pay & Spray:** clears an active pursuit when legitimately reached and used, repairs and resprays. It does not
+      remove HOT, create legal ownership or bypass parking capacity.
+    - **Impound (a physical lot).**
+      - **When:** owned vehicles go there when seized in an arrest or police recovery, when recovered after about
+        24 economic hours abandoned in public, or when positively recovered after a pursuit where appropriate.
+        Unique/rare owned vehicles never disappear; they go to impound. Destroyed owned vehicles stay wreck
+        recovery, not seizure.
+      - **Legal retrieval:** a physical interaction at the lot, a fee from Clean Bank scaling with value; the car
+        stays in the registry until actually retrieved.
+      - **Illegal retrieval:** break in, defeat the access or steal it back, for about 2–3 stars by method. The car
+        must physically be driven out; no teleport.
+    - **Arrest and cargo:** a car seized in an arrest is kept as an owned vehicle in impound, but the arrest
+      confiscation rules apply to its illegal cargo, weapons, ammo and Dirty Cash. Impound must not preserve
+      contraband the police caught.
+    - **Exploits:** no save/reload method clears HOT, wanted consequences, impound fees or cargo confiscation, and no
+      full-registry case silently destroys protected cargo. Finish and regression-test 5B before Session 6.
