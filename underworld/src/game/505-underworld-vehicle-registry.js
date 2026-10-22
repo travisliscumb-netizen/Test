@@ -142,7 +142,7 @@ class VehicleRegistry {
   // cargo or cash in it is recovered by police like any other (logged), never just dropped
   makeRoom(keep) {
     const p = this.g.player, mine = r => units(r.trunk) > 0 || Money.dirtyInCar('t' + r.id) > 0;
-    const cands = this.tracked.filter(r => { const v = this.liveT(r); return v !== p.vehicle && v !== keep; });
+    const cands = this.tracked.filter(r => { const v = this.liveT(r); return !(v && (v === p.vehicle || v === keep)); });
     cands.sort((a, b) => (mine(a) - mine(b)) || ((a.rare ? 1 : 0) - (b.rare ? 1 : 0)) || (a.seen - b.seen));
     const r = cands[0]; if (!r) return;
     if (mine(r)) this.recover(r, 'full'); else this.release(r);
@@ -213,7 +213,7 @@ class VehicleRegistry {
       } else if (outdoors && Math.hypot(r.x - px, r.z - pz) < VREG.near) { if (Math.hypot(r.x - px, r.z - pz) < VREG.attend) r.seen = e; this.spawnTracked(r); }
       // a day unattended in public: the police find it
       const v2 = this.liveT(r);
-      if (e - r.seen >= VREG.recover && v2 !== pv && !(v2 && g.inView(v2.pos.x, 1, v2.pos.z, 3) && Math.hypot(v2.pos.x - px, v2.pos.z - pz) < VREG.attend)) this.recover(r, 'abandoned');
+      if (e - r.seen >= VREG.recover && !(v2 && (v2 === pv || (g.inView(v2.pos.x, 1, v2.pos.z, 3) && Math.hypot(v2.pos.x - px, v2.pos.z - pz) < VREG.attend)))) this.recover(r, 'abandoned');
     }
   }
   // ---------------------------------------------------------------- gifts with nowhere to go
