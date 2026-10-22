@@ -51,6 +51,19 @@ Maximum Security with 4 Enforcers and a Lieutenant, ordinary rival raids can't t
 operating warehouse. The property screen of a warehouse has Product, Weapons, Dirty Cash, Security, Crew and
 Logistics tabs. (The physical fences, gates and interior come in Session 3B.)
 
+## Your cars (overhaul Session 5A)
+
+Every car you own has a real parking space at a property you own, kept for it even while you're out driving. Your
+fleet can never be bigger than your parking, and nothing waits "in storage". Leave a car on a street and it stays
+there, through reloads, until you come back for it.
+
+A stolen car you drove, or any car you left your goods or cash in, is remembered too: where it is, its damage and
+its trunk. Leave one alone for about a day and the police recover it, along with whatever was inside, and you hear
+about it. A car of yours that is destroyed is towed home by your people as a wreck you can repair. A gift car with
+nowhere to park waits until you have room (Garage → Collect).
+
+Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
+
 ## Raiding rivals, shipments and imports (overhaul Session 4B)
 
 Each gang keeps its product and cash in a physical warehouse compound with its own gate, cameras and guards. What
@@ -487,6 +500,7 @@ node underworld/tests/static-money.mjs # Node only: no old single balance anywhe
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
 node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
+node underworld/tests/vehicle.mjs    # vehicle registry: real spaces only (kept while a car is out), gifts wait, street parking saved, stolen cars + cargo + cash persist and are recovered after a day (logged), bounded registry, fleet joining, wrecks towed home, rare cars, no duplicates after reload
 node underworld/tests/raid.mjs       # rival warehouses: sites and gates, interior never regenerates stock, exact take-only transfers, remainder persists, save/reload, raid clock 4.5/7/9/10 min without stacking, pause freeze, evacuation van, wind-down, restock only by delivery, safe
 node underworld/tests/shipment.mjs   # shipments: restock on the road not the shelves, reload while due, arrival, a real van carrying the record's cargo, docking, hijack, wreck, reload with a van on the road (once), the boat and its migration, imports (rank, price, landing, truck only, Driver run, expiry, customs, reload)
 node underworld/tests/breach.mjs     # warehouse breaches persist through reload, stay open unstaffed, crew patch then repair from the vault, on-site patch, contractors, upgrades replace; task passes

@@ -11,10 +11,143 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **4B — Rival warehouses and offensive logistics** (prompt Session 4, second half per DC-33 / §45.27).
-  4A was completed and regression-tested first.
-- Commit/base revision: Session 4A `62782c4` → the Session 4B commits on `claude/practical-lamport-zld81y`.
+- Session: **5A — Vehicle registry** (prompt Session 5, split by DC-35 / §45.29; 5B covers HOT, the Chop Shop,
+  Pay & Spray and the impound lot, and comes after 5A is regression-tested).
+- Commit/base revision: Session 4 closed `3803929` → the Session 5A commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-22
+
+## Completed this session (5A)
+
+- **`VehicleRegistry`** (`src/game/505-underworld-vehicle-registry.js`). It is the one place every persistent
+  vehicle lives, and the one system that puts kept cars into the world. It replaces `GarageDisplay`, which is
+  removed.
+  - **Physical parking only.**
+    - Every owned car has a home bay (`e.at`) at a property you own, reserved while the car is out.
+    - The fleet never exceeds your real parking, and a car still waiting for a space counts against it.
+    - The dealers' `cantBuy`, `addToGarage` and parking into a bay all respect the reservation.
+    - Removed: "waits in storage" overflow, `PropertyManager.assignBays` (which moved cars between properties) and
+      the garage screen's "Move here / Park here" (a teleport).
+    - `takeOut` is now "Where is it?": the map route to the car.
+  - **Street parking is saved.** An owned car out of its bay is saved where it stands (`e.loc`, updated as it is
+    driven and before every save). It despawns when you are far away and stands there again when you come back.
+    Nothing tows a working car home. A car bought at a dealer stands on the lot until you drive it.
+  - **Tracked cars** (`save.tracked`):
+    - **What's kept:** the stolen cars you drove, and any car left with your cargo or cash in it (a hijacked van
+      included), with exact position, condition, HOT, trunk and identity.
+    - **Cash:** cash inside is kept in the wallet under the key `t<id>`, so the ledger saves it and arrest
+      seizure reaches it.
+    - **Bounded:** at most 8. When full, a car with nothing of yours in it gives way first, rare cars last. A
+      car with cargo is never just dropped: it is recovered by police and logged.
+    - **Recovery:** a day unattended on the economic clock and police recover it. This is a logged event in
+      `save.vlog`, with a toast and a news line, and the cargo and cash are seized with it.
+    - **Into your fleet:** parking one into a free bay makes it part of the fleet (one record, trunk and cash
+      carried over).
+    - **Chop shop:** selling one there removes it, logged.
+  - **Wrecks:**
+    - A burned owned car is towed home to its bay as a wreck needing a repair (logged as a recovery, never a
+      seizure). Its cargo burns, and the hulk left on the street is no longer that car.
+    - A wreck that didn't burn and is left out is towed home by your people.
+    - A tracked car that burns is logged with what burned in it.
+  - **Rare and unique cars:** owned, they come home like any other; tracked, they are the last to give way.
+  - **Gifts with nowhere to park** (Tull's Mesa Trail) wait with the giver (`save.pendingCars`) until you collect
+    them into a free space from the Garage screen.
+- **Fixes found on the way:**
+  - The save loader dropped any array field its defaults didn't declare, so `tracked`, `pendingCars` and `vlog`
+    are now declared.
+  - Pooled vehicles now reset `trackId`.
+  - The HUD layout's jail panel now keeps to the room left on short landscape screens (568×320) and scrolls inside.
+    It used to run off the bottom when its text was long: an intermittent `phone.mjs` failure that also
+    reproduced on the Session 4 build.
+- **Removed dead code:** `PropertyManager.garagePoints / garageCap / garageActionVehicle` in
+  `490-underworld-property.js` (overridden by the parking module since v6).
+
+## Files / systems changed (5A)
+
+- New: `src/game/505-underworld-vehicle-registry.js`, `tests/vehicle.mjs`.
+- `500-underworld-homes-parking.js`: `GarageDisplay` and `assignBays` removed. Dealer purchase checks free spaces
+  and stands the new car at its stall (out).
+- `360-core-content-services.js`: `addToGarage` (a bay or nothing), `storeVehicle` (a tracked car joins the fleet),
+  `takeOut` (where is it), `onVehicleGone` (registry wrecks and burns), and the garage screen (real location,
+  waiting gifts, Collect).
+- `035-core-money.js`: `uidOf`, tracked-car keys `t<id>`, `rekeyCar`, `seizeCar`. Car cash and seizure go through
+  `uidOf`.
+- `450-underworld-core.js`: trunk locations carry the registry key; the chop sale forgets the car; `bind` resets the
+  registry.
+- `030-core-save-system.js`: defaults, and `VehicleRegistry.sanitize` (cars keep `e.loc`; the old "every car back
+  in its bay on load" is gone).
+- `630-core-game.js`: constructs and updates `vreg`, and syncs it before every save.
+- `230-core-vehicle.js`: `trackId` reset.
+- `350-core-interiors.js`: the vspace hooks.
+- `370-core-activities.js`: Tull's gift goes through `vreg.give`.
+- `600-core-ui-manager.js`: the jail panel fit.
+- `490-underworld-property.js`: the dead garage methods removed.
+- `650-core-boot.js`: exports. `manifest.json`: 505.
+
+## Save/schema changes (5A)
+
+- Garage entries gain `loc: { x, z, h, y } | null`, and `out` is now saved (it equals `!!loc`).
+- New save fields:
+  - `tracked`: each record is `{ id, type, color, vtier, x, z, h, y, hp, trunk, hot, origin, fac, rare, seen,
+    since }`, sanitized, at most 8;
+  - `nextTrack`;
+  - `pendingCars: [{ type, origin, color, from }]`;
+  - `vlog`: the last 20 vehicle events.
+- `wallet.dirty.veh` keys may now be `t<id>` (a tracked car's cash).
+- **Old saves:** a car with no bay is given a free one. With none free, it stands on the street by your place
+  until one frees. No schema bump: every field is defaulted.
+
+## Tests run (5A)
+
+New `tests/vehicle.mjs`: **18 / 18**:
+- every owned car takes a real space;
+- full spaces refuse a new car, and a dealer won't sell one;
+- a car out keeps its space against parking, buying and keeping;
+- a gift with nowhere to go waits and can't be collected;
+- a car left on the street leaves the world but stays parked, survives save/reload and stands exactly there,
+  once;
+- a stolen car is tracked as HOT with its own trunk and cash;
+- a hijacked van keeps its load;
+- both come back after save/reload with exactly their cargo and cash, once each;
+- police recover one after a day unattended, logged with the cargo and cash seized;
+- the registry is bounded and lets go of an empty car first;
+- parking a stolen car into a free space makes it fleet, with trunk and cash moved;
+- a chop sale is logged;
+- a burned owned car comes home as a wreck;
+- a rare wreck left out is towed home;
+- after reload no car exists twice.
+
+Regression against the 5A build:
+- **All checks pass:** arrest 126, breach 13, build 5, business 40, camera 20, cargo 36, carmoney 10, casino 39,
+  city 25, core 64, dealers 34, fixer 17, gambling 57, gangs 23, homes 26, interiors 22, inventory 58, kingpin 6,
+  ledger 54, map 22, money 10, offline 14, phoneapps 19, police 13, prison 48, progression 33, property 33, pwa 5,
+  raid 18, roads 20, royale-sim 23, session 35, shipment 33, shooting 37, smoke 16, soak 22, static-money 8,
+  stations 17, street 11, stress 30, survival 9, taxi 20, tutorial 13, vehicles 39, warehouse 29.
+- **Run alone:** threat 25, compound 56, phone 71, ui 23.
+- **Test code updated for 5A:**
+  - `property`: the old-save car check now follows the new rule (a bay, or the street by your place; never
+    storage).
+  - `dealers`: the full-garage message.
+  - `compound` and `threat`: they release their own test cars through the registry. A stolen car you drove now
+    persists, and one test car left by the gate was touched by the delivery van.
+- **Performance** (`perf.mjs`) under parallel load: the same order as Session 4.
+
+## Known bugs / risks (5A)
+
+- HOT is recorded on tracked cars, but nothing reads it until 5B (police recognition, Chop Shop cleaning).
+- The impound lot doesn't exist yet. An owned car left on the street stays there indefinitely until 5B adds the
+  ~24-hour impound (§45.29).
+- A fleet car's repair still works from the garage screen anywhere (5B: own-garage repair at the property).
+
+## Exact next recommended task
+
+**Session 5B** (§45.29):
+- the HOT lifecycle and police recognition of HOT vehicles;
+- dealer Buy / Steal;
+- the Chop Shop: clean, repair, respray, upgrade;
+- Pay & Spray behavior;
+- the physical impound lot, with legal (Clean Bank, fee by value) and illegal (police heat) retrieval;
+- owned cars abandoned for about 24 economic hours or seized go to impound, with rare ones always impounded, never
+  lost.
 
 ## DC-34 follow-up (§45.28 rulings)
 
@@ -2134,6 +2267,19 @@ evacuation. Save/reload duplication protection from the start. (4A done; 4B done
 - **Fresh-career spawn:** must be outside the Vipers yard's activation area. The compound moved to 5,0 (done).
 - **Vehicle cargo persistence:** deferred to Session 5.
 - **Regression:** compound.mjs is re-run after the final 4B fix.
+
+### DC-35 · Session 5 is two sessions (5A registry, 5B HOT / Chop Shop / impound), with the slot, stolen-car and impound rules — RULED (§45.29)
+
+Asked before Session 5 began, with four questions:
+- **Split:** 5A / 5B.
+- **Home slots:** a car out on the street keeps its bay.
+- **Stolen cars:** they persist until police recover them (about 24 economic hours unattended, an explicit logged
+  event), in a bounded registry, and never lose cargo to a reload.
+- **Impound:** a car goes there when abandoned (about 24 economic hours) or seized (arrest or pursuit). Rare cars
+  always go to impound. Destruction is wreck recovery, not seizure. Legal retrieval is from Clean Bank with a fee
+  by value; illegal retrieval creates heat.
+
+**Disposition:** the owner chose all four as recorded in §45.29. 5A is done; 5B is next.
 
 ## Owner decisions (Session 0 review)
 
