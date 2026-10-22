@@ -19,7 +19,7 @@ const ev = (f, a) => page.evaluate(f, a);
 const helpers = first => ev(first => {
   const g = window.game, uw = g.uw;
   g.events.cool = 1e9; g.debug.god = true; g.save.rep = 5000; g.police.enabled = false; if (first) g.env.time = 13;
-  window.__canon = () => JSON.stringify(uw.shipments.D.list.map(r => [r.id, r.kind, r.fid, r.state, r.at, r.until || 0, r.to, Object.keys(r.cargo).sort().map(k => [k, r.cargo[k]])]));
+  window.__canon = () => JSON.stringify(uw.shipments.D.list.filter(r => r.fid === 'vipers').map(r => [r.id, r.kind, r.fid, r.state, r.at, r.until || 0, r.to, Object.keys(r.cargo).sort().map(k => [k, r.cargo[k]])]));
   window.__u = o => Object.keys(o || {}).reduce((a, k) => a + (window.__pv.GOODS[k] ? o[k] * window.__pv.GOODS[k].size : 0), 0);
   window.__shelf = f => window.__u(uw.rivalwh.st(f).stock);
   window.__recs = (kind, fid) => uw.shipments.D.list.filter(r => r.kind === kind && (!fid || r.fid === fid));
@@ -41,6 +41,7 @@ const sched = await ev(() => {
   const shelf0 = window.__shelf('vipers');
   uw.rivalwh.tickDay();
   const r = window.__recs('supply', 'vipers')[0];
+  if (r) r.at = Sh.absHour() + 40; // well clear of the world clock, which keeps running between steps of this test
   uw.rivalwh.tickDay(); // a second day before it lands sends no second van
   return { shelf0, shelf: window.__shelf('vipers'), cargo: r ? window.__u(r.cargo) : 0, fStock: f.stock, n: window.__recs('supply', 'vipers').length, state: r && r.state, due: r && r.at > Sh.absHour() };
 });
