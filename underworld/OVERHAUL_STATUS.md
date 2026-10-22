@@ -102,6 +102,61 @@ The mapping stays exact until a session changes the code above that line; after 
 - `uw.threats` (`{ list, next, log }`) and faction `press` / `hist`. All are sanitized and default to empty, with no
   schema bump.
 
+## Tests run (4A)
+
+New `tests/threat.mjs`: **25 / 25**. Each requirement from §45.27 and what proves it:
+
+| Requirement (§45.27) | Proof in `threat.mjs` |
+| --- | --- |
+| Pressure and retaliation from what the player actually does | A new career gets no grievances, no threats and no move on your turf over 14 days; taking turf and knockdowns build pressure, with history; daily decay; each stage goes for the right kinds of asset |
+| Warnings and threat timers (§45.10, §45.16) | Warning, then IMMINENT, then execution. The clock matches the wall time between frames exactly at 8- and 120-minute days; pause, a hidden tab and loading freeze it; the map doesn't; the Feed shows it and "Go there" routes you |
+| Persistence with no duplicate, reset or stack | Save → reload keeps clock, strength, dice and state; no second threat on the same asset after reloads and new days; a reload mid-fight settles it exactly once, with no second assault |
+| Uses the actual security state | Warehouse defense counts Enforcers, Lieutenant and cameras; open breach < patch < repaired; Maximum Security with staffing turns back an ordinary hit on the worst dice; same attack and dice: a strong warehouse holds, a weak one with its gate down is hit |
+| History counts | A gang comes back stronger to an asset it already hit, and not to others |
+| Real losses | Stock and vault cash lost, the gate left broken (persistent); a corner's Dealer hurt and stock gone; a business wrecked |
+| Automatic crew defense when jailed | The threat lands on time and the crew settle it with no fight and one result |
+| Physical assault when present | At a basic gate they ram it down for real and the fight is settled; at Maximum Security they bring no car and the gate stays shut |
+| Turf takeback | Announced, then becomes their showdown on that turf |
+
+Full regression against the 4A build:
+- **All checks pass:** arrest 126, breach 13, build 5, business 40, camera 20, cargo 36, carmoney 10, casino 39,
+  city 25, compound 56, core 64, dealers 34, fixer 17, gangs 23, homes 26, interiors 22, inventory 58, kingpin 6,
+  ledger 54, map 22, money 10, offline 14, phone 71, phoneapps 19, prison 48, progression 33, pwa 5, ramps 21,
+  roads 20, royale-sim 23, session 35, shooting 37, smoke 16, soak 22, static-money 8, stations 17, street 11,
+  survival 9, threat 25, tutorial 13, ui 23, vehicles 39, warehouse 29.
+- **Load-sensitive, pass alone or on a re-run:** gambling 57, police 13, property 33, stress 30, taxi 20.
+- **Test code updated:**
+  - `kingpin`: takebacks instead of wars.
+  - `warehouse`: raid immunity through a threat.
+  - `compound`: the loading-bay check now empties your pockets of the product first, because storing takes from
+    your pockets before the trunk, and product picked up in an earlier fight made it move 9 instead of 5.
+- **Seen once and not reproduced:** in one parallel run a Driver's van ended its compound round trip 1.4 health down
+  with no compound contact. The solo run was clean, and the cause is not established (traffic contact is the likely
+  suspect).
+- **Screenshot suites** run with no errors.
+- **Performance** (`perf.mjs`, run under parallel load): draw calls 119 / 121 vs 118 / 120 in 3B, update times
+  within the noise of a loaded run. The threat system does nothing per frame beyond a clock step and its open
+  threats.
+
+## Known bugs / risks (4A)
+
+- Physical assaults on corners, stashes and businesses are a hostile crew walking to the door or corner; their
+  dressing (cars, a smashed window) is for the graphics pass.
+- A turf takeback's showdown is the existing war system, unchanged.
+- Rival warehouses can't be raided yet (Session 4B).
+
+## Exact next recommended task
+
+**Session 4B** (§45.27): physical rival warehouses with authoritative, persistent inventory; reinforcements after
+~4.5 minutes and a stronger response at 7–10; physical evacuation; physical shipments and hijacking; save/reload
+duplication protection from the start.
+
+## Working tree (4A)
+
+- Clean after the final Session 4A commit; see `git log` on `claude/practical-lamport-zld81y`.
+
+---
+
 # Session 3B record (warehouse compounds)
 
 ## Session 3B follow-up (§45.26: DC-32 rulings)
