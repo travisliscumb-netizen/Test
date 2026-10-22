@@ -49,7 +49,34 @@ The mapping stays exact until a session changes the code above that line; after 
 - **The Vipers compound moved** from block 3,6 to 5,0, still in their Old Quarter. It is 503 m from the new-game
   start, outside the guard (160 m), raid (320 m) and shipment (380 m) radii. A fresh career starts with no warehouse
   guards in the gang cap.
+- **Gang cap:** a raid's response squads and a threat's attackers now make room under the gang cap (18) by retiring
+  ambient hangouts and buyers, farthest first, never your crew or anyone hostile (`GangManager.makeRoom`). With the
+  Vipers yard moved, the regression showed the 9-minute armed squad being refused by a full cap.
 - **Deferred to Session 5 (§45.28):** cargo in a hijacked or stolen vehicle must persist through save/reload.
+- **Tests (closing Session 4):**
+  - `shipment.mjs` **33 / 33**. The new checks:
+    - the day-length setting doesn't change an import's real time;
+    - the stretch tiers from the rival's side;
+    - risk climbs own < neutral < rival < war, with police separate;
+    - an interception conserves every lot;
+    - an own-ground delay keeps its cargo;
+    - a police seizure is logged;
+    - a van stranded on your turf survives a reload and becomes a real parked van you can take;
+    - an untaken stranded van is recovered and delivered;
+    - the Vipers yard is outside the start's radii.
+  - `raid.mjs` 18 / 18.
+  - **`compound.mjs` 56 / 56, re-run after the final 4B fix** (the ruling's closure check).
+  - Full regression on the final build, all passing:
+    - arrest 126, breach 13, build 5, business 40, camera 20, cargo 36, carmoney 10, casino 39, city 25;
+    - core 64, dealers 34, fixer 17, gambling 57, gangs 23, homes 26, interiors 22, inventory 58, kingpin 6;
+    - ledger 54, map 22, money 10, offline 14, phone 71, phoneapps 19, prison 48, progression 33, property 33;
+    - pwa 5, ramps 21, roads 20, royale-sim 23, session 35, shooting 37, smoke 16, soak 22, static-money 8;
+    - stations 17, street 11, survival 9, taxi 20, threat 25, tutorial 13, ui 23, vehicles 39, warehouse 29.
+  - **Passed alone after failing in a parallel run:** stress 30, police 13, prison 48 and compound 56.
+  - The screenshot suites and contact run with no errors.
+  - **Performance** under parallel load: calls 121 / 118, update 1.5 ms.
+  - **Van probe:** at the new Vipers site (gate on the north edge road) a van docks and leaves with 0 stalls,
+    0 contacts and full health.
 
 ## Completed this session (4B)
 
@@ -184,7 +211,9 @@ Full regression against the 4B build:
 
 ## Exact next recommended task
 
-Owner review of DC-34. Then prompt **Session 5** per `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`.
+Session 4 is closed (DC-34 ruled and applied, §45.28). Next: prompt **Session 5** per
+`docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`, including the deferred item from §45.28: hijacked and stolen vehicle
+cargo must persist through save/reload.
 
 ## Completed this session (4A)
 
