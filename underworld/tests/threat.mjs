@@ -185,7 +185,7 @@ await frames(page, 10);
 const phys = async (T) => {
   await ev(([fid, T]) => {
     const g = window.game, uw = g.uw, C = g.world.compounds.whse_w;
-    for (const v of g.vehicles.list.slice()) if (v !== g.player.vehicle && Math.hypot(v.pos.x - C.center.x, v.pos.z - C.center.z) < 80) g.vehicles.despawn(v);
+    for (const v of g.vehicles.list.slice()) if (v !== g.player.vehicle && Math.hypot(v.pos.x - C.center.x, v.pos.z - C.center.z) < 80) { g.vreg.forget(v); g.vehicles.despawn(v); }
     window.__T('whse_w', T); const br = uw.compounds.breaches('whse_w'); for (const k in br) delete br[k]; uw.compounds.build('whse_w', true);
     g.resetPlayerState(C.door.x, C.door.z + Math.cos(C.door.h) * 2, 0);
     uw.S.threats.list = []; const o = uw.threats.create(fid, 'warehouse', { prop: 'whse_w' }, 3); o.state = 'imminent'; o.left = 0.05; window.__pt = o.id;

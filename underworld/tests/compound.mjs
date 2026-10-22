@@ -174,7 +174,7 @@ await ev(() => {
 // ---------------------------------------------------------------- 4. who the gate opens for
 // run the game for n frames and report the gate's widest opening (and the wedge's)
 // clear the compounds of every car but the player's (vans that left, test cars), so each scenario starts alone
-const clearCars = () => ev(() => { const g = window.game; for (const V of g.uw.compounds.vans) V.v.wh = null; g.uw.compounds.vans = []; for (const v of g.vehicles.list.slice()) { if (v === g.player.vehicle) continue; for (const id in g.world.compounds) { const c = g.world.compounds[id].center; if (Math.hypot(v.pos.x - c.x, v.pos.z - c.z) < 90) { g.vehicles.despawn(v); break; } } } });
+const clearCars = () => ev(() => { const g = window.game; for (const V of g.uw.compounds.vans) V.v.wh = null; g.uw.compounds.vans = []; for (const v of g.vehicles.list.slice()) { if (v === g.player.vehicle) continue; for (const id in g.world.compounds) { const c = g.world.compounds[id].center; if (Math.hypot(v.pos.x - c.x, v.pos.z - c.z) < 90) { (g.vreg.forget(v), g.vehicles.despawn(v)); break; } } } });
 const watch = async (id, n) => { await ev(id => { const R = window.game.uw.compounds.R[id]; window.__gmax = 0; window.__wmax = 0; window.__gby = new Set(); window.__gw = () => { if (R.gate && R.gate.want) window.__gby.add(R.gate.by); window.__gmax = Math.max(window.__gmax, R.gate ? R.gate.open : 0); window.__wmax = Math.max(window.__wmax, R.wedge ? R.wedge.down : 0); }; }, id); for (let k = 0; k < n; k += 5) { await frames(page, 5); await ev(() => window.__gw()); } return ev(() => ({ gate: +window.__gmax.toFixed(2), wedge: +window.__wmax.toFixed(2), by: [...window.__gby] })); };
 for (const id of IDS) {
   await clearCars();
@@ -187,7 +187,7 @@ for (const id of IDS) {
   const shut = await ev(id => +window.game.uw.compounds.R[id].gate.open.toFixed(2), id);
   await ev(id => { const g = window.game, C = g.world.compounds[id]; const x = C.gate.x - C.gate.n[0] * 9, z = C.gate.z - C.gate.n[1] * 9; g.resetPlayerState(x + 3, z, 0); const v = g.vehicles.spawn('sedan', x, z, Math.atan2(C.gate.n[0], C.gate.n[1]), { parked: true }); v.touched = true; g.completeEnter(v); window.__pv0 = v; }, id);
   const drive = await watch(id, 70);
-  await ev(id => { const g = window.game; g.exitVehicle(true); g.vehicles.despawn(window.__pv0); window.__away(id); }, id); await frames(page, 80);
+  await ev(id => { const g = window.game; g.exitVehicle(true); g.vreg.forget(window.__pv0); g.vehicles.despawn(window.__pv0); window.__away(id); }, id); await frames(page, 80);
   check(`${id}: the gate opens for the player on foot and driving, and closes behind them`, foot.gate === 1 && drive.gate === 1 && shut === 0 && foot.wedge === 1, JSON.stringify({ foot, shut, drive }));
 
   // crew who work here walk in through it; crew who work elsewhere, or who were fired, are left outside
@@ -219,7 +219,7 @@ for (const id of IDS) {
     await clearCars();
     await ev(([id, until]) => { const g = window.game, C = g.world.compounds[id], lane = C.lanes.in[0], a = lane[0], b2 = lane[1]; window.__away(id); const v = g.vehicles.spawn('van', a.x, a.z, Math.atan2(b2.x - a.x, b2.z - a.z), { driver: 'npc', color: 0x5a3a2a }); v.touched = true; v.mission = 'test'; v.wh = { id, to: id, until: g.time + until }; v.drive = new window.__pv.LaneDriver(v, g, lane, { speed: 6 }); window.__dv = v; }, [id, until]);
     const w = await watch(id, 420);
-    const r = await ev(id => { const v = window.__dv, b = window.game.world.compounds[id].docks[0].bay; const o = { inside: window.__lot(id, v.pos.x, v.pos.z), bay: +Math.hypot(v.pos.x - b.x, v.pos.z - b.z).toFixed(1) }; window.game.vehicles.despawn(v); return o; }, id);
+    const r = await ev(id => { const v = window.__dv, b = window.game.world.compounds[id].docks[0].bay; const o = { inside: window.__lot(id, v.pos.x, v.pos.z), bay: +Math.hypot(v.pos.x - b.x, v.pos.z - b.z).toFixed(1) }; window.game.vreg.forget(v); window.game.vehicles.despawn(v); return o; }, id);
     return { ...w, ...r };
   };
   const ok = await del(120), late = await del(-1);
@@ -245,7 +245,7 @@ for (const [id, T] of [['whse_w', 4], ['whse_d', 1]]) {
     window.__rc = mk(0, fid); window.__tc = mk(12, null);
   }, [id, T]);
   const w = await watch(id, 600);
-  const r = await ev(id => { const g = window.game, gr = window.__rg, out = { members: window.__rgN, inside: window.__rgM.filter(m => window.__lot(id, m.x, m.z)).length, rival: window.__lot(id, window.__rc.pos.x, window.__rc.pos.z), traffic: window.__lot(id, window.__tc.pos.x, window.__tc.pos.z), why: [g.uw.compounds.why(id, gr.members[0]), g.uw.compounds.why(id, window.__rc)] }; g.uw.gangs.removeGroup(gr); g.vehicles.despawn(window.__rc); g.vehicles.despawn(window.__tc); return out; }, id);
+  const r = await ev(id => { const g = window.game, gr = window.__rg, out = { members: window.__rgN, inside: window.__rgM.filter(m => window.__lot(id, m.x, m.z)).length, rival: window.__lot(id, window.__rc.pos.x, window.__rc.pos.z), traffic: window.__lot(id, window.__tc.pos.x, window.__tc.pos.z), why: [g.uw.compounds.why(id, gr.members[0]), g.uw.compounds.why(id, window.__rc)] }; g.uw.gangs.removeGroup(gr); (g.vreg.forget(window.__rc), g.vehicles.despawn(window.__rc)); (g.vreg.forget(window.__tc), g.vehicles.despawn(window.__tc)); return out; }, id);
   check(`${id} at security ${T + 1}: the gate stays shut for a hostile rival crew, their car and ordinary traffic, and none of them gets into the yard`, w.gate === 0 && r.members > 0 && r.inside === 0 && !r.rival && !r.traffic && r.why.every(x => x === 'no business here'), JSON.stringify({ w, r }));
 }
 
@@ -281,12 +281,12 @@ for (const id of IDS) {
   check(`${id}: the loading bay works: its door opens for you, and the prompt moves the trunk's cargo into the warehouse`, /Loading bay/.test(bay.label || '') && bay.dock > 0.9 && bay.svc && bay.moved === 5 && bay.trunk === 0, JSON.stringify(bay));
   await ev(id => { const g = window.game, C = g.world.compounds[id]; window.__pilot = new window.__pv.LaneDriver(window.__pc, g, C.lanes.out[0], { speed: 6 }); }, id);
   for (let k = 0; k < 160; k++) { await frames(page, 10); if (await ev(() => window.__pilot.done)) break; }
-  const pout = await ev(id => { const g = window.game, v = window.__pc, R = g.uw.compounds.R[id]; const o = { done: window.__pilot.done, outside: !window.__lot(id, v.pos.x, v.pos.z), stalls: window.__pilot.stalls, contacts: (R.contacts || []).length }; window.__pilot = null; g.exitVehicle(true); g.vehicles.despawn(v); return o; }, id);
+  const pout = await ev(id => { const g = window.game, v = window.__pc, R = g.uw.compounds.R[id]; const o = { done: window.__pilot.done, outside: !window.__lot(id, v.pos.x, v.pos.z), stalls: window.__pilot.stalls, contacts: (R.contacts || []).length }; window.__pilot = null; g.exitVehicle(true); g.vreg.forget(v); g.vehicles.despawn(v); return o; }, id);
   check(`${id}: …and back out and away through the gate, without touching anything of the compound`, pout.done && pout.outside && pout.stalls === 0 && pout.contacts === 0, JSON.stringify(pout));
   // a car of nobody's in the other bay doesn't open that dock
   const stranger = await ev(id => { const g = window.game, C = g.world.compounds[id], b = C.docks[1].bay; const v = g.vehicles.spawn('sedan', b.x, b.z, b.h, { parked: true }); v.touched = true; window.__sv = v; return true; }, id);
   await frames(page, 60);
-  const sd = await ev(id => { const g = window.game, o = +g.world.compounds[id].dockDoors[1].open.toFixed(2); g.vehicles.despawn(window.__sv); return o; }, id);
+  const sd = await ev(id => { const g = window.game, o = +g.world.compounds[id].dockDoors[1].open.toFixed(2); g.vreg.forget(window.__sv); g.vehicles.despawn(window.__sv); return o; }, id);
   check(`${id}: a stranger's car in the loading bay doesn't open the dock`, stranger && sd === 0, String(sd));
 }
 
@@ -363,7 +363,7 @@ const ram = async (id, T, target, speed) => {
     window.__rv = v; window.__rt = { tx, tz, nx, nz };
   }, [id, T, target, speed]);
   await frames(page, 60);
-  return ev(([id, target]) => { const g = window.game, R = g.uw.compounds.R[id], v = window.__rv, t = window.__rt; const past = (v.pos.x - t.tx) * t.nx + (v.pos.z - t.tz) * t.nz; const o = { broke: target === 'gate' ? !!(R.gate && R.gate.state === 'broken') : R.panels.some(p => p.state === 'broken'), past: +past.toFixed(1) }; g.vehicles.despawn(v); g.money.W.clean = 1e9; g.uw.compounds.repairNow(id); return o; }, [id, target]);
+  return ev(([id, target]) => { const g = window.game, R = g.uw.compounds.R[id], v = window.__rv, t = window.__rt; const past = (v.pos.x - t.tx) * t.nx + (v.pos.z - t.tz) * t.nz; const o = { broke: target === 'gate' ? !!(R.gate && R.gate.state === 'broken') : R.panels.some(p => p.state === 'broken'), past: +past.toFixed(1) }; g.vreg.forget(v); g.vehicles.despawn(v); g.money.W.clean = 1e9; g.uw.compounds.repairNow(id); return o; }, [id, target]);
 };
 for (const id of IDS) {
   const g1 = await ram(id, { perimeter: 4, access: 1 }, 'gate', 16), g2 = await ram(id, { perimeter: 4, access: 2 }, 'gate', 16), g3 = await ram(id, { perimeter: 4, access: 3 }, 'gate', 22), g4 = await ram(id, 4, 'gate', 22), slow = await ram(id, { perimeter: 4, access: 1 }, 'gate', 4);
@@ -383,7 +383,7 @@ const wedge = await ev(() => {
   return true;
 });
 await frames(page, 300);
-const wedgeRes = await ev(() => { clearInterval(window.__hold); const g = window.game, C = g.world.compounds.whse_w, v = window.__wv, past = (v.pos.x - C.gate.x) * C.gate.n[0] + (v.pos.z - C.gate.z) * C.gate.n[1]; const o = { past: +past.toFixed(1), wedge: g.uw.compounds.R.whse_w.wedge.down }; g.vehicles.despawn(v); return o; });
+const wedgeRes = await ev(() => { clearInterval(window.__hold); const g = window.game, C = g.world.compounds.whse_w, v = window.__wv, past = (v.pos.x - C.gate.x) * C.gate.n[0] + (v.pos.z - C.gate.z) * C.gate.n[1]; const o = { past: +past.toFixed(1), wedge: g.uw.compounds.R.whse_w.wedge.down }; g.vreg.forget(v); g.vehicles.despawn(v); return o; });
 check('Maximum Security: with the gate held open for someone else, the wedge still stops a car nobody admitted', wedge && wedgeRes.past < 3.2 && wedgeRes.wedge === 0, JSON.stringify(wedgeRes));
 const imm = await ev(() => {
   const g = window.game, uw = g.uw, out = {};
