@@ -98,12 +98,14 @@ class VehicleRegistry {
           if (v === p.vehicle || d < VREG.attend) e.seen = this.econ();
           // a wreck left behind: your people tow it home to its bay (a recovery, not a police matter)
           if (e.dmg >= 100 && v !== p.vehicle && b && d > VREG.towWreck && !g.inView(v.pos.x, 1, v.pos.z, 3)) { this.towHome(e, v); continue; }
+          // a day left in public: the police tow it, even the last car you drove (it is only kept in the world for you)
+          if (this.abandoned(e, v)) { g.impound.seize(e, 'abandoned'); continue; }
           if (d > VREG.keep && !mine && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
           continue;
         }
       }
       // a day out on the street with nobody near it: police tow it to the impound (§45.30); a wreck goes home
-      if (e.out && e.loc && e.dmg < 100 && this.econ() - (e.seen ?? this.econ()) >= VREG.recover && (!v || (v !== p.vehicle && !(g.inView(v.pos.x, 1, v.pos.z, 3) && Math.hypot(v.pos.x - px, v.pos.z - pz) < VREG.attend))) && g.impound) { g.impound.seize(e, 'abandoned'); continue; }
+      if (this.abandoned(e, v)) { g.impound.seize(e, 'abandoned'); continue; }
       const at = e.out ? e.loc : b; if (!at) continue;
       const bay = !e.out && b;
       const near = Math.hypot(at.x - px, at.z - pz) < VREG.near && Math.abs((at.y ?? 0) - py) < (bay && b.kind === 'under' ? 20 : 60) && (bay && b.kind === 'under' ? p.interior && p.interior.vspace === b.space : !(p.interior && p.interior.vspace));
@@ -112,6 +114,12 @@ class VehicleRegistry {
     }
   }
   here(v) { return { x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y }; }
+  // out on the street, not a wreck, nobody near it for a day of the economic clock, and not in your sight right now
+  abandoned(e, v) {
+    const g = this.g, p = g.player;
+    if (!g.impound || !e.out || !e.loc || e.dmg >= 100 || this.econ() - (e.seen ?? this.econ()) < VREG.recover) return false;
+    return !v || (v !== p.vehicle && !(g.inView(v.pos.x, 1, v.pos.z, 3) && Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z) < VREG.attend));
+  }
   towHome(e, v) {
     const g = this.g;
     if (v && g.vehicles.list.includes(v) && v !== g.player.vehicle) g.vehicles.despawn(v);

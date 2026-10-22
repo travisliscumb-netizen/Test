@@ -256,7 +256,7 @@ const full = await ev(() => {
   const v = g.vehicles.spawn('van', 200, 340, 0, { parked: true }); v.looted = true;
   window.__walk(203, 340); g.completeEnter(v); window.__tick(1);
   const tracked = !!v.trackId, untracked = !!v.untracked;
-  P.Inv.add(v.trunk, 'green', 5, 0);
+  v.trunk = v.trunk || {}; P.Inv.add(v.trunk, 'green', 5, 0);
   g.exitVehicle(true); window.__tick(1);
   const after = R.tracked.map(r => r.id + ':' + window.__u(r.trunk)).join(',');
   const warned = !!v.warned;
