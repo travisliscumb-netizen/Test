@@ -91,6 +91,7 @@ const drive = await ev(async () => {
   for (let k = 0; k < 900 && r.state !== 'done'; k++) { await new Promise(res => requestAnimationFrame(res)); if (k % 30 === 0) onShelfEarly.push(window.__shelf('vipers') - shelf0); }
   const atDock = L.V && L.V.phase, trunk = window.__u(L.van.trunk);
   // and it leaves: unloads, drives back out of their gate (its lane, no manifest of yours) onto the street
+  if (L.V && L.V.phase === 'unload') L.V.t = 99; // the 20 s unload itself isn't what is tested here
   for (let k = 0; k < 2400 && L.V && L.V.phase !== 'gone'; k++) await new Promise(res => requestAnimationFrame(res));
   const outside = L.V ? (L.van.pos.x - C.gate.x) * C.gate.n[0] + (L.van.pos.z - C.gate.z) * C.gate.n[1] : 0;
   return { shelf0, shelf: window.__shelf('vipers'), state: r.state, end: r.end, docked: !!L.V, phase: atDock, left: L.V && L.V.phase, outside: +outside.toFixed(1), early: onShelfEarly.slice(0, 3), trunk };
