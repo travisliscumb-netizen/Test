@@ -26,8 +26,10 @@ const once = sd => page.evaluate(seed0 => {
     S.crew = [1, 2].map(n => uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: n === 1 ? 'w:whse_w' : null }));
     S.crew.push(uw.crew.sanitizeMember({ id: 903, name: 'Test Driver', role: 'driver', rank: 1, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: 'w:whse_w' }));
     let wars = 0, over = 0, ratios = [], hits = 0, comp = [], refused = 0, paid = 0, kp = 0;
-    const SW = uw.factions.startWar.bind(uw.factions);
-    uw.factions.startWar = (att, i, why) => { const ok = SW(att, i, why); if (ok && S.turfs[i].war && S.turfs[i].war.d === 'pc') { wars++; const r = uw.powerRatio(att); ratios.push(+r.toFixed(2)); if (r > 2.5) over++; } return ok; };
+    // since Session 4A a rival comes for your turf only through a turf-takeback threat, driven by its grievance: every
+    // faction is given the same strike-level grievance each day, and the takebacks aimed at you are counted
+    const CR = uw.threats.create.bind(uw.threats);
+    uw.threats.create = (fid, kind, target, stage) => { const o = CR(fid, kind, target, stage); if (o && kind === 'turf') { wars++; const r = uw.powerRatio(fid); ratios.push(+r.toFixed(2)); if (r > 2.5) over++; } return o; };
     for (let d = 0; d < days; d++) {
       // the map holds still: your turfs stay yours, rivals keep a toe-hold to pay royalties from
       for (const i of mine) { const T = S.turfs[i]; for (const k in T.inf) if (k !== 'pc') T.inf[k] = Math.min(T.inf[k], 20); T.inf.pc = 90; T.own = 'pc'; }
@@ -38,6 +40,8 @@ const once = sd => page.evaluate(seed0 => {
       for (let h = 0; h < 24; h++) uw.factions.tickHours(1, h);
       const before = Object.values(S.props).filter(o => o.dmg > 0).length;
       const pre = new Set(S.turfs.map((t, i) => t.war && t.war.d === 'pc' ? i : -1));
+      for (const fid in S.factions) S.factions[fid].press = 95;
+      S.threats.list = [];
       uw.factions.tickDay();
       hits += Math.max(0, Object.values(S.props).filter(o => o.dmg > 0).length - before);
       for (const o of Object.values(S.props)) o.dmg = 0;
@@ -46,7 +50,7 @@ const once = sd => page.evaluate(seed0 => {
       for (let i = 0; i < uw.T.length; i++) if (S.turfs[i].war && S.turfs[i].war.d === 'pc' && !pre.has(i) && S.turfs[i].war.a && !S.turfs[i].war.counted) { S.turfs[i].war.counted = 1; }
       for (const i of mine) { const r = S.roy[i]; if (r && r.payer) { if (r.status === 'refused' || r.status === 'challenge') refused++; else if (r.status === 'paid') paid++; } }
     }
-    uw.factions.startWar = SW;
+    uw.threats.create = CR; S.threats.list = [];
     for (const T of S.turfs) T.war = null;
     return { wars, over, rmax: ratios.length ? Math.max(...ratios) : 0, hits, infl: uw.influence, kingpin: kp === days, kp, ratio: +Math.min(...Object.keys(S.factions).map(f => uw.powerRatio(f))).toFixed(2), compMin: comp.length ? +Math.min(...comp).toFixed(2) : 1, compAvg: comp.length ? +(comp.reduce((a, c) => a + c, 0) / comp.length).toFixed(2) : 1, refused, paid };
   };
@@ -66,8 +70,8 @@ const res = {
   perSeed: runs.map(r => [r.strong.wars, r.king.wars])
 };
 check('the comparison is fair: same turfs, one ordinary boss and one kingpin', res.mine >= 20 && !res.strong.kingpin && res.king.kingpin, JSON.stringify(res));
-check('as kingpin, rival crews start far fewer wars on your turf (well under half as many, over three seeds)', res.strong.wars >= 30 && res.king.wars <= res.strong.wars * 0.45, JSON.stringify({ ordinary: res.strong.wars, kingpin: res.king.wars, perSeed: res.perSeed }));
-check('a crew the kingpin outweighs 2.5 to 1 never starts a war with him (no suicidal challenges)', res.king.over === 0, JSON.stringify({ over: res.king.over, ratioOfAttackers: res.king.rmax }));
+check('with the same grievance, rival crews come for a kingpin’s turf far less often (well under half as many takebacks, over three seeds)', res.strong.wars >= 30 && res.king.wars <= res.strong.wars * 0.45, JSON.stringify({ ordinary: res.strong.wars, kingpin: res.king.wars, perSeed: res.perSeed }));
+check('a crew the kingpin outweighs 2.5 to 1 never comes for his turf (no suicidal challenges)', res.king.over === 0, JSON.stringify({ over: res.king.over, ratioOfAttackers: res.king.rmax }));
 check('rivals doing business on a kingpin’s turf pay their cut (compliance ≥ 88%, refusals rare)', res.king.compMin >= 0.88 && res.king.refused <= res.king.paid * 0.12, JSON.stringify(res.king));
 check('lower down the ladder they still test you (it is not free money)', res.strong.compAvg < 0.85 && res.strong.refused > 0, JSON.stringify(res.strong));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));

@@ -191,19 +191,18 @@ const raid = await ev(() => {
   for (const i of near) S.turfs[i].own = 'vipers'; uw.recompute();
   const f = S.factions.vipers; f.rel = -90; f.truce = 0; f.broken = 0; f.strength = 80;
   out.immune = uw.whse.immune('whse_w');
-  for (const id in S.props) S.props[id].dmg = 0;
-  const r0 = Math.random; Math.random = () => 0;
-  try { PM.rivalAttacks(true); } finally { Math.random = r0; }
-  out.immuneDmg = S.props.whse_w.dmg;
+  // since Session 4A a raid on the player is a threat (warned, then executed); here it executes on the worst dice
+  const T = uw.threats, hit = () => { S.threats.list = []; const o = T.create('vipers', 'warehouse', { prop: 'whse_w' }, 2); o.power = 400; o.roll = 0.9999; return T.resolve(o); };
+  out.immuneRes = hit();
   // pull the Enforcers out: now an ordinary raid can land
   const enf = uw.whse.crewAt('whse_w', 'enforcer'); for (const c of enf) c.status = 'hurt';
   out.notImmune = uw.whse.immune('whse_w');
-  Math.random = () => 0; try { PM.rivalAttacks(true); } finally { Math.random = r0; }
-  out.dmg = S.props.whse_w.dmg; for (const c of enf) c.status = 'active'; S.props.whse_w.dmg = 0;
+  out.res = hit(); for (const c of enf) c.status = 'active';
+  const br = uw.compounds.breaches('whse_w'); for (const k in br) delete br[k]; uw.compounds.build('whse_w', true);
   return out;
 });
-check('Maximum Security, 4+ Enforcers and a Lieutenant: an ordinary raid can’t knock it off', raid.immune && raid.immuneDmg === 0, JSON.stringify(raid));
-check('without the minimum staff the same raid lands', !raid.notImmune && raid.dmg === 1, JSON.stringify(raid));
+check('Maximum Security, 4+ Enforcers and a Lieutenant: an ordinary raid can’t knock it off', raid.immune && raid.immuneRes === 'held', JSON.stringify(raid));
+check('without the minimum staff the same raid lands', !raid.notImmune && raid.res === 'hit', JSON.stringify(raid));
 
 // ---------------------------------------------------------------- 8. Kingpin needs an operating warehouse
 const kp = await ev(() => {

@@ -74,6 +74,15 @@ The mapping stays exact until a session changes the code above that line; after 
     duplicates nor stacks them.
   - A reload in the middle of a physical fight (the attackers are not saved) settles it exactly once, as if you had
     left.
+- **Kingpin deterrence carried over (DC-25).** Threats keep the old war rules:
+  - the coalition boost doesn't apply against the Kingpin;
+  - against the Kingpin, a turf takeback needs a real grudge (rel ≤ −60) or a coalition he doesn't outweigh 1.5
+    to 1, only one push at a time, and never from a crew he outweighs 2.5 to 1;
+  - the more you outweigh a crew, the less it picks your turf (weight × (1 − (ratio − 1) × 0.7), at least 0.1).
+
+  `tests/kingpin.mjs` now gives every faction the same strike-level grievance and counts turf-takeback threats:
+  260 against the Kingpin vs 729 against an ordinary boss over three seeds (36%; it was 38% with wars), and none
+  from a crew outweighed 2.5 to 1.
 - **Replaced:** `PropertyManager.rivalAttacks` (a daily dice roll that hit businesses and warehouses without
   warning) is gone. `chooseWar` no longer picks the player's turf: threats are the one way rivals come at the player.
 - Ledger: `Money.robbedAt` books stolen vault cash as theft.
@@ -81,6 +90,8 @@ The mapping stays exact until a session changes the code above that line; after 
 ## Files / systems changed (4A)
 
 - New `src/game/545-underworld-threats.js` (manifest after the fixer), `tests/threat.mjs` (25 checks).
+- Tests updated for the new model: `kingpin` (takebacks instead of wars, as above), `warehouse` (its raid-immunity
+  check goes through a threat on the worst dice instead of the removed `rivalAttacks`).
 - `390` (`PRESSURE`, `PRESS_STAGE`, `THREAT_T`), `035` (`robbedAt`), `450` (state, sanitize, update, pressure on turf
   taken), `460` (threat tick replaces rival attacks; `chooseWar` leaves player turf to threats; boss pressure),
   `470` (pressure for knockdowns and the stolen shipment; assault groups kept), `490` (`rivalAttacks` removed),

@@ -52248,7 +52248,8 @@ class ThreatSystem {
       const st = this.stage(fid); if (!st) continue;
       if (this.open().length >= 3 || this.open().some(o => o.fid === fid)) continue;
       // the grievance decides what they want to do; the player's power decides whether they dare (as before, §45.23)
-      const p = [0, 0.35, 0.55, 0.8][st] * (coalition ? 1.3 : 1) * (uw.attitude(fid) === 'fearful' ? 0.4 : 1) * clamp(1.4 - uw.powerRatio(fid) * 0.35, 0.15, 1);
+      // (a coalition emboldens them, except against the kingpin: the old rule, DC-25)
+      const p = [0, 0.35, 0.55, 0.8][st] * (coalition && !uw.kingpin() ? 1.3 : 1) * (uw.attitude(fid) === 'fearful' ? 0.4 : 1) * clamp(1.4 - uw.powerRatio(fid) * 0.35, 0.15, 1);
       if (Math.random() >= p) continue;
       const t = this.pickTarget(fid, st); if (t) this.create(fid, t.kind, t.target, st);
     }
@@ -52267,7 +52268,13 @@ class ThreatSystem {
       if (st >= 3 && d.kind === 'warehouse') add('warehouse', { prop: d.id }, L.x, L.z, 2.5);
     }
     if (st >= 2) for (const r of S.runs) { const A = uw.runs.locOf(r.from), B = uw.runs.locOf(r.to); if (A && B) add('delivery', { run: r.id }, (A.x + B.x) / 2, (A.z + B.z) / 2, 1.5); }
-    if (st >= 3) for (let i = 0; i < uw.T.length; i++) if (uw.owner[i] === 'pc' && !S.turfs[i].war && uw.turfNeighbors(i).some(j => uw.owner[j] === fid)) add('turf', { turf: i }, uw.T[i].cx, uw.T[i].cz, 2);
+    // a turf takeback against the kingpin (DC-25): one push at a time, and only out of a real grudge or as part of a
+    // coalition that isn't hopelessly outmatched; a crew he outweighs 2.5 to 1 never challenges him
+    const ratio = uw.powerRatio(fid), kp = uw.kingpin(), coal = !!S.flags.coalition, f = S.factions[fid];
+    const dare = !kp || (!S.turfs.some(t => t.war && t.war.d === 'pc') && !this.open().some(o => o.kind === 'turf') && ratio <= 2.5 && (f.rel <= -60 || (coal && ratio <= 1.5)));
+    // and the more you outweigh them, the less they fancy your ground at all (the old war-choice penalty, by power)
+    const tw = 2 * clamp(1 - (ratio - 1) * 0.7, 0.1, 1);
+    if (st >= 3 && dare) for (let i = 0; i < uw.T.length; i++) if (uw.owner[i] === 'pc' && !S.turfs[i].war && uw.turfNeighbors(i).some(j => uw.owner[j] === fid)) add('turf', { turf: i }, uw.T[i].cx, uw.T[i].cz, tw);
     if (!c.length) return null;
     let r = Math.random() * c.reduce((a, x) => a + x.w, 0);
     for (const x of c) { r -= x.w; if (r <= 0) return x; }
@@ -52428,7 +52435,8 @@ class ThreatSystem {
     let at, goal;
     if (o.kind === 'warehouse') {
       const C = uw.compounds.R[o.target.prop].C;
-      at = { x: C.gate.x - C.gate.n[0] * 16, z: C.gate.z - C.gate.n[1] * 16, h: Math.atan2(C.gate.n[0], C.gate.n[1]) };
+      const lat = C.gate.axis === 'x' ? [1, 0] : [0, 1];
+      at = { x: C.gate.x - C.gate.n[0] * 12 + lat[0] * 7, z: C.gate.z - C.gate.n[1] * 12 + lat[1] * 7, h: Math.atan2(C.gate.n[0], C.gate.n[1]) };
       goal = { x: C.door.x, z: C.door.z };
     } else { at = { x: o.x, z: o.z, h: 0 }; goal = { x: o.x, z: o.z }; const c = g.world.randomCurbSpot(o.x, o.z, 30, 60); at.x = c.x; at.z = c.z; }
     const gr = gs.spawnGroup('as' + o.id, 'assault', o.fid, at, n, {});
@@ -52461,9 +52469,11 @@ class ThreatSystem {
     if (up.some(m => Math.hypot(m.x - A.goal.x, m.z - A.goal.z) < 4)) A.at += dt; else A.at = Math.max(0, A.at - dt * 0.5);
     const out = !up.length ? 'won' : A.at > 6 ? 'lost' : !this.present(o) ? 'away' : o.left <= 0 ? 'stand' : null;
     if (!out) return;
+    // at a warehouse, if nobody got into the yard (the gate and fence held) they took nothing
+    const got = o.kind !== 'warehouse' || A.gr.members.some(m => this.uw.compounds.inYard(o.target.prop, m.x, m.z));
     this.live.delete(o.id);
     this.uw.gangs.removeGroup(A.gr);
-    this.resolve(o, out);
+    this.resolve(o, out === 'stand' && !got ? 'won' : out);
   }
   reset() { this.live.clear(); }
   // what the Feed shows: live threats with their clocks
