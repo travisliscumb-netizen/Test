@@ -16,6 +16,41 @@ The mapping stays exact until a session changes the code above that line; after 
 - Commit/base revision: Session 4A `62782c4` → the Session 4B commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-22
 
+## DC-34 follow-up (§45.28 rulings)
+
+- **Imports run on the economic clock** (`S.econH`):
+  - the lead (8–16 h) and the 24 h on the quay are economic hours;
+  - the Feed and the Imports card show world-clock hours left;
+  - an import saved before this moves onto the economic clock when loaded.
+
+  `shipment.mjs` checks the day-length setting: at 15-minute and 60-minute days the wait is 48 vs 12 world hours,
+  the same real time.
+- **Rival shipments run their route out of sight** (`ShipmentSystem.travel`):
+  - **Risk by stretch:** the start, the middle and the end, from the shipping gang's side, using the §8 tiers:
+    - own turf 0.2%;
+    - a coalition partner's turf 1% (friendly);
+    - nobody's turf 3% (neutral);
+    - another gang's or yours 7% (rival);
+    - a turf at war 12% (hostile).
+  - **Police:** a separate roll, from a base, the gang's heat, a crackdown and patrols.
+  - **Saved dice:** the dice are saved on the record, so a reload never rerolls them.
+  - **Every disruption is saved state:**
+    - **delay:** their own or nobody's ground; still due, later;
+    - **interception:** another gang's ground, or the other side of a war. 35–100% of the cargo becomes that gang's
+      stock and the rest goes on;
+    - **stranded van:** on your turf, at war, or half of neutral stretches. The van is parked on the street, saved,
+      with an urgent Feed entry. Near you it is a real unlocked van with the load. After 6 hours their people recover
+      it and it finishes the trip from there;
+    - **police seizure:** logged.
+
+    The log records each event (`delayed`, `intercepted` with the gang, `stranded`, `recovered`, `seized`).
+  - **A van that goes out of your sight** mid-trip runs the rest of its route the same way. Before, it simply
+    arrived.
+- **The Vipers compound moved** from block 3,6 to 5,0, still in their Old Quarter. It is 503 m from the new-game
+  start, outside the guard (160 m), raid (320 m) and shipment (380 m) radii. A fresh career starts with no warehouse
+  guards in the gang cap.
+- **Deferred to Session 5 (§45.28):** cargo in a hijacked or stolen vehicle must persist through save/reload.
+
 ## Completed this session (4B)
 
 - **Rival warehouses** (`src/game/547-underworld-rivalwh.js`, `RivalWarehouses`; state `save.uw.rivals[fid]`).
@@ -141,12 +176,11 @@ Full regression against the 4B build:
 
 - A stolen load in a vehicle that is not stored in a garage is not saved (true of every trunk). The load is lost on
   reload, never duplicated.
-- The new-game start is in Vipers ground beside their warehouse. Their guards (2–6) count against the gang cap
-  (18) while you are near.
 - A physical convoy only exists if you are within 380 m when it is due. Otherwise it is abstract and simply
   arrives. A van out of your sight for long (260 m and not in view, or 10 minutes on the road) also counts as
   arrived.
-- Rival shipments don't use the §8 route-risk tiers yet. Imports and their price are first balance guesses (DC-34).
+- Imports and their price are first balance guesses (DC-34).
+- Cargo in a stolen vehicle that isn't stored doesn't survive a reload: deferred to Session 5 (§45.28).
 
 ## Exact next recommended task
 
@@ -1976,7 +2010,7 @@ evacuation. Save/reload duplication protection from the start. (4A done; 4B done
 3. **What 4B implements** (each item is a constant or one rule, easy to change):
    - **Sites (`RIVAL_WH`).** One compound per gang, using Cannery Row's layout, facing its block's first open
      road:
-     - Vipers, block 3,6;
+     - Vipers, block 5,0 (moved from 3,6 by the DC-34 ruling);
      - Velvet, 6,10;
      - Glasshouse, 9,4;
      - Bellcourt, 9,1;
@@ -2059,6 +2093,18 @@ evacuation. Save/reload duplication protection from the start. (4A done; 4B done
    - The rank gate and the import price are first guesses for balance.
    - Rival shipments don't yet use the §8 route-risk tiers, and hardware isn't importable.
 7. **Severity:** OPTIONAL. **Blocks:** nothing. Please confirm, or rule on any item.
+
+**Disposition (owner, §45.28):**
+- **Sites and tiers:** approved provisionally; tuning belongs in Session 13.
+- **Raid timings:** approved.
+- **Imports:** approved (Territory Holder; Green, Pharma, Snow; 55% provisional; van or box truck; no hardware), with
+  their lead and 24 h wait on the economic clock. Done in the DC-34 follow-up.
+- **Out-of-sight abstraction:** approved (380 m provisional).
+- **Rival shipment route risk:** revised. The same stretch tiers apply, police separately, and every disruption is
+  persistent state (done).
+- **Fresh-career spawn:** must be outside the Vipers yard's activation area. The compound moved to 5,0 (done).
+- **Vehicle cargo persistence:** deferred to Session 5.
+- **Regression:** compound.mjs is re-run after the final 4B fix.
 
 ## Owner decisions (Session 0 review)
 

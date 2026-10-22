@@ -1244,3 +1244,30 @@ Where these conflict with an earlier section, **this section wins**. Each affect
     - **Exploits:** save/reload duplication protection from the start.
 
     Finish and regression-test 4A before beginning 4B.
+28. **Session 4B rulings (DC-34).**
+    - **Rival warehouse sites and security tiers (approved provisionally).** Keep the five compounds and their tiers.
+      Exact strength and security tuning belongs in Session 13. The Vipers compound must sit outside the fresh
+      career's initial physical-simulation and guard-activation area. It is at block 5,0, about 500 m from the start.
+    - **Raid timings (approved).** Keep:
+      - guards at first;
+      - a reinforcement squad at about 4.5 minutes;
+      - stronger armed responses around 7 and 9 minutes;
+      - an evacuation around 10 minutes.
+    - **Bulk imports (approved with a clock clarification):**
+      - they unlock at Territory Holder;
+      - goods are Green, Pharma and Snow;
+      - the price is 55% of wholesale (provisional);
+      - collection needs a cargo-capable van or box truck;
+      - hardware and guns are excluded from this system.
+
+      The import lead and the 24-hour pickup window use the normalized economic clock, not the adjustable visual
+      day length. Changing the day length must not materially change import economics per real hour.
+    - **Out-of-sight shipments (approved).** Shipments may resolve abstractly outside the physical simulation radius
+      (about 380 m, provisional). Physical vans appear near the player and the endpoints.
+    - **Rival shipment route risk (revised).** Rival shipments use the same geographic and faction logic as the
+      player's routes: own or friendly territory low, neutral moderate, rival or enemy high, active war very high.
+      Police risk stays separate. Cargo is never silently deleted out of sight: a disrupted shipment produces
+      authoritative persistent state, such as a delay, a partial loss, a rival interception or an exposed dynamic
+      opportunity.
+    - **Vehicle cargo persistence (deferred to Session 5).** No duplication is acceptable for now. Session 5 must
+      make hijacked and stolen vehicle cargo persist through save/reload instead of disappearing.

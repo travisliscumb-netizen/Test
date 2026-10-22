@@ -64,11 +64,19 @@ and at 10 minutes a van backs onto the dock to evacuate what is left. Steal that
 away and the raid winds down. A reload never resets or stacks any of it.
 
 Every load on the road is one saved shipment: a gang's daily restock from its HQ, and the Tidewater boat from the
-piers to their warehouse. Out of sight they simply arrive. Within about 380 m of either end you see a real van
-(the boat's has an escort), and you can take it.
+piers to their warehouse. Within about 380 m of either end you see a real van (the boat's has an escort), and you
+can take it.
+
+Out of sight, a load still runs its route, with risk set by who holds each stretch: low on its own ground, high on
+a rival's or yours, very high where there is a war. Police risk is separate. Whatever goes wrong is saved:
+- a delay;
+- another gang taking part of the load;
+- a police seizure;
+- a van stranded on the street, which you hear about and can go and take before their people fetch it.
 
 From Territory Holder up you can order an import: a whole load of Green, Pharma or Snow at about half the
-supplier's price, paid up front. It lands at the pier by Shed 4 and waits a day. Only a Driver run from the quay
+supplier's price, paid up front. It lands at the pier by Shed 4 and waits a day, on the economic clock, so the
+day-length setting doesn't change it in real time. Only a Driver run from the quay
 or you in a van or box truck can bring it to a warehouse. Order from Empire → Drivers → Imports. Modules:
 `src/game/547-underworld-rivalwh.js` (`RivalWarehouses`) and `src/game/549-underworld-shipments.js`
 (`ShipmentSystem`).

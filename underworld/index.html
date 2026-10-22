@@ -46761,7 +46761,8 @@ const THREAT_T = { warn: 120, imminent: 60, fight: 120, near: 140 };
 // or below 2 in perimeter and access, so there is always a way in for a determined player (a car through the gate
 // or the fence); the stronger crews watch more and keep more.
 const RIVAL_WH = {
-  vipers: { at: [3, 6], name: 'Vipers stash yard', up: { perimeter: 1, surveillance: 1, access: 1, vault: 1 }, cap: 120, cash: 30000 },
+  // Vipers keep theirs at the north end of the Old Quarter, 500 m from where a new career starts (DC-34 ruling)
+  vipers: { at: [5, 0], name: 'Vipers stash yard', up: { perimeter: 1, surveillance: 1, access: 1, vault: 1 }, cap: 120, cash: 30000 },
   velvet: { at: [6, 10], name: 'Velvet bonded store', up: { perimeter: 2, surveillance: 2, access: 1, vault: 1 }, cap: 140, cash: 45000 },
   glasshouse: { at: [9, 4], name: 'Glasshouse depot', up: { perimeter: 1, surveillance: 2, access: 2, vault: 2 }, cap: 160, cash: 60000 },
   bellcourt: { at: [9, 1], name: 'Bellcourt warehouse', up: { perimeter: 2, surveillance: 2, access: 2, vault: 2 }, cap: 180, cash: 80000 },
@@ -52812,14 +52813,26 @@ function rivalInteriorDef(C, fid, w) {
    record's cargo object, so a save mid-drive holds exactly what the van
    holds, and a reload resolves the drive once (it arrived), never twice.
    Taking the van moves the load out of the record into the van for good.
+   Out of sight a rival's load still runs its route (§8, DC-34 ruling): who
+   holds each stretch sets the risk (own low, neutral moderate, rival or
+   enemy high, a turf at war very high; police separately), with the dice
+   saved on the record. Nothing disappears silently: a disruption is a
+   delay, an interception (the cargo is now the other gang's), a van left
+   stranded on the street (an opportunity, saved, until they recover it)
+   or a police seizure, each logged.
+   Imports run on the economic clock (S.econH, §45.9): the day-length
+   setting doesn't change how long they take or wait in real time.
    ===================================================================== */
-const SHIP_T = { near: 380, supplyLead: [2, 8], importLead: [8, 16], importWait: 24, dock: 12, stray: 260, drive: 600, hold: 1 };
+// hours are world-clock hours, except imports' lead and wait (economic hours); the physical van's times are seconds
+const SHIP_T = { near: 380, supplyLead: [2, 8], importLead: [8, 16], importWait: 24, dock: 12, stray: 260, drive: 600, hold: 1, delay: [2, 5], strand: 6 };
+// police risk on a rival's route, separate from who holds the streets: a base, the gang's heat, a crackdown, patrols
+const SHIP_POLICE = { base: 0.004, heat: 1 / 2000, crackdown: 0.03, patrol: 1 / 3000 };
 // your imports: Territory Holder and up, one at a time, about half the supplier's wholesale price, a load a Driver
 // (or you, in a van or box truck) has to bring in
 const IMPORT = { rank: 4, lots: { green: 240, pills: 180, snow: 120 }, price: 0.55, seize: 0.08, vehicles: ['van', 'truck'], lead: 'Pier' };
 const SHIP_KINDS = ['supply', 'boat', 'import'];
-const SHIP_STATES = ['due', 'rolling', 'landed', 'done'];
-const SHIP_ENDS = ['delivered', 'stolen', 'seized', 'lost', 'expired', 'collected'];
+const SHIP_STATES = ['due', 'rolling', 'landed', 'stranded', 'done'];
+const SHIP_ENDS = ['delivered', 'stolen', 'seized', 'lost', 'expired', 'collected', 'intercepted', 'delayed', 'stranded', 'recovered'];
 class ShipmentSystem {
   constructor(uw) { this.uw = uw; this.live = new Map(); this.crates = new Map(); }
   get S() { return this.uw.S; }
@@ -52835,14 +52848,18 @@ class ShipmentSystem {
       const from = pt(r.from); if (!from) continue;
       const cargo = Inv.clean(r.cargo, num); if (!units(cargo)) continue;
       const s = { id: Math.floor(num(r.id, 0, 1, 1e7)), kind: r.kind, fid, cargo, state: r.state, at: num(r.at, 0, 0, 1e8), from, to: typeof r.to === 'string' ? r.to : '', n0: Math.floor(num(r.n0, units(cargo), 0, 1e6)), paid: Math.round(num(r.paid, 0, 0, 1e9)) };
-      if (r.kind === 'import') { s.until = num(r.until, s.at + SHIP_T.importWait, 0, 1e8); if (!PROP_BY_ID[s.to] || PROP_BY_ID[s.to].kind !== 'warehouse') s.to = ''; }
+      // the route dice are saved with it (a reload never rerolls them)
+      s.roll = num(r.roll, Math.random(), 0, 1); s.roll2 = num(r.roll2, Math.random(), 0, 1);
+      if (r.kind === 'import') { s.until = num(r.until, s.at + SHIP_T.importWait, 0, 1e8); if (r.clk === 'e') s.clk = 'e'; if (!PROP_BY_ID[s.to] || PROP_BY_ID[s.to].kind !== 'warehouse') s.to = ''; }
       else if (!RIVAL_WH[fid]) continue;
+      if (s.state === 'stranded') { s.pos = pt(r.pos); s.until = num(r.until, 0, 0, 1e8); if (!s.pos) s.state = 'due'; }
+      if (s.kind === 'import' && s.state === 'stranded') continue;
       out.list.push(s);
     }
     out.list = out.list.slice(0, 24);
     out.next = Math.max(Math.floor(num(o.next, 1, 1, 1e7)), ...out.list.map(r => r.id + 1), 1);
     out.log = (Array.isArray(o.log) ? o.log : []).filter(e => e && typeof e === 'object' && SHIP_ENDS.includes(e.end) && SHIP_KINDS.includes(e.kind)).slice(-12)
-      .map(e => ({ id: Math.floor(num(e.id, 0, 0, 1e7)), kind: e.kind, fid: typeof e.fid === 'string' ? e.fid : '', end: e.end, n: Math.floor(num(e.n, 0, 0, 1e6)), day: Math.floor(num(e.day, 0, 0, 1e6)) }));
+      .map(e => ({ id: Math.floor(num(e.id, 0, 0, 1e7)), kind: e.kind, fid: typeof e.fid === 'string' ? e.fid : '', end: e.end, n: Math.floor(num(e.n, 0, 0, 1e6)), day: Math.floor(num(e.day, 0, 0, 1e6)), by: typeof e.by === 'string' ? e.by : '' }));
     return out;
   }
   // a save from before Session 4B kept one Tidewater boat in save.uw.shipment: it becomes a boat record
@@ -52851,18 +52868,25 @@ class ShipmentSystem {
     if (!sh || typeof sh !== 'object' || sh.done || !isFinite(sh.at) || !isFinite(sh.x) || !isFinite(sh.z) || !sh.cargo) return;
     const cargo = {}; for (const k in sh.cargo) if (GOODS[k] && sh.cargo[k] > 0) cargo[k] = Math.floor(sh.cargo[k]);
     if (!units(cargo)) return;
-    S.ships.list.push({ id: S.ships.next++, kind: 'boat', fid: 'tidewater', cargo, state: 'due', at: +sh.at, from: { x: +sh.x, z: +sh.z }, to: 'rival:tidewater', n0: units(cargo), paid: 0 });
+    S.ships.list.push({ id: S.ships.next++, kind: 'boat', fid: 'tidewater', cargo, state: 'due', at: +sh.at, from: { x: +sh.x, z: +sh.z }, to: 'rival:tidewater', n0: units(cargo), paid: 0, roll: Math.random(), roll2: Math.random() });
   }
   get D() { const S = this.S; if (!S.ships) S.ships = ShipmentSystem.fresh(); return S.ships; }
   list() { return this.D.list; }
   find(id) { return this.D.list.find(r => r.id === id) || null; }
   absHour() { return this.S.day * 24 + Math.floor(this.g.env ? this.g.env.time : 0) % 24; }
-  add(r) { r.id = this.D.next++; r.n0 = units(r.cargo); this.D.list.push(r); return r; }
+  add(r) { r.id = this.D.next++; r.n0 = units(r.cargo); r.roll = Math.random(); r.roll2 = Math.random(); this.D.list.push(r); return r; }
+  // the economic clock (§45.9) and the world hour it corresponds to now, for imports' times on the Feed and screens
+  econ() { return this.S.econH; }
+  worldHourOf(e) { return this.absHour() + Math.round((e - this.econ()) / Math.max(0.05, this.uw.econRate())); }
+  // hours left on the world clock until economic time e
+  hoursTo(e) { return Math.max(0, Math.ceil((e - this.econ()) / Math.max(0.05, this.uw.econRate()))); }
+  // a line in the log for something that happened to a load that goes on (part intercepted, a delay)
+  note(r, end, n, by) { const D = this.D; D.log.push({ id: r.id, kind: r.kind, fid: r.fid, end, n, day: this.S.day, by: by || '' }); if (D.log.length > 12) D.log.splice(0, D.log.length - 12); }
   // the record is finished: it leaves the list and the log keeps one line about it
   finish(r, end, keepLive) {
     const D = this.D, i = D.list.indexOf(r); if (i >= 0) D.list.splice(i, 1);
     r.state = 'done'; r.end = end;
-    D.log.push({ id: r.id, kind: r.kind, fid: r.fid, end, n: r.n0, day: this.S.day }); if (D.log.length > 12) D.log.splice(0, D.log.length - 12);
+    this.note(r, end, r.n0);
     if (!keepLive) this.dropLive(r);
     this.dropCrate(r);
   }
@@ -52912,11 +52936,11 @@ class ShipmentSystem {
   }
   orderImport(k) {
     const why = this.importBlock(k); if (why) return why;
-    const uw = this.uw, L = this.importPoint(), paid = this.importPrice(k), at = this.absHour() + randi(SHIP_T.importLead[0], SHIP_T.importLead[1]);
+    const uw = this.uw, L = this.importPoint(), paid = this.importPrice(k), at = this.econ() + randi(SHIP_T.importLead[0], SHIP_T.importLead[1]);
     Money.pay(paid, 'importOrder');
     const cargo = {}; Inv.add(cargo, k, IMPORT.lots[k], paid);
-    const r = this.add({ kind: 'import', fid: 'pc', cargo, state: 'due', at, until: at + SHIP_T.importWait, from: { x: L.x, z: L.z }, to: '', paid });
-    uw.opps.add({ kind: 'shipment', title: 'Your import is at sea', text: `${goodsList(cargo)} lands at ${L.name} around ${String(at % 24).padStart(2, '0')}:00 (day ${Math.floor(at / 24) + 1}). Send a Driver for it, or bring a van or box truck. The port holds it for a day.`, x: L.x, z: L.z, until: at + SHIP_T.importWait });
+    const r = this.add({ kind: 'import', fid: 'pc', cargo, state: 'due', at, until: at + SHIP_T.importWait, clk: 'e', from: { x: L.x, z: L.z }, to: '', paid });
+    uw.opps.add({ kind: 'shipment', title: 'Your import is at sea', text: `${goodsList(cargo)} lands at ${L.name} in about ${this.hoursTo(at)} hours. Send a Driver for it, or bring a van or box truck. The port holds it for a day.`, x: L.x, z: L.z, until: this.worldHourOf(at + SHIP_T.importWait) });
     this.g.autosave('Import ordered');
     return '';
   }
@@ -52924,10 +52948,12 @@ class ShipmentSystem {
   importAt(id) { const r = this.find(id); return r && r.kind === 'import' && r.state === 'landed' ? r : null; }
   // ---------------------------------------------------------------- the hourly clock
   tickHours() {
-    const now = this.absHour();
+    const now = this.absHour(), e = this.econ();
     for (const r of this.D.list.slice()) {
-      if (r.state === 'due' && now >= r.at) this.due(r);
-      else if (r.state === 'landed' && r.kind === 'import' && now >= r.until) this.expire(r);
+      const t = r.kind === 'import' ? e : now;
+      if (r.state === 'due' && t >= r.at) this.due(r);
+      else if (r.state === 'landed' && r.kind === 'import' && t >= r.until) this.expire(r);
+      else if (r.state === 'stranded' && now >= r.until) this.recover(r);
     }
   }
   // the player can see this happen: near either end, out on the street, not in a cell
@@ -52956,7 +52982,89 @@ class ShipmentSystem {
     const w = uw.rivalwh.st(r.fid);
     if (w.raid) { r.at += SHIP_T.hold; return; }
     if (this.watching(r) && this.roll(r)) return;
+    this.travel(r, r.from);
+  }
+  // ---------------------------------------------------------------- the route, out of your sight
+  // who holds a stretch, from the shipping gang's side (§8 tiers, as for your Drivers): its own turf, a coalition
+  // partner's (friendly), nobody's (neutral), another gang's or yours (rival), or a turf at war (hostile)
+  stretch(fid, i) {
+    const S = this.S, own = this.uw.owner[i];
+    if (S.turfs[i].war) return 'hostile';
+    if (own === fid) return 'own';
+    if (!own || (own !== 'pc' && (!FACTIONS[own] || S.factions[own].broken))) return 'neutral';
+    if (own !== 'pc' && S.flags.coalition) return 'friendly';
+    return 'rival';
+  }
+  // the route's stretches (start, middle, end) with their risk, and the police risk on it
+  routeRisk(fid, A, B) {
+    const S = this.S, f = S.factions[fid], pts = [A, { x: (A.x + B.x) / 2, z: (A.z + B.z) / 2 }, B];
+    const legs = pts.map(q => { const i = turfAt(q.x, q.z); const k = this.stretch(fid, i); return { i, k, x: q.x, z: q.z, p: ROUTE_RISK[k] }; });
+    const patrol = legs.reduce((a, l) => a + S.turfs[l.i].police, 0) / legs.length;
+    const police = SHIP_POLICE.base + f.heat * SHIP_POLICE.heat + (S.crackdown > 0 ? SHIP_POLICE.crackdown : 0) + patrol * SHIP_POLICE.patrol;
+    return { legs, rival: legs.reduce((a, l) => a + l.p, 0), police };
+  }
+  // a load on the road out of your sight, from P to their warehouse: the saved dice against the route
+  travel(r, P) {
+    const B = this.dest(r); if (!B) { this.arrive(r); return; }
+    const R = this.routeRisk(r.fid, P, B);
+    if (r.roll < R.police) { this.seize(r); return; }
+    if (r.roll < R.police + R.rival) {
+      // which stretch it went wrong on, by its share of the risk
+      let q = r.roll2 * R.rival, leg = R.legs[R.legs.length - 1];
+      for (const l of R.legs) { q -= l.p; if (q <= 0) { leg = l; break; } }
+      this.disrupt(r, leg);
+      return;
+    }
     this.arrive(r);
+  }
+  // fresh dice for the next attempt (after a delay or a recovery)
+  reroll(r) { r.roll = Math.random(); r.roll2 = Math.random(); }
+  // second-level draws from the saved dice (which stretch used roll2; this keeps the rest independent of that)
+  draw(r) { return (r.roll2 * 977.13) % 1; }
+  disrupt(r, leg) {
+    const uw = this.uw, S = this.S, own = uw.owner[leg.i], war = S.turfs[leg.i].war, F = FACTIONS[r.fid], tname = uw.T[leg.i].name;
+    // who was on that stretch: the gang that holds it, or the other side of a war there
+    let by = own && own !== r.fid ? own : null;
+    if (war) { const other = war.a === r.fid ? war.d : war.d === r.fid ? war.a : (own === r.fid ? null : own); by = other || by; }
+    if (by && by !== 'pc' && FACTIONS[by] && !S.factions[by].broken) { this.intercept(r, by, tname); return; }
+    if (by === 'pc' || leg.k === 'hostile' || (leg.k === 'neutral' && this.draw(r) < 0.5)) { this.strand(r, leg, tname); return; }
+    // their own ground, or nobody's: it just took longer
+    r.at = this.absHour() + randi(SHIP_T.delay[0], SHIP_T.delay[1]); this.reroll(r);
+    this.note(r, 'delayed', units(r.cargo));
+    uw.news('unknown', `Word on the street: a ${F.short} delivery got held up around ${tname}.`);
+  }
+  // another gang took (some of) it: that part is their stock now; what they left goes on
+  intercept(r, by, tname) {
+    const uw = this.uw, S = this.S, share = 0.35 + 0.65 * this.draw(r), took = {};
+    for (const k of GOOD_IDS) { const n = Inv.has(r.cargo, k); if (!n) continue; const t = Math.max(1, Math.round(n * share)); Inv.remove(r.cargo, k, t); took[k] = t; }
+    const n = units(took);
+    S.factions[by].stock += n;
+    this.note(r, 'intercepted', n, by);
+    uw.news('unknown', `The ${FACTIONS[by].short} jumped a ${FACTIONS[r.fid].short} delivery on ${tname} and took ${goodsList(took)}.`);
+    if (units(r.cargo)) this.arrive(r); else this.finish(r, 'intercepted');
+  }
+  // the van is stuck on the street (a breakdown, a scare, a fight nearby): a saved opportunity until they fetch it
+  strand(r, leg, tname) {
+    const uw = this.uw, c = curbNear(leg.x, leg.z);
+    r.state = 'stranded'; r.pos = { x: c.x, z: c.z }; r.until = this.absHour() + SHIP_T.strand;
+    this.note(r, 'stranded', units(r.cargo));
+    uw.opps.add({ kind: 'shipment', title: `${FACTIONS[r.fid].short} van stranded`, text: `A ${FACTIONS[r.fid].short} delivery van is stuck on ${tname} with ${goodsList(r.cargo)} in the back. They’ll send people for it within ${SHIP_T.strand} hours.`, x: c.x, z: c.z, until: r.until, urgent: true });
+  }
+  // their people fetched a stranded van: it finishes its trip (from where it stood, on fresh dice)
+  recover(r) {
+    const L = this.live.get(r.id), p = this.g.player;
+    // not while you are standing over it
+    if (L && this.g.vehicles.list.includes(L.van) && Math.hypot(L.van.pos.x - p.pos.x, L.van.pos.z - p.pos.z) < 120) { r.until += 1; return; }
+    this.dropStranded(r);
+    const P = r.pos; r.state = 'due'; delete r.pos; this.reroll(r);
+    this.note(r, 'recovered', units(r.cargo));
+    this.travel(r, P);
+  }
+  seize(r) {
+    const uw = this.uw, f = this.S.factions[r.fid];
+    uw.news('radio', `Police radio: a van stopped at a checkpoint, ${goodsList(r.cargo)} in the back. ${FACTIONS[r.fid].short} colours on the driver.`);
+    f.heat = clamp(f.heat + 5, 0, 100);
+    Inv.clear(r.cargo); this.finish(r, 'seized');
   }
   // it got there: on their shelves as far as the warehouse holds, the rest to their street stock
   arrive(r) {
@@ -52980,9 +53088,9 @@ class ShipmentSystem {
       S.pressure = clamp(S.pressure + 4, 0, 100);
       Inv.clear(r.cargo); this.finish(r, 'seized'); return;
     }
-    r.state = 'landed'; r.until = this.absHour() + SHIP_T.importWait;
+    r.state = 'landed'; r.until = this.econ() + SHIP_T.importWait;
     this.buildCrate(r);
-    uw.opps.add({ kind: 'shipment', title: 'Your import has landed', text: `${goodsList(r.cargo)} is on the quay at ${this.importPoint().name} until ${String(r.until % 24).padStart(2, '0')}:00 tomorrow. A Driver can bring it in (Empire → Drivers), or load it into a van or box truck yourself.`, x: L.x, z: L.z, until: r.until, urgent: true });
+    uw.opps.add({ kind: 'shipment', title: 'Your import has landed', text: `${goodsList(r.cargo)} is on the quay at ${this.importPoint().name} for about ${this.hoursTo(r.until)} hours. A Driver can bring it in (Empire → Drivers), or load it into a van or box truck yourself.`, x: L.x, z: L.z, until: this.worldHourOf(r.until), urgent: true });
   }
   expire(r) {
     this.uw.opps.add({ kind: 'shipment', title: 'Import impounded', text: `Nobody came for it. The port impounded ${goodsList(r.cargo)}.`, x: r.from.x, z: r.from.z, hours: 12 });
@@ -53054,6 +53162,28 @@ class ShipmentSystem {
     g.ui.toast(r.kind === 'boat' ? 'The Tidewater van is on the move.' : `A ${FACTIONS[r.fid].short} van is on the move.`, 'radio');
     return true;
   }
+  // a stranded van near you is a real, parked, unlocked van with the record's cargo in it
+  updateStranded() {
+    const g = this.g, p = g.player; if (this.S.jail || p.interior) return;
+    for (const r of this.D.list) {
+      if (r.state !== 'stranded' || this.live.has(r.id)) continue;
+      if (Math.hypot(p.pos.x - r.pos.x, p.pos.z - r.pos.z) > SHIP_T.near) continue;
+      const c = curbNear(r.pos.x, r.pos.z);
+      const van = g.vehicles.spawn('van', c.x, c.z, c.h, { parked: true, color: 0x2a2e33 });
+      if (!van) continue;
+      van.mission = 'shipment'; van.touched = true; van.fac = r.fid; van.trunk = r.cargo; van.locked = false; van.health = 120;
+      const gr = { key: 'ship' + r.id, kind: 'convoy', fid: r.fid, x: c.x, z: c.z, members: [], hostile: false, cars: [van], van };
+      van.uwGroup = gr.key; this.uw.gangs.groups.set(gr.key, gr);
+      this.live.set(r.id, { r, van, gr, t: 0, V: null, after: 0, parked: true });
+    }
+  }
+  // the parked van leaves the world (out of range, or recovered); the cargo stays in the record
+  dropStranded(r) {
+    const L = this.live.get(r.id); if (!L) return;
+    const g = this.g;
+    this.dropLive(r);
+    if (g.vehicles.list.includes(L.van) && L.van !== g.player.vehicle) g.vehicles.despawn(L.van);
+  }
   dropLive(r) {
     const L = this.live.get(r.id); if (!L) return;
     this.live.delete(r.id);
@@ -53061,7 +53191,9 @@ class ShipmentSystem {
   }
   // per frame: each van on the road
   update(dt) {
-    if (!(dt > 0) || !this.live.size) return;
+    if (!(dt > 0)) return;
+    this.updateStranded();
+    if (!this.live.size) return;
     const g = this.g, p = g.player, uw = this.uw;
     for (const L of [...this.live.values()]) {
       const { r, van } = L;
@@ -53074,9 +53206,15 @@ class ShipmentSystem {
       if (van === p.vehicle) { this.stolen(r, L); continue; }
       // wrecked on the way: the load is lost with it
       if (van.burnt || van.health <= 0) { if (Math.hypot(van.pos.x - p.pos.x, van.pos.z - p.pos.z) < 80) uw.threats.press(r.fid, PRESSURE.ship, 'wrecked their delivery'); Inv.clear(r.cargo); this.finish(r, 'lost'); continue; }
-      // gone without a wreck (despawned out of your sight), or out of your sight for long: it got there
       const dp = Math.hypot(van.pos.x - p.pos.x, van.pos.z - p.pos.z);
-      if (!g.vehicles.list.includes(van) || (dp > SHIP_T.stray && !g.inView(van.pos.x, 1, van.pos.z, 3)) || L.t > SHIP_T.drive) { this.arriveLive(r, L); continue; }
+      if (L.parked) {
+        // a stranded van waits where it is; out of range it leaves the world and the record keeps the load
+        if (!g.vehicles.list.includes(van) || dp > SHIP_T.near + 40) this.dropStranded(r);
+        continue;
+      }
+      // out of your sight (despawned without a wreck, or far and unseen): the rest of its trip runs its route
+      if (!g.vehicles.list.includes(van) || (dp > SHIP_T.stray && !g.inView(van.pos.x, 1, van.pos.z, 3))) { this.awayLive(r, L); continue; }
+      if (L.t > SHIP_T.drive) { this.arriveLive(r, L); continue; }
       const id = uw.rivalwh.id(r.fid), C = uw.rivalwh.C(r.fid);
       if (!L.V) {
         // at their gate: the compound's own lane takes it onto a dock
@@ -53088,6 +53226,14 @@ class ShipmentSystem {
         }
       } else if (L.V.phase === 'unload' || L.V.phase === 'out' || L.V.phase === 'gone') this.arriveLive(r, L);
     }
+  }
+  // the van went out of your sight on the road: the rest of the trip, from where it is, runs out of sight
+  awayLive(r, L) {
+    const van = L.van, g = this.g, P = g.vehicles.list.includes(van) ? { x: van.pos.x, z: van.pos.z } : r.from;
+    this.dropLive(r);
+    if (g.vehicles.list.includes(van)) g.vehicles.despawn(van);
+    r.state = 'due';
+    this.travel(r, P);
   }
   // the van got there: the cargo goes on the shelves; the van itself drives off as an ordinary van
   arriveLive(r, L) {
@@ -53120,13 +53266,15 @@ class ShipmentSystem {
     this.live.clear(); this._ip = null;
     if (!this.uw.S) return;
     for (const r of this.D.list.slice()) {
+      // an import saved before imports ran on the economic clock: its times move onto it
+      if (r.kind === 'import' && r.clk !== 'e') { const rate = this.uw.econRate(), now = this.absHour(); r.at = this.econ() + (r.at - now) * rate; r.until = this.econ() + (r.until - now) * rate; r.clk = 'e'; }
       if (r.state === 'rolling') this.arrive(r);
       else if (r.state === 'landed') this.buildCrate(r);
     }
   }
   // the Opportunities/feed view: what is on its way, for the player's own imports and what they've heard of
   summary() {
-    return this.D.list.map(r => ({ id: r.id, kind: r.kind, fid: r.fid, state: r.state, at: r.at, until: r.until || 0, goods: goodsList(r.cargo), n: units(r.cargo) }));
+    return this.D.list.map(r => ({ id: r.id, kind: r.kind, fid: r.fid, state: r.state, at: r.at, until: r.until || 0, pos: r.pos || null, goods: goodsList(r.cargo), n: units(r.cargo) }));
   }
 }
 /* =====================================================================
@@ -53697,10 +53845,10 @@ class EmpireUI {
   }
   // IMPORTS (§3, §8): a bulk load at about half the wholesale price, landing at the docks; rank-gated
   importsHTML() {
-    const uw = this.uw, Sh = uw.shipments, imp = Sh.importOpen(), now = uw.runs.absHour(), P = Sh.importPoint();
+    const uw = this.uw, Sh = uw.shipments, imp = Sh.importOpen(), P = Sh.importPoint();
     let h = `<h3>Imports</h3><div class="hint">A whole load at about ${Math.round(IMPORT.price * 100)}% of the supplier’s price, paid up front from a vault. It lands at ${esc(P.name)} and the port holds it for a day: it becomes warehouse stock only when a Driver brings it in (a delivery from the quay) or you load it into a van or box truck and unload it at a warehouse. Customs open a container now and then.</div>`;
     if (imp) {
-      const st = imp.state === 'due' ? `at sea · lands in ~${Math.max(0, imp.at - now)}h` : `on the quay · ${Math.max(0, imp.until - now)}h before the port impounds it`;
+      const st = imp.state === 'due' ? `at sea · lands in ~${Sh.hoursTo(imp.at)}h` : `on the quay · ${Sh.hoursTo(imp.until)}h before the port impounds it`;
       return h + `<div class="card"><div class="t">${esc(goodsList(imp.cargo))}</div><div class="d">${st}</div><div class="stat"><span>Paid</span><span class="money">${fmtMoney(imp.paid)}</span></div></div>`;
     }
     h += '<div class="jobs">' + Object.keys(IMPORT.lots).map(k => {

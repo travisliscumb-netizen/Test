@@ -138,6 +138,7 @@ const restock = await ev(() => {
   S.day = w.alert; uw.rivalwh.tickDay(); const sent = window.__u(w.stock);
   // the restock left their street stock and is on the road: in the shipment record, not on the shelves yet
   const rec = Sh.D.list.find(r => r.kind === 'supply' && r.fid === 'vipers'), inTransit = rec ? window.__u(rec.cargo) : 0, fAfter = f.stock;
+  if (rec) rec.roll = 0.999; // a clean run on its route (shipment.mjs tests the route's risks)
   w.raid = { t: 10, away: 0, evacDone: false, start: 0 }; const at0 = rec && rec.at; if (rec) Sh.due(rec); const held = rec && rec.state === 'due' && rec.at === at0 + 1, duringRaid = window.__u(w.stock); w.raid = null;
   if (rec) Sh.due(rec); const after = window.__u(w.stock);
   uw.rivalwh.tickDay(); const again = Sh.D.list.filter(r => r.kind === 'supply' && r.fid === 'vipers').length;

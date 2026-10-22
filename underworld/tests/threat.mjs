@@ -41,7 +41,7 @@ const p1 = await ev(() => {
   const i = uw.T.findIndex(t => uw.owner[t.i] === fid && !S.turfs[t.i].war);
   uw.transferTurf(i, 'pc', 'take'); const afterTake = f.press;
   // knock two of their people down in a fight you started (room under the gang cap: the fortnight's police raid
-  // scenes and the Vipers warehouse guards by the start would otherwise fill it)
+  // scenes would otherwise fill it)
   for (const q of [...uw.gangs.groups.values()]) if (q.kind === 'raid' || q.kind === 'rguard') uw.gangs.removeGroup(q);
   const gr = uw.gangs.spawnGroup('presstest', 'raid', fid, { x: g.player.pos.x + 4, z: g.player.pos.z, h: 0 }, 2, {});
   const n = gr.members.length;

@@ -287,7 +287,8 @@ const THREAT_T = { warn: 120, imminent: 60, fight: 120, near: 140 };
 // or below 2 in perimeter and access, so there is always a way in for a determined player (a car through the gate
 // or the fence); the stronger crews watch more and keep more.
 const RIVAL_WH = {
-  vipers: { at: [3, 6], name: 'Vipers stash yard', up: { perimeter: 1, surveillance: 1, access: 1, vault: 1 }, cap: 120, cash: 30000 },
+  // Vipers keep theirs at the north end of the Old Quarter, 500 m from where a new career starts (DC-34 ruling)
+  vipers: { at: [5, 0], name: 'Vipers stash yard', up: { perimeter: 1, surveillance: 1, access: 1, vault: 1 }, cap: 120, cash: 30000 },
   velvet: { at: [6, 10], name: 'Velvet bonded store', up: { perimeter: 2, surveillance: 2, access: 1, vault: 1 }, cap: 140, cash: 45000 },
   glasshouse: { at: [9, 4], name: 'Glasshouse depot', up: { perimeter: 1, surveillance: 2, access: 2, vault: 2 }, cap: 160, cash: 60000 },
   bellcourt: { at: [9, 1], name: 'Bellcourt warehouse', up: { perimeter: 2, surveillance: 2, access: 2, vault: 2 }, cap: 180, cash: 80000 },

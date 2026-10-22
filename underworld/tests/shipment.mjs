@@ -9,7 +9,11 @@
      An old save's boat (save.uw.shipment) becomes a boat record.
    - Your imports: rank-gated, one at a time, paid up front; they land at the docks and wait a day. Only a Driver
      run from the quay or a van/box truck of yours brings them in; on foot or in a car you can't take them. They are
-     impounded if nobody comes. Every lot is accounted for: quay, trunk, run or warehouse, never two at once. */
+     impounded if nobody comes. Every lot is accounted for: quay, trunk, run or warehouse, never two at once.
+   - DC-34 rulings: imports run on the economic clock (the day-length setting doesn't change them in real time);
+     a rival's load out of sight runs its route with real risk by who holds each stretch (police separately), and a
+     disruption is always saved state: a delay, an interception (the cargo is the other gang's now), a stranded van
+     (an opportunity, a real parked van near you, theirs again if you leave it) or a logged seizure. */
 import { launch, open, check, startNew, finish, frames } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
@@ -57,6 +61,7 @@ check('save → reload while it is due: the shipment and its cargo come back exa
 const arr1 = await ev(() => {
   const g = window.game, uw = g.uw, Sh = uw.shipments, r = window.__recs('supply', 'vipers')[0], n = window.__u(r.cargo), shelf0 = window.__shelf('vipers');
   const far = window.__far(); g.resetPlayerState(far.x, far.z, 0);
+  r.roll = 0.999; // a clean run on its route (the route's own risks are tested in section 7)
   uw.S.day = Math.floor(r.at / 24); g.env.time = r.at % 24 + 0.5; uw.S.lastHour = Math.floor(g.env.time) % 24;
   Sh.tickHours(); Sh.tickHours();
   return { n, shelf0, shelf: window.__shelf('vipers'), left: window.__recs('supply', 'vipers').length, log: Sh.D.log.filter(e => e.id === r.id).map(e => e.end), live: [...Sh.live.values()].filter(L => L.r.fid === 'vipers').length };
@@ -143,7 +148,7 @@ const boat = await ev(() => {
   const R0 = Math.random; Math.random = () => 0; Sh.due(a); Math.random = R0;
   const seized = a.end, after = window.__recs('boat').length;
   // the next one lands and goes to their warehouse (what the shelves can't hold, to their street stock)
-  const c = Sh.scheduleBoat(); w.stock = {}; const n = window.__u(c.cargo), fs0 = f.stock, s0 = window.__shelf('tidewater');
+  const c = Sh.scheduleBoat(); c.roll = 0.999; w.stock = {}; const n = window.__u(c.cargo), fs0 = f.stock, s0 = window.__shelf('tidewater');
   Math.random = () => 0.99; Sh.due(c); Math.random = R0;
   delete Sh.watching;
   return { two: !!b2, one, seized, after, end: c.end, shelf: window.__shelf('tidewater') - s0, street: f.stock - fs0, n };
@@ -180,9 +185,9 @@ check('ordering pays the whole price up front (from a vault first); one import a
 const land = await ev(() => {
   const uw = window.game.uw, Sh = uw.shipments, r = Sh.importOpen(), R0 = Math.random; uw._rank = 4;
   Math.random = () => 0.99; Sh.due(r); Math.random = R0;
-  return { state: r.state, crate: Sh.crates.has(r.id), until: r.until - Sh.absHour() };
+  return { state: r.state, crate: Sh.crates.has(r.id), until: r.until - uw.S.econH, clk: r.clk };
 });
-check('it lands at the docks and waits there a day (a stack of crates on the quay)', land.state === 'landed' && land.crate && land.until === 24, JSON.stringify(land));
+check('it lands at the docks and waits there a day on the economic clock (a stack of crates on the quay)', land.state === 'landed' && land.crate && land.until === 24 && land.clk === 'e', JSON.stringify(land));
 // you can't take it on foot or in a car; a box truck takes it
 const take = await ev(() => {
   const g = window.game, uw = g.uw, Sh = uw.shipments, r = Sh.importOpen(), P = r.from;
@@ -228,7 +233,7 @@ check('a Driver can bring it in (only to a warehouse): the lots leave the quay i
 const exp = await ev(() => {
   const g = window.game, uw = g.uw, Sh = uw.shipments, M = g.money; uw._rank = 4; M.W.dirty.me = 5e6;
   Sh.orderImport('pills'); const r = Sh.importOpen(); const R0 = Math.random; Math.random = () => 0.99; Sh.due(r); Math.random = R0;
-  uw.S.day += 2; Sh.tickHours();
+  uw.S.econH += 25; Sh.tickHours();
   return { end: r.end, n: window.__u(r.cargo), open: !!Sh.importOpen(), crate: Sh.crates.has(r.id) };
 });
 check('nobody comes for it within the day: the port impounds it (nothing left anywhere, no crates)', exp.end === 'expired' && exp.n === 0 && !exp.open && !exp.crate, JSON.stringify(exp));
@@ -248,6 +253,107 @@ const s3 = await ev(() => {
 await reload();
 const l3 = await ev((id) => { const uw = window.game.uw, Sh = uw.shipments; Sh.reset(); const r = Sh.find(id); return { state: r && r.state, n: r ? window.__u(r.cargo) : 0, imports: window.__recs('import').length, crate: Sh.crates.has(id) }; }, s3.id);
 check('save → reload with your import on the quay: it is still there, exactly once, crates and all', l3.state === 'landed' && l3.n === s3.n && l3.imports === 1 && l3.crate, JSON.stringify({ s3, l3 }));
+
+// ---------------------------------------------------------------- 7. the DC-34 rulings: imports on the economic clock,
+// rival routes with real risk, nothing lost silently
+const clock = await ev(() => {
+  const g = window.game, uw = g.uw, Sh = uw.shipments, M = g.money, out = {};
+  for (const len of [15, 60]) {
+    g.save.settings.dayLength = len; uw._rank = 4; M.W.dirty.me = 5e6;
+    for (const r of Sh.D.list.filter(q => q.kind === 'import')) Sh.finish(r, 'expired');
+    Sh.orderImport('snow'); const r = Sh.importOpen(); const lead = r.at - uw.S.econH;
+    // run whole world hours (the real hourly tick) until it lands, then until it is impounded
+    const R0 = Math.random; Math.random = () => 0.99;
+    let h = 0, toLand = 0; while (r.state === 'due' && h < 200) { uw.tickHours(1, h % 24); h++; } toLand = h;
+    let h2 = 0; while (r.state === 'landed' && h2 < 400) { uw.tickHours(1, h2 % 24); h2++; }
+    Math.random = R0;
+    // real minutes = world hours × (day length / 24)
+    out[len] = { lead, toLand, realLand: +(toLand * len / 24).toFixed(2), wait: h2, realWait: +(h2 * len / 24).toFixed(2), end: r.end };
+  }
+  g.save.settings.dayLength = 30;
+  return out;
+});
+check('the day-length setting doesn’t change an import’s timing in real time: 24 economic hours on the quay whether a day lasts 15 or 60 minutes', clock[15].end === 'expired' && clock[60].end === 'expired' && Math.abs(clock[15].realWait - clock[60].realWait) <= 2.5 && clock[15].realWait >= 11 && clock[15].wait === 4 * clock[60].wait, JSON.stringify(clock));
+const tiers = await ev(() => {
+  const uw = window.game.uw, S = uw.S, Sh = uw.shipments, i = 0, T = S.turfs[i], keep = { own: T.own, war: T.war, co: S.flags.coalition };
+  const k = (own, war, co) => { T.own = own; T.war = war; S.flags.coalition = co; uw.recompute(); return Sh.stretch('vipers', i); };
+  const out = { own: k('vipers', null, 0), neutral: k(null, null, 0), rival: k('velvet', null, 0), yours: k('pc', null, 0), friendly: k('velvet', null, 1), war: k('velvet', { a: 'velvet', d: 'bellcourt' }, 0) };
+  T.own = keep.own; T.war = keep.war; S.flags.coalition = keep.co; uw.recompute();
+  return { out };
+});
+check('a rival’s route is weighed stretch by stretch like yours: its own turf, a coalition partner’s, nobody’s, another gang’s or yours, a turf at war', tiers.out.own === 'own' && tiers.out.neutral === 'neutral' && tiers.out.rival === 'rival' && tiers.out.yours === 'rival' && tiers.out.friendly === 'friendly' && tiers.out.war === 'hostile', JSON.stringify(tiers));
+const risky = await ev(() => {
+  const uw = window.game.uw, S = uw.S, Sh = uw.shipments, A = uw.loc('hq', 'vipers'), B = Sh.dest({ to: 'rival:vipers', fid: 'vipers' }), keep = S.turfs.map(t => [t.own, t.war]);
+  const all = (own, war) => { for (const t of S.turfs) { t.own = own; t.war = war; } uw.recompute(); return Sh.routeRisk('vipers', A, B); };
+  const own = all('vipers', null), neutral = all(null, null), rival = all('velvet', null), war = all('velvet', { a: 'velvet', d: 'glasshouse' });
+  S.turfs.forEach((t, j) => { t.own = keep[j][0]; t.war = keep[j][1]; }); uw.recompute();
+  return { own: own.rival, neutral: neutral.rival, rival: rival.rival, war: war.rival, police: own.police, policeWar: war.police };
+});
+check('…so its risk climbs from own ground (low) through neutral (moderate) and rival (high) to war (very high); police risk is separate and the same', risky.own < risky.neutral && risky.neutral < risky.rival && risky.rival < risky.war && risky.own <= 0.01 && risky.war >= 0.3 && risky.police === risky.policeWar && risky.police > 0, JSON.stringify(risky));
+// each disruption is real, saved state: a gang that intercepts keeps what it took, the rest goes on
+const inter = await ev(() => {
+  const g = window.game, uw = g.uw, S = uw.S, Sh = uw.shipments, w = uw.rivalwh.st('vipers');
+  Sh.D.list = Sh.D.list.filter(r => r.fid !== 'vipers'); w.stock = { green: 10 }; w.raid = null;
+  Sh.rivalDelivery('vipers', { green: 40 }); const r = window.__recs('supply', 'vipers')[0];
+  const i = uw.T.findIndex((t, j) => S.turfs[j].own === 'velvet'); const leg = { i, k: 'rival', x: uw.T[i].hang.x, z: uw.T[i].hang.z, p: 0.07 };
+  const v0 = S.factions.velvet.stock, sh0 = window.__shelf('vipers'), fs0 = S.factions.vipers.stock;
+  r.roll2 = 0.5; Sh.disrupt(r, leg);
+  const took = S.factions.velvet.stock - v0, shelf = window.__shelf('vipers') - sh0, street = S.factions.vipers.stock - fs0;
+  return { took, shelf, street, total: took + shelf + street, end: r.end, log: Sh.D.log.filter(e => e.id === r.id).map(e => e.end + (e.by ? ':' + e.by : '') + ':' + e.n) };
+});
+check('intercepted on another gang’s ground: they keep what they took (in their stock), the rest reaches the shelves — every lot accounted for', inter.took > 0 && inter.shelf > 0 && inter.total === 40 && inter.end === 'delivered' && inter.log.includes('intercepted:velvet:' + inter.took), JSON.stringify(inter));
+const delay = await ev(() => {
+  const uw = window.game.uw, S = uw.S, Sh = uw.shipments;
+  Sh.D.list = Sh.D.list.filter(r => r.fid !== 'vipers'); Sh.rivalDelivery('vipers', { green: 30 }); const r = window.__recs('supply', 'vipers')[0];
+  const i = uw.T.findIndex((t, j) => S.turfs[j].own === 'vipers'); const now = Sh.absHour();
+  Sh.disrupt(r, { i, k: 'own', x: uw.T[i].hang.x, z: uw.T[i].hang.z, p: 0.002 });
+  return { state: r.state, later: r.at - now, n: window.__u(r.cargo), inList: Sh.D.list.includes(r), log: Sh.D.log.filter(e => e.id === r.id).map(e => e.end) };
+});
+check('held up on their own ground: a delay, the cargo still in the record and the shipment still due (later)', delay.state === 'due' && delay.later >= 2 && delay.n === 30 && delay.inList && delay.log.includes('delayed'), JSON.stringify(delay));
+const police = await ev(() => {
+  const uw = window.game.uw, Sh = uw.shipments, r = window.__recs('supply', 'vipers')[0], n = window.__u(r.cargo);
+  r.roll = 0; Sh.travel(r, r.from);
+  return { end: r.end, n, left: window.__u(r.cargo), log: Sh.D.log.filter(e => e.id === r.id).map(e => e.end) };
+});
+check('stopped by police (their own roll): a logged seizure, not a silent loss', police.end === 'seized' && police.left === 0 && police.log.includes('seized'), JSON.stringify(police));
+// stranded on your turf: a saved opportunity, a real parked van when you come near, theirs again if you don't
+const strand = await ev(() => {
+  const g = window.game, uw = g.uw, S = uw.S, Sh = uw.shipments;
+  Sh.D.list = Sh.D.list.filter(r => r.fid !== 'vipers'); Sh.rivalDelivery('vipers', { green: 24, pills: 8 }); const r = window.__recs('supply', 'vipers')[0];
+  const i = uw.T.findIndex((t, j) => S.turfs[j].own === 'velvet'); S.turfs[i].own = 'pc'; uw.recompute();
+  const far = window.__far(); g.resetPlayerState(far.x, far.z, 0);
+  Sh.disrupt(r, { i, k: 'rival', x: uw.T[i].hang.x, z: uw.T[i].hang.z, p: 0.07 });
+  window.__SI = i;
+  g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.saveGame(true);
+  return { id: r.id, state: r.state, pos: r.pos, n: window.__u(r.cargo), live: Sh.live.has(r.id), opp: S.opps.some(o => /stranded/.test(o.title)) };
+});
+check('stuck on your turf: the van is stranded there (saved, with its load) and you hear about it', strand.state === 'stranded' && !!strand.pos && strand.n === 32 && strand.opp, JSON.stringify(strand));
+await reload();
+const strand2 = await ev(async (id) => {
+  const g = window.game, uw = g.uw, Sh = uw.shipments, r = Sh.find(id);
+  const before = { state: r && r.state, n: r ? window.__u(r.cargo) : 0 };
+  g.resetPlayerState(r.pos.x + 6, r.pos.z + 6, 0);
+  for (let k = 0; k < 20; k++) await new Promise(res => requestAnimationFrame(res));
+  const L = Sh.live.get(id), v = L && L.van;
+  const same = !!v && v.trunk === r.cargo, parked = !!v && v.driver !== 'npc';
+  if (v) { g.resetPlayerState(v.pos.x + 3, v.pos.z, 0); v.locked = false; g.completeEnter(v); Sh.update(0.1); }
+  return { before, live: !!L, same, parked, mine: !!v && g.player.vehicle === v, trunk: v ? window.__u(v.trunk) : 0, end: r.end, rec: window.__u(r.cargo) };
+}, strand.id);
+check('…after a reload it is still there; go near and it is a real parked van carrying exactly its load; take it and the load is yours', strand2.before.state === 'stranded' && strand2.before.n === 32 && strand2.live && strand2.same && strand2.mine && strand2.trunk === 32 && strand2.rec === 0 && strand2.end === 'stolen', JSON.stringify(strand2));
+await ev(() => { const g = window.game; if (g.player.state === 'vehicle') g.exitVehicle(true); });
+const recov = await ev(() => {
+  const g = window.game, uw = g.uw, S = uw.S, Sh = uw.shipments, w = uw.rivalwh.st('vipers');
+  Sh.D.list = Sh.D.list.filter(r => r.fid !== 'vipers'); w.stock = { green: 10 }; Sh.rivalDelivery('vipers', { green: 20 }); const r = window.__recs('supply', 'vipers')[0];
+  const i = uw.T.findIndex((t, j) => S.turfs[j].own === 'pc');
+  const far = window.__far(); g.resetPlayerState(far.x, far.z, 0);
+  Sh.disrupt(r, { i, k: 'rival', x: uw.T[i].hang.x, z: uw.T[i].hang.z, p: 0.07 });
+  const sh0 = window.__shelf('vipers'), was = r.state;
+  r.until = Sh.absHour(); Sh.reroll = q => { q.roll = 0.999; q.roll2 = 0.5; }; Sh.tickHours(); delete Sh.reroll;
+  return { was, end: r.end, shelf: window.__shelf('vipers') - sh0, log: Sh.D.log.filter(e => e.id === r.id).map(e => e.end) };
+});
+check('leave it and their people fetch it when the window closes: it finishes its trip, every lot accounted for', recov.was === 'stranded' && recov.end === 'delivered' && recov.shelf === 20 && recov.log.includes('recovered'), JSON.stringify(recov));
+const site = await ev(() => { const g = window.game, uw = g.uw, C = g.world.compounds.rwh_vipers; return { d: Math.round(Math.hypot(C.center.x - 212, C.center.z - 488)) }; });
+check('the Vipers warehouse is outside the new-game start’s guard, raid and shipment radii (DC-34 ruling)', site.d > 380 + 40, JSON.stringify(site));
 
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await finish(b, 'shipment');

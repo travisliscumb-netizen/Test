@@ -566,10 +566,10 @@ class EmpireUI {
   }
   // IMPORTS (§3, §8): a bulk load at about half the wholesale price, landing at the docks; rank-gated
   importsHTML() {
-    const uw = this.uw, Sh = uw.shipments, imp = Sh.importOpen(), now = uw.runs.absHour(), P = Sh.importPoint();
+    const uw = this.uw, Sh = uw.shipments, imp = Sh.importOpen(), P = Sh.importPoint();
     let h = `<h3>Imports</h3><div class="hint">A whole load at about ${Math.round(IMPORT.price * 100)}% of the supplier’s price, paid up front from a vault. It lands at ${esc(P.name)} and the port holds it for a day: it becomes warehouse stock only when a Driver brings it in (a delivery from the quay) or you load it into a van or box truck and unload it at a warehouse. Customs open a container now and then.</div>`;
     if (imp) {
-      const st = imp.state === 'due' ? `at sea · lands in ~${Math.max(0, imp.at - now)}h` : `on the quay · ${Math.max(0, imp.until - now)}h before the port impounds it`;
+      const st = imp.state === 'due' ? `at sea · lands in ~${Sh.hoursTo(imp.at)}h` : `on the quay · ${Sh.hoursTo(imp.until)}h before the port impounds it`;
       return h + `<div class="card"><div class="t">${esc(goodsList(imp.cargo))}</div><div class="d">${st}</div><div class="stat"><span>Paid</span><span class="money">${fmtMoney(imp.paid)}</span></div></div>`;
     }
     h += '<div class="jobs">' + Object.keys(IMPORT.lots).map(k => {
