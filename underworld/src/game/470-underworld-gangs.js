@@ -96,6 +96,16 @@ class GangManager {
     g.peds.peds.push(p); gr.members.push(p);
     return p;
   }
+  // room under the cap for n more: retire ambient street groups (hangouts and buyers, never anyone fighting), farthest
+  // from you first. A raid's response (and anything else that must turn up) asks before it spawns.
+  makeRoom(n) {
+    const g = this.g, p = g.player, need = this.count() + n - GANG_CAP; if (need <= 0) return true;
+    const amb = [...this.groups.values()].filter(gr => (gr.kind === 'hang' || gr.kind === 'buy') && !gr.hostile && !gr.crew)
+      .sort((a, b) => dist2(b.x, b.z, p.pos.x, p.pos.z) - dist2(a.x, a.z, p.pos.x, p.pos.z));
+    let freed = 0;
+    for (const gr of amb) { if (freed >= need) break; freed += gr.members.length; this.removeGroup(gr); }
+    return this.count() + n <= GANG_CAP;
+  }
   spawnGroup(key, kind, fid, at, n, opts = {}) {
     if (this.groups.has(key)) return this.groups.get(key);
     const g = this.g;

@@ -48712,6 +48712,16 @@ class GangManager {
     g.peds.peds.push(p); gr.members.push(p);
     return p;
   }
+  // room under the cap for n more: retire ambient street groups (hangouts and buyers, never anyone fighting), farthest
+  // from you first. A raid's response (and anything else that must turn up) asks before it spawns.
+  makeRoom(n) {
+    const g = this.g, p = g.player, need = this.count() + n - GANG_CAP; if (need <= 0) return true;
+    const amb = [...this.groups.values()].filter(gr => (gr.kind === 'hang' || gr.kind === 'buy') && !gr.hostile && !gr.crew)
+      .sort((a, b) => dist2(b.x, b.z, p.pos.x, p.pos.z) - dist2(a.x, a.z, p.pos.x, p.pos.z));
+    let freed = 0;
+    for (const gr of amb) { if (freed >= need) break; freed += gr.members.length; this.removeGroup(gr); }
+    return this.count() + n <= GANG_CAP;
+  }
   spawnGroup(key, kind, fid, at, n, opts = {}) {
     if (this.groups.has(key)) return this.groups.get(key);
     const g = this.g;
@@ -52463,6 +52473,7 @@ class ThreatSystem {
       at = { x: C.gate.x - C.gate.n[0] * 12 + lat[0] * 7, z: C.gate.z - C.gate.n[1] * 12 + lat[1] * 7, h: Math.atan2(C.gate.n[0], C.gate.n[1]) };
       goal = { x: C.door.x, z: C.door.z };
     } else { at = { x: o.x, z: o.z, h: 0 }; goal = { x: o.x, z: o.z }; const c = g.world.randomCurbSpot(o.x, o.z, 30, 60); at.x = c.x; at.z = c.z; }
+    gs.makeRoom(n); // an attack turns up at its strength, not trimmed by the street crowd
     const gr = gs.spawnGroup('as' + o.id, 'assault', o.fid, at, n, {});
     if (!gr || !gr.members.length) return false;
     gr.hostile = true; gr.enemy = 'pc';
@@ -52658,6 +52669,7 @@ class RivalWarehouses {
     const key = fid + ':' + k; if (this.squads.has(key)) return;
     const g = this.g, uw = this.uw, C = this.C(fid), G = C.gate;
     const at = g.world.randomCurbSpot(G.x - G.n[0] * 30, G.z - G.n[1] * 30, 25, 60);
+    uw.gangs.makeRoom(n); // the response turns up at full strength, not trimmed by the street crowd
     const gr = uw.gangs.spawnGroup('rs:' + key, 'assault', fid, { x: at.x, z: at.z, h: at.h }, n, {});
     if (!gr) return;
     gr.hostile = true; gr.enemy = 'pc';

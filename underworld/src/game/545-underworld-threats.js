@@ -252,6 +252,7 @@ class ThreatSystem {
       at = { x: C.gate.x - C.gate.n[0] * 12 + lat[0] * 7, z: C.gate.z - C.gate.n[1] * 12 + lat[1] * 7, h: Math.atan2(C.gate.n[0], C.gate.n[1]) };
       goal = { x: C.door.x, z: C.door.z };
     } else { at = { x: o.x, z: o.z, h: 0 }; goal = { x: o.x, z: o.z }; const c = g.world.randomCurbSpot(o.x, o.z, 30, 60); at.x = c.x; at.z = c.z; }
+    gs.makeRoom(n); // an attack turns up at its strength, not trimmed by the street crowd
     const gr = gs.spawnGroup('as' + o.id, 'assault', o.fid, at, n, {});
     if (!gr || !gr.members.length) return false;
     gr.hostile = true; gr.enemy = 'pc';

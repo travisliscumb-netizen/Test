@@ -150,6 +150,7 @@ class RivalWarehouses {
     const key = fid + ':' + k; if (this.squads.has(key)) return;
     const g = this.g, uw = this.uw, C = this.C(fid), G = C.gate;
     const at = g.world.randomCurbSpot(G.x - G.n[0] * 30, G.z - G.n[1] * 30, 25, 60);
+    uw.gangs.makeRoom(n); // the response turns up at full strength, not trimmed by the street crowd
     const gr = uw.gangs.spawnGroup('rs:' + key, 'assault', fid, { x: at.x, z: at.z, h: at.h }, n, {});
     if (!gr) return;
     gr.hostile = true; gr.enemy = 'pc';
