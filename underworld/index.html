@@ -56241,7 +56241,9 @@ class HudLayout {
     // drop an element down from its preferred top until it overlaps nothing already placed.
     // Its real rect is re-measured after every move: a box's width can depend on where it sits.
     const conflict = (c) => { let low = -1; for (const q of placed) if (HudLayout.hit(c, q, 3)) low = Math.max(low, q.b); return low; };
-    const drop = (el, xmode, y0 = sf.t + 10) => {
+    // fit: a panel that would run past the bottom of the screen keeps to the room left and scrolls inside
+    const drop = (el, xmode, y0 = sf.t + 10, fit = false) => {
+      if (fit && el && el.style.maxHeight) { el.style.maxHeight = ''; el.style.overflowY = ''; }
       let r0 = R(el); if (!r0) return null;
       const xFor = (w, below) => {
         let x;
@@ -56261,12 +56263,17 @@ class HudLayout {
         y = low + gap;
         below = (tb ? y > tb.b : true) && (tr ? y > tr.b : true);
       }
+      if (fit && out && out.b > H - sf.b - 4) {
+        const room = Math.max(60, Math.floor(H - sf.b - 4 - out.t));
+        el.style.maxHeight = room + 'px'; el.style.overflowY = 'auto';
+        r0 = R(el) || r0; out = { l: r0.l, t: r0.t, r: r0.r, b: r0.b, w: r0.w, h: r0.h };
+      }
       placed.push(out); return out;
     };
     // the money feed hangs under the money cluster while it shows: right-hand cards drop below it
     const mf = $('moneyFeed');
     if (tr && mf && mf.classList.contains('on')) placed.push({ l: tr.l, r: tr.r, t: tr.b, b: tr.b + 4 + 4 * 22, w: tr.w, h: 92 });
-    drop($('jailHud'), 'center');
+    drop($('jailHud'), 'center', undefined, true);
     drop($('taxiHud'), 'center');
     drop($('objective'), 'center');
     drop($('tip'), 'center');
