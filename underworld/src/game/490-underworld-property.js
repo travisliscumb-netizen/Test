@@ -117,25 +117,6 @@ class PropertyManager {
     g.autosave('Property purchased');
     return '';
   }
-  // garage spots: one per owned property with garage space
-  garagePoints() {
-    const uw = this.uw, pl = uw.g.world.places, out = [];
-    for (const def of this.ownedList()) {
-      if (!def.garage) continue;
-      let p0;
-      if (def.place && pl[def.place] && pl[def.place].garage) p0 = pl[def.place].garage;
-      else { const L = uw.loc('prop', def.id); const c = curbNear(L.x + Math.sin(L.h) * 4, L.z + Math.cos(L.h) * 4, 6); p0 = { x: c.x, z: c.z, h: c.h }; }
-      out.push({ id: def.id, p: p0, name: def.name + ' garage' });
-    }
-    return out;
-  }
-  garageCap() { let n = 0; for (const def of this.ownedList()) n += def.garage || 0; return n; }
-  garageActionVehicle(v) {
-    const g = this.uw.g;
-    const gp = g.content.nearGarage(v.pos.x, v.pos.z, 4.2);
-    if (gp) return { label: 'Store vehicle in garage', act: () => g.content.storeVehicle(v, gp) };
-    return null;
-  }
   garageActionFoot() {
     const g = this.uw.g, p = g.player;
     const gp = g.content.nearGarage(p.pos.x, p.pos.z, 3.2);

@@ -1271,3 +1271,33 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       opportunity.
     - **Vehicle cargo persistence (deferred to Session 5).** No duplication is acceptable for now. Session 5 must
       make hijacked and stolen vehicle cargo persist through save/reload instead of disappearing.
+29. **Session 5 rulings (DC-35).**
+    - **Split.** Session 5 is two sessions under one design. Finish and regression-test 5A before 5B.
+      - **5A:** one persistent vehicle registry; physical parking slots with no overflow; saved street-parking
+        positions; stolen cars and their trunk cargo persist through save/reload; wreck recovery; unique and rare
+        vehicle safety and persistence.
+      - **5B:** HOT lifecycle; police recognition of HOT vehicles; dealer Buy / Steal; Chop Shop clean / repair /
+        respray / upgrade; Pay & Spray behavior; the physical impound lot; legal and illegal retrieval.
+    - **Home slots.** An owned vehicle temporarily parked on the street still occupies its assigned permanent
+      parking slot. Fleet size must never exceed the player's real physical parking capacity. Street parking is
+      temporary location state, not extra storage. The player cannot buy, clean, win or permanently keep another
+      vehicle by exploiting the temporarily empty bay.
+    - **Stolen vehicles: until recovered.** A stolen/HOT vehicle the player has interacted with persists with its
+      exact saved position, condition/damage, HOT state, trunk cargo and relevant identity.
+      - **Recovery:** if left unattended in public for about 24 economic hours, police may recover it. Recovery is
+        an explicit saved world event: the vehicle is removed and any cargo is logged as seized, never silently
+        deleted.
+      - **Bounds:** only player-relevant stolen vehicles persist, in a sensible bounded registry, not every stolen
+        car in the city.
+      - **Cargo:** a stolen vehicle used for a hijacked shipment or holding player cargo never loses that cargo to a
+        save/reload before the legitimate recovery event.
+    - **Impound: abandoned or seized.** An owned vehicle goes to the physical impound lot when:
+      - police seize it during an arrest or pursuit;
+      - police recover it after it has been abandoned in public for roughly 24 economic hours;
+      - it is found after a pursuit in which police positively identified and recovered it.
+
+      Unique and rare owned vehicles always go to impound instead of disappearing. Destroyed owned vehicles recover
+      through the persistent vehicle system as wrecks needing repair. If impound is the recovery location, that is
+      acceptable, but destruction must not feel like ordinary police seizure. Legal retrieval uses Clean Bank, with
+      a release fee that scales with vehicle value. Illegal retrieval through the physical impound lot is allowed
+      and creates police heat.

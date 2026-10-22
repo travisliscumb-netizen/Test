@@ -260,11 +260,14 @@ class ContentManager {
   }
   // ------------------------------------------------------------ garage v2
   get garageCap() { return this.g.uw ? this.g.uw.props.garageCap() : 0; }
+  // a new car in your fleet: it takes a free bay (at, or the first free one). No bay, no car: there is no storage
+  // beyond your real parking (§14, §45.29). Returns null when there is nowhere to put it.
   addToGarage(type, origin, color, quiet, at) {
-    const s = this.g.save;
-    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at: at || null, out: false };
+    const s = this.g.save, PM = this.g.uw && this.g.uw.props;
+    if (!at && PM) for (const def of PM.ownedList()) { const b = PM.freeBay(def); if (b) { at = { p: def.id, i: b.i }; break; } }
+    if (!at) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
+    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null };
     s.garage.push(e);
-    if (!e.at && this.g.uw) { this.g.uw.props.assignBays(); if (!e.at && !quiet) this.g.ui.toast('No free parking space: it waits in storage until you have room.', 'warn'); }
     if (!quiet) this.g.ui.toast(`${VEHICLES[type].name} added to your garage.`, 'money');
     if (s.garage.length >= 6) this.ach('fleet');
     this.g.autosave('Vehicle acquired');
@@ -293,7 +296,7 @@ class ContentManager {
       g.ui.toast(`${v.spec.name} parked at ${def.name}. It’s yours now${origin === 'stolen' ? ' — just don’t show it to the original owner' : ''}.`, 'money');
       if (v.rareFind) this.secret('rooftop');
     } else { e.at = { p: def.id, i: bay.i }; g.ui.toast(`${v.spec.name} parked at ${def.name} · ${PARK_LABEL[bay.kind] || 'space'} ${bay.i + 1}.`, 'money'); }
-    e.out = false; e.dmg = clamp(100 - v.health, 0, 100); e.color = v.colorHex;
+    e.out = false; e.loc = null; e.dmg = clamp(100 - v.health, 0, 100); e.color = v.colorHex;
     // one trunk, one place: the garage entry and the live car share the same goods object
     if (!v.trunk) v.trunk = e.trunk || {};
     e.trunk = v.trunk;
@@ -302,34 +305,29 @@ class ContentManager {
     g.exitVehicle(true);
     v.owned = true; v.touched = true; v.garageUid = e.uid; v.display = true; v.parked = true; v.sleep = true; v.mission = null;
     v.syncMesh(0);
-    if (g.garageDisplay) g.garageDisplay.cars.set(e.uid, v);
-    if (g.garageCar === v) g.garageCar = null;
+    // a tracked car (stolen, found) joins your fleet: one record for it from now on, its cash with it
+    if (g.vreg) { g.vreg.forget(v, 'owned'); g.vreg.cars.set(e.uid, v); }
     g.audio.play('door');
     g.autosave('Vehicle stored'); g.saveGame();
     if (g.campaign) g.campaign.onStored(e, gp);
     return true;
   }
-  // "take it out": the car is already standing in its bay; bring a car in storage to a free bay here
-  takeOut(uid, gp) {
-    const g = this.g, s = g.save, e = s.garage.find(x => x.uid === uid), PM = g.uw.props;
+  // where is it: a fleet car stands in its bay or where you left it; the way there goes on the map (there is no
+  // moving it anywhere but by driving it)
+  takeOut(uid) {
+    const g = this.g, s = g.save, e = s.garage.find(x => x.uid === uid);
     if (!e) return;
-    if (e.dmg >= 100) { g.ui.toast('That car is wrecked — repair it first.', 'warn'); g.audio.play('deny'); return; }
-    const def = gp && (gp.def || PROP_BY_ID[gp.id]);
-    if (def && (!e.at || e.at.p !== def.id)) { const b = PM.freeBay(def); if (b) { const old = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (old && old !== g.player.vehicle && g.vehicles.list.includes(old)) g.vehicles.despawn(old); e.at = { p: def.id, i: b.i }; } }
-    if (!e.at) { g.ui.toast('No free space at any of your properties. Sell a car or buy a place with more parking.', 'warn'); g.audio.play('deny'); return; }
-    e.out = false;
-    const b = PM.bays(PROP_BY_ID[e.at.p])[e.at.i];
-    const v = g.garageDisplay ? g.garageDisplay.spawnFor(e, b) : null;
-    g.garageCar = v;
-    const where = PROP_BY_ID[e.at.p];
-    g.ui.toast(`${VEHICLES[e.type].name} is at ${where.name} · ${PARK_LABEL[b.kind] || 'space'} ${b.i + 1}.`, 'money');
-    if (v && Math.hypot(b.x - g.player.pos.x, b.z - g.player.pos.z) > 40) this.setWaypoint(b.x, b.z, VEHICLES[e.type].name);
+    const w = g.vreg.where(e); if (!w) { g.ui.toast('It has no space of its own yet.', 'warn'); return; }
+    g.ui.toast(`${VEHICLES[e.type].name}: ${w.name}${e.dmg >= 100 ? ' (wrecked: repair it first)' : ''}.`, 'money');
+    if (Math.hypot(w.x - g.player.pos.x, w.z - g.player.pos.z) > 40) this.setWaypoint(w.x, w.z, VEHICLES[e.type].name);
     g.audio.play('confirm');
   }
   onVehicleGone(v) {
-    // owned cars that burn are not lost: they come back wrecked and need a repair
-    if (v.garageUid) { const e = this.g.save.garage.find(x => x.uid === v.garageUid); if (e) { const lost = e.trunk && units(e.trunk) ? goodsList(e.trunk) : ''; if (e.trunk) Inv.clear(e.trunk); e.dmg = 100; e.out = false; this.g.ui.toast(`Your ${v.spec.name} was towed back to ${e.at && PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p].name : 'storage'}. It needs serious repairs.${lost ? ' The cargo burned with it: ' + lost + '.' : ''}`, 'warn'); } }
-    else if (v.trunk && units(v.trunk) && v === this.g.player.lastVehicle) { this.g.ui.toast(`The cargo burned with the ${v.spec.name}: ${goodsList(v.trunk)}.`, 'warn'); Inv.clear(v.trunk); }
+    // owned cars that burn are not lost: they come back wrecked and need a repair; a tracked car's loss is logged
+    const g = this.g;
+    if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { const lost = g.vreg.wrecked(e, v); g.ui.toast(`Your ${v.spec.name} was wrecked. Your people will tow it home: it needs a repair.${lost ? ` The cargo burned: ${lost}.` : ''}`, 'warn'); } }
+    else if (v.trackId) { const lost = g.vreg.burned(v); if (lost) g.ui.toast(`The cargo burned with the ${v.spec.name}: ${lost}.`, 'warn'); }
+    else if (v.trunk && units(v.trunk) && v === g.player.lastVehicle) { g.ui.toast(`The cargo burned with the ${v.spec.name}: ${goodsList(v.trunk)}.`, 'warn'); Inv.clear(v.trunk); }
   }
   // ------------------------------------------------------------ service screens
   _bindUI() {
@@ -366,13 +364,14 @@ class ContentManager {
     const card = (e, here) => {
       const v = VEHICLES[e.type], wrecked = e.dmg >= 100, rcost = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0;
       const tuneLv = TUNE.map(t => e.tune[t.id]).reduce((a, b) => a + b, 0);
-      const loc = e.at ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'In storage (no free space)';
-      const move = !here && PM.freeBay(def) ? `<button class="sbtn" data-act="out:${e.uid}">${e.at ? 'Move here' : 'Park here'}</button>` : '';
-      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}${e.out ? ' · out on the street' : ''}</div>${this._bars(e.type, e.tune)}
+      // its home space, and where it actually is (the street, if that's where you left it)
+      const home = e.at && PROP_BY_ID[e.at.p] ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'No space of its own: buy more parking';
+      const w = g.vreg.where(e), loc = e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
+      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
-        <div class="btns">${here ? `<button class="sbtn gold" data-act="out:${e.uid}" ${wrecked ? 'disabled' : ''}>${wrecked ? 'Wrecked' : 'Where is it?'}</button>` : move}
+        <div class="btns"><button class="sbtn${here && !e.out ? ' gold' : ''}" data-act="out:${e.uid}">${wrecked ? 'Wrecked · where is it?' : 'Where is it?'}</button>
         ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${!Money.can(rcost, 'garage') ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
         <button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button></div></div>`;
     };
@@ -383,12 +382,15 @@ class ContentManager {
       return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html('garage')}</span></div>
         <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
         <div class="grid2">${here.map(e => card(e, true)).join('') || '<div class="hint">Nothing parked here. Drive a car into a free space and stop to park it.</div>'}</div>
-        ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}`;
+        ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}
+        ${(s.pendingCars || []).length ? `<h3>Waiting for a space</h3><div class="jobs">${s.pendingCars.map((P, i) => `<div class="job"><i>⏳</i><div><b>${esc(VEHICLES[P.type].name)}</b><span>${P.from ? 'With ' + esc(P.from) + ': ' : ''}yours when you have a free space</span></div><button class="sbtn" data-act="collect:${i}" ${g.vreg.freeBays() > 0 ? '' : 'disabled'}>Collect</button></div>`).join('')}</div>` : ''}`;
     };
-    this.openSvc(def.name, 'Stored cars stand in their spaces: get in and drive off to use one. Drive into a free space and stop to park. Cars you leave around town are towed home.', render, act => {
-      const [k, id] = act.split(':'), uid = +id, e = s.garage.find(x => x.uid === uid); if (!e) return;
-      if (k === 'out') { this.takeOut(uid, gp); g.ui.back(); return; }
-      if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (dv) { dv.health = 100; dv.burnt = false; } }
+    this.openSvc(def.name, 'Each car has its own space, kept for it even while it is out. Drive into a free space and stop to park. A car you leave around town stays where you left it.', render, act => {
+      const [k, id] = act.split(':'), uid = +id;
+      if (k === 'collect') { const r = g.vreg.collect(uid); this.refreshSvc(r || 'Collected: it is in its space.'); return; }
+      const e = s.garage.find(x => x.uid === uid); if (!e) return;
+      if (k === 'out') { this.takeOut(uid); g.ui.back(); return; }
+      if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.vreg.live(e); if (dv) { dv.health = 100; dv.burnt = false; } }
       if (k === 'sell') {
         const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
         if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
@@ -396,8 +398,7 @@ class ContentManager {
         g.ui.ask(`Sell the ${VEHICLES[e.type].name}?`, `You'll get ${fmtMoney(sale.total)}${e.origin === 'stolen' ? ' in cash: it’s stolen, so nobody legit will pay you for it' : sale.dirty && sale.clean ? `: ${fmtMoney(sale.clean)} into your bank and ${fmtMoney(sale.dirty)} in cash, as you paid for it` : sale.dirty ? ' in cash: you paid for it in cash' : ' into your bank'}. ${e.origin === 'reward' || e.origin === 'found' ? 'Special cars can’t be bought back.' : ''}`, 'Sell', () => {
           const i = s.garage.indexOf(e); if (i < 0) return;
           for (const v of g.vehicles.list.slice()) if (v.garageUid === e.uid && v !== g.player.vehicle) g.vehicles.despawn(v);
-          if (g.garageDisplay) g.garageDisplay.cars.delete(e.uid);
-          if (g.garageCar && g.garageCar.garageUid === e.uid) g.garageCar = null;
+          g.vreg.cars.delete(e.uid);
           if (e.trunk && units(e.trunk) && g.uw) { const r = g.uw.unloadTrunk(e); if (r) g.ui.toast(r, 'money'); }
           Money.emptyCar(e.uid); // cash kept in its trunk comes out with you
           // a stolen car sells for Dirty Cash (§45.22); a bought one pays back in the money it was bought with (§45.24)

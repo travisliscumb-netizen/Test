@@ -66,8 +66,8 @@ await ev(() => { const g = window.game, h = g.world.homes.find(x => x.propId ===
 await frames(page, 40);
 const reapp = await ev(() => window.game.vehicles.list.filter(v => v.garageUid && v.display).length);
 check('after reloading, the stored cars are back in the garage when you arrive', reapp === 2, reapp + ' shown');
-const mig = await ev(() => { const g = window.game; g.save.garage.push({ uid: 9001, type: 'muscle', color: 0x222222, origin: 'bought', dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 } }); g.uw.props.assignBays(); const e = g.save.garage.find(x => x.uid === 9001); const r = { at: e.at }; g.save.garage.pop(); return r; });
-check('a car from an old save (no bay) is given a free bay or waits in storage', mig.at === null || (mig.at && typeof mig.at.p === 'string'), JSON.stringify(mig));
+const mig = await ev(() => { const g = window.game; g.save.garage.push({ uid: 9001, type: 'muscle', color: 0x222222, origin: 'bought', dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 } }); g.vreg.house(); const e = g.save.garage.find(x => x.uid === 9001); const r = { at: e.at, loc: !!e.loc, out: e.out }; g.save.garage.pop(); return r; });
+check('a car from an old save (no bay) is given a free bay, or stands on the street by your place until one frees up (never "in storage")', (mig.at && typeof mig.at.p === 'string') || (mig.at === null && mig.loc && mig.out), JSON.stringify(mig));
 
 // 4. the mansion: drive into the motor court, park, take the stairs up, come back, drive out
 await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; g.uw.S.props.penthouse = { owned: true, dmg: 0, since: 1 }; g.save.owns.penthouse = true; (g.money.W.clean = g.money.W.dirty.me = 5e6); const D = g.vspaces.byProp('mansion'), S = D.street; g.resetPlayerState(S.x + 3, S.z + 14, 0); const v = g.vehicles.spawn('sports', S.x, S.z + 14, Math.PI, { parked: true }); v.touched = true; g.completeEnter(v); });

@@ -1230,7 +1230,7 @@ class VSpaces {
       else { p.pos.set(D.foot.x, VY, D.foot.z); p.h = D.foot.h; p.vel.set(0, 0, 0); p.onGround = true; }
       p.interior = { id: 'vs:' + D.id, floor: VY, vspace: D.id, def: D.def };
       g.cam.yaw = v ? v.h : D.foot.h; g.cam.pitch = -0.15; g.cam.init = false;
-      if (g.garageDisplay) g.garageDisplay.t = 0;
+      if (g.vreg) g.vreg.t = 0;
       g.ui.toast(D.name); g.audio.play('door');
     });
   }
@@ -1244,7 +1244,7 @@ class VSpaces {
       if (v) { v.pos.set(x, groundY(x, z), z); v.h = h; v.vel.set(Math.sin(h) * 3, Math.cos(h) * 3); v.yawRate = 0; v.syncMesh(0); p.pos.set(x, v.pos.y, z); }
       else { p.pos.set(S.x + f[0] * 2.4, groundY(S.x + f[0] * 2.4, S.z + f[1] * 2.4), S.z + f[1] * 2.4); p.h = h; p.vel.set(0, 0, 0); }
       g.cam.yaw = h; g.cam.pitch = -0.12; g.cam.init = false;
-      if (g.garageDisplay) g.garageDisplay.t = 0;
+      if (g.vreg) g.vreg.t = 0;
       g.audio.play('door');
     });
   }

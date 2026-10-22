@@ -166,19 +166,6 @@ Object.assign(PropertyManager.prototype, {
     }
     return out;
   },
-  // every save entry sits in a bay of a property you own; anything left over waits in storage
-  assignBays() {
-    const s = this.uw.g.save, taken = new Set();
-    for (const e of s.garage) {
-      const def = e.at && PROP_BY_ID[e.at.p];
-      const ok = def && this.owned(def.id) && this.bays(def)[e.at.i] && !taken.has(def.id + ':' + e.at.i);
-      if (ok) taken.add(def.id + ':' + e.at.i); else e.at = null;
-    }
-    for (const e of s.garage) {
-      if (e.at) continue;
-      for (const def of this.ownedList()) { const b = this.bays(def).find(x => !taken.has(def.id + ':' + x.i)); if (b) { e.at = { p: def.id, i: b.i }; taken.add(def.id + ':' + b.i); break; } }
-    }
-  },
   nearFreeBay(x, z, y, r = 3.6) {
     let best = null, bd = r;
     for (const def of this.ownedList()) for (const b of this.bays(def)) {
@@ -252,7 +239,8 @@ class DealerLots {
   cantBuy(lot, c) {
     const g = this.g, s = g.save, C2 = g.content;
     if (lot !== 'used' && s.rep < (CAR_REP[c.type] || 0)) return `Needs ${CAR_REP[c.type]} Rep`;
-    if (s.garage.length >= C2.garageCap) return C2.garageCap ? 'Garage full' : 'You need a place with parking';
+    // a free space of its own (a car out on the street keeps its space: §45.29)
+    if (!g.vreg.freeBays()) return C2.garageCap ? 'No free parking space' : 'You need a place with parking';
     // Saltworks is a shady lot that takes cash or the bank; the licensed dealers take the bank only (§13)
     if (!Money.can(c.price, lot === 'used' ? 'usedLot' : 'dealer')) return `Costs ${fmtMoney(c.price)}${lot === 'used' ? '' : ' from your bank'}`;
     if (lot !== 'used' && g.police.level > 0) return 'Not with the police on you';
@@ -265,7 +253,7 @@ class DealerLots {
     // record what paid for it, by currency (Saltworks takes Dirty Cash first, then the bank): its provenance (§45.24)
     const me0 = Money.onMe, cl0 = Money.clean;
     Money.pay(c.price, lot === 'used' ? 'usedLot' : 'dealer'); s.stats.carsBought = (s.stats.carsBought || 0) + 1;
-    const e = C2.addToGarage(c.type, 'bought', c.color, true);
+    const e = C2.addToGarage(c.type, 'bought', c.color, true); if (!e) return 'No free parking space';
     e.prov = { dirty: Math.round((me0 - Money.onMe) * 100) / 100, clean: Math.round((cl0 - Money.clean) * 100) / 100 };
     e.dmg = clamp(100 - c.cond, 0, 100); e.vtier = c.vtier;
     st.cars[i] = null;
@@ -275,11 +263,12 @@ class DealerLots {
     if (!v) v = g.vehicles.spawn(c.type, sl.x, sl.z, sl.h, { parked: true, color: c.color, vtier: c.vtier });
     v.locked = false; v.dealer = null; v.display = false; v.owned = true; v.touched = true; v.legit = true; v.garageUid = e.uid; v.origin = 'bought'; v.tune = e.tune;
     v.health = Math.max(1, c.cond); v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[c.type].special;
-    e.out = true;
-    if (g.garageDisplay) g.garageDisplay.cars.set(e.uid, v);
+    // it stands on the lot until you drive it home: out, at the stall (its space is kept for it)
+    e.out = true; e.loc = { x: sl.x, z: sl.z, h: sl.h, y: v.pos.y };
+    g.vreg.cars.set(e.uid, v);
     g.audio.play('cash');
     g.ui.banner(VEHICLES[c.type].name, `Yours · ${fmtMoney(c.price)}`, 'pass', 2.6);
-    g.ui.toast(e.at ? `Keys are in it. When you park it at ${PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p].name : 'home'} it’s saved there.` : 'Keys are in it. No free parking space at home yet: it waits in storage when you leave it.', 'money');
+    g.ui.toast(`Keys are in it. Its space is at ${PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p].name : 'home'}; wherever you leave it, it stays.`, 'money');
     g.saveGame(true);
     return '';
   }
@@ -321,52 +310,4 @@ class DealerLots {
       });
     }
   }
-}
-
-/* The stored cars you can see: spawned in their bays near you, taken out by driving off,
-   towed home when abandoned far away. */
-class GarageDisplay {
-  constructor(g) { this.g = g; this.cars = new Map(); this.t = 0; }
-  get PM() { return this.g.uw.props; }
-  entryOf(v) { return v.garageUid ? this.g.save.garage.find(e => e.uid === v.garageUid) : null; }
-  bayPos(e) { const def = PROP_BY_ID[e.at.p]; return def ? this.PM.bays(def)[e.at.i] : null; }
-  spawnFor(e, b) {
-    const g = this.g;
-    for (const v of g.vehicles.list) if (v.garageUid === e.uid) { v.trunk = e.trunk || (e.trunk = {}); return v; }
-    // clear anything parked in the bay first (never the player's car)
-    for (const v of g.vehicles.nearby(b.x, b.z, 4)) if (v !== g.player.vehicle && !v.garageUid && !v.mission && Math.hypot(v.pos.x - b.x, v.pos.z - b.z) < 3 && Math.abs(v.pos.y - (b.y ?? v.pos.y)) < 2) g.vehicles.despawn(v);
-    const v = g.vehicles.spawn(e.type, b.x, b.z, b.h, { parked: true, color: e.color, y: b.y, vtier: e.vtier || VEHICLES[e.type].tier });
-    v.owned = true; v.touched = true; v.garageUid = e.uid; v.tune = e.tune; v.origin = e.origin; v.health = Math.max(1, 100 - e.dmg);
-    v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[e.type].special; v.display = true;
-    if (e.dmg >= 100) { v.health = 0; v.burnt = false; }
-    this.cars.set(e.uid, v);
-    return v;
-  }
-  update(dt) {
-    const g = this.g, s = g.save, p = g.player; if (!g.uw || g.state !== 'playing') return;
-    this.t -= dt; if (this.t > 0) return; this.t = 0.4;
-    if (s.garage.some(e => !e.at)) this.PM.assignBays();
-    const px = p.pos.x, pz = p.pos.z, py = p.pos.y;
-    for (const e of s.garage) {
-      if (!e.at) continue;
-      const b = this.bayPos(e); if (!b) continue;
-      const v = this.cars.get(e.uid);
-      const alive = v && g.vehicles.list.includes(v) && v.garageUid === e.uid;
-      if (!alive) this.cars.delete(e.uid);
-      else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});
-      // in use: leaving the bay takes the car out; it stays yours wherever you leave it
-      if (alive && !e.out) { const d = Math.hypot(v.pos.x - b.x, v.pos.z - b.z); if (d > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3) { e.out = true; v.display = false; g.autosave('Vehicle taken out'); } }
-      if (alive && e.out) {
-        e.dmg = clamp(100 - v.health, 0, 100);
-        const far = Math.hypot(v.pos.x - px, v.pos.z - pz) > 340 && v !== p.vehicle && v !== p.lastVehicle;
-        if (far && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.cars.delete(e.uid); e.out = false; }
-        continue;
-      }
-      if (e.out && !alive) e.out = false; // gone without us noticing: it is back in its bay
-      const near = Math.hypot(b.x - px, b.z - pz) < 150 && Math.abs((b.y ?? 0) - py) < (b.kind === 'under' ? 20 : 60) && (b.kind === 'under' ? p.interior && p.interior.vspace === b.space : !(p.interior && p.interior.vspace));
-      if (near && !alive) this.spawnFor(e, b);
-      else if (!near && alive && v !== p.vehicle && v !== p.lastVehicle && !e.out) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
-    }
-  }
-  clearAll() { for (const v of this.cars.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.cars.clear(); }
 }

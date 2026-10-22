@@ -155,8 +155,9 @@ const SaveSystem = {
       for (const k in e.tune) e.tune[k] = clamp(e.tune[k] | 0, 0, 3);
       e.trunk = Inv.clean(e.trunk, (v, def, lo, hi) => (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, hi) : def);
       e.at = e.at && typeof e.at === 'object' && typeof e.at.p === 'string' && Number.isInteger(e.at.i) && e.at.i >= 0 ? { p: e.at.p, i: e.at.i } : null;
-      e.out = false; // every car is back in its bay when a save loads
     }
+    // where each car is (its home bay e.at, or e.loc on the street), the tracked stolen cars, cars waiting for space
+    VehicleRegistry.sanitize(d);
     for (const k of ['pistol', 'smg', 'shotgun', 'bat']) d.weapons[k] = !!d.weapons[k];
     // where each gun is: null = on you; a property id = in that property's stash
     if (!d.wloc || typeof d.wloc !== 'object') d.wloc = {};

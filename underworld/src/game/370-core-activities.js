@@ -42,7 +42,7 @@ class StuntTracker {
       g.content.addRep(15);
       if (n === 5) {
         this.g.ach('jump5');
-        if (!s.flags.mesaGiven) { s.flags.mesaGiven = true; g.content.addToGarage('offroad', 'reward', 0xa0381e); g.content.phone('tull', 'Five jumps! Kid, you’re nuts. I left a Mesa Trail in your garage — it lands like a cat.'); }
+        if (!s.flags.mesaGiven) { s.flags.mesaGiven = true; g.vreg.give('offroad', 'reward', 0xa0381e, 'Tull'); g.content.phone('tull', 'Five jumps! Kid, you’re nuts. I left a Mesa Trail in your garage — it lands like a cat.'); }
       }
       if (n >= tot) g.ach('jumpall');
     }

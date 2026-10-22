@@ -71,7 +71,8 @@ const Money = {
     return {
       v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX),
       treasury: typeof w.treasury === 'string' && PROP_BY_ID[w.treasury] && PROP_BY_ID[w.treasury].kind === 'warehouse' ? w.treasury : null,
-      dirty: { me: num(D.me), veh: map(D.veh, k => /^\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
+      // a car's cash is keyed by its fleet uid, or 't<id>' for a tracked car you don't own (Session 5A)
+      dirty: { me: num(D.me), veh: map(D.veh, k => /^t?\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
       stunt: { day: w.stunt && Number.isFinite(w.stunt.day) ? Math.floor(w.stunt.day) : -1, paid: w.stunt ? num(w.stunt.paid) : 0 }
     };
   },
@@ -85,8 +86,10 @@ const Money = {
   dirtyInCar(uid) { return this.W.dirty.veh[uid] || 0; },
   dirtyTotal() { const D = this.W.dirty; let t = D.me; for (const k in D.veh) t += D.veh[k]; for (const k in D.prop) t += D.prop[k]; return t; },
   total() { return this.dirtyTotal() + this.W.clean; },
-  // cash in a live vehicle: an owned car keeps it in the wallet (saved), any other car on the vehicle itself
-  carCash(v) { return v ? (v.garageUid ? this.dirtyInCar(v.garageUid) : (+v.cash || 0)) : 0; },
+  // the wallet key of a car: an owned car's fleet uid, a tracked car's 't<id>' (both saved), none for any other car
+  uidOf(v) { return v ? (v.garageUid || (v.trackId ? 't' + v.trackId : 0)) : 0; },
+  // cash in a live vehicle: an owned or tracked car keeps it in the wallet (saved), any other car on the vehicle itself
+  carCash(v) { const u = this.uidOf(v); return v ? (u ? this.dirtyInCar(u) : (+v.cash || 0)) : 0; },
   // room left for Dirty Cash at a place: a warehouse vault is limited by its vault tier (§7); a safehouse stash isn't
   roomAt(key) { if (!key.startsWith('p:')) return Infinity; const id = key.slice(2), d = PROP_BY_ID[id]; return d && d.kind === 'warehouse' && this.uw && this.uw.whse ? Math.max(0, this.uw.whse.vaultCap(id) - this._get(key)) : Infinity; },
   canHoldCash(id) { const d = PROP_BY_ID[id]; return !!(d && DIRTY_PROP_KINDS.has(d.kind) && this.uw && this.uw.props.owned(id)); },
@@ -259,14 +262,18 @@ const Money = {
   // police take what you carry and what is in the car you were caught in (§2). Stashes, vaults and the bank stay.
   seize(veh) {
     let n = this._get('me'); this._set('me', 0);
-    if (veh) { if (veh.garageUid) { n += this.dirtyInCar(veh.garageUid); this._set('car:' + veh.garageUid, 0); } else { n += +veh.cash || 0; delete veh.cash; } }
+    if (veh) { const u = this.uidOf(veh); if (u) { n += this.dirtyInCar(u); this._set('car:' + u, 0); } else { n += +veh.cash || 0; delete veh.cash; } }
     if (n > 0) this._emit('dirty', -n, 'seized');
     return n;
   },
   // a live car you don't own that becomes yours keeps the cash in it; a car you own that leaves your fleet hands
   // its cash to whoever is selling it (you, in person)
   adoptCar(v, uid) { const c = +v.cash || 0; delete v.cash; if (c > 0) this.W.dirty.veh[uid] = Math.round(((this.W.dirty.veh[uid] || 0) + c) * 100) / 100; },
-  emptyCar(uid, v) { let c = 0; if (uid) { c = this.dirtyInCar(uid); this._set('car:' + uid, 0); } else if (v) { c = +v.cash || 0; delete v.cash; } if (c > 0) { this.W.dirty.me += c; this._emit('dirty', c, 'move'); } return c; },
+  emptyCar(uid, v) { let c = 0; if (!uid && v) uid = this.uidOf(v); if (uid) { c = this.dirtyInCar(uid); this._set('car:' + uid, 0); } else if (v) { c = +v.cash || 0; delete v.cash; } if (c > 0) { this.W.dirty.me += c; this._emit('dirty', c, 'move'); } return c; },
+  // a tracked car that joins your fleet: its cash moves to the fleet key (the same money, the same car)
+  rekeyCar(from, to) { const c = this.dirtyInCar(from); this._set('car:' + from, 0); if (c > 0) this.W.dirty.veh[to] = Math.round(((this.W.dirty.veh[to] || 0) + c) * 100) / 100; },
+  // police recovered a tracked car: its cash goes with it (seized, Session 5A)
+  seizeCar(uid) { const c = this.dirtyInCar(uid); this._set('car:' + uid, 0); if (c > 0) this._emit('dirty', -c, 'seized'); return c; },
   // crew theft takes Dirty Cash only from the stashes the crew can reach (warehouse vaults, safehouses), never
   // from your pockets or the bank (§45.18). frac of what they can reach, plus a flat amount, up to cap.
   crewTheft(frac, plus, cap) {

@@ -283,6 +283,7 @@ class Underworld {
     if (this.threats) this.threats.reset();
     if (this.rivalwh) this.rivalwh.reset();
     if (this.shipments) this.shipments.reset();
+    if (this.g.vreg) this.g.vreg.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -552,7 +553,7 @@ class Underworld {
       if (!v || v.burnt || !g.vehicles.list.includes(v) || !(CARGO_LB[v.type] > 0) || v.dealer) return;
       if (!v.trunk) v.trunk = {};
       if (seen.has(v.trunk)) return; seen.add(v.trunk);
-      trunks.push({ key: v.garageUid ? 'car:' + v.garageUid : 'veh', o: v.trunk, type: v.type, v, uid: v.garageUid || 0, zone: zone(v.pos.x, v.pos.z), where: why || '' });
+      trunks.push({ key: v.garageUid ? 'car:' + v.garageUid : 'veh', o: v.trunk, type: v.type, v, uid: Money.uidOf(v), zone: zone(v.pos.x, v.pos.z), where: why || '' });
     };
     const reach = A.inside ? 24 : 14;
     const cur = p.state === 'vehicle' ? p.vehicle : null;
@@ -686,7 +687,7 @@ class Underworld {
     const pay = this.chopValue(v), wanted = S.chopWanted.includes(v.type);
     const lost = units(v.trunk);
     Money.emptyCar(0, v); // cash left in a stolen car comes out with you; the cargo stays with the car
-    g.exitVehicle(true); g.vehicles.despawn(v);
+    g.exitVehicle(true); if (g.vreg) g.vreg.forget(v, 'sold'); g.vehicles.despawn(v);
     g.earn(pay, 'chop'); S.st.chopped++; this.addRep(wanted ? 25 : 10, null);
     if (wanted) S.chopWanted = S.chopWanted.filter(t => t !== v.type);
     g.ui.toast(`Chop shop paid ${fmtMoney(pay)} for the ${v.spec.name}${wanted ? ' (on the wanted list)' : ''}.${lost ? ' Whatever was in the trunk is theirs now.' : ''}`, 'money');

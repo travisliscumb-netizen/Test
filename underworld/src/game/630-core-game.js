@@ -68,7 +68,7 @@ class Game {
     this.player.applyOutfit(this.save.outfit);
     this.ui = new UIManager(this);
     this.uw = new Underworld(this);
-    this.garageDisplay = new GarageDisplay(this);
+    this.vreg = new VehicleRegistry(this);
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -248,9 +248,10 @@ class Game {
     if (this.state !== 'menu' && this.state !== 'loading') this.save.vest = Math.round(clamp(p.vest || 0, 0, VEST_MAX) * 10) / 10;
     if (this.state === 'menu' || this.state === 'loading') { /* new career: keep the default start */ }
     else if (!jail && !p.interior && (p.state === 'foot' || p.state === 'vehicle') && isFinite(p.pos.x)) {
-      // a vehicle save restores you standing beside it (owned cars are in the garage list)
+      // a vehicle save restores you standing beside it (the car itself is in the vehicle registry)
       this.save.pos = { x: p.pos.x, z: p.pos.z, h: p.h };
     } else if (p.interior && p.interior.id !== 'prison') { const d = p.interior.def.door; this.save.pos = { x: d.x + Math.sin(d.h) * 2, z: d.z + Math.cos(d.h) * 2, h: d.h }; }
+    if (this.vreg) this.vreg.sync(); // every kept car where it stands now
     const ok = SaveSystem.save(this.save);
     if (ok) this.lastSave = performance.now();
     return ok;
@@ -637,7 +638,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.garageDisplay.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);

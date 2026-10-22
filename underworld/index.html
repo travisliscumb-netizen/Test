@@ -33160,8 +33160,9 @@ const SaveSystem = {
       for (const k in e.tune) e.tune[k] = clamp(e.tune[k] | 0, 0, 3);
       e.trunk = Inv.clean(e.trunk, (v, def, lo, hi) => (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, hi) : def);
       e.at = e.at && typeof e.at === 'object' && typeof e.at.p === 'string' && Number.isInteger(e.at.i) && e.at.i >= 0 ? { p: e.at.p, i: e.at.i } : null;
-      e.out = false; // every car is back in its bay when a save loads
     }
+    // where each car is (its home bay e.at, or e.loc on the street), the tracked stolen cars, cars waiting for space
+    VehicleRegistry.sanitize(d);
     for (const k of ['pistol', 'smg', 'shotgun', 'bat']) d.weapons[k] = !!d.weapons[k];
     // where each gun is: null = on you; a property id = in that property's stash
     if (!d.wloc || typeof d.wloc !== 'object') d.wloc = {};
@@ -33308,7 +33309,8 @@ const Money = {
     return {
       v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX),
       treasury: typeof w.treasury === 'string' && PROP_BY_ID[w.treasury] && PROP_BY_ID[w.treasury].kind === 'warehouse' ? w.treasury : null,
-      dirty: { me: num(D.me), veh: map(D.veh, k => /^\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
+      // a car's cash is keyed by its fleet uid, or 't<id>' for a tracked car you don't own (Session 5A)
+      dirty: { me: num(D.me), veh: map(D.veh, k => /^t?\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
       stunt: { day: w.stunt && Number.isFinite(w.stunt.day) ? Math.floor(w.stunt.day) : -1, paid: w.stunt ? num(w.stunt.paid) : 0 }
     };
   },
@@ -33322,8 +33324,10 @@ const Money = {
   dirtyInCar(uid) { return this.W.dirty.veh[uid] || 0; },
   dirtyTotal() { const D = this.W.dirty; let t = D.me; for (const k in D.veh) t += D.veh[k]; for (const k in D.prop) t += D.prop[k]; return t; },
   total() { return this.dirtyTotal() + this.W.clean; },
-  // cash in a live vehicle: an owned car keeps it in the wallet (saved), any other car on the vehicle itself
-  carCash(v) { return v ? (v.garageUid ? this.dirtyInCar(v.garageUid) : (+v.cash || 0)) : 0; },
+  // the wallet key of a car: an owned car's fleet uid, a tracked car's 't<id>' (both saved), none for any other car
+  uidOf(v) { return v ? (v.garageUid || (v.trackId ? 't' + v.trackId : 0)) : 0; },
+  // cash in a live vehicle: an owned or tracked car keeps it in the wallet (saved), any other car on the vehicle itself
+  carCash(v) { const u = this.uidOf(v); return v ? (u ? this.dirtyInCar(u) : (+v.cash || 0)) : 0; },
   // room left for Dirty Cash at a place: a warehouse vault is limited by its vault tier (§7); a safehouse stash isn't
   roomAt(key) { if (!key.startsWith('p:')) return Infinity; const id = key.slice(2), d = PROP_BY_ID[id]; return d && d.kind === 'warehouse' && this.uw && this.uw.whse ? Math.max(0, this.uw.whse.vaultCap(id) - this._get(key)) : Infinity; },
   canHoldCash(id) { const d = PROP_BY_ID[id]; return !!(d && DIRTY_PROP_KINDS.has(d.kind) && this.uw && this.uw.props.owned(id)); },
@@ -33496,14 +33500,18 @@ const Money = {
   // police take what you carry and what is in the car you were caught in (§2). Stashes, vaults and the bank stay.
   seize(veh) {
     let n = this._get('me'); this._set('me', 0);
-    if (veh) { if (veh.garageUid) { n += this.dirtyInCar(veh.garageUid); this._set('car:' + veh.garageUid, 0); } else { n += +veh.cash || 0; delete veh.cash; } }
+    if (veh) { const u = this.uidOf(veh); if (u) { n += this.dirtyInCar(u); this._set('car:' + u, 0); } else { n += +veh.cash || 0; delete veh.cash; } }
     if (n > 0) this._emit('dirty', -n, 'seized');
     return n;
   },
   // a live car you don't own that becomes yours keeps the cash in it; a car you own that leaves your fleet hands
   // its cash to whoever is selling it (you, in person)
   adoptCar(v, uid) { const c = +v.cash || 0; delete v.cash; if (c > 0) this.W.dirty.veh[uid] = Math.round(((this.W.dirty.veh[uid] || 0) + c) * 100) / 100; },
-  emptyCar(uid, v) { let c = 0; if (uid) { c = this.dirtyInCar(uid); this._set('car:' + uid, 0); } else if (v) { c = +v.cash || 0; delete v.cash; } if (c > 0) { this.W.dirty.me += c; this._emit('dirty', c, 'move'); } return c; },
+  emptyCar(uid, v) { let c = 0; if (!uid && v) uid = this.uidOf(v); if (uid) { c = this.dirtyInCar(uid); this._set('car:' + uid, 0); } else if (v) { c = +v.cash || 0; delete v.cash; } if (c > 0) { this.W.dirty.me += c; this._emit('dirty', c, 'move'); } return c; },
+  // a tracked car that joins your fleet: its cash moves to the fleet key (the same money, the same car)
+  rekeyCar(from, to) { const c = this.dirtyInCar(from); this._set('car:' + from, 0); if (c > 0) this.W.dirty.veh[to] = Math.round(((this.W.dirty.veh[to] || 0) + c) * 100) / 100; },
+  // police recovered a tracked car: its cash goes with it (seized, Session 5A)
+  seizeCar(uid) { const c = this.dirtyInCar(uid); this._set('car:' + uid, 0); if (c > 0) this._emit('dirty', -c, 'seized'); return c; },
   // crew theft takes Dirty Cash only from the stashes the crew can reach (warehouse vaults, safehouses), never
   // from your pockets or the bank (§45.18). frac of what they can reach, plus a flat amount, up to cap.
   crewTheft(frac, plus, cap) {
@@ -44202,7 +44210,7 @@ class VSpaces {
       else { p.pos.set(D.foot.x, VY, D.foot.z); p.h = D.foot.h; p.vel.set(0, 0, 0); p.onGround = true; }
       p.interior = { id: 'vs:' + D.id, floor: VY, vspace: D.id, def: D.def };
       g.cam.yaw = v ? v.h : D.foot.h; g.cam.pitch = -0.15; g.cam.init = false;
-      if (g.garageDisplay) g.garageDisplay.t = 0;
+      if (g.vreg) g.vreg.t = 0;
       g.ui.toast(D.name); g.audio.play('door');
     });
   }
@@ -44216,7 +44224,7 @@ class VSpaces {
       if (v) { v.pos.set(x, groundY(x, z), z); v.h = h; v.vel.set(Math.sin(h) * 3, Math.cos(h) * 3); v.yawRate = 0; v.syncMesh(0); p.pos.set(x, v.pos.y, z); }
       else { p.pos.set(S.x + f[0] * 2.4, groundY(S.x + f[0] * 2.4, S.z + f[1] * 2.4), S.z + f[1] * 2.4); p.h = h; p.vel.set(0, 0, 0); }
       g.cam.yaw = h; g.cam.pitch = -0.12; g.cam.init = false;
-      if (g.garageDisplay) g.garageDisplay.t = 0;
+      if (g.vreg) g.vreg.t = 0;
       g.audio.play('door');
     });
   }
@@ -44742,11 +44750,14 @@ class ContentManager {
   }
   // ------------------------------------------------------------ garage v2
   get garageCap() { return this.g.uw ? this.g.uw.props.garageCap() : 0; }
+  // a new car in your fleet: it takes a free bay (at, or the first free one). No bay, no car: there is no storage
+  // beyond your real parking (§14, §45.29). Returns null when there is nowhere to put it.
   addToGarage(type, origin, color, quiet, at) {
-    const s = this.g.save;
-    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at: at || null, out: false };
+    const s = this.g.save, PM = this.g.uw && this.g.uw.props;
+    if (!at && PM) for (const def of PM.ownedList()) { const b = PM.freeBay(def); if (b) { at = { p: def.id, i: b.i }; break; } }
+    if (!at) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
+    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null };
     s.garage.push(e);
-    if (!e.at && this.g.uw) { this.g.uw.props.assignBays(); if (!e.at && !quiet) this.g.ui.toast('No free parking space: it waits in storage until you have room.', 'warn'); }
     if (!quiet) this.g.ui.toast(`${VEHICLES[type].name} added to your garage.`, 'money');
     if (s.garage.length >= 6) this.ach('fleet');
     this.g.autosave('Vehicle acquired');
@@ -44775,7 +44786,7 @@ class ContentManager {
       g.ui.toast(`${v.spec.name} parked at ${def.name}. It’s yours now${origin === 'stolen' ? ' — just don’t show it to the original owner' : ''}.`, 'money');
       if (v.rareFind) this.secret('rooftop');
     } else { e.at = { p: def.id, i: bay.i }; g.ui.toast(`${v.spec.name} parked at ${def.name} · ${PARK_LABEL[bay.kind] || 'space'} ${bay.i + 1}.`, 'money'); }
-    e.out = false; e.dmg = clamp(100 - v.health, 0, 100); e.color = v.colorHex;
+    e.out = false; e.loc = null; e.dmg = clamp(100 - v.health, 0, 100); e.color = v.colorHex;
     // one trunk, one place: the garage entry and the live car share the same goods object
     if (!v.trunk) v.trunk = e.trunk || {};
     e.trunk = v.trunk;
@@ -44784,34 +44795,29 @@ class ContentManager {
     g.exitVehicle(true);
     v.owned = true; v.touched = true; v.garageUid = e.uid; v.display = true; v.parked = true; v.sleep = true; v.mission = null;
     v.syncMesh(0);
-    if (g.garageDisplay) g.garageDisplay.cars.set(e.uid, v);
-    if (g.garageCar === v) g.garageCar = null;
+    // a tracked car (stolen, found) joins your fleet: one record for it from now on, its cash with it
+    if (g.vreg) { g.vreg.forget(v, 'owned'); g.vreg.cars.set(e.uid, v); }
     g.audio.play('door');
     g.autosave('Vehicle stored'); g.saveGame();
     if (g.campaign) g.campaign.onStored(e, gp);
     return true;
   }
-  // "take it out": the car is already standing in its bay; bring a car in storage to a free bay here
-  takeOut(uid, gp) {
-    const g = this.g, s = g.save, e = s.garage.find(x => x.uid === uid), PM = g.uw.props;
+  // where is it: a fleet car stands in its bay or where you left it; the way there goes on the map (there is no
+  // moving it anywhere but by driving it)
+  takeOut(uid) {
+    const g = this.g, s = g.save, e = s.garage.find(x => x.uid === uid);
     if (!e) return;
-    if (e.dmg >= 100) { g.ui.toast('That car is wrecked — repair it first.', 'warn'); g.audio.play('deny'); return; }
-    const def = gp && (gp.def || PROP_BY_ID[gp.id]);
-    if (def && (!e.at || e.at.p !== def.id)) { const b = PM.freeBay(def); if (b) { const old = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (old && old !== g.player.vehicle && g.vehicles.list.includes(old)) g.vehicles.despawn(old); e.at = { p: def.id, i: b.i }; } }
-    if (!e.at) { g.ui.toast('No free space at any of your properties. Sell a car or buy a place with more parking.', 'warn'); g.audio.play('deny'); return; }
-    e.out = false;
-    const b = PM.bays(PROP_BY_ID[e.at.p])[e.at.i];
-    const v = g.garageDisplay ? g.garageDisplay.spawnFor(e, b) : null;
-    g.garageCar = v;
-    const where = PROP_BY_ID[e.at.p];
-    g.ui.toast(`${VEHICLES[e.type].name} is at ${where.name} · ${PARK_LABEL[b.kind] || 'space'} ${b.i + 1}.`, 'money');
-    if (v && Math.hypot(b.x - g.player.pos.x, b.z - g.player.pos.z) > 40) this.setWaypoint(b.x, b.z, VEHICLES[e.type].name);
+    const w = g.vreg.where(e); if (!w) { g.ui.toast('It has no space of its own yet.', 'warn'); return; }
+    g.ui.toast(`${VEHICLES[e.type].name}: ${w.name}${e.dmg >= 100 ? ' (wrecked: repair it first)' : ''}.`, 'money');
+    if (Math.hypot(w.x - g.player.pos.x, w.z - g.player.pos.z) > 40) this.setWaypoint(w.x, w.z, VEHICLES[e.type].name);
     g.audio.play('confirm');
   }
   onVehicleGone(v) {
-    // owned cars that burn are not lost: they come back wrecked and need a repair
-    if (v.garageUid) { const e = this.g.save.garage.find(x => x.uid === v.garageUid); if (e) { const lost = e.trunk && units(e.trunk) ? goodsList(e.trunk) : ''; if (e.trunk) Inv.clear(e.trunk); e.dmg = 100; e.out = false; this.g.ui.toast(`Your ${v.spec.name} was towed back to ${e.at && PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p].name : 'storage'}. It needs serious repairs.${lost ? ' The cargo burned with it: ' + lost + '.' : ''}`, 'warn'); } }
-    else if (v.trunk && units(v.trunk) && v === this.g.player.lastVehicle) { this.g.ui.toast(`The cargo burned with the ${v.spec.name}: ${goodsList(v.trunk)}.`, 'warn'); Inv.clear(v.trunk); }
+    // owned cars that burn are not lost: they come back wrecked and need a repair; a tracked car's loss is logged
+    const g = this.g;
+    if (v.garageUid) { const e = g.save.garage.find(x => x.uid === v.garageUid); if (e) { const lost = g.vreg.wrecked(e, v); g.ui.toast(`Your ${v.spec.name} was wrecked. Your people will tow it home: it needs a repair.${lost ? ` The cargo burned: ${lost}.` : ''}`, 'warn'); } }
+    else if (v.trackId) { const lost = g.vreg.burned(v); if (lost) g.ui.toast(`The cargo burned with the ${v.spec.name}: ${lost}.`, 'warn'); }
+    else if (v.trunk && units(v.trunk) && v === g.player.lastVehicle) { g.ui.toast(`The cargo burned with the ${v.spec.name}: ${goodsList(v.trunk)}.`, 'warn'); Inv.clear(v.trunk); }
   }
   // ------------------------------------------------------------ service screens
   _bindUI() {
@@ -44848,13 +44854,14 @@ class ContentManager {
     const card = (e, here) => {
       const v = VEHICLES[e.type], wrecked = e.dmg >= 100, rcost = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0;
       const tuneLv = TUNE.map(t => e.tune[t.id]).reduce((a, b) => a + b, 0);
-      const loc = e.at ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'In storage (no free space)';
-      const move = !here && PM.freeBay(def) ? `<button class="sbtn" data-act="out:${e.uid}">${e.at ? 'Move here' : 'Park here'}</button>` : '';
-      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}${e.out ? ' · out on the street' : ''}</div>${this._bars(e.type, e.tune)}
+      // its home space, and where it actually is (the street, if that's where you left it)
+      const home = e.at && PROP_BY_ID[e.at.p] ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'No space of its own: buy more parking';
+      const w = g.vreg.where(e), loc = e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
+      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
-        <div class="btns">${here ? `<button class="sbtn gold" data-act="out:${e.uid}" ${wrecked ? 'disabled' : ''}>${wrecked ? 'Wrecked' : 'Where is it?'}</button>` : move}
+        <div class="btns"><button class="sbtn${here && !e.out ? ' gold' : ''}" data-act="out:${e.uid}">${wrecked ? 'Wrecked · where is it?' : 'Where is it?'}</button>
         ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${!Money.can(rcost, 'garage') ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
         <button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button></div></div>`;
     };
@@ -44865,12 +44872,15 @@ class ContentManager {
       return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html('garage')}</span></div>
         <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
         <div class="grid2">${here.map(e => card(e, true)).join('') || '<div class="hint">Nothing parked here. Drive a car into a free space and stop to park it.</div>'}</div>
-        ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}`;
+        ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}
+        ${(s.pendingCars || []).length ? `<h3>Waiting for a space</h3><div class="jobs">${s.pendingCars.map((P, i) => `<div class="job"><i>⏳</i><div><b>${esc(VEHICLES[P.type].name)}</b><span>${P.from ? 'With ' + esc(P.from) + ': ' : ''}yours when you have a free space</span></div><button class="sbtn" data-act="collect:${i}" ${g.vreg.freeBays() > 0 ? '' : 'disabled'}>Collect</button></div>`).join('')}</div>` : ''}`;
     };
-    this.openSvc(def.name, 'Stored cars stand in their spaces: get in and drive off to use one. Drive into a free space and stop to park. Cars you leave around town are towed home.', render, act => {
-      const [k, id] = act.split(':'), uid = +id, e = s.garage.find(x => x.uid === uid); if (!e) return;
-      if (k === 'out') { this.takeOut(uid, gp); g.ui.back(); return; }
-      if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.garageDisplay && g.garageDisplay.cars.get(e.uid); if (dv) { dv.health = 100; dv.burnt = false; } }
+    this.openSvc(def.name, 'Each car has its own space, kept for it even while it is out. Drive into a free space and stop to park. A car you leave around town stays where you left it.', render, act => {
+      const [k, id] = act.split(':'), uid = +id;
+      if (k === 'collect') { const r = g.vreg.collect(uid); this.refreshSvc(r || 'Collected: it is in its space.'); return; }
+      const e = s.garage.find(x => x.uid === uid); if (!e) return;
+      if (k === 'out') { this.takeOut(uid); g.ui.back(); return; }
+      if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.vreg.live(e); if (dv) { dv.health = 100; dv.burnt = false; } }
       if (k === 'sell') {
         const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
         if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
@@ -44878,8 +44888,7 @@ class ContentManager {
         g.ui.ask(`Sell the ${VEHICLES[e.type].name}?`, `You'll get ${fmtMoney(sale.total)}${e.origin === 'stolen' ? ' in cash: it’s stolen, so nobody legit will pay you for it' : sale.dirty && sale.clean ? `: ${fmtMoney(sale.clean)} into your bank and ${fmtMoney(sale.dirty)} in cash, as you paid for it` : sale.dirty ? ' in cash: you paid for it in cash' : ' into your bank'}. ${e.origin === 'reward' || e.origin === 'found' ? 'Special cars can’t be bought back.' : ''}`, 'Sell', () => {
           const i = s.garage.indexOf(e); if (i < 0) return;
           for (const v of g.vehicles.list.slice()) if (v.garageUid === e.uid && v !== g.player.vehicle) g.vehicles.despawn(v);
-          if (g.garageDisplay) g.garageDisplay.cars.delete(e.uid);
-          if (g.garageCar && g.garageCar.garageUid === e.uid) g.garageCar = null;
+          g.vreg.cars.delete(e.uid);
           if (e.trunk && units(e.trunk) && g.uw) { const r = g.uw.unloadTrunk(e); if (r) g.ui.toast(r, 'money'); }
           Money.emptyCar(e.uid); // cash kept in its trunk comes out with you
           // a stolen car sells for Dirty Cash (§45.22); a bought one pays back in the money it was bought with (§45.24)
@@ -45568,7 +45577,7 @@ class StuntTracker {
       g.content.addRep(15);
       if (n === 5) {
         this.g.ach('jump5');
-        if (!s.flags.mesaGiven) { s.flags.mesaGiven = true; g.content.addToGarage('offroad', 'reward', 0xa0381e); g.content.phone('tull', 'Five jumps! Kid, you’re nuts. I left a Mesa Trail in your garage — it lands like a cat.'); }
+        if (!s.flags.mesaGiven) { s.flags.mesaGiven = true; g.vreg.give('offroad', 'reward', 0xa0381e, 'Tull'); g.content.phone('tull', 'Five jumps! Kid, you’re nuts. I left a Mesa Trail in your garage — it lands like a cat.'); }
       }
       if (n >= tot) g.ach('jumpall');
     }
@@ -47756,6 +47765,7 @@ class Underworld {
     if (this.threats) this.threats.reset();
     if (this.rivalwh) this.rivalwh.reset();
     if (this.shipments) this.shipments.reset();
+    if (this.g.vreg) this.g.vreg.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -48025,7 +48035,7 @@ class Underworld {
       if (!v || v.burnt || !g.vehicles.list.includes(v) || !(CARGO_LB[v.type] > 0) || v.dealer) return;
       if (!v.trunk) v.trunk = {};
       if (seen.has(v.trunk)) return; seen.add(v.trunk);
-      trunks.push({ key: v.garageUid ? 'car:' + v.garageUid : 'veh', o: v.trunk, type: v.type, v, uid: v.garageUid || 0, zone: zone(v.pos.x, v.pos.z), where: why || '' });
+      trunks.push({ key: v.garageUid ? 'car:' + v.garageUid : 'veh', o: v.trunk, type: v.type, v, uid: Money.uidOf(v), zone: zone(v.pos.x, v.pos.z), where: why || '' });
     };
     const reach = A.inside ? 24 : 14;
     const cur = p.state === 'vehicle' ? p.vehicle : null;
@@ -48159,7 +48169,7 @@ class Underworld {
     const pay = this.chopValue(v), wanted = S.chopWanted.includes(v.type);
     const lost = units(v.trunk);
     Money.emptyCar(0, v); // cash left in a stolen car comes out with you; the cargo stays with the car
-    g.exitVehicle(true); g.vehicles.despawn(v);
+    g.exitVehicle(true); if (g.vreg) g.vreg.forget(v, 'sold'); g.vehicles.despawn(v);
     g.earn(pay, 'chop'); S.st.chopped++; this.addRep(wanted ? 25 : 10, null);
     if (wanted) S.chopWanted = S.chopWanted.filter(t => t !== v.type);
     g.ui.toast(`Chop shop paid ${fmtMoney(pay)} for the ${v.spec.name}${wanted ? ' (on the wanted list)' : ''}.${lost ? ' Whatever was in the trunk is theirs now.' : ''}`, 'money');
@@ -49715,25 +49725,6 @@ class PropertyManager {
     g.autosave('Property purchased');
     return '';
   }
-  // garage spots: one per owned property with garage space
-  garagePoints() {
-    const uw = this.uw, pl = uw.g.world.places, out = [];
-    for (const def of this.ownedList()) {
-      if (!def.garage) continue;
-      let p0;
-      if (def.place && pl[def.place] && pl[def.place].garage) p0 = pl[def.place].garage;
-      else { const L = uw.loc('prop', def.id); const c = curbNear(L.x + Math.sin(L.h) * 4, L.z + Math.cos(L.h) * 4, 6); p0 = { x: c.x, z: c.z, h: c.h }; }
-      out.push({ id: def.id, p: p0, name: def.name + ' garage' });
-    }
-    return out;
-  }
-  garageCap() { let n = 0; for (const def of this.ownedList()) n += def.garage || 0; return n; }
-  garageActionVehicle(v) {
-    const g = this.uw.g;
-    const gp = g.content.nearGarage(v.pos.x, v.pos.z, 4.2);
-    if (gp) return { label: 'Store vehicle in garage', act: () => g.content.storeVehicle(v, gp) };
-    return null;
-  }
   garageActionFoot() {
     const g = this.uw.g, p = g.player;
     const gp = g.content.nearGarage(p.pos.x, p.pos.z, 3.2);
@@ -50915,19 +50906,6 @@ Object.assign(PropertyManager.prototype, {
     }
     return out;
   },
-  // every save entry sits in a bay of a property you own; anything left over waits in storage
-  assignBays() {
-    const s = this.uw.g.save, taken = new Set();
-    for (const e of s.garage) {
-      const def = e.at && PROP_BY_ID[e.at.p];
-      const ok = def && this.owned(def.id) && this.bays(def)[e.at.i] && !taken.has(def.id + ':' + e.at.i);
-      if (ok) taken.add(def.id + ':' + e.at.i); else e.at = null;
-    }
-    for (const e of s.garage) {
-      if (e.at) continue;
-      for (const def of this.ownedList()) { const b = this.bays(def).find(x => !taken.has(def.id + ':' + x.i)); if (b) { e.at = { p: def.id, i: b.i }; taken.add(def.id + ':' + b.i); break; } }
-    }
-  },
   nearFreeBay(x, z, y, r = 3.6) {
     let best = null, bd = r;
     for (const def of this.ownedList()) for (const b of this.bays(def)) {
@@ -51001,7 +50979,8 @@ class DealerLots {
   cantBuy(lot, c) {
     const g = this.g, s = g.save, C2 = g.content;
     if (lot !== 'used' && s.rep < (CAR_REP[c.type] || 0)) return `Needs ${CAR_REP[c.type]} Rep`;
-    if (s.garage.length >= C2.garageCap) return C2.garageCap ? 'Garage full' : 'You need a place with parking';
+    // a free space of its own (a car out on the street keeps its space: §45.29)
+    if (!g.vreg.freeBays()) return C2.garageCap ? 'No free parking space' : 'You need a place with parking';
     // Saltworks is a shady lot that takes cash or the bank; the licensed dealers take the bank only (§13)
     if (!Money.can(c.price, lot === 'used' ? 'usedLot' : 'dealer')) return `Costs ${fmtMoney(c.price)}${lot === 'used' ? '' : ' from your bank'}`;
     if (lot !== 'used' && g.police.level > 0) return 'Not with the police on you';
@@ -51014,7 +50993,7 @@ class DealerLots {
     // record what paid for it, by currency (Saltworks takes Dirty Cash first, then the bank): its provenance (§45.24)
     const me0 = Money.onMe, cl0 = Money.clean;
     Money.pay(c.price, lot === 'used' ? 'usedLot' : 'dealer'); s.stats.carsBought = (s.stats.carsBought || 0) + 1;
-    const e = C2.addToGarage(c.type, 'bought', c.color, true);
+    const e = C2.addToGarage(c.type, 'bought', c.color, true); if (!e) return 'No free parking space';
     e.prov = { dirty: Math.round((me0 - Money.onMe) * 100) / 100, clean: Math.round((cl0 - Money.clean) * 100) / 100 };
     e.dmg = clamp(100 - c.cond, 0, 100); e.vtier = c.vtier;
     st.cars[i] = null;
@@ -51024,11 +51003,12 @@ class DealerLots {
     if (!v) v = g.vehicles.spawn(c.type, sl.x, sl.z, sl.h, { parked: true, color: c.color, vtier: c.vtier });
     v.locked = false; v.dealer = null; v.display = false; v.owned = true; v.touched = true; v.legit = true; v.garageUid = e.uid; v.origin = 'bought'; v.tune = e.tune;
     v.health = Math.max(1, c.cond); v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[c.type].special;
-    e.out = true;
-    if (g.garageDisplay) g.garageDisplay.cars.set(e.uid, v);
+    // it stands on the lot until you drive it home: out, at the stall (its space is kept for it)
+    e.out = true; e.loc = { x: sl.x, z: sl.z, h: sl.h, y: v.pos.y };
+    g.vreg.cars.set(e.uid, v);
     g.audio.play('cash');
     g.ui.banner(VEHICLES[c.type].name, `Yours · ${fmtMoney(c.price)}`, 'pass', 2.6);
-    g.ui.toast(e.at ? `Keys are in it. When you park it at ${PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p].name : 'home'} it’s saved there.` : 'Keys are in it. No free parking space at home yet: it waits in storage when you leave it.', 'money');
+    g.ui.toast(`Keys are in it. Its space is at ${PROP_BY_ID[e.at.p] ? PROP_BY_ID[e.at.p].name : 'home'}; wherever you leave it, it stays.`, 'money');
     g.saveGame(true);
     return '';
   }
@@ -51071,53 +51051,274 @@ class DealerLots {
     }
   }
 }
-
-/* The stored cars you can see: spawned in their bays near you, taken out by driving off,
-   towed home when abandoned far away. */
-class GarageDisplay {
-  constructor(g) { this.g = g; this.cars = new Map(); this.t = 0; }
+/* =====================================================================
+   [UNDERWORLD] VEHICLE REGISTRY (§14, §45.29; Session 5A): the one place
+   every persistent vehicle lives, and the one system that puts it in the
+   world. A vehicle is in exactly one record.
+   - Your fleet (save.garage). Every owned car holds a home bay at a
+     property you own (e.at), reserved while the car is out: the fleet can
+     never be larger than your real parking, and an empty bay whose car is
+     out is not free. Out on the street a car is saved exactly where you
+     left it (e.loc) and stands there again when you come back. Nothing
+     tows a working car home, and nothing waits "in storage".
+   - Tracked cars (save.tracked): the stolen cars you have driven and
+     anything carrying your cargo, saved with position, condition, HOT
+     state, trunk and the cash in it (the wallet key 't<id>'), at most
+     VREG.max of them. Left unattended in public for about a day of the
+     economic clock, police recover one: an explicit, logged event (its
+     cargo and cash seized with it), never a silent deletion.
+   - Wrecks: a destroyed owned car is towed home to its bay by your own
+     people as a wreck that needs a repair (a recovery, not a seizure).
+   - Rare and unique cars are never dropped: owned, they come home like
+     any other; tracked, they are the last to give way when the registry
+     is full.
+   - A car you were given with nowhere to park it waits with whoever gave
+     it to you (save.pendingCars), not in your fleet, until you have a free
+     bay and collect it.
+   ===================================================================== */
+const VREG = { near: 150, keep: 340, max: 8, attend: 60, recover: 24, tick: 0.4, towWreck: 120 };
+class VehicleRegistry {
+  constructor(g) { this.g = g; this.cars = new Map(); this.trk = new Map(); this.t = 0; }
+  get s() { return this.g.save; }
   get PM() { return this.g.uw.props; }
-  entryOf(v) { return v.garageUid ? this.g.save.garage.find(e => e.uid === v.garageUid) : null; }
-  bayPos(e) { const def = PROP_BY_ID[e.at.p]; return def ? this.PM.bays(def)[e.at.i] : null; }
-  spawnFor(e, b) {
+  get tracked() { return this.s.tracked || (this.s.tracked = []); }
+  get log() { return this.s.vlog || (this.s.vlog = []); }
+  econ() { return this.g.uw ? this.g.uw.S.econH : 0; }
+  day() { return this.g.uw ? this.g.uw.S.day : 0; }
+  // a line in the vehicle log: what happened to which car (and what went with it)
+  note(what, type, extra = {}) { const L = this.log; L.push({ day: this.day(), what, type, ...extra }); if (L.length > 20) L.splice(0, L.length - 20); }
+  // ---------------------------------------------------------------- the fleet
+  entryOf(v) { return v && v.garageUid ? this.s.garage.find(e => e.uid === v.garageUid) : null; }
+  bayPos(e) { const def = e.at && PROP_BY_ID[e.at.p]; return def ? this.PM.bays(def)[e.at.i] || null : null; }
+  // where a fleet car is: its bay, or where you left it
+  where(e) {
+    if (e.out && e.loc) return { x: e.loc.x, z: e.loc.z, name: placeNameAt(e.loc.x, e.loc.z) || 'the street', street: true };
+    const b = this.bayPos(e), def = e.at && PROP_BY_ID[e.at.p];
+    return b ? { x: b.x, z: b.z, name: `${def.name} · ${PARK_LABEL[b.kind] || 'space'} ${b.i + 1}`, street: false } : null;
+  }
+  live(e) { const v = this.cars.get(e.uid); return v && this.g.vehicles.list.includes(v) && v.garageUid === e.uid ? v : null; }
+  // put a fleet car into the world at p (a bay, or its saved street spot)
+  spawnFor(e, p) {
     const g = this.g;
-    for (const v of g.vehicles.list) if (v.garageUid === e.uid) { v.trunk = e.trunk || (e.trunk = {}); return v; }
-    // clear anything parked in the bay first (never the player's car)
-    for (const v of g.vehicles.nearby(b.x, b.z, 4)) if (v !== g.player.vehicle && !v.garageUid && !v.mission && Math.hypot(v.pos.x - b.x, v.pos.z - b.z) < 3 && Math.abs(v.pos.y - (b.y ?? v.pos.y)) < 2) g.vehicles.despawn(v);
-    const v = g.vehicles.spawn(e.type, b.x, b.z, b.h, { parked: true, color: e.color, y: b.y, vtier: e.vtier || VEHICLES[e.type].tier });
+    for (const v of g.vehicles.list) if (v.garageUid === e.uid) { v.trunk = e.trunk || (e.trunk = {}); this.cars.set(e.uid, v); return v; }
+    // clear anything standing on the spot first (never the player's car, never another kept car)
+    for (const v of g.vehicles.nearby(p.x, p.z, 4)) if (v !== g.player.vehicle && !v.garageUid && !v.trackId && !v.mission && Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 3 && Math.abs(v.pos.y - (p.y ?? v.pos.y)) < 2) g.vehicles.despawn(v);
+    const v = g.vehicles.spawn(e.type, p.x, p.z, p.h, { parked: true, color: e.color, y: p.y, vtier: e.vtier || VEHICLES[e.type].tier });
     v.owned = true; v.touched = true; v.garageUid = e.uid; v.tune = e.tune; v.origin = e.origin; v.health = Math.max(1, 100 - e.dmg);
-    v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[e.type].special; v.display = true;
+    v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[e.type].special; v.display = !e.out;
     if (e.dmg >= 100) { v.health = 0; v.burnt = false; }
     this.cars.set(e.uid, v);
     return v;
   }
-  update(dt) {
-    const g = this.g, s = g.save, p = g.player; if (!g.uw || g.state !== 'playing') return;
-    this.t -= dt; if (this.t > 0) return; this.t = 0.4;
-    if (s.garage.some(e => !e.at)) this.PM.assignBays();
-    const px = p.pos.x, pz = p.pos.z, py = p.pos.y;
+  freeBays() { let n = 0; for (const def of this.PM.ownedList()) for (const b of this.PM.bays(def)) if (!this.PM.carAt(def.id, b.i)) n++; return n; }
+  // a home bay for every car that lacks one (a save from before Session 5A, a property bought since): any free
+  // bay at a property you own. The car itself stays where it is.
+  house() {
+    const s = this.s, PM = this.PM, taken = new Set();
     for (const e of s.garage) {
-      if (!e.at) continue;
-      const b = this.bayPos(e); if (!b) continue;
-      const v = this.cars.get(e.uid);
-      const alive = v && g.vehicles.list.includes(v) && v.garageUid === e.uid;
-      if (!alive) this.cars.delete(e.uid);
-      else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});
-      // in use: leaving the bay takes the car out; it stays yours wherever you leave it
-      if (alive && !e.out) { const d = Math.hypot(v.pos.x - b.x, v.pos.z - b.z); if (d > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3) { e.out = true; v.display = false; g.autosave('Vehicle taken out'); } }
-      if (alive && e.out) {
-        e.dmg = clamp(100 - v.health, 0, 100);
-        const far = Math.hypot(v.pos.x - px, v.pos.z - pz) > 340 && v !== p.vehicle && v !== p.lastVehicle;
-        if (far && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.cars.delete(e.uid); e.out = false; }
-        continue;
-      }
-      if (e.out && !alive) e.out = false; // gone without us noticing: it is back in its bay
-      const near = Math.hypot(b.x - px, b.z - pz) < 150 && Math.abs((b.y ?? 0) - py) < (b.kind === 'under' ? 20 : 60) && (b.kind === 'under' ? p.interior && p.interior.vspace === b.space : !(p.interior && p.interior.vspace));
-      if (near && !alive) this.spawnFor(e, b);
-      else if (!near && alive && v !== p.vehicle && v !== p.lastVehicle && !e.out) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
+      const def = e.at && PROP_BY_ID[e.at.p];
+      const ok = def && PM.owned(def.id) && PM.bays(def)[e.at.i] && !taken.has(def.id + ':' + e.at.i);
+      if (ok) taken.add(def.id + ':' + e.at.i); else e.at = null;
+    }
+    for (const e of s.garage) {
+      if (e.at) continue;
+      for (const def of PM.ownedList()) { const b = PM.bays(def).find(x => !taken.has(def.id + ':' + x.i)); if (b) { e.at = { p: def.id, i: b.i }; taken.add(def.id + ':' + b.i); break; } }
+      // still nowhere: it stands on the street by your place until a bay frees up (never "in storage")
+      if (!e.at && !e.loc) { const h = this.homeSpot(); e.out = true; e.loc = { x: h.x, z: h.z, h: h.h, y: 0 }; }
     }
   }
-  clearAll() { for (const v of this.cars.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.cars.clear(); }
+  homeSpot() { const sh = this.g.missions.safe, c = curbNear(sh.x, sh.z, 8 + (this.s.garage.length % 5) * 6); return { x: c.x, z: c.z, h: c.h }; }
+  updateFleet() {
+    const g = this.g, s = this.s, p = g.player, px = p.pos.x, pz = p.pos.z, py = p.pos.y;
+    for (const e of s.garage) {
+      const v = this.live(e);
+      if (!v) this.cars.delete(e.uid); else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});
+      const b = this.bayPos(e);
+      if (v) {
+        // leaving its bay takes it out; from then on it is saved wherever it stands
+        if (!e.out && b && (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3)) { e.out = true; v.display = false; e.loc = this.here(v); g.autosave('Vehicle taken out'); }
+        if (e.out) {
+          e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100);
+          const d = Math.hypot(v.pos.x - px, v.pos.z - pz), mine = v === p.vehicle || v === p.lastVehicle;
+          // a wreck left behind: your people tow it home to its bay (a recovery, not a police matter)
+          if (e.dmg >= 100 && v !== p.vehicle && b && d > VREG.towWreck && !g.inView(v.pos.x, 1, v.pos.z, 3)) { this.towHome(e, v); continue; }
+          if (d > VREG.keep && !mine && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
+          continue;
+        }
+      }
+      const at = e.out ? e.loc : b; if (!at) continue;
+      const bay = !e.out && b;
+      const near = Math.hypot(at.x - px, at.z - pz) < VREG.near && Math.abs((at.y ?? 0) - py) < (bay && b.kind === 'under' ? 20 : 60) && (bay && b.kind === 'under' ? p.interior && p.interior.vspace === b.space : !(p.interior && p.interior.vspace));
+      if (near && !v) this.spawnFor(e, at);
+      else if (!near && v && v !== p.vehicle && v !== p.lastVehicle && !e.out) { g.vehicles.despawn(v); this.cars.delete(e.uid); }
+    }
+  }
+  here(v) { return { x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y }; }
+  towHome(e, v) {
+    const g = this.g;
+    if (v && g.vehicles.list.includes(v) && v !== g.player.vehicle) g.vehicles.despawn(v);
+    this.cars.delete(e.uid);
+    e.out = false; e.loc = null; e.dmg = 100;
+    const def = PROP_BY_ID[e.at.p];
+    this.note('towed home wrecked', e.type, { uid: e.uid, to: def ? def.name : '' });
+    g.ui.toast(`Your people towed the wrecked ${VEHICLES[e.type].name} home to ${def ? def.name : 'its space'}. It needs a repair.`, 'warn');
+  }
+  // a fleet car that burned: it comes home as a wreck (its cargo burned with it); the hulk left on the street is no
+  // longer that car
+  wrecked(e, v) {
+    const lost = e.trunk && units(e.trunk) ? goodsList(e.trunk) : '';
+    if (e.trunk) Inv.clear(e.trunk);
+    if (v) { v.garageUid = 0; v.owned = false; v.trunk = {}; }
+    this.cars.delete(e.uid);
+    e.dmg = 100; e.out = false; e.loc = null;
+    const def = e.at && PROP_BY_ID[e.at.p];
+    this.note('wrecked, towed home', e.type, { uid: e.uid, to: def ? def.name : '', cargo: lost });
+    return lost;
+  }
+  // ---------------------------------------------------------------- cars you don't own
+  // a car worth keeping track of: one you are driving or that holds your cargo, not a job's, a cab, a lot car or yours
+  eligible(v) { return !!v && !v.garageUid && !v.owned && !v.mission && !v.taxiCab && !v.dealer && !v.burnt && this.g.vehicles.list.includes(v) && CARGO_LB[v.type] !== undefined; }
+  rec(id) { return this.tracked.find(r => r.id === id) || null; }
+  liveT(r) { const v = this.trk.get(r.id); return v && this.g.vehicles.list.includes(v) && v.trackId === r.id ? v : null; }
+  track(v) {
+    const s = this.s; if (!this.eligible(v) || v.trackId) return null;
+    if (this.tracked.length >= VREG.max) this.makeRoom(v);
+    const id = s.nextTrack = (s.nextTrack || 0) + 1;
+    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ() };
+    this.tracked.push(r);
+    v.trackId = id; v.stolenBefore = v.stolenBefore || r.hot; v.touched = true;
+    Money.adoptCar(v, 't' + id); // its cash is kept in the wallet now (saved with the car)
+    this.trk.set(id, v);
+    return r;
+  }
+  // the registry is full: the oldest car with nothing of yours in it gives way first (rare ones last); one with your
+  // cargo or cash in it is recovered by police like any other (logged), never just dropped
+  makeRoom(keep) {
+    const p = this.g.player, mine = r => units(r.trunk) > 0 || Money.dirtyInCar('t' + r.id) > 0;
+    const cands = this.tracked.filter(r => { const v = this.liveT(r); return v !== p.vehicle && v !== keep; });
+    cands.sort((a, b) => (mine(a) - mine(b)) || ((a.rare ? 1 : 0) - (b.rare ? 1 : 0)) || (a.seen - b.seen));
+    const r = cands[0]; if (!r) return;
+    if (mine(r)) this.recover(r, 'full'); else this.release(r);
+  }
+  // let a tracked car go back to being any car (nothing of yours in it)
+  release(r) {
+    const v = this.liveT(r); if (v) v.trackId = 0;
+    this.trk.delete(r.id); this.tracked.splice(this.tracked.indexOf(r), 1);
+    this.note('left behind', r.type, { id: r.id });
+  }
+  // police recover a stolen car: the car goes, and what was in it is seized (an explicit event)
+  recover(r, why) {
+    const g = this.g, v = this.liveT(r);
+    const cargo = units(r.trunk) ? goodsList(r.trunk) : '', n = units(r.trunk), cash = Money.seizeCar('t' + r.id);
+    Inv.clear(r.trunk);
+    if (v && v !== g.player.vehicle) g.vehicles.despawn(v); else if (v) v.trackId = 0;
+    this.trk.delete(r.id); const i = this.tracked.indexOf(r); if (i >= 0) this.tracked.splice(i, 1);
+    const where = placeNameAt(r.x, r.z) || 'the street';
+    this.note('recovered by police', r.type, { id: r.id, why, at: where, cargo, n, cash });
+    const what = [cargo, cash > 0 ? fmtMoney(cash) : ''].filter(Boolean).join(' and ');
+    if (g.uw) g.uw.news('radio', `Police radio: stolen ${VEHICLES[r.type].name} recovered on ${where}.${what ? ` Seized from it: ${what}.` : ''}`);
+    if (!(g.uw && g.uw.S.jail)) g.ui.toast(`Police recovered the ${VEHICLES[r.type].name} you left on ${where}${what ? ` (and ${what} in it)` : ''}.`, 'warn');
+  }
+  // a tracked car burned: it is gone, and what was in it burned with it (logged); returns what was lost
+  burned(v) {
+    const r = v && v.trackId ? this.rec(v.trackId) : null; if (!r) return '';
+    const cargo = units(r.trunk) ? goodsList(r.trunk) : '';
+    Inv.clear(r.trunk); Money.seizeCar('t' + r.id);
+    this.trk.delete(r.id); this.tracked.splice(this.tracked.indexOf(r), 1); v.trackId = 0;
+    this.note('burned', r.type, { id: r.id, cargo });
+    return cargo;
+  }
+  // a tracked car leaves the registry by design: sold to the chop shop, or parked into your fleet
+  forget(v, why) {
+    const r = v && v.trackId ? this.rec(v.trackId) : null; if (!r) return;
+    if (why === 'owned' && v.garageUid) Money.rekeyCar('t' + r.id, v.garageUid);
+    this.trk.delete(r.id); this.tracked.splice(this.tracked.indexOf(r), 1);
+    v.trackId = 0;
+    if (why === 'sold') this.note('sold to the chop shop', r.type, { id: r.id });
+  }
+  spawnTracked(r) {
+    const g = this.g;
+    for (const o of g.vehicles.nearby(r.x, r.z, 4)) if (o !== g.player.vehicle && !o.garageUid && !o.trackId && !o.mission && Math.hypot(o.pos.x - r.x, o.pos.z - r.z) < 3) g.vehicles.despawn(o);
+    const v = g.vehicles.spawn(r.type, r.x, r.z, r.h, { parked: true, color: r.color, y: r.y, vtier: r.vtier });
+    v.trackId = r.id; v.trunk = r.trunk; v.health = r.hp; v.touched = true; v.looted = true; v.stolenBefore = r.hot; v.fac = null;
+    if (r.origin === 'found') v.origin = 'found';
+    if (r.hp <= 0) { v.health = 0; v.burnt = false; }
+    this.trk.set(r.id, v);
+    return v;
+  }
+  updateTracked() {
+    const g = this.g, p = g.player, px = p.pos.x, pz = p.pos.z, outdoors = !(p.interior && !p.interior.vspace), e = this.econ();
+    // what you are driving, and the last car you left your cargo in, are kept track of
+    const pv = p.state === 'vehicle' ? p.vehicle : null;
+    if (pv && !pv.trackId && this.eligible(pv)) this.track(pv);
+    const lv = p.lastVehicle;
+    if (lv && lv !== pv && !lv.trackId && this.eligible(lv) && (units(lv.trunk) > 0 || +lv.cash > 0)) this.track(lv);
+    for (const r of this.tracked.slice()) {
+      const v = this.liveT(r);
+      if (!v) this.trk.delete(r.id);
+      if (v) {
+        if (v.burnt) { this.burned(v); continue; }
+        if (v.garageUid) { this.forget(v, 'owned'); continue; }
+        r.x = v.pos.x; r.z = v.pos.z; r.h = v.h; r.y = v.pos.y; r.hp = v.health;
+        const d = Math.hypot(v.pos.x - px, v.pos.z - pz);
+        if (v === pv || d < VREG.attend) r.seen = e;
+        if (d > VREG.keep && v !== pv && v !== p.lastVehicle && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.trk.delete(r.id); }
+      } else if (outdoors && Math.hypot(r.x - px, r.z - pz) < VREG.near) { if (Math.hypot(r.x - px, r.z - pz) < VREG.attend) r.seen = e; this.spawnTracked(r); }
+      // a day unattended in public: the police find it
+      const v2 = this.liveT(r);
+      if (e - r.seen >= VREG.recover && v2 !== pv && !(v2 && g.inView(v2.pos.x, 1, v2.pos.z, 3) && Math.hypot(v2.pos.x - px, v2.pos.z - pz) < VREG.attend)) this.recover(r, 'abandoned');
+    }
+  }
+  // ---------------------------------------------------------------- gifts with nowhere to go
+  // a car given to you: into a free bay if there is one, otherwise it waits with the giver
+  give(type, origin, color, from) {
+    const C2 = this.g.content;
+    if (this.freeBays() > 0) return C2.addToGarage(type, origin, color, true);
+    const s = this.s; (s.pendingCars || (s.pendingCars = [])).push({ type, origin, color: color !== undefined ? color : VEHICLES[type].colors[0], from: from || '' });
+    this.g.ui.toast(`No free parking space: the ${VEHICLES[type].name} waits${from ? ' with ' + from : ''} until you have room (Garage).`, 'warn');
+    return null;
+  }
+  // collect a waiting car into a free bay
+  collect(i) {
+    const s = this.s, P = (s.pendingCars || [])[i]; if (!P) return 'Nothing waiting.';
+    if (this.freeBays() <= 0) return 'No free parking space.';
+    s.pendingCars.splice(i, 1);
+    this.g.content.addToGarage(P.type, P.origin, P.color, false);
+    return '';
+  }
+  // ---------------------------------------------------------------- the clock, saves and resets
+  update(dt) {
+    const g = this.g; if (!g.uw || g.state !== 'playing') return;
+    this.t -= dt; if (this.t > 0) return; this.t = VREG.tick;
+    this.updateFleet(); this.updateTracked();
+  }
+  // before a save: every live kept car's position, condition and trunk into its record
+  sync() {
+    const s = this.s; if (!s || !s.garage) return;
+    for (const e of s.garage) { const v = this.live(e); if (v && e.out) { e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100); } }
+    for (const r of this.tracked) { const v = this.liveT(r); if (v) { r.x = v.pos.x; r.z = v.pos.z; r.h = v.h; r.y = v.pos.y; r.hp = v.health; } }
+  }
+  clearAll() {
+    for (const v of this.cars.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v);
+    for (const v of this.trk.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v);
+    this.cars.clear(); this.trk.clear();
+  }
+  // a save (re)loaded: records are the truth, live cars are rebuilt from them as you come near
+  reset() { this.clearAll(); this.t = 0; if (this.g.uw && this.s && this.s.garage) this.house(); }
+  // sanitize the records in a save (SaveSystem): positions finite, trunks clean, the registry bounded
+  static sanitize(d) {
+    const ok = v => typeof v === 'number' && isFinite(v), num = (v, def, lo, hi) => ok(v) ? clamp(v, lo, hi) : def;
+    const pt = o => o && typeof o === 'object' && ok(o.x) && ok(o.z) ? { x: o.x, z: o.z, h: ok(o.h) ? o.h : 0, y: ok(o.y) ? o.y : 0 } : null;
+    for (const e of d.garage) { e.loc = pt(e.loc); e.out = !!e.loc; }
+    let next = Number.isInteger(d.nextTrack) && d.nextTrack >= 0 ? d.nextTrack : 0;
+    d.tracked = (Array.isArray(d.tracked) ? d.tracked : []).filter(r => r && typeof r === 'object' && VEHICLES[r.type] && Number.isInteger(r.id) && r.id > 0 && pt(r)).slice(-VREG.max).map(r => {
+      next = Math.max(next, r.id);
+      return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9) };
+    });
+    d.nextTrack = next;
+    d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));
+    d.vlog = (Array.isArray(d.vlog) ? d.vlog : []).filter(x => x && typeof x === 'object' && typeof x.what === 'string' && VEHICLES[x.type]).slice(-20);
+  }
 }
 /* =====================================================================
    [UNDERWORLD] POLICE PRESSURE & CORRUPTION: the long-term heat on the
@@ -57309,7 +57510,7 @@ class Game {
     this.player.applyOutfit(this.save.outfit);
     this.ui = new UIManager(this);
     this.uw = new Underworld(this);
-    this.garageDisplay = new GarageDisplay(this);
+    this.vreg = new VehicleRegistry(this);
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -57489,9 +57690,10 @@ class Game {
     if (this.state !== 'menu' && this.state !== 'loading') this.save.vest = Math.round(clamp(p.vest || 0, 0, VEST_MAX) * 10) / 10;
     if (this.state === 'menu' || this.state === 'loading') { /* new career: keep the default start */ }
     else if (!jail && !p.interior && (p.state === 'foot' || p.state === 'vehicle') && isFinite(p.pos.x)) {
-      // a vehicle save restores you standing beside it (owned cars are in the garage list)
+      // a vehicle save restores you standing beside it (the car itself is in the vehicle registry)
       this.save.pos = { x: p.pos.x, z: p.pos.z, h: p.h };
     } else if (p.interior && p.interior.id !== 'prison') { const d = p.interior.def.door; this.save.pos = { x: d.x + Math.sin(d.h) * 2, z: d.z + Math.cos(d.h) * 2, h: d.h }; }
+    if (this.vreg) this.vreg.sync(); // every kept car where it stands now
     const ok = SaveSystem.save(this.save);
     if (ok) this.lastSave = performance.now();
     return ok;
@@ -57878,7 +58080,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.garageDisplay.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -58066,7 +58268,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);
