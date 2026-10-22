@@ -266,6 +266,8 @@ for (const id of IDS) {
   const bay = await ev(id => {
     const g = window.game, uw = g.uw, v = window.__pc, PV = window.__pv;
     const a = uw.findAction(), dock = +g.world.compounds[id].dockDoors[0].open.toFixed(2);
+    // only the trunk's product: storing takes from your pockets first, and a fight earlier can leave some there
+    PV.Inv.remove(uw.S.inv, 'green', PV.Inv.has(uw.S.inv, 'green'));
     v.trunk = {}; PV.Inv.add(v.trunk, 'green', 5, 100);
     const st0 = PV.Inv.has(uw.S.storage[id] || {}, 'green');
     if (a) a.act();
