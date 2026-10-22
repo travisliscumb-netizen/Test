@@ -272,6 +272,10 @@ const WH_GATE = [null,
   { kind: 'reinforced', h: 3.0, open: 1.6, ram: Infinity, controlled: true, booth: true },
   { kind: 'massive', h: 3.8, open: 1.8, ram: Infinity, controlled: true, booth: true, posts: true, wedge: true }];
 // cameras by surveillance tier; light is the share of a camera's range it keeps at night under that tier's lighting
+// breaches (§45.26): crew assigned to the warehouse patch after patchH economic hours and repair after repairH;
+// a patch holds against anything slower than patchRam. Costs: a flat patch, a repair at the warehouse price × rate
+// × the tier being restored; contractors (from the bank, today) charge `contractor` × the repair
+const WH_BREACH = { patchH: 1, repairH: 8, patchRam: 6, patchPanel: 150, patchGate: 400, repairPanel: 0.002, repairGate: 0.012, contractor: 1.5 };
 const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;

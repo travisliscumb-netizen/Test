@@ -697,7 +697,11 @@ class EmpireUI {
         const P = uw.compounds.status(id), pct = f => Math.round(f * 100) + '%';
         const FN = { none: 'open lot', chain: 'chain-link fence', tall: 'tall fence behind bollards', anticlimb: 'anti-climb fence behind anti-ram barriers', wall: 'hardened wall and fence' };
         const GN = { none: 'an open gap', basic: 'a basic gate', motor: 'a motorised gate', reinforced: 'a reinforced gate and guard booth', massive: 'a massive gate, wedge barrier, access posts and booth' };
-        h += `<h3>On site</h3><div class="stats"><span>Perimeter</span><span>${FN[P.fence]}</span><span>Way in</span><span>${GN[P.gate]}</span><span>Cameras</span><span>${P.cams ? `${P.cams} · cover ${pct(P.day)} of the yard by day, ${pct(P.night)} at night` : 'none'}</span><span>Lights</span><span>${P.lights} fixture${P.lights === 1 ? '' : 's'}</span>${P.breaches ? `<span>Damage</span><span style="color:var(--red)">${P.breaches} breach${P.breaches === 1 ? '' : 'es'} · mended at the end of the day</span>` : ''}</div>`;
+        h += `<h3>On site</h3><div class="stats"><span>Perimeter</span><span>${FN[P.fence]}</span><span>Way in</span><span>${GN[P.gate]}</span><span>Cameras</span><span>${P.cams ? `${P.cams} · cover ${pct(P.day)} of the yard by day, ${pct(P.night)} at night` : 'none'}</span><span>Lights</span><span>${P.lights} fixture${P.lights === 1 ? '' : 's'}</span>${P.breaches || P.patched ? `<span>Damage</span><span style="color:var(--red)">${P.breaches ? `${P.breaches} breach${P.breaches === 1 ? '' : 'es'} open` : ''}${P.breaches && P.patched ? ' · ' : ''}${P.patched ? `${P.patched} patched (weak)` : ''}</span>` : ''}</div>`;
+        if (P.breaches || P.patched) {
+          const crewHere = uw.crew.active().some(c => c.assign === 'w:' + id);
+          h += `<div class="hint">${crewHere ? `Your crew here patch a breach within ${WH_BREACH.patchH} hour and repair it fully after ${WH_BREACH.repairH}, paid from the vault.` : 'Nobody works here: it stays open until you patch it on site or pay contractors.'}</div><div class="btns">${P.breaches ? '<button class="sbtn" data-act="wpatch">Patch it yourself (on site)</button>' : ''}<button class="sbtn gold" data-act="wfix">Contractors · repair everything today</button></div>`;
+        }
       }
       h += `<div class="hint">The security level is set by the weakest of the four. At ${WH_LEVEL_NAME[4]} with at least ${WH_IMMUNE.enforcers} Enforcers and a Lieutenant on site, ordinary rival raids can’t knock it off (now: level ${W.level(id)}, ${enf} Enforcer${enf === 1 ? '' : 's'}, ${lt ? 'a Lieutenant' : 'no Lieutenant'}). A gang-war assault, the police, betrayal or sabotage are another matter. Defense ${Math.round(W.defense(id))}.</div>`;
       return h;
@@ -749,6 +753,8 @@ class EmpireUI {
       if (k === 'wt') { this.whTab = parts[1]; g.content.refreshSvc(); return; }
       if (k === 'wup') { g.content.refreshSvc(uw.whse.upgrade(id, parts[1]) || `${WH_CATS[parts[1]].name}: ${WH_CATS[parts[1]].tiers[uw.whse.tier(id, parts[1])]}.`); return; }
       if (k === 'wtreas') { const on = Money.treasury === id, e = Money.setTreasury(on ? null : id); g.saveGame(); g.content.refreshSvc(e || (on ? 'No Treasury Warehouse: income goes to your home safehouse.' : `${d.name} is now your Treasury Warehouse.`)); return; }
+      if (k === 'wpatch') { const e = uw.compounds.patchNow(id); g.content.refreshSvc(e || 'Patched. It will hold against a push, not a ram.'); return; }
+      if (k === 'wfix') { const e = uw.compounds.repairNow(id); g.content.refreshSvc(e || 'Repaired: back to what you paid for.'); return; }
       if (k === 'wauto') { const st = uw.whse.st(id); st.auto = !st.auto; g.saveGame(); g.content.refreshSvc(st.auto ? 'Automatic resupply is on.' : 'Automatic resupply is off.'); return; }
       if (k === 'wcash') { const n = +parts[2], m = parts[1] === 'in' ? uw.transferCash('inv', 'p:' + id, n) : uw.transferCash('p:' + id, 'inv', n); g.saveGame(); g.content.refreshSvc(m ? `${parts[1] === 'in' ? 'Deposited' : 'Withdrew'} ${fmtMoney(m)}.` : 'Nothing moved.'); return; }
       if (k === 'wcrew') { const e = uw.crew.assign(+parts[1], parts[2], 'w:' + id); g.saveGame(); g.content.refreshSvc(e || `${uw.crew.find(+parts[1]).name.split(' ')[0]} works here now (${CREW_ROLES[parts[2]].name}).`); return; }

@@ -1207,3 +1207,22 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       challenge for transparent warehouse/fleet operating overhead; never quietly restore per-run fees.
     - **Development saves.** Dealer corners starting empty is acceptable; no complicated migration for old
       development careers (a small dev-only convenience may be proposed for testing).
+26. **Session 3B rulings (DC-32).**
+    - **Ramming thresholds (approved as implemented).** Lower-tier fences and gates break when rammed hard enough;
+      reinforced and massive gates and the anti-ram barrier tiers never break. Exact speeds may be revisited during
+      later vehicle/balance testing.
+    - **Breaches (revised).** No silent end-of-day auto-heal. Breach state persists through save/load; a breached
+      fence, gate or barrier stays compromised until repaired. Assigned crew may repair automatically after a delay
+      and at an appropriate cost; emergency patching may restore partial protection quickly; a full repair restores
+      the purchased security tier; an understaffed or unstaffed warehouse can stay vulnerable. Session 4 uses the
+      current breach state in raid calculations and physical raid behavior.
+    - **Authorization (approved with clarification).** Warehouse access is granted to the player, crew assigned to
+      that warehouse, crew currently accompanying the player, and valid Driver/delivery vehicles for that warehouse.
+      Ordinary Dealers are not permanently authorized because they belong to the player; a Dealer who must
+      physically enter for a specific task or mission gets temporary task-based authorization.
+    - **Warehouses for sale (approved).** An unowned warehouse shows an open lot so the player can enter the site and
+      buy it.
+    - **Camera alarms (approved for Session 3B).** Toast/news only for now. Session 4 connects alarms, cameras,
+      guards, breaches and security staffing to raid detection and response.
+    - **Map changes (approved).** Cannery Row replaces its block's ordinary buildings; Shed 4's yard removes some
+      terminal containers.

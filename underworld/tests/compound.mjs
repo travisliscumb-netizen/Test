@@ -361,7 +361,7 @@ const ram = async (id, T, target, speed) => {
     window.__rv = v; window.__rt = { tx, tz, nx, nz };
   }, [id, T, target, speed]);
   await frames(page, 60);
-  return ev(([id, target]) => { const g = window.game, R = g.uw.compounds.R[id], v = window.__rv, t = window.__rt; const past = (v.pos.x - t.tx) * t.nx + (v.pos.z - t.tz) * t.nz; const o = { broke: target === 'gate' ? !!(R.gate && R.gate.broken) : R.panels.some(p => p.broken), past: +past.toFixed(1) }; g.vehicles.despawn(v); g.uw.compounds.mend(); return o; }, [id, target]);
+  return ev(([id, target]) => { const g = window.game, R = g.uw.compounds.R[id], v = window.__rv, t = window.__rt; const past = (v.pos.x - t.tx) * t.nx + (v.pos.z - t.tz) * t.nz; const o = { broke: target === 'gate' ? !!(R.gate && R.gate.state === 'broken') : R.panels.some(p => p.state === 'broken'), past: +past.toFixed(1) }; g.vehicles.despawn(v); g.money.W.clean = 1e9; g.uw.compounds.repairNow(id); return o; }, [id, target]);
 };
 for (const id of IDS) {
   const g1 = await ram(id, { perimeter: 4, access: 1 }, 'gate', 16), g2 = await ram(id, { perimeter: 4, access: 2 }, 'gate', 16), g3 = await ram(id, { perimeter: 4, access: 3 }, 'gate', 22), g4 = await ram(id, 4, 'gate', 22), slow = await ram(id, { perimeter: 4, access: 1 }, 'gate', 4);

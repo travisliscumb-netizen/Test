@@ -65,7 +65,10 @@ inside. What security buys is built on site from the saved tiers, and rebuilds t
   - It opens for vehicles those crew drive, and for a vehicle carrying a delivery for the warehouse.
   - It stays shut for everyone else, and closes on a tailgater.
   - Basic and motorised gates break when rammed hard; the reinforced and massive gates don't.
-  - Damage is mended at the end of the day.
+  - Damage stays (it is saved) until it is mended. Crew who work there patch a breach within an hour (it holds
+    again, but breaks easily) and repair it fully eight economic hours after starting, paid from the vault. With
+    nobody assigned it stays open. You can patch it yourself on site or pay contractors from the bank.
+  - A crew member who doesn't work at a warehouse (a Dealer, say) can be given a pass to go in for one job.
 - **Surveillance:** cameras (2 / 4 / 6 / 10) with a field of view, a range and line of sight, wall lights and
   floodlights. At night the lighting decides how far a camera sees. Maximum Security covers the whole yard and the
   gate approach, day and night. Anyone in the yard the gate wouldn't admit raises the alarm.
@@ -436,6 +439,7 @@ node underworld/tests/build.mjs     # Node only: index.html matches what src/ bu
 node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
+node underworld/tests/breach.mjs     # warehouse breaches persist through reload, stay open unstaffed, crew patch then repair from the vault, on-site patch, contractors, upgrades replace; task passes
 node underworld/tests/compound.mjs   # warehouse compounds: every tier visible, save/reload, gate authorization (player, crew, Drivers, deliveries vs rivals, traffic), drive-through with no contacts, loading bay, interior reachability, Maximum Security geometry, mobile budget
 node underworld/tests/carmoney.mjs   # car provenance: Dirty/Clean-bought resale, stolen cars, no resale above price, no laundering loop, save/reload
 node underworld/tests/fixer.mjs      # laundering fixer: fee, minimum, daily cap, delay, day-length pace, arrest in transit, save/reload, stolen cars

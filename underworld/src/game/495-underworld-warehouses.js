@@ -13,14 +13,18 @@
 class WarehouseSystem {
   constructor(uw) { this.uw = uw; }
   get S() { return this.uw.S; }
-  static freshState() { return { up: { perimeter: 0, surveillance: 0, access: 0, vault: 0 }, auto: true }; }
+  static freshState() { return { up: { perimeter: 0, surveillance: 0, access: 0, vault: 0 }, auto: true, breach: {}, passes: [] }; }
   static sanitize(all, num) {
     const out = {};
     if (!all || typeof all !== 'object' || Array.isArray(all)) return out;
     for (const id in all) {
       const d = PROP_BY_ID[id], w = all[id]; if (!d || d.kind !== 'warehouse' || !w || typeof w !== 'object') continue;
       const up = {}; for (const k of WH_CAT_IDS) up[k] = Math.floor(num(w.up && w.up[k], 0, 0, 4));
-      out[id] = { up, auto: w.auto !== false };
+      // breaches (§45.26) and task passes (crew let in for one job) persist
+      const breach = {};
+      if (w.breach && typeof w.breach === 'object') for (const k in w.breach) { const b = w.breach[k]; if (!b || (b.s !== 'broken' && b.s !== 'patched') || !/^(gate|[nswe]:[\d.-]+:\d+)$/.test(k)) continue; breach[k] = { s: b.s, t: num(b.t, 0, 0, 1e9), tier: Math.floor(num(b.tier, 1, 1, 4)) }; if (b.w !== undefined) breach[k].w = num(b.w, 0, 0, 1e9); }
+      const passes = (Array.isArray(w.passes) ? w.passes : []).filter(q => q && typeof q === 'object').slice(0, 20).map(q => ({ crew: Math.floor(num(q.crew, 0, 0, 1e7)), until: num(q.until, 0, 0, 1e9), why: typeof q.why === 'string' ? q.why.slice(0, 80) : 'a job' }));
+      out[id] = { up, auto: w.auto !== false, breach, passes };
     }
     return out;
   }

@@ -768,6 +768,7 @@ class Underworld {
     this.cops.tickHours(h);
     this.opps.tickHours(h);
     this.crew.tickHours(h);
+    this.compounds.tickHours();
     this.recompute();
   }
   tickDay() {
@@ -779,8 +780,6 @@ class Underworld {
     this.crew.tickDay();
     // Lieutenants send Drivers to restock the corners for tomorrow (§5, §8)
     this.whse.automate();
-    // the compound crews mend whatever was rammed (§6)
-    this.compounds.mend();
     this.factions.tickDay();
     this.cops.tickDay();
     this.opps.tickDay();

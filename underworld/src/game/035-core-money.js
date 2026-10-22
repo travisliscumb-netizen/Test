@@ -30,6 +30,8 @@ const MONEY_SOURCES = {
   launderIn: { pay: 'dirty' }, launderOut: { earn: 'clean' },
   // a Driver buying product at a supplier for a warehouse: paid from the vault first (payroll order)
   supplyRun: { pay: 'payroll' },
+  // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
+  whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
   // ---- Dirty costs
   armorer: { pay: 'dirty' }, supplier: { pay: 'dirty' }, raceBuyIn: { pay: 'dirty' }, respect: { pay: 'dirty' },

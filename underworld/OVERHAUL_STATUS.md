@@ -15,6 +15,25 @@ The mapping stays exact until a session changes the code above that line; after 
 - Commit/base revision: Session 3 rulings commit → the Session 3B commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-21
 
+## Session 3B follow-up (§45.26: DC-32 rulings)
+
+- **Breaches persist and stay open until mended** (`uw.whse[id].breach`, sanitized on load). Each entry records the
+  state, the economic hour of the breach, the tier it breached, and when crew started work. The end-of-day auto-heal
+  is gone.
+- **Crew repair** (`CompoundSystem.tickHours`, on the economic clock): with anyone assigned to the warehouse, work
+  starts that hour.
+  - A **patch** follows an hour later: it holds again, but breaks at 6 m/s. It costs $150 a panel or $400 for the
+    gate.
+  - A **full repair** follows eight hours after work started: price × 0.2% a panel or 1.2% for the gate, times the
+    tier restored. It restores the bought tier's strength.
+  - Both are paid in Dirty Cash from that warehouse's vault first (new ledger source `whRepair`, booked as upkeep).
+  - No money: no work, and one news line. Nobody assigned: nothing happens, and the work clock resets.
+- **You:** patch on site (Security tab, at the warehouse), or pay contractors from Clean Bank at 1.5× to repair
+  everything today. Buying the next tier of a category replaces the breached part.
+- **Task passes** (`grantPass(id, crewId, hours, why)`, saved in `uw.whse[id].passes`): a crew member who doesn't
+  work at a warehouse (an ordinary Dealer is refused) can be let in for one job until the pass expires.
+- Tests: new `tests/breach.mjs` (13 checks); `compound.mjs` ram cleanup now uses the contractor repair.
+
 ## Completed this session (3B)
 
 - **Two compounds** (`world.compounds`, laid out once by `_whCompound` in `110-content-places.js`):
@@ -67,7 +86,7 @@ The mapping stays exact until a session changes the code above that line; after 
       and then a command room.
     Each room has an interaction point that opens its tab. Buying an upgrade while inside rebuilds the rooms around
     you.
-  - **Breaches:** rammed panels and gates are runtime state, mended by the end-of-day tick (`mend()`).
+  - **Breaches** (revised in the follow-up below): rammed panels and gates are saved and stay open until mended.
 - **Security tab** shows what is on site: fence, gate, camera count with day and night coverage, lights, breaches.
 - **Fixed:** the delivery report still printed a "Fee" (DC-31 leftover), and comments still mentioned run fees.
 
@@ -77,13 +96,15 @@ The mapping stays exact until a session changes the code above that line; after 
 - `090` (`world.compounds`), `110-content-places.js` (Cannery Row landmark, `_whCompound`, shed4 place),
   `120-content-city-v2.js` (Shed 4 yard in the terminal; `DoorSystem` `want` hook), `240` (collider `onHit` on
   impact), `390` (`WH_FENCE`, `WH_GATE`, `WH_SURV`; Cannery Row is a place), `430` (van hooks, report text), `450`
-  (system, update, end-of-day mend, loading bay action and access), `470` (guard groups), `490` (warehouse door →
+  (system, update, hourly breach work, loading bay action and access), `470` (guard groups), `490` (warehouse door →
   Enter), `495` (upgrade rebuilds), `500` (yard parking), `360` (`w:` interior points), `540` (security tab), `640`,
   `650`, `manifest.json`.
 
 ## Save/schema changes (3B)
 
-- None. The compound follows `uw.whse[id].up`; breaches are not saved (they are mended by the end of the day anyway).
+- No schema bump. The compound follows `uw.whse[id].up`. The follow-up adds `uw.whse[id].breach` (per part:
+  `{ s: 'broken' | 'patched', t, tier, w? }`) and `uw.whse[id].passes` (`{ crew, until, why }`); both sanitized,
+  and both default to empty.
 
 ## Tests run (3B)
 
@@ -131,7 +152,6 @@ No change beyond noise.
 ## Known bugs / risks (3B)
 
 - Abstract rival raids (`rivalAttacks`) still don't use the physical breaches or guards; Session 4's raids should.
-- Breaches are not saved: a reload mends them early (they mend by the end of the day anyway).
 - Driver vans appear only for runs that start or end while you are near. Runs elsewhere stay abstract, as before.
 - Block 7,10 lost its procedural buildings, and a few terminal containers are gone (deliberate, DC-32).
 
@@ -1600,7 +1620,7 @@ flipping loses money; special/unique/prize cars may get explicit custom rules la
   product, losses and risk. More logistics pressure later would be a transparent operating-overhead design challenge.
 - Route hijack risk per stretch 0.2% / 1% / 3% / 7% / 12% (`ROUTE_RISK`).
 
-### DC-32 · Session 3B physical-security choices — OPEN (owner review; nothing blocks on it)
+### DC-32 · Session 3B physical-security choices — RULED (§45.26): rams, authorization, open lots, alarms and map approved; breaches REVISED (persistent, crew repair)
 
 1. **Current specification:** DC-30 / §45.25 asks for visible tiers, an authorized automatic gate (player, crew,
    Drivers, delivery vehicles in; rivals and unauthorized NPCs out), a functional interior, and Maximum Security
@@ -1629,6 +1649,36 @@ flipping loses money; special/unique/prize cars may get explicit custom rules la
 6. **Tradeoffs / risks:** ramming creates a new way to break in. Abstract raids still ignore the physical breaches
    (Session 4's raids could use them).
 7. **Severity:** OPTIONAL. **Blocks:** nothing. Please confirm, or rule on any item.
+
+**Disposition (owner, §45.26):** ramming thresholds approved (may be retuned later); breaches revised: they persist
+through save/load and stay open until mended, assigned crew patch then repair at a cost, emergency patching gives
+partial protection, a full repair restores the tier, an unstaffed warehouse stays vulnerable (done in the 3B
+follow-up); authorization approved, with temporary task passes for anyone else who must enter (done); open lots for
+sale, toast/news alarms and the map changes approved. Session 4 wires breaches, alarms, cameras, guards and staffing
+into raid detection, odds and physical raids.
+
+### DC-33 · Session 4 is two sessions: defending the empire (4A) and raiding rivals (4B) — OPEN (session plan; nothing blocks)
+
+1. **Current specification:** prompt Session 4 covers physical major and rival shipments, raids on rival
+   warehouses (persistent remaining loot, the 4.5-minute reinforcement start, the stronger 7–10 minute response,
+   physical evacuation), gang-war escalation from actual player pressure, threat messages, automatic crew defense,
+   and closing reload/duplication exploits. §45.26 adds breaches, alarms, cameras, guards and staffing in raid
+   detection and response.
+2. **Problem observed:** these are two large systems that share little code:
+   - the **defensive** side: pressure → escalation → threat messages on a real-time timer (§45.10, §45.16) →
+     strikes on the player's dealers, deliveries, stashes, businesses and warehouses → automatic crew defense,
+     using the Session 3B compound;
+   - the **offensive** side: physical rival warehouses with persistent loot, the reinforcement timeline,
+     evacuation, carrying the loot home, and physical shipments.
+   One session for both means a very large change that is hard to review and regression-test, the same problem as
+   DC-30.
+3. **Proposed improvement:**
+   - **Session 4A** (started now): the defensive side, including everything §45.26 asks of raids on the player.
+   - **Session 4B:** the offensive side, including the duplication-proof loot rules (§39 scenarios 14-16 and 39).
+4. **Why it is better:** two reviewable steps, and 4A is what the 3B rulings point at.
+5. **Systems affected:** the session plan only.
+6. **Tradeoffs / risks:** rival warehouses aren't raidable until 4B.
+7. **Severity:** RECOMMENDED. **Blocks:** nothing. Please confirm, or ask for 4B to be folded back into one session.
 
 ## Owner decisions (Session 0 review)
 

@@ -15,10 +15,13 @@
      (coverage() and seen() measure the same thing), wall lights and
      floodlights; at night the lighting decides how far a camera sees.
    - Vault and interior: the rooms inside, built when you walk in.
-   Breaches (a rammed panel or gate) are runtime state, mended at the end of
-   the day; everything else follows the tiers in the save, so a reload
-   rebuilds the same compound. Nothing here touches money or the abstract
-   raid odds (WarehouseSystem.defense), which stay as Session 3A set them.
+   Breaches (§45.26): a rammed panel or gate stays compromised, in the save,
+   until it is mended. Crew assigned to the warehouse patch it after an
+   economic hour (partial protection: it holds again, but breaks easily) and
+   repair it fully after eight, paid from the vault first; a warehouse with
+   nobody assigned stays open. You can patch on site yourself, or pay
+   contractors from the bank. Everything else follows the tiers in the save,
+   so a reload rebuilds the same compound.
    ===================================================================== */
 const WH_SIDE = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
 const WH_LOD = 260;      // a compound is simulated (gates, agents, cameras) while the player is this close
@@ -135,8 +138,10 @@ class CompoundSystem {
     const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.uw.props.owned(id) ? 'o' : '-');
     if (!force && sig === R.sig && !R.dirty) return;
     const g = this.g, grid = g.world.grid, C = R.C;
-    const keepGate = R.sig === sig && R.gate ? { open: R.gate.open, broken: R.gate.broken } : null;
-    const keepBroken = R.sig === sig ? new Set(R.panels.filter(p => p.broken).map(p => p.key)) : new Set();
+    const keepOpen = R.sig === sig && R.gate ? R.gate.open : 0;
+    // what is breached (saved): entries from a tier that has since been replaced are gone with it
+    const br = this.uw.props.owned(id) ? this.breaches(id) : {};
+    for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
     for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     R.group = R.gateGrp = R.wedgeGrp = null;
@@ -155,19 +160,24 @@ class CompoundSystem {
           const a0 = seg.a0 + i * pl, a1 = a0 + pl, am = (a0 + a1) / 2, key = seg.side + ':' + seg.a0.toFixed(1) + ':' + i;
           const P = (a, out = 0) => ns(seg.side) ? [a, seg.e + o[1] * out] : [seg.e + o[0] * out, a];
           const [px, pz] = P(am), ry = ns(seg.side) ? 0 : Math.PI / 2;
-          const panel = { key, ram: F.ram, broken: keepBroken.has(key), side: seg.side, x: px, z: pz };
+          const st = br[key] ? br[key].s : 'ok', panel = { key, ram: st === 'patched' ? Math.min(F.ram, WH_BREACH.patchRam) : F.ram, state: st, side: seg.side, x: px, z: pz };
           const th = F.wall ? 0.4 : 0.2;
           const c = col(ns(seg.side) ? { x0: a0, x1: a1, z0: pz - th / 2, z1: pz + th / 2, y0: 0, y1: Y + F.h } : { x0: px - th / 2, x1: px + th / 2, z0: a0, z1: a1, y0: 0, y1: Y + F.h });
           c.see = !F.wall; c.wh = id;
-          if (F.ram < Infinity) c.part = panel;
-          if (panel.broken) c.on = false;
+          if (panel.ram < Infinity) c.part = panel;
+          if (st === 'broken') c.on = false;
           panel.col = c; R.panels.push(panel);
           // the post at the panel's start (and the last one at the end)
           for (const a of i === n - 1 ? [a0, a1] : [a0]) {
             const [qx, qz] = P(a), pw = F.wall ? 0.5 : F.kind === 'chain' ? 0.1 : 0.16;
             k.box(qx, Y, qz, pw, F.h + (F.wall ? 0 : 0.1), pw, F.wall ? 0x8a857a : 0x4a5056, ry);
           }
-          if (panel.broken) { k.box(px + o[0] * 1.4, Y, pz + o[1] * 1.4, pl * 0.9, 0.08, 1.2, 0x5f676e, ry + 0.2); continue; }
+          if (st === 'broken') { k.box(px + o[0] * 1.4, Y, pz + o[1] * 1.4, pl * 0.9, 0.08, 1.2, 0x5f676e, ry + 0.2); continue; }
+          if (st === 'patched') {
+            // an emergency patch: plywood sheets and a strap across the gap, about as strong as a cheap fence
+            k.box(px, Y, pz, pl - 0.1, Math.min(F.h, 2.2), 0.06, 0xb8935a, ry); k.box(px, Y + 1.1, pz, pl, 0.08, 0.1, 0xe8c04a, ry);
+            continue;
+          }
           if (F.wall) {
             k.box(px, Y, pz, pl, F.wall, 0.35, 0xa8a296, ry); k.box(px, Y + F.wall, pz, pl, 0.1, 0.45, 0xc8c2b4, ry);
             k.box(px, Y + F.wall + 0.1, pz, pl, F.h - F.wall - 0.1, 0.04, 0x5c646b, ry, 'mesh');
@@ -221,8 +231,10 @@ class CompoundSystem {
       const leaf = lk.build(); leaf.position.set(G.x, 0, G.z); g.scene.add(leaf); R.gateGrp = leaf;
       const gc = col(ns(G.side) ? { x0: G.x - hw, x1: G.x + hw, z0: G.z - th / 2 - 0.1, z1: G.z + th / 2 + 0.1, y0: 0, y1: Y + A.h, kind: 'gate' } : { x0: G.x - th / 2 - 0.1, x1: G.x + th / 2 + 0.1, z0: G.z - hw, z1: G.z + hw, y0: 0, y1: Y + A.h, kind: 'gate' });
       gc.wh = id;
-      R.gate = { def: A, ram: A.ram, open: keepGate ? keepGate.open : 0, broken: keepGate ? keepGate.broken : false, col: gc, want: false, lat, hw };
-      if (A.ram < Infinity) gc.part = R.gate;
+      const gst = br.gate ? br.gate.s : 'ok';
+      R.gate = { def: A, key: 'gate', ram: gst === 'patched' ? Math.min(A.ram, WH_BREACH.patchRam) : A.ram, state: gst, open: gst === 'broken' ? 0 : keepOpen, col: gc, want: false, lat, hw };
+      if (gst === 'patched') for (const s of [-1, 1]) k.box(G.x + lat[0] * s * hw * 0.5, Y + 0.6, G.z + lat[1] * s * hw * 0.5, ns(G.side) ? hw * 0.9 : 0.12, 0.5, ns(G.side) ? 0.12 : hw * 0.9, 0xb8935a);
+      if (R.gate.ram < Infinity) gc.part = R.gate;
       if (A.booth && C.booth) {
         const b0 = C.booth; k.box(b0.x, Y, b0.z, b0.w, 2.6, b0.d, 0xd8d0c0); k.box(b0.x, Y + 2.6, b0.z, b0.w + 0.5, 0.18, b0.d + 0.5, 0x3a3f44);
         k.box(b0.x, Y + 1.2, b0.z, b0.w + 0.04, 0.9, b0.d + 0.04, 0x6a8ab0, 0, 'glow');
@@ -321,7 +333,7 @@ class CompoundSystem {
       const C = R.C, slide = G.open * (C.gate.w - 0.4);
       R.gateGrp.position.set(C.gate.x + G.lat[0] * slide, 0, C.gate.z + G.lat[1] * slide);
       R.gateGrp.rotation.set(0, 0, 0);
-      if (G.broken) { R.gateGrp.position.set(C.gate.x + C.gate.n[0] * 1.6, -0.2, C.gate.z + C.gate.n[1] * 1.6); R.gateGrp.rotation.set(C.gate.axis === 'x' ? -1.35 * Math.sign(C.gate.n[1]) : 0, 0, C.gate.axis === 'z' ? 1.35 * Math.sign(C.gate.n[0]) : 0); }
+      if (G.state === 'broken') { R.gateGrp.position.set(C.gate.x + C.gate.n[0] * 1.6, -0.2, C.gate.z + C.gate.n[1] * 1.6); R.gateGrp.rotation.set(C.gate.axis === 'x' ? -1.35 * Math.sign(C.gate.n[1]) : 0, 0, C.gate.axis === 'z' ? 1.35 * Math.sign(C.gate.n[0]) : 0); }
     }
     if (R.wedge && R.wedgeGrp) R.wedgeGrp.position.y = -R.wedge.down * 0.88;
   }
@@ -346,7 +358,15 @@ class CompoundSystem {
     const c = this.uw.crew.find(crewId);
     if (!c || c.status !== 'active') return 'not working for you';
     if (c.assign === WarehouseSystem.key(id) || this.uw.crew.bodyguards().includes(c.id)) return '';
+    if (this.pass(id, crewId)) return '';
     return 'works somewhere else';
+  }
+  // a task pass (§45.26): someone who doesn't work here, let in for one job until a given economic hour
+  pass(id, crewId) { const st = this.uw.whse.st(id), now = this.uw.S.econH; st.passes = (st.passes || []).filter(q => q.until > now); return st.passes.find(q => q.crew === crewId) || null; }
+  grantPass(id, crewId, hours, why) {
+    const c = this.uw.crew.find(crewId); if (!c || c.status !== 'active') return 'Not someone who works for you.';
+    const st = this.uw.whse.st(id); st.passes = (st.passes || []).filter(q => q.crew !== crewId);
+    st.passes.push({ crew: crewId, until: this.uw.S.econH + hours, why: why || 'a job' }); return '';
   }
   // is anyone the gate should open for near it? (vehicles get a longer reach at speed, as DoorSystem does)
   gateWant(R) {
@@ -376,10 +396,13 @@ class CompoundSystem {
     if (c.part) this.ram(R.id, c.part, imp, v);
   }
   ram(id, part, imp, v) {
-    if (part.broken || imp < part.ram) return;
-    const R = this.R[id], g = this.g;
-    part.broken = true; part.col.on = false;
-    if (part !== R.gate && v) for (const q of R.panels) if (!q.broken && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) { q.broken = true; q.col.on = false; }
+    if (part.state === 'broken' || imp < part.ram) return;
+    const R = this.R[id], g = this.g, br = this.breaches(id), now = this.uw.S.econH;
+    // crew already working here start on it at once (w: the economic hour the work started)
+    const crewHere = this.uw.crew.active().some(c => c.assign === WarehouseSystem.key(id));
+    const hit = q => { q.state = 'broken'; q.col.on = false; br[q.key] = { s: 'broken', t: now, tier: q === R.gate ? R.t.access : R.t.perimeter }; if (crewHere) br[q.key].w = now; };
+    hit(part);
+    if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q);
     if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true;
     g.audio.play('crash', { x: part.x || R.C.gate.x, z: part.z || R.C.gate.z });
     this.events.push({ t: g.time, id, kind: 'breach', what: part === R.gate ? 'gate' : 'fence' });
@@ -394,14 +417,54 @@ class CompoundSystem {
     uw.news('pv', `${what} at ${d.name}.${WH_SURV[this.R[id].t.surveillance].cams ? ' The cameras have it.' : ''}`);
     if (!uw.S.jail && g.state === 'playing') g.ui.toast(`${d.name}: ${what.toLowerCase()}.`, 'warn');
   }
-  // the end of the day: crews mend fences and rehang gates
-  mend() {
+  // the saved breach list of a warehouse: { [part key]: { s: 'broken' | 'patched', t: econ hour of the breach, tier,
+  // w: econ hour the crew started on it (absent while nobody works here) } }
+  breaches(id) { const st = this.uw.whse.st(id); return st.breach || (st.breach = {}); }
+  // what mending a part costs: a patch is a flat price, a full repair scales with the tier being restored
+  patchCost(key) { return key === 'gate' ? WH_BREACH.patchGate : WH_BREACH.patchPanel; }
+  repairCost(id, key) { const d = PROP_BY_ID[id], b = this.breaches(id)[key]; return Math.round(d.price * (key === 'gate' ? WH_BREACH.repairGate : WH_BREACH.repairPanel) * Math.max(1, b ? b.tier : 1) / 10) * 10; }
+  // the economic clock: crew assigned here patch, then repair, what is breached; nobody assigned, nothing happens
+  tickHours() {
+    const uw = this.uw, now = uw.S.econH;
     for (const id in this.R) {
-      const R = this.R[id]; let any = false;
-      for (const p of R.panels) if (p.broken) { p.broken = false; p.col.on = true; any = true; }
-      if (R.gate && R.gate.broken) { R.gate.broken = false; any = true; }
-      if (any) this.build(id, true);
+      if (!uw.props.owned(id)) continue;
+      const br = this.breaches(id), keys = Object.keys(br); if (!keys.length) continue;
+      // nobody assigned: nobody is working on it (the clock starts again when someone is)
+      if (!uw.crew.active().some(c => c.assign === WarehouseSystem.key(id))) { for (const key of keys) delete br[key].w; continue; }
+      let patched = 0, fixed = 0, short = false;
+      for (const key of keys) {
+        const b = br[key]; if (b.w === undefined) b.w = now;
+        const age = now - b.w;
+        if (age >= WH_BREACH.repairH) { const c = this.repairCost(id, key); if (Money.payrollReserve() < c) { short = true; continue; } Money.pay(c, 'whRepair', { first: id }); delete br[key]; fixed++; continue; }
+        if (b.s === 'broken' && age >= WH_BREACH.patchH) { const c = this.patchCost(key); if (Money.payrollReserve() < c) { short = true; continue; } Money.pay(c, 'whRepair', { first: id }); b.s = 'patched'; patched++; }
+      }
+      if (patched || fixed) { this.build(id, true); uw.news('pv', `${PROP_BY_ID[id].name}: the crew ${fixed ? `repaired ${fixed} breach${fixed === 1 ? '' : 'es'}` : ''}${fixed && patched ? ' and ' : ''}${patched ? `patched ${patched} more for now` : ''}.`); }
+      if (short && !this.shortT) { this.shortT = true; uw.news('pv', `${PROP_BY_ID[id].name} can't pay for its repairs. The fence stays open until there is Dirty Cash in the vault.`); }
+      if (!short) this.shortT = false;
     }
+  }
+  // you, on site: patch everything that is broken now (paid like crew work, the vault first)
+  patchNow(id) {
+    const uw = this.uw, p = this.g.player, I = this.g.content.interiors;
+    if (!uw.props.owned(id)) return 'You don’t own it.';
+    const here = (I.cur && I.cur.propId === id) || (!p.interior && this.inYard(id, p.pos.x, p.pos.z)) || Math.hypot(p.pos.x - this.R[id].C.gate.x, p.pos.z - this.R[id].C.gate.z) < 12;
+    if (!here) return 'You have to be there to patch it.';
+    const br = this.breaches(id), keys = Object.keys(br).filter(k => br[k].s === 'broken'); if (!keys.length) return 'Nothing is broken.';
+    const cost = keys.reduce((a, k) => a + this.patchCost(k), 0);
+    if (Money.payrollReserve() < cost) return `Patching costs ${fmtMoney(cost)} in Dirty Cash.`;
+    Money.pay(cost, 'whRepair', { first: id }); for (const k of keys) br[k].s = 'patched';
+    this.build(id, true); this.uw.g.autosave('Breaches patched');
+    return '';
+  }
+  // contractors, from the bank, today: everything back to the tier you paid for
+  repairNow(id) {
+    const uw = this.uw; if (!uw.props.owned(id)) return 'You don’t own it.';
+    const br = this.breaches(id), keys = Object.keys(br); if (!keys.length) return 'Nothing needs repairing.';
+    const cost = Math.round(keys.reduce((a, k) => a + this.repairCost(id, k), 0) * WH_BREACH.contractor / 10) * 10;
+    if (!Money.can(cost, 'property')) return `Contractors want ${fmtMoney(cost)} from your bank.`;
+    Money.pay(cost, 'property'); for (const k of keys) delete br[k];
+    this.build(id, true); this.uw.g.autosave('Breaches repaired');
+    return '';
   }
   // ---------------------------------------------------------------- cameras
   // a camera sees a point when it is in range (shortened at night by the tier's lighting), inside its field of view
@@ -450,7 +513,7 @@ class CompoundSystem {
       if (!near) continue;
       const G = R.gate;
       if (G) {
-        if (G.broken) G.col.on = false;
+        if (G.state === 'broken') G.col.on = false;
         else {
           G.want = this.gateWant(R);
           G.open = clamp(G.open + (G.want ? 1 : -1) * dt / G.def.open, 0, 1);
@@ -602,14 +665,15 @@ class CompoundSystem {
     const R = this.R[id], C = R.C, t = R.t || this.tiers(id), cov = this.coverage(id, 0), covN = this.coverage(id, 1);
     return {
       fence: WH_FENCE[t.perimeter] ? WH_FENCE[t.perimeter].kind : 'none', gate: WH_GATE[t.access] ? WH_GATE[t.access].kind : 'none',
-      breaches: R.panels.filter(p => p.broken).length + (R.gate && R.gate.broken ? 1 : 0), cams: R.cams.length, lights: R.lights,
+      breaches: R.panels.filter(p => p.state === 'broken').length + (R.gate && R.gate.state === 'broken' ? 1 : 0),
+      patched: R.panels.filter(p => p.state === 'patched').length + (R.gate && R.gate.state === 'patched' ? 1 : 0), cams: R.cams.length, lights: R.lights,
       day: cov.frac, night: covN.frac, booth: !!(WH_GATE[t.access] && WH_GATE[t.access].booth && C.booth)
     };
   }
   reset() {
     for (const V of this.vans) if (this.g.vehicles.list.includes(V.v) && V.v !== this.g.player.vehicle) this.g.vehicles.despawn(V.v);
     this.vans = []; this.walkers = []; this.alarmT = {}; this.events = [];
-    for (const id in this.R) { const R = this.R[id]; R.sig = null; for (const p of R.panels) p.broken = false; if (R.gate) { R.gate.broken = false; R.gate.open = 0; } }
+    for (const id in this.R) { const R = this.R[id]; R.sig = null; if (R.gate) R.gate.open = 0; }
     this.sync(true);
   }
 }
