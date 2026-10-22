@@ -632,7 +632,7 @@ class CompoundSystem {
       const v = V.v; if (!g.vehicles.list.includes(v)) return false;
       if (v === p.vehicle) { v.mission = null; v.drive = null; return false; } // the player took it
       V.t += dt;
-      if (V.phase === 'unload' && V.t > 20) { V.phase = 'out'; V.t = 0; v.wh.until = g.time + 240; v.drive = new LaneDriver(v, g, this.R[V.id].C.lanes.out[V.dock], { speed: 6, onDone: () => { V.stalls += v.drive.stalls; V.phase = 'gone'; V.t = 0; } }); }
+      if (V.phase === 'unload' && V.t > 20) { V.phase = 'out'; V.t = 0; if (v.wh) v.wh.until = g.time + 240; /* a rival's van carries no manifest of yours */ v.drive = new LaneDriver(v, g, this.R[V.id].C.lanes.out[V.dock], { speed: 6, onDone: () => { V.stalls += v.drive.stalls; V.phase = 'gone'; V.t = 0; } }); }
       if (V.phase === 'gone') {
         // out on the street: an ordinary car again, gone once nobody is looking
         if (!(v.drive instanceof DriveAI)) { v.wh = null; v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = V.goal || g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }

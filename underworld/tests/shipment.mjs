@@ -89,9 +89,14 @@ const drive = await ev(async () => {
   g.resetPlayerState(a.x + dx / d * 40, a.z + dz / d * 40, 0);
   const onShelfEarly = [];
   for (let k = 0; k < 900 && r.state !== 'done'; k++) { await new Promise(res => requestAnimationFrame(res)); if (k % 30 === 0) onShelfEarly.push(window.__shelf('vipers') - shelf0); }
-  return { shelf0, shelf: window.__shelf('vipers'), state: r.state, end: r.end, docked: !!L.V, phase: L.V && L.V.phase, early: onShelfEarly.slice(0, 3), trunk: window.__u(L.van.trunk) };
+  const atDock = L.V && L.V.phase, trunk = window.__u(L.van.trunk);
+  // and it leaves: unloads, drives back out of their gate (its lane, no manifest of yours) onto the street
+  for (let k = 0; k < 2400 && L.V && L.V.phase !== 'gone'; k++) await new Promise(res => requestAnimationFrame(res));
+  const outside = L.V ? (L.van.pos.x - C.gate.x) * C.gate.n[0] + (L.van.pos.z - C.gate.z) * C.gate.n[1] : 0;
+  return { shelf0, shelf: window.__shelf('vipers'), state: r.state, end: r.end, docked: !!L.V, phase: atDock, left: L.V && L.V.phase, outside: +outside.toFixed(1), early: onShelfEarly.slice(0, 3), trunk };
 });
 check('the van drives into their compound and docks; the cargo reaches their shelves on arrival (not before), and the van leaves empty', drive.state === 'done' && drive.end === 'delivered' && drive.docked && drive.shelf === drive.shelf0 + 42 && drive.early[0] === 0 && drive.trunk === 0, JSON.stringify(drive));
+check('…then it unloads and drives back out through their gate onto the street', drive.left === 'gone' && drive.outside > 0, JSON.stringify(drive));
 
 // ---------------------------------------------------------------- 3. hijack: the load is yours, not theirs, for good
 await mk();
