@@ -599,7 +599,7 @@ class EmpireUI {
   t_feed() {
     const uw = this.uw, S = uw.S, g = this.g, now = uw.opps.absHour();
     const list = uw.opps.active().slice().reverse();
-    let h = '<h3>Opportunities</h3>';
+    let h = uw.threats.feedHTML(esc) + '<h3>Opportunities</h3>';
     if (!list.length) h += '<div class="hint">Nothing on the wire right now. Things change hour by hour.</div>';
     h += '<div class="msgs">' + list.map(o => `<div class="msg"><i style="background:${o.urgent ? '#ff4d5e' : '#d28cff'}">${OPP_ICON[o.kind] || '•'}</i><div><b>${esc(o.title)}</b><small>${Math.max(1, o.until - now)}h left</small><p>${esc(o.text)}</p>${o.x !== undefined && !o.taken ? this.wpBtn(o.x, o.z, o.title) : ''}</div></div>`).join('') + '</div>';
     h += '<h3>Messages</h3><div class="msgs">' + S.decisions.map(d => `<div class="msg"><i style="background:#ffd84d">?</i><div><b>${esc(d.text)}</b><div class="btns"><button class="sbtn gold" data-act="dec:${d.id}:1">Agree</button><button class="sbtn" data-act="dec:${d.id}:0">Refuse</button></div></div></div>`).join('') +
@@ -614,6 +614,7 @@ class EmpireUI {
     if (k === 'app') { this.openApp(x); return; }
     if (this.locked()) return;
     switch (k) {
+      case 'threat': { if (uw.threats.openThreat(+x)) { g.ui.closeAll(); return; } r = 'That threat is over.'; break; }
       case 'wp': { const label = decodeURIComponent(z || 'Waypoint'), key = decodeURIComponent(w || ''); g.content.setWaypoint(+x, +y, label); if (key) g.content.waypoint.key = key; r = `Waypoint set: ${label}. Follow the arrow or the GPS line.`; break; }
       case 'pk': this.pnlSel = this.pnlSel === x ? null : x; this.render(); return;
       case 'xf': { const X = this.xfer || (this.xfer = { from: 'inv', to: '' }), key = (y || '').replace(/~/g, ':'); if (x === 'swap') { const t = X.from; X.from = X.to || t; X.to = t; } else if (x === 'from') { if (X.to === key) X.to = X.from; X.from = key; } else if (x === 'to') X.to = key; this.render(); return; }
@@ -962,6 +963,7 @@ class EmpireUI {
       uw.market.sold(z, k, n); uw.addRep(Math.max(1, Math.round(n * (GOODS[k].tier + 1) * 0.8)), null);
       uw.addInf(i, 'pc', n * 0.25);
       S.pressure = clamp(S.pressure + n * GOODS[k].heat * 0.06, 0, 100); S.turfs[i].police = clamp(S.turfs[i].police + n * 0.2, 0, 100);
+      if (own && own !== 'pc' && FACTIONS[own]) uw.threats.press(own, PRESSURE.deal, 'selling on their corners');
       if (own && own !== 'pc' && FACTIONS[own]) { S.factions[own].rel -= 1 + n * 0.3; if (uw.attitude(own) === 'hostile') for (const gg of uw.gangs.groups.values()) if (gg.fid === own && gg.members.some(m => dist2(m.x, m.z, g.player.pos.x, g.player.pos.z) < 40 * 40)) gg.hostile = true; }
       if (g.police.copCanSee(g.player.pos.x, g.player.pos.z, 40)) { g.police.crime('deal', g.player.pos.x, g.player.pos.z); }
       g.audio.play('cash'); g.saveGame(); g.content.refreshSvc(`Sold ${fmtQty(k, n)} ${GOODS[k].name} for ${fmtMoney(cash)}.`);

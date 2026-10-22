@@ -215,7 +215,7 @@ class GangManager {
       }
       // keep groups that are busy fighting near the player; drop the rest
       for (const gr of [...this.groups.values()]) {
-        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'squad') continue;
+        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
         if (want.has(gr.key)) continue;
         const near = gr.members.some(m => dist2(m.x, m.z, px, pz) < 70 * 70 && m.state !== 'down');
         if ((gr.hostile || gr.kind === 'war') && near) continue;
@@ -297,6 +297,7 @@ class GangManager {
       if (byPlayer || (p.lastHitBy === 'pc')) {
         uw.addInf(i, p.fac, -(ko ? 4 : 2));
         if (uw.g.save.rep >= 100 || uw.owner[i] === 'pc') uw.addInf(i, 'pc', ko ? 2.5 : 1);
+        uw.threats.press(p.fac, ko ? PRESSURE.ko : PRESSURE.down, ko ? 'their people put down' : null);
         if (ko) { f.strength = Math.max(0, f.strength - 0.6); uw.addRep(p.role === 'guard' ? 8 : 4, null); S.infamy = Math.min(400, S.infamy + 0.6); }
         uw.opps.onKill(p);
       }
@@ -424,7 +425,7 @@ class GangManager {
     if (!g.vehicles.list.includes(van) || van.burnt) { this.ship = null; return; }
     if (van.driver === 'player') {
       if (!gr.stolen) {
-        gr.stolen = true; const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - units(van.trunk));
+        gr.stolen = true; uw.threats.press('tidewater', PRESSURE.ship, 'their shipment stolen'); const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - units(van.trunk));
         g.ui.banner('Shipment Stolen', goodsList(van.trunk), 'pass', 3); uw.addRep(80, null);
         uw.news('unknown', 'Holm: “You took something of mine. I will be taking something of yours.”');
         g.police.crime('carjack', van.pos.x, van.pos.z);

@@ -144,6 +144,7 @@ class Underworld {
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
     this.compounds = new CompoundSystem(this);
+    this.threats = new ThreatSystem(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -163,7 +164,7 @@ class Underworld {
       return { inf, police: 15 + Math.random() * 15, war: null, own: turfLeader(inf, null), offer: null };
     });
     const factions = {};
-    for (const id of FAC_IDS) { const F = FACTIONS[id]; factions[id] = { strength: F.start.strength, money: F.start.money, stock: 60, heat: 20, rel: id === 'vipers' ? -5 : 0, truce: 0, tribute: 0, boss: F.boss.name, bossDown: 0, lt: 0, broken: 0, fear: 0, hits: 0 }; }
+    for (const id of FAC_IDS) { const F = FACTIONS[id]; factions[id] = { strength: F.start.strength, money: F.start.money, stock: 60, heat: 20, rel: id === 'vipers' ? -5 : 0, truce: 0, tribute: 0, boss: F.boss.name, bossDown: 0, lt: 0, broken: 0, fear: 0, hits: 0, press: 0, hist: [] }; }
     return {
       v: UW_VERSION, day: 1, lastHour: -1, infamy: 0, pressure: 8, rankMax: 0,
       market: Market.fresh(), marketPrev: null, supply: {}, dealQ: {}, chopWanted: [],
@@ -179,7 +180,9 @@ class Underworld {
       // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
       econH: 0, fixer: LaunderFixer.fresh(),
       // Session 3: warehouse security and settings, and each turf's dealer stock on the corner
-      whse: {}, turfStock: {}
+      whse: {}, turfStock: {},
+      // Session 4A: threats against the player's assets (clocks, strength and dice saved with them)
+      threats: ThreatSystem.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -218,6 +221,7 @@ class Underworld {
       f.strength = num(f.strength, df.strength, 0, 120); f.money = num(f.money, df.money, 0, 1e8); f.stock = num(f.stock, 60, 0, 1e5); f.heat = num(f.heat, 20, 0, 100);
       f.rel = num(f.rel, 0, -100, 100); f.aggro = num(f.aggro, 0, 0, 100); f.trouble = num(f.trouble, 0, 0, 10); f.truce = num(f.truce, 0, 0, 1e6); f.tribute = num(f.tribute, 0, 0, 1e5); f.bossDown = num(f.bossDown, 0, 0, 60);
       f.lt = Math.floor(num(f.lt, 0, 0, 99)); f.broken = num(f.broken, 0, 0, 1e6); f.fear = num(f.fear, 0, 0, 100); f.hits = num(f.hits, 0, 0, 1e6);
+      f.press = num(f.press, 0, 0, 100); f.hist = arr(f.hist, []).filter(h => h && typeof h === 'object').slice(-10);
       if (typeof f.boss !== 'string' || !f.boss) f.boss = FACTIONS[id].boss.name;
     }
     // owners missing from an older save: derived once, now that faction state (broken or not) is known
@@ -243,6 +247,7 @@ class Underworld {
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
+    S.threats = ThreatSystem.sanitize(S.threats, num);
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
@@ -267,6 +272,7 @@ class Underworld {
     this.recompute();
     this.gangs.reset(); this.crew.reset(); this.pickups.clear(); this.opps.rebuildMarkers();
     if (this.compounds) this.compounds.reset();
+    if (this.threats) this.threats.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -390,6 +396,8 @@ class Underworld {
     const g = this.g, t = this.T[i], S = this.S;
     const nm = x => x === 'pc' ? 'you' : x ? FACTIONS[x].short : 'nobody';
     if (own === 'pc') {
+      // taking a gang's turf is the biggest grievance there is (Session 4A pressure)
+      if (prev && FACTIONS[prev]) this.threats.press(prev, PRESSURE.take, `took ${t.name}`);
       S.st.turfsTaken++; this.addRep(60, null); S.infamy = Math.min(400, S.infamy + 12);
       g.ui.banner('Turf Taken', `${t.name} · ${ZONES[t.zone].name}`, 'pass', 3.2); g.audio.play('pass');
       this.news('pv', `Word is ${t.name} answers to you now${prev ? ', not the ' + FACTIONS[prev].short : ''}. Put an Enforcer and a Dealer on it (Empire → Crew) and keep it supplied.`);
@@ -738,6 +746,8 @@ class Underworld {
     this.statT -= rdt;
     if (this.statT <= 0) { this.statT = 1; this.recompute(); this.computeInfluence(); if (g.state === 'playing' && !S.jail) this.streetFame(); }
     this.neon.update(g.env.night, g.time, !!(g.player.interior && !(g.player.interior.def && g.player.interior.def.realView)));
+    // threat clocks run on real active play, in jail too (§45.16)
+    this.threats.update();
     if (S.jail) { this.prison.update(dt, rdt); }
     else if (g.state === 'playing' && dt > 0) {
       const h = Math.floor(g.env.time) % 24;

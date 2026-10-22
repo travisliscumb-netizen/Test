@@ -276,6 +276,13 @@ const WH_GATE = [null,
 // a patch holds against anything slower than patchRam. Costs: a flat patch, a repair at the warehouse price × rate
 // × the tier being restored; contractors (from the bank, today) charge `contractor` × the repair
 const WH_BREACH = { patchH: 1, repairH: 8, patchRam: 6, patchPanel: 150, patchGate: 400, repairPanel: 0.002, repairGate: 0.012, contractor: 1.5 };
+// Session 4A (§10, §45.10, §45.16): gang pressure and threats. Pressure (0-100 per faction) comes only from what the
+// player does to that faction; it decays each day. Stages: intimidation, hits on assets, coordinated strikes.
+const PRESSURE = { take: 30, ko: 2, down: 0.5, boss: 25, ship: 30, deal: 1, held: -12, decay: 0.85, decayFlat: 2 };
+const PRESS_STAGE = { warn: 20, hit: 40, strike: 70 };
+// the real-time threat clock (seconds of active play): the warning to THREAT IMMINENT, then to execution; a physical
+// assault lasts at most `fight` seconds before it is decided by what is left standing
+const THREAT_T = { warn: 120, imminent: 60, fight: 120, near: 140 };
 const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;

@@ -51,6 +51,23 @@ Maximum Security with 4 Enforcers and a Lieutenant, ordinary rival raids can't t
 operating warehouse. The property screen of a warehouse has Product, Weapons, Dirty Cash, Security, Crew and
 Logistics tabs. (The physical fences, gates and interior come in Session 3B.)
 
+## Threats against your empire (overhaul Session 4A)
+
+Gangs hold a grievance against you that grows only from what you do to them. Taking their turf, knocking their
+people down, beating their boss, stealing their shipment and selling on their corners all count, and it fades day by
+day. As it grows they intimidate, then hit your corners, stashes, deliveries and businesses, then strike your
+warehouses and try to take turf back.
+
+Every threat comes as a message first. THREAT IMMINENT follows about two minutes of real play later, and the attack
+about a minute after that; the pause menu freezes the clock, the map and phone don't. Open it from the Feed to be
+routed there.
+
+If you are there, they turn up in person: at a warehouse they ram a gate a car can break, and are kept out by one it
+can't. If you aren't (or you're in jail), your crew defend with what is really there: Enforcers, the district's
+Lieutenant, the warehouse's level, breaches and patches, and cameras. Losses are real, and a warehouse they get into
+is left with its gate broken until it is mended. Threats are saved with their clocks and dice, so a reload changes
+nothing. Module: `src/game/545-underworld-threats.js` (`ThreatSystem`).
+
 ## Warehouse compounds (overhaul Session 3B)
 
 Both warehouses stand in their own compounds: Cannery Row takes a whole block of the Industrial Belt, and Tidewater
@@ -439,6 +456,7 @@ node underworld/tests/build.mjs     # Node only: index.html matches what src/ bu
 node underworld/tests/static-money.mjs # Node only: no old single balance anywhere, the wallet only in the ledger, every money source tag valid and used
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
+node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
 node underworld/tests/breach.mjs     # warehouse breaches persist through reload, stay open unstaffed, crew patch then repair from the vault, on-site patch, contractors, upgrades replace; task passes
 node underworld/tests/compound.mjs   # warehouse compounds: every tier visible, save/reload, gate authorization (player, crew, Drivers, deliveries vs rivals, traffic), drive-through with no contacts, loading bay, interior reachability, Maximum Security geometry, mobile budget
 node underworld/tests/carmoney.mjs   # car provenance: Dirty/Clean-bought resale, stolen cars, no resale above price, no laundering loop, save/reload

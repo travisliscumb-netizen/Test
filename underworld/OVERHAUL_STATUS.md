@@ -11,9 +11,87 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **3B — Warehouses: the functional physical layer** (DC-30 approved, §45.25).
-- Commit/base revision: Session 3 rulings commit → the Session 3B commits on `claude/practical-lamport-zld81y`.
-- Date: 2026-10-21
+- Session: **4A — Defending the player's empire** (prompt Session 4, split by DC-33 / §45.27; 4B is rival
+  warehouses and offensive logistics, after 4A is regression-tested).
+- Commit/base revision: Session 3B follow-up `954267e` → the Session 4A commit on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-22
+
+## Completed this session (4A)
+
+- **`ThreatSystem`** (`src/game/545-underworld-threats.js`; state `save.uw.threats`, pressure on each faction).
+  - **Pressure only from actual player pressure.** Each faction's grievance (0–100, with a short history of why):
+    - taking its turf +30;
+    - a member knocked out +2 (put down +0.5);
+    - its boss beaten +25;
+    - its shipment stolen +30;
+    - each sale on its corners +1.
+
+    It decays daily (×0.85 − 2), falls 12 when a strike fails and 20 when one succeeds. A new career has no
+    grievance, so there are no threats and no move on your turf.
+  - **Stages:** intimidation at 20+ (corners and businesses), hits at 40+ (adding safehouse stashes and deliveries on
+    the road), coordinated strikes at 70+ (adding warehouses and turf takebacks).
+  - **When they act:** once a day a faction may pick one asset of yours near its ground: 35% / 55% / 80% by stage,
+    ×1.3 in a coalition, ×0.4 if afraid of you, scaled down by your power (the old deterrence). There is at most one
+    open threat per faction, three in all, and never two on the same asset. Rival-vs-rival wars are unchanged.
+  - **The threat flow** (§10, §45.10, §45.16):
+    - A warning arrives as a message and a toast, never a modal.
+    - After 120 s of real active play comes THREAT IMMINENT, and after another 60 s the threat executes.
+    - The clock keeps its own wall time (frame-rate independent, day-length independent). The pause menu, a hidden
+      tab and loading freeze it, and so does any gap of more than 5 s (a suspended app). The map and the phone
+      don't.
+    - The Feed lists live threats with their clocks. "Go there" (opening the threat) routes you to the asset.
+  - **Execution:**
+    - **You there** (within 140 m, not jailed): the attackers turn up in person (3–6 of them) and head for the door
+      or the corner. At a warehouse whose gate a car can break, they bring a car and ram it, and the 3B ram rules
+      decide whether it gives (a real, saved breach). At a reinforced or massive gate they come on foot and are kept
+      out. Your guards fight them.
+    - **How a fight ends:** with every attacker down (held); with one holding the door or corner for 6 s (hit); with
+      you leaving (the crew settle it); or after 120 s with both sides standing (settled with your presence counted).
+    - **You away, or jailed:** the crew defend on their own (§45.16).
+  - **Defense from what is actually there:**
+    - the district's Lieutenant (and, through them, half the Enforcers on neighbouring turfs);
+    - for a corner, its Enforcers and Dealers;
+    - for a delivery, the runner's odds;
+    - for a stash, the safehouse's security;
+    - for a business, its staff, manager and the security firm;
+    - for a warehouse: security level ×10, its Enforcers and Lieutenant, camera coverage now (up to 12), an open
+      breach −8 each, a patch −3 each, an open lot −10, no gate −6, an unrammable intact gate +6.
+    - Maximum Security with staffing turns back anything short of a coordinated strike, and a strike faces its
+      defense ×1.5.
+    - Each threat's strength (faction strength × stage, +15% per earlier successful hit on that asset, capped at
+      +45%) and its dice are fixed when it is created.
+  - **Losses are real:**
+    - a corner: its people hurt, 60% of the corner stock gone, influence down;
+    - a delivery: robbed (the run's own report);
+    - a stash: 40% of the stock and 30% of the cash (to $50k, booked as theft);
+    - a business: wrecked until repaired;
+    - a warehouse: 30% of the stock and 20% of the vault (to $250k), Enforcers maybe hurt, and the gate broken — a
+      saved breach until mended.
+  - **A turf takeback** is announced the same way. On execution it becomes the faction's showdown on that turf,
+    decided by the existing war system with your crew and you.
+- **Persistence and exploits:**
+  - Threats are saved with their clock, strength, history bonus, dice and state. A reload neither resets, rerolls,
+    duplicates nor stacks them.
+  - A reload in the middle of a physical fight (the attackers are not saved) settles it exactly once, as if you had
+    left.
+- **Replaced:** `PropertyManager.rivalAttacks` (a daily dice roll that hit businesses and warehouses without
+  warning) is gone. `chooseWar` no longer picks the player's turf: threats are the one way rivals come at the player.
+- Ledger: `Money.robbedAt` books stolen vault cash as theft.
+
+## Files / systems changed (4A)
+
+- New `src/game/545-underworld-threats.js` (manifest after the fixer), `tests/threat.mjs` (25 checks).
+- `390` (`PRESSURE`, `PRESS_STAGE`, `THREAT_T`), `035` (`robbedAt`), `450` (state, sanitize, update, pressure on turf
+  taken), `460` (threat tick replaces rival attacks; `chooseWar` leaves player turf to threats; boss pressure),
+  `470` (pressure for knockdowns and the stolen shipment; assault groups kept), `490` (`rivalAttacks` removed),
+  `540` (Feed threats, "Go there", pressure for sales on rival corners), `640`, `650`.
+
+## Save/schema changes (4A)
+
+- `uw.threats` (`{ list, next, log }`) and faction `press` / `hist`. All are sanitized and default to empty, with no
+  schema bump.
+
+# Session 3B record (warehouse compounds)
 
 ## Session 3B follow-up (§45.26: DC-32 rulings)
 
@@ -1657,7 +1735,7 @@ follow-up); authorization approved, with temporary task passes for anyone else w
 sale, toast/news alarms and the map changes approved. Session 4 wires breaches, alarms, cameras, guards and staffing
 into raid detection, odds and physical raids.
 
-### DC-33 · Session 4 is two sessions: defending the empire (4A) and raiding rivals (4B) — OPEN (session plan; nothing blocks)
+### DC-33 · Session 4 is two sessions: defending the empire (4A) and raiding rivals (4B) — APPROVED (§45.27)
 
 1. **Current specification:** prompt Session 4 covers physical major and rival shipments, raids on rival
    warehouses (persistent remaining loot, the 4.5-minute reinforcement start, the stronger 7–10 minute response,

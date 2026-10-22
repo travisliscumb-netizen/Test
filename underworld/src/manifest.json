@@ -64,6 +64,7 @@
   "game/520-underworld-prison.js",
   "game/530-underworld-opportunities.js",
   "game/535-underworld-fixer.js",
+  "game/545-underworld-threats.js",
   "game/540-underworld-empire-ui.js",
   "game/550-underworld-gambling.js",
   "game/560-underworld-taxis.js",

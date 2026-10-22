@@ -155,27 +155,21 @@ class FactionSim {
     // Tidewater schedules the next boat
     if (!S.shipment || S.shipment.done) { if (!this.F('tidewater').broken && Math.random() < 0.55) this.scheduleShipment(); }
     // rivals sometimes hit the player's businesses
-    uw.props.rivalAttacks(coalition);
+    // rivals come after the player's assets through warnings and threats, from real pressure (Session 4A)
+    uw.threats.tickDay(coalition);
   }
   chooseWar(id, coalition) {
     const uw = this.uw, S = this.S, f = this.F(id);
-    const cands = [], pcWar = S.turfs.some(t => t.war && t.war.d === 'pc');
+    const cands = [];
     for (let i = 0; i < uw.T.length; i++) {
       if (uw.owner[i] !== id) continue;
       for (const j of uw.turfNeighbors(i)) {
         const o = uw.owner[j]; if (o === id || S.turfs[j].war) continue;
         let score = 50 + Math.random() * 30;
-        if (o === 'pc') {
-          if (f.truce > S.day) continue;
-          // power is a deterrent: the more the player outweighs them, the less they dare. Against the
-          // city's kingpin a crew moves only out of a real grudge, or as part of a coalition when it
-          // isn't hopelessly outmatched, and the coalition makes one push at a time.
-          const ratio = uw.powerRatio(id), kp = uw.kingpin();
-          if (kp && (pcWar || (ratio > 1.5 && f.rel > -60 && (!coalition || ratio > 2.5)))) continue;
-          score += f.rel < -20 ? 30 : -15; if (coalition) score += kp ? 10 : 45; score -= this.playerDefense(j) * 0.6;
-          score -= clamp((ratio - 1) * 35, 0, 90);
-        }
-        else if (o && this.F(o)) { if (this.F(o).truce > S.day && f.truce > S.day) continue; score -= this.F(o).strength * 0.5; }
+        // the player's turf is never picked here: retaking it is a threat, announced first and driven by
+        // pressure (Session 4A, ThreatSystem)
+        if (o === 'pc') continue;
+        if (o && this.F(o)) { if (this.F(o).truce > S.day && f.truce > S.day) continue; score -= this.F(o).strength * 0.5; }
         else score += 25; // neutral ground is cheap
         cands.push([j, score]);
       }
@@ -222,6 +216,7 @@ class FactionSim {
     f.bossDown = randi(3, 7); f.strength *= 0.72; f.fear = 100;
     for (let i = 0; i < uw.T.length; i++) if (S.turfs[i].inf[id]) S.turfs[i].inf[id] = Math.max(0, S.turfs[i].inf[id] - 14);
     if (byPlayer) {
+      uw.threats.press(id, PRESSURE.boss, `${f.boss} put down`);
       S.st.bossesBeaten++; S.infamy = Math.min(400, S.infamy + 60); uw.addRep(150, `${f.boss} put down`);
       f.rel = Math.min(f.rel - 50, -60);
       for (const o of FAC_IDS) if (o !== id) this.F(o).fear = Math.min(100, this.F(o).fear + 25);

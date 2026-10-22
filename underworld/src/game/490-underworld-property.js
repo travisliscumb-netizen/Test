@@ -187,34 +187,6 @@ class PropertyManager {
     this.policeRaids();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);
   }
-  rivalAttacks(coalition) {
-    const uw = this.uw, S = this.S;
-    for (const def of this.ownedList()) {
-      if (def.kind !== 'business' && def.kind !== 'warehouse') continue;
-      const o = S.props[def.id]; if (o.dmg > 0) continue;
-      const L = uw.loc('prop', def.id), i = turfAt(L.x, L.z);
-      const near = new Set([i, ...uw.turfNeighbors(i)]);
-      for (const fid of FAC_IDS) {
-        const f = S.factions[fid]; if (f.broken || f.truce > S.day) continue;
-        if (!(f.rel < -35 || coalition) || ![...near].some(j => uw.owner[j] === fid)) continue;
-        let p = (0.06 + (coalition ? 0.06 : 0) + (f.rel < -70 ? 0.05 : 0)) * clamp(1.4 - uw.powerRatio(fid) * 0.35, 0.08, 1);
-        if (uw.crew.onTurf(i).some(id => { const c = uw.crew.find(id); return c && c.role === 'enforcer'; })) p *= 0.4;
-        // a warehouse defends itself: its security level and the people guarding it (§6). At Maximum Security with
-        // minimum staffing an ordinary raid can't succeed; exceptional threats (Session 4) are another matter.
-        if (def.kind === 'warehouse') {
-          if (uw.whse.immune(def.id)) { if (Math.random() < p) uw.news('pv', `The ${FACTIONS[fid].short} came at ${def.name} last night and turned back at the gate. Nobody got in.`); break; }
-          p *= clamp(1 - uw.whse.defense(def.id) / 150, 0.1, 1);
-        }
-        if (Math.random() < p) {
-          o.dmg = 1;
-          const stash = S.storage[def.id], lost = units(stash) ? Inv.lose(stash, 0.3) : 0;
-          uw.news('unknown', `The ${FACTIONS[fid].short} hit ${def.name} last night: windows out, staff scared${lost ? ', some stock gone' : ''}. Income is down until you repair it.`);
-          uw.opps.add({ kind: 'retaliate', title: `Hit back at the ${FACTIONS[fid].short}`, text: `They trashed ${def.name}. Their crew hangs out on their nearest corner.`, fid, hours: 36 });
-          break;
-        }
-      }
-    }
-  }
   repairCost(def) { return Math.round(def.price * 0.12 / 10) * 10; }
   repair(id) { const g = this.uw.g, def = PROP_BY_ID[id], o = this.S.props[id]; if (!o || !o.dmg) return ''; const c = this.repairCost(def); if (!Money.can(c, 'property')) return `Repairs cost ${fmtMoney(c)} from your bank.`; Money.pay(c, 'property'); o.dmg = 0; g.audio.play('cash'); return ''; }
   policeRaids() {

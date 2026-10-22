@@ -277,6 +277,14 @@ const Money = {
     const uw = this.uw; if (uw && uw.S && uw.S.ledger) uw.S.ledger.exp.theft = (uw.S.ledger.exp.theft || 0) + Math.round(want);
     return want;
   },
+  // rivals who got into a stash or a warehouse take a share of the Dirty Cash kept there (Session 4A); booked as theft
+  robbedAt(id, frac, cap) {
+    const have = this._get('p:' + id), want = Math.round(Math.min(have * frac, cap, have) * 100) / 100;
+    if (!(want > 0)) return 0;
+    this._set('p:' + id, have - want);
+    const uw = this.uw; if (uw && uw.S && uw.S.ledger) uw.S.ledger.exp.theft = (uw.S.ledger.exp.theft || 0) + Math.round(want);
+    return want;
+  },
   // a property you no longer own: its cash comes with you if you are there, otherwise it is gone with the place
   dropProp(id) { const c = this.dirtyAtProp(id); this._set('p:' + id, 0); return c; },
   // display helpers: the balance that matters for a cost of this source, as HTML
