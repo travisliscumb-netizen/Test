@@ -40,6 +40,8 @@ const SaveSystem = {
       },
       vehicles: {},
       garage: [],
+      // the vehicle registry (Session 5A): stolen cars kept track of, cars waiting for a space, what happened to cars
+      tracked: [], nextTrack: 0, pendingCars: [], vlog: [],
       dealers: {},
       nextUid: 1,
       pos: null,
