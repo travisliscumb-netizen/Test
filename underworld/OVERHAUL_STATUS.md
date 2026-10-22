@@ -96,7 +96,7 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Tests run (4B)
 
-New suites: `tests/raid.mjs` **18 / 18** and `tests/shipment.mjs` **22 / 22**. Each requirement from §45.27 and what
+New suites: `tests/raid.mjs` **18 / 18** and `tests/shipment.mjs` **23 / 23**. Each requirement from §45.27 and what
 proves it:
 
 | Requirement (§45.27) | Proof |
@@ -107,7 +107,7 @@ proves it:
 | Reinforcement timing (~4.5 min, stronger at 7–10 min) | `raid`: guards only at 260 s; squads at 275, 425 and 545 s; a repeated stage sends nothing; the real clock is frozen by the pause menu |
 | Physical evacuation | `raid`: what leaves the shelves is on the van, nothing doubled; stealing the van gives you exactly its load; walking away winds the raid down |
 | The remainder persists until a real resupply or evacuation | `raid`: the restock is on the road (out of their street stock, in the shipment), held during a raid, and on the shelves only when it arrives. `shipment`: no second van stacks |
-| Physical shipments and hijacking | `shipment`: with you near, a real van whose trunk is the record's cargo drives in, docks, and only then stocks the shelves. Taking it puts the load in your trunk and nowhere else (+30 pressure); a wreck loses it |
+| Physical shipments and hijacking | `shipment`: with you near, a real van whose trunk is the record's cargo drives in, docks, only then stocks the shelves, and drives back out through their gate. Taking it puts the load in your trunk and nowhere else (+30 pressure); a wreck loses it |
 | Save/reload duplication protection | `shipment`: reload while due (identical); reload with the van on the road (arrived exactly once, and a second reset/bind adds nothing); a stolen load never returns to them; an import on the quay survives reload once, crates and all |
 | Major/cartel imports (§3, §8) | `shipment`: rank and warehouse gates; full price paid up front; one at a time; cost basis travels; lands and waits 24 h; not on foot or in a car; box truck → loading bay → warehouse stock; a Driver run only to a warehouse; impounded when nobody comes; customs seizure |
 | The Tidewater boat | `shipment`: one at a time; customs seizure; delivered to their warehouse with overflow to street stock; an old `save.uw.shipment` migrates |
@@ -116,7 +116,7 @@ Full regression against the 4B build:
 - **All checks pass:** arrest 126, breach 13, build 5, business 40, camera 20, cargo 36, carmoney 10, casino 39,
   city 25, core 64, dealers 34, fixer 17, gambling 57, gangs 23, homes 26, interiors 22, inventory 58, kingpin 6,
   ledger 54, map 22, money 10, offline 14, phoneapps 19, police 13, prison 48, progression 33, property 33, pwa 5,
-  raid 18, ramps 21, roads 20, royale-sim 23, session 35, shipment 22, shooting 37, smoke 16, soak 22,
+  raid 18, ramps 21, roads 20, royale-sim 23, session 35, shipment 23, shooting 37, smoke 16, soak 22,
   static-money 8, stations 17, street 11, survival 9, tutorial 13, ui 23, vehicles 39, warehouse 29.
 - **Under parallel load, pass alone:**
   - stress 30 (a 3.4 s frame stall under load);
@@ -131,7 +131,11 @@ Full regression against the 4B build:
 - **Screenshot suites** (shots, cityshots, qashots, frontshots, carshots) and contact run with no errors.
 - **Performance** (`perf.mjs`, under parallel load): draw calls 114 / 121 (119 / 121 in 4A), update times within
   noise.
-- **Van access at the five rival compounds** (probe, not a suite): see the risks below.
+- **Van access at the five rival compounds** (probe, not a suite): at every one a van drives in, docks, unloads and
+  leaves through the gate onto the street, with 0 stalls, 0 compound contacts and full health.
+- **Two bugs found by the probe and fixed** (the shipment suite now covers the exit):
+  - the unload→out step wrote a manifest a rival van doesn't carry (`v.wh`), so it never left its dock;
+  - a delivered van lost its gang, so their own gate closed on it as it went out.
 
 ## Known bugs / risks (4B)
 
