@@ -23,11 +23,16 @@ const helpers = first => ev(first => {
   window.__liveT = id => g.vehicles.list.filter(v => v.trackId === id).length;
 }, first);
 await helpers(true);
+// the ids this test follows live on this side of the page (a reload clears the window)
+const ids = {};
+const keep = () => ev(() => ({ A: window.__A, B: window.__B, T: window.__T, J: window.__J })).then(o => { for (const k in o) if (o[k] !== undefined) ids[k] = o[k]; });
 const reload = async () => {
+  await keep();
   await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
   await ev(() => window.game.quality.setMode(0));
   await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
   await helpers();
+  await ev(o => { window.__A = o.A; window.__B = o.B; window.__T = o.T; window.__J = o.J; }, ids);
 };
 const save = () => ev(() => { const g = window.game; g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.exitVehicle && g.player.state === 'vehicle' && g.exitVehicle(true); return g.saveGame(true); });
 
@@ -73,6 +78,7 @@ check('a car given to you with nowhere to park waits with the giver (not in your
 const park = await ev(() => {
   const g = window.game, s = g.save, R = g.vreg, e = s.garage.find(x => x.uid === window.__A), v = R.live(e);
   const at = { x: Math.round(v.pos.x), z: Math.round(v.pos.z) };
+  g.player.lastVehicle = null; // (the car you just left is kept beside you; drive something else and it isn't)
   window.__far(); window.__tick(2);
   return { at, live: window.__liveOf(e.uid), out: e.out, loc: e.loc && { x: Math.round(e.loc.x), z: Math.round(e.loc.z) }, home: R.bayPos(e) && { x: Math.round(R.bayPos(e).x), z: Math.round(R.bayPos(e).z) } };
 });
