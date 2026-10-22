@@ -57,7 +57,8 @@ class VehicleRegistry {
     this.cars.set(e.uid, v);
     return v;
   }
-  freeBays() { let n = 0; for (const def of this.PM.ownedList()) for (const b of this.PM.bays(def)) if (!this.PM.carAt(def.id, b.i)) n++; return n; }
+  // free spaces for one more car: unreserved bays, less any car of yours still waiting for one (never negative)
+  freeBays() { let n = 0; for (const def of this.PM.ownedList()) for (const b of this.PM.bays(def)) if (!this.PM.carAt(def.id, b.i)) n++; return Math.max(0, n - this.s.garage.filter(e => !e.at).length); }
   // a home bay for every car that lacks one (a save from before Session 5A, a property bought since): any free
   // bay at a property you own. The car itself stays where it is.
   house() {
@@ -77,6 +78,7 @@ class VehicleRegistry {
   homeSpot() { const sh = this.g.missions.safe, c = curbNear(sh.x, sh.z, 8 + (this.s.garage.length % 5) * 6); return { x: c.x, z: c.z, h: c.h }; }
   updateFleet() {
     const g = this.g, s = this.s, p = g.player, px = p.pos.x, pz = p.pos.z, py = p.pos.y;
+    if (s.garage.some(e => !e.at)) this.house(); // a car still waiting for a space takes one as soon as it frees
     for (const e of s.garage) {
       const v = this.live(e);
       if (!v) this.cars.delete(e.uid); else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});

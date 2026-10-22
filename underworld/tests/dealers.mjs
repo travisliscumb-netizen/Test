@@ -140,7 +140,7 @@ const deny = await ev(() => {
   return { rep, cash, usedRep, full };
 });
 check('prestige cars need the reputation; the cash lot sells to anyone', /^Needs \d+ Rep$/.test(deny.rep) && deny.usedRep === '', JSON.stringify(deny));
-check('no sale without the money or a free parking space', /Costs/.test(deny.cash) && /Garage full/.test(deny.full), JSON.stringify(deny));
+check('no sale without the money or a free parking space', /Costs/.test(deny.cash) && /No free parking space/.test(deny.full), JSON.stringify(deny));
 
 // 7. the showroom: walk in through the glass front, the camera sees through glass, cars have room
 await ev(() => { const g = window.game, pl = g.world.places.prestige; g.resetPlayerState(pl.door.x, pl.door.z + 6, Math.PI); });

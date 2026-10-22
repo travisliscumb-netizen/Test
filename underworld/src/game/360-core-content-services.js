@@ -264,6 +264,8 @@ class ContentManager {
   // beyond your real parking (§14, §45.29). Returns null when there is nowhere to put it.
   addToGarage(type, origin, color, quiet, at) {
     const s = this.g.save, PM = this.g.uw && this.g.uw.props;
+    // the fleet never outgrows the parking (a car from an old save still waiting for a space counts)
+    if (PM && s.garage.length >= this.garageCap) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
     if (!at && PM) for (const def of PM.ownedList()) { const b = PM.freeBay(def); if (b) { at = { p: def.id, i: b.i }; break; } }
     if (!at) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
     const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null };

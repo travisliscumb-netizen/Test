@@ -240,7 +240,7 @@ class DealerLots {
     const g = this.g, s = g.save, C2 = g.content;
     if (lot !== 'used' && s.rep < (CAR_REP[c.type] || 0)) return `Needs ${CAR_REP[c.type]} Rep`;
     // a free space of its own (a car out on the street keeps its space: §45.29)
-    if (!g.vreg.freeBays()) return C2.garageCap ? 'No free parking space' : 'You need a place with parking';
+    if (!g.vreg.freeBays() || s.garage.length >= C2.garageCap) return C2.garageCap ? 'No free parking space' : 'You need a place with parking';
     // Saltworks is a shady lot that takes cash or the bank; the licensed dealers take the bank only (§13)
     if (!Money.can(c.price, lot === 'used' ? 'usedLot' : 'dealer')) return `Costs ${fmtMoney(c.price)}${lot === 'used' ? '' : ' from your bank'}`;
     if (lot !== 'used' && g.police.level > 0) return 'Not with the police on you';

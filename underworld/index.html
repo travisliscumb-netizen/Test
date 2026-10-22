@@ -44756,6 +44756,8 @@ class ContentManager {
   // beyond your real parking (§14, §45.29). Returns null when there is nowhere to put it.
   addToGarage(type, origin, color, quiet, at) {
     const s = this.g.save, PM = this.g.uw && this.g.uw.props;
+    // the fleet never outgrows the parking (a car from an old save still waiting for a space counts)
+    if (PM && s.garage.length >= this.garageCap) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
     if (!at && PM) for (const def of PM.ownedList()) { const b = PM.freeBay(def); if (b) { at = { p: def.id, i: b.i }; break; } }
     if (!at) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
     const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null };
@@ -50982,7 +50984,7 @@ class DealerLots {
     const g = this.g, s = g.save, C2 = g.content;
     if (lot !== 'used' && s.rep < (CAR_REP[c.type] || 0)) return `Needs ${CAR_REP[c.type]} Rep`;
     // a free space of its own (a car out on the street keeps its space: §45.29)
-    if (!g.vreg.freeBays()) return C2.garageCap ? 'No free parking space' : 'You need a place with parking';
+    if (!g.vreg.freeBays() || s.garage.length >= C2.garageCap) return C2.garageCap ? 'No free parking space' : 'You need a place with parking';
     // Saltworks is a shady lot that takes cash or the bank; the licensed dealers take the bank only (§13)
     if (!Money.can(c.price, lot === 'used' ? 'usedLot' : 'dealer')) return `Costs ${fmtMoney(c.price)}${lot === 'used' ? '' : ' from your bank'}`;
     if (lot !== 'used' && g.police.level > 0) return 'Not with the police on you';
@@ -51112,7 +51114,8 @@ class VehicleRegistry {
     this.cars.set(e.uid, v);
     return v;
   }
-  freeBays() { let n = 0; for (const def of this.PM.ownedList()) for (const b of this.PM.bays(def)) if (!this.PM.carAt(def.id, b.i)) n++; return n; }
+  // free spaces for one more car: unreserved bays, less any car of yours still waiting for one (never negative)
+  freeBays() { let n = 0; for (const def of this.PM.ownedList()) for (const b of this.PM.bays(def)) if (!this.PM.carAt(def.id, b.i)) n++; return Math.max(0, n - this.s.garage.filter(e => !e.at).length); }
   // a home bay for every car that lacks one (a save from before Session 5A, a property bought since): any free
   // bay at a property you own. The car itself stays where it is.
   house() {
@@ -51132,6 +51135,7 @@ class VehicleRegistry {
   homeSpot() { const sh = this.g.missions.safe, c = curbNear(sh.x, sh.z, 8 + (this.s.garage.length % 5) * 6); return { x: c.x, z: c.z, h: c.h }; }
   updateFleet() {
     const g = this.g, s = this.s, p = g.player, px = p.pos.x, pz = p.pos.z, py = p.pos.y;
+    if (s.garage.some(e => !e.at)) this.house(); // a car still waiting for a space takes one as soon as it frees
     for (const e of s.garage) {
       const v = this.live(e);
       if (!v) this.cars.delete(e.uid); else if (v.trunk !== e.trunk) v.trunk = e.trunk || (e.trunk = {});
