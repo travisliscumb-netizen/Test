@@ -297,7 +297,8 @@ class ShipmentSystem {
   arriveLive(r, L) {
     const van = L.van;
     this.arrive(r);
-    if (this.g.vehicles.list.includes(van)) { van.trunk = {}; van.fac = null; if (!L.V) { if (!this.g.inView(van.pos.x, 1, van.pos.z, 3)) this.g.vehicles.despawn(van); } }
+    // still their van (their gate must let it back out): empty now
+    if (this.g.vehicles.list.includes(van)) { van.trunk = {}; if (!L.V) { if (!this.g.inView(van.pos.x, 1, van.pos.z, 3)) this.g.vehicles.despawn(van); } }
   }
   stolen(r, L) {
     const g = this.g, uw = this.uw, van = L.van, f = this.S.factions[r.fid], boat = r.kind === 'boat';
