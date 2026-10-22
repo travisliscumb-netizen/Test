@@ -8,7 +8,7 @@
      reinforcements, a stronger response from 7 minutes, and from 10 minutes an evacuation van that loads what is
      left (off their shelves, onto the van) and drives it to their HQ. Stop or steal the van and the load is lost to
      them or yours. Walk away and the raid winds down with the stock as it stands.
-   - Only an actual delivery restocks them, and not while a raid is on. */
+   - Only an actual delivery restocks them (a shipment that arrives), and not while a raid is on. */
 import { launch, open, check, startNew, finish, frames } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
@@ -131,14 +131,20 @@ await ev(() => { const g = window.game; g.exitVehicle(true); g.resetPlayerState(
 const down = await ev(() => { const uw = window.game.uw, w = window.__st(); const shelf = JSON.stringify(w.stock); uw.rivalwh.update(60); const still = !!w.raid; uw.rivalwh.update(40); return { still, ended: !w.raid, alert: w.alert > uw.S.day, shelf, after: JSON.stringify(w.stock) }; });
 check('walk away and after a minute and a half the raid winds down; the shelves are as you left them', down.still && down.ended && down.alert && down.shelf === down.after, JSON.stringify(down));
 const restock = await ev(() => {
-  const uw = window.game.uw, S = uw.S, w = window.__st(), f = S.factions.vipers;
+  const uw = window.game.uw, S = uw.S, w = window.__st(), f = S.factions.vipers, Sh = uw.shipments;
+  Sh.D.list = Sh.D.list.filter(r => r.fid !== 'vipers'); Sh.watching = () => false; // out of sight: it simply arrives (shipment.mjs drives the van)
   const u0 = window.__u(w.stock); f.stock = 200;
   uw.rivalwh.tickDay(); const onAlert = window.__u(w.stock);      // the day after a raid they are counting, not restocking
-  S.day = w.alert; uw.rivalwh.tickDay(); const after = window.__u(w.stock);
-  w.raid = { t: 10, away: 0, evacDone: false, start: 0 }; const u1 = after; uw.rivalwh.tickDay(); const duringRaid = window.__u(w.stock); w.raid = null;
-  return { u0, onAlert, after, duringRaid, u1, fStock: f.stock };
+  S.day = w.alert; uw.rivalwh.tickDay(); const sent = window.__u(w.stock);
+  // the restock left their street stock and is on the road: in the shipment record, not on the shelves yet
+  const rec = Sh.D.list.find(r => r.kind === 'supply' && r.fid === 'vipers'), inTransit = rec ? window.__u(rec.cargo) : 0, fAfter = f.stock;
+  w.raid = { t: 10, away: 0, evacDone: false, start: 0 }; const at0 = rec && rec.at; if (rec) Sh.due(rec); const held = rec && rec.state === 'due' && rec.at === at0 + 1, duringRaid = window.__u(w.stock); w.raid = null;
+  if (rec) Sh.due(rec); const after = window.__u(w.stock);
+  uw.rivalwh.tickDay(); const again = Sh.D.list.filter(r => r.kind === 'supply' && r.fid === 'vipers').length;
+  delete Sh.watching;
+  return { u0, onAlert, sent, inTransit, fAfter, held, duringRaid, after, done: rec && rec.state === 'done' && rec.end, again };
 });
-check('only a real delivery restocks them, and not on the alert day or while a raid is on', restock.onAlert === restock.u0 && restock.after > restock.u0 && restock.duringRaid === restock.u1 && restock.fStock < 200, JSON.stringify(restock));
+check('only a real delivery restocks them, and not on the alert day or while a raid is on: the restock is on the road (out of their street stock, in the shipment) until it arrives', restock.onAlert === restock.u0 && restock.sent === restock.u0 && restock.inTransit > 0 && restock.fAfter === 200 - restock.inTransit && restock.held && restock.duringRaid === restock.u0 && restock.after === restock.u0 + restock.inTransit && restock.done === 'delivered', JSON.stringify(restock));
 
 // ---------------------------------------------------------------- 7. the safe
 const safe = await ev(async () => {

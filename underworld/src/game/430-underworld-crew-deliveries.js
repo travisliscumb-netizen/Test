@@ -8,7 +8,8 @@
    pressure, wars, cargo value, size, your influence) - never a bare dice roll.
    Since Session 3 only Drivers make runs (§5), between your places, from a
    supplier ('spot:<id>', bought on the spot with the destination's vault
-   cash) and to a dealer's corner ('turf:<i>'). Route risk follows §8: rival
+   cash), from your import waiting at the docks ('import:<id>', Session 4B)
+   and to a dealer's corner ('turf:<i>'). Route risk follows §8: rival
    hijack risk by who holds each stretch, police risk separately.
    ===================================================================== */
 const RUNNER_BANDS = [[0, 'ROOKIE', 0.5, 0.6], [35, 'DECENT', 0.6, 0.75], [55, 'EXPERIENCED', 0.75, 0.85], [75, 'ELITE', 0.85, 0.9]];
@@ -28,15 +29,18 @@ class DeliveryManager {
   // places a run can start or end: 'inv' (you), a property id, 'turf:<i>' (a dealer's corner), 'spot:<id>' (a supplier)
   isTurf(id) { return typeof id === 'string' && /^turf:\d+$/.test(id) && +id.slice(5) < this.uw.T.length; }
   isSpot(id) { return typeof id === 'string' && id.startsWith('spot:') && SPOTS.some(s => s.id === id.slice(5) && s.sells && s.sells.length); }
-  placeOk(id) { return id === 'inv' || !!PROP_BY_ID[id] || this.isTurf(id) || this.isSpot(id); }
-  placeName(id) { return id === 'inv' ? 'your pockets' : this.isTurf(id) ? `the corner on ${this.uw.T[+id.slice(5)].name}` : this.isSpot(id) ? SPOTS.find(s => s.id === id.slice(5)).name : PROP_BY_ID[id] ? PROP_BY_ID[id].name : '?'; }
+  // your import on the quay (a pickup only; a saved run keeps the name even once the pile is gone)
+  isImport(id) { return typeof id === 'string' && /^import:\d+$/.test(id); }
+  placeOk(id) { return id === 'inv' || !!PROP_BY_ID[id] || this.isTurf(id) || this.isSpot(id) || this.isImport(id); }
+  placeName(id) { return id === 'inv' ? 'your pockets' : this.isTurf(id) ? `the corner on ${this.uw.T[+id.slice(5)].name}` : this.isSpot(id) ? SPOTS.find(s => s.id === id.slice(5)).name : this.isImport(id) ? `your import at ${this.uw.shipments.importPoint().name}` : PROP_BY_ID[id] ? PROP_BY_ID[id].name : '?'; }
   locOf(id) {
     if (id === 'inv') { const p = this.g.player; return { x: p.pos.x, z: p.pos.z, name: 'you (pockets)' }; }
     if (this.isTurf(id)) { const t = this.uw.T[+id.slice(5)]; return { x: t.deal.x, z: t.deal.z, name: this.placeName(id) }; }
+    if (this.isImport(id)) { const P = this.uw.shipments.importPoint(); return { x: P.x, z: P.z, name: this.placeName(id) }; }
     const L = this.isSpot(id) ? this.uw.loc('spot', id.slice(5)) : this.uw.loc('prop', id);
     return L ? { x: L.x, z: L.z, name: this.placeName(id) } : null;
   }
-  container(id) { return id === 'inv' ? this.S.inv : this.isTurf(id) ? this.uw.whse.turfStock(+id.slice(5)) : (this.S.storage[id] || (this.S.storage[id] = {})); }
+  container(id) { if (this.isImport(id)) { const r = this.uw.shipments.importAt(+id.slice(7)); return r ? r.cargo : {}; } return id === 'inv' ? this.S.inv : this.isTurf(id) ? this.uw.whse.turfStock(+id.slice(5)) : (this.S.storage[id] || (this.S.storage[id] = {})); }
   // room right now, before runs on the way
   rawFree(id) { return id === 'inv' ? this.uw.pocketFree() : this.isTurf(id) ? this.uw.whse.turfFree(+id.slice(5)) : this.uw.props.storageFree(id); }
   freeAt(id, excludeRun) {
@@ -99,7 +103,8 @@ class DeliveryManager {
     if (from === to) return 'Pick a different destination.';
     if (!GOODS[good] || !(n > 0)) return 'Nothing to send.';
     if (!this.placeOk(from) || this.isTurf(from)) return 'Pick a pickup.';
-    if (from !== 'inv' && !this.isSpot(from) && !uw.props.owned(from)) return 'You don’t own that stash.';
+    if (this.isImport(from)) { if (!uw.shipments.importAt(+from.slice(7))) return 'That import isn’t on the quay.'; if (!PROP_BY_ID[to] || PROP_BY_ID[to].kind !== 'warehouse') return 'An import goes to a warehouse.'; }
+    else if (from !== 'inv' && !this.isSpot(from) && !uw.props.owned(from)) return 'You don’t own that stash.';
     if (to === 'inv' || this.isSpot(to) || !this.placeOk(to)) return 'Pick a destination.';
     if (this.isTurf(to)) { const i = +to.slice(5); if (!uw.whse.dealersOn(i).length) return `You have no Dealer on ${uw.T[i].name}.`; if (GOODS[good].fence || GOODS[good].arms) return 'Dealers don’t move that.'; }
     else if (!uw.props.owned(to) || !PROP_BY_ID[to].storage) return 'The destination has no stash.';
@@ -121,6 +126,7 @@ class DeliveryManager {
     let cost;
     if (buy) { Money.pay(buy, 'supplyRun', { first }); S.supply[from.slice(5)][good] -= n; cost = buy; }
     else cost = Inv.remove(this.container(from), good, n);
+    if (this.isImport(from)) uw.shipments.taken(uw.shipments.importAt(+from.slice(7)));
     const now = this.absHour();
     const r = { id: S.nextRun++, crew: c.id, name: uw.crew.displayName(c), from, to, good, n, cost, start: now, eta: now + a.hours, chance: a.p, dist: a.dist, rival: a.rival, police: a.police };
     if (opts.auto) r.auto = true;
@@ -165,7 +171,7 @@ class DeliveryManager {
       const costEach = r.cost / r.n, room = Math.floor(Math.max(0, this.rawFree(r.to)) / GOODS[r.good].size), put = Math.min(delivered, room);
       Inv.add(dst, r.good, put, costEach * put);
       let rest = delivered - put;
-      if (rest > 0) { const back = this.isSpot(r.from) ? null : this.container(r.from), rr = !back ? 0 : Math.floor(Math.max(0, this.rawFree(r.from)) / GOODS[r.good].size); /* bought product can't go back to the supplier */ returned = Math.min(rest, rr); if (back && returned) Inv.add(back, r.good, returned, costEach * returned); noRoom = rest - returned; }
+      if (rest > 0) { const back = this.isSpot(r.from) || this.isImport(r.from) ? null : this.container(r.from), rr = !back ? 0 : Math.floor(Math.max(0, this.rawFree(r.from)) / GOODS[r.good].size); /* bought product can't go back to the supplier */ returned = Math.min(rest, rr); if (back && returned) Inv.add(back, r.good, returned, costEach * returned); noRoom = rest - returned; }
       delivered = put;
       if (returned || noRoom) extra += ` ${this.placeName(r.to)} was full: ${returned ? fmtQty(r.good, returned) + ' went back to ' + srcName : ''}${noRoom ? (returned ? ', ' : '') + fmtQty(r.good, noRoom) + ' had nowhere to go and was dumped' : ''}.`;
       lost += noRoom;

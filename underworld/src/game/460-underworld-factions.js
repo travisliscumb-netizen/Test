@@ -51,9 +51,6 @@ class FactionSim {
       T.police = clamp(T.police - 0.18 * h, 0, 100);
       if (T.war) this.warStep(i, h);
     }
-    // shipments arrive on the hour they were due
-    const sh = S.shipment;
-    if (sh && !sh.done && this.absHour() >= sh.at) this.landShipment();
   }
   // a turf war is the showdown (§4, §45.13): it ends with the attacker taking the turf or going home. The player
   // can be either side; a war the player called is w.a === 'pc'.
@@ -153,7 +150,7 @@ class FactionSim {
       if (f.strength < 6 && uw.factionTurfs(id) === 0) { f.broken = S.day; uw.news('unknown', `The ${D.name} are finished. What’s left of them scattered.`); uw.addRep(80, null); }
     }
     // Tidewater schedules the next boat
-    if (!S.shipment || S.shipment.done) { if (!this.F('tidewater').broken && Math.random() < 0.55) this.scheduleShipment(); }
+    if (!this.F('tidewater').broken && Math.random() < 0.55) uw.shipments.scheduleBoat();
     // rivals sometimes hit the player's businesses
     // rivals come after the player's assets through warnings and threats, from real pressure (Session 4A)
     uw.threats.tickDay(coalition);
@@ -238,31 +235,6 @@ class FactionSim {
     this.startWar(id, spot, 'They are back.', { force: true });
     uw.news('unknown', `The ${D.short} are back, under ${f.boss}. They’re fighting for ${uw.T[spot].name} and they remember you.`);
   }
-  scheduleShipment() {
-    const uw = this.uw, S = this.S;
-    const piers = uw.T.filter(t => t.zone === 'h');
-    const t = pick(piers);
-    const at = (S.day + 1) * 24 + randi(19, 23);
-    const cargo = { snow: randi(14, 28), hardware: randi(3, 8), smokes: randi(20, 40) };
-    S.shipment = { at, turf: t.i, cargo, done: false, x: t.hang.x, z: t.hang.z };
-    uw.opps.add({ kind: 'shipment', title: 'Tidewater boat due', text: `A Tidewater boat lands near ${t.name} tomorrow around ${String(at % 24).padStart(2, '0')}:00. The cargo goes to their HQ by van. Steal the van and the load is yours — they will not forget it.`, x: t.hang.x, z: t.hang.z, until: at + 3, turf: t.i });
-  }
-  landShipment() {
-    const uw = this.uw, S = this.S, sh = S.shipment, g = uw.g, tw = this.F('tidewater');
-    sh.done = true;
-    if (tw.broken) return;
-    const near = !g.player.interior && !S.jail && dist2(g.player.pos.x, g.player.pos.z, sh.x, sh.z) < 380 * 380;
-    // port surveillance can seize the boat before it unloads
-    const seizeP = 0.12 + (S.crackdown > 0 ? 0.2 : 0) + tw.heat / 400;
-    if (Math.random() < seizeP) {
-      uw.news('radio', 'Police radio: harbour unit has a vessel stopped at the piers. Customs are on the way.');
-      for (const k in sh.cargo) uw.market.shock(Object.keys(DEMAND), k, 0.3);
-      tw.money *= 0.9; tw.heat = clamp(tw.heat + 10, 0, 100);
-      uw.opps.add({ kind: 'scarcity', title: 'Port seizure', text: 'Customs took a whole Tidewater boat. Snow and hardware are scarce city-wide for days.', good: 'snow', hours: 48 });
-      return;
-    }
-    if (near) uw.gangs.spawnShipment(sh);
-    else { tw.stock += units(sh.cargo); }
-  }
+
 }
 

@@ -146,6 +146,7 @@ class Underworld {
     this.rivalwh = new RivalWarehouses(this);
     this.compounds = new CompoundSystem(this);
     this.threats = new ThreatSystem(this);
+    this.shipments = new ShipmentSystem(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -175,7 +176,7 @@ class Underworld {
       opps: [], nextOpp: 1, ledger: { inc: {}, exp: {} }, lastLedger: null,
       jail: null, jailPhone: false, taskforce: 0, crackdown: 0, redirect: null, pikeCD: 0, hiPressDays: 0, warHours: 0,
       decisions: [], flags: {}, realBy: {}, st: { sold: 0, seizedCash: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
-      slept: false, shipment: null,
+      slept: false,
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {},
       // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
@@ -185,7 +186,9 @@ class Underworld {
       // Session 4A: threats against the player's assets (clocks, strength and dice saved with them)
       threats: ThreatSystem.fresh(),
       // Session 4B: the rival gangs' warehouses (their stock, cash, security, breaches and any raid on)
-      rivals: RivalWarehouses.fresh()
+      rivals: RivalWarehouses.fresh(),
+      // every load on the road or at the docks: rival restocks, the Tidewater boat, your imports (cargo saved in it)
+      ships: ShipmentSystem.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -254,7 +257,8 @@ class Underworld {
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
-    S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
+    S.slept = !!S.slept;
+    S.ships = ShipmentSystem.sanitize(S.ships, num); ShipmentSystem.migrate(S);
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
     S.wstash = obj(S.wstash, {});
     for (const id in S.wstash) {
@@ -278,6 +282,7 @@ class Underworld {
     if (this.compounds) this.compounds.reset();
     if (this.threats) this.threats.reset();
     if (this.rivalwh) this.rivalwh.reset();
+    if (this.shipments) this.shipments.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -773,7 +778,7 @@ class Underworld {
     if (dt > 0) {
       this.pickups.update(dt);
       this.compounds.update(dt);
-      if (!S.jail) { this.gangs.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
+      if (!S.jail) { this.gangs.update(dt); this.shipments.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
       this.combatT = Math.max(0, this.combatT - dt);
     }
     this.ui.update(rdt);
@@ -791,6 +796,7 @@ class Underworld {
     this.opps.tickHours(h);
     this.crew.tickHours(h);
     this.compounds.tickHours();
+    this.shipments.tickHours();
     this.recompute();
   }
   tickDay() {
@@ -869,6 +875,7 @@ class Underworld {
     if (g.state !== 'playing') return null;
     if (p.interior && !p.interior.vspace) return S.jail ? this.prison.findAction() : this.props.interiorAction();
     const ra = this.rivalwh.findAction(); if (ra) return ra;
+    const sa = this.shipments.findAction(); if (sa) return sa;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       if (v.speed < 3) {

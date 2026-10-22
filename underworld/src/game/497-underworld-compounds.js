@@ -614,7 +614,9 @@ class CompoundSystem {
     if (k >= C.docks.length) return null;
     const dk = C.docks[k], lane = kind === 'arrive' ? C.lanes.in[k] : C.lanes.out[k];
     let v;
-    if (kind === 'arrive') { const a = lane[0], b2 = lane[1]; v = g.vehicles.spawn('van', a.x, a.z, Math.atan2(b2.x - a.x, b2.z - a.z), { driver: 'npc', color: 0x2a3a4a }); }
+    // man.v: a van already on the road (a delivery reaching the gate) is taken onto the lane as it is
+    if (man.v) v = man.v;
+    else if (kind === 'arrive') { const a = lane[0], b2 = lane[1]; v = g.vehicles.spawn('van', a.x, a.z, Math.atan2(b2.x - a.x, b2.z - a.z), { driver: 'npc', color: 0x2a3a4a }); }
     else v = g.vehicles.spawn('van', dk.bay.x, dk.bay.z, dk.bay.h, { driver: 'npc', color: 0x2a3a4a });
     v.touched = true; v.mission = 'whrun'; v.locked = true;
     v.wh = { id, crew: man.crew, to: man.to, run: man.run, until: g.time + 240 };

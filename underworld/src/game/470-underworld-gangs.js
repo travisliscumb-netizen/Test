@@ -59,7 +59,7 @@ class GangManager {
   updateHostility(step) {
     const g = this.g, pl = g.player;
     for (const gr of this.groups.values()) {
-      if (!gr.hostile || gr.crew || gr.kind === 'war' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'body' || !gr.fid) continue;
+      if (!gr.hostile || gr.crew || gr.kind === 'war' || gr.kind === 'raid' || gr.kind === 'convoy' || gr.kind === 'bounty' || gr.kind === 'body' || !gr.fid) continue;
       if (gr.kind === 'squad' && !gr.members.length) continue; // still in the car: the squad logic handles it
       let near = null, nd = Infinity;
       for (const m of gr.members) { if (m.state === 'down') continue; const d = dist2(m.x, m.z, pl.pos.x, pl.pos.z); if (d < nd) { nd = d; near = m; } }
@@ -77,7 +77,7 @@ class GangManager {
     this.seen = {};
     for (const gr of this.groups.values()) this.removeGroup(gr, true);
     this.groups.clear();
-    this.riding = []; this.ship = null;
+    this.riding = [];
     if (g.peds) g.peds.peds = g.peds.peds.filter(p => p.kind !== 'gang' && p.kind !== 'crew' && p.kind !== 'buyer');
   }
   count() { let n = 0; for (const gr of this.groups.values()) n += gr.members.length; return n; }
@@ -129,7 +129,6 @@ class GangManager {
     // the group's cars go back to being ordinary cars, so the world cleanup can recycle them
     if (gr.cars) for (const v of gr.cars) this.releaseCar(v);
     if (gr.car) this.releaseCar(gr.car);
-    if (this.ship === gr) this.ship = null;
   }
   releaseCar(v) {
     const g = this.g, p = g.player;
@@ -217,23 +216,22 @@ class GangManager {
       }
       // keep groups that are busy fighting near the player; drop the rest
       for (const gr of [...this.groups.values()]) {
-        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
+        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'convoy' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
         if (want.has(gr.key)) continue;
         const near = gr.members.some(m => dist2(m.x, m.z, px, pz) < 70 * 70 && m.state !== 'down');
         if ((gr.hostile || gr.kind === 'war') && near) continue;
         const seen = gr.members.some(m => g.inView(m.x, 1, m.z, 1) && dist2(m.x, m.z, px, pz) < 90 * 90);
         if (!seen || inside) this.removeGroup(gr);
       }
-      // timed scenes (raids, shipments) clean up when finished and out of sight
+      // timed scenes (raids, bounties) clean up when finished and out of sight
       for (const gr of [...this.groups.values()]) {
-        if (gr.kind !== 'raid' && gr.kind !== 'ship' && gr.kind !== 'bounty') continue;
+        if (gr.kind !== 'raid' && gr.kind !== 'bounty') continue;
         gr.life = (gr.life || 0) + 0.6;
         const far = gr.members.every(m => dist2(m.x, m.z, px, pz) > 160 * 160) || inside;
         if ((gr.life > 120 && far) || (gr.kind === 'raid' && gr.life > 240)) { this.removeGroup(gr); if (gr.cars) for (const v of gr.cars) if (g.vehicles.list.includes(v) && v !== p.vehicle && v !== p.lastVehicle && !g.inView(v.pos.x, 1, v.pos.z, 3)) g.vehicles.despawn(v); else if (g.vehicles.list.includes(v)) v.mission = null; }
       }
       this.updateHostility(0.6);
       this.updateBodyguards();
-      this.updateShipment();
       this.sweepOrphans();
     }
     this.updateSquads(dt);
@@ -402,46 +400,6 @@ class GangManager {
       g.peds.peds.push(q); gr.members.push(q);
       const cop = g.peds.make('cop', copLook()); cop.x = q.x + 1.2; cop.z = q.z + 0.6; cop.y = groundY(cop.x, cop.z); cop.state = 'free'; cop.keep = true; cop.faceX = q.x; cop.faceZ = q.z; cop.brain = idleBrain; cop.pose.hold = 'gun'; cop.pose.aim = 1;
       g.peds.peds.push(cop); gr.members.push(cop);
-    }
-  }
-  spawnShipment(sh) {
-    const g = this.g, uw = this.uw;
-    const c = curbNear(sh.x, sh.z), hq = uw.loc('hq', 'tidewater');
-    const van = g.vehicles.spawn('van', c.x, c.z, c.h, { driver: 'npc', color: 0x1a3d4a });
-    van.mission = 'shipment'; van.touched = true; van.fac = 'tidewater'; van.trunk = { ...sh.cargo }; van.health = 140;
-    van.drive = new DriveAI(van, g, 'cruise'); van.drive.cruise = 11; van.drive.setGoal(hq.x, hq.z);
-    const back = { x: c.x - Math.sin(c.h) * 10, z: c.z - Math.cos(c.h) * 10 };
-    const esc = g.vehicles.spawn('suv', back.x, back.z, c.h, { driver: 'npc', color: 0x1a2a3a });
-    esc.mission = 'shipment'; esc.touched = true; esc.fac = 'tidewater';
-    esc.drive = new DriveAI(esc, g, 'cruise'); esc.drive.cruise = 12; esc.drive.target = () => ({ x: van.pos.x, z: van.pos.z, speed: 12 });
-    const gr = { key: 'ship' + sh.at, kind: 'ship', fid: 'tidewater', x: c.x, z: c.z, members: [], hostile: false, cars: [van, esc], van, hq };
-    van.uwGroup = esc.uwGroup = gr.key;
-    this.groups.set(gr.key, gr);
-    this.ship = gr;
-    uw.opps.add({ kind: 'shipment', title: 'Tidewater van rolling', text: 'The boat is unloaded and the van is heading for their HQ with an escort. This is your window.', x: c.x, z: c.z, hours: 2, follow: 'van', urgent: true });
-    g.ui.toast('The Tidewater van is on the move.', 'radio');
-  }
-  updateShipment() {
-    const gr = this.ship; if (!gr) return;
-    const g = this.g, uw = this.uw, van = gr.van, p = g.player;
-    if (!g.vehicles.list.includes(van) || van.burnt) { this.ship = null; return; }
-    if (van.driver === 'player') {
-      if (!gr.stolen) {
-        gr.stolen = true; uw.threats.press('tidewater', PRESSURE.ship, 'their shipment stolen'); const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - units(van.trunk));
-        g.ui.banner('Shipment Stolen', goodsList(van.trunk), 'pass', 3); uw.addRep(80, null);
-        uw.news('unknown', 'Holm: “You took something of mine. I will be taking something of yours.”');
-        g.police.crime('carjack', van.pos.x, van.pos.z);
-        // the escort comes after you
-        const esc = gr.cars[1];
-        if (esc && g.vehicles.list.includes(esc) && esc.drive) { esc.drive.mode = 'pursue'; esc.drive.cruise = 26; esc.drive.target = () => ({ x: p.pos.x, z: p.pos.z, speed: 26, direct: dist2(esc.pos.x, esc.pos.z, p.pos.x, p.pos.z) < 30 * 30 }); esc.drive.targetRef = van; }
-        van.mission = null; van.fac = null;
-      }
-      return;
-    }
-    if (!gr.stolen && dist2(van.pos.x, van.pos.z, gr.hq.x, gr.hq.z) < 22 * 22) {
-      uw.S.factions.tidewater.stock += units(van.trunk);
-      this.ship = null; gr.life = 999;
-      for (const v of gr.cars) this.releaseCar(v);
     }
   }
   // ---------------------------------------------------------------- bodyguards (player's crew that follows)

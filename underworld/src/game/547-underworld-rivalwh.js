@@ -62,15 +62,14 @@ class RivalWarehouses {
       if (f.broken || w.raid) continue;
       // their own people mend what was broken, a day later
       for (const k in w.breach) if (S.econH - w.breach[k].t >= 24) delete w.breach[k];
-      // a resupply: what the gang can spare from its street stock comes in (a delivery that arrives; with you near,
-      // a van you can see and stop — ShipmentSystem)
+      // a resupply: what the gang can spare from its street stock goes on the road to it (ShipmentSystem: with you
+      // near, a van you can see and stop). Only an arrival puts it on the shelves.
       if (S.day < w.alert) continue;
       const need = Math.max(0, RIVAL_WH[fid].cap * 0.8 - this.units(fid));
       const take = Math.min(need, Math.floor(f.stock * 0.5));
       if (take >= 6) {
         const cargo = this.cargoFor(fid, take);
-        if (!(uw.shipments && uw.shipments.rivalDelivery(fid, cargo))) { for (const k in cargo) Inv.add(w.stock, k, cargo[k], 0); }
-        f.stock = Math.max(0, f.stock - units(cargo)); w.resupplied = S.day;
+        if (uw.shipments.rivalDelivery(fid, cargo)) f.stock = Math.max(0, f.stock - units(cargo));
       }
       // and some of their money goes back in the safe
       const cashNeed = Math.max(0, RIVAL_WH[fid].cash - w.cash), put = Math.min(cashNeed, Math.floor(f.money * 0.15));
@@ -84,7 +83,7 @@ class RivalWarehouses {
     goods.forEach((k, i) => { const q = Math.floor(room / (goods.length - i) / GOODS[k].size); if (q > 0) { out[k] = q; room -= q * GOODS[k].size; } });
     return out;
   }
-  // a delivery that physically arrived (ShipmentSystem): the cargo goes on the shelves
+  // a delivery that arrived (ShipmentSystem): the cargo goes on the shelves
   delivered(fid, trunk) { const w = this.st(fid); for (const k in trunk) if (GOODS[k] && trunk[k] > 0) Inv.add(w.stock, k, Inv.has(trunk, k), 0); }
   // ---------------------------------------------------------------- raids
   alarm(fid, why) {

@@ -33267,6 +33267,8 @@ const MONEY_SOURCES = {
   launderIn: { pay: 'dirty' }, launderOut: { earn: 'clean' },
   // a Driver buying product at a supplier for a warehouse: paid from the vault first (payroll order)
   supplyRun: { pay: 'payroll' },
+  // your bulk import, paid up front when ordered (Session 4B): from the vault first (payroll order)
+  importOrder: { pay: 'payroll' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
@@ -47216,7 +47218,8 @@ class Armory {
    pressure, wars, cargo value, size, your influence) - never a bare dice roll.
    Since Session 3 only Drivers make runs (§5), between your places, from a
    supplier ('spot:<id>', bought on the spot with the destination's vault
-   cash) and to a dealer's corner ('turf:<i>'). Route risk follows §8: rival
+   cash), from your import waiting at the docks ('import:<id>', Session 4B)
+   and to a dealer's corner ('turf:<i>'). Route risk follows §8: rival
    hijack risk by who holds each stretch, police risk separately.
    ===================================================================== */
 const RUNNER_BANDS = [[0, 'ROOKIE', 0.5, 0.6], [35, 'DECENT', 0.6, 0.75], [55, 'EXPERIENCED', 0.75, 0.85], [75, 'ELITE', 0.85, 0.9]];
@@ -47236,15 +47239,18 @@ class DeliveryManager {
   // places a run can start or end: 'inv' (you), a property id, 'turf:<i>' (a dealer's corner), 'spot:<id>' (a supplier)
   isTurf(id) { return typeof id === 'string' && /^turf:\d+$/.test(id) && +id.slice(5) < this.uw.T.length; }
   isSpot(id) { return typeof id === 'string' && id.startsWith('spot:') && SPOTS.some(s => s.id === id.slice(5) && s.sells && s.sells.length); }
-  placeOk(id) { return id === 'inv' || !!PROP_BY_ID[id] || this.isTurf(id) || this.isSpot(id); }
-  placeName(id) { return id === 'inv' ? 'your pockets' : this.isTurf(id) ? `the corner on ${this.uw.T[+id.slice(5)].name}` : this.isSpot(id) ? SPOTS.find(s => s.id === id.slice(5)).name : PROP_BY_ID[id] ? PROP_BY_ID[id].name : '?'; }
+  // your import on the quay (a pickup only; a saved run keeps the name even once the pile is gone)
+  isImport(id) { return typeof id === 'string' && /^import:\d+$/.test(id); }
+  placeOk(id) { return id === 'inv' || !!PROP_BY_ID[id] || this.isTurf(id) || this.isSpot(id) || this.isImport(id); }
+  placeName(id) { return id === 'inv' ? 'your pockets' : this.isTurf(id) ? `the corner on ${this.uw.T[+id.slice(5)].name}` : this.isSpot(id) ? SPOTS.find(s => s.id === id.slice(5)).name : this.isImport(id) ? `your import at ${this.uw.shipments.importPoint().name}` : PROP_BY_ID[id] ? PROP_BY_ID[id].name : '?'; }
   locOf(id) {
     if (id === 'inv') { const p = this.g.player; return { x: p.pos.x, z: p.pos.z, name: 'you (pockets)' }; }
     if (this.isTurf(id)) { const t = this.uw.T[+id.slice(5)]; return { x: t.deal.x, z: t.deal.z, name: this.placeName(id) }; }
+    if (this.isImport(id)) { const P = this.uw.shipments.importPoint(); return { x: P.x, z: P.z, name: this.placeName(id) }; }
     const L = this.isSpot(id) ? this.uw.loc('spot', id.slice(5)) : this.uw.loc('prop', id);
     return L ? { x: L.x, z: L.z, name: this.placeName(id) } : null;
   }
-  container(id) { return id === 'inv' ? this.S.inv : this.isTurf(id) ? this.uw.whse.turfStock(+id.slice(5)) : (this.S.storage[id] || (this.S.storage[id] = {})); }
+  container(id) { if (this.isImport(id)) { const r = this.uw.shipments.importAt(+id.slice(7)); return r ? r.cargo : {}; } return id === 'inv' ? this.S.inv : this.isTurf(id) ? this.uw.whse.turfStock(+id.slice(5)) : (this.S.storage[id] || (this.S.storage[id] = {})); }
   // room right now, before runs on the way
   rawFree(id) { return id === 'inv' ? this.uw.pocketFree() : this.isTurf(id) ? this.uw.whse.turfFree(+id.slice(5)) : this.uw.props.storageFree(id); }
   freeAt(id, excludeRun) {
@@ -47307,7 +47313,8 @@ class DeliveryManager {
     if (from === to) return 'Pick a different destination.';
     if (!GOODS[good] || !(n > 0)) return 'Nothing to send.';
     if (!this.placeOk(from) || this.isTurf(from)) return 'Pick a pickup.';
-    if (from !== 'inv' && !this.isSpot(from) && !uw.props.owned(from)) return 'You don’t own that stash.';
+    if (this.isImport(from)) { if (!uw.shipments.importAt(+from.slice(7))) return 'That import isn’t on the quay.'; if (!PROP_BY_ID[to] || PROP_BY_ID[to].kind !== 'warehouse') return 'An import goes to a warehouse.'; }
+    else if (from !== 'inv' && !this.isSpot(from) && !uw.props.owned(from)) return 'You don’t own that stash.';
     if (to === 'inv' || this.isSpot(to) || !this.placeOk(to)) return 'Pick a destination.';
     if (this.isTurf(to)) { const i = +to.slice(5); if (!uw.whse.dealersOn(i).length) return `You have no Dealer on ${uw.T[i].name}.`; if (GOODS[good].fence || GOODS[good].arms) return 'Dealers don’t move that.'; }
     else if (!uw.props.owned(to) || !PROP_BY_ID[to].storage) return 'The destination has no stash.';
@@ -47329,6 +47336,7 @@ class DeliveryManager {
     let cost;
     if (buy) { Money.pay(buy, 'supplyRun', { first }); S.supply[from.slice(5)][good] -= n; cost = buy; }
     else cost = Inv.remove(this.container(from), good, n);
+    if (this.isImport(from)) uw.shipments.taken(uw.shipments.importAt(+from.slice(7)));
     const now = this.absHour();
     const r = { id: S.nextRun++, crew: c.id, name: uw.crew.displayName(c), from, to, good, n, cost, start: now, eta: now + a.hours, chance: a.p, dist: a.dist, rival: a.rival, police: a.police };
     if (opts.auto) r.auto = true;
@@ -47373,7 +47381,7 @@ class DeliveryManager {
       const costEach = r.cost / r.n, room = Math.floor(Math.max(0, this.rawFree(r.to)) / GOODS[r.good].size), put = Math.min(delivered, room);
       Inv.add(dst, r.good, put, costEach * put);
       let rest = delivered - put;
-      if (rest > 0) { const back = this.isSpot(r.from) ? null : this.container(r.from), rr = !back ? 0 : Math.floor(Math.max(0, this.rawFree(r.from)) / GOODS[r.good].size); /* bought product can't go back to the supplier */ returned = Math.min(rest, rr); if (back && returned) Inv.add(back, r.good, returned, costEach * returned); noRoom = rest - returned; }
+      if (rest > 0) { const back = this.isSpot(r.from) || this.isImport(r.from) ? null : this.container(r.from), rr = !back ? 0 : Math.floor(Math.max(0, this.rawFree(r.from)) / GOODS[r.good].size); /* bought product can't go back to the supplier */ returned = Math.min(rest, rr); if (back && returned) Inv.add(back, r.good, returned, costEach * returned); noRoom = rest - returned; }
       delivered = put;
       if (returned || noRoom) extra += ` ${this.placeName(r.to)} was full: ${returned ? fmtQty(r.good, returned) + ' went back to ' + srcName : ''}${noRoom ? (returned ? ', ' : '') + fmtQty(r.good, noRoom) + ' had nowhere to go and was dumped' : ''}.`;
       lost += noRoom;
@@ -47610,6 +47618,7 @@ class Underworld {
     this.rivalwh = new RivalWarehouses(this);
     this.compounds = new CompoundSystem(this);
     this.threats = new ThreatSystem(this);
+    this.shipments = new ShipmentSystem(this);
     this.ui = new EmpireUI(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
@@ -47639,7 +47648,7 @@ class Underworld {
       opps: [], nextOpp: 1, ledger: { inc: {}, exp: {} }, lastLedger: null,
       jail: null, jailPhone: false, taskforce: 0, crackdown: 0, redirect: null, pikeCD: 0, hiPressDays: 0, warHours: 0,
       decisions: [], flags: {}, realBy: {}, st: { sold: 0, seizedCash: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
-      slept: false, shipment: null,
+      slept: false,
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {},
       // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
@@ -47649,7 +47658,9 @@ class Underworld {
       // Session 4A: threats against the player's assets (clocks, strength and dice saved with them)
       threats: ThreatSystem.fresh(),
       // Session 4B: the rival gangs' warehouses (their stock, cash, security, breaches and any raid on)
-      rivals: RivalWarehouses.fresh()
+      rivals: RivalWarehouses.fresh(),
+      // every load on the road or at the docks: rival restocks, the Tidewater boat, your imports (cargo saved in it)
+      ships: ShipmentSystem.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -47718,7 +47729,8 @@ class Underworld {
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
-    S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
+    S.slept = !!S.slept;
+    S.ships = ShipmentSystem.sanitize(S.ships, num); ShipmentSystem.migrate(S);
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
     S.wstash = obj(S.wstash, {});
     for (const id in S.wstash) {
@@ -47742,6 +47754,7 @@ class Underworld {
     if (this.compounds) this.compounds.reset();
     if (this.threats) this.threats.reset();
     if (this.rivalwh) this.rivalwh.reset();
+    if (this.shipments) this.shipments.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -48237,7 +48250,7 @@ class Underworld {
     if (dt > 0) {
       this.pickups.update(dt);
       this.compounds.update(dt);
-      if (!S.jail) { this.gangs.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
+      if (!S.jail) { this.gangs.update(dt); this.shipments.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
       this.combatT = Math.max(0, this.combatT - dt);
     }
     this.ui.update(rdt);
@@ -48255,6 +48268,7 @@ class Underworld {
     this.opps.tickHours(h);
     this.crew.tickHours(h);
     this.compounds.tickHours();
+    this.shipments.tickHours();
     this.recompute();
   }
   tickDay() {
@@ -48333,6 +48347,7 @@ class Underworld {
     if (g.state !== 'playing') return null;
     if (p.interior && !p.interior.vspace) return S.jail ? this.prison.findAction() : this.props.interiorAction();
     const ra = this.rivalwh.findAction(); if (ra) return ra;
+    const sa = this.shipments.findAction(); if (sa) return sa;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       if (v.speed < 3) {
@@ -48411,9 +48426,6 @@ class FactionSim {
       T.police = clamp(T.police - 0.18 * h, 0, 100);
       if (T.war) this.warStep(i, h);
     }
-    // shipments arrive on the hour they were due
-    const sh = S.shipment;
-    if (sh && !sh.done && this.absHour() >= sh.at) this.landShipment();
   }
   // a turf war is the showdown (§4, §45.13): it ends with the attacker taking the turf or going home. The player
   // can be either side; a war the player called is w.a === 'pc'.
@@ -48513,7 +48525,7 @@ class FactionSim {
       if (f.strength < 6 && uw.factionTurfs(id) === 0) { f.broken = S.day; uw.news('unknown', `The ${D.name} are finished. What’s left of them scattered.`); uw.addRep(80, null); }
     }
     // Tidewater schedules the next boat
-    if (!S.shipment || S.shipment.done) { if (!this.F('tidewater').broken && Math.random() < 0.55) this.scheduleShipment(); }
+    if (!this.F('tidewater').broken && Math.random() < 0.55) uw.shipments.scheduleBoat();
     // rivals sometimes hit the player's businesses
     // rivals come after the player's assets through warnings and threats, from real pressure (Session 4A)
     uw.threats.tickDay(coalition);
@@ -48598,32 +48610,7 @@ class FactionSim {
     this.startWar(id, spot, 'They are back.', { force: true });
     uw.news('unknown', `The ${D.short} are back, under ${f.boss}. They’re fighting for ${uw.T[spot].name} and they remember you.`);
   }
-  scheduleShipment() {
-    const uw = this.uw, S = this.S;
-    const piers = uw.T.filter(t => t.zone === 'h');
-    const t = pick(piers);
-    const at = (S.day + 1) * 24 + randi(19, 23);
-    const cargo = { snow: randi(14, 28), hardware: randi(3, 8), smokes: randi(20, 40) };
-    S.shipment = { at, turf: t.i, cargo, done: false, x: t.hang.x, z: t.hang.z };
-    uw.opps.add({ kind: 'shipment', title: 'Tidewater boat due', text: `A Tidewater boat lands near ${t.name} tomorrow around ${String(at % 24).padStart(2, '0')}:00. The cargo goes to their HQ by van. Steal the van and the load is yours — they will not forget it.`, x: t.hang.x, z: t.hang.z, until: at + 3, turf: t.i });
-  }
-  landShipment() {
-    const uw = this.uw, S = this.S, sh = S.shipment, g = uw.g, tw = this.F('tidewater');
-    sh.done = true;
-    if (tw.broken) return;
-    const near = !g.player.interior && !S.jail && dist2(g.player.pos.x, g.player.pos.z, sh.x, sh.z) < 380 * 380;
-    // port surveillance can seize the boat before it unloads
-    const seizeP = 0.12 + (S.crackdown > 0 ? 0.2 : 0) + tw.heat / 400;
-    if (Math.random() < seizeP) {
-      uw.news('radio', 'Police radio: harbour unit has a vessel stopped at the piers. Customs are on the way.');
-      for (const k in sh.cargo) uw.market.shock(Object.keys(DEMAND), k, 0.3);
-      tw.money *= 0.9; tw.heat = clamp(tw.heat + 10, 0, 100);
-      uw.opps.add({ kind: 'scarcity', title: 'Port seizure', text: 'Customs took a whole Tidewater boat. Snow and hardware are scarce city-wide for days.', good: 'snow', hours: 48 });
-      return;
-    }
-    if (near) uw.gangs.spawnShipment(sh);
-    else { tw.stock += units(sh.cargo); }
-  }
+
 }
 
 /* =====================================================================
@@ -48687,7 +48674,7 @@ class GangManager {
   updateHostility(step) {
     const g = this.g, pl = g.player;
     for (const gr of this.groups.values()) {
-      if (!gr.hostile || gr.crew || gr.kind === 'war' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'body' || !gr.fid) continue;
+      if (!gr.hostile || gr.crew || gr.kind === 'war' || gr.kind === 'raid' || gr.kind === 'convoy' || gr.kind === 'bounty' || gr.kind === 'body' || !gr.fid) continue;
       if (gr.kind === 'squad' && !gr.members.length) continue; // still in the car: the squad logic handles it
       let near = null, nd = Infinity;
       for (const m of gr.members) { if (m.state === 'down') continue; const d = dist2(m.x, m.z, pl.pos.x, pl.pos.z); if (d < nd) { nd = d; near = m; } }
@@ -48705,7 +48692,7 @@ class GangManager {
     this.seen = {};
     for (const gr of this.groups.values()) this.removeGroup(gr, true);
     this.groups.clear();
-    this.riding = []; this.ship = null;
+    this.riding = [];
     if (g.peds) g.peds.peds = g.peds.peds.filter(p => p.kind !== 'gang' && p.kind !== 'crew' && p.kind !== 'buyer');
   }
   count() { let n = 0; for (const gr of this.groups.values()) n += gr.members.length; return n; }
@@ -48757,7 +48744,6 @@ class GangManager {
     // the group's cars go back to being ordinary cars, so the world cleanup can recycle them
     if (gr.cars) for (const v of gr.cars) this.releaseCar(v);
     if (gr.car) this.releaseCar(gr.car);
-    if (this.ship === gr) this.ship = null;
   }
   releaseCar(v) {
     const g = this.g, p = g.player;
@@ -48845,23 +48831,22 @@ class GangManager {
       }
       // keep groups that are busy fighting near the player; drop the rest
       for (const gr of [...this.groups.values()]) {
-        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'ship' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
+        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'convoy' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
         if (want.has(gr.key)) continue;
         const near = gr.members.some(m => dist2(m.x, m.z, px, pz) < 70 * 70 && m.state !== 'down');
         if ((gr.hostile || gr.kind === 'war') && near) continue;
         const seen = gr.members.some(m => g.inView(m.x, 1, m.z, 1) && dist2(m.x, m.z, px, pz) < 90 * 90);
         if (!seen || inside) this.removeGroup(gr);
       }
-      // timed scenes (raids, shipments) clean up when finished and out of sight
+      // timed scenes (raids, bounties) clean up when finished and out of sight
       for (const gr of [...this.groups.values()]) {
-        if (gr.kind !== 'raid' && gr.kind !== 'ship' && gr.kind !== 'bounty') continue;
+        if (gr.kind !== 'raid' && gr.kind !== 'bounty') continue;
         gr.life = (gr.life || 0) + 0.6;
         const far = gr.members.every(m => dist2(m.x, m.z, px, pz) > 160 * 160) || inside;
         if ((gr.life > 120 && far) || (gr.kind === 'raid' && gr.life > 240)) { this.removeGroup(gr); if (gr.cars) for (const v of gr.cars) if (g.vehicles.list.includes(v) && v !== p.vehicle && v !== p.lastVehicle && !g.inView(v.pos.x, 1, v.pos.z, 3)) g.vehicles.despawn(v); else if (g.vehicles.list.includes(v)) v.mission = null; }
       }
       this.updateHostility(0.6);
       this.updateBodyguards();
-      this.updateShipment();
       this.sweepOrphans();
     }
     this.updateSquads(dt);
@@ -49030,46 +49015,6 @@ class GangManager {
       g.peds.peds.push(q); gr.members.push(q);
       const cop = g.peds.make('cop', copLook()); cop.x = q.x + 1.2; cop.z = q.z + 0.6; cop.y = groundY(cop.x, cop.z); cop.state = 'free'; cop.keep = true; cop.faceX = q.x; cop.faceZ = q.z; cop.brain = idleBrain; cop.pose.hold = 'gun'; cop.pose.aim = 1;
       g.peds.peds.push(cop); gr.members.push(cop);
-    }
-  }
-  spawnShipment(sh) {
-    const g = this.g, uw = this.uw;
-    const c = curbNear(sh.x, sh.z), hq = uw.loc('hq', 'tidewater');
-    const van = g.vehicles.spawn('van', c.x, c.z, c.h, { driver: 'npc', color: 0x1a3d4a });
-    van.mission = 'shipment'; van.touched = true; van.fac = 'tidewater'; van.trunk = { ...sh.cargo }; van.health = 140;
-    van.drive = new DriveAI(van, g, 'cruise'); van.drive.cruise = 11; van.drive.setGoal(hq.x, hq.z);
-    const back = { x: c.x - Math.sin(c.h) * 10, z: c.z - Math.cos(c.h) * 10 };
-    const esc = g.vehicles.spawn('suv', back.x, back.z, c.h, { driver: 'npc', color: 0x1a2a3a });
-    esc.mission = 'shipment'; esc.touched = true; esc.fac = 'tidewater';
-    esc.drive = new DriveAI(esc, g, 'cruise'); esc.drive.cruise = 12; esc.drive.target = () => ({ x: van.pos.x, z: van.pos.z, speed: 12 });
-    const gr = { key: 'ship' + sh.at, kind: 'ship', fid: 'tidewater', x: c.x, z: c.z, members: [], hostile: false, cars: [van, esc], van, hq };
-    van.uwGroup = esc.uwGroup = gr.key;
-    this.groups.set(gr.key, gr);
-    this.ship = gr;
-    uw.opps.add({ kind: 'shipment', title: 'Tidewater van rolling', text: 'The boat is unloaded and the van is heading for their HQ with an escort. This is your window.', x: c.x, z: c.z, hours: 2, follow: 'van', urgent: true });
-    g.ui.toast('The Tidewater van is on the move.', 'radio');
-  }
-  updateShipment() {
-    const gr = this.ship; if (!gr) return;
-    const g = this.g, uw = this.uw, van = gr.van, p = g.player;
-    if (!g.vehicles.list.includes(van) || van.burnt) { this.ship = null; return; }
-    if (van.driver === 'player') {
-      if (!gr.stolen) {
-        gr.stolen = true; uw.threats.press('tidewater', PRESSURE.ship, 'their shipment stolen'); const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - units(van.trunk));
-        g.ui.banner('Shipment Stolen', goodsList(van.trunk), 'pass', 3); uw.addRep(80, null);
-        uw.news('unknown', 'Holm: “You took something of mine. I will be taking something of yours.”');
-        g.police.crime('carjack', van.pos.x, van.pos.z);
-        // the escort comes after you
-        const esc = gr.cars[1];
-        if (esc && g.vehicles.list.includes(esc) && esc.drive) { esc.drive.mode = 'pursue'; esc.drive.cruise = 26; esc.drive.target = () => ({ x: p.pos.x, z: p.pos.z, speed: 26, direct: dist2(esc.pos.x, esc.pos.z, p.pos.x, p.pos.z) < 30 * 30 }); esc.drive.targetRef = van; }
-        van.mission = null; van.fac = null;
-      }
-      return;
-    }
-    if (!gr.stolen && dist2(van.pos.x, van.pos.z, gr.hq.x, gr.hq.z) < 22 * 22) {
-      uw.S.factions.tidewater.stock += units(van.trunk);
-      this.ship = null; gr.life = 999;
-      for (const v of gr.cars) this.releaseCar(v);
     }
   }
   // ---------------------------------------------------------------- bodyguards (player's crew that follows)
@@ -50607,7 +50552,9 @@ class CompoundSystem {
     if (k >= C.docks.length) return null;
     const dk = C.docks[k], lane = kind === 'arrive' ? C.lanes.in[k] : C.lanes.out[k];
     let v;
-    if (kind === 'arrive') { const a = lane[0], b2 = lane[1]; v = g.vehicles.spawn('van', a.x, a.z, Math.atan2(b2.x - a.x, b2.z - a.z), { driver: 'npc', color: 0x2a3a4a }); }
+    // man.v: a van already on the road (a delivery reaching the gate) is taken onto the lane as it is
+    if (man.v) v = man.v;
+    else if (kind === 'arrive') { const a = lane[0], b2 = lane[1]; v = g.vehicles.spawn('van', a.x, a.z, Math.atan2(b2.x - a.x, b2.z - a.z), { driver: 'npc', color: 0x2a3a4a }); }
     else v = g.vehicles.spawn('van', dk.bay.x, dk.bay.z, dk.bay.h, { driver: 'npc', color: 0x2a3a4a });
     v.touched = true; v.mission = 'whrun'; v.locked = true;
     v.wh = { id, crew: man.crew, to: man.to, run: man.run, until: g.time + 240 };
@@ -52622,15 +52569,14 @@ class RivalWarehouses {
       if (f.broken || w.raid) continue;
       // their own people mend what was broken, a day later
       for (const k in w.breach) if (S.econH - w.breach[k].t >= 24) delete w.breach[k];
-      // a resupply: what the gang can spare from its street stock comes in (a delivery that arrives; with you near,
-      // a van you can see and stop — ShipmentSystem)
+      // a resupply: what the gang can spare from its street stock goes on the road to it (ShipmentSystem: with you
+      // near, a van you can see and stop). Only an arrival puts it on the shelves.
       if (S.day < w.alert) continue;
       const need = Math.max(0, RIVAL_WH[fid].cap * 0.8 - this.units(fid));
       const take = Math.min(need, Math.floor(f.stock * 0.5));
       if (take >= 6) {
         const cargo = this.cargoFor(fid, take);
-        if (!(uw.shipments && uw.shipments.rivalDelivery(fid, cargo))) { for (const k in cargo) Inv.add(w.stock, k, cargo[k], 0); }
-        f.stock = Math.max(0, f.stock - units(cargo)); w.resupplied = S.day;
+        if (uw.shipments.rivalDelivery(fid, cargo)) f.stock = Math.max(0, f.stock - units(cargo));
       }
       // and some of their money goes back in the safe
       const cashNeed = Math.max(0, RIVAL_WH[fid].cash - w.cash), put = Math.min(cashNeed, Math.floor(f.money * 0.15));
@@ -52644,7 +52590,7 @@ class RivalWarehouses {
     goods.forEach((k, i) => { const q = Math.floor(room / (goods.length - i) / GOODS[k].size); if (q > 0) { out[k] = q; room -= q * GOODS[k].size; } });
     return out;
   }
-  // a delivery that physically arrived (ShipmentSystem): the cargo goes on the shelves
+  // a delivery that arrived (ShipmentSystem): the cargo goes on the shelves
   delivered(fid, trunk) { const w = this.st(fid); for (const k in trunk) if (GOODS[k] && trunk[k] > 0) Inv.add(w.stock, k, Inv.has(trunk, k), 0); }
   // ---------------------------------------------------------------- raids
   alarm(fid, why) {
@@ -52847,6 +52793,340 @@ function rivalInteriorDef(C, fid, w) {
     }
   };
   return def;
+}
+/* =====================================================================
+   [UNDERWORLD] SHIPMENTS (§8, §45.27; Session 4B): every load of product
+   that travels the city as one record (save.uw.ships), from the moment it
+   leaves until it is delivered, stolen, seized, lost or expired.
+   - Rival resupply: a gang's daily restock leaves its street stock and is
+     on the road to its warehouse as cargo in the record. With you near
+     either end it is a real van you can follow and take; otherwise it
+     simply arrives. Only an arrival puts it on their shelves.
+   - The Tidewater boat: lands at the piers; its cargo goes to their
+     warehouse by van, with an escort. Port surveillance can seize it.
+   - Imports (yours, rank-gated, §3/§8): a bulk order paid up front that
+     lands at the docks and waits there a day. It becomes warehouse stock
+     only once a Driver brings it in (a delivery run from the dock) or you
+     load it into a van or box truck and unload it at a warehouse.
+   One cargo, one place: while a van is on the road its trunk IS the
+   record's cargo object, so a save mid-drive holds exactly what the van
+   holds, and a reload resolves the drive once (it arrived), never twice.
+   Taking the van moves the load out of the record into the van for good.
+   ===================================================================== */
+const SHIP_T = { near: 380, supplyLead: [2, 8], importLead: [8, 16], importWait: 24, dock: 12, stray: 260, drive: 600, hold: 1 };
+// your imports: Territory Holder and up, one at a time, about half the supplier's wholesale price, a load a Driver
+// (or you, in a van or box truck) has to bring in
+const IMPORT = { rank: 4, lots: { green: 240, pills: 180, snow: 120 }, price: 0.55, seize: 0.08, vehicles: ['van', 'truck'], lead: 'Pier' };
+const SHIP_KINDS = ['supply', 'boat', 'import'];
+const SHIP_STATES = ['due', 'rolling', 'landed', 'done'];
+const SHIP_ENDS = ['delivered', 'stolen', 'seized', 'lost', 'expired', 'collected'];
+class ShipmentSystem {
+  constructor(uw) { this.uw = uw; this.live = new Map(); this.crates = new Map(); }
+  get S() { return this.uw.S; }
+  get g() { return this.uw.g; }
+  static fresh() { return { list: [], next: 1, log: [] }; }
+  static sanitize(o, num) {
+    const out = ShipmentSystem.fresh();
+    if (!o || typeof o !== 'object') return out;
+    const pt = p => p && typeof p === 'object' && isFinite(p.x) && isFinite(p.z) ? { x: +p.x, z: +p.z } : null;
+    for (const r of Array.isArray(o.list) ? o.list : []) {
+      if (!r || typeof r !== 'object' || !SHIP_KINDS.includes(r.kind) || !SHIP_STATES.includes(r.state) || r.state === 'done') continue;
+      const fid = r.kind === 'import' ? 'pc' : FACTIONS[r.fid] ? r.fid : null; if (!fid) continue;
+      const from = pt(r.from); if (!from) continue;
+      const cargo = Inv.clean(r.cargo, num); if (!units(cargo)) continue;
+      const s = { id: Math.floor(num(r.id, 0, 1, 1e7)), kind: r.kind, fid, cargo, state: r.state, at: num(r.at, 0, 0, 1e8), from, to: typeof r.to === 'string' ? r.to : '', n0: Math.floor(num(r.n0, units(cargo), 0, 1e6)), paid: Math.round(num(r.paid, 0, 0, 1e9)) };
+      if (r.kind === 'import') { s.until = num(r.until, s.at + SHIP_T.importWait, 0, 1e8); if (!PROP_BY_ID[s.to] || PROP_BY_ID[s.to].kind !== 'warehouse') s.to = ''; }
+      else if (!RIVAL_WH[fid]) continue;
+      out.list.push(s);
+    }
+    out.list = out.list.slice(0, 24);
+    out.next = Math.max(Math.floor(num(o.next, 1, 1, 1e7)), ...out.list.map(r => r.id + 1), 1);
+    out.log = (Array.isArray(o.log) ? o.log : []).filter(e => e && typeof e === 'object' && SHIP_ENDS.includes(e.end) && SHIP_KINDS.includes(e.kind)).slice(-12)
+      .map(e => ({ id: Math.floor(num(e.id, 0, 0, 1e7)), kind: e.kind, fid: typeof e.fid === 'string' ? e.fid : '', end: e.end, n: Math.floor(num(e.n, 0, 0, 1e6)), day: Math.floor(num(e.day, 0, 0, 1e6)) }));
+    return out;
+  }
+  // a save from before Session 4B kept one Tidewater boat in save.uw.shipment: it becomes a boat record
+  static migrate(S) {
+    const sh = S.shipment; delete S.shipment;
+    if (!sh || typeof sh !== 'object' || sh.done || !isFinite(sh.at) || !isFinite(sh.x) || !isFinite(sh.z) || !sh.cargo) return;
+    const cargo = {}; for (const k in sh.cargo) if (GOODS[k] && sh.cargo[k] > 0) cargo[k] = Math.floor(sh.cargo[k]);
+    if (!units(cargo)) return;
+    S.ships.list.push({ id: S.ships.next++, kind: 'boat', fid: 'tidewater', cargo, state: 'due', at: +sh.at, from: { x: +sh.x, z: +sh.z }, to: 'rival:tidewater', n0: units(cargo), paid: 0 });
+  }
+  get D() { const S = this.S; if (!S.ships) S.ships = ShipmentSystem.fresh(); return S.ships; }
+  list() { return this.D.list; }
+  find(id) { return this.D.list.find(r => r.id === id) || null; }
+  absHour() { return this.S.day * 24 + Math.floor(this.g.env ? this.g.env.time : 0) % 24; }
+  add(r) { r.id = this.D.next++; r.n0 = units(r.cargo); this.D.list.push(r); return r; }
+  // the record is finished: it leaves the list and the log keeps one line about it
+  finish(r, end, keepLive) {
+    const D = this.D, i = D.list.indexOf(r); if (i >= 0) D.list.splice(i, 1);
+    r.state = 'done'; r.end = end;
+    D.log.push({ id: r.id, kind: r.kind, fid: r.fid, end, n: r.n0, day: this.S.day }); if (D.log.length > 12) D.log.splice(0, D.log.length - 12);
+    if (!keepLive) this.dropLive(r);
+    this.dropCrate(r);
+  }
+  // ---------------------------------------------------------------- scheduling
+  // a gang's restock (RivalWarehouses.tickDay): the cargo has left their street stock and is on its way
+  rivalDelivery(fid, cargo) {
+    const hq = this.uw.loc('hq', fid); if (!hq || !RIVAL_WH[fid] || this.D.list.some(r => r.kind === 'supply' && r.fid === fid)) return false;
+    const r = this.add({ kind: 'supply', fid, cargo: Inv.clone(cargo), state: 'due', at: this.absHour() + randi(SHIP_T.supplyLead[0], SHIP_T.supplyLead[1]), from: { x: hq.x, z: hq.z }, to: 'rival:' + fid, paid: 0 });
+    if (this.S.factions[fid].rel < 0) {
+      const C = this.uw.rivalwh.C(fid);
+      this.uw.opps.add({ kind: 'shipment', title: `${FACTIONS[fid].short} restocking`, text: `A ${FACTIONS[fid].short} van runs ${goodsList(r.cargo)} from their HQ to ${RIVAL_WH[fid].name} around ${String(r.at % 24).padStart(2, '0')}:00. Be near either end and you can take it.`, x: C.center.x, z: C.center.z, until: r.at + 2 });
+    }
+    return true;
+  }
+  // Tidewater's boat (FactionAI.tickDay): it lands near a pier tomorrow evening
+  scheduleBoat() {
+    const uw = this.uw;
+    if (this.D.list.some(r => r.kind === 'boat')) return null;
+    const t = pick(uw.T.filter(q => q.zone === 'h'));
+    const at = (this.S.day + 1) * 24 + randi(19, 23);
+    const r = this.add({ kind: 'boat', fid: 'tidewater', cargo: { snow: randi(14, 28), hardware: randi(3, 8), smokes: randi(20, 40) }, state: 'due', at, from: { x: t.hang.x, z: t.hang.z }, to: 'rival:tidewater', paid: 0 });
+    uw.opps.add({ kind: 'shipment', title: 'Tidewater boat due', text: `A Tidewater boat lands near ${t.name} tomorrow around ${String(at % 24).padStart(2, '0')}:00. The cargo goes to their warehouse by van. Steal the van and the load is yours — they will not forget it.`, x: t.hang.x, z: t.hang.z, until: at + 3, turf: t.i });
+    return r;
+  }
+  // ---------------------------------------------------------------- your imports
+  // where your imports come ashore: the pier nearest your bonded shed on the docks
+  importPoint() {
+    if (this._ip) return this._ip;
+    const L = this.uw.loc('prop', 'whse_d'), hs = this.uw.T.filter(q => q.zone === 'h');
+    let best = hs[0];
+    if (L) for (const t of hs) if (dist2(t.hang.x, t.hang.z, L.x, L.z) < dist2(best.hang.x, best.hang.z, L.x, L.z)) best = t;
+    const c = curbNear(best.hang.x, best.hang.z);
+    return (this._ip = { x: c.x, z: c.z, h: c.h, name: best.name });
+  }
+  importOpen() { return this.D.list.find(r => r.kind === 'import') || null; }
+  importPrice(k) { const L = this.importPoint(); return Math.round(this.uw.market.wholesale(zoneKey(L.x, L.z), k) * IMPORT.price * IMPORT.lots[k]); }
+  // why you can't order one right now ('' when you can)
+  importBlock(k) {
+    const uw = this.uw;
+    if (uw.rank < IMPORT.rank) return `Imports open at ${RANKS[IMPORT.rank].name}.`;
+    if (!IMPORT.lots[k]) return 'Nobody ships that by the boatload.';
+    if (!uw.whse.list().length) return 'You need a warehouse to bring it into.';
+    if (this.importOpen()) return 'You already have an import on its way.';
+    if (this.S.jail) return 'Not from a cell.';
+    if (Money.payrollReserve() < this.importPrice(k)) return `It costs ${fmtMoney(this.importPrice(k))} in Dirty Cash up front, from a vault first.`;
+    return '';
+  }
+  orderImport(k) {
+    const why = this.importBlock(k); if (why) return why;
+    const uw = this.uw, L = this.importPoint(), paid = this.importPrice(k), at = this.absHour() + randi(SHIP_T.importLead[0], SHIP_T.importLead[1]);
+    Money.pay(paid, 'importOrder');
+    const cargo = {}; Inv.add(cargo, k, IMPORT.lots[k], paid);
+    const r = this.add({ kind: 'import', fid: 'pc', cargo, state: 'due', at, until: at + SHIP_T.importWait, from: { x: L.x, z: L.z }, to: '', paid });
+    uw.opps.add({ kind: 'shipment', title: 'Your import is at sea', text: `${goodsList(cargo)} lands at ${L.name} around ${String(at % 24).padStart(2, '0')}:00 (day ${Math.floor(at / 24) + 1}). Send a Driver for it, or bring a van or box truck. The port holds it for a day.`, x: L.x, z: L.z, until: at + SHIP_T.importWait });
+    this.g.autosave('Import ordered');
+    return '';
+  }
+  // landed and waiting at the dock: the record's cargo is the pile on the quay
+  importAt(id) { const r = this.find(id); return r && r.kind === 'import' && r.state === 'landed' ? r : null; }
+  // ---------------------------------------------------------------- the hourly clock
+  tickHours() {
+    const now = this.absHour();
+    for (const r of this.D.list.slice()) {
+      if (r.state === 'due' && now >= r.at) this.due(r);
+      else if (r.state === 'landed' && r.kind === 'import' && now >= r.until) this.expire(r);
+    }
+  }
+  // the player can see this happen: near either end, out on the street, not in a cell
+  watching(r) {
+    const g = this.g, p = g.player; if (this.S.jail || p.interior) return false;
+    const A = r.from, B = this.dest(r);
+    return dist2(p.pos.x, p.pos.z, A.x, A.z) < SHIP_T.near * SHIP_T.near || (B && dist2(p.pos.x, p.pos.z, B.x, B.z) < SHIP_T.near * SHIP_T.near);
+  }
+  dest(r) { if (r.to.startsWith('rival:')) { const C = this.uw.rivalwh.C(r.fid); return C ? { x: C.gate.x, z: C.gate.z } : null; } return null; }
+  due(r) {
+    const S = this.S, uw = this.uw, f = S.factions[r.fid];
+    if (r.kind === 'import') { this.land(r); return; }
+    if (f.broken) { this.finish(r, 'lost'); return; }
+    if (r.kind === 'boat') {
+      // port surveillance can seize the boat before it unloads
+      const seizeP = 0.12 + (S.crackdown > 0 ? 0.2 : 0) + f.heat / 400;
+      if (Math.random() < seizeP) {
+        uw.news('radio', 'Police radio: harbour unit has a vessel stopped at the piers. Customs are on the way.');
+        for (const k in r.cargo) if (GOODS[k]) uw.market.shock(Object.keys(DEMAND), k, 0.3);
+        f.money *= 0.9; f.heat = clamp(f.heat + 10, 0, 100);
+        uw.opps.add({ kind: 'scarcity', title: 'Port seizure', text: 'Customs took a whole Tidewater boat. Snow and hardware are scarce city-wide for days.', good: 'snow', hours: 48 });
+        this.finish(r, 'seized'); return;
+      }
+    }
+    // a warehouse being raided takes no deliveries: the van waits an hour
+    const w = uw.rivalwh.st(r.fid);
+    if (w.raid) { r.at += SHIP_T.hold; return; }
+    if (this.watching(r) && this.roll(r)) return;
+    this.arrive(r);
+  }
+  // it got there: on their shelves as far as the warehouse holds, the rest to their street stock
+  arrive(r) {
+    const uw = this.uw, w = uw.rivalwh.st(r.fid), f = this.S.factions[r.fid];
+    let room = Math.max(0, RIVAL_WH[r.fid].cap - units(w.stock));
+    const shelf = {};
+    for (const k of GOOD_IDS) { const n = Inv.has(r.cargo, k); if (!n) continue; const put = Math.min(n, Math.floor(room / GOODS[k].size)); if (put > 0) { shelf[k] = put; room -= put * GOODS[k].size; } }
+    uw.rivalwh.delivered(r.fid, shelf);
+    for (const k in shelf) Inv.remove(r.cargo, k, shelf[k]);
+    f.stock += units(r.cargo);
+    Inv.clear(r.cargo);
+    w.resupplied = this.S.day;
+    this.finish(r, 'delivered');
+  }
+  // ---------------------------------------------------------------- your import at the dock
+  land(r) {
+    const uw = this.uw, S = this.S, L = r.from;
+    if (Math.random() < IMPORT.seize + (S.crackdown > 0 ? 0.12 : 0) + (S.taskforce > 0 ? 0.08 : 0)) {
+      uw.news('radio', `Police radio: customs are opening a container at ${this.importPoint().name}.`);
+      uw.opps.add({ kind: 'shipment', title: 'Import seized', text: `Customs opened your container. ${goodsList(r.cargo)} gone, and the ${fmtMoney(r.paid)} with it.`, x: L.x, z: L.z, hours: 12 });
+      S.pressure = clamp(S.pressure + 4, 0, 100);
+      Inv.clear(r.cargo); this.finish(r, 'seized'); return;
+    }
+    r.state = 'landed'; r.until = this.absHour() + SHIP_T.importWait;
+    this.buildCrate(r);
+    uw.opps.add({ kind: 'shipment', title: 'Your import has landed', text: `${goodsList(r.cargo)} is on the quay at ${this.importPoint().name} until ${String(r.until % 24).padStart(2, '0')}:00 tomorrow. A Driver can bring it in (Empire → Drivers), or load it into a van or box truck yourself.`, x: L.x, z: L.z, until: r.until, urgent: true });
+  }
+  expire(r) {
+    this.uw.opps.add({ kind: 'shipment', title: 'Import impounded', text: `Nobody came for it. The port impounded ${goodsList(r.cargo)}.`, x: r.from.x, z: r.from.z, hours: 12 });
+    Inv.clear(r.cargo); this.finish(r, 'expired');
+  }
+  // a Driver's run took (part of) it: an empty pile is finished
+  taken(r) { if (!units(r.cargo)) this.finish(r, 'collected'); }
+  // you, in a van or box truck beside the pile: what fits goes into the trunk (cost basis with it)
+  loadImport(r, v) {
+    const uw = this.uw, g = this.g;
+    if (!IMPORT.vehicles.includes(v.type)) { g.ui.toast('A load this size needs a van or a box truck.', 'warn'); return 0; }
+    if (!v.trunk) v.trunk = {};
+    let moved = 0;
+    for (const k of GOOD_IDS) { const n = Inv.has(r.cargo, k); if (!n) continue; const put = Math.min(n, uw.trunkFit(v, k)); if (put > 0) { Inv.add(v.trunk, k, put, Inv.remove(r.cargo, k, put)); moved += put; } }
+    if (!moved) { g.ui.toast('No room left in the back.', 'warn'); return 0; }
+    g.audio.play('confirm');
+    g.ui.toast(units(r.cargo) ? `Loaded ${moved} lots. The rest is still on the quay.` : 'Loaded. Take it to a warehouse loading bay.', 'money');
+    this.taken(r);
+    if (r.state === 'landed') this.buildCrate(r);
+    g.autosave('Import loaded');
+    return moved;
+  }
+  findAction() {
+    const g = this.g, p = g.player;
+    if (p.interior) return null;
+    for (const r of this.D.list) {
+      if (r.kind !== 'import' || r.state !== 'landed') continue;
+      if (dist2(p.pos.x, p.pos.z, r.from.x, r.from.z) > 9 * 9) continue;
+      if (p.state === 'vehicle') { const v = p.vehicle; if (v.speed > 2) return null; return { label: `Load your import · ${goodsList(r.cargo)}`, act: () => this.loadImport(r, v) }; }
+      if (p.state === 'foot') return { label: `Your import · ${goodsList(r.cargo)}`, act: () => g.ui.toast('Too much to carry. Bring a van or a box truck, or send a Driver.', 'warn') };
+    }
+    return null;
+  }
+  // a stack of crates on the quay while it waits (drawn from the record: fewer lots, fewer crates)
+  buildCrate(r) {
+    this.dropCrate(r);
+    const g = this.g; if (!g.scene || r.state !== 'landed') return;
+    const k = new CompoundKit(), P = r.from, n = clamp(Math.ceil(units(r.cargo) / 30), 1, 8), h = this.importPoint().h || 0;
+    for (let i = 0; i < n; i++) { const lx = (i % 4) * 1.3 - 1.95, lz = Math.floor(i / 4) * 1.3; k.box(P.x + lx * Math.cos(h) + lz * Math.sin(h), groundY(P.x, P.z), P.z - lx * Math.sin(h) + lz * Math.cos(h), 1.2, 1.1, 1.2, 0x6a5a3a, h); }
+    const grp = k.build(); g.scene.add(grp); this.crates.set(r.id, grp);
+  }
+  dropCrate(r) {
+    const grp = this.crates.get(r.id); if (!grp) return;
+    this.g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    this.crates.delete(r.id);
+  }
+  // ---------------------------------------------------------------- the van on the road
+  // a physical van (and, for the boat, an escort) carrying the record's own cargo object
+  roll(r) {
+    const g = this.g, uw = this.uw, C = uw.rivalwh.C(r.fid); if (!C) return false;
+    const c = curbNear(r.from.x, r.from.z);
+    const van = g.vehicles.spawn('van', c.x, c.z, c.h, { driver: 'npc', color: r.kind === 'boat' ? 0x1a3d4a : 0x2a2e33 });
+    if (!van) return false;
+    van.mission = 'shipment'; van.touched = true; van.fac = r.fid; van.trunk = r.cargo; van.health = r.kind === 'boat' ? 140 : 120;
+    const lane = C.lanes.in[0][0];
+    van.drive = new DriveAI(van, g, 'cruise'); van.drive.cruise = 11; van.drive.setGoal(lane.x, lane.z);
+    const cars = [van];
+    if (r.kind === 'boat') {
+      const back = { x: c.x - Math.sin(c.h) * 10, z: c.z - Math.cos(c.h) * 10 };
+      const esc = g.vehicles.spawn('suv', back.x, back.z, c.h, { driver: 'npc', color: 0x1a2a3a });
+      if (esc) { esc.mission = 'shipment'; esc.touched = true; esc.fac = r.fid; esc.drive = new DriveAI(esc, g, 'cruise'); esc.drive.cruise = 12; esc.drive.target = () => ({ x: van.pos.x, z: van.pos.z, speed: 12 }); cars.push(esc); }
+    }
+    const gr = { key: 'ship' + r.id, kind: 'convoy', fid: r.fid, x: c.x, z: c.z, members: [], hostile: false, cars, van };
+    for (const v of cars) v.uwGroup = gr.key;
+    uw.gangs.groups.set(gr.key, gr);
+    r.state = 'rolling';
+    this.live.set(r.id, { r, van, gr, t: 0, V: null, after: 0 });
+    uw.opps.add({ kind: 'shipment', title: r.kind === 'boat' ? 'Tidewater van rolling' : `${FACTIONS[r.fid].short} van rolling`, text: `${r.kind === 'boat' ? 'The boat is unloaded and the van is heading for their warehouse with an escort.' : `A ${FACTIONS[r.fid].short} van is taking ${goodsList(r.cargo)} to ${RIVAL_WH[r.fid].name}.`} This is your window.`, x: c.x, z: c.z, hours: 2, follow: 'van', urgent: true });
+    g.ui.toast(r.kind === 'boat' ? 'The Tidewater van is on the move.' : `A ${FACTIONS[r.fid].short} van is on the move.`, 'radio');
+    return true;
+  }
+  dropLive(r) {
+    const L = this.live.get(r.id); if (!L) return;
+    this.live.delete(r.id);
+    if (this.uw.gangs.groups.get(L.gr.key) === L.gr) this.uw.gangs.removeGroup(L.gr);
+  }
+  // per frame: each van on the road
+  update(dt) {
+    if (!(dt > 0) || !this.live.size) return;
+    const g = this.g, p = g.player, uw = this.uw;
+    for (const L of [...this.live.values()]) {
+      const { r, van } = L;
+      if (r.state === 'done') {
+        // after a theft the escort keeps after you a while, then it's an ordinary car again
+        if ((L.after += dt) > 120 || !L.gr.cars.some(v => g.vehicles.list.includes(v) && v !== van && Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z) < 200)) { this.live.delete(r.id); if (uw.gangs.groups.get(L.gr.key) === L.gr) uw.gangs.removeGroup(L.gr); }
+        continue;
+      }
+      L.t += dt;
+      if (van === p.vehicle) { this.stolen(r, L); continue; }
+      // wrecked on the way: the load is lost with it
+      if (van.burnt || van.health <= 0) { if (Math.hypot(van.pos.x - p.pos.x, van.pos.z - p.pos.z) < 80) uw.threats.press(r.fid, PRESSURE.ship, 'wrecked their delivery'); Inv.clear(r.cargo); this.finish(r, 'lost'); continue; }
+      // gone without a wreck (despawned out of your sight), or out of your sight for long: it got there
+      const dp = Math.hypot(van.pos.x - p.pos.x, van.pos.z - p.pos.z);
+      if (!g.vehicles.list.includes(van) || (dp > SHIP_T.stray && !g.inView(van.pos.x, 1, van.pos.z, 3)) || L.t > SHIP_T.drive) { this.arriveLive(r, L); continue; }
+      const id = uw.rivalwh.id(r.fid), C = uw.rivalwh.C(r.fid);
+      if (!L.V) {
+        // at their gate: the compound's own lane takes it onto a dock
+        if (C.lanes.in.some(ln => Math.hypot(van.pos.x - ln[0].x, van.pos.z - ln[0].z) < SHIP_T.dock)) {
+          const V = uw.compounds.spawnVan(id, 'arrive', { v: van });
+          // the compound drives it from here (its lane, then off as traffic): it is no longer the convoy's car
+          if (V) { V.v.locked = false; V.v.mission = 'whrun'; V.v.wh = null; V.v.uwGroup = null; L.gr.cars = L.gr.cars.filter(v => v !== van); const hq = uw.loc('hq', r.fid); V.goal = { x: hq.x, z: hq.z }; L.V = V; }
+          else this.arriveLive(r, L); // every dock busy: it unloads at the gate
+        }
+      } else if (L.V.phase === 'unload' || L.V.phase === 'out' || L.V.phase === 'gone') this.arriveLive(r, L);
+    }
+  }
+  // the van got there: the cargo goes on the shelves; the van itself drives off as an ordinary van
+  arriveLive(r, L) {
+    const van = L.van;
+    this.arrive(r);
+    if (this.g.vehicles.list.includes(van)) { van.trunk = {}; van.fac = null; if (!L.V) { if (!this.g.inView(van.pos.x, 1, van.pos.z, 3)) this.g.vehicles.despawn(van); } }
+  }
+  stolen(r, L) {
+    const g = this.g, uw = this.uw, van = L.van, f = this.S.factions[r.fid], boat = r.kind === 'boat';
+    // the load leaves the record for the van: one place for it from now on
+    r.cargo = {};
+    van.fac = null; van.mission = null; van.uwGroup = null;
+    L.gr.cars = L.gr.cars.filter(v => v !== van);
+    this.finish(r, 'stolen', true); // the escort's chase stays live a while
+    uw.threats.press(r.fid, PRESSURE.ship, boat ? 'their shipment stolen' : 'took their delivery van');
+    f.rel = Math.max(-100, f.rel - (boat ? 45 : 25));
+    uw.gangs.provoke(r.fid, GANG_AGGRO.ship, van.pos.x, van.pos.z);
+    g.ui.banner('Shipment Stolen', goodsList(van.trunk), 'pass', 3); uw.addRep(boat ? 80 : 40, null);
+    if (boat) uw.news('unknown', 'Holm: “You took something of mine. I will be taking something of yours.”');
+    g.police.crime('carjack', van.pos.x, van.pos.z);
+    // the escort comes after you
+    const p = g.player;
+    for (const esc of L.gr.cars) if (g.vehicles.list.includes(esc) && esc.drive) { esc.drive.mode = 'pursue'; esc.drive.cruise = 26; esc.drive.target = () => ({ x: p.pos.x, z: p.pos.z, speed: 26, direct: dist2(esc.pos.x, esc.pos.z, p.pos.x, p.pos.z) < 30 * 30 }); esc.drive.targetRef = van; }
+  }
+  // ---------------------------------------------------------------- saves and resets
+  // after a load nothing is on the road: a van that was rolling arrived (once); a landed import's pile is redrawn
+  reset() {
+    for (const grp of this.crates.values()) { if (this.g.scene) this.g.scene.remove(grp); }
+    this.crates.clear(); this.live.clear(); this._ip = null;
+    if (!this.uw.S) return;
+    for (const r of this.D.list.slice()) {
+      if (r.state === 'rolling') this.arrive(r);
+      else if (r.state === 'landed') this.buildCrate(r);
+    }
+  }
+  // the Opportunities/feed view: what is on its way, for the player's own imports and what they've heard of
+  summary() {
+    return this.D.list.map(r => ({ id: r.id, kind: r.kind, fid: r.fid, state: r.state, at: r.at, until: r.until || 0, goods: goodsList(r.cargo), n: units(r.cargo) }));
+  }
 }
 /* =====================================================================
    [UNDERWORLD] EMPIRE UI: the phone (overview, territory map, crew, assets,
@@ -53377,10 +53657,12 @@ class EmpireUI {
     // destinations: your stashes and the corners of turfs where you have Dealers (§8)
     const spots = SPOTS.filter(sp => sp.sells && sp.sells.length && (g.save.rep >= (sp.rep || 0) || (S.flags.intro && S.flags.intro[sp.id])));
     const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = S.supply[sp.id] || {}; const o = {}; for (const k of sp.sells) o[k] = st[k] !== undefined ? st[k] : 0; return o; };
-    const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
+    const imp = uw.shipments.importOpen();
+    const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`]), ...(imp && imp.state === 'landed' ? [['import:' + imp.id, `Your import on the quay (${uw.shipments.importPoint().name})`]] : [])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
     if (!origins.some(o => o[0] === d.from)) d.from = origins.length ? origins[0][0] : '';
     const corners = uw.T.filter(t => uw.whse.dealersOn(t.i).length).map(t => ({ id: 'turf:' + t.i, name: `Dealer’s corner · ${t.name}` }));
-    const dests = [...stashes.map(p => ({ id: p.id, name: p.name })), ...corners].filter(p => p.id !== d.from);
+    // an import only goes to a warehouse (§8: it becomes warehouse stock once it is brought in)
+    const dests = [...stashes.map(p => ({ id: p.id, name: p.name })), ...corners].filter(p => p.id !== d.from && (!R.isImport(d.from) || (PROP_BY_ID[p.id] && PROP_BY_ID[p.id].kind === 'warehouse')));
     if (!dests.some(p => p.id === d.to)) d.to = dests.length ? dests[0].id : '';
     const src = d.from ? (d.from.startsWith('spot:') ? supplyOf(d.from) : R.container(d.from)) : {};
     const goods = GOOD_IDS.filter(k => Inv.has(src, k) > 0 && !(d.to && d.to.startsWith('turf:') && (GOODS[k].fence || GOODS[k].arms)));
@@ -53406,9 +53688,24 @@ class EmpireUI {
         <div class="stat"><span>Cargo value</span><span>${fmtMoney(a.value)}</span></div>${d.from.startsWith('spot:') ? `<div class="stat"><span>Product (from the vault)</span><span class="money">${fmtMoney(Math.round(uw.market.wholesale(uw.loc('spot', d.from.slice(5)).zone, d.good) * d.n))}</span></div>` : ''}<div class="stat"><span>Time on the road</span><span>about ${a.hours} h</span></div>` : ''}
         <div class="btns"><button class="sbtn gold" data-act="rungo" ${a && Money.payrollReserve() >= (d.from.startsWith('spot:') ? Math.round(uw.market.wholesale(uw.loc('spot', d.from.slice(5)).zone, d.good) * d.n) : 0) && room >= d.n * GOODS[d.good].size ? '' : 'disabled'}>${a ? `Send ${esc(uw.crew.find(d.crew).name.split(' ')[0])}` : 'Send'}</button></div></div>`;
     }
+    h += this.importsHTML();
     const now = R.absHour();
     h += `<h3>On the road <small>${S.runs.length}</small></h3>` + (S.runs.length ? '<div class="jobs">' + S.runs.map(r => `<div class="job"><i>⇢</i><div><b>${esc(r.name)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name}</b><span>${esc(r.from === 'inv' ? 'from you' : R.placeName(r.from))} → ${esc(R.placeName(r.to))} · ${Math.round(r.chance * 100)}% · arrives in ~${Math.max(0, r.eta - now)}h · fee ${fmtMoney(r.fee)}</span></div></div>`).join('') + '</div>' : '<div class="hint">No runs out right now.</div>');
     h += `<h3>Reports</h3>` + (S.runLog.length ? '<div class="msgs">' + S.runLog.slice().reverse().map(r => { const [t, col] = r.outcome === 'success' ? ['SUCCESS', '#7fe08f'] : r.outcome === 'partial' ? ['PARTIAL LOSS', '#ffd84d'] : [RUN_OUTCOMES[r.outcome] || r.outcome, '#ff8a3d']; return `<div class="msg"><i style="background:${col}">${r.outcome === 'success' ? '✓' : '!'}</i><div><b>${t} · ${esc(r.name)}</b><small>day ${r.day}</small><p>${esc(r.from)} → ${esc(r.to)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} · delivered ${fmtQty(r.good, r.delivered)}${r.lost ? ' · lost ' + fmtQty(r.good, r.lost) : ''}${r.returned ? ' · returned ' + fmtQty(r.good, r.returned) : ''} · fee ${fmtMoney(r.fee)}${r.text ? '<br>' + esc(r.text) : ''}</p></div></div>`; }).join('') + '</div>' : '<div class="hint">No runs finished yet.</div>');
+    return h;
+  }
+  // IMPORTS (§3, §8): a bulk load at about half the wholesale price, landing at the docks; rank-gated
+  importsHTML() {
+    const uw = this.uw, Sh = uw.shipments, imp = Sh.importOpen(), now = uw.runs.absHour(), P = Sh.importPoint();
+    let h = `<h3>Imports</h3><div class="hint">A whole load at about ${Math.round(IMPORT.price * 100)}% of the supplier’s price, paid up front from a vault. It lands at ${esc(P.name)} and the port holds it for a day: it becomes warehouse stock only when a Driver brings it in (a delivery from the quay) or you load it into a van or box truck and unload it at a warehouse. Customs open a container now and then.</div>`;
+    if (imp) {
+      const st = imp.state === 'due' ? `at sea · lands in ~${Math.max(0, imp.at - now)}h` : `on the quay · ${Math.max(0, imp.until - now)}h before the port impounds it`;
+      return h + `<div class="card"><div class="t">${esc(goodsList(imp.cargo))}</div><div class="d">${st}</div><div class="stat"><span>Paid</span><span class="money">${fmtMoney(imp.paid)}</span></div></div>`;
+    }
+    h += '<div class="jobs">' + Object.keys(IMPORT.lots).map(k => {
+      const why = Sh.importBlock(k), price = Sh.importPrice(k);
+      return `<div class="job${why ? ' locked' : ''}"><i>⚓</i><div><b>${fmtQty(k, IMPORT.lots[k])} ${GOODS[k].name} · ${fmtMoney(price)}</b><span>${esc(why || 'Lands in 8–16 hours.')}</span></div><button class="sbtn" data-act="import:${k}" ${why ? 'disabled' : ''}>Order</button></div>`;
+    }).join('') + '</div>';
     return h;
   }
   t_factions() {
@@ -53489,6 +53786,7 @@ class EmpireUI {
       case 'cdrop': uw.cops.drop(x); r = 'You stopped paying. They won’t miss you.'; break;
       case 'redir': r = uw.cops.redirect(x); if (!r) r = 'Pike is on it.'; break;
       case 'run': { const d = this.runDraft || (this.runDraft = {}); d[x] = x === 'n' || x === 'crew' ? +y : y; this.render(); return; }
+      case 'import': { r = uw.shipments.orderImport(x) || 'Ordered. Watch the docks.'; break; }
       case 'rungo': { const d = this.runDraft || {}; r = uw.runs.dispatch(d.crew, d.from, d.to, d.good, d.n) || `${uw.crew.find(d.crew) ? uw.crew.find(d.crew).name.split(' ')[0] : 'The runner'} is on the way.`; break; }
       default: { const ar = uw.armory.act(a, null); if (ar !== null) r = ar; }
     }
@@ -57607,7 +57905,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

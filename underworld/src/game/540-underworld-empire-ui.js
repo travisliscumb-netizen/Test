@@ -527,10 +527,12 @@ class EmpireUI {
     // destinations: your stashes and the corners of turfs where you have Dealers (§8)
     const spots = SPOTS.filter(sp => sp.sells && sp.sells.length && (g.save.rep >= (sp.rep || 0) || (S.flags.intro && S.flags.intro[sp.id])));
     const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = S.supply[sp.id] || {}; const o = {}; for (const k of sp.sells) o[k] = st[k] !== undefined ? st[k] : 0; return o; };
-    const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
+    const imp = uw.shipments.importOpen();
+    const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`]), ...(imp && imp.state === 'landed' ? [['import:' + imp.id, `Your import on the quay (${uw.shipments.importPoint().name})`]] : [])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
     if (!origins.some(o => o[0] === d.from)) d.from = origins.length ? origins[0][0] : '';
     const corners = uw.T.filter(t => uw.whse.dealersOn(t.i).length).map(t => ({ id: 'turf:' + t.i, name: `Dealer’s corner · ${t.name}` }));
-    const dests = [...stashes.map(p => ({ id: p.id, name: p.name })), ...corners].filter(p => p.id !== d.from);
+    // an import only goes to a warehouse (§8: it becomes warehouse stock once it is brought in)
+    const dests = [...stashes.map(p => ({ id: p.id, name: p.name })), ...corners].filter(p => p.id !== d.from && (!R.isImport(d.from) || (PROP_BY_ID[p.id] && PROP_BY_ID[p.id].kind === 'warehouse')));
     if (!dests.some(p => p.id === d.to)) d.to = dests.length ? dests[0].id : '';
     const src = d.from ? (d.from.startsWith('spot:') ? supplyOf(d.from) : R.container(d.from)) : {};
     const goods = GOOD_IDS.filter(k => Inv.has(src, k) > 0 && !(d.to && d.to.startsWith('turf:') && (GOODS[k].fence || GOODS[k].arms)));
@@ -556,9 +558,24 @@ class EmpireUI {
         <div class="stat"><span>Cargo value</span><span>${fmtMoney(a.value)}</span></div>${d.from.startsWith('spot:') ? `<div class="stat"><span>Product (from the vault)</span><span class="money">${fmtMoney(Math.round(uw.market.wholesale(uw.loc('spot', d.from.slice(5)).zone, d.good) * d.n))}</span></div>` : ''}<div class="stat"><span>Time on the road</span><span>about ${a.hours} h</span></div>` : ''}
         <div class="btns"><button class="sbtn gold" data-act="rungo" ${a && Money.payrollReserve() >= (d.from.startsWith('spot:') ? Math.round(uw.market.wholesale(uw.loc('spot', d.from.slice(5)).zone, d.good) * d.n) : 0) && room >= d.n * GOODS[d.good].size ? '' : 'disabled'}>${a ? `Send ${esc(uw.crew.find(d.crew).name.split(' ')[0])}` : 'Send'}</button></div></div>`;
     }
+    h += this.importsHTML();
     const now = R.absHour();
     h += `<h3>On the road <small>${S.runs.length}</small></h3>` + (S.runs.length ? '<div class="jobs">' + S.runs.map(r => `<div class="job"><i>⇢</i><div><b>${esc(r.name)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name}</b><span>${esc(r.from === 'inv' ? 'from you' : R.placeName(r.from))} → ${esc(R.placeName(r.to))} · ${Math.round(r.chance * 100)}% · arrives in ~${Math.max(0, r.eta - now)}h · fee ${fmtMoney(r.fee)}</span></div></div>`).join('') + '</div>' : '<div class="hint">No runs out right now.</div>');
     h += `<h3>Reports</h3>` + (S.runLog.length ? '<div class="msgs">' + S.runLog.slice().reverse().map(r => { const [t, col] = r.outcome === 'success' ? ['SUCCESS', '#7fe08f'] : r.outcome === 'partial' ? ['PARTIAL LOSS', '#ffd84d'] : [RUN_OUTCOMES[r.outcome] || r.outcome, '#ff8a3d']; return `<div class="msg"><i style="background:${col}">${r.outcome === 'success' ? '✓' : '!'}</i><div><b>${t} · ${esc(r.name)}</b><small>day ${r.day}</small><p>${esc(r.from)} → ${esc(r.to)} · ${fmtQty(r.good, r.n)} ${GOODS[r.good].name} · delivered ${fmtQty(r.good, r.delivered)}${r.lost ? ' · lost ' + fmtQty(r.good, r.lost) : ''}${r.returned ? ' · returned ' + fmtQty(r.good, r.returned) : ''} · fee ${fmtMoney(r.fee)}${r.text ? '<br>' + esc(r.text) : ''}</p></div></div>`; }).join('') + '</div>' : '<div class="hint">No runs finished yet.</div>');
+    return h;
+  }
+  // IMPORTS (§3, §8): a bulk load at about half the wholesale price, landing at the docks; rank-gated
+  importsHTML() {
+    const uw = this.uw, Sh = uw.shipments, imp = Sh.importOpen(), now = uw.runs.absHour(), P = Sh.importPoint();
+    let h = `<h3>Imports</h3><div class="hint">A whole load at about ${Math.round(IMPORT.price * 100)}% of the supplier’s price, paid up front from a vault. It lands at ${esc(P.name)} and the port holds it for a day: it becomes warehouse stock only when a Driver brings it in (a delivery from the quay) or you load it into a van or box truck and unload it at a warehouse. Customs open a container now and then.</div>`;
+    if (imp) {
+      const st = imp.state === 'due' ? `at sea · lands in ~${Math.max(0, imp.at - now)}h` : `on the quay · ${Math.max(0, imp.until - now)}h before the port impounds it`;
+      return h + `<div class="card"><div class="t">${esc(goodsList(imp.cargo))}</div><div class="d">${st}</div><div class="stat"><span>Paid</span><span class="money">${fmtMoney(imp.paid)}</span></div></div>`;
+    }
+    h += '<div class="jobs">' + Object.keys(IMPORT.lots).map(k => {
+      const why = Sh.importBlock(k), price = Sh.importPrice(k);
+      return `<div class="job${why ? ' locked' : ''}"><i>⚓</i><div><b>${fmtQty(k, IMPORT.lots[k])} ${GOODS[k].name} · ${fmtMoney(price)}</b><span>${esc(why || 'Lands in 8–16 hours.')}</span></div><button class="sbtn" data-act="import:${k}" ${why ? 'disabled' : ''}>Order</button></div>`;
+    }).join('') + '</div>';
     return h;
   }
   t_factions() {
@@ -639,6 +656,7 @@ class EmpireUI {
       case 'cdrop': uw.cops.drop(x); r = 'You stopped paying. They won’t miss you.'; break;
       case 'redir': r = uw.cops.redirect(x); if (!r) r = 'Pike is on it.'; break;
       case 'run': { const d = this.runDraft || (this.runDraft = {}); d[x] = x === 'n' || x === 'crew' ? +y : y; this.render(); return; }
+      case 'import': { r = uw.shipments.orderImport(x) || 'Ordered. Watch the docks.'; break; }
       case 'rungo': { const d = this.runDraft || {}; r = uw.runs.dispatch(d.crew, d.from, d.to, d.good, d.n) || `${uw.crew.find(d.crew) ? uw.crew.find(d.crew).name.split(' ')[0] : 'The runner'} is on the way.`; break; }
       default: { const ar = uw.armory.act(a, null); if (ar !== null) r = ar; }
     }
