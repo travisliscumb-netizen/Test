@@ -249,6 +249,40 @@ Object.assign(World.prototype, {
       }
     });
   },
+  // a compound laid out in the block's own frame: u runs along the street the gate is on, v runs inward from it.
+  // Cannery Row's plan (gate 4.5 m off centre between the lamp and the pole, the building at the back, two docks),
+  // turned to whichever street the block actually has
+  _genRivalWh(b, rng) {
+    const fid = Object.keys(RIVAL_WH).find(k => RIVAL_WH[k].at[0] === b.bx && RIVAL_WH[k].at[1] === b.bz), R = RIVAL_WH[fid], F = FACTIONS[fid];
+    this._sidewalk(b, rng, { trees: 0, park: 0 });
+    const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
+    const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
+    const cx = b.cx, cz = b.cz;
+    // local → world: n: (cx + u, z0 + v); s: (cx − u, z1 − v); w: (x0 + v, cz − u); e: (x1 − v, cz + u)
+    const W = (u, v) => side === 'n' ? [cx + u, b.z0 + v] : side === 's' ? [cx - u, b.z1 - v] : side === 'w' ? [b.x0 + v, cz - u] : [b.x1 - v, cz + u];
+    const rect = (u0, v0, u1, v1) => { const [ax, az] = W(u0, v0), [bx2, bz2] = W(u1, v1); return { x0: Math.min(ax, bx2), z0: Math.min(az, bz2), x1: Math.max(ax, bx2), z1: Math.max(az, bz2) }; };
+    const along = (u, v) => (side === 'n' || side === 's') ? W(u, v)[0] : W(u, v)[1];
+    const hd = (du, dv) => { const [ax, az] = W(0, 0), [bx2, bz2] = W(du, dv); return Math.atan2(bx2 - ax, bz2 - az); };
+    const P2 = (u, v, r) => { const [x, z] = W(u, v); return r ? [x, z, 1] : [x, z]; };
+    const gu = 4.5, bld = rect(-24, 30, 24, 56);
+    const [bx0, bz0] = W(13, 4.5);
+    this._whCompound(b, rng, {
+      id: 'rwh_' + fid, rival: fid, place: 'rwh_' + fid, name: R.name, color: 0x6a6258, sign: F.short.toUpperCase(), sub: 'PRIVATE · KEEP OUT',
+      lot: rect(-29, 1, 29, 59), gate: { side, at: along(gu, 1), w: 8 },
+      bld: { ...bld, h: 9 }, face: side,
+      docks: [along(-9, 30), along(9, 30)], door: along(-21, 30),
+      park: [{ x: W(26, 16)[0], z: W(26, 16)[1], h: hd(0, -1) }],
+      booth: { x: bx0, z: bz0, w: 3, d: 3 },
+      front: ['n', 's', 'w', 'e'], apron: rect(gu - 4, -4, gu + 4, 0),
+      lanes: {
+        in: [[P2(gu, -9), P2(gu, -4), P2(gu, 1), P2(gu, 6), P2(-5, 13), P2(-9, 19), P2(-9, 25)],
+             [P2(gu, -9), P2(gu, -4), P2(gu, 1), P2(gu, 6), P2(7.5, 13), P2(9, 19), P2(9, 25)]],
+        out: [[P2(-9, 19, 1), P2(-14, 13, 1), P2(-3, 9), P2(gu, 4), P2(gu, 1), P2(gu, -5), P2(gu, -10)],
+              [P2(9, 19, 1), P2(14, 13, 1), P2(9, 9), P2(gu, 4), P2(gu, 1), P2(gu, -5), P2(gu, -10)]]
+      }
+    });
+    void far;
+  },
   _whCompound(b, rng, s) {
     const L = s.lot, B = s.bld, Y = CURB_H;
     const SV = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
@@ -307,7 +341,7 @@ Object.assign(World.prototype, {
     const yard = { x0: L.x0, z0: L.z0, x1: L.x1, z1: L.z1 };
     b.place = { id: s.place, name: s.name, kind: 'landmark', door, garage: s.park[0], under: { x: (B.x0 + B.x1) / 2, z: (B.z0 + B.z1) / 2 } };
     this.compounds[s.id] = {
-      id: s.id, place: s.place, name: s.name, block: b.i, lot: { ...L }, yard, bld: { ...B }, face: s.face,
+      id: s.id, place: s.place, name: s.name, block: b.i, rival: s.rival || null, lot: { ...L }, yard, bld: { ...B }, face: s.face,
       gate: { side: G.side, x: gx, z: gz, w: G.w, axis: ns(G.side) ? 'x' : 'z', n: gn },
       docks, door, park: s.park.map(p => ({ ...p })), booth: s.booth, front: s.front.slice(), perim,
       lanes: { in: s.lanes.in.map(lane), out: s.lanes.out.map(lane) },

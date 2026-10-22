@@ -676,6 +676,8 @@ class EmpireUI {
     g.content.openSvc(d.name, PM.owned(id) ? 'Your property.' : 'For sale.', render, a => this.propAct(id, a));
   }
   // a warehouse you own (§7): Product, Weapons/Ammo, Dirty Cash, Security, Crew, Logistics
+  // a rival's stock, from inside their building or their loading bay: the transfer screen, from their shelves
+  openRivalStock(fid) { this.xfer = { from: 'rival:' + fid, to: '' }; this.open('stash'); }
   whPanel(id) {
     const uw = this.uw, W = uw.whse, S = uw.S, d = PROP_BY_ID[id], tab = this.whTab || 'product';
     const tabs = [['product', 'Product'], ['weapons', 'Weapons'], ['cash', 'Dirty Cash'], ['security', 'Security'], ['crew', 'Crew'], ['logistics', 'Logistics']];

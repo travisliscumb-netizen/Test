@@ -283,6 +283,18 @@ const PRESS_STAGE = { warn: 20, hit: 40, strike: 70 };
 // the real-time threat clock (seconds of active play): the warning to THREAT IMMINENT, then to execution; a physical
 // assault lasts at most `fight` seconds before it is decided by what is left standing
 const THREAT_T = { warn: 120, imminent: 60, fight: 120, near: 140 };
+// Session 4B: each faction keeps a physical warehouse (block, its security tiers, what it can hold). Tiers stay at
+// or below 2 in perimeter and access, so there is always a way in for a determined player (a car through the gate
+// or the fence); the stronger crews watch more and keep more.
+const RIVAL_WH = {
+  vipers: { at: [3, 6], name: 'Vipers stash yard', up: { perimeter: 1, surveillance: 1, access: 1, vault: 1 }, cap: 120, cash: 30000 },
+  velvet: { at: [6, 10], name: 'Velvet bonded store', up: { perimeter: 2, surveillance: 2, access: 1, vault: 1 }, cap: 140, cash: 45000 },
+  glasshouse: { at: [9, 4], name: 'Glasshouse depot', up: { perimeter: 1, surveillance: 2, access: 2, vault: 2 }, cap: 160, cash: 60000 },
+  bellcourt: { at: [9, 1], name: 'Bellcourt warehouse', up: { perimeter: 2, surveillance: 2, access: 2, vault: 2 }, cap: 180, cash: 80000 },
+  tidewater: { at: [11, 9], name: 'Tidewater freight shed', up: { perimeter: 2, surveillance: 3, access: 2, vault: 2 }, cap: 220, cash: 100000 }
+};
+// their blocks are landmarks laid out by World._genRivalWh (before the world is generated: this file loads first)
+for (const fid in RIVAL_WH) LANDMARK_BLOCKS[RIVAL_WH[fid].at.join(',')] = { gen: '_genRivalWh', name: RIVAL_WH[fid].name, icon: 'W', ground: 'I', rival: fid };
 const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;

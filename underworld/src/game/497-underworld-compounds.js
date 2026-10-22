@@ -126,21 +126,23 @@ class CompoundSystem {
   }
   get g() { return this.uw.g; }
   C(id) { return this.g.world.compounds[id]; }
-  // the tiers the compound shows: what you have bought, or nothing while it is for sale
+  // a rival gang's compound (Session 4B): its faction id, else null
+  rival(id) { const R = this.R[id]; return R && R.C.rival || null; }
+  // the tiers the compound shows: what you have bought (or nothing while it is for sale); a rival's, theirs
   tiers(id) {
-    const W = this.uw.whse, o = this.uw.props.owned(id);
-    const t = {}; for (const k of WH_CAT_IDS) t[k] = o ? W.tier(id, k) : 0;
+    const W = this.uw.whse, fid = this.rival(id), o = !fid && this.uw.props.owned(id);
+    const t = {}; for (const k of WH_CAT_IDS) t[k] = fid ? this.uw.rivalwh.st(fid).up[k] | 0 : o ? W.tier(id, k) : 0;
     return t;
   }
   // rebuild a compound when its tiers changed (upgrade, purchase, load) or a breach was mended
   sync(force) { for (const id in this.R) this.build(id, force); }
   build(id, force) {
-    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.uw.props.owned(id) ? 'o' : '-');
+    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.rival(id) ? 'r' : this.uw.props.owned(id) ? 'o' : '-');
     if (!force && sig === R.sig && !R.dirty) return;
     const g = this.g, grid = g.world.grid, C = R.C;
     const keepOpen = R.sig === sig && R.gate ? R.gate.open : 0;
     // what is breached (saved): entries from a tier that has since been replaced are gone with it
-    const br = this.uw.props.owned(id) ? this.breaches(id) : {};
+    const br = this.rival(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
     for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
     for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -340,7 +342,9 @@ class CompoundSystem {
   // ---------------------------------------------------------------- who the gate lets in (the one rule)
   // returns '' when allowed, or why not. a: the player, a vehicle, or a person on foot
   why(id, a) {
-    const g = this.g, uw = this.uw, p = g.player;
+    const g = this.g, uw = this.uw, p = g.player, fid = this.rival(id);
+    // a rival's compound lets in its own people and its own vehicles, and never you
+    if (fid) { if (a && a.spec && a.ctl) return a.fac === fid && a !== p.vehicle ? '' : 'not one of theirs'; return a && a !== p && a.fac === fid && a.kind === 'gang' ? '' : 'not one of theirs'; }
     if (!uw.props.owned(id)) return 'not yours';
     if (a === p) return uw.inJail ? 'in jail' : '';
     if (a && a.spec && a.ctl) {
@@ -379,13 +383,14 @@ class CompoundSystem {
     }
     for (const v of g.vehicles.nearby(G.x, G.z, 36)) { if (v === pv || v.burnt) continue; if (Math.hypot(v.pos.x - G.x, v.pos.z - G.z) < reach(v) && this.allows(id, v)) { R.gate.by = v.wh && v.wh.crew ? 'crew vehicle' : 'delivery'; return true; } }
     // people on foot: crew on their way in or out (a guard standing their post doesn't hold the gate open)
-    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !q.crewId || (q.group && q.group.kind === 'whguard')) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
+    const fid = this.rival(id);
+    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !(q.crewId || (fid && q.fac === fid)) || (q.group && (q.group.kind === 'whguard' || q.group.kind === 'rguard'))) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
     return false;
   }
   // a dock door opens for an authorized vehicle in its bay (a controlled gate also wants it stopped first)
   dockWant(id, k) {
     const R = this.R[id], C = R.C, b = C.docks[k].bay, g = this.g;
-    if (!this.uw.props.owned(id)) return false;
+    if (!this.rival(id) && !this.uw.props.owned(id)) return false;
     const A = WH_GATE[R.t ? R.t.access : 0];
     for (const v of g.vehicles.nearby(b.x, b.z, 4)) if (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) < 3.2 && (!A || !A.controlled || v.speed < 1.5) && this.allows(id, v)) return true;
     return false;
@@ -401,6 +406,8 @@ class CompoundSystem {
     // crew already working here start on it at once (w: the economic hour the work started)
     const crewHere = this.uw.crew.active().some(c => c.assign === WarehouseSystem.key(id));
     const hit = q => { q.state = 'broken'; q.col.on = false; br[q.key] = { s: 'broken', t: now, tier: q === R.gate ? R.t.access : R.t.perimeter }; if (crewHere) br[q.key].w = now; };
+    // a rival's compound rammed: that is a raid starting (Session 4B)
+    if (this.rival(id)) { hit(part); if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle) this.uw.rivalwh.alarm(this.rival(id), 'rammed'); return; }
     hit(part);
     if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q);
     if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true;
@@ -419,7 +426,7 @@ class CompoundSystem {
   }
   // the saved breach list of a warehouse: { [part key]: { s: 'broken' | 'patched', t: econ hour of the breach, tier,
   // w: econ hour the crew started on it (absent while nobody works here) } }
-  breaches(id) { const st = this.uw.whse.st(id); return st.breach || (st.breach = {}); }
+  breaches(id) { const fid = this.rival(id), st = fid ? this.uw.rivalwh.st(fid) : this.uw.whse.st(id); return st.breach || (st.breach = {}); }
   // what mending a part costs: a patch is a flat price, a full repair scales with the tier being restored
   patchCost(key) { return key === 'gate' ? WH_BREACH.patchGate : WH_BREACH.patchPanel; }
   repairCost(id, key) { const d = PROP_BY_ID[id], b = this.breaches(id)[key]; return Math.round(d.price * (key === 'gate' ? WH_BREACH.repairGate : WH_BREACH.repairPanel) * Math.max(1, b ? b.tier : 1) / 10) * 10; }
@@ -524,7 +531,12 @@ class CompoundSystem {
       }
       if (R.dirty) this.build(id, true);
       // the cameras watch the yard: anyone in it the gate wouldn't let in raises the alarm
-      if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.uw.props.owned(id)) {
+      if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
+        // a rival's cameras watch for you: you in their yard is a raid starting
+        R.watchT = 0.5;
+        const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;
+        if (!p.interior && this.inYard(id, pp.x, pp.z) && this.seen(id, pp.x, pp.y + 1.2, pp.z, night)) this.uw.rivalwh.alarm(this.rival(id), 'camera');
+      } else if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.uw.props.owned(id)) {
         R.watchT = 0.5;
         for (const q of g.peds.peds) {
           if (q.state === 'down' || !this.inYard(id, q.x, q.z) || this.allows(id, q)) continue;
@@ -621,7 +633,7 @@ class CompoundSystem {
       if (V.phase === 'unload' && V.t > 20) { V.phase = 'out'; V.t = 0; v.wh.until = g.time + 240; v.drive = new LaneDriver(v, g, this.R[V.id].C.lanes.out[V.dock], { speed: 6, onDone: () => { V.stalls += v.drive.stalls; V.phase = 'gone'; V.t = 0; } }); }
       if (V.phase === 'gone') {
         // out on the street: an ordinary car again, gone once nobody is looking
-        if (!(v.drive instanceof DriveAI)) { v.wh = null; v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
+        if (!(v.drive instanceof DriveAI)) { v.wh = null; v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = V.goal || g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
         const d = Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z);
         if (d > 200 || (d > 90 && !g.inView(v.pos.x, 1, v.pos.z, 3))) { g.vehicles.despawn(v); return false; }
       }

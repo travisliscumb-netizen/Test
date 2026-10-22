@@ -143,6 +143,7 @@ class Underworld {
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
+    this.rivalwh = new RivalWarehouses(this);
     this.compounds = new CompoundSystem(this);
     this.threats = new ThreatSystem(this);
     this.ui = new EmpireUI(this);
@@ -182,7 +183,9 @@ class Underworld {
       // Session 3: warehouse security and settings, and each turf's dealer stock on the corner
       whse: {}, turfStock: {},
       // Session 4A: threats against the player's assets (clocks, strength and dice saved with them)
-      threats: ThreatSystem.fresh()
+      threats: ThreatSystem.fresh(),
+      // Session 4B: the rival gangs' warehouses (their stock, cash, security, breaches and any raid on)
+      rivals: RivalWarehouses.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -248,6 +251,7 @@ class Underworld {
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
+    S.rivals = RivalWarehouses.sanitize(S.rivals, num);
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
@@ -273,6 +277,7 @@ class Underworld {
     this.gangs.reset(); this.crew.reset(); this.pickups.clear(); this.opps.rebuildMarkers();
     if (this.compounds) this.compounds.reset();
     if (this.threats) this.threats.reset();
+    if (this.rivalwh) this.rivalwh.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -511,6 +516,8 @@ class Underworld {
       if (!here && !(opts.all && units(o))) continue;
       out.push({ key: 'turf:' + i, cls: 'CORNER', name: `Dealer’s corner · ${t.name}`, o, cap: TURF_STOCK_CAP, zone: t.zone, turf: i, here });
     }
+    // a rival's stock, while you can reach it (inside their building, or a car of yours in their loading bay)
+    for (const fid in RIVAL_WH) if (this.rivalwh.reach(fid)) out.push(this.rivalwh.location(fid));
     out.sort((a, b) => LOC_ORDER.indexOf(a.cls) - LOC_ORDER.indexOf(b.cls) || (b.here - a.here));
     return out;
   }
@@ -582,9 +589,13 @@ class Underworld {
     if (!GOODS[k] || fromKey === toKey) return 0;
     const locs = this.locations(), A = locs.find(L => L.key === fromKey && L.here), B = locs.find(L => L.key === toKey && L.here);
     if (!A || !B || A.o === B.o) return 0;
+    // their stock is taken from, never added to; taking from it is noticed (Session 4B)
+    if (B.rival) return 0;
     if (B.turf !== undefined && (GOODS[k].fence || GOODS[k].arms)) return 0; // dealers sell product, not hot goods or hardware
     const m = Math.min(Math.floor(n), Inv.has(A.o, k), this.fitIn(B, k)); if (!(m > 0)) return 0;
-    return Inv.move(A.o, B.o, k, m);
+    const moved = Inv.move(A.o, B.o, k, m);
+    if (moved && A.rival) this.rivalwh.touched(A.rival);
+    return moved;
   }
   // move Dirty Cash between two places within reach (§2): your pockets, a trunk, a safehouse stash or a warehouse
   // vault. n < 0 moves all of it. Places across town are out of reach, exactly as for product.
@@ -748,6 +759,7 @@ class Underworld {
     this.neon.update(g.env.night, g.time, !!(g.player.interior && !(g.player.interior.def && g.player.interior.def.realView)));
     // threat clocks run on real active play, in jail too (§45.16)
     this.threats.update();
+    this.rivalwh.update();
     if (S.jail) { this.prison.update(dt, rdt); }
     else if (g.state === 'playing' && dt > 0) {
       const h = Math.floor(g.env.time) % 24;
@@ -790,6 +802,8 @@ class Underworld {
     this.crew.tickDay();
     // Lieutenants send Drivers to restock the corners for tomorrow (§5, §8)
     this.whse.automate();
+    // the rival warehouses mend and restock (a delivery that arrives), unless a raid is on
+    this.rivalwh.tickDay();
     this.factions.tickDay();
     this.cops.tickDay();
     this.opps.tickDay();
@@ -854,6 +868,7 @@ class Underworld {
     const g = this.g, p = g.player, S = this.S;
     if (g.state !== 'playing') return null;
     if (p.interior && !p.interior.vspace) return S.jail ? this.prison.findAction() : this.props.interiorAction();
+    const ra = this.rivalwh.findAction(); if (ra) return ra;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       if (v.speed < 3) {

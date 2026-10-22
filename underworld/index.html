@@ -36937,6 +36937,40 @@ Object.assign(World.prototype, {
       }
     });
   },
+  // a compound laid out in the block's own frame: u runs along the street the gate is on, v runs inward from it.
+  // Cannery Row's plan (gate 4.5 m off centre between the lamp and the pole, the building at the back, two docks),
+  // turned to whichever street the block actually has
+  _genRivalWh(b, rng) {
+    const fid = Object.keys(RIVAL_WH).find(k => RIVAL_WH[k].at[0] === b.bx && RIVAL_WH[k].at[1] === b.bz), R = RIVAL_WH[fid], F = FACTIONS[fid];
+    this._sidewalk(b, rng, { trees: 0, park: 0 });
+    const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
+    const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
+    const cx = b.cx, cz = b.cz;
+    // local → world: n: (cx + u, z0 + v); s: (cx − u, z1 − v); w: (x0 + v, cz − u); e: (x1 − v, cz + u)
+    const W = (u, v) => side === 'n' ? [cx + u, b.z0 + v] : side === 's' ? [cx - u, b.z1 - v] : side === 'w' ? [b.x0 + v, cz - u] : [b.x1 - v, cz + u];
+    const rect = (u0, v0, u1, v1) => { const [ax, az] = W(u0, v0), [bx2, bz2] = W(u1, v1); return { x0: Math.min(ax, bx2), z0: Math.min(az, bz2), x1: Math.max(ax, bx2), z1: Math.max(az, bz2) }; };
+    const along = (u, v) => (side === 'n' || side === 's') ? W(u, v)[0] : W(u, v)[1];
+    const hd = (du, dv) => { const [ax, az] = W(0, 0), [bx2, bz2] = W(du, dv); return Math.atan2(bx2 - ax, bz2 - az); };
+    const P2 = (u, v, r) => { const [x, z] = W(u, v); return r ? [x, z, 1] : [x, z]; };
+    const gu = 4.5, bld = rect(-24, 30, 24, 56);
+    const [bx0, bz0] = W(13, 4.5);
+    this._whCompound(b, rng, {
+      id: 'rwh_' + fid, rival: fid, place: 'rwh_' + fid, name: R.name, color: 0x6a6258, sign: F.short.toUpperCase(), sub: 'PRIVATE · KEEP OUT',
+      lot: rect(-29, 1, 29, 59), gate: { side, at: along(gu, 1), w: 8 },
+      bld: { ...bld, h: 9 }, face: side,
+      docks: [along(-9, 30), along(9, 30)], door: along(-21, 30),
+      park: [{ x: W(26, 16)[0], z: W(26, 16)[1], h: hd(0, -1) }],
+      booth: { x: bx0, z: bz0, w: 3, d: 3 },
+      front: ['n', 's', 'w', 'e'], apron: rect(gu - 4, -4, gu + 4, 0),
+      lanes: {
+        in: [[P2(gu, -9), P2(gu, -4), P2(gu, 1), P2(gu, 6), P2(-5, 13), P2(-9, 19), P2(-9, 25)],
+             [P2(gu, -9), P2(gu, -4), P2(gu, 1), P2(gu, 6), P2(7.5, 13), P2(9, 19), P2(9, 25)]],
+        out: [[P2(-9, 19, 1), P2(-14, 13, 1), P2(-3, 9), P2(gu, 4), P2(gu, 1), P2(gu, -5), P2(gu, -10)],
+              [P2(9, 19, 1), P2(14, 13, 1), P2(9, 9), P2(gu, 4), P2(gu, 1), P2(gu, -5), P2(gu, -10)]]
+      }
+    });
+    void far;
+  },
   _whCompound(b, rng, s) {
     const L = s.lot, B = s.bld, Y = CURB_H;
     const SV = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
@@ -36995,7 +37029,7 @@ Object.assign(World.prototype, {
     const yard = { x0: L.x0, z0: L.z0, x1: L.x1, z1: L.z1 };
     b.place = { id: s.place, name: s.name, kind: 'landmark', door, garage: s.park[0], under: { x: (B.x0 + B.x1) / 2, z: (B.z0 + B.z1) / 2 } };
     this.compounds[s.id] = {
-      id: s.id, place: s.place, name: s.name, block: b.i, lot: { ...L }, yard, bld: { ...B }, face: s.face,
+      id: s.id, place: s.place, name: s.name, block: b.i, rival: s.rival || null, lot: { ...L }, yard, bld: { ...B }, face: s.face,
       gate: { side: G.side, x: gx, z: gz, w: G.w, axis: ns(G.side) ? 'x' : 'z', n: gn },
       docks, door, park: s.park.map(p => ({ ...p })), booth: s.booth, front: s.front.slice(), perim,
       lanes: { in: s.lanes.in.map(lane), out: s.lanes.out.map(lane) },
@@ -45215,6 +45249,7 @@ class ContentManager {
     if (id.startsWith('g:')) { g.gamble.spot(id); return; }
     if (id.startsWith('c:')) { this.searchContainer(+id.slice(2)); return; }
     if (id.startsWith('w:')) { g.uw.compounds.spot(id.slice(2)); return; }
+    if (id.startsWith('rv:')) { g.uw.rivalwh.spot(id.slice(3)); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;
@@ -46720,6 +46755,18 @@ const PRESS_STAGE = { warn: 20, hit: 40, strike: 70 };
 // the real-time threat clock (seconds of active play): the warning to THREAT IMMINENT, then to execution; a physical
 // assault lasts at most `fight` seconds before it is decided by what is left standing
 const THREAT_T = { warn: 120, imminent: 60, fight: 120, near: 140 };
+// Session 4B: each faction keeps a physical warehouse (block, its security tiers, what it can hold). Tiers stay at
+// or below 2 in perimeter and access, so there is always a way in for a determined player (a car through the gate
+// or the fence); the stronger crews watch more and keep more.
+const RIVAL_WH = {
+  vipers: { at: [3, 6], name: 'Vipers stash yard', up: { perimeter: 1, surveillance: 1, access: 1, vault: 1 }, cap: 120, cash: 30000 },
+  velvet: { at: [6, 10], name: 'Velvet bonded store', up: { perimeter: 2, surveillance: 2, access: 1, vault: 1 }, cap: 140, cash: 45000 },
+  glasshouse: { at: [9, 4], name: 'Glasshouse depot', up: { perimeter: 1, surveillance: 2, access: 2, vault: 2 }, cap: 160, cash: 60000 },
+  bellcourt: { at: [9, 1], name: 'Bellcourt warehouse', up: { perimeter: 2, surveillance: 2, access: 2, vault: 2 }, cap: 180, cash: 80000 },
+  tidewater: { at: [11, 9], name: 'Tidewater freight shed', up: { perimeter: 2, surveillance: 3, access: 2, vault: 2 }, cap: 220, cash: 100000 }
+};
+// their blocks are landmarks laid out by World._genRivalWh (before the world is generated: this file loads first)
+for (const fid in RIVAL_WH) LANDMARK_BLOCKS[RIVAL_WH[fid].at.join(',')] = { gen: '_genRivalWh', name: RIVAL_WH[fid].name, icon: 'W', ground: 'I', rival: fid };
 const WH_SURV = [{ cams: 0, range: 0, light: 0.35 }, { cams: 2, range: 18, light: 0.6 }, { cams: 4, range: 22, light: 0.75 }, { cams: 6, range: 26, light: 0.9 }, { cams: 10, range: 32, light: 1 }];
 // a dealer's stock on the corner (units), filled by hand or by a Driver; automation keeps it at the target
 const TURF_STOCK_CAP = 60, TURF_STOCK_TARGET = 40;
@@ -47560,6 +47607,7 @@ class Underworld {
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
+    this.rivalwh = new RivalWarehouses(this);
     this.compounds = new CompoundSystem(this);
     this.threats = new ThreatSystem(this);
     this.ui = new EmpireUI(this);
@@ -47599,7 +47647,9 @@ class Underworld {
       // Session 3: warehouse security and settings, and each turf's dealer stock on the corner
       whse: {}, turfStock: {},
       // Session 4A: threats against the player's assets (clocks, strength and dice saved with them)
-      threats: ThreatSystem.fresh()
+      threats: ThreatSystem.fresh(),
+      // Session 4B: the rival gangs' warehouses (their stock, cash, security, breaches and any raid on)
+      rivals: RivalWarehouses.fresh()
     };
   }
   // fill missing / repair invalid fields so one bad value never breaks the save
@@ -47665,6 +47715,7 @@ class Underworld {
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
+    S.rivals = RivalWarehouses.sanitize(S.rivals, num);
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
@@ -47690,6 +47741,7 @@ class Underworld {
     this.gangs.reset(); this.crew.reset(); this.pickups.clear(); this.opps.rebuildMarkers();
     if (this.compounds) this.compounds.reset();
     if (this.threats) this.threats.reset();
+    if (this.rivalwh) this.rivalwh.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -47928,6 +47980,8 @@ class Underworld {
       if (!here && !(opts.all && units(o))) continue;
       out.push({ key: 'turf:' + i, cls: 'CORNER', name: `Dealer’s corner · ${t.name}`, o, cap: TURF_STOCK_CAP, zone: t.zone, turf: i, here });
     }
+    // a rival's stock, while you can reach it (inside their building, or a car of yours in their loading bay)
+    for (const fid in RIVAL_WH) if (this.rivalwh.reach(fid)) out.push(this.rivalwh.location(fid));
     out.sort((a, b) => LOC_ORDER.indexOf(a.cls) - LOC_ORDER.indexOf(b.cls) || (b.here - a.here));
     return out;
   }
@@ -47999,9 +48053,13 @@ class Underworld {
     if (!GOODS[k] || fromKey === toKey) return 0;
     const locs = this.locations(), A = locs.find(L => L.key === fromKey && L.here), B = locs.find(L => L.key === toKey && L.here);
     if (!A || !B || A.o === B.o) return 0;
+    // their stock is taken from, never added to; taking from it is noticed (Session 4B)
+    if (B.rival) return 0;
     if (B.turf !== undefined && (GOODS[k].fence || GOODS[k].arms)) return 0; // dealers sell product, not hot goods or hardware
     const m = Math.min(Math.floor(n), Inv.has(A.o, k), this.fitIn(B, k)); if (!(m > 0)) return 0;
-    return Inv.move(A.o, B.o, k, m);
+    const moved = Inv.move(A.o, B.o, k, m);
+    if (moved && A.rival) this.rivalwh.touched(A.rival);
+    return moved;
   }
   // move Dirty Cash between two places within reach (§2): your pockets, a trunk, a safehouse stash or a warehouse
   // vault. n < 0 moves all of it. Places across town are out of reach, exactly as for product.
@@ -48165,6 +48223,7 @@ class Underworld {
     this.neon.update(g.env.night, g.time, !!(g.player.interior && !(g.player.interior.def && g.player.interior.def.realView)));
     // threat clocks run on real active play, in jail too (§45.16)
     this.threats.update();
+    this.rivalwh.update();
     if (S.jail) { this.prison.update(dt, rdt); }
     else if (g.state === 'playing' && dt > 0) {
       const h = Math.floor(g.env.time) % 24;
@@ -48207,6 +48266,8 @@ class Underworld {
     this.crew.tickDay();
     // Lieutenants send Drivers to restock the corners for tomorrow (§5, §8)
     this.whse.automate();
+    // the rival warehouses mend and restock (a delivery that arrives), unless a raid is on
+    this.rivalwh.tickDay();
     this.factions.tickDay();
     this.cops.tickDay();
     this.opps.tickDay();
@@ -48271,6 +48332,7 @@ class Underworld {
     const g = this.g, p = g.player, S = this.S;
     if (g.state !== 'playing') return null;
     if (p.interior && !p.interior.vspace) return S.jail ? this.prison.findAction() : this.props.interiorAction();
+    const ra = this.rivalwh.findAction(); if (ra) return ra;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       if (v.speed < 3) {
@@ -48774,6 +48836,8 @@ class GangManager {
           if (dd < 80 * 80 && this.buyersActive(i)) { want.add('buy' + i); if (!this.groups.has('buy' + i) && (dd > 35 * 35 || !g.inView(dl.x, 1, dl.z, 2))) this.spawnBuyers(i); }
         }
         if (uw.compounds) uw.compounds.wantGroups(want, px, pz);
+        // a rival warehouse's guards, and the squads of a raid on it, are kept while they matter
+        for (const fid in RIVAL_WH) { want.add('rg:' + fid); for (const k of [1, 2, 3]) want.add('rs:' + fid + ':' + k); }
         for (const fid of FAC_IDS) {
           const L = uw.loc('hq', fid); if (!L || S.factions[fid].broken) continue;
           if (dist2(L.x, L.z, px, pz) < 120 * 120) { want.add('hq' + fid); if (!this.groups.has('hq' + fid) && (dist2(L.x, L.z, px, pz) > 40 * 40 || !g.inView(L.x, 1, L.z, 3))) this.spawnGroup('hq' + fid, 'hq', fid, L, clamp(Math.round(1 + S.factions[fid].strength / 40), 1, 3)); }
@@ -50055,21 +50119,23 @@ class CompoundSystem {
   }
   get g() { return this.uw.g; }
   C(id) { return this.g.world.compounds[id]; }
-  // the tiers the compound shows: what you have bought, or nothing while it is for sale
+  // a rival gang's compound (Session 4B): its faction id, else null
+  rival(id) { const R = this.R[id]; return R && R.C.rival || null; }
+  // the tiers the compound shows: what you have bought (or nothing while it is for sale); a rival's, theirs
   tiers(id) {
-    const W = this.uw.whse, o = this.uw.props.owned(id);
-    const t = {}; for (const k of WH_CAT_IDS) t[k] = o ? W.tier(id, k) : 0;
+    const W = this.uw.whse, fid = this.rival(id), o = !fid && this.uw.props.owned(id);
+    const t = {}; for (const k of WH_CAT_IDS) t[k] = fid ? this.uw.rivalwh.st(fid).up[k] | 0 : o ? W.tier(id, k) : 0;
     return t;
   }
   // rebuild a compound when its tiers changed (upgrade, purchase, load) or a breach was mended
   sync(force) { for (const id in this.R) this.build(id, force); }
   build(id, force) {
-    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.uw.props.owned(id) ? 'o' : '-');
+    const R = this.R[id], t = this.tiers(id), sig = WH_CAT_IDS.map(k => t[k]).join('') + (this.rival(id) ? 'r' : this.uw.props.owned(id) ? 'o' : '-');
     if (!force && sig === R.sig && !R.dirty) return;
     const g = this.g, grid = g.world.grid, C = R.C;
     const keepOpen = R.sig === sig && R.gate ? R.gate.open : 0;
     // what is breached (saved): entries from a tier that has since been replaced are gone with it
-    const br = this.uw.props.owned(id) ? this.breaches(id) : {};
+    const br = this.rival(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
     for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
     for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -50269,7 +50335,9 @@ class CompoundSystem {
   // ---------------------------------------------------------------- who the gate lets in (the one rule)
   // returns '' when allowed, or why not. a: the player, a vehicle, or a person on foot
   why(id, a) {
-    const g = this.g, uw = this.uw, p = g.player;
+    const g = this.g, uw = this.uw, p = g.player, fid = this.rival(id);
+    // a rival's compound lets in its own people and its own vehicles, and never you
+    if (fid) { if (a && a.spec && a.ctl) return a.fac === fid && a !== p.vehicle ? '' : 'not one of theirs'; return a && a !== p && a.fac === fid && a.kind === 'gang' ? '' : 'not one of theirs'; }
     if (!uw.props.owned(id)) return 'not yours';
     if (a === p) return uw.inJail ? 'in jail' : '';
     if (a && a.spec && a.ctl) {
@@ -50308,13 +50376,14 @@ class CompoundSystem {
     }
     for (const v of g.vehicles.nearby(G.x, G.z, 36)) { if (v === pv || v.burnt) continue; if (Math.hypot(v.pos.x - G.x, v.pos.z - G.z) < reach(v) && this.allows(id, v)) { R.gate.by = v.wh && v.wh.crew ? 'crew vehicle' : 'delivery'; return true; } }
     // people on foot: crew on their way in or out (a guard standing their post doesn't hold the gate open)
-    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !q.crewId || (q.group && q.group.kind === 'whguard')) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
+    const fid = this.rival(id);
+    for (const q of g.peds.peds) { if (q.state === 'down' || q.state === 'ko' || !(q.crewId || (fid && q.fac === fid)) || (q.group && (q.group.kind === 'whguard' || q.group.kind === 'rguard'))) continue; if (dist2(q.x, q.z, G.x, G.z) < 5 * 5 && this.allows(id, q)) { R.gate.by = 'crew ' + q.crewId; return true; } }
     return false;
   }
   // a dock door opens for an authorized vehicle in its bay (a controlled gate also wants it stopped first)
   dockWant(id, k) {
     const R = this.R[id], C = R.C, b = C.docks[k].bay, g = this.g;
-    if (!this.uw.props.owned(id)) return false;
+    if (!this.rival(id) && !this.uw.props.owned(id)) return false;
     const A = WH_GATE[R.t ? R.t.access : 0];
     for (const v of g.vehicles.nearby(b.x, b.z, 4)) if (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) < 3.2 && (!A || !A.controlled || v.speed < 1.5) && this.allows(id, v)) return true;
     return false;
@@ -50330,6 +50399,8 @@ class CompoundSystem {
     // crew already working here start on it at once (w: the economic hour the work started)
     const crewHere = this.uw.crew.active().some(c => c.assign === WarehouseSystem.key(id));
     const hit = q => { q.state = 'broken'; q.col.on = false; br[q.key] = { s: 'broken', t: now, tier: q === R.gate ? R.t.access : R.t.perimeter }; if (crewHere) br[q.key].w = now; };
+    // a rival's compound rammed: that is a raid starting (Session 4B)
+    if (this.rival(id)) { hit(part); if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle) this.uw.rivalwh.alarm(this.rival(id), 'rammed'); return; }
     hit(part);
     if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q);
     if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true;
@@ -50348,7 +50419,7 @@ class CompoundSystem {
   }
   // the saved breach list of a warehouse: { [part key]: { s: 'broken' | 'patched', t: econ hour of the breach, tier,
   // w: econ hour the crew started on it (absent while nobody works here) } }
-  breaches(id) { const st = this.uw.whse.st(id); return st.breach || (st.breach = {}); }
+  breaches(id) { const fid = this.rival(id), st = fid ? this.uw.rivalwh.st(fid) : this.uw.whse.st(id); return st.breach || (st.breach = {}); }
   // what mending a part costs: a patch is a flat price, a full repair scales with the tier being restored
   patchCost(key) { return key === 'gate' ? WH_BREACH.patchGate : WH_BREACH.patchPanel; }
   repairCost(id, key) { const d = PROP_BY_ID[id], b = this.breaches(id)[key]; return Math.round(d.price * (key === 'gate' ? WH_BREACH.repairGate : WH_BREACH.repairPanel) * Math.max(1, b ? b.tier : 1) / 10) * 10; }
@@ -50453,7 +50524,12 @@ class CompoundSystem {
       }
       if (R.dirty) this.build(id, true);
       // the cameras watch the yard: anyone in it the gate wouldn't let in raises the alarm
-      if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.uw.props.owned(id)) {
+      if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
+        // a rival's cameras watch for you: you in their yard is a raid starting
+        R.watchT = 0.5;
+        const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;
+        if (!p.interior && this.inYard(id, pp.x, pp.z) && this.seen(id, pp.x, pp.y + 1.2, pp.z, night)) this.uw.rivalwh.alarm(this.rival(id), 'camera');
+      } else if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.uw.props.owned(id)) {
         R.watchT = 0.5;
         for (const q of g.peds.peds) {
           if (q.state === 'down' || !this.inYard(id, q.x, q.z) || this.allows(id, q)) continue;
@@ -50550,7 +50626,7 @@ class CompoundSystem {
       if (V.phase === 'unload' && V.t > 20) { V.phase = 'out'; V.t = 0; v.wh.until = g.time + 240; v.drive = new LaneDriver(v, g, this.R[V.id].C.lanes.out[V.dock], { speed: 6, onDone: () => { V.stalls += v.drive.stalls; V.phase = 'gone'; V.t = 0; } }); }
       if (V.phase === 'gone') {
         // out on the street: an ordinary car again, gone once nobody is looking
-        if (!(v.drive instanceof DriveAI)) { v.wh = null; v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
+        if (!(v.drive instanceof DriveAI)) { v.wh = null; v.drive = new DriveAI(v, g, 'cruise'); v.drive.cruise = 12; const c = V.goal || g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
         const d = Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z);
         if (d > 200 || (d > 90 && !g.inView(v.pos.x, 1, v.pos.z, 3))) { g.vehicles.despawn(v); return false; }
       }
@@ -52483,6 +52559,296 @@ class ThreatSystem {
   }
 }
 /* =====================================================================
+   [UNDERWORLD] RIVAL WAREHOUSES (§9, §45.27; Session 4B): each gang keeps
+   its product and cash in a physical compound (RIVAL_WH), built by the same
+   CompoundSystem as yours, with their own gate, cameras and guards.
+   - Their stock is one authoritative saved inventory (save.uw.rivals[fid]).
+     The rooms inside are drawn from it; nothing regenerates it. What you take
+     is gone until they actually resupply (a delivery that arrives) or until
+     they evacuate it (a van that loads it and drives it to their HQ).
+   - You loot it through the ordinary transfer screen (the stock is a place
+     like any other): from inside the building, or into the trunk of a car in
+     their loading bay. The safe's cash takes time to crack.
+   - A raid starts when they notice you: their cameras see you in the yard,
+     you ram their gate or fence, force their door, or touch the stock. Its
+     clock is real active play (like the threat clock) and is saved: about
+     4.5 minutes with only the guards on site, then reinforcements, a
+     stronger response from 7 minutes, and from 10 minutes an evacuation van
+     that loads what is left and drives it away (it can be stopped or
+     stolen). Walk away and the raid winds down; the stock stays as it is.
+   ===================================================================== */
+const RAID_T = { reinforce: 270, strong: 420, stronger: 540, evacuate: 600, away: 90, near: 320, load: 8, loadLot: 18, crack: 15, force: 5 };
+class RivalWarehouses {
+  constructor(uw) { this.uw = uw; this.squads = new Map(); this.evac = new Map(); this.crack = null; this.force = null; }
+  get S() { return this.uw.S; }
+  get g() { return this.uw.g; }
+  static fresh() {
+    const out = {};
+    for (const fid in RIVAL_WH) out[fid] = RivalWarehouses.freshOne(fid);
+    return out;
+  }
+  static freshOne(fid) {
+    const R = RIVAL_WH[fid], D = FACTIONS[fid], stock = {}, goods = D.goods.filter(k => GOODS[k] && !GOODS[k].fence);
+    // most of what the place holds, split over what they sell (sizes counted)
+    let room = Math.round(R.cap * 0.7);
+    goods.forEach((k, i) => { const share = Math.floor(room / (goods.length - i) / GOODS[k].size); if (share > 0) { stock[k] = share; room -= share * GOODS[k].size; } });
+    return { up: { ...R.up }, breach: {}, stock, cash: R.cash, raid: null, evac: {}, alert: 0, resupplied: 0 };
+  }
+  static sanitize(all, num) {
+    const out = RivalWarehouses.fresh();
+    if (!all || typeof all !== 'object') return out;
+    for (const fid in RIVAL_WH) {
+      const w = all[fid]; if (!w || typeof w !== 'object') continue;
+      const o = out[fid], R = RIVAL_WH[fid];
+      for (const k of WH_CAT_IDS) o.up[k] = Math.floor(num(w.up && w.up[k], R.up[k], 0, 4));
+      o.stock = {}; for (const k in (w.stock || {})) if (GOODS[k]) { const n = Math.floor(num(w.stock[k], 0, 0, 1e5)); if (n > 0) o.stock[k] = n; }
+      o.evac = {}; for (const k in (w.evac || {})) if (GOODS[k]) { const n = Math.floor(num(w.evac[k], 0, 0, 1e5)); if (n > 0) o.evac[k] = n; }
+      o.cash = Math.round(num(w.cash, R.cash, 0, 1e8));
+      o.alert = num(w.alert, 0, 0, 1e7); o.resupplied = num(w.resupplied, 0, 0, 1e7);
+      o.breach = {}; if (w.breach && typeof w.breach === 'object') for (const k in w.breach) { const b = w.breach[k]; if (b && (b.s === 'broken' || b.s === 'patched') && /^(gate|[nswe]:[\d.-]+:\d+)$/.test(k)) o.breach[k] = { s: b.s, t: num(b.t, 0, 0, 1e9), tier: Math.floor(num(b.tier, 1, 1, 4)) }; }
+      o.raid = w.raid && typeof w.raid === 'object' ? { t: num(w.raid.t, 0, 0, 1e5), away: num(w.raid.away, 0, 0, 1e4), evacDone: !!w.raid.evacDone, start: num(w.raid.start, 0, 0, 1e9) } : null;
+    }
+    return out;
+  }
+  st(fid) { const S = this.S; if (!S.rivals) S.rivals = RivalWarehouses.fresh(); return S.rivals[fid] || (S.rivals[fid] = RivalWarehouses.freshOne(fid)); }
+  id(fid) { return 'rwh_' + fid; }
+  C(fid) { return this.g.world.compounds[this.id(fid)]; }
+  units(fid) { return units(this.st(fid).stock); }
+  // ---------------------------------------------------------------- the daily round (when nobody is raiding them)
+  tickDay() {
+    const S = this.S, uw = this.uw;
+    for (const fid in RIVAL_WH) {
+      const f = S.factions[fid], w = this.st(fid);
+      if (f.broken || w.raid) continue;
+      // their own people mend what was broken, a day later
+      for (const k in w.breach) if (S.econH - w.breach[k].t >= 24) delete w.breach[k];
+      // a resupply: what the gang can spare from its street stock comes in (a delivery that arrives; with you near,
+      // a van you can see and stop — ShipmentSystem)
+      if (S.day < w.alert) continue;
+      const need = Math.max(0, RIVAL_WH[fid].cap * 0.8 - this.units(fid));
+      const take = Math.min(need, Math.floor(f.stock * 0.5));
+      if (take >= 6) {
+        const cargo = this.cargoFor(fid, take);
+        if (!(uw.shipments && uw.shipments.rivalDelivery(fid, cargo))) { for (const k in cargo) Inv.add(w.stock, k, cargo[k], 0); }
+        f.stock = Math.max(0, f.stock - units(cargo)); w.resupplied = S.day;
+      }
+      // and some of their money goes back in the safe
+      const cashNeed = Math.max(0, RIVAL_WH[fid].cash - w.cash), put = Math.min(cashNeed, Math.floor(f.money * 0.15));
+      if (put > 0) { w.cash += put; f.money -= put; }
+    }
+  }
+  // goods for a load of n units of space, in the gang's own product
+  cargoFor(fid, n) {
+    const goods = FACTIONS[fid].goods.filter(k => GOODS[k] && !GOODS[k].fence), out = {};
+    let room = n;
+    goods.forEach((k, i) => { const q = Math.floor(room / (goods.length - i) / GOODS[k].size); if (q > 0) { out[k] = q; room -= q * GOODS[k].size; } });
+    return out;
+  }
+  // a delivery that physically arrived (ShipmentSystem): the cargo goes on the shelves
+  delivered(fid, trunk) { const w = this.st(fid); for (const k in trunk) if (GOODS[k] && trunk[k] > 0) Inv.add(w.stock, k, Inv.has(trunk, k), 0); }
+  // ---------------------------------------------------------------- raids
+  alarm(fid, why) {
+    const w = this.st(fid), uw = this.uw;
+    if (w.raid || this.S.factions[fid].broken) { if (w.raid) w.raid.away = 0; return; }
+    w.raid = { t: 0, away: 0, evacDone: false, start: this.S.econH };
+    uw.threats.press(fid, 35, 'raided their warehouse');
+    uw.gangs.provoke(fid, GANG_AGGRO.war, this.C(fid).center.x, this.C(fid).center.z);
+    const gr = uw.gangs.groups.get('rg:' + fid); if (gr) gr.hostile = true;
+    this.g.ui.toast(`⚠ The ${FACTIONS[fid].short} know you’re in their warehouse (${why}).`, 'warn');
+    this.uw.g.audio.play('wanted');
+    this.uw.g.autosave('Raid');
+  }
+  // you are at the raid: near their compound on the street, or inside their building
+  near(fid, r = RAID_T.near) {
+    const p = this.g.player, I = p.interior, C = this.C(fid);
+    if (I) return !!(I.def && I.def.rival === fid);
+    return Math.hypot(p.pos.x - C.center.x, p.pos.z - C.center.z) < r;
+  }
+  counting() { const g = this.g; return g.state === 'playing' && !(typeof document !== 'undefined' && document.hidden) && !this.S.jail; }
+  // per frame: the raid clock (its own wall time, like the threat clock), guards, squads and the evacuation
+  update(step) {
+    let rdt = step;
+    if (step === undefined) { const now = performance.now(); rdt = this.t0 === undefined ? 0 : (now - this.t0) / 1000; this.t0 = now; if (rdt > 5) rdt = 0; }
+    if (!(rdt > 0) || !this.counting()) return;
+    for (const fid in RIVAL_WH) {
+      const w = this.st(fid);
+      this.guards(fid);
+      if (!w.raid) continue;
+      const R = w.raid;
+      if (this.near(fid)) { R.away = 0; R.t += rdt; } else { R.away += rdt; if (R.away > RAID_T.away) { this.endRaid(fid); continue; } }
+      // the response, by the clock: guards only, then reinforcements, a stronger response, then evacuation
+      if (R.t >= RAID_T.reinforce) this.squad(fid, 1, 3, false);
+      if (R.t >= RAID_T.strong) this.squad(fid, 2, 4, true);
+      if (R.t >= RAID_T.stronger) this.squad(fid, 3, 4, true);
+      if (R.t >= RAID_T.evacuate && !R.evacDone) this.evacuate(fid, rdt);
+    }
+    this.updateCrack(rdt);
+  }
+  phase(fid) { const w = this.st(fid); if (!w.raid) return 'none'; const t = w.raid.t; return t >= RAID_T.evacuate ? 'evacuate' : t >= RAID_T.strong ? 'response' : t >= RAID_T.reinforce ? 'reinforce' : 'guards'; }
+  endRaid(fid) {
+    const w = this.st(fid);
+    w.raid = null; w.alert = this.S.day + 1;
+    for (const k of [1, 2, 3]) { const gr = this.squads.get(fid + ':' + k); if (gr) { this.uw.gangs.removeGroup(gr); this.squads.delete(fid + ':' + k); } }
+    const E = this.evac.get(fid); if (E) this.finishEvac(fid, E, 'stood down');
+    this.uw.news('unknown', `The ${FACTIONS[fid].short} are counting what’s left at ${RIVAL_WH[fid].name}. They’ll be watching it.`);
+  }
+  // their guards while you are near (more when they've been raided lately); hostile once there is a raid on
+  guards(fid) {
+    const uw = this.uw, gs = uw.gangs, C = this.C(fid), p = this.g.player, key = 'rg:' + fid, w = this.st(fid);
+    const near = Math.hypot(p.pos.x - C.center.x, p.pos.z - C.center.z) < 160 && !p.interior;
+    let gr = gs.groups.get(key);
+    if (!near || this.S.factions[fid].broken) { if (gr && !w.raid) gs.removeGroup(gr); return; }
+    if (gr) { if (w.raid) gr.hostile = true; return; }
+    const n = clamp(2 + (w.up.access + w.up.perimeter) / 2 + (this.S.day < w.alert ? 2 : 0), 2, 6) | 0;
+    gr = gs.spawnGroup(key, 'rguard', fid, { x: C.center.x, z: C.center.z, h: 0 }, n, {});
+    if (!gr) return;
+    gr.hostile = !!w.raid;
+    const posts = uw.compounds.R[this.id(fid)].posts;
+    gr.members.forEach((m, i) => { const P = posts[i % Math.max(1, posts.length)] || C.center; m.x = P.x + (i >= posts.length ? 1.5 : 0); m.z = P.z; m.home = { x: m.x, z: m.z, h: P.h || 0 }; m.gun = m.gun || i % 2 === 0; });
+  }
+  // a squad by car, once per stage of the response (a reload resumes the stage; it doesn't stack another)
+  squad(fid, k, n, armed) {
+    const key = fid + ':' + k; if (this.squads.has(key)) return;
+    const g = this.g, uw = this.uw, C = this.C(fid), G = C.gate;
+    const at = g.world.randomCurbSpot(G.x - G.n[0] * 30, G.z - G.n[1] * 30, 25, 60);
+    const gr = uw.gangs.spawnGroup('rs:' + key, 'assault', fid, { x: at.x, z: at.z, h: at.h }, n, {});
+    if (!gr) return;
+    gr.hostile = true; gr.enemy = 'pc';
+    for (const m of gr.members) { m.home = { x: G.x + G.n[0] * 4, z: G.z + G.n[1] * 4, h: 0 }; if (armed) m.gun = true; }
+    this.squads.set(key, gr);
+    g.ui.toast(k === 1 ? `The ${FACTIONS[fid].short} sent reinforcements.` : `More ${FACTIONS[fid].short} are coming, armed.`, 'warn');
+  }
+  // the evacuation: a van backs onto their dock, loads what is left (in lots, a few seconds each), and drives it
+  // to their HQ. What is on the van is no longer on the shelves (w.evac, saved): stop the van, or take it, and the
+  // load is yours or lost; let it reach the HQ and it is theirs again.
+  evacuate(fid, dt) {
+    const w = this.st(fid), g = this.g, uw = this.uw;
+    let E = this.evac.get(fid);
+    if (!E) {
+      const V = uw.compounds.spawnVan(this.id(fid), 'arrive', {});
+      if (!V) return;
+      V.v.fac = fid; V.v.wh = null; V.v.trunk = w.evac; V.v.mission = 'evac'; V.v.health = 220; V.v.locked = false;
+      const hq = uw.loc('hq', fid); V.goal = { x: hq.x, z: hq.z };
+      E = { V, t: 0 }; this.evac.set(fid, E);
+      g.ui.toast(`The ${FACTIONS[fid].short} are moving their stock out.`, 'warn');
+      uw.opps.add({ kind: 'shipment', title: `${FACTIONS[fid].short} evacuating`, text: `A van is loading what’s left at ${RIVAL_WH[fid].name}. Stop it, or take it.`, x: this.C(fid).center.x, z: this.C(fid).center.z, hours: 1, urgent: true });
+    }
+    const v = E.V.v;
+    // wrecked: the load is lost; gone from the world without a wreck (despawned out of your sight): it got there
+    if (v.burnt || v.health <= 0) { this.finishEvac(fid, E, 'lost'); return; }
+    if (!g.vehicles.list.includes(v)) { this.finishEvac(fid, E, 'arrived'); return; }
+    if (v === g.player.vehicle) { this.finishEvac(fid, E, 'stolen'); return; }
+    if (E.V.phase === 'unload') {
+      // loading, not unloading: lots from the shelves into the van
+      E.t += dt; E.V.t = 0;
+      if (E.t >= RAID_T.load) {
+        E.t = 0;
+        const k = Object.keys(w.stock).find(q => w.stock[q] > 0);
+        if (k) { const n = Math.min(w.stock[k], Math.max(1, Math.floor(RAID_T.loadLot / GOODS[k].size))); Inv.remove(w.stock, k, n); w.evac[k] = (w.evac[k] || 0) + n; }
+        else E.V.t = 99; // empty: off it goes
+      }
+    }
+    if (E.V.phase === 'gone') {
+      // out on the street: its run to the HQ (or, out of your sight, it is simply there)
+      const hq = uw.loc('hq', fid), d = Math.hypot(v.pos.x - hq.x, v.pos.z - hq.z), dp = Math.hypot(v.pos.x - g.player.pos.x, v.pos.z - g.player.pos.z);
+      if (d < 25 || dp > 260) this.finishEvac(fid, E, 'arrived');
+    }
+  }
+  finishEvac(fid, E, how) {
+    const w = this.st(fid), S = this.S, f = S.factions[fid], v = E.V.v;
+    this.evac.delete(fid);
+    if (how === 'arrived' || how === 'stood down') { f.stock += units(w.evac); w.evac = {}; if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle && !this.g.inView(v.pos.x, 1, v.pos.z, 3)) this.g.vehicles.despawn(v); }
+    if (how === 'stolen') { v.trunk = { ...w.evac }; w.evac = {}; v.fac = null; v.mission = null; v.drive = null; this.uw.threats.press(fid, 20, 'took their evacuation van'); this.g.ui.banner('Load Taken', goodsList(v.trunk), 'pass', 3); }
+    if (how === 'lost') w.evac = {};
+    if (w.raid) w.raid.evacDone = true;
+    this.uw.g.autosave('Evacuation ' + how);
+  }
+  // ---------------------------------------------------------------- inside, and the stock as a place
+  // where the stock can be reached from: inside their building, or from a car of yours in their loading bay
+  reach(fid) {
+    const g = this.g, p = g.player, I = p.interior, uw = this.uw;
+    if (I && I.def && I.def.rival === fid) return 'inside';
+    const v = p.state === 'vehicle' ? p.vehicle : null;
+    if (v && uw.compounds.dockAt(v.pos.x, v.pos.z) === this.id(fid) && v.speed < 2) return 'dock';
+    return null;
+  }
+  // locations() hook: the stock, when you can reach it; taking from it is noticed
+  location(fid) {
+    const w = this.st(fid), here = this.reach(fid);
+    return { key: 'rival:' + fid, cls: 'RIVAL', name: `${RIVAL_WH[fid].name} · their stock`, o: w.stock, cap: RIVAL_WH[fid].cap, zone: zoneKey(this.C(fid).center.x, this.C(fid).center.z), here: !!here, rival: fid };
+  }
+  touched(fid) { this.alarm(fid, 'stock missing'); }
+  findAction() {
+    const g = this.g, p = g.player, uw = this.uw;
+    if (p.state === 'vehicle') { for (const fid in RIVAL_WH) if (this.reach(fid) === 'dock') return { label: `Load from their stock · ${RIVAL_WH[fid].name}`, act: () => uw.ui.openRivalStock(fid) }; return null; }
+    if (p.state !== 'foot' || p.interior) return null;
+    for (const fid in RIVAL_WH) {
+      const C = this.C(fid); if (Math.hypot(p.pos.x - C.door.x, p.pos.z - C.door.z) > 2.4) continue;
+      if (this.S.factions[fid].broken) return null;
+      if (this.force && this.force.fid === fid) return { label: `Forcing the door… ${Math.ceil(RAID_T.force - this.force.t)} s`, act: () => {} };
+      return { label: `Force the door · ${RIVAL_WH[fid].name}`, act: () => { this.force = { fid, t: 0 }; } };
+    }
+    return null;
+  }
+  enter(fid) {
+    const I = this.g.content.interiors;
+    const def = I.addDynamic(rivalInteriorDef(this.C(fid), fid, this.st(fid)));
+    return I.enter(def.id);
+  }
+  spot(s) {
+    const I = this.g.content.interiors, fid = I.cur && I.cur.rival; if (!fid) return;
+    if (s === 'stock') this.uw.ui.openRivalStock(fid);
+    if (s === 'safe') { if (this.crack && this.crack.fid === fid) return; this.crack = { fid, t: 0 }; this.alarm(fid, 'the safe'); this.g.ui.toast('Cracking the safe… stay with it.', 'radio'); }
+  }
+  updateCrack(dt) {
+    const g = this.g, p = g.player;
+    if (this.force) {
+      const C = this.C(this.force.fid);
+      if (Math.hypot(p.pos.x - C.door.x, p.pos.z - C.door.z) > 2.6 || p.interior) this.force = null;
+      else if ((this.force.t += dt) >= RAID_T.force) { const fid = this.force.fid; this.force = null; this.alarm(fid, 'the door'); this.enter(fid); }
+    }
+    if (this.crack) {
+      const I = g.content.interiors, def = I.cur, fid = this.crack.fid;
+      const sp = def && def.rival === fid && def.spots.find(q => q.id === 'rv:safe');
+      if (!sp || Math.hypot(p.pos.x - (def.ox + sp.x), p.pos.z - (def.oz + sp.z)) > sp.r + 0.6) { this.crack = null; return; }
+      if ((this.crack.t += dt) >= RAID_T.crack) {
+        this.crack = null;
+        const w = this.st(fid), n = w.cash; if (n <= 0) { g.ui.toast('Empty.', 'warn'); return; }
+        w.cash = 0; Money.earn(n, 'heist'); this.uw.addRep(25, null);
+        g.ui.banner('Safe Cracked', fmtMoney(n), 'pass', 3); g.audio.play('cash');
+        this.uw.g.autosave('Safe cracked');
+      }
+    }
+  }
+  reset() { this.squads.clear(); this.evac.clear(); this.crack = null; this.force = null; this.t0 = undefined; }
+}
+
+// the inside of a rival's warehouse: racking filled as far as their stock goes (drawn from it, never the other way
+// round), a safe, and the way out
+function rivalInteriorDef(C, fid, w) {
+  const W = 30, D = 18, H = 7, hw = W / 2, hd = D / 2, full = clamp(units(w.stock) / RIVAL_WH[fid].cap, 0, 1);
+  const def = {
+    id: 'rv:' + fid, dynamic: true, name: RIVAL_WH[fid].name, w: W, d: D, h: H, seed: 900 + fid.length, rival: fid, place: null,
+    at: { x: (C.bld.x0 + C.bld.x1) / 2, z: (C.bld.z0 + C.bld.z1) / 2 }, door: { x: C.door.x, z: C.door.z, h: C.door.h },
+    exit: { x: -hw + 2.5, z: hd - 0.7 }, spawnH: Math.PI,
+    spots: [{ id: 'rv:stock', x: 0, z: 2.6, r: 1.6, label: 'Their stock · take it' }, { id: 'rv:safe', x: hw - 2, z: -hd + 1.6, r: 1.2, label: w.cash > 0 ? 'The safe · crack it' : 'The safe (empty)' }],
+    build(k, rng) {
+      k.room(W, D, H, { floor: 0x5a5c5e, wall: 0x6a6258, ceil: 0x2a2c2e, trim: 0x2a2a2a, band: [0, 1.2], bandC: FACTIONS[fid].hex, lights: [4, 2], lightC: 0xf0e8d0 });
+      k.door(-hw + 2.5, hd - 0.02, 0, 0x2a2e33, FACTIONS[fid].hex);
+      // racks, loaded as far as the stock goes
+      const racks = [-10, -6, -2, 2, 6, 10], cells = racks.length * 3 * 4, filled = Math.round(cells * full);
+      let c = 0;
+      for (const x of racks) {
+        k.shelfUnit(x, -3, 1.2, 7, 3.4, 3, () => 1, [0x000000]);
+        for (let lv = 0; lv < 3; lv++) for (let j = 0; j < 4; j++) if (c++ < filled) k.box(x, 0.3 + lv * 1.05, -5.6 + j * 1.75, 1.0, 0.7, 1.4, rng() < 0.5 ? 0x7a6a4a : 0x5a6a7a);
+      }
+      FURN.safe(k, hw - 0.6, 0, -hd + 1.6, 3);
+      k.box(hw - 3, 0, -hd + 1, 1.6, 0.8, 0.8, 0x3a3e44, { col: true });
+    }
+  };
+  return def;
+}
+/* =====================================================================
    [UNDERWORLD] EMPIRE UI: the phone (overview, territory map, crew, assets,
    market, stash, factions, police, feed), every street menu (property,
    supplier, armorer, fence, deal corner, boss sit-down, chop shop), the
@@ -53160,6 +53526,8 @@ class EmpireUI {
     g.content.openSvc(d.name, PM.owned(id) ? 'Your property.' : 'For sale.', render, a => this.propAct(id, a));
   }
   // a warehouse you own (§7): Product, Weapons/Ammo, Dirty Cash, Security, Crew, Logistics
+  // a rival's stock, from inside their building or their loading bay: the transfer screen, from their shelves
+  openRivalStock(fid) { this.xfer = { from: 'rival:' + fid, to: '' }; this.open('stash'); }
   whPanel(id) {
     const uw = this.uw, W = uw.whse, S = uw.S, d = PROP_BY_ID[id], tab = this.whTab || 'product';
     const tabs = [['product', 'Product'], ['weapons', 'Weapons'], ['cash', 'Dirty Cash'], ['security', 'Security'], ['crew', 'Crew'], ['logistics', 'Logistics']];
@@ -57239,7 +57607,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);
