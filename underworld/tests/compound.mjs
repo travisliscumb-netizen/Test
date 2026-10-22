@@ -425,7 +425,8 @@ const perf = await ev(() => {
   const t0 = performance.now(); for (let k = 0; k < 600; k++) uw.compounds.update(1 / 60); const upd = (performance.now() - t0) / 600;
   const R = uw.compounds.R.whse_w, cam = g.camera; cam.position.set(C.gate.x - C.gate.n[0] * 30 + 10, 14, C.gate.z - C.gate.n[1] * 30 + 10); cam.lookAt(C.center.x, 0, C.center.z); cam.updateMatrixWorld();
   const info = g.renderer.info; info.autoReset = false;
-  const draw = vis => { for (const id in uw.compounds.R) { const r = uw.compounds.R[id]; for (const grp of [r.group, r.gateGrp, r.wedgeGrp]) if (grp) grp.visible = vis; } info.reset(); g.renderer.render(g.scene, cam); return { calls: info.render.calls, tris: info.render.triangles }; };
+  // only this compound's meshes: a neighbour in view (Velvet's warehouse next door, Session 4B) is not its cost
+  const draw = vis => { for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) grp.visible = vis; info.reset(); g.renderer.render(g.scene, cam); return { calls: info.render.calls, tris: info.render.triangles }; };
   const on = draw(true), off = draw(false); draw(true); info.autoReset = true;
   let tris = 0; R.group.traverse(o => { if (o.geometry) tris += o.geometry.index.count / 3; });
   return { upd: +upd.toFixed(3), calls: on.calls - off.calls, tris: on.tris - off.tris, meshTris: tris, boxes: R.boxes };
