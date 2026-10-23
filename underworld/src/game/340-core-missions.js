@@ -194,7 +194,7 @@ class MissionManager {
     g.audio.play('confirm');
     g.ui.banner(spec.title, spec.replay ? 'Replay \u00b7 ' + spec.contact.name : spec.contact.name, 'info', 2.2);
     if (spec.type === 'story') { g.campaign.begin(m); return; }
-    if (spec.type === 'srace') { g.race.begin(spec.race, {}); m.timer = 0; return; }
+    if (spec.type === 'srace') { g.race.begin(spec.race, spec.pink ? { pink: true, names: ['Vance'] } : {}); m.timer = 0; return; }
     const pv = () => g.player.state === 'vehicle' ? g.player.vehicle : null;
     switch (spec.type) {
       case 'delivery': m.target = spec.dest; m.objective = `Deliver the parcel to ${districtNameAt(spec.dest.x, spec.dest.z)}`; this.objMarker(spec.dest.x, spec.dest.z); m.startHealth = pv() ? pv().health : 100; break;
@@ -232,7 +232,7 @@ class MissionManager {
     }
     const pay = Math.max(0, s.reward + (m.bonus || 0));
     // contracts are criminal work: Dirty Cash in hand; an illegal street race pays Dirty too (§45.18)
-    g.earn(pay, s.type === 'race' ? 'streetRace' : 'contract');
+    if (pay > 0) g.earn(pay, s.type === 'race' || s.type === 'srace' ? 'streetRace' : 'contract');
     this.lastFailed = null;
     g.save.missionsCompleted++; g.save.stats.missionsPassed++;
     g.audio.play('pass');
@@ -256,6 +256,8 @@ class MissionManager {
   }
   end() {
     const g = this.g, m = this.active; if (!m) return;
+    // a pink slip that ends without a result (quit, arrest, death) is a loss once the stake is down
+    if (m.spec.pink && g.pinks) g.pinks.abort();
     this.clearObj();
     if (m.spec.type === 'story') g.campaign.cleanup(m);
     if (g.race.active) g.race.end();
@@ -325,9 +327,18 @@ class MissionManager {
       m.target = R.target; m.objective = R.objective || '';
       if (res) {
         m.data.place = res.place || 0;
+        // a pink slip: a win takes his car, anything else hands yours over (§45.33)
+        if (s.pink) {
+          const win = !res.reason && res.place === 1;
+          g.pinks.resolve(win);
+          if (win) { s.reward = 0; s.rep = 0; this.pass(); } else this.fail(res.reason || 'Vance took it. Your car is his.');
+          return;
+        }
         if (res.reason || !res.place || res.place > 3) { this.fail(res.reason || `You finished ${ordinal(res.place)}.`); return; }
-        s.reward = Math.round(s.race.reward * [1, 0.4, 0.2][res.place - 1] / 10) * 10;
-        s.rep = res.place === 1 ? s.race.rep : Math.round(s.race.rep / 3);
+        // the purse and Rep for this finish, by today's tier for this race (§45.33)
+        const pay = g.raceRules.payout(s.race, res.place);
+        s.reward = pay.cash; s.rep = pay.rep;
+        if (res.place === 1) g.raceRules.noteWin(s.race.id);
         if (res.record) g.ui.toast(`New record: ${fmtRace(res.time)}`, 'money');
         this.pass(); return;
       }

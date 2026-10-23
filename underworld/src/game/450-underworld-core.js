@@ -284,6 +284,8 @@ class Underworld {
     if (this.rivalwh) this.rivalwh.reset();
     if (this.shipments) this.shipments.reset();
     if (this.g.vreg) this.g.vreg.reset();
+    if (this.g.pinks) this.g.pinks.reset();
+    if (this.g.wash) this.g.wash.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -880,6 +882,7 @@ class Underworld {
     const ia = g.impound.findAction(); if (ia) return ia;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
+      const wa = g.wash.findAction(); if (wa) return wa;
       if (v.speed < 3) {
         const ch = this.loc('spot', 'chop');
         // the chop shop works on any car that isn't legally yours: a stolen one, or a HOT one in your fleet (§45.30)

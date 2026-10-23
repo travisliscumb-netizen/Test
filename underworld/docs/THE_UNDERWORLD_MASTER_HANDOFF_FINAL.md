@@ -1394,3 +1394,33 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       - **Sources:** exploration, clues, contacts, race wins, pink slips, paid intel, collectible completion.
       - **Clues:** a search area first, then an exact pin with stronger intel.
       - **Persistence:** ownership, discovery and reward state persist through save/load with no duplication.
+33. **Session 6A rulings (DC-37).**
+    - **Street-race purse (per specific race, per economic day):**
+      - first win: 100% purse and 100% Rep;
+      - second win: 50% purse and 33% Rep;
+      - third and later wins: 25% purse and 33% Rep.
+      - The tiers reset each economic day. The buy-in stays at 15%. There is no hard cap, so racing stays available
+        for fun and practice.
+      - More diminishing Rep may come later if balance testing shows spamming one race is still farmable.
+    - **Street-race heat:** comes only from observation, at most once per race from this trigger.
+      - **Trigger:** you are actively in a street race, a police officer has real line of sight within about
+        40 m, and you are at race speed (above about 60 km/h). The result is 1★ for illegal street racing.
+      - No sighting means no heat. Night and rain routes get no artificial immunity.
+      - Finishing while wanted still resolves the result and the purse normally.
+    - **Pink slips** are special offers, not ordinary repeated races. You race the exact car you stake.
+      - **Eligible stake:** a car you own legally, not HOT, not impounded, not one of the 10 permanent unique
+        hidden cars, with no product, loot or Dirty Cash in it, and able to race.
+      - **Rival's stake:** a car of about 0.8–1.5× your stake's value.
+      - **Space:** a valid free permanent parking space is required before the start.
+      - **Win:** the rival car becomes yours in the persistent vehicle system. Its resale follows the explicit
+        pink-slip rule: Dirty Cash, because the transfer came from an illegal street race.
+      - **Lose, quit, abandon or fail:** the staked car is surrendered permanently.
+      - The stake is authoritative from the start. A reload never restores the staked car or duplicates the rival
+        car.
+      - Unique-car races and rewards belong to 6D.
+    - **Car wash** (Suds, Shine Express):
+      - **Price:** a $40 wash plus the same repair cost as the licensed Motor Works, from Clean Bank.
+      - **Service:** wash and repair happen during a 5–10 s physical brushes and foam sequence.
+      - **Own car wash:** the wash is free and the repair gets the property's 30% owner discount.
+      - It cleans the appearance and fully repairs the car. It never clears wanted level or HOT, and never changes
+        ownership or provenance.

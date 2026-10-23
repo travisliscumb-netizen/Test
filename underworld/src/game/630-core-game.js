@@ -71,8 +71,10 @@ class Game {
     this.vreg = new VehicleRegistry(this);
     // Session 5B: HOT recognition, the police impound lot, the Chop Shop's work
     this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
+    // Session 6A: street-race purse tiers and heat, pink slips, the car wash
+    this.raceRules = new RaceRules(this); this.pinks = new PinkSlips(this); this.wash = new CarWash(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset();
+    this.vreg.reset(); this.pinks.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -642,7 +644,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);

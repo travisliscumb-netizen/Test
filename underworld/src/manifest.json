@@ -62,6 +62,7 @@
   "game/500-underworld-homes-parking.js",
   "game/505-underworld-vehicle-registry.js",
   "game/507-underworld-vehicle-law.js",
+  "game/508-underworld-street-racing.js",
   "game/510-underworld-police-pressure.js",
   "game/520-underworld-prison.js",
   "game/530-underworld-opportunities.js",

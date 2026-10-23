@@ -16,6 +16,8 @@ const SUSP_UP = 0.07, SUSP_DOWN = 0.22;
 const VEH_T = { light: 85, moderate: 65, smoke: 45, heavy: 28, critical: 12 };
 const VEH_STAGES = [[VEH_T.light, 'NORMAL', '#7fe08f'], [VEH_T.moderate, 'LIGHT DAMAGE', '#c8e07f'], [VEH_T.smoke, 'DAMAGED', '#ffd84d'], [VEH_T.heavy, 'SMOKING', '#ffb547'], [VEH_T.critical, 'HEAVILY DAMAGED', '#ff8a3d'], [0, 'CRITICAL', '#ff4d5e'], [-1e9, 'DESTROYED', '#8a1020']];
 function vehStage(h) { for (const s of VEH_STAGES) if (h > s[0]) return s; return VEH_STAGES[VEH_STAGES.length - 1]; }
+// how fast road dirt builds up: from just washed to the everyday look in about 25 km
+const DIRT_PER_M = 2e-5;
 class Vehicle {
   constructor(vm, type) {
     this.vm = vm; this.type = type; this.spec = VEHICLES[type]; this.id = VEH_ID++;
@@ -45,6 +47,8 @@ class Vehicle {
     this._wy = this._wy || [0, 0, 0, 0]; this._wl = this._wl || [0, 0, 0, 0]; this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
     this._safe = null; this.recycle = false; this.tune = null; this.garageUid = 0; this.trackId = 0; this.locked = false; this.origin = null; this.rareFind = false; this.critical = false;
     this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.joinT = 0; this.staffed = undefined; this.free = false; this.goldCar = false; this.dealer = null; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
+    // road dirt (0 just washed … 1 filthy); 0.5 is the everyday look. It builds up with distance driven
+    this.dirt = 0.5;
     const col = opts.color !== undefined ? opts.color : pick(s.colors);
     this.mat.userData.u.uPaint.value.setHex(col);
     this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : 0xffffff);
@@ -88,6 +92,7 @@ class Vehicle {
     const s = this.spec;
     if (this.sleep) return;
     if (this.hitT > 0) this.hitT -= dt;
+    if (this.dirt < 1) this.dirt = Math.min(1, this.dirt + this.speed * dt * DIRT_PER_M);
     if (this.airborne) {
       // ballistic: no tyre forces, mild air drag. Spin from the launch dies away instead of
       // building up; a little air control (steer yaws the car slowly). Only a collision in the air
@@ -303,7 +308,7 @@ class Vehicle {
     const alive = !this.burnt;
     const head = alive && (this.driver || this.mode === 'kin') && this.headOn ? 1 : 0;
     u.uLights.value.set(head * (0.4 + night * 0.6), alive && (this.braking || (this.mode === 'kin' && this.aiBrake)) ? 1 : 0, alive && this.reversing ? 1 : 0, t + this.sirenPhase);
-    u.uMisc.value.set(this.burnt ? 1 : 0, this.siren && alive ? 1 : 0, clamp(1 - this.health / 100, 0, 1), 0);
+    u.uMisc.value.set(this.burnt ? 1 : 0, this.siren && alive ? 1 : 0, clamp(1 - this.health / 100, 0, 1), this.dirt);
     const blink = Math.sin(t * 9.5) > 0 ? 1 : 0;
     const il = alive && (this.indL || this.hazard) ? blink : 0, ir = alive && (this.indR || this.hazard) ? blink : 0;
     u.uLights2.value.set(il, ir, this.broken, U.uWet.value);

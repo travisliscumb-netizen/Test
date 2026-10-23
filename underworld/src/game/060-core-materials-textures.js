@@ -781,7 +781,7 @@ function makeWaterMaterial() {
              9 roof sign, 10 paint2, 11 interior, 12 indicator, 13 plate, 14 matte plastic, 15 grille
    uLights  = (headlights, brake, reverse, siren phase)
    uLights2 = (left indicator, right indicator, broken-light bitmask FL1 FR2 RL4 RR8, wet)
-   uMisc    = (burnt, siren on, damage, night)                                                   */
+   uMisc    = (burnt, siren on, damage, road dirt)                                                   */
 function makeVehicleMaterial(physical) {
   const m = physical
     ? new THREE.MeshPhysicalMaterial({ roughness: 0.35, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.05 })
@@ -818,7 +818,7 @@ function makeVehicleMaterial(physical) {
           float flake = vh(floor(vLP.xz * 140.0 + vLP.y * 40.0));
           pc *= 0.97 + flake * (0.03 + uFinish.x * 0.12);
           float wear = uFinish.z;
-          float g2 = grime * (0.6 + wear * 0.9);
+          float g2 = grime * (0.6 + wear * 0.9) * (0.3 + uMisc.w * 1.4);
           vec3 faded = mix(pc, vec3(dot(pc, vec3(0.33))) * 1.08 + 0.05, wear * 0.45);
           float rustN = vh(floor(vLP.xz * 7.0 + vLP.y * 3.0)) * vh(floor(vLP.zy * 11.0));
           float rust = wear * step(0.55, rustN + smoothstep(0.75, 0.3, vLP.y) * 0.35) * smoothstep(1.0, 0.35, vLP.y);

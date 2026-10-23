@@ -115,7 +115,7 @@ const RACES = [
   { id: 'midnight', name: 'Midnight Run', nodes: [[4, 4], [8, 4], [8, 6], [5, 6], [5, 8], [9, 8]], laps: 1, opp: 3, night: true, cls: ['sports', 'muscle', 'sports'], reward: 2200, rep: 55, blurb: 'Through the heart of the city after dark, traffic and all. 20:00–05:00 only.' },
   { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
   { id: 'wettrack', name: 'Wet Track', nodes: [[1, 6], [1, 10], [4, 10], [4, 6]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
-  { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 10], [10, 10], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, reward: 0, rep: 0, blurb: 'One on one with Vance. Winner takes the Corsair.' }
+  { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 10], [10, 10], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' }
 ];
 const RACER_NAMES = ['Vance', 'Mika "Nitro" Osei', 'Jules Ferreira', 'Big Tam', 'Lou Park', 'Danny Two-Tone'];
 function raceCheckpoints(def) {
@@ -161,7 +161,7 @@ class RaceManager {
     const n = A.def.opp;
     for (let k = 0; k < n; k++) {
       const sl = slot(k + 1), cls = A.opts.opponentCls || A.def.cls[k % A.def.cls.length];
-      const o = g.vehicles.spawn(cls, sl.x, sl.z, R.start.h, { driver: 'npc' });
+      const o = g.vehicles.spawn(cls, sl.x, sl.z, R.start.h, { driver: 'npc', vtier: A.opts.opponentTier });
       o.mission = 'race'; o.touched = true; o.critical = false;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
@@ -188,7 +188,15 @@ class RaceManager {
       const d = Math.hypot(p.pos.x - R.start.x, p.pos.z - R.start.z);
       A.target = R.start;
       A.objective = v ? (d < 9 ? 'Stop on the start line' : `Drive to the start line — ${A.def.name}`) : 'Get a vehicle and drive to the start line';
-      if (v && d < 9 && v.speed < 4) { g.fade(() => { if (this.active === A) this.lineUp(); }, true); A.phase = 'lining'; }
+      if (v && d < 9 && v.speed < 4) {
+        // a pink slip: the car you stopped in is the stake; checked, then committed (and saved) here
+        if (A.opts.pink) {
+          const why = g.pinks.canStake(v); if (why) { A.objective = why; return null; }
+          const r = g.pinks.commit(v); A.opts.opponentCls = r.type; A.opts.opponentColor = r.color; A.opts.opponentTier = r.vtier;
+          g.ui.toast(`Vance puts up a ${VEHICLES[r.type].name}. Your ${v.spec.name} against it.`, 'info');
+        }
+        g.fade(() => { if (this.active === A) this.lineUp(); }, true); A.phase = 'lining';
+      }
       return null;
     }
     if (A.phase === 'lining') return null;
@@ -212,6 +220,7 @@ class RaceManager {
     }
     // running
     A.t += dt;
+    if (g.raceRules) g.raceRules.watch(A, v);
     const cp = R.cps[A.cp];
     A.target = cp;
     if (v && Math.hypot(p.pos.x - cp.x, p.pos.z - cp.z) < 13) {
@@ -286,7 +295,7 @@ class RaceManager {
     $('raceHud').classList.add('hidden');
     for (const r of A.racers) {
       const o = r.v;
-      if (!g.vehicles.list.includes(o)) continue;
+      if (!g.vehicles.list.includes(o) || o.pinkWon) continue;
       o.mission = null; if (o.drive) { o.drive.mode = 'cruise'; o.drive.cruise = 13; const c = g.world.randomCurbSpot(o.pos.x, o.pos.z, 200, 600); o.drive.setGoal(c.x, c.z); }
     }
     this.active = null;

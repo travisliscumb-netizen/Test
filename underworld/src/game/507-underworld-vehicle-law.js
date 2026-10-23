@@ -260,7 +260,7 @@ class ChopShop {
       if (k === 'clean') { const r = this.clean(v); C2.refreshSvc(r || 'New papers. It’s a legal car of yours now, in a space of its own.'); return; }
       if (k === 'repair') { const c = Math.round(C2.repairCost(v.type, v.health) * CHOP_WORK.repair / 10) * 10; if (!Money.pay(c, 'chopWork')) return; C2.repair(v); const e = ent(); if (e) e.dmg = 0; g.audio.play('cash'); }
       if (k === 'paint') { if (!Money.pay(CHOP_WORK.paint, 'chopWork')) return; v.colorHex = +a; v.mat.userData.u.uPaint.value.setHex(+a); const e = ent(), r = rec(); if (e) e.color = +a; if (r) r.color = +a; g.audio.play('cash'); }
-      if (k === 'tune') { const t = tuneOf(), T = TUNE.find(x => x.id === a); if (!t || !T || t[a] >= 3) return; const price = C2.tunePrice(T, t[a], v.type); if (g.save.rep < (TUNE_REP[t[a]] || 0) || !Money.pay(price, 'chopWork')) return; t[a]++; v.tune = t; g.audio.play('cash'); }
+      if (k === 'tune') { const t = tuneOf(), T = TUNE.find(x => x.id === a); if (!t || !T || t[a] >= 3) return; const price = C2.tunePrice(T, t[a], v.type); if (g.save.rep < (TUNE_REP[t[a]] || 0) || !Money.pay(price, 'chopWork')) return; t[a]++; v.tune = t; g.audio.play('cash'); if (TUNE.every(x => t[x.id] >= 3)) C2.ach('tuned'); }
       g.saveGame(); C2.refreshSvc();
     });
   }

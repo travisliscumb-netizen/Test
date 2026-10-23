@@ -44,6 +44,9 @@ const SaveSystem = {
       tracked: [], nextTrack: 0, pendingCars: [], vlog: [],
       // the police impound lot's own state (Session 5B): breaches in its fence and gate
       impoundLot: { breach: {} },
+      // street racing (Session 6A): today's wins per race (the purse tiers), a pink slip's stake while it is down,
+      // and the economic day of the last pink slip
+      raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
       dealers: {},
       nextUid: 1,
       pos: null,

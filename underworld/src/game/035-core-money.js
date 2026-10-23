@@ -36,6 +36,8 @@ const MONEY_SOURCES = {
   impoundFee: { pay: 'clean' },
   // Chop Shop work on a stolen car (clean the title, repair, paint, tune): cash in hand
   chopWork: { pay: 'dirty' },
+  // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
+  carWash: { pay: 'clean' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },

@@ -56,7 +56,7 @@ class VehicleRegistry {
     for (const v of g.vehicles.nearby(p.x, p.z, 4)) if (v !== g.player.vehicle && !v.garageUid && !v.trackId && !v.mission && Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 3 && Math.abs(v.pos.y - (p.y ?? v.pos.y)) < 2) g.vehicles.despawn(v);
     const v = g.vehicles.spawn(e.type, p.x, p.z, p.h, { parked: true, color: e.color, y: p.y, vtier: e.vtier || VEHICLES[e.type].tier });
     v.owned = true; v.touched = true; v.garageUid = e.uid; v.tune = e.tune; v.origin = e.origin; v.health = Math.max(1, 100 - e.dmg);
-    v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[e.type].special; v.display = !e.out;
+    v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.special = !!VEHICLES[e.type].special; v.display = !e.out; v.dirt = e.dirt ?? 0.5;
     if (e.dmg >= 100) { v.health = 0; v.burnt = false; }
     this.cars.set(e.uid, v);
     return v;
@@ -93,7 +93,7 @@ class VehicleRegistry {
         // leaving its bay takes it out; from then on it is saved wherever it stands
         if (!e.out && b && (Math.hypot(v.pos.x - b.x, v.pos.z - b.z) > 7 || Math.abs(v.pos.y - (b.y ?? v.pos.y)) > 3)) { e.out = true; v.display = false; e.loc = this.here(v); e.seen = this.econ(); g.autosave('Vehicle taken out'); }
         if (e.out) {
-          e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100);
+          e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100); e.dirt = v.dirt;
           const d = Math.hypot(v.pos.x - px, v.pos.z - pz), mine = v === p.vehicle || v === p.lastVehicle;
           if (v === p.vehicle || d < VREG.attend) e.seen = this.econ();
           // a wreck left behind: your people tow it home to its bay (a recovery, not a police matter)
@@ -273,7 +273,7 @@ class VehicleRegistry {
   // before a save: every live kept car's position, condition and trunk into its record
   sync() {
     const s = this.s; if (!s || !s.garage) return;
-    for (const e of s.garage) { const v = this.live(e); if (v && e.out) { e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100); } }
+    for (const e of s.garage) { const v = this.live(e); if (v) e.dirt = v.dirt; if (v && e.out) { e.loc = this.here(v); e.dmg = clamp(100 - v.health, 0, 100); } }
     for (const r of this.tracked) { const v = this.liveT(r); if (v) { r.x = v.pos.x; r.z = v.pos.z; r.h = v.h; r.y = v.pos.y; r.hp = v.health; } }
   }
   clearAll() {
@@ -292,6 +292,7 @@ class VehicleRegistry {
       // HOT and the impound (Session 5B): a stolen car stays HOT until a Chop Shop clean; an impounded car keeps its fee
       e.hot = e.hot === undefined ? e.origin === 'stolen' && !e.cleaned : !!e.hot; e.cleaned = !!e.cleaned;
       e.seen = num(e.seen, 0, 0, 1e9);
+      e.dirt = num(e.dirt, 0.5, 0, 1);
       const I = e.imp && typeof e.imp === 'object' ? e.imp : null;
       e.imp = I ? { why: ['arrest', 'abandoned', 'pursuit'].includes(I.why) ? I.why : 'abandoned', since: num(I.since, 0, 0, 1e9), fee: Math.round(num(I.fee, IMPOUND.fee.min, IMPOUND.fee.min, IMPOUND.fee.max)), slot: Math.floor(num(I.slot, -1, -1, 1e5)), paid: !!I.paid } : null;
       if (e.imp) { e.out = false; e.loc = null; }

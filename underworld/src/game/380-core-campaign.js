@@ -59,12 +59,21 @@ class Campaign {
   }
   raceOffer(c) {
     const g = this.g, list = RACES.filter(r => !r.storyOnly);
-    this._ri = ((this._ri ?? -1) + 1) % list.length;
-    let def = list[this._ri];
-    for (let k = 0; k < list.length && raceAvailable(def, g); k++) { this._ri = (this._ri + 1) % list.length; def = list[this._ri]; }
+    // the rotation: every race in turn (skipping one that can't run now), and once an economic day a pink slip
+    // in the extra slot (§45.33)
+    const n = list.length + 1;
+    let def = null;
+    for (let k = 0; k < n; k++) {
+      this._ri = ((this._ri ?? -1) + 1) % n;
+      if (this._ri === list.length) { if (g.pinks && g.pinks.available()) return g.pinks.offer(c); continue; }
+      def = list[this._ri]; if (!raceAvailable(def, g)) break;
+    }
     const why = raceAvailable(def, g), rec = this.save.races[def.id];
     const fee = Math.round(def.reward * 0.15 / 10) * 10;
-    return { type: 'srace', race: def, title: def.name, desc: def.blurb + ` Buy-in ${fmtMoney(fee)}, winner takes the pot.` + (rec && rec.best ? ` Your best: ${fmtRace(rec.best)}.` : ''), reward: def.reward, fee, contact: c, locked: why, chip: `UNDERGROUND RACE · ${(def.laps || 1) > 1 ? def.laps + ' laps' : 'sprint'} · ${def.opp} rivals`, rep: def.rep };
+    // today's purse for this race: full for the first win of the day, then a half, then a quarter
+    const pay = g.raceRules ? g.raceRules.payout(def, 1) : { cash: def.reward, rep: def.rep, tier: 0 };
+    const tier = pay.tier ? ` You’ve won this one today: the pot is down to ${fmtMoney(pay.cash)}.` : '';
+    return { type: 'srace', race: def, title: def.name, desc: def.blurb + ` Buy-in ${fmtMoney(fee)}, winner takes the pot.` + tier + (rec && rec.best ? ` Your best: ${fmtRace(rec.best)}.` : ''), reward: pay.cash, fee, contact: c, locked: why, chip: `UNDERGROUND RACE · ${(def.laps || 1) > 1 ? def.laps + ' laps' : 'sprint'} · ${def.opp} rivals`, rep: pay.rep };
   }
   penthouseOpen() { const m = this.g.missions.active; return !!(m && m.spec.type === 'story' && m.spec.def.id === 'f1' && m.st && m.st.t === 'interior'); }
   depotOpen() { const m = this.g.missions.active; return !!(m && m.spec.type === 'story' && m.st && m.st.t === 'interior' && m.st.id === 'depot'); }
