@@ -262,6 +262,22 @@ Object.assign(World.prototype, {
     this._genYard(b, rng, { id: IMPOUND.id, impound: true, name: IMPOUND.name, color: 0x55606a, sign: 'POLICE IMPOUND', sub: 'RELEASES AT THE WINDOW',
       slots: (W, hd) => [[17, 12], [20.4, 12], [23.8, 12], [27.2, 12], [-27.2, 10], [-23.8, 10], [17, 24], [20.4, 24], [23.8, 24], [27.2, 24]].map(([u, v]) => ({ x: W(u, v)[0], z: W(u, v)[1], h: hd(0, -1) })) });
   },
+  // the overflow yard: every space sized for the biggest vehicle (2.9 × 7.4 m bays; the Boxline is 2.3 × 7.2), five
+  // rows of 17, each nose-out onto an aisle of 6.6 m or more: the front aisle along the gate fence, two more behind,
+  // all joined by a side lane down one side fence. A small shed in the back corner; no docks, no window
+  _genImpoundOverflow(b, rng) {
+    this._genYard(b, rng, { id: IMPOUND.overflow.id, impound: true, name: IMPOUND.overflow.name, color: 0x55606a, sign: 'OVERFLOW', sub: 'NO ENTRY', overflow: true,
+      slots: (W, hd) => {
+        const out = [], B = OVERFLOW_BAY;
+        // a painted line between neighbouring bays, the depth of the bay
+        const line = (u, v) => { const [x0, z0] = W(u, v - B.d / 2), [x1, z1] = W(u, v + B.d / 2); this._det(b, 'box', (x0 + x1) / 2, CURB_H + 0.012, (z0 + z1) / 2, Math.max(0.12, Math.abs(x1 - x0)), 0.02, Math.max(0.12, Math.abs(z1 - z0)), C(0xe8c04a)); };
+        for (const [v, dir] of OVERFLOW_ROWS) {
+          for (let k = 0; k < B.n; k++) { const u = B.u0 + k * B.w, [x, z] = W(u, v); out.push({ x, z, h: hd(0, dir), w: B.w, d: B.d }); }
+          for (let k = 0; k <= B.n; k++) line(B.u0 + (k - 0.5) * B.w, v);
+        }
+        return out;
+      } });
+  },
   _genYard(b, rng, M) {
     this._sidewalk(b, rng, { trees: 0, park: 0 });
     const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
@@ -273,18 +289,18 @@ Object.assign(World.prototype, {
     const along = (u, v) => (side === 'n' || side === 's') ? W(u, v)[0] : W(u, v)[1];
     const hd = (du, dv) => { const [ax, az] = W(0, 0), [bx2, bz2] = W(du, dv); return Math.atan2(bx2 - ax, bz2 - az); };
     const P2 = (u, v, r) => { const [x, z] = W(u, v); return r ? [x, z, 1] : [x, z]; };
-    const gu = 4.5, bld = rect(-24, 30, 24, 56);
+    const gu = 4.5, bld = M.overflow ? rect(-28.6, 51.2, -22.4, 58.6) : rect(-24, 30, 24, 56);
     const [bx0, bz0] = W(13, 4.5);
     this._whCompound(b, rng, {
       id: M.id, rival: M.rival || null, impound: !!M.impound, place: M.id, name: M.name, color: M.color, sign: M.sign, sub: M.sub,
       slots: M.slots ? M.slots(W, hd) : null,
       lot: rect(-29, 1, 29, 59), gate: { side, at: along(gu, 1), w: 8 },
-      bld: { ...bld, h: 9 }, face: side,
-      docks: [along(-9, 30), along(9, 30)], door: along(-21, 30),
-      park: [{ x: W(26, 16)[0], z: W(26, 16)[1], h: hd(0, -1) }],
-      booth: { x: bx0, z: bz0, w: 3, d: 3 },
+      bld: { ...bld, h: M.overflow ? 6 : 9 }, face: side, signW: M.overflow ? 3.4 : 11,
+      docks: M.overflow ? [] : [along(-9, 30), along(9, 30)], door: M.overflow ? along(-23.6, 51.2) : along(-21, 30),
+      park: M.overflow ? [{ x: W(-25.5, 38)[0], z: W(-25.5, 38)[1], h: hd(0, 1) }] : [{ x: W(26, 16)[0], z: W(26, 16)[1], h: hd(0, -1) }],
+      booth: M.overflow ? null : { x: bx0, z: bz0, w: 3, d: 3 },
       front: ['n', 's', 'w', 'e'], apron: rect(gu - 4, -4, gu + 4, 0),
-      lanes: {
+      lanes: M.overflow ? { in: [], out: [] } : {
         in: [[P2(gu, -9), P2(gu, -4), P2(gu, 1), P2(gu, 6), P2(-5, 13), P2(-9, 19), P2(-9, 25)],
              [P2(gu, -9), P2(gu, -4), P2(gu, 1), P2(gu, 6), P2(7.5, 13), P2(9, 19), P2(9, 25)]],
         out: [[P2(-9, 19, 1), P2(-14, 13, 1), P2(-3, 9), P2(gu, 4), P2(gu, 1), P2(gu, -5), P2(gu, -10)],
@@ -307,8 +323,8 @@ Object.assign(World.prototype, {
     const onFace = (a, out) => ns(s.face) ? [a, fz + fo[1] * out] : [fx + fo[0] * out, a];
     const ry = Math.atan2(fo[0], fo[1]);
     const mid = ns(s.face) ? (B.x0 + B.x1) / 2 : (B.z0 + B.z1) / 2;
-    { const [x, z] = onFace(mid, 0.06); b.signs.push({ text: s.sign, x, y: Y + B.h - 2.2, z, ry, w: 11, h: 1.4, bg: '#14181c', fg: '#e8c04a' }); }
-    { const [x, z] = onFace(mid, 0.06); b.signs.push({ text: s.sub, x, y: Y + B.h - 3.4, z, ry, w: 11, h: 0.55, bg: '#b03a2e', fg: '#ffffff' }); }
+    { const [x, z] = onFace(mid, 0.06); b.signs.push({ text: s.sign, x, y: Y + B.h - 2.2, z, ry, w: s.signW || 11, h: s.signW ? Math.min(1.4, s.signW / 4) : 1.4, bg: '#14181c', fg: '#e8c04a' }); }
+    { const [x, z] = onFace(mid, 0.06); b.signs.push({ text: s.sub, x, y: Y + B.h - 3.4, z, ry, w: s.signW || 11, h: 0.55, bg: '#b03a2e', fg: '#ffffff' }); }
     // loading docks: a raised platform with bumpers in front of each dock door, a dock light, painted bays
     const docks = [];
     for (const a of s.docks) {

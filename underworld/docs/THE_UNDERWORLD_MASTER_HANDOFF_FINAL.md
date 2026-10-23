@@ -1337,3 +1337,29 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       contraband the police caught.
     - **Exploits:** no save/reload method clears HOT, wanted consequences, impound fees or cargo confiscation, and no
       full-registry case silently destroys protected cargo. Finish and regression-test 5B before Session 6.
+31. **Session 5B approved; closure rulings before Session 6.**
+    - **HOT recognition values stay provisional:** visible police observation only, about 26 m, about 1 star, a 30 s
+      grace after escaping, no citywide detection. Exact tuning belongs to Session 13.
+    - **Illegal-retrieval fee:** approved as built. Stealing the car back avoids the fee; there is no separate unpaid
+      debt.
+    - **HOT plate angle:** no change. The line-of-sight, proximity and chance model is enough.
+    - **Impound physical capacity:**
+      - An 11th vehicle must never share the 10th space. Every impounded owned vehicle gets its own physical bay.
+      - When the main yard is full, cars go to a physically represented overflow area. Vehicles are never stacked in
+        the same location.
+      - No owned, rare, unique or prize vehicle is ever discarded because the impound is full.
+      - The data model has no arbitrary 10-vehicle persistence limit.
+    - **As built:**
+      - The overflow yard is its own fenced compound next door to the main yard (block 4,8): its own gate and cameras
+        and a small shed, with no docks and no window.
+      - It has 85 bays in five rows of 17. Each bay is 2.9 × 7.4 m, which fits the largest vehicle. Every bay faces
+        an aisle of at least 6.6 m, and a side lane joins the aisles.
+      - Together the two yards hold 95 cars, more than every property's parking together (94); `tests/hot.mjs`
+        enforces this.
+      - Spaces are numbered (main yard first) and each car takes the lowest free one. Spaces survive a reload.
+      - A save with shared spaces is repaired on load.
+      - If the spaces ever ran out, which the parking caps rule out, the car would still be held, on a waiting list,
+        until a space frees.
+      - The window, at the main yard, pays the release of a car in either yard. The overflow gate opens only for a
+        released car parked there. That yard has its own lock to pick and its own alarm.
+

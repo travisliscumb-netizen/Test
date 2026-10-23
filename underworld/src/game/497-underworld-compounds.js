@@ -345,7 +345,7 @@ class CompoundSystem {
   // returns '' when allowed, or why not. a: the player, a vehicle, or a person on foot
   why(id, a) {
     const g = this.g, uw = this.uw, p = g.player, fid = this.rival(id);
-    if (this.impound(id)) return g.impound ? g.impound.why(a) : 'closed';
+    if (this.impound(id)) return g.impound ? g.impound.why(a, id) : 'closed';
     // a rival's compound lets in its own people and its own vehicles, and never you
     if (fid) { if (a && a.spec && a.ctl) return a.fac === fid && a !== p.vehicle ? '' : 'not one of theirs'; return a && a !== p && a.fac === fid && a.kind === 'gang' ? '' : 'not one of theirs'; }
     if (!uw.props.owned(id)) return 'not yours';
@@ -413,7 +413,7 @@ class CompoundSystem {
     const hit = q => { q.state = 'broken'; q.col.on = false; br[q.key] = { s: 'broken', t: now, tier: q === R.gate ? R.t.access : R.t.perimeter }; if (crewHere) br[q.key].w = now; };
     // a rival's compound rammed: that is a raid starting (Session 4B)
     // the impound lot rammed: the police know at once (Session 5B); the lot mends itself a day later
-    if (this.impound(id)) { hit(part); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle && g.impound) g.impound.onRam(); return; }
+    if (this.impound(id)) { hit(part); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle && g.impound) g.impound.onRam(id); return; }
     if (this.rival(id)) { hit(part); if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q); if (part === R.gate) { R.gate.open = 0; this.place(R); } else R.dirty = true; g.audio.play('crash', { x: R.C.gate.x, z: R.C.gate.z }); if (v === g.player.vehicle) this.uw.rivalwh.alarm(this.rival(id), 'rammed'); return; }
     hit(part);
     if (part !== R.gate && v) for (const q of R.panels) if (q.state !== 'broken' && q.ram <= imp && q.side === part.side && Math.hypot(q.x - v.pos.x, q.z - v.pos.z) < 1.5 + v.spec.w + v.spec.l / 2) hit(q);
@@ -545,7 +545,7 @@ class CompoundSystem {
         // the impound's cameras: you in the yard with no release on any car of yours is a break-in
         R.watchT = 0.5;
         const pp = p.state === 'vehicle' ? p.vehicle.pos : p.pos;
-        if (!p.interior && this.inYard(id, pp.x, pp.z) && this.seen(id, pp.x, pp.y + 1.2, pp.z, night) && g.impound) g.impound.onSeen();
+        if (!p.interior && this.inYard(id, pp.x, pp.z) && this.seen(id, pp.x, pp.y + 1.2, pp.z, night) && g.impound) g.impound.onSeen(id);
       } else if ((R.watchT = (R.watchT || 0) - dt) <= 0 && R.cams.length && this.rival(id)) {
         // a rival's cameras watch for you: you in their yard is a raid starting
         R.watchT = 0.5;

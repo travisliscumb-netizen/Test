@@ -9,7 +9,10 @@
      never lost. Released at the window for a fee by value (Clean Bank), or taken back by picking or ramming the
      gate (2–3★) and driving it out, which leaves it HOT. Every case survives a reload and nothing is duplicated.
    - A full registry of stolen cars that all hold your things never drops one: the new car is used but not kept,
-     and you are warned. */
+     and you are warned.
+   - The impound never stacks cars (§45.31): every space is a real bay, the overflow yard next door takes the 11th car
+     on, the two yards hold a space for every car you could own, each car keeps its space across a reload, an old
+     save with shared spaces is repaired, and legal and illegal retrieval work from the overflow yard's own gate. */
 import { launch, open, check, startNew, finish, frames } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
@@ -266,6 +269,135 @@ check('full registry, every car holding your things: none is dropped; the new ca
 await reload();
 const full2 = await ev(() => { const g = window.game, R = g.vreg; return { n: R.tracked.length, cargo: R.tracked.every(r => window.__u(r.trunk) === 2), hotFleet: g.save.garage.filter(e => e.hot).length }; });
 check('save → reload: all eight still there with their goods; HOT cars still HOT', full2.n === 8 && full2.cargo && full2.hotFleet >= 1, JSON.stringify(full2));
+
+// ---------------------------------------------------------------- 10. the impound never stacks cars: an overflow yard, one car to a space
+// every space a real bay: big enough for the biggest vehicle, inside its yard, apart from every other bay, the shed
+// and the gate apron, and nosing out onto clear ground to drive off on
+const geo = await ev(() => {
+  const g = window.game, P = window.__pv, I = g.impound, W = g.world.compounds, PM = g.uw.props, out = {};
+  let bays = 0; for (const def of P.PROPS) bays += PM.bays(def).length;
+  out.bays = bays; out.cap = I.capacity(); out.lots = I.lots(); out.main = W[P.IMPOUND.id].slots.length; out.over = W[P.IMPOUND.overflow.id].slots.length;
+  const own = Object.keys(P.VEHICLES).filter(k => !P.VEHICLES[k].police && k !== 'police');
+  out.maxL = Math.max(...own.map(k => P.VEHICLES[k].l)); out.maxW = Math.max(...own.map(k => P.VEHICLES[k].w));
+  // a slot's footprint: the bay where it has one (overflow), else the biggest car's
+  const S = I.slots(), foot = sp => { const d = sp.d || out.maxL + 0.2, w = sp.w || out.maxW + 0.5, al = Math.abs(Math.sin(sp.h)) > 0.5; return al ? { x0: sp.x - d / 2, x1: sp.x + d / 2, z0: sp.z - w / 2, z1: sp.z + w / 2 } : { x0: sp.x - w / 2, x1: sp.x + w / 2, z0: sp.z - d / 2, z1: sp.z + d / 2 }; };
+  const F = S.map(foot), hit = (a, b) => a.x0 < b.x1 - 1e-6 && b.x0 < a.x1 - 1e-6 && a.z0 < b.z1 - 1e-6 && b.z0 < a.z1 - 1e-6;
+  out.overlap = 0; for (let i = 0; i < F.length; i++) for (let j = i + 1; j < F.length; j++) if (hit(F[i], F[j])) out.overlap++;
+  out.outside = S.filter((sp, i) => { const L = W[sp.lot].lot, f = F[i]; return f.x0 < L.x0 || f.x1 > L.x1 || f.z0 < L.z0 || f.z1 > L.z1; }).length;
+  out.inBuilding = S.filter((sp, i) => hit(F[i], W[sp.lot].bld)).length;
+  out.small = S.filter(sp => sp.w && (sp.w < out.maxW + 0.5 || sp.d < out.maxL + 0.15)).length;
+  // the ground 3.3 m beyond each overflow bay's nose: inside the yard, in no bay, not in the shed
+  out.blockedNose = S.filter(sp => sp.lot === P.IMPOUND.overflow.id).filter(sp => { const fx = Math.sin(sp.h), fz = Math.cos(sp.h), L = W[sp.lot].lot;
+    return [1, 2.2, 3.3].some(k => { const x = sp.x + fx * (sp.d / 2 + k), z = sp.z + fz * (sp.d / 2 + k), pt = { x0: x - 0.01, x1: x + 0.01, z0: z - 0.01, z1: z + 0.01 }; return x < L.x0 || x > L.x1 || z < L.z0 || z > L.z1 || F.some(f => hit(pt, f)) || hit(pt, W[sp.lot].bld); }); }).length;
+  const G = W[P.IMPOUND.overflow.id].gate; out.gateApron = F.filter(f => hit({ x0: G.x - 4, x1: G.x + 4, z0: G.z - 4, z1: G.z + 4 }, f)).length;
+  return out;
+});
+check('the two yards hold a space for every car you could ever own (every property’s spaces together), the overflow yard next door holding the rest', geo.cap >= geo.bays && geo.main === 10 && geo.over >= geo.bays - geo.main && geo.lots.length === 2, JSON.stringify(geo));
+check('every space is a real bay: fits the biggest vehicle, inside its yard, no two overlapping, none in the shed or the gate mouth, each nosing out onto clear ground', geo.overlap === 0 && geo.outside === 0 && geo.inBuilding === 0 && geo.small === 0 && geo.blockedNose === 0 && geo.gateApron === 0, JSON.stringify(geo));
+
+// a dozen of your cars seized at once (a rare one and a unique one among them): twelve spaces, none shared
+const many = await ev(() => {
+  const g = window.game, P = window.__pv, s = g.save, PM = g.uw.props, C2 = g.content, I = g.impound;
+  window.__calm(); window.__far(); window.__tick(2);
+  for (const def of P.PROPS) { if (C2.garageCap >= s.garage.length + 14) break; if (!PM.owned(def.id) && PM.bays(def).length) PM.buy(def.id); }
+  // what is already held is let go first: this case starts with an empty impound
+  for (const e of I.held()) e.imp = null;
+  const types = ['sedan', 'obsidian', 'van', 'truck', 'compact', 'suv', 'pickup', 'sports', 'coupe', 'luxury', 'muscle', 'truck', 'estate'];
+  const cars = [];
+  for (const t of types) { const e = C2.addToGarage(t, 'bought', undefined, true); if (!e) break; cars.push(e); }
+  cars[0].vtier = 'rare';
+  for (const e of cars) I.seize(e, 'abandoned');
+  window.__ids.MANY = cars.map(e => e.uid);
+  const slots = cars.map(e => e.imp.slot), pos = cars.map(e => I.slotPos(e));
+  let mn = 1e9; for (let i = 0; i < pos.length; i++) for (let j = i + 1; j < pos.length; j++) mn = Math.min(mn, Math.hypot(pos[i].x - pos[j].x, pos[i].z - pos[j].z));
+  return { n: cars.length, cap: C2.garageCap, slots, distinct: new Set(slots).size, lots: pos.map(p => p.lot), mn, names: cars.map(e => I.spaceName(e)), owned: cars.every(e => s.garage.includes(e)) };
+});
+check('thirteen cars seized at once: thirteen different spaces, the first ten in the main yard and the rest in the overflow yard, all still yours', many.n === 13 && many.distinct === 13 && many.slots.join() === [...Array(13).keys()].join() && many.lots.slice(0, 10).every(l => l === 'impound') && many.lots.slice(10).every(l => l === 'impound_x') && many.mn >= 2.85 && many.owned && /overflow yard/.test(many.names[10]) && /main yard/.test(many.names[9]), JSON.stringify(many));
+// physically: walk up to each yard and the cars are there, one to a bay, never two in the same place
+const phys = await ev(() => {
+  const g = window.game, P = window.__pv, I = g.impound, W = g.world.compounds, out = {};
+  for (const id of I.lots()) {
+    const C = W[id]; window.__walk(C.gate.x - C.gate.n[0] * 6, C.gate.z - C.gate.n[1] * 6); window.__tick(2);
+    const vs = g.vehicles.list.filter(v => v.impounded && I.lotOf(g.vreg.entryOf(v)) === id);
+    let mn = 1e9; for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) mn = Math.min(mn, Math.hypot(vs[i].pos.x - vs[j].pos.x, vs[i].pos.z - vs[j].pos.z));
+    const where = vs.every(v => { const sp = I.slotPos(g.vreg.entryOf(v)); return sp && Math.hypot(v.pos.x - sp.x, v.pos.z - sp.z) < 0.3; });
+    out[id] = { n: vs.length, mn, where, inYard: vs.every(v => g.uw.compounds.inYard(id, v.pos.x, v.pos.z)) };
+  }
+  return out;
+});
+check('at the yards: ten cars in the main yard and three in the overflow yard, each standing in its own space', phys.impound.n === 10 && phys.impound_x.n === 3 && phys.impound.where && phys.impound_x.where && phys.impound.inYard && phys.impound_x.inYard && phys.impound.mn >= 2.85 && phys.impound_x.mn >= 2.85, JSON.stringify(phys));
+await reload();
+const many2 = await ev(() => { const g = window.game, I = g.impound, cars = window.__ids.MANY.map(u => g.save.garage.find(e => e.uid === u)); return { n: cars.filter(Boolean).length, slots: cars.map(e => e && e.imp && e.imp.slot), rare: cars[0] && cars[0].vtier }; });
+check('save → reload: all thirteen still impounded, each in the same space', many2.n === 13 && many2.slots.join() === many.slots.join() && many2.rare === 'rare', JSON.stringify(many2));
+
+// legal retrieval from the overflow yard: paid at the window, its own gate opens only for it
+const ovLegal = await ev(freed => {
+  const g = window.game, I = g.impound, CS = g.uw.compounds, W = g.world.compounds, s = g.save;
+  window.__calm();
+  const cars = window.__ids.MANY.map(u => s.garage.find(e => e.uid === u)), e = cars[10], other = cars[11], G = W.impound_x.gate, M = W.impound.gate;
+  // pay at the window (the main yard's gate)
+  window.__walk(M.x - M.n[0] * 3, M.z - M.n[1] * 3); window.__tick(1);
+  const c0 = g.money.W.clean, fee = e.imp.fee;
+  I.openOffice(); g.content._svcAct('pay:' + e.uid); const msg = document.getElementById('svcHint').textContent; g.ui.closeAll();
+  const paid = e.imp.paid && Math.round(c0 - g.money.W.clean) === fee;
+  window.__walk(G.x - G.n[0] * 3, G.z - G.n[1] * 3); window.__tick(2);
+  const v = g.vreg.live(e), vo = g.vreg.live(other);
+  const onFootHere = CS.why('impound_x', g.player), onFootMain = CS.why('impound', g.player);
+  g.completeEnter(vo); const whyOther = CS.why('impound_x', vo); g.exitVehicle(true);
+  g.completeEnter(v);
+  const whyHere = CS.why('impound_x', v), whyMain = CS.why('impound', v);
+  v.pos.x = G.x - G.n[0] * 16; v.pos.z = G.z - G.n[1] * 16; v.syncMesh(0); window.__tick(1);
+  g.exitVehicle(true);
+  // the freed space is the next one used
+  const extra = g.content.addToGarage('sedan', 'bought', undefined, true); I.seize(extra, 'pursuit'); window.__ids.EXTRA = extra.uid;
+  return { paid, msg, onFootHere, onFootMain, whyOther, whyHere, whyMain, imp: e.imp, out: e.out, hot: !!e.hot, level: g.police.level, live: g.vehicles.list.filter(q => q.garageUid === e.uid).length, extraSlot: extra.imp.slot, freed };
+}, many.slots[10]);
+check('overflow, legal: paid at the window (which names its space in the overflow yard), the overflow gate opens for that car (and you on foot), not for an unpaid one, and the main gate doesn’t; driven out, retrieved once, not HOT, no stars', ovLegal.paid && /overflow yard/.test(ovLegal.msg) && ovLegal.whyHere === '' && ovLegal.whyMain === 'not released' && ovLegal.whyOther === 'not released' && ovLegal.onFootHere === '' && ovLegal.imp === null && ovLegal.out && !ovLegal.hot && ovLegal.level === 0 && ovLegal.live === 1, JSON.stringify(ovLegal));
+check('the space it left is the next one used (the lowest free space, deterministically)', ovLegal.extraSlot === ovLegal.freed, JSON.stringify(ovLegal));
+
+// illegal retrieval from the overflow yard: its own gate's lock, its own alarm, driven out HOT
+const ovPick = await ev(() => {
+  const g = window.game, I = g.impound, CS = g.uw.compounds, W = g.world.compounds, s = g.save, P = window.__pv;
+  window.__calm();
+  const e = s.garage.find(x => x.uid === window.__ids.MANY[12]), G = W.impound_x.gate;
+  window.__walk(G.x - G.n[0] * 3, G.z - G.n[1] * 3); window.__tick(2);
+  const act = g.uw.findAction(), label = act && act.label;
+  act && act.act();
+  window.__walk(G.x - G.n[0] * 2.5, G.z - G.n[1] * 2.5); I.update(P.IMPOUND.pick + 0.5);
+  const forced = CS.R.impound_x.forceT > g.time, mainForced = CS.R.impound.forceT > g.time, lvl = g.police.level;
+  const v = g.vreg.live(e); window.__walk(v.pos.x + 2, v.pos.z); g.completeEnter(v);
+  v.pos.x = G.x - G.n[0] * 16; v.pos.z = G.z - G.n[1] * 16; v.syncMesh(0); window.__tick(1);
+  const out = { label, forced, mainForced, lvl, imp: e.imp, hot: !!e.hot, after: g.police.level, live: g.vehicles.list.filter(q => q.garageUid === e.uid).length, fleet: s.garage.filter(x => x.uid === e.uid).length };
+  g.exitVehicle(true); window.__calm();
+  return out;
+});
+check('overflow, illegal: the overflow gate’s own lock (its own alarm, 2★, the main gate untouched); driven out unpaid it is taken back, one car, HOT', /Overflow yard gate/.test(ovPick.label) && ovPick.forced && !ovPick.mainForced && ovPick.lvl >= 2 && ovPick.imp === null && ovPick.hot && ovPick.live === 1 && ovPick.fleet === 1, JSON.stringify(ovPick));
+
+// an old save with cars sharing a space: every one gets a space of its own on load
+await ev(() => { const g = window.game, s = g.save, cars = window.__ids.MANY.map(u => s.garage.find(e => e.uid === u)).filter(e => e && e.imp); for (const e of cars) e.imp.slot = 9;
+  // and a car at home whose space the save lost: it is given one again on load
+  const h = s.garage.find(e => !e.imp && !e.out); window.__ids.UNHOUSED = h.uid; h.at = null; });
+await reload();
+const dup = await ev(() => { const g = window.game, I = g.impound, held = I.held(), sl = held.map(e => e.imp.slot); return { n: held.length, distinct: new Set(sl).size, valid: sl.every(x => x >= 0 && x < I.capacity()), slots: sl }; });
+const housed = await ev(() => { const g = window.game, e = g.save.garage.find(x => x.uid === window.__ids.UNHOUSED); return { at: e && e.at }; });
+check('an old save with several cars in one space: on load each is given a space of its own, none lost', dup.n === 12 && dup.distinct === dup.n && dup.valid, JSON.stringify(dup));
+check('…and a car whose home space the save lost is given one again', !!(housed.at && housed.at.p), JSON.stringify(housed));
+
+// past every space (a state the parking caps rule out): the car is still held, waits, and takes the first space freed
+const beyond = await ev(() => {
+  const g = window.game, I = g.impound, s = g.save, cap = I.capacity();
+  window.__calm(); window.__far(); window.__tick(1);
+  const n0 = s.garage.length, fill = [];
+  while (I.held().length < cap + 1) { const e = { uid: s.nextUid++, type: 'compact', color: 0, origin: 'bought', dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at: null, out: false, loc: null }; s.garage.push(e); fill.push(e); I.seize(e, 'abandoned'); }
+  const last = fill[fill.length - 1], waiting = last.imp && last.imp.slot, name = I.spaceName(last);
+  const sl = I.held().map(e => e.imp.slot).filter(x => x >= 0);
+  const free = fill[0]; const freedSlot = free.imp.slot; free.imp = null; window.__tick(1);
+  const got = last.imp && last.imp.slot;
+  for (const e of fill) { const i = s.garage.indexOf(e); if (i >= 0) s.garage.splice(i, 1); }
+  window.__tick(1);
+  return { cap, waiting, name, distinct: new Set(sl).size === sl.length, kept: s.garage.length === n0, got, freedSlot };
+});
+check('past every space: the extra car is still held (on a waiting list, never stacked, never dropped) and takes the first space freed', beyond.waiting === -1 && /waiting list/.test(beyond.name) && beyond.distinct && beyond.got === beyond.freedSlot, JSON.stringify(beyond));
 
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await finish(b, 'hot');

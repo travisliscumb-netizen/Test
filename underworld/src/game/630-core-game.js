@@ -71,6 +71,8 @@ class Game {
     this.vreg = new VehicleRegistry(this);
     // Session 5B: HOT recognition, the police impound lot, the Chop Shop's work
     this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
+    // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
+    this.vreg.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);

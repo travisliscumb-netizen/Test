@@ -42,7 +42,7 @@ class VehicleRegistry {
   bayPos(e) { const def = e.at && PROP_BY_ID[e.at.p]; return def ? this.PM.bays(def)[e.at.i] || null : null; }
   // where a fleet car is: its bay, or where you left it
   where(e) {
-    if (e.imp && this.g.impound) { const sp = this.g.impound.slotPos(e); if (sp) return { x: sp.x, z: sp.z, name: `${IMPOUND.name} · space ${e.imp.slot + 1}`, street: false, imp: true }; }
+    if (e.imp && this.g.impound) { const sp = this.g.impound.slotPos(e); if (sp) return { x: sp.x, z: sp.z, name: `${IMPOUND.name} · ${this.g.impound.spaceName(e)}`, street: false, imp: true }; }
     if (e.out && e.loc) return { x: e.loc.x, z: e.loc.z, name: placeNameAt(e.loc.x, e.loc.z) || 'the street', street: true };
     const b = this.bayPos(e), def = e.at && PROP_BY_ID[e.at.p];
     return b ? { x: b.x, z: b.z, name: `${def.name} · ${PARK_LABEL[b.kind] || 'space'} ${b.i + 1}`, street: false } : null;
@@ -293,7 +293,7 @@ class VehicleRegistry {
       e.hot = e.hot === undefined ? e.origin === 'stolen' && !e.cleaned : !!e.hot; e.cleaned = !!e.cleaned;
       e.seen = num(e.seen, 0, 0, 1e9);
       const I = e.imp && typeof e.imp === 'object' ? e.imp : null;
-      e.imp = I ? { why: ['arrest', 'abandoned', 'pursuit'].includes(I.why) ? I.why : 'abandoned', since: num(I.since, 0, 0, 1e9), fee: Math.round(num(I.fee, IMPOUND.fee.min, IMPOUND.fee.min, IMPOUND.fee.max)), slot: Math.floor(num(I.slot, 0, 0, 40)), paid: !!I.paid } : null;
+      e.imp = I ? { why: ['arrest', 'abandoned', 'pursuit'].includes(I.why) ? I.why : 'abandoned', since: num(I.since, 0, 0, 1e9), fee: Math.round(num(I.fee, IMPOUND.fee.min, IMPOUND.fee.min, IMPOUND.fee.max)), slot: Math.floor(num(I.slot, -1, -1, 1e5)), paid: !!I.paid } : null;
       if (e.imp) { e.out = false; e.loc = null; }
     }
     let next = Number.isInteger(d.nextTrack) && d.nextTrack >= 0 ? d.nextTrack : 0;
