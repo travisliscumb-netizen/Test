@@ -112,11 +112,15 @@ await frames(page, 8);
 { const st = await stale(); check('death with the map open: respawn is clean', st.length === 0, st.join(', ')); }
 // sentencing scales with record and what you carry
 const sent = await page.evaluate(() => {
-  const g = window.game, uw = g.uw;
+  const g = window.game, uw = g.uw, R = uw.S.rap;
+  // a fixed baseline: no crimes on the current record, 1★ (whatever the steps above left behind)
+  const keep = { cur: R.cur, maxLvl: R.maxLvl, lvl: g.police.level, heat: g.police.heat };
+  R.cur = {}; R.maxLvl = 1; g.police.level = 1;
   uw.S.inv = {}; const clean = uw.prison.charges().total;
   uw.S.inv = { snow: 5 }; g.save.weapons.pistol = true; const loaded = uw.prison.charges().total;
   uw.S.inv = {}; g.save.weapons.pistol = false;
-  return { clean, loaded, priors: uw.S.rap.priors };
+  R.cur = keep.cur; R.maxLvl = keep.maxLvl; g.police.level = keep.lvl; g.police.heat = keep.heat;
+  return { clean, loaded, priors: R.priors };
 });
 // v6 halves every final sentence, so 'over a month' on the old scale is over a fortnight now
 check('carried product and guns lengthen the sentence (more than double, and by over two weeks)', sent.loaded > sent.clean * 2 && sent.loaded > sent.clean + 15, JSON.stringify(sent));
