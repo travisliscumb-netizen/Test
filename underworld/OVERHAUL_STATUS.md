@@ -77,7 +77,18 @@ and the HOT plate angle were approved as built. One closure item came first: an 
   - a lost home bay is rehoused;
   - past every space, the car waits and is never dropped.
 - A visual check (aerial, gate and back-corner shots of a full overflow yard) shows one car per painted bay.
-- Targeted regression on the closure build: in progress (results in the next commit).
+- Targeted regression on the closure build, three at a time:
+  - **Pass:** hot 31, vehicle 18, dealers 34, property 33, city 25, map 22, roads 20, stations 17, business 40,
+    breach 13, arrest 126, compound 56.
+  - **session:** 34 / 35 under load (a cash drop not collected in time); 35 / 35 alone.
+  - **threat:** 24 / 25 twice: under load, then once alone. The failing case is "there in person at a basic gate".
+    In that run a 5-strong squad's fight was settled with the gate intact.
+    - It then passed 25 / 25 in two further runs, and the previous build passed it 25 / 25 alone.
+    - The squad size is random, and gate-ram timing is the known intermittent class (§4A / 4B records).
+    - Overall 2 failures in 4 runs on this build, against 1 clean run on the previous build. That is not enough
+      evidence to blame or clear the overflow change.
+    - **Open item:** make the scenario deterministic, a fixed squad and a guaranteed ram, before Session 7 touches
+      police and compounds.
 
 ## Completed this session (5B)
 
