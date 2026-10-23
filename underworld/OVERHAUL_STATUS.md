@@ -11,10 +11,143 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **5A — Vehicle registry** (prompt Session 5, split by DC-35 / §45.29; 5B covers HOT, the Chop Shop,
-  Pay & Spray and the impound lot, and comes after 5A is regression-tested).
-- Commit/base revision: Session 4 closed `3803929` → the Session 5A commits on `claude/practical-lamport-zld81y`.
-- Date: 2026-10-22
+- Session: **5B — HOT, police, dealers, Chop Shop, Pay & Spray, impound** (prompt Session 5, second half per DC-35 /
+  §45.29; scope and the extra 5A rule in §45.30). 5A was approved and locked first.
+- Commit/base revision: Session 5A `4f5b474` → the Session 5B commits on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-23
+
+## Completed this session (5B)
+
+- **Extra 5A rule (§45.30): a full registry never drops your things.**
+  - `makeRoom` only lets go of a tracked car with nothing of yours in it.
+  - When all eight hold your cargo or cash, a newly stolen car stays usable but is not kept (`v.untracked`), and
+    you get a toast when you start it.
+  - If you leave cargo or cash in it, a second, plain warning appears.
+  - If a space frees up later, it is tracked then.
+- **HOT** (`HotWatch`, `src/game/507-underworld-vehicle-law.js`):
+  - **Saved:** a fleet car's `e.hot` and a tracked car's `r.hot`, via `VehicleRegistry.isHot`.
+  - **What doesn't clear it:** a pursuit ending, parking (a stolen car parked in your space is stored HOT) or a
+    reload.
+  - **Recognition:** only a cop who can actually see the car can recognize it: a unit or officer with a line of
+    sight within 26 m (`copCanSee`), 28% per half-second check. That gives 1★ and a radio line. There is a 30 s
+    cooldown after a pursuit and no citywide detection.
+- **Dealer Buy / Steal:**
+  - every lot car's screen has "Steal it · n★": 1★ at Saltworks, 3★ at Meridian, 5★ at Valen Prestige
+    (`DEALER_THEFT`);
+  - the stall empties, you take the wheel, and the registry tracks the car HOT (origin `dealer`);
+  - buying is unchanged: licensed lots take Clean Bank, and Saltworks keeps its Dirty/Clean provenance.
+- **The Chop Shop** (`ChopShop`): driving a stolen or HOT car into the yard opens Sell, Clean the title, Repair,
+  Respray and Upgrade, all paid in Dirty Cash (`chopWork`).
+  - **No service under pursuit.**
+  - **Cleaning:** clears HOT exactly once. A car not already in your fleet needs a real free space and joins the
+    fleet with its trunk, cash and tuning. It keeps origin `stolen`, so it still resells Dirty: no laundering
+    route.
+  - **Sale:** pays Dirty Cash.
+  - **Tuning:** a tracked car's tuning is saved on its record (`r.tune`).
+- **Pay & Spray** (Okafor Motor Works): with the police after you, one "Pay & Spray" does a repair plus a respray
+  and loses the pursuit if no cop sees you come in (Dirty, `payAndSpray`). It never touches HOT, never makes a car
+  yours and never adds a space. Dex won't tune a HOT car.
+- **The police impound lot** (`ImpoundLot`). A physical yard on block 4,7 by the precinct, built by
+  `CompoundSystem` in a new impound mode: fixed tiers, a motorised gate, a 2-tier fence, cameras, and 10 numbered
+  spaces.
+  - **When a car goes there (`e.imp`):**
+    - **Arrest:** seized when you're arrested in it. The arrest still confiscates its trunk, cash and your
+      weapons, so the impound keeps nothing the police took.
+    - **Abandoned:** a day on the economic clock with nobody near it, including the last car you drove.
+    - **Pursuit:** recovered when you leave it behind in a chase, in a cop's sight.
+
+    The car stays in your fleet with its home space kept. Wrecks still go home (5A). The fee is fixed at seizure
+    from the car's value: 6%, between $300 and $25k.
+  - **Legal retrieval:**
+    - pay at the window outside the gate (Clean Bank, `impoundFee`);
+    - the gate opens only for the released car;
+    - driving it out of the yard is the retrieval.
+  - **Illegal retrieval:**
+    - picking the gate lock (8 s, the gate then stands open 12 s): 2★;
+    - ramming the gate: 3★, a saved breach;
+    - being seen in the yard unreleased: 2★;
+    - driving a car out unpaid: at least 2★, and the car is HOT from then on (police know its plate).
+
+    Every way out is physical.
+  - **Arrest seizure of a tracked stolen car** is a logged recovery.
+
+## Files / systems changed (5B)
+
+- New: `src/game/507-underworld-vehicle-law.js` (`HotWatch`, `ImpoundLot`, `ChopShop`), `tests/hot.mjs`.
+- `390-underworld-data.js`: `IMPOUND` (block 4,7), `DEALER_THEFT`, the impound landmark block.
+- `110-content-places.js`: the shared `_genYard` (rival yards and the impound), `_genImpound`, and the spaces.
+- `497-underworld-compounds.js`: impound mode (tiers, `why` → `ImpoundLot.why`, breaches in `save.impoundLot`,
+  ram → `onRam`, cameras → `onSeen`, forced gate `R.forceT`).
+- `505-underworld-vehicle-registry.js`:
+  - `isHot`, the fleet's `e.seen` and `abandoned()`;
+  - impounded cars handed to the lot;
+  - the protected full registry, untracked warnings and `r.tune`;
+  - sanitize for `hot`, `cleaned`, `seen` and `imp`.
+- `360-core-content-services.js`: storing keeps HOT; garage HOT / IMPOUNDED chips and locations; the Pay & Spray;
+  dealer Steal.
+- `500-underworld-homes-parking.js`: `DealerLots.steal`.
+- `450-underworld-core.js`: the Chop Shop action and the impound's actions.
+- `520-underworld-prison.js`: an arrest impounds your car, or recovers a tracked one.
+- `035-core-money.js`: `impoundFee` (clean), `chopWork` (dirty).
+- `030-core-save-system.js`: the `impoundLot` default.
+- `630-core-game.js`: constructs and updates the three systems.
+- `650-core-boot.js`: exports. `manifest.json`: 507.
+
+## Save/schema changes (5B)
+
+- Garage entries gain:
+  - `hot` (defaults to `origin === 'stolen'` and not cleaned);
+  - `cleaned`;
+  - `seen` (economic hour last attended);
+  - `imp: { why, since, fee, slot, paid } | null`.
+- Tracked records gain `tune`; origin may now be `dealer`.
+- New `save.impoundLot: { breach }`.
+- No schema bump.
+
+## Tests run (5B)
+
+New `tests/hot.mjs`: **20 / 20**:
+- dealer theft gives 1/3/5★, empties the stall and leaves the car HOT, which escaping doesn't clear;
+- recognition happens only beside a cop who can see the car, never alone, never far away, never for a car that
+  isn't HOT;
+- parking keeps HOT, and a reload keeps it;
+- Pay & Spray loses the pursuit and repairs, but leaves HOT on, the car not yours and the spaces unchanged;
+- the Chop Shop refuses under pursuit and needs a free space to clean;
+- cleaning clears HOT once, makes the car legal and in the fleet, charges cash, and leaves origin `stolen` (a second
+  clean is refused);
+- a chop sale pays Dirty;
+- an arrest impounds the car while confiscating its contraband and cash, and a reload keeps the fee and the
+  confiscation (a rare car included);
+- legal retrieval: fee from the bank; the gate opens only once paid; driving out completes it: one car, no stars;
+- abandoned a day: impounded, still yours;
+- after a reload, picking the lock gives 2★, and driving out unpaid makes one car, HOT, logged;
+- ramming the gate gives 3★;
+- a car left behind in a chase, in sight of a cop, goes to the impound;
+- a full registry of your things loses none of them, and the new car is used but not kept, with a warning;
+- after a reload all eight are intact and HOT cars are still HOT.
+
+Regression against the 5B build:
+- **All checks pass:** arrest 126, breach 13, build 5, business 40, camera 20, cargo 36, carmoney 10, casino 39,
+  city 25, core 64, dealers 34, fixer 17, gambling 57, gangs 23, homes 26, interiors 22, inventory 58, kingpin 6,
+  ledger 54, map 22, money 10, offline 14, phone 71, phoneapps 19, prison 48, progression 33, property 33, pwa 5,
+  roads 20, royale-sim 23, shipment 33, shooting 37, smoke 16, soak 22, static-money 8, stations 17, street 11,
+  stress 30, survival 9, threat 25, tutorial 13, ui 23, vehicle 18, vehicles 39, warehouse 29.
+- **Passed alone after failing under parallel load:** raid 18, taxi 20, police 13 and session 35.
+- **Test code updated for 5B:** `session` sells through the Chop Shop's new menu.
+- **Performance** under parallel load: calls 118 / 119, update 1.2–1.6 ms.
+
+## Known bugs / risks (5B)
+
+- HOT recognition is a probability per look, by design. A HOT car near a lot of patrols draws attention fast; it
+  isn't tied to whether the plates are visible from that angle.
+- The impound holds 10 cars in fixed spaces. An 11th shares the last space. That's unlikely with the parking
+  capacities the game has, but not prevented.
+- A car taken out unpaid has no fee left owing, so the consequence is the stars and HOT.
+
+## Exact next recommended task
+
+Owner review of Session 5B. Then prompt **Session 6** (vehicle content / racing / tracks / unique cars) per
+`docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`.
 
 ## Completed this session (5A)
 

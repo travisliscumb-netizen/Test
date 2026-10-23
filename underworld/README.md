@@ -64,6 +64,20 @@ nowhere to park waits until you have room (Garage → Collect).
 
 Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
 
+## HOT cars, the Chop Shop and the impound (overhaul Session 5B)
+
+A stolen car is HOT, and stays HOT through chases, parking and reloads. A cop who sees it up close may run the
+plates: 1★. Every dealer car can be bought or stolen, for about 1★, 3★ or 5★ depending on the lot.
+
+The Chop Shop buys stolen cars for cash, cleans their papers (once, and only into a real free parking space),
+repairs, repaints and tunes them. It won't touch anything while the police are on you. The Pay & Spray at Okafor
+Motor Works loses a pursuit and fixes the car, but a stolen car stays stolen.
+
+Your car goes to the police impound by the precinct when you're arrested in it (the police still take what was in
+it), when it's left on the street for a day, or when they recover it after a chase. Pay at the window and drive it
+out, or pick the lock or ram the gate and take it, for 2–3★, after which it is HOT. Module:
+`src/game/507-underworld-vehicle-law.js`.
+
 ## Raiding rivals, shipments and imports (overhaul Session 4B)
 
 Each gang keeps its product and cash in a physical warehouse compound with its own gate, cameras and guards. What
@@ -500,6 +514,7 @@ node underworld/tests/static-money.mjs # Node only: no old single balance anywhe
 node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/transfer, arrest seizure, stash survival, payroll order, debt, stunt cap, save/reload, v7 migration
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
 node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
+node underworld/tests/hot.mjs        # HOT and the law: dealer theft stars, recognition only by a cop who sees it, Pay & Spray never cleans, Chop Shop clean once + needs a space, arrest impound keeps the car not the contraband, legal and illegal retrieval, abandonment and chase recovery, full registry keeps everything
 node underworld/tests/vehicle.mjs    # vehicle registry: real spaces only (kept while a car is out), gifts wait, street parking saved, stolen cars + cargo + cash persist and are recovered after a day (logged), bounded registry, fleet joining, wrecks towed home, rare cars, no duplicates after reload
 node underworld/tests/raid.mjs       # rival warehouses: sites and gates, interior never regenerates stock, exact take-only transfers, remainder persists, save/reload, raid clock 4.5/7/9/10 min without stacking, pause freeze, evacuation van, wind-down, restock only by delivery, safe
 node underworld/tests/shipment.mjs   # shipments: restock on the road not the shelves, reload while due, arrival, a real van carrying the record's cargo, docking, hijack, wreck, reload with a van on the road (once), the boat and its migration, imports (rank, price, landing, truck only, Driver run, expiry, customs, reload)
