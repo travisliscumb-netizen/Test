@@ -64,6 +64,18 @@ nowhere to park waits until you have room (Garage → Collect).
 
 Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
 
+## Street racing, pink slips and the car wash (overhaul Session 6A)
+
+Tull's underground races pay Dirty Cash. The first win of the day on a race pays the full purse and Rep; win it again
+the same day and the pot drops to half, then a quarter, with a third of the Rep. The buy-in is 15%. Race where a cop
+can see you at race speed and you get 1★ for street racing. Once a day Tull has a pink slip: you race the car you put
+up (registered to you, not HOT, nothing in the trunk) against a car worth about the same. Win and his car is yours;
+lose, quit or reload mid-race and yours is his.
+
+Suds and Shine Express wash and repair your car in the tunnel at the kerb: $40 plus the Motor Works repair rate,
+from the bank (the wash is free and the repair a third off at a car wash you own). Cars pick up road dirt as they
+drive. Module: `src/game/508-underworld-street-racing.js`.
+
 ## HOT cars, the Chop Shop and the impound (overhaul Session 5B)
 
 A stolen car is HOT, and stays HOT through chases, parking and reloads. A cop who sees it up close may run the
@@ -516,6 +528,7 @@ node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/trans
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
 node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
 node underworld/tests/hot.mjs        # HOT and the law: dealer theft stars, recognition only by a cop who sees it, Pay & Spray never cleans, Chop Shop clean once + needs a space, arrest impound keeps the car not the contraband, legal and illegal retrieval, abandonment and chase recovery, full registry keeps everything, the overflow yard (a bay per car, no sharing, retrieval at its own gate, old saves repaired)
+node underworld/tests/races.mjs      # street racing: purse tiers per race per day, Dirty winnings, seen-racing 1★, pink slips (eligibility, win/lose/quit/reload, no duplication), car wash price/effects, Motor Works repair and tuning
 node underworld/tests/vehicle.mjs    # vehicle registry: real spaces only (kept while a car is out), gifts wait, street parking saved, stolen cars + cargo + cash persist and are recovered after a day (logged), bounded registry, fleet joining, wrecks towed home, rare cars, no duplicates after reload
 node underworld/tests/raid.mjs       # rival warehouses: sites and gates, interior never regenerates stock, exact take-only transfers, remainder persists, save/reload, raid clock 4.5/7/9/10 min without stacking, pause freeze, evacuation van, wind-down, restock only by delivery, safe
 node underworld/tests/shipment.mjs   # shipments: restock on the road not the shelves, reload while due, arrival, a real van carrying the record's cargo, docking, hijack, wreck, reload with a van on the road (once), the boat and its migration, imports (rank, price, landing, truck only, Driver run, expiry, customs, reload)

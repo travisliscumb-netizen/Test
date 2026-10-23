@@ -11,10 +11,124 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **5B — HOT, police, dealers, Chop Shop, Pay & Spray, impound** (prompt Session 5, second half per DC-35 /
-  §45.29; scope and the extra 5A rule in §45.30). 5A was approved and locked first.
-- Commit/base revision: Session 5A `4f5b474` → the Session 5B commits on `claude/practical-lamport-zld81y`.
+- Session: **6A — tuning, repair, respray, car wash, dealer finalisation, race economy, race heat, pink slips**
+  (prompt Session 6, first of four parts per DC-36 / §45.32; rulings in §45.33). 5B was approved and closed first
+  (§45.31).
+- Commit/base revision: 5B closure `c4bc834` → the Session 6A commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-23
+
+## Completed this session (6A)
+
+- **Street-race purse (§45.33).**
+  - `RaceRules.payout` scales a race's place share (1st 100%, 2nd 40%, 3rd 20%) by today's tier for that race:
+    100% / 50% / 25% purse and 100% / 33% / 33% Rep.
+  - The tiers live in `save.raceDay` (the economic day and wins per race) and reset with the day. A reload keeps
+    them.
+  - The buy-in stays 15% Dirty (`raceBuyIn`).
+  - Tull's offer card shows today's pot.
+- **Ledger.** Street racing winnings are now booked as `streetRace`. Before, Tull's races were booked as
+  `contract`. Both were already Dirty Cash.
+- **Seen racing.** `RaceRules.watch` runs each frame of a live race. If you are above about 60 km/h and
+  `police.copCanSee(…, 40)`, you get 1★ for street racing, once per race (`A.seen`). This uses the same
+  observation model as HOT. Nothing happens without a sighting. Finishing while wanted pays normally.
+- **Pink slips (`PinkSlips`).**
+  - **Availability:** once per economic day (`save.pinkDay`). The offer comes round in Tull's rotation until you
+    race it. A bug meant the rotation could never reach the extra slot; it is fixed and tested.
+  - **On the start line:** `canStake` refuses, with a reason as the objective and the race not lining up:
+    - a car not registered to you;
+    - a HOT car;
+    - an impounded car;
+    - a unique car (an `e.unique` / `VEHICLES[t].unique` flag, ready for 6D);
+    - goods, loot or cash in the car;
+    - health below 60, broken or burnt;
+    - no free parking space for his car.
+  - **The rival's stake:** a car worth 0.8–1.5× yours (`carWorth`: MSRP × tier value), never police or a cab.
+  - **Commit:** `commit` saves `save.pink` immediately.
+  - **Win:** his race car becomes yours where it stopped. Its origin is `pinkslip`, which resells for Dirty Cash
+    (`CAR_RESALE.pinkslip`), and it is shown with a WON chip.
+  - **Anything else is a surrender of your car:** a loss, a DNF, a quit (`missions.end` → `abort`), or a load with
+    the stake still down (`reset` on boot and bind). Your car leaves the fleet for good and the event is logged.
+    Nothing is duplicated.
+- **Car wash (`CarWash`).**
+  - **Where:** a kerb bay by Suds and by Shine Express. Stop in it and the prompt offers the wash.
+  - **The wash:** about 7 s. The car is held, brushes travel along it and foam puffs.
+  - **Price:** a $40 wash plus `repairCost` (the Motor Works rate), from the bank (`carWash`, Clean). At a car wash
+    you own, the wash is free and the repair is 30% off.
+  - **Charging:** at the end, and only if it still adds up. Driving off cancels it: nothing charged, nothing
+    done.
+  - **Effect:** a full repair and `dirt = 0`. Wanted level, HOT, ownership and provenance are untouched.
+- **Road dirt.** It is new per vehicle (`v.dirt`, 0.5 is the everyday look) and builds up with distance (about
+  25 km from clean to everyday). It is stored on fleet entries (`e.dirt`, sanitized) and drives the existing grime
+  in the car shader through `uMisc.w`. At 0.5 a car looks exactly as before.
+- **Tuning, repair, respray and dealers (audit).**
+  - Four tracks × three stages with numeric Rep (0 / 800 / 1300) and class-scaled prices were already in place.
+    The Motor Works repair (Clean) and the respray / Pay & Spray rules (§45.30) also hold.
+  - The dealers (Saltworks either currency, licensed lots Clean, Buy or Steal at 1 / 3 / 5★, HOT after theft,
+    utility stock at Meridian, rotating prestige flagships, provenance resale) meet §13 and §45.24.
+  - Gap closed: the Chop Shop's full tuning now awards `tuned` too.
+
+## Files / systems changed (6A)
+
+- New: `src/game/508-underworld-street-racing.js` (`RaceRules`, `PinkSlips`, `CarWash`, `RACE_T`, `WASH_T`,
+  `carWorth`), `tests/races.mjs`.
+- `370-core-activities.js`: the pink-slip race, the stake committed on the start line, `watch` in the run phase,
+  and the opponent's tier; a won car is skipped at cleanup.
+- `380-core-campaign.js`: Tull's rotation with the pink-slip slot, and today's pot on the card.
+- `340-core-missions.js`: pink start options, tiered payout and `noteWin`, pink resolution, abort on end, and the
+  `streetRace` booking.
+- `035-core-money.js`: `carWash` (clean).
+- `030-core-save-system.js`: `raceDay`, `pink`, `pinkDay`.
+- `360-core-content-services.js`: `CAR_RESALE.pinkslip`, `ORIGIN_CHIP.pinkslip`.
+- `230-core-vehicle.js`: `dirt` and `DIRT_PER_M`.
+- `060-core-materials-textures.js`: grime × dirt.
+- `505-underworld-vehicle-registry.js`: dirt on spawn, sync and sanitize.
+- `507-underworld-vehicle-law.js`: Chop `tuned`.
+- `450-underworld-core.js`: the wash prompt, and pinks/wash reset on bind.
+- `630-core-game.js`: construct, update and reset.
+- `650`: exports. `manifest.json`: 508.
+
+## Save/schema changes (6A)
+
+- `save.raceDay: { day, wins: { raceId: n } }`, `save.pink: { uid, rival: { type, color, vtier } } | null`,
+  `save.pinkDay`.
+- Garage entries gain `dirt`.
+- New garage origin: `pinkslip`.
+- No schema bump. All are validated in `PinkSlips.reset` and the registry sanitize.
+
+## Tests run (6A)
+
+`tests/races.mjs` passes **24 / 24**:
+- **Purse:** the tiers over four wins in a day; buy-in and winnings Dirty, booked as street racing; the tiers
+  survive a reload; second place pays 40%; a new day resets.
+- **Heat:** seen racing gives 1★ once a race, nothing when alone, slow or far; finishing while wanted still pays.
+- **Pink slip offers:** the rotation offers it, and only once a day; the rival's value band holds over 60 rolls.
+- **Pink slip outcomes:**
+  - the seven refusals, with nothing committed;
+  - a win adopts his car (Dirty resale);
+  - a loss surrenders yours;
+  - quitting after the commit loses;
+  - quitting before the line costs nothing;
+  - a reload mid-race loses with no duplicate, and a second reload changes nothing.
+- **Car wash:** price, Clean source, repair and dirt, with wanted, HOT, owner and provenance untouched; owned
+  discounts; a cancel charges nothing; no money, no start.
+- **Dirt:** builds up with distance and is persisted.
+- **Motor Works:** repair at the repair rate (Clean); a tuning stage from the bank, added to provenance;
+  Rep-locked stage 2; HOT refused.
+
+REGRESSION_PLACEHOLDER
+
+## Known bugs / risks (6A)
+
+- Pink slips use one route, the old Pink Slip line through the city. Unique-car pink slips come in 6D.
+- The car wash bay is a kerb space with temporary brushes: no tunnel building. A permanent wash structure can come
+  with the graphics pass.
+- The purse tiers count wins per race. Spamming different races still pays each one's first win of the day: by
+  design, five races a day at full pay. Exact tuning belongs to Session 13.
+- The `threat` gate-ram scenario is still intermittent (see the 5B closure).
+
+## Exact next recommended task
+
+Owner review of 6A. Then **6B**: the motorsport complex district off-map (§45.32).
 
 ## 5B closure (§45.31): the impound never shares a space
 
