@@ -1424,3 +1424,39 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       - **Own car wash:** the wash is free and the repair gets the property's 30% owner discount.
       - It cleans the appearance and fully repairs the car. It never clears wanted level or HOT, and never changes
         ownership or provenance.
+34. **Session 6A approved and locked; Session 6B scope.**
+    - **6A is locked as built.** Its known limits are accepted: one pink-slip route; the tunnel building waits for the
+      graphics overhaul; cycling different races earns each one's first full purse (balance in Session 13).
+    - **Threat and raid clock flakes:** they stay logged and don't block 6B, but 6B must not worsen their frequency or
+      timing.
+    - **6B is the motorsport complex.** It is a new off-map district joined physically to Port Valen by a
+      highway/causeway that meets the existing road network naturally. No existing block is replaced and the grid
+      isn't redesigned.
+      - **It contains at least:** a proper high-speed paved circuit (long straights, broad 70–80 mph sweepers, only a
+        few slow corners), pit lane, pit garages, paddock, grandstands, spectator and parking areas, access roads, a
+        main entrance, and track-side barriers with safe run-off. It must feel substantially larger than the street
+        races, and be drivable in free roam when appropriate.
+      - **Integration:** world/map bounds, GPS/pathfinding, road graph, police navigation, traffic, taxi routing where
+        appropriate, chunk streaming, and save/load world identity.
+      - **Ownership:** a legitimate Clean Bank asset with no Rank gate. The price makes it mid/late-game (provisional
+        until Session 13).
+        - **It gives:** substantial physical garage capacity (Session 5 registry rules, no overflow storage or
+          teleports), private track sessions, reduced or removed race fees, hosted legitimate events, passive Clean
+          income and track services.
+        - It does not replace the city's other garages or services.
+      - **Racing:** street racing stays illegal: Dirty Cash, police risk, pink slips. Official complex events use Clean
+        Bank buy-ins and rewards, carry no automatic racing heat, have vehicle/class rules, and may offer legitimate
+        prizes.
+      - **Performance:** stream the district by distance, keep crowds and NPCs cheap when you're elsewhere, reuse
+        geometry and materials, benchmark before and after, and keep the iPhone target.
+      - **Tests:**
+        - driving there and back, and GPS both ways;
+        - traffic and police use the link; no path through geometry;
+        - free-roam laps; races complete;
+        - ownership survives a reload; garages keep their exact cars and capacity;
+        - Clean rewards, while street races stay Dirty;
+        - an early jackpot player can buy it with no Rank gate;
+        - no duplicate cars or payouts on reload;
+        - streaming out and back is safe;
+        - no city performance regression while the district is unloaded;
+        - impound overflow capacity covers the new garages.
