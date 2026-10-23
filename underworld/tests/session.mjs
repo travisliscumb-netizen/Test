@@ -45,7 +45,7 @@ await stubRandom(0.1);
 const gl = await ev(q => { const g = window.game, p = g.player; g.resetPlayerState(q.x, q.z, 0); const v = g.vehicles.spawn('suv', p.pos.x + 3, p.pos.z, 0, { parked: true }); v.touched = true; const m = g.money.total(); g.completeEnter(v); return { before: m, after: g.money.total(), looted: v.looted }; }, quiet);
 await unstub();
 check('first time in a parked car: glovebox', gl.looted && gl.after > gl.before, JSON.stringify(gl));
-const chop = await ev(() => { const g = window.game, L = g.uw.loc('spot', 'chop'), v = g.player.vehicle; v.pos.set(L.x, 0, L.z); v.vel.set(0, 0); v.health = 90; const a = g.uw.findAction(); const before = g.money.total(); if (a) a.act(); return { label: a && a.label, before, after: g.money.total(), gone: !g.vehicles.list.includes(v), state: g.player.state }; });
+const chop = await ev(() => { const g = window.game, L = g.uw.loc('spot', 'chop'), v = g.player.vehicle; v.pos.set(L.x, 0, L.z); v.vel.set(0, 0); v.health = 90; const a = g.uw.findAction(); const before = g.money.total(); if (a) { a.act(); g.content._svcAct('sell'); g.ui.closeAll(); } /* the Chop Shop's menu (Session 5B): Sell */ return { label: a && a.label, before, after: g.money.total(), gone: !g.vehicles.list.includes(v), state: g.player.state }; });
 check('chop shop buys the stolen car', chop.gone && chop.after > chop.before && chop.state === 'foot', JSON.stringify(chop));
 // ---------------------------------------------------------------- 4. property
 await ev(() => { (window.game.money.W.clean += 20000, window.game.money.W.dirty.me += 20000); window.game.save.rep = 150; });
