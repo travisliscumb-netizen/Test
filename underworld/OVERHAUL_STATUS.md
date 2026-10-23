@@ -132,7 +132,9 @@ Regression against the 5B build:
   ledger 54, map 22, money 10, offline 14, phone 71, phoneapps 19, prison 48, progression 33, property 33, pwa 5,
   roads 20, royale-sim 23, shipment 33, shooting 37, smoke 16, soak 22, static-money 8, stations 17, street 11,
   stress 30, survival 9, threat 25, tutorial 13, ui 23, vehicle 18, vehicles 39, warehouse 29.
-- **Passed alone after failing under parallel load:** raid 18, taxi 20, police 13 and session 35.
+- **Passed alone after failing under parallel load:** raid 18, taxi 20, police 13, session 35 and compound 56 (the
+  gate-ram check, under load).
+- **Screenshot suites** (shots, cityshots, qashots, frontshots, carshots) and contact run with no errors.
 - **Test code updated for 5B:** `session` sells through the Chop Shop's new menu.
 - **Performance** under parallel load: calls 118 / 119, update 1.2–1.6 ms.
 
