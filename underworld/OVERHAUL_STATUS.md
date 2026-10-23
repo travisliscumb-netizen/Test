@@ -115,7 +115,22 @@ The mapping stays exact until a session changes the code above that line; after 
 - **Motor Works:** repair at the repair rate (Clean); a tuning stage from the bank, added to provenance;
   Rep-locked stage 2; HOT refused.
 
-REGRESSION_PLACEHOLDER
+Full regression against the 6A build, three suites at a time in two halves:
+- **Pass:** 54 of 61 suites with every check passing, including races 24, hot 31, vehicle 18, vehicles 39,
+  dealers 34, carmoney 10, ledger 54, static-money 8, money 10, session 35, progression 33, phone 71, core 64,
+  compound 56, shipment 33, survival 9, soak 22, plus perf (calls and update in range) and the screenshot suites
+  carshots, frontshots and contact.
+- **Load failures, passed alone:** stress 30 (a frame stall), gambling 57 (casino frame rate), property 33 (a
+  drive-out timing).
+- **Screenshot suites:** shots, cityshots and qashots timed out under load; all three ran clean alone. The car
+  shader change (grime × dirt) is identical at the default dirt.
+- **arrest:** failed one check under load (pose timing). Alone, it then failed the sentence check, whose baseline
+  was whatever crimes and wanted level earlier steps left behind (clean 18 → loaded 36, exactly double).
+  - The test now measures from a fixed baseline (no current crimes, 1★) and restores the state afterwards.
+  - arrest then passed **126 / 126** alone.
+- **threat 24 / 25** (reload clock) and **raid 17 / 18** (pause clock): the known intermittent timing class.
+- **Visual check:** a car mid-wash at Suds shows the brush arch travelling along it with foam. Afterwards the bank
+  shows −$280 ($40 + repair) and the damage label is gone.
 
 ## Known bugs / risks (6A)
 
