@@ -265,8 +265,9 @@ Object.assign(World.prototype, {
   // the overflow yard: every space sized for the biggest vehicle (2.9 × 7.4 m bays; the Boxline is 2.3 × 7.2), five
   // rows of 17, each nose-out onto an aisle of 6.6 m or more: the front aisle along the gate fence, two more behind,
   // all joined by a side lane down one side fence. A small shed in the back corner; no docks, no window
-  _genImpoundOverflow(b, rng) {
-    this._genYard(b, rng, { id: IMPOUND.overflow.id, impound: true, name: IMPOUND.overflow.name, color: 0x55606a, sign: 'OVERFLOW', sub: 'NO ENTRY', overflow: true,
+  // Y: which overflow yard (the one next to the main lot, or Valen Point's annex), with any extra yard options
+  _genImpoundOverflow(b, rng, Y = IMPOUND.overflow, extra = {}) {
+    this._genYard(b, rng, { id: Y.id, impound: true, name: Y.name, color: 0x55606a, sign: Y.sign || 'OVERFLOW', sub: 'NO ENTRY', overflow: true, ...extra,
       slots: (W, hd) => {
         const out = [], B = OVERFLOW_BAY;
         // a painted line between neighbouring bays, the depth of the bay
@@ -279,8 +280,9 @@ Object.assign(World.prototype, {
       } });
   },
   _genYard(b, rng, M) {
-    this._sidewalk(b, rng, { trees: 0, park: 0 });
-    const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
+    // a yard off the lattice (Valen Point) names its gate side and has no city pavement round it
+    if (!M.offMap) this._sidewalk(b, rng, { trees: 0, park: 0 });
+    const side = M.side || ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
     const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
     const cx = b.cx, cz = b.cz;
     // local → world: n: (cx + u, z0 + v); s: (cx − u, z1 − v); w: (x0 + v, cz − u); e: (x1 − v, cz + u)
@@ -408,7 +410,11 @@ Object.assign(World.prototype, {
 });
 {
   const base2 = World.prototype.generate;
-  World.prototype.generate = function () { base2.call(this); this._placesGen(); Links.build(this); };
+  World.prototype.generate = function () {
+    base2.call(this); this._genValenPoint(); this._placesGen();
+    for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
+    Links.build(this);
+  };
 }
 /* ---------------------------------------------------------------------
    The Valen Royale: the casino on the Nightlife Strip, a block south of Club Neon.

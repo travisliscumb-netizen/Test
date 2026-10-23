@@ -10,6 +10,21 @@ class DriveAI {
   setGoal(x, z) { this.goal = { x, z }; this.route(x, z); this.arrived = false; }
   route(tx, tz) {
     const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
+    // to or from Valen Point: the GPS route through the causeway, kept to the right-hand side of each leg
+    if (offCity(v.pos.x, v.pos.z) || offCity(tx, tz)) {
+      const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
+      if (r && r.length > 1) {
+        this.path = [];
+        for (let k = 1; k < r.length; k++) {
+          const a = r[k - 1], b = r[k], last = k === r.length - 1;
+          if (Math.hypot(b.x - a.x, b.z - a.z) < 0.5 && !last) continue;
+          const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1, o = last ? 0 : LANE * 0.7;
+          this.path.push({ x: b.x - dz / l * o, z: b.z + dx / l * o, node: !last });
+        }
+        this.pi = 0;
+        return;
+      }
+    }
     let i = Math.round(v.pos.x / P), j = Math.round(v.pos.z / P);
     const onV = Math.abs(v.pos.x - i * P) < 9, onH = Math.abs(v.pos.z - j * P) < 9;
     if (onV && !onH) j = fz > 0 ? Math.ceil(v.pos.z / P) : Math.floor(v.pos.z / P);
@@ -79,6 +94,8 @@ class DriveAI {
         if (turn > 0.5) desired = Math.min(desired, 10 + Math.max(0, dl - 12) * 0.55);
       }
       if (last) desired = Math.min(desired, 4 + dl * 0.5);
+      // a racing line carries its own safe speed (Valen Point): the lowest of this point and the next two
+      if (w.vmax) { let lim = w.vmax; for (let j = 1; j <= 2 && this.pi + j < this.path.length; j++) lim = Math.min(lim, this.path[this.pi + j].vmax || lim); desired = Math.min(desired, lim); }
     }
     const lp = v.toLocal(tx, tz);
     const ang = Math.atan2(lp.x, lp.z);

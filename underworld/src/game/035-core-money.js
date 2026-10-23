@@ -38,6 +38,8 @@ const MONEY_SOURCES = {
   chopWork: { pay: 'dirty' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
+  // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank
+  trackFee: { pay: 'clean' }, trackPrize: { earn: 'clean' }, trackIncome: { earn: 'clean', book: 'businesses' }, trackHost: { pay: 'clean' }, pitService: { pay: 'clean' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },

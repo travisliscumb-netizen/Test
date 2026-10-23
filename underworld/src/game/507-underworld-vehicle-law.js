@@ -46,8 +46,8 @@ class ImpoundLot {
   get id() { return IMPOUND.id; }
   get C() { return this.g.world.compounds[IMPOUND.id]; }
   get CS() { return this.g.uw.compounds; }
-  // the yards: the main lot (with the window) and the overflow yard next door
-  lots() { const W = this.g.world.compounds; return [IMPOUND.id, IMPOUND.overflow.id].filter(id => W[id]); }
+  // the yards: the main lot (with the window), the overflow yard next door, and Valen Point's annex (Session 6B)
+  lots() { const W = this.g.world.compounds; return [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id].filter(id => W[id]); }
   econ() { return this.g.uw ? this.g.uw.S.econH : 0; }
   // the release fee: a share of what the car is worth, fixed when it is seized
   fee(e) { const F = IMPOUND.fee, val = carMsrp(e.type) * (TIER_LOOK[e.vtier] || TIER_LOOK.common).value; return Math.round(clamp(val * F.k, F.min, F.max) / 10) * 10; }
@@ -139,7 +139,7 @@ class ImpoundLot {
     });
   }
   // "space 3 in the main yard", "space 27 in the overflow yard"
-  spaceName(e) { const S = this.slots(), sp = this.slotPos(e); if (!sp) return 'the waiting list (no space free yet)'; const n = S.filter((q, i) => q.lot === sp.lot && i <= e.imp.slot).length; return `space ${n} in the ${sp.lot === IMPOUND.id ? 'main yard' : 'overflow yard'}`; }
+  spaceName(e) { const S = this.slots(), sp = this.slotPos(e); if (!sp) return 'the waiting list (no space free yet)'; const n = S.filter((q, i) => q.lot === sp.lot && i <= e.imp.slot).length; return `space ${n} in the ${sp.lot === IMPOUND.id ? 'main yard' : sp.lot === IMPOUND.annex.id ? 'Valen Point annex' : 'overflow yard'}`; }
   findAction() {
     const g = this.g, p = g.player; if (!this.C || p.interior || p.state !== 'foot') return null;
     const picking = () => ({ label: `Picking the gate lock… ${Math.ceil(IMPOUND.pick - this.pick.t)} s`, act: () => {} });
@@ -149,7 +149,7 @@ class ImpoundLot {
       if (Math.hypot(p.pos.x - ox, p.pos.z - oz) < IMPOUND.office) {
         if (this.pick) return picking();
         if (id === IMPOUND.id) return { label: `Impound window · ${IMPOUND.name}`, act: () => this.openOffice() };
-        if (!this.entitled()) return { label: 'Overflow yard gate · pick the lock', act: () => { this.pick = { t: 0, lot: id }; } };
+        if (!this.entitled()) return { label: `${id === IMPOUND.annex.id ? 'Annex' : 'Overflow yard'} gate · pick the lock`, act: () => { this.pick = { t: 0, lot: id }; } };
       }
       // from inside a yard, the control box on its gate post
       if (this.CS.inYard(id, p.pos.x, p.pos.z) && Math.hypot(p.pos.x - G.x, p.pos.z - G.z) < 4) {

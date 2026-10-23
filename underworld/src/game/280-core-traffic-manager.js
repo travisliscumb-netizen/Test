@@ -63,8 +63,9 @@ class TrafficManager {
       if (ai.s > sc - 18 && ai.s < sc - 10) {
         ai.linkSeen = 1;
         if (v.mission || v.patrol || Math.random() > this.linkChance) return;
-        const lane = Links.lane(en.link, en.e), q0 = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, ai.s), qc = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, sc);
-        this.linkPath(v, [q0, ...this.qbez(q0, qc, lane[0], 8).slice(0, -1)], lane, en.link, 1 - en.e);
+        // a spur: out to its turning circle and back to the same junction
+        const L = en.link, lane = L.spur ? Links.loop(L) : Links.lane(L, en.e), q0 = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, ai.s), qc = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, sc);
+        this.linkPath(v, [q0, ...this.qbez(q0, qc, lane[0], 8).slice(0, -1)], lane, L, L.spur ? 0 : 1 - en.e);
         return;
       }
     }
@@ -84,7 +85,7 @@ class TrafficManager {
     // almost never be the one near the player
     const near = Links.list.filter(L => L.pts.some(q => { const d = Math.hypot(q[0] - px, q[1] - pz); return d > 75 && d < 230; }));
     const L = pick(near); if (!L) return null;
-    const from = Math.random() < 0.5 ? 0 : 1, lane = Links.lane(L, from);
+    const from = L.spur ? 0 : Math.random() < 0.5 ? 0 : 1, lane = L.spur ? Links.loop(L) : Links.lane(L, from);
     const k = Math.floor(rand(0.1, 0.8) * lane.length), [x, z] = lane[k];
     const d = Math.hypot(x - px, z - pz);
     if (d < 75 || d > 230 || (d < 160 && g.inView(x, 1, z, 3))) return null;
@@ -93,7 +94,7 @@ class TrafficManager {
     const v = g.vehicles.spawn(type, x, z, Math.atan2(b[0] - x, b[1] - z), { kinematic: true, driver: 'npc' });
     const r0 = Math.random(), pers = r0 < 0.25 ? 0 : r0 < 0.8 ? 1 : 2, pk = [[0.85, 1.5, 0.3, 1.4], [1, 1, 1, 1], [1.15, 0.55, 2.5, 0.6]][pers];
     v.ai = { i: 0, j: 0, dx: 1, dz: 0, s: 0, mode: 'path', t: 0, len: 1, speed: 8, pers, gapK: pk[3], runK: pk[2], maxV: rand(11, 14.5) * pk[0] * (type === 'truck' ? 0.8 : 1), react: rand(0.25, 1.1) * pk[1], reactT: 0, runLight: null, next: null, blockT: 0, honkT: rand(0, 2) * pk[1], laneOff: 0, overtake: 0, creepT: 0, p0: null, linkSeen: 1 };
-    this.linkPath(v, [], lane.slice(k), L, 1 - from);
+    this.linkPath(v, [], lane.slice(k), L, L.spur ? 0 : 1 - from);
     v.patrol = false;
     this.cars.push(v);
     return v;

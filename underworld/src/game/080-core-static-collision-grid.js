@@ -3,17 +3,19 @@
    ===================================================================== */
 class CollisionGrid {
   constructor() {
-    this.cs = 16; this.min = -48; this.dim = Math.ceil((CITY + 96) / this.cs);
-    this.cells = Array.from({ length: this.dim * this.dim }, () => []);
+    // the city square, and east of it out to Valen Point (Session 6B): dimX × dim cells
+    this.cs = 16; this.min = -48; this.dim = Math.ceil((CITY + 96) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.min) / this.cs);
+    this.cells = Array.from({ length: this.dimX * this.dim }, () => []);
     this.all = []; this.stamp = 1;
   }
-  _ci(x) { return clamp(Math.floor((x - this.min) / this.cs), 0, this.dim - 1); }
+  _ci(x) { return clamp(Math.floor((x - this.min) / this.cs), 0, this.dimX - 1); }
+  _cj(z) { return clamp(Math.floor((z - this.min) / this.cs), 0, this.dim - 1); }
   add(c) {
     c.stamp = 0; c.on = true;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; }
     else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._ci(z0); j <= this._ci(z1); j++) this.cells[j * this.dim + i].push(c);
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) this.cells[j * this.dimX + i].push(c);
     this.all.push(c);
     return c;
   }
@@ -21,14 +23,14 @@ class CollisionGrid {
     if (!c) return;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; } else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._ci(z0); j <= this._ci(z1); j++) { const cell = this.cells[j * this.dim + i], k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const cell = this.cells[j * this.dimX + i], k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
     const k = this.all.indexOf(c); if (k >= 0) this.all.splice(k, 1);
     c.on = false;
   }
   query(x0, z0, x1, z1, out) {
     out.length = 0; const st = ++this.stamp;
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._ci(z0); j <= this._ci(z1); j++) {
-      const cell = this.cells[j * this.dim + i];
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) {
+      const cell = this.cells[j * this.dimX + i];
       for (let k = 0; k < cell.length; k++) { const c = cell[k]; if (c.stamp !== st && c.on) { c.stamp = st; out.push(c); } }
     }
     return out;
@@ -76,8 +78,8 @@ class CollisionGrid {
     let tmz = Math.abs(dz) > 1e-9 ? ((this.min + (iz + (sz > 0 ? 1 : 0)) * cs) - oz) / dz : Infinity;
     let tCell = 0;
     for (let steps = 0; steps < 64 && tCell <= best; steps++) {
-      if (ix >= 0 && iz >= 0 && ix < this.dim && iz < this.dim) {
-        const cell = this.cells[iz * this.dim + ix];
+      if (ix >= 0 && iz >= 0 && ix < this.dimX && iz < this.dim) {
+        const cell = this.cells[iz * this.dimX + ix];
         for (let k = 0; k < cell.length; k++) {
           const c = cell[k]; if (c.stamp === st || !c.on || (see && c.see)) continue; c.stamp = st;
           // low clutter is skipped; interior colliders measure height from their own floor

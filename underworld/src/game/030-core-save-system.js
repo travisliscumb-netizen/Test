@@ -47,6 +47,8 @@ const SaveSystem = {
       // street racing (Session 6A): today's wins per race (the purse tiers), a pink slip's stake while it is down,
       // and the economic day of the last pink slip
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
+      // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
+      track: { best: null, prize: {}, hosted: null, laps: 0 },
       dealers: {},
       nextUid: 1,
       pos: null,
@@ -195,7 +197,8 @@ const SaveSystem = {
     } else d.gamble.table = null;
     for (const e of d.garage) e.vtier = typeof e.vtier === 'string' && TIER_LOOK[e.vtier] ? e.vtier : VEHICLES[e.type].tier;
     if (!d.pos || typeof d.pos !== 'object' || !isFinite(d.pos.x) || !isFinite(d.pos.z) || !isFinite(d.pos.h)) d.pos = null;
-    else { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
+    // the city square, or on Valen Point (Session 6B); anywhere else (the water) comes back to the coast
+    else if (!inValenPoint(d.pos.x, d.pos.z)) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
     if (typeof d.rep !== 'number' || !isFinite(d.rep) || d.rep < 0) d.rep = 0;
     if (!(d.nextUid > maxUid)) d.nextUid = maxUid + 1;
     if (!d.tips || typeof d.tips !== 'object' || Array.isArray(d.tips)) d.tips = {};

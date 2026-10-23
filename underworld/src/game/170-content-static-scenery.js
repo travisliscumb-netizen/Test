@@ -36,39 +36,29 @@ function buildStaticScenery(scene, world) {
   gs.add(TPL.box, M(CITY / 2, CURB_H / 2, -ROAD_HALF - pw / 2, L, CURB_H, pw), null);
   gs.add(TPL.box, M(CITY / 2, CURB_H / 2, CITY + ROAD_HALF + pw / 2, L, CURB_H, pw), null);
   gs.add(TPL.box, M(-ROAD_HALF - pw / 2, CURB_H / 2, CITY / 2, pw, CURB_H, CITY + ROAD_HALF * 2), null);
-  gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, CITY / 2, pw, CURB_H, CITY + ROAD_HALF * 2), null);
+  // the east promenade, seawall and railing stop either side of the causeway to Valen Point (Session 6B)
+  const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half, eastRun = (z0, z1, f) => { if (z1 > z0) f((z0 + z1) / 2, z1 - z0); };
+  eastRun(-ROAD_HALF, g0, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
+  eastRun(g1, CITY + ROAD_HALF, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
   // seawall faces
   const wh = 3.2;
   gs.add(TPL.box, M(CITY / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, L + 2, wh, 1), null);
   gs.add(TPL.box, M(CITY / 2, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, L + 2, wh, 1), null);
   gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
-  gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
+  eastRun(-E, g0, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
+  eastRun(g1, CITY + E, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
   const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
   // railing
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
   for (let t = -E; t <= CITY + E; t += 2.5) {
-    for (const [x, z] of [[t, -E + 0.3], [t, CITY + E - 0.3], [-E + 0.3, t], [CITY + E - 0.3, t]]) gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc);
+    for (const [x, z] of [[t, -E + 0.3], [t, CITY + E - 0.3], [-E + 0.3, t], [CITY + E - 0.3, t]]) if (!(x > CITY && z > g0 - 0.5 && z < g1 + 0.5)) gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc);
   }
-  for (const [x, z, w, d] of [[CITY / 2, -E + 0.3, L, 0.08], [CITY / 2, CITY + E - 0.3, L, 0.08], [-E + 0.3, CITY / 2, 0.08, L], [CITY + E - 0.3, CITY / 2, 0.08, L]]) {
+  for (const [x, z, w, d] of [[CITY / 2, -E + 0.3, L, 0.08], [CITY / 2, CITY + E - 0.3, L, 0.08], [-E + 0.3, CITY / 2, 0.08, L]]) {
     gr.add(TPL.box, M(x, CURB_H + 1.1, z, w, 0.07, d), rc); gr.add(TPL.box, M(x, CURB_H + 0.6, z, w, 0.04, d), rc);
   }
-  // decorative bridge to the mainland (east)
-  const bz = 6 * P + 40, deckY = 14, bc = C(0x8a3a2a), dc = C(0x55595e);
-  gr.add(TPL.box, M(CITY + E + 700, deckY, bz, 1400, 1.4, 18), dc);
-  for (let x = CITY + E + 30; x < CITY + E + 1400; x += 60) gr.add(TPL.box, M(x, (deckY - 1) / 2 - 1, bz, 3, deckY + 1, 10), dc);
-  for (const tx of [CITY + E + 260, CITY + E + 760]) for (const s of [-7.5, 7.5]) gr.add(TPL.box, M(tx, 50, bz + s, 3.2, 100, 3.2), bc);
-  for (const tx of [CITY + E + 260, CITY + E + 760]) { gr.add(TPL.box, M(tx, 96, bz, 3, 3, 18), bc); gr.add(TPL.box, M(tx, 60, bz, 2.5, 2.5, 18), bc); }
+  for (const [z0, z1] of [[-E, g0], [g1, CITY + E]]) eastRun(z0, z1, (zc, l) => { gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 1.1, zc, 0.08, 0.07, l), rc); gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 0.6, zc, 0.08, 0.04, l), rc); });
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
-  // bridge cables
-  const pts = [];
-  const towers = [CITY + E + 260, CITY + E + 760];
-  for (const s of [-7.5, 7.5]) {
-    const cab = (x0, y0, x1, y1, sag) => { const n = 24; for (let i = 0; i < n; i++) { const a = i / n, b2 = (i + 1) / n; const ya = lerp(y0, y1, a) - Math.sin(a * Math.PI) * sag, yb = lerp(y0, y1, b2) - Math.sin(b2 * Math.PI) * sag; pts.push(lerp(x0, x1, a), ya, bz + s, lerp(x0, x1, b2), yb, bz + s); } };
-    cab(CITY + E, deckY + 1, towers[0], 98, 20); cab(towers[0], 98, towers[1], 98, 70); cab(towers[1], 98, CITY + E + 1100, deckY + 1, 20);
-  }
-  const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  scene.add(new THREE.LineSegments(cg, new THREE.LineBasicMaterial({ color: 0x6a2a20 })));
   // water
   const water = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), makeWaterMaterial());
   water.position.set(CITY / 2, -1.2, CITY / 2);

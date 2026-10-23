@@ -223,6 +223,12 @@ class PoliceManager {
       if (blocked) continue;
       best = { x, z }; break;
     }
+    // off the lattice (Valen Point): a unit comes along the causeway or round the turning circle instead
+    if (!best && offCity(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
+      const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z); if (d < 120 || d > 320 || (g.inView(s.x, 2, s.z, 5) && d < 200)) continue;
+      if (g.vehicles.list.some(v => dist2(v.pos.x, v.pos.z, s.x, s.z) < 100)) continue;
+      const v = g.vehicles.spawn('police', s.x, s.z, s.h, { driver: 'cop', speed: 10 }); v.siren = true; this.adoptUnit(v); return;
+    }
     if (!best) return;
     const h = Math.atan2(p.pos.x - best.x, p.pos.z - best.z);
     const ax = Math.abs(Math.sin(h)) > Math.abs(Math.cos(h));

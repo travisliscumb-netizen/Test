@@ -182,7 +182,7 @@ class UIManager {
     this.hud = $('hud'); this.toasts = $('toasts');
     this.mm = $('minimap'); this.mmc = this.mm.getContext('2d');
     this.bigc = $('bigmapCanvas').getContext('2d');
-    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false);
+    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP();
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
     this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
@@ -193,7 +193,8 @@ class UIManager {
     const S = 1024, c = document.createElement('canvas'); c.width = S; c.height = S;
     const g = c.getContext('2d');
     const E = EDGE_MARGIN + 30, span = CITY + E * 2, k = S / span;
-    this.mapK = k; this.mapE = E;
+    // map space runs on east past the city to Valen Point (Session 6B): mapW wide, 1024 tall
+    this.mapK = k; this.mapE = E; this.mapW = Math.ceil((WORLD_X1 + E) * k);
     const X = x => (x + E) * k;
     this._paintMap(g, null);
     const lab = [];
@@ -224,6 +225,37 @@ class UIManager {
     }
     c.labels = lab;
     return c;
+  }
+  // Valen Point in map space: the causeway, the island, the paved areas, the circuit, the buildings
+  _paintVP(g, view) {
+    const vp = this.g.world.vp; if (!vp) return;
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
+    if (view && (view.x1 < CITY || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
+    const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
+    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
+    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
+    R(VP.x0, VP.z0, VP.x1, VP.z1, '#4f6e3f');
+    const S = VP_SITE;
+    for (const r of [S.paddock, S.parkN, S.parkS]) R(r.x0, r.z0, r.x1, r.z1, '#77787a');
+    R(VP_PIT.laneX - VP_PIT.laneW / 2, VP_PIT.lane[0], VP_PIT.laneX + VP_PIT.laneW / 2, VP_PIT.lane[1], '#6f7682');
+    g.fillStyle = '#6f7682'; g.beginPath(); g.arc(X(S.ring.x), X(S.ring.z), (S.ring.r + VP.cw.road) * k, 0, 7); g.fill();
+    // the circuit
+    const T = vp.track;
+    g.strokeStyle = '#2b2d30'; g.lineWidth = Math.max(2, VP_TRACK.w * k); g.lineJoin = 'round';
+    g.beginPath(); T.pts.forEach((p, i) => i ? g.lineTo(X(p[0]), X(p[1])) : g.moveTo(X(p[0]), X(p[1]))); g.closePath(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
+    // buildings
+    g.fillStyle = 'rgba(0,0,0,0.32)';
+    for (const b of this.g.world.xblocks) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+  }
+  // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
+  _renderVP() {
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
+    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(WORLD_X1)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, w, h); g.translate(-x0, -z0);
+    this._paintVP(g, null);
+    return { img: c, x: x0, z: z0 };
   }
   // paints the city (no text) in 1024-unit map space onto any 2D context; view = world-space
   // rectangle to cull to (null = everything). Used for the cached images and the live big map.
@@ -256,8 +288,8 @@ class UIManager {
       if (open(1, i, j)) { g.moveTo(X(j * P), X(i * P)); g.lineTo(X((j + 1) * P), X(i * P)); }
     }
     g.stroke();
-    // bridge
-    g.fillStyle = '#55595e'; g.fillRect(X(CITY + EDGE_MARGIN), X(6 * P + 31), 1024, 18 * k);
+    // Valen Point and its causeway (Session 6B)
+    this._paintVP(g, view);
     // district tints and borders
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const key = ZONE_MAP[bz][bx], z = ZONES[key];
@@ -585,6 +617,7 @@ class UIManager {
     const [px, pz] = this._mapXY(p.pos.x, p.pos.z);
     c.translate(-px, -pz);
     c.drawImage(this.mmImg, 0, 0);
+    if (this.vpImg) c.drawImage(this.vpImg.img, this.vpImg.x, this.vpImg.z);
     const k = this.mapK;
     // GPS route
     const m = g.missions.active;
@@ -812,7 +845,9 @@ class MapView {
   clampView(z, cx, cz) {
     const s = Math.min(this.W, this.H) / 1024 * z, hw = this.W / 2 / s, hh = this.H / 2 / s;
     // zoomed in, any point of the map can be brought to the centre (edges show water beyond)
-    cx = hw >= 512 ? 512 : clamp(cx, Math.min(hw, 0), Math.max(1024 - hw, 1024)); cz = hh >= 512 ? 512 : clamp(cz, Math.min(hh, 0), Math.max(1024 - hh, 1024));
+    // east as far as Valen Point (map space is ui.mapW wide)
+    const MW = this.ui.mapW || 1024;
+    cx = hw >= 512 ? clamp(cx, 512, Math.max(512, MW - hw)) : clamp(cx, Math.min(hw, 0), Math.max(MW - hw, MW)); cz = hh >= 512 ? 512 : clamp(cz, Math.min(hh, 0), Math.max(1024 - hh, 1024));
     return [cx, cz];
   }
   // zoom keeping the map point under (sx,sy) fixed; animated unless instant
@@ -950,7 +985,7 @@ class MapView {
   setPick(wx, wz) {
     const o = this.pickMode; if (!o) return;
     const kp = nearestRoadPoint(wx, wz);
-    if (!kp || kp.d > 140 || wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
+    if (!kp || kp.d > 140 || ((wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) && !inValenPoint(wx, wz))) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
     o.dest = { x: kp.x, z: kp.z }; o.q = o.quote(kp.x, kp.z);
     this.renderPick(); this.dirty = true;
   }
@@ -1076,7 +1111,7 @@ class MapView {
     // map-space layers under the view transform
     c.save();
     c.setTransform(d * s, 0, 0, d * s, d * (W / 2 - this.cx * s), d * (H / 2 - this.cz * s));
-    if (this.zoom < 1.35) c.drawImage(ui.mapImg, 0, 0, 1024, 1024);
+    if (this.zoom < 1.35) { c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); }
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
@@ -1174,10 +1209,29 @@ const GPS = {
     const edge = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); adj[b].push({ to: a, w, poly: poly ? poly.slice().reverse() : null }); };
     const ends = new Map(); // segment key -> [{ along, node }]
     for (const L of Links.list) {
-      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
+      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); if (e.free) return n; const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
       const poly = L.pts.map(q => ({ x: q[0], z: q[1] }));
+      // a spur gets a node at every vertex (so a point off the city can join it part way along)
+      if (L.spur) { L.vids = this._poly(nodes, adj, edge, L.pts, L.gps[0], L.gps[1]); continue; }
       edge(L.gps[0], L.gps[1], L.len + 2 * ROAD_HALF, poly);
     }
+    // Valen Point's own routes and the circuit (Session 6B): polylines whose first point meets the spur's far end
+    const vp = typeof game !== 'undefined' && game.world && game.world.vp;
+    const extra = [];
+    if (vp) {
+      const spur = Links.list.find(L => L.spur), at = new Map(), key = q => Math.round(q[0] * 10) + ':' + Math.round(q[1] * 10);
+      if (spur) at.set(key(vp.road0), spur.gps[1]);
+      const fixed = q => at.get(key(q));
+      for (const r of vp.roads) { const ids = this._poly(nodes, adj, edge, r, fixed(r[0]), fixed(r[r.length - 1])); at.set(key(r[0]), ids[0]); at.set(key(r[r.length - 1]), ids[ids.length - 1]); for (let k = 1; k < r.length - 1; k++) if (!at.has(key(r[k]))) at.set(key(r[k]), ids[k]); extra.push({ pts: r, ids }); }
+      // the circuit, a closed loop every 25 samples, joined at the pit exit and entry samples
+      const T = vp.track, ks = []; for (let k = 0; k < T.pts.length; k += 25) ks.push(k);
+      for (const k of [vp.exitK, vp.entryK]) if (!ks.includes(k)) ks.push(k);
+      ks.sort((p2, q) => p2 - q);
+      const loop = ks.map(k => T.pts[k]), ids = loop.map(q => at.get(key(q)) ?? (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
+      for (let k = 0; k < loop.length; k++) { const a = ids[k], b2 = ids[(k + 1) % loop.length], A = loop[k], B = loop[(k + 1) % loop.length]; edge(a, b2, Math.hypot(B[0] - A[0], B[1] - A[1]), null); }
+      extra.push({ pts: [...loop, loop[0]], ids: [...ids, ids[0]] });
+    }
+    this.extra = extra;
     for (const [a, len] of [[0, N], [1, N]]) for (let line = 0; line <= N; line++) for (let seg = 0; seg < len; seg++) {
       if (!RoadNet.segOpen(a, line, seg)) continue;
       const n0 = a === 0 ? id(line, seg) : id(seg, line), n1 = a === 0 ? id(line, seg + 1) : id(seg + 1, line);
@@ -1188,6 +1242,64 @@ const GPS = {
     }
     this._g = { nodes, adj, n: Links.list.length };
     return this._g;
+  },
+  // a polyline of nodes (first and last can be existing nodes); returns the node id of every vertex
+  _poly(nodes, adj, edge, pts, first, last) {
+    const ids = pts.map((q, k) => k === 0 && first !== undefined ? first : k === pts.length - 1 && last !== undefined ? last : (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
+    for (let k = 1; k < pts.length; k++) edge(ids[k - 1], ids[k], Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]), null);
+    return ids;
+  },
+  // a route between any two points, either of them off the lattice: each end joins the graph at the nearest point
+  // of a spur (when it is off the city) or at its nearest lattice node, by a straight line
+  routeAny(fx, fz, tx, tz) {
+    const G = this.graph(), nodes = G.nodes.slice(), adj = G.adj.map(a => a.slice()), W2 = N + 1;
+    const join = (x, z, isGoal) => {
+      const me = nodes.length; nodes.push({ x, z }); adj.push([]);
+      const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
+      if (offCity(x, z)) {
+        // the nearest point on the spur or any of Valen Point's routes; X joins the two vertices either side of it
+        const polys = [...Links.list.filter(L => L.spur && L.vids).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || [])];
+        let best = null;
+        for (const pl of polys) for (let k = 0; k < pl.pts.length - 1; k++) {
+          const a = pl.pts[k], b = pl.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+          const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+          if (!best || d < best.d) best = { pl, k, x: px, z: pz, d, t, l: Math.sqrt(l2) };
+        }
+        if (!best) return -1;
+        const X = nodes.length; nodes.push({ x: best.x, z: best.z }); adj.push([]);
+        const A = best.pl.ids[best.k], B = best.pl.ids[best.k + 1];
+        for (const [n, w] of [[A, best.t * best.l], [B, (1 - best.t) * best.l]]) { link(n, X, w, null); link(X, n, w, null); }
+        if (isGoal) link(X, me, best.d, null); else link(me, X, best.d, null);
+        return me;
+      }
+      const [i, j] = RoadNet.nearNode(x, z), n = i * W2 + j, d = Math.hypot(x - i * P, z - j * P);
+      if (isGoal) link(n, me, d, null); else link(me, n, d, null);
+      return me;
+    };
+    const src = join(fx, fz, false), dst = join(tx, tz, true); if (src < 0 || dst < 0) return null;
+    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
+    dist[src] = 0;
+    for (;;) {
+      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
+      if (u < 0 || u === dst) break;
+      done[u] = 1;
+      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
+    }
+    if (!isFinite(dist[dst])) return null;
+    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
+    chain.reverse();
+    const out = [{ x: fx, z: fz }];
+    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
+    return out;
+  },
+  _nearOn(L, x, z) {
+    let best = null;
+    for (let k = 0; k < L.pts.length - 1; k++) {
+      const a = L.pts[k], b = L.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+      const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+      if (!best || d < best.d) best = { link: L, k, x: px, z: pz, d, along: L.cum[k] + Math.sqrt(l2) * t };
+    }
+    return best;
   },
   route(fx, fz, i, j, tx, tz, gi, gj) {
     const G = this.graph(), W2 = N + 1, nodes = G.nodes.slice(), adj = G.adj.slice();
@@ -1219,6 +1331,8 @@ const GPS = {
   }
 };
 function gpsRoute(fx, fz, tx, tz) {
+  // off the city's square (Valen Point and its causeway): through the spur that reaches it
+  if (offCity(fx, fz) || offCity(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
   const pts = [{ x: fx, z: fz }];
   let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
   const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;

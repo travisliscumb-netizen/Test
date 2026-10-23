@@ -119,6 +119,8 @@ const RACES = [
 ];
 const RACER_NAMES = ['Vance', 'Mika "Nitro" Osei', 'Jules Ferreira', 'Big Tam', 'Lou Park', 'Danny Two-Tone'];
 function raceCheckpoints(def) {
+  // an official event at Valen Point runs on the circuit (Session 6B)
+  if (def.circuit) return vpCheckpoints(def);
   const seq = def.nodes.slice(); if (def.loop) seq.push(seq[0]);
   const one = [];
   for (let k = 1; k < seq.length; k++) {
@@ -165,7 +167,8 @@ class RaceManager {
       o.mission = 'race'; o.touched = true; o.critical = false;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
-      ai.path = R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
+      // on the circuit the racing line, with a safe speed at every point; in the street the checkpoints
+      ai.path = R.aiPath ? R.aiPath.map(c => ({ ...c, x: c.x + rand(-0.8, 0.8), z: c.z + rand(-0.8, 0.8) })) : R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
       ai.pi = 0; ai.goal = R.cps[R.cps.length - 1]; ai.wait = 99;
       const base = o.spec.vmax * (A.opts.hard ? 0.86 : rand(0.74, 0.82));
       A.racers.push({ v: o, cp: 0, base, done: false, time: 0, name: A.opts.names ? A.opts.names[k] : RACER_NAMES[(k + (A.def.id.length)) % RACER_NAMES.length], stuck: 0 });
@@ -190,6 +193,11 @@ class RaceManager {
       A.objective = v ? (d < 9 ? 'Stop on the start line' : `Drive to the start line — ${A.def.name}`) : 'Get a vehicle and drive to the start line';
       if (v && d < 9 && v.speed < 4) {
         // a pink slip: the car you stopped in is the stake; checked, then committed (and saved) here
+        // an official event: scrutineering, then the entry fee from the bank (Session 6B)
+        if (A.opts.official && !A.paid) {
+          const why = g.motorsport.canEnter(v, A.def) || g.motorsport.payIn(A.def); if (why) { A.objective = why; return null; }
+          A.paid = true;
+        }
         if (A.opts.pink) {
           const why = g.pinks.canStake(v); if (why) { A.objective = why; return null; }
           const r = g.pinks.commit(v); A.opts.opponentCls = r.type; A.opts.opponentColor = r.color; A.opts.opponentTier = r.vtier;
@@ -220,7 +228,8 @@ class RaceManager {
     }
     // running
     A.t += dt;
-    if (g.raceRules) g.raceRules.watch(A, v);
+    // a street race is illegal and draws heat when seen; an official event at Valen Point never does
+    if (g.raceRules && !A.def.official) g.raceRules.watch(A, v);
     const cp = R.cps[A.cp];
     A.target = cp;
     if (v && Math.hypot(p.pos.x - cp.x, p.pos.z - cp.z) < 13) {

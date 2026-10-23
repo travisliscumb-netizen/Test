@@ -74,6 +74,11 @@ class TaxiService {
   // a cab on a road node out of sight, 110-220 m away
   spawnCab(x, z) {
     const g = this.g, cands = [];
+    // on Valen Point: the cab comes along the causeway (Session 6B)
+    if (offCity(x, z)) {
+      const sp = vpRoadSpots().map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
+      for (const { s } of sp.slice(0, 8)) if (!g.vehicles.nearby(s.x, s.z, 6).some(v => Math.hypot(v.pos.x - s.x, v.pos.z - s.z) < 5)) return g.vehicles.spawn('taxi', s.x, s.z, s.h, {});
+    }
     for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
       if (!RoadNet.degree(i, j)) continue;
       const nx = i * P, nz = j * P, d = Math.hypot(nx - x, nz - z);

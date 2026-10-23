@@ -194,7 +194,7 @@ class MissionManager {
     g.audio.play('confirm');
     g.ui.banner(spec.title, spec.replay ? 'Replay \u00b7 ' + spec.contact.name : spec.contact.name, 'info', 2.2);
     if (spec.type === 'story') { g.campaign.begin(m); return; }
-    if (spec.type === 'srace') { g.race.begin(spec.race, spec.pink ? { pink: true, names: ['Vance'] } : {}); m.timer = 0; return; }
+    if (spec.type === 'srace') { g.race.begin(spec.race, spec.pink ? { pink: true, names: ['Vance'] } : spec.official ? { official: true } : {}); m.timer = 0; return; }
     const pv = () => g.player.state === 'vehicle' ? g.player.vehicle : null;
     switch (spec.type) {
       case 'delivery': m.target = spec.dest; m.objective = `Deliver the parcel to ${districtNameAt(spec.dest.x, spec.dest.z)}`; this.objMarker(spec.dest.x, spec.dest.z); m.startHealth = pv() ? pv().health : 100; break;
@@ -232,7 +232,7 @@ class MissionManager {
     }
     const pay = Math.max(0, s.reward + (m.bonus || 0));
     // contracts are criminal work: Dirty Cash in hand; an illegal street race pays Dirty too (§45.18)
-    if (pay > 0) g.earn(pay, s.type === 'race' || s.type === 'srace' ? 'streetRace' : 'contract');
+    if (pay > 0) g.earn(pay, s.official ? 'trackPrize' : s.type === 'race' || s.type === 'srace' ? 'streetRace' : 'contract');
     this.lastFailed = null;
     g.save.missionsCompleted++; g.save.stats.missionsPassed++;
     g.audio.play('pass');
@@ -335,6 +335,12 @@ class MissionManager {
           return;
         }
         if (res.reason || !res.place || res.place > 3) { this.fail(res.reason || `You finished ${ordinal(res.place)}.`); return; }
+        // an official event (Session 6B): prize money from the bank by today's tier, no Rep; the Invitational's car
+        if (s.official) {
+          const pay = g.motorsport.payout(s.race, res.place); s.reward = pay.cash; s.rep = 0;
+          if (res.place === 1) { g.motorsport.noteWin(s.race.id); if (s.race.car) g.motorsport.awardCar(s.race); }
+          this.pass(); return;
+        }
         // the purse and Rep for this finish, by today's tier for this race (§45.33)
         const pay = g.raceRules.payout(s.race, res.place);
         s.reward = pay.cash; s.rep = pay.rep;

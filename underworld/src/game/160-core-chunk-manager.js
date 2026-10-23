@@ -25,7 +25,7 @@ class ChunkManager {
   }
   _buildFar() {
     const list = [];
-    for (const b of this.world.blocks) for (const r of b.bld) if (r.far) list.push([b, r]);
+    for (const b of [...this.world.blocks, ...(this.world.xblocks || [])]) for (const r of b.bld) if (r.far) list.push([b, r]);
     const geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, 0.5, 0);
     geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
     const aB = new Float32Array(list.length * 4), aO = new Float32Array(list.length * 4);
@@ -154,6 +154,8 @@ class ChunkManager {
       const d = Math.hypot(b.cx - px, b.cz - pz);
       if (d < R * P + P * 0.5) { want.add(b.i); cand.push([d, b]); }
     }
+    // Valen Point's district blocks (Session 6B): wanted while the focus is within reach of what they hold
+    for (const b of this.world.xblocks || []) { const d = Math.hypot(b.cx - px, b.cz - pz); if (d < R * P + b.r) { want.add(b.i); cand.push([Math.max(0, d - b.r), b]); } }
     cand.sort((a, b) => a[0] - b[0]);
     // build at most one missing chunk per frame (two when nothing is visible yet)
     let budget = this.visible.size === 0 ? 50 : 1;

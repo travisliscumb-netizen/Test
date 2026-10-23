@@ -10,8 +10,8 @@ class PropertyManager {
   ownedList() { return PROPS.filter(p => this.owned(p.id)); }
   // what owned property on a turf adds to your side of a showdown there: 6 for the first, half as much again for each
   // further one, never more than PROP_PRESENCE_MAX (§45.23: stacking property can't make a turf invincible)
-  presenceDefense(i) { let n = 0; for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) n++; } return n ? Math.min(PROP_PRESENCE_MAX, PROP_PRESENCE * (2 - Math.pow(0.5, n - 1))) : 0; }
-  presence(i) { for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) return true; } return false; }
+  presenceDefense(i) { let n = 0; for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && !offCity(L.x, L.z) && turfAt(L.x, L.z) === i) n++; } return n ? Math.min(PROP_PRESENCE_MAX, PROP_PRESENCE * (2 - Math.pow(0.5, n - 1))) : 0; }
+  presence(i) { for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && !offCity(L.x, L.z) && turfAt(L.x, L.z) === i) return true; } return false; }
   // stash space: a storage business grows with its level; a home in the Docklands holds a quarter more
   storageCap(id) {
     const d = PROP_BY_ID[id]; if (!d) return 0;
@@ -93,7 +93,8 @@ class PropertyManager {
     // find you a better deal
     const uw = this.uw, L = uw.loc('prop', def.id);
     let k = (1 - Math.min(0.2, uw.influence / 2500)) * (1 - this.perk('propDisc'));
-    const own = L ? uw.owner[turfAt(L.x, L.z)] : null;
+    // a property off the city (Valen Point) sits on nobody's turf
+    const own = L && !offCity(L.x, L.z) ? uw.owner[turfAt(L.x, L.z)] : null;
     if (own && own !== 'pc' && uw.attitude(own) === 'hostile') k *= 1.1;
     return Math.round(def.price * k / 50) * 50;
   }
@@ -108,7 +109,7 @@ class PropertyManager {
     Money.pay(price, 'property');
     S.props[id] = { owned: true, dmg: 0, since: S.day, lvl: 1 };
     if (!S.storage[id]) S.storage[id] = {};
-    const L = uw.loc('prop', id), own = L ? uw.owner[turfAt(L.x, L.z)] : null;
+    const L = uw.loc('prop', id), own = L && !offCity(L.x, L.z) ? uw.owner[turfAt(L.x, L.z)] : null;
     if (own && own !== 'pc' && FACTIONS[own]) { S.factions[own].rel -= 8; uw.news('unknown', `The ${FACTIONS[own].short} heard you bought ${def.name} on their turf. They’re not pleased.`); }
     // a purchase buys no Rep, no influence and no hold on the turf (§1, §45.7)
     if (def.id === 'penthouse') { g.save.owns.penthouse = true; g.content.ach('home'); }
@@ -166,6 +167,8 @@ class PropertyManager {
     const floor = Math.min(MORALE_CAP, this.perk('loyalty') * 10);
     if (floor > 0) for (const c of uw.crew.active()) c.morale = Math.max(c.morale, floor);
     this.policeRaids();
+    // the motorsport park's day (Session 6B): its income, and the settling of a meeting you hosted
+    if (uw.g.motorsport) uw.g.motorsport.tickDay();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);
   }
   repairCost(def) { return Math.round(def.price * 0.12 / 10) * 10; }

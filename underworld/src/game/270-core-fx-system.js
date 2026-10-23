@@ -147,7 +147,7 @@ class FXSystem {
     if (this.ambientT <= 0) {
       this.ambientT = 0.05;
       for (const ci of g.chunks.visible) {
-        const b = g.world.blocks[ci];
+        const b = g.world.blockI(ci); if (!b) continue;
         for (const f of b.fx) {
           if (f.type === 'fountain' && dist2(f.x, f.z, g.cam.pos.x, g.cam.pos.z) < 90 * 90) {
             for (let j = 0; j < 3; j++) this.smoke.emit(f.x + rand(-0.15, 0.15), f.y, f.z + rand(-0.15, 0.15), rand(-1, 1), rand(4, 5.5), rand(-1, 1), 1.0, 0.14, 0.32, 0.8, 0.88, 0.95, 0.6, 0.2, 9.8);

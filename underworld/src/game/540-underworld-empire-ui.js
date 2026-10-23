@@ -346,7 +346,8 @@ class EmpireUI {
       <div class="d" style="margin-top:4px">Paid from, in order: ${Money.payrollSources().map(s => `${esc(s.name)} <b>${fmtMoney(s.amt)}</b>`).join(' → ')}. Wages are never taken from the bank.</div></div>`;
     if (!ros.length) h += `<div class="hint">No crew yet. ${CM.canRecruit() ? 'Hire someone below.' : 'Earn 100 reputation and people will start asking for work.'}</div>`;
     const turfOpts = sel => uw.T.map(t => `<option value="${t.i}" ${sel === t.i ? 'selected' : ''}>${esc(t.name)} · ${uw.owner[t.i] === 'pc' ? 'yours' : uw.owner[t.i] ? FACTIONS[uw.owner[t.i]].short : 'neutral'}</option>`).join('');
-    const zoneOpts = sel => Object.keys(ZONES).map(z => `<option value="${z}" ${sel === z ? 'selected' : ''}>${esc(ZONES[z].name)}</option>`).join('');
+    // districts with turfs (a Lieutenant runs streets: Valen Point has none)
+    const zoneOpts = sel => Object.keys(ZONES).filter(z => uw.T.some(t => t.zone === z)).map(z => `<option value="${z}" ${sel === z ? 'selected' : ''}>${esc(ZONES[z].name)}</option>`).join('');
     const bizOpts = sel => uw.props.ownedList().filter(p => p.kind === 'business').map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
     // a warehouse as the target ('w:<id>'), with how full it is
     const whOpts = sel => uw.whse.list().map(p => `<option value="w:${p.id}" ${sel === 'w:' + p.id ? 'selected' : ''}>${esc(p.name)} · ${uw.whse.slotsUsed(p.id)}/${WH_SLOTS}</option>`).join('');

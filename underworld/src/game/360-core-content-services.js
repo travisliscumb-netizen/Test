@@ -47,7 +47,7 @@ const TUNE_REP = [0, 800, 1300];
 // rule here (Clean, as before), to be revisited with vehicle ownership in Session 5.
 const RESALE_CAP = 0.85;
 // a car won in a pink slip came out of an illegal street race: it resells for Dirty Cash (§45.33)
-const CAR_RESALE = { bought: { k: 0.5 }, stolen: { k: 0.22, cur: 'dirty' }, found: { k: 0.35, cur: 'clean' }, reward: { k: 0.35, cur: 'clean' }, mission: { k: 0.35, cur: 'clean' }, pinkslip: { k: 0.35, cur: 'dirty' } };
+const CAR_RESALE = { bought: { k: 0.5 }, stolen: { k: 0.22, cur: 'dirty' }, found: { k: 0.35, cur: 'clean' }, reward: { k: 0.35, cur: 'clean' }, mission: { k: 0.35, cur: 'clean' }, pinkslip: { k: 0.35, cur: 'dirty' }, prize: { k: 0.35, cur: 'clean' } };
 const STORE_ITEMS = [
 // pay: how each is paid (MONEY_SOURCES): food and first aid with cash or the bank, shop goods from the bank,
 // scratch cards (a lottery) from the bank only, at the card counter (§45.5, §45.18)
@@ -58,7 +58,7 @@ const STORE_ITEMS = [
   { id: 'scratch', name: 'Scratch Cards', desc: 'Five cards from $5 to $100. Top prize $1,000,000. Most lose. Bank only.', price: 5, pay: 'casinoStake' },
   { id: 'map', name: 'Collector’s Map', desc: 'Someone marked five hidden packages on a tourist map.', price: 1200, pay: 'shop' }
 ];
-const ORIGIN_CHIP = { bought: ['OWNED', '#7fe08f'], stolen: ['STOLEN', '#ff4d5e'], reward: ['SPECIAL', '#d28cff'], found: ['FOUND', '#46d4c4'], pinkslip: ['WON', '#ff7ab8'] };
+const ORIGIN_CHIP = { bought: ['OWNED', '#7fe08f'], stolen: ['STOLEN', '#ff4d5e'], reward: ['SPECIAL', '#d28cff'], found: ['FOUND', '#46d4c4'], pinkslip: ['WON', '#ff7ab8'], prize: ['PRIZE', '#ffd84d'] };
 const ACHIEVEMENTS = [
   { id: 'day_one', name: 'Day One', desc: 'Finish your first job for Rosa.' },
   { id: 'tourist', name: 'Tourist', desc: 'Discover every district.' },
@@ -625,7 +625,7 @@ class ContentManager {
     const g = this.g, p = g.player, s = g.save;
     if (p.interior) return;
     const zk = zoneKey(p.pos.x, p.pos.z);
-    const inCity = p.pos.x > 0 && p.pos.z > 0 && p.pos.x < CITY && p.pos.z < CITY;
+    const inCity = (p.pos.x > 0 && p.pos.z > 0 && p.pos.x < CITY && p.pos.z < CITY) || vpLand(p.pos.x, p.pos.z);
     if (inCity && !s.discovered.zones[zk]) {
       s.discovered.zones[zk] = 1;
       const z = ZONES[zk], n = Object.keys(s.discovered.zones).length;

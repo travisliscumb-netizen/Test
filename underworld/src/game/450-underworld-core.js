@@ -286,6 +286,7 @@ class Underworld {
     if (this.g.vreg) this.g.vreg.reset();
     if (this.g.pinks) this.g.pinks.reset();
     if (this.g.wash) this.g.wash.reset();
+    if (this.g.motorsport) this.g.motorsport.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -880,6 +881,7 @@ class Underworld {
     const ra = this.rivalwh.findAction(); if (ra) return ra;
     const sa = this.shipments.findAction(); if (sa) return sa;
     const ia = g.impound.findAction(); if (ia) return ia;
+    const ma = g.motorsport.findAction(); if (ma) return ma;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       const wa = g.wash.findAction(); if (wa) return wa;

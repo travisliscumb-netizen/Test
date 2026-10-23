@@ -27,6 +27,8 @@ class World {
     this.lots = []; // parking stall positions per block
   }
   block(bx, bz) { return (bx < 0 || bz < 0 || bx >= N || bz >= N) ? null : this.blocks[bz * N + bx]; }
+  // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
+  blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
@@ -627,7 +629,9 @@ class World {
       { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN - 1, x1: CITY + EDGE_MARGIN + 1, z1: -EDGE_MARGIN + 0.2 },
       { x0: -EDGE_MARGIN - 1, z0: CITY + EDGE_MARGIN - 0.2, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN + 1 },
       { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN, x1: -EDGE_MARGIN + 0.2, z1: CITY + EDGE_MARGIN },
-      { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN }
+      // the east wall stops either side of the causeway to Valen Point (Session 6B)
+      { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: VP.cw.z - VP.cw.half },
+      { x0: CITY + EDGE_MARGIN - 0.2, z0: VP.cw.z + VP.cw.half, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN }
     ];
     for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
     // promenade lamps and benches outside the perimeter road

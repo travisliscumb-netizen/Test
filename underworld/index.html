@@ -32749,6 +32749,8 @@ function streetNameAt(x, z) {
   if (dx < ROAD_HALF + WALK_W && dz < ROAD_HALF + WALK_W && i >= 0 && j >= 0 && i <= N && j <= N) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
   if (dx < ROAD_HALF + WALK_W && i >= 0 && i <= N) return STREET_NAMES_X[i];
   if (dz < ROAD_HALF + WALK_W && j >= 0 && j <= N) return STREET_NAMES_Z[j];
+  if (x > CITY + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
+  if (vpLand(x, z)) return VP.name;
   if (x < 0 || z < 0 || x > CITY || z > CITY) return 'Harbor Promenade';
   return null;
 }
@@ -32792,14 +32794,19 @@ const ZONES = {
   a: { name: 'Stadium District', tag: 'Game nights, tailgates and the biggest car park in town', col: '#6fa8ff', ped: 0.6, cops: 0.9, night: 1.2,
     traffic: { sedan: 2.5, suv: 2, taxi: 2, compact: 2, sports: 0.8, van: 0.8 } },
   r: { name: 'Cedar Fields', tag: 'Dirt tracks and nobody watching', col: '#c9b06b', ped: 0.15, cops: 0.3, night: 0.3,
-    traffic: { pickup: 3.5, offroad: 1.5, van: 1, sedan: 1, compact: 0.8 } }
+    traffic: { pickup: 3.5, offroad: 1.5, van: 1, sedan: 1, compact: 0.8 } },
+  // Valen Point (Session 6B): off the lattice, east across the causeway; no foot traffic, few police
+  v: { name: 'Valen Point', tag: 'Pit garages, grandstands and the fastest legal mile on the island', col: '#ff6b4a', ped: 0, cops: 0.4, night: 0.4,
+    traffic: { sports: 2, sedan: 2, suv: 1.5, van: 1.2, pickup: 0.8, muscle: 0.6, truck: 0.4 } }
 };
 function zoneKey(x, z) {
+  if (x > CITY + EDGE_MARGIN && x < VP.x1 + 400) return 'v';
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return ZONE_MAP[bz][bx];
 }
 function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
+  if (inValenPoint(x, z)) return VP.name;
   if (x < -ROAD_HALF - 2 || z < -ROAD_HALF - 2 || x > CITY + ROAD_HALF + 2 || z > CITY + ROAD_HALF + 2) return 'Waterfront';
   return zoneAt(x, z).name;
 }
@@ -32918,12 +32925,14 @@ const Links = {
     this.list = []; this.idx.clear();
     for (const r of world.localRoads) {
       if (!r.link || r.k !== 'line') continue;
-      const a = this.attach(r.pts[0]), b = this.attach(r.pts[r.pts.length - 1]);
+      // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle
+      const last = r.pts[r.pts.length - 1];
+      const a = this.attach(r.pts[0]), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last);
       if (!a || !b) continue;
       const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
-      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r };
+      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null };
       this.list.push(L);
-      L.ends.forEach((e, k) => { const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
+      L.ends.forEach((e, k) => { if (e.free) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
     }
     world.links = this.list;
   },
@@ -32936,6 +32945,18 @@ const Links = {
       out.push([c[k][0] - tz * off, c[k][1] + tx * off]);
     }
     return out;
+  },
+  // a spur's whole lane for a car: out on the right-hand side, round the turning circle, back to the lattice
+  loop(L) {
+    const out = this.lane(L, 0), back = this.lane(L, 1), R0 = L.ring;
+    if (!R0) return [...out, ...back];
+    const e = out[out.length - 1], s = back[0];
+    let a0 = Math.atan2(e[1] - R0.z, e[0] - R0.x), a1 = Math.atan2(s[1] - R0.z, s[0] - R0.x);
+    // the long way round, by the far side of the circle (the angle falls from a0 to a1)
+    while (a1 >= a0) a1 -= Math.PI * 2;
+    const arc = [], m = Math.max(6, Math.ceil((a0 - a1) / 0.15));
+    for (let i = 1; i < m; i++) { const a = a0 + (a1 - a0) * i / m; arc.push([R0.x + Math.cos(a) * R0.r, R0.z + Math.sin(a) * R0.r]); }
+    return [...out, ...arc, ...back];
   },
   // nearest point on any link: { link, k (segment), x, z, d, along (metres from end 0) }
   nearest(x, z) {
@@ -32983,6 +33004,8 @@ function groundY(x, z, y, step) {
   return b;
 }
 function groundBase(x, z) {
+  // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
+  if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
   return RoadNet.roadAt(x, z) ? 0 : CURB_H;
@@ -33003,6 +33026,36 @@ function blockLamps(bx, bz) {
   return out;
 }
 
+/* =====================================================================
+   [CONTENT] VALEN POINT (Session 6B, §45.32, §45.34)
+   The motorsport district: an island east of the city, joined to the
+   east perimeter road by a low causeway at z = VP.cw.z. Everything here
+   is outside the 0..CITY lattice, so nothing lattice-based (RoadNet,
+   blocks, turfs) covers it: the ground, collision, roads, AI routing,
+   streaming and the maps each ask these helpers instead.
+   ===================================================================== */
+const VP = {
+  name: 'Valen Point',
+  // the island
+  x0: 1440, x1: 2380, z0: 130, z1: 910,
+  // the causeway: a two-lane road (±7 m) with a shoulder each side, from the perimeter road to the island
+  cw: { z: 520, road: 7, half: 9, x0: CITY + ROAD_HALF, x1: 1440 }
+};
+// the far edge of everything the collision grid and the maps have to cover
+const WORLD_X1 = VP.x1 + EDGE_MARGIN;
+function vpLand(x, z) { return x >= VP.x0 && x <= VP.x1 && z >= VP.z0 && z <= VP.z1; }
+function vpCauseway(x, z) { return x >= VP.cw.x0 && x <= VP.x0 + 0.5 && Math.abs(z - VP.cw.z) <= VP.cw.half; }
+// off the city's square and on Valen Point's ground (the island, or the causeway past the seawall)
+function inValenPoint(x, z) { return vpLand(x, z) || (x > CITY + EDGE_MARGIN && vpCauseway(x, z)); }
+// is (x, z) beyond the city altogether (the district or the water around it)?
+function offCity(x, z) { return x > CITY + EDGE_MARGIN || x < -EDGE_MARGIN || z < -EDGE_MARGIN || z > CITY + EDGE_MARGIN; }
+// places a car can join the road out there: the causeway's lanes every 20 m (heading toward the island on the
+// south lane, back to the city on the north), for police units and taxis (Session 6B)
+function vpRoadSpots() {
+  const out = [], z = VP.cw.z;
+  for (let x = CITY + EDGE_MARGIN + 20; x < VP.x0 + 10; x += 20) { out.push({ x, z: z + LANE, h: Math.PI / 2 }); out.push({ x, z: z - LANE, h: -Math.PI / 2 }); }
+  return out;
+}
 /* =====================================================================
    [CORE] SAVE SYSTEM
    ===================================================================== */
@@ -33052,6 +33105,8 @@ const SaveSystem = {
       // street racing (Session 6A): today's wins per race (the purse tiers), a pink slip's stake while it is down,
       // and the economic day of the last pink slip
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
+      // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
+      track: { best: null, prize: {}, hosted: null, laps: 0 },
       dealers: {},
       nextUid: 1,
       pos: null,
@@ -33200,7 +33255,8 @@ const SaveSystem = {
     } else d.gamble.table = null;
     for (const e of d.garage) e.vtier = typeof e.vtier === 'string' && TIER_LOOK[e.vtier] ? e.vtier : VEHICLES[e.type].tier;
     if (!d.pos || typeof d.pos !== 'object' || !isFinite(d.pos.x) || !isFinite(d.pos.z) || !isFinite(d.pos.h)) d.pos = null;
-    else { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
+    // the city square, or on Valen Point (Session 6B); anywhere else (the water) comes back to the coast
+    else if (!inValenPoint(d.pos.x, d.pos.z)) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
     if (typeof d.rep !== 'number' || !isFinite(d.rep) || d.rep < 0) d.rep = 0;
     if (!(d.nextUid > maxUid)) d.nextUid = maxUid + 1;
     if (!d.tips || typeof d.tips !== 'object' || Array.isArray(d.tips)) d.tips = {};
@@ -33283,6 +33339,8 @@ const MONEY_SOURCES = {
   chopWork: { pay: 'dirty' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
+  // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank
+  trackFee: { pay: 'clean' }, trackPrize: { earn: 'clean' }, trackIncome: { earn: 'clean', book: 'businesses' }, trackHost: { pay: 'clean' }, pitService: { pay: 'clean' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
@@ -35197,17 +35255,19 @@ const C = hex => new THREE.Color(hex);
    ===================================================================== */
 class CollisionGrid {
   constructor() {
-    this.cs = 16; this.min = -48; this.dim = Math.ceil((CITY + 96) / this.cs);
-    this.cells = Array.from({ length: this.dim * this.dim }, () => []);
+    // the city square, and east of it out to Valen Point (Session 6B): dimX × dim cells
+    this.cs = 16; this.min = -48; this.dim = Math.ceil((CITY + 96) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.min) / this.cs);
+    this.cells = Array.from({ length: this.dimX * this.dim }, () => []);
     this.all = []; this.stamp = 1;
   }
-  _ci(x) { return clamp(Math.floor((x - this.min) / this.cs), 0, this.dim - 1); }
+  _ci(x) { return clamp(Math.floor((x - this.min) / this.cs), 0, this.dimX - 1); }
+  _cj(z) { return clamp(Math.floor((z - this.min) / this.cs), 0, this.dim - 1); }
   add(c) {
     c.stamp = 0; c.on = true;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; }
     else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._ci(z0); j <= this._ci(z1); j++) this.cells[j * this.dim + i].push(c);
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) this.cells[j * this.dimX + i].push(c);
     this.all.push(c);
     return c;
   }
@@ -35215,14 +35275,14 @@ class CollisionGrid {
     if (!c) return;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; } else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._ci(z0); j <= this._ci(z1); j++) { const cell = this.cells[j * this.dim + i], k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const cell = this.cells[j * this.dimX + i], k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
     const k = this.all.indexOf(c); if (k >= 0) this.all.splice(k, 1);
     c.on = false;
   }
   query(x0, z0, x1, z1, out) {
     out.length = 0; const st = ++this.stamp;
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._ci(z0); j <= this._ci(z1); j++) {
-      const cell = this.cells[j * this.dim + i];
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) {
+      const cell = this.cells[j * this.dimX + i];
       for (let k = 0; k < cell.length; k++) { const c = cell[k]; if (c.stamp !== st && c.on) { c.stamp = st; out.push(c); } }
     }
     return out;
@@ -35270,8 +35330,8 @@ class CollisionGrid {
     let tmz = Math.abs(dz) > 1e-9 ? ((this.min + (iz + (sz > 0 ? 1 : 0)) * cs) - oz) / dz : Infinity;
     let tCell = 0;
     for (let steps = 0; steps < 64 && tCell <= best; steps++) {
-      if (ix >= 0 && iz >= 0 && ix < this.dim && iz < this.dim) {
-        const cell = this.cells[iz * this.dim + ix];
+      if (ix >= 0 && iz >= 0 && ix < this.dimX && iz < this.dim) {
+        const cell = this.cells[iz * this.dimX + ix];
         for (let k = 0; k < cell.length; k++) {
           const c = cell[k]; if (c.stamp === st || !c.on || (see && c.see)) continue; c.stamp = st;
           // low clutter is skipped; interior colliders measure height from their own floor
@@ -35342,6 +35402,8 @@ class World {
     this.lots = []; // parking stall positions per block
   }
   block(bx, bz) { return (bx < 0 || bz < 0 || bx >= N || bz >= N) ? null : this.blocks[bz * N + bx]; }
+  // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
+  blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
@@ -35942,7 +36004,9 @@ class World {
       { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN - 1, x1: CITY + EDGE_MARGIN + 1, z1: -EDGE_MARGIN + 0.2 },
       { x0: -EDGE_MARGIN - 1, z0: CITY + EDGE_MARGIN - 0.2, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN + 1 },
       { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN, x1: -EDGE_MARGIN + 0.2, z1: CITY + EDGE_MARGIN },
-      { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN }
+      // the east wall stops either side of the causeway to Valen Point (Session 6B)
+      { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: VP.cw.z - VP.cw.half },
+      { x0: CITY + EDGE_MARGIN - 0.2, z0: VP.cw.z + VP.cw.half, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN }
     ];
     for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
     // promenade lamps and benches outside the perimeter road
@@ -36976,8 +37040,9 @@ Object.assign(World.prototype, {
   // the overflow yard: every space sized for the biggest vehicle (2.9 × 7.4 m bays; the Boxline is 2.3 × 7.2), five
   // rows of 17, each nose-out onto an aisle of 6.6 m or more: the front aisle along the gate fence, two more behind,
   // all joined by a side lane down one side fence. A small shed in the back corner; no docks, no window
-  _genImpoundOverflow(b, rng) {
-    this._genYard(b, rng, { id: IMPOUND.overflow.id, impound: true, name: IMPOUND.overflow.name, color: 0x55606a, sign: 'OVERFLOW', sub: 'NO ENTRY', overflow: true,
+  // Y: which overflow yard (the one next to the main lot, or Valen Point's annex), with any extra yard options
+  _genImpoundOverflow(b, rng, Y = IMPOUND.overflow, extra = {}) {
+    this._genYard(b, rng, { id: Y.id, impound: true, name: Y.name, color: 0x55606a, sign: Y.sign || 'OVERFLOW', sub: 'NO ENTRY', overflow: true, ...extra,
       slots: (W, hd) => {
         const out = [], B = OVERFLOW_BAY;
         // a painted line between neighbouring bays, the depth of the bay
@@ -36990,8 +37055,9 @@ Object.assign(World.prototype, {
       } });
   },
   _genYard(b, rng, M) {
-    this._sidewalk(b, rng, { trees: 0, park: 0 });
-    const side = ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
+    // a yard off the lattice (Valen Point) names its gate side and has no city pavement round it
+    if (!M.offMap) this._sidewalk(b, rng, { trees: 0, park: 0 });
+    const side = M.side || ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
     const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
     const cx = b.cx, cz = b.cz;
     // local → world: n: (cx + u, z0 + v); s: (cx − u, z1 − v); w: (x0 + v, cz − u); e: (x1 − v, cz + u)
@@ -37119,7 +37185,11 @@ Object.assign(World.prototype, {
 });
 {
   const base2 = World.prototype.generate;
-  World.prototype.generate = function () { base2.call(this); this._placesGen(); Links.build(this); };
+  World.prototype.generate = function () {
+    base2.call(this); this._genValenPoint(); this._placesGen();
+    for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
+    Links.build(this);
+  };
 }
 /* ---------------------------------------------------------------------
    The Valen Royale: the casino on the Nightlife Strip, a block south of Club Neon.
@@ -38197,6 +38267,230 @@ function curbAt(bx, bz, side, along = 40) {
 }
 
 /* =====================================================================
+   [CONTENT] VALEN POINT: GENERATION (Session 6B, §45.34)
+   The motorsport park on the island east of the city:
+   - the circuit: straights joined by constant-radius arcs (a fillet at
+     every corner of VP_TRACK.verts), about 3.2 km a lap, 14 m wide: a
+     430 m main straight, a 680 m back straight and a 660 m east straight
+     joined by broad 110–150 m sweepers, an infield of two slow hairpins
+     (40–45 m) and medium corners (60–80 m);
+   - run-off and barriers: armco on both sides, further out on the
+     outside of the faster corners, with gaps where the pit lane merges;
+   - the pit lane beside the main straight behind a pit wall, twelve
+     drive-through pit garages (two parking bays each), the paddock with
+     Race Control, two grandstands, two spectator car parks, the main
+     entrance and the causeway's turning circle;
+   - the Valen Point annex of the police impound (an overflow yard).
+   District geometry lives in extra blocks (world.xblocks) so the chunk
+   manager streams it like city blocks; the big flat surfaces (ground,
+   track, kerbs, lines) and the barriers are a few merged meshes built by
+   ValenPointScenery and swapped for a far version with distance.
+   ===================================================================== */
+const VP_TRACK = {
+  w: 14,
+  // corners: [x, z, radius]; the main straight runs north along x = 1600 (start/finish at z = VP_TRACK.sf)
+  verts: [[1600, 230, 130], [2280, 200, 150], [2300, 860, 110], [1990, 850, 45], [1960, 560, 40], [1760, 540, 60], [1760, 860, 80], [1600, 860, 70]],
+  sf: 600, step: 2
+};
+// the pit complex beside the main straight
+const VP_PIT = { laneX: 1577, laneW: 10, wallX: 1587, wall: [445, 725], lane: [430, 740], garX: [1533, 1570], garZ: [450, 690], cell: 20,
+  entry: [[1593, 795], [1582, 768], [1577, 740]], exit: [[1577, 430], [1582, 405], [1593, 378]] };
+const VP_SITE = {
+  office: { x0: 1470, x1: 1500, z0: 560, z1: 590 },
+  ring: { x: 1474, z: 520, r: 14 },
+  paddock: { x0: 1446, x1: 1530, z0: 300, z1: 790 },
+  parkN: { x0: 1446, x1: 1530, z0: 232, z1: 296 },
+  parkS: { x0: 1446, x1: 1530, z0: 800, z1: 900 },
+  standN: { x0: 1537, x1: 1570, z0: 290, z1: 440 },
+  standS: { x0: 1537, x1: 1570, z0: 700, z1: 795 },
+  annex: { ox: 1446, oz: 150 }
+};
+// the circuit's centreline: { pts: [[x, z]...], cum, len, R (local radius, 0 on straights), n (left normal) }
+function vpTrackLine() {
+  const V = VP_TRACK.verts, n = V.length, segs = [];
+  const unit = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); return [dx / l, dz / l]; };
+  // each corner: the tangent points and the arc between them
+  const C = V.map((v, k) => {
+    const a = unit(V[(k - 1 + n) % n], v), b = unit(v, V[(k + 1) % n]), R = v[2];
+    const th = Math.acos(clamp(a[0] * b[0] + a[1] * b[1], -1, 1)), t = R * Math.tan(th / 2);
+    const cross = a[0] * b[1] - a[1] * b[0], s = cross > 0 ? 1 : -1;          // +1 a right-hand (clockwise) corner
+    const t1 = [v[0] - a[0] * t, v[1] - a[1] * t], t2 = [v[0] + b[0] * t, v[1] + b[1] * t];
+    const nrm = [-a[1] * s, a[0] * s], cen = [t1[0] + nrm[0] * R, t1[1] + nrm[1] * R];
+    return { t1, t2, cen, R, th, s, t };
+  });
+  const pts = [], Rs = [], step = VP_TRACK.step;
+  const push = (p, R) => { pts.push(p); Rs.push(R); };
+  for (let k = 0; k < n; k++) {
+    const c = C[k], nx = C[(k + 1) % n];
+    // the arc round corner k
+    const a0 = Math.atan2(c.t1[1] - c.cen[1], c.t1[0] - c.cen[0]), arcLen = c.R * c.th, m = Math.max(2, Math.ceil(arcLen / step));
+    for (let i = 0; i < m; i++) { const a = a0 + c.s * c.th * i / m; push([c.cen[0] + Math.cos(a) * c.R, c.cen[1] + Math.sin(a) * c.R], c.R); }
+    // the straight to the next corner
+    const L = Math.hypot(nx.t1[0] - c.t2[0], nx.t1[1] - c.t2[1]), ms = Math.max(1, Math.ceil(L / step));
+    for (let i = 0; i < ms; i++) push([lerp(c.t2[0], nx.t1[0], i / ms), lerp(c.t2[1], nx.t1[1], i / ms)], 0);
+  }
+  const cum = [0];
+  for (let k = 1; k <= pts.length; k++) { const a = pts[k - 1], b = pts[k % pts.length]; cum.push(cum[k - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+  // left normals (of the direction of travel)
+  const nl = pts.map((p, k) => { const a = pts[(k - 1 + pts.length) % pts.length], b = pts[(k + 1) % pts.length], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dz / l, -dx / l]; });
+  // the tangent lengths fit their straights (checked by tests/motorsport.mjs)
+  const fits = C.every((c, k) => c.t + C[(k + 1) % n].t <= Math.hypot(V[(k + 1) % n][0] - V[k][0], V[(k + 1) % n][1] - V[k][1]) + 1e-6);
+  return { pts, R: Rs, cum, len: cum[pts.length], nl, corners: C, fits };
+}
+Object.assign(World.prototype, {
+  // a district block: the same shape as a city block (so the chunk manager, far skyline, colliders, places and
+  // compounds all take it) on a lattice origin (ox, oz) east of the city; r: how far its contents reach from the centre
+  _vpBlock(id, ox, oz, r, name) {
+    const b = { bx: -1, bz: -1, t: 'V', i: 1000 + this.xblocks.length, xb: id, offMap: true, noPeds: true,
+      x0: ox + INNER, z0: oz + INNER, x1: ox + P - INNER, z1: oz + P - INNER, cx: ox + P / 2, cz: oz + P / 2, r,
+      bld: [], det: [], props: [], parked: [], signs: [], billboards: [], fx: [], secrets: [], seats: [], water: [], special: null, name: name || VP.name };
+    this.xblocks.push(b);
+    return b;
+  },
+  _genValenPoint() {
+    this.xblocks = [];
+    const T = vpTrackLine(), Y = 0, wall = (x0, z0, x1, z1, y1 = 1.2) => this.grid.add({ x0, z0, x1, z1, y0: -5, y1, kind: 'wall' });
+    const vp = this.vp = { track: T, bays: [], barriers: [], sf: null, pit: VP_PIT, site: VP_SITE };
+    // ---------------------------------------------------------------- the island's edge and the causeway's rails
+    const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half;
+    wall(VP.x0 - 1, VP.z0 - 1, VP.x1 + 1, VP.z0, 3); wall(VP.x0 - 1, VP.z1, VP.x1 + 1, VP.z1 + 1, 3); wall(VP.x1, VP.z0, VP.x1 + 1, VP.z1, 3);
+    wall(VP.x0 - 1, VP.z0, VP.x0, g0, 3); wall(VP.x0 - 1, g1, VP.x0, VP.z1, 3);
+    wall(CITY + EDGE_MARGIN, g0 - 0.4, VP.x0, g0); wall(CITY + EDGE_MARGIN, g1, VP.x0, g1 + 0.4);
+    // ---------------------------------------------------------------- barriers: armco each side, run-off by corner speed
+    // offset from the centreline: 7 m of track and a run-off that grows on the outside of faster corners and
+    // eases in over 50 m; the main straight's west side is the pit wall / catch fence line
+    const half = VP_TRACK.w / 2, N2 = T.pts.length, step = VP_TRACK.step;
+    const runOut = R => R <= 0 ? 12 : R < 60 ? 18 : R < 100 ? 22 : 28;
+    const ease = (k, f) => { let best = f(k); for (let d = 1; d <= 25; d++) { const w = 1 - d / 26; best = Math.max(best, f((k + d) % N2) * w, f((k - d + N2) % N2) * w); } return best; };
+    // +1 a right-hand bend (x right, z down: clockwise on the map), whose outside is the left; −1 a left-hand bend
+    const turn = k => T.R[k] > 0 ? Math.sign(this._vpTurn(T, k)) : 0;
+    const offL = k => half + ease(k, i => turn(i) > 0 ? runOut(T.R[i]) : T.R[i] > 0 ? 4 : 12);
+    const offR = k => half + ease(k, i => turn(i) < 0 ? runOut(T.R[i]) : T.R[i] > 0 ? 4 : 12);
+    const mainSt = (x, z) => Math.abs(x - VP_TRACK.verts[0][0]) < 1 && z > 360 && z < 790;
+    const pitGap = z => (z > 372 && z < 448) || (z > 722 && z < 800);
+    for (const side of [1, -1]) {
+      const line = [];
+      for (let k = 0; k < N2; k++) {
+        const p = T.pts[k], nl = T.nl[k];
+        let off = side > 0 ? offL(k) : offR(k);
+        const west = p[0] + nl[0] * side * off < p[0];
+        if (mainSt(p[0], p[1]) && west) { off = VP_PIT.wallX - p[0] < 0 ? p[0] - VP_PIT.wallX : off; if (pitGap(p[1])) { line.push(null); continue; } }
+        line.push([p[0] + nl[0] * side * off, p[1] + nl[1] * side * off]);
+      }
+      vp.barriers.push(line);
+      // colliders: posts a metre apart along the rail (smooth enough to slide along, round enough for curves)
+      for (let k = 0; k < N2; k++) {
+        const a = line[k], b2 = line[(k + 1) % N2]; if (!a || !b2) continue;
+        const L = Math.hypot(b2[0] - a[0], b2[1] - a[1]), m = Math.max(1, Math.round(L / 1.0));
+        for (let i = 0; i < m; i++) this.grid.add({ x: lerp(a[0], b2[0], i / m), z: lerp(a[1], b2[1], i / m), r: 0.45, y0: -1, y1: 1.1, kind: 'det', barrier: true });
+      }
+    }
+    // the pit wall between the pit lane and the main straight
+    wall(VP_PIT.wallX - 0.4, VP_PIT.wall[0], VP_PIT.wallX + 0.4, VP_PIT.wall[1], 1.2);
+    // ---------------------------------------------------------------- start / finish: the timing line and a gantry
+    const sfK = T.pts.findIndex(p => Math.abs(p[0] - VP_TRACK.verts[0][0]) < 1 && Math.abs(p[1] - VP_TRACK.sf) <= step);
+    vp.sf = { k: sfK, x: T.pts[sfK][0], z: T.pts[sfK][1], along: T.cum[sfK] };
+    const B = {};
+    B.pits = this._vpBlock('pits', 1520, 530, 240, 'Valen Point pits');
+    B.pad = this._vpBlock('paddock', 1448, 500, 300, 'Valen Point paddock');
+    B.north = this._vpBlock('north', 1515, 330, 160, 'North grandstand');
+    B.south = this._vpBlock('south', 1515, 730, 140, 'South grandstand');
+    B.track = this._vpBlock('track', 1880, 480, 520, 'Valen Point circuit');
+    const sfb = B.pits;
+    const gx0 = VP_PIT.wallX + 0.6, gx1 = VP.x0 + 0;
+    this._det(sfb, 'box', gx0, Y + 4.5, vp.sf.z, 0.6, 9, 0.6, 0x2a2e33, 0, true);
+    this._det(sfb, 'box', vp.sf.x + half + 4, Y + 4.5, vp.sf.z, 0.6, 9, 0.6, 0x2a2e33, 0, true);
+    this._det(sfb, 'box', (gx0 + vp.sf.x + half + 4) / 2, Y + 8.6, vp.sf.z, vp.sf.x + half + 4 - gx0 + 0.6, 1.4, 1.0, 0x1d2126);
+    for (let k = 0; k < 5; k++) sfb.fx.push({ type: 'neon', x: vp.sf.x - 6 + k * 3, y: Y + 7.8, z: vp.sf.z - 0.55, w: 0.6, h: 0.6, d: 0.1, c: 0xff2a2a });
+    sfb.signs.push({ text: 'VALEN POINT', x: (gx0 + vp.sf.x + half + 4) / 2, y: Y + 8.6, z: vp.sf.z + 0.52, ry: 0, w: 14, h: 1.2, bg: '#1d2126', fg: '#ffffff' });
+    void gx1;
+    // ---------------------------------------------------------------- pit garages: drive-through, two bays each
+    const [gxa, gxb] = VP_PIT.garX, [gz0, gz1] = VP_PIT.garZ, cell = VP_PIT.cell, n = Math.round((gz1 - gz0) / cell);
+    for (let i = 0; i <= n; i++) { const z = gz0 + i * cell; this._bld(B.pits, gxa, z - 0.3, gxb, z + 0.3, 5.6, STYLE.IND, 0xd8dade, 5.6, 4, { exactH: true, y0: Y, oy: Y }); }
+    // the pit building over the garages: hospitality and timing, glass on the pit side
+    this._bld(B.pits, gxa, gz0 - 0.3, gxb, gz1 + 0.3, 7, STYLE.GLASS, 0x3a4652, 3.5, 4, { exactH: true, y0: Y + 5.6, oy: Y, far: true });
+    for (let i = 0; i < n; i++) {
+      const zc = gz0 + cell * (i + 0.5);
+      for (const dz of [-4.5, 4.5]) vp.bays.push({ x: (gxa + gxb) / 2, z: zc + dz, h: Math.PI / 2, y: Y, garage: i + 1 });
+      // garage number board over the pit-lane opening, floor paint
+      B.pits.signs.push({ text: String(i + 1), x: gxb + 0.05, y: Y + 4.7, z: zc, ry: Math.PI / 2, w: 2.2, h: 1.2, bg: '#c8102e', fg: '#ffffff' });
+      this._det(B.pits, 'box', (gxa + gxb) / 2, Y + 0.012, zc, gxb - gxa - 1, 0.02, cell - 1.4, C(0x5a5e63));
+    }
+    // ---------------------------------------------------------------- grandstands: tiers rising away from the track
+    const stand = (b, S) => {
+      for (let t = 0; t < 6; t++) {
+        const x1 = S.x1 - t * 5, h = 1 + t * 1.3;
+        this._bld(b, x1 - 5, S.z0, x1, S.z1, h, STYLE.IND, 0x9aa0a6, h, 5, { exactH: true, y0: Y, oy: Y, far: t === 5 });
+        // a crowd on each tier (static, cheap: part of the chunk's detail mesh)
+        for (let z = S.z0 + 1.5; z < S.z1 - 1; z += 1.6) if (hash2i(Math.floor(z * 3), t, 41) < 0.62) this._det(b, 'box', x1 - 2.5 + (hash2i(Math.floor(z), t, 43) - 0.5), Y + h + 0.45, z, 0.5, 0.9, 0.45, C([0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60, 0x1c2833][Math.floor(hash2i(Math.floor(z * 5), t, 47) * 6)]));
+      }
+      // roof on columns
+      this._det(b, 'box', S.x0 + 12, Y + 12.5, (S.z0 + S.z1) / 2, 26, 0.6, S.z1 - S.z0 + 2, C(0xe8eaed));
+      for (let z = S.z0; z <= S.z1; z += 25) this._det(b, 'cyl', S.x0 + 1, Y + 6.3, z, 0.4, 12.6, 0x6a7078, null, { x: S.x0 + 1, z, r: 0.45, y0: 0, y1: 12.6, kind: 'det' });
+      b.signs.push({ text: 'VALEN POINT MOTORSPORT PARK', x: S.x1 + 0.05, y: Y + 1.1, z: (S.z0 + S.z1) / 2, ry: Math.PI / 2, w: 22, h: 1.0, bg: '#c8102e', fg: '#ffffff' });
+    };
+    stand(B.north, VP_SITE.standN); stand(B.south, VP_SITE.standS);
+    // ---------------------------------------------------------------- Race Control in the paddock (the office you use)
+    const O = VP_SITE.office;
+    this._bld(B.pad, O.x0, O.z0, O.x1, O.z1, 10, STYLE.GLASS, 0x2c3a48, 3.4, 3.2, { exactH: true, y0: Y, oy: Y });
+    B.pad.signs.push({ text: 'RACE CONTROL', x: (O.x0 + O.x1) / 2, y: Y + 8.6, z: O.z0 - 0.06, ry: Math.PI, w: 12, h: 1.3, bg: '#14181c', fg: '#ff6b4a' });
+    this._det(B.pad, 'box', (O.x0 + O.x1) / 2, Y + 1.2, O.z0 - 0.06, 1.4, 2.4, 0.12, C(0x22262b));
+    B.pad.fx.push({ type: 'canopy', x: (O.x0 + O.x1) / 2, y: Y + 2.9, z: O.z0 - 0.6, w: 1.6, d: 1 });
+    B.pad.place = { id: 'motorsport', name: 'Valen Point Motorsport Park', kind: 'landmark', door: { x: (O.x0 + O.x1) / 2, z: O.z0 - 1.1, h: Math.PI }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
+    // transporters and hospitality units in the paddock
+    for (let k = 0; k < 8; k++) {
+      const z = 330 + k * 26 + (k >= 4 ? 120 : 0), x = 1500;
+      this._det(B.pad, 'box', x, Y + 2.0, z, 16, 4.0, 2.6, C([0xc8102e, 0x1c3f94, 0xeeeeee, 0x111418][k % 4]), 0, true);
+      this._det(B.pad, 'box', x - 9.2, Y + 1.7, z, 2.6, 3.4, 2.5, C(0x2a2e33), 0, true);
+    }
+    // ---------------------------------------------------------------- the main entrance over the access road
+    const ex = VP.x0 + 6;
+    for (const s2 of [-1, 1]) this._det(B.pad, 'box', ex, Y + 4, VP.cw.z + s2 * 9.5, 1.6, 8, 1.6, 0x2a2e33, 0, true);
+    this._det(B.pad, 'box', ex, Y + 8.6, VP.cw.z, 1.8, 1.6, 21, C(0xc8102e));
+    B.pad.signs.push({ text: 'VALEN POINT MOTORSPORT PARK', x: ex - 0.95, y: Y + 8.6, z: VP.cw.z, ry: -Math.PI / 2, w: 18, h: 1.2, bg: '#c8102e', fg: '#ffffff' });
+    // the turning circle's island
+    this._det(B.pad, 'cyl', VP_SITE.ring.x, Y + 0.25, VP_SITE.ring.z, 6, 0.5, 0x6f8a5a, null, { x: VP_SITE.ring.x, z: VP_SITE.ring.z, r: 6, y0: -1, y1: 0.5, kind: 'det' });
+    this._det(B.pad, 'cyl', VP_SITE.ring.x, Y + 3, VP_SITE.ring.z, 0.25, 6, 0x8c949c);
+    // marshal posts round the circuit, outside the barriers
+    for (let k = 0; k < N2; k += 120) { const p = T.pts[k], nl = T.nl[k], o = offL(k) + 4; const x = p[0] + nl[0] * o, z = p[1] + nl[1] * o; if (vpLand(x, z)) this._det(B.track, 'box', x, Y + 1.3, z, 2.4, 2.6, 2.4, C(0xf2f2f2), 0, true); }
+    // ---------------------------------------------------------------- the police impound's Valen Point annex
+    const ab = this._vpBlock('annex', VP_SITE.annex.ox, VP_SITE.annex.oz, 60, IMPOUND.annex.name);
+    this._genImpoundOverflow(ab, new RNG(9137), IMPOUND.annex, { side: 's', offMap: true });
+    // ---------------------------------------------------------------- the causeway road: a spur off the perimeter road
+    // out to the turning circle (a Links spur: traffic, the GPS, taxis and police all route along it)
+    const R0 = VP_SITE.ring, sx = R0.x - R0.r;
+    this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: [[CITY + ROAD_HALF, VP.cw.z], [CITY + EDGE_MARGIN + 30, VP.cw.z], [VP.x0 - 30, VP.cw.z], [VP.x0 + 4, VP.cw.z], [sx, VP.cw.z]], ring: R0, mat: 'asphalt' });
+    // the district's drivable routes for the GPS and AI drivers (polylines; two-way): from the turning circle round
+    // to the paddock, the gaps either side of the garages, the pit lane and its merges, Race Control and the annex
+    // gate, the car parks; the circuit itself joins at the pit exit and entry (vp.track, every ~50 m)
+    const r0 = VP_SITE.ring, ex0 = r0.x + r0.r;
+    const pk = (x, z) => T.pts.reduce((b2, p, k) => Math.hypot(p[0] - x, p[1] - z) < b2.d ? { k, d: Math.hypot(p[0] - x, p[1] - z) } : b2, { k: 0, d: 1e9 }).k;
+    vp.exitK = pk(VP_PIT.exit[2][0], VP_PIT.exit[2][1] - 12); vp.entryK = pk(VP_PIT.entry[0][0], VP_PIT.entry[0][1] + 12);
+    vp.roads = [
+      [[sx, VP.cw.z], [r0.x, r0.z - r0.r - 2], [ex0 + 2, r0.z], [1515, r0.z]],
+      [[1515, r0.z], [1515, 445], [1553, 445], [VP_PIT.laneX, 445]],
+      [[1515, r0.z], [1515, 695], [1553, 695], [VP_PIT.laneX, 695]],
+      [[VP_PIT.laneX, 445], [VP_PIT.laneX, 695]],
+      [[VP_PIT.laneX, 445], ...VP_PIT.exit, T.pts[vp.exitK]],
+      [T.pts[vp.entryK], ...VP_PIT.entry, [VP_PIT.laneX, 695]],
+      [[1515, r0.z], [(O.x0 + O.x1) / 2, O.z0 - 6]],
+      [[1515, 445], [1495, 300], [VP_SITE.annex.ox + P / 2 - 4.5, 240], [VP_SITE.annex.ox + P / 2 - 4.5, 224]],
+      [[1515, 695], [1490, 820]]
+    ];
+    vp.road0 = [sx, VP.cw.z];
+    // colliders for every district block's buildings and details (the city's own loop ran before these existed)
+    for (const b of this.xblocks) {
+      for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
+      for (const d of b.det) if (d.col) this.grid.add(d.col);
+    }
+  },
+  // signed turn at centreline sample k (cross product of the incoming and outgoing directions)
+  _vpTurn(T, k) {
+    const n = T.pts.length, a = T.pts[(k - 1 + n) % n], p = T.pts[k], b = T.pts[(k + 1) % n];
+    return (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]);
+  }
+});
+/* =====================================================================
    [CORE] TRAFFIC SIGNALS (shared timing used by AI, peds, and bulbs)
    ===================================================================== */
 const Signals = {
@@ -38447,7 +38741,7 @@ class ChunkManager {
   }
   _buildFar() {
     const list = [];
-    for (const b of this.world.blocks) for (const r of b.bld) if (r.far) list.push([b, r]);
+    for (const b of [...this.world.blocks, ...(this.world.xblocks || [])]) for (const r of b.bld) if (r.far) list.push([b, r]);
     const geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, 0.5, 0);
     geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
     const aB = new Float32Array(list.length * 4), aO = new Float32Array(list.length * 4);
@@ -38576,6 +38870,8 @@ class ChunkManager {
       const d = Math.hypot(b.cx - px, b.cz - pz);
       if (d < R * P + P * 0.5) { want.add(b.i); cand.push([d, b]); }
     }
+    // Valen Point's district blocks (Session 6B): wanted while the focus is within reach of what they hold
+    for (const b of this.world.xblocks || []) { const d = Math.hypot(b.cx - px, b.cz - pz); if (d < R * P + b.r) { want.add(b.i); cand.push([Math.max(0, d - b.r), b]); } }
     cand.sort((a, b) => a[0] - b[0]);
     // build at most one missing chunk per frame (two when nothing is visible yet)
     let budget = this.visible.size === 0 ? 50 : 1;
@@ -38651,39 +38947,29 @@ function buildStaticScenery(scene, world) {
   gs.add(TPL.box, M(CITY / 2, CURB_H / 2, -ROAD_HALF - pw / 2, L, CURB_H, pw), null);
   gs.add(TPL.box, M(CITY / 2, CURB_H / 2, CITY + ROAD_HALF + pw / 2, L, CURB_H, pw), null);
   gs.add(TPL.box, M(-ROAD_HALF - pw / 2, CURB_H / 2, CITY / 2, pw, CURB_H, CITY + ROAD_HALF * 2), null);
-  gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, CITY / 2, pw, CURB_H, CITY + ROAD_HALF * 2), null);
+  // the east promenade, seawall and railing stop either side of the causeway to Valen Point (Session 6B)
+  const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half, eastRun = (z0, z1, f) => { if (z1 > z0) f((z0 + z1) / 2, z1 - z0); };
+  eastRun(-ROAD_HALF, g0, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
+  eastRun(g1, CITY + ROAD_HALF, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
   // seawall faces
   const wh = 3.2;
   gs.add(TPL.box, M(CITY / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, L + 2, wh, 1), null);
   gs.add(TPL.box, M(CITY / 2, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, L + 2, wh, 1), null);
   gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
-  gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
+  eastRun(-E, g0, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
+  eastRun(g1, CITY + E, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
   const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
   // railing
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
   for (let t = -E; t <= CITY + E; t += 2.5) {
-    for (const [x, z] of [[t, -E + 0.3], [t, CITY + E - 0.3], [-E + 0.3, t], [CITY + E - 0.3, t]]) gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc);
+    for (const [x, z] of [[t, -E + 0.3], [t, CITY + E - 0.3], [-E + 0.3, t], [CITY + E - 0.3, t]]) if (!(x > CITY && z > g0 - 0.5 && z < g1 + 0.5)) gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc);
   }
-  for (const [x, z, w, d] of [[CITY / 2, -E + 0.3, L, 0.08], [CITY / 2, CITY + E - 0.3, L, 0.08], [-E + 0.3, CITY / 2, 0.08, L], [CITY + E - 0.3, CITY / 2, 0.08, L]]) {
+  for (const [x, z, w, d] of [[CITY / 2, -E + 0.3, L, 0.08], [CITY / 2, CITY + E - 0.3, L, 0.08], [-E + 0.3, CITY / 2, 0.08, L]]) {
     gr.add(TPL.box, M(x, CURB_H + 1.1, z, w, 0.07, d), rc); gr.add(TPL.box, M(x, CURB_H + 0.6, z, w, 0.04, d), rc);
   }
-  // decorative bridge to the mainland (east)
-  const bz = 6 * P + 40, deckY = 14, bc = C(0x8a3a2a), dc = C(0x55595e);
-  gr.add(TPL.box, M(CITY + E + 700, deckY, bz, 1400, 1.4, 18), dc);
-  for (let x = CITY + E + 30; x < CITY + E + 1400; x += 60) gr.add(TPL.box, M(x, (deckY - 1) / 2 - 1, bz, 3, deckY + 1, 10), dc);
-  for (const tx of [CITY + E + 260, CITY + E + 760]) for (const s of [-7.5, 7.5]) gr.add(TPL.box, M(tx, 50, bz + s, 3.2, 100, 3.2), bc);
-  for (const tx of [CITY + E + 260, CITY + E + 760]) { gr.add(TPL.box, M(tx, 96, bz, 3, 3, 18), bc); gr.add(TPL.box, M(tx, 60, bz, 2.5, 2.5, 18), bc); }
+  for (const [z0, z1] of [[-E, g0], [g1, CITY + E]]) eastRun(z0, z1, (zc, l) => { gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 1.1, zc, 0.08, 0.07, l), rc); gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 0.6, zc, 0.08, 0.04, l), rc); });
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
-  // bridge cables
-  const pts = [];
-  const towers = [CITY + E + 260, CITY + E + 760];
-  for (const s of [-7.5, 7.5]) {
-    const cab = (x0, y0, x1, y1, sag) => { const n = 24; for (let i = 0; i < n; i++) { const a = i / n, b2 = (i + 1) / n; const ya = lerp(y0, y1, a) - Math.sin(a * Math.PI) * sag, yb = lerp(y0, y1, b2) - Math.sin(b2 * Math.PI) * sag; pts.push(lerp(x0, x1, a), ya, bz + s, lerp(x0, x1, b2), yb, bz + s); } };
-    cab(CITY + E, deckY + 1, towers[0], 98, 20); cab(towers[0], 98, towers[1], 98, 70); cab(towers[1], 98, CITY + E + 1100, deckY + 1, 20);
-  }
-  const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  scene.add(new THREE.LineSegments(cg, new THREE.LineBasicMaterial({ color: 0x6a2a20 })));
   // water
   const water = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), makeWaterMaterial());
   water.position.set(CITY / 2, -1.2, CITY / 2);
@@ -38695,6 +38981,141 @@ function buildStaticScenery(scene, world) {
   return { ground, slabs, water, sky, gmat };
 }
 
+/* =====================================================================
+   [CONTENT] VALEN POINT: STATIC SCENERY (Session 6B)
+   Two merged versions of the district's ground-level dressing:
+   - near: the island's ground and seawall, the causeway, the track with
+     run-off, kerbs, edge lines and the start/finish line, the pit lane,
+     paddock and car parks, and the armco on both sides of the circuit
+     (two meshes, two draw calls);
+   - far: the island, the causeway and the track's asphalt only (one).
+   One or the other is shown by the focus's distance from the island.
+   Buildings, grandstands and the paddock stream as district blocks.
+   ===================================================================== */
+const VP_COL = { grass: 0x5d7f45, gravel: 0xb3a27e, asphalt: 0x2b2d30, line: 0xeeeeea, red: 0xc0392b, white: 0xf2f2f2, concrete: 0x8e8c86, park: 0x36383b, rock: 0x6b665c, yellow: 0xe8c04a };
+// levels (the physical ground is 0 everywhere on the island: the verge sits a little lower for the eye)
+const VP_Y = { ground: -0.08, gravel: -0.04, asphalt: 0, paint: 0.02, kerb: 0.03 };
+class FlatBuilder {
+  constructor() { this.p = []; this.c = []; }
+  quad(a, b, c2, d, y, col) {
+    const cc = new THREE.Color(col);
+    for (const q of [a, b, c2, a, c2, d]) { this.p.push(q[0], y, q[1]); this.c.push(cc.r, cc.g, cc.b); }
+  }
+  rect(x0, z0, x1, z1, y, col) { this.quad([x0, z0], [x0, z1], [x1, z1], [x1, z0], y, col); }
+  // a strip along a centreline between signed offsets o1 < o2 (along the left normal), sample k to k+1
+  strip(pts, nl, k0, k1, o1, o2, y, col, closed) {
+    const n = pts.length;
+    for (let k = k0; k < k1; k++) {
+      const a = k % n, b = (k + 1) % n; if (!closed && b === 0) break;
+      const A = pts[a], B = pts[b], na = nl[a], nb = nl[b];
+      const c = typeof col === 'function' ? col(a) : col; if (c === null) continue;
+      const O1 = typeof o1 === 'function' ? o1(a) : o1, O2 = typeof o2 === 'function' ? o2(a) : o2;
+      this.quad([A[0] + na[0] * O1, A[1] + na[1] * O1], [A[0] + na[0] * O2, A[1] + na[1] * O2], [B[0] + nb[0] * O2, B[1] + nb[1] * O2], [B[0] + nb[0] * O1, B[1] + nb[1] * O1], y, c);
+    }
+  }
+  mesh(mat) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    const nrm = new Float32Array(this.p.length); for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, mat); m.receiveShadow = true;
+    return m;
+  }
+}
+// normals for an open polyline
+function vpNormals(pts) { return pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dz / l, -dx / l]; }); }
+class ValenPointScenery {
+  constructor(scene, world) {
+    this.scene = scene; this.world = world;
+    const vp = world.vp, T = vp.track, mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    this.mat = mat;
+    // ---------------------------------------------------------------- shared: the island and the causeway
+    const base = fb => {
+      fb.rect(VP.x0, VP.z0, VP.x1, VP.z1, VP_Y.ground, VP_COL.grass);
+      // seawall faces (vertical) round the island and the causeway's embankment
+      const face = (x0, z0, x1, z1) => { const cc = new THREE.Color(VP_COL.rock); for (const q of [[x0, 0, z0], [x0, -3, z0], [x1, -3, z1], [x0, 0, z0], [x1, -3, z1], [x1, 0, z1]]) { fb.p.push(q[0], q[1] + VP_Y.ground, q[2]); fb.c.push(cc.r, cc.g, cc.b); } };
+      face(VP.x0, VP.z0, VP.x1, VP.z0); face(VP.x1, VP.z0, VP.x1, VP.z1); face(VP.x1, VP.z1, VP.x0, VP.z1); face(VP.x0, VP.z1, VP.x0, VP.cw.z + VP.cw.half); face(VP.x0, VP.cw.z - VP.cw.half, VP.x0, VP.z0);
+      const cz = VP.cw.z, h = VP.cw.half + 2, ce = CITY + EDGE_MARGIN;
+      fb.rect(ce, cz - h, VP.x0, cz + h, -0.25, VP_COL.rock);
+      face(ce, cz - h, VP.x0, cz - h); face(VP.x0, cz + h, ce, cz + h);
+      fb.rect(VP.cw.x0, cz - VP.cw.road, VP_SITE.ring.x, cz + VP.cw.road, VP_Y.asphalt, VP_COL.asphalt);
+    };
+    // ---------------------------------------------------------------- near
+    const fn = new FlatBuilder(); base(fn);
+    const half = VP_TRACK.w / 2, N2 = T.pts.length, cz = VP.cw.z;
+    // the causeway's paint: edge lines and a dashed centre line
+    for (const s of [-1, 1]) fn.rect(VP.cw.x0 + 4, cz + s * (VP.cw.road - 0.45) - 0.12, VP.x0, cz + s * (VP.cw.road - 0.45) + 0.12, VP_Y.paint, VP_COL.line);
+    for (let x = VP.cw.x0 + 10; x < VP.x0; x += 9) fn.rect(x, cz - 0.1, x + 4.5, cz + 0.1, VP_Y.paint, VP_COL.yellow);
+    // the turning circle (an asphalt disc round the island)
+    { const R0 = VP_SITE.ring, m = 32; for (let i = 0; i < m; i++) { const a = i / m * Math.PI * 2, b = (i + 1) / m * Math.PI * 2, ro = R0.r + VP.cw.road; fn.quad([R0.x + Math.cos(a) * 6, R0.z + Math.sin(a) * 6], [R0.x + Math.cos(a) * ro, R0.z + Math.sin(a) * ro], [R0.x + Math.cos(b) * ro, R0.z + Math.sin(b) * ro], [R0.x + Math.cos(b) * 6, R0.z + Math.sin(b) * 6], VP_Y.asphalt + 0.001, VP_COL.asphalt); } }
+    // paddock (concrete), car parks (asphalt with bay lines)
+    const S = VP_SITE;
+    fn.rect(S.paddock.x0, S.paddock.z0, S.paddock.x1, S.paddock.z1, VP_Y.gravel + 0.01, VP_COL.concrete);
+    for (const Pk of [S.parkN, S.parkS]) {
+      fn.rect(Pk.x0, Pk.z0, Pk.x1, Pk.z1, VP_Y.gravel + 0.01, VP_COL.park);
+      for (let z = Pk.z0 + 8; z < Pk.z1 - 6; z += 16) for (let x = Pk.x0 + 3; x < Pk.x1 - 2; x += 2.8) fn.rect(x, z - 2.6, x + 0.12, z + 2.6, VP_Y.paint - 0.01, VP_COL.line);
+    }
+    // the apron between the garages, the grandstands and the pit lane
+    fn.rect(VP_PIT.garX[1], S.standN.z0, VP_PIT.laneX - VP_PIT.laneW / 2, S.standS.z1, VP_Y.gravel + 0.01, VP_COL.concrete);
+    // the pit lane, its merges, and its paint
+    const lane = [...VP_PIT.entry, ...VP_PIT.exit];
+    void lane;
+    for (const poly of [[...VP_PIT.entry, [VP_PIT.laneX, VP_PIT.lane[0]]], [[VP_PIT.laneX, VP_PIT.lane[0]], ...VP_PIT.exit.slice(1)]]) {
+      const ps = this._dense(poly, 2), nl = vpNormals(ps);
+      fn.strip(ps, nl, 0, ps.length - 1, -VP_PIT.laneW / 2, VP_PIT.laneW / 2, VP_Y.asphalt, VP_COL.asphalt, false);
+    }
+    fn.rect(VP_PIT.laneX - VP_PIT.laneW / 2 - 0.2, VP_PIT.lane[0], VP_PIT.laneX + VP_PIT.laneW / 2, VP_PIT.lane[1], VP_Y.asphalt, VP_COL.asphalt);
+    fn.rect(VP_PIT.laneX + 1.8, VP_PIT.lane[0], VP_PIT.laneX + 2.0, VP_PIT.lane[1], VP_Y.paint, VP_COL.line);
+    fn.rect(VP_PIT.wallX - 0.6, VP_PIT.wall[0], VP_PIT.wallX + 0.6, VP_PIT.wall[1], 1.25, 0xd8dade);
+    // the circuit: gravel traps outside the corners, asphalt, kerbs on the corners, edge lines, the start/finish line
+    const bar = vp.barriers;
+    const dist = (k, s) => { const q = bar[s > 0 ? 0 : 1][k]; if (!q) return half + 12; const p = T.pts[k]; return Math.hypot(q[0] - p[0], q[1] - p[1]); };
+    fn.strip(T.pts, T.nl, 0, N2, k => half + 1.2, k => Math.max(half + 1.3, dist(k, 1) - 1.5), VP_Y.gravel, k => T.R[k] > 0 ? VP_COL.gravel : null, true);
+    fn.strip(T.pts, T.nl, 0, N2, k => -Math.max(half + 1.3, dist(k, -1) - 1.5), -half - 1.2, VP_Y.gravel, k => T.R[k] > 0 ? VP_COL.gravel : null, true);
+    fn.strip(T.pts, T.nl, 0, N2, -half, half, VP_Y.asphalt, VP_COL.asphalt, true);
+    const kerb = k => T.R[k] > 0 ? (Math.floor(k / 2) % 2 ? VP_COL.red : VP_COL.white) : null;
+    fn.strip(T.pts, T.nl, 0, N2, half, half + 1.2, VP_Y.kerb, kerb, true);
+    fn.strip(T.pts, T.nl, 0, N2, -half - 1.2, -half, VP_Y.kerb, kerb, true);
+    fn.strip(T.pts, T.nl, 0, N2, half - 0.55, half - 0.3, VP_Y.paint, VP_COL.line, true);
+    fn.strip(T.pts, T.nl, 0, N2, -half + 0.3, -half + 0.55, VP_Y.paint, VP_COL.line, true);
+    { const k = vp.sf.k; for (let i = 0; i < 14; i++) for (let j = 0; j < 2; j++) { const o = -half + i, c = (i + j) % 2 ? VP_COL.white : 0x111111; const p = T.pts[k], nl = T.nl[k], tx = -nl[1], tz = nl[0], d0 = j * 0.6 - 0.6, d1 = d0 + 0.6; const P0 = (oo, dd) => [p[0] + nl[0] * oo + tx * dd, p[1] + nl[1] * oo + tz * dd]; fn.quad(P0(o, d0), P0(o + 1, d0), P0(o + 1, d1), P0(o, d1), VP_Y.kerb + 0.002, c); } }
+    // armco: rails and posts along both barrier lines (one vertex-coloured mesh)
+    const gv = new GeoBuilder(), steel = C(0xb9bec4), post = C(0x6a7078);
+    for (const line of bar) for (let k = 0; k < N2; k++) {
+      const a = line[k], b = line[(k + 1) % N2]; if (!a || !b) continue;
+      const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz); if (L < 0.01) continue;
+      const ry = Math.atan2(-dz, dx), mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      gv.add(TPL.box, M(mx, 0.55, mz, L + 0.05, 0.32, 0.12, ry), steel);
+      if (k % 2 === 0) gv.add(TPL.box, M(a[0], 0.35, a[1], 0.14, 0.7, 0.14, ry), post);
+    }
+    const near = new THREE.Group();
+    near.add(fn.mesh(mat));
+    const steelM = new THREE.Mesh(gv.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.6 })); steelM.castShadow = false; steelM.receiveShadow = true;
+    near.add(steelM);
+    // ---------------------------------------------------------------- far: the island, the causeway and the asphalt
+    const ff = new FlatBuilder(); base(ff);
+    const coarse = T.pts.filter((p, k) => k % 4 === 0), cn = coarse.map((p, k) => T.nl[k * 4]);
+    ff.strip(coarse, cn, 0, coarse.length, -half, half, VP_Y.asphalt, VP_COL.asphalt, true);
+    const far = new THREE.Group(); far.add(ff.mesh(mat));
+    this.near = near; this.far = far; this.mode = null;
+    scene.add(near); scene.add(far); near.visible = false; far.visible = true;
+  }
+  // a polyline resampled every `step` metres
+  _dense(poly, step) {
+    const out = [];
+    for (let k = 0; k < poly.length - 1; k++) { const a = poly[k], b = poly[k + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / step)); for (let i = 0; i < m; i++) out.push([lerp(a[0], b[0], i / m), lerp(a[1], b[1], i / m)]); }
+    out.push(poly[poly.length - 1]);
+    return out;
+  }
+  // near within 650 m of the island, far beyond
+  update(fx, fz) {
+    const dx = Math.max(VP.x0 - fx, 0, fx - VP.x1), dz = Math.max(VP.z0 - fz, 0, fz - VP.z1), d = Math.hypot(dx, dz);
+    const near = d < 650;
+    if (near !== this.mode) { this.mode = near; this.near.visible = near; this.far.visible = !near; }
+  }
+}
 /* =====================================================================
    [CORE] CHARACTER RENDERER: every human (player, peds, cops) is drawn with a
    handful of InstancedMeshes; poses are computed procedurally per frame.
@@ -40658,7 +41079,7 @@ class FXSystem {
     if (this.ambientT <= 0) {
       this.ambientT = 0.05;
       for (const ci of g.chunks.visible) {
-        const b = g.world.blocks[ci];
+        const b = g.world.blockI(ci); if (!b) continue;
         for (const f of b.fx) {
           if (f.type === 'fountain' && dist2(f.x, f.z, g.cam.pos.x, g.cam.pos.z) < 90 * 90) {
             for (let j = 0; j < 3; j++) this.smoke.emit(f.x + rand(-0.15, 0.15), f.y, f.z + rand(-0.15, 0.15), rand(-1, 1), rand(4, 5.5), rand(-1, 1), 1.0, 0.14, 0.32, 0.8, 0.88, 0.95, 0.6, 0.2, 9.8);
@@ -40798,8 +41219,9 @@ class TrafficManager {
       if (ai.s > sc - 18 && ai.s < sc - 10) {
         ai.linkSeen = 1;
         if (v.mission || v.patrol || Math.random() > this.linkChance) return;
-        const lane = Links.lane(en.link, en.e), q0 = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, ai.s), qc = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, sc);
-        this.linkPath(v, [q0, ...this.qbez(q0, qc, lane[0], 8).slice(0, -1)], lane, en.link, 1 - en.e);
+        // a spur: out to its turning circle and back to the same junction
+        const L = en.link, lane = L.spur ? Links.loop(L) : Links.lane(L, en.e), q0 = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, ai.s), qc = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, sc);
+        this.linkPath(v, [q0, ...this.qbez(q0, qc, lane[0], 8).slice(0, -1)], lane, L, L.spur ? 0 : 1 - en.e);
         return;
       }
     }
@@ -40819,7 +41241,7 @@ class TrafficManager {
     // almost never be the one near the player
     const near = Links.list.filter(L => L.pts.some(q => { const d = Math.hypot(q[0] - px, q[1] - pz); return d > 75 && d < 230; }));
     const L = pick(near); if (!L) return null;
-    const from = Math.random() < 0.5 ? 0 : 1, lane = Links.lane(L, from);
+    const from = L.spur ? 0 : Math.random() < 0.5 ? 0 : 1, lane = L.spur ? Links.loop(L) : Links.lane(L, from);
     const k = Math.floor(rand(0.1, 0.8) * lane.length), [x, z] = lane[k];
     const d = Math.hypot(x - px, z - pz);
     if (d < 75 || d > 230 || (d < 160 && g.inView(x, 1, z, 3))) return null;
@@ -40828,7 +41250,7 @@ class TrafficManager {
     const v = g.vehicles.spawn(type, x, z, Math.atan2(b[0] - x, b[1] - z), { kinematic: true, driver: 'npc' });
     const r0 = Math.random(), pers = r0 < 0.25 ? 0 : r0 < 0.8 ? 1 : 2, pk = [[0.85, 1.5, 0.3, 1.4], [1, 1, 1, 1], [1.15, 0.55, 2.5, 0.6]][pers];
     v.ai = { i: 0, j: 0, dx: 1, dz: 0, s: 0, mode: 'path', t: 0, len: 1, speed: 8, pers, gapK: pk[3], runK: pk[2], maxV: rand(11, 14.5) * pk[0] * (type === 'truck' ? 0.8 : 1), react: rand(0.25, 1.1) * pk[1], reactT: 0, runLight: null, next: null, blockT: 0, honkT: rand(0, 2) * pk[1], laneOff: 0, overtake: 0, creepT: 0, p0: null, linkSeen: 1 };
-    this.linkPath(v, [], lane.slice(k), L, 1 - from);
+    this.linkPath(v, [], lane.slice(k), L, L.spur ? 0 : 1 - from);
     v.patrol = false;
     this.cars.push(v);
     return v;
@@ -41112,6 +41534,21 @@ class DriveAI {
   setGoal(x, z) { this.goal = { x, z }; this.route(x, z); this.arrived = false; }
   route(tx, tz) {
     const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
+    // to or from Valen Point: the GPS route through the causeway, kept to the right-hand side of each leg
+    if (offCity(v.pos.x, v.pos.z) || offCity(tx, tz)) {
+      const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
+      if (r && r.length > 1) {
+        this.path = [];
+        for (let k = 1; k < r.length; k++) {
+          const a = r[k - 1], b = r[k], last = k === r.length - 1;
+          if (Math.hypot(b.x - a.x, b.z - a.z) < 0.5 && !last) continue;
+          const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1, o = last ? 0 : LANE * 0.7;
+          this.path.push({ x: b.x - dz / l * o, z: b.z + dx / l * o, node: !last });
+        }
+        this.pi = 0;
+        return;
+      }
+    }
     let i = Math.round(v.pos.x / P), j = Math.round(v.pos.z / P);
     const onV = Math.abs(v.pos.x - i * P) < 9, onH = Math.abs(v.pos.z - j * P) < 9;
     if (onV && !onH) j = fz > 0 ? Math.ceil(v.pos.z / P) : Math.floor(v.pos.z / P);
@@ -41181,6 +41618,8 @@ class DriveAI {
         if (turn > 0.5) desired = Math.min(desired, 10 + Math.max(0, dl - 12) * 0.55);
       }
       if (last) desired = Math.min(desired, 4 + dl * 0.5);
+      // a racing line carries its own safe speed (Valen Point): the lowest of this point and the next two
+      if (w.vmax) { let lim = w.vmax; for (let j = 1; j <= 2 && this.pi + j < this.path.length; j++) lim = Math.min(lim, this.path[this.pi + j].vmax || lim); desired = Math.min(desired, lim); }
     }
     const lp = v.toLocal(tx, tz);
     const ang = Math.atan2(lp.x, lp.z);
@@ -41829,6 +42268,12 @@ class PoliceManager {
       let blocked = false; for (const v of g.vehicles.list) if (dist2(v.pos.x, v.pos.z, x, z) < 100) { blocked = true; break; }
       if (blocked) continue;
       best = { x, z }; break;
+    }
+    // off the lattice (Valen Point): a unit comes along the causeway or round the turning circle instead
+    if (!best && offCity(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
+      const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z); if (d < 120 || d > 320 || (g.inView(s.x, 2, s.z, 5) && d < 200)) continue;
+      if (g.vehicles.list.some(v => dist2(v.pos.x, v.pos.z, s.x, s.z) < 100)) continue;
+      const v = g.vehicles.spawn('police', s.x, s.z, s.h, { driver: 'cop', speed: 10 }); v.siren = true; this.adoptUnit(v); return;
     }
     if (!best) return;
     const h = Math.atan2(p.pos.x - best.x, p.pos.z - best.z);
@@ -42791,7 +43236,7 @@ class MissionManager {
     g.audio.play('confirm');
     g.ui.banner(spec.title, spec.replay ? 'Replay \u00b7 ' + spec.contact.name : spec.contact.name, 'info', 2.2);
     if (spec.type === 'story') { g.campaign.begin(m); return; }
-    if (spec.type === 'srace') { g.race.begin(spec.race, spec.pink ? { pink: true, names: ['Vance'] } : {}); m.timer = 0; return; }
+    if (spec.type === 'srace') { g.race.begin(spec.race, spec.pink ? { pink: true, names: ['Vance'] } : spec.official ? { official: true } : {}); m.timer = 0; return; }
     const pv = () => g.player.state === 'vehicle' ? g.player.vehicle : null;
     switch (spec.type) {
       case 'delivery': m.target = spec.dest; m.objective = `Deliver the parcel to ${districtNameAt(spec.dest.x, spec.dest.z)}`; this.objMarker(spec.dest.x, spec.dest.z); m.startHealth = pv() ? pv().health : 100; break;
@@ -42829,7 +43274,7 @@ class MissionManager {
     }
     const pay = Math.max(0, s.reward + (m.bonus || 0));
     // contracts are criminal work: Dirty Cash in hand; an illegal street race pays Dirty too (§45.18)
-    if (pay > 0) g.earn(pay, s.type === 'race' || s.type === 'srace' ? 'streetRace' : 'contract');
+    if (pay > 0) g.earn(pay, s.official ? 'trackPrize' : s.type === 'race' || s.type === 'srace' ? 'streetRace' : 'contract');
     this.lastFailed = null;
     g.save.missionsCompleted++; g.save.stats.missionsPassed++;
     g.audio.play('pass');
@@ -42932,6 +43377,12 @@ class MissionManager {
           return;
         }
         if (res.reason || !res.place || res.place > 3) { this.fail(res.reason || `You finished ${ordinal(res.place)}.`); return; }
+        // an official event (Session 6B): prize money from the bank by today's tier, no Rep; the Invitational's car
+        if (s.official) {
+          const pay = g.motorsport.payout(s.race, res.place); s.reward = pay.cash; s.rep = 0;
+          if (res.place === 1) { g.motorsport.noteWin(s.race.id); if (s.race.car) g.motorsport.awardCar(s.race); }
+          this.pass(); return;
+        }
         // the purse and Rep for this finish, by today's tier for this race (§45.33)
         const pay = g.raceRules.payout(s.race, res.place);
         s.reward = pay.cash; s.rep = pay.rep;
@@ -44592,7 +45043,7 @@ const TUNE_REP = [0, 800, 1300];
 // rule here (Clean, as before), to be revisited with vehicle ownership in Session 5.
 const RESALE_CAP = 0.85;
 // a car won in a pink slip came out of an illegal street race: it resells for Dirty Cash (§45.33)
-const CAR_RESALE = { bought: { k: 0.5 }, stolen: { k: 0.22, cur: 'dirty' }, found: { k: 0.35, cur: 'clean' }, reward: { k: 0.35, cur: 'clean' }, mission: { k: 0.35, cur: 'clean' }, pinkslip: { k: 0.35, cur: 'dirty' } };
+const CAR_RESALE = { bought: { k: 0.5 }, stolen: { k: 0.22, cur: 'dirty' }, found: { k: 0.35, cur: 'clean' }, reward: { k: 0.35, cur: 'clean' }, mission: { k: 0.35, cur: 'clean' }, pinkslip: { k: 0.35, cur: 'dirty' }, prize: { k: 0.35, cur: 'clean' } };
 const STORE_ITEMS = [
 // pay: how each is paid (MONEY_SOURCES): food and first aid with cash or the bank, shop goods from the bank,
 // scratch cards (a lottery) from the bank only, at the card counter (§45.5, §45.18)
@@ -44603,7 +45054,7 @@ const STORE_ITEMS = [
   { id: 'scratch', name: 'Scratch Cards', desc: 'Five cards from $5 to $100. Top prize $1,000,000. Most lose. Bank only.', price: 5, pay: 'casinoStake' },
   { id: 'map', name: 'Collector’s Map', desc: 'Someone marked five hidden packages on a tourist map.', price: 1200, pay: 'shop' }
 ];
-const ORIGIN_CHIP = { bought: ['OWNED', '#7fe08f'], stolen: ['STOLEN', '#ff4d5e'], reward: ['SPECIAL', '#d28cff'], found: ['FOUND', '#46d4c4'], pinkslip: ['WON', '#ff7ab8'] };
+const ORIGIN_CHIP = { bought: ['OWNED', '#7fe08f'], stolen: ['STOLEN', '#ff4d5e'], reward: ['SPECIAL', '#d28cff'], found: ['FOUND', '#46d4c4'], pinkslip: ['WON', '#ff7ab8'], prize: ['PRIZE', '#ffd84d'] };
 const ACHIEVEMENTS = [
   { id: 'day_one', name: 'Day One', desc: 'Finish your first job for Rosa.' },
   { id: 'tourist', name: 'Tourist', desc: 'Discover every district.' },
@@ -45170,7 +45621,7 @@ class ContentManager {
     const g = this.g, p = g.player, s = g.save;
     if (p.interior) return;
     const zk = zoneKey(p.pos.x, p.pos.z);
-    const inCity = p.pos.x > 0 && p.pos.z > 0 && p.pos.x < CITY && p.pos.z < CITY;
+    const inCity = (p.pos.x > 0 && p.pos.z > 0 && p.pos.x < CITY && p.pos.z < CITY) || vpLand(p.pos.x, p.pos.z);
     if (inCity && !s.discovered.zones[zk]) {
       s.discovered.zones[zk] = 1;
       const z = ZONES[zk], n = Object.keys(s.discovered.zones).length;
@@ -45726,6 +46177,8 @@ const RACES = [
 ];
 const RACER_NAMES = ['Vance', 'Mika "Nitro" Osei', 'Jules Ferreira', 'Big Tam', 'Lou Park', 'Danny Two-Tone'];
 function raceCheckpoints(def) {
+  // an official event at Valen Point runs on the circuit (Session 6B)
+  if (def.circuit) return vpCheckpoints(def);
   const seq = def.nodes.slice(); if (def.loop) seq.push(seq[0]);
   const one = [];
   for (let k = 1; k < seq.length; k++) {
@@ -45772,7 +46225,8 @@ class RaceManager {
       o.mission = 'race'; o.touched = true; o.critical = false;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
-      ai.path = R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
+      // on the circuit the racing line, with a safe speed at every point; in the street the checkpoints
+      ai.path = R.aiPath ? R.aiPath.map(c => ({ ...c, x: c.x + rand(-0.8, 0.8), z: c.z + rand(-0.8, 0.8) })) : R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
       ai.pi = 0; ai.goal = R.cps[R.cps.length - 1]; ai.wait = 99;
       const base = o.spec.vmax * (A.opts.hard ? 0.86 : rand(0.74, 0.82));
       A.racers.push({ v: o, cp: 0, base, done: false, time: 0, name: A.opts.names ? A.opts.names[k] : RACER_NAMES[(k + (A.def.id.length)) % RACER_NAMES.length], stuck: 0 });
@@ -45797,6 +46251,11 @@ class RaceManager {
       A.objective = v ? (d < 9 ? 'Stop on the start line' : `Drive to the start line — ${A.def.name}`) : 'Get a vehicle and drive to the start line';
       if (v && d < 9 && v.speed < 4) {
         // a pink slip: the car you stopped in is the stake; checked, then committed (and saved) here
+        // an official event: scrutineering, then the entry fee from the bank (Session 6B)
+        if (A.opts.official && !A.paid) {
+          const why = g.motorsport.canEnter(v, A.def) || g.motorsport.payIn(A.def); if (why) { A.objective = why; return null; }
+          A.paid = true;
+        }
         if (A.opts.pink) {
           const why = g.pinks.canStake(v); if (why) { A.objective = why; return null; }
           const r = g.pinks.commit(v); A.opts.opponentCls = r.type; A.opts.opponentColor = r.color; A.opts.opponentTier = r.vtier;
@@ -45827,7 +46286,8 @@ class RaceManager {
     }
     // running
     A.t += dt;
-    if (g.raceRules) g.raceRules.watch(A, v);
+    // a street race is illegal and draws heat when seen; an official event at Valen Point never does
+    if (g.raceRules && !A.def.official) g.raceRules.watch(A, v);
     const cp = R.cps[A.cp];
     A.target = cp;
     if (v && Math.hypot(p.pos.x - cp.x, p.pos.z - cp.z) < 13) {
@@ -46695,6 +47155,9 @@ const PROPS = [
   { id: 'pawn', name: 'Lucky’s Pawn', kind: 'business', price: 18000, at: [2, 6, 0, 30], income: 420, storage: 60, crew: 2, fence: true, desc: 'The Old Quarter’s fence. Buy it and every hot watch in the city comes through your door.' },
   { id: 'bar', name: 'The Rusty Anchor', kind: 'business', price: 24000, at: [11, 6, 3, 25], income: 560, storage: 40, crew: 2, recruit: true, desc: 'A dockside bar full of people looking for work. Good for recruiting.' },
   { id: 'diner', name: 'Rosie’s Diner', kind: 'business', price: 26000, at: [6, 1, 3, 40], income: 620, storage: 30, crew: 2, desc: 'Coffee, pie and a back booth for meetings.' },
+  // Valen Point (Session 6B): a legitimate asset bought from the bank, no Rank or Rep gate; its garage is the 24 pit
+  // garage bays. Price provisional (Session 13)
+  { id: 'motorsport', name: 'Valen Point Motorsport Park', kind: 'motorsport', price: 1500000, place: 'motorsport', garage: 24, storage: 0, desc: 'The circuit, its pit garages and grandstands on Valen Point. Track days, race meetings, a garage for a whole collection, and a clean income.' },
   { id: 'carwash', name: 'Suds Car Wash', kind: 'business', price: 34000, at: [9, 2, 3, 40], income: 760, storage: 40, garage: 1, crew: 2, launder: true, respray: true, desc: 'Cleans cars and cash. Respray stolen rides on site.' },
   { id: 'motel', name: 'Starlite Motel', kind: 'business', price: 42000, at: [4, 9, 1, 35], income: 980, storage: 80, crew: 2, night: true, desc: 'Rooms by the hour on the Nightlife Strip. Discreet, profitable, never quiet.' },
   { id: 'club', name: 'Club Neon', kind: 'business', price: 95000, at: [5, 8, 2, 40], income: 2300, storage: 60, crew: 3, night: true, recruit: true, infl: 30, desc: 'The hottest door on the Strip. Whoever owns it owns the night.' },
@@ -46878,7 +47341,10 @@ const IMPOUND = { id: 'impound', at: [4, 7], name: 'Port Valen Police Impound', 
   fee: { min: 300, k: 0.06, max: 25000 }, pick: 8, open: 12, stars: { pick: 2, ram: 3, drive: 2, seen: 2 }, office: 3.5,
   // the overflow yard next door: when the main yard's spaces are taken, seized cars go to their own numbered space
   // there. Between the two there is a space for every car you could ever own (tests/hot.mjs checks it)
-  overflow: { id: 'impound_x', at: [4, 8], name: 'Police Impound · overflow yard' } };
+  overflow: { id: 'impound_x', at: [4, 8], name: 'Police Impound · overflow yard' },
+  // Valen Point's annex (Session 6B): the pit garages add parking past what the two city yards hold, so a third
+  // yard by the causeway landing keeps a space for every car you could own
+  annex: { id: 'impound_vp', name: 'Police Impound · Valen Point annex', sign: 'ANNEX' } };
 // the overflow yard's spaces (yard-local metres: u across the gate fence, v in from it). Bays fit the biggest vehicle;
 // rows face aisles of 6.6 m or more (v 1–8.1 along the gate fence, 22.9–29.5, 44.3–50.9) joined by a lane at u −29…−22
 const OVERFLOW_BAY = { w: 2.9, d: 7.4, n: 17, u0: -19.7 };
@@ -47194,7 +47660,7 @@ const Inv = {
   }
 };
 // the five kinds of place goods can be (Part 14 of the design): property kind -> location class
-const LOC_CLASS = { safehouse: 'SAFEHOUSE', business: 'PROPERTY', garage: 'PROPERTY', warehouse: 'WAREHOUSE' };
+const LOC_CLASS = { safehouse: 'SAFEHOUSE', business: 'PROPERTY', garage: 'PROPERTY', warehouse: 'WAREHOUSE', motorsport: 'MOTORSPORT' };
 const LOC_ORDER = ['ON PERSON', 'VEHICLE', 'SAFEHOUSE', 'PROPERTY', 'WAREHOUSE', 'CORNER'];
 // valuation of one container at a district's street price: per good qty, cost, value, P/L
 function holdings(o, zone, market) {
@@ -47874,6 +48340,7 @@ class Underworld {
     if (this.g.vreg) this.g.vreg.reset();
     if (this.g.pinks) this.g.pinks.reset();
     if (this.g.wash) this.g.wash.reset();
+    if (this.g.motorsport) this.g.motorsport.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -48468,6 +48935,7 @@ class Underworld {
     const ra = this.rivalwh.findAction(); if (ra) return ra;
     const sa = this.shipments.findAction(); if (sa) return sa;
     const ia = g.impound.findAction(); if (ia) return ia;
+    const ma = g.motorsport.findAction(); if (ma) return ma;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       const wa = g.wash.findAction(); if (wa) return wa;
@@ -49729,8 +50197,8 @@ class PropertyManager {
   ownedList() { return PROPS.filter(p => this.owned(p.id)); }
   // what owned property on a turf adds to your side of a showdown there: 6 for the first, half as much again for each
   // further one, never more than PROP_PRESENCE_MAX (§45.23: stacking property can't make a turf invincible)
-  presenceDefense(i) { let n = 0; for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) n++; } return n ? Math.min(PROP_PRESENCE_MAX, PROP_PRESENCE * (2 - Math.pow(0.5, n - 1))) : 0; }
-  presence(i) { for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && turfAt(L.x, L.z) === i) return true; } return false; }
+  presenceDefense(i) { let n = 0; for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && !offCity(L.x, L.z) && turfAt(L.x, L.z) === i) n++; } return n ? Math.min(PROP_PRESENCE_MAX, PROP_PRESENCE * (2 - Math.pow(0.5, n - 1))) : 0; }
+  presence(i) { for (const p of this.ownedList()) { const L = this.uw.loc('prop', p.id); if (L && !offCity(L.x, L.z) && turfAt(L.x, L.z) === i) return true; } return false; }
   // stash space: a storage business grows with its level; a home in the Docklands holds a quarter more
   storageCap(id) {
     const d = PROP_BY_ID[id]; if (!d) return 0;
@@ -49812,7 +50280,8 @@ class PropertyManager {
     // find you a better deal
     const uw = this.uw, L = uw.loc('prop', def.id);
     let k = (1 - Math.min(0.2, uw.influence / 2500)) * (1 - this.perk('propDisc'));
-    const own = L ? uw.owner[turfAt(L.x, L.z)] : null;
+    // a property off the city (Valen Point) sits on nobody's turf
+    const own = L && !offCity(L.x, L.z) ? uw.owner[turfAt(L.x, L.z)] : null;
     if (own && own !== 'pc' && uw.attitude(own) === 'hostile') k *= 1.1;
     return Math.round(def.price * k / 50) * 50;
   }
@@ -49827,7 +50296,7 @@ class PropertyManager {
     Money.pay(price, 'property');
     S.props[id] = { owned: true, dmg: 0, since: S.day, lvl: 1 };
     if (!S.storage[id]) S.storage[id] = {};
-    const L = uw.loc('prop', id), own = L ? uw.owner[turfAt(L.x, L.z)] : null;
+    const L = uw.loc('prop', id), own = L && !offCity(L.x, L.z) ? uw.owner[turfAt(L.x, L.z)] : null;
     if (own && own !== 'pc' && FACTIONS[own]) { S.factions[own].rel -= 8; uw.news('unknown', `The ${FACTIONS[own].short} heard you bought ${def.name} on their turf. They’re not pleased.`); }
     // a purchase buys no Rep, no influence and no hold on the turf (§1, §45.7)
     if (def.id === 'penthouse') { g.save.owns.penthouse = true; g.content.ach('home'); }
@@ -49885,6 +50354,8 @@ class PropertyManager {
     const floor = Math.min(MORALE_CAP, this.perk('loyalty') * 10);
     if (floor > 0) for (const c of uw.crew.active()) c.morale = Math.max(c.morale, floor);
     this.policeRaids();
+    // the motorsport park's day (Session 6B): its income, and the settling of a meeting you hosted
+    if (uw.g.motorsport) uw.g.motorsport.tickDay();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);
   }
   repairCost(def) { return Math.round(def.price * 0.12 / 10) * 10; }
@@ -51001,6 +51472,8 @@ Object.assign(PropertyManager.prototype, {
     if (home && def.yard) { const f = FACE_V[home.face]; for (let k = 0; k < def.yard; k++) out.push({ x: home.door.x + f[0] * 9 + (home.face < 2 ? (k * 3.4 + 8) : 0), z: home.door.z + f[1] * 9 + (home.face < 2 ? 0 : (k * 3.4 + 8)), h: Math.atan2(-f[0], -f[1]), kind: 'yard', y: CURB_H }); }
     if (def.id === 'penthouse' && w.towerDrive) out.push({ ...w.towerDrive, kind: 'outdoor' });
     if (def.kind === 'warehouse' && w.compounds[def.id]) for (const p of w.compounds[def.id].park) out.push({ x: p.x, z: p.z, h: p.h, kind: 'yard', y: CURB_H });
+    // the motorsport park's pit garages, two bays each (Session 6B)
+    if (def.kind === 'motorsport' && w.vp) for (const b of w.vp.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: 0 });
     if (def.under && g.vspaces) { const vs = g.vspaces.byProp(def.id); if (vs) for (const b of vs.bays) out.push({ ...b, kind: 'under', space: vs.id }); }
     // kerbside spaces for flats, lock-ups and businesses without a drive
     const want = home ? 0 : (def.street || def.garage || 0);
@@ -51553,8 +52026,8 @@ class ImpoundLot {
   get id() { return IMPOUND.id; }
   get C() { return this.g.world.compounds[IMPOUND.id]; }
   get CS() { return this.g.uw.compounds; }
-  // the yards: the main lot (with the window) and the overflow yard next door
-  lots() { const W = this.g.world.compounds; return [IMPOUND.id, IMPOUND.overflow.id].filter(id => W[id]); }
+  // the yards: the main lot (with the window), the overflow yard next door, and Valen Point's annex (Session 6B)
+  lots() { const W = this.g.world.compounds; return [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id].filter(id => W[id]); }
   econ() { return this.g.uw ? this.g.uw.S.econH : 0; }
   // the release fee: a share of what the car is worth, fixed when it is seized
   fee(e) { const F = IMPOUND.fee, val = carMsrp(e.type) * (TIER_LOOK[e.vtier] || TIER_LOOK.common).value; return Math.round(clamp(val * F.k, F.min, F.max) / 10) * 10; }
@@ -51646,7 +52119,7 @@ class ImpoundLot {
     });
   }
   // "space 3 in the main yard", "space 27 in the overflow yard"
-  spaceName(e) { const S = this.slots(), sp = this.slotPos(e); if (!sp) return 'the waiting list (no space free yet)'; const n = S.filter((q, i) => q.lot === sp.lot && i <= e.imp.slot).length; return `space ${n} in the ${sp.lot === IMPOUND.id ? 'main yard' : 'overflow yard'}`; }
+  spaceName(e) { const S = this.slots(), sp = this.slotPos(e); if (!sp) return 'the waiting list (no space free yet)'; const n = S.filter((q, i) => q.lot === sp.lot && i <= e.imp.slot).length; return `space ${n} in the ${sp.lot === IMPOUND.id ? 'main yard' : sp.lot === IMPOUND.annex.id ? 'Valen Point annex' : 'overflow yard'}`; }
   findAction() {
     const g = this.g, p = g.player; if (!this.C || p.interior || p.state !== 'foot') return null;
     const picking = () => ({ label: `Picking the gate lock… ${Math.ceil(IMPOUND.pick - this.pick.t)} s`, act: () => {} });
@@ -51656,7 +52129,7 @@ class ImpoundLot {
       if (Math.hypot(p.pos.x - ox, p.pos.z - oz) < IMPOUND.office) {
         if (this.pick) return picking();
         if (id === IMPOUND.id) return { label: `Impound window · ${IMPOUND.name}`, act: () => this.openOffice() };
-        if (!this.entitled()) return { label: 'Overflow yard gate · pick the lock', act: () => { this.pick = { t: 0, lot: id }; } };
+        if (!this.entitled()) return { label: `${id === IMPOUND.annex.id ? 'Annex' : 'Overflow yard'} gate · pick the lock`, act: () => { this.pick = { t: 0, lot: id }; } };
       }
       // from inside a yard, the control box on its gate post
       if (this.CS.inYard(id, p.pos.x, p.pos.z) && Math.hypot(p.pos.x - G.x, p.pos.z - G.z) < 4) {
@@ -51984,6 +52457,196 @@ class CarWash {
   }
   stop() { this.job = null; if (this.rig) this.rig.visible = false; }
   reset() { this.stop(); this._bays = null; }
+}
+/* =====================================================================
+   [UNDERWORLD] VALEN POINT MOTORSPORT PARK (§16, §45.34; Session 6B)
+   A legitimate asset on the island east of the city (world: 025, 125,
+   175). Everything here is Clean Bank, and nothing here draws heat:
+   - Race Control (the paddock office): buy the park (no Rank or Rep
+     gate), enter official events, book a track day.
+   - Official events: circuit races against the clock and a grid, with
+     class rules by the value of the car you bring (registered to you,
+     not HOT, in one piece), a buy-in and prize money from the bank (the
+     buy-in waived for the owner), paid by the same daily tiers as street
+     races (per event, per economic day); the Invitational awards a prize
+     car, once.
+   - Track days: timed laps on the circuit (a fee, or free for the owner:
+     a private session). Valid laps pass every sector; the best is saved.
+   - The owner also gets: 24 pit-garage parking bays (the registry's
+     physical spaces), a pit crew for repairs a third off, the right to
+     host a race meeting (pay to put it on, the gate takes it back the
+     next day), and the park's daily income.
+   ===================================================================== */
+const VP_EVENTS = [
+  { id: 'vp_club', name: 'Club Sprint', laps: 2, opp: 4, band: [0, 16000], fee: 300, reward: 2400, cls: ['compact', 'apex', 'sedan', 'crest'], blurb: 'Hatchbacks and saloons, nothing worth more than $16,000. Two laps.' },
+  { id: 'vp_gt', name: 'GT Cup', laps: 3, opp: 5, band: [16000, 65000], fee: 1500, reward: 9000, cls: ['sports', 'tempest', 'muscle', 'hellion', 'revenant'], blurb: 'Sports cars and muscle, $16,000 to $65,000. Three laps.' },
+  { id: 'vp_super', name: 'Supercar Showdown', laps: 3, opp: 5, band: [65000, Infinity], fee: 5000, reward: 30000, cls: ['supercar', 'valkyr', 'obsidian', 'monarch', 'coupe'], blurb: 'The fastest cars on the island, $65,000 and up. Three laps.' },
+  { id: 'vp_inv', name: 'Valen Point Invitational', laps: 3, opp: 5, band: [40000, Infinity], fee: 8000, reward: 0, car: 'monarch', cls: ['valkyr', 'obsidian', 'supercar', 'coupe', 'kodiak'], blurb: 'Invitation only, $40,000 and up. The winner drives home a Monarch GT. Once.' }
+];
+for (const e of VP_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; }
+const VP_PARK = { trackDay: 250, session: 600, hostCost: 20000, hostTake: 32000, income: 9000, upkeep: 2500, pitK: 0.7, minHp: 60 };
+const RACE_CONTROL = { id: 'racecontrol', name: 'Race Control' };
+// the circuit's checkpoints for an event: every 40 m from the start/finish line round the loop, `laps` times; the
+// grid 34 m behind the line on the main straight; the racing line for AI drivers every 10 m with a safe speed
+function vpCheckpoints(def) {
+  const vp = game.world.vp, T = vp.track, n = T.pts.length, k0 = vp.sf.k, laps = def.laps || 1, out = [];
+  for (let l = 0; l < laps; l++) for (let j = 20; j <= n; j += 20) { const k = (k0 + j) % n; out.push({ x: T.pts[k][0], z: T.pts[k][1], lap: l }); }
+  // the last checkpoint of every lap is the line itself
+  for (let l = 0; l < laps; l++) { const i = (l + 1) * Math.floor(n / 20) - 1; if (out[i]) { out[i].x = vp.sf.x; out[i].z = vp.sf.z; } }
+  const ks = (k0 - 17 + n) % n, p = T.pts[ks], q = T.pts[(ks + 1) % n], dx = q[0] - p[0], dz = q[1] - p[1], l2 = Math.hypot(dx, dz) || 1;
+  const dir = { x: dx / l2, z: dz / l2 };
+  const ai = []; const vs = vpSafeSpeeds();
+  for (let j = 5; j <= n * laps + 30; j += 5) { const k = (ks + j) % n; ai.push({ x: T.pts[k][0], z: T.pts[k][1], node: true, vmax: vs[k] }); }
+  return { cps: out, perLap: out.length / laps, start: { x: p[0], z: p[1], h: Math.atan2(dir.x, dir.z), dir }, aiPath: ai };
+}
+// how fast the racing line can be taken at each centreline sample: v = √(a·R) in corners, braking back from each
+// corner at 7 m/s², capped at 60 m/s on the straights
+function vpSafeSpeeds() {
+  const T = game.world.vp.track; if (T._vs) return T._vs;
+  const n = T.pts.length, v = T.R.map(R => R > 0 ? Math.sqrt(8.5 * R) : 60);
+  for (let pass = 0; pass < 3; pass++) for (let i = n - 1; i >= 0; i--) { const j = (i + 1) % n, ds = T.cum[i + 1] - T.cum[i]; v[i] = Math.min(v[i], Math.sqrt(v[j] * v[j] + 2 * 7 * ds)); }
+  return (T._vs = v);
+}
+class MotorsportPark {
+  constructor(g) { this.g = g; this.session = null; this.lapT = null; this.sect = 0; this._prevZ = null; }
+  get s() { const s = this.g.save; return s.track || (s.track = MotorsportPark.fresh()); }
+  static fresh() { return { best: null, prize: {}, hosted: null, laps: 0 }; }
+  owned() { return !!(this.g.uw && this.g.uw.props.owned('motorsport')); }
+  day() { return this.g.uw ? this.g.uw.S.day : 0; }
+  // ---------------------------------------------------------------- official events
+  fee(def) { return this.owned() ? 0 : def.fee; }
+  payout(def, place) {
+    const k = this.g.raceRules ? this.g.raceRules.tier(def.id) : 0;
+    return { cash: Math.round(def.reward * [1, 0.4, 0.2][place - 1] * RACE_T.purse[k] / 10) * 10, tier: k };
+  }
+  noteWin(id) { if (this.g.raceRules) this.g.raceRules.noteWin(id); }
+  // scrutineering on the grid: '' when the car may race this event
+  canEnter(v, def) {
+    const g = this.g, e = g.vreg.entryOf(v);
+    if (!e) return 'Race Control only lets in cars registered to you.';
+    if (e.hot) return 'Scrutineering won’t pass a car with hot plates.';
+    if (v.health < VP_PARK.minHp || v.broken) return 'Scrutineering: get the car repaired first (the pit crew can do it).';
+    const w = carWorth(e.type, e.vtier);
+    if (w < def.band[0] || w >= def.band[1]) return `Wrong class: this event is for cars worth ${def.band[1] === Infinity ? fmtMoney(def.band[0]) + ' and up' : fmtMoney(def.band[0]) + '–' + fmtMoney(def.band[1])} (yours: ${fmtMoney(Math.round(w))}).`;
+    if (def.car && this.s.prize[def.id]) return 'You have already won the Invitational.';
+    if (def.car && g.vreg.freeBays() < 1) return 'You need a free parking space for the prize car.';
+    return '';
+  }
+  // the buy-in at the start line (after scrutineering): '' paid, else why not
+  payIn(def) { const f = this.fee(def); if (!f) return ''; return Money.pay(f, 'trackFee') ? '' : `The entry fee is ${fmtMoney(f)} from your bank.`; }
+  // the Invitational's car, once: the flag is set and saved with the car (a reload can't award it twice)
+  awardCar(def) {
+    const g = this.g; if (!def.car || this.s.prize[def.id]) return null;
+    this.s.prize[def.id] = true;
+    const e = g.vreg.give(def.car, 'prize', undefined, 'Race Control');
+    g.vreg.note('won at Valen Point', def.car, { event: def.id });
+    g.ui.toast(`The ${VEHICLES[def.car].name} is yours. Its space is waiting in your garage.`, 'money');
+    g.saveGame(true);
+    return e;
+  }
+  spec(def) {
+    const p = this.payout(def, 1), f = this.fee(def);
+    return { type: 'srace', official: true, race: def, title: def.name, desc: def.blurb + (f ? ` Entry ${fmtMoney(f)} from your bank on the grid.` : ' No entry fee: it’s your track.') + (p.tier ? ` Won today already: the prize is ${fmtMoney(p.cash)}.` : ''), reward: def.reward ? p.cash : 0, fee: 0, contact: RACE_CONTROL, locked: '', chip: 'VALEN POINT · official', rep: 0 };
+  }
+  enter(def) {
+    const g = this.g; if (g.missions.active) { g.ui.toast('Finish what you’re doing first.', 'warn'); return; }
+    g.ui.closeAll(); g.missions.start(this.spec(def));
+  }
+  // ---------------------------------------------------------------- track days and private sessions
+  book() {
+    const g = this.g, own = this.owned(), cost = own ? 0 : VP_PARK.trackDay;
+    if (this.session) return 'You’re already on track.';
+    if (cost && !Money.pay(cost, 'trackFee')) return `A track day is ${fmtMoney(cost)} from your bank.`;
+    this.session = { until: g.time + VP_PARK.session, laps: 0, best: 0, own };
+    this.lapT = null; this.sect = 0; this._prevZ = null;
+    g.ui.toast(own ? 'Private session: the track is yours. Laps are timed from the line.' : 'Track day booked: ten minutes on track, laps timed from the line.', 'money');
+    return '';
+  }
+  // ---------------------------------------------------------------- the owner's meeting and the park's day
+  host() {
+    const g = this.g, s = this.s;
+    if (!this.owned()) return 'Only the owner hosts meetings.';
+    if (s.hosted) return 'A meeting is already on the calendar.';
+    if (!Money.pay(VP_PARK.hostCost, 'trackHost')) return `Putting a meeting on costs ${fmtMoney(VP_PARK.hostCost)} from your bank.`;
+    s.hosted = { day: this.day() };
+    g.saveGame(true);
+    return '';
+  }
+  // once an economic day (PropertyManager.tickDay): the park's takings, and the gate from a meeting you hosted
+  tickDay() {
+    const g = this.g, s = this.s; if (!this.owned()) return;
+    Money.earn(VP_PARK.income, 'trackIncome');
+    Money.pay(VP_PARK.upkeep, 'upkeep', { partial: true });
+    if (s.hosted && s.hosted.day < this.day()) { s.hosted = null; Money.earn(VP_PARK.hostTake, 'trackIncome'); g.uw.news('pv', `Race meeting at Valen Point: a full house. ${fmtMoney(VP_PARK.hostTake)} from the gate is in your bank.`); }
+  }
+  // ---------------------------------------------------------------- the pit crew (in a pit garage, in a car)
+  pitAction(v) {
+    const g = this.g, [x0, x1] = VP_PIT.garX, [z0, z1] = VP_PIT.garZ;
+    if (v.speed > 2 || v.pos.x < x0 || v.pos.x > x1 || v.pos.z < z0 || v.pos.z > z1) return null;
+    const dmg = v.health < 99.5 || v.broken || v.deformed > 0.05; if (!dmg) return null;
+    const c = Math.round(g.content.repairCost(v.type, v.health) * (this.owned() ? VP_PARK.pitK : 1) / 10) * 10;
+    return { label: `Pit crew · repair ${fmtMoney(c)}`, act: () => { if (!Money.pay(c, 'pitService')) { g.ui.toast('Not enough in the bank.', 'warn'); return; } g.content.repair(v); const e = g.vreg.entryOf(v); if (e) e.dmg = 0; g.audio.play('cash'); g.ui.toast('Pit crew: fixed.', 'money'); } };
+  }
+  door() { const pl = this.g.world.places.motorsport; return pl ? pl.door : null; }
+  findAction() {
+    const g = this.g, p = g.player;
+    if (p.state === 'vehicle') return p.vehicle ? this.pitAction(p.vehicle) : null;
+    const d = this.door(); if (!d || p.state !== 'foot' || p.interior) return null;
+    if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) > 2.6) return null;
+    return { label: 'Race Control · Valen Point Motorsport Park', act: () => this.openOffice() };
+  }
+  openOffice() {
+    const g = this.g, C2 = g.content, PM = g.uw.props, def = PROP_BY_ID.motorsport;
+    const render = () => {
+      const own = this.owned(), s = this.s;
+      let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>Best lap <b>${s.best ? fmtRace(s.best.t) : '—'}</b></span><span>${Money.html('trackFee')}</span></div>`;
+      if (!own) h += `<div class="card"><div class="t">Buy the park</div><div class="d">${esc(def.desc)} 24 pit-garage spaces, no entry fees, a private session whenever you like, the pit crew a third off, race meetings you host, and about ${fmtMoney(VP_PARK.income - VP_PARK.upkeep)} a day clear.</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
+      h += '<h3>Official events</h3><div class="grid2">' + VP_EVENTS.map(e => {
+        const done = e.car && s.prize[e.id], p = this.payout(e, 1), f = this.fee(e);
+        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${e.car ? (done ? 'won' : esc(VEHICLES[e.car].name)) : fmtMoney(p.cash) + (p.tier ? ' (won today)' : '')}</span></div><button class="sbtn" data-act="ev:${e.id}" ${done ? 'disabled' : ''}>${done ? 'Won' : 'Enter'}</button></div>`;
+      }).join('') + '</div>';
+      h += `<h3>On track</h3><div class="btns"><button class="sbtn" data-act="day" ${this.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Track day · ' + fmtMoney(VP_PARK.trackDay)}</button>${own ? `<button class="sbtn" data-act="host" ${s.hosted ? 'disabled' : ''}>${s.hosted ? 'Meeting on the calendar' : 'Host a race meeting · ' + fmtMoney(VP_PARK.hostCost)}</button>` : ''}</div>`;
+      return h;
+    };
+    C2.openSvc('Race Control', 'Official: “Clean money, clean cars, a clean lap. Everything here goes through the bank.”', render, act => {
+      const [k, id] = act.split(':');
+      if (k === 'buy') { const r = PM.buy('motorsport'); C2.refreshSvc(r || 'Valen Point Motorsport Park is yours.'); return; }
+      if (k === 'ev') { const e = VP_EVENTS.find(x => x.id === id); if (e) this.enter(e); return; }
+      if (k === 'day') { C2.refreshSvc(this.book() || 'Session booked.'); return; }
+      if (k === 'host') { C2.refreshSvc(this.host() || 'Meeting on the calendar: the takings come in tomorrow.'); return; }
+    });
+  }
+  // ---------------------------------------------------------------- lap timing on a track day
+  update(dt) {
+    const g = this.g, S = this.session; if (!S) return;
+    if (g.time > S.until) { this.session = null; g.ui.toast(`Session over. ${S.laps} lap${S.laps === 1 ? '' : 's'}${S.best ? ', best ' + fmtRace(S.best) : ''}.`, 'info'); return; }
+    const p = g.player, v = p.state === 'vehicle' ? p.vehicle : null; if (!v) { this._prevZ = null; return; }
+    const vp = g.world.vp, T = vp.track, n = T.pts.length;
+    // sectors: a quarter, half and three quarters of the way round must be passed in order
+    const sec = [0.25, 0.5, 0.75].map(f => T.pts[(vp.sf.k + Math.floor(n * f)) % n]);
+    if (this.lapT !== null && this.sect < 3) { const q = sec[this.sect]; if (Math.hypot(v.pos.x - q[0], v.pos.z - q[1]) < 18) this.sect++; }
+    const z = v.pos.z, crossed = this._prevZ !== null && this._prevZ > vp.sf.z && z <= vp.sf.z && Math.abs(v.pos.x - vp.sf.x) < VP_TRACK.w / 2 + 1.5;
+    this._prevZ = z;
+    if (this.lapT !== null) this.lapT += dt;
+    if (!crossed) return;
+    if (this.lapT !== null && this.sect >= 3) {
+      const t = Math.round(this.lapT * 100) / 100; S.laps++; this.s.laps++;
+      if (!S.best || t < S.best) S.best = t;
+      const rec = !this.s.best || t < this.s.best.t; if (rec) this.s.best = { t, type: v.type };
+      g.ui.toast(`Lap ${S.laps}: ${fmtRace(t)}${rec ? ' · track record' : ''}`, rec ? 'money' : 'info');
+    }
+    this.lapT = 0; this.sect = 0;
+  }
+  // a save's park state: validated
+  reset() {
+    const s = this.g.save; if (!s) return;
+    const T = s.track && typeof s.track === 'object' ? s.track : MotorsportPark.fresh();
+    T.best = T.best && isFinite(T.best.t) && T.best.t > 10 && VEHICLES[T.best.type] ? { t: T.best.t, type: T.best.type } : null;
+    T.prize = T.prize && typeof T.prize === 'object' ? Object.fromEntries(Object.keys(T.prize).filter(k => VP_EVENTS.some(e => e.id === k)).map(k => [k, true])) : {};
+    T.hosted = T.hosted && Number.isInteger(T.hosted.day) ? { day: T.hosted.day } : null;
+    T.laps = Number.isInteger(T.laps) && T.laps >= 0 ? T.laps : 0;
+    s.track = T; this.session = null; this.lapT = null; this.sect = 0; this._prevZ = null;
+  }
 }
 /* =====================================================================
    [UNDERWORLD] POLICE PRESSURE & CORRUPTION: the long-term heat on the
@@ -54506,7 +55169,8 @@ class EmpireUI {
       <div class="d" style="margin-top:4px">Paid from, in order: ${Money.payrollSources().map(s => `${esc(s.name)} <b>${fmtMoney(s.amt)}</b>`).join(' → ')}. Wages are never taken from the bank.</div></div>`;
     if (!ros.length) h += `<div class="hint">No crew yet. ${CM.canRecruit() ? 'Hire someone below.' : 'Earn 100 reputation and people will start asking for work.'}</div>`;
     const turfOpts = sel => uw.T.map(t => `<option value="${t.i}" ${sel === t.i ? 'selected' : ''}>${esc(t.name)} · ${uw.owner[t.i] === 'pc' ? 'yours' : uw.owner[t.i] ? FACTIONS[uw.owner[t.i]].short : 'neutral'}</option>`).join('');
-    const zoneOpts = sel => Object.keys(ZONES).map(z => `<option value="${z}" ${sel === z ? 'selected' : ''}>${esc(ZONES[z].name)}</option>`).join('');
+    // districts with turfs (a Lieutenant runs streets: Valen Point has none)
+    const zoneOpts = sel => Object.keys(ZONES).filter(z => uw.T.some(t => t.zone === z)).map(z => `<option value="${z}" ${sel === z ? 'selected' : ''}>${esc(ZONES[z].name)}</option>`).join('');
     const bizOpts = sel => uw.props.ownedList().filter(p => p.kind === 'business').map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
     // a warehouse as the target ('w:<id>'), with how full it is
     const whOpts = sel => uw.whse.list().map(p => `<option value="w:${p.id}" ${sel === 'w:' + p.id ? 'selected' : ''}>${esc(p.name)} · ${uw.whse.slotsUsed(p.id)}/${WH_SLOTS}</option>`).join('');
@@ -56379,6 +57043,11 @@ class TaxiService {
   // a cab on a road node out of sight, 110-220 m away
   spawnCab(x, z) {
     const g = this.g, cands = [];
+    // on Valen Point: the cab comes along the causeway (Session 6B)
+    if (offCity(x, z)) {
+      const sp = vpRoadSpots().map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
+      for (const { s } of sp.slice(0, 8)) if (!g.vehicles.nearby(s.x, s.z, 6).some(v => Math.hypot(v.pos.x - s.x, v.pos.z - s.z) < 5)) return g.vehicles.spawn('taxi', s.x, s.z, s.h, {});
+    }
     for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
       if (!RoadNet.degree(i, j)) continue;
       const nx = i * P, nz = j * P, d = Math.hypot(nx - x, nz - z);
@@ -56999,7 +57668,7 @@ class UIManager {
     this.hud = $('hud'); this.toasts = $('toasts');
     this.mm = $('minimap'); this.mmc = this.mm.getContext('2d');
     this.bigc = $('bigmapCanvas').getContext('2d');
-    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false);
+    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP();
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
     this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
@@ -57010,7 +57679,8 @@ class UIManager {
     const S = 1024, c = document.createElement('canvas'); c.width = S; c.height = S;
     const g = c.getContext('2d');
     const E = EDGE_MARGIN + 30, span = CITY + E * 2, k = S / span;
-    this.mapK = k; this.mapE = E;
+    // map space runs on east past the city to Valen Point (Session 6B): mapW wide, 1024 tall
+    this.mapK = k; this.mapE = E; this.mapW = Math.ceil((WORLD_X1 + E) * k);
     const X = x => (x + E) * k;
     this._paintMap(g, null);
     const lab = [];
@@ -57041,6 +57711,37 @@ class UIManager {
     }
     c.labels = lab;
     return c;
+  }
+  // Valen Point in map space: the causeway, the island, the paved areas, the circuit, the buildings
+  _paintVP(g, view) {
+    const vp = this.g.world.vp; if (!vp) return;
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
+    if (view && (view.x1 < CITY || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
+    const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
+    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
+    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
+    R(VP.x0, VP.z0, VP.x1, VP.z1, '#4f6e3f');
+    const S = VP_SITE;
+    for (const r of [S.paddock, S.parkN, S.parkS]) R(r.x0, r.z0, r.x1, r.z1, '#77787a');
+    R(VP_PIT.laneX - VP_PIT.laneW / 2, VP_PIT.lane[0], VP_PIT.laneX + VP_PIT.laneW / 2, VP_PIT.lane[1], '#6f7682');
+    g.fillStyle = '#6f7682'; g.beginPath(); g.arc(X(S.ring.x), X(S.ring.z), (S.ring.r + VP.cw.road) * k, 0, 7); g.fill();
+    // the circuit
+    const T = vp.track;
+    g.strokeStyle = '#2b2d30'; g.lineWidth = Math.max(2, VP_TRACK.w * k); g.lineJoin = 'round';
+    g.beginPath(); T.pts.forEach((p, i) => i ? g.lineTo(X(p[0]), X(p[1])) : g.moveTo(X(p[0]), X(p[1]))); g.closePath(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
+    // buildings
+    g.fillStyle = 'rgba(0,0,0,0.32)';
+    for (const b of this.g.world.xblocks) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+  }
+  // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
+  _renderVP() {
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
+    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(WORLD_X1)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, w, h); g.translate(-x0, -z0);
+    this._paintVP(g, null);
+    return { img: c, x: x0, z: z0 };
   }
   // paints the city (no text) in 1024-unit map space onto any 2D context; view = world-space
   // rectangle to cull to (null = everything). Used for the cached images and the live big map.
@@ -57073,8 +57774,8 @@ class UIManager {
       if (open(1, i, j)) { g.moveTo(X(j * P), X(i * P)); g.lineTo(X((j + 1) * P), X(i * P)); }
     }
     g.stroke();
-    // bridge
-    g.fillStyle = '#55595e'; g.fillRect(X(CITY + EDGE_MARGIN), X(6 * P + 31), 1024, 18 * k);
+    // Valen Point and its causeway (Session 6B)
+    this._paintVP(g, view);
     // district tints and borders
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const key = ZONE_MAP[bz][bx], z = ZONES[key];
@@ -57402,6 +58103,7 @@ class UIManager {
     const [px, pz] = this._mapXY(p.pos.x, p.pos.z);
     c.translate(-px, -pz);
     c.drawImage(this.mmImg, 0, 0);
+    if (this.vpImg) c.drawImage(this.vpImg.img, this.vpImg.x, this.vpImg.z);
     const k = this.mapK;
     // GPS route
     const m = g.missions.active;
@@ -57629,7 +58331,9 @@ class MapView {
   clampView(z, cx, cz) {
     const s = Math.min(this.W, this.H) / 1024 * z, hw = this.W / 2 / s, hh = this.H / 2 / s;
     // zoomed in, any point of the map can be brought to the centre (edges show water beyond)
-    cx = hw >= 512 ? 512 : clamp(cx, Math.min(hw, 0), Math.max(1024 - hw, 1024)); cz = hh >= 512 ? 512 : clamp(cz, Math.min(hh, 0), Math.max(1024 - hh, 1024));
+    // east as far as Valen Point (map space is ui.mapW wide)
+    const MW = this.ui.mapW || 1024;
+    cx = hw >= 512 ? clamp(cx, 512, Math.max(512, MW - hw)) : clamp(cx, Math.min(hw, 0), Math.max(MW - hw, MW)); cz = hh >= 512 ? 512 : clamp(cz, Math.min(hh, 0), Math.max(1024 - hh, 1024));
     return [cx, cz];
   }
   // zoom keeping the map point under (sx,sy) fixed; animated unless instant
@@ -57767,7 +58471,7 @@ class MapView {
   setPick(wx, wz) {
     const o = this.pickMode; if (!o) return;
     const kp = nearestRoadPoint(wx, wz);
-    if (!kp || kp.d > 140 || wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
+    if (!kp || kp.d > 140 || ((wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) && !inValenPoint(wx, wz))) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
     o.dest = { x: kp.x, z: kp.z }; o.q = o.quote(kp.x, kp.z);
     this.renderPick(); this.dirty = true;
   }
@@ -57893,7 +58597,7 @@ class MapView {
     // map-space layers under the view transform
     c.save();
     c.setTransform(d * s, 0, 0, d * s, d * (W / 2 - this.cx * s), d * (H / 2 - this.cz * s));
-    if (this.zoom < 1.35) c.drawImage(ui.mapImg, 0, 0, 1024, 1024);
+    if (this.zoom < 1.35) { c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); }
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
@@ -57991,10 +58695,29 @@ const GPS = {
     const edge = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); adj[b].push({ to: a, w, poly: poly ? poly.slice().reverse() : null }); };
     const ends = new Map(); // segment key -> [{ along, node }]
     for (const L of Links.list) {
-      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
+      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); if (e.free) return n; const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
       const poly = L.pts.map(q => ({ x: q[0], z: q[1] }));
+      // a spur gets a node at every vertex (so a point off the city can join it part way along)
+      if (L.spur) { L.vids = this._poly(nodes, adj, edge, L.pts, L.gps[0], L.gps[1]); continue; }
       edge(L.gps[0], L.gps[1], L.len + 2 * ROAD_HALF, poly);
     }
+    // Valen Point's own routes and the circuit (Session 6B): polylines whose first point meets the spur's far end
+    const vp = typeof game !== 'undefined' && game.world && game.world.vp;
+    const extra = [];
+    if (vp) {
+      const spur = Links.list.find(L => L.spur), at = new Map(), key = q => Math.round(q[0] * 10) + ':' + Math.round(q[1] * 10);
+      if (spur) at.set(key(vp.road0), spur.gps[1]);
+      const fixed = q => at.get(key(q));
+      for (const r of vp.roads) { const ids = this._poly(nodes, adj, edge, r, fixed(r[0]), fixed(r[r.length - 1])); at.set(key(r[0]), ids[0]); at.set(key(r[r.length - 1]), ids[ids.length - 1]); for (let k = 1; k < r.length - 1; k++) if (!at.has(key(r[k]))) at.set(key(r[k]), ids[k]); extra.push({ pts: r, ids }); }
+      // the circuit, a closed loop every 25 samples, joined at the pit exit and entry samples
+      const T = vp.track, ks = []; for (let k = 0; k < T.pts.length; k += 25) ks.push(k);
+      for (const k of [vp.exitK, vp.entryK]) if (!ks.includes(k)) ks.push(k);
+      ks.sort((p2, q) => p2 - q);
+      const loop = ks.map(k => T.pts[k]), ids = loop.map(q => at.get(key(q)) ?? (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
+      for (let k = 0; k < loop.length; k++) { const a = ids[k], b2 = ids[(k + 1) % loop.length], A = loop[k], B = loop[(k + 1) % loop.length]; edge(a, b2, Math.hypot(B[0] - A[0], B[1] - A[1]), null); }
+      extra.push({ pts: [...loop, loop[0]], ids: [...ids, ids[0]] });
+    }
+    this.extra = extra;
     for (const [a, len] of [[0, N], [1, N]]) for (let line = 0; line <= N; line++) for (let seg = 0; seg < len; seg++) {
       if (!RoadNet.segOpen(a, line, seg)) continue;
       const n0 = a === 0 ? id(line, seg) : id(seg, line), n1 = a === 0 ? id(line, seg + 1) : id(seg + 1, line);
@@ -58005,6 +58728,64 @@ const GPS = {
     }
     this._g = { nodes, adj, n: Links.list.length };
     return this._g;
+  },
+  // a polyline of nodes (first and last can be existing nodes); returns the node id of every vertex
+  _poly(nodes, adj, edge, pts, first, last) {
+    const ids = pts.map((q, k) => k === 0 && first !== undefined ? first : k === pts.length - 1 && last !== undefined ? last : (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
+    for (let k = 1; k < pts.length; k++) edge(ids[k - 1], ids[k], Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]), null);
+    return ids;
+  },
+  // a route between any two points, either of them off the lattice: each end joins the graph at the nearest point
+  // of a spur (when it is off the city) or at its nearest lattice node, by a straight line
+  routeAny(fx, fz, tx, tz) {
+    const G = this.graph(), nodes = G.nodes.slice(), adj = G.adj.map(a => a.slice()), W2 = N + 1;
+    const join = (x, z, isGoal) => {
+      const me = nodes.length; nodes.push({ x, z }); adj.push([]);
+      const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
+      if (offCity(x, z)) {
+        // the nearest point on the spur or any of Valen Point's routes; X joins the two vertices either side of it
+        const polys = [...Links.list.filter(L => L.spur && L.vids).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || [])];
+        let best = null;
+        for (const pl of polys) for (let k = 0; k < pl.pts.length - 1; k++) {
+          const a = pl.pts[k], b = pl.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+          const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+          if (!best || d < best.d) best = { pl, k, x: px, z: pz, d, t, l: Math.sqrt(l2) };
+        }
+        if (!best) return -1;
+        const X = nodes.length; nodes.push({ x: best.x, z: best.z }); adj.push([]);
+        const A = best.pl.ids[best.k], B = best.pl.ids[best.k + 1];
+        for (const [n, w] of [[A, best.t * best.l], [B, (1 - best.t) * best.l]]) { link(n, X, w, null); link(X, n, w, null); }
+        if (isGoal) link(X, me, best.d, null); else link(me, X, best.d, null);
+        return me;
+      }
+      const [i, j] = RoadNet.nearNode(x, z), n = i * W2 + j, d = Math.hypot(x - i * P, z - j * P);
+      if (isGoal) link(n, me, d, null); else link(me, n, d, null);
+      return me;
+    };
+    const src = join(fx, fz, false), dst = join(tx, tz, true); if (src < 0 || dst < 0) return null;
+    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
+    dist[src] = 0;
+    for (;;) {
+      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
+      if (u < 0 || u === dst) break;
+      done[u] = 1;
+      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
+    }
+    if (!isFinite(dist[dst])) return null;
+    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
+    chain.reverse();
+    const out = [{ x: fx, z: fz }];
+    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
+    return out;
+  },
+  _nearOn(L, x, z) {
+    let best = null;
+    for (let k = 0; k < L.pts.length - 1; k++) {
+      const a = L.pts[k], b = L.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+      const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+      if (!best || d < best.d) best = { link: L, k, x: px, z: pz, d, along: L.cum[k] + Math.sqrt(l2) * t };
+    }
+    return best;
   },
   route(fx, fz, i, j, tx, tz, gi, gj) {
     const G = this.graph(), W2 = N + 1, nodes = G.nodes.slice(), adj = G.adj.slice();
@@ -58036,6 +58817,8 @@ const GPS = {
   }
 };
 function gpsRoute(fx, fz, tx, tz) {
+  // off the city's square (Valen Point and its causeway): through the spur that reaches it
+  if (offCity(fx, fz) || offCity(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
   const pts = [{ x: fx, z: fz }];
   let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
   const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;
@@ -58157,6 +58940,7 @@ class Game {
     for (const id of this.world.homeProps) { const d = PROP_BY_ID[id], h = d.home && this.world.homes.find(x => x.id === d.home); if (h && h.garageRect) hollowGarage(this.world, h, id); }
     progress(0.3, 'Pouring concrete'); await nextFrame();
     this.scenery = buildStaticScenery(this.scene, this.world);
+    this.vpScene = new ValenPointScenery(this.scene, this.world);
     this.env = new Environment(this);
     this.chunks = new ChunkManager(this);
     this.props = new PropManager(this);
@@ -58190,8 +58974,10 @@ class Game {
     this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
     // Session 6A: street-race purse tiers and heat, pink slips, the car wash
     this.raceRules = new RaceRules(this); this.pinks = new PinkSlips(this); this.wash = new CarWash(this);
+    // Session 6B: Valen Point Motorsport Park
+    this.motorsport = new MotorsportPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.pinks.reset();
+    this.vreg.reset(); this.pinks.reset(); this.motorsport.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -58725,6 +59511,7 @@ class Game {
     this.env.update(dt);
     this.content.interiors.update(dt);
     this.chunks.update(this.focus.x, this.focus.z, this.frame);
+    this.vpScene.update(this.focus.x, this.focus.z);
     this.propT -= rdt;
     if (this.propT <= 0) {
       this.propT = 0.5;
@@ -58761,7 +59548,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -58949,7 +59736,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

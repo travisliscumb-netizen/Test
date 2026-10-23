@@ -50,6 +50,8 @@ function streetNameAt(x, z) {
   if (dx < ROAD_HALF + WALK_W && dz < ROAD_HALF + WALK_W && i >= 0 && j >= 0 && i <= N && j <= N) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
   if (dx < ROAD_HALF + WALK_W && i >= 0 && i <= N) return STREET_NAMES_X[i];
   if (dz < ROAD_HALF + WALK_W && j >= 0 && j <= N) return STREET_NAMES_Z[j];
+  if (x > CITY + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
+  if (vpLand(x, z)) return VP.name;
   if (x < 0 || z < 0 || x > CITY || z > CITY) return 'Harbor Promenade';
   return null;
 }
@@ -93,14 +95,19 @@ const ZONES = {
   a: { name: 'Stadium District', tag: 'Game nights, tailgates and the biggest car park in town', col: '#6fa8ff', ped: 0.6, cops: 0.9, night: 1.2,
     traffic: { sedan: 2.5, suv: 2, taxi: 2, compact: 2, sports: 0.8, van: 0.8 } },
   r: { name: 'Cedar Fields', tag: 'Dirt tracks and nobody watching', col: '#c9b06b', ped: 0.15, cops: 0.3, night: 0.3,
-    traffic: { pickup: 3.5, offroad: 1.5, van: 1, sedan: 1, compact: 0.8 } }
+    traffic: { pickup: 3.5, offroad: 1.5, van: 1, sedan: 1, compact: 0.8 } },
+  // Valen Point (Session 6B): off the lattice, east across the causeway; no foot traffic, few police
+  v: { name: 'Valen Point', tag: 'Pit garages, grandstands and the fastest legal mile on the island', col: '#ff6b4a', ped: 0, cops: 0.4, night: 0.4,
+    traffic: { sports: 2, sedan: 2, suv: 1.5, van: 1.2, pickup: 0.8, muscle: 0.6, truck: 0.4 } }
 };
 function zoneKey(x, z) {
+  if (x > CITY + EDGE_MARGIN && x < VP.x1 + 400) return 'v';
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return ZONE_MAP[bz][bx];
 }
 function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
+  if (inValenPoint(x, z)) return VP.name;
   if (x < -ROAD_HALF - 2 || z < -ROAD_HALF - 2 || x > CITY + ROAD_HALF + 2 || z > CITY + ROAD_HALF + 2) return 'Waterfront';
   return zoneAt(x, z).name;
 }
@@ -219,12 +226,14 @@ const Links = {
     this.list = []; this.idx.clear();
     for (const r of world.localRoads) {
       if (!r.link || r.k !== 'line') continue;
-      const a = this.attach(r.pts[0]), b = this.attach(r.pts[r.pts.length - 1]);
+      // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle
+      const last = r.pts[r.pts.length - 1];
+      const a = this.attach(r.pts[0]), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last);
       if (!a || !b) continue;
       const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
-      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r };
+      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null };
       this.list.push(L);
-      L.ends.forEach((e, k) => { const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
+      L.ends.forEach((e, k) => { if (e.free) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
     }
     world.links = this.list;
   },
@@ -237,6 +246,18 @@ const Links = {
       out.push([c[k][0] - tz * off, c[k][1] + tx * off]);
     }
     return out;
+  },
+  // a spur's whole lane for a car: out on the right-hand side, round the turning circle, back to the lattice
+  loop(L) {
+    const out = this.lane(L, 0), back = this.lane(L, 1), R0 = L.ring;
+    if (!R0) return [...out, ...back];
+    const e = out[out.length - 1], s = back[0];
+    let a0 = Math.atan2(e[1] - R0.z, e[0] - R0.x), a1 = Math.atan2(s[1] - R0.z, s[0] - R0.x);
+    // the long way round, by the far side of the circle (the angle falls from a0 to a1)
+    while (a1 >= a0) a1 -= Math.PI * 2;
+    const arc = [], m = Math.max(6, Math.ceil((a0 - a1) / 0.15));
+    for (let i = 1; i < m; i++) { const a = a0 + (a1 - a0) * i / m; arc.push([R0.x + Math.cos(a) * R0.r, R0.z + Math.sin(a) * R0.r]); }
+    return [...out, ...arc, ...back];
   },
   // nearest point on any link: { link, k (segment), x, z, d, along (metres from end 0) }
   nearest(x, z) {
@@ -284,6 +305,8 @@ function groundY(x, z, y, step) {
   return b;
 }
 function groundBase(x, z) {
+  // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
+  if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
   return RoadNet.roadAt(x, z) ? 0 : CURB_H;
