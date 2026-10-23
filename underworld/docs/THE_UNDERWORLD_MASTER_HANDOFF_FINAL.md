@@ -1363,3 +1363,34 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       - The window, at the main yard, pays the release of a car in either yard. The overflow gate opens only for a
         released car parked there. That yard has its own lock to pick and its own alarm.
 
+32. **Session 6 split and rulings (DC-36).** Finish and regression-test each part before starting the next.
+    - **6A:** tuning, repair, respray, car wash, dealer finalisation, race economy and currencies, police heat from
+      races, pink slips, and race regression tests.
+    - **6B:** a paved motorsport complex.
+      - **Location:** a new district off-map, beyond one edge of Port Valen, reached by a highway/causeway. It is
+        not squeezed into the stadium or industrial blocks, and the existing city layout is preserved.
+      - **Room for:** long straights, broad 70–80 mph sweepers, pits, garages, paddock, grandstands, parking,
+        access roads, and future expansion.
+      - **Ownership:** garage/storage and hosting/private sessions.
+      - **Must integrate with:** the impound capacity, map bounds, GPS/pathfinding, traffic, police navigation,
+        taxi routing where appropriate, and chunk streaming/performance.
+      - It is a functional world expansion, not part of the later full map overhaul.
+    - **6C:** a Cedar Fields terrain overhaul with a real height map, limited to Cedar Fields.
+      - **Shape:** bumps, ruts, rises, dips, rocky sections, mud/dirt sections, uneven camber and meaningful
+        elevation.
+      - **Physics:** the surface affects every vehicle's real physics. Dirt and mud give less grip; rough ground
+        adds suspension movement. Road cars struggle more; off-road vehicles are materially less affected.
+      - **Off-road track:** included.
+      - **Tests:** traffic, pedestrians, props, collision, race checkpoints, suspension/ground contact, camera, and
+        mobile performance.
+      - The full-city terrain overhaul stays a separate post-build project.
+    - **6D:** 10 permanent unique hidden cars, mostly new one-offs.
+      - **Categories:** classic, coupe, luxury, supercar, off-road, muscle, track, GT, vintage, and an ultimate
+        top-tier car.
+      - **Each has its own:** name, tuned spec, performance and visual identity, clue/intel, and fixed world/reward
+        identity.
+      - **Base:** they are built on the existing body/profile system but are distinct from dealer stock, and never
+        respawn once owned.
+      - **Sources:** exploration, clues, contacts, race wins, pink slips, paid intel, collectible completion.
+      - **Clues:** a search area first, then an exact pin with stronger intel.
+      - **Persistence:** ownership, discovery and reward state persist through save/load with no duplication.
