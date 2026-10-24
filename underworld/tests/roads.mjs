@@ -19,14 +19,15 @@ const geo = await ev(() => {
   out.links = w.links.map(L => {
     let maxTurn = 0;
     for (let k = 1; k < L.pts.length - 1; k++) { const a = L.pts[k - 1], q = L.pts[k], c = L.pts[k + 1]; const h0 = Math.atan2(q[0] - a[0], q[1] - a[1]), h1 = Math.atan2(c[0] - q[0], c[1] - q[1]); let d = Math.abs(h1 - h0); if (d > Math.PI) d = 2 * Math.PI - d; maxTurn = Math.max(maxTurn, d); }
-    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => P.RoadNet.segOpen(e.axis, e.line, e.seg)) };
+    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || P.RoadNet.segOpen(e.axis, e.line, e.seg)) };
   });
   // the lattice: exactly the segments the superblocks close, nothing else
   let expect = 0; for (const sb of P.SUPERBLOCKS) expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
   out.closed = P.RoadNet.closed.size; out.expect = expect;
   out.path = P.RoadNet.path(0, 0, 12, 12).length;
   // every link point is on the road the ground shader paints (the local road raster)
-  let off = 0; for (const L of w.links) for (const q of L.pts) if (!P.localRoadAt(q[0], q[1])) off++;
+  // (beyond the city's seawall the Valen Point causeway is painted by the district's own scenery: its band counts)
+  let off = 0; for (const L of w.links) for (const q of L.pts) if (!P.localRoadAt(q[0], q[1]) && !(L.spur && q[0] >= P.VP.cw.x0 && Math.abs(q[1] - P.VP.cw.z) <= P.VP.cw.road)) off++;
   out.offRaster = off;
   return out;
 });
@@ -34,7 +35,7 @@ const names = geo.links.map(l => l.name);
 check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].every(n => names.includes(n)) && new Set(names).size === names.length, JSON.stringify(names));
 check('they are smooth splines (samples every ~2.5 m, no kink sharper than 10°)', geo.links.every(l => l.n >= l.len / 3 && l.maxTurn < 0.175), JSON.stringify(geo.links.map(l => [l.name, l.n, Math.round(l.len), +l.maxTurn.toFixed(3)])));
 check('one polyline: what the ground paints and the maps draw is what traffic and GPS follow', geo.links.every(l => l.same) && geo.offRaster === 0, JSON.stringify(geo.offRaster));
-check('each end meets an open lattice road', geo.links.every(l => l.ends.every(Boolean)));
+check('each end meets an open lattice road (a spur’s far end is its turning circle)', geo.links.every(l => l.ends.every(Boolean)));
 check('the lattice graph is unchanged (only superblock closures)', geo.closed === geo.expect && geo.path > 1, JSON.stringify([geo.closed, geo.expect, geo.path]));
 
 // ---------------------------------------------------------------- 2. traffic on the curves

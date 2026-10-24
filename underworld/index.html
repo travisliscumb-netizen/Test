@@ -33047,6 +33047,9 @@ function vpLand(x, z) { return x >= VP.x0 && x <= VP.x1 && z >= VP.z0 && z <= VP
 function vpCauseway(x, z) { return x >= VP.cw.x0 && x <= VP.x0 + 0.5 && Math.abs(z - VP.cw.z) <= VP.cw.half; }
 // off the city's square and on Valen Point's ground (the island, or the causeway past the seawall)
 function inValenPoint(x, z) { return vpLand(x, z) || (x > CITY + EDGE_MARGIN && vpCauseway(x, z)); }
+// east of the city's seawall, on Valen Point's side of the water: where routing and spawns go by the causeway
+// (anywhere else off the city is just sea, and keeps the lattice's behaviour)
+function vpSide(x, z) { return x > CITY + EDGE_MARGIN && z > VP.z0 - 200 && z < VP.z1 + 200; }
 // is (x, z) beyond the city altogether (the district or the water around it)?
 function offCity(x, z) { return x > CITY + EDGE_MARGIN || x < -EDGE_MARGIN || z < -EDGE_MARGIN || z > CITY + EDGE_MARGIN; }
 // places a car can join the road out there: the causeway's lanes every 20 m (heading toward the island on the
@@ -38465,7 +38468,9 @@ Object.assign(World.prototype, {
     // ---------------------------------------------------------------- the causeway road: a spur off the perimeter road
     // out to the turning circle (a Links spur: traffic, the GPS, taxis and police all route along it)
     const R0 = VP_SITE.ring, sx = R0.x - R0.r;
-    this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: [[CITY + ROAD_HALF, VP.cw.z], [CITY + EDGE_MARGIN + 30, VP.cw.z], [VP.x0 - 30, VP.cw.z], [VP.x0 + 4, VP.cw.z], [sx, VP.cw.z]], ring: R0, mat: 'asphalt' });
+    // sampled every 2.5 m like the other curved roads (one polyline for the paint, traffic and the GPS)
+    const cwPts = []; for (let x = CITY + ROAD_HALF; x < sx; x += 2.5) cwPts.push([x, VP.cw.z]); cwPts.push([sx, VP.cw.z]);
+    this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: cwPts, ring: R0, mat: 'asphalt' });
     // the district's drivable routes for the GPS and AI drivers (polylines; two-way): from the turning circle round
     // to the paddock, the gaps either side of the garages, the pit lane and its merges, Race Control and the annex
     // gate, the car parks; the circuit itself joins at the pit exit and entry (vp.track, every ~50 m)
@@ -41541,7 +41546,7 @@ class DriveAI {
   route(tx, tz) {
     const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
     // to or from Valen Point: the GPS route through the causeway, kept to the right-hand side of each leg
-    if (offCity(v.pos.x, v.pos.z) || offCity(tx, tz)) {
+    if (vpSide(v.pos.x, v.pos.z) || vpSide(tx, tz)) {
       const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
       if (r && r.length > 1) {
         this.path = [];
@@ -42276,7 +42281,7 @@ class PoliceManager {
       best = { x, z }; break;
     }
     // off the lattice (Valen Point): a unit comes along the causeway or round the turning circle instead
-    if (!best && offCity(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
+    if (!best && vpSide(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
       // in the lane heading your way
       if (Math.sin(s.h) * (p.pos.x - s.x) < 0) continue;
       const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z); if (d < 120 || d > 320 || (g.inView(s.x, 2, s.z, 5) && d < 200)) continue;
@@ -57063,7 +57068,7 @@ class TaxiService {
   spawnCab(x, z) {
     const g = this.g, cands = [];
     // on Valen Point: the cab comes along the causeway (Session 6B)
-    if (offCity(x, z)) {
+    if (vpSide(x, z)) {
       const sp = vpRoadSpots().filter(s => Math.sin(s.h) * (x - s.x) > 0).map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
       for (const { s } of sp.slice(0, 8)) if (!g.vehicles.nearby(s.x, s.z, 6).some(v => Math.hypot(v.pos.x - s.x, v.pos.z - s.z) < 5)) return g.vehicles.spawn('taxi', s.x, s.z, s.h, {});
     }
@@ -58761,7 +58766,7 @@ const GPS = {
     const join = (x, z, isGoal) => {
       const me = nodes.length; nodes.push({ x, z }); adj.push([]);
       const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
-      if (offCity(x, z)) {
+      if (vpSide(x, z)) {
         // the nearest point on the spur or any of Valen Point's routes; X joins the two vertices either side of it
         const polys = [...Links.list.filter(L => L.spur && L.vids).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || [])];
         let best = null;
@@ -58837,7 +58842,7 @@ const GPS = {
 };
 function gpsRoute(fx, fz, tx, tz) {
   // off the city's square (Valen Point and its causeway): through the spur that reaches it
-  if (offCity(fx, fz) || offCity(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
+  if (vpSide(fx, fz) || vpSide(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
   const pts = [{ x: fx, z: fz }];
   let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
   const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;
@@ -59755,7 +59760,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

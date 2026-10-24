@@ -11,7 +11,7 @@ class DriveAI {
   route(tx, tz) {
     const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
     // to or from Valen Point: the GPS route through the causeway, kept to the right-hand side of each leg
-    if (offCity(v.pos.x, v.pos.z) || offCity(tx, tz)) {
+    if (vpSide(v.pos.x, v.pos.z) || vpSide(tx, tz)) {
       const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
       if (r && r.length > 1) {
         this.path = [];

@@ -1256,7 +1256,7 @@ const GPS = {
     const join = (x, z, isGoal) => {
       const me = nodes.length; nodes.push({ x, z }); adj.push([]);
       const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
-      if (offCity(x, z)) {
+      if (vpSide(x, z)) {
         // the nearest point on the spur or any of Valen Point's routes; X joins the two vertices either side of it
         const polys = [...Links.list.filter(L => L.spur && L.vids).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || [])];
         let best = null;
@@ -1332,7 +1332,7 @@ const GPS = {
 };
 function gpsRoute(fx, fz, tx, tz) {
   // off the city's square (Valen Point and its causeway): through the spur that reaches it
-  if (offCity(fx, fz) || offCity(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
+  if (vpSide(fx, fz) || vpSide(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
   const pts = [{ x: fx, z: fz }];
   let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
   const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;

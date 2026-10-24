@@ -19,6 +19,9 @@ function vpLand(x, z) { return x >= VP.x0 && x <= VP.x1 && z >= VP.z0 && z <= VP
 function vpCauseway(x, z) { return x >= VP.cw.x0 && x <= VP.x0 + 0.5 && Math.abs(z - VP.cw.z) <= VP.cw.half; }
 // off the city's square and on Valen Point's ground (the island, or the causeway past the seawall)
 function inValenPoint(x, z) { return vpLand(x, z) || (x > CITY + EDGE_MARGIN && vpCauseway(x, z)); }
+// east of the city's seawall, on Valen Point's side of the water: where routing and spawns go by the causeway
+// (anywhere else off the city is just sea, and keeps the lattice's behaviour)
+function vpSide(x, z) { return x > CITY + EDGE_MARGIN && z > VP.z0 - 200 && z < VP.z1 + 200; }
 // is (x, z) beyond the city altogether (the district or the water around it)?
 function offCity(x, z) { return x > CITY + EDGE_MARGIN || x < -EDGE_MARGIN || z < -EDGE_MARGIN || z > CITY + EDGE_MARGIN; }
 // places a car can join the road out there: the causeway's lanes every 20 m (heading toward the island on the

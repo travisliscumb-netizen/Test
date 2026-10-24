@@ -191,7 +191,9 @@ Object.assign(World.prototype, {
     // ---------------------------------------------------------------- the causeway road: a spur off the perimeter road
     // out to the turning circle (a Links spur: traffic, the GPS, taxis and police all route along it)
     const R0 = VP_SITE.ring, sx = R0.x - R0.r;
-    this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: [[CITY + ROAD_HALF, VP.cw.z], [CITY + EDGE_MARGIN + 30, VP.cw.z], [VP.x0 - 30, VP.cw.z], [VP.x0 + 4, VP.cw.z], [sx, VP.cw.z]], ring: R0, mat: 'asphalt' });
+    // sampled every 2.5 m like the other curved roads (one polyline for the paint, traffic and the GPS)
+    const cwPts = []; for (let x = CITY + ROAD_HALF; x < sx; x += 2.5) cwPts.push([x, VP.cw.z]); cwPts.push([sx, VP.cw.z]);
+    this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: cwPts, ring: R0, mat: 'asphalt' });
     // the district's drivable routes for the GPS and AI drivers (polylines; two-way): from the turning circle round
     // to the paddock, the gaps either side of the garages, the pit lane and its merges, Race Control and the annex
     // gate, the car parks; the circuit itself joins at the pit exit and entry (vp.track, every ~50 m)

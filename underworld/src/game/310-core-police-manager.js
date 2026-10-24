@@ -224,7 +224,7 @@ class PoliceManager {
       best = { x, z }; break;
     }
     // off the lattice (Valen Point): a unit comes along the causeway or round the turning circle instead
-    if (!best && offCity(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
+    if (!best && vpSide(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
       // in the lane heading your way
       if (Math.sin(s.h) * (p.pos.x - s.x) < 0) continue;
       const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z); if (d < 120 || d > 320 || (g.inView(s.x, 2, s.z, 5) && d < 200)) continue;
