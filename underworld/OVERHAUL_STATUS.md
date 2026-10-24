@@ -176,7 +176,31 @@ The mapping stays exact until a session changes the code above that line; after 
 - **On the circuit with five AI cars:** desktop 54 calls, 164k triangles, update 0.76 ms; phone ×4 CPU 82 calls,
   187k triangles, update 4.3 ms. That is lighter than the city.
 
-Full regression against the 6B build: in progress (results in the next commit).
+Full regression against the 6B build: **clean.** Three suites at a time; reruns alone where noted.
+- **Pass, first half (28 of 30):** soak, interiors, casino, prison, property, session, ramps, vehicles, inventory,
+  cargo, arrest 126, city, phone, taxi, stations, map, shooting, ui, offline, smoke, money, survival, business,
+  street, dealers, core, plus homes and roads after their fixes (below).
+- **Pass, second half (all 31):** camera, pwa, kingpin, phoneapps, static-money, build, tutorial, ledger, gangs,
+  progression, fixer, carmoney, warehouse, breach, vehicle, hot 31, shipment, motorsport 27, races 24, perf,
+  royale-sim, compound 56, and reruns of taxi, map, city, roads, stations, homes and vehicles on the fixed build.
+  police, threat and raid also pass (below).
+- **Load timing, passed alone:** stress 30 (a frame stall), gambling 57 (casino frame rate), police 13 (a parked
+  cruiser joining the chase), threat 25.
+- **Screenshot suites:** shots, cityshots, qashots, frontshots, carshots and contact run with no errors.
+- **True 6B regressions found and fixed:**
+  - `roads`: a GPS route starting in the sea off any city edge was sent via the causeway. Off-city routing and
+    police/taxi spawns now apply only on Valen Point's side (`vpSide`: east of the seawall around the island); the
+    rest of the sea keeps the lattice's behaviour. The causeway road is now sampled every 2.5 m like the other curved
+    roads, and the test knows a spur's far end is its turning circle and that the district paints the causeway
+    beyond the city edge.
+  - `homes`: the Property app's most expensive listing is now the park. The app is right; the test was updated.
+- **`raid` reload check: pre-existing, now fixed in the test.**
+  - The raid clock moved from 0 to 1 s across a reload, because the game runs a few frames after Continue before the
+    test measures.
+  - The 6A build fails it the same way: run alone, alternately with 6B, 6A failed 1 of 2 and 6B 2 of 2, all with
+    the clock off by one second.
+  - The check now requires the clock to carry over, neither reset nor rewound, and to advance less than 3 s. It
+    passed 18 / 18 twice.
 
 ## Known bugs / risks (6B)
 
@@ -321,7 +345,7 @@ Full regression against the 6A build, three suites at a time in two halves:
   with the graphics pass.
 - The purse tiers count wins per race. Spamming different races still pays each one's first win of the day: by
   design, five races a day at full pay. Exact tuning belongs to Session 13.
-- The `threat` gate-ram scenario is still intermittent (see the 5B closure).
+- The `threat` gate-ram scenario is still intermittent (see the 5B closure). The raid reload-clock flake is fixed (6B).
 
 ## Exact next recommended task
 

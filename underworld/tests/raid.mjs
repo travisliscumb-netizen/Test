@@ -75,13 +75,14 @@ const persist = await ev(async () => {
 });
 check('take half, drive away, unload at your own warehouse, come back: the remainder is still on their shelves', persist.stored > 0 && persist.mine === persist.stored && persist.theirs[take.k] === take.left, JSON.stringify(persist));
 // save and reload: both sides exactly as they were; no second helping
-const saved = await ev(() => { const g = window.game, uw = g.uw, S = uw.S; g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.saveGame(true); return { theirs: JSON.stringify(window.__stock()), mine: JSON.stringify(S.storage.whse_w), inv: JSON.stringify(S.inv), raid: window.__st().raid && Math.round(window.__st().raid.t) }; });
+const saved = await ev(() => { const g = window.game, uw = g.uw, S = uw.S; g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.saveGame(true); return { theirs: JSON.stringify(window.__stock()), mine: JSON.stringify(S.storage.whse_w), inv: JSON.stringify(S.inv), raid: window.__st().raid && window.__st().raid.t }; });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await helpers();
-const loaded = await ev(() => { const uw = window.game.uw, S = uw.S; return { theirs: JSON.stringify(window.__stock()), mine: JSON.stringify(S.storage.whse_w), inv: JSON.stringify(S.inv), raid: window.__st().raid && Math.round(window.__st().raid.t) }; });
-check('save → reload: their stock, your warehouse and your pockets are exactly as saved, and the raid is still on', loaded.theirs === saved.theirs && loaded.mine === saved.mine && loaded.inv === saved.inv && loaded.raid !== null && loaded.raid === saved.raid, JSON.stringify({ saved, loaded }));
+// the raid's clock carries over: not reset, not rewound, and on by no more than the few frames since Continue
+const loaded = await ev(() => { const uw = window.game.uw, S = uw.S; return { theirs: JSON.stringify(window.__stock()), mine: JSON.stringify(S.storage.whse_w), inv: JSON.stringify(S.inv), raid: window.__st().raid && window.__st().raid.t }; });
+check('save → reload: their stock, your warehouse and your pockets are exactly as saved, and the raid is still on', loaded.theirs === saved.theirs && loaded.mine === saved.mine && loaded.inv === saved.inv && loaded.raid !== null && saved.raid !== null && loaded.raid >= saved.raid - 0.01 && loaded.raid - saved.raid < 3, JSON.stringify({ saved, loaded }));
 const twice = await ev(() => { const g = window.game, uw = g.uw, k = Object.keys(window.__stock())[0]; const before = window.__stock()[k]; const away = uw.transfer('rival:vipers', 'inv', k, 1); return { before, away, after: window.__stock()[k] }; });
 check('out of reach (not inside, not at their dock), their stock can’t be taken at all', twice.away === 0 && twice.after === twice.before, JSON.stringify(twice));
 
