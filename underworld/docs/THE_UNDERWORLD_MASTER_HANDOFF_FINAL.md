@@ -1479,3 +1479,22 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       stalled car; static crowds; minimal night lighting on the circuit; flat island terrain.
     - **6B is not complete** until the remaining regression suites finish and any true 6B regressions are fixed.
       Then go on to 6C.
+36. **Session 6C rulings (DC-37).**
+    - **Site:** keep the existing Cedar Fields strip and make it rough too. Add a countryside extension south of the
+      current map, about 700 × 450 m, joined physically from Cedar Fields Road by dirt tracks over a low land bridge.
+      No city block is replaced.
+      - **The real height field covers:** the strip, the extension, the off-road course and the rough countryside.
+      - **In the extension:** the dedicated off-road course and its garage compound.
+      - **Integrated like Valen Point:** GPS/pathfinding, traffic and taxis where appropriate, police navigation,
+        map/minimap bounds, streaming and save/load world identity.
+      - It is a functional world expansion, not the later map overhaul.
+    - **Events, both kinds, kept clearly separate in the UI and the economy:**
+      - **At the course (official):** Clean Bank buy-ins and prizes, no criminal Rep, no automatic racing heat, class
+        rules (off-road vehicles, trucks, suitable values), the same provisional daily repeat-win tiers as the paved
+        circuit, and free-roam timed laps.
+      - **Across the wider countryside (occasional illegal off-road races):** Dirty Cash, criminal Rep, heat only
+        when observed, and possibly special pink slips.
+    - **The off-road garage compound:** a separate buyable property, not bundled with Valen Point.
+      - About 6 physical registry bays, a repair/service stand, and free private course sessions for the owner.
+      - Clean Bank, no Rank gate, price provisional until Session 13.
+      - Fleet ↔ impound capacity stays valid, with no abstract overflow.
