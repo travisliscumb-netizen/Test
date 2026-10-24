@@ -36,7 +36,7 @@ function vpCheckpoints(def) {
   const ks = (k0 - 17 + n) % n, p = T.pts[ks], q = T.pts[(ks + 1) % n], dx = q[0] - p[0], dz = q[1] - p[1], l2 = Math.hypot(dx, dz) || 1;
   const dir = { x: dx / l2, z: dz / l2 };
   const ai = []; const vs = vpSafeSpeeds();
-  for (let j = 5; j <= n * laps + 30; j += 5) { const k = (ks + j) % n; ai.push({ x: T.pts[k][0], z: T.pts[k][1], node: true, vmax: vs[k] }); }
+  for (let j = 5; j <= n * laps + 30; j += 5) { const k = (ks + j) % n; ai.push({ x: T.pts[k][0], z: T.pts[k][1], node: true, vmax: vs[k], nx: T.nl[k][0], nz: T.nl[k][1] }); }
   return { cps: out, perLap: out.length / laps, start: { x: p[0], z: p[1], h: Math.atan2(dir.x, dir.z), dir }, aiPath: ai };
 }
 // how fast the racing line can be taken at each centreline sample: v = √(a·R) in corners, braking back from each

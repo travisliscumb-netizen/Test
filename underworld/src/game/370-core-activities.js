@@ -162,13 +162,15 @@ class RaceManager {
     g.cam.yaw = v.h; g.cam.init = false;
     const n = A.def.opp;
     for (let k = 0; k < n; k++) {
+      // on the circuit each car keeps to its own side of the racing line, as it lined up on the grid
+      const lat = ((k + 1) % 2 ? 2.7 : -2.7) * 0.9, side = R.aiPath && R.aiPath[0].nx !== undefined ? (rx * R.aiPath[0].nx + rz * R.aiPath[0].nz) * lat : 0;
       const sl = slot(k + 1), cls = A.opts.opponentCls || A.def.cls[k % A.def.cls.length];
       const o = g.vehicles.spawn(cls, sl.x, sl.z, R.start.h, { driver: 'npc', vtier: A.opts.opponentTier });
       o.mission = 'race'; o.touched = true; o.critical = false;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
       // on the circuit the racing line, with a safe speed at every point; in the street the checkpoints
-      ai.path = R.aiPath ? R.aiPath.map(c => ({ ...c, x: c.x + rand(-0.8, 0.8), z: c.z + rand(-0.8, 0.8) })) : R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
+      ai.path = R.aiPath ? R.aiPath.map(c => ({ ...c, x: c.x + (c.nx || 0) * side, z: c.z + (c.nz || 0) * side })) : R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
       ai.pi = 0; ai.goal = R.cps[R.cps.length - 1]; ai.wait = 99;
       const base = o.spec.vmax * (A.opts.hard ? 0.86 : rand(0.74, 0.82));
       A.racers.push({ v: o, cp: 0, base, done: false, time: 0, name: A.opts.names ? A.opts.names[k] : RACER_NAMES[(k + (A.def.id.length)) % RACER_NAMES.length], stuck: 0 });

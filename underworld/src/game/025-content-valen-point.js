@@ -28,3 +28,9 @@ function vpRoadSpots() {
   for (let x = CITY + EDGE_MARGIN + 20; x < VP.x0 + 10; x += 20) { out.push({ x, z: z + LANE, h: Math.PI / 2 }); out.push({ x, z: z - LANE, h: -Math.PI / 2 }); }
   return out;
 }
+// a point for the police to drive to near `ref` (where you are, or were last seen): kept inside the city square, or
+// on Valen Point's island when that is where you are (Session 6B)
+function vpClampSearch(refX, x, z, m) {
+  if (refX > CITY + EDGE_MARGIN) return [clamp(x, VP.x0 + m, VP.x1 - m), clamp(z, VP.z0 + m, VP.z1 - m)];
+  return [clamp(x, m, CITY - m), clamp(z, m, CITY - m)];
+}

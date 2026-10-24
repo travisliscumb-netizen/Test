@@ -276,7 +276,7 @@ check('save → reload: all eight still there with their goods; HOT cars still H
 const geo = await ev(() => {
   const g = window.game, P = window.__pv, I = g.impound, W = g.world.compounds, PM = g.uw.props, out = {};
   let bays = 0; for (const def of P.PROPS) bays += PM.bays(def).length;
-  out.bays = bays; out.cap = I.capacity(); out.lots = I.lots(); out.main = W[P.IMPOUND.id].slots.length; out.over = W[P.IMPOUND.overflow.id].slots.length;
+  out.bays = bays; out.cap = I.capacity(); out.lots = I.lots(); out.main = W[P.IMPOUND.id].slots.length; out.over = W[P.IMPOUND.overflow.id].slots.length; out.annex = W[P.IMPOUND.annex.id] ? W[P.IMPOUND.annex.id].slots.length : 0;
   const own = Object.keys(P.VEHICLES).filter(k => !P.VEHICLES[k].police && k !== 'police');
   out.maxL = Math.max(...own.map(k => P.VEHICLES[k].l)); out.maxW = Math.max(...own.map(k => P.VEHICLES[k].w));
   // a slot's footprint: the bay where it has one (overflow), else the biggest car's
@@ -287,12 +287,12 @@ const geo = await ev(() => {
   out.inBuilding = S.filter((sp, i) => hit(F[i], W[sp.lot].bld)).length;
   out.small = S.filter(sp => sp.w && (sp.w < out.maxW + 0.5 || sp.d < out.maxL + 0.15)).length;
   // the ground 3.3 m beyond each overflow bay's nose: inside the yard, in no bay, not in the shed
-  out.blockedNose = S.filter(sp => sp.lot === P.IMPOUND.overflow.id).filter(sp => { const fx = Math.sin(sp.h), fz = Math.cos(sp.h), L = W[sp.lot].lot;
+  out.blockedNose = S.filter(sp => sp.lot !== P.IMPOUND.id).filter(sp => { const fx = Math.sin(sp.h), fz = Math.cos(sp.h), L = W[sp.lot].lot;
     return [1, 2.2, 3.3].some(k => { const x = sp.x + fx * (sp.d / 2 + k), z = sp.z + fz * (sp.d / 2 + k), pt = { x0: x - 0.01, x1: x + 0.01, z0: z - 0.01, z1: z + 0.01 }; return x < L.x0 || x > L.x1 || z < L.z0 || z > L.z1 || F.some(f => hit(pt, f)) || hit(pt, W[sp.lot].bld); }); }).length;
-  const G = W[P.IMPOUND.overflow.id].gate; out.gateApron = F.filter(f => hit({ x0: G.x - 4, x1: G.x + 4, z0: G.z - 4, z1: G.z + 4 }, f)).length;
+  out.gateApron = 0; for (const id of [P.IMPOUND.overflow.id, P.IMPOUND.annex.id]) { const G = W[id].gate; out.gateApron += F.filter(f => hit({ x0: G.x - 4, x1: G.x + 4, z0: G.z - 4, z1: G.z + 4 }, f)).length; }
   return out;
 });
-check('the two yards hold a space for every car you could ever own (every property’s spaces together), the overflow yard next door holding the rest', geo.cap >= geo.bays && geo.main === 10 && geo.over >= geo.bays - geo.main && geo.lots.length === 2, JSON.stringify(geo));
+check('the yards hold a space for every car you could ever own (every property’s spaces together, the motorsport park’s pit garages included): the main yard, the overflow yard next door and Valen Point’s annex', geo.cap >= geo.bays && geo.main === 10 && geo.over === 85 && geo.annex === 85 && geo.lots.length === 3, JSON.stringify(geo));
 check('every space is a real bay: fits the biggest vehicle, inside its yard, no two overlapping, none in the shed or the gate mouth, each nosing out onto clear ground', geo.overlap === 0 && geo.outside === 0 && geo.inBuilding === 0 && geo.small === 0 && geo.blockedNose === 0 && geo.gateApron === 0, JSON.stringify(geo));
 
 // a dozen of your cars seized at once (a rare one and a unique one among them): twelve spaces, none shared

@@ -33056,6 +33056,12 @@ function vpRoadSpots() {
   for (let x = CITY + EDGE_MARGIN + 20; x < VP.x0 + 10; x += 20) { out.push({ x, z: z + LANE, h: Math.PI / 2 }); out.push({ x, z: z - LANE, h: -Math.PI / 2 }); }
   return out;
 }
+// a point for the police to drive to near `ref` (where you are, or were last seen): kept inside the city square, or
+// on Valen Point's island when that is where you are (Session 6B)
+function vpClampSearch(refX, x, z, m) {
+  if (refX > CITY + EDGE_MARGIN) return [clamp(x, VP.x0 + m, VP.x1 - m), clamp(z, VP.z0 + m, VP.z1 - m)];
+  return [clamp(x, m, CITY - m), clamp(z, m, CITY - m)];
+}
 /* =====================================================================
    [CORE] SAVE SYSTEM
    ===================================================================== */
@@ -42183,7 +42189,7 @@ class PoliceManager {
       if (pv && u.role === 'intercept' && lvl >= 2 && d > 25) { tx += pv.vel.x * 2.2; tz += pv.vel.y * 2.2; }
       // flank: aim at a point a block to one side of where the player is heading; the route there runs down a
       // parallel street, and it closes in once it is near
-      if (pv && u.role === 'flank' && d > 45) { const sp2 = Math.hypot(pv.vel.x, pv.vel.y) || 1, fx = pv.vel.x / sp2, fz = pv.vel.y / sp2; tx = clamp(tx + fx * 60 - fz * P * 0.75 * u.offset, 10, CITY - 10); tz = clamp(tz + fz * 60 + fx * P * 0.75 * u.offset, 10, CITY - 10); return { x: tx, z: tz, speed: sp }; }
+      if (pv && u.role === 'flank' && d > 45) { const sp2 = Math.hypot(pv.vel.x, pv.vel.y) || 1, fx = pv.vel.x / sp2, fz = pv.vel.y / sp2; [tx, tz] = vpClampSearch(p.pos.x, tx + fx * 60 - fz * P * 0.75 * u.offset, tz + fz * 60 + fx * P * 0.75 * u.offset, 10); return { x: tx, z: tz, speed: sp }; }
       if (d < 45 && g.world.grid.lineOfSight(v.pos.x, 1, v.pos.z, p.pos.x, 1, p.pos.z)) {
         const ram = lvl >= 3;
         const close = d < 14 && !pv;
@@ -42194,7 +42200,7 @@ class PoliceManager {
     // search mode: sweep around the last known position
     if (!u.searchPt || dist2(v.pos.x, v.pos.z, u.searchPt.x, u.searchPt.z) < 18 * 18) {
       const a = Math.random() * Math.PI * 2, r = Math.random() * this.searchRadius;
-      u.searchPt = { x: clamp(this.lastSeen.x + Math.cos(a) * r, 0, CITY), z: clamp(this.lastSeen.z + Math.sin(a) * r, 0, CITY) };
+      const [sx, sz] = vpClampSearch(this.lastSeen.x, this.lastSeen.x + Math.cos(a) * r, this.lastSeen.z + Math.sin(a) * r, 0); u.searchPt = { x: sx, z: sz };
     }
     return { x: u.searchPt.x, z: u.searchPt.z, speed: 14 };
   }
@@ -42271,6 +42277,8 @@ class PoliceManager {
     }
     // off the lattice (Valen Point): a unit comes along the causeway or round the turning circle instead
     if (!best && offCity(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
+      // in the lane heading your way
+      if (Math.sin(s.h) * (p.pos.x - s.x) < 0) continue;
       const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z); if (d < 120 || d > 320 || (g.inView(s.x, 2, s.z, 5) && d < 200)) continue;
       if (g.vehicles.list.some(v => dist2(v.pos.x, v.pos.z, s.x, s.z) < 100)) continue;
       const v = g.vehicles.spawn('police', s.x, s.z, s.h, { driver: 'cop', speed: 10 }); v.siren = true; this.adoptUnit(v); return;
@@ -46220,13 +46228,15 @@ class RaceManager {
     g.cam.yaw = v.h; g.cam.init = false;
     const n = A.def.opp;
     for (let k = 0; k < n; k++) {
+      // on the circuit each car keeps to its own side of the racing line, as it lined up on the grid
+      const lat = ((k + 1) % 2 ? 2.7 : -2.7) * 0.9, side = R.aiPath && R.aiPath[0].nx !== undefined ? (rx * R.aiPath[0].nx + rz * R.aiPath[0].nz) * lat : 0;
       const sl = slot(k + 1), cls = A.opts.opponentCls || A.def.cls[k % A.def.cls.length];
       const o = g.vehicles.spawn(cls, sl.x, sl.z, R.start.h, { driver: 'npc', vtier: A.opts.opponentTier });
       o.mission = 'race'; o.touched = true; o.critical = false;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
       // on the circuit the racing line, with a safe speed at every point; in the street the checkpoints
-      ai.path = R.aiPath ? R.aiPath.map(c => ({ ...c, x: c.x + rand(-0.8, 0.8), z: c.z + rand(-0.8, 0.8) })) : R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
+      ai.path = R.aiPath ? R.aiPath.map(c => ({ ...c, x: c.x + (c.nx || 0) * side, z: c.z + (c.nz || 0) * side })) : R.cps.map((c, i) => ({ x: c.x + rand(-1.2, 1.2), z: c.z + rand(-1.2, 1.2), node: i < R.cps.length - 1 }));
       ai.pi = 0; ai.goal = R.cps[R.cps.length - 1]; ai.wait = 99;
       const base = o.spec.vmax * (A.opts.hard ? 0.86 : rand(0.74, 0.82));
       A.racers.push({ v: o, cp: 0, base, done: false, time: 0, name: A.opts.names ? A.opts.names[k] : RACER_NAMES[(k + (A.def.id.length)) % RACER_NAMES.length], stuck: 0 });
@@ -52496,7 +52506,7 @@ function vpCheckpoints(def) {
   const ks = (k0 - 17 + n) % n, p = T.pts[ks], q = T.pts[(ks + 1) % n], dx = q[0] - p[0], dz = q[1] - p[1], l2 = Math.hypot(dx, dz) || 1;
   const dir = { x: dx / l2, z: dz / l2 };
   const ai = []; const vs = vpSafeSpeeds();
-  for (let j = 5; j <= n * laps + 30; j += 5) { const k = (ks + j) % n; ai.push({ x: T.pts[k][0], z: T.pts[k][1], node: true, vmax: vs[k] }); }
+  for (let j = 5; j <= n * laps + 30; j += 5) { const k = (ks + j) % n; ai.push({ x: T.pts[k][0], z: T.pts[k][1], node: true, vmax: vs[k], nx: T.nl[k][0], nz: T.nl[k][1] }); }
   return { cps: out, perLap: out.length / laps, start: { x: p[0], z: p[1], h: Math.atan2(dir.x, dir.z), dir }, aiPath: ai };
 }
 // how fast the racing line can be taken at each centreline sample: v = √(a·R) in corners, braking back from each
@@ -57045,7 +57055,7 @@ class TaxiService {
     const g = this.g, cands = [];
     // on Valen Point: the cab comes along the causeway (Session 6B)
     if (offCity(x, z)) {
-      const sp = vpRoadSpots().map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
+      const sp = vpRoadSpots().filter(s => Math.sin(s.h) * (x - s.x) > 0).map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
       for (const { s } of sp.slice(0, 8)) if (!g.vehicles.nearby(s.x, s.z, 6).some(v => Math.hypot(v.pos.x - s.x, v.pos.z - s.z) < 5)) return g.vehicles.spawn('taxi', s.x, s.z, s.h, {});
     }
     for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
