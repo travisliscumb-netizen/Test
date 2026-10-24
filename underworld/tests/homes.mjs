@@ -113,7 +113,7 @@ const app = await ev(() => {
   return out;
 });
 check('Property app: owned / district / tier / parking-storage filters, sort and search', app.selects >= 4 && app.search && app.all >= 45 && app.owned >= 1 && app.sig >= 5 && app.crest >= 8 && app.g3 >= 4 && app.search1 >= 2, JSON.stringify(app));
-check('Property app: sorted by price, most expensive first', /Estate|Highcliff|Skyline|Penthouse/.test(app.first), app.first);
+check('Property app: sorted by price, most expensive first (Valen Point Motorsport Park, $1.5M, heads the list since Session 6B)', /Motorsport Park/.test(app.first), app.first);
 check('Property app fits a phone (no sideways scroll, 44 px controls)', !app.overflow && app.minH >= 43.5, JSON.stringify(app));
 
 // save, reload and a v5 save with owned homes
