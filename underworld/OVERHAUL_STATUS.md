@@ -83,6 +83,8 @@ The mapping stays exact until a session changes the code above that line; after 
       line.
     - **The prize car:** flagged and saved together, so a reload can never award it twice. A prize car resells Clean.
 - **Impound:** the annex is the third yard in `ImpoundLot.lots()`, with its own gate, lock and alarm.
+- **Impound by place (§45.35):** `freeSlot(skip, at)` takes the yard nearest the seizure (from the car, where it
+  was left, or where you were). From the city it goes main → overflow → annex; from Valen Point, the annex first.
 
 ## Files / systems changed (6B)
 
@@ -135,7 +137,7 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Tests run (6B)
 
-`tests/motorsport.mjs` passes **26 / 26**:
+`tests/motorsport.mjs` passes **27 / 27** (with the seizure-by-place check):
 - **The world:**
   - the causeway is a spur off the perimeter road;
   - ground is at road level on the causeway and island, sea elsewhere;

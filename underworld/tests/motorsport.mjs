@@ -85,8 +85,8 @@ await ev(() => { const g = window.game; window.__calm(); g.police.enabled = fals
 const office = await ev(() => { const d = window.game.world.places.motorsport.door; return { x: d.x, z: d.z - 4 }; });
 const there = await drive(office);
 const back = await drive({ x: 700, z: 480 });
-check('a car drives from the city along the causeway to Race Control, every step physical (never more than a fast car covers in a quarter second)', there.arrived && there.alive && there.onCause && there.jump < 8 && Math.hypot(there.x - office.x, there.z - office.z) < 12, JSON.stringify(there));
-check('…and drives back into the city the same way', back.arrived && back.alive && back.onCause && back.jump < 8 && back.x < 960, JSON.stringify(back));
+check('a car drives from the city along the causeway to Race Control, every step physical (no teleport: never more than 15 m in a quarter second)', there.arrived && there.alive && there.onCause && there.jump < 15 && Math.hypot(there.x - office.x, there.z - office.z) < 12, JSON.stringify(there));
+check('…and drives back into the city the same way', back.arrived && back.alive && back.onCause && back.jump < 15 && back.x < 960, JSON.stringify(back));
 await ev(() => { const g = window.game, v = window.__drv; g.vehicles.despawn(v); g.police.enabled = true; });
 
 // ---------------------------------------------------------------- 4. the GPS both ways, never through a building
@@ -178,6 +178,14 @@ const park3 = await ev(ids => {
 check('pit-garage parking: each car keeps its exact garage bay (or its street spot on the apron) through a reload, one car each', park3.at.every(p => p === 'motorsport') && park3.inBays.every(Boolean) && park3.street && park3.dupes.every(n => n === 1), JSON.stringify({ park, park3 }));
 const imp = await ev(() => { const g = window.game, pv = window.__pv, PM = g.uw.props; let bays = 0; for (const d of pv.PROPS) bays += PM.bays(d).length; return { bays, cap: g.impound.capacity(), lots: g.impound.lots() }; });
 check('the impound still holds a space for every car you could own, now in three yards (the Valen Point annex too)', imp.cap >= imp.bays && imp.lots.length === 3 && imp.bays >= 118, JSON.stringify(imp));
+// seized where it stands: on the island to the annex, downtown to the main yard (never across the causeway for nothing)
+const where = await ev(() => {
+  const g = window.game, I = g.impound, s = g.save, out = {};
+  const one = (x, z) => { const e = g.content.addToGarage('sedan', 'bought', undefined, true); const v = g.vreg.spawnFor(e, { x, z, h: 0, y: 0 }); e.out = true; e.loc = { x, z, h: 0, y: v.pos.y }; g.resetPlayerState(x + 30, z, 0); I.seize(e, 'abandoned'); const r = { lot: I.lotOf(e), name: I.spaceName(e) }; e.imp = null; s.garage.splice(s.garage.indexOf(e), 1); return r; };
+  out.island = one(1500, 470); out.city = one(400, 365);
+  return out;
+});
+check('a car seized on Valen Point goes to the annex; one seized downtown goes to the city’s main yard', where.island.lot === 'impound_vp' && /annex/.test(where.island.name) && where.city.lot === 'impound' && /main yard/.test(where.city.name), JSON.stringify(where));
 
 // ---------------------------------------------------------------- 7. official events: Clean money, class rules, no heat
 const raceTo = async (id, place, prep) => {

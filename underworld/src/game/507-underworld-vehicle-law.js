@@ -64,7 +64,14 @@ class ImpoundLot {
   // the lowest-numbered space nobody is in. -1 only if every space were taken, which the parking caps rule out (the
   // two yards hold more than every property's spaces together); such a car is still held, never dropped, and is given
   // the first space that frees up
-  freeSlot(skip) { const used = new Set(this.held().filter(e => e !== skip).map(e => e.imp.slot)); const n = this.capacity(); for (let i = 0; i < n; i++) if (!used.has(i)) return i; return -1; }
+  freeSlot(skip, at) {
+    const used = new Set(this.held().filter(e => e !== skip).map(e => e.imp.slot)), S = this.slots();
+    // the yard nearest to where it was seized first (§45.35): from the city, the main yard, the overflow yard, then
+    // Valen Point's annex; from Valen Point, its annex first, then the city's yards
+    const order = at && offCity(at.x, at.z) ? [IMPOUND.annex.id, IMPOUND.id, IMPOUND.overflow.id] : [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id];
+    for (const lot of order) for (let i = 0; i < S.length; i++) if (S[i].lot === lot && !used.has(i)) return i;
+    return -1;
+  }
   slotPos(e) { return e.imp && e.imp.slot >= 0 ? this.slots()[e.imp.slot] || null : null; }
   lotOf(e) { const sp = this.slotPos(e); return sp ? sp.lot : IMPOUND.id; }
   // a save from before the overflow yard (two cars sharing a space) or with a space that no longer exists: every
@@ -73,13 +80,15 @@ class ImpoundLot {
   // your car is taken to the lot: why is 'arrest', 'abandoned' or 'pursuit'
   seize(e, why) {
     const g = this.g, R = g.vreg, v = R.live(e);
+    // where it was taken from: the car itself, where it was left, or (an arrest on foot) where you were
+    const at = v ? { x: v.pos.x, z: v.pos.z } : e.loc ? { x: e.loc.x, z: e.loc.z } : { x: g.player.pos.x, z: g.player.pos.z };
     if (v && v !== g.player.vehicle) g.vehicles.despawn(v);
     R.cars.delete(e.uid);
-    e.imp = { why, since: this.econ(), fee: this.fee(e), slot: this.freeSlot(e), paid: false };
+    e.imp = { why, since: this.econ(), fee: this.fee(e), slot: this.freeSlot(e, at), paid: false };
     e.out = false; e.loc = null;
     R.note('impounded', e.type, { uid: e.uid, why, fee: e.imp.fee });
     const what = { arrest: 'seized when you were arrested', abandoned: 'found abandoned on the street', pursuit: 'recovered by the police after the chase' }[why] || 'impounded';
-    if (!g.uw.S.jail || why === 'arrest') g.uw.news('pv', `Your ${VEHICLES[e.type].name} was ${what} and taken to the ${IMPOUND.name}. Release fee ${fmtMoney(e.imp.fee)} at the window, from your bank.`);
+    if (!g.uw.S.jail || why === 'arrest') g.uw.news('pv', `Your ${VEHICLES[e.type].name} was ${what} and taken to the ${IMPOUND.name} (${this.spaceName(e)}). Release fee ${fmtMoney(e.imp.fee)} at the window, from your bank.`);
     return e.imp;
   }
   // ---------------------------------------------------------------- who the gate opens for (CompoundSystem.why)

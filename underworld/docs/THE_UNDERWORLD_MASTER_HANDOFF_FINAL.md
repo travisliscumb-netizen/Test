@@ -1460,3 +1460,22 @@ Where these conflict with an earlier section, **this section wins**. Each affect
         - streaming out and back is safe;
         - no city performance regression while the district is unloaded;
         - impound overflow capacity covers the new garages.
+35. **Session 6B review (provisional approval pending full regression).**
+    - **The Valen Point design is approved,** including the removal of the old decorative suspension bridge in favour
+      of the functional causeway.
+    - **Impound annex: approved.** It has 85 physical bays, the same legal and illegal retrieval rules as the city
+      impounds, and no stacking or disappearing. Assignment prefers the impound nearest the seizure: a seizure in the
+      city goes to the main yard, then the overflow yard, then the annex; one on Valen Point goes to the annex first.
+      Downtown seizures are never sent across the causeway for no reason.
+    - **Rep:** official events give no criminal Rep. Street racing is Dirty Cash, illegal, criminal Rep and police
+      risk; official circuit events are Clean Bank, legitimate, no criminal Rep and no racing heat. No separate
+      motorsport-fame progression unless a later design challenge raises it.
+    - **Provisional economy until Session 13:**
+      - income $9,000/day, upkeep $2,500/day;
+      - a hosted meeting costs $20,000, with a $32,000 gate the next day;
+      - a track day is $250;
+      - official repeat-win tiers match the street-race daily tiers.
+    - **Known limits accepted:** the track is always open in free roam; AI racers yield briefly before passing a
+      stalled car; static crowds; minimal night lighting on the circuit; flat island terrain.
+    - **6B is not complete** until the remaining regression suites finish and any true 6B regressions are fixed.
+      Then go on to 6C.
