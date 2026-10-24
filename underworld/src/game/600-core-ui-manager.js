@@ -674,7 +674,7 @@ class UIManager {
     const bs = 9 * (W / 380) * 1.6;
     { const cs = g.world.places.chopshop, pd = g.world.places.police.door; if (cs) badge(cs.door.x, cs.door.z, MAP_CATS.chop.col, 'C', bs, false); badge(pd.x, pd.z, MAP_CATS.police.col, 'P', bs, false); }
     for (const L of uw.locs) {
-      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
+      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) blip(L.x, L.z, FACTIONS[L.id].col, 5, false, 'sq');
       else if (L.kind === 'spot') blip(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), 4, false, 'sq');
     }
@@ -785,7 +785,7 @@ class MapView {
       if (L.kind === 'prop') {
         const d = L.def, own = uw.props.owned(d.id);
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
-        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
+        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
         if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });

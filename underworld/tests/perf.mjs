@@ -46,6 +46,18 @@ await page.evaluate(() => {
 await new Promise(r => setTimeout(r, 4000));
 await page.evaluate(() => { const g = window.game; if (g.uw) for (const gr of g.uw.gangs.groups.values()) if (gr.members.length) { g.uw.onPedHit(gr.members[0], 'light', 1); break; } });
 const busy = await measure();
-console.log(path.basename(path.dirname(file)) + (PHONE ? ' [phone x4 CPU]' : ''), JSON.stringify({ calm, busy, errors: errs.slice(0, 3) }));
+// Valen Point (Session 6B), when the build has it: on the main straight in a car, five AI cars lapping the circuit
+let track = null;
+if (await page.evaluate(() => !!(window.game.world && window.game.world.vp))) {
+  await page.evaluate(() => {
+    const g = window.game, pv = window.__pv; g.police.clear(); g.police.setLevel(0); g.env.time = 13; try { g.env.setWeather('clear', true); } catch {}
+    const ck = pv.vpCheckpoints({ laps: 3 }), s = ck.start;
+    const me = g.vehicles.spawn('sports', s.x - 2.7, s.z + 30, s.h, {}); g.resetPlayerState(me.pos.x + 2, me.pos.z, 0); g.completeEnter(me);
+    for (let k = 0; k < 5; k++) { const v = g.vehicles.spawn(['sports', 'muscle', 'tempest', 'hellion', 'revenant'][k], s.x + (k % 2 ? 2.7 : -2.7), s.z + 9 * k, s.h, { driver: 'npc' }); v.mission = 'perf'; v.drive = new pv.DriveAI(v, g, 'race'); v.drive.path = ck.aiPath.map(c => ({ ...c, x: c.x + (c.nx || 0) * (k % 2 ? 2.4 : -2.4), z: c.z + (c.nz || 0) * (k % 2 ? 2.4 : -2.4) })); v.drive.pi = 0; v.drive.wait = 0; v.drive.cruise = 60; }
+  });
+  await new Promise(r => setTimeout(r, 4000));
+  track = await measure();
+}
+console.log(path.basename(path.dirname(file)) + (PHONE ? ' [phone x4 CPU]' : ''), JSON.stringify({ calm, busy, track, errors: errs.slice(0, 3) }));
 await Promise.race([b.close(), new Promise(r => setTimeout(r, 4000))]);
 process.exit(0);

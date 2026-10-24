@@ -330,7 +330,7 @@ class EmpireUI {
     if (!full) return;
     const icon = (x, z, col, txt) => { const [mx, mz] = ui._mapXY(x, z); c.fillStyle = col; c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.rect(mx - 9, mz - 9, 18, 18); c.fill(); c.stroke(); c.fillStyle = '#111'; c.font = 'bold 12px Arial'; c.textAlign = 'center'; c.fillText(txt, mx, mz + 4); };
     for (const L of uw.locs) {
-      if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : 'W');
+      if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : 'W');
       else if (L.kind === 'hq' && !S.factions[L.id].broken) icon(L.x, L.z, FACTIONS[L.id].col, '♛');
       else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : L.def.fixer ? 'L' : 'S');
     }
