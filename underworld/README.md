@@ -64,6 +64,17 @@ nowhere to park waits until you have room (Garage → Collect).
 
 Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
 
+## Valen Point Motorsport Park (overhaul Session 6B)
+
+East of the city, across a causeway from the perimeter road, the island of Valen Point holds a 3 km circuit with long
+straights and fast sweepers, a pit lane with twelve drive-through garages, grandstands, a paddock with Race Control,
+car parks and an annex of the police impound. Traffic, police and cabs use the causeway, and the GPS and the maps
+reach it. At Race Control you can enter official events (Clean Bank entry fees and prizes, class rules, no heat),
+book a track day with timed laps, or buy the park ($1.5M from the bank, no Rank or Rep needed): 24 garage spaces, no
+entry fees, private sessions, a pit crew, race meetings you host, and a daily income. Modules:
+`src/game/025-content-valen-point.js`, `125-content-valen-point-gen.js`, `175-content-valen-point-scenery.js`,
+`509-underworld-motorsport.js`.
+
 ## Street racing, pink slips and the car wash (overhaul Session 6A)
 
 Tull's underground races pay Dirty Cash. The first win of the day on a race pays the full purse and Rep; win it again
@@ -529,6 +540,7 @@ node underworld/tests/warehouse.mjs  # warehouses: security path, vault and trea
 node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
 node underworld/tests/hot.mjs        # HOT and the law: dealer theft stars, recognition only by a cop who sees it, Pay & Spray never cleans, Chop Shop clean once + needs a space, arrest impound keeps the car not the contraband, legal and illegal retrieval, abandonment and chase recovery, full registry keeps everything, the overflow yard (a bay per car, no sharing, retrieval at its own gate, old saves repaired)
 node underworld/tests/races.mjs      # street racing: purse tiers per race per day, Dirty winnings, seen-racing 1★, pink slips (eligibility, win/lose/quit/reload, no duplication), car wash price/effects, Motor Works repair and tuning
+node underworld/tests/motorsport.mjs  # Valen Point: causeway and island ground/walls, circuit geometry, a self-driving car there and back, GPS both ways through no building, traffic and police on the causeway, purchase with no Rank gate, pit-garage bays through reloads, impound capacity, official events (Clean money, class rules, no heat, prize car once), hosting, a lap at speed, track-day timing, streaming, maps
 node underworld/tests/vehicle.mjs    # vehicle registry: real spaces only (kept while a car is out), gifts wait, street parking saved, stolen cars + cargo + cash persist and are recovered after a day (logged), bounded registry, fleet joining, wrecks towed home, rare cars, no duplicates after reload
 node underworld/tests/raid.mjs       # rival warehouses: sites and gates, interior never regenerates stock, exact take-only transfers, remainder persists, save/reload, raid clock 4.5/7/9/10 min without stacking, pause freeze, evacuation van, wind-down, restock only by delivery, safe
 node underworld/tests/shipment.mjs   # shipments: restock on the road not the shelves, reload while due, arrival, a real van carrying the record's cargo, docking, hijack, wreck, reload with a van on the road (once), the boat and its migration, imports (rank, price, landing, truck only, Driver run, expiry, customs, reload)

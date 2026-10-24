@@ -11,11 +11,191 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **6A — tuning, repair, respray, car wash, dealer finalisation, race economy, race heat, pink slips**
-  (prompt Session 6, first of four parts per DC-36 / §45.32; rulings in §45.33). 5B was approved and closed first
-  (§45.31).
-- Commit/base revision: 5B closure `c4bc834` → the Session 6A commits on `claude/practical-lamport-zld81y`.
-- Date: 2026-10-23
+- Session: **6B — Valen Point Motorsport Park** (prompt Session 6, second of four parts per DC-36 / §45.32; scope
+  §45.34). 6A was approved and locked first.
+- Commit/base revision: 6A `eef887b` → the Session 6B commits on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-24
+
+## Completed this session (6B)
+
+- **A new district off the map (`025-content-valen-point.js`).** Valen Point is an island east of the city at
+  x 1440–2380, z 130–910. The existing city grid is untouched.
+  - **The causeway:** a low causeway at z = 520 leaves the east perimeter road and replaces the old decorative
+    suspension bridge, which had no road on it. The east seawall, promenade, railing and invisible perimeter wall now
+    stop either side of the causeway; it has rails, and the island has an edge wall.
+  - **Ground:** `groundBase` puts the causeway and island at road level. Anywhere else beyond the seawall is still
+    sea.
+  - **Collision:** the grid is now rectangular, out to x = 2398.
+  - **Saves:** a saved position on Valen Point is kept (only the water is pulled back to the coast).
+  - **Zone and names:** a new zone `v` (Valen Point: no foot traffic, few police) can be discovered, and has street
+    and district names. The Lieutenant zone picker lists only zones with turfs.
+- **Generation (`125-content-valen-point-gen.js`).**
+  - **The circuit:** 2,961 m, built from straights and constant-radius arcs (every corner's tangents are checked
+    against its straights).
+    - A 436 m main straight, a 680 m back straight and a 660 m east straight.
+    - Sweepers of 110, 130 and 150 m (about 85 mph at the AI's grip) and medium corners of 60–80 m.
+    - Two slow infield hairpins of 40 and 45 m.
+  - **Barriers:** armco on both sides, set further out on the outside of faster corners (gravel traps there), with
+    run-off easing in over 50 m and gaps for the pit merges. Their colliders are posts a metre apart; no barrier comes
+    within 8.5 m of the centreline.
+  - **The pit complex:** a pit lane and pit wall, and 12 drive-through pit garages (24 parking bays) under a glass pit
+    building.
+  - **Around it:** two grandstands with a static crowd, the paddock with transporters and Race Control, two
+    spectator car parks, the main entrance gate, and the turning circle.
+  - **Start / finish:** a timing gantry.
+  - **Annex:** the police impound's Valen Point annex, an 85-bay overflow yard (see Risks).
+  - **Streaming:** district geometry lives in district blocks (`world.xblocks`, indexes from 1000;
+    `world.blockI(i)`). The chunk manager streams them by distance and the far skyline includes them.
+- **Scenery (`175-content-valen-point-scenery.js`).** A near version (ground, track, kerbs, lines, causeway,
+  paddock and car parks, pit lane: 2 draw calls with the armco) and a far version (1 draw call), switched at 650 m
+  from the island.
+- **Roads and AI.**
+  - **The causeway road:** a `Links` spur, attached to the lattice at one end, with a turning circle at the other.
+    Traffic drives out, round and back onto the lattice.
+  - **GPS:** `GPS.routeAny` routes between any two points when either is off the city. The spur has a node at
+    every vertex, and a district road graph (`vp.roads`, plus the circuit every ~50 m) covers the paddock, the gaps
+    beside the garages, the pit lane and merges, Race Control and the annex gate.
+  - **AI drivers:** `DriveAI` uses the GPS route off the lattice, kept to the right-hand side of the road.
+  - **Police and taxis:** units and cabs come along the causeway in the lane heading your way (`vpRoadSpots`).
+    Police search and flank points now stay on the island when you are there; before, they were clamped into the
+    city.
+  - **Maps:** the minimap and big map paint the district (a cached image, plus live painting when zoomed in), the
+    big map pans east to it, map taps work there, and the park is marked "M".
+- **The park (`509-underworld-motorsport.js`, property kind `motorsport`).**
+  - **Price:** $1.5M from Clean Bank (provisional). There is no Rank or Rep gate, and no turf, presence or
+    protection effects.
+  - **Parking:** its 24 pit-garage bays are registry parking (`PM.bays`).
+  - **Income:** $9,000 a day (`trackIncome`, Clean) less $2,500 upkeep.
+  - **Hosting:** the owner hosts a meeting for $20,000 now (`trackHost`). The gate pays $32,000 on the next
+    economic day, once.
+  - **Pit crew:** repairs in a pit garage at the Motor Works rate, 30% off for the owner (`pitService`).
+  - **Track days:** $250 (free private sessions for the owner). Laps are timed from the line through three sectors;
+    the best lap is saved and cutting across doesn't count.
+  - **Official events at Race Control:**
+    - **The events:** Club Sprint (≤$16k cars), GT Cup ($16k–$65k), Supercar Showdown ($65k+), and the Invitational
+      ($40k+, prize: a Monarch, once).
+    - **Scrutineering:** the car must be registered to you, not HOT, healthy and in class. The entry fee (`trackFee`,
+      Clean) is charged on the grid, and waived for the owner.
+    - **Prizes:** from the bank (`trackPrize`), using the same daily per-event tiers as street races. There is no Rep
+      and no heat.
+    - **The racing:** the circuit's checkpoints, a grid behind the line, and AI on a racing line with a safe speed at
+      every point. That speed is √(8.5·R) in corners, with braking at 7 m/s². Each car keeps its own side of the
+      line.
+    - **The prize car:** flagged and saved together, so a reload can never award it twice. A prize car resells Clean.
+- **Impound:** the annex is the third yard in `ImpoundLot.lots()`, with its own gate, lock and alarm.
+
+## Files / systems changed (6B)
+
+- **New:**
+  - `025-content-valen-point.js`
+  - `125-content-valen-point-gen.js`
+  - `175-content-valen-point-scenery.js`
+  - `509-underworld-motorsport.js`
+  - `tests/motorsport.mjs`
+- **World and engine:**
+  - `020`: ground, zone, names, `Links` spurs and `loop`;
+  - `080`: rectangular collision grid;
+  - `090`: perimeter gap, `blockI`;
+  - `110`: generate hook, yard options, annex overflow;
+  - `160`: district block streaming and far skyline;
+  - `170`: bridge removed, seawall/promenade/railing gaps;
+  - `270`: fx block lookup.
+- **Roads and AI:**
+  - `280`: spur traffic;
+  - `290`: GPS routing off the lattice, racing-line `vmax`;
+  - `310`: police spawn and search/flank on the island;
+  - `560`: cabs;
+  - `600`: GPS `routeAny`, district map image and painting, pan bounds, pick, markers;
+  - `540`: Lieutenant zones, marker.
+- **Racing and the park:**
+  - `370`: circuit races, scrutineering on the grid, no heat for official events;
+  - `340`: official payout and sources;
+  - `390`: the property, the annex;
+  - `410`: `LOC_CLASS`;
+  - `490`: off-city property guards, park day tick;
+  - `500`: park bays;
+  - `507`: three yards;
+  - `035`: track sources;
+  - `030`: `save.track`, position clamp;
+  - `360`: `prize` resale and chip, discovery;
+  - `450`: findAction, reset;
+  - `630`: construct, update, reset;
+  - `650`: exports;
+  - `manifest.json`.
+- **Tests:** `tests/hot.mjs` (three yards, annex bays), `tests/perf.mjs` (a district scenario).
+
+## Save/schema changes (6B)
+
+- `save.track: { best: { t, type } | null, prize: { eventId: true }, hosted: { day } | null, laps }`, validated
+  in `MotorsportPark.reset`.
+- Property `motorsport` in `save.uw.props`.
+- Garage origin `prize`.
+- A saved position on Valen Point is no longer clamped.
+- No schema bump.
+
+## Tests run (6B)
+
+`tests/motorsport.mjs` passes **26 / 26**:
+- **The world:**
+  - the causeway is a spur off the perimeter road;
+  - ground is at road level on the causeway and island, sea elsewhere;
+  - the seawall gap is only for the causeway; the causeway has rails and the island an edge.
+- **The circuit:** about 3 km; the fillets fit; at least 3 sweepers of 110 m or more; only 2 slow corners; a
+  straight over 400 m; barriers at least 8.5 m off the centreline.
+- **Driving:** a car drives itself city → Race Control → city, every step physical, along the causeway.
+- **GPS:** routes city ↔ Race Control, city ↔ the circuit and to the annex, with no leg through a building or
+  wall.
+- **Traffic and police:** traffic drives the causeway and rejoins the lattice; a police unit comes out along the
+  causeway and closes in.
+- **Ownership:**
+  - an early jackpot player (rank 0, rep under 300) buys the park from the bank, with +24 spaces;
+  - after a reload it is still owned and an island position is kept;
+  - pit-garage cars keep their exact bays, and an apron-parked car keeps its spot, with no duplicates;
+  - the impound covers 118 possible cars across 3 yards (capacity 180).
+- **Official events:**
+  - scrutineering refuses a car in the wrong class, charging nothing;
+  - GT Cup: fee and prize in Clean ($1,500 / $9,000) with no Dirty movement; no heat with a cop watching; all 5
+    opponents race;
+  - a second win the same day pays half;
+  - the owner races free; the Invitational's Monarch is awarded once, and after a reload there is still one car and
+    it can't be won again;
+  - a hosted meeting pays its gate once, alongside the daily income.
+- **Free roam and track days:** an AI car laps the circuit on its racing line at over 150 km/h without leaving the
+  track; a track day times a full lap, keeps the best, and ignores a cut.
+- **Streaming:** district blocks and near scenery show on the island and go in the city (far version only), within
+  the cache bound, and come back.
+- **Maps:** they reach Valen Point.
+- **`tests/hot.mjs`** passes **31 / 31** (three yards, annex bays real, capacity ≥ every property's bays).
+
+**Performance** (`tests/perf.mjs`, the same viewport and quality for each build):
+- **The city with the district unloaded,** run alternately three times each, before (6A) and after: the same calls
+  (116–120) and triangles (376–381k); update 1.04–1.39 ms against 1.00–1.39 ms. Phone profile: calls 247 vs 248,
+  update within run-to-run noise.
+- **On the circuit with five AI cars:** desktop 54 calls, 164k triangles, update 0.76 ms; phone ×4 CPU 82 calls,
+  187k triangles, update 4.3 ms. That is lighter than the city.
+
+Full regression against the 6B build: in progress (results in the next commit).
+
+## Known bugs / risks (6B)
+
+- **The annex: a design call for the owner.** The pit garages raise the most cars you can own to 118, past the
+  two city yards' 95. Rather than take another city block (6B keeps the grid), the impound's third yard is on Valen
+  Point by the causeway landing. A car seized past the city yards' 95 spaces waits there.
+- **Prices and numbers are provisional (Session 13):** the park $1.5M, income $9k/day less $2.5k, a meeting
+  $20k → $32k, a track day $250, entry fees, prizes, and the Invitational Monarch.
+- **No Rep from official events:** they pay Clean prize money only, as legitimate racing; street credibility comes
+  from the street. Say if you want some Rep there.
+- **The track is always open in free roam.** Timing needs a track day or private session; an official event takes
+  the grid when it starts.
+- **AI racers:** they follow a fixed line with corner speeds and yield to anything ahead. A stalled car on the grid
+  holds up the row behind it for a few seconds before they pull round it.
+- **Visuals:** there is no tunnel or bridge to the infield; grandstand crowds are static; the island is flat
+  (Cedar Fields terrain is 6C). Night lighting on the circuit is minimal.
+- **The old decorative suspension bridge is gone,** replaced by the low causeway.
+
+## Exact next recommended task
+
+Owner review of 6B. Then **6C**: the Cedar Fields terrain overhaul and off-road track (§45.32).
 
 ## Completed this session (6A)
 
