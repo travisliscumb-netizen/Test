@@ -30,14 +30,8 @@ function inExtension(x, z) { return inValenPoint(x, z) || inCedarSouth(x, z); }
 // Fields South every ~20 m along the land bridge's track and the countryside tracks, in both lanes (h is the heading)
 function extRoadSpots(x, z) {
   if (!cfsSide(x, z)) return vpRoadSpots();
-  const cf = typeof game !== 'undefined' && game.world && game.world.cfs, out = [];
-  if (!cf) return out;
-  for (const pts of [cf.spur, cf.loop, cf.east]) for (let k = 4; k < pts.length - 4; k += 8) {
-    const a = pts[k - 1], b = pts[k + 1], h = Math.atan2(b[0] - a[0], b[1] - a[1]), ox = -Math.cos(h) * LANE * 0.8, oz = Math.sin(h) * LANE * 0.8;
-    if (pts[k][1] < CITY + EDGE_MARGIN + 8) continue;
-    out.push({ x: pts[k][0] + ox, z: pts[k][1] + oz, h }, { x: pts[k][0] - ox, z: pts[k][1] - oz, h: h + Math.PI });
-  }
-  return out;
+  // every ~20 m of the countryside's roads (the land bridge's track and the tracks traffic drives), from the seawall out
+  return RoadGraph.ready ? RoadGraph.spots(e => (e.ext === 'cfs' && e.traffic) || (e.kind === 'spur' && e.name === 'Cedar Fields Track')).filter(s => s.z > CITY + EDGE_MARGIN + 8) : [];
 }
 // is a car at spot s heading toward (x, z)?
 const spotToward = (s, x, z) => Math.sin(s.h) * (x - s.x) + Math.cos(s.h) * (z - s.z) > 0;

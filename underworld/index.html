@@ -32926,18 +32926,32 @@ const Links = {
     else { const seg = clamp(Math.floor(E[0] / P), 0, N - 1); a = { axis: 1, line: j, seg, along: E[0] - seg * P, C: { x: E[0], z: j * P }, d: dH }; }
     return a.d <= ROAD_HALF + 1.5 && a.along > TURN_IN + 4 && a.along < P - TURN_IN - 4 && RoadNet.segOpen(a.axis, a.line, a.seg) ? a : null;
   },
+  // an end that meets another curved road part way along it (a Y-junction, a lane off a lane): the point on that road
+  attachLink(E, world, self) {
+    let best = null;
+    for (const r of world.localRoads) {
+      if (!r.link || r.k !== 'line' || r === self) continue;
+      for (let k = 0; k < r.pts.length - 1; k++) {
+        const a = r.pts[k], b = r.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+        const t = clamp(((E[0] - a[0]) * dx + (E[1] - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(E[0] - px, E[1] - pz);
+        if (d <= 0.5 && (!best || d < best.d)) best = { axis: -1, onLink: r.link, C: { x: px, z: pz }, d };
+      }
+    }
+    return best;
+  },
   build(world) {
     this.list = []; this.idx.clear();
     for (const r of world.localRoads) {
       if (!r.link || r.k !== 'line') continue;
-      // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle
+      // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle.
+      // An end may also meet another curved road (Curved Roads pass: Y-junctions, the farm track off Cedar Fields Road)
       const last = r.pts[r.pts.length - 1];
-      const a = this.attach(r.pts[0]), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last);
+      const a = this.attach(r.pts[0]) || this.attachLink(r.pts[0], world, r), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last) || this.attachLink(last, world, r);
       if (!a || !b) continue;
       const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
       const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null };
       this.list.push(L);
-      L.ends.forEach((e, k) => { if (e.free) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
+      L.ends.forEach((e, k) => { if (e.free || e.onLink) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
     }
     world.links = this.list;
   },
@@ -32963,6 +32977,8 @@ const Links = {
     for (let i = 1; i < m; i++) { const a = a0 + (a1 - a0) * i / m; arc.push([R0.x + Math.cos(a) * R0.r, R0.z + Math.sin(a) * R0.r]); }
     return [...out, ...arc, ...back];
   },
+  // nearest point on one link
+  nearestOn(L, x, z) { const s = this.list; this.list = [L]; const r = this.nearest(x, z); this.list = s; return r; },
   // nearest point on any link: { link, k (segment), x, z, d, along (metres from end 0) }
   nearest(x, z) {
     let best = null;
@@ -33017,7 +33033,8 @@ function groundBase(x, z) {
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
   if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
-  return RoadNet.roadAt(x, z) ? 0 : CURB_H;
+  // (the kerb is cut where a curved road leaves a lattice street: a ramp in the gutter, CurbCuts in 135)
+  return RoadNet.roadAt(x, z) ? (CurbCuts.n ? CurbCuts.at(x, z) : 0) : CURB_H;
 }
 function isOnRoad(x, z) { return RoadNet.roadAt(x, z); }
 // Streetlight positions for one block (must match the ground shader formula).
@@ -33106,14 +33123,8 @@ function inExtension(x, z) { return inValenPoint(x, z) || inCedarSouth(x, z); }
 // Fields South every ~20 m along the land bridge's track and the countryside tracks, in both lanes (h is the heading)
 function extRoadSpots(x, z) {
   if (!cfsSide(x, z)) return vpRoadSpots();
-  const cf = typeof game !== 'undefined' && game.world && game.world.cfs, out = [];
-  if (!cf) return out;
-  for (const pts of [cf.spur, cf.loop, cf.east]) for (let k = 4; k < pts.length - 4; k += 8) {
-    const a = pts[k - 1], b = pts[k + 1], h = Math.atan2(b[0] - a[0], b[1] - a[1]), ox = -Math.cos(h) * LANE * 0.8, oz = Math.sin(h) * LANE * 0.8;
-    if (pts[k][1] < CITY + EDGE_MARGIN + 8) continue;
-    out.push({ x: pts[k][0] + ox, z: pts[k][1] + oz, h }, { x: pts[k][0] - ox, z: pts[k][1] - oz, h: h + Math.PI });
-  }
-  return out;
+  // every ~20 m of the countryside's roads (the land bridge's track and the tracks traffic drives), from the seawall out
+  return RoadGraph.ready ? RoadGraph.spots(e => (e.ext === 'cfs' && e.traffic) || (e.kind === 'spur' && e.name === 'Cedar Fields Track')).filter(s => s.z > CITY + EDGE_MARGIN + 8) : [];
 }
 // is a car at spot s heading toward (x, z)?
 const spotToward = (s, x, z) => Math.sin(s.h) * (x - s.x) + Math.cos(s.h) * (z - s.z) > 0;
@@ -33332,9 +33343,31 @@ const Terrain = {
         R.s[o] = rocky ? TSURF.rock : wet ? TSURF.mud : TSURF.grass;
         if (pad) { R.s[o] = TSURF.gravel; R.m[o] = 0.2; }
       }
-      // dirt tracks: packed surface and two wheel ruts, a full cell each side where the wheels run (0.5–1.5 m out; a
-      // pad keeps its gravel)
-      for (const T of tracks) this._stampLine(R, T.pts, T.w, (o, along, off) => { if (R.s[o] === TSURF.gravel) return; R.s[o] = TSURF.track; if (Math.abs(Math.abs(off) - 1.0) <= 0.5) R.h[o] -= 0.07; });
+      // dirt tracks, laid as country roads (the Curved Roads pass): each follows the hills on a smoothed profile (about
+      // 25 m either side averaged, no grade over 10%), level across its width, eased into the ground over 3 m shoulders.
+      // A track that ends on another takes that one's level there; one that crosses a pad takes the pad's. Then the
+      // packed surface and two wheel ruts, a full cell each side where the wheels run (0.5–1.5 m out; a pad keeps its
+      // gravel), with the rough held to 60% (a used track is smoother than the field beside it)
+      const done = [], laid = new Uint8Array(R.W * R.H);
+      for (const T of tracks) {
+        T.prof = this._profile(R, T, done);
+        done.push(T);
+        const yAt = d => { const c = T.prof.cum, n = c.length; let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] <= d) lo = m; else hi = m; } const t = clamp((d - c[lo]) / ((c[hi] - c[lo]) || 1), 0, 1); return T.prof.y[lo] + (T.prof.y[hi] - T.prof.y[lo]) * t; };
+        // (a road cell laid by a track before keeps that track's level: where one track runs into another, the first
+        // one's road stays level across; on a pad the profile is the pad's own level and the surface stays gravel)
+        const mine = [];
+        this._stampLine(R, T.pts, T.w + 6, (o, along, off) => {
+          if (laid[o]) return;
+          const t = smoothstep(T.w / 2, T.w / 2 + 3, Math.abs(off));
+          R.h[o] = yAt(along) * (1 - t) + R.h[o] * t;
+          if (Math.abs(off) > T.w / 2) return;
+          mine.push(o);
+          if (R.s[o] === TSURF.gravel) return;
+          R.s[o] = TSURF.track; R.m[o] = 0.6;
+          if (Math.abs(Math.abs(off) - 1.0) <= 0.5) R.h[o] -= 0.07;
+        });
+        for (const o of mine) laid[o] = 1;
+      }
       // the course: dirt, with its features by distance along it
       this._stampLine(R, course.pts, course.w, (o, along, off) => {
         R.s[o] = TSURF.dirt; R.m[o] = 1;
@@ -33349,6 +33382,38 @@ const Terrain = {
       }, true);
     }
     this.ready = true;
+  },
+  // a track's level along its length: the ground under it averaged over about 25 m either side (twice: a smooth
+  // crest, no sharp dip), held to the level of a pad it crosses and of a track it ends on (eased in over 20 m), then no
+  // grade over 10%. Returns { cum, y } at the track's points
+  _profile(R, T, done) {
+    const pts = T.pts, n = pts.length, cum = new Float64Array(n), raw = new Float64Array(n), pin = new Float64Array(n).fill(NaN);
+    for (let k = 1; k < n; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    for (let k = 0; k < n; k++) {
+      const [x, z] = pts[k], inR = x >= R.x0 && x < R.x1 && z >= R.z0 && z < R.z1;
+      raw[k] = inR ? this._baked(R, x, z) : R.h[this._cell(R, clamp(x, R.x0, R.x1 - 1), clamp(z, R.z0, R.z1 - 1))];
+      if (inR && R.s[this._cell(R, x, z)] === TSURF.gravel) pin[k] = raw[k];
+    }
+    // wherever it runs on or beside a track already laid (its end, a shallow merge): that track's level there
+    for (let k = 0; k < n; k++) for (const D of done) {
+      const q = D.pts; let best = Infinity, at = 0, tt = 0;
+      for (let j = 0; j < q.length - 1; j++) {
+        const dx = q[j + 1][0] - q[j][0], dz = q[j + 1][1] - q[j][1], l2 = dx * dx + dz * dz || 1, t = clamp(((pts[k][0] - q[j][0]) * dx + (pts[k][1] - q[j][1]) * dz) / l2, 0, 1);
+        const d = Math.hypot(pts[k][0] - q[j][0] - dx * t, pts[k][1] - q[j][1] - dz * t); if (d < best) { best = d; at = j; tt = t; }
+      }
+      if (best < (D.w + T.w) / 2 + 1) pin[k] = D.prof.y[at] + (D.prof.y[at + 1] - D.prof.y[at]) * tt;
+    }
+    const avg = (src, rad) => { const out = new Float64Array(n); for (let k = 0; k < n; k++) { let s = 0, w = 0; for (let j = k; j >= 0 && cum[k] - cum[j] <= rad; j--) { s += src[j]; w++; } for (let j = k + 1; j < n && cum[j] - cum[k] <= rad; j++) { s += src[j]; w++; } out[k] = s / w; } return out; };
+    let y = avg(avg(raw, 25), 25);
+    // the pins: each pulls the profile to its level, fading out over 20 m
+    for (let k = 0; k < n; k++) if (!isNaN(pin[k])) {
+      const dlt = pin[k] - y[k];
+      for (let j = 0; j < n; j++) { const f = 1 - Math.abs(cum[j] - cum[k]) / 20; if (f > 0) y[j] += dlt * f; }
+    }
+    for (let k = 0; k < n; k++) if (!isNaN(pin[k])) y[k] = pin[k];
+    // no grade over 10%, either way along it (pinned points stay put)
+    for (let pass = 0; pass < 2; pass++) for (let k = 1; k < n; k++) { const i = pass ? n - 1 - k : k, j = pass ? i + 1 : i - 1, ds = Math.abs(cum[i] - cum[j]) * 0.1; if (isNaN(pin[i])) y[i] = clamp(y[i], y[j] - ds, y[j] + ds); }
+    return { cum, y, raw };
   },
   // every cell within w/2 of a polyline: fn(cellIndex, distance along, signed offset (+ on the left of travel)).
   // Each cell takes its nearest segment, so features and offsets run on smoothly through the bends
@@ -35065,10 +35130,16 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
             vec3 grav = mix(vec3(0.52, 0.45, 0.34), vec3(0.6, 0.55, 0.44), pvn(p * 9.0)) * (0.85 + 0.2 * n1);
             vec3 asph = vec3(0.15, 0.155, 0.165) * (0.8 + 0.36 * n1) + (lgr - 0.5) * 0.035;
             float ka = smoothstep(0.35, 0.6, lm.r), kg = smoothstep(0.35, 0.6, lm.g), kc = smoothstep(0.35, 0.6, lm.b);
+            // asphalt laid like the streets': aggregate speckles, repaired patches, fine cracks; darker when wet
+            asph += step(0.93, pvh(floor(p * 18.0))) * 0.035;
+            { vec2 pc = floor(p / 7.0); vec2 pf = fract(p / 7.0); float ph = pvh(pc + 13.0);
+              if (ph > 0.86) { vec2 hs = vec2(0.2 + pvh(pc + 3.0) * 0.25, 0.15 + pvh(pc + 7.0) * 0.3); asph = mix(asph, vec3(0.105, 0.11, 0.115) * (0.9 + 0.2 * lgr), boxAA(pf - 0.5, hs) * 0.9); } }
+            { float cr = abs(pvn(p * 0.9) - 0.5); asph *= 1.0 - 0.18 * (1.0 - smoothstep(0.0, 0.01 + fwidth(cr), cr)) * step(0.68, pvn(p * 0.21 + 5.0)); }
+            asph *= mix(1.0, 0.55, uWet);
             col = mix(col, conc, kc); col = mix(col, grav, kg * (1.0 - ka)); col = mix(col, asph, ka);
             // a painted edge line just inside the asphalt edge
             col = mix(col, vec3(0.8, 0.8, 0.76), (1.0 - smoothstep(0.0, 0.07, abs(lm.r - 0.72))) * step(lm.r, 0.95) * 0.7);
-            rough = mix(rough, 0.88, max(ka, kc)); hgt = mix(hgt, lgr * 0.004, max(ka, max(kg, kc)));
+            rough = mix(rough, mix(0.88, 0.3, uWet), max(ka, kc)); hgt = mix(hgt, lgr * 0.004, max(ka, max(kg, kc)));
             isRoad = max(isRoad, max(ka, kc));
           }
         }
@@ -37509,11 +37580,14 @@ Object.assign(World.prototype, {
     // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
     this.exts = [
-      { id: 'vp', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK] },
-      { id: 'cfs', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK] }
+      { id: 'vp', name: 'Valen Point', loopName: 'Valen Point circuit', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK], traffic: [] },
+      // traffic drives the countryside's two tracks (the farm track east past the compound and the loop)
+      { id: 'cfs', name: 'Cedar Fields South', loopName: 'Cedar Fields off-road course', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [4, 5] }
     ];
     for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
     Links.build(this);
+    // every drivable road in one graph (the Curved Roads pass): the GPS, AI drivers, traffic, taxis and police
+    RoadGraph.build(this);
   };
 }
 /* ---------------------------------------------------------------------
@@ -37900,6 +37974,13 @@ Object.assign(World.prototype, {
     const t = kind === 'hedge' ? 1.0 : kind === 'wall' ? 0.45 : 0.08, hh = h || (kind === 'hedge' ? 1.4 : kind === 'wall' ? 1.2 : kind === 'chain' ? 2.2 : 1.0);
     this._det(b, 'box', cx, CURB_H + hh / 2, cz, ax ? len : t, hh, ax ? t : len, col, 0, true);
     if (kind === 'wall') this._det(b, 'box', cx, CURB_H + hh + 0.06, cz, ax ? len + 0.1 : t + 0.12, 0.12, ax ? t + 0.12 : len + 0.1, C(0xd8ccb4));
+  },
+  // a fence run between any two points (a short run along a curved road): drawn along the line, its collider the
+  // run's box (the runs are short and nearly straight with the axes, so the box is barely wider than the rail)
+  _fenceSeg(b, x0, z0, x1, z1, kind = 'rail', h) {
+    const len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.4) return;
+    const col = kind === 'rail' ? C(0x8a7050) : kind === 'chain' ? C(0x5c6166) : C(0xf0eee8), hh = h || (kind === 'chain' ? 2.2 : 1.0), t = 0.08, ry = Math.atan2(x1 - x0, z1 - z0);
+    this._det(b, 'box', (x0 + x1) / 2, CURB_H + hh / 2, (z0 + z1) / 2, t, hh, len + 0.04, col, ry, { x0: Math.min(x0, x1) - t, x1: Math.max(x0, x1) + t, z0: Math.min(z0, z1) - t, z1: Math.max(z0, z1) + t, y0: 0, y1: CURB_H + hh, kind: 'det' });
   },
   _yardTrees(b, rng, x0, z0, x1, z1, n, kinds = ['tree', 'tree', 'bush']) {
     for (let i = 0, tries = 0; i < n && tries < n * 8; tries++) {
@@ -38407,11 +38488,15 @@ Object.assign(World.prototype, {
   _genFields(a, sb, rng) {
     this._sbSidewalks(sb, rng, { trees: 0.8, park: 0 });
     const b = a, zr = 920;
-    this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt', { smooth: true, link: 'Cedar Fields Road' });
+    const cfr = this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt', { smooth: true, link: 'Cedar Fields Road' });
     this._road([[150, zr], [150, 906]], 4.2, 'dirt');
     this._road([[60, zr], [60, 938]], 4.2, 'dirt');
-    // the farm track south to the perimeter road and the land bridge to Cedar Fields South (Session 6C)
-    this._road([[CFS.lb.x, zr], [CFS.lb.x, CITY]], CFS.lb.road * 2, 'dirt');
+    // the farm track south to the perimeter road and the land bridge to Cedar Fields South (Session 6C). A curved road
+    // of its own since the Curved Roads pass: it leaves Cedar Fields Road at a T (a link-to-link junction, its first
+    // point a sample of that road) and meets the perimeter road straight across from the bridge track
+    let ft = cfr.pts[0];
+    for (let k = 0; k < cfr.pts.length - 1; k++) { const a = cfr.pts[k], c = cfr.pts[k + 1]; if ((a[0] - CFS.lb.x) * (c[0] - CFS.lb.x) <= 0 && a[0] !== c[0]) { const t = (CFS.lb.x - a[0]) / (c[0] - a[0]); ft = [CFS.lb.x, a[1] + (c[1] - a[1]) * t]; break; } }
+    this._road(linePts(ft, [ft[0], CITY - ROAD_HALF + 0.6]), CFS.lb.road * 2, 'dirt', { link: 'Farm Track' });
     // the farm: house, red barn, silo, paddock
     this._house(b, rng, { x: 150, z: 897, face: 1, type: 'farm', w: 12, d: 9, garage: 'street', drive: 'auto', color: 0xf0e6c8, roofColor: 0x5a3a32, name: 'Cedar Farmhouse' });
     const barn = this._bld(b, 172, 892, 188, 906, 7.5, STYLE.WARE, 0x8a2a20, 7.5, 4, { roof: 'gable', roofColor: 0x3a3d40, exactH: true });
@@ -38423,11 +38508,16 @@ Object.assign(World.prototype, {
     for (let k = 0; k < 7; k++) { const x = 212 + rng.range(0, 20), z = 897 + rng.range(0, 12); this._det(b, 'cyl', x, CURB_H + 0.6, z, 0.75, 1.2, 0xd8b45a, null, { x, z, r: 0.8, y0: 0, y1: 1.2, kind: 'det' }); }
     // a cottage on the west field, rail fences along the track, hedgerows and an orchard
     this._house(b, rng, { x: 60, z: 944, face: 0, type: 'bungalow', w: 10, d: 7, garage: 'carport', drive: 'auto', color: 0xe8e0d0, name: 'Mill Cottage' });
-    for (const [x0, x1] of [[12, 52], [68, 142], [158, 240], [250, 308]]) {
-      this._fence(b, x0, zr - 4.2, x1, zr - 4.2, 'rail');
-      // the south fence opens for the farm track
-      if (x0 < CFS.lb.x && x1 > CFS.lb.x) { this._fence(b, x0, zr + 4.2, CFS.lb.x - 6, zr + 4.2, 'rail'); this._fence(b, CFS.lb.x + 6, zr + 4.2, x1, zr + 4.2, 'rail'); }
-      else this._fence(b, x0, zr + 4.2, x1, zr + 4.2, 'rail');
+    // rail fences along both sides of the road, following its bends (in runs of about 5 m; the south side opens for the
+    // farm track)
+    const zAt = x => { for (let k = 0; k < cfr.pts.length - 1; k++) { const a = cfr.pts[k], c = cfr.pts[k + 1]; if ((a[0] - x) * (c[0] - x) <= 0 && a[0] !== c[0]) return a[1] + (c[1] - a[1]) * (x - a[0]) / (c[0] - a[0]); } return zr; };
+    for (const [x0, x1] of [[12, 52], [68, 142], [158, 240], [250, 308]]) for (const side of [-1, 1]) {
+      const n = Math.ceil((x1 - x0) / 5);
+      for (let k = 0; k < n; k++) {
+        const xa = x0 + (x1 - x0) * k / n, xb = x0 + (x1 - x0) * (k + 1) / n;
+        if (side > 0 && xb > CFS.lb.x - 6 && xa < CFS.lb.x + 6) continue;
+        this._fenceSeg(b, xa, zAt(xa) + side * 4.2, xb, zAt(xb) + side * 4.2, 'rail');
+      }
     }
     for (const hx of [100, 250]) for (let z = sb.z0 + 3; z < sb.z1 - 2; z += 5) if (Math.abs(z - zr) > 6) this._prop(b, rng.chance(0.7) ? 'tree' : 'bush', hx + rng.range(-1, 1), z, rng.range(0, 6), rng.range(0.9, 1.3));
     for (let x = 262; x < 306; x += 7) for (let z = 928; z < 948; z += 7) this._prop(b, 'tree', x + rng.range(-0.6, 0.6), z + rng.range(-0.6, 0.6), rng.range(0, 6), rng.range(0.75, 0.95));
@@ -38598,6 +38688,206 @@ function curbAt(bx, bz, side, along = 40) {
   }
 }
 
+/* =====================================================================
+   [CONTENT] CURVED STREETS (the Curved Roads pass)
+   New streets that leave the grid at an angle, laid into blocks that hold nothing a save depends on
+   (no house on the home ladder, no property, contact or headquarters; each block has its own random
+   stream, so nothing else in the city moves). Each is a Link, a real through-road: traffic, the GPS,
+   AI drivers, taxis and police all use it, through the road graph (135).
+   - The Saltmarsh estate (Industrial Belt, blocks 10,2 and 10,3). Saltmarsh Way, a 12 m collector,
+     leaves Juniper St on a straight diagonal, crosses 3rd Ave at a skew and sweeps east onto Kestrel
+     St; Kiln Lane forks off it at a shallow Y and curves down to 4th Ave. Warehouses, container stacks
+     and fences are set round the roads; cars park along the kerbs, nose to tail with the curve.
+   - Tanner's Row (Old Quarter, blocks 3,10 and 4,10): a winding lane through the terraces, in off
+     10th Ave, across Dock St and out onto 11th Ave. The terraces are built as before and the lane is
+     cut through them: the houses in its way and whatever stood in the courtyards it crosses are gone.
+   ===================================================================== */
+// a straight road as a dense polyline (sampled every 2.5 m like the splines)
+function linePts(a, b, step = 2.5) {
+  const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)), out = [];
+  for (let k = 0; k <= n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+  return out;
+}
+// distance from a point to a polyline
+function polyDist(x, z, pts) {
+  let best = Infinity;
+  for (let k = 0; k < pts.length - 1; k++) { const d = segDist(x, z, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1]); if (d < best) best = d; }
+  return best;
+}
+// distance from an axis-aligned rectangle to a polyline (0 when they cross)
+function rectPolyDist(x0, z0, x1, z1, pts) {
+  let best = Infinity;
+  for (let k = 0; k < pts.length - 1; k++) {
+    const a = pts[k], b = pts[k + 1];
+    // a segment end inside the rectangle, or the segment crossing one of its sides
+    const inside = q => q[0] >= x0 && q[0] <= x1 && q[1] >= z0 && q[1] <= z1;
+    if (inside(a) || inside(b)) return 0;
+    const box = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+    for (let s = 0; s < 4; s++) if (segCross(a, b, box[s], box[(s + 1) % 4])) return 0;
+    for (const q of [a, b]) { const dx = Math.max(x0 - q[0], 0, q[0] - x1), dz = Math.max(z0 - q[1], 0, q[1] - z1); best = Math.min(best, Math.hypot(dx, dz)); }
+    for (const c of box) best = Math.min(best, segDist(c[0], c[1], a[0], a[1], b[0], b[1]));
+  }
+  return best;
+}
+function segCross(a, b, c, d) {
+  const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+}
+// the blocks and their streets: `line` a straight road between two points, `ctrl` a spline through control points,
+// `fork` the road a Y-junction branches off (its first control point is a sample of that road: `at`), `park` the
+// kerbs that take parked cars (+1 the right-hand side of the road's direction, -1 the left)
+const SALT_B = [[852, 245.4], [857.73, 252.35], [866, 258], [874.6, 261]];
+const CURVED_STREETS = {
+  '10,2': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, line: [[805.4, 178], [852, 234.6]], park: [1, -1] }] },
+  '10,3': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, ctrl: SALT_B, park: [-1] }, { name: 'Kiln Lane', w: 8, fork: 0, at: 4, ctrl: [[862, 268], [858, 290], [846, 314.6]] }] },
+  '3,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[262, 805.4], [266, 818], [280, 832], [300, 839], [314.6, 842]] }] },
+  '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] }
+};
+{
+  const base = World.prototype._genBlock;
+  World.prototype._genBlock = function (b) {
+    const spec = CURVED_STREETS[b.bx + ',' + b.bz];
+    if (!spec || b.superblock || b.special) return base.call(this, b);
+    if (spec.kind === 'lane') {
+      // the block as it always was, then the lane cut through it
+      base.call(this, b);
+      const roads = this._curvedRoads(b, spec);
+      for (const r of roads) this._carveFor(b, r, 1.2);
+      b.roadKind = 'lane';
+      return;
+    }
+    this._genWorks(b, new RNG(b.i * 7919 + 1337), spec);
+    b.name = DNAME[b.t] || 'Port Valen';
+  };
+}
+Object.assign(World.prototype, {
+  _curvedRoads(b, spec) {
+    const out = [];
+    for (const R of spec.roads) {
+      let pts;
+      if (R.line) pts = linePts(R.line[0], R.line[1]);
+      else if (R.fork !== undefined) pts = splinePts([out[R.fork].pts[R.at], ...R.ctrl]);
+      else pts = splinePts(R.ctrl);
+      out.push(this._road(pts, R.w, R.st || 'asphalt', { link: R.name }));
+      out[out.length - 1].park = R.park || null;
+    }
+    return out;
+  },
+  // take out what stands in a new road's way (buildings and their dressing, props, signs, parked cars, seats)
+  _carveFor(b, r, m) {
+    const near = (x, z, pad = 0) => polyDist(x, z, r.pts) < r.w / 2 + m + pad;
+    const hitR = (x0, z0, x1, z1) => rectPolyDist(x0, z0, x1, z1, r.pts) < r.w / 2 + m;
+    b.bld = b.bld.filter(q => !hitR(q.x0, q.z0, q.x1, q.z1));
+    b.det = b.det.filter(d => {
+      if (d.col && d.col.x0 !== undefined) return !hitR(d.col.x0, d.col.z0, d.col.x1, d.col.z1);
+      const h = Math.max(d.sx || 0, d.sz || 0) / 2;
+      return !hitR(d.x - h, d.z - h, d.x + h, d.z + h);
+    });
+    for (let i = b.props.length - 1; i >= 0; i--) {
+      const p = b.props[i]; if (!near(p.x, p.z, 0.8)) continue;
+      const list = this.propTypes[p.type], li = list ? list.indexOf(p) : -1; if (li >= 0) list.splice(li, 1);
+      b.props.splice(i, 1);
+    }
+    for (const k of ['signs', 'billboards', 'fx', 'seats', 'parked', 'secrets']) if (b[k]) b[k] = b[k].filter(o => o.x === undefined || !near(o.x, o.z, 1.5));
+    if (b.water) b.water = b.water.filter(o => !near(o.x, o.z, o.r || 0));
+  },
+  // cars parked along a road's kerbs, nose to tail with it (clear of its two ends and of any other road)
+  _kerbCars(b, rng, r, others) {
+    if (!r.park) return;
+    const pts = r.pts, cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+    const L = cum[cum.length - 1];
+    for (const side of r.park) for (let d = 16; d < L - 16; d += 6.4) {
+      if (!rng.chance(0.55)) continue;
+      let k = 0; while (k < pts.length - 2 && cum[k + 1] < d) k++;
+      const a = pts[k], c = pts[k + 1], t = (d - cum[k]) / ((cum[k + 1] - cum[k]) || 1), tx = (c[0] - a[0]) / ((cum[k + 1] - cum[k]) || 1), tz = (c[1] - a[1]) / ((cum[k + 1] - cum[k]) || 1);
+      const o = (r.w / 2 - 1.15) * side, x = a[0] + (c[0] - a[0]) * t - tz * o, z = a[1] + (c[1] - a[1]) * t + tx * o;
+      if (others.some(q => q !== r && polyDist(x, z, q.pts) < q.w / 2 + 4)) continue;
+      // on the right-hand kerb a car faces the way the road runs; on the left, the other way (with the traffic)
+      b.parked.push({ x, z, h: side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz), cls: null, kerb: true });
+    }
+  },
+  // an industrial block threaded by the new roads: warehouses, tanks and container stacks set clear of them
+  _genWorks(b, rng, spec) {
+    this._sidewalk(b, rng, { trees: 0, park: 0.2 });
+    const roads = this._curvedRoads(b, spec);
+    const clear = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m);
+    const fenceC = C(0x5c6166), fy = CURB_H + 1.1, e = 0.6;
+    // chain-link round the block's edge, open where a road passes
+    const fence = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(len / 0.5), runs = [];
+      let s0 = null;
+      for (let k = 0; k <= n; k++) {
+        const t = k / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t, open = roads.some(r => polyDist(x, z, r.pts) < r.w / 2 + 1.2);
+        if (!open && s0 === null) s0 = t;
+        if ((open || k === n) && s0 !== null) { runs.push([s0, t]); s0 = null; }
+      }
+      for (const [ta, tb] of runs) {
+        const ax = x0 + (x1 - x0) * ta, az = z0 + (z1 - z0) * ta, bx = x0 + (x1 - x0) * tb, bz = z0 + (z1 - z0) * tb, l = Math.hypot(bx - ax, bz - az); if (l < 1) continue;
+        const cx = (ax + bx) / 2, cz = (az + bz) / 2, alongX = Math.abs(bx - ax) > Math.abs(bz - az);
+        this._det(b, 'box', cx, fy, cz, alongX ? l : 0.06, 2.2, alongX ? 0.06 : l, fenceC, 0, true);
+        this._det(b, 'box', cx, CURB_H + 2.25, cz, alongX ? l : 0.1, 0.08, alongX ? 0.1 : l, C(0x3a3d40));
+      }
+    };
+    fence(b.x0 + e, b.z0 + e, b.x1 - e, b.z0 + e); fence(b.x0 + e, b.z1 - e, b.x1 - e, b.z1 - e);
+    fence(b.x0 + e, b.z0 + e, b.x0 + e, b.z1 - e); fence(b.x1 - e, b.z0 + e, b.x1 - e, b.z1 - e);
+    // warehouses: the biggest that fits, five times over, each with its roll-up doors on the side nearest a road
+    const placed = [], sizes = [[40, 24], [34, 22], [28, 18], [22, 16], [18, 13], [14, 11], [11, 9]];
+    for (let n = 0; n < 5; n++) {
+      let best = null;
+      for (const [w0, d0] of sizes) {
+        for (const rot of [0, 1]) {
+          const w = rot ? d0 : w0, d = rot ? w0 : d0;
+          for (let x = b.x0 + 3; x + w <= b.x1 - 3; x += 2) for (let z = b.z0 + 3; z + d <= b.z1 - 3; z += 2) {
+            if (placed.some(p => x < p.x1 + 4 && x + w > p.x0 - 4 && z < p.z1 + 4 && z + d > p.z0 - 4) || !clear(x, z, x + w, z + d, 3)) continue;
+            const score = w * d + rng.next();
+            if (!best || score > best.score) best = { x0: x, z0: z, x1: x + w, z1: z + d, score };
+          }
+        }
+        if (best) break;
+      }
+      if (!best) break;
+      placed.push(best);
+      const ware = rng.chance(0.3), h = rng.range(8, 13);
+      const r = this._bld(b, best.x0, best.z0, best.x1, best.z1, h, ware ? STYLE.WARE : STYLE.IND, rng.pick(ware ? PAL.brick : PAL.ind), 5, 4.5, { gtype: 3 });
+      this._dressBox(b, r, rng, 'warehouse');
+      this._rooftop(b, r, rng, 'ind');
+      const faces = [[(r.x0 + r.x1) / 2, r.z0, 0], [(r.x0 + r.x1) / 2, r.z1, 1], [r.x0, (r.z0 + r.z1) / 2, 2], [r.x1, (r.z0 + r.z1) / 2, 3]];
+      const face = faces.reduce((p, q) => Math.min(...roads.map(rd => polyDist(q[0], q[1], rd.pts))) < Math.min(...roads.map(rd => polyDist(p[0], p[1], rd.pts))) ? q : p)[2];
+      const along = face < 2 ? r.x1 - r.x0 : r.z1 - r.z0, nd = Math.floor(along / 8);
+      for (let k = 0; k < nd; k++) {
+        const a = 4 + k * 8 + (along - nd * 8) / 2;
+        if (face === 0) this._det(b, 'box', r.x0 + a, CURB_H + 2.2, r.z0 - 0.06, 4, 4.4, 0.1, 0x55595e);
+        else if (face === 1) this._det(b, 'box', r.x0 + a, CURB_H + 2.2, r.z1 + 0.06, 4, 4.4, 0.1, 0x55595e);
+        else this._det(b, 'box', face === 2 ? r.x0 - 0.06 : r.x1 + 0.06, CURB_H + 2.2, r.z0 + a, 0.1, 4.4, 4, 0x55595e);
+      }
+    }
+    const free = (x0, z0, x1, z1, m = 1.5) => x0 >= b.x0 + 1.5 && z0 >= b.z0 + 1.5 && x1 <= b.x1 - 1.5 && z1 <= b.z1 - 1.5 && clear(x0, z0, x1, z1, 2.5) && !placed.some(p => x0 < p.x1 + m && x1 > p.x0 - m && z0 < p.z1 + m && z1 > p.z0 - m);
+    // a pair of tanks where there is room
+    for (let tries = 0, n = 0; tries < 40 && n < 2; tries++) {
+      const r0 = rng.range(3.2, 4.2), tx = rng.range(b.x0 + 6, b.x1 - 6), tz = rng.range(b.z0 + 6, b.z1 - 6), h = rng.range(8, 12);
+      if (!free(tx - r0, tz - r0, tx + r0, tz + r0, 2)) continue;
+      this._det(b, 'cyl', tx, CURB_H + h / 2, tz, r0, h, rng.pick([0xc8c8c0, 0xaab4bb, 0x9ea38a]), null, { x: tx, z: tz, r: r0, y0: 0, y1: h + 1, kind: 'det' });
+      this._det(b, 'cyl', tx, CURB_H + h + 0.3, tz, r0 * 0.92, 0.6, 0x8a8f94);
+      placed.push({ x0: tx - r0, z0: tz - r0, x1: tx + r0, z1: tz + r0 }); n++;
+    }
+    // container stacks
+    for (let tries = 0, n = 0; tries < 60 && n < 7; tries++) {
+      const rot = rng.chance(0.5), w = rot ? 2.5 : 6.1, d = rot ? 6.1 : 2.5, x = rng.range(b.x0 + 3, b.x1 - 3), z = rng.range(b.z0 + 3, b.z1 - 3);
+      if (!free(x - w / 2, z - d / 2, x + w / 2, z + d / 2, 1.2)) continue;
+      const stack = rng.int(1, 3);
+      for (let s = 0; s < stack; s++) this._det(b, 'box', x, CURB_H + 1.3 + s * 2.6, z, w, 2.6, d, rng.pick(PAL.container), 0, s === 0 ? { x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: 0, y1: CURB_H + 2.6 * stack, kind: 'det' } : null);
+      placed.push({ x0: x - w / 2, z0: z - d / 2, x1: x + w / 2, z1: z + d / 2 }); n++;
+    }
+    for (let tries = 0, n = 0; tries < 30 && n < 5; tries++) {
+      const x = rng.range(b.x0 + 3, b.x1 - 3), z = rng.range(b.z0 + 3, b.z1 - 3);
+      if (!free(x - 0.8, z - 0.8, x + 0.8, z + 0.8, 0.6)) continue;
+      this._prop(b, rng.chance(0.5) ? 'pallet' : 'barrel', x, z, rng.range(0, 3)); n++;
+    }
+    for (const r of roads) this._kerbCars(b, rng, r, roads);
+    for (let tries = 0; tries < 30; tries++) { const x = rng.range(b.x0 + 3, b.x1 - 3), z = rng.range(b.z0 + 3, b.z1 - 3); if (free(x - 1, z - 1, x + 1, z + 1, 1)) { b.secrets.push({ x, z }); break; } }
+    b.roadKind = 'works';
+  }
+});
 /* =====================================================================
    [CONTENT] VALEN POINT: GENERATION (Session 6B, §45.34)
    The motorsport park on the island east of the city:
@@ -38979,7 +39269,7 @@ Object.assign(World.prototype, {
       this._det(b, 'cyl', x, y + 0.6, z, 0.75, 1.2, 0xd8b45a, null, { x, z, r: 0.8, y0: y - 1, y1: y + 1.2, kind: 'det' });
     }
     // ---------------------------------------------------------------- routes for the GPS and AI drivers (polylines, two-way), from the spur's far end
-    const ex = [R0.x - R0.r, R0.z], every = (pts, n) => pts.filter((p, k) => k % n === 0 || k === pts.length - 1);
+    const ex = [R0.x - R0.r, R0.z];
     // the course joins at a sample 30 m before the line, off the paddock
     cf.joinK = (T.sfK - 15 + T.pts.length) % T.pts.length;
     const cj = T.pts[cf.joinK];
@@ -38988,8 +39278,9 @@ Object.assign(World.prototype, {
       [[R0.x + R0.r + 2, R0.z], [(G.x0 + G.x1) / 2, G.z1 + 6]],
       [[R0.x + R0.r + 2, R0.z], [(SS.x0 + SS.x1) / 2, SS.z1 + 6]],
       [[R0.x + R0.r + 2, R0.z], [cj[0], S.compound.z1 + 2], cj],
-      [[O.x0 - 6, (O.z0 + O.z1) / 2], [O.x0 - 6, O.z0 - 6], [O.x1 + 4, O.z0 - 6], ...every(east, 4)],
-      every(loop, 4)
+      // the two tracks at their full resolution (the 2.5 m spline samples): routes follow the bends, not chords
+      [[O.x0 - 6, (O.z0 + O.z1) / 2], [O.x0 - 6, O.z0 - 6], [O.x1 + 4, O.z0 - 6], ...east],
+      loop
     ];
     cf.road0 = ex;
     // colliders for the district's buildings and details
@@ -39023,6 +39314,648 @@ const Signals = {
   }
 };
 
+/* =====================================================================
+   [CORE] ROAD GRAPH (the Curved Roads pass)
+   Every drivable road in one graph: the lattice's open segments, the curved links and spurs, the
+   extensions' routes and their loops. Each road comes in as a polyline (a chain). Wherever the end
+   of one chain lies on another (a link's end on a lattice segment, a track's end on a spur, one lane
+   meeting another part way along) the host is split there, so the junctions come from the geometry
+   itself: T-junctions at any angle, Y-junctions and shallow merges, crossings, link-to-link joins.
+   Edges keep their polylines, so a route is as long as the road it follows and every consumer (the
+   GPS and both maps, AI drivers, traffic, taxis, police, spawns) follows the same curve.
+   The lattice (RoadNet) does not change: signals, lane traffic, races and saves still use it, and
+   its segments are edges here like any other road.
+   ===================================================================== */
+const RG_EPS = 0.75, RG_CELL = 16;
+// road kinds: 'grid' (a lattice segment or part of one), 'link' (a curved through-road), 'spur' (a road with a
+// free end: the causeway, the land bridge track), 'ext' (an extension's own routes), 'loop' (a circuit or course)
+const RG_STREETS = new Set(['grid', 'link', 'spur', 'ext']);
+const RoadGraph = {
+  ready: false, nodes: [], edges: [], segAtt: new Map(),
+  _cells: new Map(), _segE: null, _segK: null, _stamp: null, _q: 0,
+  build(world) {
+    this.ready = false; this._walk = null;
+    const chains = [];
+    for (let a = 0; a < 2; a++) for (let line = 0; line <= N; line++) for (let seg = 0; seg < N; seg++) {
+      if (!RoadNet.segOpen(a, line, seg)) continue;
+      const p0 = a === 0 ? [line * P, seg * P] : [seg * P, line * P], p1 = a === 0 ? [line * P, (seg + 1) * P] : [(seg + 1) * P, line * P];
+      chains.push({ pts: [p0, p1], w: ROAD_HALF * 2, kind: 'grid', name: a === 0 ? STREET_NAMES_X[line] : STREET_NAMES_Z[line], lat: { axis: a, line, seg }, traffic: true });
+    }
+    for (const L of Links.list) {
+      // a link's ends meet the lattice road on its centreline (the attach point), so the junction is a point the
+      // two roads share
+      const pts = L.pts.map(q => [q[0], q[1]]), e0 = L.ends[0], e1 = L.ends[1], last = pts[pts.length - 1];
+      if (!e0.onLink && Math.hypot(pts[0][0] - e0.C.x, pts[0][1] - e0.C.z) > 0.01) pts.unshift([e0.C.x, e0.C.z]);
+      if (!L.spur && !e1.onLink && Math.hypot(last[0] - e1.C.x, last[1] - e1.C.z) > 0.01) pts.push([e1.C.x, e1.C.z]);
+      chains.push({ pts, w: L.w, kind: L.spur ? 'spur' : 'link', name: L.name, link: L, st: L.road.st || L.road.mat || 'asphalt', ring: L.spur ? L.ring : null, traffic: true });
+    }
+    for (const X of world.exts || []) {
+      X.roads.forEach((r, k) => chains.push({ pts: r.map(q => [q[0], q[1]]), w: 7, kind: 'ext', ext: X.id, name: X.name || X.id, traffic: !!(X.traffic && X.traffic.includes(k)) }));
+      if (X.loop) chains.push({ pts: X.loop.pts.map(q => [q[0], q[1]]), closed: true, w: 12, kind: 'loop', ext: X.id, name: X.loopName || X.id, traffic: false });
+    }
+    this._split(chains);
+    this._index();
+    this._exitDist();
+    this.ready = true;
+    this.buildCuts();
+    world.roadGraph = this;
+  },
+  // ---------------------------------------------------------------- building
+  _split(chains) {
+    const cell = v => Math.floor(v / RG_CELL), key = (cx, cz) => (cx + 1000) * 4096 + (cz + 1000);
+    // segments of every chain, by cell
+    const segs = new Map();
+    chains.forEach((c, ci) => {
+      const n = c.pts.length, m = c.closed ? n : n - 1;
+      for (let k = 0; k < m; k++) {
+        const a = c.pts[k], b = c.pts[(k + 1) % n];
+        for (let cx = cell(Math.min(a[0], b[0]) - RG_EPS); cx <= cell(Math.max(a[0], b[0]) + RG_EPS); cx++) for (let cz = cell(Math.min(a[1], b[1]) - RG_EPS); cz <= cell(Math.max(a[1], b[1]) + RG_EPS); cz++) {
+          const kk = key(cx, cz); if (!segs.has(kk)) segs.set(kk, []); segs.get(kk).push(ci, k);
+        }
+      }
+    });
+    // split points: every open chain's two ends, and wherever such an end lies on another chain
+    const splits = chains.map(() => []);
+    chains.forEach((c, ci) => {
+      if (c.closed) return;
+      for (const end of [0, 1]) {
+        const E = end ? c.pts[c.pts.length - 1] : c.pts[0];
+        let snap = null;
+        const list = segs.get(key(cell(E[0]), cell(E[1]))) || [];
+        for (let q = 0; q < list.length; q += 2) {
+          const cj = list[q], k = list[q + 1]; if (cj === ci) continue;
+          const H = chains[cj], n = H.pts.length, a = H.pts[k], b = H.pts[(k + 1) % n];
+          const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+          const t = clamp(((E[0] - a[0]) * dx + (E[1] - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t;
+          if (Math.hypot(E[0] - px, E[1] - pz) > RG_EPS) continue;
+          splits[cj].push({ s: k + t, x: px, z: pz });
+          if (!snap) snap = [px, pz];
+        }
+        // the end itself, moved onto the road it meets (so the two share the junction point exactly)
+        if (snap) { if (end) c.pts[c.pts.length - 1] = snap; else c.pts[0] = snap; }
+        const P2 = end ? c.pts[c.pts.length - 1] : c.pts[0];
+        splits[ci].push({ s: end ? c.pts.length - 1 : 0, x: P2[0], z: P2[1] });
+      }
+    });
+    // nodes: split points closer than RG_EPS are one node
+    const nodes = [], nh = new Map(), nk = v => Math.floor(v / 2);
+    const nodeAt = (x, z) => {
+      for (let cx = nk(x) - 1; cx <= nk(x) + 1; cx++) for (let cz = nk(z) - 1; cz <= nk(z) + 1; cz++) for (const n of nh.get(key(cx, cz)) || []) if (Math.hypot(n.x - x, n.z - z) <= RG_EPS) return n;
+      const n = { id: nodes.length, x, z, edges: [], lat: null, att: null, ring: null };
+      nodes.push(n); const kk = key(nk(x), nk(z)); if (!nh.has(kk)) nh.set(kk, []); nh.get(kk).push(n);
+      return n;
+    };
+    const edges = [];
+    this.segAtt.clear();
+    chains.forEach((c, ci) => {
+      const n = c.pts.length, S = splits[ci];
+      if (c.closed && !S.length) S.push({ s: 0, x: c.pts[0][0], z: c.pts[0][1] });
+      for (const sp of S) sp.node = nodeAt(sp.x, sp.z);
+      S.sort((p, q) => p.s - q.s);
+      const U = []; for (const sp of S) { const l = U[U.length - 1]; if (!l || (sp.s - l.s > 1e-6 && sp.node !== l.node)) U.push(sp); }
+      if (c.closed && U.length > 1 && U[U.length - 1].node === U[0].node) U.pop();
+      // grid chains: what the split points are on the lattice (a node, or a point part way along the segment)
+      if (c.lat) for (const sp of U) {
+        if (sp.s < 1e-6 || sp.s > 1 - 1e-6) { if (!sp.node.lat) sp.node.lat = [Math.round(sp.x / P), Math.round(sp.z / P)]; }
+        else if (!sp.node.att) {
+          sp.node.att = { axis: c.lat.axis, line: c.lat.line, seg: c.lat.seg, along: sp.s * P, C: { x: sp.x, z: sp.z } };
+          const kk = Links.key(c.lat.axis, c.lat.line, c.lat.seg); if (!this.segAtt.has(kk)) this.segAtt.set(kk, []);
+          this.segAtt.get(kk).push(sp.node); this.segAtt.get(kk).sort((p, q) => p.att.along - q.att.along);
+        }
+      }
+      if (c.ring) { const fe = U[U.length - 1]; if (fe && fe.s > n - 1 - 1e-6) fe.node.ring = c.ring; }
+      const piece = (A, B, wrap) => {
+        const pts = [[A.x, A.z]];
+        if (!wrap) { for (let k = Math.floor(A.s) + 1; k < B.s - 1e-6; k++) if (k > A.s + 1e-6) pts.push(c.pts[k]); }
+        else { for (let k = Math.floor(A.s) + 1; k < n; k++) if (k > A.s + 1e-6) pts.push(c.pts[k]); for (let k = 0; k < B.s - 1e-6; k++) pts.push(c.pts[k]); }
+        pts.push([B.x, B.z]);
+        const P2 = pts.filter((q, k) => k === 0 || Math.hypot(q[0] - pts[k - 1][0], q[1] - pts[k - 1][1]) > 1e-3);
+        if (P2.length < 2) return;
+        const cum = new Float64Array(P2.length);
+        for (let k = 1; k < P2.length; k++) cum[k] = cum[k - 1] + Math.hypot(P2[k][0] - P2[k - 1][0], P2[k][1] - P2[k - 1][1]);
+        const len = cum[P2.length - 1]; if (len < 0.05) return;
+        const e = { id: edges.length, a: A.node, b: B.node, pts: P2, cum, len, w: c.w, kind: c.kind, name: c.name, traffic: c.traffic, st: c.st || 'asphalt', ext: c.ext || null, link: c.link || null, lat: null };
+        if (c.lat) e.lat = { axis: c.lat.axis, line: c.lat.line, seg: c.lat.seg, a0: A.s * P, a1: (wrap ? B.s + n : B.s) * P };
+        const u0 = [P2[1][0] - P2[0][0], P2[1][1] - P2[0][1]], m = P2.length, u1 = [P2[m - 1][0] - P2[m - 2][0], P2[m - 1][1] - P2[m - 2][1]], l0 = Math.hypot(u0[0], u0[1]) || 1, l1 = Math.hypot(u1[0], u1[1]) || 1;
+        e.t0 = [u0[0] / l0, u0[1] / l0]; e.t1 = [u1[0] / l1, u1[1] / l1];
+        e.rad = this._radii(P2, cum);
+        edges.push(e); A.node.edges.push({ e, end: 0 }); B.node.edges.push({ e, end: 1 });
+      };
+      for (let k = 0; k + 1 < U.length; k++) piece(U[k], U[k + 1], false);
+      if (c.closed && U.length) piece(U[U.length - 1], U[0], true);
+    });
+    this.nodes = nodes; this.edges = edges;
+    // each lattice segment's pieces, in order along it
+    this.segEdges = new Map();
+    for (const e of edges) if (e.lat) { const kk = Links.key(e.lat.axis, e.lat.line, e.lat.seg); if (!this.segEdges.has(kk)) this.segEdges.set(kk, []); this.segEdges.get(kk).push(e); }
+    for (const L of this.segEdges.values()) L.sort((p, q) => p.lat.a0 - q.lat.a0);
+  },
+  // the bend radius at each vertex, from the circle through the points about 4 m either side (Infinity on a straight)
+  _radii(pts, cum) {
+    const n = pts.length, R = new Float32Array(n).fill(Infinity);
+    for (let k = 1; k < n - 1; k++) {
+      let a = k - 1, b = k + 1;
+      while (a > 0 && cum[k] - cum[a] < 4) a--;
+      while (b < n - 1 && cum[b] - cum[k] < 4) b++;
+      R[k] = circR(pts[a], pts[k], pts[b]);
+    }
+    if (n > 2) { R[0] = R[1]; R[n - 1] = R[n - 2]; }
+    return R;
+  },
+  _index() {
+    const segE = [], segK = [];
+    this._cells.clear();
+    const cell = v => Math.floor(v / RG_CELL);
+    for (const e of this.edges) for (let k = 0; k < e.pts.length - 1; k++) {
+      const a = e.pts[k], b = e.pts[k + 1], id = segE.length; segE.push(e.id); segK.push(k);
+      for (let cx = cell(Math.min(a[0], b[0])); cx <= cell(Math.max(a[0], b[0])); cx++) for (let cz = cell(Math.min(a[1], b[1])); cz <= cell(Math.max(a[1], b[1])); cz++) {
+        const kk = (cx + 1000) * 4096 + (cz + 1000); let L = this._cells.get(kk); if (!L) this._cells.set(kk, L = []); L.push(id);
+      }
+    }
+    this._segE = Int32Array.from(segE); this._segK = Int32Array.from(segK); this._stamp = new Uint32Array(segE.length); this._q = 0;
+    const E2 = this.edges.length * 2;
+    this._dist = new Float64Array(E2); this._prev = new Int32Array(E2); this._done = new Uint8Array(E2);
+  },
+  // how far each node is from a junction with the lattice over the roads traffic drives (cars walking the curved
+  // roads use it to find their way back)
+  _exitDist() {
+    const d = new Float64Array(this.nodes.length).fill(Infinity), heap = new RGHeap();
+    for (const n of this.nodes) if (n.att) { d[n.id] = 0; heap.push(n.id, 0); }
+    while (heap.n) {
+      const [u, du] = heap.pop(); if (du > d[u]) continue;
+      for (const { e } of this.nodes[u].edges) {
+        if (e.kind === 'grid' || !e.traffic) continue;
+        const v = e.a.id === u ? e.b.id : e.a.id, nd = du + e.len;
+        if (nd < d[v]) { d[v] = nd; heap.push(v, nd); }
+      }
+    }
+    for (const n of this.nodes) n.exitD = d[n.id];
+  },
+  // ---------------------------------------------------------------- queries
+  // a point on edge e, `d` metres from its first point: [x, z, tx, tz] (tx, tz: the unit direction of the road there)
+  pointAt(e, d) {
+    const c = e.cum, n = c.length; d = clamp(d, 0, e.len);
+    let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] <= d) lo = m; else hi = m; }
+    const a = e.pts[lo], b = e.pts[hi], l = c[hi] - c[lo] || 1, t = (d - c[lo]) / l, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l;
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, tx, tz];
+  },
+  // the part of edge e from d0 to d1 metres along it, in that order (either way round)
+  slice(e, d0, d1) {
+    const out = [], a = this.pointAt(e, d0), b = this.pointAt(e, d1);
+    out.push([a[0], a[1]]);
+    if (d1 >= d0) { for (let k = 0; k < e.pts.length; k++) if (e.cum[k] > d0 + 1e-6 && e.cum[k] < d1 - 1e-6) out.push(e.pts[k]); }
+    else { for (let k = e.pts.length - 1; k >= 0; k--) if (e.cum[k] < d0 - 1e-6 && e.cum[k] > d1 + 1e-6) out.push(e.pts[k]); }
+    out.push([b[0], b[1]]);
+    return out;
+  },
+  // the nearest point on any road: { e, k, x, z, d, along (m from the edge's first point), side (+1 right of the edge's
+  // direction, -1 left) }. o.kinds: a Set of road kinds to consider (default: all); o.filter(e): any other test
+  nearest(x, z, o = {}) {
+    if (!this.ready) return null;
+    const kinds = o.kinds || null, filter = o.filter || null, maxD = o.maxD || 600, cell = v => Math.floor(v / RG_CELL);
+    const q = ++this._q, cx0 = cell(x), cz0 = cell(z);
+    let best = null;
+    for (let r = 0; r * RG_CELL < maxD + RG_CELL; r++) {
+      if (best && (r - 1) * RG_CELL > best.d) break;
+      for (let cx = cx0 - r; cx <= cx0 + r; cx++) for (let cz = cz0 - r; cz <= cz0 + r; cz++) {
+        if (Math.max(Math.abs(cx - cx0), Math.abs(cz - cz0)) !== r) continue;
+        const L = this._cells.get((cx + 1000) * 4096 + (cz + 1000)); if (!L) continue;
+        for (const id of L) {
+          if (this._stamp[id] === q) continue; this._stamp[id] = q;
+          const e = this.edges[this._segE[id]]; if (kinds && !kinds.has(e.kind)) continue; if (filter && !filter(e)) continue;
+          const k = this._segK[id], a = e.pts[k], b = e.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+          const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+          if (!best || d < best.d - 1e-9) best = { e, k, x: px, z: pz, d, along: e.cum[k] + Math.sqrt(l2) * t, side: (x - a[0]) * dz - (z - a[1]) * dx > 0 ? -1 : 1 };
+        }
+      }
+    }
+    return best && best.d <= maxD ? best : null;
+  },
+  // how far (x, z) is outside the surface of the nearest road around it (negative: on a road, by that much), over every
+  // road within `r` m: at a junction a point can be off one road's edge and well inside another's
+  surfaceDist(x, z, o = {}) {
+    if (!this.ready) return Infinity;
+    const r = o.r || 24, kinds = o.kinds || null, cell = v => Math.floor(v / RG_CELL), q = ++this._q;
+    let best = Infinity;
+    for (let cx = cell(x - r); cx <= cell(x + r); cx++) for (let cz = cell(z - r); cz <= cell(z + r); cz++) {
+      const L = this._cells.get((cx + 1000) * 4096 + (cz + 1000)); if (!L) continue;
+      for (const id of L) {
+        if (this._stamp[id] === q) continue; this._stamp[id] = q;
+        const e = this.edges[this._segE[id]]; if (kinds && !kinds.has(e.kind)) continue;
+        const k = this._segK[id], a = e.pts[k], b = e.pts[k + 1], d = segDist(x, z, a[0], a[1], b[0], b[1]) - e.w / 2;
+        if (d < best) best = d;
+      }
+    }
+    // a spur's turning circle is road too
+    for (const n of this.nodes) if (n.ring && Math.abs(n.ring.x - x) < r + n.ring.r && Math.abs(n.ring.z - z) < r + n.ring.r) best = Math.min(best, Math.hypot(x - n.ring.x, z - n.ring.z) - n.ring.r);
+    return best;
+  },
+  // the cost of turning from one traversal into the next at a node (0 straight on, turnK at a right angle)
+  _turn(e, dir, e2, dir2, turnK) {
+    const u = dir ? [-e.t0[0], -e.t0[1]] : e.t1, w = dir2 ? [-e2.t1[0], -e2.t1[1]] : e2.t0;
+    return turnK * (1 - (u[0] * w[0] + u[1] * w[1])) * 0.5;
+  },
+  // the shortest way by road from (fx, fz) to (tx, tz): each end joins the nearest road. o.h: the heading of a car
+  // starting there (driving off backwards costs o.uturn m); o.kinds / o.filter as for nearest; o.turnK: what a right
+  // angle costs (m). Returns { steps: [{ e, dir (0 along the edge, 1 against it), from, to }], len, pts: [{ x, z }],
+  // s, g } (the two road points the ends joined), or null when no road joins them
+  route(fx, fz, tx, tz, o = {}) {
+    if (!this.ready) return null;
+    const s = this.nearest(fx, fz, o), g = this.nearest(tx, tz, o); if (!s || !g) return null;
+    const turnK = o.turnK ?? 8, E = this.edges, dist = this._dist, prev = this._prev, done = this._done, heap = new RGHeap();
+    dist.fill(Infinity); prev.fill(-1); done.fill(0);
+    const hp = dir => {
+      if (o.h === undefined) return 0;
+      const p = this.pointAt(s.e, s.along), sg = dir ? -1 : 1;
+      // turning back costs more where the road is too narrow to turn in (a car goes round the block instead)
+      return (p[2] * sg * Math.sin(o.h) + p[3] * sg * Math.cos(o.h)) < -0.2 ? (o.uturn ?? (s.e.w >= 10 ? 40 : 220)) : 0;
+    };
+    const gx = g.x, gz = g.z, H = n => Math.hypot(n.x - gx, n.z - gz);
+    const kinds = o.kinds || null, filter = o.filter || null, ok = e => (!kinds || kinds.has(e.kind)) && (!filter || filter(e));
+    let best = Infinity, bestS = -2, bestTail = 0;
+    if (s.e === g.e) { const dir = g.along >= s.along ? 0 : 1; best = Math.abs(g.along - s.along) + hp(dir); bestS = -1; bestTail = dir; }
+    for (const dir of [0, 1]) {
+      const st = s.e.id * 2 + dir, c = (dir ? s.along : s.e.len - s.along) + hp(dir);
+      dist[st] = c; heap.push(st, c + H(dir ? s.e.a : s.e.b));
+    }
+    while (heap.n) {
+      const [st, key] = heap.pop(); if (done[st]) continue; done[st] = 1;
+      if (key >= best) break;
+      const e = E[st >> 1], dir = st & 1, n = dir ? e.a : e.b, c = dist[st];
+      // reaching the goal's road from this node
+      if (n === g.e.a) { const tot = c + this._turn(e, dir, g.e, 0, turnK) + g.along; if (tot < best) { best = tot; bestS = st; bestTail = 0; } }
+      if (n === g.e.b) { const tot = c + this._turn(e, dir, g.e, 1, turnK) + g.e.len - g.along; if (tot < best) { best = tot; bestS = st; bestTail = 1; } }
+      for (const inc of n.edges) {
+        const e2 = inc.e; if (!ok(e2)) continue;
+        const dir2 = inc.end === 0 ? 0 : 1;
+        let pen;
+        if (e2 === e) { if (dir2 === dir || n.edges.length > 1) continue; pen = n.ring ? 6 : 25; } // a U-turn only at a dead end
+        else pen = this._turn(e, dir, e2, dir2, turnK);
+        const st2 = e2.id * 2 + dir2, nc = c + pen + e2.len;
+        if (nc < dist[st2]) { dist[st2] = nc; prev[st2] = st; heap.push(st2, nc + H(dir2 ? e2.a : e2.b)); }
+      }
+    }
+    if (bestS === -2) return null;
+    const steps = [];
+    if (bestS === -1) steps.push({ e: s.e, dir: bestTail, from: s.along, to: g.along });
+    else {
+      const chain = []; for (let st = bestS; st >= 0; st = prev[st]) chain.push(st);
+      chain.reverse();
+      chain.forEach((st, k) => {
+        const e = E[st >> 1], dir = st & 1;
+        const from = k === 0 ? s.along : dir ? e.len : 0, to = dir ? 0 : e.len;
+        steps.push({ e, dir, from, to });
+      });
+      steps.push({ e: g.e, dir: bestTail, from: bestTail ? g.e.len : 0, to: g.along });
+    }
+    const pts = [];
+    let len = 0;
+    for (const st of steps) {
+      len += Math.abs(st.to - st.from);
+      for (const q of this.slice(st.e, st.from, st.to)) { const l = pts[pts.length - 1]; if (!l || Math.hypot(l.x - q[0], l.z - q[1]) > 1e-6) pts.push({ x: q[0], z: q[1] }); }
+    }
+    return { steps: steps.filter(st => Math.abs(st.to - st.from) > 1e-6 || steps.length === 1), len, pts, s, g, cost: best };
+  },
+  // the lane a car drives along a list of steps: each road offset to the right of travel (o.off(e), m), the corners
+  // between them rounded to about o.R m (o.maxCut caps how far back a corner starts), a U-turn round a spur's turning
+  // circle or a tight loop at another dead end, resampled every o.step m and lightly smoothed.
+  // Returns { pts: [[x, z]], cum, rad (the bend radius at each point), marks (where each step's lane starts, m) }
+  lane(steps, o = {}) {
+    const offOf = o.off || (e => Math.min(LANE * 0.7, e.w / 4)), R0 = o.R ?? 10, step = o.step ?? 2;
+    const pcs = [];
+    steps.forEach((st, si) => {
+      const raw = this.slice(st.e, st.from, st.to); if (raw.length < 2) return;
+      const q = offsetLine(raw, offOf(st.e)), len = lineLen(q);
+      if (len < 0.3 && pcs.length) return;
+      pcs.push({ q, st, len, si });
+    });
+    if (!pcs.length) return null;
+    // join the pieces: trim each corner back and bridge it with a curve
+    const out = [], marks = [];
+    let cur = pcs[0].q.slice(), rawLen = 0;
+    marks.push(0);
+    // a curved road leaves a lattice street by a short stub from the street's centre line to the kerb, then turns onto
+    // its own line: the stub is part of the junction, and the corner is turned straight onto the road's own line
+    const stub = q => q.length > 2 && Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) > 3 && (() => { const u = unit2(q[0], q[1]), v = unit2(q[1], q[2]); return u[0] * v[0] + u[1] * v[1] < 0.99; })();
+    for (let k = 1; k < pcs.length; k++) {
+      let A = cur, B = pcs[k].q;
+      const nd = pcs[k - 1].st.dir ? pcs[k - 1].st.e.a : pcs[k - 1].st.e.b;
+      if (nd.att && pcs[k].st.e.kind !== 'grid' && stub(B)) B = B.slice(1);
+      if (nd.att && pcs[k - 1].st.e.kind !== 'grid' && stub(A.slice().reverse())) A = A.slice(0, -1);
+      const nA = A.length;
+      const ta = unit2(A[nA - 2], A[nA - 1]), tb = unit2(B[0], B[1]);
+      const th = Math.acos(clamp(ta[0] * tb[0] + ta[1] * tb[1], -1, 1));
+      const node = pcs[k - 1].st.dir ? pcs[k - 1].st.e.a : pcs[k - 1].st.e.b;
+      if (th < 0.06) { out.push(...A.slice(0, -1)); rawLen += lineLen(A); marks.push(rawLen); cur = B.slice(); if (Math.hypot(B[0][0] - A[nA - 1][0], B[0][1] - A[nA - 1][1]) > 0.5) cur.unshift(A[nA - 1]); continue; }
+      let bridge;
+      const lenA = lineLen(A), lenB = lineLen(B);
+      if (th > 2.6) {
+        // a U-turn: round the turning circle when the road has one, else a tight loop beyond the end
+        const pA = A[nA - 1], pB = B[0];
+        const c = node.ring ? [node.ring.x, node.ring.z] : [(pA[0] + pB[0]) / 2 + ta[0] * 3, (pA[1] + pB[1]) / 2 + ta[1] * 3];
+        const r = node.ring ? node.ring.r : Math.max(3, Math.hypot(pA[0] - c[0], pA[1] - c[1]));
+        bridge = arcVia(pA, pB, c, r, ta);
+        out.push(...A.slice(0, -1)); out.push(pA, ...bridge); rawLen += lenA; marks.push(rawLen + lineLen([pA, ...bridge, pB])); rawLen += lineLen([pA, ...bridge, pB]);
+        cur = B.slice();
+        continue;
+      }
+      // how far back the corner starts: about R0 m of radius, but no further than keeps the curve's apex (a quarter of
+      // the way into the corner along its bisector) 1.6 m inside the road surface on the inside of the turn
+      const eA = pcs[k - 1].st.e, eB = pcs[k].st.e, s2 = Math.max(0.2, Math.sin(th / 2));
+      const room = Math.min(eA.w / 2 - offOf(eA), eB.w / 2 - offOf(eB)) / s2 - 1.6, lMax = Math.max(1.2, room / (0.5 * s2));
+      const cut = clamp(R0 * Math.tan(Math.min(th, 2.4) / 2), 1.2, Math.min(o.maxCut ?? 14, lenA * 0.45, lenB * 0.45, lMax));
+      const A2 = trimEnd(A, cut), B2 = trimStart(B, cut), p0 = A2[A2.length - 1], p2 = B2[0];
+      // the control point: where the two lane lines meet (the middle of the gap if they don't, ahead of both)
+      let ctl = lineX(p0, ta, p2, tb);
+      if (!ctl || (ctl[0] - p0[0]) * ta[0] + (ctl[1] - p0[1]) * ta[1] < 0 || (p2[0] - ctl[0]) * tb[0] + (p2[1] - ctl[1]) * tb[1] < 0) ctl = [(A[nA - 1][0] + B[0][0]) / 2, (A[nA - 1][1] + B[0][1]) / 2];
+      const m = Math.max(3, Math.ceil(cut * 2 / 1.5));
+      bridge = []; for (let i = 1; i < m; i++) { const t = i / m, u = 1 - t; bridge.push([u * u * p0[0] + 2 * u * t * ctl[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * ctl[1] + t * t * p2[1]]); }
+      out.push(...A2, ...bridge);
+      rawLen += lineLen(A2) + lineLen([p0, ...bridge, p2]); marks.push(rawLen);
+      cur = B2;
+    }
+    out.push(...cur); rawLen += lineLen(cur);
+    // resample, smooth (the ends stay put) and measure
+    let pts = resample(out, step);
+    for (let it = 0; it < 2; it++) { const q = pts.map(p => p.slice()); for (let k = 1; k < pts.length - 1; k++) { q[k][0] = pts[k][0] + 0.25 * (pts[k - 1][0] + pts[k + 1][0] - 2 * pts[k][0]); q[k][1] = pts[k][1] + 0.25 * (pts[k - 1][1] + pts[k + 1][1] - 2 * pts[k][1]); } pts = q; }
+    const cum = new Float64Array(pts.length); for (let k = 1; k < pts.length; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    // marks by step: where each step's lane starts (a step too short to draw starts where the next one does)
+    const sc = rawLen > 0 ? cum[pts.length - 1] / rawLen : 1, bySt = [];
+    for (let si = 0, p = 0; si < steps.length; si++) { while (p < pcs.length - 1 && pcs[p].si < si) p++; bySt.push((pcs[p].si >= si ? marks[p] : rawLen) * sc); }
+    return { pts, cum, rad: this._radii(pts, cum), marks: bySt, len: cum[pts.length - 1] };
+  },
+  // lattice pieces of one segment between two distances along it (from its lower node), as steps
+  gridSteps(axis, line, seg, a0, a1) {
+    const out = [], up = a1 >= a0, es = this.segEdges.get(Links.key(axis, line, seg)) || [];
+    for (const e of up ? es : es.slice().reverse()) {
+      const lo = Math.max(Math.min(a0, a1), e.lat.a0), hi = Math.min(Math.max(a0, a1), e.lat.a1); if (hi - lo < 1e-6) continue;
+      out.push(up ? { e, dir: 0, from: lo - e.lat.a0, to: hi - e.lat.a0 } : { e, dir: 1, from: hi - e.lat.a0, to: lo - e.lat.a0 });
+    }
+    return out;
+  },
+  // places a car can join a road, every ~`every` m of the roads that pass `test`, in both lanes: [{ x, z, h, e }]
+  spots(test, every = 20) {
+    const out = [];
+    for (const e of this.edges) {
+      if (!test(e)) continue;
+      const off = Math.min(LANE * 0.8, e.w / 4);
+      for (let d = Math.min(e.len / 2, 8); d < e.len - 4; d += every) {
+        const [x, z, tx, tz] = this.pointAt(e, d), h = Math.atan2(tx, tz);
+        out.push({ x: x - tz * off, z: z + tx * off, h, e }, { x: x + tz * off, z: z - tx * off, h: h + Math.PI, e });
+      }
+    }
+    return out;
+  }
+};
+// a small binary heap of (id, key) pairs
+class RGHeap {
+  constructor() { this.id = []; this.k = []; this.n = 0; }
+  push(id, k) {
+    let i = this.n++; this.id[i] = id; this.k[i] = k;
+    while (i > 0) { const p = (i - 1) >> 1; if (this.k[p] <= k) break; this.id[i] = this.id[p]; this.k[i] = this.k[p]; i = p; }
+    this.id[i] = id; this.k[i] = k;
+  }
+  pop() {
+    const id = this.id[0], k = this.k[0], n = --this.n;
+    if (n > 0) {
+      const lid = this.id[n], lk = this.k[n]; let i = 0;
+      for (;;) { let c = 2 * i + 1; if (c >= n) break; if (c + 1 < n && this.k[c + 1] < this.k[c]) c++; if (this.k[c] >= lk) break; this.id[i] = this.id[c]; this.k[i] = this.k[c]; i = c; }
+      this.id[i] = lid; this.k[i] = lk;
+    }
+    return [id, k];
+  }
+}
+// ---------------------------------------------------------------- polyline helpers
+// the radius of the circle through three points (Infinity when they are in a line)
+function circR(a, b, c) {
+  const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+  const A2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  return A2 < 1e-9 ? Infinity : ab * bc * ca / (2 * A2);
+}
+function unit2(a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; }
+function lineLen(q) { let l = 0; for (let k = 1; k < q.length; k++) l += Math.hypot(q[k][0] - q[k - 1][0], q[k][1] - q[k - 1][1]); return l; }
+// a polyline moved `off` m to the right of its direction of travel (mitred at the vertices, the mitre capped)
+function offsetLine(q, off) {
+  const n = q.length, out = [];
+  for (let k = 0; k < n; k++) {
+    const t0 = k > 0 ? unit2(q[k - 1], q[k]) : null, t1 = k < n - 1 ? unit2(q[k], q[k + 1]) : null;
+    let tx, tz, m = 1;
+    if (t0 && t1) { tx = t0[0] + t1[0]; tz = t0[1] + t1[1]; const l = Math.hypot(tx, tz); if (l < 1e-6) { tx = t1[0]; tz = t1[1]; } else { tx /= l; tz /= l; m = Math.min(2, 1 / Math.max(0.5, tx * t1[0] + tz * t1[1])); } }
+    else { const t = t0 || t1; tx = t[0]; tz = t[1]; }
+    out.push([q[k][0] - tz * off * m, q[k][1] + tx * off * m]);
+  }
+  return out;
+}
+function trimEnd(q, d) {
+  let rem = d;
+  for (let k = q.length - 1; k > 0; k--) {
+    const l = Math.hypot(q[k][0] - q[k - 1][0], q[k][1] - q[k - 1][1]);
+    if (l >= rem) { const t = (l - rem) / (l || 1); return [...q.slice(0, k), [q[k - 1][0] + (q[k][0] - q[k - 1][0]) * t, q[k - 1][1] + (q[k][1] - q[k - 1][1]) * t]]; }
+    rem -= l;
+  }
+  return [q[0], q[0]];
+}
+function trimStart(q, d) { return trimEnd(q.slice().reverse(), d).reverse(); }
+// where the line through a along u meets the line through b along v (null if they are parallel)
+function lineX(a, u, b, v) {
+  const den = u[0] * v[1] - u[1] * v[0]; if (Math.abs(den) < 1e-6) return null;
+  const t = ((b[0] - a[0]) * v[1] - (b[1] - a[1]) * v[0]) / den;
+  return [a[0] + u[0] * t, a[1] + u[1] * t];
+}
+// points every `step` m along a polyline (its two ends kept)
+function resample(q, step) {
+  const out = [q[0].slice()]; let carry = 0;
+  for (let k = 1; k < q.length; k++) {
+    const a = q[k - 1], b = q[k], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l < 1e-9) continue;
+    let d = step - carry;
+    while (d < l) { const t = d / l; out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); d += step; }
+    carry = l - (d - step);
+  }
+  const last = q[q.length - 1], pl = out[out.length - 1];
+  if (Math.hypot(last[0] - pl[0], last[1] - pl[1]) > step * 0.35) out.push(last.slice()); else out[out.length - 1] = last.slice();
+  return out;
+}
+// an arc of radius r round c from a toward b, the way that sweeps through direction `fwd` (the far side of a turn)
+function arcVia(a, b, c, r, fwd) {
+  const a0 = Math.atan2(a[1] - c[1], a[0] - c[0]), af = Math.atan2(fwd[1], fwd[0]);
+  let a1 = Math.atan2(b[1] - c[1], b[0] - c[0]);
+  // which way round passes the far side (af)?
+  const ccw = (((af - a0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) < (((a1 - a0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  if (ccw) { while (a1 <= a0) a1 += 2 * Math.PI; } else { while (a1 >= a0) a1 -= 2 * Math.PI; }
+  const m = Math.max(6, Math.ceil(Math.abs(a1 - a0) * r / 1.5)), out = [];
+  for (let i = 1; i < m; i++) { const t = a0 + (a1 - a0) * i / m; out.push([c[0] + Math.cos(t) * r, c[1] + Math.sin(t) * r]); }
+  return out;
+}
+// ---------------------------------------------------------------- kerb cuts
+// Where a curved road leaves a lattice street the kerb (the block's 15 cm slab edge) is cut: a ramp in the gutter, 1.4 m
+// wide, rises from the road to the kerb top across the mouth of the road (a metre of flare each side), so a car drives
+// on and off the curved roads without a step. The ground (groundBase) and the drawn ramp are the same plane.
+const CUT_W = 1.4;
+const CurbCuts = {
+  n: 0, list: [], bySeg: new Map(),
+  // the ramp's height at a point on a lattice road (0 off the ramps)
+  at(x, z) {
+    const i = Math.round(x / P), j = Math.round(z / P), dv = x - i * P, dh = z - j * P, g0 = ROAD_HALF - CUT_W;
+    let axis, line, off, seg, along;
+    if (Math.abs(dv) > g0 && Math.abs(dv) < ROAD_HALF && Math.abs(dh) >= ROAD_HALF) { axis = 0; line = i; off = dv; seg = Math.floor(z / P); along = z - seg * P; }
+    else if (Math.abs(dh) > g0 && Math.abs(dh) < ROAD_HALF && Math.abs(dv) >= ROAD_HALF) { axis = 1; line = j; off = dh; seg = Math.floor(x / P); along = x - seg * P; }
+    else return 0;
+    const L = this.bySeg.get(axis * 10000 + line * 100 + seg); if (!L) return 0;
+    for (const c of L) if ((off > 0 ? 1 : -1) === c.side && along >= c.a0 && along <= c.a1) return CURB_H * (Math.abs(off) - g0) / CUT_W;
+    return 0;
+  }
+};
+RoadGraph.buildCuts = function () {
+  CurbCuts.n = 0; CurbCuts.list = []; CurbCuts.bySeg.clear();
+  for (const n of this.nodes) if (n.att) for (const inc of n.edges) {
+    const e = inc.e; if (e.kind === 'grid') continue;
+    const at = n.att, out = inc.end === 0, ofs = p => at.axis === 0 ? p[0] - at.line * P : p[1] - at.line * P, alg = p => at.axis === 0 ? p[1] - at.seg * P : p[0] - at.seg * P;
+    const q = out ? this.slice(e, 0, Math.min(e.len, 30)) : this.slice(e, e.len, Math.max(0, e.len - 30));
+    const side = ofs(q[q.length - 1]) > 0 ? 1 : -1;
+    // only where the ground beside the street is the kerb (the promenade's gaps and the extensions are at road level)
+    const pr = at.axis === 0 ? [at.line * P + side * (ROAD_HALF + 1), at.C.z] : [at.C.x, at.line * P + side * (ROAD_HALF + 1)];
+    if (groundBase(pr[0], pr[1]) < CURB_H * 0.5) continue;
+    // where the road's two edges cross the kerb line: the mouth
+    let a0 = Infinity, a1 = -Infinity;
+    for (const s of [-1, 1]) {
+      const b = offsetLine(q, s * e.w / 2), tgt = side * ROAD_HALF;
+      for (let k = 0; k < b.length - 1; k++) {
+        const o0 = ofs(b[k]), o1 = ofs(b[k + 1]); if ((o0 - tgt) * (o1 - tgt) > 0 || o0 === o1) continue;
+        const t = (tgt - o0) / (o1 - o0), al = alg([b[k][0] + (b[k + 1][0] - b[k][0]) * t, b[k][1] + (b[k + 1][1] - b[k][1]) * t]);
+        a0 = Math.min(a0, al); a1 = Math.max(a1, al); break;
+      }
+    }
+    if (!isFinite(a0)) continue;
+    const c = { axis: at.axis, line: at.line, seg: at.seg, side, a0: a0 - 1, a1: a1 + 1, e: e.id }, key = c.axis * 10000 + c.line * 100 + c.seg;
+    CurbCuts.list.push(c); if (!CurbCuts.bySeg.has(key)) CurbCuts.bySeg.set(key, []); CurbCuts.bySeg.get(key).push(c);
+  }
+  CurbCuts.n = CurbCuts.list.length;
+};
+// the ramp's shape: across x 0 (the gutter, road level) to 1 (the kerb, its top), along z -0.5..0.5, up y (the top is y = x)
+let _wedgeTpl = null;
+function wedgeTemplate() {
+  if (_wedgeTpl) return _wedgeTpl;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, -0.5, 1, 1, 0.5, 1, 1, -0.5, 0, 0, -0.5, 0, 0, 0.5, 1, 1, 0.5,   // the slope
+    0, 0, -0.5, 1, 1, -0.5, 1, 0, -0.5,                                  // the two flanks
+    0, 0, 0.5, 1, 0, 0.5, 1, 1, 0.5
+  ], 3));
+  g.computeVertexNormals();
+  return (_wedgeTpl = templateFrom(g));
+}
+function addCurbCuts(gs) {
+  for (const c of CurbCuts.list) {
+    const len = c.a1 - c.a0, mid = (c.a0 + c.a1) / 2, g0 = ROAD_HALF - CUT_W;
+    if (c.axis === 0) gs.add(wedgeTemplate(), M(c.line * P + c.side * g0, 0.004, c.seg * P + mid, CUT_W, CURB_H - 0.004, len, c.side > 0 ? 0 : Math.PI), null);
+    else gs.add(wedgeTemplate(), M(c.seg * P + mid, 0.004, c.line * P + c.side * g0, CUT_W, CURB_H - 0.004, len, c.side > 0 ? -Math.PI / 2 : Math.PI / 2), null);
+  }
+}
+// ---------------------------------------------------------------- road markings on the curved streets
+// Painted lines as thin ribbons a centimetre above the road (one mesh, one draw call): the centre line follows the curve
+// (a double yellow line, or the Old Quarter's dashed white one; faded in the industrial districts), and a dashed give-way
+// line crosses the lane that meets another road. Only on asphalt streets; never inside a lattice road or a junction.
+function buildRoadMarkings(scene) {
+  const pos = [], col = [], idx = [];
+  const Y = CURB_H + 0.012, YEL = [0.7, 0.53, 0.13], WHT = [0.78, 0.78, 0.76];
+  const ribbon = (q, off, wd, c) => {
+    if (q.length < 2) return;
+    const L = offsetLine(q, off), base = pos.length / 3;
+    for (let k = 0; k < L.length; k++) {
+      const t = k < L.length - 1 ? unit2(L[k], L[k + 1]) : unit2(L[k - 1], L[k]), nx = -t[1] * wd / 2, nz = t[0] * wd / 2;
+      pos.push(L[k][0] - nx, Y, L[k][1] - nz, L[k][0] + nx, Y, L[k][1] + nz); col.push(...c, ...c);
+      if (k) { const a = base + (k - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+  };
+  // the stretches of each street that are clear of junctions, as [from, to] distances along its polyline
+  const R = RoadGraph;
+  for (const L of Links.list) {
+    if (L.spur || (L.road.st || 'asphalt') !== 'asphalt') continue;
+    const pts = L.pts, cum = L.cum, near = [];
+    for (const e of L.ends) if (e.onLink) { const H = Links.list.find(h => h.name === e.onLink && Links.nearestOn(h, e.C.x, e.C.z).d < 0.6); near.push([e.C.x, e.C.z, (H ? H.w : 8) / 2 + 1.6]); }
+    // where another street meets this one part way along (a Y-junction on it)
+    for (const M2 of Links.list) for (const e of M2.ends) if (e.onLink === L.name && Links.nearestOn(L, e.C.x, e.C.z).d < 0.6) near.push([e.C.x, e.C.z, M2.w / 2 + 2.5]);
+    const ok = k => !RoadNet.roadAt(pts[k][0], pts[k][1]) && Math.min(Math.abs(pts[k][0] - Math.round(pts[k][0] / P) * P), Math.abs(pts[k][1] - Math.round(pts[k][1] / P) * P)) > ROAD_HALF + 1.4 && near.every(n => Math.hypot(pts[k][0] - n[0], pts[k][1] - n[1]) > n[2]);
+    const runs = []; let s = -1;
+    for (let k = 0; k < pts.length; k++) { if (ok(k) && s < 0) s = k; if ((!ok(k) || k === pts.length - 1) && s >= 0) { const e2 = ok(k) ? k : k - 1; if (e2 > s) runs.push([s, e2]); s = -1; } }
+    const mid = pts[Math.floor(pts.length / 2)], style = ROAD_STYLE[zoneKey(mid[0], mid[1])] || 0;
+    for (const [k0, k1] of runs) {
+      const q = pts.slice(k0, k1 + 1);
+      if (style === 1) {
+        // the Old Quarter's dashed white line: 3 m of paint, 1.5 m gap
+        const qc = cum.slice(k0, k1 + 1);
+        for (let d = qc[0] + 0.5; d < qc[qc.length - 1] - 0.5; d += 4.5) ribbon(cutLine(q, qc, d, Math.min(d + 3, qc[qc.length - 1] - 0.5)), 0, 0.12, WHT);
+      } else {
+        const c = style === 3 ? YEL.map(v => v * 0.75) : YEL;
+        ribbon(q, -0.17, 0.11, c); ribbon(q, 0.17, 0.11, c);
+      }
+    }
+  }
+  // give-way lines: across the lane that comes up to a lattice street or another street, just short of it
+  for (const n of R.nodes) {
+    const minor = [];
+    if (n.att) for (const inc of n.edges) if (inc.e.kind === 'link') minor.push(inc);
+    for (const inc of n.edges) if (inc.e.kind === 'link' && !n.att && inc.e.link && inc.e.link.ends.some(e => e.onLink && Math.hypot(e.C.x - n.x, e.C.z - n.z) < 0.8)) minor.push(inc);
+    for (const inc of minor) {
+      const e = inc.e; if ((e.st || 'asphalt') !== 'asphalt') continue;
+      const out = inc.end === 0, host = n.att ? null : n.edges.find(x => x.e.link !== e.link);
+      // how far out from the node the road leaves its host's surface
+      let d = 0;
+      for (; d < Math.min(e.len - 1, 25); d += 0.25) {
+        const p = R.pointAt(e, out ? d : e.len - d);
+        if (n.att ? !RoadNet.roadAt(p[0], p[1]) : polyDist(p[0], p[1], host.e.pts) > host.e.w / 2) break;
+      }
+      const p = R.pointAt(e, out ? d + 0.6 : e.len - d - 0.6), tx = out ? p[2] : -p[2], tz = out ? p[3] : -p[3];
+      // the lane toward the node is on the left of the outward direction
+      const lx = tz, lz = -tx;
+      for (let o = 0.25; o < e.w / 2 - 0.35; o += 0.85) {
+        const a = [p[0] + lx * o, p[1] + lz * o], b = [p[0] + lx * Math.min(o + 0.5, e.w / 2 - 0.35), p[1] + lz * Math.min(o + 0.5, e.w / 2 - 0.35)];
+        ribbon([a, b], 0, 0.3, WHT);
+      }
+    }
+  }
+  if (!pos.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((v, k) => k % 3 === 1 ? 1 : 0), 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+  m.receiveShadow = true; m.name = 'roadMarkings';
+  scene.add(m);
+  return m;
+}
+// the part of a polyline between distances d0 and d1 along it (cum: its cumulative lengths)
+function cutLine(q, cum, d0, d1) {
+  const at = d => { let k = 0; while (k < q.length - 2 && cum[k + 1] < d) k++; const t = (d - cum[k]) / ((cum[k + 1] - cum[k]) || 1); return [q[k][0] + (q[k + 1][0] - q[k][0]) * t, q[k][1] + (q[k + 1][1] - q[k][1]) * t]; };
+  const out = [at(d0)]; for (let k = 0; k < q.length; k++) if (cum[k] > d0 && cum[k] < d1) out.push(q[k]); out.push(at(d1));
+  return out;
+}
+// ---------------------------------------------------------------- kerb spots (save safety)
+// is a car's footprint at (x, z) (on ground y) inside something solid: a building, a wall, a container, a tank?
+// (its footprint as three circles along heading h; a graze, a mirror over a fence, does not count)
+function kerbBlocked(world, x, z, y, h = 0) {
+  const r = kerbBlocked._r || (kerbBlocked._r = {}), fx = Math.sin(h), fz = Math.cos(h);
+  for (const a of [-1.3, 0, 1.3]) {
+    world.grid.resolveCircle(x + fx * a, z + fz * a, 0.85, y + 0.3, y + 1.4, r);
+    if (r.hit && r.col && r.col.kind !== 'prop' && r.depth > 0.25) return true;
+  }
+  return false;
+}
+// the nearest clear kerb spot to (x, z): by the nearest street, at its kerb on that side, facing the way traffic goes
+// there; spots further along that street, then the lattice's kerbs, if that one is taken
+function kerbSpot(world, x, z) {
+  const R = RoadGraph, q = R.ready ? R.nearest(x, z, { kinds: RG_STREETS }) : null;
+  if (q) for (let k = 0; k < 12; k++) {
+    const d = clamp(q.along + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 6.5, 0, q.e.len);
+    const [px, pz, tx, tz] = R.pointAt(q.e, d), off = (q.e.lat ? 4.6 : q.e.w / 2 - 1.15) * q.side, sx = px - tz * off, sz = pz + tx * off;
+    if (q.e.lat && (q.e.lat.a0 + d < 14 || q.e.lat.a0 + d > P - 14)) continue;
+    const h = q.side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz);
+    if (!kerbBlocked(world, sx, sz, groundY(sx, sz), h)) return { x: sx, z: sz, h };
+  }
+  const c = curbNear(x, z);
+  return kerbBlocked(world, c.x, c.z, groundY(c.x, c.z), c.h) ? null : c;
+}
 /* =====================================================================
    [CONTENT] PROP DEFINITIONS (instanced street furniture)
    ===================================================================== */
@@ -39472,7 +40405,11 @@ function buildStaticScenery(scene, world) {
   gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
   eastRun(-E, g0, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
   eastRun(g1, CITY + E, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
+  // the kerb cut away where each curved road leaves a lattice street (Curved Roads pass)
+  addCurbCuts(gs);
   const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
+  // the curved streets' painted lines
+  buildRoadMarkings(scene);
   // railing
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
   for (let t = -E; t <= CITY + E; t += 2.5) {
@@ -41891,82 +42828,123 @@ class TrafficManager {
     }
   }
   validDir(i, j, dx, dz) { const a = i + dx, b = j + dz; return i >= 0 && j >= 0 && i <= N && j <= N && a >= 0 && b >= 0 && a <= N && b <= N && RoadNet.open(i, j, dx, dz); }
-  // ---------------------------------------------------------------- curved links
+  // ---------------------------------------------------------------- the curved roads (the road graph, 135)
+  // A lane car passing a junction with a curved road may turn off onto it; a car on the curved roads walks them
+  // (any junction: a T at any angle, a Y, a crossing of a lattice street, a dead end's turning circle) until it
+  // merges back onto a lattice street. Its whole way is one lane polyline with corners rounded and a speed limit at
+  // every point from the bend's radius; at each lattice street it meets it waits for a gap.
   segKey(ai) { return ai.dx ? Links.key(1, ai.j, Math.min(ai.i, ai.i + ai.dx)) : Links.key(0, ai.i, Math.min(ai.j, ai.j + ai.dz)); }
   lanePt(i, j, dx, dz, s, off = LANE) { return [i * P + dx * s - dz * off, j * P + dz * s + dx * off]; }
   alongOf(ai, C) { return ai.dx ? (C.x - ai.i * P) * ai.dx : (C.z - ai.j * P) * ai.dz; }
-  qbez(a, c, b, n) { const out = []; for (let k = 1; k <= n; k++) { const t = k / n, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]); } return out; }
-  // the lattice lane a car joins at a link end, heading either way along that road
+  // the lattice lane a car joins at a junction (a node part way along a segment), heading either way along that road
   exitState(e, sgn) {
     if (e.axis === 0) return sgn > 0 ? { i: e.line, j: e.seg, dx: 0, dz: 1, s: e.along } : { i: e.line, j: e.seg + 1, dx: 0, dz: -1, s: P - e.along };
     return sgn > 0 ? { i: e.seg, j: e.line, dx: 1, dz: 0, s: e.along } : { i: e.seg + 1, j: e.line, dx: -1, dz: 0, s: P - e.along };
   }
-  // follow `lane` (link lane points) then merge onto the lattice at the far end of link L
-  linkPath(v, start, lane, L, farEnd) {
-    const x = this.exitState(L.ends[farEnd], Math.random() < 0.5 ? 1 : -1);
-    const xs = Math.min(x.s + 10, P - TURN_IN - 0.5), ctl = this.lanePt(x.i, x.j, x.dx, x.dz, x.s), tgt = this.lanePt(x.i, x.j, x.dx, x.dz, xs);
-    const pts = [...start, ...lane], mergeK = pts.length - 1;
-    pts.push(...this.qbez(lane[lane.length - 1], ctl, tgt, 8));
-    const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
-    // corner speed from the local radius (two points either side): v = sqrt(a_lat * R)
-    const lim = pts.map((q, k) => {
-      const a = pts[Math.max(0, k - 2)], b = pts[Math.min(pts.length - 1, k + 2)];
-      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), aq = Math.hypot(q[0] - a[0], q[1] - a[1]), qb = Math.hypot(b[0] - q[0], b[1] - q[1]);
-      const cr = Math.abs((q[0] - a[0]) * (b[1] - a[1]) - (q[1] - a[1]) * (b[0] - a[0]));
-      const R = cr < 1e-6 ? 1e6 : ab * aq * qb / (2 * cr);
-      return clamp(Math.sqrt(3.2 * R), 4.5, 40);
-    });
-    const ai = v.ai;
-    ai.path = { pts, cum, lim, len: cum[cum.length - 1], d: 0, k: 0, exit: { ...x, s: xs }, abeam: x.s, mergeD: cum[mergeK], link: L.id };
-    ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
-  }
-  // a lattice car reaching a link junction: some turn off onto the curved road
-  maybeTakeLink(v) {
-    const ai = v.ai, ends = Links.idx.get(this.segKey(ai)); if (!ends || ai.linkSeen) return;
-    for (const en of ends) {
-      const sc = this.alongOf(ai, en.end.C);
-      if (ai.s > sc - 18 && ai.s < sc - 10) {
-        ai.linkSeen = 1;
-        if (v.mission || v.patrol || Math.random() > this.linkChance) return;
-        // a spur: out to its turning circle and back to the same junction
-        const L = en.link, lane = L.spur ? Links.loop(L) : Links.lane(L, en.e), q0 = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, ai.s), qc = this.lanePt(ai.i, ai.j, ai.dx, ai.dz, sc);
-        this.linkPath(v, [q0, ...this.qbez(q0, qc, lane[0], 8).slice(0, -1)], lane, L, L.spur ? 0 : 1 - en.e);
-        return;
+  // the roads a car on the curved roads may go on by from node n, having come by edge `from`
+  walkOpts(n, from) { return n.edges.filter(x => x.e.traffic && x.e.kind !== 'grid' && x.e !== from).map(x => x.e); }
+  // a walk from node n (come by edge `from`) over the curved roads to a junction with the lattice and the lane it
+  // merges into there. Appends to `steps`; returns { exit, gates } or null. `enter`: the car has just turned off the
+  // lattice at n (it doesn't merge straight back)
+  walk(n, from, steps, enter) {
+    const gates = [];
+    let total = 0, cur = n, prev = from;
+    for (let guard = 0; guard < 80; guard++) {
+      let opts = this.walkOpts(cur, prev);
+      if (cur.att && !(enter && guard === 0) && (!opts.length || total > 1500 || Math.random() < 0.7)) {
+        // merge: the way with room to settle into the lane before the next node (either, if both have)
+        const at = cur.att, room = sgn => sgn > 0 ? P - TURN_IN - 0.5 - at.along : at.along - TURN_IN - 0.5;
+        let sgn = Math.random() < 0.5 ? 1 : -1; if (room(sgn) < 10 && room(-sgn) > room(sgn)) sgn = -sgn;
+        const x = this.exitState(at, sgn), xs = Math.min(x.s + 10, P - TURN_IN - 0.5);
+        const k0 = steps.length;
+        steps.push(...RoadGraph.gridSteps(at.axis, at.line, at.seg, at.along, sgn > 0 ? xs : P - xs));
+        gates.push({ k: k0, node: cur });
+        return { exit: { ...x, s: xs }, gates };
       }
+      if (!opts.length) opts = prev ? [prev] : [];              // a dead end: back the way we came (round its turning circle)
+      if (!opts.length) return null;
+      // a long way from the lattice already: head for the nearest junction with it
+      const e2 = total > 1500 ? opts.reduce((p, q) => ((p.a === cur ? p.b : p.a).exitD <= (q.a === cur ? q.b : q.a).exitD ? p : q)) : pick(opts);
+      const dir = e2.a === cur ? 0 : 1;
+      if (cur.att) gates.push({ k: steps.length, node: cur });   // crossing a lattice street
+      steps.push({ e: e2, dir, from: dir ? e2.len : 0, to: dir ? 0 : e2.len });
+      total += e2.len; prev = e2; cur = dir ? e2.a : e2.b;
+    }
+    return null;
+  }
+  // the car's path from a list of steps: the lane (traffic's offset), its speed limits and where it must give way
+  linkPath(v, steps, w) {
+    const L = RoadGraph.lane(steps, { off: e => Math.min(LANE, e.w / 4), R: 10, step: 2 }); if (!L) return false;
+    const pts = L.pts, cum = L.cum;
+    // corner speed from the radius: v = sqrt(a_lat R)
+    const lim = Array.from(L.rad, R => clamp(Math.sqrt(3.2 * R), 4.5, 40));
+    // a gate stops the car short of the lattice street it joins or crosses: the first lane point on that street
+    const gates = w.gates.map(gt => {
+      const d0 = gt.k > 0 ? L.marks[gt.k - 1] : 0;
+      let d = L.marks[gt.k] || 0;
+      for (let k = 0; k < pts.length; k++) if (cum[k] >= d0 && RoadNet.roadAt(pts[k][0], pts[k][1])) { d = cum[k]; break; }
+      return { d, att: gt.node.att };
+    }).sort((p, q) => p.d - q.d);
+    const ln = steps.find(st => st.e.link);
+    const ai = v.ai;
+    ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
+    ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
+    // (a car put straight onto a bend starts no faster than the bend allows)
+    ai.speed = Math.min(ai.speed, lim[0]);
+    return true;
+  }
+  // a lattice car reaching a junction with a curved road: some turn off onto it
+  maybeTakeLink(v) {
+    const ai = v.ai, ns = RoadGraph.segAtt.get(this.segKey(ai)); if (!ns) return;
+    for (const n of ns) {
+      const sc = this.alongOf(ai, n.att.C);
+      if (sc <= (ai.linkSeen || 0) || !(ai.s > sc - 18 && ai.s < sc - 10)) continue;
+      ai.linkSeen = sc;
+      if (v.mission || v.patrol || Math.random() > this.linkChance || !this.walkOpts(n, null).length) return;
+      const at = n.att, up = ai.dx > 0 || ai.dz > 0, steps = RoadGraph.gridSteps(at.axis, at.line, at.seg, up ? ai.s : P - ai.s, at.along);
+      const w = this.walk(n, steps.length ? steps[steps.length - 1].e : null, steps, true);
+      if (w) this.linkPath(v, steps, w);
+      return;
     }
   }
-  // is a lattice car about to pass the merge point in the lane we are joining?
-  mergeBlocked(v) {
-    const x = v.ai.path.exit;
+  // is a lattice car about to pass the junction this car has to cross or join (either way along that street)?
+  gateBlocked(v, gt) {
+    const at = gt.att, key = Links.key(at.axis, at.line, at.seg);
     for (const c of this.cars) {
-      const ca = c.ai; if (!ca || c === v) continue;
-      if (ca.mode === 'lane' && ca.i === x.i && ca.j === x.j && ca.dx === x.dx && ca.dz === x.dz && ca.s > v.ai.path.abeam - 30 && ca.s < v.ai.path.abeam + 6) return true;
+      const ca = c.ai; if (!ca || c === v || ca.mode !== 'lane' || this.segKey(ca) !== key) continue;
+      const toC = this.alongOf(ca, at.C) - ca.s;
+      if (toC > -6 && toC < 30) return true;
     }
     return false;
   }
   trySpawnLink() {
-    const g = this.g, px = g.focus.x, pz = g.focus.z;
-    // only curved roads within spawning range: with several links in the city, a random pick would
-    // almost never be the one near the player
-    const near = Links.list.filter(L => L.pts.some(q => { const d = Math.hypot(q[0] - px, q[1] - pz); return d > 75 && d < 230; }));
-    const L = pick(near); if (!L) return null;
-    const from = L.spur ? 0 : Math.random() < 0.5 ? 0 : 1, lane = L.spur ? Links.loop(L) : Links.lane(L, from);
-    const k = Math.floor(rand(0.1, 0.8) * lane.length), [x, z] = lane[k];
-    const d = Math.hypot(x - px, z - pz);
-    if (d < 75 || d > 230 || (d < 160 && g.inView(x, 1, z, 3))) return null;
-    for (const v of g.vehicles.list) if (dist2(v.pos.x, v.pos.z, x, z) < 15 * 15) return null;
-    const type = zoneVehicle(x, z), b = lane[Math.min(lane.length - 1, k + 1)];
-    const v = g.vehicles.spawn(type, x, z, Math.atan2(b[0] - x, b[1] - z), { kinematic: true, driver: 'npc' });
+    const g = this.g, px = g.focus.x, pz = g.focus.z, R = RoadGraph;
+    if (!R.ready) return null;
+    // only curved roads within spawning range: a random pick over the whole map would almost never be near the player
+    // every 10 m of the curved roads traffic drives; a place in spawning range, any of them equally likely
+    if (!R._walk) { R._walk = []; for (const e of R.edges) if (e.traffic && e.kind !== 'grid') for (let d = 5; d < e.len - 5; d += 10) R._walk.push([e, d, ...R.pointAt(e, d)]); }
+    const near = R._walk.filter(q => { const d = Math.hypot(q[2] - px, q[3] - pz); return d > 75 && d < 230; });
+    const c = pick(near); if (!c) return null;
+    const e = c[0], dir = Math.random() < 0.5 ? 0 : 1, d = c[1], [cx, cz, tx, tz] = R.pointAt(e, d), sg = dir ? -1 : 1, off = Math.min(LANE, e.w / 4);
+    const x = cx - tz * sg * off, z = cz + tx * sg * off, dd = Math.hypot(x - px, z - pz);
+    if (dd < 75 || dd > 230 || (dd < 160 && g.inView(x, 1, z, 3))) return null;
+    for (const o of g.vehicles.list) if (dist2(o.pos.x, o.pos.z, x, z) < 15 * 15) return null;
+    const steps = [{ e, dir, from: d, to: dir ? 0 : e.len }], w = this.walk(dir ? e.a : e.b, e, steps, false);
+    if (!w) return null;
+    const type = zoneVehicle(x, z);
+    const v = g.vehicles.spawn(type, x, z, Math.atan2(tx * sg, tz * sg), { kinematic: true, driver: 'npc' });
     const r0 = Math.random(), pers = r0 < 0.25 ? 0 : r0 < 0.8 ? 1 : 2, pk = [[0.85, 1.5, 0.3, 1.4], [1, 1, 1, 1], [1.15, 0.55, 2.5, 0.6]][pers];
-    v.ai = { i: 0, j: 0, dx: 1, dz: 0, s: 0, mode: 'path', t: 0, len: 1, speed: 8, pers, gapK: pk[3], runK: pk[2], maxV: rand(11, 14.5) * pk[0] * (type === 'truck' ? 0.8 : 1), react: rand(0.25, 1.1) * pk[1], reactT: 0, runLight: null, next: null, blockT: 0, honkT: rand(0, 2) * pk[1], laneOff: 0, overtake: 0, creepT: 0, p0: null, linkSeen: 1 };
-    this.linkPath(v, [], lane.slice(k), L, L.spur ? 0 : 1 - from);
+    v.ai = { i: 0, j: 0, dx: 1, dz: 0, s: 0, mode: 'path', t: 0, len: 1, speed: 8, pers, gapK: pk[3], runK: pk[2], maxV: rand(11, 14.5) * pk[0] * (type === 'truck' ? 0.8 : 1), react: rand(0.25, 1.1) * pk[1], reactT: 0, runLight: null, next: null, blockT: 0, honkT: rand(0, 2) * pk[1], laneOff: 0, overtake: 0, creepT: 0, p0: null, linkSeen: 0 };
+    if (!this.linkPath(v, steps, w)) { g.vehicles.despawn(v); return null; }
     v.patrol = false;
     this.cars.push(v);
     return v;
   }
   trySpawn() {
     const g = this.g, px = g.focus.x, pz = g.focus.z;
-    if (Links.list.length && Math.random() < 0.18) { const v = this.trySpawnLink(); if (v) return v; }
+    // off the city's square (the countryside, the causeway) every car comes along the curved roads
+    const offCity = px < -150 || pz < -150 || px > CITY + 150 || pz > CITY + 150;
+    if (Math.random() < (offCity ? 1 : 0.18)) { const v = this.trySpawnLink(); if (v || offCity) return v; }
     for (let tries = 0; tries < 14; tries++) {
       const i = clamp(Math.round(px / P) + randi(-3, 3), 0, N), j = clamp(Math.round(pz / P) + randi(-3, 3), 0, N);
       const [dx, dz] = pick(DIRS);
@@ -42097,10 +43075,12 @@ class TrafficManager {
       const pa = ai.path;
       vAllow = Math.min(vAllow, ai.maxV * 0.92);
       for (let k = pa.k; k < pa.pts.length && pa.cum[k] - pa.d < 45; k++) { const va = Math.sqrt(pa.lim[k] * pa.lim[k] + 2 * 4.5 * Math.max(0, pa.cum[k] - pa.d)); if (va < vAllow) vAllow = va; }
-      // a car stopped in the merge zone (a queue at a light) must not hold us forever: after a few
-      // seconds we nose out anyway and the obstacle check keeps us off its bumper
-      if (pa.d < pa.mergeD && pa.mergeD - pa.d < 24 && (pa.waitT || 0) < 6 && this.mergeBlocked(v)) {
-        const va = Math.sqrt(2 * 5 * Math.max(0, pa.mergeD - pa.d - 1.5)); if (va < vAllow) { vAllow = va; lightStop = true; }
+      // a lattice street ahead to join or cross: wait for a gap. A car stopped there (a queue at a light) must not
+      // hold us forever: after a few seconds we nose out anyway and the obstacle check keeps us off its bumper
+      while (pa.gates.length && pa.gates[0].d < pa.d - 4) { pa.gates.shift(); pa.waitT = 0; }
+      const gt = pa.gates[0];
+      if (gt && gt.d - pa.d < 24 && (pa.waitT || 0) < 6 && this.gateBlocked(v, gt)) {
+        const va = Math.sqrt(2 * 5 * Math.max(0, gt.d - pa.d - 3)); if (va < vAllow) { vAllow = va; lightStop = true; }
         if (ai.speed < 0.5) pa.waitT = (pa.waitT || 0) + dt;
       }
     } else if (ai.mode === 'lane') {
@@ -42194,7 +43174,7 @@ class TrafficManager {
       const pa = ai.path;
       pa.d += ai.speed * dt;
       while (pa.k < pa.pts.length - 2 && pa.cum[pa.k + 1] <= pa.d) pa.k++;
-      if (pa.d >= pa.len) { const x = pa.exit; ai.i = x.i; ai.j = x.j; ai.dx = x.dx; ai.dz = x.dz; ai.s = x.s; ai.mode = 'lane'; ai.path = null; ai.next = null; ai.laneOff = 0; ai.linkSeen = 1; v._lo = undefined; }
+      if (pa.d >= pa.len) { const x = pa.exit; ai.i = x.i; ai.j = x.j; ai.dx = x.dx; ai.dz = x.dz; ai.s = x.s; ai.mode = 'lane'; ai.path = null; ai.next = null; ai.laneOff = 0; ai.linkSeen = x.s; v._lo = undefined; }
     }
     // resolve pose
     let x, z, h, steer = 0;
@@ -42239,26 +43219,28 @@ class DriveAI {
     this.v = v; this.g = game; this.mode = mode;
     this.path = []; this.pi = 0; this.repath = 0; this.stuck = 0; this.rev = 0; this.revSteer = 1;
     this.cruise = 14; this.wait = 0; this.goal = null; this.target = null; this.arrived = false; this.direct = false;
+    this.dense = false; this.cum = null; this.along = 0;
   }
   setGoal(x, z) { this.goal = { x, z }; this.route(x, z); this.arrived = false; }
+  // the road graph's route (every road: the lattice, the curved links, the extensions), driven as a lane: each road
+  // kept to the right-hand side, the corners rounded, a safe speed at every point from the bend's radius (dense)
   route(tx, tz) {
-    const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
-    // to or from Valen Point or Cedar Fields South: the GPS route by the causeway or the land bridge, kept to the
-    // right-hand side of each leg
-    if (extSide(v.pos.x, v.pos.z) || extSide(tx, tz)) {
-      const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
-      if (r && r.length > 1) {
-        this.path = [];
-        for (let k = 1; k < r.length; k++) {
-          const a = r[k - 1], b = r[k], last = k === r.length - 1;
-          if (Math.hypot(b.x - a.x, b.z - a.z) < 0.5 && !last) continue;
-          const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1, o = last ? 0 : LANE * 0.7;
-          this.path.push({ x: b.x - dz / l * o, z: b.z + dx / l * o, node: !last });
-        }
-        this.pi = 0;
-        return;
+    const v = this.v;
+    const r = RoadGraph.ready ? RoadGraph.route(v.pos.x, v.pos.z, tx, tz, { h: v.h }) : null;
+    const L = r && RoadGraph.lane(r.steps, { R: 12 });
+    if (L) {
+      const pts = L.pts.map((q, k) => ({ x: q[0], z: q[1], r: L.rad[k] })), last = pts[pts.length - 1];
+      // the goal itself, when it is off the lane (a kerb spot across the road, a door, a yard)
+      if (Math.hypot(tx - last.x, tz - last.z) > 0.5) {
+        const n = Math.max(1, Math.ceil(Math.hypot(tx - last.x, tz - last.z) / 2));
+        for (let k = 1; k <= n; k++) pts.push({ x: last.x + (tx - last.x) * k / n, z: last.z + (tz - last.z) * k / n, r: Infinity });
       }
+      const cum = new Float64Array(pts.length); for (let k = 1; k < pts.length; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
+      this.path = pts; this.cum = cum; this.dense = true; this.pi = 0; this.along = 0;
+      return;
     }
+    this.dense = false; this.cum = null;
+    const fx = Math.sin(v.h), fz = Math.cos(v.h);
     let i = Math.round(v.pos.x / P), j = Math.round(v.pos.z / P);
     const onV = Math.abs(v.pos.x - i * P) < 9, onH = Math.abs(v.pos.z - j * P) < 9;
     if (onV && !onH) j = fz > 0 ? Math.ceil(v.pos.z / P) : Math.floor(v.pos.z / P);
@@ -42286,6 +43268,27 @@ class DriveAI {
     this.path.push({ x: tx, z: tz, node: false });
     this.pi = 0;
   }
+  // the point `d` m along the dense lane (its end beyond that)
+  at(d) {
+    const W = this.path, C = this.cum, n = W.length;
+    if (d >= C[n - 1]) return W[n - 1];
+    let lo = Math.min(this.pi, n - 2), hi = n - 1;
+    if (C[lo] > d) lo = 0;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (C[m] <= d) lo = m; else hi = m; }
+    const a = W[lo], b = W[hi], t = (d - C[lo]) / ((C[hi] - C[lo]) || 1);
+    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+  }
+  // how far the car still has to go: along the lane (a dense path), else as the crow flies to the last waypoint
+  remaining() {
+    const v = this.v, W = this.path; if (!W.length) return 0;
+    if (this.dense && this.cum) { const end = W[W.length - 1]; return Math.max(0, this.cum[W.length - 1] - (this.along || 0)) + (this.along >= this.cum[W.length - 1] - 0.5 ? Math.hypot(end.x - v.pos.x, end.z - v.pos.z) : 0); }
+    const end = W[W.length - 1]; return Math.hypot(end.x - v.pos.x, end.z - v.pos.z);
+  }
+  // where the route goes next, about `d` m on (a waypoint of a sparse path)
+  ahead(d) {
+    if (this.dense && this.cum) return this.at((this.along || 0) + d);
+    return this.path[Math.min(this.path.length - 1, this.pi + 1)] || this.goal;
+  }
   update(dt) {
     const v = this.v, g = this.g, ctl = v.ctl;
     if (v.health <= 0 || v.burnt) { ctl.throttle = 0; ctl.handbrake = true; ctl.steer = 0; return; }
@@ -42305,7 +43308,27 @@ class DriveAI {
       if (t.speed && !this.direct) desired = t.speed;
     }
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
-    if (!this.direct) {
+    if (!this.direct && this.dense && this.path.length > 1) {
+      // follow the lane: where we are on it (the nearest point a little either side of where we were; the whole lane
+      // if we have lost it), then steer for a point further along it, further at speed (pure pursuit)
+      const W = this.path, C = this.cum, n = W.length;
+      let bk = this.pi, bd = Infinity, bt = 0;
+      const scan = (k0, k1) => { for (let k = k0; k < k1; k++) { const a = W[k], b = W[k + 1], dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz || 1, t = clamp(((v.pos.x - a.x) * dx + (v.pos.z - a.z) * dz) / l2, 0, 1), d = Math.hypot(v.pos.x - a.x - dx * t, v.pos.z - a.z - dz * t); if (d < bd) { bd = d; bk = k; bt = t; } } };
+      scan(Math.max(0, this.pi - 2), Math.min(n - 1, this.pi + 40));
+      if (bd > 20) scan(0, n - 1);
+      this.pi = bk; const along = C[bk] + (C[bk + 1] - C[bk]) * bt; this.along = along;
+      const sp = Math.abs(v.localVel().z), q = this.at(along + clamp(4 + sp * 0.42, 5.5, 18)); tx = q.x; tz = q.z;
+      const rem = C[n - 1] - along, end = W[n - 1], dl = Math.hypot(end.x - v.pos.x, end.z - v.pos.z);
+      if (rem < 9 && dl < 7) {
+        this.arrived = true;
+        if (this.mode === 'cruise' || this.mode === 'flee') { const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 250, 700); this.setGoal(c.x, c.z); }
+        else { ctl.throttle = v.localVel().z > 0.5 ? -0.6 : 0; ctl.handbrake = v.speed < 1; return; }
+      }
+      // the bends ahead set the speed (v = sqrt(a_lat R), braking back at 4.5 m/s²), and the goal brings it down
+      const aLat = this.mode === 'pursue' ? 10 : this.mode === 'flee' || this.mode === 'race' ? 8 : 5.5, reach = sp * sp / 9 + 12;
+      for (let k = bk + 1; k < n && C[k] - along < reach; k++) { const vm = Math.sqrt(aLat * W[k].r + 9 * (C[k] - along)); if (vm < desired) desired = vm; }
+      desired = Math.min(desired, 4 + rem * 0.5);
+    } else if (!this.direct) {
       if (!this.path.length) { ctl.throttle = 0; ctl.handbrake = true; return; }
       while (this.pi < this.path.length - 1) {
         const w = this.path[this.pi];
@@ -46897,10 +47920,23 @@ const RACES = [
 // a countryside race's ground (Session 6C): 'loop' is the countryside track from the land bridge round to the
 // compound; 'ring' closes it along the farm track between its two ends
 function cfsRacePath(def) {
+  if (def.route) return routeRacePath(def);
   const cf = game.world.cfs, L = cf.loop;
   if (def.path === 'loop') return { pts: L, closed: false };
   const ia = cf.spur.findIndex(p => p[0] === L[0][0] && p[1] === L[0][1]), iz = cf.spur.findIndex(p => p[0] === L[L.length - 1][0] && p[1] === L[L.length - 1][1]);
   return { pts: [...L, ...cf.spur.slice(ia + 1, iz).reverse()], closed: true };
+}
+// a race laid along streets between waypoints (the Curved Roads pass): the road graph's route through them, curves,
+// diagonals and junctions included, its centreline sampled every 2.5 m (a closed course when def.loop)
+function routeRacePath(def) {
+  const W = def.loop ? [...def.route, def.route[0]] : def.route, out = [];
+  for (let k = 1; k < W.length; k++) {
+    const r = RoadGraph.route(W[k - 1][0], W[k - 1][1], W[k][0], W[k][1], { kinds: RG_STREETS }); if (!r) break;
+    for (const q of r.pts) { const l = out[out.length - 1]; if (!l || Math.hypot(l[0] - q.x, l[1] - q.z) > 0.05) out.push([q.x, q.z]); }
+  }
+  const pts = out.length > 1 ? resample(out, 2.5) : out;
+  if (def.loop && pts.length > 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1.5) pts.pop();
+  return { pts, closed: !!def.loop };
 }
 // checkpoints along a path every 40 m, the start 15 m in, the racing line every 5 m with a safe speed for the dirt
 // (the bend's radius, slower over mud and rock, braking back at 4 m/s²) and the left normal
@@ -46926,8 +47962,9 @@ const RACER_NAMES = ['Vance', 'Mika "Nitro" Osei', 'Jules Ferreira', 'Big Tam', 
 function raceCheckpoints(def) {
   // an official event runs on its venue's loop: Valen Point's circuit (Session 6B), the off-road course (Session 6C)
   if (def.circuit) return venueOf(def).checkpoints(def);
-  // a countryside race runs along its own path (Session 6C)
-  if (def.path) return pathCheckpoints(def);
+  // a countryside race runs along its own path (Session 6C); a race laid along streets by waypoints, along the road
+  // graph's route through them (the Curved Roads pass)
+  if (def.path || def.route) return pathCheckpoints(def);
   const seq = def.nodes.slice(); if (def.loop) seq.push(seq[0]);
   const one = [];
   for (let k = 1; k < seq.length; k++) {
@@ -52481,6 +53518,15 @@ class VehicleRegistry {
   spawnFor(e, p) {
     const g = this.g;
     for (const v of g.vehicles.list) if (v.garageUid === e.uid) { v.trunk = e.trunk || (e.trunk = {}); this.cars.set(e.uid, v); return v; }
+    // a street spot something now stands on (the city was rebuilt round it: the Curved Roads pass laid new streets and
+    // warehouses): the car is put at the nearest clear kerb instead, once, and you are told where (never inside a wall)
+    if (e.out && p === e.loc && kerbBlocked(g.world, p.x, p.z, groundY(p.x, p.z, p.y), p.h || 0)) {
+      const k = kerbSpot(g.world, p.x, p.z);
+      if (k) {
+        e.loc = { x: k.x, z: k.z, h: k.h, y: groundY(k.x, k.z) }; p = e.loc;
+        if (g.ui) g.ui.toast(`Your ${VEHICLES[e.type].name} was moved to the kerb nearby: the street it stood on was rebuilt.`);
+      }
+    }
     // clear anything standing on the spot first (never the player's car, never another kept car)
     for (const v of g.vehicles.nearby(p.x, p.z, 4)) if (v !== g.player.vehicle && !v.garageUid && !v.trackId && !v.mission && Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 3 && Math.abs(v.pos.y - (p.y ?? v.pos.y)) < 2) g.vehicles.despawn(v);
     const v = g.vehicles.spawn(e.type, p.x, p.z, p.h, { parked: true, color: e.color, y: p.y, vtier: e.vtier || VEHICLES[e.type].tier });
@@ -57875,22 +58921,17 @@ function roulettePick(bets, rnd = Math.random) {
 const FARE_BASE = 6, FARE_PER_KM = 22, CAB_SPEED = 13;
 function fareFor(m) { return Math.max(8, Math.round(FARE_BASE + m / 1000 * FARE_PER_KM)); }
 function routeLen(x0, z0, x1, z1) { const r = gpsRoute(x0, z0, x1, z1); let d = 0, px = x0, pz = z0; for (const q of r) { d += Math.hypot(q.x - px, q.z - pz); px = q.x; pz = q.z; } return d + Math.hypot(x1 - px, z1 - pz); }
-// the nearest point on a street that exists (the lattice and the curved through-roads), in the kerb lane
+// the nearest point on a street (any road but a circuit or a course: the lattice, the curved roads, the spurs and the
+// extensions' routes), in the lane on that side, heading the way traffic drives there. On a lattice street it stays
+// 6 m clear of the junctions at either end.
 function nearestRoadPoint(x, z) {
-  let best = null, bd = 1e9;
-  const tryP = (px, pz, h) => { const d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = { x: px, z: pz, h }; } };
-  for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) {
-    if (RoadNet.segOpen(0, i, j)) { const zz = clamp(z, j * P + 6, (j + 1) * P - 6), side = x >= i * P ? 1 : -1; tryP(i * P + side * LANE, zz, side > 0 ? 0 : Math.PI); }
-    if (RoadNet.segOpen(1, i, j)) { const xx = clamp(x, j * P + 6, (j + 1) * P - 6), side = z >= i * P ? 1 : -1; tryP(xx, i * P + side * LANE, side > 0 ? -Math.PI / 2 : Math.PI / 2); }
-  }
-  const ln = Links.nearest(x, z); if (ln && ln.d < bd) tryP(ln.x, ln.z, 0);
-  // Cedar Fields South's tracks (Session 6C)
-  const cf = typeof game !== 'undefined' && game.world && game.world.cfs;
-  if (cf && cfsSide(x, z)) for (const pts of [cf.loop, cf.east]) for (let k = 0; k < pts.length - 1; k++) {
-    const a = pts[k], b = pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
-    tryP(a[0] + dx * t, a[1] + dz * t, Math.atan2(dx, dz));
-  }
-  return best ? { ...best, d: bd } : null;
+  const q = RoadGraph.nearest(x, z, { kinds: RG_STREETS }); if (!q) return null;
+  const e = q.e; let along = q.along;
+  if (e.lat) along = clamp(clamp(e.lat.a0 + along, 6, P - 6) - e.lat.a0, 0, e.len);
+  const [px, pz, tx, tz] = RoadGraph.pointAt(e, along), off = Math.min(LANE, e.w / 4) * q.side;
+  // the right-hand lane of travel is to the right of the direction (-tz, tx): on the left side, traffic comes the other way
+  const lx = px - tz * off, lz = pz + tx * off, h = q.side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz);
+  return { x: lx, z: lz, h, d: Math.hypot(lx - x, lz - z) };
 }
 function placeNameAt(x, z) {
   const g = game; let best = null, bd = 60;
@@ -58085,7 +59126,7 @@ class TaxiService {
     if (this.state === 'coming') {
       const d = Math.hypot(v.pos.x - this.pick.x, v.pos.z - this.pick.z);
       if (d < 8 && v.speed < 1.5) { this.state = 'waiting'; this.t = 0; v.ctl.handbrake = true; g.ui.toast('Your cab is here. Walk up to it.'); g.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.3, gain: 0.7 }); }
-      else this.watch(dt, d, () => { this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); });
+      else this.watch(dt, v.drive.remaining(), () => { this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); });
       // the player wandered off: follow them (re-aim every few seconds)
       if (this.t > 4 && Math.hypot(p.pos.x - this.pick.x, p.pos.z - this.pick.z) > 25) { this.t = 0; this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); }
       if (g.police.level > 0) { g.ui.toast('The cab turns off. Not with the police around.', 'warn'); this.release(); }
@@ -58099,16 +59140,17 @@ class TaxiService {
       if (g.police.level > 0) { this.finish(Math.min(this.quote, this.meterFare()), 'The driver pulls over: “Out. I don’t need that kind of trouble.”'); return; }
       if (this.leaving) { v.drive.wait = 0.5; v.ctl.throttle = 0; v.ctl.handbrake = true; if (v.speed <= 1.5) this.getOut(); return; }
       if ((v.drive.arrived || d < 9) && v.speed < 1.2) { this.finish(this.quote, `You’ve arrived at ${this.dest.name}. ${fmtMoney(this.quote)}.`); return; }
-      this.watch(dt, d, () => this.recover());
+      this.watch(dt, v.drive.remaining(), () => this.recover());
       this._hudT = (this._hudT || 0) - dt;
       if (this._hudT <= 0) { this._hudT = 0.5; this.renderHud(); }
     }
   }
-  // progress watchdog: no real progress for a while -> recover
+  // progress watchdog: no real progress for a while -> recover. Progress is the way still to go along the route (a road
+  // that bends away from the destination for a while is not a stall)
   watch(dt, d, recover) {
     if (d < this.best - 3) { this.best = d; this.stall = 0; }
     else this.stall += dt;
-    if (this.stall > 14) { this.stall = 0; this.best = d; recover(); }
+    if (this.stall > 14) { this.stall = 0; recover(); this.best = 1e9; }
   }
   // a driver who can't get through: reroute first, then take the short way (a short fade to the next junction)
   recover() {
@@ -58116,7 +59158,7 @@ class TaxiService {
     this.recov = (this.recov || 0) + 1;
     if (this.recov === 1) { v.drive.rev = 1.2; v.drive.route(this.dest.x, this.dest.z); return; }
     if (this.recov >= 4) { g.ui.toast('The driver gives up on the traffic and takes you straight there.'); this.skip(); return; }
-    const path = v.drive.path, nxt = path[Math.min(path.length - 1, v.drive.pi + 1)] || this.dest;
+    const nxt = v.drive.ahead(40) || this.dest;
     g.fade(() => { const kp = nearestRoadPoint(nxt.x, nxt.z) || nxt; v.pos.set(kp.x, groundY(kp.x, kp.z), kp.z); v.vel.set(0, 0); v.yawRate = 0; v.h = Math.atan2(this.dest.x - kp.x, this.dest.z - kp.z); v.syncMesh(0); v.drive.route(this.dest.x, this.dest.z); g.ui.toast('“Shortcut,” says the driver.'); });
   }
   renderHud() {
@@ -59449,7 +60491,7 @@ class MapView {
     const ln = Links.nearest(x, z); if (!ln || ln.d > Math.max(6, r)) return null;
     const L = ln.link, zone = ZONES[zoneKey(ln.x, ln.z)];
     return { key: 'road:' + L.id, name: L.name, cat: 'landmark', catName: 'Road', icon: '≈', col: '#c8ccd2', x: ln.x, z: ln.z, district: zone.name,
-      extra: `<div class="stats"><span>Length</span><span>${fmtDist(L.len)}</span><span>Surface</span><span>${L.road.st === 'dirt' ? 'Dirt track' : 'Asphalt'}</span><span>Joins</span><span>${L.ends.map(e => e.axis === 0 ? STREET_NAMES_X[e.line] : STREET_NAMES_Z[e.line]).join(' · ')}</span></div><div class="hint" style="margin:6px 0 0">A winding through-road. Traffic and your GPS use it.</div>` };
+      extra: `<div class="stats"><span>Length</span><span>${fmtDist(L.len)}</span><span>Surface</span><span>${L.road.st === 'dirt' ? 'Dirt track' : 'Asphalt'}</span><span>Joins</span><span>${L.ends.map(e => e.onLink || (e.free ? 'turning circle' : e.axis === 0 ? STREET_NAMES_X[e.line] : STREET_NAMES_Z[e.line])).join(' · ')}</span></div><div class="hint" style="margin:6px 0 0">A winding through-road. Traffic and your GPS use it.</div>` };
   }
   districtEntry(x, z) {
     const g = this.g, uw = g.uw; if (x < 0 || z < 0 || x >= CITY || z >= CITY) return null;
@@ -59628,166 +60670,15 @@ class MapView {
   }
 }
 function fmtDist(d) { return d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'; }
-// GPS over the lattice plus the curved links. Nodes: the 13x13 lattice nodes, then each link end
-// (a T-junction part way along a lattice segment), then the start and goal. A link edge carries
-// its polyline, so the route drawn on the maps bends with the road.
+// The GPS: the road graph's shortest route (135-core-road-graph.js) over every road there is, the lattice, the
+// curved links, the spurs and the extensions' routes. Its points are the roads' own polylines, so the line drawn on
+// both maps bends with each road and the distance it gives is the length of the road.
 const GPS = {
-  _g: null,
-  graph() {
-    if (this._g && this._g.n === Links.list.length) return this._g;
-    const W2 = N + 1, nodes = [], adj = [], id = (i, j) => i * W2 + j;
-    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) { nodes[id(i, j)] = { x: i * P, z: j * P }; adj[id(i, j)] = []; }
-    const edge = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); adj[b].push({ to: a, w, poly: poly ? poly.slice().reverse() : null }); };
-    const ends = new Map(); // segment key -> [{ along, node }]
-    for (const L of Links.list) {
-      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); if (e.free) return n; const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
-      const poly = L.pts.map(q => ({ x: q[0], z: q[1] }));
-      // a spur gets a node at every vertex (so a point off the city can join it part way along)
-      if (L.spur) { L.vids = this._poly(nodes, adj, edge, L.pts, L.gps[0], L.gps[1]); continue; }
-      edge(L.gps[0], L.gps[1], L.len + 2 * ROAD_HALF, poly);
-    }
-    // the extensions' own routes and their loops (Valen Point's circuit, Session 6B; the off-road course, Session 6C):
-    // polylines that start and end on their spur's vertices or on each other's
-    const exts = typeof game !== 'undefined' && game.world && game.world.exts;
-    const extra = [];
-    for (const X of exts || []) {
-      const spur = Links.list.find(L => L.spur && L.name === X.spur), at = new Map(), key = q => Math.round(q[0] * 10) + ':' + Math.round(q[1] * 10);
-      if (spur && spur.vids) spur.pts.forEach((q, k) => at.set(key(q), spur.vids[k]));
-      const fixed = q => at.get(key(q));
-      for (const r of X.roads) { const ids = this._poly(nodes, adj, edge, r, fixed(r[0]), fixed(r[r.length - 1])); at.set(key(r[0]), ids[0]); at.set(key(r[r.length - 1]), ids[ids.length - 1]); for (let k = 1; k < r.length - 1; k++) if (!at.has(key(r[k]))) at.set(key(r[k]), ids[k]); extra.push({ pts: r, ids, ext: X.id }); }
-      // the loop, every 25 samples, joined at its join samples
-      const T = X.loop, ks = []; for (let k = 0; k < T.pts.length; k += 25) ks.push(k);
-      for (const k of X.joins) if (!ks.includes(k)) ks.push(k);
-      ks.sort((p2, q) => p2 - q);
-      const loop = ks.map(k => T.pts[k]), ids = loop.map(q => at.get(key(q)) ?? (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
-      for (let k = 0; k < loop.length; k++) { const a = ids[k], b2 = ids[(k + 1) % loop.length], A = loop[k], B = loop[(k + 1) % loop.length]; edge(a, b2, Math.hypot(B[0] - A[0], B[1] - A[1]), null); }
-      extra.push({ pts: [...loop, loop[0]], ids: [...ids, ids[0]], ext: X.id });
-    }
-    this.extra = extra;
-    for (const [a, len] of [[0, N], [1, N]]) for (let line = 0; line <= N; line++) for (let seg = 0; seg < len; seg++) {
-      if (!RoadNet.segOpen(a, line, seg)) continue;
-      const n0 = a === 0 ? id(line, seg) : id(seg, line), n1 = a === 0 ? id(line, seg + 1) : id(seg + 1, line);
-      const mids = (ends.get(Links.key(a, line, seg)) || []).slice().sort((p, q) => p.along - q.along);
-      let prev = n0, at = 0;
-      for (const m of mids) { edge(prev, m.node, m.along - at, null); prev = m.node; at = m.along; }
-      edge(prev, n1, P - at, null);
-    }
-    this._g = { nodes, adj, n: Links.list.length };
-    return this._g;
-  },
-  // a polyline of nodes (first and last can be existing nodes); returns the node id of every vertex
-  _poly(nodes, adj, edge, pts, first, last) {
-    const ids = pts.map((q, k) => k === 0 && first !== undefined ? first : k === pts.length - 1 && last !== undefined ? last : (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
-    for (let k = 1; k < pts.length; k++) edge(ids[k - 1], ids[k], Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]), null);
-    return ids;
-  },
-  // a route between any two points, either of them off the lattice: each end joins the graph at the nearest point
-  // of a spur (when it is off the city) or at its nearest lattice node, by a straight line
-  routeAny(fx, fz, tx, tz) {
-    const G = this.graph(), nodes = G.nodes.slice(), adj = G.adj.map(a => a.slice()), W2 = N + 1;
-    const join = (x, z, isGoal) => {
-      const me = nodes.length; nodes.push({ x, z }); adj.push([]);
-      const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
-      if (extSide(x, z)) {
-        // the nearest point on that extension's spur or any of its routes; X joins the two vertices either side of it
-        const X0 = cfsSide(x, z) ? 'cfs' : 'vp', ext = (game.world.exts || []).find(e => e.id === X0);
-        const polys = [...Links.list.filter(L => L.spur && L.vids && (!ext || L.name === ext.spur)).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || []).filter(e => e.ext === X0)];
-        let best = null;
-        for (const pl of polys) for (let k = 0; k < pl.pts.length - 1; k++) {
-          const a = pl.pts[k], b = pl.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
-          const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
-          if (!best || d < best.d) best = { pl, k, x: px, z: pz, d, t, l: Math.sqrt(l2) };
-        }
-        if (!best) return -1;
-        const X = nodes.length; nodes.push({ x: best.x, z: best.z }); adj.push([]);
-        const A = best.pl.ids[best.k], B = best.pl.ids[best.k + 1];
-        for (const [n, w] of [[A, best.t * best.l], [B, (1 - best.t) * best.l]]) { link(n, X, w, null); link(X, n, w, null); }
-        if (isGoal) link(X, me, best.d, null); else link(me, X, best.d, null);
-        return me;
-      }
-      const [i, j] = RoadNet.nearNode(x, z), n = i * W2 + j, d = Math.hypot(x - i * P, z - j * P);
-      // on (or by) a curved road: onto it there, along its polyline from either end (as route() does), so a goal on a
-      // bend is reached along the bend, not across the gardens from the nearest junction; otherwise the nearest node
-      const ln = Links.nearest(x, z);
-      if (!(ln && ln.d < 40 && ln.d < d)) { if (isGoal) link(n, me, d, null); else link(me, n, d, null); }
-      else {
-        const L = ln.link, X = nodes.length; nodes.push({ x: ln.x, z: ln.z }); adj.push([]);
-        const P0 = L.pts.slice(0, ln.k + 1).map(q => ({ x: q[0], z: q[1] })), P1 = L.pts.slice(ln.k + 1).map(q => ({ x: q[0], z: q[1] })).reverse();
-        const ends = L.spur && L.vids ? [[L.vids[ln.k], [], L.cum[ln.k]], [L.vids[ln.k + 1], [], L.cum[ln.k + 1]]] : [[L.gps[0], P0, 0], [L.gps[1], P1, L.len]];
-        for (const [e, poly, at] of ends) { const w = Math.abs(ln.along - at) + 0.01; link(e, X, w, poly.length ? poly : null); link(X, e, w, poly.length ? poly.slice().reverse() : null); }
-        if (isGoal) link(X, me, ln.d, null); else link(me, X, ln.d, null);
-      }
-      return me;
-    };
-    const src = join(fx, fz, false), dst = join(tx, tz, true); if (src < 0 || dst < 0) return null;
-    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
-    dist[src] = 0;
-    for (;;) {
-      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
-      if (u < 0 || u === dst) break;
-      done[u] = 1;
-      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
-    }
-    if (!isFinite(dist[dst])) return null;
-    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
-    chain.reverse();
-    const out = [{ x: fx, z: fz }];
-    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
-    return out;
-  },
-  _nearOn(L, x, z) {
-    let best = null;
-    for (let k = 0; k < L.pts.length - 1; k++) {
-      const a = L.pts[k], b = L.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
-      const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
-      if (!best || d < best.d) best = { link: L, k, x: px, z: pz, d, along: L.cum[k] + Math.sqrt(l2) * t };
-    }
-    return best;
-  },
-  route(fx, fz, i, j, tx, tz, gi, gj) {
-    const G = this.graph(), W2 = N + 1, nodes = G.nodes.slice(), adj = G.adj.slice();
-    const src = i * W2 + j;
-    // the goal: the nearest lattice node, or a point on a link when the target sits on (or by) one
-    let dst = gi * W2 + gj;
-    const ln = Links.nearest(tx, tz);
-    if (ln && ln.d < Math.hypot(tx - gi * P, tz - gj * P) && ln.d < 40) {
-      dst = nodes.length; nodes.push({ x: ln.x, z: ln.z }); adj.push([]);
-      const L = ln.link, toA = L.pts.slice(0, ln.k + 1).map(q => ({ x: q[0], z: q[1] })), toB = L.pts.slice(ln.k + 1).map(q => ({ x: q[0], z: q[1] }));
-      // walk from each end of the link to the goal point (polylines oriented end -> goal)
-      adj[L.gps[0]] = adj[L.gps[0]].concat([{ to: dst, w: ln.along + ROAD_HALF, poly: [...toA, { x: ln.x, z: ln.z }] }]);
-      adj[L.gps[1]] = adj[L.gps[1]].concat([{ to: dst, w: L.len - ln.along + ROAD_HALF, poly: [...toB.slice().reverse(), { x: ln.x, z: ln.z }] }]);
-    }
-    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
-    dist[src] = 0;
-    for (;;) {
-      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
-      if (u < 0 || u === dst) break;
-      done[u] = 1;
-      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
-    }
-    if (!isFinite(dist[dst])) return null;
-    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
-    chain.reverse();
-    const out = [];
-    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
-    return { pts: out, cost: dist[dst], onLink: dst >= G.nodes.length };
-  }
+  // a polyline from (fx, fz) to (tx, tz) by road, or null when no road joins them
+  routeAny(fx, fz, tx, tz) { const r = RoadGraph.route(fx, fz, tx, tz); return r ? [{ x: fx, z: fz }, ...r.pts, { x: tx, z: tz }] : null; }
 };
 function gpsRoute(fx, fz, tx, tz) {
-  // off the city's square (Valen Point and its causeway, Cedar Fields South and its land bridge): through the spur
-  if (extSide(fx, fz) || extSide(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
-  const pts = [{ x: fx, z: fz }];
-  let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
-  const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;
-  const [gi, gj] = RoadNet.nearNode(tx, tz);
-  if (onV && !onH) { j = Math.abs(gj * P - fz) < Math.abs(fz - j * P) ? j : (gj * P > fz ? Math.ceil(fz / P) : Math.floor(fz / P)); }
-  if (RoadNet.degree(i, j) === 0) [i, j] = RoadNet.nearNode(fx, fz);
-  pts.push({ x: i * P, z: onH ? fz : j * P });
-  const viaLinks = Links.list.length ? GPS.route(fx, fz, i, j, tx, tz, gi, gj) : null;
-  if (viaLinks) for (const q of viaLinks.pts) pts.push(q);
-  else for (const [a, b] of RoadNet.path(i, j, gi, gj).slice(1)) pts.push({ x: a * P, z: b * P });
-  pts.push({ x: tx, z: tz });
-  return pts;
+  return GPS.routeAny(fx, fz, tx, tz) || [{ x: fx, z: fz }, { x: tx, z: tz }];
 }
 
 /* =====================================================================
@@ -60696,7 +61587,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

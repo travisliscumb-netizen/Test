@@ -173,9 +173,31 @@ const Terrain = {
         R.s[o] = rocky ? TSURF.rock : wet ? TSURF.mud : TSURF.grass;
         if (pad) { R.s[o] = TSURF.gravel; R.m[o] = 0.2; }
       }
-      // dirt tracks: packed surface and two wheel ruts, a full cell each side where the wheels run (0.5–1.5 m out; a
-      // pad keeps its gravel)
-      for (const T of tracks) this._stampLine(R, T.pts, T.w, (o, along, off) => { if (R.s[o] === TSURF.gravel) return; R.s[o] = TSURF.track; if (Math.abs(Math.abs(off) - 1.0) <= 0.5) R.h[o] -= 0.07; });
+      // dirt tracks, laid as country roads (the Curved Roads pass): each follows the hills on a smoothed profile (about
+      // 25 m either side averaged, no grade over 10%), level across its width, eased into the ground over 3 m shoulders.
+      // A track that ends on another takes that one's level there; one that crosses a pad takes the pad's. Then the
+      // packed surface and two wheel ruts, a full cell each side where the wheels run (0.5–1.5 m out; a pad keeps its
+      // gravel), with the rough held to 60% (a used track is smoother than the field beside it)
+      const done = [], laid = new Uint8Array(R.W * R.H);
+      for (const T of tracks) {
+        T.prof = this._profile(R, T, done);
+        done.push(T);
+        const yAt = d => { const c = T.prof.cum, n = c.length; let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] <= d) lo = m; else hi = m; } const t = clamp((d - c[lo]) / ((c[hi] - c[lo]) || 1), 0, 1); return T.prof.y[lo] + (T.prof.y[hi] - T.prof.y[lo]) * t; };
+        // (a road cell laid by a track before keeps that track's level: where one track runs into another, the first
+        // one's road stays level across; on a pad the profile is the pad's own level and the surface stays gravel)
+        const mine = [];
+        this._stampLine(R, T.pts, T.w + 6, (o, along, off) => {
+          if (laid[o]) return;
+          const t = smoothstep(T.w / 2, T.w / 2 + 3, Math.abs(off));
+          R.h[o] = yAt(along) * (1 - t) + R.h[o] * t;
+          if (Math.abs(off) > T.w / 2) return;
+          mine.push(o);
+          if (R.s[o] === TSURF.gravel) return;
+          R.s[o] = TSURF.track; R.m[o] = 0.6;
+          if (Math.abs(Math.abs(off) - 1.0) <= 0.5) R.h[o] -= 0.07;
+        });
+        for (const o of mine) laid[o] = 1;
+      }
       // the course: dirt, with its features by distance along it
       this._stampLine(R, course.pts, course.w, (o, along, off) => {
         R.s[o] = TSURF.dirt; R.m[o] = 1;
@@ -190,6 +212,38 @@ const Terrain = {
       }, true);
     }
     this.ready = true;
+  },
+  // a track's level along its length: the ground under it averaged over about 25 m either side (twice: a smooth
+  // crest, no sharp dip), held to the level of a pad it crosses and of a track it ends on (eased in over 20 m), then no
+  // grade over 10%. Returns { cum, y } at the track's points
+  _profile(R, T, done) {
+    const pts = T.pts, n = pts.length, cum = new Float64Array(n), raw = new Float64Array(n), pin = new Float64Array(n).fill(NaN);
+    for (let k = 1; k < n; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    for (let k = 0; k < n; k++) {
+      const [x, z] = pts[k], inR = x >= R.x0 && x < R.x1 && z >= R.z0 && z < R.z1;
+      raw[k] = inR ? this._baked(R, x, z) : R.h[this._cell(R, clamp(x, R.x0, R.x1 - 1), clamp(z, R.z0, R.z1 - 1))];
+      if (inR && R.s[this._cell(R, x, z)] === TSURF.gravel) pin[k] = raw[k];
+    }
+    // wherever it runs on or beside a track already laid (its end, a shallow merge): that track's level there
+    for (let k = 0; k < n; k++) for (const D of done) {
+      const q = D.pts; let best = Infinity, at = 0, tt = 0;
+      for (let j = 0; j < q.length - 1; j++) {
+        const dx = q[j + 1][0] - q[j][0], dz = q[j + 1][1] - q[j][1], l2 = dx * dx + dz * dz || 1, t = clamp(((pts[k][0] - q[j][0]) * dx + (pts[k][1] - q[j][1]) * dz) / l2, 0, 1);
+        const d = Math.hypot(pts[k][0] - q[j][0] - dx * t, pts[k][1] - q[j][1] - dz * t); if (d < best) { best = d; at = j; tt = t; }
+      }
+      if (best < (D.w + T.w) / 2 + 1) pin[k] = D.prof.y[at] + (D.prof.y[at + 1] - D.prof.y[at]) * tt;
+    }
+    const avg = (src, rad) => { const out = new Float64Array(n); for (let k = 0; k < n; k++) { let s = 0, w = 0; for (let j = k; j >= 0 && cum[k] - cum[j] <= rad; j--) { s += src[j]; w++; } for (let j = k + 1; j < n && cum[j] - cum[k] <= rad; j++) { s += src[j]; w++; } out[k] = s / w; } return out; };
+    let y = avg(avg(raw, 25), 25);
+    // the pins: each pulls the profile to its level, fading out over 20 m
+    for (let k = 0; k < n; k++) if (!isNaN(pin[k])) {
+      const dlt = pin[k] - y[k];
+      for (let j = 0; j < n; j++) { const f = 1 - Math.abs(cum[j] - cum[k]) / 20; if (f > 0) y[j] += dlt * f; }
+    }
+    for (let k = 0; k < n; k++) if (!isNaN(pin[k])) y[k] = pin[k];
+    // no grade over 10%, either way along it (pinned points stay put)
+    for (let pass = 0; pass < 2; pass++) for (let k = 1; k < n; k++) { const i = pass ? n - 1 - k : k, j = pass ? i + 1 : i - 1, ds = Math.abs(cum[i] - cum[j]) * 0.1; if (isNaN(pin[i])) y[i] = clamp(y[i], y[j] - ds, y[j] + ds); }
+    return { cum, y, raw };
   },
   // every cell within w/2 of a polyline: fn(cellIndex, distance along, signed offset (+ on the left of travel)).
   // Each cell takes its nearest segment, so features and offsets run on smoothly through the bends

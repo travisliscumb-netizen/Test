@@ -578,10 +578,16 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
             vec3 grav = mix(vec3(0.52, 0.45, 0.34), vec3(0.6, 0.55, 0.44), pvn(p * 9.0)) * (0.85 + 0.2 * n1);
             vec3 asph = vec3(0.15, 0.155, 0.165) * (0.8 + 0.36 * n1) + (lgr - 0.5) * 0.035;
             float ka = smoothstep(0.35, 0.6, lm.r), kg = smoothstep(0.35, 0.6, lm.g), kc = smoothstep(0.35, 0.6, lm.b);
+            // asphalt laid like the streets': aggregate speckles, repaired patches, fine cracks; darker when wet
+            asph += step(0.93, pvh(floor(p * 18.0))) * 0.035;
+            { vec2 pc = floor(p / 7.0); vec2 pf = fract(p / 7.0); float ph = pvh(pc + 13.0);
+              if (ph > 0.86) { vec2 hs = vec2(0.2 + pvh(pc + 3.0) * 0.25, 0.15 + pvh(pc + 7.0) * 0.3); asph = mix(asph, vec3(0.105, 0.11, 0.115) * (0.9 + 0.2 * lgr), boxAA(pf - 0.5, hs) * 0.9); } }
+            { float cr = abs(pvn(p * 0.9) - 0.5); asph *= 1.0 - 0.18 * (1.0 - smoothstep(0.0, 0.01 + fwidth(cr), cr)) * step(0.68, pvn(p * 0.21 + 5.0)); }
+            asph *= mix(1.0, 0.55, uWet);
             col = mix(col, conc, kc); col = mix(col, grav, kg * (1.0 - ka)); col = mix(col, asph, ka);
             // a painted edge line just inside the asphalt edge
             col = mix(col, vec3(0.8, 0.8, 0.76), (1.0 - smoothstep(0.0, 0.07, abs(lm.r - 0.72))) * step(lm.r, 0.95) * 0.7);
-            rough = mix(rough, 0.88, max(ka, kc)); hgt = mix(hgt, lgr * 0.004, max(ka, max(kg, kc)));
+            rough = mix(rough, mix(0.88, 0.3, uWet), max(ka, kc)); hgt = mix(hgt, lgr * 0.004, max(ka, max(kg, kc)));
             isRoad = max(isRoad, max(ka, kc));
           }
         }

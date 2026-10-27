@@ -227,18 +227,32 @@ const Links = {
     else { const seg = clamp(Math.floor(E[0] / P), 0, N - 1); a = { axis: 1, line: j, seg, along: E[0] - seg * P, C: { x: E[0], z: j * P }, d: dH }; }
     return a.d <= ROAD_HALF + 1.5 && a.along > TURN_IN + 4 && a.along < P - TURN_IN - 4 && RoadNet.segOpen(a.axis, a.line, a.seg) ? a : null;
   },
+  // an end that meets another curved road part way along it (a Y-junction, a lane off a lane): the point on that road
+  attachLink(E, world, self) {
+    let best = null;
+    for (const r of world.localRoads) {
+      if (!r.link || r.k !== 'line' || r === self) continue;
+      for (let k = 0; k < r.pts.length - 1; k++) {
+        const a = r.pts[k], b = r.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+        const t = clamp(((E[0] - a[0]) * dx + (E[1] - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(E[0] - px, E[1] - pz);
+        if (d <= 0.5 && (!best || d < best.d)) best = { axis: -1, onLink: r.link, C: { x: px, z: pz }, d };
+      }
+    }
+    return best;
+  },
   build(world) {
     this.list = []; this.idx.clear();
     for (const r of world.localRoads) {
       if (!r.link || r.k !== 'line') continue;
-      // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle
+      // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle.
+      // An end may also meet another curved road (Curved Roads pass: Y-junctions, the farm track off Cedar Fields Road)
       const last = r.pts[r.pts.length - 1];
-      const a = this.attach(r.pts[0]), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last);
+      const a = this.attach(r.pts[0]) || this.attachLink(r.pts[0], world, r), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last) || this.attachLink(last, world, r);
       if (!a || !b) continue;
       const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
       const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null };
       this.list.push(L);
-      L.ends.forEach((e, k) => { if (e.free) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
+      L.ends.forEach((e, k) => { if (e.free || e.onLink) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
     }
     world.links = this.list;
   },
@@ -264,6 +278,8 @@ const Links = {
     for (let i = 1; i < m; i++) { const a = a0 + (a1 - a0) * i / m; arc.push([R0.x + Math.cos(a) * R0.r, R0.z + Math.sin(a) * R0.r]); }
     return [...out, ...arc, ...back];
   },
+  // nearest point on one link
+  nearestOn(L, x, z) { const s = this.list; this.list = [L]; const r = this.nearest(x, z); this.list = s; return r; },
   // nearest point on any link: { link, k (segment), x, z, d, along (metres from end 0) }
   nearest(x, z) {
     let best = null;
@@ -318,7 +334,8 @@ function groundBase(x, z) {
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
   if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
-  return RoadNet.roadAt(x, z) ? 0 : CURB_H;
+  // (the kerb is cut where a curved road leaves a lattice street: a ramp in the gutter, CurbCuts in 135)
+  return RoadNet.roadAt(x, z) ? (CurbCuts.n ? CurbCuts.at(x, z) : 0) : CURB_H;
 }
 function isOnRoad(x, z) { return RoadNet.roadAt(x, z); }
 // Streetlight positions for one block (must match the ground shader formula).

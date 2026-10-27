@@ -1060,7 +1060,7 @@ class MapView {
     const ln = Links.nearest(x, z); if (!ln || ln.d > Math.max(6, r)) return null;
     const L = ln.link, zone = ZONES[zoneKey(ln.x, ln.z)];
     return { key: 'road:' + L.id, name: L.name, cat: 'landmark', catName: 'Road', icon: '≈', col: '#c8ccd2', x: ln.x, z: ln.z, district: zone.name,
-      extra: `<div class="stats"><span>Length</span><span>${fmtDist(L.len)}</span><span>Surface</span><span>${L.road.st === 'dirt' ? 'Dirt track' : 'Asphalt'}</span><span>Joins</span><span>${L.ends.map(e => e.axis === 0 ? STREET_NAMES_X[e.line] : STREET_NAMES_Z[e.line]).join(' · ')}</span></div><div class="hint" style="margin:6px 0 0">A winding through-road. Traffic and your GPS use it.</div>` };
+      extra: `<div class="stats"><span>Length</span><span>${fmtDist(L.len)}</span><span>Surface</span><span>${L.road.st === 'dirt' ? 'Dirt track' : 'Asphalt'}</span><span>Joins</span><span>${L.ends.map(e => e.onLink || (e.free ? 'turning circle' : e.axis === 0 ? STREET_NAMES_X[e.line] : STREET_NAMES_Z[e.line])).join(' · ')}</span></div><div class="hint" style="margin:6px 0 0">A winding through-road. Traffic and your GPS use it.</div>` };
   }
   districtEntry(x, z) {
     const g = this.g, uw = g.uw; if (x < 0 || z < 0 || x >= CITY || z >= CITY) return null;
@@ -1239,165 +1239,14 @@ class MapView {
   }
 }
 function fmtDist(d) { return d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'; }
-// GPS over the lattice plus the curved links. Nodes: the 13x13 lattice nodes, then each link end
-// (a T-junction part way along a lattice segment), then the start and goal. A link edge carries
-// its polyline, so the route drawn on the maps bends with the road.
+// The GPS: the road graph's shortest route (135-core-road-graph.js) over every road there is, the lattice, the
+// curved links, the spurs and the extensions' routes. Its points are the roads' own polylines, so the line drawn on
+// both maps bends with each road and the distance it gives is the length of the road.
 const GPS = {
-  _g: null,
-  graph() {
-    if (this._g && this._g.n === Links.list.length) return this._g;
-    const W2 = N + 1, nodes = [], adj = [], id = (i, j) => i * W2 + j;
-    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) { nodes[id(i, j)] = { x: i * P, z: j * P }; adj[id(i, j)] = []; }
-    const edge = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); adj[b].push({ to: a, w, poly: poly ? poly.slice().reverse() : null }); };
-    const ends = new Map(); // segment key -> [{ along, node }]
-    for (const L of Links.list) {
-      L.gps = L.ends.map((e, k) => { const n = nodes.length; nodes.push({ x: e.C.x, z: e.C.z }); adj.push([]); if (e.free) return n; const key = Links.key(e.axis, e.line, e.seg); if (!ends.has(key)) ends.set(key, []); ends.get(key).push({ along: e.along, node: n }); return n; });
-      const poly = L.pts.map(q => ({ x: q[0], z: q[1] }));
-      // a spur gets a node at every vertex (so a point off the city can join it part way along)
-      if (L.spur) { L.vids = this._poly(nodes, adj, edge, L.pts, L.gps[0], L.gps[1]); continue; }
-      edge(L.gps[0], L.gps[1], L.len + 2 * ROAD_HALF, poly);
-    }
-    // the extensions' own routes and their loops (Valen Point's circuit, Session 6B; the off-road course, Session 6C):
-    // polylines that start and end on their spur's vertices or on each other's
-    const exts = typeof game !== 'undefined' && game.world && game.world.exts;
-    const extra = [];
-    for (const X of exts || []) {
-      const spur = Links.list.find(L => L.spur && L.name === X.spur), at = new Map(), key = q => Math.round(q[0] * 10) + ':' + Math.round(q[1] * 10);
-      if (spur && spur.vids) spur.pts.forEach((q, k) => at.set(key(q), spur.vids[k]));
-      const fixed = q => at.get(key(q));
-      for (const r of X.roads) { const ids = this._poly(nodes, adj, edge, r, fixed(r[0]), fixed(r[r.length - 1])); at.set(key(r[0]), ids[0]); at.set(key(r[r.length - 1]), ids[ids.length - 1]); for (let k = 1; k < r.length - 1; k++) if (!at.has(key(r[k]))) at.set(key(r[k]), ids[k]); extra.push({ pts: r, ids, ext: X.id }); }
-      // the loop, every 25 samples, joined at its join samples
-      const T = X.loop, ks = []; for (let k = 0; k < T.pts.length; k += 25) ks.push(k);
-      for (const k of X.joins) if (!ks.includes(k)) ks.push(k);
-      ks.sort((p2, q) => p2 - q);
-      const loop = ks.map(k => T.pts[k]), ids = loop.map(q => at.get(key(q)) ?? (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
-      for (let k = 0; k < loop.length; k++) { const a = ids[k], b2 = ids[(k + 1) % loop.length], A = loop[k], B = loop[(k + 1) % loop.length]; edge(a, b2, Math.hypot(B[0] - A[0], B[1] - A[1]), null); }
-      extra.push({ pts: [...loop, loop[0]], ids: [...ids, ids[0]], ext: X.id });
-    }
-    this.extra = extra;
-    for (const [a, len] of [[0, N], [1, N]]) for (let line = 0; line <= N; line++) for (let seg = 0; seg < len; seg++) {
-      if (!RoadNet.segOpen(a, line, seg)) continue;
-      const n0 = a === 0 ? id(line, seg) : id(seg, line), n1 = a === 0 ? id(line, seg + 1) : id(seg + 1, line);
-      const mids = (ends.get(Links.key(a, line, seg)) || []).slice().sort((p, q) => p.along - q.along);
-      let prev = n0, at = 0;
-      for (const m of mids) { edge(prev, m.node, m.along - at, null); prev = m.node; at = m.along; }
-      edge(prev, n1, P - at, null);
-    }
-    this._g = { nodes, adj, n: Links.list.length };
-    return this._g;
-  },
-  // a polyline of nodes (first and last can be existing nodes); returns the node id of every vertex
-  _poly(nodes, adj, edge, pts, first, last) {
-    const ids = pts.map((q, k) => k === 0 && first !== undefined ? first : k === pts.length - 1 && last !== undefined ? last : (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
-    for (let k = 1; k < pts.length; k++) edge(ids[k - 1], ids[k], Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]), null);
-    return ids;
-  },
-  // a route between any two points, either of them off the lattice: each end joins the graph at the nearest point
-  // of a spur (when it is off the city) or at its nearest lattice node, by a straight line
-  routeAny(fx, fz, tx, tz) {
-    const G = this.graph(), nodes = G.nodes.slice(), adj = G.adj.map(a => a.slice()), W2 = N + 1;
-    const join = (x, z, isGoal) => {
-      const me = nodes.length; nodes.push({ x, z }); adj.push([]);
-      const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
-      if (extSide(x, z)) {
-        // the nearest point on that extension's spur or any of its routes; X joins the two vertices either side of it
-        const X0 = cfsSide(x, z) ? 'cfs' : 'vp', ext = (game.world.exts || []).find(e => e.id === X0);
-        const polys = [...Links.list.filter(L => L.spur && L.vids && (!ext || L.name === ext.spur)).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || []).filter(e => e.ext === X0)];
-        let best = null;
-        for (const pl of polys) for (let k = 0; k < pl.pts.length - 1; k++) {
-          const a = pl.pts[k], b = pl.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
-          const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
-          if (!best || d < best.d) best = { pl, k, x: px, z: pz, d, t, l: Math.sqrt(l2) };
-        }
-        if (!best) return -1;
-        const X = nodes.length; nodes.push({ x: best.x, z: best.z }); adj.push([]);
-        const A = best.pl.ids[best.k], B = best.pl.ids[best.k + 1];
-        for (const [n, w] of [[A, best.t * best.l], [B, (1 - best.t) * best.l]]) { link(n, X, w, null); link(X, n, w, null); }
-        if (isGoal) link(X, me, best.d, null); else link(me, X, best.d, null);
-        return me;
-      }
-      const [i, j] = RoadNet.nearNode(x, z), n = i * W2 + j, d = Math.hypot(x - i * P, z - j * P);
-      // on (or by) a curved road: onto it there, along its polyline from either end (as route() does), so a goal on a
-      // bend is reached along the bend, not across the gardens from the nearest junction; otherwise the nearest node
-      const ln = Links.nearest(x, z);
-      if (!(ln && ln.d < 40 && ln.d < d)) { if (isGoal) link(n, me, d, null); else link(me, n, d, null); }
-      else {
-        const L = ln.link, X = nodes.length; nodes.push({ x: ln.x, z: ln.z }); adj.push([]);
-        const P0 = L.pts.slice(0, ln.k + 1).map(q => ({ x: q[0], z: q[1] })), P1 = L.pts.slice(ln.k + 1).map(q => ({ x: q[0], z: q[1] })).reverse();
-        const ends = L.spur && L.vids ? [[L.vids[ln.k], [], L.cum[ln.k]], [L.vids[ln.k + 1], [], L.cum[ln.k + 1]]] : [[L.gps[0], P0, 0], [L.gps[1], P1, L.len]];
-        for (const [e, poly, at] of ends) { const w = Math.abs(ln.along - at) + 0.01; link(e, X, w, poly.length ? poly : null); link(X, e, w, poly.length ? poly.slice().reverse() : null); }
-        if (isGoal) link(X, me, ln.d, null); else link(me, X, ln.d, null);
-      }
-      return me;
-    };
-    const src = join(fx, fz, false), dst = join(tx, tz, true); if (src < 0 || dst < 0) return null;
-    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
-    dist[src] = 0;
-    for (;;) {
-      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
-      if (u < 0 || u === dst) break;
-      done[u] = 1;
-      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
-    }
-    if (!isFinite(dist[dst])) return null;
-    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
-    chain.reverse();
-    const out = [{ x: fx, z: fz }];
-    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
-    return out;
-  },
-  _nearOn(L, x, z) {
-    let best = null;
-    for (let k = 0; k < L.pts.length - 1; k++) {
-      const a = L.pts[k], b = L.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
-      const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
-      if (!best || d < best.d) best = { link: L, k, x: px, z: pz, d, along: L.cum[k] + Math.sqrt(l2) * t };
-    }
-    return best;
-  },
-  route(fx, fz, i, j, tx, tz, gi, gj) {
-    const G = this.graph(), W2 = N + 1, nodes = G.nodes.slice(), adj = G.adj.slice();
-    const src = i * W2 + j;
-    // the goal: the nearest lattice node, or a point on a link when the target sits on (or by) one
-    let dst = gi * W2 + gj;
-    const ln = Links.nearest(tx, tz);
-    if (ln && ln.d < Math.hypot(tx - gi * P, tz - gj * P) && ln.d < 40) {
-      dst = nodes.length; nodes.push({ x: ln.x, z: ln.z }); adj.push([]);
-      const L = ln.link, toA = L.pts.slice(0, ln.k + 1).map(q => ({ x: q[0], z: q[1] })), toB = L.pts.slice(ln.k + 1).map(q => ({ x: q[0], z: q[1] }));
-      // walk from each end of the link to the goal point (polylines oriented end -> goal)
-      adj[L.gps[0]] = adj[L.gps[0]].concat([{ to: dst, w: ln.along + ROAD_HALF, poly: [...toA, { x: ln.x, z: ln.z }] }]);
-      adj[L.gps[1]] = adj[L.gps[1]].concat([{ to: dst, w: L.len - ln.along + ROAD_HALF, poly: [...toB.slice().reverse(), { x: ln.x, z: ln.z }] }]);
-    }
-    const dist = new Float64Array(nodes.length).fill(Infinity), prev = new Int32Array(nodes.length).fill(-1), via = new Array(nodes.length), done = new Uint8Array(nodes.length);
-    dist[src] = 0;
-    for (;;) {
-      let u = -1, best = Infinity; for (let k = 0; k < nodes.length; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
-      if (u < 0 || u === dst) break;
-      done[u] = 1;
-      for (const e of adj[u]) { const nd = dist[u] + e.w; if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; via[e.to] = e; } }
-    }
-    if (!isFinite(dist[dst])) return null;
-    const chain = []; for (let c = dst; c !== src; c = prev[c]) chain.push(c);
-    chain.reverse();
-    const out = [];
-    for (const c of chain) { const e = via[c]; if (e.poly) out.push(...e.poly); out.push(nodes[c]); }
-    return { pts: out, cost: dist[dst], onLink: dst >= G.nodes.length };
-  }
+  // a polyline from (fx, fz) to (tx, tz) by road, or null when no road joins them
+  routeAny(fx, fz, tx, tz) { const r = RoadGraph.route(fx, fz, tx, tz); return r ? [{ x: fx, z: fz }, ...r.pts, { x: tx, z: tz }] : null; }
 };
 function gpsRoute(fx, fz, tx, tz) {
-  // off the city's square (Valen Point and its causeway, Cedar Fields South and its land bridge): through the spur
-  if (extSide(fx, fz) || extSide(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
-  const pts = [{ x: fx, z: fz }];
-  let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
-  const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;
-  const [gi, gj] = RoadNet.nearNode(tx, tz);
-  if (onV && !onH) { j = Math.abs(gj * P - fz) < Math.abs(fz - j * P) ? j : (gj * P > fz ? Math.ceil(fz / P) : Math.floor(fz / P)); }
-  if (RoadNet.degree(i, j) === 0) [i, j] = RoadNet.nearNode(fx, fz);
-  pts.push({ x: i * P, z: onH ? fz : j * P });
-  const viaLinks = Links.list.length ? GPS.route(fx, fz, i, j, tx, tz, gi, gj) : null;
-  if (viaLinks) for (const q of viaLinks.pts) pts.push(q);
-  else for (const [a, b] of RoadNet.path(i, j, gi, gj).slice(1)) pts.push({ x: a * P, z: b * P });
-  pts.push({ x: tx, z: tz });
-  return pts;
+  return GPS.routeAny(fx, fz, tx, tz) || [{ x: fx, z: fz }, { x: tx, z: tz }];
 }
 

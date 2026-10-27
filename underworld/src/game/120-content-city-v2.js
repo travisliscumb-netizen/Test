@@ -280,6 +280,13 @@ Object.assign(World.prototype, {
     this._det(b, 'box', cx, CURB_H + hh / 2, cz, ax ? len : t, hh, ax ? t : len, col, 0, true);
     if (kind === 'wall') this._det(b, 'box', cx, CURB_H + hh + 0.06, cz, ax ? len + 0.1 : t + 0.12, 0.12, ax ? t + 0.12 : len + 0.1, C(0xd8ccb4));
   },
+  // a fence run between any two points (a short run along a curved road): drawn along the line, its collider the
+  // run's box (the runs are short and nearly straight with the axes, so the box is barely wider than the rail)
+  _fenceSeg(b, x0, z0, x1, z1, kind = 'rail', h) {
+    const len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.4) return;
+    const col = kind === 'rail' ? C(0x8a7050) : kind === 'chain' ? C(0x5c6166) : C(0xf0eee8), hh = h || (kind === 'chain' ? 2.2 : 1.0), t = 0.08, ry = Math.atan2(x1 - x0, z1 - z0);
+    this._det(b, 'box', (x0 + x1) / 2, CURB_H + hh / 2, (z0 + z1) / 2, t, hh, len + 0.04, col, ry, { x0: Math.min(x0, x1) - t, x1: Math.max(x0, x1) + t, z0: Math.min(z0, z1) - t, z1: Math.max(z0, z1) + t, y0: 0, y1: CURB_H + hh, kind: 'det' });
+  },
   _yardTrees(b, rng, x0, z0, x1, z1, n, kinds = ['tree', 'tree', 'bush']) {
     for (let i = 0, tries = 0; i < n && tries < n * 8; tries++) {
       const x = rng.range(x0, x1), z = rng.range(z0, z1);
@@ -786,11 +793,15 @@ Object.assign(World.prototype, {
   _genFields(a, sb, rng) {
     this._sbSidewalks(sb, rng, { trees: 0.8, park: 0 });
     const b = a, zr = 920;
-    this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt', { smooth: true, link: 'Cedar Fields Road' });
+    const cfr = this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt', { smooth: true, link: 'Cedar Fields Road' });
     this._road([[150, zr], [150, 906]], 4.2, 'dirt');
     this._road([[60, zr], [60, 938]], 4.2, 'dirt');
-    // the farm track south to the perimeter road and the land bridge to Cedar Fields South (Session 6C)
-    this._road([[CFS.lb.x, zr], [CFS.lb.x, CITY]], CFS.lb.road * 2, 'dirt');
+    // the farm track south to the perimeter road and the land bridge to Cedar Fields South (Session 6C). A curved road
+    // of its own since the Curved Roads pass: it leaves Cedar Fields Road at a T (a link-to-link junction, its first
+    // point a sample of that road) and meets the perimeter road straight across from the bridge track
+    let ft = cfr.pts[0];
+    for (let k = 0; k < cfr.pts.length - 1; k++) { const a = cfr.pts[k], c = cfr.pts[k + 1]; if ((a[0] - CFS.lb.x) * (c[0] - CFS.lb.x) <= 0 && a[0] !== c[0]) { const t = (CFS.lb.x - a[0]) / (c[0] - a[0]); ft = [CFS.lb.x, a[1] + (c[1] - a[1]) * t]; break; } }
+    this._road(linePts(ft, [ft[0], CITY - ROAD_HALF + 0.6]), CFS.lb.road * 2, 'dirt', { link: 'Farm Track' });
     // the farm: house, red barn, silo, paddock
     this._house(b, rng, { x: 150, z: 897, face: 1, type: 'farm', w: 12, d: 9, garage: 'street', drive: 'auto', color: 0xf0e6c8, roofColor: 0x5a3a32, name: 'Cedar Farmhouse' });
     const barn = this._bld(b, 172, 892, 188, 906, 7.5, STYLE.WARE, 0x8a2a20, 7.5, 4, { roof: 'gable', roofColor: 0x3a3d40, exactH: true });
@@ -802,11 +813,16 @@ Object.assign(World.prototype, {
     for (let k = 0; k < 7; k++) { const x = 212 + rng.range(0, 20), z = 897 + rng.range(0, 12); this._det(b, 'cyl', x, CURB_H + 0.6, z, 0.75, 1.2, 0xd8b45a, null, { x, z, r: 0.8, y0: 0, y1: 1.2, kind: 'det' }); }
     // a cottage on the west field, rail fences along the track, hedgerows and an orchard
     this._house(b, rng, { x: 60, z: 944, face: 0, type: 'bungalow', w: 10, d: 7, garage: 'carport', drive: 'auto', color: 0xe8e0d0, name: 'Mill Cottage' });
-    for (const [x0, x1] of [[12, 52], [68, 142], [158, 240], [250, 308]]) {
-      this._fence(b, x0, zr - 4.2, x1, zr - 4.2, 'rail');
-      // the south fence opens for the farm track
-      if (x0 < CFS.lb.x && x1 > CFS.lb.x) { this._fence(b, x0, zr + 4.2, CFS.lb.x - 6, zr + 4.2, 'rail'); this._fence(b, CFS.lb.x + 6, zr + 4.2, x1, zr + 4.2, 'rail'); }
-      else this._fence(b, x0, zr + 4.2, x1, zr + 4.2, 'rail');
+    // rail fences along both sides of the road, following its bends (in runs of about 5 m; the south side opens for the
+    // farm track)
+    const zAt = x => { for (let k = 0; k < cfr.pts.length - 1; k++) { const a = cfr.pts[k], c = cfr.pts[k + 1]; if ((a[0] - x) * (c[0] - x) <= 0 && a[0] !== c[0]) return a[1] + (c[1] - a[1]) * (x - a[0]) / (c[0] - a[0]); } return zr; };
+    for (const [x0, x1] of [[12, 52], [68, 142], [158, 240], [250, 308]]) for (const side of [-1, 1]) {
+      const n = Math.ceil((x1 - x0) / 5);
+      for (let k = 0; k < n; k++) {
+        const xa = x0 + (x1 - x0) * k / n, xb = x0 + (x1 - x0) * (k + 1) / n;
+        if (side > 0 && xb > CFS.lb.x - 6 && xa < CFS.lb.x + 6) continue;
+        this._fenceSeg(b, xa, zAt(xa) + side * 4.2, xb, zAt(xb) + side * 4.2, 'rail');
+      }
     }
     for (const hx of [100, 250]) for (let z = sb.z0 + 3; z < sb.z1 - 2; z += 5) if (Math.abs(z - zr) > 6) this._prop(b, rng.chance(0.7) ? 'tree' : 'bush', hx + rng.range(-1, 1), z, rng.range(0, 6), rng.range(0.9, 1.3));
     for (let x = 262; x < 306; x += 7) for (let z = 928; z < 948; z += 7) this._prop(b, 'tree', x + rng.range(-0.6, 0.6), z + rng.range(-0.6, 0.6), rng.range(0, 6), rng.range(0.75, 0.95));

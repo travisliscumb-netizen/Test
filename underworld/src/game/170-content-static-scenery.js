@@ -49,7 +49,11 @@ function buildStaticScenery(scene, world) {
   gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
   eastRun(-E, g0, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
   eastRun(g1, CITY + E, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
+  // the kerb cut away where each curved road leaves a lattice street (Curved Roads pass)
+  addCurbCuts(gs);
   const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
+  // the curved streets' painted lines
+  buildRoadMarkings(scene);
   // railing
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
   for (let t = -E; t <= CITY + E; t += 2.5) {

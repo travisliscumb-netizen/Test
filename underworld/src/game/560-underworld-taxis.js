@@ -10,22 +10,17 @@
 const FARE_BASE = 6, FARE_PER_KM = 22, CAB_SPEED = 13;
 function fareFor(m) { return Math.max(8, Math.round(FARE_BASE + m / 1000 * FARE_PER_KM)); }
 function routeLen(x0, z0, x1, z1) { const r = gpsRoute(x0, z0, x1, z1); let d = 0, px = x0, pz = z0; for (const q of r) { d += Math.hypot(q.x - px, q.z - pz); px = q.x; pz = q.z; } return d + Math.hypot(x1 - px, z1 - pz); }
-// the nearest point on a street that exists (the lattice and the curved through-roads), in the kerb lane
+// the nearest point on a street (any road but a circuit or a course: the lattice, the curved roads, the spurs and the
+// extensions' routes), in the lane on that side, heading the way traffic drives there. On a lattice street it stays
+// 6 m clear of the junctions at either end.
 function nearestRoadPoint(x, z) {
-  let best = null, bd = 1e9;
-  const tryP = (px, pz, h) => { const d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = { x: px, z: pz, h }; } };
-  for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) {
-    if (RoadNet.segOpen(0, i, j)) { const zz = clamp(z, j * P + 6, (j + 1) * P - 6), side = x >= i * P ? 1 : -1; tryP(i * P + side * LANE, zz, side > 0 ? 0 : Math.PI); }
-    if (RoadNet.segOpen(1, i, j)) { const xx = clamp(x, j * P + 6, (j + 1) * P - 6), side = z >= i * P ? 1 : -1; tryP(xx, i * P + side * LANE, side > 0 ? -Math.PI / 2 : Math.PI / 2); }
-  }
-  const ln = Links.nearest(x, z); if (ln && ln.d < bd) tryP(ln.x, ln.z, 0);
-  // Cedar Fields South's tracks (Session 6C)
-  const cf = typeof game !== 'undefined' && game.world && game.world.cfs;
-  if (cf && cfsSide(x, z)) for (const pts of [cf.loop, cf.east]) for (let k = 0; k < pts.length - 1; k++) {
-    const a = pts[k], b = pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
-    tryP(a[0] + dx * t, a[1] + dz * t, Math.atan2(dx, dz));
-  }
-  return best ? { ...best, d: bd } : null;
+  const q = RoadGraph.nearest(x, z, { kinds: RG_STREETS }); if (!q) return null;
+  const e = q.e; let along = q.along;
+  if (e.lat) along = clamp(clamp(e.lat.a0 + along, 6, P - 6) - e.lat.a0, 0, e.len);
+  const [px, pz, tx, tz] = RoadGraph.pointAt(e, along), off = Math.min(LANE, e.w / 4) * q.side;
+  // the right-hand lane of travel is to the right of the direction (-tz, tx): on the left side, traffic comes the other way
+  const lx = px - tz * off, lz = pz + tx * off, h = q.side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz);
+  return { x: lx, z: lz, h, d: Math.hypot(lx - x, lz - z) };
 }
 function placeNameAt(x, z) {
   const g = game; let best = null, bd = 60;
@@ -220,7 +215,7 @@ class TaxiService {
     if (this.state === 'coming') {
       const d = Math.hypot(v.pos.x - this.pick.x, v.pos.z - this.pick.z);
       if (d < 8 && v.speed < 1.5) { this.state = 'waiting'; this.t = 0; v.ctl.handbrake = true; g.ui.toast('Your cab is here. Walk up to it.'); g.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.3, gain: 0.7 }); }
-      else this.watch(dt, d, () => { this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); });
+      else this.watch(dt, v.drive.remaining(), () => { this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); });
       // the player wandered off: follow them (re-aim every few seconds)
       if (this.t > 4 && Math.hypot(p.pos.x - this.pick.x, p.pos.z - this.pick.z) > 25) { this.t = 0; this.pick = nearestRoadPoint(p.pos.x, p.pos.z) || this.pick; v.drive.setGoal(this.pick.x, this.pick.z); }
       if (g.police.level > 0) { g.ui.toast('The cab turns off. Not with the police around.', 'warn'); this.release(); }
@@ -234,16 +229,17 @@ class TaxiService {
       if (g.police.level > 0) { this.finish(Math.min(this.quote, this.meterFare()), 'The driver pulls over: “Out. I don’t need that kind of trouble.”'); return; }
       if (this.leaving) { v.drive.wait = 0.5; v.ctl.throttle = 0; v.ctl.handbrake = true; if (v.speed <= 1.5) this.getOut(); return; }
       if ((v.drive.arrived || d < 9) && v.speed < 1.2) { this.finish(this.quote, `You’ve arrived at ${this.dest.name}. ${fmtMoney(this.quote)}.`); return; }
-      this.watch(dt, d, () => this.recover());
+      this.watch(dt, v.drive.remaining(), () => this.recover());
       this._hudT = (this._hudT || 0) - dt;
       if (this._hudT <= 0) { this._hudT = 0.5; this.renderHud(); }
     }
   }
-  // progress watchdog: no real progress for a while -> recover
+  // progress watchdog: no real progress for a while -> recover. Progress is the way still to go along the route (a road
+  // that bends away from the destination for a while is not a stall)
   watch(dt, d, recover) {
     if (d < this.best - 3) { this.best = d; this.stall = 0; }
     else this.stall += dt;
-    if (this.stall > 14) { this.stall = 0; this.best = d; recover(); }
+    if (this.stall > 14) { this.stall = 0; recover(); this.best = 1e9; }
   }
   // a driver who can't get through: reroute first, then take the short way (a short fade to the next junction)
   recover() {
@@ -251,7 +247,7 @@ class TaxiService {
     this.recov = (this.recov || 0) + 1;
     if (this.recov === 1) { v.drive.rev = 1.2; v.drive.route(this.dest.x, this.dest.z); return; }
     if (this.recov >= 4) { g.ui.toast('The driver gives up on the traffic and takes you straight there.'); this.skip(); return; }
-    const path = v.drive.path, nxt = path[Math.min(path.length - 1, v.drive.pi + 1)] || this.dest;
+    const nxt = v.drive.ahead(40) || this.dest;
     g.fade(() => { const kp = nearestRoadPoint(nxt.x, nxt.z) || nxt; v.pos.set(kp.x, groundY(kp.x, kp.z), kp.z); v.vel.set(0, 0); v.yawRate = 0; v.h = Math.atan2(this.dest.x - kp.x, this.dest.z - kp.z); v.syncMesh(0); v.drive.route(this.dest.x, this.dest.z); g.ui.toast('“Shortcut,” says the driver.'); });
   }
   renderHud() {

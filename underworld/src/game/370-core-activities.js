@@ -125,10 +125,23 @@ const RACES = [
 // a countryside race's ground (Session 6C): 'loop' is the countryside track from the land bridge round to the
 // compound; 'ring' closes it along the farm track between its two ends
 function cfsRacePath(def) {
+  if (def.route) return routeRacePath(def);
   const cf = game.world.cfs, L = cf.loop;
   if (def.path === 'loop') return { pts: L, closed: false };
   const ia = cf.spur.findIndex(p => p[0] === L[0][0] && p[1] === L[0][1]), iz = cf.spur.findIndex(p => p[0] === L[L.length - 1][0] && p[1] === L[L.length - 1][1]);
   return { pts: [...L, ...cf.spur.slice(ia + 1, iz).reverse()], closed: true };
+}
+// a race laid along streets between waypoints (the Curved Roads pass): the road graph's route through them, curves,
+// diagonals and junctions included, its centreline sampled every 2.5 m (a closed course when def.loop)
+function routeRacePath(def) {
+  const W = def.loop ? [...def.route, def.route[0]] : def.route, out = [];
+  for (let k = 1; k < W.length; k++) {
+    const r = RoadGraph.route(W[k - 1][0], W[k - 1][1], W[k][0], W[k][1], { kinds: RG_STREETS }); if (!r) break;
+    for (const q of r.pts) { const l = out[out.length - 1]; if (!l || Math.hypot(l[0] - q.x, l[1] - q.z) > 0.05) out.push([q.x, q.z]); }
+  }
+  const pts = out.length > 1 ? resample(out, 2.5) : out;
+  if (def.loop && pts.length > 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1.5) pts.pop();
+  return { pts, closed: !!def.loop };
 }
 // checkpoints along a path every 40 m, the start 15 m in, the racing line every 5 m with a safe speed for the dirt
 // (the bend's radius, slower over mud and rock, braking back at 4 m/s²) and the left normal
@@ -154,8 +167,9 @@ const RACER_NAMES = ['Vance', 'Mika "Nitro" Osei', 'Jules Ferreira', 'Big Tam', 
 function raceCheckpoints(def) {
   // an official event runs on its venue's loop: Valen Point's circuit (Session 6B), the off-road course (Session 6C)
   if (def.circuit) return venueOf(def).checkpoints(def);
-  // a countryside race runs along its own path (Session 6C)
-  if (def.path) return pathCheckpoints(def);
+  // a countryside race runs along its own path (Session 6C); a race laid along streets by waypoints, along the road
+  // graph's route through them (the Curved Roads pass)
+  if (def.path || def.route) return pathCheckpoints(def);
   const seq = def.nodes.slice(); if (def.loop) seq.push(seq[0]);
   const one = [];
   for (let k = 1; k < seq.length; k++) {

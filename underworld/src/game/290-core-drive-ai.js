@@ -6,26 +6,28 @@ class DriveAI {
     this.v = v; this.g = game; this.mode = mode;
     this.path = []; this.pi = 0; this.repath = 0; this.stuck = 0; this.rev = 0; this.revSteer = 1;
     this.cruise = 14; this.wait = 0; this.goal = null; this.target = null; this.arrived = false; this.direct = false;
+    this.dense = false; this.cum = null; this.along = 0;
   }
   setGoal(x, z) { this.goal = { x, z }; this.route(x, z); this.arrived = false; }
+  // the road graph's route (every road: the lattice, the curved links, the extensions), driven as a lane: each road
+  // kept to the right-hand side, the corners rounded, a safe speed at every point from the bend's radius (dense)
   route(tx, tz) {
-    const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
-    // to or from Valen Point or Cedar Fields South: the GPS route by the causeway or the land bridge, kept to the
-    // right-hand side of each leg
-    if (extSide(v.pos.x, v.pos.z) || extSide(tx, tz)) {
-      const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
-      if (r && r.length > 1) {
-        this.path = [];
-        for (let k = 1; k < r.length; k++) {
-          const a = r[k - 1], b = r[k], last = k === r.length - 1;
-          if (Math.hypot(b.x - a.x, b.z - a.z) < 0.5 && !last) continue;
-          const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1, o = last ? 0 : LANE * 0.7;
-          this.path.push({ x: b.x - dz / l * o, z: b.z + dx / l * o, node: !last });
-        }
-        this.pi = 0;
-        return;
+    const v = this.v;
+    const r = RoadGraph.ready ? RoadGraph.route(v.pos.x, v.pos.z, tx, tz, { h: v.h }) : null;
+    const L = r && RoadGraph.lane(r.steps, { R: 12 });
+    if (L) {
+      const pts = L.pts.map((q, k) => ({ x: q[0], z: q[1], r: L.rad[k] })), last = pts[pts.length - 1];
+      // the goal itself, when it is off the lane (a kerb spot across the road, a door, a yard)
+      if (Math.hypot(tx - last.x, tz - last.z) > 0.5) {
+        const n = Math.max(1, Math.ceil(Math.hypot(tx - last.x, tz - last.z) / 2));
+        for (let k = 1; k <= n; k++) pts.push({ x: last.x + (tx - last.x) * k / n, z: last.z + (tz - last.z) * k / n, r: Infinity });
       }
+      const cum = new Float64Array(pts.length); for (let k = 1; k < pts.length; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
+      this.path = pts; this.cum = cum; this.dense = true; this.pi = 0; this.along = 0;
+      return;
     }
+    this.dense = false; this.cum = null;
+    const fx = Math.sin(v.h), fz = Math.cos(v.h);
     let i = Math.round(v.pos.x / P), j = Math.round(v.pos.z / P);
     const onV = Math.abs(v.pos.x - i * P) < 9, onH = Math.abs(v.pos.z - j * P) < 9;
     if (onV && !onH) j = fz > 0 ? Math.ceil(v.pos.z / P) : Math.floor(v.pos.z / P);
@@ -53,6 +55,27 @@ class DriveAI {
     this.path.push({ x: tx, z: tz, node: false });
     this.pi = 0;
   }
+  // the point `d` m along the dense lane (its end beyond that)
+  at(d) {
+    const W = this.path, C = this.cum, n = W.length;
+    if (d >= C[n - 1]) return W[n - 1];
+    let lo = Math.min(this.pi, n - 2), hi = n - 1;
+    if (C[lo] > d) lo = 0;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (C[m] <= d) lo = m; else hi = m; }
+    const a = W[lo], b = W[hi], t = (d - C[lo]) / ((C[hi] - C[lo]) || 1);
+    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+  }
+  // how far the car still has to go: along the lane (a dense path), else as the crow flies to the last waypoint
+  remaining() {
+    const v = this.v, W = this.path; if (!W.length) return 0;
+    if (this.dense && this.cum) { const end = W[W.length - 1]; return Math.max(0, this.cum[W.length - 1] - (this.along || 0)) + (this.along >= this.cum[W.length - 1] - 0.5 ? Math.hypot(end.x - v.pos.x, end.z - v.pos.z) : 0); }
+    const end = W[W.length - 1]; return Math.hypot(end.x - v.pos.x, end.z - v.pos.z);
+  }
+  // where the route goes next, about `d` m on (a waypoint of a sparse path)
+  ahead(d) {
+    if (this.dense && this.cum) return this.at((this.along || 0) + d);
+    return this.path[Math.min(this.path.length - 1, this.pi + 1)] || this.goal;
+  }
   update(dt) {
     const v = this.v, g = this.g, ctl = v.ctl;
     if (v.health <= 0 || v.burnt) { ctl.throttle = 0; ctl.handbrake = true; ctl.steer = 0; return; }
@@ -72,7 +95,27 @@ class DriveAI {
       if (t.speed && !this.direct) desired = t.speed;
     }
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
-    if (!this.direct) {
+    if (!this.direct && this.dense && this.path.length > 1) {
+      // follow the lane: where we are on it (the nearest point a little either side of where we were; the whole lane
+      // if we have lost it), then steer for a point further along it, further at speed (pure pursuit)
+      const W = this.path, C = this.cum, n = W.length;
+      let bk = this.pi, bd = Infinity, bt = 0;
+      const scan = (k0, k1) => { for (let k = k0; k < k1; k++) { const a = W[k], b = W[k + 1], dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz || 1, t = clamp(((v.pos.x - a.x) * dx + (v.pos.z - a.z) * dz) / l2, 0, 1), d = Math.hypot(v.pos.x - a.x - dx * t, v.pos.z - a.z - dz * t); if (d < bd) { bd = d; bk = k; bt = t; } } };
+      scan(Math.max(0, this.pi - 2), Math.min(n - 1, this.pi + 40));
+      if (bd > 20) scan(0, n - 1);
+      this.pi = bk; const along = C[bk] + (C[bk + 1] - C[bk]) * bt; this.along = along;
+      const sp = Math.abs(v.localVel().z), q = this.at(along + clamp(4 + sp * 0.42, 5.5, 18)); tx = q.x; tz = q.z;
+      const rem = C[n - 1] - along, end = W[n - 1], dl = Math.hypot(end.x - v.pos.x, end.z - v.pos.z);
+      if (rem < 9 && dl < 7) {
+        this.arrived = true;
+        if (this.mode === 'cruise' || this.mode === 'flee') { const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 250, 700); this.setGoal(c.x, c.z); }
+        else { ctl.throttle = v.localVel().z > 0.5 ? -0.6 : 0; ctl.handbrake = v.speed < 1; return; }
+      }
+      // the bends ahead set the speed (v = sqrt(a_lat R), braking back at 4.5 m/s²), and the goal brings it down
+      const aLat = this.mode === 'pursue' ? 10 : this.mode === 'flee' || this.mode === 'race' ? 8 : 5.5, reach = sp * sp / 9 + 12;
+      for (let k = bk + 1; k < n && C[k] - along < reach; k++) { const vm = Math.sqrt(aLat * W[k].r + 9 * (C[k] - along)); if (vm < desired) desired = vm; }
+      desired = Math.min(desired, 4 + rem * 0.5);
+    } else if (!this.direct) {
       if (!this.path.length) { ctl.throttle = 0; ctl.handbrake = true; return; }
       while (this.pi < this.path.length - 1) {
         const w = this.path[this.pi];

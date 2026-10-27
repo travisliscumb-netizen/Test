@@ -183,7 +183,7 @@ Object.assign(World.prototype, {
       this._det(b, 'cyl', x, y + 0.6, z, 0.75, 1.2, 0xd8b45a, null, { x, z, r: 0.8, y0: y - 1, y1: y + 1.2, kind: 'det' });
     }
     // ---------------------------------------------------------------- routes for the GPS and AI drivers (polylines, two-way), from the spur's far end
-    const ex = [R0.x - R0.r, R0.z], every = (pts, n) => pts.filter((p, k) => k % n === 0 || k === pts.length - 1);
+    const ex = [R0.x - R0.r, R0.z];
     // the course joins at a sample 30 m before the line, off the paddock
     cf.joinK = (T.sfK - 15 + T.pts.length) % T.pts.length;
     const cj = T.pts[cf.joinK];
@@ -192,8 +192,9 @@ Object.assign(World.prototype, {
       [[R0.x + R0.r + 2, R0.z], [(G.x0 + G.x1) / 2, G.z1 + 6]],
       [[R0.x + R0.r + 2, R0.z], [(SS.x0 + SS.x1) / 2, SS.z1 + 6]],
       [[R0.x + R0.r + 2, R0.z], [cj[0], S.compound.z1 + 2], cj],
-      [[O.x0 - 6, (O.z0 + O.z1) / 2], [O.x0 - 6, O.z0 - 6], [O.x1 + 4, O.z0 - 6], ...every(east, 4)],
-      every(loop, 4)
+      // the two tracks at their full resolution (the 2.5 m spline samples): routes follow the bends, not chords
+      [[O.x0 - 6, (O.z0 + O.z1) / 2], [O.x0 - 6, O.z0 - 6], [O.x1 + 4, O.z0 - 6], ...east],
+      loop
     ];
     cf.road0 = ex;
     // colliders for the district's buildings and details

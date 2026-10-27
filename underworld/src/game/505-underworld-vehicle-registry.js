@@ -52,6 +52,15 @@ class VehicleRegistry {
   spawnFor(e, p) {
     const g = this.g;
     for (const v of g.vehicles.list) if (v.garageUid === e.uid) { v.trunk = e.trunk || (e.trunk = {}); this.cars.set(e.uid, v); return v; }
+    // a street spot something now stands on (the city was rebuilt round it: the Curved Roads pass laid new streets and
+    // warehouses): the car is put at the nearest clear kerb instead, once, and you are told where (never inside a wall)
+    if (e.out && p === e.loc && kerbBlocked(g.world, p.x, p.z, groundY(p.x, p.z, p.y), p.h || 0)) {
+      const k = kerbSpot(g.world, p.x, p.z);
+      if (k) {
+        e.loc = { x: k.x, z: k.z, h: k.h, y: groundY(k.x, k.z) }; p = e.loc;
+        if (g.ui) g.ui.toast(`Your ${VEHICLES[e.type].name} was moved to the kerb nearby: the street it stood on was rebuilt.`);
+      }
+    }
     // clear anything standing on the spot first (never the player's car, never another kept car)
     for (const v of g.vehicles.nearby(p.x, p.z, 4)) if (v !== g.player.vehicle && !v.garageUid && !v.trackId && !v.mission && Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 3 && Math.abs(v.pos.y - (p.y ?? v.pos.y)) < 2) g.vehicles.despawn(v);
     const v = g.vehicles.spawn(e.type, p.x, p.z, p.h, { parked: true, color: e.color, y: p.y, vtier: e.vtier || VEHICLES[e.type].tier });

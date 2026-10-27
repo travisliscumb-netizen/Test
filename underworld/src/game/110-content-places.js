@@ -415,11 +415,14 @@ Object.assign(World.prototype, {
     // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
     this.exts = [
-      { id: 'vp', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK] },
-      { id: 'cfs', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK] }
+      { id: 'vp', name: 'Valen Point', loopName: 'Valen Point circuit', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK], traffic: [] },
+      // traffic drives the countryside's two tracks (the farm track east past the compound and the loop)
+      { id: 'cfs', name: 'Cedar Fields South', loopName: 'Cedar Fields off-road course', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [4, 5] }
     ];
     for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
     Links.build(this);
+    // every drivable road in one graph (the Curved Roads pass): the GPS, AI drivers, traffic, taxis and police
+    RoadGraph.build(this);
   };
 }
 /* ---------------------------------------------------------------------
