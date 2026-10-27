@@ -41,6 +41,7 @@ class Game {
     progress(0.3, 'Pouring concrete'); await nextFrame();
     this.scenery = buildStaticScenery(this.scene, this.world);
     this.vpScene = new ValenPointScenery(this.scene, this.world);
+    this.cfsScene = new CedarScenery(this.scene, this.world, this.scenery.gmat);
     this.env = new Environment(this);
     this.chunks = new ChunkManager(this);
     this.props = new PropManager(this);
@@ -76,8 +77,10 @@ class Game {
     this.raceRules = new RaceRules(this); this.pinks = new PinkSlips(this); this.wash = new CarWash(this);
     // Session 6B: Valen Point Motorsport Park
     this.motorsport = new MotorsportPark(this);
+    // Session 6C: the Cedar Fields off-road park
+    this.offroad = new OffroadPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.pinks.reset(); this.motorsport.reset();
+    this.vreg.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -611,7 +614,7 @@ class Game {
     this.env.update(dt);
     this.content.interiors.update(dt);
     this.chunks.update(this.focus.x, this.focus.z, this.frame);
-    this.vpScene.update(this.focus.x, this.focus.z);
+    this.vpScene.update(this.focus.x, this.focus.z); this.cfsScene.update(this.focus.x, this.focus.z);
     this.propT -= rdt;
     if (this.propT <= 0) {
       this.propT = 0.5;
@@ -648,7 +651,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);

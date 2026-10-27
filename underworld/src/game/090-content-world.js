@@ -627,7 +627,9 @@ class World {
     // stored separately; world mesh builds the seawall/railing
     this.perimeter = [
       { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN - 1, x1: CITY + EDGE_MARGIN + 1, z1: -EDGE_MARGIN + 0.2 },
-      { x0: -EDGE_MARGIN - 1, z0: CITY + EDGE_MARGIN - 0.2, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN + 1 },
+      // the south wall stops either side of the land bridge to Cedar Fields South (Session 6C)
+      { x0: -EDGE_MARGIN - 1, z0: CITY + EDGE_MARGIN - 0.2, x1: CFS.lb.x - CFS.lb.half, z1: CITY + EDGE_MARGIN + 1 },
+      { x0: CFS.lb.x + CFS.lb.half, z0: CITY + EDGE_MARGIN - 0.2, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN + 1 },
       { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN, x1: -EDGE_MARGIN + 0.2, z1: CITY + EDGE_MARGIN },
       // the east wall stops either side of the causeway to Valen Point (Session 6B)
       { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: VP.cw.z - VP.cw.half },
@@ -641,7 +643,7 @@ class World {
       this.promenade.push({ type: 'lamp', x: -LAMP_SIDE, z: t, ry: Math.PI / 2 });
       this.promenade.push({ type: 'lamp', x: CITY + LAMP_SIDE, z: t, ry: -Math.PI / 2 });
       this.promenade.push({ type: 'lamp', x: t, z: -LAMP_SIDE, ry: 0 });
-      this.promenade.push({ type: 'lamp', x: t, z: CITY + LAMP_SIDE, ry: Math.PI });
+      if (Math.abs(t - CFS.lb.x) > CFS.lb.half + 2) this.promenade.push({ type: 'lamp', x: t, z: CITY + LAMP_SIDE, ry: Math.PI });
     }
   }
   // ---------- queries used by AI / missions ----------

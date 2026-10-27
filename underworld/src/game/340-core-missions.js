@@ -335,10 +335,10 @@ class MissionManager {
           return;
         }
         if (res.reason || !res.place || res.place > 3) { this.fail(res.reason || `You finished ${ordinal(res.place)}.`); return; }
-        // an official event (Session 6B): prize money from the bank by today's tier, no Rep; the Invitational's car
+        // an official event (Sessions 6B, 6C): prize money from the bank by today's tier, no Rep; a prize car once
         if (s.official) {
-          const pay = g.motorsport.payout(s.race, res.place); s.reward = pay.cash; s.rep = 0;
-          if (res.place === 1) { g.motorsport.noteWin(s.race.id); if (s.race.car) g.motorsport.awardCar(s.race); }
+          const V = venueOf(s.race), pay = V.payout(s.race, res.place); s.reward = pay.cash; s.rep = 0;
+          if (res.place === 1) { V.noteWin(s.race.id); if (s.race.car) V.awardCar(s.race); }
           this.pass(); return;
         }
         // the purse and Rep for this finish, by today's tier for this race (§45.33)

@@ -3,8 +3,8 @@
    ===================================================================== */
 class CollisionGrid {
   constructor() {
-    // the city square, and east of it out to Valen Point (Session 6B): dimX × dim cells
-    this.cs = 16; this.min = -48; this.dim = Math.ceil((CITY + 96) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.min) / this.cs);
+    // the city square, east of it out to Valen Point (Session 6B) and south to Cedar Fields South (Session 6C): dimX × dim cells
+    this.cs = 16; this.min = -48; this.dim = Math.ceil((WORLD_Z1 + 48 - this.min) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.min) / this.cs);
     this.cells = Array.from({ length: this.dimX * this.dim }, () => []);
     this.all = []; this.stamp = 1;
   }

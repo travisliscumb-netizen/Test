@@ -115,12 +115,47 @@ const RACES = [
   { id: 'midnight', name: 'Midnight Run', nodes: [[4, 4], [8, 4], [8, 6], [5, 6], [5, 8], [9, 8]], laps: 1, opp: 3, night: true, cls: ['sports', 'muscle', 'sports'], reward: 2200, rep: 55, blurb: 'Through the heart of the city after dark, traffic and all. 20:00–05:00 only.' },
   { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
   { id: 'wettrack', name: 'Wet Track', nodes: [[1, 6], [1, 10], [4, 10], [4, 6]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
-  { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 10], [10, 10], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' }
+  { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 10], [10, 10], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' },
+  // Cedar Fields South (Session 6C): illegal off-road races across the countryside, each run on alternate economic
+  // days; and Vance's special, a pink slip across the fields every third day
+  { id: 'dustdevil', name: 'Dust Devil', path: 'loop', laps: 1, opp: 3, country: true, dayOff: 0, cls: ['pickup', 'offroad', 'suv'], reward: 1700, rep: 45, blurb: 'Across the land bridge and flat out round the fields and the south hills. Dirt, ruts and nobody watching. Bring something that likes mud.' },
+  { id: 'ridgerun', name: 'Ridge Run', path: 'ring', laps: 2, opp: 3, country: true, dayOff: 1, cls: ['offroad', 'pickup', 'kodiak'], reward: 2300, rep: 55, blurb: 'Two laps of the countryside loop: the west fields, the ridge and back along the farm track.' },
+  { id: 'pinkdirt', name: 'Pink Slip: Dirt', path: 'loop', laps: 1, opp: 1, cls: ['offroad'], storyOnly: true, pink: true, offroad: true, reward: 0, rep: 0, blurb: 'One on one with Vance across the Cedar Fields countryside, for pink slips. Off-road cars only: winner drives home in the other one.' }
 ];
+// a countryside race's ground (Session 6C): 'loop' is the countryside track from the land bridge round to the
+// compound; 'ring' closes it along the farm track between its two ends
+function cfsRacePath(def) {
+  const cf = game.world.cfs, L = cf.loop;
+  if (def.path === 'loop') return { pts: L, closed: false };
+  const ia = cf.spur.findIndex(p => p[0] === L[0][0] && p[1] === L[0][1]), iz = cf.spur.findIndex(p => p[0] === L[L.length - 1][0] && p[1] === L[L.length - 1][1]);
+  return { pts: [...L, ...cf.spur.slice(ia + 1, iz).reverse()], closed: true };
+}
+// checkpoints along a path every 40 m, the start 15 m in, the racing line every 5 m with a safe speed for the dirt
+// (the bend's radius, slower over mud and rock, braking back at 4 m/s²) and the left normal
+function pathCheckpoints(def) {
+  const { pts, closed } = cfsRacePath(def), n = pts.length, laps = def.laps || 1, k0 = 6;
+  const at = k => pts[closed ? ((k % n) + n) % n : clamp(k, 0, n - 1)];
+  const one = [];
+  for (let k = k0 + 16; k < (closed ? n + k0 : n - 1); k += 16) one.push(at(k));
+  one.push(at(closed ? k0 + n - 1 : n - 1));
+  const out = []; for (let l = 0; l < laps; l++) for (const p of one) out.push({ x: p[0], z: p[1], lap: l });
+  const nl = k => { const a = at(k - 1), b = at(k + 1), dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dz / l, -dx / l]; };
+  const rad = k => { const a = at(k - 4), b = at(k), c = at(k + 4), ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]), A2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])); return A2 < 1e-6 ? Infinity : ab * bc * ca / (2 * A2); };
+  const last = closed ? k0 + n * laps : n - 1, ai = [];
+  for (let k = k0 + 2; k <= last; k += 2) {
+    const p = at(k), s = Terrain.surf(p[0], p[1]), N2 = nl(k);
+    ai.push({ x: p[0], z: p[1], node: true, vmax: Math.min(Math.sqrt(4.5 * rad(k)), 26, s === TSURF.mud ? 12 : s === TSURF.rock ? 16 : 26), nx: N2[0], nz: N2[1] });
+  }
+  for (let i = ai.length - 2; i >= 0; i--) ai[i].vmax = Math.min(ai[i].vmax, Math.sqrt(ai[i + 1].vmax ** 2 + 2 * 4 * 5));
+  const s0 = at(k0), s1 = at(k0 + 1), l0 = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) || 1, dir = { x: (s1[0] - s0[0]) / l0, z: (s1[1] - s0[1]) / l0 };
+  return { cps: out, perLap: one.length, start: { x: s0[0], z: s0[1], h: Math.atan2(dir.x, dir.z), dir }, aiPath: ai };
+}
 const RACER_NAMES = ['Vance', 'Mika "Nitro" Osei', 'Jules Ferreira', 'Big Tam', 'Lou Park', 'Danny Two-Tone'];
 function raceCheckpoints(def) {
-  // an official event at Valen Point runs on the circuit (Session 6B)
-  if (def.circuit) return vpCheckpoints(def);
+  // an official event runs on its venue's loop: Valen Point's circuit (Session 6B), the off-road course (Session 6C)
+  if (def.circuit) return venueOf(def).checkpoints(def);
+  // a countryside race runs along its own path (Session 6C)
+  if (def.path) return pathCheckpoints(def);
   const seq = def.nodes.slice(); if (def.loop) seq.push(seq[0]);
   const one = [];
   for (let k = 1; k < seq.length; k++) {
@@ -137,6 +172,7 @@ function raceCheckpoints(def) {
 }
 function raceAvailable(def, g) {
   const t = g.env.time;
+  if (def.country && g.uw && (g.uw.S.day + def.dayOff) % 2) return 'Not running today: the farmers are out in the fields. Try tomorrow.';
   if (def.night && !(t >= 20 || t < 5)) return 'Only after dark (20:00–05:00).';
   if (def.rain && g.env.rain < 0.4) return 'Only runs in the rain.';
   return '';
@@ -197,12 +233,12 @@ class RaceManager {
         // a pink slip: the car you stopped in is the stake; checked, then committed (and saved) here
         // an official event: scrutineering, then the entry fee from the bank (Session 6B)
         if (A.opts.official && !A.paid) {
-          const why = g.motorsport.canEnter(v, A.def) || g.motorsport.payIn(A.def); if (why) { A.objective = why; return null; }
+          const V = venueOf(A.def), why = V.canEnter(v, A.def) || V.payIn(A.def); if (why) { A.objective = why; return null; }
           A.paid = true;
         }
         if (A.opts.pink) {
-          const why = g.pinks.canStake(v); if (why) { A.objective = why; return null; }
-          const r = g.pinks.commit(v); A.opts.opponentCls = r.type; A.opts.opponentColor = r.color; A.opts.opponentTier = r.vtier;
+          const why = g.pinks.canStake(v, A.def); if (why) { A.objective = why; return null; }
+          const r = g.pinks.commit(v, A.def); A.opts.opponentCls = r.type; A.opts.opponentColor = r.color; A.opts.opponentTier = r.vtier;
           g.ui.toast(`Vance puts up a ${VEHICLES[r.type].name}. Your ${v.spec.name} against it.`, 'info');
         }
         g.fade(() => { if (this.active === A) this.lineUp(); }, true); A.phase = 'lining';
@@ -230,7 +266,7 @@ class RaceManager {
     }
     // running
     A.t += dt;
-    // a street race is illegal and draws heat when seen; an official event at Valen Point never does
+    // a street (or countryside) race is illegal and draws heat when seen; an official event never does
     if (g.raceRules && !A.def.official) g.raceRules.watch(A, v);
     const cp = R.cps[A.cp];
     A.target = cp;
@@ -286,9 +322,10 @@ class RaceManager {
     A.nextMk = A.nextMk2 = null;
     const c = R.cps[A.cp]; if (!c) return;
     const last = A.cp === R.cps.length - 1;
-    A.nextMk = mm.markers.get(last ? 0xffd84d : 0xff8a3d, 9, true); A.nextMk.g.position.set(c.x, 0.02, c.z);
+    // on the ground (the Cedar Fields terrain has hills)
+    A.nextMk = mm.markers.get(last ? 0xffd84d : 0xff8a3d, 9, true); A.nextMk.g.position.set(c.x, groundY(c.x, c.z) + 0.02, c.z);
     const c2 = R.cps[A.cp + 1];
-    if (c2) { A.nextMk2 = mm.markers.get(0xff8a3d, 4, false); A.nextMk2.g.position.set(c2.x, 0.02, c2.z); }
+    if (c2) { A.nextMk2 = mm.markers.get(0xff8a3d, 4, false); A.nextMk2.g.position.set(c2.x, groundY(c2.x, c2.z) + 0.02, c2.z); }
   }
   _finish() {
     const g = this.g, A = this.active, s = g.save;

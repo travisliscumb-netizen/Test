@@ -78,7 +78,7 @@ const Terrain = {
   // the countryside's hills before anything is stamped on them (the generator levels its pads from this)
   raw(x, z) {
     const edge = Math.min(x - CFS.x0, CFS.x1 - x, z - CFS.z0, CFS.z1 - z);
-    const h = 3.2 * (tNoise(x / 150, z / 150, 21) + 1) + 1.4 * tNoise(x / 60, z / 60, 23) + 0.55 * tNoise(x / 19, z / 19, 25) + 0.18 * tNoise(x / 6, z / 6, 27);
+    const h = 3.4 * (tNoise(x / 150, z / 150, 21) + 1) + 2.4 * tNoise(x / 60, z / 60, 23) + 0.9 * tNoise(x / 19, z / 19, 25) + 0.22 * tNoise(x / 6, z / 6, 27);
     return Math.max(0.3, h) * smoothstep(0, 35, edge) + 0.1;
   },
   // ---------------------------------------------------------------- building the grids
@@ -97,21 +97,22 @@ const Terrain = {
       const S = CF_STRIP, R = this._region('strip', S.x0 + ROAD_HALF, S.z0 + ROAD_HALF, S.x1 - ROAD_HALF, S.z1 - ROAD_HALF);
       const blocked = [];
       for (const b of world.blocks) if (b.superblock && b.superblock.id === 'fields') {
-        for (const r of b.bld) blocked.push([r.x0 - 4, r.z0 - 4, r.x1 + 4, r.z1 + 4]);
-        for (const d of b.det) { const e = Math.max(d.sx, d.sz) / 2 + 2.5; blocked.push([d.x - e, d.z - e, d.x + e, d.z + e]); }
-        for (const p of b.props) blocked.push([p.x - 3, p.z - 3, p.x + 3, p.z + 3]);
-        for (const c of b.parked) blocked.push([c.x - 5, c.z - 5, c.x + 5, c.z + 5]);
+        for (const r of b.bld) blocked.push([r.x0 - 3, r.z0 - 3, r.x1 + 3, r.z1 + 3]);
+        // details by their real (rotated) footprint: a long rail fence holds a narrow band flat, not a square
+        for (const d of b.det) { const c = Math.abs(Math.cos(d.ry || 0)), sn = Math.abs(Math.sin(d.ry || 0)), hx = (c * d.sx + sn * d.sz) / 2 + 1, hz = (sn * d.sx + c * d.sz) / 2 + 1; blocked.push([d.x - hx, d.z - hz, d.x + hx, d.z + hz]); }
+        for (const p of b.props) blocked.push([p.x - 1.5, p.z - 1.5, p.x + 1.5, p.z + 1.5]);
+        for (const c of b.parked) blocked.push([c.x - 3.5, c.z - 3.5, c.x + 3.5, c.z + 3.5]);
       }
-      for (const h of world.homes || []) if (h.door && h.door.z > S.z0 && h.door.z < S.z1 && h.door.x < S.x1) blocked.push([h.door.x - 16, h.door.z - 16, h.door.x + 16, h.door.z + 16]);
+      for (const h of world.homes || []) if (h.door && h.door.z > S.z0 && h.door.z < S.z1 && h.door.x < S.x1) blocked.push([h.door.x - 8, h.door.z - 8, h.door.x + 8, h.door.z + 8]);
       for (let j = 0; j < R.H; j++) for (let i = 0; i < R.W; i++) {
         const x = R.x0 + i, z = R.z0 + j, o = j * R.W + i;
-        // distance to anything built or paved: held flat there, easing in over 5 m (the sidewalk band, 5 m in
+        // distance to anything built or paved: held flat there, easing in over 3 m (the sidewalk band, 5 m in
         // from the kerb, stays flat too)
         let d = Math.min(x - R.x0, R.x1 - x, z - R.z0, R.z1 - z) - 5;
         for (const q of blocked) { const dx = Math.max(q[0] - x, 0, x - q[2]), dz = Math.max(q[1] - z, 0, z - q[3]); d = Math.min(d, Math.hypot(dx, dz)); }
         const road = localSurfaceAt(x, z); if (road) d = Math.min(d, 0);
         for (let a = -3; a <= 3 && d > 0; a += 3) for (let c = -3; c <= 3; c += 3) if (localSurfaceAt(x + a, z + c)) d = Math.min(d, Math.hypot(a, c) - 1.5);
-        const m = smoothstep(0, 5, d);
+        const m = smoothstep(0, 3, d);
         const hills = 0.55 * (tNoise(x / 26, z / 26, 11) + 1) + 0.25 * (tNoise(x / 9, z / 9, 13) + 1);
         R.h[o] = CURB_H + hills * m; R.m[o] = m;
         R.s[o] = road === 2 ? TSURF.dirt : tNoise(x / 14, z / 14, 17) > 0.55 ? TSURF.dirt : TSURF.grass;
@@ -141,9 +142,9 @@ const Terrain = {
         for (const P of pads) { const dx = Math.max(P.x0 - x, 0, x - P.x1), dz = Math.max(P.z0 - z, 0, z - P.z1), dd = Math.hypot(dx, dz); if (dd < 18) { const t = smoothstep(0, 18, dd); h = P.y * (1 - t) + h * t; } if (dd === 0) pad = P; }
         R.h[o] = h; R.m[o] = 1;
         // surfaces: grass with rocky outcrops on the high ground and mud in the hollows
-        const rocky = tNoise(x / 30, z / 30, 31) > 0.45 && h > 4.5, wet = tNoise(x / 25, z / 25, 33) > 0.5 && h < 2.2;
+        const rocky = tNoise(x / 30, z / 30, 31) > 0.45 && h > 4.5, wet = tNoise(x / 25, z / 25, 33) > 0.62 && h < 2.2;
         R.s[o] = rocky ? TSURF.rock : wet ? TSURF.mud : TSURF.grass;
-        if (pad) { R.s[o] = TSURF.gravel; R.m[o] = 0.3; }
+        if (pad) { R.s[o] = TSURF.gravel; R.m[o] = 0.2; }
       }
       // dirt tracks: packed surface and two wheel ruts (a pad keeps its gravel)
       for (const T of tracks) this._stampLine(R, T.pts, T.w, (o, along, off) => { if (R.s[o] === TSURF.gravel) return; R.s[o] = TSURF.track; if (Math.abs(Math.abs(off) - 1.0) < 0.35) R.h[o] -= 0.06; });

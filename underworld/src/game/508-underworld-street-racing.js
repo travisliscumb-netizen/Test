@@ -8,7 +8,9 @@
    - The police. Racing is illegal, but only an officer who actually sees
      it does anything about it: in a live race, at race speed, within
      sight of a cop close by, you get 1★ for street racing, once a race.
-   - Pink slips. Once an economic day Tull has one: you race the car you
+   - Pink slips. Once an economic day Tull has one (and every third day
+     Vance's off-road special across Cedar Fields South, Session 6C, for
+     cars built for dirt, with its own day-flag): you race the car you
      put up, one on one, for a car of about the same worth. The stake is
      checked and committed (and saved) on the start line; from then on a
      loss, a quit, a wreck, an arrest or a reload all hand your car over.
@@ -55,28 +57,31 @@ class PinkSlips {
   constructor(g) { this.g = g; }
   get s() { return this.g.save; }
   day() { return this.g.uw ? this.g.uw.S.day : 0; }
-  available() { return this.s.pinkDay !== this.day() && !this.s.pink; }
-  def() { return RACES.find(r => r.pink); }
-  offer(c) {
-    const def = this.def();
-    return { type: 'srace', race: def, pink: true, title: def.name, desc: def.blurb + ' You race the car you put up: a legal car of yours, nothing in the trunk, in one piece, and a free space at home for his.', reward: 0, fee: 0, contact: c, locked: '', chip: 'PINK SLIP · one on one · once a day', rep: 0 };
+  // the street pink slip once an economic day; Vance's special across the Cedar Fields countryside (Session 6C) every
+  // third day, with a day-flag of its own (it never takes the street one's place)
+  available(dirt) { const s = this.s, d = this.day(); return !s.pink && (dirt ? d % 3 === 2 && s.pinkDirtDay !== d : s.pinkDay !== d); }
+  def(dirt) { return RACES.find(r => r.pink && !!r.offroad === !!dirt); }
+  offer(c, dirt) {
+    const def = this.def(dirt);
+    return { type: 'srace', race: def, pink: true, title: def.name, desc: def.blurb + ` You race the car you put up: a legal car of yours${dirt ? ' built for dirt (a pickup, an SUV, a truck or an off-roader)' : ''}, nothing in the trunk, in one piece, and a free space at home for his.`, reward: 0, fee: 0, contact: c, locked: '', chip: dirt ? 'PINK SLIP · off-road · special' : 'PINK SLIP · one on one · once a day', rep: 0 };
   }
   // why this car can't be put up ('' when it can)
-  canStake(v) {
+  canStake(v, def) {
     const g = this.g, R = g.vreg, e = R.entryOf(v);
     if (!e) return 'Vance only races for a car with papers in your name.';
     if (e.hot) return 'Not with hot plates: Vance wants a car he can register.';
     if (e.imp) return 'That car is in the impound.';
     if (e.unique || VEHICLES[e.type].unique) return 'Not that one: it’s one of a kind.';
+    if (def && def.offroad && trailOf(e.type) < 0.5) return 'Off-road pink slip: Vance only races something built for dirt (a pickup, an SUV, a truck or an off-roader).';
     if ((e.trunk && Object.values(e.trunk).some(n => n > 0)) || Money.dirtyInCar(e.uid) > 0) return 'Empty it first: no goods, loot or cash in a car you put up.';
     if (v.health < RACE_T.pink.minHp || v.broken || v.burnt) return 'Get it fixed first: Vance won’t race a wreck.';
     if (R.freeBays() < 1) return 'You need a free parking space for his car if you win.';
     return '';
   }
   // the rival's stake: a car worth about 0.8–1.5× yours
-  rival(e) {
+  rival(e, def) {
     const sv = carWorth(e.type, e.vtier);
-    const all = Object.keys(VEHICLES).filter(t => !VEHICLES[t].police && !VEHICLES[t].unique && !PINK_NEVER.includes(t) && CAR_MSRP[t]);
+    const all = Object.keys(VEHICLES).filter(t => !VEHICLES[t].police && !VEHICLES[t].unique && !PINK_NEVER.includes(t) && CAR_MSRP[t] && (!def || !def.offroad || trailOf(t) >= 0.5));
     const val = t => carWorth(t, VEHICLES[t].tier);
     let pool = all.filter(t => val(t) >= sv * RACE_T.pink.lo && val(t) <= sv * RACE_T.pink.hi);
     if (!pool.length) pool = [all.reduce((a, t) => Math.abs(Math.log(val(t) / sv)) < Math.abs(Math.log(val(a) / sv)) ? t : a)];
@@ -84,10 +89,10 @@ class PinkSlips {
     return { type, color: pick(VEHICLES[type].colors), vtier: VEHICLES[type].tier };
   }
   // on the start line: the stake is committed and saved; from here every way out but a win hands the car over
-  commit(v) {
-    const g = this.g, e = g.vreg.entryOf(v), r = this.rival(e);
+  commit(v, def) {
+    const g = this.g, e = g.vreg.entryOf(v), r = this.rival(e, def);
     this.s.pink = { uid: e.uid, rival: r };
-    this.s.pinkDay = this.day();
+    if (def && def.offroad) this.s.pinkDirtDay = this.day(); else this.s.pinkDay = this.day();
     g.vreg.note('put up in a pink slip', e.type, { uid: e.uid, vs: r.type });
     g.saveGame(true);
     return r;
@@ -136,8 +141,12 @@ class PinkSlips {
     if (P && (typeof P !== 'object' || !Number.isInteger(P.uid) || !P.rival || !VEHICLES[P.rival.type])) { s.pink = null; return; }
     if (P) { const e = s.garage.find(x => x.uid === P.uid); s.pink = null; if (e) this.surrender(e, P); if (this.g.uw) this.g.uw.news('pv', `You walked away from a pink slip. Vance kept your ${e ? VEHICLES[e.type].name : 'car'}.`); }
     if (!Number.isInteger(s.pinkDay)) s.pinkDay = -1;
+    if (!Number.isInteger(s.pinkDirtDay)) s.pinkDirtDay = -1;
     if (!s.raceDay || typeof s.raceDay !== 'object' || !Number.isInteger(s.raceDay.day) || !s.raceDay.wins || typeof s.raceDay.wins !== 'object') s.raceDay = { day: -1, wins: {} };
-    for (const k in s.raceDay.wins) { const n = s.raceDay.wins[k]; if (!RACES.some(r => r.id === k) || !Number.isInteger(n) || n < 0) delete s.raceDay.wins[k]; }
+    // today's wins per race: street and countryside races, and the official events of both venues (whose tiers the
+    // same record keeps)
+    const known = k => RACES.some(r => r.id === k) || VP_EVENTS.some(e => e.id === k) || OR_EVENTS.some(e => e.id === k);
+    for (const k in s.raceDay.wins) { const n = s.raceDay.wins[k]; if (!known(k) || !Number.isInteger(n) || n < 0) delete s.raceDay.wins[k]; }
   }
 }
 

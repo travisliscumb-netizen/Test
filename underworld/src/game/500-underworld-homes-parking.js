@@ -137,6 +137,8 @@ Object.assign(PropertyManager.prototype, {
     if (def.kind === 'warehouse' && w.compounds[def.id]) for (const p of w.compounds[def.id].park) out.push({ x: p.x, z: p.z, h: p.h, kind: 'yard', y: CURB_H });
     // the motorsport park's pit garages, two bays each (Session 6B)
     if (def.kind === 'motorsport' && w.vp) for (const b of w.vp.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: 0 });
+    // the off-road compound's six bays in the owners' garage shed (Session 6C), on its pad
+    if (def.kind === 'offroad' && w.cfs) for (const b of w.cfs.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });
     if (def.under && g.vspaces) { const vs = g.vspaces.byProp(def.id); if (vs) for (const b of vs.bays) out.push({ ...b, kind: 'under', space: vs.id }); }
     // kerbside spaces for flats, lock-ups and businesses without a drive
     const want = home ? 0 : (def.street || def.garage || 0);

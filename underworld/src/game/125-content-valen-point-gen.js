@@ -37,38 +37,8 @@ const VP_SITE = {
   standS: { x0: 1537, x1: 1570, z0: 700, z1: 795 },
   annex: { ox: 1446, oz: 150 }
 };
-// the circuit's centreline: { pts: [[x, z]...], cum, len, R (local radius, 0 on straights), n (left normal) }
-function vpTrackLine() {
-  const V = VP_TRACK.verts, n = V.length, segs = [];
-  const unit = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); return [dx / l, dz / l]; };
-  // each corner: the tangent points and the arc between them
-  const C = V.map((v, k) => {
-    const a = unit(V[(k - 1 + n) % n], v), b = unit(v, V[(k + 1) % n]), R = v[2];
-    const th = Math.acos(clamp(a[0] * b[0] + a[1] * b[1], -1, 1)), t = R * Math.tan(th / 2);
-    const cross = a[0] * b[1] - a[1] * b[0], s = cross > 0 ? 1 : -1;          // +1 a right-hand (clockwise) corner
-    const t1 = [v[0] - a[0] * t, v[1] - a[1] * t], t2 = [v[0] + b[0] * t, v[1] + b[1] * t];
-    const nrm = [-a[1] * s, a[0] * s], cen = [t1[0] + nrm[0] * R, t1[1] + nrm[1] * R];
-    return { t1, t2, cen, R, th, s, t };
-  });
-  const pts = [], Rs = [], step = VP_TRACK.step;
-  const push = (p, R) => { pts.push(p); Rs.push(R); };
-  for (let k = 0; k < n; k++) {
-    const c = C[k], nx = C[(k + 1) % n];
-    // the arc round corner k
-    const a0 = Math.atan2(c.t1[1] - c.cen[1], c.t1[0] - c.cen[0]), arcLen = c.R * c.th, m = Math.max(2, Math.ceil(arcLen / step));
-    for (let i = 0; i < m; i++) { const a = a0 + c.s * c.th * i / m; push([c.cen[0] + Math.cos(a) * c.R, c.cen[1] + Math.sin(a) * c.R], c.R); }
-    // the straight to the next corner
-    const L = Math.hypot(nx.t1[0] - c.t2[0], nx.t1[1] - c.t2[1]), ms = Math.max(1, Math.ceil(L / step));
-    for (let i = 0; i < ms; i++) push([lerp(c.t2[0], nx.t1[0], i / ms), lerp(c.t2[1], nx.t1[1], i / ms)], 0);
-  }
-  const cum = [0];
-  for (let k = 1; k <= pts.length; k++) { const a = pts[k - 1], b = pts[k % pts.length]; cum.push(cum[k - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
-  // left normals (of the direction of travel)
-  const nl = pts.map((p, k) => { const a = pts[(k - 1 + pts.length) % pts.length], b = pts[(k + 1) % pts.length], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dz / l, -dx / l]; });
-  // the tangent lengths fit their straights (checked by tests/motorsport.mjs)
-  const fits = C.every((c, k) => c.t + C[(k + 1) % n].t <= Math.hypot(V[(k + 1) % n][0] - V[k][0], V[(k + 1) % n][1] - V[k][1]) + 1e-6);
-  return { pts, R: Rs, cum, len: cum[pts.length], nl, corners: C, fits };
-}
+// the circuit's centreline: { pts: [[x, z]...], cum, len, R (local radius, 0 on straights), nl (left normal) }
+function vpTrackLine() { return filletLoop(VP_TRACK.verts, VP_TRACK.step); }
 Object.assign(World.prototype, {
   // a district block: the same shape as a city block (so the chunk manager, far skyline, colliders, places and
   // compounds all take it) on a lattice origin (ox, oz) east of the city; r: how far its contents reach from the centre

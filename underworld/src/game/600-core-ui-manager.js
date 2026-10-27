@@ -182,7 +182,7 @@ class UIManager {
     this.hud = $('hud'); this.toasts = $('toasts');
     this.mm = $('minimap'); this.mmc = this.mm.getContext('2d');
     this.bigc = $('bigmapCanvas').getContext('2d');
-    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP();
+    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP(); this.cfsImg = this._renderCFS();
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
     this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
@@ -195,6 +195,8 @@ class UIManager {
     const E = EDGE_MARGIN + 30, span = CITY + E * 2, k = S / span;
     // map space runs on east past the city to Valen Point (Session 6B): mapW wide, 1024 tall
     this.mapK = k; this.mapE = E; this.mapW = Math.ceil((WORLD_X1 + E) * k);
+    // and south to Cedar Fields South (Session 6C): mapH tall
+    this.mapH = Math.ceil((WORLD_Z1 + E) * k);
     const X = x => (x + E) * k;
     this._paintMap(g, null);
     const lab = [];
@@ -246,7 +248,46 @@ class UIManager {
     g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
     // buildings
     g.fillStyle = 'rgba(0,0,0,0.32)';
-    for (const b of this.g.world.xblocks) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+    for (const b of this.g.world.xblocks) if (vpLand(b.cx, b.cz)) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+  }
+  // Cedar Fields South in map space (Session 6C): the land bridge, the ground by surface, the tracks, the course,
+  // the pads and the buildings
+  _paintCFS(g, view) {
+    const cf = this.g.world.cfs; if (!cf) return;
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
+    if (view && (view.z1 < CITY || view.x1 < CFS.x0 - 20 || view.x0 > CFS.x1 + 20)) return;
+    const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
+    R(CFS.lb.x - CFS.lb.half, CITY + ROAD_HALF, CFS.lb.x + CFS.lb.half, CFS.z0, '#4f6e3f');
+    R(CFS.lb.x - CFS.lb.road, CITY + ROAD_HALF, CFS.lb.x + CFS.lb.road, CFS.z0, '#9a7d58');
+    // the ground: one pixel per map pixel, coloured by surface (cached by _renderCFS; drawn live only zoomed in)
+    if (this._cfsGround) g.drawImage(this._cfsGround, X(CFS.x0), X(CFS.z0), (CFS.x1 - CFS.x0) * k, (CFS.z1 - CFS.z0) * k);
+    else R(CFS.x0, CFS.z0, CFS.x1, CFS.z1, '#4f6e3f');
+    for (const P2 of cf.pads) R(P2.x0, P2.z0, P2.x1, P2.z1, '#9c8f74');
+    const line = (pts, w, col, closed) => { g.strokeStyle = col; g.lineWidth = Math.max(1.5, w * k); g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), X(p[1])) : g.moveTo(X(p[0]), X(p[1]))); if (closed) g.closePath(); g.stroke(); };
+    for (const T of cf.tracks) line(T.pts, T.w, '#9a7d58');
+    line(cf.track.pts, CFS_COURSE.w, '#7a5a38', true);
+    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = 'rgba(0,0,0,0.32)';
+    for (const b of cf.blocks) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+  }
+  // a cached image of Cedar Fields South: { img, x, z } in map space
+  _renderCFS() {
+    const cf = this.g.world.cfs; if (!cf) return null;
+    const R = Terrain.regions.find(r => r.id === 'country'), w = Math.ceil(R.x1 - R.x0), h = Math.ceil(R.z1 - R.z0);
+    const gc = document.createElement('canvas'); gc.width = w; gc.height = h;
+    const gg = gc.getContext('2d'), id = gg.createImageData(w, h), C3 = new THREE.Color();
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const o = j * R.W + i, sf = R.s[o], y = R.h[o]; C3.setHex(TSURF_COL[sf]);
+      const sh = 0.82 + clamp(y * 0.03, 0, 0.3), q = (j * w + i) * 4;
+      id.data[q] = C3.r * 255 * sh; id.data[q + 1] = C3.g * 255 * sh; id.data[q + 2] = C3.b * 255 * sh; id.data[q + 3] = 255;
+    }
+    gg.putImageData(id, 0, 0); this._cfsGround = gc;
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
+    const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CITY + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
+    const c = document.createElement('canvas'); c.width = x1 - x0; c.height = z1 - z0;
+    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, c.width, c.height); g.translate(-x0, -z0);
+    this._paintCFS(g, null);
+    return { img: c, x: x0, z: z0 };
   }
   // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
   _renderVP() {
@@ -288,8 +329,8 @@ class UIManager {
       if (open(1, i, j)) { g.moveTo(X(j * P), X(i * P)); g.lineTo(X((j + 1) * P), X(i * P)); }
     }
     g.stroke();
-    // Valen Point and its causeway (Session 6B)
-    this._paintVP(g, view);
+    // Valen Point and its causeway (Session 6B), Cedar Fields South and its land bridge (Session 6C)
+    this._paintVP(g, view); this._paintCFS(g, view);
     // district tints and borders
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const key = ZONE_MAP[bz][bx], z = ZONES[key];
@@ -618,6 +659,7 @@ class UIManager {
     c.translate(-px, -pz);
     c.drawImage(this.mmImg, 0, 0);
     if (this.vpImg) c.drawImage(this.vpImg.img, this.vpImg.x, this.vpImg.z);
+    if (this.cfsImg) c.drawImage(this.cfsImg.img, this.cfsImg.x, this.cfsImg.z);
     const k = this.mapK;
     // GPS route
     const m = g.missions.active;
@@ -674,7 +716,7 @@ class UIManager {
     const bs = 9 * (W / 380) * 1.6;
     { const cs = g.world.places.chopshop, pd = g.world.places.police.door; if (cs) badge(cs.door.x, cs.door.z, MAP_CATS.chop.col, 'C', bs, false); badge(pd.x, pd.z, MAP_CATS.police.col, 'P', bs, false); }
     for (const L of uw.locs) {
-      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
+      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) blip(L.x, L.z, FACTIONS[L.id].col, 5, false, 'sq');
       else if (L.kind === 'spot') blip(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), 4, false, 'sq');
     }
@@ -785,7 +827,7 @@ class MapView {
       if (L.kind === 'prop') {
         const d = L.def, own = uw.props.owned(d.id);
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
-        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
+        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
         if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
@@ -845,9 +887,9 @@ class MapView {
   clampView(z, cx, cz) {
     const s = Math.min(this.W, this.H) / 1024 * z, hw = this.W / 2 / s, hh = this.H / 2 / s;
     // zoomed in, any point of the map can be brought to the centre (edges show water beyond)
-    // east as far as Valen Point (map space is ui.mapW wide)
-    const MW = this.ui.mapW || 1024;
-    cx = hw >= 512 ? clamp(cx, 512, Math.max(512, MW - hw)) : clamp(cx, Math.min(hw, 0), Math.max(MW - hw, MW)); cz = hh >= 512 ? 512 : clamp(cz, Math.min(hh, 0), Math.max(1024 - hh, 1024));
+    // east as far as Valen Point and south to Cedar Fields South (map space is ui.mapW wide and ui.mapH tall)
+    const MW = this.ui.mapW || 1024, MH = this.ui.mapH || 1024;
+    cx = hw >= 512 ? clamp(cx, 512, Math.max(512, MW - hw)) : clamp(cx, Math.min(hw, 0), Math.max(MW - hw, MW)); cz = hh >= 512 ? clamp(cz, 512, Math.max(512, MH - hh)) : clamp(cz, Math.min(hh, 0), Math.max(MH - hh, MH));
     return [cx, cz];
   }
   // zoom keeping the map point under (sx,sy) fixed; animated unless instant
@@ -985,7 +1027,7 @@ class MapView {
   setPick(wx, wz) {
     const o = this.pickMode; if (!o) return;
     const kp = nearestRoadPoint(wx, wz);
-    if (!kp || kp.d > 140 || ((wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) && !inValenPoint(wx, wz))) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
+    if (!kp || kp.d > 140 || ((wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) && !inExtension(wx, wz))) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
     o.dest = { x: kp.x, z: kp.z }; o.q = o.quote(kp.x, kp.z);
     this.renderPick(); this.dirty = true;
   }
@@ -1111,7 +1153,7 @@ class MapView {
     // map-space layers under the view transform
     c.save();
     c.setTransform(d * s, 0, 0, d * s, d * (W / 2 - this.cx * s), d * (H / 2 - this.cz * s));
-    if (this.zoom < 1.35) { c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); }
+    if (this.zoom < 1.35) { c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
@@ -1215,21 +1257,22 @@ const GPS = {
       if (L.spur) { L.vids = this._poly(nodes, adj, edge, L.pts, L.gps[0], L.gps[1]); continue; }
       edge(L.gps[0], L.gps[1], L.len + 2 * ROAD_HALF, poly);
     }
-    // Valen Point's own routes and the circuit (Session 6B): polylines whose first point meets the spur's far end
-    const vp = typeof game !== 'undefined' && game.world && game.world.vp;
+    // the extensions' own routes and their loops (Valen Point's circuit, Session 6B; the off-road course, Session 6C):
+    // polylines that start and end on their spur's vertices or on each other's
+    const exts = typeof game !== 'undefined' && game.world && game.world.exts;
     const extra = [];
-    if (vp) {
-      const spur = Links.list.find(L => L.spur), at = new Map(), key = q => Math.round(q[0] * 10) + ':' + Math.round(q[1] * 10);
-      if (spur) at.set(key(vp.road0), spur.gps[1]);
+    for (const X of exts || []) {
+      const spur = Links.list.find(L => L.spur && L.name === X.spur), at = new Map(), key = q => Math.round(q[0] * 10) + ':' + Math.round(q[1] * 10);
+      if (spur && spur.vids) spur.pts.forEach((q, k) => at.set(key(q), spur.vids[k]));
       const fixed = q => at.get(key(q));
-      for (const r of vp.roads) { const ids = this._poly(nodes, adj, edge, r, fixed(r[0]), fixed(r[r.length - 1])); at.set(key(r[0]), ids[0]); at.set(key(r[r.length - 1]), ids[ids.length - 1]); for (let k = 1; k < r.length - 1; k++) if (!at.has(key(r[k]))) at.set(key(r[k]), ids[k]); extra.push({ pts: r, ids }); }
-      // the circuit, a closed loop every 25 samples, joined at the pit exit and entry samples
-      const T = vp.track, ks = []; for (let k = 0; k < T.pts.length; k += 25) ks.push(k);
-      for (const k of [vp.exitK, vp.entryK]) if (!ks.includes(k)) ks.push(k);
+      for (const r of X.roads) { const ids = this._poly(nodes, adj, edge, r, fixed(r[0]), fixed(r[r.length - 1])); at.set(key(r[0]), ids[0]); at.set(key(r[r.length - 1]), ids[ids.length - 1]); for (let k = 1; k < r.length - 1; k++) if (!at.has(key(r[k]))) at.set(key(r[k]), ids[k]); extra.push({ pts: r, ids, ext: X.id }); }
+      // the loop, every 25 samples, joined at its join samples
+      const T = X.loop, ks = []; for (let k = 0; k < T.pts.length; k += 25) ks.push(k);
+      for (const k of X.joins) if (!ks.includes(k)) ks.push(k);
       ks.sort((p2, q) => p2 - q);
       const loop = ks.map(k => T.pts[k]), ids = loop.map(q => at.get(key(q)) ?? (nodes.push({ x: q[0], z: q[1] }), adj.push([]), nodes.length - 1));
       for (let k = 0; k < loop.length; k++) { const a = ids[k], b2 = ids[(k + 1) % loop.length], A = loop[k], B = loop[(k + 1) % loop.length]; edge(a, b2, Math.hypot(B[0] - A[0], B[1] - A[1]), null); }
-      extra.push({ pts: [...loop, loop[0]], ids: [...ids, ids[0]] });
+      extra.push({ pts: [...loop, loop[0]], ids: [...ids, ids[0]], ext: X.id });
     }
     this.extra = extra;
     for (const [a, len] of [[0, N], [1, N]]) for (let line = 0; line <= N; line++) for (let seg = 0; seg < len; seg++) {
@@ -1256,9 +1299,10 @@ const GPS = {
     const join = (x, z, isGoal) => {
       const me = nodes.length; nodes.push({ x, z }); adj.push([]);
       const link = (a, b, w, poly) => { adj[a].push({ to: b, w, poly }); };
-      if (vpSide(x, z)) {
-        // the nearest point on the spur or any of Valen Point's routes; X joins the two vertices either side of it
-        const polys = [...Links.list.filter(L => L.spur && L.vids).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || [])];
+      if (extSide(x, z)) {
+        // the nearest point on that extension's spur or any of its routes; X joins the two vertices either side of it
+        const X0 = cfsSide(x, z) ? 'cfs' : 'vp', ext = (game.world.exts || []).find(e => e.id === X0);
+        const polys = [...Links.list.filter(L => L.spur && L.vids && (!ext || L.name === ext.spur)).map(L => ({ pts: L.pts, ids: L.vids })), ...(this.extra || []).filter(e => e.ext === X0)];
         let best = null;
         for (const pl of polys) for (let k = 0; k < pl.pts.length - 1; k++) {
           const a = pl.pts[k], b = pl.pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
@@ -1331,8 +1375,8 @@ const GPS = {
   }
 };
 function gpsRoute(fx, fz, tx, tz) {
-  // off the city's square (Valen Point and its causeway): through the spur that reaches it
-  if (vpSide(fx, fz) || vpSide(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
+  // off the city's square (Valen Point and its causeway, Cedar Fields South and its land bridge): through the spur
+  if (extSide(fx, fz) || extSide(tx, tz)) { const r = GPS.routeAny(fx, fz, tx, tz); if (r) return r; }
   const pts = [{ x: fx, z: fz }];
   let i = clamp(Math.round(fx / P), 0, N), j = clamp(Math.round(fz / P), 0, N);
   const onV = Math.abs(fx - i * P) < 8, onH = Math.abs(fz - j * P) < 8;

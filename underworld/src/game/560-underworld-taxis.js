@@ -19,6 +19,12 @@ function nearestRoadPoint(x, z) {
     if (RoadNet.segOpen(1, i, j)) { const xx = clamp(x, j * P + 6, (j + 1) * P - 6), side = z >= i * P ? 1 : -1; tryP(xx, i * P + side * LANE, side > 0 ? -Math.PI / 2 : Math.PI / 2); }
   }
   const ln = Links.nearest(x, z); if (ln && ln.d < bd) tryP(ln.x, ln.z, 0);
+  // Cedar Fields South's tracks (Session 6C)
+  const cf = typeof game !== 'undefined' && game.world && game.world.cfs;
+  if (cf && cfsSide(x, z)) for (const pts of [cf.loop, cf.east]) for (let k = 0; k < pts.length - 1; k++) {
+    const a = pts[k], b = pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
+    tryP(a[0] + dx * t, a[1] + dz * t, Math.atan2(dx, dz));
+  }
   return best ? { ...best, d: bd } : null;
 }
 function placeNameAt(x, z) {
@@ -26,6 +32,7 @@ function placeNameAt(x, z) {
   const pl = g.world.places;
   for (const id in pl) { const d = pl[id].door; if (pl[id].hidden) continue; const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd) { bd = dd; best = pl[id].name; } }
   if (!best && g.uw) for (const L of g.uw.locs) if (L.kind === 'prop') { const dd = Math.hypot(L.x - x, L.z - z); if (dd < bd) { bd = dd; best = L.def.name; } }
+  if (!best && inExtension(x, z)) return districtNameAt(x, z);
   const vi = Math.round(x / P), hj = Math.round(z / P);
   const street = Math.abs(x - vi * P) < Math.abs(z - hj * P) ? STREET_NAMES_X[clamp(vi, 0, N)] : STREET_NAMES_Z[clamp(hj, 0, N)];
   return best ? `${best}` : `${street}, ${districtNameAt(x, z)}`;
@@ -74,9 +81,9 @@ class TaxiService {
   // a cab on a road node out of sight, 110-220 m away
   spawnCab(x, z) {
     const g = this.g, cands = [];
-    // on Valen Point: the cab comes along the causeway (Session 6B)
-    if (vpSide(x, z)) {
-      const sp = vpRoadSpots().filter(s => Math.sin(s.h) * (x - s.x) > 0).map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
+    // on Valen Point or in Cedar Fields South: the cab comes along the causeway or the tracks (Sessions 6B, 6C)
+    if (extSide(x, z)) {
+      const sp = extRoadSpots(x, z).filter(s => spotToward(s, x, z)).map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
       for (const { s } of sp.slice(0, 8)) if (!g.vehicles.nearby(s.x, s.z, 6).some(v => Math.hypot(v.pos.x - s.x, v.pos.z - s.z) < 5)) return g.vehicles.spawn('taxi', s.x, s.z, s.h, {});
     }
     for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {

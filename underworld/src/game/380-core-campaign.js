@@ -60,13 +60,14 @@ class Campaign {
   raceOffer(c) {
     const g = this.g, list = RACES.filter(r => !r.storyOnly);
     // the rotation: every race in turn (skipping one that can't run now), and once an economic day a pink slip
-    // in the extra slot (§45.33)
-    const n = list.length + 1;
+    // in the extra slot (§45.33); Vance's off-road special in a slot half way round (Session 6C), on its days
+    const n = list.length + 2, dirtSlot = Math.floor(list.length / 2), at = i => i < dirtSlot ? i : i - 1;
     let def = null;
     for (let k = 0; k < n; k++) {
       this._ri = ((this._ri ?? -1) + 1) % n;
-      if (this._ri === list.length) { if (g.pinks && g.pinks.available()) return g.pinks.offer(c); continue; }
-      def = list[this._ri]; if (!raceAvailable(def, g)) break;
+      if (this._ri === n - 1) { if (g.pinks && g.pinks.available(false)) return g.pinks.offer(c, false); continue; }
+      if (this._ri === dirtSlot) { if (g.pinks && g.pinks.available(true)) return g.pinks.offer(c, true); continue; }
+      def = list[at(this._ri)]; if (!raceAvailable(def, g)) break;
     }
     const why = raceAvailable(def, g), rec = this.save.races[def.id];
     const fee = Math.round(def.reward * 0.15 / 10) * 10;

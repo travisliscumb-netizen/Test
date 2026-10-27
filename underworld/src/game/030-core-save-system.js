@@ -198,7 +198,7 @@ const SaveSystem = {
     for (const e of d.garage) e.vtier = typeof e.vtier === 'string' && TIER_LOOK[e.vtier] ? e.vtier : VEHICLES[e.type].tier;
     if (!d.pos || typeof d.pos !== 'object' || !isFinite(d.pos.x) || !isFinite(d.pos.z) || !isFinite(d.pos.h)) d.pos = null;
     // the city square, or on Valen Point (Session 6B); anywhere else (the water) comes back to the coast
-    else if (!inValenPoint(d.pos.x, d.pos.z)) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
+    else if (!inExtension(d.pos.x, d.pos.z)) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
     if (typeof d.rep !== 'number' || !isFinite(d.rep) || d.rep < 0) d.rep = 0;
     if (!(d.nextUid > maxUid)) d.nextUid = maxUid + 1;
     if (!d.tips || typeof d.tips !== 'object' || Array.isArray(d.tips)) d.tips = {};

@@ -137,7 +137,7 @@ class PoliceManager {
       if (pv && u.role === 'intercept' && lvl >= 2 && d > 25) { tx += pv.vel.x * 2.2; tz += pv.vel.y * 2.2; }
       // flank: aim at a point a block to one side of where the player is heading; the route there runs down a
       // parallel street, and it closes in once it is near
-      if (pv && u.role === 'flank' && d > 45) { const sp2 = Math.hypot(pv.vel.x, pv.vel.y) || 1, fx = pv.vel.x / sp2, fz = pv.vel.y / sp2; [tx, tz] = vpClampSearch(p.pos.x, tx + fx * 60 - fz * P * 0.75 * u.offset, tz + fz * 60 + fx * P * 0.75 * u.offset, 10); return { x: tx, z: tz, speed: sp }; }
+      if (pv && u.role === 'flank' && d > 45) { const sp2 = Math.hypot(pv.vel.x, pv.vel.y) || 1, fx = pv.vel.x / sp2, fz = pv.vel.y / sp2; [tx, tz] = extClampSearch(p.pos.x, p.pos.z, tx + fx * 60 - fz * P * 0.75 * u.offset, tz + fz * 60 + fx * P * 0.75 * u.offset, 10); return { x: tx, z: tz, speed: sp }; }
       if (d < 45 && g.world.grid.lineOfSight(v.pos.x, 1, v.pos.z, p.pos.x, 1, p.pos.z)) {
         const ram = lvl >= 3;
         const close = d < 14 && !pv;
@@ -148,7 +148,7 @@ class PoliceManager {
     // search mode: sweep around the last known position
     if (!u.searchPt || dist2(v.pos.x, v.pos.z, u.searchPt.x, u.searchPt.z) < 18 * 18) {
       const a = Math.random() * Math.PI * 2, r = Math.random() * this.searchRadius;
-      const [sx, sz] = vpClampSearch(this.lastSeen.x, this.lastSeen.x + Math.cos(a) * r, this.lastSeen.z + Math.sin(a) * r, 0); u.searchPt = { x: sx, z: sz };
+      const [sx, sz] = extClampSearch(this.lastSeen.x, this.lastSeen.z, this.lastSeen.x + Math.cos(a) * r, this.lastSeen.z + Math.sin(a) * r, 0); u.searchPt = { x: sx, z: sz };
     }
     return { x: u.searchPt.x, z: u.searchPt.z, speed: 14 };
   }
@@ -223,10 +223,10 @@ class PoliceManager {
       if (blocked) continue;
       best = { x, z }; break;
     }
-    // off the lattice (Valen Point): a unit comes along the causeway or round the turning circle instead
-    if (!best && vpSide(p.pos.x, p.pos.z)) for (const s of vpRoadSpots()) {
+    // off the lattice (Valen Point, Cedar Fields South): a unit comes along the causeway or the countryside tracks
+    if (!best && extSide(p.pos.x, p.pos.z)) for (const s of extRoadSpots(p.pos.x, p.pos.z)) {
       // in the lane heading your way
-      if (Math.sin(s.h) * (p.pos.x - s.x) < 0) continue;
+      if (!spotToward(s, p.pos.x, p.pos.z)) continue;
       const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z); if (d < 120 || d > 320 || (g.inView(s.x, 2, s.z, 5) && d < 200)) continue;
       if (g.vehicles.list.some(v => dist2(v.pos.x, v.pos.z, s.x, s.z) < 100)) continue;
       const v = g.vehicles.spawn('police', s.x, s.z, s.h, { driver: 'cop', speed: 10 }); v.siren = true; this.adoptUnit(v); return;

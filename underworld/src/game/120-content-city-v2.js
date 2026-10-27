@@ -789,6 +789,8 @@ Object.assign(World.prototype, {
     this._road([[5.4, zr], [80, zr + 2], [160, zr - 1], [240, zr + 2], [314.6, zr]], 5.4, 'dirt', { smooth: true, link: 'Cedar Fields Road' });
     this._road([[150, zr], [150, 906]], 4.2, 'dirt');
     this._road([[60, zr], [60, 938]], 4.2, 'dirt');
+    // the farm track south to the perimeter road and the land bridge to Cedar Fields South (Session 6C)
+    this._road([[CFS.lb.x, zr], [CFS.lb.x, CITY]], CFS.lb.road * 2, 'dirt');
     // the farm: house, red barn, silo, paddock
     this._house(b, rng, { x: 150, z: 897, face: 1, type: 'farm', w: 12, d: 9, garage: 'street', drive: 'auto', color: 0xf0e6c8, roofColor: 0x5a3a32, name: 'Cedar Farmhouse' });
     const barn = this._bld(b, 172, 892, 188, 906, 7.5, STYLE.WARE, 0x8a2a20, 7.5, 4, { roof: 'gable', roofColor: 0x3a3d40, exactH: true });
@@ -800,7 +802,12 @@ Object.assign(World.prototype, {
     for (let k = 0; k < 7; k++) { const x = 212 + rng.range(0, 20), z = 897 + rng.range(0, 12); this._det(b, 'cyl', x, CURB_H + 0.6, z, 0.75, 1.2, 0xd8b45a, null, { x, z, r: 0.8, y0: 0, y1: 1.2, kind: 'det' }); }
     // a cottage on the west field, rail fences along the track, hedgerows and an orchard
     this._house(b, rng, { x: 60, z: 944, face: 0, type: 'bungalow', w: 10, d: 7, garage: 'carport', drive: 'auto', color: 0xe8e0d0, name: 'Mill Cottage' });
-    for (const [x0, x1] of [[12, 52], [68, 142], [158, 240], [250, 308]]) { this._fence(b, x0, zr - 4.2, x1, zr - 4.2, 'rail'); this._fence(b, x0, zr + 4.2, x1, zr + 4.2, 'rail'); }
+    for (const [x0, x1] of [[12, 52], [68, 142], [158, 240], [250, 308]]) {
+      this._fence(b, x0, zr - 4.2, x1, zr - 4.2, 'rail');
+      // the south fence opens for the farm track
+      if (x0 < CFS.lb.x && x1 > CFS.lb.x) { this._fence(b, x0, zr + 4.2, CFS.lb.x - 6, zr + 4.2, 'rail'); this._fence(b, CFS.lb.x + 6, zr + 4.2, x1, zr + 4.2, 'rail'); }
+      else this._fence(b, x0, zr + 4.2, x1, zr + 4.2, 'rail');
+    }
     for (const hx of [100, 250]) for (let z = sb.z0 + 3; z < sb.z1 - 2; z += 5) if (Math.abs(z - zr) > 6) this._prop(b, rng.chance(0.7) ? 'tree' : 'bush', hx + rng.range(-1, 1), z, rng.range(0, 6), rng.range(0.9, 1.3));
     for (let x = 262; x < 306; x += 7) for (let z = 928; z < 948; z += 7) this._prop(b, 'tree', x + rng.range(-0.6, 0.6), z + rng.range(-0.6, 0.6), rng.range(0, 6), rng.range(0.75, 0.95));
     for (let k = 0; k < 10; k++) { const x = rng.range(sb.x0 + 4, sb.x1 - 4), z = rng.range(sb.z0 + 3, sb.z1 - 3); if (this._roadDist(x, z, true) > 3 && !this._inBld(b, x, z, 4)) this._prop(b, 'tree', x, z, rng.range(0, 6), rng.range(1, 1.4)); }

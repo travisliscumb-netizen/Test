@@ -10,8 +10,9 @@ class DriveAI {
   setGoal(x, z) { this.goal = { x, z }; this.route(x, z); this.arrived = false; }
   route(tx, tz) {
     const v = this.v, fx = Math.sin(v.h), fz = Math.cos(v.h);
-    // to or from Valen Point: the GPS route through the causeway, kept to the right-hand side of each leg
-    if (vpSide(v.pos.x, v.pos.z) || vpSide(tx, tz)) {
+    // to or from Valen Point or Cedar Fields South: the GPS route by the causeway or the land bridge, kept to the
+    // right-hand side of each leg
+    if (extSide(v.pos.x, v.pos.z) || extSide(tx, tz)) {
       const r = gpsRoute(v.pos.x, v.pos.z, tx, tz);
       if (r && r.length > 1) {
         this.path = [];

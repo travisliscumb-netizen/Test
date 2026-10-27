@@ -411,7 +411,13 @@ Object.assign(World.prototype, {
 {
   const base2 = World.prototype.generate;
   World.prototype.generate = function () {
-    base2.call(this); this._genValenPoint(); this._placesGen();
+    base2.call(this); this._genValenPoint(); this._genCedarSouth(); this._placesGen();
+    // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
+    // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
+    this.exts = [
+      { id: 'vp', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK] },
+      { id: 'cfs', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK] }
+    ];
     for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
     Links.build(this);
   };
