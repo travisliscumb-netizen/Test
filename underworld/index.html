@@ -44025,6 +44025,23 @@ class PoliceManager {
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     const vx = pv ? pv.vel.x : Math.sin(g.cam.yaw), vz = pv ? pv.vel.y : Math.cos(g.cam.yaw);
     const l = Math.hypot(vx, vz) || 1;
+    // on a curved street (in the city or out in the countryside): the roadblock goes across that street, ahead
+    const cv = this.curvedRoadblockAt(p.pos.x, p.pos.z, vx / l, vz / l);
+    if (cv) {
+      if (g.inView(cv.x, 1, cv.z, 6) && Math.hypot(cv.x - p.pos.x, cv.z - p.pos.z) < 90) return;
+      const rb = { t: 45, cars: [], cops: [] }, nx = -cv.tz, nz = cv.tx, o = Math.min(2.6, cv.w / 4), across = Math.atan2(cv.tx, cv.tz) + Math.PI / 2;
+      for (const off of [-o, o]) {
+        const cx = cv.x + nx * off, cz = cv.z + nz * off;
+        const v = g.vehicles.spawn('police', cx, cz, across + rand(-0.35, 0.35), { driver: null, parked: true });
+        v.siren = true; v.roadblock = true; v.touched = true;
+        rb.cars.push(v);
+        const c = this.spawnCop(cx + cv.tx * 3 + rand(-1, 1) * nx, cz + cv.tz * 3 + rand(-1, 1) * nz);
+        if (c) rb.cops.push(c);
+      }
+      this.roadblocks.push(rb);
+      g.ui.toast('Dispatch: roadblock in position.', 'radio');
+      return;
+    }
     const ax = Math.abs(vx) > Math.abs(vz);
     let x = p.pos.x + vx / l * 130, z = p.pos.z + vz / l * 130;
     if (ax) { z = Math.round(z / P) * P; x = (Math.floor(x / P) + 0.5) * P; } else { x = Math.round(x / P) * P; z = (Math.floor(z / P) + 0.5) * P; }
@@ -44042,6 +44059,34 @@ class PoliceManager {
     }
     this.roadblocks.push(rb);
     g.ui.toast('Dispatch: roadblock in position.', 'radio');
+  }
+  // where a roadblock goes when you are on a curved street: about 130 m ahead along it (on along the straightest street
+  // at each junction off the grid), clear of junctions, with the road's direction there; null when you aren't on one or
+  // it runs out onto the grid first (then the grid's roadblock)
+  curvedRoadblockAt(px, pz, ux, uz) {
+    const R = RoadGraph, q = R.ready ? R.nearest(px, pz, { kinds: RG_STREETS }) : null;
+    if (!q || q.e.kind === 'grid' || q.d > q.e.w / 2 + 1) return null;
+    let e = q.e, d = q.along, left = 130;
+    const t0 = R.pointAt(e, d);
+    let dir = t0[2] * ux + t0[3] * uz >= 0 ? 0 : 1;
+    for (let guard = 0; ; guard++) {
+      const room = dir ? d : e.len - d;
+      if (room >= left) { d += dir ? -left : left; break; }
+      left -= room;
+      const n = dir ? e.a : e.b; if (n.att || guard > 12) return null;
+      const u = dir ? [-e.t0[0], -e.t0[1]] : e.t1;
+      let best = null, bc = -2;
+      for (const x of n.edges) {
+        if (x.e === e || !RG_STREETS.has(x.e.kind) || x.e.kind === 'grid') continue;
+        const w = x.end === 0 ? x.e.t0 : [-x.e.t1[0], -x.e.t1[1]], c = u[0] * w[0] + u[1] * w[1];
+        if (c > bc) { bc = c; best = x; }
+      }
+      if (!best) return null;
+      e = best.e; dir = best.end === 0 ? 0 : 1; d = dir ? e.len : 0;
+    }
+    d = clamp(d, Math.min(12, e.len / 2), Math.max(e.len - 12, e.len / 2));
+    const [x, z, tx, tz] = R.pointAt(e, d), sg = dir ? -1 : 1;
+    return { x, z, tx: tx * sg, tz: tz * sg, w: e.w, e };
   }
   spawnCop(x, z) {
     const g = this.g;

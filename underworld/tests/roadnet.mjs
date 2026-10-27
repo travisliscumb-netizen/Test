@@ -275,6 +275,27 @@ const drive = await ev(() => {
 });
 check('police drive to a suspect on Tanner’s Row at pursuit speed along its bends, on the road the whole way', drive.police.d <= 12 && drive.police.viaRow && drive.police.off === 0 && drive.police.n > 20, JSON.stringify(drive.police));
 check('a delivery van takes the diagonal and the Y to a yard off Kiln Lane, on the road the whole way, and stops there', drive.van.arrived && drive.van.d < 10 && drive.van.viaA && drive.van.off === 0, JSON.stringify(drive.van));
+// roadblocks: at four stars the police block the curved street you are on, ahead of you and across it
+const blocks = await ev(() => {
+  const g = window.game, P = window.__pv, out = [];
+  const R = P.RoadGraph;
+  for (const [name, frac] of [['Greenway Park Drive', 0.15], ['Cedar Fields South', 0.2]]) {
+    const e = name === 'Greenway Park Drive' ? R.edges.find(x => x.name === name) : R.edges.filter(x => x.ext === 'cfs' && x.traffic).sort((a, c) => c.len - a.len)[0];
+    const [x, z, tx, tz] = R.pointAt(e, e.len * frac);
+    if (g.player.state === 'vehicle') g.exitVehicle(true);
+    const v = g.vehicles.spawn('sports', x - tz * 1.8, z + tx * 1.8, Math.atan2(tx, tz), {}); v.mission = 'test';
+    g.resetPlayerState(x - tz * 4, z + tx * 4, 0); g.completeEnter(v); v.vel.set(tx * 20, tz * 20);
+    const n0 = g.police.roadblocks.length; g.police.roadblock();
+    const rb = g.police.roadblocks.length > n0 ? g.police.roadblocks[g.police.roadblocks.length - 1] : null;
+    if (!rb) { out.push({ name, none: true }); continue; }
+    const c = rb.cars.map(q => { const k = R.nearest(q.pos.x, q.pos.z, { kinds: P.RG_STREETS }), t2 = R.pointAt(k.e, k.along), across = Math.abs(Math.sin(q.h) * t2[2] + Math.cos(q.h) * t2[3]); return { on: window.__off(q.pos.x, q.pos.z) < 0, same: k.e === e || k.e.name === e.name, ahead: (q.pos.x - x) * tx + (q.pos.z - z) * tz, across: +across.toFixed(2) }; });
+    out.push({ name, cars: c.length, on: c.every(q => q.on), same: c.every(q => q.same), ahead: Math.round(Math.min(...c.map(q => q.ahead))), across: Math.max(...c.map(q => q.across)) });
+    for (const q of rb.cars) g.vehicles.despawn(q); for (const cp of rb.cops) cp.keep = false; g.police.roadblocks.length = n0;
+    g.exitVehicle(true); g.vehicles.despawn(v);
+  }
+  return out;
+});
+check('roadblocks on curved streets: the police block the street you are on (Greenway Park Drive, a countryside track), ahead of you and across the road', blocks.length === 2 && blocks.every(b => b.cars === 2 && b.on && b.same && b.ahead > 60 && b.across < 0.45), JSON.stringify(blocks));
 // a cab: called from Kiln Lane, hired to Tanner's Row; it drives there by itself (no shortcut, no fade)
 const cab = await ev(() => {
   const g = window.game, T = g.taxi, P = window.__pv, p = g.player;

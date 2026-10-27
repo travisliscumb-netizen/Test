@@ -11,13 +11,141 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **6C — closed** (owner final review §45.37). Cedar Fields terrain, Cedar Fields South and off-road
-  racing, plus the closure item: terrain occludes police line of sight.
-- **Next milestone: Curved Roads / Road-Network Evolution** (inserted before 6D, §45.37). It is a High-effort
-  checkpoint: nothing of it, and nothing of 6D, has been started.
-- Commit/base revision: 6B `549749b` → the Session 6C commits on `claude/practical-lamport-zld81y` (closure commit
-  at the end of this section's history).
+- Milestone: **Curved Roads / Road-Network Evolution — complete, awaiting owner review** (inserted before 6D,
+  §45.37; High effort). 6C is closed (§45.37). **6D has not been started.**
+- Commit/base revision: 6C closure `09c2ffd` → the Curved Roads commits on `claude/practical-lamport-zld81y`.
 - Date: 2026-10-27
+
+## Curved Roads / Road-Network Evolution
+
+### Inspection: what depended on roads being a 90° grid
+
+| Consumer | Before | After |
+|---|---|---|
+| Road representation | `RoadNet` lattice (13×13 nodes, superblock closures); `Links` (curved roads joined mid-segment to the lattice, or spurs); the extensions' route polylines | unchanged, plus **`RoadGraph`** (`135`): one graph of every road |
+| Junctions | only a link end on a lattice segment (a T) | any chain end on any road: T at any angle, Y, link-to-link, crossings |
+| GPS (`600`) | three routers: lattice BFS, a link graph, an O(n²) Dijkstra off the city with straight joins | the graph's A* (length plus a turn cost), joins at the nearest road point |
+| AI drivers (`290`): police, taxis, vans, gangs, missions, flee | lattice BFS, 80 m waypoints offset 1.8 m, steering at the next waypoint; links ignored in the city | the graph route as a dense lane (2 m), corners rounded within the road, pure-pursuit steering, speed from the bend's radius |
+| Traffic (`280`) | lattice lanes; links only between two lattice T-junctions; spurs out and back | lattice lanes unchanged; off the grid a walk over the graph through any junction, giving way at every lattice street it joins or crosses |
+| Spawns: police, taxis | lattice nodes; the extensions' own lists | lattice nodes; countryside spots from the graph |
+| `nearestRoadPoint` (taxis, map taps) | lattice + links + two countryside tracks | the graph (every street, not circuits), in the lane on that side, facing the traffic |
+| Roadblocks (`310`) | lattice only, city square only | across the curved street you are on (city or countryside), else as before |
+| Kerbs | a link's mouth met the street's 15 cm kerb as a step | the kerb is cut: a ramp in the gutter, the same plane drawn and driven |
+| Markings | none on curved roads | centre lines that follow the curve (district style); give-way lines |
+| Parking | lattice kerbs only (`curbNear`, unchanged: saved bays depend on it) | plus cars parked along the new streets' kerbs, aligned with the curve |
+| Races | lattice nodes, circuits, countryside paths | plus races laid along streets by waypoints (`routeRacePath`) |
+| Countryside tracks (`027`) | the raw hills, up to 18% grade, 20% side slope | country roads: a smoothed profile (≤ 9%), level across, eased shoulders |
+| Saves | street cars at their saved spot | the same; a spot something now stands on → the nearest clear kerb, once, with a notice |
+
+### Decision on scope
+
+This is a **medium-to-large evolutionary refactor**, not the very large foundational rewrite that needs a STOP.
+- The lattice stays the backbone: block generation, signals, lane traffic, saves and races are unchanged.
+- The graph is layered over it, and every consumer reads the graph.
+- Replacing the lattice and block generation themselves belongs to the future map overhaul.
+
+### The road graph (`135-core-road-graph.js`)
+
+- **Chains:**
+  - every open lattice segment;
+  - every link (from its attach point on the street's centre line), and spurs (their free end and turning circle);
+  - the extensions' routes;
+  - Valen Point's circuit and the off-road course (closed chains).
+- **Junctions from geometry.** Wherever a chain's end lies within 0.75 m of another chain, that chain is split there and the two share a node.
+  - A lattice split records where along the segment it is (`node.att`). The lane traffic and kerb-cut code use that.
+- **Edges** keep their polylines and their cumulative lengths.
+  - The bend radius at each vertex comes from the circle through points ±4 m either side.
+- **Spatial hash** (16 m cells) for `nearest` and `surfaceDist`.
+- **Routing:**
+  - `route()` is A* over directed edge traversals.
+  - Cost is length plus a turn cost.
+  - A U-turn is allowed only at a dead end; driving off backwards costs 40 m, or 220 m on a road under 10 m wide.
+  - Each end joins at the nearest road point.
+- **`lane()`** turns a route into the line a car drives:
+  - each road offset to the right;
+  - each corner a curve no wider than keeps its apex 1.6 m inside the road on the inside of the turn;
+  - the kerb stub of a link turned past;
+  - U-turns round a spur's turning circle;
+  - resampled every 2 m and lightly smoothed.
+- **Kerb cuts (`CurbCuts`), markings (`buildRoadMarkings`), save-safe kerb spots (`kerbSpot` / `kerbBlocked`)** live in the same module.
+
+### What changed where
+
+- `020`:
+  - `Links.attachLink`: a link end may meet another curved road (a Y, a link-to-link T);
+  - `Links.nearestOn`;
+  - `groundBase` asks `CurbCuts` on a lattice road.
+- `027`: the countryside tracks' profiles (`_profile`).
+  - Each track follows the hills on a 25 m moving average twice, with no grade over 10%.
+  - Each is pinned to the pads and to the tracks it meets, level across, with 3 m shoulders and rough at 60%.
+  - A road cell laid by one track keeps its level.
+- `060`: curved-street asphalt gets the streets' speckles, patches, fine cracks and wet darkening (it never got wet
+  before).
+- `110`: builds the graph after the links; the extensions say which of their routes carry traffic.
+- `120`:
+  - the Farm Track is a link off Cedar Fields Road;
+  - Cedar Fields Road's rail fences follow its bends (`_fenceSeg`). Before, the straight fences cut 0.5 m into the
+    road at two bulges.
+- `122-content-curved-streets.js` (new): the new streets and the estate generator (below).
+- `126`: the countryside routes at full resolution (2.5 m), not every 4th sample.
+- `170`: kerb cuts added to the slab mesh; road markings (one mesh).
+- `280`: traffic's curved-road logic rewritten over the graph (`walk`, `linkPath`, `gateBlocked`, spawn sampling).
+- `290`: `DriveAI.route` and the dense-lane follower (`at`, `ahead`, `remaining`); sparse race paths are followed as
+  before.
+- `310`: roadblocks on curved streets (`curvedRoadblockAt`).
+- `370`: races by waypoints along streets (`routeRacePath`).
+- `505`: a street car whose saved spot is now built on is moved to the nearest clear kerb.
+- `560`:
+  - `nearestRoadPoint` uses the graph;
+  - the cab's progress watchdog measures the way still to go along the route;
+  - the shortcut takes a point 40 m on.
+- `600`: the GPS is a wrapper over the graph.
+- `026`: countryside spawn spots come from the graph.
+
+### The streets you can see
+
+- **The Saltmarsh estate** (Industrial Belt, blocks 10,2 and 10,3, which hold nothing a save depends on).
+  - **Saltmarsh Way:** a 12 m collector. It leaves Juniper St on a straight diagonal (39.5° to the grid, a 50° T),
+    crosses 3rd Ave at a skew, and sweeps east onto Kestrel St.
+  - **Kiln Lane:** forks off it at a 24° Y and curves down to 4th Ave.
+  - The estate is rebuilt round them: warehouses with their doors on the road side, tanks, container stacks,
+    chain-link with gaps where the roads pass, and cars parked along the kerbs, nose to tail with the street.
+- **Tanner's Row** (Old Quarter, blocks 3,10 and 4,10): a winding 7 m lane.
+  - It runs in off 10th Ave, across Dock St and out onto 11th Ave.
+  - The terraces are generated as before, and the lane is cut through them: the houses and courtyard dressing in
+    its way are gone.
+- **The Farm Track** joins Cedar Fields Road at a link-to-link T, and meets the land bridge's track across the
+  perimeter road.
+- **The countryside's tracks** are country roads that climb and fall with the hills; traffic drives the loop and
+  the east track.
+- **Every curved street** gets centre lines (double yellow; dashed white in the Old Quarter; faded in industrial
+  districts), give-way lines and kerb cuts. That includes the existing bends and Greenway Park Drive.
+
+### Saves
+
+- No schema change.
+- A saved street car keeps its position, heading and ground (a car on the re-levelled countryside tracks is put on
+  the new ground by `groundY`).
+- **Recovery rule:** if something solid now stands where a street car was saved (a building, wall, container or
+  tank), it is put at the nearest clear kerb of the nearest street, facing the traffic, and you are told once.
+  - It is never placed inside geometry, and never silently.
+- Homes, properties, places and their IDs are untouched. Only blocks with no home, property, contact or HQ changed.
+- Prop IDs after those blocks shift; they only seed a prop's tint.
+
+### Decisions that need an owner ruling
+
+- **Roadblocks now also go up in the countryside at 4★** (before: never off the city square). They go across the
+  track you are on.
+- **Countryside traffic on the loop and the east track.**
+  - The east track ends at the Course Office's forecourt, where cars turn round on the gravel.
+  - This partly lifts the 6C limitation "traffic mainly on the access route".
+- **No new race added.** Races can now be laid along curved streets (`def.route`). A Saltmarsh street race is
+  proposed, but adding one would change the race list, completion stats and the all-races achievement.
+- **The Saltmarsh estate and Tanner's Row** change those four blocks' buildings (the industrial plan; a few
+  terraced houses removed).
+- **Curved-street asphalt now darkens in the wet,** as the streets always did.
+
+CR_RESULTS_PLACEHOLDER
 
 ## 6C closure (§45.37): terrain hides you from the police
 

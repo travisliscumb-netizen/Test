@@ -19,7 +19,8 @@ const geo = await ev(() => {
   out.links = w.links.map(L => {
     let maxTurn = 0;
     for (let k = 1; k < L.pts.length - 1; k++) { const a = L.pts[k - 1], q = L.pts[k], c = L.pts[k + 1]; const h0 = Math.atan2(q[0] - a[0], q[1] - a[1]), h1 = Math.atan2(c[0] - q[0], c[1] - q[1]); let d = Math.abs(h1 - h0); if (d > Math.PI) d = 2 * Math.PI - d; maxTurn = Math.max(maxTurn, d); }
-    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || P.RoadNet.segOpen(e.axis, e.line, e.seg)) };
+    // an end meets an open lattice road, another curved road part way along it (Curved Roads pass), or is a spur's free end
+    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || (e.onLink ? w.links.some(M => M !== L && M.name === e.onLink && M.pts.some((q, k) => k < M.pts.length - 1 && Math.hypot(q[0] - e.C.x, q[1] - e.C.z) < M.len)) : P.RoadNet.segOpen(e.axis, e.line, e.seg))), cross: L.ends.map(e => e.C ? Math.round(e.C.x) + ',' + Math.round(e.C.z) : '') };
   });
   // the lattice: exactly the segments the superblocks close, nothing else
   let expect = 0; for (const sb of P.SUPERBLOCKS) expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
@@ -34,10 +35,12 @@ const geo = await ev(() => {
   return out;
 });
 const names = geo.links.map(l => l.name);
-check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].every(n => names.includes(n)) && new Set(names).size === names.length, JSON.stringify(names));
+// a name appears twice only for a street that carries on across a lattice street (its two halves meet at one crossing)
+const dupOk = geo.links.every(l => geo.links.filter(m => m.name === l.name).length === 1 || geo.links.filter(m => m.name === l.name).length === 2 && geo.links.filter(m => m.name === l.name).every(m => m.cross.some(c => geo.links.find(o => o !== m && o.name === m.name).cross.includes(c))));
+check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends (and the Curved Roads pass’s streets)', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend', 'Saltmarsh Way', 'Kiln Lane', 'Tanner’s Row', 'Farm Track'].every(n => names.includes(n)) && dupOk, JSON.stringify(names));
 check('they are smooth splines (samples every ~2.5 m, no kink sharper than 10°)', geo.links.every(l => l.n >= l.len / 3 && l.maxTurn < 0.175), JSON.stringify(geo.links.map(l => [l.name, l.n, Math.round(l.len), +l.maxTurn.toFixed(3)])));
 check('one polyline: what the ground paints and the maps draw is what traffic and GPS follow', geo.links.every(l => l.same) && geo.offRaster === 0, JSON.stringify(geo.offRaster));
-check('each end meets an open lattice road (a spur’s far end is its turning circle)', geo.links.every(l => l.ends.every(Boolean)));
+check('each end meets an open lattice road or another curved road (a spur’s far end is its turning circle)', geo.links.every(l => l.ends.every(Boolean)), JSON.stringify(geo.links.filter(l => !l.ends.every(Boolean)).map(l => l.name)));
 check('the lattice graph is unchanged (only superblock closures)', geo.closed === geo.expect && geo.path > 1, JSON.stringify([geo.closed, geo.expect, geo.path]));
 
 // ---------------------------------------------------------------- 2. traffic on the curves
@@ -48,22 +51,23 @@ const trafficOn = await ev(async () => {
   await new Promise(r => { const f0 = g.frame; const iv = setInterval(() => { if (g.frame > f0 + 5) { clearInterval(iv); r(); } }, 20); });
   for (const v of tr.cars.slice()) g.vehicles.despawn(v);
   let n = 0; for (let k = 0; k < 60 && n < 4; k++) if (tr.trySpawnLink()) n++;
-  const track = tr.cars.filter(v => v.ai && v.ai.mode === 'path').map(v => ({ v, maxOff: 0, merged: false, link: w.links[v.ai.path.link], d0: v.ai.path.d }));
+  const track = tr.cars.filter(v => v.ai && v.ai.mode === 'path').map(v => ({ v, maxOff: 0, mid: 0, merged: false, link: w.links[v.ai.path.link], d0: v.ai.path.d }));
   const t0 = g.time;
   await new Promise(res => { const iv = setInterval(() => {
     for (const T of track) {
       const v = T.v; if (!g.vehicles.list.includes(v) || !v.ai) continue;
       if (v.ai.mode === 'path' && v.ai.path.d > 12 && v.ai.path.d < v.ai.path.mergeD - 4) {
         let best = 1e9; const P2 = T.link.pts; for (let k = 0; k < P2.length - 1; k++) { const a = P2[k], c = P2[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); best = Math.min(best, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); }
-        T.maxOff = Math.max(T.maxOff, best);
+        T.maxOff = Math.max(T.maxOff, best); T.mid++;
       } else if (v.ai.mode !== 'path') T.merged = true;
     }
     if (g.time - t0 > 70 || track.every(T => T.merged)) { clearInterval(iv); res(); } }, 80); });
-  out.n = track.length; out.cars = track.map(T => ({ off: +T.maxOff.toFixed(2), merged: T.merged, w: T.link.w, ...(T.merged ? {} : { alive: g.vehicles.list.includes(T.v), d: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.d), len: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.len), v: T.v.ai && +T.v.ai.speed.toFixed(1), blockT: T.v.ai && T.v.ai.blockT }) }));
+  out.n = track.length; out.cars = track.map(T => ({ off: +T.maxOff.toFixed(2), mid: T.mid, merged: T.merged, w: T.link.w, ...(T.merged ? {} : { alive: g.vehicles.list.includes(T.v), d: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.d), len: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.len), v: T.v.ai && +T.v.ai.speed.toFixed(1), blockT: T.v.ai && T.v.ai.blockT }) }));
   return out;
 });
 check('cars spawn on the curved roads', trafficOn.n >= 2, String(trafficOn.n));
-check('they drive the curve inside their lane (centre to car under half the road width)', trafficOn.cars.every(c => c.off > 0.5 && c.off < c.w / 2), JSON.stringify(trafficOn.cars));
+// (a car spawned close to the end of its curve merges before it reaches the curve's middle: it is judged by the others)
+check('they drive the curve inside their lane (centre to car under half the road width)', trafficOn.cars.filter(c => c.mid > 0).length >= 2 && trafficOn.cars.every(c => c.mid === 0 || (c.off > 0.5 && c.off < c.w / 2)), JSON.stringify(trafficOn.cars));
 check('and merge back onto the lattice at the far end', trafficOn.cars.every(c => c.merged), JSON.stringify(trafficOn.cars));
 // a lattice car reaching the junction turns off onto the drive
 const turnOff = await ev(async () => {
@@ -86,7 +90,7 @@ check('lattice traffic turns off onto the curved road at its junction', turnOff.
 // every suburb bend is a real road: a lattice car turns in, drives it in lane and merges out the far end
 const bends = await ev(async () => {
   const g = window.game, w = g.world, tr = g.traffic, out = [];
-  for (const L of w.links.filter(L => /Bend|Curve|Lane/.test(L.name))) {
+  for (const L of w.links.filter(L => ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].includes(L.name))) {
     for (const v of tr.cars.slice()) g.vehicles.despawn(v);
     const e = L.ends[0];
     g.resetPlayerState(e.C.x + (e.axis === 0 ? 30 : 0), e.C.z + (e.axis === 1 ? 30 : 0), 0);
@@ -115,7 +119,7 @@ const bends = await ev(async () => {
 check('every suburb bend is driven by traffic: in at one street, along the curve in lane, out onto the other', bends.length === 4 && bends.every(b => b.took && b.merged && b.off < b.w / 2), JSON.stringify(bends));
 const bendGps = await ev(() => {
   const g = window.game, P = window.__pv, out = [];
-  for (const L of g.world.links.filter(L => /Bend|Curve|Lane/.test(L.name))) { const q = L.pts[Math.floor(L.pts.length / 2)], r = P.gpsRoute(q[0] + 200, q[1] + 200, q[0], q[1]), end = r[r.length - 1]; out.push({ name: L.name, end: +Math.hypot(end.x - q[0], end.z - q[1]).toFixed(2), on: r.filter(p => L.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)).length }); }
+  for (const L of g.world.links.filter(L => ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].includes(L.name))) { const q = L.pts[Math.floor(L.pts.length / 2)], r = P.gpsRoute(q[0] + 200, q[1] + 200, q[0], q[1]), end = r[r.length - 1]; out.push({ name: L.name, end: +Math.hypot(end.x - q[0], end.z - q[1]).toFixed(2), on: r.filter(p => L.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)).length }); }
   return out;
 });
 check('the GPS (and so taxis and the map) routes onto each bend', bendGps.every(b => b.end < 0.01 && b.on >= 3), JSON.stringify(bendGps));

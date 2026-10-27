@@ -64,6 +64,30 @@ nowhere to park waits until you have room (Garage → Collect).
 
 Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
 
+## Curved roads and the road graph (overhaul: Curved Roads pass)
+
+- **One graph of every road** (`src/game/135-core-road-graph.js`, `RoadGraph`).
+  - It holds the lattice's streets, the curved links and spurs, and the extensions' routes and circuits.
+  - Junctions come from the geometry: T-junctions at any angle, Y-junctions, link-to-link joins, and curved streets
+    crossing a lattice street.
+- **Everything that drives or routes uses the graph:**
+  - the GPS and both maps;
+  - AI drivers: police, cabs, vans and anyone fleeing. They follow a dense lane with rounded corners and
+    pure-pursuit steering, and slow for bends by their radius;
+  - traffic, which walks the curved streets through any junction and gives way where it joins or crosses a street;
+  - cab pickups and drop-offs, countryside spawns, and police roadblocks.
+- **New streets:**
+  - Saltmarsh Way: a diagonal collector that sweeps across 3rd Ave;
+  - Kiln Lane, which forks off it at a Y. Both are in the Industrial Belt, with a rebuilt estate round them;
+  - Tanner's Row: a winding lane through the Old Quarter's terraces;
+  - the Farm Track off Cedar Fields Road.
+- **Curved streets get kerb cuts, centre lines and give-way lines.** Cars park along their kerbs, nose to tail with
+  the curve.
+- **The countryside's tracks are country roads.** They follow the hills on a smoothed profile (≤ 9% grade), level
+  across, and carry traffic.
+- **Races** can be laid along streets by waypoints (`routeRacePath`).
+- **Saves:** a car saved where something now stands is moved to the nearest clear kerb, and you are told.
+
 ## Cedar Fields South: terrain and off-road racing (overhaul Session 6C)
 
 The Cedar Fields strip at the south edge of the city is no longer flat: its fields roll and dip, rough underfoot and
@@ -385,9 +409,9 @@ Gameplay pass (this build):
   blackjack, European roulette and fixed-limit Hold'em against four AI personalities, with LOW /
   STANDARD / HIGH / VIP limits by standing. Every bet is settled in one step before its reveal; an
   open blackjack hand and poker chips survive a reload. Every game keeps a house edge.
-- Roads (`splinePts`, `Links`, `GPS`): Greenway Park Drive and the Cedar Fields road are smooth
-  curved through-roads. One polyline feeds the ground shader, both maps, traffic (which turns off
-  onto them and merges back) and the GPS. The lattice graph is unchanged. District road styles
+- Roads (`splinePts`, `Links`, `RoadGraph`, `GPS`): curved through-roads are smooth splines. One polyline feeds
+  the ground shader, both maps, the road graph, traffic and the GPS. The lattice graph is unchanged; the road
+  graph (`135`) is built over it. District road styles
   (`ROAD_STYLE`) for the Old Quarter, Financial District, industrial areas, residential hills and
   the Strip.
 - Map: tap open ground for a district card (police, turf, territory tax, property, street prices),
@@ -602,6 +626,7 @@ node underworld/tests/vehicles.mjs  # turning, reverse, braking, durability, dam
 node underworld/tests/inventory.mjs # located inventory, cost basis, armory, deliveries, royalties, v3 migration
 node underworld/tests/gambling.mjs  # scratch cards, slots, casino games, limits, records, no money duplication
 node underworld/tests/roads.mjs     # curved roads, traffic on curves, GPS, road styles, interactive map
+node underworld/tests/roadnet.mjs   # the road graph: grid intact, skewed T / Y / crossings, no road through a building, kerb cuts, GPS length = road length, two-way, no chord cuts, traffic and give-way, police/van/cab on curves, roadblocks, maps, parked cars aligned, a race on curved streets, country roads, save/reload and relocation, cost
 node underworld/tests/ramps.mjs     # parkade up/down, Quarter Garage, every stunt jump at three speeds, ramp sides, slopes per class
 node underworld/tests/interiors.mjs # reachability walk-search, mansion stairs, penthouse, house tiers, burglary, loot tables
 node underworld/tests/prison.mjs    # no speed buttons, sentence clock and calendar, lawyers, bribes, work, cards, escape, save/reload, v4 migration
