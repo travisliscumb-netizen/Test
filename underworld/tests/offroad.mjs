@@ -13,6 +13,8 @@
    - Official events (Clean Bank, no Rep, no heat), class rules for off-roaders, trucks and values, the daily tiers,
      timed laps; the countryside races (Dirty Cash, Rep, heat only when a cop sees it, on alternate days); Vance's
      off-road pink slip (every third day, cars built for dirt only).
+   - Terrain hides you: a hill through the sight line blocks a cop's view (a bump under it doesn't), in a live
+     countryside race too; the city's sight lines are unchanged; a reload keeps the same ground.
    - The compound: Clean Bank, no Rank gate; six real bays; the service stand (owner only, a third off); the impound
      still holds a space for every car you could own; a reload keeps it all and a position in the countryside.
    - Streaming: the district's blocks and the near terrain tiles come and go with you. */
@@ -358,11 +360,14 @@ const lapT = await ev(() => {
   const ck = O.checkpoints({ laps: 1 }), s = ck.start, v = g.vehicles.spawn('offroad', s.x, s.z, s.h, { driver: 'npc' });
   v.mission = 'test'; v.touched = true; v.drive = new pv.DriveAI(v, g, 'race'); v.drive.path = ck.aiPath.map(c => ({ ...c })); v.drive.pi = 0; v.drive.wait = 0; v.drive.cruise = 30;
   let off = 0, t = 0, air = 0;
+  // the top of each jump: the car must pass over it (within 4 m of the crest)
+  const tops = g.world.cfs.course.features.filter(f => f.kind === 'jump').map(f => { const k = T.cum.findIndex(c => c >= f.at + f.len * 0.62); return { p: T.pts[k], hit: false }; });
   for (let k = 0; k < 4000 && v.drive.pi < v.drive.path.length - 8; k++) {
     window.__step(1, v); t += 0.05; if (v.airborne) air++;
+    for (const q of tops) if (Math.hypot(v.pos.x - q.p[0], v.pos.z - q.p[1]) < 4) q.hit = true;
     if (k % 10 === 0) { let d = 1e9; for (let j = 0; j < T.pts.length; j += 3) d = Math.min(d, Math.hypot(T.pts[j][0] - v.pos.x, T.pts[j][1] - v.pos.z)); if (d > 9) off++; }
   }
-  out.done = v.drive.pi >= v.drive.path.length - 8; out.t = Math.round(t); out.off = off; out.air = air;
+  out.done = v.drive.pi >= v.drive.path.length - 8; out.t = Math.round(t); out.off = off; out.air = air; out.jumps = tops.filter(q => q.hit).length + '/' + tops.length;
   g.vehicles.despawn(v);
   // the player's timed lap: from before the line, every sector, over it again
   const n = T.pts.length, k0 = g.world.cfs.sf.k;
@@ -371,7 +376,7 @@ const lapT = await ev(() => {
   out.laps = O.session && O.session.laps; out.best = O.s.best;
   return out;
 });
-check('the owner’s private session is free; an AI off-roader laps the course on its own line (over the jumps, through the mud) without leaving it', lapT.book === '' && lapT.fee === 0 && lapT.done && lapT.off === 0 && lapT.air > 0 && lapT.t < 150, JSON.stringify(lapT));
+check('the owner’s private session is free; an AI off-roader laps the course on its own line (over the jumps, through the mud) without leaving it', lapT.book === '' && lapT.fee === 0 && lapT.done && lapT.off === 0 && lapT.jumps === '2/2' && lapT.t < 150, JSON.stringify(lapT));
 check('free-roam timed laps: a lap through every sector is timed and the best kept', lapT.laps === 1 && lapT.best && lapT.best.t > 0, JSON.stringify(lapT));
 
 // ---------------------------------------------------------------- 7. the countryside races: Dirty Cash, Rep, heat only when seen
@@ -415,6 +420,91 @@ const pink = await ev(() => {
 });
 check('the off-road pink slip: only a car built for dirt can be put up, and Vance brings one too', /built for dirt/.test(pink.sedan) && pink.pickup === '' && pink.rivals === 30, JSON.stringify(pink));
 
+// ---------------------------------------------------------------- 7b. the hills hide you from the police (6C closure)
+// pairs of real places 28–38 m apart (inside the 40 m a cop needs to see a race), with no collider between them: one
+// with a ridge through the sight line (eye 1.6 m over the cop's ground, 1.2 m over yours), one where a bump rises
+// between them but stays under the sight line, one plain
+const losPairs = await ev(() => {
+  const g = window.game, P = window.__pv, T = P.Terrain, C = T.regions.find(r => r.id === 'country'), grid = g.world.grid, out = {};
+  const gy = (x, z) => P.groundY(x, z) - T.rough;
+  const okGround = (x, z) => T.surf(x, z) === P.TSURF.grass && !grid.resolveCircle(x, z, 1.2, gy(x, z) + 0.2, gy(x, z) + 1.8, {}).hit;
+  for (let z = 1080; z < 1460 && !(out.ridge && out.bump && out.plain); z += 9) for (let x = 20; x < 660 && !(out.ridge && out.bump && out.plain); x += 9) {
+    if (!okGround(x, z)) continue;
+    for (const [ux, uz] of [[1, 0], [0, 1], [0.7071, 0.7071], [0.7071, -0.7071]]) {
+      const d = 33, bx = x + ux * d, bz = z + uz * d; if (!okGround(bx, bz)) continue;
+      const ay = gy(x, z) + 1.6, by = gy(bx, bz) + 1.2;
+      if (!grid.raycast || grid.raycast(x, ay, z, ux / Math.hypot(1, (by - ay) / d), (by - ay) / d / Math.hypot(1, (by - ay) / d), uz / Math.hypot(1, (by - ay) / d), Math.hypot(d, by - ay) - 0.3, 1.2, true)) continue;
+      // how far the ground rises above the sight line (and above the higher end's ground) between them
+      let over = -1e9, rise = -1e9; for (let t = 0.05; t < 0.96; t += 0.05) { const h = T._baked(C, x + ux * d * t, z + uz * d * t); over = Math.max(over, h - (ay + (by - ay) * t)); rise = Math.max(rise, h - Math.max(gy(x, z), gy(bx, bz))); }
+      const pair = { a: [x, z], b: [bx, bz], over: +over.toFixed(2), rise: +rise.toFixed(2) };
+      if (!out.ridge && over > 0.6) out.ridge = pair;
+      else if (!out.bump && rise > 0.4 && over < -0.3) out.bump = pair;
+      else if (!out.plain && rise < 0.1 && over < -0.8) out.plain = pair;
+    }
+  }
+  let sum = 0; for (let i = 0; i < C.h.length; i += 97) sum += C.h[i]; out.terrSum = +sum.toFixed(3);
+  return out;
+});
+// a cop standing at a, you standing at b: does the police see you? (and are both really there?)
+const copSees = pr => ev(pr => {
+  const g = window.game, P = window.__pv; window.__calm();
+  if (g.player.state === 'vehicle') g.exitVehicle(true);
+  g.resetPlayerState(pr.b[0], pr.b[1], 0);
+  const c = g.police.spawnCop(pr.a[0], pr.a[1]); g.update(0.05, 0.05);
+  const r = { sees: g.police.copCanSee(g.player.pos.x, g.player.pos.z, 40), cop: +Math.hypot(c.x - pr.a[0], c.z - pr.a[1]).toFixed(2), copOnGround: +Math.abs(c.y - P.groundY(c.x, c.z)).toFixed(2), me: +Math.hypot(g.player.pos.x - pr.b[0], g.player.pos.z - pr.b[1]).toFixed(2), meOnGround: +Math.abs(g.player.pos.y - P.groundY(g.player.pos.x, g.player.pos.z)).toFixed(2), d: +Math.hypot(c.x - g.player.pos.x, c.z - g.player.pos.z).toFixed(1), terrain: P.Terrain.occludes(c.x, c.y + 1.6, c.z, g.player.pos.x, P.groundY(g.player.pos.x, g.player.pos.z) + 1.2, g.player.pos.z) };
+  window.__calm();
+  return r;
+}, pr);
+const there2 = r => r.cop < 1.5 && r.copOnGround < 0.2 && r.me < 0.5 && r.meOnGround < 0.2 && r.d < 40;
+const seeRidge = await copSees(losPairs.ridge), seeBump = await copSees(losPairs.bump), seePlain = await copSees(losPairs.plain);
+check('terrain LOS: with open ground between a cop and you (both standing there), the cop sees you', losPairs.plain && there2(seePlain) && seePlain.sees && !seePlain.terrain, JSON.stringify({ pair: losPairs.plain, seePlain }));
+check('terrain LOS: a hill rising through the sight line hides you (nothing else in the way)', losPairs.ridge && there2(seeRidge) && !seeRidge.sees && seeRidge.terrain, JSON.stringify({ pair: losPairs.ridge, seeRidge }));
+check('terrain LOS: a bump between you that stays under the sight line doesn’t hide you', losPairs.bump && there2(seeBump) && seeBump.sees && !seeBump.terrain, JSON.stringify({ pair: losPairs.bump, seeBump }));
+const cityLos = await ev(() => {
+  const g = window.game, P = window.__pv, grid = g.world.grid, out = {};
+  // along a city street: seen; straight through a building: not (the terrain never enters into it)
+  out.street = grid.lineOfSight(402.6, 1.6, 330, 402.6, 1.2, 362);
+  const b2 = g.world.blocks.flatMap(b => b.bld).find(r => r.x1 - r.x0 > 12 && r.x1 - r.x0 < 26 && r.h > 6 && r.y0 < 0.5);
+  const zc = (b2.z0 + b2.z1) / 2; out.building = grid.lineOfSight(b2.x0 - 4, 1.6, zc, b2.x1 + 4, 1.2, zc);
+  out.terrainStreet = P.Terrain.occludes(402.6, 1.6, 330, 402.6, 1.2, 362);
+  // a cop on the street sees you down the street
+  window.__calm(); if (g.player.state === 'vehicle') g.exitVehicle(true); g.resetPlayerState(402.6, 362, 0); g.police.spawnCop(402.6, 330); g.update(0.05, 0.05);
+  out.cop = g.police.copCanSee(g.player.pos.x, g.player.pos.z, 40); window.__calm();
+  // inside an interior far underground the terrain never counts
+  out.under = P.Terrain.occludes(100, -58, 920, 140, -58, 930);
+  return out;
+});
+check('flat city LOS is unchanged: seen down a street, hidden behind a building; underground spaces never meet the terrain', cityLos.street && !cityLos.building && !cityLos.terrainStreet && cityLos.cop && !cityLos.under, JSON.stringify(cityLos));
+// a live countryside race: a cop with a ridge between you sees nothing (no heat); one with a clear view does (1★)
+const raceSight = async pr => {
+  await ev(() => { const g = window.game, P = window.__pv; g.uw.S.day = 30; window.__calm(); const p0 = g.world.cfs.loop[10]; window.__car('offroad', p0[0], p0[1], 0); g.money.W.dirty.me = 5000; const tull = g.missions.contacts.find(c => c.id === 'tull'); let o = null; for (let k = 0; k < 30 && !o; k++) { const x = g.campaign.raceOffer(tull); if (!x.pink && x.race.id === 'dustdevil') o = x; } g.missions.start(o); void P; });
+  await ev(() => { const g = window.game, A = g.race.active, v = g.player.vehicle; v.pos.x = A.R.start.x; v.pos.z = A.R.start.z; v.h = A.R.start.h; v.vel.set(0, 0); v.syncMesh(0); });
+  for (let k = 0; k < 15; k++) await ev(() => window.game.update(0.05, 0.05));
+  await page.waitForFunction(() => { const A = window.game.race.active; return A && (A.phase === 'count' || A.phase === 'run'); }, null, { timeout: 60000, polling: 50 });
+  await ev(() => { window.game.race.active.count = 0.01; });
+  await page.waitForFunction(() => window.game.race.active && window.game.race.active.phase === 'run', null, { timeout: 30000, polling: 50 });
+  const r = await ev(pr => {
+    const g = window.game, P = window.__pv, A = g.race.active, v = g.player.vehicle; g.police.enabled = true;
+    // your race car at b (on its wheels, at race speed, heading across the line of sight), the cop standing at a
+    const h = Math.atan2(-(pr.b[1] - pr.a[1]), pr.b[0] - pr.a[0]);
+    v.pos.x = pr.b[0]; v.pos.z = pr.b[1]; v.h = h; v.syncMesh(0);
+    const c = g.police.spawnCop(pr.a[0], pr.a[1]);
+    const out = { level0: g.police.level };
+    for (let k = 0; k < 4; k++) { v.pos.x = pr.b[0]; v.pos.z = pr.b[1]; v.vel.set(Math.sin(h) * 18, Math.cos(h) * 18); g.update(0.05, 0.05); }
+    out.level = g.police.level; out.seen = !!A.seen; out.speed = +v.speed.toFixed(1);
+    out.cop = +Math.hypot(c.x - pr.a[0], c.z - pr.a[1]).toFixed(2); out.car = +Math.hypot(v.pos.x - pr.b[0], v.pos.z - pr.b[1]).toFixed(2); out.carOnGround = +Math.abs(v.pos.y - P.groundY(v.pos.x, v.pos.z)).toFixed(2);
+    out.d = +Math.hypot(c.x - v.pos.x, c.z - v.pos.z).toFixed(1);
+    g.missions.fail('test'); window.__calm();
+    return out;
+  }, pr);
+  return r;
+};
+const raceHidden = await raceSight(losPairs.ridge), raceSeen = await raceSight(losPairs.plain);
+// (a car crossing a hillside at race speed can be a little off the ground: within a metre of it)
+const inPlace = r => r.cop < 1.5 && r.car < 2 && r.carOnGround < 1 && r.d < 40 && r.speed > 60 / 3.6;
+check('a countryside race behind a ridge: the cop is right there but can’t see through the hill, so no race heat', inPlace(raceHidden) && raceHidden.level0 === 0 && raceHidden.level === 0 && !raceHidden.seen, JSON.stringify(raceHidden));
+check('…and the same race in plain view of a cop draws 1★, as the rules say', inPlace(raceSeen) && raceSeen.level === 1 && raceSeen.seen, JSON.stringify(raceSeen));
+
 // ---------------------------------------------------------------- 8. save and reload in the countryside
 // an official win today (its tier must survive the reload: 6B dropped official ids from today's record on load)
 await ev(() => { const g = window.game; if (g.missions.active) g.missions.fail('test'); if (g.player.state === 'vehicle') g.exitVehicle(true); g.raceRules.noteWin('or_trail'); window.__tier = g.raceRules.today().or_trail; g.resetPlayerState(150, 1300, 0); window.__step(10); });
@@ -432,6 +522,8 @@ const after = await ev(ids => {
   return out;
 }, bayIds);
 after.tier0 = tier0;
+const losAfter = await ev(pr => { const P = window.__pv, T = P.Terrain, C = T.regions.find(r => r.id === 'country'), gy = (x, z) => P.groundY(x, z) - T.rough; let sum = 0; for (let i = 0; i < C.h.length; i += 97) sum += C.h[i]; const occ = q => T.occludes(q.a[0], gy(q.a[0], q.a[1]) + 1.6, q.a[1], q.b[0], gy(q.b[0], q.b[1]) + 1.2, q.b[1]); return { sum: +sum.toFixed(3), ridge: occ(pr.ridge), bump: occ(pr.bump), plain: occ(pr.plain) }; }, losPairs);
+check('save → reload: the terrain is the same ground and hides (and doesn’t hide) the same sight lines', losAfter.sum === losPairs.terrSum && losAfter.ridge && !losAfter.bump && !losAfter.plain, JSON.stringify({ losAfter, sum0: losPairs.terrSum }));
 check('save → reload: a position in the countryside is kept (on the ground, not pulled back to the city); the compound, its bays, the best lap and today’s tiers are kept', after.pos[1] > 1200 && Math.abs(after.y) < 0.2 && after.owned && after.bays.every(Boolean) && after.best && after.tier0 > 0 && after.tier === after.tier0, JSON.stringify(after));
 
 // ---------------------------------------------------------------- 9. streaming, the camera and the maps

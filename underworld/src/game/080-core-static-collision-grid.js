@@ -114,10 +114,13 @@ class CollisionGrid {
     }
     return hit;
   }
+  // nothing solid between two points: no collider (glass hides nothing) and, on the Cedar Fields terrain (Session 6C),
+  // no hill or ridge rising through the sight line
   lineOfSight(ax, ay, az, bx, by, bz) {
     const dx = bx - ax, dy = by - ay, dz = bz - az; const l = Math.hypot(dx, dy, dz);
     if (l < 0.01) return true;
-    return !this.raycast(ax, ay, az, dx / l, dy / l, dz / l, l - 0.3, 1.2, true); // glass hides nothing
+    if (this.raycast(ax, ay, az, dx / l, dy / l, dz / l, l - 0.3, 1.2, true)) return false;
+    return !Terrain.occludes(ax, ay, az, bx, by, bz);
   }
 }
 

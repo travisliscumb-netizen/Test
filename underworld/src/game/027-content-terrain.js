@@ -75,6 +75,33 @@ const Terrain = {
     E.grip = 1 - (1 - F.grip) * k * w; E.drag = F.drag * k * w; E.bump = F.rough * m * k; E.s = s;
     return E;
   },
+  // does the ground rise through the straight line from a to b? (Session 6C closure: hills and ridges block sight.)
+  // Only the part of the line over a terrain region is looked at (a city sight line costs a bounds test per region);
+  // there the baked ground (not the centimetre rough layer) is sampled every ~1.5 m, the last 0.75 m at each end left
+  // out (the ground the eyes stand on), and the ground must rise 2 cm above the line to hide it
+  occludes(ax, ay, az, bx, by, bz) {
+    // (interiors and underground spaces are far below the ground: never under the terrain's sky)
+    if (!this.ready || ay < -5 || by < -5) return false;
+    const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 2) return false;
+    const gx = this.gx, gz = this.gz;
+    let hit = false;
+    for (const R of this.regions) {
+      // clip the segment to the region's rectangle (slabs in x and z)
+      let t0 = 0, t1 = 1;
+      for (const [p, d, lo, hi] of [[ax, dx, R.x0, R.x1], [az, dz, R.z0, R.z1]]) {
+        if (Math.abs(d) < 1e-9) { if (p < lo || p > hi) { t0 = 1; t1 = 0; } continue; }
+        let u = (lo - p) / d, v = (hi - p) / d; if (u > v) [u, v] = [v, u];
+        t0 = Math.max(t0, u); t1 = Math.min(t1, v);
+      }
+      t0 = Math.max(t0, 0.75 / L); t1 = Math.min(t1, 1 - 0.75 / L);
+      if (t1 <= t0) continue;
+      const n = Math.ceil((t1 - t0) * L / 1.5);
+      for (let k = 0; k <= n && !hit; k++) { const t = t0 + (t1 - t0) * k / n; if (this._baked(R, ax + dx * t, az + dz * t) > ay + (by - ay) * t + 0.02) hit = true; }
+      if (hit) break;
+    }
+    this.gx = gx; this.gz = gz;
+    return hit;
+  },
   // the countryside's hills before anything is stamped on them (the generator levels its pads from this)
   raw(x, z) {
     const edge = Math.min(x - CFS.x0, CFS.x1 - x, z - CFS.z0, CFS.z1 - z);
