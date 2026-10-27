@@ -18,9 +18,9 @@ const net = await ev(() => {
   // connectivity: BFS from (0,0) reaches every node that has a road
   const seen = new Set(['0,0']), q = [[0, 0]];
   while (q.length) { const [i, j] = q.shift(); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (RoadNet.open(i, j, dx, dz) && !seen.has((i + dx) + ',' + (j + dz))) { seen.add((i + dx) + ',' + (j + dz)); q.push([i + dx, j + dz]); } }
-  // perimeter stays whole; race lines stay open
+  // perimeter stays whole; race lines on the lattice stay open (countryside races run on their own paths: offroad.mjs)
   let perim = true; for (let k = 0; k < N; k++) for (const [a, i] of [[0, 0], [0, N], [1, 0], [1, N]]) if (!RoadNet.segOpen(a, i, k)) perim = false;
-  const races = window.__pv.RACES.every(r => { const ns = r.nodes.concat(r.loop ? [r.nodes[0]] : []); for (let k = 0; k < ns.length - 1; k++) { const [a0, b0] = ns[k], [a1, b1] = ns[k + 1]; const dx = Math.sign(a1 - a0), dz = Math.sign(b1 - b0); let i = a0, j = b0; while (i !== a1 || j !== b1) { if (!RoadNet.open(i, j, dx, dz)) return false; i += dx; j += dz; } } return true; });
+  const races = window.__pv.RACES.filter(r => r.nodes).every(r => { const ns = r.nodes.concat(r.loop ? [r.nodes[0]] : []); for (let k = 0; k < ns.length - 1; k++) { const [a0, b0] = ns[k], [a1, b1] = ns[k + 1]; const dx = Math.sign(a1 - a0), dz = Math.sign(b1 - b0); let i = a0, j = b0; while (i !== a1 || j !== b1) { if (!RoadNet.open(i, j, dx, dz)) return false; i += dx; j += dz; } } return true; });
   // longest straight run of open road (the old grid ran 12 blocks edge to edge everywhere)
   let fullRuns = 0; for (let a = 0; a < 2; a++) for (let i = 1; i < N; i++) { let all = true; for (let k = 0; k < N; k++) if (!RoadNet.segOpen(a, i, k)) all = false; if (all) fullRuns++; }
   return { closed, dead, tj, iso, open, reached: seen.size, perim, races, fullRuns, sb: SUPERBLOCKS.length };
