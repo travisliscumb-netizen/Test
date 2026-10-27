@@ -66,9 +66,10 @@ class ImpoundLot {
   // the first space that frees up
   freeSlot(skip, at) {
     const used = new Set(this.held().filter(e => e !== skip).map(e => e.imp.slot)), S = this.slots();
-    // the yard nearest to where it was seized first (§45.35): from the city, the main yard, the overflow yard, then
-    // Valen Point's annex; from Valen Point, its annex first, then the city's yards
-    const order = at && offCity(at.x, at.z) ? [IMPOUND.annex.id, IMPOUND.id, IMPOUND.overflow.id] : [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id];
+    // the yard nearest to where it was seized first (§45.35): from the city (and from Cedar Fields South, over the
+    // land bridge, Session 6C), the main yard, the overflow yard, then Valen Point's annex; from Valen Point, its
+    // annex first, then the city's yards
+    const order = at && vpSide(at.x, at.z) ? [IMPOUND.annex.id, IMPOUND.id, IMPOUND.overflow.id] : [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id];
     for (const lot of order) for (let i = 0; i < S.length; i++) if (S[i].lot === lot && !used.has(i)) return i;
     return -1;
   }

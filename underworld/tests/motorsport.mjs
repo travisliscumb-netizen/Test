@@ -38,7 +38,7 @@ const reload = async () => {
 // ---------------------------------------------------------------- 1. the world: a causeway out to an island
 const world = await ev(() => {
   const g = window.game, w = g.world, pv = window.__pv, VP = pv.VP, out = {};
-  out.links = w.links.filter(l => l.spur).map(l => ({ name: l.name, a: l.ends[0].axis + ':' + l.ends[0].line + ':' + l.ends[0].seg, b: !!l.ends[1].free }));
+  out.links = w.links.filter(l => l.spur && l.name === 'Valen Point Causeway').map(l => ({ name: l.name, a: l.ends[0].axis + ':' + l.ends[0].line + ':' + l.ends[0].seg, b: !!l.ends[1].free }));
   out.groundCause = window.__pv.groundY(1200, VP.cw.z); out.groundIsland = window.__pv.groundY(1900, 500); out.sea = window.__pv.groundY(1200, VP.cw.z + 40); out.seaCity = window.__pv.groundY(1300, 200);
   // walls: from the perimeter road straight out along the causeway is open; along the old seawall it is not
   const res = { x: 0, z: 0 }, grid = w.grid;
@@ -105,7 +105,7 @@ check('GPS routes there and back (city ↔ Race Control, city ↔ the circuit, t
 
 // ---------------------------------------------------------------- 5. traffic and police use the causeway
 const traffic = await ev(() => {
-  const g = window.game, spur = g.world.links.find(l => l.spur), out = { seen: 0, back: 0 };
+  const g = window.game, spur = g.world.links.find(l => l.spur && l.name === 'Valen Point Causeway'), out = { seen: 0, back: 0 };
   window.__calm(); g.police.enabled = false;
   g.resetPlayerState(1100, 527.5, 0);
   const watch = new Set();
@@ -198,7 +198,7 @@ const raceTo = async (id, place, prep) => {
   await ev(() => { window.game.race.active.count = 0.01; });
   await page.waitForFunction(() => window.game.race.active && window.game.race.active.phase === 'run', null, { timeout: 30000, polling: 50 });
   // let the field get away, a cop watching from the pit wall
-  const mid = await ev(() => { const g = window.game, A = g.race.active, v = g.player.vehicle; const s0 = A.racers.map(r => [r.v.pos.x, r.v.pos.z]); g.police.spawnCop(window.__pv.VP_PIT.laneX, v.pos.z - 10); for (let k = 0; k < 160; k++) { v.vel.set(Math.sin(v.h) * 30, Math.cos(v.h) * 30); g.update(0.05, 0.05); } return { moved: A.racers.map((r, i) => Math.round(Math.hypot(r.v.pos.x - s0[i][0], r.v.pos.z - s0[i][1]))), level: g.police.level }; });
+  const mid = await ev(() => { const g = window.game, A = g.race.active, v = g.player.vehicle; const s0 = A.racers.map(r => [r.v.pos.x, r.v.pos.z]); g.police.spawnCop(window.__pv.VP_PIT.laneX, v.pos.z - 10); let saw = 0; for (let k = 0; k < 160; k++) { v.vel.set(Math.sin(v.h) * 30, Math.cos(v.h) * 30); g.update(0.05, 0.05); if (g.police.copCanSee(v.pos.x, v.pos.z, 40)) saw++; } return { moved: A.racers.map((r, i) => Math.round(Math.hypot(r.v.pos.x - s0[i][0], r.v.pos.z - s0[i][1]))), level: g.police.level, saw }; });
   await ev(place => { const g = window.game, A = g.race.active, v = g.player.vehicle, c = A.R.cps[A.R.cps.length - 1]; A.finished = place - 1; A.cp = A.R.cps.length - 1; v.pos.x = c.x; v.pos.z = c.z; v.vel.set(0, 0); v.syncMesh(0); }, place);
   await page.waitForFunction(() => !window.game.missions.active, null, { timeout: 30000, polling: 50 });
   return { mid };
@@ -214,7 +214,7 @@ await ev(() => { const g = window.game; window.__log = []; window.__c0 = g.money
 const gt = await raceTo('vp_gt', 1);
 const gtMoney = await ev(() => { const g = window.game, L = window.__log.filter(x => /^track/.test(x.src) || x.cur === 'dirty'); return { in: L.filter(x => x.d > 0).map(x => x.cur + ':' + x.src + ':' + Math.round(x.d)).join(), out: L.filter(x => x.d < 0).map(x => x.cur + ':' + x.src + ':' + Math.round(-x.d)).join(), dirty: Math.round(g.money.W.dirty.me - window.__d0), level: g.police.level }; });
 check('an official event: the entry fee and the prize are Clean Bank (no Dirty Cash moves), booked as the track’s', gtMoney.in === 'clean:trackPrize:9000' && gtMoney.out === 'clean:trackFee:1500' && gtMoney.dirty === 0, JSON.stringify(gtMoney));
-check('…no heat from a cop watching you race it; the opponents really race (each covered ground)', gt.mid.level === 0 && gt.mid.moved.length === 5 && gt.mid.moved.every(d => d > 60), JSON.stringify(gt));
+check('…no heat from a cop watching you race it (it really saw you); the opponents really race (each covered ground)', gt.mid.level === 0 && gt.mid.saw > 0 && gt.mid.moved.length === 5 && gt.mid.moved.every(d => d > 60), JSON.stringify(gt));
 const again = await (async () => { await ev(() => { window.__log = []; }); await raceTo('vp_gt', 1); return ev(() => window.__log.filter(x => x.d > 0 && /^track/.test(x.src)).map(x => x.src + ':' + Math.round(x.d)).join()); })();
 check('the same event won again today pays half (the daily tiers, as street races)', again === 'trackPrize:4500', again);
 // the owner: no entry fee; the Invitational's car once

@@ -320,7 +320,8 @@ class PedManager {
     if (p.y <= gy) { p.y = gy; if (p.vy < -6 && p.state === 'down') g.fx.dust(p.x, gy + 0.1, p.z, 3); p.vy = 0; }
     const r = g.world.grid.resolveCircle(p.x, p.z, 0.3, p.y + 0.3, p.y + 1.7, this._res);
     if (r.hit) { p.x = r.x; p.z = r.z; if (p.state === 'rejoin' || p.state === 'flee') { p.vx += -r.nz * 2; p.vz += r.nx * 2; } }
-    if (p.x < -EDGE_MARGIN + 1 || p.z < -EDGE_MARGIN + 1 || p.x > CITY + EDGE_MARGIN - 1 || p.z > CITY + EDGE_MARGIN - 1) { p.x = clamp(p.x, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); p.z = clamp(p.z, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); }
+    // kept to the city's promenade, unless standing on Valen Point or Cedar Fields South (and their causeway and bridge)
+    if ((p.x < -EDGE_MARGIN + 1 || p.z < -EDGE_MARGIN + 1 || p.x > CITY + EDGE_MARGIN - 1 || p.z > CITY + EDGE_MARGIN - 1) && !inExtension(p.x, p.z)) { p.x = clamp(p.x, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); p.z = clamp(p.z, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); }
     const hs = Math.hypot(p.vx, p.vz);
     if (hs > 0.3 && p.state !== 'down') p.h = dampAngle(p.h, Math.atan2(p.vx, p.vz), 10, dt);
   }

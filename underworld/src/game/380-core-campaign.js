@@ -197,7 +197,7 @@ class Campaign {
       W.hotT = (W.hotT || 0) - dt;
       if (W.hotT <= 0) {
         W.hotT = 0.4;
-        for (const v of g.traffic.cars) if (v.patrol && dist2(v.pos.x, v.pos.z, p.pos.x, p.pos.z) < 32 * 32 && g.world.grid.lineOfSight(v.pos.x, 1.5, v.pos.z, p.pos.x, 1.2, p.pos.z)) { g.police.adoptUnit(v); g.police.setLevel(2); g.ui.toast('A patrol car got a look at the case!', 'warn'); break; }
+        for (const v of g.traffic.cars) if (v.patrol && dist2(v.pos.x, v.pos.z, p.pos.x, p.pos.z) < 32 * 32 && g.world.grid.lineOfSight(v.pos.x, v.pos.y + 1.5, v.pos.z, p.pos.x, p.pos.y + 1.2, p.pos.z)) { g.police.adoptUnit(v); g.police.setLevel(2); g.ui.toast('A patrol car got a look at the case!', 'warn'); break; }
       }
     }
     if (W.noCops && g.police.level > 0) { g.missions.fail('You brought heat. The deal is off.'); return; }

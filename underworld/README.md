@@ -64,6 +64,36 @@ nowhere to park waits until you have room (Garage → Collect).
 
 Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
 
+## Cedar Fields South: terrain and off-road racing (overhaul Session 6C)
+
+The Cedar Fields strip at the south edge of the city is no longer flat: its fields roll and dip, rough underfoot and
+under the wheels, while the ground stays level under everything built there (the farm, its fences, drives and
+trees). The farm track now runs down to the perimeter road, and from there a dirt track crosses a low land bridge to
+**Cedar Fields South**: about 700 × 450 m of countryside with hills, rock outcrops, muddy hollows, rutted dirt tracks
+and an off-road course of about 1 km with whoops, two jumps, a mud wallow, a rock garden and a cambered bend.
+
+The ground is a real height field. Every car feels it: grass, dirt, mud, rock and gravel each change grip and rolling
+drag, and the bumps shake the tyres loose the faster you take them. The wheels ride every bump while the springs soak
+up part of it. A road car struggles; a pickup, an SUV or a truck copes better; an off-roader (the Mesa Trail) feels
+about a third of it. Slopes pull, crests launch you, and jumps fly.
+
+At the **Course Office** in the compound, official events are Clean Bank, with no Rep and no heat:
+- the Trail Cup (built for dirt, under $30,000);
+- the Truck Run (trucks and pickups);
+- Mesa Pro (real off-roaders worth $20,000 and up).
+
+They use the same daily prize tiers as every race. Timed laps on the course cost $150 a session.
+
+The compound itself is for sale: $180,000 from the bank, provisional, with no Rank gate. It brings six bays in the
+owners' garage shed, a service stand that repairs a third off, and free private sessions.
+
+Out in the fields, Tull runs illegal countryside races (Dust Devil and Ridge Run, on alternate days) for Dirty Cash
+and Rep, with heat only if a cop sees you. Every third day Vance offers an off-road pink slip for cars built for dirt.
+
+Traffic, police and cabs come over the land bridge, and the GPS and the maps reach it all. Modules:
+`src/game/026-content-cedar-south.js`, `027-content-terrain.js`, `126-content-cedar-south-gen.js`,
+`176-content-cedar-south-scenery.js`, `509b-underworld-offroad.js`.
+
 ## Valen Point Motorsport Park (overhaul Session 6B)
 
 East of the city, across a causeway from the perimeter road, the island of Valen Point holds a 3 km circuit with long
@@ -541,6 +571,7 @@ node underworld/tests/threat.mjs     # threats: pressure only from player action
 node underworld/tests/hot.mjs        # HOT and the law: dealer theft stars, recognition only by a cop who sees it, Pay & Spray never cleans, Chop Shop clean once + needs a space, arrest impound keeps the car not the contraband, legal and illegal retrieval, abandonment and chase recovery, full registry keeps everything, the overflow yard (a bay per car, no sharing, retrieval at its own gate, old saves repaired)
 node underworld/tests/races.mjs      # street racing: purse tiers per race per day, Dirty winnings, seen-racing 1★, pink slips (eligibility, win/lose/quit/reload, no duplication), car wash price/effects, Motor Works repair and tuning
 node underworld/tests/motorsport.mjs  # Valen Point: causeway and island ground/walls, circuit geometry, a self-driving car there and back, GPS both ways through no building, traffic and police on the causeway, purchase with no Rank gate, pit-garage bays through reloads, impound capacity, official events (Clean money, class rules, no heat, prize car once), hosting, a lap at speed, track-day timing, streaming, maps
+node underworld/tests/offroad.mjs     # Cedar Fields South: land bridge ground/walls, terrain relief and surfaces, course features and ruts, the strip rough but flat under everything built, mesh = physics, surface grip/drag road car vs off-roader, suspension over rock, jumps, slopes, a self-driving car there and back, GPS, traffic, police, cabs, no peds, the compound (no gate, six bays, service stand, impound capacity), official events (Clean, class rules, tiers, no heat), timed laps, countryside races (Dirty, Rep, heat when seen), the off-road pink slip, reload, streaming, camera, maps
 node underworld/tests/vehicle.mjs    # vehicle registry: real spaces only (kept while a car is out), gifts wait, street parking saved, stolen cars + cargo + cash persist and are recovered after a day (logged), bounded registry, fleet joining, wrecks towed home, rare cars, no duplicates after reload
 node underworld/tests/raid.mjs       # rival warehouses: sites and gates, interior never regenerates stock, exact take-only transfers, remainder persists, save/reload, raid clock 4.5/7/9/10 min without stacking, pause freeze, evacuation van, wind-down, restock only by delivery, safe
 node underworld/tests/shipment.mjs   # shipments: restock on the road not the shelves, reload while due, arrival, a real van carrying the record's cargo, docking, hijack, wreck, reload with a van on the road (once), the boat and its migration, imports (rank, price, landing, truck only, Driver run, expiry, customs, reload)

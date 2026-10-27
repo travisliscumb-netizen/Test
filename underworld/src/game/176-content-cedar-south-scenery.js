@@ -85,6 +85,7 @@ class CedarScenery {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
     g.setIndex(idx); g.computeBoundingSphere();
     const m = new THREE.Mesh(g, opt.mat || this.mat); m.receiveShadow = true;
+    m.userData.nGrid = nx * nz;
     return m;
   }
   // the countryside at 5 m: one mesh; its index skips the cells of the near tiles; a rock bank round the shore

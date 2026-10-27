@@ -58,6 +58,20 @@ if (await page.evaluate(() => !!(window.game.world && window.game.world.vp))) {
   await new Promise(r => setTimeout(r, 4000));
   track = await measure();
 }
-console.log(path.basename(path.dirname(file)) + (PHONE ? ' [phone x4 CPU]' : ''), JSON.stringify({ calm, busy, track, errors: errs.slice(0, 3) }));
+// Cedar Fields South (Session 6C), when the build has it: in an off-roader on the course, four AI off-roaders lapping it,
+// the terrain's near tiles round you and the hills, the compound and the countryside in view
+let fields = null;
+if (await page.evaluate(() => !!(window.game.world && window.game.world.cfs))) {
+  await page.evaluate(() => {
+    const g = window.game, pv = window.__pv; g.police.clear(); g.police.setLevel(0); g.env.time = 13; try { g.env.setWeather('clear', true); } catch {}
+    for (const v of g.vehicles.list.slice()) if (v.mission === 'perf' || v === g.player.vehicle) { if (v === g.player.vehicle) g.exitVehicle(true); g.vehicles.despawn(v); }
+    const ck = g.offroad.checkpoints({ laps: 3 }), s = ck.start;
+    const me = g.vehicles.spawn('offroad', s.x - 2.7 * s.dir.z, s.z + 2.7 * s.dir.x, s.h, {}); g.resetPlayerState(me.pos.x + 2, me.pos.z, 0); g.completeEnter(me);
+    for (let k = 0; k < 4; k++) { const v = g.vehicles.spawn(['offroad', 'pickup', 'kodiak', 'suv'][k], s.x + s.dir.x * (12 + 9 * k), s.z + s.dir.z * (12 + 9 * k), s.h, { driver: 'npc' }); v.mission = 'perf'; v.drive = new pv.DriveAI(v, g, 'race'); v.drive.path = ck.aiPath.map(c => ({ ...c })); v.drive.pi = 0; v.drive.wait = 0; v.drive.cruise = 30; }
+  });
+  await new Promise(r => setTimeout(r, 4000));
+  fields = await measure();
+}
+console.log(path.basename(path.dirname(file)) + (PHONE ? ' [phone x4 CPU]' : ''), JSON.stringify({ calm, busy, track, fields, errors: errs.slice(0, 3) }));
 await Promise.race([b.close(), new Promise(r => setTimeout(r, 4000))]);
 process.exit(0);

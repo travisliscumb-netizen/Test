@@ -20,8 +20,8 @@ const helpers = first => ev(first => {
   g.events.cool = 1e9; g.debug.god = true; g.police.enabled = true; if (first) g.env.time = 13;
   window.__calm = () => { g.police.clear(); g.police.units.length = 0; for (const c of g.police.cops.slice()) { const i = g.peds.peds.indexOf(c); if (i >= 0) g.peds.peds.splice(i, 1); } g.police.cops.length = 0; g.hotwatch.cool = 1e9; };
   window.__tull = () => g.missions.contacts.find(c => c.id === 'tull');
-  // a Tull offer of the kind asked for (a race by id, or the pink slip)
-  window.__offer = want => { const C = g.campaign; for (let k = 0; k < 20; k++) { const o = C.raceOffer(window.__tull()); if (want === 'pink' ? o.pink : !o.pink && o.race.id === want) return o; } return null; };
+  // a Tull offer of the kind asked for (a race by id, or the street pink slip; Vance's off-road special is offroad.mjs's)
+  window.__offer = want => { const C = g.campaign; for (let k = 0; k < 20; k++) { const o = C.raceOffer(window.__tull()); if (want === 'pink' ? o.pink && !o.race.offroad : !o.pink && o.race.id === want) return o; } return null; };
   // a car of yours, standing at (x, z), you in it
   window.__car = (type, x, z) => { const e = g.content.addToGarage(type, 'bought', undefined, true); e.prov = { dirty: 0, clean: Math.round(window.__pv.CAR_MSRP[type] * 0.8) }; if (g.player.state === 'vehicle') g.exitVehicle(true); const v = g.vreg.spawnFor(e, { x, z, h: 0, y: 0.15 }); v.display = false; e.out = true; e.loc = { x, z, h: 0, y: v.pos.y }; g.resetPlayerState(x + 2, z, 0); g.completeEnter(v); return e; };
   window.__log = []; if (!window.__hooked) { g.money.on(x => window.__log.push(x)); window.__hooked = true; }
@@ -98,7 +98,7 @@ check('finishing while wanted still pays the purse', wanted.paid === 1200 - 180,
 await ev(() => window.__calm());
 
 // ---------------------------------------------------------------- 3. pink slips
-const offers = await ev(() => { const g = window.game, n = []; for (let k = 0; k < 14; k++) n.push(g.campaign.raceOffer(window.__tull()).pink ? 1 : 0); return n.join(''); });
+const offers = await ev(() => { const g = window.game, n = []; for (let k = 0; k < 14; k++) { const o = g.campaign.raceOffer(window.__tull()); n.push(o.pink && !o.race.offroad ? 1 : 0); }; return n.join(''); });
 check('a pink slip comes round in Tull’s rotation, between the ordinary races (until it is raced that day)', /1/.test(offers) && !/11|101|1001/.test(offers), offers);
 const vals = await ev(() => { const g = window.game, W = window.__pv.carWorth, e = g.save.garage.find(x => x.type === 'sports'), sv = W(e.type, e.vtier); let ok = 0; for (let k = 0; k < 60; k++) { const r = g.pinks.rival(e), x = W(r.type, r.vtier) / sv; if (x >= 0.8 && x <= 1.5 && !['police', 'unmarked', 'taxi'].includes(r.type)) ok++; } return ok; });
 check('the rival’s stake is always worth 0.8–1.5× yours (and never a police car or a cab)', vals === 60, String(vals));
@@ -129,7 +129,7 @@ const win = await (async () => {
   }, b0);
 })();
 check('pink slip won: his car joins your fleet where it stopped (one car, resells for Dirty Cash), yours stays yours, the stake is settled', win.n === 1 && win.origin === 'pinkslip' && win.live && win.adopted && win.sports && win.pink === null && win.sale && win.sale.dirty === win.sale.total && win.sale.clean === 0 && win.day && win.log, JSON.stringify(win));
-const once = await ev(() => { const g = window.game, n = []; for (let k = 0; k < 14; k++) n.push(g.campaign.raceOffer(window.__tull()).pink ? 1 : 0); return n.join(''); });
+const once = await ev(() => { const g = window.game, n = []; for (let k = 0; k < 14; k++) { const o = g.campaign.raceOffer(window.__tull()); n.push(o.pink && !o.race.offroad ? 1 : 0); }; return n.join(''); });
 check('one pink slip a day: no second offer today', !/1/.test(once), once);
 // a loss: yours is his
 const lose = await (async () => {

@@ -52,7 +52,7 @@ class PoliceManager {
         if (p.kind !== 'civ' || p.state === 'down' || p.called || looked > 8) continue;
         if (dist2(p.x, p.z, x, z) > 38 * 38) continue;
         looked++;
-        if (!grid.lineOfSight(p.x, p.y + 1.6, p.z, x, 1.2, z)) continue;
+        if (!grid.lineOfSight(p.x, p.y + 1.6, p.z, x, groundY(x, z) + 1.2, z)) continue;
         // personality: some people always call, some never do, most depend on how bad it was
         const nature = hash2i(p.id, 7, 3);
         const callP = clamp((nature < 0.15 ? 0.95 : nature > 0.8 ? 0.05 : 0.35 + sev * 0.18) * callMul * (1 - g.env.night * 0.25), 0, 0.98);
@@ -64,11 +64,12 @@ class PoliceManager {
       }
     }
   }
+  // eye heights above the ground each one stands on (the Cedar Fields terrain has hills: Session 6C)
   copCanSee(x, z, range) {
-    const grid = this.g.world.grid;
-    for (const u of this.units) if (!u.v.burnt && dist2(u.v.pos.x, u.v.pos.z, x, z) < range * range && grid.lineOfSight(u.v.pos.x, 1.5, u.v.pos.z, x, 1.2, z)) return true;
-    for (const c of this.cops) if (c.state !== 'down' && dist2(c.x, c.z, x, z) < range * range && grid.lineOfSight(c.x, 1.6, c.z, x, 1.2, z)) return true;
-    for (const v of this.g.traffic.cars) if (v.patrol && dist2(v.pos.x, v.pos.z, x, z) < range * range && grid.lineOfSight(v.pos.x, 1.5, v.pos.z, x, 1.2, z)) { this.adoptUnit(v); return true; }
+    const grid = this.g.world.grid, y = groundY(x, z) + 1.2;
+    for (const u of this.units) if (!u.v.burnt && dist2(u.v.pos.x, u.v.pos.z, x, z) < range * range && grid.lineOfSight(u.v.pos.x, u.v.pos.y + 1.5, u.v.pos.z, x, y, z)) return true;
+    for (const c of this.cops) if (c.state !== 'down' && dist2(c.x, c.z, x, z) < range * range && grid.lineOfSight(c.x, c.y + 1.6, c.z, x, y, z)) return true;
+    for (const v of this.g.traffic.cars) if (v.patrol && dist2(v.pos.x, v.pos.z, x, z) < range * range && grid.lineOfSight(v.pos.x, v.pos.y + 1.5, v.pos.z, x, y, z)) { this.adoptUnit(v); return true; }
     return false;
   }
   addHeat(pts, x, z) {
@@ -138,7 +139,7 @@ class PoliceManager {
       // flank: aim at a point a block to one side of where the player is heading; the route there runs down a
       // parallel street, and it closes in once it is near
       if (pv && u.role === 'flank' && d > 45) { const sp2 = Math.hypot(pv.vel.x, pv.vel.y) || 1, fx = pv.vel.x / sp2, fz = pv.vel.y / sp2; [tx, tz] = extClampSearch(p.pos.x, p.pos.z, tx + fx * 60 - fz * P * 0.75 * u.offset, tz + fz * 60 + fx * P * 0.75 * u.offset, 10); return { x: tx, z: tz, speed: sp }; }
-      if (d < 45 && g.world.grid.lineOfSight(v.pos.x, 1, v.pos.z, p.pos.x, 1, p.pos.z)) {
+      if (d < 45 && g.world.grid.lineOfSight(v.pos.x, v.pos.y + 1, v.pos.z, p.pos.x, p.pos.y + 1, p.pos.z)) {
         const ram = lvl >= 3;
         const close = d < 14 && !pv;
         return { x: tx, z: tz, direct: true, speed: close ? Math.max(0, d - 8) * 0.8 : ram ? sp : Math.min(sp, 6 + d * 0.6) };

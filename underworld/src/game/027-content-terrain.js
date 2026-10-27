@@ -22,7 +22,7 @@ const TSURF = { grass: 0, dirt: 1, mud: 2, rock: 3, gravel: 4, track: 5 };
 const TSURF_FX = [
   { grip: 0.82, drag: 0.35, rough: 0.035, name: 'grass' },
   { grip: 0.8, drag: 0.25, rough: 0.04, name: 'dirt' },
-  { grip: 0.55, drag: 1.1, rough: 0.025, name: 'mud' },
+  { grip: 0.45, drag: 2.4, rough: 0.025, name: 'mud' },
   { grip: 0.74, drag: 0.6, rough: 0.11, name: 'rock' },
   { grip: 0.72, drag: 0.4, rough: 0.05, name: 'gravel' },
   { grip: 0.88, drag: 0.15, rough: 0.02, name: 'track' }
