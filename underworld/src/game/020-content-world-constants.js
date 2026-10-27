@@ -52,6 +52,8 @@ function streetNameAt(x, z) {
   if (dz < ROAD_HALF + WALK_W && j >= 0 && j <= N) return STREET_NAMES_Z[j];
   if (x > CITY + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
   if (vpLand(x, z)) return VP.name;
+  if (z > CITY + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
+  if (cfsLand(x, z)) return CFS.name;
   if (x < 0 || z < 0 || x > CITY || z > CITY) return 'Harbor Promenade';
   return null;
 }
@@ -102,12 +104,15 @@ const ZONES = {
 };
 function zoneKey(x, z) {
   if (x > CITY + EDGE_MARGIN && x < VP.x1 + 400) return 'v';
+  // Cedar Fields South (Session 6C) is more of Cedar Fields
+  if (cfsSide(x, z)) return 'r';
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return ZONE_MAP[bz][bx];
 }
 function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
   if (inValenPoint(x, z)) return VP.name;
+  if (inCedarSouth(x, z)) return CFS.name;
   if (x < -ROAD_HALF - 2 || z < -ROAD_HALF - 2 || x > CITY + ROAD_HALF + 2 || z > CITY + ROAD_HALF + 2) return 'Waterfront';
   return zoneAt(x, z).name;
 }
@@ -295,18 +300,22 @@ function localSurfaceAt(x, z) {
 // step: how far above the reference height y a surface may be and still count as ground (people
 // climb 1.25 m onto a deck edge; a car's wheel only rides up CAR_STEP and treats anything higher as a wall)
 // After a call SURF.gx / SURF.gz hold the slope of the ground that was found (dh/dx, dh/dz).
+// On the Cedar Fields terrain (Session 6C) the slope is the height field's, and Terrain.hit / Terrain.rough say that
+// the ground came from it and how much of its height is the fine rough layer (the suspension's business).
 function groundY(x, z, y, step) {
-  SURF.gx = 0; SURF.gz = 0;
+  SURF.gx = 0; SURF.gz = 0; Terrain.hit = false;
   if (y !== undefined && y < -12 && typeof vspaceFloor === 'function') { const f = vspaceFloor(x, z, y); if (f !== null) return f; }
-  const b = groundBase(x, z);
+  const b = groundBase(x, z), hit = Terrain.hit, tgx = Terrain.gx, tgz = Terrain.gz;
   const s = surfaceY(x, z, y, step);
-  if (s > b) return s;
-  SURF.gx = 0; SURF.gz = 0;
+  if (s > b) { Terrain.hit = false; return s; }
+  SURF.gx = hit ? tgx : 0; SURF.gz = hit ? tgz : 0;
   return b;
 }
 function groundBase(x, z) {
   // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
   if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
+  // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
+  if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
   if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
   return RoadNet.roadAt(x, z) ? 0 : CURB_H;

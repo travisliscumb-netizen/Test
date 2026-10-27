@@ -44,7 +44,7 @@ class Vehicle {
     this.ctl.throttle = 0; this.ctl.steer = 0; this.ctl.handbrake = !!opts.parked;
     this.deformed = 0; this.smokeT = 0; this.mission = null; this.lastHitBy = null; this.honkT = 0;
     this.airborne = false; this.airT = 0; this.pitchG = 0; this.rollG = 0; this.pitchGV = 0; this.bodyOff = 0; this.bodyV = 0; this.planeOff = 0; this.slopeF = 0; this.hitT = 0; this.brakeP = 0; this.landT = 0; this.broken = 0;
-    this._wy = this._wy || [0, 0, 0, 0]; this._wl = this._wl || [0, 0, 0, 0]; this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
+    this._wy = this._wy || [0, 0, 0, 0]; this._wl = this._wl || [0, 0, 0, 0]; this._wr = this._wr || [0, 0, 0, 0]; this.bump = 0; this.trail = trailOf(this.type); this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
     this._safe = null; this.recycle = false; this.tune = null; this.garageUid = 0; this.trackId = 0; this.locked = false; this.origin = null; this.rareFind = false; this.critical = false;
     this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.joinT = 0; this.staffed = undefined; this.free = false; this.goldCar = false; this.dealer = null; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
     // road dirt (0 just washed … 1 filthy); 0.5 is the everyday look. It builds up with distance driven
@@ -92,7 +92,9 @@ class Vehicle {
     const s = this.spec;
     if (this.sleep) return;
     if (this.hitT > 0) this.hitT -= dt;
-    if (this.dirt < 1) this.dirt = Math.min(1, this.dirt + this.speed * dt * DIRT_PER_M);
+    // the Cedar Fields terrain under the car (Session 6C): grip, rolling drag and bumps by surface (null off it)
+    const te = this.airborne ? null : Terrain.effect(this.pos.x, this.pos.z, this.trail);
+    if (this.dirt < 1) this.dirt = Math.min(1, this.dirt + this.speed * dt * DIRT_PER_M * (te ? (te.s === TSURF.mud ? 12 : 4) : 1));
     if (this.airborne) {
       // ballistic: no tyre forces, mild air drag. Spin from the launch dies away instead of
       // building up; a little air control (steer yaws the car slowly). Only a collision in the air
@@ -118,6 +120,8 @@ class Vehicle {
     const tn = this.tune;
     let grip = s.grip * game.env.gripMul * (tn ? 1 + tn.grip * 0.06 : 1);
     if (this.health <= VEH_T.critical) grip *= 0.86; else if (this.health <= VEH_T.heavy) grip *= 0.95;
+    // off the road: the surface's grip, and bumps that shake the tyres loose the faster they are taken
+    if (te) grip *= te.grip * (1 - Math.min(0.25, te.bump * this.speed * 0.1));
     const hb = ctl.handbrake || disabled;
     // speed-sensitive steering: a big lock for parking, alleys and three-point turns that fades
     // smoothly to the old high-speed angle (and a touch below it) so motorway driving stays calm
@@ -161,7 +165,7 @@ class Vehicle {
     acc -= 0.00042 * vf * Math.abs(vf);
     acc -= gSlope;
     vf += acc * dt;
-    const decel = brake + (Math.abs(thr) < 0.01 ? 1.0 : 0) + 0.12;
+    const decel = brake + (Math.abs(thr) < 0.01 ? 1.0 : 0) + 0.12 + (te ? te.drag : 0);
     if (Math.abs(vf) <= decel * dt) vf = 0; else vf -= Math.sign(vf) * decel * dt;
     // weight transfer: braking loads the nose (sharper turn-in, a lighter tail), accelerating loads the tail
     const wtT = clamp(-(this.aLongSm || 0) / 14.7, -0.35, 0.45);
@@ -210,8 +214,8 @@ class Vehicle {
   }
   // wheel ground heights: a wheel only rides up CAR_STEP (a kerb, a ramp lip), anything taller is a wall
   _sampleWheels(ref) {
-    const W = this.vg.wheels, c = Math.cos(this.h), sn = Math.sin(this.h), wy = this._wy;
-    for (let i = 0; i < 4; i++) { const lx = W[i][0], lz = W[i][1]; wy[i] = groundY(this.pos.x + lx * c + lz * sn, this.pos.z - lx * sn + lz * c, ref, CAR_STEP); }
+    const W = this.vg.wheels, c = Math.cos(this.h), sn = Math.sin(this.h), wy = this._wy, wr = this._wr;
+    for (let i = 0; i < 4; i++) { const lx = W[i][0], lz = W[i][1]; wy[i] = groundY(this.pos.x + lx * c + lz * sn, this.pos.z - lx * sn + lz * c, ref, CAR_STEP); wr[i] = Terrain.hit ? Terrain.rough : 0; }
     return wy;
   }
   // Vertical physics: ground contact, ramps, decks, launches, flight and landings. Driven cars run it
@@ -223,16 +227,21 @@ class Vehicle {
   ground(dt) {
     const W = this.vg.wheels, wbase = W[0][1] - W[2][1], track = W[0][0] - W[1][0];
     const ref = this.pos.y;
-    const h = this._sampleWheels(ref);
+    const h = this._sampleWheels(ref), wr = this._wr;
     // the surface under the centre and its slope: the car's centre follows exactly this
-    const gc = groundY(this.pos.x, this.pos.z, ref, CAR_STEP), gx = SURF.gx, gz = SURF.gz;
+    const gc0 = groundY(this.pos.x, this.pos.z, ref, CAR_STEP), gx = SURF.gx, gz = SURF.gz;
+    // rough ground (Session 6C): the tyres ride every bump (the wheels are drawn on their contacts); the springs soak
+    // up part of it (most on a long-travel off-roader) and pass the rest to the chassis as shake and bounce. The
+    // centre follows the smooth ground under the rough
+    const gc = gc0 - (Terrain.hit ? Terrain.rough : 0), soak = 0.35 + 0.5 * this.trail;
+    this.bump = (wr[0] + wr[1] + wr[2] + wr[3]) / 4 * (1 - soak);
     const c = Math.cos(this.h), sn = Math.sin(this.h);
     // a wheel more than half a metre off the plane of the centre's surface is hanging over a drop
     // (or the lip of a ramp): it takes the plane's height for the chassis attitude
     const sup = this._wl;
     for (let i = 0; i < 4; i++) {
       const lx = W[i][0], lz = W[i][1], p = gc + gx * (lx * c + lz * sn) + gz * (-lx * sn + lz * c);
-      sup[i] = Math.abs(h[i] - p) < 0.5 ? h[i] : p;
+      sup[i] = Math.abs(h[i] - p) < 0.5 ? h[i] - wr[i] * soak : p;
     }
     const hf = (sup[0] + sup[1]) / 2, hr = (sup[2] + sup[3]) / 2, hl = (sup[0] + sup[2]) / 2, hrr = (sup[1] + sup[3]) / 2;
     const gPitch = Math.atan2(hr - hf, wbase), gRoll = Math.atan2(hl - hrr, track);
@@ -291,7 +300,7 @@ class Vehicle {
     }
     this.planeOff = this.airborne ? damp(this.planeOff || 0, 0, 6, dt) : damp(this.planeOff || 0, planeT, 22, dt);
     // cosmetic body bounce (kerbs, landings), kept inside the wheel-arch clearance
-    this.bodyV += (-this.bodyOff * 260 - this.bodyV * 24) * dt;
+    this.bodyV += ((this.bump - this.bodyOff) * 260 - this.bodyV * 24) * dt;
     this.bodyOff = clamp(this.bodyOff + this.bodyV * dt, -0.09, 0.05);
     this.pitchG = clamp(this.pitchG, -0.9, 0.9);
   }

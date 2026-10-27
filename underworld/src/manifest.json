@@ -10,6 +10,8 @@
   "game/010-core-utilities.js",
   "game/020-content-world-constants.js",
   "game/025-content-valen-point.js",
+  "game/026-content-cedar-south.js",
+  "game/027-content-terrain.js",
   "game/030-core-save-system.js",
   "game/035-core-money.js",
   "game/040-core-input-manager.js",
