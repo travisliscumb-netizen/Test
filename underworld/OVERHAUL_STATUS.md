@@ -162,6 +162,41 @@ The mapping stays exact until a session changes the code above that line; after 
     daily tiers. `PinkSlips.reset` now keeps the ids of both venues' events.
   - **Race checkpoint markers** sat at y 0; they now sit on the ground.
 
+### Closure tests and regression (terrain LOS build)
+
+- **`tests/offroad.mjs`: 51 / 51.** The 44 checks from before, plus seven for terrain LOS. In each, the cop and the
+  player physically stand on the spots (checked to within 1.5 m, on the ground), with no collider between them:
+  - **Open ground** (`a` [38, 1080] → `b` [38, 1113], 33 m): the cop sees you.
+  - **A ridge** (the ground 1.33 m above the sight line, 2 m above the higher end): hidden.
+  - **A bump** 0.55 m high that stays 0.45 m under the sight line: still seen.
+  - **The flat city:** seen down a street, hidden behind a building, no terrain cost in the city; interiors never
+    meet the terrain.
+  - **A live Dust Devil race** at race speed with the cop 33 m away: behind the ridge, no heat and not "seen"; in
+    plain view, 1★ and "seen".
+  - **Save → reload:** the same ground (height checksum) and the same answers for all three sight lines.
+  - Also: the AI course lap now checks that it passes over both jump crests (it used to require airtime, which at
+    its 20 m/s jump cap was a marginal 0–3 frames).
+- **Full regression on the closure build** (`tools/runall.mjs`, three suites at a time, then two):
+  - **Pass, every suite but those below:** `police` 13, `motorsport` 27, `roads` 20, `hot` 31, `gangs` 23, `shooting` 37, `threat` 25, `raid` 18,
+    `shipment` 33, `breach` 13, `compound` 56, `session` 35, `city` 25, `map` 22, `property` 33, `prison` 48,
+    `inventory` 58, `phone` 71, `soak` 22 (second run), `core` 64 (second run), and every screenshot suite.
+  - **Failures, all pre-existing and none from this work:**
+    - **`races`:** the "pink slip won: his car joins your fleet where it stopped" check (the rival's car not live
+      when the race resolves) fails intermittently. The 6B build fails it 2 of 2 alone, and the pre-LOS 6C build
+      1 of 2.
+    - **`taxi`:** under load, "it stays on the roads" (and earlier "coming"). The 6B build fails the same checks
+      under the same load. The closure build passed 3 of 3 alone.
+    - **`stress`:** the frame stall under load (2.8–3.6 s). Alone: 805 ms on the closure build, 1,258 ms on the
+      pre-LOS build.
+    - **`arrest`:** the documented hands-up pose timing.
+    - **`core`:** a melee-facing check, once; 64/64 on re-run.
+    - **`soak`:** late/early frame ratio while it shared the machine; 22/22 on re-run.
+- **Performance:** a terrain occlusion test costs ~1 µs (0.8 µs for a city line), against ~1.7 µs for a whole LOS
+  call.
+  - Phone profile (4× CPU) after the change: calm city 249 calls / 903k / 5.2 ms (6B 249 / 892k / 7.2 ms), busy
+    222 / 677k / 4.9 ms (6B 218 / 667k / 5.7 ms), the course 47 / 204k / 2.8 ms.
+  - No regression.
+
 ## 6C rulings (§45.37, owner final review)
 
 1. **Countryside race frequency: approved.** The two races alternate economic days, so one is normally on offer.
