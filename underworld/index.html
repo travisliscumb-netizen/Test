@@ -33305,8 +33305,9 @@ const Terrain = {
         R.s[o] = rocky ? TSURF.rock : wet ? TSURF.mud : TSURF.grass;
         if (pad) { R.s[o] = TSURF.gravel; R.m[o] = 0.2; }
       }
-      // dirt tracks: packed surface and two wheel ruts (a pad keeps its gravel)
-      for (const T of tracks) this._stampLine(R, T.pts, T.w, (o, along, off) => { if (R.s[o] === TSURF.gravel) return; R.s[o] = TSURF.track; if (Math.abs(Math.abs(off) - 1.0) < 0.35) R.h[o] -= 0.06; });
+      // dirt tracks: packed surface and two wheel ruts, a full cell each side where the wheels run (0.5–1.5 m out; a
+      // pad keeps its gravel)
+      for (const T of tracks) this._stampLine(R, T.pts, T.w, (o, along, off) => { if (R.s[o] === TSURF.gravel) return; R.s[o] = TSURF.track; if (Math.abs(Math.abs(off) - 1.0) <= 0.5) R.h[o] -= 0.07; });
       // the course: dirt, with its features by distance along it
       this._stampLine(R, course.pts, course.w, (o, along, off) => {
         R.s[o] = TSURF.dirt; R.m[o] = 1;

@@ -81,8 +81,16 @@ const terrain = await ev(() => {
   const mud = cf.course.features.find(f => f.kind === 'mud'); out.mudSurf = T.surf(...Tk.pts[kAt(mud.at + mud.len / 2)]) === P.TSURF.mud;
   const rock = cf.course.features.find(f => f.kind === 'rock'); out.rockSurf = T.surf(...Tk.pts[kAt(rock.at + rock.len / 2)]) === P.TSURF.rock;
   // ruts on a track: the wheel lines sit lower than the crown
-  const sp = cf.spur, q = sp[Math.floor(sp.length * 0.7)], q2 = sp[Math.floor(sp.length * 0.7) + 1], dx = q2[0] - q[0], dz = q2[1] - q[1], l = Math.hypot(dx, dz), nx = dz / l, nz = -dx / l;
-  out.rut = +(T._baked(C, q[0] + nx * 1.0, q[1] + nz * 1.0) - T._baked(C, q[0], q[1])).toFixed(3);
+  // (across the countryside loop at a dozen places)
+  let rut = 0, nr = 0;
+  for (let k = 40; k < cf.loop.length - 40; k += 60) {
+    const q = cf.loop[k], q2 = cf.loop[k + 1], dx = q2[0] - q[0], dz = q2[1] - q[1], l = Math.hypot(dx, dz), nx = dz / l, nz = -dx / l;
+    if (T.surf(q[0], q[1]) !== P.TSURF.track) continue;
+    // both wheel lines against the crown (the hill's cross-slope cancels out between the two sides)
+    let sum = 0, m = 0; for (let o = 0.8; o <= 1.21; o += 0.1) { sum += (T._baked(C, q[0] + nx * o, q[1] + nz * o) + T._baked(C, q[0] - nx * o, q[1] - nz * o)) / 2 - T._baked(C, q[0], q[1]); m++; }
+    rut += sum / m; nr++;
+  }
+  out.rut = +(rut / Math.max(1, nr)).toFixed(3); out.rutN = nr;
   // the strip: rough where it is free, flat at kerb height under everything built there
   let free = 0, mx = 0; for (let i = 0; i < S.m.length; i++) { if (S.m[i] > 0.01) free++; mx = Math.max(mx, S.h[i] - 0.15); }
   out.stripFree = +(free / S.m.length).toFixed(2); out.stripMax = +mx.toFixed(2);
@@ -105,7 +113,7 @@ const terrain = await ev(() => {
   return out;
 });
 check('the countryside has real relief (hills of several metres) and every surface: grass, dirt, mud, rock, gravel, packed track', terrain.relief[1] - terrain.relief[0] > 5 && terrain.surfaces.every(f => f > 0.005), JSON.stringify(terrain));
-check('the course is stamped into the ground: a jump of over a metre, whoops, a cambered bend, a mud wallow, a rock garden; the tracks have wheel ruts', terrain.jumpH > 1 && terrain.whoopRange > 0.3 && Math.abs(terrain.camber) > 0.6 && terrain.mudSurf && terrain.rockSurf && terrain.rut < -0.03 && ['jump', 'whoops', 'mud', 'rock', 'camber'].every(k => terrain.features.includes(k)), JSON.stringify(terrain));
+check('the course is stamped into the ground: a jump of over a metre, whoops, a cambered bend, a mud wallow, a rock garden; the tracks have wheel ruts', terrain.jumpH > 1 && terrain.whoopRange > 0.3 && Math.abs(terrain.camber) > 0.6 && terrain.mudSurf && terrain.rockSurf && terrain.rut < -0.025 && terrain.rutN >= 6 && ['jump', 'whoops', 'mud', 'rock', 'camber'].every(k => terrain.features.includes(k)), JSON.stringify(terrain));
 const solid = await ev(() => {
   const g = window.game, w = g.world, out = { n: 0, hit: 0 };
   for (const b2 of w.cfs.blocks) for (const d of b2.det) if (d.col && d.col.r !== undefined) { out.n++; if (w.grid.resolveCircle(d.col.x + 0.2, d.col.z, 0.5, d.col.y0 + 1.2, d.col.y0 + 2, {}).hit) out.hit++; }
