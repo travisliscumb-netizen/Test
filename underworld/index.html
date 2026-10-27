@@ -39609,16 +39609,18 @@ class ValenPointScenery {
    - the countryside in 50 m tiles: tiles near the focus at the full 1 m
      grid (each with a short skirt so no crack shows against its
      neighbours), everything else in one 5 m mesh with holes where the
-     near tiles are (its index is rebuilt when the near set changes), and
-     a rock face down to the water round the shore;
+     near tiles are (its index is rebuilt when the near set changes), or
+     a 10 m one from more than 300 m away, and a rock face down to the
+     water round the shore;
    - the land bridge's embankment (always drawn) and the Cedar Fields
-     strip (drawn near it, in the city's ground material so its fields
-     look as they did; only where its ground rises off the kerb slab,
-     which shows through everywhere else);
+     strip (in the city's ground material so its fields look as they
+     did, at 1 m within 120 m and at 4 m out to 500 m; only where its
+     ground rises off the kerb slab, which shows through everywhere
+     else);
    - the shore fence and the bridge rails (one merged mesh).
    ===================================================================== */
 const TSURF_COL = [0x5d7f45, 0x8a6b47, 0x4b3a29, 0x7d776d, 0xa39478, 0x96784f];
-const CFS_SCN = { tile: 50, far: 5, nearR: 70, stripR: 500, cache: 24 };
+const CFS_SCN = { tile: 50, far: 5, farC: 10, farR: 300, nearR: 70, stripR: 500, stripNear: 120, stripStep: 4, fenceR: 250, cache: 24 };
 class CedarScenery {
   constructor(scene, world, gmat) {
     this.scene = scene; this.world = world; this.cf = world.cfs;
@@ -39637,11 +39639,15 @@ class CedarScenery {
     };
     const RC = this.R.country;
     this.TW = Math.ceil((RC.W - 1) / CFS_SCN.tile); this.TH = Math.ceil((RC.H - 1) / CFS_SCN.tile);
-    this.far = this._farMesh(RC); scene.add(this.far);
+    // the far countryside: at 5 m within 300 m of it (with holes for the near tiles), at 10 m beyond
+    this.far = this._farMesh(RC, CFS_SCN.far); scene.add(this.far);
+    this.farC = this._farMesh(RC, CFS_SCN.farC); this.farC.visible = false; scene.add(this.farC);
     this.bridge = this._gridMesh(this.R.bridge, 0, 0, this.R.bridge.W - 1, this.R.bridge.H - 1, { sides: true, mat: this.matOff }); scene.add(this.bridge);
     // the strip wears the city's ground (its fields, drives and verges are painted by world position), a centimetre
     // above the kerb slab it rises from
     this.strip = this._gridMesh(this.R.strip, 0, 0, this.R.strip.W - 1, this.R.strip.H - 1, { masked: true, mat: gmat || this.matOff }); this.strip.position.y = 0.01; scene.add(this.strip);
+    // and a 4 m version of it beyond 120 m
+    this.stripC = this._gridMesh(this.R.strip, 0, 0, this.R.strip.W - 1, this.R.strip.H - 1, { masked: true, mat: gmat || this.matOff, step: CFS_SCN.stripStep }); this.stripC.position.y = 0.01; this.stripC.visible = false; scene.add(this.stripC);
     this.fence = this._fenceMesh(); scene.add(this.fence);
     this.group = new THREE.Group(); scene.add(this.group);
   }
@@ -39651,18 +39657,19 @@ class CedarScenery {
     const o = j * R.W + i, x = R.x0 + i, z = R.z0 + j;
     return [x, R.h[o] + Terrain._rough(x, z, R.s[o], R.m[o]), z, o];
   }
-  // a mesh over cells [i0, i1) × [j0, j1) of R at 1 m, with options: skirt (a short drop on all four edges),
-  // sides (rock faces down to the water along the long edges), masked (only where the ground is free of the mask)
+  // a mesh over cells [i0, i1) × [j0, j1) of R every `step` cells (1 m by default), with options: skirt (a short drop
+  // on all four edges), sides (rock faces down to the water along the long edges), masked (only where the ground is
+  // free of the mask)
   _gridMesh(R, i0, j0, i1, j1, opt = {}) {
-    const nx = i1 - i0 + 1, nz = j1 - j0 + 1, pos = [], col = [], nrm = [], idx = [];
+    const st = opt.step || 1, nx = Math.floor((i1 - i0) / st) + 1, nz = Math.floor((j1 - j0) / st) + 1, pos = [], col = [], nrm = [], idx = [];
     const H = (i, j) => this._v(R, i, j)[1];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-      const [x, y, z] = this._v(R, i0 + i, j0 + j);
-      pos.push(x, y, z); col.push(...this._colAt(R, i0 + i, j0 + j, y, 1));
-      const gx = (H(i0 + i + 1, j0 + j) - H(i0 + i - 1, j0 + j)) / 2, gz = (H(i0 + i, j0 + j + 1) - H(i0 + i, j0 + j - 1)) / 2, l = Math.hypot(gx, 1, gz);
+      const ci = i0 + i * st, cj = j0 + j * st, [x, y, z] = this._v(R, ci, cj);
+      pos.push(x, y, z); col.push(...this._colAt(R, ci, cj, y, st > 1 ? Math.ceil(st / 2) : 1));
+      const gx = (H(ci + st, cj) - H(ci - st, cj)) / (2 * st), gz = (H(ci, cj + st) - H(ci, cj - st)) / (2 * st), l = Math.hypot(gx, 1, gz);
       nrm.push(-gx / l, 1 / l, -gz / l);
     }
-    const free = (i, j) => !opt.masked || R.m[clamp(j0 + j, 0, R.H - 1) * R.W + clamp(i0 + i, 0, R.W - 1)] > 0.001;
+    const free = (i, j) => !opt.masked || R.m[clamp(j0 + j * st, 0, R.H - 1) * R.W + clamp(i0 + i * st, 0, R.W - 1)] > 0.001;
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
       if (!(free(i, j) && free(i + 1, j) && free(i, j + 1) && free(i + 1, j + 1))) continue;
       const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
@@ -39691,9 +39698,9 @@ class CedarScenery {
     m.userData.nGrid = nx * nz;
     return m;
   }
-  // the countryside at 5 m: one mesh; its index skips the cells of the near tiles; a rock bank round the shore
-  _farMesh(R) {
-    const s = CFS_SCN.far, nx = Math.floor((R.W - 1) / s) + 1, nz = Math.floor((R.H - 1) / s) + 1, pos = [], col = [], nrm = [];
+  // the countryside at s m: one mesh; its index skips the cells of the near tiles; a rock bank round the shore
+  _farMesh(R, s) {
+    const nx = Math.floor((R.W - 1) / s) + 1, nz = Math.floor((R.H - 1) / s) + 1, pos = [], col = [], nrm = [];
     const H = (i, j) => R.h[clamp(j * s, 0, R.H - 1) * R.W + clamp(i * s, 0, R.W - 1)];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
       const o = Math.min(R.H - 1, j * s) * R.W + Math.min(R.W - 1, i * s), x = R.x0 + Math.min(R.W - 1, i * s), z = R.z0 + Math.min(R.H - 1, j * s), y = R.h[o];
@@ -39701,7 +39708,7 @@ class CedarScenery {
       const gx = (H(i + 1, j) - H(i - 1, j)) / (4 * s) * 2, gz = (H(i, j + 1) - H(i, j - 1)) / (4 * s) * 2, l = Math.hypot(gx, 1, gz);
       nrm.push(-gx / l, 1 / l, -gz / l);
     }
-    this._fn = { nx, nz, s };
+    const m0 = { nx, nz, s };
     // the shore: rock faces from the edge vertices down to the water
     const bank = [];
     const ring = []; for (let i = 0; i < nx; i++) ring.push(i); for (let j = 1; j < nz; j++) ring.push(j * nx + nx - 1); for (let i = nx - 2; i >= 0; i--) ring.push((nz - 1) * nx + i); for (let j = nz - 2; j >= 0; j--) ring.push(j * nx);
@@ -39710,18 +39717,18 @@ class CedarScenery {
       for (const q of [A, B]) { pos.push(pos[q * 3], -3, pos[q * 3 + 2]); col.push(...this._col(TSURF.rock, pos[q * 3], pos[q * 3 + 2], 0)); nrm.push(0, 0.3, 0.95); }
       bank.push(A, base, B, B, base, base + 1, A, B, base, B, base + 1, base);
     }
-    this._bank = bank;
+    m0.bank = bank;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
     g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, this.mat); m.receiveShadow = true;
+    const m = new THREE.Mesh(g, this.mat); m.receiveShadow = true; m.userData.grid = m0;
     this._farIndex(m, new Set());
     return m;
   }
   _farIndex(m, holes) {
-    const { nx, nz, s } = this._fn, T = CFS_SCN.tile / s, idx = this._bank.slice();
+    const { nx, nz, s, bank } = m.userData.grid, T = CFS_SCN.tile / s, idx = bank.slice();
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
       if (holes.has(Math.floor(i / T) + ',' + Math.floor(j / T))) continue;
       const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
@@ -39738,11 +39745,11 @@ class CedarScenery {
     }
     return t;
   }
-  // the shore fence and the land bridge's rails: posts every 3 m and two rails, on the ground
+  // the shore fence and the land bridge's rails: posts every 4 m and two rails, on the ground
   _fenceMesh() {
     const gv = new GeoBuilder(), wood = C(0x6b5236), steel = C(0x8c949c), cf = this.cf;
     const run = (x0, z0, x1, z1, c, h) => {
-      const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 3)), ry = Math.atan2(-(z1 - z0), x1 - x0);
+      const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 4)), ry = Math.atan2(-(z1 - z0), x1 - x0);
       for (let k = 0; k <= n; k++) { const x = lerp(x0, x1, k / n), z = lerp(z0, z1, k / n), y = groundY(x, z); gv.add(TPL.box, M(x, y + h / 2, z, 0.14, h, 0.14, ry), c); }
       for (let k = 0; k < n; k++) {
         const xa = lerp(x0, x1, k / n), za = lerp(z0, z1, k / n), xb = lerp(x0, x1, (k + 1) / n), zb = lerp(z0, z1, (k + 1) / n), ya = groundY(xa, za), yb = groundY(xb, zb);
@@ -39766,8 +39773,9 @@ class CedarScenery {
     }
     const key = want.join('|');
     const S = this.R.strip, ds = Math.hypot(Math.max(S.x0 - fx, 0, fx - S.x1), Math.max(S.z0 - fz, 0, fz - S.z1));
-    this.strip.visible = ds < CFS_SCN.stripR;
-    this.fence.visible = d0 < 600;
+    this.strip.visible = ds < CFS_SCN.stripNear; this.stripC.visible = !this.strip.visible && ds < CFS_SCN.stripR;
+    this.fence.visible = Math.min(d0, Math.hypot(CFS.lb.x - fx, Math.max(0, CITY - fz))) < CFS_SCN.fenceR;
+    this.far.visible = d0 < CFS_SCN.farR; this.farC.visible = !this.far.visible;
     if (key === this.nearSet) return;
     this.nearSet = key;
     this.group.clear();

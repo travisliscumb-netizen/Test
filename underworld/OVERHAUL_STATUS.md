@@ -214,7 +214,94 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Tests run (6C)
 
-(TESTS)
+`tests/offroad.mjs` passes **44 / 44** on the final build. It covers:
+- **The world:** the land bridge and its walls, the ground along it, and the sea beside it.
+- **The terrain:**
+  - relief and every surface;
+  - the course features measured in the ground: a kicker 1.43 m over its hill, whoops, a ±2.4 m camber, the mud
+    and the rock;
+  - ruts of about 4 cm across both wheel lines;
+  - the strip rough over 56% of it and flat at kerb height under all 223 built points checked; the placement audit
+    clean;
+  - mesh vertices on the physics ground to 1 cm.
+- **Physics:**
+  - surface effects;
+  - mud costs a sedan far more than an off-roader;
+  - suspension over the rocks: the off-roader's body moves less;
+  - no airtime on rough ground, and nothing sinks;
+  - a jump flies and lands;
+  - coasting up a slope versus down it.
+- **Collision:** every countryside tree and rock is solid, and a car stops at a trunk.
+- **The road:** a car drives there and back with no teleport and never under the ground. GPS legs go through no
+  building, Valen Point ↔ the course included. Traffic goes out and back on the ground; police and cabs come along
+  the tracks; there are no pedestrians.
+- **The compound:**
+  - no gate, $180k Clean;
+  - 6 real bays, cars kept on the pad;
+  - the impound holds 180 for a fleet of at most 124;
+  - a countryside seizure goes to the main yard;
+  - the service stand.
+- **Official events:**
+  - class rules turn away a sedan, and a sedan from the Truck Run;
+  - Clean fee and prize, no Rep;
+  - no heat while a cop really sees the race;
+  - opponents race the course, none under the surface;
+  - markers on the ground;
+  - the daily tier halves a second win;
+  - an AI off-roader laps the course (jumps included) without leaving it;
+  - timed laps.
+- **The countryside races:** alternate days; Dirty buy-in and winnings, Rep; 1★ only when seen.
+- **The off-road pink slip:** every third day, beside the street one; stakes and rivals built for dirt.
+- **Reload:** the countryside position, the compound and its bays, the best lap and today's official tier.
+- **Streaming, the camera** (never under the hills) **and the maps.**
+
+**Full regression against the 6C build** (`tools/runall.mjs`, three suites at a time):
+- **Passed:** 49 of the first 55 suites. The run hit my time cap before `compound` and the shot suites. Those, every
+  suite that failed, and every suite touched by later fixes were re-run on the final build. `compound` 56/56;
+  `carshots`, `frontshots`, `qashots`, `contact` pass; `city` 25/25, `roads` 20/20, `map` 22/22, `races` 24/24,
+  `motorsport` 27/27.
+- **True 6C regressions found and fixed:**
+  - **`roads`:**
+    - The spur had a hook at its end, from a control point too close to it; it is re-splined, worst turn 4.5°.
+    - A GPS route with one end off the city joined the city end at the nearest lattice node in a straight line, so
+      a goal on a suburb bend was reached across gardens. This dates from 6B; it showed once points south of the
+      city became Cedar Fields' side. That end now snaps onto the curved road, as the city router does.
+  - **`city`:** the race-lines check assumed every race runs on lattice nodes; it now checks the lattice races.
+- **Flaky, not 6C:**
+  - **`prison`:** "cards & dice settle real bets" fails whenever 40 even-money $20 bets break exactly even (about
+    1 run in 8). It passed 48/48 on re-run.
+  - **`property`:** the estate exit-lane flake; 33/33 on re-run.
+  - **`stress`:** the frame-stall check (3.0–3.7 s under load) failed the same way on the 6B build in its own
+    regression (3,044 ms). 30/30 alone.
+  - **`taxi`:** under three-way load the cab is still "coming" at the deadline. The 6B build fails four of its
+    checks under the same load. 20/20 alone.
+  - **`shots`, `cityshots`:** screenshot and frame timeouts under load (6B's ran in a quieter batch); both pass
+    alone.
+- **Suites changed** (new content, not regressions): `motorsport` (the spur by name; the no-heat check now proves the
+  cop saw), `races` (the street pink slip by name), `city` (lattice races), `roads` (the terrain-painted track),
+  `perf` (the fields scenario).
+
+**Performance (`tests/perf.mjs`, interleaved with the 6B build):**
+
+| Scene | 6B calls / tris / update | 6C calls / tris / update |
+|---|---|---|
+| Calm city, desktop | 116–119 / 373–377k / 0.94–1.09 ms | 118–119 / 374–376k / 0.80–0.88 ms |
+| Busy city, desktop | 118–119 / 296–298k | 119–120 / 306–308k (+10k) |
+| Valen Point, desktop | 52–54 / 162–163k | 52–56 / 162–163k |
+| Calm city, phone (4× CPU) | 248 / 910k / 7.3 ms | 246 / 913k / 6.0 ms |
+| Busy city, phone (4× CPU) | 220 / 658k / 5.9 ms | 218 / 664k / 3.8 ms |
+| The course, desktop | — | 47 / 205k / 0.8–1.0 ms |
+| The course, phone (4× CPU) | — | 47 / 204k / 3.1 ms |
+
+- **The busy scene's +10k triangles** are the countryside's 10 m far mesh (7.2k) and the bridge (2.7k), in view
+  across the water from the north edge. No extra draw calls.
+- **Near the countryside:** the 5 m far mesh (27k, with holes), 1 m tiles within 70 m, the strip at 1 m within 120 m
+  and 4 m to 500 m, and the fence within 250 m.
+- **On the course** (four AI off-roaders racing) the phone profile is cheaper than Valen Point's circuit (81 calls,
+  3.6 ms).
+
+**Visual check:** screenshots of the aerial view, the bridge, the compound, the course at driving height, the
+hills and the strip. The strip keeps its fields' look; the countryside is continuous with no cracks.
 
 ## Known bugs / risks (6C)
 
@@ -236,6 +323,8 @@ The mapping stays exact until a session changes the code above that line; after 
 - **6B's "no heat with a cop watching" check was vacuous until now.** A pedestrian-bounds clamp moved any person
   off the city square back to the promenade, so the cop the test placed at Valen Point's pit wall was teleported to
   the city. People may now stand on either extension, and both suites prove the cop really saw the race.
+- **The countryside far mesh is always drawn from the city** (10k triangles, see Performance): a new landmass in
+  view across the water.
 - **Numbers are provisional (Session 13).** See the decisions list above.
 
 ## Exact next recommended task
