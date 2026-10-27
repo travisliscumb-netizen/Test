@@ -11,10 +11,236 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **6B — Valen Point Motorsport Park** (prompt Session 6, second of four parts per DC-36 / §45.32; scope
-  §45.34). 6A was approved and locked first.
-- Commit/base revision: 6A `eef887b` → the Session 6B commits on `claude/practical-lamport-zld81y`.
-- Date: 2026-10-24
+- Session: **6C — Cedar Fields terrain, Cedar Fields South and off-road racing** (prompt Session 6, third of four
+  parts per DC-36 / §45.32; rulings §45.36). 6B's full regression came back clean, so 6C followed as §45.35 directs.
+- Commit/base revision: 6B `549749b` (§45.36 recorded in `026320e`) → the Session 6C commits on
+  `claude/practical-lamport-zld81y`.
+- Date: 2026-10-27
+
+## Completed this session (6C)
+
+- **A real height field (`027-content-terrain.js`, `Terrain`).** Three regions on 1 m grids, sampled bilinearly,
+  with the slope handed to the physics through `groundY` (`SURF.gx / gz`):
+  - **The Cedar Fields strip** (the city's superblock `fields`): gentle rough fields (rises of up to ~1.4 m). It is
+    held flat at kerb height under and around everything already built there (buildings, fences by their real
+    footprint, props, parked cars, the house doors, Cedar Fields Road and the drives) and along the sidewalk band,
+    easing in over 3 m. 56% of it is free to rise. Its mesh wears the city's own ground material, so the farm's
+    fields look as before.
+  - **The land bridge:** a dirt road on an embankment from the perimeter road's kerb (road level through the
+    promenade gap) rising to 0.9 m at the fields, with ruts and grass verges between rails.
+  - **The countryside** (x −20…680, z 1040…1490): multi-scale hills (0.1–8.4 m) easing to the shore, rocky outcrops
+    on the high ground, mud in the hollows, level gravel pads for the bridge landing and the compound, rutted packed
+    dirt tracks, and the course stamped in (below).
+  - **Surfaces:** grass, dirt, mud, rock, gravel and packed track (`TSURF`, `TSURF_FX`), each with its own grip,
+    rolling drag and rough amplitude.
+  - **The rough layer:** centimetres, 1–2 m apart, by surface; zero where the ground is held flat.
+- **Terrain physics (`230-core-vehicle.js`, `020` `groundY`/`groundBase`).**
+  - **Grip, drag and bumps.** Every car reads the surface under it: its grip, its rolling drag (added to the
+    deceleration), and bumps that cost grip the faster they are taken.
+  - **Off-road capability.** `TRAIL` scales every penalty by 1 − 0.65 × trail:
+    - Mesa Trail 1, so it feels about a third;
+    - Kodiak 0.7;
+    - pickup 0.65;
+    - SUV and Workhorse 0.6;
+    - truck 0.5;
+    - crossover 0.35;
+    - vans 0.15–0.2;
+    - road cars 0.
+  - **Suspension.** The tyres follow every bump (the wheels are drawn on their contacts). The springs soak up
+    35% (road car) to 85% (off-roader) of the rough; the rest reaches the chassis attitude and a body bounce. The
+    centre follows the smooth ground, so rough ground never launches a car by itself; crests, jumps and slopes
+    work as before.
+  - **Mud and dirt** cake the car faster (×12 and ×4 road dirt; a wash cleans it).
+  - **Untouched:** the city's roads and ground (`Terrain.effect` is null off the terrain), and kinematic traffic,
+    which glues to the smooth ground.
+- **Cedar Fields South (`026-content-cedar-south.js`, `126-content-cedar-south-gen.js`).**
+  - **Getting there:**
+    - the farm track runs from Cedar Fields Road down to the south perimeter road, through a new gap in the
+      roadside rail fence;
+    - the south seawall, promenade, railing and perimeter wall open for the land bridge at x 193–207, and the
+      promenade lamp there is gone;
+    - the bridge has rails and the countryside a post-and-rail fence all round (colliders included).
+  - **The off-road course:** a 1,047 m closed loop, 12 m wide, of straights and fillets, drawn by `filletLoop`
+    (the Valen Point circuit's routine, now shared; `vpTrackLine` calls it). Features are placed on straights or
+    bends by lap fraction:
+    - whoops (0.45 m and 0.35 m);
+    - two jumps (1.5 m and 1.0 m kickers);
+    - a mud wallow and a rock garden;
+    - a cambered bend (±1.2 m).
+    - Trackside: marker poles, tyre stacks on the bends, a start/finish gantry, the timing tower and a spectator
+      bank.
+  - **The compound:** on a level pad, with:
+    - the Course Office (place `offroad`);
+    - the owners' garage shed with 6 bays;
+    - the service stand;
+    - the park gate and sign, and the turning circle.
+  - **The countryside:** 260 trees in copses, rocks on the rocky ground and hay bales. All of it is placed on the
+    terrain and clear of the tracks, the course and the pads.
+  - **Streaming:** 17 district blocks (the compound, the course, 15 countryside tiles), as `world.xblocks`.
+- **Scenery (`176-content-cedar-south-scenery.js`).** The countryside is drawn in 50 m tiles:
+  - tiles within 70 m of the focus at the full 1 m grid, each with a short skirt against cracks;
+  - the rest in one 5 m mesh, whose index skips the near tiles (rebuilt only when the near set changes);
+  - a rock bank down to the water round the shore.
+  - **Strip, bridge and fence:** the bridge embankment is always drawn; the strip only near it, only where it rises
+    off the kerb slab. The shore fence and bridge rails are one merged mesh.
+  - **What is drawn is what is touched:** vertex heights are the physics grid's exactly, rough layer included.
+  - **Colours:** surface colours blend across neighbouring cells.
+- **Integration, as for Valen Point.**
+  - **The spur:** a `Links` spur, "Cedar Fields Track", from the south perimeter road over the bridge to a turning
+    circle in the compound forecourt. Traffic drives it and comes back.
+  - **Extensions in general:** `world.exts` lists both extensions, and the GPS graph takes each one's spur
+    vertices, routes and loop. `extSide` / `extRoadSpots` / `extClampSearch` / `spotToward` generalise the
+    Valen Point helpers for DriveAI, police spawns and search, and cab spawns.
+  - **Countryside routes:** `cfs.roads` covers the countryside loop, the east farm track, the office, the shed,
+    the stand and the course (joined 30 m before the line).
+  - **Taxis:** destinations snap to the countryside tracks.
+  - **Zone and names:** the countryside is zone `r` (Cedar Fields); districts read "Cedar Fields South", streets
+    "Cedar Fields Track".
+  - **Save:** a position in the extension is kept.
+  - **Collision grid:** extended south to z 1508.
+  - **Maps:** the big map pans south (`mapH`). The minimap and big map draw a cached, surface-coloured image of the
+    countryside with its tracks, course, pads and buildings.
+  - **Impound:** a car seized in the countryside goes to the city's main yard first. Only Valen Point seizures
+    start with the annex.
+- **The official side: `OfficialVenue` (`509`) and `OffroadPark` (`509b-underworld-offroad.js`).**
+  - **One implementation:** Valen Point's park is refactored into a shared `OfficialVenue`, which both venues
+    extend: events, scrutineering, buy-ins, daily tiers, prize cars, track sessions, lap timing (the line crossed
+    forwards, the sectors in order) and save validation. `loopCheckpoints` and `loopSafeSpeeds` are shared, and
+    `venueOf(def)` routes the race manager and the payout.
+  - **Official events:** Clean Bank, no Rep, no heat. Daily tiers as everywhere.
+
+    | Event | Laps | Class | Entry | Prize |
+    |---|---|---|---|---|
+    | Trail Cup | 2 | built for dirt, under $30,000 | $250 | $2,000 |
+    | Truck Run | 2 | Boxline, Ridgeback, Workhorse | $300 | $2,400 |
+    | Mesa Pro | 3 | real off-roaders, $20,000 and up | $1,200 | $8,000 |
+
+    AI opponents race the course on a racing line with safe speeds for dirt: slower over the whoops, the mud, the
+    rock and into the jumps.
+  - **Timed laps:** $150 a session, free for the owner (a private session).
+  - **The compound property:**
+    - `offroad`, kind `offroad`, $180,000 Clean Bank (provisional), no Rank gate, separate from Valen Point;
+    - 6 registry bays in the shed;
+    - the service stand: the owner's repairs a third off, owners only.
+- **The illegal side (`370`, `380`, `508`).**
+  - **Countryside races in Tull's rotation:**
+    - **Dust Devil:** a sprint round the countryside loop.
+    - **Ridge Run:** two laps of the loop, closed along the farm track.
+    - Each runs on alternate economic days, so one or the other is always on.
+    - Dirty Cash buy-in and purse, criminal Rep, daily tiers, and 1★ only when a cop sees it (`RaceRules.watch`).
+    - Checkpoints and an AI line from the path (`pathCheckpoints`).
+  - **Vance's off-road pink slip:** every third economic day, in its own rotation slot with its own day flag
+    (`save.pinkDirtDay`). It never replaces the street pink slip.
+    - The stake must be built for dirt (trail ≥ 0.5), and Vance brings such a car.
+    - Otherwise it follows the pink-slip rules of §45.33.
+- **Fixes found on the way.**
+  - **Police sight lines** used fixed heights above sea level (1.5 m / 1.2 m). On hills they ran underground or
+    under buildings on raised pads. They now start at eye height above each one's ground: `copCanSee`, witness
+    calls, pursuit LOS, and Tull's patrol check.
+  - **Today's race wins for official events** (6B) were dropped from `save.raceDay` on every load, which reset their
+    daily tiers. `PinkSlips.reset` now keeps the ids of both venues' events.
+  - **Race checkpoint markers** sat at y 0; they now sit on the ground.
+
+## Decisions taken in 6C that need an owner ruling
+
+- **Countryside race frequency:** each of the two races runs on alternate economic days, so one is always on offer.
+- **Off-road pink slip:** every third economic day, separate from (and in addition to) the daily street pink slip,
+  for cars with trail ≥ 0.5.
+- **The compound:**
+  - $180,000;
+  - no daily income or upkeep;
+  - the owner does **not** race official off-road events free (the ruling lists bays, the stand and free sessions
+    only; Valen Point's owner does race free);
+  - the service stand is owners only, at 0.7× the Motor Works rate (as Valen Point's pit crew).
+- **Prices and numbers:** sessions $150; entries $250, $300 and $1,200; prizes $2,000, $2,400 and $8,000. All
+  provisional (Session 13).
+- **Completion:** the two countryside races count towards "Street races won" and the all-races achievement.
+
+## Files / systems changed (6C)
+
+- New:
+  - `026-content-cedar-south.js` (`CFS`, the strip and bridge geometry, `inCedarSouth`, `cfsSide`, `extSide`,
+    `inExtension`, `extRoadSpots`, `extClampSearch`, `spotToward`, `filletLoop`);
+  - `027-content-terrain.js` (`Terrain`, `TSURF`, `TSURF_FX`, `TRAIL`, `trailOf`);
+  - `126-content-cedar-south-gen.js` (`CFS_COURSE`, `CFS_SITE`, `cfsCourseLine`, `World._genCedarSouth`);
+  - `176-content-cedar-south-scenery.js` (`CedarScenery`);
+  - `509b-underworld-offroad.js` (`OR_EVENTS`, `OR_PARK`, `OffroadPark`, `cfsSafeSpeeds`).
+- Changed:
+
+  | File | Change |
+  |---|---|
+  | `020` | `groundY`/`groundBase` terrain, zone `r` and names for the extension |
+  | `030` | save position kept in either extension |
+  | `080` | collision grid south to `WORLD_Z1` |
+  | `090` | south perimeter wall gap, no promenade lamp in it |
+  | `110` | generate hook (`_genCedarSouth`, `world.exts`) |
+  | `120` | the farm track to the perimeter road, the fence gap |
+  | `125` | `vpTrackLine` → `filletLoop` |
+  | `170` | south promenade, seawall and railing gap |
+  | `230` | terrain grip, drag, bumps, rough suspension, dirt |
+  | `290` | `extSide` routing |
+  | `300` | people may stand on the extensions |
+  | `310` | ground-relative sight lines; units and search on the tracks |
+  | `340` | `venueOf` payouts |
+  | `370` | countryside races, `cfsRacePath`, `pathCheckpoints`, venue checkpoints and scrutineering, markers on the ground |
+  | `380` | the rotation's off-road pink slot; patrol sight line |
+  | `390` | property `offroad` |
+  | `410` | `LOC_CLASS` |
+  | `450` | reset and action hooks |
+  | `500` | the compound's bays |
+  | `507` | yard order by place |
+  | `508` | the off-road pink slip; today's official wins kept |
+  | `509` | `OfficialVenue`, `loopCheckpoints`, `loopSafeSpeeds`, `venueOf`; `MotorsportPark` now extends it |
+  | `540`, `600` | "O" icons; GPS over `world.exts`; `routeAny` per extension; `_paintCFS`/`_renderCFS`, `mapH`, `clampView` |
+  | `560` | cabs and destinations on the tracks; place names |
+  | `630` | `CedarScenery`, `OffroadPark` |
+  | `650` | exports |
+  | `manifest.json` | the new files |
+
+- Tests:
+  - new `tests/offroad.mjs`;
+  - `tests/motorsport.mjs`: names its spur, and the "no heat" check now proves the cop saw;
+  - `tests/races.mjs`: asks for the street pink slip;
+  - `tests/perf.mjs`: a "fields" scenario.
+
+## Save/schema changes (6C)
+
+- `save.offroad: { best, prize, laps }`, validated in `OffroadPark.reset` (`OfficialVenue.reset`).
+- `save.pinkDirtDay` (−1 by default).
+- `save.raceDay.wins` now keeps official event ids.
+- Property `offroad` in `save.uw.props`.
+- A saved position in Cedar Fields South is kept.
+- No schema bump.
+
+## Tests run (6C)
+
+(TESTS)
+
+## Known bugs / risks (6C)
+
+- **The terrain doesn't block sight lines.** Police and witness sight lines are now measured from eye height above
+  each one's ground, but only colliders (buildings, walls, trees, rocks) block them. A hill between a cop and a race
+  does not; the grid has no terrain in it.
+- **Traffic.** Traffic on the land bridge track is kinematic: it follows the smooth ground and doesn't feel
+  surfaces. Countryside traffic is only the spur's: cars go out to the compound and back. No traffic on the
+  countryside loop or the course.
+- **No foot traffic in the countryside or on the strip.** The strip's superblock never had any.
+- **Dressing.**
+  - Out in the fields, trees, rocks and bales are static details: solid, but not breakable props. Props still
+    draw at kerb height, so none are placed on the terrain.
+  - The strip's existing props stay on flat ground ringed by the rough.
+- **The countryside is a rectangle with a fence round its shore.** A functional expansion, not the map overhaul.
+- **AI.** Opponents in the countryside races follow the path's line with a safe speed for its bends and surfaces.
+  They don't take shortcuts across the fields, and a car stuck off the line is put back once it is out of sight
+  (as in street races).
+- **6B's "no heat with a cop watching" check was vacuous until now.** A pedestrian-bounds clamp moved any person
+  off the city square back to the promenade, so the cop the test placed at Valen Point's pit wall was teleported to
+  the city. People may now stand on either extension, and both suites prove the cop really saw the race.
+- **Numbers are provisional (Session 13).** See the decisions list above.
+
+## Exact next recommended task
+
+Owner review of 6C. Then **6D**: the 10 unique hidden cars (§45.32).
 
 ## Completed this session (6B)
 

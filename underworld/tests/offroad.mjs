@@ -106,6 +106,17 @@ const terrain = await ev(() => {
 });
 check('the countryside has real relief (hills of several metres) and every surface: grass, dirt, mud, rock, gravel, packed track', terrain.relief[1] - terrain.relief[0] > 5 && terrain.surfaces.every(f => f > 0.005), JSON.stringify(terrain));
 check('the course is stamped into the ground: a jump of over a metre, whoops, a cambered bend, a mud wallow, a rock garden; the tracks have wheel ruts', terrain.jumpH > 1 && terrain.whoopRange > 0.3 && Math.abs(terrain.camber) > 0.6 && terrain.mudSurf && terrain.rockSurf && terrain.rut < -0.03 && ['jump', 'whoops', 'mud', 'rock', 'camber'].every(k => terrain.features.includes(k)), JSON.stringify(terrain));
+const solid = await ev(() => {
+  const g = window.game, w = g.world, out = { n: 0, hit: 0 };
+  for (const b2 of w.cfs.blocks) for (const d of b2.det) if (d.col && d.col.r !== undefined) { out.n++; if (w.grid.resolveCircle(d.col.x + 0.2, d.col.z, 0.5, d.col.y0 + 1.2, d.col.y0 + 2, {}).hit) out.hit++; }
+  // a car driven into a tree trunk stops at it
+  const t = w.cfs.blocks.flatMap(b2 => b2.det).find(d => d.col && d.col.r !== undefined && d.col.r > 0.3 && d.kind === 'cylr' && d.sy > 2);
+  const v = g.vehicles.spawn('pickup', t.col.x - 12, t.col.z, Math.PI / 2, { driver: 'npc' }); v.mission = 'test'; v.touched = true; g.resetPlayerState(t.col.x - 20, t.col.z + 5, 0);
+  for (let k = 0; k < 80; k++) { v.ctl.throttle = 0.6; v.ctl.steer = 0; v.h = Math.PI / 2; g.update(0.05, 0.05); }
+  out.past = +(v.pos.x - t.col.x).toFixed(2); g.vehicles.despawn(v);
+  return out;
+});
+check('collision: the countryside’s trees and rocks are solid (every one), and a car driven at a tree trunk stops at it', solid.n > 100 && solid.hit === solid.n && solid.past < 0, JSON.stringify(solid));
 check('the strip is rough where it is free (over a third of it, rises of half a metre and more)', terrain.stripFree > 0.35 && terrain.stripMax > 0.5, JSON.stringify(terrain));
 check('…and flat at kerb height under every prop, building, fence, the house doors and Cedar Fields Road; the placement audit is clean', terrain.stripFlat.worst < 0.02 && terrain.stripFlat.n > 50 && terrain.road < 0.02 && terrain.audit === 0, JSON.stringify(terrain));
 check('what is drawn is what the wheels touch: terrain mesh vertices sit on the physics ground (within 2 cm)', terrain.mesh.worst < 0.02 && terrain.mesh.n > 500 && terrain.mesh.tiles > 0, JSON.stringify(terrain.mesh));
@@ -310,7 +321,7 @@ const raceTo = async (id, place, opts = {}) => {
   await page.waitForFunction(() => { const A = window.game.race.active; return A && (A.phase === 'count' || A.phase === 'run'); }, null, { timeout: 60000, polling: 50 });
   await ev(() => { window.game.race.active.count = 0.01; });
   await page.waitForFunction(() => window.game.race.active && window.game.race.active.phase === 'run', null, { timeout: 30000, polling: 50 });
-  const mid = await ev(watch => { const g = window.game, A = g.race.active, v = g.player.vehicle, P = window.__pv; const s0 = A.racers.map(r => [r.v.pos.x, r.v.pos.z]); if (watch) g.police.spawnCop(v.pos.x + 8, v.pos.z + 8); let under = 0, saw = 0; for (let k = 0; k < 300; k++) { v.vel.set(Math.sin(v.h) * 20, Math.cos(v.h) * 20); g.update(0.05, 0.05); if (g.police.copCanSee(v.pos.x, v.pos.z, 40)) saw++; for (const r of A.racers) if (!r.v.airborne && r.v.pos.y < P.groundY(r.v.pos.x, r.v.pos.z) - 0.3) under++; } return { moved: A.racers.map((r, i) => Math.round(Math.hypot(r.v.pos.x - s0[i][0], r.v.pos.z - s0[i][1]))), level: g.police.level, under, saw, cps: A.racers.map(r => r.cp) }; }, !!opts.watch);
+  const mid = await ev(watch => { const g = window.game, A = g.race.active, v = g.player.vehicle, P = window.__pv; const s0 = A.racers.map(r => [r.v.pos.x, r.v.pos.z]); if (watch) g.police.spawnCop(v.pos.x + 8, v.pos.z + 8); const mk = A.nextMk ? +(A.nextMk.g.position.y - P.groundY(A.nextMk.g.position.x, A.nextMk.g.position.z)).toFixed(2) : null; let under = 0, saw = 0; for (let k = 0; k < 300; k++) { v.vel.set(Math.sin(v.h) * 20, Math.cos(v.h) * 20); g.update(0.05, 0.05); if (g.police.copCanSee(v.pos.x, v.pos.z, 40)) saw++; for (const r of A.racers) if (!r.v.airborne && r.v.pos.y < P.groundY(r.v.pos.x, r.v.pos.z) - 0.3) under++; } return { moved: A.racers.map((r, i) => Math.round(Math.hypot(r.v.pos.x - s0[i][0], r.v.pos.z - s0[i][1]))), level: g.police.level, under, saw, mk, cps: A.racers.map(r => r.cp) }; }, !!opts.watch);
   await ev(place => { const g = window.game, A = g.race.active, v = g.player.vehicle, c = A.R.cps[A.R.cps.length - 1]; A.finished = place - 1; A.cp = A.R.cps.length - 1; v.pos.x = c.x; v.pos.z = c.z; v.vel.set(0, 0); v.syncMesh(0); }, place);
   for (let k = 0; k < 40; k++) { const done = await ev(() => { window.game.update(0.05, 0.05); return !window.game.missions.active; }); if (done) break; }
   return { mid };
@@ -328,6 +339,7 @@ const tm = await ev(() => { const g = window.game, L = window.__log.filter(x => 
 check('an official off-road event: the buy-in and the prize are Clean Bank (no Dirty Cash), no criminal Rep', tm.in === 'clean:trackPrize:2000' && tm.out === 'clean:trackFee:250' && tm.dirty === 0 && tm.rep === 0, JSON.stringify(tm));
 check('…no heat from a cop watching (it really saw you); the opponents really race over the course (each covered ground, none under the surface)', trail.mid.level === 0 && trail.mid.saw > 0 && tm.level === 0 && trail.mid.moved.length === 4 && trail.mid.moved.every(d => d > 40) && trail.mid.under === 0, JSON.stringify(trail));
 const again = await (async () => { await ev(sf => { window.__car('offroad', sf.x, sf.z, Math.PI / 2); window.__log = []; }, sf); await raceTo('or_trail', 1); return ev(() => window.__log.filter(x => x.d > 0 && /^track/.test(x.src)).map(x => x.src + ':' + Math.round(x.d)).join()); })();
+check('race checkpoints: the next checkpoint’s marker stands on the ground (on the hills, not at sea level)', trail.mid.mk !== null && Math.abs(trail.mid.mk) < 0.1, JSON.stringify(trail.mid));
 check('the same event won again today pays half (the same daily tiers as every race)', again === 'trackPrize:1000', again);
 const lapT = await ev(() => {
   const g = window.game, O = g.offroad, T = g.world.cfs.track, pv = window.__pv, out = {};
@@ -396,19 +408,23 @@ const pink = await ev(() => {
 check('the off-road pink slip: only a car built for dirt can be put up, and Vance brings one too', /built for dirt/.test(pink.sedan) && pink.pickup === '' && pink.rivals === 30, JSON.stringify(pink));
 
 // ---------------------------------------------------------------- 8. save and reload in the countryside
-await ev(() => { const g = window.game; if (g.missions.active) g.missions.fail('test'); if (g.player.state === 'vehicle') g.exitVehicle(true); g.resetPlayerState(150, 1300, 0); window.__step(10); });
+// an official win today (its tier must survive the reload: 6B dropped official ids from today's record on load)
+await ev(() => { const g = window.game; if (g.missions.active) g.missions.fail('test'); if (g.player.state === 'vehicle') g.exitVehicle(true); g.raceRules.noteWin('or_trail'); window.__tier = g.raceRules.today().or_trail; g.resetPlayerState(150, 1300, 0); window.__step(10); });
+const tier0 = await ev(() => window.__tier);
 const bayIds = await ev(() => window.__bayIds);
 await reload();
 const after = await ev(ids => {
   const g = window.game, s = g.save, out = {};
   out.pos = [Math.round(g.player.pos.x), Math.round(g.player.pos.z)]; out.y = +(g.player.pos.y - window.__pv.groundY(g.player.pos.x, g.player.pos.z)).toFixed(2);
   out.owned = g.uw.props.owned('offroad');
-  window.__step(20);
+  // walk over to the compound: the parked cars come out round you
+  const d = g.world.places.offroad.door; g.resetPlayerState(d.x - 3, d.z, 0); window.__step(20);
   out.bays = ids.map(u => { const e = s.garage.find(x => x.uid === u), v = e && g.vreg.live(e), b2 = e && g.vreg.bayPos(e); return !!(v && b2 && Math.hypot(v.pos.x - b2.x, v.pos.z - b2.z) < 1); });
   out.best = !!s.offroad.best; out.tier = s.raceDay && s.raceDay.wins && s.raceDay.wins.or_trail;
   return out;
 }, bayIds);
-check('save → reload: a position in the countryside is kept (on the ground, not pulled back to the city); the compound, its bays, the best lap and today’s tiers are kept', after.pos[1] > 1200 && Math.abs(after.y) < 0.2 && after.owned && after.bays.every(Boolean) && after.best && after.tier === 2, JSON.stringify(after));
+after.tier0 = tier0;
+check('save → reload: a position in the countryside is kept (on the ground, not pulled back to the city); the compound, its bays, the best lap and today’s tiers are kept', after.pos[1] > 1200 && Math.abs(after.y) < 0.2 && after.owned && after.bays.every(Boolean) && after.best && after.tier0 > 0 && after.tier === after.tier0, JSON.stringify(after));
 
 // ---------------------------------------------------------------- 9. streaming, the camera and the maps
 const stream = await ev(() => {
