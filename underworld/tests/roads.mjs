@@ -26,8 +26,10 @@ const geo = await ev(() => {
   out.closed = P.RoadNet.closed.size; out.expect = expect;
   out.path = P.RoadNet.path(0, 0, 12, 12).length;
   // every link point is on the road the ground shader paints (the local road raster)
-  // (beyond the city's seawall the Valen Point causeway is painted by the district's own scenery: its band counts)
-  let off = 0; for (const L of w.links) for (const q of L.pts) if (!P.localRoadAt(q[0], q[1]) && !(L.spur && q[0] >= P.VP.cw.x0 && Math.abs(q[1] - P.VP.cw.z) <= P.VP.cw.road)) off++;
+  // (beyond the city's seawall the Valen Point causeway is painted by the district's own scenery: its band counts;
+  // the Cedar Fields Track is the terrain's packed track (gravel on the pads) from the perimeter road's kerb out)
+  const cfsTrack = q => q[1] >= P.CFS.lb.z0 && (P.Terrain.surf(q[0], q[1]) === P.TSURF.track || P.Terrain.surf(q[0], q[1]) === P.TSURF.gravel);
+  let off = 0; for (const L of w.links) for (const q of L.pts) if (!P.localRoadAt(q[0], q[1]) && !(L.spur && q[0] >= P.VP.cw.x0 && Math.abs(q[1] - P.VP.cw.z) <= P.VP.cw.road) && !(L.name === 'Cedar Fields Track' && cfsTrack(q))) off++;
   out.offRaster = off;
   return out;
 });

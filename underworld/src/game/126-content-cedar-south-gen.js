@@ -70,7 +70,7 @@ Object.assign(World.prototype, {
     }
     // ---------------------------------------------------------------- the spur: perimeter road → land bridge → compound
     const R0 = S.ring, lb = CFS.lb;
-    const spurPts = splinePts([[lb.x, lb.z0], [lb.x, CFS.z0], [lb.x, 1062], [222, 1088], [268, 1106], [R0.x - R0.r - 6, R0.z], [R0.x - R0.r, R0.z]]);
+    const spurPts = splinePts([[lb.x, lb.z0], [lb.x, CFS.z0], [lb.x + 2, 1064], [216, 1084], [240, 1098], [272, 1107], [R0.x - R0.r, R0.z]]);
     this.localRoads.push({ k: 'line', link: 'Cedar Fields Track', spur: true, w: lb.road * 2, pts: spurPts, ring: R0, mat: 'dirt' });
     tracks.push({ pts: spurPts.filter(p => p[1] >= CFS.z0 - 1), w: lb.road * 2 + 1 });
     // the countryside loop (west fields, south hills and back), from the spur and back to it further along (both ends

@@ -1317,7 +1317,17 @@ const GPS = {
         return me;
       }
       const [i, j] = RoadNet.nearNode(x, z), n = i * W2 + j, d = Math.hypot(x - i * P, z - j * P);
-      if (isGoal) link(n, me, d, null); else link(me, n, d, null);
+      // on (or by) a curved road: onto it there, along its polyline from either end (as route() does), so a goal on a
+      // bend is reached along the bend, not across the gardens from the nearest junction; otherwise the nearest node
+      const ln = Links.nearest(x, z);
+      if (!(ln && ln.d < 40 && ln.d < d)) { if (isGoal) link(n, me, d, null); else link(me, n, d, null); }
+      else {
+        const L = ln.link, X = nodes.length; nodes.push({ x: ln.x, z: ln.z }); adj.push([]);
+        const P0 = L.pts.slice(0, ln.k + 1).map(q => ({ x: q[0], z: q[1] })), P1 = L.pts.slice(ln.k + 1).map(q => ({ x: q[0], z: q[1] })).reverse();
+        const ends = L.spur && L.vids ? [[L.vids[ln.k], [], L.cum[ln.k]], [L.vids[ln.k + 1], [], L.cum[ln.k + 1]]] : [[L.gps[0], P0, 0], [L.gps[1], P1, L.len]];
+        for (const [e, poly, at] of ends) { const w = Math.abs(ln.along - at) + 0.01; link(e, X, w, poly.length ? poly : null); link(X, e, w, poly.length ? poly.slice().reverse() : null); }
+        if (isGoal) link(X, me, ln.d, null); else link(me, X, ln.d, null);
+      }
       return me;
     };
     const src = join(fx, fz, false), dst = join(tx, tz, true); if (src < 0 || dst < 0) return null;
