@@ -90,6 +90,8 @@ owners' garage shed, a service stand that repairs a third off, and free private 
 Out in the fields, Tull runs illegal countryside races (Dust Devil and Ridge Run, on alternate days) for Dirty Cash
 and Rep, with heat only if a cop sees you. Every third day Vance offers an off-road pink slip for cars built for dirt.
 
+The hills are solid to the eye as well: a cop can't see you through a ridge (a low bump under the sight line doesn't hide you), so a countryside race behind a hill draws no heat.
+
 Traffic, police and cabs come over the land bridge, and the GPS and the maps reach it all. Modules:
 `src/game/026-content-cedar-south.js`, `027-content-terrain.js`, `126-content-cedar-south-gen.js`,
 `176-content-cedar-south-scenery.js`, `509b-underworld-offroad.js`.

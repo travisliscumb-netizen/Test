@@ -1498,3 +1498,44 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       - About 6 physical registry bays, a repair/service stand, and free private course sessions for the owner.
       - Clean Bank, no Rank gate, price provisional until Session 13.
       - Fleet ↔ impound capacity stays valid, with no abstract overflow.
+37. **Session 6C final review and closure.** 6C is approved overall.
+    - **Countryside race frequency: approved.** The two illegal countryside races alternate economic days, so one is
+      normally on offer each day. The exact frequency is provisional for the holistic balance pass.
+    - **Off-road pink slip: approved.** Every third economic day, on its own allowance; it never replaces the street
+      pink slip. Only dirt/off-road-capable vehicles may be staked. The existing vehicle-protection, persistence and
+      stake rules stay in force. Frequency is balance-tunable later.
+    - **Off-road compound owner perks: approved as implemented.** It is deliberately smaller than Valen Point and
+      different from it: 6 real persistent bays, the owner's service stand, and free private/timed sessions.
+      - No passive daily income.
+      - No free official entry: the owner pays event entry fees like anyone else. The difference from Valen Point
+        is intentional.
+    - **Service stand: approved provisionally.** Owner-only, at 70% of the Motor Works rate, until the holistic
+      economy pass.
+    - **Event economy: approved provisionally.** Sessions $150; entries $250 / $300 / $1,200; prizes $2,000 /
+      $2,400 / $8,000. No retuning now; they belong to the holistic economy/balance pass.
+    - **Completion stats: approved.** The countryside races count towards the street-race progression and the
+      all-races achievement. Progression is not to be redesigned now.
+      - **Deferred to the UI/UX pass:** whether the label "Street races won" should become something broader, such
+        as "Underground races won", to cover city and countryside illegal racing.
+    - **Terrain must block police line of sight.** Required to close 6C. A real hill or ridge blocks police vision;
+      a low bump that does not cross the sight line does not. Observer and target heights count; existing collider
+      LOS, the flat city and Valen Point must not regress; countryside race heat still needs a real observation.
+      The check must be efficient on mobile and reusable.
+    - **Accepted 6C limitations (not blockers):**
+      - normal traffic mainly uses the land-bridge/access route to the compound;
+      - countryside trees and rocks are solid but not destructible;
+      - the extension's boundary is a fenced rectangle, not a natural coastline.
+    - **Next milestone (inserted before 6D): Curved Roads / Road-Network Evolution.** It extends the road
+      architecture beyond the 90° grid:
+      - smooth bends, sweeping curves, diagonals and non-90° junctions;
+      - irregular suburban streets, rural winding and terrain-following roads, curved access roads;
+      - more natural junctions.
+      - It must integrate safely with every dependent system:
+        - road representation, meshes and collision;
+        - GPS, pathfinding, and traffic, police and taxi AI;
+        - deliveries, shipments and races;
+        - both maps, parking, streaming, world bounds, saved positions and route persistence;
+        - mobile performance.
+      - It is not a licence to redesign the whole city. Scope and architecture are set after inspecting the
+        existing road system at High effort; recommend Extra High only if that inspection shows a deep
+        foundational rewrite is needed. 6D (the 10 unique cars) follows it.

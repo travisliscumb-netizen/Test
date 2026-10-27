@@ -11,11 +11,32 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Session: **6C — Cedar Fields terrain, Cedar Fields South and off-road racing** (prompt Session 6, third of four
-  parts per DC-36 / §45.32; rulings §45.36). 6B's full regression came back clean, so 6C followed as §45.35 directs.
-- Commit/base revision: 6B `549749b` (§45.36 recorded in `026320e`) → the Session 6C commits on
-  `claude/practical-lamport-zld81y`.
+- Session: **6C — closed** (owner final review §45.37). Cedar Fields terrain, Cedar Fields South and off-road
+  racing, plus the closure item: terrain occludes police line of sight.
+- **Next milestone: Curved Roads / Road-Network Evolution** (inserted before 6D, §45.37). It is a High-effort
+  checkpoint: nothing of it, and nothing of 6D, has been started.
+- Commit/base revision: 6B `549749b` → the Session 6C commits on `claude/practical-lamport-zld81y` (closure commit
+  at the end of this section's history).
 - Date: 2026-10-27
+
+## 6C closure (§45.37): terrain hides you from the police
+
+- **The fix.** `CollisionGrid.lineOfSight` (`080`), which police, witnesses, gangs, combat and compound cameras
+  all use, now also asks `Terrain.occludes(a, b)` (`027`) once no collider blocks the line.
+  - Only the part of the sight line over a terrain region is examined, after a slab clip against each region's
+    rectangle. A city sight line costs a bounds test per region.
+  - The baked ground (not the centimetre rough layer) is sampled every ~1.5 m. The last 0.75 m at each end is left
+    out (the ground the eyes stand on), and the line is hidden only where the ground rises 2 cm above it.
+  - Observer and target heights are the callers' eye heights over their own ground (Session 6C made them
+    ground-relative).
+  - Points far underground (interiors, underground spaces, below −5 m) never meet the terrain.
+- **Cost:** about 1 µs per check in the countryside, 0.8 µs for a city line (the bounds tests), against ~1.7 µs
+  for the whole LOS call. No per-frame storm: the existing callers already gate by range and their own throttles.
+- **Behaviour:**
+  - A ridge through the sight line hides you.
+  - A bump under the line doesn't.
+  - City and Valen Point sight lines are unchanged.
+  - Countryside race heat still needs a real observation.
 
 ## Completed this session (6C)
 
@@ -141,20 +162,30 @@ The mapping stays exact until a session changes the code above that line; after 
     daily tiers. `PinkSlips.reset` now keeps the ids of both venues' events.
   - **Race checkpoint markers** sat at y 0; they now sit on the ground.
 
-## Decisions taken in 6C that need an owner ruling
+## 6C rulings (§45.37, owner final review)
 
-- **Countryside race frequency:** each of the two races runs on alternate economic days, so one is always on offer.
-- **Off-road pink slip:** every third economic day, separate from (and in addition to) the daily street pink slip,
-  for cars with trail ≥ 0.5.
-- **The compound:**
-  - $180,000;
-  - no daily income or upkeep;
-  - the owner does **not** race official off-road events free (the ruling lists bays, the stand and free sessions
-    only; Valen Point's owner does race free);
-  - the service stand is owners only, at 0.7× the Motor Works rate (as Valen Point's pit crew).
-- **Prices and numbers:** sessions $150; entries $250, $300 and $1,200; prizes $2,000, $2,400 and $8,000. All
-  provisional (Session 13).
-- **Completion:** the two countryside races count towards "Street races won" and the all-races achievement.
+1. **Countryside race frequency: approved.** The two races alternate economic days, so one is normally on offer.
+   Provisional for the holistic balance pass.
+2. **Off-road pink slip: approved.**
+   - Every third economic day, on its own allowance; it never replaces the street pink slip.
+   - Off-road-capable stakes only.
+   - The existing protection, persistence and stake rules apply.
+   - Frequency is balance-tunable later.
+3. **Compound owner perks: approved as implemented.** 6 real bays, the owner's service stand, and free private/timed
+   sessions. No daily income and no free official entry (the owner pays event fees). The difference from Valen
+   Point is intentional.
+4. **Service stand: approved provisionally.** Owner-only at 70% of the Motor Works rate, until the economy pass.
+5. **Event economy: approved provisionally.** Sessions $150; entries $250 / $300 / $1,200; prizes $2,000 / $2,400 /
+   $8,000. Not to be retuned before the holistic economy pass.
+6. **Completion stats: approved.** The countryside races count towards the street-race progression and the
+   all-races achievement.
+   - **Deferred (UI/UX pass):** whether "Street races won" should read something broader, such as "Underground
+     races won".
+
+**Accepted / deferred 6C limitations:**
+- normal traffic mainly uses the land-bridge access route to the compound;
+- countryside trees and rocks are solid but not destructible;
+- the extension's boundary is a fenced rectangle, not a natural coastline.
 
 ## Files / systems changed (6C)
 
@@ -305,9 +336,6 @@ hills and the strip. The strip keeps its fields' look; the countryside is contin
 
 ## Known bugs / risks (6C)
 
-- **The terrain doesn't block sight lines.** Police and witness sight lines are now measured from eye height above
-  each one's ground, but only colliders (buildings, walls, trees, rocks) block them. A hill between a cop and a race
-  does not; the grid has no terrain in it.
 - **Traffic.** Traffic on the land bridge track is kinematic: it follows the smooth ground and doesn't feel
   surfaces. Countryside traffic is only the spur's: cars go out to the compound and back. No traffic on the
   countryside loop or the course.
@@ -329,7 +357,9 @@ hills and the strip. The strip keeps its fields' look; the countryside is contin
 
 ## Exact next recommended task
 
-Owner review of 6C. Then **6D**: the 10 unique hidden cars (§45.32).
+**Curved Roads / Road-Network Evolution** (§45.37), at High effort: inspect the existing road architecture first,
+then set the scope. Recommend Extra High only if that inspection shows a deep foundational rewrite. **6D** (the 10
+unique hidden cars) follows it. Neither has been started.
 
 ## Completed this session (6B)
 
