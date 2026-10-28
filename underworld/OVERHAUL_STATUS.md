@@ -121,6 +121,131 @@ The mapping stays exact until a session changes the code above that line; after 
     chip;
   - phone contacts added: Lucky, Valen Prestige Motors, a Cedar Fields farmhand, Race Control.
 
+### Files / systems changed (6D)
+
+- **New:**
+  - `225-content-unique-cars.js` (the ten, profiles, the 'unique' tier look);
+  - `506-underworld-unique-cars.js` (`UniqueCars`);
+  - `tests/unique.mjs`.
+- **Edited:**
+  - **Vehicle code:** `220` (one-off body details; sporty profiles; dressed as rare), `230` (finish and paint2;
+    `uniqueId` reset on a recycled car), `505` (stolen-car registry ignores one-offs; waiting cars keep the origins
+    prize and pinkslip).
+  - **Saves and money:** `030` (`uniques` default; `UniqueCars.sanitize`), `035` (money source `intel`).
+  - **Content and services** (`360`): value, class name, packages → clue, the gold-car spawner removed (the registry
+    owns it), garage card and sale block, `storeVehicle` guard, collection, Progress, contacts; new fleet entries
+    carry their tier.
+  - **Cargo and the Chop Shop:** `400` (cargo), `450` (Chop Shop refusal; registry reset on bind).
+  - **Racing:** `340` (race wins reach the registry), `370` (a one-off on the grid is locked), `508` (Vance's
+    Widowmaker).
+  - **Map and game loop:** `600` (map category, entries, area circles on both maps), `630` (construct, reset,
+    update; "Take the …" prompt and interact; debug spawn excludes one-offs).
+  - **Elsewhere:** `650` (test exports), `manifest.json`.
+- **Tests edited:**
+  - `vehicles.mjs` (the one-off tier is a valid visual tier);
+  - `dealers.mjs` (the 25–30 civilian roster leaves the one-offs out).
+- **Not touched:**
+  - the curved-road architecture (§45.38);
+  - the vehicle registry's model (an acquired one-off is a fleet entry);
+  - the impound, HOT and the Chop Shop clean;
+  - physics.
+
+### Save/schema (6D)
+
+- **New field `save.uniques`** (defaults to `{}`; every record is created on bind). It needs no version bump, like
+  every additive field since v9.
+- **One migration:** a save with the Golden Corsair secret found and the gold Corsair 68 kept (colour 0xc9a227,
+  origin found) has that entry turned into `u_corsair` (acquired).
+  - A save that had sold or never kept it gets the clue again (the secret was found, the car is gone). That is not
+    a duplicate: no one-off was ever owned.
+- **Repairs on load:**
+  - at most one fleet or waiting entry per one-off (extras dropped, logged);
+  - an acquired one-off found nowhere waits in `pendingCars`;
+  - a pink-slip stake naming a one-off Vance doesn't own is discarded.
+
+### Tests (6D)
+
+- **`tests/unique.mjs`: 57/57,** in the affected run, the regression's re-run and solo. It covers:
+  - **Definitions:** ten defined with unique ids, models and names; the ten identities; ten different bodies; no
+    two alike in handling; none a stock car repainted; the range from early to top; values and cargo; the mix of
+    acquisition methods.
+  - **Separation from normal cars:** never in dealers, race fields, events, traffic or a rival's stake; its own
+    finish, wheels and geometry.
+  - **Placement:** spots clear and inside, but never centred in, their search areas; thematic districts.
+  - **The Corsair stages:** a new game has nothing; fifteen packages → clue + area (no car while far); the big map
+    entry; near → standing, exact `◆`; no space → can't take it; the prompt and confirmation, then taken once (not
+    HOT); never taken twice; off the map, never respawned; the Golden Corsair secret.
+  - **Reloads and protection:** reload keeps one, same entry, no respawn; spec and finish kept; no sale button;
+    Chop Shop and pink-slip refusals; a stray copy can't be parked or tracked.
+  - **Impound and wrecks:** impound across reload; released and driven out; wreck towed home and kept across
+    reload.
+  - **The Ambassador:** Lucky's lead; paid intel refused without cash, charged once ($3,000 Dirty), never sold twice;
+    taking it is theft (HOT, a theft crime reported); cleaned at the Chop Shop, still one.
+  - **Rewards:** the Spectre's lead, then waiting with Tull (no space), never claimed twice, collected into a space;
+    the Clubsport once.
+  - **The Widowmaker:** three pink slips → offered; the $24,000 stake rule; never in the dirt pink slip; locked on
+    the grid; lost (your car is his, it stays on offer); won (one, yours, never staked again); a one-off can't be
+    staked.
+  - **Streaming:** each find-car on the ground near you and none away from them.
+  - **Persistence and repair:** every stage kept across reload; Progress "One-offs · 5 of 10" with the undiscovered
+    unnamed; a duplicate removed and logged; a lost one restored to waiting; the old gold Corsair migrated; the
+    Aeterna gate.
+  - No console errors.
+- **Affected suites** (on the 6D build before the last one-line message):
+  - unique 57/57, vehicle 18/18, hot 31/31, races 24/24, motorsport 27/27, offroad 51/51;
+  - homes 26/26, property 33/33, session 35/35, map 22/22, carmoney 10/10;
+  - progression 33/33, ui 23/23, arrest 126/126, core 64/64;
+  - vehicles 38/39 and dealers 33/34. Both failures were test lists that predate the one-offs; after the fixes,
+    vehicles 39/39 and dealers 34/34 in the regression.
+- **Full regression** (the final build, the 50 remaining suites, three at a time): 43 passed.
+  - Seven failed under load and then passed solo:
+    - gambling 57/57 (under load: the scratch-card timer and casino fps);
+    - stress 30/30 (a 3.0 s frame stall);
+    - threat 25/25 (the real-seconds clock);
+    - prison 48/48 (one dice/cards outcome);
+    - unique 57/57 (Vance's car was gone, so the Widowmaker went to its bay: a valid outcome the check now accepts);
+    - shots and cityshots (timeouts) ran clean.
+  - Screenshot suites ran without errors: carshots, frontshots, qashots, contact.
+  - **Visual QA:** the ten photographed side-on and three-quarter on a city street. Each has a distinct silhouette;
+    the Tourer's wings, running boards and spare read; nothing broken or see-through.
+
+### Performance (6D)
+
+| Scene | afb8cef (3 runs): ms/frame · update ms | 6D (3 runs): ms/frame · update ms | calls · triangles |
+|---|---|---|---|
+| calm street | 250 / 222 / 242 · 1.05–1.28 | 216 / 235 / 235 · 1.02–1.52 | 118–122 · 373–376k both |
+| busy (storm, 3★, gang fight) | 210 / 210 / 258 · 1.06–1.24 | 229 / 258 / 250 · 0.96–1.29 | 118–122 · 307–310k both |
+| Valen Point track | 103 / 103 / 125 · 0.68–1.14 | 129 / 98 / 121 · 0.95–1.25 | 53–54 · 162–164k both |
+| Cedar Fields | 89 / 90 / 99 · 0.76–0.85 | 100 / 95 / 94 · 0.56–0.93 | 48 · 207–208k both |
+
+- **Unchanged within software-GL noise:** both builds range over the same values, and the order of runs moves the
+  numbers more than the build does. Draw calls and triangles are unchanged.
+- **The registry itself** (measured in the page):
+  - a 0.5 s tick costs 2.4 µs with every clue active;
+  - the map's search areas cost 1.1 µs a frame;
+  - map entries cost 5 µs when the map opens.
+- **No car is simulated** unless it is near you. At most the find-cars within 160–340 m of you exist, and a fresh
+  game has none.
+
+### Known risks / limits (6D)
+
+- **The Rooftop Zephyr** (pre-existing, not one of the ten): the stock Zephyr on the Quarter Garage roof is a
+  parked-stall car. It stands there again whenever the block streams back in, so it can be taken and parked
+  repeatedly (bays permitting). 6D leaves it as it was: it needs an owner ruling (one-time like the secret, or
+  rotating like a rare find).
+- **One-offs are never sold.** This is a design choice for "never lost". Allowing a sale (which ends that one-off for
+  good) would be a small change if wanted.
+- **The Ambassador joins your fleet when taken.** It does not wait as a tracked stolen car until parked: that is
+  what guarantees it can't be lost. It is still stolen, HOT, and police-recognised until cleaned.
+- **Spots are kerb spots, not building interiors.**
+  - "A carport", "a driveway" and "a bonded yard" are the nearest clear kerb to the right place, chosen
+    deterministically.
+  - A real hidden garage would need new interior or vspace work, which belongs to a later visual pass.
+- **The Widowmaker counter starts at 6D.** Pink slips won before this build don't count toward Vance's three.
+- **A car pushed away from its spot before you take it** returns there the next time it streams in. The exact map
+  marker shows its place, not where it was shoved.
+- **Provisional numbers:** speeds, values, the Rep gates (800, 1,300, 2,000), the $3,000 tip and the $24,000 stake.
+
 ## Curved Roads / Road-Network Evolution
 
 ### Inspection: what depended on roads being a 90° grid
@@ -377,8 +502,8 @@ This is a **medium-to-large evolutionary refactor**, not the very large foundati
 
 ## Exact next recommended task
 
-**Owner review of the Curved Roads pass** (the rulings listed above). Then **6D** (the 10 unique hidden cars), which
-has not been started.
+**Owner review of Session 6D** (the ten one-offs; the rulings asked for under "Known risks / limits (6D)": the Rooftop
+Zephyr, selling a one-off, and the provisional values). Do not begin the next roadmap milestone before that review.
 
 
 ## 6C closure (§45.37): terrain hides you from the police
