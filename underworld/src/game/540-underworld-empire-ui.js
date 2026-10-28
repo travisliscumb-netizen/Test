@@ -5,22 +5,23 @@
    territory overlay for the big map and the jail HUD. The HUD itself stays
    clean: money, health, wanted level, prompt, weapon, speed.
    ===================================================================== */
-// the phone: apps on a home screen, each with one or a few pages (tabs). 'go' apps leave the phone.
+// the phone (M11, §27): apps on a home screen in six groups (Empire, Operations, Trade, Assets, City, Messages), each
+// with one or a few pages (tabs). 'go' apps leave the phone. The Map is also one tap from the top of the home screen.
 const PHONE_APPS = [
-  { id: 'empire', name: 'Empire', icon: '👑', col: '#ffb547', cat: 'BUSINESS', sub: 'turf · rivals', tabs: [['overview', 'Overview'], ['map', 'Territory'], ['factions', 'Factions']] },
-  { id: 'market', name: 'Market', icon: '📈', col: '#7fe08f', cat: 'BUSINESS', sub: 'cost · profit', tabs: [['pnl', 'My stock'], ['market', 'Prices']] },
-  { id: 'connect', name: 'Street Connect', icon: '🤝', col: '#d28cff', cat: 'BUSINESS', sub: 'buy · sell', tabs: [['connect', 'Contacts']] },
-  { id: 'inventory', name: 'Inventory', icon: '🎒', col: '#46d4c4', cat: 'BUSINESS', sub: 'carried · stored', tabs: [['stash', 'All product']] },
-  { id: 'stashes', name: 'Stashes', icon: '📦', col: '#c9a46b', cat: 'BUSINESS', sub: 'what is where', tabs: [['stashes', 'Stashes']] },
+  { id: 'empire', name: 'Empire', icon: '👑', col: '#ffb547', cat: 'EMPIRE', sub: 'turf · rivals', tabs: [['overview', 'Overview'], ['map', 'Territory'], ['factions', 'Factions']] },
+  { id: 'police', name: 'Police', icon: '🚨', col: '#4d8dff', cat: 'EMPIRE', sub: 'heat · case file', tabs: [['police', 'Police']] },
   { id: 'crew', name: 'Crew', icon: '👥', col: '#7fb2ff', cat: 'OPERATIONS', sub: 'people · runs', tabs: [['crew', 'Crew'], ['runs', 'Deliveries']] },
-  { id: 'property', name: 'Property', icon: '🏠', col: '#8fe39b', cat: 'OPERATIONS', sub: 'homes · garages', tabs: [['assets', 'Property']] },
-  { id: 'business', name: 'Business', icon: '🏢', col: '#ffd84d', cat: 'OPERATIONS', sub: 'income · upgrades', tabs: [['biz', 'Businesses']] },
-  { id: 'garage', name: 'Garage', icon: '🚗', col: '#9ec5ff', cat: 'OPERATIONS', sub: 'your cars', tabs: [['garage', 'Cars']] },
+  { id: 'business', name: 'Business', icon: '🏢', col: '#ffd84d', cat: 'OPERATIONS', sub: 'income · fronts', tabs: [['biz', 'Businesses']] },
   { id: 'armory', name: 'Armory', icon: '🎯', col: '#ff8a3d', cat: 'OPERATIONS', sub: 'guns · ammo', tabs: [['loadout', 'Weapons']] },
-  { id: 'police', name: 'Police', icon: '🚨', col: '#4d8dff', cat: 'CITY', sub: 'heat · payroll', tabs: [['police', 'Police']] },
-  { id: 'feed', name: 'Feed', icon: '📰', col: '#e8eef6', cat: 'CITY', sub: 'news · messages', tabs: [['feed', 'Feed']] },
+  { id: 'market', name: 'Market', icon: '📈', col: '#7fe08f', cat: 'TRADE', sub: 'cost · profit', tabs: [['pnl', 'My stock'], ['market', 'Prices']] },
+  { id: 'connect', name: 'Street Connect', icon: '🤝', col: '#d28cff', cat: 'TRADE', sub: 'buy · sell', tabs: [['connect', 'Contacts']] },
+  { id: 'inventory', name: 'Inventory', icon: '🎒', col: '#46d4c4', cat: 'TRADE', sub: 'carried · stored', tabs: [['stash', 'All product']] },
+  { id: 'property', name: 'Property', icon: '🏠', col: '#8fe39b', cat: 'ASSETS', sub: 'homes · garages', tabs: [['assets', 'Property']] },
+  { id: 'stashes', name: 'Stashes', icon: '📦', col: '#c9a46b', cat: 'ASSETS', sub: 'what is where', tabs: [['stashes', 'Stashes']] },
+  { id: 'garage', name: 'Garage', icon: '🚗', col: '#9ec5ff', cat: 'ASSETS', sub: 'your cars', tabs: [['garage', 'Cars']] },
   { id: 'map', name: 'Map', icon: '🗺️', col: '#46d4c4', cat: 'CITY', sub: 'city map', go: 'map' },
-  { id: 'taxi', name: 'Cabline', icon: '🚕', col: '#f4c20d', cat: 'CITY', sub: 'call a cab', go: 'taxi' }
+  { id: 'taxi', name: 'Cabline', icon: '🚕', col: '#f4c20d', cat: 'CITY', sub: 'call a cab', go: 'taxi' },
+  { id: 'feed', name: 'Messages', icon: '💬', col: '#e8eef6', cat: 'MESSAGES', sub: 'priority · offers · news', tabs: [['feed', 'Messages']] }
 ];
 const APP_OF_TAB = {}; for (const a of PHONE_APPS) for (const [t] of a.tabs || []) APP_OF_TAB[t] = a;
 const EMP_TABS = [['overview', 'Overview'], ['map', 'Territory'], ['crew', 'Crew'], ['runs', 'Deliveries'], ['assets', 'Assets'], ['market', 'Market'], ['stash', 'Inventory'], ['loadout', 'Loadout'], ['factions', 'Factions'], ['police', 'Police'], ['feed', 'Feed']];
@@ -74,7 +75,9 @@ class EmpireUI {
     tabs.classList.toggle('hidden', !app);
     tabs.innerHTML = app ? `<button class="etab back" data-tab="home" aria-label="Back to the home screen">‹ Apps</button>${app.tabs.length > 1 ? app.tabs.map(([k, n]) => `<button class="etab${k === this.tab ? ' on' : ''}" data-tab="${k}">${esc(n)}</button>`).join('') : ''}` : '';
     const st = RANKS[uw.rank];
-    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Rep <b>${g.save.rep}</b></span><span>Influence <b>${uw.influence}</b></span><span>Pressure <b style="color:${S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)'}">${Math.round(S.pressure)}</b></span><span>Day <b>${uw.calDay}</b></span>${S.jail ? `<span class="chipS red">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</span>` : ''}`;
+    // the header (M11): Rank · Dirty · Bank · Pressure always, the rest smaller
+    const pcol = S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)';
+    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Pressure <b style="color:${pcol}">${Math.round(S.pressure)}</b></span><small class="empSub">Rep ${g.save.rep} · Influence ${uw.influence} · Day ${uw.calDay}${S.jail ? ` · <b style="color:var(--red)">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</b>` : ''}</small>`;
     let h = '';
     if (this.tab === 'home') h = this.t_home();
     else if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; a guard might smuggle in a phone, if the money is right and you pick your moment.</div>`;
@@ -88,16 +91,32 @@ class EmpireUI {
   // ---------------------------------------------------------------- home screen
   badge(id) {
     const uw = this.uw, S = uw.S;
-    if (id === 'feed') return uw.opps.active().filter(o => o.urgent && !o.taken).length + S.decisions.length;
+    if (id === 'feed') return this.inbox().filter(m => m.pri <= 1).length + uw.opps.active().filter(o => o.urgent && !o.taken).length;
     if (id === 'crew') return S.decisions.length;
     return 0;
   }
   t_home() {
-    const cats = [...new Set(PHONE_APPS.map(a => a.cat))];
-    return '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
+    const cats = [...new Set(PHONE_APPS.map(a => a.cat))], now = this.locked('feed') ? [] : this.inbox().filter(m => m.pri <= 1);
+    // the top strip: the Map one tap away, and whatever needs you now (each a deep link)
+    let h = `<div class="appTop"><button class="sbtn gold" data-act="app:map">🗺️ Map</button>${now.length ? `<button class="sbtn danger" data-act="app:feed">${now.length} need${now.length === 1 ? 's' : ''} you</button>` : '<span class="hint">Nothing urgent.</span>'}</div>`;
+    return h + '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
       const n = this.badge(a.id), locked = a.tabs ? this.locked(a.tabs[0][0]) : this.uw.inJail;
       return `<button class="app${locked ? ' locked' : ''}" data-act="app:${a.id}" style="--c:${a.col}" aria-label="${esc(a.name)}"><i>${a.icon}</i><b>${esc(a.name)}</b><small>${esc(a.sub)}</small>${n ? `<em>${n}</em>` : ''}</button>`;
     }).join('') + '</div>').join('') + '</div>';
+  }
+  // what needs you (M11): pri 0 critical, 1 needs a decision soon, 2 worth knowing; each with a deep link into the
+  // app (or the place) that deals with it
+  inbox() {
+    const uw = this.uw, S = uw.S, g = this.g, out = [];
+    for (const o of uw.threats.open()) out.push({ pri: 0, icon: '⚠', col: '#ff4d5e', title: `${FACTIONS[o.fid].short}: ${o.label}`, text: o.state === 'live' ? 'Happening now.' : o.state === 'imminent' ? 'Imminent.' : 'A warning.', go: `threat:${o.id}`, goLabel: 'Respond' });
+    if (S.fugitive && S.fugitive.left > 0) out.push({ pri: 1, icon: '🚔', col: '#ff8a3d', title: 'You are a fugitive', text: 'A recapture adds time to the sentence. Keep your head down.', go: 'tab:police', goLabel: 'Case file' });
+    else if (uw.legal.L.warrant) out.push({ pri: 1, icon: '🚔', col: '#ff8a3d', title: 'There is a warrant out for you', text: 'Any officer who recognises you will make the arrest. A lawyer can try to quash it.', go: 'tab:police', goLabel: 'Case file' });
+    for (const d of S.decisions) out.push({ pri: 1, icon: '?', col: '#ffd84d', title: d.text, text: 'Your crew is waiting on an answer.', dec: d.id });
+    const dmg = uw.props.ownedList().filter(d => (S.props[d.id] && S.props[d.id].dmg) > 0);
+    if (dmg.length) out.push({ pri: 2, icon: '🔧', col: '#ffb547', title: `${dmg.length} propert${dmg.length === 1 ? 'y needs' : 'ies need'} repairs`, text: dmg.slice(0, 3).map(d => d.name).join(', ') + (dmg.length > 3 ? '…' : ''), go: dmg[0].kind === 'business' ? 'tab:biz' : 'tab:assets', goLabel: 'Open' });
+    const imp = (g.save.garage || []).filter(e => e.imp && !e.imp.paid);
+    if (imp.length) out.push({ pri: 2, icon: '🚗', col: '#9ec5ff', title: `${imp.length} car${imp.length === 1 ? '' : 's'} in the impound lot`, text: 'Pay the release at the window, then drive it out.', go: 'tab:garage', goLabel: 'Garage' });
+    return out.sort((a, b) => a.pri - b.pri);
   }
   openApp(id) {
     const g = this.g, a = PHONE_APPS.find(x => x.id === id); if (!a) return;
@@ -618,7 +637,9 @@ class EmpireUI {
   t_feed() {
     const uw = this.uw, S = uw.S, g = this.g, now = uw.opps.absHour();
     const list = uw.opps.active().slice().reverse();
-    let h = uw.threats.feedHTML(esc) + '<h3>Opportunities</h3>';
+    const box = this.inbox().filter(m => !m.dec);
+    let h = box.length ? '<h3>Needs you</h3><div class="msgs">' + box.map(m => `<div class="msg"><i style="background:${m.col}">${m.icon}</i><div><b>${esc(m.title)}</b><small>${['CRITICAL', 'SOON', 'WORTH KNOWING'][m.pri]}</small><p>${esc(m.text)}</p>${m.go ? `<div class="btns"><button class="sbtn${m.pri ? '' : ' danger'}" data-act="${m.go.startsWith('tab:') ? 'go:' + m.go.slice(4) : m.go}">${esc(m.goLabel)}</button></div>` : ''}</div></div>`).join('') + '</div>' : '';
+    h += '<h3>Opportunities</h3>';
     if (!list.length) h += '<div class="hint">Nothing on the wire right now. Things change hour by hour.</div>';
     h += '<div class="msgs">' + list.map(o => `<div class="msg"><i style="background:${o.urgent ? '#ff4d5e' : '#d28cff'}">${OPP_ICON[o.kind] || '•'}</i><div><b>${esc(o.title)}</b><small>${Math.max(1, o.until - now)}h left</small><p>${esc(o.text)}</p>${o.x !== undefined && !o.taken ? this.wpBtn(o.x, o.z, o.title) : ''}</div></div>`).join('') + '</div>';
     h += '<h3>Messages</h3><div class="msgs">' + S.decisions.map(d => `<div class="msg"><i style="background:#ffd84d">?</i><div><b>${esc(d.text)}</b><div class="btns"><button class="sbtn gold" data-act="dec:${d.id}:1">Agree</button><button class="sbtn" data-act="dec:${d.id}:0">Refuse</button></div></div></div>`).join('') +
@@ -631,6 +652,8 @@ class EmpireUI {
     const [k, x, y, z, w] = a.split(':');
     let r = '';
     if (k === 'app') { this.openApp(x); return; }
+    // a deep link into another app's page (M11)
+    if (k === 'go') { if (APP_OF_TAB[x]) { this.tab = x; this.msg = ''; this.render(); $('empBody').scrollTop = 0; } return; }
     if (this.locked()) return;
     switch (k) {
       case 'threat': { if (uw.threats.openThreat(+x)) { g.ui.closeAll(); return; } r = 'That threat is over.'; break; }
