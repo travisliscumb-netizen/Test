@@ -39,6 +39,9 @@ const MONEY_SOURCES = {
   // a tip bought from a fence about where a one-off stands (Session 6D): cash in hand
   intel: { pay: 'dirty' },
   // the court (M7): fines and a judge's campaign donation from the bank; a crew envelope in Dirty Cash (payroll order)
+  // fronts (M9): carried Dirty Cash put through a business's books, a manager's top-ups from your stashes, the
+  // clean money that comes out of the books
+  frontIn: { pay: 'dirty' }, frontAuto: { pay: 'payroll' }, frontOut: { earn: 'clean', book: 'laundering' },
   courtFine: { pay: 'clean' }, judgeFix: { pay: 'clean' }, judgeBribe: { pay: 'payroll' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },

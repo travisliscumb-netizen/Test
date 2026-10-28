@@ -160,6 +160,8 @@ class PropertyManager {
       if (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful') { const fee = Math.round(def.income * 0.12 * (1 - this.perk('allIncome'))); const p = Money.pay(fee, 'protection', { partial: true }); S.factions[B.own].money += p; }
       if (B.mgr) S.pressure = clamp(S.pressure - 0.2, 0, 100);
     }
+    // the fronts wash their float (M9)
+    uw.fronts.tickDay();
     // laundering and quiet funerals take the heat down
     S.pressure = clamp(S.pressure - this.perk('launder') - this.perk('heat'), 0, 100);
     // a decent meal and a place to sit keep the crew's morale up: a floor under it, capped like any money-bought
@@ -189,6 +191,7 @@ class PropertyManager {
       if (tip) { uw.news(scout ? 'pv' : 'unknown', `${scout ? 'Your scout' : 'Your friend at the precinct'} called it in time: police hit ${def.name} and found it clean. Stock was moved overnight.`); S.pressure = clamp(S.pressure - 3, 0, 100); continue; }
       const seizedList = goodsList(st);
       Inv.clear(st);
+      const took = uw.fronts.raided(def.id); if (took) uw.news('pv', `The police took ${fmtMoney(took)} of the float from ${def.name}'s books as evidence.`);
       S.pressure = clamp(S.pressure + 5, 0, 100); S.st.seized += n;
       uw.market.shock([L.zone], 'green', 0.15); uw.market.shock([L.zone], 'snow', 0.15);
       uw.news('radio', `Police radio: search warrant executed at ${def.name}. Evidence recovered.`);

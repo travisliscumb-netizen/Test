@@ -5,9 +5,10 @@
    in one step, before the reels spin or the card is scratched. The show is
    only a reveal, so closing a screen, double-tapping, a state change or a
    reload can never duplicate or lose money (a blackjack hand you walk away
-   from is stood; a poker stack is cashed out). Fuel & Go games keep a house
-   edge. The casino is player-favoured (about 60/40 on decided rounds, see
-   CASINO) and has no table limits.
+   from is stood; a poker stack is cashed out). Every game keeps an honest,
+   modest house edge (§45.4, M9): ordinary rules, ordinary odds, table
+   limits by room. The windfalls are the Royale Billions major prizes and the
+   world-time billion-dollar progressive (a $10,000 spin qualifies).
    ===================================================================== */
 const SCRATCH_CARDS = {
   5: { name: 'Lucky Fives', col: '#7fe08f', prizes: [[5, 0.21], [10, 0.08], [20, 0.03], [50, 0.006], [100, 0.002], [500, 0.0002], [2500, 0.00002], [12500, 0.0000025]] },
@@ -75,24 +76,25 @@ function slotSpin(def, bet, pool) {
   }
   return { grid, win, lines, jackpot };
 }
-// ---- the Valen Royale: one player-favoured house. There is no table maximum: the only limit on a wager is
-// the cash you carry. Every game is tuned so that, over a fair sample, about 60% of the rounds that are decided
-// go the player's way and 40% the house's, by the same rule at $10 and at $10,000,000 (a bigger stake never
-// changes the odds). The tuning knobs live here so the balance can be read and changed in one place.
+// ---- the Valen Royale (§45.4, M9): an honest house. Ordinary rules and odds at every table (European roulette
+// 2.7%, blackjack 6 decks S17 3:2 about 0.5%, baccarat about 1.1–1.2%, three card poker about 3.4%, craps pass line
+// 1.4%), the Royale Billions slot at about 94% return, and table limits by room: $10,000 on the floor, $250,000 in
+// the VIP room once you are known there (Rep 1,300). The knobs below used to tilt every game to the player; they are
+// kept at their honest values so the old rules can't come back by accident.
 const CASINO = {
-  minBet: 10,
-  quick: [100, 1e3, 1e4, 1e5, 1e6, 5e6, 1e7, 2.5e7, 1e8, 1e9],
+  minBet: 10, floorMax: 10000, vipMax: 250000, vipRep: 1300, slotMax: 10000,
+  quick: [100, 1e3, 5e3, 1e4, 5e4, 1e5, 2.5e5],
   // roulette: a round counts for the player when (total paid back − total staked) > 0. Layouts that win less
   // often than `roulTarget` have their winning pockets weighted up by `roulBoost` (even chances 48.6% → 60%);
   // a layout that already wins that often (most of the board covered) gets no help, so covering the table
   // only buys many small wins against rare large losses.
-  roulTarget: 0.6, roulBoost: 0.6 / (18 / 37),
+  roulTarget: 0, roulBoost: 1,
   // blackjack: a card that would bust the player is sometimes put back (once), and a dealer run that beats a
   // standing hand is sometimes re-dealt (once). Normal rules otherwise (6 decks, S17, 3:2).
-  bjSaveBust: 0.72, bjDealerRedo: 0.82,
+  bjSaveBust: 0, bjDealerRedo: 0,
   // Hold'em: the chance that a hand is dealt from a deck where your seven cards end up the best at the table
   // (otherwise the deck is left as shuffled, where you are best about one time in four)
-  pokerFavor: 0.1
+  pokerFavor: 0
 };
 // "2.5m", "10k", "$1,000,000", "1b" → whole dollars (NaN when it is not an amount)
 function parseMoney(s) { const t = String(s == null ? '' : s).trim().toLowerCase().replace(/[$,\s_]/g, ''); const m = t.match(/^(\d+(?:\.\d+)?)([kmbt]?)$/); if (!m) return NaN; return Math.floor(+m[1] * { '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2]]); }
@@ -127,7 +129,10 @@ const ROYALE_MAJORS = [
   { id: 'm100k', prize: 1e5, w: 0.04, perH: 0.45, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, perH: 0.7, name: 'MINOR' },
   { id: 'm25k', prize: 2.5e4, w: 0.03, perH: 1.0, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, perH: 1.5, name: 'BONUS' }
 ];
-const ROYALE = { share: 0.12, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, fullBet: 1000, sph: 1300 };
+// M9: the majors share 8% of every stake as expected return (split by w, scaled by the drought average); the base game
+// pays BASE_K of its table, so the machine returns about 94% in all. The billion tier is the world-time progressive
+// (jp.pool, seeded at $1B, growing ~$400k–$800k an economic day) and is only in play on a qualifying $10,000 spin.
+const ROYALE = { share: 0.08, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, fullBet: 1000, sph: 1300, baseK: 0.875, qualify: 10000, grow: [400000, 800000] };
 // mean of the pressured wait in units of the unpressured one: ∫₀^∞ exp(−(x + c·x³/3)) dx (0.536 for c = 4)
 const ROYALE_DROUGHT_K = (() => { const c = ROYALE.drought, dx = 1e-3; let sum = 0; for (let x = dx / 2; x < 16; x += dx) sum += Math.exp(-(x + c * x * x * x / 3)) * dx; return sum; })();
 function royaleEval(grid) {
@@ -171,9 +176,8 @@ function royaleChances(bet) {
   _royaleChBet = bet; return (_royaleCh = royaleChancesRaw(bet));
 }
 function royaleChancesRaw(bet) {
-  const el = ROYALE_MAJORS.filter(m => bet >= CASINO.minBet && m.prize >= ROYALE.minRatio * bet), sw = el.reduce((a, m) => a + m.w, 0);
-  const k = Math.min(1, bet / ROYALE.fullBet);
-  return ROYALE_MAJORS.map(m => el.includes(m) ? Math.min(ROYALE.maxP, Math.max(m.perH / ROYALE.sph * ROYALE_DROUGHT_K * k, ROYALE.share * m.w / sw * bet / m.prize)) : 0);
+  const el = ROYALE_MAJORS.filter(m => bet >= CASINO.minBet && m.prize >= ROYALE.minRatio * bet && (m.id !== 'm1b' || bet >= ROYALE.qualify)), sw = el.reduce((a, m) => a + m.w, 0);
+  return ROYALE_MAJORS.map(m => el.includes(m) ? Math.min(ROYALE.maxP, ROYALE.share * m.w / sw * bet / m.prize * ROYALE_DROUGHT_K) : 0);
 }
 // long-run average spins between hits of each tier at this bet, pressure included (0 = not in play)
 function royaleEvery(bet) { return royaleChances(bet).map(p => p > 0 ? ROYALE_DROUGHT_K / p : 0); }
@@ -188,7 +192,7 @@ function royaleSeedPressure(rnd = Math.random) {
 function royaleLive(bet, jp) { return royaleChances(bet).map((b, t) => { if (!b) return 0; const P = +(jp && jp.pr && jp.pr[ROYALE_MAJORS[t].id]) || 0; return Math.min(ROYALE.maxP, b * (1 + ROYALE.drought * P * P)); }); }
 // when no major is in play (a bet over a fifth of the top prize) the base game pays its share instead, so the
 // expected return never drops for betting big
-function royaleBaseScale(bet) { return royaleChances(bet).some(p => p > 0) ? 1 : (ROYALE_BASE_RTP + ROYALE.share) / ROYALE_BASE_RTP; }
+function royaleBaseScale(bet) { return ROYALE.baseK * (royaleChances(bet).some(p => p > 0) ? 1 : (ROYALE_BASE_RTP * ROYALE.baseK + ROYALE.share) / (ROYALE_BASE_RTP * ROYALE.baseK)); }
 // the major roll of one spin: every tier in play is rolled, the biggest that hits is paid. Updates jp in place
 // (pressure and hit counts) and returns the tier index or -1. Shared by royaleSpin and the simulations.
 function royaleRollMajor(bet, jp, rnd = Math.random) {
@@ -209,7 +213,10 @@ function royaleSpin(bet, jp, rnd = Math.random) {
   if (major >= 0) {
     b = royaleBuild(0, rnd) || royaleBlank();
     for (let r = 0; r < 5; r++) b.grid[r][1] = 'royal';
-    return { grid: b.grid, win: ROYALE_MAJORS[major].prize, lines: [{ li: 0, n: 5, sym: 'royal' }], major, mult: 0, teaser: 0 };
+    // the billion tier pays the live progressive and starts it again from the seed
+    const prog = ROYALE_MAJORS[major].id === 'm1b', prize = prog ? Math.max(ROYALE.top, Math.floor(+jp.pool || ROYALE.top)) : ROYALE_MAJORS[major].prize;
+    if (prog) jp.pool = ROYALE.top;
+    return { grid: b.grid, win: prize, lines: [{ li: 0, n: 5, sym: 'royal' }], major, mult: 0, teaser: 0, progressive: prog };
   }
   b = royaleBuild(_apick(ROYALE_K, rnd), rnd) || royaleBuild(0, rnd) || royaleBlank();
   let teaser = 0;
@@ -422,6 +429,10 @@ class Gamble {
     if (kind === 'bj') this.openBlackjack(+arg || 0);
     else if (kind === 'roul') this.openRoulette(+arg || 0);
     else if (kind === 'poker') this.openPoker();
+    else if (kind === 'bacc') this.openBaccarat(+arg || 0);
+    else if (kind === 'craps') this.openCraps();
+    else if (kind === 'tcp') this.openThreeCard(+arg || 0);
+    else if (kind === 'sports') this.openSportsbook();
     else if (kind === 'slot') this.openRoyale(arg);
     else if (kind === 'cashier') this.openCashier();
     else if (kind === 'bar') this.barDrink();
@@ -435,8 +446,8 @@ class Gamble {
   openCashier() {
     const render = () => {
       const s = this.g.save, J = this.G.jp;
-      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>No table limits: bet anything from ${fmtMoney(CASINO.minBet)} up to your whole bankroll</span></div>`;
-      h += '<div class="hint">The Valen Royale is a player’s house: across its games about six decided rounds in ten go your way. Losing streaks still happen, and nothing changes with the size of your bet.</div>';
+      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Limits: ${fmtMoney(CASINO.minBet)}–${fmtMoney(CASINO.floorMax)} on the floor · up to ${fmtMoney(CASINO.vipMax)} at the VIP tables (Rep ${CASINO.vipRep.toLocaleString('en-US')}) · Royale Billions up to ${fmtMoney(CASINO.slotMax)}</span></div>`;
+      h += `<div class="hint">An honest house: ordinary rules and odds, a small edge on every game. The windfalls are the Royale Billions major prizes and the progressive, now <b class="money">${fmtMoney(Math.floor(+J.pool || ROYALE.top))}</b>, which grows every day and is only in play on a $10,000 spin.</div>`;
       h += `<h3>Royale Billions jackpots</h3><div class="stats">${ROYALE_MAJORS.slice(0, 8).map(m => `<span>${fmtMoney(m.prize)}</span><span>${(J.hits[m.id] || 0)} hit${(J.hits[m.id] || 0) === 1 ? '' : 's'}</span>`).join('')}</div>`;
       h += '<h3>Casino record</h3>' + this.statsHTML('casino') + '<h3>Fuel & Go slot</h3>' + this.statsHTML('slots') + '<h3>Scratch cards</h3>' + this.statsHTML('scratch');
       return h;
@@ -486,14 +497,19 @@ class Gamble {
     const stopAt = (i) => this.later(650 + i * 330, () => { sl.stopped = i + 1; this.g.audio.play('reelstop', { gain: 0.6 }); if (i === def.reels - 1) { sl.spinning = false; sl.grid = r.grid; this.busy = false; this.refresh(r.win ? `Win: ${fmtMoney(r.win)}` : 'No win.'); this.celebrate(r.cls, r.win, def.progressive ? 'PROGRESSIVE JACKPOT' : 'JACKPOT'); } });
     for (let i = 0; i < def.reels; i++) stopAt(i);
   }
+  // the economic day (M9): the progressive grows from the unseen players, whether you are here or not
+  tickDay(rnd = Math.random) { const J = this.G.jp; J.pool = Math.max(ROYALE.top, +J.pool || ROYALE.top) + Math.round(ROYALE.grow[0] + rnd() * (ROYALE.grow[1] - ROYALE.grow[0])); if (this.tickSports) this.tickSports(); }
   // ------------------------------------------------------------- wagers: any amount from the minimum to the whole bankroll
   get pref() { const G = this.G; if (!G.pref || typeof G.pref !== 'object' || Array.isArray(G.pref)) G.pref = {}; return G.pref; }
-  wager(game, def) { const v = this.pref[game]; return typeof v === 'number' && isFinite(v) && v >= CASINO.minBet ? v : def; }
-  setWager(game, v) { v = Math.floor(+v); if (!(v >= CASINO.minBet)) v = CASINO.minBet; this.pref[game] = v; return v; }
+  // the table limit (M9): the Royale slot tops out at the qualifying $10,000; tables at $10,000 on the floor and
+  // $250,000 at a VIP table for someone known there
+  maxBet(game) { if (game === 'royale') return CASINO.slotMax; return this.seat === 3 && this.g.save.rep >= CASINO.vipRep ? CASINO.vipMax : CASINO.floorMax; }
+  wager(game, def) { const v = this.pref[game]; return Math.min(this.maxBet(game), typeof v === 'number' && isFinite(v) && v >= CASINO.minBet ? v : def); }
+  setWager(game, v) { v = Math.floor(+v); if (!(v >= CASINO.minBet)) v = CASINO.minBet; v = Math.min(v, this.maxBet(game)); this.pref[game] = v; return v; }
   // the shared bet bar: balance, wager, what it can pay; quick amounts up to what you hold, MAX, ½, ×2 and a typed amount
   wagerHTML(game, cur, o = {}) {
     const m = Math.floor(o.avail !== undefined ? o.avail : this.shownMoney()), lock = o.lock ? 'disabled' : '';
-    const quick = CASINO.quick.filter((v, i) => i < 5 || v <= m);
+    const quick = CASINO.quick.filter(v => v <= this.maxBet(game));
     const top = o.noTop ? '' : `<div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>${o.label || 'BET'}<b>${fmtMoney(cur)}</b></span>${o.pays ? `<span>${o.paysLabel || 'PAYS UP TO'}<b class="money">${o.pays}</b></span>` : ''}</div>`;
     return `<div class="wager">${top}
       <div class="wq">${quick.map(v => `<button class="sbtn${cur === v ? ' gold' : ''}" data-act="w:q:${v}" ${v > m || o.lock ? 'disabled' : ''}>$${fmtShort(v)}</button>`).join('')}<button class="sbtn${cur === m && m >= CASINO.minBet ? ' gold' : ''}" data-act="w:max" ${m < CASINO.minBet || o.lock ? 'disabled' : ''}>MAX</button></div>
@@ -502,7 +518,7 @@ class Gamble {
   // a bet-bar action → the new wager (null when the action is not one); cap is what can still be staked
   wagerAct(game, a, cur, cap) {
     const [k, sub, x] = a.split(':'); if (k !== 'w') return null;
-    const m = Math.floor(cap !== undefined ? cap : Money.clean);
+    const m = Math.min(this.maxBet(game), Math.floor(cap !== undefined ? cap : Money.clean));
     let v = cur;
     if (sub === 'q') v = +x; else if (sub === 'max') v = m; else if (sub === 'half') v = Math.floor(cur / 2); else if (sub === 'dbl') v = cur * 2;
     else if (sub === 'set') { const el = document.getElementById('wagerIn'); const n = parseMoney(el && el.value); if (!(n > 0)) { this.refresh('Type an amount like 7500, 250k, 2.5m or 1b.'); return cur; } v = n; }
@@ -531,6 +547,7 @@ class Gamble {
   // the player's hit: a card that would bust the hand is now and then put back in the shoe and another drawn (once)
   bjHitCard(cards) { let c = this.draw(); if (bjValue([...cards, c]).total > 21 && Math.random() < CASINO.bjSaveBust) { this.unDraw(c); c = this.draw(); } return c; }
   openBlackjack(seat) {
+    this.seat = seat | 0;
     seat = Math.max(0, seat | 0);
     if (!this.bj || this.bj.phase !== 'play') this.bj = { seat, bet: this.wager('bj', 100), hands: [], dealer: [], phase: 'bet', cur: 0, msg: '' };
     const render = () => {
@@ -628,6 +645,7 @@ class Gamble {
   }
   // ------------------------------------------------------------- roulette: European single zero, as many bets as you like in one spin
   openRoulette(seat) {
+    this.seat = seat | 0;
     seat = Math.max(0, seat | 0);
     if (!this.roul) this.roul = { bets: {}, stack: [], hist: [], res: null, spinning: null, last: null, mode: 'add' };
     const R = this.roul, red = n => ROUL_RED.has(n);
@@ -921,7 +939,7 @@ class Gamble {
       const ch = royaleChances(bet), every = royaleEvery(bet), live = royaleLive(bet, J), sc = royaleBaseScale(bet), hrs = n => { const h = n / ROYALE.sph; return h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 100 ? `${h < 10 ? h.toFixed(1) : Math.round(h)} h` : `${Math.round(h).toLocaleString('en-US')} h`; }, nm = { seven: 'seven', crown: 'crown', diamond: 'diamond', car: 'car', cash: 'cash', shoe: 'horseshoe' };
       h += `<div class="rylInfo"><h3>Line pays at ${fmtMoney(bet)}</h3><div class="stats">${ROYALE_SYMS.map(k => `<span>${this.royaleCell(k, ' mini')} ${nm[k]} ×3 / ×4 / ×5</span><span>${ROYALE_PAY[k].map(x => fmtMoney(Math.round(x * sc * bet))).join(' / ')}</span>`).join('')}</div>
         <div class="hint">Five lines: the three rows and two V shapes, read from the left reel. Every winning line on a spin is paid.</div>
-        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.prize)}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
+        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.id === 'm1b' ? Math.floor(+this.G.jp.pool || ROYALE.top) : m.prize)}${m.id === 'm1b' ? ' (progressive · $10,000 spins only)' : ''}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
         <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them, even twice in a row. These are long-run averages at about ${ROYALE.sph.toLocaleString('en-US')} spins an hour, never a schedule. Full odds from a ${fmtMoney(ROYALE.fullBet)} bet; smaller bets get a proportionally smaller chance, and very big bets a bigger one. A jackpot that hasn’t landed for a while gets more likely (“due”) until it does. Bets above ${fmtMoney(ROYALE.top / ROYALE.minRatio)} play the line pays a little richer instead.</div>
         <h3>Your record</h3><div class="stats"><span>Spins</span><span>${(J.spins || 0).toLocaleString('en-US')}</span><span>Biggest win</span><span>${fmtMoney(J.biggest || 0)}</span>${ROYALE_MAJORS.filter(m => J.hits[m.id]).map(m => `<span>${fmtMoney(m.prize)} hits</span><span>${J.hits[m.id]}</span>`).join('')}</div></div>`;
     }

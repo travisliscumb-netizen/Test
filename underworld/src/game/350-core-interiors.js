@@ -1275,10 +1275,10 @@ function interiorLighting(g) {
     I.sky.lit.opacity = clamp(env.night * 1.2, 0, 1);
   }
 }
-// The Valen Royale gaming floor: lobby with cashier and bar, Royale Billions slot banks, blackjack and
-// roulette tables (no limits: every table takes any stake), one big no-limit Hold'em table and the VIP
-// lounge behind a rope (open to everyone, it is just quieter). Built on entry, disposed on exit.
-const CASINO_GAMES = [['bj', 'Blackjack'], ['roul', 'Roulette'], ['poker', 'Hold’em']];
+// The Valen Royale gaming floor: lobby with cashier, bar and sportsbook, Royale Billions slot banks, blackjack,
+// roulette and craps tables (limits by room, M9), one big Hold'em table and the VIP room behind a rope (blackjack,
+// roulette, baccarat, three card poker: higher limits once they know you). Built on entry, disposed on exit.
+const CASINO_GAMES = [['bj', 'Blackjack'], ['roul', 'Roulette'], ['poker', 'Hold’em'], ['bacc', 'Baccarat'], ['craps', 'Craps'], ['tcp', 'Three Card Poker']];
 const CASINO_FELT = [0x1f6a3e, 0x1d4f8a, 0x7a1a2a, 0x141418];
 const CASINO_TRIM = [0x7fe08f, 0x7fb2ff, 0xff4d5e, 0xffd84d];
 function casinoInteriorDef() {
@@ -1288,13 +1288,16 @@ function casinoInteriorDef() {
   for (let t = 0; t < 3; t++) { tables.push({ g: 'bj', t, n: t, x: -2, z: 4.5 - t * 4 }); tables.push({ g: 'roul', t, n: t, x: 5, z: 4.5 - t * 4 }); }
   tables.push({ g: 'poker', t: 2, n: 0, x: 12, z: 0.5, big: true });
   tables.push({ g: 'bj', t: 3, n: 3, x: -2, z: -10.5 }, { g: 'roul', t: 3, n: 3, x: 5, z: -10.5 });
+  // M9: craps on the main floor; baccarat and three card poker in the VIP room
+  tables.push({ g: 'craps', t: 1, n: 0, x: 12, z: -4.2, big: true }, { g: 'bacc', t: 3, n: 3, x: -8.5, z: -10.5 }, { g: 'tcp', t: 3, n: 3, x: 16.5, z: -10.5 });
   const slots = [['royale', -16, 3.5, 0xff4d5e], ['royale', -11, 3.5, 0x46d4c4], ['royale', -16, -1.5, 0xd28cff], ['royale', -11, -1.5, 0xffd84d], ['royale', -14, -10.5, 0xf4f2ee], ['royale', 12, -10.5, 0xffd84d]];
   const spots = [
     { id: 'g:cashier', x: 15.2, z: 9.6, r: 1.5, label: 'Cashier · records & table access' },
-    { id: 'g:bar', x: -14.5, z: 9.6, r: 1.6, label: 'Royale Bar · drink $40' }
+    { id: 'g:bar', x: -14.5, z: 9.6, r: 1.6, label: 'Royale Bar · drink $40' },
+    { id: 'g:sports', x: 17.4, z: 4, r: 1.6, label: 'Sportsbook · today’s matches' }
   ];
-  for (const T of tables) spots.push({ id: `g:${T.g}:${T.n}`, x: T.x, z: T.z + (T.big ? 2.1 : 1.35), r: T.big ? 1.6 : 1.25, label: T.g === 'poker' ? 'Hold’em · no limit · choose your stakes' : `${CASINO_GAMES.find(c => c[0] === T.g)[1]} · table ${T.n + 1} · any stake` });
-  for (const [id, x, z] of slots) spots.push({ id: 'g:slot:' + id, x, z: z + 1.2, r: 1.2, label: 'Royale Billions · max jackpot $1,000,000,000' });
+  for (const T of tables) spots.push({ id: `g:${T.g}:${T.n}`, x: T.x, z: T.z + (T.big ? 2.1 : 1.35), r: T.big ? 1.6 : 1.25, label: T.g === 'poker' ? 'Hold’em · choose your stakes' : `${CASINO_GAMES.find(c => c[0] === T.g)[1]} · ${T.t === 3 ? 'VIP table · up to $250,000 when they know you' : 'table ' + (T.n + 1) + ' · up to $10,000'}` });
+  for (const [id, x, z] of slots) spots.push({ id: 'g:slot:' + id, x, z: z + 1.2, r: 1.2, label: 'Royale Billions · the billion-dollar progressive on a $10,000 spin' });
   const npcs = [
     { id: 'cashier', x: 15.2, z: 11.6, h: Math.PI, look: { shirt: 0x1a1a1e, pants: 0x1a1a1e, cap: 0xd8a227 } },
     { id: 'bartender', x: -14.5, z: 11.6, h: Math.PI, look: { shirt: 0xf4f2ee, pants: 0x1a1a1e } },
@@ -1336,6 +1339,11 @@ function casinoInteriorDef() {
           k.box(T.x, 0, T.z, 3.0, 0.85, 1.3, 0x3a2416, { col: true }); k.box(T.x, 0.85, T.z, 3.1, 0.05, 1.4, felt);
           k.box(T.x - 1.0, 0.9, T.z, 0.9, 0.12, 0.9, 0x5a3a1a); k.box(T.x - 1.0, 1.02, T.z, 0.6, 0.04, 0.6, 0xd8a227); k.box(T.x - 1.0, 1.06, T.z, 0.12, 0.18, 0.12, 0xd8a227);
           for (let i = 0; i < 12; i++) k.box(T.x - 0.3 + (i % 6) * 0.3, 0.9, T.z - 0.3 + Math.floor(i / 6) * 0.45, 0.24, 0.01, 0.36, i % 2 ? 0xa8242a : 0x15171c);
+        } else if (T.g === 'craps') {
+          // the craps tub: a long rail round a sunken felt, the stickman's side and the boxman's chair
+          k.box(T.x, 0, T.z, 4.0, 0.95, 2.0, 0x3a2416, { col: true }); k.box(T.x, 0.95, T.z, 4.1, 0.08, 2.1, 0x1a1a1e); k.box(T.x, 0.9, T.z, 3.6, 0.04, 1.6, felt);
+          for (const dx of [-1.2, 0, 1.2]) k.box(T.x + dx, 0.95, T.z + 0.2, 0.5, 0.01, 0.4, 0xf4f2ee);
+          for (let i = 0; i < 6; i++) k.box(T.x - 1.6 + i * 0.64, 0, T.z + 1.45, 0.42, 0.62, 0.42, 0x1a1a1e);
         } else if (T.g === 'poker') {
           // the one big no-limit table: long felt, padded rail, eight chairs
           k.box(T.x, 0, T.z, 4.6, 0.82, 2.6, 0x3a2416, { col: true }); k.box(T.x, 0.82, T.z, 4.7, 0.08, 2.7, 0x1a1a1e); k.box(T.x, 0.84, T.z, 4.2, 0.07, 2.2, felt);
@@ -1354,6 +1362,9 @@ function casinoInteriorDef() {
       for (const x of [-3.8, -1.2]) { k.box(x, 0, -6.7, 0.18, 1.0, 0.18, 0xd8a227); k.box(x + (x < -2.5 ? -0.3 : 0.3), 0.8, -6.7, 0.6, 0.05, 0.05, 0x9a1a2a); }
       k.glow(-2.5, 3.1, -6.82, 3.4, 0.5, 0.05, 0xffd84d, 2.4);
       k.box(0, -0.003, -10.5, W, 0.012, 7, 0x141418, { flat: true });
+      // the sportsbook (M9): a counter and a wall of screens on the east side of the lobby
+      k.box(18.6, 0, 4, 0.8, 1.1, 3.6, 0x2a1a36, { col: true }); k.box(18.6, 1.1, 4, 0.9, 0.06, 3.7, 0xd8a227);
+      for (let i = 0; i < 3; i++) for (let r = 0; r < 2; r++) k.glow(19.9, 1.9 + r * 0.9, 2.6 + i * 1.4, 0.04, 0.75, 1.25, [0x2f8a4a, 0x2a5fa8, 0xa83a2a][(i + r) % 3], 1.5);
     }
   };
 }

@@ -141,6 +141,7 @@ class Underworld {
     this.cops = new PressureSystem(this);
     this.prison = new Prison(this);
     this.legal = new Legal(this);
+    this.fronts = new Fronts(this);
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
@@ -254,6 +255,7 @@ class Underworld {
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.legal = Legal.sanitize(S.legal, num, S.rap);
+    S.fronts = Fronts.sanitize(S.fronts, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
@@ -823,6 +825,7 @@ class Underworld {
     this.factions.tickDay();
     this.cops.tickDay();
     this.legal.tickDay();
+    if (g.gamble) g.gamble.tickDay();
     this.opps.tickDay();
     S.infamy *= 0.99;
     // the chop shop wanted list and street buyer quotas refresh daily

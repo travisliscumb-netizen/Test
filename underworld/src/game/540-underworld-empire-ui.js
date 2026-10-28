@@ -682,6 +682,7 @@ class EmpireUI {
       const o = S.props[id];
       let h = `<div class="svcTop"><span>${d.kind.toUpperCase()} · yours</span>${PM.storageCap(id) ? `<span>Storage <b>${units(S.storage[id])} / ${PM.storageCap(id)}</b></span>` : ''}<span>${Money.html('property')}</span></div>`;
       if (d.kind === 'business' && d.cat) h += this.bizCard(d, true);
+      h += uw.fronts.html(id);
       h += '<div class="btns">';
       if (d.kind === 'safehouse') h += `<button class="sbtn gold" data-act="save">Save game</button><button class="sbtn" data-act="sleep">Sleep / lie low</button><button class="sbtn" data-act="wardrobe">Wardrobe</button>`;
       if (PM.capOf(d)) h += `<button class="sbtn" data-act="garage">Parking · ${PM.capOf(d)}</button>`;
@@ -771,6 +772,9 @@ class EmpireUI {
     const uw = this.uw, g = this.g, S = uw.S, d = PROP_BY_ID[id];
     const [k, good] = a.split(':');
     let r = '';
+    // a front's books (M9): cash through, manager top-ups
+    if (k === 'fdep') { const e = uw.fronts.deposit(id, good === 'all' ? Infinity : +good); g.content.refreshSvc(e || 'Through the books. It comes out clean, a day at a time.'); return; }
+    if (k === 'fauto') { g.content.refreshSvc(uw.fronts.toggleAuto(id)); g.saveGame(); return; }
     // the warehouse panel
     if (d.kind === 'warehouse') {
       const parts = a.split(':');

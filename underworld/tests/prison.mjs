@@ -3,7 +3,7 @@
    (trays, litter, laundry) and lost again by misbehaviour; no phone and no map by default; a phone only by
    a guard bribe (yes / no / caught); the walk-out bribe (out / refused / backfire with half the offer kept);
    lawyers, paperwork, work, cards, inmates, the escape; save and reload in jail; release; v4 and v5 migrations. */
-import { launch, open, check, startNew, finish } from './lib.mjs';
+import { launch, open, check, startNew, finish, throughCourt } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
@@ -11,9 +11,9 @@ const ev = (f, a) => page.evaluate(f, a);
 const waitFade = () => page.waitForFunction(() => !window.game.fading, null, { timeout: 30000, polling: 100 });
 const step = (sec) => ev(s => { const g = window.game; for (let n = 0; n < s * 60; n++) g.update(1 / 60, 1 / 60); }, sec);
 
-check('there is no 5× or 20× sentence speed anywhere; the tiers are 1×, 2×, 3×', await ev(() => !/20×|5×/.test(document.getElementById('jailHud').innerHTML) && window.__pv.GAME_CONFIG.underworld.jailSpeeds.map(s => s.x).join() === '1,2,3'));
-const half = await ev(() => { const g = window.game, P = g.uw.prison; g.uw.S.rap.cur = { robbery: 2, shoot: 1 }; g.police.setLevel(3); const c = P.charges(); g.uw.S.rap.cur = {}; g.uw.S.rap.maxLvl = 0; g.police.clear(); return { full: c.full, total: c.total }; });
-check('the final sentence is half of what the old scale gave', half.full > 0 && half.total === Math.max(3, Math.round(half.full * 0.5)), JSON.stringify(half));
+check('the sentence speeds are 1×, 3×, 5× and 7× (§24), and the jail panel offers exactly those', await ev(() => window.__pv.GAME_CONFIG.underworld.jailSpeeds.map(s => s.x).join() === '1,3,5,7' && [...document.querySelectorAll('#jailHud [data-spd]')].map(b => b.dataset.spd).join() === '1,3,5,7'));
+const half = await ev(() => { const g = window.game, P = g.uw.prison, L = g.uw.legal; L.add('robbery', 'police'); L.add('robbery', 'police'); L.add('shoot', 'police'); g.police.setLevel(3); const c = P.charges(); const raw = c.counts.reduce((a, x) => a + x.days, 0); L.L.items = []; g.uw.S.rap.maxLvl = 0; g.police.clear(); return { raw, mul: c.mul, total: c.total }; });
+check('the final sentence is half of what the counts add up to (×record)', half.raw > 0 && half.total === Math.max(3, Math.round(Math.min(half.raw * half.mul, 1095) * 0.5)), JSON.stringify(half));
 const fmt = await ev(() => { const f = window.__pv.fmtSentence; return [f(1), f(45), f(365), f(439), f(800)]; });
 check('sentences read as days or years + days', fmt.join('|') === '1 day|45 days|1 year|1 year 74 days|2 years 70 days', fmt.join('|'));
 
@@ -120,23 +120,65 @@ const chore = await ev(() => {
   out.gbp2 = j.gbp;
   return out;
 });
-check('chore: pick up a dirty tray and carry it to the serving window (+3)', /tray/.test(chore.label1) && chore.carrying === 'tray' && /serving window/.test(chore.label2) && chore.gbp === 3 && !chore.carry2, JSON.stringify(chore));
+check('chore: pick up a dirty tray in the cafeteria and carry it to the serving counter (+3)', /tray/.test(chore.label1) && chore.carrying === 'tray' && /serving counter/.test(chore.label2) && chore.gbp === 3 && !chore.carry2, JSON.stringify(chore));
 check('chore: pick up litter (up to three) and bin it (+2 each)', chore.litter === 3 && /Bin/.test(chore.label3) && chore.gbp2 === 9, JSON.stringify(chore));
 const spd = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, out = {};
-  out.locked2 = !P.setSpeed(2) && j.speed === 1;
-  j.gbp = 20; out.max20 = P.maxSpeed(); out.set2 = P.setSpeed(2); out.no3 = !P.setSpeed(3);
-  j.gbp = 50; out.set3 = P.setSpeed(3) && P.maxSpeed() === 3;
-  // 3× really runs three times as fast
-  const a = j.served; for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60); out.days3 = j.served - a;
+  out.locked3 = !P.setSpeed(3) && j.speed === 1;
+  j.gbp = 20; out.max20 = P.maxSpeed(); out.set3 = P.setSpeed(3); out.no5 = !P.setSpeed(5);
+  j.gbp = 45; out.set5 = P.setSpeed(5); out.no7 = !P.setSpeed(7);
+  j.gbp = 75; out.set7 = P.setSpeed(7) && P.maxSpeed() === 7;
+  // 7× really runs seven times as fast
+  const a = j.served; for (let n = 0; n < 60 * 4; n++) g.update(1 / 60, 1 / 60); out.days7 = j.served - a;
   P.misbehave(25, 'test'); out.after = { gbp: j.gbp, speed: j.speed };
-  P.misbehave(20, 'test'); out.after2 = { gbp: j.gbp, speed: j.speed };
+  P.misbehave(30, 'test'); out.after2 = { gbp: j.gbp, speed: j.speed };
+  P.misbehave(20, 'test'); out.after3 = { gbp: j.gbp, speed: j.speed };
   out.hud = [...document.querySelectorAll('#jailHud [data-spd]')].map(b => b.dataset.spd + (b.disabled ? 'x' : '') + (b.classList.contains('on') ? '*' : '')).join(' ');
   return out;
 });
-check('good behaviour: 2× unlocks at 20 points, 3× at 50; locked tiers refuse', spd.locked2 && spd.max20 === 2 && spd.set2 && spd.no3 && spd.set3, JSON.stringify(spd));
-check('3× time: four seconds serve about six days', spd.days3 >= 5 && spd.days3 <= 7, JSON.stringify(spd));
-check('misbehaviour costs points and drops the speed tier (50→25: 2×, →5: 1×)', spd.after.gbp === 25 && spd.after.speed === 2 && spd.after2.gbp === 5 && spd.after2.speed === 1 && /1\*/.test(spd.hud), JSON.stringify(spd));
+check('good behaviour: 3× unlocks at 20 points, 5× at 45, 7× at 75; locked tiers refuse', spd.locked3 && spd.max20 === 3 && spd.set3 && spd.no5 && spd.set5 && spd.no7 && spd.set7, JSON.stringify(spd));
+check('7× time: four seconds serve about fourteen days', spd.days7 >= 12 && spd.days7 <= 15, JSON.stringify(spd));
+check('misbehaviour costs points and drops the speed tier (75→50: 5×, →20: 3×, →0: 1×)', spd.after.gbp === 50 && spd.after.speed === 5 && spd.after2.gbp === 20 && spd.after2.speed === 3 && spd.after3.gbp === 0 && spd.after3.speed === 1 && /1\*/.test(spd.hud), JSON.stringify(spd));
+// the rebuilt jail (M8): two tiers, the catwalk and stairs, the rooms round the day room, the restricted area
+const lay = await ev(() => {
+  const g = window.game, P = g.uw.prison, j = g.uw.S.jail, def = g.content.interiors.cur, p = g.player, fy = def.fy !== undefined ? def.fy : p.pos.y, out = {};
+  const lvl = window.__pv.intFloorY;
+  out.catwalk = lvl(def, 2, -10.7, 9); out.under = lvl(def, 2, -10.7, 0.2); out.stairMid = lvl(def, 13, -6.15, 3); out.dayroom = lvl(def, 0, -4, 3);
+  const ids = def.spots.map(s => s.id); out.rooms = ['bunk', 'payphone', 'smokey', 'guard', 'visit', 'infirmary', 'work', 'cards', 'hatch', 'weights', 'tv', 'rota'].every(k => ids.includes(k));
+  // the catwalk spot only up there
+  const rota = def.spots.find(s => s.id === 'rota');
+  p.pos.set(def.ox + rota.x, fy, def.oz + rota.z); const below = g.uw.findAction(); out.below = below ? below.label : null;
+  p.pos.set(def.ox + rota.x, fy + rota.y, def.oz + rota.z); const above = g.uw.findAction(); out.above = above ? above.label : null;
+  // the restricted maintenance room: a guard sends you back, once a day, and it goes on your record
+  j.gbp = 30; j.susp = 0; const gb = j.gbp;
+  p.pos.set(def.ox - 17, fy, def.oz - 12.5); P.restricted(); P.restricted();
+  out.trespass = { gbp: gb - j.gbp, susp: j.susp };
+  p.pos.set(def.ox + 0, fy, def.oz - 4);
+  // the infirmary
+  p.health = 10; P.spot('infirmary'); out.healed = p.health === p.maxHealth;
+  return out;
+});
+check('two tiers: the catwalk is a deck at the upper tier, the stair climbs to it, the ground under it stays ground', lay.catwalk > 3 && lay.under === 0 && lay.stairMid > 0.5 && lay.stairMid < 3 && lay.dayroom === 0, JSON.stringify(lay));
+check('every room of the jail has its place: cells, day room, cafeteria, laundry/work, visitation, infirmary, gym, guard station, the catwalk, maintenance', lay.rooms, JSON.stringify(lay));
+check('the catwalk spot is only reachable up on the catwalk', !(lay.below || '').includes('catwalk') && /catwalk/.test(lay.above || ''), JSON.stringify(lay));
+check('maintenance is staff only: walking in costs good behaviour and raises suspicion, once a day', lay.trespass.gbp === 4 && lay.trespass.susp === 10, JSON.stringify(lay));
+check('the infirmary patches you up', lay.healed, JSON.stringify(lay));
+const fav = await ev(() => {
+  const g = window.game, P = g.uw.prison, j = g.uw.S.jail, out = {};
+  j.commissary = 5000; j.susp = 50; for (const k of ['inmate1', 'inmate2', 'inmate3', 'inmate4']) j.inm[k] = 70; j.intel = 0; j.cover = false; j.tool = false; j.phone = false; j.fav = {};
+  out.deacon = P.favor('inmate1'); out.susp = j.susp;
+  out.lou = P.favor('inmate3'); out.cover = j.cover;
+  out.wire1 = P.favor('inmate4'); out.intel1 = j.intel;
+  out.again = P.favor('inmate4');
+  j.fav.inmate4 = -99; P.favor('inmate4'); j.fav.inmate4 = -99; out.wireTool = (P.favor('inmate4'), j.tool);
+  out.tito = P.favor('inmate2', () => 0.1); out.phone = j.phone;
+  j.inm.inmate1 = 30; j.fav.inmate1 = -99; out.lowTrust = P.favor('inmate1');
+  out.commissary = j.commissary;
+  j.phone = false;
+  return out;
+});
+check('inmate favours (trust 60+, commissary): protection cuts suspicion, Big Lou a distraction, Wire the rota then a tool, Tito a phone', fav.susp === 30 && fav.cover && fav.intel1 === 1 && fav.wireTool && fav.phone, JSON.stringify(fav));
+check('favours have a cooldown and need trust; they never take time off the sentence', /Not now/.test(fav.again) && /Not now/.test(fav.lowTrust), JSON.stringify(fav));
 // the phone: only from a guard, a real roll
 const ph = await ev(() => {
   const g = window.game, P = g.uw.prison, j = g.uw.S.jail, R = Math.random, out = {};
@@ -176,8 +218,8 @@ check('walk-out bribe: backfire takes half the offer ($25,000 of $50,000) and ad
 check('walk-out bribe: one attempt a week', rb.cool, JSON.stringify(rb));
 
 // save and reload in jail
-const sv = await ev(() => { const g = window.game; g.uw.S.jail.gbp = 22; g.uw.S.jail.speed = 2; g.saveGame(true); const d = window.__pv.SaveSystem.load().data; return { v: d.version, jail: !!d.uw.jail, served: d.uw.jail.served, ally: d.uw.jail.ally, speed: d.uw.jail.speed, gbp: d.uw.jail.gbp, phone: d.uw.jail.phone }; });
-check('save in jail: current schema; the sentence, progress, good behaviour, speed and phone survive a reload', sv.v === 9 && sv.jail && sv.served > 0 && sv.ally && sv.speed === 2 && sv.gbp === 22 && sv.phone === true, JSON.stringify(sv));
+const sv = await ev(() => { const g = window.game; g.uw.S.jail.gbp = 22; g.uw.S.jail.speed = 3; g.saveGame(true); const d = window.__pv.SaveSystem.load().data; return { v: d.version, jail: !!d.uw.jail, served: d.uw.jail.served, ally: d.uw.jail.ally, speed: d.uw.jail.speed, gbp: d.uw.jail.gbp, phone: d.uw.jail.phone }; });
+check('save in jail: current schema; the sentence, progress, good behaviour, speed and phone survive a reload', sv.v === 9 && sv.jail && sv.served > 0 && sv.ally && sv.speed === 3 && sv.gbp === 22 && sv.phone === true, JSON.stringify(sv));
 
 // the escape: caught
 const caught = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; j.tool = true; j.intel = 2; window.__t0 = j.total; P.startEscape(); return true; });
@@ -192,12 +234,13 @@ void caught;
 // the escape: out
 await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; j.lockUntil = 0; j.tool = true; j.intel = 2; P.startEscape(); });
 await waitFade();
-await ev(() => { const g = window.game, I = g.content.interiors, d = I.cur, p = g.player; const gd = I.guards[0]; gd.route = [[10.5, -3.6], [10.6, -3.6]]; gd.x = d.ox + 10.5; gd.z = d.oz - 3.6; gd.h = 0; p.pos.set(d.ox - 12.1, d.fy, d.oz + 4.0); g.uw.prison.escapeHatch(); for (let n = 0; n < 60 * 5; n++) g.update(1 / 60, 1 / 60); });
+await ev(() => { const g = window.game, I = g.content.interiors, d = I.cur, p = g.player; const gd = I.guards[0]; gd.route = [[10.5, -3.6], [10.6, -3.6]]; gd.x = d.ox + 10.5; gd.z = d.oz - 3.6; gd.h = 0; g.uw.prison.drainOdds = () => 1; const H = d.spots.find(s => s.id === 'hatch'); p.pos.set(d.ox + H.x, d.fy, d.oz + H.z); g.uw.prison.escapeHatch(); for (let n = 0; n < 60 * 5; n++) g.update(1 / 60, 1 / 60); });
 await waitFade();
 const out = await ev(() => { const g = window.game, S = g.uw.S; return { jail: !!S.jail, fug: S.fugitive, lvl: g.police.level, interior: !!g.player.interior }; });
 check('escape: reach the grate unseen and unscrew it → out, a fugitive, three stars', !out.jail && out.fug && out.fug.left > 0 && out.lvl >= 3 && !out.interior, JSON.stringify(out));
 const ch = await ev(() => { const g = window.game; return g.uw.prison.charges().lines.map(l => l[0]).join(' | '); });
-check('a fugitive caught again answers for the rest of the old sentence', /Escaped custody/.test(ch), ch);
+check('a fugitive caught again faces the recapture enhancement (not the whole old sentence)', /Escaped custody/.test(ch), ch);
+await ev(() => { delete window.game.uw.prison.drainOdds; });
 
 // release after a served sentence
 await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });

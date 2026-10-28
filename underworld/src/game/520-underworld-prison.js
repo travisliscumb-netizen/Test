@@ -12,85 +12,130 @@ const INMATES = {
   inmate3: { name: 'Big Lou', blurb: 'Two hundred pounds of patience. Getting out the same month as you, maybe.', gift: 'recruit', giftText: 'Work for you when you’re both out' },
   inmate4: { name: 'Kenji "Wire" Sato', blurb: 'Fixed the block’s cameras once. Knows when the night guard walks.', gift: 'ally', giftText: 'Help with a way out' }
 };
+// favours (M8, §24): once an inmate trusts you (60+), each can do his kind of favour again and again, for commissary
+// money and a cooldown. Favours never take time off the sentence.
+const INMATE_FAVORS = {
+  inmate1: { id: 'protect', text: 'Protection: nobody touches you, and the guards look elsewhere', fee: 100, cd: 10 },
+  inmate2: { id: 'phone', text: 'Smuggle in a phone (it might get found)', fee: 300, cd: 15 },
+  inmate3: { id: 'cover', text: 'Cause a scene on the night you go (a distraction)', fee: 150, cd: 10 },
+  inmate4: { id: 'intel', text: 'Guard routines, or a tool for a grate', fee: 250, cd: 8 }
+};
+// the jail (M8): a compact multi-room county jail round a two-tier cell block (§24). Local metres, origin at the
+// centre: the cell block's two tiers along the north wall with a catwalk and a stair, the day room in front of them,
+// the laundry (work) and the restricted maintenance room in the west wing, the guard station and the exit in the east
+// wing, and along the south the cafeteria, visitation (lawyers) with the infirmary behind it, and the gym.
+const JAIL = { W: 40, D: 32, H1: 3.4, H: 7.4, bunk: { x: -2, z: -14.3 }, restricted: { x0: -20, x1: -14, z0: -16, z1: -9 } };
 INTERIOR_DEFS.prison = {
-  name: 'Port Valen County Jail · Block C', place: 'prison', w: 26, d: 18, h: 4.6, exit: { x: 0, z: 99 }, spawnH: 0, noExit: true, noDoor: true,
-  build(k, rng) {
-    k.room(26, 18, 4.6, { floor: 0x7d7f80, wall: 0xa8b0a6, wall2: 0x9aa39a, ceil: 0x8a8f8c, trim: 0x3a3e40, band: [0, 1.3], bandC: 0x5d6b62, lights: [4, 2], lightC: 0xe8f4ff });
-    k.tiles(26, 18, 0x7d7f80, 0x737576, 1.2);
-    // six cells along the north wall: side walls, bunk, toilet, and a barred front
-    for (let c = 0; c < 6; c++) {
-      const x0 = -12 + c * 4;
-      k.box(x0, 0, -7.2, 0.18, 3.2, 3.6, 0x8f978e, { col: true });
-      k.box(x0 + 2, 0, -8.55, 3.4, 0.45, 0.85, 0x5a5e62, { col: true }); k.box(x0 + 2, 0.45, -8.55, 3.2, 0.1, 0.8, 0xc8c2b4);
-      k.box(x0 + 2.4, 1.35, -8.55, 3.0, 0.12, 0.8, 0x5a5e62); k.box(x0 + 2.4, 1.47, -8.55, 2.9, 0.08, 0.75, 0xc8c2b4);
-      k.box(x0 + 3.4, 0, -6.2, 0.45, 0.42, 0.55, 0xd8dcd8, { col: true });
-      // bars (the player's cell, the 3rd, stands open)
-      const open = c === 2;
-      for (let b = 0; b < 11; b++) { if (open && b > 2 && b < 8) continue; k.box(x0 + 0.2 + b * 0.36, 0, -5.35, 0.05, 3.2, 0.05, 0x3a3e44); }
-      k.box(x0 + 2, 3.15, -5.35, 4, 0.12, 0.12, 0x3a3e44); k.cols.push({ x0: x0 + 0.1, x1: x0 + 4, z0: -5.42, z1: -5.28, y0: 0, y1: 3.2 });
-      if (open) k.cols.pop(), k.cols.push({ x0: x0 + 0.1, x1: x0 + 1.1, z0: -5.42, z1: -5.28, y0: 0, y1: 3.2 }, { x0: x0 + 2.95, x1: x0 + 4, z0: -5.42, z1: -5.28, y0: 0, y1: 3.2 });
-      k.glow(x0 + 2, 3.0, -7.2, 0.6, 0.05, 0.3, 0xe8f4ff, 1.8);
-    }
-    k.box(12, 0, -7.2, 0.18, 3.2, 3.6, 0x8f978e, { col: true });
-    // common area: steel tables, a TV, the payphone, the guard post behind glass
-    for (const [tx, tz] of [[-6, 0], [0, 0.5], [6, 0]]) {
-      k.box(tx, 0, tz, 2.4, 0.78, 1.0, 0x9aa0a6, { col: true });
-      for (const s of [-1, 1]) k.box(tx, 0, tz + s * 0.95, 2.4, 0.45, 0.32, 0x8a9096);
-    }
-    // cards on the middle table
-    for (let i = 0; i < 5; i++) k.box(-0.6 + i * 0.25, 0.79, 0.4 + (i % 2) * 0.12, 0.16, 0.01, 0.22, i % 2 ? 0xf4f2ee : 0xd23a2a);
-    k.box(0.6, 0.79, 0.6, 0.1, 0.1, 0.1, 0xf4f2ee); k.box(0.78, 0.79, 0.5, 0.1, 0.1, 0.1, 0xf4f2ee);
-    k.box(-12.6, 1.6, 2, 0.08, 1.0, 1.6, 0x111111); k.glow(-12.55, 1.65, 2, 0.02, 0.9, 1.5, 0x6a8ab0, 1.3);
-    k.box(12.7, 0.9, 3.5, 0.2, 0.7, 0.4, 0x2a2c30); k.box(12.6, 1.25, 3.5, 0.12, 0.25, 0.18, 0x111111); k.glow(12.58, 1.45, 3.5, 0.02, 0.1, 0.15, 0x7fe08f, 1.4);
-    k.box(9, 0, 7, 5, 1.1, 0.4, 0x3a3e44, { col: true }); k.glow(9, 1.1, 7, 4.8, 1.4, 0.04, 0x8fb4c8, 0.5); k.box(9, 0, 8.2, 5, 1.0, 1.4, 0x4a4e54);
-    // visitation booth (lawyers) on the east wall: a counter, a glass screen, a stool, a handset
-    k.box(12.45, 0, -2.6, 0.9, 1.0, 2.2, 0x5a5e62, { col: true }); k.glow(12.5, 1.0, -2.6, 0.03, 1.4, 2.0, 0x8fb4c8, 0.5);
-    k.box(11.4, 0, -2.6, 0.45, 0.6, 0.45, 0x3a3e44); k.box(12.0, 1.05, -2.0, 0.08, 0.25, 0.1, 0x111111);
-    k.box(12.8, 2.4, -2.6, 0.04, 0.4, 1.6, 0x2f4a6a); k.glow(12.77, 2.45, -2.6, 0.02, 0.28, 1.4, 0xe8f4ff, 1.2);
-    // work board, laundry carts and a mop bucket on the west wall
-    k.box(-12.82, 1.3, -2.4, 0.04, 1.0, 1.4, 0xb59a6a); for (let i = 0; i < 6; i++) k.box(-12.78, 1.4 + (i % 2) * 0.4, -2.9 + Math.floor(i / 2) * 0.45, 0.02, 0.3, 0.32, 0xf4f2ee);
-    for (const z of [-0.9, 0.3]) { k.box(-11.8, 0.2, z, 0.9, 0.7, 0.9, 0x6a7a8a, { col: true }); k.box(-11.8, 0.85, z, 0.8, 0.15, 0.8, 0xe8e4dc); }
-    k.box(-11.2, 0, -3.6, 0.5, 0.45, 0.5, 0xd8a227, { col: true }); k.box(-11.2, 0.45, -3.6, 0.04, 1.0, 0.04, 0x8a6a4a);
-    // the maintenance hatch: a grate low on the west wall
-    k.box(-12.92, 0.15, 4.0, 0.06, 0.8, 1.1, 0x3a3e44); for (let i = 0; i < 6; i++) k.box(-12.88, 0.2 + i * 0.13, 4.0, 0.03, 0.04, 1.0, 0x22252a);
-    // workout corner
-    k.box(-9, 0, 6.2, 0.5, 0.45, 1.6, 0x2a2a2e, { col: true }); k.box(-9, 0.95, 6.0, 1.6, 0.06, 0.06, 0x9a9a9a);
-    for (const s of [-1, 1]) k.box(-9 + s * 0.75, 0.95, 6.0, 0.08, 0.35, 0.35, 0x222222);
-    // the kitchen's serving window (dirty trays go here) and a red trash can by the guard post (chores)
-    k.box(-4.2, 0, 8.6, 2.6, 1.0, 0.7, 0x8a9096, { col: true }); k.box(-4.2, 1.0, 8.6, 2.7, 0.06, 0.8, 0xc8ccd0);
-    k.box(-4.2, 1.06, 8.95, 2.4, 1.3, 0.04, 0x2a2c30); k.glow(-4.2, 1.7, 8.92, 2.2, 0.9, 0.02, 0xffe6b8, 1.4);
-    k.glow(-4.2, 2.55, 8.9, 2.0, 0.28, 0.03, 0xd8762a, 1.6);
-    k.box(5.6, 0, 7.7, 0.55, 0.85, 0.55, 0xc23a2a, { col: true }); k.box(5.6, 0.85, 7.7, 0.6, 0.06, 0.6, 0x3a3e44);
-    // locked exit door and high windows
-    k.door(0, 8.98, 0, 0x55595e, 0xff4d5e);
-    for (let i = 0; i < 5; i++) k.glow(-10 + i * 5, 3.7, 8.96, 2.0, 0.5, 0.03, 0xcfe0ff, 1.2);
+  name: 'Port Valen County Jail', place: 'prison', w: JAIL.W, d: JAIL.D, h: JAIL.H, exit: { x: 0, z: 99 }, spawnH: 0, noExit: true, noDoor: true,
+  // the catwalk in front of the upper cells and the stair up to it at the east end of the block
+  levels: [
+    { x0: -12, x1: 13.8, z0: -11.5, z1: -9.9, h: JAIL.H1 },
+    { x0: 12.2, x1: 13.8, z0: -9.9, z1: -2.4, axis: 'z', dir: -1, h0: 0, h1: JAIL.H1 }
+  ],
+  build(k) {
+    const H1 = JAIL.H1, H = JAIL.H, wall = 0xa8b0a6, wall2 = 0x9aa39a, steel = 0x3a3e44, bar = 0x3a3e44, orange = 0xd8762a;
+    k.room(JAIL.W, JAIL.D, H, { floor: 0x7d7f80, wall, wall2, ceil: 0x8a8f8c, trim: 0x3a3e40, band: [0, 1.3], bandC: 0x5d6b62, lights: [6, 4], lightC: 0xe8f4ff });
+    k.tiles(JAIL.W, JAIL.D, 0x7d7f80, 0x737576, 1.25);
+    // ----- interior walls (doorways as gaps)
+    iwall(k, 'z', -14, -16, 2, 0, H, wall, [[-3.2, -1.4]]);            // block | west wing (laundry door)
+    iwall(k, 'x', -9, -20, -14, 0, H, wall2, [[-17.8, -16.4]]);        // laundry | maintenance (restricted)
+    iwall(k, 'z', 14, -16, 2, 0, H, wall, [[-1.4, 0.2]]);              // block | guard station (its door; a window above the counter)
+    iwall(k, 'x', 2, -20, 20, 0, H1, wall2, [[-12.2, -10.2], [-1.4, 1.4], [10.2, 12.2]]); // block | cafeteria, visitation, gym
+    iwall(k, 'z', -6, 2, 16, 0, H1, wall);                              // cafeteria | visitation & infirmary
+    iwall(k, 'z', 6, 2, 16, 0, H1, wall);                               // visitation & infirmary | gym
+    iwall(k, 'x', 9, -6, 6, 0, H1, wall2, [[-1, 1]]);                  // visitation | infirmary
+    k.box(0, H1, 9, 40, 0.2, 14, 0x8a8f8c);                             // the low ceiling over the south rooms
+    // the guard station's window onto the day room
+    k.glow(14.02, 1.4, -6, 0.04, 1.2, 3.4, 0x8fb4c8, 0.5); k.box(14.6, 0, -6, 1.0, 1.0, 3.6, steel, { col: true });
+    // ----- the cell block: six cells a tier, the player's (lower, third from the west) open
+    const cellRow = (y, open) => {
+      for (let c = 0; c < 6; c++) {
+        const x0 = -12 + c * 4;
+        k.box(x0, y, -13.8, 0.18, 3.2, 4.4, 0x8f978e, { col: true });
+        k.box(x0 + 2, y, -15.35, 3.4, 0.45, 0.85, 0x5a5e62, { col: true }); k.box(x0 + 2, y + 0.45, -15.35, 3.2, 0.1, 0.8, 0xc8c2b4);
+        k.box(x0 + 2.4, y + 1.35, -15.35, 3.0, 0.12, 0.8, 0x5a5e62); k.box(x0 + 2.4, y + 1.47, -15.35, 2.9, 0.08, 0.75, 0xc8c2b4);
+        k.box(x0 + 3.4, y, -12.6, 0.45, 0.42, 0.55, 0xd8dcd8, { col: true });
+        const isOpen = open && c === 2;
+        for (let b = 0; b < 11; b++) { if (isOpen && b > 2 && b < 8) continue; k.box(x0 + 0.2 + b * 0.36, y, -11.6, 0.05, 3.2, 0.05, bar); }
+        k.box(x0 + 2, y + 3.15, -11.6, 4, 0.12, 0.12, bar);
+        if (isOpen) k.cols.push({ x0: x0 + 0.1, x1: x0 + 1.1, z0: -11.68, z1: -11.52, y0: y, y1: y + 3.2 }, { x0: x0 + 2.95, x1: x0 + 4, z0: -11.68, z1: -11.52, y0: y, y1: y + 3.2 });
+        else k.cols.push({ x0: x0 + 0.1, x1: x0 + 4, z0: -11.68, z1: -11.52, y0: y, y1: y + 3.2 });
+        k.glow(x0 + 2, y + 3.0, -13.8, 0.6, 0.05, 0.3, 0xe8f4ff, 1.8);
+      }
+      k.box(12, y, -13.8, 0.18, 3.2, 4.4, 0x8f978e, { col: true });
+    };
+    cellRow(0, true); cellRow(H1, false);
+    k.box(0, H1 - 0.25, -13.8, 24.2, 0.25, 4.4, 0x5a5e62);
+    // the catwalk: a steel deck, a railing on its open side, and the stair down at the east end
+    k.box(1, H1 - 0.25, -10.7, 25.6, 0.25, 1.6, 0x5a5e62, { col: true });
+    k.box(1, H1 - 0.005, -10.7, 25.4, 0.01, 1.5, 0x6a6e72, { flat: true });
+    k.box(0.1, H1 + 1.0, -9.92, 24.2, 0.06, 0.06, 0xc8ccd0); k.cols.push({ x0: -12, x1: 12.2, z0: -9.98, z1: -9.86, y0: H1, y1: H1 + 1.1 });
+    for (let x = -12; x <= 12; x += 2) k.box(x, H1, -9.92, 0.05, 1.0, 0.05, 0xc8ccd0);
+    for (let i = 0; i < 16; i++) { const z0 = -2.4 - i * (7.5 / 16), top = (i + 1) * H1 / 16; k.box(13, top - 0.14, z0 - 7.5 / 32, 1.6, 0.14, 7.5 / 16 + 0.01, 0x5a5e62); }
+    for (let i = 0; i < 8; i++) { const za = -2.4 - i * 7.5 / 8, zb = -2.4 - (i + 1) * 7.5 / 8, ha = i * H1 / 8; if (ha > 0.4) k.cols.push({ x0: 12.2, x1: 13.8, z0: zb, z1: za, y0: 0, y1: ha - 0.05 }); k.cols.push({ x0: 12.05, x1: 12.2, z0: zb, z1: za, y0: Math.max(0, ha - 0.3), y1: ha + H1 / 8 + 1.0 }); }
+    k.box(12.12, H1 * 0.5 + 0.9, -6.15, 0.05, 0.05, 7.6, 0xc8ccd0);
+    // ----- the day room: steel tables, the TV, the payphone, cards on the middle table
+    for (const [tx, tz] of [[-8, -6], [-2, -4.5], [4, -6], [-8, -1], [4, -1]]) { k.box(tx, 0, tz, 2.4, 0.78, 1.0, 0x9aa0a6, { col: true }); for (const s of [-1, 1]) k.box(tx, 0, tz + s * 0.95, 2.4, 0.45, 0.32, 0x8a9096); }
+    for (let i = 0; i < 5; i++) k.box(-2.6 + i * 0.25, 0.79, -4.1 + (i % 2) * 0.12, 0.16, 0.01, 0.22, i % 2 ? 0xf4f2ee : 0xd23a2a);
+    k.box(-13.9, 1.6, -5, 0.08, 1.0, 1.6, 0x111111); k.glow(-13.85, 1.65, -5, 0.02, 0.9, 1.5, 0x6a8ab0, 1.3);
+    k.box(13.7, 0.9, 1.0, 0.2, 0.7, 0.4, 0x2a2c30); k.box(13.6, 1.25, 1.0, 0.12, 0.25, 0.18, 0x111111); k.glow(13.58, 1.45, 1.0, 0.02, 0.1, 0.15, 0x7fe08f, 1.4);
+    k.box(12.8, 0, -7.5, 0.55, 0.85, 0.55, 0xc23a2a, { col: true }); k.box(12.8, 0.85, -7.5, 0.6, 0.06, 0.6, steel);
+    // ----- the laundry (the work board), the restricted maintenance room behind it, the grate
+    for (let i = 0; i < 4; i++) { k.box(-19.4, 0, -7.6 + i * 2.2, 1.1, 1.2, 1.4, 0xd8dcd8, { col: true }); k.glow(-18.84, 0.65, -7.6 + i * 2.2, 0.02, 0.5, 0.5, 0x6a7a8a, 0.8); }
+    for (const z of [-6.4, -5.2]) { k.box(-15.5, 0.2, z, 0.9, 0.7, 0.9, 0x6a7a8a, { col: true }); k.box(-15.5, 0.85, z, 0.8, 0.15, 0.8, 0xe8e4dc); }
+    k.box(-14.12, 1.3, 0.2, 0.04, 1.0, 1.4, 0xb59a6a); for (let i = 0; i < 6; i++) k.box(-14.16, 1.4 + (i % 2) * 0.4, -0.3 + Math.floor(i / 2) * 0.45, 0.02, 0.3, 0.32, 0xf4f2ee);
+    k.box(-17.1, 0, -9, 1.4, 2.3, 0.08, 0x4a4e54); k.glow(-17.1, 2.2, -8.95, 0.6, 0.08, 0.03, 0xff4d5e, 1.6); // the restricted door (it stands open on its stop)
+    for (let i = 0; i < 4; i++) k.box(-17, 2.6 + i * 0.25, -12.5, 6, 0.12, 0.12, i % 2 ? 0x8a6a4a : 0x6a7a8a); // pipes
+    k.box(-19.92, 0.15, -13, 0.06, 0.8, 1.1, steel); for (let i = 0; i < 6; i++) k.box(-19.88, 0.2 + i * 0.13, -13, 0.03, 0.04, 1.0, 0x22252a);
+    // ----- the cafeteria: three long tables and the serving counter
+    for (const tz of [5, 8.5, 12]) { k.box(-13, 0, tz, 8, 0.78, 1.0, 0x9aa0a6, { col: true }); for (const s of [-1, 1]) k.box(-13, 0, tz + s * 0.95, 8, 0.45, 0.32, 0x8a9096); }
+    k.box(-13, 0, 15.3, 8, 1.0, 0.7, 0x8a9096, { col: true }); k.box(-13, 1.0, 15.3, 8.1, 0.06, 0.8, 0xc8ccd0);
+    k.box(-13, 1.06, 15.65, 7.6, 1.3, 0.04, 0x2a2c30); k.glow(-13, 1.7, 15.62, 7.2, 0.9, 0.02, 0xffe6b8, 1.4); k.glow(-13, 2.6, 15.6, 6.0, 0.28, 0.03, orange, 1.6);
+    // ----- visitation: booths behind glass; the infirmary: beds and a cabinet
+    for (const x of [-3.5, 0, 3.5]) { k.box(x, 0, 6.2, 2.6, 1.0, 0.5, 0x5a5e62, { col: true }); k.glow(x, 1.0, 6.25, 2.4, 1.4, 0.03, 0x8fb4c8, 0.5); k.box(x, 0, 5.2, 0.45, 0.6, 0.45, steel); k.box(x + 0.6, 1.05, 6.0, 0.08, 0.25, 0.1, 0x111111); }
+    for (const x of [-4, 4]) { k.box(x, 0, 13.5, 1.0, 0.55, 2.0, 0xe8e8e4, { col: true }); k.box(x, 0.55, 12.8, 0.9, 0.12, 0.5, 0xf4f4f0); }
+    k.box(0, 0, 15.6, 2.0, 1.9, 0.5, 0xe8e8e4, { col: true }); k.glow(0, 1.5, 15.34, 0.5, 0.5, 0.02, 0xff4d5e, 1.4);
+    // ----- the gym: a bench, a rack, a hoop, high windows
+    k.box(13, 0, 12, 0.5, 0.45, 1.6, 0x2a2a2e, { col: true }); k.box(13, 0.95, 11.8, 1.6, 0.06, 0.06, 0x9a9a9a);
+    for (const sx of [-1, 1]) k.box(13 + sx * 0.75, 0.95, 11.8, 0.08, 0.35, 0.35, 0x222222);
+    k.box(16, 0, 14.8, 2.4, 1.2, 0.5, 0x2a2a2e, { col: true }); k.box(19.8, 2.4, 9, 0.1, 1.0, 1.4, 0xf4f2ee); k.box(19.4, 2.4, 9, 0.6, 0.04, 0.04, orange);
+    for (let i = 0; i < 4; i++) k.glow(7 + i * 3.6, 2.6, 15.96, 2.6, 0.5, 0.03, 0xcfe0ff, 1.2);
+    // ----- the guard station: a desk, monitors, the locked exit
+    k.box(17.5, 0, -6, 1.4, 0.8, 3.2, steel, { col: true }); for (let i = 0; i < 3; i++) k.glow(18.2, 1.2 + (i % 2) * 0.4, -7 + i, 0.03, 0.35, 0.5, 0x7fd0ff, 1.3);
+    k.door(19.98, -6, 3, 0x55595e, 0xff4d5e);
+    for (let i = 0; i < 6; i++) k.glow(-14 + i * 5.6, H - 1.2, -15.96, 2.0, 0.6, 0.03, 0xcfe0ff, 1.0);
   },
   spots: [
-    { id: 'bunk', x: -2, z: -7.2, r: 1.4, label: 'Bunk · sentence & empire' },
-    { id: 'payphone', x: 12.0, z: 3.5, r: 1.3, label: 'Payphone' },
-    { id: 'smokey', x: 6.2, z: -1.4, r: 1.5, label: 'Smokey · contraband' },
-    { id: 'guard', x: 9, z: 6.3, r: 1.6, label: 'Guard post' },
-    { id: 'visit', x: 11.0, z: -2.6, r: 1.2, label: 'Visitation booth · lawyers' },
-    { id: 'work', x: -11.4, z: -2.4, r: 1.3, label: 'Work board · laundry, kitchen, cleaning' },
-    { id: 'cards', x: 0, z: 1.8, r: 1.1, label: 'Cards & dice' },
-    { id: 'hatch', x: -12.1, z: 4.0, r: 1.1, label: 'Maintenance hatch' },
-    { id: 'weights', x: -9, z: 5.4, r: 1.3, label: 'Work out' },
-    { id: 'tv', x: -11.4, z: 2, r: 1.2, label: 'Watch the news' },
-    { id: 'inmate:inmate1', x: -6, z: 1.9, r: 1.0, label: 'Talk to Deacon' },
-    { id: 'inmate:inmate2', x: -5.2, z: -1.8, r: 1.0, label: 'Talk to Tito' },
-    { id: 'inmate:inmate3', x: 1.0, z: 2.6, r: 1.0, label: 'Talk to Big Lou' },
-    { id: 'inmate:inmate4', x: -9.4, z: 4.2, r: 1.0, label: 'Talk to Wire' }
+    { id: 'bunk', x: JAIL.bunk.x, z: JAIL.bunk.z, r: 1.4, label: 'Bunk · sentence & empire' },
+    { id: 'payphone', x: 13.2, z: 1.0, r: 1.3, label: 'Payphone' },
+    { id: 'smokey', x: 6.2, z: -5.6, r: 1.5, label: 'Smokey · contraband' },
+    { id: 'guard', x: 13.1, z: -5.2, r: 1.5, label: 'Guard station window' },
+    { id: 'visit', x: 0, z: 4.6, r: 1.2, label: 'Visitation · lawyers' },
+    { id: 'infirmary', x: 0, z: 12, r: 1.6, label: 'Infirmary' },
+    { id: 'work', x: -15, z: 0.2, r: 1.3, label: 'Work board · laundry, kitchen, cleaning' },
+    { id: 'cards', x: -2, z: -3.3, r: 1.1, label: 'Cards & dice' },
+    { id: 'hatch', x: -19.2, z: -13, r: 1.1, label: 'Maintenance grate' },
+    { id: 'weights', x: 13, z: 10.6, r: 1.3, label: 'Work out' },
+    { id: 'tv', x: -13, z: -5, r: 1.2, label: 'Watch the news' },
+    { id: 'rota', x: 2, z: -10.7, y: JAIL.H1, r: 1.3, label: 'Watch the guards from the catwalk' },
+    { id: 'inmate:inmate1', x: -13, z: 7.6, r: 1.0, label: 'Talk to Deacon' },
+    { id: 'inmate:inmate2', x: -16.4, z: -3.6, r: 1.0, label: 'Talk to Tito' },
+    { id: 'inmate:inmate3', x: 11.2, z: 12.4, r: 1.0, label: 'Talk to Big Lou' },
+    { id: 'inmate:inmate4', x: 10.6, z: -3.4, r: 1.0, label: 'Talk to Wire' }
   ],
   npcs: [
-    { id: 'smokey', x: 6.2, z: -0.6, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a, cap: 0x2a2a2e } },
-    { id: 'inmate1', x: -6, z: 1.1, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'inmate2', x: -5.2, z: -1.0, h: 0, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'inmate3', x: 1.0, z: 1.5, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'inmate4', x: -9.4, z: 5.2, h: 0.4, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'guard', x: 9, z: 7.6, h: Math.PI, look: 'cop' }
+    { id: 'smokey', x: 6.2, z: -4.8, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a, cap: 0x2a2a2e } },
+    { id: 'inmate1', x: -13, z: 6.8, h: 0, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'inmate2', x: -17.2, z: -3.6, h: Math.PI / 2, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'inmate3', x: 11.2, z: 13.2, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'inmate4', x: 10.6, z: -2.6, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'guard', x: 16.6, z: -5, h: -Math.PI / 2, look: 'cop' },
+    { id: 'nurse', x: 1.2, z: 14.6, h: Math.PI, look: { shirt: 0xe8eef6, pants: 0xe8eef6 } }
   ],
-  // the night guard's walk during an escape (lights out): along the cells, past the tables, round the hatch side
-  guards: [[[-10.5, -3.6], [10.5, -3.6], [10.5, 3.2], [-4, 3.2], [-4, 6.0], [-10.6, 6.0], [-10.6, 0.6], [-6, -2.6]]]
+  // the night guards during an escape (lights out): one walks the block, the corridor under the catwalk and the
+  // laundry; a second (no rota known, or the jail tightened up after escapes) works the laundry and maintenance
+  guards: [[[-12, -10.4], [11, -10.4], [11, -6], [-12, -6], [-12, -2.2], [-16.5, -2.2], [-16.5, -7.5], [-12, -2.2]]],
+  guards2: [[-15.5, -1.5], [-19, -1.5], [-19, -7.4], [-17, -8.2], [-17, -14.5], [-15, -14.5], [-17, -8.2], [-15.5, -6]]
 };
 // Sentencing: a sentence day passes every two real seconds at 1× while you are in the block (menus stop it).
 // Every day served is a full day on the street: businesses, payroll, upkeep, territory and suppliers all run
@@ -99,7 +144,8 @@ INTERIOR_DEFS.prison = {
 const JAIL_SEC_PER_DAY = 2;
 const JAIL_STREET_RATIO = 1;
 const SENTENCE_FACTOR = 0.5;
-const JAIL_SPEEDS = [{ x: 1, pts: 0 }, { x: 2, pts: 20 }, { x: 3, pts: 50 }];
+// §24 / §37.4: 1× / 3× / 5× / 7×, each unlocked by good-behaviour points (and lost again by misbehaviour)
+const JAIL_SPEEDS = [{ x: 1, pts: 0 }, { x: 3, pts: 20 }, { x: 5, pts: 45 }, { x: 7, pts: 75 }];
 const GBP_MAX = 100;
 // chore points: a tray to the serving window, a piece of litter in the bin, a laundry bag to the carts
 const CHORE_PTS = { tray: 3, trash: 2, bag: 5 };
@@ -170,7 +216,7 @@ class Prison {
       // sentence under half of what it started at; the smuggled phone (if a guard brings one) is for this sentence only
       gbp: 0, speed: 1, floor: Math.max(2, Math.ceil(ch.total * 0.5)), phone: false, lastPhone: -99, lastRelease: -99, chores: 0,
       // the jail commissary account: prison wages and the dice table, kept apart from street money (§45.18)
-      commissary: 0,
+      commissary: 0, cover: false, fav: {}, trespass: -1, lastSick: -9,
       charges: ch.lines.map(l => `${l[0]}: ${fmtSentence(l[1])}`).join(' · ') + (ch.mul > 1.01 ? ` · ×${ch.mul.toFixed(2)} record & pressure` : ch.mul < 0.99 ? ` · ×${ch.mul.toFixed(2)} (friends at the precinct)` : '') + (ch.full ? ` · halved: ${fmtSentence(ch.full)} → ${fmtSentence(ch.total)}` : '')
     };
   }
@@ -189,7 +235,9 @@ class Prison {
     if (j.phone !== undefined) j.phone = !!j.phone;
     j.streetAcc = Math.min(j.streetAcc, 0.999);
     j.standing = clamp(j.standing, 0, 100); j.susp = clamp(j.susp, 0, 100); j.intel = clamp(j.intel, 0, 3);
-    j.appealed = !!j.appealed; j.bribed = !!j.bribed; j.tool = !!j.tool; j.ally = !!j.ally;
+    j.appealed = !!j.appealed; j.bribed = !!j.bribed; j.tool = !!j.tool; j.ally = !!j.ally; j.cover = !!j.cover;
+    j.fav = j.fav && typeof j.fav === 'object' ? j.fav : {}; for (const k in j.fav) { if (!INMATE_FAVORS[k]) delete j.fav[k]; else j.fav[k] = num(j.fav[k], 0, -999, 1e6); }
+    j.trespass = num(j.trespass, -1, -1, 1e6); j.lastSick = num(j.lastSick, -9, -999, 1e6);
     j.lawyers = Array.isArray(j.lawyers) ? j.lawyers.filter(x => typeof x === 'string').slice(0, 3) : [];
     j.gifts = Array.isArray(j.gifts) ? j.gifts.filter(x => INMATES[x]).slice(0, 4) : [];
     j.inm = j.inm && typeof j.inm === 'object' ? j.inm : {};
@@ -203,7 +251,7 @@ class Prison {
     const def = INTERIOR_DEFS.prison;
     g.player.applyOutfit(JAIL_LOOK);
     g.content.interiors.enter('prison', true);
-    p.pos.set(def.ox - 2, IY, def.oz - 6.4); p.h = 0; g.cam.yaw = 0; g.cam.pitch = -0.2; g.cam.init = false;
+    p.pos.set(def.ox + JAIL.bunk.x, IY, def.oz + JAIL.bunk.z); p.h = 0; g.cam.yaw = 0; g.cam.pitch = -0.2; g.cam.init = false;
     g.audio.play('clank');
     this.choreReset();
     uw.ui.showJail(true);
@@ -230,10 +278,21 @@ class Prison {
       if (j.served >= j.total) this.release();
     }
     this.choreFrame(rdt);
+    this.restricted();
     // block ambience: distant doors, buzzers
     this.ambT -= rdt;
     if (this.ambT <= 0) { this.ambT = rand(3, 9); g.audio.play(Math.random() < 0.8 ? 'clank' : 'buzzer', { gain: rand(0.15, 0.4) }); }
     uw.ui.updateJail();
+  }
+  // the maintenance room is off limits by day: a guard sends you back, it goes on your record (once a day)
+  restricted() {
+    const j = this.j, g = this.uw.g, p = g.player, def = INTERIOR_DEFS.prison, R = JAIL.restricted; if (!j || this.esc) return;
+    const lx = p.pos.x - def.ox, lz = p.pos.z - def.oz;
+    if (lx < R.x0 || lx > R.x1 || lz < R.z0 || lz > R.z1) return;
+    if (j.trespass === j.served) return;
+    j.trespass = j.served; j.susp = clamp(j.susp + 10, 0, 100);
+    this.misbehave(4, 'Out of bounds in maintenance');
+    this.say('Guard', 'Maintenance is staff only. Out. Now.');
   }
   // time off for work: at most a tenth of the sentence, and never under the floor (half the original sentence)
   earnCredit(days) {
@@ -285,12 +344,15 @@ class Prison {
   }
   findAction() {
     const g = this.uw.g, p = g.player, def = INTERIOR_DEFS.prison;
+    const hatch = def.spots.find(s => s.id === 'hatch');
     if (this.esc) {
-      if (Math.hypot(p.pos.x - (def.ox - 12.1), p.pos.z - (def.oz + 4.0)) < 1.2) return { label: 'Unscrew the grate', act: () => this.escapeHatch() };
+      if (Math.hypot(p.pos.x - (def.ox + hatch.x), p.pos.z - (def.oz + hatch.z)) < 1.2) return { label: 'Unscrew the grate', act: () => this.escapeHatch() };
       return null;
     }
     const c = this.choreAction(); if (c) return c;
-    for (const s of def.spots) if (Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return { label: s.label, act: () => this.spot(s.id) };
+    // a spot on the catwalk is only reachable up there (and one under it only down here)
+    const fy = def.fy !== undefined ? def.fy : IY, ly = p.pos.y - fy;
+    for (const s of def.spots) if (Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r && Math.abs(ly - (s.y || 0)) < 1.5) return { label: s.label, act: () => this.spot(s.id) };
     return null;
   }
   // ------------------------------------------------------------------ chores: small jobs in the block for good-behaviour points.
@@ -320,13 +382,13 @@ class Prison {
   // where things turn up (prison-local coordinates): tray spots on the three tables, floor spots for litter, bag spots by the cells
   static get CHORE_SPOTS() {
     return {
-      tray: [[-6.7, -0.2, 0.8], [-5.3, 0.2, 0.8], [-0.7, 0.3, 0.8], [0.7, 0.7, 0.8], [5.3, -0.2, 0.8], [6.7, 0.2, 0.8]],
-      trash: [[-8, -2.2], [-3, -3.6], [2, -3.1], [7.2, -3.8], [9.8, 1], [4, 3.6], [-2.2, 4.6], [-7.2, 2.9], [-10.4, 1.5], [5.6, 5.4], [-4.6, 6.6], [10.4, -0.6]],
-      bag: [[-10, -4.4], [-6, -4.4], [2, -4.4], [6, -4.4], [10, -4.4]]
+      tray: [[-15.5, 5, 0.8], [-11, 5.1, 0.8], [-14, 8.5, 0.8], [-10.5, 8.4, 0.8], [-16, 12, 0.8], [-12, 12.1, 0.8]],
+      trash: [[-10, -7.6], [-5, -8.2], [2.6, -7.8], [9, -7.4], [-10.6, 0.6], [6.4, 0.8], [9.6, -1.6], [8.6, 5.4], [16, 6.2], [10.4, 14.2], [0.4, -1.6], [-11.6, -3.4]],
+      bag: [[-10, -10.8], [-6, -10.8], [2, -10.8], [6, -10.8], [10, -10.8]]
     };
   }
   // drop-off points
-  static get CHORE_DROPS() { return { tray: [-4.2, 7.9, 'Serving window'], trash: [5.6, 7.7, 'Trash can'], bag: [-11.3, -0.3, 'Laundry carts'] }; }
+  static get CHORE_DROPS() { return { tray: [-13, 14.5, 'Serving counter'], trash: [12.8, -6.8, 'Trash can'], bag: [-15.5, -4.4, 'Laundry carts'] }; }
   choreSpawn(kind) {
     const ch = this.choreSetup(), spots = Prison.CHORE_SPOTS[kind], used = new Set(ch.items.filter(i => i.kind === kind).map(i => i.si));
     const free = spots.map((s, i) => i).filter(i => !used.has(i)); if (!free.length) return false;
@@ -422,6 +484,18 @@ class Prison {
       case 'work': this.openWork(); break;
       case 'cards': this.openCards(); break;
       case 'hatch': this.openHatch(); break;
+      case 'infirmary': {
+        if (j.served - j.lastSick < 1) { this.say('Nurse', 'You were here today. Go lie down.'); break; }
+        j.lastSick = j.served; const p = g.player; p.health = p.maxHealth; j.standing = clamp(j.standing + 1, 0, 100);
+        this.say('Nurse', pick(['Patched up. Try not to walk into anything.', 'Two aspirin and stay out of the gym fights.', 'You’re fine. Next.']));
+        break;
+      }
+      case 'rota': {
+        if (j.intel >= 2) { this.say('pv', 'You know the night rota by heart.'); break; }
+        if (Math.max(0, 5 - (j.served - j.lastStudy)) > 0) { this.say('pv', 'Nothing new to see from up here yet.'); break; }
+        g.content.channel('WATCHING THE GUARDS FROM THE CATWALK', 6, () => { j.intel = Math.min(2, j.intel + 1); j.lastStudy = j.served; j.susp = clamp(j.susp + 3, 0, 100); this.say('pv', j.intel >= 2 ? 'Midnight count, then twelve minutes of nothing on the west side. That’s the window.' : 'The night guard takes the laundry corridor at the half hour. Need another look.'); });
+        break;
+      }
       case 'weights': {
         g.content.channel('WORKING OUT', 5, () => {
           const p = g.player; p.health = Math.min(p.maxHealth, p.health + 25 * HP_SCALE); p.stamina = 1; j.workouts++;
@@ -446,12 +520,13 @@ class Prison {
       <div class="hint" style="font-size:12px">Chores earn good-behaviour points: carry dirty trays from the cafeteria tables to the serving window (+${CHORE_PTS.tray}), pick litter off the floor and bin it (+${CHORE_PTS.trash} each, up to three at a time), take laundry bags from the cells to the carts (+${CHORE_PTS.bag}). Work shifts add 2. Bribes that go wrong, contraband and escape attempts take points away.</div>
       ${lock ? `<div class="hint" style="color:var(--red)">Lockdown: ${fmtSentence(lock)} confined to your bunk.</div>` : ''}
       <h3>Charges</h3><div class="hint" style="font-size:12px">${esc(j.charges || '—')}</div>
-      <h3>A way out</h3><div class="stats">${row('Guard rota', yes(j.intel >= 2, `known (${j.intel}/2)`))}${row('Tool for the grate', yes(j.tool, 'have one'))}${row('Someone to cover you', yes(j.ally, 'Wire (optional)'))}</div>
-      <h3>The block</h3><div class="hint" style="font-size:12px;line-height:1.5">
-        <b>Visitation booth</b> (east wall): hire a lawyer. · <b>Chores</b>: trays, litter, laundry — good-behaviour points for faster time. ·
-        <b>Work board</b> (west wall): laundry, kitchen, cleaning — commissary money and time off. · <b>Cards & dice</b> at the middle table. ·
-        <b>Weights</b>: conditioning that stays with you. · <b>Inmates</b>: get to know Deacon, Tito, Big Lou and Wire. ·
-        <b>Smokey</b>: a tool, smokes. · <b>Guard post</b>: a phone, or walking out today, if the money is right and the guard is. · <b>Payphone</b>: one call a month. · <b>Maintenance hatch</b>: if you’re ready.</div>
+      <h3>A way out</h3><div class="stats">${row('Guard rota', yes(j.intel >= 2, `known (${j.intel}/2)`))}${row('Tool for the grate', yes(j.tool, 'have one'))}${row('Cover', yes(j.ally, 'Wire (optional)'))}${row('Distraction', yes(j.cover, 'Big Lou (optional)'))}</div>
+      <h3>The jail</h3><div class="hint" style="font-size:12px;line-height:1.5">
+        <b>Cell block</b>: your bunk on the lower tier; the <b>catwalk</b> (stairs at the east end) looks down on the night guards' rounds. ·
+        <b>Day room</b>: cards & dice, the TV, the payphone (one call a month), Smokey (contraband), the <b>guard window</b> (a phone or walking out, if the money is right and so is the guard). ·
+        <b>Cafeteria</b>: trays to the serving counter. · <b>Laundry</b> (west): the work board and the carts. <b>Maintenance</b> behind it is staff only. ·
+        <b>Visitation</b>: lawyers; the <b>infirmary</b> behind it patches you up. · <b>Gym</b>: conditioning that stays with you. ·
+        <b>Inmates</b>: get to know Deacon, Tito, Big Lou and Wire; trusted, each does favours (protection, contraband, a distraction, guard routines).</div>
       <div class="btns">${j.phone ? '<button class="sbtn gold" data-act="empire">Phone (smuggled)</button>' : ''}<button class="sbtn" data-act="feed">News on the TV</button></div>`;
     g.content.openSvc('County Jail · Block C', 'Time only passes while you’re out of this screen.', render, a => {
       if (a.startsWith('spd:')) { if (this.setSpeed(+a.slice(4))) g.content.refreshSvc(); return; }
@@ -667,7 +742,9 @@ class Prison {
       return `<div class="card"><div class="t">${esc(I.name)}</div><div class="d">${esc(I.blurb)}</div><div class="stat"><span>Trust</span><span>${r} / 100</span></div><div class="bar"><i style="width:${r}%"></i></div></div>
       <div class="btns"><button class="sbtn" data-act="chat">Talk</button><button class="sbtn gold" data-act="favour">Do him a favour</button><button class="sbtn gold" data-act="gift" ${r < 40 || given ? 'disabled' : ''}>${given ? 'Done' : esc(I.giftText)}${r < 40 && !given ? ' (trust 40)' : ''}</button></div>`;
     };
-    g.content.openSvc(I.name, 'Block C', render, a => {
+    const base = render, F = INMATE_FAVORS[id];
+    const render2 = () => { const r = rel(), cd = this.favorWait(id); return base() + (F ? `<div class="jobs"><div class="job"><div style="flex:1"><b>${esc(F.text)}</b><span>Needs trust 60 · ${fmtMoney(F.fee)} commissary${cd ? ` · again in ${fmtSentence(cd)}` : ''}</span></div><button class="sbtn gold" data-act="ask" ${r < 60 || cd || !this.canCommissary(F.fee) ? 'disabled' : ''}>Ask</button></div></div>` : ''); };
+    g.content.openSvc(I.name, 'County Jail', render2, a => {
       if (a === 'chat') {
         j.inm[id] = clamp(rel() + (j.standing > 40 ? 4 : 2), 0, 100);
         const rumour = Math.random() < 0.35 ? this.rumour() : null;
@@ -679,7 +756,25 @@ class Prison {
         return;
       }
       if (a === 'gift' && rel() >= 40 && !j.gifts.includes(id)) { j.gifts.push(id); g.content.refreshSvc(this.gift(id)); g.audio.play('pass'); }
+      if (a === 'ask') { const r = this.favor(id); g.content.refreshSvc(r); }
     });
+  }
+  favorWait(id) { const j = this.j, F = INMATE_FAVORS[id], last = (j.fav || {})[id]; return F && last !== undefined ? Math.max(0, F.cd - (j.served - last)) : 0; }
+  favor(id, rnd = Math.random) {
+    const j = this.j, F = INMATE_FAVORS[id], g = this.uw.g; if (!j || !F) return '';
+    if ((j.inm[id] | 0) < 60 || this.favorWait(id) || !this.payCommissary(F.fee)) return 'Not now.';
+    (j.fav || (j.fav = {}))[id] = j.served;
+    g.audio.play('cash');
+    if (F.id === 'protect') { j.susp = Math.max(0, j.susp - 20); j.standing = clamp(j.standing + 5, 0, 100); return 'Deacon nods to a few people. Nobody bothers you, and the guards find someone else to watch (−20 suspicion).'; }
+    if (F.id === 'cover') { j.cover = true; return 'Big Lou cracks his knuckles. “The night you go, I start a fight in the gym. Loud.” (a distraction for your escape)'; }
+    if (F.id === 'intel') { if (j.intel < 2) { j.intel++; return `Wire draws the night rota on a napkin (${j.intel}/2 known).`; } j.tool = true; return 'Wire palms you a filed-down screwdriver. It fits a maintenance grate.'; }
+    if (F.id === 'phone') {
+      if (j.phone) return 'You already have one.';
+      if (rnd() < 0.75) { j.phone = true; this.uw.ui.updateJail(true); return 'Tito’s cousin works the kitchen delivery. A phone turns up in a bread crate, charged. Keep it hidden.'; }
+      const add = Math.max(5, Math.round(this.left * 0.05)); j.total += add; j.susp = clamp(j.susp + 25, 0, 100); this.misbehave(20, 'Caught with contraband');
+      return `A shakedown finds the phone before you do: +${fmtSentence(add)}.`;
+    }
+    return '';
   }
   rumour() {
     const uw = this.uw, S = this.S;
@@ -695,43 +790,84 @@ class Prison {
     if (id === 'inmate4') { j.ally = true; j.intel = Math.max(j.intel, 2); return 'Wire leans in: “Midnight count, then the night guard walks the cells and sits down by the door. I’ll make some noise at the far end when you go.” (Guard rota known; Wire will cover you.)'; }
     return '';
   }
-  // ---- the escape: a tool for the grate, the night rota, then lights-out. Get from your bunk to the
-  // maintenance hatch and unscrew it while the night guard walks his route. If he sees you, it's over.
+  // ---- escapes (M8, §24). Never guaranteed, and the jail adapts: every escape you have made (legal.L.escapes) makes
+  // the next a little harder. Two ways out:
+  // - the grate: a tool is a must; at lights-out reach it unseen from your bunk (one night guard, two if you don't know
+  //   the rota or the jail has tightened up), unscrew it, then the storm drains (a roll: drainOdds). Out on foot, 3★.
+  // - the laundry truck (crew-assisted): your people outside arrange it (Dirty Cash through a courier, Crew Leader and
+  //   up); one roll (truckOdds), out with a getaway car waiting, 1★. Preparation (rota, cover, a distraction, a tool)
+  //   counts for both.
+  escapes() { return this.uw.legal ? this.uw.legal.L.escapes : 0; }
+  drainOdds() { const j = this.j; return clamp(0.55 + j.intel * 0.12 + (j.ally ? 0.1 : 0) + (j.cover ? 0.08 : 0) - this.escapes() * 0.05 - j.susp / 400, 0.3, 0.9); }
+  truckCrew() { const c = this.courier(); return c && this.uw.rank >= 3 ? c : null; }
+  truckPrice() { return Math.max(15000, Math.round(this.left * 400 / 1000) * 1000); }
+  truckOdds() {
+    const j = this.j, c = this.truckCrew(); if (!c) return 0;
+    return clamp(0.5 + j.intel * 0.08 + (j.tool ? 0.05 : 0) + (j.ally ? 0.07 : 0) + (j.cover ? 0.06 : 0) + (c.skill || 0) / 400 + this.uw.rank * 0.03 - this.escapes() * 0.05 - j.susp / 300, 0.2, 0.85);
+  }
   openHatch() {
     const uw = this.uw, g = uw.g, j = this.j;
-    const ready = j.tool && j.intel >= 2;
-    const render = () => `<div class="hint">A grate low on the west wall. Behind it, a crawlspace to the storm drains.</div><div class="stats">
-      <span>A tool for the screws</span><span>${j.tool ? '<b style="color:var(--green)">✓ in your sock</b>' : '✗ Smokey sells one; the laundry turns one up sometimes'}</span>
-      <span>The night guard’s rota</span><span>${j.intel >= 2 ? '<b style="color:var(--green)">✓ known</b>' : `✗ ${j.intel}/2 — watch the guard post, or ask Wire`}</span>
-      <span>Cover</span><span>${j.ally ? '<b style="color:var(--green)">✓ Wire makes noise at the far end</b>' : 'none (optional)'}</span></div>
-      <div class="hint">At lights-out you start at your bunk. Reach the grate without the night guard seeing you, then hold still while you unscrew it. Caught: months more, lockdown, and you lose the tool. Out: you’re a fugitive with every cop looking for you.</div>
-      <div class="btns"><button class="sbtn gold" data-act="go" ${ready ? '' : 'disabled'}>Wait for lights-out</button></div>`;
-    g.content.openSvc('Maintenance hatch', 'A way out', render, a => { if (a === 'go' && j.tool && j.intel >= 2) { g.ui.back(); this.startEscape(); } });
+    const yes = (b, t) => b ? `<b style="color:var(--green)">✓ ${t}</b>` : `✗ ${t}`;
+    const render = () => {
+      const crew = this.truckCrew(), price = this.truckPrice();
+      return `<div class="hint">The grate behind the laundry opens on a crawlspace to the storm drains. Or your people outside can get you onto the laundry truck.</div><div class="stats">
+      <span>A tool for the screws</span><span>${yes(j.tool, j.tool ? 'in your sock' : 'Smokey sells one; Wire or the laundry may turn one up')}</span>
+      <span>The night rota</span><span>${yes(j.intel >= 2, `${j.intel}/2 known (the catwalk, the guard window or Wire)`)}</span>
+      <span>Cover</span><span>${yes(j.ally, 'Wire makes noise at the far end')}</span>
+      <span>A distraction</span><span>${yes(j.cover, 'Big Lou starts a fight')}</span>
+      <span>Escapes so far</span><span>${this.escapes()} ${this.escapes() ? '(the jail has tightened up)' : ''}</span></div>
+      <h3>Through the grate</h3><div class="hint">At lights-out, from your bunk to the grate without the night guard${j.intel >= 2 && this.escapes() < 2 ? '' : 's'} seeing you, then the drains: about <b>${Math.round(this.drainOdds() * 100)}%</b> you come out clear once you are through. Caught: more time, lockdown, the tool gone. Out: a fugitive, 3★.</div>
+      <div class="btns"><button class="sbtn gold" data-act="go" ${j.tool ? '' : 'disabled'}>Wait for lights-out</button></div>
+      <h3>The laundry truck</h3><div class="hint">${crew ? `${esc(crew.name)} can set it up: ${fmtMoney(price)} in Dirty Cash for the driver and the gate. About <b>${Math.round(this.truckOdds() * 100)}%</b>. Out with a car waiting (1★). Caught: more time, and ${esc(crew.name.split(' ')[0])} may be picked up.` : 'Needs someone in your crew still on the street, and enough standing to organise it (Crew Leader).'}</div>
+      <div class="btns"><button class="sbtn" data-act="truck" ${crew && this.canOutside(price) && !this.locked() ? '' : 'disabled'}>${crew ? 'Set it up · ' + fmtMoney(price) : 'Not possible'}</button></div>`;
+    };
+    g.content.openSvc('A way out', 'Never a sure thing', render, a => {
+      if (a === 'go' && j.tool) { g.ui.back(); this.startEscape(); }
+      if (a === 'truck') { g.ui.back(); this.truckEscape(); }
+    });
   }
   startEscape() {
     const uw = this.uw, g = uw.g, j = this.j, I = g.content.interiors, def = INTERIOR_DEFS.prison, p = g.player;
     j.escapes++;
+    const routes = def.guards.slice(); if (j.intel < 2 || this.escapes() >= 2) routes.push(def.guards2);
+    const slow = (j.ally ? 1.6 : 1) * (j.cover ? 1.25 : 1) / (1 + this.escapes() * 0.1);
     g.fade(() => {
-      p.pos.set(def.ox - 2, IY, def.oz - 6.6); p.h = 0; g.cam.yaw = 0; g.cam.init = false;
-      this.esc = { t: 60, caught: false };
-      I.guards = def.guards.map((route, i) => ({ route, i: 1, x: def.ox + route[0][0], z: def.oz + route[0][1], h: 0, alert: 0, look: copLook(), pose: { phase: i * 2, amp: 0 }, flash: 0, y: IY, wait: 0, slow: j.ally ? 1.6 : 1 }));
+      p.pos.set(def.ox + JAIL.bunk.x, IY, def.oz + JAIL.bunk.z); p.h = 0; g.cam.yaw = 0; g.cam.init = false;
+      this.esc = { t: 70, caught: false };
+      I.guards = routes.map((route, i) => ({ route, i: 1, x: def.ox + route[0][0], z: def.oz + route[0][1], h: 0, alert: 0, look: copLook(), pose: { phase: i * 2, amp: 0 }, flash: 0, y: IY, wait: 0, slow }));
       I.alarm = false;
       I.onAlarm = () => this.escapeCaught();
-      // the day guard and the inmates are asleep: they leave the common area
       for (const c of def.chars) c.hidden = true;
-      g.ui.banner('Lights out', j.ally ? 'Wire starts banging on his bars at the far end' : 'Reach the grate on the west wall', 'info', 2.5);
+      g.ui.banner('Lights out', j.cover ? 'Big Lou starts shouting in the gym' : j.ally ? 'Wire starts banging on his bars at the far end' : 'Reach the grate behind the laundry', 'info', 2.5);
       g.audio.play('buzzer', { gain: 0.6 });
     });
   }
   updateEscape(dt) {
-    const e = this.esc, g = this.uw.g;
+    const e = this.esc;
     if (!e || e.done) return;
     if (dt > 0) e.t -= dt;
-    if (e.t <= 0 && !e.done) { this.escapeCaught('Morning count. You’re out of your bunk and the hatch is still shut.'); }
+    if (e.t <= 0 && !e.done) { this.escapeCaught('Morning count. You’re out of your bunk and the grate is still shut.'); }
   }
   escapeHatch() {
     const g = this.uw.g, e = this.esc; if (!e || e.done) return;
-    g.content.channel('UNSCREWING THE GRATE', 4, () => { if (this.esc && !this.esc.done) this.escapeOut(); });
+    g.content.channel('UNSCREWING THE GRATE', 4, () => { if (this.esc && !this.esc.done) this.drains(); });
+  }
+  // through the grate: the storm drains are the last roll
+  drains(rnd = Math.random) {
+    if (rnd() < this.drainOdds()) { this.escapeOut('drain'); return true; }
+    this.escapeCaught('A patrol was waiting where the drain comes out. Back you go.');
+    return false;
+  }
+  // the laundry truck: one roll, prepared or not
+  truckEscape(rnd = Math.random) {
+    const uw = this.uw, g = uw.g, j = this.j, crew = this.truckCrew(), price = this.truckPrice(); if (!j || !crew || !this.canOutside(price) || this.locked()) return null;
+    const p = this.truckOdds();
+    Money.pay(price, 'jailBribe'); j.escapes++;
+    this.esc = { t: 1, caught: false };
+    if (rnd() < p) { this.escapeOut('truck'); return 'out'; }
+    if (rnd() < 0.4) uw.crew.arrest(crew, 'a jailbreak that went wrong');
+    this.escapeCaught('The truck gets searched at the gate. You’re pulled out of a laundry bin.');
+    return 'caught';
   }
   endEscape() {
     const g = this.uw.g, I = g.content.interiors;
@@ -748,35 +884,34 @@ class Prison {
       this.endEscape();
       if (!this.j) return;
       const add = Math.max(30, Math.round(this.left * 0.3));
-      j.total += add; j.tool = false; j.intel = 0; j.susp = 100; j.lockUntil = j.served + 10; j.standing = clamp(j.standing + 5, 0, 100);
+      j.total += add; j.tool = false; j.intel = 0; j.cover = false; j.susp = 100; j.lockUntil = j.served + 10; j.standing = clamp(j.standing + 5, 0, 100);
       this.misbehave(GBP_MAX, 'Escape attempt'); j.speed = 1;
-      const def = INTERIOR_DEFS.prison, p = g.player; p.pos.set(def.ox - 2, IY, def.oz - 6.6); p.h = 0; g.cam.init = false;
+      const def = INTERIOR_DEFS.prison, p = g.player; p.pos.set(def.ox + JAIL.bunk.x, IY, def.oz + JAIL.bunk.z); p.h = 0; g.cam.init = false;
       g.ui.banner('Caught', `Attempted escape: +${fmtSentence(add)}`, 'fail', 3);
       this.say('Guard', why || 'Got you. Back in your box. You’ll be here a while longer now.');
       g.saveGame(true);
     });
   }
-  escapeOut() {
+  escapeOut(route) {
     const uw = this.uw, g = uw.g, S = this.S, j = this.j; if (!j || !this.esc) return;
     this.esc.done = true;
-    const left = this.left;
+    const left = this.left, truck = route === 'truck';
     g.fade(() => {
       this.endEscape();
       S.jail = null; this.callT = 0; this.choreClear(); uw.ui.showJail(false);
       S.fugitive = { left, day: S.day }; uw.legal.L.escapes++;
       g.content.interiors.exit(true);
       g.player.applyOutfit(g.save.outfit);
-      // the storm drain comes out by the harbour wall, a few blocks from County
-      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CITY / 2, pl.z - CITY / 2);
-      const x = clamp(pl.x + Math.sin(ang) * 140, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * 140, 20, CITY - 20);
+      // the storm drain comes out by the harbour wall; the laundry truck drops you a few blocks further on
+      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CITY / 2, pl.z - CITY / 2), far = truck ? 260 : 140;
+      const x = clamp(pl.x + Math.sin(ang) * far, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * far, 20, CITY - 20);
       g.resetPlayerState(x, z, ang);
       S.lastHour = Math.floor(g.env.time);
-      g.police.setLevel(3); g.police.crime('escape', x, z);
-      S.pressure = clamp(S.pressure + 15, 0, 100);
-      g.ui.banner('Escaped', 'Every cop in Port Valen has your picture', 'fail', 3.5);
-      uw.news('radio', `All units: inmate escaped from County Block C. Considered dangerous. ${fmtSentence(left)} left on the sentence.`);
+      g.police.setLevel(truck ? 1 : 3); g.police.crime('escape', x, z);
+      S.pressure = clamp(S.pressure + (truck ? 8 : 15), 0, 100);
+      g.ui.banner('Escaped', truck ? 'The truck stops in an alley. A car is waiting.' : 'Every cop in Port Valen has your picture', 'fail', 3.5);
+      uw.news('radio', `All units: inmate escaped from County. Considered dangerous. ${fmtSentence(left)} left on the sentence.`);
       g.saveGame(true);
     });
   }
 }
-

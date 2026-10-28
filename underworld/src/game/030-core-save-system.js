@@ -184,9 +184,10 @@ const SaveSystem = {
     { // jackpot pressure: finite, non-negative, known tiers only; preferences: positive finite amounts only
       const J = d.gamble.jp && typeof d.gamble.jp === 'object' && !Array.isArray(d.gamble.jp) ? d.gamble.jp : {}, okN = v => typeof v === 'number' && isFinite(v) && v >= 0;
       const pr = {}, hits = {}; for (const m of ROYALE_MAJORS) { if (J.pr && okN(J.pr[m.id])) pr[m.id] = Math.min(J.pr[m.id], 50); if (J.hits && okN(J.hits[m.id])) hits[m.id] = Math.floor(J.hits[m.id]); }
-      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null };
+      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null, pool: okN(J.pool) && J.pool >= 1e9 ? Math.min(J.pool, 1e12) : 1e9 };
       const P = d.gamble.pref && typeof d.gamble.pref === 'object' && !Array.isArray(d.gamble.pref) ? d.gamble.pref : {}; d.gamble.pref = {};
-      for (const k of ['bj', 'roul', 'royale', 'pokerBuy', 'pokerDepth']) if (typeof P[k] === 'number' && isFinite(P[k]) && P[k] > 0 && P[k] < 1e15) d.gamble.pref[k] = Math.floor(P[k]);
+      d.gamble.sports = sanitizeSports(d.gamble.sports, okN);
+      for (const k of ['bj', 'roul', 'royale', 'pokerBuy', 'pokerDepth', 'bacc', 'craps', 'tcp', 'sports']) if (typeof P[k] === 'number' && isFinite(P[k]) && P[k] > 0 && P[k] < 1e15) d.gamble.pref[k] = Math.floor(P[k]);
     }
     // progressive pools and an unfinished blackjack hand (stood on load; a malformed one is refunded)
     const pools = d.gamble.casino.pools; d.gamble.casino.pools = {};
