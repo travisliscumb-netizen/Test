@@ -4,8 +4,8 @@
 - Done this phase: M7 legal/court (`f1f5ed5`), M8 jail + M9 fronts/honest casino (`90d10ff`), M10 crime content
   (`c1c323e`), M11 phone/map/taxi (`3d5a1a3`), M12 opening jobs (`1098c0e`).
 - Stopped at the **High-effort checkpoint before M13** (owner to switch effort, then continue).
-- Last full regression: `m12-full` on `.stage-m12.html` (the M12 build) — results in
-  `underworld/.runs/m12-full/results.json`; summary in OVERHAUL_STATUS.md (Autonomous phase M7–M12).
+- Last full regression: `m12-full` (the M12 build): green apart from 4 load flakes that pass solo (police, raid ×2,
+  roadnet); summary and perf in OVERHAUL_STATUS.md (Autonomous phase M7–M12).
 
 ## Next: M13 — economy / progression balance (High effort)
 Goal: one integrated tuning pass so the whole game plays from Nobody to City Kingpin with no dominant loop, no

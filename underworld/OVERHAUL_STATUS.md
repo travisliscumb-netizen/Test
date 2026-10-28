@@ -4139,3 +4139,9 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 - **M11 phone** (`3d5a1a3`): six app groups + direct Map, Rank·Dirty·Bank·Pressure header, priority inbox with deep
   links, Intel map layer, taxi rules. Suite `phoneapps`.
 - **M12 opening** (`1098c0e`): Rosa's six jobs, `until` stages, stale wording removed. Suite `opening`.
+- **Regression `m12-full`** (the M12 build, CONC=3): every check-bearing suite ran; all green except police (1),
+  raid (2) and roadnet (1), each green on a solo rerun (load flakes, KNOWN_ISSUES.md). The run was cut short by a
+  worker restart during the last screenshot scripts (qashots, carshots), which carry no checks.
+- **Perf (solo, SwiftShader, low quality):** update 1.21 ms/frame calm, 1.59 busy; 121 draw calls, ~379k triangles
+  calm, in line with the 6D baseline (1.0–1.3 ms, 116–120 calls, ~360k). Software-GL frame times are not a
+  device measurement; the mobile baseline proper is part of the CONTENT COMPLETE gate.

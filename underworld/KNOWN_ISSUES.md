@@ -8,6 +8,8 @@
 - compound: hostile crew / gate-ram checks under load.
 - shots / cityshots: timeouts under load (screenshot scripts, no checks).
 - gambling: the reel-stop timing check (first reel late under load).
+- police: a parked cruiser's pull-out distance; raid: real-time clock and save-clock checks; roadnet: the
+  estate-relocation reload check (all pass solo; seen failing only in the 3-wide run, m12-full).
 
 ## Accepted limitations
 - One-off hiding places are clear kerb spots (§45.39); the Widowmaker count starts with 6D; a pushed untaken
