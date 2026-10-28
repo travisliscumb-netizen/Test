@@ -118,7 +118,7 @@ const vis = await ev(() => {
   for (const k in V) out[k] = V[k].tier;
   return out;
 });
-check('every vehicle has a visual tier', Object.values(vis).every(x => ['beater', 'common', 'nice', 'sport', 'luxury', 'rare'].includes(x)), JSON.stringify(vis));
+check('every vehicle has a visual tier', Object.values(vis).every(x => ['beater', 'common', 'nice', 'sport', 'luxury', 'rare', 'unique'].includes(x)), JSON.stringify(vis));
 const lod = await ev(() => {
   const g = window.game, p = g.player, vm = g.vehicles, out = {};
   const c = g.camera.position, near = vm.spawn('supercar', c.x + 8, c.z, 0, { parked: true }), far = vm.spawn('supercar', c.x + 140, c.z, 0, { parked: true });
