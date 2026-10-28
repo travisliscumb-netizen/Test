@@ -1539,3 +1539,29 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       - It is not a licence to redesign the whole city. Scope and architecture are set after inspecting the
         existing road system at High effort; recommend Extra High only if that inspection shows a deep
         foundational rewrite is needed. 6D (the 10 unique cars) follows it.
+38. **Curved Roads final review.** The milestone is complete at `afb8cef`.
+    - Countryside police roadblocks at 4★: keep. Countryside traffic on the loop and the east track: keep.
+    - The possible Saltmarsh street race is not added yet.
+    - The four changed Saltmarsh / Tanner's Row blocks and wet curved streets darkening in rain are approved.
+    - The curved-road architecture is not reopened unless a later session exposes a genuine bug or dependency.
+39. **Session 6D final rulings and the autonomous content-complete phase.** 6D is complete at `ce80f5c`.
+    - **Rooftop stock Zephyr:** a persistent one-time rare find. Once claimed it never stands on the Quarter Garage
+      roof again; it never becomes a rotating free-car source. It is not one of the ten one-offs.
+    - **One-offs:** permanently unsellable, unchoppable and never ordinary pink-slip stakes. No permanent-loss sale.
+    - **Ambassador:** approved as built. Taken, it goes straight into a real parking space as an owned stolen/HOT
+      car; HOT and its criminal provenance stay until resolved through the established systems (Chop Shop clean).
+    - **Accepted 6D limitations:** hidden locations resolve to nearby clear kerb spots (a later world/presentation
+      pass may build real hiding places); the Widowmaker's count starts with wins recorded by the new system; an
+      untaken one-off pushed from its spot returns there when the area reloads.
+    - **Autonomous phase.** Claude takes implementation ownership of the remaining pre-graphics build (prompt
+      Sessions 7–13) and continues milestone to milestone without stopping per session, until CONTENT COMPLETE.
+      - Ordinary design/tuning/implementation decisions are Claude's. Stop only for a true blocker (contradictory
+        locked requirements, an identity change, deleting approved content, an unsafe repository), a very large
+        foundational rewrite (DESIGN / ARCHITECTURE CHALLENGE first), a High / Extra High effort checkpoint, an
+        unrecoverable technical issue, or CONTENT COMPLETE.
+      - Earlier sessions are history, not frozen code: improve them where it materially helps.
+      - Functional UI and usable visuals for new gameplay are built now; the cohesive game-wide graphics /
+        presentation / UI-UX overhaul (prompt Session 14) is a separate Extra High phase, not started in this run.
+      - Mobile target: 60 FPS ideal, 45 acceptable in demanding scenes, 30 sustained floor. Measure major additions.
+      - The repository (CLAUDE.md, ROADMAP.md, CURRENT_SESSION.md, SYSTEMS.md, DECISIONS.md, KNOWN_ISSUES.md,
+        TESTING.md, OVERHAUL_STATUS.md) must stay sufficient for another context to resume.

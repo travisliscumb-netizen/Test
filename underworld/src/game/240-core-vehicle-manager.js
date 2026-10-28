@@ -92,6 +92,8 @@ class VehicleManager {
         if (!p.cls && hh > 0.985) type = 'muscle';
         if (!p.cls && hash2i(bi, k, 35) < (RARE_ZONES[zoneKey(p.x, p.z)] || 0)) type = RARE_TYPES[Math.floor(hash2i(bi, k, 34) * RARE_TYPES.length)];
         if (Math.hypot(p.x - px, p.z - pz) < 6) return;
+        // the rooftop Zephyr is a one-time find (§45.39): once taken it never stands there again
+        if (p.rare && (this.game.save.flags.rooftopTaken || this.game.save.secrets.rooftop)) return;
         // no parking at a curved road's junction: cars turning on and off sweep across the kerb there
         for (const L of Links.list) for (const e of L.ends) if (Math.hypot(p.x - e.C.x, p.z - e.C.z) < 16) return;
         // skip if something already occupies the slot

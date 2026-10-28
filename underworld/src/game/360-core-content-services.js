@@ -1009,7 +1009,8 @@ class ContentManager {
       this.checkT = 0.5;
       this._discover(); this._checkSecrets(); this._guide();
       const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
-      if (pv && pv.rareFind && !g.save.flags.zephyrSeen) { g.save.flags.zephyrSeen = true; g.ui.toast('A Zephyr, just sitting up here. Store it in your garage to keep it.'); }
+      // taking the rooftop Zephyr claims it for good: the roof stays empty from now on (§45.39)
+      if (pv && pv.rareFind && !g.save.flags.rooftopTaken) { g.save.flags.rooftopTaken = true; g.save.flags.zephyrSeen = true; g.ui.toast('A Zephyr, just sitting up here. It won’t be here again: park it in a space of yours to keep it.'); g.saveGame(); }
     }
     // pitch invader: drifting on the stadium pitch
     const p = g.player, pv = p.state === 'vehicle' ? p.vehicle : null, sc = g.world.places.stadium.center;

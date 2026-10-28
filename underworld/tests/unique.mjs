@@ -315,5 +315,19 @@ const last = await ev(() => {
 });
 check('the Aeterna V16: nothing until the other nine are yours, then its clue and search area', last.before === 0 && last.after === 1 && last.area, JSON.stringify(last));
 
+// ---------------------------------------------------------------- 13. the rooftop Zephyr: a one-time find (§45.39)
+const roof = await ev(() => {
+  const g = window.game, V = g.vehicles, R = g.world.places.garageRoof.roof;
+  const stream = () => { for (const [bi, cars] of V.parkedBlocks) { for (const v of cars) if (V.list.includes(v) && v !== g.player.vehicle && !v.garageUid) V.despawn(v); } V.parkedBlocks.clear(); V.updateParked(R.x, R.z, 120); return V.list.filter(v => v.rareFind && !v.garageUid).length; };
+  g.save.flags.rooftopTaken = false; delete g.save.secrets.rooftop;
+  const before = stream();
+  const v = V.list.find(x => x.rareFind); if (!v) return { before, err: 'no rooftop car' };
+  window.__to(v.pos.x + 2, v.pos.z); g.player.pos.y = v.pos.y; g.completeEnter(v); g.content.checkT = 0; g.content.update(0.016, 0.6);
+  const flag = g.save.flags.rooftopTaken; g.exitVehicle(true);
+  V.despawn(v); const after = stream(), after2 = stream();
+  return { before, flag, after, after2 };
+});
+check('the rooftop Zephyr is a one-time find: there until taken; once taken it never stands on the roof again, however often the block reloads', roof.before === 1 && roof.flag === true && roof.after === 0 && roof.after2 === 0, JSON.stringify(roof));
+
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 await finish(b, 'unique');
