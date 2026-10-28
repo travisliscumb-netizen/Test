@@ -6,15 +6,87 @@
    start so every mission works on the generated city.
    ===================================================================== */
 const ARCS = [
-  { id: 1, name: 'Fresh Off the Ferry', who: 'rosa', blurb: 'Rosa Calder runs a courier dispatch and needs a driver she can trust.' },
+  { id: 1, name: 'Fresh Off the Ferry', who: 'rosa', blurb: 'Rosa Calder runs a courier dispatch and knows how this town works.' },
   { id: 2, name: 'Wheels for Hire', who: 'ines', blurb: 'Ines Varga brokers cars. Dex Okafor makes them disappear.' },
   { id: 3, name: 'Street Heat', who: 'tull', blurb: '"Sprocket" Tull runs the night races out in Saltworks.' },
   { id: 4, name: 'Pressure', who: 'moss', blurb: 'Somebody at Police HQ has started paying attention to you.' },
   { id: 5, name: 'The Long Haul', who: 'ferry', blurb: 'The Ferryman has one job left in him. It’s a big one.' }
 ];
-// Underworld is free-roam: there is no scripted story. Contacts offer optional contracts
-// through the stage/mission engine, which stays in place for them.
-const CAMPAIGN = [];
+// Underworld is free-roam. The only script is the opening (M12): six short jobs from Rosa Calder that each put one
+// system in your hands (product, Dirty and Clean money, stolen cars and HOT plates, police heat and the case file,
+// the map, the scale of a warehouse operation) and then let you go. Each job is done by doing the real thing, any way
+// you like ('until' stages test the game's own state), and pays modestly in Dirty Cash. After that, contacts offer
+// optional contracts through the same engine.
+const UW_LOC = (C, kind, id) => { const L = C.g.uw.loc(kind, id); return L ? { x: L.x, z: L.z } : null; };
+const CAMPAIGN = [
+  { id: 'o1', arc: 1, giver: 'rosa', title: 'Smokes', reward: 150, rep: 40, after: [],
+    brief: 'Everyone starts somewhere. Buy cheap smokes from Dockside Sully and sell them on a street corner.',
+    stages: C => {
+      const sully = UW_LOC(C, 'spot', 'sully');
+      return [
+        { t: 'say', who: 'rosa', text: 'You want to make money in this town? Start small. Dockside Sully sells untaxed smokes cheap.' },
+        { t: 'fn', f: (C2, m) => { const g = C2.g; if (Money.available('supplier') < 150) { g.earn(150, 'contract'); g.content.phone('rosa', 'Here’s $150 to start. Cash, so it’s Dirty: it lives in your pocket, not the bank.'); } m.vars.sold0 = g.uw.S.st.sold; } },
+        { t: 'goto', at: sully, obj: 'Go to Dockside Sully (the ↓ BUY point on the map)' },
+        { t: 'until', f: g => (g.uw.carried().smokes | 0) >= 3, obj: 'Buy at least 3 cartons of smokes from Sully' },
+        { t: 'msg', from: 'rosa', text: 'Now sell them. The map’s $ SELL points are street buyers; Street Connect on the phone says who pays what.' },
+        { t: 'until', f: (g, m) => g.uw.S.st.sold > m.vars.sold0, obj: 'Sell your smokes to street buyers (a $ SELL point)' },
+        { t: 'say', who: 'rosa', text: 'Bought low, sold high. That’s the whole business. Everything else is just bigger numbers.' }
+      ];
+    } },
+  { id: 'o2', arc: 1, giver: 'rosa', title: 'Clean Hands', reward: 200, rep: 40, after: ['o1'],
+    brief: 'Street cash is Dirty: it can be taken off you. Dina Vance turns it into money in the bank, for a fee.',
+    stages: C => [
+      { t: 'say', who: 'rosa', text: 'The cash in your pocket is Dirty. Cops take it if they catch you, and the bank won’t touch it. Dina Vance washes it.' },
+      { t: 'fn', f: (C2, m) => { const g = C2.g; m.vars.f0 = g.uw.S.fixer.next; if (Money.available('launderIn') < 100) g.earn(150, 'contract'); } },
+      { t: 'goto', at: UW_LOC(C, 'spot', 'fixer'), obj: 'Find Dina Vance (the L on the map)' },
+      { t: 'until', f: (g, m) => g.uw.S.fixer.next > m.vars.f0, obj: 'Hand Dina some Dirty Cash to launder (at least $100)' },
+      { t: 'say', who: 'rosa', text: 'It shows up in your bank in half a day, less her cut. Property, cars, lawyers and the casino all want Clean money. Later, a business of your own does it cheaper.' }
+    ] },
+  { id: 'o3', arc: 1, giver: 'rosa', title: 'Hot Wheels', reward: 300, rep: 50, after: ['o2'],
+    brief: 'Steal a car and sell it to the Saltworks Chop Shop. A stolen car is HOT: police who see it come for you.',
+    stages: C => {
+      const chop = C.pl.chopshop && C.pl.chopshop.door;
+      return [
+        { t: 'say', who: 'rosa', text: 'Cars are money too. Take one off the street and drive it to the Saltworks Chop Shop.' },
+        { t: 'fn', f: (C2, m) => { m.vars.c0 = C2.g.uw.S.st.chopped; } },
+        { t: 'until', f: g => { const v = g.player.state === 'vehicle' && !g.player.passenger ? g.player.vehicle : null; return !!(v && !v.owned && !v.garageUid); }, obj: 'Steal a car (any car on the street)' },
+        { t: 'msg', from: 'rosa', text: 'That car is HOT now. A cop who sees the plate will chase you. Get it to the Chop Shop before anyone looks.' },
+        { t: 'until', at: chop, f: (g, m) => g.uw.S.st.chopped > m.vars.c0, obj: 'Sell the car at the Saltworks Chop Shop' },
+        { t: 'say', who: 'rosa', text: 'Easy money, until it isn’t. Keep a car you like and it stays HOT until the Chop Shop cleans its papers.' }
+      ];
+    } },
+  { id: 'o4', arc: 1, giver: 'rosa', title: 'Heat', reward: 300, rep: 50, after: ['o3'],
+    brief: 'The police only know what they see. Learn to lose them, and what happens when you don’t.',
+    stages: C => [
+      { t: 'say', who: 'rosa', text: 'You’ve been noticed. A patrol has your description. Lose them: break line of sight and stay out of view.' },
+      { t: 'wanted', level: 1 },
+      { t: 'lose', obj: 'Lose the police: get out of their sight', tip: 'Turn corners, go inside, keep moving. The stars fade once they stop seeing you.' },
+      { t: 'say', who: 'rosa', text: 'Good. What they saw goes in your case file (Police app): witnesses, cameras, plates. A thick file means a long sentence when they do catch you, and a lawyer costs Clean money.' }
+    ] },
+  { id: 'o5', arc: 1, giver: 'rosa', title: 'Know the City', reward: 300, rep: 50, after: ['o4'],
+    brief: 'Greenhouse Gus sells green, if he’s heard of you. Find him with the map and go and meet him.',
+    stages: C => {
+      const gus = UW_LOC(C, 'spot', 'gus');
+      return [
+        { t: 'say', who: 'rosa', text: 'Smokes pay pennies. Greenhouse Gus grows the good stuff. Open the map, find him (↓ BUY), and set a waypoint: the GPS line takes you there.' },
+        { t: 'until', f: g => !!(g.content.waypoint && gus && Math.hypot(g.content.waypoint.x - gus.x, g.content.waypoint.z - gus.z) < 30), obj: 'Mark Greenhouse Gus on the map (tap him, then Waypoint)' },
+        { t: 'goto', at: gus, obj: 'Follow the GPS to Greenhouse Gus' },
+        { t: 'say', who: 'rosa', text: 'He’ll deal with you now. Different districts want different things and pay different prices: the Market app tracks what your stock is worth.' }
+      ];
+    },
+    onPass: g => { const S = g.uw.S; S.flags.intro = S.flags.intro || {}; S.flags.intro.gus = 1; } },
+  { id: 'o6', arc: 1, giver: 'rosa', title: 'Bigger Than You', reward: 500, rep: 80, after: ['o5'],
+    brief: 'Take a look at a warehouse. That’s what a real operation runs on.',
+    stages: C => {
+      const w = PROPS.filter(p => p.kind === 'warehouse').sort((a, b) => a.price - b.price)[0], at = w && UW_LOC(C, 'prop', w.id);
+      return [
+        { t: 'say', who: 'rosa', text: 'Pockets only hold so much. A warehouse holds stock and cash, and crew: drivers move product, dealers sell it on your corners while you sleep.' },
+        { t: 'goto', at, obj: `Look over ${w ? w.name : 'a warehouse'} (for sale)` },
+        { t: 'say', who: 'rosa', text: 'You’ll need Clean money, some Rep and people you trust. Your Rank grows with what you actually control, not what you buy. You don’t need me any more. Other people will call.' }
+      ];
+    },
+    onPass: g => { g.save.flags.introDone = true; g.content.phone('ines', 'Ines Varga. Rosa says you can drive and keep quiet. I broker cars. Come and see me when you have a moment.'); g.content.phone('tull', 'Heard you’ve got a car or two. Night races out in Saltworks. Bring something fast.'); } }
+];
 const CAMPAIGN_BY_ID = Object.fromEntries(CAMPAIGN.map(m => [m.id, m]));
 const CONTACT_GATE = { rosa: () => true, tull: s => s.rep >= 60, ines: s => s.rep >= 120, ferry: s => s.rep >= 400, dex: () => false, moss: () => false };
 
@@ -164,6 +236,8 @@ class Campaign {
       case 'tail': { st.close = 0; st.far = 0; const v = m.refs[st.ref]; if (v && v.drive) { v.drive.wait = 0; v.drive.mode = 'race'; v.drive.cruise = 12; v.drive.setGoal(st.dest.x, st.dest.z); } return false; }
       case 'deliverCars': st.done = {}; for (const r of st.refs) { const v = m.refs[r]; if (v) g.missions.objMarker(v.pos.x, v.pos.z, 0xffd84d, 2.2, false); } return false;
       case 'interior': { const d = g.world.places[INTERIOR_DEFS[st.id].place].door; g.missions.objMarker(d.x, d.z, 0xffd84d, 1.6); return false; }
+      // until (M12): done when its test holds, whatever way the player gets there (the systems teach, not the script)
+      case 'until': if (st.at) g.missions.objMarker(st.at.x, st.at.z, 0xffd84d, 4); return false;
       default: return false;
     }
   }
@@ -222,6 +296,7 @@ class Campaign {
         if (pv === v) { done = true; if (v.alarmLvl) { g.police.setLevel(Math.max(g.police.level, v.alarmLvl)); g.ui.toast('Car alarm! Someone called it in.', 'warn'); v.alarmT = 4; } }
         break;
       }
+      case 'until': m.objective = st.obj; m.target = st.at || null; done = !!st.f(g, m); break;
       case 'goto': {
         m.target = st.at;
         const ok = need(st);

@@ -10,7 +10,7 @@ const TUTORIAL = [
   { id: 'interact', when: g => !$('prompt').classList.contains('hidden'),
     text: g => `When a prompt appears, ${touchUI(g) ? 'tap USE' : 'press E'} to do it: doors, people, cars, shops.` },
   { id: 'money', when: g => g.uw && g.uw.rank === 0 && g.save.stats.playTime > 25,
-    text: () => 'First money: steal a car and sell it at the Saltworks Chop Shop, or buy cheap smokes from Dockside Sully and sell them to street buyers. Street Connect (phone) shows who buys and who sells.' },
+    text: () => 'First money: Rosa Calder (the ! on the map) has work. Or go it alone: steal a car for the Saltworks Chop Shop, or buy cheap smokes from Dockside Sully and sell them to street buyers.' },
   { id: 'map', when: g => g.save.stats.playTime > 50,
     text: g => `The Map (${touchUI(g) ? 'the map button' : 'M'}) shows places, BUY ↓ and SELL $ points and your territory. Tap a place to track it or take a cab there.` },
   { id: 'phone', when: g => g.save.stats.playTime > 100,
@@ -26,13 +26,13 @@ const TUTORIAL = [
   { id: 'police', when: g => g.police.level > 0,
     text: () => 'Stars mean the police are after you. Break line of sight and stay out of view until they fade. No cab will stop while you’re wanted.' },
   { id: 'property', when: g => /for sale/.test($('prompt').textContent),
-    text: () => 'Property is bought in person. Homes are safehouses with a stash and parking; businesses pay every day and launder your name.' },
+    text: () => 'Property is bought in person with Clean money. Homes are safehouses with a stash and parking; businesses pay every day, and some wash Dirty Cash through their books.' },
   { id: 'garage', when: g => /Garage|garage/.test($('prompt').textContent),
     text: () => 'Drive a car you own into a free space and stop to park it. Cars you leave around town get towed home. The Garage app lists them all.' },
   { id: 'taxi', when: g => /Taxi/.test($('prompt').textContent),
-    text: () => 'Hire the cab, pick any street on the map and see the fare first. Ride along, skip the drive, change destination or get out early.' },
+    text: () => 'Hire the cab, pick any street on the map and see the fare first. Ride along, skip the drive, change destination or get out early. No cab skips the trip while you carry product.' },
   { id: 'jail', when: g => g.uw && g.uw.inJail,
-    text: () => 'No phone and no map in here. Do chores (trays to the serving window, litter in the bin) for good-behaviour points: they unlock 2× and 3× time. Your businesses keep earning every day. Open “Prison life” for everything.' }
+    text: () => 'No phone and no map in here. Do chores (trays to the serving counter, litter in the bin) for good-behaviour points: they unlock 3×, 5× and 7× time. Your businesses keep running day for day. Open “Prison life” for everything.' }
 ];
 class Tutorial {
   constructor(g) {

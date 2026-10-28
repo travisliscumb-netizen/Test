@@ -48718,15 +48718,87 @@ class EventManager {
    start so every mission works on the generated city.
    ===================================================================== */
 const ARCS = [
-  { id: 1, name: 'Fresh Off the Ferry', who: 'rosa', blurb: 'Rosa Calder runs a courier dispatch and needs a driver she can trust.' },
+  { id: 1, name: 'Fresh Off the Ferry', who: 'rosa', blurb: 'Rosa Calder runs a courier dispatch and knows how this town works.' },
   { id: 2, name: 'Wheels for Hire', who: 'ines', blurb: 'Ines Varga brokers cars. Dex Okafor makes them disappear.' },
   { id: 3, name: 'Street Heat', who: 'tull', blurb: '"Sprocket" Tull runs the night races out in Saltworks.' },
   { id: 4, name: 'Pressure', who: 'moss', blurb: 'Somebody at Police HQ has started paying attention to you.' },
   { id: 5, name: 'The Long Haul', who: 'ferry', blurb: 'The Ferryman has one job left in him. It’s a big one.' }
 ];
-// Underworld is free-roam: there is no scripted story. Contacts offer optional contracts
-// through the stage/mission engine, which stays in place for them.
-const CAMPAIGN = [];
+// Underworld is free-roam. The only script is the opening (M12): six short jobs from Rosa Calder that each put one
+// system in your hands (product, Dirty and Clean money, stolen cars and HOT plates, police heat and the case file,
+// the map, the scale of a warehouse operation) and then let you go. Each job is done by doing the real thing, any way
+// you like ('until' stages test the game's own state), and pays modestly in Dirty Cash. After that, contacts offer
+// optional contracts through the same engine.
+const UW_LOC = (C, kind, id) => { const L = C.g.uw.loc(kind, id); return L ? { x: L.x, z: L.z } : null; };
+const CAMPAIGN = [
+  { id: 'o1', arc: 1, giver: 'rosa', title: 'Smokes', reward: 150, rep: 40, after: [],
+    brief: 'Everyone starts somewhere. Buy cheap smokes from Dockside Sully and sell them on a street corner.',
+    stages: C => {
+      const sully = UW_LOC(C, 'spot', 'sully');
+      return [
+        { t: 'say', who: 'rosa', text: 'You want to make money in this town? Start small. Dockside Sully sells untaxed smokes cheap.' },
+        { t: 'fn', f: (C2, m) => { const g = C2.g; if (Money.available('supplier') < 150) { g.earn(150, 'contract'); g.content.phone('rosa', 'Here’s $150 to start. Cash, so it’s Dirty: it lives in your pocket, not the bank.'); } m.vars.sold0 = g.uw.S.st.sold; } },
+        { t: 'goto', at: sully, obj: 'Go to Dockside Sully (the ↓ BUY point on the map)' },
+        { t: 'until', f: g => (g.uw.carried().smokes | 0) >= 3, obj: 'Buy at least 3 cartons of smokes from Sully' },
+        { t: 'msg', from: 'rosa', text: 'Now sell them. The map’s $ SELL points are street buyers; Street Connect on the phone says who pays what.' },
+        { t: 'until', f: (g, m) => g.uw.S.st.sold > m.vars.sold0, obj: 'Sell your smokes to street buyers (a $ SELL point)' },
+        { t: 'say', who: 'rosa', text: 'Bought low, sold high. That’s the whole business. Everything else is just bigger numbers.' }
+      ];
+    } },
+  { id: 'o2', arc: 1, giver: 'rosa', title: 'Clean Hands', reward: 200, rep: 40, after: ['o1'],
+    brief: 'Street cash is Dirty: it can be taken off you. Dina Vance turns it into money in the bank, for a fee.',
+    stages: C => [
+      { t: 'say', who: 'rosa', text: 'The cash in your pocket is Dirty. Cops take it if they catch you, and the bank won’t touch it. Dina Vance washes it.' },
+      { t: 'fn', f: (C2, m) => { const g = C2.g; m.vars.f0 = g.uw.S.fixer.next; if (Money.available('launderIn') < 100) g.earn(150, 'contract'); } },
+      { t: 'goto', at: UW_LOC(C, 'spot', 'fixer'), obj: 'Find Dina Vance (the L on the map)' },
+      { t: 'until', f: (g, m) => g.uw.S.fixer.next > m.vars.f0, obj: 'Hand Dina some Dirty Cash to launder (at least $100)' },
+      { t: 'say', who: 'rosa', text: 'It shows up in your bank in half a day, less her cut. Property, cars, lawyers and the casino all want Clean money. Later, a business of your own does it cheaper.' }
+    ] },
+  { id: 'o3', arc: 1, giver: 'rosa', title: 'Hot Wheels', reward: 300, rep: 50, after: ['o2'],
+    brief: 'Steal a car and sell it to the Saltworks Chop Shop. A stolen car is HOT: police who see it come for you.',
+    stages: C => {
+      const chop = C.pl.chopshop && C.pl.chopshop.door;
+      return [
+        { t: 'say', who: 'rosa', text: 'Cars are money too. Take one off the street and drive it to the Saltworks Chop Shop.' },
+        { t: 'fn', f: (C2, m) => { m.vars.c0 = C2.g.uw.S.st.chopped; } },
+        { t: 'until', f: g => { const v = g.player.state === 'vehicle' && !g.player.passenger ? g.player.vehicle : null; return !!(v && !v.owned && !v.garageUid); }, obj: 'Steal a car (any car on the street)' },
+        { t: 'msg', from: 'rosa', text: 'That car is HOT now. A cop who sees the plate will chase you. Get it to the Chop Shop before anyone looks.' },
+        { t: 'until', at: chop, f: (g, m) => g.uw.S.st.chopped > m.vars.c0, obj: 'Sell the car at the Saltworks Chop Shop' },
+        { t: 'say', who: 'rosa', text: 'Easy money, until it isn’t. Keep a car you like and it stays HOT until the Chop Shop cleans its papers.' }
+      ];
+    } },
+  { id: 'o4', arc: 1, giver: 'rosa', title: 'Heat', reward: 300, rep: 50, after: ['o3'],
+    brief: 'The police only know what they see. Learn to lose them, and what happens when you don’t.',
+    stages: C => [
+      { t: 'say', who: 'rosa', text: 'You’ve been noticed. A patrol has your description. Lose them: break line of sight and stay out of view.' },
+      { t: 'wanted', level: 1 },
+      { t: 'lose', obj: 'Lose the police: get out of their sight', tip: 'Turn corners, go inside, keep moving. The stars fade once they stop seeing you.' },
+      { t: 'say', who: 'rosa', text: 'Good. What they saw goes in your case file (Police app): witnesses, cameras, plates. A thick file means a long sentence when they do catch you, and a lawyer costs Clean money.' }
+    ] },
+  { id: 'o5', arc: 1, giver: 'rosa', title: 'Know the City', reward: 300, rep: 50, after: ['o4'],
+    brief: 'Greenhouse Gus sells green, if he’s heard of you. Find him with the map and go and meet him.',
+    stages: C => {
+      const gus = UW_LOC(C, 'spot', 'gus');
+      return [
+        { t: 'say', who: 'rosa', text: 'Smokes pay pennies. Greenhouse Gus grows the good stuff. Open the map, find him (↓ BUY), and set a waypoint: the GPS line takes you there.' },
+        { t: 'until', f: g => !!(g.content.waypoint && gus && Math.hypot(g.content.waypoint.x - gus.x, g.content.waypoint.z - gus.z) < 30), obj: 'Mark Greenhouse Gus on the map (tap him, then Waypoint)' },
+        { t: 'goto', at: gus, obj: 'Follow the GPS to Greenhouse Gus' },
+        { t: 'say', who: 'rosa', text: 'He’ll deal with you now. Different districts want different things and pay different prices: the Market app tracks what your stock is worth.' }
+      ];
+    },
+    onPass: g => { const S = g.uw.S; S.flags.intro = S.flags.intro || {}; S.flags.intro.gus = 1; } },
+  { id: 'o6', arc: 1, giver: 'rosa', title: 'Bigger Than You', reward: 500, rep: 80, after: ['o5'],
+    brief: 'Take a look at a warehouse. That’s what a real operation runs on.',
+    stages: C => {
+      const w = PROPS.filter(p => p.kind === 'warehouse').sort((a, b) => a.price - b.price)[0], at = w && UW_LOC(C, 'prop', w.id);
+      return [
+        { t: 'say', who: 'rosa', text: 'Pockets only hold so much. A warehouse holds stock and cash, and crew: drivers move product, dealers sell it on your corners while you sleep.' },
+        { t: 'goto', at, obj: `Look over ${w ? w.name : 'a warehouse'} (for sale)` },
+        { t: 'say', who: 'rosa', text: 'You’ll need Clean money, some Rep and people you trust. Your Rank grows with what you actually control, not what you buy. You don’t need me any more. Other people will call.' }
+      ];
+    },
+    onPass: g => { g.save.flags.introDone = true; g.content.phone('ines', 'Ines Varga. Rosa says you can drive and keep quiet. I broker cars. Come and see me when you have a moment.'); g.content.phone('tull', 'Heard you’ve got a car or two. Night races out in Saltworks. Bring something fast.'); } }
+];
 const CAMPAIGN_BY_ID = Object.fromEntries(CAMPAIGN.map(m => [m.id, m]));
 const CONTACT_GATE = { rosa: () => true, tull: s => s.rep >= 60, ines: s => s.rep >= 120, ferry: s => s.rep >= 400, dex: () => false, moss: () => false };
 
@@ -48876,6 +48948,8 @@ class Campaign {
       case 'tail': { st.close = 0; st.far = 0; const v = m.refs[st.ref]; if (v && v.drive) { v.drive.wait = 0; v.drive.mode = 'race'; v.drive.cruise = 12; v.drive.setGoal(st.dest.x, st.dest.z); } return false; }
       case 'deliverCars': st.done = {}; for (const r of st.refs) { const v = m.refs[r]; if (v) g.missions.objMarker(v.pos.x, v.pos.z, 0xffd84d, 2.2, false); } return false;
       case 'interior': { const d = g.world.places[INTERIOR_DEFS[st.id].place].door; g.missions.objMarker(d.x, d.z, 0xffd84d, 1.6); return false; }
+      // until (M12): done when its test holds, whatever way the player gets there (the systems teach, not the script)
+      case 'until': if (st.at) g.missions.objMarker(st.at.x, st.at.z, 0xffd84d, 4); return false;
       default: return false;
     }
   }
@@ -48934,6 +49008,7 @@ class Campaign {
         if (pv === v) { done = true; if (v.alarmLvl) { g.police.setLevel(Math.max(g.police.level, v.alarmLvl)); g.ui.toast('Car alarm! Someone called it in.', 'warn'); v.alarmT = 4; } }
         break;
       }
+      case 'until': m.objective = st.obj; m.target = st.at || null; done = !!st.f(g, m); break;
       case 'goto': {
         m.target = st.at;
         const ok = need(st);
@@ -55624,7 +55699,7 @@ class Legal {
 /* =====================================================================
    [UNDERWORLD] PRISON: sentencing from the arrest, the charges and the
    record (halved since v6); a playable cell block on its own clock while the
-   empire keeps running day for day; good-behaviour chores unlock 2× and 3×
+   empire keeps running day for day; good-behaviour chores unlock 3×, 5× and 7×
    time; payphone; a phone or an early release only by bribing a guard.
    ===================================================================== */
 const JAIL_LOOK = { shirt: 0xd8762a, pants: 0xd8762a, shoes: 0xe8e8e8, cap: -1, hair: 0x1a1410 };
@@ -60760,7 +60835,7 @@ const TUTORIAL = [
   { id: 'interact', when: g => !$('prompt').classList.contains('hidden'),
     text: g => `When a prompt appears, ${touchUI(g) ? 'tap USE' : 'press E'} to do it: doors, people, cars, shops.` },
   { id: 'money', when: g => g.uw && g.uw.rank === 0 && g.save.stats.playTime > 25,
-    text: () => 'First money: steal a car and sell it at the Saltworks Chop Shop, or buy cheap smokes from Dockside Sully and sell them to street buyers. Street Connect (phone) shows who buys and who sells.' },
+    text: () => 'First money: Rosa Calder (the ! on the map) has work. Or go it alone: steal a car for the Saltworks Chop Shop, or buy cheap smokes from Dockside Sully and sell them to street buyers.' },
   { id: 'map', when: g => g.save.stats.playTime > 50,
     text: g => `The Map (${touchUI(g) ? 'the map button' : 'M'}) shows places, BUY ↓ and SELL $ points and your territory. Tap a place to track it or take a cab there.` },
   { id: 'phone', when: g => g.save.stats.playTime > 100,
@@ -60776,13 +60851,13 @@ const TUTORIAL = [
   { id: 'police', when: g => g.police.level > 0,
     text: () => 'Stars mean the police are after you. Break line of sight and stay out of view until they fade. No cab will stop while you’re wanted.' },
   { id: 'property', when: g => /for sale/.test($('prompt').textContent),
-    text: () => 'Property is bought in person. Homes are safehouses with a stash and parking; businesses pay every day and launder your name.' },
+    text: () => 'Property is bought in person with Clean money. Homes are safehouses with a stash and parking; businesses pay every day, and some wash Dirty Cash through their books.' },
   { id: 'garage', when: g => /Garage|garage/.test($('prompt').textContent),
     text: () => 'Drive a car you own into a free space and stop to park it. Cars you leave around town get towed home. The Garage app lists them all.' },
   { id: 'taxi', when: g => /Taxi/.test($('prompt').textContent),
-    text: () => 'Hire the cab, pick any street on the map and see the fare first. Ride along, skip the drive, change destination or get out early.' },
+    text: () => 'Hire the cab, pick any street on the map and see the fare first. Ride along, skip the drive, change destination or get out early. No cab skips the trip while you carry product.' },
   { id: 'jail', when: g => g.uw && g.uw.inJail,
-    text: () => 'No phone and no map in here. Do chores (trays to the serving window, litter in the bin) for good-behaviour points: they unlock 2× and 3× time. Your businesses keep earning every day. Open “Prison life” for everything.' }
+    text: () => 'No phone and no map in here. Do chores (trays to the serving counter, litter in the bin) for good-behaviour points: they unlock 3×, 5× and 7× time. Your businesses keep running day for day. Open “Prison life” for everything.' }
 ];
 class Tutorial {
   constructor(g) {
@@ -62340,7 +62415,7 @@ class Game {
         this.ui.banner('Port Valen', 'Old Quarter \u00b7 $0 \u00b7 nobody knows your name', 'info', 3.5);
         this.later(1400, () => this.ui.toast(IS_TOUCH ? 'Left stick moves. Drag on the right to look around. PHONE opens your empire.' : 'WASD moves, mouse looks. Shift sprints, Space jumps. Tab opens your empire.'));
         this.later(5200, () => this.ui.toast('Ideas: lift a wallet from behind (E), break into a parked car, or sell a stolen one at the chop shop.'));
-        this.later(9000, () => this.content.phone('unknown', 'Heard you’re new and broke. Lucky’s Pawn on Ninth Street buys whatever falls into your pockets. No questions.'));
+        this.later(9000, () => this.content.phone('rosa', 'Rosa Calder. A friend said you’re new and broke. I can show you how this town pays. Come and find me: I’m the ! on your map.'));
       } else {
         this.ui.toast(this.uw.S.jail ? 'You’re still inside. Serve your time or work the system.' : 'Back on the street.');
       }
@@ -62992,7 +63067,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

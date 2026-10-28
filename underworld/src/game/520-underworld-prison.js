@@ -1,7 +1,7 @@
 /* =====================================================================
    [UNDERWORLD] PRISON: sentencing from the arrest, the charges and the
    record (halved since v6); a playable cell block on its own clock while the
-   empire keeps running day for day; good-behaviour chores unlock 2× and 3×
+   empire keeps running day for day; good-behaviour chores unlock 3×, 5× and 7×
    time; payphone; a phone or an early release only by bribing a guard.
    ===================================================================== */
 const JAIL_LOOK = { shirt: 0xd8762a, pants: 0xd8762a, shoes: 0xe8e8e8, cap: -1, hair: 0x1a1410 };

@@ -192,7 +192,7 @@ class Game {
         this.ui.banner('Port Valen', 'Old Quarter \u00b7 $0 \u00b7 nobody knows your name', 'info', 3.5);
         this.later(1400, () => this.ui.toast(IS_TOUCH ? 'Left stick moves. Drag on the right to look around. PHONE opens your empire.' : 'WASD moves, mouse looks. Shift sprints, Space jumps. Tab opens your empire.'));
         this.later(5200, () => this.ui.toast('Ideas: lift a wallet from behind (E), break into a parked car, or sell a stolen one at the chop shop.'));
-        this.later(9000, () => this.content.phone('unknown', 'Heard you’re new and broke. Lucky’s Pawn on Ninth Street buys whatever falls into your pockets. No questions.'));
+        this.later(9000, () => this.content.phone('rosa', 'Rosa Calder. A friend said you’re new and broke. I can show you how this town pays. Come and find me: I’m the ! on your map.'));
       } else {
         this.ui.toast(this.uw.S.jail ? 'You’re still inside. Serve your time or work the system.' : 'Back on the street.');
       }
