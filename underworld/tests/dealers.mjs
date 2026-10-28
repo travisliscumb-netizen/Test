@@ -14,7 +14,7 @@ await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = 
 const ros = await ev(() => {
   const V = window.game.vehicles.specs ? window.game.vehicles.specs : null;
   const P = window.__pv, specs = window.__pvDebug ? null : null; void specs;
-  const all = Object.entries(P.VEHICLES), civ = all.filter(([k, s]) => !s.police && !s.unmarked);
+  const all = Object.entries(P.VEHICLES), civ = all.filter(([k, s]) => !s.police && !s.unmarked && !s.unique); // the one-offs (Session 6D) are not part of the roster: unique.mjs covers them
   const out = { n: civ.length, names: new Set(civ.map(([, s]) => s.name)).size, profiles: {}, tris: {}, bad: [] };
   for (const [k, s] of civ) {
     (out.profiles[s.profile] = out.profiles[s.profile] || []).push(k);
