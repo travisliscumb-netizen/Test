@@ -1,17 +1,25 @@
 # CURRENT SESSION
 
-- Phase: autonomous pre-graphics build (§45.39), effort Medium.
-- Done this phase: M7 legal/court (`f1f5ed5`), M8 jail rebuild + M9 fronts/honest casino (`90d10ff`), M10 crime
-  content (`c1c323e`).
-- Running: full regression `m9-full` on the staged copy `underworld/.stage-m9.html`
-  (results in `underworld/.runs/m9-full/results.json`, progress in `underworld/.runs-m9.out`; build and
-  static-money were run separately and pass). Known load flakes: threat clock, stress frame stall, gambling
-  scratch timing.
-- Note: the m9-full runner uses the live tests/ against the staged pre-M10 build, so suites edited for M10
-  (interiors, property, stations, gambling) must be rerun on the final build; do that in the CC regression.
-- M11 done: phone in six groups + direct Map, Rank·Dirty·Bank·Pressure header, a priority inbox with deep links
-  (threats, warrant/fugitive, decisions, repairs, impound), the Intel map layer (known rival stash houses, live
-  threats), taxi rules (no fare while wanted or with a load of product; no Skip with any product).
-- Now: **M12 — contacts / onboarding / missions** (ROADMAP.md): 5–7 opening jobs teaching product, Dirty Cash,
-  vehicles, HOT, warehouse, police risk and the map; mentor hints that stop once learned; remove stale wording.
-- Next action: audit `CAMPAIGN` (380), `590-tutorial.js`, contacts in `340`, then write the opening jobs.
+- Phase: autonomous pre-graphics build (§45.39).
+- Done this phase: M7 legal/court (`f1f5ed5`), M8 jail + M9 fronts/honest casino (`90d10ff`), M10 crime content
+  (`c1c323e`), M11 phone/map/taxi (`3d5a1a3`), M12 opening jobs (`1098c0e`).
+- Stopped at the **High-effort checkpoint before M13** (owner to switch effort, then continue).
+- Last full regression: `m12-full` on `.stage-m12.html` (the M12 build) — results in
+  `underworld/.runs/m12-full/results.json`; summary in OVERHAUL_STATUS.md (Autonomous phase M7–M12).
+
+## Next: M13 — economy / progression balance (High effort)
+Goal: one integrated tuning pass so the whole game plays from Nobody to City Kingpin with no dominant loop, no
+soft lock and no money exploit. Concretely:
+1. Build a measurement harness (Node, like royale-sim): income per real hour for each loop at each Rank — street
+   sales by tier and district, chop shop, burglary (with the 17.5% report), business robbery (with security
+   recovery), pickpocketing (district × hour), contracts, races/pink slips, businesses (Clean, by level, managed),
+   fronts (wash capacity), dealers/warehouses/drivers (crew wages), casino (house edge), jail-time costs.
+2. Compare against the Rank gates (RANKS.need: Rep, crew, lieutenants, turfs, influence, warehouses) and the price
+   ladder (properties, warehouses, upgrades, cars, lawyers/fixes, fronts) so each Rank takes a sensible slice of play
+   and no single loop dominates (e.g. robbery/chop vs. product; fronts vs. fixer; casino never a money engine).
+3. Check soft locks: broke after an arrest (seizure + fines), no car, no crew; the opening's $150 front; a jail
+   term with no businesses.
+4. Retune provisional values found across M7–M12 (fines, quash price, lockpick price, robbery ranges, front
+   capacity/fees, sportsbook margin, the Royale's ~4% profitable hours) with the harness as evidence.
+5. A `progression` / `economy` suite asserting the bands; then the CONTENT COMPLETE gate (full regression, save/load,
+   progression + mission flows, mobile perf baseline, docs) and STOP for the Extra High graphics phase.

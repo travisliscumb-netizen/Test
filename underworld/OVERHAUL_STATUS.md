@@ -4123,3 +4123,19 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 | 9 | 2.5 | `uw.econH` (economic clock, hours) and `uw.fixer` (laundering batches, daily use, totals); defaults on load, no version bump |
 | 9 | 2.5 follow-up | garage entries of bought cars gain `prov` (`{ dirty, clean }` put into the car); a bought entry without it becomes Dirty-origin at 50% of list; other origins carry none; no version bump |
 | 9 | 3A | `uw.whse` (warehouse category tiers, automation flag), `uw.turfStock` (dealer corner stock), crew `from` and `'w:<id>'` posts, run fields `rival` / `police` / `auto` and `spot:` / `turf:` endpoints; defaults on load, no version bump |
+
+
+## Autonomous phase M7–M12 (§45.39)
+- **M7 legal** (`f1f5ed5`): case file (witnessed crimes, staleness), warrants by sight, court hearing at every
+  arrest (plead / contest / defence tiers / fix), fines for small cases, priors, modest fugitive enhancement. Suite
+  `legal`.
+- **M8 jail** (`90d10ff`): two-tier cell block with catwalk and stair and nine rooms; 1/3/5/7×; inmate favours;
+  restricted area; drain and laundry-truck escapes, never certain, tightening after repeats. Suite `prison`.
+- **M9 fronts & casino** (`90d10ff`): laundering fronts; honest casino (luck knobs removed), limits by room,
+  Royale ~95% with a world-time progressive, baccarat/craps/3-card/sportsbook. Suites `fronts`, `tables`, `casino`,
+  `royale-sim`.
+- **M10 crime** (`c1c323e`): themed robbable business interiors, security that rises and recovers, owner lockout,
+  lockpicks, single burglary report roll, high-end containment, pickpocket by hour, events by heat/turf. Suite `crime`.
+- **M11 phone** (`3d5a1a3`): six app groups + direct Map, Rank·Dirty·Bank·Pressure header, priority inbox with deep
+  links, Intel map layer, taxi rules. Suite `phoneapps`.
+- **M12 opening** (`1098c0e`): Rosa's six jobs, `until` stages, stale wording removed. Suite `opening`.

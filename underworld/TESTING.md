@@ -10,3 +10,6 @@
 - Performance: `node underworld/tests/perf.mjs <index.html>`; compare against the previous milestone's build with
   alternating runs (software GL is noisy, ±15%).
 - Reload pattern in suites: `g.saveGame(true)`, `page.reload()`, click `#btnContinue`.
+- Suites added in this phase: `legal` (M7), `prison` rewritten (M8), `fronts`, `tables`, `casino`/`royale-sim`
+  rewritten (M9), `crime` (M10), `phoneapps` extended (M11), `opening` (M12).
+- A runner reads the live `tests/` folder: don't edit suites while it runs against a staged build.
