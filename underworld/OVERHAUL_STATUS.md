@@ -145,7 +145,136 @@ This is a **medium-to-large evolutionary refactor**, not the very large foundati
   terraced houses removed).
 - **Curved-street asphalt now darkens in the wet,** as the streets always did.
 
-CR_RESULTS_PLACEHOLDER
+### Tests
+
+- **New suite: `tests/roadnet.mjs`, 42 checks, all in the running game.** It passed 42/42 standalone and again in
+  the full regression, and 41/41 twice before the roadblock check was added.
+  - **The graph:**
+    - the grid is intact (every open segment present, straight, 80 m end to end; closures and lattice paths
+      unchanged);
+    - one connected network;
+    - skewed T-junctions (at least three under 75°, none under 30°);
+    - the Kiln Lane Y (24°) and the Farm Track's link-to-link T;
+    - three crossings;
+    - the diagonal (39.5°, straight);
+    - curves (no turn over 10° between samples, radius 20 m or more);
+    - a curve meeting a straight across 3rd Ave (2.3°).
+  - **Geometry:**
+    - no street through a building, wall, fence, container or tank, sampled across its width every ~0.6 m (this
+      found Cedar Fields Road's fence overlap, fixed);
+    - no street through a house or its lot;
+    - the estate built round its roads.
+  - **Kerb cuts:**
+    - 22 kerb cuts; the ramp climbs smoothly (under 6 mm per 5 cm) and the kerb beyond is untouched;
+    - an AI car crossing a cut is never airborne, with at most 1.1 cm of height change per frame.
+  - **GPS:**
+    - route length equals road length (Saltmarsh Way: 123.09 m = 123.09 m);
+    - the Y is taken;
+    - two-way lengths are equal;
+    - no chord cuts (5,940 samples over six cross-town routes, all on a road surface);
+    - a disconnection is detected (no route);
+    - fares measure the same distance.
+  - **Traffic:**
+    - it drives the curve, the diagonal and the Y on the road and merges back;
+    - never faster than the bend allows;
+    - it waits at the 3rd Ave crossing for a car on 3rd Ave, then crosses.
+  - **AI drivers:**
+    - police reach a suspect on Tanner's Row at pursuit speed;
+    - a delivery van takes the diagonal and the Y;
+    - roadblocks go across the street you are on (Greenway Park Drive, a countryside track);
+    - a cab comes to Kiln Lane and drives a fare to Tanner's Row with no recovery and no shortcut.
+    - In all of these the driver stays on the road.
+  - **Maps:** both maps draw the new streets (and not the yards beside them); the road card names a curved street.
+  - **Parking:** cars parked along the kerbs sit within 3° of the street's line (0°, in fact), both as generated
+    and as spawned.
+  - **Races:** a race laid along curved streets has its checkpoints on the road, and an AI racer finishes it on
+    the road.
+  - **Country roads:**
+    - they still climb (each track 3 m or more), with grade ≤ 12% (≤ 8% over 20 m) and side slope ≤ 2%;
+    - cut and fill ≤ 2.5 m (measured ≤ 1.02 m), and the hills are still there (8.3 m of relief);
+    - traffic drives them on the ground.
+  - **Saves:**
+    - a car on Tanner's Row's bend reloads in place and in line;
+    - a car saved inside a new warehouse is moved to a clear kerb and you are told.
+  - **Cost:** graph build 21 ms; GPS route 0.14 ms; a car's lane 0.69 ms; nearest road 2.9 µs; 207 nodes, 351 edges.
+- **`tests/roads.mjs` evolved for the new streets:**
+  - names may repeat only for a street that carries on across a crossing;
+  - an end may meet another curved road;
+  - the bend checks name the four suburb bends;
+  - the lane check judges cars that reached the curve's middle.
+  - It passed 20/20 on three more runs and in the regression.
+- **`tests/ramps.mjs` test isolation:** each class's test car is now forgotten by the vehicle registry before the
+  next. A stolen car you entered is tracked and put back where it stood, on the ramp in the next car's way.
+  - In a fresh game this queueing happens identically on the 6C closure build. Whether the old suite tripped over
+    it depended on how full the registry was after the jump section.
+  - It passed 21/21 three times after the fix.
+
+### Regression (full, every suite; staged build of `ed41717`)
+
+- **Pass:** 60 of 62 suites after the solo reruns below. The other two (compound, gambling) are flaky, explained
+  below. perf.mjs is a tool, run separately.
+- **Run three at a time and failed:**
+  - stress (a 6.5 s frame stall), gambling, ramps, inventory (a 76% run of an 80% chance), arrest (the pose
+    timing), pwa, races (the pink-slip adoption), compound (the gate ram).
+- **Solo:**
+  - stress 30/30, inventory 58/58, arrest 126/126, races 24/24;
+  - ramps: the isolation fix above;
+  - pwa 5/5. The staged copy lacked the manifest and icons beside it; run against the repo build.
+- **Still flaky (not caused by this pass):**
+  - **compound:** passed 56/56 in its most recent solo run.
+    - One solo run failed the hostile-crew check: a rival on foot reached the yard. That check involves
+      pedestrians, fences and `LaneDriver`, none of which this pass touched.
+    - The run under load failed the gate-ram check. The car spawns 9 m out at 16 m/s and the check advances 60
+      real frames, so under load the car crosses the gate without the collision being caught.
+    - The 6C closure build passed 56/56 in its one solo run.
+  - **gambling:**
+    - The slot reels' stop order is timed by the wall clock (the second reel at 1.2 s instead of 1.0 s in one spin).
+    - The poker reload check fails on the 6C closure build too.
+- **Screenshot suites (shots, cityshots, qashots, frontshots, carshots):** ran without errors.
+
+### Performance (`tests/perf.mjs`, SwiftShader, two alternating runs each)
+
+| Scene | 6C closure: ms/frame · update ms · calls · triangles | Curved Roads: ms/frame · update ms · calls · triangles |
+|---|---|---|
+| calm street | 228.6–235.3 · 0.87–1.05 · 119–120 · 374k | 228.6–242.4 · 0.99–1.00 · 119–120 · 376k |
+| busy (storm, 3★, gang fight) | 266.7–275.9 · 0.88–0.90 · 119–121 · 305–311k | 266.7–275.9 · 0.98–1.27 · 119–120 · 308k |
+| Valen Point track | 131.2–133.4 · 0.69–0.75 · 51–54 · 164k | 140.4–148.2 · 0.69–0.93 · 54 · 164k |
+| Cedar Fields | 100–101.3 · 0.63–0.82 · 47 · 204k | 98.8–100 · 0.69–1.02 · 48 · 208k |
+
+- Frame cost is unchanged within the noise of software GL. The track scene ran 7–15 ms slower per frame in both
+  runs, but nothing changed at Valen Point, so it is not attributed to this pass.
+- **Draw calls:** +1 at most (the road markings are one mesh; the kerb cuts are part of the slab mesh).
+- **Triangles:** +2–4k: markings, cuts, and Cedar Fields Road's fences in short runs.
+- **CPU:**
+  - The GPS is 3.9× faster: 0.55 → 0.14 ms per city route. Off the city the old router's O(n²) Dijkstra over
+    every vertex is gone.
+  - An AI driver's route and lane cost about 0.8 ms per re-plan. Re-plans are event-driven (police at most every
+    1.5 s).
+  - Building the graph adds 21 ms at load.
+
+### Known limits
+
+- **No physical kerbs along curved streets.** They are painted on the block's slab, with edge lines and markings;
+  the 15 cm kerb exists only along lattice streets. A curved street's mouth on a lattice street is a ramp.
+- **No signals off the grid.**
+  - Curved streets give way to lattice traffic at every lattice street they join or cross.
+  - At a Y or a link-to-link T, traffic only follows the car ahead: there is no right-of-way.
+- **Kinematic traffic doesn't give way to physics cars.** That is unchanged.
+- **The lattice and blocks are still the city's skeleton.** New streets run inside blocks and meet the grid. An
+  arterial that crosses several blocks diagonally needs the map overhaul.
+- **Taxi recovery.** The cab's recovery after 14 s without progress still ends in a "shortcut" fade as a last
+  resort, as before.
+  - Progress is now measured along the route, so a road that bends away is no longer mistaken for a stall.
+  - No ride in the tests needed a recovery.
+- **The east countryside track ends at the Course Office forecourt:** traffic turns round on the gravel there.
+- **Sidewalk parking and `curbNear`** are still the lattice's. Property parking bays depend on them, so they are
+  unchanged.
+
+## Exact next recommended task
+
+**Owner review of the Curved Roads pass** (the rulings listed above). Then **6D** (the 10 unique hidden cars), which
+has not been started.
+
 
 ## 6C closure (§45.37): terrain hides you from the police
 
