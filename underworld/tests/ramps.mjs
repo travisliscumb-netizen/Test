@@ -92,7 +92,9 @@ await ev(() => {
   };
   A.car = (type, x, z, h, y) => {
     if (g.player.state === 'vehicle') g.exitVehicle(true);
-    if (g.player.lastVehicle && g.vehicles.list.includes(g.player.lastVehicle)) g.vehicles.despawn(g.player.lastVehicle);
+    // the last test car goes for good: entering a parked car makes it a tracked stolen car, which the registry would
+    // put back where it stood (on the ramp, in the next car's way)
+    if (g.player.lastVehicle && g.vehicles.list.includes(g.player.lastVehicle)) { g.vreg.forget(g.player.lastVehicle); g.vehicles.despawn(g.player.lastVehicle); }
     g.resetPlayerState(x + 3, z, 0);
     const v = g.vehicles.spawn(type, x, z, h, { parked: true, y }); v.touched = true; g.completeEnter(v); v.health = 100;
     return v;
