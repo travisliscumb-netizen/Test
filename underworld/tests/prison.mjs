@@ -22,7 +22,7 @@ await ev(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = 
 await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const s0 = await ev(() => { const g = window.game, j = g.uw.S.jail; return { total: j.total, day: g.uw.S.day, hud: document.getElementById('jailDays').textContent + ' / ' + document.getElementById('jailLeft').textContent }; });
-check('an early mistake gets a short sentence (a pickpocketing at one star: under two weeks)', s0.total >= 3 && s0.total <= 12, JSON.stringify(s0));
+check('an early mistake gets a short sentence (a pickpocketing at one star: under two weeks)', s0.total >= 3 && s0.total < 14, JSON.stringify(s0));
 const noPhone = await ev(() => { const g = window.game; g.uw.ui.open('overview'); const locked = g.uw.ui.locked('overview') && g.uw.ui.locked('crew') && g.uw.ui.locked('market'); const body = document.getElementById('empBody').innerHTML; while (g.ui.stack.length) g.ui.back(); g.ui.toggleMap(true); const map = !document.getElementById('bigmap').classList.contains('hidden'); g.ui.toggleMap(false); return { locked, cant: /can’t reach anyone/.test(body), map, phone: g.uw.prison.phone(), btn: document.getElementById('jailEmpire').classList.contains('hidden') }; });
 check('no phone, no map and no empire browsing by default in jail', noPhone.locked && noPhone.cant && !noPhone.map && !noPhone.phone && noPhone.btn, JSON.stringify(noPhone));
 check('the jail panel shows remaining, sentence and served in words', /left/.test(s0.hud) && /Sentence/.test(s0.hud) && /served/.test(s0.hud), s0.hud);
@@ -241,6 +241,36 @@ check('escape: reach the grate unseen and unscrew it → out, a fugitive, three 
 const ch = await ev(() => { const g = window.game; return g.uw.prison.charges().lines.map(l => l[0]).join(' | '); });
 check('a fugitive caught again faces the recapture enhancement (not the whole old sentence)', /Escaped custody/.test(ch), ch);
 await ev(() => { delete window.game.uw.prison.drainOdds; });
+
+// the laundry truck (M8): organised from outside by a crew member, needs Crew Leader standing, paid in Dirty Cash
+await ev(() => { const g = window.game; g.police.clear(); g.uw.S.fugitive = null; g.uw.prison.lockUp({ total: 200, full: 200, lines: [], counts: [] }); });
+await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
+const truck = await ev(() => {
+  const g = window.game, uw = g.uw, P = uw.prison, j = uw.S.jail, out = {};
+  out.escapes0 = P.escapes();
+  if (!P.courier()) { const c = uw.crew.genCandidate(); c.id = uw.S.nextCrew++; uw.S.crew.push(c); }
+  g.money.W.dirty.me = 1e6; uw._rank = 2;
+  out.lowRank = { crew: P.truckCrew(), odds: P.truckOdds(), r: P.truckEscape(() => 0) };
+  uw._rank = 3; j.intel = 2; j.susp = 0;
+  out.price = P.truckPrice(); out.odds = P.truckOdds(); out.drain = P.drainOdds();
+  const m0 = g.money.W.dirty.me; out.r = P.truckEscape(() => 0); out.paid = m0 - g.money.W.dirty.me;
+  return out;
+});
+await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
+const tOut = await ev(() => { const g = window.game; return { fug: g.uw.S.fugitive, lvl: g.police.level, escapes: g.uw.prison.escapes(), interior: !!g.player.interior }; });
+check('the laundry truck needs Crew Leader standing (no crew route below it)', truck.lowRank.crew === null && truck.lowRank.odds === 0 && truck.lowRank.r === null, JSON.stringify(truck.lowRank));
+check('the laundry truck: priced by what is left ($80,000 for 200 days), odds 20–85%, never certain', truck.price === 80000 && truck.odds > 0.2 && truck.odds <= 0.85 && truck.odds < 1, JSON.stringify(truck));
+check('the truck works: paid once in Dirty Cash, out at one star with the car waiting, a fugitive, the escape counted', truck.r === 'out' && truck.paid === 80000 && tOut.fug && tOut.lvl === 1 && !tOut.interior && tOut.escapes === truck.escapes0 + 1, JSON.stringify([truck.r, truck.paid, tOut]));
+// the jail adapts: after two escapes the second night guard walks the maintenance corridor even with good intel, and the odds drop
+await ev(() => { const g = window.game; g.police.clear(); g.uw.S.fugitive = null; g.uw.prison.lockUp({ total: 200, full: 200, lines: [], counts: [] }); });
+await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
+const adapt = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; j.lockUntil = 0; j.tool = true; j.intel = 2; j.susp = 0; j.ally = false; j.cover = false; return { escapes: P.escapes(), drain: P.drainOdds(), fresh: 0.55 + 2 * 0.12 }; });
+await ev(() => window.game.uw.prison.startEscape());
+await waitFade();
+const adapt2 = await ev(() => { const g = window.game, P = g.uw.prison, n = g.content.interiors.guards.length; P.endEscape(); return { guards: n }; });
+check('the jail adapts to repeat escapes: a second night guard even with good intel, and lower drain odds', adapt.escapes >= 2 && adapt2.guards === 2 && Math.abs(adapt.drain - (adapt.fresh - adapt.escapes * 0.05)) < 1e-9, JSON.stringify([adapt, adapt2]));
+await ev(() => { const g = window.game; g.uw.prison.release('served'); g.police.clear(); });
+await waitFade();
 
 // release after a served sentence
 await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });

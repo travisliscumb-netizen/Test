@@ -78,23 +78,11 @@ function slotSpin(def, bet, pool) {
 }
 // ---- the Valen Royale (§45.4, M9): an honest house. Ordinary rules and odds at every table (European roulette
 // 2.7%, blackjack 6 decks S17 3:2 about 0.5%, baccarat about 1.1–1.2%, three card poker about 3.4%, craps pass line
-// 1.4%), the Royale Billions slot at about 94% return, and table limits by room: $10,000 on the floor, $250,000 in
-// the VIP room once you are known there (Rep 1,300). The knobs below used to tilt every game to the player; they are
-// kept at their honest values so the old rules can't come back by accident.
+// 1.4%), the Royale Billions slot at about 95% return, and table limits by room: $10,000 on the floor, $250,000 in
+// the VIP room once you are known there (Rep 1,300).
 const CASINO = {
   minBet: 10, floorMax: 10000, vipMax: 250000, vipRep: 1300, slotMax: 10000,
-  quick: [100, 1e3, 5e3, 1e4, 5e4, 1e5, 2.5e5],
-  // roulette: a round counts for the player when (total paid back − total staked) > 0. Layouts that win less
-  // often than `roulTarget` have their winning pockets weighted up by `roulBoost` (even chances 48.6% → 60%);
-  // a layout that already wins that often (most of the board covered) gets no help, so covering the table
-  // only buys many small wins against rare large losses.
-  roulTarget: 0, roulBoost: 1,
-  // blackjack: a card that would bust the player is sometimes put back (once), and a dealer run that beats a
-  // standing hand is sometimes re-dealt (once). Normal rules otherwise (6 decks, S17, 3:2).
-  bjSaveBust: 0, bjDealerRedo: 0,
-  // Hold'em: the chance that a hand is dealt from a deck where your seven cards end up the best at the table
-  // (otherwise the deck is left as shuffled, where you are best about one time in four)
-  pokerFavor: 0
+  quick: [100, 1e3, 5e3, 1e4, 5e4, 1e5, 2.5e5]
 };
 // "2.5m", "10k", "$1,000,000", "1b" → whole dollars (NaN when it is not an amount)
 function parseMoney(s) { const t = String(s == null ? '' : s).trim().toLowerCase().replace(/[$,\s_]/g, ''); const m = t.match(/^(\d+(?:\.\d+)?)([kmbt]?)$/); if (!m) return NaN; return Math.floor(+m[1] * { '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2]]); }
@@ -111,28 +99,26 @@ const ROYALE_SYM_W = { shoe: 9, cash: 38, car: 26, diamond: 13, crown: 8, seven:
 const ROYALE_N_W = [0.9, 0.085, 0.015]; // 3, 4, 5 in a row
 // base game (measured, 1M spins): return 98.4%, 56% of spins pay more than the bet, 4.4% pay it back exactly
 const ROYALE_BASE_RTP = 0.984;
-// the major prize ladder (v7: tuned to play time). A prize is in play when it is at least 5× the bet. perH is how often
-// it lands on average per hour of play at a bet of ROYALE.fullBet or more (ROYALE.sph spins an hour: a spin takes
-// 1.95 s to settle and about 0.8 s to tap again); below fullBet the chance scales down with the bet. Those rates are
-// long-run averages, not a schedule: every spin rolls every tier in play independently, a hit only resets that tier's
-// pressure, and nothing caps how often a tier can land. High rollers keep the old rule as a floor: the tiers in play
-// share 12% of the stake as expected return (split by w), so the chance never drops for betting more.
+// the major prize ladder (M9). A prize is in play when it is at least 5× the bet (the billion only on a qualifying
+// $10,000 spin). The tiers in play share ROYALE.share of every stake as expected return, split by w, so a jackpot's
+// chance is proportional to the bet and nothing about the machine favours a big bettor. Every spin rolls every tier
+// in play independently, a hit only resets that tier's pressure, and nothing caps how often a tier can land.
 // Drought pressure: each spin without a hit adds that spin's base chance to the tier's pressure P (P = hits you were
 // "owed"); the live chance is base × (1 + 4·P²), so a long dry run gets steadily more likely to end. The base chance
-// is divided by ROYALE_DROUGHT_K so that the long-run average, pressure included, is exactly perH.
+// is scaled by ROYALE_DROUGHT_K so that the long-run average, pressure included, is exactly the share.
 const ROYALE_MAJORS = [
-  { id: 'm1b', prize: 1e9, w: 0.25, perH: 1 / 30, name: 'BILLION DOLLAR JACKPOT' }, { id: 'm250m', prize: 2.5e8, w: 0.1, perH: 0.036, name: 'GRAND JACKPOT' },
-  { id: 'm100m', prize: 1e8, w: 0.1, perH: 0.038, name: 'MEGA JACKPOT' }, { id: 'm50m', prize: 5e7, w: 0.08, perH: 0.04, name: 'SUPER JACKPOT' },
-  { id: 'm25m', prize: 2.5e7, w: 0.08, perH: 0.042, name: 'ROYAL JACKPOT' }, { id: 'm10m', prize: 1e7, w: 0.07, perH: 0.045, name: 'GOLD JACKPOT' },
-  { id: 'm5m', prize: 5e6, w: 0.06, perH: 0.05, name: 'SILVER JACKPOT' }, { id: 'm1m', prize: 1e6, w: 0.05, perH: 0.07, name: 'MILLION' },
-  { id: 'm500k', prize: 5e5, w: 0.04, perH: 0.15, name: 'MAJOR' }, { id: 'm250k', prize: 2.5e5, w: 0.04, perH: 0.25, name: 'MAJOR' },
-  { id: 'm100k', prize: 1e5, w: 0.04, perH: 0.45, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, perH: 0.7, name: 'MINOR' },
-  { id: 'm25k', prize: 2.5e4, w: 0.03, perH: 1.0, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, perH: 1.5, name: 'BONUS' }
+  { id: 'm1b', prize: 1e9, w: 0.25, name: 'BILLION DOLLAR JACKPOT' }, { id: 'm250m', prize: 2.5e8, w: 0.1, name: 'GRAND JACKPOT' },
+  { id: 'm100m', prize: 1e8, w: 0.1, name: 'MEGA JACKPOT' }, { id: 'm50m', prize: 5e7, w: 0.08, name: 'SUPER JACKPOT' },
+  { id: 'm25m', prize: 2.5e7, w: 0.08, name: 'ROYAL JACKPOT' }, { id: 'm10m', prize: 1e7, w: 0.07, name: 'GOLD JACKPOT' },
+  { id: 'm5m', prize: 5e6, w: 0.06, name: 'SILVER JACKPOT' }, { id: 'm1m', prize: 1e6, w: 0.05, name: 'MILLION' },
+  { id: 'm500k', prize: 5e5, w: 0.04, name: 'MAJOR' }, { id: 'm250k', prize: 2.5e5, w: 0.04, name: 'MAJOR' },
+  { id: 'm100k', prize: 1e5, w: 0.04, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, name: 'MINOR' },
+  { id: 'm25k', prize: 2.5e4, w: 0.03, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, name: 'BONUS' }
 ];
-// M9: the majors share 8% of every stake as expected return (split by w, scaled by the drought average); the base game
-// pays BASE_K of its table, so the machine returns about 94% in all. The billion tier is the world-time progressive
+// M9: the majors share 4% of every stake as expected return (split by w, scaled by the drought average); the base game
+// pays baseK of its table (about 91%), so the machine returns about 95% in all. The billion tier is the world-time progressive
 // (jp.pool, seeded at $1B, growing ~$400k–$800k an economic day) and is only in play on a qualifying $10,000 spin.
-const ROYALE = { share: 0.08, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, fullBet: 1000, sph: 1300, baseK: 0.875, qualify: 10000, grow: [400000, 800000] };
+const ROYALE = { share: 0.04, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, sph: 1300, baseK: 0.925, qualify: 10000, grow: [400000, 800000] };
 // mean of the pressured wait in units of the unpressured one: ∫₀^∞ exp(−(x + c·x³/3)) dx (0.536 for c = 4)
 const ROYALE_DROUGHT_K = (() => { const c = ROYALE.drought, dx = 1e-3; let sum = 0; for (let x = dx / 2; x < 16; x += dx) sum += Math.exp(-(x + c * x * x * x / 3)) * dx; return sum; })();
 function royaleEval(grid) {
@@ -502,8 +488,8 @@ class Gamble {
   // ------------------------------------------------------------- wagers: any amount from the minimum to the whole bankroll
   get pref() { const G = this.G; if (!G.pref || typeof G.pref !== 'object' || Array.isArray(G.pref)) G.pref = {}; return G.pref; }
   // the table limit (M9): the Royale slot tops out at the qualifying $10,000; tables at $10,000 on the floor and
-  // $250,000 at a VIP table for someone known there
-  maxBet(game) { if (game === 'royale') return CASINO.slotMax; return this.seat === 3 && this.g.save.rep >= CASINO.vipRep ? CASINO.vipMax : CASINO.floorMax; }
+  // $250,000 at a VIP table for someone known there; the poker room's buy-in and the sportsbook follow the same two limits by Rep alone
+  maxBet(game) { if (game === 'royale') return CASINO.slotMax; return (game === 'pokerBuy' || game === 'sports' || this.seat === 3) && this.g.save.rep >= CASINO.vipRep ? CASINO.vipMax : CASINO.floorMax; }
   wager(game, def) { const v = this.pref[game]; return Math.min(this.maxBet(game), typeof v === 'number' && isFinite(v) && v >= CASINO.minBet ? v : def); }
   setWager(game, v) { v = Math.floor(+v); if (!(v >= CASINO.minBet)) v = CASINO.minBet; v = Math.min(v, this.maxBet(game)); this.pref[game] = v; return v; }
   // the shared bet bar: balance, wager, what it can pay; quick amounts up to what you hold, MAX, ½, ×2 and a typed amount
@@ -543,9 +529,6 @@ class Gamble {
   // ------------------------------------------------------------- blackjack: six decks, dealer stands on soft 17, blackjack pays 3:2,
   // double on any two cards, one split (split aces take one card each). Dealer checks for blackjack first.
   draw() { if (this.shoe.length < 78) { this.shoe = makeDeck(6); this.g.audio.play('card', { gain: 0.6 }); } return this.shoe.pop(); }
-  unDraw(c) { this.shoe.splice(Math.floor(Math.random() * (this.shoe.length + 1)), 0, c); }
-  // the player's hit: a card that would bust the hand is now and then put back in the shoe and another drawn (once)
-  bjHitCard(cards) { let c = this.draw(); if (bjValue([...cards, c]).total > 21 && Math.random() < CASINO.bjSaveBust) { this.unDraw(c); c = this.draw(); } return c; }
   openBlackjack(seat) {
     this.seat = seat | 0;
     seat = Math.max(0, seat | 0);
@@ -563,10 +546,10 @@ class Gamble {
         h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
         h += `<div class="btns big"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && Money.clean >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
       } else {
-        h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(bj.bet * 2.5), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
+        h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(Math.floor(bj.bet * 2.5)), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
         h += `<div class="btns big"><button class="sbtn gold" data-act="deal" style="min-width:160px" ${Money.clean < bj.bet || bj.revealing ? 'disabled' : ''}>DEAL · ${fmtMoney(bj.bet)}</button></div>`;
       }
-      return h + '<div class="hint">Dealer stands on all 17s · Blackjack pays 3:2 · Double on any two cards · One split · No table maximum · Walking away mid-hand stands every hand.</div><h3>Casino record</h3>' + this.statsHTML('casino');
+      return h + '<div class="hint">Dealer stands on all 17s · Blackjack pays 3:2 · Double on any two cards · One split · Limits by room ($10,000 on the floor, $250,000 VIP once known) · Walking away mid-hand stands every hand.</div><h3>Casino record</h3>' + this.statsHTML('casino');
     };
     this.open(`Blackjack · Table ${seat + 1}`, 'Dealer: “Place your bets. Sky’s the limit tonight.”', render, a => {
       const [k] = a.split(':'), bj = this.bj;
@@ -589,9 +572,9 @@ class Gamble {
   }
   bjAction(k) {
     const bj = this.bj, hd = bj.hands[bj.cur]; if (!hd || hd.done) return;
-    if (k === 'hit') { hd.cards.push(this.bjHitCard(hd.cards)); this.g.audio.play('card'); const v = bjValue(hd.cards).total; if (v >= 21) { hd.done = true; if (v > 21) hd.out = 'BUST'; } }
+    if (k === 'hit') { hd.cards.push(this.draw()); this.g.audio.play('card'); const v = bjValue(hd.cards).total; if (v >= 21) { hd.done = true; if (v > 21) hd.out = 'BUST'; } }
     else if (k === 'stand') hd.done = true;
-    else if (k === 'double') { if (hd.cards.length !== 2 || !this.debit(hd.bet)) return; hd.bet *= 2; hd.cards.push(this.bjHitCard(hd.cards)); hd.done = true; this.g.audio.play('chip'); if (bjValue(hd.cards).total > 21) hd.out = 'BUST'; }
+    else if (k === 'double') { if (hd.cards.length !== 2 || !this.debit(hd.bet)) return; hd.bet *= 2; hd.cards.push(this.draw()); hd.done = true; this.g.audio.play('chip'); if (bjValue(hd.cards).total > 21) hd.out = 'BUST'; }
     else if (k === 'split') {
       const a = hd.cards[0], b = hd.cards[1], val = c => c.r === 14 ? 11 : Math.min(10, c.r);
       if (hd.cards.length !== 2 || bj.hands.length !== 1 || val(a) !== val(b) || !this.debit(hd.bet)) return;
@@ -613,16 +596,13 @@ class Gamble {
     if (live && !dealerBJ && !(bj.hands.length === 1 && natural(bj.hands[0]))) {
       const play = () => { while (bjValue(d).total < 17) d.push(this.draw()); };
       play();
-      // a dealer run that beats a standing hand is now and then dealt again from the shoe (once)
-      const dv0 = bjValue(d).total;
-      if (d.length > 2 && dv0 <= 21 && bj.hands.some(h => { const v = bjValue(h.cards).total; return v <= 21 && v < dv0; }) && Math.random() < CASINO.bjDealerRedo) { while (d.length > 2) this.unDraw(d.pop()); play(); }
     }
     const dv = bjValue(d).total;
     let stake = 0, win = 0;
     for (const h of bj.hands) {
       const v = bjValue(h.cards).total; stake += h.bet; let w = 0;
       if (v > 21) { h.out = 'BUST'; }
-      else if (natural(h) && !dealerBJ) { w = h.bet * 2.5; h.out = 'BLACKJACK'; }
+      else if (natural(h) && !dealerBJ) { w = Math.floor(h.bet * 2.5); h.out = 'BLACKJACK'; } // 3:2, rounded down on odd bets
       else if (dealerBJ) { w = natural(h) ? h.bet : 0; h.out = natural(h) ? 'PUSH' : 'DEALER BLACKJACK'; }
       else if (dv > 21 || v > dv) { w = h.bet * 2; h.out = 'WIN'; }
       else if (v === dv) { w = h.bet; h.out = 'PUSH'; }
@@ -781,25 +761,15 @@ class Gamble {
     for (const o of out) if (o.allin) o.label = 'ALL IN';
     return out;
   }
-  // which seat wins at showdown for a given deck (seats are dealt two each from the top, then burn-and-turn as pokerStreet does)
-  pokerDeckWinner(deck, n) {
-    const L = deck.length, hole = i => [deck[L - 1 - 2 * i], deck[L - 2 - 2 * i]], k = 2 * n;
-    const board = [deck[L - 2 - k], deck[L - 3 - k], deck[L - 4 - k], deck[L - 6 - k], deck[L - 8 - k]];
-    let best = -1, who = 0; for (let i = 0; i < n; i++) { const v = bestOf([...hole(i), ...board]); if (v > best) { best = v; who = i; } else if (v === best && i !== 0 && who === 0) { /* a tie keeps you at the top */ } }
-    return who;
-  }
-  pokerDeck(n) {
-    let deck = makeDeck(1);
-    if (Math.random() < CASINO.pokerFavor) for (let t = 0; t < 80 && this.pokerDeckWinner(deck, n) !== 0; t++) deck = makeDeck(1);
-    return deck;
-  }
+  // an honest shuffle every hand
+  pokerDeck() { return makeDeck(1); }
   pokerHand() {
     const pk = this.pk, bb = pk.bb, n = pk.seats.length;
     for (const x of pk.seats) if (!x.isP && x.stack < bb * 2) { const fresh = pick(POKER_AI.filter(a => !pk.seats.some(y => y.name === a.name))) || POKER_AI[0]; Object.assign(x, { ...fresh, stack: Math.max(bb * 10, Math.round(pk.buy * rand(0.6, 1.6) / bb) * bb) }); }
     const me = pk.seats[0];
     if (me.stack < bb) { pk.phase = 'idle'; this.refresh('You need more chips to play a hand.'); return; }
     pk.btn = (pk.btn + 1) % n;
-    pk.deck = this.pokerDeck(n); pk.board = []; pk.pot = 0; pk.street = 0; pk.cls = ''; pk.msg = '';
+    pk.deck = this.pokerDeck(); pk.board = []; pk.pot = 0; pk.street = 0; pk.cls = ''; pk.msg = '';
     for (const x of pk.seats) { x.hole = [pk.deck.pop(), pk.deck.pop()]; x.put = 0; x.total = 0; x.folded = false; x.allin = false; x.last = ''; x.won = false; x.sitout = false; }
     const post = (i, amt) => { const x = pk.seats[i], a = Math.min(amt, x.stack); x.stack -= a; x.put += a; x.total += a; if (!x.stack) x.allin = true; x.last = a === bb ? 'big blind' : 'small blind'; };
     post((pk.btn + 1) % n, bb / 2); post((pk.btn + 2) % n, bb);
@@ -927,7 +897,7 @@ class Gamble {
     const lines = SLOT_LINES5.map((L, li) => `<polyline class="ln${res && res.lines.some(x => x.li === li) ? ' on' : ''}" points="${L.map((row, r) => `${50 + r * 100},${50 + row * 100}`).join(' ')}"/>`).join('');
     let h = `<div class="ryl"><div class="rylCab ${ry.spinning ? 'spin' : res && res.win ? 'w-' + res.cls : 'idle'}" id="rylCab">
       <div class="rylBulbs">${bulbs(18)}</div>
-      <div class="rylMarq"><span class="rylName">ROYALE BILLIONS</span><span class="rylMax">MAX JACKPOT <b>${fmtMoney(ROYALE.top)}</b></span></div>
+      <div class="rylMarq"><span class="rylName">ROYALE BILLIONS</span><span class="rylMax">PROGRESSIVE <b>${fmtMoney(Math.floor(+this.G.jp.pool || ROYALE.top))}</b></span></div>
       <div class="rylWin"><span id="rylTier">${res && res.major >= 0 ? ROYALE_MAJORS[res.major].name : res && res.win ? 'WIN' : ry.spinning ? 'GOOD LUCK' : 'WIN'}</span><b id="rylWinV">${res && res.win ? fmtMoney(res.win) : '$0'}</b></div>
       <div class="rylGlass"><div class="rylReels" id="rylReels">${grid.map((col, r) => `<div class="ryr" data-r="${r}"><div class="rys">${col.map((sy, w) => this.royaleCell(sy, hitCells.has(r + ':' + w) ? ' hit' : '')).join('')}</div></div>`).join('')}</div><svg class="rylLines" viewBox="0 0 500 300" preserveAspectRatio="none">${lines}</svg></div>
       <div class="rylBulbs">${bulbs(18)}</div></div></div>`;
@@ -939,8 +909,8 @@ class Gamble {
       const ch = royaleChances(bet), every = royaleEvery(bet), live = royaleLive(bet, J), sc = royaleBaseScale(bet), hrs = n => { const h = n / ROYALE.sph; return h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 100 ? `${h < 10 ? h.toFixed(1) : Math.round(h)} h` : `${Math.round(h).toLocaleString('en-US')} h`; }, nm = { seven: 'seven', crown: 'crown', diamond: 'diamond', car: 'car', cash: 'cash', shoe: 'horseshoe' };
       h += `<div class="rylInfo"><h3>Line pays at ${fmtMoney(bet)}</h3><div class="stats">${ROYALE_SYMS.map(k => `<span>${this.royaleCell(k, ' mini')} ${nm[k]} ×3 / ×4 / ×5</span><span>${ROYALE_PAY[k].map(x => fmtMoney(Math.round(x * sc * bet))).join(' / ')}</span>`).join('')}</div>
         <div class="hint">Five lines: the three rows and two V shapes, read from the left reel. Every winning line on a spin is paid.</div>
-        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.id === 'm1b' ? Math.floor(+this.G.jp.pool || ROYALE.top) : m.prize)}${m.id === 'm1b' ? ' (progressive · $10,000 spins only)' : ''}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
-        <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them, even twice in a row. These are long-run averages at about ${ROYALE.sph.toLocaleString('en-US')} spins an hour, never a schedule. Full odds from a ${fmtMoney(ROYALE.fullBet)} bet; smaller bets get a proportionally smaller chance, and very big bets a bigger one. A jackpot that hasn’t landed for a while gets more likely (“due”) until it does. Bets above ${fmtMoney(ROYALE.top / ROYALE.minRatio)} play the line pays a little richer instead.</div>
+        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.id === 'm1b' ? Math.floor(+this.G.jp.pool || ROYALE.top) : m.prize)}${m.id === 'm1b' ? ' (progressive · $10,000 spins only)' : ''}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : m.id === 'm1b' && bet < ROYALE.qualify ? 'only on a ' + fmtMoney(ROYALE.qualify) + ' spin' : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
+        <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them, even twice in a row. These are long-run averages at about ${ROYALE.sph.toLocaleString('en-US')} spins an hour, never a schedule, and the chance grows with the bet in proportion: the machine keeps its edge at every stake. A jackpot that hasn’t landed for a while gets more likely (“due”) until it does. The billion is a progressive: it grows every day, with or without you, and only a ${fmtMoney(ROYALE.qualify)} spin can win it.</div>
         <h3>Your record</h3><div class="stats"><span>Spins</span><span>${(J.spins || 0).toLocaleString('en-US')}</span><span>Biggest win</span><span>${fmtMoney(J.biggest || 0)}</span>${ROYALE_MAJORS.filter(m => J.hits[m.id]).map(m => `<span>${fmtMoney(m.prize)} hits</span><span>${J.hits[m.id]}</span>`).join('')}</div></div>`;
     }
     return h;
@@ -1037,15 +1007,7 @@ function roulettePayout(bets, n) {
 const fmtFit = v => v >= 1e7 ? '$' + fmtShort(v) : fmtMoney(v);
 // $1.5k, $25M, $1B: short amounts for chips and buttons (one decimal only when it is not whole)
 const fmtShort = v => { v = Math.floor(+v || 0); for (const [d, u] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']]) if (v >= d) { const x = v / d; return (x >= 100 || Math.abs(x - Math.round(x)) < 0.05 ? Math.round(x) : x.toFixed(1)) + u; } return String(v); };
-// the pocket for a spin: the layout's winning pockets (net > 0) are weighted up to the player-favoured target
-// when they would come up less often than that; the pocket inside the winning or losing set is uniform
-function roulettePick(bets, rnd = Math.random) {
-  let stake = 0; for (const k in bets) stake += bets[k];
-  const win = [], lose = [];
-  for (let n = 0; n <= 36; n++) (roulettePayout(bets, n) > stake ? win : lose).push(n);
-  const nat = win.length / 37;
-  const p = !win.length ? 0 : nat >= CASINO.roulTarget ? nat : Math.min(CASINO.roulTarget, nat * CASINO.roulBoost);
-  const set = rnd() < p ? win : lose.length ? lose : win;
-  return set[Math.floor(rnd() * set.length)];
-}
+// the pocket for a spin: a fair single-zero wheel, whatever is on the layout (the bets are kept in the signature for
+// the callers and the tests)
+function roulettePick(bets, rnd = Math.random) { void bets; return Math.floor(rnd() * 37); }
 

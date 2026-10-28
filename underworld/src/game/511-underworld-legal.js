@@ -122,7 +122,9 @@ class Legal {
     const pv = g.player.lastVehicle;
     if (pv && !pv.owned && !pv.garageUid && pv.stolenBefore && dist2(pv.pos.x, pv.pos.z, g.player.pos.x, g.player.pos.z) < 20 * 20) counts.push({ t: 'car', name: 'Possession of a stolen vehicle', days: 10, q: 'physical' });
     const mul = Math.min(1.8, 1 + S.rap.priors * 0.08) * uw.cops.sentenceMul();
-    return { counts, mul, fugitive: !!(S.fugitive && S.fugitive.left > 0) };
+    const fugitive = !!(S.fugitive && S.fugitive.left > 0);
+    if (fugitive) counts.push({ t: 'fugitive', name: 'Escaped custody (recapture enhancement)', days: 0, q: 'police', severe: true });
+    return { counts, mul, fugitive };
   }
   // days for a set of counts after the multiplier and the 6.5 halving, plus the modest fugitive enhancement
   sentenceOf(counts, mul, fugitive, k = 1) {
@@ -160,7 +162,6 @@ class Legal {
   arraign(pre) {
     const ch = pre && pre.counts ? pre : this.charges(), L = this.L;
     L.hearing = { counts: ch.counts, mul: ch.mul, fugitive: ch.fugitive, fixTried: false };
-    if (ch.fugitive) ch.counts.push({ t: 'fugitive', name: 'Escaped custody (recapture enhancement)', days: 0, q: 'police', severe: true });
     this.uw.g.saveGame(true);
     this.hearing();
   }

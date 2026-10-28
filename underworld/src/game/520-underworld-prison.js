@@ -147,7 +147,7 @@ const SENTENCE_FACTOR = 0.5;
 // §24 / §37.4: 1× / 3× / 5× / 7×, each unlocked by good-behaviour points (and lost again by misbehaviour)
 const JAIL_SPEEDS = [{ x: 1, pts: 0 }, { x: 3, pts: 20 }, { x: 5, pts: 45 }, { x: 7, pts: 75 }];
 const GBP_MAX = 100;
-// chore points: a tray to the serving window, a piece of litter in the bin, a laundry bag to the carts
+// chore points: a tray to the serving counter, a piece of litter in the bin, a laundry bag to the carts
 const CHORE_PTS = { tray: 3, trash: 2, bag: 5 };
 const SENTENCE_BASE = [5, 7, 14, 30, 75, 150]; // days by wanted level at arrest
 const SENTENCE_MAX = 3 * 365;
@@ -357,7 +357,7 @@ class Prison {
   }
   // ------------------------------------------------------------------ chores: small jobs in the block for good-behaviour points.
   // Trays turn up on the cafeteria tables, litter on the floor, laundry bags by the cells; you carry them to the
-  // serving window, the bin by the guard post or the laundry carts. Items are plain meshes that exist only
+  // serving counter, the bin by the guard post or the laundry carts. Items are plain meshes that exist only
   // while you are inside; what is lying around is not saved (it is regenerated on load).
   choreSetup() {
     if (this.ch) return this.ch;
@@ -425,6 +425,8 @@ class Prison {
   choreTarget() {
     const ch = this.ch; if (!ch || !ch.grp.visible || this.esc) return null;
     const p = this.uw.g.player, def = INTERIOR_DEFS.prison, lx = p.pos.x - def.ox, lz = p.pos.z - def.oz;
+    // every chore is on the ground floor: nothing below reaches you up on the catwalk
+    if (p.pos.y - (def.fy ?? IY) > 1.5) return null;
     if (ch.carry) { const D = Prison.CHORE_DROPS[ch.carry.kind]; if (Math.hypot(lx - D[0], lz - D[1]) < 1.5) return { drop: true, x: def.ox + D[0], z: def.oz + D[1], label: D[2] }; if (!(ch.carry.kind === 'trash' && ch.carry.n < 3)) return null; }
     // holding litter, more litter comes first (up to three); otherwise the nearest thing
     let best = null, bd = 1.2;
@@ -436,7 +438,7 @@ class Prison {
   choreAction() {
     const ch = this.ch, t = this.choreTarget(); if (!t) return null;
     const names = { tray: 'tray', trash: 'litter', bag: 'laundry bag' };
-    if (t.drop) { const k = ch.carry.kind, n = ch.carry.n; return { label: k === 'tray' ? 'Return the tray at the serving window' : k === 'trash' ? `Bin the litter (${n})` : 'Drop the laundry at the carts', act: () => this.choreDrop() }; }
+    if (t.drop) { const k = ch.carry.kind, n = ch.carry.n; return { label: k === 'tray' ? 'Return the tray at the serving counter' : k === 'trash' ? `Bin the litter (${n})` : 'Drop the laundry at the carts', act: () => this.choreDrop() }; }
     const it = t.item;
     if (ch.carry && (ch.carry.kind !== it.kind || it.kind !== 'trash' || ch.carry.n >= 3)) return { label: `Hands full: ${ch.carry.kind === 'trash' ? 'bin the litter first' : 'take the ' + names[ch.carry.kind] + ' to the ' + Prison.CHORE_DROPS[ch.carry.kind][2].toLowerCase()}`, act: () => this.uw.g.audio.play('deny') };
     return { label: it.kind === 'tray' ? 'Pick up the dirty tray' : it.kind === 'trash' ? 'Pick up the litter' : 'Pick up the laundry bag', act: () => this.choreTake(it) };
@@ -517,7 +519,7 @@ class Prison {
     const mx = this.maxSpeed(), nxt = JAIL_SPEEDS.find(sp => sp.pts > j.gbp);
     const render = () => `<div class="stats">${row('Sentence', '<b>' + fmtSentence(j.total) + '</b>')}${row('Served', fmtSentence(j.served))}${row('Remaining', '<b>' + fmtSentence(j.total - j.served) + '</b>')}${row('Good behaviour', `<b>${Math.floor(j.gbp)}</b> points · ${mx}× time unlocked${nxt ? ` · ${nxt.x}× at ${nxt.pts}` : ''}`)}${row('Good-time credit', fmtSentence(j.credit) + ' off (max ' + fmtSentence(Math.floor((j.total + j.credit) * 0.1)) + ')')}${row('Standing with the block', Math.round(j.standing) + ' / 100')}${row('Guard suspicion', `<span style="color:${j.susp > 60 ? 'var(--red)' : j.susp > 30 ? 'var(--amber)' : 'var(--green)'}">${Math.round(j.susp)} / 100</span>`)}${row('Street calendar', 'every day in here is a full day out there')}${row('Phone', j.phone ? '<b style="color:var(--green)">smuggled phone (this sentence)</b>' : 'none · payphone once a month')}</div>
       <h3>Time</h3><div class="btns">${JAIL_SPEEDS.map(sp => `<button class="sbtn${j.speed === sp.x ? ' gold' : ''}" data-act="spd:${sp.x}" ${sp.x > mx ? 'disabled' : ''}>${sp.x}×${sp.pts > j.gbp ? ' · ' + sp.pts + ' pts' : ''}</button>`).join('')}</div>
-      <div class="hint" style="font-size:12px">Chores earn good-behaviour points: carry dirty trays from the cafeteria tables to the serving window (+${CHORE_PTS.tray}), pick litter off the floor and bin it (+${CHORE_PTS.trash} each, up to three at a time), take laundry bags from the cells to the carts (+${CHORE_PTS.bag}). Work shifts add 2. Bribes that go wrong, contraband and escape attempts take points away.</div>
+      <div class="hint" style="font-size:12px">Chores earn good-behaviour points: carry dirty trays from the cafeteria tables to the serving counter (+${CHORE_PTS.tray}), pick litter off the floor and bin it (+${CHORE_PTS.trash} each, up to three at a time), take laundry bags from the cells to the carts (+${CHORE_PTS.bag}). Work shifts add 2. Bribes that go wrong, contraband and escape attempts take points away.</div>
       ${lock ? `<div class="hint" style="color:var(--red)">Lockdown: ${fmtSentence(lock)} confined to your bunk.</div>` : ''}
       <h3>Charges</h3><div class="hint" style="font-size:12px">${esc(j.charges || '—')}</div>
       <h3>A way out</h3><div class="stats">${row('Guard rota', yes(j.intel >= 2, `known (${j.intel}/2)`))}${row('Tool for the grate', yes(j.tool, 'have one'))}${row('Cover', yes(j.ally, 'Wire (optional)'))}${row('Distraction', yes(j.cover, 'Big Lou (optional)'))}</div>
@@ -907,7 +909,8 @@ class Prison {
       const x = clamp(pl.x + Math.sin(ang) * far, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * far, 20, CITY - 20);
       g.resetPlayerState(x, z, ang);
       S.lastHour = Math.floor(g.env.time);
-      g.police.setLevel(truck ? 1 : 3); g.police.crime('escape', x, z);
+      // nobody sees the truck route come out (a search at one star); the drain comes up in front of a patrol
+      g.police.setLevel(truck ? 1 : 3); if (!truck) g.police.crime('escape', x, z);
       S.pressure = clamp(S.pressure + (truck ? 8 : 15), 0, 100);
       g.ui.banner('Escaped', truck ? 'The truck stops in an alley. A car is waiting.' : 'Every cop in Port Valen has your picture', 'fail', 3.5);
       uw.news('radio', `All units: inmate escaped from County. Considered dangerous. ${fmtSentence(left)} left on the sentence.`);

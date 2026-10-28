@@ -58,10 +58,10 @@
   <div id="taxiHud" class="hidden"><small>CABLINE · TAXI</small><b class="td">—</b><span class="tm"></span><div class="tbtns"><button data-tx="skip">Skip ride</button><button data-tx="change">Change</button><button data-tx="out">Get out</button></div></div>
   <div id="chanBar" class="hidden"><span class="cl"></span><div class="bar"><i style="width:0"></i></div><small>Stay close · moving away stops it</small></div>
   <div id="jailHud" class="hidden">
-    <small>COUNTY JAIL · BLOCK C</small><b id="jailDays">0 days left</b><span id="jailLeft"></span>
+    <div class="jrow jtop"><span><small>COUNTY JAIL</small> <b id="jailDays">0 days left</b></span><span id="jailGbp">Good behaviour 0</span></div>
+    <div class="jsub"><span id="jailLeft"></span> · <span id="jailPhone">No phone</span></div>
     <div class="bar"><i id="jailBar" style="width:0"></i></div>
-    <div class="jrow"><span id="jailGbp">Good behaviour 0</span><span class="jbtns jspd"><button data-spd="1">1×</button><button data-spd="3">3×</button><button data-spd="5">5×</button><button data-spd="7">7×</button></span></div>
-    <div class="jrow"><span id="jailPhone">No phone</span><span class="jbtns"><button id="jailLife">Prison life</button><button id="jailEmpire" class="hidden">Phone</button></span></div>
+    <div class="jrow"><span class="jbtns jspd"><button data-spd="1">1×</button><button data-spd="3">3×</button><button data-spd="5">5×</button><button data-spd="7">7×</button></span><span class="jbtns"><button id="jailLife">Prison life</button><button id="jailEmpire" class="hidden">Phone</button></span></div>
   </div>
 </div>
 <div id="flash"></div>

@@ -13,8 +13,9 @@
    - The sportsbook: three matches a day with the house's margin built into
      the odds; a bet settles when that economic day ends, once. Matches and
      their results come from the day's seed: nothing a reload can reroll.
+     Limits as at the tables: $10,000 a bet, $250,000 for someone known (Rep).
    ===================================================================== */
-const SPORTS = { margin: 0.06, maxBet: 50000, keep: 20,
+const SPORTS = { margin: 0.06, keep: 20,
   teams: ['Port Valen Harriers', 'Saltworks Rovers', 'Crestmoor Lions', 'Docklands United', 'Linden Hills FC', 'Old Quarter Athletic', 'Greenway Wanderers', 'Strip City', 'Stadium Town', 'Cedar Fields Rangers', 'Harbor Row Mariners', 'Warehouse Athletic'] };
 const CARD_RANKS = 'A23456789TJQK';
 // ---------------------------------------------------------------- pure rules (exported for the tests)
@@ -38,7 +39,8 @@ function baccaratPay(bets, result) {
   if (result === 'tie') { back += (bets.tie || 0) * 9 + (bets.player || 0) + (bets.banker || 0); }
   else if (result === 'player') back += (bets.player || 0) * 2;
   else back += (bets.banker || 0) * 1.95;
-  return Math.round(back);
+  // the house rounds the commission in its own favour (a $10 Banker win pays $19, never $20)
+  return Math.floor(back + 1e-9);
 }
 function crapsRoll(rnd = Math.random) { const a = 1 + Math.floor(rnd() * 6), b = 1 + Math.floor(rnd() * 6); return [a, b]; }
 // a pass-line decision rolled out to the end: the rolls and 'pass' / 'dont' / 'push12' (a come-out 12)
@@ -169,35 +171,35 @@ Object.assign(Gamble.prototype, {
     }, 'tcp');
   },
   // ---------------------------------------------------------------- the sportsbook
-  get SB() { const G = this.G; if (!G.sports || typeof G.sports !== 'object') G.sports = { bets: [], next: 1, won: 0, staked: 0 }; return G.sports; },
+  sbook() { const G = this.G; if (!G.sports || typeof G.sports !== 'object') G.sports = { bets: [], next: 1, won: 0, staked: 0 }; return G.sports; },
   sportsToday() { return this.g.uw ? this.g.uw.S.day : 1; },
   openSportsbook() {
     this.seat = 0;
     const st = this.sb || (this.sb = { pick: null });
     const render = () => {
-      const day = this.sportsToday(), M = sportsDay(day), SB = this.SB, bet = Math.min(SPORTS.maxBet, this.wager('sports', 100));
+      const day = this.sportsToday(), M = sportsDay(day), SB = this.sbook(), bet = this.wager('sports', 100);
       let h = this.wagerHTML('sports', bet, { pays: 'the odds shown' });
       h += '<h3>Today’s matches</h3><div class="jobs">' + M.map(m => `<div class="job"><div style="flex:1"><b>${esc(m.home)} v ${esc(m.away)}</b><span>Results at the end of the day</span></div>${['Home', 'Draw', 'Away'].map((n, i) => `<button class="sbtn${st.pick === m.id + ':' + i ? ' gold' : ''}" data-act="sb:${m.id}:${i}">${n} ${m.odds[i].toFixed(2)}</button>`).join('')}</div>`).join('') + '</div>';
       h += `<div class="btns"><button class="sbtn danger" data-act="sbgo" ${st.pick ? '' : 'disabled'}>PLACE BET</button></div>`;
       const open = SB.bets.filter(b => !b.settled), done = SB.bets.filter(b => b.settled).slice(-6).reverse();
       if (open.length) h += '<h3>Your open bets</h3><div class="stats">' + open.map(b => `<span>${esc(b.label)}</span><span>${fmtMoney(b.stake)} @ ${b.odds.toFixed(2)}</span>`).join('') + '</div>';
       if (done.length) h += '<h3>Settled</h3><div class="stats">' + done.map(b => `<span>${esc(b.label)}</span><span>${b.win ? '<b style="color:var(--green)">won ' + fmtMoney(b.paid) + '</b>' : 'lost'}</span>`).join('') + '</div>';
-      return h + `<div class="hint">The book keeps about ${Math.round(SPORTS.margin * 100)}% in its odds. Bets settle once, when the economic day ends; up to ${fmtMoney(SPORTS.maxBet)} a bet.</div>`;
+      return h + `<div class="hint">The book keeps about ${Math.round(SPORTS.margin * 100)}% in its odds. Bets settle once, when the economic day ends; up to ${fmtMoney(this.maxBet('sports'))} a bet.</div>`;
     };
     this.open('Sportsbook', 'Today’s card', render, a => {
       const [k, x, y] = a.split(':');
-      if (k === 'w') { if (this.wagerAct('sports', a, this.wager('sports', 100), SPORTS.maxBet) !== null) this.refresh(); return; }
+      if (k === 'w') { if (this.wagerAct('sports', a, this.wager('sports', 100)) !== null) this.refresh(); return; }
       if (k === 'sb') { st.pick = x + ':' + y; this.refresh(); return; }
-      if (k === 'sbgo' && st.pick) { const r = this.sportsBet(+st.pick.split(':')[0], +st.pick.split(':')[1], Math.min(SPORTS.maxBet, this.wager('sports', 100))); st.pick = null; this.refresh(r || 'Bet placed. It settles at the end of the day.'); }
+      if (k === 'sbgo' && st.pick) { const r = this.sportsBet(+st.pick.split(':')[0], +st.pick.split(':')[1], this.wager('sports', 100)); st.pick = null; this.refresh(r || 'Bet placed. It settles at the end of the day.'); }
     }, 'sports');
   },
   // a sportsbook bet: the stake leaves now; it settles once, at the end of today's economic day
   sportsBet(matchId, pick, stake) {
     const day = this.sportsToday(), m = sportsDay(day).find(x => x.id === matchId); if (!m || ![0, 1, 2].includes(pick)) return 'No such match today.';
-    stake = Math.floor(stake); if (!(stake >= CASINO.minBet) || stake > SPORTS.maxBet) return `Bets from ${fmtMoney(CASINO.minBet)} to ${fmtMoney(SPORTS.maxBet)}.`;
+    stake = Math.floor(stake); if (!(stake >= CASINO.minBet) || stake > this.maxBet('sports')) return `Bets from ${fmtMoney(CASINO.minBet)} to ${fmtMoney(this.maxBet('sports'))}.`;
     if (!Money.can(stake, 'casinoStake')) return 'Not enough in the bank.';
     if (!this.settle('casino', stake, 0)) return 'Not enough in the bank.';
-    const SB = this.SB; SB.staked += stake;
+    const SB = this.sbook(); SB.staked += stake;
     SB.bets.push({ id: SB.next++, day, match: matchId, pick, odds: m.odds[pick], stake, label: `${m.home} v ${m.away}: ${[m.home, 'Draw', m.away][pick]}`, settled: false, win: false, paid: 0 });
     if (SB.bets.length > 60) SB.bets.splice(0, SB.bets.length - 60);
     this.g.saveGame();
@@ -205,7 +207,7 @@ Object.assign(Gamble.prototype, {
   },
   // the end of the economic day: every open bet from an earlier day settles, exactly once
   tickSports() {
-    const SB = this.SB, today = this.sportsToday();
+    const SB = this.sbook(), today = this.sportsToday();
     for (const b of SB.bets) {
       if (b.settled || b.day >= today) continue;
       const m = sportsDay(b.day).find(x => x.id === b.match); b.settled = true;
@@ -220,7 +222,7 @@ Object.assign(Gamble.prototype, {
 function sanitizeSports(x, okN) {
   const out = { bets: [], next: 1, won: 0, staked: 0 }; if (!x || typeof x !== 'object') return out;
   out.won = okN(x.won) ? x.won : 0; out.staked = okN(x.staked) ? x.staked : 0;
-  for (const b of Array.isArray(x.bets) ? x.bets : []) if (b && Number.isInteger(b.id) && Number.isInteger(b.day) && Number.isInteger(b.match) && [0, 1, 2].includes(b.pick) && okN(b.stake) && b.stake <= SPORTS.maxBet && okN(b.odds) && b.odds < 100) out.bets.push({ id: b.id, day: b.day, match: b.match, pick: b.pick, odds: b.odds, stake: b.stake, label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', settled: !!b.settled, win: !!b.win, paid: okN(b.paid) ? b.paid : 0 });
+  for (const b of Array.isArray(x.bets) ? x.bets : []) if (b && Number.isInteger(b.id) && Number.isInteger(b.day) && Number.isInteger(b.match) && [0, 1, 2].includes(b.pick) && okN(b.stake) && b.stake <= CASINO.vipMax && okN(b.odds) && b.odds < 100) out.bets.push({ id: b.id, day: b.day, match: b.match, pick: b.pick, odds: b.odds, stake: b.stake, label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', settled: !!b.settled, win: !!b.win, paid: okN(b.paid) ? b.paid : 0 });
   out.bets = out.bets.slice(-60); out.next = Math.max(1, ...out.bets.map(b => b.id + 1), Number.isInteger(x.next) ? x.next : 1);
   return out;
 }

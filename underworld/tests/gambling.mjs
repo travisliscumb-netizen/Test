@@ -30,7 +30,7 @@ check('scratch: a win about one card in three or four', Object.values(maths.scra
 check('slots: every machine and bet returns less than it takes (78–96%)', Object.values(maths.slots).every(a => a.every(r => r.rtp > 0.78 && r.rtp < 0.96)), JSON.stringify(Object.fromEntries(Object.entries(maths.slots).map(([k, a]) => [k, a.map(r => +(r.rtp * 100).toFixed(1))]))));
 const fuel100 = maths.slots.fuel.find(r => r.bet === 100);
 check('Fuel & Go slot: bets $10/$25/$50/$100, high-roller jackpot $2–5M and extremely rare', maths.slots.fuel.map(r => r.bet).join() === '10,25,50,100' && fuel100.top >= 2e6 && fuel100.top <= 5e6 && fuel100.jp < 1e-6, JSON.stringify(fuel100));
-check('roulette: the pay table is standard European (every bet 36/37 on a fair wheel; the casino’s favour is in the wheel, casino.mjs)', Object.values(maths.roul).every(v => Math.abs(v - 36 / 37) < 1e-9), JSON.stringify(maths.roul));
+check('roulette: the pay table is standard European (every bet 36/37 on a fair wheel: the 2.7% edge, casino.mjs)', Object.values(maths.roul).every(v => Math.abs(v - 36 / 37) < 1e-9), JSON.stringify(maths.roul));
 
 // ---------------------------------------------------------------- 2. scratch cards: purchase, reveal, payout, records
 const sc = await ev(async () => {
@@ -147,20 +147,23 @@ await frames(page, 20);
 const fps = await ev(async () => { const g = window.game, f0 = g.frame, t0 = performance.now(); await new Promise(r => setTimeout(r, 2500)); return (g.frame - f0) / ((performance.now() - t0) / 1000); });
 check('casino interior renders without a frame-rate collapse', fps > 3, fps.toFixed(1) + ' fps (software GL)');
 
-// ---------------------------------------------------------------- 6. no table limits: every table takes any stake the bankroll covers
+// ---------------------------------------------------------------- 6. table limits by room (M9): anyone sits anywhere; the VIP limit needs Rep
 const lim = await ev(() => {
-  const g = window.game, G = g.gamble, s = g.save, out = {};
-  const keep = window.game.money.clean; window.game.money.W.clean = 500;
+  const g = window.game, G = g.gamble, s = g.save, K = window.__pv.CASINO, out = {};
+  const keep = window.game.money.clean, rep = s.rep; window.game.money.W.clean = 500;
   out.open = []; for (const k of ['g:bj:0', 'g:bj:3', 'g:roul:3', 'g:poker:0', 'g:slot:royale']) { G.spot(k); out.open.push(document.getElementById('svcTitle').textContent); while (g.ui.stack.length) g.ui.back(); }
-  window.game.money.W.clean = keep;
+  window.game.money.W.clean = 1e7; s.rep = 0;
+  G.seat = 0; out.floor = G.maxBet('bj'); G.seat = 3; out.vipNobody = G.maxBet('bj'); s.rep = K.vipRep; out.vipKnown = G.maxBet('bj'); out.slot = G.maxBet('royale');
+  G.seat = 0; out.capped = G.setWager('bj', 5e6);
+  s.rep = rep; window.game.money.W.clean = keep;
   return out;
 });
-check('a nobody can sit at every table (no limit tiers, no pit boss)', lim.open.every(t => t && !/VIP|LOW|STANDARD/.test(t)) && lim.open.length === 5, JSON.stringify(lim.open));
+check('anyone can sit at every table (five stations open with $500)', lim.open.every(t => !!t) && lim.open.length === 5, JSON.stringify(lim.open));
+check('limits: $10,000 on the floor; the VIP table is $10,000 for a nobody and $250,000 once known (Rep 1,300); the Royale slot $10,000', lim.floor === 1e4 && lim.vipNobody === 1e4 && lim.vipKnown === 2.5e5 && lim.slot === 1e4 && lim.capped === 1e4, JSON.stringify(lim));
 
-// ---------------------------------------------------------------- 7. blackjack (rules checked with the player-favoured luck switched off)
+// ---------------------------------------------------------------- 7. blackjack (ordinary rules)
 const bj = await ev(async () => {
-  const g = window.game, G = g.gamble, s = g.save, C = (r, su = 0) => ({ r, s: su }), K = window.__pv.CASINO, keepK = [K.bjSaveBust, K.bjDealerRedo];
-  K.bjSaveBust = 0; K.bjDealerRedo = 0;
+  const g = window.game, G = g.gamble, s = g.save, C = (r, su = 0) => ({ r, s: su }), K = window.__pv.CASINO;
   const fill = () => window.__pv.makeDeck(2).slice(0, 100);
   // shoe pops from the end: player, player, dealer, dealer, then hits
   const deal = (seq) => { G.shoe = fill().concat(seq.slice().reverse()); };
@@ -184,9 +187,8 @@ const bj = await ev(async () => {
   // walking away mid-hand stands it and pays (dealer 15 draws 9 and busts)
   g.ui.back(); out.walk = { won: window.game.money.clean - m0, table: s.gamble.table, phase: G.bj.phase };
   out.stats = { hands: s.gamble.casino.bjHands, wins: s.gamble.casino.bjWins };
-  // a $5,000,000 hand: no $100 cap any more
-  window.game.money.W.clean = Math.max(window.game.money.clean, 2e7); G.openBlackjack(1); G.setWager('bj', 5e6); G.bj.bet = 5e6; m0 = window.game.money.clean; deal([C(10), C(9), C(10), C(7)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.big = window.game.money.clean - m0;
-  K.bjSaveBust = keepK[0]; K.bjDealerRedo = keepK[1];
+  // a $250,000 hand at the VIP table, for someone known there
+  const rep0 = s.rep; s.rep = Math.max(s.rep, K.vipRep); window.game.money.W.clean = Math.max(window.game.money.clean, 2e7); G.openBlackjack(3); G.bj.bet = G.setWager('bj', 2.5e5); m0 = window.game.money.clean; deal([C(10), C(9), C(10), C(7)]); G.bjDeal(); G.bjAction('stand'); await wait(); out.big = window.game.money.clean - m0; s.rep = rep0;
   while (g.ui.stack.length) g.ui.back();
   return out;
 });
@@ -198,7 +200,7 @@ check('blackjack: bust loses, push returns the stake', bj.bust === -100 && bj.pu
 check('blackjack: DEAL spammed charges one bet', bj.spam === 100, String(bj.spam));
 check('blackjack: leaving mid-hand stands the hand and settles it once', bj.walk.won === 100 && bj.walk.table === null && bj.walk.phase === 'done', JSON.stringify(bj.walk));
 check('blackjack: hands and wins recorded', bj.stats.hands >= 7 && bj.stats.wins >= 5, JSON.stringify(bj.stats));
-check('blackjack: a $5,000,000 hand plays and pays (19 v 17: +$5,000,000)', bj.big === 5e6, String(bj.big));
+check('blackjack: a $250,000 VIP hand plays and pays (19 v 17: +$250,000)', bj.big === 2.5e5, String(bj.big));
 
 // ---------------------------------------------------------------- 8. roulette: many bets in one spin, no table maximum
 const rl = await ev(async () => {
@@ -303,7 +305,6 @@ check('closing an unscratched card keeps it to finish later, paid once', midClos
 // a blackjack hand and a poker stack left on the table survive a reload: stood and cashed out
 const pre = await ev(() => {
   const g = window.game, G = g.gamble, s = g.save, C = r => ({ r, s: 0 });
-  const K = window.__pv.CASINO; K.bjDealerRedo = 0; K.bjSaveBust = 0; // fixed cards below: no luck re-deals
   G.setWager('bj', 250); G.openBlackjack(1);
   G.shoe = window.__pv.makeDeck(2).slice(0, 100).concat([C(9), C(10), C(10), C(10), C(10)].reverse()); // player 19 v dealer 20
   G.bjDeal();

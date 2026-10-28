@@ -125,6 +125,15 @@ if (want('jail')) {
   await throughCourt(page);
   await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
   await frames(page, 20); await shot('jail-yard-hud');
+  // the rebuilt block (M8): the day room under the catwalk, up on the catwalk, the cafeteria, the gym, maintenance, and an overview
+  await at(0, 0, 2, Math.PI, -0.1); await shot('jail-dayroom-cells');
+  await at(13, 0, -1.5, Math.PI, -0.05); await shot('jail-stair');
+  await at(-4, 3.4, -10.7, -Math.PI / 2, -0.3); await shot('jail-catwalk');
+  await at(-8, 0, 9, -Math.PI * 0.75, -0.12); await shot('jail-cafeteria');
+  await at(8, 0, 9, Math.PI * 0.7, -0.12); await shot('jail-gym-infirmary');
+  await at(-14.5, 0, -10, -Math.PI * 0.6, -0.15); await shot('jail-maintenance');
+  await ev(() => { const d = window.game.content.interiors.cur; window.__freeCam = { x: d.ox, y: d.fy + 26, z: d.oz + 20, lx: d.ox, ly: d.fy, lz: d.oz - 1 }; window.__hideHud(true); }); await shot('jail-overview');
+  await ev(() => { window.__freeCam = null; window.__hideHud(false); });
   await ev(() => window.game.uw.prison.openLife()); await shot('jail-life');
   await ev(() => { const g = window.game; while (g.ui.stack.length) g.ui.back(); g.uw.prison.release ? g.uw.prison.release() : null; });
 }

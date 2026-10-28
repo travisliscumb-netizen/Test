@@ -540,12 +540,12 @@ body.touch.driving #speedo .vh{margin:6px auto 0}
 .mtable th{color:var(--dim);font-size:10px;letter-spacing:.1em;text-transform:uppercase}.mtable small{font-size:9px;margin-left:2px}
 .bossCard{background:var(--panel2);border-radius:10px;padding:12px 14px;margin-bottom:10px}.bossCard b{font-size:20px;font-style:italic}.bossCard small{display:block;color:var(--dim);letter-spacing:.08em}.bossCard p{margin:8px 0 0;font-size:15px;line-height:1.45}
 .job.locked{opacity:.45}
-#jailHud{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);background:var(--panel);border:1px solid rgba(216,118,42,.6);border-top:3px solid #d8762a;border-radius:12px;padding:10px 14px;min-width:260px;text-align:center;pointer-events:auto}
-#jailHud small{display:block;font-size:10px;letter-spacing:.24em;color:#d8762a;font-weight:900}#jailHud b{font-size:22px;font-weight:900;display:block}#jailHud span{font-size:12px;color:var(--dim)}
-#jailHud .bar{margin:6px 0}#jailHud .bar i{background:#d8762a}
+#jailHud{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);background:var(--panel);border:1px solid rgba(216,118,42,.6);border-top:3px solid #d8762a;border-radius:12px;padding:6px 10px;min-width:260px;max-width:min(92vw,380px);text-align:left;pointer-events:auto}
+#jailHud small{font-size:9px;letter-spacing:.2em;color:#d8762a;font-weight:900}#jailHud b{font-size:16px;font-weight:900}#jailHud span{font-size:12px;color:var(--dim)}#jailHud .jsub{font-size:11px;line-height:1.3;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#jailHud .jsub span{font-size:11px}#jailHud .jtop{margin-top:0}
+#jailHud .bar{margin:4px 0}#jailHud .bar i{background:#d8762a}
 #jailLife,#jailEmpire{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);border-radius:7px;padding:6px 10px;font-weight:800;cursor:pointer;font-size:13px;min-height:36px}
 #jailHud .jbtns{display:flex;gap:6px}#jailHud .jspd button{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);border-radius:7px;min-width:44px;min-height:36px;font-weight:900;font-size:13px;cursor:pointer}#jailHud .jspd button.on{background:#d8762a;color:#1b1206;border-color:transparent}#jailHud .jspd button:disabled{opacity:.35;cursor:default}#jailHud #jailGbp{color:#ffd84d}
-#jailHud .jrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+#jailHud .jrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px}
 body[data-gs="paused"] #jailHud{display:none}
 @media (max-width:820px),(max-height:520px){
   #hud .tr{max-width:calc(100vw - 166px - var(--safe-l) - var(--safe-r))}
@@ -621,10 +621,10 @@ body[data-gs="paused"] #jailHud{display:none}
   <div id="taxiHud" class="hidden"><small>CABLINE · TAXI</small><b class="td">—</b><span class="tm"></span><div class="tbtns"><button data-tx="skip">Skip ride</button><button data-tx="change">Change</button><button data-tx="out">Get out</button></div></div>
   <div id="chanBar" class="hidden"><span class="cl"></span><div class="bar"><i style="width:0"></i></div><small>Stay close · moving away stops it</small></div>
   <div id="jailHud" class="hidden">
-    <small>COUNTY JAIL · BLOCK C</small><b id="jailDays">0 days left</b><span id="jailLeft"></span>
+    <div class="jrow jtop"><span><small>COUNTY JAIL</small> <b id="jailDays">0 days left</b></span><span id="jailGbp">Good behaviour 0</span></div>
+    <div class="jsub"><span id="jailLeft"></span> · <span id="jailPhone">No phone</span></div>
     <div class="bar"><i id="jailBar" style="width:0"></i></div>
-    <div class="jrow"><span id="jailGbp">Good behaviour 0</span><span class="jbtns jspd"><button data-spd="1">1×</button><button data-spd="2">2×</button><button data-spd="3">3×</button></span></div>
-    <div class="jrow"><span id="jailPhone">No phone</span><span class="jbtns"><button id="jailLife">Prison life</button><button id="jailEmpire" class="hidden">Phone</button></span></div>
+    <div class="jrow"><span class="jbtns jspd"><button data-spd="1">1×</button><button data-spd="3">3×</button><button data-spd="5">5×</button><button data-spd="7">7×</button></span><span class="jbtns"><button id="jailLife">Prison life</button><button id="jailEmpire" class="hidden">Phone</button></span></div>
   </div>
 </div>
 <div id="flash"></div>
@@ -33621,9 +33621,10 @@ const SaveSystem = {
     { // jackpot pressure: finite, non-negative, known tiers only; preferences: positive finite amounts only
       const J = d.gamble.jp && typeof d.gamble.jp === 'object' && !Array.isArray(d.gamble.jp) ? d.gamble.jp : {}, okN = v => typeof v === 'number' && isFinite(v) && v >= 0;
       const pr = {}, hits = {}; for (const m of ROYALE_MAJORS) { if (J.pr && okN(J.pr[m.id])) pr[m.id] = Math.min(J.pr[m.id], 50); if (J.hits && okN(J.hits[m.id])) hits[m.id] = Math.floor(J.hits[m.id]); }
-      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null };
+      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null, pool: okN(J.pool) && J.pool >= 1e9 ? Math.min(J.pool, 1e12) : 1e9 };
       const P = d.gamble.pref && typeof d.gamble.pref === 'object' && !Array.isArray(d.gamble.pref) ? d.gamble.pref : {}; d.gamble.pref = {};
-      for (const k of ['bj', 'roul', 'royale', 'pokerBuy', 'pokerDepth']) if (typeof P[k] === 'number' && isFinite(P[k]) && P[k] > 0 && P[k] < 1e15) d.gamble.pref[k] = Math.floor(P[k]);
+      d.gamble.sports = sanitizeSports(d.gamble.sports, okN);
+      for (const k of ['bj', 'roul', 'royale', 'pokerBuy', 'pokerDepth', 'bacc', 'craps', 'tcp', 'sports']) if (typeof P[k] === 'number' && isFinite(P[k]) && P[k] > 0 && P[k] < 1e15) d.gamble.pref[k] = Math.floor(P[k]);
     }
     // progressive pools and an unfinished blackjack hand (stood on load; a malformed one is refunded)
     const pools = d.gamble.casino.pools; d.gamble.casino.pools = {};
@@ -33723,6 +33724,9 @@ const MONEY_SOURCES = {
   // a tip bought from a fence about where a one-off stands (Session 6D): cash in hand
   intel: { pay: 'dirty' },
   // the court (M7): fines and a judge's campaign donation from the bank; a crew envelope in Dirty Cash (payroll order)
+  // fronts (M9): carried Dirty Cash put through a business's books, a manager's top-ups from your stashes, the
+  // clean money that comes out of the books
+  frontIn: { pay: 'dirty' }, frontAuto: { pay: 'payroll' }, frontOut: { earn: 'clean', book: 'laundering' },
   courtFine: { pay: 'clean' }, judgeFix: { pay: 'clean' }, judgeBribe: { pay: 'payroll' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
@@ -46654,10 +46658,10 @@ function interiorLighting(g) {
     I.sky.lit.opacity = clamp(env.night * 1.2, 0, 1);
   }
 }
-// The Valen Royale gaming floor: lobby with cashier and bar, Royale Billions slot banks, blackjack and
-// roulette tables (no limits: every table takes any stake), one big no-limit Hold'em table and the VIP
-// lounge behind a rope (open to everyone, it is just quieter). Built on entry, disposed on exit.
-const CASINO_GAMES = [['bj', 'Blackjack'], ['roul', 'Roulette'], ['poker', 'Hold’em']];
+// The Valen Royale gaming floor: lobby with cashier, bar and sportsbook, Royale Billions slot banks, blackjack,
+// roulette and craps tables (limits by room, M9), one big Hold'em table and the VIP room behind a rope (blackjack,
+// roulette, baccarat, three card poker: higher limits once they know you). Built on entry, disposed on exit.
+const CASINO_GAMES = [['bj', 'Blackjack'], ['roul', 'Roulette'], ['poker', 'Hold’em'], ['bacc', 'Baccarat'], ['craps', 'Craps'], ['tcp', 'Three Card Poker']];
 const CASINO_FELT = [0x1f6a3e, 0x1d4f8a, 0x7a1a2a, 0x141418];
 const CASINO_TRIM = [0x7fe08f, 0x7fb2ff, 0xff4d5e, 0xffd84d];
 function casinoInteriorDef() {
@@ -46667,13 +46671,16 @@ function casinoInteriorDef() {
   for (let t = 0; t < 3; t++) { tables.push({ g: 'bj', t, n: t, x: -2, z: 4.5 - t * 4 }); tables.push({ g: 'roul', t, n: t, x: 5, z: 4.5 - t * 4 }); }
   tables.push({ g: 'poker', t: 2, n: 0, x: 12, z: 0.5, big: true });
   tables.push({ g: 'bj', t: 3, n: 3, x: -2, z: -10.5 }, { g: 'roul', t: 3, n: 3, x: 5, z: -10.5 });
+  // M9: craps on the main floor; baccarat and three card poker in the VIP room
+  tables.push({ g: 'craps', t: 1, n: 0, x: 12, z: -4.2, big: true }, { g: 'bacc', t: 3, n: 3, x: -8.5, z: -10.5 }, { g: 'tcp', t: 3, n: 3, x: 16.5, z: -10.5 });
   const slots = [['royale', -16, 3.5, 0xff4d5e], ['royale', -11, 3.5, 0x46d4c4], ['royale', -16, -1.5, 0xd28cff], ['royale', -11, -1.5, 0xffd84d], ['royale', -14, -10.5, 0xf4f2ee], ['royale', 12, -10.5, 0xffd84d]];
   const spots = [
     { id: 'g:cashier', x: 15.2, z: 9.6, r: 1.5, label: 'Cashier · records & table access' },
-    { id: 'g:bar', x: -14.5, z: 9.6, r: 1.6, label: 'Royale Bar · drink $40' }
+    { id: 'g:bar', x: -14.5, z: 9.6, r: 1.6, label: 'Royale Bar · drink $40' },
+    { id: 'g:sports', x: 17.4, z: 4, r: 1.6, label: 'Sportsbook · today’s matches' }
   ];
-  for (const T of tables) spots.push({ id: `g:${T.g}:${T.n}`, x: T.x, z: T.z + (T.big ? 2.1 : 1.35), r: T.big ? 1.6 : 1.25, label: T.g === 'poker' ? 'Hold’em · no limit · choose your stakes' : `${CASINO_GAMES.find(c => c[0] === T.g)[1]} · table ${T.n + 1} · any stake` });
-  for (const [id, x, z] of slots) spots.push({ id: 'g:slot:' + id, x, z: z + 1.2, r: 1.2, label: 'Royale Billions · max jackpot $1,000,000,000' });
+  for (const T of tables) spots.push({ id: `g:${T.g}:${T.n}`, x: T.x, z: T.z + (T.big ? 2.1 : 1.35), r: T.big ? 1.6 : 1.25, label: T.g === 'poker' ? 'Hold’em · choose your stakes' : `${CASINO_GAMES.find(c => c[0] === T.g)[1]} · ${T.t === 3 ? 'VIP table · up to $250,000 when they know you' : 'table ' + (T.n + 1) + ' · up to $10,000'}` });
+  for (const [id, x, z] of slots) spots.push({ id: 'g:slot:' + id, x, z: z + 1.2, r: 1.2, label: 'Royale Billions · the billion-dollar progressive on a $10,000 spin' });
   const npcs = [
     { id: 'cashier', x: 15.2, z: 11.6, h: Math.PI, look: { shirt: 0x1a1a1e, pants: 0x1a1a1e, cap: 0xd8a227 } },
     { id: 'bartender', x: -14.5, z: 11.6, h: Math.PI, look: { shirt: 0xf4f2ee, pants: 0x1a1a1e } },
@@ -46715,6 +46722,11 @@ function casinoInteriorDef() {
           k.box(T.x, 0, T.z, 3.0, 0.85, 1.3, 0x3a2416, { col: true }); k.box(T.x, 0.85, T.z, 3.1, 0.05, 1.4, felt);
           k.box(T.x - 1.0, 0.9, T.z, 0.9, 0.12, 0.9, 0x5a3a1a); k.box(T.x - 1.0, 1.02, T.z, 0.6, 0.04, 0.6, 0xd8a227); k.box(T.x - 1.0, 1.06, T.z, 0.12, 0.18, 0.12, 0xd8a227);
           for (let i = 0; i < 12; i++) k.box(T.x - 0.3 + (i % 6) * 0.3, 0.9, T.z - 0.3 + Math.floor(i / 6) * 0.45, 0.24, 0.01, 0.36, i % 2 ? 0xa8242a : 0x15171c);
+        } else if (T.g === 'craps') {
+          // the craps tub: a long rail round a sunken felt, the stickman's side and the boxman's chair
+          k.box(T.x, 0, T.z, 4.0, 0.95, 2.0, 0x3a2416, { col: true }); k.box(T.x, 0.95, T.z, 4.1, 0.08, 2.1, 0x1a1a1e); k.box(T.x, 0.9, T.z, 3.6, 0.04, 1.6, felt);
+          for (const dx of [-1.2, 0, 1.2]) k.box(T.x + dx, 0.95, T.z + 0.2, 0.5, 0.01, 0.4, 0xf4f2ee);
+          for (let i = 0; i < 6; i++) k.box(T.x - 1.6 + i * 0.64, 0, T.z + 1.45, 0.42, 0.62, 0.42, 0x1a1a1e);
         } else if (T.g === 'poker') {
           // the one big no-limit table: long felt, padded rail, eight chairs
           k.box(T.x, 0, T.z, 4.6, 0.82, 2.6, 0x3a2416, { col: true }); k.box(T.x, 0.82, T.z, 4.7, 0.08, 2.7, 0x1a1a1e); k.box(T.x, 0.84, T.z, 4.2, 0.07, 2.2, felt);
@@ -46733,6 +46745,9 @@ function casinoInteriorDef() {
       for (const x of [-3.8, -1.2]) { k.box(x, 0, -6.7, 0.18, 1.0, 0.18, 0xd8a227); k.box(x + (x < -2.5 ? -0.3 : 0.3), 0.8, -6.7, 0.6, 0.05, 0.05, 0x9a1a2a); }
       k.glow(-2.5, 3.1, -6.82, 3.4, 0.5, 0.05, 0xffd84d, 2.4);
       k.box(0, -0.003, -10.5, W, 0.012, 7, 0x141418, { flat: true });
+      // the sportsbook (M9): a counter and a wall of screens on the east side of the lobby
+      k.box(18.6, 0, 4, 0.8, 1.1, 3.6, 0x2a1a36, { col: true }); k.box(18.6, 1.1, 4, 0.9, 0.06, 3.7, 0xd8a227);
+      for (let i = 0; i < 3; i++) for (let r = 0; r < 2; r++) k.glow(19.9, 1.9 + r * 0.9, 2.6 + i * 1.4, 0.04, 0.75, 1.25, [0x2f8a4a, 0x2a5fa8, 0xa83a2a][(i + r) % 3], 1.5);
     }
   };
 }
@@ -50146,6 +50161,7 @@ class Underworld {
     this.cops = new PressureSystem(this);
     this.prison = new Prison(this);
     this.legal = new Legal(this);
+    this.fronts = new Fronts(this);
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
@@ -50259,6 +50275,7 @@ class Underworld {
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.legal = Legal.sanitize(S.legal, num, S.rap);
+    S.fronts = Fronts.sanitize(S.fronts, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
@@ -50828,6 +50845,7 @@ class Underworld {
     this.factions.tickDay();
     this.cops.tickDay();
     this.legal.tickDay();
+    if (g.gamble) g.gamble.tickDay();
     this.opps.tickDay();
     S.infamy *= 0.99;
     // the chop shop wanted list and street buyer quotas refresh daily
@@ -52306,6 +52324,8 @@ class PropertyManager {
       if (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful') { const fee = Math.round(def.income * 0.12 * (1 - this.perk('allIncome'))); const p = Money.pay(fee, 'protection', { partial: true }); S.factions[B.own].money += p; }
       if (B.mgr) S.pressure = clamp(S.pressure - 0.2, 0, 100);
     }
+    // the fronts wash their float (M9)
+    uw.fronts.tickDay();
     // laundering and quiet funerals take the heat down
     S.pressure = clamp(S.pressure - this.perk('launder') - this.perk('heat'), 0, 100);
     // a decent meal and a place to sit keep the crew's morale up: a floor under it, capped like any money-bought
@@ -52335,6 +52355,7 @@ class PropertyManager {
       if (tip) { uw.news(scout ? 'pv' : 'unknown', `${scout ? 'Your scout' : 'Your friend at the precinct'} called it in time: police hit ${def.name} and found it clean. Stock was moved overnight.`); S.pressure = clamp(S.pressure - 3, 0, 100); continue; }
       const seizedList = goodsList(st);
       Inv.clear(st);
+      const took = uw.fronts.raided(def.id); if (took) uw.news('pv', `The police took ${fmtMoney(took)} of the float from ${def.name}'s books as evidence.`);
       S.pressure = clamp(S.pressure + 5, 0, 100); S.st.seized += n;
       uw.market.shock([L.zone], 'green', 0.15); uw.market.shock([L.zone], 'snow', 0.15);
       uw.news('radio', `Police radio: search warrant executed at ${def.name}. Evidence recovered.`);
@@ -55291,7 +55312,9 @@ class Legal {
     const pv = g.player.lastVehicle;
     if (pv && !pv.owned && !pv.garageUid && pv.stolenBefore && dist2(pv.pos.x, pv.pos.z, g.player.pos.x, g.player.pos.z) < 20 * 20) counts.push({ t: 'car', name: 'Possession of a stolen vehicle', days: 10, q: 'physical' });
     const mul = Math.min(1.8, 1 + S.rap.priors * 0.08) * uw.cops.sentenceMul();
-    return { counts, mul, fugitive: !!(S.fugitive && S.fugitive.left > 0) };
+    const fugitive = !!(S.fugitive && S.fugitive.left > 0);
+    if (fugitive) counts.push({ t: 'fugitive', name: 'Escaped custody (recapture enhancement)', days: 0, q: 'police', severe: true });
+    return { counts, mul, fugitive };
   }
   // days for a set of counts after the multiplier and the 6.5 halving, plus the modest fugitive enhancement
   sentenceOf(counts, mul, fugitive, k = 1) {
@@ -55329,7 +55352,6 @@ class Legal {
   arraign(pre) {
     const ch = pre && pre.counts ? pre : this.charges(), L = this.L;
     L.hearing = { counts: ch.counts, mul: ch.mul, fugitive: ch.fugitive, fixTried: false };
-    if (ch.fugitive) ch.counts.push({ t: 'fugitive', name: 'Escaped custody (recapture enhancement)', days: 0, q: 'police', severe: true });
     this.uw.g.saveGame(true);
     this.hearing();
   }
@@ -55442,85 +55464,130 @@ const INMATES = {
   inmate3: { name: 'Big Lou', blurb: 'Two hundred pounds of patience. Getting out the same month as you, maybe.', gift: 'recruit', giftText: 'Work for you when you’re both out' },
   inmate4: { name: 'Kenji "Wire" Sato', blurb: 'Fixed the block’s cameras once. Knows when the night guard walks.', gift: 'ally', giftText: 'Help with a way out' }
 };
+// favours (M8, §24): once an inmate trusts you (60+), each can do his kind of favour again and again, for commissary
+// money and a cooldown. Favours never take time off the sentence.
+const INMATE_FAVORS = {
+  inmate1: { id: 'protect', text: 'Protection: nobody touches you, and the guards look elsewhere', fee: 100, cd: 10 },
+  inmate2: { id: 'phone', text: 'Smuggle in a phone (it might get found)', fee: 300, cd: 15 },
+  inmate3: { id: 'cover', text: 'Cause a scene on the night you go (a distraction)', fee: 150, cd: 10 },
+  inmate4: { id: 'intel', text: 'Guard routines, or a tool for a grate', fee: 250, cd: 8 }
+};
+// the jail (M8): a compact multi-room county jail round a two-tier cell block (§24). Local metres, origin at the
+// centre: the cell block's two tiers along the north wall with a catwalk and a stair, the day room in front of them,
+// the laundry (work) and the restricted maintenance room in the west wing, the guard station and the exit in the east
+// wing, and along the south the cafeteria, visitation (lawyers) with the infirmary behind it, and the gym.
+const JAIL = { W: 40, D: 32, H1: 3.4, H: 7.4, bunk: { x: -2, z: -14.3 }, restricted: { x0: -20, x1: -14, z0: -16, z1: -9 } };
 INTERIOR_DEFS.prison = {
-  name: 'Port Valen County Jail · Block C', place: 'prison', w: 26, d: 18, h: 4.6, exit: { x: 0, z: 99 }, spawnH: 0, noExit: true, noDoor: true,
-  build(k, rng) {
-    k.room(26, 18, 4.6, { floor: 0x7d7f80, wall: 0xa8b0a6, wall2: 0x9aa39a, ceil: 0x8a8f8c, trim: 0x3a3e40, band: [0, 1.3], bandC: 0x5d6b62, lights: [4, 2], lightC: 0xe8f4ff });
-    k.tiles(26, 18, 0x7d7f80, 0x737576, 1.2);
-    // six cells along the north wall: side walls, bunk, toilet, and a barred front
-    for (let c = 0; c < 6; c++) {
-      const x0 = -12 + c * 4;
-      k.box(x0, 0, -7.2, 0.18, 3.2, 3.6, 0x8f978e, { col: true });
-      k.box(x0 + 2, 0, -8.55, 3.4, 0.45, 0.85, 0x5a5e62, { col: true }); k.box(x0 + 2, 0.45, -8.55, 3.2, 0.1, 0.8, 0xc8c2b4);
-      k.box(x0 + 2.4, 1.35, -8.55, 3.0, 0.12, 0.8, 0x5a5e62); k.box(x0 + 2.4, 1.47, -8.55, 2.9, 0.08, 0.75, 0xc8c2b4);
-      k.box(x0 + 3.4, 0, -6.2, 0.45, 0.42, 0.55, 0xd8dcd8, { col: true });
-      // bars (the player's cell, the 3rd, stands open)
-      const open = c === 2;
-      for (let b = 0; b < 11; b++) { if (open && b > 2 && b < 8) continue; k.box(x0 + 0.2 + b * 0.36, 0, -5.35, 0.05, 3.2, 0.05, 0x3a3e44); }
-      k.box(x0 + 2, 3.15, -5.35, 4, 0.12, 0.12, 0x3a3e44); k.cols.push({ x0: x0 + 0.1, x1: x0 + 4, z0: -5.42, z1: -5.28, y0: 0, y1: 3.2 });
-      if (open) k.cols.pop(), k.cols.push({ x0: x0 + 0.1, x1: x0 + 1.1, z0: -5.42, z1: -5.28, y0: 0, y1: 3.2 }, { x0: x0 + 2.95, x1: x0 + 4, z0: -5.42, z1: -5.28, y0: 0, y1: 3.2 });
-      k.glow(x0 + 2, 3.0, -7.2, 0.6, 0.05, 0.3, 0xe8f4ff, 1.8);
-    }
-    k.box(12, 0, -7.2, 0.18, 3.2, 3.6, 0x8f978e, { col: true });
-    // common area: steel tables, a TV, the payphone, the guard post behind glass
-    for (const [tx, tz] of [[-6, 0], [0, 0.5], [6, 0]]) {
-      k.box(tx, 0, tz, 2.4, 0.78, 1.0, 0x9aa0a6, { col: true });
-      for (const s of [-1, 1]) k.box(tx, 0, tz + s * 0.95, 2.4, 0.45, 0.32, 0x8a9096);
-    }
-    // cards on the middle table
-    for (let i = 0; i < 5; i++) k.box(-0.6 + i * 0.25, 0.79, 0.4 + (i % 2) * 0.12, 0.16, 0.01, 0.22, i % 2 ? 0xf4f2ee : 0xd23a2a);
-    k.box(0.6, 0.79, 0.6, 0.1, 0.1, 0.1, 0xf4f2ee); k.box(0.78, 0.79, 0.5, 0.1, 0.1, 0.1, 0xf4f2ee);
-    k.box(-12.6, 1.6, 2, 0.08, 1.0, 1.6, 0x111111); k.glow(-12.55, 1.65, 2, 0.02, 0.9, 1.5, 0x6a8ab0, 1.3);
-    k.box(12.7, 0.9, 3.5, 0.2, 0.7, 0.4, 0x2a2c30); k.box(12.6, 1.25, 3.5, 0.12, 0.25, 0.18, 0x111111); k.glow(12.58, 1.45, 3.5, 0.02, 0.1, 0.15, 0x7fe08f, 1.4);
-    k.box(9, 0, 7, 5, 1.1, 0.4, 0x3a3e44, { col: true }); k.glow(9, 1.1, 7, 4.8, 1.4, 0.04, 0x8fb4c8, 0.5); k.box(9, 0, 8.2, 5, 1.0, 1.4, 0x4a4e54);
-    // visitation booth (lawyers) on the east wall: a counter, a glass screen, a stool, a handset
-    k.box(12.45, 0, -2.6, 0.9, 1.0, 2.2, 0x5a5e62, { col: true }); k.glow(12.5, 1.0, -2.6, 0.03, 1.4, 2.0, 0x8fb4c8, 0.5);
-    k.box(11.4, 0, -2.6, 0.45, 0.6, 0.45, 0x3a3e44); k.box(12.0, 1.05, -2.0, 0.08, 0.25, 0.1, 0x111111);
-    k.box(12.8, 2.4, -2.6, 0.04, 0.4, 1.6, 0x2f4a6a); k.glow(12.77, 2.45, -2.6, 0.02, 0.28, 1.4, 0xe8f4ff, 1.2);
-    // work board, laundry carts and a mop bucket on the west wall
-    k.box(-12.82, 1.3, -2.4, 0.04, 1.0, 1.4, 0xb59a6a); for (let i = 0; i < 6; i++) k.box(-12.78, 1.4 + (i % 2) * 0.4, -2.9 + Math.floor(i / 2) * 0.45, 0.02, 0.3, 0.32, 0xf4f2ee);
-    for (const z of [-0.9, 0.3]) { k.box(-11.8, 0.2, z, 0.9, 0.7, 0.9, 0x6a7a8a, { col: true }); k.box(-11.8, 0.85, z, 0.8, 0.15, 0.8, 0xe8e4dc); }
-    k.box(-11.2, 0, -3.6, 0.5, 0.45, 0.5, 0xd8a227, { col: true }); k.box(-11.2, 0.45, -3.6, 0.04, 1.0, 0.04, 0x8a6a4a);
-    // the maintenance hatch: a grate low on the west wall
-    k.box(-12.92, 0.15, 4.0, 0.06, 0.8, 1.1, 0x3a3e44); for (let i = 0; i < 6; i++) k.box(-12.88, 0.2 + i * 0.13, 4.0, 0.03, 0.04, 1.0, 0x22252a);
-    // workout corner
-    k.box(-9, 0, 6.2, 0.5, 0.45, 1.6, 0x2a2a2e, { col: true }); k.box(-9, 0.95, 6.0, 1.6, 0.06, 0.06, 0x9a9a9a);
-    for (const s of [-1, 1]) k.box(-9 + s * 0.75, 0.95, 6.0, 0.08, 0.35, 0.35, 0x222222);
-    // the kitchen's serving window (dirty trays go here) and a red trash can by the guard post (chores)
-    k.box(-4.2, 0, 8.6, 2.6, 1.0, 0.7, 0x8a9096, { col: true }); k.box(-4.2, 1.0, 8.6, 2.7, 0.06, 0.8, 0xc8ccd0);
-    k.box(-4.2, 1.06, 8.95, 2.4, 1.3, 0.04, 0x2a2c30); k.glow(-4.2, 1.7, 8.92, 2.2, 0.9, 0.02, 0xffe6b8, 1.4);
-    k.glow(-4.2, 2.55, 8.9, 2.0, 0.28, 0.03, 0xd8762a, 1.6);
-    k.box(5.6, 0, 7.7, 0.55, 0.85, 0.55, 0xc23a2a, { col: true }); k.box(5.6, 0.85, 7.7, 0.6, 0.06, 0.6, 0x3a3e44);
-    // locked exit door and high windows
-    k.door(0, 8.98, 0, 0x55595e, 0xff4d5e);
-    for (let i = 0; i < 5; i++) k.glow(-10 + i * 5, 3.7, 8.96, 2.0, 0.5, 0.03, 0xcfe0ff, 1.2);
+  name: 'Port Valen County Jail', place: 'prison', w: JAIL.W, d: JAIL.D, h: JAIL.H, exit: { x: 0, z: 99 }, spawnH: 0, noExit: true, noDoor: true,
+  // the catwalk in front of the upper cells and the stair up to it at the east end of the block
+  levels: [
+    { x0: -12, x1: 13.8, z0: -11.5, z1: -9.9, h: JAIL.H1 },
+    { x0: 12.2, x1: 13.8, z0: -9.9, z1: -2.4, axis: 'z', dir: -1, h0: 0, h1: JAIL.H1 }
+  ],
+  build(k) {
+    const H1 = JAIL.H1, H = JAIL.H, wall = 0xa8b0a6, wall2 = 0x9aa39a, steel = 0x3a3e44, bar = 0x3a3e44, orange = 0xd8762a;
+    k.room(JAIL.W, JAIL.D, H, { floor: 0x7d7f80, wall, wall2, ceil: 0x8a8f8c, trim: 0x3a3e40, band: [0, 1.3], bandC: 0x5d6b62, lights: [6, 4], lightC: 0xe8f4ff });
+    k.tiles(JAIL.W, JAIL.D, 0x7d7f80, 0x737576, 1.25);
+    // ----- interior walls (doorways as gaps)
+    iwall(k, 'z', -14, -16, 2, 0, H, wall, [[-3.2, -1.4]]);            // block | west wing (laundry door)
+    iwall(k, 'x', -9, -20, -14, 0, H, wall2, [[-17.8, -16.4]]);        // laundry | maintenance (restricted)
+    iwall(k, 'z', 14, -16, 2, 0, H, wall, [[-1.4, 0.2]]);              // block | guard station (its door; a window above the counter)
+    iwall(k, 'x', 2, -20, 20, 0, H1, wall2, [[-12.2, -10.2], [-1.4, 1.4], [10.2, 12.2]]); // block | cafeteria, visitation, gym
+    iwall(k, 'z', -6, 2, 16, 0, H1, wall);                              // cafeteria | visitation & infirmary
+    iwall(k, 'z', 6, 2, 16, 0, H1, wall);                               // visitation & infirmary | gym
+    iwall(k, 'x', 9, -6, 6, 0, H1, wall2, [[-1, 1]]);                  // visitation | infirmary
+    k.box(0, H1, 9, 40, 0.2, 14, 0x8a8f8c);                             // the low ceiling over the south rooms
+    // the guard station's window onto the day room
+    k.glow(14.02, 1.4, -6, 0.04, 1.2, 3.4, 0x8fb4c8, 0.5); k.box(14.6, 0, -6, 1.0, 1.0, 3.6, steel, { col: true });
+    // ----- the cell block: six cells a tier, the player's (lower, third from the west) open
+    const cellRow = (y, open) => {
+      for (let c = 0; c < 6; c++) {
+        const x0 = -12 + c * 4;
+        k.box(x0, y, -13.8, 0.18, 3.2, 4.4, 0x8f978e, { col: true });
+        k.box(x0 + 2, y, -15.35, 3.4, 0.45, 0.85, 0x5a5e62, { col: true }); k.box(x0 + 2, y + 0.45, -15.35, 3.2, 0.1, 0.8, 0xc8c2b4);
+        k.box(x0 + 2.4, y + 1.35, -15.35, 3.0, 0.12, 0.8, 0x5a5e62); k.box(x0 + 2.4, y + 1.47, -15.35, 2.9, 0.08, 0.75, 0xc8c2b4);
+        k.box(x0 + 3.4, y, -12.6, 0.45, 0.42, 0.55, 0xd8dcd8, { col: true });
+        const isOpen = open && c === 2;
+        for (let b = 0; b < 11; b++) { if (isOpen && b > 2 && b < 8) continue; k.box(x0 + 0.2 + b * 0.36, y, -11.6, 0.05, 3.2, 0.05, bar); }
+        k.box(x0 + 2, y + 3.15, -11.6, 4, 0.12, 0.12, bar);
+        if (isOpen) k.cols.push({ x0: x0 + 0.1, x1: x0 + 1.1, z0: -11.68, z1: -11.52, y0: y, y1: y + 3.2 }, { x0: x0 + 2.95, x1: x0 + 4, z0: -11.68, z1: -11.52, y0: y, y1: y + 3.2 });
+        else k.cols.push({ x0: x0 + 0.1, x1: x0 + 4, z0: -11.68, z1: -11.52, y0: y, y1: y + 3.2 });
+        k.glow(x0 + 2, y + 3.0, -13.8, 0.6, 0.05, 0.3, 0xe8f4ff, 1.8);
+      }
+      k.box(12, y, -13.8, 0.18, 3.2, 4.4, 0x8f978e, { col: true });
+    };
+    cellRow(0, true); cellRow(H1, false);
+    k.box(0, H1 - 0.25, -13.8, 24.2, 0.25, 4.4, 0x5a5e62);
+    // the catwalk: a steel deck, a railing on its open side, and the stair down at the east end
+    k.box(1, H1 - 0.25, -10.7, 25.6, 0.25, 1.6, 0x5a5e62, { col: true });
+    k.box(1, H1 - 0.005, -10.7, 25.4, 0.01, 1.5, 0x6a6e72, { flat: true });
+    k.box(0.1, H1 + 1.0, -9.92, 24.2, 0.06, 0.06, 0xc8ccd0); k.cols.push({ x0: -12, x1: 12.2, z0: -9.98, z1: -9.86, y0: H1, y1: H1 + 1.1 });
+    for (let x = -12; x <= 12; x += 2) k.box(x, H1, -9.92, 0.05, 1.0, 0.05, 0xc8ccd0);
+    for (let i = 0; i < 16; i++) { const z0 = -2.4 - i * (7.5 / 16), top = (i + 1) * H1 / 16; k.box(13, top - 0.14, z0 - 7.5 / 32, 1.6, 0.14, 7.5 / 16 + 0.01, 0x5a5e62); }
+    for (let i = 0; i < 8; i++) { const za = -2.4 - i * 7.5 / 8, zb = -2.4 - (i + 1) * 7.5 / 8, ha = i * H1 / 8; if (ha > 0.4) k.cols.push({ x0: 12.2, x1: 13.8, z0: zb, z1: za, y0: 0, y1: ha - 0.05 }); k.cols.push({ x0: 12.05, x1: 12.2, z0: zb, z1: za, y0: Math.max(0, ha - 0.3), y1: ha + H1 / 8 + 1.0 }); }
+    k.box(12.12, H1 * 0.5 + 0.9, -6.15, 0.05, 0.05, 7.6, 0xc8ccd0);
+    // ----- the day room: steel tables, the TV, the payphone, cards on the middle table
+    for (const [tx, tz] of [[-8, -6], [-2, -4.5], [4, -6], [-8, -1], [4, -1]]) { k.box(tx, 0, tz, 2.4, 0.78, 1.0, 0x9aa0a6, { col: true }); for (const s of [-1, 1]) k.box(tx, 0, tz + s * 0.95, 2.4, 0.45, 0.32, 0x8a9096); }
+    for (let i = 0; i < 5; i++) k.box(-2.6 + i * 0.25, 0.79, -4.1 + (i % 2) * 0.12, 0.16, 0.01, 0.22, i % 2 ? 0xf4f2ee : 0xd23a2a);
+    k.box(-13.9, 1.6, -5, 0.08, 1.0, 1.6, 0x111111); k.glow(-13.85, 1.65, -5, 0.02, 0.9, 1.5, 0x6a8ab0, 1.3);
+    k.box(13.7, 0.9, 1.0, 0.2, 0.7, 0.4, 0x2a2c30); k.box(13.6, 1.25, 1.0, 0.12, 0.25, 0.18, 0x111111); k.glow(13.58, 1.45, 1.0, 0.02, 0.1, 0.15, 0x7fe08f, 1.4);
+    k.box(12.8, 0, -7.5, 0.55, 0.85, 0.55, 0xc23a2a, { col: true }); k.box(12.8, 0.85, -7.5, 0.6, 0.06, 0.6, steel);
+    // ----- the laundry (the work board), the restricted maintenance room behind it, the grate
+    for (let i = 0; i < 4; i++) { k.box(-19.4, 0, -7.6 + i * 2.2, 1.1, 1.2, 1.4, 0xd8dcd8, { col: true }); k.glow(-18.84, 0.65, -7.6 + i * 2.2, 0.02, 0.5, 0.5, 0x6a7a8a, 0.8); }
+    for (const z of [-6.4, -5.2]) { k.box(-15.5, 0.2, z, 0.9, 0.7, 0.9, 0x6a7a8a, { col: true }); k.box(-15.5, 0.85, z, 0.8, 0.15, 0.8, 0xe8e4dc); }
+    k.box(-14.12, 1.3, 0.2, 0.04, 1.0, 1.4, 0xb59a6a); for (let i = 0; i < 6; i++) k.box(-14.16, 1.4 + (i % 2) * 0.4, -0.3 + Math.floor(i / 2) * 0.45, 0.02, 0.3, 0.32, 0xf4f2ee);
+    k.box(-17.1, 0, -9, 1.4, 2.3, 0.08, 0x4a4e54); k.glow(-17.1, 2.2, -8.95, 0.6, 0.08, 0.03, 0xff4d5e, 1.6); // the restricted door (it stands open on its stop)
+    for (let i = 0; i < 4; i++) k.box(-17, 2.6 + i * 0.25, -12.5, 6, 0.12, 0.12, i % 2 ? 0x8a6a4a : 0x6a7a8a); // pipes
+    k.box(-19.92, 0.15, -13, 0.06, 0.8, 1.1, steel); for (let i = 0; i < 6; i++) k.box(-19.88, 0.2 + i * 0.13, -13, 0.03, 0.04, 1.0, 0x22252a);
+    // ----- the cafeteria: three long tables and the serving counter
+    for (const tz of [5, 8.5, 12]) { k.box(-13, 0, tz, 8, 0.78, 1.0, 0x9aa0a6, { col: true }); for (const s of [-1, 1]) k.box(-13, 0, tz + s * 0.95, 8, 0.45, 0.32, 0x8a9096); }
+    k.box(-13, 0, 15.3, 8, 1.0, 0.7, 0x8a9096, { col: true }); k.box(-13, 1.0, 15.3, 8.1, 0.06, 0.8, 0xc8ccd0);
+    k.box(-13, 1.06, 15.65, 7.6, 1.3, 0.04, 0x2a2c30); k.glow(-13, 1.7, 15.62, 7.2, 0.9, 0.02, 0xffe6b8, 1.4); k.glow(-13, 2.6, 15.6, 6.0, 0.28, 0.03, orange, 1.6);
+    // ----- visitation: booths behind glass; the infirmary: beds and a cabinet
+    for (const x of [-3.5, 0, 3.5]) { k.box(x, 0, 6.2, 2.6, 1.0, 0.5, 0x5a5e62, { col: true }); k.glow(x, 1.0, 6.25, 2.4, 1.4, 0.03, 0x8fb4c8, 0.5); k.box(x, 0, 5.2, 0.45, 0.6, 0.45, steel); k.box(x + 0.6, 1.05, 6.0, 0.08, 0.25, 0.1, 0x111111); }
+    for (const x of [-4, 4]) { k.box(x, 0, 13.5, 1.0, 0.55, 2.0, 0xe8e8e4, { col: true }); k.box(x, 0.55, 12.8, 0.9, 0.12, 0.5, 0xf4f4f0); }
+    k.box(0, 0, 15.6, 2.0, 1.9, 0.5, 0xe8e8e4, { col: true }); k.glow(0, 1.5, 15.34, 0.5, 0.5, 0.02, 0xff4d5e, 1.4);
+    // ----- the gym: a bench, a rack, a hoop, high windows
+    k.box(13, 0, 12, 0.5, 0.45, 1.6, 0x2a2a2e, { col: true }); k.box(13, 0.95, 11.8, 1.6, 0.06, 0.06, 0x9a9a9a);
+    for (const sx of [-1, 1]) k.box(13 + sx * 0.75, 0.95, 11.8, 0.08, 0.35, 0.35, 0x222222);
+    k.box(16, 0, 14.8, 2.4, 1.2, 0.5, 0x2a2a2e, { col: true }); k.box(19.8, 2.4, 9, 0.1, 1.0, 1.4, 0xf4f2ee); k.box(19.4, 2.4, 9, 0.6, 0.04, 0.04, orange);
+    for (let i = 0; i < 4; i++) k.glow(7 + i * 3.6, 2.6, 15.96, 2.6, 0.5, 0.03, 0xcfe0ff, 1.2);
+    // ----- the guard station: a desk, monitors, the locked exit
+    k.box(17.5, 0, -6, 1.4, 0.8, 3.2, steel, { col: true }); for (let i = 0; i < 3; i++) k.glow(18.2, 1.2 + (i % 2) * 0.4, -7 + i, 0.03, 0.35, 0.5, 0x7fd0ff, 1.3);
+    k.door(19.98, -6, 3, 0x55595e, 0xff4d5e);
+    for (let i = 0; i < 6; i++) k.glow(-14 + i * 5.6, H - 1.2, -15.96, 2.0, 0.6, 0.03, 0xcfe0ff, 1.0);
   },
   spots: [
-    { id: 'bunk', x: -2, z: -7.2, r: 1.4, label: 'Bunk · sentence & empire' },
-    { id: 'payphone', x: 12.0, z: 3.5, r: 1.3, label: 'Payphone' },
-    { id: 'smokey', x: 6.2, z: -1.4, r: 1.5, label: 'Smokey · contraband' },
-    { id: 'guard', x: 9, z: 6.3, r: 1.6, label: 'Guard post' },
-    { id: 'visit', x: 11.0, z: -2.6, r: 1.2, label: 'Visitation booth · lawyers' },
-    { id: 'work', x: -11.4, z: -2.4, r: 1.3, label: 'Work board · laundry, kitchen, cleaning' },
-    { id: 'cards', x: 0, z: 1.8, r: 1.1, label: 'Cards & dice' },
-    { id: 'hatch', x: -12.1, z: 4.0, r: 1.1, label: 'Maintenance hatch' },
-    { id: 'weights', x: -9, z: 5.4, r: 1.3, label: 'Work out' },
-    { id: 'tv', x: -11.4, z: 2, r: 1.2, label: 'Watch the news' },
-    { id: 'inmate:inmate1', x: -6, z: 1.9, r: 1.0, label: 'Talk to Deacon' },
-    { id: 'inmate:inmate2', x: -5.2, z: -1.8, r: 1.0, label: 'Talk to Tito' },
-    { id: 'inmate:inmate3', x: 1.0, z: 2.6, r: 1.0, label: 'Talk to Big Lou' },
-    { id: 'inmate:inmate4', x: -9.4, z: 4.2, r: 1.0, label: 'Talk to Wire' }
+    { id: 'bunk', x: JAIL.bunk.x, z: JAIL.bunk.z, r: 1.4, label: 'Bunk · sentence & empire' },
+    { id: 'payphone', x: 13.2, z: 1.0, r: 1.3, label: 'Payphone' },
+    { id: 'smokey', x: 6.2, z: -5.6, r: 1.5, label: 'Smokey · contraband' },
+    { id: 'guard', x: 13.1, z: -5.2, r: 1.5, label: 'Guard station window' },
+    { id: 'visit', x: 0, z: 4.6, r: 1.2, label: 'Visitation · lawyers' },
+    { id: 'infirmary', x: 0, z: 12, r: 1.6, label: 'Infirmary' },
+    { id: 'work', x: -15, z: 0.2, r: 1.3, label: 'Work board · laundry, kitchen, cleaning' },
+    { id: 'cards', x: -2, z: -3.3, r: 1.1, label: 'Cards & dice' },
+    { id: 'hatch', x: -19.2, z: -13, r: 1.1, label: 'Maintenance grate' },
+    { id: 'weights', x: 13, z: 10.6, r: 1.3, label: 'Work out' },
+    { id: 'tv', x: -13, z: -5, r: 1.2, label: 'Watch the news' },
+    { id: 'rota', x: 2, z: -10.7, y: JAIL.H1, r: 1.3, label: 'Watch the guards from the catwalk' },
+    { id: 'inmate:inmate1', x: -13, z: 7.6, r: 1.0, label: 'Talk to Deacon' },
+    { id: 'inmate:inmate2', x: -16.4, z: -3.6, r: 1.0, label: 'Talk to Tito' },
+    { id: 'inmate:inmate3', x: 11.2, z: 12.4, r: 1.0, label: 'Talk to Big Lou' },
+    { id: 'inmate:inmate4', x: 10.6, z: -3.4, r: 1.0, label: 'Talk to Wire' }
   ],
   npcs: [
-    { id: 'smokey', x: 6.2, z: -0.6, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a, cap: 0x2a2a2e } },
-    { id: 'inmate1', x: -6, z: 1.1, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'inmate2', x: -5.2, z: -1.0, h: 0, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'inmate3', x: 1.0, z: 1.5, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'inmate4', x: -9.4, z: 5.2, h: 0.4, look: { shirt: 0xd8762a, pants: 0xd8762a } },
-    { id: 'guard', x: 9, z: 7.6, h: Math.PI, look: 'cop' }
+    { id: 'smokey', x: 6.2, z: -4.8, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a, cap: 0x2a2a2e } },
+    { id: 'inmate1', x: -13, z: 6.8, h: 0, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'inmate2', x: -17.2, z: -3.6, h: Math.PI / 2, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'inmate3', x: 11.2, z: 13.2, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'inmate4', x: 10.6, z: -2.6, h: Math.PI, look: { shirt: 0xd8762a, pants: 0xd8762a } },
+    { id: 'guard', x: 16.6, z: -5, h: -Math.PI / 2, look: 'cop' },
+    { id: 'nurse', x: 1.2, z: 14.6, h: Math.PI, look: { shirt: 0xe8eef6, pants: 0xe8eef6 } }
   ],
-  // the night guard's walk during an escape (lights out): along the cells, past the tables, round the hatch side
-  guards: [[[-10.5, -3.6], [10.5, -3.6], [10.5, 3.2], [-4, 3.2], [-4, 6.0], [-10.6, 6.0], [-10.6, 0.6], [-6, -2.6]]]
+  // the night guards during an escape (lights out): one walks the block, the corridor under the catwalk and the
+  // laundry; a second (no rota known, or the jail tightened up after escapes) works the laundry and maintenance
+  guards: [[[-12, -10.4], [11, -10.4], [11, -6], [-12, -6], [-12, -2.2], [-16.5, -2.2], [-16.5, -7.5], [-12, -2.2]]],
+  guards2: [[-15.5, -1.5], [-19, -1.5], [-19, -7.4], [-17, -8.2], [-17, -14.5], [-15, -14.5], [-17, -8.2], [-15.5, -6]]
 };
 // Sentencing: a sentence day passes every two real seconds at 1× while you are in the block (menus stop it).
 // Every day served is a full day on the street: businesses, payroll, upkeep, territory and suppliers all run
@@ -55529,9 +55596,10 @@ INTERIOR_DEFS.prison = {
 const JAIL_SEC_PER_DAY = 2;
 const JAIL_STREET_RATIO = 1;
 const SENTENCE_FACTOR = 0.5;
-const JAIL_SPEEDS = [{ x: 1, pts: 0 }, { x: 2, pts: 20 }, { x: 3, pts: 50 }];
+// §24 / §37.4: 1× / 3× / 5× / 7×, each unlocked by good-behaviour points (and lost again by misbehaviour)
+const JAIL_SPEEDS = [{ x: 1, pts: 0 }, { x: 3, pts: 20 }, { x: 5, pts: 45 }, { x: 7, pts: 75 }];
 const GBP_MAX = 100;
-// chore points: a tray to the serving window, a piece of litter in the bin, a laundry bag to the carts
+// chore points: a tray to the serving counter, a piece of litter in the bin, a laundry bag to the carts
 const CHORE_PTS = { tray: 3, trash: 2, bag: 5 };
 const SENTENCE_BASE = [5, 7, 14, 30, 75, 150]; // days by wanted level at arrest
 const SENTENCE_MAX = 3 * 365;
@@ -55600,7 +55668,7 @@ class Prison {
       // sentence under half of what it started at; the smuggled phone (if a guard brings one) is for this sentence only
       gbp: 0, speed: 1, floor: Math.max(2, Math.ceil(ch.total * 0.5)), phone: false, lastPhone: -99, lastRelease: -99, chores: 0,
       // the jail commissary account: prison wages and the dice table, kept apart from street money (§45.18)
-      commissary: 0,
+      commissary: 0, cover: false, fav: {}, trespass: -1, lastSick: -9,
       charges: ch.lines.map(l => `${l[0]}: ${fmtSentence(l[1])}`).join(' · ') + (ch.mul > 1.01 ? ` · ×${ch.mul.toFixed(2)} record & pressure` : ch.mul < 0.99 ? ` · ×${ch.mul.toFixed(2)} (friends at the precinct)` : '') + (ch.full ? ` · halved: ${fmtSentence(ch.full)} → ${fmtSentence(ch.total)}` : '')
     };
   }
@@ -55619,7 +55687,9 @@ class Prison {
     if (j.phone !== undefined) j.phone = !!j.phone;
     j.streetAcc = Math.min(j.streetAcc, 0.999);
     j.standing = clamp(j.standing, 0, 100); j.susp = clamp(j.susp, 0, 100); j.intel = clamp(j.intel, 0, 3);
-    j.appealed = !!j.appealed; j.bribed = !!j.bribed; j.tool = !!j.tool; j.ally = !!j.ally;
+    j.appealed = !!j.appealed; j.bribed = !!j.bribed; j.tool = !!j.tool; j.ally = !!j.ally; j.cover = !!j.cover;
+    j.fav = j.fav && typeof j.fav === 'object' ? j.fav : {}; for (const k in j.fav) { if (!INMATE_FAVORS[k]) delete j.fav[k]; else j.fav[k] = num(j.fav[k], 0, -999, 1e6); }
+    j.trespass = num(j.trespass, -1, -1, 1e6); j.lastSick = num(j.lastSick, -9, -999, 1e6);
     j.lawyers = Array.isArray(j.lawyers) ? j.lawyers.filter(x => typeof x === 'string').slice(0, 3) : [];
     j.gifts = Array.isArray(j.gifts) ? j.gifts.filter(x => INMATES[x]).slice(0, 4) : [];
     j.inm = j.inm && typeof j.inm === 'object' ? j.inm : {};
@@ -55633,7 +55703,7 @@ class Prison {
     const def = INTERIOR_DEFS.prison;
     g.player.applyOutfit(JAIL_LOOK);
     g.content.interiors.enter('prison', true);
-    p.pos.set(def.ox - 2, IY, def.oz - 6.4); p.h = 0; g.cam.yaw = 0; g.cam.pitch = -0.2; g.cam.init = false;
+    p.pos.set(def.ox + JAIL.bunk.x, IY, def.oz + JAIL.bunk.z); p.h = 0; g.cam.yaw = 0; g.cam.pitch = -0.2; g.cam.init = false;
     g.audio.play('clank');
     this.choreReset();
     uw.ui.showJail(true);
@@ -55660,10 +55730,21 @@ class Prison {
       if (j.served >= j.total) this.release();
     }
     this.choreFrame(rdt);
+    this.restricted();
     // block ambience: distant doors, buzzers
     this.ambT -= rdt;
     if (this.ambT <= 0) { this.ambT = rand(3, 9); g.audio.play(Math.random() < 0.8 ? 'clank' : 'buzzer', { gain: rand(0.15, 0.4) }); }
     uw.ui.updateJail();
+  }
+  // the maintenance room is off limits by day: a guard sends you back, it goes on your record (once a day)
+  restricted() {
+    const j = this.j, g = this.uw.g, p = g.player, def = INTERIOR_DEFS.prison, R = JAIL.restricted; if (!j || this.esc) return;
+    const lx = p.pos.x - def.ox, lz = p.pos.z - def.oz;
+    if (lx < R.x0 || lx > R.x1 || lz < R.z0 || lz > R.z1) return;
+    if (j.trespass === j.served) return;
+    j.trespass = j.served; j.susp = clamp(j.susp + 10, 0, 100);
+    this.misbehave(4, 'Out of bounds in maintenance');
+    this.say('Guard', 'Maintenance is staff only. Out. Now.');
   }
   // time off for work: at most a tenth of the sentence, and never under the floor (half the original sentence)
   earnCredit(days) {
@@ -55715,17 +55796,20 @@ class Prison {
   }
   findAction() {
     const g = this.uw.g, p = g.player, def = INTERIOR_DEFS.prison;
+    const hatch = def.spots.find(s => s.id === 'hatch');
     if (this.esc) {
-      if (Math.hypot(p.pos.x - (def.ox - 12.1), p.pos.z - (def.oz + 4.0)) < 1.2) return { label: 'Unscrew the grate', act: () => this.escapeHatch() };
+      if (Math.hypot(p.pos.x - (def.ox + hatch.x), p.pos.z - (def.oz + hatch.z)) < 1.2) return { label: 'Unscrew the grate', act: () => this.escapeHatch() };
       return null;
     }
     const c = this.choreAction(); if (c) return c;
-    for (const s of def.spots) if (Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return { label: s.label, act: () => this.spot(s.id) };
+    // a spot on the catwalk is only reachable up there (and one under it only down here)
+    const fy = def.fy !== undefined ? def.fy : IY, ly = p.pos.y - fy;
+    for (const s of def.spots) if (Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r && Math.abs(ly - (s.y || 0)) < 1.5) return { label: s.label, act: () => this.spot(s.id) };
     return null;
   }
   // ------------------------------------------------------------------ chores: small jobs in the block for good-behaviour points.
   // Trays turn up on the cafeteria tables, litter on the floor, laundry bags by the cells; you carry them to the
-  // serving window, the bin by the guard post or the laundry carts. Items are plain meshes that exist only
+  // serving counter, the bin by the guard post or the laundry carts. Items are plain meshes that exist only
   // while you are inside; what is lying around is not saved (it is regenerated on load).
   choreSetup() {
     if (this.ch) return this.ch;
@@ -55750,13 +55834,13 @@ class Prison {
   // where things turn up (prison-local coordinates): tray spots on the three tables, floor spots for litter, bag spots by the cells
   static get CHORE_SPOTS() {
     return {
-      tray: [[-6.7, -0.2, 0.8], [-5.3, 0.2, 0.8], [-0.7, 0.3, 0.8], [0.7, 0.7, 0.8], [5.3, -0.2, 0.8], [6.7, 0.2, 0.8]],
-      trash: [[-8, -2.2], [-3, -3.6], [2, -3.1], [7.2, -3.8], [9.8, 1], [4, 3.6], [-2.2, 4.6], [-7.2, 2.9], [-10.4, 1.5], [5.6, 5.4], [-4.6, 6.6], [10.4, -0.6]],
-      bag: [[-10, -4.4], [-6, -4.4], [2, -4.4], [6, -4.4], [10, -4.4]]
+      tray: [[-15.5, 5, 0.8], [-11, 5.1, 0.8], [-14, 8.5, 0.8], [-10.5, 8.4, 0.8], [-16, 12, 0.8], [-12, 12.1, 0.8]],
+      trash: [[-10, -7.6], [-5, -8.2], [2.6, -7.8], [9, -7.4], [-10.6, 0.6], [6.4, 0.8], [9.6, -1.6], [8.6, 5.4], [16, 6.2], [10.4, 14.2], [0.4, -1.6], [-11.6, -3.4]],
+      bag: [[-10, -10.8], [-6, -10.8], [2, -10.8], [6, -10.8], [10, -10.8]]
     };
   }
   // drop-off points
-  static get CHORE_DROPS() { return { tray: [-4.2, 7.9, 'Serving window'], trash: [5.6, 7.7, 'Trash can'], bag: [-11.3, -0.3, 'Laundry carts'] }; }
+  static get CHORE_DROPS() { return { tray: [-13, 14.5, 'Serving counter'], trash: [12.8, -6.8, 'Trash can'], bag: [-15.5, -4.4, 'Laundry carts'] }; }
   choreSpawn(kind) {
     const ch = this.choreSetup(), spots = Prison.CHORE_SPOTS[kind], used = new Set(ch.items.filter(i => i.kind === kind).map(i => i.si));
     const free = spots.map((s, i) => i).filter(i => !used.has(i)); if (!free.length) return false;
@@ -55793,6 +55877,8 @@ class Prison {
   choreTarget() {
     const ch = this.ch; if (!ch || !ch.grp.visible || this.esc) return null;
     const p = this.uw.g.player, def = INTERIOR_DEFS.prison, lx = p.pos.x - def.ox, lz = p.pos.z - def.oz;
+    // every chore is on the ground floor: nothing below reaches you up on the catwalk
+    if (p.pos.y - (def.fy ?? IY) > 1.5) return null;
     if (ch.carry) { const D = Prison.CHORE_DROPS[ch.carry.kind]; if (Math.hypot(lx - D[0], lz - D[1]) < 1.5) return { drop: true, x: def.ox + D[0], z: def.oz + D[1], label: D[2] }; if (!(ch.carry.kind === 'trash' && ch.carry.n < 3)) return null; }
     // holding litter, more litter comes first (up to three); otherwise the nearest thing
     let best = null, bd = 1.2;
@@ -55804,7 +55890,7 @@ class Prison {
   choreAction() {
     const ch = this.ch, t = this.choreTarget(); if (!t) return null;
     const names = { tray: 'tray', trash: 'litter', bag: 'laundry bag' };
-    if (t.drop) { const k = ch.carry.kind, n = ch.carry.n; return { label: k === 'tray' ? 'Return the tray at the serving window' : k === 'trash' ? `Bin the litter (${n})` : 'Drop the laundry at the carts', act: () => this.choreDrop() }; }
+    if (t.drop) { const k = ch.carry.kind, n = ch.carry.n; return { label: k === 'tray' ? 'Return the tray at the serving counter' : k === 'trash' ? `Bin the litter (${n})` : 'Drop the laundry at the carts', act: () => this.choreDrop() }; }
     const it = t.item;
     if (ch.carry && (ch.carry.kind !== it.kind || it.kind !== 'trash' || ch.carry.n >= 3)) return { label: `Hands full: ${ch.carry.kind === 'trash' ? 'bin the litter first' : 'take the ' + names[ch.carry.kind] + ' to the ' + Prison.CHORE_DROPS[ch.carry.kind][2].toLowerCase()}`, act: () => this.uw.g.audio.play('deny') };
     return { label: it.kind === 'tray' ? 'Pick up the dirty tray' : it.kind === 'trash' ? 'Pick up the litter' : 'Pick up the laundry bag', act: () => this.choreTake(it) };
@@ -55852,6 +55938,18 @@ class Prison {
       case 'work': this.openWork(); break;
       case 'cards': this.openCards(); break;
       case 'hatch': this.openHatch(); break;
+      case 'infirmary': {
+        if (j.served - j.lastSick < 1) { this.say('Nurse', 'You were here today. Go lie down.'); break; }
+        j.lastSick = j.served; const p = g.player; p.health = p.maxHealth; j.standing = clamp(j.standing + 1, 0, 100);
+        this.say('Nurse', pick(['Patched up. Try not to walk into anything.', 'Two aspirin and stay out of the gym fights.', 'You’re fine. Next.']));
+        break;
+      }
+      case 'rota': {
+        if (j.intel >= 2) { this.say('pv', 'You know the night rota by heart.'); break; }
+        if (Math.max(0, 5 - (j.served - j.lastStudy)) > 0) { this.say('pv', 'Nothing new to see from up here yet.'); break; }
+        g.content.channel('WATCHING THE GUARDS FROM THE CATWALK', 6, () => { j.intel = Math.min(2, j.intel + 1); j.lastStudy = j.served; j.susp = clamp(j.susp + 3, 0, 100); this.say('pv', j.intel >= 2 ? 'Midnight count, then twelve minutes of nothing on the west side. That’s the window.' : 'The night guard takes the laundry corridor at the half hour. Need another look.'); });
+        break;
+      }
       case 'weights': {
         g.content.channel('WORKING OUT', 5, () => {
           const p = g.player; p.health = Math.min(p.maxHealth, p.health + 25 * HP_SCALE); p.stamina = 1; j.workouts++;
@@ -55873,15 +55971,16 @@ class Prison {
     const mx = this.maxSpeed(), nxt = JAIL_SPEEDS.find(sp => sp.pts > j.gbp);
     const render = () => `<div class="stats">${row('Sentence', '<b>' + fmtSentence(j.total) + '</b>')}${row('Served', fmtSentence(j.served))}${row('Remaining', '<b>' + fmtSentence(j.total - j.served) + '</b>')}${row('Good behaviour', `<b>${Math.floor(j.gbp)}</b> points · ${mx}× time unlocked${nxt ? ` · ${nxt.x}× at ${nxt.pts}` : ''}`)}${row('Good-time credit', fmtSentence(j.credit) + ' off (max ' + fmtSentence(Math.floor((j.total + j.credit) * 0.1)) + ')')}${row('Standing with the block', Math.round(j.standing) + ' / 100')}${row('Guard suspicion', `<span style="color:${j.susp > 60 ? 'var(--red)' : j.susp > 30 ? 'var(--amber)' : 'var(--green)'}">${Math.round(j.susp)} / 100</span>`)}${row('Street calendar', 'every day in here is a full day out there')}${row('Phone', j.phone ? '<b style="color:var(--green)">smuggled phone (this sentence)</b>' : 'none · payphone once a month')}</div>
       <h3>Time</h3><div class="btns">${JAIL_SPEEDS.map(sp => `<button class="sbtn${j.speed === sp.x ? ' gold' : ''}" data-act="spd:${sp.x}" ${sp.x > mx ? 'disabled' : ''}>${sp.x}×${sp.pts > j.gbp ? ' · ' + sp.pts + ' pts' : ''}</button>`).join('')}</div>
-      <div class="hint" style="font-size:12px">Chores earn good-behaviour points: carry dirty trays from the cafeteria tables to the serving window (+${CHORE_PTS.tray}), pick litter off the floor and bin it (+${CHORE_PTS.trash} each, up to three at a time), take laundry bags from the cells to the carts (+${CHORE_PTS.bag}). Work shifts add 2. Bribes that go wrong, contraband and escape attempts take points away.</div>
+      <div class="hint" style="font-size:12px">Chores earn good-behaviour points: carry dirty trays from the cafeteria tables to the serving counter (+${CHORE_PTS.tray}), pick litter off the floor and bin it (+${CHORE_PTS.trash} each, up to three at a time), take laundry bags from the cells to the carts (+${CHORE_PTS.bag}). Work shifts add 2. Bribes that go wrong, contraband and escape attempts take points away.</div>
       ${lock ? `<div class="hint" style="color:var(--red)">Lockdown: ${fmtSentence(lock)} confined to your bunk.</div>` : ''}
       <h3>Charges</h3><div class="hint" style="font-size:12px">${esc(j.charges || '—')}</div>
-      <h3>A way out</h3><div class="stats">${row('Guard rota', yes(j.intel >= 2, `known (${j.intel}/2)`))}${row('Tool for the grate', yes(j.tool, 'have one'))}${row('Someone to cover you', yes(j.ally, 'Wire (optional)'))}</div>
-      <h3>The block</h3><div class="hint" style="font-size:12px;line-height:1.5">
-        <b>Visitation booth</b> (east wall): hire a lawyer. · <b>Chores</b>: trays, litter, laundry — good-behaviour points for faster time. ·
-        <b>Work board</b> (west wall): laundry, kitchen, cleaning — commissary money and time off. · <b>Cards & dice</b> at the middle table. ·
-        <b>Weights</b>: conditioning that stays with you. · <b>Inmates</b>: get to know Deacon, Tito, Big Lou and Wire. ·
-        <b>Smokey</b>: a tool, smokes. · <b>Guard post</b>: a phone, or walking out today, if the money is right and the guard is. · <b>Payphone</b>: one call a month. · <b>Maintenance hatch</b>: if you’re ready.</div>
+      <h3>A way out</h3><div class="stats">${row('Guard rota', yes(j.intel >= 2, `known (${j.intel}/2)`))}${row('Tool for the grate', yes(j.tool, 'have one'))}${row('Cover', yes(j.ally, 'Wire (optional)'))}${row('Distraction', yes(j.cover, 'Big Lou (optional)'))}</div>
+      <h3>The jail</h3><div class="hint" style="font-size:12px;line-height:1.5">
+        <b>Cell block</b>: your bunk on the lower tier; the <b>catwalk</b> (stairs at the east end) looks down on the night guards' rounds. ·
+        <b>Day room</b>: cards & dice, the TV, the payphone (one call a month), Smokey (contraband), the <b>guard window</b> (a phone or walking out, if the money is right and so is the guard). ·
+        <b>Cafeteria</b>: trays to the serving counter. · <b>Laundry</b> (west): the work board and the carts. <b>Maintenance</b> behind it is staff only. ·
+        <b>Visitation</b>: lawyers; the <b>infirmary</b> behind it patches you up. · <b>Gym</b>: conditioning that stays with you. ·
+        <b>Inmates</b>: get to know Deacon, Tito, Big Lou and Wire; trusted, each does favours (protection, contraband, a distraction, guard routines).</div>
       <div class="btns">${j.phone ? '<button class="sbtn gold" data-act="empire">Phone (smuggled)</button>' : ''}<button class="sbtn" data-act="feed">News on the TV</button></div>`;
     g.content.openSvc('County Jail · Block C', 'Time only passes while you’re out of this screen.', render, a => {
       if (a.startsWith('spd:')) { if (this.setSpeed(+a.slice(4))) g.content.refreshSvc(); return; }
@@ -56097,7 +56196,9 @@ class Prison {
       return `<div class="card"><div class="t">${esc(I.name)}</div><div class="d">${esc(I.blurb)}</div><div class="stat"><span>Trust</span><span>${r} / 100</span></div><div class="bar"><i style="width:${r}%"></i></div></div>
       <div class="btns"><button class="sbtn" data-act="chat">Talk</button><button class="sbtn gold" data-act="favour">Do him a favour</button><button class="sbtn gold" data-act="gift" ${r < 40 || given ? 'disabled' : ''}>${given ? 'Done' : esc(I.giftText)}${r < 40 && !given ? ' (trust 40)' : ''}</button></div>`;
     };
-    g.content.openSvc(I.name, 'Block C', render, a => {
+    const base = render, F = INMATE_FAVORS[id];
+    const render2 = () => { const r = rel(), cd = this.favorWait(id); return base() + (F ? `<div class="jobs"><div class="job"><div style="flex:1"><b>${esc(F.text)}</b><span>Needs trust 60 · ${fmtMoney(F.fee)} commissary${cd ? ` · again in ${fmtSentence(cd)}` : ''}</span></div><button class="sbtn gold" data-act="ask" ${r < 60 || cd || !this.canCommissary(F.fee) ? 'disabled' : ''}>Ask</button></div></div>` : ''); };
+    g.content.openSvc(I.name, 'County Jail', render2, a => {
       if (a === 'chat') {
         j.inm[id] = clamp(rel() + (j.standing > 40 ? 4 : 2), 0, 100);
         const rumour = Math.random() < 0.35 ? this.rumour() : null;
@@ -56109,7 +56210,25 @@ class Prison {
         return;
       }
       if (a === 'gift' && rel() >= 40 && !j.gifts.includes(id)) { j.gifts.push(id); g.content.refreshSvc(this.gift(id)); g.audio.play('pass'); }
+      if (a === 'ask') { const r = this.favor(id); g.content.refreshSvc(r); }
     });
+  }
+  favorWait(id) { const j = this.j, F = INMATE_FAVORS[id], last = (j.fav || {})[id]; return F && last !== undefined ? Math.max(0, F.cd - (j.served - last)) : 0; }
+  favor(id, rnd = Math.random) {
+    const j = this.j, F = INMATE_FAVORS[id], g = this.uw.g; if (!j || !F) return '';
+    if ((j.inm[id] | 0) < 60 || this.favorWait(id) || !this.payCommissary(F.fee)) return 'Not now.';
+    (j.fav || (j.fav = {}))[id] = j.served;
+    g.audio.play('cash');
+    if (F.id === 'protect') { j.susp = Math.max(0, j.susp - 20); j.standing = clamp(j.standing + 5, 0, 100); return 'Deacon nods to a few people. Nobody bothers you, and the guards find someone else to watch (−20 suspicion).'; }
+    if (F.id === 'cover') { j.cover = true; return 'Big Lou cracks his knuckles. “The night you go, I start a fight in the gym. Loud.” (a distraction for your escape)'; }
+    if (F.id === 'intel') { if (j.intel < 2) { j.intel++; return `Wire draws the night rota on a napkin (${j.intel}/2 known).`; } j.tool = true; return 'Wire palms you a filed-down screwdriver. It fits a maintenance grate.'; }
+    if (F.id === 'phone') {
+      if (j.phone) return 'You already have one.';
+      if (rnd() < 0.75) { j.phone = true; this.uw.ui.updateJail(true); return 'Tito’s cousin works the kitchen delivery. A phone turns up in a bread crate, charged. Keep it hidden.'; }
+      const add = Math.max(5, Math.round(this.left * 0.05)); j.total += add; j.susp = clamp(j.susp + 25, 0, 100); this.misbehave(20, 'Caught with contraband');
+      return `A shakedown finds the phone before you do: +${fmtSentence(add)}.`;
+    }
+    return '';
   }
   rumour() {
     const uw = this.uw, S = this.S;
@@ -56125,43 +56244,84 @@ class Prison {
     if (id === 'inmate4') { j.ally = true; j.intel = Math.max(j.intel, 2); return 'Wire leans in: “Midnight count, then the night guard walks the cells and sits down by the door. I’ll make some noise at the far end when you go.” (Guard rota known; Wire will cover you.)'; }
     return '';
   }
-  // ---- the escape: a tool for the grate, the night rota, then lights-out. Get from your bunk to the
-  // maintenance hatch and unscrew it while the night guard walks his route. If he sees you, it's over.
+  // ---- escapes (M8, §24). Never guaranteed, and the jail adapts: every escape you have made (legal.L.escapes) makes
+  // the next a little harder. Two ways out:
+  // - the grate: a tool is a must; at lights-out reach it unseen from your bunk (one night guard, two if you don't know
+  //   the rota or the jail has tightened up), unscrew it, then the storm drains (a roll: drainOdds). Out on foot, 3★.
+  // - the laundry truck (crew-assisted): your people outside arrange it (Dirty Cash through a courier, Crew Leader and
+  //   up); one roll (truckOdds), out with a getaway car waiting, 1★. Preparation (rota, cover, a distraction, a tool)
+  //   counts for both.
+  escapes() { return this.uw.legal ? this.uw.legal.L.escapes : 0; }
+  drainOdds() { const j = this.j; return clamp(0.55 + j.intel * 0.12 + (j.ally ? 0.1 : 0) + (j.cover ? 0.08 : 0) - this.escapes() * 0.05 - j.susp / 400, 0.3, 0.9); }
+  truckCrew() { const c = this.courier(); return c && this.uw.rank >= 3 ? c : null; }
+  truckPrice() { return Math.max(15000, Math.round(this.left * 400 / 1000) * 1000); }
+  truckOdds() {
+    const j = this.j, c = this.truckCrew(); if (!c) return 0;
+    return clamp(0.5 + j.intel * 0.08 + (j.tool ? 0.05 : 0) + (j.ally ? 0.07 : 0) + (j.cover ? 0.06 : 0) + (c.skill || 0) / 400 + this.uw.rank * 0.03 - this.escapes() * 0.05 - j.susp / 300, 0.2, 0.85);
+  }
   openHatch() {
     const uw = this.uw, g = uw.g, j = this.j;
-    const ready = j.tool && j.intel >= 2;
-    const render = () => `<div class="hint">A grate low on the west wall. Behind it, a crawlspace to the storm drains.</div><div class="stats">
-      <span>A tool for the screws</span><span>${j.tool ? '<b style="color:var(--green)">✓ in your sock</b>' : '✗ Smokey sells one; the laundry turns one up sometimes'}</span>
-      <span>The night guard’s rota</span><span>${j.intel >= 2 ? '<b style="color:var(--green)">✓ known</b>' : `✗ ${j.intel}/2 — watch the guard post, or ask Wire`}</span>
-      <span>Cover</span><span>${j.ally ? '<b style="color:var(--green)">✓ Wire makes noise at the far end</b>' : 'none (optional)'}</span></div>
-      <div class="hint">At lights-out you start at your bunk. Reach the grate without the night guard seeing you, then hold still while you unscrew it. Caught: months more, lockdown, and you lose the tool. Out: you’re a fugitive with every cop looking for you.</div>
-      <div class="btns"><button class="sbtn gold" data-act="go" ${ready ? '' : 'disabled'}>Wait for lights-out</button></div>`;
-    g.content.openSvc('Maintenance hatch', 'A way out', render, a => { if (a === 'go' && j.tool && j.intel >= 2) { g.ui.back(); this.startEscape(); } });
+    const yes = (b, t) => b ? `<b style="color:var(--green)">✓ ${t}</b>` : `✗ ${t}`;
+    const render = () => {
+      const crew = this.truckCrew(), price = this.truckPrice();
+      return `<div class="hint">The grate behind the laundry opens on a crawlspace to the storm drains. Or your people outside can get you onto the laundry truck.</div><div class="stats">
+      <span>A tool for the screws</span><span>${yes(j.tool, j.tool ? 'in your sock' : 'Smokey sells one; Wire or the laundry may turn one up')}</span>
+      <span>The night rota</span><span>${yes(j.intel >= 2, `${j.intel}/2 known (the catwalk, the guard window or Wire)`)}</span>
+      <span>Cover</span><span>${yes(j.ally, 'Wire makes noise at the far end')}</span>
+      <span>A distraction</span><span>${yes(j.cover, 'Big Lou starts a fight')}</span>
+      <span>Escapes so far</span><span>${this.escapes()} ${this.escapes() ? '(the jail has tightened up)' : ''}</span></div>
+      <h3>Through the grate</h3><div class="hint">At lights-out, from your bunk to the grate without the night guard${j.intel >= 2 && this.escapes() < 2 ? '' : 's'} seeing you, then the drains: about <b>${Math.round(this.drainOdds() * 100)}%</b> you come out clear once you are through. Caught: more time, lockdown, the tool gone. Out: a fugitive, 3★.</div>
+      <div class="btns"><button class="sbtn gold" data-act="go" ${j.tool ? '' : 'disabled'}>Wait for lights-out</button></div>
+      <h3>The laundry truck</h3><div class="hint">${crew ? `${esc(crew.name)} can set it up: ${fmtMoney(price)} in Dirty Cash for the driver and the gate. About <b>${Math.round(this.truckOdds() * 100)}%</b>. Out with a car waiting (1★). Caught: more time, and ${esc(crew.name.split(' ')[0])} may be picked up.` : 'Needs someone in your crew still on the street, and enough standing to organise it (Crew Leader).'}</div>
+      <div class="btns"><button class="sbtn" data-act="truck" ${crew && this.canOutside(price) && !this.locked() ? '' : 'disabled'}>${crew ? 'Set it up · ' + fmtMoney(price) : 'Not possible'}</button></div>`;
+    };
+    g.content.openSvc('A way out', 'Never a sure thing', render, a => {
+      if (a === 'go' && j.tool) { g.ui.back(); this.startEscape(); }
+      if (a === 'truck') { g.ui.back(); this.truckEscape(); }
+    });
   }
   startEscape() {
     const uw = this.uw, g = uw.g, j = this.j, I = g.content.interiors, def = INTERIOR_DEFS.prison, p = g.player;
     j.escapes++;
+    const routes = def.guards.slice(); if (j.intel < 2 || this.escapes() >= 2) routes.push(def.guards2);
+    const slow = (j.ally ? 1.6 : 1) * (j.cover ? 1.25 : 1) / (1 + this.escapes() * 0.1);
     g.fade(() => {
-      p.pos.set(def.ox - 2, IY, def.oz - 6.6); p.h = 0; g.cam.yaw = 0; g.cam.init = false;
-      this.esc = { t: 60, caught: false };
-      I.guards = def.guards.map((route, i) => ({ route, i: 1, x: def.ox + route[0][0], z: def.oz + route[0][1], h: 0, alert: 0, look: copLook(), pose: { phase: i * 2, amp: 0 }, flash: 0, y: IY, wait: 0, slow: j.ally ? 1.6 : 1 }));
+      p.pos.set(def.ox + JAIL.bunk.x, IY, def.oz + JAIL.bunk.z); p.h = 0; g.cam.yaw = 0; g.cam.init = false;
+      this.esc = { t: 70, caught: false };
+      I.guards = routes.map((route, i) => ({ route, i: 1, x: def.ox + route[0][0], z: def.oz + route[0][1], h: 0, alert: 0, look: copLook(), pose: { phase: i * 2, amp: 0 }, flash: 0, y: IY, wait: 0, slow }));
       I.alarm = false;
       I.onAlarm = () => this.escapeCaught();
-      // the day guard and the inmates are asleep: they leave the common area
       for (const c of def.chars) c.hidden = true;
-      g.ui.banner('Lights out', j.ally ? 'Wire starts banging on his bars at the far end' : 'Reach the grate on the west wall', 'info', 2.5);
+      g.ui.banner('Lights out', j.cover ? 'Big Lou starts shouting in the gym' : j.ally ? 'Wire starts banging on his bars at the far end' : 'Reach the grate behind the laundry', 'info', 2.5);
       g.audio.play('buzzer', { gain: 0.6 });
     });
   }
   updateEscape(dt) {
-    const e = this.esc, g = this.uw.g;
+    const e = this.esc;
     if (!e || e.done) return;
     if (dt > 0) e.t -= dt;
-    if (e.t <= 0 && !e.done) { this.escapeCaught('Morning count. You’re out of your bunk and the hatch is still shut.'); }
+    if (e.t <= 0 && !e.done) { this.escapeCaught('Morning count. You’re out of your bunk and the grate is still shut.'); }
   }
   escapeHatch() {
     const g = this.uw.g, e = this.esc; if (!e || e.done) return;
-    g.content.channel('UNSCREWING THE GRATE', 4, () => { if (this.esc && !this.esc.done) this.escapeOut(); });
+    g.content.channel('UNSCREWING THE GRATE', 4, () => { if (this.esc && !this.esc.done) this.drains(); });
+  }
+  // through the grate: the storm drains are the last roll
+  drains(rnd = Math.random) {
+    if (rnd() < this.drainOdds()) { this.escapeOut('drain'); return true; }
+    this.escapeCaught('A patrol was waiting where the drain comes out. Back you go.');
+    return false;
+  }
+  // the laundry truck: one roll, prepared or not
+  truckEscape(rnd = Math.random) {
+    const uw = this.uw, g = uw.g, j = this.j, crew = this.truckCrew(), price = this.truckPrice(); if (!j || !crew || !this.canOutside(price) || this.locked()) return null;
+    const p = this.truckOdds();
+    Money.pay(price, 'jailBribe'); j.escapes++;
+    this.esc = { t: 1, caught: false };
+    if (rnd() < p) { this.escapeOut('truck'); return 'out'; }
+    if (rnd() < 0.4) uw.crew.arrest(crew, 'a jailbreak that went wrong');
+    this.escapeCaught('The truck gets searched at the gate. You’re pulled out of a laundry bin.');
+    return 'caught';
   }
   endEscape() {
     const g = this.uw.g, I = g.content.interiors;
@@ -56178,38 +56338,38 @@ class Prison {
       this.endEscape();
       if (!this.j) return;
       const add = Math.max(30, Math.round(this.left * 0.3));
-      j.total += add; j.tool = false; j.intel = 0; j.susp = 100; j.lockUntil = j.served + 10; j.standing = clamp(j.standing + 5, 0, 100);
+      j.total += add; j.tool = false; j.intel = 0; j.cover = false; j.susp = 100; j.lockUntil = j.served + 10; j.standing = clamp(j.standing + 5, 0, 100);
       this.misbehave(GBP_MAX, 'Escape attempt'); j.speed = 1;
-      const def = INTERIOR_DEFS.prison, p = g.player; p.pos.set(def.ox - 2, IY, def.oz - 6.6); p.h = 0; g.cam.init = false;
+      const def = INTERIOR_DEFS.prison, p = g.player; p.pos.set(def.ox + JAIL.bunk.x, IY, def.oz + JAIL.bunk.z); p.h = 0; g.cam.init = false;
       g.ui.banner('Caught', `Attempted escape: +${fmtSentence(add)}`, 'fail', 3);
       this.say('Guard', why || 'Got you. Back in your box. You’ll be here a while longer now.');
       g.saveGame(true);
     });
   }
-  escapeOut() {
+  escapeOut(route) {
     const uw = this.uw, g = uw.g, S = this.S, j = this.j; if (!j || !this.esc) return;
     this.esc.done = true;
-    const left = this.left;
+    const left = this.left, truck = route === 'truck';
     g.fade(() => {
       this.endEscape();
       S.jail = null; this.callT = 0; this.choreClear(); uw.ui.showJail(false);
       S.fugitive = { left, day: S.day }; uw.legal.L.escapes++;
       g.content.interiors.exit(true);
       g.player.applyOutfit(g.save.outfit);
-      // the storm drain comes out by the harbour wall, a few blocks from County
-      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CITY / 2, pl.z - CITY / 2);
-      const x = clamp(pl.x + Math.sin(ang) * 140, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * 140, 20, CITY - 20);
+      // the storm drain comes out by the harbour wall; the laundry truck drops you a few blocks further on
+      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CITY / 2, pl.z - CITY / 2), far = truck ? 260 : 140;
+      const x = clamp(pl.x + Math.sin(ang) * far, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * far, 20, CITY - 20);
       g.resetPlayerState(x, z, ang);
       S.lastHour = Math.floor(g.env.time);
-      g.police.setLevel(3); g.police.crime('escape', x, z);
-      S.pressure = clamp(S.pressure + 15, 0, 100);
-      g.ui.banner('Escaped', 'Every cop in Port Valen has your picture', 'fail', 3.5);
-      uw.news('radio', `All units: inmate escaped from County Block C. Considered dangerous. ${fmtSentence(left)} left on the sentence.`);
+      // nobody sees the truck route come out (a search at one star); the drain comes up in front of a patrol
+      g.police.setLevel(truck ? 1 : 3); if (!truck) g.police.crime('escape', x, z);
+      S.pressure = clamp(S.pressure + (truck ? 8 : 15), 0, 100);
+      g.ui.banner('Escaped', truck ? 'The truck stops in an alley. A car is waiting.' : 'Every cop in Port Valen has your picture', 'fail', 3.5);
+      uw.news('radio', `All units: inmate escaped from County. Considered dangerous. ${fmtSentence(left)} left on the sentence.`);
       g.saveGame(true);
     });
   }
 }
-
 /* =====================================================================
    [UNDERWORLD] OPPORTUNITIES FEED: one list for rumours, scarcity, raids,
    rare cars, vulnerable shipments, turf instability, bounties and contacts.
@@ -56383,6 +56543,80 @@ class LaunderFixer {
       F.washed += b.dirty; F.fees += b.dirty - b.clean;
       uw.news('Dina', `It’s done. ${fmtMoney(got)} is in your bank, clean as a whistle. Pleasure doing business.`);
     }
+  }
+}
+/* =====================================================================
+   [UNDERWORLD] FRONTS (M9, §26, §45.6): laundering through businesses you
+   own. Any owned business with a laundering line (laundromat, boutique,
+   car wash, construction firm: def.launder) washes Dirty Cash into Clean
+   Bank through its books, at a much lower fee than the early fixer and
+   at a capacity that grows with the business's level.
+   - You put cash through the books in person at the business (carried
+     Dirty Cash): it joins the front's float.
+   - Each economic day the front washes up to its daily capacity from the
+     float: the clean money (less the fee) lands in your bank.
+   - A manager assigned to the business can keep the float topped up from
+     your stashes and vaults (payroll order) and trims the fee: a managed
+     front keeps working while you are in jail; an unmanaged one only
+     washes what is already in its float.
+   - Police raids on a front take half its float as evidence.
+   - Buying a front buys no Rank, influence or turf (§45.7).
+   State: save.uw.fronts[propId] = { float, washed, fees, auto }.
+   ===================================================================== */
+const FRONT = { cap: [15000, 40000, 100000], fee: [0.15, 0.12, 0.09], mgrFee: 0.02, mgrCap: 1.2, min: 500, raidTake: 0.5 };
+class Fronts {
+  constructor(uw) { this.uw = uw; }
+  get S() { return this.uw.S; }
+  get F() { return this.S.fronts || (this.S.fronts = {}); }
+  static sanitize(F, num) {
+    const out = {};
+    if (F && typeof F === 'object') for (const id in F) {
+      const d = PROP_BY_ID[id], f = F[id]; if (!d || !d.launder || !f || typeof f !== 'object') continue;
+      out[id] = { float: num(f.float, 0, 0, 1e12), washed: num(f.washed, 0, 0, 1e15), fees: num(f.fees, 0, 0, 1e15), auto: !!f.auto };
+    }
+    return out;
+  }
+  isFront(id) { const d = PROP_BY_ID[id]; return !!(d && d.launder && this.uw.props.owned(id)); }
+  list() { return this.uw.props.ownedList().filter(d => d.launder); }
+  st(id) { return this.F[id] || (this.F[id] = { float: 0, washed: 0, fees: 0, auto: false }); }
+  // a day's washing capacity and the fee, by the business's level and whether a manager runs it
+  cap(id) { const lv = Math.max(1, this.uw.props.level(id)); return Math.round(FRONT.cap[lv - 1] * (this.uw.props.manager(id) ? FRONT.mgrCap : 1)); }
+  fee(id) { const lv = Math.max(1, this.uw.props.level(id)); return Math.max(0.05, FRONT.fee[lv - 1] - (this.uw.props.manager(id) ? FRONT.mgrFee : 0)); }
+  // how much more the float takes: up to two days of capacity waiting at once
+  room(id) { return Math.max(0, this.cap(id) * 2 - this.st(id).float); }
+  // put carried Dirty Cash through the books (in person); returns '' or why not
+  deposit(id, n) {
+    const uw = this.uw; if (!this.isFront(id)) return 'Not a front of yours.';
+    if (uw.inJail) return 'Not from a cell.';
+    const L = uw.loc('prop', id), p = uw.g.player; if (!L || Math.hypot(p.pos.x - L.x, p.pos.z - L.z) > 12) return 'Cash goes through the books in person: go to the business.';
+    n = Math.floor(Math.min(n, this.room(id), Money.available('frontIn')));
+    if (n < FRONT.min) return this.room(id) < FRONT.min ? 'The books can’t take more right now: let them wash what they have.' : `At least ${fmtMoney(FRONT.min)} in cash, on you.`;
+    if (Money.pay(n, 'frontIn') !== n) return 'You don’t have it on you.';
+    this.st(id).float += n;
+    uw.g.autosave('Cash through the books');
+    return '';
+  }
+  toggleAuto(id) { const f = this.st(id); if (!this.uw.props.manager(id)) return 'Only a manager can keep the float topped up.'; f.auto = !f.auto; return f.auto ? 'Your manager keeps the float topped up from your stashes.' : 'Top-ups off: only what you bring in gets washed.'; }
+  // the economic day: managed fronts top up from your stashes, then every front washes up to its capacity
+  tickDay() {
+    const uw = this.uw;
+    for (const d of this.list()) {
+      const f = this.st(d.id), mgr = uw.props.manager(d.id);
+      if (f.auto && mgr) { const want = Math.floor(Math.min(this.cap(d.id) - f.float, Money.available('frontAuto'))); if (want >= FRONT.min) f.float += Money.pay(want, 'frontAuto', { partial: true }); }
+      const wash = Math.min(f.float, this.cap(d.id)); if (wash < 1) continue;
+      const fee = Math.round(wash * this.fee(d.id)), clean = wash - fee;
+      f.float -= wash; f.washed += wash; f.fees += fee;
+      Money.earn(clean, 'frontOut');
+    }
+  }
+  // a police raid on a front: half the float is evidence
+  raided(id) { const f = this.F[id]; if (!f || f.float < 1) return 0; const take = Math.round(f.float * FRONT.raidTake); f.float -= take; return take; }
+  html(id) {
+    if (!this.isFront(id)) return '';
+    const f = this.st(id), mgr = this.uw.props.manager(id), room = this.room(id), here = Money.available('frontIn');
+    return `<h3>The books (laundering)</h3><div class="stats"><span>Washes a day</span><span>up to ${fmtMoney(this.cap(id))}</span><span>Fee</span><span>${Math.round(this.fee(id) * 100)}%${mgr ? ' (managed)' : ''}</span><span>Waiting in the float</span><span>${fmtMoney(f.float)}</span><span>Washed so far</span><span>${fmtMoney(f.washed)} (fees ${fmtMoney(f.fees)})</span></div>
+      <div class="hint">Cash you put through the books is washed a day’s capacity at a time and arrives in your bank, less the fee. A manager can top the float up from your stashes, and keeps it going while you’re away. A police raid here takes half the float.</div>
+      <div class="btns">${[5000, 20000, 50000].map(n => `<button class="sbtn gold" data-act="fdep:${n}" ${here >= Math.min(n, FRONT.min) && room >= FRONT.min ? '' : 'disabled'}>Put ${fmtMoney(Math.min(n, room))} through</button>`).join('')}<button class="sbtn" data-act="fdep:all" ${here >= FRONT.min && room >= FRONT.min ? '' : 'disabled'}>All I carry</button>${mgr ? `<button class="sbtn" data-act="fauto">${f.auto ? 'Manager top-ups: ON' : 'Manager top-ups: off'}</button>` : ''}</div>`;
   }
 }
 /* =====================================================================
@@ -58133,12 +58367,13 @@ class EmpireUI {
         const extra = (d.kind === 'safehouse' ? `<div class="stats">${d.finish ? `<span>Finish</span><span>${d.finish}</span>` : ''}${d.sec ? `<span>Security</span><span>${'■'.repeat(d.sec)}${'□'.repeat(5 - d.sec)}</span>` : ''}${d.crew ? `<span>Crew room</span><span>${d.crew}</span>` : ''}${d.infl ? `<span>Prestige</span><span>+${d.infl} influence</span>` : ''}${H0 ? `<span>${esc(H0.name)}</span><span>${esc(H0.perk)}</span>` : ''}${d.sig ? '<span>Signature home</span><span>the finest house in the neighbourhood</span>' : ''}</div>` : '')
           + (C0 ? `<div class="stats"><span>Category</span><span>${C0.icon} ${C0.name}</span><span>Income</span><span>about ${fmtMoney(PM.bizPreview(d).net)}/day after costs</span><span>Benefit</span><span>${esc(C0.benefit(C0.lv[0]))}</span><span>Upgrades</span><span>to level 2 ${fmtMoney(bizUpgradeCost(d, 1))} · to level 3 ${fmtMoney(bizUpgradeCost(d, 2))}</span></div>` : '');
         return `<div class="svcTop"><span>${d.kind.toUpperCase()}</span><span>${esc(ZONES[z0].name)}</span><span>${Money.html('property')}</span></div>${extra}
-          <div class="hint">${esc(d.desc)}</div><div class="stats">${d.storage ? `<span>Storage</span><span>${d.storage} units</span>` : ''}${PM.capOf(d) ? `<span>Parking</span><span>${esc(PM.parkingText(d))}</span>` : ''}${d.tier ? `<span>Tier</span><span>${d.tier} of 6 · ${esc(d.type || '')}</span>` : ''}${d.crew ? `<span>Room for crew</span><span>+${d.crew}</span>` : ''}${d.income ? `<span>Income</span><span>~${fmtMoney(d.income)} / day</span>` : ''}${d.kind === 'safehouse' ? '<span>Safehouse</span><span>save, rest, wardrobe</span>' : ''}${d.launder ? '<span>Front</span><span>cools police pressure</span>' : ''}${d.fence ? '<span>Fence</span><span>better prices on hot goods</span>' : ''}${d.recruit ? '<span>Recruiting</span><span>better candidates</span>' : ''}</div>
+          <div class="hint">${esc(d.desc)}</div><div class="stats">${d.storage ? `<span>Storage</span><span>${d.storage} units</span>` : ''}${PM.capOf(d) ? `<span>Parking</span><span>${esc(PM.parkingText(d))}</span>` : ''}${d.tier ? `<span>Tier</span><span>${d.tier} of 6 · ${esc(d.type || '')}</span>` : ''}${d.crew ? `<span>Room for crew</span><span>+${d.crew}</span>` : ''}${d.income ? `<span>Income</span><span>~${fmtMoney(d.income)} / day</span>` : ''}${d.kind === 'safehouse' ? '<span>Safehouse</span><span>save, rest, wardrobe</span>' : ''}${d.launder ? `<span>Front</span><span>washes up to ${fmtMoney(FRONT.cap[0])} of Dirty Cash a day at ${Math.round(FRONT.fee[0] * 100)}% (more at higher levels); cools police pressure</span>` : ''}${d.fence ? '<span>Fence</span><span>better prices on hot goods</span>' : ''}${d.recruit ? '<span>Recruiting</span><span>better candidates</span>' : ''}</div>
           <div class="actions" style="justify-content:flex-start"><button class="sbtn gold" data-act="buy" ${!Money.can(PM.price(d), 'property') ? 'disabled' : ''}>Buy · ${fmtMoney(PM.price(d))}</button>${d.home ? '<button class="sbtn" data-act="view">Look inside</button><button class="sbtn danger" data-act="breakin">Break in</button>' : ''}${d.fence ? '<button class="sbtn" data-act="fence">Sell to Lucky (fence)</button>' : ''}</div>`;
       }
       const o = S.props[id];
       let h = `<div class="svcTop"><span>${d.kind.toUpperCase()} · yours</span>${PM.storageCap(id) ? `<span>Storage <b>${units(S.storage[id])} / ${PM.storageCap(id)}</b></span>` : ''}<span>${Money.html('property')}</span></div>`;
       if (d.kind === 'business' && d.cat) h += this.bizCard(d, true);
+      h += uw.fronts.html(id);
       h += '<div class="btns">';
       if (d.kind === 'safehouse') h += `<button class="sbtn gold" data-act="save">Save game</button><button class="sbtn" data-act="sleep">Sleep / lie low</button><button class="sbtn" data-act="wardrobe">Wardrobe</button>`;
       if (PM.capOf(d)) h += `<button class="sbtn" data-act="garage">Parking · ${PM.capOf(d)}</button>`;
@@ -58228,6 +58463,9 @@ class EmpireUI {
     const uw = this.uw, g = this.g, S = uw.S, d = PROP_BY_ID[id];
     const [k, good] = a.split(':');
     let r = '';
+    // a front's books (M9): cash through, manager top-ups
+    if (k === 'fdep') { const e = uw.fronts.deposit(id, good === 'all' ? Infinity : +good); g.content.refreshSvc(e || 'Through the books. It comes out clean, a day at a time.'); return; }
+    if (k === 'fauto') { g.content.refreshSvc(uw.fronts.toggleAuto(id)); g.saveGame(); return; }
     // the warehouse panel
     if (d.kind === 'warehouse') {
       const parts = a.split(':');
@@ -58550,7 +58788,7 @@ class EmpireUI {
     $('jailLeft').textContent = `Sentence ${fmtSentence(j.total)} · served ${fmtSentence(j.served)}${j.credit ? ` · ${fmtSentence(j.credit)} good time` : ''}`;
     $('jailBar').style.width = (j.served / Math.max(1, j.total) * 100) + '%';
     const pr = this.uw.prison, ch = pr.ch && pr.ch.carry;
-    $('jailPhone').textContent = ch ? `Carrying ${ch.kind === 'tray' ? 'a tray → serving window' : ch.kind === 'trash' ? ch.n + ' litter → trash can' : 'laundry → carts'}` : j.phone ? 'Smuggled phone' : pr.callT > 0 ? `On the payphone: ${Math.ceil(pr.callT)}s` : 'No phone · no map';
+    $('jailPhone').textContent = ch ? `Carrying ${ch.kind === 'tray' ? 'a tray → serving counter' : ch.kind === 'trash' ? ch.n + ' litter → trash can' : 'laundry → carts'}` : j.phone ? 'Smuggled phone' : pr.callT > 0 ? `On the payphone: ${Math.ceil(pr.callT)}s` : 'No phone · no map';
     const mx = pr.maxSpeed(), nx = JAIL_SPEEDS.find(sp => sp.pts > j.gbp);
     $('jailGbp').textContent = `Good behaviour ${Math.floor(j.gbp)}${nx ? ' / ' + nx.pts : ''}`;
     for (const b of $('jailHud').querySelectorAll('[data-spd]')) { const x = +b.dataset.spd; b.disabled = x > mx; b.classList.toggle('on', x === (j.speed || 1)); }
@@ -58577,9 +58815,10 @@ class EmpireUI {
    in one step, before the reels spin or the card is scratched. The show is
    only a reveal, so closing a screen, double-tapping, a state change or a
    reload can never duplicate or lose money (a blackjack hand you walk away
-   from is stood; a poker stack is cashed out). Fuel & Go games keep a house
-   edge. The casino is player-favoured (about 60/40 on decided rounds, see
-   CASINO) and has no table limits.
+   from is stood; a poker stack is cashed out). Every game keeps an honest,
+   modest house edge (§45.4, M9): ordinary rules, ordinary odds, table
+   limits by room. The windfalls are the Royale Billions major prizes and the
+   world-time billion-dollar progressive (a $10,000 spin qualifies).
    ===================================================================== */
 const SCRATCH_CARDS = {
   5: { name: 'Lucky Fives', col: '#7fe08f', prizes: [[5, 0.21], [10, 0.08], [20, 0.03], [50, 0.006], [100, 0.002], [500, 0.0002], [2500, 0.00002], [12500, 0.0000025]] },
@@ -58647,24 +58886,13 @@ function slotSpin(def, bet, pool) {
   }
   return { grid, win, lines, jackpot };
 }
-// ---- the Valen Royale: one player-favoured house. There is no table maximum: the only limit on a wager is
-// the cash you carry. Every game is tuned so that, over a fair sample, about 60% of the rounds that are decided
-// go the player's way and 40% the house's, by the same rule at $10 and at $10,000,000 (a bigger stake never
-// changes the odds). The tuning knobs live here so the balance can be read and changed in one place.
+// ---- the Valen Royale (§45.4, M9): an honest house. Ordinary rules and odds at every table (European roulette
+// 2.7%, blackjack 6 decks S17 3:2 about 0.5%, baccarat about 1.1–1.2%, three card poker about 3.4%, craps pass line
+// 1.4%), the Royale Billions slot at about 95% return, and table limits by room: $10,000 on the floor, $250,000 in
+// the VIP room once you are known there (Rep 1,300).
 const CASINO = {
-  minBet: 10,
-  quick: [100, 1e3, 1e4, 1e5, 1e6, 5e6, 1e7, 2.5e7, 1e8, 1e9],
-  // roulette: a round counts for the player when (total paid back − total staked) > 0. Layouts that win less
-  // often than `roulTarget` have their winning pockets weighted up by `roulBoost` (even chances 48.6% → 60%);
-  // a layout that already wins that often (most of the board covered) gets no help, so covering the table
-  // only buys many small wins against rare large losses.
-  roulTarget: 0.6, roulBoost: 0.6 / (18 / 37),
-  // blackjack: a card that would bust the player is sometimes put back (once), and a dealer run that beats a
-  // standing hand is sometimes re-dealt (once). Normal rules otherwise (6 decks, S17, 3:2).
-  bjSaveBust: 0.72, bjDealerRedo: 0.82,
-  // Hold'em: the chance that a hand is dealt from a deck where your seven cards end up the best at the table
-  // (otherwise the deck is left as shuffled, where you are best about one time in four)
-  pokerFavor: 0.1
+  minBet: 10, floorMax: 10000, vipMax: 250000, vipRep: 1300, slotMax: 10000,
+  quick: [100, 1e3, 5e3, 1e4, 5e4, 1e5, 2.5e5]
 };
 // "2.5m", "10k", "$1,000,000", "1b" → whole dollars (NaN when it is not an amount)
 function parseMoney(s) { const t = String(s == null ? '' : s).trim().toLowerCase().replace(/[$,\s_]/g, ''); const m = t.match(/^(\d+(?:\.\d+)?)([kmbt]?)$/); if (!m) return NaN; return Math.floor(+m[1] * { '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2]]); }
@@ -58681,25 +58909,26 @@ const ROYALE_SYM_W = { shoe: 9, cash: 38, car: 26, diamond: 13, crown: 8, seven:
 const ROYALE_N_W = [0.9, 0.085, 0.015]; // 3, 4, 5 in a row
 // base game (measured, 1M spins): return 98.4%, 56% of spins pay more than the bet, 4.4% pay it back exactly
 const ROYALE_BASE_RTP = 0.984;
-// the major prize ladder (v7: tuned to play time). A prize is in play when it is at least 5× the bet. perH is how often
-// it lands on average per hour of play at a bet of ROYALE.fullBet or more (ROYALE.sph spins an hour: a spin takes
-// 1.95 s to settle and about 0.8 s to tap again); below fullBet the chance scales down with the bet. Those rates are
-// long-run averages, not a schedule: every spin rolls every tier in play independently, a hit only resets that tier's
-// pressure, and nothing caps how often a tier can land. High rollers keep the old rule as a floor: the tiers in play
-// share 12% of the stake as expected return (split by w), so the chance never drops for betting more.
+// the major prize ladder (M9). A prize is in play when it is at least 5× the bet (the billion only on a qualifying
+// $10,000 spin). The tiers in play share ROYALE.share of every stake as expected return, split by w, so a jackpot's
+// chance is proportional to the bet and nothing about the machine favours a big bettor. Every spin rolls every tier
+// in play independently, a hit only resets that tier's pressure, and nothing caps how often a tier can land.
 // Drought pressure: each spin without a hit adds that spin's base chance to the tier's pressure P (P = hits you were
 // "owed"); the live chance is base × (1 + 4·P²), so a long dry run gets steadily more likely to end. The base chance
-// is divided by ROYALE_DROUGHT_K so that the long-run average, pressure included, is exactly perH.
+// is scaled by ROYALE_DROUGHT_K so that the long-run average, pressure included, is exactly the share.
 const ROYALE_MAJORS = [
-  { id: 'm1b', prize: 1e9, w: 0.25, perH: 1 / 30, name: 'BILLION DOLLAR JACKPOT' }, { id: 'm250m', prize: 2.5e8, w: 0.1, perH: 0.036, name: 'GRAND JACKPOT' },
-  { id: 'm100m', prize: 1e8, w: 0.1, perH: 0.038, name: 'MEGA JACKPOT' }, { id: 'm50m', prize: 5e7, w: 0.08, perH: 0.04, name: 'SUPER JACKPOT' },
-  { id: 'm25m', prize: 2.5e7, w: 0.08, perH: 0.042, name: 'ROYAL JACKPOT' }, { id: 'm10m', prize: 1e7, w: 0.07, perH: 0.045, name: 'GOLD JACKPOT' },
-  { id: 'm5m', prize: 5e6, w: 0.06, perH: 0.05, name: 'SILVER JACKPOT' }, { id: 'm1m', prize: 1e6, w: 0.05, perH: 0.07, name: 'MILLION' },
-  { id: 'm500k', prize: 5e5, w: 0.04, perH: 0.15, name: 'MAJOR' }, { id: 'm250k', prize: 2.5e5, w: 0.04, perH: 0.25, name: 'MAJOR' },
-  { id: 'm100k', prize: 1e5, w: 0.04, perH: 0.45, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, perH: 0.7, name: 'MINOR' },
-  { id: 'm25k', prize: 2.5e4, w: 0.03, perH: 1.0, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, perH: 1.5, name: 'BONUS' }
+  { id: 'm1b', prize: 1e9, w: 0.25, name: 'BILLION DOLLAR JACKPOT' }, { id: 'm250m', prize: 2.5e8, w: 0.1, name: 'GRAND JACKPOT' },
+  { id: 'm100m', prize: 1e8, w: 0.1, name: 'MEGA JACKPOT' }, { id: 'm50m', prize: 5e7, w: 0.08, name: 'SUPER JACKPOT' },
+  { id: 'm25m', prize: 2.5e7, w: 0.08, name: 'ROYAL JACKPOT' }, { id: 'm10m', prize: 1e7, w: 0.07, name: 'GOLD JACKPOT' },
+  { id: 'm5m', prize: 5e6, w: 0.06, name: 'SILVER JACKPOT' }, { id: 'm1m', prize: 1e6, w: 0.05, name: 'MILLION' },
+  { id: 'm500k', prize: 5e5, w: 0.04, name: 'MAJOR' }, { id: 'm250k', prize: 2.5e5, w: 0.04, name: 'MAJOR' },
+  { id: 'm100k', prize: 1e5, w: 0.04, name: 'MINOR' }, { id: 'm50k', prize: 5e4, w: 0.03, name: 'MINOR' },
+  { id: 'm25k', prize: 2.5e4, w: 0.03, name: 'BONUS' }, { id: 'm10k', prize: 1e4, w: 0.03, name: 'BONUS' }
 ];
-const ROYALE = { share: 0.12, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, fullBet: 1000, sph: 1300 };
+// M9: the majors share 4% of every stake as expected return (split by w, scaled by the drought average); the base game
+// pays baseK of its table (about 91%), so the machine returns about 95% in all. The billion tier is the world-time progressive
+// (jp.pool, seeded at $1B, growing ~$400k–$800k an economic day) and is only in play on a qualifying $10,000 spin.
+const ROYALE = { share: 0.04, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, sph: 1300, baseK: 0.925, qualify: 10000, grow: [400000, 800000] };
 // mean of the pressured wait in units of the unpressured one: ∫₀^∞ exp(−(x + c·x³/3)) dx (0.536 for c = 4)
 const ROYALE_DROUGHT_K = (() => { const c = ROYALE.drought, dx = 1e-3; let sum = 0; for (let x = dx / 2; x < 16; x += dx) sum += Math.exp(-(x + c * x * x * x / 3)) * dx; return sum; })();
 function royaleEval(grid) {
@@ -58743,9 +58972,8 @@ function royaleChances(bet) {
   _royaleChBet = bet; return (_royaleCh = royaleChancesRaw(bet));
 }
 function royaleChancesRaw(bet) {
-  const el = ROYALE_MAJORS.filter(m => bet >= CASINO.minBet && m.prize >= ROYALE.minRatio * bet), sw = el.reduce((a, m) => a + m.w, 0);
-  const k = Math.min(1, bet / ROYALE.fullBet);
-  return ROYALE_MAJORS.map(m => el.includes(m) ? Math.min(ROYALE.maxP, Math.max(m.perH / ROYALE.sph * ROYALE_DROUGHT_K * k, ROYALE.share * m.w / sw * bet / m.prize)) : 0);
+  const el = ROYALE_MAJORS.filter(m => bet >= CASINO.minBet && m.prize >= ROYALE.minRatio * bet && (m.id !== 'm1b' || bet >= ROYALE.qualify)), sw = el.reduce((a, m) => a + m.w, 0);
+  return ROYALE_MAJORS.map(m => el.includes(m) ? Math.min(ROYALE.maxP, ROYALE.share * m.w / sw * bet / m.prize * ROYALE_DROUGHT_K) : 0);
 }
 // long-run average spins between hits of each tier at this bet, pressure included (0 = not in play)
 function royaleEvery(bet) { return royaleChances(bet).map(p => p > 0 ? ROYALE_DROUGHT_K / p : 0); }
@@ -58760,7 +58988,7 @@ function royaleSeedPressure(rnd = Math.random) {
 function royaleLive(bet, jp) { return royaleChances(bet).map((b, t) => { if (!b) return 0; const P = +(jp && jp.pr && jp.pr[ROYALE_MAJORS[t].id]) || 0; return Math.min(ROYALE.maxP, b * (1 + ROYALE.drought * P * P)); }); }
 // when no major is in play (a bet over a fifth of the top prize) the base game pays its share instead, so the
 // expected return never drops for betting big
-function royaleBaseScale(bet) { return royaleChances(bet).some(p => p > 0) ? 1 : (ROYALE_BASE_RTP + ROYALE.share) / ROYALE_BASE_RTP; }
+function royaleBaseScale(bet) { return ROYALE.baseK * (royaleChances(bet).some(p => p > 0) ? 1 : (ROYALE_BASE_RTP * ROYALE.baseK + ROYALE.share) / (ROYALE_BASE_RTP * ROYALE.baseK)); }
 // the major roll of one spin: every tier in play is rolled, the biggest that hits is paid. Updates jp in place
 // (pressure and hit counts) and returns the tier index or -1. Shared by royaleSpin and the simulations.
 function royaleRollMajor(bet, jp, rnd = Math.random) {
@@ -58781,7 +59009,10 @@ function royaleSpin(bet, jp, rnd = Math.random) {
   if (major >= 0) {
     b = royaleBuild(0, rnd) || royaleBlank();
     for (let r = 0; r < 5; r++) b.grid[r][1] = 'royal';
-    return { grid: b.grid, win: ROYALE_MAJORS[major].prize, lines: [{ li: 0, n: 5, sym: 'royal' }], major, mult: 0, teaser: 0 };
+    // the billion tier pays the live progressive and starts it again from the seed
+    const prog = ROYALE_MAJORS[major].id === 'm1b', prize = prog ? Math.max(ROYALE.top, Math.floor(+jp.pool || ROYALE.top)) : ROYALE_MAJORS[major].prize;
+    if (prog) jp.pool = ROYALE.top;
+    return { grid: b.grid, win: prize, lines: [{ li: 0, n: 5, sym: 'royal' }], major, mult: 0, teaser: 0, progressive: prog };
   }
   b = royaleBuild(_apick(ROYALE_K, rnd), rnd) || royaleBuild(0, rnd) || royaleBlank();
   let teaser = 0;
@@ -58994,6 +59225,10 @@ class Gamble {
     if (kind === 'bj') this.openBlackjack(+arg || 0);
     else if (kind === 'roul') this.openRoulette(+arg || 0);
     else if (kind === 'poker') this.openPoker();
+    else if (kind === 'bacc') this.openBaccarat(+arg || 0);
+    else if (kind === 'craps') this.openCraps();
+    else if (kind === 'tcp') this.openThreeCard(+arg || 0);
+    else if (kind === 'sports') this.openSportsbook();
     else if (kind === 'slot') this.openRoyale(arg);
     else if (kind === 'cashier') this.openCashier();
     else if (kind === 'bar') this.barDrink();
@@ -59007,8 +59242,8 @@ class Gamble {
   openCashier() {
     const render = () => {
       const s = this.g.save, J = this.G.jp;
-      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>No table limits: bet anything from ${fmtMoney(CASINO.minBet)} up to your whole bankroll</span></div>`;
-      h += '<div class="hint">The Valen Royale is a player’s house: across its games about six decided rounds in ten go your way. Losing streaks still happen, and nothing changes with the size of your bet.</div>';
+      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Limits: ${fmtMoney(CASINO.minBet)}–${fmtMoney(CASINO.floorMax)} on the floor · up to ${fmtMoney(CASINO.vipMax)} at the VIP tables (Rep ${CASINO.vipRep.toLocaleString('en-US')}) · Royale Billions up to ${fmtMoney(CASINO.slotMax)}</span></div>`;
+      h += `<div class="hint">An honest house: ordinary rules and odds, a small edge on every game. The windfalls are the Royale Billions major prizes and the progressive, now <b class="money">${fmtMoney(Math.floor(+J.pool || ROYALE.top))}</b>, which grows every day and is only in play on a $10,000 spin.</div>`;
       h += `<h3>Royale Billions jackpots</h3><div class="stats">${ROYALE_MAJORS.slice(0, 8).map(m => `<span>${fmtMoney(m.prize)}</span><span>${(J.hits[m.id] || 0)} hit${(J.hits[m.id] || 0) === 1 ? '' : 's'}</span>`).join('')}</div>`;
       h += '<h3>Casino record</h3>' + this.statsHTML('casino') + '<h3>Fuel & Go slot</h3>' + this.statsHTML('slots') + '<h3>Scratch cards</h3>' + this.statsHTML('scratch');
       return h;
@@ -59058,14 +59293,19 @@ class Gamble {
     const stopAt = (i) => this.later(650 + i * 330, () => { sl.stopped = i + 1; this.g.audio.play('reelstop', { gain: 0.6 }); if (i === def.reels - 1) { sl.spinning = false; sl.grid = r.grid; this.busy = false; this.refresh(r.win ? `Win: ${fmtMoney(r.win)}` : 'No win.'); this.celebrate(r.cls, r.win, def.progressive ? 'PROGRESSIVE JACKPOT' : 'JACKPOT'); } });
     for (let i = 0; i < def.reels; i++) stopAt(i);
   }
+  // the economic day (M9): the progressive grows from the unseen players, whether you are here or not
+  tickDay(rnd = Math.random) { const J = this.G.jp; J.pool = Math.max(ROYALE.top, +J.pool || ROYALE.top) + Math.round(ROYALE.grow[0] + rnd() * (ROYALE.grow[1] - ROYALE.grow[0])); if (this.tickSports) this.tickSports(); }
   // ------------------------------------------------------------- wagers: any amount from the minimum to the whole bankroll
   get pref() { const G = this.G; if (!G.pref || typeof G.pref !== 'object' || Array.isArray(G.pref)) G.pref = {}; return G.pref; }
-  wager(game, def) { const v = this.pref[game]; return typeof v === 'number' && isFinite(v) && v >= CASINO.minBet ? v : def; }
-  setWager(game, v) { v = Math.floor(+v); if (!(v >= CASINO.minBet)) v = CASINO.minBet; this.pref[game] = v; return v; }
+  // the table limit (M9): the Royale slot tops out at the qualifying $10,000; tables at $10,000 on the floor and
+  // $250,000 at a VIP table for someone known there; the poker room's buy-in and the sportsbook follow the same two limits by Rep alone
+  maxBet(game) { if (game === 'royale') return CASINO.slotMax; return (game === 'pokerBuy' || game === 'sports' || this.seat === 3) && this.g.save.rep >= CASINO.vipRep ? CASINO.vipMax : CASINO.floorMax; }
+  wager(game, def) { const v = this.pref[game]; return Math.min(this.maxBet(game), typeof v === 'number' && isFinite(v) && v >= CASINO.minBet ? v : def); }
+  setWager(game, v) { v = Math.floor(+v); if (!(v >= CASINO.minBet)) v = CASINO.minBet; v = Math.min(v, this.maxBet(game)); this.pref[game] = v; return v; }
   // the shared bet bar: balance, wager, what it can pay; quick amounts up to what you hold, MAX, ½, ×2 and a typed amount
   wagerHTML(game, cur, o = {}) {
     const m = Math.floor(o.avail !== undefined ? o.avail : this.shownMoney()), lock = o.lock ? 'disabled' : '';
-    const quick = CASINO.quick.filter((v, i) => i < 5 || v <= m);
+    const quick = CASINO.quick.filter(v => v <= this.maxBet(game));
     const top = o.noTop ? '' : `<div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>${o.label || 'BET'}<b>${fmtMoney(cur)}</b></span>${o.pays ? `<span>${o.paysLabel || 'PAYS UP TO'}<b class="money">${o.pays}</b></span>` : ''}</div>`;
     return `<div class="wager">${top}
       <div class="wq">${quick.map(v => `<button class="sbtn${cur === v ? ' gold' : ''}" data-act="w:q:${v}" ${v > m || o.lock ? 'disabled' : ''}>$${fmtShort(v)}</button>`).join('')}<button class="sbtn${cur === m && m >= CASINO.minBet ? ' gold' : ''}" data-act="w:max" ${m < CASINO.minBet || o.lock ? 'disabled' : ''}>MAX</button></div>
@@ -59074,7 +59314,7 @@ class Gamble {
   // a bet-bar action → the new wager (null when the action is not one); cap is what can still be staked
   wagerAct(game, a, cur, cap) {
     const [k, sub, x] = a.split(':'); if (k !== 'w') return null;
-    const m = Math.floor(cap !== undefined ? cap : Money.clean);
+    const m = Math.min(this.maxBet(game), Math.floor(cap !== undefined ? cap : Money.clean));
     let v = cur;
     if (sub === 'q') v = +x; else if (sub === 'max') v = m; else if (sub === 'half') v = Math.floor(cur / 2); else if (sub === 'dbl') v = cur * 2;
     else if (sub === 'set') { const el = document.getElementById('wagerIn'); const n = parseMoney(el && el.value); if (!(n > 0)) { this.refresh('Type an amount like 7500, 250k, 2.5m or 1b.'); return cur; } v = n; }
@@ -59099,10 +59339,8 @@ class Gamble {
   // ------------------------------------------------------------- blackjack: six decks, dealer stands on soft 17, blackjack pays 3:2,
   // double on any two cards, one split (split aces take one card each). Dealer checks for blackjack first.
   draw() { if (this.shoe.length < 78) { this.shoe = makeDeck(6); this.g.audio.play('card', { gain: 0.6 }); } return this.shoe.pop(); }
-  unDraw(c) { this.shoe.splice(Math.floor(Math.random() * (this.shoe.length + 1)), 0, c); }
-  // the player's hit: a card that would bust the hand is now and then put back in the shoe and another drawn (once)
-  bjHitCard(cards) { let c = this.draw(); if (bjValue([...cards, c]).total > 21 && Math.random() < CASINO.bjSaveBust) { this.unDraw(c); c = this.draw(); } return c; }
   openBlackjack(seat) {
+    this.seat = seat | 0;
     seat = Math.max(0, seat | 0);
     if (!this.bj || this.bj.phase !== 'play') this.bj = { seat, bet: this.wager('bj', 100), hands: [], dealer: [], phase: 'bet', cur: 0, msg: '' };
     const render = () => {
@@ -59118,10 +59356,10 @@ class Gamble {
         h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
         h += `<div class="btns big"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && Money.clean >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
       } else {
-        h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(bj.bet * 2.5), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
+        h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(Math.floor(bj.bet * 2.5)), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
         h += `<div class="btns big"><button class="sbtn gold" data-act="deal" style="min-width:160px" ${Money.clean < bj.bet || bj.revealing ? 'disabled' : ''}>DEAL · ${fmtMoney(bj.bet)}</button></div>`;
       }
-      return h + '<div class="hint">Dealer stands on all 17s · Blackjack pays 3:2 · Double on any two cards · One split · No table maximum · Walking away mid-hand stands every hand.</div><h3>Casino record</h3>' + this.statsHTML('casino');
+      return h + '<div class="hint">Dealer stands on all 17s · Blackjack pays 3:2 · Double on any two cards · One split · Limits by room ($10,000 on the floor, $250,000 VIP once known) · Walking away mid-hand stands every hand.</div><h3>Casino record</h3>' + this.statsHTML('casino');
     };
     this.open(`Blackjack · Table ${seat + 1}`, 'Dealer: “Place your bets. Sky’s the limit tonight.”', render, a => {
       const [k] = a.split(':'), bj = this.bj;
@@ -59144,9 +59382,9 @@ class Gamble {
   }
   bjAction(k) {
     const bj = this.bj, hd = bj.hands[bj.cur]; if (!hd || hd.done) return;
-    if (k === 'hit') { hd.cards.push(this.bjHitCard(hd.cards)); this.g.audio.play('card'); const v = bjValue(hd.cards).total; if (v >= 21) { hd.done = true; if (v > 21) hd.out = 'BUST'; } }
+    if (k === 'hit') { hd.cards.push(this.draw()); this.g.audio.play('card'); const v = bjValue(hd.cards).total; if (v >= 21) { hd.done = true; if (v > 21) hd.out = 'BUST'; } }
     else if (k === 'stand') hd.done = true;
-    else if (k === 'double') { if (hd.cards.length !== 2 || !this.debit(hd.bet)) return; hd.bet *= 2; hd.cards.push(this.bjHitCard(hd.cards)); hd.done = true; this.g.audio.play('chip'); if (bjValue(hd.cards).total > 21) hd.out = 'BUST'; }
+    else if (k === 'double') { if (hd.cards.length !== 2 || !this.debit(hd.bet)) return; hd.bet *= 2; hd.cards.push(this.draw()); hd.done = true; this.g.audio.play('chip'); if (bjValue(hd.cards).total > 21) hd.out = 'BUST'; }
     else if (k === 'split') {
       const a = hd.cards[0], b = hd.cards[1], val = c => c.r === 14 ? 11 : Math.min(10, c.r);
       if (hd.cards.length !== 2 || bj.hands.length !== 1 || val(a) !== val(b) || !this.debit(hd.bet)) return;
@@ -59168,16 +59406,13 @@ class Gamble {
     if (live && !dealerBJ && !(bj.hands.length === 1 && natural(bj.hands[0]))) {
       const play = () => { while (bjValue(d).total < 17) d.push(this.draw()); };
       play();
-      // a dealer run that beats a standing hand is now and then dealt again from the shoe (once)
-      const dv0 = bjValue(d).total;
-      if (d.length > 2 && dv0 <= 21 && bj.hands.some(h => { const v = bjValue(h.cards).total; return v <= 21 && v < dv0; }) && Math.random() < CASINO.bjDealerRedo) { while (d.length > 2) this.unDraw(d.pop()); play(); }
     }
     const dv = bjValue(d).total;
     let stake = 0, win = 0;
     for (const h of bj.hands) {
       const v = bjValue(h.cards).total; stake += h.bet; let w = 0;
       if (v > 21) { h.out = 'BUST'; }
-      else if (natural(h) && !dealerBJ) { w = h.bet * 2.5; h.out = 'BLACKJACK'; }
+      else if (natural(h) && !dealerBJ) { w = Math.floor(h.bet * 2.5); h.out = 'BLACKJACK'; } // 3:2, rounded down on odd bets
       else if (dealerBJ) { w = natural(h) ? h.bet : 0; h.out = natural(h) ? 'PUSH' : 'DEALER BLACKJACK'; }
       else if (dv > 21 || v > dv) { w = h.bet * 2; h.out = 'WIN'; }
       else if (v === dv) { w = h.bet; h.out = 'PUSH'; }
@@ -59200,6 +59435,7 @@ class Gamble {
   }
   // ------------------------------------------------------------- roulette: European single zero, as many bets as you like in one spin
   openRoulette(seat) {
+    this.seat = seat | 0;
     seat = Math.max(0, seat | 0);
     if (!this.roul) this.roul = { bets: {}, stack: [], hist: [], res: null, spinning: null, last: null, mode: 'add' };
     const R = this.roul, red = n => ROUL_RED.has(n);
@@ -59335,25 +59571,15 @@ class Gamble {
     for (const o of out) if (o.allin) o.label = 'ALL IN';
     return out;
   }
-  // which seat wins at showdown for a given deck (seats are dealt two each from the top, then burn-and-turn as pokerStreet does)
-  pokerDeckWinner(deck, n) {
-    const L = deck.length, hole = i => [deck[L - 1 - 2 * i], deck[L - 2 - 2 * i]], k = 2 * n;
-    const board = [deck[L - 2 - k], deck[L - 3 - k], deck[L - 4 - k], deck[L - 6 - k], deck[L - 8 - k]];
-    let best = -1, who = 0; for (let i = 0; i < n; i++) { const v = bestOf([...hole(i), ...board]); if (v > best) { best = v; who = i; } else if (v === best && i !== 0 && who === 0) { /* a tie keeps you at the top */ } }
-    return who;
-  }
-  pokerDeck(n) {
-    let deck = makeDeck(1);
-    if (Math.random() < CASINO.pokerFavor) for (let t = 0; t < 80 && this.pokerDeckWinner(deck, n) !== 0; t++) deck = makeDeck(1);
-    return deck;
-  }
+  // an honest shuffle every hand
+  pokerDeck() { return makeDeck(1); }
   pokerHand() {
     const pk = this.pk, bb = pk.bb, n = pk.seats.length;
     for (const x of pk.seats) if (!x.isP && x.stack < bb * 2) { const fresh = pick(POKER_AI.filter(a => !pk.seats.some(y => y.name === a.name))) || POKER_AI[0]; Object.assign(x, { ...fresh, stack: Math.max(bb * 10, Math.round(pk.buy * rand(0.6, 1.6) / bb) * bb) }); }
     const me = pk.seats[0];
     if (me.stack < bb) { pk.phase = 'idle'; this.refresh('You need more chips to play a hand.'); return; }
     pk.btn = (pk.btn + 1) % n;
-    pk.deck = this.pokerDeck(n); pk.board = []; pk.pot = 0; pk.street = 0; pk.cls = ''; pk.msg = '';
+    pk.deck = this.pokerDeck(); pk.board = []; pk.pot = 0; pk.street = 0; pk.cls = ''; pk.msg = '';
     for (const x of pk.seats) { x.hole = [pk.deck.pop(), pk.deck.pop()]; x.put = 0; x.total = 0; x.folded = false; x.allin = false; x.last = ''; x.won = false; x.sitout = false; }
     const post = (i, amt) => { const x = pk.seats[i], a = Math.min(amt, x.stack); x.stack -= a; x.put += a; x.total += a; if (!x.stack) x.allin = true; x.last = a === bb ? 'big blind' : 'small blind'; };
     post((pk.btn + 1) % n, bb / 2); post((pk.btn + 2) % n, bb);
@@ -59481,7 +59707,7 @@ class Gamble {
     const lines = SLOT_LINES5.map((L, li) => `<polyline class="ln${res && res.lines.some(x => x.li === li) ? ' on' : ''}" points="${L.map((row, r) => `${50 + r * 100},${50 + row * 100}`).join(' ')}"/>`).join('');
     let h = `<div class="ryl"><div class="rylCab ${ry.spinning ? 'spin' : res && res.win ? 'w-' + res.cls : 'idle'}" id="rylCab">
       <div class="rylBulbs">${bulbs(18)}</div>
-      <div class="rylMarq"><span class="rylName">ROYALE BILLIONS</span><span class="rylMax">MAX JACKPOT <b>${fmtMoney(ROYALE.top)}</b></span></div>
+      <div class="rylMarq"><span class="rylName">ROYALE BILLIONS</span><span class="rylMax">PROGRESSIVE <b>${fmtMoney(Math.floor(+this.G.jp.pool || ROYALE.top))}</b></span></div>
       <div class="rylWin"><span id="rylTier">${res && res.major >= 0 ? ROYALE_MAJORS[res.major].name : res && res.win ? 'WIN' : ry.spinning ? 'GOOD LUCK' : 'WIN'}</span><b id="rylWinV">${res && res.win ? fmtMoney(res.win) : '$0'}</b></div>
       <div class="rylGlass"><div class="rylReels" id="rylReels">${grid.map((col, r) => `<div class="ryr" data-r="${r}"><div class="rys">${col.map((sy, w) => this.royaleCell(sy, hitCells.has(r + ':' + w) ? ' hit' : '')).join('')}</div></div>`).join('')}</div><svg class="rylLines" viewBox="0 0 500 300" preserveAspectRatio="none">${lines}</svg></div>
       <div class="rylBulbs">${bulbs(18)}</div></div></div>`;
@@ -59493,8 +59719,8 @@ class Gamble {
       const ch = royaleChances(bet), every = royaleEvery(bet), live = royaleLive(bet, J), sc = royaleBaseScale(bet), hrs = n => { const h = n / ROYALE.sph; return h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 100 ? `${h < 10 ? h.toFixed(1) : Math.round(h)} h` : `${Math.round(h).toLocaleString('en-US')} h`; }, nm = { seven: 'seven', crown: 'crown', diamond: 'diamond', car: 'car', cash: 'cash', shoe: 'horseshoe' };
       h += `<div class="rylInfo"><h3>Line pays at ${fmtMoney(bet)}</h3><div class="stats">${ROYALE_SYMS.map(k => `<span>${this.royaleCell(k, ' mini')} ${nm[k]} ×3 / ×4 / ×5</span><span>${ROYALE_PAY[k].map(x => fmtMoney(Math.round(x * sc * bet))).join(' / ')}</span>`).join('')}</div>
         <div class="hint">Five lines: the three rows and two V shapes, read from the left reel. Every winning line on a spin is paid.</div>
-        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.prize)}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
-        <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them, even twice in a row. These are long-run averages at about ${ROYALE.sph.toLocaleString('en-US')} spins an hour, never a schedule. Full odds from a ${fmtMoney(ROYALE.fullBet)} bet; smaller bets get a proportionally smaller chance, and very big bets a bigger one. A jackpot that hasn’t landed for a while gets more likely (“due”) until it does. Bets above ${fmtMoney(ROYALE.top / ROYALE.minRatio)} play the line pays a little richer instead.</div>
+        <h3>Jackpots</h3><div class="stats">${ROYALE_MAJORS.map((m, t) => `<span>${this.royaleCell('royal', ' mini')} ${fmtMoney(m.id === 'm1b' ? Math.floor(+this.G.jp.pool || ROYALE.top) : m.prize)}${m.id === 'm1b' ? ' (progressive · $10,000 spins only)' : ''}</span><span>${ch[t] ? `on average every ${hrs(every[t])} of play${live[t] > ch[t] * 1.05 ? ` · <b style="color:var(--gold, #ffd84d)">due: ×${(live[t] / ch[t]).toFixed(1)}</b>` : ''}` : m.id === 'm1b' && bet < ROYALE.qualify ? 'only on a ' + fmtMoney(ROYALE.qualify) + ' spin' : 'needs a bet of ' + fmtMoney(m.prize / ROYALE.minRatio) + ' or less'}</span>`).join('')}</div>
+        <div class="hint">Five jackpot crowns on the middle line. Every spin rolls every jackpot that is at least five times your bet, independently, so any spin can hit any of them, even twice in a row. These are long-run averages at about ${ROYALE.sph.toLocaleString('en-US')} spins an hour, never a schedule, and the chance grows with the bet in proportion: the machine keeps its edge at every stake. A jackpot that hasn’t landed for a while gets more likely (“due”) until it does. The billion is a progressive: it grows every day, with or without you, and only a ${fmtMoney(ROYALE.qualify)} spin can win it.</div>
         <h3>Your record</h3><div class="stats"><span>Spins</span><span>${(J.spins || 0).toLocaleString('en-US')}</span><span>Biggest win</span><span>${fmtMoney(J.biggest || 0)}</span>${ROYALE_MAJORS.filter(m => J.hits[m.id]).map(m => `<span>${fmtMoney(m.prize)} hits</span><span>${J.hits[m.id]}</span>`).join('')}</div></div>`;
     }
     return h;
@@ -59591,18 +59817,238 @@ function roulettePayout(bets, n) {
 const fmtFit = v => v >= 1e7 ? '$' + fmtShort(v) : fmtMoney(v);
 // $1.5k, $25M, $1B: short amounts for chips and buttons (one decimal only when it is not whole)
 const fmtShort = v => { v = Math.floor(+v || 0); for (const [d, u] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']]) if (v >= d) { const x = v / d; return (x >= 100 || Math.abs(x - Math.round(x)) < 0.05 ? Math.round(x) : x.toFixed(1)) + u; } return String(v); };
-// the pocket for a spin: the layout's winning pockets (net > 0) are weighted up to the player-favoured target
-// when they would come up less often than that; the pocket inside the winning or losing set is uniform
-function roulettePick(bets, rnd = Math.random) {
-  let stake = 0; for (const k in bets) stake += bets[k];
-  const win = [], lose = [];
-  for (let n = 0; n <= 36; n++) (roulettePayout(bets, n) > stake ? win : lose).push(n);
-  const nat = win.length / 37;
-  const p = !win.length ? 0 : nat >= CASINO.roulTarget ? nat : Math.min(CASINO.roulTarget, nat * CASINO.roulBoost);
-  const set = rnd() < p ? win : lose.length ? lose : win;
-  return set[Math.floor(rnd() * set.length)];
-}
+// the pocket for a spin: a fair single-zero wheel, whatever is on the layout (the bets are kept in the signature for
+// the callers and the tests)
+function roulettePick(bets, rnd = Math.random) { void bets; return Math.floor(rnd() * 37); }
 
+/* =====================================================================
+   [UNDERWORLD] MORE OF THE VALEN ROYALE (M9, §25): baccarat, craps, three
+   card poker and the sportsbook. Every game is the ordinary one with its
+   ordinary house edge, settled in one step when the bet is placed (stake
+   out, any win in), so a closed screen or a reload can't change a result.
+   - Baccarat: Player 1:1, Banker 0.95:1, Tie 8:1 (a tie returns Player and
+     Banker bets); standard drawing rules, cards drawn from an 8-deck mix.
+   - Craps: Pass Line, Don't Pass (12 pushes on the come-out) and the
+     Field (2 and 12 pay double); a pass decision is rolled out to the end.
+   - Three Card Poker: Ante and Play against the dealer, who needs queen
+     high; you play anything from queen-six-four up (the usual strategy) and
+     fold the rest; Ante bonus on a straight or better; optional Pair Plus.
+   - The sportsbook: three matches a day with the house's margin built into
+     the odds; a bet settles when that economic day ends, once. Matches and
+     their results come from the day's seed: nothing a reload can reroll.
+     Limits as at the tables: $10,000 a bet, $250,000 for someone known (Rep).
+   ===================================================================== */
+const SPORTS = { margin: 0.06, keep: 20,
+  teams: ['Port Valen Harriers', 'Saltworks Rovers', 'Crestmoor Lions', 'Docklands United', 'Linden Hills FC', 'Old Quarter Athletic', 'Greenway Wanderers', 'Strip City', 'Stadium Town', 'Cedar Fields Rangers', 'Harbor Row Mariners', 'Warehouse Athletic'] };
+const CARD_RANKS = 'A23456789TJQK';
+// ---------------------------------------------------------------- pure rules (exported for the tests)
+const baccVal = r => r >= 10 ? 0 : r; // r: 1 (ace) .. 13 (king)
+function baccaratDeal(rnd = Math.random) {
+  const card = () => 1 + Math.floor(rnd() * 13), tot = h => h.reduce((a, r) => a + baccVal(r), 0) % 10;
+  const P = [card(), card()], B = [card(), card()];
+  if (tot(P) < 8 && tot(B) < 8) {
+    let p3 = null;
+    if (tot(P) <= 5) { p3 = card(); P.push(p3); }
+    const b = tot(B), v = p3 === null ? null : baccVal(p3);
+    const draw = v === null ? b <= 5 : b <= 2 || (b === 3 && v !== 8) || (b === 4 && v >= 2 && v <= 7) || (b === 5 && v >= 4 && v <= 7) || (b === 6 && v >= 6 && v <= 7);
+    if (draw) B.push(card());
+  }
+  const p = tot(P), b = tot(B);
+  return { P, B, p, b, result: p > b ? 'player' : b > p ? 'banker' : 'tie' };
+}
+// what a set of bets returns (stake included) on a result
+function baccaratPay(bets, result) {
+  let back = 0;
+  if (result === 'tie') { back += (bets.tie || 0) * 9 + (bets.player || 0) + (bets.banker || 0); }
+  else if (result === 'player') back += (bets.player || 0) * 2;
+  else back += (bets.banker || 0) * 1.95;
+  // the house rounds the commission in its own favour (a $10 Banker win pays $19, never $20)
+  return Math.floor(back + 1e-9);
+}
+function crapsRoll(rnd = Math.random) { const a = 1 + Math.floor(rnd() * 6), b = 1 + Math.floor(rnd() * 6); return [a, b]; }
+// a pass-line decision rolled out to the end: the rolls and 'pass' / 'dont' / 'push12' (a come-out 12)
+function crapsDecision(rnd = Math.random) {
+  const rolls = [], first = crapsRoll(rnd), s0 = first[0] + first[1]; rolls.push(first);
+  if (s0 === 7 || s0 === 11) return { rolls, point: 0, result: 'pass' };
+  if (s0 === 2 || s0 === 3) return { rolls, point: 0, result: 'dont' };
+  if (s0 === 12) return { rolls, point: 0, result: 'push12' };
+  for (let n = 0; n < 200; n++) { const r = crapsRoll(rnd), t = r[0] + r[1]; rolls.push(r); if (t === s0) return { rolls, point: s0, result: 'pass' }; if (t === 7) return { rolls, point: s0, result: 'dont' }; }
+  return { rolls, point: s0, result: 'dont' };
+}
+function crapsPay(bets, dec) {
+  let back = 0;
+  if (dec.result === 'pass') back += (bets.pass || 0) * 2;
+  else if (dec.result === 'dont') back += (bets.dont || 0) * 2;
+  else back += (bets.dont || 0); // a come-out 12: Pass loses, Don't Pass is returned
+  if (bets.field) { const f = dec.rolls[0][0] + dec.rolls[0][1]; back += (f === 2 || f === 12) ? bets.field * 3 : [3, 4, 9, 10, 11].includes(f) ? bets.field * 2 : 0; }
+  return Math.round(back);
+}
+// three card poker hands: cards are [rank 2..14, suit 0..3]; returns [category, ...tiebreak] (5 SF, 4 trips, 3 straight, 2 flush, 1 pair, 0 high)
+function tcpRank(h) {
+  const r = h.map(c => c[0]).sort((a, b) => b - a), fl = h[0][1] === h[1][1] && h[1][1] === h[2][1];
+  const wheel = r[0] === 14 && r[1] === 3 && r[2] === 2, st = (r[0] - r[1] === 1 && r[1] - r[2] === 1) || wheel, top = wheel ? 3 : r[0];
+  if (st && fl) return [5, top];
+  if (r[0] === r[2]) return [4, r[0]];
+  if (st) return [3, top];
+  if (fl) return [2, ...r];
+  if (r[0] === r[1] || r[1] === r[2]) { const pr = r[1], k = r[0] === r[1] ? r[2] : r[0]; return [1, pr, k]; }
+  return [0, ...r];
+}
+const tcpCmp = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
+function tcpDeal(rnd = Math.random) {
+  const deck = []; for (let s = 0; s < 4; s++) for (let r = 2; r <= 14; r++) deck.push([r, s]);
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  return { you: deck.slice(0, 3), dealer: deck.slice(3, 6) };
+}
+// one round: ante (and play = ante when you play), Pair Plus side bet; returns what comes back, stake included
+function tcpRound(ante, pairPlus, rnd = Math.random) {
+  const d = tcpDeal(rnd), y = tcpRank(d.you), k = tcpRank(d.dealer);
+  const play = tcpCmp(y, [0, 12, 6, 4]) >= 0, staked = ante + pairPlus + (play ? ante : 0);
+  let back = 0;
+  if (play) {
+    const qual = tcpCmp(k, [0, 12, 0, 0]) >= 0, c = tcpCmp(y, k);
+    if (!qual) back += ante * 2 + ante; // ante wins, play is returned
+    else if (c > 0) back += ante * 2 + ante * 2;
+    else if (c === 0) back += ante * 2;
+    back += ante * ({ 5: 5, 4: 4, 3: 1 }[y[0]] || 0); // the ante bonus is paid whatever the dealer has
+  }
+  if (pairPlus) back += pairPlus * ({ 5: 41, 4: 31, 3: 7, 2: 5, 1: 2 }[y[0]] || 0);
+  return { ...d, y, k, play, staked, back: Math.round(back) };
+}
+// the day's matches: from the day's seed, so a reload shows (and settles) the same ones
+function sportsDay(day) {
+  const rnd = mulberry32(day * 7919 + 13), T = SPORTS.teams.slice(), out = [];
+  for (let i = T.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [T[i], T[j]] = [T[j], T[i]]; }
+  for (let m = 0; m < 3; m++) {
+    const home = T[m * 2], away = T[m * 2 + 1], ph = 0.3 + rnd() * 0.4, pd = 0.18 + rnd() * 0.1, pa = Math.max(0.05, 1 - ph - pd);
+    const odds = [ph, pd, pa].map(p => Math.max(1.05, Math.round((1 - SPORTS.margin) / p * 100) / 100));
+    const r = rnd(), result = r < ph ? 0 : r < ph + pd ? 1 : 2;
+    out.push({ id: day * 10 + m, home, away, odds, result });
+  }
+  return out;
+}
+// ---------------------------------------------------------------- the tables
+Object.assign(Gamble.prototype, {
+  // a table bet: one of the new games, settled now (stake out, any win in) with its own record
+  tableBet(stake, back, label) {
+    if (!(stake >= CASINO.minBet) || Money.clean < stake) return false;
+    if (!this.settle('casino', stake, back)) return false;
+    this.g.audio.play(back > stake ? 'win1' : back === stake ? 'ui' : 'deny', { gain: 0.6 });
+    this.g.saveGame();
+    void label; return true;
+  },
+  cardHTML(r, s) { const red = s === 1 || s === 2; return `<span class="pcard${red ? ' red' : ''}">${CARD_RANKS[(r === 14 ? 1 : r) - 1] || '?'}${'♠♥♦♣'[s] || ''}</span>`; },
+  openBaccarat(seat) {
+    this.seat = seat | 0;
+    const st = this.bacc || (this.bacc = { pick: 'banker', last: null });
+    const render = () => {
+      const bet = this.wager('bacc', 100), L = st.last;
+      return this.wagerHTML('bacc', bet, { pays: st.pick === 'tie' ? '8:1' : st.pick === 'banker' ? '0.95:1' : '1:1' }) +
+        `<div class="btns">${['player', 'banker', 'tie'].map(k => `<button class="sbtn${st.pick === k ? ' gold' : ''}" data-act="pick:${k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}<button class="sbtn danger" data-act="deal">DEAL</button></div>` +
+        (L ? `<div class="card gres"><div class="t">Player ${L.P.map(r => this.cardHTML(r === 1 ? 14 : r, 0)).join('')} = <b>${L.p}</b> · Banker ${L.B.map(r => this.cardHTML(r === 1 ? 14 : r, 1)).join('')} = <b>${L.b}</b></div><div class="d">${L.result.toUpperCase()} · ${L.back > L.stake ? 'you win ' + fmtMoney(L.back - L.stake) : L.back === L.stake ? 'bet returned' : 'you lose ' + fmtMoney(L.stake)}</div></div>` : '') +
+        '<div class="hint">Player pays 1:1, Banker 0.95:1 (5% commission), Tie 8:1; a tie returns Player and Banker bets. Standard drawing rules.</div>';
+    };
+    this.open('Baccarat', 'Punto banco', render, a => {
+      const [k, x] = a.split(':');
+      if (k === 'w') { if (this.wagerAct('bacc', a, this.wager('bacc', 100)) !== null) this.refresh(); return; }
+      if (k === 'pick') { st.pick = x; this.refresh(); return; }
+      if (k === 'deal') { const bet = this.wager('bacc', 100), d = baccaratDeal(), back = baccaratPay({ [st.pick]: bet }, d.result); if (this.tableBet(bet, back, 'bacc')) st.last = { ...d, stake: bet, back }; this.refresh(); }
+    }, 'bacc');
+  },
+  openCraps() {
+    this.seat = 0;
+    const st = this.craps || (this.craps = { pick: 'pass', last: null });
+    const render = () => {
+      const bet = this.wager('craps', 100), L = st.last;
+      return this.wagerHTML('craps', bet, { pays: st.pick === 'field' ? '1:1 · 2 & 12 pay 2:1' : '1:1' }) +
+        `<div class="btns">${[['pass', 'Pass Line'], ['dont', 'Don’t Pass'], ['field', 'Field']].map(([k, n]) => `<button class="sbtn${st.pick === k ? ' gold' : ''}" data-act="pick:${k}">${n}</button>`).join('')}<button class="sbtn danger" data-act="roll">ROLL</button></div>` +
+        (L ? `<div class="card gres"><div class="t">${L.rolls.map(r => `⚀⚁⚂⚃⚄⚅`[r[0] - 1] + `⚀⚁⚂⚃⚄⚅`[r[1] - 1]).join(' ')}</div><div class="d">${L.point ? 'Point ' + L.point + ' · ' : ''}${L.result === 'pass' ? 'Pass wins' : L.result === 'dont' ? 'Don’t Pass wins' : 'Twelve: Don’t Pass pushes'} · ${L.back > L.stake ? 'you win ' + fmtMoney(L.back - L.stake) : L.back === L.stake ? 'bet returned' : 'you lose ' + fmtMoney(L.stake)}</div></div>` : '') +
+        '<div class="hint">Pass Line: 7 or 11 on the come-out wins, 2, 3 or 12 loses; otherwise make the point before a 7. Don’t Pass is the other side (12 pushes). Field: one roll, 3 4 9 10 11 pay 1:1, 2 and 12 pay 2:1.</div>';
+    };
+    this.open('Craps', 'The craps table', render, a => {
+      const [k, x] = a.split(':');
+      if (k === 'w') { if (this.wagerAct('craps', a, this.wager('craps', 100)) !== null) this.refresh(); return; }
+      if (k === 'pick') { st.pick = x; this.refresh(); return; }
+      if (k === 'roll') { const bet = this.wager('craps', 100), dec = crapsDecision(), back = crapsPay({ [st.pick]: bet }, dec); if (this.tableBet(bet, back, 'craps')) st.last = { ...dec, stake: bet, back }; this.refresh(); }
+    }, 'craps');
+  },
+  openThreeCard(seat) {
+    this.seat = seat | 0;
+    const st = this.tcp || (this.tcp = { pp: false, last: null });
+    const names = ['High card', 'Pair', 'Flush', 'Straight', 'Three of a kind', 'Straight flush'];
+    const render = () => {
+      const ante = this.wager('tcp', 100), L = st.last, need = ante * 2 + (st.pp ? ante : 0);
+      return this.wagerHTML('tcp', ante, { label: 'ANTE', pays: 'Play 1:1 · bonus up to 5:1' }) +
+        `<div class="btns"><button class="sbtn${st.pp ? ' gold' : ''}" data-act="pp">Pair Plus (${fmtMoney(ante)}) ${st.pp ? 'ON' : 'off'}</button><button class="sbtn danger" data-act="deal" ${Money.clean < need ? 'disabled' : ''}>DEAL · needs ${fmtMoney(need)}</button></div>` +
+        (L ? `<div class="card gres"><div class="t">You ${L.you.map(c => this.cardHTML(c[0], c[1])).join('')} ${names[L.y[0]]} · Dealer ${L.dealer.map(c => this.cardHTML(c[0], c[1])).join('')} ${names[L.k[0]]}</div><div class="d">${L.play ? 'You played' : 'You folded (below queen-six-four)'} · ${L.back > L.staked ? 'you win ' + fmtMoney(L.back - L.staked) : L.back === L.staked ? 'even' : 'you lose ' + fmtMoney(L.staked - L.back)}</div></div>` : '') +
+        '<div class="hint">You play queen-six-four or better (the play bet equals the ante) and fold the rest. The dealer needs queen high: if not, the ante pays and the play bet is returned. Ante bonus: straight 1:1, trips 4:1, straight flush 5:1. Pair Plus: pair 1:1, flush 4:1, straight 6:1, trips 30:1, straight flush 40:1.</div>';
+    };
+    this.open('Three Card Poker', 'Ante, play, Pair Plus', render, a => {
+      const [k] = a.split(':');
+      if (k === 'w') { if (this.wagerAct('tcp', a, this.wager('tcp', 100)) !== null) this.refresh(); return; }
+      if (k === 'pp') { st.pp = !st.pp; this.refresh(); return; }
+      if (k === 'deal') {
+        const ante = this.wager('tcp', 100), pp = st.pp ? ante : 0; if (Money.clean < ante * 2 + pp) { this.refresh('You need the play bet too: twice the ante, plus Pair Plus.'); return; }
+        const r = tcpRound(ante, pp); if (this.tableBet(r.staked, r.back, 'tcp')) st.last = r; this.refresh();
+      }
+    }, 'tcp');
+  },
+  // ---------------------------------------------------------------- the sportsbook
+  sbook() { const G = this.G; if (!G.sports || typeof G.sports !== 'object') G.sports = { bets: [], next: 1, won: 0, staked: 0 }; return G.sports; },
+  sportsToday() { return this.g.uw ? this.g.uw.S.day : 1; },
+  openSportsbook() {
+    this.seat = 0;
+    const st = this.sb || (this.sb = { pick: null });
+    const render = () => {
+      const day = this.sportsToday(), M = sportsDay(day), SB = this.sbook(), bet = this.wager('sports', 100);
+      let h = this.wagerHTML('sports', bet, { pays: 'the odds shown' });
+      h += '<h3>Today’s matches</h3><div class="jobs">' + M.map(m => `<div class="job"><div style="flex:1"><b>${esc(m.home)} v ${esc(m.away)}</b><span>Results at the end of the day</span></div>${['Home', 'Draw', 'Away'].map((n, i) => `<button class="sbtn${st.pick === m.id + ':' + i ? ' gold' : ''}" data-act="sb:${m.id}:${i}">${n} ${m.odds[i].toFixed(2)}</button>`).join('')}</div>`).join('') + '</div>';
+      h += `<div class="btns"><button class="sbtn danger" data-act="sbgo" ${st.pick ? '' : 'disabled'}>PLACE BET</button></div>`;
+      const open = SB.bets.filter(b => !b.settled), done = SB.bets.filter(b => b.settled).slice(-6).reverse();
+      if (open.length) h += '<h3>Your open bets</h3><div class="stats">' + open.map(b => `<span>${esc(b.label)}</span><span>${fmtMoney(b.stake)} @ ${b.odds.toFixed(2)}</span>`).join('') + '</div>';
+      if (done.length) h += '<h3>Settled</h3><div class="stats">' + done.map(b => `<span>${esc(b.label)}</span><span>${b.win ? '<b style="color:var(--green)">won ' + fmtMoney(b.paid) + '</b>' : 'lost'}</span>`).join('') + '</div>';
+      return h + `<div class="hint">The book keeps about ${Math.round(SPORTS.margin * 100)}% in its odds. Bets settle once, when the economic day ends; up to ${fmtMoney(this.maxBet('sports'))} a bet.</div>`;
+    };
+    this.open('Sportsbook', 'Today’s card', render, a => {
+      const [k, x, y] = a.split(':');
+      if (k === 'w') { if (this.wagerAct('sports', a, this.wager('sports', 100)) !== null) this.refresh(); return; }
+      if (k === 'sb') { st.pick = x + ':' + y; this.refresh(); return; }
+      if (k === 'sbgo' && st.pick) { const r = this.sportsBet(+st.pick.split(':')[0], +st.pick.split(':')[1], this.wager('sports', 100)); st.pick = null; this.refresh(r || 'Bet placed. It settles at the end of the day.'); }
+    }, 'sports');
+  },
+  // a sportsbook bet: the stake leaves now; it settles once, at the end of today's economic day
+  sportsBet(matchId, pick, stake) {
+    const day = this.sportsToday(), m = sportsDay(day).find(x => x.id === matchId); if (!m || ![0, 1, 2].includes(pick)) return 'No such match today.';
+    stake = Math.floor(stake); if (!(stake >= CASINO.minBet) || stake > this.maxBet('sports')) return `Bets from ${fmtMoney(CASINO.minBet)} to ${fmtMoney(this.maxBet('sports'))}.`;
+    if (!Money.can(stake, 'casinoStake')) return 'Not enough in the bank.';
+    if (!this.settle('casino', stake, 0)) return 'Not enough in the bank.';
+    const SB = this.sbook(); SB.staked += stake;
+    SB.bets.push({ id: SB.next++, day, match: matchId, pick, odds: m.odds[pick], stake, label: `${m.home} v ${m.away}: ${[m.home, 'Draw', m.away][pick]}`, settled: false, win: false, paid: 0 });
+    if (SB.bets.length > 60) SB.bets.splice(0, SB.bets.length - 60);
+    this.g.saveGame();
+    return '';
+  },
+  // the end of the economic day: every open bet from an earlier day settles, exactly once
+  tickSports() {
+    const SB = this.sbook(), today = this.sportsToday();
+    for (const b of SB.bets) {
+      if (b.settled || b.day >= today) continue;
+      const m = sportsDay(b.day).find(x => x.id === b.match); b.settled = true;
+      // (the stake was booked as lost when it was placed: a win takes that back)
+      if (m && m.result === b.pick) { b.win = true; b.paid = Math.round(b.stake * b.odds); Money.earn(b.paid, 'casino'); const C = this.G.casino; C.won += b.paid; C.lost = Math.max(0, C.lost - b.stake); C.biggest = Math.max(C.biggest, b.paid - b.stake); SB.won += b.paid; }
+    }
+    // keep the record short
+    const done = SB.bets.filter(b => b.settled); if (done.length > SPORTS.keep) SB.bets = SB.bets.filter(b => !b.settled || done.indexOf(b) >= done.length - SPORTS.keep);
+  }
+});
+// a sportsbook record from a save: open bets kept (their stake is gone already), the record bounded
+function sanitizeSports(x, okN) {
+  const out = { bets: [], next: 1, won: 0, staked: 0 }; if (!x || typeof x !== 'object') return out;
+  out.won = okN(x.won) ? x.won : 0; out.staked = okN(x.staked) ? x.staked : 0;
+  for (const b of Array.isArray(x.bets) ? x.bets : []) if (b && Number.isInteger(b.id) && Number.isInteger(b.day) && Number.isInteger(b.match) && [0, 1, 2].includes(b.pick) && okN(b.stake) && b.stake <= CASINO.vipMax && okN(b.odds) && b.odds < 100) out.bets.push({ id: b.id, day: b.day, match: b.match, pick: b.pick, odds: b.odds, stake: b.stake, label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', settled: !!b.settled, win: !!b.win, paid: okN(b.paid) ? b.paid : 0 });
+  out.bets = out.bets.slice(-60); out.next = Math.max(1, ...out.bets.map(b => b.id + 1), Number.isInteger(x.next) ? x.next : 1);
+  return out;
+}
 /* =====================================================================
    [UNDERWORLD] TAXIS: Cabline cabs are real cars. Taxis drive in traffic everywhere; call one (phone,
    or from the map) and the nearest free cab comes to you, or one is sent from round the corner.
@@ -62291,7 +62737,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);
