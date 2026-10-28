@@ -54006,6 +54006,7 @@ class UniqueCars {
     const g = this.g, d = UNIQUE_BY[id]; if (!d || this.st(id) >= 3 || this.entry(id) || this.pendingIdx(id) >= 0) return null;
     const e = g.vreg.give(d.type, d.origin, VEHICLES[d.type].colors[0], d.keeper);
     if (e) e.vtier = 'unique';
+    if (d.how === 'reward') g.content.phone(UQ_FROM[id], `The ${VEHICLES[d.type].name} is yours. ${e ? 'It’s in your space.' : 'I’ll keep it here until you have a space for it.'}`);
     this.acquired(d);
     return e;
   }
