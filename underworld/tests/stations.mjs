@@ -53,9 +53,9 @@ const back = await ev(() => {
   const g = window.game, p = g.player, d = g.content.interiors.cur, out = {};
   const R = Math.random; Math.random = () => 0.9;
   p.pos.set(d.ox + 4.6, d.fy, d.oz - 4.4); let m0 = g.money.total(); g.content.spotAct('safe');
-  for (let n = 0; n < 60 * 7; n++) g.update(1 / 60, 1 / 60);
+  for (let n = 0; n < 60 * 9; n++) g.update(1 / 60, 1 / 60);
   out.safe = g.money.total() - m0;
-  m0 = g.money.total(); g.content.spotAct('safe'); for (let n = 0; n < 60 * 7; n++) g.update(1 / 60, 1 / 60); out.safeAgain = g.money.total() - m0;
+  m0 = g.money.total(); g.content.spotAct('safe'); for (let n = 0; n < 60 * 9; n++) g.update(1 / 60, 1 / 60); out.safeAgain = g.money.total() - m0;
   const inv0 = JSON.stringify(g.uw.S.inv); p.pos.set(d.ox - 3.6, d.fy, d.oz - 3.3); g.content.spotAct('stock'); out.stock = JSON.stringify(g.uw.S.inv) !== inv0;
   Math.random = () => 0.1; m0 = g.money.total(); p.pos.set(d.ox + 3.0, d.fy, d.oz - 3.6); g.content.spotAct('desk'); out.desk = g.money.total() - m0;
   Math.random = R;

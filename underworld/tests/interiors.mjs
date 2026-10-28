@@ -101,6 +101,7 @@ check('your own house has no loot to steal from yourself', houses.filter(h => h.
 // ---------------------------------------------------------------- burglary
 const brk = await ev(() => {
   const g = window.game, P = window.__pv;
+  g.uw.S.tools.picks = 5; // a break-in needs a lockpick set (M10)
   const h = g.world.homes.find(x => !x.propId && x.type !== 'farm' && x.type !== 'mansion' && P.homeTier(x, null) >= 3 && g.content.nearHomeDoor({ pos: { x: x.door.x, z: x.door.z } }));
   if (!h) return null;
   g.resetPlayerState(h.door.x, h.door.z, 0); g.player.pos.x = h.door.x; g.player.pos.z = h.door.z;
