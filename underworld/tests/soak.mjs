@@ -4,7 +4,7 @@
    startup: bounded entity / particle / audio counts, no NaN, no runaway listeners or timers,
    flat GPU memory, flat frame cost, no camera drift, sane physics, and a save that round-trips.
    Usage: CYCLES=10 node underworld/tests/soak.mjs */
-import { launch, open, check, frames, startNew, finish } from './lib.mjs';
+import { launch, open, check, frames, startNew, finish, throughCourt } from './lib.mjs';
 const CYCLES = +(process.env.CYCLES || 10);
 // count live event listeners and intervals / pending timeouts from the very first script
 const instrument = () => {
@@ -83,7 +83,8 @@ for (let c = 0; c < CYCLES; c++) {
   // map + overlay
   await page.keyboard.press('KeyM'); await frames(page, 3); await page.keyboard.press('KeyT'); await frames(page, 2); await page.keyboard.press('KeyT'); await frames(page, 2); await page.keyboard.press('KeyM'); await frames(page, 3);
   if (c % 2 === 1) {
-    await ev(() => { const g = window.game; g.police.setLevel(1); g.onBusted(); });
+    await ev(() => { const g = window.game; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+    await throughCourt(page);
     await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
     await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 2; });
     await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 180000 });

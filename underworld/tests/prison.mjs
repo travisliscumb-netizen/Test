@@ -18,7 +18,8 @@ const fmt = await ev(() => { const f = window.__pv.fmtSentence; return [f(1), f(
 check('sentences read as days or years + days', fmt.join('|') === '1 day|45 days|1 year|1 year 74 days|2 years 70 days', fmt.join('|'));
 
 // an early-game arrest: one star, a pickpocketing
-await ev(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = g.money.W.dirty.me = 50000); g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.events.cool = 1e9; (g.money.W.clean = g.money.W.dirty.me = 50000); g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const s0 = await ev(() => { const g = window.game, j = g.uw.S.jail; return { total: j.total, day: g.uw.S.day, hud: document.getElementById('jailDays').textContent + ' / ' + document.getElementById('jailLeft').textContent }; });
 check('an early mistake gets a short sentence (a pickpocketing at one star: under two weeks)', s0.total >= 3 && s0.total <= 12, JSON.stringify(s0));
@@ -199,14 +200,16 @@ const ch = await ev(() => { const g = window.game; return g.uw.prison.charges().
 check('a fugitive caught again answers for the rest of the old sentence', /Escaped custody/.test(ch), ch);
 
 // release after a served sentence
-await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 await ev(() => { const j = window.game.uw.S.jail; j.total = j.served + 1; });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const rel = await ev(() => { const g = window.game; return { interior: !!g.player.interior, hud: document.getElementById('jailHud').classList.contains('hidden'), fug: g.uw.S.fugitive, chores: !g.uw.prison.ch || !g.uw.prison.ch.grp.visible }; });
 check('serve the time and you walk out: back on the street, no jail panel, no fugitive record, chores gone', !rel.interior && rel.hud && !rel.fug && rel.chores, JSON.stringify(rel));
 // a walk-out that works: released at once, the offer paid
-await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(2); g.onBusted(); });
+await ev(() => { const g = window.game; g.police.clear(); g.police.setLevel(2); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const walk = await ev(() => { const g = window.game, P = g.uw.prison, j = g.uw.S.jail; if (!P.courier()) { const c = g.uw.crew.genCandidate(); c.id = g.uw.S.nextCrew++; g.uw.S.crew.push(c); } (g.money.W.clean = g.money.W.dirty.me = 200000); j.lastRelease = -99; j.lockUntil = 0; const m0 = g.money.total(); const r = P.releaseBribe(20000, () => 0); return { r, paid: m0 - g.money.total(), phone: j.phone }; });
 await page.waitForFunction(() => !window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });

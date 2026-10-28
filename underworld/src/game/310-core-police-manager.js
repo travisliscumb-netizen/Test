@@ -323,7 +323,7 @@ class PoliceManager {
       const c = this.pending[i]; c.t -= dt;
       // a witness who was knocked down, scared off or out of range never finishes the call
       if (c.by && (c.by.state === 'down' || c.by.state === 'ko' || !g.peds.peds.includes(c.by))) { this.pending.splice(i, 1); continue; }
-      if (c.t <= 0) { this.pending.splice(i, 1); if (this.enabled) { if (this.level === 0) g.ui.toast('A witness called the police.', 'warn'); if (g.uw) g.uw.cops.crime(c.type, c.sev, true, c.x, c.z); this.addHeat(c.sev, c.x, c.z); } }
+      if (c.t <= 0) { this.pending.splice(i, 1); if (this.enabled) { if (this.level === 0) g.ui.toast('A witness called the police.', 'warn'); if (g.uw) g.uw.cops.crime(c.type, c.sev, true, c.x, c.z, 'witness'); this.addHeat(c.sev, c.x, c.z); } }
     }
     // cleanup dead/far units
     for (let i = this.units.length - 1; i >= 0; i--) {

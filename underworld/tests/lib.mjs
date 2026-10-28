@@ -58,3 +58,9 @@ export async function finish(browser, name) {
   await Promise.race([browser.close().catch(() => {}), new Promise(r => setTimeout(r, 5000))]);
   process.exit(process.exitCode || 0);
 }
+// an arrest goes to court (M7): wait for the hearing, then take a defence ('plead' by default). Suites that need jail
+// make the case big enough first (bustToJail); a small case ends in a fine and never reaches the cells.
+export async function throughCourt(page, choice = 'plead') {
+  await page.waitForFunction(() => { const g = window.game; return g.uw.S.jail || (g.uw.legal.L.hearing && g.state === 'playing' && !g.fading); }, null, { timeout: 120000, polling: 100 });
+  return page.evaluate(c => { const g = window.game; return g.uw.S.jail ? 'jail' : g.uw.legal.verdict(c, () => 0.99); }, choice);
+}

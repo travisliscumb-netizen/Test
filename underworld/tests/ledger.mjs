@@ -3,7 +3,7 @@
    trunk seizure, save and reload, duplicate prevention, invalid and negative amounts) and the owner's rulings
    (§45.1-§45.21): payroll order, crew theft, medical debt, the stunt cash cap, the Clean-only casino, the jail
    commissary, and the v7 → v8 migration of an old single balance into Clean Bank. */
-import { launch, open, check, startNew, finish, frames } from './lib.mjs';
+import { launch, open, check, startNew, finish, frames, throughCourt } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
@@ -106,7 +106,8 @@ const car = await ev(() => { const g = window.game, uw = g.uw, M = g.money, p = 
 check('cash can ride in a car (a stolen one keeps it on the car itself)', car.inCar && car.moved === 5000 && car.car === 5000 && car.me === 15000, JSON.stringify(car));
 check('getting in and moving the cash is the only money event (nothing else pays or charges)', car.log.length === 1 && car.log[0].src === 'move' && car.log[0].d === -5000, JSON.stringify(car.log));
 const pre = await W();
-await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const post = await ev(() => { const g = window.game, M = g.money; return { w: JSON.parse(JSON.stringify(g.save.wallet)), seized: g.uw.S.st.seizedCash, news: (g.save.messages || []).map(m => m.text).filter(t => /took .* in cash/.test(t)).slice(-1)[0] || '' }; });
 check('arrest seizes the Dirty Cash you carried (§2)', pre.dirty.me === 15000 && post.w.dirty.me === 0, JSON.stringify({ pre: pre.dirty, post: post.w.dirty }));

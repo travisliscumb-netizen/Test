@@ -3,7 +3,7 @@
    block (accelerated clock, frozen street clock, world still ticking) and release. After
    every release: hands down, clean pose, and walk / run / sprint / punch / jump / enter /
    exit all work. */
-import { launch, open, check, frames, startNew, summary, finish } from './lib.mjs';
+import { launch, open, check, frames, startNew, summary, finish, throughCourt } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
@@ -33,12 +33,13 @@ async function arrestAndServe(tag, setup, opts = {}) {
   for (const k of opts.keys || []) await page.keyboard.down(k);
   if (opts.keys) await frames(page, 12);
   if (opts.map) { await page.keyboard.press('KeyM'); await frames(page, 3); check(`${tag}: map is open before the bust`, await page.evaluate(() => window.game.mapOpen)); }
-  await page.evaluate(() => { const g = window.game; if (g.police.level === 0) g.police.setLevel(1); g.onBusted(); });
+  await page.evaluate(() => { const g = window.game; if (g.police.level === 0) g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
   for (const k of opts.keys || []) await page.keyboard.up(k);
   if (opts.map) check(`${tag}: the bust closes the map`, await page.evaluate(() => !window.game.mapOpen && document.getElementById('bigmap').classList.contains('hidden')));
   let mid = 0;
   for (let k = 0; k < 40 && mid < 0.6; k++) { await frames(page, 1); mid = Math.max(mid, await page.evaluate(() => window.game.player.pose.surrender || 0)); }
   check(`${tag}: hands-up arrest pose plays`, mid > 0.5, mid.toFixed(2));
+  await throughCourt(page);
   await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
   await frames(page, 5);
   let s = await pose();
@@ -126,7 +127,8 @@ const sent = await page.evaluate(() => {
 check('carried product and guns lengthen the sentence (more than double, and by over two weeks)', sent.loaded > sent.clean * 2 && sent.loaded > sent.clean + 15, JSON.stringify(sent));
 check('nine priors on record', sent.priors === 9, JSON.stringify(sent));
 // jail persists through save + reload
-await page.evaluate(() => { const g = window.game; g.police.setLevel(1); g.onBusted(); });
+await page.evaluate(() => { const g = window.game; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
 await frames(page, 5);
 await page.reload();

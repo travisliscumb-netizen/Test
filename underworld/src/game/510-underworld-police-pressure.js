@@ -12,7 +12,7 @@ class PressureSystem {
   // a paid officer's perks work unless an outside task force is in town
   perk(id) { const c = this.S.cops[id]; return !!(c && c.st === 'paid' && !(this.S.taskforce > 0)); }
   paidCount() { return Object.values(this.S.cops).filter(c => c.st === 'paid').length; }
-  crime(type, sev, witnessed, x, z) {
+  crime(type, sev, witnessed, x, z, q) {
     const uw = this.uw, S = this.S;
     const i = turfAt(x, z);
     let k = (CRIME_PRESSURE[type] || 1) * (witnessed ? 1 : 0.45);
@@ -20,7 +20,8 @@ class PressureSystem {
     if (this.S.taskforce > 0) k *= 1.3;
     S.pressure = clamp(S.pressure + k, 0, 100);
     S.turfs[i].police = clamp(S.turfs[i].police + sev * 3, 0, 100);
-    if (witnessed) { const r = S.rap.cur || (S.rap.cur = {}); r[type] = (r[type] || 0) + 1; }
+    // what somebody saw goes on the case file (M7): an officer's report, or a witness whose call got through
+    if (witnessed && uw.legal) uw.legal.add(type, q || 'police');
     if (type === 'hitcop' || type === 'shootcop') S.rap.cops++;
     if (type === 'copcar') S.rap.copcars++;
   }

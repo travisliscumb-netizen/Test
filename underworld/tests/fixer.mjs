@@ -6,7 +6,7 @@
    - Cash with her isn't on you: an arrest doesn't take it, and it arrives while you are inside.
    - Batches survive save and reload and are delivered exactly once; a corrupt fixer state loads clean.
    - No Clean Bank comes from a stolen car, through the garage or the chop shop. */
-import { launch, open, check, startNew, finish } from './lib.mjs';
+import { launch, open, check, startNew, finish, throughCourt } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
@@ -92,7 +92,8 @@ const pre = await ev(() => {
   uw.fixer.hand(2000);
   return { me: M.W.dirty.me, batches: S.fixer.batches.length };
 });
-await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const jail = await ev(() => {
   const g = window.game, uw = g.uw, M = g.money, S = uw.S;

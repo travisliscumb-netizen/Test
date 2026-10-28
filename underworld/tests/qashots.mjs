@@ -1,7 +1,7 @@
 /* Visual-QA screenshots for this pass (not a test): interiors (mansion both floors, game room, penthouse,
    houses by tier), the parkade decks, gas stations, phone apps, taxi map, jail, vehicles, entrances,
    districts. Written to underworld/.shots/qa. */
-import { launch, open, frames, startNew } from './lib.mjs';
+import { launch, open, frames, startNew, throughCourt } from './lib.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 const OUT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '.shots', 'qa');
@@ -121,7 +121,8 @@ if (want('taxi')) {
   await ev(() => { const g = window.game; g.taxi.cab.vel.set(0, 0); g.taxi.getOut(); });
 }
 if (want('jail')) {
-  await ev(() => { const g = window.game; g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.onBusted(); });
+  await ev(() => { const g = window.game; g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+  await throughCourt(page);
   await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
   await frames(page, 20); await shot('jail-yard-hud');
   await ev(() => window.game.uw.prison.openLife()); await shot('jail-life');

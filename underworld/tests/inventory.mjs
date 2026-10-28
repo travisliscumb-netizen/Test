@@ -5,7 +5,7 @@
    v3 saves load with their stash intact. Guns are single items that live on you or in a stash;
    stashed guns survive an arrest. Runner deliveries: every outcome, capacity, mid-run reload and no
    duplication. Royalties: rivals on your turf pay, reluctantly early and automatically at the top. */
-import { launch, open, check, frames, startNew, finish } from './lib.mjs';
+import { launch, open, check, frames, startNew, finish, throughCourt } from './lib.mjs';
 const b = await launch();
 const t = await open(b, {});
 const page = t.page;
@@ -127,7 +127,8 @@ check('Armorer: Buy weapons / Buy ammo / Buy armor / Loadout / Stash', armr.tabs
 check('Armorer: an owned gun cannot be bought twice and says where it is', armr.pistolDisabled && armr.pistolTxt, JSON.stringify(armr));
 check('Armorer ammo tab counts rounds explicitly (no bare "Carrying 4")', /On you: \d+ pistol rounds/.test(armr.ammoTxt) && !/Carrying \d/.test(armr.ammoTxt), armr.ammoTxt.slice(0, 160));
 // arrest: carried SMG and its rounds go; the stashed pistol and its 24 rounds stay
-await ev(() => { const g = window.game; g.saveGame(true); g.police.enabled = true; g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.saveGame(true); g.police.enabled = true; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 const jailed = await ev(() => { const s = window.game.save, uw = window.game.uw; return { pistol: s.weapons.pistol, where: s.wloc.pistol, smg: s.weapons.smg, smgAmmo: s.ammo.smg, stashAmmo: uw.S.wstash.linden.ammo.pistol, vests: uw.S.wstash.linden.vests.length, inv: Object.keys(uw.S.inv).length }; });
 check('arrest: carried guns and rounds confiscated, the stashed pistol, its rounds and the spare vest stay', jailed.pistol && jailed.where === 'linden' && !jailed.smg && jailed.smgAmmo === 0 && jailed.stashAmmo === 24 && jailed.vests === 1 && jailed.inv === 0, JSON.stringify(jailed));

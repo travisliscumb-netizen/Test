@@ -11,7 +11,7 @@
      staffing turns back anything short of a coordinated strike. Losses are real and persistent.
    - With the player there, the attackers turn up in person: at a warehouse they bring a car for a gate it can break
      (and it breaks through the 3B ram rules), and are kept out by one it can't. A reload mid-fight settles it once. */
-import { launch, open, check, startNew, finish, frames } from './lib.mjs';
+import { launch, open, check, startNew, finish, frames, throughCourt } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
@@ -173,7 +173,8 @@ check('a corner with an Enforcer on it is harder to hit; when it is hit, the Dea
 check('a business that is hit is wrecked (income stops) until you repair it', other.biz === 'hit' && other.dmg === 1, JSON.stringify(other));
 
 // ---------------------------------------------------------------- 6. in jail, the crew settle it without you
-await ev(fid => { const g = window.game, uw = g.uw; for (const o of uw.threats.open()) o.state = 'done'; uw.S.threats.list = []; const o = uw.threats.create(fid, 'stash', { prop: 'linden' }, 2); o.left = 3; o.state = 'imminent'; window.__jt = o.id; g.uw.S.rap.cur = { pickpocket: 1 }; g.police.enabled = true; g.police.setLevel(1); g.onBusted(); }, p1.fid);
+await ev(fid => { const g = window.game, uw = g.uw; for (const o of uw.threats.open()) o.state = 'done'; uw.S.threats.list = []; const o = uw.threats.create(fid, 'stash', { prop: 'linden' }, 2); o.left = 3; o.state = 'imminent'; window.__jt = o.id; g.uw.S.rap.cur = { pickpocket: 1 }; g.police.enabled = true; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); }, p1.fid);
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 await page.waitForFunction(id => window.game.uw.S.threats.log.some(l => l.id === id), await ev(() => window.__jt), { timeout: 60000, polling: 250 });
 const jail = await ev(id => { const uw = window.game.uw, l = uw.S.threats.log.find(x => x.id === id); return { l, live: uw.threats.live.size, still: uw.threats.open().some(o => o.id === id) }; }, await ev(() => window.__jt));

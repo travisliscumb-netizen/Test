@@ -1,5 +1,5 @@
 /* Visual pass: renders key scenes to PNGs (SHOT_DIR, default underworld/.shots). */
-import { launch, open, frames, startNew } from './lib.mjs';
+import { launch, open, frames, startNew, throughCourt } from './lib.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 const DIR = process.env.SHOT_DIR || path.resolve('.shots');
@@ -44,7 +44,8 @@ await set(() => window.game.uw.ui.open('market')); await shot('09-empire-market'
 await set(() => { while (window.game.ui.stack.length) window.game.ui.back(); });
 await page.keyboard.press('KeyM'); await shot('10-bigmap-overlay'); await page.keyboard.press('KeyM');
 // jail
-await set(() => { const g = window.game; g.police.setLevel(2); g.onBusted(); });
+await set(() => { const g = window.game; g.police.setLevel(2); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading, null, { timeout: 120000 });
 await frames(page, 40);
 await shot('11-jail');

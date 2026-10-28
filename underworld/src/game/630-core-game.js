@@ -330,7 +330,7 @@ class Game {
     const ch = this.uw.prison.charges();
     const lv = this.player.lastVehicle;
     this.uw.prison.pending = { ch, veh: lv && this.vehicles.list.includes(lv) && dist2(lv.pos.x, lv.pos.z, this.player.pos.x, this.player.pos.z) < 20 * 20 ? lv : null };
-    go.querySelector('.gs').textContent = `Facing ${fmtDays(ch.total)} · everything you carry is evidence now`;
+    go.querySelector('.gs').textContent = `${ch.counts.length} count${ch.counts.length === 1 ? '' : 's'}, up to ${fmtDays(ch.total)} · everything you carry is evidence now · the court decides`;
     this.audio.play('radio');
     this.input.releaseAll();
     const token = ++this.lifeToken;

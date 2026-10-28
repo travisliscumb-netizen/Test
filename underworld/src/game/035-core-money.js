@@ -38,6 +38,8 @@ const MONEY_SOURCES = {
   chopWork: { pay: 'dirty' },
   // a tip bought from a fence about where a one-off stands (Session 6D): cash in hand
   intel: { pay: 'dirty' },
+  // the court (M7): fines and a judge's campaign donation from the bank; a crew envelope in Dirty Cash (payroll order)
+  courtFine: { pay: 'clean' }, judgeFix: { pay: 'clean' }, judgeBribe: { pay: 'payroll' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
   // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank

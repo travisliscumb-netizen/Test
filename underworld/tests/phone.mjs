@@ -3,7 +3,7 @@
    the jail panel never sits under the Map button (in jail, with the map open, after a rotation
    and after release), and while driving the pedals never cover the speedometer, prompts or
    the arrest bar. */
-import { launch, open, check, frames, startNew, finish } from './lib.mjs';
+import { launch, open, check, frames, startNew, finish, throughCourt } from './lib.mjs';
 const SIZES = [[390, 844], [844, 390], [375, 667], [667, 375], [320, 568], [568, 320], [430, 932], [932, 430]];
 const b = await launch();
 const t = await open(b, { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
@@ -89,7 +89,8 @@ await frames(page, 6);
 
 // 4. jail: the panel and the Map button each keep their own space
 await setSize(390, 844);
-await page.evaluate(() => { const g = window.game; g.police.setLevel(1); g.onBusted(); });
+await page.evaluate(() => { const g = window.game; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 for (const [w, h] of SIZES) {
   await setSize(w, h);

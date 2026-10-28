@@ -4,7 +4,7 @@
    into the stadium, ride the penthouse elevator to the garage and drive out. After every step
    the HUD is checked for overlaps and off-screen controls, menus for clipping, and the run for
    console errors and long frame stalls. */
-import { launch, open, check, frames, startNew, finish } from './lib.mjs';
+import { launch, open, check, frames, startNew, finish, throughCourt } from './lib.mjs';
 const W = 390, H = 844;
 const b = await launch();
 const t = await open(b, { hasTouch: true, isMobile: true, viewport: { width: W, height: H } });
@@ -81,7 +81,8 @@ await ev(() => { const g = window.game; g.exitVehicle(true); });
 const menus = await ev(() => { const g = window.game, out = []; for (const tab of ['overview', 'map', 'crew', 'assets', 'market', 'stash', 'factions', 'police', 'feed']) { g.uw.ui.open(tab); const p = document.querySelector('#empireScreen .panel'), r = p.getBoundingClientRect(); out.push({ tab, ok: r.left >= -1 && r.right <= innerWidth + 1 && r.top >= -1 && r.bottom <= innerHeight + 1 && p.scrollWidth <= p.clientWidth + 2 }); g.ui.closeAll(); } return out; });
 check('every management tab fits the phone without sideways overflow', menus.every(m => m.ok), JSON.stringify(menus.filter(m => !m.ok)));
 // 5. jail, with the map opened inside
-await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.onBusted(); });
+await ev(() => { const g = window.game; g.police.enabled = true; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000, polling: 100 });
 await hudCheck('in jail');
 await tap('#tbar .tbtn[data-act="map"]');

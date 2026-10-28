@@ -603,6 +603,7 @@ class EmpireUI {
       <div class="tile"><small>Crackdown</small><b>${S.crackdown > 0 ? S.crackdown + ' days' : 'none'}</b></div></div>
       <div class="hint">Pressure is your long-term heat: more patrols, sharper eyes, raids on your stashes and longer sentences. It rises with witnessed crimes, wanted levels, dealing and gang war, and falls with time, lying low, front businesses and friends on the force.</div>
       <div class="stats"><span>Prior convictions</span><span>${S.rap.priors}</span><span>Officers assaulted</span><span>${S.rap.cops}</span><span>Police cars destroyed</span><span>${S.rap.copcars}</span><span>Sentence multiplier now</span><span>×${(uw.cops.sentenceMul() * (1 + S.rap.priors * 0.12)).toFixed(2)}</span></div>
+      ${uw.legal.caseHtml()}
       <h3>People on the force</h3><div class="grid2">`;
     for (const O of OFFICERS) {
       const c = S.cops[O.id], can = CS.canApproach(O);
@@ -654,6 +655,7 @@ class EmpireUI {
       case 'repair': r = uw.props.repair(x); break;
       case 'dec': uw.crew.decide(+x, y === '1'); break;
       case 'cbribe': r = uw.cops.approach(x); break;
+      case 'quash': r = uw.legal.quash(); break;
       case 'cdrop': uw.cops.drop(x); r = 'You stopped paying. They won’t miss you.'; break;
       case 'redir': r = uw.cops.redirect(x); if (!r) r = 'Pike is on it.'; break;
       case 'run': { const d = this.runDraft || (this.runDraft = {}); d[x] = x === 'n' || x === 'crew' ? +y : y; this.render(); return; }

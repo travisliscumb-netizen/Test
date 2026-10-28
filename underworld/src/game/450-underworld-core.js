@@ -140,6 +140,7 @@ class Underworld {
     this.royalty = new RoyaltySystem(this);
     this.cops = new PressureSystem(this);
     this.prison = new Prison(this);
+    this.legal = new Legal(this);
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
@@ -252,6 +253,7 @@ class Underworld {
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
+    S.legal = Legal.sanitize(S.legal, num, S.rap);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
@@ -785,6 +787,7 @@ class Underworld {
     if (dt > 0) {
       this.pickups.update(dt);
       this.compounds.update(dt);
+      this.legal.update(dt);
       if (!S.jail) { this.gangs.update(dt); this.shipments.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
       this.combatT = Math.max(0, this.combatT - dt);
     }
@@ -819,6 +822,7 @@ class Underworld {
     this.rivalwh.tickDay();
     this.factions.tickDay();
     this.cops.tickDay();
+    this.legal.tickDay();
     this.opps.tickDay();
     S.infamy *= 0.99;
     // the chop shop wanted list and street buyer quotas refresh daily

@@ -164,7 +164,7 @@ const arrest = await ev(() => {
   const v = R.live(e); g.completeEnter(v);
   P.Inv.add(v.trunk, 'snow', 20, 0); g.money.W.dirty.veh[e.uid] = 777;
   g.player.state = 'busted';
-  uw.prison.pending = { ch: uw.prison.charges(), veh: v }; uw.prison.arrest();
+  uw.S.rap.maxLvl = 3; uw.legal.add('assault', 'police'); uw.prison.pending = { ch: uw.prison.charges(), veh: v }; uw.prison.arrest(); uw.legal.verdict('plead', () => 0.99);
   return { imp: e.imp && { why: e.imp.why, fee: e.imp.fee, paid: e.imp.paid }, owned: s.garage.includes(e), trunk: window.__u(e.trunk), cash: g.money.dirtyInCar(e.uid), jail: !!uw.S.jail };
 });
 check('arrested in your car: the car goes to the impound, still yours; its contraband and cash are confiscated (impound keeps nothing the police took)', arrest.jail && arrest.owned && arrest.imp && arrest.imp.why === 'arrest' && arrest.imp.fee > 0 && !arrest.imp.paid && arrest.trunk === 0 && arrest.cash === 0, JSON.stringify(arrest));

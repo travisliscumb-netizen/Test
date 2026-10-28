@@ -3,7 +3,7 @@
    deals -> crew dealer income -> gang fight -> turf takeover -> rivals acting alone ->
    police raid supply shock -> corruption (bought and honest cops) -> save / reload ->
    corrupted save recovery. */
-import { launch, open, check, frames, startNew, summary, finish } from './lib.mjs';
+import { launch, open, check, frames, startNew, summary, finish, throughCourt } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b);
 await startNew(page);
@@ -161,7 +161,8 @@ await page.keyboard.down('KeyW'); await frames(page, 30); await page.keyboard.up
 let chase = { lvl: 0, units: 0 };
 for (let k = 0; k < 80 && !(chase.units > 0); k++) { await frames(page, 4); chase = await ev(() => ({ lvl: window.game.police.level, units: window.game.police.units.length + window.game.police.cops.length })); }
 check('session: a pursuit starts', chase.lvl >= 1 && chase.units > 0, JSON.stringify(chase));
-await ev(() => window.game.onBusted());
+await ev(() => (() => { const g = window.game; g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); })());
+await throughCourt(page);
 await page.waitForFunction(() => window.game.uw.S.jail && !window.game.fading && window.game.state === 'playing', null, { timeout: 120000 });
 const jailed = await ev(() => ({ inv: Object.keys(window.game.uw.S.inv).length, interior: window.game.player.interior && window.game.player.interior.id, veh: window.game.player.vehicle }));
 check('session: busted in the car -> jail, product confiscated', jailed.interior === 'prison' && jailed.inv === 0 && !jailed.veh, JSON.stringify(jailed));

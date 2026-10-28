@@ -117,29 +117,14 @@ class Prison {
   constructor(uw) { this.uw = uw; this.callT = 0; this.ambT = 0; this.esc = null; }
   get S() { return this.uw.S; }
   get j() { return this.uw.S.jail; }
+  // what the arrest looks like before the court (the busted screen): the court's counts and the sentence they add up to
   charges() {
-    const uw = this.uw, S = this.S, g = uw.g;
-    const lines = [];
-    const lvl = Math.max(g.police.level, (S.rap.maxLvl || 0));
-    let days = SENTENCE_BASE[clamp(lvl, 1, 5)];
-    lines.push([`Resisting arrest / evading (${lvl}★)`, days]);
-    const cur = S.rap.cur || {};
-    for (const k in cur) if (CRIME_DAYS[k] && cur[k] > 0) { const d = CRIME_DAYS[k] * Math.min(cur[k], 6); days += d; lines.push([`${({ hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person', robbery: 'Armed robbery', burglary: 'Burglary' })[k] || k} ×${cur[k]}`, d]); }
-    const carried = uw.carried();
-    // only what is on you (or in the car you were caught by): goods by lot, guns you were carrying
-    for (const k of GOOD_IDS) { const n = carried[k] | 0; const d = Math.round(TIERS[GOODS[k].tier].charge * n * 0.5); if (d) { days += d; lines.push([`Possession: ${fmtQty(k, n)} ${GOODS[k].name}`, d]); } }
-    const on = id => g.player.carries(id);
-    if (on('pistol') || on('smg') || on('shotgun')) { const d = (on('pistol') ? 14 : 0) + (on('smg') ? 45 : 0) + (on('shotgun') ? 30 : 0); days += d; lines.push(['Unlicensed firearms', d]); }
-    const pv = g.player.lastVehicle;
-    if (pv && !pv.owned && !pv.garageUid && g.player.state === 'busted' && pv.stolenBefore) { days += 10; lines.push(['Possession of a stolen vehicle', 10]); }
-    if (S.fugitive && S.fugitive.left > 0) { const d = S.fugitive.left + 60; days += d; lines.push(['Escaped custody (the rest of your last sentence + 60 days)', d]); }
-    const mul = Math.min(1.8, 1 + S.rap.priors * 0.08) * uw.cops.sentenceMul();
-    const full = clamp(Math.round(days * mul), 5, SENTENCE_MAX);
-    // the sentence served is half of what the old scale gave (5 days → 3, the 3-year cap → 1 year 183 days)
-    const total = Math.max(3, Math.round(full * SENTENCE_FACTOR));
-    return { total, full, lines, mul };
+    const L = this.uw.legal, ch = L.charges(), total = L.sentenceOf(ch.counts, ch.mul, ch.fugitive);
+    return { ...ch, total, full: total, lines: ch.counts.map(c => [c.name, c.days]) };
   }
   // called once the arrest animation has played: sentence, confiscate, lock up
+  // booking (M7): the counts are fixed from what you had on you before it is taken, then everything carried is
+  // confiscated, then the court hears the case (Legal.arraign); a jail sentence comes back through lockUp
   arrest() {
     const uw = this.uw, S = this.S, g = uw.g, p = g.player;
     const pend = this.pending || { ch: this.charges(), veh: null }; this.pending = null;
@@ -165,7 +150,11 @@ class Prison {
     for (const k in g.save.ammo) g.save.ammo[k] = 0;
     p.mag = { pistol: 0, smg: 0, shotgun: 0 }; p.weapon = 0; p.vest = 0; g.save.vest = 0;
     if (kept) uw.news('pv', `The police took what you carried. The ${kept === 1 ? 'gun' : kept + ' guns'} in your stash ${kept === 1 ? 'is' : 'are'} still there.`);
-    S.rap.priors++; S.rap.cur = {}; S.rap.maxLvl = 0; S.fugitive = null;
+    uw.legal.arraign(ch);
+  }
+  // the court sent you down: the cell block, on its own clock
+  lockUp(ch) {
+    const uw = this.uw, S = this.S, g = uw.g;
     S.jail = Prison.fresh(ch);
     this.acc = 0;
     this.enter();
@@ -774,7 +763,7 @@ class Prison {
     g.fade(() => {
       this.endEscape();
       S.jail = null; this.callT = 0; this.choreClear(); uw.ui.showJail(false);
-      S.fugitive = { left, day: S.day };
+      S.fugitive = { left, day: S.day }; uw.legal.L.escapes++;
       g.content.interiors.exit(true);
       g.player.applyOutfit(g.save.outfit);
       // the storm drain comes out by the harbour wall, a few blocks from County
