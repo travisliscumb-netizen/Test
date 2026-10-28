@@ -8,6 +8,10 @@
    stuck backs up, reroutes, and as a last resort takes the short way round (a quick fade).
    ===================================================================== */
 const FARE_BASE = 6, FARE_PER_KM = 22, CAB_SPEED = 13;
+// a cab is not a way round the logistics (M11, §27): no fare while wanted; a load of product (more than `carry`
+// units on you) is a delivery, not a fare; any product at all and the ride goes the whole way (no Skip)
+const TAXI_RULES = { carry: 2 };
+const taxiCarried = g => g.uw ? units(g.uw.S.inv) : 0;
 function fareFor(m) { return Math.max(8, Math.round(FARE_BASE + m / 1000 * FARE_PER_KM)); }
 function routeLen(x0, z0, x1, z1) { const r = gpsRoute(x0, z0, x1, z1); let d = 0, px = x0, pz = z0; for (const q of r) { d += Math.hypot(q.x - px, q.z - pz); px = q.x; pz = q.z; } return d + Math.hypot(x1 - px, z1 - pz); }
 // the nearest point on a street (any road but a circuit or a course: the lattice, the curved roads, the spurs and the
@@ -52,6 +56,7 @@ class TaxiService {
     if (p.interior) return 'Step outside first.';
     if (p.state === 'vehicle') return p.passenger ? 'You’re already in a cab.' : 'Get out of the car first.';
     if (g.uw && g.uw.S.jail) return 'Not from in here.';
+    if (taxiCarried(g) > TAXI_RULES.carry) return 'Cabline: “We don’t do deliveries.” Not with that much product on you.';
     return null;
   }
   // call a cab: the nearest free taxi in traffic turns round for you, else one is sent from out of sight
@@ -121,7 +126,7 @@ class TaxiService {
       <div class="btns" style="display:flex;flex-direction:column;gap:8px"><button class="sbtn gold" data-act="hire">Hire the cab</button><button class="sbtn" data-act="jack">Carjack it (a crime)</button><button class="sbtn" data-act="no">Never mind</button></div>`;
     g.content.openSvc('Taxi', 'The driver looks up.', render, a => {
       g.ui.back();
-      if (a === 'hire') this.choose(false);
+      if (a === 'hire') { const why = this.canHail(); if (why) { g.ui.toast(why, 'warn'); g.audio.play('deny'); this.cab = null; this.state = 'idle'; v.ctl.handbrake = false; return; } this.choose(false); }
       else if (a === 'jack') { this.cab = null; this.state = 'idle'; v.taxiCab = false; v.drive = null; g.beginEnter(v); }
     });
   }
@@ -186,6 +191,7 @@ class TaxiService {
   // skip the drive: the screen dips and you arrive; the full agreed fare
   skip() {
     const g = this.g, v = this.cab; if (this.state !== 'riding' || !v || !this.dest || g.fading) return;
+    if (taxiCarried(g) > 0) { g.ui.toast('Not with product on you: the driver takes the long way, and so do you.', 'warn'); g.audio.play('deny'); return; }
     const left = this.remaining(), fare = this.quote, d = this.dest;
     g.fade(() => {
       const kp = nearestRoadPoint(d.x, d.z) || d;
@@ -255,6 +261,7 @@ class TaxiService {
     const left = this.remaining();
     el.querySelector('.td').textContent = this.dest.name;
     el.querySelector('.tm').textContent = `${fmtDist(left)} to go · fare ${fmtMoney(this.quote)} · meter ${fmtMoney(Math.min(this.quote, this.meterFare()))}`;
+    const sk = el.querySelector('[data-tx="skip"]'); if (sk) sk.disabled = taxiCarried(this.g) > 0;
   }
 }
 

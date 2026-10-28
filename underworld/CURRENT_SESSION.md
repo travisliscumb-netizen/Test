@@ -9,7 +9,9 @@
   scratch timing.
 - Note: the m9-full runner uses the live tests/ against the staged pre-M10 build, so suites edited for M10
   (interiors, property, stations, gambling) must be rerun on the final build; do that in the CC regression.
-- Now: **M11 — phone / map / GPS / taxi** (ROADMAP.md): regroup the phone into Empire / Operations / Trade /
-  Assets / City / Messages + direct Map; the Rank · Dirty · Bank · Pressure header; inventory by location; message
-  priorities and deep links; map intel layers; taxi refusal rules (wanted, HOT, cargo).
-- Next action: audit the phone (`540` app grid, `phoneapps` suite), then regroup.
+- M11 done: phone in six groups + direct Map, Rank·Dirty·Bank·Pressure header, a priority inbox with deep links
+  (threats, warrant/fugitive, decisions, repairs, impound), the Intel map layer (known rival stash houses, live
+  threats), taxi rules (no fare while wanted or with a load of product; no Skip with any product).
+- Now: **M12 — contacts / onboarding / missions** (ROADMAP.md): 5–7 opening jobs teaching product, Dirty Cash,
+  vehicles, HOT, warehouse, police risk and the map; mentor hints that stop once learned; remove stale wording.
+- Next action: audit `CAMPAIGN` (380), `590-tutorial.js`, contacts in `340`, then write the opening jobs.

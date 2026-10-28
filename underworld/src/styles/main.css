@@ -544,3 +544,4 @@ body[data-gs="paused"] #jailHud{display:none}
   .tabs .etab{padding:6px 8px;font-size:11px}
   .tile b{font-size:17px}
 }
+#empBody .appTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 10px}#empBody .appTop .hint{margin:0}#empStats .empSub{flex-basis:100%;font-size:11px;color:var(--dim)}

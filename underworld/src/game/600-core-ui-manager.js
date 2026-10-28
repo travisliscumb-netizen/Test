@@ -773,14 +773,18 @@ const MAP_CATS = {
   carsNew: { name: 'New Cars', icon: 'N', col: '#7fb2ff', layer: 'locations' },
   carsLux: { name: 'Performance & Luxury', icon: '★', col: '#e8d28a', layer: 'locations' },
   // a one-off's search area (?) or, once spotted, its exact place (◆) (Session 6D)
-  unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' }
+  unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' },
+  // intel (M11): what you actually know, never more: a gang's stash house once you know its district, and the
+  // places a threat is aimed at while it is live
+  rivalwh: { name: 'Rival stash houses', icon: 'R', col: '#ff4d5e', layer: 'intel' },
+  threat: { name: 'Threats', icon: '⚠', col: '#ff4d5e', layer: 'intel' }
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
   ['factions', 'Faction HQs'], ['territory', 'Territory'], ['police', 'Police'], ['garages', 'Garages & parking'], ['economy', 'Street prices'],
-  ['buy', '↓ Buy product (suppliers)'], ['sell', '$ Sell product (buyers)']
+  ['buy', '↓ Buy product (suppliers)'], ['sell', '$ Sell product (buyers)'], ['intel', 'Intel (rival stashes, threats)']
 ];
-const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true };
+const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true, intel: true };
 // centre of each named district (average of its blocks), for map labels and cards
 const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
 // the street good paying furthest over its base price in a district right now
@@ -851,6 +855,10 @@ class MapView {
       const pw = uw.loc('prop', 'pawn'); if (pw) add({ key: 'sell:pawn', name: 'Lucky’s Pawn · fence', cat: 'sell', x: pw.x + 1.5, z: pw.z + 1.5, sub: 'SELL hot goods and smokes · no questions asked' });
     }
     if (g.uniques) for (const e of g.uniques.mapEntries()) add(e);
+    if (uw) {
+      for (const fid in RIVAL_WH) { const C = uw.rivalwh.C(fid); if (!C || uw.S.factions[fid].broken || !g.save.discovered.zones[zoneKey(C.center.x, C.center.z)]) continue; add({ key: 'rv:' + fid, name: RIVAL_WH[fid].name, cat: 'rivalwh', col: FACTIONS[fid].col, x: C.center.x, z: C.center.z, sub: `${FACTIONS[fid].name}: their product and cash` }); }
+      for (const o of uw.threats.open()) add({ key: 'th:' + o.id, name: `Threat: ${o.label}`, cat: 'threat', x: o.x, z: o.z, sub: `${FACTIONS[o.fid].short} · ${o.state === 'live' ? 'happening now' : o.state}` });
+    }
     for (const ct of g.missions.contacts) if (ct.visible !== false && !ct.interior && (!ct.storyOnly || ct.marker.g.visible)) add({ key: 'ct:' + ct.id, name: ct.name, cat: 'contact', col: '#' + new THREE.Color(ct.color).getHexString(), x: ct.x, z: ct.z, sub: ct.role });
     this.entries = out;
     return out;

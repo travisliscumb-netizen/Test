@@ -290,9 +290,4 @@ class ThreatSystem {
     this.resolve(o, out === 'stand' && !got ? 'won' : out);
   }
   reset() { this.live.clear(); }
-  // what the Feed shows: live threats with their clocks
-  feedHTML(esc) {
-    const list = this.open(); if (!list.length) return '';
-    return '<h3>Threats</h3><div class="msgs">' + list.map(o => `<div class="msg"><i style="background:#ff4d5e">⚠</i><div><b>${esc(FACTIONS[o.fid].short)} · ${esc(o.label)}</b><small>${o.state === 'live' ? 'happening now' : o.state === 'imminent' ? `IMMINENT · ${Math.ceil(o.left)} s` : `about ${Math.ceil((o.left + THREAT_T.imminent) / 60)} min`}${o.opened ? '' : ' · new'}</small><p>Against ${esc(THREAT_KINDS[o.kind])}. Get there to defend it in person, or your crew will try on their own.</p><div class="btns"><button class="sbtn gold" data-act="threat:${o.id}">Go there</button></div></div></div>`).join('') + '</div>';
-  }
 }

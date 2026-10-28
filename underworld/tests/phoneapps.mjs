@@ -16,9 +16,9 @@ const home = await ev(() => {
   const rects = tiles.map(t => t.getBoundingClientRect());
   return { modal: g.ui.modal, title: document.getElementById('empTitle').textContent, n: tiles.length, groups: [...document.querySelectorAll('#empBody .appHome h4')].map(h => h.textContent), tabsHidden: document.getElementById('empTabs').classList.contains('hidden'), minW: Math.min(...rects.map(r => r.width)), minH: Math.min(...rects.map(r => r.height)), inside: rects.every(r => r.left >= 0 && r.right <= W + 0.5), names: tiles.map(t => t.querySelector('b').textContent) };
 });
-check('opening the phone shows the app home screen (no tab wall)', home.modal === 'empireScreen' && home.title === 'Phone' && home.tabsHidden && home.n >= 10 && home.n <= 14, JSON.stringify(home));
-check('apps are grouped (Business / Operations / City) with big touch targets inside the screen', home.groups.length === 3 && home.minW >= 64 && home.minH >= 64 && home.inside, JSON.stringify(home));
-check('the home screen has every app the job needs', ['Empire', 'Market', 'Street Connect', 'Inventory', 'Stashes', 'Crew', 'Property', 'Garage', 'Armory', 'Police', 'Feed', 'Map', 'Cabline'].every(n => home.names.includes(n)), JSON.stringify(home.names));
+check('opening the phone shows the app home screen (no tab wall)', home.modal === 'empireScreen' && home.title === 'Phone' && home.tabsHidden && home.n >= 10 && home.n <= 15, JSON.stringify(home));
+check('apps are grouped (Empire / Operations / Trade / Assets / City / Messages) with big touch targets inside the screen', home.groups.join() === 'EMPIRE,OPERATIONS,TRADE,ASSETS,CITY,MESSAGES' && home.minW >= 64 && home.minH >= 64 && home.inside, JSON.stringify(home));
+check('the home screen has every app the job needs', ['Empire', 'Market', 'Street Connect', 'Inventory', 'Stashes', 'Crew', 'Property', 'Garage', 'Armory', 'Police', 'Messages', 'Map', 'Cabline'].every(n => home.names.includes(n)), JSON.stringify(home.names));
 
 // every app: opens, has a back button, its pages render, no sideways overflow, back returns home
 const apps = await ev(() => {
@@ -136,6 +136,50 @@ const jail = await ev(() => {
   while (g.ui.stack.length) g.ui.back(); uw.S.jail = null;
   return { locked, blocked: t.includes('can’t reach anyone') };
 });
-check('in jail without a phone, every app but Feed (Empire included) is greyed out and locked', jail.locked.includes('Market') && jail.locked.includes('Empire') && !jail.locked.includes('Feed') && jail.blocked, JSON.stringify(jail));
+check('in jail without a phone, every app but Messages (Empire included) is greyed out and locked', jail.locked.includes('Market') && jail.locked.includes('Empire') && !jail.locked.includes('Messages') && jail.blocked, JSON.stringify(jail));
+// ---------------------------------------------------------------- M11: the header, the direct Map, the inbox and its deep links
+const m11 = await ev(() => {
+  const g = window.game, uw = g.uw, out = {};
+  uw.ui.open();
+  out.header = [...document.querySelectorAll('#empStats > span')].map(e => e.textContent.replace(/[^A-Za-z ]/g, '').trim().split(' ')[0]);
+  out.sub = /Rep/.test(document.querySelector('#empStats .empSub').textContent);
+  out.mapBtn = !!document.querySelector('#empBody .appTop [data-act="app:map"]');
+  out.calm = /Nothing urgent/.test(document.querySelector('#empBody .appTop').textContent);
+  // a warrant: it shows on the home strip and in Messages, and its link opens the case file
+  uw.legal.L.warrant = true; uw.ui.render();
+  out.strip = document.querySelector('#empBody .appTop').textContent;
+  document.querySelector('#empBody [data-act="app:feed"]').click();
+  const body = document.getElementById('empBody'); out.inbox = /Needs you/.test(body.textContent) && /warrant/.test(body.textContent);
+  const go = body.querySelector('[data-act="go:police"]'); out.go = !!go; if (go) go.click();
+  out.tab = uw.ui.tab; out.title = document.getElementById('empTitle').textContent;
+  uw.legal.L.warrant = false;
+  while (g.ui.stack.length) g.ui.back();
+  return out;
+});
+check('the phone header leads with Rank · Dirty · Bank · Pressure (Rep, influence and day below)', m11.header.length === 4 && m11.header[1] === 'Dirty' && m11.header[2] === 'Bank' && m11.header[3] === 'Pressure' && m11.sub, JSON.stringify(m11));
+check('the Map is one tap from the top of the home screen, which says when nothing is urgent', m11.mapBtn && m11.calm, JSON.stringify(m11));
+check('a warrant shows as “needs you”; in Messages its link opens the Police case file', /1 needs you/.test(m11.strip) && m11.inbox && m11.go && m11.tab === 'police' && m11.title === 'Police', JSON.stringify(m11));
+const intel = await ev(() => {
+  const g = window.game, uw = g.uw, v = g.ui.mapView, out = {};
+  for (const z in window.__pv.ZONES) g.save.discovered.zones[z] = false;
+  v.buildIndex(); out.none = v.entries.filter(e => e.cat === 'rivalwh').length;
+  for (const z in window.__pv.ZONES) g.save.discovered.zones[z] = true;
+  v.buildIndex(); out.all = v.entries.filter(e => e.cat === 'rivalwh').length; out.layer = v.layerOn('intel');
+  return out;
+});
+check('map intel: a rival stash house appears only once you know its district; the Intel layer is on by default', intel.none === 0 && intel.all >= 3 && intel.layer, JSON.stringify(intel));
+const cab = await ev(() => {
+  const g = window.game, uw = g.uw, T = g.taxi, P = window.__pv, out = {};
+  const kp = P.nearestRoadPoint(5 * 80 + 40, 5 * 80); g.resetPlayerState(kp.x, kp.z, 0); g.police.clear();
+  uw.S.inv = {}; out.clean = T.canHail();
+  uw.S.inv = { green: 5 }; out.load = T.canHail();
+  uw.S.inv = { green: 1 }; out.small = T.canHail();
+  g.police.setLevel(1); out.wanted = T.canHail(); g.police.clear();
+  // a ride with a little product: no Skip
+  T.state = 'riding'; T.cab = g.vehicles.list[0] || {}; T.dest = { x: kp.x + 300, z: kp.z, name: 'x' }; const t0 = g.env.time; T.skip(); out.skipped = g.fading || g.env.time !== t0;
+  T.state = 'idle'; T.cab = null; T.dest = null; uw.S.inv = {};
+  return out;
+});
+check('taxi rules: no cab while wanted or with a load of product; a little product rides but cannot Skip', cab.clean === null && /deliveries/.test(cab.load || '') && cab.small === null && /police/.test(cab.wanted || '') && !cab.skipped, JSON.stringify(cab));
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));
 await finish(b, 'phoneapps');

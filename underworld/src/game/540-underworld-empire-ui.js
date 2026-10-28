@@ -108,7 +108,7 @@ class EmpireUI {
   // app (or the place) that deals with it
   inbox() {
     const uw = this.uw, S = uw.S, g = this.g, out = [];
-    for (const o of uw.threats.open()) out.push({ pri: 0, icon: '⚠', col: '#ff4d5e', title: `${FACTIONS[o.fid].short}: ${o.label}`, text: o.state === 'live' ? 'Happening now.' : o.state === 'imminent' ? 'Imminent.' : 'A warning.', go: `threat:${o.id}`, goLabel: 'Respond' });
+    for (const o of uw.threats.open()) out.push({ pri: 0, icon: '⚠', col: '#ff4d5e', title: `${FACTIONS[o.fid].short}: ${o.label}`, text: o.state === 'live' ? 'HAPPENING NOW' : `${o.state === 'imminent' ? 'IMMINENT' : 'WARNING'} · ${Math.ceil(o.left)} s left`, go: `threat:${o.id}`, goLabel: 'Respond' });
     if (S.fugitive && S.fugitive.left > 0) out.push({ pri: 1, icon: '🚔', col: '#ff8a3d', title: 'You are a fugitive', text: 'A recapture adds time to the sentence. Keep your head down.', go: 'tab:police', goLabel: 'Case file' });
     else if (uw.legal.L.warrant) out.push({ pri: 1, icon: '🚔', col: '#ff8a3d', title: 'There is a warrant out for you', text: 'Any officer who recognises you will make the arrest. A lawyer can try to quash it.', go: 'tab:police', goLabel: 'Case file' });
     for (const d of S.decisions) out.push({ pri: 1, icon: '?', col: '#ffd84d', title: d.text, text: 'Your crew is waiting on an answer.', dec: d.id });

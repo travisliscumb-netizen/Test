@@ -561,6 +561,7 @@ body[data-gs="paused"] #jailHud{display:none}
   .tabs .etab{padding:6px 8px;font-size:11px}
   .tile b{font-size:17px}
 }
+#empBody .appTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 10px}#empBody .appTop .hint{margin:0}#empStats .empSub{flex-basis:100%;font-size:11px;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -57127,11 +57128,6 @@ class ThreatSystem {
     this.resolve(o, out === 'stand' && !got ? 'won' : out);
   }
   reset() { this.live.clear(); }
-  // what the Feed shows: live threats with their clocks
-  feedHTML(esc) {
-    const list = this.open(); if (!list.length) return '';
-    return '<h3>Threats</h3><div class="msgs">' + list.map(o => `<div class="msg"><i style="background:#ff4d5e">⚠</i><div><b>${esc(FACTIONS[o.fid].short)} · ${esc(o.label)}</b><small>${o.state === 'live' ? 'happening now' : o.state === 'imminent' ? `IMMINENT · ${Math.ceil(o.left)} s` : `about ${Math.ceil((o.left + THREAT_T.imminent) / 60)} min`}${o.opened ? '' : ' · new'}</small><p>Against ${esc(THREAT_KINDS[o.kind])}. Get there to defend it in person, or your crew will try on their own.</p><div class="btns"><button class="sbtn gold" data-act="threat:${o.id}">Go there</button></div></div></div>`).join('') + '</div>';
-  }
 }
 /* =====================================================================
    [UNDERWORLD] RIVAL WAREHOUSES (§9, §45.27; Session 4B): each gang keeps
@@ -57912,22 +57908,23 @@ class ShipmentSystem {
    territory overlay for the big map and the jail HUD. The HUD itself stays
    clean: money, health, wanted level, prompt, weapon, speed.
    ===================================================================== */
-// the phone: apps on a home screen, each with one or a few pages (tabs). 'go' apps leave the phone.
+// the phone (M11, §27): apps on a home screen in six groups (Empire, Operations, Trade, Assets, City, Messages), each
+// with one or a few pages (tabs). 'go' apps leave the phone. The Map is also one tap from the top of the home screen.
 const PHONE_APPS = [
-  { id: 'empire', name: 'Empire', icon: '👑', col: '#ffb547', cat: 'BUSINESS', sub: 'turf · rivals', tabs: [['overview', 'Overview'], ['map', 'Territory'], ['factions', 'Factions']] },
-  { id: 'market', name: 'Market', icon: '📈', col: '#7fe08f', cat: 'BUSINESS', sub: 'cost · profit', tabs: [['pnl', 'My stock'], ['market', 'Prices']] },
-  { id: 'connect', name: 'Street Connect', icon: '🤝', col: '#d28cff', cat: 'BUSINESS', sub: 'buy · sell', tabs: [['connect', 'Contacts']] },
-  { id: 'inventory', name: 'Inventory', icon: '🎒', col: '#46d4c4', cat: 'BUSINESS', sub: 'carried · stored', tabs: [['stash', 'All product']] },
-  { id: 'stashes', name: 'Stashes', icon: '📦', col: '#c9a46b', cat: 'BUSINESS', sub: 'what is where', tabs: [['stashes', 'Stashes']] },
+  { id: 'empire', name: 'Empire', icon: '👑', col: '#ffb547', cat: 'EMPIRE', sub: 'turf · rivals', tabs: [['overview', 'Overview'], ['map', 'Territory'], ['factions', 'Factions']] },
+  { id: 'police', name: 'Police', icon: '🚨', col: '#4d8dff', cat: 'EMPIRE', sub: 'heat · case file', tabs: [['police', 'Police']] },
   { id: 'crew', name: 'Crew', icon: '👥', col: '#7fb2ff', cat: 'OPERATIONS', sub: 'people · runs', tabs: [['crew', 'Crew'], ['runs', 'Deliveries']] },
-  { id: 'property', name: 'Property', icon: '🏠', col: '#8fe39b', cat: 'OPERATIONS', sub: 'homes · garages', tabs: [['assets', 'Property']] },
-  { id: 'business', name: 'Business', icon: '🏢', col: '#ffd84d', cat: 'OPERATIONS', sub: 'income · upgrades', tabs: [['biz', 'Businesses']] },
-  { id: 'garage', name: 'Garage', icon: '🚗', col: '#9ec5ff', cat: 'OPERATIONS', sub: 'your cars', tabs: [['garage', 'Cars']] },
+  { id: 'business', name: 'Business', icon: '🏢', col: '#ffd84d', cat: 'OPERATIONS', sub: 'income · fronts', tabs: [['biz', 'Businesses']] },
   { id: 'armory', name: 'Armory', icon: '🎯', col: '#ff8a3d', cat: 'OPERATIONS', sub: 'guns · ammo', tabs: [['loadout', 'Weapons']] },
-  { id: 'police', name: 'Police', icon: '🚨', col: '#4d8dff', cat: 'CITY', sub: 'heat · payroll', tabs: [['police', 'Police']] },
-  { id: 'feed', name: 'Feed', icon: '📰', col: '#e8eef6', cat: 'CITY', sub: 'news · messages', tabs: [['feed', 'Feed']] },
+  { id: 'market', name: 'Market', icon: '📈', col: '#7fe08f', cat: 'TRADE', sub: 'cost · profit', tabs: [['pnl', 'My stock'], ['market', 'Prices']] },
+  { id: 'connect', name: 'Street Connect', icon: '🤝', col: '#d28cff', cat: 'TRADE', sub: 'buy · sell', tabs: [['connect', 'Contacts']] },
+  { id: 'inventory', name: 'Inventory', icon: '🎒', col: '#46d4c4', cat: 'TRADE', sub: 'carried · stored', tabs: [['stash', 'All product']] },
+  { id: 'property', name: 'Property', icon: '🏠', col: '#8fe39b', cat: 'ASSETS', sub: 'homes · garages', tabs: [['assets', 'Property']] },
+  { id: 'stashes', name: 'Stashes', icon: '📦', col: '#c9a46b', cat: 'ASSETS', sub: 'what is where', tabs: [['stashes', 'Stashes']] },
+  { id: 'garage', name: 'Garage', icon: '🚗', col: '#9ec5ff', cat: 'ASSETS', sub: 'your cars', tabs: [['garage', 'Cars']] },
   { id: 'map', name: 'Map', icon: '🗺️', col: '#46d4c4', cat: 'CITY', sub: 'city map', go: 'map' },
-  { id: 'taxi', name: 'Cabline', icon: '🚕', col: '#f4c20d', cat: 'CITY', sub: 'call a cab', go: 'taxi' }
+  { id: 'taxi', name: 'Cabline', icon: '🚕', col: '#f4c20d', cat: 'CITY', sub: 'call a cab', go: 'taxi' },
+  { id: 'feed', name: 'Messages', icon: '💬', col: '#e8eef6', cat: 'MESSAGES', sub: 'priority · offers · news', tabs: [['feed', 'Messages']] }
 ];
 const APP_OF_TAB = {}; for (const a of PHONE_APPS) for (const [t] of a.tabs || []) APP_OF_TAB[t] = a;
 const EMP_TABS = [['overview', 'Overview'], ['map', 'Territory'], ['crew', 'Crew'], ['runs', 'Deliveries'], ['assets', 'Assets'], ['market', 'Market'], ['stash', 'Inventory'], ['loadout', 'Loadout'], ['factions', 'Factions'], ['police', 'Police'], ['feed', 'Feed']];
@@ -57981,7 +57978,9 @@ class EmpireUI {
     tabs.classList.toggle('hidden', !app);
     tabs.innerHTML = app ? `<button class="etab back" data-tab="home" aria-label="Back to the home screen">‹ Apps</button>${app.tabs.length > 1 ? app.tabs.map(([k, n]) => `<button class="etab${k === this.tab ? ' on' : ''}" data-tab="${k}">${esc(n)}</button>`).join('') : ''}` : '';
     const st = RANKS[uw.rank];
-    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Rep <b>${g.save.rep}</b></span><span>Influence <b>${uw.influence}</b></span><span>Pressure <b style="color:${S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)'}">${Math.round(S.pressure)}</b></span><span>Day <b>${uw.calDay}</b></span>${S.jail ? `<span class="chipS red">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</span>` : ''}`;
+    // the header (M11): Rank · Dirty · Bank · Pressure always, the rest smaller
+    const pcol = S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)';
+    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Pressure <b style="color:${pcol}">${Math.round(S.pressure)}</b></span><small class="empSub">Rep ${g.save.rep} · Influence ${uw.influence} · Day ${uw.calDay}${S.jail ? ` · <b style="color:var(--red)">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</b>` : ''}</small>`;
     let h = '';
     if (this.tab === 'home') h = this.t_home();
     else if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; a guard might smuggle in a phone, if the money is right and you pick your moment.</div>`;
@@ -57995,16 +57994,32 @@ class EmpireUI {
   // ---------------------------------------------------------------- home screen
   badge(id) {
     const uw = this.uw, S = uw.S;
-    if (id === 'feed') return uw.opps.active().filter(o => o.urgent && !o.taken).length + S.decisions.length;
+    if (id === 'feed') return this.inbox().filter(m => m.pri <= 1).length + uw.opps.active().filter(o => o.urgent && !o.taken).length;
     if (id === 'crew') return S.decisions.length;
     return 0;
   }
   t_home() {
-    const cats = [...new Set(PHONE_APPS.map(a => a.cat))];
-    return '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
+    const cats = [...new Set(PHONE_APPS.map(a => a.cat))], now = this.locked('feed') ? [] : this.inbox().filter(m => m.pri <= 1);
+    // the top strip: the Map one tap away, and whatever needs you now (each a deep link)
+    let h = `<div class="appTop"><button class="sbtn gold" data-act="app:map">🗺️ Map</button>${now.length ? `<button class="sbtn danger" data-act="app:feed">${now.length} need${now.length === 1 ? 's' : ''} you</button>` : '<span class="hint">Nothing urgent.</span>'}</div>`;
+    return h + '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
       const n = this.badge(a.id), locked = a.tabs ? this.locked(a.tabs[0][0]) : this.uw.inJail;
       return `<button class="app${locked ? ' locked' : ''}" data-act="app:${a.id}" style="--c:${a.col}" aria-label="${esc(a.name)}"><i>${a.icon}</i><b>${esc(a.name)}</b><small>${esc(a.sub)}</small>${n ? `<em>${n}</em>` : ''}</button>`;
     }).join('') + '</div>').join('') + '</div>';
+  }
+  // what needs you (M11): pri 0 critical, 1 needs a decision soon, 2 worth knowing; each with a deep link into the
+  // app (or the place) that deals with it
+  inbox() {
+    const uw = this.uw, S = uw.S, g = this.g, out = [];
+    for (const o of uw.threats.open()) out.push({ pri: 0, icon: '⚠', col: '#ff4d5e', title: `${FACTIONS[o.fid].short}: ${o.label}`, text: o.state === 'live' ? 'HAPPENING NOW' : `${o.state === 'imminent' ? 'IMMINENT' : 'WARNING'} · ${Math.ceil(o.left)} s left`, go: `threat:${o.id}`, goLabel: 'Respond' });
+    if (S.fugitive && S.fugitive.left > 0) out.push({ pri: 1, icon: '🚔', col: '#ff8a3d', title: 'You are a fugitive', text: 'A recapture adds time to the sentence. Keep your head down.', go: 'tab:police', goLabel: 'Case file' });
+    else if (uw.legal.L.warrant) out.push({ pri: 1, icon: '🚔', col: '#ff8a3d', title: 'There is a warrant out for you', text: 'Any officer who recognises you will make the arrest. A lawyer can try to quash it.', go: 'tab:police', goLabel: 'Case file' });
+    for (const d of S.decisions) out.push({ pri: 1, icon: '?', col: '#ffd84d', title: d.text, text: 'Your crew is waiting on an answer.', dec: d.id });
+    const dmg = uw.props.ownedList().filter(d => (S.props[d.id] && S.props[d.id].dmg) > 0);
+    if (dmg.length) out.push({ pri: 2, icon: '🔧', col: '#ffb547', title: `${dmg.length} propert${dmg.length === 1 ? 'y needs' : 'ies need'} repairs`, text: dmg.slice(0, 3).map(d => d.name).join(', ') + (dmg.length > 3 ? '…' : ''), go: dmg[0].kind === 'business' ? 'tab:biz' : 'tab:assets', goLabel: 'Open' });
+    const imp = (g.save.garage || []).filter(e => e.imp && !e.imp.paid);
+    if (imp.length) out.push({ pri: 2, icon: '🚗', col: '#9ec5ff', title: `${imp.length} car${imp.length === 1 ? '' : 's'} in the impound lot`, text: 'Pay the release at the window, then drive it out.', go: 'tab:garage', goLabel: 'Garage' });
+    return out.sort((a, b) => a.pri - b.pri);
   }
   openApp(id) {
     const g = this.g, a = PHONE_APPS.find(x => x.id === id); if (!a) return;
@@ -58525,7 +58540,9 @@ class EmpireUI {
   t_feed() {
     const uw = this.uw, S = uw.S, g = this.g, now = uw.opps.absHour();
     const list = uw.opps.active().slice().reverse();
-    let h = uw.threats.feedHTML(esc) + '<h3>Opportunities</h3>';
+    const box = this.inbox().filter(m => !m.dec);
+    let h = box.length ? '<h3>Needs you</h3><div class="msgs">' + box.map(m => `<div class="msg"><i style="background:${m.col}">${m.icon}</i><div><b>${esc(m.title)}</b><small>${['CRITICAL', 'SOON', 'WORTH KNOWING'][m.pri]}</small><p>${esc(m.text)}</p>${m.go ? `<div class="btns"><button class="sbtn${m.pri ? '' : ' danger'}" data-act="${m.go.startsWith('tab:') ? 'go:' + m.go.slice(4) : m.go}">${esc(m.goLabel)}</button></div>` : ''}</div></div>`).join('') + '</div>' : '';
+    h += '<h3>Opportunities</h3>';
     if (!list.length) h += '<div class="hint">Nothing on the wire right now. Things change hour by hour.</div>';
     h += '<div class="msgs">' + list.map(o => `<div class="msg"><i style="background:${o.urgent ? '#ff4d5e' : '#d28cff'}">${OPP_ICON[o.kind] || '•'}</i><div><b>${esc(o.title)}</b><small>${Math.max(1, o.until - now)}h left</small><p>${esc(o.text)}</p>${o.x !== undefined && !o.taken ? this.wpBtn(o.x, o.z, o.title) : ''}</div></div>`).join('') + '</div>';
     h += '<h3>Messages</h3><div class="msgs">' + S.decisions.map(d => `<div class="msg"><i style="background:#ffd84d">?</i><div><b>${esc(d.text)}</b><div class="btns"><button class="sbtn gold" data-act="dec:${d.id}:1">Agree</button><button class="sbtn" data-act="dec:${d.id}:0">Refuse</button></div></div></div>`).join('') +
@@ -58538,6 +58555,8 @@ class EmpireUI {
     const [k, x, y, z, w] = a.split(':');
     let r = '';
     if (k === 'app') { this.openApp(x); return; }
+    // a deep link into another app's page (M11)
+    if (k === 'go') { if (APP_OF_TAB[x]) { this.tab = x; this.msg = ''; this.render(); $('empBody').scrollTop = 0; } return; }
     if (this.locked()) return;
     switch (k) {
       case 'threat': { if (uw.threats.openThreat(+x)) { g.ui.closeAll(); return; } r = 'That threat is over.'; break; }
@@ -60280,6 +60299,10 @@ function sanitizeSports(x, okN) {
    stuck backs up, reroutes, and as a last resort takes the short way round (a quick fade).
    ===================================================================== */
 const FARE_BASE = 6, FARE_PER_KM = 22, CAB_SPEED = 13;
+// a cab is not a way round the logistics (M11, §27): no fare while wanted; a load of product (more than `carry`
+// units on you) is a delivery, not a fare; any product at all and the ride goes the whole way (no Skip)
+const TAXI_RULES = { carry: 2 };
+const taxiCarried = g => g.uw ? units(g.uw.S.inv) : 0;
 function fareFor(m) { return Math.max(8, Math.round(FARE_BASE + m / 1000 * FARE_PER_KM)); }
 function routeLen(x0, z0, x1, z1) { const r = gpsRoute(x0, z0, x1, z1); let d = 0, px = x0, pz = z0; for (const q of r) { d += Math.hypot(q.x - px, q.z - pz); px = q.x; pz = q.z; } return d + Math.hypot(x1 - px, z1 - pz); }
 // the nearest point on a street (any road but a circuit or a course: the lattice, the curved roads, the spurs and the
@@ -60324,6 +60347,7 @@ class TaxiService {
     if (p.interior) return 'Step outside first.';
     if (p.state === 'vehicle') return p.passenger ? 'You’re already in a cab.' : 'Get out of the car first.';
     if (g.uw && g.uw.S.jail) return 'Not from in here.';
+    if (taxiCarried(g) > TAXI_RULES.carry) return 'Cabline: “We don’t do deliveries.” Not with that much product on you.';
     return null;
   }
   // call a cab: the nearest free taxi in traffic turns round for you, else one is sent from out of sight
@@ -60393,7 +60417,7 @@ class TaxiService {
       <div class="btns" style="display:flex;flex-direction:column;gap:8px"><button class="sbtn gold" data-act="hire">Hire the cab</button><button class="sbtn" data-act="jack">Carjack it (a crime)</button><button class="sbtn" data-act="no">Never mind</button></div>`;
     g.content.openSvc('Taxi', 'The driver looks up.', render, a => {
       g.ui.back();
-      if (a === 'hire') this.choose(false);
+      if (a === 'hire') { const why = this.canHail(); if (why) { g.ui.toast(why, 'warn'); g.audio.play('deny'); this.cab = null; this.state = 'idle'; v.ctl.handbrake = false; return; } this.choose(false); }
       else if (a === 'jack') { this.cab = null; this.state = 'idle'; v.taxiCab = false; v.drive = null; g.beginEnter(v); }
     });
   }
@@ -60458,6 +60482,7 @@ class TaxiService {
   // skip the drive: the screen dips and you arrive; the full agreed fare
   skip() {
     const g = this.g, v = this.cab; if (this.state !== 'riding' || !v || !this.dest || g.fading) return;
+    if (taxiCarried(g) > 0) { g.ui.toast('Not with product on you: the driver takes the long way, and so do you.', 'warn'); g.audio.play('deny'); return; }
     const left = this.remaining(), fare = this.quote, d = this.dest;
     g.fade(() => {
       const kp = nearestRoadPoint(d.x, d.z) || d;
@@ -60527,6 +60552,7 @@ class TaxiService {
     const left = this.remaining();
     el.querySelector('.td').textContent = this.dest.name;
     el.querySelector('.tm').textContent = `${fmtDist(left)} to go · fare ${fmtMoney(this.quote)} · meter ${fmtMoney(Math.min(this.quote, this.meterFare()))}`;
+    const sk = el.querySelector('[data-tx="skip"]'); if (sk) sk.disabled = taxiCarried(this.g) > 0;
   }
 }
 
@@ -61565,14 +61591,18 @@ const MAP_CATS = {
   carsNew: { name: 'New Cars', icon: 'N', col: '#7fb2ff', layer: 'locations' },
   carsLux: { name: 'Performance & Luxury', icon: '★', col: '#e8d28a', layer: 'locations' },
   // a one-off's search area (?) or, once spotted, its exact place (◆) (Session 6D)
-  unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' }
+  unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' },
+  // intel (M11): what you actually know, never more: a gang's stash house once you know its district, and the
+  // places a threat is aimed at while it is live
+  rivalwh: { name: 'Rival stash houses', icon: 'R', col: '#ff4d5e', layer: 'intel' },
+  threat: { name: 'Threats', icon: '⚠', col: '#ff4d5e', layer: 'intel' }
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
   ['factions', 'Faction HQs'], ['territory', 'Territory'], ['police', 'Police'], ['garages', 'Garages & parking'], ['economy', 'Street prices'],
-  ['buy', '↓ Buy product (suppliers)'], ['sell', '$ Sell product (buyers)']
+  ['buy', '↓ Buy product (suppliers)'], ['sell', '$ Sell product (buyers)'], ['intel', 'Intel (rival stashes, threats)']
 ];
-const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true };
+const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true, intel: true };
 // centre of each named district (average of its blocks), for map labels and cards
 const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
 // the street good paying furthest over its base price in a district right now
@@ -61643,6 +61673,10 @@ class MapView {
       const pw = uw.loc('prop', 'pawn'); if (pw) add({ key: 'sell:pawn', name: 'Lucky’s Pawn · fence', cat: 'sell', x: pw.x + 1.5, z: pw.z + 1.5, sub: 'SELL hot goods and smokes · no questions asked' });
     }
     if (g.uniques) for (const e of g.uniques.mapEntries()) add(e);
+    if (uw) {
+      for (const fid in RIVAL_WH) { const C = uw.rivalwh.C(fid); if (!C || uw.S.factions[fid].broken || !g.save.discovered.zones[zoneKey(C.center.x, C.center.z)]) continue; add({ key: 'rv:' + fid, name: RIVAL_WH[fid].name, cat: 'rivalwh', col: FACTIONS[fid].col, x: C.center.x, z: C.center.z, sub: `${FACTIONS[fid].name}: their product and cash` }); }
+      for (const o of uw.threats.open()) add({ key: 'th:' + o.id, name: `Threat: ${o.label}`, cat: 'threat', x: o.x, z: o.z, sub: `${FACTIONS[o.fid].short} · ${o.state === 'live' ? 'happening now' : o.state}` });
+    }
     for (const ct of g.missions.contacts) if (ct.visible !== false && !ct.interior && (!ct.storyOnly || ct.marker.g.visible)) add({ key: 'ct:' + ct.id, name: ct.name, cat: 'contact', col: '#' + new THREE.Color(ct.color).getHexString(), x: ct.x, z: ct.z, sub: ct.role });
     this.entries = out;
     return out;
@@ -62958,7 +62992,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);
