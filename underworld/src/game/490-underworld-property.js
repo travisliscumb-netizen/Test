@@ -126,6 +126,8 @@ class PropertyManager {
   }
   doorAction(L) {
     const def = L.def, uw = this.uw;
+    // a shop-front business (M10): walk in, owned or not; the counter inside is where it is bought or managed
+    if (def.kind === 'business' && robTheme(def)) return { label: `Enter ${def.name}${this.owned(def.id) ? '' : ' · for sale ' + fmtMoney(this.price(def))}`, act: () => uw.g.content.enterBiz(def.id) };
     if (this.owned(def.id)) {
       if (def.interior) return null; // the interior door is handled by the interiors kit
       if (def.home) return { label: `Enter ${def.name}`, act: () => uw.g.content.enterHome(def.id) };

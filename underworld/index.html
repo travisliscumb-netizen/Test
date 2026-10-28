@@ -33726,7 +33726,7 @@ const MONEY_SOURCES = {
   // the court (M7): fines and a judge's campaign donation from the bank; a crew envelope in Dirty Cash (payroll order)
   // fronts (M9): carried Dirty Cash put through a business's books, a manager's top-ups from your stashes, the
   // clean money that comes out of the books
-  frontIn: { pay: 'dirty' }, frontAuto: { pay: 'payroll' }, frontOut: { earn: 'clean', book: 'laundering' },
+  frontIn: { pay: 'dirty' }, lockpick: { pay: 'dirty' }, frontAuto: { pay: 'payroll' }, frontOut: { earn: 'clean', book: 'laundering' },
   courtFine: { pay: 'clean' }, judgeFix: { pay: 'clean' }, judgeBribe: { pay: 'payroll' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
@@ -43960,6 +43960,8 @@ class PoliceManager {
     }
   }
   // eye heights above the ground each one stands on (the Cedar Fields terrain has hills: Session 6C)
+  // a contained burglary (M10): while you are still inside the house they are watching, the search goes on
+  contained() { const I = this.g.content.interiors; return !!(this.contain && I.cur && I.cur.id === this.contain && this.g.player.interior); }
   copCanSee(x, z, range) {
     const grid = this.g.world.grid, y = groundY(x, z) + 1.2;
     for (const u of this.units) if (!u.v.burnt && dist2(u.v.pos.x, u.v.pos.z, x, z) < range * range && grid.lineOfSight(u.v.pos.x, u.v.pos.y + 1.5, u.v.pos.z, x, y, z)) return true;
@@ -44002,7 +44004,7 @@ class PoliceManager {
   clear(msg) {
     const g = this.g;
     if (this.level > 0 && msg) { g.ui.toast(msg, 'money'); g.audio.play('confirm'); }
-    this.level = 0; this.heat = 0; this.bust = 0; this.visible = false; this.pending.length = 0;
+    this.level = 0; this.heat = 0; this.bust = 0; this.visible = false; this.pending.length = 0; this.contain = null;
     for (const u of this.units) { u.v.siren = false; if (u.v.drive) { u.v.drive.target = null; u.v.drive.mode = 'cruise'; const c = g.world.randomCurbSpot(u.v.pos.x, u.v.pos.z, 300, 800); u.v.drive.setGoal(c.x, c.z); u.v.drive.cruise = 13; } u.standDown = true; }
     for (const c of this.cops) { c.brain = copStandDown; }
     for (const rb of this.roadblocks) rb.t = Math.min(rb.t, 5);
@@ -44218,7 +44220,7 @@ class PoliceManager {
       const c = this.pending[i]; c.t -= dt;
       // a witness who was knocked down, scared off or out of range never finishes the call
       if (c.by && (c.by.state === 'down' || c.by.state === 'ko' || !g.peds.peds.includes(c.by))) { this.pending.splice(i, 1); continue; }
-      if (c.t <= 0) { this.pending.splice(i, 1); if (this.enabled) { if (this.level === 0) g.ui.toast('A witness called the police.', 'warn'); if (g.uw) g.uw.cops.crime(c.type, c.sev, true, c.x, c.z, 'witness'); this.addHeat(c.sev, c.x, c.z); } }
+      if (c.t <= 0) { this.pending.splice(i, 1); if (this.enabled) { if (this.level === 0) g.ui.toast('A witness called the police.', 'warn'); if (g.uw) g.uw.cops.crime(c.type, c.sev, true, c.x, c.z, 'witness'); this.addHeat(c.sev, c.x, c.z); if (c.contain) this.contain = c.contain; } }
     }
     // cleanup dead/far units
     for (let i = this.units.length - 1; i >= 0; i--) {
@@ -44261,7 +44263,7 @@ class PoliceManager {
       // out of sight: they search for the description they have. Switching cars (or ditching the
       // car on foot) makes that description wrong, so the search goes cold much faster.
       else { this.visible = false; this.seenT += 0.25 * (this.seenVeh !== cur ? 2.2 : 1); }
-      if (!this.visible && this.seenT > this.escapeTime && !this.lockLevel) { const lv = this.level; this.clear('You lost the police.'); g.missions.onEvaded(lv); return; }
+      if (!this.visible && this.seenT > this.escapeTime && !this.lockLevel && !this.contained()) { const lv = this.level; this.clear('You lost the police.'); g.missions.onEvaded(lv); return; }
     }
     // police already out there join the pursuit when they see you go by (patrols in traffic, staffed cars
     // parked at the kerb or the precinct, officers on foot)
@@ -46903,6 +46905,113 @@ class InteriorManager {
 }
 
 /* =====================================================================
+   [CONTENT] ROBBABLE BUSINESSES (M10, §27): every shop-front business of a
+   robbable category has a modular interior you can walk into: the shop
+   floor dressed for its trade, the counter and its till, a staff door, and
+   the back: an office (desk, the safe) and a stockroom. One layout, themed
+   by a table, so a new trade is a new row, not a new room.
+   - The heist itself is the Fuel & Go one (360 storeHeist), paid by the
+     theme: till and safe ranges, what the stockroom holds.
+   - Security: every robbery raises the business's security a step (a guard
+     on the door, faster alarms) and it recovers a step every ROB_SEC.recover
+     economic days. A business can't be robbed again while it is still
+     counting the losses (the till refills daily, the back office weekly).
+   - Your own business: walk in, no robbing yourself; the counter is where
+     you manage it.
+   ===================================================================== */
+// fit: how the shop floor is dressed; till/safe: cash ranges; stock: what the stockroom gives; sec: the security a
+// trade starts with (0 none, 1 cameras, 2 a guard); pal: the colours of its stock
+const ROB_THEMES = {
+  shop: { fit: 'shelves', till: [120, 380], safe: [1200, 3600], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
+  pharmacy: { fit: 'shelves', till: [150, 450], safe: [2000, 5000], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
+  jewelry: { fit: 'cases', till: [300, 900], safe: [6000, 15000], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
+  electronics: { fit: 'screens', till: [200, 600], safe: [2500, 6000], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
+  pawn: { fit: 'clutter', till: [250, 700], safe: [3000, 8000], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
+  boutique: { fit: 'racks', till: [200, 600], safe: [2500, 6500], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
+  bar: { fit: 'bar', till: [300, 900], safe: [1500, 4000], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
+  food: { fit: 'tables', till: [120, 420], safe: [900, 2600], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
+  service: { fit: 'chairs', till: [100, 320], safe: [800, 2200], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
+};
+const ROB_CAT_THEME = { convenience: 'shop', grocery: 'shop', pharmacy: 'pharmacy', jewelry: 'jewelry', electronics: 'electronics', pawn: 'pawn', boutique: 'boutique', bar: 'bar',
+  coffee: 'food', diner: 'food', pizza: 'food', restaurant: 'food', barber: 'service', salon: 'service', tattoo: 'service', laundromat: 'service', arcade: 'service' };
+// security: a robbery adds a step (up to max); a step recovers every `recover` economic days; each step adds to the
+// clerk's alarm chance and to how long the jobs take
+// a burglary (M10): one report roll as you go in; the neighbour's call lands after `delay` seconds; a home of
+// `highTier` or above is contained (the search does not give up while you hide inside it)
+const BURGLARY = { report: 0.175, delay: [20, 45], highTier: 4 };
+// a Fuel & Go's take (it has no trade of its own)
+const STORE_ROB = { till: [180, 460], safe: [1400, 4200], stock: { smokes: [2, 5] }, sec: 0 };
+const ROB_SEC = { max: 3, recover: 5, alarm: 0.15, slow: 1 };
+const robTheme = def => def && ROB_THEMES[ROB_CAT_THEME[def.cat]] || null;
+function bizInteriorDef(prop, L) {
+  const T = robTheme(prop), W = 12, D = 11, hw = W / 2, hd = D / 2;
+  return {
+    id: 'b:' + prop.id, dynamic: true, name: prop.name, w: W, d: D, h: 3.2, exit: { x: -3.5, z: 4.6 }, spawnH: Math.PI, store: true, noExit: true,
+    propId: prop.id, rob: T, at: { x: L.x, z: L.z }, door: { x: L.x, z: L.z, h: L.h }, seed: prop.id.length * 131 + prop.price % 997,
+    build(k, rng, def) {
+      k.room(W, D, 3.2, { floor: 0xcfcac0, wall: T.wall, ceil: 0xf4f2ee, trim: T.trim, band: [2.5, 0.3], bandC: T.trim, lights: [3, 3], lightC: 0xf4fbff });
+      k.tiles(W, D, 0xcfcac0, 0xb8b3a8, 0.6);
+      k.door(-3.5, hd - 0.02, 0, 0x9ab4c4, T.trim);
+      // the partition, the staff door behind the counter (same place as at a Fuel & Go, so openStaffDoor serves both)
+      iwall(k, 'x', -1.8, -hw, hw, 0, 3.2, 0xd8d4ca, [[2.6, 3.8]]);
+      iwall(k, 'z', 0, -hd, -1.8, 0, 3.2, 0xd0ccc2, [[-3.6, -2.6]]);
+      def.staffCol = k.cols.length; k.cols.push({ x0: 2.6, x1: 3.8, z0: -1.9, z1: -1.7, y0: 0, y1: 2.3 });
+      k.box(3.2, 2.35, -1.7, 1.3, 0.22, 0.04, T.trim);
+      // the counter and its till
+      k.box(3.6, 0, 2.6, 2.8, 1.0, 0.8, T.trim, { col: true }); k.box(3.6, 1.0, 2.6, 2.9, 0.05, 0.9, 0xe8e4da);
+      k.box(2.7, 1.05, 2.6, 0.45, 0.3, 0.38, 0x2a2a2e); k.glow(2.7, 1.2, 2.82, 0.3, 0.12, 0.02, 0x7fe08f, 1.6);
+      k.glow(3.6, 2.2, hd - 0.04, 2.4, 0.5, 0.03, T.trim, 1.4);
+      // the shop floor, by trade
+      const P = T.pal;
+      if (T.fit === 'shelves') { k.shelfUnit(-1.9, 1.7, 0.7, 3.4, 1.6, 3, rng, P); k.shelfUnit(0.5, 1.7, 0.7, 3.4, 1.6, 3, rng, P); k.shelfUnit(-4.6, -0.6, 0.6, 2.4, 1.9, 4, rng, P); }
+      else if (T.fit === 'cases') {
+        for (const [x, z] of [[-4.2, 0.4], [-1.6, 0.4], [-4.2, 3.0], [-1.6, 3.0]]) { k.box(x, 0, z, 1.8, 0.9, 0.7, 0x2a2630, { col: true }); k.glow(x, 0.92, z, 1.7, 0.08, 0.6, 0xcfe8ff, 0.6); for (let i = 0; i < 4; i++) k.glow(x - 0.6 + i * 0.4, 0.97, z, 0.12, 0.03, 0.12, P[i % P.length], 1.8); }
+        k.box(-5.7, 0, -0.6, 0.4, 2.2, 1.6, 0x2a2630, { col: true }); k.glow(-5.48, 1.2, -0.6, 0.02, 1.4, 1.4, 0xcfe8ff, 0.5);
+      } else if (T.fit === 'screens') {
+        for (let i = 0; i < 4; i++) { k.box(-5.0 + i * 1.6, 1.0, -1.45, 1.4, 0.85, 0.06, 0x111111); k.glow(-5.0 + i * 1.6, 1.05, -1.4, 1.3, 0.75, 0.01, [0x2a8ad8, 0x8a2f3a, 0x3a7a4a, 0xd8a227][i], 1.2); }
+        k.box(-3.0, 0, 1.6, 4.4, 0.85, 1.0, 0x5c5e62, { col: true }); for (let i = 0; i < 6; i++) k.box(-4.8 + i * 0.7, 0.85, 1.6, 0.5, 0.05, 0.35, 0x2a2c30);
+      } else if (T.fit === 'clutter') {
+        k.shelfUnit(-4.6, -0.6, 0.6, 2.4, 1.9, 4, rng, P); k.shelfUnit(-1.4, 1.5, 0.7, 3.0, 1.6, 3, rng, P);
+        k.box(-4.8, 0, 2.8, 1.2, 1.1, 1.0, 0x8a6a4a, { col: true }); k.box(-4.8, 1.1, 2.8, 0.9, 0.5, 0.2, 0xd8a227);
+        k.box(0.2, 0, 3.6, 0.06, 2.4, 2.6, 0x5a5e62); // the cage by the counter
+      } else if (T.fit === 'racks') {
+        for (const [x, z] of [[-4.4, 0.6], [-2.0, 0.6], [-4.4, 3.0], [-2.0, 3.0]]) { k.box(x, 1.5, z, 1.6, 0.04, 0.04, 0xc8ccd0); for (let i = 0; i < 7; i++) k.box(x - 0.66 + i * 0.22, 0.6, z, 0.18, 0.9, 0.36, P[(i + Math.round(x)) % P.length]); }
+        k.box(-5.75, 0, -0.4, 0.1, 2.0, 1.0, 0xc8ccd0); k.glow(-5.68, 1.0, -0.4, 0.01, 1.8, 0.9, 0xcfe8ff, 0.7);
+      } else if (T.fit === 'bar') {
+        k.box(-2.4, 0, -0.6, 5.8, 1.05, 0.7, 0x4a2a1a, { col: true }); k.box(-2.4, 1.05, -0.6, 5.9, 0.06, 0.8, 0x2a1a10);
+        for (let i = 0; i < 12; i++) k.box(-5.0 + i * 0.45, 1.4, -1.55, 0.1, 0.32, 0.1, P[i % P.length]);
+        for (let i = 0; i < 5; i++) k.box(-4.6 + i * 1.1, 0, 0.3, 0.38, 0.75, 0.38, 0x2a2a2e, { col: true });
+        for (const [x, z] of [[-4.0, 2.8], [-1.2, 2.8]]) { k.box(x, 0, z, 0.9, 0.75, 0.9, 0x6a4a2a, { col: true }); }
+      } else if (T.fit === 'tables') {
+        for (const [x, z] of [[-4.4, 0.4], [-1.8, 0.4], [-4.4, 3.0], [-1.8, 3.0]]) { k.box(x, 0, z, 1.2, 0.75, 0.9, 0xd8d0c0, { col: true }); for (const s of [-1, 1]) k.box(x + s * 0.85, 0, z, 0.4, 0.45, 0.8, P[0]); }
+        k.box(-3.0, 0, -1.4, 5.0, 1.0, 0.6, 0xb8b0a0, { col: true }); k.glow(-3.0, 1.6, -1.65, 4.6, 0.5, 0.02, 0xffe6b8, 1.3);
+      } else {
+        for (const x of [-4.6, -2.6, -0.6]) { k.box(x, 0, -1.2, 0.8, 0.55, 0.8, 0x2a2a2e, { col: true }); k.box(x, 0.55, -1.5, 0.8, 0.7, 0.12, 0x2a2a2e); k.box(x, 1.0, -1.62, 0.7, 1.0, 0.04, 0xcfe8ff); }
+        k.box(-4.0, 0, 2.6, 2.6, 0.45, 0.8, P[1]);
+      }
+      // the back office: desk, CCTV, the safe; the stockroom
+      FURN.desk(k, 3.0, 0, -4.9, 0, 1.4, false, 0x5a5e62); k.box(2.7, 0.74, -5.05, 0.5, 0.35, 0.05, 0x111111); k.glow(2.7, 0.78, -5.02, 0.44, 0.28, 0.01, 0x6a9a7a, 1.2);
+      FURN.safe(k, 5.45, 0, -4.7, T.sec >= 2 ? 4 : 3);
+      for (const sx of [-5.3, -2.0]) k.shelfUnit(sx, -3.8, 0.7, 2.6, 2.0, 4, rng, [0x8a6a4a, 0x7a5a3a, 0x9a7a5a, 0xd8c8a0]);
+      k.crate(-3.6, -5.0, 0.55, 0x8a6a4a, 2);
+    },
+    afterInstall(grp, def) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.2, 0.06), new THREE.MeshBasicMaterial({ color: 0x6a7076, fog: false }));
+      m.position.set(3.2, 1.1, -1.8); grp.add(m); def.staffMesh = m;
+    },
+    spots: [
+      { id: 'manage', x: 4.4, z: 3.5, r: 1.0, label: 'The counter' },
+      { id: 'register', x: 2.4, z: 3.5, r: 0.8, label: 'Rob the till' },
+      { id: 'staff', x: 3.2, z: -1.0, r: 0.9, label: 'Staff only · force the door' },
+      { id: 'safe', x: 4.6, z: -4.4, r: 0.9, label: 'Crack the office safe' },
+      { id: 'desk', x: 3.0, z: -3.6, r: 0.8, label: 'Search the desk' },
+      { id: 'stock', x: -3.6, z: -3.3, r: 1.1, label: 'Search the stockroom' },
+      { id: 'exit', x: -3.5, z: 4.6, r: 1.1, label: 'Leave' }
+    ],
+    npcs: [{ id: 'clerk', x: 3.6, z: 1.8, h: 0, look: { shirt: T.trim, pants: 0x2a2a2e } }, { id: 'guard', x: -2.2, z: 4.2, h: Math.PI, look: { shirt: 0x2a3346, pants: 0x1a1c22, cap: 0x1a1c22 } }]
+  };
+}
+/* =====================================================================
    [CORE+CONTENT] CONTENT: reputation, phone & dialogue, districts, services (garage,
    dealership, repair shop, store, wardrobe), collectibles, secrets,
    achievements, fast travel, police posts and on-screen guidance.
@@ -47672,7 +47781,8 @@ class ContentManager {
     if (best.propId) return null; // the ladder's doors are property locations (Underworld handles them)
     if (hash2i(best.x0 | 0, best.z0 | 0, 61) > 0.38 || best.type === 'farm') return null;
     if (g.police.level > 0) return { label: 'Break in (not with the police on you)', act: () => this.deny('Lose the heat first.') };
-    return { label: best.type === 'apartment' ? 'Slip into an apartment' : 'Break in', act: () => { g.police.crime('theft', p.pos.x, p.pos.z); const def = this.interiors.addDynamic(houseInteriorDef(best, null)); this.interiors.enter(def.id); } };
+    if (!g.uw.tools.picks) return { label: 'Break in (needs a lockpick set)', act: () => this.deny('You need a lockpick set. Dockside Sully sells them.') };
+    return { label: best.type === 'apartment' ? 'Slip into an apartment' : 'Break in', act: () => { g.uw.tools.usePick(); g.police.crime('theft', p.pos.x, p.pos.z); const def = this.interiors.addDynamic(houseInteriorDef(best, null)); this.interiors.enter(def.id); this.burglaryReport(def); } };
   }
   offerPenthouse() {
     const g = this.g, s = g.save;
@@ -47697,7 +47807,7 @@ class ContentManager {
       case 'elevator': this.openElevator(); break;
       case 'concierge': if (g.uw.props.owned('penthouse')) this.say('pv', pick(['Welcome home. Your car is downstairs whenever you want it.', 'Good evening. Nobody has asked for you. Nobody would dare.'])); else g.uw.ui.openProp('penthouse'); break;
       case 'view': g.ui.toast('The whole city at your feet: the stadium, the cranes at the port, Greenway Park, Crestmoor on the point.'); g.audio.play('ui'); break;
-      case 'stash': if (I.cur && I.cur.propId) g.uw.ui.openProp(I.cur.propId); break;
+      case 'stash': case 'manage': if (I.cur && I.cur.propId) g.uw.ui.openProp(I.cur.propId); break;
       case 'motorcourt': g.vspaces.enter(g.vspaces.byProp('mansion'), null); break;
       case 'loot': this.burgle(); break;
       case 'pool': g.audio.play('ui'); g.ui.toast(pick(['You break and sink two. The rest is a mess.', 'Bank shot off the cushion. Nobody saw it.', 'You clear the table in four. A shame nobody was watching.'])); break;
@@ -47746,8 +47856,18 @@ class ContentManager {
     const def = I.addDynamic(houseInteriorDef(home, prop));
     if (viewing) { def.viewing = !breakin; def.name = PROP_BY_ID[id].name + (breakin ? '' : ' (viewing)'); }
     const p = g.player;
-    if (p.interior && p.interior.vspace) { this.ride(() => { I.enter(def.id, true); }); return; }
+    if (p.interior && p.interior.vspace) { this.ride(() => { I.enter(def.id, true); if (breakin) this.burglaryReport(def); }); return; }
     I.enter(def.id);
+    if (breakin) this.burglaryReport(def);
+  }
+  // a burglary is reported or not (M10, §45.39): one roll as you go in, BURGLARY.report. A neighbour who saw the door
+  // go calls it in after a while; at a high-end home the police also contain the house: hiding inside doesn't
+  // make the search give up, you have to get out and lose them
+  burglaryReport(def, rnd = Math.random) {
+    const g = this.g; def.reported = rnd() < BURGLARY.report; if (!def.reported) return false;
+    const d = def.door, high = (def.tier || 0) >= BURGLARY.highTier;
+    g.police.pending.push({ t: rand(BURGLARY.delay[0], BURGLARY.delay[1]), sev: high ? 2 : 1, x: d.x, z: d.z, type: 'theft', by: null, contain: high ? def.id : null });
+    return true;
   }
   // from the hallway door into the attached garage, beside the cars
   toGarage(def) {
@@ -47818,9 +47938,6 @@ class ContentManager {
       if (got.length) { g.audio.play('pickup'); g.ui.toast(`${K.label[0].toUpperCase() + K.label.slice(1)}: ${got.join(', ')}.`, 'money'); }
       else { g.audio.play('ui'); g.ui.toast(pick(['Nothing worth taking.', 'Old receipts and a dead phone charger.', 'Empty.', 'Socks. Just socks.'])); }
       g.save.stats.burglaries = (g.save.stats.burglaries || 0) + 1;
-      // noise: a neighbour hears it; a safe is loud
-      const noise = c.kind === 'safe' ? 0.35 : 0.07 + st2.s.length * 0.015;
-      if (Math.random() < noise) { const d = def.door; g.police.crime('theft', d.x, d.z); g.ui.toast('A neighbour heard something and is calling it in. Get out.', 'warn'); }
     };
     if (K.slow) this.channel(`CRACKING THE ${K.label.toUpperCase()}`, K.slow, finish);
     else { g.audio.play('ui'); finish(); }
@@ -47846,51 +47963,78 @@ class ContentManager {
     if (g.police.level < stars) g.police.setLevel(stars);
     g.ui.toast('Silent alarm. The police are on their way.', 'warn');
   }
+  // security at a robbable business (M10): the trade's own level plus a step for every robbery, a step recovering
+  // every ROB_SEC.recover economic days. A Fuel & Go has none of its own.
+  robSecurity(def) {
+    const fl = this.g.save.flags.robSec || (this.g.save.flags.robSec = {}), r = fl[def.id], base = def.rob ? def.rob.sec : 0;
+    if (!r) return base;
+    const today = this.g.uw.S.day, add = Math.max(0, r.n - Math.floor((today - r.day) / ROB_SEC.recover));
+    if (!add) { delete fl[def.id]; return base; }
+    return Math.min(ROB_SEC.max, base + add);
+  }
+  robbed(def) {
+    const fl = this.g.save.flags.robSec || (this.g.save.flags.robSec = {}), today = this.g.uw.S.day, cur = this.robSecurity(def) - (def.rob ? def.rob.sec : 0);
+    fl[def.id] = { n: Math.min(ROB_SEC.max, cur + 1), day: today };
+  }
   storeHeist(id) {
     const g = this.g, def = this.interiors.cur; if (!def || !def.store) return;
-    const st = this.storeState(def), S = g.uw.S, armed = g.player.wep && !g.player.wep.melee;
+    // your own business: nothing in it is yours to take
+    if (def.propId && g.uw.props.owned(def.propId)) { this.say('pv', pick(['Your manager gives you a look. “Boss, that’s your own till.”', 'Robbing yourself is just bookkeeping with extra steps.'])); return; }
+    const st = this.storeState(def), S = g.uw.S, armed = g.player.wep && !g.player.wep.melee, R = def.rob || STORE_ROB;
+    const sec = this.robSecurity(def), alarm = p => Math.min(0.97, p + sec * ROB_SEC.alarm), slow = t => t + sec * ROB_SEC.slow;
     const area = ({ u: 1.4, c: 1.3, p: 1.25, a: 1.1, m: 1.1, l: 1.0, g: 1.0, o: 0.85, s: 0.85, w: 0.85, r: 0.8, h: 0.9 })[zoneKey(def.door.x, def.door.z)] || 1;
     if (id === 'register') {
       if (st.reg === S.day) { g.ui.toast('The till is empty. They dropped it in the safe after the last guy.', 'warn'); return; }
-      if (!armed && Math.random() < 0.4) { st.reg = S.day; this.say('Clerk', 'Not today, pal. *slams the alarm*'); this.silentAlarm(def, 1); return; }
-      this.channel(armed ? 'THE CLERK EMPTIES THE TILL' : 'LEANING ON THE CLERK', 3, () => {
-        st.reg = S.day;
-        const cash = Math.round((armed ? randi(180, 460) : randi(60, 200)) * area);
+      // a guard on the door (security 2+) means nobody hands over a till to an empty hand
+      if (!armed && (sec >= 2 || Math.random() < 0.4)) { st.reg = S.day; this.say('Clerk', sec >= 2 ? 'The guard steps in. “Walk away, friend.” *the alarm goes*' : 'Not today, pal. *slams the alarm*'); this.silentAlarm(def, 1); return; }
+      this.channel(armed ? 'THE CLERK EMPTIES THE TILL' : 'LEANING ON THE CLERK', slow(3), () => {
+        st.reg = S.day; this.robbed(def);
+        const cash = Math.round((armed ? randi(R.till[0], R.till[1]) : randi(Math.round(R.till[0] * 0.4), Math.round(R.till[1] * 0.45))) * area);
         g.earn(cash, 'heist'); g.audio.play('cash');
         g.save.stats.robberies = (g.save.stats.robberies || 0) + 1;
         this.say('Clerk', pick(['Take it, take it! The back office key too, just go!', 'Okay! Okay. Here. And the key to the back. Please.']));
         this.openStaffDoor(def, true);
-        if (Math.random() < 0.75) this.silentAlarm(def, armed ? 2 : 1); else g.police.crime('robbery', def.door.x, def.door.z);
+        if (Math.random() < alarm(0.75)) this.silentAlarm(def, armed ? 2 : 1); else g.police.crime('robbery', def.door.x, def.door.z);
       });
       return;
     }
     if (id === 'staff') {
       if (def.staffOpen) { g.ui.toast('The back office is open.'); return; }
-      this.channel('FORCING THE STAFF DOOR', 3.5, () => {
+      // a lock on a staff door: a pick opens it quietly, without one it is shouldered (slower, louder)
+      const pick1 = g.uw.tools.usePick();
+      this.channel(pick1 ? 'PICKING THE STAFF DOOR' : 'FORCING THE STAFF DOOR', slow(pick1 ? 2.5 : 3.5), () => {
         this.openStaffDoor(def, true); g.audio.play('clank');
-        if (st.reg !== S.day && Math.random() < 0.6) { this.say('Clerk', 'Hey! You can’t go back there! *picks up the phone*'); this.silentAlarm(def, 1); }
+        if (st.reg !== S.day && Math.random() < alarm(pick1 ? 0.3 : 0.6)) { this.say('Clerk', 'Hey! You can’t go back there! *picks up the phone*'); this.silentAlarm(def, 1); }
       });
       return;
     }
-    if (st[id]) { g.ui.toast(id === 'safe' ? 'The safe is already empty. Cash pickup comes on Mondays.' : 'Already gone through it.', 'warn'); return; }
+    if (st[id]) { g.ui.toast(id === 'safe' ? 'The safe is already empty. The cash pickup comes weekly.' : 'Already gone through it.', 'warn'); return; }
     const grab = () => {
       st[id] = true;
       if (id === 'safe') {
-        const cash = Math.round(randi(1400, 4200) * area); g.earn(cash, 'heist'); g.audio.play('cash');
+        this.robbed(def);
+        const cash = Math.round(randi(R.safe[0], R.safe[1]) * area); g.earn(cash, 'heist'); g.audio.play('cash');
         const got = Math.random() < 0.35 ? g.uw.give({ hot: 1 + randi(0, 2) }, 'robbery') : null;
         g.ui.toast(`The safe: ${fmtMoney(cash)}${got ? ' and ' + goodsList(got) : ''}.`, 'money');
-        if (Math.random() < 0.45) { g.audio.play('buzzer'); this.silentAlarm(def, 3); } else g.police.crime('robbery', def.door.x, def.door.z);
+        if (Math.random() < alarm(0.45)) { g.audio.play('buzzer'); this.silentAlarm(def, 3); } else g.police.crime('robbery', def.door.x, def.door.z);
       } else if (id === 'desk') {
         if (Math.random() < 0.6) { const c = randi(40, 220); g.earn(c, 'heist'); g.ui.toast(`Petty cash in the desk: ${fmtMoney(c)}.`, 'money'); }
         else if (Math.random() < 0.5) { g.save.ammo.pistol = (g.save.ammo.pistol || 0) + 12; g.ui.toast('A box of pistol rounds in the drawer: 12 rounds.', 'money'); }
         else g.ui.toast('Invoices and a stale doughnut.');
       } else {
-        const got = g.uw.give(Math.random() < 0.6 ? { smokes: randi(2, 5) } : { hot: randi(1, 2) }, 'robbery');
+        const k = Object.keys(R.stock)[0], n = R.stock[k], got = g.uw.give({ [k]: randi(n[0], n[1]) }, 'robbery');
         g.ui.toast(got ? `From the stockroom: ${goodsList(got)}.` : 'Nothing you can carry right now.', got ? 'money' : 'warn');
       }
     };
     if (!def.staffOpen) { g.ui.toast('That’s behind the staff door.', 'warn'); return; }
-    if (id === 'safe') this.channel('CRACKING THE OFFICE SAFE', 6, grab); else { g.audio.play('pickup'); grab(); }
+    if (id === 'safe') this.channel('CRACKING THE OFFICE SAFE', slow(6), grab); else { g.audio.play('pickup'); grab(); }
+  }
+  // walking into a business (M10): its themed interior, the guard on the door while security is up
+  enterBiz(id) {
+    const g = this.g, d = PROP_BY_ID[id], L = g.uw.loc('prop', id); if (!d || !L || !robTheme(d)) return;
+    const def = this.interiors.addDynamic(bizInteriorDef(d, L));
+    const guard = def.chars.find(c => c.id === 'guard'); if (guard) guard.hidden = this.robSecurity(def) < 2;
+    this.interiors.enter(def.id);
   }
   // the old one-button search: the nearest container not searched yet
   burgle() {
@@ -48354,12 +48498,23 @@ function brawlBrain(p, dt) {
   gangAttack(p, o, dt);
 }
 function idleBrain(p, dt) { p.state = 'free'; p.vx = damp(p.vx, 0, 6, dt); p.vz = damp(p.vz, 0, 6, dt); if (p.faceX !== undefined) p.h = dampAngle(p.h, Math.atan2(p.faceX - p.x, p.faceZ - p.z), 3, dt); }
+// heat and turf shape the street (M10): police pressure, a warrant or a fugitive record put more patrols and stops
+// on the streets; on your own turf your people keep petty crime down; on a rival's turf there's more trouble
+function eventBias(g, k) {
+  const uw = g.uw; if (!uw || !uw.S) return 1;
+  const p = g.player.pos, own = offCity(p.x, p.z) ? null : uw.owner[turfAt(p.x, p.z)], hot = uw.S.pressure > 50 || (uw.legal && uw.legal.L.warrant) || !!uw.S.fugitive;
+  let m = 1;
+  if (hot && (k === 'stop' || k === 'pursuit')) m *= k === 'stop' ? 1.8 : 1.3;
+  if (own === 'pc' && (k === 'robbery' || k === 'streetfight')) m *= k === 'robbery' ? 0.4 : 0.6;
+  if (own && own !== 'pc' && (k === 'streetfight' || k === 'drop')) m *= k === 'streetfight' ? 1.6 : 1.4;
+  return m;
+}
 class EventManager {
   constructor(game) { this.g = game; this.ev = null; this.cool = rand(40, 70); this.list = []; }
   pickType() {
     const g = this.g, night = g.env.night > 0.5;
     const opts = Object.entries(EVENT_TYPES).filter(([k, t]) => !t.night || night).filter(([k]) => !(k === 'robbery' && night && Math.random() < 0.5));
-    const wt = (k, t) => t.w * (k === 'accident' && g.env.rain > 0.5 ? 2 : 1) * (k === 'racers' && zoneAt(g.player.pos.x, g.player.pos.z).night > 1 ? 2 : 1);
+    const wt = (k, t) => t.w * (k === 'accident' && g.env.rain > 0.5 ? 2 : 1) * (k === 'racers' && zoneAt(g.player.pos.x, g.player.pos.z).night > 1 ? 2 : 1) * eventBias(g, k);
     let sum = 0; for (const [k, t] of opts) sum += wt(k, t);
     let r = Math.random() * sum;
     for (const [k, t] of opts) { r -= wt(k, t); if (r <= 0) return k; }
@@ -49487,11 +49642,21 @@ function pedType(q, zk) {
   let acc = 0; for (const t of PED_TYPES) { acc += t.w[band]; if (r < acc) return { t, band, wl }; }
   return { t: PED_TYPES[0], band, wl };
 }
+// the time of day (M10): office districts carry more in office hours, the Strip and the Heights by night, and the
+// small hours carry little anywhere (null: no time, the old rates)
+function pocketTimeK(zk, hour) {
+  if (hour == null) return 1;
+  const h = ((Math.floor(hour) % 24) + 24) % 24, night = h >= 20 || h < 3, office = h >= 9 && h < 18;
+  if (h >= 3 && h < 6) return 0.6;
+  if (zk === 'p' || zk === 'u') return night ? 1.35 : 0.9;
+  if (zk === 'c' || zk === 'm') return office ? 1.2 : night ? 0.8 : 1;
+  return night ? 0.9 : 1;
+}
 // what lifting a pocket gets you: { cash, hot, item, jackpot }
-function pocketLoot(q, zk, rnd = Math.random) {
+function pocketLoot(q, zk, rnd = Math.random, hour = null) {
   const { t, band, wl } = pedType(q, zk);
   const [lo, hi] = t.cash, u = Math.pow(rnd(), 2.4);
-  let cash = Math.round(lo * Math.pow(hi / lo, u) * (0.75 + wl * 0.25));
+  let cash = Math.round(lo * Math.pow(hi / lo, u) * (0.75 + wl * 0.25) * pocketTimeK(zk, hour));
   let jackpot = 0;
   if (t.jp && rnd() < t.jp * [0.25, 0.6, 1][band]) {
     let r = rnd(), pickV = PED_JACKPOTS[0][0];
@@ -50162,6 +50327,7 @@ class Underworld {
     this.prison = new Prison(this);
     this.legal = new Legal(this);
     this.fronts = new Fronts(this);
+    this.tools = new Tools(this);
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
@@ -50276,6 +50442,7 @@ class Underworld {
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.legal = Legal.sanitize(S.legal, num, S.rap);
     S.fronts = Fronts.sanitize(S.fronts, num);
+    S.tools = Tools.sanitize(S.tools, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
@@ -50754,7 +50921,7 @@ class Underworld {
     const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0);
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
-      const L = pocketLoot(q, z), cash = L.cash;
+      const L = pocketLoot(q, z, Math.random, g.env.time), cash = L.cash;
       g.earn(cash, 'pickpocket'); S.st.picks++;
       let extra = '';
       if (L.hot) { const t = this.give({ hot: L.hot }); if (t) extra = ` and ${L.item}${L.hot > 1 ? ` (+${L.hot - 1} more)` : ''}`; }
@@ -52290,6 +52457,8 @@ class PropertyManager {
   }
   doorAction(L) {
     const def = L.def, uw = this.uw;
+    // a shop-front business (M10): walk in, owned or not; the counter inside is where it is bought or managed
+    if (def.kind === 'business' && robTheme(def)) return { label: `Enter ${def.name}${this.owned(def.id) ? '' : ' · for sale ' + fmtMoney(this.price(def))}`, act: () => uw.g.content.enterBiz(def.id) };
     if (this.owned(def.id)) {
       if (def.interior) return null; // the interior door is handled by the interiors kit
       if (def.home) return { label: `Enter ${def.name}`, act: () => uw.g.content.enterHome(def.id) };
@@ -55240,7 +55409,7 @@ class Legal {
     if (rap && rap.cur && typeof rap.cur === 'object') { for (const k in rap.cur) if (CRIME_DAYS[k]) for (let n = 0; n < Math.min(6, rap.cur[k] | 0); n++) out.items.push({ t: k, q: 'police', day: 0 }); delete rap.cur; }
     out.items = out.items.slice(-60);
     const H = L.hearing;
-    if (H && typeof H === 'object' && Array.isArray(H.counts)) out.hearing = { counts: H.counts.filter(c => c && typeof c.name === 'string' && Number.isFinite(c.days)).slice(0, 40).map(c => ({ name: c.name.slice(0, 80), days: clamp(Math.round(c.days), 0, 5000), q: ['police', 'witness', 'physical'].includes(c.q) ? c.q : 'police', t: CRIME_DAYS[c.t] || c.t === 'resist' || c.t === 'possession' || c.t === 'guns' || c.t === 'car' || c.t === 'fugitive' ? c.t : 'other', severe: !!c.severe })), mul: num(H.mul, 1, 0.3, 3), fugitive: !!H.fugitive, fixTried: !!H.fixTried };
+    if (H && typeof H === 'object' && Array.isArray(H.counts)) out.hearing = { counts: H.counts.filter(c => c && typeof c.name === 'string' && Number.isFinite(c.days)).slice(0, 40).map(c => ({ name: c.name.slice(0, 80), days: clamp(Math.round(c.days), 0, 5000), q: ['police', 'witness', 'physical'].includes(c.q) ? c.q : 'police', t: CRIME_DAYS[c.t] || c.t === 'resist' || c.t === 'possession' || c.t === 'guns' || c.t === 'car' || c.t === 'fugitive' || c.t === 'tools' ? c.t : 'other', severe: !!c.severe })), mul: num(H.mul, 1, 0.3, 3), fugitive: !!H.fugitive, fixTried: !!H.fixTried };
     return out;
   }
   econDay() { return Math.floor(this.S.econH / 24); }
@@ -55309,6 +55478,7 @@ class Legal {
     for (const k of GOOD_IDS) { const n = carried[k] | 0; const d = Math.round(TIERS[GOODS[k].tier].charge * n * 0.5); if (d) counts.push({ t: 'possession', name: `Possession: ${fmtQty(k, n)} ${GOODS[k].name}`, days: d, q: 'physical' }); }
     const on = id => g.player.carries(id);
     if (on('pistol') || on('smg') || on('shotgun')) counts.push({ t: 'guns', name: 'Unlicensed firearms', days: (on('pistol') ? 14 : 0) + (on('smg') ? 45 : 0) + (on('shotgun') ? 30 : 0), q: 'physical' });
+    if (uw.tools && uw.tools.picks > 0) counts.push({ t: 'tools', name: 'Possession of burglary tools', days: TOOLS.days, q: 'physical' });
     const pv = g.player.lastVehicle;
     if (pv && !pv.owned && !pv.garageUid && pv.stolenBefore && dist2(pv.pos.x, pv.pos.z, g.player.pos.x, g.player.pos.z) < 20 * 20) counts.push({ t: 'car', name: 'Possession of a stolen vehicle', days: 10, q: 'physical' });
     const mul = Math.min(1.8, 1 + S.rap.priors * 0.08) * uw.cops.sentenceMul();
@@ -55629,7 +55799,7 @@ class Prison {
     const ch = pend.ch;
     // confiscation: everything carried, the trunk of the car you were in, every firearm, and the Dirty Cash on you
     // and in that car (§2). Cash in stashes and vaults, and the bank, are not touched by an ordinary arrest.
-    S.st.seized += units(S.inv); Inv.clear(S.inv);
+    S.st.seized += units(S.inv); Inv.clear(S.inv); uw.tools.confiscate();
     const v = pend.veh;
     const cash = Money.seize(v && g.vehicles.list.includes(v) ? v : null);
     S.st.seizedCash = (S.st.seizedCash || 0) + cash;
@@ -56617,6 +56787,52 @@ class Fronts {
     return `<h3>The books (laundering)</h3><div class="stats"><span>Washes a day</span><span>up to ${fmtMoney(this.cap(id))}</span><span>Fee</span><span>${Math.round(this.fee(id) * 100)}%${mgr ? ' (managed)' : ''}</span><span>Waiting in the float</span><span>${fmtMoney(f.float)}</span><span>Washed so far</span><span>${fmtMoney(f.washed)} (fees ${fmtMoney(f.fees)})</span></div>
       <div class="hint">Cash you put through the books is washed a day’s capacity at a time and arrives in your bank, less the fee. A manager can top the float up from your stashes, and keeps it going while you’re away. A police raid here takes half the float.</div>
       <div class="btns">${[5000, 20000, 50000].map(n => `<button class="sbtn gold" data-act="fdep:${n}" ${here >= Math.min(n, FRONT.min) && room >= FRONT.min ? '' : 'disabled'}>Put ${fmtMoney(Math.min(n, room))} through</button>`).join('')}<button class="sbtn" data-act="fdep:all" ${here >= FRONT.min && room >= FRONT.min ? '' : 'disabled'}>All I carry</button>${mgr ? `<button class="sbtn" data-act="fauto">${f.auto ? 'Manager top-ups: ON' : 'Manager top-ups: off'}</button>` : ''}</div>`;
+  }
+}
+/* =====================================================================
+   [UNDERWORLD] TOOLS (M10): lockpicks. A set is bought from Dockside Sully
+   (Dirty Cash), carried (up to TOOLS.carry), and stashed at any property you
+   own that holds things. A break-in needs one: a house door, a property you
+   don't own, a shop's staff door picked quietly instead of shouldered. Each
+   job uses a set up. An arrest takes the ones on you (and they are on the
+   charge sheet: possession of burglary tools); stashed ones stay put.
+   State: save.uw.tools = { picks, at: { propId: n } }.
+   ===================================================================== */
+const TOOLS = { price: 150, carry: 5, stash: 50, days: 3 };
+class Tools {
+  constructor(uw) { this.uw = uw; }
+  get T() { const S = this.uw.S; return S.tools || (S.tools = { picks: 0, at: {} }); }
+  static sanitize(T, num) {
+    const out = { picks: 0, at: {} }; if (!T || typeof T !== 'object') return out;
+    out.picks = Math.floor(num(T.picks, 0, 0, TOOLS.carry));
+    if (T.at && typeof T.at === 'object') for (const id in T.at) { const d = PROP_BY_ID[id], n = Math.floor(num(T.at[id], 0, 0, TOOLS.stash)); if (d && n > 0) out.at[id] = n; }
+    return out;
+  }
+  get picks() { return this.T.picks; }
+  // a break-in uses a set up; true when there was one
+  usePick() { const T = this.T; if (T.picks <= 0) return false; T.picks--; return true; }
+  // at Sully's: returns '' or why not
+  buy(n = 1) {
+    const T = this.T; n = Math.min(n, TOOLS.carry - T.picks);
+    if (n <= 0) return `You can carry ${TOOLS.carry} sets.`;
+    if (!Money.can(n * TOOLS.price, 'lockpick')) return 'Cash on you only.';
+    Money.pay(n * TOOLS.price, 'lockpick'); T.picks += n; this.uw.g.saveGame();
+    return '';
+  }
+  // a property's stash: in person, at a place that holds things
+  canStash(id) { return this.uw.props.owned(id) && Money.canHoldCash(id); }
+  store(id, n) { const T = this.T; if (!this.canStash(id)) return 'Nowhere to keep them here.'; n = Math.min(n, T.picks, TOOLS.stash - (T.at[id] || 0)); if (n <= 0) return 'Nothing to put away.'; T.picks -= n; T.at[id] = (T.at[id] || 0) + n; return ''; }
+  take(id, n) { const T = this.T, have = T.at[id] || 0; n = Math.min(n, have, TOOLS.carry - T.picks); if (n <= 0) return have ? `You can carry ${TOOLS.carry} sets.` : 'None stashed here.'; T.at[id] = have - n; if (!T.at[id]) delete T.at[id]; T.picks += n; return ''; }
+  // an arrest: the sets on you go
+  confiscate() { const n = this.T.picks; this.T.picks = 0; return n; }
+  stashHTML(id) {
+    if (!this.canStash(id)) return '';
+    const T = this.T, here = T.at[id] || 0;
+    return `<h3>Tools</h3><div class="job"><div style="flex:1"><b>Lockpick sets</b><span>${T.picks} on you · ${here} here</span></div><button class="sbtn" data-act="tpst" ${T.picks ? '' : 'disabled'}>Store all</button><button class="sbtn" data-act="tptk" ${here && T.picks < TOOLS.carry ? '' : 'disabled'}>Take</button></div>`;
+  }
+  shopHTML() {
+    const T = this.T;
+    return `<h3>Tools</h3><div class="job"><div style="flex:1"><b>Lockpick set</b><span>${fmtMoney(TOOLS.price)} each, cash · you carry ${T.picks}/${TOOLS.carry} · one set per break-in · the police take them if they catch you with them</span></div><button class="sbtn gold" data-act="pick:1" ${T.picks < TOOLS.carry && Money.can(TOOLS.price, 'lockpick') ? '' : 'disabled'}>Buy 1</button><button class="sbtn" data-act="pick:${TOOLS.carry}" ${T.picks < TOOLS.carry && Money.can(TOOLS.price, 'lockpick') ? '' : 'disabled'}>Fill up</button></div>`;
   }
 }
 /* =====================================================================
@@ -58374,6 +58590,7 @@ class EmpireUI {
       let h = `<div class="svcTop"><span>${d.kind.toUpperCase()} · yours</span>${PM.storageCap(id) ? `<span>Storage <b>${units(S.storage[id])} / ${PM.storageCap(id)}</b></span>` : ''}<span>${Money.html('property')}</span></div>`;
       if (d.kind === 'business' && d.cat) h += this.bizCard(d, true);
       h += uw.fronts.html(id);
+      h += uw.tools.stashHTML(id);
       h += '<div class="btns">';
       if (d.kind === 'safehouse') h += `<button class="sbtn gold" data-act="save">Save game</button><button class="sbtn" data-act="sleep">Sleep / lie low</button><button class="sbtn" data-act="wardrobe">Wardrobe</button>`;
       if (PM.capOf(d)) h += `<button class="sbtn" data-act="garage">Parking · ${PM.capOf(d)}</button>`;
@@ -58466,6 +58683,8 @@ class EmpireUI {
     // a front's books (M9): cash through, manager top-ups
     if (k === 'fdep') { const e = uw.fronts.deposit(id, good === 'all' ? Infinity : +good); g.content.refreshSvc(e || 'Through the books. It comes out clean, a day at a time.'); return; }
     if (k === 'fauto') { g.content.refreshSvc(uw.fronts.toggleAuto(id)); g.saveGame(); return; }
+    // lockpick sets in the stash (M10)
+    if (k === 'tpst' || k === 'tptk') { const e = k === 'tpst' ? uw.tools.store(id, Infinity) : uw.tools.take(id, Infinity); g.saveGame(); g.content.refreshSvc(e || (k === 'tpst' ? 'Put away.' : 'Taken.')); return; }
     // the warehouse panel
     if (d.kind === 'warehouse') {
       const parts = a.split(':');
@@ -58486,7 +58705,7 @@ class EmpireUI {
       case 'wardrobe': g.content.openWardrobe(); return;
       case 'garage': { const gp = uw.props.garagePoints().find(p => p.id === id); if (gp) g.content.openGarage(gp); return; }
       case 'view': { g.ui.closeAll(); g.content.enterHome(id, true); return; }
-      case 'breakin': { if (g.police.level > 0) { r = 'Not with the police on you.'; break; } g.ui.closeAll(); const L0 = uw.loc('prop', id); if (L0) g.police.crime('theft', L0.x, L0.z); g.content.enterHome(id, true, true); return; }
+      case 'breakin': { if (g.police.level > 0) { r = 'Not with the police on you.'; break; } if (!uw.tools.usePick()) { r = 'You need a lockpick set (Dockside Sully sells them).'; break; } g.ui.closeAll(); const L0 = uw.loc('prop', id); if (L0) g.police.crime('theft', L0.x, L0.z); g.content.enterHome(id, true, true); return; }
       case 'upgrade': { r = PM.upgrade(id) || `${d.name} is now level ${PM.level(id)}: ${BIZ_LEVEL_NAME[PM.level(id) - 1].toLowerCase()}.`; break; }
       case 'fence': this.openFence(id); return;
       case 'crew': g.ui.back(); this.open('crew'); return;
@@ -58567,8 +58786,10 @@ class EmpireUI {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
         const qs = lb ? [1, 2, 5] : [1, 5, 20];
         return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, p)} · ${fmtQty(k, n)} available · ${TIERS[GOODS[k].tier].name} · street price here ${fmtPerUnit(k, uw.market.price(z, k))}</span></div><div class="btns">${qs.map(q => { const lots = lotsFor(k, q); return `<button class="sbtn" data-act="buy:${k}:${lots}" ${n < lots || !Money.can(p * lots, 'supplier') ? 'disabled' : ''}>${lb ? q + ' lb' : '×' + q} · ${fmtMoney(p * lots)}</button>`; }).join('')}</div></div>`;
-      }).join('') + '</div><div class="hint">Product goes in your pockets, then the trunk of a car parked nearby. Every lot remembers what you paid, so the Inventory tab shows what it is worth now and your profit or loss. Store it at a property, sell it to street buyers, or put crew on it.</div>');
+      }).join('') + '</div><div class="hint">Product goes in your pockets, then the trunk of a car parked nearby. Every lot remembers what you paid, so the Inventory tab shows what it is worth now and your profit or loss. Store it at a property, sell it to street buyers, or put crew on it.</div>') + (s.id === 'sully' ? uw.tools.shopHTML() : '');
     g.content.openSvc(s.name, '', render, a => {
+      // Sully sells lockpick sets as well (M10)
+      if (s.id === 'sully' && a.startsWith('pick:')) { const e = uw.tools.buy(+a.split(':')[1]); g.content.refreshSvc(e || 'A roll of picks and tension wrenches. Don’t get caught with them.'); return; }
       const [, k, q] = a.split(':'); if (locked || !GOODS[k]) return;
       const p = uw.market.wholesale(z, k);
       let n = Math.min(+q, stock[k] | 0, Math.floor(Money.available('supplier') / p));
@@ -62737,7 +62958,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

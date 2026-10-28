@@ -65,6 +65,8 @@ class PoliceManager {
     }
   }
   // eye heights above the ground each one stands on (the Cedar Fields terrain has hills: Session 6C)
+  // a contained burglary (M10): while you are still inside the house they are watching, the search goes on
+  contained() { const I = this.g.content.interiors; return !!(this.contain && I.cur && I.cur.id === this.contain && this.g.player.interior); }
   copCanSee(x, z, range) {
     const grid = this.g.world.grid, y = groundY(x, z) + 1.2;
     for (const u of this.units) if (!u.v.burnt && dist2(u.v.pos.x, u.v.pos.z, x, z) < range * range && grid.lineOfSight(u.v.pos.x, u.v.pos.y + 1.5, u.v.pos.z, x, y, z)) return true;
@@ -107,7 +109,7 @@ class PoliceManager {
   clear(msg) {
     const g = this.g;
     if (this.level > 0 && msg) { g.ui.toast(msg, 'money'); g.audio.play('confirm'); }
-    this.level = 0; this.heat = 0; this.bust = 0; this.visible = false; this.pending.length = 0;
+    this.level = 0; this.heat = 0; this.bust = 0; this.visible = false; this.pending.length = 0; this.contain = null;
     for (const u of this.units) { u.v.siren = false; if (u.v.drive) { u.v.drive.target = null; u.v.drive.mode = 'cruise'; const c = g.world.randomCurbSpot(u.v.pos.x, u.v.pos.z, 300, 800); u.v.drive.setGoal(c.x, c.z); u.v.drive.cruise = 13; } u.standDown = true; }
     for (const c of this.cops) { c.brain = copStandDown; }
     for (const rb of this.roadblocks) rb.t = Math.min(rb.t, 5);
@@ -323,7 +325,7 @@ class PoliceManager {
       const c = this.pending[i]; c.t -= dt;
       // a witness who was knocked down, scared off or out of range never finishes the call
       if (c.by && (c.by.state === 'down' || c.by.state === 'ko' || !g.peds.peds.includes(c.by))) { this.pending.splice(i, 1); continue; }
-      if (c.t <= 0) { this.pending.splice(i, 1); if (this.enabled) { if (this.level === 0) g.ui.toast('A witness called the police.', 'warn'); if (g.uw) g.uw.cops.crime(c.type, c.sev, true, c.x, c.z, 'witness'); this.addHeat(c.sev, c.x, c.z); } }
+      if (c.t <= 0) { this.pending.splice(i, 1); if (this.enabled) { if (this.level === 0) g.ui.toast('A witness called the police.', 'warn'); if (g.uw) g.uw.cops.crime(c.type, c.sev, true, c.x, c.z, 'witness'); this.addHeat(c.sev, c.x, c.z); if (c.contain) this.contain = c.contain; } }
     }
     // cleanup dead/far units
     for (let i = this.units.length - 1; i >= 0; i--) {
@@ -366,7 +368,7 @@ class PoliceManager {
       // out of sight: they search for the description they have. Switching cars (or ditching the
       // car on foot) makes that description wrong, so the search goes cold much faster.
       else { this.visible = false; this.seenT += 0.25 * (this.seenVeh !== cur ? 2.2 : 1); }
-      if (!this.visible && this.seenT > this.escapeTime && !this.lockLevel) { const lv = this.level; this.clear('You lost the police.'); g.missions.onEvaded(lv); return; }
+      if (!this.visible && this.seenT > this.escapeTime && !this.lockLevel && !this.contained()) { const lv = this.level; this.clear('You lost the police.'); g.missions.onEvaded(lv); return; }
     }
     // police already out there join the pursuit when they see you go by (patrols in traffic, staffed cars
     // parked at the kerb or the precinct, officers on foot)

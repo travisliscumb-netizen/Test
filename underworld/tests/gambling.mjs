@@ -327,13 +327,13 @@ await quiet();
 const post = await ev(() => { const s = window.game.save; return { money: window.game.money.clean, table: s.gamble.table, hands: s.gamble.casino.bjHands }; });
 check('reload mid-hand: the hand is stood (20 v 17) and paid exactly once', post.table === null && post.money === pre.money + 500 && post.hands === pre.hands + 1, JSON.stringify([pre.money, post]));
 // poker chips across a reload
-const pkPre = await ev(() => { const g = window.game, G = g.gamble, s = g.save; G.openPoker(); G.setWager('pokerBuy', 1000); g.content._svcAct('sit'); G.token++; s.stats.playTime = Math.max(s.stats.playTime, 120); g.saveGame(true); return { money: window.game.money.clean, chips: s.gamble.casino.chips }; });
+const pkPre = await ev(() => { const g = window.game, G = g.gamble, s = g.save; G.openPoker(); G.setWager('pokerBuy', 1000); g.content._svcAct('sit'); G.token++; s.stats.playTime = Math.max(s.stats.playTime, 120); g.saveGame(true); return { money: window.game.money.clean, chips: s.gamble.casino.chips, bb: G.pk.bb }; });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 await quiet();
 const pkPost = await ev(() => { const s = window.game.save; return { money: window.game.money.clean, chips: s.gamble.casino.chips }; });
-check('reload at the poker table: chips cashed out once (the blind in the pot is forfeit, like a fold)', pkPost.chips === 0 && pkPost.money === pkPre.money + pkPre.chips && pkPre.chips >= 990, JSON.stringify([pkPre, pkPost]));
+check('reload at the poker table: chips cashed out once (the blind in the pot is forfeit, like a fold)', pkPost.chips === 0 && pkPost.money === pkPre.money + pkPre.chips && pkPre.chips >= 1000 - pkPre.bb, JSON.stringify([pkPre, pkPost]));
 // records persist
 const rec = await ev(() => JSON.stringify(window.game.save.gamble));
 check('gambling records survive save and reload', /"bought":\d+/.test(rec) && JSON.parse(rec).scratch.bought >= 7 && JSON.parse(rec).slots.jackpots >= 1 && JSON.parse(rec).casino.bjHands >= 9, rec.slice(0, 300));

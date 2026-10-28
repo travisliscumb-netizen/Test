@@ -50,7 +50,7 @@ class Legal {
     if (rap && rap.cur && typeof rap.cur === 'object') { for (const k in rap.cur) if (CRIME_DAYS[k]) for (let n = 0; n < Math.min(6, rap.cur[k] | 0); n++) out.items.push({ t: k, q: 'police', day: 0 }); delete rap.cur; }
     out.items = out.items.slice(-60);
     const H = L.hearing;
-    if (H && typeof H === 'object' && Array.isArray(H.counts)) out.hearing = { counts: H.counts.filter(c => c && typeof c.name === 'string' && Number.isFinite(c.days)).slice(0, 40).map(c => ({ name: c.name.slice(0, 80), days: clamp(Math.round(c.days), 0, 5000), q: ['police', 'witness', 'physical'].includes(c.q) ? c.q : 'police', t: CRIME_DAYS[c.t] || c.t === 'resist' || c.t === 'possession' || c.t === 'guns' || c.t === 'car' || c.t === 'fugitive' ? c.t : 'other', severe: !!c.severe })), mul: num(H.mul, 1, 0.3, 3), fugitive: !!H.fugitive, fixTried: !!H.fixTried };
+    if (H && typeof H === 'object' && Array.isArray(H.counts)) out.hearing = { counts: H.counts.filter(c => c && typeof c.name === 'string' && Number.isFinite(c.days)).slice(0, 40).map(c => ({ name: c.name.slice(0, 80), days: clamp(Math.round(c.days), 0, 5000), q: ['police', 'witness', 'physical'].includes(c.q) ? c.q : 'police', t: CRIME_DAYS[c.t] || c.t === 'resist' || c.t === 'possession' || c.t === 'guns' || c.t === 'car' || c.t === 'fugitive' || c.t === 'tools' ? c.t : 'other', severe: !!c.severe })), mul: num(H.mul, 1, 0.3, 3), fugitive: !!H.fugitive, fixTried: !!H.fixTried };
     return out;
   }
   econDay() { return Math.floor(this.S.econH / 24); }
@@ -119,6 +119,7 @@ class Legal {
     for (const k of GOOD_IDS) { const n = carried[k] | 0; const d = Math.round(TIERS[GOODS[k].tier].charge * n * 0.5); if (d) counts.push({ t: 'possession', name: `Possession: ${fmtQty(k, n)} ${GOODS[k].name}`, days: d, q: 'physical' }); }
     const on = id => g.player.carries(id);
     if (on('pistol') || on('smg') || on('shotgun')) counts.push({ t: 'guns', name: 'Unlicensed firearms', days: (on('pistol') ? 14 : 0) + (on('smg') ? 45 : 0) + (on('shotgun') ? 30 : 0), q: 'physical' });
+    if (uw.tools && uw.tools.picks > 0) counts.push({ t: 'tools', name: 'Possession of burglary tools', days: TOOLS.days, q: 'physical' });
     const pv = g.player.lastVehicle;
     if (pv && !pv.owned && !pv.garageUid && pv.stolenBefore && dist2(pv.pos.x, pv.pos.z, g.player.pos.x, g.player.pos.z) < 20 * 20) counts.push({ t: 'car', name: 'Possession of a stolen vehicle', days: 10, q: 'physical' });
     const mul = Math.min(1.8, 1 + S.rap.priors * 0.08) * uw.cops.sentenceMul();

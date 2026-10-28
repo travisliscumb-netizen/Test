@@ -768,7 +768,8 @@ class ContentManager {
     if (best.propId) return null; // the ladder's doors are property locations (Underworld handles them)
     if (hash2i(best.x0 | 0, best.z0 | 0, 61) > 0.38 || best.type === 'farm') return null;
     if (g.police.level > 0) return { label: 'Break in (not with the police on you)', act: () => this.deny('Lose the heat first.') };
-    return { label: best.type === 'apartment' ? 'Slip into an apartment' : 'Break in', act: () => { g.police.crime('theft', p.pos.x, p.pos.z); const def = this.interiors.addDynamic(houseInteriorDef(best, null)); this.interiors.enter(def.id); } };
+    if (!g.uw.tools.picks) return { label: 'Break in (needs a lockpick set)', act: () => this.deny('You need a lockpick set. Dockside Sully sells them.') };
+    return { label: best.type === 'apartment' ? 'Slip into an apartment' : 'Break in', act: () => { g.uw.tools.usePick(); g.police.crime('theft', p.pos.x, p.pos.z); const def = this.interiors.addDynamic(houseInteriorDef(best, null)); this.interiors.enter(def.id); this.burglaryReport(def); } };
   }
   offerPenthouse() {
     const g = this.g, s = g.save;
@@ -793,7 +794,7 @@ class ContentManager {
       case 'elevator': this.openElevator(); break;
       case 'concierge': if (g.uw.props.owned('penthouse')) this.say('pv', pick(['Welcome home. Your car is downstairs whenever you want it.', 'Good evening. Nobody has asked for you. Nobody would dare.'])); else g.uw.ui.openProp('penthouse'); break;
       case 'view': g.ui.toast('The whole city at your feet: the stadium, the cranes at the port, Greenway Park, Crestmoor on the point.'); g.audio.play('ui'); break;
-      case 'stash': if (I.cur && I.cur.propId) g.uw.ui.openProp(I.cur.propId); break;
+      case 'stash': case 'manage': if (I.cur && I.cur.propId) g.uw.ui.openProp(I.cur.propId); break;
       case 'motorcourt': g.vspaces.enter(g.vspaces.byProp('mansion'), null); break;
       case 'loot': this.burgle(); break;
       case 'pool': g.audio.play('ui'); g.ui.toast(pick(['You break and sink two. The rest is a mess.', 'Bank shot off the cushion. Nobody saw it.', 'You clear the table in four. A shame nobody was watching.'])); break;
@@ -842,8 +843,18 @@ class ContentManager {
     const def = I.addDynamic(houseInteriorDef(home, prop));
     if (viewing) { def.viewing = !breakin; def.name = PROP_BY_ID[id].name + (breakin ? '' : ' (viewing)'); }
     const p = g.player;
-    if (p.interior && p.interior.vspace) { this.ride(() => { I.enter(def.id, true); }); return; }
+    if (p.interior && p.interior.vspace) { this.ride(() => { I.enter(def.id, true); if (breakin) this.burglaryReport(def); }); return; }
     I.enter(def.id);
+    if (breakin) this.burglaryReport(def);
+  }
+  // a burglary is reported or not (M10, §45.39): one roll as you go in, BURGLARY.report. A neighbour who saw the door
+  // go calls it in after a while; at a high-end home the police also contain the house: hiding inside doesn't
+  // make the search give up, you have to get out and lose them
+  burglaryReport(def, rnd = Math.random) {
+    const g = this.g; def.reported = rnd() < BURGLARY.report; if (!def.reported) return false;
+    const d = def.door, high = (def.tier || 0) >= BURGLARY.highTier;
+    g.police.pending.push({ t: rand(BURGLARY.delay[0], BURGLARY.delay[1]), sev: high ? 2 : 1, x: d.x, z: d.z, type: 'theft', by: null, contain: high ? def.id : null });
+    return true;
   }
   // from the hallway door into the attached garage, beside the cars
   toGarage(def) {
@@ -914,9 +925,6 @@ class ContentManager {
       if (got.length) { g.audio.play('pickup'); g.ui.toast(`${K.label[0].toUpperCase() + K.label.slice(1)}: ${got.join(', ')}.`, 'money'); }
       else { g.audio.play('ui'); g.ui.toast(pick(['Nothing worth taking.', 'Old receipts and a dead phone charger.', 'Empty.', 'Socks. Just socks.'])); }
       g.save.stats.burglaries = (g.save.stats.burglaries || 0) + 1;
-      // noise: a neighbour hears it; a safe is loud
-      const noise = c.kind === 'safe' ? 0.35 : 0.07 + st2.s.length * 0.015;
-      if (Math.random() < noise) { const d = def.door; g.police.crime('theft', d.x, d.z); g.ui.toast('A neighbour heard something and is calling it in. Get out.', 'warn'); }
     };
     if (K.slow) this.channel(`CRACKING THE ${K.label.toUpperCase()}`, K.slow, finish);
     else { g.audio.play('ui'); finish(); }
@@ -942,51 +950,78 @@ class ContentManager {
     if (g.police.level < stars) g.police.setLevel(stars);
     g.ui.toast('Silent alarm. The police are on their way.', 'warn');
   }
+  // security at a robbable business (M10): the trade's own level plus a step for every robbery, a step recovering
+  // every ROB_SEC.recover economic days. A Fuel & Go has none of its own.
+  robSecurity(def) {
+    const fl = this.g.save.flags.robSec || (this.g.save.flags.robSec = {}), r = fl[def.id], base = def.rob ? def.rob.sec : 0;
+    if (!r) return base;
+    const today = this.g.uw.S.day, add = Math.max(0, r.n - Math.floor((today - r.day) / ROB_SEC.recover));
+    if (!add) { delete fl[def.id]; return base; }
+    return Math.min(ROB_SEC.max, base + add);
+  }
+  robbed(def) {
+    const fl = this.g.save.flags.robSec || (this.g.save.flags.robSec = {}), today = this.g.uw.S.day, cur = this.robSecurity(def) - (def.rob ? def.rob.sec : 0);
+    fl[def.id] = { n: Math.min(ROB_SEC.max, cur + 1), day: today };
+  }
   storeHeist(id) {
     const g = this.g, def = this.interiors.cur; if (!def || !def.store) return;
-    const st = this.storeState(def), S = g.uw.S, armed = g.player.wep && !g.player.wep.melee;
+    // your own business: nothing in it is yours to take
+    if (def.propId && g.uw.props.owned(def.propId)) { this.say('pv', pick(['Your manager gives you a look. “Boss, that’s your own till.”', 'Robbing yourself is just bookkeeping with extra steps.'])); return; }
+    const st = this.storeState(def), S = g.uw.S, armed = g.player.wep && !g.player.wep.melee, R = def.rob || STORE_ROB;
+    const sec = this.robSecurity(def), alarm = p => Math.min(0.97, p + sec * ROB_SEC.alarm), slow = t => t + sec * ROB_SEC.slow;
     const area = ({ u: 1.4, c: 1.3, p: 1.25, a: 1.1, m: 1.1, l: 1.0, g: 1.0, o: 0.85, s: 0.85, w: 0.85, r: 0.8, h: 0.9 })[zoneKey(def.door.x, def.door.z)] || 1;
     if (id === 'register') {
       if (st.reg === S.day) { g.ui.toast('The till is empty. They dropped it in the safe after the last guy.', 'warn'); return; }
-      if (!armed && Math.random() < 0.4) { st.reg = S.day; this.say('Clerk', 'Not today, pal. *slams the alarm*'); this.silentAlarm(def, 1); return; }
-      this.channel(armed ? 'THE CLERK EMPTIES THE TILL' : 'LEANING ON THE CLERK', 3, () => {
-        st.reg = S.day;
-        const cash = Math.round((armed ? randi(180, 460) : randi(60, 200)) * area);
+      // a guard on the door (security 2+) means nobody hands over a till to an empty hand
+      if (!armed && (sec >= 2 || Math.random() < 0.4)) { st.reg = S.day; this.say('Clerk', sec >= 2 ? 'The guard steps in. “Walk away, friend.” *the alarm goes*' : 'Not today, pal. *slams the alarm*'); this.silentAlarm(def, 1); return; }
+      this.channel(armed ? 'THE CLERK EMPTIES THE TILL' : 'LEANING ON THE CLERK', slow(3), () => {
+        st.reg = S.day; this.robbed(def);
+        const cash = Math.round((armed ? randi(R.till[0], R.till[1]) : randi(Math.round(R.till[0] * 0.4), Math.round(R.till[1] * 0.45))) * area);
         g.earn(cash, 'heist'); g.audio.play('cash');
         g.save.stats.robberies = (g.save.stats.robberies || 0) + 1;
         this.say('Clerk', pick(['Take it, take it! The back office key too, just go!', 'Okay! Okay. Here. And the key to the back. Please.']));
         this.openStaffDoor(def, true);
-        if (Math.random() < 0.75) this.silentAlarm(def, armed ? 2 : 1); else g.police.crime('robbery', def.door.x, def.door.z);
+        if (Math.random() < alarm(0.75)) this.silentAlarm(def, armed ? 2 : 1); else g.police.crime('robbery', def.door.x, def.door.z);
       });
       return;
     }
     if (id === 'staff') {
       if (def.staffOpen) { g.ui.toast('The back office is open.'); return; }
-      this.channel('FORCING THE STAFF DOOR', 3.5, () => {
+      // a lock on a staff door: a pick opens it quietly, without one it is shouldered (slower, louder)
+      const pick1 = g.uw.tools.usePick();
+      this.channel(pick1 ? 'PICKING THE STAFF DOOR' : 'FORCING THE STAFF DOOR', slow(pick1 ? 2.5 : 3.5), () => {
         this.openStaffDoor(def, true); g.audio.play('clank');
-        if (st.reg !== S.day && Math.random() < 0.6) { this.say('Clerk', 'Hey! You can’t go back there! *picks up the phone*'); this.silentAlarm(def, 1); }
+        if (st.reg !== S.day && Math.random() < alarm(pick1 ? 0.3 : 0.6)) { this.say('Clerk', 'Hey! You can’t go back there! *picks up the phone*'); this.silentAlarm(def, 1); }
       });
       return;
     }
-    if (st[id]) { g.ui.toast(id === 'safe' ? 'The safe is already empty. Cash pickup comes on Mondays.' : 'Already gone through it.', 'warn'); return; }
+    if (st[id]) { g.ui.toast(id === 'safe' ? 'The safe is already empty. The cash pickup comes weekly.' : 'Already gone through it.', 'warn'); return; }
     const grab = () => {
       st[id] = true;
       if (id === 'safe') {
-        const cash = Math.round(randi(1400, 4200) * area); g.earn(cash, 'heist'); g.audio.play('cash');
+        this.robbed(def);
+        const cash = Math.round(randi(R.safe[0], R.safe[1]) * area); g.earn(cash, 'heist'); g.audio.play('cash');
         const got = Math.random() < 0.35 ? g.uw.give({ hot: 1 + randi(0, 2) }, 'robbery') : null;
         g.ui.toast(`The safe: ${fmtMoney(cash)}${got ? ' and ' + goodsList(got) : ''}.`, 'money');
-        if (Math.random() < 0.45) { g.audio.play('buzzer'); this.silentAlarm(def, 3); } else g.police.crime('robbery', def.door.x, def.door.z);
+        if (Math.random() < alarm(0.45)) { g.audio.play('buzzer'); this.silentAlarm(def, 3); } else g.police.crime('robbery', def.door.x, def.door.z);
       } else if (id === 'desk') {
         if (Math.random() < 0.6) { const c = randi(40, 220); g.earn(c, 'heist'); g.ui.toast(`Petty cash in the desk: ${fmtMoney(c)}.`, 'money'); }
         else if (Math.random() < 0.5) { g.save.ammo.pistol = (g.save.ammo.pistol || 0) + 12; g.ui.toast('A box of pistol rounds in the drawer: 12 rounds.', 'money'); }
         else g.ui.toast('Invoices and a stale doughnut.');
       } else {
-        const got = g.uw.give(Math.random() < 0.6 ? { smokes: randi(2, 5) } : { hot: randi(1, 2) }, 'robbery');
+        const k = Object.keys(R.stock)[0], n = R.stock[k], got = g.uw.give({ [k]: randi(n[0], n[1]) }, 'robbery');
         g.ui.toast(got ? `From the stockroom: ${goodsList(got)}.` : 'Nothing you can carry right now.', got ? 'money' : 'warn');
       }
     };
     if (!def.staffOpen) { g.ui.toast('That’s behind the staff door.', 'warn'); return; }
-    if (id === 'safe') this.channel('CRACKING THE OFFICE SAFE', 6, grab); else { g.audio.play('pickup'); grab(); }
+    if (id === 'safe') this.channel('CRACKING THE OFFICE SAFE', slow(6), grab); else { g.audio.play('pickup'); grab(); }
+  }
+  // walking into a business (M10): its themed interior, the guard on the door while security is up
+  enterBiz(id) {
+    const g = this.g, d = PROP_BY_ID[id], L = g.uw.loc('prop', id); if (!d || !L || !robTheme(d)) return;
+    const def = this.interiors.addDynamic(bizInteriorDef(d, L));
+    const guard = def.chars.find(c => c.id === 'guard'); if (guard) guard.hidden = this.robSecurity(def) < 2;
+    this.interiors.enter(def.id);
   }
   // the old one-button search: the nearest container not searched yet
   burgle() {

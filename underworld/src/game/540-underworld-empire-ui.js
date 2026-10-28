@@ -683,6 +683,7 @@ class EmpireUI {
       let h = `<div class="svcTop"><span>${d.kind.toUpperCase()} · yours</span>${PM.storageCap(id) ? `<span>Storage <b>${units(S.storage[id])} / ${PM.storageCap(id)}</b></span>` : ''}<span>${Money.html('property')}</span></div>`;
       if (d.kind === 'business' && d.cat) h += this.bizCard(d, true);
       h += uw.fronts.html(id);
+      h += uw.tools.stashHTML(id);
       h += '<div class="btns">';
       if (d.kind === 'safehouse') h += `<button class="sbtn gold" data-act="save">Save game</button><button class="sbtn" data-act="sleep">Sleep / lie low</button><button class="sbtn" data-act="wardrobe">Wardrobe</button>`;
       if (PM.capOf(d)) h += `<button class="sbtn" data-act="garage">Parking · ${PM.capOf(d)}</button>`;
@@ -775,6 +776,8 @@ class EmpireUI {
     // a front's books (M9): cash through, manager top-ups
     if (k === 'fdep') { const e = uw.fronts.deposit(id, good === 'all' ? Infinity : +good); g.content.refreshSvc(e || 'Through the books. It comes out clean, a day at a time.'); return; }
     if (k === 'fauto') { g.content.refreshSvc(uw.fronts.toggleAuto(id)); g.saveGame(); return; }
+    // lockpick sets in the stash (M10)
+    if (k === 'tpst' || k === 'tptk') { const e = k === 'tpst' ? uw.tools.store(id, Infinity) : uw.tools.take(id, Infinity); g.saveGame(); g.content.refreshSvc(e || (k === 'tpst' ? 'Put away.' : 'Taken.')); return; }
     // the warehouse panel
     if (d.kind === 'warehouse') {
       const parts = a.split(':');
@@ -795,7 +798,7 @@ class EmpireUI {
       case 'wardrobe': g.content.openWardrobe(); return;
       case 'garage': { const gp = uw.props.garagePoints().find(p => p.id === id); if (gp) g.content.openGarage(gp); return; }
       case 'view': { g.ui.closeAll(); g.content.enterHome(id, true); return; }
-      case 'breakin': { if (g.police.level > 0) { r = 'Not with the police on you.'; break; } g.ui.closeAll(); const L0 = uw.loc('prop', id); if (L0) g.police.crime('theft', L0.x, L0.z); g.content.enterHome(id, true, true); return; }
+      case 'breakin': { if (g.police.level > 0) { r = 'Not with the police on you.'; break; } if (!uw.tools.usePick()) { r = 'You need a lockpick set (Dockside Sully sells them).'; break; } g.ui.closeAll(); const L0 = uw.loc('prop', id); if (L0) g.police.crime('theft', L0.x, L0.z); g.content.enterHome(id, true, true); return; }
       case 'upgrade': { r = PM.upgrade(id) || `${d.name} is now level ${PM.level(id)}: ${BIZ_LEVEL_NAME[PM.level(id) - 1].toLowerCase()}.`; break; }
       case 'fence': this.openFence(id); return;
       case 'crew': g.ui.back(); this.open('crew'); return;
@@ -876,8 +879,10 @@ class EmpireUI {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
         const qs = lb ? [1, 2, 5] : [1, 5, 20];
         return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, p)} · ${fmtQty(k, n)} available · ${TIERS[GOODS[k].tier].name} · street price here ${fmtPerUnit(k, uw.market.price(z, k))}</span></div><div class="btns">${qs.map(q => { const lots = lotsFor(k, q); return `<button class="sbtn" data-act="buy:${k}:${lots}" ${n < lots || !Money.can(p * lots, 'supplier') ? 'disabled' : ''}>${lb ? q + ' lb' : '×' + q} · ${fmtMoney(p * lots)}</button>`; }).join('')}</div></div>`;
-      }).join('') + '</div><div class="hint">Product goes in your pockets, then the trunk of a car parked nearby. Every lot remembers what you paid, so the Inventory tab shows what it is worth now and your profit or loss. Store it at a property, sell it to street buyers, or put crew on it.</div>');
+      }).join('') + '</div><div class="hint">Product goes in your pockets, then the trunk of a car parked nearby. Every lot remembers what you paid, so the Inventory tab shows what it is worth now and your profit or loss. Store it at a property, sell it to street buyers, or put crew on it.</div>') + (s.id === 'sully' ? uw.tools.shopHTML() : '');
     g.content.openSvc(s.name, '', render, a => {
+      // Sully sells lockpick sets as well (M10)
+      if (s.id === 'sully' && a.startsWith('pick:')) { const e = uw.tools.buy(+a.split(':')[1]); g.content.refreshSvc(e || 'A roll of picks and tension wrenches. Don’t get caught with them.'); return; }
       const [, k, q] = a.split(':'); if (locked || !GOODS[k]) return;
       const p = uw.market.wholesale(z, k);
       let n = Math.min(+q, stock[k] | 0, Math.floor(Money.available('supplier') / p));

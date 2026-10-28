@@ -142,6 +142,7 @@ class Underworld {
     this.prison = new Prison(this);
     this.legal = new Legal(this);
     this.fronts = new Fronts(this);
+    this.tools = new Tools(this);
     this.opps = new OppFeed(this);
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
@@ -256,6 +257,7 @@ class Underworld {
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
     S.legal = Legal.sanitize(S.legal, num, S.rap);
     S.fronts = Fronts.sanitize(S.fronts, num);
+    S.tools = Tools.sanitize(S.tools, num);
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
@@ -734,7 +736,7 @@ class Underworld {
     const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0);
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
-      const L = pocketLoot(q, z), cash = L.cash;
+      const L = pocketLoot(q, z, Math.random, g.env.time), cash = L.cash;
       g.earn(cash, 'pickpocket'); S.st.picks++;
       let extra = '';
       if (L.hot) { const t = this.give({ hot: L.hot }); if (t) extra = ` and ${L.item}${L.hot > 1 ? ` (+${L.hot - 1} more)` : ''}`; }

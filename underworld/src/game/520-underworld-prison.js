@@ -177,7 +177,7 @@ class Prison {
     const ch = pend.ch;
     // confiscation: everything carried, the trunk of the car you were in, every firearm, and the Dirty Cash on you
     // and in that car (§2). Cash in stashes and vaults, and the bank, are not touched by an ordinary arrest.
-    S.st.seized += units(S.inv); Inv.clear(S.inv);
+    S.st.seized += units(S.inv); Inv.clear(S.inv); uw.tools.confiscate();
     const v = pend.veh;
     const cash = Money.seize(v && g.vehicles.list.includes(v) ? v : null);
     S.st.seizedCash = (S.st.seizedCash || 0) + cash;

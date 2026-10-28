@@ -120,6 +120,14 @@ if (want('taxi')) {
   await frames(page, 30); await shot('taxi-ride-hud');
   await ev(() => { const g = window.game; g.taxi.cab.vel.set(0, 0); g.taxi.getOut(); });
 }
+if (want('biz')) {
+  // the robbable businesses (M10): one shot per fit
+  for (const cat of ['pharmacy', 'jewelry', 'electronics', 'pawn', 'boutique', 'bar', 'diner', 'barber']) {
+    await ev(c => { const g = window.game, uw = g.uw, d = window.__pv.PROPS.find(p => p.kind === 'business' && p.cat === c); if (!d) return; g.content.enterBiz(d.id); }, cat); await fadeDone();
+    await at(-1.5, 0, 4.2, Math.PI * 0.95, -0.12); await ev(() => window.__hideTip()); await shot('biz-' + cat);
+    await ev(() => window.game.content.interiors.exit(true)); await fadeDone();
+  }
+}
 if (want('jail')) {
   await ev(() => { const g = window.game; g.uw.S.rap.cur = { pickpocket: 1 }; g.police.setLevel(1); g.uw.S.rap.maxLvl = Math.max(g.uw.S.rap.maxLvl || 0, 3); g.uw.legal.add('assault', 'police'); g.onBusted(); });
   await throughCourt(page);

@@ -47,11 +47,21 @@ function pedType(q, zk) {
   let acc = 0; for (const t of PED_TYPES) { acc += t.w[band]; if (r < acc) return { t, band, wl }; }
   return { t: PED_TYPES[0], band, wl };
 }
+// the time of day (M10): office districts carry more in office hours, the Strip and the Heights by night, and the
+// small hours carry little anywhere (null: no time, the old rates)
+function pocketTimeK(zk, hour) {
+  if (hour == null) return 1;
+  const h = ((Math.floor(hour) % 24) + 24) % 24, night = h >= 20 || h < 3, office = h >= 9 && h < 18;
+  if (h >= 3 && h < 6) return 0.6;
+  if (zk === 'p' || zk === 'u') return night ? 1.35 : 0.9;
+  if (zk === 'c' || zk === 'm') return office ? 1.2 : night ? 0.8 : 1;
+  return night ? 0.9 : 1;
+}
 // what lifting a pocket gets you: { cash, hot, item, jackpot }
-function pocketLoot(q, zk, rnd = Math.random) {
+function pocketLoot(q, zk, rnd = Math.random, hour = null) {
   const { t, band, wl } = pedType(q, zk);
   const [lo, hi] = t.cash, u = Math.pow(rnd(), 2.4);
-  let cash = Math.round(lo * Math.pow(hi / lo, u) * (0.75 + wl * 0.25));
+  let cash = Math.round(lo * Math.pow(hi / lo, u) * (0.75 + wl * 0.25) * pocketTimeK(zk, hour));
   let jackpot = 0;
   if (t.jp && rnd() < t.jp * [0.25, 0.6, 1][band]) {
     let r = rnd(), pickV = PED_JACKPOTS[0][0];

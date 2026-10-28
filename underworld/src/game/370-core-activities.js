@@ -388,12 +388,23 @@ function brawlBrain(p, dt) {
   gangAttack(p, o, dt);
 }
 function idleBrain(p, dt) { p.state = 'free'; p.vx = damp(p.vx, 0, 6, dt); p.vz = damp(p.vz, 0, 6, dt); if (p.faceX !== undefined) p.h = dampAngle(p.h, Math.atan2(p.faceX - p.x, p.faceZ - p.z), 3, dt); }
+// heat and turf shape the street (M10): police pressure, a warrant or a fugitive record put more patrols and stops
+// on the streets; on your own turf your people keep petty crime down; on a rival's turf there's more trouble
+function eventBias(g, k) {
+  const uw = g.uw; if (!uw || !uw.S) return 1;
+  const p = g.player.pos, own = offCity(p.x, p.z) ? null : uw.owner[turfAt(p.x, p.z)], hot = uw.S.pressure > 50 || (uw.legal && uw.legal.L.warrant) || !!uw.S.fugitive;
+  let m = 1;
+  if (hot && (k === 'stop' || k === 'pursuit')) m *= k === 'stop' ? 1.8 : 1.3;
+  if (own === 'pc' && (k === 'robbery' || k === 'streetfight')) m *= k === 'robbery' ? 0.4 : 0.6;
+  if (own && own !== 'pc' && (k === 'streetfight' || k === 'drop')) m *= k === 'streetfight' ? 1.6 : 1.4;
+  return m;
+}
 class EventManager {
   constructor(game) { this.g = game; this.ev = null; this.cool = rand(40, 70); this.list = []; }
   pickType() {
     const g = this.g, night = g.env.night > 0.5;
     const opts = Object.entries(EVENT_TYPES).filter(([k, t]) => !t.night || night).filter(([k]) => !(k === 'robbery' && night && Math.random() < 0.5));
-    const wt = (k, t) => t.w * (k === 'accident' && g.env.rain > 0.5 ? 2 : 1) * (k === 'racers' && zoneAt(g.player.pos.x, g.player.pos.z).night > 1 ? 2 : 1);
+    const wt = (k, t) => t.w * (k === 'accident' && g.env.rain > 0.5 ? 2 : 1) * (k === 'racers' && zoneAt(g.player.pos.x, g.player.pos.z).night > 1 ? 2 : 1) * eventBias(g, k);
     let sum = 0; for (const [k, t] of opts) sum += wt(k, t);
     let r = Math.random() * sum;
     for (const [k, t] of opts) { r -= wt(k, t); if (r <= 0) return k; }
