@@ -152,7 +152,7 @@ class VehicleRegistry {
   }
   // ---------------------------------------------------------------- cars you don't own
   // a car worth keeping track of: one you are driving or that holds your cargo, not a job's, a cab, a lot car or yours
-  eligible(v) { return !!v && !v.garageUid && !v.owned && !v.mission && !v.taxiCab && !v.dealer && !v.burnt && this.g.vehicles.list.includes(v) && CARGO_LB[v.type] !== undefined; }
+  eligible(v) { return !!v && !v.garageUid && !v.owned && !v.mission && !v.taxiCab && !v.dealer && !v.burnt && !isUniqueType(v.type) && this.g.vehicles.list.includes(v) && CARGO_LB[v.type] !== undefined; }
   rec(id) { return this.tracked.find(r => r.id === id) || null; }
   liveT(r) { const v = this.trk.get(r.id); return v && this.g.vehicles.list.includes(v) && v.trackId === r.id ? v : null; }
   track(v) {
@@ -161,7 +161,7 @@ class VehicleRegistry {
     // car stays usable while you use it, but it can't be remembered: you are told so, plainly.
     if (this.tracked.length >= VREG.max && !this.makeRoom(v)) { v.untracked = true; this.g.ui.toast(`Too many stolen cars with your things in them: this ${v.spec.name} can’t be kept track of. Leave it and it, and anything you put in it, won’t be safe.`, 'warn'); return null; }
     const id = s.nextTrack = (s.nextTrack || 0) + 1;
-    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.dealerStolen ? 'dealer' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ(), tune: v.tune ? { ...v.tune } : null };
+    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.dealerStolen ? 'dealer' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ(), tune: v.tune ? { ...v.tune } : null };
     this.tracked.push(r);
     v.trackId = id; v.stolenBefore = v.stolenBefore || r.hot; v.touched = true;
     Money.adoptCar(v, 't' + id); // its cash is kept in the wallet now (saved with the car)
@@ -313,7 +313,7 @@ class VehicleRegistry {
       return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found', 'dealer'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9), tune };
     });
     d.nextTrack = next;
-    d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));
+    d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission', 'prize', 'pinkslip'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));
     d.vlog = (Array.isArray(d.vlog) ? d.vlog : []).filter(x => x && typeof x === 'object' && typeof x.what === 'string' && VEHICLES[x.type]).slice(-20);
   }
 }

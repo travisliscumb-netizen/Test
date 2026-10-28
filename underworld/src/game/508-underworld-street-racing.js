@@ -76,10 +76,15 @@ class PinkSlips {
     if ((e.trunk && Object.values(e.trunk).some(n => n > 0)) || Money.dirtyInCar(e.uid) > 0) return 'Empty it first: no goods, loot or cash in a car you put up.';
     if (v.health < RACE_T.pink.minHp || v.broken || v.burnt) return 'Get it fixed first: Vance won’t race a wreck.';
     if (R.freeBays() < 1) return 'You need a free parking space for his car if you win.';
+    // the Widowmaker (Session 6D): Vance only puts it up against a car worth having
+    const W = UNIQUE_BY.widow;
+    if (def && !def.offroad && g.uniques && g.uniques.widowDue() && carWorth(e.type, e.vtier) < W.stake) return `Vance is putting up the Widowmaker: he wants a car worth ${fmtMoney(W.stake)} or more against it.`;
     return '';
   }
   // the rival's stake: a car worth about 0.8–1.5× yours
   rival(e, def) {
+    // Vance's own car, once he has offered it: a street pink slip only, against whatever you put up (Session 6D)
+    if ((!def || !def.offroad) && this.g.uniques && this.g.uniques.widowDue()) return { type: 'u_widow', color: VEHICLES.u_widow.colors[0], vtier: 'unique', u: 'widow' };
     const sv = carWorth(e.type, e.vtier);
     const all = Object.keys(VEHICLES).filter(t => !VEHICLES[t].police && !VEHICLES[t].unique && !PINK_NEVER.includes(t) && CAR_MSRP[t] && (!def || !def.offroad || trailOf(t) >= 0.5));
     const val = t => carWorth(t, VEHICLES[t].tier);
@@ -104,7 +109,8 @@ class PinkSlips {
     const e = s.garage.find(x => x.uid === P.uid), V = VEHICLES[P.rival.type];
     if (win) {
       const A = g.race.active, o = A && A.racers[0] && g.vehicles.list.includes(A.racers[0].v) ? A.racers[0].v : null;
-      const ne = g.content.addToGarage(P.rival.type, 'pinkslip', P.rival.color, true) || g.vreg.give(P.rival.type, 'pinkslip', P.rival.color, 'Vance');
+      // a one-off goes through its registry: once only, and never a second copy (Session 6D)
+      const ne = P.rival.u ? g.uniques.grant(P.rival.u) : g.content.addToGarage(P.rival.type, 'pinkslip', P.rival.color, true) || g.vreg.give(P.rival.type, 'pinkslip', P.rival.color, 'Vance');
       if (ne) {
         ne.vtier = P.rival.vtier;
         if (o) {
@@ -115,6 +121,7 @@ class PinkSlips {
         }
       }
       g.vreg.note('won in a pink slip', P.rival.type, { from: 'Vance' });
+      if (g.uniques) g.uniques.onPinkWin(!!P.rival.u);
       g.ui.toast(`Pink slip won: the ${V.name} is yours.`, 'money');
     } else if (e) this.surrender(e, P);
     g.saveGame(true);
@@ -138,7 +145,7 @@ class PinkSlips {
   reset() {
     const s = this.s; if (!s) return;
     const P = s.pink;
-    if (P && (typeof P !== 'object' || !Number.isInteger(P.uid) || !P.rival || !VEHICLES[P.rival.type])) { s.pink = null; return; }
+    if (P && (typeof P !== 'object' || !Number.isInteger(P.uid) || !P.rival || !VEHICLES[P.rival.type] || (isUniqueType(P.rival.type) && P.rival.u !== VEHICLES[P.rival.type].unique))) { s.pink = null; return; }
     if (P) { const e = s.garage.find(x => x.uid === P.uid); s.pink = null; if (e) this.surrender(e, P); if (this.g.uw) this.g.uw.news('pv', `You walked away from a pink slip. Vance kept your ${e ? VEHICLES[e.type].name : 'car'}.`); }
     if (!Number.isInteger(s.pinkDay)) s.pinkDay = -1;
     if (!Number.isInteger(s.pinkDirtDay)) s.pinkDirtDay = -1;

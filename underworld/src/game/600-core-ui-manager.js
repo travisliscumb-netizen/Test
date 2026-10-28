@@ -669,6 +669,7 @@ class UIManager {
       c.strokeStyle = m ? 'rgba(255,216,77,0.85)' : 'rgba(127,224,143,0.8)'; c.lineWidth = 5 * k * 1.2; c.lineJoin = 'round';
       c.beginPath(); route.forEach((q, i) => { const [x, z] = this._mapXY(q.x, q.z); i ? c.lineTo(x, z) : c.moveTo(x, z); }); c.stroke();
     }
+    if (g.uniques) for (const a of g.uniques.areas()) { const [ax, az] = this._mapXY(a.x, a.z); c.fillStyle = 'rgba(255,216,77,0.12)'; c.strokeStyle = 'rgba(255,216,77,0.7)'; c.lineWidth = 1.5 / zoom * k; c.beginPath(); c.arc(ax, az, a.r * k, 0, 7); c.fill(); c.stroke(); }
     if (m && m.area) { const [ax, az] = this._mapXY(m.area.x, m.area.z); c.fillStyle = 'rgba(255,216,77,0.18)'; c.strokeStyle = 'rgba(255,216,77,0.8)'; c.lineWidth = 2 / zoom * k; c.beginPath(); c.arc(ax, az, m.area.r * k, 0, 7); c.fill(); c.stroke(); }
     if (g.police.level > 0 && !g.police.visible) { const [sx, sz] = this._mapXY(g.police.lastSeen.x, g.police.lastSeen.z); c.fillStyle = 'rgba(255,60,80,0.15)'; c.beginPath(); c.arc(sx, sz, g.police.searchRadius * k, 0, 7); c.fill(); }
     c.restore();
@@ -770,7 +771,9 @@ const MAP_CATS = {
   casino: { name: 'Casino', icon: '♦', col: '#ffd84d', layer: 'landmarks' },
   carsUsed: { name: 'Used Autos', icon: 'U', col: '#e0a020', layer: 'locations' },
   carsNew: { name: 'New Cars', icon: 'N', col: '#7fb2ff', layer: 'locations' },
-  carsLux: { name: 'Performance & Luxury', icon: '★', col: '#e8d28a', layer: 'locations' }
+  carsLux: { name: 'Performance & Luxury', icon: '★', col: '#e8d28a', layer: 'locations' },
+  // a one-off's search area (?) or, once spotted, its exact place (◆) (Session 6D)
+  unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' }
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
@@ -847,6 +850,7 @@ class MapView {
       }
       const pw = uw.loc('prop', 'pawn'); if (pw) add({ key: 'sell:pawn', name: 'Lucky’s Pawn · fence', cat: 'sell', x: pw.x + 1.5, z: pw.z + 1.5, sub: 'SELL hot goods and smokes · no questions asked' });
     }
+    if (g.uniques) for (const e of g.uniques.mapEntries()) add(e);
     for (const ct of g.missions.contacts) if (ct.visible !== false && !ct.interior && (!ct.storyOnly || ct.marker.g.visible)) add({ key: 'ct:' + ct.id, name: ct.name, cat: 'contact', col: '#' + new THREE.Color(ct.color).getHexString(), x: ct.x, z: ct.z, sub: ct.role });
     this.entries = out;
     return out;
@@ -1157,6 +1161,7 @@ class MapView {
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
+    if (g.uniques && this.layerOn('locations')) for (const a of g.uniques.areas()) { const [ax, az] = ui._mapXY(a.x, a.z); c.fillStyle = 'rgba(255,216,77,0.14)'; c.strokeStyle = 'rgba(255,216,77,0.85)'; c.lineWidth = Math.max(1.5, 3 / this.zoom); c.setLineDash([6 / this.zoom, 4 / this.zoom]); c.beginPath(); c.arc(ax, az, a.r * k, 0, 7); c.fill(); c.stroke(); c.setLineDash([]); }
     // route to the tracked place
     const wp = g.content.waypoint, m = g.missions.active, tgt = (m && m.target) || wp;
     const pk = this.pickMode && this.pickMode.dest ? this.pickMode : null;

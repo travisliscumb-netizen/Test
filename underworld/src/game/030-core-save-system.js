@@ -49,6 +49,8 @@ const SaveSystem = {
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
       // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
       track: { best: null, prize: {}, hosted: null, laps: 0 },
+      // the ten one-offs (Session 6D): each one's stage (undiscovered, clue, exact location, acquired)
+      uniques: {},
       dealers: {},
       nextUid: 1,
       pos: null,
@@ -167,6 +169,8 @@ const SaveSystem = {
     }
     // where each car is (its home bay e.at, or e.loc on the street), the tracked stolen cars, cars waiting for space
     VehicleRegistry.sanitize(d);
+    // the one-offs: their stages, and one fleet or waiting entry each at most (Session 6D)
+    UniqueCars.sanitize(d);
     for (const k of ['pistol', 'smg', 'shotgun', 'bat']) d.weapons[k] = !!d.weapons[k];
     // where each gun is: null = on you; a property id = in that property's stash
     if (!d.wloc || typeof d.wloc !== 'object') d.wloc = {};

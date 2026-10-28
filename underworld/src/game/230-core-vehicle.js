@@ -46,12 +46,12 @@ class Vehicle {
     this.airborne = false; this.airT = 0; this.pitchG = 0; this.rollG = 0; this.pitchGV = 0; this.bodyOff = 0; this.bodyV = 0; this.planeOff = 0; this.slopeF = 0; this.hitT = 0; this.brakeP = 0; this.landT = 0; this.broken = 0;
     this._wy = this._wy || [0, 0, 0, 0]; this._wl = this._wl || [0, 0, 0, 0]; this._wr = this._wr || [0, 0, 0, 0]; this.bump = 0; this.trail = trailOf(this.type); this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
     this._safe = null; this.recycle = false; this.tune = null; this.garageUid = 0; this.trackId = 0; this.locked = false; this.origin = null; this.rareFind = false; this.critical = false;
-    this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.joinT = 0; this.staffed = undefined; this.free = false; this.goldCar = false; this.dealer = null; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
+    this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.joinT = 0; this.staffed = undefined; this.free = false; this.uniqueId = ''; this.dealer = null; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
     // road dirt (0 just washed … 1 filthy); 0.5 is the everyday look. It builds up with distance driven
     this.dirt = 0.5;
     const col = opts.color !== undefined ? opts.color : pick(s.colors);
     this.mat.userData.u.uPaint.value.setHex(col);
-    this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : 0xffffff);
+    this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : s.paint2 !== undefined ? s.paint2 : 0xffffff);
     this.mat.userData.u.uMisc.value.set(0, 0, 0, 0);
     this.restoreGeo();
     this.colorHex = col;
@@ -65,9 +65,10 @@ class Vehicle {
     this.mesh.geometry = this.vg.geo;
   }
   setTier(tier) {
-    const L = TIER_LOOK[tier] || TIER_LOOK.common;
-    this.vtier = tier; this.rim = L.rim;
-    this.mat.userData.u.uFinish.value.set(L.flake, L.gloss, L.wear, L.rim);
+    // a one-off (Session 6D) has a finish of its own: matte, satin or mirror, and its own wheels
+    const L = TIER_LOOK[tier] || TIER_LOOK.common, F = tier === 'unique' && this.spec.finish ? this.spec.finish : L;
+    this.vtier = tier; this.rim = F.rim;
+    this.mat.userData.u.uFinish.value.set(F.flake, F.gloss, F.wear, F.rim);
   }
   get speed() { return Math.hypot(this.vel.x, this.vel.y); }
   get fx() { return Math.sin(this.h); } get fz() { return Math.cos(this.h); }

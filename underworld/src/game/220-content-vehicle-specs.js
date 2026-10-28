@@ -131,7 +131,7 @@ const PROFILES = {
   wedge: { body: [[-2.42, 0.24], [2.42, 0.24], [2.42, 0.4], [2.05, 0.52], [0.8, 0.68], [-1.9, 0.86], [-2.42, 0.84], [-2.42, 0.62]], cabin: [[0.8, 0.66], [-0.2, 1.16], [-1.0, 1.16], [-1.85, 0.85]] }
 };
 // low, sporty bodies: blacked-out pillars, a small factory spoiler and side strakes
-const SPORTY_PROFILES = new Set(['super', 'sports', 'coupe', 'mid', 'wedge', 'roadster', 'hothatch', 'musclemod']);
+const SPORTY_PROFILES = new Set(['super', 'sports', 'coupe', 'mid', 'wedge', 'roadster', 'hothatch', 'musclemod', 'u_coupe', 'u_proto', 'u_club', 'hyper']);
 const BOXY_PROFILES = new Set(['van', 'truck', 'minivan']);
 function extrudeProfile(pts, width, bevel = 0.06, taper = 0) {
   const sh = new THREE.Shape();
@@ -316,9 +316,16 @@ function vehicleGeometry(type) {
     g.box(sx * (W / 2 - 0.005), (yb + belt) / 2 + 0.04, -wb * 0.2, 0.05, 0.26, 0.62, null, 0, { part: 14 });
     g.box(sx * (W / 2 + 0.01), (yb + belt) / 2 + 0.18, -wb * 0.2, 0.03, 0.04, 0.7, null, 0, { part: 2 });
   }
+  // one-off details (Session 6D): separate flared front wings with running boards, and a spare wheel on the tail
+  if (s.fenders) for (const sx of [-1, 1]) {
+    g.box(sx * (W / 2 - 0.06), R + 0.12, wb / 2, 0.24, 0.16, R * 2.6, null, 0, { part: 0 });
+    g.box(sx * (W / 2 - 0.02), yb + 0.04, 0, 0.2, 0.05, wb - R * 2.2, null, 0, { part: 14 });
+  }
+  if (s.spare) g.add(TPL.cyl, M(0, (yb + rearTop) / 2 + 0.05, zr - 0.14, R * 0.95, 0.22, R * 0.95, 0, Math.PI / 2), null, { part: 14 });
   if (s.louvers) for (let k = 0; k < 4; k++) { const z = cabR - 0.12 - k * 0.11, y = profileTopAt(pr.body, z); if (y < 5) g.box(0, y + 0.012, z, W * 0.5, 0.025, 0.05, null, 0, { part: 14 }); }
   // ---- tier detail: what separates a junk runabout from a car people want to collect
-  const tier = s.tier || 'common', T = { nice: 1, sport: 2, luxury: 3, rare: 4 }[tier] || 0;
+  // a one-off (Session 6D) is dressed like a rare model
+  const tier = s.tier === 'unique' ? 'rare' : s.tier || 'common', T = { nice: 1, sport: 2, luxury: 3, rare: 4 }[tier] || 0;
   const hoodZ = (zf + cabF) / 2;
   if (T >= 1) {
     // projector headlamp rings and a light strip (part 16)

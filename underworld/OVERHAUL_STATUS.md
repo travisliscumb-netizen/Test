@@ -11,10 +11,115 @@ The mapping stays exact until a session changes the code above that line; after 
 
 ## Current phase
 
-- Milestone: **Curved Roads / Road-Network Evolution — complete, awaiting owner review** (inserted before 6D,
-  §45.37; High effort). 6C is closed (§45.37). **6D has not been started.**
-- Commit/base revision: 6C closure `09c2ffd` → the Curved Roads commits on `claude/practical-lamport-zld81y`.
-- Date: 2026-10-27
+- Milestone: **Session 6D — the ten permanent unique hidden cars: complete, awaiting owner review** (Medium effort).
+  Curved Roads is closed (§45.38).
+- Commit/base revision: Curved Roads closure `afb8cef` → the 6D commit on `claude/practical-lamport-zld81y`.
+- Date: 2026-10-28
+
+## Curved Roads rulings (§45.38, owner review of the Curved Roads pass)
+
+- Countryside police roadblocks at 4★: **KEEP**.
+- Countryside traffic on the loop and the east track: **KEEP**.
+- The possible Saltmarsh street race: **not added** (do not add it yet).
+- The four changed Saltmarsh / Tanner's Row blocks: **approved**.
+- Wet curved streets darkening in the rain: **approved**.
+- The curved-road architecture is not to be reopened unless a later session exposes a genuine bug or dependency.
+  6D did not need to touch it: it only reads `kerbSpot`, `kerbBlocked` and `RoadGraph.spots`.
+
+## Session 6D — the ten one-offs
+
+### Inspection (what already existed)
+
+- **The Golden Corsair** was a secret: a stock Corsair 68 painted gold. It spawned at a Docklands kerb after fifteen
+  packages, and nothing protected it. Not storing it lost it; it was a reskin, not a model.
+- **The Rooftop Zephyr** is a stock Zephyr parked on the Quarter Garage roof (`rareFind`). See "Known risks": it
+  stands there again every time the block streams in.
+- **The pink slips already refused to stake a car flagged `unique`.** Rivals never put one up (§45.33 prepared the
+  hook). The registry (§45.29) already promised that unique cars are never dropped.
+- **Every pool that chooses a model is an explicit list:** dealers, traffic, parked stalls, rare finds, race fields,
+  events and the chop list. A new model therefore can't leak into normal stock.
+- **The save loader merges new fields with defaults.** `uniques` needed no schema bump. Its sanitizer is idempotent
+  and also does the one migration (the old gold Corsair).
+- **Verdict:** no foundational rewrite was needed. The one-offs are VEHICLES models plus a small registry layered on
+  the vehicle registry. An acquired one-off is an ordinary fleet entry.
+
+### The ten
+
+| # | Id · model | Kind | Body / look | Handling identity | How it is acquired | Where | Stage |
+|---|---|---|---|---|---|---|---|
+| 1 | `corsair` · Golden Corsair | Classic | the 68 Corsair body, gold leaf with black pinstripes, mirror paint, polished rims | big-block torque, tail-happy (drift 0.36), 67 m/s | **collectible completion:** fifteen hidden packages → tip and search area → exact spot when close → take it | a kerb behind the depot on Harbor Row (Docklands, block 11,8) | mid |
+| 2 | `spectre` · Calloway Spectre | Coupe | the Aurel fastback stretched 4%, lowered, lip wing, side intakes, deep blue | planted GT-coupe grip (1.36), 80 m/s | **race victories:** a lead after the first city street race; all five won, then Tull's one-time reward | delivered to a free space, or waits with Tull | mid–late |
+| 3 | `ambassador` · Sovereign Ambassador | Luxury | Sovereign limousine stretched 6% (5.7 m), black, light bars | 2.45 t, armour ×1.6, soft and slow to turn, 60 m/s | **contact + paid intel:** Rep 800, Lucky phones; his tip ($3,000 cash) → search area → take it. **Stolen by design:** HOT until the Chop Shop cleans it | a Crestmoor Heights driveway (block 1,1) | mid |
+| 4 | `proto` · Zephyr Prototype | Supercar | the Zephyr body lowered, matte grey (gloss 0.22), swan-neck wing, louvres | 89 m/s, grip 1.44, brakes 19 | **contact:** Rep 2,000, Valen Prestige Motors' lead → search area → find it (papers in the glovebox: legal) | a bonded yard in the Warehouse District (block 8,10) | late |
+| 5 | `baja` · Baja One | Off-road | Mesa body lifted 14 cm on 0.53 m wheels, rally orange, satin, light bar, roof rails | long-travel suspension (soft 2.1), trail 1.0, armour ×1.3, 55 m/s | **exploration:** first time in Cedar Fields South → a farmhand's tip → search area → find it | just off the farm track in the far fields east of the park | early–mid |
+| 6 | `widow` · Widowmaker | Muscle | the Brakken lowered 4 cm, satin black, red stripe, scoop | the loosest car on the island (drift 0.48), 70 m/s | **pink-slip challenge:** beat Vance in three ordinary pink slips; the next street pink slip stakes it, against a car worth ≥ $24,000. Lose: ordinary rules (your car is his); it stays on offer | Vance's own; yours where it stopped | mid |
+| 7 | `club` · Tempest Clubsport | Track | roadster lowered, white, swan wing, side intakes | 880 kg, grip 1.6, brakes 21, steering 0.68, fragile (armour ×0.8), 74 m/s | **official event:** a lead on first visiting Valen Point; win the GT Cup → Race Control's prize car, once | delivered to a free space, or waits with Race Control | mid–late |
+| 8 | `riviera` · Monarch Riviera | GT | the Monarch long-tailed (5.25 m), burgundy, chrome, light bars | a stable high-speed cruiser (82 m/s, drift 0.09) | **existing world systems:** every district discovered and Rep 1,300 → the Valen Courier's story → search area → find it | a Linden Hills carport street (block 1,9) | mid–late |
+| 9 | `tourer` · Regent Tourer 1931 | Vintage | its own tall pre-war body: separate flared wings, running boards, spare wheel, bottle green, steel wheels | power 5,600 (the lowest of the ten), 41 m/s, soft 1.7, weak brakes: a collector's piece, not a racer | **special event:** the Ghost Ferry secret (fog, 3–5 am) → the Ferryman's story → search area → find it | the old ferry slip on the west shore (Old Quarter, block 0,6) | any (rare event) |
+| 10 | `aeterna` · Aeterna V16 | Ultimate | its own hypercar body (the lowest and longest), pearl white, lip wing, intakes, louvres, light bars | 95 m/s (the fastest car on the island), grip 1.48, power 25,500 (the highest in the game) | **the other nine:** a message once all nine are yours → search area → find it | at the foot of Valen Tower (Financial District) | final |
+
+- **Values are provisional:** speeds, prices (worth $36,000–$250,000), Rep gates, the $3,000 tip and the $24,000
+  stake.
+- **No early car trivialises progression.** The early and mid finds (Baja, Corsair, Ambassador, Widowmaker,
+  Tourer) are all slower than the stock sports cars. Everything faster needs Rep 1,300–2,000, every city race, a
+  Valen Point win or the other nine.
+
+### How it works (`225`, `506`)
+
+- **Models.** `UNIQUE_CARS` defines each one-off: id, model, kind, how it is acquired, keeper, value, cargo and the
+  clue texts. Its spec goes into `VEHICLES` with:
+  - `unique: <id>`, `tier: 'unique'`, `unlockOnly`, `special`;
+  - new profiles: `vintage`, `hyper`, and stretched, lifted or lowered derivatives (`deriveProfile`);
+  - new body details: `fenders`, `spare`, `paint2` (stripes);
+  - its own finish under the 'unique' tier (flake, gloss, wear, rim), applied in `Vehicle.setTier`.
+- **State.** `save.uniques[id] = { st, lead, n, day }`:
+  - `st` is 0 undiscovered, 1 clue known, 2 exact location known (or, for the Widowmaker, offered), 3 acquired;
+  - `lead` is a pre-clue hint (Lucky's call, the Riviera's districts);
+  - `n` counts Vance's pink-slip losses.
+  - "Owned / stored / impounded / out" is not stored. It is read from the car's fleet entry, so discovered never
+    means owned.
+- **Stages.** `UniqueCars.check()` runs on a 0.5 s clock and on race and pink-slip results. Each stage is reached
+  once, saved, and announced (a phone message from the contact, a toast; a banner for a sighting or an
+  acquisition).
+- **Cars that stand somewhere (7):**
+  - **Spot:** a fixed, deterministic place (`spotOf`, from `kerbSpot`, `curbAt` or the countryside road spots),
+    checked clear of buildings.
+  - **Search area:** centred 45% of its radius away from the car.
+  - **Streaming:** the car exists only from the clue on, only within 160 m, never popping in within 60 m in view.
+    It is despawned beyond 340 m out of view, and never exists once acquired. A burnt one is replaced by a fresh
+    one at its place the next time you come by (it was never yours).
+  - **Taking it** (`E`: "Take the …"): one confirmation, then `claim`. That needs a free bay and the fleet under
+    its cap, adds the fleet entry where the car stands (out, its bay reserved), and makes the stage acquired. A
+    second claim is impossible.
+- **Rewards (Spectre, Clubsport) and the Widowmaker** go through `grant`. It puts the car into a free bay, or it
+  waits in `pendingCars` with the keeper (the existing "nowhere to park" rule). It runs once: the stage, the entry
+  and the waiting entry are all checked.
+- **Pink slips** (`508`):
+  - `rival()` returns Vance's Widowmaker when it is due (street pink slip only);
+  - `canStake` asks for a stake worth ≥ $24,000 against it;
+  - `resolve(win)` grants it through the registry;
+  - his car on the grid is locked;
+  - a stake record naming a one-off that isn't his is discarded on load.
+- **Protection:**
+  - no Sell button for a one-off in the garage (a refusal if forced);
+  - the Chop Shop refuses one;
+  - the pink slip refuses one (as before);
+  - `storeVehicle` and the stolen-car registry refuse any copy that wasn't acquired;
+  - the debug "spawn car" excludes them.
+  - The impound, the wreck tow, HOT, the Chop Shop clean, tuning, dirt, damage and parking are untouched: an
+    acquired one-off is a fleet entry like any other.
+- **Save repair** (`UniqueCars.sanitize`, after the vehicle registry's):
+  - unknown ids and states are dropped;
+  - a second fleet or waiting entry of the same one-off is removed and logged (`duplicate one-off removed`);
+  - an acquired one-off found nowhere waits for you in `pendingCars` (never silently lost);
+  - the old gold Corsair 68 (secret found, colour 0xc9a227, origin found) becomes the real Golden Corsair.
+- **UI:**
+  - the map category "One-off leads": `?` search areas, drawn as dashed circles on both maps, then `◆` exact
+    places;
+  - Progress › "One-offs · n of 10" with each one's state (undiscovered ones unnamed) and where acquired ones are;
+  - the garage collection line counts one-offs, and a one-off's garage card has a gold outline and the ONE-OFF
+    chip;
+  - phone contacts added: Lucky, Valen Prestige Motors, a Cedar Fields farmhand, Race Control.
 
 ## Curved Roads / Road-Network Evolution
 

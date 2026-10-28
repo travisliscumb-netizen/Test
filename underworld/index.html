@@ -33486,6 +33486,8 @@ const SaveSystem = {
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
       // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
       track: { best: null, prize: {}, hosted: null, laps: 0 },
+      // the ten one-offs (Session 6D): each one's stage (undiscovered, clue, exact location, acquired)
+      uniques: {},
       dealers: {},
       nextUid: 1,
       pos: null,
@@ -33604,6 +33606,8 @@ const SaveSystem = {
     }
     // where each car is (its home bay e.at, or e.loc on the street), the tracked stolen cars, cars waiting for space
     VehicleRegistry.sanitize(d);
+    // the one-offs: their stages, and one fleet or waiting entry each at most (Session 6D)
+    UniqueCars.sanitize(d);
     for (const k of ['pistol', 'smg', 'shotgun', 'bat']) d.weapons[k] = !!d.weapons[k];
     // where each gun is: null = on you; a property id = in that property's stash
     if (!d.wloc || typeof d.wloc !== 'object') d.wloc = {};
@@ -33716,6 +33720,8 @@ const MONEY_SOURCES = {
   impoundFee: { pay: 'clean' },
   // Chop Shop work on a stolen car (clean the title, repair, paint, tune): cash in hand
   chopWork: { pay: 'dirty' },
+  // a tip bought from a fence about where a one-off stands (Session 6D): cash in hand
+  intel: { pay: 'dirty' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
   // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank
@@ -41601,7 +41607,7 @@ const PROFILES = {
   wedge: { body: [[-2.42, 0.24], [2.42, 0.24], [2.42, 0.4], [2.05, 0.52], [0.8, 0.68], [-1.9, 0.86], [-2.42, 0.84], [-2.42, 0.62]], cabin: [[0.8, 0.66], [-0.2, 1.16], [-1.0, 1.16], [-1.85, 0.85]] }
 };
 // low, sporty bodies: blacked-out pillars, a small factory spoiler and side strakes
-const SPORTY_PROFILES = new Set(['super', 'sports', 'coupe', 'mid', 'wedge', 'roadster', 'hothatch', 'musclemod']);
+const SPORTY_PROFILES = new Set(['super', 'sports', 'coupe', 'mid', 'wedge', 'roadster', 'hothatch', 'musclemod', 'u_coupe', 'u_proto', 'u_club', 'hyper']);
 const BOXY_PROFILES = new Set(['van', 'truck', 'minivan']);
 function extrudeProfile(pts, width, bevel = 0.06, taper = 0) {
   const sh = new THREE.Shape();
@@ -41786,9 +41792,16 @@ function vehicleGeometry(type) {
     g.box(sx * (W / 2 - 0.005), (yb + belt) / 2 + 0.04, -wb * 0.2, 0.05, 0.26, 0.62, null, 0, { part: 14 });
     g.box(sx * (W / 2 + 0.01), (yb + belt) / 2 + 0.18, -wb * 0.2, 0.03, 0.04, 0.7, null, 0, { part: 2 });
   }
+  // one-off details (Session 6D): separate flared front wings with running boards, and a spare wheel on the tail
+  if (s.fenders) for (const sx of [-1, 1]) {
+    g.box(sx * (W / 2 - 0.06), R + 0.12, wb / 2, 0.24, 0.16, R * 2.6, null, 0, { part: 0 });
+    g.box(sx * (W / 2 - 0.02), yb + 0.04, 0, 0.2, 0.05, wb - R * 2.2, null, 0, { part: 14 });
+  }
+  if (s.spare) g.add(TPL.cyl, M(0, (yb + rearTop) / 2 + 0.05, zr - 0.14, R * 0.95, 0.22, R * 0.95, 0, Math.PI / 2), null, { part: 14 });
   if (s.louvers) for (let k = 0; k < 4; k++) { const z = cabR - 0.12 - k * 0.11, y = profileTopAt(pr.body, z); if (y < 5) g.box(0, y + 0.012, z, W * 0.5, 0.025, 0.05, null, 0, { part: 14 }); }
   // ---- tier detail: what separates a junk runabout from a car people want to collect
-  const tier = s.tier || 'common', T = { nice: 1, sport: 2, luxury: 3, rare: 4 }[tier] || 0;
+  // a one-off (Session 6D) is dressed like a rare model
+  const tier = s.tier === 'unique' ? 'rare' : s.tier || 'common', T = { nice: 1, sport: 2, luxury: 3, rare: 4 }[tier] || 0;
   const hoodZ = (zf + cabF) / 2;
   if (T >= 1) {
     // projector headlamp rings and a light strip (part 16)
@@ -41860,6 +41873,99 @@ function wheelGeometry(style = 1) {
 }
 
 /* =====================================================================
+   [CONTENT] THE TEN ONE-OFFS (Session 6D): permanent unique hidden cars.
+   Each is a model of its own (a VEHICLES type nobody sells, parks, drives
+   in traffic or stakes), with its own body, stance, wheels, paint finish
+   and handling, and one permanent id (UNIQUE_CARS[i].id; the type maps to
+   it one to one). There is exactly one of each, ever: the UniqueCars
+   registry (506) keeps where each stands in its discovery (undiscovered,
+   clue known, exact location known, acquired) and, once acquired, the car
+   is an ordinary fleet entry of yours that can't be sold, chopped or put
+   up in a pink slip.
+   How each is found (the `how` field; the registry runs the stages):
+   - find:   it stands somewhere in the world. A clue gives a search area
+             on the map; close enough, its exact place is known; you take
+             it by getting in (it needs a free parking space of yours).
+   - reward: it is given to you (into a free space, or it waits with
+             whoever gave it) when the condition is met.
+   - pink:   Vance puts it up in a street pink slip once he is ready to.
+   Values (speeds, prices, gates) are provisional until the balance pass.
+   ===================================================================== */
+// a body outline from an existing one: stretched along the car (sz), taller or lower (sy) and raised (dy, ride height)
+const deriveProfile = (base, { sz = 1, sy = 1, dy = 0 } = {}) => {
+  const f = pts => pts.map(([z, y]) => [z * sz, y * sy + dy]);
+  return { body: f(PROFILES[base].body), cabin: f(PROFILES[base].cabin) };
+};
+Object.assign(PROFILES, {
+  // a pre-war tourer: a tall, upright cabin set well back behind a long bonnet, high off the road
+  vintage: { body: [[-2.2, 0.44], [2.2, 0.44], [2.2, 0.96], [2.06, 1.03], [0.5, 1.07], [-1.9, 1.07], [-2.2, 0.99]], cabin: [[0.5, 1.05], [0.32, 1.74], [-1.38, 1.74], [-1.62, 1.07]] },
+  // a hypercar: lower and longer than anything else on the island, the cabin a bubble far forward
+  hyper: { body: [[-2.35, 0.2], [2.35, 0.2], [2.35, 0.36], [2.0, 0.45], [1.25, 0.55], [-1.3, 0.78], [-2.35, 0.74], [-2.35, 0.56]], cabin: [[1.25, 0.53], [0.4, 1.02], [-0.38, 1.02], [-1.25, 0.76]] },
+  u_coupe: deriveProfile('coupe', { sz: 1.04, dy: -0.02 }),
+  u_limo: deriveProfile('luxury', { sz: 1.06, sy: 1.02 }),
+  u_proto: deriveProfile('super', { dy: -0.02, sy: 0.96 }),
+  u_baja: deriveProfile('offroad', { dy: 0.14 }),
+  u_widow: deriveProfile('muscle', { dy: -0.04 }),
+  u_club: deriveProfile('roadster', { dy: -0.03, sy: 0.97 }),
+  u_gt: deriveProfile('gtcoupe', { sz: 1.03 })
+});
+// the ten. finish: paint flake, gloss, wear and rim style for the 'unique' tier look; paint2 the stripe colour.
+// spot (find): where it stands, by name of a builder in UniqueCars.spotOf; area: the search area's radius (m);
+// gate: what has to be true first (the registry reads it); keeper: who holds it for you without a free space
+const UNIQUE_CARS = [
+  { id: 'corsair', n: 1, type: 'u_corsair', kind: 'Classic', how: 'find', spot: 'corsair', area: 95, reveal: 45, origin: 'found', msrp: 42000, cargo: 220, keeper: 'the depot night man',
+    spec: { rev: 0.37, name: 'Golden Corsair', l: 5.0, w: 1.95, h: 1.32, mass: 1620, power: 16400, drift: 0.36, vmax: 67, steer: 0.5, grip: 0.98, brake: 12.5, soft: 1.2, wheelR: 0.36, camDist: 6.9, camH: 1.7, eng: 0.6, profile: 'classic', chromeBumpers: true, dualExhaust: true, stripes: true,
+      colors: [0xc9a227], paint2: 0x1a1408, finish: { flake: 1, gloss: 1, wear: 0, rim: 3 }, blurb: 'A 1968 Corsair finished in gold leaf, black pinstripes and every chrome part re-plated. The only one.' },
+    clue: 'Fifteen packages: someone has noticed. A phone tip points to the Docklands, the alleys behind the depot on Harbor Row.', hint: 'Behind the depot, Harbor Row (Docklands)' },
+  { id: 'spectre', n: 2, type: 'u_spectre', kind: 'Coupe', how: 'reward', origin: 'reward', msrp: 58000, cargo: 110, keeper: '"Sprocket" Tull',
+    spec: { rev: 0.36, name: 'Calloway Spectre', l: 4.68, w: 1.98, h: 1.22, mass: 1340, power: 18200, drift: 0.16, vmax: 80, steer: 0.54, grip: 1.36, brake: 17.5, soft: 0.62, wheelR: 0.36, camDist: 6.4, camH: 1.55, eng: 1.55, profile: 'u_coupe', dualExhaust: true, wing: 'lip', sideIntakes: true,
+      colors: [0x1d3d6b], finish: { flake: 0.9, gloss: 1, wear: 0, rim: 2 }, blurb: 'A coachbuilt fastback coupe on a racing chassis: longer, lower and sharper than the Aurel it started as.' },
+    clue: 'Tull keeps a covered car in his back room for whoever wins every street race in the city.', hint: 'Win all five city street races (Tull)' },
+  { id: 'ambassador', n: 3, type: 'u_ambassador', kind: 'Luxury', how: 'find', spot: 'ambassador', area: 120, reveal: 40, origin: 'stolen', msrp: 78000, cargo: 320, armorK: 1.6, keeper: 'Lucky',
+    spec: { rev: 0.4, name: 'Sovereign Ambassador', l: 5.72, w: 1.98, h: 1.5, mass: 2450, power: 14200, drift: 0.04, vmax: 60, steer: 0.46, grip: 1.05, brake: 13, soft: 1.45, wheelR: 0.37, camDist: 7.6, camH: 2.0, eng: 0.75, profile: 'u_limo', chromeBumpers: true, dualExhaust: true, lightbar: true,
+      colors: [0x0b0c10], finish: { flake: 0.6, gloss: 1, wear: 0, rim: 3 }, blurb: 'A consul’s stretched, armoured Sovereign: two and a half tonnes of glass that stops bullets. Stolen, it stays HOT until it is cleaned.' },
+    clue: 'Lucky’s tip: a foreign consul’s armoured Sovereign sleeps on a driveway in Crestmoor Heights. Nobody guards it at night.', hint: 'A driveway in Crestmoor Heights', lead: 'Lucky (Old Quarter pawn shop) has something to sell about a diplomat’s car.' },
+  { id: 'proto', n: 4, type: 'u_proto', kind: 'Supercar', how: 'find', spot: 'proto', area: 120, reveal: 40, origin: 'found', msrp: 160000, cargo: 40, keeper: 'Valen Prestige Motors',
+    spec: { rev: 0.35, name: 'Zephyr Prototype', l: 4.5, w: 2.04, h: 1.1, mass: 1290, power: 21000, drift: 0.1, vmax: 89, steer: 0.52, grip: 1.44, brake: 19, soft: 0.55, wheelR: 0.36, camDist: 6.4, camH: 1.5, eng: 1.8, profile: 'u_proto', wing: 'swan', louvers: true, dualExhaust: true,
+      colors: [0x3b3f45], finish: { flake: 0, gloss: 0.22, wear: 0, rim: 2 }, blurb: 'The test mule for a Zephyr that was never built: matte, unbadged, faster than anything in the showroom.' },
+    clue: 'Valen Prestige Motors: the factory wrote its Zephyr test mule off and never crushed it. It was last stored in a bonded yard in the Warehouse District, papers in the glovebox.', hint: 'A bonded yard in the Warehouse District' },
+  { id: 'baja', n: 5, type: 'u_baja', kind: 'Off-road', how: 'find', spot: 'baja', area: 150, reveal: 55, origin: 'found', msrp: 36000, cargo: 400, armorK: 1.3, trail: 1, keeper: 'the farm',
+    spec: { rev: 0.46, name: 'Baja One', l: 4.9, w: 2.12, h: 2.1, mass: 2050, power: 14800, drift: 0.22, vmax: 55, steer: 0.53, grip: 1.02, brake: 12, soft: 2.1, wheelR: 0.53, camDist: 7.7, camH: 2.5, eng: 0.75, profile: 'u_baja', offroad: true, roofRails: true, lightbar: true,
+      colors: [0xd07a2a], finish: { flake: 0.2, gloss: 0.5, wear: 0.15, rim: 1 }, blurb: 'A 1989 desert-rally Mesa on long-travel suspension. It went into a gully on the farm and nobody pulled it out.' },
+    clue: 'A farmhand: a rally car went off the farm track in ’89, out in the far fields of Cedar Fields South, and nobody ever pulled it out.', hint: 'The far fields, Cedar Fields South' },
+  { id: 'widow', n: 6, type: 'u_widow', kind: 'Muscle', how: 'pink', origin: 'pinkslip', msrp: 48000, cargo: 190, keeper: 'Vance', stake: 24000, wins: 3,
+    spec: { rev: 0.36, name: 'Widowmaker', l: 4.8, w: 1.94, h: 1.26, mass: 1580, power: 17200, drift: 0.48, vmax: 70, steer: 0.5, grip: 0.96, brake: 13.5, soft: 0.95, wheelR: 0.36, camDist: 6.6, camH: 1.65, eng: 0.65, profile: 'u_widow', scoop: true, stripes: true, dualExhaust: true,
+      colors: [0x121214], paint2: 0xb8142a, finish: { flake: 0.1, gloss: 0.32, wear: 0, rim: 2 }, blurb: 'Vance’s own Brakken: lowered, supercharged, satin black with a red stripe. Faster sideways than straight.' },
+    clue: 'Vance: beat him in three pink slips and he puts up his own car, the Widowmaker, against something worth at least $24,000.', hint: 'Win three pink slips, then race Vance for it' },
+  { id: 'club', n: 7, type: 'u_club', kind: 'Track', how: 'reward', origin: 'prize', msrp: 70000, cargo: 30, armorK: 0.8, keeper: 'Race Control',
+    spec: { rev: 0.33, name: 'Tempest Clubsport', l: 3.96, w: 1.84, h: 1.08, mass: 880, power: 12800, drift: 0.08, vmax: 74, steer: 0.68, grip: 1.6, brake: 21, soft: 0.42, wheelR: 0.31, camDist: 5.9, camH: 1.42, eng: 1.75, profile: 'u_club', wing: 'swan', sideIntakes: true,
+      colors: [0xf2f2f0], finish: { flake: 0.3, gloss: 0.8, wear: 0, rim: 2 }, blurb: 'Valen Point’s own club racer: stripped, caged, on slicks. It corners like nothing else and hates kerbs.' },
+    clue: 'Race Control at Valen Point: win the GT Cup and the club hands over its old Clubsport.', hint: 'Win the GT Cup at Valen Point' },
+  { id: 'riviera', n: 8, type: 'u_riviera', kind: 'GT', how: 'find', spot: 'riviera', area: 120, reveal: 40, origin: 'found', msrp: 110000, cargo: 140, keeper: 'the estate’s executor', rep: 1300,
+    spec: { rev: 0.38, name: 'Monarch Riviera', l: 5.25, w: 2.0, h: 1.32, mass: 1880, power: 18600, drift: 0.09, vmax: 82, steer: 0.5, grip: 1.24, brake: 16.5, soft: 0.95, wheelR: 0.38, camDist: 7.0, camH: 1.7, eng: 0.72, profile: 'u_gt', chromeBumpers: true, dualExhaust: true, lightbar: true,
+      colors: [0x5a1a24], finish: { flake: 0.95, gloss: 1, wear: 0, rim: 3 }, blurb: 'The long-tail Monarch a collector had built for the coast road: a V12 that cruises at two hundred and never tires.' },
+    clue: 'The Valen Courier: the late collector Halloran’s estate is being cleared, and his long-tail Monarch was never found. It sat under a cover in a Linden Hills carport.', hint: 'A carport in Linden Hills', lead: 'Explore every district and make a name for yourself (Rep 1,300).' },
+  { id: 'tourer', n: 9, type: 'u_tourer', kind: 'Vintage', how: 'find', spot: 'tourer', area: 90, reveal: 40, origin: 'found', msrp: 90000, cargo: 260, keeper: 'the Ferryman',
+    spec: { rev: 0.5, name: 'Regent Tourer 1931', l: 4.4, w: 1.72, h: 1.75, mass: 1500, power: 5600, drift: 0.12, vmax: 41, steer: 0.5, grip: 0.82, brake: 8, soft: 1.7, wheelR: 0.42, camDist: 6.8, camH: 2.1, eng: 0.55, profile: 'vintage', chromeBumpers: true, fenders: true, spare: true,
+      colors: [0x1f3a2a], finish: { flake: 0.15, gloss: 0.85, wear: 0, rim: 0 }, blurb: 'A 1931 Regent tourer, bottle green, still on its original wheels. Slow, soft, and worth more than a supercar.' },
+    clue: 'The Ferryman: the last thing the ghost ferry ever carried was a 1931 Regent tourer, and it was never unloaded. Try the old slip on the west shore, by the Old Quarter seawall.', hint: 'The old ferry slip, west shore (Old Quarter)', lead: 'Something about the ghost ferry, if you ever see it.' },
+  { id: 'aeterna', n: 10, type: 'u_aeterna', kind: 'Ultimate', how: 'find', spot: 'aeterna', area: 80, reveal: 40, origin: 'found', msrp: 250000, cargo: 40, armorK: 1.1, keeper: 'the Valen Tower night porter',
+    spec: { rev: 0.33, name: 'Aeterna V16', l: 4.7, w: 2.1, h: 1.02, mass: 1420, power: 25500, drift: 0.11, vmax: 95, steer: 0.52, grip: 1.48, brake: 20, soft: 0.5, wheelR: 0.37, camDist: 6.6, camH: 1.45, eng: 1.6, profile: 'hyper', wing: 'lip', sideIntakes: true, louvers: true, lightbar: true, dualExhaust: true,
+      colors: [0xe8e4dc], finish: { flake: 1, gloss: 1, wear: 0, rim: 3 }, blurb: 'Sixteen cylinders, one owner, built for the man who built Valen Tower. The last word in Port Valen.' },
+    clue: 'An unknown number: “Nine. The tenth was built for the man who built Valen Tower. The night porter brings it up to the street for whoever owns the other nine.”', hint: 'At the foot of Valen Tower', lead: 'Find the other nine.' }
+];
+const UNIQUE_BY = {}, UNIQUE_OF_TYPE = {};
+for (const u of UNIQUE_CARS) {
+  UNIQUE_BY[u.id] = u; UNIQUE_OF_TYPE[u.type] = u;
+  // a model nobody sells: never in traffic, on a lot, on a parked stall or staked by a rival (unique), and
+  // valued like the one-off it is
+  VEHICLES[u.type] = { ...u.spec, price: 0, unlockOnly: true, special: true, unique: u.id, tier: 'unique' };
+  if (u.armorK) VEHICLES[u.type].armorK = u.armorK;
+  if (u.trail) TRAIL[u.type] = u.trail;
+}
+TIER_LOOK.unique = { flake: 1.0, gloss: 1.0, wear: 0, rim: 3, label: 'ONE-OFF', col: '#ffd84d', value: 1 };
+const isUniqueType = type => !!(VEHICLES[type] && VEHICLES[type].unique);
+/* =====================================================================
    [CORE] VEHICLE
    ===================================================================== */
 let VEH_ID = 1;
@@ -41907,12 +42013,12 @@ class Vehicle {
     this.airborne = false; this.airT = 0; this.pitchG = 0; this.rollG = 0; this.pitchGV = 0; this.bodyOff = 0; this.bodyV = 0; this.planeOff = 0; this.slopeF = 0; this.hitT = 0; this.brakeP = 0; this.landT = 0; this.broken = 0;
     this._wy = this._wy || [0, 0, 0, 0]; this._wl = this._wl || [0, 0, 0, 0]; this._wr = this._wr || [0, 0, 0, 0]; this.bump = 0; this.trail = trailOf(this.type); this.indL = 0; this.indR = 0; this.hazard = false; this.align = 0; this.owned = false; this.special = false;
     this._safe = null; this.recycle = false; this.tune = null; this.garageUid = 0; this.trackId = 0; this.locked = false; this.origin = null; this.rareFind = false; this.critical = false;
-    this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.joinT = 0; this.staffed = undefined; this.free = false; this.goldCar = false; this.dealer = null; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
+    this.fac = null; this.trunk = null; this.looted = false; this.rareOpp = 0; this.stolenBefore = false; this.legit = false; this.shotByPlayer = false; this.roadblock = false; this.joinT = 0; this.staffed = undefined; this.free = false; this.uniqueId = ''; this.dealer = null; this.homeBlock = undefined; this.patrol = false; this.revHold = 0;
     // road dirt (0 just washed … 1 filthy); 0.5 is the everyday look. It builds up with distance driven
     this.dirt = 0.5;
     const col = opts.color !== undefined ? opts.color : pick(s.colors);
     this.mat.userData.u.uPaint.value.setHex(col);
-    this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : 0xffffff);
+    this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : s.paint2 !== undefined ? s.paint2 : 0xffffff);
     this.mat.userData.u.uMisc.value.set(0, 0, 0, 0);
     this.restoreGeo();
     this.colorHex = col;
@@ -41926,9 +42032,10 @@ class Vehicle {
     this.mesh.geometry = this.vg.geo;
   }
   setTier(tier) {
-    const L = TIER_LOOK[tier] || TIER_LOOK.common;
-    this.vtier = tier; this.rim = L.rim;
-    this.mat.userData.u.uFinish.value.set(L.flake, L.gloss, L.wear, L.rim);
+    // a one-off (Session 6D) has a finish of its own: matte, satin or mirror, and its own wheels
+    const L = TIER_LOOK[tier] || TIER_LOOK.common, F = tier === 'unique' && this.spec.finish ? this.spec.finish : L;
+    this.vtier = tier; this.rim = F.rim;
+    this.mat.userData.u.uFinish.value.set(F.flake, F.gloss, F.wear, F.rim);
   }
   get speed() { return Math.hypot(this.vel.x, this.vel.y); }
   get fx() { return Math.sin(this.h); } get fz() { return Math.cos(this.h); }
@@ -45162,13 +45269,13 @@ class MissionManager {
         // an official event (Sessions 6B, 6C): prize money from the bank by today's tier, no Rep; a prize car once
         if (s.official) {
           const V = venueOf(s.race), pay = V.payout(s.race, res.place); s.reward = pay.cash; s.rep = 0;
-          if (res.place === 1) { V.noteWin(s.race.id); if (s.race.car) V.awardCar(s.race); }
+          if (res.place === 1) { V.noteWin(s.race.id); if (s.race.car) V.awardCar(s.race); if (g.uniques) g.uniques.onRaceWin(s.race.id); }
           this.pass(); return;
         }
         // the purse and Rep for this finish, by today's tier for this race (§45.33)
         const pay = g.raceRules.payout(s.race, res.place);
         s.reward = pay.cash; s.rep = pay.rep;
-        if (res.place === 1) g.raceRules.noteWin(s.race.id);
+        if (res.place === 1) { g.raceRules.noteWin(s.race.id); if (g.uniques) g.uniques.onRaceWin(s.race.id); }
         if (res.record) g.ui.toast(`New record: ${fmtRace(res.time)}`, 'money');
         this.pass(); return;
       }
@@ -46785,6 +46892,8 @@ class InteriorManager {
 const CAR_MSRP = { compact: 1800, sedan: 3200, taxi: 3600, van: 4200, pickup: 6500, suv: 8200, truck: 9500, sports: 19500, muscle: 26000, supercar: 72000,
   classic: 30000, coupe: 46000, offroad: 22000, luxury: 52000, gangcar: 14000, utility: 7000, police: 40000, unmarked: 20000,
   metro: 1500, regent: 2600, crest: 5200, estate: 4600, courier: 3800, apex: 15500, hellion: 34000, revenant: 38000, tempest: 28000, kodiak: 64000, monarch: 88000, valkyr: 120000, obsidian: 150000 };
+// the one-offs (Session 6D): what each is worth, for insurance, impound fees and event classes (never a sale price)
+for (const u of UNIQUE_CARS) CAR_MSRP[u.type] = u.msrp;
 const carMsrp = type => CAR_MSRP[type] || (VEHICLES[type] && VEHICLES[type].price) || 8000;
 // ---- v6 dealerships: three lots with stock you walk up to, inspect and buy where it stands
 // used: a rotating cash lot (condition, mileage, bargains); new: Meridian's practical line-up, restocked daily;
@@ -46809,6 +46918,7 @@ const CAR_CLASS = { metro: 'City car', compact: 'Hatchback', apex: 'Hot hatch', 
   pickup: 'Pickup', utility: 'Work truck', truck: 'Box truck', van: 'Van', courier: 'Panel van', taxi: 'Ex-taxi', sports: 'Sports car', tempest: 'Lightweight sports car',
   muscle: 'Muscle car', hellion: 'Modern muscle', gangcar: 'Lowrider', classic: 'Classic muscle', revenant: 'Classic fastback', coupe: 'Grand tourer', monarch: 'Luxury GT',
   luxury: 'Luxury sedan', supercar: 'Supercar', valkyr: 'Mid-engine exotic', obsidian: 'Luxury supercar', offroad: 'Off-roader', police: 'Ex-police', unmarked: 'Ex-police' };
+for (const u of UNIQUE_CARS) CAR_CLASS[u.type] = 'One-off ' + u.kind.toLowerCase();
 const condLabel = c => c >= 90 ? ['Excellent', '#7fe08f'] : c >= 75 ? ['Good', '#c8e07f'] : c >= 62 ? ['Fair', '#ffd84d'] : ['Rough', '#ff8a3d'];
 const TUNE = [
   { id: 'engine', name: 'Engine', desc: 'More power and a higher top speed.', prices: [1500, 3500, 7000] },
@@ -46872,8 +46982,8 @@ const POSTS = [
   { place: 'police', dx: -3.2, dz: -1.5 }, { place: 'police', dx: 3.4, dz: -1.2 },
   { place: 'mall', dx: -7, dz: 1.5 }, { place: 'tower', dx: 6.5, dz: 2.5 }, { place: 'stadium', dx: -9, dz: 1.2 }
 ];
-const CONTACT_AVATAR = { radio: '#4d8dff', rosa: '#46d4c4', tull: '#ff8a3d', ines: '#d28cff', ferry: '#ffd84d', dex: '#4d8dff', moss: '#7fb2ff', pv: '#e8eef6', unknown: '#8a8f96', vance: '#ff4d5e' };
-const CONTACT_NAMES = { radio: 'Police radio', rosa: 'Rosa Calder', tull: '"Sprocket" Tull', ines: 'Ines Varga', ferry: 'The Ferryman', dex: 'Dex Okafor', moss: 'Sgt. Lena Moss', pv: 'Valen Courier', unknown: 'Unknown number', vance: 'Vance' };
+const CONTACT_AVATAR = { radio: '#4d8dff', rosa: '#46d4c4', tull: '#ff8a3d', ines: '#d28cff', ferry: '#ffd84d', dex: '#4d8dff', moss: '#7fb2ff', pv: '#e8eef6', unknown: '#8a8f96', vance: '#ff4d5e', lucky: '#c9a46b', prestige: '#e8d28a', farm: '#c9b06b', racecontrol: '#e8eef6' };
+const CONTACT_NAMES = { radio: 'Police radio', rosa: 'Rosa Calder', tull: '"Sprocket" Tull', ines: 'Ines Varga', ferry: 'The Ferryman', dex: 'Dex Okafor', moss: 'Sgt. Lena Moss', pv: 'Valen Courier', unknown: 'Unknown number', vance: 'Vance', lucky: 'Lucky (pawn shop)', prestige: 'Valen Prestige Motors', farm: 'Cedar Fields farmhand', racecontrol: 'Valen Point Race Control' };
 
 function copPost(c, dt) {
   const g = game, pol = g.police;
@@ -46892,7 +47002,7 @@ class ContentManager {
     this.phoneQ = []; this.phoneT = 0; this.subQ = []; this.subT = 0;
     this.checkT = 0; this.discT = 0; this.postT = 0; this.secretT = 0;
     this.waypoint = null; this.guideTarget = null; this.posts = POSTS.map(p => ({ ...p, ped: null }));
-    this.pitchT = 0; this.goldCar = null;
+    this.pitchT = 0;
     this._buildPackages();
     this._bindUI();
   }
@@ -47024,18 +47134,11 @@ class ContentManager {
     g.audio.play('pickup'); g.fx.flashLight(pk.x, pk.y + 1, pk.z, 6, 0.4, 0x7fe08f);
     g.ui.banner('Hidden Package', `${n} of 30 · $250`, 'info', 2.2);
     if (n === 10) { g.earn(2500, 'package'); s.ammo.pistol += 48; this.phone('unknown', 'Ten already? Keep looking. There’s a pistol crate on its way to your safehouse.'); s.weapons.pistol = true; this.ach('pack10'); }
-    if (n === 15) { this.phone('unknown', 'You like finding things. Harbor Row, the alley behind the depot — someone left something golden there.'); s.flags.goldHint = true; }
+    // fifteen: the Golden Corsair's clue (the one-off registry gives it, with its search area: Session 6D)
+    if (n === 15) { s.flags.goldHint = true; if (g.uniques) g.uniques.check(); }
     if (n === 20) { g.earn(5000, 'package'); s.weapons.smg = true; s.ammo.smg += 120; this.phone('unknown', 'Twenty. An SMG is waiting in your stash. Don’t make me regret it.'); }
     if (n === 30) { g.earn(15000, 'package'); this.ach('pack30'); this.phone('unknown', 'All thirty. You know this island better than I do now.'); }
     g.saveGame();
-  }
-  _spawnGold() {
-    const g = this.g, s = g.save;
-    if (!s.flags.goldHint || s.secrets.gold || (this.goldCar && g.vehicles.list.includes(this.goldCar))) return;
-    const sp = curbAt(11, 8, 2, 62);
-    if (dist2(sp.x, sp.z, g.player.pos.x, g.player.pos.z) > 160 * 160 || dist2(sp.x, sp.z, g.player.pos.x, g.player.pos.z) < 30 * 30) return;
-    const v = g.vehicles.spawn('classic', sp.x, sp.z, sp.h, { parked: true, color: 0xc9a227 });
-    v.touched = true; v.goldCar = true; v.special = true; this.goldCar = v;
   }
   // ------------------------------------------------------------ garage v2
   get garageCap() { return this.g.uw ? this.g.uw.props.garageCap() : 0; }
@@ -47047,7 +47150,7 @@ class ContentManager {
     if (PM && s.garage.length >= this.garageCap) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
     if (!at && PM) for (const def of PM.ownedList()) { const b = PM.freeBay(def); if (b) { at = { p: def.id, i: b.i }; break; } }
     if (!at) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
-    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null };
+    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null, vtier: VEHICLES[type].tier };
     s.garage.push(e);
     if (!quiet) this.g.ui.toast(`${VEHICLES[type].name} added to your garage.`, 'money');
     if (s.garage.length >= 6) this.ach('fleet');
@@ -47059,6 +47162,8 @@ class ContentManager {
   storeVehicle(v, gp) {
     const g = this.g, s = g.save, PM = g.uw.props;
     if (v.mission && !(g.campaign && g.campaign.canStore(v))) { g.ui.toast('This vehicle is needed for the job.', 'warn'); g.audio.play('deny'); return false; }
+    // a one-off becomes yours by taking it where it stands, never by parking a stray copy (Session 6D)
+    if (isUniqueType(v.type) && !v.garageUid) { g.ui.toast('That car isn’t yours to park.', 'warn'); g.audio.play('deny'); return false; }
     if (v.type === 'police' || v.type === 'unmarked' && !v.garageUid) { g.ui.toast('Too hot to keep — every cop in the city knows this car.', 'warn'); g.audio.play('deny'); return false; }
     if (g.police.level > 0) { g.ui.toast('Lose the police before you open the garage.', 'warn'); g.audio.play('deny'); return false; }
     const def = gp.def || PROP_BY_ID[gp.id];
@@ -47070,7 +47175,7 @@ class ContentManager {
     const occupant = bay && PM.carAt(def.id, bay.i);
     if (!bay || (occupant && occupant !== e)) { g.ui.toast(`No free space at ${def.name} (${PM.capOf(def)} in all). Park somewhere else or sell a car.`, 'warn'); g.audio.play('deny'); return false; }
     if (!e) {
-      const origin = v.goldCar ? 'found' : v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
+      const origin = v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
       e = this.addToGarage(v.type, origin, v.colorHex, true, { p: def.id, i: bay.i });
       if (!e) { g.ui.toast('No free parking space.', 'warn'); g.audio.play('deny'); return false; }
       // a stolen car parked in your space is still stolen: HOT until the Chop Shop cleans it (§45.30)
@@ -47151,20 +47256,20 @@ class ContentManager {
       // its home space, and where it actually is (the street, if that's where you left it)
       const home = e.at && PROP_BY_ID[e.at.p] ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'No space of its own: buy more parking';
       const w = g.vreg.where(e), loc = e.imp ? `In the ${IMPOUND.name} (${g.impound.spaceName(e)}) · release ${fmtMoney(e.imp.fee)}${e.imp.paid ? ' paid: drive it out' : ' at the window'} · its space: ${home}` : e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
-      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}${e.hot ? ' <span class="chip" style="--c:#ff4d5e">HOT</span>' : ''}${e.imp ? ' <span class="chip" style="--c:#ffb547">IMPOUNDED</span>' : ''}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
+      return `<div class="card"${e.vtier === 'unique' ? ' style="box-shadow:0 0 0 1px #ffd84d inset"' : e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}${e.hot ? ' <span class="chip" style="--c:#ff4d5e">HOT</span>' : ''}${e.imp ? ' <span class="chip" style="--c:#ffb547">IMPOUNDED</span>' : ''}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
         <div class="btns"><button class="sbtn${here && !e.out ? ' gold' : ''}" data-act="out:${e.uid}">${wrecked ? 'Wrecked · where is it?' : 'Where is it?'}</button>
         ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${!Money.can(rcost, 'garage') ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
-        <button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button></div></div>`;
+        ${isUniqueType(e.type) ? '<button class="sbtn" disabled>One of a kind · not for sale</button>' : `<button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button>`}</div></div>`;
     };
     const render = () => {
       const here = s.garage.filter(e => e.at && e.at.p === def.id), other = s.garage.filter(e => !(e.at && e.at.p === def.id));
-      const col = this.collection(), rank = ['beater', 'common', 'nice', 'sport', 'luxury', 'rare'];
+      const col = this.collection(), rank = ['beater', 'common', 'nice', 'sport', 'luxury', 'rare', 'unique'];
       here.sort((a, b) => rank.indexOf(b.vtier) - rank.indexOf(a.vtier));
       return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html('garage')}</span></div>
-        <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
+        <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · one-offs ${g.uniques ? g.uniques.count() : 0} of ${UNIQUE_CARS.length} · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
         <div class="grid2">${here.map(e => card(e, true)).join('') || '<div class="hint">Nothing parked here. Drive a car into a free space and stop to park it.</div>'}</div>
         ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}
         ${(s.pendingCars || []).length ? `<h3>Waiting for a space</h3><div class="jobs">${s.pendingCars.map((P, i) => `<div class="job"><i>⏳</i><div><b>${esc(VEHICLES[P.type].name)}</b><span>${P.from ? 'With ' + esc(P.from) + ': ' : ''}yours when you have a free space</span></div><button class="sbtn" data-act="collect:${i}" ${g.vreg.freeBays() > 0 ? '' : 'disabled'}>Collect</button></div>`).join('')}</div>` : ''}`;
@@ -47176,6 +47281,7 @@ class ContentManager {
       if (k === 'out') { this.takeOut(uid); g.ui.back(); return; }
       if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.vreg.live(e); if (dv) { dv.health = 100; dv.burnt = false; } }
       if (k === 'sell') {
+        if (isUniqueType(e.type)) { this.refreshSvc('One of a kind: nobody can buy it, and you would never see another.'); return; }
         const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
         if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
         const sale = this.saleOf(e);
@@ -47212,10 +47318,10 @@ class ContentManager {
   }
   // the garage as a collection: models owned of every model there is, rare finds, what it is all worth
   collection() {
-    const s = this.g.save, models = new Set(s.garage.map(e => e.type)), all = Object.keys(VEHICLES).filter(k => !VEHICLES[k].police && k !== 'gangcar');
+    const s = this.g.save, models = new Set(s.garage.map(e => e.type).filter(t => !isUniqueType(t))), all = Object.keys(VEHICLES).filter(k => !VEHICLES[k].police && k !== 'gangcar' && !isUniqueType(k));
     const rare = s.garage.filter(e => e.vtier === 'rare'), byTier = {};
     for (const e of s.garage) byTier[e.vtier || VEHICLES[e.type].tier] = (byTier[e.vtier || VEHICLES[e.type].tier] || 0) + 1;
-    return { models: models.size, of: all.length, rare: rare.length, rareModels: new Set(rare.map(e => e.type)).size, rareOf: RARE_TYPES.length, value: s.garage.reduce((a, e) => a + this.sellPrice(e), 0), byTier };
+    return { models: models.size, of: all.length, rare: rare.length, rareModels: new Set(rare.map(e => e.type)).size, rareOf: RARE_TYPES.length, value: s.garage.reduce((a, e) => a + (isUniqueType(e.type) ? 0 : this.sellPrice(e)), 0), byTier };
   }
   classK(type) { return 0.8 + Math.min(1.4, carMsrp(type) / 30000); }
   repairCost(type, health) { const d = this.g.uw ? this.g.uw.props.perk('repair') : 0; return Math.max(60, Math.round((100 - health) * 9 * this.classK(type) * (1 - d) / 10) * 10); }
@@ -47786,9 +47892,8 @@ class ContentManager {
     this.checkT -= rdt;
     if (this.checkT <= 0) {
       this.checkT = 0.5;
-      this._discover(); this._checkSecrets(); this._guide(); this._spawnGold();
+      this._discover(); this._checkSecrets(); this._guide();
       const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
-      if (pv && pv.goldCar) this.secret('gold');
       if (pv && pv.rareFind && !g.save.flags.zephyrSeen) { g.save.flags.zephyrSeen = true; g.ui.toast('A Zephyr, just sitting up here. Store it in your garage to keep it.'); }
     }
     // pitch invader: drifting on the stadium pitch
@@ -47831,6 +47936,7 @@ class ContentManager {
       <span>Districts discovered</span><span>${Object.keys(s.discovered.zones).length} / ${Object.keys(ZONES).length}</span>
       <span>Street races won</span><span>${races.filter(r => s.races[r.id] && s.races[r.id].won).length} / ${races.length}</span>
       <span>Vehicles owned</span><span>${s.garage.length} / ${this.garageCap}</span></div>`;
+    if (g.uniques) h += g.uniques.statsHtml();
     h += `<h3>Race records</h3><div class="stats">${RACES.map(r => `<span>${r.name}</span><span>${s.races[r.id] && s.races[r.id].best ? fmtRace(s.races[r.id].best) + (s.races[r.id].won ? ' ★' : '') : '—'}</span>`).join('')}</div>`;
     h += `<h3>Achievements · ${Object.keys(s.achievements).length} / ${ACHIEVEMENTS.length}</h3><div class="achGrid">${ACHIEVEMENTS.map(a => `<div class="achc${s.achievements[a.id] ? ' on' : ''}"><b>${a.name}</b><span>${a.desc}</span></div>`).join('')}</div>`;
     $('progressBody').innerHTML = h;
@@ -48057,6 +48163,8 @@ class RaceManager {
       const sl = slot(k + 1), cls = A.opts.opponentCls || A.def.cls[k % A.def.cls.length];
       const o = g.vehicles.spawn(cls, sl.x, sl.z, R.start.h, { driver: 'npc', vtier: A.opts.opponentTier });
       o.mission = 'race'; o.touched = true; o.critical = false;
+      // Vance's one-off is his until he loses it: nobody gets in it (Session 6D)
+      if (isUniqueType(cls)) o.locked = true;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
       // on the circuit the racing line, with a safe speed at every point; in the street the checkpoints
@@ -49330,6 +49438,7 @@ const CARGO_LB = {
 const GOOD_CLB = { hot: 100, smokes: 100, green: 50, pills: 25, snow: 10, hardware: 500 };
 // weight of a container's goods in hundredths of a pound, and a vehicle model's capacity in the same unit
 function cargoC(o) { let c = 0; if (o) for (const k in o) if (GOOD_CLB[k]) c += (o[k] | 0) * GOOD_CLB[k]; return c; }
+for (const u of UNIQUE_CARS) CARGO_LB[u.type] = u.cargo;
 function cargoCapC(type) { return (CARGO_LB[type] || 0) * 100; }
 // how many lots of good k still fit in a vehicle of this type holding o
 function cargoFit(type, o, k) { return GOOD_CLB[k] ? Math.max(0, Math.floor((cargoCapC(type) - cargoC(o)) / GOOD_CLB[k])) : 0; }
@@ -50175,6 +50284,7 @@ class Underworld {
     if (this.rivalwh) this.rivalwh.reset();
     if (this.shipments) this.shipments.reset();
     if (this.g.vreg) this.g.vreg.reset();
+    if (this.g.uniques) this.g.uniques.reset();
     if (this.g.pinks) this.g.pinks.reset();
     if (this.g.wash) this.g.wash.reset();
     if (this.g.motorsport) this.g.motorsport.reset();
@@ -50577,6 +50687,7 @@ class Underworld {
     const g = this.g, S = this.S;
     if (g.police.level > 0) { g.content.deny('The chop shop rolls the door down. “Not with cops on you.”'); return; }
     if (v.garageUid || v.owned) { g.content.deny('That one’s registered to you. Sell it from your garage.'); return; }
+    if (isUniqueType(v.type)) { g.content.deny('Knuckles: “A one-off? Nobody strips that. Get it out of my yard.”'); return; }
     if (v.type === 'police' || v.type === 'unmarked') { g.content.deny('“A cop car? Get that out of here.”'); return; }
     if (!withCargo && units(v.trunk)) { g.ui.ask('Sell it with the cargo?', `The trunk still holds ${goodsList(v.trunk)} (${fmtLb(cargoC(v.trunk))}). The chop shop keeps whatever is in it.`, 'Sell with cargo', () => this.sellCar(v, true)); return; }
     const pay = this.chopValue(v), wanted = S.chopWanted.includes(v.type);
@@ -53663,7 +53774,7 @@ class VehicleRegistry {
   }
   // ---------------------------------------------------------------- cars you don't own
   // a car worth keeping track of: one you are driving or that holds your cargo, not a job's, a cab, a lot car or yours
-  eligible(v) { return !!v && !v.garageUid && !v.owned && !v.mission && !v.taxiCab && !v.dealer && !v.burnt && this.g.vehicles.list.includes(v) && CARGO_LB[v.type] !== undefined; }
+  eligible(v) { return !!v && !v.garageUid && !v.owned && !v.mission && !v.taxiCab && !v.dealer && !v.burnt && !isUniqueType(v.type) && this.g.vehicles.list.includes(v) && CARGO_LB[v.type] !== undefined; }
   rec(id) { return this.tracked.find(r => r.id === id) || null; }
   liveT(r) { const v = this.trk.get(r.id); return v && this.g.vehicles.list.includes(v) && v.trackId === r.id ? v : null; }
   track(v) {
@@ -53672,7 +53783,7 @@ class VehicleRegistry {
     // car stays usable while you use it, but it can't be remembered: you are told so, plainly.
     if (this.tracked.length >= VREG.max && !this.makeRoom(v)) { v.untracked = true; this.g.ui.toast(`Too many stolen cars with your things in them: this ${v.spec.name} can’t be kept track of. Leave it and it, and anything you put in it, won’t be safe.`, 'warn'); return null; }
     const id = s.nextTrack = (s.nextTrack || 0) + 1;
-    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.dealerStolen ? 'dealer' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.goldCar || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ(), tune: v.tune ? { ...v.tune } : null };
+    const r = { id, type: v.type, color: v.colorHex, vtier: v.vtier || VEHICLES[v.type].tier, x: v.pos.x, z: v.pos.z, h: v.h, y: v.pos.y, hp: v.health, trunk: v.trunk || (v.trunk = {}), hot: !(v.origin === 'found' || v.legit), origin: v.origin === 'found' ? 'found' : v.dealerStolen ? 'dealer' : v.fac ? 'hijack' : 'stolen', fac: v.fac || null, rare: !!(v.rareFind || v.special || v.vtier === 'rare'), seen: this.econ(), since: this.econ(), tune: v.tune ? { ...v.tune } : null };
     this.tracked.push(r);
     v.trackId = id; v.stolenBefore = v.stolenBefore || r.hot; v.touched = true;
     Money.adoptCar(v, 't' + id); // its cash is kept in the wallet now (saved with the car)
@@ -53824,8 +53935,276 @@ class VehicleRegistry {
       return { id: r.id, type: r.type, color: ok(r.color) ? r.color : VEHICLES[r.type].colors[0], vtier: TIER_LOOK[r.vtier] ? r.vtier : VEHICLES[r.type].tier, x: r.x, z: r.z, h: ok(r.h) ? r.h : 0, y: ok(r.y) ? r.y : 0, hp: num(r.hp, 100, 0, 100), trunk: Inv.clean(r.trunk, num), hot: !!r.hot, origin: ['stolen', 'hijack', 'found', 'dealer'].includes(r.origin) ? r.origin : 'stolen', fac: null, rare: !!r.rare, seen: num(r.seen, 0, 0, 1e9), since: num(r.since, 0, 0, 1e9), tune };
     });
     d.nextTrack = next;
-    d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));
+    d.pendingCars = (Array.isArray(d.pendingCars) ? d.pendingCars : []).filter(P => P && typeof P === 'object' && VEHICLES[P.type]).slice(0, 12).map(P => ({ type: P.type, origin: ['reward', 'found', 'bought', 'mission', 'prize', 'pinkslip'].includes(P.origin) ? P.origin : 'reward', color: ok(P.color) ? P.color : VEHICLES[P.type].colors[0], from: typeof P.from === 'string' ? P.from.slice(0, 40) : '' }));
     d.vlog = (Array.isArray(d.vlog) ? d.vlog : []).filter(x => x && typeof x === 'object' && typeof x.what === 'string' && VEHICLES[x.type]).slice(-20);
+  }
+}
+/* =====================================================================
+   [UNDERWORLD] THE ONE-OFFS (Session 6D): the registry of the ten unique
+   cars (UNIQUE_CARS, 225). save.uniques[id] = { st, lead, n } is the
+   truth for each:
+     st 0 undiscovered · 1 clue known (a search area on the map for a car
+     that stands somewhere) · 2 exact location known (or, for Vance's car,
+     offered) · 3 acquired.
+   Discovered is not owned: a car is acquired exactly once, and from then
+   on it is an ordinary fleet entry of yours (save.garage, or waiting for
+   a space in save.pendingCars) that the vehicle registry keeps like any
+   other: its own bay, saved where you left it, recovered from the impound,
+   towed home as a wreck. Nothing removes it: it can't be sold, chopped or
+   staked in a pink slip, so the registry's count never goes down and a
+   reload can't bring a second one.
+   A car that stands in the world (how 'find') is put there only once its
+   clue is known, only while you are near (streamed like the fleet), and
+   never once acquired. You take it by getting in, which needs a free
+   parking space: it joins your fleet there and then (the Ambassador as a
+   stolen, HOT car until the Chop Shop cleans it).
+   ===================================================================== */
+const UQ = { tick: 0.5, near: 160, keep: 340, pop: 60, intel: 3000, intelRep: 800 };
+// who tells you about each (the phone contact)
+const UQ_FROM = { corsair: 'unknown', spectre: 'tull', ambassador: 'lucky', proto: 'prestige', baja: 'farm', widow: 'vance', club: 'racecontrol', riviera: 'pv', tourer: 'ferry', aeterna: 'unknown' };
+const UQ_STATE = ['Undiscovered', 'Clue known', 'Exact location known', 'Acquired'];
+// the five city street races (the Spectre's condition)
+const uqCityRaces = () => RACES.filter(r => !r.storyOnly && !r.country);
+class UniqueCars {
+  constructor(g) { this.g = g; this.live = new Map(); this.t = 0; this._spots = {}; }
+  get s() { return this.g.save; }
+  get U() { const s = this.s; if (!s.uniques || typeof s.uniques !== 'object') s.uniques = {}; return s.uniques; }
+  rec(id) { const U = this.U; return U[id] || (U[id] = { st: 0, lead: false, n: 0 }); }
+  st(id) { return this.rec(id).st; }
+  // the one fleet entry of a one-off, or where it waits for a space (-1: none)
+  entry(id) { const t = UNIQUE_BY[id].type; return this.s.garage.find(e => e.type === t) || null; }
+  pendingIdx(id) { const t = UNIQUE_BY[id].type; return (this.s.pendingCars || []).findIndex(P => P.type === t); }
+  count() { return UNIQUE_CARS.filter(u => this.st(u.id) >= 3).length; }
+  // where an acquired one-off is right now, in words
+  whereText(id) {
+    const e = this.entry(id);
+    if (e) { if (e.imp) return 'In the police impound'; const w = this.g.vreg.where(e); return e.out ? `Out: ${w ? w.name : 'on the street'}` : `Stored: ${w ? w.name : 'its space'}`; }
+    if (this.pendingIdx(id) >= 0) return `Waiting with ${UNIQUE_BY[id].keeper} for a free space`;
+    return '';
+  }
+  // ---------------------------------------------------------------- the stages
+  // a stage reached: once, saved, with the message that goes with it
+  advance(id, st, quiet) {
+    const r = this.rec(id), d = UNIQUE_BY[id]; if (r.st >= st) return false;
+    r.st = st;
+    if (!quiet && st === 1) { this.g.content.phone(UQ_FROM[id], d.clue); this.g.ui.toast(`New lead: ${d.hint}${d.how === 'find' ? ' (search area on the map)' : ''}.`, 'info'); }
+    if (!quiet && st === 2 && d.how === 'find') { this.g.ui.banner('One-off spotted', VEHICLES[d.type].name, 'info', 2.6); this.g.audio.play('pass'); }
+    this.g.saveGame();
+    return true;
+  }
+  setLead(id) { const r = this.rec(id); if (r.lead) return; r.lead = true; const d = UNIQUE_BY[id]; if (d.lead && UQ_FROM[id] === 'lucky') this.g.content.phone('lucky', 'Come by the shop. I hear things about a diplomat’s car, and I sell what I hear.'); this.g.saveGame(); }
+  // acquired: the one moment it becomes yours (the caller has already made the fleet or waiting entry)
+  acquired(d) {
+    const g = this.g, r = this.rec(d.id); r.st = 3; r.day = g.uw ? g.uw.S.day : 0;
+    g.vreg.note('one-off acquired', d.type, { id: d.id });
+    g.ui.banner('One-off acquired', `${VEHICLES[d.type].name} · ${this.count()} of ${UNIQUE_CARS.length}`, 'pass', 3.5);
+    g.audio.play('pass');
+    g.saveGame(true);
+  }
+  // given to you (a reward, Vance's car): into a free space, or it waits with whoever gave it. Once only.
+  grant(id) {
+    const g = this.g, d = UNIQUE_BY[id]; if (!d || this.st(id) >= 3 || this.entry(id) || this.pendingIdx(id) >= 0) return null;
+    const e = g.vreg.give(d.type, d.origin, VEHICLES[d.type].colors[0], d.keeper);
+    if (e) e.vtier = 'unique';
+    this.acquired(d);
+    return e;
+  }
+  // what unlocks each stage (checked on the registry's clock)
+  check() {
+    const g = this.g, s = this.s, p = g.player, rep = s.rep;
+    const cityWon = uqCityRaces().filter(r => s.races[r.id] && s.races[r.id].won).length;
+    if (s.flags.goldHint) this.advance('corsair', 1);
+    if (cityWon > 0) this.advance('spectre', 1);
+    if (cityWon >= uqCityRaces().length && this.st('spectre') < 3) this.grant('spectre');
+    if (rep >= UQ.intelRep) this.setLead('ambassador');
+    if (rep >= 2000) this.advance('proto', 1);
+    if (inCedarSouth(p.pos.x, p.pos.z)) this.advance('baja', 1);
+    if (inValenPoint(p.pos.x, p.pos.z)) this.advance('club', 1);
+    if (Object.keys(ZONES).every(z => s.discovered.zones[z])) { this.setLead('riviera'); if (rep >= UNIQUE_BY.riviera.rep) this.advance('riviera', 1); }
+    if (s.secrets.ghostferry) this.advance('tourer', 1);
+    if (UNIQUE_CARS.every(u => u.id === 'aeterna' || this.st(u.id) >= 3)) this.advance('aeterna', 1);
+  }
+  // a race won: the Spectre (all five city races) and the Clubsport (the GT Cup at Valen Point)
+  onRaceWin(raceId) {
+    if (raceId === 'vp_gt') { this.advance('club', 1, true); this.grant('club'); }
+    this.check();
+  }
+  // a pink slip won against Vance: three ordinary ones and he puts up the Widowmaker
+  onPinkWin(wasWidow) {
+    if (wasWidow) return;
+    const r = this.rec('widow'), d = UNIQUE_BY.widow; if (r.st >= 3) return;
+    r.n = (r.n || 0) + 1;
+    if (r.n === 1) this.advance('widow', 1);
+    if (r.n >= d.wins && this.advance('widow', 2, true)) this.g.content.phone('vance', `Fine. Next street pink slip, I put up the Widowmaker. Bring something worth ${fmtMoney(d.stake)} or more.`);
+    this.g.saveGame();
+  }
+  // Vance is racing his own car today (a street pink slip, once he has offered it)
+  widowDue() { return this.st('widow') === 2; }
+  // ---------------------------------------------------------------- where each one stands
+  spotOf(id) {
+    if (this._spots[id] !== undefined) return this._spots[id];
+    const w = this.g.world; if (!w || !RoadGraph.ready) return null;
+    const blk = (bx, bz, fx = 0.5, fz = 0.5) => { const b = w.block(bx, bz); return kerbSpot(w, b.x0 + (b.x1 - b.x0) * fx, b.z0 + (b.z1 - b.z0) * fz); };
+    let sp = null;
+    switch (id) {
+      case 'corsair': sp = curbAt(11, 8, 2, 62); break; // behind the depot on Harbor Row, where the old tip always said
+      case 'ambassador': sp = blk(1, 1); break;          // a Crestmoor Heights driveway
+      case 'proto': sp = blk(8, 10, 0.5, 0.8); break;    // a bonded yard in the Warehouse District
+      case 'riviera': sp = blk(1, 9, 0.3, 0.5); break;   // a Linden Hills carport
+      case 'tourer': sp = blk(0, 6, 0, 0.5); break;      // the old ferry slip on the west shore
+      case 'aeterna': { const t = w.places.tower; sp = t && t.door ? kerbSpot(w, t.door.x, t.door.z) : null; break; } // the foot of Valen Tower
+      case 'baja': { // just off the farm track in the far fields east of the park
+        const sps = extRoadSpots(CITY / 2, CITY + 300); let best = null, bd = 1e18;
+        for (const q of sps) { const d2 = dist2(q.x, q.z, 610, 1105); if (d2 < bd) { bd = d2; best = q; } }
+        if (best) {
+          const ox = best.x + Math.cos(best.h) * 7, oz = best.z - Math.sin(best.h) * 7;
+          sp = !kerbBlocked(w, ox, oz, groundY(ox, oz), best.h) ? { x: ox, z: oz, h: best.h } : { x: best.x, z: best.z, h: best.h };
+        }
+        break;
+      }
+    }
+    if (sp) sp = { x: sp.x, z: sp.z, h: sp.h || 0 };
+    return (this._spots[id] = sp);
+  }
+  // the search area: around the car, never centred on it
+  areaOf(id) {
+    const d = UNIQUE_BY[id], sp = this.spotOf(id); if (!sp || !d.area) return null;
+    const a = (d.n * 2.39996) % (Math.PI * 2);
+    return { x: sp.x + Math.cos(a) * d.area * 0.45, z: sp.z + Math.sin(a) * d.area * 0.45, r: d.area };
+  }
+  liveOf(id) { const v = this.live.get(id); return v && this.g.vehicles.list.includes(v) && v.uniqueId === id && !v.garageUid ? v : null; }
+  spawnAt(d, sp) {
+    const g = this.g, y = groundY(sp.x, sp.z);
+    for (const o of g.vehicles.nearby(sp.x, sp.z, 5)) if (o !== g.player.vehicle && !o.garageUid && !o.trackId && !o.mission && !o.uniqueId && Math.hypot(o.pos.x - sp.x, o.pos.z - sp.z) < 4) g.vehicles.despawn(o);
+    const v = g.vehicles.spawn(d.type, sp.x, sp.z, sp.h, { parked: true, color: VEHICLES[d.type].colors[0], y, vtier: 'unique' });
+    v.uniqueId = d.id; v.touched = true; v.looted = true; v.display = true;
+    if (d.origin !== 'stolen') { v.origin = 'found'; v.legit = true; }
+    this.live.set(d.id, v);
+    return v;
+  }
+  // the cars that stand in the world: there while you are near and the clue is known, never once acquired
+  updateWorld() {
+    const g = this.g, p = g.player, px = p.pos.x, pz = p.pos.z, outdoors = !(p.interior && !p.interior.vspace);
+    for (const d of UNIQUE_CARS) {
+      if (d.how !== 'find') continue;
+      const r = this.rec(d.id), v = this.liveOf(d.id);
+      if (!v) this.live.delete(d.id);
+      if (r.st < 1 || r.st >= 3) { if (v && v !== p.vehicle) { g.vehicles.despawn(v); this.live.delete(d.id); } continue; }
+      const sp = this.spotOf(d.id); if (!sp) continue;
+      const ds = Math.hypot(sp.x - px, sp.z - pz);
+      if (r.st === 1 && outdoors && ds < d.reveal) this.advance(d.id, 2);
+      if (!v) { if (outdoors && ds < UQ.near && (ds > UQ.pop || !g.inView(sp.x, 1, sp.z, 3))) this.spawnAt(d, sp); continue; }
+      // a hulk is not the car: a fresh one stands at its place the next time you come by
+      if (v.burnt) { v.uniqueId = ''; this.live.delete(d.id); continue; }
+      if (Math.hypot(v.pos.x - px, v.pos.z - pz) > UQ.keep && !g.inView(v.pos.x, 1, v.pos.z, 3)) { g.vehicles.despawn(v); this.live.delete(d.id); }
+    }
+  }
+  // ---------------------------------------------------------------- taking one
+  // why you can't take it ('' when you can)
+  claimBlock(v) {
+    const g = this.g, d = v && UNIQUE_BY[v.uniqueId];
+    if (!d || v.garageUid || this.st(d.id) >= 3 || this.entry(d.id) || this.pendingIdx(d.id) >= 0) return 'Gone.';
+    if (g.vreg.freeBays() < 1 || g.save.garage.length >= g.content.garageCap) return `Nowhere to keep it: the ${VEHICLES[d.type].name} needs a free parking space of yours. Make room first.`;
+    return '';
+  }
+  // into your fleet where it stands: its own space reserved, saved from now on, and it can't happen twice
+  claim(v) {
+    const g = this.g, why = this.claimBlock(v); if (why) return why;
+    const d = UNIQUE_BY[v.uniqueId], R = g.vreg;
+    const e = g.content.addToGarage(d.type, d.origin, v.colorHex, true); if (!e) return 'No free parking space.';
+    e.vtier = 'unique'; e.out = true; e.loc = R.here(v); e.seen = R.econ(); e.dmg = clamp(100 - v.health, 0, 100); e.dirt = v.dirt;
+    e.hot = d.origin === 'stolen';
+    v.owned = true; v.garageUid = e.uid; v.origin = d.origin; v.tune = e.tune; v.trunk = e.trunk || (e.trunk = {}); v.looted = true; v.display = false; v.uniqueId = '';
+    if (d.origin === 'stolen') { v.stolenBefore = true; g.save.stats.stolen++; g.police.crime('theft', v.pos.x, v.pos.z); }
+    R.cars.set(e.uid, v); this.live.delete(d.id);
+    this.acquired(d);
+    if (e.hot) g.ui.toast(`The ${VEHICLES[d.type].name} is yours, and it is stolen: HOT until the Chop Shop cleans its papers.`, 'warn');
+    return '';
+  }
+  // the player walks up to it: one question, then it is yours
+  offer(v) {
+    const g = this.g, d = UNIQUE_BY[v.uniqueId], why = this.claimBlock(v);
+    if (why) { g.ui.toast(why, 'warn'); g.audio.play('deny'); return; }
+    const V = VEHICLES[d.type];
+    g.ui.ask(`Take the ${V.name}?`, `${V.blurb} One of ten one-offs on the island: it takes a free parking space of yours and is yours for good (it can’t be sold or staked).${d.origin === 'stolen' ? ' Taking it is theft: it stays HOT until the Chop Shop cleans it.' : ''}`, 'Take it', () => {
+      const r = this.claim(v); if (r) { g.ui.toast(r, 'warn'); return; }
+      if (g.player.state === 'foot') g.beginEnter(v);
+    });
+  }
+  // Lucky's tip (the Ambassador): paid intel at the pawn shop, cash in hand, once
+  intelSpot() { const L = this.g.uw && this.g.uw.loc('prop', 'pawn'); if (!L) return null; const h = L.h || 0; return { x: L.x + Math.cos(h) * 3.4, z: L.z - Math.sin(h) * 3.4 }; }
+  findAction() {
+    const g = this.g, p = g.player; if (g.state !== 'playing' || p.state !== 'foot' || p.interior) return null;
+    const r = this.rec('ambassador'); if (!r.lead || r.st > 0) return null;
+    const q = this.intelSpot(); if (!q || Math.hypot(p.pos.x - q.x, p.pos.z - q.z) > 2) return null;
+    return { label: `Lucky’s tip · ${fmtMoney(UQ.intel)} cash`, act: () => this.buyIntel() };
+  }
+  buyIntel() {
+    const g = this.g, r = this.rec('ambassador'); if (!r.lead || r.st > 0) return 'Nothing to sell.';
+    if (!Money.pay(UQ.intel, 'intel')) { g.ui.toast(`Lucky wants ${fmtMoney(UQ.intel)} in cash.`, 'warn'); g.audio.play('deny'); return 'Not enough cash.'; }
+    g.audio.play('cash');
+    this.advance('ambassador', 1);
+    return '';
+  }
+  // ---------------------------------------------------------------- the map and the stats screen
+  // search areas (clue known) and exact places (found, not yet taken)
+  mapEntries() {
+    const out = [];
+    for (const d of UNIQUE_CARS) {
+      if (d.how !== 'find') continue;
+      const st = this.st(d.id);
+      if (st === 1) { const a = this.areaOf(d.id); if (a) out.push({ key: 'uq:' + d.id, name: `Search area · ${d.hint}`, cat: 'unique', icon: '?', x: a.x, z: a.z, area: a, sub: `One-off ${d.kind.toLowerCase()}: somewhere in here` }); }
+      else if (st === 2) { const sp = this.spotOf(d.id); if (sp) out.push({ key: 'uq:' + d.id, name: VEHICLES[d.type].name, cat: 'unique', icon: '◆', x: sp.x, z: sp.z, sub: `One-off ${d.kind.toLowerCase()} · ${d.hint}` }); }
+    }
+    return out;
+  }
+  areas() { const out = []; for (const d of UNIQUE_CARS) if (d.how === 'find' && this.st(d.id) === 1) { const a = this.areaOf(d.id); if (a) out.push(a); } return out; }
+  statsHtml() {
+    const rows = UNIQUE_CARS.map(d => {
+      const r = this.rec(d.id), V = VEHICLES[d.type], known = r.st > 0;
+      const what = r.st >= 3 ? this.whereText(d.id) || 'Yours' : r.st > 0 ? d.hint : r.lead && d.lead ? d.lead : '';
+      return `<span>${known ? esc(V.name) : '???'} <i style="opacity:.6">${esc(d.kind)}</i></span><span>${UQ_STATE[r.st]}${what ? ' · ' + esc(what) : ''}</span>`;
+    }).join('');
+    return `<h3>One-offs · ${this.count()} of ${UNIQUE_CARS.length}</h3><div class="stats">${rows}</div>`;
+  }
+  // ---------------------------------------------------------------- the clock, saves and resets
+  update(dt) {
+    const g = this.g; if (!g.uw || g.state !== 'playing') return;
+    this.t -= dt; if (this.t > 0) return; this.t = UQ.tick;
+    this.check(); this.updateWorld();
+    // the Golden Corsair is also one of the city's secrets (the first time you drive it)
+    const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
+    if (pv && pv.type === 'u_corsair' && pv.garageUid) g.content.secret('gold');
+  }
+  clearAll() { for (const v of this.live.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.live.clear(); }
+  reset() { this.clearAll(); this.t = 0; this._spots = {}; if (this.s) for (const u of UNIQUE_CARS) this.rec(u.id); }
+  // sanitize a save (SaveSystem, after the vehicle registry's): known ids and states only, one fleet or waiting
+  // entry per one-off at most, every acquired one accounted for, and the old Golden Corsair brought in
+  static sanitize(d) {
+    const src = d.uniques && typeof d.uniques === 'object' && !Array.isArray(d.uniques) ? d.uniques : {}, U = {};
+    for (const u of UNIQUE_CARS) {
+      const r = src[u.id] && typeof src[u.id] === 'object' ? src[u.id] : {};
+      U[u.id] = { st: Number.isInteger(r.st) ? clamp(r.st, 0, 3) : 0, lead: !!r.lead, n: Number.isInteger(r.n) && r.n >= 0 ? Math.min(r.n, 99) : 0 };
+      if (Number.isInteger(r.day)) U[u.id].day = r.day;
+    }
+    d.uniques = U;
+    if (!Array.isArray(d.pendingCars)) d.pendingCars = [];
+    // before Session 6D the Golden Corsair was a gold-painted stock Corsair 68: the one you kept becomes the real one
+    if (d.secrets && d.secrets.gold && !d.garage.some(e => e.type === 'u_corsair')) {
+      const old = d.garage.find(e => e.type === 'classic' && e.color === 0xc9a227 && e.origin === 'found');
+      if (old) { old.type = 'u_corsair'; old.vtier = 'unique'; U.corsair.st = 3; }
+    }
+    for (const u of UNIQUE_CARS) {
+      // one of each, ever: a second entry (a corrupted or hand-edited save) is dropped and logged
+      const mine = d.garage.filter(e => e.type === u.type), wait = d.pendingCars.filter(P => P.type === u.type);
+      for (const e of mine.slice(1)) { d.garage.splice(d.garage.indexOf(e), 1); (d.vlog || (d.vlog = [])).push({ day: 0, what: 'duplicate one-off removed', type: u.type, uid: e.uid }); }
+      for (const P of (mine.length ? wait : wait.slice(1))) d.pendingCars.splice(d.pendingCars.indexOf(P), 1);
+      for (const e of mine.slice(0, 1)) e.vtier = 'unique';
+      const held = mine.length > 0 || wait.length > 0;
+      if (held) U[u.id].st = 3;
+      // acquired but nowhere (a save from a broken build): it is never silently gone, it waits with its keeper
+      else if (U[u.id].st >= 3) d.pendingCars.push({ type: u.type, origin: u.origin === 'stolen' ? 'found' : u.origin, color: VEHICLES[u.type].colors[0], from: u.keeper.slice(0, 40) });
+    }
   }
 }
 /* =====================================================================
@@ -54183,10 +54562,15 @@ class PinkSlips {
     if ((e.trunk && Object.values(e.trunk).some(n => n > 0)) || Money.dirtyInCar(e.uid) > 0) return 'Empty it first: no goods, loot or cash in a car you put up.';
     if (v.health < RACE_T.pink.minHp || v.broken || v.burnt) return 'Get it fixed first: Vance won’t race a wreck.';
     if (R.freeBays() < 1) return 'You need a free parking space for his car if you win.';
+    // the Widowmaker (Session 6D): Vance only puts it up against a car worth having
+    const W = UNIQUE_BY.widow;
+    if (def && !def.offroad && g.uniques && g.uniques.widowDue() && carWorth(e.type, e.vtier) < W.stake) return `Vance is putting up the Widowmaker: he wants a car worth ${fmtMoney(W.stake)} or more against it.`;
     return '';
   }
   // the rival's stake: a car worth about 0.8–1.5× yours
   rival(e, def) {
+    // Vance's own car, once he has offered it: a street pink slip only, against whatever you put up (Session 6D)
+    if ((!def || !def.offroad) && this.g.uniques && this.g.uniques.widowDue()) return { type: 'u_widow', color: VEHICLES.u_widow.colors[0], vtier: 'unique', u: 'widow' };
     const sv = carWorth(e.type, e.vtier);
     const all = Object.keys(VEHICLES).filter(t => !VEHICLES[t].police && !VEHICLES[t].unique && !PINK_NEVER.includes(t) && CAR_MSRP[t] && (!def || !def.offroad || trailOf(t) >= 0.5));
     const val = t => carWorth(t, VEHICLES[t].tier);
@@ -54211,7 +54595,8 @@ class PinkSlips {
     const e = s.garage.find(x => x.uid === P.uid), V = VEHICLES[P.rival.type];
     if (win) {
       const A = g.race.active, o = A && A.racers[0] && g.vehicles.list.includes(A.racers[0].v) ? A.racers[0].v : null;
-      const ne = g.content.addToGarage(P.rival.type, 'pinkslip', P.rival.color, true) || g.vreg.give(P.rival.type, 'pinkslip', P.rival.color, 'Vance');
+      // a one-off goes through its registry: once only, and never a second copy (Session 6D)
+      const ne = P.rival.u ? g.uniques.grant(P.rival.u) : g.content.addToGarage(P.rival.type, 'pinkslip', P.rival.color, true) || g.vreg.give(P.rival.type, 'pinkslip', P.rival.color, 'Vance');
       if (ne) {
         ne.vtier = P.rival.vtier;
         if (o) {
@@ -54222,6 +54607,7 @@ class PinkSlips {
         }
       }
       g.vreg.note('won in a pink slip', P.rival.type, { from: 'Vance' });
+      if (g.uniques) g.uniques.onPinkWin(!!P.rival.u);
       g.ui.toast(`Pink slip won: the ${V.name} is yours.`, 'money');
     } else if (e) this.surrender(e, P);
     g.saveGame(true);
@@ -54245,7 +54631,7 @@ class PinkSlips {
   reset() {
     const s = this.s; if (!s) return;
     const P = s.pink;
-    if (P && (typeof P !== 'object' || !Number.isInteger(P.uid) || !P.rival || !VEHICLES[P.rival.type])) { s.pink = null; return; }
+    if (P && (typeof P !== 'object' || !Number.isInteger(P.uid) || !P.rival || !VEHICLES[P.rival.type] || (isUniqueType(P.rival.type) && P.rival.u !== VEHICLES[P.rival.type].unique))) { s.pink = null; return; }
     if (P) { const e = s.garage.find(x => x.uid === P.uid); s.pink = null; if (e) this.surrender(e, P); if (this.g.uw) this.g.uw.news('pv', `You walked away from a pink slip. Vance kept your ${e ? VEHICLES[e.type].name : 'car'}.`); }
     if (!Number.isInteger(s.pinkDay)) s.pinkDay = -1;
     if (!Number.isInteger(s.pinkDirtDay)) s.pinkDirtDay = -1;
@@ -60145,6 +60531,7 @@ class UIManager {
       c.strokeStyle = m ? 'rgba(255,216,77,0.85)' : 'rgba(127,224,143,0.8)'; c.lineWidth = 5 * k * 1.2; c.lineJoin = 'round';
       c.beginPath(); route.forEach((q, i) => { const [x, z] = this._mapXY(q.x, q.z); i ? c.lineTo(x, z) : c.moveTo(x, z); }); c.stroke();
     }
+    if (g.uniques) for (const a of g.uniques.areas()) { const [ax, az] = this._mapXY(a.x, a.z); c.fillStyle = 'rgba(255,216,77,0.12)'; c.strokeStyle = 'rgba(255,216,77,0.7)'; c.lineWidth = 1.5 / zoom * k; c.beginPath(); c.arc(ax, az, a.r * k, 0, 7); c.fill(); c.stroke(); }
     if (m && m.area) { const [ax, az] = this._mapXY(m.area.x, m.area.z); c.fillStyle = 'rgba(255,216,77,0.18)'; c.strokeStyle = 'rgba(255,216,77,0.8)'; c.lineWidth = 2 / zoom * k; c.beginPath(); c.arc(ax, az, m.area.r * k, 0, 7); c.fill(); c.stroke(); }
     if (g.police.level > 0 && !g.police.visible) { const [sx, sz] = this._mapXY(g.police.lastSeen.x, g.police.lastSeen.z); c.fillStyle = 'rgba(255,60,80,0.15)'; c.beginPath(); c.arc(sx, sz, g.police.searchRadius * k, 0, 7); c.fill(); }
     c.restore();
@@ -60246,7 +60633,9 @@ const MAP_CATS = {
   casino: { name: 'Casino', icon: '♦', col: '#ffd84d', layer: 'landmarks' },
   carsUsed: { name: 'Used Autos', icon: 'U', col: '#e0a020', layer: 'locations' },
   carsNew: { name: 'New Cars', icon: 'N', col: '#7fb2ff', layer: 'locations' },
-  carsLux: { name: 'Performance & Luxury', icon: '★', col: '#e8d28a', layer: 'locations' }
+  carsLux: { name: 'Performance & Luxury', icon: '★', col: '#e8d28a', layer: 'locations' },
+  // a one-off's search area (?) or, once spotted, its exact place (◆) (Session 6D)
+  unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' }
 };
 const MAP_LAYERS = [
   ['locations', 'Locations'], ['landmarks', 'Landmarks'], ['properties', 'Properties for sale'], ['businesses', 'Businesses'],
@@ -60323,6 +60712,7 @@ class MapView {
       }
       const pw = uw.loc('prop', 'pawn'); if (pw) add({ key: 'sell:pawn', name: 'Lucky’s Pawn · fence', cat: 'sell', x: pw.x + 1.5, z: pw.z + 1.5, sub: 'SELL hot goods and smokes · no questions asked' });
     }
+    if (g.uniques) for (const e of g.uniques.mapEntries()) add(e);
     for (const ct of g.missions.contacts) if (ct.visible !== false && !ct.interior && (!ct.storyOnly || ct.marker.g.visible)) add({ key: 'ct:' + ct.id, name: ct.name, cat: 'contact', col: '#' + new THREE.Color(ct.color).getHexString(), x: ct.x, z: ct.z, sub: ct.role });
     this.entries = out;
     return out;
@@ -60633,6 +61023,7 @@ class MapView {
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
+    if (g.uniques && this.layerOn('locations')) for (const a of g.uniques.areas()) { const [ax, az] = ui._mapXY(a.x, a.z); c.fillStyle = 'rgba(255,216,77,0.14)'; c.strokeStyle = 'rgba(255,216,77,0.85)'; c.lineWidth = Math.max(1.5, 3 / this.zoom); c.setLineDash([6 / this.zoom, 4 / this.zoom]); c.beginPath(); c.arc(ax, az, a.r * k, 0, 7); c.fill(); c.stroke(); c.setLineDash([]); }
     // route to the tracked place
     const wp = g.content.waypoint, m = g.missions.active, tgt = (m && m.target) || wp;
     const pk = this.pickMode && this.pickMode.dest ? this.pickMode : null;
@@ -60864,6 +61255,8 @@ class Game {
     this.ui = new UIManager(this);
     this.uw = new Underworld(this);
     this.vreg = new VehicleRegistry(this);
+    // Session 6D: the ten one-offs
+    this.uniques = new UniqueCars(this);
     // Session 5B: HOT recognition, the police impound lot, the Chop Shop's work
     this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
     // Session 6A: street-race purse tiers and heat, pink slips, the car wash
@@ -60873,7 +61266,7 @@ class Game {
     // Session 6C: the Cedar Fields off-road park
     this.offroad = new OffroadPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
+    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -61300,6 +61693,7 @@ class Game {
     if (p.passenger) { this.taxi.getOut(); return; }
     const u = this.uw.findAction(); if (u) { u.act(); return; }
     if (this.uw.S.jail) return;
+    const uq = this.uniques.findAction(); if (uq) { uq.act(); return; }
     if (m.offer && !m.active) { m.start(m.offer); return; }
     const a = this.content.findAction();
     if (a) { a.act(); return; }
@@ -61307,6 +61701,8 @@ class Game {
     if (p.state !== 'foot' || (p.interior && !p.interior.vspace)) return;
     const v = this.nearestVehicle(1.8);
     if (v) {
+      // a one-off standing where it was found: taking it makes it yours (Session 6D)
+      if (v.uniqueId && !v.garageUid) { this.uniques.offer(v); return; }
       if (v.locked) { this.ui.toast(v.mission === 'sold' ? 'Delivered. Leave it.' : v.dealer ? `Locked. It’s for sale at ${DEALERSHIPS[v.dealer.lot].name}: inspect it to buy it.` : 'Locked.', 'warn'); this.audio.play('deny'); return; }
       this.beginEnter(v);
     }
@@ -61319,9 +61715,9 @@ class Game {
       if (u) t = u.label;
       else if (this.uw.S.jail) t = null;
       else if (p.state === 'foot' && !m.offer) {
-        const a = this.content.findAction();
+        const a = this.uniques.findAction() || this.content.findAction();
         if (a) t = a.label;
-        else if (!p.interior || p.interior.vspace) { const v = this.nearestVehicle(1.8); if (v) t = v.locked ? (v.mission === 'sold' || v.dealer ? null : 'Locked') : (v.driver === 'npc' || v.driver === 'cop' ? 'Steal ' : 'Enter ') + v.spec.name; }
+        else if (!p.interior || p.interior.vspace) { const v = this.nearestVehicle(1.8); if (v) t = v.uniqueId && !v.garageUid ? `Take the ${v.spec.name} (one-off)` : v.locked ? (v.mission === 'sold' || v.dealer ? null : 'Locked') : (v.driver === 'npc' || v.driver === 'cop' ? 'Steal ' : 'Enter ') + v.spec.name; }
       } else if (p.state === 'vehicle' && p.vehicle.health <= 0 && !p.vehicle.burnt) t = 'Get out \u2014 it\u2019s on fire!';
       else if (p.state === 'vehicle' && !m.offer) { const a = this.content.findAction(); if (a) t = a.label; }
     }
@@ -61444,7 +61840,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -61556,7 +61952,7 @@ class Game {
     $('dbgCash').addEventListener('click', () => Money.earn(5000, 'debug'));
     $('dbgHeat').addEventListener('click', () => { if (this.state === 'playing') this.police.setLevel(Math.min(5, this.police.level + 1)); });
     $('dbgClear').addEventListener('click', () => this.police.clear('Heat cleared (debug).'));
-    $('dbgCar').addEventListener('click', () => { const p = this.player; const v = this.vehicles.spawn(pick(Object.keys(VEHICLES)), p.pos.x + Math.sin(p.h) * 5, p.pos.z + Math.cos(p.h) * 5, p.h + Math.PI / 2, { parked: true }); v.touched = true; });
+    $('dbgCar').addEventListener('click', () => { const p = this.player; const v = this.vehicles.spawn(pick(Object.keys(VEHICLES).filter(t => !isUniqueType(t))), p.pos.x + Math.sin(p.h) * 5, p.pos.z + Math.cos(p.h) * 5, p.h + Math.PI / 2, { parked: true }); v.touched = true; });
   }
   updateDebug(dt) {
     this._dbgT = (this._dbgT || 0) - dt;
@@ -61632,7 +62028,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

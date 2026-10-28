@@ -7,6 +7,8 @@
 const CAR_MSRP = { compact: 1800, sedan: 3200, taxi: 3600, van: 4200, pickup: 6500, suv: 8200, truck: 9500, sports: 19500, muscle: 26000, supercar: 72000,
   classic: 30000, coupe: 46000, offroad: 22000, luxury: 52000, gangcar: 14000, utility: 7000, police: 40000, unmarked: 20000,
   metro: 1500, regent: 2600, crest: 5200, estate: 4600, courier: 3800, apex: 15500, hellion: 34000, revenant: 38000, tempest: 28000, kodiak: 64000, monarch: 88000, valkyr: 120000, obsidian: 150000 };
+// the one-offs (Session 6D): what each is worth, for insurance, impound fees and event classes (never a sale price)
+for (const u of UNIQUE_CARS) CAR_MSRP[u.type] = u.msrp;
 const carMsrp = type => CAR_MSRP[type] || (VEHICLES[type] && VEHICLES[type].price) || 8000;
 // ---- v6 dealerships: three lots with stock you walk up to, inspect and buy where it stands
 // used: a rotating cash lot (condition, mileage, bargains); new: Meridian's practical line-up, restocked daily;
@@ -31,6 +33,7 @@ const CAR_CLASS = { metro: 'City car', compact: 'Hatchback', apex: 'Hot hatch', 
   pickup: 'Pickup', utility: 'Work truck', truck: 'Box truck', van: 'Van', courier: 'Panel van', taxi: 'Ex-taxi', sports: 'Sports car', tempest: 'Lightweight sports car',
   muscle: 'Muscle car', hellion: 'Modern muscle', gangcar: 'Lowrider', classic: 'Classic muscle', revenant: 'Classic fastback', coupe: 'Grand tourer', monarch: 'Luxury GT',
   luxury: 'Luxury sedan', supercar: 'Supercar', valkyr: 'Mid-engine exotic', obsidian: 'Luxury supercar', offroad: 'Off-roader', police: 'Ex-police', unmarked: 'Ex-police' };
+for (const u of UNIQUE_CARS) CAR_CLASS[u.type] = 'One-off ' + u.kind.toLowerCase();
 const condLabel = c => c >= 90 ? ['Excellent', '#7fe08f'] : c >= 75 ? ['Good', '#c8e07f'] : c >= 62 ? ['Fair', '#ffd84d'] : ['Rough', '#ff8a3d'];
 const TUNE = [
   { id: 'engine', name: 'Engine', desc: 'More power and a higher top speed.', prices: [1500, 3500, 7000] },
@@ -94,8 +97,8 @@ const POSTS = [
   { place: 'police', dx: -3.2, dz: -1.5 }, { place: 'police', dx: 3.4, dz: -1.2 },
   { place: 'mall', dx: -7, dz: 1.5 }, { place: 'tower', dx: 6.5, dz: 2.5 }, { place: 'stadium', dx: -9, dz: 1.2 }
 ];
-const CONTACT_AVATAR = { radio: '#4d8dff', rosa: '#46d4c4', tull: '#ff8a3d', ines: '#d28cff', ferry: '#ffd84d', dex: '#4d8dff', moss: '#7fb2ff', pv: '#e8eef6', unknown: '#8a8f96', vance: '#ff4d5e' };
-const CONTACT_NAMES = { radio: 'Police radio', rosa: 'Rosa Calder', tull: '"Sprocket" Tull', ines: 'Ines Varga', ferry: 'The Ferryman', dex: 'Dex Okafor', moss: 'Sgt. Lena Moss', pv: 'Valen Courier', unknown: 'Unknown number', vance: 'Vance' };
+const CONTACT_AVATAR = { radio: '#4d8dff', rosa: '#46d4c4', tull: '#ff8a3d', ines: '#d28cff', ferry: '#ffd84d', dex: '#4d8dff', moss: '#7fb2ff', pv: '#e8eef6', unknown: '#8a8f96', vance: '#ff4d5e', lucky: '#c9a46b', prestige: '#e8d28a', farm: '#c9b06b', racecontrol: '#e8eef6' };
+const CONTACT_NAMES = { radio: 'Police radio', rosa: 'Rosa Calder', tull: '"Sprocket" Tull', ines: 'Ines Varga', ferry: 'The Ferryman', dex: 'Dex Okafor', moss: 'Sgt. Lena Moss', pv: 'Valen Courier', unknown: 'Unknown number', vance: 'Vance', lucky: 'Lucky (pawn shop)', prestige: 'Valen Prestige Motors', farm: 'Cedar Fields farmhand', racecontrol: 'Valen Point Race Control' };
 
 function copPost(c, dt) {
   const g = game, pol = g.police;
@@ -114,7 +117,7 @@ class ContentManager {
     this.phoneQ = []; this.phoneT = 0; this.subQ = []; this.subT = 0;
     this.checkT = 0; this.discT = 0; this.postT = 0; this.secretT = 0;
     this.waypoint = null; this.guideTarget = null; this.posts = POSTS.map(p => ({ ...p, ped: null }));
-    this.pitchT = 0; this.goldCar = null;
+    this.pitchT = 0;
     this._buildPackages();
     this._bindUI();
   }
@@ -246,18 +249,11 @@ class ContentManager {
     g.audio.play('pickup'); g.fx.flashLight(pk.x, pk.y + 1, pk.z, 6, 0.4, 0x7fe08f);
     g.ui.banner('Hidden Package', `${n} of 30 · $250`, 'info', 2.2);
     if (n === 10) { g.earn(2500, 'package'); s.ammo.pistol += 48; this.phone('unknown', 'Ten already? Keep looking. There’s a pistol crate on its way to your safehouse.'); s.weapons.pistol = true; this.ach('pack10'); }
-    if (n === 15) { this.phone('unknown', 'You like finding things. Harbor Row, the alley behind the depot — someone left something golden there.'); s.flags.goldHint = true; }
+    // fifteen: the Golden Corsair's clue (the one-off registry gives it, with its search area: Session 6D)
+    if (n === 15) { s.flags.goldHint = true; if (g.uniques) g.uniques.check(); }
     if (n === 20) { g.earn(5000, 'package'); s.weapons.smg = true; s.ammo.smg += 120; this.phone('unknown', 'Twenty. An SMG is waiting in your stash. Don’t make me regret it.'); }
     if (n === 30) { g.earn(15000, 'package'); this.ach('pack30'); this.phone('unknown', 'All thirty. You know this island better than I do now.'); }
     g.saveGame();
-  }
-  _spawnGold() {
-    const g = this.g, s = g.save;
-    if (!s.flags.goldHint || s.secrets.gold || (this.goldCar && g.vehicles.list.includes(this.goldCar))) return;
-    const sp = curbAt(11, 8, 2, 62);
-    if (dist2(sp.x, sp.z, g.player.pos.x, g.player.pos.z) > 160 * 160 || dist2(sp.x, sp.z, g.player.pos.x, g.player.pos.z) < 30 * 30) return;
-    const v = g.vehicles.spawn('classic', sp.x, sp.z, sp.h, { parked: true, color: 0xc9a227 });
-    v.touched = true; v.goldCar = true; v.special = true; this.goldCar = v;
   }
   // ------------------------------------------------------------ garage v2
   get garageCap() { return this.g.uw ? this.g.uw.props.garageCap() : 0; }
@@ -269,7 +265,7 @@ class ContentManager {
     if (PM && s.garage.length >= this.garageCap) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
     if (!at && PM) for (const def of PM.ownedList()) { const b = PM.freeBay(def); if (b) { at = { p: def.id, i: b.i }; break; } }
     if (!at) { if (!quiet) this.g.ui.toast('No free parking space.', 'warn'); return null; }
-    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null };
+    const e = { uid: s.nextUid++, type, color: color !== undefined ? color : VEHICLES[type].colors[0], origin, dmg: 0, tune: { engine: 0, brakes: 0, grip: 0, armor: 0 }, at, out: false, loc: null, vtier: VEHICLES[type].tier };
     s.garage.push(e);
     if (!quiet) this.g.ui.toast(`${VEHICLES[type].name} added to your garage.`, 'money');
     if (s.garage.length >= 6) this.ach('fleet');
@@ -281,6 +277,8 @@ class ContentManager {
   storeVehicle(v, gp) {
     const g = this.g, s = g.save, PM = g.uw.props;
     if (v.mission && !(g.campaign && g.campaign.canStore(v))) { g.ui.toast('This vehicle is needed for the job.', 'warn'); g.audio.play('deny'); return false; }
+    // a one-off becomes yours by taking it where it stands, never by parking a stray copy (Session 6D)
+    if (isUniqueType(v.type) && !v.garageUid) { g.ui.toast('That car isn’t yours to park.', 'warn'); g.audio.play('deny'); return false; }
     if (v.type === 'police' || v.type === 'unmarked' && !v.garageUid) { g.ui.toast('Too hot to keep — every cop in the city knows this car.', 'warn'); g.audio.play('deny'); return false; }
     if (g.police.level > 0) { g.ui.toast('Lose the police before you open the garage.', 'warn'); g.audio.play('deny'); return false; }
     const def = gp.def || PROP_BY_ID[gp.id];
@@ -292,7 +290,7 @@ class ContentManager {
     const occupant = bay && PM.carAt(def.id, bay.i);
     if (!bay || (occupant && occupant !== e)) { g.ui.toast(`No free space at ${def.name} (${PM.capOf(def)} in all). Park somewhere else or sell a car.`, 'warn'); g.audio.play('deny'); return false; }
     if (!e) {
-      const origin = v.goldCar ? 'found' : v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
+      const origin = v.rareFind ? 'found' : v.origin || (v.owned ? 'bought' : 'stolen');
       e = this.addToGarage(v.type, origin, v.colorHex, true, { p: def.id, i: bay.i });
       if (!e) { g.ui.toast('No free parking space.', 'warn'); g.audio.play('deny'); return false; }
       // a stolen car parked in your space is still stolen: HOT until the Chop Shop cleans it (§45.30)
@@ -373,20 +371,20 @@ class ContentManager {
       // its home space, and where it actually is (the street, if that's where you left it)
       const home = e.at && PROP_BY_ID[e.at.p] ? `${PROP_BY_ID[e.at.p].name} · ${PARK_LABEL[PM.bays(PROP_BY_ID[e.at.p])[e.at.i].kind] || 'space'} ${e.at.i + 1}` : 'No space of its own: buy more parking';
       const w = g.vreg.where(e), loc = e.imp ? `In the ${IMPOUND.name} (${g.impound.spaceName(e)}) · release ${fmtMoney(e.imp.fee)}${e.imp.paid ? ' paid: drive it out' : ' at the window'} · its space: ${home}` : e.out && w ? `Parked on ${w.name} · its space: ${home}` : home;
-      return `<div class="card"${e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}${e.hot ? ' <span class="chip" style="--c:#ff4d5e">HOT</span>' : ''}${e.imp ? ' <span class="chip" style="--c:#ffb547">IMPOUNDED</span>' : ''}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
+      return `<div class="card"${e.vtier === 'unique' ? ' style="box-shadow:0 0 0 1px #ffd84d inset"' : e.vtier === 'rare' ? ' style="box-shadow:0 0 0 1px #d28cff inset"' : ''}><div class="t">${v.name} ${tierChip(e.vtier || v.tier)} ${this.chip(e.origin)}${e.hot ? ' <span class="chip" style="--c:#ff4d5e">HOT</span>' : ''}${e.imp ? ' <span class="chip" style="--c:#ffb547">IMPOUNDED</span>' : ''}</div><div class="d">${esc(loc)}</div>${this._bars(e.type, e.tune)}
         <div class="stat"><span>Condition</span><span style="color:${e.dmg > 60 ? 'var(--red)' : 'inherit'}">${100 - e.dmg}%</span></div>
         <div class="stat"><span>Tuning</span><span>${tuneLv ? tuneLv + ' / 12' : 'stock'}</span></div>
         <div class="stat"><span>Cargo</span><span>${fmtLb(cargoC(e.trunk))} of ${fmtLb(cargoCapC(e.type))}</span></div>
         <div class="btns"><button class="sbtn${here && !e.out ? ' gold' : ''}" data-act="out:${e.uid}">${wrecked ? 'Wrecked · where is it?' : 'Where is it?'}</button>
         ${e.dmg > 0 ? `<button class="sbtn" data-act="fix:${e.uid}" ${!Money.can(rcost, 'garage') ? 'disabled' : ''}>Repair ${fmtMoney(rcost)}</button>` : ''}
-        <button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button></div></div>`;
+        ${isUniqueType(e.type) ? '<button class="sbtn" disabled>One of a kind · not for sale</button>' : `<button class="sbtn" data-act="sell:${e.uid}">Sell ${fmtMoney(this.sellPrice(e))}</button>`}</div></div>`;
     };
     const render = () => {
       const here = s.garage.filter(e => e.at && e.at.p === def.id), other = s.garage.filter(e => !(e.at && e.at.p === def.id));
-      const col = this.collection(), rank = ['beater', 'common', 'nice', 'sport', 'luxury', 'rare'];
+      const col = this.collection(), rank = ['beater', 'common', 'nice', 'sport', 'luxury', 'rare', 'unique'];
       here.sort((a, b) => rank.indexOf(b.vtier) - rank.indexOf(a.vtier));
       return `<div class="svcTop"><span>Here <b>${here.length} / ${PM.capOf(def)}</b> · ${esc(PM.parkingText(def))}</span><span>All your cars <b>${s.garage.length} / ${this.garageCap}</b></span><span>${Money.html('garage')}</span></div>
-        <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
+        <div class="card"><div class="t">${def.id === 'mansion' ? 'The Crestmoor collection' : 'Your collection'}</div><div class="d">${col.models} of ${col.of} models · rare finds ${col.rareModels} of ${col.rareOf} (${col.rare} car${col.rare === 1 ? '' : 's'}) · one-offs ${g.uniques ? g.uniques.count() : 0} of ${UNIQUE_CARS.length} · worth ${fmtMoney(col.value)}</div><div class="d">${rank.filter(t => col.byTier[t]).map(t => `${tierChip(t)} ${col.byTier[t]}`).join(' ') || 'No cars yet.'}</div><div class="d" style="font-size:11px">Rare models (Aurel RS, Corsair 68, Zephyr, Mesa Trail) turn up parked in Crestmoor, the Financial District and on the Strip.</div></div>
         <div class="grid2">${here.map(e => card(e, true)).join('') || '<div class="hint">Nothing parked here. Drive a car into a free space and stop to park it.</div>'}</div>
         ${other.length ? `<h3>Elsewhere</h3><div class="grid2">${other.map(e => card(e, false)).join('')}</div>` : ''}
         ${(s.pendingCars || []).length ? `<h3>Waiting for a space</h3><div class="jobs">${s.pendingCars.map((P, i) => `<div class="job"><i>⏳</i><div><b>${esc(VEHICLES[P.type].name)}</b><span>${P.from ? 'With ' + esc(P.from) + ': ' : ''}yours when you have a free space</span></div><button class="sbtn" data-act="collect:${i}" ${g.vreg.freeBays() > 0 ? '' : 'disabled'}>Collect</button></div>`).join('')}</div>` : ''}`;
@@ -398,6 +396,7 @@ class ContentManager {
       if (k === 'out') { this.takeOut(uid); g.ui.back(); return; }
       if (k === 'fix') { const c = this.repairCost(e.type, 100 - e.dmg) * 1.4 | 0; if (!Money.pay(c, 'garage')) return; e.dmg = 0; s.stats.repairs++; g.audio.play('cash'); const dv = g.vreg.live(e); if (dv) { dv.health = 100; dv.burnt = false; } }
       if (k === 'sell') {
+        if (isUniqueType(e.type)) { this.refreshSvc('One of a kind: nobody can buy it, and you would never see another.'); return; }
         const left = e.trunk && units(e.trunk) && g.uw ? g.uw.unloadLeftover(e) : '';
         if (left) { this.refreshSvc(`Empty the trunk first: ${left} would not fit in the stash or your pockets.`); return; }
         const sale = this.saleOf(e);
@@ -434,10 +433,10 @@ class ContentManager {
   }
   // the garage as a collection: models owned of every model there is, rare finds, what it is all worth
   collection() {
-    const s = this.g.save, models = new Set(s.garage.map(e => e.type)), all = Object.keys(VEHICLES).filter(k => !VEHICLES[k].police && k !== 'gangcar');
+    const s = this.g.save, models = new Set(s.garage.map(e => e.type).filter(t => !isUniqueType(t))), all = Object.keys(VEHICLES).filter(k => !VEHICLES[k].police && k !== 'gangcar' && !isUniqueType(k));
     const rare = s.garage.filter(e => e.vtier === 'rare'), byTier = {};
     for (const e of s.garage) byTier[e.vtier || VEHICLES[e.type].tier] = (byTier[e.vtier || VEHICLES[e.type].tier] || 0) + 1;
-    return { models: models.size, of: all.length, rare: rare.length, rareModels: new Set(rare.map(e => e.type)).size, rareOf: RARE_TYPES.length, value: s.garage.reduce((a, e) => a + this.sellPrice(e), 0), byTier };
+    return { models: models.size, of: all.length, rare: rare.length, rareModels: new Set(rare.map(e => e.type)).size, rareOf: RARE_TYPES.length, value: s.garage.reduce((a, e) => a + (isUniqueType(e.type) ? 0 : this.sellPrice(e)), 0), byTier };
   }
   classK(type) { return 0.8 + Math.min(1.4, carMsrp(type) / 30000); }
   repairCost(type, health) { const d = this.g.uw ? this.g.uw.props.perk('repair') : 0; return Math.max(60, Math.round((100 - health) * 9 * this.classK(type) * (1 - d) / 10) * 10); }
@@ -1008,9 +1007,8 @@ class ContentManager {
     this.checkT -= rdt;
     if (this.checkT <= 0) {
       this.checkT = 0.5;
-      this._discover(); this._checkSecrets(); this._guide(); this._spawnGold();
+      this._discover(); this._checkSecrets(); this._guide();
       const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
-      if (pv && pv.goldCar) this.secret('gold');
       if (pv && pv.rareFind && !g.save.flags.zephyrSeen) { g.save.flags.zephyrSeen = true; g.ui.toast('A Zephyr, just sitting up here. Store it in your garage to keep it.'); }
     }
     // pitch invader: drifting on the stadium pitch
@@ -1053,6 +1051,7 @@ class ContentManager {
       <span>Districts discovered</span><span>${Object.keys(s.discovered.zones).length} / ${Object.keys(ZONES).length}</span>
       <span>Street races won</span><span>${races.filter(r => s.races[r.id] && s.races[r.id].won).length} / ${races.length}</span>
       <span>Vehicles owned</span><span>${s.garage.length} / ${this.garageCap}</span></div>`;
+    if (g.uniques) h += g.uniques.statsHtml();
     h += `<h3>Race records</h3><div class="stats">${RACES.map(r => `<span>${r.name}</span><span>${s.races[r.id] && s.races[r.id].best ? fmtRace(s.races[r.id].best) + (s.races[r.id].won ? ' ★' : '') : '—'}</span>`).join('')}</div>`;
     h += `<h3>Achievements · ${Object.keys(s.achievements).length} / ${ACHIEVEMENTS.length}</h3><div class="achGrid">${ACHIEVEMENTS.map(a => `<div class="achc${s.achievements[a.id] ? ' on' : ''}"><b>${a.name}</b><span>${a.desc}</span></div>`).join('')}</div>`;
     $('progressBody').innerHTML = h;

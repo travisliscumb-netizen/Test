@@ -217,6 +217,8 @@ class RaceManager {
       const sl = slot(k + 1), cls = A.opts.opponentCls || A.def.cls[k % A.def.cls.length];
       const o = g.vehicles.spawn(cls, sl.x, sl.z, R.start.h, { driver: 'npc', vtier: A.opts.opponentTier });
       o.mission = 'race'; o.touched = true; o.critical = false;
+      // Vance's one-off is his until he loses it: nobody gets in it (Session 6D)
+      if (isUniqueType(cls)) o.locked = true;
       if (A.opts.opponentColor !== undefined) o.mat.userData.u.uPaint.value.setHex(A.opts.opponentColor);
       const ai = o.drive = new DriveAI(o, g, 'race');
       // on the circuit the racing line, with a safe speed at every point; in the street the checkpoints

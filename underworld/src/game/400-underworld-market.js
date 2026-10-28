@@ -18,6 +18,7 @@ const CARGO_LB = {
 const GOOD_CLB = { hot: 100, smokes: 100, green: 50, pills: 25, snow: 10, hardware: 500 };
 // weight of a container's goods in hundredths of a pound, and a vehicle model's capacity in the same unit
 function cargoC(o) { let c = 0; if (o) for (const k in o) if (GOOD_CLB[k]) c += (o[k] | 0) * GOOD_CLB[k]; return c; }
+for (const u of UNIQUE_CARS) CARGO_LB[u.type] = u.cargo;
 function cargoCapC(type) { return (CARGO_LB[type] || 0) * 100; }
 // how many lots of good k still fit in a vehicle of this type holding o
 function cargoFit(type, o, k) { return GOOD_CLB[k] ? Math.max(0, Math.floor((cargoCapC(type) - cargoC(o)) / GOOD_CLB[k])) : 0; }

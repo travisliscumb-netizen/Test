@@ -71,6 +71,8 @@ class Game {
     this.ui = new UIManager(this);
     this.uw = new Underworld(this);
     this.vreg = new VehicleRegistry(this);
+    // Session 6D: the ten one-offs
+    this.uniques = new UniqueCars(this);
     // Session 5B: HOT recognition, the police impound lot, the Chop Shop's work
     this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
     // Session 6A: street-race purse tiers and heat, pink slips, the car wash
@@ -80,7 +82,7 @@ class Game {
     // Session 6C: the Cedar Fields off-road park
     this.offroad = new OffroadPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
+    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -507,6 +509,7 @@ class Game {
     if (p.passenger) { this.taxi.getOut(); return; }
     const u = this.uw.findAction(); if (u) { u.act(); return; }
     if (this.uw.S.jail) return;
+    const uq = this.uniques.findAction(); if (uq) { uq.act(); return; }
     if (m.offer && !m.active) { m.start(m.offer); return; }
     const a = this.content.findAction();
     if (a) { a.act(); return; }
@@ -514,6 +517,8 @@ class Game {
     if (p.state !== 'foot' || (p.interior && !p.interior.vspace)) return;
     const v = this.nearestVehicle(1.8);
     if (v) {
+      // a one-off standing where it was found: taking it makes it yours (Session 6D)
+      if (v.uniqueId && !v.garageUid) { this.uniques.offer(v); return; }
       if (v.locked) { this.ui.toast(v.mission === 'sold' ? 'Delivered. Leave it.' : v.dealer ? `Locked. It’s for sale at ${DEALERSHIPS[v.dealer.lot].name}: inspect it to buy it.` : 'Locked.', 'warn'); this.audio.play('deny'); return; }
       this.beginEnter(v);
     }
@@ -526,9 +531,9 @@ class Game {
       if (u) t = u.label;
       else if (this.uw.S.jail) t = null;
       else if (p.state === 'foot' && !m.offer) {
-        const a = this.content.findAction();
+        const a = this.uniques.findAction() || this.content.findAction();
         if (a) t = a.label;
-        else if (!p.interior || p.interior.vspace) { const v = this.nearestVehicle(1.8); if (v) t = v.locked ? (v.mission === 'sold' || v.dealer ? null : 'Locked') : (v.driver === 'npc' || v.driver === 'cop' ? 'Steal ' : 'Enter ') + v.spec.name; }
+        else if (!p.interior || p.interior.vspace) { const v = this.nearestVehicle(1.8); if (v) t = v.uniqueId && !v.garageUid ? `Take the ${v.spec.name} (one-off)` : v.locked ? (v.mission === 'sold' || v.dealer ? null : 'Locked') : (v.driver === 'npc' || v.driver === 'cop' ? 'Steal ' : 'Enter ') + v.spec.name; }
       } else if (p.state === 'vehicle' && p.vehicle.health <= 0 && !p.vehicle.burnt) t = 'Get out \u2014 it\u2019s on fire!';
       else if (p.state === 'vehicle' && !m.offer) { const a = this.content.findAction(); if (a) t = a.label; }
     }
@@ -651,7 +656,7 @@ class Game {
     this.frustum.setFromProjectionMatrix(this._pm);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -763,7 +768,7 @@ class Game {
     $('dbgCash').addEventListener('click', () => Money.earn(5000, 'debug'));
     $('dbgHeat').addEventListener('click', () => { if (this.state === 'playing') this.police.setLevel(Math.min(5, this.police.level + 1)); });
     $('dbgClear').addEventListener('click', () => this.police.clear('Heat cleared (debug).'));
-    $('dbgCar').addEventListener('click', () => { const p = this.player; const v = this.vehicles.spawn(pick(Object.keys(VEHICLES)), p.pos.x + Math.sin(p.h) * 5, p.pos.z + Math.cos(p.h) * 5, p.h + Math.PI / 2, { parked: true }); v.touched = true; });
+    $('dbgCar').addEventListener('click', () => { const p = this.player; const v = this.vehicles.spawn(pick(Object.keys(VEHICLES).filter(t => !isUniqueType(t))), p.pos.x + Math.sin(p.h) * 5, p.pos.z + Math.cos(p.h) * 5, p.h + Math.PI / 2, { parked: true }); v.touched = true; });
   }
   updateDebug(dt) {
     this._dbgT = (this._dbgT || 0) - dt;

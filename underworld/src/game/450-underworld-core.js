@@ -284,6 +284,7 @@ class Underworld {
     if (this.rivalwh) this.rivalwh.reset();
     if (this.shipments) this.shipments.reset();
     if (this.g.vreg) this.g.vreg.reset();
+    if (this.g.uniques) this.g.uniques.reset();
     if (this.g.pinks) this.g.pinks.reset();
     if (this.g.wash) this.g.wash.reset();
     if (this.g.motorsport) this.g.motorsport.reset();
@@ -686,6 +687,7 @@ class Underworld {
     const g = this.g, S = this.S;
     if (g.police.level > 0) { g.content.deny('The chop shop rolls the door down. “Not with cops on you.”'); return; }
     if (v.garageUid || v.owned) { g.content.deny('That one’s registered to you. Sell it from your garage.'); return; }
+    if (isUniqueType(v.type)) { g.content.deny('Knuckles: “A one-off? Nobody strips that. Get it out of my yard.”'); return; }
     if (v.type === 'police' || v.type === 'unmarked') { g.content.deny('“A cop car? Get that out of here.”'); return; }
     if (!withCargo && units(v.trunk)) { g.ui.ask('Sell it with the cargo?', `The trunk still holds ${goodsList(v.trunk)} (${fmtLb(cargoC(v.trunk))}). The chop shop keeps whatever is in it.`, 'Sell with cargo', () => this.sellCar(v, true)); return; }
     const pay = this.chopValue(v), wanted = S.chopWanted.includes(v.type);

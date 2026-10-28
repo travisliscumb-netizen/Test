@@ -338,13 +338,13 @@ class MissionManager {
         // an official event (Sessions 6B, 6C): prize money from the bank by today's tier, no Rep; a prize car once
         if (s.official) {
           const V = venueOf(s.race), pay = V.payout(s.race, res.place); s.reward = pay.cash; s.rep = 0;
-          if (res.place === 1) { V.noteWin(s.race.id); if (s.race.car) V.awardCar(s.race); }
+          if (res.place === 1) { V.noteWin(s.race.id); if (s.race.car) V.awardCar(s.race); if (g.uniques) g.uniques.onRaceWin(s.race.id); }
           this.pass(); return;
         }
         // the purse and Rep for this finish, by today's tier for this race (§45.33)
         const pay = g.raceRules.payout(s.race, res.place);
         s.reward = pay.cash; s.rep = pay.rep;
-        if (res.place === 1) g.raceRules.noteWin(s.race.id);
+        if (res.place === 1) { g.raceRules.noteWin(s.race.id); if (g.uniques) g.uniques.onRaceWin(s.race.id); }
         if (res.record) g.ui.toast(`New record: ${fmtRace(res.time)}`, 'money');
         this.pass(); return;
       }

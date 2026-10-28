@@ -36,6 +36,8 @@ const MONEY_SOURCES = {
   impoundFee: { pay: 'clean' },
   // Chop Shop work on a stolen car (clean the title, repair, paint, tune): cash in hand
   chopWork: { pay: 'dirty' },
+  // a tip bought from a fence about where a one-off stands (Session 6D): cash in hand
+  intel: { pay: 'dirty' },
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
   // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank

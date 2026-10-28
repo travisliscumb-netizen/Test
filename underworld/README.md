@@ -64,6 +64,35 @@ nowhere to park waits until you have room (Garage → Collect).
 
 Module: `src/game/505-underworld-vehicle-registry.js` (`VehicleRegistry`).
 
+## The ten one-offs (overhaul Session 6D)
+
+- **Ten permanent unique cars** (`src/game/225-content-unique-cars.js`, `UNIQUE_CARS`): Golden Corsair (classic),
+  Calloway Spectre (coupe), Sovereign Ambassador (luxury), Zephyr Prototype (supercar), Baja One (off-road),
+  Widowmaker (muscle), Tempest Clubsport (track), Monarch Riviera (GT), Regent Tourer 1931 (vintage) and Aeterna V16
+  (the ultimate).
+  - Each is a model of its own: its own body outline, stance, wheels, paint finish and handling.
+  - None is sold, parked on a stall, driven in traffic, raced by the AI or staked by a rival.
+- **Staged discovery** (`src/game/506-underworld-unique-cars.js`, `UniqueCars`, saved in `save.uniques`):
+  - undiscovered → clue known → exact location known → acquired;
+  - a car that stands somewhere first shows a search area on the map (`?`), then its exact place (`◆`) once you
+    are close;
+  - Progress › One-offs lists them, with the undiscovered still unnamed.
+- **Acquisition:**
+  - **finding it:** take it by getting in. It needs a free parking space;
+  - **one-time rewards:** all five city street races (Tull), or the GT Cup at Valen Point. With no space, the car
+    waits with whoever gave it;
+  - **paid intel:** Lucky's tip at the pawn shop, $3,000 cash;
+  - **a pink slip:** Vance stakes his Widowmaker after you have beaten him three times;
+  - **collectibles and secrets:** fifteen packages, the Ghost Ferry, every district;
+  - **the other nine** unlock the tenth.
+- **Protection:**
+  - An acquired one-off is an ordinary fleet entry: its own bay, saved where you left it, recovered from the
+    impound, towed home as a wreck.
+  - It can't be sold, chopped or staked.
+  - A reload never duplicates or respawns it.
+  - The save loader keeps one of each and never loses one (it waits for you to collect it).
+  - The Ambassador is stolen, so it stays HOT until the Chop Shop cleans it.
+
 ## Curved roads and the road graph (overhaul: Curved Roads pass)
 
 - **One graph of every road** (`src/game/135-core-road-graph.js`, `RoadGraph`).
@@ -595,6 +624,7 @@ node underworld/tests/ledger.mjs    # Dirty/Clean ledger: deposit/withdraw/trans
 node underworld/tests/warehouse.mjs  # warehouses: security path, vault and treasury, 15 slots, corner stock, Drivers and supply runs, route risk, automation, immunity, save/reload
 node underworld/tests/threat.mjs     # threats: pressure only from player actions, stages, real-time clock and freeze rules, deep link, persistence without duplication, defense from real state, jail, physical assaults, mid-fight reload, turf takeback
 node underworld/tests/hot.mjs        # HOT and the law: dealer theft stars, recognition only by a cop who sees it, Pay & Spray never cleans, Chop Shop clean once + needs a space, arrest impound keeps the car not the contraband, legal and illegal retrieval, abandonment and chase recovery, full registry keeps everything, the overflow yard (a bay per car, no sharing, retrieval at its own gate, old saves repaired)
+node underworld/tests/unique.mjs     # the ten one-offs: ten distinct models (body, finish, handling; no reskins), never in normal stock, clear thematic placements, staged clues and search areas, finding and taking (needs a space, once), rewards once (waiting with the giver), paid intel once, Vance's Widowmaker pink slip, HOT Ambassador cleaned, no sale/chop/stake, impound and wreck, reload without duplication or respawn, streaming, damaged-save repair, old Golden Corsair migration
 node underworld/tests/races.mjs      # street racing: purse tiers per race per day, Dirty winnings, seen-racing 1★, pink slips (eligibility, win/lose/quit/reload, no duplication), car wash price/effects, Motor Works repair and tuning
 node underworld/tests/motorsport.mjs  # Valen Point: causeway and island ground/walls, circuit geometry, a self-driving car there and back, GPS both ways through no building, traffic and police on the causeway, purchase with no Rank gate, pit-garage bays through reloads, impound capacity, official events (Clean money, class rules, no heat, prize car once), hosting, a lap at speed, track-day timing, streaming, maps
 node underworld/tests/offroad.mjs     # Cedar Fields South: land bridge ground/walls, terrain relief and surfaces, course features and ruts, the strip rough but flat under everything built, mesh = physics, surface grip/drag road car vs off-roader, suspension over rock, jumps, slopes, a self-driving car there and back, GPS, traffic, police, cabs, no peds, the compound (no gate, six bays, service stand, impound capacity), official events (Clean, class rules, tiers, no heat), timed laps, countryside races (Dirty, Rep, heat when seen), the off-road pink slip, reload, streaming, camera, maps
