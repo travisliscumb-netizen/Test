@@ -313,11 +313,11 @@ const Money = {
   dropProp(id) { const c = this.dirtyAtProp(id); this._set('p:' + id, 0); return c; },
   // display helpers: the balance that matters for a cost of this source, as HTML
   html(src) {
-    const S = MONEY_SOURCES[src], W = this.W, b = v => `<b class="money">${fmtMoney(v)}</b>`;
+    const S = MONEY_SOURCES[src], W = this.W, b = (v, k = 'dirty') => `<b class="cash ${k}">${fmtMoney(v)}</b>`;
     const mode = S ? (S.pay || S.earn) : 'either';
-    if (mode === 'clean' || mode === 'medical') return `Bank ${b(W.clean)}${W.debt > 0 ? ` · debt ${fmtMoney(W.debt)}` : ''}`;
+    if (mode === 'clean' || mode === 'medical') return `Bank ${b(W.clean, 'clean')}${W.debt > 0 ? ` · debt ${fmtMoney(W.debt)}` : ''}`;
     if (mode === 'dirty' || mode === 'me') return `Cash on you ${b(W.dirty.me)}`;
     if (mode === 'payroll' || mode === 'stash') return `Dirty reserve ${b(this.payrollReserve())}`;
-    return `Cash ${b(W.dirty.me)} · Bank ${b(W.clean)}`;
+    return `Cash ${b(W.dirty.me)} · Bank ${b(W.clean, 'clean')}`;
   }
 };

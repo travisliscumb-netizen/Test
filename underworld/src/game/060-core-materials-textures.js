@@ -331,11 +331,11 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime;
-    sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow;
+    sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
     patchWorldVaryings(sh);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow;
+        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec3 uHorizon; uniform vec3 uZenith;
         varying vec3 vPW; varying vec3 vPN;
         ${GLSL_NOISE}
         ${GLSL_BUMP}
@@ -354,6 +354,21 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
           float dx2 = min(min(abs(l.x - 16.0), abs(l.x - 40.0)), abs(l.x - 64.0));
           float g2 = exp(-(dx2*dx2 + dz2*dz2) / 50.0);
           return max(g1 * step(0.5, vO), g2 * step(0.5, hO));
+        }
+        // the street lamp nearest a ground point, as the offset from the point to the lamp's foot (0 when its road is
+        // closed or the point is outside the city): the same lamp layout as lampPool
+        vec2 lampOff(vec2 s){
+          if (s.x < -6.0 || s.y < -6.0 || s.x > 966.0 || s.y > 966.0) return vec2(1e3);
+          vec2 ci = floor(s / 80.0); vec2 l = s - ci * 80.0;
+          vec2 rcl = clamp(floor((s + 40.0) / 80.0), 0.0, 12.0);
+          float vO = texture2D(uRoad, (vec2(rcl.x, clamp(ci.y, 0.0, 11.0)) + 0.5) / 16.0).r;
+          float hO = texture2D(uRoad, (vec2(clamp(ci.x, 0.0, 11.0), rcl.y) + 0.5) / 16.0).g;
+          float ex = l.x < 40.0 ? (l.x < 0.0 ? -5.3 : 5.3) : (l.x > 80.0 ? 85.3 : 74.7);
+          float ez = l.y < 40.0 ? (l.y < 0.0 ? -5.3 : 5.3) : (l.y > 80.0 ? 85.3 : 74.7);
+          vec2 a = vec2(ex, l.y < 28.0 ? 16.0 : l.y < 52.0 ? 40.0 : 64.0) - l;
+          vec2 b = vec2(l.x < 28.0 ? 16.0 : l.x < 52.0 ? 40.0 : 64.0, ez) - l;
+          a = vO > 0.5 ? a : vec2(1e3); b = hO > 0.5 ? b : vec2(1e3);
+          return dot(a, a) < dot(b, b) ? a : b;
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
@@ -620,6 +635,24 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
         float lp = lampPool(p, vOpen, hOpen) * uNight;
         totalEmissiveRadiance += col * vec3(1.0, 0.72, 0.42) * lp * 1.25 + vec3(1.0, 0.72, 0.45) * lp * lp * (0.03 + uWet * 0.3) * (0.4 + 0.6 * isRoad);
         totalEmissiveRadiance += col * vec3(1.0, 0.8, 0.55) * spill * 0.55;
+        // wet ground (G7): a film of water mirrors the sky, strongest at a glancing angle and in puddles, dimmer where
+        // buildings close in; at night every street lamp throws a long reflected streak toward the eye
+        if (uWet > 0.02 && vPN.y > 0.5) {
+          vec3 V = normalize(cameraPosition - vPW);
+          float ndv = clamp(V.y, 0.0, 1.0), fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+          float film = uWet * clamp(0.25 + 0.5 * isRoad + 0.75 * puddleMask, 0.0, 1.0);
+          totalEmissiveRadiance += mix(uHorizon, uZenith, clamp(ndv * 1.6, 0.0, 1.0)) * aoK * fres * film * (0.3 + 1.1 * puddleMask);
+          #ifdef PV_HQ
+          if (uNight > 0.05) {
+            float hc = max(cameraPosition.y - vPW.y, 0.6), hl = 6.0;
+            vec2 sp = cameraPosition.xz + (p - cameraPosition.xz) * (hc + hl) / hc;
+            vec2 d = lampOff(sp), u = normalize(sp - cameraPosition.xz + 1e-4);
+            float along = dot(d, u), perp = dot(d, vec2(-u.y, u.x));
+            float streak = exp(-perp * perp / mix(0.6, 3.0, 1.0 - puddleMask) - along * along / mix(260.0, 70.0, puddleMask));
+            totalEmissiveRadiance += vec3(1.0, 0.74, 0.46) * streak * uNight * film * (0.35 + 0.65 * fres) * 1.7;
+          }
+          #endif
+        }
         #ifdef PV_HQ
           // rain ripples in standing water
           if (uRain > 0.05 && puddleMask > 0.05) {
@@ -683,6 +716,86 @@ function makeFoliageMaterial() {
 function makePropMaterial(rough = 0.8, metal = 0.05) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal, envMapIntensity: 0.65 });
   atmos(m);
+  return m;
+}
+
+/* ---------------- Countryside terrain (Cedar Fields): detail over the height field's vertex colours ----------------
+   The vertex colour says which surface a spot is (grass is the green one; dirt, mud, rock and gravel are not), so
+   the shader only adds what a 1 m grid can't carry: sun-dried and lush patches, clumps and blades and the odd
+   wildflower up close, soil grain and pebbles, bare rock on steep slopes, darker ground and puddles in the rain, and
+   the passing cloud shadows the city has. The height field and the physics are untouched. */
+function makeTerrainMaterial(opt = {}) {
+  const { mown, ...mo } = opt;
+  const m = new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, roughness: 0.95, metalness: 0, envMapIntensity: 0.55 }, mo));
+  atmos(m, sh => {
+    sh.uniforms.uWet = U.uWet; sh.uniforms.uTime = U.uTime; sh.uniforms.uCloudShadow = U.uCloudShadow;
+    patchWorldVaryings(sh);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uWet; uniform float uTime; uniform float uCloudShadow;
+        varying vec3 vPW; varying vec3 vPN;
+        ${GLSL_NOISE}
+        ${GLSL_BUMP}
+        ${GLSL_CLOUDSHADOW}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec2 p = vPW.xz;
+        vec3 base = diffuseColor.rgb;
+        float gr = clamp((base.g - max(base.r, base.b)) * 14.0, 0.0, 1.0);
+        float near = 1.0 - smoothstep(22.0, 80.0, length(vPW - cameraPosition));
+        // fine detail only where a pixel is small enough to show it (no shimmer at a glancing angle)
+        vec2 fwp = fwidth(p); float fw = max(fwp.x, fwp.y);
+        float fine = 1.0 - smoothstep(0.025, 0.09, fw), mesoF = 1.0 - smoothstep(0.08, 0.3, fw);
+        float macro = pvf(p * 0.017), mid = pvn(p * 0.23), n1 = pvn(p * 1.9);
+        // grass: big sun-dried and lush patches, clumps, blades and wildflowers near the eye
+        vec3 g = base * (0.8 + 0.34 * mid);
+        g = mix(g, g * vec3(1.42, 1.16, 0.62), smoothstep(0.56, 0.8, macro) * 0.7);
+        g = mix(g, g * vec3(0.72, 0.92, 0.7), smoothstep(0.42, 0.2, macro) * 0.6);
+        float blades = pvn(p * vec2(9.0, 11.0)) * 0.6 + pvn(p * vec2(17.0, 15.0) + 3.0) * 0.4;
+        g *= mix(1.0, 0.76 + 0.48 * blades, near * fine);
+        g *= mix(1.0, 0.88 + 0.24 * pvn(p * vec2(3.1, 2.7)), mesoF);
+        // the odd wildflower: a small round head somewhere in a 40 cm cell (none on the mown grass of a circuit)
+        vec2 fc = floor(p * 2.5), fo = fract(p * 2.5) - 0.5 - (vec2(pvh(fc + 1.7), pvh(fc + 4.3)) - 0.5) * 0.5;
+        float fl = step(0.975, pvh(fc)) * (1.0 - smoothstep(0.1, 0.16, length(fo))) * near * mesoF * smoothstep(0.35, 0.55, macro);
+        #ifdef PV_MOWN
+          fl = 0.0;
+        #endif
+        g = mix(g, mix(vec3(0.62, 0.52, 0.08), vec3(0.55, 0.2, 0.42), step(0.5, pvh(fc + 5.0))), fl);
+        // soil and gravel: grain and pebbles
+        vec3 s = base * (0.8 + 0.32 * pvf(p * 0.33)) * (0.9 + 0.2 * n1);
+        float peb = step(0.88, pvh(floor(p * 5.0))) * near * mesoF * (1.0 - smoothstep(0.25, 0.45, dot(base, vec3(0.33))));
+        s = mix(s, s * 1.4 + 0.02, peb * 0.55);
+        vec3 col = mix(s, g, gr);
+        // asphalt (Valen Point): fine aggregate and the odd glint; paint and kerbs stay clean
+        float lum = dot(base, vec3(0.3, 0.59, 0.11));
+        float asph = (1.0 - smoothstep(0.035, 0.07, lum)) * (1.0 - gr), bright = smoothstep(0.35, 0.6, lum);
+        col = mix(col, max(base, vec3(0.115, 0.12, 0.125)) * (0.86 + 0.28 * pvn(p * 7.0)) + step(0.94, pvh(floor(p * 17.0))) * 0.02 * near * fine, asph); // the city roads' asphalt tone, not black
+        col = mix(col, base * (0.95 + 0.06 * n1), bright);
+        #ifdef PV_MOWN
+          col *= 1.0 + gr * (0.075 * (smoothstep(-0.3, 0.3, sin((p.x - p.y * 0.18) * 0.8976)) * 2.0 - 1.0) + 0.03 * (pvn(p * vec2(0.6, 4.0)) - 0.5)); // mowing stripes
+        #endif
+        // bare rock on steep ground
+        float slope = 1.0 - clamp(vPN.y, 0.0, 1.0);
+        float rk = smoothstep(0.32, 0.55, slope + (mid - 0.5) * 0.12);
+        vec3 rock = vec3(0.3, 0.29, 0.27) * (0.75 + 0.4 * pvn(vec2(p.x + p.y, vPW.y * 3.0) * vec2(0.4, 1.0))) * (0.9 + 0.2 * n1);
+        col = mix(col, rock, rk);
+        float rough = mix(0.97, 0.88, rk);
+        float hgt = (blades * 0.014 * gr * fine + (peb * 0.012 + n1 * 0.02) * (1.0 - gr) * (1.0 - asph) * (1.0 - bright)) * near + rk * pvn(p * 3.0) * 0.04;
+        rough = mix(rough, 0.86, asph);
+        // rain: everything darkens and gains a sheen; puddles collect on bare ground
+        float puddle = smoothstep(0.6, 0.7, pvf(p * 0.14 + 7.0)) * (1.0 - gr) * (1.0 - rk) * uWet;
+        col *= 1.0 - uWet * mix(mix(0.22, 0.3, 1.0 - gr), 0.42, asph);
+        col = mix(col, col * 0.6, puddle);
+        rough = mix(rough, rough * mix(0.62, 0.36, asph), uWet); rough = mix(rough, 0.06, puddle);
+        hgt *= 1.0 - puddle;
+        col *= pvCloudShadow(p);
+        diffuseColor.rgb = col;
+        roughnessFactor = rough;
+        normal = pvBump(-vViewPosition, normal, hgt, 1.0);
+      }`);
+  });
+  if (opt.mown) { m.defines = Object.assign(m.defines || {}, { PV_MOWN: '' }); }
+  m.customProgramCacheKey = () => 'pv-terrain' + (opt.polygonOffset ? '-off' : '') + (opt.mown ? '-mown' : '');
   return m;
 }
 
@@ -807,7 +920,7 @@ function makeVehicleMaterial(physical) {
   const u = {
     uPaint: { value: new THREE.Color(0.6, 0.1, 0.1) }, uPaint2: { value: new THREE.Color(1, 1, 1) },
     uLights: { value: new THREE.Vector4(0, 0, 0, 0) }, uLights2: { value: new THREE.Vector4(0, 0, 0, 0) }, uMisc: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uFinish: { value: new THREE.Vector4(0.25, 0.45, 0.2, 0) }
+    uFinish: { value: new THREE.Vector4(0.25, 0.45, 0.2, 0) }, uFinish2: { value: new THREE.Vector4(-1, 0, 0, 0) }
   };
   m.userData.u = u;
   atmos(m, sh => {
@@ -817,7 +930,7 @@ function makeVehicleMaterial(physical) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPart = aPart; vLP = position;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform vec3 uPaint; uniform vec3 uPaint2; uniform vec4 uLights; uniform vec4 uLights2; uniform vec4 uMisc; uniform vec4 uFinish; uniform float uNight; uniform float uWet;
+        uniform vec3 uPaint; uniform vec3 uPaint2; uniform vec4 uLights; uniform vec4 uLights2; uniform vec4 uMisc; uniform vec4 uFinish; uniform vec4 uFinish2; uniform float uNight; uniform float uWet;
         varying float vPart; varying vec3 vLP;
         float vh(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -842,7 +955,7 @@ function makeVehicleMaterial(physical) {
           float rust = wear * step(0.55, rustN + smoothstep(0.75, 0.3, vLP.y) * 0.35) * smoothstep(1.0, 0.35, vLP.y);
           diffuseColor.rgb = mix(mix(faded, faded * vec3(0.55, 0.5, 0.45), g2), vec3(0.32, 0.17, 0.08), rust * 0.8);
           roughnessFactor = mix(mix(0.5, 0.1, uFinish.y), 0.7, max(g2, rust));
-          metalnessFactor = mix(0.3, 0.62, uFinish.x) * (1.0 - rust);
+          metalnessFactor = (uFinish2.x >= 0.0 ? uFinish2.x : mix(0.3, 0.62, uFinish.x)) * (1.0 - rust); // a one-off's own metal (gold leaf)
         }
         else if (pp < 1.5) { diffuseColor.rgb = vec3(0.025, 0.03, 0.04); roughnessFactor = 0.03; metalnessFactor = 0.9; }
         else if (pp < 2.5) { diffuseColor.rgb = vec3(0.04); roughnessFactor = 0.55; metalnessFactor = 0.1; }

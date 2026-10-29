@@ -31,12 +31,22 @@
 - races' pink-slip check expected the won car on the street; a finish 500 m ahead leaves it beyond the registry's
   340 m keep radius, so it is stored where it stopped. The check now goes there and finds it, yours.
 
-## For the graphics / UI overhaul (not content)
-- Inside the casino the frame still costs ~223 draw calls / ~683k triangles on the phone profile, about the
-  street's, so the city behind the interior appears not to be culled (perf-scenarios, M13; not yet traced).
-  A presentation-pass target.
-- The jail HUD was compacted (M8) but still sits top-centre over the view; the phone and service screens are
-  functional, not designed.
-- Themed business interiors (M10) are box-kit rooms; one layout for every trade.
-- Royale Billions one-hour sessions end ahead 3–5% of the time (measured M13: a 95% machine with a lottery tail).
-  Kept by ruling (§45.40); the presentation pass may want to soften how a losing hour feels, not the odds.
+## Graphics overhaul (Session 14) — status of the items it inherited
+- Casino (and every interior) drawing the city behind its walls: **fixed** (casino 255 → 49 draw calls; GRAPHICS.md).
+- Jail HUD over the view: placed by the HUD layout clear of the top controls and now translucent; on a 640×360
+  view it still sits in the upper middle. A smaller jail panel is a candidate for the polish pass.
+- Phone and service screens: phone home redesigned (groups side by side; all 14 apps on one landscape screen),
+  currency colours on every balance line; the individual app screens keep their M11 layouts.
+- Business interiors: lit per pixel and themed per trade (floor, ceiling, lamp colour); still one floor plan for
+  every trade (the plan carries the heist's spots).
+- Royale Billions' losing hour: unchanged by ruling (§45.40); the presentation pass only made the machine fit a
+  landscape phone. Odds untouched.
+
+## Graphics overhaul (Session 14) — known limits
+- Not measured on a physical iPhone: every frame time is SwiftShader in headless Chromium (CPU rasterised). Draw
+  calls, triangles, geometries and update ms carry over; wall ms per frame does not.
+- Building facades, street furniture, alleys, fences and the animation set are as M13 left them (roofs and lighting
+  changed); police cars keep their M13 livery.
+- Wet-road lamp reflections come from the city's lamp grid: lamps off the grid (curved streets, Cedar Fields) and
+  car headlights are not mirrored.
+- Interior lamps light without shadows (no light passes through walls inside one room, but furniture casts none).

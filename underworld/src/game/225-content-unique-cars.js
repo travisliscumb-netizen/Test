@@ -41,7 +41,7 @@ Object.assign(PROFILES, {
 const UNIQUE_CARS = [
   { id: 'corsair', n: 1, type: 'u_corsair', kind: 'Classic', how: 'find', spot: 'corsair', area: 95, reveal: 45, origin: 'found', msrp: 42000, cargo: 220, keeper: 'the depot night man',
     spec: { rev: 0.37, name: 'Golden Corsair', l: 5.0, w: 1.95, h: 1.32, mass: 1620, power: 16400, drift: 0.36, vmax: 67, steer: 0.5, grip: 0.98, brake: 12.5, soft: 1.2, wheelR: 0.36, camDist: 6.9, camH: 1.7, eng: 0.6, profile: 'classic', chromeBumpers: true, dualExhaust: true, stripes: true,
-      colors: [0xc9a227], paint2: 0x1a1408, finish: { flake: 1, gloss: 1, wear: 0, rim: 3 }, blurb: 'A 1968 Corsair finished in gold leaf, black pinstripes and every chrome part re-plated. The only one.' },
+      colors: [0xc9a227], paint2: 0x1a1408, finish: { flake: 1, gloss: 1, wear: 0, rim: 3, metal: 0.9 }, blurb: 'A 1968 Corsair finished in gold leaf, black pinstripes and every chrome part re-plated. The only one.' },
     clue: 'Fifteen packages: someone has noticed. A phone tip points to the Docklands, the alleys behind the depot on Harbor Row.', hint: 'Behind the depot, Harbor Row (Docklands)' },
   { id: 'spectre', n: 2, type: 'u_spectre', kind: 'Coupe', how: 'reward', origin: 'reward', msrp: 58000, cargo: 110, keeper: '"Sprocket" Tull',
     spec: { rev: 0.36, name: 'Calloway Spectre', l: 4.68, w: 1.98, h: 1.22, mass: 1340, power: 18200, drift: 0.16, vmax: 80, steer: 0.54, grip: 1.36, brake: 17.5, soft: 0.62, wheelR: 0.36, camDist: 6.4, camH: 1.55, eng: 1.55, profile: 'u_coupe', dualExhaust: true, wing: 'lip', sideIntakes: true,

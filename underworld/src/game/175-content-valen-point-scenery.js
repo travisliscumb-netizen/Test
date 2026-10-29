@@ -46,7 +46,7 @@ function vpNormals(pts) { return pts.map((p, k) => { const a = pts[Math.max(0, k
 class ValenPointScenery {
   constructor(scene, world) {
     this.scene = scene; this.world = world;
-    const vp = world.vp, T = vp.track, mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    const vp = world.vp, T = vp.track, mat = makeTerrainMaterial({ side: THREE.DoubleSide, mown: true });
     this.mat = mat;
     // ---------------------------------------------------------------- shared: the island and the causeway
     const base = fb => {

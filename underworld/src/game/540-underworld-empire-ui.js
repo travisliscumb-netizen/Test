@@ -77,7 +77,7 @@ class EmpireUI {
     const st = RANKS[uw.rank];
     // the header (M11): Rank · Dirty · Bank · Pressure always, the rest smaller
     const pcol = S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)';
-    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Pressure <b style="color:${pcol}">${Math.round(S.pressure)}</b></span><small class="empSub">Rep ${g.save.rep} · Influence ${uw.influence} · Day ${uw.calDay}${S.jail ? ` · <b style="color:var(--red)">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</b>` : ''}</small>`;
+    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="cash dirty">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="cash clean">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Pressure <b style="color:${pcol}">${Math.round(S.pressure)}</b></span><small class="empSub">Rep ${g.save.rep} · Influence ${uw.influence} · Day ${uw.calDay}${S.jail ? ` · <b style="color:var(--red)">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</b>` : ''}</small>`;
     let h = '';
     if (this.tab === 'home') h = this.t_home();
     else if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; a guard might smuggle in a phone, if the money is right and you pick your moment.</div>`;
@@ -99,10 +99,10 @@ class EmpireUI {
     const cats = [...new Set(PHONE_APPS.map(a => a.cat))], now = this.locked('feed') ? [] : this.inbox().filter(m => m.pri <= 1);
     // the top strip: the Map one tap away, and whatever needs you now (each a deep link)
     let h = `<div class="appTop"><button class="sbtn gold" data-act="app:map">🗺️ Map</button>${now.length ? `<button class="sbtn danger" data-act="app:feed">${now.length} need${now.length === 1 ? 's' : ''} you</button>` : '<span class="hint">Nothing urgent.</span>'}</div>`;
-    return h + '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
+    return h + '<div class="appHome">' + cats.map(c => `<section class="appCat"><h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
       const n = this.badge(a.id), locked = a.tabs ? this.locked(a.tabs[0][0]) : this.uw.inJail;
       return `<button class="app${locked ? ' locked' : ''}" data-act="app:${a.id}" style="--c:${a.col}" aria-label="${esc(a.name)}"><i>${a.icon}</i><b>${esc(a.name)}</b><small>${esc(a.sub)}</small>${n ? `<em>${n}</em>` : ''}</button>`;
-    }).join('') + '</div>').join('') + '</div>';
+    }).join('') + '</div></section>').join('') + '</div>';
   }
   // what needs you (M11): pri 0 critical, 1 needs a decision soon, 2 worth knowing; each with a deep link into the
   // app (or the place) that deals with it
@@ -170,7 +170,7 @@ class EmpireUI {
     const rb = S.realBy || {}, ks = GOOD_IDS.filter(k => agg[k] || rb[k]);
     let tv = 0, tc = 0; for (const k in agg) { tv += agg[k].value; tc += agg[k].cost; }
     const sign = v => `<b class="${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v))}</b>`;
-    let h = `<div class="grid4"><div class="tile"><small>Worth now</small><b class="money">${fmtMoney(tv)}</b><span>at street prices where it sits</span></div><div class="tile"><small>You paid</small><b>${fmtMoney(tc)}</b><span>cost basis</span></div><div class="tile"><small>Unrealised</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b><span>if sold at those prices</span></div><div class="tile"><small>Realised</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b><span>banked from sales</span></div></div>`;
+    let h = `<div class="grid4"><div class="tile"><small>Worth now</small><b class="cash dirty">${fmtMoney(tv)}</b><span>at street prices where it sits</span></div><div class="tile"><small>You paid</small><b>${fmtMoney(tc)}</b><span>cost basis</span></div><div class="tile"><small>Unrealised</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b><span>if sold at those prices</span></div><div class="tile"><small>Realised</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b><span>banked from sales</span></div></div>`;
     if (!ks.length) return h + '<div class="hint">You hold no product. Buy from a supplier (Street Connect shows who sells what), then check back here: every lot remembers what you paid.</div>';
     h += '<div class="grid2 pnl">' + ks.map(k => {
       const a = agg[k], G = GOODS[k], best = this.sellQuotes(k).find(q => q.known), sellHere = !G.fence && !G.arms && DEMAND[here] ? M.price(here, k) : null;
@@ -259,7 +259,7 @@ class EmpireUI {
     const crew = uw.crew.active(), biz = uw.props.ownedList();
     const nxt = RANKS[Math.min(RANK_MAX, uw.rank + 1)], miss = uw.rankMissing();
     let h = `<div class="grid4">
-      <div class="tile"><small>Cash on you</small><b class="money">${fmtMoney(Money.onMe)}</b></div><div class="tile"><small>Dirty in stashes</small><b class="money">${fmtMoney(Money.dirtyTotal() - Money.onMe)}</b></div><div class="tile"><small>Bank</small><b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? `<small>medical debt ${fmtMoney(Money.debt)}</small>` : ''}</div>
+      <div class="tile"><small>Cash on you</small><b class="cash dirty">${fmtMoney(Money.onMe)}</b></div><div class="tile"><small>Dirty in stashes</small><b class="cash dirty">${fmtMoney(Money.dirtyTotal() - Money.onMe)}</b></div><div class="tile"><small>Bank</small><b class="cash clean">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? `<small>medical debt ${fmtMoney(Money.debt)}</small>` : ''}</div>
       <div class="tile"><small>Rank</small><b>${esc(RANKS[uw.rank].name)}</b><span>${uw.rank + 1} of ${RANKS.length}</span></div>
       <div class="tile"><small>Reputation</small><b>${g.save.rep}</b><span>who knows you</span></div>
       <div class="tile"><small>Influence</small><b>${uw.influence}</b>${this.bar(uw.influence, 1000, '#d28cff')}</div>
@@ -267,8 +267,8 @@ class EmpireUI {
       <div class="tile"><small>Turfs held</small><b>${uw.playerTurfs()} / ${uw.T.length}</b></div>
       <div class="tile"><small>Crew</small><b>${crew.length} / ${uw.crew.cap()}</b></div>
       <div class="tile"><small>Properties</small><b>${biz.length}</b><span>${biz.filter(b => b.kind === 'business').length} businesses</span></div>
-      <div class="tile"><small>Product value</small><b class="money">${fmtMoney(uw.locations({ all: true }).reduce((a, L) => a + holdings(L.o, L.zone, uw.market).reduce((x, r) => x + r.value, 0), 0))}</b><span>${units(S.inv)} space carried${S.runs.length ? ' · ' + S.runs.length + ' on the road' : ''}</span></div>
-      <div class="tile"><small>Territory tax</small><b class="money">${fmtMoney(uw.T.reduce((a, t, i) => a + (uw.owner[i] === 'pc' ? uw.royalty.owed(i) : 0), 0))}</b><span>expected per day · ${fmtMoney(S.st.royalties || 0)} collected</span></div>
+      <div class="tile"><small>Product value</small><b class="cash dirty">${fmtMoney(uw.locations({ all: true }).reduce((a, L) => a + holdings(L.o, L.zone, uw.market).reduce((x, r) => x + r.value, 0), 0))}</b><span>${units(S.inv)} space carried${S.runs.length ? ' · ' + S.runs.length + ' on the road' : ''}</span></div>
+      <div class="tile"><small>Territory tax</small><b class="cash dirty">${fmtMoney(uw.T.reduce((a, t, i) => a + (uw.owner[i] === 'pc' ? uw.royalty.owed(i) : 0), 0))}</b><span>expected per day · ${fmtMoney(S.st.royalties || 0)} collected</span></div>
     </div>`;
     h += `<h3>Next step</h3><div class="hint">${uw.rank < RANK_MAX ? esc(RANKS[uw.rank].hint) + (miss.length ? `<br><small>${esc(nxt.name)} still needs: ${esc(miss.join(' · '))}</small>` : '') : 'You run the city. Rivals will form coalitions, lieutenants will get ambitious and the state will send investigators. Hold on to it.'}</div>`;
     if (S.decisions.length) h += `<h3>Waiting on you</h3>` + S.decisions.map(d => `<div class="job open"><i>?</i><div><b>${esc(d.text)}</b></div><button class="sbtn gold" data-act="dec:${d.id}:1">Agree</button><button class="sbtn" data-act="dec:${d.id}:0">Refuse</button></div>`).join('');
@@ -450,7 +450,7 @@ class EmpireUI {
     const opts = (key, list, cur) => `<select data-sel="bf:${key}" aria-label="${key}">${list.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
     const cats = [...new Set(all.map(d => d.cat))].sort((a, b) => BIZ_CATS[a].name.localeCompare(BIZ_CATS[b].name));
     const zones = [...new Set(all.map(d => uw.loc('prop', d.id).zone))];
-    let h = `<div class="tiles"><div class="tile"><small>Businesses owned</small><b>${owned.length} / ${all.length}</b></div><div class="tile"><small>Net per day</small><b class="money">${fmtMoney(net)}</b><span>${fmtMoney(gross)} in</span></div><div class="tile"><small>Fully developed</small><b>${owned.filter(d => PM.level(d.id) === 3).length}</b></div></div>`;
+    let h = `<div class="tiles"><div class="tile"><small>Businesses owned</small><b>${owned.length} / ${all.length}</b></div><div class="tile"><small>Net per day</small><b class="cash clean">${fmtMoney(net)}</b><span>${fmtMoney(gross)} in</span></div><div class="tile"><small>Fully developed</small><b>${owned.filter(d => PM.level(d.id) === 3).length}</b></div></div>`;
     h += `<div class="filt">${opts('own', [['all', 'All'], ['owned', 'Owned'], ['sale', 'For sale']], f.own)}${opts('cat', [['all', 'Every kind'], ...cats.map(c => [c, BIZ_CATS[c].icon + ' ' + BIZ_CATS[c].name])], f.cat)}${opts('zone', [['all', 'Every district'], ...zones.map(z => [z, ZONES[z].name])], f.zone)}${opts('sort', [['income-', 'Income ↓'], ['price', 'Price ↑'], ['price-', 'Price ↓'], ['level', 'Level'], ['name', 'Name']], f.sort)}<input id="bizSearch" class="search" type="search" placeholder="Search name, kind, district" value="${esc(f.q)}" autocomplete="off"></div>`;
     return h + `<div id="bizList">${this.bizListHTML()}</div>`;
   }
@@ -531,7 +531,7 @@ class EmpireUI {
       }).join('') + '</div>';
     }
     const runs = S.runs.reduce((a, r) => a + r.cost, 0);
-    const head = `<div class="grid4"><div class="tile"><small>Product value now</small><b class="money">${fmtMoney(tv)}</b><span>at local street prices</span></div><div class="tile"><small>Cost basis</small><b>${fmtMoney(tc)}</b><span>what you paid</span></div><div class="tile"><small>Unrealised P/L</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b></div><div class="tile"><small>Realised P/L (all time)</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b>${S.runs.length ? `<span>${S.runs.length} run(s) in transit (cost ${fmtMoney(runs)})</span>` : ''}</div></div>`;
+    const head = `<div class="grid4"><div class="tile"><small>Product value now</small><b class="cash dirty">${fmtMoney(tv)}</b><span>at local street prices</span></div><div class="tile"><small>Cost basis</small><b>${fmtMoney(tc)}</b><span>what you paid</span></div><div class="tile"><small>Unrealised P/L</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b></div><div class="tile"><small>Realised P/L (all time)</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b>${S.runs.length ? `<span>${S.runs.length} run(s) in transit (cost ${fmtMoney(runs)})</span>` : ''}</div></div>`;
     return head + h + '<div class="hint">Moves happen by hand, only between places within reach. Prices move; quantities and what you paid never do. Carried product adds to your sentence if you’re arrested.</div>';
   }
   t_loadout() {
@@ -874,7 +874,7 @@ class EmpireUI {
     const render = () => {
       const cap = FX.capacityLeft(), have = Money.available('launderIn');
       const pend = F.batches.map(b => `<span>${fmtMoney(b.dirty)} → ${fmtMoney(b.clean)}</span><span>in about ${Math.max(1, Math.ceil(FX.hoursLeft(b)))} h</span>`).join('');
-      return `<div class="svcTop"><span>Cash on you <b class="money">${fmtMoney(have)}</b></span><span>She’ll take today <b class="money">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
+      return `<div class="svcTop"><span>Cash on you <b class="cash dirty">${fmtMoney(have)}</b></span><span>She’ll take today <b class="cash dirty">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
         <div class="hint">Dirty Cash you hand her lands in your bank, minus her cut, about ${Math.round(FIXER_DELAY / uw.econRate())} hours later. Once it’s with her it isn’t on you: the police can’t take it off you. A front business (later) will wash more, for less.</div>
         <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_DAY_CAP ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_DAY_CAP ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
         ${(() => { const l = FX.limit(FIXER_DAY_CAP); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}

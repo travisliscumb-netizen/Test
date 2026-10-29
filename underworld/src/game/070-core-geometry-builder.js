@@ -33,6 +33,22 @@ function prismGeometry() {
 }
 // a lumpy clump of leaves: an icosphere pushed in and out by smooth position noise, its normals half way between
 // the facets and the sphere's, so a canopy of them reads soft but not blobby (G3)
+// a unit box (centred, side 1) with rounded edges: r per axis is the rounding radius in the box's own units (0 keeps
+// that axis's faces flat). Normals come from the rounding, so the seams between the box's faces shade smoothly (G6:
+// limbs and torsos without box edges)
+function roundBoxGeometry(sx, sy, sz, rx, ry, rz) {
+  const g = new THREE.BoxGeometry(1, 1, 1, sx, sy, sz), p = g.attributes.position, n = g.attributes.normal;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const cx = clamp(x, -0.5 + rx, 0.5 - rx), cy = clamp(y, -0.5 + ry, 0.5 - ry), cz = clamp(z, -0.5 + rz, 0.5 - rz);
+    const ux = rx ? (x - cx) / rx : 0, uy = ry ? (y - cy) / ry : 0, uz = rz ? (z - cz) / rz : 0, L = Math.hypot(ux, uy, uz);
+    if (L < 1e-6) continue;
+    p.setXYZ(i, cx + ux / L * rx, cy + uy / L * ry, cz + uz / L * rz);
+    const nx = rx ? ux / L / rx : 0, ny = ry ? uy / L / ry : 0, nz = rz ? uz / L / rz : 0, nl = Math.hypot(nx, ny, nz) || 1;
+    n.setXYZ(i, nx / nl, ny / nl, nz / nl);
+  }
+  return g;
+}
 function blobGeometry(detail = 1) {
   const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position;
   const bump = (x, y, z) => 1 + 0.17 * Math.sin(3.1 * x + 1.7 * y + 0.4) * Math.cos(2.3 * z + 0.9 * x) + 0.09 * Math.sin(5.3 * y + 2.1 * z + 1.3) - 0.05 * Math.cos(4.1 * x - 3.7 * z);

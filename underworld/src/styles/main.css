@@ -545,3 +545,135 @@ body[data-gs="paused"] #jailHud{display:none}
   .tile b{font-size:17px}
 }
 #empBody .appTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 10px}#empBody .appTop .hint{margin:0}#empStats .empSub{flex-basis:100%;font-size:11px;color:var(--dim)}
+
+/* ==========================================================================================================
+   G8 · HUD v2 (graphics / presentation / UI-UX overhaul). Status card top right: Rank and Rep, the cash on you
+   (Dirty, green, CASH) and the bank (Clean, blue, BANK), heat and the clock. Labels come from CSS so the text the
+   game and its tests read stays "$1,840" / "BANK $26,500". Touch buttons carry an icon over a small label.
+   ========================================================================================================== */
+:root{--dirty:#8fe39b;--dirty-d:#0a3214;--clean:#7fc6ff;--clean-d:#062642;--gold:#ffcf6b}
+#hud .tr{background:linear-gradient(180deg,rgba(8,10,15,.62),rgba(8,10,15,.34));border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:8px 12px 7px;gap:3px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#rankChip{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-bottom:2px}
+#rankChip b{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);text-shadow:0 1px 2px #000}
+#rankChip .rb{display:block;width:118px;height:4px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
+#rankChip .rb i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff9b3d,var(--gold));transition:width .5s}
+#rankChip small{font-size:10px;font-weight:700;letter-spacing:.06em;color:#c9cfda;text-shadow:0 1px 2px #000}
+#money{font-size:28px;color:var(--dirty);text-shadow:0 2px 0 var(--dirty-d),0 0 14px rgba(0,0,0,.55);display:flex;align-items:center;gap:7px;line-height:1.05}
+#money::before{content:"CASH";font-size:9px;font-weight:900;letter-spacing:.14em;color:#0b2412;background:var(--dirty);border-radius:4px;padding:2px 5px 1px;text-shadow:none}
+#bank{font-size:13px;color:var(--clean);display:flex;align-items:center;gap:6px}
+#bank::before{content:"";width:12px;height:12px;flex:none;background:var(--clean);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat}
+#stars{font-size:21px;margin-top:2px}
+#clock{font-size:12px;color:#cfd6e2}
+/* the two currencies everywhere money is shown: Dirty Cash green, Clean Bank blue. <b class="cash dirty">$75</b>,
+   <b class="cash clean">$2,000</b>; add "tag" where no word says which it is, for a CASH / BANK label */
+.cash{font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cash.dirty,.svcTop b.cash.dirty,.empStats b.cash.dirty,.wtop b.cash.dirty{color:var(--dirty)}.cash.clean,.svcTop b.cash.clean,.empStats b.cash.clean,.wtop b.cash.clean{color:var(--clean)}
+.cash.tag::before{display:inline-block;font-size:.62em;font-weight:900;letter-spacing:.1em;border-radius:3px;padding:1px 4px 0;margin-right:4px;vertical-align:.18em}
+.cash.tag.dirty::before{content:"CASH";background:var(--dirty);color:#0b2412}
+.cash.tag.clean::before{content:"BANK";background:var(--clean);color:#04203a}
+/* touch controls: an icon over a small label, a frosted dark disc, a warm ring when held */
+#touch .tbtn{backdrop-filter:none;-webkit-backdrop-filter:none;flex-direction:column;gap:1px;background:radial-gradient(circle at 50% 35%,rgba(40,46,60,.62),rgba(12,15,22,.58));border:1.5px solid rgba(255,255,255,.22);box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1);font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.82)}
+#touch .tbtn::before{content:"";display:block;width:26px;height:26px;background:#fff;-webkit-mask-image:var(--ic);mask-image:var(--ic);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+#touch .tbtn.big::before{width:32px;height:32px}
+#touch .tbtn.sm::before{width:20px;height:20px}
+#touch .tbtn.fire::before{display:none}
+#touch .tbtn.on{background:radial-gradient(circle at 50% 35%,rgba(255,196,96,.75),rgba(255,138,61,.55));border-color:var(--amber);color:#1b1206}
+#touch .tbtn.on::before{background:#1b1206}
+#touch .tbtn.car[data-act="gas"]{background:radial-gradient(circle at 50% 35%,rgba(40,90,60,.66),rgba(12,30,20,.6));border-color:rgba(127,224,143,.5)}
+#touch .tbtn.car[data-act="brake"]{background:radial-gradient(circle at 50% 35%,rgba(100,40,40,.66),rgba(30,12,12,.6));border-color:rgba(255,120,120,.45)}
+#tbar{gap:7px}
+#tbar .tbtn{width:44px;height:44px;font-size:8px;border-radius:13px}
+#tbar .tbtn::before{width:20px;height:20px}
+#tbar #touchPause{font-size:0}
+#stickBase{border:2px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.06),rgba(12,15,22,.38))}
+#stickKnob{background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.85),rgba(200,206,218,.55));box-shadow:0 3px 10px rgba(0,0,0,.4)}
+#minimap{box-shadow:0 0 0 3px rgba(8,10,15,.85),0 8px 22px rgba(0,0,0,.55)}
+#prompt{background:linear-gradient(180deg,rgba(14,17,24,.88),rgba(8,10,15,.82));border:1px solid rgba(255,207,107,.35);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+#touch .tbtn[data-act="jump"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v11M7 9l5-5 5 5M5 20h14%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="attack"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 13V9a2 2 0 0 1 4 0v3M10 11V7a2 2 0 0 1 4 0v4M14 10V8a2 2 0 0 1 4 0v6c0 4-3 6-6 6s-6-2-6-5v-2%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="sprint"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 6l6 6-6 6M12 6l6 6-6 6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="weapon"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 8h15l2 2v2H11l-1 3v3H6l1-5H3z%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="interact"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%228%22/%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%222.5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="block"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="aim"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%227%22/%3E%3Cpath d=%22M12 2v5M12 17v5M2 12h5M17 12h5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="reload"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="melee"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 19L19 5M14 5h5v5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="gas"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 20V6M6 12l6-6 6 6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="brake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v14M6 12l6 6 6-6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="handbrake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 17c0-6 4-10 10-10h4M15 3l4 4-4 4%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="horn"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 10v4h3l5 4V6L7 10zM16 9c1.5 1.5 1.5 4.5 0 6M19 6c3 3 3 9 0 12%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="map"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="empire"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%227%22 y=%222.5%22 width=%2210%22 height=%2219%22 rx=%222%22/%3E%3Cpath d=%22M11 18.5h2%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="camera"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 8h3l2-3h6l2 3h3v11H4z%22/%3E%3Ccircle cx=%2212%22 cy=%2213%22 r=%223.5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="radio"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 9h14v10H5zM8 9l9-5%22/%3E%3Ccircle cx=%229.5%22 cy=%2214%22 r=%222%22/%3E%3Cpath d=%22M14 13h3M14 16h3%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="pause"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 5v14M15 5v14%22/%3E%3C/svg%3E")}
+/* casino prizes and jackpots: gold, not a currency */
+b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
+/* G8 · map: round symbols with pictograms (the same ones the canvas draws); on a landscape phone the tools sit in a
+   two-column block at the right, clear of the city, instead of a row across its top */
+.mapPop .ico,.mdItem .ico,.mapCardHead .ico{border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.ico svg{width:16px;height:16px;fill:#0d1117;display:block}
+.mapCardHead .ico{width:30px;height:30px}.mapCardHead .ico svg{width:20px;height:20px}
+@media (orientation:landscape) and (max-height:520px){
+  #mapTools{display:grid;grid-template-columns:repeat(2,auto);gap:5px;max-width:none}
+  .mapPop{right:200px;top:8px;max-height:calc(100% - 16px)}
+}
+/* G8 · the status card on a landscape phone: Rank and Rep on one line over the bar, the stars and the clock side by
+   side, so the card ends above the Use button */
+@media (max-height:520px){
+  #hud .tr{display:grid;grid-template-columns:auto auto;column-gap:10px;row-gap:2px;justify-items:end;align-items:center;padding:6px 10px 5px}
+  #hud .tr>*{grid-column:1/-1}
+  #hud .tr>#stars{grid-column:1;margin-top:0;font-size:16px}
+  #hud .tr>#clock{grid-column:2;font-size:11px}
+  #rankChip{display:grid;grid-template-columns:auto auto;column-gap:8px;align-items:baseline;justify-self:stretch;margin-bottom:1px}
+  #rankChip b{font-size:11px;justify-self:start}
+  #rankChip small{grid-row:1;grid-column:2;justify-self:end;font-size:9px}
+  #rankChip .rb{grid-column:1/-1;width:auto;height:3px}
+  #money{font-size:24px}
+  #bank{font-size:12px}
+}
+/* G8 · phone home: the app groups flow side by side as wide as the screen allows (a landscape phone shows most of
+   them without scrolling), each group's tiles a fixed size */
+.appHome{display:flex;flex-wrap:wrap;gap:2px 20px;align-items:flex-start}
+.appCat{flex:0 1 auto;min-width:0}
+.appCat .apps{display:flex;flex-wrap:wrap;gap:8px}
+.appCat .app{width:94px;flex:none}
+.appHome .appCat h4{margin:8px 2px 6px}
+.app i{background:linear-gradient(160deg,color-mix(in srgb,var(--c) 82%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 75%,#000));box-shadow:inset 0 -3px 0 rgba(0,0,0,.22),0 3px 8px rgba(0,0,0,.35)}
+.app{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border-color:rgba(255,255,255,.09)}
+/* G11 · banners: a small kicker line over the title; "rank" is the gold fanfare (a new Rank, a one-off acquired) with a
+   light sweep across the title; the HUD's Rank chip pulses when the Rank changes */
+#banner .bk{font-size:clamp(11px,1.6vw,15px);font-weight:900;letter-spacing:.32em;text-transform:uppercase;color:#fff;opacity:.85;margin-bottom:4px;text-shadow:0 2px 6px #000;animation:slideUp .5s both}
+#banner .bk:empty{display:none}
+#banner.rank .bt{color:transparent;background:linear-gradient(100deg,#c98a1c 0%,#ffe08a 38%,#fff6d8 50%,#ffe08a 62%,#c98a1c 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 3px 0 #3a2404) drop-shadow(0 0 18px rgba(255,190,80,.35));animation:bannerIn .5s cubic-bezier(.2,1.4,.4,1) both,goldSweep 2.2s .4s ease-in-out both}
+#banner.rank .stripe{background:linear-gradient(90deg,transparent,rgba(40,26,4,.6) 20%,rgba(40,26,4,.6) 80%,transparent)}
+@keyframes goldSweep{from{background-position:100% 0}to{background-position:0 0}}
+@keyframes bannerIn{from{opacity:0;transform:skewX(-6deg) scale(1.25)}to{opacity:1;transform:skewX(-6deg) scale(1)}}
+#rankChip.up{animation:rankUp 1.6s ease-out}
+@keyframes rankUp{0%{transform:scale(1.25);filter:drop-shadow(0 0 10px var(--gold))}100%{transform:none;filter:none}}
+/* G8 · the phone on a landscape phone: a slimmer header and smaller tiles, so two full rows of apps show */
+@media (max-height:520px){
+  .emp .empHead h2{font-size:22px;margin:0}
+  .emp .empHead{align-items:center;gap:4px 12px}
+  #empBody .appTop{margin:0 0 4px}
+  #empBody .appTop .sbtn{min-height:38px;padding:6px 14px}
+  .appHome h4,.appHome .appCat h4{margin:4px 2px 4px}
+  .appCat .app{width:84px;min-height:84px;padding:7px 4px 6px;gap:3px}
+  .app i{width:38px;height:38px;font-size:20px;border-radius:11px}
+  .app small{display:none}
+}
+/* G8 · screens on a landscape phone: slimmer panel headers; Royale Billions puts its controls beside the cabinet
+   instead of below it (the machine and SPIN on one screen, no scrolling); its odds are untouched */
+@media (max-height:520px){
+  .panel{padding:12px 14px}
+  .panel h2{font-size:20px}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #svcBody:has(> .ryl){display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,290px);column-gap:14px;align-items:start}
+  #svcBody:has(> .ryl) > .ryl{grid-column:1;grid-row:1 / span 8}
+  #svcBody:has(> .ryl) > :not(.ryl){grid-column:2}
+  #svcBody:has(> .ryl) > .rylBar{margin-top:0}
+  .ryr{height:132px}.ryc{height:44px;font-size:23px}.ryc.royal span{width:34px;height:34px;font-size:20px}
+}
+/* G8 · the jail panel lets the cell show through (it is placed by the HUD layout, clear of the top controls) */
+#jailHud{background:linear-gradient(180deg,rgba(18,14,12,.82),rgba(14,12,10,.66));backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 8px 22px rgba(0,0,0,.35)}

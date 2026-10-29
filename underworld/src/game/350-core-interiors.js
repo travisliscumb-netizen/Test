@@ -17,7 +17,7 @@ const KIT_FACES = [
   [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1], 0.86]
 ];
 class InteriorKit {
-  constructor(h) { this.H = h; this.a = { p: [], c: [], i: [] }; this.g = { p: [], c: [], i: [] }; this.cols = []; this._c = new THREE.Color(); }
+  constructor(h) { this.H = h; this.a = { p: [], c: [], i: [] }; this.g = { p: [], c: [], i: [] }; this.cols = []; this._c = new THREE.Color(); this.lights = []; }
   // x,z: centre; y: bottom; w,h,d: size. opt.col adds a collider, opt.glow puts it in the emissive mesh.
   box(x, y, z, w, h, d, color, opt = {}) {
     const t = opt.glow ? this.g : this.a, c = this._c.set(color);
@@ -35,7 +35,12 @@ class InteriorKit {
     for (let q = 0; q < 6; q++) { const o = base + q * 4; t.i.push(o, o + 1, o + 2, o, o + 2, o + 3); }
     if (opt.col) this.cols.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, y0: y, y1: y + h });
   }
-  glow(x, y, z, w, h, d, color, k = 2.2) { this.box(x, y, z, w, h, d, color, { glow: k }); }
+  // a lamp of any real size also lights the room (G4): its centre, colour and a strength from its size
+  glow(x, y, z, w, h, d, color, k = 2.2) {
+    this.box(x, y, z, w, h, d, color, { glow: k });
+    const area = w * d + w * h + h * d;
+    if (k >= 1.8 && area >= 0.3) this.lights.push({ x, y: y + h / 2, z, c: new THREE.Color(color), s: Math.min(1.25, 0.45 + area * 0.5) });
+  }
   // closed room: floor, ceiling, four walls (with colliders), skirting and a ceiling light grid
   room(w, d, h, o) {
     this.box(0, -0.25, 0, w + 0.8, 0.25, d + 0.8, o.floor, { flat: true });
@@ -93,11 +98,63 @@ class InteriorKit {
       geo.setIndex(t.i); geo.computeBoundingSphere();
       const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; return m;
     };
-    return { main: mk(this.a, INT_MAT()), glow: this.g.p.length ? mk(this.g, INT_GLOW()) : null };
+    const main = mk(this.a, makeInteriorMaterial(this.lights));
+    main.onBeforeRender = (r, sc, cam) => main.material.userData.pick(cam, main);
+    return { main, glow: this.g.p.length ? mk(this.g, INT_GLOW()) : null };
   }
 }
-let _intMat = null, _intGlow = null;
-function INT_MAT() { return _intMat || (_intMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); }
+let _intGlow = null;
+/* the room's own light (G4): the baked colours (face shading, floor AO) are the ambient; every lamp of the room adds
+   a warm pool with distance falloff on the surfaces facing it, and floors catch a soft reflection of the lamps over
+   them. Flat faces get their normal from the screen derivatives, so the kit needs no normals. Up to INT_LIGHTS
+   lamps light a room at once: in a bigger one, the ones nearest the camera (re-picked a few times a second). Each
+   room has its own material (its own lamps), all of them one shader program. */
+const INT_LIGHTS = 20;
+function makeInteriorMaterial(lights) {
+  const m = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+  const uL = [], uC = []; for (let i = 0; i < INT_LIGHTS; i++) { uL.push(new THREE.Vector4()); uC.push(new THREE.Color()); }
+  const u = { uL: { value: uL }, uLC: { value: uC }, uLN: { value: 0 } };
+  const load = list => { list.forEach((L, i) => { uL[i].set(L.x, L.y, L.z, L.s); uC[i].copy(L.c); }); u.uLN.value = list.length; };
+  load(lights.slice(0, INT_LIGHTS));
+  let t = 0; const v = new THREE.Vector3();
+  m.userData.pick = (cam, mesh) => {
+    if (lights.length <= INT_LIGHTS) return;
+    const now = performance.now(); if (now - t < 300) return; t = now;
+    v.copy(cam.position).sub(mesh.parent ? mesh.parent.position : mesh.position);
+    load(lights.slice().sort((a, b) => ((a.x - v.x) ** 2 + (a.z - v.z) ** 2) - ((b.x - v.x) ** 2 + (b.z - v.z) ** 2)).slice(0, INT_LIGHTS));
+  };
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLP; varying vec3 vCamL;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position; vCamL = cameraPosition - modelMatrix[3].xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vLP; varying vec3 vCamL;
+        uniform vec4 uL[${INT_LIGHTS}]; uniform vec3 uLC[${INT_LIGHTS}]; uniform int uLN;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec3 N = normalize(cross(dFdx(vLP), dFdy(vLP)));
+        vec3 V = normalize(vCamL - vLP);
+        if (dot(N, V) < 0.0) N = -N;
+        float flo = step(0.85, N.y) * (1.0 - smoothstep(0.03, 0.2, vLP.y));
+        vec3 R = reflect(-V, N), acc = vec3(0.0), spec = vec3(0.0);
+        for (int i = 0; i < ${INT_LIGHTS}; i++) {
+          if (i >= uLN) break;
+          vec3 d = uL[i].xyz - vLP; float dd = dot(d, d); vec3 l = d * inversesqrt(dd + 1e-4);
+          float att = uL[i].w / (1.0 + dd * 0.085);
+          acc += uLC[i] * att * (max(dot(N, l), 0.0) * 0.85 + 0.15);
+          spec += uLC[i] * uL[i].w * pow(max(dot(R, l), 0.0), 48.0);
+        }
+        // the baked colours were made to read at 1.0: lamps lift a surface to ~1.15 at most (soft saturation, so a floor
+        // under many lamps does not burn out) and the far corners settle near 0.7
+        vec3 lit = 0.68 + 0.62 * acc / (1.0 + acc);
+        diffuseColor.rgb = uLN > 0 ? diffuseColor.rgb * lit + min(spec, vec3(1.2)) * flo * 0.16 : diffuseColor.rgb; // a room without lamps keeps its baked light
+      }`);
+  };
+  m.customProgramCacheKey = () => 'pv-interior';
+  return m;
+}
 function INT_GLOW() { return _intGlow || (_intGlow = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); }
 
 // skyline used behind interior windows: sky gradient plane + silhouette plane + lit-window plane
@@ -1313,7 +1370,7 @@ function casinoInteriorDef() {
       k.tiles(W, D, 0x5a1420, 0x6a1c2a, 2);
       k.door(0, D / 2 - 0.02, 0, 0x1a0e24, 0xffd84d);
       // lobby: marble strip at the doors, cashier cage (east), bar (west), a gold fountain-sculpture between
-      k.box(0, -0.004, D / 2 - 3, 12, 0.012, 6, 0xe8e2d4, { flat: true });
+      k.box(0, -0.004, D / 2 - 3, 12, 0.012, 6, 0xbfb5a3, { flat: true }); // (G4: a shade darker, so it reads as marble under the lamps, not as white)
       k.box(15.2, 0, 10.6, 6, 1.15, 0.8, 0x2a1a36, { col: true }); k.box(15.2, 1.15, 10.6, 6.1, 0.06, 0.9, 0xd8a227);
       for (let i = 0; i < 7; i++) k.box(12.4 + i * 0.93, 1.21, 10.6, 0.05, 1.6, 0.05, 0xd8a227);
       k.glow(15.2, 2.9, 10.3, 5.6, 0.35, 0.05, 0xffd84d, 2.2);
@@ -1405,7 +1462,7 @@ class InteriorManager {
     if (!def || !def.dynamic) return;
     for (const c of def.cols || []) this.g.world.grid.remove(c);
     this.g.scene.remove(def.group);
-    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.pick) o.material.dispose(); });
     delete this.defs[def.id];
   }
   _window(w) {

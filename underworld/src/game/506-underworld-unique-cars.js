@@ -47,7 +47,7 @@ class UniqueCars {
     const r = this.rec(id), d = UNIQUE_BY[id]; if (r.st >= st) return false;
     r.st = st;
     if (!quiet && st === 1) { this.g.content.phone(UQ_FROM[id], d.clue); this.g.ui.toast(`New lead: ${d.hint}${d.how === 'find' ? ' (search area on the map)' : ''}.`, 'info'); }
-    if (!quiet && st === 2 && d.how === 'find') { this.g.ui.banner('One-off spotted', VEHICLES[d.type].name, 'info', 2.6); this.g.audio.play('pass'); }
+    if (!quiet && st === 2 && d.how === 'find') { this.g.ui.banner(VEHICLES[d.type].name, d.kind, 'info', 3, 'One-off spotted'); this.g.audio.play('pass'); }
     this.g.saveGame();
     return true;
   }
@@ -56,7 +56,7 @@ class UniqueCars {
   acquired(d) {
     const g = this.g, r = this.rec(d.id); r.st = 3; r.day = g.uw ? g.uw.S.day : 0;
     g.vreg.note('one-off acquired', d.type, { id: d.id });
-    g.ui.banner('One-off acquired', `${VEHICLES[d.type].name} · ${this.count()} of ${UNIQUE_CARS.length}`, 'pass', 3.5);
+    g.ui.banner(VEHICLES[d.type].name, `One of ten · ${this.count()} of ${UNIQUE_CARS.length} found`, 'rank', 4, 'One-off acquired');
     g.audio.play('pass');
     g.saveGame(true);
   }
@@ -230,13 +230,50 @@ class UniqueCars {
   // ---------------------------------------------------------------- the clock, saves and resets
   update(dt) {
     const g = this.g; if (!g.uw || g.state !== 'playing') return;
+    this.showcase(dt);
     this.t -= dt; if (this.t > 0) return; this.t = UQ.tick;
     this.check(); this.updateWorld();
     // the Golden Corsair is also one of the city's secrets (the first time you drive it)
     const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
     if (pv && pv.type === 'u_corsair' && pv.garageUid) g.content.secret('gold');
   }
-  clearAll() { for (const v of this.live.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.live.clear(); }
+  // ---------------------------------------------------------------- how a waiting one-off looks (G5)
+  // one still standing where its clue put it is lit like a car on a stand: a warm pool of light round it on the
+  // ground and, from dusk, a soft beam from above. Both go the moment it leaves its spot or is taken.
+  showcase(dt) {
+    const g = this.g;
+    if (!this._sc) {
+      const cv = (w, h, paint) => { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d')); return new THREE.CanvasTexture(c); };
+      const pool = cv(128, 128, x => { const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); });
+      const beam = cv(4, 64, x => { const gr = x.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 4, 64); });
+      const mat = map => new THREE.MeshBasicMaterial({ map, color: 0xffd7a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide });
+      const pg = new THREE.PlaneGeometry(1, 1); pg.rotateX(-Math.PI / 2);
+      const bg = new THREE.CylinderGeometry(0.35, 1, 1, 20, 1, true); bg.translate(0, 0.5, 0);
+      this._sc = { pg, bg, pm: mat(pool), bm: mat(beam), on: new Map(), t: 0 };
+    }
+    const S = this._sc; S.t += dt;
+    const night = U.uNight.value, pulse = 1 + 0.07 * Math.sin(S.t * 1.7);
+    for (const [id, o] of S.on) if (!this.live.has(id)) { g.outdoor.remove(o.pool, o.beam); S.on.delete(id); }
+    for (const [id, v] of this.live) {
+      const sp = this.spotOf(id), show = !!sp && this.liveOf(id) === v && v !== g.player.vehicle && !v.burnt && this.st(id) < 3 && Math.hypot(v.pos.x - sp.x, v.pos.z - sp.z) < 3;
+      let o = S.on.get(id);
+      if (!show) { if (o) { g.outdoor.remove(o.pool, o.beam); S.on.delete(id); } continue; }
+      if (!o) {
+        o = { pool: new THREE.Mesh(S.pg, S.pm), beam: new THREE.Mesh(S.bg, S.bm) };
+        o.pool.renderOrder = 2; o.beam.renderOrder = 3; o.pool.frustumCulled = o.beam.frustumCulled = false;
+        g.outdoor.add(o.pool, o.beam); S.on.set(id, o);
+      }
+      const y = groundY(v.pos.x, v.pos.z), L = v.spec.l + 3.2, W = v.spec.w + 3.2, H = 7.5;
+      o.pool.position.set(v.pos.x, y + 0.05, v.pos.z); o.pool.rotation.y = v.h; o.pool.scale.set(W, 1, L);
+      o.beam.position.set(v.pos.x, y + 0.02, v.pos.z); o.beam.scale.set(L * 0.42, H, L * 0.42);
+      o.beam.visible = night > 0.15;
+    }
+    S.pm.opacity = (0.16 + 0.5 * night) * pulse; S.bm.opacity = 0.2 * clamp((night - 0.15) / 0.5, 0, 1);
+  }
+  clearAll() {
+    if (this._sc) { for (const o of this._sc.on.values()) this.g.outdoor.remove(o.pool, o.beam); this._sc.on.clear(); }
+    for (const v of this.live.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.live.clear();
+  }
   reset() { this.clearAll(); this.t = 0; this._spots = {}; if (this.s) for (const u of UNIQUE_CARS) this.rec(u.id); }
   // sanitize a save (SaveSystem, after the vehicle registry's): known ids and states only, one fleet or waiting
   // entry per one-off at most, every acquired one accounted for, and the old Golden Corsair brought in

@@ -63,7 +63,7 @@ async function shot(S, name, prep, settle = 40) {
 const view = (px, pz, cam, time = 12, weather = 'clear') => ({ fn: ([px, pz, cam, time, weather]) => {
   const g = window.game; if (g.content.interiors && g.content.interiors.cur) g.content.interiors.exit(true);
   if (g.player.vehicle) g.exitVehicle(true);
-  g.resetPlayerState(px, pz, 0); g.env.time = time; try { g.env.setWeather(weather, true); } catch {}
+  g.resetPlayerState(px, pz, 0); g.env.time = time; try { g.env.setWeather(weather, true); g.env.wet = g.env.rain; } catch {} // the ground soaked through, as after a while in the rain
   for (const id of ['hud', 'touch', 'moneyFeed', 'toasts', 'tip', 'zoneCard', 'objective']) { const el = document.getElementById(id); if (el) el.style.visibility = 'hidden'; }
   window.__cam = cam; for (let k = 0; k < 40; k++) g.chunks.update(px, pz, g.frame + k);
 }, arg: [px, pz, cam, time, weather] });
@@ -93,6 +93,7 @@ const hud = on => () => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts
   // Valen Point's pit straight: aimed at the track start from the game's own data
   await shot(S, 'w19-valen-point-pits', { fn: () => { const g = window.game, P = window.__pv, s = P.vpCheckpoints({ laps: 1 }).start; g.resetPlayerState(s.x, s.z, 0); g.env.time = 15; window.__cam = [s.x + 25, 8, s.z - 40, s.x, 2, s.z + 20]; for (let k = 0; k < 40; k++) g.chunks.update(s.x, s.z, g.frame + k); } });
   await shot(S, 'w20-skyline-dusk', view(480, 480, [-60, 40, 1000, 480, 40, 480], 19.2));
+  await shot(S, 'w21-downtown-night-rain', view(560, 410, [563.5, 1.8, 418, 560, 9, 330], 22, 'rain'));
   // vehicles on the causeway: every ordinary model, then the ten one-offs
   const lineup = (types, tag) => ({ fn: ([types]) => {
     const g = window.game, z = 516, x0 = 1060; if (g.player.vehicle) g.exitVehicle(true);
@@ -111,9 +112,14 @@ const hud = on => () => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts
   for (const t of ['sedan', 'sports', 'police', 'pickup', 'van']) await shot(S, `v10-car-${t}`, close(t));
   for (const t of uniq) await shot(S, `v11-unique-${t}`, close(t));
   // people: the player close up, a crowd at noon
-  await shot(S, 'c01-player-front', { fn: () => { const g = window.game; if (g.player.vehicle) g.exitVehicle(true); g.traffic.enabled = true; g.env.time = 12; const x = 563.5, z = 380; g.resetPlayerState(x, z, Math.PI); window.__cam = [x, 1.55, z - 2.6, x, 1.0, z]; hud(false)(); } });
+  await shot(S, 'c01-player-front', { fn: () => { const g = window.game; if (g.player.vehicle) g.exitVehicle(true); g.traffic.enabled = true; g.env.time = 12; try { g.env.setWeather('clear', true); g.env.wet = 0; } catch {} const x = 563.5, z = 380; g.resetPlayerState(x, z, Math.PI); window.__cam = [x, 1.55, z - 2.6, x, 1.0, z]; for (const id of ['hud', 'touch', 'moneyFeed', 'toasts', 'tip', 'zoneCard', 'objective']) { const el = document.getElementById(id); if (el) el.style.visibility = 'hidden'; } } });
   await shot(S, 'c02-player-back', { fn: () => { const g = window.game, x = 563.5, z = 380; window.__cam = [x + 1.2, 1.9, z + 3.2, x, 1.1, z]; } });
-  await shot(S, 'c03-crowd', { fn: () => { const g = window.game; g.peds.target = 60; const x = 571, z = 380; g.resetPlayerState(x, z, 0); g.env.time = 12.5; window.__cam = [x - 1, 2.3, z + 14, x - 1, 1.2, z - 10]; }, after: async S2 => { await frames(S2.page, 200); } });
+  await shot(S, 'c03-crowd', { fn: () => { const g = window.game; g.peds.target = 60; const x = 571, z = 380; g.resetPlayerState(x, z, 0); g.env.time = 12.5; window.__cam = [x - 1, 2.3, z + 14, x - 1, 1.2, z - 10]; }, after: async S2 => { await S2.ev(() => {
+    // the crowd walks in on the simulation clock (no rendering); then the camera frames the nearest group of people
+    const g = window.game; for (let n = 0; n < 240; n++) g.update(1 / 60, 1 / 60);
+    const p = g.player.pos, near = g.peds.peds.filter(q => q.state !== 'dead' && q.health > 0).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z)).slice(0, 6);
+    if (near.length) { const cx = near.reduce((a, q) => a + q.x, 0) / near.length, cz = near.reduce((a, q) => a + q.z, 0) / near.length, dx = p.x - cx, dz = p.z - cz, l = Math.hypot(dx, dz) || 1; window.__cam = [cx + dx / l * 7, 2.0, cz + dz / l * 7, cx, 1.1, cz]; }
+  }); } });
   await S.ctx.close();
 }
 // ---------------------------------------------------------------- play scenes with the game camera

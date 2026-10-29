@@ -562,6 +562,138 @@ body[data-gs="paused"] #jailHud{display:none}
   .tile b{font-size:17px}
 }
 #empBody .appTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 10px}#empBody .appTop .hint{margin:0}#empStats .empSub{flex-basis:100%;font-size:11px;color:var(--dim)}
+
+/* ==========================================================================================================
+   G8 · HUD v2 (graphics / presentation / UI-UX overhaul). Status card top right: Rank and Rep, the cash on you
+   (Dirty, green, CASH) and the bank (Clean, blue, BANK), heat and the clock. Labels come from CSS so the text the
+   game and its tests read stays "$1,840" / "BANK $26,500". Touch buttons carry an icon over a small label.
+   ========================================================================================================== */
+:root{--dirty:#8fe39b;--dirty-d:#0a3214;--clean:#7fc6ff;--clean-d:#062642;--gold:#ffcf6b}
+#hud .tr{background:linear-gradient(180deg,rgba(8,10,15,.62),rgba(8,10,15,.34));border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:8px 12px 7px;gap:3px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#rankChip{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-bottom:2px}
+#rankChip b{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);text-shadow:0 1px 2px #000}
+#rankChip .rb{display:block;width:118px;height:4px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
+#rankChip .rb i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff9b3d,var(--gold));transition:width .5s}
+#rankChip small{font-size:10px;font-weight:700;letter-spacing:.06em;color:#c9cfda;text-shadow:0 1px 2px #000}
+#money{font-size:28px;color:var(--dirty);text-shadow:0 2px 0 var(--dirty-d),0 0 14px rgba(0,0,0,.55);display:flex;align-items:center;gap:7px;line-height:1.05}
+#money::before{content:"CASH";font-size:9px;font-weight:900;letter-spacing:.14em;color:#0b2412;background:var(--dirty);border-radius:4px;padding:2px 5px 1px;text-shadow:none}
+#bank{font-size:13px;color:var(--clean);display:flex;align-items:center;gap:6px}
+#bank::before{content:"";width:12px;height:12px;flex:none;background:var(--clean);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat}
+#stars{font-size:21px;margin-top:2px}
+#clock{font-size:12px;color:#cfd6e2}
+/* the two currencies everywhere money is shown: Dirty Cash green, Clean Bank blue. <b class="cash dirty">$75</b>,
+   <b class="cash clean">$2,000</b>; add "tag" where no word says which it is, for a CASH / BANK label */
+.cash{font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cash.dirty,.svcTop b.cash.dirty,.empStats b.cash.dirty,.wtop b.cash.dirty{color:var(--dirty)}.cash.clean,.svcTop b.cash.clean,.empStats b.cash.clean,.wtop b.cash.clean{color:var(--clean)}
+.cash.tag::before{display:inline-block;font-size:.62em;font-weight:900;letter-spacing:.1em;border-radius:3px;padding:1px 4px 0;margin-right:4px;vertical-align:.18em}
+.cash.tag.dirty::before{content:"CASH";background:var(--dirty);color:#0b2412}
+.cash.tag.clean::before{content:"BANK";background:var(--clean);color:#04203a}
+/* touch controls: an icon over a small label, a frosted dark disc, a warm ring when held */
+#touch .tbtn{backdrop-filter:none;-webkit-backdrop-filter:none;flex-direction:column;gap:1px;background:radial-gradient(circle at 50% 35%,rgba(40,46,60,.62),rgba(12,15,22,.58));border:1.5px solid rgba(255,255,255,.22);box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1);font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.82)}
+#touch .tbtn::before{content:"";display:block;width:26px;height:26px;background:#fff;-webkit-mask-image:var(--ic);mask-image:var(--ic);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+#touch .tbtn.big::before{width:32px;height:32px}
+#touch .tbtn.sm::before{width:20px;height:20px}
+#touch .tbtn.fire::before{display:none}
+#touch .tbtn.on{background:radial-gradient(circle at 50% 35%,rgba(255,196,96,.75),rgba(255,138,61,.55));border-color:var(--amber);color:#1b1206}
+#touch .tbtn.on::before{background:#1b1206}
+#touch .tbtn.car[data-act="gas"]{background:radial-gradient(circle at 50% 35%,rgba(40,90,60,.66),rgba(12,30,20,.6));border-color:rgba(127,224,143,.5)}
+#touch .tbtn.car[data-act="brake"]{background:radial-gradient(circle at 50% 35%,rgba(100,40,40,.66),rgba(30,12,12,.6));border-color:rgba(255,120,120,.45)}
+#tbar{gap:7px}
+#tbar .tbtn{width:44px;height:44px;font-size:8px;border-radius:13px}
+#tbar .tbtn::before{width:20px;height:20px}
+#tbar #touchPause{font-size:0}
+#stickBase{border:2px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.06),rgba(12,15,22,.38))}
+#stickKnob{background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.85),rgba(200,206,218,.55));box-shadow:0 3px 10px rgba(0,0,0,.4)}
+#minimap{box-shadow:0 0 0 3px rgba(8,10,15,.85),0 8px 22px rgba(0,0,0,.55)}
+#prompt{background:linear-gradient(180deg,rgba(14,17,24,.88),rgba(8,10,15,.82));border:1px solid rgba(255,207,107,.35);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+#touch .tbtn[data-act="jump"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v11M7 9l5-5 5 5M5 20h14%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="attack"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 13V9a2 2 0 0 1 4 0v3M10 11V7a2 2 0 0 1 4 0v4M14 10V8a2 2 0 0 1 4 0v6c0 4-3 6-6 6s-6-2-6-5v-2%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="sprint"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 6l6 6-6 6M12 6l6 6-6 6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="weapon"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 8h15l2 2v2H11l-1 3v3H6l1-5H3z%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="interact"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%228%22/%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%222.5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="block"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="aim"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%227%22/%3E%3Cpath d=%22M12 2v5M12 17v5M2 12h5M17 12h5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="reload"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="melee"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 19L19 5M14 5h5v5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="gas"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 20V6M6 12l6-6 6 6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="brake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v14M6 12l6 6 6-6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="handbrake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 17c0-6 4-10 10-10h4M15 3l4 4-4 4%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="horn"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 10v4h3l5 4V6L7 10zM16 9c1.5 1.5 1.5 4.5 0 6M19 6c3 3 3 9 0 12%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="map"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="empire"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%227%22 y=%222.5%22 width=%2210%22 height=%2219%22 rx=%222%22/%3E%3Cpath d=%22M11 18.5h2%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="camera"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 8h3l2-3h6l2 3h3v11H4z%22/%3E%3Ccircle cx=%2212%22 cy=%2213%22 r=%223.5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="radio"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 9h14v10H5zM8 9l9-5%22/%3E%3Ccircle cx=%229.5%22 cy=%2214%22 r=%222%22/%3E%3Cpath d=%22M14 13h3M14 16h3%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="pause"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 5v14M15 5v14%22/%3E%3C/svg%3E")}
+/* casino prizes and jackpots: gold, not a currency */
+b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
+/* G8 · map: round symbols with pictograms (the same ones the canvas draws); on a landscape phone the tools sit in a
+   two-column block at the right, clear of the city, instead of a row across its top */
+.mapPop .ico,.mdItem .ico,.mapCardHead .ico{border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.ico svg{width:16px;height:16px;fill:#0d1117;display:block}
+.mapCardHead .ico{width:30px;height:30px}.mapCardHead .ico svg{width:20px;height:20px}
+@media (orientation:landscape) and (max-height:520px){
+  #mapTools{display:grid;grid-template-columns:repeat(2,auto);gap:5px;max-width:none}
+  .mapPop{right:200px;top:8px;max-height:calc(100% - 16px)}
+}
+/* G8 · the status card on a landscape phone: Rank and Rep on one line over the bar, the stars and the clock side by
+   side, so the card ends above the Use button */
+@media (max-height:520px){
+  #hud .tr{display:grid;grid-template-columns:auto auto;column-gap:10px;row-gap:2px;justify-items:end;align-items:center;padding:6px 10px 5px}
+  #hud .tr>*{grid-column:1/-1}
+  #hud .tr>#stars{grid-column:1;margin-top:0;font-size:16px}
+  #hud .tr>#clock{grid-column:2;font-size:11px}
+  #rankChip{display:grid;grid-template-columns:auto auto;column-gap:8px;align-items:baseline;justify-self:stretch;margin-bottom:1px}
+  #rankChip b{font-size:11px;justify-self:start}
+  #rankChip small{grid-row:1;grid-column:2;justify-self:end;font-size:9px}
+  #rankChip .rb{grid-column:1/-1;width:auto;height:3px}
+  #money{font-size:24px}
+  #bank{font-size:12px}
+}
+/* G8 · phone home: the app groups flow side by side as wide as the screen allows (a landscape phone shows most of
+   them without scrolling), each group's tiles a fixed size */
+.appHome{display:flex;flex-wrap:wrap;gap:2px 20px;align-items:flex-start}
+.appCat{flex:0 1 auto;min-width:0}
+.appCat .apps{display:flex;flex-wrap:wrap;gap:8px}
+.appCat .app{width:94px;flex:none}
+.appHome .appCat h4{margin:8px 2px 6px}
+.app i{background:linear-gradient(160deg,color-mix(in srgb,var(--c) 82%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 75%,#000));box-shadow:inset 0 -3px 0 rgba(0,0,0,.22),0 3px 8px rgba(0,0,0,.35)}
+.app{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border-color:rgba(255,255,255,.09)}
+/* G11 · banners: a small kicker line over the title; "rank" is the gold fanfare (a new Rank, a one-off acquired) with a
+   light sweep across the title; the HUD's Rank chip pulses when the Rank changes */
+#banner .bk{font-size:clamp(11px,1.6vw,15px);font-weight:900;letter-spacing:.32em;text-transform:uppercase;color:#fff;opacity:.85;margin-bottom:4px;text-shadow:0 2px 6px #000;animation:slideUp .5s both}
+#banner .bk:empty{display:none}
+#banner.rank .bt{color:transparent;background:linear-gradient(100deg,#c98a1c 0%,#ffe08a 38%,#fff6d8 50%,#ffe08a 62%,#c98a1c 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 3px 0 #3a2404) drop-shadow(0 0 18px rgba(255,190,80,.35));animation:bannerIn .5s cubic-bezier(.2,1.4,.4,1) both,goldSweep 2.2s .4s ease-in-out both}
+#banner.rank .stripe{background:linear-gradient(90deg,transparent,rgba(40,26,4,.6) 20%,rgba(40,26,4,.6) 80%,transparent)}
+@keyframes goldSweep{from{background-position:100% 0}to{background-position:0 0}}
+@keyframes bannerIn{from{opacity:0;transform:skewX(-6deg) scale(1.25)}to{opacity:1;transform:skewX(-6deg) scale(1)}}
+#rankChip.up{animation:rankUp 1.6s ease-out}
+@keyframes rankUp{0%{transform:scale(1.25);filter:drop-shadow(0 0 10px var(--gold))}100%{transform:none;filter:none}}
+/* G8 · the phone on a landscape phone: a slimmer header and smaller tiles, so two full rows of apps show */
+@media (max-height:520px){
+  .emp .empHead h2{font-size:22px;margin:0}
+  .emp .empHead{align-items:center;gap:4px 12px}
+  #empBody .appTop{margin:0 0 4px}
+  #empBody .appTop .sbtn{min-height:38px;padding:6px 14px}
+  .appHome h4,.appHome .appCat h4{margin:4px 2px 4px}
+  .appCat .app{width:84px;min-height:84px;padding:7px 4px 6px;gap:3px}
+  .app i{width:38px;height:38px;font-size:20px;border-radius:11px}
+  .app small{display:none}
+}
+/* G8 · screens on a landscape phone: slimmer panel headers; Royale Billions puts its controls beside the cabinet
+   instead of below it (the machine and SPIN on one screen, no scrolling); its odds are untouched */
+@media (max-height:520px){
+  .panel{padding:12px 14px}
+  .panel h2{font-size:20px}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #svcBody:has(> .ryl){display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,290px);column-gap:14px;align-items:start}
+  #svcBody:has(> .ryl) > .ryl{grid-column:1;grid-row:1 / span 8}
+  #svcBody:has(> .ryl) > :not(.ryl){grid-column:2}
+  #svcBody:has(> .ryl) > .rylBar{margin-top:0}
+  .ryr{height:132px}.ryc{height:44px;font-size:23px}.ryc.royal span{width:34px;height:34px;font-size:20px}
+}
+/* G8 · the jail panel lets the cell show through (it is placed by the HUD layout, clear of the top controls) */
+#jailHud{background:linear-gradient(180deg,rgba(18,14,12,.82),rgba(14,12,10,.66));backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 8px 22px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
@@ -582,6 +714,7 @@ body[data-gs="paused"] #jailHud{display:none}
   <div id="objective" class="hidden"><span class="ot"></span><span class="otm hidden"></span></div>
   <div id="radio"></div>
   <div class="tr">
+    <div id="rankChip" title="Rank and Rep"><b id="rankName">Nobody</b><span class="rb"><i id="repFill"></i></span><small id="repText">0 Rep</small></div>
     <div id="money" title="Dirty Cash on you">$0</div>
     <div id="bank">BANK $0</div>
     <div id="carry"></div>
@@ -629,7 +762,7 @@ body[data-gs="paused"] #jailHud{display:none}
   </div>
 </div>
 <div id="flash"></div>
-<div id="banner" class="hidden"><div class="stripe"></div><div class="bt"></div><div class="bs"></div></div>
+<div id="banner" class="hidden"><div class="stripe"></div><div class="bk"></div><div class="bt"></div><div class="bs"></div></div>
 <div id="gameover" class="hidden"><div class="gt"></div><div class="gs"></div></div>
 <div id="fade"></div>
 
@@ -33999,12 +34132,12 @@ const Money = {
   dropProp(id) { const c = this.dirtyAtProp(id); this._set('p:' + id, 0); return c; },
   // display helpers: the balance that matters for a cost of this source, as HTML
   html(src) {
-    const S = MONEY_SOURCES[src], W = this.W, b = v => `<b class="money">${fmtMoney(v)}</b>`;
+    const S = MONEY_SOURCES[src], W = this.W, b = (v, k = 'dirty') => `<b class="cash ${k}">${fmtMoney(v)}</b>`;
     const mode = S ? (S.pay || S.earn) : 'either';
-    if (mode === 'clean' || mode === 'medical') return `Bank ${b(W.clean)}${W.debt > 0 ? ` · debt ${fmtMoney(W.debt)}` : ''}`;
+    if (mode === 'clean' || mode === 'medical') return `Bank ${b(W.clean, 'clean')}${W.debt > 0 ? ` · debt ${fmtMoney(W.debt)}` : ''}`;
     if (mode === 'dirty' || mode === 'me') return `Cash on you ${b(W.dirty.me)}`;
     if (mode === 'payroll' || mode === 'stash') return `Dirty reserve ${b(this.payrollReserve())}`;
-    return `Cash ${b(W.dirty.me)} · Bank ${b(W.clean)}`;
+    return `Cash ${b(W.dirty.me)} · Bank ${b(W.clean, 'clean')}`;
   }
 };
 /* =====================================================================
@@ -34896,11 +35029,11 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime;
-    sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow;
+    sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
     patchWorldVaryings(sh);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow;
+        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec3 uHorizon; uniform vec3 uZenith;
         varying vec3 vPW; varying vec3 vPN;
         ${GLSL_NOISE}
         ${GLSL_BUMP}
@@ -34919,6 +35052,21 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
           float dx2 = min(min(abs(l.x - 16.0), abs(l.x - 40.0)), abs(l.x - 64.0));
           float g2 = exp(-(dx2*dx2 + dz2*dz2) / 50.0);
           return max(g1 * step(0.5, vO), g2 * step(0.5, hO));
+        }
+        // the street lamp nearest a ground point, as the offset from the point to the lamp's foot (0 when its road is
+        // closed or the point is outside the city): the same lamp layout as lampPool
+        vec2 lampOff(vec2 s){
+          if (s.x < -6.0 || s.y < -6.0 || s.x > 966.0 || s.y > 966.0) return vec2(1e3);
+          vec2 ci = floor(s / 80.0); vec2 l = s - ci * 80.0;
+          vec2 rcl = clamp(floor((s + 40.0) / 80.0), 0.0, 12.0);
+          float vO = texture2D(uRoad, (vec2(rcl.x, clamp(ci.y, 0.0, 11.0)) + 0.5) / 16.0).r;
+          float hO = texture2D(uRoad, (vec2(clamp(ci.x, 0.0, 11.0), rcl.y) + 0.5) / 16.0).g;
+          float ex = l.x < 40.0 ? (l.x < 0.0 ? -5.3 : 5.3) : (l.x > 80.0 ? 85.3 : 74.7);
+          float ez = l.y < 40.0 ? (l.y < 0.0 ? -5.3 : 5.3) : (l.y > 80.0 ? 85.3 : 74.7);
+          vec2 a = vec2(ex, l.y < 28.0 ? 16.0 : l.y < 52.0 ? 40.0 : 64.0) - l;
+          vec2 b = vec2(l.x < 28.0 ? 16.0 : l.x < 52.0 ? 40.0 : 64.0, ez) - l;
+          a = vO > 0.5 ? a : vec2(1e3); b = hO > 0.5 ? b : vec2(1e3);
+          return dot(a, a) < dot(b, b) ? a : b;
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
@@ -35185,6 +35333,24 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
         float lp = lampPool(p, vOpen, hOpen) * uNight;
         totalEmissiveRadiance += col * vec3(1.0, 0.72, 0.42) * lp * 1.25 + vec3(1.0, 0.72, 0.45) * lp * lp * (0.03 + uWet * 0.3) * (0.4 + 0.6 * isRoad);
         totalEmissiveRadiance += col * vec3(1.0, 0.8, 0.55) * spill * 0.55;
+        // wet ground (G7): a film of water mirrors the sky, strongest at a glancing angle and in puddles, dimmer where
+        // buildings close in; at night every street lamp throws a long reflected streak toward the eye
+        if (uWet > 0.02 && vPN.y > 0.5) {
+          vec3 V = normalize(cameraPosition - vPW);
+          float ndv = clamp(V.y, 0.0, 1.0), fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+          float film = uWet * clamp(0.25 + 0.5 * isRoad + 0.75 * puddleMask, 0.0, 1.0);
+          totalEmissiveRadiance += mix(uHorizon, uZenith, clamp(ndv * 1.6, 0.0, 1.0)) * aoK * fres * film * (0.3 + 1.1 * puddleMask);
+          #ifdef PV_HQ
+          if (uNight > 0.05) {
+            float hc = max(cameraPosition.y - vPW.y, 0.6), hl = 6.0;
+            vec2 sp = cameraPosition.xz + (p - cameraPosition.xz) * (hc + hl) / hc;
+            vec2 d = lampOff(sp), u = normalize(sp - cameraPosition.xz + 1e-4);
+            float along = dot(d, u), perp = dot(d, vec2(-u.y, u.x));
+            float streak = exp(-perp * perp / mix(0.6, 3.0, 1.0 - puddleMask) - along * along / mix(260.0, 70.0, puddleMask));
+            totalEmissiveRadiance += vec3(1.0, 0.74, 0.46) * streak * uNight * film * (0.35 + 0.65 * fres) * 1.7;
+          }
+          #endif
+        }
         #ifdef PV_HQ
           // rain ripples in standing water
           if (uRain > 0.05 && puddleMask > 0.05) {
@@ -35248,6 +35414,86 @@ function makeFoliageMaterial() {
 function makePropMaterial(rough = 0.8, metal = 0.05) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal, envMapIntensity: 0.65 });
   atmos(m);
+  return m;
+}
+
+/* ---------------- Countryside terrain (Cedar Fields): detail over the height field's vertex colours ----------------
+   The vertex colour says which surface a spot is (grass is the green one; dirt, mud, rock and gravel are not), so
+   the shader only adds what a 1 m grid can't carry: sun-dried and lush patches, clumps and blades and the odd
+   wildflower up close, soil grain and pebbles, bare rock on steep slopes, darker ground and puddles in the rain, and
+   the passing cloud shadows the city has. The height field and the physics are untouched. */
+function makeTerrainMaterial(opt = {}) {
+  const { mown, ...mo } = opt;
+  const m = new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, roughness: 0.95, metalness: 0, envMapIntensity: 0.55 }, mo));
+  atmos(m, sh => {
+    sh.uniforms.uWet = U.uWet; sh.uniforms.uTime = U.uTime; sh.uniforms.uCloudShadow = U.uCloudShadow;
+    patchWorldVaryings(sh);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uWet; uniform float uTime; uniform float uCloudShadow;
+        varying vec3 vPW; varying vec3 vPN;
+        ${GLSL_NOISE}
+        ${GLSL_BUMP}
+        ${GLSL_CLOUDSHADOW}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec2 p = vPW.xz;
+        vec3 base = diffuseColor.rgb;
+        float gr = clamp((base.g - max(base.r, base.b)) * 14.0, 0.0, 1.0);
+        float near = 1.0 - smoothstep(22.0, 80.0, length(vPW - cameraPosition));
+        // fine detail only where a pixel is small enough to show it (no shimmer at a glancing angle)
+        vec2 fwp = fwidth(p); float fw = max(fwp.x, fwp.y);
+        float fine = 1.0 - smoothstep(0.025, 0.09, fw), mesoF = 1.0 - smoothstep(0.08, 0.3, fw);
+        float macro = pvf(p * 0.017), mid = pvn(p * 0.23), n1 = pvn(p * 1.9);
+        // grass: big sun-dried and lush patches, clumps, blades and wildflowers near the eye
+        vec3 g = base * (0.8 + 0.34 * mid);
+        g = mix(g, g * vec3(1.42, 1.16, 0.62), smoothstep(0.56, 0.8, macro) * 0.7);
+        g = mix(g, g * vec3(0.72, 0.92, 0.7), smoothstep(0.42, 0.2, macro) * 0.6);
+        float blades = pvn(p * vec2(9.0, 11.0)) * 0.6 + pvn(p * vec2(17.0, 15.0) + 3.0) * 0.4;
+        g *= mix(1.0, 0.76 + 0.48 * blades, near * fine);
+        g *= mix(1.0, 0.88 + 0.24 * pvn(p * vec2(3.1, 2.7)), mesoF);
+        // the odd wildflower: a small round head somewhere in a 40 cm cell (none on the mown grass of a circuit)
+        vec2 fc = floor(p * 2.5), fo = fract(p * 2.5) - 0.5 - (vec2(pvh(fc + 1.7), pvh(fc + 4.3)) - 0.5) * 0.5;
+        float fl = step(0.975, pvh(fc)) * (1.0 - smoothstep(0.1, 0.16, length(fo))) * near * mesoF * smoothstep(0.35, 0.55, macro);
+        #ifdef PV_MOWN
+          fl = 0.0;
+        #endif
+        g = mix(g, mix(vec3(0.62, 0.52, 0.08), vec3(0.55, 0.2, 0.42), step(0.5, pvh(fc + 5.0))), fl);
+        // soil and gravel: grain and pebbles
+        vec3 s = base * (0.8 + 0.32 * pvf(p * 0.33)) * (0.9 + 0.2 * n1);
+        float peb = step(0.88, pvh(floor(p * 5.0))) * near * mesoF * (1.0 - smoothstep(0.25, 0.45, dot(base, vec3(0.33))));
+        s = mix(s, s * 1.4 + 0.02, peb * 0.55);
+        vec3 col = mix(s, g, gr);
+        // asphalt (Valen Point): fine aggregate and the odd glint; paint and kerbs stay clean
+        float lum = dot(base, vec3(0.3, 0.59, 0.11));
+        float asph = (1.0 - smoothstep(0.035, 0.07, lum)) * (1.0 - gr), bright = smoothstep(0.35, 0.6, lum);
+        col = mix(col, max(base, vec3(0.115, 0.12, 0.125)) * (0.86 + 0.28 * pvn(p * 7.0)) + step(0.94, pvh(floor(p * 17.0))) * 0.02 * near * fine, asph); // the city roads' asphalt tone, not black
+        col = mix(col, base * (0.95 + 0.06 * n1), bright);
+        #ifdef PV_MOWN
+          col *= 1.0 + gr * (0.075 * (smoothstep(-0.3, 0.3, sin((p.x - p.y * 0.18) * 0.8976)) * 2.0 - 1.0) + 0.03 * (pvn(p * vec2(0.6, 4.0)) - 0.5)); // mowing stripes
+        #endif
+        // bare rock on steep ground
+        float slope = 1.0 - clamp(vPN.y, 0.0, 1.0);
+        float rk = smoothstep(0.32, 0.55, slope + (mid - 0.5) * 0.12);
+        vec3 rock = vec3(0.3, 0.29, 0.27) * (0.75 + 0.4 * pvn(vec2(p.x + p.y, vPW.y * 3.0) * vec2(0.4, 1.0))) * (0.9 + 0.2 * n1);
+        col = mix(col, rock, rk);
+        float rough = mix(0.97, 0.88, rk);
+        float hgt = (blades * 0.014 * gr * fine + (peb * 0.012 + n1 * 0.02) * (1.0 - gr) * (1.0 - asph) * (1.0 - bright)) * near + rk * pvn(p * 3.0) * 0.04;
+        rough = mix(rough, 0.86, asph);
+        // rain: everything darkens and gains a sheen; puddles collect on bare ground
+        float puddle = smoothstep(0.6, 0.7, pvf(p * 0.14 + 7.0)) * (1.0 - gr) * (1.0 - rk) * uWet;
+        col *= 1.0 - uWet * mix(mix(0.22, 0.3, 1.0 - gr), 0.42, asph);
+        col = mix(col, col * 0.6, puddle);
+        rough = mix(rough, rough * mix(0.62, 0.36, asph), uWet); rough = mix(rough, 0.06, puddle);
+        hgt *= 1.0 - puddle;
+        col *= pvCloudShadow(p);
+        diffuseColor.rgb = col;
+        roughnessFactor = rough;
+        normal = pvBump(-vViewPosition, normal, hgt, 1.0);
+      }`);
+  });
+  if (opt.mown) { m.defines = Object.assign(m.defines || {}, { PV_MOWN: '' }); }
+  m.customProgramCacheKey = () => 'pv-terrain' + (opt.polygonOffset ? '-off' : '') + (opt.mown ? '-mown' : '');
   return m;
 }
 
@@ -35372,7 +35618,7 @@ function makeVehicleMaterial(physical) {
   const u = {
     uPaint: { value: new THREE.Color(0.6, 0.1, 0.1) }, uPaint2: { value: new THREE.Color(1, 1, 1) },
     uLights: { value: new THREE.Vector4(0, 0, 0, 0) }, uLights2: { value: new THREE.Vector4(0, 0, 0, 0) }, uMisc: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uFinish: { value: new THREE.Vector4(0.25, 0.45, 0.2, 0) }
+    uFinish: { value: new THREE.Vector4(0.25, 0.45, 0.2, 0) }, uFinish2: { value: new THREE.Vector4(-1, 0, 0, 0) }
   };
   m.userData.u = u;
   atmos(m, sh => {
@@ -35382,7 +35628,7 @@ function makeVehicleMaterial(physical) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPart = aPart; vLP = position;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform vec3 uPaint; uniform vec3 uPaint2; uniform vec4 uLights; uniform vec4 uLights2; uniform vec4 uMisc; uniform vec4 uFinish; uniform float uNight; uniform float uWet;
+        uniform vec3 uPaint; uniform vec3 uPaint2; uniform vec4 uLights; uniform vec4 uLights2; uniform vec4 uMisc; uniform vec4 uFinish; uniform vec4 uFinish2; uniform float uNight; uniform float uWet;
         varying float vPart; varying vec3 vLP;
         float vh(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -35407,7 +35653,7 @@ function makeVehicleMaterial(physical) {
           float rust = wear * step(0.55, rustN + smoothstep(0.75, 0.3, vLP.y) * 0.35) * smoothstep(1.0, 0.35, vLP.y);
           diffuseColor.rgb = mix(mix(faded, faded * vec3(0.55, 0.5, 0.45), g2), vec3(0.32, 0.17, 0.08), rust * 0.8);
           roughnessFactor = mix(mix(0.5, 0.1, uFinish.y), 0.7, max(g2, rust));
-          metalnessFactor = mix(0.3, 0.62, uFinish.x) * (1.0 - rust);
+          metalnessFactor = (uFinish2.x >= 0.0 ? uFinish2.x : mix(0.3, 0.62, uFinish.x)) * (1.0 - rust); // a one-off's own metal (gold leaf)
         }
         else if (pp < 1.5) { diffuseColor.rgb = vec3(0.025, 0.03, 0.04); roughnessFactor = 0.03; metalnessFactor = 0.9; }
         else if (pp < 2.5) { diffuseColor.rgb = vec3(0.04); roughnessFactor = 0.55; metalnessFactor = 0.1; }
@@ -35608,6 +35854,22 @@ function prismGeometry() {
 }
 // a lumpy clump of leaves: an icosphere pushed in and out by smooth position noise, its normals half way between
 // the facets and the sphere's, so a canopy of them reads soft but not blobby (G3)
+// a unit box (centred, side 1) with rounded edges: r per axis is the rounding radius in the box's own units (0 keeps
+// that axis's faces flat). Normals come from the rounding, so the seams between the box's faces shade smoothly (G6:
+// limbs and torsos without box edges)
+function roundBoxGeometry(sx, sy, sz, rx, ry, rz) {
+  const g = new THREE.BoxGeometry(1, 1, 1, sx, sy, sz), p = g.attributes.position, n = g.attributes.normal;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const cx = clamp(x, -0.5 + rx, 0.5 - rx), cy = clamp(y, -0.5 + ry, 0.5 - ry), cz = clamp(z, -0.5 + rz, 0.5 - rz);
+    const ux = rx ? (x - cx) / rx : 0, uy = ry ? (y - cy) / ry : 0, uz = rz ? (z - cz) / rz : 0, L = Math.hypot(ux, uy, uz);
+    if (L < 1e-6) continue;
+    p.setXYZ(i, cx + ux / L * rx, cy + uy / L * ry, cz + uz / L * rz);
+    const nx = rx ? ux / L / rx : 0, ny = ry ? uy / L / ry : 0, nz = rz ? uz / L / rz : 0, nl = Math.hypot(nx, ny, nz) || 1;
+    n.setXYZ(i, nx / nl, ny / nl, nz / nl);
+  }
+  return g;
+}
 function blobGeometry(detail = 1) {
   const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position;
   const bump = (x, y, z) => 1 + 0.17 * Math.sin(3.1 * x + 1.7 * y + 0.4) * Math.cos(2.3 * z + 0.9 * x) + 0.09 * Math.sin(5.3 * y + 2.1 * z + 1.3) - 0.05 * Math.cos(4.1 * x - 3.7 * z);
@@ -40591,7 +40853,7 @@ function vpNormals(pts) { return pts.map((p, k) => { const a = pts[Math.max(0, k
 class ValenPointScenery {
   constructor(scene, world) {
     this.scene = scene; this.world = world;
-    const vp = world.vp, T = vp.track, mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    const vp = world.vp, T = vp.track, mat = makeTerrainMaterial({ side: THREE.DoubleSide, mown: true });
     this.mat = mat;
     // ---------------------------------------------------------------- shared: the island and the causeway
     const base = fb => {
@@ -40701,9 +40963,9 @@ const CFS_SCN = { tile: 50, far: 5, farC: 10, farR: 300, nearR: 70, stripR: 500,
 class CedarScenery {
   constructor(scene, world, gmat) {
     this.scene = scene; this.world = world; this.cf = world.cfs;
-    this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+    this.mat = makeTerrainMaterial();
     // the strip and the bridge's promenade gap meet the city's ground slabs at the same height: they draw on top
-    this.matOff = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    this.matOff = makeTerrainMaterial({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     this.R = {}; for (const R of Terrain.regions) this.R[R.id] = R;
     this.tiles = new Map(); this.nearSet = null; this.stats = { built: 0 }; this._stamp = 0;
     const C3 = new THREE.Color(); this._col = (s, x, z, y) => { C3.setHex(TSURF_COL[s]); const k = 1 + 0.08 * tNoise(x / 9, z / 9, 61) + (s === 0 ? clamp((y - 3) * 0.02, -0.08, 0.06) : 0); return [C3.r * k, C3.g * k, C3.b * k]; };
@@ -40887,6 +41149,10 @@ function randomLook(rng = Math.random) {
   if (fem && rng() < 0.3) L.skirt = C(p(PANTS.concat([0x7a2e3a, 0x2e4a7a])));
   if (rng() < 0.1) L.shades = true;
   if (!fem && rng() < 0.12) L.cap = C(p([0x111111, 0x8a2f3a, 0x2f5d8a, 0xd8d0c0]));
+  // G6: more of a street's variety (drawn last, so a seeded look keeps everything it had): long coats over a jacket,
+  // knitted beanies
+  if (L.jacket && !L.skirt && rng() < 0.3) L.coat = true;
+  if (!L.cap && rng() < 0.08) L.beanie = C(p([0x2a2a2e, 0x8a2f3a, 0x2f5d8a, 0x3a6a4a, 0xc9822a, 0xd8d0c0]));
   return L;
 }
 const _cm = Array.from({ length: 28 }, () => new THREE.Matrix4());
@@ -40901,17 +41167,14 @@ class CharacterRenderer {
   constructor(scene, max = 110) {
     this.max = max;
     this.mat = new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02 });
-    // tapered limb: narrower at the far end, slightly rounded edges via a bevel-ish vertex pull
-    const limbGeo = new THREE.BoxGeometry(1, 1, 1, 1, 2, 1); limbGeo.translate(0, -0.5, 0);
+    // tapered limb: a rounded section (G6: no box edges), narrower at the far end
+    const limbGeo = roundBoxGeometry(3, 2, 3, 0.42, 0, 0.42); limbGeo.translate(0, -0.5, 0);
     { const p = limbGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); const k = y < -0.9 ? 0.8 : y < -0.4 ? 0.93 : 1; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); } }
-    limbGeo.computeVertexNormals();
-    // torso: chest wider than waist, front slightly fuller than back
-    const torsoGeo = new THREE.BoxGeometry(1, 1, 1, 1, 3, 1);
+    // torso: rounded at the sides and shoulders; chest wider than waist, front slightly fuller than back
+    const torsoGeo = roundBoxGeometry(3, 3, 3, 0.3, 0.1, 0.36);
     { const p = torsoGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < 0) { p.setX(i, p.getX(i) * (y < -0.4 ? 0.8 : 0.86)); } else if (y > 0.4) { p.setX(i, p.getX(i) * 0.92); p.setZ(i, p.getZ(i) * 0.9); } if (p.getZ(i) > 0 && y > -0.2 && y < 0.35) p.setZ(i, p.getZ(i) * 1.08); } }
-    torsoGeo.computeVertexNormals();
-    const hipsGeo = new THREE.BoxGeometry(1, 1, 1);
+    const hipsGeo = roundBoxGeometry(3, 1, 3, 0.28, 0, 0.34);
     { const p = hipsGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.9); } }
-    hipsGeo.computeVertexNormals();
     const skirtGeo = new THREE.CylinderGeometry(0.5, 0.78, 1, 10, 1, false); skirtGeo.translate(0, -0.5, 0);
     const handGeo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
     { const p = handGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.75); p.setZ(i, p.getZ(i) * 0.8); } }
@@ -41005,6 +41268,7 @@ class CharacterRenderer {
     _cm[6].copy(root).multiply(mT(_tm, 0, hipY + 0.04, 0)).multiply(mS(_tm, 0.37 * bw * hpW, 0.21, 0.23));
     this._put('hips', _cm[6], col(L.skirt || L.pants));
     if (L.skirt && !far) { _cm[6].copy(root).multiply(mT(_tm, 0, hipY + 0.14, 0)).multiply(mS(_tm, 0.42 * bw * hpW, 0.42, 0.3)); this._put('skirt', _cm[6], col(L.skirt)); }
+    else if (L.coat && L.jacket && !far && sit < 0.5) { _cm[6].copy(root).multiply(mT(_tm, 0, hipY + 0.2, -0.01)).multiply(mS(_tm, 0.47 * bw * hpW, 0.56, 0.31)); this._put('skirt', _cm[6], col(L.jacket)); }
     const lean = (ps.lean || 0) + crouch * 0.5 - sit * 0.05 - hit * 0.35 + (ps.dodge || 0) * 0.25 + heavy * 0.15;
     const twist = (ps.twist || 0) + (heavy > 0 ? (heavy < 0.45 ? 0.5 * heavy / 0.45 : -0.6 * Math.sin((heavy - 0.45) / 0.55 * Math.PI)) : 0) + (ps.punch > 0 ? -0.3 * (ps.punchArm || -1) * Math.sin(ps.punch * Math.PI) : 0);
     const hp = _cm[7].copy(root).multiply(mT(_tm, 0, hipY + 0.1, 0)).multiply(mRx(_tm, lean)).multiply(mRy(_tm, twist + Math.sin(phase) * A * 0.12));
@@ -41052,6 +41316,9 @@ class CharacterRenderer {
         this._put('hat', _cm[11], col(L.cap));
         _cm[11].copy(hd).multiply(mT(_tm, 0, 0.07, 0.1)).multiply(mS(_tm, 0.12, 0.02, 0.1));
         this._put('small', _cm[11], col(L.cap));
+      } else if (L.beanie) {
+        _cm[11].copy(hd).multiply(mT(_tm, 0, 0.055, -0.008)).multiply(mS(_tm, 0.132, 0.1, 0.142));
+        this._put('hat', _cm[11], col(L.beanie));
       } else if (L.hairStyle > 0) {
         const long = L.hairStyle === 2, bun = L.hairStyle === 3, curly = L.hairStyle === 4, tail = L.hairStyle === 5;
         _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.005 : 0.025, -0.012)).multiply(mS(_tm, curly ? 0.142 : 0.125, long ? 0.17 : curly ? 0.155 : 0.135, curly ? 0.155 : 0.14));
@@ -42076,7 +42343,7 @@ Object.assign(PROFILES, {
 const UNIQUE_CARS = [
   { id: 'corsair', n: 1, type: 'u_corsair', kind: 'Classic', how: 'find', spot: 'corsair', area: 95, reveal: 45, origin: 'found', msrp: 42000, cargo: 220, keeper: 'the depot night man',
     spec: { rev: 0.37, name: 'Golden Corsair', l: 5.0, w: 1.95, h: 1.32, mass: 1620, power: 16400, drift: 0.36, vmax: 67, steer: 0.5, grip: 0.98, brake: 12.5, soft: 1.2, wheelR: 0.36, camDist: 6.9, camH: 1.7, eng: 0.6, profile: 'classic', chromeBumpers: true, dualExhaust: true, stripes: true,
-      colors: [0xc9a227], paint2: 0x1a1408, finish: { flake: 1, gloss: 1, wear: 0, rim: 3 }, blurb: 'A 1968 Corsair finished in gold leaf, black pinstripes and every chrome part re-plated. The only one.' },
+      colors: [0xc9a227], paint2: 0x1a1408, finish: { flake: 1, gloss: 1, wear: 0, rim: 3, metal: 0.9 }, blurb: 'A 1968 Corsair finished in gold leaf, black pinstripes and every chrome part re-plated. The only one.' },
     clue: 'Fifteen packages: someone has noticed. A phone tip points to the Docklands, the alleys behind the depot on Harbor Row.', hint: 'Behind the depot, Harbor Row (Docklands)' },
   { id: 'spectre', n: 2, type: 'u_spectre', kind: 'Coupe', how: 'reward', origin: 'reward', msrp: 58000, cargo: 110, keeper: '"Sprocket" Tull',
     spec: { rev: 0.36, name: 'Calloway Spectre', l: 4.68, w: 1.98, h: 1.22, mass: 1340, power: 18200, drift: 0.16, vmax: 80, steer: 0.54, grip: 1.36, brake: 17.5, soft: 0.62, wheelR: 0.36, camDist: 6.4, camH: 1.55, eng: 1.55, profile: 'u_coupe', dualExhaust: true, wing: 'lip', sideIntakes: true,
@@ -42197,6 +42464,7 @@ class Vehicle {
     const L = TIER_LOOK[tier] || TIER_LOOK.common, F = tier === 'unique' && this.spec.finish ? this.spec.finish : L;
     this.vtier = tier; this.rim = F.rim;
     this.mat.userData.u.uFinish.value.set(F.flake, F.gloss, F.wear, F.rim);
+    this.mat.userData.u.uFinish2.value.set(F.metal !== undefined ? F.metal : -1, 0, 0, 0);
   }
   get speed() { return Math.hypot(this.vel.x, this.vel.y); }
   get fx() { return Math.sin(this.h); } get fz() { return Math.cos(this.h); }
@@ -45557,7 +45825,7 @@ const KIT_FACES = [
   [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1], 0.86]
 ];
 class InteriorKit {
-  constructor(h) { this.H = h; this.a = { p: [], c: [], i: [] }; this.g = { p: [], c: [], i: [] }; this.cols = []; this._c = new THREE.Color(); }
+  constructor(h) { this.H = h; this.a = { p: [], c: [], i: [] }; this.g = { p: [], c: [], i: [] }; this.cols = []; this._c = new THREE.Color(); this.lights = []; }
   // x,z: centre; y: bottom; w,h,d: size. opt.col adds a collider, opt.glow puts it in the emissive mesh.
   box(x, y, z, w, h, d, color, opt = {}) {
     const t = opt.glow ? this.g : this.a, c = this._c.set(color);
@@ -45575,7 +45843,12 @@ class InteriorKit {
     for (let q = 0; q < 6; q++) { const o = base + q * 4; t.i.push(o, o + 1, o + 2, o, o + 2, o + 3); }
     if (opt.col) this.cols.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, y0: y, y1: y + h });
   }
-  glow(x, y, z, w, h, d, color, k = 2.2) { this.box(x, y, z, w, h, d, color, { glow: k }); }
+  // a lamp of any real size also lights the room (G4): its centre, colour and a strength from its size
+  glow(x, y, z, w, h, d, color, k = 2.2) {
+    this.box(x, y, z, w, h, d, color, { glow: k });
+    const area = w * d + w * h + h * d;
+    if (k >= 1.8 && area >= 0.3) this.lights.push({ x, y: y + h / 2, z, c: new THREE.Color(color), s: Math.min(1.25, 0.45 + area * 0.5) });
+  }
   // closed room: floor, ceiling, four walls (with colliders), skirting and a ceiling light grid
   room(w, d, h, o) {
     this.box(0, -0.25, 0, w + 0.8, 0.25, d + 0.8, o.floor, { flat: true });
@@ -45633,11 +45906,63 @@ class InteriorKit {
       geo.setIndex(t.i); geo.computeBoundingSphere();
       const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; return m;
     };
-    return { main: mk(this.a, INT_MAT()), glow: this.g.p.length ? mk(this.g, INT_GLOW()) : null };
+    const main = mk(this.a, makeInteriorMaterial(this.lights));
+    main.onBeforeRender = (r, sc, cam) => main.material.userData.pick(cam, main);
+    return { main, glow: this.g.p.length ? mk(this.g, INT_GLOW()) : null };
   }
 }
-let _intMat = null, _intGlow = null;
-function INT_MAT() { return _intMat || (_intMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); }
+let _intGlow = null;
+/* the room's own light (G4): the baked colours (face shading, floor AO) are the ambient; every lamp of the room adds
+   a warm pool with distance falloff on the surfaces facing it, and floors catch a soft reflection of the lamps over
+   them. Flat faces get their normal from the screen derivatives, so the kit needs no normals. Up to INT_LIGHTS
+   lamps light a room at once: in a bigger one, the ones nearest the camera (re-picked a few times a second). Each
+   room has its own material (its own lamps), all of them one shader program. */
+const INT_LIGHTS = 20;
+function makeInteriorMaterial(lights) {
+  const m = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+  const uL = [], uC = []; for (let i = 0; i < INT_LIGHTS; i++) { uL.push(new THREE.Vector4()); uC.push(new THREE.Color()); }
+  const u = { uL: { value: uL }, uLC: { value: uC }, uLN: { value: 0 } };
+  const load = list => { list.forEach((L, i) => { uL[i].set(L.x, L.y, L.z, L.s); uC[i].copy(L.c); }); u.uLN.value = list.length; };
+  load(lights.slice(0, INT_LIGHTS));
+  let t = 0; const v = new THREE.Vector3();
+  m.userData.pick = (cam, mesh) => {
+    if (lights.length <= INT_LIGHTS) return;
+    const now = performance.now(); if (now - t < 300) return; t = now;
+    v.copy(cam.position).sub(mesh.parent ? mesh.parent.position : mesh.position);
+    load(lights.slice().sort((a, b) => ((a.x - v.x) ** 2 + (a.z - v.z) ** 2) - ((b.x - v.x) ** 2 + (b.z - v.z) ** 2)).slice(0, INT_LIGHTS));
+  };
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLP; varying vec3 vCamL;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position; vCamL = cameraPosition - modelMatrix[3].xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vLP; varying vec3 vCamL;
+        uniform vec4 uL[${INT_LIGHTS}]; uniform vec3 uLC[${INT_LIGHTS}]; uniform int uLN;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec3 N = normalize(cross(dFdx(vLP), dFdy(vLP)));
+        vec3 V = normalize(vCamL - vLP);
+        if (dot(N, V) < 0.0) N = -N;
+        float flo = step(0.85, N.y) * (1.0 - smoothstep(0.03, 0.2, vLP.y));
+        vec3 R = reflect(-V, N), acc = vec3(0.0), spec = vec3(0.0);
+        for (int i = 0; i < ${INT_LIGHTS}; i++) {
+          if (i >= uLN) break;
+          vec3 d = uL[i].xyz - vLP; float dd = dot(d, d); vec3 l = d * inversesqrt(dd + 1e-4);
+          float att = uL[i].w / (1.0 + dd * 0.085);
+          acc += uLC[i] * att * (max(dot(N, l), 0.0) * 0.85 + 0.15);
+          spec += uLC[i] * uL[i].w * pow(max(dot(R, l), 0.0), 48.0);
+        }
+        // the baked colours were made to read at 1.0: lamps lift a surface to ~1.15 at most (soft saturation, so a floor
+        // under many lamps does not burn out) and the far corners settle near 0.7
+        vec3 lit = 0.68 + 0.62 * acc / (1.0 + acc);
+        diffuseColor.rgb = uLN > 0 ? diffuseColor.rgb * lit + min(spec, vec3(1.2)) * flo * 0.16 : diffuseColor.rgb; // a room without lamps keeps its baked light
+      }`);
+  };
+  m.customProgramCacheKey = () => 'pv-interior';
+  return m;
+}
 function INT_GLOW() { return _intGlow || (_intGlow = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })); }
 
 // skyline used behind interior windows: sky gradient plane + silhouette plane + lit-window plane
@@ -46853,7 +47178,7 @@ function casinoInteriorDef() {
       k.tiles(W, D, 0x5a1420, 0x6a1c2a, 2);
       k.door(0, D / 2 - 0.02, 0, 0x1a0e24, 0xffd84d);
       // lobby: marble strip at the doors, cashier cage (east), bar (west), a gold fountain-sculpture between
-      k.box(0, -0.004, D / 2 - 3, 12, 0.012, 6, 0xe8e2d4, { flat: true });
+      k.box(0, -0.004, D / 2 - 3, 12, 0.012, 6, 0xbfb5a3, { flat: true }); // (G4: a shade darker, so it reads as marble under the lamps, not as white)
       k.box(15.2, 0, 10.6, 6, 1.15, 0.8, 0x2a1a36, { col: true }); k.box(15.2, 1.15, 10.6, 6.1, 0.06, 0.9, 0xd8a227);
       for (let i = 0; i < 7; i++) k.box(12.4 + i * 0.93, 1.21, 10.6, 0.05, 1.6, 0.05, 0xd8a227);
       k.glow(15.2, 2.9, 10.3, 5.6, 0.35, 0.05, 0xffd84d, 2.2);
@@ -46945,7 +47270,7 @@ class InteriorManager {
     if (!def || !def.dynamic) return;
     for (const c of def.cols || []) this.g.world.grid.remove(c);
     this.g.scene.remove(def.group);
-    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.pick) o.material.dispose(); });
     delete this.defs[def.id];
   }
   _window(w) {
@@ -47074,19 +47399,19 @@ class InteriorManager {
    - Your own business: walk in, no robbing yourself; the counter is where
      you manage it.
    ===================================================================== */
-// fit: how the shop floor is dressed; till/safe: cash ranges (M13: tills ×0.8, safes ×0.65, so a robbery spree is the
+// floor (two tile colours), ceil, lamp: the room's surfaces and light; fit: how the shop floor is dressed; till/safe: cash ranges (M13: tills ×0.8, safes ×0.65, so a robbery spree is the
 // high-risk loop, not the one loop worth doing); stock: what the stockroom gives; sec: the security a
 // trade starts with (0 none, 1 cameras, 2 a guard); pal: the colours of its stock
 const ROB_THEMES = {
-  shop: { fit: 'shelves', till: [100, 300], safe: [780, 2340], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
-  pharmacy: { fit: 'shelves', till: [120, 360], safe: [1300, 3250], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
-  jewelry: { fit: 'cases', till: [240, 720], safe: [3900, 9750], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
-  electronics: { fit: 'screens', till: [160, 480], safe: [1620, 3900], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
-  pawn: { fit: 'clutter', till: [200, 560], safe: [1950, 5200], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
-  boutique: { fit: 'racks', till: [160, 480], safe: [1620, 4220], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
-  bar: { fit: 'bar', till: [240, 720], safe: [980, 2600], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
-  food: { fit: 'tables', till: [100, 340], safe: [580, 1690], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
-  service: { fit: 'chairs', till: [80, 260], safe: [520, 1430], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
+  shop: { floor: [0xcfcac0, 0xb8b3a8], ceil: 0xf4f2ee, lamp: 0xf4fbff, fit: 'shelves', till: [100, 300], safe: [780, 2340], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
+  pharmacy: { floor: [0xeef2f2, 0xd6e0e0], ceil: 0xf8fbfb, lamp: 0xf0fbff, fit: 'shelves', till: [120, 360], safe: [1300, 3250], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
+  jewelry: { floor: [0x2c2832, 0x3c3644], ceil: 0x221f27, lamp: 0xffe6bc, fit: 'cases', till: [240, 720], safe: [3900, 9750], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
+  electronics: { floor: [0x5e626a, 0x4e525a], ceil: 0x3a3e46, lamp: 0xe4f0ff, fit: 'screens', till: [160, 480], safe: [1620, 3900], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
+  pawn: { floor: [0x86704f, 0x765f42], ceil: 0xb8ad98, lamp: 0xffdca0, fit: 'clutter', till: [200, 560], safe: [1950, 5200], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
+  boutique: { floor: [0xeadfd8, 0xdacbc2], ceil: 0xfbf6f4, lamp: 0xfff0e6, fit: 'racks', till: [160, 480], safe: [1620, 4220], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
+  bar: { floor: [0x5a3a24, 0x4a2e1c], ceil: 0x2c2018, lamp: 0xffc070, fit: 'bar', till: [240, 720], safe: [980, 2600], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
+  food: { floor: [0xece2cc, 0xb8402e], ceil: 0xf6efe0, lamp: 0xfff0d0, fit: 'tables', till: [100, 340], safe: [580, 1690], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
+  service: { floor: [0xd6dade, 0xc2c8ce], ceil: 0xf4f6f8, lamp: 0xf4fbff, fit: 'chairs', till: [80, 260], safe: [520, 1430], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
 };
 const ROB_CAT_THEME = { convenience: 'shop', grocery: 'shop', pharmacy: 'pharmacy', jewelry: 'jewelry', electronics: 'electronics', pawn: 'pawn', boutique: 'boutique', bar: 'bar',
   coffee: 'food', diner: 'food', pizza: 'food', restaurant: 'food', barber: 'service', salon: 'service', tattoo: 'service', laundromat: 'service', arcade: 'service' };
@@ -47105,8 +47430,10 @@ function bizInteriorDef(prop, L) {
     id: 'b:' + prop.id, dynamic: true, name: prop.name, w: W, d: D, h: 3.2, exit: { x: -3.5, z: 4.6 }, spawnH: Math.PI, store: true, noExit: true,
     propId: prop.id, rob: T, at: { x: L.x, z: L.z }, door: { x: L.x, z: L.z, h: L.h }, seed: prop.id.length * 131 + prop.price % 997,
     build(k, rng, def) {
-      k.room(W, D, 3.2, { floor: 0xcfcac0, wall: T.wall, ceil: 0xf4f2ee, trim: T.trim, band: [2.5, 0.3], bandC: T.trim, lights: [3, 3], lightC: 0xf4fbff });
-      k.tiles(W, D, 0xcfcac0, 0xb8b3a8, 0.6);
+      // each trade its own floor, ceiling and lamp colour (G4): a bar is dark wood under amber light, a jeweller dark
+      // stone under warm spots, a pharmacy clinical white; the layout, its spots and the heist are the same for all
+      k.room(W, D, 3.2, { floor: T.floor[0], wall: T.wall, ceil: T.ceil, trim: T.trim, band: [2.5, 0.3], bandC: T.trim, lights: [3, 3], lightC: T.lamp });
+      k.tiles(W, D, T.floor[0], T.floor[1], 0.6);
       k.door(-3.5, hd - 0.02, 0, 0x9ab4c4, T.trim);
       // the partition, the staff door behind the counter (same place as at a Fuel & Go, so openStaffDoor serves both)
       iwall(k, 'x', -1.8, -hw, hw, 0, 3.2, 0xd8d4ca, [[2.6, 3.8]]);
@@ -50925,7 +51252,7 @@ class Underworld {
     if (r > S.rankMax) {
       S.rankMax = r;
       if (this._booted) {
-        this.g.later(1200, () => { this.g.ui.banner(RANKS[r].name, r < RANK_MAX ? 'Next: ' + RANKS[r].hint : 'The city is yours. Hold it.', 'pass', 4.5); this.g.audio.play('pass'); });
+        this.g.later(1200, () => { this.g.ui.banner(RANKS[r].name, r < RANK_MAX ? 'Next: ' + RANKS[r].hint : 'The city is yours. Hold it.', 'rank', 4.5, 'New rank'); this.g.audio.play('pass'); const c = $('rankChip'); if (c) { c.classList.remove('up'); void c.offsetWidth; c.classList.add('up'); } });
         this.news('pv', this.rankLine(r));
       }
     }
@@ -54466,7 +54793,7 @@ class UniqueCars {
     const r = this.rec(id), d = UNIQUE_BY[id]; if (r.st >= st) return false;
     r.st = st;
     if (!quiet && st === 1) { this.g.content.phone(UQ_FROM[id], d.clue); this.g.ui.toast(`New lead: ${d.hint}${d.how === 'find' ? ' (search area on the map)' : ''}.`, 'info'); }
-    if (!quiet && st === 2 && d.how === 'find') { this.g.ui.banner('One-off spotted', VEHICLES[d.type].name, 'info', 2.6); this.g.audio.play('pass'); }
+    if (!quiet && st === 2 && d.how === 'find') { this.g.ui.banner(VEHICLES[d.type].name, d.kind, 'info', 3, 'One-off spotted'); this.g.audio.play('pass'); }
     this.g.saveGame();
     return true;
   }
@@ -54475,7 +54802,7 @@ class UniqueCars {
   acquired(d) {
     const g = this.g, r = this.rec(d.id); r.st = 3; r.day = g.uw ? g.uw.S.day : 0;
     g.vreg.note('one-off acquired', d.type, { id: d.id });
-    g.ui.banner('One-off acquired', `${VEHICLES[d.type].name} · ${this.count()} of ${UNIQUE_CARS.length}`, 'pass', 3.5);
+    g.ui.banner(VEHICLES[d.type].name, `One of ten · ${this.count()} of ${UNIQUE_CARS.length} found`, 'rank', 4, 'One-off acquired');
     g.audio.play('pass');
     g.saveGame(true);
   }
@@ -54649,13 +54976,50 @@ class UniqueCars {
   // ---------------------------------------------------------------- the clock, saves and resets
   update(dt) {
     const g = this.g; if (!g.uw || g.state !== 'playing') return;
+    this.showcase(dt);
     this.t -= dt; if (this.t > 0) return; this.t = UQ.tick;
     this.check(); this.updateWorld();
     // the Golden Corsair is also one of the city's secrets (the first time you drive it)
     const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
     if (pv && pv.type === 'u_corsair' && pv.garageUid) g.content.secret('gold');
   }
-  clearAll() { for (const v of this.live.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.live.clear(); }
+  // ---------------------------------------------------------------- how a waiting one-off looks (G5)
+  // one still standing where its clue put it is lit like a car on a stand: a warm pool of light round it on the
+  // ground and, from dusk, a soft beam from above. Both go the moment it leaves its spot or is taken.
+  showcase(dt) {
+    const g = this.g;
+    if (!this._sc) {
+      const cv = (w, h, paint) => { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d')); return new THREE.CanvasTexture(c); };
+      const pool = cv(128, 128, x => { const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); });
+      const beam = cv(4, 64, x => { const gr = x.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 4, 64); });
+      const mat = map => new THREE.MeshBasicMaterial({ map, color: 0xffd7a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide });
+      const pg = new THREE.PlaneGeometry(1, 1); pg.rotateX(-Math.PI / 2);
+      const bg = new THREE.CylinderGeometry(0.35, 1, 1, 20, 1, true); bg.translate(0, 0.5, 0);
+      this._sc = { pg, bg, pm: mat(pool), bm: mat(beam), on: new Map(), t: 0 };
+    }
+    const S = this._sc; S.t += dt;
+    const night = U.uNight.value, pulse = 1 + 0.07 * Math.sin(S.t * 1.7);
+    for (const [id, o] of S.on) if (!this.live.has(id)) { g.outdoor.remove(o.pool, o.beam); S.on.delete(id); }
+    for (const [id, v] of this.live) {
+      const sp = this.spotOf(id), show = !!sp && this.liveOf(id) === v && v !== g.player.vehicle && !v.burnt && this.st(id) < 3 && Math.hypot(v.pos.x - sp.x, v.pos.z - sp.z) < 3;
+      let o = S.on.get(id);
+      if (!show) { if (o) { g.outdoor.remove(o.pool, o.beam); S.on.delete(id); } continue; }
+      if (!o) {
+        o = { pool: new THREE.Mesh(S.pg, S.pm), beam: new THREE.Mesh(S.bg, S.bm) };
+        o.pool.renderOrder = 2; o.beam.renderOrder = 3; o.pool.frustumCulled = o.beam.frustumCulled = false;
+        g.outdoor.add(o.pool, o.beam); S.on.set(id, o);
+      }
+      const y = groundY(v.pos.x, v.pos.z), L = v.spec.l + 3.2, W = v.spec.w + 3.2, H = 7.5;
+      o.pool.position.set(v.pos.x, y + 0.05, v.pos.z); o.pool.rotation.y = v.h; o.pool.scale.set(W, 1, L);
+      o.beam.position.set(v.pos.x, y + 0.02, v.pos.z); o.beam.scale.set(L * 0.42, H, L * 0.42);
+      o.beam.visible = night > 0.15;
+    }
+    S.pm.opacity = (0.16 + 0.5 * night) * pulse; S.bm.opacity = 0.2 * clamp((night - 0.15) / 0.5, 0, 1);
+  }
+  clearAll() {
+    if (this._sc) { for (const o of this._sc.on.values()) this.g.outdoor.remove(o.pool, o.beam); this._sc.on.clear(); }
+    for (const v of this.live.values()) if (this.g.vehicles.list.includes(v) && v !== this.g.player.vehicle) this.g.vehicles.despawn(v); this.live.clear();
+  }
   reset() { this.clearAll(); this.t = 0; this._spots = {}; if (this.s) for (const u of UNIQUE_CARS) this.rec(u.id); }
   // sanitize a save (SaveSystem, after the vehicle registry's): known ids and states only, one fleet or waiting
   // entry per one-off at most, every acquired one accounted for, and the old Golden Corsair brought in
@@ -58262,7 +58626,7 @@ class EmpireUI {
     const st = RANKS[uw.rank];
     // the header (M11): Rank · Dirty · Bank · Pressure always, the rest smaller
     const pcol = S.pressure > 66 ? 'var(--red)' : S.pressure > 33 ? 'var(--amber)' : 'var(--green)';
-    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="money">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Pressure <b style="color:${pcol}">${Math.round(S.pressure)}</b></span><small class="empSub">Rep ${g.save.rep} · Influence ${uw.influence} · Day ${uw.calDay}${S.jail ? ` · <b style="color:var(--red)">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</b>` : ''}</small>`;
+    $('empStats').innerHTML = `<span class="chipS">${esc(st.name)}</span><span>Dirty <b class="cash dirty">${fmtMoney(Money.dirtyTotal())}</b></span><span>Bank <b class="cash clean">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? ` <small>debt ${fmtMoney(Money.debt)}</small>` : ''}</span><span>Pressure <b style="color:${pcol}">${Math.round(S.pressure)}</b></span><small class="empSub">Rep ${g.save.rep} · Influence ${uw.influence} · Day ${uw.calDay}${S.jail ? ` · <b style="color:var(--red)">IN JAIL · ${uw.prison.phone() ? (S.jailPhone ? 'phone' : 'payphone ' + Math.ceil(uw.prison.callT) + 's') : 'no phone'}</b>` : ''}</small>`;
     let h = '';
     if (this.tab === 'home') h = this.t_home();
     else if (this.locked()) h = `<div class="hint">You can’t reach anyone from your cell. The payphone gives you one call a month; a guard might smuggle in a phone, if the money is right and you pick your moment.</div>`;
@@ -58284,10 +58648,10 @@ class EmpireUI {
     const cats = [...new Set(PHONE_APPS.map(a => a.cat))], now = this.locked('feed') ? [] : this.inbox().filter(m => m.pri <= 1);
     // the top strip: the Map one tap away, and whatever needs you now (each a deep link)
     let h = `<div class="appTop"><button class="sbtn gold" data-act="app:map">🗺️ Map</button>${now.length ? `<button class="sbtn danger" data-act="app:feed">${now.length} need${now.length === 1 ? 's' : ''} you</button>` : '<span class="hint">Nothing urgent.</span>'}</div>`;
-    return h + '<div class="appHome">' + cats.map(c => `<h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
+    return h + '<div class="appHome">' + cats.map(c => `<section class="appCat"><h4>${c}</h4><div class="apps">` + PHONE_APPS.filter(a => a.cat === c).map(a => {
       const n = this.badge(a.id), locked = a.tabs ? this.locked(a.tabs[0][0]) : this.uw.inJail;
       return `<button class="app${locked ? ' locked' : ''}" data-act="app:${a.id}" style="--c:${a.col}" aria-label="${esc(a.name)}"><i>${a.icon}</i><b>${esc(a.name)}</b><small>${esc(a.sub)}</small>${n ? `<em>${n}</em>` : ''}</button>`;
-    }).join('') + '</div>').join('') + '</div>';
+    }).join('') + '</div></section>').join('') + '</div>';
   }
   // what needs you (M11): pri 0 critical, 1 needs a decision soon, 2 worth knowing; each with a deep link into the
   // app (or the place) that deals with it
@@ -58355,7 +58719,7 @@ class EmpireUI {
     const rb = S.realBy || {}, ks = GOOD_IDS.filter(k => agg[k] || rb[k]);
     let tv = 0, tc = 0; for (const k in agg) { tv += agg[k].value; tc += agg[k].cost; }
     const sign = v => `<b class="${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v))}</b>`;
-    let h = `<div class="grid4"><div class="tile"><small>Worth now</small><b class="money">${fmtMoney(tv)}</b><span>at street prices where it sits</span></div><div class="tile"><small>You paid</small><b>${fmtMoney(tc)}</b><span>cost basis</span></div><div class="tile"><small>Unrealised</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b><span>if sold at those prices</span></div><div class="tile"><small>Realised</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b><span>banked from sales</span></div></div>`;
+    let h = `<div class="grid4"><div class="tile"><small>Worth now</small><b class="cash dirty">${fmtMoney(tv)}</b><span>at street prices where it sits</span></div><div class="tile"><small>You paid</small><b>${fmtMoney(tc)}</b><span>cost basis</span></div><div class="tile"><small>Unrealised</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b><span>if sold at those prices</span></div><div class="tile"><small>Realised</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b><span>banked from sales</span></div></div>`;
     if (!ks.length) return h + '<div class="hint">You hold no product. Buy from a supplier (Street Connect shows who sells what), then check back here: every lot remembers what you paid.</div>';
     h += '<div class="grid2 pnl">' + ks.map(k => {
       const a = agg[k], G = GOODS[k], best = this.sellQuotes(k).find(q => q.known), sellHere = !G.fence && !G.arms && DEMAND[here] ? M.price(here, k) : null;
@@ -58444,7 +58808,7 @@ class EmpireUI {
     const crew = uw.crew.active(), biz = uw.props.ownedList();
     const nxt = RANKS[Math.min(RANK_MAX, uw.rank + 1)], miss = uw.rankMissing();
     let h = `<div class="grid4">
-      <div class="tile"><small>Cash on you</small><b class="money">${fmtMoney(Money.onMe)}</b></div><div class="tile"><small>Dirty in stashes</small><b class="money">${fmtMoney(Money.dirtyTotal() - Money.onMe)}</b></div><div class="tile"><small>Bank</small><b class="money">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? `<small>medical debt ${fmtMoney(Money.debt)}</small>` : ''}</div>
+      <div class="tile"><small>Cash on you</small><b class="cash dirty">${fmtMoney(Money.onMe)}</b></div><div class="tile"><small>Dirty in stashes</small><b class="cash dirty">${fmtMoney(Money.dirtyTotal() - Money.onMe)}</b></div><div class="tile"><small>Bank</small><b class="cash clean">${fmtMoney(Money.clean)}</b>${Money.debt > 0 ? `<small>medical debt ${fmtMoney(Money.debt)}</small>` : ''}</div>
       <div class="tile"><small>Rank</small><b>${esc(RANKS[uw.rank].name)}</b><span>${uw.rank + 1} of ${RANKS.length}</span></div>
       <div class="tile"><small>Reputation</small><b>${g.save.rep}</b><span>who knows you</span></div>
       <div class="tile"><small>Influence</small><b>${uw.influence}</b>${this.bar(uw.influence, 1000, '#d28cff')}</div>
@@ -58452,8 +58816,8 @@ class EmpireUI {
       <div class="tile"><small>Turfs held</small><b>${uw.playerTurfs()} / ${uw.T.length}</b></div>
       <div class="tile"><small>Crew</small><b>${crew.length} / ${uw.crew.cap()}</b></div>
       <div class="tile"><small>Properties</small><b>${biz.length}</b><span>${biz.filter(b => b.kind === 'business').length} businesses</span></div>
-      <div class="tile"><small>Product value</small><b class="money">${fmtMoney(uw.locations({ all: true }).reduce((a, L) => a + holdings(L.o, L.zone, uw.market).reduce((x, r) => x + r.value, 0), 0))}</b><span>${units(S.inv)} space carried${S.runs.length ? ' · ' + S.runs.length + ' on the road' : ''}</span></div>
-      <div class="tile"><small>Territory tax</small><b class="money">${fmtMoney(uw.T.reduce((a, t, i) => a + (uw.owner[i] === 'pc' ? uw.royalty.owed(i) : 0), 0))}</b><span>expected per day · ${fmtMoney(S.st.royalties || 0)} collected</span></div>
+      <div class="tile"><small>Product value</small><b class="cash dirty">${fmtMoney(uw.locations({ all: true }).reduce((a, L) => a + holdings(L.o, L.zone, uw.market).reduce((x, r) => x + r.value, 0), 0))}</b><span>${units(S.inv)} space carried${S.runs.length ? ' · ' + S.runs.length + ' on the road' : ''}</span></div>
+      <div class="tile"><small>Territory tax</small><b class="cash dirty">${fmtMoney(uw.T.reduce((a, t, i) => a + (uw.owner[i] === 'pc' ? uw.royalty.owed(i) : 0), 0))}</b><span>expected per day · ${fmtMoney(S.st.royalties || 0)} collected</span></div>
     </div>`;
     h += `<h3>Next step</h3><div class="hint">${uw.rank < RANK_MAX ? esc(RANKS[uw.rank].hint) + (miss.length ? `<br><small>${esc(nxt.name)} still needs: ${esc(miss.join(' · '))}</small>` : '') : 'You run the city. Rivals will form coalitions, lieutenants will get ambitious and the state will send investigators. Hold on to it.'}</div>`;
     if (S.decisions.length) h += `<h3>Waiting on you</h3>` + S.decisions.map(d => `<div class="job open"><i>?</i><div><b>${esc(d.text)}</b></div><button class="sbtn gold" data-act="dec:${d.id}:1">Agree</button><button class="sbtn" data-act="dec:${d.id}:0">Refuse</button></div>`).join('');
@@ -58635,7 +58999,7 @@ class EmpireUI {
     const opts = (key, list, cur) => `<select data-sel="bf:${key}" aria-label="${key}">${list.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
     const cats = [...new Set(all.map(d => d.cat))].sort((a, b) => BIZ_CATS[a].name.localeCompare(BIZ_CATS[b].name));
     const zones = [...new Set(all.map(d => uw.loc('prop', d.id).zone))];
-    let h = `<div class="tiles"><div class="tile"><small>Businesses owned</small><b>${owned.length} / ${all.length}</b></div><div class="tile"><small>Net per day</small><b class="money">${fmtMoney(net)}</b><span>${fmtMoney(gross)} in</span></div><div class="tile"><small>Fully developed</small><b>${owned.filter(d => PM.level(d.id) === 3).length}</b></div></div>`;
+    let h = `<div class="tiles"><div class="tile"><small>Businesses owned</small><b>${owned.length} / ${all.length}</b></div><div class="tile"><small>Net per day</small><b class="cash clean">${fmtMoney(net)}</b><span>${fmtMoney(gross)} in</span></div><div class="tile"><small>Fully developed</small><b>${owned.filter(d => PM.level(d.id) === 3).length}</b></div></div>`;
     h += `<div class="filt">${opts('own', [['all', 'All'], ['owned', 'Owned'], ['sale', 'For sale']], f.own)}${opts('cat', [['all', 'Every kind'], ...cats.map(c => [c, BIZ_CATS[c].icon + ' ' + BIZ_CATS[c].name])], f.cat)}${opts('zone', [['all', 'Every district'], ...zones.map(z => [z, ZONES[z].name])], f.zone)}${opts('sort', [['income-', 'Income ↓'], ['price', 'Price ↑'], ['price-', 'Price ↓'], ['level', 'Level'], ['name', 'Name']], f.sort)}<input id="bizSearch" class="search" type="search" placeholder="Search name, kind, district" value="${esc(f.q)}" autocomplete="off"></div>`;
     return h + `<div id="bizList">${this.bizListHTML()}</div>`;
   }
@@ -58716,7 +59080,7 @@ class EmpireUI {
       }).join('') + '</div>';
     }
     const runs = S.runs.reduce((a, r) => a + r.cost, 0);
-    const head = `<div class="grid4"><div class="tile"><small>Product value now</small><b class="money">${fmtMoney(tv)}</b><span>at local street prices</span></div><div class="tile"><small>Cost basis</small><b>${fmtMoney(tc)}</b><span>what you paid</span></div><div class="tile"><small>Unrealised P/L</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b></div><div class="tile"><small>Realised P/L (all time)</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b>${S.runs.length ? `<span>${S.runs.length} run(s) in transit (cost ${fmtMoney(runs)})</span>` : ''}</div></div>`;
+    const head = `<div class="grid4"><div class="tile"><small>Product value now</small><b class="cash dirty">${fmtMoney(tv)}</b><span>at local street prices</span></div><div class="tile"><small>Cost basis</small><b>${fmtMoney(tc)}</b><span>what you paid</span></div><div class="tile"><small>Unrealised P/L</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b></div><div class="tile"><small>Realised P/L (all time)</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b>${S.runs.length ? `<span>${S.runs.length} run(s) in transit (cost ${fmtMoney(runs)})</span>` : ''}</div></div>`;
     return head + h + '<div class="hint">Moves happen by hand, only between places within reach. Prices move; quantities and what you paid never do. Carried product adds to your sentence if you’re arrested.</div>';
   }
   t_loadout() {
@@ -59059,7 +59423,7 @@ class EmpireUI {
     const render = () => {
       const cap = FX.capacityLeft(), have = Money.available('launderIn');
       const pend = F.batches.map(b => `<span>${fmtMoney(b.dirty)} → ${fmtMoney(b.clean)}</span><span>in about ${Math.max(1, Math.ceil(FX.hoursLeft(b)))} h</span>`).join('');
-      return `<div class="svcTop"><span>Cash on you <b class="money">${fmtMoney(have)}</b></span><span>She’ll take today <b class="money">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
+      return `<div class="svcTop"><span>Cash on you <b class="cash dirty">${fmtMoney(have)}</b></span><span>She’ll take today <b class="cash dirty">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
         <div class="hint">Dirty Cash you hand her lands in your bank, minus her cut, about ${Math.round(FIXER_DELAY / uw.econRate())} hours later. Once it’s with her it isn’t on you: the police can’t take it off you. A front business (later) will wash more, for less.</div>
         <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_DAY_CAP ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_DAY_CAP ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
         ${(() => { const l = FX.limit(FIXER_DAY_CAP); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
@@ -59695,7 +60059,7 @@ class Gamble {
     if (this.sc && this.sc.done) this.sc = null;
     const render = () => {
       const s = this.g.save, sc = this.sc;
-      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
+      let h = `<div class="svcTop"><span>Bank <b class="cash clean">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
       h += '<div class="grid2">' + Object.keys(SCRATCH_CARDS).map(d => { const c = SCRATCH_CARDS[d]; return `<div class="card" style="border-left:4px solid ${c.col}"><div class="t">${c.name} · $${d}</div><div class="d">Top prize ${fmtMoney(c.grand)} · wins about 1 in ${Math.round(1 / c.prizes.reduce((a, p) => a + p[1], 0))}</div><button class="sbtn gold" data-act="buy:${d}" ${Money.clean < +d || (sc && !sc.done) ? 'disabled' : ''}>Buy · $${d}</button></div>`; }).join('') + '</div>';
       if (sc) {
         h += `<div class="scard" style="--sc:${SCRATCH_CARDS[sc.den].col}"><div class="sct">${SCRATCH_CARDS[sc.den].name} <small>$${sc.den}</small></div><div class="scgrid">${sc.cells.map((a, i) => `<div class="scc${sc.open[i] ? ' open' : ''}${sc.done && sc.win && a === sc.win ? ' hit' : ''}" data-act="sc:${i}">${sc.open[i] ? fmtMoney(a) : ''}</div>`).join('')}</div>
@@ -59764,8 +60128,8 @@ class Gamble {
   openCashier() {
     const render = () => {
       const s = this.g.save, J = this.G.jp;
-      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Limits: ${fmtMoney(CASINO.minBet)}–${fmtMoney(CASINO.floorMax)} on the floor · up to ${fmtMoney(CASINO.vipMax)} at the VIP tables (Rep ${CASINO.vipRep.toLocaleString('en-US')}) · Royale Billions up to ${fmtMoney(CASINO.slotMax)}</span></div>`;
-      h += `<div class="hint">An honest house: ordinary rules and odds, a small edge on every game. The windfalls are the Royale Billions major prizes and the progressive, now <b class="money">${fmtMoney(Math.floor(+J.pool || ROYALE.top))}</b>, which grows every day and is only in play on a $10,000 spin.</div>`;
+      let h = `<div class="svcTop"><span>Bank <b class="cash clean">${fmtMoney(Money.clean)}</b></span><span>Limits: ${fmtMoney(CASINO.minBet)}–${fmtMoney(CASINO.floorMax)} on the floor · up to ${fmtMoney(CASINO.vipMax)} at the VIP tables (Rep ${CASINO.vipRep.toLocaleString('en-US')}) · Royale Billions up to ${fmtMoney(CASINO.slotMax)}</span></div>`;
+      h += `<div class="hint">An honest house: ordinary rules and odds, a small edge on every game. The windfalls are the Royale Billions major prizes and the progressive, now <b class="gold">${fmtMoney(Math.floor(+J.pool || ROYALE.top))}</b>, which grows every day and is only in play on a $10,000 spin.</div>`;
       h += `<h3>Royale Billions jackpots</h3><div class="stats">${ROYALE_MAJORS.slice(0, 8).map(m => `<span>${fmtMoney(m.prize)}</span><span>${(J.hits[m.id] || 0)} hit${(J.hits[m.id] || 0) === 1 ? '' : 's'}</span>`).join('')}</div>`;
       h += '<h3>Casino record</h3>' + this.statsHTML('casino') + '<h3>Fuel & Go slot</h3>' + this.statsHTML('slots') + '<h3>Scratch cards</h3>' + this.statsHTML('scratch');
       return h;
@@ -59782,7 +60146,7 @@ class Gamble {
     const render = () => {
       const s = this.g.save, pool = def.progressive ? this.pool(id) : 0;
       const grid = sl.grid || Array.from({ length: def.reels }, () => Array.from({ length: rows }, () => pick(SLOT_SYMS)));
-      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Bank <b class="money">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="money">${fmtMoney(pool)}</b></span>` : ''}</div>`;
+      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Bank <b class="cash clean">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="gold">${fmtMoney(pool)}</b></span>` : ''}</div>`;
       h += `<div class="slotm${def.reels === 5 ? ' five' : ''}"><div class="reels">${grid.map((col, r) => `<div class="reel${sl.spinning && r >= sl.stopped ? ' spin' : ''}">${col.map((s2, k) => `<div class="cell${sl.res && !sl.spinning && sl.res.lines.length && (def.reels === 3 || sl.res.lines.some(li => def.lines[li][r] === k)) ? ' win' : ''}">${sym(s2)}</div>`).join('')}</div>`).join('')}</div>
         <div class="lever${sl.spinning ? ' pulled' : ''}" data-act="spin"><i></i><b></b></div></div>`;
       h += `<div class="gres ${sl.res && !sl.spinning ? sl.res.cls : ''}">${sl.spinning ? '…' : sl.res ? (sl.res.win ? `WIN ${fmtMoney(sl.res.win)}${sl.res.jackpot ? ' · JACKPOT' : ''}` : 'No win') : 'Pick a bet and spin'}</div>`;
@@ -59832,7 +60196,7 @@ class Gamble {
   wagerHTML(game, cur, o = {}) {
     const m = Math.floor(o.avail !== undefined ? o.avail : this.shownMoney()), lock = o.lock ? 'disabled' : '';
     const quick = CASINO.quick.filter(v => v <= this.maxBet(game));
-    const top = o.noTop ? '' : `<div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>${o.label || 'BET'}<b>${fmtMoney(cur)}</b></span>${o.pays ? `<span>${o.paysLabel || 'PAYS UP TO'}<b class="money">${o.pays}</b></span>` : ''}</div>`;
+    const top = o.noTop ? '' : `<div class="wtop"><span>BALANCE<b class="cash clean">${fmtMoney(this.shownMoney())}</b></span><span>${o.label || 'BET'}<b>${fmtMoney(cur)}</b></span>${o.pays ? `<span>${o.paysLabel || 'PAYS UP TO'}<b class="gold">${o.pays}</b></span>` : ''}</div>`;
     return `<div class="wager">${top}
       <div class="wq">${quick.map(v => `<button class="sbtn${cur === v ? ' gold' : ''}" data-act="w:q:${v}" ${v > m || o.lock ? 'disabled' : ''}>$${fmtShort(v)}</button>`).join('')}<button class="sbtn${cur === m && m >= CASINO.minBet ? ' gold' : ''}" data-act="w:max" ${m < CASINO.minBet || o.lock ? 'disabled' : ''}>MAX</button></div>
       <div class="wq wc"><button class="sbtn" data-act="w:half" ${lock}>½</button><button class="sbtn" data-act="w:dbl" ${lock}>×2</button><input id="wagerIn" class="wagerIn" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" placeholder="Custom: 7500, 250k, 2.5m" aria-label="Custom amount" ${lock}><button class="sbtn gold" data-act="w:set" ${lock}>SET</button></div></div>`;
@@ -59879,7 +60243,7 @@ class Gamble {
       if (play) {
         const hd = bj.hands[bj.cur], two = hd && hd.cards.length === 2;
         const canSplit = two && bj.hands.length === 1 && Math.min(10, hd.cards[0].r === 14 ? 11 : hd.cards[0].r) === Math.min(10, hd.cards[1].r === 14 ? 11 : hd.cards[1].r) && Money.clean >= hd.bet;
-        h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
+        h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="cash clean">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
         h += `<div class="btns big"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && Money.clean >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
       } else {
         h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(Math.floor(bj.bet * 2.5)), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
@@ -60038,7 +60402,7 @@ class Gamble {
         return h + '<h3>Casino record</h3>' + this.statsHTML('casino');
       }
       const showAll = pk.phase === 'show';
-      let h = `<div class="svcTop"><span>Blinds <b>${fmtMoney(pk.bb / 2)} / ${fmtMoney(pk.bb)}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Your chips <b class="money">${fmtMoney(pk.seats[0].stack)}</b></span></div>`;
+      let h = `<div class="svcTop"><span>Blinds <b>${fmtMoney(pk.bb / 2)} / ${fmtMoney(pk.bb)}</b></span><span>Bank <b class="cash clean">${fmtMoney(Money.clean)}</b></span><span>Your chips <b class="gold">${fmtMoney(pk.seats[0].stack)}</b></span></div>`;
       h += `<div class="felt poker"><div class="board">${pk.board.map(c => cardHTML(c)).join('') || '<span class="hint">—</span>'}</div><div class="pot">Pot ${fmtMoney(pk.pot + pk.seats.reduce((a, x) => a + x.put, 0))}</div>`;
       h += `<div class="seats">${pk.seats.map((x, i) => `<div class="seat${i === pk.toAct && pk.phase === 'play' ? ' cur' : ''}${x.folded ? ' out' : ''}${x.won ? ' won' : ''}"><div class="who">${i === pk.btn ? '<b class="btn">D</b> ' : ''}${esc(x.name)}${x.isP ? '' : ` <small>${x.pers}</small>`}</div><div class="cards">${x.hole.map(c => cardHTML(c, !x.isP && !(showAll && !x.folded))).join('')}</div><div class="d">$${fmtShort(x.stack)}${x.put ? ' · bet $' + fmtShort(x.put) : ''}${x.allin ? ' · ALL IN' : ''}</div><div class="act">${esc(x.last || '')}</div></div>`).join('')}</div></div>`;
       h += `<div class="gres ${pk.cls || ''}">${esc(pk.msg || '')}</div>`;
@@ -60237,7 +60601,7 @@ class Gamble {
       <div class="rylWin"><span id="rylTier">${res && res.major >= 0 ? ROYALE_MAJORS[res.major].name : res && res.win ? 'WIN' : ry.spinning ? 'GOOD LUCK' : 'WIN'}</span><b id="rylWinV">${res && res.win ? fmtMoney(res.win) : '$0'}</b></div>
       <div class="rylGlass"><div class="rylReels" id="rylReels">${grid.map((col, r) => `<div class="ryr" data-r="${r}"><div class="rys">${col.map((sy, w) => this.royaleCell(sy, hitCells.has(r + ':' + w) ? ' hit' : '')).join('')}</div></div>`).join('')}</div><svg class="rylLines" viewBox="0 0 500 300" preserveAspectRatio="none">${lines}</svg></div>
       <div class="rylBulbs">${bulbs(18)}</div></div></div>`;
-    h += `<div class="rylBar"><div><span>BALANCE</span><b class="money" id="rylBal">${fmtFit(this.shownMoney())}</b></div><div><span>BET</span><b>${fmtFit(bet)}</b></div><div><span>WIN</span><b class="money" id="rylLast">${res && res.win ? fmtFit(res.win) : '$0'}</b></div></div>`;
+    h += `<div class="rylBar"><div><span>BALANCE</span><b class="cash clean" id="rylBal">${fmtFit(this.shownMoney())}</b></div><div><span>BET</span><b>${fmtFit(bet)}</b></div><div><span>WIN</span><b class="money" id="rylLast">${res && res.win ? fmtFit(res.win) : '$0'}</b></div></div>`;
     h += `<div class="btns rylCtl"><button class="sbtn" data-act="ry:down" ${ry.spinning ? 'disabled' : ''} aria-label="Lower bet">−</button><button class="sbtn gold rylSpin" data-act="ry:spin" ${ry.spinning || Money.clean < bet ? 'disabled' : ''}>SPIN</button><button class="sbtn" data-act="ry:up" ${ry.spinning ? 'disabled' : ''} aria-label="Raise bet">+</button></div>`;
     h += this.wagerHTML('royale', bet, { lock: ry.spinning, noTop: true });
     h += `<div class="btns"><button class="sbtn${ry.info ? ' gold' : ''}" data-act="ry:info">${ry.info ? 'HIDE INFO' : 'INFO / PAYTABLE'}</button></div>`;
@@ -61524,8 +61888,10 @@ class UIManager {
     while (this.toasts.children.length > 4) this.toasts.firstChild.remove();
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, type === 'radio' ? 5200 : 3800);
   }
-  banner(title, sub, cls = 'pass', dur = 3) {
+  // kicker: a small line over the title ("New rank", "One-off acquired") for the moments worth a fanfare (G11)
+  banner(title, sub, cls = 'pass', dur = 3, kicker = '') {
     const b = $('banner'); b.className = cls; b.querySelector('.bt').textContent = title; b.querySelector('.bs').textContent = sub || '';
+    b.querySelector('.bk').textContent = kicker;
     const bt = b.querySelector('.bt'); bt.style.animation = 'none'; void bt.offsetWidth; bt.style.animation = '';
     this.bannerUntil = performance.now() + dur * 1000; this.show('banner', true);
   }
@@ -61686,6 +62052,16 @@ class UIManager {
     this.hudT -= dt;
     if (this.hudT <= 0) {
       this.hudT = 0.25;
+      // Rank and Rep (G8): the Rank you hold, and how far your Rep is toward the next Rank's Rep
+      if (g.uw) {
+        const rk = g.uw.rank, rep = Math.floor(s.rep || 0), nx = RANKS[Math.min(RANK_MAX, rk + 1)], lo = (RANKS[rk].need.rep || 0), hi = rk < RANK_MAX ? (nx.need.rep || lo) : lo;
+        const key = rk + '/' + rep;
+        if (key !== this._rankKey) {
+          this._rankKey = key; $('rankName').textContent = RANKS[rk].name;
+          $('repFill').style.width = (rk >= RANK_MAX || hi <= lo ? 100 : clamp((rep - lo) / (hi - lo), 0, 1) * 100) + '%';
+          $('repText').textContent = rk >= RANK_MAX ? `${rep.toLocaleString('en-US')} Rep` : rep >= hi ? `${rep.toLocaleString('en-US')} Rep · next: ${nx.name}` : `${rep.toLocaleString('en-US')} / ${hi.toLocaleString('en-US')} Rep`;
+        }
+      }
       $('clockT').textContent = g.env.timeString();
       $('clockW').textContent = ({ clear: g.env.night > 0.5 ? '☾ Clear' : '☀ Clear', cloudy: '☁ Cloudy', rain: '☂ Rain', heavy: '☔ Storm', fog: '≋ Fog' }[g.env.weather] || '') + (isRushHour(g.env.time) ? ' · Rush hour' : '');
       const w = p.wep;
@@ -61785,7 +62161,8 @@ class UIManager {
         const dx = (L.x - px) * sc, dz = (L.z - pz) * sc, x = R + dx * cr - dz * sr, y = R + dx * sr + dz * cr;
         if (x < -150 || x > W + 150 || y < -40 || y > W + 40) continue;
         c.font = L.big ? `bold ${Math.round(17 * fs)}px Arial` : `bold ${Math.round(12 * fs)}px Arial`;
-        if (L.big) { c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillText(L.t, x + 1.5, y + 1.5); }
+        // a dark outline keeps every label readable over the roads and the territory colours (G8)
+        c.lineJoin = 'round'; c.lineWidth = (L.big ? 3.2 : 2.6) * fs; c.strokeStyle = 'rgba(6,8,12,0.75)'; c.strokeText(L.t, x, y);
         c.fillStyle = L.col; c.fillText(L.t, x, y);
       }
       c.restore();
@@ -61893,12 +62270,44 @@ const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false,
 const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
 // the street good paying furthest over its base price in a district right now
 function econBest(uw, z) { let best = null; for (const k of GOOD_IDS) { if (GOODS[k].fence || GOODS[k].arms || !DEMAND[z]) continue; const r = uw.market.ratio(z, k); if (!best || r > best.r) best = { k, r, price: uw.market.price(z, k) }; } return best; }
-// draw one map badge (rounded square, letter) at screen position x,y with size r (half side)
+// pictograms for the map symbols (G8), keyed by the symbol's letter so the data (and what the tests read) stays the
+// letter: drawn on the map and the minimap, and inline in the index, the legend and the cards. 24-unit box, even-odd
+// fill. A symbol without one (the $, the street letters of landmarks) is drawn as its letter.
+const MAP_GLYPHS = {
+  H: 'M12 3 2 11.5h3V21h5.2v-5.6h3.6V21H19v-9.5h3z', // home
+  G: 'M2.5 10 12 4l9.5 6v11H18v-8.5H6V21H2.5zM7.5 14h9v2h-9zm0 3.5h9v2h-9z', // garage / parking
+  W: 'M2 9.5 12 4l10 5.5V21h-3.5v-8h-13v8H2zm5.5 5h9V16h-9zm0 3h9V19h-9z', // warehouse
+  B: 'M9 3.5h6A1.5 1.5 0 0 1 16.5 5v1.5H21a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7.5a1 1 0 0 1 1-1h4.5V5A1.5 1.5 0 0 1 9 3.5zm.5 3h5V5.5h-5zM2 12h20v1.6H2z', // business
+  C: 'M21.3 6.2a5.4 5.4 0 0 1-7 6.1L6.4 20.2a2.1 2.1 0 0 1-3-3l7.9-7.9a5.4 5.4 0 0 1 6.1-7l-3.3 3.3.6 3 3 .6z', // chop shop (wrench)
+  P: 'M12 2 4 5v6.2c0 5 3.4 9.4 8 10.8 4.6-1.4 8-5.8 8-10.8V5zm0 4 1.4 2.9 3.2.4-2.3 2.2.6 3.2-2.9-1.5-2.9 1.5.6-3.2-2.3-2.2 3.2-.4z', // police
+  '+': 'M8.8 2.5h6.4v6.3h6.3v6.4h-6.3v6.3H8.8v-6.3H2.5V8.8h6.3z', // hospital
+  '♛': 'M2.5 7.5 7.4 12 12 4.5l4.6 7.5 4.9-4.5L19.4 19H4.6zM4.6 20.2h14.8V22H4.6z', // faction HQ
+  '↓': 'M9.6 2.5h4.8v8.3h4.4L12 18.6 5.2 10.8h4.4zM3.5 19.6h17v2.4h-17z', // buy
+  'A': 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 0v4.5h2V5zm0 9.5V19h2v-4.5zM5 11v2h4.5v-2zm9.5 0v2H19v-2z', // arms
+  L: 'M4 3h16v18H4zm2 2v14h12V5zm6 3.4a4.6 4.6 0 1 1 0 9.2 4.6 4.6 0 0 1 0-9.2zm0 2a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM7 5.6h2.4v1.6H7z', // launderer
+  U: 'M4.2 11 6 6.6A2.2 2.2 0 0 1 8 5.2h8a2.2 2.2 0 0 1 2 1.4l1.8 4.4h.7a1 1 0 0 1 1 1v5.5h-2.2v1.4a1.6 1.6 0 0 1-3.2 0V17.5H7.9v1.4a1.6 1.6 0 0 1-3.2 0V17.5H2.5V12a1 1 0 0 1 1-1zm2.5 0h10.6l-1.3-3.4a.8.8 0 0 0-.7-.5H8.7a.8.8 0 0 0-.7.5zM5.5 13.2v1.9h2.6v-1.9zm10.4 0v1.9h2.6v-1.9z', // used cars
+  '★': 'M12 2.3l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.1l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z',
+  '♦': 'M12 2 20.5 12 12 22 3.5 12zm0 4.6L7.4 12l4.6 5.4 4.6-5.4z', // casino
+  '◆': 'M12 2 20.5 12 12 22 3.5 12z', // a one-off, found
+  '▲': 'M5 2.5h2.2V22H5zM8.4 3.3h11.4l-2.6 4.1 2.6 4.1H8.4z', // landmark
+  '⚠': 'M12 2.2 23 21.3H1zm-1.3 6.6v6.6h2.6V8.8zm0 8.4v2.4h2.6v-2.4z', // threat
+  O: 'M1.5 20 8.5 8l3.6 5.7L15 9.5 22.5 20zm7-7.7L5.6 17h5.8z', // off-road park
+  R: 'M3 6.5h18V21H3zm2.2 2.2v10.1h13.6V8.7zM3 3h18v2.2H3zm4.9 7.7L12 13.4l4.1-2.7 1.1 1.6L13.8 14.6l3.4 2.3-1.1 1.6L12 15.8l-4.1 2.7-1.1-1.6 3.4-2.3-3.4-2.3z' // rival stash
+};
+MAP_GLYPHS.N = MAP_GLYPHS.U; // new cars: the same car, in the dealer's own colour
+const MAP_GLYPH_P2 = {};
+function mapGlyph(icon) { const d = MAP_GLYPHS[icon]; if (!d || typeof Path2D === 'undefined') return null; return MAP_GLYPH_P2[icon] || (MAP_GLYPH_P2[icon] = new Path2D(d)); }
+// the same symbol as HTML, for the index, the legend and the cards (the letter stays as its accessible name)
+function mapIconHTML(icon) { const d = MAP_GLYPHS[icon]; return d ? `<svg viewBox="0 0 24 24" aria-label="${esc(icon)}" role="img"><path fill-rule="evenodd" d="${d}"/></svg>` : esc(icon); }
+// draw one map badge (a disc with its pictogram or letter) at screen position x,y with size r (radius)
 function drawMapBadge(c, x, y, r, col, icon, ring) {
-  c.beginPath();
-  if (c.roundRect) c.roundRect(x - r, y - r, r * 2, r * 2, r * 0.35); else c.rect(x - r, y - r, r * 2, r * 2);
-  c.fillStyle = col; c.fill(); c.lineWidth = Math.max(1.5, r * 0.16); c.strokeStyle = ring || 'rgba(0,0,0,0.75)'; c.stroke();
-  c.fillStyle = '#111'; c.font = `900 ${Math.round(r * 1.25)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.beginPath(); c.arc(x, y + r * 0.12, r * 1.08, 0, Math.PI * 2); c.fillStyle = 'rgba(0,0,0,0.38)'; c.fill(); // soft drop shadow
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+  c.fillStyle = col; c.fill(); c.lineWidth = Math.max(1.5, r * 0.16); c.strokeStyle = ring || 'rgba(8,10,14,0.85)'; c.stroke();
+  const gl = mapGlyph(icon);
+  c.fillStyle = '#0d1117';
+  if (gl) { const k = r * 1.3 / 24; c.save(); c.translate(x - 12 * k, y - 12 * k); c.scale(k, k); c.fill(gl, 'evenodd'); c.restore(); return; }
+  c.font = `900 ${Math.round(r * 1.2)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillText(icon, x, y + r * 0.06);
 }
 class MapView {
@@ -62102,7 +62511,7 @@ class MapView {
   syncTools() { $('mapLayBtn').classList.toggle('on', !$('mapLayers').classList.contains('hidden')); $('mapIdxBtn').classList.toggle('on', !$('mapDrawer').classList.contains('hidden')); }
   renderLayers() {
     $('mapLayers').innerHTML = MAP_LAYERS.map(([id, name]) => `<label><input type="checkbox" data-layer="${id}" ${this.layerOn(id) ? 'checked' : ''}>${name}</label>`).join('') +
-      '<div class="mdGroup">Symbols</div>' + Object.keys(MAP_CATS).map(k => `<label style="min-height:30px;font-weight:600;font-size:13px"><span class="ico" style="background:${MAP_CATS[k].col}">${MAP_CATS[k].icon}</span>${MAP_CATS[k].name}</label>`).join('');
+      '<div class="mdGroup">Symbols</div>' + Object.keys(MAP_CATS).map(k => `<label style="min-height:30px;font-weight:600;font-size:13px"><span class="ico" style="background:${MAP_CATS[k].col}">${mapIconHTML(MAP_CATS[k].icon)}</span>${MAP_CATS[k].name}</label>`).join('');
   }
   openDrawer() {
     this.buildIndex(); $('mapDrawer').classList.remove('hidden'); $('mapLayers').classList.add('hidden');
@@ -62125,7 +62534,7 @@ class MapView {
     for (const e of list) {
       if (e.cat !== last) { last = e.cat; h += `<div class="mdGroup">${MAP_CATS[e.cat].name}</div>`; }
       const d = Math.hypot(e.x - p.pos.x, e.z - p.pos.z), tracked = wp && wp.key === e.key;
-      h += `<button class="mdItem${this.sel && this.sel.key === e.key ? ' sel' : ''}" data-key="${esc(e.key)}"><span class="ico" style="background:${e.col}">${e.icon}</span><span><b>${esc(e.name)}</b><small>${esc(e.district)} · ${fmtDist(d)}${e.sub ? ' · ' + esc(e.sub) : ''}</small></span>${tracked ? '<span class="tr2">TRACKED</span>' : ''}</button>`;
+      h += `<button class="mdItem${this.sel && this.sel.key === e.key ? ' sel' : ''}" data-key="${esc(e.key)}"><span class="ico" style="background:${e.col}">${mapIconHTML(e.icon)}</span><span><b>${esc(e.name)}</b><small>${esc(e.district)} · ${fmtDist(d)}${e.sub ? ' · ' + esc(e.sub) : ''}</small></span>${tracked ? '<span class="tr2">TRACKED</span>' : ''}</button>`;
     }
     $('mapList').innerHTML = h || '<div class="hint" style="padding:12px">Nothing matches that search.</div>';
   }
@@ -62243,7 +62652,7 @@ class MapView {
       if (def.desc) stats += `<div class="hint" style="margin:8px 0 0">${esc(def.desc)}</div>`;
     }
     const cab = !g.player.interior && g.player.state === 'foot';
-    $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${en.icon}</span><div><b>${esc(en.name)}</b><small>${esc(en.catName || MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}${en.extra || ''}
+    $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${mapIconHTML(en.icon)}</span><div><b>${esc(en.name)}</b><small>${esc(en.catName || MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}${en.extra || ''}
       <div class="btns">${tracked ? '<button class="sbtn" data-act="untrack">Stop tracking</button>' : '<button class="sbtn gold" data-act="track">Track location</button>'}${cab ? '<button class="sbtn" data-act="taxi">&#128661; Taxi here</button>' : ''}</div>`;
     $('mapCard').classList.remove('hidden');
   }
@@ -62370,10 +62779,12 @@ function gpsRoute(fx, fz, tx, tz) {
 /* =====================================================================
    [CORE] QUALITY MANAGER (presets + adaptive resolution / detail)
    ===================================================================== */
+// pr caps the device pixel ratio (G2: Medium was 0.9, under a phone's CSS resolution and visibly soft on a Retina
+// screen; it is now 1.25, with dynamic resolution below to give pixels back when a frame runs long)
 const QUALITY = [
-  { name: 'Low', pr: 0.7, shadow: 0, post: false, msaa: 0, chunkR: 2, propR: 130, parkedR: 110, traffic: 9, peds: 16 },
-  { name: 'Medium', pr: 0.9, shadow: 1024, post: true, msaa: 0, chunkR: 3, propR: 170, parkedR: 130, traffic: 15, peds: 26 },
-  { name: 'High', pr: 1.25, shadow: 2048, post: true, msaa: 4, chunkR: 4, propR: 210, parkedR: 150, traffic: 22, peds: 38 },
+  { name: 'Low', pr: 0.85, shadow: 0, post: false, msaa: 0, chunkR: 2, propR: 130, parkedR: 110, traffic: 9, peds: 16 },
+  { name: 'Medium', pr: 1.25, shadow: 1024, post: true, msaa: 0, chunkR: 3, propR: 170, parkedR: 130, traffic: 15, peds: 26 },
+  { name: 'High', pr: 1.6, shadow: 2048, post: true, msaa: 4, chunkR: 4, propR: 210, parkedR: 150, traffic: 22, peds: 38 },
   { name: 'Ultra', pr: 2, shadow: 4096, post: true, msaa: 4, chunkR: 5, propR: 250, parkedR: 160, traffic: 28, peds: 50 }
 ];
 class QualityManager {
@@ -62401,9 +62812,17 @@ class QualityManager {
   update(dt) {
     if (this.mode !== 'auto' || this.g.state !== 'playing') return;
     this.acc += dt; this.frames++; this.cool -= dt;
+    // dynamic resolution (G2): every second, a long frame takes 8% of the pixel ratio away (down to 60% of the
+    // preset's), a quick one gives 5% back; whole presets only change when that is not enough (below)
+    this.drsAcc = (this.drsAcc || 0) + dt; this.drsN = (this.drsN || 0) + 1;
+    if (this.drsAcc >= 1) {
+      const ms = this.drsAcc / this.drsN * 1000, k = this.dynScale || 1; this.drsAcc = 0; this.drsN = 0;
+      const nk = ms > 21 ? Math.max(0.6, k * 0.92) : ms < 15 ? Math.min(1, k * 1.05) : k;
+      if (Math.abs(nk - k) > 0.004) { this.dynScale = nk; this.g.renderer.setPixelRatio(Math.min(Math.min(window.devicePixelRatio || 1, 3), QUALITY[this.level].pr) * nk); this.g.onResize(); }
+    }
     if (this.acc >= 2) {
       const ms = this.acc / this.frames * 1000; this.acc = 0; this.frames = 0;
-      if (this.cool > 0) return;
+      if (this.cool > 0 || (this.dynScale || 1) > 0.62 && ms > 24) return;
       if (ms > 24 && this.level > 0) { this.level--; this.cool = 5; this.apply(); this.g.ui.toast(`Graphics adjusted to ${QUALITY[this.level].name} for smoother play.`); }
       else if (ms < 12.5 && this.level < (IS_MOBILE ? 2 : 3) && !this.droppedFrom?.[this.level + 1]) { this.level++; this.cool = 8; this.apply(); }
       if (ms > 24) { this.droppedFrom = this.droppedFrom || {}; this.droppedFrom[this.level + 1] = true; }
@@ -63288,7 +63707,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

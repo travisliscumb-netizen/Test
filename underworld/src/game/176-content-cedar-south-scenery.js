@@ -21,9 +21,9 @@ const CFS_SCN = { tile: 50, far: 5, farC: 10, farR: 300, nearR: 70, stripR: 500,
 class CedarScenery {
   constructor(scene, world, gmat) {
     this.scene = scene; this.world = world; this.cf = world.cfs;
-    this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+    this.mat = makeTerrainMaterial();
     // the strip and the bridge's promenade gap meet the city's ground slabs at the same height: they draw on top
-    this.matOff = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    this.matOff = makeTerrainMaterial({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     this.R = {}; for (const R of Terrain.regions) this.R[R.id] = R;
     this.tiles = new Map(); this.nearSet = null; this.stats = { built: 0 }; this._stamp = 0;
     const C3 = new THREE.Color(); this._col = (s, x, z, y) => { C3.setHex(TSURF_COL[s]); const k = 1 + 0.08 * tNoise(x / 9, z / 9, 61) + (s === 0 ? clamp((y - 3) * 0.02, -0.08, 0.06) : 0); return [C3.r * k, C3.g * k, C3.b * k]; };

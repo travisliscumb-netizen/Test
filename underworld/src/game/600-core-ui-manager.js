@@ -420,8 +420,10 @@ class UIManager {
     while (this.toasts.children.length > 4) this.toasts.firstChild.remove();
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, type === 'radio' ? 5200 : 3800);
   }
-  banner(title, sub, cls = 'pass', dur = 3) {
+  // kicker: a small line over the title ("New rank", "One-off acquired") for the moments worth a fanfare (G11)
+  banner(title, sub, cls = 'pass', dur = 3, kicker = '') {
     const b = $('banner'); b.className = cls; b.querySelector('.bt').textContent = title; b.querySelector('.bs').textContent = sub || '';
+    b.querySelector('.bk').textContent = kicker;
     const bt = b.querySelector('.bt'); bt.style.animation = 'none'; void bt.offsetWidth; bt.style.animation = '';
     this.bannerUntil = performance.now() + dur * 1000; this.show('banner', true);
   }
@@ -582,6 +584,16 @@ class UIManager {
     this.hudT -= dt;
     if (this.hudT <= 0) {
       this.hudT = 0.25;
+      // Rank and Rep (G8): the Rank you hold, and how far your Rep is toward the next Rank's Rep
+      if (g.uw) {
+        const rk = g.uw.rank, rep = Math.floor(s.rep || 0), nx = RANKS[Math.min(RANK_MAX, rk + 1)], lo = (RANKS[rk].need.rep || 0), hi = rk < RANK_MAX ? (nx.need.rep || lo) : lo;
+        const key = rk + '/' + rep;
+        if (key !== this._rankKey) {
+          this._rankKey = key; $('rankName').textContent = RANKS[rk].name;
+          $('repFill').style.width = (rk >= RANK_MAX || hi <= lo ? 100 : clamp((rep - lo) / (hi - lo), 0, 1) * 100) + '%';
+          $('repText').textContent = rk >= RANK_MAX ? `${rep.toLocaleString('en-US')} Rep` : rep >= hi ? `${rep.toLocaleString('en-US')} Rep · next: ${nx.name}` : `${rep.toLocaleString('en-US')} / ${hi.toLocaleString('en-US')} Rep`;
+        }
+      }
       $('clockT').textContent = g.env.timeString();
       $('clockW').textContent = ({ clear: g.env.night > 0.5 ? '☾ Clear' : '☀ Clear', cloudy: '☁ Cloudy', rain: '☂ Rain', heavy: '☔ Storm', fog: '≋ Fog' }[g.env.weather] || '') + (isRushHour(g.env.time) ? ' · Rush hour' : '');
       const w = p.wep;
@@ -681,7 +693,8 @@ class UIManager {
         const dx = (L.x - px) * sc, dz = (L.z - pz) * sc, x = R + dx * cr - dz * sr, y = R + dx * sr + dz * cr;
         if (x < -150 || x > W + 150 || y < -40 || y > W + 40) continue;
         c.font = L.big ? `bold ${Math.round(17 * fs)}px Arial` : `bold ${Math.round(12 * fs)}px Arial`;
-        if (L.big) { c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillText(L.t, x + 1.5, y + 1.5); }
+        // a dark outline keeps every label readable over the roads and the territory colours (G8)
+        c.lineJoin = 'round'; c.lineWidth = (L.big ? 3.2 : 2.6) * fs; c.strokeStyle = 'rgba(6,8,12,0.75)'; c.strokeText(L.t, x, y);
         c.fillStyle = L.col; c.fillText(L.t, x, y);
       }
       c.restore();
@@ -789,12 +802,44 @@ const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false,
 const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
 // the street good paying furthest over its base price in a district right now
 function econBest(uw, z) { let best = null; for (const k of GOOD_IDS) { if (GOODS[k].fence || GOODS[k].arms || !DEMAND[z]) continue; const r = uw.market.ratio(z, k); if (!best || r > best.r) best = { k, r, price: uw.market.price(z, k) }; } return best; }
-// draw one map badge (rounded square, letter) at screen position x,y with size r (half side)
+// pictograms for the map symbols (G8), keyed by the symbol's letter so the data (and what the tests read) stays the
+// letter: drawn on the map and the minimap, and inline in the index, the legend and the cards. 24-unit box, even-odd
+// fill. A symbol without one (the $, the street letters of landmarks) is drawn as its letter.
+const MAP_GLYPHS = {
+  H: 'M12 3 2 11.5h3V21h5.2v-5.6h3.6V21H19v-9.5h3z', // home
+  G: 'M2.5 10 12 4l9.5 6v11H18v-8.5H6V21H2.5zM7.5 14h9v2h-9zm0 3.5h9v2h-9z', // garage / parking
+  W: 'M2 9.5 12 4l10 5.5V21h-3.5v-8h-13v8H2zm5.5 5h9V16h-9zm0 3h9V19h-9z', // warehouse
+  B: 'M9 3.5h6A1.5 1.5 0 0 1 16.5 5v1.5H21a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7.5a1 1 0 0 1 1-1h4.5V5A1.5 1.5 0 0 1 9 3.5zm.5 3h5V5.5h-5zM2 12h20v1.6H2z', // business
+  C: 'M21.3 6.2a5.4 5.4 0 0 1-7 6.1L6.4 20.2a2.1 2.1 0 0 1-3-3l7.9-7.9a5.4 5.4 0 0 1 6.1-7l-3.3 3.3.6 3 3 .6z', // chop shop (wrench)
+  P: 'M12 2 4 5v6.2c0 5 3.4 9.4 8 10.8 4.6-1.4 8-5.8 8-10.8V5zm0 4 1.4 2.9 3.2.4-2.3 2.2.6 3.2-2.9-1.5-2.9 1.5.6-3.2-2.3-2.2 3.2-.4z', // police
+  '+': 'M8.8 2.5h6.4v6.3h6.3v6.4h-6.3v6.3H8.8v-6.3H2.5V8.8h6.3z', // hospital
+  '♛': 'M2.5 7.5 7.4 12 12 4.5l4.6 7.5 4.9-4.5L19.4 19H4.6zM4.6 20.2h14.8V22H4.6z', // faction HQ
+  '↓': 'M9.6 2.5h4.8v8.3h4.4L12 18.6 5.2 10.8h4.4zM3.5 19.6h17v2.4h-17z', // buy
+  'A': 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 0v4.5h2V5zm0 9.5V19h2v-4.5zM5 11v2h4.5v-2zm9.5 0v2H19v-2z', // arms
+  L: 'M4 3h16v18H4zm2 2v14h12V5zm6 3.4a4.6 4.6 0 1 1 0 9.2 4.6 4.6 0 0 1 0-9.2zm0 2a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM7 5.6h2.4v1.6H7z', // launderer
+  U: 'M4.2 11 6 6.6A2.2 2.2 0 0 1 8 5.2h8a2.2 2.2 0 0 1 2 1.4l1.8 4.4h.7a1 1 0 0 1 1 1v5.5h-2.2v1.4a1.6 1.6 0 0 1-3.2 0V17.5H7.9v1.4a1.6 1.6 0 0 1-3.2 0V17.5H2.5V12a1 1 0 0 1 1-1zm2.5 0h10.6l-1.3-3.4a.8.8 0 0 0-.7-.5H8.7a.8.8 0 0 0-.7.5zM5.5 13.2v1.9h2.6v-1.9zm10.4 0v1.9h2.6v-1.9z', // used cars
+  '★': 'M12 2.3l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.1l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z',
+  '♦': 'M12 2 20.5 12 12 22 3.5 12zm0 4.6L7.4 12l4.6 5.4 4.6-5.4z', // casino
+  '◆': 'M12 2 20.5 12 12 22 3.5 12z', // a one-off, found
+  '▲': 'M5 2.5h2.2V22H5zM8.4 3.3h11.4l-2.6 4.1 2.6 4.1H8.4z', // landmark
+  '⚠': 'M12 2.2 23 21.3H1zm-1.3 6.6v6.6h2.6V8.8zm0 8.4v2.4h2.6v-2.4z', // threat
+  O: 'M1.5 20 8.5 8l3.6 5.7L15 9.5 22.5 20zm7-7.7L5.6 17h5.8z', // off-road park
+  R: 'M3 6.5h18V21H3zm2.2 2.2v10.1h13.6V8.7zM3 3h18v2.2H3zm4.9 7.7L12 13.4l4.1-2.7 1.1 1.6L13.8 14.6l3.4 2.3-1.1 1.6L12 15.8l-4.1 2.7-1.1-1.6 3.4-2.3-3.4-2.3z' // rival stash
+};
+MAP_GLYPHS.N = MAP_GLYPHS.U; // new cars: the same car, in the dealer's own colour
+const MAP_GLYPH_P2 = {};
+function mapGlyph(icon) { const d = MAP_GLYPHS[icon]; if (!d || typeof Path2D === 'undefined') return null; return MAP_GLYPH_P2[icon] || (MAP_GLYPH_P2[icon] = new Path2D(d)); }
+// the same symbol as HTML, for the index, the legend and the cards (the letter stays as its accessible name)
+function mapIconHTML(icon) { const d = MAP_GLYPHS[icon]; return d ? `<svg viewBox="0 0 24 24" aria-label="${esc(icon)}" role="img"><path fill-rule="evenodd" d="${d}"/></svg>` : esc(icon); }
+// draw one map badge (a disc with its pictogram or letter) at screen position x,y with size r (radius)
 function drawMapBadge(c, x, y, r, col, icon, ring) {
-  c.beginPath();
-  if (c.roundRect) c.roundRect(x - r, y - r, r * 2, r * 2, r * 0.35); else c.rect(x - r, y - r, r * 2, r * 2);
-  c.fillStyle = col; c.fill(); c.lineWidth = Math.max(1.5, r * 0.16); c.strokeStyle = ring || 'rgba(0,0,0,0.75)'; c.stroke();
-  c.fillStyle = '#111'; c.font = `900 ${Math.round(r * 1.25)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.beginPath(); c.arc(x, y + r * 0.12, r * 1.08, 0, Math.PI * 2); c.fillStyle = 'rgba(0,0,0,0.38)'; c.fill(); // soft drop shadow
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+  c.fillStyle = col; c.fill(); c.lineWidth = Math.max(1.5, r * 0.16); c.strokeStyle = ring || 'rgba(8,10,14,0.85)'; c.stroke();
+  const gl = mapGlyph(icon);
+  c.fillStyle = '#0d1117';
+  if (gl) { const k = r * 1.3 / 24; c.save(); c.translate(x - 12 * k, y - 12 * k); c.scale(k, k); c.fill(gl, 'evenodd'); c.restore(); return; }
+  c.font = `900 ${Math.round(r * 1.2)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillText(icon, x, y + r * 0.06);
 }
 class MapView {
@@ -998,7 +1043,7 @@ class MapView {
   syncTools() { $('mapLayBtn').classList.toggle('on', !$('mapLayers').classList.contains('hidden')); $('mapIdxBtn').classList.toggle('on', !$('mapDrawer').classList.contains('hidden')); }
   renderLayers() {
     $('mapLayers').innerHTML = MAP_LAYERS.map(([id, name]) => `<label><input type="checkbox" data-layer="${id}" ${this.layerOn(id) ? 'checked' : ''}>${name}</label>`).join('') +
-      '<div class="mdGroup">Symbols</div>' + Object.keys(MAP_CATS).map(k => `<label style="min-height:30px;font-weight:600;font-size:13px"><span class="ico" style="background:${MAP_CATS[k].col}">${MAP_CATS[k].icon}</span>${MAP_CATS[k].name}</label>`).join('');
+      '<div class="mdGroup">Symbols</div>' + Object.keys(MAP_CATS).map(k => `<label style="min-height:30px;font-weight:600;font-size:13px"><span class="ico" style="background:${MAP_CATS[k].col}">${mapIconHTML(MAP_CATS[k].icon)}</span>${MAP_CATS[k].name}</label>`).join('');
   }
   openDrawer() {
     this.buildIndex(); $('mapDrawer').classList.remove('hidden'); $('mapLayers').classList.add('hidden');
@@ -1021,7 +1066,7 @@ class MapView {
     for (const e of list) {
       if (e.cat !== last) { last = e.cat; h += `<div class="mdGroup">${MAP_CATS[e.cat].name}</div>`; }
       const d = Math.hypot(e.x - p.pos.x, e.z - p.pos.z), tracked = wp && wp.key === e.key;
-      h += `<button class="mdItem${this.sel && this.sel.key === e.key ? ' sel' : ''}" data-key="${esc(e.key)}"><span class="ico" style="background:${e.col}">${e.icon}</span><span><b>${esc(e.name)}</b><small>${esc(e.district)} · ${fmtDist(d)}${e.sub ? ' · ' + esc(e.sub) : ''}</small></span>${tracked ? '<span class="tr2">TRACKED</span>' : ''}</button>`;
+      h += `<button class="mdItem${this.sel && this.sel.key === e.key ? ' sel' : ''}" data-key="${esc(e.key)}"><span class="ico" style="background:${e.col}">${mapIconHTML(e.icon)}</span><span><b>${esc(e.name)}</b><small>${esc(e.district)} · ${fmtDist(d)}${e.sub ? ' · ' + esc(e.sub) : ''}</small></span>${tracked ? '<span class="tr2">TRACKED</span>' : ''}</button>`;
     }
     $('mapList').innerHTML = h || '<div class="hint" style="padding:12px">Nothing matches that search.</div>';
   }
@@ -1139,7 +1184,7 @@ class MapView {
       if (def.desc) stats += `<div class="hint" style="margin:8px 0 0">${esc(def.desc)}</div>`;
     }
     const cab = !g.player.interior && g.player.state === 'foot';
-    $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${en.icon}</span><div><b>${esc(en.name)}</b><small>${esc(en.catName || MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}${en.extra || ''}
+    $('mapCard').innerHTML = `<button class="mtb x" data-act="close" aria-label="Close">&#10005;</button><div class="mapCardHead"><span class="ico" style="background:${en.col}">${mapIconHTML(en.icon)}</span><div><b>${esc(en.name)}</b><small>${esc(en.catName || MAP_CATS[en.cat].name)} · ${esc(en.district)} · ${fmtDist(d)} away</small></div></div>${en.sub && !en.prop ? `<div class="hint" style="margin:6px 0 0">${esc(en.sub)}</div>` : ''}${stats}${en.extra || ''}
       <div class="btns">${tracked ? '<button class="sbtn" data-act="untrack">Stop tracking</button>' : '<button class="sbtn gold" data-act="track">Track location</button>'}${cab ? '<button class="sbtn" data-act="taxi">&#128661; Taxi here</button>' : ''}</div>`;
     $('mapCard').classList.remove('hidden');
   }

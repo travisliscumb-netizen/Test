@@ -22,6 +22,10 @@ function randomLook(rng = Math.random) {
   if (fem && rng() < 0.3) L.skirt = C(p(PANTS.concat([0x7a2e3a, 0x2e4a7a])));
   if (rng() < 0.1) L.shades = true;
   if (!fem && rng() < 0.12) L.cap = C(p([0x111111, 0x8a2f3a, 0x2f5d8a, 0xd8d0c0]));
+  // G6: more of a street's variety (drawn last, so a seeded look keeps everything it had): long coats over a jacket,
+  // knitted beanies
+  if (L.jacket && !L.skirt && rng() < 0.3) L.coat = true;
+  if (!L.cap && rng() < 0.08) L.beanie = C(p([0x2a2a2e, 0x8a2f3a, 0x2f5d8a, 0x3a6a4a, 0xc9822a, 0xd8d0c0]));
   return L;
 }
 const _cm = Array.from({ length: 28 }, () => new THREE.Matrix4());
@@ -36,17 +40,14 @@ class CharacterRenderer {
   constructor(scene, max = 110) {
     this.max = max;
     this.mat = new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02 });
-    // tapered limb: narrower at the far end, slightly rounded edges via a bevel-ish vertex pull
-    const limbGeo = new THREE.BoxGeometry(1, 1, 1, 1, 2, 1); limbGeo.translate(0, -0.5, 0);
+    // tapered limb: a rounded section (G6: no box edges), narrower at the far end
+    const limbGeo = roundBoxGeometry(3, 2, 3, 0.42, 0, 0.42); limbGeo.translate(0, -0.5, 0);
     { const p = limbGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); const k = y < -0.9 ? 0.8 : y < -0.4 ? 0.93 : 1; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); } }
-    limbGeo.computeVertexNormals();
-    // torso: chest wider than waist, front slightly fuller than back
-    const torsoGeo = new THREE.BoxGeometry(1, 1, 1, 1, 3, 1);
+    // torso: rounded at the sides and shoulders; chest wider than waist, front slightly fuller than back
+    const torsoGeo = roundBoxGeometry(3, 3, 3, 0.3, 0.1, 0.36);
     { const p = torsoGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < 0) { p.setX(i, p.getX(i) * (y < -0.4 ? 0.8 : 0.86)); } else if (y > 0.4) { p.setX(i, p.getX(i) * 0.92); p.setZ(i, p.getZ(i) * 0.9); } if (p.getZ(i) > 0 && y > -0.2 && y < 0.35) p.setZ(i, p.getZ(i) * 1.08); } }
-    torsoGeo.computeVertexNormals();
-    const hipsGeo = new THREE.BoxGeometry(1, 1, 1);
+    const hipsGeo = roundBoxGeometry(3, 1, 3, 0.28, 0, 0.34);
     { const p = hipsGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.9); } }
-    hipsGeo.computeVertexNormals();
     const skirtGeo = new THREE.CylinderGeometry(0.5, 0.78, 1, 10, 1, false); skirtGeo.translate(0, -0.5, 0);
     const handGeo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
     { const p = handGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.75); p.setZ(i, p.getZ(i) * 0.8); } }
@@ -140,6 +141,7 @@ class CharacterRenderer {
     _cm[6].copy(root).multiply(mT(_tm, 0, hipY + 0.04, 0)).multiply(mS(_tm, 0.37 * bw * hpW, 0.21, 0.23));
     this._put('hips', _cm[6], col(L.skirt || L.pants));
     if (L.skirt && !far) { _cm[6].copy(root).multiply(mT(_tm, 0, hipY + 0.14, 0)).multiply(mS(_tm, 0.42 * bw * hpW, 0.42, 0.3)); this._put('skirt', _cm[6], col(L.skirt)); }
+    else if (L.coat && L.jacket && !far && sit < 0.5) { _cm[6].copy(root).multiply(mT(_tm, 0, hipY + 0.2, -0.01)).multiply(mS(_tm, 0.47 * bw * hpW, 0.56, 0.31)); this._put('skirt', _cm[6], col(L.jacket)); }
     const lean = (ps.lean || 0) + crouch * 0.5 - sit * 0.05 - hit * 0.35 + (ps.dodge || 0) * 0.25 + heavy * 0.15;
     const twist = (ps.twist || 0) + (heavy > 0 ? (heavy < 0.45 ? 0.5 * heavy / 0.45 : -0.6 * Math.sin((heavy - 0.45) / 0.55 * Math.PI)) : 0) + (ps.punch > 0 ? -0.3 * (ps.punchArm || -1) * Math.sin(ps.punch * Math.PI) : 0);
     const hp = _cm[7].copy(root).multiply(mT(_tm, 0, hipY + 0.1, 0)).multiply(mRx(_tm, lean)).multiply(mRy(_tm, twist + Math.sin(phase) * A * 0.12));
@@ -187,6 +189,9 @@ class CharacterRenderer {
         this._put('hat', _cm[11], col(L.cap));
         _cm[11].copy(hd).multiply(mT(_tm, 0, 0.07, 0.1)).multiply(mS(_tm, 0.12, 0.02, 0.1));
         this._put('small', _cm[11], col(L.cap));
+      } else if (L.beanie) {
+        _cm[11].copy(hd).multiply(mT(_tm, 0, 0.055, -0.008)).multiply(mS(_tm, 0.132, 0.1, 0.142));
+        this._put('hat', _cm[11], col(L.beanie));
       } else if (L.hairStyle > 0) {
         const long = L.hairStyle === 2, bun = L.hairStyle === 3, curly = L.hairStyle === 4, tail = L.hairStyle === 5;
         _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.005 : 0.025, -0.012)).multiply(mS(_tm, curly ? 0.142 : 0.125, long ? 0.17 : curly ? 0.155 : 0.135, curly ? 0.155 : 0.14));

@@ -69,6 +69,7 @@ class Vehicle {
     const L = TIER_LOOK[tier] || TIER_LOOK.common, F = tier === 'unique' && this.spec.finish ? this.spec.finish : L;
     this.vtier = tier; this.rim = F.rim;
     this.mat.userData.u.uFinish.value.set(F.flake, F.gloss, F.wear, F.rim);
+    this.mat.userData.u.uFinish2.value.set(F.metal !== undefined ? F.metal : -1, 0, 0, 0);
   }
   get speed() { return Math.hypot(this.vel.x, this.vel.y); }
   get fx() { return Math.sin(this.h); } get fz() { return Math.cos(this.h); }

@@ -487,7 +487,7 @@ class Underworld {
     if (r > S.rankMax) {
       S.rankMax = r;
       if (this._booted) {
-        this.g.later(1200, () => { this.g.ui.banner(RANKS[r].name, r < RANK_MAX ? 'Next: ' + RANKS[r].hint : 'The city is yours. Hold it.', 'pass', 4.5); this.g.audio.play('pass'); });
+        this.g.later(1200, () => { this.g.ui.banner(RANKS[r].name, r < RANK_MAX ? 'Next: ' + RANKS[r].hint : 'The city is yours. Hold it.', 'rank', 4.5, 'New rank'); this.g.audio.play('pass'); const c = $('rankChip'); if (c) { c.classList.remove('up'); void c.offsetWidth; c.classList.add('up'); } });
         this.news('pv', this.rankLine(r));
       }
     }

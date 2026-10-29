@@ -366,7 +366,7 @@ class Gamble {
     if (this.sc && this.sc.done) this.sc = null;
     const render = () => {
       const s = this.g.save, sc = this.sc;
-      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
+      let h = `<div class="svcTop"><span>Bank <b class="cash clean">${fmtMoney(this.shownMoney())}</b></span><span>Three matching amounts win that amount</span></div>`;
       h += '<div class="grid2">' + Object.keys(SCRATCH_CARDS).map(d => { const c = SCRATCH_CARDS[d]; return `<div class="card" style="border-left:4px solid ${c.col}"><div class="t">${c.name} · $${d}</div><div class="d">Top prize ${fmtMoney(c.grand)} · wins about 1 in ${Math.round(1 / c.prizes.reduce((a, p) => a + p[1], 0))}</div><button class="sbtn gold" data-act="buy:${d}" ${Money.clean < +d || (sc && !sc.done) ? 'disabled' : ''}>Buy · $${d}</button></div>`; }).join('') + '</div>';
       if (sc) {
         h += `<div class="scard" style="--sc:${SCRATCH_CARDS[sc.den].col}"><div class="sct">${SCRATCH_CARDS[sc.den].name} <small>$${sc.den}</small></div><div class="scgrid">${sc.cells.map((a, i) => `<div class="scc${sc.open[i] ? ' open' : ''}${sc.done && sc.win && a === sc.win ? ' hit' : ''}" data-act="sc:${i}">${sc.open[i] ? fmtMoney(a) : ''}</div>`).join('')}</div>
@@ -435,8 +435,8 @@ class Gamble {
   openCashier() {
     const render = () => {
       const s = this.g.save, J = this.G.jp;
-      let h = `<div class="svcTop"><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Limits: ${fmtMoney(CASINO.minBet)}–${fmtMoney(CASINO.floorMax)} on the floor · up to ${fmtMoney(CASINO.vipMax)} at the VIP tables (Rep ${CASINO.vipRep.toLocaleString('en-US')}) · Royale Billions up to ${fmtMoney(CASINO.slotMax)}</span></div>`;
-      h += `<div class="hint">An honest house: ordinary rules and odds, a small edge on every game. The windfalls are the Royale Billions major prizes and the progressive, now <b class="money">${fmtMoney(Math.floor(+J.pool || ROYALE.top))}</b>, which grows every day and is only in play on a $10,000 spin.</div>`;
+      let h = `<div class="svcTop"><span>Bank <b class="cash clean">${fmtMoney(Money.clean)}</b></span><span>Limits: ${fmtMoney(CASINO.minBet)}–${fmtMoney(CASINO.floorMax)} on the floor · up to ${fmtMoney(CASINO.vipMax)} at the VIP tables (Rep ${CASINO.vipRep.toLocaleString('en-US')}) · Royale Billions up to ${fmtMoney(CASINO.slotMax)}</span></div>`;
+      h += `<div class="hint">An honest house: ordinary rules and odds, a small edge on every game. The windfalls are the Royale Billions major prizes and the progressive, now <b class="gold">${fmtMoney(Math.floor(+J.pool || ROYALE.top))}</b>, which grows every day and is only in play on a $10,000 spin.</div>`;
       h += `<h3>Royale Billions jackpots</h3><div class="stats">${ROYALE_MAJORS.slice(0, 8).map(m => `<span>${fmtMoney(m.prize)}</span><span>${(J.hits[m.id] || 0)} hit${(J.hits[m.id] || 0) === 1 ? '' : 's'}</span>`).join('')}</div>`;
       h += '<h3>Casino record</h3>' + this.statsHTML('casino') + '<h3>Fuel & Go slot</h3>' + this.statsHTML('slots') + '<h3>Scratch cards</h3>' + this.statsHTML('scratch');
       return h;
@@ -453,7 +453,7 @@ class Gamble {
     const render = () => {
       const s = this.g.save, pool = def.progressive ? this.pool(id) : 0;
       const grid = sl.grid || Array.from({ length: def.reels }, () => Array.from({ length: rows }, () => pick(SLOT_SYMS)));
-      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Bank <b class="money">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="money">${fmtMoney(pool)}</b></span>` : ''}</div>`;
+      let h = `<div class="svcTop"><span>${esc(def.kind || def.where || 'SLOT')}</span><span>Bank <b class="cash clean">${fmtMoney(this.shownMoney())}</b></span>${def.progressive ? `<span>Progressive <b class="gold">${fmtMoney(pool)}</b></span>` : ''}</div>`;
       h += `<div class="slotm${def.reels === 5 ? ' five' : ''}"><div class="reels">${grid.map((col, r) => `<div class="reel${sl.spinning && r >= sl.stopped ? ' spin' : ''}">${col.map((s2, k) => `<div class="cell${sl.res && !sl.spinning && sl.res.lines.length && (def.reels === 3 || sl.res.lines.some(li => def.lines[li][r] === k)) ? ' win' : ''}">${sym(s2)}</div>`).join('')}</div>`).join('')}</div>
         <div class="lever${sl.spinning ? ' pulled' : ''}" data-act="spin"><i></i><b></b></div></div>`;
       h += `<div class="gres ${sl.res && !sl.spinning ? sl.res.cls : ''}">${sl.spinning ? '…' : sl.res ? (sl.res.win ? `WIN ${fmtMoney(sl.res.win)}${sl.res.jackpot ? ' · JACKPOT' : ''}` : 'No win') : 'Pick a bet and spin'}</div>`;
@@ -503,7 +503,7 @@ class Gamble {
   wagerHTML(game, cur, o = {}) {
     const m = Math.floor(o.avail !== undefined ? o.avail : this.shownMoney()), lock = o.lock ? 'disabled' : '';
     const quick = CASINO.quick.filter(v => v <= this.maxBet(game));
-    const top = o.noTop ? '' : `<div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>${o.label || 'BET'}<b>${fmtMoney(cur)}</b></span>${o.pays ? `<span>${o.paysLabel || 'PAYS UP TO'}<b class="money">${o.pays}</b></span>` : ''}</div>`;
+    const top = o.noTop ? '' : `<div class="wtop"><span>BALANCE<b class="cash clean">${fmtMoney(this.shownMoney())}</b></span><span>${o.label || 'BET'}<b>${fmtMoney(cur)}</b></span>${o.pays ? `<span>${o.paysLabel || 'PAYS UP TO'}<b class="gold">${o.pays}</b></span>` : ''}</div>`;
     return `<div class="wager">${top}
       <div class="wq">${quick.map(v => `<button class="sbtn${cur === v ? ' gold' : ''}" data-act="w:q:${v}" ${v > m || o.lock ? 'disabled' : ''}>$${fmtShort(v)}</button>`).join('')}<button class="sbtn${cur === m && m >= CASINO.minBet ? ' gold' : ''}" data-act="w:max" ${m < CASINO.minBet || o.lock ? 'disabled' : ''}>MAX</button></div>
       <div class="wq wc"><button class="sbtn" data-act="w:half" ${lock}>½</button><button class="sbtn" data-act="w:dbl" ${lock}>×2</button><input id="wagerIn" class="wagerIn" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" placeholder="Custom: 7500, 250k, 2.5m" aria-label="Custom amount" ${lock}><button class="sbtn gold" data-act="w:set" ${lock}>SET</button></div></div>`;
@@ -550,7 +550,7 @@ class Gamble {
       if (play) {
         const hd = bj.hands[bj.cur], two = hd && hd.cards.length === 2;
         const canSplit = two && bj.hands.length === 1 && Math.min(10, hd.cards[0].r === 14 ? 11 : hd.cards[0].r) === Math.min(10, hd.cards[1].r === 14 ? 11 : hd.cards[1].r) && Money.clean >= hd.bet;
-        h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="money">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
+        h += `<div class="wager"><div class="wtop"><span>BALANCE<b class="cash clean">${fmtMoney(this.shownMoney())}</b></span><span>ON THE TABLE<b>${fmtMoney(bj.hands.reduce((a, x) => a + x.bet, 0))}</b></span></div></div>`;
         h += `<div class="btns big"><button class="sbtn gold" data-act="hit">HIT</button><button class="sbtn gold" data-act="stand">STAND</button><button class="sbtn" data-act="double" ${two && Money.clean >= hd.bet ? '' : 'disabled'}>DOUBLE</button><button class="sbtn" data-act="split" ${canSplit ? '' : 'disabled'}>SPLIT</button></div>`;
       } else {
         h += this.wagerHTML('bj', bj.bet, { pays: fmtMoney(Math.floor(bj.bet * 2.5)), paysLabel: 'BLACKJACK PAYS', lock: bj.revealing });
@@ -709,7 +709,7 @@ class Gamble {
         return h + '<h3>Casino record</h3>' + this.statsHTML('casino');
       }
       const showAll = pk.phase === 'show';
-      let h = `<div class="svcTop"><span>Blinds <b>${fmtMoney(pk.bb / 2)} / ${fmtMoney(pk.bb)}</b></span><span>Bank <b class="money">${fmtMoney(Money.clean)}</b></span><span>Your chips <b class="money">${fmtMoney(pk.seats[0].stack)}</b></span></div>`;
+      let h = `<div class="svcTop"><span>Blinds <b>${fmtMoney(pk.bb / 2)} / ${fmtMoney(pk.bb)}</b></span><span>Bank <b class="cash clean">${fmtMoney(Money.clean)}</b></span><span>Your chips <b class="gold">${fmtMoney(pk.seats[0].stack)}</b></span></div>`;
       h += `<div class="felt poker"><div class="board">${pk.board.map(c => cardHTML(c)).join('') || '<span class="hint">—</span>'}</div><div class="pot">Pot ${fmtMoney(pk.pot + pk.seats.reduce((a, x) => a + x.put, 0))}</div>`;
       h += `<div class="seats">${pk.seats.map((x, i) => `<div class="seat${i === pk.toAct && pk.phase === 'play' ? ' cur' : ''}${x.folded ? ' out' : ''}${x.won ? ' won' : ''}"><div class="who">${i === pk.btn ? '<b class="btn">D</b> ' : ''}${esc(x.name)}${x.isP ? '' : ` <small>${x.pers}</small>`}</div><div class="cards">${x.hole.map(c => cardHTML(c, !x.isP && !(showAll && !x.folded))).join('')}</div><div class="d">$${fmtShort(x.stack)}${x.put ? ' · bet $' + fmtShort(x.put) : ''}${x.allin ? ' · ALL IN' : ''}</div><div class="act">${esc(x.last || '')}</div></div>`).join('')}</div></div>`;
       h += `<div class="gres ${pk.cls || ''}">${esc(pk.msg || '')}</div>`;
@@ -908,7 +908,7 @@ class Gamble {
       <div class="rylWin"><span id="rylTier">${res && res.major >= 0 ? ROYALE_MAJORS[res.major].name : res && res.win ? 'WIN' : ry.spinning ? 'GOOD LUCK' : 'WIN'}</span><b id="rylWinV">${res && res.win ? fmtMoney(res.win) : '$0'}</b></div>
       <div class="rylGlass"><div class="rylReels" id="rylReels">${grid.map((col, r) => `<div class="ryr" data-r="${r}"><div class="rys">${col.map((sy, w) => this.royaleCell(sy, hitCells.has(r + ':' + w) ? ' hit' : '')).join('')}</div></div>`).join('')}</div><svg class="rylLines" viewBox="0 0 500 300" preserveAspectRatio="none">${lines}</svg></div>
       <div class="rylBulbs">${bulbs(18)}</div></div></div>`;
-    h += `<div class="rylBar"><div><span>BALANCE</span><b class="money" id="rylBal">${fmtFit(this.shownMoney())}</b></div><div><span>BET</span><b>${fmtFit(bet)}</b></div><div><span>WIN</span><b class="money" id="rylLast">${res && res.win ? fmtFit(res.win) : '$0'}</b></div></div>`;
+    h += `<div class="rylBar"><div><span>BALANCE</span><b class="cash clean" id="rylBal">${fmtFit(this.shownMoney())}</b></div><div><span>BET</span><b>${fmtFit(bet)}</b></div><div><span>WIN</span><b class="money" id="rylLast">${res && res.win ? fmtFit(res.win) : '$0'}</b></div></div>`;
     h += `<div class="btns rylCtl"><button class="sbtn" data-act="ry:down" ${ry.spinning ? 'disabled' : ''} aria-label="Lower bet">−</button><button class="sbtn gold rylSpin" data-act="ry:spin" ${ry.spinning || Money.clean < bet ? 'disabled' : ''}>SPIN</button><button class="sbtn" data-act="ry:up" ${ry.spinning ? 'disabled' : ''} aria-label="Raise bet">+</button></div>`;
     h += this.wagerHTML('royale', bet, { lock: ry.spinning, noTop: true });
     h += `<div class="btns"><button class="sbtn${ry.info ? ' gold' : ''}" data-act="ry:info">${ry.info ? 'HIDE INFO' : 'INFO / PAYTABLE'}</button></div>`;

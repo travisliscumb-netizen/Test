@@ -13,19 +13,19 @@
    - Your own business: walk in, no robbing yourself; the counter is where
      you manage it.
    ===================================================================== */
-// fit: how the shop floor is dressed; till/safe: cash ranges (M13: tills ×0.8, safes ×0.65, so a robbery spree is the
+// floor (two tile colours), ceil, lamp: the room's surfaces and light; fit: how the shop floor is dressed; till/safe: cash ranges (M13: tills ×0.8, safes ×0.65, so a robbery spree is the
 // high-risk loop, not the one loop worth doing); stock: what the stockroom gives; sec: the security a
 // trade starts with (0 none, 1 cameras, 2 a guard); pal: the colours of its stock
 const ROB_THEMES = {
-  shop: { fit: 'shelves', till: [100, 300], safe: [780, 2340], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
-  pharmacy: { fit: 'shelves', till: [120, 360], safe: [1300, 3250], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
-  jewelry: { fit: 'cases', till: [240, 720], safe: [3900, 9750], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
-  electronics: { fit: 'screens', till: [160, 480], safe: [1620, 3900], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
-  pawn: { fit: 'clutter', till: [200, 560], safe: [1950, 5200], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
-  boutique: { fit: 'racks', till: [160, 480], safe: [1620, 4220], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
-  bar: { fit: 'bar', till: [240, 720], safe: [980, 2600], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
-  food: { fit: 'tables', till: [100, 340], safe: [580, 1690], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
-  service: { fit: 'chairs', till: [80, 260], safe: [520, 1430], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
+  shop: { floor: [0xcfcac0, 0xb8b3a8], ceil: 0xf4f2ee, lamp: 0xf4fbff, fit: 'shelves', till: [100, 300], safe: [780, 2340], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
+  pharmacy: { floor: [0xeef2f2, 0xd6e0e0], ceil: 0xf8fbfb, lamp: 0xf0fbff, fit: 'shelves', till: [120, 360], safe: [1300, 3250], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
+  jewelry: { floor: [0x2c2832, 0x3c3644], ceil: 0x221f27, lamp: 0xffe6bc, fit: 'cases', till: [240, 720], safe: [3900, 9750], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
+  electronics: { floor: [0x5e626a, 0x4e525a], ceil: 0x3a3e46, lamp: 0xe4f0ff, fit: 'screens', till: [160, 480], safe: [1620, 3900], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
+  pawn: { floor: [0x86704f, 0x765f42], ceil: 0xb8ad98, lamp: 0xffdca0, fit: 'clutter', till: [200, 560], safe: [1950, 5200], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
+  boutique: { floor: [0xeadfd8, 0xdacbc2], ceil: 0xfbf6f4, lamp: 0xfff0e6, fit: 'racks', till: [160, 480], safe: [1620, 4220], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
+  bar: { floor: [0x5a3a24, 0x4a2e1c], ceil: 0x2c2018, lamp: 0xffc070, fit: 'bar', till: [240, 720], safe: [980, 2600], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
+  food: { floor: [0xece2cc, 0xb8402e], ceil: 0xf6efe0, lamp: 0xfff0d0, fit: 'tables', till: [100, 340], safe: [580, 1690], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
+  service: { floor: [0xd6dade, 0xc2c8ce], ceil: 0xf4f6f8, lamp: 0xf4fbff, fit: 'chairs', till: [80, 260], safe: [520, 1430], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
 };
 const ROB_CAT_THEME = { convenience: 'shop', grocery: 'shop', pharmacy: 'pharmacy', jewelry: 'jewelry', electronics: 'electronics', pawn: 'pawn', boutique: 'boutique', bar: 'bar',
   coffee: 'food', diner: 'food', pizza: 'food', restaurant: 'food', barber: 'service', salon: 'service', tattoo: 'service', laundromat: 'service', arcade: 'service' };
@@ -44,8 +44,10 @@ function bizInteriorDef(prop, L) {
     id: 'b:' + prop.id, dynamic: true, name: prop.name, w: W, d: D, h: 3.2, exit: { x: -3.5, z: 4.6 }, spawnH: Math.PI, store: true, noExit: true,
     propId: prop.id, rob: T, at: { x: L.x, z: L.z }, door: { x: L.x, z: L.z, h: L.h }, seed: prop.id.length * 131 + prop.price % 997,
     build(k, rng, def) {
-      k.room(W, D, 3.2, { floor: 0xcfcac0, wall: T.wall, ceil: 0xf4f2ee, trim: T.trim, band: [2.5, 0.3], bandC: T.trim, lights: [3, 3], lightC: 0xf4fbff });
-      k.tiles(W, D, 0xcfcac0, 0xb8b3a8, 0.6);
+      // each trade its own floor, ceiling and lamp colour (G4): a bar is dark wood under amber light, a jeweller dark
+      // stone under warm spots, a pharmacy clinical white; the layout, its spots and the heist are the same for all
+      k.room(W, D, 3.2, { floor: T.floor[0], wall: T.wall, ceil: T.ceil, trim: T.trim, band: [2.5, 0.3], bandC: T.trim, lights: [3, 3], lightC: T.lamp });
+      k.tiles(W, D, T.floor[0], T.floor[1], 0.6);
       k.door(-3.5, hd - 0.02, 0, 0x9ab4c4, T.trim);
       // the partition, the staff door behind the counter (same place as at a Fuel & Go, so openStaffDoor serves both)
       iwall(k, 'x', -1.8, -hw, hw, 0, 3.2, 0xd8d4ca, [[2.6, 3.8]]);
