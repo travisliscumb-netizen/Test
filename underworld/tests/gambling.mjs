@@ -98,14 +98,16 @@ const sl = await ev(async () => {
   for (const bet of [10, 25, 50, 100]) {
     g.content._svcAct('bet:' + bet);
     const m0 = window.game.money.clean, sp0 = s.gamble.slots.spins;
+    const later = G.later, sched = []; G.later = function (ms, fn) { if (ms >= 500) sched.push(ms); return later.call(this, ms, fn); };
     g.content._svcAct('spin'); g.content._svcAct('spin'); G.slotGo('fuel', G.slotState.fuel); // spam: one spin only
+    G.later = later;
     const st = G.slotState.fuel, r = st.res, hid = G.shownMoney() === m0 - bet;
     // each reel-stop clunk is recorded with the reel count at that moment (event-driven, not polled)
     const stops = [], t0 = performance.now(), play = g.audio.play;
     g.audio.play = function (n, o) { if (n === 'reelstop') stops.push([st.stopped, Math.round(performance.now() - t0)]); return play.call(this, n, o); };
     await new Promise(done => { const iv = setInterval(() => { if (!st.spinning) { clearInterval(iv); done(); } }, 15); });
     g.audio.play = play;
-    res.push({ bet, win: r.win, once: window.game.money.clean === m0 - bet + r.win && s.gamble.slots.spins === sp0 + 1, hid, stops, grid: r.grid.map(c => c[0]) });
+    res.push({ bet, win: r.win, once: window.game.money.clean === m0 - bet + r.win && s.gamble.slots.spins === sp0 + 1, hid, stops, sched, grid: r.grid.map(c => c[0]) });
   }
   // the payout matches the pay table for the symbols shown
   const P = window.__pv, def = P.SLOT_DEFS.fuel; let bad = 0;
@@ -114,7 +116,9 @@ const sl = await ev(async () => {
 });
 check('slot: opens from the cabinet with a pull handle and SPIN', sl.title === 'Lucky Pump' && sl.lever, sl.title);
 check('slot: each bet ($10/$25/$50/$100) deducted once even when SPIN is spammed; win paid once', sl.res.every(r => r.once), JSON.stringify(sl.res.map(r => [r.bet, r.win, r.once])));
-check('slot: the three reels stop one after another', sl.res.every(r => r.stops.length >= 3 && r.stops[0][0] === 1 && r.stops[1][0] === 2 && r.stops[2][0] === 3 && r.stops[1][1] - r.stops[0][1] > 200 && r.stops[2][1] - r.stops[1][1] > 200), JSON.stringify(sl.res.map(r => r.stops)));
+// the stops are scheduled a third of a second apart and land in reel order; the wall-clock gaps are not checked (on
+// software GL a frame blocks the main thread for 300–600 ms, so a timer can land a frame late: the M13 gate run)
+check('slot: the three reels stop one after another (scheduled ≥ 300 ms apart, landing in reel order)', sl.res.every(r => r.sched.length === 3 && r.sched[1] - r.sched[0] >= 300 && r.sched[2] - r.sched[1] >= 300 && r.stops.length >= 3 && r.stops[0][0] === 1 && r.stops[1][0] === 2 && r.stops[2][0] === 3 && r.stops[0][1] <= r.stops[1][1] && r.stops[1][1] <= r.stops[2][1]), JSON.stringify(sl.res.map(r => [r.sched, r.stops])));
 check('slot: win hidden until the last reel stops', sl.res.every(r => r.hid));
 check('slot: 4,000 spins all pay exactly what the pay table says', sl.bad === 0, String(sl.bad));
 const jp = await ev(async () => {

@@ -125,10 +125,20 @@ const win = await (async () => {
   await race('pink', 1);
   return ev(b0 => {
     const g = window.game, s = g.save, ne = s.garage.find(e => !b0.uids.includes(e.uid)), v = ne && g.vreg.live(ne), sale = ne && g.content.saleOf(ne);
-    return { n: s.garage.length - b0.n, origin: ne && ne.origin, live: !!v, adopted: !!(v && v.garageUid === ne.uid && v.owned && !v.drive), sports: s.garage.some(e => e.type === 'sports'), pink: s.pink, sale, day: s.pinkDay === g.uw.S.day, log: s.vlog.some(l => l.what === 'won in a pink slip') };
+    return { uid: ne && ne.uid, n: s.garage.length - b0.n, origin: ne && ne.origin, out: !!(ne && ne.out), loc: ne && ne.loc, live: !!v, adopted: !!(v && v.garageUid === ne.uid && v.owned && !v.drive), sports: s.garage.some(e => e.type === 'sports'), pink: s.pink, sale, day: s.pinkDay === g.uw.S.day, log: s.vlog.some(l => l.what === 'won in a pink slip') };
   }, b0);
 })();
-check('pink slip won: his car joins your fleet where it stopped (one car, resells for Dirty Cash), yours stays yours, the stake is settled', win.n === 1 && win.origin === 'pinkslip' && win.live && win.adopted && win.sports && win.pink === null && win.sale && win.sale.dirty === win.sale.total && win.sale.clean === 0 && win.day && win.log, JSON.stringify(win));
+// where it stopped: the registry may already have put it away (the finish can leave his car beyond its 340 m keep
+// radius); go there and it is on the street again, yours, with nobody driving it (within its coast-down: it is
+// handed over still rolling)
+const there = win.loc ? await ev(r => {
+  const g = window.game; if (g.player.state === 'vehicle') g.exitVehicle(true); g.resetPlayerState(r.loc.x + 3, r.loc.z + 3, 0);
+  for (let n = 0; n < 120; n++) g.update(1 / 60, 1 / 60);
+  const e = g.save.garage.find(x => x.uid === r.uid), v = e && g.vreg.live(e);
+  return { live: !!v, adopted: !!(v && v.garageUid === e.uid && v.owned && !v.drive), d: v ? Math.round(Math.hypot(v.pos.x - r.loc.x, v.pos.z - r.loc.z)) : null };
+}, win) : null;
+win.there = there;
+check('pink slip won: his car joins your fleet where it stopped (one car, resells for Dirty Cash), yours stays yours, the stake is settled', win.n === 1 && win.origin === 'pinkslip' && win.out && (!win.live || win.adopted) && win.there && win.there.live && win.there.adopted && win.there.d < 40 && win.sports && win.pink === null && win.sale && win.sale.dirty === win.sale.total && win.sale.clean === 0 && win.day && win.log, JSON.stringify(win));
 const once = await ev(() => { const g = window.game, n = []; for (let k = 0; k < 14; k++) { const o = g.campaign.raceOffer(window.__tull()); n.push(o.pink && !o.race.offroad ? 1 : 0); }; return n.join(''); });
 check('one pink slip a day: no second offer today', !/1/.test(once), once);
 // a loss: yours is his
