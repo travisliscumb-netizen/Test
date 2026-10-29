@@ -42,3 +42,11 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
   business upgrades 0.6×/1.2× of price; suppliers restock half a shelf a day; the Armorer buys hardware but no
   longer sells it; the Royale progressive is also won by other visitors (1 in 400 econ days), so it stays bounded
   (~$1.25B average) and the machine never turns positive. Royale Billions kept (95%, a lottery tail).
+- **Graphics overhaul (Session 14, GRAPHICS.md):** no engine rewrite was needed (three.js r160, one file, instanced
+  and merged meshes stay the architecture). Interiors hide the outdoors group and pause the sun's shadow pass;
+  Dirty Cash is green and Clean Bank blue everywhere money shows; map symbols keep their letters as data (tests
+  and saves) and draw pictograms; the terrain shader only adds detail over the height field's own colours (physics
+  untouched); interior lamps light per pixel with no shadows; wet-road reflections are analytic (sky film, lamp
+  grid), not a reflection pass; the Royale's odds are untouched (presentation only); no save field added, so no
+  migration and no `SAVE_VERSION` bump. The M13 snapshot (`releases/pre-graphics-m13/`) is frozen; the after build
+  ships with the main save keys.

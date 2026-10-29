@@ -21,3 +21,8 @@
   baseline for downtown on foot, a downtown drive, the phone map, the casino, a jail cell; run it alone, never
   beside the regression runner). With `PHONE=1 tests/perf.mjs` it makes the CONTENT COMPLETE mobile baseline.
 - A runner reads the live `tests/` folder: don't edit suites while it runs against a staged build.
+- Graphics overhaul tools (Session 14): `node underworld/tools/vqa-shots.mjs <build.html> <out dir> [scene
+  prefixes]` (the same 70-odd scenes and cameras on any build: world, vehicles, people, interiors, UI on a touch
+  phone viewport; `VQA_QUICK=1` for half-size look-dev); `node underworld/tools/build-cost.mjs <a.html> [b.html…]`
+  (raw/gzip/brotli, boot ms, JS heap, live geometries/textures, medians of three cold loads; run on a quiet machine);
+  `tools/export-release.mjs` + `tools/verify-release.mjs` (single-file release and its static-host check).

@@ -33,3 +33,7 @@
 | Taxis | `560` | `TAXI_RULES` (M11) |
 | UI manager, map | `600` | Intel layer (M11) |
 | Game loop, boot | `630`, `650` | `window.__pv` exports for tests |
+| Rendering: materials, shaders, terrain, interiors' light | `060`, `350` | `makeTerrainMaterial` (Cedar Fields, Valen Point), wet-ground film and lamp streaks in the ground shader, `makeInteriorMaterial` (per-room lamps, Session 14) |
+| Rendering: outdoors group, culling, quality | `630`, `150`, `610` | `game.outdoor` hidden inside rooms; foliage LOD/culling `props.cull`; dynamic resolution (auto) |
+| People's looks | `180` | `randomLook` (faces, hairstyles, coats, beanies), `roundBoxGeometry` (`070`) |
+| HUD, map symbols, currency classes | `600`, `main.css` | Rank/Rep chip, `MAP_GLYPHS`/`mapIconHTML`, `.cash.dirty`/`.cash.clean`, banner kickers (Session 14) |
