@@ -206,5 +206,16 @@ check('Rank requirements only ever grow from one Rank to the next', rk.mono, JSO
 check('Underworld Power needs a Lieutenant and 8 turfs; City Kingpin two Lieutenants, 16 turfs, an operating warehouse, 2,500 Rep', rk.up.lts === 1 && rk.up.turfs === 8 && rk.top.lts === 2 && rk.top.turfs === 16 && rk.top.wh === 1 && rk.top.rep === 2500, JSON.stringify([rk.up, rk.top]));
 check('each Rank’s hint names the next Rank’s Rep and turf numbers', rk.hints.every(h => h[1]), JSON.stringify(rk.hints));
 
+// ---------------------------------------------------------------- suppliers restock (no soft lock on the trade)
+const shelf = await ev(() => {
+  const g = window.game, uw = g.uw, S = uw.S, out = {};
+  const st = uw.shelf('sully'); out.full = uw.supplyFull('sully', 'smokes'); out.first = st.smokes;
+  st.smokes = 0; uw.restockSuppliers(); out.day1 = st.smokes; uw.restockSuppliers(); out.day2 = st.smokes; uw.restockSuppliers(); out.day3 = st.smokes;
+  { const L = uw.loc('spot', 'armorer'); out.armorerSells = !!(L.def.sells && L.def.sells.length); }
+  return out;
+});
+check('a supplier starts with a full shelf and, bought out, restocks half of it each economic day (full again in two, never over)', shelf.first === shelf.full && shelf.day1 === Math.ceil(shelf.full / 2) && shelf.day2 === shelf.full && shelf.day3 === shelf.full, JSON.stringify(shelf));
+check('the Armorer sells no hardware (only buys it), so his counter is no buy-sell loop', shelf.armorerSells === false, JSON.stringify(shelf));
+
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'economy');

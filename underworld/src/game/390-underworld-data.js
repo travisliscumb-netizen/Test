@@ -351,11 +351,14 @@ const HOOD = {
 const HOME_SEC = [1, 1, 2, 3, 4, 5, 5];
 const HOME_FINISH = ['', 'Basic', 'Standard', 'Good', 'Premium', 'Luxury', 'Estate'];
 // street-level contacts: suppliers, buyers, the armorer
+// a supplier's shelf restocks half a full delivery each economic day (M13: shelves never refilled before, so a bought-out
+// supplier stayed empty for good)
+const SUPPLY_RESTOCK = 0.5;
 const SPOTS = [
   { id: 'sully', name: 'Dockside Sully', role: 'Supplier · smokes & hot goods', at: [10, 8, 3, 50], sells: ['smokes'], buysHot: false, rep: 0, col: 0x46d4c4 },
   { id: 'gus', name: 'Greenhouse Gus', role: 'Supplier · green', at: [1, 1, 1, 30], sells: ['green'], rep: 100, col: 0x7fe08f },
   { id: 'feld', name: 'Doc Feld', role: 'Supplier · pharma', at: [4, 4, 2, 50], sells: ['pills'], rep: 300, col: 0xffd84d },
-  { id: 'armorer', name: 'The Armorer', role: 'Weapons & hardware', at: [8, 11, 0, 30], sells: ['hardware'], arms: true, rep: 0, col: 0xff8a3d },
+  { id: 'armorer', name: 'The Armorer', role: 'Weapons · buys hardware', at: [8, 11, 0, 30], arms: true, rep: 0, col: 0xff8a3d },
   { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b },
   { id: 'fixer', name: 'Dina Vance', role: 'Laundering fixer · Dirty Cash in, Clean Bank out', at: [3, 1, 3, 30], fixer: true, rep: 0, col: 0x8fe39b }
 ];

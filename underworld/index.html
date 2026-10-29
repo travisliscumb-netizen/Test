@@ -49580,11 +49580,14 @@ const HOOD = {
 const HOME_SEC = [1, 1, 2, 3, 4, 5, 5];
 const HOME_FINISH = ['', 'Basic', 'Standard', 'Good', 'Premium', 'Luxury', 'Estate'];
 // street-level contacts: suppliers, buyers, the armorer
+// a supplier's shelf restocks half a full delivery each economic day (M13: shelves never refilled before, so a bought-out
+// supplier stayed empty for good)
+const SUPPLY_RESTOCK = 0.5;
 const SPOTS = [
   { id: 'sully', name: 'Dockside Sully', role: 'Supplier · smokes & hot goods', at: [10, 8, 3, 50], sells: ['smokes'], buysHot: false, rep: 0, col: 0x46d4c4 },
   { id: 'gus', name: 'Greenhouse Gus', role: 'Supplier · green', at: [1, 1, 1, 30], sells: ['green'], rep: 100, col: 0x7fe08f },
   { id: 'feld', name: 'Doc Feld', role: 'Supplier · pharma', at: [4, 4, 2, 50], sells: ['pills'], rep: 300, col: 0xffd84d },
-  { id: 'armorer', name: 'The Armorer', role: 'Weapons & hardware', at: [8, 11, 0, 30], sells: ['hardware'], arms: true, rep: 0, col: 0xff8a3d },
+  { id: 'armorer', name: 'The Armorer', role: 'Weapons · buys hardware', at: [8, 11, 0, 30], arms: true, rep: 0, col: 0xff8a3d },
   { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b },
   { id: 'fixer', name: 'Dina Vance', role: 'Laundering fixer · Dirty Cash in, Clean Bank out', at: [3, 1, 3, 30], fixer: true, rep: 0, col: 0x8fe39b }
 ];
@@ -50126,9 +50129,9 @@ class DeliveryManager {
     if (this.isSpot(from)) {
       // a supply run: the Driver buys at the supplier's wholesale price, paid from the vault (§8)
       const sp = SPOTS.find(x => x.id === from.slice(5)), L = uw.loc('spot', sp.id);
-      if (!sp.sells.includes(good)) return `${sp.name} doesn’t sell that.`;
+      if (!(sp.sells || []).includes(good)) return `${sp.name} doesn’t sell that.`;
       if (g.save.rep < (sp.rep || 0) && !(S.flags.intro && S.flags.intro[sp.id])) return `${sp.name} doesn’t deal with you yet.`;
-      const stock = S.supply[sp.id] || (S.supply[sp.id] = {}); if (stock[good] === undefined) stock[good] = Math.round(30 * S.market[L.zone][good][0] / GOODS[good].size);
+      const stock = uw.shelf(sp.id);
       n = Math.min(Math.floor(n), stock[good] | 0); if (n <= 0) return `${sp.name} is out of that.`;
       buy = Math.round(uw.market.wholesale(L.zone, good) * n);
     } else { const src = this.container(from); n = Math.min(Math.floor(n), Inv.has(src, good)); }
@@ -51103,6 +51106,11 @@ class Underworld {
   // the economic day turns on the economic clock (M13, §45.9): every 24 economic hours, whatever the visual day length,
   // so a short day setting never pays the daily economy faster per hour of play
   econDays() { const S = this.S, d = Math.floor(S.econH / 24); while ((S.econDay | 0) < d && !S.jail) { S.econDay = (S.econDay | 0) + 1; this.tickDay(); } }
+  // a supplier's shelf: a full delivery is 30 lots, more where the district is flush with that good; created full the
+  // first time anyone deals there, then restocked by SUPPLY_RESTOCK of a full shelf each economic day
+  supplyFull(id, k) { const L = this.loc('spot', id); return Math.max(1, Math.round(30 * this.S.market[L.zone][k][0] / GOODS[k].size)); }
+  shelf(id) { const sp = SPOTS.find(x => x.id === id), st = this.S.supply[id] || (this.S.supply[id] = {}); if (sp && sp.sells) for (const k of sp.sells) if (!(st[k] >= 0)) st[k] = this.supplyFull(id, k); return st; }
+  restockSuppliers() { for (const sp of SPOTS) if (sp.sells && this.S.supply[sp.id]) { const st = this.shelf(sp.id); for (const k of sp.sells) { const full = this.supplyFull(sp.id, k); if (st[k] < full) st[k] = Math.min(full, st[k] + Math.ceil(full * SUPPLY_RESTOCK)); } } }
   tickDay() {
     const S = this.S, g = this.g;
     S.day++;
@@ -51119,6 +51127,7 @@ class Underworld {
     this.legal.tickDay();
     if (g.gamble) g.gamble.tickDay();
     this.opps.tickDay();
+    this.restockSuppliers();
     S.infamy *= 0.99;
     // the chop shop wanted list and street buyer quotas refresh daily
     if (S.day % 2 === 0) this.rollChopList();
@@ -58564,7 +58573,7 @@ class EmpireUI {
     // pickups: you, your stashes and the suppliers who deal with you (a supply run buys there, from the vault);
     // destinations: your stashes and the corners of turfs where you have Dealers (§8)
     const spots = SPOTS.filter(sp => sp.sells && sp.sells.length && (g.save.rep >= (sp.rep || 0) || (S.flags.intro && S.flags.intro[sp.id])));
-    const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = S.supply[sp.id] || {}; const o = {}; for (const k of sp.sells) o[k] = st[k] !== undefined ? st[k] : 0; return o; };
+    const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = uw.shelf(sp.id); const o = {}; for (const k of sp.sells) o[k] = st[k]; return o; };
     const imp = uw.shipments.importOpen();
     const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`]), ...(imp && imp.state === 'landed' ? [['import:' + imp.id, `Your import on the quay (${uw.shipments.importPoint().name})`]] : [])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
     if (!origins.some(o => o[0] === d.from)) d.from = origins.length ? origins[0][0] : '';
@@ -58912,8 +58921,7 @@ class EmpireUI {
     if (s.arms) { this.openArmorer(L); return; }
     if (s.fixer) { this.openFixer(L); return; }
     const z = L.zone;
-    const stock = S.supply[s.id] || (S.supply[s.id] = {});
-    for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
+    const stock = uw.shelf(s.id);
     const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
     const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>${Money.html('supplier')}</span></div>` +
       (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} Rep)</div>` : '<div class="jobs">' + s.sells.map(k => {
@@ -58949,8 +58957,9 @@ class EmpireUI {
       { gun: 'shotgun', n: 12, price: 160 }, { gun: 'shotgun', n: 48, price: 590 },
       { gun: 'smg', n: 90, price: 360 }, { gun: 'smg', n: 270, price: 1000 }
     ];
-    const hw = uw.market.wholesale(z, 'hardware'), hs = Math.round(uw.market.price(z, 'hardware') * 0.9);
-    const stock = S.supply.armorer || (S.supply.armorer = { hardware: 8 });
+    // he buys hardware (from Tidewater, their boats, a raid, a gang's drop); he doesn't sell it (M13: a counter that sells
+    // at wholesale and buys back at 90% of street is a free loop)
+    const hs = Math.round(uw.market.price(z, 'hardware') * 0.9);
     const tabs = [['guns', 'Buy weapons'], ['ammo', 'Buy ammo'], ['armor', 'Buy armor'], ['loadout', 'Loadout'], ['stash', 'Stash']];
     if (!tabs.some(t => t[0] === this.armTab)) this.armTab = 'guns';
     const owned = uw.props.ownedList().filter(d => d.storage);
@@ -58961,7 +58970,7 @@ class EmpireUI {
           const own = s.weapons[it.id], lock = it.rep && s.rep < it.rep;
           return `<div class="card${lock ? ' locked' : ''}"><div class="t">${it.name} ${own ? `<span class="chip" style="--c:#7fe08f">OWNED</span>` : ''}</div><div class="d">${it.desc}${own ? `<br><b>${esc(A.whereText(it.id))}</b>` : ''}</div><button class="sbtn gold" data-act="w:${it.id}" ${own || lock || !Money.can(it.price, 'armorer') ? 'disabled' : ''}>${own ? 'Owned — one is all you need' : lock ? 'Needs ' + it.rep + ' rep' : fmtMoney(it.price)}</button></div>`;
         }).join('') + '</div>';
-        h += `<h3>Hardware <small>bulk product, untraceable</small></h3><div class="jobs"><div class="job"><i style="color:${TIERS[3].col}">■</i><div><b>Buy hardware</b><span>${fmtMoney(hw)} a unit · ${fmtQty('hardware', stock.hardware | 0)} available${s.rep < 500 ? ' · needs 500 rep' : ''}</span></div><button class="sbtn" data-act="hb:1" ${s.rep < 500 || (stock.hardware | 0) < 1 || !Money.can(hw, 'armorer') ? 'disabled' : ''}>×1</button><button class="sbtn" data-act="hb:5" ${s.rep < 500 || (stock.hardware | 0) < 5 || !Money.can(hw * 5, 'armorer') ? 'disabled' : ''}>×5</button></div>
+        h += `<h3>Hardware <small>bulk product, untraceable</small></h3><div class="jobs">
           <div class="job"><i style="color:${TIERS[3].col}">■</i><div><b>Sell hardware</b><span>${fmtMoney(hs)} a unit · ${fmtQty('hardware', uw.carried().hardware | 0)} carried</span></div><button class="sbtn gold" data-act="hs" ${(uw.carried().hardware | 0) ? '' : 'disabled'}>Sell all</button></div></div>`;
       } else if (this.armTab === 'ammo') {
         h += '<div class="grid2">' + BOXES.map((bx, i) => {
@@ -58994,9 +59003,6 @@ class EmpireUI {
       } else if (k === 'vspare') {
         const pid = this.vestTo && uw.props.owned(this.vestTo) ? this.vestTo : owned[0] && owned[0].id; if (!pid || !Money.can(480, 'armorer') || s.rep < 100) return;
         A.ws(pid).vests.push(VEST_MAX); Money.pay(480, 'armorer'); r = `A spare vest is waiting at ${PROP_BY_ID[pid].name}.`;
-      } else if (k === 'hb') {
-        const n = Math.min(+id, stock.hardware | 0, Math.floor(Money.available('armorer') / hw)); const got = n > 0 ? uw.give({ hardware: n }, 'buy', { hardware: hw }) : null;
-        if (!got) r = 'No room to carry it.'; else { Money.pay(got.hardware * hw, 'armorer'); stock.hardware -= got.hardware; r = `Bought ${fmtQty('hardware', got.hardware)} hardware.`; }
       } else if (k === 'hs') {
         const n = uw.carried().hardware | 0; if (n) { uw.take('hardware', n); g.earn(n * hs, 'arms'); uw.realize(n * hs, 'hardware'); uw.market.sold(z, 'hardware', n); uw.S.st.sold += n; r = `Sold ${fmtQty('hardware', n)} for ${fmtMoney(n * hs)}.`; uw.addRep(n * 4, null); }
       } else { const ar = A.act(a, null); if (ar === null) return; r = ar; g.content.refreshSvc(r); g.saveGame(); return; }
@@ -61776,10 +61782,10 @@ class MapView {
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
         add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
-        // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
+        // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
         if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
         else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_DAY_CAP)} a day` });
-        else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `BUY ${L.def.sells.map(k => GOODS[k].name).join(', ')}${L.def.arms ? ' · guns · also buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
+        else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `${L.def.sells ? 'BUY ' + L.def.sells.map(k => GOODS[k].name).join(', ') : 'BUY guns, ammo, armour'}${L.def.arms ? ' · buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });
     }

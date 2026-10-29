@@ -826,6 +826,11 @@ class Underworld {
   // the economic day turns on the economic clock (M13, §45.9): every 24 economic hours, whatever the visual day length,
   // so a short day setting never pays the daily economy faster per hour of play
   econDays() { const S = this.S, d = Math.floor(S.econH / 24); while ((S.econDay | 0) < d && !S.jail) { S.econDay = (S.econDay | 0) + 1; this.tickDay(); } }
+  // a supplier's shelf: a full delivery is 30 lots, more where the district is flush with that good; created full the
+  // first time anyone deals there, then restocked by SUPPLY_RESTOCK of a full shelf each economic day
+  supplyFull(id, k) { const L = this.loc('spot', id); return Math.max(1, Math.round(30 * this.S.market[L.zone][k][0] / GOODS[k].size)); }
+  shelf(id) { const sp = SPOTS.find(x => x.id === id), st = this.S.supply[id] || (this.S.supply[id] = {}); if (sp && sp.sells) for (const k of sp.sells) if (!(st[k] >= 0)) st[k] = this.supplyFull(id, k); return st; }
+  restockSuppliers() { for (const sp of SPOTS) if (sp.sells && this.S.supply[sp.id]) { const st = this.shelf(sp.id); for (const k of sp.sells) { const full = this.supplyFull(sp.id, k); if (st[k] < full) st[k] = Math.min(full, st[k] + Math.ceil(full * SUPPLY_RESTOCK)); } } }
   tickDay() {
     const S = this.S, g = this.g;
     S.day++;
@@ -842,6 +847,7 @@ class Underworld {
     this.legal.tickDay();
     if (g.gamble) g.gamble.tickDay();
     this.opps.tickDay();
+    this.restockSuppliers();
     S.infamy *= 0.99;
     // the chop shop wanted list and street buyer quotas refresh daily
     if (S.day % 2 === 0) this.rollChopList();

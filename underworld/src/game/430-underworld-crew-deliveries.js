@@ -113,9 +113,9 @@ class DeliveryManager {
     if (this.isSpot(from)) {
       // a supply run: the Driver buys at the supplier's wholesale price, paid from the vault (§8)
       const sp = SPOTS.find(x => x.id === from.slice(5)), L = uw.loc('spot', sp.id);
-      if (!sp.sells.includes(good)) return `${sp.name} doesn’t sell that.`;
+      if (!(sp.sells || []).includes(good)) return `${sp.name} doesn’t sell that.`;
       if (g.save.rep < (sp.rep || 0) && !(S.flags.intro && S.flags.intro[sp.id])) return `${sp.name} doesn’t deal with you yet.`;
-      const stock = S.supply[sp.id] || (S.supply[sp.id] = {}); if (stock[good] === undefined) stock[good] = Math.round(30 * S.market[L.zone][good][0] / GOODS[good].size);
+      const stock = uw.shelf(sp.id);
       n = Math.min(Math.floor(n), stock[good] | 0); if (n <= 0) return `${sp.name} is out of that.`;
       buy = Math.round(uw.market.wholesale(L.zone, good) * n);
     } else { const src = this.container(from); n = Math.min(Math.floor(n), Inv.has(src, good)); }

@@ -37,13 +37,15 @@ check('an everyday purchase (taxi) takes cash on you first, then the bank', pol.
 check('the casino will not take Dirty Cash: no bet without Clean Bank (§45.5)', pol.casinoDirty.ok === false && pol.casinoDirty.can === false, JSON.stringify(pol.casinoDirty));
 check('crew wages never fall back to the bank (§45.17)', pol.wagesNoBank.paid === 0 && pol.wagesNoBank.clean === 1e6, JSON.stringify(pol.wagesNoBank));
 
-// the Armorer's hardware buttons check the full price of the batch (×5 needs five units' worth of Dirty Cash)
-const arm = await ev(() => { const g = window.game, uw = g.uw, M = g.money, L = uw.loc('spot', 'armorer');
-  const hw = uw.market.wholesale(L.zone, 'hardware'), keep = M.W.dirty.me; (uw.S.supply.armorer || (uw.S.supply.armorer = {})).hardware = 8;
-  const rep = g.save.rep; g.save.rep = 600; M.W.dirty.me = hw * 2; uw.ui.armTab = 'guns'; uw.ui.openSpot(L);
-  const btn = n => { const b = document.querySelector(`#svcBody [data-act="hb:${n}"]`); return b ? !b.disabled : null; };
-  const r = { hw, one: btn(1), five: btn(5) }; while (g.ui.stack.length) g.ui.back(); M.W.dirty.me = keep; g.save.rep = rep; return r; });
-check('Armorer hardware (500 Rep): with cash for two units, ×1 is enabled and ×5 is not', arm.one === true && arm.five === false, JSON.stringify(arm));
+// the Armorer's buttons check the full price against the money that can pay it (Dirty Cash on you)
+const arm = await ev(() => { const g = window.game, uw = g.uw, M = g.money, L = uw.loc('spot', 'armorer'), s = g.save;
+  const keep = M.W.dirty.me, rep = s.rep, sg = s.weapons.shotgun, pistol = s.weapons.pistol; s.rep = 600; s.weapons.shotgun = false; s.weapons.pistol = false; uw.ui.armTab = 'guns';
+  const btn = id => { const b = document.querySelector(`#svcBody [data-act="w:${id}"]`); return b ? !b.disabled : null; };
+  M.W.dirty.me = 3799; uw.ui.openSpot(L); const r = { pistol: btn('pistol'), shotgun: btn('shotgun') }; while (g.ui.stack.length) g.ui.back();
+  M.W.dirty.me = 3800; uw.ui.openSpot(L); r.shotgunExact = btn('shotgun'); r.noHardwareSale = !document.querySelector('#svcBody [data-act^="hb:"]'); r.buysHardware = !!document.querySelector('#svcBody [data-act="hs"]'); while (g.ui.stack.length) g.ui.back();
+  M.W.dirty.me = keep; s.rep = rep; s.weapons.shotgun = sg; s.weapons.pistol = pistol; return r; });
+check('Armorer: with $3,799 on you the pistol is enabled and the $3,800 shotgun is not; with $3,800 it is', arm.pistol === true && arm.shotgun === false && arm.shotgunExact === true, JSON.stringify(arm));
+check('the Armorer buys hardware but no longer sells it (no buy-and-sell-back loop at one counter, M13)', arm.noHardwareSale && arm.buysHardware, JSON.stringify(arm));
 // buying a vest to wear and a box of rounds actually goes through (Session 1 shipped both handlers always refusing:
 // Money.can(450) without its source is always false)
 const armBuy = await ev(() => { const g = window.game, uw = g.uw, M = g.money, s = g.save, p = g.player, L = uw.loc('spot', 'armorer');

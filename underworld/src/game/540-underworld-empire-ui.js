@@ -546,7 +546,7 @@ class EmpireUI {
     // pickups: you, your stashes and the suppliers who deal with you (a supply run buys there, from the vault);
     // destinations: your stashes and the corners of turfs where you have Dealers (§8)
     const spots = SPOTS.filter(sp => sp.sells && sp.sells.length && (g.save.rep >= (sp.rep || 0) || (S.flags.intro && S.flags.intro[sp.id])));
-    const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = S.supply[sp.id] || {}; const o = {}; for (const k of sp.sells) o[k] = st[k] !== undefined ? st[k] : 0; return o; };
+    const supplyOf = id => { const sp = SPOTS.find(x => 'spot:' + x.id === id); const st = uw.shelf(sp.id); const o = {}; for (const k of sp.sells) o[k] = st[k]; return o; };
     const imp = uw.shipments.importOpen();
     const origins = [['inv', 'Your pockets (the Driver meets you)'], ...stashes.map(p => ['' + p.id, p.name]), ...spots.map(sp => ['spot:' + sp.id, `${sp.name} (buy there)`]), ...(imp && imp.state === 'landed' ? [['import:' + imp.id, `Your import on the quay (${uw.shipments.importPoint().name})`]] : [])].filter(([id]) => id.startsWith('spot:') ? units(supplyOf(id)) > 0 : units(R.container(id)) > 0);
     if (!origins.some(o => o[0] === d.from)) d.from = origins.length ? origins[0][0] : '';
@@ -894,8 +894,7 @@ class EmpireUI {
     if (s.arms) { this.openArmorer(L); return; }
     if (s.fixer) { this.openFixer(L); return; }
     const z = L.zone;
-    const stock = S.supply[s.id] || (S.supply[s.id] = {});
-    for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
+    const stock = uw.shelf(s.id);
     const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
     const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>${Money.html('supplier')}</span></div>` +
       (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} Rep)</div>` : '<div class="jobs">' + s.sells.map(k => {
@@ -931,8 +930,9 @@ class EmpireUI {
       { gun: 'shotgun', n: 12, price: 160 }, { gun: 'shotgun', n: 48, price: 590 },
       { gun: 'smg', n: 90, price: 360 }, { gun: 'smg', n: 270, price: 1000 }
     ];
-    const hw = uw.market.wholesale(z, 'hardware'), hs = Math.round(uw.market.price(z, 'hardware') * 0.9);
-    const stock = S.supply.armorer || (S.supply.armorer = { hardware: 8 });
+    // he buys hardware (from Tidewater, their boats, a raid, a gang's drop); he doesn't sell it (M13: a counter that sells
+    // at wholesale and buys back at 90% of street is a free loop)
+    const hs = Math.round(uw.market.price(z, 'hardware') * 0.9);
     const tabs = [['guns', 'Buy weapons'], ['ammo', 'Buy ammo'], ['armor', 'Buy armor'], ['loadout', 'Loadout'], ['stash', 'Stash']];
     if (!tabs.some(t => t[0] === this.armTab)) this.armTab = 'guns';
     const owned = uw.props.ownedList().filter(d => d.storage);
@@ -943,7 +943,7 @@ class EmpireUI {
           const own = s.weapons[it.id], lock = it.rep && s.rep < it.rep;
           return `<div class="card${lock ? ' locked' : ''}"><div class="t">${it.name} ${own ? `<span class="chip" style="--c:#7fe08f">OWNED</span>` : ''}</div><div class="d">${it.desc}${own ? `<br><b>${esc(A.whereText(it.id))}</b>` : ''}</div><button class="sbtn gold" data-act="w:${it.id}" ${own || lock || !Money.can(it.price, 'armorer') ? 'disabled' : ''}>${own ? 'Owned — one is all you need' : lock ? 'Needs ' + it.rep + ' rep' : fmtMoney(it.price)}</button></div>`;
         }).join('') + '</div>';
-        h += `<h3>Hardware <small>bulk product, untraceable</small></h3><div class="jobs"><div class="job"><i style="color:${TIERS[3].col}">■</i><div><b>Buy hardware</b><span>${fmtMoney(hw)} a unit · ${fmtQty('hardware', stock.hardware | 0)} available${s.rep < 500 ? ' · needs 500 rep' : ''}</span></div><button class="sbtn" data-act="hb:1" ${s.rep < 500 || (stock.hardware | 0) < 1 || !Money.can(hw, 'armorer') ? 'disabled' : ''}>×1</button><button class="sbtn" data-act="hb:5" ${s.rep < 500 || (stock.hardware | 0) < 5 || !Money.can(hw * 5, 'armorer') ? 'disabled' : ''}>×5</button></div>
+        h += `<h3>Hardware <small>bulk product, untraceable</small></h3><div class="jobs">
           <div class="job"><i style="color:${TIERS[3].col}">■</i><div><b>Sell hardware</b><span>${fmtMoney(hs)} a unit · ${fmtQty('hardware', uw.carried().hardware | 0)} carried</span></div><button class="sbtn gold" data-act="hs" ${(uw.carried().hardware | 0) ? '' : 'disabled'}>Sell all</button></div></div>`;
       } else if (this.armTab === 'ammo') {
         h += '<div class="grid2">' + BOXES.map((bx, i) => {
@@ -976,9 +976,6 @@ class EmpireUI {
       } else if (k === 'vspare') {
         const pid = this.vestTo && uw.props.owned(this.vestTo) ? this.vestTo : owned[0] && owned[0].id; if (!pid || !Money.can(480, 'armorer') || s.rep < 100) return;
         A.ws(pid).vests.push(VEST_MAX); Money.pay(480, 'armorer'); r = `A spare vest is waiting at ${PROP_BY_ID[pid].name}.`;
-      } else if (k === 'hb') {
-        const n = Math.min(+id, stock.hardware | 0, Math.floor(Money.available('armorer') / hw)); const got = n > 0 ? uw.give({ hardware: n }, 'buy', { hardware: hw }) : null;
-        if (!got) r = 'No room to carry it.'; else { Money.pay(got.hardware * hw, 'armorer'); stock.hardware -= got.hardware; r = `Bought ${fmtQty('hardware', got.hardware)} hardware.`; }
       } else if (k === 'hs') {
         const n = uw.carried().hardware | 0; if (n) { uw.take('hardware', n); g.earn(n * hs, 'arms'); uw.realize(n * hs, 'hardware'); uw.market.sold(z, 'hardware', n); uw.S.st.sold += n; r = `Sold ${fmtQty('hardware', n)} for ${fmtMoney(n * hs)}.`; uw.addRep(n * 4, null); }
       } else { const ar = A.act(a, null); if (ar === null) return; r = ar; g.content.refreshSvc(r); g.saveGame(); return; }
