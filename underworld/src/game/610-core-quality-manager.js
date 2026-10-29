@@ -21,7 +21,7 @@ class QualityManager {
     const g = this.g, q = QUALITY[this.level], s = g.save.settings;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     g.renderer.setPixelRatio(Math.min(dpr, q.pr) * (this.dynScale || 1));
-    const sh = s.shadows && q.shadow > 0;
+    const sh = s.shadows && q.shadow > 0, shChanged = this._sh !== undefined && this._sh !== sh; this._sh = sh;
     g.renderer.shadowMap.enabled = sh;
     g.env.sun.castShadow = sh;
     if (sh && g.env.sun.shadow.mapSize.x !== q.shadow) { g.env.sun.shadow.mapSize.set(q.shadow, q.shadow); if (g.env.sun.shadow.map) { g.env.sun.shadow.map.dispose(); g.env.sun.shadow.map = null; } }
@@ -32,6 +32,13 @@ class QualityManager {
     g.propR = q.propR; g.parkedR = q.parkedR;
     g.setupPost(q.msaa);
     g.onResize();
+    // shadows on or off changes every lit material's program: compile them all now (in the background where the
+    // browser compiles in parallel), not one by one the first time each comes into view, a hitch per new district
+    if (shChanged && this.g.compiled) {
+      const r = g.renderer, par = r.compileAsync && r.extensions.has('KHR_parallel_shader_compile');
+      try { if (par) r.compileAsync(g.scene, g.camera).catch(() => {}); else r.compile(g.scene, g.camera); } catch { /* an optimisation only */ }
+      g.warmShaders();
+    }
   }
   update(dt) {
     if (this.mode !== 'auto' || this.g.state !== 'playing') return;

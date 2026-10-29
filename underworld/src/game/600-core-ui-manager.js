@@ -831,8 +831,8 @@ const MAP_GLYPH_P2 = {};
 function mapGlyph(icon) { const d = MAP_GLYPHS[icon]; if (!d || typeof Path2D === 'undefined') return null; return MAP_GLYPH_P2[icon] || (MAP_GLYPH_P2[icon] = new Path2D(d)); }
 // the same symbol as HTML, for the index, the legend and the cards (the letter stays as its accessible name)
 function mapIconHTML(icon) { const d = MAP_GLYPHS[icon]; return d ? `<svg viewBox="0 0 24 24" aria-label="${esc(icon)}" role="img"><path fill-rule="evenodd" d="${d}"/></svg>` : esc(icon); }
-// draw one map badge (a disc with its pictogram or letter) at screen position x,y with size r (radius)
-function drawMapBadge(c, x, y, r, col, icon, ring) {
+// one map badge (a disc with its pictogram or letter) drawn at x,y with size r (radius)
+function paintMapBadge(c, x, y, r, col, icon, ring) {
   c.beginPath(); c.arc(x, y + r * 0.12, r * 1.08, 0, Math.PI * 2); c.fillStyle = 'rgba(0,0,0,0.38)'; c.fill(); // soft drop shadow
   c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
   c.fillStyle = col; c.fill(); c.lineWidth = Math.max(1.5, r * 0.16); c.strokeStyle = ring || 'rgba(8,10,14,0.85)'; c.stroke();
@@ -841,6 +841,23 @@ function drawMapBadge(c, x, y, r, col, icon, ring) {
   if (gl) { const k = r * 1.3 / 24; c.save(); c.translate(x - 12 * k, y - 12 * k); c.scale(k, k); c.fill(gl, 'evenodd'); c.restore(); return; }
   c.font = `900 ${Math.round(r * 1.2)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillText(icon, x, y + r * 0.06);
+}
+// the minimap redraws ~30 times a second and the big map on every pan: each badge is painted once per size, colour
+// and ring into a small sprite at the canvas's own resolution and then only copied (a vector path fill per badge per
+// frame is costly, worst on software-rendered canvases)
+const MAP_BADGE_SPRITES = new Map();
+function drawMapBadge(c, x, y, r, col, icon, ring) {
+  const t = c.getTransform ? c.getTransform() : null, sc = t ? Math.hypot(t.a, t.b) || 1 : 1;
+  const key = icon + '|' + col + '|' + (ring || '') + '|' + Math.round(r * sc * 2);
+  let sp = MAP_BADGE_SPRITES.get(key);
+  if (!sp) {
+    if (MAP_BADGE_SPRITES.size > 400) MAP_BADGE_SPRITES.clear();
+    const half = r * 1.3 + 2, px = Math.ceil(half * 2 * sc), cv = document.createElement('canvas'); cv.width = cv.height = px;
+    const cc = cv.getContext('2d'); cc.scale(sc, sc); paintMapBadge(cc, half, half, r, col, icon, ring);
+    sp = { cv, half }; MAP_BADGE_SPRITES.set(key, sp);
+  }
+  c.drawImage(sp.cv, x - sp.half, y - sp.half, sp.half * 2, sp.half * 2);
+  if (c.__trace) c.__trace.push(icon); // tests read which symbols a canvas drew
 }
 class MapView {
   constructor(ui) {

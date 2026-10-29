@@ -68,12 +68,12 @@ check('"Track location" sets the destination', tr && tr.key === chop.key && tr.i
 await ev(() => window.game.ui.toggleMap(false)); await frames(page, 30);
 const hud = await ev(() => { const g = window.game; return { obj: document.querySelector('#objective .ot').textContent, arrow: !document.getElementById('objArrow').classList.contains('hidden'), gt: g.content.guideTarget && g.content.guideTarget.icon }; });
 check('the HUD shows the tracked place with its distance and an arrow', /Chop/.test(hud.obj) && /\d+ m|km/.test(hud.obj) && hud.arrow, JSON.stringify(hud));
-// minimap draws the same badge symbol for the tracked place: a letter, or (G8) the pictogram drawn for that letter
+// minimap draws the same badge symbol for the tracked place (labels as text; symbols, since G8, as cached badge
+// sprites that report which symbol they drew)
 const mm = await ev(() => {
-  const g = window.game, P = window.__pv, c = g.ui.mmc, seen = [], o = c.fillText, of = c.fill;
+  const g = window.game, c = g.ui.mmc, seen = [], o = c.fillText;
   c.fillText = function (s) { seen.push(String(s)); return o.apply(this, arguments); };
-  c.fill = function (a) { if (typeof Path2D !== 'undefined' && a instanceof Path2D) for (const k in P.MAP_GLYPHS) if (P.mapGlyph(k) === a) seen.push(k); return of.apply(this, arguments); };
-  g.ui.drawMinimap(); c.fillText = o; c.fill = of; return seen;
+  c.__trace = seen; g.ui.drawMinimap(); c.fillText = o; c.__trace = null; return seen;
 });
 check('the minimap shows the tracked place with the same C symbol', mm.includes('C'), JSON.stringify(mm.slice(0, 20)));
 const cons = await ev(() => { const v = window.game.ui.mapView, C = window.__pv.MAP_CATS; v.buildIndex(); const chop = v.entries.filter(e => e.cat === 'chop'); return { chop: chop.map(e => e.icon), cat: C.chop.icon, police: v.entries.filter(e => e.cat === 'police').map(e => e.icon), pcat: C.police.icon }; });

@@ -99,6 +99,8 @@ class Game {
     for (let k = 0; k < 6; k++) { this.chunks.update(this.focus.x, this.focus.z, this.frame++); }
     progress(0.85, 'Compiling shaders'); await nextFrame();
     try { this.renderer.compile(this.scene, this.camera); } catch { /* compile is an optimisation only */ }
+    this.warmShaders();
+    this.compiled = true; // from here a quality change that alters the programs recompiles them (610)
     this._bindGlobal();
     this._bindDebug();
     progress(1, 'Ready'); await nextFrame();
@@ -116,6 +118,25 @@ class Game {
     ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, unlockAudio, { passive: true }));
     if (IS_TOUCH) document.body.classList.add('touch');
     window.addEventListener('beforeunload', () => { if (this.state !== 'menu' && this.state !== 'loading') this.saveGame(); });
+  }
+  // Draw everything once (every room and district, hidden or not, no culling) into one pixel of the kind of target
+  // the real frame uses, so the GPU builds every shader and draw state now, behind the loading screen or a settings
+  // change, not the first time each district or room comes into view (a software or lazily-compiling GPU stalls on
+  // that first draw for a second or more). Visibility and culling are put back as they were. (G2)
+  warmShaders() {
+    const r = this.renderer, sc = this.scene, cam = this.camera, shown = [], culled = [];
+    sc.traverse(o => { if (!o.visible) { shown.push(o); o.visible = true; } if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine)) { culled.push(o); o.frustumCulled = false; } });
+    const prevT = r.getRenderTarget(), prevS = r.getScissorTest(), sAuto = r.shadowMap.autoUpdate;
+    const vp = r.getViewport(new THREE.Vector4()), sci = r.getScissor(new THREE.Vector4());
+    try {
+      // post-processing renders the scene into a target (no tone mapping, linear output); without it, to the screen
+      const t = this.usePost ? (this._warmRT || (this._warmRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType }))) : null;
+      r.setRenderTarget(t); r.setScissorTest(true); r.setScissor(0, 0, 1, 1); r.setViewport(0, 0, 1, 1);
+      r.shadowMap.needsUpdate = true; r.render(sc, cam);
+    } catch { /* an optimisation only */ }
+    r.setRenderTarget(prevT); r.setScissorTest(prevS); r.setScissor(sci); r.setViewport(vp); r.shadowMap.autoUpdate = sAuto; r.shadowMap.needsUpdate = true;
+    for (const o of shown) o.visible = false;
+    for (const o of culled) o.frustumCulled = true;
   }
   setupPost(msaa) {
     const r = this.renderer;
