@@ -159,8 +159,8 @@ class PropertyManager {
     for (const def of this.ownedList()) {
       if (def.kind !== 'business') continue;
       const B = this.bizDay(def);
-      // inside (M13, §45.8): a managed business covers its costs, an unmanaged one takes in half of them
-      if (S.jail) { const cover = B.upkeep + (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful' ? def.income * 0.12 * (1 - this.perk('allIncome')) : 0); Money.earn(Math.round(cover * (B.mgr ? 1 : JAIL_OPS.unmanaged)), 'business'); }
+      // inside (M13, §45.8): a managed business covers its upkeep (Clean for Clean), an unmanaged one takes in half of it
+      if (S.jail) Money.earn(Math.round(B.upkeep * (B.mgr ? 1 : JAIL_OPS.unmanaged)), 'business');
       else Money.earn(B.gross * rand(0.9, 1.1), 'business');
       Money.pay(Math.round(B.upkeep), 'upkeep', { partial: true });
       // protection money when it sits on someone else's turf (an accountant makes it smaller)

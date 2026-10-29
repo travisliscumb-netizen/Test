@@ -102,12 +102,24 @@ R.passive = await ev(async () => {
   // stage 4: a mid empire: 12 established businesses with managers, 6 turfs held, a Lieutenant
   const more = P.PROPS.filter(p => p.kind === 'business' && !uw.props.owned(p.id)).sort((a, b2) => a.price - b2.price).slice(0, 9);
   for (const d of more) { uw.props.buy(d.id); S.props[d.id].since = S.day - 30; hire('manager', d.id); }
-  const ts = uw.T.filter(t => uw.owner[t.i] !== 'pc').slice(0, 6); for (const t of ts) { uw.owner[t.i] = 'pc'; S.turfs[t.i].owner = 'pc'; S.turfs[t.i].inf.pc = 80; }
+  const take = (n) => { const ts = uw.T.filter(t => uw.owner[t.i] !== 'pc').slice(0, n); for (const t of ts) { const inf = S.turfs[t.i].inf; const rv = Object.keys(inf).find(k => k !== 'pc'); S.turfs[t.i].own = 'pc'; inf.pc = 85; if (rv) inf[rv] = 40; } uw.recompute(); };
+  take(6);
   out.mid = run(6, '12 managed businesses, 6 turfs, 2 dealers');
-  out.midState = { businesses: uw.props.ownedList().filter(d => d.kind === 'business').length, crew: uw.crew.active().length, payroll: uw.crew.payroll(), influence: uw.influence, rank: uw.rank };
+  const state = () => { uw.computeInfluence(); return { businesses: uw.props.ownedList().filter(d => d.kind === 'business').length, crew: uw.crew.active().length, payroll: uw.crew.payroll(), turfs: uw.playerTurfs(), influence: uw.influence, earned: uw._inflEarned, bought: uw._inflBought, rank: uw.rank }; };
+  out.midState = state();
+  // territory tax: what each held turf owes a day (before compliance), and the compliance a mid-game boss gets
+  out.royalty = (() => { const o = []; for (let i = 0; i < uw.T.length; i++) if (uw.owner[i] === 'pc') o.push(uw.royalty.owed(i)); o.sort((a, b2) => a - b2); return { turfs: o.length, owedMin: o[0], owedMed: o[o.length >> 1], owedMax: o[o.length - 1] }; })();
+  // the late game: 16 turfs, two Lieutenants running districts, 30 managed businesses, a warehouse with a Driver
+  take(10);
+  const zones = [...new Set(uw.T.filter(t => uw.owner[t.i] === 'pc').map(t => t.zone))];
+  for (const z of zones.slice(0, 2)) { const c = hire(null); c.rank = 3; uw.crew.assign(c.id, 'lieutenant', z); }
+  const extra = P.PROPS.filter(p => p.kind === 'business' && !uw.props.owned(p.id)).sort((a, b2) => a.price - b2.price).slice(0, 18);
+  for (const d of extra) { uw.props.buy(d.id); S.props[d.id].since = S.day - 30; hire('manager', d.id); }
+  out.late = run(6, '30 managed businesses, 16 turfs, two Lieutenants');
+  out.lateState = state();
   // the jail comparison: the same empire, one jail day vs one street day
   S.jail = P.Prison.fresh({ total: 30, full: 30, lines: [] });
-  out.midJail = run(6, 'the same empire while you are in jail');
+  out.lateJail = run(6, 'the same empire while you are in jail');
   S.jail = null;
   return out;
 });

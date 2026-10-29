@@ -98,10 +98,10 @@ const PLAYER_COL = '#ffb547', PLAYER_HEX = 0xffb547;
 // active crew, Lieutenants running districts, turf held (it changes hands only through a showdown, §45.13) and
 // influence (in which a business counts only once it is established). Underworld.rankOf is the one reader.
 const RANKS = [
-  { name: 'Nobody', need: {}, hint: 'Make your first money: pickpocket, steal cars for the chop shop, fence hot goods.' },
+  { name: 'Nobody', need: {}, hint: 'Make your first money and a name: pickpocket, steal cars for the chop shop, fence hot goods. Reach 100 Rep.' },
   { name: 'Street Hustler', need: { rep: 100 }, hint: 'Reach 400 Rep: deals, races, scores and escapes all count.' },
-  { name: 'Known Operator', need: { rep: 400 }, hint: 'Hire at least two crew (Empire → Crew) and keep them paid.' },
-  { name: 'Crew Leader', need: { rep: 400, crew: 2 }, hint: 'Take a turf: weaken a rival’s hold until you can Take Turf (Empire → Turf map), then win the showdown. Get known: 800 Rep.' },
+  { name: 'Known Operator', need: { rep: 400 }, hint: 'Hire at least two crew (Empire → Crew), keep them paid, and keep your 400 Rep.' },
+  { name: 'Crew Leader', need: { rep: 400, crew: 2 }, hint: 'Take 1 turf: weaken a rival’s hold until you can Take Turf (Empire → Turf map), then win the showdown. Get known: 800 Rep.' },
   { name: 'Territory Holder', need: { rep: 800, crew: 2, turfs: 1 }, hint: 'Hold 8 turfs with four crew, put a Lieutenant in charge of a district, reach 1,500 Rep and grow your influence past 450 (businesses can at most double what your turf and crew earn).' },
   { name: 'Underworld Power', need: { rep: 1500, crew: 4, turfs: 8, lts: 1, infl: 450 }, hint: 'Hold 16 turfs with six crew and two Lieutenants, 2,500 Rep, influence past 800 and a warehouse running (a Lieutenant and a Driver) to run the city.' },
   { name: 'City Kingpin', need: { rep: 2500, crew: 6, turfs: 16, lts: 2, infl: 800, wh: 1 }, hint: 'You run Port Valen. Now keep it.' }

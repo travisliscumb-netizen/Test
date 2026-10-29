@@ -13,18 +13,19 @@
    - Your own business: walk in, no robbing yourself; the counter is where
      you manage it.
    ===================================================================== */
-// fit: how the shop floor is dressed; till/safe: cash ranges; stock: what the stockroom gives; sec: the security a
+// fit: how the shop floor is dressed; till/safe: cash ranges (M13: tills ×0.8, safes ×0.65, so a robbery spree is the
+// high-risk loop, not the one loop worth doing); stock: what the stockroom gives; sec: the security a
 // trade starts with (0 none, 1 cameras, 2 a guard); pal: the colours of its stock
 const ROB_THEMES = {
-  shop: { fit: 'shelves', till: [120, 380], safe: [1200, 3600], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
-  pharmacy: { fit: 'shelves', till: [150, 450], safe: [2000, 5000], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
-  jewelry: { fit: 'cases', till: [300, 900], safe: [6000, 15000], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
-  electronics: { fit: 'screens', till: [200, 600], safe: [2500, 6000], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
-  pawn: { fit: 'clutter', till: [250, 700], safe: [3000, 8000], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
-  boutique: { fit: 'racks', till: [200, 600], safe: [2500, 6500], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
-  bar: { fit: 'bar', till: [300, 900], safe: [1500, 4000], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
-  food: { fit: 'tables', till: [120, 420], safe: [900, 2600], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
-  service: { fit: 'chairs', till: [100, 320], safe: [800, 2200], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
+  shop: { fit: 'shelves', till: [100, 300], safe: [780, 2340], stock: { smokes: [2, 5] }, sec: 0, wall: 0xe8e4da, trim: 0x3a7a4a, pal: [0xd23a2a, 0xf2c230, 0x2a5f9e, 0x3a7a4a, 0xe67e22, 0xecf0f1] },
+  pharmacy: { fit: 'shelves', till: [120, 360], safe: [1300, 3250], stock: { pills: [2, 6] }, sec: 1, wall: 0xf2f6f6, trim: 0x2a9a6a, pal: [0xffffff, 0x7fd0ff, 0x2a9a6a, 0xd8e8f0, 0xff8a8a, 0xf4f2ee] },
+  jewelry: { fit: 'cases', till: [240, 720], safe: [3900, 9750], stock: { hot: [3, 7] }, sec: 2, wall: 0x2a2630, trim: 0xd8b44a, pal: [0xffd84d, 0xf4f2ee, 0xd8b44a, 0x8fd8ff] },
+  electronics: { fit: 'screens', till: [160, 480], safe: [1620, 3900], stock: { hot: [2, 5] }, sec: 1, wall: 0x2c3440, trim: 0x2a8ad8, pal: [0x111111, 0x2a2c30, 0x7fd0ff, 0xd8dce0] },
+  pawn: { fit: 'clutter', till: [200, 560], safe: [1950, 5200], stock: { hot: [2, 4] }, sec: 1, wall: 0x8a7a5a, trim: 0xd8a227, pal: [0xd8a227, 0x8a6a4a, 0x5a5e62, 0xc8c2b4, 0x3a2a20] },
+  boutique: { fit: 'racks', till: [160, 480], safe: [1620, 4220], stock: { hot: [1, 3] }, sec: 1, wall: 0xf4ecec, trim: 0xd28cff, pal: [0x2a2a2e, 0xd28cff, 0xf4f2ee, 0x8a2f3a, 0x2f5d8a] },
+  bar: { fit: 'bar', till: [240, 720], safe: [980, 2600], stock: { smokes: [2, 5] }, sec: 0, wall: 0x4a3426, trim: 0xd8762a, pal: [0x6a3a1a, 0x2a5a2a, 0xd8a227, 0x8a2f3a] },
+  food: { fit: 'tables', till: [100, 340], safe: [580, 1690], stock: { smokes: [1, 3] }, sec: 0, wall: 0xf0e2c8, trim: 0xc23a2a, pal: [0xc23a2a, 0xf2c230, 0xf4f2ee, 0x3a7a4a] },
+  service: { fit: 'chairs', till: [80, 260], safe: [520, 1430], stock: { hot: [1, 2] }, sec: 0, wall: 0xe4e8ec, trim: 0x46d4c4, pal: [0x2a2a2e, 0x46d4c4, 0xf4f2ee, 0xd8762a] }
 };
 const ROB_CAT_THEME = { convenience: 'shop', grocery: 'shop', pharmacy: 'pharmacy', jewelry: 'jewelry', electronics: 'electronics', pawn: 'pawn', boutique: 'boutique', bar: 'bar',
   coffee: 'food', diner: 'food', pizza: 'food', restaurant: 'food', barber: 'service', salon: 'service', tattoo: 'service', laundromat: 'service', arcade: 'service' };
