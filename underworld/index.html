@@ -62782,9 +62782,10 @@ function gpsRoute(fx, fz, tx, tz) {
    [CORE] QUALITY MANAGER (presets + adaptive resolution / detail)
    ===================================================================== */
 // pr caps the device pixel ratio (G2: Medium was 0.9, under a phone's CSS resolution and visibly soft on a Retina
-// screen; it is now 1.25, with dynamic resolution below to give pixels back when a frame runs long)
+// screen; it is now 1.25, with dynamic resolution below to give pixels back when a frame runs long). Low stays 0.7:
+// it is the weak-device preset
 const QUALITY = [
-  { name: 'Low', pr: 0.85, shadow: 0, post: false, msaa: 0, chunkR: 2, propR: 130, parkedR: 110, traffic: 9, peds: 16 },
+  { name: 'Low', pr: 0.7, shadow: 0, post: false, msaa: 0, chunkR: 2, propR: 130, parkedR: 110, traffic: 9, peds: 16 },
   { name: 'Medium', pr: 1.25, shadow: 1024, post: true, msaa: 0, chunkR: 3, propR: 170, parkedR: 130, traffic: 15, peds: 26 },
   { name: 'High', pr: 1.6, shadow: 2048, post: true, msaa: 4, chunkR: 4, propR: 210, parkedR: 150, traffic: 22, peds: 38 },
   { name: 'Ultra', pr: 2, shadow: 4096, post: true, msaa: 4, chunkR: 5, propR: 250, parkedR: 160, traffic: 28, peds: 50 }

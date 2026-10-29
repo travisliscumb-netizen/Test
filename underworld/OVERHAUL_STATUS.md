@@ -4203,3 +4203,18 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
   Desktop solo (`perf.mjs`): update 1.3 ms calm and 1.25 busy, 118–122 calls, ~380k triangles, the same as M12.
 
   No M13 change moved frame cost.
+
+## Session 14 — graphics / presentation / UI-UX overhaul (Extra High)
+- **Before:** the M13 build is frozen as one self-contained file, `releases/pre-graphics-m13/` (`2f624b6`; tag
+  `underworld-pre-graphics-m13` on `5b19596`, local only: the proxy refuses tag pushes), saves under
+  `pvunderworld.m13.*`. Verified served statically (desktop and iPhone profiles).
+- **Record:** GRAPHICS.md (the audit with priorities, what changed by area, performance and size tables, save
+  compatibility, how it was checked). Captures: `tools/vqa-shots.mjs` on both builds.
+- **Commits:** `b21e645` (interior culling, light balance, trees + LOD, roofs, vehicle shaping, faces, capture
+  tool), `fd7d798` (HUD v2, currency language, map/phone/Royale layouts, terrain shader, wet roads, lit and themed
+  interiors, rounded people, one-off showcase), `96bc636` (after release, docs), `5c03b12` (room lighting from
+  Medium up), then the gate commit.
+- **After:** `releases/after-graphics/Underworld_After_Graphics.html` (main save keys).
+- **No engine rewrite** was needed (no GRAPHICS / ENGINE ARCHITECTURE CHALLENGE raised): the overhaul fits the
+  existing three.js r160 single-file architecture (merged chunks, instancing, onBeforeCompile shader patches).
+- **Saves:** no field added, renamed or removed; `SAVE_VERSION` unchanged; M13 saves load as they are.
