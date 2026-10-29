@@ -677,3 +677,12 @@ b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
 }
 /* G8 · the jail panel lets the cell show through (it is placed by the HUD layout, clear of the top controls) */
 #jailHud{background:linear-gradient(180deg,rgba(18,14,12,.82),rgba(14,12,10,.66));backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 8px 22px rgba(0,0,0,.35)}
+/* G8 · the narrowest phones (iPhone SE landscape): stars over the clock again and a smaller cash line, so the card
+   stays as narrow as M13's and the centred objective keeps its place */
+@media (max-height:520px) and (max-width:720px){
+  #hud .tr>#stars,#hud .tr>#clock{grid-column:1/-1}
+  #hud .tr>#stars{font-size:15px}
+  #money{font-size:20px;gap:5px}
+  #money::before{font-size:8px;padding:1px 4px 0}
+  #rankChip b{font-size:10px;letter-spacing:.12em}
+}
