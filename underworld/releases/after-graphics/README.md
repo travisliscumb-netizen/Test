@@ -1,6 +1,6 @@
 # The Underworld — after the graphics / presentation / UI-UX overhaul
 
-The game as commit `5c03b12` built it: the content-complete M13 game with the Session 14 overhaul (GRAPHICS.md at
+The game as commit `f42a110` built it: the content-complete M13 game with the Session 14 overhaul (GRAPHICS.md at
 the repository's `underworld/` folder is the before/after record). It is the "after" half of the comparison; the
 "before" is `../pre-graphics-m13/`.
 
@@ -23,7 +23,7 @@ no save field). The M13 snapshot keeps its careers under `pvunderworld.m13.*`, s
 site without touching each other.
 
 ## How it was made and checked
-- `node underworld/tools/export-release.mjs --ref 5c03b12 --dir underworld/releases/after-graphics --name Underworld_After_Graphics.html`
+- `node underworld/tools/export-release.mjs --ref f42a110 --dir underworld/releases/after-graphics --name Underworld_After_Graphics.html`
   (refuses to export unless the committed `index.html` is byte-identical to that commit's `src/` in manifest order;
   the only changes are the icons and manifest inlined as `data:` URIs and a `<meta name="release">` line).
 - `node underworld/tools/verify-release.mjs underworld/releases/after-graphics Underworld_After_Graphics.html`

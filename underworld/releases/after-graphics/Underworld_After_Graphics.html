@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="release" content="5c03b12 5c03b12c7aba84ec10062e3520010e1937890217">
+<meta name="release" content="f42a110 f42a1105d88e6c48c51dad596e33069e3f4cdd6d">
 <meta name="build-version" content="v7-casino-2026-10-18-a">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
@@ -62783,9 +62783,10 @@ function gpsRoute(fx, fz, tx, tz) {
    [CORE] QUALITY MANAGER (presets + adaptive resolution / detail)
    ===================================================================== */
 // pr caps the device pixel ratio (G2: Medium was 0.9, under a phone's CSS resolution and visibly soft on a Retina
-// screen; it is now 1.25, with dynamic resolution below to give pixels back when a frame runs long)
+// screen; it is now 1.25, with dynamic resolution below to give pixels back when a frame runs long). Low stays 0.7:
+// it is the weak-device preset
 const QUALITY = [
-  { name: 'Low', pr: 0.85, shadow: 0, post: false, msaa: 0, chunkR: 2, propR: 130, parkedR: 110, traffic: 9, peds: 16 },
+  { name: 'Low', pr: 0.7, shadow: 0, post: false, msaa: 0, chunkR: 2, propR: 130, parkedR: 110, traffic: 9, peds: 16 },
   { name: 'Medium', pr: 1.25, shadow: 1024, post: true, msaa: 0, chunkR: 3, propR: 170, parkedR: 130, traffic: 15, peds: 26 },
   { name: 'High', pr: 1.6, shadow: 2048, post: true, msaa: 4, chunkR: 4, propR: 210, parkedR: 150, traffic: 22, peds: 38 },
   { name: 'Ultra', pr: 2, shadow: 4096, post: true, msaa: 4, chunkR: 5, propR: 250, parkedR: 160, traffic: 28, peds: 50 }
