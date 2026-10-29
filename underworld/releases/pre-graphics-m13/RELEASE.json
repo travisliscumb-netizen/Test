@@ -1,0 +1,25 @@
+{
+ "ref": "underworld-pre-graphics-m13",
+ "commit": "5b1959673c278ecb6ff6106f876327849c8c9896",
+ "file": "Underworld_M13_Before_Graphics.html",
+ "saveNamespace": "m13",
+ "saveKeys": {
+  "save": "pvunderworld.m13.save.v1",
+  "settings": "pvunderworld.m13.settings.v1"
+ },
+ "bytes": 4018323,
+ "gzipBytes": 1257009,
+ "brotliBytes": 909193,
+ "sha256": "5cb6054163416f9e29067af4095caf5091ef6785ab53a869a9f9b89f17c24fc5",
+ "moduleScripts": 2,
+ "substitutions": [
+  "favicon inlined",
+  "192px icon inlined",
+  "home-screen icon inlined",
+  "web-app manifest inlined",
+  "save key namespaced",
+  "settings key namespaced",
+  "title marked",
+  "release recorded"
+ ]
+}
