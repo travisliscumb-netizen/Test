@@ -4,7 +4,8 @@ Read this first, then `CURRENT_SESSION.md` (what is in progress and the exact ne
 
 ## Authority
 - `docs/THE_UNDERWORLD_MASTER_HANDOFF_FINAL.md` is the design. Owner rulings are §45.1–§45.n at its end and win
-  over older text. §45.39 sets the current phase: autonomous pre-graphics build to CONTENT COMPLETE.
+  over older text. §45.39 set the autonomous pre-graphics build; CONTENT COMPLETE was reached at M13
+  (§45.40, ECONOMY.md). The next phase is the Session 14 graphics / presentation / UI-UX overhaul at Extra High.
 - `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`: the session plan (Sessions 7–13 remain; 14 graphics is NOT this phase).
 - `OVERHAUL_STATUS.md`: the detailed per-session history (long). `DECISIONS.md` summarises the rulings that matter.
 

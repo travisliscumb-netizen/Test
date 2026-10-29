@@ -1578,3 +1578,6 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       sinks, ranks, automation, crew, vehicles, racing, crime, legal/jail, laundering curve toward ~25/20/15/10/~5%,
       recovery from broke, dominant strategies, Rep, influence/turf thresholds, Rank requirements), retunes
       provisional values on evidence, adds an economy suite, and closes with the CONTENT COMPLETE gate.
+    - **Outcome (M13 done):** ECONOMY.md records the audit, the fixes and every finalised value; the `economy`
+      suite holds the invariants. CONTENT COMPLETE: the next phase is the Session 14 graphics / presentation /
+      UI-UX overhaul at Extra High effort.

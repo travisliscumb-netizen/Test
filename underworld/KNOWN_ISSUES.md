@@ -7,7 +7,8 @@
 - prison: one random dice/cards outcome.
 - compound: hostile crew / gate-ram checks under load.
 - shots / cityshots: timeouts under load (screenshot scripts, no checks).
-- gambling: the reel-stop timing check (first reel late under load).
+- taxi: a cab stuck in traffic under load (the full-ride and recovery checks; 20/20 solo, M13 gate).
+- stress: the 2.5 s frame-stall check under load (30/30 solo, M13 gate).
 - police: a parked cruiser's pull-out distance; raid: real-time clock and save-clock checks; roadnet: the
   estate-relocation reload check (all pass solo; seen failing only in the 3-wide run, m12-full).
 
@@ -24,7 +25,16 @@
 - No physical kerbs along curved streets; no signals off the grid (Curved Roads limits).
 - Countryside trees/rocks are solid, not destructible; the extension boundary is a fenced rectangle.
 
+## Fixed at the M13 gate (were intermittent)
+- gambling's reel-stop check measured wall-clock gaps between timers on a main thread that software GL blocks for
+  300–600 ms a frame; it now checks the scheduled stops and their order (the game was right).
+- races' pink-slip check expected the won car on the street; a finish 500 m ahead leaves it beyond the registry's
+  340 m keep radius, so it is stored where it stopped. The check now goes there and finds it, yours.
+
 ## For the graphics / UI overhaul (not content)
+- Inside the casino the frame still costs ~223 draw calls / ~683k triangles on the phone profile, about the
+  street's, so the city behind the interior appears not to be culled (perf-scenarios, M13; not yet traced).
+  A presentation-pass target.
 - The jail HUD was compacted (M8) but still sits top-centre over the view; the phone and service screens are
   functional, not designed.
 - Themed business interiors (M10) are box-kit rooms; one layout for every trade.

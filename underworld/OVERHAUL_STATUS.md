@@ -4145,3 +4145,61 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 - **Perf (solo, SwiftShader, low quality):** update 1.21 ms/frame calm, 1.59 busy; 121 draw calls, ~379k triangles
   calm, in line with the 6D baseline (1.0–1.3 ms, 116–120 calls, ~360k). Software-GL frame times are not a
   device measurement; the mobile baseline proper is part of the CONTENT COMPLETE gate.
+
+## M13 and the CONTENT COMPLETE gate (§45.40)
+- **Audit:** ECONOMY.md lists every source and sink (currency, gate, repeatability, risk, measured EV, Rep, jail
+  effect), passive income at four scales, the casino and progressive, the laundering ladder, the seven Ranks
+  (needs, income, affordable assets, bottleneck, routes, time), and every value finalised here. Numbers come from
+  `tools/econ-probe.mjs` and seeded in-page simulations, not estimates, except the per-Rank play times (stated as
+  estimates).
+- **Dominant loops and soft locks fixed:**
+  - the daily economy ran at visual midnight (short days paid ~7× an hour): now economic days;
+  - sleep skipped to payday;
+  - jail paid businesses, dealers and royalties: now no profit in jail;
+  - jail cover paid protection in Clean;
+  - influence bought with money: capped at earned;
+  - pickpocket rich districts $31–38k/h → ~$6.6k/h (district wariness, stronger where the rich walk);
+  - robbery ~$49k/h (tills ×0.8, safes ×0.65);
+  - official racing $60–90k/h Clean (purses retuned);
+  - the progressive drifted toward a positive machine: other visitors win it, so it averages $1.24B, peaks at $2.9B,
+    RTP ≤ 96.9%;
+  - **suppliers never restocked** (a bought-out shelf stayed empty, starving trade and Lieutenant automation): half a
+    shelf a day;
+  - the Armorer's buy-at-wholesale / sell-back-at-90%-of-street loop: he only buys hardware now.
+- **Retuned:**
+  - laundering ladder fixer 32% → fronts 25/20, 15/10, 10/5%;
+  - lockpick $75;
+  - business upgrades 0.6× / 1.2×;
+  - Rank needs (Territory Holder 800 Rep; Underworld Power 1,500 + 4 crew; Kingpin 2,500 + 6 crew), with every hint
+    naming the next Rank's numbers.
+- **Kept by ruling:** the honest casino (no 60/40); Royale Billions (95%, ends an hour ahead 3–5%); the billion
+  only on a $10k spin.
+- **Suite `economy`** (28 checks).
+- **Suites changed:**
+  - `fronts`, `crime`, `progression`, `motorsport`, `offroad`, `kingpin`, `ledger` follow the retunes;
+  - `gambling` (reel order by schedule) and `races` (pink-slip car stored where it stopped) made deterministic.
+- **Regression `m13-final`** (final build, CONC=3): 70 suites, 1,834 checks passed, 8 failed. Each failure on a solo
+  re-run:
+  - taxi 20/20, threat 25/25, stress 30/30;
+  - gambling and races: test fixes, then 58/58 and 24/24 twice (both paths of the pink slip exercised).
+
+  The screenshot scripts shots, cityshots and qashots (no checks) timed out under load, as before.
+- **Mobile baseline** (no physical iPhone here; Chromium phone profile 800×400, touch, 4× CPU throttle,
+  SwiftShader). Game-logic update ms, render-submit ms, draw calls and triangles; wall frame time under software GL
+  is not a device number.
+
+  | Scene | Update ms | Render ms | Draw calls | Triangles |
+  |---|---|---|---|---|
+  | calm street | 8.5 (pre-M13 7.5 / 8.2) | 39 | 253 | 900k |
+  | night storm, 3★ pursuit, gang fight | 7.5 (7.2 / 7.4) | 28 | 220 | 686k |
+  | Valen Point, 5 AI cars | 4.7 | 17 | 84 | 188k |
+  | Cedar Fields, 4 AI off-roaders | 7.6 | 19 | 79 | 253k |
+  | downtown on foot at noon | 6.7 | 33 | 236 | 568k |
+  | a fast drive through downtown | 7.7 | 42 | 255 | 652k |
+  | phone map open | 8.9 | 45 | 258 | 661k |
+  | casino floor | 9.2 | 30 | 223 | 683k |
+  | jail cell | 6.9 | 25 | 152 | 388k |
+
+  Desktop solo (`perf.mjs`): update 1.3 ms calm and 1.25 busy, 118–122 calls, ~380k triangles, the same as M12.
+
+  No M13 change moved frame cost.
