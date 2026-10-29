@@ -205,7 +205,7 @@ class Prison {
     this.acc = 0;
     this.enter();
     g.ui.banner('Sentenced', fmtSentence(ch.total), 'fail', 3.5);
-    uw.news('pv', `Sentenced to ${fmtSentence(ch.total)}. No phone, no map in here: the business runs without you, day for day. Do chores for good-behaviour points to speed time up, hire a lawyer, or try a guard.`);
+    uw.news('pv', `Sentenced to ${fmtSentence(ch.total)}. No phone, no map in here: the business runs without you, day for day: managed businesses and Lieutenant-run districts keep going, but no profit reaches a boss in a cell, and wages and upkeep are still due. Do chores for good-behaviour points to speed time up, hire a lawyer, or try a guard.`);
     g.saveGame(true);
   }
   static fresh(ch) {
@@ -272,7 +272,7 @@ class Prison {
         j.susp = Math.max(0, j.susp - 1.5);
         j.streetAcc += 1 / JAIL_STREET_RATIO;
         // the street keeps its full calendar: every day here is a day of revenue, payroll, upkeep and turf out there
-        while (j.streetAcc >= 1) { j.streetAcc -= 1; for (let q = 0; q < 4; q++) uw.tickHours(6, q * 6); uw.tickDay(); if (!S.jail) return; }
+        while (j.streetAcc >= 1) { j.streetAcc -= 1; for (let q = 0; q < 4; q++) uw.tickHours(6, q * 6); uw.tickDay(); S.econDay = Math.floor(S.econH / 24); if (!S.jail) return; }
         this.choreTick();
       }
       if (j.served >= j.total) this.release();

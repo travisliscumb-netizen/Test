@@ -16,12 +16,12 @@
    Vance's off-road pink slip) is in RACES (370) and PinkSlips (508).
    ===================================================================== */
 const OR_EVENTS = [
-  { id: 'or_trail', name: 'Trail Cup', laps: 2, opp: 4, band: [0, 30000], trail: 0.55, fee: 250, reward: 2000, cls: ['pickup', 'suv', 'utility', 'offroad'], blurb: 'Pickups, SUVs and off-roaders worth under $30,000. Two laps of the course: whoops, jumps, mud and rock.' },
-  { id: 'or_truck', name: 'Truck Run', laps: 2, opp: 3, band: [0, Infinity], types: ['truck', 'pickup', 'utility'], fee: 300, reward: 2400, cls: ['truck', 'pickup', 'utility'], blurb: 'Trucks and pickups only. Two laps, heavy metal, mind the jumps.' },
-  { id: 'or_pro', name: 'Mesa Pro', laps: 3, opp: 4, band: [20000, Infinity], trail: 0.7, fee: 1200, reward: 8000, cls: ['offroad', 'kodiak'], blurb: 'Real off-roaders worth $20,000 and up. Three laps, flat out.' }
+  { id: 'or_trail', name: 'Trail Cup', laps: 2, opp: 4, band: [0, 30000], trail: 0.55, fee: 200, reward: 1600, cls: ['pickup', 'suv', 'utility', 'offroad'], blurb: 'Pickups, SUVs and off-roaders worth under $30,000. Two laps of the course: whoops, jumps, mud and rock.' },
+  { id: 'or_truck', name: 'Truck Run', laps: 2, opp: 3, band: [0, Infinity], types: ['truck', 'pickup', 'utility'], fee: 250, reward: 1800, cls: ['truck', 'pickup', 'utility'], blurb: 'Trucks and pickups only. Two laps, heavy metal, mind the jumps.' },
+  { id: 'or_pro', name: 'Mesa Pro', laps: 3, opp: 4, band: [20000, Infinity], trail: 0.7, fee: 800, reward: 5000, cls: ['offroad', 'kodiak'], blurb: 'Real off-roaders worth $20,000 and up. Three laps, flat out.' }
 ];
 for (const e of OR_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; e.venue = 'cfs'; }
-// prices (provisional until Session 13): a session on the course, the compound's service stand discount
+// prices (M13, final): a session on the course, the compound's service stand discount
 const OR_PARK = { trackDay: 150, session: 600, minHp: 60, standK: 0.7 };
 const COURSE_OFFICE = { id: 'courseoffice', name: 'Course Office' };
 // the course's safe speeds: dirt corners (√(4.5·R)), 30 m/s at most, slower over the whoops, the mud and the rock

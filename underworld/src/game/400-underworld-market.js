@@ -57,6 +57,10 @@ function pocketTimeK(zk, hour) {
   if (zk === 'c' || zk === 'm') return office ? 1.2 : night ? 0.8 : 1;
   return night ? 0.9 : 1;
 }
+// a wary crowd (M13): every lift in a district puts its people on guard (+gain, up to 1), and it fades by `fade` an
+// economic hour (about 75 s of play); wariness cuts the chance by up to `chance` and the take by up to `take`. A spree
+// in one rich district stops paying after a handful of lifts, so the money moves you round the city.
+const PICK_WARY = { gain: 0.14, fade: 0.35, chance: 0.45, take: 0.35 };
 // what lifting a pocket gets you: { cash, hot, item, jackpot }
 function pocketLoot(q, zk, rnd = Math.random, hour = null) {
   const { t, band, wl } = pedType(q, zk);

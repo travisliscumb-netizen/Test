@@ -228,6 +228,8 @@ class CrewManager {
       c.wins += sold > 6 ? 1 : 0;
       S.st.sold += sold;
       // the takings go to the warehouse that supplies this corner (§45.22), else the treasury, home or you
+      // inside (M13, §45.8): the boss's cut shrinks, most of all where no Lieutenant runs the district
+      if (S.jail) cash *= uw.crew.active().some(x => this.ltZone(x) === z) ? JAIL_OPS.dealLt : JAIL_OPS.deal;
       if (cash > 0) Money.earn(Math.round(cash), 'dealers', { op: uw.whse.supplierOf(c) });
       return { units: sold, cash: Math.round(cash) };
     }

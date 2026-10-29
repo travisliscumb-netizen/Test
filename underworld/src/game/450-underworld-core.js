@@ -183,7 +183,7 @@ class Underworld {
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {},
       // Session 2.5: the economic clock (hours at the reference day length, §45.9) and the laundering fixer
-      econH: 0, fixer: LaunderFixer.fresh(),
+      econH: 0, econDay: 0, fixer: LaunderFixer.fresh(),
       // Session 3: warehouse security and settings, and each turf's dealer stock on the corner
       whse: {}, turfStock: {},
       // Session 4A: threats against the player's assets (clocks, strength and dice saved with them)
@@ -255,6 +255,8 @@ class Underworld {
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
     S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
     S.econH = num(S.econH, 0, 0, 1e9); S.fixer = LaunderFixer.sanitize(S.fixer, num);
+    // economic days already turned (M13): an older save starts counting from where its clock is, never catching up
+    S.econDay = Math.floor(num(S.econDay, Math.floor(S.econH / 24), 0, 1e8)); if (S.econDay > Math.floor(S.econH / 24)) S.econDay = Math.floor(S.econH / 24);
     S.legal = Legal.sanitize(S.legal, num, S.rap);
     S.fronts = Fronts.sanitize(S.fronts, num);
     S.tools = Tools.sanitize(S.tools, num);
@@ -264,6 +266,7 @@ class Underworld {
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept;
+    { const W = {}; if (S.wary && typeof S.wary === 'object') for (const z in S.wary) { const o = S.wary[z]; if (ZONES[z] && o && isFinite(o.w) && isFinite(o.h)) W[z] = { w: clamp(o.w, 0, 1), h: num(o.h, 0, 0, 1e9) }; } S.wary = W; }
     S.ships = ShipmentSystem.sanitize(S.ships, num); ShipmentSystem.migrate(S);
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
     S.wstash = obj(S.wstash, {});
@@ -474,7 +477,12 @@ class Underworld {
     const crew = S.crew.filter(c => c.status === 'active');
     const lts = crew.filter(c => c.rank >= 3).length;
     const cops = Object.values(S.cops).filter(c => c.st === 'paid').length;
-    this._infl = Math.round(clamp(turfs * 22 + bizInfl + crew.length * 5 + lts * 12 + cops * 8 + S.infamy, 0, 1000));
+    // influence (M13): what you hold and command (turfs, crew, Lieutenants, infamy) is earned; what money brings
+    // (established businesses, officers on the payroll) counts only up to as much again, so cash can double an
+    // organisation's weight but never stand in for one (§45.7, §45.40)
+    const earned = turfs * 22 + crew.length * 5 + lts * 12 + S.infamy, bought = bizInfl + cops * 8;
+    this._inflEarned = Math.round(earned); this._inflBought = Math.round(Math.min(bought, earned));
+    this._infl = Math.round(clamp(earned + Math.min(bought, earned), 0, 1000));
     const r = this._rank = this.rankOf(this.power());
     if (r > S.rankMax) {
       S.rankMax = r;
@@ -733,10 +741,12 @@ class Underworld {
   pickpocket(q) {
     const g = this.g, S = this.S, z = zoneKey(q.x, q.z);
     q.picked = true;
-    const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0);
+    const W = S.wary || (S.wary = {}), w0 = W[z], wary = w0 ? clamp(w0.w - (S.econH - w0.h) * PICK_WARY.fade, 0, 1) : 0;
+    W[z] = { w: Math.min(1, wary + PICK_WARY.gain), h: S.econH };
+    const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0) - wary * PICK_WARY.chance;
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
-      const L = pocketLoot(q, z, Math.random, g.env.time), cash = L.cash;
+      const L = pocketLoot(q, z, Math.random, g.env.time), cash = Math.max(1, Math.round(L.cash * (1 - wary * PICK_WARY.take)));
       g.earn(cash, 'pickpocket'); S.st.picks++;
       let extra = '';
       if (L.hot) { const t = this.give({ hot: L.hot }); if (t) extra = ` and ${L.item}${L.hot > 1 ? ` (+${L.hot - 1} more)` : ''}`; }
@@ -784,7 +794,7 @@ class Underworld {
       if (S.lastHour < 0) S.lastHour = h;
       if (h !== S.lastHour) {
         const steps = (h - S.lastHour + 24) % 24;
-        for (let i = 1; i <= steps; i++) { const hr = (S.lastHour + i) % 24; this.tickHours(1, hr); if (hr === 0) this.tickDay(); }
+        for (let i = 1; i <= steps; i++) { const hr = (S.lastHour + i) % 24; this.tickHours(1, hr); this.econDays(); }
         S.lastHour = h;
       }
     }
@@ -813,6 +823,9 @@ class Underworld {
     this.shipments.tickHours();
     this.recompute();
   }
+  // the economic day turns on the economic clock (M13, §45.9): every 24 economic hours, whatever the visual day length,
+  // so a short day setting never pays the daily economy faster per hour of play
+  econDays() { const S = this.S, d = Math.floor(S.econH / 24); while ((S.econDay | 0) < d && !S.jail) { S.econDay = (S.econDay | 0) + 1; this.tickDay(); } }
   tickDay() {
     const S = this.S, g = this.g;
     S.day++;

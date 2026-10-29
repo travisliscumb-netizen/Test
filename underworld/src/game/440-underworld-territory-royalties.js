@@ -39,7 +39,9 @@ class RoyaltySystem {
       const r = S.roy[i] || (S.roy[i] = { owed: 0, late: 0, status: 'none', payer: null, last: 0 });
       if (uw.owner[i] !== 'pc') { if (r.status !== 'none') { r.status = 'none'; r.owed = 0; r.late = 0; r.last = 0; } continue; }
       const fid = this.payer(i); r.payer = fid;
-      const due = this.owed(i) + r.owed; r.owed = 0;
+      let due = this.owed(i) + r.owed; r.owed = 0;
+      // inside (M13, §45.8): only a Lieutenant collects, and only part of it reaches you
+      if (S.jail) due = uw.crew.active().some(c => uw.crew.ltZone(c) === uw.T[i].zone) ? Math.round(due * JAIL_OPS.royLt / 10) * 10 : 0;
       if (!fid) { // nobody else operating here: your own street businesses pay a smaller protection cut
         const own = Math.round(due * 0.35 / 10) * 10; r.status = own > 0 ? 'paid' : 'none'; r.last = own; total += own; continue;
       }

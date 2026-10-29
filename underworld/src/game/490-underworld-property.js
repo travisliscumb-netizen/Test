@@ -141,8 +141,11 @@ class PropertyManager {
   sleep(id) {
     const uw = this.uw, g = uw.g, S = this.S;
     if (g.police.level > 0) { g.content.deny('You can’t sleep with sirens outside.'); return; }
+    if (S.slept) { g.content.deny('You’re not tired. One proper sleep a day.'); return; }
     g.fade(() => {
-      g.env.time = g.env.time < 7 ? 8 : (g.env.time < 19 ? 20 : 8);
+      // the night passes outside; the economy doesn't fast-forward while you sleep (M13): the businesses, the crew and
+      // the clocks keep to the economic day, so sleeping is rest and lying low, never a way to skip to payday
+      g.env.time = g.env.time < 7 ? 8 : (g.env.time < 19 ? 20 : 8); S.lastHour = Math.floor(g.env.time) % 24;
       g.player.health = g.player.maxHealth; S.slept = true;
       for (const fid of FAC_IDS) if (uw.S.factions[fid]) { uw.S.factions[fid].aggro = 0; uw.S.factions[fid].trouble = 0; }
       uw.gangs.seen = {};
@@ -156,7 +159,9 @@ class PropertyManager {
     for (const def of this.ownedList()) {
       if (def.kind !== 'business') continue;
       const B = this.bizDay(def);
-      Money.earn(B.gross * rand(0.9, 1.1), 'business');
+      // inside (M13, §45.8): a managed business covers its costs, an unmanaged one takes in half of them
+      if (S.jail) { const cover = B.upkeep + (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful' ? def.income * 0.12 * (1 - this.perk('allIncome')) : 0); Money.earn(Math.round(cover * (B.mgr ? 1 : JAIL_OPS.unmanaged)), 'business'); }
+      else Money.earn(B.gross * rand(0.9, 1.1), 'business');
       Money.pay(Math.round(B.upkeep), 'upkeep', { partial: true });
       // protection money when it sits on someone else's turf (an accountant makes it smaller)
       if (B.own && B.own !== 'pc' && FACTIONS[B.own] && uw.attitude(B.own) !== 'fearful') { const fee = Math.round(def.income * 0.12 * (1 - this.perk('allIncome'))); const p = Money.pay(fee, 'protection', { partial: true }); S.factions[B.own].money += p; }

@@ -1565,3 +1565,16 @@ Where these conflict with an earlier section, **this section wins**. Each affect
       - Mobile target: 60 FPS ideal, 45 acceptable in demanding scenes, 30 sustained floor. Measure major additions.
       - The repository (CLAUDE.md, ROADMAP.md, CURRENT_SESSION.md, SYSTEMS.md, DECISIONS.md, KNOWN_ISSUES.md,
         TESTING.md, OVERHAUL_STATUS.md) must stay sufficient for another context to resume.
+40. **M7–M12 rulings and the M13 brief.** M7–M12 are approved at `021d84d`.
+    - **Honest casino:** keep a genuine house edge on every routine game; the old player-favoured 60/40 tuning is
+      never restored. Routine gambling must not be a guaranteed money-making strategy.
+    - **Royale Billions:** the jackpot architecture stays provisionally; M13 evaluates its expected value, variance,
+      growth, qualifying bet and anti-drought behaviour within the whole economy. The billion-dollar progressive is
+      not removed merely for being an extreme outlier: winning it is extraordinarily rare and life-changing, and
+      it changes the player's finances, never their power (no Rank, Rep, turf, crew or influence for money).
+    - **Taxi:** a cab cannot fast-skip a trip while the player carries product.
+    - **Lockpicks:** required for burglary entry.
+    - **M13** evaluates Underworld as one economy and progression system from Nobody to City Kingpin (sources,
+      sinks, ranks, automation, crew, vehicles, racing, crime, legal/jail, laundering curve toward ~25/20/15/10/~5%,
+      recovery from broke, dominant strategies, Rep, influence/turf thresholds, Rank requirements), retunes
+      provisional values on evidence, adds an economy suite, and closes with the CONTENT COMPLETE gate.

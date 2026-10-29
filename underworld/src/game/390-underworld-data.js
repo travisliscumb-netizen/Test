@@ -101,10 +101,10 @@ const RANKS = [
   { name: 'Nobody', need: {}, hint: 'Make your first money: pickpocket, steal cars for the chop shop, fence hot goods.' },
   { name: 'Street Hustler', need: { rep: 100 }, hint: 'Reach 400 Rep: deals, races, scores and escapes all count.' },
   { name: 'Known Operator', need: { rep: 400 }, hint: 'Hire at least two crew (Empire → Crew) and keep them paid.' },
-  { name: 'Crew Leader', need: { rep: 400, crew: 2 }, hint: 'Take a turf: weaken a rival’s hold until you can Take Turf (Empire → Turf map), then win the showdown.' },
-  { name: 'Territory Holder', need: { rep: 400, crew: 2, turfs: 1 }, hint: 'Hold 8 turfs, put a Lieutenant in charge of a district and grow your influence past 450.' },
-  { name: 'Underworld Power', need: { rep: 400, crew: 2, turfs: 8, lts: 1, infl: 450 }, hint: 'Hold 16 turfs with two Lieutenants, influence past 800 and a warehouse running (a Lieutenant and a Driver) to run the city.' },
-  { name: 'City Kingpin', need: { rep: 400, crew: 2, turfs: 16, lts: 2, infl: 800, wh: 1 }, hint: 'You run Port Valen. Now keep it.' }
+  { name: 'Crew Leader', need: { rep: 400, crew: 2 }, hint: 'Take a turf: weaken a rival’s hold until you can Take Turf (Empire → Turf map), then win the showdown. Get known: 800 Rep.' },
+  { name: 'Territory Holder', need: { rep: 800, crew: 2, turfs: 1 }, hint: 'Hold 8 turfs with four crew, put a Lieutenant in charge of a district, reach 1,500 Rep and grow your influence past 450 (businesses can at most double what your turf and crew earn).' },
+  { name: 'Underworld Power', need: { rep: 1500, crew: 4, turfs: 8, lts: 1, infl: 450 }, hint: 'Hold 16 turfs with six crew and two Lieutenants, 2,500 Rep, influence past 800 and a warehouse running (a Lieutenant and a Driver) to run the city.' },
+  { name: 'City Kingpin', need: { rep: 2500, crew: 6, turfs: 16, lts: 2, infl: 800, wh: 1 }, hint: 'You run Port Valen. Now keep it.' }
 ];
 const RANK_MAX = RANKS.length - 1;
 // what each Rank condition is called when the UI explains what is missing
@@ -236,12 +236,21 @@ for (const [id, name, cat, zone, price, at, desc] of BIZ_NEW) {
 for (const id in BIZ_CAT_OF) if (PROP_BY_ID[id]) PROP_BY_ID[id].cat = BIZ_CAT_OF[id];
 const BIZ_IDS = PROPS.filter(p => p.kind === 'business').map(p => p.id);
 // upgrade prices: level 2 costs 90% of the purchase price, level 3 twice it again
-function bizUpgradeCost(def, lvl) { return lvl === 1 ? Math.round(def.price * 0.9 / 500) * 500 : lvl === 2 ? Math.round(def.price * 2.2 / 500) * 500 : 0; }
+// an upgrade pays for itself in about 50 (to level 2) and 80 (to level 3) economic days at the ordinary rate (M13; it
+// was 70 and 150, so nobody developed a business)
+function bizUpgradeCost(def, lvl) { return lvl === 1 ? Math.round(def.price * 0.6 / 500) * 500 : lvl === 2 ? Math.round(def.price * 1.2 / 500) * 500 : 0; }
 // daily running costs (staff, rent, stock) at each level, as a share of the base income
 const BIZ_UPKEEP = [0.18, 0.24, 0.3];
 // §45.7: buying a business buys no influence. It starts to count after BIZ_EST_DAYS world days of operation and
 // reaches its full weight (BIZ_INFL plus its own prestige, def.infl) over the next BIZ_EST_RAMP days
 const BIZ_INFL = 15, BIZ_EST_DAYS = 7, BIZ_EST_RAMP = 14;
+// the empire while you are in jail (M13, §45.8): every day inside is a full economic day out there (1:1 calendar),
+// but a boss in a cell earns no profit from it, so a sentence is never a way to fast-forward income. A managed
+// business (or the motorsport park) covers its own costs and stays strong; an unmanaged one takes in only half its
+// costs and slides. A dealer hands over `dealLt` of the takings where a Lieutenant runs the district, `deal`
+// elsewhere (the rest walks); territory tax comes in at `royLt` only where a Lieutenant collects it. Wages and
+// upkeep are due in full; fronts keep washing (a conversion, not a profit).
+const JAIL_OPS = { unmanaged: 0.5, deal: 0.3, dealLt: 0.55, royLt: 0.3 };
 // owned property on a turf is local presence (§45.23): showdown strength 6 for one, diminishing to at most 12 however
 // many you own there, and your hold fades at PROP_PRESENCE_DECAY of the rate it would without anyone on the ground
 const PROP_PRESENCE = 6, PROP_PRESENCE_MAX = 12, PROP_PRESENCE_DECAY = 0.5;

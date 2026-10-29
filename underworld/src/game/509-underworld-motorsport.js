@@ -18,9 +18,9 @@
      next day), and the park's daily income.
    ===================================================================== */
 const VP_EVENTS = [
-  { id: 'vp_club', name: 'Club Sprint', laps: 2, opp: 4, band: [0, 16000], fee: 300, reward: 2400, cls: ['compact', 'apex', 'sedan', 'crest'], blurb: 'Hatchbacks and saloons, nothing worth more than $16,000. Two laps.' },
-  { id: 'vp_gt', name: 'GT Cup', laps: 3, opp: 5, band: [16000, 65000], fee: 1500, reward: 9000, cls: ['sports', 'tempest', 'muscle', 'hellion', 'revenant'], blurb: 'Sports cars and muscle, $16,000 to $65,000. Three laps.' },
-  { id: 'vp_super', name: 'Supercar Showdown', laps: 3, opp: 5, band: [65000, Infinity], fee: 5000, reward: 30000, cls: ['supercar', 'valkyr', 'obsidian', 'monarch', 'coupe'], blurb: 'The fastest cars on the island, $65,000 and up. Three laps.' },
+  { id: 'vp_club', name: 'Club Sprint', laps: 2, opp: 4, band: [0, 16000], fee: 200, reward: 2000, cls: ['compact', 'apex', 'sedan', 'crest'], blurb: 'Hatchbacks and saloons, nothing worth more than $16,000. Two laps.' },
+  { id: 'vp_gt', name: 'GT Cup', laps: 3, opp: 5, band: [16000, 65000], fee: 1000, reward: 6000, cls: ['sports', 'tempest', 'muscle', 'hellion', 'revenant'], blurb: 'Sports cars and muscle, $16,000 to $65,000. Three laps.' },
+  { id: 'vp_super', name: 'Supercar Showdown', laps: 3, opp: 5, band: [65000, Infinity], fee: 3000, reward: 15000, cls: ['supercar', 'valkyr', 'obsidian', 'monarch', 'coupe'], blurb: 'The fastest cars on the island, $65,000 and up. Three laps.' },
   { id: 'vp_inv', name: 'Valen Point Invitational', laps: 3, opp: 5, band: [40000, Infinity], fee: 8000, reward: 0, car: 'monarch', cls: ['valkyr', 'obsidian', 'supercar', 'coupe', 'kodiak'], blurb: 'Invitation only, $40,000 and up. The winner drives home a Monarch GT. Once.' }
 ];
 for (const e of VP_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; }
@@ -174,7 +174,8 @@ class MotorsportPark extends OfficialVenue {
   // once an economic day (PropertyManager.tickDay): the park's takings, and the gate from a meeting you hosted
   tickDay() {
     const g = this.g, s = this.s; if (!this.owned()) return;
-    Money.earn(VP_PARK.income, 'trackIncome');
+    // inside (M13, §45.8): the park's staff keep it running at cost, no profit for an owner in a cell
+    Money.earn(g.uw && g.uw.S.jail ? VP_PARK.upkeep : VP_PARK.income, 'trackIncome');
     Money.pay(VP_PARK.upkeep, 'upkeep', { partial: true });
     if (s.hosted && s.hosted.day < this.day()) { s.hosted = null; Money.earn(VP_PARK.hostTake, 'trackIncome'); g.uw.news('pv', `Race meeting at Valen Point: a full house. ${fmtMoney(VP_PARK.hostTake)} from the gate is in your bank.`); }
   }

@@ -16,7 +16,9 @@
    - Buying a front buys no Rank, influence or turf (§45.7).
    State: save.uw.fronts[propId] = { float, washed, fees, auto }.
    ===================================================================== */
-const FRONT = { cap: [15000, 40000, 100000], fee: [0.15, 0.12, 0.09], mgrFee: 0.02, mgrCap: 1.2, min: 500, raidTake: 0.5 };
+// the laundering ladder (M13): the fixer 32% → a front 25% → managed 20% → improved 15% (managed 10%) → fully
+// developed 10% (managed 5%), with capacity growing at each level
+const FRONT = { cap: [15000, 40000, 100000], fee: [0.25, 0.15, 0.10], mgrFee: 0.05, mgrCap: 1.2, min: 500, raidTake: 0.5 };
 class Fronts {
   constructor(uw) { this.uw = uw; }
   get S() { return this.uw.S; }
@@ -34,7 +36,7 @@ class Fronts {
   st(id) { return this.F[id] || (this.F[id] = { float: 0, washed: 0, fees: 0, auto: false }); }
   // a day's washing capacity and the fee, by the business's level and whether a manager runs it
   cap(id) { const lv = Math.max(1, this.uw.props.level(id)); return Math.round(FRONT.cap[lv - 1] * (this.uw.props.manager(id) ? FRONT.mgrCap : 1)); }
-  fee(id) { const lv = Math.max(1, this.uw.props.level(id)); return Math.max(0.05, FRONT.fee[lv - 1] - (this.uw.props.manager(id) ? FRONT.mgrFee : 0)); }
+  fee(id) { const lv = Math.max(1, this.uw.props.level(id)); return Math.max(0.05, Math.round((FRONT.fee[lv - 1] - (this.uw.props.manager(id) ? FRONT.mgrFee : 0)) * 100) / 100); }
   // how much more the float takes: up to two days of capacity waiting at once
   room(id) { return Math.max(0, this.cap(id) * 2 - this.st(id).float); }
   // put carried Dirty Cash through the books (in person); returns '' or why not

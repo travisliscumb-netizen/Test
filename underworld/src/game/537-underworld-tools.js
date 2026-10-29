@@ -7,7 +7,8 @@
    charge sheet: possession of burglary tools); stashed ones stay put.
    State: save.uw.tools = { picks, at: { propId: n } }.
    ===================================================================== */
-const TOOLS = { price: 150, carry: 5, stash: 50, days: 3 };
+// a set costs less than the poorest house is worth (M13: at $150 a tier-2 house barely paid for its pick)
+const TOOLS = { price: 75, carry: 5, stash: 50, days: 3 };
 class Tools {
   constructor(uw) { this.uw = uw; }
   get T() { const S = this.uw.S; return S.tools || (S.tools = { picks: 0, at: {} }); }
