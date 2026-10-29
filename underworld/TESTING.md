@@ -11,5 +11,13 @@
   alternating runs (software GL is noisy, ±15%).
 - Reload pattern in suites: `g.saveGame(true)`, `page.reload()`, click `#btnContinue`.
 - Suites added in this phase: `legal` (M7), `prison` rewritten (M8), `fronts`, `tables`, `casino`/`royale-sim`
-  rewritten (M9), `crime` (M10), `phoneapps` extended (M11), `opening` (M12).
+  rewritten (M9), `crime` (M10), `phoneapps` extended (M11), `opening` (M12), `economy` (M13: the balance
+  invariants — resale ≤85%, the laundering ladder, the economic clock, sleep, no jail profit, casino RTP, the
+  bounded progressive, race tiers, the jackpot stress test, broke recovery, payroll order, pickpocket wariness,
+  supplier restock, Rank monotonicity and hints).
+- Measurement tools (not tests; they print and write JSON under `.runs/`):
+  `node underworld/tools/econ-probe.mjs [index.html] [out.json]` (prices, loot EVs, passive simulations: the
+  tables in ECONOMY.md); `node underworld/tools/perf-scenarios.mjs [index.html] [out.json]` (the phone-profile
+  baseline for downtown on foot, a downtown drive, the phone map, the casino, a jail cell; run it alone, never
+  beside the regression runner). With `PHONE=1 tests/perf.mjs` it makes the CONTENT COMPLETE mobile baseline.
 - A runner reads the live `tests/` folder: don't edit suites while it runs against a staged build.

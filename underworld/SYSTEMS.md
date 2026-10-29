@@ -15,8 +15,9 @@
 | Robbable business interiors | `352` | `ROB_THEMES`, `ROB_SEC`, `BURGLARY`, `bizInteriorDef` (M10) |
 | Content services: garage, dealers, secrets, burglary | `360` | |
 | Activities: races, events | `370` | |
-| Underworld data (props, goods, factions) | `390` | |
-| Market, inventory, armory, crew, turf | `400`–`480` | |
+| Underworld data (props, goods, factions) | `390` | `RANKS`, `JAIL_OPS`, `SUPPLY_RESTOCK`, `bizUpgradeCost` (M13) |
+| Market, inventory, armory, crew, turf | `400`–`480` | pickpocket wariness `PICK_WARY` (`400`, M13) |
+| Economic day, supplier shelves, influence | `450` | `econDays` (the daily economy every 24 econ hours), `shelf`/`restockSuppliers` (`SUPPLY_RESTOCK`), influence earned vs bought (M13) |
 | Property & businesses | `490` | income, perks, raids |
 | Warehouses & compounds | `495`, `497` | |
 | Homes/parking | `500` | |

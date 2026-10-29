@@ -25,11 +25,20 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
 - **Casino (M9):** the old player-favoured 60/40 tuning is removed outright (no knobs left). Limits $10k floor /
   $250k VIP at Rep 1,300 (tables, poker buy-in, sportsbook); Royale Billions ~95% (line game ~91%, jackpots 4%),
   billion = world-time progressive on a $10k spin only (~7,000 h of $10k play per hit). Payouts round down.
-- **Fronts (M9):** carried Dirty Cash in person; capacity $15k/$40k/$100k a day by level at 15/12/9% (manager +20%
-  capacity, −2% fee, top-ups that keep running in jail); a raid takes half the float.
+- **Fronts (M9, retuned M13):** carried Dirty Cash in person; capacity $15k/$40k/$100k a day by level at 25/15/10%
+  (manager +20% capacity, −5 points, floor 5%; top-ups keep running in jail); a raid takes half the float.
 - **Crime (M10):** robbable shop-front trades only; security +1 a robbery, −1 per 5 economic days; owner lockout.
-  Lockpicks: $150 cash at Sully's, carry 5, one per break-in, charged and taken at arrest. Burglary: one 17.5%
+  Lockpicks: $75 (M13; was $150) cash at Sully's, carry 5, one per break-in, charged and taken at arrest. Burglary: one 17.5%
   report roll on entry (call lands 20–45 s later); tier 4+ homes are contained while you hide inside.
 - **Phone/taxi (M11):** six groups; a priority inbox with deep links; Intel map layer shows only what you know;
   cabs refuse wanted fares and loads over 2 units, and never Skip with product aboard.
 - **Opening (M12):** six Rosa jobs finished by doing the real thing; modest Dirty pay; no Rank handed out.
+- **Economy (M13, ECONOMY.md):** the daily economy turns on economic days (every 24 econ hours = 30 min of play),
+  not visual midnight; one sleep a day and it skips no payday; no profit in jail (`JAIL_OPS`); influence = earned
+  (turfs, crew, Lieutenants, infamy) + bought (businesses, paid officers) capped at earned; Rank needs
+  100 / 400 / 400+2 crew / 800+1 turf / 1,500+4 crew+8 turfs+Lt+450 / 2,500+6 crew+16 turfs+2 Lts+800+warehouse;
+  laundering ladder fixer 32% ($5k) → fronts 25/20 → 15/10 → 10/5%; robbery tills ×0.8 / safes ×0.65; pickpocket
+  wariness per district, much stronger in the rich districts (circling them ≈ $6.6k/h, was $31–38k/h); official purses $2k/$6k/$15k (VP) and $1.6k/$1.8k/$5k (Cedar Fields), Clean, no Rep;
+  business upgrades 0.6×/1.2× of price; suppliers restock half a shelf a day; the Armorer buys hardware but no
+  longer sells it; the Royale progressive is also won by other visitors (1 in 400 econ days), so it stays bounded
+  (~$1.25B average) and the machine never turns positive. Royale Billions kept (95%, a lottery tail).

@@ -741,12 +741,12 @@ class Underworld {
   pickpocket(q) {
     const g = this.g, S = this.S, z = zoneKey(q.x, q.z);
     q.picked = true;
-    const W = S.wary || (S.wary = {}), w0 = W[z], wary = w0 ? clamp(w0.w - (S.econH - w0.h) * PICK_WARY.fade, 0, 1) : 0;
-    W[z] = { w: Math.min(1, wary + PICK_WARY.gain), h: S.econH };
-    const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0) - wary * PICK_WARY.chance;
+    const W = S.wary || (S.wary = {}), PW = pickWary(z), w0 = W[z], wary = w0 ? clamp(w0.w - (S.econH - w0.h) * PW.fade, 0, 1) : 0;
+    W[z] = { w: Math.min(1, wary + PW.gain), h: S.econH };
+    const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._rank * 0.02) - (q.state === 'sit' ? 0.15 : 0) - wary * PW.chance;
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
-      const L = pocketLoot(q, z, Math.random, g.env.time), cash = Math.max(1, Math.round(L.cash * (1 - wary * PICK_WARY.take)));
+      const L = pocketLoot(q, z, Math.random, g.env.time), cash = Math.max(1, Math.round(L.cash * (1 - wary * PW.take)));
       g.earn(cash, 'pickpocket'); S.st.picks++;
       let extra = '';
       if (L.hot) { const t = this.give({ hot: L.hot }); if (t) extra = ` and ${L.item}${L.hot > 1 ? ` (+${L.hot - 1} more)` : ''}`; }

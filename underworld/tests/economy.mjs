@@ -187,11 +187,21 @@ const wary = await ev(() => {
   const lift = () => { const before = M.W.dirty.me; uw.pickpocket({ id: 900 + (k++), x: 2 * 80 + 40, z: 4 * 80 + 40, state: 'walk' }); return M.W.dirty.me - before; };
   const z = window.__pv.zoneKey(2 * 80 + 40, 4 * 80 + 40);
   const takes = []; for (let i = 0; i < 7; i++) takes.push(lift());
-  out.wary = +S.wary[z].w.toFixed(2); S.econH += 12 * 1; out.faded = +Math.max(0, S.wary[z].w - (S.econH - S.wary[z].h) * window.__pv.PICK_WARY.fade).toFixed(2);
+  const PW = window.__pv.pickWary(z); out.zone = z; out.rich = PW === window.__pv.PICK_WARY.rich;
+  out.wary = +S.wary[z].w.toFixed(2); out.clearH = +(1 / PW.fade).toFixed(1); S.econH += 1 / PW.fade; out.faded = +Math.max(0, S.wary[z].w - (S.econH - S.wary[z].h) * PW.fade).toFixed(2);
   Math.random = R; out.takes = takes;
+  // an hour of lifting (seeded): a lift every 20 s, a failed one costs 45 s (the mark runs, the police are called),
+  // four lifts a district then 90 s to the next; the rich districts against ordinary ones
+  const P = window.__pv; let sd = 5; const rnd = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
+  const hour = (zones, hr, night) => { let cash = 0, wy = {}, zi = 0, n = 0; for (let t = 0; t < 3600;) { const zk = zones[zi], W2 = P.pickWary(zk), now = t / 75, w0 = wy[zk], w = w0 ? Math.max(0, w0.w - (now - w0.h) * W2.fade) : 0; wy[zk] = { w: Math.min(1, w + W2.gain), h: now };
+    if (rnd() < 0.7 + night * 0.1 - w * W2.chance) { cash += Math.max(1, Math.round(P.pocketLoot({ id: 1 + Math.floor(rnd() * 1e6) }, zk, rnd, hr).cash * (1 - w * W2.take))); t += 20; } else t += 65;
+    if (++n >= 4) { n = 0; zi = (zi + 1) % zones.length; t += 90; } } return cash; };
+  const mean = f => { let c = 0; for (let i = 0; i < 40; i++) c += f(); return Math.round(c / 40); };
+  out.richHour = mean(() => hour(['u', 'c'], 22, 1)); out.ordinaryHour = mean(() => hour(['o', 'm', 'g'], 15, 0));
   return out;
 });
-check('a pickpocket spree puts a district on guard (wariness ~1 after seven lifts: lower odds, smaller takes), and it fades over ~12 minutes', wary.wary >= 0.9 && wary.faded < 0.05, JSON.stringify(wary));
+check('a pickpocket spree puts a district on guard (wariness ~1 after seven lifts: lower odds, smaller takes), and it fades (rich districts take longer)', wary.wary >= 0.9 && wary.faded < 0.05, JSON.stringify(wary));
+check('an hour circling the rich districts pays more than ordinary ones but is no money engine (≤ $12k, ≤ 3× ordinary)', wary.richHour > wary.ordinaryHour && wary.richHour <= 12000 && wary.richHour <= 3 * wary.ordinaryHour, JSON.stringify({ rich: wary.richHour, ordinary: wary.ordinaryHour }));
 
 // ---------------------------------------------------------------- Rank: monotonic, explained, reachable, not for sale
 const rk = await ev(() => {

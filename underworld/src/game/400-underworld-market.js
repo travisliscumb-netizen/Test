@@ -59,8 +59,12 @@ function pocketTimeK(zk, hour) {
 }
 // a wary crowd (M13): every lift in a district puts its people on guard (+gain, up to 1), and it fades by `fade` an
 // economic hour (75 s of play: a district fully on guard takes about 12 minutes to forget); wariness cuts the chance by up to `chance` and the take by up to `take`. A spree
-// in one rich district stops paying after a handful of lifts, so the money moves you round the city.
-const PICK_WARY = { gain: 0.15, fade: 0.1, chance: 0.45, take: 0.35 };
+// in one district stops paying after a handful of lifts, so the money moves you round the city.
+// The rich districts (the wealth band where executives, high rollers and couriers walk: the Financial District and
+// Crestmoor Heights) guard their pockets harder and longer: measured at a lift every 20 s, camping or circling them
+// paid $25–38k an hour against $1.5–5k in ordinary districts; with `rich` it pays $4–9k (ECONOMY.md).
+const PICK_WARY = { gain: 0.15, fade: 0.1, chance: 0.45, take: 0.35, rich: { gain: 0.3, fade: 0.06, chance: 0.6, take: 0.85 } };
+const pickWary = zk => (ZONE_WEALTH[zk] || 1) >= 1.9 ? PICK_WARY.rich : PICK_WARY;
 // what lifting a pocket gets you: { cash, hot, item, jackpot }
 function pocketLoot(q, zk, rnd = Math.random, hour = null) {
   const { t, band, wl } = pedType(q, zk);
