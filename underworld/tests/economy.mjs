@@ -85,6 +85,22 @@ const jail = await ev(() => {
 });
 check('outside, the empire makes money; inside, a day of it never does (managed businesses cover their upkeep, unmanaged slide, wages still due)', jail.street > 0 && jail.inside <= 0, JSON.stringify(jail));
 
+// ---------------------------------------------------------------- the progressive stays bounded (others win it too)
+const prog = await ev(() => {
+  const g = window.game, P = window.__pv, J = g.gamble.G.jp, keep = { pool: J.pool, others: J.others }, news = g.uw.news, sports = g.gamble.tickSports;
+  let s = 21; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  g.uw.news = () => {}; g.gamble.tickSports = null; J.pool = P.ROYALE.top; J.others = 0;
+  const pools = []; try { for (let d = 0; d < 200000; d++) { g.gamble.tickDay(rnd); pools.push(J.pool); } } finally { g.uw.news = news; g.gamble.tickSports = sports; }
+  const out = { others: J.others }; pools.sort((a, b) => a - b);
+  out.mean = pools.reduce((a, b) => a + b, 0) / pools.length; out.p99 = pools[Math.floor(pools.length * 0.99)]; out.max = pools[pools.length - 1];
+  // the billion tier's share of the 4% is priced at the $1B seed: a bigger pool adds (pool/1B − 1) × that share
+  const w = P.ROYALE_MAJORS[0].w, rtpAt = pool => P.ROYALE_BASE_RTP * P.ROYALE.baseK + P.ROYALE.share + P.ROYALE.share * w * (pool / P.ROYALE.top - 1);
+  out.rtpMean = rtpAt(out.mean); out.rtpP99 = rtpAt(out.p99); out.rtpMax = rtpAt(out.max);
+  J.pool = keep.pool; J.others = keep.others;
+  return out;
+});
+check('the progressive is won by others too (about once in 400 economic days): over 200,000 days it averages ~$1.25B and never drifts the machine into the player’s favour', prog.others > 350 && prog.mean > 1.1e9 && prog.mean < 1.4e9 && prog.rtpMax < 1, JSON.stringify(prog));
+
 // ---------------------------------------------------------------- gambling: routine play loses
 const gam = await ev(() => {
   const P = window.__pv, out = {}; let s = 9; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };

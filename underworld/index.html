@@ -33473,7 +33473,7 @@ const SaveSystem = {
         slots: { spins: 0, wagered: 0, won: 0, biggest: 0, jackpots: 0 },
         casino: { wagered: 0, won: 0, lost: 0, biggest: 0, biggestSlot: 0, bjHands: 0, bjWins: 0, pokerHands: 0, pokerWins: 0, rouletteSpins: 0, slotSpins: 0, chips: 0 },
         // Royale Billions: per-jackpot drought pressure and hit counts (saved so a reload never resets the pressure)
-        jp: { spins: 0, wagered: 0, won: 0, biggest: 0, pr: {}, hits: {}, last: null },
+        jp: { spins: 0, wagered: 0, won: 0, biggest: 0, pr: {}, hits: {}, last: null, others: 0 },
         pref: {}
       },
       vehicles: {},
@@ -33622,7 +33622,7 @@ const SaveSystem = {
     { // jackpot pressure: finite, non-negative, known tiers only; preferences: positive finite amounts only
       const J = d.gamble.jp && typeof d.gamble.jp === 'object' && !Array.isArray(d.gamble.jp) ? d.gamble.jp : {}, okN = v => typeof v === 'number' && isFinite(v) && v >= 0;
       const pr = {}, hits = {}; for (const m of ROYALE_MAJORS) { if (J.pr && okN(J.pr[m.id])) pr[m.id] = Math.min(J.pr[m.id], 50); if (J.hits && okN(J.hits[m.id])) hits[m.id] = Math.floor(J.hits[m.id]); }
-      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null, pool: okN(J.pool) && J.pool >= 1e9 ? Math.min(J.pool, 1e12) : 1e9 };
+      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null, others: okN(J.others) ? Math.floor(J.others) : 0, pool: okN(J.pool) && J.pool >= 1e9 ? Math.min(J.pool, 1e12) : 1e9 };
       const P = d.gamble.pref && typeof d.gamble.pref === 'object' && !Array.isArray(d.gamble.pref) ? d.gamble.pref : {}; d.gamble.pref = {};
       d.gamble.sports = sanitizeSports(d.gamble.sports, okN);
       for (const k of ['bj', 'roul', 'royale', 'pokerBuy', 'pokerDepth', 'bacc', 'craps', 'tcp', 'sports']) if (typeof P[k] === 'number' && isFinite(P[k]) && P[k] > 0 && P[k] < 1e15) d.gamble.pref[k] = Math.floor(P[k]);
@@ -59283,7 +59283,10 @@ const ROYALE_MAJORS = [
 // M9: the majors share 4% of every stake as expected return (split by w, scaled by the drought average); the base game
 // pays baseK of its table (about 91%), so the machine returns about 95% in all. The billion tier is the world-time progressive
 // (jp.pool, seeded at $1B, growing ~$400k–$800k an economic day) and is only in play on a qualifying $10,000 spin.
-const ROYALE = { share: 0.04, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, sph: 1300, baseK: 0.925, qualify: 10000, grow: [400000, 800000] };
+// othersWin (M13): the chance an economic day that somebody else at the Royale hits the progressive, so the pool stays
+// bounded (about $1.25B on average) and the machine never drifts into positive expectation (that would take a pool
+// over ~$5.7B: the billion tier is priced at the $1B seed)
+const ROYALE = { share: 0.04, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, sph: 1300, baseK: 0.925, qualify: 10000, grow: [400000, 800000], othersWin: 1 / 400 };
 // mean of the pressured wait in units of the unpressured one: ∫₀^∞ exp(−(x + c·x³/3)) dx (0.536 for c = 4)
 const ROYALE_DROUGHT_K = (() => { const c = ROYALE.drought, dx = 1e-3; let sum = 0; for (let x = dx / 2; x < 16; x += dx) sum += Math.exp(-(x + c * x * x * x / 3)) * dx; return sum; })();
 function royaleEval(grid) {
@@ -59649,7 +59652,11 @@ class Gamble {
     for (let i = 0; i < def.reels; i++) stopAt(i);
   }
   // the economic day (M9): the progressive grows from the unseen players, whether you are here or not
-  tickDay(rnd = Math.random) { const J = this.G.jp; J.pool = Math.max(ROYALE.top, +J.pool || ROYALE.top) + Math.round(ROYALE.grow[0] + rnd() * (ROYALE.grow[1] - ROYALE.grow[0])); if (this.tickSports) this.tickSports(); }
+  tickDay(rnd = Math.random) {
+    const J = this.G.jp; J.pool = Math.max(ROYALE.top, +J.pool || ROYALE.top) + Math.round(ROYALE.grow[0] + rnd() * (ROYALE.grow[1] - ROYALE.grow[0]));
+    if (rnd() < ROYALE.othersWin) { const won = J.pool; J.pool = ROYALE.top; J.others = (J.others | 0) + 1; if (this.g.uw) this.g.uw.news('pv', `A visitor hit the Royale Billions progressive last night: ${fmtMoney(won)}. The pool starts again at ${fmtMoney(ROYALE.top)}.`); }
+    if (this.tickSports) this.tickSports();
+  }
   // ------------------------------------------------------------- wagers: any amount from the minimum to the whole bankroll
   get pref() { const G = this.G; if (!G.pref || typeof G.pref !== 'object' || Array.isArray(G.pref)) G.pref = {}; return G.pref; }
   // the table limit (M9): the Royale slot tops out at the qualifying $10,000; tables at $10,000 on the floor and

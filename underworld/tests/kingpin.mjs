@@ -18,13 +18,15 @@ const once = sd => page.evaluate(seed0 => {
   const snap = window.__kpSnap || (window.__kpSnap = JSON.stringify({ turfs: S.turfs, factions: S.factions, infamy: S.infamy, props: S.props, day: S.day }));
   const run = (infamy, days) => {
     const base = JSON.parse(snap); S.turfs = base.turfs; S.factions = base.factions; S.props = base.props; S.infamy = infamy; S.day = base.day;
-    // the top Rank needs the whole empire (§31): Rep, crew, two Lieutenants, 16 turfs and 800 influence. Both runs
+    // the top Rank needs the whole empire (§31): 2,500 Rep, six crew, two Lieutenants, 16 turfs and 800 influence. Both runs
     // have the same people; only infamy (and so influence) differs
     g.save.rep = 2500;
     // ...and an operating warehouse (Session 3): one of the Lieutenants runs Cannery Row, with a Driver
     S.props.whse_w = { owned: true, dmg: 0, since: 1, lvl: 1 };
     S.crew = [1, 2].map(n => uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Lieutenant' + n, role: 'lieutenant', rank: 3, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: n === 1 ? 'w:whse_w' : null }));
     S.crew.push(uw.crew.sanitizeMember({ id: 903, name: 'Test Driver', role: 'driver', rank: 1, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: 'w:whse_w' }));
+    // City Kingpin needs six active crew (M13): three more hands, unassigned, the same in both runs
+    for (const n of [4, 5, 6]) S.crew.push(uw.crew.sanitizeMember({ id: 900 + n, name: 'Test Hand' + n, role: 'enforcer', rank: 1, skill: 50, loyalty: 90, pay: 100, traits: [], status: 'active', assign: null }));
     let wars = 0, over = 0, ratios = [], hits = 0, comp = [], refused = 0, paid = 0, kp = 0;
     // since Session 4A a rival comes for your turf only through a turf-takeback threat, driven by its grievance: every
     // faction is given the same strike-level grievance each day, and the takebacks aimed at you are counted

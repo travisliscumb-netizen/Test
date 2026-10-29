@@ -346,11 +346,11 @@ check('…nor of the Truck Run (trucks and pickups only)', trk.refused && /Wrong
 await ev(sf => { window.__car('offroad', sf.x, sf.z, Math.PI / 2); const g = window.game; window.__log = []; window.__d0 = g.money.W.dirty.me; window.__r0 = g.save.rep; }, sf);
 const trail = await raceTo('or_trail', 1, { watch: true });
 const tm = await ev(() => { const g = window.game, L = window.__log.filter(x => /^track/.test(x.src) || x.cur === 'dirty'); return { in: L.filter(x => x.d > 0).map(x => x.cur + ':' + x.src + ':' + Math.round(x.d)).join(), out: L.filter(x => x.d < 0).map(x => x.cur + ':' + x.src + ':' + Math.round(-x.d)).join(), dirty: Math.round(g.money.W.dirty.me - window.__d0), rep: g.save.rep - window.__r0, level: g.police.level }; });
-check('an official off-road event: the buy-in and the prize are Clean Bank (no Dirty Cash), no criminal Rep', tm.in === 'clean:trackPrize:2000' && tm.out === 'clean:trackFee:250' && tm.dirty === 0 && tm.rep === 0, JSON.stringify(tm));
+check('an official off-road event: the buy-in and the prize are Clean Bank (no Dirty Cash), no criminal Rep', tm.in === 'clean:trackPrize:1600' && tm.out === 'clean:trackFee:200' && tm.dirty === 0 && tm.rep === 0, JSON.stringify(tm));
 check('…no heat from a cop watching (it really saw you); the opponents really race over the course (each covered ground, none under the surface)', trail.mid.level === 0 && trail.mid.saw > 0 && tm.level === 0 && trail.mid.moved.length === 4 && trail.mid.moved.every(d => d > 40) && trail.mid.under === 0, JSON.stringify(trail));
 const again = await (async () => { await ev(sf => { window.__car('offroad', sf.x, sf.z, Math.PI / 2); window.__log = []; }, sf); await raceTo('or_trail', 1); return ev(() => window.__log.filter(x => x.d > 0 && /^track/.test(x.src)).map(x => x.src + ':' + Math.round(x.d)).join()); })();
 check('race checkpoints: the next checkpoint’s marker stands on the ground (on the hills, not at sea level)', trail.mid.mk !== null && Math.abs(trail.mid.mk) < 0.1, JSON.stringify(trail.mid));
-check('the same event won again today pays half (the same daily tiers as every race)', again === 'trackPrize:1000', again);
+check('the same event won again today pays half (the same daily tiers as every race)', again === 'trackPrize:800', again);
 const lapT = await ev(() => {
   const g = window.game, O = g.offroad, T = g.world.cfs.track, pv = window.__pv, out = {};
   window.__calm(); g.police.enabled = false;

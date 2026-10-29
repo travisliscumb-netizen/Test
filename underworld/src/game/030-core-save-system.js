@@ -35,7 +35,7 @@ const SaveSystem = {
         slots: { spins: 0, wagered: 0, won: 0, biggest: 0, jackpots: 0 },
         casino: { wagered: 0, won: 0, lost: 0, biggest: 0, biggestSlot: 0, bjHands: 0, bjWins: 0, pokerHands: 0, pokerWins: 0, rouletteSpins: 0, slotSpins: 0, chips: 0 },
         // Royale Billions: per-jackpot drought pressure and hit counts (saved so a reload never resets the pressure)
-        jp: { spins: 0, wagered: 0, won: 0, biggest: 0, pr: {}, hits: {}, last: null },
+        jp: { spins: 0, wagered: 0, won: 0, biggest: 0, pr: {}, hits: {}, last: null, others: 0 },
         pref: {}
       },
       vehicles: {},
@@ -184,7 +184,7 @@ const SaveSystem = {
     { // jackpot pressure: finite, non-negative, known tiers only; preferences: positive finite amounts only
       const J = d.gamble.jp && typeof d.gamble.jp === 'object' && !Array.isArray(d.gamble.jp) ? d.gamble.jp : {}, okN = v => typeof v === 'number' && isFinite(v) && v >= 0;
       const pr = {}, hits = {}; for (const m of ROYALE_MAJORS) { if (J.pr && okN(J.pr[m.id])) pr[m.id] = Math.min(J.pr[m.id], 50); if (J.hits && okN(J.hits[m.id])) hits[m.id] = Math.floor(J.hits[m.id]); }
-      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null, pool: okN(J.pool) && J.pool >= 1e9 ? Math.min(J.pool, 1e12) : 1e9 };
+      d.gamble.jp = { spins: okN(J.spins) ? Math.floor(J.spins) : 0, wagered: okN(J.wagered) ? J.wagered : 0, won: okN(J.won) ? J.won : 0, biggest: okN(J.biggest) ? J.biggest : 0, pr, hits, last: J.last && typeof J.last === 'object' && typeof J.last.id === 'string' ? { id: J.last.id, day: J.last.day | 0 } : null, others: okN(J.others) ? Math.floor(J.others) : 0, pool: okN(J.pool) && J.pool >= 1e9 ? Math.min(J.pool, 1e12) : 1e9 };
       const P = d.gamble.pref && typeof d.gamble.pref === 'object' && !Array.isArray(d.gamble.pref) ? d.gamble.pref : {}; d.gamble.pref = {};
       d.gamble.sports = sanitizeSports(d.gamble.sports, okN);
       for (const k of ['bj', 'roul', 'royale', 'pokerBuy', 'pokerDepth', 'bacc', 'craps', 'tcp', 'sports']) if (typeof P[k] === 'number' && isFinite(P[k]) && P[k] > 0 && P[k] < 1e15) d.gamble.pref[k] = Math.floor(P[k]);

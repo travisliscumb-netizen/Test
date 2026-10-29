@@ -213,10 +213,10 @@ await into('sports');
 await ev(() => { const g = window.game; window.__log = []; window.__c0 = g.money.W.clean; window.__d0 = g.money.W.dirty.me; });
 const gt = await raceTo('vp_gt', 1);
 const gtMoney = await ev(() => { const g = window.game, L = window.__log.filter(x => /^track/.test(x.src) || x.cur === 'dirty'); return { in: L.filter(x => x.d > 0).map(x => x.cur + ':' + x.src + ':' + Math.round(x.d)).join(), out: L.filter(x => x.d < 0).map(x => x.cur + ':' + x.src + ':' + Math.round(-x.d)).join(), dirty: Math.round(g.money.W.dirty.me - window.__d0), level: g.police.level }; });
-check('an official event: the entry fee and the prize are Clean Bank (no Dirty Cash moves), booked as the track’s', gtMoney.in === 'clean:trackPrize:9000' && gtMoney.out === 'clean:trackFee:1500' && gtMoney.dirty === 0, JSON.stringify(gtMoney));
+check('an official event: the entry fee and the prize are Clean Bank (no Dirty Cash moves), booked as the track’s', gtMoney.in === 'clean:trackPrize:6000' && gtMoney.out === 'clean:trackFee:1000' && gtMoney.dirty === 0, JSON.stringify(gtMoney));
 check('…no heat from a cop watching you race it (it really saw you); the opponents really race (each covered ground)', gt.mid.level === 0 && gt.mid.saw > 0 && gt.mid.moved.length === 5 && gt.mid.moved.every(d => d > 60), JSON.stringify(gt));
 const again = await (async () => { await ev(() => { window.__log = []; }); await raceTo('vp_gt', 1); return ev(() => window.__log.filter(x => x.d > 0 && /^track/.test(x.src)).map(x => x.src + ':' + Math.round(x.d)).join()); })();
-check('the same event won again today pays half (the daily tiers, as street races)', again === 'trackPrize:4500', again);
+check('the same event won again today pays half (the daily tiers, as street races)', again === 'trackPrize:3000', again);
 // the owner: no entry fee; the Invitational's car once
 await ev(() => { const g = window.game; g.save.uw.props.motorsport.owned = true; });
 await into('kodiak');

@@ -36,12 +36,17 @@ const rich = await ev(() => {
 check('a rich Nobody can buy what is for sale (many properties, businesses included)', rich.bought >= 10 && rich.businesses >= 3, JSON.stringify(rich));
 check('buying and upgrading every property buys no Rep, influence, turf hold or Rank', rich.z.rep === rich.a.rep && rich.z.infl === rich.a.infl && rich.z.rank === 0 && rich.z.turfs === 0 && rich.z.own === rich.a.own && rich.z.pc === rich.a.pc, JSON.stringify({ before: { ...rich.a, own: undefined }, after: { ...rich.z, own: undefined } }));
 const est = await ev(() => {
-  const g = window.game, uw = g.uw, S = uw.S, d0 = S.day, out = {};
+  const g = window.game, uw = g.uw, S = uw.S, d0 = S.day, i0 = S.infamy, out = {};
+  // with no earned standing, bought influence counts for nothing (M13: bought influence is capped by earned)
+  S.infamy = 0; S.day = d0 + 40; uw.computeInfluence(); out.none = uw.influence;
+  // with some earned standing (infamy from the street), an established business adds to it
+  S.infamy = 200;
   for (const n of [0, 7, 14, 21, 40]) { S.day = d0 + n; uw.computeInfluence(); out['d' + n] = uw.influence; }
-  S.day = d0; uw.computeInfluence();
+  S.day = d0; S.infamy = i0; uw.computeInfluence();
   return out;
 });
-check('a business adds influence only once established: nothing for a week, then gradually, then fully', est.d0 === 0 && est.d7 === 0 && est.d14 > 0 && est.d21 > est.d14 && est.d40 >= est.d21 && est.d40 > 0, JSON.stringify(est));
+check('bought influence is capped by earned: with nothing earned, businesses add none', est.none === 0, JSON.stringify(est));
+check('a business adds influence only once established: nothing for a week, then gradually, then fully', est.d0 === 200 && est.d7 === 200 && est.d14 > 200 && est.d21 > est.d14 && est.d40 >= est.d21, JSON.stringify(est));
 
 // ---------------------------------------------------------------- 3. Nobody → City Kingpin, in order
 const chain = await ev(() => {
@@ -69,19 +74,22 @@ const chain = await ev(() => {
   const fails = [];
   let k = 0;
   const takeN = n => { while (uw.playerTurfs() < n && k < order.length) { const r = takeOne(order[k++]); if (r) fails.push(r); } };
-  takeN(1); note('one turf');
+  g.content.addRep(400); takeN(1); note('800 Rep, one turf');
   // Lieutenants: promotion is time and Dirty Cash (no Rank gate), then the role runs a district
   const crew = uw.crew.active();
   const lt = c => { c.days = 99; let r = ''; for (let n = 0; n < 3 && !r; n++) r = uw.crew.promote(c.id); const z = uw.T[order[0]].zone; return r || uw.crew.assign(c.id, 'lieutenant', z) || ''; };
   const lt1 = lt(crew[0]);
   // bosses put down (Rep and infamy earned on the street)
   for (const fid of Object.keys(S.factions)) uw.factions.bossDown(fid, true);
-  takeN(8); note('eight turfs, one Lieutenant: ' + (lt1 || 'ok'));
+  const hire = () => { uw.crew.refreshCandidates(true); return uw.crew.hire(0) || 'ok'; };
+  const h4 = hire();
+  takeN(8); note('eight turfs, one Lieutenant, four crew: ' + [lt1, h4].map(x => x || 'ok').join('/'));
   const lt2 = lt(crew[1]);
   // City Kingpin's infrastructure (Session 3): a warehouse run by a Lieutenant, with a Driver
   if (!uw.props.owned('whse_w')) { g.money.W.clean += 40000; uw.props.buy('whse_w'); }
   const whLt = uw.crew.assign(crew[1].id, 'lieutenant', 'w:whse_w'), whDrv = uw.crew.assign(crew[2].id, 'driver', 'w:whse_w');
-  takeN(16); note('sixteen turfs, two Lieutenants, an operating warehouse: ' + [lt2, whLt, whDrv].map(x => x || 'ok').join('/'));
+  const h5 = hire(), h6 = hire();
+  takeN(16); note('sixteen turfs, two Lieutenants, six crew, an operating warehouse: ' + [lt2, whLt, whDrv, h5, h6].map(x => x || 'ok').join('/'));
   return { steps, fails: fails.slice(0, 5), lts: uw.crew.active().filter(c => c.role === 'lieutenant').length, kingpin: uw.kingpin(), rankMax: S.rankMax };
 });
 const ranks = chain.steps.map(s => s.rank);

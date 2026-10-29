@@ -56,14 +56,14 @@ check('buying a front buys no Rank or Rep (§45.7)', r.buy === '|' && r.after.ra
 check('only a business with a laundering line is a front', r.isFront && !r.plainFront && r.plainHtml === '', JSON.stringify([r.isFront, r.plainFront]));
 check('cash goes through the books in person: from across town it is refused', /in person/.test(r.far), r.far);
 check('a deposit under $500 is refused', /At least/.test(r.small), r.small);
-check('level 1: up to $15,000 a day at 15%', r.cap1 === 15000 && Math.abs(r.fee1 - 0.15) < 1e-9, JSON.stringify([r.cap1, r.fee1]));
+check('level 1: up to $15,000 a day at 25%', r.cap1 === 15000 && Math.abs(r.fee1 - 0.25) < 1e-9, JSON.stringify([r.cap1, r.fee1]));
 check('$5,000 of carried Dirty Cash joins the float', r.dep === '' && r.float1 === 5000 && r.dirty1 === 45000, JSON.stringify(r));
 check('the float holds two days of capacity at most ($30,000): “all I carry” takes only what fits', r.depAll === '' && r.float2 === 30000 && r.dirty2 === 20000 && /can’t take more/.test(r.full), JSON.stringify([r.float2, r.dirty2, r.full]));
-check('an economic day washes $15,000: $12,750 lands in Clean Bank, $2,250 fee, $15,000 left in the float', r.wash1.clean === 12750 && r.wash1.float === 15000 && r.wash1.fees === 2250 && r.wash1.washed === 15000, JSON.stringify(r.wash1));
-check('level 3: up to $100,000 a day at 9%', r.cap3 === 100000 && Math.abs(r.fee3 - 0.09) < 1e-9, JSON.stringify([r.cap3, r.fee3]));
+check('an economic day washes $15,000: $11,250 lands in Clean Bank, $3,750 fee, $15,000 left in the float', r.wash1.clean === 11250 && r.wash1.float === 15000 && r.wash1.fees === 3750 && r.wash1.washed === 15000, JSON.stringify(r.wash1));
+check('level 3: up to $100,000 a day at 10%', r.cap3 === 100000 && Math.abs(r.fee3 - 0.10) < 1e-9, JSON.stringify([r.cap3, r.fee3]));
 check('top-ups need a manager', /Only a manager/.test(r.autoNoMgr), r.autoNoMgr);
-check('a manager adds 20% capacity and trims the fee to 7%', r.assign === '' && r.capM === 120000 && Math.abs(r.feeM - 0.07) < 1e-9, JSON.stringify([r.assign, r.capM, r.feeM]));
-check('with top-ups on, the manager fills the float from your cash and stashes, and the day washes it', r.autoOn && r.wash2.clean === Math.round(120000 * 0.93) && r.wash2.float === 0 && r.wash2.dirty === 200000 - (120000 - r.wash2.f0), JSON.stringify(r.wash2));
+check('a manager adds 20% capacity and trims the fee to 5% (the ladder’s bottom rung, §45.40)', r.assign === '' && r.capM === 120000 && Math.abs(r.feeM - 0.05) < 1e-9, JSON.stringify([r.assign, r.capM, r.feeM]));
+check('with top-ups on, the manager fills the float from your cash and stashes, and the day washes it', r.autoOn && r.wash2.clean === Math.round(120000 * 0.95) && r.wash2.float === 0 && r.wash2.dirty === 200000 - (120000 - r.wash2.f0), JSON.stringify(r.wash2));
 check('the business screen shows the books: capacity, fee, float, washed, deposit buttons', /The books/.test(r.html) && /Washes a day/.test(r.html) && /Waiting in the float/.test(r.html) && /Put \$/.test(r.html) && /Manager top-ups: ON/.test(r.html), r.html.slice(0, 300));
 check('a police raid takes half the float as evidence', r.raid === 20000 && r.afterRaid === 20000, JSON.stringify([r.raid, r.afterRaid]));
 
@@ -87,7 +87,7 @@ const j = await ev((id) => {
 }, r.id);
 check('the float and the top-up setting survive save and reload exactly', j.float === 12345 && j.auto === true, JSON.stringify(j));
 check('a malformed save entry is cleaned (negatives zeroed, unknown businesses dropped)', Object.keys(j.san).length === 1 && Object.values(j.san)[0].float === 0 && Object.values(j.san)[0].auto === true, JSON.stringify(j.san));
-check('in jail: no deposits from a cell, but a managed front keeps washing from your stashes', /cell/.test(j.jailDep) && j.inJail && j.jailWash === Math.round(120000 * 0.93) && j.stashLeft === 30000, JSON.stringify(j));
+check('in jail: no deposits from a cell, but a managed front keeps washing from your stashes', /cell/.test(j.jailDep) && j.inJail && j.jailWash === Math.round(120000 * 0.95) && j.stashLeft === 30000, JSON.stringify(j));
 
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'fronts');

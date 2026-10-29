@@ -118,7 +118,10 @@ const ROYALE_MAJORS = [
 // M9: the majors share 4% of every stake as expected return (split by w, scaled by the drought average); the base game
 // pays baseK of its table (about 91%), so the machine returns about 95% in all. The billion tier is the world-time progressive
 // (jp.pool, seeded at $1B, growing ~$400k–$800k an economic day) and is only in play on a qualifying $10,000 spin.
-const ROYALE = { share: 0.04, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, sph: 1300, baseK: 0.925, qualify: 10000, grow: [400000, 800000] };
+// othersWin (M13): the chance an economic day that somebody else at the Royale hits the progressive, so the pool stays
+// bounded (about $1.25B on average) and the machine never drifts into positive expectation (that would take a pool
+// over ~$5.7B: the billion tier is priced at the $1B seed)
+const ROYALE = { share: 0.04, drought: 4, minRatio: 5, maxP: 0.5, top: 1e9, sph: 1300, baseK: 0.925, qualify: 10000, grow: [400000, 800000], othersWin: 1 / 400 };
 // mean of the pressured wait in units of the unpressured one: ∫₀^∞ exp(−(x + c·x³/3)) dx (0.536 for c = 4)
 const ROYALE_DROUGHT_K = (() => { const c = ROYALE.drought, dx = 1e-3; let sum = 0; for (let x = dx / 2; x < 16; x += dx) sum += Math.exp(-(x + c * x * x * x / 3)) * dx; return sum; })();
 function royaleEval(grid) {
@@ -484,7 +487,11 @@ class Gamble {
     for (let i = 0; i < def.reels; i++) stopAt(i);
   }
   // the economic day (M9): the progressive grows from the unseen players, whether you are here or not
-  tickDay(rnd = Math.random) { const J = this.G.jp; J.pool = Math.max(ROYALE.top, +J.pool || ROYALE.top) + Math.round(ROYALE.grow[0] + rnd() * (ROYALE.grow[1] - ROYALE.grow[0])); if (this.tickSports) this.tickSports(); }
+  tickDay(rnd = Math.random) {
+    const J = this.G.jp; J.pool = Math.max(ROYALE.top, +J.pool || ROYALE.top) + Math.round(ROYALE.grow[0] + rnd() * (ROYALE.grow[1] - ROYALE.grow[0]));
+    if (rnd() < ROYALE.othersWin) { const won = J.pool; J.pool = ROYALE.top; J.others = (J.others | 0) + 1; if (this.g.uw) this.g.uw.news('pv', `A visitor hit the Royale Billions progressive last night: ${fmtMoney(won)}. The pool starts again at ${fmtMoney(ROYALE.top)}.`); }
+    if (this.tickSports) this.tickSports();
+  }
   // ------------------------------------------------------------- wagers: any amount from the minimum to the whole bankroll
   get pref() { const G = this.G; if (!G.pref || typeof G.pref !== 'object' || Array.isArray(G.pref)) G.pref = {}; return G.pref; }
   // the table limit (M9): the Royale slot tops out at the qualifying $10,000; tables at $10,000 on the floor and

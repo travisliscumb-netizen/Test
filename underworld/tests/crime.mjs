@@ -137,7 +137,7 @@ const lp = await ev(() => {
   out.san = P.Tools.sanitize({ picks: 99, at: { nope: 3, [sh.id]: -2 } }, (v, d, lo, hi) => (typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d));
   return out;
 });
-check('a lockpick set costs $150 cash at Sully’s; you carry five at most', lp.buy1 === '' && lp.after1.picks === 1 && lp.after1.dirty === 850 && lp.fill === '' && lp.after2.picks === 5 && lp.after2.dirty === 250 && /carry 5/.test(lp.full) && lp.shop, JSON.stringify(lp));
+check('a lockpick set costs $75 cash at Sully’s; you carry five at most', lp.buy1 === '' && lp.after1.picks === 1 && lp.after1.dirty === 925 && lp.fill === '' && lp.after2.picks === 5 && lp.after2.dirty === 625 && /carry 5/.test(lp.full) && lp.shop, JSON.stringify(lp));
 check('sets go into a safehouse stash and come back out', lp.store === '' && lp.stored.me === 0 && lp.stored.there === 5 && lp.take === '' && lp.took.me === 2 && lp.took.there === 3 && lp.html, JSON.stringify(lp));
 check('no set on you: a house door only says it needs one', /needs a lockpick set/.test(lp.noPick || ''), lp.noPick);
 check('a malformed tools save is cleaned (carry capped at 5, unknown places and negatives dropped)', lp.san.picks === 5 && Object.keys(lp.san.at).length === 0, JSON.stringify(lp.san));
