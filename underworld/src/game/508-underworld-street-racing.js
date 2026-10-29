@@ -196,7 +196,7 @@ class CarWash {
     const grp = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: 0x2f7fd8 }), geo = new THREE.CylinderGeometry(0.45, 0.45, 2.2, 10);
     for (const s of [-1.6, 1.6]) { const m = new THREE.Mesh(geo, mat); m.position.set(s, 1.1, 0); grp.add(m); }
     const top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 3.0, 10), mat); top.rotation.z = Math.PI / 2; top.position.set(0, 2.1, 0); grp.add(top);
-    grp.visible = false; this.g.scene.add(grp);
+    grp.visible = false; this.g.outdoor.add(grp);
     return grp;
   }
   update(dt) {

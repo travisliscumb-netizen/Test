@@ -3,12 +3,12 @@
    ===================================================================== */
 class PropManager {
   constructor(game) {
-    this.game = game; this.world = game.world; this.scene = game.scene;
+    this.game = game; this.world = game.world; this.scene = game.outdoor;
     this.mat = makePropMaterial(0.8, 0.05);
     this.folMat = makeFoliageMaterial();
     this.glowMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
     this.bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    this.meshes = {}; this.glows = {}; this.geos = {};
+    this.meshes = {}; this.glows = {}; this.geos = {}; this.far = {}; this.act = {}; this._cullAt = new THREE.Vector3(1e9, 0, 0); this._cullDir = new THREE.Vector3(); this._cullT = 0; this._sph = new THREE.Sphere(); this.nearR = 70;
     this.active = new Set(); this.dirty = true;
     this.byType = {};
     for (const t in PROP_DEFS) {
@@ -22,6 +22,14 @@ class PropManager {
       im.count = 0; im.frustumCulled = false; im.castShadow = !!PROP_DEFS[t].cast; im.receiveShadow = true;
       if (PROP_DEFS[t].tint) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3); }
       this.scene.add(im); this.meshes[t] = im;
+      // foliage has a far version (G3): cull() splits the active instances between the two, and skips the unseen
+      if (PROP_DEFS[t].lod) {
+        const lg = new GeoBuilder(); PROP_DEFS[t].lod(lg);
+        const fm = new THREE.InstancedMesh(lg.build(), PROP_DEFS[t].foliage ? this.folMat : this.mat, list.length);
+        fm.count = 0; fm.frustumCulled = false; fm.castShadow = !!PROP_DEFS[t].cast; fm.receiveShadow = true;
+        fm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3);
+        this.scene.add(fm); this.far[t] = fm; this.act[t] = [];
+      }
       if (PROP_DEFS[t].glow) {
         const gg = new GeoBuilder();
         for (const [x, y, z, sx, sy, sz] of PROP_DEFS[t].glow) gg.add(TPL.sphere0, M(x, y, z, sx, sy, sz), C(0xffffff));
@@ -53,6 +61,11 @@ class PropManager {
     for (const t in this.meshes) {
       const im = this.meshes[t], list = this.byType[t]; let n = 0;
       const gm = this.glows[t];
+      if (this.far[t]) { // foliage: collect the active instances; cull() places them
+        const A = this.act[t]; A.length = 0;
+        for (const p of list) if (!p.broken && promoOK(p)) { const h = hash2i(p.id, 3, 9); A.push({ x: p.x, z: p.z, ry: p.ry, s: p.s, r: 0.8 + h * 0.4, g: 0.85 + hash2i(p.id, 4, 9) * 0.3, b: 0.75 + h * 0.3 }); }
+        this._cullT = 0; continue;
+      }
       for (const p of list) {
         if (p.broken || !promoOK(p)) continue;
         M(p.x, CURB_H, p.z, p.s, p.s, p.s, p.ry);
@@ -73,6 +86,29 @@ class PropManager {
     this.bulbTimer = 0;
   }
   markDirty() { this.dirty = true; }
+  // foliage LOD and culling (G3): every instance in the active blocks used to be drawn at full detail in every
+  // direction (a park view reached 1.2M triangles). Near ones (nearR) get the full tree, farther ones the cheap
+  // version, and ones outside the view are skipped, except within 18 m, whose shadows can still fall into view.
+  // Re-sorted five times a second, or at once when the camera moves 6 m or turns.
+  cull(camera, frustum, dt) {
+    this._cullT -= dt;
+    camera.getWorldDirection(this._cullDir);
+    const moved = camera.position.distanceToSquared(this._cullAt) > 36 || this._cullDir.dot(this._lastDir || this._cullDir) < 0.97;
+    if (this._cullT > 0 && !moved) return;
+    this._cullT = 0.2; this._cullAt.copy(camera.position); this._lastDir = (this._lastDir || new THREE.Vector3()).copy(this._cullDir);
+    const cx = camera.position.x, cz = camera.position.z, nr2 = this.nearR * this.nearR, sph = this._sph, col = this._c;
+    for (const t in this.far) {
+      const im = this.meshes[t], fm = this.far[t]; let n = 0, f = 0;
+      for (const a of this.act[t]) {
+        const d2 = (a.x - cx) * (a.x - cx) + (a.z - cz) * (a.z - cz);
+        if (d2 > 18 * 18) { sph.center.set(a.x, 3.5 * a.s, a.z); sph.radius = 5 * a.s; if (!frustum.intersectsSphere(sph)) continue; }
+        M(a.x, CURB_H, a.z, a.s, a.s, a.s, a.ry); col.setRGB(a.r, a.g, a.b);
+        if (d2 < nr2) { im.setMatrixAt(n, _m4); im.setColorAt(n, col); n++; } else { fm.setMatrixAt(f, _m4); fm.setColorAt(f, col); f++; }
+      }
+      im.count = n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      fm.count = f; fm.instanceMatrix.needsUpdate = true; fm.instanceColor.needsUpdate = true;
+    }
+  }
   update(dt, night) {
     this.glowMat.color.setRGB(1, 0.82, 0.55).multiplyScalar(0.15 + night * 3.2);
     this.bulbTimer -= dt;

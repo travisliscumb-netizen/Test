@@ -55,7 +55,9 @@ async function profile(tag, ctxOpts, throttle) {
   const meta = await ev(() => (document.querySelector('meta[name="release"]') || {}).content || '');
   check(`${tag}: it is the release (${meta})`, meta.includes(rel.commit), meta);
   await ev(() => window.game.quality.setMode(0));
-  await page.click('#btnNew');
+  // the loading screen fades after the first rendered frames (slow on software GL): wait for it, then click
+  await page.waitForFunction(() => { const l = document.getElementById('loading'); return !l || l.style.display === 'none' || l.classList.contains('hidden') || getComputedStyle(l).opacity === '0' || !l.isConnected; }, null, { timeout: 180000, polling: 200 });
+  await page.click('#btnNew', { timeout: 120000 });
   await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 240000 });
   await ev(() => { const g = window.game; g.events.cool = 1e9; g.save.settings.guide = false; });
   const sys = await ev(() => { const g = window.game; return ['uw', 'police', 'traffic', 'peds', 'missions', 'vehicles', 'vreg', 'gamble', 'race', 'world', 'chunks', 'money'].filter(k => !g[k]); });

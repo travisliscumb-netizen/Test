@@ -149,6 +149,48 @@ function extrudeProfile(pts, width, bevel = 0.06, taper = 0) {
   return templateFrom(ng);
 }
 const VEH_GEO = {};
+// ---- body shaping (G5). The bodies are side profiles extruded straight across, so from above every car was a slab
+// with square corners and vertical flanks. This bends the whole mesh (lamps, bumpers and trim move with the panels
+// they sit on): the nose and tail round off in plan, the flanks tuck under below the sill and roll in above the
+// shoulder, and the hood and deck crown a little. Dimensions, wheel positions and physics are untouched.
+function shapeVehicle(geo, d) {
+  const p = geo.attributes.position, W2 = d.W / 2, L = d.zf - d.zr;
+  const rf = Math.min(0.75, L * 0.17), rr = Math.min(0.6, L * 0.13), sporty = d.sporty ? 1 : 0, boxy = d.boxy ? 1 : 0;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const tf = clamp((z - (d.zf - rf)) / rf, 0, 1), tr = clamp(((d.zr + rr) - z) / rr, 0, 1);
+    // plan: corners pulled in on a circular-ish curve; less on vans and trucks (square by nature)
+    const plan = 1 - (0.13 - 0.07 * boxy + 0.03 * sporty) * tf * tf - (0.09 - 0.05 * boxy) * tr * tr;
+    // section: tuck under below the sill, roll in above the shoulder (the glasshouse already tapers on its own)
+    const tuck = clamp((d.yb + 0.22 - y) / 0.22, 0, 1), sh = clamp((y - (d.belt - 0.16)) / 0.16, 0, 1) * (y < d.belt + 0.08 ? 1 : 0);
+    const sect = 1 - 0.07 * tuck * tuck - (0.035 - 0.02 * boxy) * sh;
+    x *= plan * sect;
+    // a crowned hood and deck: the middle of the top surfaces rises a few centimetres
+    if (Math.abs(x) < W2 && y > d.yb + 0.3 && y < d.belt + 0.06 && (z > d.cabF - 0.05 || z < d.cabR + 0.05)) y += 0.035 * (1 - Math.pow(x / W2, 2)) * (1 - tf * 0.6);
+    p.setXYZ(i, x, y, z);
+  }
+  p.needsUpdate = true;
+}
+// smooth shading across the facets of the paint and glass (crease angle in degrees): vertices that share a position
+// average the normals that face within the crease of their own, so curved panels catch light as one surface and
+// real edges stay sharp
+function creaseNormals(geo, parts, crease = 42) {
+  geo.computeVertexNormals();
+  const p = geo.attributes.position, n = geo.attributes.normal, pa = geo.attributes.aPart, cos = Math.cos(crease * Math.PI / 180);
+  const key = i => Math.round(p.getX(i) * 400) + ',' + Math.round(p.getY(i) * 400) + ',' + Math.round(p.getZ(i) * 400);
+  const groups = new Map();
+  for (let i = 0; i < p.count; i++) { if (pa && !parts.includes(pa.getX(i))) continue; const k = key(i); let a = groups.get(k); if (!a) groups.set(k, a = []); a.push(i); }
+  const out = new Float32Array(n.array), v = new THREE.Vector3(), w = new THREE.Vector3(), sum = new THREE.Vector3();
+  for (const a of groups.values()) {
+    if (a.length < 2) continue;
+    for (const i of a) {
+      v.fromBufferAttribute(n, i); sum.set(0, 0, 0);
+      for (const j of a) { w.fromBufferAttribute(n, j); if (v.dot(w) >= cos) sum.add(w); }
+      sum.normalize(); out[i * 3] = sum.x; out[i * 3 + 1] = sum.y; out[i * 3 + 2] = sum.z;
+    }
+  }
+  n.array.set(out); n.needsUpdate = true;
+}
 // height of the body's upper outline at a given z (used to keep wheel arches below the hood/deck)
 function profileTopAt(pts, z) {
   let best = 99;
@@ -354,6 +396,8 @@ function vehicleGeometry(type) {
     if (tier === 'rare' && s.profile === 'super' && !s.sideIntakes) for (const sx of [-1, 1]) g.box(sx * (W / 2 - 0.02), (yb + belt) / 2, -wb * 0.2, 0.05, 0.22, 0.5, null, 0, { part: 17 });
   }
   const geo = g.build();
+  const dims = { W, zf, zr, yb, belt, cabF, cabR, sporty: SPORTY_PROFILES.has(s.profile), boxy };
+  shapeVehicle(geo, dims); creaseNormals(geo, [0, 1, 10]);
   // LOD: body, cabin, lights and bumpers only, for cars far from the camera (traffic in the distance)
   const lg = new GeoBuilder({ part: true });
   lg.add(extrudeProfile(pr.body.slice(), W, 0.04), M(0, 0, 0), null, { part: 0 });
@@ -364,7 +408,7 @@ function vehicleGeometry(type) {
   if (s.taxi) lg.box(0, cabTop + 0.17, (cabF + cabR) / 2, 0.6, 0.22, 0.28, null, 0, { part: 9 });
   if (s.police) { lg.box(-0.32, cabTop + 0.18, (cabF + cabR) / 2 - 0.05, 0.5, 0.12, 0.26, null, 0, { part: 7 }); lg.box(0.32, cabTop + 0.18, (cabF + cabR) / 2 - 0.05, 0.5, 0.12, 0.26, null, 0, { part: 8 }); }
   if (s.profile === 'truck') lg.box(0, 1.9, -1.0, W - 0.05, 2.6, 5.2, null, 0, { part: 10 });
-  const lod = lg.build();
+  const lod = lg.build(); shapeVehicle(lod, dims); creaseNormals(lod, [0, 1, 10]);
   VEH_GEO[type] = { geo, lod, wheels: [[W / 2 - 0.16, wb / 2], [-(W / 2 - 0.16), wb / 2], [W / 2 - 0.16, -wb / 2], [-(W / 2 - 0.16), -wb / 2]], yb, zf, zr, frontTop, rearTop, cabTop };
   return VEH_GEO[type];
 }

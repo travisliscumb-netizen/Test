@@ -942,7 +942,7 @@ class DoorSystem {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     const mesh = new THREE.Mesh(geo, this.mat); this.mat.vertexColors = true;
     mesh.position.set(d.x, d.y + d.h / 2, d.z); mesh.castShadow = true;
-    this.g.scene.add(mesh);
+    this.g.outdoor.add(mesh);
     const col = { x0: d.x - (ax ? d.w / 2 : thick), x1: d.x + (ax ? d.w / 2 : thick), z0: d.z - (ax ? thick : d.w / 2), z1: d.z + (ax ? thick : d.w / 2), y0: 0, y1: d.y + d.h, kind: 'door' };
     this.g.world.grid.add(col);
     const e = { d, mesh, col, open: 0, want: 0, sounded: false };

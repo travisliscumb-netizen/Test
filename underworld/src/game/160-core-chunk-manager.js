@@ -3,7 +3,7 @@
    ===================================================================== */
 class ChunkManager {
   constructor(game) {
-    this.game = game; this.world = game.world; this.scene = game.scene;
+    this.game = game; this.world = game.world; this.scene = game.outdoor;
     this.bldMat = makeBuildingMaterial();
     this.detMat = makePropMaterial(0.82, 0.05);
     this.wireMat = new THREE.LineBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.8 });
@@ -89,6 +89,8 @@ class ChunkManager {
       else if (d.kind === 'cylr') gd.add(TPL.cyl, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'cone') gd.add(TPL.cone, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'disc') gd.add(TPL.disc, M(d.x, d.y, d.z, d.sx, 1, d.sz, d.ry, rx, rz), d.color);
+      else if (d.kind === 'blob') gd.add(TPL.blob, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
+      else if (d.kind === 'fir') gd.add(TPL.fir, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
     }
     for (const f of b.fx) {
       if (f.type === 'crown') {

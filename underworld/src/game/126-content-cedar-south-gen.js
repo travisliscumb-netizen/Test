@@ -165,8 +165,13 @@ Object.assign(World.prototype, {
       if (tNoise(x / 70, z / 70, 51) < 0.05 || !clearOf(x, z, 4)) continue;
       const b = tileAt(x, z), y = gy(x, z), s = rng.range(0.85, 1.35), pine = rng.chance(0.55);
       this._det(b, 'cyl', x, y + 1.4 * s, z, 0.22 * s, 2.8 * s, 0x5a4330, null, { x, z, r: 0.35 * s, y0: y - 1, y1: y + 3 * s, kind: 'det' });
-      if (pine) this._det(b, 'cone', x, y + 4.2 * s, z, 2.2 * s, 4.6 * s, 2.2 * s, C(0x2f5a32));
-      else this._det(b, 'box', x, y + 3.6 * s, z, 3.4 * s, 2.6 * s, 3.4 * s, C(0x4a7a3a), rng.range(0, 1.5));
+      // firs in tiers of boughs, broadleaves as a canopy of leaf clumps (G3; they were a cone and a box)
+      if (pine) [[2.2, 2.3, 2.6, 0x264a2c], [1.75, 2.0, 4.1, 0x2c5232], [1.25, 1.8, 5.4, 0x325b37], [0.7, 1.4, 6.5, 0x3a643c]].forEach(([r, h, yy, c], i) => this._det(b, 'fir', x, y + yy * s, z, r * s, h * s, r * s, C(c), i * 0.8 + x));
+      else {
+        const ry0 = rng.range(0, 6);
+        this._det(b, 'blob', x, y + 3.7 * s, z, 2.1 * s, 1.7 * s, 2.1 * s, C(0x3e6a2e), ry0);
+        for (let q = 0; q < 4; q++) { const a = ry0 + q * 1.57 + rng.range(-0.3, 0.3); this._det(b, 'blob', x + Math.cos(a) * 1.3 * s, y + (3.2 + rng.range(0, 1.2)) * s, z + Math.sin(a) * 1.3 * s, 1.3 * s, 1.1 * s, 1.3 * s, C([0x4a7a3a, 0x3a6630, 0x54843f, 0x456f35][q]), a); }
+      }
       cf.trees++;
     }
     cf.rocks = 0;

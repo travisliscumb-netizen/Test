@@ -36,7 +36,7 @@ class EntranceDressing {
     }
     this.build();
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
-    ring.rotation.x = -Math.PI / 2; ring.renderOrder = 2; ring.visible = false; g.scene.add(ring); this.ring = ring;
+    ring.rotation.x = -Math.PI / 2; ring.renderOrder = 2; ring.visible = false; g.outdoor.add(ring); this.ring = ring;
   }
   build() {
     const g = this.g, grid = g.world.grid, gb = new GeoBuilder(), lb = new GeoBuilder();
@@ -79,16 +79,16 @@ class EntranceDressing {
       box(lb, 0, 0.16, 2.54, 0.3, 0.12, 0.14, 0xffffff);
     }
     this.mesh = new THREE.Mesh(gb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.05 }));
-    this.mesh.receiveShadow = true; this.mesh.frustumCulled = false; g.scene.add(this.mesh);
+    this.mesh.receiveShadow = true; this.mesh.frustumCulled = false; g.outdoor.add(this.mesh);
     this.lampMat = new THREE.MeshStandardMaterial({ color: 0xfff1d6, emissive: 0xffc070, emissiveIntensity: 0.4, roughness: 0.4 });
-    this.lamps = new THREE.Mesh(lb.build(), this.lampMat); this.lamps.frustumCulled = false; g.scene.add(this.lamps);
+    this.lamps = new THREE.Mesh(lb.build(), this.lampMat); this.lamps.frustumCulled = false; g.outdoor.add(this.lamps);
     this.buildSigns();
   }
   // business name boards over every storefront: one 1024×1024 texture atlas (4×21 slots), and two merged meshes,
   // plain boards and lit ones (a business you have improved lights its sign at night; level 3 gets a neon frame)
   buildSigns() {
     const g = this.g;
-    if (this.signMeshes) for (const m of this.signMeshes) { g.scene.remove(m); m.geometry.dispose(); }
+    if (this.signMeshes) for (const m of this.signMeshes) { g.outdoor.remove(m); m.geometry.dispose(); }
     this.signMeshes = [];
     if (!this.signs.length) return;
     if (!this.atlas) {
@@ -115,9 +115,9 @@ class EntranceDressing {
         idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
       }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
-      const m = new THREE.Mesh(geo, this.signMat[gi]); m.frustumCulled = false; g.scene.add(m); this.signMeshes.push(m);
+      const m = new THREE.Mesh(geo, this.signMat[gi]); m.frustumCulled = false; g.outdoor.add(m); this.signMeshes.push(m);
     });
-    if (!frames.empty) { const m = new THREE.Mesh(frames.build(), new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.9 })); m.frustumCulled = false; g.scene.add(m); this.signMeshes.push(m); }
+    if (!frames.empty) { const m = new THREE.Mesh(frames.build(), new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.9 })); m.frustumCulled = false; g.outdoor.add(m); this.signMeshes.push(m); }
   }
   refresh() { this.buildSigns(); }
   // the approach to a door: nothing parks in front of it, and on a car park or a forecourt a paved walk with

@@ -34634,7 +34634,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
     // low-lying haze thickens toward the ground and the water
     float hh = max(min(vFogWorld.y, cameraPosition.y), 0.0);
     float haze = (1.0 - exp(-vFogDepth * pvHaze)) * exp(-hh * 0.045);
-    fogFactor = clamp(fogFactor + haze * 0.55, 0.0, 1.0);
+    fogFactor = clamp(fogFactor + haze * 0.42, 0.0, 1.0);
     float sunAmt = pow(max(dot(fdir, pvSunDir), 0.0), 6.0) * (1.0 - pvNight);
     fogC = mix(fogColor, pvSunCol * 1.15, sunAmt * 0.45);
   #endif
@@ -34670,7 +34670,7 @@ function patchWorldVaryings(sh, extraAttribs = '') {
    styles: 0 glass 1 office 2 brick 3 stucco 4 industrial 5 siding 6 deco 7 apartment 8 parking 9 warehouse
    ground: 0 same as upper 1 shopfront 2 lobby 3 loading/garage doors                                   */
 function makeBuildingMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.55 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uTime = U.uTime; sh.uniforms.uCloudShadow = U.uCloudShadow;
@@ -34850,10 +34850,22 @@ function makeBuildingMaterial() {
           ao *= 1.0 - recessShadow * 0.25;
         } else if (n.y > 0.45) {
           if (n.y > 0.97) {
-            float g = pvn(vPW.xz * 3.0);
-            col = mix(vec3(0.3, 0.3, 0.31), base * 0.5, 0.2) * (0.78 + 0.32 * pvn(vPW.xz * 1.3)) * (0.9 + 0.2 * g);
-            col *= 1.0 - 0.25 * smoothstep(0.6, 0.85, pvn(vPW.xz * 0.35 + seed)); // tar patches
-            hgt += g * 0.01; rough = 0.95;
+            // roofs (G3): each building picks a covering from its seed (white membrane with welded seams, black
+            // tar, pale gravel, a planted green roof on the newer towers, or bare concrete in the building's tone)
+            float g = pvn(vPW.xz * 3.0), rk = pvh(vec2(seed * 1.7, 31.0)), wear = pvn(vPW.xz * 1.3);
+            vec3 rc;
+            if (rk < 0.3) { // membrane: light, with seams every 1.8 m
+              rc = vec3(0.7, 0.7, 0.68); float sm = abs(fract(vPW.x / 1.8 + seed) - 0.5); rc *= 1.0 - (1.0 - smoothstep(0.0, 0.02 + fwidth(vPW.x / 1.8), sm)) * 0.12; hgt -= (1.0 - smoothstep(0.0, 0.03, sm)) * 0.004;
+              rc *= 0.86 + 0.18 * wear; rough = 0.7;
+            } else if (rk < 0.55) { rc = vec3(0.16, 0.16, 0.17) * (0.85 + 0.3 * wear); rc += step(0.97, pvh(floor(vPW.xz * 6.0))) * 0.05; rough = 0.62; } // tar
+            else if (rk < 0.78) { rc = vec3(0.46, 0.44, 0.4) * (0.8 + 0.3 * g) * (0.88 + 0.2 * wear); hgt += g * 0.012; rough = 0.95; } // gravel
+            else if (rk < 0.86 && (style < 1.5 || style > 5.5 && style < 7.5)) { // a green roof
+              float tuft = pvn(vPW.xz * 2.2 + seed); rc = mix(vec3(0.2, 0.31, 0.12), vec3(0.34, 0.42, 0.17), tuft) * (0.85 + 0.25 * g); hgt += tuft * 0.02; rough = 0.95;
+              rc = mix(rc, vec3(0.5, 0.48, 0.44), (1.0 - smoothstep(0.0, 0.12, abs(fract(vPW.z / 6.0) - 0.5))) * 0.8); // stepping-stone paths
+            } else { rc = mix(base, vec3(0.55, 0.54, 0.51), 0.55) * (0.82 + 0.26 * wear); rough = 0.88; } // concrete
+            col = rc;
+            col *= 1.0 - 0.2 * smoothstep(0.62, 0.86, pvn(vPW.xz * 0.35 + seed)); // weathering patches
+            col *= 1.0 - 0.12 * step(0.985, pvh(floor(vPW.xz * 1.5) + seed)); // stains under old units
           } else {
             float tl = fract(vPW.y * 5.0);
             col = base * (0.78 + 0.22 * tl) * (0.9 + 0.2 * pvn(vPW.xz * 2.0));
@@ -34880,7 +34892,7 @@ function makeBuildingMaterial() {
 const BLVD = 6;
 function isBoulevard(axisIndex) { return axisIndex === BLVD; }
 function makeGroundMaterial(blockTex, roadTex, localTex) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime;
@@ -34902,10 +34914,10 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
           vec2 ci = floor(p / 80.0); vec2 l = p - ci * 80.0;
           float dx = min(min(abs(l.x - 5.3), abs(l.x - 74.7)), min(abs(l.x + 5.3), abs(l.x - 85.3)));
           float dz = min(min(abs(l.y - 16.0), abs(l.y - 40.0)), abs(l.y - 64.0));
-          float g1 = exp(-(dx*dx + dz*dz) / 42.0);
+          float g1 = exp(-(dx*dx + dz*dz) / 50.0);
           float dz2 = min(min(abs(l.y - 5.3), abs(l.y - 74.7)), min(abs(l.y + 5.3), abs(l.y - 85.3)));
           float dx2 = min(min(abs(l.x - 16.0), abs(l.x - 40.0)), abs(l.x - 64.0));
-          float g2 = exp(-(dx2*dx2 + dz2*dz2) / 42.0);
+          float g2 = exp(-(dx2*dx2 + dz2*dz2) / 50.0);
           return max(g1 * step(0.5, vO), g2 * step(0.5, hO));
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -35171,7 +35183,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
         diffuseColor.rgb = col;
         roughnessFactor = rough;
         float lp = lampPool(p, vOpen, hOpen) * uNight;
-        totalEmissiveRadiance += col * vec3(1.0, 0.72, 0.42) * lp * 0.75 + vec3(1.0, 0.7, 0.4) * lp * uWet * 0.06 * isRoad;
+        totalEmissiveRadiance += col * vec3(1.0, 0.72, 0.42) * lp * 1.25 + vec3(1.0, 0.72, 0.45) * lp * lp * (0.03 + uWet * 0.3) * (0.4 + 0.6 * isRoad);
         totalEmissiveRadiance += col * vec3(1.0, 0.8, 0.55) * spill * 0.55;
         #ifdef PV_HQ
           // rain ripples in standing water
@@ -35211,7 +35223,7 @@ function makeAOTexture(world) {
 
 /* ---------------- Foliage with wind sway (instanced) ---------------- */
 function makeFoliageMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.5 });
   atmos(m, sh => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind;
     sh.vertexShader = sh.vertexShader
@@ -35234,7 +35246,7 @@ function makeFoliageMaterial() {
 }
 // generic prop/detail material with atmosphere + cloud shadow
 function makePropMaterial(rough = 0.8, metal = 0.05) {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal, envMapIntensity: 0.65 });
   atmos(m);
   return m;
 }
@@ -35594,6 +35606,24 @@ function prismGeometry() {
   g.computeVertexNormals();
   return g;
 }
+// a lumpy clump of leaves: an icosphere pushed in and out by smooth position noise, its normals half way between
+// the facets and the sphere's, so a canopy of them reads soft but not blobby (G3)
+function blobGeometry(detail = 1) {
+  const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position;
+  const bump = (x, y, z) => 1 + 0.17 * Math.sin(3.1 * x + 1.7 * y + 0.4) * Math.cos(2.3 * z + 0.9 * x) + 0.09 * Math.sin(5.3 * y + 2.1 * z + 1.3) - 0.05 * Math.cos(4.1 * x - 3.7 * z);
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = bump(x, y, z); p.setXYZ(i, x * k, y * k * 0.92, z * k); }
+  g.computeVertexNormals();
+  const n = g.attributes.normal, v = new THREE.Vector3(), r = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { r.set(p.getX(i), p.getY(i), p.getZ(i)).normalize(); v.set(n.getX(i), n.getY(i), n.getZ(i)).multiplyScalar(0.45).addScaledVector(r, 0.55).normalize(); n.setXYZ(i, v.x, v.y, v.z); }
+  return g;
+}
+// one tier of a fir: a cone whose rim zig-zags in and out, so a stack of them looks like boughs (G3)
+function firTierGeometry() {
+  const g = new THREE.CylinderGeometry(0, 1, 1, 12, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i), x = p.getX(i), z = p.getZ(i); if (y < 0 && Math.hypot(x, z) > 0.5) { const a = Math.atan2(z, x), k = 0.8 + 0.2 * Math.round((Math.sin(a * 6) + 1) / 2); p.setXYZ(i, x * k, y - (1 - k) * 0.6, z * k); } }
+  g.computeVertexNormals();
+  return g;
+}
 const TPL = {};
 function initTemplates() {
   TPL.box = templateFrom(new THREE.BoxGeometry(1, 1, 1));
@@ -35605,6 +35635,8 @@ function initTemplates() {
   TPL.prism = templateFrom(prismGeometry());
   TPL.plane = templateFrom(new THREE.PlaneGeometry(1, 1));
   TPL.disc = templateFrom(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2));
+  TPL.blob = templateFrom(blobGeometry(1));
+  TPL.fir = templateFrom(firTierGeometry());
 }
 class GeoBuilder {
   constructor(opts = {}) {
@@ -35633,6 +35665,9 @@ class GeoBuilder {
   box(x, y, z, w, h, d, color, ry = 0, extra) { this.add(TPL.box, M(x, y, z, w, h, d, ry), color, extra); }
   cyl(x, y, z, r, h, color, extra, tpl = TPL.cyl) { this.add(tpl, M(x, y, z, r, h, r), color, extra); }
   get empty() { return this.n === 0; }
+  // bake shading into the vertex colours added since vertex `from`: fn(x, y, z) returns a multiplier (G3: canopy
+  // depth, leaf undersides, the dark foot of a wall)
+  shade(from, fn) { for (let i = from; i < this.n; i++) { const k = fn(this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2]); this.col[i * 3] *= k; this.col[i * 3 + 1] *= k; this.col[i * 3 + 2] *= k; } }
   build() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -38650,7 +38685,7 @@ class DoorSystem {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     const mesh = new THREE.Mesh(geo, this.mat); this.mat.vertexColors = true;
     mesh.position.set(d.x, d.y + d.h / 2, d.z); mesh.castShadow = true;
-    this.g.scene.add(mesh);
+    this.g.outdoor.add(mesh);
     const col = { x0: d.x - (ax ? d.w / 2 : thick), x1: d.x + (ax ? d.w / 2 : thick), z0: d.z - (ax ? thick : d.w / 2), z1: d.z + (ax ? thick : d.w / 2), y0: 0, y1: d.y + d.h, kind: 'door' };
     this.g.world.grid.add(col);
     const e = { d, mesh, col, open: 0, want: 0, sounded: false };
@@ -39264,8 +39299,13 @@ Object.assign(World.prototype, {
       if (tNoise(x / 70, z / 70, 51) < 0.05 || !clearOf(x, z, 4)) continue;
       const b = tileAt(x, z), y = gy(x, z), s = rng.range(0.85, 1.35), pine = rng.chance(0.55);
       this._det(b, 'cyl', x, y + 1.4 * s, z, 0.22 * s, 2.8 * s, 0x5a4330, null, { x, z, r: 0.35 * s, y0: y - 1, y1: y + 3 * s, kind: 'det' });
-      if (pine) this._det(b, 'cone', x, y + 4.2 * s, z, 2.2 * s, 4.6 * s, 2.2 * s, C(0x2f5a32));
-      else this._det(b, 'box', x, y + 3.6 * s, z, 3.4 * s, 2.6 * s, 3.4 * s, C(0x4a7a3a), rng.range(0, 1.5));
+      // firs in tiers of boughs, broadleaves as a canopy of leaf clumps (G3; they were a cone and a box)
+      if (pine) [[2.2, 2.3, 2.6, 0x264a2c], [1.75, 2.0, 4.1, 0x2c5232], [1.25, 1.8, 5.4, 0x325b37], [0.7, 1.4, 6.5, 0x3a643c]].forEach(([r, h, yy, c], i) => this._det(b, 'fir', x, y + yy * s, z, r * s, h * s, r * s, C(c), i * 0.8 + x));
+      else {
+        const ry0 = rng.range(0, 6);
+        this._det(b, 'blob', x, y + 3.7 * s, z, 2.1 * s, 1.7 * s, 2.1 * s, C(0x3e6a2e), ry0);
+        for (let q = 0; q < 4; q++) { const a = ry0 + q * 1.57 + rng.range(-0.3, 0.3); this._det(b, 'blob', x + Math.cos(a) * 1.3 * s, y + (3.2 + rng.range(0, 1.2)) * s, z + Math.sin(a) * 1.3 * s, 1.3 * s, 1.1 * s, 1.3 * s, C([0x4a7a3a, 0x3a6630, 0x54843f, 0x456f35][q]), a); }
+      }
       cf.trees++;
     }
     cf.rocks = 0;
@@ -39972,6 +40012,24 @@ function kerbSpot(world, x, z) {
 /* =====================================================================
    [CONTENT] PROP DEFINITIONS (instanced street furniture)
    ===================================================================== */
+// a canopy of leaf clumps around (cx, cy, cz) with radii (rx, ry), shaded in the geometry: deeper and lower
+// clumps darker, the sunlit crown lighter, so a tree reads as a volume before any light touches it (G3)
+function canopy(g, cx, cy, cz, rx, ry, n, cols, seed) {
+  const rnd = mulberry32(seed), from = g.n;
+  g.add(TPL.blob, M(cx, cy, cz, rx * 0.78, ry * 0.8, rx * 0.78, rnd() * 6), C(cols[0]));
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2 + rnd() * 0.6, up = rnd() * 2 - 0.8, r = 0.62 + rnd() * 0.25, s = 0.48 + rnd() * 0.22;
+    g.add(TPL.blob, M(cx + Math.cos(a) * rx * r, cy + up * ry * 0.45, cz + Math.sin(a) * rx * r, rx * s, ry * s * 0.9, rx * s, rnd() * 6, rnd() * 0.6), C(cols[1 + (i % (cols.length - 1))]));
+  }
+  g.shade(from, (x, y, z) => { const dy = (y - cy) / ry, dr = Math.hypot(x - cx, z - cz) / rx; return clamp(0.62 + 0.3 * dy + 0.22 * dr, 0.45, 1.18); });
+}
+function trunk(g, h, r, bark, branches, seed) {
+  const rnd = mulberry32(seed);
+  g.add(TPL.cyl6, M(0, h * 0.35, 0, r, h * 0.7, r), bark);
+  g.add(TPL.cyl6, M(0, h * 0.82, 0, r * 0.72, h * 0.36, r * 0.72), bark);
+  g.add(TPL.cyl6, M(0, 0.12, 0, r * 1.5, 0.24, r * 1.5), bark); // root flare
+  for (let i = 0; i < branches; i++) { const a = i / branches * Math.PI * 2 + rnd(); g.add(TPL.cyl6, M(Math.cos(a) * 0.38, h * 0.78, Math.sin(a) * 0.38, r * 0.45, h * 0.42, r * 0.45, -a, 0, 0.75), bark); }
+}
 const PROP_DEFS = {
   lamp: { col: { r: 0.16, h: 7.5 }, glow: [[0, 7.2, 1.5, 0.22, 0.07, 0.42]], cast: true, breakable: true, breakSpeed: 15, mass: 400,
     build(g) { const c = C(0x2c3035); g.cyl(0, 3.75, 0, 0.09, 7.5, c); g.cyl(0, 0.3, 0, 0.16, 0.6, c); g.box(0, 7.45, 0.75, 0.1, 0.1, 1.6, c); g.box(0, 7.32, 1.5, 0.34, 0.16, 0.64, c); } },
@@ -39990,20 +40048,21 @@ const PROP_DEFS = {
     } },
   tree: { col: { r: 0.32, h: 4 }, cast: true, tint: true, foliage: true,
     build(g) {
-      g.add(TPL.cyl6, M(0, 1.3, 0, 0.16, 2.6, 0.16), C(0x4a3626));
-      const leaf = C(0x3f6b2a);
-      g.add(TPL.sphere, M(0, 3.6, 0, 1.9, 1.6, 1.9), leaf);
-      g.add(TPL.sphere, M(0.9, 3.1, 0.4, 1.2, 1.1, 1.2), C(0x4b7a30));
-      g.add(TPL.sphere, M(-0.7, 3.3, -0.6, 1.3, 1.1, 1.3), C(0x355f25));
-      g.add(TPL.sphere, M(0.1, 4.5, -0.2, 1.1, 1.0, 1.1), C(0x4f8034));
-    } },
+      trunk(g, 3.1, 0.17, C(0x4a3828), 3, 11);
+      canopy(g, 0, 4.05, 0, 2.15, 1.75, 7, [0x3a6326, 0x4b7a30, 0x355f25, 0x56853a, 0x416f2b], 7);
+    },
+    // past the near range (PropManager.cull): a trunk and three clumps in the same colours, a quarter of the triangles
+    lod(g) { g.add(TPL.cyl6, M(0, 1.6, 0, 0.17, 3.2, 0.17), C(0x4a3828)); canopy(g, 0, 4.05, 0, 2.15, 1.75, 2, [0x3a6326, 0x4b7a30, 0x416f2b], 7); } },
   pine: { col: { r: 0.3, h: 5 }, cast: true, tint: true, foliage: true,
     build(g) {
-      g.add(TPL.cyl6, M(0, 0.8, 0, 0.15, 1.6, 0.15), C(0x4a3626));
-      const c = C(0x2a4a2a);
-      g.add(TPL.cone, M(0, 2.2, 0, 1.8, 2.4, 1.8), c); g.add(TPL.cone, M(0, 3.6, 0, 1.4, 2.1, 1.4), C(0x2f5530)); g.add(TPL.cone, M(0, 4.8, 0, 0.9, 1.7, 0.9), C(0x356035));
-    } },
-  bush: { tint: true, foliage: true, build(g) { g.add(TPL.sphere, M(0, 0.5, 0, 1.0, 0.75, 1.0), C(0x3d6a2c)); g.add(TPL.sphere, M(0.6, 0.4, 0.3, 0.7, 0.55, 0.7), C(0x46782f)); } },
+      g.add(TPL.cyl6, M(0, 1.4, 0, 0.16, 2.8, 0.16), C(0x4a3626));
+      const from = g.n, tiers = [[1.9, 2.0, 2.0, 0x24432a], [1.62, 1.8, 3.15, 0x2a4c2e], [1.3, 1.6, 4.2, 0x2e5432], [0.95, 1.4, 5.1, 0x325a35], [0.55, 1.1, 5.9, 0x386238]];
+      tiers.forEach(([r, h, y, c], i) => g.add(TPL.fir, M(0, y, 0, r, h, r, i * 0.7), C(c)));
+      g.shade(from, (x, y, z) => clamp(0.7 + 0.12 * (y - 2.0) + 0.25 * Math.hypot(x, z) / 1.9, 0.55, 1.15));
+    },
+    lod(g) { g.add(TPL.cyl6, M(0, 1.4, 0, 0.16, 2.8, 0.16), C(0x4a3626)); const from = g.n; g.add(TPL.cone, M(0, 3.1, 0, 1.9, 3.6, 1.9), C(0x284a2e)); g.add(TPL.cone, M(0, 5.0, 0, 1.15, 2.4, 1.15), C(0x325a35)); g.shade(from, (x, y) => clamp(0.7 + 0.1 * (y - 2.0), 0.6, 1.1)); } },
+  bush: { tint: true, foliage: true, build(g) { const from = g.n; g.add(TPL.blob, M(0, 0.55, 0, 1.0, 0.72, 1.0), C(0x3d6a2c)); g.add(TPL.blob, M(0.62, 0.42, 0.3, 0.7, 0.55, 0.7, 1.3), C(0x46782f)); g.add(TPL.blob, M(-0.5, 0.4, -0.35, 0.65, 0.5, 0.65, 2.1), C(0x36602a)); g.shade(from, (x, y) => clamp(0.6 + y * 0.45, 0.5, 1.12)); },
+    lod(g) { g.add(TPL.blob, M(0.05, 0.5, 0, 1.25, 0.75, 1.15), C(0x3a6a2c)); } },
   bench: { col: { w: 1.8, d: 0.6, h: 0.9 }, breakable: true, breakSpeed: 9, mass: 80,
     build(g) { const w = C(0x7a5434), m = C(0x2b2f33); g.box(0, 0.45, 0, 1.8, 0.07, 0.5, w); g.box(0, 0.75, -0.22, 1.8, 0.4, 0.06, w); for (const x of [-0.75, 0.75]) { g.box(x, 0.22, 0, 0.07, 0.44, 0.45, m); g.box(x, 0.6, -0.22, 0.07, 0.6, 0.06, m); } } },
   bin: { col: { r: 0.3, h: 0.95 }, breakable: true, mass: 20,
@@ -40022,7 +40081,7 @@ const PROP_DEFS = {
   newsbox: { col: { r: 0.32, h: 1.05 }, breakable: true, mass: 25,
     build(g) { g.box(0, 0.55, 0, 0.5, 1.0, 0.45, C(0x1f4fa0)); g.box(0, 0.85, 0.23, 0.38, 0.25, 0.02, C(0xd8e0e8)); } },
   planter: { col: { w: 1.6, d: 1.6, h: 0.75 },
-    build(g) { g.box(0, 0.35, 0, 1.6, 0.7, 1.6, C(0x8a857c)); g.add(TPL.sphere, M(0, 0.95, 0, 0.75, 0.5, 0.75), C(0x3d6a2c)); } },
+    build(g) { g.box(0, 0.35, 0, 1.6, 0.7, 1.6, C(0x8a857c)); g.box(0, 0.71, 0, 1.66, 0.06, 1.66, C(0x9a958c)); g.box(0, 0.66, 0, 1.4, 0.06, 1.4, C(0x3a2c22)); const from = g.n; g.add(TPL.blob, M(0, 0.98, 0, 0.72, 0.42, 0.72), C(0x3d6a2c)); g.add(TPL.blob, M(0.3, 1.05, -0.2, 0.4, 0.3, 0.4, 1.1), C(0x4f8033)); g.shade(from, (x, y) => clamp(0.55 + (y - 0.7) * 1.2, 0.5, 1.12)); } },
   cone: { col: { r: 0.25, h: 0.7 }, breakable: true, mass: 3,
     build(g) { g.add(TPL.cone, M(0, 0.37, 0, 0.22, 0.7, 0.22), C(0xff6a14)); g.add(TPL.cyl6, M(0, 0.4, 0, 0.13, 0.1, 0.13), C(0xf2f2f2)); g.box(0, 0.025, 0, 0.5, 0.05, 0.5, C(0x222222)); } },
   barrier: { col: { w: 2.0, d: 0.6, h: 0.85 }, breakable: true, mass: 120,
@@ -40058,12 +40117,12 @@ const PROP_DEFS = {
    ===================================================================== */
 class PropManager {
   constructor(game) {
-    this.game = game; this.world = game.world; this.scene = game.scene;
+    this.game = game; this.world = game.world; this.scene = game.outdoor;
     this.mat = makePropMaterial(0.8, 0.05);
     this.folMat = makeFoliageMaterial();
     this.glowMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
     this.bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    this.meshes = {}; this.glows = {}; this.geos = {};
+    this.meshes = {}; this.glows = {}; this.geos = {}; this.far = {}; this.act = {}; this._cullAt = new THREE.Vector3(1e9, 0, 0); this._cullDir = new THREE.Vector3(); this._cullT = 0; this._sph = new THREE.Sphere(); this.nearR = 70;
     this.active = new Set(); this.dirty = true;
     this.byType = {};
     for (const t in PROP_DEFS) {
@@ -40077,6 +40136,14 @@ class PropManager {
       im.count = 0; im.frustumCulled = false; im.castShadow = !!PROP_DEFS[t].cast; im.receiveShadow = true;
       if (PROP_DEFS[t].tint) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3); }
       this.scene.add(im); this.meshes[t] = im;
+      // foliage has a far version (G3): cull() splits the active instances between the two, and skips the unseen
+      if (PROP_DEFS[t].lod) {
+        const lg = new GeoBuilder(); PROP_DEFS[t].lod(lg);
+        const fm = new THREE.InstancedMesh(lg.build(), PROP_DEFS[t].foliage ? this.folMat : this.mat, list.length);
+        fm.count = 0; fm.frustumCulled = false; fm.castShadow = !!PROP_DEFS[t].cast; fm.receiveShadow = true;
+        fm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3);
+        this.scene.add(fm); this.far[t] = fm; this.act[t] = [];
+      }
       if (PROP_DEFS[t].glow) {
         const gg = new GeoBuilder();
         for (const [x, y, z, sx, sy, sz] of PROP_DEFS[t].glow) gg.add(TPL.sphere0, M(x, y, z, sx, sy, sz), C(0xffffff));
@@ -40108,6 +40175,11 @@ class PropManager {
     for (const t in this.meshes) {
       const im = this.meshes[t], list = this.byType[t]; let n = 0;
       const gm = this.glows[t];
+      if (this.far[t]) { // foliage: collect the active instances; cull() places them
+        const A = this.act[t]; A.length = 0;
+        for (const p of list) if (!p.broken && promoOK(p)) { const h = hash2i(p.id, 3, 9); A.push({ x: p.x, z: p.z, ry: p.ry, s: p.s, r: 0.8 + h * 0.4, g: 0.85 + hash2i(p.id, 4, 9) * 0.3, b: 0.75 + h * 0.3 }); }
+        this._cullT = 0; continue;
+      }
       for (const p of list) {
         if (p.broken || !promoOK(p)) continue;
         M(p.x, CURB_H, p.z, p.s, p.s, p.s, p.ry);
@@ -40128,6 +40200,29 @@ class PropManager {
     this.bulbTimer = 0;
   }
   markDirty() { this.dirty = true; }
+  // foliage LOD and culling (G3): every instance in the active blocks used to be drawn at full detail in every
+  // direction (a park view reached 1.2M triangles). Near ones (nearR) get the full tree, farther ones the cheap
+  // version, and ones outside the view are skipped, except within 18 m, whose shadows can still fall into view.
+  // Re-sorted five times a second, or at once when the camera moves 6 m or turns.
+  cull(camera, frustum, dt) {
+    this._cullT -= dt;
+    camera.getWorldDirection(this._cullDir);
+    const moved = camera.position.distanceToSquared(this._cullAt) > 36 || this._cullDir.dot(this._lastDir || this._cullDir) < 0.97;
+    if (this._cullT > 0 && !moved) return;
+    this._cullT = 0.2; this._cullAt.copy(camera.position); this._lastDir = (this._lastDir || new THREE.Vector3()).copy(this._cullDir);
+    const cx = camera.position.x, cz = camera.position.z, nr2 = this.nearR * this.nearR, sph = this._sph, col = this._c;
+    for (const t in this.far) {
+      const im = this.meshes[t], fm = this.far[t]; let n = 0, f = 0;
+      for (const a of this.act[t]) {
+        const d2 = (a.x - cx) * (a.x - cx) + (a.z - cz) * (a.z - cz);
+        if (d2 > 18 * 18) { sph.center.set(a.x, 3.5 * a.s, a.z); sph.radius = 5 * a.s; if (!frustum.intersectsSphere(sph)) continue; }
+        M(a.x, CURB_H, a.z, a.s, a.s, a.s, a.ry); col.setRGB(a.r, a.g, a.b);
+        if (d2 < nr2) { im.setMatrixAt(n, _m4); im.setColorAt(n, col); n++; } else { fm.setMatrixAt(f, _m4); fm.setColorAt(f, col); f++; }
+      }
+      im.count = n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      fm.count = f; fm.instanceMatrix.needsUpdate = true; fm.instanceColor.needsUpdate = true;
+    }
+  }
   update(dt, night) {
     this.glowMat.color.setRGB(1, 0.82, 0.55).multiplyScalar(0.15 + night * 3.2);
     this.bulbTimer -= dt;
@@ -40177,7 +40272,7 @@ class PropManager {
    ===================================================================== */
 class ChunkManager {
   constructor(game) {
-    this.game = game; this.world = game.world; this.scene = game.scene;
+    this.game = game; this.world = game.world; this.scene = game.outdoor;
     this.bldMat = makeBuildingMaterial();
     this.detMat = makePropMaterial(0.82, 0.05);
     this.wireMat = new THREE.LineBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.8 });
@@ -40263,6 +40358,8 @@ class ChunkManager {
       else if (d.kind === 'cylr') gd.add(TPL.cyl, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'cone') gd.add(TPL.cone, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'disc') gd.add(TPL.disc, M(d.x, d.y, d.z, d.sx, 1, d.sz, d.ry, rx, rz), d.color);
+      else if (d.kind === 'blob') gd.add(TPL.blob, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
+      else if (d.kind === 'fir') gd.add(TPL.fir, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
     }
     for (const f of b.fx) {
       if (f.type === 'crown') {
@@ -40783,7 +40880,7 @@ function randomLook(rng = Math.random) {
   const fem = rng() < 0.45;
   const L = {
     skin: C(p(SKIN)), hair: C(p(HAIR)), shirt: C(p(SHIRT)), pants: C(p(PANTS)), shoes: C(p(SHOES)),
-    sleeve: rng() < 0.5, hairStyle: fem ? (rng() < 0.75 ? 2 : 3) : Math.floor(rng() * 4), scale: (fem ? 0.9 : 0.95) + rng() * 0.12, build: 0.88 + rng() * 0.28, cap: null,
+    sleeve: rng() < 0.5, hairStyle: fem ? [2, 2, 3, 4, 5, 5, 1][Math.floor(rng() * 7)] : [0, 1, 1, 1, 4, 1, 2][Math.floor(rng() * 7)], scale: (fem ? 0.9 : 0.95) + rng() * 0.12, build: 0.88 + rng() * 0.28, cap: null,
     shoulders: fem ? 0.9 : 1 + rng() * 0.08, hips: fem ? 1.1 : 0.96, jacket: null, skirt: null, shades: false, chain: null, tie: null, bandana: null, hood: null, belt: rng() < 0.5
   };
   if (rng() < 0.32) L.jacket = C(p(JACKETS));
@@ -40824,7 +40921,7 @@ class CharacterRenderer {
     footGeo.computeVertexNormals();
     const defs = {
       head: [new THREE.IcosahedronGeometry(1, 2), 1], hair: [new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.55), 1],
-      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 6],
+      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 14], eye: [new THREE.SphereGeometry(1, 8, 6), 4],
       hand: [handGeo, 2], foot: [footGeo, 2], joint: [new THREE.SphereGeometry(1, 10, 7), 4], skirt: [skirtGeo, 1],
       gun: [new THREE.BoxGeometry(1, 1, 1), 1], bat: [new THREE.CylinderGeometry(1, 0.7, 1, 6), 1], hat: [new THREE.CylinderGeometry(1, 1.05, 1, 12), 1],
       gold: [new THREE.BoxGeometry(1, 1, 1), 2]
@@ -40838,11 +40935,12 @@ class CharacterRenderer {
       else if (k === 'gold') mat = new THREE.MeshStandardMaterial({ roughness: 0.25, metalness: 0.9 });
       const im = new THREE.InstancedMesh(g, mat, max * per);
       if (k !== 'gun' && k !== 'bat') im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * per * 3), 3);
-      im.count = 0; im.frustumCulled = false; im.castShadow = k !== 'gold' && k !== 'small'; im.receiveShadow = false;
+      im.count = 0; im.frustumCulled = false; im.castShadow = k !== 'gold' && k !== 'small' && k !== 'eye'; im.receiveShadow = false;
       scene.add(im); this.m[k] = im;
     }
     this.n = {}; this._col = new THREE.Color(); this._white = new THREE.Color(1, 1, 1); this._dark = new THREE.Color(0x0c0c0e);
     this._lip = new THREE.Color(); this._shade = new THREE.Color(0x111214);
+    this._eyeW = new THREE.Color(0xe8e4dc); this._eyeP = new THREE.Color(0x1a1410); this._mouth = new THREE.Color();
     this.frustum = new THREE.Frustum(); this._sph = new THREE.Sphere(new THREE.Vector3(), 1.4);
     this.handR = new THREE.Matrix4();
   }
@@ -40931,10 +41029,17 @@ class CharacterRenderer {
       _cm[10].copy(hd).multiply(mS(_tm, 0.112, 0.14, 0.128));
       this._put('head', _cm[10], col(L.skin));
       if (!far) {
-        // nose and brow give the head a front
-        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.005, 0.12)).multiply(mS(_tm, 0.025, 0.04, 0.03));
+        // a face (G6): nose, ears, eyes (white and pupil), brows in the hair colour and a mouth; shades cover the eyes
+        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.005, 0.122)).multiply(mS(_tm, 0.024, 0.042, 0.032));
         this._put('small', _cm[10], col(L.skin));
+        for (const ex of [-1, 1]) { _cm[10].copy(hd).multiply(mT(_tm, ex * 0.108, 0.0, -0.005)).multiply(mS(_tm, 0.018, 0.04, 0.03)); this._put('small', _cm[10], col(L.skin)); }
         if (L.shades) { _cm[10].copy(hd).multiply(mT(_tm, 0, 0.03, 0.115)).multiply(mS(_tm, 0.2, 0.04, 0.02)); this._put('small', _cm[10], col(this._shade)); }
+        else for (const ex of [-1, 1]) {
+          _cm[10].copy(hd).multiply(mT(_tm, ex * 0.043, 0.03, 0.103)).multiply(mS(_tm, 0.019, 0.013, 0.012)); this._put('eye', _cm[10], col(this._eyeW));
+          _cm[10].copy(hd).multiply(mT(_tm, ex * 0.043, 0.03, 0.113)).multiply(mS(_tm, 0.009, 0.01, 0.006)); this._put('eye', _cm[10], col(this._eyeP));
+          _cm[10].copy(hd).multiply(mT(_tm, ex * 0.045, 0.058, 0.108)).multiply(mRz(_tm, ex * -0.12)).multiply(mS(_tm, 0.034, 0.008, 0.012)); this._put('small', _cm[10], col(L.hairStyle === 0 ? this._lip.copy(L.skin).multiplyScalar(0.55) : L.hair));
+        }
+        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.058, 0.108)).multiply(mS(_tm, 0.036, 0.008, 0.01)); this._put('small', _cm[10], col(this._mouth.copy(L.skin).multiplyScalar(0.62)));
       }
       if (L.bandana) {
         _cm[11].copy(hd).multiply(mT(_tm, 0, 0.06, -0.005)).multiply(mS(_tm, 0.122, 0.07, 0.136));
@@ -40948,10 +41053,15 @@ class CharacterRenderer {
         _cm[11].copy(hd).multiply(mT(_tm, 0, 0.07, 0.1)).multiply(mS(_tm, 0.12, 0.02, 0.1));
         this._put('small', _cm[11], col(L.cap));
       } else if (L.hairStyle > 0) {
-        const long = L.hairStyle === 2, bun = L.hairStyle === 3;
-        _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.0 : 0.025, -0.012)).multiply(mS(_tm, 0.125, long ? 0.2 : 0.135, 0.14));
+        const long = L.hairStyle === 2, bun = L.hairStyle === 3, curly = L.hairStyle === 4, tail = L.hairStyle === 5;
+        _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.005 : 0.025, -0.012)).multiply(mS(_tm, curly ? 0.142 : 0.125, long ? 0.17 : curly ? 0.155 : 0.135, curly ? 0.155 : 0.14));
         this._put('hair', _cm[11], col(L.hair));
-        if (bun && !far) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.1, -0.1)).multiply(mS(_tm, 0.06, 0.06, 0.06)); this._put('joint', _cm[11], col(L.hair)); }
+        if (!far) {
+          if (bun) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.1, -0.1)).multiply(mS(_tm, 0.06, 0.06, 0.06)); this._put('joint', _cm[11], col(L.hair)); }
+          // long hair falls behind the shoulders; a ponytail hangs from the crown
+          if (long) { _cm[11].copy(hd).multiply(mT(_tm, 0, -0.1, -0.075)).multiply(mS(_tm, 0.24, 0.22, 0.07)); this._put('small', _cm[11], col(L.hair)); }
+          if (tail) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.0, -0.14)).multiply(mRx(_tm, 0.35)).multiply(mS(_tm, 0.05, 0.16, 0.05)); this._put('small', _cm[11], col(L.hair)); }
+        }
       }
     }
     // --- arms ---
@@ -41632,6 +41742,48 @@ function extrudeProfile(pts, width, bevel = 0.06, taper = 0) {
   return templateFrom(ng);
 }
 const VEH_GEO = {};
+// ---- body shaping (G5). The bodies are side profiles extruded straight across, so from above every car was a slab
+// with square corners and vertical flanks. This bends the whole mesh (lamps, bumpers and trim move with the panels
+// they sit on): the nose and tail round off in plan, the flanks tuck under below the sill and roll in above the
+// shoulder, and the hood and deck crown a little. Dimensions, wheel positions and physics are untouched.
+function shapeVehicle(geo, d) {
+  const p = geo.attributes.position, W2 = d.W / 2, L = d.zf - d.zr;
+  const rf = Math.min(0.75, L * 0.17), rr = Math.min(0.6, L * 0.13), sporty = d.sporty ? 1 : 0, boxy = d.boxy ? 1 : 0;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const tf = clamp((z - (d.zf - rf)) / rf, 0, 1), tr = clamp(((d.zr + rr) - z) / rr, 0, 1);
+    // plan: corners pulled in on a circular-ish curve; less on vans and trucks (square by nature)
+    const plan = 1 - (0.13 - 0.07 * boxy + 0.03 * sporty) * tf * tf - (0.09 - 0.05 * boxy) * tr * tr;
+    // section: tuck under below the sill, roll in above the shoulder (the glasshouse already tapers on its own)
+    const tuck = clamp((d.yb + 0.22 - y) / 0.22, 0, 1), sh = clamp((y - (d.belt - 0.16)) / 0.16, 0, 1) * (y < d.belt + 0.08 ? 1 : 0);
+    const sect = 1 - 0.07 * tuck * tuck - (0.035 - 0.02 * boxy) * sh;
+    x *= plan * sect;
+    // a crowned hood and deck: the middle of the top surfaces rises a few centimetres
+    if (Math.abs(x) < W2 && y > d.yb + 0.3 && y < d.belt + 0.06 && (z > d.cabF - 0.05 || z < d.cabR + 0.05)) y += 0.035 * (1 - Math.pow(x / W2, 2)) * (1 - tf * 0.6);
+    p.setXYZ(i, x, y, z);
+  }
+  p.needsUpdate = true;
+}
+// smooth shading across the facets of the paint and glass (crease angle in degrees): vertices that share a position
+// average the normals that face within the crease of their own, so curved panels catch light as one surface and
+// real edges stay sharp
+function creaseNormals(geo, parts, crease = 42) {
+  geo.computeVertexNormals();
+  const p = geo.attributes.position, n = geo.attributes.normal, pa = geo.attributes.aPart, cos = Math.cos(crease * Math.PI / 180);
+  const key = i => Math.round(p.getX(i) * 400) + ',' + Math.round(p.getY(i) * 400) + ',' + Math.round(p.getZ(i) * 400);
+  const groups = new Map();
+  for (let i = 0; i < p.count; i++) { if (pa && !parts.includes(pa.getX(i))) continue; const k = key(i); let a = groups.get(k); if (!a) groups.set(k, a = []); a.push(i); }
+  const out = new Float32Array(n.array), v = new THREE.Vector3(), w = new THREE.Vector3(), sum = new THREE.Vector3();
+  for (const a of groups.values()) {
+    if (a.length < 2) continue;
+    for (const i of a) {
+      v.fromBufferAttribute(n, i); sum.set(0, 0, 0);
+      for (const j of a) { w.fromBufferAttribute(n, j); if (v.dot(w) >= cos) sum.add(w); }
+      sum.normalize(); out[i * 3] = sum.x; out[i * 3 + 1] = sum.y; out[i * 3 + 2] = sum.z;
+    }
+  }
+  n.array.set(out); n.needsUpdate = true;
+}
 // height of the body's upper outline at a given z (used to keep wheel arches below the hood/deck)
 function profileTopAt(pts, z) {
   let best = 99;
@@ -41837,6 +41989,8 @@ function vehicleGeometry(type) {
     if (tier === 'rare' && s.profile === 'super' && !s.sideIntakes) for (const sx of [-1, 1]) g.box(sx * (W / 2 - 0.02), (yb + belt) / 2, -wb * 0.2, 0.05, 0.22, 0.5, null, 0, { part: 17 });
   }
   const geo = g.build();
+  const dims = { W, zf, zr, yb, belt, cabF, cabR, sporty: SPORTY_PROFILES.has(s.profile), boxy };
+  shapeVehicle(geo, dims); creaseNormals(geo, [0, 1, 10]);
   // LOD: body, cabin, lights and bumpers only, for cars far from the camera (traffic in the distance)
   const lg = new GeoBuilder({ part: true });
   lg.add(extrudeProfile(pr.body.slice(), W, 0.04), M(0, 0, 0), null, { part: 0 });
@@ -41847,7 +42001,7 @@ function vehicleGeometry(type) {
   if (s.taxi) lg.box(0, cabTop + 0.17, (cabF + cabR) / 2, 0.6, 0.22, 0.28, null, 0, { part: 9 });
   if (s.police) { lg.box(-0.32, cabTop + 0.18, (cabF + cabR) / 2 - 0.05, 0.5, 0.12, 0.26, null, 0, { part: 7 }); lg.box(0.32, cabTop + 0.18, (cabF + cabR) / 2 - 0.05, 0.5, 0.12, 0.26, null, 0, { part: 8 }); }
   if (s.profile === 'truck') lg.box(0, 1.9, -1.0, W - 0.05, 2.6, 5.2, null, 0, { part: 10 });
-  const lod = lg.build();
+  const lod = lg.build(); shapeVehicle(lod, dims); creaseNormals(lod, [0, 1, 10]);
   VEH_GEO[type] = { geo, lod, wheels: [[W / 2 - 0.16, wb / 2], [-(W / 2 - 0.16), wb / 2], [W / 2 - 0.16, -wb / 2], [-(W / 2 - 0.16), -wb / 2]], yb, zf, zr, frontTop, rearTop, cabTop };
   return VEH_GEO[type];
 }
@@ -42323,7 +42477,7 @@ class Vehicle {
    ===================================================================== */
 class VehicleManager {
   constructor(game) {
-    this.game = game; this.scene = game.scene;
+    this.game = game; this.scene = game.outdoor;
     this.physical = game.quality.level >= 2;
     this.list = []; this.pools = {};
     this.maxWheels = 4 * 140;
@@ -43923,7 +44077,7 @@ class PoliceManager {
     this.heliLight.position.set(0, -1, 0.5); g.add(this.heliLight); g.add(this.heliLight.target);
     g.visible = false;
     this.heli = { g, active: false, x: 0, z: 0, y: 60, vx: 0, vz: 0 };
-    this.g.scene.add(g);
+    this.g.outdoor.add(g);
   }
   get escapeTime() { return [0, 12, 16, 21, 26, 32][this.level] * (this.g.uw ? this.g.uw.cops.escapeMul() : 1); }
   get searchRadius() { return 35 + this.seenT * 5; }
@@ -44875,28 +45029,28 @@ class Environment {
     const grey = new THREE.Color().setScalar(0.5 * (1 - this.night * 0.9) * (1 - this.dark * 0.45) + 0.02);
     zen.lerp(grey, this.cloud * 0.7); hor.lerp(grey, this.cloud * 0.6 + this.fog * 0.3);
     U.uCloud.value = this.cloud; U.uCloudDark.value = this.dark;
-    const sunCol = U.uSunCol.value.setRGB(1, 0.96, 0.88).lerp(new THREE.Color(1, 0.55, 0.3), dusk);
+    const sunCol = U.uSunCol.value.setRGB(1, 0.93, 0.83).lerp(new THREE.Color(1, 0.55, 0.3), dusk);
     // lights
     const sunUp = sd.y > -0.02;
-    const sunI = sunUp ? 3.2 * Math.pow(clamp(sd.y + 0.02, 0, 1), 0.45) * (1 - this.cloud * 0.55) * (1 - this.dark * 0.3) : 0;
+    const sunI = sunUp ? 3.9 * Math.pow(clamp(sd.y + 0.02, 0, 1), 0.45) * (1 - this.cloud * 0.55) * (1 - this.dark * 0.3) : 0;
     const moonI = 0.35 * this.night * (1 - this.cloud * 0.6);
     if (sunI > moonI) { this.sun.color.copy(sunCol); this.sun.intensity = sunI; this._ld = sd; }
     else { this.sun.color.setRGB(0.55, 0.65, 1.0); this.sun.intensity = moonI; this._ld = U.uMoonDir.value; }
     this.hemi.color.copy(zen).lerp(new THREE.Color(1, 1, 1), 0.35 * (1 - this.night * 0.6));
     this.hemi.groundColor.setRGB(0.28, 0.25, 0.22).multiplyScalar(1 - this.night * 0.8);
-    this.hemi.intensity = lerp(0.95, 0.42, this.night) * (1 - this.dark * 0.2);
+    this.hemi.intensity = lerp(0.66, 0.34, this.night) * (1 - this.dark * 0.2) + this.dark * 0.12;
     if (this.flashT > 0) { this.flashT -= dt; this.hemi.intensity += 4 * Math.max(0, this.flashT) / 0.25; }
     // thunder in heavy rain
     if (this.rain > 0.85) { this.thunderT -= dt; if (this.thunderT <= 0) { this.thunderT = rand(12, 30); this.flashT = 0.25; setTimeout(() => g.audio.play('thunder'), 600 + Math.random() * 1500); } }
     // fog
     const fogC = U.uFogCol.value.copy(hor).lerp(new THREE.Color(0.55, 0.57, 0.6).multiplyScalar(1 - this.night * 0.85), this.fog * 0.5 + this.rain * 0.2);
-    const den = 0.0011 + this.fog * 0.0085 + this.rain * 0.0022 + this.night * 0.0004;
+    const den = 0.00075 + this.fog * 0.0085 + this.rain * 0.0024 + this.night * 0.0004;
     U.uFogDen.value = den;
     g.scene.fog.color.copy(fogC); g.scene.fog.density = den;
     U.uWet.value = this.wet; U.uRain.value = this.rain;
     U.uWind.value = 0.35 + this.rain * 0.9 + this.cloud * 0.3 + Math.sin(g.time * 0.05) * 0.15;
     U.uCloudShadow.value = clamp(this.cloud * 0.55 * (1 - this.night) * (1 - this.dark * 0.6), 0, 0.4);
-    U.uHaze.value = 0.0012 + this.fog * 0.004 + this.rain * 0.0015 + (1 - Math.abs(sd.y)) * 0.0008;
+    U.uHaze.value = 0.0007 + this.fog * 0.004 + this.rain * 0.0018 + (1 - Math.abs(sd.y)) * 0.0008;
     this.rainMesh.visible = this.rain > 0.02;
     g.renderer.toneMappingExposure = lerp(1.0, 1.08, this.night);
     this.gripMul = 1 - this.wet * 0.18;
@@ -47227,7 +47381,7 @@ class ContentManager {
     const halo = new THREE.MeshBasicMaterial({ map: makeRadialTexture('rgba(120,255,160,0.9)', 'rgba(120,255,160,0)', 64), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
     this.pkHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2).rotateX(-Math.PI / 2), halo, 30);
     this.pkHalo.count = 0; this.pkHalo.frustumCulled = false;
-    g.scene.add(this.pkMesh, this.pkHalo);
+    g.outdoor.add(this.pkMesh, this.pkHalo);
     this.pkNear = []; this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(); this._s = new THREE.Vector3(1, 1, 1); this._v = new THREE.Vector3();
   }
   _updatePackages(dt) {
@@ -50306,7 +50460,7 @@ class CashPickups {
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.1, 0.18), mat, 40);
     const bagMat = new THREE.MeshStandardMaterial({ color: 0x6a5a3a, emissive: 0x3a2a10, emissiveIntensity: 0.6, roughness: 0.8 });
     this.bags = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.3, 0.24), bagMat, 20);
-    for (const m of [this.mesh, this.bags]) { m.count = 0; m.frustumCulled = false; m.castShadow = true; g.scene.add(m); }
+    for (const m of [this.mesh, this.bags]) { m.count = 0; m.frustumCulled = false; m.castShadow = true; g.outdoor.add(m); }
     this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(); this._v = new THREE.Vector3(); this._s = new THREE.Vector3(1, 1, 1);
   }
   drop(x, z, cash, goods) {
@@ -50396,7 +50550,7 @@ class NeonSigns {
       groups[wi].forEach((m, i) => im.setMatrixAt(i, m));
       im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere();
       im.userData.flicker = rng() < 0.3; im.userData.ph = rng() * 10;
-      g.scene.add(im); this.meshes.push(im);
+      g.outdoor.add(im); this.meshes.push(im);
     }
   }
   update(night, t, inside) {
@@ -52943,7 +53097,7 @@ class CompoundSystem {
     const br = this.rival(id) || this.impound(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
     for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
-    for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+    for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.outdoor.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     R.group = R.gateGrp = R.wedgeGrp = null;
     R.cols = []; R.panels = []; R.gate = null; R.wedge = null; R.cams = []; R.lights = 0; R.posts = []; R.samples = null;
     R.sig = sig; R.dirty = false; R.t = t;
@@ -53028,7 +53182,7 @@ class CompoundSystem {
       if (A.kind === 'basic') { lk.box(0, Y + 0.08, 0, G.w, A.h - 0.1, 0.03, 0xaab2ba, gry, 'mesh'); lk.box(0, Y + A.h - 0.07, 0, G.w, 0.07, 0.07, 0x6a7076, gry); lk.box(0, Y + 0.05, 0, G.w, 0.07, 0.07, 0x6a7076, gry); for (const s of [-1, 0, 1]) lk.box(lat[0] * s * (hw - 0.05), Y, lat[1] * s * (hw - 0.05), 0.07, A.h, 0.07, 0x6a7076, gry); }
       else if (A.kind === 'motor') { lk.box(0, Y + 0.1, 0, G.w, 1.2, th, 0x5f676e, gry); lk.box(0, Y + 1.3, 0, G.w, A.h - 1.3, 0.04, 0x7c868e, gry, 'mesh'); lk.box(0, Y + A.h - 0.08, 0, G.w, 0.08, 0.12, 0x3a3f44, gry); }
       else { lk.box(0, Y + 0.08, 0, G.w, A.h - 0.08, th, A.kind === 'massive' ? 0x2f3439 : 0x3a3f46, gry); for (let i = 0; i < 4; i++) lk.box(lat[0] * (-hw + 1 + i * 2), Y + 0.5, lat[1] * (-hw + 1 + i * 2), 0.9, 0.18, th + 0.02, i % 2 ? 0x1a1c20 : 0xe8c04a, gry); }
-      const leaf = lk.build(); leaf.position.set(G.x, 0, G.z); g.scene.add(leaf); R.gateGrp = leaf;
+      const leaf = lk.build(); leaf.position.set(G.x, 0, G.z); g.outdoor.add(leaf); R.gateGrp = leaf;
       const gc = col(ns(G.side) ? { x0: G.x - hw, x1: G.x + hw, z0: G.z - th / 2 - 0.1, z1: G.z + th / 2 + 0.1, y0: 0, y1: Y + A.h, kind: 'gate' } : { x0: G.x - th / 2 - 0.1, x1: G.x + th / 2 + 0.1, z0: G.z - hw, z1: G.z + hw, y0: 0, y1: Y + A.h, kind: 'gate' });
       gc.wh = id;
       const gst = br.gate ? br.gate.s : 'ok';
@@ -53050,7 +53204,7 @@ class CompoundSystem {
         const wk = new CompoundKit(), wx = G.x + gn[0] * 3.2, wz = G.z + gn[1] * 3.2, ww = G.w - 1.4;
         wk.box(0, Y, 0, ns(G.side) ? ww : 1.2, 0.9, ns(G.side) ? 1.2 : ww, 0x2a2d33);
         for (let i = 0; i < 5; i++) { const a = -ww / 2 + (i + 0.5) * ww / 5; wk.box(lat[0] * a, Y + 0.9, lat[1] * a, ns(G.side) ? ww / 5 - 0.1 : 1.22, 0.02, ns(G.side) ? 1.22 : ww / 5 - 0.1, i % 2 ? 0x1a1c20 : 0xe8c04a); }
-        const wg = wk.build(); wg.position.set(wx, 0, wz); g.scene.add(wg); R.wedgeGrp = wg;
+        const wg = wk.build(); wg.position.set(wx, 0, wz); g.outdoor.add(wg); R.wedgeGrp = wg;
         const wc = col(ns(G.side) ? { x0: wx - ww / 2, x1: wx + ww / 2, z0: wz - 0.6, z1: wz + 0.6, y0: 0, y1: Y + 0.95, kind: 'gate' } : { x0: wx - 0.6, x1: wx + 0.6, z0: wz - ww / 2, z1: wz + ww / 2, y0: 0, y1: Y + 0.95, kind: 'gate' });
         R.wedge = { down: 0, col: wc };
       }
@@ -53065,7 +53219,7 @@ class CompoundSystem {
       if (cm.dome) k.box(cm.x, cm.y + 0.1, cm.z, 0.3, 0.12, 0.3, 0x2a2d33);
     }
     R.lights = this.lights(C, t.surveillance, k, col);
-    const grp = k.build(); g.scene.add(grp); R.group = grp; R.boxes = k.n;
+    const grp = k.build(); g.outdoor.add(grp); R.group = grp; R.boxes = k.n;
     R.posts.push(...this.guardPosts(C));
     this.place(R);
   }
@@ -55007,7 +55161,7 @@ class CarWash {
     const grp = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: 0x2f7fd8 }), geo = new THREE.CylinderGeometry(0.45, 0.45, 2.2, 10);
     for (const s of [-1.6, 1.6]) { const m = new THREE.Mesh(geo, mat); m.position.set(s, 1.1, 0); grp.add(m); }
     const top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 3.0, 10), mat); top.rotation.z = Math.PI / 2; top.position.set(0, 2.1, 0); grp.add(top);
-    grp.visible = false; this.g.scene.add(grp);
+    grp.visible = false; this.g.outdoor.add(grp);
     return grp;
   }
   update(dt) {
@@ -57882,11 +58036,11 @@ class ShipmentSystem {
     const g = this.g; if (!g.scene || r.state !== 'landed') return;
     const k = new CompoundKit(), P = r.from, n = clamp(Math.ceil(units(r.cargo) / 30), 1, 8), h = this.importPoint().h || 0;
     for (let i = 0; i < n; i++) { const lx = (i % 4) * 1.3 - 1.95, lz = Math.floor(i / 4) * 1.3; k.box(P.x + lx * Math.cos(h) + lz * Math.sin(h), groundY(P.x, P.z), P.z - lx * Math.sin(h) + lz * Math.cos(h), 1.2, 1.1, 1.2, 0x6a5a3a, h); }
-    const grp = k.build(); g.scene.add(grp); this.crates.set(r.id, grp);
+    const grp = k.build(); g.outdoor.add(grp); this.crates.set(r.id, grp);
   }
   dropCrate(r) {
     const grp = this.crates.get(r.id); if (!grp) return;
-    this.g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    this.g.outdoor.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     this.crates.delete(r.id);
   }
   // ---------------------------------------------------------------- the van on the road
@@ -60726,7 +60880,7 @@ class EntranceDressing {
     }
     this.build();
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
-    ring.rotation.x = -Math.PI / 2; ring.renderOrder = 2; ring.visible = false; g.scene.add(ring); this.ring = ring;
+    ring.rotation.x = -Math.PI / 2; ring.renderOrder = 2; ring.visible = false; g.outdoor.add(ring); this.ring = ring;
   }
   build() {
     const g = this.g, grid = g.world.grid, gb = new GeoBuilder(), lb = new GeoBuilder();
@@ -60769,16 +60923,16 @@ class EntranceDressing {
       box(lb, 0, 0.16, 2.54, 0.3, 0.12, 0.14, 0xffffff);
     }
     this.mesh = new THREE.Mesh(gb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.05 }));
-    this.mesh.receiveShadow = true; this.mesh.frustumCulled = false; g.scene.add(this.mesh);
+    this.mesh.receiveShadow = true; this.mesh.frustumCulled = false; g.outdoor.add(this.mesh);
     this.lampMat = new THREE.MeshStandardMaterial({ color: 0xfff1d6, emissive: 0xffc070, emissiveIntensity: 0.4, roughness: 0.4 });
-    this.lamps = new THREE.Mesh(lb.build(), this.lampMat); this.lamps.frustumCulled = false; g.scene.add(this.lamps);
+    this.lamps = new THREE.Mesh(lb.build(), this.lampMat); this.lamps.frustumCulled = false; g.outdoor.add(this.lamps);
     this.buildSigns();
   }
   // business name boards over every storefront: one 1024×1024 texture atlas (4×21 slots), and two merged meshes,
   // plain boards and lit ones (a business you have improved lights its sign at night; level 3 gets a neon frame)
   buildSigns() {
     const g = this.g;
-    if (this.signMeshes) for (const m of this.signMeshes) { g.scene.remove(m); m.geometry.dispose(); }
+    if (this.signMeshes) for (const m of this.signMeshes) { g.outdoor.remove(m); m.geometry.dispose(); }
     this.signMeshes = [];
     if (!this.signs.length) return;
     if (!this.atlas) {
@@ -60805,9 +60959,9 @@ class EntranceDressing {
         idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
       }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
-      const m = new THREE.Mesh(geo, this.signMat[gi]); m.frustumCulled = false; g.scene.add(m); this.signMeshes.push(m);
+      const m = new THREE.Mesh(geo, this.signMat[gi]); m.frustumCulled = false; g.outdoor.add(m); this.signMeshes.push(m);
     });
-    if (!frames.empty) { const m = new THREE.Mesh(frames.build(), new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.9 })); m.frustumCulled = false; g.scene.add(m); this.signMeshes.push(m); }
+    if (!frames.empty) { const m = new THREE.Mesh(frames.build(), new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.9 })); m.frustumCulled = false; g.outdoor.add(m); this.signMeshes.push(m); }
   }
   refresh() { this.buildSigns(); }
   // the approach to a door: nothing parks in front of it, and on a car park or a forecourt a paved walk with
@@ -62261,7 +62415,7 @@ class QualityManager {
    [CORE] POST-PROCESSING: colour grade + vignette + grain
    ===================================================================== */
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uTime: { value: 0 }, uNight: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.17 }, uCon: { value: 1.1 }, uTime: { value: 0 }, uNight: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig; uniform float uSat; uniform float uCon; uniform float uTime; uniform float uNight; varying vec2 vUv;
     void main(){
@@ -62300,6 +62454,10 @@ class Game {
     this.renderer.info.autoReset = false;
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x9fb0c0, 0.002);
+    // everything that belongs to the open city (ground, buildings, props, scenery, vehicles, street dressing) lives
+    // under one group, so an interior can switch the whole outdoors off: interiors are built 60 m under their door,
+    // and without this the city above stayed in the view frustum and was drawn behind the walls (G2)
+    this.outdoor = new THREE.Group(); this.outdoor.name = 'outdoor'; this.scene.add(this.outdoor); this._indoor = false;
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.15, 3000);
     this.time = 0; this.frame = 0; this.state = 'loading'; this.focus = new THREE.Vector3(6.5 * P, 0, 5 * P);
     this.debug = { open: false, god: false, col: false };
@@ -62319,9 +62477,9 @@ class Game {
     defineHomeProps(this.world);
     for (const id of this.world.homeProps) { const d = PROP_BY_ID[id], h = d.home && this.world.homes.find(x => x.id === d.home); if (h && h.garageRect) hollowGarage(this.world, h, id); }
     progress(0.3, 'Pouring concrete'); await nextFrame();
-    this.scenery = buildStaticScenery(this.scene, this.world);
-    this.vpScene = new ValenPointScenery(this.scene, this.world);
-    this.cfsScene = new CedarScenery(this.scene, this.world, this.scenery.gmat);
+    this.scenery = buildStaticScenery(this.outdoor, this.world);
+    this.vpScene = new ValenPointScenery(this.outdoor, this.world);
+    this.cfsScene = new CedarScenery(this.outdoor, this.world, this.scenery.gmat);
     this.env = new Environment(this);
     this.chunks = new ChunkManager(this);
     this.props = new PropManager(this);
@@ -62934,6 +63092,7 @@ class Game {
     this.camera.updateMatrixWorld();
     this._pm.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this._pm);
+    this.props.cull(this.camera, this.frustum, rdt);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
     if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
@@ -63006,24 +63165,29 @@ class Game {
   }
   render(dt, rdt) {
     const p = this.player, r = this.renderer;
+    // indoors (G2): an interior with no view of the city (all but the penthouse) switches the outdoors off, and the
+    // sun's shadow pass with it (no sun reaches 60 m under the street; its map was still redrawn every frame). The
+    // shadow map keeps its last content while paused, and no program changes, so stepping inside never recompiles.
+    const indoor = !!(p.interior && !(p.interior.def && p.interior.def.realView)) && this.state !== 'menu';
+    if (indoor !== this._indoor) { this._indoor = indoor; this.outdoor.visible = !indoor; r.shadowMap.autoUpdate = !indoor; r.shadowMap.needsUpdate = true; }
     this.scenery.sky.position.copy(this.camera.position);
     // characters
     const cr = this.chars; cr.begin(this.camera);
     const showPlayer = this.state !== 'menu' && this.state !== 'loading' && p.state !== 'vehicle';
     if (showPlayer) cr.draw(p.char, { wantHand: true, noHead: this.cam.mode === 2 && p.state === 'foot', force: true });
-    this.peds.draw(cr);
+    if (!indoor) this.peds.draw(cr);
     for (const c of this.missions.contacts) if ((c.marker.g.visible || this.state === 'menu' && !c.interior) || (c.interior && p.interior && p.interior.id === c.interior)) { c.ch.pose.phase += rdt; c.ch.pose.phone = !c.interior && Math.sin(this.time * 0.3 + c.x) > 0.3; cr.draw(c.ch); }
     this.content.drawChars(cr); this.campaign.drawChars(cr);
     cr.end();
     this.vehicles.render(dt, this.env.night, this.time, this.camera);
     // contact shadows ground everything that moves
     const bl = this.blobs, cp = this.camera.position; bl.begin();
-    for (const v of this.vehicles.list) {
+    if (!indoor) for (const v of this.vehicles.list) {
       if (!v.mesh.visible || dist2(v.pos.x, v.pos.z, cp.x, cp.z) > 130 * 130) continue;
       const gy = groundY(v.pos.x, v.pos.z), hgt = Math.max(0, v.pos.y - gy), k = 1 + hgt * 0.15;
       bl.add(v.pos.x, gy, v.pos.z, v.spec.w * 1.3 * k, v.spec.l * 1.12 * k, v.h);
     }
-    for (const c of this.peds.peds) if (dist2(c.x, c.z, cp.x, cp.z) < 70 * 70) bl.add(c.x, groundY(c.x, c.z), c.z, c.state === 'down' ? 1.5 : 0.9, c.state === 'down' ? 1.9 : 0.9, c.h);
+    if (!indoor) for (const c of this.peds.peds) if (dist2(c.x, c.z, cp.x, cp.z) < 70 * 70) bl.add(c.x, groundY(c.x, c.z), c.z, c.state === 'down' ? 1.5 : 0.9, c.state === 'down' ? 1.9 : 0.9, c.h);
     if (showPlayer && !this.player.interior) bl.add(this.player.pos.x, groundY(this.player.pos.x, this.player.pos.z), this.player.pos.z, 0.95, 0.95, 0);
     bl.end(this.env.night);
     r.info.reset();

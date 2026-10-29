@@ -22,7 +22,7 @@ class CashPickups {
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.1, 0.18), mat, 40);
     const bagMat = new THREE.MeshStandardMaterial({ color: 0x6a5a3a, emissive: 0x3a2a10, emissiveIntensity: 0.6, roughness: 0.8 });
     this.bags = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.3, 0.24), bagMat, 20);
-    for (const m of [this.mesh, this.bags]) { m.count = 0; m.frustumCulled = false; m.castShadow = true; g.scene.add(m); }
+    for (const m of [this.mesh, this.bags]) { m.count = 0; m.frustumCulled = false; m.castShadow = true; g.outdoor.add(m); }
     this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(); this._v = new THREE.Vector3(); this._s = new THREE.Vector3(1, 1, 1);
   }
   drop(x, z, cash, goods) {
@@ -112,7 +112,7 @@ class NeonSigns {
       groups[wi].forEach((m, i) => im.setMatrixAt(i, m));
       im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere();
       im.userData.flicker = rng() < 0.3; im.userData.ph = rng() * 10;
-      g.scene.add(im); this.meshes.push(im);
+      g.outdoor.add(im); this.meshes.push(im);
     }
   }
   update(night, t, inside) {

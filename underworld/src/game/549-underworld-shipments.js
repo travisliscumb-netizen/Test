@@ -333,11 +333,11 @@ class ShipmentSystem {
     const g = this.g; if (!g.scene || r.state !== 'landed') return;
     const k = new CompoundKit(), P = r.from, n = clamp(Math.ceil(units(r.cargo) / 30), 1, 8), h = this.importPoint().h || 0;
     for (let i = 0; i < n; i++) { const lx = (i % 4) * 1.3 - 1.95, lz = Math.floor(i / 4) * 1.3; k.box(P.x + lx * Math.cos(h) + lz * Math.sin(h), groundY(P.x, P.z), P.z - lx * Math.sin(h) + lz * Math.cos(h), 1.2, 1.1, 1.2, 0x6a5a3a, h); }
-    const grp = k.build(); g.scene.add(grp); this.crates.set(r.id, grp);
+    const grp = k.build(); g.outdoor.add(grp); this.crates.set(r.id, grp);
   }
   dropCrate(r) {
     const grp = this.crates.get(r.id); if (!grp) return;
-    this.g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    this.g.outdoor.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     this.crates.delete(r.id);
   }
   // ---------------------------------------------------------------- the van on the road

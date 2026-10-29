@@ -69,7 +69,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
     // low-lying haze thickens toward the ground and the water
     float hh = max(min(vFogWorld.y, cameraPosition.y), 0.0);
     float haze = (1.0 - exp(-vFogDepth * pvHaze)) * exp(-hh * 0.045);
-    fogFactor = clamp(fogFactor + haze * 0.55, 0.0, 1.0);
+    fogFactor = clamp(fogFactor + haze * 0.42, 0.0, 1.0);
     float sunAmt = pow(max(dot(fdir, pvSunDir), 0.0), 6.0) * (1.0 - pvNight);
     fogC = mix(fogColor, pvSunCol * 1.15, sunAmt * 0.45);
   #endif
@@ -105,7 +105,7 @@ function patchWorldVaryings(sh, extraAttribs = '') {
    styles: 0 glass 1 office 2 brick 3 stucco 4 industrial 5 siding 6 deco 7 apartment 8 parking 9 warehouse
    ground: 0 same as upper 1 shopfront 2 lobby 3 loading/garage doors                                   */
 function makeBuildingMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.55 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uTime = U.uTime; sh.uniforms.uCloudShadow = U.uCloudShadow;
@@ -285,10 +285,22 @@ function makeBuildingMaterial() {
           ao *= 1.0 - recessShadow * 0.25;
         } else if (n.y > 0.45) {
           if (n.y > 0.97) {
-            float g = pvn(vPW.xz * 3.0);
-            col = mix(vec3(0.3, 0.3, 0.31), base * 0.5, 0.2) * (0.78 + 0.32 * pvn(vPW.xz * 1.3)) * (0.9 + 0.2 * g);
-            col *= 1.0 - 0.25 * smoothstep(0.6, 0.85, pvn(vPW.xz * 0.35 + seed)); // tar patches
-            hgt += g * 0.01; rough = 0.95;
+            // roofs (G3): each building picks a covering from its seed (white membrane with welded seams, black
+            // tar, pale gravel, a planted green roof on the newer towers, or bare concrete in the building's tone)
+            float g = pvn(vPW.xz * 3.0), rk = pvh(vec2(seed * 1.7, 31.0)), wear = pvn(vPW.xz * 1.3);
+            vec3 rc;
+            if (rk < 0.3) { // membrane: light, with seams every 1.8 m
+              rc = vec3(0.7, 0.7, 0.68); float sm = abs(fract(vPW.x / 1.8 + seed) - 0.5); rc *= 1.0 - (1.0 - smoothstep(0.0, 0.02 + fwidth(vPW.x / 1.8), sm)) * 0.12; hgt -= (1.0 - smoothstep(0.0, 0.03, sm)) * 0.004;
+              rc *= 0.86 + 0.18 * wear; rough = 0.7;
+            } else if (rk < 0.55) { rc = vec3(0.16, 0.16, 0.17) * (0.85 + 0.3 * wear); rc += step(0.97, pvh(floor(vPW.xz * 6.0))) * 0.05; rough = 0.62; } // tar
+            else if (rk < 0.78) { rc = vec3(0.46, 0.44, 0.4) * (0.8 + 0.3 * g) * (0.88 + 0.2 * wear); hgt += g * 0.012; rough = 0.95; } // gravel
+            else if (rk < 0.86 && (style < 1.5 || style > 5.5 && style < 7.5)) { // a green roof
+              float tuft = pvn(vPW.xz * 2.2 + seed); rc = mix(vec3(0.2, 0.31, 0.12), vec3(0.34, 0.42, 0.17), tuft) * (0.85 + 0.25 * g); hgt += tuft * 0.02; rough = 0.95;
+              rc = mix(rc, vec3(0.5, 0.48, 0.44), (1.0 - smoothstep(0.0, 0.12, abs(fract(vPW.z / 6.0) - 0.5))) * 0.8); // stepping-stone paths
+            } else { rc = mix(base, vec3(0.55, 0.54, 0.51), 0.55) * (0.82 + 0.26 * wear); rough = 0.88; } // concrete
+            col = rc;
+            col *= 1.0 - 0.2 * smoothstep(0.62, 0.86, pvn(vPW.xz * 0.35 + seed)); // weathering patches
+            col *= 1.0 - 0.12 * step(0.985, pvh(floor(vPW.xz * 1.5) + seed)); // stains under old units
           } else {
             float tl = fract(vPW.y * 5.0);
             col = base * (0.78 + 0.22 * tl) * (0.9 + 0.2 * pvn(vPW.xz * 2.0));
@@ -315,7 +327,7 @@ function makeBuildingMaterial() {
 const BLVD = 6;
 function isBoulevard(axisIndex) { return axisIndex === BLVD; }
 function makeGroundMaterial(blockTex, roadTex, localTex) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime;
@@ -337,10 +349,10 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
           vec2 ci = floor(p / 80.0); vec2 l = p - ci * 80.0;
           float dx = min(min(abs(l.x - 5.3), abs(l.x - 74.7)), min(abs(l.x + 5.3), abs(l.x - 85.3)));
           float dz = min(min(abs(l.y - 16.0), abs(l.y - 40.0)), abs(l.y - 64.0));
-          float g1 = exp(-(dx*dx + dz*dz) / 42.0);
+          float g1 = exp(-(dx*dx + dz*dz) / 50.0);
           float dz2 = min(min(abs(l.y - 5.3), abs(l.y - 74.7)), min(abs(l.y + 5.3), abs(l.y - 85.3)));
           float dx2 = min(min(abs(l.x - 16.0), abs(l.x - 40.0)), abs(l.x - 64.0));
-          float g2 = exp(-(dx2*dx2 + dz2*dz2) / 42.0);
+          float g2 = exp(-(dx2*dx2 + dz2*dz2) / 50.0);
           return max(g1 * step(0.5, vO), g2 * step(0.5, hO));
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -606,7 +618,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
         diffuseColor.rgb = col;
         roughnessFactor = rough;
         float lp = lampPool(p, vOpen, hOpen) * uNight;
-        totalEmissiveRadiance += col * vec3(1.0, 0.72, 0.42) * lp * 0.75 + vec3(1.0, 0.7, 0.4) * lp * uWet * 0.06 * isRoad;
+        totalEmissiveRadiance += col * vec3(1.0, 0.72, 0.42) * lp * 1.25 + vec3(1.0, 0.72, 0.45) * lp * lp * (0.03 + uWet * 0.3) * (0.4 + 0.6 * isRoad);
         totalEmissiveRadiance += col * vec3(1.0, 0.8, 0.55) * spill * 0.55;
         #ifdef PV_HQ
           // rain ripples in standing water
@@ -646,7 +658,7 @@ function makeAOTexture(world) {
 
 /* ---------------- Foliage with wind sway (instanced) ---------------- */
 function makeFoliageMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.5 });
   atmos(m, sh => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind;
     sh.vertexShader = sh.vertexShader
@@ -669,7 +681,7 @@ function makeFoliageMaterial() {
 }
 // generic prop/detail material with atmosphere + cloud shadow
 function makePropMaterial(rough = 0.8, metal = 0.05) {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal, envMapIntensity: 0.65 });
   atmos(m);
   return m;
 }

@@ -74,28 +74,28 @@ class Environment {
     const grey = new THREE.Color().setScalar(0.5 * (1 - this.night * 0.9) * (1 - this.dark * 0.45) + 0.02);
     zen.lerp(grey, this.cloud * 0.7); hor.lerp(grey, this.cloud * 0.6 + this.fog * 0.3);
     U.uCloud.value = this.cloud; U.uCloudDark.value = this.dark;
-    const sunCol = U.uSunCol.value.setRGB(1, 0.96, 0.88).lerp(new THREE.Color(1, 0.55, 0.3), dusk);
+    const sunCol = U.uSunCol.value.setRGB(1, 0.93, 0.83).lerp(new THREE.Color(1, 0.55, 0.3), dusk);
     // lights
     const sunUp = sd.y > -0.02;
-    const sunI = sunUp ? 3.2 * Math.pow(clamp(sd.y + 0.02, 0, 1), 0.45) * (1 - this.cloud * 0.55) * (1 - this.dark * 0.3) : 0;
+    const sunI = sunUp ? 3.9 * Math.pow(clamp(sd.y + 0.02, 0, 1), 0.45) * (1 - this.cloud * 0.55) * (1 - this.dark * 0.3) : 0;
     const moonI = 0.35 * this.night * (1 - this.cloud * 0.6);
     if (sunI > moonI) { this.sun.color.copy(sunCol); this.sun.intensity = sunI; this._ld = sd; }
     else { this.sun.color.setRGB(0.55, 0.65, 1.0); this.sun.intensity = moonI; this._ld = U.uMoonDir.value; }
     this.hemi.color.copy(zen).lerp(new THREE.Color(1, 1, 1), 0.35 * (1 - this.night * 0.6));
     this.hemi.groundColor.setRGB(0.28, 0.25, 0.22).multiplyScalar(1 - this.night * 0.8);
-    this.hemi.intensity = lerp(0.95, 0.42, this.night) * (1 - this.dark * 0.2);
+    this.hemi.intensity = lerp(0.66, 0.34, this.night) * (1 - this.dark * 0.2) + this.dark * 0.12;
     if (this.flashT > 0) { this.flashT -= dt; this.hemi.intensity += 4 * Math.max(0, this.flashT) / 0.25; }
     // thunder in heavy rain
     if (this.rain > 0.85) { this.thunderT -= dt; if (this.thunderT <= 0) { this.thunderT = rand(12, 30); this.flashT = 0.25; setTimeout(() => g.audio.play('thunder'), 600 + Math.random() * 1500); } }
     // fog
     const fogC = U.uFogCol.value.copy(hor).lerp(new THREE.Color(0.55, 0.57, 0.6).multiplyScalar(1 - this.night * 0.85), this.fog * 0.5 + this.rain * 0.2);
-    const den = 0.0011 + this.fog * 0.0085 + this.rain * 0.0022 + this.night * 0.0004;
+    const den = 0.00075 + this.fog * 0.0085 + this.rain * 0.0024 + this.night * 0.0004;
     U.uFogDen.value = den;
     g.scene.fog.color.copy(fogC); g.scene.fog.density = den;
     U.uWet.value = this.wet; U.uRain.value = this.rain;
     U.uWind.value = 0.35 + this.rain * 0.9 + this.cloud * 0.3 + Math.sin(g.time * 0.05) * 0.15;
     U.uCloudShadow.value = clamp(this.cloud * 0.55 * (1 - this.night) * (1 - this.dark * 0.6), 0, 0.4);
-    U.uHaze.value = 0.0012 + this.fog * 0.004 + this.rain * 0.0015 + (1 - Math.abs(sd.y)) * 0.0008;
+    U.uHaze.value = 0.0007 + this.fog * 0.004 + this.rain * 0.0018 + (1 - Math.abs(sd.y)) * 0.0008;
     this.rainMesh.visible = this.rain > 0.02;
     g.renderer.toneMappingExposure = lerp(1.0, 1.08, this.night);
     this.gripMul = 1 - this.wet * 0.18;

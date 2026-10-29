@@ -147,7 +147,7 @@ class CompoundSystem {
     const br = this.rival(id) || this.impound(id) || this.uw.props.owned(id) ? this.breaches(id) : {};
     for (const key in br) if (br[key].tier !== (key === 'gate' ? t.access : t.perimeter)) delete br[key];
     for (const c of R.cols) grid.remove(c);
-    for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.scene.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+    for (const grp of [R.group, R.gateGrp, R.wedgeGrp]) if (grp) { g.outdoor.remove(grp); grp.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     R.group = R.gateGrp = R.wedgeGrp = null;
     R.cols = []; R.panels = []; R.gate = null; R.wedge = null; R.cams = []; R.lights = 0; R.posts = []; R.samples = null;
     R.sig = sig; R.dirty = false; R.t = t;
@@ -232,7 +232,7 @@ class CompoundSystem {
       if (A.kind === 'basic') { lk.box(0, Y + 0.08, 0, G.w, A.h - 0.1, 0.03, 0xaab2ba, gry, 'mesh'); lk.box(0, Y + A.h - 0.07, 0, G.w, 0.07, 0.07, 0x6a7076, gry); lk.box(0, Y + 0.05, 0, G.w, 0.07, 0.07, 0x6a7076, gry); for (const s of [-1, 0, 1]) lk.box(lat[0] * s * (hw - 0.05), Y, lat[1] * s * (hw - 0.05), 0.07, A.h, 0.07, 0x6a7076, gry); }
       else if (A.kind === 'motor') { lk.box(0, Y + 0.1, 0, G.w, 1.2, th, 0x5f676e, gry); lk.box(0, Y + 1.3, 0, G.w, A.h - 1.3, 0.04, 0x7c868e, gry, 'mesh'); lk.box(0, Y + A.h - 0.08, 0, G.w, 0.08, 0.12, 0x3a3f44, gry); }
       else { lk.box(0, Y + 0.08, 0, G.w, A.h - 0.08, th, A.kind === 'massive' ? 0x2f3439 : 0x3a3f46, gry); for (let i = 0; i < 4; i++) lk.box(lat[0] * (-hw + 1 + i * 2), Y + 0.5, lat[1] * (-hw + 1 + i * 2), 0.9, 0.18, th + 0.02, i % 2 ? 0x1a1c20 : 0xe8c04a, gry); }
-      const leaf = lk.build(); leaf.position.set(G.x, 0, G.z); g.scene.add(leaf); R.gateGrp = leaf;
+      const leaf = lk.build(); leaf.position.set(G.x, 0, G.z); g.outdoor.add(leaf); R.gateGrp = leaf;
       const gc = col(ns(G.side) ? { x0: G.x - hw, x1: G.x + hw, z0: G.z - th / 2 - 0.1, z1: G.z + th / 2 + 0.1, y0: 0, y1: Y + A.h, kind: 'gate' } : { x0: G.x - th / 2 - 0.1, x1: G.x + th / 2 + 0.1, z0: G.z - hw, z1: G.z + hw, y0: 0, y1: Y + A.h, kind: 'gate' });
       gc.wh = id;
       const gst = br.gate ? br.gate.s : 'ok';
@@ -254,7 +254,7 @@ class CompoundSystem {
         const wk = new CompoundKit(), wx = G.x + gn[0] * 3.2, wz = G.z + gn[1] * 3.2, ww = G.w - 1.4;
         wk.box(0, Y, 0, ns(G.side) ? ww : 1.2, 0.9, ns(G.side) ? 1.2 : ww, 0x2a2d33);
         for (let i = 0; i < 5; i++) { const a = -ww / 2 + (i + 0.5) * ww / 5; wk.box(lat[0] * a, Y + 0.9, lat[1] * a, ns(G.side) ? ww / 5 - 0.1 : 1.22, 0.02, ns(G.side) ? 1.22 : ww / 5 - 0.1, i % 2 ? 0x1a1c20 : 0xe8c04a); }
-        const wg = wk.build(); wg.position.set(wx, 0, wz); g.scene.add(wg); R.wedgeGrp = wg;
+        const wg = wk.build(); wg.position.set(wx, 0, wz); g.outdoor.add(wg); R.wedgeGrp = wg;
         const wc = col(ns(G.side) ? { x0: wx - ww / 2, x1: wx + ww / 2, z0: wz - 0.6, z1: wz + 0.6, y0: 0, y1: Y + 0.95, kind: 'gate' } : { x0: wx - 0.6, x1: wx + 0.6, z0: wz - ww / 2, z1: wz + ww / 2, y0: 0, y1: Y + 0.95, kind: 'gate' });
         R.wedge = { down: 0, col: wc };
       }
@@ -269,7 +269,7 @@ class CompoundSystem {
       if (cm.dome) k.box(cm.x, cm.y + 0.1, cm.z, 0.3, 0.12, 0.3, 0x2a2d33);
     }
     R.lights = this.lights(C, t.surveillance, k, col);
-    const grp = k.build(); g.scene.add(grp); R.group = grp; R.boxes = k.n;
+    const grp = k.build(); g.outdoor.add(grp); R.group = grp; R.boxes = k.n;
     R.posts.push(...this.guardPosts(C));
     this.place(R);
   }

@@ -2,7 +2,7 @@
    [CORE] POST-PROCESSING: colour grade + vignette + grain
    ===================================================================== */
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uTime: { value: 0 }, uNight: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.17 }, uCon: { value: 1.1 }, uTime: { value: 0 }, uNight: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig; uniform float uSat; uniform float uCon; uniform float uTime; uniform float uNight; varying vec2 vUv;
     void main(){

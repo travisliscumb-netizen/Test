@@ -212,7 +212,7 @@ class ContentManager {
     const halo = new THREE.MeshBasicMaterial({ map: makeRadialTexture('rgba(120,255,160,0.9)', 'rgba(120,255,160,0)', 64), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
     this.pkHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2).rotateX(-Math.PI / 2), halo, 30);
     this.pkHalo.count = 0; this.pkHalo.frustumCulled = false;
-    g.scene.add(this.pkMesh, this.pkHalo);
+    g.outdoor.add(this.pkMesh, this.pkHalo);
     this.pkNear = []; this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(); this._s = new THREE.Vector3(1, 1, 1); this._v = new THREE.Vector3();
   }
   _updatePackages(dt) {

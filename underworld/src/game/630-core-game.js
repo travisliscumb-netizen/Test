@@ -20,6 +20,10 @@ class Game {
     this.renderer.info.autoReset = false;
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x9fb0c0, 0.002);
+    // everything that belongs to the open city (ground, buildings, props, scenery, vehicles, street dressing) lives
+    // under one group, so an interior can switch the whole outdoors off: interiors are built 60 m under their door,
+    // and without this the city above stayed in the view frustum and was drawn behind the walls (G2)
+    this.outdoor = new THREE.Group(); this.outdoor.name = 'outdoor'; this.scene.add(this.outdoor); this._indoor = false;
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.15, 3000);
     this.time = 0; this.frame = 0; this.state = 'loading'; this.focus = new THREE.Vector3(6.5 * P, 0, 5 * P);
     this.debug = { open: false, god: false, col: false };
@@ -39,9 +43,9 @@ class Game {
     defineHomeProps(this.world);
     for (const id of this.world.homeProps) { const d = PROP_BY_ID[id], h = d.home && this.world.homes.find(x => x.id === d.home); if (h && h.garageRect) hollowGarage(this.world, h, id); }
     progress(0.3, 'Pouring concrete'); await nextFrame();
-    this.scenery = buildStaticScenery(this.scene, this.world);
-    this.vpScene = new ValenPointScenery(this.scene, this.world);
-    this.cfsScene = new CedarScenery(this.scene, this.world, this.scenery.gmat);
+    this.scenery = buildStaticScenery(this.outdoor, this.world);
+    this.vpScene = new ValenPointScenery(this.outdoor, this.world);
+    this.cfsScene = new CedarScenery(this.outdoor, this.world, this.scenery.gmat);
     this.env = new Environment(this);
     this.chunks = new ChunkManager(this);
     this.props = new PropManager(this);
@@ -654,6 +658,7 @@ class Game {
     this.camera.updateMatrixWorld();
     this._pm.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this._pm);
+    this.props.cull(this.camera, this.frustum, rdt);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
     if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
@@ -726,24 +731,29 @@ class Game {
   }
   render(dt, rdt) {
     const p = this.player, r = this.renderer;
+    // indoors (G2): an interior with no view of the city (all but the penthouse) switches the outdoors off, and the
+    // sun's shadow pass with it (no sun reaches 60 m under the street; its map was still redrawn every frame). The
+    // shadow map keeps its last content while paused, and no program changes, so stepping inside never recompiles.
+    const indoor = !!(p.interior && !(p.interior.def && p.interior.def.realView)) && this.state !== 'menu';
+    if (indoor !== this._indoor) { this._indoor = indoor; this.outdoor.visible = !indoor; r.shadowMap.autoUpdate = !indoor; r.shadowMap.needsUpdate = true; }
     this.scenery.sky.position.copy(this.camera.position);
     // characters
     const cr = this.chars; cr.begin(this.camera);
     const showPlayer = this.state !== 'menu' && this.state !== 'loading' && p.state !== 'vehicle';
     if (showPlayer) cr.draw(p.char, { wantHand: true, noHead: this.cam.mode === 2 && p.state === 'foot', force: true });
-    this.peds.draw(cr);
+    if (!indoor) this.peds.draw(cr);
     for (const c of this.missions.contacts) if ((c.marker.g.visible || this.state === 'menu' && !c.interior) || (c.interior && p.interior && p.interior.id === c.interior)) { c.ch.pose.phase += rdt; c.ch.pose.phone = !c.interior && Math.sin(this.time * 0.3 + c.x) > 0.3; cr.draw(c.ch); }
     this.content.drawChars(cr); this.campaign.drawChars(cr);
     cr.end();
     this.vehicles.render(dt, this.env.night, this.time, this.camera);
     // contact shadows ground everything that moves
     const bl = this.blobs, cp = this.camera.position; bl.begin();
-    for (const v of this.vehicles.list) {
+    if (!indoor) for (const v of this.vehicles.list) {
       if (!v.mesh.visible || dist2(v.pos.x, v.pos.z, cp.x, cp.z) > 130 * 130) continue;
       const gy = groundY(v.pos.x, v.pos.z), hgt = Math.max(0, v.pos.y - gy), k = 1 + hgt * 0.15;
       bl.add(v.pos.x, gy, v.pos.z, v.spec.w * 1.3 * k, v.spec.l * 1.12 * k, v.h);
     }
-    for (const c of this.peds.peds) if (dist2(c.x, c.z, cp.x, cp.z) < 70 * 70) bl.add(c.x, groundY(c.x, c.z), c.z, c.state === 'down' ? 1.5 : 0.9, c.state === 'down' ? 1.9 : 0.9, c.h);
+    if (!indoor) for (const c of this.peds.peds) if (dist2(c.x, c.z, cp.x, cp.z) < 70 * 70) bl.add(c.x, groundY(c.x, c.z), c.z, c.state === 'down' ? 1.5 : 0.9, c.state === 'down' ? 1.9 : 0.9, c.h);
     if (showPlayer && !this.player.interior) bl.add(this.player.pos.x, groundY(this.player.pos.x, this.player.pos.z), this.player.pos.z, 0.95, 0.95, 0);
     bl.end(this.env.night);
     r.info.reset();

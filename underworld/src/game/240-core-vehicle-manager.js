@@ -3,7 +3,7 @@
    ===================================================================== */
 class VehicleManager {
   constructor(game) {
-    this.game = game; this.scene = game.scene;
+    this.game = game; this.scene = game.outdoor;
     this.physical = game.quality.level >= 2;
     this.list = []; this.pools = {};
     this.maxWheels = 4 * 140;

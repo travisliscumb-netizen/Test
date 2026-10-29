@@ -27,7 +27,7 @@ class PoliceManager {
     this.heliLight.position.set(0, -1, 0.5); g.add(this.heliLight); g.add(this.heliLight.target);
     g.visible = false;
     this.heli = { g, active: false, x: 0, z: 0, y: 60, vx: 0, vz: 0 };
-    this.g.scene.add(g);
+    this.g.outdoor.add(g);
   }
   get escapeTime() { return [0, 12, 16, 21, 26, 32][this.level] * (this.g.uw ? this.g.uw.cops.escapeMul() : 1); }
   get searchRadius() { return 35 + this.seenT * 5; }

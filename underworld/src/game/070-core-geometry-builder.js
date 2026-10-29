@@ -31,6 +31,24 @@ function prismGeometry() {
   g.computeVertexNormals();
   return g;
 }
+// a lumpy clump of leaves: an icosphere pushed in and out by smooth position noise, its normals half way between
+// the facets and the sphere's, so a canopy of them reads soft but not blobby (G3)
+function blobGeometry(detail = 1) {
+  const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position;
+  const bump = (x, y, z) => 1 + 0.17 * Math.sin(3.1 * x + 1.7 * y + 0.4) * Math.cos(2.3 * z + 0.9 * x) + 0.09 * Math.sin(5.3 * y + 2.1 * z + 1.3) - 0.05 * Math.cos(4.1 * x - 3.7 * z);
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = bump(x, y, z); p.setXYZ(i, x * k, y * k * 0.92, z * k); }
+  g.computeVertexNormals();
+  const n = g.attributes.normal, v = new THREE.Vector3(), r = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { r.set(p.getX(i), p.getY(i), p.getZ(i)).normalize(); v.set(n.getX(i), n.getY(i), n.getZ(i)).multiplyScalar(0.45).addScaledVector(r, 0.55).normalize(); n.setXYZ(i, v.x, v.y, v.z); }
+  return g;
+}
+// one tier of a fir: a cone whose rim zig-zags in and out, so a stack of them looks like boughs (G3)
+function firTierGeometry() {
+  const g = new THREE.CylinderGeometry(0, 1, 1, 12, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i), x = p.getX(i), z = p.getZ(i); if (y < 0 && Math.hypot(x, z) > 0.5) { const a = Math.atan2(z, x), k = 0.8 + 0.2 * Math.round((Math.sin(a * 6) + 1) / 2); p.setXYZ(i, x * k, y - (1 - k) * 0.6, z * k); } }
+  g.computeVertexNormals();
+  return g;
+}
 const TPL = {};
 function initTemplates() {
   TPL.box = templateFrom(new THREE.BoxGeometry(1, 1, 1));
@@ -42,6 +60,8 @@ function initTemplates() {
   TPL.prism = templateFrom(prismGeometry());
   TPL.plane = templateFrom(new THREE.PlaneGeometry(1, 1));
   TPL.disc = templateFrom(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2));
+  TPL.blob = templateFrom(blobGeometry(1));
+  TPL.fir = templateFrom(firTierGeometry());
 }
 class GeoBuilder {
   constructor(opts = {}) {
@@ -70,6 +90,9 @@ class GeoBuilder {
   box(x, y, z, w, h, d, color, ry = 0, extra) { this.add(TPL.box, M(x, y, z, w, h, d, ry), color, extra); }
   cyl(x, y, z, r, h, color, extra, tpl = TPL.cyl) { this.add(tpl, M(x, y, z, r, h, r), color, extra); }
   get empty() { return this.n === 0; }
+  // bake shading into the vertex colours added since vertex `from`: fn(x, y, z) returns a multiplier (G3: canopy
+  // depth, leaf undersides, the dark foot of a wall)
+  shade(from, fn) { for (let i = from; i < this.n; i++) { const k = fn(this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2]); this.col[i * 3] *= k; this.col[i * 3 + 1] *= k; this.col[i * 3 + 2] *= k; } }
   build() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));

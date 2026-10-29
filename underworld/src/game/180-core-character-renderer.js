@@ -15,7 +15,7 @@ function randomLook(rng = Math.random) {
   const fem = rng() < 0.45;
   const L = {
     skin: C(p(SKIN)), hair: C(p(HAIR)), shirt: C(p(SHIRT)), pants: C(p(PANTS)), shoes: C(p(SHOES)),
-    sleeve: rng() < 0.5, hairStyle: fem ? (rng() < 0.75 ? 2 : 3) : Math.floor(rng() * 4), scale: (fem ? 0.9 : 0.95) + rng() * 0.12, build: 0.88 + rng() * 0.28, cap: null,
+    sleeve: rng() < 0.5, hairStyle: fem ? [2, 2, 3, 4, 5, 5, 1][Math.floor(rng() * 7)] : [0, 1, 1, 1, 4, 1, 2][Math.floor(rng() * 7)], scale: (fem ? 0.9 : 0.95) + rng() * 0.12, build: 0.88 + rng() * 0.28, cap: null,
     shoulders: fem ? 0.9 : 1 + rng() * 0.08, hips: fem ? 1.1 : 0.96, jacket: null, skirt: null, shades: false, chain: null, tie: null, bandana: null, hood: null, belt: rng() < 0.5
   };
   if (rng() < 0.32) L.jacket = C(p(JACKETS));
@@ -56,7 +56,7 @@ class CharacterRenderer {
     footGeo.computeVertexNormals();
     const defs = {
       head: [new THREE.IcosahedronGeometry(1, 2), 1], hair: [new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.55), 1],
-      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 6],
+      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 14], eye: [new THREE.SphereGeometry(1, 8, 6), 4],
       hand: [handGeo, 2], foot: [footGeo, 2], joint: [new THREE.SphereGeometry(1, 10, 7), 4], skirt: [skirtGeo, 1],
       gun: [new THREE.BoxGeometry(1, 1, 1), 1], bat: [new THREE.CylinderGeometry(1, 0.7, 1, 6), 1], hat: [new THREE.CylinderGeometry(1, 1.05, 1, 12), 1],
       gold: [new THREE.BoxGeometry(1, 1, 1), 2]
@@ -70,11 +70,12 @@ class CharacterRenderer {
       else if (k === 'gold') mat = new THREE.MeshStandardMaterial({ roughness: 0.25, metalness: 0.9 });
       const im = new THREE.InstancedMesh(g, mat, max * per);
       if (k !== 'gun' && k !== 'bat') im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * per * 3), 3);
-      im.count = 0; im.frustumCulled = false; im.castShadow = k !== 'gold' && k !== 'small'; im.receiveShadow = false;
+      im.count = 0; im.frustumCulled = false; im.castShadow = k !== 'gold' && k !== 'small' && k !== 'eye'; im.receiveShadow = false;
       scene.add(im); this.m[k] = im;
     }
     this.n = {}; this._col = new THREE.Color(); this._white = new THREE.Color(1, 1, 1); this._dark = new THREE.Color(0x0c0c0e);
     this._lip = new THREE.Color(); this._shade = new THREE.Color(0x111214);
+    this._eyeW = new THREE.Color(0xe8e4dc); this._eyeP = new THREE.Color(0x1a1410); this._mouth = new THREE.Color();
     this.frustum = new THREE.Frustum(); this._sph = new THREE.Sphere(new THREE.Vector3(), 1.4);
     this.handR = new THREE.Matrix4();
   }
@@ -163,10 +164,17 @@ class CharacterRenderer {
       _cm[10].copy(hd).multiply(mS(_tm, 0.112, 0.14, 0.128));
       this._put('head', _cm[10], col(L.skin));
       if (!far) {
-        // nose and brow give the head a front
-        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.005, 0.12)).multiply(mS(_tm, 0.025, 0.04, 0.03));
+        // a face (G6): nose, ears, eyes (white and pupil), brows in the hair colour and a mouth; shades cover the eyes
+        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.005, 0.122)).multiply(mS(_tm, 0.024, 0.042, 0.032));
         this._put('small', _cm[10], col(L.skin));
+        for (const ex of [-1, 1]) { _cm[10].copy(hd).multiply(mT(_tm, ex * 0.108, 0.0, -0.005)).multiply(mS(_tm, 0.018, 0.04, 0.03)); this._put('small', _cm[10], col(L.skin)); }
         if (L.shades) { _cm[10].copy(hd).multiply(mT(_tm, 0, 0.03, 0.115)).multiply(mS(_tm, 0.2, 0.04, 0.02)); this._put('small', _cm[10], col(this._shade)); }
+        else for (const ex of [-1, 1]) {
+          _cm[10].copy(hd).multiply(mT(_tm, ex * 0.043, 0.03, 0.103)).multiply(mS(_tm, 0.019, 0.013, 0.012)); this._put('eye', _cm[10], col(this._eyeW));
+          _cm[10].copy(hd).multiply(mT(_tm, ex * 0.043, 0.03, 0.113)).multiply(mS(_tm, 0.009, 0.01, 0.006)); this._put('eye', _cm[10], col(this._eyeP));
+          _cm[10].copy(hd).multiply(mT(_tm, ex * 0.045, 0.058, 0.108)).multiply(mRz(_tm, ex * -0.12)).multiply(mS(_tm, 0.034, 0.008, 0.012)); this._put('small', _cm[10], col(L.hairStyle === 0 ? this._lip.copy(L.skin).multiplyScalar(0.55) : L.hair));
+        }
+        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.058, 0.108)).multiply(mS(_tm, 0.036, 0.008, 0.01)); this._put('small', _cm[10], col(this._mouth.copy(L.skin).multiplyScalar(0.62)));
       }
       if (L.bandana) {
         _cm[11].copy(hd).multiply(mT(_tm, 0, 0.06, -0.005)).multiply(mS(_tm, 0.122, 0.07, 0.136));
@@ -180,10 +188,15 @@ class CharacterRenderer {
         _cm[11].copy(hd).multiply(mT(_tm, 0, 0.07, 0.1)).multiply(mS(_tm, 0.12, 0.02, 0.1));
         this._put('small', _cm[11], col(L.cap));
       } else if (L.hairStyle > 0) {
-        const long = L.hairStyle === 2, bun = L.hairStyle === 3;
-        _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.0 : 0.025, -0.012)).multiply(mS(_tm, 0.125, long ? 0.2 : 0.135, 0.14));
+        const long = L.hairStyle === 2, bun = L.hairStyle === 3, curly = L.hairStyle === 4, tail = L.hairStyle === 5;
+        _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.005 : 0.025, -0.012)).multiply(mS(_tm, curly ? 0.142 : 0.125, long ? 0.17 : curly ? 0.155 : 0.135, curly ? 0.155 : 0.14));
         this._put('hair', _cm[11], col(L.hair));
-        if (bun && !far) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.1, -0.1)).multiply(mS(_tm, 0.06, 0.06, 0.06)); this._put('joint', _cm[11], col(L.hair)); }
+        if (!far) {
+          if (bun) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.1, -0.1)).multiply(mS(_tm, 0.06, 0.06, 0.06)); this._put('joint', _cm[11], col(L.hair)); }
+          // long hair falls behind the shoulders; a ponytail hangs from the crown
+          if (long) { _cm[11].copy(hd).multiply(mT(_tm, 0, -0.1, -0.075)).multiply(mS(_tm, 0.24, 0.22, 0.07)); this._put('small', _cm[11], col(L.hair)); }
+          if (tail) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.0, -0.14)).multiply(mRx(_tm, 0.35)).multiply(mS(_tm, 0.05, 0.16, 0.05)); this._put('small', _cm[11], col(L.hair)); }
+        }
       }
     }
     // --- arms ---
