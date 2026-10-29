@@ -110,10 +110,12 @@ let _intGlow = null;
    lamps light a room at once: in a bigger one, the ones nearest the camera (re-picked a few times a second). Each
    room has its own material (its own lamps), all of them one shader program. */
 const INT_LIGHTS = 20;
+// the Low preset (weak devices) keeps the baked look: the quality manager sets this (one uniform for every room)
+const INT_LIT = { value: 1 };
 function makeInteriorMaterial(lights) {
   const m = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
   const uL = [], uC = []; for (let i = 0; i < INT_LIGHTS; i++) { uL.push(new THREE.Vector4()); uC.push(new THREE.Color()); }
-  const u = { uL: { value: uL }, uLC: { value: uC }, uLN: { value: 0 } };
+  const u = { uL: { value: uL }, uLC: { value: uC }, uLN: { value: 0 }, uIntLit: INT_LIT };
   const load = list => { list.forEach((L, i) => { uL[i].set(L.x, L.y, L.z, L.s); uC[i].copy(L.c); }); u.uLN.value = list.length; };
   load(lights.slice(0, INT_LIGHTS));
   let t = 0; const v = new THREE.Vector3();
@@ -131,9 +133,9 @@ function makeInteriorMaterial(lights) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         varying vec3 vLP; varying vec3 vCamL;
-        uniform vec4 uL[${INT_LIGHTS}]; uniform vec3 uLC[${INT_LIGHTS}]; uniform int uLN;`)
+        uniform vec4 uL[${INT_LIGHTS}]; uniform vec3 uLC[${INT_LIGHTS}]; uniform int uLN; uniform float uIntLit;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-      {
+      if (uIntLit > 0.5 && uLN > 0) {
         vec3 N = normalize(cross(dFdx(vLP), dFdy(vLP)));
         vec3 V = normalize(vCamL - vLP);
         if (dot(N, V) < 0.0) N = -N;
@@ -149,7 +151,7 @@ function makeInteriorMaterial(lights) {
         // the baked colours were made to read at 1.0: lamps lift a surface to ~1.15 at most (soft saturation, so a floor
         // under many lamps does not burn out) and the far corners settle near 0.7
         vec3 lit = 0.68 + 0.62 * acc / (1.0 + acc);
-        diffuseColor.rgb = uLN > 0 ? diffuseColor.rgb * lit + min(spec, vec3(1.2)) * flo * 0.16 : diffuseColor.rgb; // a room without lamps keeps its baked light
+        diffuseColor.rgb = diffuseColor.rgb * lit + min(spec, vec3(1.2)) * flo * 0.16; // (a room without lamps, or on Low, keeps its baked light)
       }`);
   };
   m.customProgramCacheKey = () => 'pv-interior';

@@ -25,6 +25,7 @@ class QualityManager {
     g.env.sun.castShadow = sh;
     if (sh && g.env.sun.shadow.mapSize.x !== q.shadow) { g.env.sun.shadow.mapSize.set(q.shadow, q.shadow); if (g.env.sun.shadow.map) { g.env.sun.shadow.map.dispose(); g.env.sun.shadow.map = null; } }
     g.usePost = s.post && q.post;
+    INT_LIT.value = this.level >= 1 ? 1 : 0; // rooms lit per lamp from Medium up; Low keeps their baked look
     g.chunks.setRadius(q.chunkR);
     g.traffic.target = q.traffic; g.peds.target = q.peds;
     g.propR = q.propR; g.parkedR = q.parkedR;
