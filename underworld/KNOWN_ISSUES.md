@@ -13,9 +13,15 @@
 - taxi: a cab stuck in traffic under load (the full-ride and recovery checks; 20/20 solo, M13 gate).
 - stress: the 2.5 s frame-stall check under load (30/30 solo, M13 gate and graphics gate). The M13 build itself
   fails it solo now and then (29/30 in one of two runs at the graphics gate: 3.2 s on first entering the jail).
-- arrest: the hands-up pose check with the map open (a 4 s real-time window); unique: the won-Widowmaker check;
-  ui: the second (touch) page's boot exceeding its 180 s wait while the first page runs. All pass solo (graphics
-  gate: 126/126, 58/58, 23/23).
+- arrest: the hands-up pose check with the map open (a 4 s real-time window); ui: the second (touch) page's boot
+  exceeding its 180 s wait while the first page runs; pwa: the page's 30 s navigation limit (the 3.6 MB file);
+  police: the officer on foot who sees a chase and joins it; property: driving out of an underground garage's exit
+  lane; roads: traffic merging out of a suburb bend. All pass solo (graphics gate, on `7919b22`: 126/126, 23/23,
+  5/5, 13/13, 33/33, 20/20); the last three were first seen in the gate's final 3-wide run.
+- unique: the won-Widowmaker check failed in three after-build runs (two 3-wide, one solo; never on M13) when the
+  finish left the car beyond the vehicle registry's 340 m keep radius and it was stored on the street where it
+  stopped, a state the check did not accept (the races suite already did). Fixed in the suite at the gate
+  (`24f3f0c`); that commit's message says "M13 included", which is wrong: every M13 run passed.
 - police: a parked cruiser's pull-out distance; raid: real-time clock and save-clock checks; roadnet: the
   estate-relocation reload check (all pass solo; seen failing only in the 3-wide run, m12-full).
 
