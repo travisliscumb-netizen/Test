@@ -7,9 +7,9 @@
 - prison: one random dice/cards outcome.
 - compound: hostile crew / gate-ram checks under load.
 - shots / cityshots: timeouts under load (screenshot scripts, no checks).
-- qashots (screenshot script, no checks): in the 3-wide run it either stops at the taxi scene (the cab is not
-  there after the phone scenes; M13 gate too, and the scene alone runs) or reaches the runner's 75-minute limit
-  (graphics gate). Run it alone.
+- qashots (screenshot script, no checks): reaches the runner's 75-minute limit in the 3-wide run; run it alone.
+  (Its taxi scene failed from M11 to the graphics gate because the phone scene left the player more product than a
+  cab carries; fixed at the gate.)
 - taxi: a cab stuck in traffic under load (the full-ride and recovery checks; 20/20 solo, M13 gate).
 - stress: the 2.5 s frame-stall check under load (30/30 solo, M13 gate and graphics gate). The M13 build itself
   fails it solo now and then (29/30 in one of two runs at the graphics gate: 3.2 s on first entering the jail).
@@ -39,7 +39,7 @@
   340 m keep radius, so it is stored where it stopped. The check now goes there and finds it, yours.
 
 ## Graphics overhaul (Session 14) — status of the items it inherited
-- Casino (and every interior) drawing the city behind its walls: **fixed** (casino 255 → 49 draw calls; GRAPHICS.md).
+- Casino (and every interior) drawing the city behind its walls: **fixed** (casino 222 → 40 draw calls; GRAPHICS.md §3).
 - Jail HUD over the view: placed by the HUD layout clear of the top controls and now translucent; on a 640×360
   view it still sits in the upper middle. A smaller jail panel is a candidate for the polish pass.
 - Phone and service screens: phone home redesigned (groups side by side; all 14 apps on one landscape screen),
@@ -60,4 +60,13 @@
 - Boot compiles every shader before the menu (the warm-up, GRAPHICS.md §2): ~5 s more to the menu on software
   GL (M13 ~10 s, after ~15 s), where M13 compiled lazily and paid in play (up to 3.2 s on first entering the
   jail in one solo stress run). Untested on a device. The alternative for the optimisation phase: compile in the
-  background behind the menu and finish behind the new-game fade.
+  background behind the menu and finish behind the new-game fade. The warm-up also puts all 66.7 MB of scene
+  textures on the GPU at boot (M13 21.5 MB, uploading the rest as places are first seen).
+- Fill rate: Medium's pixel-ratio cap is 1.25 (M13 0.9), up to 1.93× the pixels on a 2–3× phone screen, and roofs,
+  foliage, terrain and people shade more per pixel; open-city render time on software raster is up ~50–80%. Auto
+  quality's dynamic resolution bounds it; a hand-picked Medium on a phone does not. Cedar Fields' terrain shader
+  roughly doubles that scene's software-raster cost. Measure on a device before the release candidate.
+- Game logic: ~+1–2 ms a step at 4× CPU throttle (HUD card, outlined minimap labels and sprite badges, the extra
+  character parts), about +0.3–0.5 ms unthrottled.
+- Visual QA (GRAPHICS.md §6): the night-rain road film lifts the carriageway toward grey; rounded torsos read as
+  padded shoulders and faces only read close up; Cedar Fields' nearest grass smears at a low camera.

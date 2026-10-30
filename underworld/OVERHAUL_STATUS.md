@@ -4213,8 +4213,19 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 - **Commits:** `b21e645` (interior culling, light balance, trees + LOD, roofs, vehicle shaping, faces, capture
   tool), `fd7d798` (HUD v2, currency language, map/phone/Royale layouts, terrain shader, wet roads, lit and themed
   interiors, rounded people, one-off showcase), `96bc636` (after release, docs), `5c03b12` (room lighting from
-  Medium up), then the gate commit.
-- **After:** `releases/after-graphics/Underworld_After_Graphics.html` (main save keys).
+  Medium up), `f42a110` (Low keeps 0.7), `5452800` (narrowest landscape phones), `f4a8aee` (the gate's stall
+  hunt: the touch-button rule that made the overlay re-rasterise in software; shader warm-up), `b389ca5` (the
+  warm-up as one stand-in per program: boot ~6 s back, hidden meshes no longer resident), `739449b` (qashots'
+  taxi scene, capture tool frame wait), plus release and docs commits.
+- **After:** `releases/after-graphics/Underworld_After_Graphics.html` (main save keys), from `b389ca5`, verified
+  20/20.
+- **Gate (STOP for review):** full regression on `b389ca5` 1,827 passed / 6 failed (M13 gate 1,834 / 8), every
+  failure a load-timing check that passes solo; economy 28/28, royale-sim 17/17. 74-scene before/after captures
+  (the first before-set came from a stale M12 stage file and was retaken on M13). Phone-profile perf, three runs
+  each: interiors 75–85% fewer draw calls and 90–99% fewer triangles, street calls flat with ~10% fewer
+  triangles; logic ~+1–2 ms at 4× throttle; open-city fill up by design (Medium 0.9 → 1.25 pixel ratio). Boot
+  +5 s on software GL (shader compile moved from play to the loading screen). Download +16 KB brotli. Saves
+  untouched. GRAPHICS.md §3–§6 has the tables; KNOWN_ISSUES the risks.
 - **No engine rewrite** was needed (no GRAPHICS / ENGINE ARCHITECTURE CHALLENGE raised): the overhaul fits the
   existing three.js r160 single-file architecture (merged chunks, instancing, onBeforeCompile shader patches).
 - **Saves:** no field added, renamed or removed; `SAVE_VERSION` unchanged; M13 saves load as they are.
