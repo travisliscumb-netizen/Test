@@ -136,7 +136,7 @@ function makeInteriorMaterial(lights) {
         uniform vec4 uL[${INT_LIGHTS}]; uniform vec3 uLC[${INT_LIGHTS}]; uniform int uLN; uniform float uIntLit;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       if (uIntLit > 0.5 && uLN > 0) {
-        vec3 N = normalize(cross(dFdx(vLP), dFdy(vLP)));
+        vec3 N = cross(dFdx(vLP), dFdy(vLP)); float nl = dot(N, N); N = nl > 1e-30 ? N * inversesqrt(nl) : vec3(0.0, 1.0, 0.0); // (degenerate derivatives: no NaN for bloom to spread)
         vec3 V = normalize(vCamL - vLP);
         if (dot(N, V) < 0.0) N = -N;
         float flo = step(0.85, N.y) * (1.0 - smoothstep(0.03, 0.2, vLP.y));

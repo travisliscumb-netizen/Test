@@ -18,13 +18,16 @@ float pvf(vec2 p){ float a=0.5, s=0.0; for(int i=0;i<4;i++){ s+=a*pvn(p); p=p*2.
 `;
 // derivative bump mapping: h is a height in metres sampled per pixel
 const GLSL_BUMP = `
+// where the screen derivatives degenerate (ground far off at a grazing angle) det and the height gradient are both 0:
+// normalize(0) is NaN, and bloom smears one NaN pixel over half the screen as black. Keep the plain normal there.
 vec3 pvBump(vec3 sp, vec3 sn, float h, float k){
   vec3 sx = dFdx(sp), sy = dFdy(sp);
   vec3 r1 = cross(sy, sn), r2 = cross(sn, sx);
   float det = dot(sx, r1);
   vec2 dh = vec2(dFdx(h), dFdy(h)) * k;
   vec3 g = sign(det) * (dh.x * r1 + dh.y * r2);
-  return normalize(abs(det) * sn - g);
+  vec3 v = abs(det) * sn - g; float l2 = dot(v, v);
+  return l2 > 1e-30 ? v * inversesqrt(l2) : sn;
 }
 float pvRect(vec2 f, vec4 r, vec2 fw){
   return smoothstep(r.x-fw.x, r.x+fw.x, f.x) * (1.0-smoothstep(r.y-fw.x, r.y+fw.x, f.x))
