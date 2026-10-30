@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="release" content="f42a110 f42a1105d88e6c48c51dad596e33069e3f4cdd6d">
+<meta name="release" content="b389ca5 b389ca59377d6d22edd616ca12816dcf5050b448">
 <meta name="build-version" content="v7-casino-2026-10-18-a">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
@@ -570,7 +570,7 @@ body[data-gs="paused"] #jailHud{display:none}
    game and its tests read stays "$1,840" / "BANK $26,500". Touch buttons carry an icon over a small label.
    ========================================================================================================== */
 :root{--dirty:#8fe39b;--dirty-d:#0a3214;--clean:#7fc6ff;--clean-d:#062642;--gold:#ffcf6b}
-#hud .tr{background:linear-gradient(180deg,rgba(8,10,15,.62),rgba(8,10,15,.34));border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:8px 12px 7px;gap:3px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#hud .tr{background:rgba(8,10,15,.5);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:8px 12px 7px;gap:3px}
 #rankChip{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-bottom:2px}
 #rankChip b{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);text-shadow:0 1px 2px #000}
 #rankChip .rb{display:block;width:118px;height:4px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
@@ -579,7 +579,7 @@ body[data-gs="paused"] #jailHud{display:none}
 #money{font-size:28px;color:var(--dirty);text-shadow:0 2px 0 var(--dirty-d),0 0 14px rgba(0,0,0,.55);display:flex;align-items:center;gap:7px;line-height:1.05}
 #money::before{content:"CASH";font-size:9px;font-weight:900;letter-spacing:.14em;color:#0b2412;background:var(--dirty);border-radius:4px;padding:2px 5px 1px;text-shadow:none}
 #bank{font-size:13px;color:var(--clean);display:flex;align-items:center;gap:6px}
-#bank::before{content:"";width:12px;height:12px;flex:none;background:var(--clean);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat}
+#bank::before{content:"";width:12px;height:12px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237fc6ff'%3E%3Cpath d='M12 2 2 7v2h20V7zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 20h20v2H2z'/%3E%3C/svg%3E") center/contain no-repeat}
 #stars{font-size:21px;margin-top:2px}
 #clock{font-size:12px;color:#cfd6e2}
 /* the two currencies everywhere money is shown: Dirty Cash green, Clean Bank blue. <b class="cash dirty">$75</b>,
@@ -590,52 +590,54 @@ body[data-gs="paused"] #jailHud{display:none}
 .cash.tag.dirty::before{content:"CASH";background:var(--dirty);color:#0b2412}
 .cash.tag.clean::before{content:"BANK";background:var(--clean);color:#04203a}
 /* touch controls: an icon over a small label, a frosted dark disc, a warm ring when held */
-#touch .tbtn{backdrop-filter:none;-webkit-backdrop-filter:none;flex-direction:column;gap:1px;background:radial-gradient(circle at 50% 35%,rgba(40,46,60,.62),rgba(12,15,22,.58));border:1.5px solid rgba(255,255,255,.22);box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1);font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.82)}
-#touch .tbtn::before{content:"";display:block;width:26px;height:26px;background:#fff;-webkit-mask-image:var(--ic);mask-image:var(--ic);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+#touch .tbtn{flex-direction:column;gap:1px;background:rgba(18,22,30,.6);border:2px solid rgba(255,255,255,.22);font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#fff}
+#touch .tbtn::before{content:"";display:block;width:26px;height:26px;background:var(--ic) center/contain no-repeat;opacity:.92}
 #touch .tbtn.big::before{width:32px;height:32px}
 #touch .tbtn.sm::before{width:20px;height:20px}
 #touch .tbtn.fire::before{display:none}
-#touch .tbtn.on{background:radial-gradient(circle at 50% 35%,rgba(255,196,96,.75),rgba(255,138,61,.55));border-color:var(--amber);color:#1b1206}
-#touch .tbtn.on::before{background:#1b1206}
-#touch .tbtn.car[data-act="gas"]{background:radial-gradient(circle at 50% 35%,rgba(40,90,60,.66),rgba(12,30,20,.6));border-color:rgba(127,224,143,.5)}
-#touch .tbtn.car[data-act="brake"]{background:radial-gradient(circle at 50% 35%,rgba(100,40,40,.66),rgba(30,12,12,.6));border-color:rgba(255,120,120,.45)}
+#touch .tbtn.on{background:rgba(255,170,80,.72);border-color:var(--amber);color:#1b1206}
+#touch .tbtn.on::before{filter:brightness(0);opacity:.85}
+#touch .tbtn.car[data-act="gas"]{background:rgba(28,68,44,.64);border-color:rgba(127,224,143,.5)}
+#touch .tbtn.car[data-act="brake"]{background:rgba(84,30,30,.64);border-color:rgba(255,120,120,.45)}
 #tbar{gap:7px}
 #tbar .tbtn{width:44px;height:44px;font-size:8px;border-radius:13px}
 #tbar .tbtn::before{width:20px;height:20px}
 #tbar #touchPause{font-size:0}
-#stickBase{border:2px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.06),rgba(12,15,22,.38))}
-#stickKnob{background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.85),rgba(200,206,218,.55));box-shadow:0 3px 10px rgba(0,0,0,.4)}
-#minimap{box-shadow:0 0 0 3px rgba(8,10,15,.85),0 8px 22px rgba(0,0,0,.55)}
-#prompt{background:linear-gradient(180deg,rgba(14,17,24,.88),rgba(8,10,15,.82));border:1px solid rgba(255,207,107,.35);box-shadow:0 6px 18px rgba(0,0,0,.4)}
-#touch .tbtn[data-act="jump"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v11M7 9l5-5 5 5M5 20h14%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="attack"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 13V9a2 2 0 0 1 4 0v3M10 11V7a2 2 0 0 1 4 0v4M14 10V8a2 2 0 0 1 4 0v6c0 4-3 6-6 6s-6-2-6-5v-2%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="sprint"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 6l6 6-6 6M12 6l6 6-6 6%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="weapon"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 8h15l2 2v2H11l-1 3v3H6l1-5H3z%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="interact"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%228%22/%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%222.5%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="block"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="aim"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%227%22/%3E%3Cpath d=%22M12 2v5M12 17v5M2 12h5M17 12h5%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="reload"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="melee"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 19L19 5M14 5h5v5%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="gas"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 20V6M6 12l6-6 6 6%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="brake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v14M6 12l6 6 6-6%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="handbrake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 17c0-6 4-10 10-10h4M15 3l4 4-4 4%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="horn"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 10v4h3l5 4V6L7 10zM16 9c1.5 1.5 1.5 4.5 0 6M19 6c3 3 3 9 0 12%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="map"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="empire"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%227%22 y=%222.5%22 width=%2210%22 height=%2219%22 rx=%222%22/%3E%3Cpath d=%22M11 18.5h2%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="camera"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 8h3l2-3h6l2 3h3v11H4z%22/%3E%3Ccircle cx=%2212%22 cy=%2213%22 r=%223.5%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="radio"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 9h14v10H5zM8 9l9-5%22/%3E%3Ccircle cx=%229.5%22 cy=%2214%22 r=%222%22/%3E%3Cpath d=%22M14 13h3M14 16h3%22/%3E%3C/svg%3E")}
-#touch .tbtn[data-act="pause"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 5v14M15 5v14%22/%3E%3C/svg%3E")}
+#stickBase{border:2px solid rgba(255,255,255,.22);background:rgba(12,15,22,.3)}
+#stickKnob{background:rgba(232,236,244,.72)}
+#minimap{box-shadow:0 0 0 3px rgba(8,10,15,.85)}
+#prompt{background:rgba(12,15,22,.86);border:1px solid rgba(255,207,107,.35)}
+#touch .tbtn[data-act="jump"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v11M7 9l5-5 5 5M5 20h14%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="attack"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 13V9a2 2 0 0 1 4 0v3M10 11V7a2 2 0 0 1 4 0v4M14 10V8a2 2 0 0 1 4 0v6c0 4-3 6-6 6s-6-2-6-5v-2%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="sprint"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 6l6 6-6 6M12 6l6 6-6 6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="weapon"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 8h15l2 2v2H11l-1 3v3H6l1-5H3z%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="interact"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%228%22/%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%222.5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="block"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="aim"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%227%22/%3E%3Cpath d=%22M12 2v5M12 17v5M2 12h5M17 12h5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="reload"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="melee"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 19L19 5M14 5h5v5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="gas"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 20V6M6 12l6-6 6 6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="brake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M12 4v14M6 12l6 6 6-6%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="handbrake"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 17c0-6 4-10 10-10h4M15 3l4 4-4 4%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="horn"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 10v4h3l5 4V6L7 10zM16 9c1.5 1.5 1.5 4.5 0 6M19 6c3 3 3 9 0 12%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="map"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="empire"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%227%22 y=%222.5%22 width=%2210%22 height=%2219%22 rx=%222%22/%3E%3Cpath d=%22M11 18.5h2%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="camera"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M4 8h3l2-3h6l2 3h3v11H4z%22/%3E%3Ccircle cx=%2212%22 cy=%2213%22 r=%223.5%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="radio"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 9h14v10H5zM8 9l9-5%22/%3E%3Ccircle cx=%229.5%22 cy=%2214%22 r=%222%22/%3E%3Cpath d=%22M14 13h3M14 16h3%22/%3E%3C/svg%3E")}
+#touch .tbtn[data-act="pause"]{--ic:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 5v14M15 5v14%22/%3E%3C/svg%3E")}
 /* casino prizes and jackpots: gold, not a currency */
 b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
 /* G8 · map: round symbols with pictograms (the same ones the canvas draws); on a landscape phone the tools sit in a
    two-column block at the right, clear of the city, instead of a row across its top */
-.mapPop .ico,.mdItem .ico,.mapCardHead .ico{border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.mapPop .ico,.mdItem .ico,.mapCardHead .ico{border-radius:50%}
 .ico svg{width:16px;height:16px;fill:#0d1117;display:block}
 .mapCardHead .ico{width:30px;height:30px}.mapCardHead .ico svg{width:20px;height:20px}
 @media (orientation:landscape) and (max-height:520px){
   #mapTools{display:grid;grid-template-columns:repeat(2,auto);gap:5px;max-width:none}
   .mapPop{right:200px;top:8px;max-height:calc(100% - 16px)}
 }
+/* (in-game overlays are flat translucent fills without blurred shadows or per-button gradients: over a live 3D view
+   those are re-rasterised whenever a control changes, a measured multi-second stall on a software-rendered GPU) */
 /* G8 · the status card on a landscape phone: Rank and Rep on one line over the bar, the stars and the clock side by
    side, so the card ends above the Use button */
 @media (max-height:520px){
@@ -657,7 +659,7 @@ b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
 .appCat .apps{display:flex;flex-wrap:wrap;gap:8px}
 .appCat .app{width:94px;flex:none}
 .appHome .appCat h4{margin:8px 2px 6px}
-.app i{background:linear-gradient(160deg,color-mix(in srgb,var(--c) 82%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 75%,#000));box-shadow:inset 0 -3px 0 rgba(0,0,0,.22),0 3px 8px rgba(0,0,0,.35)}
+.app i{background:linear-gradient(160deg,color-mix(in srgb,var(--c) 82%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 75%,#000));box-shadow:inset 0 -3px 0 rgba(0,0,0,.22)}
 .app{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border-color:rgba(255,255,255,.09)}
 /* G11 · banners: a small kicker line over the title; "rank" is the gold fanfare (a new Rank, a one-off acquired) with a
    light sweep across the title; the HUD's Rank chip pulses when the Rank changes */
@@ -694,7 +696,19 @@ b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
   .ryr{height:132px}.ryc{height:44px;font-size:23px}.ryc.royal span{width:34px;height:34px;font-size:20px}
 }
 /* G8 · the jail panel lets the cell show through (it is placed by the HUD layout, clear of the top controls) */
-#jailHud{background:linear-gradient(180deg,rgba(18,14,12,.82),rgba(14,12,10,.66));backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 8px 22px rgba(0,0,0,.35)}
+#jailHud{background:rgba(16,13,11,.78);backdrop-filter:none;-webkit-backdrop-filter:none}
+/* G8 · the narrowest phones (iPhone SE landscape): stars over the clock again and a smaller cash line, so the card
+   stays as narrow as M13's and the centred objective keeps its place */
+@media (max-height:520px) and (max-width:720px){
+  #hud .tr>#stars,#hud .tr>#clock{grid-column:1/-1}
+  #hud .tr>#stars{font-size:15px}
+  #money{font-size:20px;gap:5px}
+  #money::before{font-size:8px;padding:1px 4px 0}
+  #rankChip b{font-size:10px;letter-spacing:.12em}
+}
+/* G8 · each touch button, the status card and the minimap get a compositing layer of their own (as M13's
+   backdrop-blurred buttons had), so a change to one repaints only it, not the whole control overlay */
+#touch .tbtn,#hud .tr,#minimapWrap{will-change:transform}
 </style>
 </head>
 <body>
@@ -62302,8 +62316,8 @@ const MAP_GLYPH_P2 = {};
 function mapGlyph(icon) { const d = MAP_GLYPHS[icon]; if (!d || typeof Path2D === 'undefined') return null; return MAP_GLYPH_P2[icon] || (MAP_GLYPH_P2[icon] = new Path2D(d)); }
 // the same symbol as HTML, for the index, the legend and the cards (the letter stays as its accessible name)
 function mapIconHTML(icon) { const d = MAP_GLYPHS[icon]; return d ? `<svg viewBox="0 0 24 24" aria-label="${esc(icon)}" role="img"><path fill-rule="evenodd" d="${d}"/></svg>` : esc(icon); }
-// draw one map badge (a disc with its pictogram or letter) at screen position x,y with size r (radius)
-function drawMapBadge(c, x, y, r, col, icon, ring) {
+// one map badge (a disc with its pictogram or letter) drawn at x,y with size r (radius)
+function paintMapBadge(c, x, y, r, col, icon, ring) {
   c.beginPath(); c.arc(x, y + r * 0.12, r * 1.08, 0, Math.PI * 2); c.fillStyle = 'rgba(0,0,0,0.38)'; c.fill(); // soft drop shadow
   c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
   c.fillStyle = col; c.fill(); c.lineWidth = Math.max(1.5, r * 0.16); c.strokeStyle = ring || 'rgba(8,10,14,0.85)'; c.stroke();
@@ -62312,6 +62326,23 @@ function drawMapBadge(c, x, y, r, col, icon, ring) {
   if (gl) { const k = r * 1.3 / 24; c.save(); c.translate(x - 12 * k, y - 12 * k); c.scale(k, k); c.fill(gl, 'evenodd'); c.restore(); return; }
   c.font = `900 ${Math.round(r * 1.2)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillText(icon, x, y + r * 0.06);
+}
+// the minimap redraws ~30 times a second and the big map on every pan: each badge is painted once per size, colour
+// and ring into a small sprite at the canvas's own resolution and then only copied (a vector path fill per badge per
+// frame is costly, worst on software-rendered canvases)
+const MAP_BADGE_SPRITES = new Map();
+function drawMapBadge(c, x, y, r, col, icon, ring) {
+  const t = c.getTransform ? c.getTransform() : null, sc = t ? Math.hypot(t.a, t.b) || 1 : 1;
+  const key = icon + '|' + col + '|' + (ring || '') + '|' + Math.round(r * sc * 2);
+  let sp = MAP_BADGE_SPRITES.get(key);
+  if (!sp) {
+    if (MAP_BADGE_SPRITES.size > 400) MAP_BADGE_SPRITES.clear();
+    const half = r * 1.3 + 2, px = Math.ceil(half * 2 * sc), cv = document.createElement('canvas'); cv.width = cv.height = px;
+    const cc = cv.getContext('2d'); cc.scale(sc, sc); paintMapBadge(cc, half, half, r, col, icon, ring);
+    sp = { cv, half }; MAP_BADGE_SPRITES.set(key, sp);
+  }
+  c.drawImage(sp.cv, x - sp.half, y - sp.half, sp.half * 2, sp.half * 2);
+  if (c.__trace) c.__trace.push(icon); // tests read which symbols a canvas drew
 }
 class MapView {
   constructor(ui) {
@@ -62802,7 +62833,7 @@ class QualityManager {
     const g = this.g, q = QUALITY[this.level], s = g.save.settings;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     g.renderer.setPixelRatio(Math.min(dpr, q.pr) * (this.dynScale || 1));
-    const sh = s.shadows && q.shadow > 0;
+    const sh = s.shadows && q.shadow > 0, shChanged = this._sh !== undefined && this._sh !== sh; this._sh = sh;
     g.renderer.shadowMap.enabled = sh;
     g.env.sun.castShadow = sh;
     if (sh && g.env.sun.shadow.mapSize.x !== q.shadow) { g.env.sun.shadow.mapSize.set(q.shadow, q.shadow); if (g.env.sun.shadow.map) { g.env.sun.shadow.map.dispose(); g.env.sun.shadow.map = null; } }
@@ -62813,6 +62844,13 @@ class QualityManager {
     g.propR = q.propR; g.parkedR = q.parkedR;
     g.setupPost(q.msaa);
     g.onResize();
+    // shadows on or off changes every lit material's program: compile them all now (in the background where the
+    // browser compiles in parallel), not one by one the first time each comes into view, a hitch per new district
+    if (shChanged && this.g.compiled) {
+      const r = g.renderer, par = r.compileAsync && r.extensions.has('KHR_parallel_shader_compile');
+      try { if (par) r.compileAsync(g.scene, g.camera).catch(() => {}); else r.compile(g.scene, g.camera); } catch { /* an optimisation only */ }
+      g.warmShaders();
+    }
   }
   update(dt) {
     if (this.mode !== 'auto' || this.g.state !== 'playing') return;
@@ -62957,6 +62995,8 @@ class Game {
     for (let k = 0; k < 6; k++) { this.chunks.update(this.focus.x, this.focus.z, this.frame++); }
     progress(0.85, 'Compiling shaders'); await nextFrame();
     try { this.renderer.compile(this.scene, this.camera); } catch { /* compile is an optimisation only */ }
+    this.warmShaders();
+    this.compiled = true; // from here a quality change that alters the programs recompiles them (610)
     this._bindGlobal();
     this._bindDebug();
     progress(1, 'Ready'); await nextFrame();
@@ -62974,6 +63014,57 @@ class Game {
     ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, unlockAudio, { passive: true }));
     if (IS_TOUCH) document.body.classList.add('touch');
     window.addEventListener('beforeunload', () => { if (this.state !== 'menu' && this.state !== 'loading') this.saveGame(); });
+  }
+  // Draw every shader once into one pixel of the kind of target the real frame uses, so the GPU builds each program
+  // and draw state now, behind the loading screen or a settings change, not the first time a district or room comes
+  // into view (a software or lazily-compiling GPU stalls on that first draw for a second or more). What picks a
+  // program is the material, the object kind (instanced, instance colours) and the attribute layout, not how much
+  // geometry there is: so each distinct combination, hidden or not, is drawn once as a three-vertex stand-in (a
+  // sprite as a sprite), and the real objects sit out the draw by layer mask (their child lights still count, so the
+  // light state is the one play will see; showing hidden objects instead also switched on the lights they carry and
+  // built programs for a light state that never occurs). Drawing the objects themselves pushed every vertex of the
+  // city through both passes (about 4 s of boot on software GL) and uploaded every hidden mesh. Skinned, batched and
+  // morphing objects (none today) draw as themselves. Layers are put back whatever happens. (G2)
+  warmShaders() {
+    const r = this.renderer, sc = this.scene, cam = this.camera, seen = new Map(), masked = [], stand = [];
+    const prevT = r.getRenderTarget(), prevS = r.getScissorTest(), sAuto = r.shadowMap.autoUpdate;
+    const vp = r.getViewport(new THREE.Vector4()), sci = r.getScissor(new THREE.Vector4());
+    try {
+      sc.traverse(o => {
+        if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite) || !o.geometry || !o.material) return;
+        const gm = o.geometry;
+        if (o.isSkinnedMesh || o.isBatchedMesh || Object.keys(gm.morphAttributes).length) return;
+        masked.push(o, o.layers.mask); o.layers.mask = 0;
+        if (o.isSprite) { if (!seen.has('S' + o.material.id)) seen.set('S' + o.material.id, o); return; }
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        let key = `${o.isInstancedMesh ? 'I' : o.type}${o.instanceColor ? 'c' : ''}${o.castShadow ? 's' : ''}:${mats.map(m => m.id).join(',')}:${o.customDepthMaterial ? o.customDepthMaterial.id : ''}:${o.customDistanceMaterial ? o.customDistanceMaterial.id : ''}`;
+        for (const n in gm.attributes) { const a = gm.attributes[n]; key += `|${n}${a.itemSize}${a.array.constructor.name}${a.normalized ? 'n' : ''}${a.isInstancedBufferAttribute ? 'i' : ''}`; }
+        if (!seen.has(key)) seen.set(key, o);
+      });
+      for (const o of seen.values()) {
+        if (o.isSprite) { const p = new THREE.Sprite(o.material); p.frustumCulled = false; stand.push(p); sc.add(p); continue; }
+        const src = o.geometry, gm = new THREE.BufferGeometry();
+        for (const n in src.attributes) {
+          const a = src.attributes[n], arr = new a.array.constructor(3 * a.itemSize);
+          gm.setAttribute(n, a.isInstancedBufferAttribute ? new THREE.InstancedBufferAttribute(arr, a.itemSize, a.normalized, a.meshPerAttribute) : new THREE.BufferAttribute(arr, a.itemSize, a.normalized));
+        }
+        for (const gr of src.groups) gm.addGroup(0, 3, gr.materialIndex);
+        const p = o.isInstancedMesh ? new THREE.InstancedMesh(gm, o.material, 1) : o.isPoints ? new THREE.Points(gm, o.material)
+          : o.isLineSegments ? new THREE.LineSegments(gm, o.material) : o.isLineLoop ? new THREE.LineLoop(gm, o.material) : o.isLine ? new THREE.Line(gm, o.material) : new THREE.Mesh(gm, o.material);
+        if (o.instanceColor) p.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(3), 3);
+        p.castShadow = o.castShadow; p.receiveShadow = o.receiveShadow; p.frustumCulled = false;
+        p.customDepthMaterial = o.customDepthMaterial; p.customDistanceMaterial = o.customDistanceMaterial;
+        stand.push(p); sc.add(p);
+      }
+      // post-processing renders the scene into a target (no tone mapping, linear output); without it, to the screen
+      const t = this.usePost ? (this._warmRT || (this._warmRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType }))) : null;
+      r.setRenderTarget(t); r.setScissorTest(true); r.setScissor(0, 0, 1, 1); r.setViewport(0, 0, 1, 1);
+      r.shadowMap.needsUpdate = true; r.render(sc, cam);
+    } catch { /* an optimisation only */ } finally {
+      r.setRenderTarget(prevT); r.setScissorTest(prevS); r.setScissor(sci); r.setViewport(vp); r.shadowMap.autoUpdate = sAuto; r.shadowMap.needsUpdate = true;
+      for (const p of stand) { sc.remove(p); if (p.isSprite) continue; p.geometry.dispose(); if (p.isInstancedMesh) p.dispose(); } // sprites share three's quad
+      for (let i = 0; i < masked.length; i += 2) masked[i].layers.mask = masked[i + 1];
+    }
   }
   setupPost(msaa) {
     const r = this.renderer;
