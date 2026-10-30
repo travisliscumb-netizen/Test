@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="release" content="b389ca5 b389ca59377d6d22edd616ca12816dcf5050b448">
+<meta name="release" content="7919b22 7919b226bb9303dec283deb70af48f8a9e960fdc">
 <meta name="build-version" content="v7-casino-2026-10-18-a">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
@@ -34731,13 +34731,16 @@ float pvf(vec2 p){ float a=0.5, s=0.0; for(int i=0;i<4;i++){ s+=a*pvn(p); p=p*2.
 `;
 // derivative bump mapping: h is a height in metres sampled per pixel
 const GLSL_BUMP = `
+// where the screen derivatives degenerate (ground far off at a grazing angle) det and the height gradient are both 0:
+// normalize(0) is NaN, and bloom smears one NaN pixel over half the screen as black. Keep the plain normal there.
 vec3 pvBump(vec3 sp, vec3 sn, float h, float k){
   vec3 sx = dFdx(sp), sy = dFdy(sp);
   vec3 r1 = cross(sy, sn), r2 = cross(sn, sx);
   float det = dot(sx, r1);
   vec2 dh = vec2(dFdx(h), dFdy(h)) * k;
   vec3 g = sign(det) * (dh.x * r1 + dh.y * r2);
-  return normalize(abs(det) * sn - g);
+  vec3 v = abs(det) * sn - g; float l2 = dot(v, v);
+  return l2 > 1e-30 ? v * inversesqrt(l2) : sn;
 }
 float pvRect(vec2 f, vec4 r, vec2 fw){
   return smoothstep(r.x-fw.x, r.x+fw.x, f.x) * (1.0-smoothstep(r.y-fw.x, r.y+fw.x, f.x))
@@ -45959,7 +45962,7 @@ function makeInteriorMaterial(lights) {
         uniform vec4 uL[${INT_LIGHTS}]; uniform vec3 uLC[${INT_LIGHTS}]; uniform int uLN; uniform float uIntLit;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       if (uIntLit > 0.5 && uLN > 0) {
-        vec3 N = normalize(cross(dFdx(vLP), dFdy(vLP)));
+        vec3 N = cross(dFdx(vLP), dFdy(vLP)); float nl = dot(N, N); N = nl > 1e-30 ? N * inversesqrt(nl) : vec3(0.0, 1.0, 0.0); // (degenerate derivatives: no NaN for bloom to spread)
         vec3 V = normalize(vCamL - vLP);
         if (dot(N, V) < 0.0) N = -N;
         float flo = step(0.85, N.y) * (1.0 - smoothstep(0.03, 0.2, vLP.y));
