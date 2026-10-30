@@ -263,8 +263,16 @@ check('racing for it: his Widowmaker lines up against you, locked (nobody takes 
 check('lost: your car is his (ordinary pink-slip rules); the Widowmaker stays his and on offer, and nobody can drive off in it', !lost.mine && !lost.widow && lost.st === 2 && lost.strays, JSON.stringify(lost));
 await ev(() => { const g = window.game; g.uw.S.day += 1; window.__E = window.__car('muscle', 320, 330).uid; window.__calm(); });
 const won = await race(1);
-const wonS = await ev(() => { const g = window.game, s = g.save, e = s.garage.filter(x => x.type === 'u_widow'); const v = e[0] && g.vreg.live(e[0]); return { inBay: !!(e[0] && !e[0].out && e[0].at), n: e.length, origin: e[0] && e[0].origin, vtier: e[0] && e[0].vtier, st: s.uniques.widow.st, mine: s.garage.some(x => x.uid === window.__E), live: !!(v && v.owned && !v.locked), due: g.uniques.widowDue(), next: g.pinks.rival(s.garage.find(x => x.uid === window.__E), g.pinks.def(false)).type }; });
-check('won: the Widowmaker is yours (where it stopped, unlocked, or in its space if his car was gone), your car stays yours, and he never stakes it again', won.opp && won.opp.type === 'u_widow' && wonS.n === 1 && wonS.origin === 'pinkslip' && wonS.vtier === 'unique' && wonS.st === 3 && wonS.mine && (wonS.live || wonS.inBay) && !wonS.due && wonS.next !== 'u_widow', JSON.stringify(wonS));
+const wonS = await ev(() => { const g = window.game, s = g.save, e = s.garage.filter(x => x.type === 'u_widow'); const v = e[0] && g.vreg.live(e[0]); return { uid: e[0] && e[0].uid, out: !!(e[0] && e[0].out), loc: e[0] && e[0].loc, inBay: !!(e[0] && !e[0].out && e[0].at), n: e.length, origin: e[0] && e[0].origin, vtier: e[0] && e[0].vtier, st: s.uniques.widow.st, mine: s.garage.some(x => x.uid === window.__E), live: !!(v && v.owned && !v.locked), due: g.uniques.widowDue(), next: g.pinks.rival(s.garage.find(x => x.uid === window.__E), g.pinks.def(false)).type }; });
+// where it stopped: as with any pink slip, a finish that leaves his car beyond the registry's 340 m keep radius puts it
+// away on the street there; go there and it is in the world again, yours and unlocked
+if (!wonS.live && !wonS.inBay && wonS.out && wonS.loc) wonS.there = await ev(r => {
+  const g = window.game; if (g.player.state === 'vehicle') g.exitVehicle(true); g.resetPlayerState(r.loc.x + 3, r.loc.z + 3, 0);
+  for (let n = 0; n < 120; n++) g.update(1 / 60, 1 / 60);
+  const e = g.save.garage.find(x => x.uid === r.uid), v = e && g.vreg.live(e);
+  return { live: !!(v && v.owned && !v.locked), d: v ? Math.round(Math.hypot(v.pos.x - r.loc.x, v.pos.z - r.loc.z)) : null };
+}, wonS);
+check('won: the Widowmaker is yours (where it stopped, unlocked, or in its space if his car was gone), your car stays yours, and he never stakes it again', won.opp && won.opp.type === 'u_widow' && wonS.n === 1 && wonS.origin === 'pinkslip' && wonS.vtier === 'unique' && wonS.st === 3 && wonS.mine && (wonS.live || wonS.inBay || (wonS.there && wonS.there.live && wonS.there.d < 40)) && !wonS.due && wonS.next !== 'u_widow', JSON.stringify(wonS));
 const widowStake = await ev(() => { const g = window.game, e = g.save.garage.find(x => x.type === 'u_widow'), v = g.vreg.live(e) || g.vreg.spawnFor(e, g.vreg.where(e)); return g.pinks.canStake(v, g.pinks.def(false)); });
 check('a one-off is never staked: the Widowmaker can’t be put up', /one of a kind/i.test(widowStake), widowStake);
 
