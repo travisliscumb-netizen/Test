@@ -63014,24 +63014,56 @@ class Game {
     if (IS_TOUCH) document.body.classList.add('touch');
     window.addEventListener('beforeunload', () => { if (this.state !== 'menu' && this.state !== 'loading') this.saveGame(); });
   }
-  // Draw everything once (every room and district, hidden or not, no culling) into one pixel of the kind of target
-  // the real frame uses, so the GPU builds every shader and draw state now, behind the loading screen or a settings
-  // change, not the first time each district or room comes into view (a software or lazily-compiling GPU stalls on
-  // that first draw for a second or more). Visibility and culling are put back as they were. (G2)
+  // Draw every shader once into one pixel of the kind of target the real frame uses, so the GPU builds each program
+  // and draw state now, behind the loading screen or a settings change, not the first time a district or room comes
+  // into view (a software or lazily-compiling GPU stalls on that first draw for a second or more). What picks a
+  // program is the material, the object kind (instanced, instance colours) and the attribute layout, not how much
+  // geometry there is: so each distinct combination, hidden or not, is drawn once as a three-vertex stand-in (a
+  // sprite as a sprite), and the real objects sit out the draw by layer mask (their child lights still count, so the
+  // light state is the one play will see; showing hidden objects instead also switched on the lights they carry and
+  // built programs for a light state that never occurs). Drawing the objects themselves pushed every vertex of the
+  // city through both passes (about 4 s of boot on software GL) and uploaded every hidden mesh. Skinned, batched and
+  // morphing objects (none today) draw as themselves. Layers are put back whatever happens. (G2)
   warmShaders() {
-    const r = this.renderer, sc = this.scene, cam = this.camera, shown = [], culled = [];
-    sc.traverse(o => { if (!o.visible) { shown.push(o); o.visible = true; } if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine)) { culled.push(o); o.frustumCulled = false; } });
+    const r = this.renderer, sc = this.scene, cam = this.camera, seen = new Map(), masked = [], stand = [];
     const prevT = r.getRenderTarget(), prevS = r.getScissorTest(), sAuto = r.shadowMap.autoUpdate;
     const vp = r.getViewport(new THREE.Vector4()), sci = r.getScissor(new THREE.Vector4());
     try {
+      sc.traverse(o => {
+        if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite) || !o.geometry || !o.material) return;
+        const gm = o.geometry;
+        if (o.isSkinnedMesh || o.isBatchedMesh || Object.keys(gm.morphAttributes).length) return;
+        masked.push(o, o.layers.mask); o.layers.mask = 0;
+        if (o.isSprite) { if (!seen.has('S' + o.material.id)) seen.set('S' + o.material.id, o); return; }
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        let key = `${o.isInstancedMesh ? 'I' : o.type}${o.instanceColor ? 'c' : ''}${o.castShadow ? 's' : ''}:${mats.map(m => m.id).join(',')}:${o.customDepthMaterial ? o.customDepthMaterial.id : ''}:${o.customDistanceMaterial ? o.customDistanceMaterial.id : ''}`;
+        for (const n in gm.attributes) { const a = gm.attributes[n]; key += `|${n}${a.itemSize}${a.array.constructor.name}${a.normalized ? 'n' : ''}${a.isInstancedBufferAttribute ? 'i' : ''}`; }
+        if (!seen.has(key)) seen.set(key, o);
+      });
+      for (const o of seen.values()) {
+        if (o.isSprite) { const p = new THREE.Sprite(o.material); p.frustumCulled = false; stand.push(p); sc.add(p); continue; }
+        const src = o.geometry, gm = new THREE.BufferGeometry();
+        for (const n in src.attributes) {
+          const a = src.attributes[n], arr = new a.array.constructor(3 * a.itemSize);
+          gm.setAttribute(n, a.isInstancedBufferAttribute ? new THREE.InstancedBufferAttribute(arr, a.itemSize, a.normalized, a.meshPerAttribute) : new THREE.BufferAttribute(arr, a.itemSize, a.normalized));
+        }
+        for (const gr of src.groups) gm.addGroup(0, 3, gr.materialIndex);
+        const p = o.isInstancedMesh ? new THREE.InstancedMesh(gm, o.material, 1) : o.isPoints ? new THREE.Points(gm, o.material)
+          : o.isLineSegments ? new THREE.LineSegments(gm, o.material) : o.isLineLoop ? new THREE.LineLoop(gm, o.material) : o.isLine ? new THREE.Line(gm, o.material) : new THREE.Mesh(gm, o.material);
+        if (o.instanceColor) p.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(3), 3);
+        p.castShadow = o.castShadow; p.receiveShadow = o.receiveShadow; p.frustumCulled = false;
+        p.customDepthMaterial = o.customDepthMaterial; p.customDistanceMaterial = o.customDistanceMaterial;
+        stand.push(p); sc.add(p);
+      }
       // post-processing renders the scene into a target (no tone mapping, linear output); without it, to the screen
       const t = this.usePost ? (this._warmRT || (this._warmRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType }))) : null;
       r.setRenderTarget(t); r.setScissorTest(true); r.setScissor(0, 0, 1, 1); r.setViewport(0, 0, 1, 1);
       r.shadowMap.needsUpdate = true; r.render(sc, cam);
-    } catch { /* an optimisation only */ }
-    r.setRenderTarget(prevT); r.setScissorTest(prevS); r.setScissor(sci); r.setViewport(vp); r.shadowMap.autoUpdate = sAuto; r.shadowMap.needsUpdate = true;
-    for (const o of shown) o.visible = false;
-    for (const o of culled) o.frustumCulled = true;
+    } catch { /* an optimisation only */ } finally {
+      r.setRenderTarget(prevT); r.setScissorTest(prevS); r.setScissor(sci); r.setViewport(vp); r.shadowMap.autoUpdate = sAuto; r.shadowMap.needsUpdate = true;
+      for (const p of stand) { sc.remove(p); if (p.isSprite) continue; p.geometry.dispose(); if (p.isInstancedMesh) p.dispose(); } // sprites share three's quad
+      for (let i = 0; i < masked.length; i += 2) masked[i].layers.mask = masked[i + 1];
+    }
   }
   setupPost(msaa) {
     const r = this.renderer;
