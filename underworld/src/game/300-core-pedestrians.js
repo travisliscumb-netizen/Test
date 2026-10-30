@@ -292,7 +292,8 @@ class PedManager {
     const g = this.g;
     if (p.state === 'down') {
       p.timer -= dt;
-      p.vx = damp(p.vx, 0, p.y > groundY(p.x, p.z) + 0.05 ? 0.5 : 5, dt); p.vz = damp(p.vz, 0, p.y > groundY(p.x, p.z) + 0.05 ? 0.5 : 5, dt);
+      const fl = p.floor !== undefined ? p.floor : groundY(p.x, p.z);
+      p.vx = damp(p.vx, 0, p.y > fl + 0.05 ? 0.5 : 5, dt); p.vz = damp(p.vz, 0, p.y > fl + 0.05 ? 0.5 : 5, dt);
       if (p.timer <= 0 && !p.ko) { p.state = p.kind === 'cop' ? 'chase' : (p.brain && p.kind !== 'civ') ? 'free' : 'flee'; p.timer = rand(4, 7); p.fleeFrom = { x: g.player.pos.x, z: g.player.pos.z }; }
     } else if (p.state === 'flee') {
       p.timer -= dt;
@@ -316,7 +317,8 @@ class PedManager {
     }
     p.vy -= GRAVITY * dt;
     p.x += p.vx * dt; p.z += p.vz * dt; p.y += p.vy * dt;
-    const gy = groundY(p.x, p.z);
+    // someone inside a building (a bank's guards, the police who storm it) stands on its floor, not the street above
+    const gy = p.floor !== undefined ? p.floor : groundY(p.x, p.z);
     if (p.y <= gy) { p.y = gy; if (p.vy < -6 && p.state === 'down') g.fx.dust(p.x, gy + 0.1, p.z, 3); p.vy = 0; }
     const r = g.world.grid.resolveCircle(p.x, p.z, 0.3, p.y + 0.3, p.y + 1.7, this._res);
     if (r.hit) { p.x = r.x; p.z = r.z; if (p.state === 'rejoin' || p.state === 'flee') { p.vx += -r.nz * 2; p.vz += r.nx * 2; } }

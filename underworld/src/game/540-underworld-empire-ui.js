@@ -351,6 +351,7 @@ class EmpireUI {
     for (const L of uw.locs) {
       if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : 'W');
       else if (L.kind === 'hq' && !S.factions[L.id].broken) icon(L.x, L.z, FACTIONS[L.id].col, '♛');
+      else if (L.kind === 'spot' && L.def.bank) { if (this.g.save.discovered.zones[L.zone]) icon(L.x, L.z, '#ffd84d', 'K'); }
       else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : L.def.fixer ? 'L' : 'S');
     }
     const pd = this.g.world.places.police.door; icon(pd.x, pd.z, '#4d8dff', 'P');
@@ -889,8 +890,15 @@ class EmpireUI {
       g.content.refreshSvc(`She counts ${fmtMoney(r.dirty)} twice. ${fmtMoney(r.clean)} will be in your bank in about ${Math.round(FIXER_DELAY / uw.econRate())} hours.`);
     });
   }
+  // a bank's street panel: what kind of branch it is, whether security is up, and the way in
+  openBank(L) {
+    const uw = this.uw, g = this.g, id = L.def.bank, B = BANKS[id], sec = uw.banks.sec(id);
+    g.content.openSvc(B.name, B.role, () => `<div class="hint">${ZONES[L.zone].name}. Open to everyone. ${['', 'A savings branch: two tellers, a back office, a small cash room and deposit boxes.', 'A business bank: four windows, glass offices, a secured corridor, a vault and a deposit room.', 'The island’s central bank: a marble hall, six windows, a great vault and a deposit hall.'][B.tier]}${sec ? ' <b>Security is up</b> after a recent robbery.' : ''}</div><div class="row"><button data-act="in">Walk in</button><button data-act="close">Not now</button></div>`,
+      a => { g.ui.back(); if (a === 'in') uw.banks.enter(id); });
+  }
   openSpot(L) {
     const uw = this.uw, g = this.g, S = uw.S, s = L.def;
+    if (s.bank) { this.openBank(L); return; }
     if (s.arms) { this.openArmorer(L); return; }
     if (s.fixer) { this.openFixer(L); return; }
     const z = L.zone;

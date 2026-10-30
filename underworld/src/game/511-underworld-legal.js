@@ -30,12 +30,12 @@ const LEGAL = {
   // the chance a contested count is thrown out, by the evidence behind it
   dismiss: { police: 0.06, witness: 0.34, physical: 0.02 },
   fineMaxDays: 6, finePerDay: 400,
-  severe: ['shootcop', 'hitcop', 'stealcop', 'copcar', 'robbery', 'koped', 'explosion', 'escape'],
+  severe: ['shootcop', 'hitcop', 'stealcop', 'copcar', 'robbery', 'koped', 'explosion', 'escape', 'bankrob', 'killguard'],
   fixMax: 0.95, fixDirtyK: 1.25,
   fugitive: { k: 0.2, min: 7, max: 60 },
   quash: { base: 0.7, per: 900, min: 2000 }
 };
-const CHARGE_NAME = { hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person', robbery: 'Armed robbery', burglary: 'Burglary', escape: 'Escaping custody' };
+const CHARGE_NAME = { hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person', robbery: 'Armed robbery', burglary: 'Burglary', escape: 'Escaping custody', bankrob: 'Bank robbery', assaultguard: 'Assaulting a security guard', killguard: 'Killing a security guard' };
 const EVIDENCE_NAME = { police: 'an officer saw it', witness: 'a witness statement', physical: 'found on you' };
 class Legal {
   constructor(uw) { this.uw = uw; this.recT = 0; this.open = false; }

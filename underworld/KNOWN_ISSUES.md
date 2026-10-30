@@ -25,6 +25,16 @@
 - police: a parked cruiser's pull-out distance; raid: real-time clock and save-clock checks; roadnet: the
   estate-relocation reload check (all pass solo; seen failing only in the 3-wide run, m12-full).
 
+## Banks (after the graphics gate) — known limits
+- Guards stay in their building; once you are out, the police take over (the street pursuit as ever).
+- No hostages and no bag carrying limit: what you take is Dirty Cash in hand as you take it; an arrest seizes it.
+- The police storm through the front doors only (no back entrance); the vault's time lock is a drill timer.
+- Fights are switched on only inside the banks (an interior opts in); other interiors are as before.
+- Banking at the counter is the Clean Bank account and statement; no deposits, withdrawals or loans (by design: the
+  game has no cash-to-bank move outside laundering).
+- Not measured on a device: a bank interior is 24–28 draw calls at Low (44 at Medium for the Central), the city
+  hidden; the Central's hall is the largest room in the game.
+
 ## Economy (M13) — watch in playtesting
 - Pickpocketing: after the M13 rich-district wariness, circling the rich districts measures ≈ $6.6k an hour against
   ≈ $5.0k in ordinary ones (seeded model of a brisk pace, ECONOMY.md); a human pace will differ. `PICK_WARY` is

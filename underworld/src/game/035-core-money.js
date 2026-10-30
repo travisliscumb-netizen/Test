@@ -17,7 +17,7 @@
 const MONEY_SOURCES = {
   // ---- Dirty income (§2, §45.17, §45.18)
   pickpocket: { earn: 'me' }, glovebox: { earn: 'me' }, pickup: { earn: 'me' }, chop: { earn: 'me' },
-  fence: { earn: 'me' }, deal: { earn: 'me' }, arms: { earn: 'me' }, heist: { earn: 'me' }, burglary: { earn: 'me' },
+  fence: { earn: 'me' }, deal: { earn: 'me' }, arms: { earn: 'me' }, heist: { earn: 'me' }, burglary: { earn: 'me' }, bankRob: { earn: 'me' },
   package: { earn: 'me' }, secret: { earn: 'me' }, contract: { earn: 'me' }, streetRace: { earn: 'me' }, event: { earn: 'me' },
   bounty: { earn: 'stash', book: 'bounties' }, dealers: { earn: 'stash', book: 'dealers' }, royalty: { earn: 'stash', book: 'territory tax' }, tribute: { earn: 'stash', book: 'tribute' },
   // ---- Clean income

@@ -688,6 +688,7 @@ class ContentManager {
       if (id === 'safehouse' || id === 'penthouse') { const pt = id === 'safehouse' ? 'linden' : 'penthouse'; g.save.home = pt; g.autosave('Home'); }
     }
     if (g.campaign) g.campaign.onInterior(id, entered);
+    if (g.uw && g.uw.banks) g.uw.banks.onInterior(id, entered);
   }
   onAlarm() {
     const g = this.g;
@@ -788,6 +789,7 @@ class ContentManager {
     if (id.startsWith('c:')) { this.searchContainer(+id.slice(2)); return; }
     if (id.startsWith('w:')) { g.uw.compounds.spot(id.slice(2)); return; }
     if (id.startsWith('rv:')) { g.uw.rivalwh.spot(id.slice(3)); return; }
+    if (id.startsWith('bk:')) { g.uw.banks.spot(id.slice(3)); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;

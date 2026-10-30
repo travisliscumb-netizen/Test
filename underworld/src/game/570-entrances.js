@@ -28,6 +28,8 @@ class EntranceDressing {
       add(def.door.x, def.door.z, def.door.h || 0, kind, def.id);
     }
     // property for sale or owned (homes, businesses, warehouses)
+    // the banks' front doors (their facades are the bank system's own, 512)
+    if (g.uw) for (const L of g.uw.locs) if (L.kind === 'spot' && L.def.bank) add(L.x, L.z, L.h || 0, 'public', L.id);
     if (g.uw) for (const L of g.uw.locs) if (L.kind === 'prop' && L.def.kind !== 'garage') add(L.x, L.z, L.h || 0, L.def.kind === 'safehouse' ? 'home' : L.def.kind === 'warehouse' ? 'works' : 'shop', L.def.id, L.setback);
     // houses you can break into look like houses you can walk into
     for (const hm of w.homes) {

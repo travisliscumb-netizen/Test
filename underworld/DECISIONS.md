@@ -50,3 +50,23 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
   grid), not a reflection pass; the Royale's odds are untouched (presentation only); no save field added, so no
   migration and no `SAVE_VERSION` bump. The M13 snapshot (`releases/pre-graphics-m13/`) is frozen; the after build
   ships with the main save keys.
+
+## The banks (owner request after the graphics gate; built on existing systems)
+- Three branches open from day one (Old Quarter Neighborhood Bank, Downtown Commercial Bank, Port Valen Central
+  Bank); no Rank, Rep, job or upgrade gate: the difficulty is the gate (guards 1/3/6, alarm 2★/3★/3★, the police
+  through the door after 75/55/40 s, a star more every 60/45/30 s inside).
+- Reserves vary by economic day (seeded per bank and day) and rise to the end of the economic week; your ranges
+  are the full banks (Neighborhood ~$27–74k, Commercial ~$79–216k, Central ~$160–448k before the deposit boxes'
+  spread). Recovery is slow on purpose (tills 2 days, cash room 10, vault 25, drilled boxes 21): robbing one
+  branch every economic day earns 6–15% of a full robbery a day (ECONOMY.md §12).
+- Proceeds are Dirty Cash in hand ('bankRob'); valuables from the boxes are hot goods; an arrest seizes what you
+  carry, like any arrest.
+- Legitimate banking is the Clean Bank account at the counter (balance, debt, yesterday's statement); the branch
+  takes no cash over the counter (Dirty money still goes through a front or the fixer: no parallel laundering).
+- Charges of their own on the case file, on the CCTV as an officer's report: Bank robbery (45 days, severe),
+  Assaulting a security guard (8), Killing a security guard (90, severe). A guard downed by gunfire is a killing;
+  by fists or a bat, an assault.
+- Interiors gained an opt-in fight flag (only the banks set it): combat, guards and officers on the interior
+  floor, police who came in can see and arrest you there. A guard holds an unarmed robber (an arrest); the
+  guards shoot it out with an armed or violent one; at 3★ and above the police shoot, as on the street.
+

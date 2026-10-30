@@ -1464,7 +1464,7 @@ class InteriorManager {
     if (!def || !def.dynamic) return;
     for (const c of def.cols || []) this.g.world.grid.remove(c);
     this.g.scene.remove(def.group);
-    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.pick) o.material.dispose(); });
+    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && (o.material.userData.pick || o.material.userData.own)) o.material.dispose(); });
     delete this.defs[def.id];
   }
   _window(w) {
@@ -1499,7 +1499,7 @@ class InteriorManager {
       if (prev) prev.group.visible = false;
       if (prev && prev !== def) this.dispose(prev);
       this.cur = def; def.group.visible = true;
-      p.interior = { id, floor: def.fy, def };
+      p.interior = { id, floor: def.fy, def, fight: !!def.fight };
       const sp = def.spawn || { x: def.exit.x, z: def.exit.z - 0.9 };
       p.pos.set(def.ox + sp.x, def.fy, def.oz + sp.z);
       if (def.realView) this.g.chunks.wide(true); else this.g.chunks.wide(false);

@@ -15,6 +15,11 @@
   invariants — resale ≤85%, the laundering ladder, the economic clock, sleep, no jail profit, casino RTP, the
   bounded progressive, race tiers, the jackpot stress test, broke recovery, payroll order, pickpocket wariness,
   supplier restock, Rank monotonicity and hints).
+- Added after the graphics gate: `nanframes` (no shader writes a NaN or infinite pixel: seven scenes at Medium and
+  High into a float target) and `banks` (the three banks: entry from a new game, tiers, reserves by economic day,
+  every robbery stage and its payout as Dirty Cash, persistence through leaving, save/reload, arrest and death,
+  recovery, the no-money-engine bound, guards' warning and fight, the alarm, containment, escalation and the
+  police storming in, guard violence on the case file, an unarmed robber held and arrested, draw cost inside).
 - Measurement tools (not tests; they print and write JSON under `.runs/`):
   `node underworld/tools/econ-probe.mjs [index.html] [out.json]` (prices, loot EVs, passive simulations: the
   tables in ECONOMY.md); `node underworld/tools/perf-scenarios.mjs [index.html] [out.json]` (the phone-profile

@@ -2,7 +2,7 @@
    [CORE] POLICE MANAGER (heat levels, perception, pursuit, search, arrests)
    ===================================================================== */
 const HEAT_LEVELS = [0, 1, 4, 10, 20, 34];
-const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5 };
+const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5, bankrob: 5, assaultguard: 2, killguard: 7 };
 const UNITS_PER_LEVEL = [0, 2, 3, 5, 7, 9];
 class PoliceManager {
   constructor(game) {
@@ -362,7 +362,8 @@ class PoliceManager {
       for (const u of this.units) { if (u.v.burnt || u.standDown) continue; const d = Math.hypot(u.v.pos.x - px, u.v.pos.z - pz); if (d < range && grid.lineOfSight(u.v.pos.x, u.v.pos.y + 1.4, u.v.pos.z, px, py, pz)) { seen = true; break; } }
       if (!seen) for (const c of this.cops) { if (c.state === 'down') continue; const d = Math.hypot(c.x - px, c.z - pz); if (d < range * 0.8 && grid.lineOfSight(c.x, c.y + 1.6, c.z, px, py, pz)) { seen = true; break; } }
       if (!seen && this.heli.active && Math.hypot(this.heli.x - px, this.heli.z - pz) < 65) seen = true;
-      if (p.interior) seen = false;
+      // inside: nobody outside sees you; in a building where a fight can happen (a bank), an officer who came in does
+      if (p.interior) seen = !!p.interior.fight && this.cops.some(c => c.state !== 'down' && Math.abs(c.y - p.pos.y) < 2.5 && Math.hypot(c.x - px, c.z - pz) < range * 0.8 && grid.lineOfSight(c.x, c.y + 1.6, c.z, px, py, pz));
       const cur = p.state === 'vehicle' ? p.vehicle : null;
       if (seen) { this.visible = true; this.seenT = 0; this.lastSeen.x = px; this.lastSeen.z = pz; this.seenVeh = cur; }
       // out of sight: they search for the description they have. Switching cars (or ditching the
@@ -401,8 +402,8 @@ class PoliceManager {
     }
     // arrest
     let near = false;
-    if (this.level <= 2 && !p.interior) {
-      for (const c of this.cops) if (c.state === 'chase' && dist2(c.x, c.z, p.pos.x, p.pos.z) < (pv ? 3.2 : 1.7) ** 2) { near = true; break; }
+    if (this.level <= 2 && (!p.interior || p.interior.fight)) {
+      for (const c of this.cops) if (c.state === 'chase' && Math.abs(c.y - p.pos.y) < 2.5 && dist2(c.x, c.z, p.pos.x, p.pos.z) < (pv ? 3.2 : 1.7) ** 2) { near = true; break; }
     }
     if (near && (!pv || pv.speed < 1)) this.bust = Math.min(1, this.bust + dt / (pv ? 2.6 : 1.7));
     else this.bust = Math.max(0, this.bust - dt * 0.8);

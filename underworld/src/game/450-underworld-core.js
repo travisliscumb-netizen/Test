@@ -147,6 +147,7 @@ class Underworld {
     this.fixer = new LaunderFixer(this);
     this.whse = new WarehouseSystem(this);
     this.rivalwh = new RivalWarehouses(this);
+    this.banks = new BankSystem(this); this.banks.buildFacades();
     this.compounds = new CompoundSystem(this);
     this.threats = new ThreatSystem(this);
     this.shipments = new ShipmentSystem(this);
@@ -190,6 +191,8 @@ class Underworld {
       threats: ThreatSystem.fresh(),
       // Session 4B: the rival gangs' warehouses (their stock, cash, security, breaches and any raid on)
       rivals: RivalWarehouses.fresh(),
+      // the three banks: what each robbery took from which area and when, deposit boxes drilled, security steps
+      banks: BankSystem.fresh(),
       // every load on the road or at the docks: rival restocks, the Tidewater boat, your imports (cargo saved in it)
       ships: ShipmentSystem.fresh()
     };
@@ -263,6 +266,7 @@ class Underworld {
     S.whse = WarehouseSystem.sanitize(S.whse, num);
     S.threats = ThreatSystem.sanitize(S.threats, num);
     S.rivals = RivalWarehouses.sanitize(S.rivals, num);
+    S.banks = BankSystem.sanitize(S.banks, num);
     S.turfStock = obj(S.turfStock, {}); for (const k in S.turfStock) { if (!(+k >= 0 && +k < this.T.length)) delete S.turfStock[k]; else S.turfStock[k] = goods(S.turfStock[k]); }
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept;
@@ -291,6 +295,7 @@ class Underworld {
     if (this.compounds) this.compounds.reset();
     if (this.threats) this.threats.reset();
     if (this.rivalwh) this.rivalwh.reset();
+    if (this.banks) this.banks.reset();
     if (this.shipments) this.shipments.reset();
     if (this.g.vreg) this.g.vreg.reset();
     if (this.g.uniques) this.g.uniques.reset();
@@ -763,6 +768,7 @@ class Underworld {
   }
   // the engine reports every knockdown; robbing gang members and their drops live here
   onKnock(p, byPlayer, ko) {
+    if (p.bank) this.banks.onKnock(p, byPlayer, ko);
     if (!byPlayer) return;
     // knocking a civilian down is assault, not a way to earn: nothing drops (mugging is cut, §20, §45.18).
     // Pickpocketing is the civilian-theft verb. Criminals still drop their Dirty Cash and product.
@@ -776,7 +782,7 @@ class Underworld {
       this.pickups.drop(dx, dz, (p.role === 'boss' ? rand(1500, 4000) : rand(40, 190)) * (p.role === 'dealer' ? 1.6 : 1), goods);
     }
   }
-  onPedHit(c, kind, dmg) { this.gangs.onHit(c, kind, dmg); }
+  onPedHit(c, kind, dmg) { if (c.bank) this.banks.onHit(c, kind); this.gangs.onHit(c, kind, dmg); }
   onCrime(type, sev, witnessed, x, z) { this.cops.crime(type, sev, witnessed, x, z); }
   // ---------------------------------------------------------------- strategic clock
   update(dt, rdt) {
@@ -802,7 +808,7 @@ class Underworld {
       this.pickups.update(dt);
       this.compounds.update(dt);
       this.legal.update(dt);
-      if (!S.jail) { this.gangs.update(dt); this.shipments.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
+      if (!S.jail) { this.gangs.update(dt); this.banks.update(dt); this.shipments.update(dt); this.crew.update(dt); this.opps.update(dt); this.updateMarkers(rdt); }
       this.combatT = Math.max(0, this.combatT - dt);
     }
     this.ui.update(rdt);
@@ -931,6 +937,7 @@ class Underworld {
       if (L.kind === 'deal') continue;
       if (dist2(L.x, L.z, p.pos.x, p.pos.z) > 2.4 * 2.4) continue;
       if (L.kind === 'prop') { const a = this.props.doorAction(L); if (a) return a; }
+      if (L.kind === 'spot' && L.def.bank) return { label: `Enter ${L.def.name}`, act: () => this.banks.enter(L.def.bank) };
       if (L.kind === 'spot') return { label: L.def.chop ? 'Chop shop (drive a stolen car in)' : `${L.def.name} · ${L.def.role}`, act: () => L.def.chop ? this.ui.openChopInfo() : this.ui.openSpot(L) };
     }
     const ga = this.props.garageActionFoot(); if (ga) return ga;

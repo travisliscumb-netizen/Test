@@ -360,7 +360,9 @@ const SPOTS = [
   { id: 'feld', name: 'Doc Feld', role: 'Supplier · pharma', at: [4, 4, 2, 50], sells: ['pills'], rep: 300, col: 0xffd84d },
   { id: 'armorer', name: 'The Armorer', role: 'Weapons · buys hardware', at: [8, 11, 0, 30], arms: true, rep: 0, col: 0xff8a3d },
   { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b },
-  { id: 'fixer', name: 'Dina Vance', role: 'Laundering fixer · Dirty Cash in, Clean Bank out', at: [3, 1, 3, 30], fixer: true, rep: 0, col: 0x8fe39b }
+  { id: 'fixer', name: 'Dina Vance', role: 'Laundering fixer · Dirty Cash in, Clean Bank out', at: [3, 1, 3, 30], fixer: true, rep: 0, col: 0x8fe39b },
+  // the three banks (353, 512): where they stand comes from BANKS
+  ...['n', 'd', 'c'].map(id => ({ id: 'bank_' + id, name: BANKS[id].name, role: BANKS[id].role, at: BANKS[id].at, bank: id, col: BANKS[id].col }))
 ];
 // the early laundering fixer (§45.6, §45.22): she takes Dirty Cash you hand her in person and puts it in your bank
 // FIXER_DELAY economic hours later, minus FIXER_FEE, at most FIXER_DAY_CAP a day. Time runs on the economic clock
@@ -414,7 +416,7 @@ const OFFICERS = [
   { id: 'vale', name: 'Deputy Chief Corinne Vale', rank: 'Headquarters', minRank: 5, fee: 50000, honest: 0.5, perks: 'Halves the pressure your turfs generate and takes 30% off every sentence.' }
 ];
 const OFFICER_BY_ID = Object.fromEntries(OFFICERS.map(o => [o.id, o]));
-const CRIME_PRESSURE = { hitped: 2, assault: 1.2, shoot: 1.5, carjack: 1.6, stealcop: 5, ramcop: 2.5, hitcop: 4, shootcop: 6, copcar: 7, explosion: 3, koped: 2.5, theft: 0.8, deal: 1.5, pickpocket: 0.6 };
+const CRIME_PRESSURE = { hitped: 2, assault: 1.2, shoot: 1.5, carjack: 1.6, stealcop: 5, ramcop: 2.5, hitcop: 4, shootcop: 6, copcar: 7, explosion: 3, koped: 2.5, theft: 0.8, deal: 1.5, pickpocket: 0.6, bankrob: 6, assaultguard: 2, killguard: 9 };
 function turfAt(x, z) {
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return Math.floor(bz / 2) * TURF_N + Math.floor(bx / 2);

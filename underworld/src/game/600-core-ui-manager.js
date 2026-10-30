@@ -732,6 +732,7 @@ class UIManager {
     for (const L of uw.locs) {
       if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) blip(L.x, L.z, FACTIONS[L.id].col, 5, false, 'sq');
+      else if (L.kind === 'spot' && L.def.bank) { if (g.save.discovered.zones[L.zone]) badge(L.x, L.z, MAP_CATS.bank.col, 'K', bs, false); }
       else if (L.kind === 'spot') blip(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), 4, false, 'sq');
     }
     for (const m of uw.gangs.blips()) blip(m.x, m.z, m.kind === 'crew' ? '#ffb547' : (m.group && m.group.hostile ? '#ff4d5e' : FACTIONS[m.fac] ? FACTIONS[m.fac].col : '#aaa'), m.kind === 'crew' ? 3.5 : 3);
@@ -789,6 +790,7 @@ const MAP_CATS = {
   unique: { name: 'One-off leads', icon: '?', col: '#ffd84d', layer: 'locations' },
   // intel (M11): what you actually know, never more: a gang's stash house once you know its district, and the
   // places a threat is aimed at while it is live
+  bank: { name: 'Banks', icon: 'K', col: '#ffd84d', layer: 'locations' },
   rivalwh: { name: 'Rival stash houses', icon: 'R', col: '#ff4d5e', layer: 'intel' },
   threat: { name: 'Threats', icon: '⚠', col: '#ff4d5e', layer: 'intel' }
 };
@@ -824,6 +826,7 @@ const MAP_GLYPHS = {
   '▲': 'M5 2.5h2.2V22H5zM8.4 3.3h11.4l-2.6 4.1 2.6 4.1H8.4z', // landmark
   '⚠': 'M12 2.2 23 21.3H1zm-1.3 6.6v6.6h2.6V8.8zm0 8.4v2.4h2.6v-2.4z', // threat
   O: 'M1.5 20 8.5 8l3.6 5.7L15 9.5 22.5 20zm7-7.7L5.6 17h5.8z', // off-road park
+  K: 'M12 2 2.5 7v2.2h19V7zM4.5 10.4h2.8v7.4H4.5zm4.6 0h2.8v7.4H9.1zm4.6 0h2.8v7.4h-2.8zm4.6 0H21v7.4h-2.7zM2.5 19h19v2.6h-19z', // bank
   R: 'M3 6.5h18V21H3zm2.2 2.2v10.1h13.6V8.7zM3 3h18v2.2H3zm4.9 7.7L12 13.4l4.1-2.7 1.1 1.6L13.8 14.6l3.4 2.3-1.1 1.6L12 15.8l-4.1 2.7-1.1-1.6 3.4-2.3-3.4-2.3z' // rival stash
 };
 MAP_GLYPHS.N = MAP_GLYPHS.U; // new cars: the same car, in the dealer's own colour
@@ -899,7 +902,8 @@ class MapView {
         add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
-        if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
+        if (L.def.bank) { /* the banks list themselves once their district is known (BankSystem.mapEntries) */ }
+        else if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
         else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_DAY_CAP)} a day` });
         else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `${L.def.sells ? 'BUY ' + L.def.sells.map(k => GOODS[k].name).join(', ') : 'BUY guns, ammo, armour'}${L.def.arms ? ' · buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
@@ -917,6 +921,7 @@ class MapView {
       const pw = uw.loc('prop', 'pawn'); if (pw) add({ key: 'sell:pawn', name: 'Lucky’s Pawn · fence', cat: 'sell', x: pw.x + 1.5, z: pw.z + 1.5, sub: 'SELL hot goods and smokes · no questions asked' });
     }
     if (g.uniques) for (const e of g.uniques.mapEntries()) add(e);
+    if (uw) for (const e of uw.banks.mapEntries()) add(e);
     if (uw) {
       for (const fid in RIVAL_WH) { const C = uw.rivalwh.C(fid); if (!C || uw.S.factions[fid].broken || !g.save.discovered.zones[zoneKey(C.center.x, C.center.z)]) continue; add({ key: 'rv:' + fid, name: RIVAL_WH[fid].name, cat: 'rivalwh', col: FACTIONS[fid].col, x: C.center.x, z: C.center.z, sub: `${FACTIONS[fid].name}: their product and cash` }); }
       for (const o of uw.threats.open()) add({ key: 'th:' + o.id, name: `Threat: ${o.label}`, cat: 'threat', x: o.x, z: o.z, sub: `${FACTIONS[o.fid].short} · ${o.state === 'live' ? 'happening now' : o.state}` });

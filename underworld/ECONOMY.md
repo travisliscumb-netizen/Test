@@ -190,3 +190,28 @@ nothing that costs money: the opening's first job fronts $150.
   districts: +0.3, −0.06, odds −60 points, take −85%.
 - **Supplier restock:** half a shelf a day.
 - **Progressive:** visitor wins 1 in 400 days.
+
+## 12. Banks (added after the graphics gate; `banks` suite)
+Three branches, robbable from a new game. What each holds is `BANKS[].base` × the day of the economic week
+(×0.62 on its first day rising to ×1.30 on its last) × a seeded ±15% for that day, split between the tills, the cash
+room, the vault and the deposit boxes:
+
+| Bank | Full on a given day | Tills / cash room / vault / boxes | Guards | Alarm, response |
+|---|---|---|---|---|
+| Old Quarter Neighborhood Bank | ~$27–74k | 10 / 60 / – / 30% (24 boxes) | 1 | 2★; police in at 75 s; +1★ / 60 s |
+| Downtown Commercial Bank | ~$79–216k | 6 / 28 / 46 / 20% (60 boxes) | 3 | 3★; 55 s; +1★ / 45 s |
+| Port Valen Central Bank | ~$160–448k | 4 / 18 / 56 / 22% (120 boxes) | 6 | 3★; 40 s; +1★ / 30 s |
+
+Deposit boxes are skewed (most hold little, one in a few holds a lot; about one in five valuables as hot goods), so a
+full haul can pass the top of its range. A rushed job is the tills: a window is a few thousand dollars.
+
+- **Recovery** (`BANK_T.recover`): a robbed area refills from the economic clock: the tills in 2 days, the cash
+  room in 10, the vault in 25; a drilled box is empty for 21. A robbery adds a security step (another guard,
+  police 10 s sooner, stars 8 s sooner, jobs 15% slower), one step wearing off every 7 economic days.
+- **No money engine.** The same branch robbed perfectly every economic day (everything left, every time) earns 6–15%
+  of one full robbery a day: measured $10.6k / $21.2k / $34.4k an hour of play for the three (vs a first full haul
+  of $37k / $150k / $313k on the days sampled). Each of those is 2–5★, a 45-day count and more security; the
+  M13 jewellery spree it compares with is ~$33k an hour at 1–3★. All proceeds are Dirty Cash in hand: laundering
+  capacity (§6) and the arrest seizure still apply.
+- **Not for sale, not a bank account for dirty money:** the counter is your Clean Bank account (balance, debt,
+  yesterday's statement); it takes no cash deposits, so it is no laundering route.

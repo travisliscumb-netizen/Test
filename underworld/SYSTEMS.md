@@ -10,6 +10,7 @@
 | Traffic, driving AI | `280`, `290` | |
 | Pedestrians | `300` | |
 | Police (wanted 0–5, units, sight) | `310` | `copCanSee`, `crime()` |
+| Banks (three branches: banking, robbery) | `353` content, `512` `BankSystem` | reserves by economic day, depletion/recovery in `S.banks`; guards are people (`300`, `p.floor`) fighting with `gangAttack` (`470`); the alarm uses police containment (`310`); charges `bankrob`/`assaultguard`/`killguard` (`510`/`511`); Dirty Cash via `bankRob` |
 | Missions/stage engine, contacts | `340`, `380` | `CAMPAIGN`: Rosa's six opening jobs (M12), `until` stages |
 | Interiors kit, homes, stores | `350` | burglary/register robbery |
 | Robbable business interiors | `352` | `ROB_THEMES`, `ROB_SEC`, `BURGLARY`, `bizInteriorDef` (M10) |

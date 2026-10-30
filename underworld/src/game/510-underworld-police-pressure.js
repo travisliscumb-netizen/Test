@@ -5,7 +5,7 @@
    cannot be bought, outside task forces and political crackdowns.
    ===================================================================== */
 // days added per offence (capped at six counts each); ordinary early mistakes stay short
-const CRIME_DAYS = { hitped: 5, assault: 3, shoot: 8, carjack: 10, stealcop: 30, ramcop: 12, hitcop: 22, shootcop: 60, copcar: 45, explosion: 20, koped: 15, theft: 4, deal: 12, pickpocket: 2, robbery: 20, burglary: 6 };
+const CRIME_DAYS = { hitped: 5, assault: 3, shoot: 8, carjack: 10, stealcop: 30, ramcop: 12, hitcop: 22, shootcop: 60, copcar: 45, explosion: 20, koped: 15, theft: 4, deal: 12, pickpocket: 2, robbery: 20, burglary: 6, bankrob: 45, assaultguard: 8, killguard: 90 };
 class PressureSystem {
   constructor(uw) { this.uw = uw; }
   get S() { return this.uw.S; }

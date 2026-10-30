@@ -4229,3 +4229,21 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 - **No engine rewrite** was needed (no GRAPHICS / ENGINE ARCHITECTURE CHALLENGE raised): the overhaul fits the
   existing three.js r160 single-file architecture (merged chunks, instancing, onBeforeCompile shader patches).
 - **Saves:** no field added, renamed or removed; `SAVE_VERSION` unchanged; M13 saves load as they are.
+
+## After the graphics gate — the banks of Port Valen (owner request)
+- **What:** three banks in three districts (Old Quarter, Downtown, Financial District), each with its own facade
+  (stone and a green awning; dark glass and steel; a six-column portico under a stepped pediment), its own interior
+  (terrazzo and walnut, two windows, back office, cash room, 24 boxes; grey stone and navy, four windows, glass
+  offices, keypad door, cash room, vault, 60 boxes; a marble hall with columns and chandeliers, six windows,
+  executive suite, security office, bronze door, cash room, a round vault door, 120 boxes), and a map entry once
+  its district is known. Enter and rob from a new game.
+- **How (no parallel systems):** guards are people (`300`, new `p.floor` for an interior floor) fighting with the
+  gang fight code; interiors opt into combat (`def.fight`); police inside see and arrest you there; the alarm uses
+  the burglary containment; charges `bankrob` (45 d), `assaultguard` (8), `killguard` (90) on the M7 case file;
+  proceeds `bankRob` Dirty Cash; reserves on the M13 economic clock; state in `S.banks` (sanitized).
+- **Tuning:** reserves ~$27–74k / $79–216k / $160–448k by economic day (rising to the week's end); recovery tills
+  2 d, cash room 10, vault 25, boxes 21; security steps; a perfect daily robbery of one branch earns 6–15% of a full
+  one a day ($11k / $21k / $34k an hour of play at 2–5★ each time).
+- **Found on the way:** a manager's-desk petty-cash loop (now out of the tills' pool), the counter climbable over
+  its glass (colliders added), dynamic interiors not disposing their own door materials (fixed), the street menu
+  for a non-supplier spot (a bank panel).
