@@ -119,6 +119,18 @@ missing program at boot or after any quality change (the first version missed fi
 Warm draw 4.1 s → 26 ms; resident geometries after boot 476 → 188. What remains is the compile itself, ~5 s on
 software GL before the menu (§3), which M13 paid in play instead.
 
+### The black-out at the gate (G3)
+The after capture set had six frames 73–95% black that M13 did not (the causeway line-ups, the docks from the air,
+the skyline at dusk). The canvas itself was black there, with no scissor or overlay; the scene rendered into a
+float target, then each object on its own, showed NaN pixels from one material: Valen Point's new terrain shader,
+where its ground lies far off at a grazing angle. The bump-mapping helper (shared with the city's ground and walls
+since before the overhaul) normalised `abs(det) * n - grad`, a zero vector where the screen derivatives degenerate
+and the height has no gradient; `normalize(0)` is NaN on any GPU, and the bloom pass blurs one NaN pixel across
+its mip chain into most of the frame. The helper, and the interior lamp shader's derivative normal (the same
+pattern), now keep the plain normal for a zero or NaN vector. `tests/nanframes.mjs` renders seven scenes at
+Medium and High into a float target and fails on any NaN or infinite pixel; it fails on the build before the fix
+(12 and 27 NaN pixels) and passes after (`7919b22`).
+
 ## 3. Performance (G2, G12)
 
 All in headless Chromium on SwiftShader (CPU rasterised), M13 (`5b19596`) against the after build (`b389ca5`) on
