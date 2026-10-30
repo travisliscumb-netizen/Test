@@ -96,20 +96,28 @@ wet weather → map and phone → feedback → quality scaling → final gate.
   acquired; the HUD's Rank chip pulses when the Rank changes.
 
 ### The stall hunt at the gate (G2)
-The stress suite (390×844 touch, Low) showed 3–6 s frame gaps on transitions that M13 did not have on the same
-machine (M13: 0.6–2.4 s). Long-animation-frame timing showed an idle main thread: the cost was in the GPU
+The stress suite (390×844 touch, Low) showed 3–6 s frame gaps on every transition, far beyond the M13 build's on
+the same machine. Long-animation-frame timing showed an idle main thread: the cost was in the GPU
 process. Ruled out by measurement: shader programs (none new on those frames), streamed geometry (smaller than
 M13's), the HUD layer count, the map's vector symbols. A bisection of the stylesheet pinned it to one rule: the
 touch buttons' base style (a fractional 1.5 px border on round buttons, translucent label text, a redundant
 backdrop override), which made every control change re-rasterise the overlay in software. Fixed (2 px border,
 solid text), and the other costs found on the way removed too: icons are background images (not CSS masks),
 in-game overlays are flat translucent fills (no blurred shadows or per-button gradients), map symbols come from
-cached sprites. Result: stress 30/30, worst gap 1.2 s.
+cached sprites. Result: stress 30/30, worst gap after the first drive 1.7 s (two solo runs; the M13 build on
+the same machine: 30/30 and 29/30, 1.7 s and 3.2 s, the 3.2 s on first entering the jail).
 
 The same hunt also measured the Low preset's pixel ratio (raised to 0.85 earlier in the overhaul; back to 0.7, it
-is the weak-device preset) and added shader warm-up: a quality change that turns shadows on or off recompiles
-every program, and everything is drawn once at one pixel at boot and after such a change, so a browser that
-compiles shaders on first draw (Safari) does it behind the loading screen.
+is the weak-device preset) and added a shader warm-up, so a browser that builds shaders on their first draw
+(Safari) does it behind the loading screen or a settings change, not on first sight of a room or district. The
+first version drew the whole scene, hidden objects included, at one pixel: the size table at the gate showed it
+cost ~6 s of boot on software GL and kept every hidden mesh resident. What picks a program is the material, the
+object kind and the attribute layout, not the geometry; the warm-up now draws one three-vertex stand-in per
+distinct combination (192 in the city) with the real objects masked out by layer, so lights carried by hidden
+cars are not switched on and the programs built are the ones play uses. An exhaustive draw afterwards finds no
+missing program at boot or after any quality change (the first version missed five under the real light state).
+Warm draw 4.1 s → 26 ms; resident geometries after boot 476 → 188. What remains is the compile itself, ~5 s on
+software GL before the menu (§3), which M13 paid in play instead.
 
 ## 3. Performance (G2, G12)
 

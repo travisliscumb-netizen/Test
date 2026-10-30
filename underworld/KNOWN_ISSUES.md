@@ -7,8 +7,15 @@
 - prison: one random dice/cards outcome.
 - compound: hostile crew / gate-ram checks under load.
 - shots / cityshots: timeouts under load (screenshot scripts, no checks).
+- qashots (screenshot script, no checks): in the 3-wide run it either stops at the taxi scene (the cab is not
+  there after the phone scenes; M13 gate too, and the scene alone runs) or reaches the runner's 75-minute limit
+  (graphics gate). Run it alone.
 - taxi: a cab stuck in traffic under load (the full-ride and recovery checks; 20/20 solo, M13 gate).
-- stress: the 2.5 s frame-stall check under load (30/30 solo, M13 gate).
+- stress: the 2.5 s frame-stall check under load (30/30 solo, M13 gate and graphics gate). The M13 build itself
+  fails it solo now and then (29/30 in one of two runs at the graphics gate: 3.2 s on first entering the jail).
+- arrest: the hands-up pose check with the map open (a 4 s real-time window); unique: the won-Widowmaker check;
+  ui: the second (touch) page's boot exceeding its 180 s wait while the first page runs. All pass solo (graphics
+  gate: 126/126, 58/58, 23/23).
 - police: a parked cruiser's pull-out distance; raid: real-time clock and save-clock checks; roadnet: the
   estate-relocation reload check (all pass solo; seen failing only in the 3-wide run, m12-full).
 
@@ -50,3 +57,7 @@
 - Wet-road lamp reflections come from the city's lamp grid: lamps off the grid (curved streets, Cedar Fields) and
   car headlights are not mirrored.
 - Interior lamps light without shadows (no light passes through walls inside one room, but furniture casts none).
+- Boot compiles every shader before the menu (the warm-up, GRAPHICS.md §2): ~5 s more to the menu on software
+  GL (M13 ~10 s, after ~15 s), where M13 compiled lazily and paid in play (up to 3.2 s on first entering the
+  jail in one solo stress run). Untested on a device. The alternative for the optimisation phase: compile in the
+  background behind the menu and finish behind the new-game fade.
