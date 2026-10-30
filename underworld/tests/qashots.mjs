@@ -111,10 +111,11 @@ if (want('phone')) {
   for (const [tab, name] of [[null, 'phone-home'], ['pnl', 'phone-market-mystock'], ['connect', 'phone-street-connect'], ['stashes', 'phone-stashes'], ['garage', 'phone-garage']]) {
     await ev(tab => window.game.uw.ui.open(tab || undefined), tab); await shot(name);
   }
-  await ev(() => { const g = window.game; while (g.ui.stack.length) g.ui.back(); });
+  // put back the product it gave: more than two units on you and no cab will take you (M11 taxi rule)
+  await ev(() => { const g = window.game; while (g.ui.stack.length) g.ui.back(); g.uw.take('smokes', 6); g.uw.take('green', 4); });
 }
 if (want('taxi')) {
-  await ev(() => { const g = window.game, P = window.__pv, kp = P.nearestRoadPoint(5 * 80 + 40, 5 * 80); g.resetPlayerState(kp.x, kp.z, 0); g.taxi.call(); let t = 0; while (g.taxi.state === 'coming' && t < 5400) { g.update(1 / 60, 1 / 60); t++; } const v = g.taxi.cab, w = v.toWorld(v.spec.w / 2 + 0.6, 0); g.player.pos.set(w.x, g.player.pos.y, w.z); g.taxi.approach(v); document.querySelector('#svcBody [data-act="hire"]').click(); g.ui.mapView.setPick(9 * 80 + 40, 2 * 80); });
+  await ev(() => { const g = window.game, P = window.__pv, kp = P.nearestRoadPoint(5 * 80 + 40, 5 * 80); g.resetPlayerState(kp.x, kp.z, 0); if (!g.taxi.call()) throw new Error('no cab: ' + g.taxi.canHail()); let t = 0; while (g.taxi.state === 'coming' && t < 5400) { g.update(1 / 60, 1 / 60); t++; } const v = g.taxi.cab, w = v.toWorld(v.spec.w / 2 + 0.6, 0); g.player.pos.set(w.x, g.player.pos.y, w.z); g.taxi.approach(v); document.querySelector('#svcBody [data-act="hire"]').click(); g.ui.mapView.setPick(9 * 80 + 40, 2 * 80); });
   await shot('taxi-destination-map');
   await ev(() => document.querySelector('#mapPick [data-pk="ok"]').click());
   await frames(page, 30); await shot('taxi-ride-hud');

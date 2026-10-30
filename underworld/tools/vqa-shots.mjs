@@ -46,7 +46,8 @@ async function session(opts) {
   });
   return { ctx, page, ev, errors };
 }
-const frames = async (page, n) => { const f0 = await page.evaluate(() => window.game.frame); await page.waitForFunction(t => window.game.frame >= t, f0 + n, { timeout: 240000, polling: 50 }); };
+// a heavy scene on software GL (a three-star pursuit at night) can take over a second a frame: allow 2 s each
+const frames = async (page, n) => { const f0 = await page.evaluate(() => window.game.frame); await page.waitForFunction(t => window.game.frame >= t, f0 + n, { timeout: Math.max(240000, n * 2000), polling: 50 }); };
 async function shot(S, name, prep, settle = 40) {
   if (!want(name)) return;
   try {
