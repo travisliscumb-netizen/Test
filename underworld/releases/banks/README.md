@@ -1,8 +1,9 @@
 # The Underworld — with the banks of Port Valen
 
-The game as commit `fc97fd5` built it: the content-complete M13 game, the Session 14 graphics / presentation /
-UI-UX overhaul (`../after-graphics/` is that build alone) and the three banks (ECONOMY.md §12, DECISIONS.md "The
-banks"). This is the current playable build.
+The game as commit `d5b3c8b` built it: the content-complete M13 game, the Session 14 graphics / presentation /
+UI-UX overhaul (`../after-graphics/` is that build alone) and the three banks with the owner's follow-up (the vault
+doors, the loot bag, dye packs, hostages, a rear staff door; ECONOMY.md §12, DECISIONS.md "The banks"). This is the
+current playable build. (The first bank build, `fc97fd5`, is this folder at commit `e308561`.)
 
 | File | What it is |
 |---|---|
@@ -18,19 +19,24 @@ banks"). This is the current playable build.
 ## The banks
 - Old Quarter Neighborhood Bank, Downtown Commercial Bank and Port Valen Central Bank: open from a new game, no Rank,
   mission or reputation gate. Each shows on the map once its district has been discovered.
-- Walk in through the front door: the tellers serve the Clean Bank account, or rob a window (a note, or a gun), then
-  the back office, the security room, the cash room, the vault (Downtown and Central; the Neighborhood bank has none)
-  and the deposit boxes, each deeper and slower.
-- Takings are Dirty Cash in hand. Guards warn, fight or restrain; the alarm brings the police, who contain the
-  building and storm it in waves. What is taken stays taken through leaving, saving, reloading, arrest and death;
-  the reserves recover over economic days and security rises after each robbery.
+- Walk in through the front doors (the tellers serve the Clean Bank account), or pick the staff entrance at the back
+  of the building with a lockpick set (staff or a guard who sees you back there raises the alarm).
+- Rob a window (a note, or a gun), the manager's desk (a keycard), the security door, the cash room, the vault
+  (Downtown and Central: the wheel turns, the bolts draw, the door swings open) and the deposit boxes.
+- Armed, in the banking hall: "Everybody on the floor!" takes hostages. The police negotiate before they storm;
+  hurt one and they come straight in; leave the hall too long and hostages make a run for it.
+- Takings go into a bag that holds only so much (small bills fill it fastest) and become Dirty Cash only when you
+  walk out of a door. Teller drawers and cash room straps can hide a dye pack: go through the bag before you leave,
+  or one bursts on the way out. Out the back before the police cover it, and they are still watching the front.
+- What is taken stays taken through leaving, saving, reloading, arrest and death; reserves recover over economic
+  days and security rises after each robbery.
 
 ## Saves
 The main game's browser keys, `pvunderworld.save.v1` and `pvunderworld.settings.v1`: an existing career loads as
-it is (the banks add one save field with its own default).
+it is (the banks add one save field with its own default; the follow-up adds none).
 
 ## How it was made and checked
-- `node underworld/tools/export-release.mjs --ref fc97fd5 --dir underworld/releases/banks --name Underworld_Banks.html`
+- `node underworld/tools/export-release.mjs --ref d5b3c8b --dir underworld/releases/banks --name Underworld_Banks.html`
   (refuses unless the committed `index.html` is byte-identical to that commit's `src/`; the only changes are the
   icons and manifest inlined as `data:` URIs and a `<meta name="release">` line).
 - `node underworld/tools/verify-release.mjs underworld/releases/banks Underworld_Banks.html`: RELEASE VERIFIED in

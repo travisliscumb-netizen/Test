@@ -1,16 +1,16 @@
 {
- "ref": "fc97fd5",
- "commit": "fc97fd5d581a938ffaaa4e26fcb96bb58241ef0a",
+ "ref": "d5b3c8b",
+ "commit": "d5b3c8b385f11b90b7fcfbb0de3232b87d509b65",
  "file": "Underworld_Banks.html",
  "saveNamespace": null,
  "saveKeys": {
   "save": "pvunderworld.save.v1",
   "settings": "pvunderworld.settings.v1"
  },
- "bytes": 4142299,
- "gzipBytes": 1297053,
- "brotliBytes": 939712,
- "sha256": "670bafa9b26dbae6dc5996286664887fc5a4fa47af9da06bb086795b9cb0b0c6",
+ "bytes": 4177957,
+ "gzipBytes": 1308503,
+ "brotliBytes": 948806,
+ "sha256": "25b0066fb0a933402ada9060b5ed27069d8886a2f2e148b15a1d452fdfc37738",
  "moduleScripts": 2,
  "substitutions": [
   "favicon inlined",

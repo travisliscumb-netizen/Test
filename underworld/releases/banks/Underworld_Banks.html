@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="release" content="fc97fd5 fc97fd5d581a938ffaaa4e26fcb96bb58241ef0a">
+<meta name="release" content="d5b3c8b d5b3c8b385f11b90b7fcfbb0de3232b87d509b65">
 <meta name="build-version" content="v7-casino-2026-10-18-a">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
@@ -44212,7 +44212,7 @@ class PedManager {
     if (p.atkT !== undefined) { p.atkT -= dt; ps.punch = p.atkT > 0 && p.atkKind === 'punch' ? 1 - p.atkT / 0.45 : 0; ps.swing = p.atkT > 0 && p.atkKind === 'swing' ? 1 - p.atkT / 0.55 : 0; ps.kick = p.atkT > 0 && p.atkKind === 'kick' ? 1 - p.atkT / 0.5 : 0; }
     if (p.blockT !== undefined) { p.blockT -= dt; ps.block = p.blockT > 0 ? 1 : 0; }
     ps.air = p.vy > 0.5 && p.state !== 'down' ? 1 : 0;
-    if (p.state !== 'down' && p.state !== 'flee' && p.state !== 'dive' && p.state !== 'free' && p.state !== 'chase') p.y = groundY(p.x, p.z);
+    if (p.state !== 'down' && p.state !== 'flee' && p.state !== 'dive' && p.state !== 'free' && p.state !== 'chase') p.y = p.floor !== undefined ? p.floor : groundY(p.x, p.z);
     if (p.char.flash > 0) p.char.flash -= dt;
     p.char.x = p.x; p.char.y = p.y; p.char.z = p.z; p.char.h = p.h;
   }
@@ -44329,7 +44329,9 @@ class PedManager {
       }
     }
   }
-  draw(r) { for (const p of this.peds) { p.char.flash = p.char.flash || 0; r.draw(p.char); } }
+  // floor: indoors, only the people standing on that interior's floor (a bank's guards, staff and customers, the
+  // police who storm it); the street's people are 60 m overhead and not drawn
+  draw(r, floor) { for (const p of this.peds) { if (floor !== undefined && p.floor !== floor) continue; p.char.flash = p.char.flash || 0; r.draw(p.char); } }
 }
 function copLook() {
   const l = randomLook(); l.shirt = C(0x1d2e4a); l.pants = C(0x15181f); l.shoes = C(0x0b0b0b); l.sleeve = true; l.cap = C(0x111a2e); l.hairStyle = 1; l.build = 1.05 + Math.random() * 0.1;
@@ -44340,7 +44342,7 @@ function copLook() {
    [CORE] POLICE MANAGER (heat levels, perception, pursuit, search, arrests)
    ===================================================================== */
 const HEAT_LEVELS = [0, 1, 4, 10, 20, 34];
-const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5, bankrob: 5, assaultguard: 2, killguard: 7 };
+const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5, bankrob: 5, assaultguard: 2, killguard: 7, hostage: 4, harmhostage: 3, killhostage: 7 };
 const UNITS_PER_LEVEL = [0, 2, 3, 5, 7, 9];
 class PoliceManager {
   constructor(game) {
@@ -47293,7 +47295,7 @@ class InteriorManager {
     if (!def || !def.dynamic) return;
     for (const c of def.cols || []) this.g.world.grid.remove(c);
     this.g.scene.remove(def.group);
-    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && (o.material.userData.pick || o.material.userData.own)) o.material.dispose(); });
+    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.pick) o.material.dispose(); });
     delete this.defs[def.id];
   }
   _window(w) {
@@ -47342,13 +47344,14 @@ class InteriorManager {
     if (quiet) go(); else g.fade(go);
     return true;
   }
-  exit(quiet) {
+  // out to the street at the building's door, or at another way out (at: { x, z, h }, a bank's rear staff door)
+  exit(quiet, at) {
     const g = this.g, p = g.player, def = this.cur;
     if (!def) return;
     const go = () => {
       def.group.visible = false; this.cur = null; p.interior = null; this.guards = [];
       this.dispose(def); this.g.chunks.wide(false);
-      const d = def.door;
+      const d = at || def.door;
       const x = d.x + Math.sin(d.h) * 0.9, z = d.z + Math.cos(d.h) * 0.9;
       p.pos.set(x, groundY(x, z), z); p.vel.set(0, 0, 0); p.h = d.h; p.onGround = true;
       g.cam.yaw = d.h; g.cam.pitch = -0.12; g.cam.init = false;
@@ -47402,7 +47405,8 @@ class InteriorManager {
     if (!def.noExit && Math.hypot(p.pos.x - (def.ox + def.exit.x), p.pos.z - (def.oz + def.exit.z)) < 1.3) return { id: 'exit', label: def.exitLabel || 'Leave' };
     // spots on an upper floor only answer to someone standing on that floor
     const ly = p.pos.y - def.fy;
-    for (const s of def.spots) if (Math.abs(ly - (s.y || 0)) < 1.6 && Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return s;
+    // (a spot whose label is empty has nothing to offer right now: a bank's banking hall to someone unarmed)
+    for (const s of def.spots) if (Math.abs(ly - (s.y || 0)) < 1.6 && Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r && s.label) return s;
     return null;
   }
 }
@@ -47574,12 +47578,27 @@ const BANK_IDS = Object.keys(BANKS);
 // hold little, a few a lot) and may hold valuables (hot goods); secMax/secRecover: a robbery adds a security step
 // (another guard, police faster), one step recovering every secRecover economic days; wave: seconds between
 // police waves once they storm; restrain: seconds a guard needs his hands on you, unarmed and not fighting back
+// bag: what you carry out. Notes take room by what they are: the tills are small bills (cap 100 of them is $60k), the
+// cash room mixed straps ($150k), the vault bricks of hundreds ($300k), a deposit box whatever was in it; check: seconds
+// to go through it per bundle not yet checked (at least checkMin)
+// dye: a teller's drawer may hold a dye pack (win, by tier; a note handed over gets one more often: note), so may a
+// cash room strap (cash); one that leaves the building bursts: its bundle is ruined and `stain` of the rest of the bag
+// with it, and the red smoke shows the police where you came out. Found in time, it costs only its bait money (bait)
+// hostage: each hostage holds the police storm back `delay` seconds (at most `cap`) and slows their waves (waveMul);
+// held while you're out in the hall with them (within `reach`); while you're in the back, one makes a run for the doors
+// after `nerve` seconds (each their own)
+// rearCover: seconds after the police first come in before they also cover the rear staff door; pick: seconds to pick
+// its lock from the street (a lockpick set)
 const BANK_T = {
   week: [0.62, 0.72, 0.84, 0.96, 1.08, 1.2, 1.3], noise: 0.15,
   recover: { counter: 0.5, cash: 0.1, vault: 0.04 }, boxRefill: 21,
   boxSkew: 2.6, boxHot: 0.22,
   secMax: 3, secRecover: 7, secStorm: 10, secEscal: 8, secSlow: 0.15,
-  wave: 20, restrain: 2.2, warnT: 2.5, sightR: 15
+  wave: 20, restrain: 2.2, warnT: 2.5, sightR: 15,
+  bag: { cap: 100, per: { counter: 600, cash: 1500, vault: 3000, boxes: 2000 }, check: 1.2, checkMin: 3 },
+  dye: { win: [0, 0.2, 0.3, 0.4], note: 0.15, cash: [0, 0.08, 0.12, 0.16], bait: 0.2, stain: 0.15 },
+  hostage: { delay: 12, cap: 60, waveMul: 0.15, nerve: [20, 40], reach: 20 },
+  rearCover: 10, pick: 6
 };
 const BANK_GLASS = 0xb8d4e0;
 // a spot whose prompt reads the robbery's state (BankSystem.label)
@@ -47639,12 +47658,126 @@ function cashCart(k, x, z, rng) {
   for (let i = 0; i < 6; i++) k.box(x - 0.36 + (i % 3) * 0.36, 0.82, z - 0.14 + Math.floor(i / 3) * 0.28, 0.32, 0.12 + rng() * 0.1, 0.24, 0x5f8f5a);
 }
 function goldStack(k, x, z) { k.box(x, 0, z, 1.1, 0.62, 0.6, 0x5c5e62, { col: true }); for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) k.box(x - 0.36 + i * 0.24 + r * 0.12, 0.62 + r * 0.09, z, 0.22, 0.09, 0.42, 0xd8b44a); }
-// a lockable door in a wall gap (security, cash room, vault): a collider and a mesh that swings open
-function lockDoor(k, def, key, x, z, along, w = 1.15, color = 0x6a7076) {
+// round parts the box kit can't make: a ring (r0 > 0) or a disc (r0 = 0) about an axis along z, from z0 to z1, in
+// `segs` facets, with the kit's baked face shading (tops light, undersides dark) and its floor AO (flat: none)
+function kitRingZ(k, cx, cy, z0, z1, r0, r1, segs, color, flat) {
+  const t = k.a, c = new THREE.Color(color), H = k.H;
+  const put = (v, sh) => {
+    const ao = flat ? 1 : (0.62 + 0.38 * smoothstep(0, 1.3, v[1])) * (1 - 0.14 * smoothstep(H - 0.9, H, v[1]));
+    t.p.push(v[0], v[1], v[2]); t.c.push(c.r * sh * ao, c.g * sh * ao, c.b * sh * ao);
+  };
+  const quad = (A, B, C, D, sh) => { const o = t.p.length / 3; put(A, sh); put(B, sh); put(C, sh); put(D, sh); t.i.push(o, o + 1, o + 2, o, o + 2, o + 3); };
+  const P = (r, a, z) => [cx + r * Math.cos(a), cy + r * Math.sin(a), z];
+  for (let s = 0; s < segs; s++) {
+    const a0 = s / segs * Math.PI * 2, a1 = (s + 1) / segs * Math.PI * 2, ny = Math.sin((a0 + a1) / 2);
+    quad(P(r0, a0, z1), P(r1, a0, z1), P(r1, a1, z1), P(r0, a1, z1), 0.9); // the face (+z)
+    quad(P(r0, a1, z0), P(r1, a1, z0), P(r1, a0, z0), P(r0, a0, z0), 0.86); // the back (-z)
+    quad(P(r1, a0, z1), P(r1, a0, z0), P(r1, a1, z0), P(r1, a1, z1), ny > 0 ? 0.8 + 0.2 * ny : 0.8 + 0.25 * ny); // the rim
+    if (r0 > 0) quad(P(r0, a1, z1), P(r0, a1, z0), P(r0, a0, z0), P(r0, a0, z1), ny < 0 ? 0.8 - 0.2 * ny : 0.8 - 0.25 * ny); // the hole
+  }
+}
+// a box turned `ang` about the z axis round its own centre: a wheel spoke, a radial bolt, a rivet on a round door
+function kitBoxZ(k, cx, cy, cz, w, h, d, ang, color) {
+  const t = k.a, n0 = t.p.length, cs = Math.cos(ang), sn = Math.sin(ang);
+  k.box(0, -h / 2, 0, w, h, d, color, { flat: true });
+  for (let i = n0; i < t.p.length; i += 3) { const x = t.p[i], y = t.p[i + 1]; t.p[i] = cx + x * cs - y * sn; t.p[i + 1] = cy + x * sn + y * cs; t.p[i + 2] += cz; }
+}
+// a lockable door in a wall gap (security, cash room, vault): its collider while it is shut, and how it opens (o). A
+// plain door swings 90° on its jamb. A vault door turns its wheel (`turns`), draws its bolts (`boltIn` metres), comes
+// `pull` metres straight out of the frame (negative: into the room behind) and swings `ang` about `hinge` (room metres,
+// where the hinge is while shut); `times` are the seconds each part of that takes (BankSystem.swingDoors)
+function lockDoor(k, def, key, x, z, along, w = 1.15, color = 0x6a7076, o = {}) {
   def.locks = def.locks || {};
-  def.locks[key] = { col: k.cols.length, x, z, along, w, color };
+  def.locks[key] = Object.assign({ key, col: k.cols.length, x, z, along, w, color, kind: 'plain', thick: 0.06, h: 2.25, half: w / 2 - 0.01,
+    hinge: along === 'x' ? [x + w / 2, z] : [x, z + w / 2], pull: [0, 0], ang: along === 'x' ? Math.PI / 2 : -Math.PI / 2, times: { swing: [0, 0.7] } }, o);
   if (along === 'x') k.cols.push({ x0: x - w / 2, x1: x + w / 2, z0: z - 0.12, z1: z + 0.12, y0: 0, y1: 2.6 });
   else k.cols.push({ x0: x - 0.12, x1: x + 0.12, z0: z - w / 2, z1: z + w / 2, y0: 0, y1: 2.6 });
+}
+// the door itself: a small vertex-coloured mesh of its own, built in the room's coordinates and drawn with the room's
+// lamp-lit material (350), so it is lit like the walls round it at any hour of the day outside; opening it moves its
+// vertices (bankDoorPlace). Vertex tags: 0 the door, 1 a locking bolt (draws in along its dir), 2 the wheel (turns)
+function bankDoor(Lk, H, mat) {
+  const k = new InteriorKit(H), tag = [], dir = [], { x, z, w, color, along } = Lk;
+  const mark = (tg, d) => { const n = k.a.p.length / 3; while (tag.length < n) { tag.push(tg); dir.push(d ? d[0] : 0, d ? d[1] : 0, d ? d[2] : 0); } };
+  const dark = new THREE.Color(color).multiplyScalar(0.72).getHex(), light = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.18).getHex();
+  if (Lk.kind === 'round') {
+    // the Central's great round door: a steel disc in its frame, a bevel and a face ring, rivets, the hinge on the west
+    // edge, ten bolts round the rim and the wheel on its boss
+    const T = Lk.thick, cy = Lk.hub[1], R = Lk.half, f = z + T / 2;
+    kitRingZ(k, x, cy, z - T / 2, f, 0, R, 40, color);
+    kitRingZ(k, x, cy, f, f + 0.03, R - 0.13, R - 0.03, 40, dark, true);
+    kitRingZ(k, x, cy, f, f + 0.04, 1.02, 1.12, 40, light, true);
+    for (let s = 0; s < 12; s++) { const a = s / 12 * Math.PI * 2; kitBoxZ(k, x + Math.cos(a) * 1.28, cy + Math.sin(a) * 1.28, f + 0.015, 0.08, 0.08, 0.03, a, 0x6a7076); }
+    for (const y of [0.7, 2.3]) k.box(x - R - 0.05, y, z - T / 2 + 0.02, 0.2, 0.4, 0.2, 0x5c5e62);
+    mark(0);
+    for (let s = 0; s < 10; s++) { const a = (s + 0.5) / 10 * Math.PI * 2; kitBoxZ(k, x + Math.cos(a) * (R + 0.07), cy + Math.sin(a) * (R + 0.07), z, 0.36, 0.09, 0.09, a, 0xc8ccd0); mark(1, [Math.cos(a), Math.sin(a), 0]); }
+    kitRingZ(k, x, cy, f, f + 0.16, 0, 0.18, 16, 0x8a8f96, true);
+    kitRingZ(k, x, cy, f + 0.12, f + 0.2, 0.62, 0.7, 28, 0xc8ccd0, true);
+    for (let s = 0; s < 3; s++) kitBoxZ(k, x, cy, f + 0.16, 1.32, 0.06, 0.06, s * Math.PI / 3, 0xb4b9bf);
+    kitRingZ(k, x, cy, f + 0.16, f + 0.24, 0, 0.12, 12, 0xc9a54a, true);
+    mark(2);
+  } else if (Lk.kind === 'vault') {
+    // the Commercial's vault door: a thick steel slab, a face plate, rivets, hinges on the east edge, four bolts on
+    // the west edge and the wheel
+    const T = Lk.thick, f = z + T / 2, hy = Lk.hub[1];
+    k.box(x, 0.02, z, w, Lk.h - 0.02, T, color);
+    k.box(x, 0.35, f + 0.02, w - 0.4, 1.6, 0.04, light);
+    for (const [u, y] of [[-0.66, 0.15], [0, 0.15], [0.66, 0.15], [-0.66, 2.1], [0, 2.1], [0.66, 2.1], [-0.66, 1.12], [0.66, 1.12]]) k.box(x + u, y, f + 0.015, 0.07, 0.07, 0.03, 0x6a7076);
+    for (const y of [0.35, 1.5]) k.box(x + w / 2 + 0.04, y, f - 0.05, 0.1, 0.4, 0.14, 0x5c5e62);
+    mark(0);
+    for (const y of [0.45, 0.9, 1.35, 1.8]) { k.box(x - w / 2 - 0.06, y, z, 0.14, 0.07, 0.07, 0xc8ccd0); mark(1, [-1, 0, 0]); }
+    kitRingZ(k, x, hy, f + 0.02, f + 0.12, 0.3, 0.36, 20, 0xc8ccd0, true);
+    for (let s = 0; s < 3; s++) kitBoxZ(k, x, hy, f + 0.08, 0.62, 0.04, 0.04, s * Math.PI / 3, 0xb4b9bf);
+    kitRingZ(k, x, hy, f, f + 0.14, 0, 0.07, 12, 0x8a8f96, true);
+    mark(2);
+  } else {
+    // a plain door: the leaf, a kick plate and a handle on both faces (the latch side, away from the hinge), a vision
+    // panel in the security door, steel bands on the cash room's
+    const B = (u, y, v, wu, hh, dv, col) => along === 'x' ? k.box(x + u, y, z + v, wu, hh, dv, col) : k.box(x + v, y, z + u, dv, hh, wu, col);
+    B(0, 0.02, 0, w - 0.02, Lk.h - 0.02, Lk.thick, color);
+    for (const s of [-1, 1]) {
+      B(0, 0.04, s * 0.032, w - 0.14, 0.22, 0.006, dark);
+      B(-w / 2 + 0.17, 1.0, s * 0.05, 0.17, 0.04, 0.03, 0xc8ccd0); B(-w / 2 + 0.1, 0.94, s * 0.036, 0.05, 0.16, 0.012, 0xb4b9bf);
+      if (Lk.key === 'sec') B(0.06, 1.3, s * 0.032, 0.26, 0.62, 0.006, 0x1d2a33);
+      else for (const y of [0.75, 1.65]) B(0, y, s * 0.032, w - 0.1, 0.06, 0.008, dark);
+    }
+    mark(0);
+  }
+  const geo = new THREE.BufferGeometry(), base = new Float32Array(k.a.p);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(base.slice(), 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(k.a.c, 3));
+  geo.setIndex(k.a.i); geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
+  return { mesh, base, tag: Uint8Array.from(tag), dir: Float32Array.from(dir), Lk };
+}
+// where a point of the door's body is `t` seconds after it starts to open (room metres, x and z: the swing is about
+// a vertical hinge, after the pull)
+function bankDoorAt(Lk, t, x, z) {
+  const T = Lk.times, ph = r => r ? smoothstep(r[0], r[1], t) : 1, pull = ph(T.pull), sw = ph(T.swing) * Lk.ang;
+  const hx = Lk.hinge[0] + Lk.pull[0], hz = Lk.hinge[1] + Lk.pull[1], cs = Math.cos(sw), sn = Math.sin(sw);
+  const rx = x + Lk.pull[0] * pull - hx, rz = z + Lk.pull[1] * pull - hz;
+  return [hx + rx * cs + rz * sn, hz - rx * sn + rz * cs];
+}
+function bankDoorPlace(D, t) {
+  const Lk = D.Lk, T = Lk.times, ph = r => r ? smoothstep(r[0], r[1], t) : 1;
+  const spin = ph(T.spin) * (Lk.turns || 0) * Math.PI * 2, bolt = ph(T.bolt) * (Lk.boltIn || 0), cw = Math.cos(spin), sw = Math.sin(spin);
+  const a = D.mesh.geometry.attributes.position, p = a.array, b = D.base, hub = Lk.hub;
+  for (let i = 0, n = b.length / 3; i < n; i++) {
+    let x = b[i * 3], y = b[i * 3 + 1], z = b[i * 3 + 2];
+    if (D.tag[i] === 1) { x -= D.dir[i * 3] * bolt; y -= D.dir[i * 3 + 1] * bolt; z -= D.dir[i * 3 + 2] * bolt; }
+    else if (D.tag[i] === 2) { const dx = x - hub[0], dy = y - hub[1]; x = hub[0] + dx * cw - dy * sw; y = hub[1] + dx * sw + dy * cw; }
+    const q = bankDoorAt(Lk, t, x, z); p[i * 3] = q[0]; p[i * 3 + 1] = y; p[i * 3 + 2] = q[1];
+  }
+  a.needsUpdate = true;
+}
+// the floor box an open door stands on (its collider once it has swung): the body's footprint, moved to the end
+function bankDoorOpenBox(Lk) {
+  const t = Lk.times.swing[1], hu = Lk.half, hv = Math.max(Lk.thick, 0.12) / 2, xs = [], zs = [];
+  for (const [u, v] of [[-hu, -hv], [hu, -hv], [hu, hv], [-hu, hv]]) {
+    const q = Lk.along === 'x' ? bankDoorAt(Lk, t, Lk.x + u, Lk.z + v) : bankDoorAt(Lk, t, Lk.x + v, Lk.z + u);
+    xs.push(q[0]); zs.push(q[1]);
+  }
+  return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), y0: 0, y1: Lk.h };
 }
 // ------------------------------------------------------------ the three interiors
 const BANK_BUILD = {
@@ -47682,6 +47815,8 @@ const BANK_BUILD = {
     cashShelf(k, 3.6, -5.6, 4.6, 0.6, 2.0, rng); cashShelf(k, 6.6, -4.0, 2.4, 0.6, 2.0, rng, true);
     FURN.safe(k, 1.6, 0, -5.4, 0);
     k.glow(3.6, H - 0.08, -4.2, 1.2, 0.03, 0.4, 0xf4fbff, 2.4);
+    // the rear staff door: the back wall of the manager's office (a fire door with a crash bar and an exit sign)
+    k.door(-6.0, -hd + 0.02, Math.PI, 0x4a4f55, 0x46d46a); k.box(-6.0, 0.95, -hd + 0.08, 0.9, 0.08, 0.06, 0xc8ccd0);
     // the deposit boxes: the end wall of the corridor
     boxWall(k, 'x', -hd + 0.3, -1.5, 0.5, 0.3, 6, 4, 1);
   },
@@ -47723,10 +47858,14 @@ const BANK_BUILD = {
     // the vault (x -4.5..5): a thick steel door at x 2.5 in a heavy frame; carts and shelves inside
     iwall(k, 'z', 5.0, -hd, -2.4, 0, H, 0x9aa0a6);
     k.box(1.35, 0, -2.4, 0.5, 2.9, 0.7, 0x5c5e62, { col: true }); k.box(3.65, 0, -2.4, 0.5, 2.9, 0.7, 0x5c5e62, { col: true }); k.box(2.5, 2.6, -2.4, 2.8, 0.5, 0.7, 0x5c5e62);
-    lockDoor(k, def, 'vault', 2.5, -2.4, 'x', 1.6, 0x7a7f86);
+    // it opens out into the corridor and right round, flat against the wall east of the frame
+    lockDoor(k, def, 'vault', 2.5, -2.4, 'x', 1.56, 0x8a9096, { kind: 'vault', thick: 0.4, half: 0.78, hinge: [3.28, -2.2], pull: [0, 0.6], ang: Math.PI, hub: [2.5, 1.2],
+      turns: 1.5, boltIn: 0.16, times: { spin: [0, 1.0], bolt: [0.4, 1.0], pull: [1.0, 1.5], swing: [1.5, 3.0] } });
     for (const [x, z] of [[-3.2, -5.2], [-1.4, -5.2], [0.6, -6.4], [3.2, -6.4]]) cashCart(k, x, z, rng);
     cashShelf(k, 0.2, -8.4, 8.6, 0.6, 2.4, rng);
     k.glow(0.2, H - 0.08, -5.8, 1.4, 0.03, 0.45, 0xf4fbff, 2.6);
+    // the rear staff door: the east end of the secured corridor
+    k.door(hw - 0.02, -0.4, -Math.PI / 2, 0x4a4f55, 0x46d46a); k.box(hw - 0.08, 0.95, -0.4, 0.06, 0.08, 0.9, 0xc8ccd0);
     // the deposit room (x 5..11): boxes on two walls, a viewing table
     boxWall(k, 'x', -hd + 0.3, 5.6, 10.6, 0.3, 7, 10, 1); boxWall(k, 'z', hw - 0.3, -8.4, -3.2, 0.3, 7, 6, -1);
     k.box(7.6, 0, -5.2, 1.6, 0.9, 0.8, 0x7a7f86, { col: true });
@@ -47774,16 +47913,27 @@ const BANK_BUILD = {
     lockDoor(k, def, 'cash', -9.8, -6.2, 'x', 1.15, 0x5c5e62);
     for (const z of [-8.6, -11.4]) cashShelf(k, -10.5, z, 7.0, 0.6, 2.4, rng);
     k.glow(-10.5, H - 0.08, -10.0, 2.2, 0.03, 0.5, 0xf4fbff, 2.6);
-    // the great round vault door (x 4) in its stone face; inside, cash carts and gold
-    iwall(k, 'x', -6.2, -6.0, hw, 0, H, 0x7a7f86, [[2.4, 5.6], [11.4, 12.6]]);
-    k.box(1.95, 0, -6.2, 0.9, 4.0, 0.9, 0x5c5e62, { col: true }); k.box(6.05, 0, -6.2, 0.9, 4.0, 0.9, 0x5c5e62, { col: true }); k.box(4.0, 3.4, -6.2, 4.2, 0.6, 0.9, 0x5c5e62);
-    lockDoor(k, def, 'vault', 4.0, -6.2, 'x', 3.2, 0x9aa0a6);
+    // the great round vault door (x 4) in a massive round steel frame set in the stone face (a square opening behind
+    // the frame, the wall above it to the ceiling; the frame's lower quarters are solid, so the way through is the
+    // round hole); the door opens back into the vault, so nothing stands where it swings
+    iwall(k, 'x', -6.2, -6.0, 2.4, 0, H, 0x7a7f86);
+    iwall(k, 'x', -6.2, 5.6, hw, 0, H, 0x7a7f86, [[11.4, 12.6]]);
+    k.box(4.0, 3.3, -6.2, 3.2, H - 3.3, 0.15, 0x7a7f86, { col: true });
+    kitRingZ(k, 4.0, 1.7, -6.5, -5.9, 1.6, 2.4, 40, 0x6a6f76);
+    kitRingZ(k, 4.0, 1.7, -5.9, -5.86, 2.2, 2.38, 40, 0x8a8f96, true);
+    k.cols.push({ x0: 2.4, x1: 3.25, z0: -6.5, z1: -5.9, y0: 0, y1: 0.9 }, { x0: 4.75, x1: 5.6, z0: -6.5, z1: -5.9, y0: 0, y1: 0.9 });
+    lockDoor(k, def, 'vault', 4.0, -6.2, 'x', 3.2, 0x9aa0a6, { kind: 'round', thick: 0.45, half: 1.55, h: 3.25, hinge: [2.45, -6.425], pull: [0, -0.65], ang: Math.PI / 2, hub: [4.0, 1.7],
+      turns: 2, boltIn: 0.3, times: { spin: [0, 1.4], bolt: [0.6, 1.4], pull: [1.4, 2.1], swing: [2.1, 4.0] } });
     iwall(k, 'z', 9.0, -hd, -6.2, 0, H, 0x7a7f86);
-    for (const [x, z] of [[-3.6, -8.6], [-1.6, -8.6], [0.4, -8.6], [-3.6, -11.0], [-1.6, -11.0]]) cashCart(k, x, z, rng);
-    for (const [x, z] of [[3.4, -9.4], [5.2, -9.4], [7.0, -9.4], [4.4, -11.2], [6.4, -11.2]]) goldStack(k, x, z);
+    // the west of the vault (behind the open door): cash carts; the east: gold on its trolleys and two more carts
+    for (const [x, z] of [[-3.6, -8.6], [-1.6, -8.6], [0.4, -8.6], [-3.6, -11.0], [-1.6, -11.0], [0.4, -11.0]]) cashCart(k, x, z, rng);
+    for (const [x, z] of [[7.6, -7.6], [7.6, -9.4], [7.6, -11.2]]) goldStack(k, x, z);
+    for (const [x, z] of [[4.2, -11.4], [5.8, -11.4]]) cashCart(k, x, z, rng);
     cashShelf(k, 1.6, -12.5, 12, 0.6, 2.6, rng);
     k.glow(1.6, H - 0.08, -9.6, 2.6, 0.03, 0.6, 0xfff1d6, 2.6);
     k.glow(-2, H - 0.08, -4.6, 6, 0.03, 0.3, 0xfff1d6, 2.4); k.glow(8, H - 0.08, -4.6, 6, 0.03, 0.3, 0xfff1d6, 2.4);
+    // the rear staff door: the west end of the corridor
+    k.door(-hw + 0.02, -4.7, Math.PI / 2, 0x4a4f55, 0x46d46a); k.box(-hw + 0.08, 0.95, -4.7, 0.06, 0.08, 0.9, 0xc8ccd0);
     // the deposit hall (x 9..15): boxes floor to head height on three walls, a viewing table
     boxWall(k, 'z', hw - 0.3, -12.5, -6.8, 0.3, 8, 14, -1); boxWall(k, 'x', -hd + 0.3, 9.6, 14.4, 0.3, 8, 10, 1); boxWall(k, 'z', 9.3, -12.5, -8.5, 0.3, 8, 10, 1);
     k.box(12.0, 0, -9.2, 1.8, 0.9, 0.9, 0x7a7f86, { col: true });
@@ -47791,10 +47941,12 @@ const BANK_BUILD = {
   }
 };
 // where things are in each interior (local metres): the windows to rob or bank at, the jobs behind, the guards'
-// posts (in the order they come on duty), the staff and the customers, and where the police come in
+// posts (in the order they come on duty), the staff and the customers, where the police come in (the front: storm;
+// the rear staff door: rear, also where you stand to use it and where you come in through it), the middle of the
+// banking hall (hall: where you take control of it) and the counter line (staffZ: behind it is staff only)
 const BANK_LAYOUT = {
   n: {
-    exit: { x: 0, z: 5.4 }, storm: { x: 0, z: 4.6 },
+    exit: { x: 0, z: 5.4 }, storm: { x: 0, z: 4.6 }, rear: { x: -6.0, z: -5.2, h: 0 }, hall: { x: 1.2, z: 3.4, r: 1.5 }, staffZ: 0.2,
     windows: [{ x: 1.6, z: 1.1 }, { x: 4.8, z: 1.1 }],
     jobs: { office: { x: -4.2, z: -4.2 }, sec: { x: -1.4, z: 1.0 }, cashdoor: { x: -0.2, z: -3.1 }, cash: { x: 3.6, z: -4.6 }, boxes: { x: -0.5, z: -4.9 } },
     posts: [{ x: 2.6, z: 4.6, h: Math.PI }, { x: -3.6, z: 2.2, h: Math.PI / 2 }, { x: -0.5, z: -3.6, h: 0 }],
@@ -47802,17 +47954,17 @@ const BANK_LAYOUT = {
     customers: [{ x: 1.6, z: 2.0, h: Math.PI }, { x: -6.2, z: 3.4, h: Math.PI / 2 }]
   },
   d: {
-    exit: { x: 0, z: 8.4 }, storm: { x: 0, z: 7.6 },
+    exit: { x: 0, z: 8.4 }, storm: { x: 0, z: 7.6 }, rear: { x: 10.2, z: -0.4, h: -Math.PI / 2 }, hall: { x: -2.0, z: 6.2, r: 1.8 }, staffZ: 1.6,
     windows: [{ x: -7.69, z: 2.5 }, { x: -5.06, z: 2.5 }, { x: -2.44, z: 2.5 }, { x: 0.19, z: 2.5 }],
-    jobs: { office: { x: 7.4, z: 4.4 }, sec: { x: 3.1, z: 2.5 }, cashdoor: { x: -7.0, z: -1.6 }, cash: { x: -8.0, z: -7.0 }, vaultdoor: { x: 2.5, z: -1.4 }, vault: { x: 0.2, z: -6.0 }, boxes: { x: 8.0, z: -7.2 } },
+    jobs: { office: { x: 7.4, z: 4.4 }, sec: { x: 3.1, z: 2.5 }, cashdoor: { x: -7.0, z: -1.6 }, cash: { x: -8.0, z: -7.0 }, vaultdoor: { x: 1.0, z: -1.2 }, vault: { x: 0.2, z: -6.0 }, boxes: { x: 8.0, z: -7.2 } },
     posts: [{ x: 1.8, z: 7.6, h: Math.PI }, { x: -7.0, z: 5.6, h: Math.PI / 2 }, { x: -1.0, z: -0.6, h: Math.PI / 2 }, { x: 8.0, z: -0.4, h: Math.PI }, { x: 6.0, z: -1.2, h: -Math.PI / 2 }],
     staff: [{ id: 'teller0', x: -7.69, z: 0.6, h: 0 }, { id: 'teller1', x: -5.06, z: 0.6, h: 0 }, { id: 'teller2', x: -2.44, z: 0.6, h: 0 }, { id: 'teller3', x: 0.19, z: 0.6, h: 0 }, { id: 'manager', x: 9.6, z: 3.4, h: -Math.PI / 2 }, { id: 'officer', x: 9.6, z: 7.2, h: -Math.PI / 2 }],
     customers: [{ x: -5.06, z: 3.4, h: Math.PI }, { x: -2.6, z: 5.3, h: Math.PI }, { x: -10.2, z: 6.6, h: Math.PI / 2 }, { x: 7.4, z: 7.2, h: Math.PI / 2 }]
   },
   c: {
-    exit: { x: 0, z: 12.4 }, storm: { x: 0, z: 11.6 },
+    exit: { x: 0, z: 12.4 }, storm: { x: 0, z: 11.6 }, rear: { x: -14.2, z: -4.7, h: Math.PI / 2 }, hall: { x: 0, z: 7.6, r: 2.0 }, staffZ: -0.8,
     windows: [{ x: -8.96, z: 0.1 }, { x: -5.875, z: 0.1 }, { x: -2.79, z: 0.1 }, { x: 0.29, z: 0.1 }, { x: 3.375, z: 0.1 }, { x: 6.46, z: 0.1 }],
-    jobs: { office: { x: -11.9, z: 7.8 }, sec: { x: 9.25, z: 0.1 }, cashdoor: { x: -9.8, z: -5.3 }, cash: { x: -10.5, z: -10.0 }, vaultdoor: { x: 4.0, z: -5.2 }, vault: { x: 1.0, z: -10.0 }, boxes: { x: 12.0, z: -7.6 } },
+    jobs: { office: { x: -11.9, z: 7.8 }, sec: { x: 9.25, z: 0.1 }, cashdoor: { x: -9.8, z: -5.3 }, cash: { x: -10.5, z: -10.0 }, vaultdoor: { x: 4.0, z: -5.2 }, vault: { x: 4.6, z: -9.2 }, boxes: { x: 12.0, z: -7.6 } },
     posts: [{ x: -4.4, z: 11.6, h: Math.PI }, { x: 4.4, z: 11.6, h: Math.PI }, { x: -6.0, z: 1.8, h: Math.PI / 2 }, { x: 6.0, z: 1.8, h: -Math.PI / 2 }, { x: 12.6, z: 7.0, h: -Math.PI / 2 }, { x: 4.0, z: -4.4, h: Math.PI }, { x: -4.0, z: -4.6, h: Math.PI / 2 }, { x: 12.0, z: -11.0, h: 0 }],
     staff: [{ id: 'teller0', x: -8.96, z: -1.8, h: 0 }, { id: 'teller1', x: -5.875, z: -1.8, h: 0 }, { id: 'teller2', x: -2.79, z: -1.8, h: 0 }, { id: 'teller3', x: 0.29, z: -1.8, h: 0 }, { id: 'teller4', x: 3.375, z: -1.8, h: 0 }, { id: 'teller5', x: 6.46, z: -1.8, h: 0 }, { id: 'manager', x: -14.2, z: 9.0, h: Math.PI / 2 }, { id: 'security', x: 14.0, z: 4.0, h: -Math.PI / 2 }],
     customers: [{ x: -5.875, z: 1.0, h: Math.PI }, { x: 0.29, z: 1.0, h: Math.PI }, { x: -1.0, z: 5.4, h: 0 }, { x: -6.0, z: 6.4, h: Math.PI / 2 }, { x: 6.0, z: 6.4, h: -Math.PI / 2 }]
@@ -47826,28 +47978,18 @@ function bankInteriorDef(B, L) {
   const Y = BANK_LAYOUT[B.id], spots = [];
   Y.windows.forEach((w, i) => spots.push(bankSpot('w' + i, w.x, w.z, 0.85)));
   for (const k in Y.jobs) spots.push(bankSpot(k, Y.jobs[k].x, Y.jobs[k].z, k === 'boxes' || k === 'cash' || k === 'vault' ? 1.5 : 1.0));
-  spots.push({ id: 'exit', x: Y.exit.x, z: Y.exit.z, r: 1.2, label: 'Leave' });
-  const npcs = Y.staff.map(s => ({ id: s.id, x: s.x, z: s.z, h: s.h, look: s.id === 'security' ? BANK_GUARD_LOOK : BANK_STAFF_LOOK[B.id] }))
-    .concat(Y.customers.map((c, i) => ({ id: 'cust' + i, x: c.x, z: c.z, h: c.h })));
+  spots.push(bankSpot('hall', Y.hall.x, Y.hall.z, Y.hall.r), bankSpot('exit', Y.exit.x, Y.exit.z, 1.2), bankSpot('back', Y.rear.x, Y.rear.z, 0.9));
   return {
     id: 'bank:' + B.id, dynamic: true, name: B.name, w: B.w, d: B.d, h: B.h, exit: Y.exit, spawnH: Math.PI, noExit: true, fight: true,
     bank: B.id, at: { x: L.x, z: L.z }, door: { x: L.x, z: L.z, h: L.h }, seed: 7919 + B.tier * 131,
     build(k, rng, def) { BANK_BUILD[B.id](k, rng, def); },
     afterInstall(grp, def) {
-      // the doors that open: a slab (or the round vault door) per lock, swung aside when it opens
-      def.doorMesh = {};
-      for (const key in def.locks) {
-        const Lk = def.locks[key], round = key === 'vault' && B.id === 'c';
-        const geo = round ? new THREE.CylinderGeometry(1.55, 1.55, 0.45, 28) : Lk.along === 'x' ? new THREE.BoxGeometry(Lk.w, 2.25, key === 'vault' ? 0.4 : 0.08) : new THREE.BoxGeometry(0.08, 2.25, Lk.w);
-        const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: Lk.color, roughness: key === 'vault' ? 0.35 : 0.6, metalness: key === 'vault' ? 0.8 : 0.3 }));
-        m.material.userData.own = true; // disposed with the interior (350 dispose)
-        if (round) { m.rotation.x = Math.PI / 2; m.position.set(Lk.x, 1.7, Lk.z + 0.1); const hub = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 18), m.material); hub.position.y = 0.26; hub.rotation.x = Math.PI / 2; m.add(hub); }
-        else m.position.set(Lk.x, 1.125, Lk.z);
-        m.userData.closed = { x: m.position.x, z: m.position.z, ry: m.rotation.y };
-        grp.add(m); def.doorMesh[key] = m;
-      }
+      // the doors that open, drawn with this room's own lamp-lit material (grp's first child is the room mesh, 350)
+      def.doors = {};
+      const mat = grp.children[0].material;
+      for (const key in def.locks) { const D = bankDoor(def.locks[key], B.h, mat); grp.add(D.mesh); def.doors[key] = D; }
     },
-    spots, npcs
+    spots
   };
 }
 // ------------------------------------------------------------ the street front
@@ -47884,6 +48026,31 @@ function bankFacade(gb, lb, B, d) {
   // the name board
   const [nx, nz] = at(0, B.id === 'c' ? 3.6 : B.id === 'd' ? 0.32 : 0.3);
   return { x: nx, y: y0 + (B.id === 'c' ? 8.6 : B.id === 'd' ? 5.6 : 3.75), z: nz, h: d.h, w: B.id === 'c' ? 14 : B.id === 'd' ? 8 : 5.6, ht: B.id === 'c' ? 0.9 : B.id === 'd' ? 0.9 : 0.6 };
+}
+// the rear staff door on the back wall of a bank's building (r: BankSystem.rearOf, the wall point and the way out):
+// a steel door in a dark frame on a concrete step, a lock box, a caged lamp over it; its sign is bankRearSigns
+function bankRearDoor(gb, lb, r) {
+  const ox = Math.sin(r.h), oz = Math.cos(r.h), rx = Math.cos(r.h), rz = -Math.sin(r.h);
+  const box = (b, side, out, y, w, h, dd, col) => b.box(r.x + ox * out + rx * side, r.y0 + y + h / 2, r.z + oz * out + rz * side, w, h, dd, C(col), r.h);
+  box(gb, 0, 0.6, 0, 1.9, 0.12, 1.2, 0x8a8f96);
+  box(gb, 0, 0.06, 0, 1.6, 2.55, 0.12, 0x2a2e33);
+  box(gb, 0, 0.13, 0.12, 1.2, 2.25, 0.04, 0x6a7076);
+  box(gb, 0, 0.155, 0.16, 1.1, 0.25, 0.01, 0x4a4f55);
+  box(gb, 0.42, 0.16, 1.0, 0.05, 0.14, 0.05, 0xc8ccd0); box(gb, 0.48, 0.15, 1.2, 0.12, 0.2, 0.04, 0x1a1c20);
+  box(gb, 0, 0.2, 2.66, 0.46, 0.14, 0.4, 0x2a2e33); box(lb, 0, 0.2, 2.6, 0.36, 0.06, 0.3, 0xffffff);
+}
+// the rear doors' "STAFF ENTRANCE" signs: one quad each over the door, all in one mesh (one draw call)
+function bankRearSigns(rs) {
+  const p = [], n = [], uv = [], ix = [], w = 1.5, ht = 0.28;
+  rs.forEach((r, k) => {
+    const ox = Math.sin(r.h), oz = Math.cos(r.h), rx = Math.cos(r.h), rz = -Math.sin(r.h), cx = r.x + ox * 0.03, cz = r.z + oz * 0.03, y = r.y0 + 3.06;
+    for (const [s, t] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { p.push(cx + rx * s * w / 2, y + t * ht / 2, cz + rz * s * w / 2); n.push(ox, 0, oz); uv.push((s + 1) / 2, (t + 1) / 2); }
+    ix.push(k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(ix); geo.computeBoundingSphere();
+  return geo;
 }
 /* =====================================================================
    [CORE+CONTENT] CONTENT: reputation, phone & dialogue, districts, services (garage,
@@ -50519,7 +50686,7 @@ const OFFICERS = [
   { id: 'vale', name: 'Deputy Chief Corinne Vale', rank: 'Headquarters', minRank: 5, fee: 50000, honest: 0.5, perks: 'Halves the pressure your turfs generate and takes 30% off every sentence.' }
 ];
 const OFFICER_BY_ID = Object.fromEntries(OFFICERS.map(o => [o.id, o]));
-const CRIME_PRESSURE = { hitped: 2, assault: 1.2, shoot: 1.5, carjack: 1.6, stealcop: 5, ramcop: 2.5, hitcop: 4, shootcop: 6, copcar: 7, explosion: 3, koped: 2.5, theft: 0.8, deal: 1.5, pickpocket: 0.6, bankrob: 6, assaultguard: 2, killguard: 9 };
+const CRIME_PRESSURE = { hitped: 2, assault: 1.2, shoot: 1.5, carjack: 1.6, stealcop: 5, ramcop: 2.5, hitcop: 4, shootcop: 6, copcar: 7, explosion: 3, koped: 2.5, theft: 0.8, deal: 1.5, pickpocket: 0.6, bankrob: 6, assaultguard: 2, killguard: 9, hostage: 5, harmhostage: 3, killhostage: 9 };
 function turfAt(x, z) {
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return Math.floor(bz / 2) * TURF_N + Math.floor(bx / 2);
@@ -52093,6 +52260,7 @@ class Underworld {
       return null;
     }
     if (p.state !== 'foot') return null;
+    const bk = this.banks.rearAction(); if (bk) return bk;
     for (const L of this.locs) {
       if (L.kind === 'deal') continue;
       if (dist2(L.x, L.z, p.pos.x, p.pos.z) > 2.4 * 2.4) continue;
@@ -56274,7 +56442,7 @@ class OffroadPark extends OfficialVenue {
    cannot be bought, outside task forces and political crackdowns.
    ===================================================================== */
 // days added per offence (capped at six counts each); ordinary early mistakes stay short
-const CRIME_DAYS = { hitped: 5, assault: 3, shoot: 8, carjack: 10, stealcop: 30, ramcop: 12, hitcop: 22, shootcop: 60, copcar: 45, explosion: 20, koped: 15, theft: 4, deal: 12, pickpocket: 2, robbery: 20, burglary: 6, bankrob: 45, assaultguard: 8, killguard: 90 };
+const CRIME_DAYS = { hitped: 5, assault: 3, shoot: 8, carjack: 10, stealcop: 30, ramcop: 12, hitcop: 22, shootcop: 60, copcar: 45, explosion: 20, koped: 15, theft: 4, deal: 12, pickpocket: 2, robbery: 20, burglary: 6, bankrob: 45, assaultguard: 8, killguard: 90, hostage: 30, harmhostage: 12, killhostage: 90 };
 class PressureSystem {
   constructor(uw) { this.uw = uw; }
   get S() { return this.uw.S; }
@@ -56435,12 +56603,12 @@ const LEGAL = {
   // the chance a contested count is thrown out, by the evidence behind it
   dismiss: { police: 0.06, witness: 0.34, physical: 0.02 },
   fineMaxDays: 6, finePerDay: 400,
-  severe: ['shootcop', 'hitcop', 'stealcop', 'copcar', 'robbery', 'koped', 'explosion', 'escape', 'bankrob', 'killguard'],
+  severe: ['shootcop', 'hitcop', 'stealcop', 'copcar', 'robbery', 'koped', 'explosion', 'escape', 'bankrob', 'killguard', 'hostage', 'harmhostage', 'killhostage'],
   fixMax: 0.95, fixDirtyK: 1.25,
   fugitive: { k: 0.2, min: 7, max: 60 },
   quash: { base: 0.7, per: 900, min: 2000 }
 };
-const CHARGE_NAME = { hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person', robbery: 'Armed robbery', burglary: 'Burglary', escape: 'Escaping custody', bankrob: 'Bank robbery', assaultguard: 'Assaulting a security guard', killguard: 'Killing a security guard' };
+const CHARGE_NAME = { hitped: 'Hit and run', assault: 'Assault', shoot: 'Discharging a firearm', carjack: 'Carjacking', stealcop: 'Theft of a police vehicle', ramcop: 'Ramming a police vehicle', hitcop: 'Assaulting an officer', shootcop: 'Shooting at police', copcar: 'Destroying police property', explosion: 'Arson / explosion', koped: 'Aggravated assault', theft: 'Auto theft', deal: 'Distribution', pickpocket: 'Theft from the person', robbery: 'Armed robbery', burglary: 'Burglary', escape: 'Escaping custody', bankrob: 'Bank robbery', assaultguard: 'Assaulting a security guard', killguard: 'Killing a security guard', hostage: 'Hostage-taking', harmhostage: 'Assaulting a hostage', killhostage: 'Killing a hostage' };
 const EVIDENCE_NAME = { police: 'an officer saw it', witness: 'a witness statement', physical: 'found on you' };
 class Legal {
   constructor(uw) { this.uw = uw; this.recT = 0; this.open = false; }
@@ -56694,7 +56862,7 @@ class Legal {
      from the boxes are hot goods.
    ===================================================================== */
 class BankSystem {
-  constructor(uw) { this.uw = uw; this.R = null; this.guards = []; this.facade = null; }
+  constructor(uw) { this.uw = uw; this.R = null; this.guards = []; this.civs = []; this.facade = null; this.rear = {}; this.via = 'front'; this.last = null; }
   get g() { return this.uw.g; }
   get S() { return this.uw.S; }
   static fresh() { return {}; }
@@ -56757,16 +56925,19 @@ class BankSystem {
   stormAt(id) { return Math.max(15, BANKS[id].storm - this.sec(id) * BANK_T.secStorm); }
   escalEvery(id) { return Math.max(15, BANKS[id].escal - this.sec(id) * BANK_T.secEscal); }
   // ---------------------------------------------------------------- the street side
-  // the facades: one merged mesh, one lamp mesh, a name board each (built once)
+  // the facades: one merged mesh, one lamp mesh, a name board each, and the rear staff doors with one sign mesh for
+  // all three (built once)
   buildFacades() {
     if (this.facade) return;
     const g = this.g, grid = g.world.grid, gb = new GeoBuilder(), lb = new GeoBuilder(), boards = [];
+    this.rear = {};
     for (const id of BANK_IDS) {
       const L = this.uw.loc('spot', 'bank_' + id); if (!L) continue;
       const fx = Math.sin(L.h), fz = Math.cos(L.h), y0 = groundY(L.x, L.z, CURB_H + 1);
       const hit = grid.raycast(L.x, y0 + 1.2, L.z, -fx, 0, -fz, 6, 0.5);
       const d = { x: L.x, z: L.z, h: L.h, wall: hit ? hit.t : 1.3, y0 };
       const nb = bankFacade(gb, lb, BANKS[id], d); nb.id = id; boards.push(nb);
+      const r = this.rearOf(L); if (r) { this.rear[id] = r; bankRearDoor(gb, lb, r); }
     }
     const grp = new THREE.Group();
     if (gb.n) { const m = new THREE.Mesh(gb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.08 })); m.receiveShadow = true; m.castShadow = true; grp.add(m); }
@@ -56776,14 +56947,61 @@ class BankSystem {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(b.w, b.ht), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35, roughness: 0.5 }));
       m.position.set(b.x, b.y, b.z); m.rotation.y = b.h; grp.add(m);
     }
+    const rs = Object.values(this.rear);
+    if (rs.length) {
+      const tex = makeSignTexture('STAFF ENTRANCE', '#1d2a33', '#e8eef2', 512, 96);
+      grp.add(new THREE.Mesh(bankRearSigns(rs), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.25, roughness: 0.5 })));
+    }
     for (const o of grp.children) o.frustumCulled = false;
     g.outdoor.add(grp); this.facade = grp;
   }
+  // a bank's rear staff door: on the back wall of its building (the building's box, straight through from the front
+  // door), at the pavement of the street behind; slid along the wall clear of anything standing on that pavement
+  rearOf(L) {
+    const g = this.g, grid = g.world.grid, fx = Math.sin(L.h), fz = Math.cos(L.h), ix = L.x - fx * 3, iz = L.z - fz * 3;
+    const b = grid.query(ix - 0.1, iz - 0.1, ix + 0.1, iz + 0.1, []).find(c => c.kind === 'bld' && c.x1 !== undefined);
+    if (!b) return null;
+    const wx = Math.abs(fx) > 0.5 ? (fx > 0 ? b.x0 : b.x1) : L.x, wz = Math.abs(fz) > 0.5 ? (fz > 0 ? b.z0 : b.z1) : L.z;
+    const h = L.h + Math.PI, ox = Math.sin(h), oz = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
+    // (the grid's query is by cell: each collider is tested for real, boxes and round props alike)
+    const touches = (c, x, z, r) => c.x0 !== undefined ? x + r > c.x0 && x - r < c.x1 && z + r > c.z0 && z - r < c.z1 : Math.hypot(c.x - x, c.z - z) < r + (c.r || 0);
+    const clear = (x, z) => !grid.query(x - 0.7, z - 0.7, x + 0.7, z + 0.7, []).some(c => c !== b && c.on !== false && c.kind !== 'int' && c.y1 > 0.2 && c.y0 < 2.2 && touches(c, x, z, 0.7));
+    for (const s of [0, 1.5, -1.5, 3, -3, 4.5, -4.5, 6, -6]) {
+      const x = wx + rx * s, z = wz + rz * s, sx = x + ox * 1.3, sz = z + oz * 1.3;
+      if (!clear(sx, sz) || !clear(x + ox * 0.5, z + oz * 0.5)) continue;
+      return { x, z, h, sx, sz, y0: groundY(sx, sz, CURB_H + 1) };
+    }
+    return null;
+  }
+  // on the street by a bank's rear staff door: locked; a lockpick set (M10 tools) opens it, with nobody watching
+  rearAction() {
+    const g = this.g, p = g.player; if (!this.rear) return null;
+    for (const id in this.rear) {
+      const r = this.rear[id];
+      if (dist2(r.sx, r.sz, p.pos.x, p.pos.z) > 1.8 * 1.8) continue;
+      if (!this.uw.tools.picks) return { label: `Staff entrance · ${BANKS[id].short} · locked`, act: () => g.content.deny('Locked. A lockpick set would open it (Dockside Sully sells them).') };
+      return { label: `Pick the staff entrance · ${BANKS[id].short}`, act: () => this.pickRear(id) };
+    }
+    return null;
+  }
+  pickRear(id) {
+    const g = this.g, r = this.rear[id];
+    if (g.police.level > 0) { g.content.deny('Not with the police on you.'); return; }
+    g.content.channel('PICKING THE STAFF DOOR', BANK_T.pick, () => {
+      if (!this.uw.tools.usePick()) return;
+      this.enter(id, 'back');
+      // a break-in on the street: anyone who saw it may call it in (300/310 witnesses)
+      g.police.crime('burglary', r.sx, r.sz);
+    });
+  }
   // ---------------------------------------------------------------- walking in and out
-  enter(id) {
+  // in by the front doors, or (via 'back') by the rear staff door: you start just inside it, facing the room
+  enter(id, via) {
     const g = this.g, B = BANKS[id], L = this.uw.loc('spot', 'bank_' + id); if (!B || !L) return;
     if (g.police.level > 0 && g.police.visible) { g.content.deny('They’d follow you straight in. Break line of sight first.'); return; }
-    const I = g.content.interiors, def = I.addDynamic(bankInteriorDef(B, L));
+    const I = g.content.interiors, def = I.addDynamic(bankInteriorDef(B, L)), Y = BANK_LAYOUT[id];
+    def.spawn = via === 'back' ? { x: Y.rear.x, z: Y.rear.z } : null; def.spawnH = via === 'back' ? Y.rear.h : Math.PI;
+    this.via = via === 'back' ? 'back' : 'front';
     I.enter(def.id);
   }
   onInterior(id, entered) {
@@ -56791,26 +57009,38 @@ class BankSystem {
     const g = this.g, I = g.content.interiors;
     if (entered) {
       const def = I.def(id), bid = def.bank;
-      this.R = { id: bid, def, alarm: false, alarmT: 0, waveT: 0, hostile: false, violent: false, filed: false, took: 0, keycard: false,
-        open: { sec: false, cash: false, vault: false }, win: {}, grabs: { cash: 0, vault: 0 }, hit: new Set(), killed: new Set(), restrainT: 0, warnT: 0, warned: false, started: false, seenT: 0 };
-      this.spawnGuards();
+      this.R = { id: bid, def, via: this.via || 'front', alarm: false, alarmT: 0, waveT: 0, hostile: false, violent: false, took: 0, keycard: false,
+        open: { sec: false, cash: false, vault: false }, swing: [], win: {}, grabs: { cash: 0, vault: 0 }, hit: new Set(), killed: new Set(), restrainT: 0, warnT: 0, warned: false, started: false,
+        bag: { items: [], units: 0 }, hostages: false, noDeal: false, civHit: new Set(), civDead: new Set(), stormN: 0, stormT: 0, rearCovered: false, trespassT: 0, out: null };
+      this.spawnGuards(); this.spawnCivilians();
       const B = BANKS[bid];
-      g.ui.toast(`${B.name} · ${this.sec(bid) ? 'security is up after a recent robbery' : 'open for business'}`);
+      g.ui.toast(this.R.via === 'back' ? `${B.name} · in by the staff door. Staff only back here: keep out of the guards’ sight.` : `${B.name} · ${this.sec(bid) ? 'security is up after a recent robbery' : 'open for business'}`);
     } else this.leave();
   }
-  // whatever the way out (the door, an arrest, a death, a reload): the guards and any police inside go; the robbery
-  // is over; what was taken stays taken (it was saved to S.banks as it happened)
+  // whatever the way out (a door, an arrest, a death, a reload): the guards, the people in the bank and any police
+  // inside go; the robbery is over; what was taken from the bank stays taken (S.banks, as it happened). The bag pays
+  // out only through a door (settle); arrested or dead, it goes with you into custody, or nowhere
   leave() {
     const g = this.g, R = this.R; if (!R) return;
-    for (const p of this.guards) { const i = g.peds.peds.indexOf(p); if (i >= 0) g.peds.peds.splice(i, 1); }
-    this.guards = [];
+    for (const p of this.guards.concat(this.civs)) { const i = g.peds.peds.indexOf(p); if (i >= 0) g.peds.peds.splice(i, 1); }
+    this.guards = []; this.civs = [];
     for (let k = g.police.cops.length - 1; k >= 0; k--) { const c = g.police.cops[k]; if (!c.bankCop) continue; const i = g.peds.peds.indexOf(c); if (i >= 0) g.peds.peds.splice(i, 1); g.police.cops.splice(k, 1); }
     if (g.police.contain === R.def.id) g.police.contain = null;
     if (R.alarm && g.police.level > 0) { g.police.lastSeen.x = R.def.door.x; g.police.lastSeen.z = R.def.door.z; }
-    if (R.took > 0 && g.state === 'playing') g.ui.toast(`Out with ${fmtMoney(R.took)} from ${BANKS[R.id].short}.`, 'money');
+    if (R.out === 'back' && R.alarm && g.police.level > 0 && R.rearCovered) this.rearCops();
+    if (R.out) this.settle();
+    else if (R.bag.items.length) g.ui.toast(`The bag (${fmtMoney(this.bagCash())}) goes into police evidence.`, 'warn');
     this.R = null;
   }
-  reset() { if (this.R) this.leave(); this.R = null; this.guards = []; }
+  reset() { if (this.R) this.leave(); this.R = null; this.guards = []; this.civs = []; }
+  // out of the back with the police already covering it: officers at the door, and they have you
+  rearCops() {
+    const g = this.g, r = this.rear[this.R.id]; if (!r) return;
+    const rx = Math.cos(r.h), rz = -Math.sin(r.h);
+    for (const s of [-2.2, 2.2]) g.police.spawnCop(r.sx + rx * s + Math.sin(r.h) * 2.5, r.sz + rz * s + Math.cos(r.h) * 2.5);
+    g.police.lastSeen.x = r.sx; g.police.lastSeen.z = r.sz; g.police.seenT = 0;
+    g.ui.toast('Police at the back door! They were waiting for you.', 'warn');
+  }
   spawnGuards() {
     const g = this.g, R = this.R, def = R.def, B = BANKS[R.id], Y = BANK_LAYOUT[R.id], n = this.guardsFor(R.id);
     this.guards = [];
@@ -56824,6 +57054,30 @@ class BankSystem {
       g.peds.peds.push(p); this.guards.push(p);
     }
   }
+  // the people in the bank: the tellers, the manager and the other staff, the customers. People (300) on the bank's
+  // floor, so they can be hurt like anyone else; bankCivBrain decides what each does (cv: idle, hands up, cowering,
+  // on the floor as a hostage, running out, gone)
+  spawnCivilians() {
+    const g = this.g, R = this.R, def = R.def, Y = BANK_LAYOUT[R.id], look = BANK_STAFF_LOOK[R.id];
+    this.civs = [];
+    const add = (s, i, staff) => {
+      const lk = randomLook(mulberry32((staff ? 41 : 59) * (i + 1) + R.id.charCodeAt(0) * 7 + (staff ? 0 : this.S.day)));
+      if (staff) Object.assign(lk, s.id === 'security' ? { shirt: C(BANK_GUARD_LOOK.shirt), pants: C(BANK_GUARD_LOOK.pants), cap: C(BANK_GUARD_LOOK.cap), skirt: null } : { shirt: C(look.shirt), pants: C(look.pants), cap: null });
+      const p = g.peds.make('bankciv', lk);
+      p.x = def.ox + s.x; p.z = def.oz + s.z; p.y = def.fy; p.floor = def.fy; p.h = s.h; p.state = 'free'; p.keep = true; p.bank = R.id; p.bankCiv = true;
+      p.staff = staff; p.post = { x: p.x, z: p.z, h: s.h }; p.cv = 'idle'; p.nerve = 0; p.nerveMax = rand(BANK_T.hostage.nerve[0], BANK_T.hostage.nerve[1]);
+      p.brain = bankCivBrain; p.char.x = p.x; p.char.y = p.y; p.char.z = p.z; p.char.h = p.h;
+      g.peds.peds.push(p); this.civs.push(p);
+    };
+    Y.staff.forEach((s, i) => add(s, i, true));
+    Y.customers.forEach((c, i) => add(c, i, false));
+  }
+  // a civilian who ran out of the doors (or was let go)
+  civGone(p) { const g = this.g, i = g.peds.peds.indexOf(p); if (i >= 0) g.peds.peds.splice(i, 1); p.cv = 'gone'; }
+  // hostages: people on the floor at your word, still there and not hurt badly enough to be out of it
+  hostages() { let n = 0; for (const c of this.civs) if (c.cv === 'floor' && !c.ko && c.state !== 'ko') n++; return n; }
+  // the police wait while you hold hostages (a negotiator on the phone), and stop waiting once one has been hurt
+  negotiation() { return this.R.noDeal ? 0 : Math.min(BANK_T.hostage.cap, this.hostages() * BANK_T.hostage.delay); }
   // ---------------------------------------------------------------- the alarm and the response
   alarm(why, violent, robbery) {
     const g = this.g, R = this.R; if (!R) return;
@@ -56834,12 +57088,17 @@ class BankSystem {
       g.police.contain = R.def.id; g.police.lastSeen.x = R.def.door.x; g.police.lastSeen.z = R.def.door.z;
       g.audio.play('buzzer');
       g.ui.toast(why || 'Silent alarm. The police are on their way.', 'warn');
-      for (const c of R.def.chars) { if (c.id.startsWith('cust')) c.pose.crouch = 1; else if (c.id !== 'security') c.pose.surrender = 1; }
+      // the staff put their hands up; a customer nobody is holding runs for the doors, or freezes where they are
+      for (const c of this.civs) if (c.cv === 'idle') c.cv = c.staff ? 'hands' : Math.random() < 0.6 ? 'run' : 'cower';
     }
     this.escalate();
   }
-  // the stars this robbery calls for: the branch's, one for violence, one more for every escal seconds inside
-  wantStars() { const R = this.R, B = BANKS[R.id]; return Math.min(5, B.stars + (R.violent ? 1 : 0) + (R.killed.size ? 1 : 0) + Math.floor(R.alarmT / this.escalEvery(R.id))); }
+  // the stars this robbery calls for: the branch's, one for violence, one for a killing, one for holding hostages,
+  // one more for every escal seconds inside
+  wantStars() {
+    const R = this.R, B = BANKS[R.id];
+    return Math.min(5, B.stars + (R.violent ? 1 : 0) + (R.killed.size || R.civDead.size ? 1 : 0) + (R.hostages ? 1 : 0) + Math.floor(R.alarmT / this.escalEvery(R.id)));
+  }
   escalate() { const g = this.g, w = this.wantStars(); if (g.police.level < w) g.police.setLevel(w); }
   // the first real move against the bank: a security step for next time, the count, the charge on the CCTV
   started() {
@@ -56850,35 +57109,60 @@ class BankSystem {
     this.file('bankrob');
   }
   file(type) { const R = this.R, d = R.def.door; this.uw.cops.crime(type, CRIMES[type] || 1, true, d.x, d.z, 'police'); }
-  // combat (320) and the people code (300): hitting a guard, putting one down
+  // combat (320) and the people code (300): hitting a guard or anyone else in the bank, putting one down
   onHit(c, kind) {
     const R = this.R; if (!R || c.bank !== R.id) return;
-    c.lastHitKind = kind; R.hostile = true;
+    c.lastHitKind = kind;
+    if (c.bankCiv) { this.hurtCiv(c, false); return; }
+    R.hostile = true;
     if (!R.hit.has(c.id)) { R.hit.add(c.id); this.file('assaultguard'); }
     this.alarm('A guard is down on the alarm. Every officer in the district is coming.', true);
   }
   onKnock(p, byPlayer, ko) {
     const R = this.R; if (!R || p.bank !== R.id || !byPlayer) return;
+    if (p.bankCiv) { this.hurtCiv(p, ko && p.lastHitKind === 'gun'); return; }
     R.hostile = true;
     if (ko && !R.killed.has(p.id) && p.lastHitKind === 'gun') { R.killed.add(p.id); this.file('killguard'); this.g.ui.toast('A guard is dead. This is a murder case now.', 'warn'); }
     else if (!R.hit.has(p.id)) { R.hit.add(p.id); this.file('assaultguard'); }
     this.alarm(null, true);
   }
+  // someone in the bank hurt by you: once the robbery is on (or they are your hostage) it is a hostage hurt, on the
+  // CCTV as its own charge, and the police stop negotiating and come straight in; before that, an assault
+  hurtCiv(c, dead) {
+    const g = this.g, R = this.R, held = R.started || c.cv === 'floor';
+    if (dead && !R.civDead.has(c.id)) { R.civDead.add(c.id); this.file(held ? 'killhostage' : 'koped'); g.ui.toast(held ? 'A hostage is dead. This is a murder case now.' : 'Someone is dead on the bank floor.', 'warn'); }
+    else if (!R.civHit.has(c.id)) { R.civHit.add(c.id); this.file(held ? 'harmhostage' : 'assault'); }
+    if (c.cv !== 'gone') c.cv = 'floor';
+    this.alarm(held ? null : 'Screams in the bank: the alarm goes.', true);
+    if (held && !R.noDeal) {
+      R.noDeal = true;
+      if (!R.stormed) { R.alarmT = Math.max(R.alarmT, this.stormAt(R.id)); R.waveT = 0; }
+      g.ui.toast('A hostage is hurt. The police stop talking: they’re coming in now.', 'warn');
+    }
+  }
+  // the police come in: through the front doors, and once they cover the back, every other wave through the staff door
   stormIn() {
     const g = this.g, R = this.R, B = BANKS[R.id], Y = BANK_LAYOUT[R.id], def = R.def;
     const inside = g.police.cops.filter(c => c.bankCop && c.state !== 'down' && g.peds.peds.includes(c)).length;
     let n = Math.min(B.wave, B.stormMax - inside);
-    if (n > 0 && !R.stormed) { R.stormed = true; g.ui.toast('Police! They’re coming through the front doors.', 'warn'); g.audio.play('radio'); }
+    if (n <= 0) return;
+    R.stormN++;
+    const back = R.rearCovered && R.stormN % 2 === 0, at = back ? Y.rear : Y.storm;
+    if (!R.stormed) { R.stormed = true; R.stormT = R.alarmT; g.ui.toast('Police! They’re coming through the front doors.', 'warn'); g.audio.play('radio'); }
+    else if (back && !R.saidBack) { R.saidBack = true; g.ui.toast('Police coming in through the staff door at the back!', 'warn'); }
     while (n-- > 0) {
-      const c = g.police.spawnCop(def.ox + Y.storm.x + rand(-1.2, 1.2), def.oz + Y.storm.z + rand(-0.4, 0.4)); if (!c) break;
+      const c = g.police.spawnCop(def.ox + at.x + rand(-0.8, 0.8), def.oz + at.z + rand(-0.6, 0.6)); if (!c) break;
       c.floor = def.fy; c.y = def.fy; c.bankCop = true; c.health = 90 + B.tier * 10; c.char.y = def.fy;
     }
+    // the police bring out whoever is frozen in a corner
+    for (const c of this.civs) if (c.cv === 'cower') c.cv = 'run';
   }
   // ---------------------------------------------------------------- per frame inside
   update(dt) {
     const g = this.g, R = this.R; if (!R || g.state !== 'playing') return;
-    const p = g.player, B = BANKS[R.id];
+    const p = g.player, Y = BANK_LAYOUT[R.id];
     if (!p.interior || p.interior.id !== R.def.id) return;
+    this.swingDoors(dt);
     // a gun out: a guard who sees it tells you to put it away; keep it out (or fire) and the alarm goes
     const gunOut = p.wep && !p.wep.melee && p.aiming;
     const firing = p.wep && !p.wep.melee && p.attackT > 0;
@@ -56887,13 +57171,27 @@ class BankSystem {
       if (!R.warned) { R.warned = true; R.warnT = 0; this.say(pick(['Hey! Put that away. Now.', 'Gun! Drop it!', 'Easy... put the weapon down.'])); }
       R.warnT += dt; if (R.warnT > BANK_T.warnT) { R.hostile = true; this.alarm('The guard hits the alarm. The police are on their way.'); }
     } else if (!gunOut && R.warned && !R.alarm) R.warnT = Math.max(0, R.warnT - dt);
+    // behind the counter with no alarm (in by the staff door): a guard who sees you there tells you to get out; stay
+    // in his sight and he hits the alarm (a break-in on the CCTV)
+    const who = !R.alarm && p.pos.z - R.def.oz < Y.staffZ - 0.3 ? this.seenBy() : null;
+    if (who) {
+      if (!R.trespass) { R.trespass = true; g.content.say(who, who === 'Guard' ? pick(['Hey! You can’t be back here.', 'Staff only! Out. Now.']) : 'Who are you? You can’t be back here!'); }
+      R.trespassT += dt;
+      if (R.trespassT > BANK_T.warnT) { this.file('burglary'); this.alarm(who === 'Guard' ? 'The guard hits the alarm: an intruder in the back.' : 'The staff hit the panic button: an intruder in the back.'); }
+    }
     // an armed robbery turns the guards on you; an unarmed one they try to hold for the police
     if (R.alarm && gunOut) R.hostile = true;
     if (R.alarm) {
       // the building stays contained while you are in it (whatever else cleared the search)
       if (g.police.contain !== R.def.id && g.police.level > 0) g.police.contain = R.def.id;
       R.alarmT += dt; this.escalate();
-      if (R.alarmT >= this.stormAt(R.id)) { R.waveT -= dt; if (R.waveT <= 0) { R.waveT = BANK_T.wave; this.stormIn(); } }
+      const wait = this.negotiation(), at = this.stormAt(R.id);
+      if (!R.stormed && wait > 0 && R.alarmT >= at && !R.negotiating) { R.negotiating = true; g.content.say('Police negotiator', 'This is the police. Nobody has to get hurt today. Let those people go and we can talk.'); }
+      if (R.alarmT >= at + (R.stormed ? 0 : wait)) {
+        R.waveT -= dt;
+        if (R.waveT <= 0) { R.waveT = BANK_T.wave * (1 + Math.min(1, this.hostages() * BANK_T.hostage.waveMul)); this.stormIn(); }
+      }
+      if (R.stormed && !R.rearCovered && R.alarmT >= R.stormT + BANK_T.rearCover) { R.rearCovered = true; g.ui.toast('Police radio: units are covering the staff door at the back.', 'warn'); }
       // a guard's hands on an unarmed robber who isn't fighting back: held for the police
       if (!R.hostile) {
         const close = this.guards.some(q => q.state !== 'down' && Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < 1.5 && Math.abs(q.y - p.pos.y) < 1.2);
@@ -56902,7 +57200,20 @@ class BankSystem {
         if (R.restrainT >= BANK_T.restrain) { R.restrainT = 0; g.content.cancelChannel(null); g.ui.toast('The guard pins you to the floor and holds you for the police.', 'warn'); g.onBusted(); return; }
       }
     }
-    void B;
+    this.watchHostages(dt);
+  }
+  // hostages are held while you're out in the banking hall with them (the public side of the counter, within earshot);
+  // while you're in the back (the cash room, the vault) each one loses their nerve, at their own pace, and makes a run
+  // for the doors; back in the hall, they settle again
+  watchHostages(dt) {
+    const p = this.g.player, R = this.R, Y = BANK_LAYOUT[R.id];
+    const hall = p.pos.z - R.def.oz > Y.staffZ;
+    for (const c of this.civs) {
+      if (c.cv !== 'floor' || c.ko || c.state === 'down') continue;
+      const held = hall && Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < BANK_T.hostage.reach;
+      c.nerve = held ? Math.max(0, c.nerve - dt * 2) : c.nerve + dt;
+      if (c.nerve > c.nerveMax) { c.cv = 'run'; c.nerve = 0; if (!R.saidRun) { R.saidRun = true; this.g.ui.toast('A hostage is making a run for the doors.', 'warn'); } }
+    }
   }
   guardSees() {
     const g = this.g, p = g.player, grid = g.world.grid;
@@ -56913,38 +57224,134 @@ class BankSystem {
     }
     return false;
   }
+  // who in the bank sees you: a guard, or one of the staff at their post
+  seenBy() {
+    if (this.guardSees()) return 'Guard';
+    const g = this.g, p = g.player, grid = g.world.grid;
+    for (const c of this.civs) if (c.staff && c.cv === 'idle' && Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < 10 && grid.lineOfSight(c.x, c.y + 1.6, c.z, p.pos.x, p.pos.y + 1.3, p.pos.z)) return 'Staff';
+    return null;
+  }
   say(text) { this.g.content.say('Guard', text); }
+  // ---------------------------------------------------------------- the bag
+  bagCash() { return this.R.bag.items.reduce((a, i) => a + i.cash, 0); }
+  bagFull() { return this.R.bag.units >= BANK_T.bag.cap - 0.5; }
+  // what still fits in the bag of one kind of notes, in dollars
+  room(src) { return Math.max(0, (BANK_T.bag.cap - this.R.bag.units) * BANK_T.bag.per[src]); }
+  // take up to `share` of an area's full value, as much of it as fits in the bag (the rest stays in the bank)
+  grab(area, share, src = area) {
+    const full = this.areaFull(this.R.id, area); if (full <= 0) return 0;
+    return this.take(this.R.id, area, Math.min(share, this.room(src) / full));
+  }
+  // into the bag: notes from the tills, the cash room, the vault or a box; dyeP: the chance a dye pack is in them
+  bagPut(src, cash, dyeP, what, quiet) {
+    const g = this.g, R = this.R;
+    if (cash <= 0) { if (!quiet) g.ui.toast('Nothing left here. It hasn’t been restocked since the last robbery.', 'warn'); return; }
+    const risky = dyeP > 0;
+    R.bag.items.push({ src, cash, risky, dye: risky && Math.random() < dyeP, checked: !risky });
+    R.bag.units += cash / BANK_T.bag.per[src];
+    if (!quiet) g.ui.toast(`${what ? what + ': ' : ''}${fmtMoney(cash)} into the bag · ${fmtMoney(this.bagCash())}, ${Math.round(R.bag.units)}% full.`, 'money');
+  }
+  recount() { const R = this.R; R.bag.units = R.bag.items.reduce((a, i) => a + i.cash / BANK_T.bag.per[i.src], 0); }
+  // the bag is full: dump the bulky small notes for denser ones, if there are any to dump; otherwise it's time to go
+  makeRoom(src, then) {
+    const g = this.g, R = this.R, per = BANK_T.bag.per, light = R.bag.items.filter(i => per[i.src] < per[src]);
+    if (!light.length) { g.ui.toast('The bag is full. Get it out: the front doors, or the staff door at the back.', 'warn'); return; }
+    const cash = light.reduce((a, i) => a + i.cash, 0);
+    g.ui.ask('The bag is full', `Dump ${fmtMoney(cash)} of bulkier notes on the floor to make room for ${src === 'vault' ? 'the vault’s hundreds' : src === 'boxes' ? 'what’s in the boxes' : 'the cash room’s straps'}?`, 'Dump them', () => {
+      if (!this.R) return;
+      R.bag.items = R.bag.items.filter(i => per[i.src] >= per[src]); this.recount();
+      g.ui.toast(`Dumped ${fmtMoney(cash)} on the floor. The bag is ${Math.round(R.bag.units)}% full.`, 'warn');
+      then();
+    });
+  }
+  unchecked() { return this.R.bag.items.filter(i => i.risky && !i.checked); }
+  checkSecs() { return Math.max(BANK_T.bag.checkMin, Math.round(this.unchecked().length * BANK_T.bag.check)); }
+  // going through the bag for dye packs: every bundle from the tills and the cash room; a pack found goes, with the
+  // bait money round it
+  checkBag(then) {
+    const g = this.g, R = this.R, todo = this.unchecked(); if (!todo.length) { if (then) then(); return; }
+    g.content.channel('GOING THROUGH THE BAG', this.checkSecs(), () => {
+      let n = 0, lost = 0;
+      for (const i of todo) { i.checked = true; if (!i.dye) continue; n++; i.dye = false; const b = Math.round(i.cash * BANK_T.dye.bait); i.cash -= b; lost += b; }
+      this.recount();
+      g.ui.toast(n ? `${n} dye pack${n > 1 ? 's' : ''} found and dumped, with the bait money round ${n > 1 ? 'them' : 'it'} (${fmtMoney(lost)}).` : 'No dye packs. Clean notes.', n ? 'warn' : 'money');
+      if (then) then();
+    });
+  }
+  // out of the front doors or the staff door at the back. Bundles in the bag nobody has gone through: a choice first
+  walkOut(how) {
+    const g = this.g, R = this.R, todo = this.unchecked();
+    if (!todo.length) { this.goOut(how); return; }
+    g.content.openSvc(how === 'back' ? 'The staff door' : 'The front doors', 'Teller drawers and cash room straps can hide a dye pack.', () => {
+      let h = `<div class="svcTop"><span>The bag <b class="cash dirty">${fmtMoney(this.bagCash())}</b></span><span>${Math.round(R.bag.units)}% full</span></div>`;
+      h += `<div class="hint">${todo.length} bundle${todo.length > 1 ? 's' : ''} from the tills and the cash room you haven’t gone through. A dye pack that leaves the building bursts: its bundle and some of the rest are ruined, and the red smoke shows the police where you came out.</div>`;
+      h += `<div class="row"><button data-act="check">Go through the bag · ${this.checkSecs()} s</button><button class="danger" data-act="out">Walk out now</button><button data-act="stay">Stay</button></div>`;
+      return h;
+    }, a => { g.ui.back(); if (a === 'out') this.goOut(how); else if (a === 'check') this.checkBag(); });
+  }
+  goOut(how, quiet) {
+    const g = this.g, R = this.R, I = g.content.interiors; R.out = how;
+    const r = how === 'back' ? this.rear[R.id] : null;
+    if (r) I.exit(quiet, { x: r.x + Math.sin(r.h) * 0.4, z: r.z + Math.cos(r.h) * 0.4, h: r.h }); else I.exit(quiet);
+  }
+  // through a door with the bag: what is in it becomes Dirty Cash in hand ('bankRob'), less what a dye pack leaving
+  // the building ruins (its bundle and BANK_T.dye.stain of the rest); the red smoke shows the police where you are
+  settle() {
+    const g = this.g, R = this.R, items = R.bag.items; if (!items.length) return;
+    const total = this.bagCash(), burst = items.filter(i => i.dye), hit = burst.reduce((a, i) => a + i.cash, 0);
+    const ruined = burst.length ? hit + Math.round((total - hit) * BANK_T.dye.stain) : 0, paid = Math.max(0, total - ruined);
+    if (paid > 0) { g.earn(paid, 'bankRob'); this.st(R.id).taken += paid; }
+    R.took = paid; this.last = { id: R.id, out: R.out, total, ruined, paid, burst: burst.length };
+    if (!burst.length) { g.ui.toast(`Out with ${fmtMoney(paid)} from the ${BANKS[R.id].short}.`, 'money'); return; }
+    const p = g.player.pos;
+    for (let k = 0; k < 8; k++) g.fx.puff(p.x + rand(-0.7, 0.7), p.y + 0.8 + rand(0, 0.8), p.z + rand(-0.7, 0.7), [0.86, 0.1, 0.14]);
+    if (g.police.level > 0) { g.police.lastSeen.x = p.x; g.police.lastSeen.z = p.z; g.police.seenT = 0; }
+    g.ui.toast(`A dye pack bursts in the bag! Red smoke everywhere: ${fmtMoney(ruined)} ruined. Out with ${fmtMoney(paid)}.`, 'warn');
+  }
   // ---------------------------------------------------------------- the jobs (interior spots 'bk:...')
   label(key) {
     const R = this.R; if (!R) return '';
-    const B = BANKS[R.id], armed = this.armed();
+    const B = BANKS[R.id], armed = this.armed(), full = this.bagFull(), pct = () => ` · bag ${Math.round(R.bag.units)}%`;
     if (key[0] === 'w') {
       const i = +key.slice(1);
       if (R.win[i]) return `Window ${i + 1} · the drawer is empty`;
-      return R.alarm || armed ? `Rob window ${i + 1}` : `Window ${i + 1} · teller`;
+      return R.alarm || armed ? `Rob window ${i + 1}${full ? ' · the bag is full' : ''}` : `Window ${i + 1} · teller`;
     }
+    const bag = R.bag.items.length ? ` · the bag: ${fmtMoney(this.bagCash())}` : '';
     switch (key) {
       case 'office': return R.keycard ? 'The manager’s desk · searched' : 'Search the manager’s desk';
       case 'sec': return R.open.sec ? 'The door is open' : R.keycard ? 'Swipe the keycard' : `Force the ${R.id === 'n' ? 'staff' : 'security'} door`;
       case 'cashdoor': return R.open.cash ? 'Cash room · open' : R.keycard ? 'Swipe the keycard · cash room' : 'Drill the cash room door';
-      case 'cash': return !R.open.cash ? 'Cash room · locked' : R.grabs.cash >= B.grabs || this.avail(R.id, 'cash') <= 0 ? 'Cash room · cleaned out' : 'Bag the cash';
+      case 'cash': return !R.open.cash ? 'Cash room · locked' : this.cleaned('cash') ? 'Cash room · cleaned out' : full ? 'Cash room · the bag is full' : 'Bag the cash' + pct();
       case 'vaultdoor': return R.open.vault ? 'Vault · open' : `Drill the vault door · ${Math.round(B.vaultDoor * this.slow(R.id))} s`;
-      case 'vault': return !R.open.vault ? 'Vault · sealed' : R.grabs.vault >= B.vaultGrabs || this.avail(R.id, 'vault') <= 0 ? 'Vault · cleaned out' : 'Load the vault cash';
-      case 'boxes': { const n = this.boxesLeft(R.id); return n ? `Drill a deposit box · ${n} left` : 'Deposit boxes · all drilled'; }
+      case 'vault': return !R.open.vault ? 'Vault · sealed' : this.cleaned('vault') ? 'Vault · cleaned out' : full ? 'Vault · the bag is full' : 'Load the vault cash' + pct();
+      case 'boxes': { const n = this.boxesLeft(R.id); return !n ? 'Deposit boxes · all drilled' : full ? 'Deposit boxes · the bag is full' : `Drill a deposit box · ${n} left` + pct(); }
+      case 'hall': {
+        if (!armed) return '';
+        const n = this.hostages(), free = this.civs.some(c => c.cv !== 'floor' && c.cv !== 'gone' && !c.ko);
+        return free ? 'Everybody on the floor! · take the hall' : n ? `Stay down! · ${n} hostage${n > 1 ? 's' : ''}` : '';
+      }
+      case 'exit': return 'Leave' + bag;
+      case 'back': return 'Staff door · out the back' + bag;
     }
     return '';
   }
   armed() { const p = this.g.player; return !!(p.wep && !p.wep.melee); }
+  // a room emptied this visit (R.grabs: the share of its full value taken), or with nothing in it to take
+  cleaned(area) { return this.R.grabs[area] >= 0.995 || this.avail(this.R.id, area) <= 0; }
   spot(key) {
     const g = this.g, R = this.R; if (!R) return;
-    const B = BANKS[R.id], C2 = g.content, slow = this.slow(R.id), d = R.def;
+    const B = BANKS[R.id], C2 = g.content, slow = this.slow(R.id);
+    if (key === 'exit') { this.walkOut('front'); return; }
+    if (key === 'back') { this.walkOut('back'); return; }
     if (key[0] === 'w') { const i = +key.slice(1); if (R.win[i]) { g.ui.toast('That drawer is already empty.', 'warn'); return; } if (R.alarm || this.armed()) this.robWindow(i); else this.teller(i); return; }
+    if (key === 'hall') { this.takeHall(); return; }
     if (key === 'office') {
       if (R.keycard) { g.ui.toast('Nothing else in the desk.'); return; }
       C2.channel('GOING THROUGH THE MANAGER’S DESK', 3 * slow, () => {
-        // the petty cash comes out of the branch's tills (so it is never there twice)
-        R.keycard = true; const c = this.take(R.id, 'counter', 0.03); if (c > 0) { g.earn(c, 'bankRob'); R.took += c; this.st(R.id).taken += c; }
-        g.ui.toast(c > 0 ? `A staff keycard and ${fmtMoney(c)} petty cash.` : 'A staff keycard. The petty cash tin is empty.', 'money');
+        // the petty cash comes out of the branch's tills (so it is never there twice), into the bag if it fits
+        R.keycard = true; const c = this.grab('counter', 0.03); this.bagPut('counter', c, 0, null, true);
+        g.ui.toast(c > 0 ? `A staff keycard and ${fmtMoney(c)} petty cash.` : this.bagFull() ? 'A staff keycard. No room in the bag for the petty cash.' : 'A staff keycard. The petty cash tin is empty.', 'money');
         this.alarm('The manager hits the panic button under the desk.', false, true);
       });
       return;
@@ -56965,35 +57372,53 @@ class BankSystem {
     if (key === 'cash' || key === 'vault') {
       const area = key, grabs = area === 'cash' ? B.grabs : B.vaultGrabs;
       if (!R.open[area]) { g.ui.toast(area === 'cash' ? 'The cash room is locked.' : 'The vault door is sealed.', 'warn'); return; }
-      if (R.grabs[area] >= grabs || this.avail(R.id, area) <= 0) { g.ui.toast('There’s nothing left in here. It hasn’t been restocked since the last time.', 'warn'); return; }
+      if (this.cleaned(area)) { g.ui.toast('There’s nothing left in here. It hasn’t been restocked since the last time.', 'warn'); return; }
+      if (this.bagFull()) { this.makeRoom(area, () => this.spot(key)); return; }
       C2.channel(area === 'cash' ? 'BAGGING THE CASH' : 'LOADING THE VAULT CASH', (area === 'cash' ? B.grab : B.vaultGrab) * slow, () => {
-        R.grabs[area]++;
-        const cash = this.take(R.id, area, 1 / grabs);
-        this.pay(cash, area === 'vault' && R.id === 'c' && Math.random() < 0.35 ? { hot: randi(1, 3) } : null);
+        const amt = this.grab(area, 1 / grabs); R.grabs[area] += amt / Math.max(1, this.areaFull(R.id, area));
+        this.bagPut(area, amt, area === 'cash' ? BANK_T.dye.cash[B.tier] : 0);
+        if (area === 'vault' && R.id === 'c' && Math.random() < 0.35) { const got = this.uw.give({ hot: randi(1, 3) }, 'robbery'); if (got) g.ui.toast(`And from the vault's shelves: ${goodsList(got)}.`, 'money'); }
       });
       this.alarm(null, false, true);
       return;
     }
     if (key === 'vaultdoor') {
       if (R.open.vault) return;
-      C2.channel('DRILLING THE VAULT DOOR', B.vaultDoor * slow, () => { this.openDoor('vault'); g.audio.play('clank'); g.ui.toast('The vault door swings open.', 'money'); });
+      C2.channel('DRILLING THE VAULT DOOR', B.vaultDoor * slow, () => { this.openDoor('vault'); g.audio.play('clank'); g.ui.toast('The bolts draw back. The vault door swings open.', 'money'); });
       this.alarm('The vault’s seismic alarm trips.', false, true);
       return;
     }
     if (key === 'boxes') {
       if (!this.boxesLeft(R.id)) { g.ui.toast('Every box here has been drilled. Nothing left until people fill them again.', 'warn'); return; }
+      if (this.bagFull()) { this.makeRoom('boxes', () => this.spot(key)); return; }
       C2.channel('DRILLING A DEPOSIT BOX', B.box * slow, () => {
         const b = this.drillBox(R.id); if (!b) return;
-        if (!b.cash && !b.hot) { g.ui.toast(pick(['Box ' + (b.i + 1) + ': old letters and a will.', 'Box ' + (b.i + 1) + ': empty.', 'Box ' + (b.i + 1) + ': somebody’s baby teeth.']), ''); return; }
-        this.pay(b.cash, b.hot ? { hot: b.hot } : null, 'Box ' + (b.i + 1));
+        const got = b.hot ? this.uw.give({ hot: b.hot }, 'robbery') : null, fit = Math.min(b.cash, Math.floor(this.room('boxes')));
+        if (!fit && !got) { g.ui.toast(b.cash ? `Box ${b.i + 1}: ${fmtMoney(b.cash)}, and no room left in the bag for it.` : pick([`Box ${b.i + 1}: old letters and a will.`, `Box ${b.i + 1}: empty.`, `Box ${b.i + 1}: somebody’s baby teeth.`]), ''); return; }
+        if (fit) this.bagPut('boxes', fit, 0, `Box ${b.i + 1}${got ? ' (and ' + goodsList(got) + ')' : ''}${fit < b.cash ? ` · ${fmtMoney(b.cash - fit)} didn’t fit` : ''}`);
+        else g.ui.toast(`Box ${b.i + 1}: ${goodsList(got)}.`, 'money');
       });
       this.alarm(null, false, true);
     }
-    void d;
+  }
+  // "Everybody on the floor!": everyone in the hall (in earshot) goes down and stays down while you're watching; it
+  // starts the robbery, files hostage-taking on the CCTV and turns the guards on you (a gun on the room)
+  takeHall() {
+    const g = this.g, R = this.R, p = g.player; if (!this.armed()) return;
+    let n = 0;
+    for (const c of this.civs) {
+      if (c.cv === 'gone' || c.ko || Math.hypot(c.x - p.pos.x, c.z - p.pos.z) > BANK_T.hostage.reach) continue;
+      c.cv = 'floor'; c.nerve = 0; n++;
+    }
+    g.content.say('You', R.hostages ? 'Stay down! Nobody moves!' : 'Everybody on the floor! Nobody moves, nobody gets hurt!');
+    if (n && !R.hostages) { R.hostages = true; this.file('hostage'); }
+    R.hostile = true;
+    this.alarm('A hold-up in the banking hall. The alarm goes.', false, true);
   }
   // a teller: an armed robber gets the drawer; an unarmed note gets half of it, or a refusal and the alarm
   robWindow(i) {
     const g = this.g, R = this.R, B = BANKS[R.id], armed = this.armed(), Y = BANK_LAYOUT[R.id];
+    if (this.bagFull()) { this.makeRoom('counter', () => this.robWindow(i)); return; }
     if (!armed && !R.alarm && Math.random() > [0, 0.65, 0.45, 0.3][B.tier]) {
       R.win[i] = true; this.say('Not today. *the teller ducks and the alarm goes*');
       this.alarm('The teller hits the alarm. The guards are coming for you.', false, true);
@@ -57001,26 +57426,28 @@ class BankSystem {
     }
     g.content.channel(armed ? 'THE TELLER FILLS THE BAG' : 'PASSING THE TELLER A NOTE', B.win * this.slow(R.id), () => {
       R.win[i] = true;
-      const cash = this.take(R.id, 'counter', (armed ? 1 : 0.5) / Y.windows.length);
-      this.pay(cash, null, `Window ${i + 1}`);
+      this.bagPut('counter', this.grab('counter', (armed ? 1 : 0.5) / Y.windows.length), BANK_T.dye.win[B.tier] + (armed ? 0 : BANK_T.dye.note), `Window ${i + 1}`);
     });
     this.alarm(null, false, true);
   }
-  pay(cash, goods, what) {
-    const g = this.g, R = this.R;
-    if (cash > 0) { g.earn(cash, 'bankRob'); R.took += cash; this.st(R.id).taken += cash; }
-    const got = goods ? this.uw.give(goods, 'robbery') : null;
-    if (cash > 0 || got) g.ui.toast(`${what ? what + ': ' : ''}${cash > 0 ? fmtMoney(cash) : ''}${cash > 0 && got ? ' and ' : ''}${got ? goodsList(got) : ''}. Total ${fmtMoney(R.took)}.`, 'money');
-    else g.ui.toast('Nothing left here. It hasn’t been restocked since the last robbery.', 'warn');
-  }
+  // a door the robbery has opened: it swings (swingDoors); the label and the job behind it count it open at once
   openDoor(key) {
-    const R = this.R, def = R.def, Lk = def.locks && def.locks[key]; if (!Lk) return;
-    R.open[key] = true;
-    const c = def.cols[Lk.col]; if (c) c.on = false;
-    const m = def.doorMesh && def.doorMesh[key]; if (!m) return;
-    if (key === 'vault' && R.id === 'c') { m.position.x = Lk.x + 2.4; m.position.z = Lk.z + 1.0; m.rotation.z = 0; m.rotation.y = -Math.PI / 2.6; }
-    else if (Lk.along === 'x') { m.position.x = Lk.x + Lk.w / 2; m.position.z = Lk.z + Lk.w / 2; m.rotation.y = Math.PI / 2; }
-    else { m.position.z = Lk.z + Lk.w / 2; m.position.x = Lk.x + Lk.w / 2; m.rotation.y = Math.PI / 2; }
+    const R = this.R, Lk = R.def.locks && R.def.locks[key]; if (!Lk || R.open[key]) return;
+    R.open[key] = true; R.swing.push({ key, t: 0 });
+  }
+  // the doors on their way open: a vault's wheel, its bolts, out of the frame, the swing. The doorway stays shut until
+  // the door is clear of it; then the open door is solid where it stands (a collider of its own, gone with the room)
+  swingDoors(dt) {
+    const R = this.R, def = R.def;
+    for (let i = R.swing.length - 1; i >= 0; i--) {
+      const s = R.swing[i], Lk = def.locks[s.key], end = Lk.times.swing[1];
+      s.t = Math.min(end, s.t + dt); bankDoorPlace(def.doors[s.key], s.t);
+      if (s.t < end) continue;
+      R.swing.splice(i, 1);
+      const c = def.cols[Lk.col]; if (c) c.on = false;
+      const o = bankDoorOpenBox(Lk);
+      def.cols.push(this.g.world.grid.add({ x0: def.ox + o.x0, x1: def.ox + o.x1, z0: def.oz + o.z0, z1: def.oz + o.z1, y0: def.fy + o.y0 - 0.5, y1: def.fy + o.y1, kind: 'int', base: def.fy }));
+    }
   }
   // banking at a window: your Clean Bank account, the books, and (if you mean it) the robbery
   teller(i) {
@@ -57075,6 +57502,27 @@ function bankGuardBrain(p, dt) {
   const h = p.post, hx = h.x - p.x, hz = h.z - p.z, hd = Math.hypot(hx, hz);
   if (hd > 0.4) { const sp = hd > 3 ? 3.2 : 1.3; p.vx = damp(p.vx, hx / hd * sp, 5, dt); p.vz = damp(p.vz, hz / hd * sp, 5, dt); p.h = dampAngle(p.h, Math.atan2(hx, hz), 6, dt); }
   else { p.vx = damp(p.vx, 0, 6, dt); p.vz = damp(p.vz, 0, 6, dt); p.h = dampAngle(p.h, h.h + (here && d < 6 ? Math.atan2(dx, dz) - h.h : 0) * 0.6, 3, dt); }
+}
+// someone in the bank: at their post (a teller at the window, a customer in the queue); when the alarm goes the staff
+// put their hands up and a customer runs for the doors or freezes; on the floor at your word they are hostages and
+// stay down (BankSystem.watchHostages decides when one runs); a run ends out of the front doors
+function bankCivBrain(p, dt) {
+  const g = game, BK = g.uw && g.uw.banks, R = BK && BK.R;
+  if (p.state === 'down' || p.state === 'ko' || p.ko || !R) return;
+  const def = R.def, Y = BANK_LAYOUT[R.id];
+  if (p.cv === 'floor' || p.cv === 'cower') { p.state = 'cower'; p.timer = 99; p.pose.surrender = 0; p.vx = 0; p.vz = 0; return; }
+  p.state = 'free';
+  if (p.cv === 'run') {
+    const tx = def.ox + Y.exit.x, tz = def.oz + Y.exit.z, dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+    p.runT = (p.runT || 0) + dt; p.pose.surrender = 0;
+    if (d < 1.0 || p.runT > 12) { BK.civGone(p); return; }
+    p.vx = damp(p.vx, dx / d * 4.4, 6, dt); p.vz = damp(p.vz, dz / d * 4.4, 6, dt);
+    return;
+  }
+  p.pose.surrender = p.cv === 'hands' ? 1 : 0;
+  const h = p.post, hx = h.x - p.x, hz = h.z - p.z, hd = Math.hypot(hx, hz);
+  if (hd > 0.3) { p.vx = damp(p.vx, hx / hd * 1.3, 5, dt); p.vz = damp(p.vz, hz / hd * 1.3, 5, dt); p.h = dampAngle(p.h, Math.atan2(hx, hz), 6, dt); }
+  else { p.vx = damp(p.vx, 0, 6, dt); p.vz = damp(p.vz, 0, 6, dt); p.h = dampAngle(p.h, h.h, 4, dt); }
 }
 /* =====================================================================
    [UNDERWORLD] PRISON: sentencing from the arrest, the charges and the
@@ -64500,7 +64948,7 @@ class Game {
     const cr = this.chars; cr.begin(this.camera);
     const showPlayer = this.state !== 'menu' && this.state !== 'loading' && p.state !== 'vehicle';
     if (showPlayer) cr.draw(p.char, { wantHand: true, noHead: this.cam.mode === 2 && p.state === 'foot', force: true });
-    if (!indoor) this.peds.draw(cr);
+    this.peds.draw(cr, indoor ? p.interior.floor : undefined);
     for (const c of this.missions.contacts) if ((c.marker.g.visible || this.state === 'menu' && !c.interior) || (c.interior && p.interior && p.interior.id === c.interior)) { c.ch.pose.phase += rdt; c.ch.pose.phone = !c.interior && Math.sin(this.time * 0.3 + c.x) > 0.3; cr.draw(c.ch); }
     this.content.drawChars(cr); this.campaign.drawChars(cr);
     cr.end();
@@ -64613,7 +65061,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);
