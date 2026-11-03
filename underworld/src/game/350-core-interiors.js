@@ -1464,7 +1464,7 @@ class InteriorManager {
     if (!def || !def.dynamic) return;
     for (const c of def.cols || []) this.g.world.grid.remove(c);
     this.g.scene.remove(def.group);
-    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && (o.material.userData.pick || o.material.userData.own)) o.material.dispose(); });
+    def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.pick) o.material.dispose(); });
     delete this.defs[def.id];
   }
   _window(w) {
@@ -1513,13 +1513,14 @@ class InteriorManager {
     if (quiet) go(); else g.fade(go);
     return true;
   }
-  exit(quiet) {
+  // out to the street at the building's door, or at another way out (at: { x, z, h }, a bank's rear staff door)
+  exit(quiet, at) {
     const g = this.g, p = g.player, def = this.cur;
     if (!def) return;
     const go = () => {
       def.group.visible = false; this.cur = null; p.interior = null; this.guards = [];
       this.dispose(def); this.g.chunks.wide(false);
-      const d = def.door;
+      const d = at || def.door;
       const x = d.x + Math.sin(d.h) * 0.9, z = d.z + Math.cos(d.h) * 0.9;
       p.pos.set(x, groundY(x, z), z); p.vel.set(0, 0, 0); p.h = d.h; p.onGround = true;
       g.cam.yaw = d.h; g.cam.pitch = -0.12; g.cam.init = false;
@@ -1573,7 +1574,8 @@ class InteriorManager {
     if (!def.noExit && Math.hypot(p.pos.x - (def.ox + def.exit.x), p.pos.z - (def.oz + def.exit.z)) < 1.3) return { id: 'exit', label: def.exitLabel || 'Leave' };
     // spots on an upper floor only answer to someone standing on that floor
     const ly = p.pos.y - def.fy;
-    for (const s of def.spots) if (Math.abs(ly - (s.y || 0)) < 1.6 && Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r) return s;
+    // (a spot whose label is empty has nothing to offer right now: a bank's banking hall to someone unarmed)
+    for (const s of def.spots) if (Math.abs(ly - (s.y || 0)) < 1.6 && Math.hypot(p.pos.x - (def.ox + s.x), p.pos.z - (def.oz + s.z)) < s.r && s.label) return s;
     return null;
   }
 }

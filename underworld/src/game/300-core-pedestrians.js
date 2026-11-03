@@ -250,7 +250,7 @@ class PedManager {
     if (p.atkT !== undefined) { p.atkT -= dt; ps.punch = p.atkT > 0 && p.atkKind === 'punch' ? 1 - p.atkT / 0.45 : 0; ps.swing = p.atkT > 0 && p.atkKind === 'swing' ? 1 - p.atkT / 0.55 : 0; ps.kick = p.atkT > 0 && p.atkKind === 'kick' ? 1 - p.atkT / 0.5 : 0; }
     if (p.blockT !== undefined) { p.blockT -= dt; ps.block = p.blockT > 0 ? 1 : 0; }
     ps.air = p.vy > 0.5 && p.state !== 'down' ? 1 : 0;
-    if (p.state !== 'down' && p.state !== 'flee' && p.state !== 'dive' && p.state !== 'free' && p.state !== 'chase') p.y = groundY(p.x, p.z);
+    if (p.state !== 'down' && p.state !== 'flee' && p.state !== 'dive' && p.state !== 'free' && p.state !== 'chase') p.y = p.floor !== undefined ? p.floor : groundY(p.x, p.z);
     if (p.char.flash > 0) p.char.flash -= dt;
     p.char.x = p.x; p.char.y = p.y; p.char.z = p.z; p.char.h = p.h;
   }
@@ -367,7 +367,9 @@ class PedManager {
       }
     }
   }
-  draw(r) { for (const p of this.peds) { p.char.flash = p.char.flash || 0; r.draw(p.char); } }
+  // floor: indoors, only the people standing on that interior's floor (a bank's guards, staff and customers, the
+  // police who storm it); the street's people are 60 m overhead and not drawn
+  draw(r, floor) { for (const p of this.peds) { if (floor !== undefined && p.floor !== floor) continue; p.char.flash = p.char.flash || 0; r.draw(p.char); } }
 }
 function copLook() {
   const l = randomLook(); l.shirt = C(0x1d2e4a); l.pants = C(0x15181f); l.shoes = C(0x0b0b0b); l.sleeve = true; l.cap = C(0x111a2e); l.hairStyle = 1; l.build = 1.05 + Math.random() * 0.1;

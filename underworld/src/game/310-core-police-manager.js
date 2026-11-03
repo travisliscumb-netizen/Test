@@ -2,7 +2,7 @@
    [CORE] POLICE MANAGER (heat levels, perception, pursuit, search, arrests)
    ===================================================================== */
 const HEAT_LEVELS = [0, 1, 4, 10, 20, 34];
-const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5, bankrob: 5, assaultguard: 2, killguard: 7 };
+const CRIMES = { hitped: 2, assault: 1.5, shoot: 1, carjack: 2, stealcop: 6, ramcop: 3, hitcop: 5, shootcop: 6, copcar: 8, explosion: 4, koped: 3, theft: 1, deal: 2, pickpocket: 1, robbery: 3, burglary: 1.5, escape: 5, bankrob: 5, assaultguard: 2, killguard: 7, hostage: 4, harmhostage: 3, killhostage: 7 };
 const UNITS_PER_LEVEL = [0, 2, 3, 5, 7, 9];
 class PoliceManager {
   constructor(game) {

@@ -19,7 +19,12 @@
   High into a float target) and `banks` (the three banks: entry from a new game, tiers, reserves by economic day,
   every robbery stage and its payout as Dirty Cash, persistence through leaving, save/reload, arrest and death,
   recovery, the no-money-engine bound, guards' warning and fight, the alarm, containment, escalation and the
-  police storming in, guard violence on the case file, an unarmed robber held and arrested, draw cost inside).
+  police storming in, guard violence on the case file, an unarmed robber held and arrested, draw cost inside; the
+  follow-up: doors lit by their room, a vault door's swing and its solid open state, everyone inside drawn, the bag
+  and paying out through a door, a full bag and making room, dye packs bursting or found, hostages and the
+  negotiation, a hostage hurt or killed, hostages running, the rear staff door picked, an intruder in the back, out
+  the back unseen or into the police). Skip days in suites with `__days(n)` (econH, day and the clock's econDay
+  together), or the clock replays the days when play resumes.
 - Measurement tools (not tests; they print and write JSON under `.runs/`):
   `node underworld/tools/econ-probe.mjs [index.html] [out.json]` (prices, loot EVs, passive simulations: the
   tables in ECONOMY.md); `node underworld/tools/perf-scenarios.mjs [index.html] [out.json]` (the phone-profile

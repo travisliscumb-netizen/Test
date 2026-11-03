@@ -4247,3 +4247,36 @@ Read paths that gate progression: `save.rep` → `ContentManager.repLevel` (name
 - **Found on the way:** a manager's-desk petty-cash loop (now out of the tills' pool), the counter climbable over
   its glass (colliders added), dynamic interiors not disposing their own door materials (fixed), the street menu
   for a non-supplier spot (a bank panel).
+
+## After the banks — the owner's follow-up: the vault, and what a bank robbery needs
+- **Asked:** "Fix the vault; make sure the bank has all the aspects it needs." The scope was put to the owner: the
+  vault doors (chosen), a running drill / a visibly emptying vault / a Neighborhood vault (not chosen), and the
+  three parts left out as known limits: a loot bag with dye packs, hostages and crowd control, a rear staff door
+  (all three chosen, "integrated with the existing systems, no huge redesign, focused tests, export, stop").
+- **Doors:** every door that opens is its own small mesh in the room's coordinates on the room's lamp-lit material
+  (they were plain standard materials lit by the street's sun: brown by day, black at night). Vault doors have a
+  wheel, rivets, hinges and locking bolts; opening turns the wheel, draws the bolts, pulls the door out of its frame
+  and swings it (the Commercial's 180° against the wall; the Central's round door, now in a round steel frame with
+  a wall over it, 90° back into the vault, its contents moved out of the swing). The doorway stays shut until the
+  door is clear; then the open door has its own collider.
+- **The bag:** takings in a bag of 100 (tills $600, cash room $1,500, vault $3,000, boxes $2,000 a unit), paid out as
+  Dirty Cash through a door; a full bag can dump bulkier notes; what didn't fit stays in the bank; evidence on an
+  arrest or a death. **Dye packs** in drawers and cash-room loads burst on the way out (bundle + 15% of the rest,
+  the police shown where), unless found by going through the bag (their bait money lost).
+- **Hostages:** the staff and customers are people (`bankciv`); "Everybody on the floor!" (armed, in the hall) takes
+  hostages (Hostage-taking, 30 d, severe, +1★); the police negotiate 12 s a hostage (≤ 60 s); a hostage hurt
+  (12 d) ends it at once, a hostage killed (90 d, +1★); hostages are held while you're in the hall, otherwise they
+  run after 20–40 s each. Uncontrolled customers run or freeze when the alarm goes; staff put their hands up.
+- **Rear staff door:** on the back wall of each building (found from the building's collider, slid clear of street
+  props), steel door, frame, lamp, one "STAFF ENTRANCE" sign mesh for all three; picked from the street with a
+  lockpick set (`537`; a burglary witnesses can call in); inside, a fire door with an exit sign in the back rooms;
+  staff or a guard who sees you in the back without the alarm warns, then alarms (Burglary on the CCTV); the police
+  come in through it every other wave from 10 s after they first storm; out through it before then, unseen (they
+  watch the front); after, into the officers waiting there.
+- **Found on the way:** nobody inside an interior was drawn (`630` drew the street's people only outdoors, and the
+  bank's guards and police with them) — now the people on the interior's floor are drawn; a cowering person was
+  snapped to street height (`300`, now their floor); prompts with an empty label are skipped (`350`); suites that
+  skip days must advance the clock's own `econDay` too (`__days`).
+- **Checks:** `banks` 55/55 (21 new); interiors, smoke, legal, nanframes, static-money; draw calls inside 21/26/28 at
+  Low with everyone drawn.
+

@@ -794,7 +794,7 @@ class Game {
     const cr = this.chars; cr.begin(this.camera);
     const showPlayer = this.state !== 'menu' && this.state !== 'loading' && p.state !== 'vehicle';
     if (showPlayer) cr.draw(p.char, { wantHand: true, noHead: this.cam.mode === 2 && p.state === 'foot', force: true });
-    if (!indoor) this.peds.draw(cr);
+    this.peds.draw(cr, indoor ? p.interior.floor : undefined);
     for (const c of this.missions.contacts) if ((c.marker.g.visible || this.state === 'menu' && !c.interior) || (c.interior && p.interior && p.interior.id === c.interior)) { c.ch.pose.phase += rdt; c.ch.pose.phone = !c.interior && Math.sin(this.time * 0.3 + c.x) > 0.3; cr.draw(c.ch); }
     this.content.drawChars(cr); this.campaign.drawChars(cr);
     cr.end();

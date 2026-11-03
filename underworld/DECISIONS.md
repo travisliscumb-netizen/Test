@@ -69,4 +69,20 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
 - Interiors gained an opt-in fight flag (only the banks set it): combat, guards and officers on the interior
   floor, police who came in can see and arrest you there. A guard holds an unarmed robber (an arrest); the
   guards shoot it out with an armed or violent one; at 3★ and above the police shoot, as on the street.
+- Owner follow-up ("fix the vault; all the aspects a bank needs"; the owner chose the scope): the doors (vault, cash
+  room, security) are drawn with their room's lamp-lit material (they had been lit by the street's sun: brown by
+  day, black at night); a vault's wheel turns, its bolts draw, it swings open (the Commercial's right round against
+  the wall; the Central's round door, now in a round steel frame, back into the vault) and stands solid open. The
+  vault drill (a timed job lost if you are hit) and the Neighborhood branch having no vault are unchanged (not
+  chosen).
+- The loot bag, dye packs (ECONOMY.md §12), hostages and a rear staff door for every bank, on the same systems: the
+  staff and customers are people (`300`, kind `bankciv`) instead of figures; "Everybody on the floor!" (armed, in the
+  hall) makes everyone in it a hostage: Hostage-taking (30 days, severe, a star); the police negotiate 12 s a
+  hostage (at most a minute) before they storm; a hostage hurt is Assaulting a hostage (12 days, severe) and ends
+  the talking (they come in at once); a hostage killed is Killing a hostage (90, severe, a star). Hostages are held
+  while you're out in the hall with them; while you're in the back, each loses their nerve (20–40 s) and runs. The
+  rear staff door is on the back wall of each building (a lockpick set opens it from the street: a break-in that
+  witnesses can call in); staff or a guard who sees you in the back without the alarm tells you to get out, then
+  hits it (a Burglary on the CCTV); the police start coming in through it 10 s after they first storm, and once they
+  cover it, leaving that way walks into them; before that, it is the way out unseen.
 

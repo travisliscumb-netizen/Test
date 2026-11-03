@@ -27,13 +27,23 @@
 
 ## Banks (after the graphics gate) — known limits
 - Guards stay in their building; once you are out, the police take over (the street pursuit as ever).
-- No hostages and no bag carrying limit: what you take is Dirty Cash in hand as you take it; an arrest seizes it.
-- The police storm through the front doors only (no back entrance); the vault's time lock is a drill timer.
-- Fights are switched on only inside the banks (an interior opts in); other interiors are as before.
+- The vault's time lock is a drill timer, lost if you are hit or step away (unchanged in the follow-up: not chosen);
+  the Neighborhood branch has no vault (its money is the tills, the cash room and the boxes).
+- Hostages are held while you are out in the banking hall with them (a positional rule, not a line of sight: the
+  teller glass is solid to the collision grid, so tellers would never "see" you through it). A hostage who runs is
+  gone (no crowd outside); the negotiator is a timer and a line, not a conversation.
+- Dumped and dye-ruined notes are gone, not returned to the bank's reserve (it lost them either way). A dye burst is
+  red smoke and a sighting; the player model is not stained.
+- The rear staff door is a door on the back wall of the building (inside, a fire door in the back rooms); there is no
+  modelled passage between. Fights are switched on only inside the banks (an interior opts in).
 - Banking at the counter is the Clean Bank account and statement; no deposits, withdrawals or loans (by design: the
   game has no cash-to-bank move outside laundering).
-- Not measured on a device: a bank interior is 24–28 draw calls at Low (44 at Medium for the Central), the city
-  hidden; the Central's hall is the largest room in the game.
+- Not measured on a device: a bank interior is 21/26/28 draw calls at Low with everyone in it drawn (the city
+  hidden); the Central's hall is the largest room in the game.
+- Fixed in the follow-up (were in `fc97fd5`): nobody inside an interior was drawn (the street's people are hidden
+  indoors since the graphics overhaul, and the bank's guards and the police who stormed in were hidden with them:
+  the fights worked, unseen); someone cowering was put back at street height (the hostages' first version); the
+  vault and other bank doors were lit by the street's sun.
 
 ## Economy (M13) — watch in playtesting
 - Pickpocketing: after the M13 rich-district wariness, circling the rich districts measures ≈ $6.6k an hour against

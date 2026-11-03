@@ -215,3 +215,15 @@ full haul can pass the top of its range. A rushed job is the tills: a window is 
   capacity (§6) and the arrest seizure still apply.
 - **Not for sale, not a bank account for dirty money:** the counter is your Clean Bank account (balance, debt,
   yesterday's statement); it takes no cash deposits, so it is no laundering route.
+- **The bag** (`BANK_T.bag`, owner follow-up): takings go into a bag and become Dirty Cash only through a door (the
+  front or the rear staff door); arrested or dead inside, the bag is police evidence. Notes take room by what they
+  are: a full bag (100) is $60k of till bills, $150k of cash-room straps, $300k of vault hundreds or $200k of box
+  cash. A whole Commercial job fits (≈37–77 of 100 across the week); a late-week Central does not (≈125–170), so
+  its robber chooses (a full bag can dump its bulkier notes for the vault's) or makes a second, harder trip (doors
+  shut again, a security step more). What didn't fit stays in the bank; dumped notes are lost. The bag only ever
+  reduces what a robbery pays, so the no-money-engine bound above stands.
+- **Dye packs** (`BANK_T.dye`): a teller's drawer holds one 20/30/40% of the time by tier (15 points more for a note
+  handed over), a cash-room load 8/12/16%; none in the vault or the boxes. One that leaves the building bursts: its
+  bundle and 15% of the rest of the bag are ruined, and the police are shown where you came out. Going through the
+  bag first (1.2 s a bundle from the tills or the cash room, at least 3 s, with the police on their way) finds them,
+  at the cost of their bait money (20% of that bundle).

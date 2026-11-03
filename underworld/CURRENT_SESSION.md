@@ -1,9 +1,10 @@
 # CURRENT SESSION
 
-- **Last addition (owner request after the graphics gate): the banks of Port Valen.** Three branches, enterable and
-  robbable from day one: the Old Quarter Neighborhood Bank, the Downtown Commercial Bank, Port Valen Central Bank
-  (`353` content, `512` BankSystem; ECONOMY.md §12, DECISIONS.md "The banks"). Suite `banks`; targeted regression
-  of the affected suites (TESTING.md). Then STOP: no further milestone, graphics pass or release prep.
+- **Last addition (owner follow-up on the banks): the vault doors fixed, and the loot bag, dye packs, hostages and a
+  rear staff door for every bank** (`353`, `512`; ECONOMY.md §12, DECISIONS.md "The banks", KNOWN_ISSUES "Banks").
+  Also fixed: people inside interiors were not drawn (the bank guards and police were invisible). Suite `banks`
+  55/55; affected suites interiors, smoke, legal, nanframes, static-money. Then STOP: no further milestone.
+- Before it: the banks of Port Valen (`fc97fd5`, release `releases/banks/` from it).
 - Phase: **Session 14 — graphics / presentation / UI-UX overhaul (Extra High): COMPLETE, STOPPED FOR REVIEW.**
   GRAPHICS.md is the before/after record (audit, what changed, performance, sizes, saves, checks, visual QA).
 - Before: `releases/pre-graphics-m13/Underworld_M13_Before_Graphics.html` (`2f624b6`; tag

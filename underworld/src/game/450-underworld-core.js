@@ -933,6 +933,7 @@ class Underworld {
       return null;
     }
     if (p.state !== 'foot') return null;
+    const bk = this.banks.rearAction(); if (bk) return bk;
     for (const L of this.locs) {
       if (L.kind === 'deal') continue;
       if (dist2(L.x, L.z, p.pos.x, p.pos.z) > 2.4 * 2.4) continue;

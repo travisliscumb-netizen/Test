@@ -55,12 +55,27 @@ const BANK_IDS = Object.keys(BANKS);
 // hold little, a few a lot) and may hold valuables (hot goods); secMax/secRecover: a robbery adds a security step
 // (another guard, police faster), one step recovering every secRecover economic days; wave: seconds between
 // police waves once they storm; restrain: seconds a guard needs his hands on you, unarmed and not fighting back
+// bag: what you carry out. Notes take room by what they are: the tills are small bills (cap 100 of them is $60k), the
+// cash room mixed straps ($150k), the vault bricks of hundreds ($300k), a deposit box whatever was in it; check: seconds
+// to go through it per bundle not yet checked (at least checkMin)
+// dye: a teller's drawer may hold a dye pack (win, by tier; a note handed over gets one more often: note), so may a
+// cash room strap (cash); one that leaves the building bursts: its bundle is ruined and `stain` of the rest of the bag
+// with it, and the red smoke shows the police where you came out. Found in time, it costs only its bait money (bait)
+// hostage: each hostage holds the police storm back `delay` seconds (at most `cap`) and slows their waves (waveMul);
+// held while you're out in the hall with them (within `reach`); while you're in the back, one makes a run for the doors
+// after `nerve` seconds (each their own)
+// rearCover: seconds after the police first come in before they also cover the rear staff door; pick: seconds to pick
+// its lock from the street (a lockpick set)
 const BANK_T = {
   week: [0.62, 0.72, 0.84, 0.96, 1.08, 1.2, 1.3], noise: 0.15,
   recover: { counter: 0.5, cash: 0.1, vault: 0.04 }, boxRefill: 21,
   boxSkew: 2.6, boxHot: 0.22,
   secMax: 3, secRecover: 7, secStorm: 10, secEscal: 8, secSlow: 0.15,
-  wave: 20, restrain: 2.2, warnT: 2.5, sightR: 15
+  wave: 20, restrain: 2.2, warnT: 2.5, sightR: 15,
+  bag: { cap: 100, per: { counter: 600, cash: 1500, vault: 3000, boxes: 2000 }, check: 1.2, checkMin: 3 },
+  dye: { win: [0, 0.2, 0.3, 0.4], note: 0.15, cash: [0, 0.08, 0.12, 0.16], bait: 0.2, stain: 0.15 },
+  hostage: { delay: 12, cap: 60, waveMul: 0.15, nerve: [20, 40], reach: 20 },
+  rearCover: 10, pick: 6
 };
 const BANK_GLASS = 0xb8d4e0;
 // a spot whose prompt reads the robbery's state (BankSystem.label)
@@ -120,12 +135,126 @@ function cashCart(k, x, z, rng) {
   for (let i = 0; i < 6; i++) k.box(x - 0.36 + (i % 3) * 0.36, 0.82, z - 0.14 + Math.floor(i / 3) * 0.28, 0.32, 0.12 + rng() * 0.1, 0.24, 0x5f8f5a);
 }
 function goldStack(k, x, z) { k.box(x, 0, z, 1.1, 0.62, 0.6, 0x5c5e62, { col: true }); for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) k.box(x - 0.36 + i * 0.24 + r * 0.12, 0.62 + r * 0.09, z, 0.22, 0.09, 0.42, 0xd8b44a); }
-// a lockable door in a wall gap (security, cash room, vault): a collider and a mesh that swings open
-function lockDoor(k, def, key, x, z, along, w = 1.15, color = 0x6a7076) {
+// round parts the box kit can't make: a ring (r0 > 0) or a disc (r0 = 0) about an axis along z, from z0 to z1, in
+// `segs` facets, with the kit's baked face shading (tops light, undersides dark) and its floor AO (flat: none)
+function kitRingZ(k, cx, cy, z0, z1, r0, r1, segs, color, flat) {
+  const t = k.a, c = new THREE.Color(color), H = k.H;
+  const put = (v, sh) => {
+    const ao = flat ? 1 : (0.62 + 0.38 * smoothstep(0, 1.3, v[1])) * (1 - 0.14 * smoothstep(H - 0.9, H, v[1]));
+    t.p.push(v[0], v[1], v[2]); t.c.push(c.r * sh * ao, c.g * sh * ao, c.b * sh * ao);
+  };
+  const quad = (A, B, C, D, sh) => { const o = t.p.length / 3; put(A, sh); put(B, sh); put(C, sh); put(D, sh); t.i.push(o, o + 1, o + 2, o, o + 2, o + 3); };
+  const P = (r, a, z) => [cx + r * Math.cos(a), cy + r * Math.sin(a), z];
+  for (let s = 0; s < segs; s++) {
+    const a0 = s / segs * Math.PI * 2, a1 = (s + 1) / segs * Math.PI * 2, ny = Math.sin((a0 + a1) / 2);
+    quad(P(r0, a0, z1), P(r1, a0, z1), P(r1, a1, z1), P(r0, a1, z1), 0.9); // the face (+z)
+    quad(P(r0, a1, z0), P(r1, a1, z0), P(r1, a0, z0), P(r0, a0, z0), 0.86); // the back (-z)
+    quad(P(r1, a0, z1), P(r1, a0, z0), P(r1, a1, z0), P(r1, a1, z1), ny > 0 ? 0.8 + 0.2 * ny : 0.8 + 0.25 * ny); // the rim
+    if (r0 > 0) quad(P(r0, a1, z1), P(r0, a1, z0), P(r0, a0, z0), P(r0, a0, z1), ny < 0 ? 0.8 - 0.2 * ny : 0.8 - 0.25 * ny); // the hole
+  }
+}
+// a box turned `ang` about the z axis round its own centre: a wheel spoke, a radial bolt, a rivet on a round door
+function kitBoxZ(k, cx, cy, cz, w, h, d, ang, color) {
+  const t = k.a, n0 = t.p.length, cs = Math.cos(ang), sn = Math.sin(ang);
+  k.box(0, -h / 2, 0, w, h, d, color, { flat: true });
+  for (let i = n0; i < t.p.length; i += 3) { const x = t.p[i], y = t.p[i + 1]; t.p[i] = cx + x * cs - y * sn; t.p[i + 1] = cy + x * sn + y * cs; t.p[i + 2] += cz; }
+}
+// a lockable door in a wall gap (security, cash room, vault): its collider while it is shut, and how it opens (o). A
+// plain door swings 90° on its jamb. A vault door turns its wheel (`turns`), draws its bolts (`boltIn` metres), comes
+// `pull` metres straight out of the frame (negative: into the room behind) and swings `ang` about `hinge` (room metres,
+// where the hinge is while shut); `times` are the seconds each part of that takes (BankSystem.swingDoors)
+function lockDoor(k, def, key, x, z, along, w = 1.15, color = 0x6a7076, o = {}) {
   def.locks = def.locks || {};
-  def.locks[key] = { col: k.cols.length, x, z, along, w, color };
+  def.locks[key] = Object.assign({ key, col: k.cols.length, x, z, along, w, color, kind: 'plain', thick: 0.06, h: 2.25, half: w / 2 - 0.01,
+    hinge: along === 'x' ? [x + w / 2, z] : [x, z + w / 2], pull: [0, 0], ang: along === 'x' ? Math.PI / 2 : -Math.PI / 2, times: { swing: [0, 0.7] } }, o);
   if (along === 'x') k.cols.push({ x0: x - w / 2, x1: x + w / 2, z0: z - 0.12, z1: z + 0.12, y0: 0, y1: 2.6 });
   else k.cols.push({ x0: x - 0.12, x1: x + 0.12, z0: z - w / 2, z1: z + w / 2, y0: 0, y1: 2.6 });
+}
+// the door itself: a small vertex-coloured mesh of its own, built in the room's coordinates and drawn with the room's
+// lamp-lit material (350), so it is lit like the walls round it at any hour of the day outside; opening it moves its
+// vertices (bankDoorPlace). Vertex tags: 0 the door, 1 a locking bolt (draws in along its dir), 2 the wheel (turns)
+function bankDoor(Lk, H, mat) {
+  const k = new InteriorKit(H), tag = [], dir = [], { x, z, w, color, along } = Lk;
+  const mark = (tg, d) => { const n = k.a.p.length / 3; while (tag.length < n) { tag.push(tg); dir.push(d ? d[0] : 0, d ? d[1] : 0, d ? d[2] : 0); } };
+  const dark = new THREE.Color(color).multiplyScalar(0.72).getHex(), light = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.18).getHex();
+  if (Lk.kind === 'round') {
+    // the Central's great round door: a steel disc in its frame, a bevel and a face ring, rivets, the hinge on the west
+    // edge, ten bolts round the rim and the wheel on its boss
+    const T = Lk.thick, cy = Lk.hub[1], R = Lk.half, f = z + T / 2;
+    kitRingZ(k, x, cy, z - T / 2, f, 0, R, 40, color);
+    kitRingZ(k, x, cy, f, f + 0.03, R - 0.13, R - 0.03, 40, dark, true);
+    kitRingZ(k, x, cy, f, f + 0.04, 1.02, 1.12, 40, light, true);
+    for (let s = 0; s < 12; s++) { const a = s / 12 * Math.PI * 2; kitBoxZ(k, x + Math.cos(a) * 1.28, cy + Math.sin(a) * 1.28, f + 0.015, 0.08, 0.08, 0.03, a, 0x6a7076); }
+    for (const y of [0.7, 2.3]) k.box(x - R - 0.05, y, z - T / 2 + 0.02, 0.2, 0.4, 0.2, 0x5c5e62);
+    mark(0);
+    for (let s = 0; s < 10; s++) { const a = (s + 0.5) / 10 * Math.PI * 2; kitBoxZ(k, x + Math.cos(a) * (R + 0.07), cy + Math.sin(a) * (R + 0.07), z, 0.36, 0.09, 0.09, a, 0xc8ccd0); mark(1, [Math.cos(a), Math.sin(a), 0]); }
+    kitRingZ(k, x, cy, f, f + 0.16, 0, 0.18, 16, 0x8a8f96, true);
+    kitRingZ(k, x, cy, f + 0.12, f + 0.2, 0.62, 0.7, 28, 0xc8ccd0, true);
+    for (let s = 0; s < 3; s++) kitBoxZ(k, x, cy, f + 0.16, 1.32, 0.06, 0.06, s * Math.PI / 3, 0xb4b9bf);
+    kitRingZ(k, x, cy, f + 0.16, f + 0.24, 0, 0.12, 12, 0xc9a54a, true);
+    mark(2);
+  } else if (Lk.kind === 'vault') {
+    // the Commercial's vault door: a thick steel slab, a face plate, rivets, hinges on the east edge, four bolts on
+    // the west edge and the wheel
+    const T = Lk.thick, f = z + T / 2, hy = Lk.hub[1];
+    k.box(x, 0.02, z, w, Lk.h - 0.02, T, color);
+    k.box(x, 0.35, f + 0.02, w - 0.4, 1.6, 0.04, light);
+    for (const [u, y] of [[-0.66, 0.15], [0, 0.15], [0.66, 0.15], [-0.66, 2.1], [0, 2.1], [0.66, 2.1], [-0.66, 1.12], [0.66, 1.12]]) k.box(x + u, y, f + 0.015, 0.07, 0.07, 0.03, 0x6a7076);
+    for (const y of [0.35, 1.5]) k.box(x + w / 2 + 0.04, y, f - 0.05, 0.1, 0.4, 0.14, 0x5c5e62);
+    mark(0);
+    for (const y of [0.45, 0.9, 1.35, 1.8]) { k.box(x - w / 2 - 0.06, y, z, 0.14, 0.07, 0.07, 0xc8ccd0); mark(1, [-1, 0, 0]); }
+    kitRingZ(k, x, hy, f + 0.02, f + 0.12, 0.3, 0.36, 20, 0xc8ccd0, true);
+    for (let s = 0; s < 3; s++) kitBoxZ(k, x, hy, f + 0.08, 0.62, 0.04, 0.04, s * Math.PI / 3, 0xb4b9bf);
+    kitRingZ(k, x, hy, f, f + 0.14, 0, 0.07, 12, 0x8a8f96, true);
+    mark(2);
+  } else {
+    // a plain door: the leaf, a kick plate and a handle on both faces (the latch side, away from the hinge), a vision
+    // panel in the security door, steel bands on the cash room's
+    const B = (u, y, v, wu, hh, dv, col) => along === 'x' ? k.box(x + u, y, z + v, wu, hh, dv, col) : k.box(x + v, y, z + u, dv, hh, wu, col);
+    B(0, 0.02, 0, w - 0.02, Lk.h - 0.02, Lk.thick, color);
+    for (const s of [-1, 1]) {
+      B(0, 0.04, s * 0.032, w - 0.14, 0.22, 0.006, dark);
+      B(-w / 2 + 0.17, 1.0, s * 0.05, 0.17, 0.04, 0.03, 0xc8ccd0); B(-w / 2 + 0.1, 0.94, s * 0.036, 0.05, 0.16, 0.012, 0xb4b9bf);
+      if (Lk.key === 'sec') B(0.06, 1.3, s * 0.032, 0.26, 0.62, 0.006, 0x1d2a33);
+      else for (const y of [0.75, 1.65]) B(0, y, s * 0.032, w - 0.1, 0.06, 0.008, dark);
+    }
+    mark(0);
+  }
+  const geo = new THREE.BufferGeometry(), base = new Float32Array(k.a.p);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(base.slice(), 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(k.a.c, 3));
+  geo.setIndex(k.a.i); geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
+  return { mesh, base, tag: Uint8Array.from(tag), dir: Float32Array.from(dir), Lk };
+}
+// where a point of the door's body is `t` seconds after it starts to open (room metres, x and z: the swing is about
+// a vertical hinge, after the pull)
+function bankDoorAt(Lk, t, x, z) {
+  const T = Lk.times, ph = r => r ? smoothstep(r[0], r[1], t) : 1, pull = ph(T.pull), sw = ph(T.swing) * Lk.ang;
+  const hx = Lk.hinge[0] + Lk.pull[0], hz = Lk.hinge[1] + Lk.pull[1], cs = Math.cos(sw), sn = Math.sin(sw);
+  const rx = x + Lk.pull[0] * pull - hx, rz = z + Lk.pull[1] * pull - hz;
+  return [hx + rx * cs + rz * sn, hz - rx * sn + rz * cs];
+}
+function bankDoorPlace(D, t) {
+  const Lk = D.Lk, T = Lk.times, ph = r => r ? smoothstep(r[0], r[1], t) : 1;
+  const spin = ph(T.spin) * (Lk.turns || 0) * Math.PI * 2, bolt = ph(T.bolt) * (Lk.boltIn || 0), cw = Math.cos(spin), sw = Math.sin(spin);
+  const a = D.mesh.geometry.attributes.position, p = a.array, b = D.base, hub = Lk.hub;
+  for (let i = 0, n = b.length / 3; i < n; i++) {
+    let x = b[i * 3], y = b[i * 3 + 1], z = b[i * 3 + 2];
+    if (D.tag[i] === 1) { x -= D.dir[i * 3] * bolt; y -= D.dir[i * 3 + 1] * bolt; z -= D.dir[i * 3 + 2] * bolt; }
+    else if (D.tag[i] === 2) { const dx = x - hub[0], dy = y - hub[1]; x = hub[0] + dx * cw - dy * sw; y = hub[1] + dx * sw + dy * cw; }
+    const q = bankDoorAt(Lk, t, x, z); p[i * 3] = q[0]; p[i * 3 + 1] = y; p[i * 3 + 2] = q[1];
+  }
+  a.needsUpdate = true;
+}
+// the floor box an open door stands on (its collider once it has swung): the body's footprint, moved to the end
+function bankDoorOpenBox(Lk) {
+  const t = Lk.times.swing[1], hu = Lk.half, hv = Math.max(Lk.thick, 0.12) / 2, xs = [], zs = [];
+  for (const [u, v] of [[-hu, -hv], [hu, -hv], [hu, hv], [-hu, hv]]) {
+    const q = Lk.along === 'x' ? bankDoorAt(Lk, t, Lk.x + u, Lk.z + v) : bankDoorAt(Lk, t, Lk.x + v, Lk.z + u);
+    xs.push(q[0]); zs.push(q[1]);
+  }
+  return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), y0: 0, y1: Lk.h };
 }
 // ------------------------------------------------------------ the three interiors
 const BANK_BUILD = {
@@ -163,6 +292,8 @@ const BANK_BUILD = {
     cashShelf(k, 3.6, -5.6, 4.6, 0.6, 2.0, rng); cashShelf(k, 6.6, -4.0, 2.4, 0.6, 2.0, rng, true);
     FURN.safe(k, 1.6, 0, -5.4, 0);
     k.glow(3.6, H - 0.08, -4.2, 1.2, 0.03, 0.4, 0xf4fbff, 2.4);
+    // the rear staff door: the back wall of the manager's office (a fire door with a crash bar and an exit sign)
+    k.door(-6.0, -hd + 0.02, Math.PI, 0x4a4f55, 0x46d46a); k.box(-6.0, 0.95, -hd + 0.08, 0.9, 0.08, 0.06, 0xc8ccd0);
     // the deposit boxes: the end wall of the corridor
     boxWall(k, 'x', -hd + 0.3, -1.5, 0.5, 0.3, 6, 4, 1);
   },
@@ -204,10 +335,14 @@ const BANK_BUILD = {
     // the vault (x -4.5..5): a thick steel door at x 2.5 in a heavy frame; carts and shelves inside
     iwall(k, 'z', 5.0, -hd, -2.4, 0, H, 0x9aa0a6);
     k.box(1.35, 0, -2.4, 0.5, 2.9, 0.7, 0x5c5e62, { col: true }); k.box(3.65, 0, -2.4, 0.5, 2.9, 0.7, 0x5c5e62, { col: true }); k.box(2.5, 2.6, -2.4, 2.8, 0.5, 0.7, 0x5c5e62);
-    lockDoor(k, def, 'vault', 2.5, -2.4, 'x', 1.6, 0x7a7f86);
+    // it opens out into the corridor and right round, flat against the wall east of the frame
+    lockDoor(k, def, 'vault', 2.5, -2.4, 'x', 1.56, 0x8a9096, { kind: 'vault', thick: 0.4, half: 0.78, hinge: [3.28, -2.2], pull: [0, 0.6], ang: Math.PI, hub: [2.5, 1.2],
+      turns: 1.5, boltIn: 0.16, times: { spin: [0, 1.0], bolt: [0.4, 1.0], pull: [1.0, 1.5], swing: [1.5, 3.0] } });
     for (const [x, z] of [[-3.2, -5.2], [-1.4, -5.2], [0.6, -6.4], [3.2, -6.4]]) cashCart(k, x, z, rng);
     cashShelf(k, 0.2, -8.4, 8.6, 0.6, 2.4, rng);
     k.glow(0.2, H - 0.08, -5.8, 1.4, 0.03, 0.45, 0xf4fbff, 2.6);
+    // the rear staff door: the east end of the secured corridor
+    k.door(hw - 0.02, -0.4, -Math.PI / 2, 0x4a4f55, 0x46d46a); k.box(hw - 0.08, 0.95, -0.4, 0.06, 0.08, 0.9, 0xc8ccd0);
     // the deposit room (x 5..11): boxes on two walls, a viewing table
     boxWall(k, 'x', -hd + 0.3, 5.6, 10.6, 0.3, 7, 10, 1); boxWall(k, 'z', hw - 0.3, -8.4, -3.2, 0.3, 7, 6, -1);
     k.box(7.6, 0, -5.2, 1.6, 0.9, 0.8, 0x7a7f86, { col: true });
@@ -255,16 +390,27 @@ const BANK_BUILD = {
     lockDoor(k, def, 'cash', -9.8, -6.2, 'x', 1.15, 0x5c5e62);
     for (const z of [-8.6, -11.4]) cashShelf(k, -10.5, z, 7.0, 0.6, 2.4, rng);
     k.glow(-10.5, H - 0.08, -10.0, 2.2, 0.03, 0.5, 0xf4fbff, 2.6);
-    // the great round vault door (x 4) in its stone face; inside, cash carts and gold
-    iwall(k, 'x', -6.2, -6.0, hw, 0, H, 0x7a7f86, [[2.4, 5.6], [11.4, 12.6]]);
-    k.box(1.95, 0, -6.2, 0.9, 4.0, 0.9, 0x5c5e62, { col: true }); k.box(6.05, 0, -6.2, 0.9, 4.0, 0.9, 0x5c5e62, { col: true }); k.box(4.0, 3.4, -6.2, 4.2, 0.6, 0.9, 0x5c5e62);
-    lockDoor(k, def, 'vault', 4.0, -6.2, 'x', 3.2, 0x9aa0a6);
+    // the great round vault door (x 4) in a massive round steel frame set in the stone face (a square opening behind
+    // the frame, the wall above it to the ceiling; the frame's lower quarters are solid, so the way through is the
+    // round hole); the door opens back into the vault, so nothing stands where it swings
+    iwall(k, 'x', -6.2, -6.0, 2.4, 0, H, 0x7a7f86);
+    iwall(k, 'x', -6.2, 5.6, hw, 0, H, 0x7a7f86, [[11.4, 12.6]]);
+    k.box(4.0, 3.3, -6.2, 3.2, H - 3.3, 0.15, 0x7a7f86, { col: true });
+    kitRingZ(k, 4.0, 1.7, -6.5, -5.9, 1.6, 2.4, 40, 0x6a6f76);
+    kitRingZ(k, 4.0, 1.7, -5.9, -5.86, 2.2, 2.38, 40, 0x8a8f96, true);
+    k.cols.push({ x0: 2.4, x1: 3.25, z0: -6.5, z1: -5.9, y0: 0, y1: 0.9 }, { x0: 4.75, x1: 5.6, z0: -6.5, z1: -5.9, y0: 0, y1: 0.9 });
+    lockDoor(k, def, 'vault', 4.0, -6.2, 'x', 3.2, 0x9aa0a6, { kind: 'round', thick: 0.45, half: 1.55, h: 3.25, hinge: [2.45, -6.425], pull: [0, -0.65], ang: Math.PI / 2, hub: [4.0, 1.7],
+      turns: 2, boltIn: 0.3, times: { spin: [0, 1.4], bolt: [0.6, 1.4], pull: [1.4, 2.1], swing: [2.1, 4.0] } });
     iwall(k, 'z', 9.0, -hd, -6.2, 0, H, 0x7a7f86);
-    for (const [x, z] of [[-3.6, -8.6], [-1.6, -8.6], [0.4, -8.6], [-3.6, -11.0], [-1.6, -11.0]]) cashCart(k, x, z, rng);
-    for (const [x, z] of [[3.4, -9.4], [5.2, -9.4], [7.0, -9.4], [4.4, -11.2], [6.4, -11.2]]) goldStack(k, x, z);
+    // the west of the vault (behind the open door): cash carts; the east: gold on its trolleys and two more carts
+    for (const [x, z] of [[-3.6, -8.6], [-1.6, -8.6], [0.4, -8.6], [-3.6, -11.0], [-1.6, -11.0], [0.4, -11.0]]) cashCart(k, x, z, rng);
+    for (const [x, z] of [[7.6, -7.6], [7.6, -9.4], [7.6, -11.2]]) goldStack(k, x, z);
+    for (const [x, z] of [[4.2, -11.4], [5.8, -11.4]]) cashCart(k, x, z, rng);
     cashShelf(k, 1.6, -12.5, 12, 0.6, 2.6, rng);
     k.glow(1.6, H - 0.08, -9.6, 2.6, 0.03, 0.6, 0xfff1d6, 2.6);
     k.glow(-2, H - 0.08, -4.6, 6, 0.03, 0.3, 0xfff1d6, 2.4); k.glow(8, H - 0.08, -4.6, 6, 0.03, 0.3, 0xfff1d6, 2.4);
+    // the rear staff door: the west end of the corridor
+    k.door(-hw + 0.02, -4.7, Math.PI / 2, 0x4a4f55, 0x46d46a); k.box(-hw + 0.08, 0.95, -4.7, 0.06, 0.08, 0.9, 0xc8ccd0);
     // the deposit hall (x 9..15): boxes floor to head height on three walls, a viewing table
     boxWall(k, 'z', hw - 0.3, -12.5, -6.8, 0.3, 8, 14, -1); boxWall(k, 'x', -hd + 0.3, 9.6, 14.4, 0.3, 8, 10, 1); boxWall(k, 'z', 9.3, -12.5, -8.5, 0.3, 8, 10, 1);
     k.box(12.0, 0, -9.2, 1.8, 0.9, 0.9, 0x7a7f86, { col: true });
@@ -272,10 +418,12 @@ const BANK_BUILD = {
   }
 };
 // where things are in each interior (local metres): the windows to rob or bank at, the jobs behind, the guards'
-// posts (in the order they come on duty), the staff and the customers, and where the police come in
+// posts (in the order they come on duty), the staff and the customers, where the police come in (the front: storm;
+// the rear staff door: rear, also where you stand to use it and where you come in through it), the middle of the
+// banking hall (hall: where you take control of it) and the counter line (staffZ: behind it is staff only)
 const BANK_LAYOUT = {
   n: {
-    exit: { x: 0, z: 5.4 }, storm: { x: 0, z: 4.6 },
+    exit: { x: 0, z: 5.4 }, storm: { x: 0, z: 4.6 }, rear: { x: -6.0, z: -5.2, h: 0 }, hall: { x: 1.2, z: 3.4, r: 1.5 }, staffZ: 0.2,
     windows: [{ x: 1.6, z: 1.1 }, { x: 4.8, z: 1.1 }],
     jobs: { office: { x: -4.2, z: -4.2 }, sec: { x: -1.4, z: 1.0 }, cashdoor: { x: -0.2, z: -3.1 }, cash: { x: 3.6, z: -4.6 }, boxes: { x: -0.5, z: -4.9 } },
     posts: [{ x: 2.6, z: 4.6, h: Math.PI }, { x: -3.6, z: 2.2, h: Math.PI / 2 }, { x: -0.5, z: -3.6, h: 0 }],
@@ -283,17 +431,17 @@ const BANK_LAYOUT = {
     customers: [{ x: 1.6, z: 2.0, h: Math.PI }, { x: -6.2, z: 3.4, h: Math.PI / 2 }]
   },
   d: {
-    exit: { x: 0, z: 8.4 }, storm: { x: 0, z: 7.6 },
+    exit: { x: 0, z: 8.4 }, storm: { x: 0, z: 7.6 }, rear: { x: 10.2, z: -0.4, h: -Math.PI / 2 }, hall: { x: -2.0, z: 6.2, r: 1.8 }, staffZ: 1.6,
     windows: [{ x: -7.69, z: 2.5 }, { x: -5.06, z: 2.5 }, { x: -2.44, z: 2.5 }, { x: 0.19, z: 2.5 }],
-    jobs: { office: { x: 7.4, z: 4.4 }, sec: { x: 3.1, z: 2.5 }, cashdoor: { x: -7.0, z: -1.6 }, cash: { x: -8.0, z: -7.0 }, vaultdoor: { x: 2.5, z: -1.4 }, vault: { x: 0.2, z: -6.0 }, boxes: { x: 8.0, z: -7.2 } },
+    jobs: { office: { x: 7.4, z: 4.4 }, sec: { x: 3.1, z: 2.5 }, cashdoor: { x: -7.0, z: -1.6 }, cash: { x: -8.0, z: -7.0 }, vaultdoor: { x: 1.0, z: -1.2 }, vault: { x: 0.2, z: -6.0 }, boxes: { x: 8.0, z: -7.2 } },
     posts: [{ x: 1.8, z: 7.6, h: Math.PI }, { x: -7.0, z: 5.6, h: Math.PI / 2 }, { x: -1.0, z: -0.6, h: Math.PI / 2 }, { x: 8.0, z: -0.4, h: Math.PI }, { x: 6.0, z: -1.2, h: -Math.PI / 2 }],
     staff: [{ id: 'teller0', x: -7.69, z: 0.6, h: 0 }, { id: 'teller1', x: -5.06, z: 0.6, h: 0 }, { id: 'teller2', x: -2.44, z: 0.6, h: 0 }, { id: 'teller3', x: 0.19, z: 0.6, h: 0 }, { id: 'manager', x: 9.6, z: 3.4, h: -Math.PI / 2 }, { id: 'officer', x: 9.6, z: 7.2, h: -Math.PI / 2 }],
     customers: [{ x: -5.06, z: 3.4, h: Math.PI }, { x: -2.6, z: 5.3, h: Math.PI }, { x: -10.2, z: 6.6, h: Math.PI / 2 }, { x: 7.4, z: 7.2, h: Math.PI / 2 }]
   },
   c: {
-    exit: { x: 0, z: 12.4 }, storm: { x: 0, z: 11.6 },
+    exit: { x: 0, z: 12.4 }, storm: { x: 0, z: 11.6 }, rear: { x: -14.2, z: -4.7, h: Math.PI / 2 }, hall: { x: 0, z: 7.6, r: 2.0 }, staffZ: -0.8,
     windows: [{ x: -8.96, z: 0.1 }, { x: -5.875, z: 0.1 }, { x: -2.79, z: 0.1 }, { x: 0.29, z: 0.1 }, { x: 3.375, z: 0.1 }, { x: 6.46, z: 0.1 }],
-    jobs: { office: { x: -11.9, z: 7.8 }, sec: { x: 9.25, z: 0.1 }, cashdoor: { x: -9.8, z: -5.3 }, cash: { x: -10.5, z: -10.0 }, vaultdoor: { x: 4.0, z: -5.2 }, vault: { x: 1.0, z: -10.0 }, boxes: { x: 12.0, z: -7.6 } },
+    jobs: { office: { x: -11.9, z: 7.8 }, sec: { x: 9.25, z: 0.1 }, cashdoor: { x: -9.8, z: -5.3 }, cash: { x: -10.5, z: -10.0 }, vaultdoor: { x: 4.0, z: -5.2 }, vault: { x: 4.6, z: -9.2 }, boxes: { x: 12.0, z: -7.6 } },
     posts: [{ x: -4.4, z: 11.6, h: Math.PI }, { x: 4.4, z: 11.6, h: Math.PI }, { x: -6.0, z: 1.8, h: Math.PI / 2 }, { x: 6.0, z: 1.8, h: -Math.PI / 2 }, { x: 12.6, z: 7.0, h: -Math.PI / 2 }, { x: 4.0, z: -4.4, h: Math.PI }, { x: -4.0, z: -4.6, h: Math.PI / 2 }, { x: 12.0, z: -11.0, h: 0 }],
     staff: [{ id: 'teller0', x: -8.96, z: -1.8, h: 0 }, { id: 'teller1', x: -5.875, z: -1.8, h: 0 }, { id: 'teller2', x: -2.79, z: -1.8, h: 0 }, { id: 'teller3', x: 0.29, z: -1.8, h: 0 }, { id: 'teller4', x: 3.375, z: -1.8, h: 0 }, { id: 'teller5', x: 6.46, z: -1.8, h: 0 }, { id: 'manager', x: -14.2, z: 9.0, h: Math.PI / 2 }, { id: 'security', x: 14.0, z: 4.0, h: -Math.PI / 2 }],
     customers: [{ x: -5.875, z: 1.0, h: Math.PI }, { x: 0.29, z: 1.0, h: Math.PI }, { x: -1.0, z: 5.4, h: 0 }, { x: -6.0, z: 6.4, h: Math.PI / 2 }, { x: 6.0, z: 6.4, h: -Math.PI / 2 }]
@@ -307,28 +455,18 @@ function bankInteriorDef(B, L) {
   const Y = BANK_LAYOUT[B.id], spots = [];
   Y.windows.forEach((w, i) => spots.push(bankSpot('w' + i, w.x, w.z, 0.85)));
   for (const k in Y.jobs) spots.push(bankSpot(k, Y.jobs[k].x, Y.jobs[k].z, k === 'boxes' || k === 'cash' || k === 'vault' ? 1.5 : 1.0));
-  spots.push({ id: 'exit', x: Y.exit.x, z: Y.exit.z, r: 1.2, label: 'Leave' });
-  const npcs = Y.staff.map(s => ({ id: s.id, x: s.x, z: s.z, h: s.h, look: s.id === 'security' ? BANK_GUARD_LOOK : BANK_STAFF_LOOK[B.id] }))
-    .concat(Y.customers.map((c, i) => ({ id: 'cust' + i, x: c.x, z: c.z, h: c.h })));
+  spots.push(bankSpot('hall', Y.hall.x, Y.hall.z, Y.hall.r), bankSpot('exit', Y.exit.x, Y.exit.z, 1.2), bankSpot('back', Y.rear.x, Y.rear.z, 0.9));
   return {
     id: 'bank:' + B.id, dynamic: true, name: B.name, w: B.w, d: B.d, h: B.h, exit: Y.exit, spawnH: Math.PI, noExit: true, fight: true,
     bank: B.id, at: { x: L.x, z: L.z }, door: { x: L.x, z: L.z, h: L.h }, seed: 7919 + B.tier * 131,
     build(k, rng, def) { BANK_BUILD[B.id](k, rng, def); },
     afterInstall(grp, def) {
-      // the doors that open: a slab (or the round vault door) per lock, swung aside when it opens
-      def.doorMesh = {};
-      for (const key in def.locks) {
-        const Lk = def.locks[key], round = key === 'vault' && B.id === 'c';
-        const geo = round ? new THREE.CylinderGeometry(1.55, 1.55, 0.45, 28) : Lk.along === 'x' ? new THREE.BoxGeometry(Lk.w, 2.25, key === 'vault' ? 0.4 : 0.08) : new THREE.BoxGeometry(0.08, 2.25, Lk.w);
-        const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: Lk.color, roughness: key === 'vault' ? 0.35 : 0.6, metalness: key === 'vault' ? 0.8 : 0.3 }));
-        m.material.userData.own = true; // disposed with the interior (350 dispose)
-        if (round) { m.rotation.x = Math.PI / 2; m.position.set(Lk.x, 1.7, Lk.z + 0.1); const hub = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 18), m.material); hub.position.y = 0.26; hub.rotation.x = Math.PI / 2; m.add(hub); }
-        else m.position.set(Lk.x, 1.125, Lk.z);
-        m.userData.closed = { x: m.position.x, z: m.position.z, ry: m.rotation.y };
-        grp.add(m); def.doorMesh[key] = m;
-      }
+      // the doors that open, drawn with this room's own lamp-lit material (grp's first child is the room mesh, 350)
+      def.doors = {};
+      const mat = grp.children[0].material;
+      for (const key in def.locks) { const D = bankDoor(def.locks[key], B.h, mat); grp.add(D.mesh); def.doors[key] = D; }
     },
-    spots, npcs
+    spots
   };
 }
 // ------------------------------------------------------------ the street front
@@ -365,4 +503,29 @@ function bankFacade(gb, lb, B, d) {
   // the name board
   const [nx, nz] = at(0, B.id === 'c' ? 3.6 : B.id === 'd' ? 0.32 : 0.3);
   return { x: nx, y: y0 + (B.id === 'c' ? 8.6 : B.id === 'd' ? 5.6 : 3.75), z: nz, h: d.h, w: B.id === 'c' ? 14 : B.id === 'd' ? 8 : 5.6, ht: B.id === 'c' ? 0.9 : B.id === 'd' ? 0.9 : 0.6 };
+}
+// the rear staff door on the back wall of a bank's building (r: BankSystem.rearOf, the wall point and the way out):
+// a steel door in a dark frame on a concrete step, a lock box, a caged lamp over it; its sign is bankRearSigns
+function bankRearDoor(gb, lb, r) {
+  const ox = Math.sin(r.h), oz = Math.cos(r.h), rx = Math.cos(r.h), rz = -Math.sin(r.h);
+  const box = (b, side, out, y, w, h, dd, col) => b.box(r.x + ox * out + rx * side, r.y0 + y + h / 2, r.z + oz * out + rz * side, w, h, dd, C(col), r.h);
+  box(gb, 0, 0.6, 0, 1.9, 0.12, 1.2, 0x8a8f96);
+  box(gb, 0, 0.06, 0, 1.6, 2.55, 0.12, 0x2a2e33);
+  box(gb, 0, 0.13, 0.12, 1.2, 2.25, 0.04, 0x6a7076);
+  box(gb, 0, 0.155, 0.16, 1.1, 0.25, 0.01, 0x4a4f55);
+  box(gb, 0.42, 0.16, 1.0, 0.05, 0.14, 0.05, 0xc8ccd0); box(gb, 0.48, 0.15, 1.2, 0.12, 0.2, 0.04, 0x1a1c20);
+  box(gb, 0, 0.2, 2.66, 0.46, 0.14, 0.4, 0x2a2e33); box(lb, 0, 0.2, 2.6, 0.36, 0.06, 0.3, 0xffffff);
+}
+// the rear doors' "STAFF ENTRANCE" signs: one quad each over the door, all in one mesh (one draw call)
+function bankRearSigns(rs) {
+  const p = [], n = [], uv = [], ix = [], w = 1.5, ht = 0.28;
+  rs.forEach((r, k) => {
+    const ox = Math.sin(r.h), oz = Math.cos(r.h), rx = Math.cos(r.h), rz = -Math.sin(r.h), cx = r.x + ox * 0.03, cz = r.z + oz * 0.03, y = r.y0 + 3.06;
+    for (const [s, t] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { p.push(cx + rx * s * w / 2, y + t * ht / 2, cz + rz * s * w / 2); n.push(ox, 0, oz); uv.push((s + 1) / 2, (t + 1) / 2); }
+    ix.push(k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(ix); geo.computeBoundingSphere();
+  return geo;
 }
