@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="build-version" content="v7-casino-2026-10-18-a">
+<meta name="build-version" content="v9-climb-graphics-2026-11-13-a">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
 <meta name="mobile-web-app-capable" content="yes">
@@ -33058,7 +33058,7 @@ const SaveSystem = {
       achievements: {},
       jumps: {},
       races: {},
-      outfit: { shirt: 0x26323f, pants: 0x2b3448, shoes: 0x151515, cap: -1, hair: 0x1a1410 },
+      outfit: { shirt: 0xd8d0c0, pants: 0x2b3448, shoes: 0xe8e8e8, cap: -1, hair: 0x1a1410 },
       messages: [], tips: {},
       settings: {
         quality: 'auto', post: true, shadows: true, fov: 70, showFps: false,
@@ -34441,6 +34441,19 @@ function makeAOTexture(world) {
   return t;
 }
 
+// (v9) bake soft light into a foliage prop: leaves darken toward the underside and the middle of the crown and
+// brighten on top (a cheap stand-in for self-shadowing); bark is left as it is
+function shadeFoliage(geo) {
+  const p = geo.attributes.position, c = geo.attributes.color; if (!p || !c) return;
+  let y0 = Infinity, y1 = -Infinity; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  for (let i = 0; i < p.count; i++) {
+    const g = c.getY(i), r = c.getX(i); if (!(g > r * 1.15)) continue; // not a leaf colour
+    const t = (p.getY(i) - y0) / Math.max(0.01, y1 - y0), rad = Math.min(1, Math.hypot(p.getX(i), p.getZ(i)) / 1.6);
+    const k = (0.46 + 0.86 * t * t) * (0.8 + 0.2 * rad);
+    c.setXYZ(i, r * k * (1 + 0.1 * t), g * k, c.getZ(i) * k * (1 - 0.15 * t));
+  }
+  c.needsUpdate = true;
+}
 /* ---------------- Foliage with wind sway (instanced) ---------------- */
 function makeFoliageMaterial() {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
@@ -34460,8 +34473,14 @@ function makeFoliageMaterial() {
           transformed.z += cos(uTime * 1.3 + ph.y + position.x) * 0.035 * sway * uWind;
           transformed.y += sin(uTime * 2.3 + ph.x + position.z * 3.0) * 0.01 * sway * uWind;
         }`);
+    // (v9) leaves are never pitch black: a little of their own colour always comes through (street light at night,
+    // light through the crown by day)
+    sh.uniforms.uFolNight = U.uNight;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uFolNight;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * mix(0.10, 0.07, uFolNight);');
   });
-  m.customProgramCacheKey = () => 'pv-foliage';
+  m.customProgramCacheKey = () => 'pv-foliage2';
   return m;
 }
 // generic prop/detail material with atmosphere + cloud shadow
@@ -34834,6 +34853,8 @@ function initTemplates() {
   TPL.cone = templateFrom(new THREE.CylinderGeometry(0, 1, 1, 8));
   TPL.sphere = templateFrom(new THREE.IcosahedronGeometry(1, 1));
   TPL.sphere0 = templateFrom(new THREE.IcosahedronGeometry(1, 0));
+  TPL.sphS = templateFrom(new THREE.SphereGeometry(1, 7, 5)); // smooth-shaded lobe for tree crowns (v9 graphics)
+  TPL.cyl8t = templateFrom(new THREE.CylinderGeometry(0.62, 1, 1, 8));
   TPL.prism = templateFrom(prismGeometry());
   TPL.plane = templateFrom(new THREE.PlaneGeometry(1, 1));
   TPL.disc = templateFrom(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2));
@@ -37760,20 +37781,21 @@ const PROP_DEFS = {
     } },
   tree: { col: { r: 0.32, h: 4 }, cast: true, tint: true, foliage: true,
     build(g) {
-      g.add(TPL.cyl6, M(0, 1.3, 0, 0.16, 2.6, 0.16), C(0x4a3626));
-      const leaf = C(0x3f6b2a);
-      g.add(TPL.sphere, M(0, 3.6, 0, 1.9, 1.6, 1.9), leaf);
-      g.add(TPL.sphere, M(0.9, 3.1, 0.4, 1.2, 1.1, 1.2), C(0x4b7a30));
-      g.add(TPL.sphere, M(-0.7, 3.3, -0.6, 1.3, 1.1, 1.3), C(0x355f25));
-      g.add(TPL.sphere, M(0.1, 4.5, -0.2, 1.1, 1.0, 1.1), C(0x4f8034));
+      // (v9) a tapered trunk with two boughs, and a crown of nine smooth lobes in four greens
+      const bark = C(0x4a3626), bark2 = C(0x3d2c1f);
+      g.add(TPL.cyl8t, M(0, 1.35, 0, 0.2, 2.7, 0.2), bark);
+      g.add(TPL.cyl6, M(0.42, 2.75, 0.1, 0.07, 1.3, 0.07, 0, 0, -0.7), bark2);
+      const L = [[0, 3.7, 0, 1.75, 1.45, 1.75, 0x4a7d31], [1.05, 3.25, 0.45, 1.1, 0.95, 1.1, 0x5a8f3a], [-0.95, 3.35, -0.6, 1.15, 1.0, 1.15, 0x437529], [0.15, 4.7, -0.2, 1.1, 0.9, 1.1, 0x6aa043],
+        [-0.6, 3.2, 0.95, 1.0, 0.85, 1.0, 0x528636], [0.7, 3.45, -1.0, 1.0, 0.85, 1.0, 0x46782d], [-0.2, 4.15, 0.75, 0.85, 0.7, 0.85, 0x73a84a]];
+      for (const [x, y, z, sx, sy, sz, c] of L) g.add(TPL.sphS, M(x, y, z, sx, sy, sz), C(c));
     } },
   pine: { col: { r: 0.3, h: 5 }, cast: true, tint: true, foliage: true,
     build(g) {
-      g.add(TPL.cyl6, M(0, 0.8, 0, 0.15, 1.6, 0.15), C(0x4a3626));
-      const c = C(0x2a4a2a);
-      g.add(TPL.cone, M(0, 2.2, 0, 1.8, 2.4, 1.8), c); g.add(TPL.cone, M(0, 3.6, 0, 1.4, 2.1, 1.4), C(0x2f5530)); g.add(TPL.cone, M(0, 4.8, 0, 0.9, 1.7, 0.9), C(0x356035));
+      g.add(TPL.cyl8t, M(0, 0.9, 0, 0.17, 1.8, 0.17), C(0x4a3626));
+      const tiers = [[2.0, 1.9, 1.7, 0x25452a], [2.9, 1.6, 1.6, 0x2a4d2d], [3.75, 1.3, 1.5, 0x2f5530], [4.55, 1.0, 1.4, 0x356035], [5.3, 0.65, 1.3, 0x3c6a3a]];
+      for (const [y, r, h, c] of tiers) g.add(TPL.cone, M(0, y, 0, r, h, r), C(c));
     } },
-  bush: { tint: true, foliage: true, build(g) { g.add(TPL.sphere, M(0, 0.5, 0, 1.0, 0.75, 1.0), C(0x3d6a2c)); g.add(TPL.sphere, M(0.6, 0.4, 0.3, 0.7, 0.55, 0.7), C(0x46782f)); } },
+  bush: { tint: true, foliage: true, build(g) { for (const [x, y, z, sx, sy, c] of [[0, 0.5, 0, 1.0, 0.72, 0x3d6a2c], [0.62, 0.42, 0.3, 0.7, 0.55, 0x46782f], [-0.5, 0.4, -0.35, 0.65, 0.5, 0x356025], [0.1, 0.78, -0.1, 0.6, 0.45, 0x4f8034]]) g.add(TPL.sphS, M(x, y, z, sx, sy, sx), C(c)); } },
   bench: { col: { w: 1.8, d: 0.6, h: 0.9 }, breakable: true, breakSpeed: 9, mass: 80,
     build(g) { const w = C(0x7a5434), m = C(0x2b2f33); g.box(0, 0.45, 0, 1.8, 0.07, 0.5, w); g.box(0, 0.75, -0.22, 1.8, 0.4, 0.06, w); for (const x of [-0.75, 0.75]) { g.box(x, 0.22, 0, 0.07, 0.44, 0.45, m); g.box(x, 0.6, -0.22, 0.07, 0.6, 0.06, m); } } },
   bin: { col: { r: 0.3, h: 0.95 }, breakable: true, mass: 20,
@@ -37843,6 +37865,7 @@ class PropManager {
       if (!list.length) continue;
       const g = new GeoBuilder(); PROP_DEFS[t].build(g);
       const geo = g.build(); this.geos[t] = geo;
+      if (PROP_DEFS[t].foliage) shadeFoliage(geo);
       const im = new THREE.InstancedMesh(geo, PROP_DEFS[t].foliage ? this.folMat : this.mat, list.length);
       im.count = 0; im.frustumCulled = false; im.castShadow = !!PROP_DEFS[t].cast; im.receiveShadow = true;
       if (PROP_DEFS[t].tint) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3); }
@@ -38255,28 +38278,40 @@ class CharacterRenderer {
   constructor(scene, max = 110) {
     this.max = max;
     this.mat = new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02 });
-    // tapered limb: narrower at the far end, slightly rounded edges via a bevel-ish vertex pull
-    const limbGeo = new THREE.BoxGeometry(1, 1, 1, 1, 2, 1); limbGeo.translate(0, -0.5, 0);
-    { const p = limbGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); const k = y < -0.9 ? 0.8 : y < -0.4 ? 0.93 : 1; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); } }
-    limbGeo.computeVertexNormals();
-    // torso: chest wider than waist, front slightly fuller than back
-    const torsoGeo = new THREE.BoxGeometry(1, 1, 1, 1, 3, 1);
-    { const p = torsoGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < 0) { p.setX(i, p.getX(i) * (y < -0.4 ? 0.8 : 0.86)); } else if (y > 0.4) { p.setX(i, p.getX(i) * 0.92); p.setZ(i, p.getZ(i) * 0.9); } if (p.getZ(i) > 0 && y > -0.2 && y < 0.35) p.setZ(i, p.getZ(i) * 1.08); } }
-    torsoGeo.computeVertexNormals();
-    const hipsGeo = new THREE.BoxGeometry(1, 1, 1);
-    { const p = hipsGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.9); } }
-    hipsGeo.computeVertexNormals();
-    const skirtGeo = new THREE.CylinderGeometry(0.5, 0.78, 1, 10, 1, false); skirtGeo.translate(0, -0.5, 0);
-    const handGeo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
-    { const p = handGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.75); p.setZ(i, p.getZ(i) * 0.8); } }
+    // (v9) rounded body parts with smooth shading. Every part keeps the unit bounds of the box it replaces, so
+    // the poses and proportions are exactly as before; only the silhouette changes.
+    // a rounded-square tube: a cylinder pushed toward a superellipse (n = 4 is nearly a box, 2.6 a soft pillow)
+    const tube = (seg, rows, n, yShape) => {
+      const g = new THREE.CylinderGeometry(0.5, 0.5, 1, seg, rows, false), p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), z = p.getZ(i), y = p.getY(i), r = Math.hypot(x, z);
+        let kx = 1, kz = 1;
+        if (r > 1e-4) { const c = Math.abs(x / r), s2 = Math.abs(z / r), k = 1 / Math.pow(Math.pow(c, n) + Math.pow(s2, n), 1 / n); kx = k; kz = k; }
+        const [ax, az] = yShape ? yShape(y) : [1, 1];
+        p.setX(i, x * kx * ax); p.setZ(i, z * kz * az);
+      }
+      g.computeVertexNormals(); return g;
+    };
+    // limb: round, tapering to the wrist / ankle, with a softened far end
+    const limbGeo = tube(10, 3, 2.3, y => { const t = 0.5 - y; const k = t > 0.92 ? 0.74 : 1 - 0.2 * t; return [k * 1.04, k * 1.04]; }); limbGeo.translate(0, -0.5, 0);
+    // torso: chest wider than waist, shoulders rounded off, front a little fuller than the back
+    const torsoGeo = tube(14, 5, 3.0, y => y < -0.3 ? [0.8, 0.94] : y < 0 ? [0.86, 0.97] : y > 0.42 ? [0.86, 0.84] : y > 0.2 ? [0.98, 0.96] : [0.95, 1]);
+    const hipsGeo = tube(12, 2, 3.0, y => y < 0 ? [0.9, 0.95] : [1, 1]);
+    const handGeo = new THREE.SphereGeometry(0.56, 8, 6); handGeo.scale(0.9, 1, 0.8);
+    { const p = handGeo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) { p.setX(i, p.getX(i) * 0.82); p.setZ(i, p.getZ(i) * 0.85); } }
     handGeo.computeVertexNormals();
-    const footGeo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 2);
-    { const p = footGeo.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.2 && p.getY(i) > 0) p.setY(i, p.getY(i) * 0.3); if (p.getZ(i) > 0.4) p.setX(i, p.getX(i) * 0.85); } }
+    // foot: a shoe with a rounded toe that drops toward the front
+    const footGeo = new THREE.BoxGeometry(1, 1, 1, 4, 2, 5);
+    { const p = footGeo.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      if (z > 0.1 && y > 0) y *= 1 - 0.7 * Math.min(1, (z - 0.1) / 0.4);
+      const rz = Math.max(0, (Math.abs(z) - 0.3) / 0.2); x *= 1 - 0.3 * rz * rz; if (Math.abs(x) > 0.3 && y > 0.2) y *= 0.86;
+      p.setXYZ(i, x, y, z); } }
     footGeo.computeVertexNormals();
+    const skirtGeo = new THREE.CylinderGeometry(0.5, 0.78, 1, 10, 1, false); skirtGeo.translate(0, -0.5, 0);
     const defs = {
-      head: [new THREE.IcosahedronGeometry(1, 2), 1], hair: [new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.55), 1],
-      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 6],
-      hand: [handGeo, 2], foot: [footGeo, 2], joint: [new THREE.SphereGeometry(1, 10, 7), 4], skirt: [skirtGeo, 1],
+      head: [new THREE.SphereGeometry(1, 14, 10), 1], hair: [new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), 1],
+      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 9],
+      hand: [handGeo, 2], foot: [footGeo, 2], joint: [new THREE.SphereGeometry(1, 10, 8), 6], skirt: [skirtGeo, 1],
       gun: [new THREE.BoxGeometry(1, 1, 1), 1], bat: [new THREE.CylinderGeometry(1, 0.7, 1, 6), 1], hat: [new THREE.CylinderGeometry(1, 1.05, 1, 12), 1],
       gold: [new THREE.BoxGeometry(1, 1, 1), 2]
     };
@@ -38385,6 +38420,12 @@ class CharacterRenderer {
         // nose and brow give the head a front
         _cm[10].copy(hd).multiply(mT(_tm, 0, -0.005, 0.12)).multiply(mS(_tm, 0.025, 0.04, 0.03));
         this._put('small', _cm[10], col(L.skin));
+        // (v9) a face: eyes, brows and a mouth (hidden behind shades; skipped for people far away)
+        if (!L.shades) for (const sd of [-1, 1]) {
+          _cm[10].copy(hd).multiply(mT(_tm, sd * 0.043, 0.022, 0.115)).multiply(mS(_tm, 0.015, 0.017, 0.012)); this._put('joint', _cm[10], col(this._dark));
+          _cm[10].copy(hd).multiply(mT(_tm, sd * 0.045, 0.054, 0.117)).multiply(mRz(_tm, -sd * 0.12)).multiply(mS(_tm, 0.042, 0.011, 0.016)); this._put('small', _cm[10], col(L.hair));
+        }
+        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.062, 0.112)).multiply(mS(_tm, 0.046, 0.009, 0.02)); this._put('small', _cm[10], col(this._lip.copy(L.skin).multiplyScalar(0.55)));
         if (L.shades) { _cm[10].copy(hd).multiply(mT(_tm, 0, 0.03, 0.115)).multiply(mS(_tm, 0.2, 0.04, 0.02)); this._put('small', _cm[10], col(this._shade)); }
       }
       if (L.bandana) {
@@ -38438,7 +38479,7 @@ class CharacterRenderer {
       if (down > 0) { shoulder = lerp(shoulder, -2.6, down); abd = lerp(abd, 0.5, down); }
       const sx = side * 0.255 * bw * shW;
       // rounded shoulder cap (deltoid) in the sleeve colour
-      _cm[20].copy(hp).multiply(mT(_tm, sx * 0.96, 0.5, 0)).multiply(mS(_tm, 0.085 * bw, 0.08, 0.1));
+      _cm[20].copy(hp).multiply(mT(_tm, sx * 0.96, 0.5, 0)).multiply(mS(_tm, 0.072 * bw, 0.066, 0.088));
       const upperCol = L.jacket || (L.sleeve ? L.shirt : null);
       this._put('joint', _cm[20], col(upperCol || L.shirt));
       const sj = _cm[12].copy(hp).multiply(mT(_tm, sx, 0.52, 0)).multiply(mRx(_tm, shoulder)).multiply(mRz(_tm, side * abd));
@@ -38495,7 +38536,7 @@ class Player {
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.h = 0; this.onGround = true; this.state = 'foot';
     this.health = 100; this.stamina = 1; this.vehicle = null;
-    this.look = { skin: C(0xd9a07a), hair: C(0x1a1410), shirt: C(0x26323f), pants: C(0x2b3448), shoes: C(0x151515), sleeve: true, hairStyle: 1, scale: 1, build: 1.05, cap: null };
+    this.look = { skin: C(0xd9a07a), hair: C(0x1a1410), shirt: C(0xb9bec6), jacket: C(0x4a5a3c), pants: C(0x2b3448), shoes: C(0xe4e2dc), sleeve: true, hairStyle: 1, scale: 1, build: 1.05, cap: null };
     this.pose = { phase: 0, amp: 0 };
     this.char = { x: 0, y: 0, z: 0, h: 0, look: this.look, pose: this.pose, flash: 0 };
     this.weapon = 0; this.mag = { pistol: 0, smg: 0, shotgun: 0 };
@@ -54737,11 +54778,13 @@ class QualityManager {
    [CORE] POST-PROCESSING: colour grade + vignette + grain
    ===================================================================== */
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uTime: { value: 0 }, uNight: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.14 }, uCon: { value: 1.08 }, uTime: { value: 0 }, uNight: { value: 0 }, uPx: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uSharp: { value: 0.45 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig; uniform float uSat; uniform float uCon; uniform float uTime; uniform float uNight; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig; uniform float uSat; uniform float uCon; uniform float uTime; uniform float uNight; uniform vec2 uPx; uniform float uSharp; varying vec2 vUv;
     void main(){
       vec3 col = texture2D(tDiffuse, vUv).rgb;
+      // (v9) a light unsharp mask: four neighbours, clamped so edges never ring
+      if (uSharp > 0.0) { vec3 nb = (texture2D(tDiffuse, vUv + vec2(uPx.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(uPx.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, uPx.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, uPx.y)).rgb) * 0.25; col += clamp(col - nb, -0.08, 0.08) * uSharp; }
       float l = dot(col, vec3(0.299, 0.587, 0.114));
       col = mix(vec3(l), col, uSat);
       col = (col - 0.5) * uCon + 0.5;
@@ -55485,7 +55528,7 @@ class Game {
     r.info.reset();
     if (this.usePost && this.composer) {
       this.bloom.strength = p.interior ? 0.28 : lerp(0.22, 0.6, this.env.night) + this.env.wet * 0.08;
-      this.grade.uniforms.uTime.value = this.time % 100; this.grade.uniforms.uNight.value = this.env.night;
+      this.grade.uniforms.uTime.value = this.time % 100; this.grade.uniforms.uNight.value = this.env.night; this.grade.uniforms.uPx.value.set(1 / Math.max(1, this.canvas.width), 1 / Math.max(1, this.canvas.height));
       this.composer.render(rdt);
     } else r.render(this.scene, this.camera);
   }

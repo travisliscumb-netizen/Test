@@ -334,6 +334,22 @@ v7 saves load as they are.
 
 New suite: `climb` (units, restock, freight, distributors, rank, career, landmarks, bank, phone layout, save/reload).
 
+## v9 graphics pass (no mechanics changed)
+
+The pre-graphics build is kept as `backup/index-v8-pre-graphics.html`.
+
+- **People (`CharacterRenderer`):** every body part is a rounded, smooth-shaded shape instead of a box (limbs taper to
+  the wrist and ankle, the torso and hips are rounded tubes, hands are mitts, shoes have a rounded toe). Each part keeps
+  the bounds of the box it replaced, so poses, hit boxes and proportions are unchanged. Faces have eyes, brows and a
+  mouth up close. Smaller shoulder caps. New careers start in an olive jacket over a light shirt with white trainers
+  (existing saves keep their wardrobe).
+- **Trees and bushes (`PROP_DEFS`, `shadeFoliage`):** a tapered trunk with a bough and a crown of seven smooth lobes in
+  several greens; light is baked into the leaf colours (dark under the crown, bright on top); pines have five tiers.
+  Leaves keep a little of their own colour in shadow and at night (they used to go pure black after dark).
+- **Image (`GradeShader`):** a light, clamped unsharp mask and slightly more contrast and saturation.
+- **Cost:** trees are the only added geometry: about 1.21M → 1.28M triangles in the same high-quality street view; no
+  new draw calls, textures or lights.
+
 ## Tests
 
 The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
