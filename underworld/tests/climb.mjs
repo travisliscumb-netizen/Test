@@ -210,5 +210,28 @@ await page.waitForFunction(() => window.game.state === 'playing' && !window.game
 const post = await ev(() => { const uw = window.game.uw; return { v: window.game.save.version, state: JSON.stringify([uw.S.trade, uw.S.career.i, uw.S.bank.vault, uw.S.st.vaults, uw.S.flags.drill]) }; });
 check('orders, the pier shed, landmarks, career, bank cooldowns and the drill survive a save and reload (schema 8)', post.v === 8 && post.state === ph.state, post.state.slice(0, 200));
 
+// ---------------------------------------------------------------- 9. backgrounded with the phone open (the iOS resume bug)
+const bg = await ev(() => {
+  const g = window.game, uw = g.uw, out = {};
+  uw.ui.open('crew');
+  Object.defineProperty(document, 'hidden', { value: true, configurable: true }); document.dispatchEvent(new Event('visibilitychange'));
+  Object.defineProperty(document, 'hidden', { value: false, configurable: true }); document.dispatchEvent(new Event('visibilitychange'));
+  out.state = g.state;
+  const btn = document.getElementById('btnResume') || document.querySelector('#pauseMenu button'), r = btn.getBoundingClientRect();
+  const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  out.onTop = !!top && (top === btn || btn.contains(top)); out.btn = btn.id || btn.textContent.slice(0, 20);
+  btn.click(); out.after = [g.state, g.ui.modal];
+  return out;
+});
+check('backgrounded with the Crew app open: the pause menu is on top and Resume works (it was hidden behind the phone)', bg.state === 'paused' && bg.onTop && bg.after[0] === 'playing' && bg.after[1] === null, JSON.stringify(bg));
+
+const bays = await ev(() => {
+  const g = window.game, grid = g.world.grid, bad = [];
+  for (const h of g.world.homes) for (const bb of h.bays || []) { if (!['single', 'double', 'triple'].includes(bb.kind)) continue;
+    for (const c of grid.query(bb.x - 0.9, bb.z - 0.9, bb.x + 0.9, bb.z + 0.9, [])) if (c.on !== false && c.kind === 'det' && c.x0 !== undefined && bb.x + 0.9 > c.x0 && bb.x - 0.9 < c.x1 && bb.z + 0.9 > c.z0 && bb.z - 0.9 < c.z1) bad.push(h.id); }
+  return bad;
+});
+check('no fence or hedge collider crosses any home garage bay (269 Maple Court had one through its garage)', bays.length === 0, bays.join(','));
+
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'climb');
