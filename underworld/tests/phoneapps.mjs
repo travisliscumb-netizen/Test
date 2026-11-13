@@ -16,7 +16,7 @@ const home = await ev(() => {
   const rects = tiles.map(t => t.getBoundingClientRect());
   return { modal: g.ui.modal, title: document.getElementById('empTitle').textContent, n: tiles.length, groups: [...document.querySelectorAll('#empBody .appHome h4')].map(h => h.textContent), tabsHidden: document.getElementById('empTabs').classList.contains('hidden'), minW: Math.min(...rects.map(r => r.width)), minH: Math.min(...rects.map(r => r.height)), inside: rects.every(r => r.left >= 0 && r.right <= W + 0.5), names: tiles.map(t => t.querySelector('b').textContent) };
 });
-check('opening the phone shows the app home screen (no tab wall)', home.modal === 'empireScreen' && home.title === 'Phone' && home.tabsHidden && home.n >= 10 && home.n <= 14, JSON.stringify(home));
+check('opening the phone shows the app home screen (no tab wall)', home.modal === 'empireScreen' && home.title === 'Phone' && home.tabsHidden && home.n >= 10 && home.n <= 16, JSON.stringify(home));
 check('apps are grouped (Business / Operations / City) with big touch targets inside the screen', home.groups.length === 3 && home.minW >= 64 && home.minH >= 64 && home.inside, JSON.stringify(home));
 check('the home screen has every app the job needs', ['Empire', 'Market', 'Street Connect', 'Inventory', 'Stashes', 'Crew', 'Property', 'Garage', 'Armory', 'Police', 'Feed', 'Map', 'Cabline'].every(n => home.names.includes(n)), JSON.stringify(home.names));
 

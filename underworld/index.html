@@ -385,6 +385,7 @@ body:not(.driving) #touch .car{display:none}
 .xsel{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.xsel .sbtn{flex:1 1 130px;min-height:44px;padding:6px 10px;font-size:12px;text-align:left;line-height:1.25}.xsel .sbtn small{display:block;font-weight:600;opacity:.75;letter-spacing:0}
 .xrow{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}.xrow .xh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}.xrow .xh small{opacity:.75}
 .xq{display:flex;gap:6px;margin-top:8px}.xq .sbtn{flex:1 1 0;min-height:46px;padding:6px 4px;font-size:13px}
+#empBody .card .btns .sbtn{min-height:40px}
 .card.remote{opacity:.5;filter:saturate(.35)}.card.reach{box-shadow:0 0 0 1px #46d4c4 inset}
 .wq.wc{flex-wrap:nowrap}.wq.wc .sbtn{flex:0 0 48px;padding:6px 4px}.wq.wc .sbtn.gold{flex:0 0 62px}.wagerIn{flex:1 1 0;min-width:0;min-height:44px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text);font-size:16px;padding:0 10px;font-weight:700}
 #svcBody>.btns.big .sbtn{min-height:52px;font-size:16px;flex:1 1 120px;max-width:260px}
@@ -33019,7 +33020,7 @@ const SETTINGS_KEY = 'pvunderworld.settings.v1';
 // v6: no casino table limits (tables are seats, not tiers), Royale Billions jackpot pressure (gamble.jp) and
 // bet preferences (gamble.pref); jail good-behaviour points and contraband phone state; 45 homes and 50
 // businesses with business levels; dealership lots. Every new field defaults safely, so v5 saves load as they are.
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 const SaveSystem = {
   defaults() {
     return {
@@ -33106,6 +33107,8 @@ const SaveSystem = {
     // intact): every v6 load weighs far less than its car's new capacity, so nothing is moved or dropped. Faction
     // aggression (aggro, trouble) is new and starts calm; Royale pressure keeps its meaning (owed hits per tier).
     if (oldVersion < 7 && d.gamble && d.gamble.jp) d.gamble.jp.pr = {};
+    // v7 -> v8: stashes and pockets are weighed in pounds like trunks (contents unchanged: every old load fits its new
+    // capacity); the freight office, the career, the bank and landmarks are new state with safe defaults.
     const migrated = oldVersion < SAVE_VERSION;
     if (migrated) { d.flags.migratedFrom = oldVersion; }
     return { data: d, existed: true, migrated };
@@ -44707,7 +44710,9 @@ class ContentManager {
       if (Math.hypot(p.pos.x - this.waypoint.x, p.pos.z - this.waypoint.z) < 12) { this.waypoint = null; g.ui.toast('Waypoint reached.'); }
       else { this.guideTarget = this.waypoint; this.guideArrow = true; g.ui.setObjective('▸ ' + this.waypoint.label + ' · ' + fmtDist(Math.hypot(p.pos.x - this.waypoint.x, p.pos.z - this.waypoint.z)), null, true); return; }
     }
-    if (s.settings.guide && g.uw && !p.interior && g.uw.stage === 0 && s.stats.playTime < 240 && !g.uw.inJail) { g.ui.setObjective('$0 to your name. ' + STAGES[0].hint, null, true); return; }
+    if (s.settings.guide && g.uw && !p.interior && g.uw.stage === 0 && s.stats.playTime < 60 && !g.uw.inJail) { g.ui.setObjective('$0 to your name. ' + STAGES[0].hint, null, true); return; }
+    // (v8) the current career goal: shown for a few seconds whenever it changes or moves, and all through the first minutes
+    if (s.settings.guide && g.uw && !g.uw.inJail && g.uw.career.current() && (g.uw.career.showT > 0 || s.stats.playTime < 300)) { g.ui.setObjective('◆ ' + g.uw.career.hudLine(), null, true); return; }
     g.ui.setObjective(null);
   }
   // ------------------------------------------------------------ interaction hooks
@@ -44816,6 +44821,7 @@ class ContentManager {
     const g = this.g, p = g.player, I = this.interiors;
     if (id.startsWith('g:')) { g.gamble.spot(id); return; }
     if (id.startsWith('c:')) { this.searchContainer(+id.slice(2)); return; }
+    if (id.startsWith('bk:')) { g.uw.bank.spot(id); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;
@@ -46041,14 +46047,17 @@ function C2(hex) { return new THREE.Color(hex); }
    scarcity only; it never models how anything is made or moved for real.
    ===================================================================== */
 const GOODS = {
-  hot: { name: 'Hot Goods', tier: 0, base: 75, size: 1, heat: 0.3, fence: true, desc: 'Phones, watches, jewellery. Only a fence will take them.' },
-  smokes: { name: 'Bootleg Smokes', tier: 0, base: 45, size: 1, heat: 0.25, desc: 'Untaxed cartons that fell off a container.' },
-  green: { name: 'Green', tier: 1, base: 130, size: 1, heat: 0.6, desc: 'The city’s favourite leafy vice. Steady demand everywhere.' },
-  pills: { name: 'Pharma', tier: 1, base: 240, size: 1, heat: 0.8, desc: 'Diverted prescriptions. Nightlife can’t get enough.' },
-  snow: { name: 'Snow', tier: 2, base: 700, size: 1, heat: 1.4, desc: 'Premium party powder. Big money, big sentences.' },
-  hardware: { name: 'Hardware', tier: 3, base: 1500, size: 2, heat: 2.2, arms: true, desc: 'Unregistered iron. Only arms buyers deal in it.' }
+  hot: { name: 'Hot Goods', tier: 0, base: 75, size: 100, heat: 0.3, fence: true, desc: 'Phones, watches, jewellery. Only a fence will take them.' },
+  smokes: { name: 'Bootleg Smokes', tier: 0, base: 45, size: 100, heat: 0.25, desc: 'Untaxed cartons that fell off a container.' },
+  green: { name: 'Green', tier: 1, base: 130, size: 50, heat: 0.6, desc: 'The city’s favourite leafy vice. Steady demand everywhere.' },
+  pills: { name: 'Pharma', tier: 1, base: 240, size: 25, heat: 0.8, desc: 'Diverted prescriptions. Nightlife can’t get enough.' },
+  snow: { name: 'Snow', tier: 2, base: 700, size: 10, heat: 1.4, desc: 'Premium party powder. Big money, big sentences.' },
+  hardware: { name: 'Hardware', tier: 3, base: 1500, size: 500, heat: 2.2, arms: true, desc: 'Unregistered iron. Only arms buyers deal in it.' }
 };
 const GOOD_IDS = Object.keys(GOODS);
+// (v8) size is the weight of one lot in hundredths of a pound: every container (pockets, stashes, trunks) is weighed
+// in the same integer unit, so capacity maths never drifts. lots(o) counts lots; units(o) weighs them.
+function lots(o) { let n = 0; if (o) for (const k in o) if (GOODS[k]) n += o[k] | 0; return n; }
 const TIERS = [{ name: 'LOW RISK', col: '#7fe08f', charge: 1 }, { name: 'MEDIUM RISK', col: '#ffd84d', charge: 3 }, { name: 'HIGH RISK', col: '#ff8a3d', charge: 8 }, { name: 'EXTREME RISK', col: '#ff4d5e', charge: 20 }];
 // how much each district wants each good (1 = average)
 const DEMAND = {
@@ -46187,7 +46196,7 @@ const BIZ_CATS = {
   towing: { name: 'Towing company', icon: '🚚', col: '#f4c20d', perk: 'delivery', lv: [0.05, 0.1, 0.15], inc: [1, 1.45, 2.0], up: ['Two more trucks and the police contract', 'Every impound lot in the city calls you first'], benefit: v => `crew deliveries ${Math.round(v * 100)}% more likely to arrive; wrecks repaired cheaper` },
   carwash: { name: 'Car wash', icon: '🫧', col: '#46d4c4', perk: 'launder', lv: [0.3, 0.5, 0.8], inc: [1, 1.45, 2.0], up: ['A second tunnel and a detailing bay', 'Cash-only VIP valet: the cleanest dirty money in town'], benefit: v => `launders your heat: pressure −${v.toFixed(2)} a day; respray on site` },
   construction: { name: 'Construction company', icon: '🏗', col: '#d8a227', perk: 'launder', lv: [0.3, 0.55, 0.85], inc: [1, 1.6, 2.4], up: ['City contracts and a cement fleet', 'The firm that builds the new stadium stand'], benefit: v => `launders heat (−${v.toFixed(2)} a day); property repairs cheaper` },
-  storage: { name: 'Storage facility', icon: '📦', col: '#c9a46b', perk: 'storage', lv: [250, 600, 1200], inc: [1, 1.35, 1.8], up: ['A new wing of lock-ups', 'Climate-controlled vaults no inspector opens'], benefit: v => `${v} units of stash space here` },
+  storage: { name: 'Storage facility', icon: '📦', col: '#c9a46b', perk: 'storage', lv: [250, 600, 1200], inc: [1, 1.35, 1.8], up: ['A new wing of lock-ups', 'Climate-controlled vaults no inspector opens'], benefit: v => `${(v * 25).toLocaleString('en-US')} lb of stash space here` },
   realestate: { name: 'Real-estate office', icon: '🏘', col: '#8fe39b', perk: 'propDisc', lv: [0.04, 0.08, 0.12], inc: [1, 1.5, 2.2], up: ['Agents in every district', 'You hear about every sale before it lists'], benefit: v => `property ${Math.round(v * 100)}% cheaper to buy` },
   accounting: { name: 'Accounting office', icon: '🧾', col: '#e8eef6', perk: 'allIncome', lv: [0.04, 0.08, 0.12], inc: [1, 1.4, 1.9], up: ['A tax partner and better software', 'A partner who used to audit for the state'], benefit: v => `every business earns ${Math.round(v * 100)}% more; protection fees lower` },
   arcade: { name: 'Arcade', icon: '🕹', col: '#d28cff', perk: 'recruit', lv: [1, 1, 2], inc: [1, 1.5, 2.1], up: ['VR booths and a prize counter', 'A gaming lounge: runners who know every street'], benefit: v => `${v} more young recruit${v > 1 ? 's' : ''}; deliveries a little safer` },
@@ -46284,7 +46293,10 @@ const SPOTS = [
   { id: 'gus', name: 'Greenhouse Gus', role: 'Supplier · green', at: [1, 1, 1, 30], sells: ['green'], rep: 100, col: 0x7fe08f },
   { id: 'feld', name: 'Doc Feld', role: 'Supplier · pharma', at: [4, 4, 2, 50], sells: ['pills'], rep: 300, col: 0xffd84d },
   { id: 'armorer', name: 'The Armorer', role: 'Weapons & hardware', at: [8, 11, 0, 30], sells: ['hardware'], arms: true, rep: 0, col: 0xff8a3d },
-  { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b }
+  { id: 'chop', name: 'Saltworks Chop Shop', role: 'Buys stolen cars', place: 'chopshop', chop: true, col: 0xc9a46b },
+  // (v8) the freight office on the docks and the bank in the Financial District
+  { id: 'port', name: 'Pier 12 Freight Office', role: 'Bulk imports & distributors', at: [11, 8, 3, 30], port: true, col: 0x4d8dff },
+  { id: 'bank', name: 'Valen First National', role: 'Bank', at: [6, 4, 0, 50], bank: true, col: 0xd8a227 }
 ];
 // faction headquarters (the boss and guards stand here)
 const HQS = { vipers: [1, 6, 1, 40], tidewater: [11, 7, 3, 40], velvet: [6, 9, 0, 30], bellcourt: [8, 1, 3, 40], glasshouse: [7, 6, 1, 40] };
@@ -46371,10 +46383,10 @@ function lookFrom(o, rng = Math.random) {
    with police seizures, gang wars, faction losses, large player sales, time
    of day and random events, and drift back toward normal over time.
    ===================================================================== */
-const POCKET_CAP = 12;
+const POCKET_CAP = 3000; // 30 lb on you (hundredths of a pound)
 // ---- cargo (v7): a vehicle carries product by weight. Every model has its own capacity in pounds, set by its
 // body: a sports car trades the boot for speed, a box truck out-hauls a pickup five times over. Police cruisers
-// carry nothing (the cage and the radio rack fill the boot). Pockets and property stashes keep their space units.
+// carry nothing (the cage and the radio rack fill the boot). Since v8 pockets and property stashes are weighed too.
 const CARGO_LB = {
   supercar: 50, valkyr: 50, tempest: 60, obsidian: 70, sports: 80, coupe: 100, metro: 110, monarch: 120, apex: 140,
   compact: 150, gangcar: 180, revenant: 180, hellion: 190, muscle: 200, classic: 220, taxi: 230, sedan: 250, unmarked: 250,
@@ -46383,7 +46395,7 @@ const CARGO_LB = {
 };
 // cargo weight of one lot of each good, in hundredths of a pound (integers, so totals never drift): a hot-goods
 // item or a carton of smokes about a pound, a hardware unit (cased) five; Green, Pharma and Snow weigh what they are
-const GOOD_CLB = { hot: 100, smokes: 100, green: 50, pills: 25, snow: 10, hardware: 500 };
+const GOOD_CLB = Object.fromEntries(GOOD_IDS.map(k => [k, GOODS[k].size]));
 // weight of a container's goods in hundredths of a pound, and a vehicle model's capacity in the same unit
 function cargoC(o) { let c = 0; if (o) for (const k in o) if (GOOD_CLB[k]) c += (o[k] | 0) * GOOD_CLB[k]; return c; }
 function cargoCapC(type) { return (CARGO_LB[type] || 0) * 100; }
@@ -46554,7 +46566,7 @@ const Inv = {
 };
 // the five kinds of place goods can be (Part 14 of the design): property kind -> location class
 const LOC_CLASS = { safehouse: 'SAFEHOUSE', business: 'PROPERTY', garage: 'PROPERTY', warehouse: 'WAREHOUSE' };
-const LOC_ORDER = ['ON PERSON', 'VEHICLE', 'SAFEHOUSE', 'PROPERTY', 'WAREHOUSE'];
+const LOC_ORDER = ['ON PERSON', 'VEHICLE', 'PORT', 'SAFEHOUSE', 'PROPERTY', 'WAREHOUSE'];
 // valuation of one container at a district's street price: per good qty, cost, value, P/L
 function holdings(o, zone, market) {
   const rows = [];
@@ -46743,7 +46755,7 @@ class DeliveryManager {
     if (S.crackdown > 0) add('crackdown', -0.03);
     const value = n * uw.market.price(zoneKey(B.x, B.z), good);
     add('cargo value', -clamp(Math.log10(Math.max(1, value / 800)) * 0.035, 0, 0.09));
-    add('load size', -clamp((n * GOODS[good].size - 20) / 20 * 0.02, 0, 0.06));
+    add('load size', -clamp((n * GOODS[good].size / 100 - 20) / 20 * 0.02, 0, 0.06));
     add('your influence', clamp(uw.influence / 1000 * 0.06, 0, 0.06));
     if (uw.props.perk('delivery') > 0) add('your couriers and drivers', uw.props.perk('delivery'));
     p = clamp(p, 0.3, 0.95);
@@ -47028,6 +47040,7 @@ class Underworld {
     this.prison = new Prison(this);
     this.opps = new OppFeed(this);
     this.ui = new EmpireUI(this);
+    this.trade = new Trade(this); this.career = new Career(this); this.bank = new Bank(this);
     this.neon = new NeonSigns(game);
     this.locT = 0; this.statT = 0; this.combatT = 0; this.mapOverlay = true; this.fameT = 20;
     this._infl = 0; this._stage = 0;
@@ -47055,8 +47068,8 @@ class Underworld {
       cops: {}, rap: { priors: 0, cops: 0, copcars: 0, kills: 0 },
       opps: [], nextOpp: 1, ledger: { inc: {}, exp: {} }, lastLedger: null,
       jail: null, jailPhone: false, taskforce: 0, crackdown: 0, redirect: null, pikeCD: 0, hiPressDays: 0, warHours: 0,
-      decisions: [], flags: {}, realBy: {}, st: { sold: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, mugs: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0 },
-      slept: false, shipment: null,
+      decisions: [], flags: {}, realBy: {}, st: { sold: 0, earnedDeals: 0, turfsTaken: 0, turfsLost: 0, bossesBeaten: 0, picks: 0, mugs: 0, chopped: 0, jailDays: 0, seized: 0, realized: 0, runs: 0, runsOk: 0, royalties: 0, vaults: 0, bankJobs: 0 },
+      slept: false, shipment: null, trade: Trade.fresh(), career: Career.fresh(), bank: { teller: -99, vault: -99 },
       // v2 additions: weapon/armour stashes, crew delivery runs, territory royalties
       wstash: {}, runs: [], runLog: [], nextRun: 1, roy: {}
     };
@@ -47073,6 +47086,7 @@ class Underworld {
     S.market = obj(S.market, d.market);
     for (const z in DEMAND) { S.market[z] = obj(S.market[z], d.market[z]); for (const k of GOOD_IDS) { const m = S.market[z][k]; S.market[z][k] = Array.isArray(m) && m.length === 2 ? [num(m[0], 1, 0.25, 2.6), num(m[1], 1, 0.5, 1.8)] : [1, 1]; } }
     S.marketPrev = obj(S.marketPrev, null);
+    S.trade = Trade.sanitize(S.trade, num); S.career = obj(S.career, Career.fresh()); S.career.i = Math.floor(num(S.career.i, 0, 0, CAREER.length)); S.bank = obj(S.bank, { teller: -99, vault: -99 }); S.bank.teller = num(S.bank.teller, -99); S.bank.vault = num(S.bank.vault, -99);
     S.supply = obj(S.supply, {}); S.dealQ = obj(S.dealQ, {}); S.chopWanted = arr(S.chopWanted, []).filter(t => VEHICLES[t]);
     const goods = o => Inv.clean(o, num);
     S.inv = goods(S.inv);
@@ -47113,7 +47127,7 @@ class Underworld {
     S.decisions = arr(S.decisions, []).filter(x => x && typeof x === 'object' && typeof x.text === 'string').slice(-6);
     S.dayOffset = Math.floor(num(S.dayOffset, 0, 0, Math.max(0, S.day - 1))); S.fit = Math.floor(num(S.fit, 0, 0, 5));
     S.fugitive = S.fugitive && typeof S.fugitive === 'object' ? { left: Math.floor(num(S.fugitive.left, 0, 0, SENTENCE_MAX)), day: num(S.fugitive.day, 0) } : null;
-    S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e9 : 0, 1e9);
+    S.flags = obj(S.flags, {}); S.st = obj(S.st, d.st); for (const k in d.st) S.st[k] = num(S.st[k], 0, k === 'realized' ? -1e13 : 0, 1e13);
     S.realBy = obj(S.realBy, {}); for (const k in S.realBy) { if (!GOODS[k]) delete S.realBy[k]; else S.realBy[k] = num(S.realBy[k], 0, -1e9, 1e9); }
     S.slept = !!S.slept; S.shipment = S.shipment && typeof S.shipment === 'object' && isFinite(S.shipment.at) ? S.shipment : null;
     // stashes of weapons/ammo/armour at owned (or once-owned) properties
@@ -47257,7 +47271,7 @@ class Underworld {
     const turfs = this.playerTurfs();
     let biz = 0, propInfl = 0;
     for (const id in S.props) if (S.props[id].owned) { const d = PROP_BY_ID[id]; if (!d) continue; if (d.kind === 'business') biz++; propInfl += d.infl || 0; if (d.kind === 'safehouse') { const h = this.props.hoodOf(d); if (h && h.infl) propInfl += h.infl; } }
-    propInfl += this.props.perk('infl');
+    propInfl += this.props.perk('infl') + this.trade.landmarkInfl();
     const crew = S.crew.filter(c => c.status === 'active');
     const lts = crew.filter(c => c.rank >= 3).length;
     const cops = Object.values(S.cops).filter(c => c.st === 'paid').length;
@@ -47314,6 +47328,8 @@ class Underworld {
     // a car you are not keeping (a stolen hauler) that you walked away from: its cargo is still yours, out there
     const lv = g.player.lastVehicle;
     if (opts.all && lv && lv.trunk && units(lv.trunk) && !seen.has(lv.trunk) && !lv.burnt && g.vehicles.list.includes(lv)) { seen.add(lv.trunk); out.push({ key: 'last', cls: 'VEHICLE', name: `${lv.spec.name} trunk · where you left it`, o: lv.trunk, lb: true, type: lv.type, capC: cargoCapC(lv.type), zone: zoneKey(lv.pos.x, lv.pos.z), here: false, veh: lv }); }
+    // freight waiting at Pier 12: within reach when you stand at the pier; it only ever comes out
+    { const dk = this.trade.T.dock, at = this.trade.atPort(); if (units(dk) && (at || opts.all)) { const PL = this.trade.portLoc(); out.push({ key: 'dock', cls: 'PORT', name: 'Pier 12 freight shed', o: dk, cap: units(dk), zone: PL ? PL.zone : pz, here: at, out: true }); } }
     for (const d of this.props.ownedList()) {
       const cap = this.props.storageCap(d.id), here = acc.props.has(d.id); if (!cap || (!here && !opts.all)) continue;
       const L = this.loc('prop', d.id);
@@ -47379,6 +47395,7 @@ class Underworld {
   // lots of good k that fit in a location from locations()
   fitIn(L, k) {
     if (L.lb) return cargoFit(L.type, L.o, k);
+    if (L.out) return 0;
     const free = L.key === 'inv' ? this.pocketFree() : L.prop ? this.props.storageFree(L.prop) : L.cap - units(L.o);
     return Math.max(0, Math.floor(free / GOODS[k].size));
   }
@@ -47561,6 +47578,7 @@ class Underworld {
       this.combatT = Math.max(0, this.combatT - dt);
     }
     this.ui.update(rdt);
+    this.career.update(rdt);
   }
   tickHours(h, hour) {
     this.market.tick(h);
@@ -47569,6 +47587,7 @@ class Underworld {
     this.cops.tickHours(h);
     this.opps.tickHours(h);
     this.crew.tickHours(h);
+    this.trade.tickHours();
     this.recompute();
   }
   tickDay() {
@@ -47585,6 +47604,8 @@ class Underworld {
     // the chop shop wanted list and street buyer quotas refresh daily
     if (S.day % 2 === 0) this.rollChopList();
     S.dealQ = {}; S.slept = false;
+    S.supply = {}; // (v8) suppliers restock every morning (they used to sell out once and stay empty)
+    this.trade.tickDay();
     this.market.snapshot();
     this.recompute(); this.computeInfluence();
     const L = S.ledger, inc = Object.values(L.inc).reduce((a, b) => a + b, 0), exp = Object.values(L.exp).reduce((a, b) => a + b, 0);
@@ -47658,7 +47679,7 @@ class Underworld {
       if (L.kind === 'deal') continue;
       if (dist2(L.x, L.z, p.pos.x, p.pos.z) > 2.4 * 2.4) continue;
       if (L.kind === 'prop') { const a = this.props.doorAction(L); if (a) return a; }
-      if (L.kind === 'spot') return { label: L.def.chop ? 'Chop shop (drive a stolen car in)' : `${L.def.name} · ${L.def.role}`, act: () => L.def.chop ? this.ui.openChopInfo() : this.ui.openSpot(L) };
+      if (L.kind === 'spot') return { label: L.def.chop ? 'Chop shop (drive a stolen car in)' : L.def.bank ? 'Enter Valen First National' : `${L.def.name} · ${L.def.role}`, act: () => L.def.chop ? this.ui.openChopInfo() : this.ui.openSpot(L) };
     }
     const ga = this.props.garageActionFoot(); if (ga) return ga;
     const t = this.gangs.talkTarget(); if (t) return t;
@@ -47919,7 +47940,7 @@ class FactionSim {
       return;
     }
     if (near) uw.gangs.spawnShipment(sh);
-    else { tw.stock += units(sh.cargo); }
+    else { tw.stock += lots(sh.cargo); }
   }
 }
 
@@ -48339,7 +48360,7 @@ class GangManager {
     if (!g.vehicles.list.includes(van) || van.burnt) { this.ship = null; return; }
     if (van.driver === 'player') {
       if (!gr.stolen) {
-        gr.stolen = true; const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - units(van.trunk));
+        gr.stolen = true; const f = uw.S.factions.tidewater; f.rel = Math.max(-100, f.rel - 45); this.provoke('tidewater', GANG_AGGRO.ship, van.pos.x, van.pos.z); f.stock = Math.max(0, f.stock - lots(van.trunk));
         g.ui.banner('Shipment Stolen', goodsList(van.trunk), 'pass', 3); uw.addRep(80, null);
         uw.news('unknown', 'Holm: “You took something of mine. I will be taking something of yours.”');
         g.police.crime('carjack', van.pos.x, van.pos.z);
@@ -48351,7 +48372,7 @@ class GangManager {
       return;
     }
     if (!gr.stolen && dist2(van.pos.x, van.pos.z, gr.hq.x, gr.hq.z) < 22 * 22) {
-      uw.S.factions.tidewater.stock += units(van.trunk);
+      uw.S.factions.tidewater.stock += lots(van.trunk);
       this.ship = null; gr.life = 999;
       for (const v of gr.cars) this.releaseCar(v);
     }
@@ -48916,9 +48937,16 @@ class PropertyManager {
   // stash space: a storage business grows with its level; a home in the Docklands holds a quarter more
   storageCap(id) {
     const d = PROP_BY_ID[id]; if (!d) return 0;
-    if (d.kind === 'business' && d.cat && BIZ_CATS[d.cat].perk === 'storage') return BIZ_CATS[d.cat].lv[Math.max(1, this.level(id)) - 1];
+    return this.storageLb(d) * 100;
+  }
+  // (v8) stash capacity in pounds. The old space figures scale by kind: a home or business holds 5 lb per old unit,
+  // a lock-up 10, a storage business 25; the two warehouses are real bulk storage (100,000 and 150,000 lb).
+  storageLb(d) {
+    if (!d) return 0;
+    if (d.kind === 'business' && d.cat && BIZ_CATS[d.cat].perk === 'storage') return BIZ_CATS[d.cat].lv[Math.max(1, this.level(d.id) || 1) - 1] * 25;
+    if (d.kind === 'warehouse') return d.storage >= 900 ? 150000 : 100000;
     const hood = d.kind === 'safehouse' ? this.hoodOf(d) : null;
-    return Math.round((d.storage || 0) * (hood && hood.store ? hood.store : 1));
+    return Math.round((d.storage || 0) * (d.kind === 'garage' ? 10 : 5) * (hood && hood.store ? hood.store : 1));
   }
   hoodOf(d) { const L = this.uw.loc('prop', d.id); return L ? HOOD[L.zone] || null : null; }
   // ---- v6 business levels and perks
@@ -49565,6 +49593,7 @@ class PressureSystem {
     const uw = this.uw, S = this.S, g = uw.g;
     let decay = 2.2 + (S.slept ? 3 : 0);
     if (this.perk('bramford')) decay += 2;
+    if (uw.trade.owns('courier')) decay += 2;
     if (this.perk('kerr') || this.perk('park')) decay += 0.4;
     if (this.perk('pike')) decay += 0.6;
     if (S.taskforce > 0) decay *= 0.4;
@@ -49778,7 +49807,7 @@ class Prison {
     const pend = this.pending || { ch: this.charges(), veh: null }; this.pending = null;
     const ch = pend.ch;
     // confiscation: everything carried, the trunk of the car you were in, every firearm
-    S.st.seized += units(S.inv); Inv.clear(S.inv);
+    S.st.seized += lots(S.inv); Inv.clear(S.inv);
     const v = pend.veh;
     if (v && g.vehicles.list.includes(v)) {
       if (v.trunk) Inv.clear(v.trunk);
@@ -50499,6 +50528,396 @@ class OppFeed {
 function uw_toastOnce(uw, text) { const g = uw.g; if (g.time - (uw._lastT || 0) > 1.5) { uw._lastT = g.time; g.ui.toast(text); } }
 
 /* =====================================================================
+   [UNDERWORLD] v8 · THE CLIMB: the systems that give the sandbox a spine.
+   - UW_RANKS: a personal rank ladder on top of reputation (what the street
+     calls you). Rank opens bigger supplier stock, the freight office and
+     larger import / export volumes.
+   - Trade: bulk freight through Pier 12. Order product by the hundred or
+     thousand pounds, collect it at the pier with a vehicle big enough (or
+     pay to have it trucked to a stash), and sell weight to out-of-town
+     distributors: collected from a stash at 62% of the street, or 80% if
+     you haul it to the pier yourself. Daily volume grows with rank.
+   - Landmarks: the city's institutions are for sale to somebody with a
+     nine-figure bankroll. Each pays a daily cut and changes a rule.
+   - Career: a 24-chapter campaign in six acts. Every chapter is a set of
+     goals read from what the player has actually done, so it never gets
+     in the way of free roam and an old save catches up on its own.
+   - Bank: Valen First National. Hold up the tellers, or bring a thermal
+     drill for the vault.
+   ===================================================================== */
+const UW_RANKS = [[0, 'Nobody'], [50, 'Lookout'], [150, 'Pickpocket'], [300, 'Corner Boy'], [500, 'Runner'], [800, 'Dealer'], [1200, 'Earner'], [1700, 'Operator'], [2300, 'Fixer'],
+  [3000, 'Shot Caller'], [4000, 'Lieutenant'], [5200, 'Captain'], [6600, 'Underboss'], [8200, 'Boss'], [10000, 'Don'], [13000, 'Legend']].map(([at, name], i) => ({ at, name, i }));
+function rankOf(rep) { let r = 0; for (const k of UW_RANKS) if (rep >= k.at) r = k.i; return r; }
+// what a supplier has on the shelf each morning, in lots: more for a bigger name
+function supplierStock(k, supply, rep) {
+  const lb = (GOODS[k].size >= 100 ? 30 : 15) * (1 + rankOf(rep) * 0.5);
+  return Math.max(1, Math.round(lb * 100 / GOODS[k].size * supply));
+}
+const TRADE_RANK = 4; // Runner: the freight office starts taking your calls
+const IMPORT_GOODS = ['smokes', 'green', 'pills', 'snow', 'hardware'];
+const IMPORT_MAX_LB = [0, 0, 0, 0, 100, 250, 500, 1000, 2000, 5000, 10000, 10000, 25000, 25000, 50000, 50000];
+const EXPORT_DAY_LB = [0, 0, 0, 0, 50, 150, 400, 1000, 2500, 6000, 12000, 12000, 25000, 25000, 50000, 50000];
+const IMPORT_SIZES_LB = [5, 25, 100, 500, 2000, 10000, 50000];
+// trade volume is counted in pounds of Green-equivalent: a pound of Snow uses ten pounds of your limit, Pharma four
+// (so the limits track value, not just weight)
+const TRADE_W = { snow: 10, pills: 4 };
+const tradeVol = (k, n) => n * GOODS[k].size * (TRADE_W[k] || 1);
+const LANDMARKS = [
+  { id: 'ferry', name: 'Port Valen Ferry Company', price: 1.5e8, income: 3e5, perk: 'Export volume +50%', desc: 'Every car and crate that crosses the water pays you first.' },
+  { id: 'courier', name: 'The Valen Courier', price: 2.5e8, income: 4e5, perk: 'Police pressure fades 2 a day faster', desc: 'The city’s newspaper. The stories about you stop being written.' },
+  { id: 'stadium', name: 'Port Valen Stadium & the Mariners', price: 4e8, income: 9e5, infl: 40, perk: '+40 influence', desc: 'Forty thousand people chanting for a team that belongs to you.' },
+  { id: 'royale', name: 'The Valen Royale', price: 7.5e8, income: 2e6, perk: 'The house’s cut, every single day', desc: 'You have fed it enough. Buy the casino and be the house.' },
+  { id: 'port', name: 'Port Authority concession', price: 1.2e9, income: 1.5e6, perk: 'Imports 15% cheaper · order and export limits doubled', desc: 'The cranes, the customs shed and everyone who works in it.' },
+  { id: 'tower', name: 'Valen Tower', price: 2e9, income: 3e6, infl: 100, perk: '+100 influence', desc: 'The tallest building on the island, with your name on the deed.' },
+  { id: 'cityhall', name: 'City Hall', price: 5e9, income: 0, infl: 60, perk: 'The mayor is yours: police pressure never rises above 40', desc: 'Not for sale, officially. Everything is for sale.' }
+];
+const LANDMARK_BY_ID = Object.fromEntries(LANDMARKS.map(l => [l.id, l]));
+const LANDMARK_RANK = 8;
+class Trade {
+  constructor(uw) { this.uw = uw; this.to = 'dock'; this.src = ''; }
+  static fresh() { return { orders: [], dock: {}, dockDay: 0, soldC: 0, next: 1, imported: 0, exported: 0, landmarks: {} }; }
+  static sanitize(T, num) {
+    const d = Trade.fresh(); if (!T || typeof T !== 'object') return d;
+    const clampN = (v, def, lo, hi) => (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, hi) : def;
+    T.orders = (Array.isArray(T.orders) ? T.orders : []).filter(o => o && GOODS[o.good] && o.n > 0 && typeof o.eta === 'number').slice(0, 40).map(o => ({ id: o.id | 0, good: o.good, n: Math.floor(clampN(o.n, 0, 0, 1e7)), cost: clampN(o.cost, 0, 0, 1e12), eta: o.eta, to: typeof o.to === 'string' ? o.to : 'dock' }));
+    T.dock = Inv.clean(T.dock, (v, def, lo) => (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, 1e7) : def);
+    T.dockDay = clampN(T.dockDay, 0, 0, 1e6); T.soldC = clampN(T.soldC, 0, 0, 1e9); T.next = Math.floor(clampN(T.next, 1, 1, 1e9));
+    T.imported = clampN(T.imported, 0, 0, 1e12); T.exported = clampN(T.exported, 0, 0, 1e12);
+    const lm = {}; if (T.landmarks && typeof T.landmarks === 'object') for (const k in T.landmarks) if (LANDMARK_BY_ID[k]) lm[k] = clampN(T.landmarks[k], 1, 1, 1e6);
+    T.landmarks = lm; void num;
+    return T;
+  }
+  get g() { return this.uw.g; }
+  get T() { const S = this.uw.S; return S.trade || (S.trade = Trade.fresh()); }
+  rank() { return rankOf(this.g.save.rep); }
+  unlocked() { return this.rank() >= TRADE_RANK; }
+  owns(id) { return !!this.T.landmarks[id]; }
+  maxLb() { return IMPORT_MAX_LB[this.rank()] * (this.owns('port') ? 2 : 1); }
+  capC() { return Math.round(EXPORT_DAY_LB[this.rank()] * 100 * (this.owns('port') ? 2 : 1) * (this.owns('ferry') ? 1.5 : 1)); }
+  leftC() { return Math.max(0, this.capC() - this.T.soldC); }
+  // what a lot costs off the boat, and what a distributor pays for one (the average street price across the city)
+  price(k) { return Math.max(2, Math.round(GOODS[k].base * 0.36 * (this.owns('port') ? 0.85 : 1))); }
+  street(k) { let s = 0, n = 0; for (const z in DEMAND) { s += this.uw.market.price(z, k); n++; } return n ? s / n : GOODS[k].base; }
+  exportPrice(k, atPort) { return Math.max(1, Math.round(this.street(k) * (atPort ? 0.8 : 0.62))); }
+  portLoc() { return this.uw.loc('spot', 'port'); }
+  atPort() { const L = this.portLoc(), p = this.g.player; return !!L && !p.interior && dist2(L.x, L.z, p.pos.x, p.pos.z) < 18 * 18; }
+  order(k, n) {
+    const g = this.g, uw = this.uw, T = this.T;
+    if (!this.unlocked()) return 'The freight office doesn’t know you yet.';
+    if (!IMPORT_GOODS.includes(k) || !(n > 0)) return '';
+    if (k === 'hardware' && this.rank() < 8) return 'Crates of hardware are for people the office trusts (rank Fixer).';
+    const lbC = n * GOODS[k].size;
+    if (tradeVol(k, n) > this.maxLb() * 100) return `Your name is good for ${fmtLb(this.maxLb() * 100 / (TRADE_W[k] || 1))} of ${GOODS[k].name} an order.`;
+    if (T.orders.length >= 6) return 'Six consignments on the water is enough. Wait for one to land.';
+    const to = this.to !== 'dock' && uw.props.owned(this.to) && uw.props.storageCap(this.to) ? this.to : 'dock';
+    const base = n * this.price(k), fee = to === 'dock' ? 0 : Math.round(base * 0.08), cost = base + fee;
+    if (g.save.money < cost) return `That consignment costs ${fmtMoney(cost)}.`;
+    g.content.spend(cost);
+    T.orders.push({ id: T.next++, good: k, n, cost: base, eta: uw.runs.absHour() + (to === 'dock' ? 12 : 18), to });
+    uw.S.pressure = clamp(uw.S.pressure + Math.min(2, lbC / 500000), 0, 100);
+    g.audio.play('cash');
+    return `Ordered ${fmtQty(k, n)} ${GOODS[k].name} for ${fmtMoney(cost)}. ${to === 'dock' ? 'It lands at Pier 12 in about 12 hours: bring something that can carry it.' : `It will be trucked to ${PROP_BY_ID[to].name} in about 18 hours.`}`;
+  }
+  tickHours() {
+    const uw = this.uw, T = this.T, now = uw.runs.absHour();
+    for (const o of T.orders.slice()) {
+      if (now < o.eta) continue;
+      T.orders.splice(T.orders.indexOf(o), 1);
+      let n = o.n, each = o.cost / o.n, note = '';
+      // a trucked load now and then loses a pallet to an "inspection"
+      if (o.to !== 'dock' && Math.random() < 0.05) { const lost = Math.max(1, Math.round(n * 0.2)); n -= lost; note = ` Customs “inspected” ${fmtQty(o.good, lost)} of it.`; }
+      let put = 0;
+      if (o.to !== 'dock' && uw.props.owned(o.to)) {
+        const st = uw.S.storage[o.to] || (uw.S.storage[o.to] = {});
+        put = Math.min(n, Math.max(0, Math.floor(uw.props.storageFree(o.to) / GOODS[o.good].size)));
+        if (put > 0) Inv.add(st, o.good, put, each * put);
+      }
+      const rest = n - put;
+      if (rest > 0) { if (!units(T.dock)) T.dockDay = uw.S.day; Inv.add(T.dock, o.good, rest, each * rest); }
+      T.imported += n * GOODS[o.good].size;
+      uw.news('unknown', `Freight office: ${fmtQty(o.good, n)} ${GOODS[o.good].name} ${put ? `delivered to ${PROP_BY_ID[o.to].name}` : 'landed at Pier 12'}${put && rest ? `, ${fmtQty(o.good, rest)} left at Pier 12 (no room)` : ''}.${note}${rest ? ' You have three days to collect before the port authority gets curious.' : ''}`);
+    }
+  }
+  tickDay() {
+    const uw = this.uw, T = this.T, S = uw.S;
+    T.soldC = 0;
+    if (units(T.dock) && S.day - T.dockDay >= 3) {
+      const what = goodsList(T.dock); Inv.clear(T.dock);
+      S.pressure = clamp(S.pressure + 6, 0, 100);
+      uw.news('unknown', `Freight office: the port authority opened your shed. ${what} is gone, and they are asking whose it was.`);
+    }
+    let inc = 0; for (const id in T.landmarks) inc += LANDMARK_BY_ID[id].income;
+    if (inc > 0 && !S.jail) uw.income('landmarks', inc);
+    if (this.owns('cityhall') && S.pressure > 40) S.pressure = 40;
+  }
+  // sell up to n lots of k to the distributors; from: 'carry' (pockets and the car with you, at the pier) or a stash id
+  sell(from, k, n) {
+    const uw = this.uw, T = this.T, S = uw.S, g = this.g;
+    if (!this.unlocked()) return 'The distributors don’t know you yet.';
+    if (!GOODS[k] || GOODS[k].fence) return 'They don’t touch that.';
+    const atPort = from === 'carry';
+    if (atPort && !this.atPort()) return 'Bring it to Pier 12.';
+    if (g.police.level > 0) return 'Not with the police on you.';
+    const src = atPort ? uw.carried() : (uw.props.owned(from) ? S.storage[from] : null);
+    if (!src) return '';
+    n = Math.min(Math.floor(n), Inv.has(src, k), Math.floor(this.leftC() / tradeVol(k, 1)));
+    if (!(n > 0)) return this.leftC() < tradeVol(k, 1) ? 'They have taken all they can move today. Volume grows with your rank.' : 'Nothing to sell there.';
+    const pr = this.exportPrice(k, atPort), cash = pr * n;
+    if (atPort) { uw.take(k, n); uw.realize(cash, k); }
+    else { const c = Inv.remove(S.storage[from], k, n); S.st.realized = (S.st.realized || 0) + cash - c; const rb = S.realBy || (S.realBy = {}); rb[k] = Math.round((rb[k] || 0) + cash - c); }
+    uw.income('export', cash);
+    T.soldC += tradeVol(k, n); T.exported += n * GOODS[k].size; S.st.sold += n;
+    S.pressure = clamp(S.pressure + Math.min(1.5, n * GOODS[k].size / 400000) * GOODS[k].heat, 0, 100);
+    uw.addRep(Math.min(40, Math.ceil(n * GOODS[k].size / 2500)), null);
+    g.audio.play('cash');
+    return `Sold ${fmtQty(k, n)} ${GOODS[k].name} for ${fmtMoney(cash)}${atPort ? ' at the pier' : ', collected by their truck'}.`;
+  }
+  buyLandmark(id) {
+    const g = this.g, L = LANDMARK_BY_ID[id], T = this.T;
+    if (!L || T.landmarks[id]) return '';
+    if (this.rank() < LANDMARK_RANK) return `Nobody sells a landmark to a ${UW_RANKS[this.rank()].name}. Reach rank ${UW_RANKS[LANDMARK_RANK].name}.`;
+    if (g.save.money < L.price) return `${L.name} costs ${fmtMoney(L.price)}.`;
+    g.content.spend(L.price); T.landmarks[id] = this.uw.S.day;
+    this.uw.addRep(400, null); this.uw.computeInfluence();
+    g.ui.banner('Landmark Acquired', L.name, 'pass', 4); g.audio.play('pass');
+    this.uw.news('pv', `Valen Courier: ${L.name} changes hands for ${fmtMoney(L.price)}. The buyer’s name appears nowhere on the paperwork.`);
+    g.autosave('Landmark bought');
+    return `${L.name} is yours.`;
+  }
+  landmarkInfl() { let n = 0; for (const id in this.T.landmarks) n += LANDMARK_BY_ID[id].infl || 0; return n; }
+  // one handler for the freight office counter and the phone's Trade app
+  act(a) {
+    const [k, x, y] = a.split(':');
+    if (k === 'td') { this.to = x; return ''; }
+    if (k === 'ts') { this.src = x; return ''; }
+    if (k === 'ti') return this.order(x, +y);
+    if (k === 'tx') return this.sell(this.src, x, +y < 0 ? 1e9 : +y);
+    if (k === 'tw') { const L = this.portLoc(); if (L) { this.g.content.setWaypoint(L.x, L.z, 'Pier 12 Freight Office'); return 'Waypoint set: Pier 12 Freight Office.'; } }
+    if (k === 'lm') return this.buyLandmark(x);
+    return '';
+  }
+  html() {
+    const uw = this.uw, g = this.g, T = this.T, S = uw.S, r = this.rank(), atPort = this.atPort();
+    const stat = (a, b) => `<div class="stat"><span>${a}</span><span>${b}</span></div>`;
+    if (!this.unlocked()) return `<div class="hint">Pier 12 Freight Office moves product by the pallet: imports at a third of the street price, and distributors who buy weight. They only deal with people they have heard of. <b>Reach rank ${UW_RANKS[TRADE_RANK].name} (${UW_RANKS[TRADE_RANK].at} reputation; you have ${g.save.rep}).</b></div><div class="btns"><button class="sbtn" data-act="tw">Waypoint to Pier 12</button></div>`;
+    let h = `<div class="grid4"><div class="tile"><small>Your rank</small><b>${UW_RANKS[r].name}</b><span>orders up to ${this.maxLb().toLocaleString('en-US')} lb (Snow counts ×10, Pharma ×4)</span></div><div class="tile"><small>Distributors today</small><b>${fmtLb(this.leftC())}</b><span>of ${fmtLb(this.capC())} a day</span></div><div class="tile"><small>Imported</small><b>${fmtLb(T.imported)}</b><span>all time</span></div><div class="tile"><small>Exported</small><b>${fmtLb(T.exported)}</b><span>all time</span></div></div>`;
+    // ---- waiting at the pier
+    if (units(T.dock)) h += `<h3>Waiting at Pier 12 <small>${Math.max(0, 3 - (S.day - T.dockDay))} day(s) left</small></h3><div class="card reach"><div class="d">${esc(goodsList(T.dock))} · ${fmtLb(units(T.dock))}</div><div class="d">${atPort ? 'You are at the pier: open <b>Inventory</b> and move it from “Pier 12 freight shed” into your vehicle.' : 'Drive something big enough to the pier, then load it from the Inventory app.'}</div><div class="btns"><button class="sbtn" data-act="tw">Waypoint</button></div></div>`;
+    if (T.orders.length) { const now = uw.runs.absHour(); h += '<h3>On the water</h3><div class="jobs">' + T.orders.map(o => `<div class="job"><i>⚓</i><div><b>${fmtQty(o.good, o.n)} ${GOODS[o.good].name}</b><span>${o.to === 'dock' ? 'to Pier 12' : 'trucked to ' + esc(PROP_BY_ID[o.to] ? PROP_BY_ID[o.to].name : 'a stash')} · in about ${Math.max(1, o.eta - now)} h · paid ${fmtMoney(o.cost)}</span></div></div>`).join('') + '</div>'; }
+    // ---- import
+    const stashes = uw.props.ownedList().filter(d => uw.props.storageCap(d.id));
+    if (this.to !== 'dock' && !stashes.some(d => d.id === this.to)) this.to = 'dock';
+    h += `<h3>Import <small>off the boat at about a third of the street price</small></h3><div class="xsel"><button class="sbtn${this.to === 'dock' ? ' gold' : ''}" data-act="td:dock">Collect at Pier 12<small>free · 12 h · you haul it</small></button>${stashes.map(d => `<button class="sbtn${this.to === d.id ? ' gold' : ''}" data-act="td:${d.id}">Truck to ${esc(d.name)}<small>+8% · 18 h · ${fmtLb(Math.max(0, uw.props.storageFree(d.id)))} free</small></button>`).join('')}</div>`;
+    h += IMPORT_GOODS.filter(k => k !== 'hardware' || r >= 8).map(k => {
+      const pr = this.price(k), sizes = IMPORT_SIZES_LB.filter(lb => lb * (TRADE_W[k] || 1) <= this.maxLb()).slice(-4);
+      return `<div class="xrow"><div class="xh"><span><b style="color:${TIERS[GOODS[k].tier].col}">■</b> <b>${GOODS[k].name}</b> · ${fmtPerUnit(k, pr)}</span><small>street average ${fmtPerUnit(k, this.street(k))}</small></div><div class="xq">${sizes.map(lb => { const n = Math.round(lb * 100 / GOODS[k].size), c = Math.round(n * pr * (this.to === 'dock' ? 1 : 1.08)); return `<button class="sbtn" data-act="ti:${k}:${n}" ${g.save.money < c ? 'disabled' : ''}>${lb.toLocaleString('en-US')} lb<br><small>${fmtShort(c)}</small></button>`; }).join('')}</div></div>`;
+    }).join('');
+    // ---- export
+    const srcs = [];
+    if (atPort) srcs.push(['carry', 'What you brought', '80% of the street', uw.carried()]);
+    for (const d of stashes) if (units(S.storage[d.id])) srcs.push([d.id, d.name, 'collected · 62%', S.storage[d.id]]);
+    if (!srcs.some(x => x[0] === this.src)) this.src = srcs.length ? srcs[0][0] : '';
+    h += `<h3>Sell to distributors <small>${atPort ? 'at the pier' : 'haul it to Pier 12 yourself for 80% instead of 62%'}</small></h3>`;
+    if (!srcs.length) h += '<div class="hint">Nothing to sell: stock a stash, or drive a load to the pier.</div>';
+    else {
+      const cur = srcs.find(x => x[0] === this.src);
+      h += `<div class="xsel">${srcs.map(([id, name, sub]) => `<button class="sbtn${id === this.src ? ' gold' : ''}" data-act="ts:${id}">${esc(name)}<small>${sub}</small></button>`).join('')}</div>`;
+      const goods = GOOD_IDS.filter(k => !GOODS[k].fence && Inv.has(cur[3], k) > 0);
+      h += goods.length ? goods.map(k => {
+        const have = Inv.has(cur[3], k), pr = this.exportPrice(k, cur[0] === 'carry'), fit = Math.floor(this.leftC() / tradeVol(k, 1)), avg = Inv.avg(cur[3], k);
+        const amt = [25, 100, 1000].map(lb => [lb, Math.round(lb * 100 / GOODS[k].size)]).filter(([, n]) => n < have);
+        return `<div class="xrow"><div class="xh"><span><b style="color:${TIERS[GOODS[k].tier].col}">■</b> <b>${GOODS[k].name}</b> · ${fmtQty(k, have)}</span><small>${fmtPerUnit(k, pr)}${avg ? ` · you paid ${fmtPerUnit(k, avg)}` : ''}</small></div><div class="xq">${amt.map(([lb, n]) => `<button class="sbtn" data-act="tx:${k}:${n}" ${fit < 1 ? 'disabled' : ''}>${lb.toLocaleString('en-US')} lb</button>`).join('')}<button class="sbtn gold" data-act="tx:${k}:-1" ${fit < 1 ? 'disabled' : ''}>Max · ${fmtShort(Math.min(have, fit) * pr)}</button></div></div>`;
+      }).join('') : '<div class="hint">Nothing there they buy. (Hot goods go to a fence.)</div>';
+    }
+    return h + '<div class="hint">Distributors move product out of town, so it never floods your own streets. What they take in a day grows with your rank. Big consignments get noticed: police pressure creeps up with volume.</div>';
+  }
+  landmarksHTML() {
+    const g = this.g, T = this.T, r = this.rank();
+    let inc = 0; for (const id in T.landmarks) inc += LANDMARK_BY_ID[id].income;
+    let h = `<div class="hint">The institutions of Port Valen are for sale to anybody with enough money and the name to be taken seriously${r < LANDMARK_RANK ? ` (rank ${UW_RANKS[LANDMARK_RANK].name}; you are a ${UW_RANKS[r].name})` : ''}. Each pays you a cut every day and changes a rule of the city.${inc ? ` Your landmarks pay <b class="money">${fmtMoney(inc)}</b> a day.` : ''}</div><div class="grid2">`;
+    h += LANDMARKS.map(L => { const own = !!T.landmarks[L.id]; return `<div class="card${own ? ' reach' : ''}"><div class="t">${esc(L.name)} ${own ? '<span class="chip" style="--c:#ffd84d">YOURS</span>' : ''}</div><div class="d">${esc(L.desc)}</div><div class="stat"><span>Daily cut</span><span class="money">${L.income ? fmtMoney(L.income) : '—'}</span></div><div class="stat"><span>Changes</span><span>${esc(L.perk)}</span></div>${own ? '' : `<div class="btns"><button class="sbtn gold" data-act="lm:${L.id}" ${g.save.money < L.price || r < LANDMARK_RANK ? 'disabled' : ''}>Buy · ${fmtShort(L.price)}</button></div>`}</div>`; }).join('');
+    return h + '</div>';
+  }
+}
+
+/* ---- the career: six acts, twenty-four chapters. v(g, uw, S) reads progress; n is the target. ---- */
+const stashMaxC = (uw, S) => { let m = 0; for (const d of uw.props.ownedList()) m = Math.max(m, units(S.storage[d.id])); return m; };
+const ownsKind = (uw, kind) => uw.props.ownedList().filter(d => d.kind === kind).length;
+const bestCargoLb = g => { let m = 0; for (const e of g.save.garage) m = Math.max(m, CARGO_LB[e.type] || 0); return m; };
+const CAREER_ACTS = ['Nobody', 'Hustler', 'Crew', 'Territory', 'Power', 'Kingpin'];
+const CAREER = [
+  // ---- Act I
+  { id: 'c1', act: 0, title: 'Light Fingers', brief: 'You stepped off the ferry with nothing. The crowd on the pavement is carrying your first week’s rent. Walk up behind someone and lift their wallet.', goals: [['Pick 3 pockets', (g, uw, S) => S.st.picks, 3]], cash: 150, rep: 15 },
+  { id: 'c2', act: 0, title: 'Hot Property', brief: 'The Saltworks chop shop pays cash for cars and asks nothing. Take one that isn’t yours and drive it into the yard.', goals: [['Sell a stolen car to the chop shop', (g, uw, S) => S.st.chopped, 1]], cash: 300, rep: 20 },
+  { id: 'c3', act: 0, title: 'A Door That Locks', brief: 'You can’t build anything sleeping in stolen cars. Find a room with a lock: somewhere to sleep, save and hide what you carry.', goals: [['Own a safehouse', (g, uw) => ownsKind(uw, 'safehouse'), 1]], cash: 500, rep: 25 },
+  { id: 'c4', act: 0, title: 'First Weight', brief: 'Dockside Sully sells cartons that fell off a container. Buy from a supplier, then find the people on the corners who are buying.', goals: [['Sell 10 lots of product on the street', (g, uw, S) => S.st.sold, 10]], cash: 800, rep: 30 },
+  // ---- Act II
+  { id: 'c5', act: 1, title: 'Wheels', brief: 'A car of your own is a trunk, a getaway and an alibi. Buy one, or park a stolen one in a space that is yours and it stays.', goals: [['Own a car', g => g.save.garage.length, 1]], cash: 1000, rep: 30 },
+  { id: 'c6', act: 1, title: 'Tooled Up', brief: 'The Armorer works out of the Cannery. The people you are about to annoy carry guns. So should you.', goals: [['Own a pistol', g => g.save.weapons.pistol ? 1 : 0, 1]], cash: 1200, rep: 30 },
+  { id: 'c7', act: 1, title: 'Stock Room', brief: 'Prices move. The money is in buying when it is cheap and sitting on it. Put real weight in a stash.', goals: [['Hold 10 lb in one stash', (g, uw, S) => stashMaxC(uw, S) / 100, 10]], cash: 2000, rep: 40 },
+  { id: 'c8', act: 1, title: 'Known Face', brief: 'Names travel. When yours has travelled far enough, the Pier 12 freight office will take your calls.', goals: [['Reach rank Runner', g => rankOf(g.save.rep), TRADE_RANK]], cash: 3000, rep: 0 },
+  // ---- Act III
+  { id: 'c9', act: 2, title: 'Two’s Company', brief: 'You can only stand on one corner. Hire people (Phone › Crew) and keep them paid.', goals: [['Have 2 crew on the payroll', (g, uw, S) => S.crew.filter(c => c.status === 'active').length, 2]], cash: 4000, rep: 60 },
+  { id: 'c10', act: 2, title: 'Corner Office', brief: 'Give one of them a corner. A dealer sells out of your stashes every day while you do something else.', goals: [['Put a dealer on a turf', (g, uw, S) => S.crew.filter(c => c.status === 'active' && c.role === 'dealer' && typeof c.assign === 'number').length, 1]], cash: 5000, rep: 60 },
+  { id: 'c11', act: 2, title: 'Clean Money', brief: 'Cash with no story is evidence. A business gives it one, and pays you every day on top.', goals: [['Own a business', (g, uw) => ownsKind(uw, 'business'), 1]], cash: 8000, rep: 80 },
+  { id: 'c12', act: 2, title: 'Freight', brief: 'Stop buying by the pound. Pier 12 sells by the pallet at a third of the street. Order a consignment and get it home.', goals: [['Import 100 lb through Pier 12', (g, uw, S) => S.trade.imported / 100, 100]], cash: 10000, rep: 100 },
+  // ---- Act IV
+  { id: 'c13', act: 3, title: 'This Corner Is Mine', brief: 'Every block belongs to somebody. Beat a crew on its own corner, put your people there, and it belongs to you.', goals: [['Hold a turf', (g, uw) => uw.playerTurfs(), 1]], cash: 15000, rep: 120 },
+  { id: 'c14', act: 3, title: 'Big Rig', brief: 'A sedan carries 250 lb. A van carries a ton. You are in the haulage business now: buy something that hauls.', goals: [['Own a vehicle that carries 2,000 lb', g => bestCargoLb(g), 2000]], cash: 15000, rep: 80 },
+  { id: 'c15', act: 3, title: 'Bulk', brief: 'A warehouse holds a hundred thousand pounds. Buy one and fill a corner of it.', goals: [['Own a warehouse', (g, uw) => ownsKind(uw, 'warehouse'), 1], ['Hold 1,000 lb in one stash', (g, uw, S) => stashMaxC(uw, S) / 100, 1000]], cash: 40000, rep: 150 },
+  { id: 'c16', act: 3, title: 'Out of Town', brief: 'Your corners can only swallow so much. The distributors at Pier 12 buy weight and take it far away.', goals: [['Export 500 lb to distributors', (g, uw, S) => S.trade.exported / 100, 500]], cash: 50000, rep: 150 },
+  { id: 'c17', act: 3, title: 'Friends in Blue', brief: 'Some of the police can be bought. One on the payroll changes what the rest of them see.', goals: [['Have an officer on your payroll', (g, uw, S) => Object.values(S.cops).filter(c => c.st === 'paid').length, 1]], cash: 30000, rep: 120 },
+  // ---- Act V
+  { id: 'c18', act: 4, title: 'The Vault', brief: 'Valen First National keeps the city’s money behind eighteen inches of steel. The Armorer sells a thermal drill. Bring a gun, a fast car and a plan for four stars.', goals: [['Crack the vault at Valen First National', (g, uw, S) => S.st.vaults || 0, 1]], cash: 250000, rep: 300 },
+  { id: 'c19', act: 4, title: 'Regicide', brief: 'Every crew in this city has a boss who thinks he is untouchable. Walk into a headquarters and prove one of them wrong.', goals: [['Put a faction boss down', (g, uw, S) => S.st.bossesBeaten, 1]], cash: 100000, rep: 200 },
+  { id: 'c20', act: 4, title: 'Eight Corners', brief: 'One corner is a start. Eight is a territory, and people who hold territory get listened to.', goals: [['Hold 8 turfs', (g, uw) => uw.playerTurfs(), 8]], cash: 250000, rep: 300 },
+  { id: 'c21', act: 4, title: 'Tonnage', brief: 'Move real weight. The port measures people in tons.', goals: [['Export 10,000 lb to distributors', (g, uw, S) => S.trade.exported / 100, 10000]], cash: 500000, rep: 300 },
+  // ---- Act VI
+  { id: 'c22', act: 5, title: 'Skyline', brief: 'Live where the city can see you: the penthouse at the top of Valen Tower, or the estate on the point.', goals: [['Own the penthouse or the Crestmoor Estate', (g, uw) => (uw.props.owned('penthouse') || uw.props.owned('mansion')) ? 1 : 0, 1]], cash: 500000, rep: 300 },
+  { id: 'c23', act: 5, title: 'Be the House', brief: 'The institutions of this city are for sale. Start with one. (Phone › Career › Landmarks)', goals: [['Own a landmark', (g, uw, S) => Object.keys(S.trade.landmarks).length, 1]], cash: 5000000, rep: 500 },
+  { id: 'c24', act: 5, title: 'Port Valen Is Yours', brief: 'Run the streets, own the skyline. Then there is nobody left to ask.', goals: [['Become City Kingpin', (g, uw) => uw.stage, 6], ['Own 4 landmarks', (g, uw, S) => Object.keys(S.trade.landmarks).length, 4]], cash: 100000000, rep: 2000 }
+];
+class Career {
+  constructor(uw) { this.uw = uw; this.t = 0; this.cool = 3; this.showT = 0; this.sig = ''; }
+  static fresh() { return { i: 0, done: 0 }; }
+  get g() { return this.uw.g; }
+  get C() { const S = this.uw.S; return S.career || (S.career = Career.fresh()); }
+  current() { return CAREER[this.C.i] || null; }
+  progress(ch) { const g = this.g, uw = this.uw, S = uw.S; return ch.goals.map(([t, v, n]) => { let cur = 0; try { cur = +v(g, uw, S) || 0; } catch { cur = 0; } return { t, cur: Math.min(n, Math.floor(cur)), n, ok: cur >= n }; }); }
+  // the line under the clock: the first goal not met yet
+  hudLine() { const ch = this.current(); if (!ch) return ''; const p = this.progress(ch).find(x => !x.ok); return p ? `${ch.title} · ${p.t}${p.n > 1 ? ` (${p.cur.toLocaleString('en-US')}/${p.n.toLocaleString('en-US')})` : ''}` : ch.title; }
+  update(rdt) {
+    const g = this.g, uw = this.uw;
+    this.showT = Math.max(0, this.showT - rdt);
+    this.t -= rdt; if (this.t > 0) return; this.t = 1;
+    if (g.state !== 'playing' || g.fading || uw.inJail || g.ui.modal) return;
+    // a rank earned since the last look
+    const r = rankOf(g.save.rep), C = this.C;
+    if (C.rank === undefined) C.rank = r;
+    if (r > C.rank) { C.rank = r; g.ui.banner('Rank Up', UW_RANKS[r].name, 'pass', 3); g.audio.play('pass'); uw.news('unknown', `Word on the street: they are calling you a ${UW_RANKS[r].name} now.${r === TRADE_RANK ? ' The Pier 12 freight office will take your calls (Phone › Trade).' : r === LANDMARK_RANK ? ' People who own landmarks will take your money (Phone › Career › Landmarks).' : ' Suppliers will keep more on the shelf for you.'}`); }
+    const ch = this.current(); if (!ch) return;
+    const pr = this.progress(ch), sig = ch.id + pr.map(x => x.cur).join(',');
+    if (sig !== this.sig) { this.sig = sig; this.showT = 12; }
+    this.cool -= 1; if (this.cool > 0) return;
+    if (pr.every(x => x.ok)) this.complete(ch);
+  }
+  complete(ch) {
+    const g = this.g, uw = this.uw, C = this.C;
+    C.i++; C.done = C.i; this.cool = 5; this.sig = '';
+    if (ch.cash) g.addMoney(ch.cash, true);
+    if (ch.rep) uw.addRep(ch.rep, null);
+    const nx = this.current(), actEnd = !nx || nx.act !== ch.act;
+    g.ui.banner(actEnd ? `Act ${ch.act + 1} Complete · ${CAREER_ACTS[ch.act]}` : 'Chapter Complete', `${ch.title} · +${fmtMoney(ch.cash)}`, 'pass', actEnd ? 4.5 : 3);
+    g.audio.play('pass');
+    uw.news('unknown', nx ? `${nx.act !== ch.act ? `Act ${nx.act + 1}: ${CAREER_ACTS[nx.act]}. ` : ''}${nx.title}: ${nx.brief}` : 'There is nobody left above you. Port Valen is yours. Keep it.');
+    g.autosave('Chapter complete');
+  }
+  html() {
+    const g = this.g, C = this.C, r = rankOf(g.save.rep), R = UW_RANKS[r], nxR = UW_RANKS[r + 1], ch = this.current();
+    let h = `<div class="grid2"><div class="card"><div class="t">Rank · ${R.name}</div><div class="d">${nxR ? `${g.save.rep.toLocaleString('en-US')} / ${nxR.at.toLocaleString('en-US')} reputation to ${nxR.name}` : 'The top of the ladder.'}</div>${this.uw.ui.bar(g.save.rep - R.at, nxR ? nxR.at - R.at : 1, '#d28cff')}<div class="d" style="font-size:11px">Everything you do on the wrong side of the law earns reputation. Rank stocks the suppliers deeper, opens Pier 12 (${UW_RANKS[TRADE_RANK].name}) and the landmarks (${UW_RANKS[LANDMARK_RANK].name}), and raises what you can import and export.</div></div>`;
+    h += `<div class="card"><div class="t">The Climb</div><div class="d">${C.i} of ${CAREER.length} chapters · Act ${ch ? ch.act + 1 : 6}: ${CAREER_ACTS[ch ? ch.act : 5]}</div>${this.uw.ui.bar(C.i, CAREER.length, '#ffb547')}</div></div>`;
+    if (ch) {
+      const pr = this.progress(ch);
+      h += `<h3>Now · ${esc(ch.title)}</h3><div class="card reach"><div class="d">${esc(ch.brief)}</div>${pr.map(p => `<div class="stat"><span>${p.ok ? '✓' : '○'} ${esc(p.t)}</span><span>${p.cur.toLocaleString('en-US')} / ${p.n.toLocaleString('en-US')}</span></div>${this.uw.ui.bar(p.cur, p.n, p.ok ? 'var(--green)' : 'var(--amber)')}`).join('')}<div class="stat"><span>Reward</span><span class="money">${fmtMoney(ch.cash)}${ch.rep ? ` · +${ch.rep} rep` : ''}</span></div></div>`;
+    } else h += '<div class="hint">Every chapter is done. The city is yours.</div>';
+    h += '<h3>Chapters</h3>' + CAREER_ACTS.map((name, a) => `<div class="stats"><span><b>Act ${a + 1} · ${name}</b></span><span></span>${CAREER.map((c, i) => c.act === a ? `<span>${i < C.i ? '✓' : i === C.i ? '▸' : '·'} ${i <= C.i ? esc(c.title) : '???'}</span><span>${i < C.i ? 'done' : i === C.i ? 'current' : ''}</span>` : '').join('')}</div>`).join('');
+    return h;
+  }
+}
+
+/* ---- Valen First National: a dynamic interior behind a door in the Financial District ---- */
+const BANK = { tellerCD: 3, vaultCD: 14, drill: 25000 };
+function bankInteriorDef(door) {
+  const W = 16, D = 14, H = 4.2, hw = W / 2, hd = D / 2;
+  return {
+    id: 'bank', dynamic: true, name: 'Valen First National', w: W, d: D, h: H, seed: 77, floorY: IY - 16, bank: true,
+    exit: { x: 0, z: hd - 0.6 }, spawnH: Math.PI, place: null, at: { x: door.x, z: door.z }, door: { x: door.x, z: door.z, h: door.h },
+    build(k) {
+      k.room(W, D, H, { floor: 0xcfc8b8, wall: 0xe8e2d4, ceil: 0xf2efe8, trim: 0x2a3a34, lights: [3, 2], lightC: 0xfff4e0 });
+      k.tiles(W, D, 0xd8d2c4, 0xc4bdaa, 2);
+      k.door(0, hd - 0.02, 0);
+      // the teller line: a long counter with glass, three windows
+      k.box(0, 0, -1.2, W - 4, 1.1, 0.8, 0x3a2a1e, { col: true }); k.box(0, 1.1, -1.2, W - 3.8, 0.06, 0.9, 0x1f4a3a);
+      for (let i = 0; i < 3; i++) { const x = -4 + i * 4; k.glow(x, 1.2, -1.2, 1.6, 1.0, 0.03, 0xbfe8dc, 0.9); k.box(x - 1.0, 1.16, -1.2, 0.08, 1.1, 0.5, 0x2a3a34); k.box(x + 1.0, 1.16, -1.2, 0.08, 1.1, 0.5, 0x2a3a34); k.box(x, 1.16, -0.86, 0.5, 0.04, 0.3, 0xd8a227); }
+      // partitions closing off the back, with the vault in the middle of the rear wall
+      k.box(-hw + 1.0, 0, -1.2, 2.0, H, 0.2, 0xd8d2c4, { col: true }); k.box(hw - 1.0, 0, -1.2, 2.0, H, 0.2, 0xd8d2c4, { col: true });
+      k.box(0, 0, -hd + 0.5, 3.4, 3.2, 0.8, 0x6a7076, { col: true }); k.box(0, 0.2, -hd + 0.95, 2.6, 2.7, 0.12, 0x9ea4aa);
+      k.box(0, 1.35, -hd + 1.05, 0.9, 0.9, 0.1, 0x3a3e44); k.box(0, 1.72, -hd + 1.12, 0.12, 0.16, 0.08, 0xd8a227); k.glow(1.5, 2.2, -hd + 0.96, 0.16, 0.16, 0.04, 0xff4d5e, 2.4);
+      // the public side: queue rail, writing desks, sofas, plants, the guard's podium, a flag of brass on the wall
+      for (let i = 0; i < 4; i++) k.box(-3 + i * 2, 0, 1.6, 0.08, 0.95, 0.08, 0xd8a227, { col: i % 3 === 0 });
+      k.box(0, 0.9, 1.6, 6.1, 0.05, 0.05, 0x7a1e2a);
+      FURN.desk(k, -hw + 1.6, 0, 3.4, 1, 1.4, false, 0x3a2a1e); FURN.desk(k, hw - 1.6, 0, 3.4, 3, 1.4, false, 0x3a2a1e);
+      FURN.sofa(k, -hw + 1.2, 0, 0.6, 1, 2.2, 0x1f4a3a); FURN.plant(k, -hw + 0.8, 0, 5.6, 1.1); FURN.plant(k, hw - 0.8, 0, 5.6, 1.1);
+      k.box(hw - 2.2, 0, 5.2, 0.7, 1.1, 0.5, 0x2a3a34, { col: true });
+      k.glow(0, 3.2, -1.16, 5.2, 0.5, 0.03, 0xd8a227, 1.3);
+      // behind the counter: desks, a trolley of deposit bags
+      FURN.desk(k, -4.4, 0, -3.6, 0, 1.4, true, 0x3a2a1e); FURN.desk(k, 4.4, 0, -3.6, 0, 1.4, true, 0x3a2a1e);
+      k.crate(-2.6, -5.6, 0.5, 0x8a7a5a, 2); k.crate(2.8, -5.6, 0.5, 0x8a7a5a, 1);
+    },
+    spots: [
+      { id: 'bk:tellers', x: 0, z: -0.1, r: 1.3, label: 'Hold up the tellers' },
+      { id: 'bk:gate', x: -hw + 2.6, z: -0.6, r: 1.0, label: 'Vault the counter (to the back)' },
+      { id: 'bk:back', x: -hw + 2.6, z: -2.4, r: 1.0, label: 'Back over the counter' },
+      { id: 'bk:vault', x: 0, z: -hd + 2.0, r: 1.4, label: 'Drill the vault' },
+      { id: 'exit', x: 0, z: hd - 0.9, r: 1.1, label: 'Leave' }
+    ],
+    noExit: true,
+    npcs: [{ id: 'teller1', x: -4, z: -2.0, h: 0, look: { shirt: 0xe8e4da, pants: 0x2a3a34 } }, { id: 'teller2', x: 0, z: -2.0, h: 0, look: { shirt: 0xd8e4ec, pants: 0x2a2a2e } }, { id: 'teller3', x: 4, z: -2.0, h: 0, look: { shirt: 0xe8e4da, pants: 0x3a2a1e } },
+      { id: 'bankguard', x: hw - 2.2, z: 4.4, h: Math.PI * 1.5, look: 'cop' }]
+  };
+}
+class Bank {
+  constructor(uw) { this.uw = uw; }
+  get g() { return this.uw.g; }
+  get B() { const S = this.uw.S; return S.bank || (S.bank = { teller: -99, vault: -99 }); }
+  loc() { return this.uw.loc('spot', 'bank'); }
+  enter() {
+    const g = this.g, L = this.loc(); if (!L) return;
+    if (g.police.level > 0) { g.content.deny('The doors lock when there are sirens outside.'); return; }
+    const def = g.content.interiors.addDynamic(bankInteriorDef(L));
+    g.content.interiors.enter(def.id);
+  }
+  alarm(stars) { const g = this.g, L = this.loc(); g.police.crime('robbery', L.x, L.z); if (g.police.level < stars) g.police.setLevel(stars); g.audio.play('buzzer'); g.ui.toast('The alarm is ringing at the precinct. Every car in the district is coming.', 'warn'); }
+  hop(dz) { const g = this.g, def = g.content.interiors.cur, p = g.player; if (!def) return; p.pos.set(def.ox - def.w / 2 + 2.6, def.fy, def.oz + dz); p.vel.set(0, 0, 0); g.audio.play('ui'); }
+  spot(id) {
+    const g = this.g, uw = this.uw, S = uw.S, B = this.B, C = g.content, armed = g.player.wep && !g.player.wep.melee;
+    if (id === 'bk:gate') { if (!B.hot || B.hot !== S.day) { C.say('Teller', 'Sir? Sir! You can’t come back here!'); this.alarm(3); B.hot = S.day; } this.hop(-2.4); return; }
+    if (id === 'bk:back') { this.hop(0.1); return; }
+    if (id === 'bk:tellers') {
+      if (!armed) { C.say('Teller', pick(['Next, please.', 'Do you have an account with us?', 'The queue starts behind the rope, sir.'])); g.ui.toast('Draw a gun to hold up the tellers.', 'warn'); return; }
+      if (S.day - B.teller < BANK.tellerCD) { g.ui.toast('The drawers are empty: head office hasn’t restocked the branch since the last robbery.', 'warn'); return; }
+      C.channel('THE TELLERS EMPTY THEIR DRAWERS', 5, () => {
+        B.teller = S.day; B.hot = S.day;
+        const cash = randi(40, 90) * 1000; g.addMoney(cash, true); g.audio.play('cash');
+        g.save.stats.robberies = (g.save.stats.robberies || 0) + 1; S.st.bankJobs = (S.st.bankJobs || 0) + 1;
+        uw.addRep(60, 'bank robbery'); C.say('Teller', 'That’s all of it! Please, that’s everything in the drawers!');
+        g.ui.toast(`The drawers: ${fmtMoney(cash)}.`, 'money');
+        this.alarm(3);
+      });
+      return;
+    }
+    if (id === 'bk:vault') {
+      if (S.day - B.vault < BANK.vaultCD) { g.ui.toast(`The vault is empty. The armoured truck refills it in ${BANK.vaultCD - (S.day - B.vault)} day(s).`, 'warn'); return; }
+      if (!(S.flags.drill > 0)) { g.ui.toast(`Eighteen inches of steel. You need a thermal drill: the Armorer sells one (${fmtMoney(BANK.drill)}).`, 'warn'); return; }
+      this.alarm(4); B.hot = S.day;
+      C.channel('DRILLING THE VAULT', 30, () => {
+        S.flags.drill = Math.max(0, (S.flags.drill | 0) - 1); B.vault = S.day;
+        const crew = uw.crew.bodyguards().length, cash = Math.round(randi(2500, 6000) * 1000 * (1 + crew * 0.1));
+        g.addMoney(cash, true); g.audio.play('cash');
+        const got = uw.give({ hot: randi(4, 9) }, 'robbery');
+        S.st.vaults = (S.st.vaults || 0) + 1; S.st.bankJobs = (S.st.bankJobs || 0) + 1; g.save.stats.robberies = (g.save.stats.robberies || 0) + 1;
+        S.infamy = Math.min(400, S.infamy + 25); S.pressure = clamp(S.pressure + 10, 0, 100);
+        uw.addRep(400, null);
+        g.ui.banner('The Vault', fmtMoney(cash), 'pass', 4.5);
+        g.ui.toast(`Deposit bags: ${fmtMoney(cash)}${got ? ' and ' + goodsList(got) + ' from the boxes' : ''}${crew ? ` · your crew carried ${crew * 10}% more` : ''}. Now get out.`, 'money');
+        uw.news('pv', `Valen Courier: VAULT EMPTIED AT FIRST NATIONAL. Police say the thieves “knew exactly what they were doing”. ${fmtMoney(cash)} is missing.`);
+        if (g.police.level < 4) g.police.setLevel(4);
+      }, { r: 2.2 });
+    }
+  }
+}
+
+/* =====================================================================
    [UNDERWORLD] EMPIRE UI: the phone (overview, territory map, crew, assets,
    market, stash, factions, police, feed), every street menu (property,
    supplier, armorer, fence, deal corner, boss sit-down, chop shop), the
@@ -50507,6 +50926,8 @@ function uw_toastOnce(uw, text) { const g = uw.g; if (g.time - (uw._lastT || 0) 
    ===================================================================== */
 // the phone: apps on a home screen, each with one or a few pages (tabs). 'go' apps leave the phone.
 const PHONE_APPS = [
+  { id: 'career', name: 'Career', icon: '🏆', col: '#ffb547', cat: 'BUSINESS', sub: 'rank · the climb', tabs: [['career', 'The Climb'], ['legacy', 'Landmarks']] },
+  { id: 'trade', name: 'Trade', icon: '⚓', col: '#4d8dff', cat: 'BUSINESS', sub: 'import · export', tabs: [['trade', 'Pier 12']] },
   { id: 'empire', name: 'Empire', icon: '👑', col: '#ffb547', cat: 'BUSINESS', sub: 'turf · rivals', tabs: [['overview', 'Overview'], ['map', 'Territory'], ['factions', 'Factions']] },
   { id: 'market', name: 'Market', icon: '📈', col: '#7fe08f', cat: 'BUSINESS', sub: 'cost · profit', tabs: [['pnl', 'My stock'], ['market', 'Prices']] },
   { id: 'connect', name: 'Street Connect', icon: '🤝', col: '#d28cff', cat: 'BUSINESS', sub: 'buy · sell', tabs: [['connect', 'Contacts']] },
@@ -50705,7 +51126,7 @@ class EmpireUI {
       const guns = ARMORY_GUNS.filter(gid => s.weapons[gid] && s.wloc[gid] === d.id).map(gid => WEAPONS.find(w => w.id === gid).name);
       const ammo = ws ? Object.keys(ws.ammo).filter(k => ws.ammo[k] > 0).map(k => `${ws.ammo[k]} ${WEAPONS.find(w => w.id === k).ammoName}`) : [];
       return `<div class="card"><div class="t">${esc(d.name)} <span class="chip" style="--c:#c9a46b">${LOC_CLASS[d.kind] || 'PROPERTY'}</span></div><div class="d">${esc(ZONES[L.zone].name)}</div>
-        <div class="stat"><span>Space</span><span>${units(o)} / ${d.storage}</span></div>${this.bar(units(o), d.storage)}
+        <div class="stat"><span>Stash</span><span>${fmtLb(units(o))} / ${fmtLb(uw.props.storageCap(d.id))}</span></div>${this.bar(units(o), uw.props.storageCap(d.id))}
         ${rows.length ? rows.map(r => `<div class="stat"><span>${GOODS[r.k].name} · ${fmtQty(r.k, r.n)}</span><span>${fmtMoney(r.value)}</span></div>`).join('') : '<div class="d">No product.</div>'}
         <div class="stat"><span>Guns</span><span>${guns.length ? esc(guns.join(', ')) : 'none'}</span></div>
         <div class="stat"><span>Rounds</span><span>${ammo.length ? esc(ammo.join(' · ')) : 'none'}</span></div>
@@ -50823,7 +51244,7 @@ class EmpireUI {
     for (const L of uw.locs) {
       if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : 'W');
       else if (L.kind === 'hq' && !S.factions[L.id].broken) icon(L.x, L.z, FACTIONS[L.id].col, '♛');
-      else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : 'S');
+      else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : L.def.port ? 'P' : L.def.bank ? '$' : 'S');
     }
     const pd = this.g.world.places.police.door; icon(pd.x, pd.z, '#4d8dff', 'P');
   }
@@ -50868,7 +51289,7 @@ class EmpireUI {
     const zones = [...new Set(PROPS.filter(d => d.kind !== 'business').map(d => (uw.loc('prop', d.id) || {}).zone).filter(Boolean))];
     const owned = PROPS.filter(d => d.kind !== 'business' && PM.owned(d.id));
     let h = `<div class="tiles"><div class="tile"><small>Homes owned</small><b>${owned.filter(d => d.kind === 'safehouse').length} / ${PROPS.filter(d => d.kind === 'safehouse').length}</b></div><div class="tile"><small>Parking</small><b>${PM.garageCap()}</b><span>spaces</span></div><div class="tile"><small>Crew room</small><b>${uw.crew.cap()}</b></div></div>`;
-    h += `<div class="filt">${opts('own', [['all', 'All'], ['owned', 'Owned'], ['sale', 'For sale']], f.own)}${opts('zone', [['all', 'Every district'], ...zones.map(z => [z, ZONES[z].name])], f.zone)}${opts('tier', [['all', 'Any tier'], ['1', 'Rooms & bedsits'], ['2', 'Apartments & starters'], ['3', 'Houses'], ['4', 'Upscale'], ['5', 'Luxury'], ['6', 'Penthouse & estate'], ['sig', 'Signature homes'], ['other', 'Garages & warehouses']], f.tier)}${opts('need', [['any', 'Any parking/storage'], ['g2', '2+ parking'], ['g3', '3+ parking'], ['s100', '100+ storage'], ['s300', '300+ storage']], f.need)}${opts('sort', [['price', 'Price ↑'], ['price-', 'Price ↓'], ['tier', 'Tier'], ['name', 'Name'], ['zone', 'District']], f.sort)}<input id="propSearch" class="search" type="search" placeholder="Search name, street, district" value="${esc(f.q)}" autocomplete="off"></div>`;
+    h += `<div class="filt">${opts('own', [['all', 'All'], ['owned', 'Owned'], ['sale', 'For sale']], f.own)}${opts('zone', [['all', 'Every district'], ...zones.map(z => [z, ZONES[z].name])], f.zone)}${opts('tier', [['all', 'Any tier'], ['1', 'Rooms & bedsits'], ['2', 'Apartments & starters'], ['3', 'Houses'], ['4', 'Upscale'], ['5', 'Luxury'], ['6', 'Penthouse & estate'], ['sig', 'Signature homes'], ['other', 'Garages & warehouses']], f.tier)}${opts('need', [['any', 'Any parking/storage'], ['g2', '2+ parking'], ['g3', '3+ parking'], ['s500', '500+ lb stash'], ['s5000', '5,000+ lb stash']], f.need)}${opts('sort', [['price', 'Price ↑'], ['price-', 'Price ↓'], ['tier', 'Tier'], ['name', 'Name'], ['zone', 'District']], f.sort)}<input id="propSearch" class="search" type="search" placeholder="Search name, street, district" value="${esc(f.q)}" autocomplete="off"></div>`;
     return h + `<div id="propList">${this.propListHTML()}</div>`;
   }
   propListHTML() {
@@ -50878,7 +51299,7 @@ class EmpireUI {
     if (f.own === 'owned') list = list.filter(x => x.own); else if (f.own === 'sale') list = list.filter(x => !x.own);
     if (f.zone !== 'all') list = list.filter(x => x.L.zone === f.zone);
     if (f.tier === 'sig') list = list.filter(x => x.d.sig); else if (f.tier === 'other') list = list.filter(x => x.d.kind !== 'safehouse'); else if (f.tier !== 'all') list = list.filter(x => String(x.d.tier) === f.tier);
-    if (f.need !== 'any') { const n = +f.need.slice(1); list = list.filter(x => f.need[0] === 'g' ? PM.capOf(x.d) >= n : PM.storageCap(x.d.id) >= n); }
+    if (f.need !== 'any') { const n = +f.need.slice(1); list = list.filter(x => f.need[0] === 'g' ? PM.capOf(x.d) >= n : PM.storageLb(x.d) >= n); }
     if (q) list = list.filter(x => (x.d.name + ' ' + (x.d.type || '') + ' ' + ZONES[x.L.zone].name + ' ' + (x.d.kind)).toLowerCase().includes(q));
     const by = { price: (a, b) => a.d.price - b.d.price, 'price-': (a, b) => b.d.price - a.d.price, tier: (a, b) => (a.d.tier || 0) - (b.d.tier || 0) || a.d.price - b.d.price, name: (a, b) => a.d.name.localeCompare(b.d.name), zone: (a, b) => ZONES[a.L.zone].name.localeCompare(ZONES[b.L.zone].name) || a.d.price - b.d.price }[f.sort] || ((a, b) => a.d.price - b.d.price);
     // the default view puts what you own first; an explicit sort is honoured as asked
@@ -50886,9 +51307,9 @@ class EmpireUI {
     if (!list.length) return '<div class="hint">Nothing matches. Try another filter.</div>';
     return `<div class="hint" style="margin:4px 0">${list.length} propert${list.length === 1 ? 'y' : 'ies'}</div><div class="grid2">` + list.map(({ d, L, own }) => {
       const o = S.props[d.id] || {}, hood = d.kind === 'safehouse' ? HOOD[L.zone] : null;
-      const facts = [d.type || d.kind, d.finish ? d.finish + ' finish' : '', PM.capOf(d) ? PM.parkingText(d) : 'no parking', PM.storageCap(d.id) ? PM.storageCap(d.id) + ' storage' : '', d.crew ? `${d.crew} crew` : '', d.sec ? `security ${d.sec}/5` : '', d.infl ? `+${d.infl} influence` : ''].filter(Boolean).join(' · ');
+      const facts = [d.type || d.kind, d.finish ? d.finish + ' finish' : '', PM.capOf(d) ? PM.parkingText(d) : 'no parking', PM.storageCap(d.id) ? fmtLb(PM.storageCap(d.id)) + ' stash' : '', d.crew ? `${d.crew} crew` : '', d.sec ? `security ${d.sec}/5` : '', d.infl ? `+${d.infl} influence` : ''].filter(Boolean).join(' · ');
       return `<div class="card${own ? ' own' : ''}"><div class="t">${esc(d.name)} ${d.sig ? '<span class="chip" style="--c:#ffd84d">SIGNATURE</span>' : ''}${own ? '<span class="chip" style="--c:#8fe39b">YOURS</span>' : ''}</div><div class="d">${esc(ZONES[L.zone].name)}${d.tier ? ' · tier ' + d.tier : ''} · ${esc(facts)}</div>${hood ? `<div class="d" style="font-size:11px;color:var(--teal)">${esc(hood.perk)}</div>` : ''}
-        ${own && PM.storageCap(d.id) ? `<div class="stat"><span>Stash</span><span>${units(S.storage[d.id])} / ${PM.storageCap(d.id)}</span></div>` : ''}${o.dmg ? `<div class="stat" style="color:var(--red)"><span>Damaged</span><span><button class="sbtn gold" data-act="repair:${d.id}">Repair ${fmtMoney(PM.repairCost(d))}</button></span></div>` : ''}
+        ${own && PM.storageCap(d.id) ? `<div class="stat"><span>Stash</span><span>${fmtLb(units(S.storage[d.id]))} / ${fmtLb(PM.storageCap(d.id))}</span></div>` : ''}${o.dmg ? `<div class="stat" style="color:var(--red)"><span>Damaged</span><span><button class="sbtn gold" data-act="repair:${d.id}">Repair ${fmtMoney(PM.repairCost(d))}</button></span></div>` : ''}
         <div class="stat"><span>${own ? 'Bought for' : 'Price'}</span><span class="money">${fmtMoney(own ? d.price : PM.price(d))}</span></div><div class="btns">${this.wpBtn(L.x, L.z, d.name)}</div></div>`;
     }).join('') + '</div>';
   }
@@ -50949,7 +51370,7 @@ class EmpireUI {
     const uw = this.uw, S = uw.S, M = uw.market;
     const locs = uw.locations({ all: true }), near = locs.filter(L => L.here);
     const ek = k => k.replace(/:/g, '~');
-    const spaceTxt = L => L.lb ? `${fmtLb(cargoC(L.o))} / ${fmtLb(L.capC)}` : `${units(L.o)} / ${L.cap} space`;
+    const spaceTxt = L => L.lb ? `${fmtLb(cargoC(L.o))} / ${fmtLb(L.capC)}` : `${fmtLb(units(L.o))} / ${fmtLb(L.cap)}`;
     let tv = 0, tc = 0, h = '';
     // ---- transfers
     const X = this.xfer || (this.xfer = { from: 'inv', to: '' });
@@ -50976,7 +51397,7 @@ class EmpireUI {
     for (const cls of LOC_ORDER) {
       const list = locs.filter(L => L.cls === cls);
       h += `<h3 style="font-size:12px;opacity:.85">${cls}</h3>`;
-      if (!list.length) { h += `<div class="hint">${cls === 'VEHICLE' ? 'No car with you. Stand near your car (or sit in it) to use its trunk.' : cls === 'ON PERSON' ? '' : cls === 'WAREHOUSE' ? 'No warehouse yet: the biggest storage in the game (600-900 space). For sale on the Property app.' : 'None owned.'}</div>`; continue; }
+      if (!list.length) { h += `<div class="hint">${cls === 'VEHICLE' ? 'No car with you. Stand near your car (or sit in it) to use its trunk.' : cls === 'ON PERSON' ? '' : cls === 'WAREHOUSE' ? 'No warehouse yet: the biggest storage in the game (100,000-150,000 lb). For sale on the Property app.' : 'None owned.'}</div>`; continue; }
       h += '<div class="grid2">' + list.map(L => {
         const rows = holdings(L.o, L.zone, M); let v = 0, c = 0; for (const r of rows) { v += r.value; c += r.cost; }
         tv += v; tc += c;
@@ -50988,6 +51409,13 @@ class EmpireUI {
     const runs = S.runs.reduce((a, r) => a + r.cost, 0);
     const head = `<div class="grid4"><div class="tile"><small>Product value now</small><b class="money">${fmtMoney(tv)}</b><span>at local street prices</span></div><div class="tile"><small>Cost basis</small><b>${fmtMoney(tc)}</b><span>what you paid</span></div><div class="tile"><small>Unrealised P/L</small><b style="color:${tv - tc >= 0 ? 'var(--green)' : 'var(--red)'}">${tv - tc >= 0 ? '+' : '−'}${fmtMoney(Math.abs(tv - tc))}</b></div><div class="tile"><small>Realised P/L (all time)</small><b style="color:${(S.st.realized || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(S.st.realized || 0) >= 0 ? '+' : '−'}${fmtMoney(Math.abs(S.st.realized || 0))}</b>${S.runs.length ? `<span>${S.runs.length} run(s) in transit (cost ${fmtMoney(runs)})</span>` : ''}</div></div>`;
     return head + h + '<div class="hint">Moves happen by hand, only between places within reach. Prices move; quantities and what you paid never do. Carried product adds to your sentence if you’re arrested.</div>';
+  }
+  t_career() { return this.uw.career.html(); }
+  t_legacy() { return this.uw.trade.landmarksHTML(); }
+  t_trade() { return this.uw.trade.html(); }
+  openPort() {
+    const uw = this.uw, g = this.g;
+    g.content.openSvc('Pier 12 Freight Office', '“Paperwork is extra. You don’t want paperwork.”', () => uw.trade.html(), a => { if (a === 'tw') return; const r = uw.trade.act(a); g.saveGame(); g.content.refreshSvc(r); });
   }
   t_loadout() {
     const uw = this.uw;
@@ -51018,7 +51446,7 @@ class EmpireUI {
       const room = d.to ? R.freeAt(d.to) : 0;
       h += `<div class="card"><div class="t">New delivery</div>
         <div class="stat"><span>Pickup</span></div>${origins.length ? sel('from', origins, d.from) : '<div class="d">No stash has product in it.</div>'}
-        <div class="stat"><span>Destination</span><span>${d.to ? `${room} space free` : ''}</span></div>${dests.length ? sel('to', dests.map(p => [p.id, p.name]), d.to) : '<div class="d">You need a second property with a stash.</div>'}
+        <div class="stat"><span>Destination</span><span>${d.to ? `${fmtLb(room)} free` : ''}</span></div>${dests.length ? sel('to', dests.map(p => [p.id, p.name]), d.to) : '<div class="d">You need a second property with a stash.</div>'}
         <div class="stat"><span>Product</span></div>${goods.length ? sel('good', goods.map(k => [k, `${GOODS[k].name} · ${fmtQty(k, Inv.has(src, k))} there`]), d.good) : '<div class="d">—</div>'}
         <div class="stat"><span>Quantity</span></div>${amounts.length ? sel('n', amounts.map(n => [n, fmtQty(d.good, n) + (n === have ? ' (all)' : '')]), d.n) : '<div class="d">—</div>'}
         <div class="stat"><span>Runner</span></div>${crew.length ? sel('crew', crew.map(c => [c.id, `${uw.crew.displayName(c)} · ${R.band(c)[1]} · skill ${Math.round(c.skill)} · loyalty ${Math.round(c.loyalty)}`]), d.crew) : '<div class="d">Everyone is busy.</div>'}
@@ -51086,6 +51514,8 @@ class EmpireUI {
     switch (k) {
       case 'wp': { const label = decodeURIComponent(z || 'Waypoint'), key = decodeURIComponent(w || ''); g.content.setWaypoint(+x, +y, label); if (key) g.content.waypoint.key = key; r = `Waypoint set: ${label}. Follow the arrow or the GPS line.`; break; }
       case 'pk': this.pnlSel = this.pnlSel === x ? null : x; this.render(); return;
+      case 'td': case 'ts': uw.trade.act(a); this.render(); return;
+      case 'ti': case 'tx': case 'tw': case 'lm': r = uw.trade.act(a); break;
       case 'xf': { const X = this.xfer || (this.xfer = { from: 'inv', to: '' }), key = (y || '').replace(/~/g, ':'); if (x === 'swap') { const t = X.from; X.from = X.to || t; X.to = t; } else if (x === 'from') { if (X.to === key) X.to = X.from; X.from = key; } else if (x === 'to') X.to = key; this.render(); return; }
       case 'xm': { const X = this.xfer || {}, n = +y, src = uw.locations().find(L => L.key === X.from && L.here); if (!GOODS[x] || !src) break; const moved = uw.transfer(X.from, X.to, x, n < 0 ? Inv.has(src.o, x) : n); const dst = uw.locations().find(L => L.key === X.to); r = moved ? `Moved ${fmtQty(x, moved)} ${GOODS[x].name} to ${dst ? dst.name : 'there'}.` : 'No room there.'; break; }
       case 'cc': if (x === 'good' || x === 'role') this.cc[x] = y; this.render(); return;
@@ -51121,11 +51551,11 @@ class EmpireUI {
         const extra = (d.kind === 'safehouse' ? `<div class="stats">${d.finish ? `<span>Finish</span><span>${d.finish}</span>` : ''}${d.sec ? `<span>Security</span><span>${'■'.repeat(d.sec)}${'□'.repeat(5 - d.sec)}</span>` : ''}${d.crew ? `<span>Crew room</span><span>${d.crew}</span>` : ''}${d.infl ? `<span>Prestige</span><span>+${d.infl} influence</span>` : ''}${H0 ? `<span>${esc(H0.name)}</span><span>${esc(H0.perk)}</span>` : ''}${d.sig ? '<span>Signature home</span><span>the finest house in the neighbourhood</span>' : ''}</div>` : '')
           + (C0 ? `<div class="stats"><span>Category</span><span>${C0.icon} ${C0.name}</span><span>Income</span><span>about ${fmtMoney(PM.bizPreview(d).net)}/day after costs</span><span>Benefit</span><span>${esc(C0.benefit(C0.lv[0]))}</span><span>Upgrades</span><span>to level 2 ${fmtMoney(bizUpgradeCost(d, 1))} · to level 3 ${fmtMoney(bizUpgradeCost(d, 2))}</span></div>` : '');
         return `<div class="svcTop"><span>${d.kind.toUpperCase()}</span><span>${esc(ZONES[z0].name)}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>${extra}
-          <div class="hint">${esc(d.desc)}</div><div class="stats">${d.storage ? `<span>Storage</span><span>${d.storage} units</span>` : ''}${PM.capOf(d) ? `<span>Parking</span><span>${esc(PM.parkingText(d))}</span>` : ''}${d.tier ? `<span>Tier</span><span>${d.tier} of 6 · ${esc(d.type || '')}</span>` : ''}${d.crew ? `<span>Room for crew</span><span>+${d.crew}</span>` : ''}${d.income ? `<span>Income</span><span>~${fmtMoney(d.income)} / day</span>` : ''}${d.kind === 'safehouse' ? '<span>Safehouse</span><span>save, rest, wardrobe</span>' : ''}${d.launder ? '<span>Front</span><span>cools police pressure</span>' : ''}${d.fence ? '<span>Fence</span><span>better prices on hot goods</span>' : ''}${d.recruit ? '<span>Recruiting</span><span>better candidates</span>' : ''}</div>
+          <div class="hint">${esc(d.desc)}</div><div class="stats">${d.storage ? `<span>Storage</span><span>${fmtLb(PM.storageLb(d) * 100)}</span>` : ''}${PM.capOf(d) ? `<span>Parking</span><span>${esc(PM.parkingText(d))}</span>` : ''}${d.tier ? `<span>Tier</span><span>${d.tier} of 6 · ${esc(d.type || '')}</span>` : ''}${d.crew ? `<span>Room for crew</span><span>+${d.crew}</span>` : ''}${d.income ? `<span>Income</span><span>~${fmtMoney(d.income)} / day</span>` : ''}${d.kind === 'safehouse' ? '<span>Safehouse</span><span>save, rest, wardrobe</span>' : ''}${d.launder ? '<span>Front</span><span>cools police pressure</span>' : ''}${d.fence ? '<span>Fence</span><span>better prices on hot goods</span>' : ''}${d.recruit ? '<span>Recruiting</span><span>better candidates</span>' : ''}</div>
           <div class="actions" style="justify-content:flex-start"><button class="sbtn gold" data-act="buy" ${g.save.money < PM.price(d) ? 'disabled' : ''}>Buy · ${fmtMoney(PM.price(d))}</button>${d.home ? '<button class="sbtn" data-act="view">Look inside</button><button class="sbtn danger" data-act="breakin">Break in</button>' : ''}${d.fence ? '<button class="sbtn" data-act="fence">Sell to Lucky (fence)</button>' : ''}</div>`;
       }
       const o = S.props[id];
-      let h = `<div class="svcTop"><span>${d.kind.toUpperCase()} · yours</span>${PM.storageCap(id) ? `<span>Storage <b>${units(S.storage[id])} / ${PM.storageCap(id)}</b></span>` : ''}<span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>`;
+      let h = `<div class="svcTop"><span>${d.kind.toUpperCase()} · yours</span>${PM.storageCap(id) ? `<span>Storage <b>${fmtLb(units(S.storage[id]))} / ${fmtLb(PM.storageCap(id))}</b></span>` : ''}<span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>`;
       if (d.kind === 'business' && d.cat) h += this.bizCard(d, true);
       h += '<div class="btns">';
       if (d.kind === 'safehouse') h += `<button class="sbtn gold" data-act="save">Save game</button><button class="sbtn" data-act="sleep">Sleep / lie low</button><button class="sbtn" data-act="wardrobe">Wardrobe</button>`;
@@ -51151,7 +51581,7 @@ class EmpireUI {
     const uw = this.uw, S = uw.S, v = uw.nearVehicle(), st = S.storage[id] || (S.storage[id] = {}), d = PROP_BY_ID[id];
     const L = uw.loc('prop', id), z = L ? L.zone : 'm';
     const rows = GOOD_IDS.filter(k => Inv.has(S.inv, k) + (v ? Inv.has(v.trunk, k) : 0) + Inv.has(st, k) > 0);
-    let h = `<h3>Product stash <small>${esc(LOC_CLASS[d.kind] || 'PROPERTY')} · here ${units(st)}/${uw.props.storageCap(id)} space · pockets ${units(S.inv)}/${POCKET_CAP}${v ? ` · ${esc(v.spec.name)} trunk ${fmtLb(cargoC(v.trunk))} of ${fmtLb(cargoCapC(v.type))}` : ' · no car nearby'}</small></h3>`;
+    let h = `<h3>Product stash <small>${esc(LOC_CLASS[d.kind] || 'PROPERTY')} · here ${fmtLb(units(st))} of ${fmtLb(uw.props.storageCap(id))} · pockets ${fmtLb(units(S.inv))} of ${fmtLb(POCKET_CAP)}${v ? ` · ${esc(v.spec.name)} trunk ${fmtLb(cargoC(v.trunk))} of ${fmtLb(cargoCapC(v.type))}` : ' · no car nearby'}</small></h3>`;
     if (!rows.length) h += '<div class="hint">Nothing to move. Product you buy goes in your pockets, then the trunk of a car parked nearby.</div>';
     else h += '<div class="jobs">' + rows.map(k => {
       const here = Inv.has(st, k), lot = uw.market.price(z, k), val = here * lot, cost = Inv.cost(st, k), pl = val - cost;
@@ -51222,15 +51652,17 @@ class EmpireUI {
   openSpot(L) {
     const uw = this.uw, g = this.g, S = uw.S, s = L.def;
     if (s.arms) { this.openArmorer(L); return; }
+    if (s.port) { this.openPort(); return; }
+    if (s.bank) { uw.bank.enter(); return; }
     const z = L.zone;
     const stock = S.supply[s.id] || (S.supply[s.id] = {});
-    for (const k of s.sells) if (stock[k] === undefined) stock[k] = Math.round(30 * S.market[z][k][0] / GOODS[k].size);
+    for (const k of s.sells) if (stock[k] === undefined) stock[k] = supplierStock(k, S.market[z][k][0], g.save.rep);
     const locked = g.save.rep < (s.rep || 0) && !(S.flags.intro && S.flags.intro[s.id]);
-    const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${units(S.inv)}/${POCKET_CAP}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>` +
+    const render = () => `<div class="svcTop"><span>${esc(s.role)}</span><span>Pockets <b>${fmtLb(units(S.inv))} / ${fmtLb(POCKET_CAP)}</b>${uw.nearVehicle() ? ` · trunk <b>${fmtLb(cargoC(uw.nearVehicle().trunk))} / ${fmtLb(cargoCapC(uw.nearVehicle().type))}</b>` : ''}</span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>` +
       (locked ? `<div class="hint">${esc(s.name)} doesn’t deal with nobodies. (${s.rep} reputation)</div>` : '<div class="jobs">' + s.sells.map(k => {
         const p = uw.market.wholesale(z, k), n = stock[k] | 0, lb = GOOD_UNIT[k][2] < 1;
         const qs = lb ? [1, 2, 5] : [1, 5, 20];
-        return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, p)} · ${fmtQty(k, n)} available · ${TIERS[GOODS[k].tier].name} · street price here ${fmtPerUnit(k, uw.market.price(z, k))}</span></div><div class="btns">${qs.map(q => { const lots = lotsFor(k, q); return `<button class="sbtn" data-act="buy:${k}:${lots}" ${n < lots || g.save.money < p * lots ? 'disabled' : ''}>${lb ? q + ' lb' : '×' + q} · ${fmtMoney(p * lots)}</button>`; }).join('')}</div></div>`;
+        return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, p)} · ${fmtQty(k, n)} available · ${TIERS[GOODS[k].tier].name} · street price here ${fmtPerUnit(k, uw.market.price(z, k))}</span></div><div class="btns">${qs.map(q => { const lots = lotsFor(k, q); return `<button class="sbtn" data-act="buy:${k}:${lots}" ${n < lots || g.save.money < p * lots ? 'disabled' : ''}>${lb ? q + ' lb' : '×' + q} · ${fmtMoney(p * lots)}</button>`; }).join('')}<button class="sbtn gold" data-act="buy:${k}:99999" ${n < 1 || g.save.money < p ? 'disabled' : ''}>Max</button></div></div>`;
       }).join('') + '</div><div class="hint">Product goes in your pockets, then the trunk of a car parked nearby. Every lot remembers what you paid, so the Inventory tab shows what it is worth now and your profit or loss. Store it at a property, sell it to street buyers, or put crew on it.</div>');
     g.content.openSvc(s.name, '', render, a => {
       const [, k, q] = a.split(':'); if (locked || !GOODS[k]) return;
@@ -51259,7 +51691,7 @@ class EmpireUI {
       { gun: 'smg', n: 90, price: 360 }, { gun: 'smg', n: 270, price: 1000 }
     ];
     const hw = uw.market.wholesale(z, 'hardware'), hs = Math.round(uw.market.price(z, 'hardware') * 0.9);
-    const stock = S.supply.armorer || (S.supply.armorer = { hardware: 8 });
+    const stock = S.supply.armorer || (S.supply.armorer = { hardware: 8 + rankOf(s.rep) * 2 });
     const tabs = [['guns', 'Buy weapons'], ['ammo', 'Buy ammo'], ['armor', 'Buy armor'], ['loadout', 'Loadout'], ['stash', 'Stash']];
     if (!tabs.some(t => t[0] === this.armTab)) this.armTab = 'guns';
     const owned = uw.props.ownedList().filter(d => d.storage);
@@ -51270,6 +51702,7 @@ class EmpireUI {
           const own = s.weapons[it.id], lock = it.rep && s.rep < it.rep;
           return `<div class="card${lock ? ' locked' : ''}"><div class="t">${it.name} ${own ? `<span class="chip" style="--c:#7fe08f">OWNED</span>` : ''}</div><div class="d">${it.desc}${own ? `<br><b>${esc(A.whereText(it.id))}</b>` : ''}</div><button class="sbtn gold" data-act="w:${it.id}" ${own || lock || s.money < it.price ? 'disabled' : ''}>${own ? 'Owned — one is all you need' : lock ? 'Needs ' + it.rep + ' rep' : fmtMoney(it.price)}</button></div>`;
         }).join('') + '</div>';
+        h += `<h3>Tools</h3><div class="jobs"><div class="job"><i style="color:#ff8a3d">■</i><div><b>Thermal drill</b><span>${fmtMoney(BANK.drill)} · opens one bank vault, then it is scrap · you have ${S.flags.drill | 0}${s.rep < UW_RANKS[6].at ? ` · needs rank ${UW_RANKS[6].name}` : ''}</span></div><button class="sbtn gold" data-act="drill" ${s.money < BANK.drill || s.rep < UW_RANKS[6].at ? 'disabled' : ''}>Buy</button></div></div>`;
         h += `<h3>Hardware <small>bulk product, untraceable</small></h3><div class="jobs"><div class="job"><i style="color:${TIERS[3].col}">■</i><div><b>Buy hardware</b><span>${fmtMoney(hw)} a unit · ${fmtQty('hardware', stock.hardware | 0)} available${s.rep < 500 ? ' · needs 500 rep' : ''}</span></div><button class="sbtn" data-act="hb:1" ${s.rep < 500 || (stock.hardware | 0) < 1 || s.money < hw ? 'disabled' : ''}>×1</button><button class="sbtn" data-act="hb:5" ${s.rep < 500 || (stock.hardware | 0) < 5 || s.money < hw * 5 ? 'disabled' : ''}>×5</button></div>
           <div class="job"><i style="color:${TIERS[3].col}">■</i><div><b>Sell hardware</b><span>${fmtMoney(hs)} a unit · ${fmtQty('hardware', uw.carried().hardware | 0)} carried</span></div><button class="sbtn gold" data-act="hs" ${(uw.carried().hardware | 0) ? '' : 'disabled'}>Sell all</button></div></div>`;
       } else if (this.armTab === 'ammo') {
@@ -51290,6 +51723,7 @@ class EmpireUI {
       let r = '';
       if (k === 'tab') { this.armTab = id; g.content.refreshSvc(); return; }
       if (k === 'vto') { this.vestTo = id; return; }
+      if (k === 'drill') { if (s.money < BANK.drill || s.rep < UW_RANKS[6].at) return; g.content.spend(BANK.drill); S.flags.drill = (S.flags.drill | 0) + 1; g.audio.play('cash'); g.saveGame(); g.content.refreshSvc('One thermal drill. It burns out after one vault.'); return; }
       if (k === 'w') {
         const it = GUNS.find(x => x.id === id); if (!it || s.money < it.price || s.weapons[it.id] || (it.rep && s.rep < it.rep)) return;
         s.weapons[it.id] = true; s.wloc[it.id] = null; if (it.ammo) s.ammo[it.id] += it.ammo; g.player.selectWeapon(WEAPONS.findIndex(w => w.id === it.id));
@@ -51464,7 +51898,7 @@ class EmpireUI {
     const c = units(uw.S.inv);
     const v = uw.nearVehicle(); const tr = v ? cargoC(v.trunk) : 0;
     const el = $('carry');
-    const txt = c || tr ? `▣ ${c}${tr ? ' · trunk ' + fmtLb(tr) : ''}` : '';
+    const txt = c || tr ? `▣ ${c ? fmtLb(c) : '0 lb'}${tr ? ' · trunk ' + fmtLb(tr) : ''}` : '';
     if (el.textContent !== txt) { el.textContent = txt; el.classList.toggle('hot', uw.carryHeat() > 6); }
     if (g.ui.modal === 'empireScreen' && uw.inJail) { this._rt = (this._rt || 0) - 1; if (this._rt <= 0) { this._rt = 4; this.render(); } }
   }
@@ -53778,6 +54212,7 @@ class MapView {
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and hardware and buys hardware back
         if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
+        else if (L.def.port || L.def.bank) add({ key: 'spot:' + L.id, name: L.def.name, cat: L.def.port ? 'buy' : 'landmark', icon: L.def.port ? '⚓' : '$', x: L.x, z: L.z, sub: L.def.port ? 'BUY by the pallet · distributors buy weight here' : L.def.role });
         else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `BUY ${L.def.sells.map(k => GOODS[k].name).join(', ')}${L.def.arms ? ' · guns · also buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });
@@ -54064,7 +54499,7 @@ class MapView {
       const kind = def.tier ? `Tier ${def.tier} · ${def.type || def.kind}` : def.kind;
       const feats = [];
       if (def.kind === 'safehouse') feats.push('sleep & save', 'heat cools overnight');
-      if (def.storage) feats.push(`stash ${def.storage}`);
+      if (def.storage) feats.push(`stash ${fmtLb(g.uw.props.storageLb(def) * 100)}`);
       if (def.crew) feats.push(`room for ${def.crew} crew`);
       if (def.income) feats.push(`~${fmtMoney(def.income)}/day`);
       stats = `<div class="stats"><span>Status</span><span>${own ? 'Owned' : 'For sale'}</span><span>Price</span><span>${fmtMoney(uw.props.price(def))}</span><span>Type</span><span>${esc(kind)}</span><span>Parking</span><span>${esc(uw.props.parkingText ? uw.props.parkingText(def) : (cap ? cap + ' spaces' : 'none'))}</span><span>District</span><span>${esc(en.district)}</span>${feats.length ? `<span>Features</span><span>${esc(feats.join(' · '))}</span>` : ''}</div>`;
@@ -55145,7 +55580,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, UW_RANKS, rankOf, supplierStock, CAREER, CAREER_ACTS, LANDMARKS, IMPORT_MAX_LB, EXPORT_DAY_LB, BANK, Trade, Career, POCKET_CAP, lots, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);

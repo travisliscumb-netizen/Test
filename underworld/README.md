@@ -299,6 +299,41 @@ New suites: `cargo` (capacities, weight, dealership/garage display, reach, trans
 save/reload, v6 migration), `gangs` (aggression and cooling, squads and sightings, standing down, recognition, save,
 sleep), `royale-sim` (Monte Carlo of the real slot code in Node, no browser).
 
+## v8 pass (schema 8): The Climb
+
+The v7 build is kept as `backup/index-v7-original.html` (and the git tag `underworld-v7-backup`). Save key unchanged;
+v7 saves load as they are.
+
+- **One weight unit everywhere:** pockets (30 lb), every stash and every trunk are weighed in pounds
+  (`GOODS[k].size` is now hundredths of a pound per lot; `units()` weighs, `lots()` counts). Stashes: homes and
+  businesses 5 lb per old space unit (flop 200 lb, Linden 450, penthouse 800, estate 2,000), lock-ups 10, storage
+  businesses 6,250 / 15,000 / 30,000 lb, and the two warehouses 100,000 and 150,000 lb (`PropertyManager.storageLb`).
+  Every old load fits its new capacity.
+- **Suppliers restock** every morning (they used to sell out once and stay empty for the rest of the save), keep more
+  on the shelf as your rank rises (`supplierStock`), and have a Max button.
+- **Rank (`UW_RANKS`, `rankOf`):** sixteen ranks on top of reputation, Nobody to Legend, with a rank-up banner. Rank
+  deepens supplier stock, opens Pier 12 (Runner, 500 rep) and the landmarks (Fixer, 2,300 rep), and sets trade volume.
+- **Pier 12 Freight Office (`Trade`, Phone › Trade, or walk in on the docks):** import by the pallet at 36% of the
+  base price, 5 lb to 50,000 lb an order by rank. Collect at the pier (free, 12 h: the shed is a container that is only
+  within reach at the pier, so you need a vehicle that can carry it; three days before it is seized) or have it trucked
+  to a stash (+8%, 18 h, a small chance customs skims a pallet). Distributors buy weight: 62% of the city's average
+  street price collected from a stash, 80% if you haul it to the pier. Daily volume 50 lb to 50,000 lb by rank; a
+  pound of Snow counts as ten against the limits and Pharma as four, so the limits track value.
+- **Career (`CAREER`, `Career`, Phone › Career):** 24 chapters in six acts (Nobody, Hustler, Crew, Territory, Power,
+  Kingpin). Each chapter is a set of goals read from what you have actually done (pockets picked, stash weight, crew,
+  turfs, freight, the vault, landmarks...), with a cash and reputation reward, a banner, and the next brief on your
+  phone. The current goal shows on the HUD for a few seconds whenever it changes or moves. An old save catches up one
+  chapter at a time. Free roam is untouched: nothing is locked behind a chapter.
+- **Landmarks (`LANDMARKS`, Phone › Career › Landmarks):** seven institutions for casino-sized fortunes, $150M to $5B
+  (the ferry company, the Courier, the stadium, the Valen Royale, the Port Authority, Valen Tower, City Hall). Each pays
+  a daily cut and changes a rule (export volume, pressure decay, influence, import price and limits, a pressure cap).
+- **Valen First National (`Bank`, `bankInteriorDef`):** a bank in the Financial District with its own interior. Hold up
+  the tellers with a gun ($40K-$90K, 3 stars, 3-day cooldown), or buy a thermal drill from the Armorer ($25,000, rank
+  Earner) and drill the vault: 30 seconds under 4 stars for $2.5M-$6M and valuables, +10% per bodyguard with you,
+  two-week cooldown.
+
+New suite: `climb` (units, restock, freight, distributors, rank, career, landmarks, bank, phone layout, save/reload).
+
 ## Tests
 
 The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
@@ -347,6 +382,7 @@ node underworld/tests/pwa.mjs       # icons at every size, manifest over http, n
 node underworld/tests/cargo.mjs     # cargo by weight, dealership/garage capacity, reach-based transfers, conservation fuzz, sales, v6 migration
 node underworld/tests/gangs.mjs     # aggression vs relationship, cooling, sightings, squads to last-seen, standing down, recognition, save
 node underworld/tests/royale-sim.mjs # Royale Billions Monte Carlo on the real slot code (Node, 4 workers, ~6 min; QUICK=1 for a short run)
+node underworld/tests/climb.mjs     # v8: weight units, supplier restock, Pier 12 freight, rank, career, landmarks, the bank
 node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE_DIR=... to compare the CDN-based template)
 ```
 

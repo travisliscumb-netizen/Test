@@ -21,7 +21,7 @@ const menus = await page.evaluate(() => {
   const tryOpen = (name, fn) => { try { fn(); out[name] = document.getElementById('svcBody').innerHTML.length > 20; } catch (e) { out[name] = 'ERR ' + e.message; } while (g.ui.stack.length) g.ui.back(); };
   for (const L of uw.locs) {
     if (L.kind === 'prop') tryOpen('prop:' + L.id, () => uw.ui.openProp(L.id));
-    if (L.kind === 'spot' && !L.def.chop) tryOpen('spot:' + L.id, () => uw.ui.openSpot(L));
+    if (L.kind === 'spot' && !L.def.chop && !L.def.bank) tryOpen('spot:' + L.id, () => uw.ui.openSpot(L));
     if (L.kind === 'hq') tryOpen('boss:' + L.id, () => uw.ui.openBoss(L.id));
   }
   tryOpen('fence', () => uw.ui.openFence('pawn'));

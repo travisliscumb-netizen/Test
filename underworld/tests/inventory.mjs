@@ -39,7 +39,7 @@ const buy1 = await ev(() => {
   while (g.ui.stack.length) g.ui.back();
   return r;
 });
-check('suppliers sell by weight: 1 lb / 2 lb / 5 lb buttons', buy1.btns.length === 3 && /1 lb/.test(buy1.btns[0]) && /5 lb/.test(buy1.btns[2]), buy1.btns.join(' | '));
+check('suppliers sell by weight: 1 lb / 2 lb / 5 lb / Max buttons', buy1.btns.length === 4 && /1 lb/.test(buy1.btns[0]) && /5 lb/.test(buy1.btns[2]) && /Max/.test(buy1.btns[3]), buy1.btns.join(' | '));
 check('bought 1 lb + 2 lb of Green = 3 lb in pockets (6 lots of 0.5 lb)', buy1.lots === 6, JSON.stringify(buy1));
 check('cost basis = exactly what was paid', Math.abs(buy1.cost - buy1.paid) < 0.01 && buy1.paid > 0, JSON.stringify(buy1));
 const disp = await ev(() => window.__pv.fmtQty('green', window.game.uw.S.inv.green));
@@ -216,17 +216,17 @@ check('an elite, loyal runner gets through most of the time', rate > 0.7, rate.t
 const cap = await ev(ids => {
   const g = window.game, uw = g.uw, S = uw.S, R = uw.runs, c = uw.crew.find(ids[0]); c.status = 'active';
   const d = window.__pv.PROP_BY_ID.flop; S.storage.linden = {}; window.__pv.Inv.add(S.storage.linden, 'green', 30, 0);
-  // flop has 40 space; fill it to 35, then try to send 10 lots (10 space) into it: refused
-  S.storage.flop = {}; window.__pv.Inv.add(S.storage.flop, 'smokes', 35, 0);
+  // the flop holds 200 lb; fill it to 197 lb, then try to send 10 lots of Green (5 lb) into it: refused
+  S.storage.flop = {}; window.__pv.Inv.add(S.storage.flop, 'smokes', 197, 0);
   const e1 = R.dispatch(c.id, 'linden', 'flop', 'green', 10);
   // send 5 (fits), then fill the flop while it is on the road: the overflow goes back
   const e2 = R.dispatch(c.id, 'linden', 'flop', 'green', 5);
-  window.__pv.Inv.add(S.storage.flop, 'smokes', 3, 0);
+  window.__pv.Inv.add(S.storage.flop, 'smokes', 1, 0); // 2 lb left: room for 4 of the 5 lots
   const r = S.runs[S.runs.length - 1]; const rep = R.resolve(r, 0);
   return { e1, e2, rep, flop: S.storage.flop.green | 0, linden: S.storage.linden.green | 0 };
 }, crewSetup);
 check('a run into a stash without room is refused up front', /room/i.test(cap.e1), cap.e1);
-check('if the stash fills while the run is on the road, the overflow goes back to the pickup (all accounted for)', cap.e2 === '' && cap.rep.delivered === 2 && cap.rep.returned === 3 && cap.flop === 2 && cap.linden === 28, JSON.stringify(cap));
+check('if the stash fills while the run is on the road, the overflow goes back to the pickup (all accounted for)', cap.e2 === '' && cap.rep.delivered === 4 && cap.rep.returned === 1 && cap.flop === 4 && cap.linden === 26, JSON.stringify(cap));
 const cEnd = await census();
 check('crew deliveries: every lot accounted for (start - reported losses)', true, JSON.stringify(cEnd.tot));
 
@@ -283,7 +283,7 @@ await page.reload(); await page.waitForFunction(() => window.__pvBooted === true
 await ev(() => window.game.quality.setMode(0));
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 const mig = await ev(() => { const g = window.game, s = g.save, S = g.uw.S; return { v: s.version, from: s.flags.migratedFrom, money: s.money, inv: { ...S.inv }, flop: { ...S.storage.flop }, pistol: s.weapons.pistol, where: s.wloc.pistol, draw: g.player.ownedWeapons().map(w => w.id), ammo: s.ammo.pistol, vest: s.vest, gamble: !!s.gamble && s.gamble.scratch.bought === 0, runs: Array.isArray(S.runs), car: s.garage[0] && s.garage[0].trunk.pills, tier: s.garage[0] && s.garage[0].vtier }; });
-check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 7 && mig.from === 3, JSON.stringify(mig));
+check('v3 save migrates forward to the current schema (migration recorded)', mig.v === 8 && mig.from === 3, JSON.stringify(mig));
 check('v3 save: money, pockets, stash and trunk exactly as they were', mig.money === 4321 && mig.inv.green === 7 && mig.inv.snow === 3 && mig.flop.smokes === 12 && mig.flop.hardware === 2 && mig.car === 4, JSON.stringify(mig));
 check('v3 save: guns are carried and drawable, ammo kept, no vest, empty stats', mig.pistol && mig.where === null && mig.draw.includes('pistol') && mig.draw.includes('shotgun') && mig.ammo === 36 && mig.vest === 0 && mig.gamble && mig.runs, JSON.stringify(mig));
 check('v3 save: cars get their visual tier', mig.tier === 'common', mig.tier);
