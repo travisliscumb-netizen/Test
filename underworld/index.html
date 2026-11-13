@@ -47057,7 +47057,18 @@ class NeonSigns {
       g.scene.add(im); this.meshes.push(im);
     }
   }
+  // (v9) a lit blade sign on a post, standing out over the pavement at a street location (the bank, Pier 12)
+  addMarker(x, z, h, word, col) {
+    const y = 4.4, grp = new THREE.Group(); grp.position.set(x, groundY(x, z), z); grp.rotation.y = h - Math.PI / 2;
+    const dark = new THREE.MeshBasicMaterial({ color: 0x0e1218 });
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, y + 0.75, 0.16), dark); post.position.set(-2.55, (y + 0.75) / 2, 0); grp.add(post);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.25, 0.12), dark); board.position.set(-0.3, y, 0); grp.add(board);
+    const mat = new THREE.MeshBasicMaterial({ map: neonTexture(word, col), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+    for (const sd of [1, -1]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 1.08), mat); pl.position.set(-0.3, y, sd * 0.07); if (sd < 0) pl.rotation.y = Math.PI; grp.add(pl); }
+    grp.userData.mat = mat; this.g.scene.add(grp); (this.markers || (this.markers = [])).push(grp);
+  }
   update(night, t, inside) {
+    if (this.markers) for (const m of this.markers) { m.visible = !inside; m.userData.mat.color.setScalar(0.95 + night * 1.2); }
     for (const im of this.meshes) {
       im.visible = !inside;
       let k = 0.25 + night * 1.9;
@@ -47624,6 +47635,7 @@ class Underworld {
     }
     this.ui.update(rdt);
     this.career.update(rdt);
+    if (!this._signs) { this._signs = true; for (const [id, word, col] of [['bank', 'FIRST NATIONAL', '#ffd84d'], ['port', 'PIER 12 FREIGHT', '#6fb2ff']]) { const L = this.loc('spot', id); if (L) this.neon.addMarker(L.x, L.z, L.h, word, col); } }
   }
   tickHours(h, hour) {
     this.market.tick(h);
