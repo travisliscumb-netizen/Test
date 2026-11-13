@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="build-version" content="v9-climb-graphics-2026-11-13-a">
+<meta name="build-version" content="v9.1-haulage-2026-11-13-b">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
 <meta name="mobile-web-app-capable" content="yes">
@@ -46016,6 +46016,7 @@ class Campaign {
   // MissionManager hooks
   onPass(m) {
     const g = this.g, def = m.spec.def, s = this.save;
+    if (def.haul) { g.content.addRep(def.rep, null); if (def.onPass) def.onPass(g); return; }
     if (m.spec.replay) { g.content.addRep(Math.round(def.rep * 0.2), 'replay'); return; }
     s.story[def.id] = Math.max(1, Math.round(m.t));
     s.stats.storyDone = this.doneCount();
@@ -50758,6 +50759,46 @@ class Trade {
     g.autosave('Landmark bought');
     return `${L.name} is yours.`;
   }
+  // ---- haulage (v9): three contracts a day, open to anybody. A loaded vehicle waits at Pier 12; get it across town
+  // to a business before the clock runs out without wrecking the load. Runs on the story stage engine.
+  haulOffers() {
+    const uw = this.uw, S = uw.S, L = this.portLoc(), out = []; if (!L) return out;
+    const rng = mulberry32(S.day * 7919 + 13), dests = uw.locs.filter(x => x.kind === 'prop' && x.def.kind === 'business' && Math.hypot(x.x - L.x, x.z - L.z) > 350);
+    const tiers = [['courier', 'Parcels', 1], ['van', 'Pallets', 1.6], ['truck', 'A full container load', 2.5]];
+    for (let i = 0; i < 3 && dests.length; i++) {
+      const d = dests[Math.floor(rng() * dests.length)], [cls, what, k] = tiers[i], dist = Math.hypot(d.x - L.x, d.z - L.z);
+      out.push({ i, cls, what, dest: d, dist, time: Math.round(55 + dist / (cls === 'truck' ? 7.5 : 9)), pay: Math.round((250 + dist * 1.5) * k / 10) * 10, rep: Math.round(8 + 6 * k) });
+    }
+    return out;
+  }
+  haulsLeft() { const T = this.T; if (!T.haul || T.haul.day !== this.uw.S.day) T.haul = { day: this.uw.S.day, n: 0 }; return 3 - T.haul.n; }
+  startHaul(i) {
+    const g = this.g, uw = this.uw, o = this.haulOffers()[i], L = this.portLoc();
+    if (!o) return '';
+    if (g.missions.active || (g.race && g.race.active)) return 'Finish the job you are on first.';
+    if (g.police.level > 0) return 'Not with the police on you.';
+    if (g.player.interior) return 'Step outside first.';
+    if (this.haulsLeft() < 1) return 'No more contracts today. The board refills in the morning.';
+    this.T.haul.n++;
+    const at = curbNear(L.x, L.z, 6), dn = o.dest.def.name;
+    const def = { id: 'haul', haul: true, arc: 0, rep: o.rep, title: `Haulage · ${dn}`, reward: o.pay,
+      onPass: () => { uw.S.st.hauls = (uw.S.st.hauls || 0) + 1; },
+      stages: C => [
+        { t: 'car', ref: 'rig', cls: o.cls, at, critical: true, legit: true },
+        { t: 'enter', ref: 'rig', obj: `Get in the loaded ${VEHICLES[o.cls].name} at Pier 12` },
+        { t: 'timer', dur: o.time },
+        { t: 'watch', fragile: { ref: 'rig', max: 55 } },
+        { t: 'goto', at: { x: o.dest.x, z: o.dest.z }, need: 'rig', r: 9, obj: `Deliver the load to ${dn}` },
+        { t: 'fn', f: () => C.release('rig', true) }
+      ] };
+    g.ui.closeAll();
+    g.missions.start({ type: 'story', def, title: def.title, desc: o.what, reward: o.pay, contact: { id: 'port', name: 'Pier 12 Freight' } });
+    return '';
+  }
+  haulHTML() {
+    const offers = this.haulOffers(), left = this.haulsLeft();
+    return `<h3>Haulage contracts <small>${left} of 3 left today · honest work, more or less</small></h3>` + offers.map(o => `<div class="xrow"><div class="xh"><span><b>${esc(o.what)}</b> to ${esc(o.dest.def.name)}</span><small>${esc(VEHICLES[o.cls].name)} · ${fmtDist(o.dist)} · ${fmtTime(o.time)} on the clock</small></div><div class="xq"><button class="sbtn gold" data-act="th:${o.i}" ${left < 1 ? 'disabled' : ''}>Take it · ${fmtMoney(o.pay)}</button></div></div>`).join('') + '<div class="hint">The loaded vehicle waits at Pier 12. Deliver it before the clock runs out; a wrecked load pays nothing.</div>';
+  }
   landmarkInfl() { let n = 0; for (const id in this.T.landmarks) n += LANDMARK_BY_ID[id].infl || 0; return n; }
   // one handler for the freight office counter and the phone's Trade app
   act(a) {
@@ -50768,12 +50809,13 @@ class Trade {
     if (k === 'tx') return this.sell(this.src, x, +y < 0 ? 1e9 : +y);
     if (k === 'tw') { const L = this.portLoc(); if (L) { this.g.content.setWaypoint(L.x, L.z, 'Pier 12 Freight Office'); return 'Waypoint set: Pier 12 Freight Office.'; } }
     if (k === 'lm') return this.buyLandmark(x);
+    if (k === 'th') return this.startHaul(+x);
     return '';
   }
   html() {
     const uw = this.uw, g = this.g, T = this.T, S = uw.S, r = this.rank(), atPort = this.atPort();
     const stat = (a, b) => `<div class="stat"><span>${a}</span><span>${b}</span></div>`;
-    if (!this.unlocked()) return `<div class="hint">Pier 12 Freight Office moves product by the pallet: imports at a third of the street price, and distributors who buy weight. They only deal with people they have heard of. <b>Reach rank ${UW_RANKS[TRADE_RANK].name} (${UW_RANKS[TRADE_RANK].at} reputation; you have ${g.save.rep}).</b></div><div class="btns"><button class="sbtn" data-act="tw">Waypoint to Pier 12</button></div>`;
+    if (!this.unlocked()) return `<div class="hint">Pier 12 Freight Office moves product by the pallet: imports at a third of the street price, and distributors who buy weight. They only deal with people they have heard of. <b>Reach rank ${UW_RANKS[TRADE_RANK].name} (${UW_RANKS[TRADE_RANK].at} reputation; you have ${g.save.rep}).</b> Until then, they always need drivers.</div><div class="btns"><button class="sbtn" data-act="tw">Waypoint to Pier 12</button></div>` + this.haulHTML();
     let h = `<div class="grid4"><div class="tile"><small>Your rank</small><b>${UW_RANKS[r].name}</b><span>orders up to ${this.maxLb().toLocaleString('en-US')} lb (Snow counts ×10, Pharma ×4)</span></div><div class="tile"><small>Distributors today</small><b>${fmtLb(this.leftC())}</b><span>of ${fmtLb(this.capC())} a day</span></div><div class="tile"><small>Imported</small><b>${fmtLb(T.imported)}</b><span>all time</span></div><div class="tile"><small>Exported</small><b>${fmtLb(T.exported)}</b><span>all time</span></div></div>`;
     // ---- waiting at the pier
     if (units(T.dock)) h += `<h3>Waiting at Pier 12 <small>${Math.max(0, 3 - (S.day - T.dockDay))} day(s) left</small></h3><div class="card reach"><div class="d">${esc(goodsList(T.dock))} · ${fmtLb(units(T.dock))}</div><div class="d">${atPort ? 'You are at the pier: open <b>Inventory</b> and move it from “Pier 12 freight shed” into your vehicle.' : 'Drive something big enough to the pier, then load it from the Inventory app.'}</div><div class="btns"><button class="sbtn" data-act="tw">Waypoint</button></div></div>`;
@@ -50803,6 +50845,7 @@ class Trade {
         return `<div class="xrow"><div class="xh"><span><b style="color:${TIERS[GOODS[k].tier].col}">■</b> <b>${GOODS[k].name}</b> · ${fmtQty(k, have)}</span><small>${fmtPerUnit(k, pr)}${avg ? ` · you paid ${fmtPerUnit(k, avg)}` : ''}</small></div><div class="xq">${amt.map(([lb, n]) => `<button class="sbtn" data-act="tx:${k}:${n}" ${fit < 1 ? 'disabled' : ''}>${lb.toLocaleString('en-US')} lb</button>`).join('')}<button class="sbtn gold" data-act="tx:${k}:-1" ${fit < 1 ? 'disabled' : ''}>Max · ${fmtShort(Math.min(have, fit) * pr)}</button></div></div>`;
       }).join('') : '<div class="hint">Nothing there they buy. (Hot goods go to a fence.)</div>';
     }
+    h += this.haulHTML();
     return h + '<div class="hint">Distributors move product out of town, so it never floods your own streets. What they take in a day grows with your rank. Big consignments get noticed: police pressure creeps up with volume.</div>';
   }
   landmarksHTML() {
@@ -51489,7 +51532,7 @@ class EmpireUI {
   t_trade() { return this.uw.trade.html(); }
   openPort() {
     const uw = this.uw, g = this.g;
-    g.content.openSvc('Pier 12 Freight Office', '“Paperwork is extra. You don’t want paperwork.”', () => uw.trade.html(), a => { if (a === 'tw') return; const r = uw.trade.act(a); g.saveGame(); g.content.refreshSvc(r); });
+    g.content.openSvc('Pier 12 Freight Office', '“Paperwork is extra. You don’t want paperwork.”', () => uw.trade.html(), a => { if (a === 'tw') return; const r = uw.trade.act(a); if (a.startsWith('th') && !r) return; g.saveGame(); g.content.refreshSvc(r); });
   }
   t_loadout() {
     const uw = this.uw;
@@ -51589,7 +51632,7 @@ class EmpireUI {
       case 'wp': { const label = decodeURIComponent(z || 'Waypoint'), key = decodeURIComponent(w || ''); g.content.setWaypoint(+x, +y, label); if (key) g.content.waypoint.key = key; r = `Waypoint set: ${label}. Follow the arrow or the GPS line.`; break; }
       case 'pk': this.pnlSel = this.pnlSel === x ? null : x; this.render(); return;
       case 'td': case 'ts': uw.trade.act(a); this.render(); return;
-      case 'ti': case 'tx': case 'tw': case 'lm': r = uw.trade.act(a); break;
+      case 'ti': case 'tx': case 'tw': case 'lm': case 'th': r = uw.trade.act(a); if (a.startsWith('th') && !r) return; break;
       case 'xf': { const X = this.xfer || (this.xfer = { from: 'inv', to: '' }), key = (y || '').replace(/~/g, ':'); if (x === 'swap') { const t = X.from; X.from = X.to || t; X.to = t; } else if (x === 'from') { if (X.to === key) X.to = X.from; X.from = key; } else if (x === 'to') X.to = key; this.render(); return; }
       case 'xm': { const X = this.xfer || {}, n = +y, src = uw.locations().find(L => L.key === X.from && L.here); if (!GOODS[x] || !src) break; const moved = uw.transfer(X.from, X.to, x, n < 0 ? Inv.has(src.o, x) : n); const dst = uw.locations().find(L => L.key === X.to); r = moved ? `Moved ${fmtQty(x, moved)} ${GOODS[x].name} to ${dst ? dst.name : 'there'}.` : 'No room there.'; break; }
       case 'cc': if (x === 'good' || x === 'role') this.cc[x] = y; this.render(); return;

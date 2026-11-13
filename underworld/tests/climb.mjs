@@ -233,5 +233,33 @@ const bays = await ev(() => {
 });
 check('no fence or hedge collider crosses any home garage bay (269 Maple Court had one through its garage)', bays.length === 0, bays.join(','));
 
+// ---------------------------------------------------------------- 10. haulage contracts
+await ev(() => { const g = window.game; g.ui.closeAll(); g.police.level = 0; if (g.player.interior) g.content.interiors.exit(true); const L = g.uw.trade.portLoc(); g.resetPlayerState(L.x, L.z, 0); });
+await frames(page, 5);
+const hl = await ev(() => {
+  const g = window.game, T = g.uw.trade, out = {};
+  const offers = T.haulOffers(); out.n = offers.length; out.cls = offers.map(o => o.cls); out.pay = offers.map(o => o.pay);
+  out.html = /Haulage contracts/.test(T.html());
+  const m0 = g.save.money; T.T.haul = null;
+  out.r = T.startHaul(1); const m = g.missions.active; out.active = !!m && m.spec.def && m.spec.def.haul; out.left = T.haulsLeft();
+  return out;
+});
+await frames(page, 10);
+const hl2 = await ev(async () => {
+  const g = window.game, m = g.missions.active, out = {}; if (!m) return { none: true };
+  const v = m.refs.rig; out.rig = v && v.type; out.obj0 = m.objective;
+  g.completeEnter(v); await new Promise(r => setTimeout(r, 400));
+  out.obj1 = m.objective; out.timer = m.timerOn;
+  const st = m.stages.find(x => x.t === 'goto'); const m0 = g.save.money;
+  v.pos.set(st.at.x, v.pos.y, st.at.z); v.vel.set(0, 0); g.player.pos.set(st.at.x, v.pos.y, st.at.z);
+  for (let k = 0; k < 60 && g.missions.active; k++) await new Promise(r => setTimeout(r, 100));
+  out.passed = !g.missions.active; out.paid = g.save.money - m0; out.hauls = g.uw.S.st.hauls;
+  if (g.player.state === 'vehicle') g.exitVehicle(true);
+  return out;
+});
+check('Pier 12 offers three haulage contracts (courier, van, box truck) to anybody, even before rank Runner', hl.n === 3 && hl.cls.join() === 'courier,van,truck' && hl.html && hl.pay[2] > hl.pay[0], JSON.stringify(hl));
+check('taking one starts a timed delivery with the loaded vehicle waiting at the pier', hl.r === '' && hl.active && hl.left === 2 && hl2.rig === 'van' && /loaded Haulmark at Pier 12/.test(hl2.obj0) && hl2.timer, JSON.stringify([hl, hl2]));
+check('delivering the load pays the contract', hl2.passed && hl2.paid >= hl.pay[1] && hl2.hauls === 1, JSON.stringify(hl2));
+
 check('no console errors', t.errors.length === 0, t.errors.slice(0, 5).join(' | '));
 await finish(b, 'climb');

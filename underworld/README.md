@@ -350,6 +350,17 @@ The pre-graphics build is kept as `backup/index-v8-pre-graphics.html`.
 - **Cost:** trees are the only added geometry: about 1.21M → 1.28M triangles in the same high-quality street view; no
   new draw calls, textures or lights.
 
+## v9.1 (fixes and haulage)
+
+- **Haulage contracts (`Trade.haulOffers` / `startHaul`):** three a day at Pier 12, open to anybody from the first
+  hour (courier van, cargo van, box truck). Get the loaded vehicle across town to a business before the clock runs out,
+  without wrecking the load. Pays $900-$2,600 plus reputation. Runs on the existing story stage engine.
+- **Lit blade signs** for Valen First National and Pier 12, so both read from the street.
+- **iOS resume bug:** when the game was backgrounded with the phone or a street menu open, the pause menu opened
+  behind it and Resume could not be tapped. The pause menu now sits above them.
+- **Blocked garage bays:** a lot-line hedge or fence collider ran through the garage at 269 Maple Court.
+  `clearGarageColliders` trims any such collider at load; a check confirms no home bay is crossed.
+
 ## Tests
 
 The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
