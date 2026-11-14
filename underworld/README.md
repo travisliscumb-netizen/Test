@@ -361,6 +361,22 @@ The pre-graphics build is kept as `backup/index-v8-pre-graphics.html`.
 - **Blocked garage bays:** a lot-line hedge or fence collider ran through the garage at 269 Maple Court.
   `clearGarageColliders` trims any such collider at load; a check confirms no home bay is crossed.
 
+## v9.2 (street life, turf, poker)
+
+- **Civilians dress as who they are (`dressCiv`):** the pickpocket system always gave each pedestrian a hidden type
+  (local, office worker, tourist, executive, business owner, wealthy tourist, payroll courier). Now you can see it:
+  executives wear suits and ties, tourists bright colours with backpacks and caps, office workers light shirts and
+  sometimes a bag, owners and high rollers jackets and gold, couriers a dark uniform with a shoulder bag. The type is
+  fixed to the district they appeared in, so the outfit always tells the truth about the pocket.
+- **Faces and hair:** bolder eyes and brows, beards on about a quarter of men, a quiff, far fewer bald men.
+- **Gangs watch their corners (`GangManager.watcher` / `dealSeen`):** dealing on a rival's turf in sight of their crew
+  earns a warning the first time; do it there again within five minutes and the crew comes for you (their aggression
+  rises). Out of their sight nobody reacts. The deal menu says whether their crew can see you.
+- **Hold'em is now genuinely player-favoured:** at `pokerFavor` 0.10 you won 64% of played hands but lost the big
+  all-in pots, and the measured edge over 9,000 hands was -0.03 big blinds a hand (break-even). At 0.15 it is about
+  +1.8 BB a hand with ~66% of decided hands yours, in line with the rest of the casino. The casino check now samples
+  3,000 hands (it used to fail about half the time on 1,500).
+
 ## Tests
 
 The tests use Playwright with headless Chromium (SwiftShader). Run them from the repo root. Every
@@ -414,6 +430,9 @@ node underworld/tests/perf.mjs underworld/index.html   # frame-cost probe (THREE
 ```
 
 Each suite prints PASS/FAIL lines and a summary, and it exits non-zero if any check fails.
+
+v9.2 record: all 38 check suites pass on the final build (1,175 checks), run in four batches. Playable builds are
+published as Vercel previews of this branch (project `operation-blackgate-2`) at `/underworld/`.
 
 ## Validation record (v7 pass)
 
