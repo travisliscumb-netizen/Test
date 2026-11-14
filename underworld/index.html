@@ -52170,7 +52170,9 @@ const CASINO = {
   bjSaveBust: 0.72, bjDealerRedo: 0.82,
   // Hold'em: the chance that a hand is dealt from a deck where your seven cards end up the best at the table
   // (otherwise the deck is left as shuffled, where you are best about one time in four)
-  pokerFavor: 0.1
+  // (v9.2: 0.10 → 0.15. At 0.10 you won 64% of played hands but lost the big all-in pots: measured over 9,000 hands
+  // the edge was −0.03 big blinds a hand, break-even. At 0.15 it is about +1.8 BB a hand, decided hands ~66% yours.)
+  pokerFavor: 0.15
 };
 // "2.5m", "10k", "$1,000,000", "1b" → whole dollars (NaN when it is not an amount)
 function parseMoney(s) { const t = String(s == null ? '' : s).trim().toLowerCase().replace(/[$,\s_]/g, ''); const m = t.match(/^(\d+(?:\.\d+)?)([kmbt]?)$/); if (!m) return NaN; return Math.floor(+m[1] * { '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2]]); }

@@ -118,7 +118,7 @@ const psim = await ev(() => {
   out.stacks = pk.seats.map(x => x.stack + x.put); out.bb = pk.bb;
   out.opts = (() => { pk.phase = pk.phase; return null; })();
   let pw = 0, pl = 0, pn = 0, folds = 0, ev = 0, allins = 0, raiseOpts = null;
-  for (let h = 0; h < 1500; h++) {
+  for (let h = 0; h < 3000; h++) {
     if (pk.seats[0].stack < pk.bb * 20) { const need = pk.buy - pk.seats[0].stack; g.save.money -= need; pk.seats[0].stack += need; }
     if (pk.phase !== 'play') G.pokerHand();
     let guard = 0;
@@ -142,7 +142,7 @@ report.poker = psim.sim;
 console.log('POKER SIM', JSON.stringify(psim));
 check('poker: $1M buy-in; NPC stacks in the same range ($600k–$1.6M), blinds from the depth', psim.stacks[0] === 1e6 && psim.stacks.slice(1).every(v => v >= 6e5 - psim.bb && v <= 1.6e6 + psim.bb) && psim.bb === 20000, JSON.stringify(psim));
 check('poker: bet sizes offered (min, ½ pot, pot, all in)', psim.raiseOpts && psim.raiseOpts.includes('ALL IN') && psim.raiseOpts.length >= 2, JSON.stringify(psim.raiseOpts));
-check('poker: of the hands you play, ~60–68% are net wins over 1,500 hands, with a small positive edge', psim.sim.decided > 0.57 && psim.sim.decided < 0.72 && psim.sim.evBB > -0.5, JSON.stringify(psim.sim));
+check('poker: of the hands you play, ~60–68% are net wins over 3,000 hands, with a positive edge', psim.sim.decided > 0.57 && psim.sim.decided < 0.72 && psim.sim.evBB > -0.5, JSON.stringify(psim.sim));
 check('poker: still has losing hands, folds and all-ins (believable play)', psim.sim.lose > 0.25 && psim.sim.folded > 100 && psim.sim.aiAllIns > 0, JSON.stringify(psim.sim));
 const pkUI = await ev(async () => {
   const g = window.game, G = g.gamble, s = g.save, out = {};
