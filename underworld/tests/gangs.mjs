@@ -162,6 +162,50 @@ const carHot = await watch(5);
 check('a faction actively after you knows your face even in a car slowing past (6 m)', carHot.hostile, JSON.stringify(carHot));
 await G(() => { const g = window.game; if (g.player.state === 'vehicle') { const v = g.player.vehicle; g.exitVehicle(true); g.vehicles.despawn(v); } });
 
+// ---------------------------------------------------------------- 4b. dealing on their corner (v9.2)
+const deal = await G(S0 => {
+  const g = window.game, uw = g.uw, gm = uw.gangs, S = uw.S, f = S.factions[S0.fid], out = {};
+  f.rel = -10; f.aggro = 0; f.trouble = 0; f.truce = 0; f.tribute = 0; gm.seen = {}; gm.dealWarned = {}; S.pressure = 0; S.turfs[S0.i].police = 0;
+  if (g.player.state === 'vehicle') { const v0 = g.player.vehicle; g.exitVehicle(true); g.vehicles.despawn(v0); }
+  g.resetPlayerState(S0.at8.x, S0.at8.z, 0);
+  const gr = gm.groups.get('hang' + S0.i) || gm.spawnGroup('hang' + S0.i, 'hang', S0.fid, S0.h, 3, { turf: S0.i });
+  gr.hostile = false; for (const m of gr.members) { m.x = S0.h.x; m.z = S0.h.z; m.state = 'free'; }
+  out.att = uw.attitude(S0.fid);
+  const sell = () => { S.inv = { green: 20 }; S.dealQ[S0.i] = { green: 50 }; const keep = Math.random; Math.random = () => 0.99; try { uw.ui.openDeal({ turf: S0.i, members: [] }); const hint = document.getElementById('svcBody').textContent; g.content._svcAct('s:green:2'); return { hint, msg: document.getElementById('svcHint').textContent, open: g.ui.stack.length > 0 }; } finally { Math.random = keep; while (g.ui.stack.length) g.ui.back(); } };
+  out.first = sell(); out.hostile1 = gr.hostile; out.aggro1 = f.aggro;
+  out.second = sell(); out.hostile2 = gr.hostile; out.aggro2 = f.aggro;
+  // out of their sight: no warning, no reaction
+  gr.hostile = false; f.aggro = 0; gm.dealWarned = {};
+  g.resetPlayerState(S0.h.x + 200, S0.h.z + 30, 0);
+  out.unseen = sell(); out.hostile3 = gr.hostile; out.aggro3 = f.aggro;
+  S.inv = {}; f.aggro = 0; gr.hostile = false;
+  return out;
+}, setup);
+check('dealing on a rival corner in sight of their crew: the menu says they can see you, and the first deal earns a warning', /Their crew can see you/.test(deal.first.hint) && /saw you dealing/.test(deal.first.msg) && !deal.hostile1 && deal.aggro1 === 0, JSON.stringify(deal.first) + ' ' + deal.att);
+check('…deal there again and the crew comes for you (aggression rises, the menu closes)', deal.hostile2 && deal.aggro2 > 0 && !deal.second.open, JSON.stringify([deal.hostile2, deal.aggro2]));
+check('…out of their sight nobody reacts', /Nobody from their crew is in sight/.test(deal.unseen.hint) && !deal.hostile3 && deal.aggro3 === 0 && !/saw/.test(deal.unseen.msg), JSON.stringify(deal.unseen));
+
+// ---------------------------------------------------------------- 4c. civilians dress as who they are (v9.2)
+const dress = await G(() => {
+  const g = window.game, P = window.__pv, out = { byType: {} };
+  for (let k = 0; k < 600; k++) {
+    const p = g.peds.make('civ'); window.__pv.dressCiv(p, ['u', 'c', 'o', 'm'][k % 4]);
+    const L = p.look, t = L.ptype, b = out.byType[t] || (out.byType[t] = { n: 0, suit: 0, pack: 0, bag: 0, cap: 0, home: 0 });
+    b.n++; if (L.jacket && L.pants && L.jacket.getHex() === L.pants.getHex()) b.suit++; if (L.pack) b.pack++; if (L.bag) b.bag++; if (L.cap) b.cap++;
+    if (P.pedType(p, p.homeZone).t.id === t) b.home++;
+  }
+  // a whole street of people: same look for the same person every time (seeded by id)
+  const q = g.peds.make('civ'); q.id = 4242; window.__pv.dressCiv(q, 'u'); const a = JSON.stringify([q.look.ptype, q.look.shirt.getHex(), !!q.look.pack]);
+  const q2 = g.peds.make('civ'); q2.id = 4242; window.__pv.dressCiv(q2, 'u'); out.stable = a === JSON.stringify([q2.look.ptype, q2.look.shirt.getHex(), !!q2.look.pack]);
+  const looks = Array.from({ length: 400 }, () => P.randomLook ? P.randomLook() : null).filter(Boolean);
+  out.bald = looks.filter(L => !L.fem && L.hairStyle === 0).length / Math.max(1, looks.filter(L => !L.fem).length);
+  out.beard = looks.filter(L => L.beard).length; out.quiff = looks.filter(L => L.hairStyle === 4).length;
+  return out;
+});
+const T = dress.byType;
+check('executives wear suits, tourists carry backpacks, payroll couriers carry bags, and loot matches the outfit', T.exec && T.exec.suit === T.exec.n && T.tourist && T.tourist.pack > T.tourist.n * 0.4 && T.courier && T.courier.bag === T.courier.n && Object.values(T).every(b => b.home === b.n), JSON.stringify(T));
+check('the same person always dresses the same; fewer bald men; beards and a quiff in the mix', dress.stable && dress.bald < 0.2 && dress.beard > 20 && dress.quiff > 20, JSON.stringify(dress));
+
 // ---------------------------------------------------------------- 5. save/reload keeps it; a night's sleep clears it (not the grudge)
 const pre = await G(fid => { const g = window.game, f = g.uw.S.factions[fid]; f.aggro = 47.5; f.trouble = 3; f.rel = -70; g.uw.gangs.seen = {}; for (const gr of [...g.uw.gangs.groups.values()]) g.uw.gangs.removeGroup(gr); g.police.level = 0; g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.saveGame(true); return { a: f.aggro, tr: f.trouble }; }, setup.fid);
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });

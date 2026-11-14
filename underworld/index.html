@@ -38260,7 +38260,7 @@ function randomLook(rng = Math.random) {
   const fem = rng() < 0.45;
   const L = {
     skin: C(p(SKIN)), hair: C(p(HAIR)), shirt: C(p(SHIRT)), pants: C(p(PANTS)), shoes: C(p(SHOES)),
-    sleeve: rng() < 0.5, hairStyle: fem ? (rng() < 0.75 ? 2 : 3) : Math.floor(rng() * 4), scale: (fem ? 0.9 : 0.95) + rng() * 0.12, build: 0.88 + rng() * 0.28, cap: null,
+    sleeve: rng() < 0.5, hairStyle: fem ? (rng() < 0.75 ? 2 : 3) : (u => u < 0.1 ? 0 : u < 0.62 ? 1 : u < 0.86 ? 4 : u < 0.95 ? 2 : 3)(rng()), fem, beard: !fem && rng() < 0.28, scale: (fem ? 0.9 : 0.95) + rng() * 0.12, build: 0.88 + rng() * 0.28, cap: null,
     shoulders: fem ? 0.9 : 1 + rng() * 0.08, hips: fem ? 1.1 : 0.96, jacket: null, skirt: null, shades: false, chain: null, tie: null, bandana: null, hood: null, belt: rng() < 0.5
   };
   if (rng() < 0.32) L.jacket = C(p(JACKETS));
@@ -38313,8 +38313,8 @@ class CharacterRenderer {
     const skirtGeo = new THREE.CylinderGeometry(0.5, 0.78, 1, 10, 1, false); skirtGeo.translate(0, -0.5, 0);
     const defs = {
       head: [new THREE.SphereGeometry(1, 14, 10), 1], hair: [new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), 1],
-      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 9],
-      hand: [handGeo, 2], foot: [footGeo, 2], joint: [new THREE.SphereGeometry(1, 10, 8), 6], skirt: [skirtGeo, 1],
+      torso: [torsoGeo, 2], hips: [hipsGeo, 1], limb: [limbGeo, 12], small: [new THREE.BoxGeometry(1, 1, 1), 13],
+      hand: [handGeo, 2], foot: [footGeo, 2], joint: [new THREE.SphereGeometry(1, 10, 8), 9], skirt: [skirtGeo, 1],
       gun: [new THREE.BoxGeometry(1, 1, 1), 1], bat: [new THREE.CylinderGeometry(1, 0.7, 1, 6), 1], hat: [new THREE.CylinderGeometry(1, 1.05, 1, 12), 1],
       gold: [new THREE.BoxGeometry(1, 1, 1), 2]
     };
@@ -38401,6 +38401,12 @@ class CharacterRenderer {
     const hp = _cm[7].copy(root).multiply(mT(_tm, 0, hipY + 0.1, 0)).multiply(mRx(_tm, lean)).multiply(mRy(_tm, twist + Math.sin(phase) * A * 0.12));
     _cm[8].copy(hp).multiply(mT(_tm, 0, 0.28, 0)).multiply(mS(_tm, 0.44 * bw * shW, 0.56, 0.25));
     this._put('torso', _cm[8], col(L.shirt));
+    // (v9.2) a backpack, or a shoulder bag with its strap across the chest
+    if (L.pack && !far) { _cm[8].copy(hp).multiply(mT(_tm, 0, 0.3, -0.19)).multiply(mS(_tm, 0.3 * bw, 0.36, 0.14)); this._put('small', _cm[8], col(L.pack)); }
+    if (L.bag && !far) {
+      _cm[8].copy(hp).multiply(mT(_tm, 0.25 * bw * shW, -0.02, 0.0)).multiply(mS(_tm, 0.08, 0.24, 0.3)); this._put('small', _cm[8], col(L.bag));
+      _cm[8].copy(hp).multiply(mT(_tm, 0, 0.3, 0.13)).multiply(mRz(_tm, 0.72)).multiply(mS(_tm, 0.035, 0.66, 0.02)); this._put('small', _cm[8], col(L.bag));
+    }
     if (L.jacket) {
       // open jacket: a slightly larger shell, shirt shows through as a front strip
       _cm[8].copy(hp).multiply(mT(_tm, 0, 0.26, -0.012)).multiply(mS(_tm, 0.47 * bw * shW, 0.6, 0.26));
@@ -38425,10 +38431,12 @@ class CharacterRenderer {
         this._put('small', _cm[10], col(L.skin));
         // (v9) a face: eyes, brows and a mouth (hidden behind shades; skipped for people far away)
         if (!L.shades) for (const sd of [-1, 1]) {
-          _cm[10].copy(hd).multiply(mT(_tm, sd * 0.043, 0.022, 0.115)).multiply(mS(_tm, 0.015, 0.017, 0.012)); this._put('joint', _cm[10], col(this._dark));
-          _cm[10].copy(hd).multiply(mT(_tm, sd * 0.045, 0.054, 0.117)).multiply(mRz(_tm, -sd * 0.12)).multiply(mS(_tm, 0.042, 0.011, 0.016)); this._put('small', _cm[10], col(L.hair));
+          _cm[10].copy(hd).multiply(mT(_tm, sd * 0.043, 0.022, 0.114)).multiply(mS(_tm, 0.019, 0.023, 0.013)); this._put('joint', _cm[10], col(this._dark));
+          _cm[10].copy(hd).multiply(mT(_tm, sd * 0.045, 0.056, 0.117)).multiply(mRz(_tm, -sd * 0.12)).multiply(mS(_tm, 0.047, 0.014, 0.017)); this._put('small', _cm[10], col(L.hair));
         }
-        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.062, 0.112)).multiply(mS(_tm, 0.046, 0.009, 0.02)); this._put('small', _cm[10], col(this._lip.copy(L.skin).multiplyScalar(0.55)));
+        // (v9.2) a jaw beard in the hair colour for some men; the mouth sits on its surface
+        if (L.beard) { _cm[10].copy(hd).multiply(mT(_tm, 0, -0.05, 0.025)).multiply(mS(_tm, 0.108, 0.08, 0.115)); this._put('joint', _cm[10], col(L.hair)); }
+        _cm[10].copy(hd).multiply(mT(_tm, 0, -0.062, L.beard ? 0.137 : 0.112)).multiply(mS(_tm, 0.046, 0.01, 0.02)); this._put('small', _cm[10], col(this._lip.copy(L.skin).multiplyScalar(L.beard ? 0.4 : 0.55)));
         if (L.shades) { _cm[10].copy(hd).multiply(mT(_tm, 0, 0.03, 0.115)).multiply(mS(_tm, 0.2, 0.04, 0.02)); this._put('small', _cm[10], col(this._shade)); }
       }
       if (L.bandana) {
@@ -38447,6 +38455,7 @@ class CharacterRenderer {
         _cm[11].copy(hd).multiply(mT(_tm, 0, long ? 0.0 : 0.025, -0.012)).multiply(mS(_tm, 0.125, long ? 0.2 : 0.135, 0.14));
         this._put('hair', _cm[11], col(L.hair));
         if (bun && !far) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.1, -0.1)).multiply(mS(_tm, 0.06, 0.06, 0.06)); this._put('joint', _cm[11], col(L.hair)); }
+        if (L.hairStyle === 4 && !far) { _cm[11].copy(hd).multiply(mT(_tm, 0, 0.118, 0.045)).multiply(mRx(_tm, -0.35)).multiply(mS(_tm, 0.09, 0.045, 0.085)); this._put('joint', _cm[11], col(L.hair)); }
       }
     }
     // --- arms ---
@@ -40858,6 +40867,7 @@ class PedManager {
       if (d < 32 || d > 110) continue;
       if (d < 70 && g.inView(q.x, 1, q.z, 1)) continue;
       p.x = q.x; p.z = q.z; p.y = groundY(q.x, q.z);
+      dressCiv(p, zoneKey(p.x, p.z));
       this.setSegment(p);
       this.newDest(p);
       this.peds.push(p);
@@ -46471,6 +46481,22 @@ function pedType(q, zk) {
   let acc = 0; for (const t of PED_TYPES) { acc += t.w[band]; if (r < acc) return { t, band, wl }; }
   return { t: PED_TYPES[0], band, wl };
 }
+// (v9.2) civilians dress as who they are, so the street can be read: an executive in a suit, a tourist in bright
+// colours with a backpack, a payroll courier in a dark uniform with a bag. The type is the one pocketLoot rolls,
+// fixed in the district where they first appeared.
+function dressCiv(q, zk) {
+  const { t } = pedType(q, zk), L = q.look, r = mulberry32((q.id | 0) * 7 + 3), pk = a => a[Math.floor(r() * a.length)], fem = !!L.fem;
+  q.homeZone = zk; L.ptype = t.id;
+  switch (t.id) {
+    case 'worker': L.shirt = C(pk([0xe8ecf2, 0xcfe0f2, 0xf2efe6, 0xdfe6d8])); L.pants = C(pk([0x2a2f38, 0x3a3f48, 0x22304a])); L.shoes = C(0x1a1a1a); L.jacket = r() < 0.45 ? C(pk([0x2b2f36, 0x23344f, 0x4a4f58])) : null; L.tie = !fem && r() < 0.35 ? C(pk([0x2f5d8a, 0x8a2f3a, 0x3a3f46])) : null; L.cap = null; L.hood = null; L.bag = r() < 0.35 ? C(pk([0x1b1b1e, 0x4a3a2a])) : null; L.skirt = fem && r() < 0.4 ? C(pk([0x2a2f38, 0x3a3f48])) : null; break;
+    case 'tourist': L.shirt = C(pk([0xf2c94c, 0xff8a3d, 0x2a8a8a, 0xff7ab8, 0x7fb2ff, 0xe8e8e8])); L.pants = C(pk([0xb8ab90, 0x5a6a7a, 0xd8d0c0])); L.shoes = C(0xe8e8e8); L.jacket = null; L.hood = null; L.cap = r() < 0.5 ? C(pk([0xe8e8e8, 0xd35400, 0x1d4f8a])) : null; L.pack = r() < 0.65 ? C(pk([0xd23a2a, 0x1d4f8a, 0x3a7a4a, 0x2b2f36])) : null; L.shades = r() < 0.35; L.skirt = null; break;
+    case 'exec': { const suit = C(pk([0x1b1b1e, 0x23344f, 0x2b2f36, 0x3a3f46])); L.jacket = suit; L.pants = suit; L.shirt = C(pk([0xf2f2f2, 0xdfe8f4])); L.tie = fem ? null : C(pk([0x8a2f3a, 0x2f5d8a, 0x5a2a5a, 0xc9a227])); L.shoes = C(0x111111); L.cap = null; L.hood = null; L.pack = null; L.bag = r() < 0.5 ? C(0x2a1a12) : null; L.skirt = fem && r() < 0.5 ? suit : null; L.sleeve = true; break; }
+    case 'owner': L.jacket = C(pk([0x5a3a22, 0x6a5a3a, 0x3c4a3a, 0x7a2e1a])); L.shirt = C(pk([0xe8e0cc, 0x2a3a4a, 0x8a6a3a])); L.pants = C(pk([0x2a2a2e, 0x4a3a2a])); L.chain = r() < 0.45 ? C(0xd8b04a) : null; L.cap = null; L.hood = null; break;
+    case 'highroller': L.jacket = C(pk([0xe8e0cc, 0xd8c8a0, 0x1b1b1e, 0x6a1e2a])); L.shirt = C(pk([0x1b1b1e, 0xf2f2f2, 0x2a3346])); L.pants = C(pk([0xe8e0cc, 0x1b1b1e])); L.shoes = C(pk([0x6a2a1a, 0x111111, 0xe8e8e8])); L.shades = r() < 0.6; L.chain = r() < 0.6 ? C(0xe8c060) : null; L.cap = null; L.hood = null; L.tie = null; L.pack = null; break;
+    case 'courier': L.shirt = C(0x2a3346); L.jacket = C(0x1e2a3a); L.pants = C(0x22262c); L.cap = C(0x1e2a3a); L.bag = C(0x111111); L.shades = false; L.skirt = null; L.tie = null; L.hood = null; L.pack = null; break;
+    default: if (r() < 0.22) { L.hood = C(pk([0x22262c, 0x3a3a46, 0x4a3a2a, 0x2a3a4a, 0x5a2a2a])); L.shirt = L.hood; L.jacket = null; } if (r() < 0.12) L.pack = C(pk([0x2b2f36, 0x3a5a3a, 0x5a2a2a]));
+  }
+}
 // what lifting a pocket gets you: { cash, hot, item, jackpot }
 function pocketLoot(q, zk, rnd = Math.random) {
   const { t, band, wl } = pedType(q, zk);
@@ -47577,7 +47603,7 @@ class Underworld {
     const chance = 0.7 + g.env.night * 0.1 + Math.min(0.12, this._stage * 0.02) - (q.state === 'sit' ? 0.15 : 0);
     g.player.punchT = g.player.punchDur = 0.3; g.player.pose.punchArm = 1;
     if (Math.random() < chance) {
-      const L = pocketLoot(q, z), cash = L.cash;
+      const L = pocketLoot(q, q.homeZone || z), cash = L.cash;
       g.addMoney(cash, true); S.st.picks++;
       let extra = '';
       if (L.hot) { const t = this.give({ hot: L.hot }); if (t) extra = ` and ${L.item}${L.hot > 1 ? ` (+${L.hot - 1} more)` : ''}`; }
@@ -47602,7 +47628,7 @@ class Underworld {
     if (p.kind === 'civ' && !p.dropped) {
       p.dropped = true;
       // a mugging spills about half of what a clean lift would have got (and their valuables)
-      if (Math.random() < 0.75) { S.st.mugs++; const L = pocketLoot(p, z); this.pickups.drop(dx, dz, Math.max(5, L.cash * 0.5) + rand(0, 10) * w, L.hot ? { hot: L.hot } : Math.random() < 0.12 ? { hot: 1 } : null); }
+      if (Math.random() < 0.75) { S.st.mugs++; const L = pocketLoot(p, p.homeZone || z); this.pickups.drop(dx, dz, Math.max(5, L.cash * 0.5) + rand(0, 10) * w, L.hot ? { hot: L.hot } : Math.random() < 0.12 ? { hot: 1 } : null); }
     } else if (p.kind === 'gang' && !p.dropped && (ko || Math.random() < 0.6)) {
       p.dropped = true;
       const F = FACTIONS[p.fac];
@@ -48013,7 +48039,7 @@ const GANG_CAP = 18;
 // hard a faction is actively after you right now. Only hostile acts raise it (repeat trouble raises it faster), and it
 // cools whenever none of their people can see you, so getting away works: pursuit stops, groups stand down, and the
 // hit squads stop coming. Gangs only know where you are from a sighting (they drive to where you were last seen).
-const GANG_AGGRO = { hit: 4, bossHit: 15, ko: 12, guardKo: 14, bossKo: 40, car: 8, ship: 35, war: 40,
+const GANG_AGGRO = { deal: 10, hit: 4, bossHit: 15, ko: 12, guardKo: 14, bossKo: 40, car: 8, ship: 35, war: 40,
   cool: 0.35,            // aggro lost per second while no member of the faction sees you
   hot: 15,               // at or above: any member anywhere recognises you on sight (on foot or in a slow car)
   squad: 35,             // at or above: they send cars to where you were last seen
@@ -48058,6 +48084,32 @@ class GangManager {
     if (m.state === 'down' || pl.interior || pl.state === 'dead') return false;
     if (dist2(m.x, m.z, pl.pos.x, pl.pos.z) > range * range) return false;
     return g.world.grid.lineOfSight(m.x, (m.y || 0) + 1.5, m.z, pl.pos.x, pl.pos.y + 1.4, pl.pos.z);
+  }
+  // (v9.2) one of faction fid's people who can see the player right now (within r), or null
+  watcher(fid, r = 35) {
+    const pl = this.g.player;
+    for (const gr of this.groups.values()) {
+      if (gr.fid !== fid || gr.crew || gr.kind === 'buy' || gr.kind === 'raid') continue;
+      for (const m of gr.members) if (m.state !== 'down' && dist2(m.x, m.z, pl.pos.x, pl.pos.z) < r * r && this.canSee(m, r)) return m;
+    }
+    return null;
+  }
+  // (v9.2) the player sold product on fid's turf i. If their people saw it: a warning the first time, and the crew
+  // comes for you if you do it again there within five minutes (or straight away if they already hate you)
+  dealSeen(fid, i) {
+    const g = this.g, uw = this.uw, att = uw.attitude(fid); if (att === 'fearful' || att === 'friendly') return '';
+    const w = this.watcher(fid, 35); if (!w) return '';
+    this.sighting(fid);
+    const warned = this.dealWarned || (this.dealWarned = {}), now = g.time;
+    if (att === 'hostile' || (warned[i] && now - warned[i] < 300)) {
+      warned[i] = 0; this.provoke(fid, GANG_AGGRO.deal, g.player.pos.x, g.player.pos.z);
+      if (w.group) { w.group.hostile = true; w.group.lostT = 0; }
+      this.say(w, pick(['I told you. Now we do this the hard way.', 'You don’t listen, do you?', 'That’s our corner. Get him.']));
+      return `The ${FACTIONS[fid].short} saw that. They are coming for you.`;
+    }
+    warned[i] = now;
+    this.say(w, pick(['This is our corner. Sell here again and you leave on a stretcher.', 'Walk away. Last warning.', 'Who said you could work this block?']));
+    return `The ${FACTIONS[fid].short} saw you dealing on their corner. Do it again here and they will come for you.`;
   }
   // hostile groups that have lost the player stand down (twice a second, one sight check per group)
   updateHostility(step) {
@@ -51874,7 +51926,7 @@ class EmpireUI {
     const render = () => {
       const c = uw.carried();
       const rows = GOOD_IDS.filter(k => q[k] !== undefined);
-      return `<div class="svcTop"><span>${esc(t.name)} · ${esc(ZONES[z].name)}</span><span>Risk <b>${Math.round(this.dealRisk(i) * 100)}%</b></span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>${own && own !== 'pc' ? `<div class="hint">This is ${FACTIONS[own].short} turf. Dealing here costs you with them.</div>` : ''}<div class="jobs">` +
+      return `<div class="svcTop"><span>${esc(t.name)} · ${esc(ZONES[z].name)}</span><span>Risk <b>${Math.round(this.dealRisk(i) * 100)}%</b></span><span>Cash <b class="money">${fmtMoney(g.save.money)}</b></span></div>${own && own !== 'pc' ? `<div class="hint">This is ${FACTIONS[own].short} turf. Dealing here costs you with them. ${uw.gangs.watcher(own, 35) ? '<b style="color:var(--red)">Their crew can see you.</b>' : 'Nobody from their crew is in sight.'}</div>` : ''}<div class="jobs">` +
         rows.map(k => { const lb = GOOD_UNIT[k][2] < 1, opts = lb ? [[1, lotsFor(k, 1)], [5, lotsFor(k, 5)]] : [[1, 1], [5, 5]]; const pl = c[k] ? price(k) - Inv.avg(c, k) : 0; return `<div class="job" style="flex-wrap:wrap"><i style="color:${TIERS[GOODS[k].tier].col}">■</i><div style="min-width:170px"><b>${GOODS[k].name}</b><span>${fmtPerUnit(k, price(k))} · they want ${fmtQty(k, q[k])} · you have ${fmtQty(k, c[k] | 0)}${c[k] && Inv.cost(c, k) ? ` · ${pl >= 0 ? '+' : '−'}${fmtMoney(Math.abs(perUnit(k, pl)))}/${unitName(k)} vs what you paid` : ''}</span></div><div class="btns">${opts.map(([t, n]) => `<button class="sbtn" data-act="s:${k}:${n}" ${(c[k] | 0) < 1 || q[k] < 1 ? 'disabled' : ''}>${lb ? t + ' lb' : '×' + t}</button>`).join('')}<button class="sbtn gold" data-act="s:${k}:999" ${(c[k] | 0) < 1 || q[k] < 1 ? 'disabled' : ''}>Max</button></div></div>`; }).join('') + '</div><div class="hint">Each deal risks an undercover cop or a patrol seeing it. Quotas refill daily.</div>';
     };
     g.content.openSvc('Street buyers', '', render, a => {
@@ -51896,9 +51948,12 @@ class EmpireUI {
       uw.market.sold(z, k, n); uw.addRep(Math.max(1, Math.round(n * (GOODS[k].tier + 1) * 0.8)), null);
       uw.addInf(i, 'pc', n * 0.25);
       S.pressure = clamp(S.pressure + n * GOODS[k].heat * 0.06, 0, 100); S.turfs[i].police = clamp(S.turfs[i].police + n * 0.2, 0, 100);
-      if (own && own !== 'pc' && FACTIONS[own]) { S.factions[own].rel -= 1 + n * 0.3; if (uw.attitude(own) === 'hostile') for (const gg of uw.gangs.groups.values()) if (gg.fid === own && gg.members.some(m => dist2(m.x, m.z, g.player.pos.x, g.player.pos.z) < 40 * 40)) gg.hostile = true; }
+      let seen = '';
+      if (own && own !== 'pc' && FACTIONS[own]) { S.factions[own].rel -= 1 + n * 0.3; seen = uw.gangs.dealSeen(own, i); }
       if (g.police.copCanSee(g.player.pos.x, g.player.pos.z, 40)) { g.police.crime('deal', g.player.pos.x, g.player.pos.z); }
-      g.audio.play('cash'); g.saveGame(); g.content.refreshSvc(`Sold ${fmtQty(k, n)} ${GOODS[k].name} for ${fmtMoney(cash)}.`);
+      g.audio.play('cash'); g.saveGame();
+      if (seen && /coming for you/.test(seen)) { g.ui.closeAll(); g.ui.toast(seen, 'warn'); return; }
+      g.content.refreshSvc(`Sold ${fmtQty(k, n)} ${GOODS[k].name} for ${fmtMoney(cash)}.${seen ? ' ' + seen : ''}`);
     });
   }
   dealRisk(i) {
@@ -55699,7 +55754,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, UW_RANKS, rankOf, supplierStock, CAREER, CAREER_ACTS, LANDMARKS, IMPORT_MAX_LB, EXPORT_DAY_LB, BANK, Trade, Career, POCKET_CAP, lots, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, UW_RANKS, rankOf, supplierStock, CAREER, CAREER_ACTS, LANDMARKS, IMPORT_MAX_LB, EXPORT_DAY_LB, BANK, Trade, Career, POCKET_CAP, lots, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, STAGES, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, dressCiv, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
     await game.init(progress);
   } catch (e) {
     console.error(e);
