@@ -308,7 +308,7 @@ const Island = {
     const h = this.base0(x, z);
     if (!this._nearRoad(this._seg, x, z)) return h;
     const y = this._ry, d = this._rd;
-    if (wide) return d < wide ? Math.min(h, y - 0.4) : h;
+    if (wide) return d < wide ? Math.min(h, y - 0.4 - 0.02 * Math.max(0, d)) : h;
     // level across the road and a verge either side (ISLE.verge: wide enough that every 4 m cell the carriageway
     // touches is level, so the baked tile is too), then eased into the hillside over a shoulder as wide as the cut is deep
     const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h)), v0 = ISLE.verge;

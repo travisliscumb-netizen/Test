@@ -739,6 +739,9 @@ class Game {
     this.chunks.updateMaterials(this.env.night, this.time);
     // camera
     if (this.state !== 'menu' && this.state !== 'loading') this.cam.update(rdt);
+    // up in an aircraft nothing is within metres of the lens: a deeper near plane keeps the far shore from shimmering
+    // against the sea (depth precision goes with the near plane)
+    { const pv = p.state === 'vehicle' ? p.vehicle : null, near = pv && pv.air && pv.air.agl > 12 ? 2.4 : 0.15; if (this.camera.near !== near) { this.camera.near = near; this.camera.updateProjectionMatrix(); } }
     this.camera.updateMatrixWorld();
     this._pm.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this._pm);

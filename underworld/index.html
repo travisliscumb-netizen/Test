@@ -33538,7 +33538,7 @@ const Island = {
     const h = this.base0(x, z);
     if (!this._nearRoad(this._seg, x, z)) return h;
     const y = this._ry, d = this._rd;
-    if (wide) return d < wide ? Math.min(h, y - 0.4) : h;
+    if (wide) return d < wide ? Math.min(h, y - 0.4 - 0.02 * Math.max(0, d)) : h;
     // level across the road and a verge either side (ISLE.verge: wide enough that every 4 m cell the carriageway
     // touches is level, so the baked tile is too), then eased into the hillside over a shoulder as wide as the cut is deep
     const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h)), v0 = ISLE.verge;
@@ -41979,8 +41979,10 @@ class IslandScenery {
   }
   // ---------------------------------------------------------------- colours
   // the ground's colour at (x, z): its surface (grass, sand, rock, forest floor, dry grass), paler with height, mottled
-  _col(x, z, h, slope) {
-    const s = Island.surface(x, z, h, slope), c = this._c.setHex(ISLE_COL[s]), o = this._rgb;
+  // (far: the coarse mesh never takes a road's colour: the ribbon is the road, and one dark vertex in four is a blot)
+  _col(x, z, h, slope, far) {
+    let s = Island.surface(x, z, h, slope); if (far && s === 3) s = 0;
+    const c = this._c.setHex(ISLE_COL[s]), o = this._rgb;
     let k = 1 + 0.09 * tNoise(x / 37, z / 37, 67) + 0.05 * tNoise(x / 9, z / 9, 69);
     if (s === 0 || s === 4 || s === 5) {
       // open ground shades into the forest's floor by how wooded it is (no hard edge: the far mesh is 32 m a vertex)
@@ -41988,6 +41990,9 @@ class IslandScenery {
       // steep ground shows its rock, high ground goes pale and stony, the shore's grass thins into sand
       const rock = smoothstep(0.42, 0.62, slope) + smoothstep(150, 215, h) * 0.7;
       if (rock > 0) c.lerp(this._c2.setHex(ISLE_COL[2]), Math.min(1, rock));
+      // and behind a beach the grass thins into the sand over a few metres (the physics' sand ends on a line; the eye's does not)
+      const bk = (1 - smoothstep(34, 58, -Island.sd(x, z))) * (1 - smoothstep(SEA_Y + 2.9, SEA_Y + 4.6, h));
+      if (bk > 0) c.lerp(this._c2.setHex(ISLE_COL[1]), bk);
       k *= 1 + clamp((h - 30) * 0.0012, -0.04, 0.12);
     } else if (s === 1) k *= h < SEA_Y + 0.25 ? 0.72 : 1;
     o[0] = c.r * k; o[1] = c.g * k; o[2] = c.b * k;
@@ -42007,14 +42012,15 @@ class IslandScenery {
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
       const x = ISLE.x0 + i * s, z = ISLE.z0 + j * s;
       // inside the city's square the coarse mesh ducks under the streets it would otherwise cover
-      H[j * nx + i] = x > -E && z > -E && x < CITY + E && z < CITY + E ? -0.6 : Island.compute(x, z, 26);
+      // (and within 52 m of a road it keeps under the road's level, so no coarse triangle rises through the ribbon)
+      H[j * nx + i] = x > -E && z > -E && x < CITY + E && z < CITY + E ? -0.6 : Island.compute(x, z, 52);
     }
     const hAt = (i, j) => H[clamp(j, 0, nz - 1) * nx + clamp(i, 0, nx - 1)];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
       const o = (j * nx + i) * 3, x = ISLE.x0 + i * s, z = ISLE.z0 + j * s, h = H[j * nx + i];
       const gx = (hAt(i + 1, j) - hAt(i - 1, j)) / (2 * s), gz = (hAt(i, j + 1) - hAt(i, j - 1)) / (2 * s), l = Math.hypot(gx, 1, gz);
       pos[o] = x; pos[o + 1] = h; pos[o + 2] = z; nrm[o] = -gx / l; nrm[o + 1] = 1 / l; nrm[o + 2] = -gz / l;
-      const c = this._col(x, z, h, Math.hypot(gx, gz)); col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
+      const c = this._col(x, z, h, Math.hypot(gx, gz), true); col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
@@ -42164,11 +42170,21 @@ class IslandScenery {
     const t = new THREE.CanvasTexture(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
     return t;
   }
+  // the ribbons: a mesh for about every kilometre of each road (so only what is in view is drawn), one material
   _roadMesh() {
-    const pos = [], uv = [], nrm = [], idx = [], E = EDGE_MARGIN;
+    const E = EDGE_MARGIN, group = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
     const inCity = p => p[0] > -E && p[1] > -E && p[0] < CITY + E && p[1] < CITY + E;
+    let pos = [], uv = [], nrm = [], idx = [];
+    const flush = () => {
+      if (!idx.length) { pos = []; uv = []; nrm = []; return; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+      g.setIndex(idx); g.computeBoundingSphere();
+      const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
+      pos = []; uv = []; nrm = []; idx = [];
+    };
     for (const R of Island.roads) {
-      let prev = -1;
+      let prev = -1, chunk0 = 0;
       for (let k = 0; k < R.pts.length; k++) {
         const p = R.pts[k];
         // inside the city's square the ground shader paints the road (the local-roads raster); the ribbon starts at its edge
@@ -42178,6 +42194,8 @@ class IslandScenery {
         uv.push(0, R.cum[k] / 12, 1, R.cum[k] / 12); nrm.push(0, 1, 0, 0, 1, 0);
         if (prev >= 0) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
         prev = base;
+        // a new mesh every 400 points (a kilometre): it starts with this point again, so the ribbon has no gap
+        if (k - chunk0 >= 400 && k < R.pts.length - 1) { flush(); chunk0 = k; k--; prev = -1; }
       }
       // the turning circle at a dead end
       if (R.ring) {
@@ -42185,17 +42203,21 @@ class IslandScenery {
         pos.push(R.ring.x, y, R.ring.z); uv.push(0.3, 0); nrm.push(0, 1, 0);
         for (let q = 0; q <= 32; q++) { const an = q / 32 * Math.PI * 2; pos.push(R.ring.x + Math.cos(an) * rr, y, R.ring.z + Math.sin(an) * rr); uv.push(0.3, 0.6); nrm.push(0, 1, 0); if (q) idx.push(c0, c0 + q + 1, c0 + q); }
       }
+      flush();
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-    g.setIndex(idx); g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
-    m.receiveShadow = true; m.frustumCulled = false; m.name = 'isleRoads';
-    return m;
+    group.name = 'isleRoads';
+    return group;
   }
   // ---------------------------------------------------------------- the bridge and the tunnel
   _structures() {
-    const g = new GeoBuilder(), glow = new GeoBuilder(), group = new THREE.Group(), steel = C(0x23272c), conc = C(0x9a9c98), dark = C(0x3a3c40);
+    let g = new GeoBuilder(), glow = new GeoBuilder();
+    const group = new THREE.Group(), steel = C(0x23272c), conc = C(0x9a9c98), dark = C(0x3a3c40), solid = makePropMaterial(0.85, 0.1), lit = new THREE.MeshBasicMaterial({ vertexColors: true });
+    // (each structure is a mesh of its own, so the bridge is not drawn while you look at the tunnel)
+    const flush = () => {
+      if (!g.empty) { const m = new THREE.Mesh(g.build(), solid); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+      if (!glow.empty) group.add(new THREE.Mesh(glow.build(), lit));
+      g = new GeoBuilder(); glow = new GeoBuilder();
+    };
     const seg = (a, b, w, hgt, yOff, col) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz), pitch = Math.atan2(b[2] - a[2], L); g.add(TPL.box, M((a[0] + b[0]) / 2, (a[2] + b[2]) / 2 + yOff, (a[1] + b[1]) / 2, w, hgt, Math.hypot(L, b[2] - a[2]) + 0.05, Math.atan2(dx, dz), -pitch), col); };
     for (const R of Island.roads) {
       const P3 = k => [R.pts[k][0], R.pts[k][1], R.y[k]];
@@ -42219,6 +42241,8 @@ class IslandScenery {
             for (let k = k0; k < k1; k++) { const a = at(k), b = at(k + 1); a[2] += hgt(k); b[2] += hgt(k + 1); seg(a, b, 0.5, 0.5, 0, steel); if ((k - k0) % 6 === 3) { const p = at(k), hh = hgt(k); if (hh > 2) g.add(TPL.box, M(p[0], p[2] + hh / 2, p[1], 0.14, hh, 0.14), steel); } }
           }
         }
+        for (const r of this.world.isle.rails) if (r.kind === 1 && r.road === R) for (let k = 0; k < r.line.length - 1; k++) seg(r.line[k], r.line[k + 1], 0.3, 1.0, 0.5, conc);
+        flush();
       }
       // parapets along every span's rails; the tunnel's walls, roof and lights
       if (R.tunnel) {
@@ -42237,17 +42261,18 @@ class IslandScenery {
           const sgn = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.5), new THREE.MeshBasicMaterial({ map: makeSignTexture('BLACKGATE TUNNEL', '#14181c', '#ffffff', 1024, 118) }));
           sgn.position.set(p[0] - fx * 0.85, p[2] + 8.6, p[1] - fz * 0.85); sgn.rotation.y = h + Math.PI; group.add(sgn);
         }
+        flush();
       }
     }
-    for (const r of this.world.isle.rails) if (r.kind === 1) for (let k = 0; k < r.line.length - 1; k++) seg(r.line[k], r.line[k + 1], 0.3, 1.0, 0.5, conc);
-    if (!g.empty) { const m = new THREE.Mesh(g.build(), makePropMaterial(0.85, 0.1)); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; group.add(m); }
-    if (!glow.empty) { const m = new THREE.Mesh(glow.build(), new THREE.MeshBasicMaterial({ vertexColors: true })); m.frustumCulled = false; group.add(m); }
     group.name = 'isleStruct';
     return group;
   }
   // ---------------------------------------------------------------- the airfield and the proving ground: surfaces and paint
   _paint() {
-    const g = new GeoBuilder(), group = new THREE.Group(), A = AIRPORT, Y = A.y, asph = C(0x2e3034), conc = C(0x8f918e), white = C(0xe8e8e2), yel = C(0xe2b43a), lot = C(0x3a3c40);
+    let g = new GeoBuilder();
+    const group = new THREE.Group(), A = AIRPORT, Y = A.y, asph = C(0x2e3034), conc = C(0x8f918e), white = C(0xe8e8e2), yel = C(0xe2b43a), lot = C(0x3a3c40);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const flush = () => { const m = new THREE.Mesh(g.build(), mat); m.receiveShadow = true; group.add(m); g = new GeoBuilder(); };
     const slab = (x0, z0, x1, z1, y, col, lift = 0.03) => g.add(TPL.box, M((x0 + x1) / 2, y + lift - 0.05, (z0 + z1) / 2, x1 - x0, 0.1, z1 - z0), col);
     const label = (text, x, y, z, w, h, ry, fg = '#e8e8e2') => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: makeSignTexture(text, '#2e3034', fg, 512, Math.round(512 * h / w)), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 })); m.rotation.set(-Math.PI / 2, 0, ry); m.position.set(x, y + 0.07, z); group.add(m); };
     // the apron, the taxiway and its links to both runways, the runways with their centre lines, edges and thresholds
@@ -42269,6 +42294,7 @@ class IslandScenery {
     for (let r = 0; r < 3; r++) for (let k = 0; k <= 11; k++) slab(304.4 + k * 15, 1857 + r * 22, 304.7 + k * 15, 1867 + r * 22, Y, white, 0.05);
     // hangar floors
     for (const H of this.world.isle.sites.hangars) slab(H.x0, H.z0, H.x1, A.apron.z0, Y, conc, 0.025);
+    flush();
     // the proving ground: the strip and its lanes, the skid pad's rings, the slalom lot
     const G = PROVING, S = G.strip, GY = G.y;
     slab(S.x0, S.z - S.w / 2, S.x1, S.z + S.w / 2, GY, asph, 0.04);
@@ -42278,8 +42304,7 @@ class IslandScenery {
     for (const rr of [18, 34, G.pad.r - 2]) for (let q = 0; q < 48; q++) { const a = q / 48 * Math.PI * 2; g.add(TPL.box, M(G.pad.x + Math.cos(a) * rr, GY + 0.02, G.pad.z + Math.sin(a) * rr, rr * 0.09, 0.1, 0.3, -a + Math.PI / 2), white); }
     slab(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, GY, asph, 0.04);
     slab(1196, 1503, 1204, S.z - S.w / 2, GY, asph, 0.035);
-    const m = new THREE.Mesh(g.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
-    m.receiveShadow = true; m.frustumCulled = false; group.add(m); group.name = 'islePaint';
+    flush(); group.name = 'islePaint';
     return group;
   }
 }
@@ -66420,6 +66445,9 @@ class Game {
     this.chunks.updateMaterials(this.env.night, this.time);
     // camera
     if (this.state !== 'menu' && this.state !== 'loading') this.cam.update(rdt);
+    // up in an aircraft nothing is within metres of the lens: a deeper near plane keeps the far shore from shimmering
+    // against the sea (depth precision goes with the near plane)
+    { const pv = p.state === 'vehicle' ? p.vehicle : null, near = pv && pv.air && pv.air.agl > 12 ? 2.4 : 0.15; if (this.camera.near !== near) { this.camera.near = near; this.camera.updateProjectionMatrix(); } }
     this.camera.updateMatrixWorld();
     this._pm.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this._pm);

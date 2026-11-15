@@ -98,7 +98,7 @@ const roads = await ev(() => {
   const T = I.roads.find(R => R.tunnel), kt = Math.round((T.tunnel[0] + T.tunnel[1]) / 2), pt = T.pts[kt];
   out.tunnel = { road: T.name, len: Math.round(T.cum[T.tunnel[1]] - T.cum[T.tunnel[0]]), floor: +T.y[kt].toFixed(2), inside: +groundY(pt[0], pt[1], T.y[kt] + 1).toFixed(2), above: +groundY(pt[0], pt[1], T.y[kt] + 60).toFixed(1) };
   out.spots = window.__pv.extRoadSpots(600, 1716).length;
-  out.ribbon = [g.isleScene.roads.geometry.attributes.position.count, I.roads.reduce((s, R) => s + R.pts.filter(p => window.__pv.offCity(p[0], p[1])).length, 0) * 2];
+  out.ribbon = [g.isleScene.roads.children.reduce((s, m) => s + m.geometry.attributes.position.count, 0), I.roads.reduce((s, R) => s + R.pts.filter(p => window.__pv.offCity(p[0], p[1])).length, 0) * 2];
   return out;
 });
 check('nine island roads, every one a curved link in the road graph, over 25 km of them, each painted by a ribbon along its own polyline', roads.roads.length === 9 && roads.links === 9 && roads.beds.km > 25 && roads.ribbon[0] >= roads.ribbon[1], JSON.stringify([roads.roads, roads.beds, roads.ribbon]));
