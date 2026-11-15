@@ -49,19 +49,21 @@ const world = await ev(() => {
   out.vpLink = !!w.links.find(l => l.spur && l.name === 'Valen Point Causeway');
   // ground: road level through the promenade gap, rising along the bridge to the landing; sea either side of it
   out.bridge = [968, 975, 1000, 1020, 1039].map(z => +gy(CFS.lb.x, z).toFixed(2));
-  out.sea = [gy(CFS.lb.x - 30, 1000), gy(CFS.lb.x + 30, 1000), gy(800, 1200), gy(CFS.x1 + 40, 1200)].map(v => +v.toFixed(1));
+  // (Operation Blackgate: the land bridge crosses the island's dry fields now; the sea is off the terminal)
+  out.fields = [gy(CFS.lb.x - 30, 1000), gy(CFS.lb.x + 30, 1000), gy(CFS.x1 + 40, 1200)].map(v => +v.toFixed(1));
+  out.sea = +gy(900, 1060).toFixed(2);
   out.cityPromenade = +gy(CFS.lb.x - 40, 972).toFixed(2);
   const hitAt = (x, z) => w.grid.resolveCircle(x, z, 0.6, 0.2, 1.5, {}).hit;
   out.gap = [970, 980, 1000, 1030].every(z => !hitAt(CFS.lb.x, z));
-  out.seawall = hitAt(CFS.lb.x - 40, 978) && hitAt(CFS.lb.x + 40, 978);
+  out.seawall = !hitAt(CFS.lb.x - 40, 978) && !hitAt(CFS.lb.x + 40, 978) && hitAt(900, 978);
   out.rails = hitAt(CFS.lb.x - CFS.lb.half + 0.4, 1010) && hitAt(CFS.lb.x + CFS.lb.half - 0.4, 1010);
   out.shore = hitAt(CFS.x0 + 1, 1300) && hitAt(CFS.x1 - 1, 1300) && hitAt(400, CFS.z1 - 1) && hitAt(100, CFS.z0 + 1);
   out.place = !!w.places.offroad;
   return out;
 });
 check('a land bridge leaves the south perimeter road (a spur off the lattice) and ends in the countryside; Valen Point’s causeway is still there', world.link && world.link.a === '1:12:2' && world.link.free && world.vpLink && world.place, JSON.stringify(world));
-check('ground: road level through the promenade gap, rising along the bridge to the fields; sea either side and beyond', world.bridge[0] === 0 && world.bridge[1] === 0 && world.bridge[4] > 0.6 && world.bridge[2] < world.bridge[3] && world.sea.every(v => v < -1) && world.cityPromenade === 0.15, JSON.stringify(world));
-check('walls: the seawall opens only for the land bridge; the bridge has rails; the countryside has a fence all round', world.gap && world.seawall && world.rails && world.shore, JSON.stringify(world));
+check('ground: road level through the promenade gap, rising along the bridge to the fields; dry fields either side of it (the island), the sea off the terminal', world.bridge[0] === 0 && world.bridge[1] === 0 && world.bridge[4] > 0.6 && world.bridge[2] < world.bridge[3] && world.fields.every(v => v > -0.6 && v < 4) && world.sea < -2 && world.cityPromenade === 0.15, JSON.stringify(world));
+check('walls: no seawall where the island’s fields meet the city (it still stands round the terminal); the bridge has rails; the countryside has a fence all round', world.gap && world.seawall && world.rails && world.shore, JSON.stringify(world));
 
 // ---------------------------------------------------------------- 2. the terrain
 const terrain = await ev(() => {

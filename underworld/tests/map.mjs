@@ -39,7 +39,10 @@ await ev(() => { const v = window.game.ui.mapView; for (let k = 0; k < 10; k++) 
 const vmax = await view();
 await ev(() => { const v = window.game.ui.mapView; for (let k = 0; k < 10; k++) v.zoomAt(0.2, v.W / 2, v.H / 2, true); });
 const vmin = await view();
-check('zoom is clamped between 1x and 8x', vmax.z === 8 && vmin.z === 1, JSON.stringify({ vmax, vmin }));
+// (Operation Blackgate: pinching far out now stops where the whole island fits the screen, about 0.16x)
+const zmin = await ev(() => window.game.ui.mapView.minZoom());
+check('zoom is clamped between the whole island (about 0.16x) and 8x', vmax.z === 8 && Math.abs(vmin.z - zmin) < 0.001 && zmin > 0.1 && zmin < 0.3, JSON.stringify({ vmax, vmin, zmin }));
+await ev(() => { const v = window.game.ui.mapView; v.zoomAt(1 / v.tz, v.W / 2, v.H / 2, true); });
 // mouse wheel zooms about the cursor (desktop)
 await ev(() => { const cv = document.getElementById('bigmapCanvas'), r = cv.getBoundingClientRect(); cv.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: r.left + r.width * 0.3, clientY: r.top + r.height * 0.4, bubbles: true, cancelable: true })); });
 await settle();

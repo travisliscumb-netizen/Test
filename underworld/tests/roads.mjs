@@ -30,7 +30,10 @@ const geo = await ev(() => {
   // (beyond the city's seawall the Valen Point causeway is painted by the district's own scenery: its band counts;
   // the Cedar Fields Track is the terrain's packed track (gravel on the pads) from the perimeter road's kerb out)
   const cfsTrack = q => q[1] >= P.CFS.lb.z0 && (P.Terrain.surf(q[0], q[1]) === P.TSURF.track || P.Terrain.surf(q[0], q[1]) === P.TSURF.gravel);
-  let off = 0; for (const L of w.links) for (const q of L.pts) if (!P.localRoadAt(q[0], q[1]) && !(L.spur && q[0] >= P.VP.cw.x0 && Math.abs(q[1] - P.VP.cw.z) <= P.VP.cw.road) && !(L.name === 'Cedar Fields Track' && cfsTrack(q))) off++;
+  // (Operation Blackgate: out on the island a road is painted by its own ribbon, laid along the same polyline: only
+  // the stretch inside the raster, where it crosses the city's promenade, has to be on it)
+  const isleRibbon = (L, q) => L.road.isle && (q[0] < -40 || q[1] < -40 || q[0] > 1000 || q[1] > 1000);
+  let off = 0; for (const L of w.links) for (const q of L.pts) if (!P.localRoadAt(q[0], q[1]) && !(L.spur && q[0] >= P.VP.cw.x0 && Math.abs(q[1] - P.VP.cw.z) <= P.VP.cw.road) && !(L.name === 'Cedar Fields Track' && cfsTrack(q)) && !isleRibbon(L, q)) off++;
   out.offRaster = off;
   return out;
 });

@@ -33284,7 +33284,7 @@ const LAKE = { name: 'Lake Valen', x: 1650, z: -900, rx: 330, rz: 235 };
 const MT_VALEN = { x: 350, z: -1750, h: 250, r: 800 };
 const BG_RIDGE = { ax: -2150, az: -1220, bx: -650, bz: -1560, h: 100, r: 150 };
 /* ---------------- the road network off the lattice ----------------
-   Each road is a spline through its control points, sampled every 4 m. An end is 'lat' (it meets a perimeter road of
+   Each road is a spline through its control points, sampled every 2.5 m like the city's curved streets. An end is 'lat' (it meets a perimeter road of
    the lattice at the kerb), a road's id (it ends on that road: the end is moved onto that road's nearest point) or
    'ring' (a turning circle). deck: a bridge's height over the water; cut: where the road goes through a ridge instead
    of over it, one even grade for `half` m either side of the point (the Blackgate Tunnel). Order matters: a road can
@@ -33298,7 +33298,7 @@ const ISLE_ROADS = [
   { id: 'n3', name: 'Highland Pass', w: 9, grade: 0.09, ends: ['n2', 'n1'], pts: [[1315, -1750], [1480, -1880], [1720, -1930], [2020, -1830], [2330, -1700]] },
   { id: 'n4', name: 'Lighthouse Road', w: 8, grade: 0.09, ends: ['n1', 'ring'], ring: 13, pts: [[1620, -2452], [1642, -2560], [1602, -2680], [1548, -2745], [1530, -2772]] },
   { id: 's1', name: 'Southshore Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'],
-    pts: [[40, 966], [40, 1005], [-30, 1075], [-100, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [725, 1100], [695, 1022], [680, 1000], [680, 966]] },
+    pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [722, 1080], [700, 1035], [686, 1005], [680, 985], [680, 966]] },
   { id: 's2', name: 'Airport Access', w: 10, grade: 0.07, ends: ['s1', 'ring'], ring: 17, pts: [[600, 1716], [600, 1770], [600, 1820], [600, 1856]] },
   { id: 's3', name: 'Blackgate Bridge', w: 12, grade: 0.065, deck: 16, ends: ['s1', 'n1'],
     pts: [[-100, 1230], [-270, 1192], [-520, 1172], [-780, 1130], [-960, 1060], [-1062, 960], [-1090, 860], [-1096, 700], [-1100, 500], [-1104, 300], [-1100, 190], [-1085, 60], [-1000, -140], [-920, -250], [-860, -300]] },
@@ -33440,7 +33440,7 @@ const Island = {
         const p = H.pts[best]; if (k) cp[cp.length - 1] = [p[0], p[1]]; else cp[0] = [p[0], p[1]];
         hosts[k] = { road: H, k: best };
       });
-      const pts = splinePts(cp, 4);
+      const pts = splinePts(cp, 2.5);
       const R = { id: D.id, name: D.name, w: D.w, grade: D.grade, deck: D.deck, cut: D.cut || null, ends: D.ends, ring: null, pts, hosts, st: D.st || 'asphalt' };
       if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
       this._profile(R);
@@ -40399,7 +40399,7 @@ Object.assign(World.prototype, {
       const folk = (id, x, z, people) => isle.fleet.push({ id: 'folk_' + id, x, z, r: 0, slots: [], people });
       folk('terminal', 600, 1884, [[590, 1885, 1.2], [594, 1886, -1.5], [606, 1885.5, 0.4], [612, 1886, -2.4], [575, 1881.6, 1.57], [628, 1884, 2.8], [600, 1886.5, 3.1]]);
       folk('apron', 1050, 1968, [[1030, 1975, -1.2], [1085, 1960, 0.6], [958, 1968, 1.57]]);
-      folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1519, 472, 1.57], [1519, 570, 1.57], [1508, 520, 0.4]]);
+      folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1527.6, 472, -1.57], [1527.6, 570, -1.57], [1527.6, 652, -1.57]]);
       folk('proving', 1163, 1492, [[1166, 1491, 3.14], [1170, 1490, -2.6], [PROVING.strip.x0 + 3, PROVING.strip.z - 12.5, 1.57]]);
       folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
       folk('summit', 380, -1800, [[372, -1784.5, 0.2], [376, -1785.5, -0.3], [392, -1847, 3.14]]);
@@ -42058,7 +42058,7 @@ class IslandScenery {
     const mouth = (x, z) => {
       if (!T.multi || !Island._nearRoad(Island._sseg, x, z)) return false;
       const R = Island._rr, k = Island._rk; if (!R.tunnel || Island._rd > 2.6) return false;
-      return Math.abs(k - R.tunnel[0]) <= 1 || Math.abs(k + 1 - R.tunnel[1]) <= 1;
+      return Math.abs(k - R.tunnel[0]) <= 2 || Math.abs(k + 1 - R.tunnel[1]) <= 2;
     };
     for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
       const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
@@ -42216,18 +42216,18 @@ class IslandScenery {
             const off = R.w / 2 + 1.2, at = k => { const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [R.pts[k][0] + (b[1] - a[1]) / l * off * side, R.pts[k][1] - (b[0] - a[0]) / l * off * side, R.y[k]]; };
             // the cable's height over the deck: from the anchorages up to each tower's top, sagging to 4 m at mid-span
             const hgt = k => { const [A, B] = TT; if (k <= A.k) return lerp(1.2, A.top - A.deck, ((k - k0) / Math.max(1, A.k - k0)) ** 1.6); if (k >= B.k) return lerp(1.2, B.top - B.deck, ((k1 - k) / Math.max(1, k1 - B.k)) ** 1.6); const u = (k - A.k) / (B.k - A.k) * 2 - 1; return 4 + (A.top - A.deck - 4) * u * u; };
-            for (let k = k0; k < k1; k++) { const a = at(k), b = at(k + 1); a[2] += hgt(k); b[2] += hgt(k + 1); seg(a, b, 0.5, 0.5, 0, steel); if ((k - k0) % 4 === 2) { const p = at(k), hh = hgt(k); if (hh > 2) g.add(TPL.box, M(p[0], p[2] + hh / 2, p[1], 0.14, hh, 0.14), steel); } }
+            for (let k = k0; k < k1; k++) { const a = at(k), b = at(k + 1); a[2] += hgt(k); b[2] += hgt(k + 1); seg(a, b, 0.5, 0.5, 0, steel); if ((k - k0) % 6 === 3) { const p = at(k), hh = hgt(k); if (hh > 2) g.add(TPL.box, M(p[0], p[2] + hh / 2, p[1], 0.14, hh, 0.14), steel); } }
           }
         }
       }
       // parapets along every span's rails; the tunnel's walls, roof and lights
       if (R.tunnel) {
-        const [k0, k1] = R.tunnel, a0 = Math.max(0, k0 - 2), a1 = Math.min(R.pts.length - 1, k1 + 2), wl = R.w / 2 + 1.1;
+        const [k0, k1] = R.tunnel, a0 = Math.max(0, k0 - 3), a1 = Math.min(R.pts.length - 1, k1 + 3), wl = R.w / 2 + 1.1;
         for (let k = a0; k < a1; k++) {
           const a = P3(k), b = P3(k + 1), dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = dz / L, nz = -dx / L;
           for (const s of [-1, 1]) seg([a[0] + nx * wl * s, a[1] + nz * wl * s, a[2]], [b[0] + nx * wl * s, b[1] + nz * wl * s, b[2]], 0.6, 6.6, 3.2, dark);
           seg(a, b, R.w + 2.8, 0.6, 6.7, dark);
-          if (k % 4 === 0) glow.add(TPL.box, M(a[0], a[2] + 6.3, a[1], 1.6, 0.12, 0.5, Math.atan2(dx, dz)), C(0xffe2a8));
+          if (k % 6 === 0) glow.add(TPL.box, M(a[0], a[2] + 6.3, a[1], 1.6, 0.12, 0.5, Math.atan2(dx, dz)), C(0xffe2a8));
         }
         // the portals: two piers and a lintel in front of each mouth
         for (const [k, dir] of [[a0, 1], [a1, -1]]) {
@@ -44041,11 +44041,14 @@ const Flight = {
   _q: [], _res: {},
   init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
   // what an aircraft at height y over (x, z) would come down on: the ground or a deck at its level, or a roof below it
+  // (its slope is left in _gx / _gz: flying into a hillside is not a landing)
   ground(world, x, z, y) {
-    let g = groundY(x, z, y + 0.5, 1.5);
-    for (const c of world.grid.query(x - 0.5, z - 0.5, x + 0.5, z + 0.5, this._q)) if (c.kind === 'bld' && c.x0 !== undefined && x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1 && c.y1 <= y + 1.2 && c.y1 > g) g = c.y1;
+    let g = groundY(x, z, y + 0.5, 1.5); this._gx = SURF.gx; this._gz = SURF.gz;
+    for (const c of world.grid.query(x - 0.5, z - 0.5, x + 0.5, z + 0.5, this._q)) if (c.kind === 'bld' && c.x0 !== undefined && x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1 && c.y1 <= y + 1.2 && c.y1 > g) { g = c.y1; this._gx = 0; this._gz = 0; }
     return g;
   },
+  // how fast something moving at (vx, vy, vz) is closing on the ground just found (m/s into its surface)
+  closing(vx, vy, vz) { return Math.max(0, (vx * this._gx + vz * this._gz - vy) / Math.hypot(1, this._gx, this._gz)); },
   // set down where it stands (a spawn, a reset)
   place(v, world) { const A = v.air; v.pos.y = this.ground(world, v.pos.x, v.pos.z, v.pos.y); A.vy = 0; A.pitch = 0; A.bank = 0; A.grounded = true; A.agl = 0; this.wheels(v, world); },
   wheels(v, world) { const W = v.vg.wheels, c = Math.cos(v.h), s = Math.sin(v.h); for (let i = 0; i < 4; i++) v._wy[i] = v.air.grounded ? this.ground(world, v.pos.x + W[i][0] * c + W[i][1] * s, v.pos.z - W[i][0] * s + W[i][1] * c, v.pos.y) : -1e6; },
@@ -44110,7 +44113,7 @@ const Flight = {
         const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
         if (v.pos.y <= g2) {
           // touchdown: gently and wings level it is a landing; too hard, banked over or nose first, it is a crash
-          const sink = Math.max(0, -vy), bad = sink > 13 || Math.abs(A.bank) > 0.6 || A.pitch < -0.33 || (g2 < SEA_Y - 0.4);
+          const sink = this.closing(vx, vy, vz), bad = sink > 13 || Math.abs(A.bank) > 0.6 || A.pitch < -0.33 || (g2 < SEA_Y - 0.4);
           v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 5, bad);
         }
         v.braking = false; v.spin += 6 * dt;
@@ -44140,7 +44143,7 @@ const Flight = {
       v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y += vy * dt;
       const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
       if (A.grounded) v.pos.y = g2;
-      else if (v.pos.y <= g2) { const sink = Math.max(0, -vy), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
+      else if (v.pos.y <= g2) { const sink = this.closing(vx, vy, vz), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
       v.braking = false;
     }
     // the island ends: a headwind that grows with every metre past the edge of the map turns it back

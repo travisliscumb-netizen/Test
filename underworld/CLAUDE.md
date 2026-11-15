@@ -9,9 +9,12 @@ Read this first, then `CURRENT_SESSION.md` (what is in progress and the exact ne
   stopped for owner review (GRAPHICS.md); the debugging, optimisation and release-candidate phases wait on the owner.
 - `docs/THE_UNDERWORLD_BUILD_SESSION_PROMPTS.md`: the session plan.
 - `OVERHAUL_STATUS.md`: the detailed per-session history (long). `DECISIONS.md` summarises the rulings that matter.
+- `ISLAND.md`: Operation Blackgate, the owner's world rebuild (the island, its roads, the airport, aircraft, race
+  cars). The owner gave full creative and technical authority for it; its decisions are recorded there.
 
 ## Repository rules
 - Branch `claude/practical-lamport-zld81y`; push with `git push -u origin claude/practical-lamport-zld81y`.
+  (Operation Blackgate was built on `claude/epic-galileo-m47k4d`, branched from it; work on the branch your session names.)
 - No pull requests unless asked. No model identifiers in commits or files. Commit messages end with the
   Co-Authored-By / Claude-Session lines the harness gives.
 - Source is `src/` (concatenated in `src/manifest.json` order). Build: `node underworld/tools/build.mjs`

@@ -119,11 +119,14 @@ const Flight = {
   _q: [], _res: {},
   init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
   // what an aircraft at height y over (x, z) would come down on: the ground or a deck at its level, or a roof below it
+  // (its slope is left in _gx / _gz: flying into a hillside is not a landing)
   ground(world, x, z, y) {
-    let g = groundY(x, z, y + 0.5, 1.5);
-    for (const c of world.grid.query(x - 0.5, z - 0.5, x + 0.5, z + 0.5, this._q)) if (c.kind === 'bld' && c.x0 !== undefined && x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1 && c.y1 <= y + 1.2 && c.y1 > g) g = c.y1;
+    let g = groundY(x, z, y + 0.5, 1.5); this._gx = SURF.gx; this._gz = SURF.gz;
+    for (const c of world.grid.query(x - 0.5, z - 0.5, x + 0.5, z + 0.5, this._q)) if (c.kind === 'bld' && c.x0 !== undefined && x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1 && c.y1 <= y + 1.2 && c.y1 > g) { g = c.y1; this._gx = 0; this._gz = 0; }
     return g;
   },
+  // how fast something moving at (vx, vy, vz) is closing on the ground just found (m/s into its surface)
+  closing(vx, vy, vz) { return Math.max(0, (vx * this._gx + vz * this._gz - vy) / Math.hypot(1, this._gx, this._gz)); },
   // set down where it stands (a spawn, a reset)
   place(v, world) { const A = v.air; v.pos.y = this.ground(world, v.pos.x, v.pos.z, v.pos.y); A.vy = 0; A.pitch = 0; A.bank = 0; A.grounded = true; A.agl = 0; this.wheels(v, world); },
   wheels(v, world) { const W = v.vg.wheels, c = Math.cos(v.h), s = Math.sin(v.h); for (let i = 0; i < 4; i++) v._wy[i] = v.air.grounded ? this.ground(world, v.pos.x + W[i][0] * c + W[i][1] * s, v.pos.z - W[i][0] * s + W[i][1] * c, v.pos.y) : -1e6; },
@@ -188,7 +191,7 @@ const Flight = {
         const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
         if (v.pos.y <= g2) {
           // touchdown: gently and wings level it is a landing; too hard, banked over or nose first, it is a crash
-          const sink = Math.max(0, -vy), bad = sink > 13 || Math.abs(A.bank) > 0.6 || A.pitch < -0.33 || (g2 < SEA_Y - 0.4);
+          const sink = this.closing(vx, vy, vz), bad = sink > 13 || Math.abs(A.bank) > 0.6 || A.pitch < -0.33 || (g2 < SEA_Y - 0.4);
           v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 5, bad);
         }
         v.braking = false; v.spin += 6 * dt;
@@ -218,7 +221,7 @@ const Flight = {
       v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y += vy * dt;
       const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
       if (A.grounded) v.pos.y = g2;
-      else if (v.pos.y <= g2) { const sink = Math.max(0, -vy), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
+      else if (v.pos.y <= g2) { const sink = this.closing(vx, vy, vz), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
       v.braking = false;
     }
     // the island ends: a headwind that grows with every metre past the edge of the map turns it back

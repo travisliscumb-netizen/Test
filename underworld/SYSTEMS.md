@@ -38,3 +38,11 @@
 | Rendering: outdoors group, culling, quality | `630`, `150`, `610` | `game.outdoor` hidden inside rooms; foliage LOD/culling `props.cull`; dynamic resolution (auto) |
 | People's looks | `180` | `randomLook` (faces, hairstyles, coats, beanies), `roundBoxGeometry` (`070`) |
 | HUD, map symbols, currency classes | `600`, `main.css` | Rank/Rep chip, `MAP_GLYPHS`/`mapIconHTML`, `.cash.dirty`/`.cash.clean`, banner kickers (Session 14) |
+| The island's ground (Operation Blackgate) | `022` | `Island`: shore (signed-distance grid), heights, pads, road beds, 256 m tiles of 4 m cells, `height(x, z, y)` (a bridge's deck and the tunnel's floor answer by `y`), `surface`, `effect`, `occludes`, `zoneKey`; `ISLE_ROADS`, `AIRPORT`, `PROVING`, `LAKE`; `SEA_Y`, wading depth `ISLE.wade` |
+| What stands on the island | `127` | `_genIsland`: roads as curved links, the airport, the proving ground, settlements, colliders (bridge rails, tunnel walls, towers), `world.isle.fleet` (vehicle and bystander sites), `world.isle.lifts` (the two helipad lifts) |
+| The island's scenery | `177` | `IslandScenery`: near tiles + the 32 m far mesh, forests, road ribbons, bridge and tunnel, airfield paint |
+| The city's edge | `090` `_genPerimeter` (`world.shore`), `170` | the seawall only on the wet stretches; rooftop helipads in `_genSpecial` |
+| Competition cars, emergency vehicles, aircraft | `232` (`Flight`, `ISLE_BUILD`, `makeRotors`), hooks in `220` / `230` / `240` | `spec.air` ('plane' / 'heli') switches a vehicle to flight physics; `spec.fleet` marks island-only types |
+| The fleet | `245` `IslandFleet` | spawns `world.isle.fleet` sites' vehicles and bystanders near the focus |
+| Island on the maps | `600` `_renderIsle`, `_paintIsle`, `mapX0` / `mapZ0`, `MapView.minZoom` | map space runs north and west of the city (negative) |
+

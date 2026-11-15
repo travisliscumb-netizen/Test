@@ -39,3 +39,14 @@
   phone viewport; `VQA_QUICK=1` for half-size look-dev); `node underworld/tools/build-cost.mjs <a.html> [b.html…]`
   (raw/gzip/brotli, boot ms, JS heap, live geometries/textures, medians of three cold loads; run on a quiet machine);
   `tools/export-release.mjs` + `tools/verify-release.mjs` (single-file release and its static-host check).
+- Operation Blackgate: `island` (the island's size, outline, waters and islets; the city's edge; meshes and physics
+  on the same ground; districts and places; every island road a curved link, GPS routes to every place and back, road
+  beds, the bridge's deck and the tunnel's floor by height; the airport; wading and a car in the sea; the fleet and
+  the race cars, one taken and driven on the circuit; the aeroplane's take-off, climb, turn and landing and the
+  helicopter from the hospital's roof, both flown by the physics alone at 1/60 s a step; highway traffic; the map; a
+  save on the island; a touch phone). `offroad`, `roads` and `map` changed where the island changed what they assert
+  (dry fields round the land bridge, ribbons outside the raster, zooming out to the whole island).
+- Island tools (not tests): `node underworld/tools/isle-preview.mjs [out.png] [m per px]` draws the island without a
+  browser and prints each road's length, grade, deepest cut, bridges, tunnel and sharpest kink (`ISLE_BEDS=1` adds the
+  road-bed check); `node underworld/tools/isle-shots.mjs <out dir> [prefixes…]` captures the island's views
+  (`ISLE_DPR=2` for presentation).

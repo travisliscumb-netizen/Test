@@ -96,3 +96,15 @@
   character parts), about +0.3–0.5 ms unthrottled.
 - Visual QA (GRAPHICS.md §6): the night-rain road film lifts the carriageway toward grey; rounded torsos read as
   padded shoulders and faces only read close up; Cedar Fields' nearest grass smears at a low camera.
+
+## Operation Blackgate (the island) — known limits
+- The city itself is still the 12 × 12 lattice (ISLAND.md §2): the island was built round it.
+- Pedestrians walk the lattice's pavements only; out on the island each place has bystanders who stand about.
+- No aircraft are flown by anyone but you, and the police do not follow one into the air (they lose sight of it).
+- An aircraft's collision is its fuselage: wings and rotor blades pass through what they touch.
+- A bridge's deck is solid from below for something climbing into it from underneath (it pops onto the deck).
+- Where a side road meets a road on a grade, the first metres of the side road twist a little to meet it.
+- Beyond the near tiles the hills are a 32 m mesh: a road's ribbon can float a little over a far hillside.
+- Highways are unlit at night (a car's own lamps, the airfield's and the tunnel's lights).
+- The far ground and the forests' trees appear as you approach (tiles are built one a frame).
+

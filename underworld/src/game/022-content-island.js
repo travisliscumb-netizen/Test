@@ -54,7 +54,7 @@ const LAKE = { name: 'Lake Valen', x: 1650, z: -900, rx: 330, rz: 235 };
 const MT_VALEN = { x: 350, z: -1750, h: 250, r: 800 };
 const BG_RIDGE = { ax: -2150, az: -1220, bx: -650, bz: -1560, h: 100, r: 150 };
 /* ---------------- the road network off the lattice ----------------
-   Each road is a spline through its control points, sampled every 4 m. An end is 'lat' (it meets a perimeter road of
+   Each road is a spline through its control points, sampled every 2.5 m like the city's curved streets. An end is 'lat' (it meets a perimeter road of
    the lattice at the kerb), a road's id (it ends on that road: the end is moved onto that road's nearest point) or
    'ring' (a turning circle). deck: a bridge's height over the water; cut: where the road goes through a ridge instead
    of over it, one even grade for `half` m either side of the point (the Blackgate Tunnel). Order matters: a road can
@@ -68,7 +68,7 @@ const ISLE_ROADS = [
   { id: 'n3', name: 'Highland Pass', w: 9, grade: 0.09, ends: ['n2', 'n1'], pts: [[1315, -1750], [1480, -1880], [1720, -1930], [2020, -1830], [2330, -1700]] },
   { id: 'n4', name: 'Lighthouse Road', w: 8, grade: 0.09, ends: ['n1', 'ring'], ring: 13, pts: [[1620, -2452], [1642, -2560], [1602, -2680], [1548, -2745], [1530, -2772]] },
   { id: 's1', name: 'Southshore Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'],
-    pts: [[40, 966], [40, 1005], [-30, 1075], [-100, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [725, 1100], [695, 1022], [680, 1000], [680, 966]] },
+    pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [722, 1080], [700, 1035], [686, 1005], [680, 985], [680, 966]] },
   { id: 's2', name: 'Airport Access', w: 10, grade: 0.07, ends: ['s1', 'ring'], ring: 17, pts: [[600, 1716], [600, 1770], [600, 1820], [600, 1856]] },
   { id: 's3', name: 'Blackgate Bridge', w: 12, grade: 0.065, deck: 16, ends: ['s1', 'n1'],
     pts: [[-100, 1230], [-270, 1192], [-520, 1172], [-780, 1130], [-960, 1060], [-1062, 960], [-1090, 860], [-1096, 700], [-1100, 500], [-1104, 300], [-1100, 190], [-1085, 60], [-1000, -140], [-920, -250], [-860, -300]] },
@@ -210,7 +210,7 @@ const Island = {
         const p = H.pts[best]; if (k) cp[cp.length - 1] = [p[0], p[1]]; else cp[0] = [p[0], p[1]];
         hosts[k] = { road: H, k: best };
       });
-      const pts = splinePts(cp, 4);
+      const pts = splinePts(cp, 2.5);
       const R = { id: D.id, name: D.name, w: D.w, grade: D.grade, deck: D.deck, cut: D.cut || null, ends: D.ends, ring: null, pts, hosts, st: D.st || 'asphalt' };
       if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
       this._profile(R);

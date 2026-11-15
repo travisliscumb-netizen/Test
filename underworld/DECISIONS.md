@@ -86,3 +86,14 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
   hits it (a Burglary on the CCTV); the police start coming in through it 10 s after they first storm, and once they
   cover it, leaving that way walks into them; before that, it is the way out unseen.
 
+## Operation Blackgate (the owner's world rebuild; full authority given; ISLAND.md is the record)
+- The lattice city stays as the island's metropolitan core; the world round it was rebuilt (an hourglass island: the
+  highlands north, the lowlands south, Valen Bay and Valen Sound either side of the city). The seawall stands only
+  where the city meets water.
+- Roads off the lattice are curved links (the Curved Roads architecture, used as built, not reopened).
+- Aircraft and competition cars are vehicles (walk up, get in, steal), with flight physics in place of the car's.
+  They and the emergency vehicles are island-only types: taken and used, never kept or sold (no cargo class, no list
+  price), so the M13 economy is as it was. No save field was added.
+- The sea is shallow physics (you wade to 1.25 m, a car bogs down); an aircraft that comes down in it is lost.
+- The racetrack was already there (Valen Point): it gained a chicane, a grid and race cars; the proving ground and
+  the airport's 1.5 km runway are where a car's top speed is found.

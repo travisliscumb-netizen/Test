@@ -111,7 +111,7 @@ class IslandScenery {
     const mouth = (x, z) => {
       if (!T.multi || !Island._nearRoad(Island._sseg, x, z)) return false;
       const R = Island._rr, k = Island._rk; if (!R.tunnel || Island._rd > 2.6) return false;
-      return Math.abs(k - R.tunnel[0]) <= 1 || Math.abs(k + 1 - R.tunnel[1]) <= 1;
+      return Math.abs(k - R.tunnel[0]) <= 2 || Math.abs(k + 1 - R.tunnel[1]) <= 2;
     };
     for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
       const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
@@ -269,18 +269,18 @@ class IslandScenery {
             const off = R.w / 2 + 1.2, at = k => { const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [R.pts[k][0] + (b[1] - a[1]) / l * off * side, R.pts[k][1] - (b[0] - a[0]) / l * off * side, R.y[k]]; };
             // the cable's height over the deck: from the anchorages up to each tower's top, sagging to 4 m at mid-span
             const hgt = k => { const [A, B] = TT; if (k <= A.k) return lerp(1.2, A.top - A.deck, ((k - k0) / Math.max(1, A.k - k0)) ** 1.6); if (k >= B.k) return lerp(1.2, B.top - B.deck, ((k1 - k) / Math.max(1, k1 - B.k)) ** 1.6); const u = (k - A.k) / (B.k - A.k) * 2 - 1; return 4 + (A.top - A.deck - 4) * u * u; };
-            for (let k = k0; k < k1; k++) { const a = at(k), b = at(k + 1); a[2] += hgt(k); b[2] += hgt(k + 1); seg(a, b, 0.5, 0.5, 0, steel); if ((k - k0) % 4 === 2) { const p = at(k), hh = hgt(k); if (hh > 2) g.add(TPL.box, M(p[0], p[2] + hh / 2, p[1], 0.14, hh, 0.14), steel); } }
+            for (let k = k0; k < k1; k++) { const a = at(k), b = at(k + 1); a[2] += hgt(k); b[2] += hgt(k + 1); seg(a, b, 0.5, 0.5, 0, steel); if ((k - k0) % 6 === 3) { const p = at(k), hh = hgt(k); if (hh > 2) g.add(TPL.box, M(p[0], p[2] + hh / 2, p[1], 0.14, hh, 0.14), steel); } }
           }
         }
       }
       // parapets along every span's rails; the tunnel's walls, roof and lights
       if (R.tunnel) {
-        const [k0, k1] = R.tunnel, a0 = Math.max(0, k0 - 2), a1 = Math.min(R.pts.length - 1, k1 + 2), wl = R.w / 2 + 1.1;
+        const [k0, k1] = R.tunnel, a0 = Math.max(0, k0 - 3), a1 = Math.min(R.pts.length - 1, k1 + 3), wl = R.w / 2 + 1.1;
         for (let k = a0; k < a1; k++) {
           const a = P3(k), b = P3(k + 1), dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = dz / L, nz = -dx / L;
           for (const s of [-1, 1]) seg([a[0] + nx * wl * s, a[1] + nz * wl * s, a[2]], [b[0] + nx * wl * s, b[1] + nz * wl * s, b[2]], 0.6, 6.6, 3.2, dark);
           seg(a, b, R.w + 2.8, 0.6, 6.7, dark);
-          if (k % 4 === 0) glow.add(TPL.box, M(a[0], a[2] + 6.3, a[1], 1.6, 0.12, 0.5, Math.atan2(dx, dz)), C(0xffe2a8));
+          if (k % 6 === 0) glow.add(TPL.box, M(a[0], a[2] + 6.3, a[1], 1.6, 0.12, 0.5, Math.atan2(dx, dz)), C(0xffe2a8));
         }
         // the portals: two piers and a lintel in front of each mouth
         for (const [k, dir] of [[a0, 1], [a1, -1]]) {
