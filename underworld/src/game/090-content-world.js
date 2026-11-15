@@ -30,6 +30,8 @@ class World {
   // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
   blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
+    // the island's shore first (022): the city's edge is built by where it meets the water
+    Island.init();
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
       const b = {
@@ -608,7 +610,20 @@ class World {
     const main = this._bld(b, b.x0 + 4, b.z0 + 4, b.x1 - 4, b.z0 + 34, isH ? 30 : 18, isH ? STYLE.OFFICE : STYLE.DECO, col, 3.6, 3.4);
     this._rooftop(b, main, rng, 'tower');
     const wing = this._bld(b, b.x0 + 4, b.z0 + 34, b.x0 + 24, b.z1 - 4, isH ? 14 : 10, isH ? STYLE.OFFICE : STYLE.DECO, col, 3.6, 3.4);
-    this._rooftop(b, wing, rng, 'mid');
+    // the wing's roof is a helipad (Operation Blackgate): a clear deck you can stand and land on, its lights, an H,
+    // a parapet with the lift's head-house in one corner; the lift's street door is on the wing's east wall
+    {
+      const wy = wing.y0 + wing.h, hx = (wing.x0 + wing.x1) / 2, hz = (wing.z0 + wing.z1) / 2 - 1;
+      this._platform(b, wing.x0, wing.z0, wing.x1, wing.z1, wy);
+      b.helipad = { x: hx, z: hz, y: wy, lift: { x: wing.x1 + 1.4, z: wing.z1 - 3 }, top: { x: wing.x1 - 3.4, z: wing.z1 - 3 } };
+      b.fx.push({ type: 'helipad', x: hx, y: wy + 0.12, z: hz });
+      this._det(b, 'disc', hx, wy + 0.03, hz, 7, 1, 7, C(isH ? 0xd02a3a : 0x1c3f94)); this._det(b, 'disc', hx, wy + 0.05, hz, 6, 1, 6, C(0x3a3d42));
+      for (const dx of [-1.5, 1.5]) this._det(b, 'box', hx + dx, wy + 0.07, hz, 0.6, 0.04, 4.4, C(0xf2f2f2)); this._det(b, 'box', hx, wy + 0.07, hz, 3, 0.04, 0.6, C(0xf2f2f2));
+      for (const [px, pz, sx, sz] of [[hx, wing.z0 + 0.2, wing.x1 - wing.x0, 0.4], [hx, wing.z1 - 0.2, wing.x1 - wing.x0, 0.4], [wing.x0 + 0.2, (wing.z0 + wing.z1) / 2, 0.4, wing.z1 - wing.z0]]) this._det(b, 'box', px, wy + 0.45, pz, sx, 0.9, sz, C(0x8c949c), 0, true);
+      this._det(b, 'box', wing.x1 - 1.2, wy + 1.3, wing.z1 - 3, 2.2, 2.6, 2.6, C(0x6a7078), 0, true);
+      this._det(b, 'box', wing.x1 + 0.06, CURB_H + 1.15, wing.z1 - 3, 0.12, 2.3, 1.5, C(0x22262b));
+      b.signs.push({ text: 'HELIPAD LIFT', x: wing.x1 + 0.08, y: CURB_H + 2.75, z: wing.z1 - 3, ry: Math.PI / 2, w: 3.2, h: 0.5, bg: isH ? '#d02a3a' : '#0f2a52', fg: '#ffffff' });
+    }
     const fx = b.x0 + 42, fz = b.z1 + 2.2;
     if (isH) {
       b.signs.push({ text: '✚ ST. ALDA HOSPITAL', x: (b.x0 + b.x1) / 2, y: CURB_H + 27, z: b.z0 + 4 - 0.12, ry: Math.PI, w: 18, h: 2.4, bg: '#f4f6f8', fg: '#d02a3a' });
@@ -616,6 +631,7 @@ class World {
       this._det(b, 'box', b.x0 + 40, CURB_H + 3.5, b.z0 + 37, 10, 0.3, 6, 0xd02a3a);
       for (const dx of [-4.6, 4.6]) this._det(b, 'box', b.x0 + 40 + dx, CURB_H + 1.75, b.z0 + 39.6, 0.3, 3.5, 0.3, 0xd0d0d0, 0, true);
       b.respawn = { x: b.x0 + 40, z: b.z1 + 2, h: 0 };
+      b.parked.push({ x: b.x0 + 47, z: b.z0 + 45, h: Math.PI / 2, cls: 'ambulance' });
     } else {
       b.signs.push({ text: 'PORT VALEN POLICE', x: (b.x0 + b.x1) / 2, y: CURB_H + 15, z: b.z0 + 4 - 0.12, ry: Math.PI, w: 16, h: 2.2, bg: '#0f2a52', fg: '#ffffff' });
       for (let k = 0; k < 5; k++) b.parked.push({ x: b.x0 + 32 + k * 4.5, z: b.z0 + 44, h: 0, cls: 'police' });
@@ -624,16 +640,28 @@ class World {
     for (let k = 0; k < 4; k++) this._prop(b, 'planter', b.x0 + 30 + k * 7, b.z1 - 3, 0);
   }
   _genPerimeter() {
-    // stored separately; world mesh builds the seawall/railing
+    // The seawall (and the wall nothing drives through) stands only where the city's edge meets open water
+    // (Operation Blackgate, 022): Valen Bay on the west, Valen Sound on the east and round the terminal. Everywhere
+    // else the island's ground carries on from the promenade. world.shore: the wet stretches [t0, t1] of each side
+    // (t runs from -E to CITY + E), less the causeway to Valen Point and the land bridge to Cedar Fields South.
+    const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] };
+    const wet = (x, z) => Island.nat(x, z) < SEA_Y + 0.35;
+    for (const side of 'nswe') {
+      let run = null;
+      for (let t = -E; t <= CITY + E + 0.01; t += 2) {
+        const [x, z] = side === 'n' ? [t, -E - 5] : side === 's' ? [t, CITY + E + 5] : side === 'w' ? [-E - 5, t] : [CITY + E + 5, t];
+        if (wet(x, z)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { shore[side].push(run); run = null; }
+      }
+      if (run) shore[side].push(run);
+      const gap = side === 'e' ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
+      if (gap) shore[side] = shore[side].flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
+      // a run that reaches a corner closes it
+      for (const r of shore[side]) { if (r[0] <= -E + 2) r[0] = -E - 1; if (r[1] >= CITY + E - 2) r[1] = CITY + E + 1; }
+      shore[side] = shore[side].filter(r => r[1] - r[0] > 3);
+    }
     this.perimeter = [
-      { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN - 1, x1: CITY + EDGE_MARGIN + 1, z1: -EDGE_MARGIN + 0.2 },
-      // the south wall stops either side of the land bridge to Cedar Fields South (Session 6C)
-      { x0: -EDGE_MARGIN - 1, z0: CITY + EDGE_MARGIN - 0.2, x1: CFS.lb.x - CFS.lb.half, z1: CITY + EDGE_MARGIN + 1 },
-      { x0: CFS.lb.x + CFS.lb.half, z0: CITY + EDGE_MARGIN - 0.2, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN + 1 },
-      { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN, x1: -EDGE_MARGIN + 0.2, z1: CITY + EDGE_MARGIN },
-      // the east wall stops either side of the causeway to Valen Point (Session 6B)
-      { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: VP.cw.z - VP.cw.half },
-      { x0: CITY + EDGE_MARGIN - 0.2, z0: VP.cw.z + VP.cw.half, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN }
+      ...shore.n.map(([a, b]) => ({ x0: a, z0: -E - 1, x1: b, z1: -E + 0.2 })), ...shore.s.map(([a, b]) => ({ x0: a, z0: CITY + E - 0.2, x1: b, z1: CITY + E + 1 })),
+      ...shore.w.map(([a, b]) => ({ x0: -E - 1, z0: a, x1: -E + 0.2, z1: b })), ...shore.e.map(([a, b]) => ({ x0: CITY + E - 0.2, z0: a, x1: CITY + E + 1, z1: b }))
     ];
     for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
     // promenade lamps and benches outside the perimeter road

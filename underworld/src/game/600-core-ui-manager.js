@@ -182,7 +182,7 @@ class UIManager {
     this.hud = $('hud'); this.toasts = $('toasts');
     this.mm = $('minimap'); this.mmc = this.mm.getContext('2d');
     this.bigc = $('bigmapCanvas').getContext('2d');
-    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP(); this.cfsImg = this._renderCFS();
+    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP(); this.cfsImg = this._renderCFS(); this.isleImg = this._renderIsle();
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
     this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
@@ -197,6 +197,8 @@ class UIManager {
     this.mapK = k; this.mapE = E; this.mapW = Math.ceil((WORLD_X1 + E) * k);
     // and south to Cedar Fields South (Session 6C): mapH tall
     this.mapH = Math.ceil((WORLD_Z1 + E) * k);
+    // and north and west over the rest of the island (Operation Blackgate): map space starts at (mapX0, mapZ0), both negative
+    this.mapX0 = Math.floor((WORLD_X0 + E) * k); this.mapZ0 = Math.floor((WORLD_Z0 + E) * k);
     const X = x => (x + E) * k;
     this._paintMap(g, null);
     const lab = [];
@@ -214,6 +216,10 @@ class UIManager {
       g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillText(ZONES[key].name.toUpperCase(), X(cx * P) + 1.5, X(cz * P) + 1.5);
       g.fillStyle = ZONES[key].col; g.fillText(ZONES[key].name.toUpperCase(), X(cx * P), X(cz * P));
     }
+    // the island off the lattice (022): its districts and waters
+    for (const [t, x, z, col, big] of [['CRESTMOOR RIDGE', 250, -640, ZONES.k.col, 1], ['MOUNT VALEN', MT_VALEN.x, MT_VALEN.z + 120, ZONES.n.col, 1], ['BLACKGATE HIGHLANDS', -1250, -1700, ZONES.t.col, 1], ['SALTMARSH', -520, 1090, ZONES.b.col, 1],
+      ['SOUTHSHORE', -520, 2000, ZONES.e.col, 1], ['PORT VALEN INTERNATIONAL', 600, 2290, ZONES.y.col, 1], ['PROVING GROUND', 1420, 1610, ZONES.j.col, 1], ['LAKE VALEN', LAKE.x, LAKE.z, '#8fd0e8', 0], ['VALEN BAY', -520, 330, '#8fd0e8', 0],
+      ['VALEN SOUND', 1210, 300, '#8fd0e8', 0], ['GULL HARBOR', -1290, -2330, ZONES.t.col, 0], ['CAPE VALEN LIGHT', 1500, -2850, ZONES.t.col, 0], ['BLACKGATE BRIDGE', -1100, 520, '#ffffff', 0]]) lab.push({ t, x: X(x), z: X(z), col, big: !!big });
     // landmarks
     g.font = 'bold 11px Arial';
     for (const key in LANDMARK_BLOCKS) {
@@ -285,25 +291,72 @@ class UIManager {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
     const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CITY + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
     const c = document.createElement('canvas'); c.width = x1 - x0; c.height = z1 - z0;
-    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, c.width, c.height); g.translate(-x0, -z0);
+    const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintCFS(g, null);
     return { img: c, x: x0, z: z0 };
   }
   // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
   _renderVP() {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(WORLD_X1)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
+    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, w, h); g.translate(-x0, -z0);
+    const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintVP(g, null);
     return { img: c, x: x0, z: z0 };
+  }
+  // the island's ground as a small image (once; 16 m a pixel, the shore soft-edged, the sea and the lake left clear)
+  _renderIsle() {
+    const S = 16, W = Math.round((ISLE.x1 - ISLE.x0) / S), H = Math.round((ISLE.z1 - ISLE.z0) / S), c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'), id = g.createImageData(W, H), d = id.data, E = EDGE_MARGIN;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      const x = ISLE.x0 + (i + 0.5) * S, z = ISLE.z0 + (j + 0.5) * S, sd = Island.sd(x, z); if (sd > 10) continue;
+      const h = Island.base0(x, z), o = (j * W + i) * 4; if (h < SEA_Y - 0.6) continue;
+      let r, gg, b;
+      if (h < SEA_Y + 3.2 && sd > -44) { r = 205; gg = 191; b = 142; }
+      else { const f = clamp(Island.forest(x, z) * 1.4 - 0.4, 0, 1), e = clamp((h - 20) / 200, 0, 1); r = lerp(lerp(86, 62, f), 150, e); gg = lerp(lerp(116, 92, f), 142, e); b = lerp(lerp(66, 54, f), 124, e); if (z > 980) { r += 14; gg += 8; } }
+      d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255 * clamp(Math.min(0.5 - sd / S, (h - SEA_Y + 0.6) / 1.2), 0, 1);
+    }
+    g.putImageData(id, 0, 0);
+    // road chunks for the painter below: a bounding box every 48 points
+    for (const R of Island.roads) { R.mapChunks = []; for (let k0 = 0; k0 < R.pts.length - 1; k0 += 48) { const k1 = Math.min(R.pts.length - 1, k0 + 48); let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (let k = k0; k <= k1; k++) { const q = R.pts[k]; x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); } R.mapChunks.push([k0, k1, x0 - 12, z0 - 12, x1 + 12, z1 + 12]); } }
+    void E;
+    return c;
+  }
+  // the island in map space: its ground, the airfield and the proving ground, the roads (a bridge edged white, the
+  // tunnel dashed), the footprints of what stands out there. view: a world rectangle to cull to (null: everything)
+  _paintIsle(g, view) {
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k, I = this.isleImg; if (!I) return;
+    const inV = (x0, z0, x1, z1) => !view || (x1 >= view.x0 && x0 <= view.x1 && z1 >= view.z0 && z0 <= view.z1);
+    const R4 = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
+    g.imageSmoothingEnabled = true; g.drawImage(I, X(ISLE.x0), X(ISLE.z0), (ISLE.x1 - ISLE.x0) * k, (ISLE.z1 - ISLE.z0) * k);
+    const A = AIRPORT, G = PROVING;
+    if (inV(A.x0, A.z0, A.x1, A.z1)) {
+      R4(A.apron.x0, A.apron.z0, A.apron.x1, A.apron.z1, '#8a8c8a'); R4(A.tw.x0, A.tw.z - A.tw.w / 2, A.tw.x1, A.tw.z + A.tw.w / 2, '#5a5d63');
+      for (const lx of A.links) R4(lx - 9, A.apron.z1, lx + 9, A.rw[0].z, '#5a5d63');
+      for (const r of A.rw) { R4(r.x0, r.z - r.w / 2, r.x1, r.z + r.w / 2, '#3d3f44'); g.fillStyle = '#e8e8e2'; for (let x = r.x0 + 60; x < r.x1 - 60; x += 90) g.fillRect(X(x), X(r.z - 1), 40 * k, 2 * k); }
+      const cp = this.g.world.isle.sites.carpark; R4(cp.x0, cp.z0, cp.x1, cp.z1, '#55585e');
+    }
+    if (inV(G.x0, G.z0, G.x1, G.z1)) { R4(G.strip.x0, G.strip.z - G.strip.w / 2, G.strip.x1, G.strip.z + G.strip.w / 2, '#3d3f44'); R4(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, '#4a4d52'); g.fillStyle = '#4a4d52'; g.beginPath(); g.arc(X(G.pad.x), X(G.pad.z), G.pad.r * k, 0, 7); g.fill(); }
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const R of Island.roads) for (const [k0, k1, x0, z0, x1, z1] of R.mapChunks) {
+      if (!inV(x0, z0, x1, z1)) continue;
+      const path = (a, b) => { g.beginPath(); for (let q = a; q <= b; q++) { const p = R.pts[q]; q === a ? g.moveTo(X(p[0]), X(p[1])) : g.lineTo(X(p[0]), X(p[1])); } g.stroke(); };
+      g.strokeStyle = '#6f7682'; g.lineWidth = Math.max(1.6, R.w * k); path(k0, k1);
+      // spans: a bridge's deck edged in white, the tunnel dashed
+      let a = -1;
+      for (let q = k0; q <= k1 + 1; q++) { const sp = q <= k1 ? R.sp[q] : 0; if (sp && a < 0) a = q; if ((!sp || (a >= 0 && R.sp[a] !== sp)) && a >= 0) { if (R.sp[a] === 1) { g.strokeStyle = '#e8e8e2'; g.lineWidth = Math.max(2.4, (R.w + 5) * k); path(a, q - 1); g.strokeStyle = '#8a909a'; g.lineWidth = Math.max(1.6, R.w * k); path(a, q - 1); } else { g.strokeStyle = '#2a2d33'; g.setLineDash([6 * k, 6 * k]); g.lineWidth = Math.max(1.6, R.w * k); path(a, q - 1); g.setLineDash([]); } a = sp ? q : -1; } }
+    }
+    for (const R of Island.roads) if (R.ring && inV(R.ring.x - 30, R.ring.z - 30, R.ring.x + 30, R.ring.z + 30)) { g.fillStyle = '#6f7682'; g.beginPath(); g.arc(X(R.ring.x), X(R.ring.z), (R.ring.r + R.w / 2) * k, 0, 7); g.fill(); }
+    g.fillStyle = 'rgba(0,0,0,0.34)';
+    for (const b of this.g.world.isle.blocks) if (inV(b.cx - b.r, b.cz - b.r, b.cx + b.r, b.cz + b.r)) for (const r of b.bld) if (!r.farOnly || true) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
   }
   // paints the city (no text) in 1024-unit map space onto any 2D context; view = world-space
   // rectangle to cull to (null = everything). Used for the cached images and the live big map.
   _paintMap(g, view) {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
     const inView = (x0, z0, x1, z1) => !view || (x1 >= view.x0 && x0 <= view.x1 && z1 >= view.z0 && z0 <= view.z1);
-    g.fillStyle = '#0f2b3a'; g.fillRect(X(-E), X(-E), (CITY + E * 2) * k, (CITY + E * 2) * k);
+    // the island under everything (live painting only: the cached images are drawn over the island's own)
+    if (view) this._paintIsle(g, view);
     g.fillStyle = '#3d3a36'; g.fillRect(X(-EDGE_MARGIN), X(-EDGE_MARGIN), (CITY + EDGE_MARGIN * 2) * k, (CITY + EDGE_MARGIN * 2) * k);
     g.fillStyle = '#6f7682'; g.fillRect(X(-ROAD_HALF), X(-ROAD_HALF), (CITY + ROAD_HALF * 2) * k, (CITY + ROAD_HALF * 2) * k);
     const cols = MAP_LAND_COLS;
@@ -660,7 +713,7 @@ class UIManager {
   drawMinimap() {
     const g = this.g, c = this.mmc, W = this.mm.width, R = W / 2, p = g.player;
     const pv = p.state === 'vehicle' ? p.vehicle : null;
-    const zoom = (pv ? clamp(1.5 - pv.speed * 0.012, 0.85, 1.5) : 1.9) * (W / 380);
+    const zoom = (pv ? (pv.air ? lerp(1.2, 0.42, clamp(pv.air.agl / 60, 0, 1)) : clamp(1.5 - pv.speed * 0.012, 0.85, 1.5)) : 1.9) * (W / 380);
     const rot = g.cam.yaw + Math.PI;
     c.save();
     c.clearRect(0, 0, W, W);
@@ -669,6 +722,8 @@ class UIManager {
     c.translate(R, R); c.rotate(rot); c.scale(zoom / this.mapK, zoom / this.mapK);
     const [px, pz] = this._mapXY(p.pos.x, p.pos.z);
     c.translate(-px, -pz);
+    // the island under the city's image (a pixel of the minimap is 1 / zoom metres: what is within the dial, and a margin)
+    { const vr = R / zoom * 1.45 + 20; this._paintIsle(c, { x0: p.pos.x - vr, z0: p.pos.z - vr, x1: p.pos.x + vr, z1: p.pos.z + vr }); }
     c.drawImage(this.mmImg, 0, 0);
     if (this.vpImg) c.drawImage(this.vpImg.img, this.vpImg.x, this.vpImg.z);
     if (this.cfsImg) c.drawImage(this.cfsImg.img, this.cfsImg.x, this.cfsImg.z);
@@ -963,17 +1018,20 @@ class MapView {
   toMap(sx, sy) { const s = this.scale; return [(sx - this.W / 2) / s + this.cx, (sy - this.H / 2) / s + this.cz]; }
   worldToScreen(x, z) { const [mx, mz] = this.ui._mapXY(x, z); return this.toScreen(mx, mz); }
   screenToWorld(sx, sy) { const [mx, mz] = this.toMap(sx, sy); return [mx / this.ui.mapK - this.ui.mapE, mz / this.ui.mapK - this.ui.mapE]; }
+  // zoomed right out, the whole island fits the shorter side of the screen
+  minZoom() { return clamp(1024 / Math.max((this.ui.mapW || 1024) - (this.ui.mapX0 || 0), (this.ui.mapH || 1024) - (this.ui.mapZ0 || 0)) * 0.98, 0.1, 1); }
   clampView(z, cx, cz) {
     const s = Math.min(this.W, this.H) / 1024 * z, hw = this.W / 2 / s, hh = this.H / 2 / s;
     // zoomed in, any point of the map can be brought to the centre (edges show water beyond)
     // east as far as Valen Point and south to Cedar Fields South (map space is ui.mapW wide and ui.mapH tall)
-    const MW = this.ui.mapW || 1024, MH = this.ui.mapH || 1024;
-    cx = hw >= 512 ? clamp(cx, 512, Math.max(512, MW - hw)) : clamp(cx, Math.min(hw, 0), Math.max(MW - hw, MW)); cz = hh >= 512 ? clamp(cz, 512, Math.max(512, MH - hh)) : clamp(cz, Math.min(hh, 0), Math.max(MH - hh, MH));
+    // (Operation Blackgate: and north and west over the rest of the island, from ui.mapX0 / ui.mapZ0)
+    const MW = this.ui.mapW || 1024, MH = this.ui.mapH || 1024, X0 = this.ui.mapX0 || 0, Z0 = this.ui.mapZ0 || 0;
+    cx = clamp(cx, Math.min(X0 + hw, (X0 + MW) / 2), Math.max(MW - hw, (X0 + MW) / 2)); cz = clamp(cz, Math.min(Z0 + hh, (Z0 + MH) / 2), Math.max(MH - hh, (Z0 + MH) / 2));
     return [cx, cz];
   }
   // zoom keeping the map point under (sx,sy) fixed; animated unless instant
   zoomAt(f, sx, sy, instant) {
-    const nz = clamp(this.tz * f, 1, 8);
+    const nz = clamp(this.tz * f, this.minZoom(), 8);
     const [mx, mz] = this.toMap(sx, sy);
     // the point under the cursor stays put: solve for the new centre at the target zoom
     const s = Math.min(this.W, this.H) / 1024 * nz;
@@ -1002,7 +1060,7 @@ class MapView {
       const [x, y] = pos(e); pt.x = x; pt.y = y;
       if (this.ptrs.size >= 2 && this.pinch) {
         const [a, b] = [...this.ptrs.values()];
-        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, nz = clamp(this.pinch.z * d / this.pinch.d, 1, 8);
+        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, nz = clamp(this.pinch.z * d / this.pinch.d, this.minZoom(), 8);
         const s = Math.min(this.W, this.H) / 1024 * nz, sx = (a.x + b.x) / 2, sy = (a.y + b.y) / 2;
         const [cx, cz] = this.clampView(nz, this.pinch.mid[0] - (sx - this.W / 2) / s, this.pinch.mid[1] - (sy - this.H / 2) / s);
         this.zoom = this.tz = nz; this.cx = this.tcx = cx; this.cz = this.tcz = cz; this.dirty = true;
@@ -1232,7 +1290,7 @@ class MapView {
     // map-space layers under the view transform
     c.save();
     c.setTransform(d * s, 0, 0, d * s, d * (W / 2 - this.cx * s), d * (H / 2 - this.cz * s));
-    if (this.zoom < 1.35) { c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
+    if (this.zoom < 1.35) { ui._paintIsle(c, null); c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);

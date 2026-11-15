@@ -30,6 +30,8 @@ class Vehicle {
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector2();
     this.ctl = { throttle: 0, steer: 0, handbrake: false };
     this.circles = Math.max(2, Math.round(this.spec.l / this.spec.w));
+    // an aircraft (232): its flight state, its propeller or rotors
+    this.air = null; if (this.spec.air) { Flight.init(this); this.rotors = makeRotors(this); }
   }
   reset(x, z, h, opts = {}) {
     const s = this.spec;
@@ -54,6 +56,7 @@ class Vehicle {
     this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : s.paint2 !== undefined ? s.paint2 : 0xffffff);
     this.mat.userData.u.uMisc.value.set(0, 0, 0, 0);
     this.restoreGeo();
+    if (this.spec.air) Flight.init(this);
     this.colorHex = col;
     this.setTier(opts.vtier || (opts.parked || opts.kinematic ? (beaterRoll(this.type, x, z, opts.beaterSeed) ? 'beater' : s.tier) : s.tier));
     this.syncMesh(0);
@@ -93,7 +96,11 @@ class Vehicle {
   step(dt, game) {
     const s = this.spec;
     if (this.sleep) return;
+    if (this.air) return Flight.step(this, dt, game);
     if (this.hitT > 0) this.hitT -= dt;
+    // in the sea (022: deeper than the sills): the water takes the speed off and most of the engine with it
+    const wet = this.pos.y < SEA_Y - 0.55 && !this.airborne;
+    if (wet) { const k = Math.exp(-1.7 * dt); this.vel.x *= k; this.vel.y *= k; }
     // the Cedar Fields terrain under the car (Session 6C): grip, rolling drag and bumps by surface (null off it)
     const te = this.airborne ? null : Terrain.effect(this.pos.x, this.pos.z, this.trail);
     if (this.dirt < 1) this.dirt = Math.min(1, this.dirt + this.speed * dt * DIRT_PER_M * (te ? (te.s === TSURF.mud ? 12 : 4) : 1));
@@ -115,7 +122,7 @@ class Vehicle {
     let vf = this.vel.x * fx + this.vel.y * fz, vl = this.vel.x * rx + this.vel.y * rz;
     const ctl = this.ctl;
     const disabled = this.burnt || this.health <= 0;
-    const thr = disabled ? 0 : ctl.throttle;
+    const thr = disabled ? 0 : ctl.throttle * (wet ? 0.3 : 1);
     // damage stages (see VEH_STAGES): power fades as the car gets beaten up
     const hpK = this.health > VEH_T.smoke ? 1 : this.health > VEH_T.heavy ? 0.92 : this.health > VEH_T.critical ? 0.76 : 0.55;
     const isPlayer = this.driver === 'player';
@@ -227,6 +234,8 @@ class Vehicle {
   // (bodyOff) and weight-transfer tilt on top, and the wheels are drawn at their contact points but
   // never further than the suspension travel from their arches (see VehicleManager.render).
   ground(dt) {
+    // an aircraft keeps its own height (232): set down where it stands on a placement, its wheels' contacts otherwise
+    if (this.air) { if (dt > 0) Flight.wheels(this, this.vm.game.world); else Flight.place(this, this.vm.game.world); return; }
     const W = this.vg.wheels, wbase = W[0][1] - W[2][1], track = W[0][0] - W[1][0];
     const ref = this.pos.y;
     const h = this._sampleWheels(ref), wr = this._wr;
@@ -307,7 +316,8 @@ class Vehicle {
     this.pitchG = clamp(this.pitchG, -0.9, 0.9);
   }
   // body transform from the physics state (render only; no simulation here)
-  pose() {
+  pose(dt) {
+    if (this.air) return Flight.pose(this, dt);
     this.mesh.position.set(this.pos.x, this.pos.y + this.bodyOff + (this.planeOff || 0), this.pos.z);
     // weight transfer adds a little dive / squat and lean on top of the chassis attitude; small
     // enough that the arches always clear the tyres

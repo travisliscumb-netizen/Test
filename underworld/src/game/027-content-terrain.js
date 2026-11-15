@@ -68,7 +68,9 @@ const Terrain = {
   // what the ground does to a car here (null off the terrain): grip ×, rolling drag (m/s²), bump (the rough's
   // amplitude, which costs grip with speed). `trail` is the car's off-road capability (TRAIL). A reused object.
   effect(x, z, trail) {
-    const R = this.ready ? this.region(x, z) : null; if (!R) return null;
+    const R = this.ready ? this.region(x, z) : null;
+    // off the height field's own regions, out on the island (022): its sand, grass and rock
+    if (!R) return offCity(x, z) ? Island.effect(x, z, trail) : null;
     const o = this._cell(R, x, z), s = R.s[o], F = TSURF_FX[s], k = 1 - 0.65 * (trail || 0), E = this._fx;
     // the strip's held-flat ground (the lawns and drives round the farm) is ordinary ground: it eases in with the mask
     const m = R.m[o], w = Math.min(1, m * 2);
@@ -100,7 +102,8 @@ const Terrain = {
       if (hit) break;
     }
     this.gx = gx; this.gz = gz;
-    return hit;
+    // and the island's own hills (022)
+    return hit || Island.occludes(ax, ay, az, bx, by, bz);
   },
   // the countryside's hills before anything is stamped on them (the generator levels its pads from this)
   raw(x, z) {

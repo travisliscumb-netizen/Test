@@ -4,18 +4,19 @@
 class CollisionGrid {
   constructor() {
     // the city square, east of it out to Valen Point (Session 6B) and south to Cedar Fields South (Session 6C): dimX × dim cells
-    this.cs = 16; this.min = -48; this.dim = Math.ceil((WORLD_Z1 + 48 - this.min) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.min) / this.cs);
-    this.cells = Array.from({ length: this.dimX * this.dim }, () => []);
+    // (Operation Blackgate: the whole island, from WORLD_X0 / WORLD_Z0; a cell's list is made when something first lands in it)
+    this.cs = 16; this.minX = WORLD_X0 - 48; this.minZ = WORLD_Z0 - 48; this.dim = Math.ceil((WORLD_Z1 + 48 - this.minZ) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.minX) / this.cs);
+    this.cells = new Array(this.dimX * this.dim);
     this.all = []; this.stamp = 1;
   }
-  _ci(x) { return clamp(Math.floor((x - this.min) / this.cs), 0, this.dimX - 1); }
-  _cj(z) { return clamp(Math.floor((z - this.min) / this.cs), 0, this.dim - 1); }
+  _ci(x) { return clamp(Math.floor((x - this.minX) / this.cs), 0, this.dimX - 1); }
+  _cj(z) { return clamp(Math.floor((z - this.minZ) / this.cs), 0, this.dim - 1); }
   add(c) {
     c.stamp = 0; c.on = true;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; }
     else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) this.cells[j * this.dimX + i].push(c);
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const k = j * this.dimX + i; (this.cells[k] || (this.cells[k] = [])).push(c); }
     this.all.push(c);
     return c;
   }
@@ -23,14 +24,14 @@ class CollisionGrid {
     if (!c) return;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; } else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const cell = this.cells[j * this.dimX + i], k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const cell = this.cells[j * this.dimX + i]; if (!cell) continue; const k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
     const k = this.all.indexOf(c); if (k >= 0) this.all.splice(k, 1);
     c.on = false;
   }
   query(x0, z0, x1, z1, out) {
     out.length = 0; const st = ++this.stamp;
     for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) {
-      const cell = this.cells[j * this.dimX + i];
+      const cell = this.cells[j * this.dimX + i]; if (!cell) continue;
       for (let k = 0; k < cell.length; k++) { const c = cell[k]; if (c.stamp !== st && c.on) { c.stamp = st; out.push(c); } }
     }
     return out;
@@ -71,15 +72,15 @@ class CollisionGrid {
   raycast(ox, oy, oz, dx, dy, dz, maxT, ignoreLow = 0, see = false) {
     const st = ++this.stamp; let best = maxT, hit = null;
     const cs = this.cs;
-    let ix = Math.floor((ox - this.min) / cs), iz = Math.floor((oz - this.min) / cs);
+    let ix = Math.floor((ox - this.minX) / cs), iz = Math.floor((oz - this.minZ) / cs);
     const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
     const tdx = Math.abs(dx) > 1e-9 ? Math.abs(cs / dx) : Infinity, tdz = Math.abs(dz) > 1e-9 ? Math.abs(cs / dz) : Infinity;
-    let tmx = Math.abs(dx) > 1e-9 ? ((this.min + (ix + (sx > 0 ? 1 : 0)) * cs) - ox) / dx : Infinity;
-    let tmz = Math.abs(dz) > 1e-9 ? ((this.min + (iz + (sz > 0 ? 1 : 0)) * cs) - oz) / dz : Infinity;
+    let tmx = Math.abs(dx) > 1e-9 ? ((this.minX + (ix + (sx > 0 ? 1 : 0)) * cs) - ox) / dx : Infinity;
+    let tmz = Math.abs(dz) > 1e-9 ? ((this.minZ + (iz + (sz > 0 ? 1 : 0)) * cs) - oz) / dz : Infinity;
     let tCell = 0;
     for (let steps = 0; steps < 64 && tCell <= best; steps++) {
       if (ix >= 0 && iz >= 0 && ix < this.dimX && iz < this.dim) {
-        const cell = this.cells[iz * this.dimX + ix];
+        const cell = this.cells[iz * this.dimX + ix] || CollisionGrid.NONE;
         for (let k = 0; k < cell.length; k++) {
           const c = cell[k]; if (c.stamp === st || !c.on || (see && c.see)) continue; c.stamp = st;
           // low clutter is skipped; interior colliders measure height from their own floor
@@ -123,4 +124,5 @@ class CollisionGrid {
     return !Terrain.occludes(ax, ay, az, bx, by, bz);
   }
 }
+CollisionGrid.NONE = [];
 

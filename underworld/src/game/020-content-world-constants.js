@@ -54,6 +54,8 @@ function streetNameAt(x, z) {
   if (vpLand(x, z)) return VP.name;
   if (z > CITY + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
+  // out on the island (022): the road you are on, by name
+  if (offCity(x, z)) { const q = RoadGraph.ready ? RoadGraph.nearest(x, z, { maxD: 12, kinds: RG_STREETS }) : null; return q && q.d <= q.e.w / 2 + 2 ? q.e.name : null; }
   if (x < 0 || z < 0 || x > CITY || z > CITY) return 'Harbor Promenade';
   return null;
 }
@@ -98,14 +100,32 @@ const ZONES = {
     traffic: { sedan: 2.5, suv: 2, taxi: 2, compact: 2, sports: 0.8, van: 0.8 } },
   r: { name: 'Cedar Fields', tag: 'Dirt tracks and nobody watching', col: '#c9b06b', ped: 0.15, cops: 0.3, night: 0.3,
     traffic: { pickup: 3.5, offroad: 1.5, van: 1, sedan: 1, compact: 0.8 } },
+  // the island off the lattice (Operation Blackgate, 022): the highlands north of the city, the lowlands south of it
+  k: { name: 'Crestmoor Ridge', tag: 'Eight gates on a hill, and the whole city at their feet', col: '#e8d28a', ped: 0, cops: 0.9, night: 0.3,
+    traffic: { luxury: 3, suv: 2.5, sports: 1.8, coupe: 1, sedan: 1 } },
+  n: { name: 'Mount Valen', tag: 'One road, 246 metres, no guard rail', col: '#b9c4b0', ped: 0, cops: 0.2, night: 0.2,
+    traffic: { suv: 2.5, pickup: 2, sports: 1.6, offroad: 1.4, sedan: 1.2, compact: 1 } },
+  t: { name: 'Blackgate Highlands', tag: 'Forest, cliff road and the long way round', col: '#7fae78', ped: 0, cops: 0.3, night: 0.3,
+    traffic: { pickup: 3, suv: 2, sedan: 2, van: 1.5, truck: 1.2, compact: 1.5, sports: 0.6 } },
+  b: { name: 'Saltmarsh', tag: 'Pastel houses, a stone jetty and the bridge on the horizon', col: '#f0d9a8', ped: 0, cops: 0.4, night: 0.4,
+    traffic: { compact: 3, suv: 2, pickup: 1.5, sedan: 2, van: 1, sports: 0.7 } },
+  e: { name: 'Southshore', tag: 'Flat fields, a long beach and the sound of jets', col: '#c9d38a', ped: 0, cops: 0.4, night: 0.4,
+    traffic: { sedan: 2.5, pickup: 2.5, van: 2, truck: 1.5, compact: 2, suv: 1.5, taxi: 1 } },
+  y: { name: 'Port Valen International', tag: 'Two runways and a hangar door left open', col: '#9fc4e8', ped: 0, cops: 1.0, night: 0.8,
+    traffic: { taxi: 3.5, sedan: 2.5, van: 2, suv: 1.5, luxury: 0.8, truck: 1 } },
+  j: { name: 'Valen Proving Ground', tag: 'A kilometre of nothing to hit', col: '#ff9d6b', ped: 0, cops: 0.2, night: 0.2,
+    traffic: { sports: 2, van: 1.5, pickup: 1, sedan: 1 } },
   // Valen Point (Session 6B): off the lattice, east across the causeway; no foot traffic, few police
   v: { name: 'Valen Point', tag: 'Pit garages, grandstands and the fastest legal mile on the island', col: '#ff6b4a', ped: 0, cops: 0.4, night: 0.4,
     traffic: { sports: 2, sedan: 2, suv: 1.5, van: 1.2, pickup: 0.8, muscle: 0.6, truck: 0.4 } }
 };
 function zoneKey(x, z) {
-  if (x > CITY + EDGE_MARGIN && x < VP.x1 + 400) return 'v';
-  // Cedar Fields South (Session 6C) is more of Cedar Fields
-  if (cfsSide(x, z)) return 'r';
+  if (offCity(x, z)) {
+    // Valen Point and the sound round it; Cedar Fields South (Session 6C) is more of Cedar Fields; the rest of the island
+    if (vpSide(x, z)) return 'v';
+    if (inCedarSouth(x, z)) return 'r';
+    return Island.zoneKey(x, z);
+  }
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return ZONE_MAP[bz][bx];
 }
@@ -113,6 +133,7 @@ function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
   if (inValenPoint(x, z)) return VP.name;
   if (inCedarSouth(x, z)) return CFS.name;
+  if (offCity(x, z)) return Island.land(x, z) ? ZONES[Island.zoneKey(x, z)].name : Island.lake(x, z) ? LAKE.name : 'Offshore';
   if (x < -ROAD_HALF - 2 || z < -ROAD_HALF - 2 || x > CITY + ROAD_HALF + 2 || z > CITY + ROAD_HALF + 2) return 'Waterfront';
   return zoneAt(x, z).name;
 }
@@ -321,18 +342,25 @@ function localSurfaceAt(x, z) {
 function groundY(x, z, y, step) {
   SURF.gx = 0; SURF.gz = 0; Terrain.hit = false;
   if (y !== undefined && y < -12 && typeof vspaceFloor === 'function') { const f = vspaceFloor(x, z, y); if (f !== null) return f; }
-  const b = groundBase(x, z), hit = Terrain.hit, tgx = Terrain.gx, tgz = Terrain.gz;
+  const b = groundBase(x, z, y), hit = Terrain.hit, tgx = Terrain.gx, tgz = Terrain.gz;
   const s = surfaceY(x, z, y, step);
   if (s > b) { Terrain.hit = false; return s; }
   SURF.gx = hit ? tgx : 0; SURF.gz = hit ? tgz : 0;
   return b;
 }
-function groundBase(x, z) {
+function groundBase(x, z, y) {
   // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
   if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
-  if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
+  if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) {
+    // the island (022): its ground (a bridge's deck or the tunnel's floor by the height y of whoever asks), or as
+    // deep as you can wade where that ground is under the sea
+    const h = Island.height(x, z, y);
+    if (h <= SEA_Y - ISLE.wade) return SEA_Y - ISLE.wade;
+    Terrain.hit = true; Terrain.gx = Island.gx; Terrain.gz = Island.gz; Terrain.rough = 0;
+    return h;
+  }
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
   // (the kerb is cut where a curved road leaves a lattice street: a ramp in the gutter, CurbCuts in 135)
   return RoadNet.roadAt(x, z) ? (CurbCuts.n ? CurbCuts.at(x, z) : 0) : CURB_H;

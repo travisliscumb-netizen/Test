@@ -42,28 +42,25 @@ function buildStaticScenery(scene, world) {
   const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half, eastRun = (z0, z1, f) => { if (z1 > z0) f((z0 + z1) / 2, z1 - z0); };
   eastRun(-ROAD_HALF, g0, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
   eastRun(g1, CITY + ROAD_HALF, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
-  // seawall faces
-  const wh = 3.2;
-  gs.add(TPL.box, M(CITY / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, L + 2, wh, 1), null);
-  for (const [x0, x1] of [[-E - 1, s0], [s1, CITY + E + 1]]) southRun(x0, x1, (xc, l) => gs.add(TPL.box, M(xc, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, l, wh, 1), null));
-  gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
-  eastRun(-E, g0, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
-  eastRun(g1, CITY + E, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
+  // seawall faces: only where the city's edge meets open water (world.shore; Operation Blackgate)
+  const wh = 3.2, SH = world.shore;
+  for (const [a, b] of SH.n) gs.add(TPL.box, M((a + b) / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, b - a, wh, 1), null);
+  for (const [a, b] of SH.s) gs.add(TPL.box, M((a + b) / 2, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, b - a, wh, 1), null);
+  for (const [a, b] of SH.w) gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, (a + b) / 2, 1, wh, b - a), null);
+  for (const [a, b] of SH.e) gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, (a + b) / 2, 1, wh, b - a), null);
   // the kerb cut away where each curved road leaves a lattice street (Curved Roads pass)
   addCurbCuts(gs);
   const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
   // the curved streets' painted lines
   buildRoadMarkings(scene);
-  // railing
+  // railing: posts and two rails along the same runs
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
-  for (let t = -E; t <= CITY + E; t += 2.5) {
-    for (const [x, z] of [[t, -E + 0.3], [t, CITY + E - 0.3], [-E + 0.3, t], [CITY + E - 0.3, t]]) if (!(x > CITY && z > g0 - 0.5 && z < g1 + 0.5) && !(z > CITY && x > s0 - 0.5 && x < s1 + 0.5)) gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc);
+  for (const [side, runs] of Object.entries(SH)) for (const [a, b] of runs) {
+    const P2 = t => side === 'n' ? [t, -E + 0.3] : side === 's' ? [t, CITY + E - 0.3] : side === 'w' ? [-E + 0.3, t] : [CITY + E - 0.3, t];
+    for (let t = Math.max(a, -E); t <= Math.min(b, CITY + E); t += 2.5) { const [x, z] = P2(t); gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc); }
+    const [mx, mz] = P2((a + b) / 2), alongX = side === 'n' || side === 's';
+    for (const [y, h] of [[1.1, 0.07], [0.6, 0.04]]) gr.add(TPL.box, M(mx, CURB_H + y, mz, alongX ? b - a : 0.08, h, alongX ? 0.08 : b - a), rc);
   }
-  for (const [x0, x1] of [[-E, s0], [s1, CITY + E]]) southRun(x0, x1, (xc, l) => { gr.add(TPL.box, M(xc, CURB_H + 1.1, CITY + E - 0.3, l, 0.07, 0.08), rc); gr.add(TPL.box, M(xc, CURB_H + 0.6, CITY + E - 0.3, l, 0.04, 0.08), rc); });
-  for (const [x, z, w, d] of [[CITY / 2, -E + 0.3, L, 0.08], [-E + 0.3, CITY / 2, 0.08, L]]) {
-    gr.add(TPL.box, M(x, CURB_H + 1.1, z, w, 0.07, d), rc); gr.add(TPL.box, M(x, CURB_H + 0.6, z, w, 0.04, d), rc);
-  }
-  for (const [z0, z1] of [[-E, g0], [g1, CITY + E]]) eastRun(z0, z1, (zc, l) => { gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 1.1, zc, 0.08, 0.07, l), rc); gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 0.6, zc, 0.08, 0.04, l), rc); });
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
   // water
@@ -71,7 +68,7 @@ function buildStaticScenery(scene, world) {
   water.position.set(CITY / 2, -1.2, CITY / 2);
   scene.add(water);
   // sky
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(2400, 32, 16), makeSkyMaterial());
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(4800, 32, 16), makeSkyMaterial());
   sky.frustumCulled = false; sky.renderOrder = -10;
   scene.add(sky);
   return { ground, slabs, water, sky, gmat };

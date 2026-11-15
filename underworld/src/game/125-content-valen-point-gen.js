@@ -21,7 +21,8 @@
 const VP_TRACK = {
   w: 14,
   // corners: [x, z, radius]; the main straight runs north along x = 1600 (start/finish at z = VP_TRACK.sf)
-  verts: [[1600, 230, 130], [2280, 200, 150], [2300, 860, 110], [1990, 850, 45], [1960, 560, 40], [1760, 540, 60], [1760, 860, 80], [1600, 860, 70]],
+  // (Operation Blackgate: the east straight has a chicane half way down it, a left-right-left of 45-60 m corners)
+  verts: [[1600, 230, 130], [2280, 200, 150], [2284, 420, 60], [2240, 490, 45], [2240, 560, 45], [2296, 630, 60], [2300, 860, 110], [1990, 850, 45], [1960, 560, 40], [1760, 540, 60], [1760, 860, 80], [1600, 860, 70]],
   sf: 600, step: 2
 };
 // the pit complex beside the main straight
@@ -106,6 +107,12 @@ Object.assign(World.prototype, {
     for (let k = 0; k < 5; k++) sfb.fx.push({ type: 'neon', x: vp.sf.x - 6 + k * 3, y: Y + 7.8, z: vp.sf.z - 0.55, w: 0.6, h: 0.6, d: 0.1, c: 0xff2a2a });
     sfb.signs.push({ text: 'VALEN POINT', x: (gx0 + vp.sf.x + half + 4) / 2, y: Y + 8.6, z: vp.sf.z + 0.52, ry: 0, w: 14, h: 1.2, bg: '#1d2126', fg: '#ffffff' });
     void gx1;
+    // the starting grid: ten boxes in two staggered files behind the line (it runs north: the grid is south of it)
+    for (let k = 0; k < 10; k++) {
+      const gx = vp.sf.x + (k % 2 ? 3 : -3), gz = vp.sf.z + 34 + k * 8;
+      this._det(sfb, 'box', gx, Y + 0.012, gz - 2.6, 3, 0.02, 0.18, C(0xf2f2f2));
+      for (const s2 of [-1, 1]) this._det(sfb, 'box', gx + s2 * 1.5, Y + 0.012, gz - 1.9, 0.18, 0.02, 1.4, C(0xf2f2f2));
+    }
     // ---------------------------------------------------------------- pit garages: drive-through, two bays each
     const [gxa, gxb] = VP_PIT.garX, [gz0, gz1] = VP_PIT.garZ, cell = VP_PIT.cell, n = Math.round((gz1 - gz0) / cell);
     for (let i = 0; i <= n; i++) { const z = gz0 + i * cell; this._bld(B.pits, gxa, z - 0.3, gxb, z + 0.3, 5.6, STYLE.IND, 0xd8dade, 5.6, 4, { exactH: true, y0: Y, oy: Y }); }

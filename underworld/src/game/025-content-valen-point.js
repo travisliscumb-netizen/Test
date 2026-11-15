@@ -14,7 +14,7 @@ const VP = {
   cw: { z: 520, road: 7, half: 9, x0: CITY + ROAD_HALF, x1: 1440 }
 };
 // the far edge of everything the collision grid and the maps have to cover
-const WORLD_X1 = VP.x1 + EDGE_MARGIN;
+const WORLD_X1 = ISLE.x1;
 function vpLand(x, z) { return x >= VP.x0 && x <= VP.x1 && z >= VP.z0 && z <= VP.z1; }
 function vpCauseway(x, z) { return x >= VP.cw.x0 && x <= VP.x0 + 0.5 && Math.abs(z - VP.cw.z) <= VP.cw.half; }
 // off the city's square and on Valen Point's ground (the island, or the causeway past the seawall)

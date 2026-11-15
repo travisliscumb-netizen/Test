@@ -249,7 +249,7 @@ class VehicleManager {
     const RM = this.rims, cnt = [0, 0, 0, 0]; let nb = 0;
     const camPos = camera.position;
     for (const v of this.list) {
-      if (v.mode === 'phys') v.pose();
+      if (v.mode === 'phys') v.pose(dt);
       v.headOn = night > 0.25 || this.game.env.rain > 0.5;
       v.updateMaterial(night, t);
       if (v.alarmT > 0) { v.alarmT -= dt; v.mat.userData.u.uLights.value.x = (Math.sin(t * 10) > 0) ? 1.5 : 0; if (Math.random() < dt * 3) this.game.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.2, gain: 0.6 }); }
@@ -263,7 +263,7 @@ class VehicleManager {
       // wheels
       const st = v.rim | 0, W = RM[st];
       let n = cnt[st];
-      if (n + 4 <= W.instanceMatrix.count && d2 < 160 * 160) {
+      if (n + 4 <= W.instanceMatrix.count && d2 < 160 * 160 && !v.spec.noWheels) {
         const s = v.spec, R = s.wheelR;
         v.mesh.updateMatrix();
         const e = v.mesh.matrix.elements, upY = Math.max(0.5, e[5]);

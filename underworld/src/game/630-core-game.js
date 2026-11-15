@@ -24,7 +24,7 @@ class Game {
     // under one group, so an interior can switch the whole outdoors off: interiors are built 60 m under their door,
     // and without this the city above stayed in the view frustum and was drawn behind the walls (G2)
     this.outdoor = new THREE.Group(); this.outdoor.name = 'outdoor'; this.scene.add(this.outdoor); this._indoor = false;
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.15, 3000);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.15, 5200);
     this.time = 0; this.frame = 0; this.state = 'loading'; this.focus = new THREE.Vector3(6.5 * P, 0, 5 * P);
     this.debug = { open: false, god: false, col: false };
     this.input = new InputManager(this.canvas);
@@ -54,7 +54,10 @@ class Game {
     this.player = new Player(this);
     this.cam = new CameraRig(this.camera, this);
     this.quality = new QualityManager(this);
+    // the island off the lattice (022/177): its ground, roads, bridge and tunnel, forests, the airfield's paint
+    this.isleScene = new IslandScenery(this.outdoor, this.world, this);
     this.vehicles = new VehicleManager(this);
+    this.fleet = new IslandFleet(this);
     this.traffic = new TrafficManager(this);
     this.peds = new PedManager(this);
     this.police = new PoliceManager(this);
@@ -97,6 +100,7 @@ class Game {
     this.menuCam(0);
     this.env.update(0.016);
     for (let k = 0; k < 6; k++) { this.chunks.update(this.focus.x, this.focus.z, this.frame++); }
+    this.isleScene.update(this.focus.x, this.focus.z);
     progress(0.85, 'Compiling shaders'); await nextFrame();
     try { this.renderer.compile(this.scene, this.camera); } catch { /* compile is an optimisation only */ }
     this.warmShaders();
@@ -235,7 +239,9 @@ class Game {
       this.lifeToken++; $('gameover').classList.add('hidden');
       this.player.vest = clamp(this.save.vest || 0, 0, VEST_MAX);
       // fresh: on the street in the Old Quarter with nothing. continue: where you last saved
-      const start = fresh ? null : this.save.pos;
+      let start = fresh ? null : this.save.pos;
+      // a spot out at sea (022: saved in the air, or wading) comes back ashore at the nearest road, or at the city's edge
+      if (start && offCity(start.x, start.z) && !inExtension(start.x, start.z)) { const q = RoadGraph.nearest(start.x, start.z, { maxD: 1500, kinds: RG_STREETS }); start = q && Island.land(q.x, q.z) ? { x: q.x, z: q.z, h: start.h } : { x: clamp(start.x, -10, CITY + 10), z: clamp(start.z, -10, CITY + 10), h: start.h }; }
       if (start) this.resetPlayerState(start.x, start.z, start.h);
       else { const lp = this.uw.loc('prop', 'pawn'), sp = sidewalkSpot(2, 6, 0, 52); this.resetPlayerState(sp.x, sp.z, Math.atan2(lp.x - sp.x, lp.z - sp.z)); }
       this.env.time = this.save.timeOfDay;
@@ -491,7 +497,7 @@ class Game {
       this.ui.toast(`You jacked a ${v.spec.name}.`);
     } else if (!v.owned && !v.stolenBefore && !v.legit && v.origin !== 'found') {
       s.stats.stolen++; v.stolenBefore = true;
-      if (v.type === 'police') this.police.crime('stealcop', v.pos.x, v.pos.z);
+      if (v.type === 'police' || v.spec.polAir) this.police.crime('stealcop', v.pos.x, v.pos.z);
       else this.police.crime('theft', v.pos.x, v.pos.z);
       if (v.parked && Math.random() < 0.15) { v.alarmT = 5; this.ui.toast('Car alarm!', 'warn'); }
     }
@@ -504,10 +510,16 @@ class Game {
     p.vehicle = v; p.lastVehicle = v; p.state = 'vehicle'; p.trans = null;
     this.audio.play('door');
     this.cam.yaw = v.h;
+    // an aircraft (232): how it flies, once each time you take one
+    if (v.air) this.ui.toast(v.spec.air === 'plane'
+      ? (IS_TOUCH ? 'Gas and Brake are the throttle. The stick rolls it; pull it back to climb.' : 'W / S throttle · A / D roll · Space climbs · Ctrl dives. Build speed, then ease the nose up.')
+      : (IS_TOUCH ? 'Gas climbs, Brake descends once the rotor is up to speed. The stick flies it forward, back and round.' : 'Space climbs · Ctrl descends · W / S forward and back · A / D turn. Wait for the rotor.'));
     HitchLog.mark('got into a ' + v.type);
   }
   exitVehicle(force) {
     const p = this.player, v = p.vehicle; if (!v) return;
+    // an aircraft: on the ground, or low and slow enough to drop out of (232)
+    if (v.air && !force && !Flight.canExit(v)) { this.ui.toast('Land first.', 'warn'); this.audio.play('deny'); return; }
     this.cam.revT = 0; this.cam.revCam = false; this.cam.revBack = false;
     const res = {};
     let spot = null;
@@ -548,11 +560,20 @@ class Game {
     let steer = (inp.isDown('left') ? 1 : 0) - (inp.isDown('right') ? 1 : 0);
     if (inp.stick.active) steer -= inp.stick.x;
     if (inp.gp.active) { thr += inp.gp.rt - inp.gp.lt; steer -= inp.gp.lx; }
+    if (v.air) {
+      // aircraft (232). Keys: W / S the throttle (the helicopter: forward and back), A / D roll or turn, Space or Shift up,
+      // Ctrl or X down. Touch: the stick flies it; Gas and Brake are the throttle (the helicopter: up and down).
+      const upK = (inp.isDown('jump') || inp.isDown('sprint') ? 1 : 0) - (inp.isDown('walk') || inp.isDown('dodge') ? 1 : 0);
+      const key = (inp.isDown('up') ? 1 : 0) - (inp.isDown('down') ? 1 : 0), btn = (inp.isDown('gas') ? 1 : 0) - (inp.isDown('brake') ? 1 : 0);
+      const sy = inp.stick.active ? inp.stick.y : 0, gy = inp.gp.active ? inp.gp.ly : 0, trig = inp.gp.active ? inp.gp.rt - inp.gp.lt : 0;
+      if (v.spec.air === 'plane') { thr = key + btn + trig; v.ctl.pitch = blocked ? 0 : clamp(upK - sy - gy, -1, 1); }
+      else { thr = key + sy + gy; v.ctl.lift = blocked ? 0 : clamp(upK + btn + trig, -1, 1); }
+    }
     v.ctl.throttle = blocked ? 0 : clamp(thr, -1, 1);
     v.ctl.steer = blocked ? 0 : clamp(steer, -1, 1);
     v.ctl.handbrake = !blocked && (inp.isDown('jump') || inp.isDown('handbrake'));
     if (inp.pressed('horn')) {
-      if (v.type === 'police') { v.siren = !v.siren; this.ui.toast(v.siren ? 'Siren on' : 'Siren off'); }
+      if (v.type === 'police' || v.spec.ems || v.spec.polAir) { v.siren = !v.siren; this.ui.toast(v.siren ? 'Siren on' : 'Siren off'); }
       else { this.audio.play('horn', { dur: 0.5, gain: 0.9 }); this.peds.panic(v.pos.x + Math.sin(v.h) * 8, v.pos.z + Math.cos(v.h) * 8, 7, 0); }
     }
     if (inp.pressed('radio')) { const n = this.audio.nextStation(); const r = $('radio'); r.textContent = '♪ ' + n; r.classList.add('show'); clearTimeout(this._rt); this._rt = setTimeout(() => r.classList.remove('show'), 2500); }
@@ -561,6 +582,14 @@ class Game {
     s.distDrive += v.speed * dt; s.topSpeed = Math.max(s.topSpeed, v.speed);
     p.regen(dt);
   }
+  // the lifts to the two rooftop helipads (the hospital's, the police station's): a door at the foot of the wing, one on the roof
+  liftAction() {
+    const p = this.player; if (p.state !== 'foot' || p.interior) return null;
+    for (const L of this.world.isle.lifts) for (const [from, to, label] of [[L.a, L.b, 'Lift up to the ' + L.name], [L.b, L.a, 'Lift down to the street']]) {
+      if (Math.abs(p.pos.y - from.y) < 1.5 && Math.hypot(p.pos.x - from.x, p.pos.z - from.z) < 1.7) return { label, act: () => this.fade(() => { p.pos.set(to.x, to.y, to.z); p.vel.set(0, 0, 0); this.audio.play('door'); }) };
+    }
+    return null;
+  }
   interact() {
     const p = this.player, m = this.missions;
     if (p.passenger) { this.taxi.getOut(); return; }
@@ -568,6 +597,7 @@ class Game {
     if (this.uw.S.jail) return;
     const uq = this.uniques.findAction(); if (uq) { uq.act(); return; }
     if (m.offer && !m.active) { m.start(m.offer); return; }
+    const la = this.liftAction(); if (la) { la.act(); return; }
     const a = this.content.findAction();
     if (a) { a.act(); return; }
     if (p.state === 'vehicle') { if (p.passenger) this.taxi.getOut(); else this.exitVehicle(false); return; }
@@ -588,7 +618,7 @@ class Game {
       if (u) t = u.label;
       else if (this.uw.S.jail) t = null;
       else if (p.state === 'foot' && !m.offer) {
-        const a = this.uniques.findAction() || this.content.findAction();
+        const a = this.uniques.findAction() || this.liftAction() || this.content.findAction();
         if (a) t = a.label;
         else if (!p.interior || p.interior.vspace) { const v = this.nearestVehicle(1.8); if (v) t = v.uniqueId && !v.garageUid ? `Take the ${v.spec.name} (one-off)` : v.locked ? (v.mission === 'sold' || v.dealer ? null : 'Locked') : (v.driver === 'npc' || v.driver === 'cop' ? 'Steal ' : 'Enter ') + v.spec.name; }
       } else if (p.state === 'vehicle' && p.vehicle.health <= 0 && !p.vehicle.burnt) t = 'Get out \u2014 it\u2019s on fire!';
@@ -676,7 +706,7 @@ class Game {
     this.env.update(dt);
     this.content.interiors.update(dt);
     this.chunks.update(this.focus.x, this.focus.z, this.frame);
-    this.vpScene.update(this.focus.x, this.focus.z); this.cfsScene.update(this.focus.x, this.focus.z);
+    this.vpScene.update(this.focus.x, this.focus.z); this.cfsScene.update(this.focus.x, this.focus.z); this.isleScene.update(this.focus.x, this.focus.z);
     this.propT -= rdt;
     if (this.propT <= 0) {
       this.propT = 0.5;
@@ -685,6 +715,7 @@ class Game {
       this.props.setActiveBlocks(set);
       this.props.respawnTick(this.focus.x, this.focus.z);
       this.vehicles.updateParked(this.focus.x, this.focus.z, this.parkedR);
+      if (this.state === 'playing') this.fleet.update(this.focus.x, this.focus.z);
     }
     if (dt > 0) {
       this.traffic.update(dt, this.frame);

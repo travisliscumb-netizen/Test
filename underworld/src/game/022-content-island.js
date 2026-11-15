@@ -342,6 +342,8 @@ const Island = {
   top(x, z) { return this.height(x, z, 1e6); },
   // is (x, z) open water (the ground under it below the sea)?
   sea(x, z) { return this.height(x, z, -100) < SEA_Y - 0.25; },
+  // is (x, z) on Lake Valen?
+  lake(x, z) { const lx = (x - LAKE.x) / LAKE.rx, lz = (z - LAKE.z) / LAKE.rz; return lx * lx + lz * lz < 2.2 && this.sea(x, z); },
   // is (x, z) dry land of the island (anything above the tide line)?
   land(x, z) { return this.ready && this.height(x, z) > SEA_Y + 0.3; },
   // ---------------------------------------------------------------- surfaces and districts

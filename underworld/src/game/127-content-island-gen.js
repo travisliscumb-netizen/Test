@@ -70,6 +70,17 @@ Object.assign(World.prototype, {
         }
       }
     }
+    // the Blackgate Bridge's two towers: legs outside the parapets (drawn by the scenery, solid to whatever flies into them)
+    isle.towers = [];
+    for (const R of Island.roads) for (const [k0, k1] of R.bridges) {
+      if (R.cum[k1] - R.cum[k0] < 300) continue;
+      for (const f of [0.27, 0.73]) {
+        const k = Math.round(k0 + (k1 - k0) * f), p = R.pts[k], q = R.pts[k + 1], h = Math.atan2(q[0] - p[0], q[1] - p[1]), rx = Math.cos(h), rz = -Math.sin(h), deck = R.y[k], bed = Island.base0(p[0], p[1]) - 1, top = deck + 48;
+        const legs = [-1, 1].map(s => ({ x: p[0] + rx * s * (R.w / 2 + 2.6), z: p[1] + rz * s * (R.w / 2 + 2.6) }));
+        for (const L of legs) this.grid.add({ x: L.x, z: L.z, r: 2, y0: bed, y1: top, kind: 'det' });
+        isle.towers.push({ road: R, k, x: p[0], z: p[1], h, deck, top, bed, legs });
+      }
+    }
     // ================================================================ PORT VALEN INTERNATIONAL
     const A = AIRPORT, Y = A.y, B = {};
     B.term = this._isleBlock('ap_term', 600, 1915, 170, A.name);

@@ -110,6 +110,8 @@ class Player {
     let speed = this.ads ? 2.6 : this.aiming ? (walking ? 1.8 : 3.9) : wantSprint ? SPRINT_SPEED + up.stamina * 0.3 : walking ? 1.8 : 4.4;
     if (this.blocking) speed = Math.min(speed, 1.6);
     if (this.attackT > 0 && this.wep.melee) speed *= 0.45;
+    // wading (the island's sea, 022): the deeper you stand in it, the slower you go
+    if (this.pos.y < SEA_Y - 0.25 && !this.interior) speed *= lerp(0.8, 0.38, clamp((SEA_Y - 0.25 - this.pos.y) / (ISLE.wade - 0.25), 0, 1));
     const stunned = this.knockT > 0;
     let tvx = dx * speed * (mv.mag > 0.05 ? 1 : 0), tvz = dz * speed * (mv.mag > 0.05 ? 1 : 0);
     if (stunned) { tvx = 0; tvz = 0; }

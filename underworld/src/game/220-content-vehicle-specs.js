@@ -203,6 +203,8 @@ function profileTopAt(pts, z) {
 function vehicleGeometry(type) {
   if (VEH_GEO[type]) return VEH_GEO[type];
   const s = VEHICLES[type], pr = PROFILES[s.profile];
+  // a body of its own (232): the open-wheeler, the aeroplane, the helicopter
+  if (s.build) return VEH_GEO[type] = ISLE_BUILD[s.build](type);
   const g = new GeoBuilder({ part: true });
   const W = s.w, R = s.wheelR, wb = s.l * 0.6;
   const zs = pr.body.map(p => p[0]), ys = pr.body.map(p => p[1]);
@@ -300,6 +302,14 @@ function vehicleGeometry(type) {
     g.box(0.32, cabTop + 0.18, (cabF + cabR) / 2 - 0.05, 0.5, 0.12, 0.26, null, 0, { part: 8 });
     for (const sx of [-1, 1]) g.box(sx * (W / 2 + 0.04), (yb + belt) / 2 + 0.06, 0.15, 0.03, 0.34, 2.0, null, 0, { part: 10 });
     g.box(0, yb + 0.3, zf + 0.2, W * 0.7, 0.3, 0.12, null, 0, { part: 2 });
+  }
+  if (s.ems) {
+    // an ambulance (1) or a fire engine (2): a light bar over the cab, a stripe down each flank, the engine's ladder (232)
+    const tr = s.profile === 'truck', ly = tr ? 2.56 : 2.27, lz = tr ? 1.95 : 0.9;
+    g.box(0, ly, lz, W * 0.7, 0.1, 0.3, null, 0, { part: 2 });
+    g.box(-W * 0.2, ly + 0.1, lz, W * 0.3, 0.12, 0.26, null, 0, { part: 7 }); g.box(W * 0.2, ly + 0.1, lz, W * 0.3, 0.12, 0.26, null, 0, { part: tr ? 7 : 8 });
+    for (const sx of [-1, 1]) g.box(sx * (W / 2 + 0.02), tr ? 1.5 : 1.25, -0.3, 0.02, 0.26, s.l * 0.62, null, 0, { part: 10 });
+    if (tr) { for (const sx of [-0.42, 0.42]) g.box(sx, 3.36, -0.9, 0.08, 0.1, 5.4, null, 0, { part: 3 }); for (let k = 0; k < 9; k++) g.box(0, 3.36, -3.3 + k * 0.6, 0.84, 0.05, 0.06, null, 0, { part: 3 }); }
   }
   if (s.unmarked) { // hidden grille strobes and a push bar
     g.box(-0.2, frontTop - 0.25, zf + 0.09, 0.14, 0.06, 0.02, null, 0, { part: 7 });

@@ -32901,6 +32901,8 @@ function streetNameAt(x, z) {
   if (vpLand(x, z)) return VP.name;
   if (z > CITY + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
+  // out on the island (022): the road you are on, by name
+  if (offCity(x, z)) { const q = RoadGraph.ready ? RoadGraph.nearest(x, z, { maxD: 12, kinds: RG_STREETS }) : null; return q && q.d <= q.e.w / 2 + 2 ? q.e.name : null; }
   if (x < 0 || z < 0 || x > CITY || z > CITY) return 'Harbor Promenade';
   return null;
 }
@@ -32945,14 +32947,32 @@ const ZONES = {
     traffic: { sedan: 2.5, suv: 2, taxi: 2, compact: 2, sports: 0.8, van: 0.8 } },
   r: { name: 'Cedar Fields', tag: 'Dirt tracks and nobody watching', col: '#c9b06b', ped: 0.15, cops: 0.3, night: 0.3,
     traffic: { pickup: 3.5, offroad: 1.5, van: 1, sedan: 1, compact: 0.8 } },
+  // the island off the lattice (Operation Blackgate, 022): the highlands north of the city, the lowlands south of it
+  k: { name: 'Crestmoor Ridge', tag: 'Eight gates on a hill, and the whole city at their feet', col: '#e8d28a', ped: 0, cops: 0.9, night: 0.3,
+    traffic: { luxury: 3, suv: 2.5, sports: 1.8, coupe: 1, sedan: 1 } },
+  n: { name: 'Mount Valen', tag: 'One road, 246 metres, no guard rail', col: '#b9c4b0', ped: 0, cops: 0.2, night: 0.2,
+    traffic: { suv: 2.5, pickup: 2, sports: 1.6, offroad: 1.4, sedan: 1.2, compact: 1 } },
+  t: { name: 'Blackgate Highlands', tag: 'Forest, cliff road and the long way round', col: '#7fae78', ped: 0, cops: 0.3, night: 0.3,
+    traffic: { pickup: 3, suv: 2, sedan: 2, van: 1.5, truck: 1.2, compact: 1.5, sports: 0.6 } },
+  b: { name: 'Saltmarsh', tag: 'Pastel houses, a stone jetty and the bridge on the horizon', col: '#f0d9a8', ped: 0, cops: 0.4, night: 0.4,
+    traffic: { compact: 3, suv: 2, pickup: 1.5, sedan: 2, van: 1, sports: 0.7 } },
+  e: { name: 'Southshore', tag: 'Flat fields, a long beach and the sound of jets', col: '#c9d38a', ped: 0, cops: 0.4, night: 0.4,
+    traffic: { sedan: 2.5, pickup: 2.5, van: 2, truck: 1.5, compact: 2, suv: 1.5, taxi: 1 } },
+  y: { name: 'Port Valen International', tag: 'Two runways and a hangar door left open', col: '#9fc4e8', ped: 0, cops: 1.0, night: 0.8,
+    traffic: { taxi: 3.5, sedan: 2.5, van: 2, suv: 1.5, luxury: 0.8, truck: 1 } },
+  j: { name: 'Valen Proving Ground', tag: 'A kilometre of nothing to hit', col: '#ff9d6b', ped: 0, cops: 0.2, night: 0.2,
+    traffic: { sports: 2, van: 1.5, pickup: 1, sedan: 1 } },
   // Valen Point (Session 6B): off the lattice, east across the causeway; no foot traffic, few police
   v: { name: 'Valen Point', tag: 'Pit garages, grandstands and the fastest legal mile on the island', col: '#ff6b4a', ped: 0, cops: 0.4, night: 0.4,
     traffic: { sports: 2, sedan: 2, suv: 1.5, van: 1.2, pickup: 0.8, muscle: 0.6, truck: 0.4 } }
 };
 function zoneKey(x, z) {
-  if (x > CITY + EDGE_MARGIN && x < VP.x1 + 400) return 'v';
-  // Cedar Fields South (Session 6C) is more of Cedar Fields
-  if (cfsSide(x, z)) return 'r';
+  if (offCity(x, z)) {
+    // Valen Point and the sound round it; Cedar Fields South (Session 6C) is more of Cedar Fields; the rest of the island
+    if (vpSide(x, z)) return 'v';
+    if (inCedarSouth(x, z)) return 'r';
+    return Island.zoneKey(x, z);
+  }
   const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
   return ZONE_MAP[bz][bx];
 }
@@ -32960,6 +32980,7 @@ function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
   if (inValenPoint(x, z)) return VP.name;
   if (inCedarSouth(x, z)) return CFS.name;
+  if (offCity(x, z)) return Island.land(x, z) ? ZONES[Island.zoneKey(x, z)].name : Island.lake(x, z) ? LAKE.name : 'Offshore';
   if (x < -ROAD_HALF - 2 || z < -ROAD_HALF - 2 || x > CITY + ROAD_HALF + 2 || z > CITY + ROAD_HALF + 2) return 'Waterfront';
   return zoneAt(x, z).name;
 }
@@ -33168,18 +33189,25 @@ function localSurfaceAt(x, z) {
 function groundY(x, z, y, step) {
   SURF.gx = 0; SURF.gz = 0; Terrain.hit = false;
   if (y !== undefined && y < -12 && typeof vspaceFloor === 'function') { const f = vspaceFloor(x, z, y); if (f !== null) return f; }
-  const b = groundBase(x, z), hit = Terrain.hit, tgx = Terrain.gx, tgz = Terrain.gz;
+  const b = groundBase(x, z, y), hit = Terrain.hit, tgx = Terrain.gx, tgz = Terrain.gz;
   const s = surfaceY(x, z, y, step);
   if (s > b) { Terrain.hit = false; return s; }
   SURF.gx = hit ? tgx : 0; SURF.gz = hit ? tgz : 0;
   return b;
 }
-function groundBase(x, z) {
+function groundBase(x, z, y) {
   // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
   if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
-  if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) return -3;
+  if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) {
+    // the island (022): its ground (a bridge's deck or the tunnel's floor by the height y of whoever asks), or as
+    // deep as you can wade where that ground is under the sea
+    const h = Island.height(x, z, y);
+    if (h <= SEA_Y - ISLE.wade) return SEA_Y - ISLE.wade;
+    Terrain.hit = true; Terrain.gx = Island.gx; Terrain.gz = Island.gz; Terrain.rough = 0;
+    return h;
+  }
   // roads sit at 0; everything else (blocks, the outer promenade, closed road strips) is raised
   // (the kerb is cut where a curved road leaves a lattice street: a ramp in the gutter, CurbCuts in 135)
   return RoadNet.roadAt(x, z) ? (CurbCuts.n ? CurbCuts.at(x, z) : 0) : CURB_H;
@@ -33201,6 +33229,417 @@ function blockLamps(bx, bz) {
 }
 
 /* =====================================================================
+   [CONTENT] VALEN ISLAND (Operation Blackgate)
+   The whole world as one island. The lattice city no longer stands in a
+   square of sea: it sits on the waist of an hourglass island, with the
+   highlands (Mount Valen, the Crestmoor ridge, the Blackgate ridge) to the
+   north, the lowlands (Cedar Fields, the airport, the proving ground, the
+   long beach) to the south, Valen Bay on its west waterfront and Valen
+   Sound, with Valen Point in it, on its east.
+   - the coast: a closed spline (ISLE_COAST) and a few islets, kept as a
+     signed-distance grid (16 m) with noise on it wherever nothing built
+     needs the shore to stay put;
+   - the ground: an analytic height (the shore's profile, the lobes'
+     hills) with level pads blended in (the city, Cedar Fields, the
+     airport, building sites) and a road bed cut or banked for every road,
+     baked on demand into 256 m tiles of 4 m cells. The physics reads the
+     tiles as the same two triangles a cell is drawn with, so a wheel sits
+     on what you see;
+   - two-level ground: a bridge's deck over the water and the Blackgate
+     Tunnel's floor under the ridge are answered by the reference height
+     (groundY's y), like the city's decks;
+   - the sea: you can wade (ISLE.wade deep), a car bogs down in it.
+   Everything off the lattice asks Island: groundBase, the scenery, the
+   maps, zones, spawns.
+   ===================================================================== */
+const SEA_Y = -1.2;
+const ISLE = { name: 'Valen Island', x0: -2560, z0: -3328, x1: 3072, z1: 3072, tile: 256, cell: 4, wade: 1.25, sdfCell: 16, sdfMax: 400, shMax: 34 };
+const WORLD_X0 = ISLE.x0, WORLD_Z0 = ISLE.z0;
+// the coast, clockwise from the city's north-west corner: Valen Bay's north shore and Blackgate Point, the highlands'
+// west coast, the north cape, the east coast and the north shore of Valen Sound, the city's east side (inside the
+// city's own square, whose seawall is the real edge there), the lowlands' north coast, the east cape, the south
+// coast, the long beach, the south headland and the bay's south shore
+const ISLE_COAST = [
+  [30, 70], [-260, -40], [-640, -60], [-980, 40], [-1120, 235], [-1300, 150], [-1500, -150], [-1750, -500], [-2050, -900],
+  [-2200, -1400], [-2050, -1900], [-1750, -2300], [-1300, -2550], [-800, -2900], [-200, -3100], [400, -3000], [1000, -2750],
+  [1500, -2830], [2100, -2600], [2500, -2200], [2700, -1700], [2600, -1200], [2300, -800], [2500, -450], [2250, -200],
+  [1800, -230], [1400, -170], [1120, -130], [960, 30], [930, 500], [930, 900], [790, 940], [800, 1080], [900, 1200],
+  [1150, 1230], [1500, 1150], [1900, 1160], [2300, 1300], [2450, 1650], [2300, 2050], [2000, 2300], [1700, 2700],
+  [1200, 2900], [600, 2850], [0, 2900], [-500, 2700], [-900, 2300], [-1150, 1900], [-1250, 1500], [-1300, 1100],
+  [-1260, 940], [-1100, 760], [-880, 900], [-600, 1000], [-300, 960], [-100, 900], [30, 860]
+];
+// islets: [x, z, radius, name]
+const ISLE_ISLETS = [[-560, 470, 78, 'Battery Island'], [-1720, 520, 120, 'Gull Rock'], [2860, -900, 135, 'Tern Island'], [-1450, 2720, 150, 'Castaway Cay'], [2680, 2480, 165, 'Dutchman’s Rest'], [-2330, -2480, 120, 'Widow’s Tooth']];
+// where the shore must stay exactly as drawn (no coast noise): the city, Cedar Fields, the airport, the proving
+// ground, the bridge's two headlands, the lighthouse point
+const ISLE_KEEP = [[-140, -140, 1100, 1100], [-80, 980, 740, 1550], [-330, 1740, 1530, 2600], [800, 1420, 2040, 1760], [-1260, 60, -960, 360], [-1250, 690, -940, 990], [1380, -2900, 1680, -2620]];
+// the airport and the proving ground (level pads; built in 127)
+const AIRPORT = { name: 'Port Valen International', x0: -250, z0: 1820, x1: 1450, z1: 2520, y: 3.2,
+  rw: [{ id: '09/27', z: 2410, x0: -170, x1: 1370, w: 46 }, { id: '09R/27L', z: 2205, x0: 120, x1: 1220, w: 32 }],
+  tw: { z: 2085, x0: -120, x1: 1320, w: 18 }, links: [0, 420, 840, 1260], apron: { x0: 230, z0: 1945, x1: 1330, z1: 2050 } };
+const PROVING = { name: 'Valen Proving Ground', x0: 880, z0: 1490, x1: 1960, z1: 1690, y: 3.0, strip: { z: 1528, x0: 900, x1: 1940, w: 22 }, pad: { x: 1120, z: 1622, r: 52 }, lot: { x0: 1280, z0: 1575, x1: 1900, z1: 1675 } };
+// Lake Valen: an inland sea in the highlands' east, between the mountain and the east hills (its water is the sea's level)
+const LAKE = { name: 'Lake Valen', x: 1650, z: -900, rx: 330, rz: 235 };
+// Mount Valen's summit and the Blackgate ridge's crest line
+const MT_VALEN = { x: 350, z: -1750, h: 250, r: 800 };
+const BG_RIDGE = { ax: -2150, az: -1220, bx: -650, bz: -1560, h: 100, r: 150 };
+/* ---------------- the road network off the lattice ----------------
+   Each road is a spline through its control points, sampled every 4 m. An end is 'lat' (it meets a perimeter road of
+   the lattice at the kerb), a road's id (it ends on that road: the end is moved onto that road's nearest point) or
+   'ring' (a turning circle). deck: a bridge's height over the water; cut: where the road goes through a ridge instead
+   of over it, one even grade for `half` m either side of the point (the Blackgate Tunnel). Order matters: a road can
+   only end on one listed before it. */
+function isleSpiral(cx, cz, r0, a0, r1, a1, n) { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, a = (a0 + (a1 - a0) * t) * Math.PI / 180, r = r0 + (r1 - r0) * t; out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return out; }
+const ISLE_ROADS = [
+  { id: 'n1', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], cut: { x: -1925, z: -1270, half: 340 },
+    pts: [[120, -6], [120, -60], [95, -170], [-10, -270], [-240, -330], [-560, -330], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
+  { id: 'n2', name: 'Mount Valen Road', w: 9, grade: 0.11, ends: ['n1', 'ring'], ring: 15,
+    pts: [[-10, -270], [-150, -420], [-60, -560], [140, -604], [330, -590], ...isleSpiral(MT_VALEN.x, MT_VALEN.z, 1150, 85, 78, -410, 44)] },
+  { id: 'n3', name: 'Highland Pass', w: 9, grade: 0.09, ends: ['n2', 'n1'], pts: [[1315, -1750], [1480, -1880], [1720, -1930], [2020, -1830], [2330, -1700]] },
+  { id: 'n4', name: 'Lighthouse Road', w: 8, grade: 0.09, ends: ['n1', 'ring'], ring: 13, pts: [[1620, -2452], [1642, -2560], [1602, -2680], [1548, -2745], [1530, -2772]] },
+  { id: 's1', name: 'Southshore Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'],
+    pts: [[40, 966], [40, 1005], [-30, 1075], [-100, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [725, 1100], [695, 1022], [680, 1000], [680, 966]] },
+  { id: 's2', name: 'Airport Access', w: 10, grade: 0.07, ends: ['s1', 'ring'], ring: 17, pts: [[600, 1716], [600, 1770], [600, 1820], [600, 1856]] },
+  { id: 's3', name: 'Blackgate Bridge', w: 12, grade: 0.065, deck: 16, ends: ['s1', 'n1'],
+    pts: [[-100, 1230], [-270, 1192], [-520, 1172], [-780, 1130], [-960, 1060], [-1062, 960], [-1090, 860], [-1096, 700], [-1100, 500], [-1104, 300], [-1100, 190], [-1085, 60], [-1000, -140], [-920, -250], [-860, -300]] },
+  { id: 's4', name: 'Longshore Drive', w: 10, grade: 0.08, ends: ['s3', 's1'],
+    pts: [[-780, 1130], [-930, 1300], [-1010, 1560], [-960, 1860], [-780, 2180], [-500, 2470], [-140, 2700], [400, 2710], [1000, 2710], [1420, 2640], [1700, 2380], [1980, 2080], [2120, 1750], [2010, 1420], [1650, 1330], [1200, 1375], [900, 1350], [756, 1330]] },
+  { id: 's5', name: 'Proving Ground Road', w: 9, grade: 0.07, ends: ['s4', 'ring'], ring: 14, pts: [[1200, 1375], [1200, 1430], [1200, 1475]] }
+];
+const Island = {
+  ready: false, sdf: null, SW: 0, SH: 0, pads: [], roads: [], tiles: new Map(), _seg: new Map(), _sseg: new Map(), _multi: new Set(),
+  // left by the last height(): the slope of the ground found
+  gx: 0, gz: 0,
+  _fx: { grip: 1, drag: 0, bump: 0, s: 0 },
+  // ---------------------------------------------------------------- the coast
+  // the coast's outline: a closed Catmull-Rom through ISLE_COAST, a point about every 24 m
+  coastLine() {
+    if (this._coast) return this._coast;
+    const P0 = ISLE_COAST, n = P0.length, out = [];
+    for (let i = 0; i < n; i++) {
+      const a = P0[(i - 1 + n) % n], b = P0[i], c = P0[(i + 1) % n], d = P0[(i + 2) % n];
+      const m = Math.max(2, Math.ceil(Math.hypot(c[0] - b[0], c[1] - b[1]) / 24));
+      for (let k = 0; k < m; k++) {
+        const t = k / m, t2 = t * t, t3 = t2 * t;
+        const f = (p, q, r, s) => 0.5 * (2 * q + (r - p) * t + (2 * p - 5 * q + 4 * r - s) * t2 + (3 * q - p - 3 * r + s) * t3);
+        out.push([f(a[0], b[0], c[0], d[0]), f(a[1], b[1], c[1], d[1])]);
+      }
+    }
+    return this._coast = out;
+  },
+  // how freely the shore may wander here: 0 inside a kept rectangle, 1 from 200 m out
+  _coastAmp(x, z) {
+    let a = 1;
+    for (const K of ISLE_KEEP) { const dx = Math.max(K[0] - x, 0, x - K[2]), dz = Math.max(K[1] - z, 0, z - K[3]); a = Math.min(a, smoothstep(0, 200, Math.hypot(dx, dz))); if (a === 0) break; }
+    return a;
+  },
+  _buildSDF() {
+    const c = ISLE.sdfCell, W = Math.round((ISLE.x1 - ISLE.x0) / c) + 1, H = Math.round((ISLE.z1 - ISLE.z0) / c) + 1, MAXD = ISLE.sdfMax;
+    const line = this.coastLine(), n = line.length, d2 = new Float32Array(W * H).fill(MAXD * MAXD);
+    // the distance to the outline: each segment lowers the points within MAXD of it
+    for (let k = 0; k < n; k++) {
+      const a = line[k], b = line[(k + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+      const i0 = Math.max(0, Math.ceil((Math.min(a[0], b[0]) - MAXD - ISLE.x0) / c)), i1 = Math.min(W - 1, Math.floor((Math.max(a[0], b[0]) + MAXD - ISLE.x0) / c));
+      const j0 = Math.max(0, Math.ceil((Math.min(a[1], b[1]) - MAXD - ISLE.z0) / c)), j1 = Math.min(H - 1, Math.floor((Math.max(a[1], b[1]) + MAXD - ISLE.z0) / c));
+      for (let j = j0; j <= j1; j++) {
+        const pz = ISLE.z0 + j * c - a[1];
+        for (let i = i0; i <= i1; i++) {
+          const px = ISLE.x0 + i * c - a[0], t = clamp((px * dx + pz * dz) / l2, 0, 1), ex = px - dx * t, ez = pz - dz * t, d = ex * ex + ez * ez, o = j * W + i;
+          if (d < d2[o]) d2[o] = d;
+        }
+      }
+    }
+    const sdf = new Float32Array(W * H), xs = [], E = EDGE_MARGIN;
+    for (let j = 0; j < H; j++) {
+      const z = ISLE.z0 + j * c, zs = z + 0.0137;
+      // inside the outline: even-odd along the row
+      xs.length = 0;
+      for (let k = 0; k < n; k++) { const a = line[k], b = line[(k + 1) % n]; if ((a[1] > zs) !== (b[1] > zs)) xs.push(a[0] + (zs - a[1]) / (b[1] - a[1]) * (b[0] - a[0])); }
+      xs.sort((p, q) => p - q);
+      let q = 0, inside = false;
+      for (let i = 0; i < W; i++) {
+        const x = ISLE.x0 + i * c;
+        while (q < xs.length && xs[q] < x) { inside = !inside; q++; }
+        let d = Math.sqrt(d2[j * W + i]); if (inside) d = -d;
+        for (const I of ISLE_ISLETS) d = Math.min(d, Math.hypot(x - I[0], z - I[1]) - I[2]);
+        const amp = this._coastAmp(x, z);
+        if (amp > 0) d += amp * (38 * tNoise(x / 330, z / 330, 91) + 15 * tNoise(x / 105, z / 105, 93));
+        // the city's own square (to its seawall) is land whatever the outline does
+        const ex = Math.max(-E - x, x - CITY - E), ez = Math.max(-E - z, z - CITY - E);
+        const dc = ex > 0 || ez > 0 ? Math.hypot(Math.max(ex, 0), Math.max(ez, 0)) : Math.max(ex, ez);
+        sdf[j * W + i] = clamp(Math.min(d, dc), -MAXD, MAXD);
+      }
+    }
+    this.sdf = sdf; this.SW = W; this.SH = H;
+  },
+  // signed distance to the shore (m): negative on land, positive at sea
+  sd(x, z) {
+    const c = ISLE.sdfCell, u = (x - ISLE.x0) / c, v = (z - ISLE.z0) / c, W = this.SW;
+    if (u < 0 || v < 0 || u >= W - 1 || v >= this.SH - 1) return ISLE.sdfMax;
+    const i = Math.floor(u), j = Math.floor(v), fx = u - i, fz = v - j, o = j * W + i, s = this.sdf;
+    return (s[o] * (1 - fx) + s[o + 1] * fx) * (1 - fz) + (s[o + W] * (1 - fx) + s[o + W + 1] * fx) * fz;
+  },
+  // ---------------------------------------------------------------- the natural ground
+  // the island before anything is built on it: the shore's profile (a seabed shelving away, a beach, a coastal
+  // plain) and the hills of each lobe, which die away toward the coast
+  nat(x, z) {
+    const d = -this.sd(x, z);
+    if (d <= 0) return Math.max(SEA_Y - 6, SEA_Y + d * 0.07);
+    const G = (dx, dz, r) => Math.exp(-(dx * dx + dz * dz) / (r * r));
+    const shore = SEA_Y + 2.5 * smoothstep(0, 36, d) + 1.3 * smoothstep(36, 170, d), inl = smoothstep(26, 360, d);
+    const wN = 1 - smoothstep(-260, 60, z), wS = smoothstep(980, 1220, z);
+    let hills = 0, extra = 0;
+    if (wN > 0) {
+      // Mount Valen (rugged), the east hills, the north cape, the Crestmoor ridge above the city, the west and north-east rises
+      let m = MT_VALEN.h * G(x - MT_VALEN.x, z - MT_VALEN.z, MT_VALEN.r) * (0.88 + 0.12 * (1 - Math.abs(tNoise(x / 360, z / 360, 61))));
+      m += 85 * G(x - 1750, z + 1450, 560) + 60 * G(x + 250, z + 2500, 480) + 44 * G(x - 330, z + 520, 330) + 45 * G(x - 1050, z + 2250, 400) + 38 * G(x + 1500, z + 500, 380);
+      m += (6 * tNoise(x / 190, z / 190, 63) + 2 * tNoise(x / 67, z / 67, 65)) * smoothstep(8, 60, m);
+      hills += wN * m;
+      // the Blackgate ridge runs from the mountain's shoulder down to the west coast and ends in a cliff
+      const R = BG_RIDGE, rx = R.bx - R.ax, rz = R.bz - R.az, t = clamp(((x - R.ax) * rx + (z - R.az) * rz) / (rx * rx + rz * rz), 0, 1), dr = Math.hypot(x - R.ax - rx * t, z - R.az - rz * t);
+      extra += wN * R.h * Math.exp(-dr * dr / (R.r * R.r)) * smoothstep(10, 130, d);
+    }
+    if (wS > 0) hills += wS * (34 * G(x - 2260, z - 1660, 330) + 14 * G(x + 760, z - 1560, 380) + 18 * G(x - 300, z - 2790, 300));
+    // the two bluffs the bridge springs from
+    extra += 13 * (G(x + 1105, z - 215, 150) + G(x + 1088, z - 835, 150)) * smoothstep(4, 60, d);
+    const roll = 2.2 * (tNoise(x / 240, z / 240, 51) + 0.55) + 1.1 * tNoise(x / 84, z / 84, 53) + 0.35 * tNoise(x / 29, z / 29, 55);
+    const h = shore + inl * (hills + roll * (0.5 + 1.2 * Math.max(wN, wS))) + extra;
+    // Lake Valen's basin: the ground eases down to a bed below the sea's level, the shore wandering a little
+    const lx = (x - LAKE.x) / LAKE.rx, lz = (z - LAKE.z) / LAKE.rz, le = lx * lx + lz * lz;
+    if (le < 2.6) { const k = 1 - smoothstep(0.55, 1.75, le + 0.22 * tNoise(x / 120, z / 120, 57)); return h * (1 - k) + (SEA_Y - 4.5) * k; }
+    return h;
+  },
+  // a level pad: the ground is exactly y inside the rectangle and eases back to the natural ground over `blend` m
+  // outside it (only where that ground is land: a pad on the shore does not fill the sea in)
+  addPad(x0, z0, x1, z1, y, blend = 40) { const P = { x0, z0, x1, z1, y, blend }; this.pads.push(P); return P; },
+  // the natural ground with the pads in it
+  base0(x, z) {
+    let h = this.nat(x, z);
+    const land = smoothstep(SEA_Y + 0.15, SEA_Y + 1.5, h);
+    for (const P of this.pads) {
+      const dx = Math.max(P.x0 - x, 0, x - P.x1), dz = Math.max(P.z0 - z, 0, z - P.z1);
+      if (dx === 0 && dz === 0) { h = P.y; continue; }
+      if (dx >= P.blend || dz >= P.blend) continue;
+      const dd = Math.hypot(dx, dz); if (dd >= P.blend) continue;
+      const k = (1 - smoothstep(0, P.blend, dd)) * land;
+      h = P.y * k + h * (1 - k);
+    }
+    return h;
+  },
+  // ---------------------------------------------------------------- roads
+  // lay the network out: sample each road, move its ends onto the roads they meet, then give each a level along its
+  // length (its profile) and index the segments. Called once by the world's generator, after the pads are in.
+  buildRoads() {
+    this.roads = []; const byId = {};
+    for (const D of ISLE_ROADS) {
+      const cp = D.pts.map(p => [p[0], p[1]]), hosts = [null, null];
+      D.ends.forEach((e, k) => {
+        const H = byId[e]; if (!H) return;
+        const q = k ? cp[cp.length - 1] : cp[0]; let best = 0, bd = Infinity;
+        H.pts.forEach((p, i) => { const d = Math.hypot(p[0] - q[0], p[1] - q[1]); if (d < bd) { bd = d; best = i; } });
+        const p = H.pts[best]; if (k) cp[cp.length - 1] = [p[0], p[1]]; else cp[0] = [p[0], p[1]];
+        hosts[k] = { road: H, k: best };
+      });
+      const pts = splinePts(cp, 4);
+      const R = { id: D.id, name: D.name, w: D.w, grade: D.grade, deck: D.deck, cut: D.cut || null, ends: D.ends, ring: null, pts, hosts, st: D.st || 'asphalt' };
+      if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
+      this._profile(R);
+      this.roads.push(R); byId[R.id] = R;
+    }
+    this._indexRoads();
+    this.tiles.clear();
+    this.ready = true;
+  },
+  // a road's level at each of its points. Over water it is a bridge (its deck's height); through a cut it holds one
+  // grade from end to end (the deep part is the tunnel); elsewhere it follows the ground, averaged over about 40 m
+  // either side, pinned where it meets the lattice or another road, and never steeper than its grade.
+  _profile(R) {
+    const pts = R.pts, n = pts.length, cum = new Float64Array(n), raw = new Float64Array(n), nat = new Float64Array(n), sp = new Uint8Array(n), pin = new Float64Array(n).fill(NaN);
+    for (let k = 1; k < n; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    const deck = R.deck !== undefined ? R.deck : SEA_Y + 4.4;
+    for (let k = 0; k < n; k++) {
+      const h = this.base0(pts[k][0], pts[k][1]); nat[k] = h;
+      if (h < SEA_Y + 0.7) { sp[k] = 1; raw[k] = deck; } else raw[k] = Math.max(h, SEA_Y + 1.7);
+    }
+    // a bridge's span reaches a little past the water's edge onto the abutments
+    for (let pass = 0; pass < 2; pass++) { const c = sp.slice(); for (let k = 0; k < n; k++) if (c[k] === 1 && pass < 2) { if (k > 0 && !c[k - 1]) sp[k - 1] = 1; if (k < n - 1 && !c[k + 1]) sp[k + 1] = 1; } }
+    // the ends: the lattice's kerb level, the level of the road it meets, or the ground itself
+    R.ends.forEach((e, k) => {
+      const i = k ? n - 1 : 0, H = R.hosts[k];
+      if (e === 'lat') pin[i] = CURB_H; else if (H) pin[i] = H.road.y[H.k];
+    });
+    // the cut: from where the ground first rises above T either side of the ridge, one even grade
+    let cut = null;
+    if (R.cut) {
+      let c = 0, bd = Infinity; for (let k = 0; k < n; k++) { const d = Math.hypot(pts[k][0] - R.cut.x, pts[k][1] - R.cut.z); if (d < bd) { bd = d; c = k; } }
+      let a = c, b = c; while (a > 1 && cum[c] - cum[a] < R.cut.half) a--; while (b < n - 2 && cum[b] - cum[c] < R.cut.half) b++;
+      cut = [a, b];
+    }
+    const avg = (src, rad) => { const out = new Float64Array(n); let lo = 0, hi = 0, s = 0; for (let k = 0; k < n; k++) { while (hi < n && cum[hi] - cum[k] <= rad) s += src[hi++]; while (cum[k] - cum[lo] > rad) s -= src[lo++]; out[k] = s / (hi - lo); } return out; };
+    if (cut) for (let k = cut[0]; k <= cut[1]; k++) raw[k] = raw[cut[0]] + (raw[cut[1]] - raw[cut[0]]) * (cum[k] - cum[cut[0]]) / ((cum[cut[1]] - cum[cut[0]]) || 1);
+    let y = avg(avg(raw, 40), 40);
+    for (let k = 0; k < n; k++) if (!isNaN(pin[k])) { const dl = pin[k] - y[k]; for (let j = 0; j < n; j++) { const f = 1 - Math.abs(cum[j] - cum[k]) / 60; if (f > 0) y[j] += dl * f * f * (3 - 2 * f); } }
+    for (let k = 0; k < n; k++) if (!isNaN(pin[k])) y[k] = pin[k];
+    // no steeper than the grade: out from the first end, then back from the last (a pinned end stays put; two pins
+    // further apart in height than the road is long enough for leave the step at the first end, which the preview tool reports)
+    for (let pass = 0; pass < 2; pass++) for (let k = 1; k < n; k++) { const i = pass ? n - 1 - k : k, j = pass ? i + 1 : i - 1, ds = Math.abs(cum[i] - cum[j]) * R.grade; if (isNaN(pin[i])) y[i] = clamp(y[i], y[j] - ds, y[j] + ds); }
+    // the tunnel: the part of the cut with at least 8.5 m of hill over the road
+    if (cut) { for (let k = cut[0]; k <= cut[1]; k++) if (nat[k] - y[k] > 8.5) sp[k] = 2; let a = -1, b = -1; for (let k = 0; k < n; k++) if (sp[k] === 2) { if (a < 0) a = k; b = k; } for (let k = a; k <= b && a >= 0; k++) sp[k] = 2; R.tunnel = a >= 0 ? [a, b] : null; }
+    R.cum = cum; R.len = cum[n - 1]; R.y = y; R.sp = sp;
+    // the bridges: runs of span points over water
+    R.bridges = []; for (let k = 0; k < n; k++) if (sp[k] === 1) { let b = k; while (b < n - 1 && sp[b + 1] === 1) b++; R.bridges.push([k, b]); k = b; }
+  },
+  _indexRoads() {
+    this._seg.clear(); this._sseg.clear(); this._multi.clear();
+    const C = 64, T = ISLE.tile;
+    this.roads.forEach((R, ri) => {
+      const reach = R.w / 2 + 1 + ISLE.shMax;
+      for (let k = 0; k < R.pts.length - 1; k++) {
+        const a = R.pts[k], b = R.pts[k + 1], span = R.sp[k] && R.sp[k + 1], id = ri * 65536 + k;
+        const put = (M, m) => { for (let cx = Math.floor((Math.min(a[0], b[0]) - m) / C); cx <= Math.floor((Math.max(a[0], b[0]) + m) / C); cx++) for (let cz = Math.floor((Math.min(a[1], b[1]) - m) / C); cz <= Math.floor((Math.max(a[1], b[1]) + m) / C); cz++) { const key = (cx + 512) * 1024 + cz + 512; let L = M.get(key); if (!L) M.set(key, L = []); L.push(id); } };
+        if (!span) put(this._seg, reach);
+        if (R.sp[k] || R.sp[k + 1]) {
+          put(this._sseg, R.w / 2 + 4);
+          for (let tx = Math.floor((Math.min(a[0], b[0]) - R.w - ISLE.x0) / T); tx <= Math.floor((Math.max(a[0], b[0]) + R.w - ISLE.x0) / T); tx++) for (let tz = Math.floor((Math.min(a[1], b[1]) - R.w - ISLE.z0) / T); tz <= Math.floor((Math.max(a[1], b[1]) + R.w - ISLE.z0) / T); tz++) this._multi.add(tz * 64 + tx);
+        }
+      }
+    });
+  },
+  // the nearest road bed to (x, z) among the segments indexed in M: sets _rd (distance outside the road's edge),
+  // _ry (the road's level there), _rr (the road), _rk (segment), _rt (how far along the segment), _ro (signed offset)
+  _nearRoad(M, x, z) {
+    const L = M.get((Math.floor(x / 64) + 512) * 1024 + Math.floor(z / 64) + 512); if (!L) return false;
+    let bd = Infinity;
+    for (let q = 0; q < L.length; q++) {
+      const id = L[q], R = this.roads[(id / 65536) | 0], k = id % 65536, a = R.pts[k], b = R.pts[k + 1];
+      const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
+      const ox = x - a[0] - dx * t, oz = z - a[1] - dz * t, d = Math.hypot(ox, oz) - R.w / 2;
+      if (d < bd) { bd = d; this._rr = R; this._rk = k; this._rt = t; this._ry = R.y[k] + (R.y[k + 1] - R.y[k]) * t; }
+    }
+    this._rd = bd;
+    return bd < Infinity;
+  },
+  // the ground at (x, z): the natural ground and pads with the road beds cut or banked into it (bridge decks and
+  // the tunnel's floor are not part of it: see _spanAt). o.wide: for the far mesh (32 m apart), the ground within
+  // that many metres of a road is never above it, so the road's ribbon is not buried by the coarse hills
+  compute(x, z, wide) {
+    const h = this.base0(x, z);
+    if (!this._nearRoad(this._seg, x, z)) return h;
+    const y = this._ry, d = this._rd;
+    if (wide) return d < wide ? Math.min(h, y - 0.4) : h;
+    const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h));
+    if (d >= 1 + sh) return h;
+    const t = smoothstep(1, 1 + sh, d);
+    return y * (1 - t) + h * t;
+  },
+  // ---------------------------------------------------------------- tiles
+  _tile(tx, tz) {
+    const key = tz * 64 + tx; let T = this.tiles.get(key); if (T) return T;
+    const c = ISLE.cell, n = ISLE.tile / c + 1, h = new Float32Array(n * n), x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) h[j * n + i] = this.compute(x0 + i * c, z0 + j * c);
+    T = { tx, tz, x0, z0, h, n, multi: this._multi.has(key) };
+    this.tiles.set(key, T);
+    return T;
+  },
+  // a bridge's deck or the tunnel's floor at (x, z) for something at height y (undefined: whatever stands on the
+  // road), or null where the ordinary ground answers. Sets _sgx / _sgz (the slope along the road).
+  _spanAt(x, z, y) {
+    if (!this._nearRoad(this._sseg, x, z)) return null;
+    const R = this._rr, k = this._rk, s0 = R.sp[k], s1 = R.sp[k + 1], kind = s0 || s1;
+    // a span's last segment (one end on the ground): the road's own bed takes over from the middle of it
+    if ((!s0 && this._rt < 0.5) || (!s1 && this._rt > 0.5)) return null;
+    const lim = kind === 2 ? 3.2 : 0.7;
+    if (this._rd > lim) return null;
+    const ry = this._ry;
+    if (kind === 1 ? (y !== undefined && y < ry - 3.5) : (y !== undefined && y > ry + 8)) return null;
+    const a = R.pts[k], b = R.pts[k + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, g = (R.y[k + 1] - R.y[k]) / l;
+    this._sgx = g * (b[0] - a[0]) / l; this._sgz = g * (b[1] - a[1]) / l;
+    return ry;
+  },
+  // ground height at (x, z); y: the height of whatever is asking (see _spanAt). The slope is left in gx / gz.
+  height(x, z, y) {
+    if (!this.ready || x < ISLE.x0 || z < ISLE.z0 || x >= ISLE.x1 || z >= ISLE.z1) { this.gx = 0; this.gz = 0; return SEA_Y - 6; }
+    const c = ISLE.cell, T = this._tile(Math.floor((x - ISLE.x0) / ISLE.tile), Math.floor((z - ISLE.z0) / ISLE.tile));
+    if (T.multi) { const s = this._spanAt(x, z, y); if (s !== null) { this.gx = this._sgx; this.gz = this._sgz; return s; } }
+    const u = (x - T.x0) / c, v = (z - T.z0) / c, i = Math.min(T.n - 2, Math.floor(u)), j = Math.min(T.n - 2, Math.floor(v)), fx = u - i, fz = v - j, o = j * T.n + i, hh = T.h;
+    const a = hh[o], b = hh[o + 1], cc = hh[o + T.n], d = hh[o + T.n + 1];
+    // the cell's two triangles, split along b–c as the meshes are
+    if (fx + fz <= 1) { this.gx = (b - a) / c; this.gz = (cc - a) / c; return a + (b - a) * fx + (cc - a) * fz; }
+    this.gx = (d - cc) / c; this.gz = (d - b) / c;
+    return d + (cc - d) * (1 - fx) + (b - d) * (1 - fz);
+  },
+  // the top surface (a bridge's deck, the hill over the tunnel): what scenery and spawns stand on
+  top(x, z) { return this.height(x, z, 1e6); },
+  // is (x, z) open water (the ground under it below the sea)?
+  sea(x, z) { return this.height(x, z, -100) < SEA_Y - 0.25; },
+  // is (x, z) on Lake Valen?
+  lake(x, z) { const lx = (x - LAKE.x) / LAKE.rx, lz = (z - LAKE.z) / LAKE.rz; return lx * lx + lz * lz < 2.2 && this.sea(x, z); },
+  // is (x, z) dry land of the island (anything above the tide line)?
+  land(x, z) { return this.ready && this.height(x, z) > SEA_Y + 0.3; },
+  // ---------------------------------------------------------------- surfaces and districts
+  // 0 grass, 1 sand, 2 rock, 3 road, 4 forest floor, 5 dry grass, 6 concrete (the airport, the proving ground)
+  surface(x, z, h, slope) {
+    if (this._nearRoad(this._seg, x, z) && this._rd <= 0.5) return 3;
+    const d = -this.sd(x, z);
+    if ((d < 40 && h < SEA_Y + 3.4) || h < SEA_Y + 0.9) return 1;
+    if (slope > 0.62 || h > 205) return 2;
+    if (z > 980) return this.forest(x, z) > 0.62 ? 4 : 5;
+    return this.forest(x, z) > 0.5 ? 4 : 0;
+  },
+  // how wooded the ground is (0 open … 1 deep forest): the highlands' slopes and the hollows of the north, copses in the south
+  forest(x, z) {
+    const n = 0.5 + 0.5 * tNoise(x / 310, z / 310, 71) + 0.22 * tNoise(x / 90, z / 90, 73);
+    return z < 60 ? n + 0.12 : n - 0.2;
+  },
+  // what the ground does to a car off the road (null on a road or off the island's ground): grip ×, rolling drag,
+  // bump. The same shape Terrain.effect answers with.
+  effect(x, z, trail) {
+    if (!this.ready || x < ISLE.x0 || z < ISLE.z0 || x >= ISLE.x1 || z >= ISLE.z1) return null;
+    if (this._nearRoad(this._seg, x, z) && this._rd <= 1) return null;
+    if (this._nearRoad(this._sseg, x, z) && this._rd <= 1) return null;
+    const h = this.height(x, z, 1e6), s = this.surface(x, z, h, Math.hypot(this.gx, this.gz)), k = 1 - 0.65 * (trail || 0), E = this._fx;
+    if (s === 6 || s === 3) return null;
+    const F = s === 1 ? [0.66, 1.5, 0.03, TSURF.dirt] : s === 2 ? [0.74, 0.6, 0.08, TSURF.rock] : [0.82, 0.4, 0.035, TSURF.grass];
+    E.grip = 1 - (1 - F[0]) * k; E.drag = F[1] * k; E.bump = F[2] * k; E.s = F[3];
+    return E;
+  },
+  // do the island's hills rise through the straight line from a to b? (Sight: the police, the camera.)
+  occludes(ax, ay, az, bx, by, bz) {
+    if (!this.ready || ay < -5 || by < -5) return false;
+    const inC = (x, z) => x > -EDGE_MARGIN && z > -EDGE_MARGIN && x < CITY + EDGE_MARGIN && z < CITY + EDGE_MARGIN;
+    if (inC(ax, az) && inC(bx, bz)) return false;
+    const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 12) return false;
+    const n = Math.ceil(L / 8), gx = this.gx, gz = this.gz; let hit = false;
+    for (let k = 1; k < n && !hit; k++) { const t = k / n, x = ax + dx * t, z = az + dz * t; if (!inC(x, z) && this.height(x, z, 1e6) > ay + (by - ay) * t + 0.3) hit = true; }
+    this.gx = gx; this.gz = gz;
+    return hit;
+  },
+  // the island's districts off the lattice (keys of ZONES)
+  zoneKey(x, z) {
+    const A = AIRPORT, G = PROVING;
+    if (x > A.x0 - 60 && x < A.x1 + 60 && z > A.z0 - 90 && z < A.z1 + 60) return 'y';
+    if (x > G.x0 - 30 && x < G.x1 + 30 && z > G.z0 - 30 && z < G.z1 + 30) return 'j';
+    if (z > 880) return x < -160 && z < 1500 ? 'b' : 'e';
+    if (z > -700 && z < -250 && x > -120 && x < 760) return 'k';
+    if (Math.hypot(x - MT_VALEN.x, z - MT_VALEN.z) < 1250) return 'n';
+    return 't';
+  },
+  // one-time set-up: the shore (the generator adds its building sites' pads, then corePads, then the roads)
+  init() {
+    if (this.sdf) return;
+    this._buildSDF();
+    this.pads = [];
+  },
+  // the big level grounds, strongest last: the proving ground, the airport, Cedar Fields South's rim, the city
+  corePads() {
+    const A = AIRPORT, G = PROVING, E = EDGE_MARGIN;
+    this.addPad(G.x0, G.z0, G.x1, G.z1, G.y, 90);
+    this.addPad(A.x0, A.z0, A.x1, A.z1, A.y, 140);
+    this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
+    this.addPad(-E, -E, CITY + E, CITY + E, CURB_H, 110);
+  }
+};
+/* =====================================================================
    [CONTENT] VALEN POINT (Session 6B, §45.32, §45.34)
    The motorsport district: an island east of the city, joined to the
    east perimeter road by a low causeway at z = VP.cw.z. Everything here
@@ -33216,7 +33655,7 @@ const VP = {
   cw: { z: 520, road: 7, half: 9, x0: CITY + ROAD_HALF, x1: 1440 }
 };
 // the far edge of everything the collision grid and the maps have to cover
-const WORLD_X1 = VP.x1 + EDGE_MARGIN;
+const WORLD_X1 = ISLE.x1;
 function vpLand(x, z) { return x >= VP.x0 && x <= VP.x1 && z >= VP.z0 && z <= VP.z1; }
 function vpCauseway(x, z) { return x >= VP.cw.x0 && x <= VP.x0 + 0.5 && Math.abs(z - VP.cw.z) <= VP.cw.half; }
 // off the city's square and on Valen Point's ground (the island, or the causeway past the seawall)
@@ -33258,28 +33697,36 @@ const CFS = {
 };
 // the city's Cedar Fields strip (superblock 'fields'): rough too, around what is built there
 const CF_STRIP = { x0: 0, x1: 320, z0: 880, z1: 960 };
-const WORLD_Z1 = CFS.z1 + EDGE_MARGIN;
+const WORLD_Z1 = ISLE.z1;
 function cfsLand(x, z) { return x >= CFS.x0 && x <= CFS.x1 && z >= CFS.z0 && z <= CFS.z1; }
 function cfsBridge(x, z) { return z >= CFS.lb.z0 && z <= CFS.z0 + 0.5 && Math.abs(x - CFS.lb.x) <= CFS.lb.half; }
 function inCedarSouth(x, z) { return cfsLand(x, z) || (z > CITY + EDGE_MARGIN && cfsBridge(x, z)); }
 // south of the city's seawall, on the countryside's side: where routing and spawns go by the land bridge
 function cfsSide(x, z) { return z > CITY + EDGE_MARGIN && x > CFS.x0 - 150 && x < CFS.x1 + 150; }
-// either extension (Valen Point or Cedar Fields South): routing off the lattice goes by its spur
-function extSide(x, z) { return vpSide(x, z) || cfsSide(x, z); }
-function inExtension(x, z) { return inValenPoint(x, z) || inCedarSouth(x, z); }
+// anywhere off the city's square (Valen Point, Cedar Fields South, the rest of the island): routing and spawns go by
+// the roads that leave the lattice
+function extSide(x, z) { return offCity(x, z); }
+// on ground of its own off the lattice: Valen Point, Cedar Fields South, the island's dry land (022)
+function inExtension(x, z) { return inValenPoint(x, z) || inCedarSouth(x, z) || (offCity(x, z) && Island.land(x, z)); }
 // places a car can join the road out there, for police units and taxis: Valen Point's causeway lanes, or in Cedar
 // Fields South every ~20 m along the land bridge's track and the countryside tracks, in both lanes (h is the heading)
 function extRoadSpots(x, z) {
-  if (!cfsSide(x, z)) return vpRoadSpots();
-  // every ~20 m of the countryside's roads (the land bridge's track and the tracks traffic drives), from the seawall out
-  return RoadGraph.ready ? RoadGraph.spots(e => (e.ext === 'cfs' && e.traffic) || (e.kind === 'spur' && e.name === 'Cedar Fields Track')).filter(s => s.z > CITY + EDGE_MARGIN + 8) : [];
+  if (vpSide(x, z)) return vpRoadSpots();
+  if (!RoadGraph.ready) return [];
+  // every ~20 m of the roads traffic drives off the lattice (the countryside's tracks, the island's highways), from
+  // the seawall out; the ones within reach of (x, z)
+  const all = RoadGraph._offSpots || (RoadGraph._offSpots = RoadGraph.spots(e => e.kind !== 'grid' && e.kind !== 'loop' && e.traffic && e.ext !== 'vp').filter(s => offCity(s.x, s.z) && (s.z > CITY + EDGE_MARGIN + 8 || !cfsSide(s.x, s.z))));
+  return all.filter(s => Math.abs(s.x - x) < 420 && Math.abs(s.z - z) < 420);
 }
 // is a car at spot s heading toward (x, z)?
 const spotToward = (s, x, z) => Math.sin(s.h) * (x - s.x) + Math.cos(s.h) * (z - s.z) > 0;
 // a point for the police to drive to near `ref`: kept on the ground that `ref` is on
 function extClampSearch(refX, refZ, x, z, m) {
-  if (cfsSide(refX, refZ)) return [clamp(x, CFS.x0 + m, CFS.x1 - m), clamp(z, CFS.z0 + m, CFS.z1 - m)];
-  return vpClampSearch(refX, x, z, m);
+  if (!offCity(refX, refZ)) return [clamp(x, m, CITY - m), clamp(z, m, CITY - m)];
+  if (inCedarSouth(refX, refZ)) return [clamp(x, CFS.x0 + m, CFS.x1 - m), clamp(z, CFS.z0 + m, CFS.z1 - m)];
+  if (vpSide(refX, refZ)) return vpClampSearch(refX, x, z, m);
+  // out on the island: anywhere
+  return [x, z];
 }
 // a closed loop of straights joined by constant-radius arcs: a fillet of radius r at every corner [x, z, r] of V,
 // sampled every `step` m. Returns { pts, R (radius at each sample, 0 on a straight), cum, len, nl (left normals of
@@ -33386,7 +33833,9 @@ const Terrain = {
   // what the ground does to a car here (null off the terrain): grip ×, rolling drag (m/s²), bump (the rough's
   // amplitude, which costs grip with speed). `trail` is the car's off-road capability (TRAIL). A reused object.
   effect(x, z, trail) {
-    const R = this.ready ? this.region(x, z) : null; if (!R) return null;
+    const R = this.ready ? this.region(x, z) : null;
+    // off the height field's own regions, out on the island (022): its sand, grass and rock
+    if (!R) return offCity(x, z) ? Island.effect(x, z, trail) : null;
     const o = this._cell(R, x, z), s = R.s[o], F = TSURF_FX[s], k = 1 - 0.65 * (trail || 0), E = this._fx;
     // the strip's held-flat ground (the lawns and drives round the farm) is ordinary ground: it eases in with the mask
     const m = R.m[o], w = Math.min(1, m * 2);
@@ -33418,7 +33867,8 @@ const Terrain = {
       if (hit) break;
     }
     this.gx = gx; this.gz = gz;
-    return hit;
+    // and the island's own hills (022)
+    return hit || Island.occludes(ax, ay, az, bx, by, bz);
   },
   // the countryside's hills before anything is stamped on them (the generator levels its pads from this)
   raw(x, z) {
@@ -33787,8 +34237,9 @@ const SaveSystem = {
     } else d.gamble.table = null;
     for (const e of d.garage) e.vtier = typeof e.vtier === 'string' && TIER_LOOK[e.vtier] ? e.vtier : VEHICLES[e.type].tier;
     if (!d.pos || typeof d.pos !== 'object' || !isFinite(d.pos.x) || !isFinite(d.pos.z) || !isFinite(d.pos.h)) d.pos = null;
-    // the city square, or on Valen Point (Session 6B); anywhere else (the water) comes back to the coast
-    else if (!inExtension(d.pos.x, d.pos.z)) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
+    // anywhere on the island's map (022); a spot out at sea comes back ashore when play starts (Game.startPlay), a
+    // spot off the map altogether comes back to the city
+    else if (d.pos.x < ISLE.x0 || d.pos.z < ISLE.z0 || d.pos.x > ISLE.x1 || d.pos.z > ISLE.z1) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
     if (typeof d.rep !== 'number' || !isFinite(d.rep) || d.rep < 0) d.rep = 0;
     if (!(d.nextUid > maxUid)) d.nextUid = maxUid + 1;
     if (!d.tips || typeof d.tips !== 'object' || Array.isArray(d.tips)) d.tips = {};
@@ -35968,18 +36419,19 @@ const C = hex => new THREE.Color(hex);
 class CollisionGrid {
   constructor() {
     // the city square, east of it out to Valen Point (Session 6B) and south to Cedar Fields South (Session 6C): dimX × dim cells
-    this.cs = 16; this.min = -48; this.dim = Math.ceil((WORLD_Z1 + 48 - this.min) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.min) / this.cs);
-    this.cells = Array.from({ length: this.dimX * this.dim }, () => []);
+    // (Operation Blackgate: the whole island, from WORLD_X0 / WORLD_Z0; a cell's list is made when something first lands in it)
+    this.cs = 16; this.minX = WORLD_X0 - 48; this.minZ = WORLD_Z0 - 48; this.dim = Math.ceil((WORLD_Z1 + 48 - this.minZ) / this.cs); this.dimX = Math.ceil((WORLD_X1 + 48 - this.minX) / this.cs);
+    this.cells = new Array(this.dimX * this.dim);
     this.all = []; this.stamp = 1;
   }
-  _ci(x) { return clamp(Math.floor((x - this.min) / this.cs), 0, this.dimX - 1); }
-  _cj(z) { return clamp(Math.floor((z - this.min) / this.cs), 0, this.dim - 1); }
+  _ci(x) { return clamp(Math.floor((x - this.minX) / this.cs), 0, this.dimX - 1); }
+  _cj(z) { return clamp(Math.floor((z - this.minZ) / this.cs), 0, this.dim - 1); }
   add(c) {
     c.stamp = 0; c.on = true;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; }
     else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) this.cells[j * this.dimX + i].push(c);
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const k = j * this.dimX + i; (this.cells[k] || (this.cells[k] = [])).push(c); }
     this.all.push(c);
     return c;
   }
@@ -35987,14 +36439,14 @@ class CollisionGrid {
     if (!c) return;
     let x0, z0, x1, z1;
     if (c.r !== undefined) { x0 = c.x - c.r; x1 = c.x + c.r; z0 = c.z - c.r; z1 = c.z + c.r; } else { x0 = c.x0; x1 = c.x1; z0 = c.z0; z1 = c.z1; }
-    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const cell = this.cells[j * this.dimX + i], k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
+    for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) { const cell = this.cells[j * this.dimX + i]; if (!cell) continue; const k = cell.indexOf(c); if (k >= 0) cell.splice(k, 1); }
     const k = this.all.indexOf(c); if (k >= 0) this.all.splice(k, 1);
     c.on = false;
   }
   query(x0, z0, x1, z1, out) {
     out.length = 0; const st = ++this.stamp;
     for (let i = this._ci(x0); i <= this._ci(x1); i++) for (let j = this._cj(z0); j <= this._cj(z1); j++) {
-      const cell = this.cells[j * this.dimX + i];
+      const cell = this.cells[j * this.dimX + i]; if (!cell) continue;
       for (let k = 0; k < cell.length; k++) { const c = cell[k]; if (c.stamp !== st && c.on) { c.stamp = st; out.push(c); } }
     }
     return out;
@@ -36035,15 +36487,15 @@ class CollisionGrid {
   raycast(ox, oy, oz, dx, dy, dz, maxT, ignoreLow = 0, see = false) {
     const st = ++this.stamp; let best = maxT, hit = null;
     const cs = this.cs;
-    let ix = Math.floor((ox - this.min) / cs), iz = Math.floor((oz - this.min) / cs);
+    let ix = Math.floor((ox - this.minX) / cs), iz = Math.floor((oz - this.minZ) / cs);
     const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
     const tdx = Math.abs(dx) > 1e-9 ? Math.abs(cs / dx) : Infinity, tdz = Math.abs(dz) > 1e-9 ? Math.abs(cs / dz) : Infinity;
-    let tmx = Math.abs(dx) > 1e-9 ? ((this.min + (ix + (sx > 0 ? 1 : 0)) * cs) - ox) / dx : Infinity;
-    let tmz = Math.abs(dz) > 1e-9 ? ((this.min + (iz + (sz > 0 ? 1 : 0)) * cs) - oz) / dz : Infinity;
+    let tmx = Math.abs(dx) > 1e-9 ? ((this.minX + (ix + (sx > 0 ? 1 : 0)) * cs) - ox) / dx : Infinity;
+    let tmz = Math.abs(dz) > 1e-9 ? ((this.minZ + (iz + (sz > 0 ? 1 : 0)) * cs) - oz) / dz : Infinity;
     let tCell = 0;
     for (let steps = 0; steps < 64 && tCell <= best; steps++) {
       if (ix >= 0 && iz >= 0 && ix < this.dimX && iz < this.dim) {
-        const cell = this.cells[iz * this.dimX + ix];
+        const cell = this.cells[iz * this.dimX + ix] || CollisionGrid.NONE;
         for (let k = 0; k < cell.length; k++) {
           const c = cell[k]; if (c.stamp === st || !c.on || (see && c.see)) continue; c.stamp = st;
           // low clutter is skipped; interior colliders measure height from their own floor
@@ -36087,6 +36539,7 @@ class CollisionGrid {
     return !Terrain.occludes(ax, ay, az, bx, by, bz);
   }
 }
+CollisionGrid.NONE = [];
 
 /* =====================================================================
    [CONTENT] WORLD (deterministic city layout + colliders + nav helpers)
@@ -36120,6 +36573,8 @@ class World {
   // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
   blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
+    // the island's shore first (022): the city's edge is built by where it meets the water
+    Island.init();
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
       const b = {
@@ -36698,7 +37153,20 @@ class World {
     const main = this._bld(b, b.x0 + 4, b.z0 + 4, b.x1 - 4, b.z0 + 34, isH ? 30 : 18, isH ? STYLE.OFFICE : STYLE.DECO, col, 3.6, 3.4);
     this._rooftop(b, main, rng, 'tower');
     const wing = this._bld(b, b.x0 + 4, b.z0 + 34, b.x0 + 24, b.z1 - 4, isH ? 14 : 10, isH ? STYLE.OFFICE : STYLE.DECO, col, 3.6, 3.4);
-    this._rooftop(b, wing, rng, 'mid');
+    // the wing's roof is a helipad (Operation Blackgate): a clear deck you can stand and land on, its lights, an H,
+    // a parapet with the lift's head-house in one corner; the lift's street door is on the wing's east wall
+    {
+      const wy = wing.y0 + wing.h, hx = (wing.x0 + wing.x1) / 2, hz = (wing.z0 + wing.z1) / 2 - 1;
+      this._platform(b, wing.x0, wing.z0, wing.x1, wing.z1, wy);
+      b.helipad = { x: hx, z: hz, y: wy, lift: { x: wing.x1 + 1.4, z: wing.z1 - 3 }, top: { x: wing.x1 - 3.4, z: wing.z1 - 3 } };
+      b.fx.push({ type: 'helipad', x: hx, y: wy + 0.12, z: hz });
+      this._det(b, 'disc', hx, wy + 0.03, hz, 7, 1, 7, C(isH ? 0xd02a3a : 0x1c3f94)); this._det(b, 'disc', hx, wy + 0.05, hz, 6, 1, 6, C(0x3a3d42));
+      for (const dx of [-1.5, 1.5]) this._det(b, 'box', hx + dx, wy + 0.07, hz, 0.6, 0.04, 4.4, C(0xf2f2f2)); this._det(b, 'box', hx, wy + 0.07, hz, 3, 0.04, 0.6, C(0xf2f2f2));
+      for (const [px, pz, sx, sz] of [[hx, wing.z0 + 0.2, wing.x1 - wing.x0, 0.4], [hx, wing.z1 - 0.2, wing.x1 - wing.x0, 0.4], [wing.x0 + 0.2, (wing.z0 + wing.z1) / 2, 0.4, wing.z1 - wing.z0]]) this._det(b, 'box', px, wy + 0.45, pz, sx, 0.9, sz, C(0x8c949c), 0, true);
+      this._det(b, 'box', wing.x1 - 1.2, wy + 1.3, wing.z1 - 3, 2.2, 2.6, 2.6, C(0x6a7078), 0, true);
+      this._det(b, 'box', wing.x1 + 0.06, CURB_H + 1.15, wing.z1 - 3, 0.12, 2.3, 1.5, C(0x22262b));
+      b.signs.push({ text: 'HELIPAD LIFT', x: wing.x1 + 0.08, y: CURB_H + 2.75, z: wing.z1 - 3, ry: Math.PI / 2, w: 3.2, h: 0.5, bg: isH ? '#d02a3a' : '#0f2a52', fg: '#ffffff' });
+    }
     const fx = b.x0 + 42, fz = b.z1 + 2.2;
     if (isH) {
       b.signs.push({ text: '✚ ST. ALDA HOSPITAL', x: (b.x0 + b.x1) / 2, y: CURB_H + 27, z: b.z0 + 4 - 0.12, ry: Math.PI, w: 18, h: 2.4, bg: '#f4f6f8', fg: '#d02a3a' });
@@ -36706,6 +37174,7 @@ class World {
       this._det(b, 'box', b.x0 + 40, CURB_H + 3.5, b.z0 + 37, 10, 0.3, 6, 0xd02a3a);
       for (const dx of [-4.6, 4.6]) this._det(b, 'box', b.x0 + 40 + dx, CURB_H + 1.75, b.z0 + 39.6, 0.3, 3.5, 0.3, 0xd0d0d0, 0, true);
       b.respawn = { x: b.x0 + 40, z: b.z1 + 2, h: 0 };
+      b.parked.push({ x: b.x0 + 47, z: b.z0 + 45, h: Math.PI / 2, cls: 'ambulance' });
     } else {
       b.signs.push({ text: 'PORT VALEN POLICE', x: (b.x0 + b.x1) / 2, y: CURB_H + 15, z: b.z0 + 4 - 0.12, ry: Math.PI, w: 16, h: 2.2, bg: '#0f2a52', fg: '#ffffff' });
       for (let k = 0; k < 5; k++) b.parked.push({ x: b.x0 + 32 + k * 4.5, z: b.z0 + 44, h: 0, cls: 'police' });
@@ -36714,16 +37183,28 @@ class World {
     for (let k = 0; k < 4; k++) this._prop(b, 'planter', b.x0 + 30 + k * 7, b.z1 - 3, 0);
   }
   _genPerimeter() {
-    // stored separately; world mesh builds the seawall/railing
+    // The seawall (and the wall nothing drives through) stands only where the city's edge meets open water
+    // (Operation Blackgate, 022): Valen Bay on the west, Valen Sound on the east and round the terminal. Everywhere
+    // else the island's ground carries on from the promenade. world.shore: the wet stretches [t0, t1] of each side
+    // (t runs from -E to CITY + E), less the causeway to Valen Point and the land bridge to Cedar Fields South.
+    const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] };
+    const wet = (x, z) => Island.nat(x, z) < SEA_Y + 0.35;
+    for (const side of 'nswe') {
+      let run = null;
+      for (let t = -E; t <= CITY + E + 0.01; t += 2) {
+        const [x, z] = side === 'n' ? [t, -E - 5] : side === 's' ? [t, CITY + E + 5] : side === 'w' ? [-E - 5, t] : [CITY + E + 5, t];
+        if (wet(x, z)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { shore[side].push(run); run = null; }
+      }
+      if (run) shore[side].push(run);
+      const gap = side === 'e' ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
+      if (gap) shore[side] = shore[side].flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
+      // a run that reaches a corner closes it
+      for (const r of shore[side]) { if (r[0] <= -E + 2) r[0] = -E - 1; if (r[1] >= CITY + E - 2) r[1] = CITY + E + 1; }
+      shore[side] = shore[side].filter(r => r[1] - r[0] > 3);
+    }
     this.perimeter = [
-      { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN - 1, x1: CITY + EDGE_MARGIN + 1, z1: -EDGE_MARGIN + 0.2 },
-      // the south wall stops either side of the land bridge to Cedar Fields South (Session 6C)
-      { x0: -EDGE_MARGIN - 1, z0: CITY + EDGE_MARGIN - 0.2, x1: CFS.lb.x - CFS.lb.half, z1: CITY + EDGE_MARGIN + 1 },
-      { x0: CFS.lb.x + CFS.lb.half, z0: CITY + EDGE_MARGIN - 0.2, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN + 1 },
-      { x0: -EDGE_MARGIN - 1, z0: -EDGE_MARGIN, x1: -EDGE_MARGIN + 0.2, z1: CITY + EDGE_MARGIN },
-      // the east wall stops either side of the causeway to Valen Point (Session 6B)
-      { x0: CITY + EDGE_MARGIN - 0.2, z0: -EDGE_MARGIN, x1: CITY + EDGE_MARGIN + 1, z1: VP.cw.z - VP.cw.half },
-      { x0: CITY + EDGE_MARGIN - 0.2, z0: VP.cw.z + VP.cw.half, x1: CITY + EDGE_MARGIN + 1, z1: CITY + EDGE_MARGIN }
+      ...shore.n.map(([a, b]) => ({ x0: a, z0: -E - 1, x1: b, z1: -E + 0.2 })), ...shore.s.map(([a, b]) => ({ x0: a, z0: CITY + E - 0.2, x1: b, z1: CITY + E + 1 })),
+      ...shore.w.map(([a, b]) => ({ x0: -E - 1, z0: a, x1: -E + 0.2, z1: b })), ...shore.e.map(([a, b]) => ({ x0: CITY + E - 0.2, z0: a, x1: CITY + E + 1, z1: b }))
     ];
     for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
     // promenade lamps and benches outside the perimeter road
@@ -37903,7 +38384,12 @@ Object.assign(World.prototype, {
 {
   const base2 = World.prototype.generate;
   World.prototype.generate = function () {
-    base2.call(this); this._genValenPoint(); this._genCedarSouth(); this._placesGen();
+    base2.call(this); this._genValenPoint(); this._genCedarSouth();
+    // the island off the lattice (Operation Blackgate, 127): its roads, the airport, the proving ground, the settlements
+    this._genIsland();
+    // (the roads that leave the city cross its promenade: the ground shader paints them from the local-roads raster)
+    this._buildLocalRaster();
+    this._placesGen();
     // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
     this.exts = [
@@ -37911,6 +38397,7 @@ Object.assign(World.prototype, {
       // traffic drives the countryside's two tracks (the farm track east past the compound and the loop)
       { id: 'cfs', name: 'Cedar Fields South', loopName: 'Cedar Fields off-road course', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [4, 5] }
     ];
+    // (the island's own roads are curved links, not an extension's routes: Links.build takes them from localRoads)
     for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
     Links.build(this);
     // every drivable road in one graph (the Curved Roads pass): the GPS, AI drivers, traffic, taxis and police
@@ -39238,7 +39725,8 @@ Object.assign(World.prototype, {
 const VP_TRACK = {
   w: 14,
   // corners: [x, z, radius]; the main straight runs north along x = 1600 (start/finish at z = VP_TRACK.sf)
-  verts: [[1600, 230, 130], [2280, 200, 150], [2300, 860, 110], [1990, 850, 45], [1960, 560, 40], [1760, 540, 60], [1760, 860, 80], [1600, 860, 70]],
+  // (Operation Blackgate: the east straight has a chicane half way down it, a left-right-left of 45-60 m corners)
+  verts: [[1600, 230, 130], [2280, 200, 150], [2284, 420, 60], [2240, 490, 45], [2240, 560, 45], [2296, 630, 60], [2300, 860, 110], [1990, 850, 45], [1960, 560, 40], [1760, 540, 60], [1760, 860, 80], [1600, 860, 70]],
   sf: 600, step: 2
 };
 // the pit complex beside the main straight
@@ -39323,6 +39811,12 @@ Object.assign(World.prototype, {
     for (let k = 0; k < 5; k++) sfb.fx.push({ type: 'neon', x: vp.sf.x - 6 + k * 3, y: Y + 7.8, z: vp.sf.z - 0.55, w: 0.6, h: 0.6, d: 0.1, c: 0xff2a2a });
     sfb.signs.push({ text: 'VALEN POINT', x: (gx0 + vp.sf.x + half + 4) / 2, y: Y + 8.6, z: vp.sf.z + 0.52, ry: 0, w: 14, h: 1.2, bg: '#1d2126', fg: '#ffffff' });
     void gx1;
+    // the starting grid: ten boxes in two staggered files behind the line (it runs north: the grid is south of it)
+    for (let k = 0; k < 10; k++) {
+      const gx = vp.sf.x + (k % 2 ? 3 : -3), gz = vp.sf.z + 34 + k * 8;
+      this._det(sfb, 'box', gx, Y + 0.012, gz - 2.6, 3, 0.02, 0.18, C(0xf2f2f2));
+      for (const s2 of [-1, 1]) this._det(sfb, 'box', gx + s2 * 1.5, Y + 0.012, gz - 1.9, 0.18, 0.02, 1.4, C(0xf2f2f2));
+    }
     // ---------------------------------------------------------------- pit garages: drive-through, two bays each
     const [gxa, gxb] = VP_PIT.garX, [gz0, gz1] = VP_PIT.garZ, cell = VP_PIT.cell, n = Math.round((gz1 - gz0) / cell);
     for (let i = 0; i <= n; i++) { const z = gz0 + i * cell; this._bld(B.pits, gxa, z - 0.3, gxb, z + 0.3, 5.6, STYLE.IND, 0xd8dade, 5.6, 4, { exactH: true, y0: Y, oy: Y }); }
@@ -39626,6 +40120,290 @@ Object.assign(World.prototype, {
   _cfsK(T, a) { let lo = 0, hi = T.pts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (T.cum[m] <= a) lo = m; else hi = m - 1; } return lo; }
 });
 /* =====================================================================
+   [CONTENT] VALEN ISLAND: GENERATION (Operation Blackgate)
+   What stands on the island off the lattice (022 is the ground itself):
+   - the road network as curved links (the Coast Highway round the
+     highlands, Mount Valen Road to the summit, the Southshore Highway and
+     Longshore Drive round the lowlands, the Blackgate Bridge across the
+     mouth of Valen Bay), so the GPS, traffic, taxis and police all use it;
+   - Port Valen International: two runways, a parallel taxiway and its
+     links, the apron, the terminal with two piers, the control tower,
+     three hangars, the helipads, a car park, the airport fire station;
+   - the Valen Proving Ground: a kilometre strip, a skid pad, a slalom lot;
+   - Crestmoor Ridge's mansions, Saltmarsh on the bay, Gull Harbor, the
+     lighthouse, the Mount Valen observatory, Fire Station No. 1;
+   - colliders: the bridge's rails, the tunnel's walls;
+   - the fleet: where the island's own vehicles stand (race cars in the
+     Valen Point pits and paddock, aircraft at the airport, helicopters on
+     the hospital's and the police station's roofs, fire engines,
+     ambulances, the cars of each settlement). IslandFleet (245) spawns
+     them as you come near, like the city's parked cars.
+   District geometry lives in extra blocks (world.xblocks), streamed like
+   Valen Point's.
+   ===================================================================== */
+// Crestmoor Ridge: [x, z, the side the forecourt faces] along Mount Valen Road's first leg
+const ISLE_MANSIONS = [[-150, -518, 'e'], [-58, -452, 'w'], [30, -628, 's'], [50, -536, 'n'], [232, -644, 's'], [238, -550, 'n'], [395, -646, 's'], [392, -551, 'n']];
+// Saltmarsh: houses either side of the bay road (x, side: -1 the bay side, 1 the landward side)
+const ISLE_SALTMARSH = [-322, -392, -462, -532, -602, -672];
+const ISLE_GULL = [[-1389, -2230], [-1328, -2271], [-1266, -2311], [-1205, -2352], [-1304, -2191], [-1202, -2259]];
+const ISLE_FIRE = { x0: 140, z0: -158, x1: 216, z1: -96 };
+const ISLE_LIGHT = { x0: 1486, z0: -2812, x1: 1548, z1: -2758, y: 5 };
+const ISLE_SUMMIT = { x0: 342, z0: -1868, x1: 438, z1: -1778, y: 246 };
+const ISLE_JETTY = { x0: -468, z0: 898, x1: -452, z1: 992, y: 1.1 };
+Object.assign(World.prototype, {
+  _isleBlock(id, cx, cz, r, name) { const b = this._vpBlock(id, cx - P / 2, cz - P / 2, r, name || ISLE.name); b.t = 'S'; b.isle = true; this.isle.blocks.push(b); return b; },
+  _genIsland() {
+    Island.init();
+    const isle = this.isle = { blocks: [], fleet: [], lifts: [], rails: [], sites: {} };
+    const box = (b, x, y, z, sx, sy, sz, col, solid, ry = 0) => this._det(b, 'box', x, y, z, sx, sy, sz, typeof col === 'number' ? C(col) : col, ry, solid ? true : undefined);
+    const cyl = (b, x, y, z, r, h, col, solid) => this._det(b, 'cyl', x, y, z, r, h, col, null, solid ? { x, z, r, y0: y - h / 2, y1: y + h / 2, kind: 'det' } : undefined);
+    const fleet = (id, x, z, r, slots) => { const F = { id, x, z, r, slots }; isle.fleet.push(F); return F; };
+    const sitePad = (x0, z0, x1, z1, blend = 28, y) => Island.addPad(x0, z0, x1, z1, y !== undefined ? y : Math.round(Island.nat((x0 + x1) / 2, (z0 + z1) / 2) * 10) / 10, blend);
+    // ---------------------------------------------------------------- level sites (before the roads: a road's level comes from the ground it finds)
+    const mans = ISLE_MANSIONS.map(([x, z, f]) => ({ x, z, f, P: sitePad(x - 25, z - 22, x + 25, z + 22) }));
+    const salt = []; for (const x of ISLE_SALTMARSH) for (const s of [-1, 1]) { const rz = x > -520 ? 1192 - (-270 - x) * 0.08 : 1172 - (-520 - x) * 0.1615, z = rz + s * 33; salt.push({ x, z, s, P: sitePad(x - 11, z - 9, x + 11, z + 9, 16) }); }
+    const gull = ISLE_GULL.map(([x, z]) => ({ x, z, P: sitePad(x - 10, z - 8, x + 10, z + 8, 16) }));
+    const fireP = sitePad(ISLE_FIRE.x0, ISLE_FIRE.z0, ISLE_FIRE.x1, ISLE_FIRE.z1, 30);
+    Island.addPad(ISLE_LIGHT.x0, ISLE_LIGHT.z0, ISLE_LIGHT.x1, ISLE_LIGHT.z1, ISLE_LIGHT.y, 26);
+    Island.addPad(ISLE_SUMMIT.x0, ISLE_SUMMIT.z0, ISLE_SUMMIT.x1, ISLE_SUMMIT.z1, ISLE_SUMMIT.y, 55);
+    Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
+    Island.corePads();
+    // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
+    Island.addPad(CFS.lb.x - CFS.lb.half - 1, CITY + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
+    Island.buildRoads();
+    // ---------------------------------------------------------------- the roads: curved links like the city's own
+    for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
+    // promenade lamps that would stand in a road leaving the city
+    this.promenade = this.promenade.filter(l => !Island.roads.some(R => R.ends.includes('lat') && [R.pts[0], R.pts[R.pts.length - 1]].some(e => Math.hypot(l.x - e[0], l.z - e[1]) < 13)));
+    // ---------------------------------------------------------------- colliders: bridge rails, tunnel walls (posts 1.3 m apart)
+    for (const R of Island.roads) {
+      const spans = R.bridges.map(s => [s[0], s[1], 1]); if (R.tunnel) spans.push([R.tunnel[0], R.tunnel[1], 2]);
+      for (const [k0, k1, kind] of spans) {
+        const off = R.w / 2 + (kind === 2 ? 0.7 : 0.45);
+        for (const side of [-1, 1]) {
+          const line = [];
+          for (let k = k0; k <= k1; k++) { const a = R.pts[Math.max(0, k - 1)], c = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; line.push([R.pts[k][0] + (c[1] - a[1]) / l * off * side, R.pts[k][1] - (c[0] - a[0]) / l * off * side, R.y[k]]); }
+          isle.rails.push({ line, kind, road: R });
+          for (let k = 0; k < line.length - 1; k++) {
+            const a = line[k], c = line[k + 1], L = Math.hypot(c[0] - a[0], c[1] - a[1]), m = Math.max(1, Math.round(L / 1.3));
+            for (let i = 0; i < m; i++) { const y = lerp(a[2], c[2], i / m); this.grid.add({ x: lerp(a[0], c[0], i / m), z: lerp(a[1], c[1], i / m), r: 0.45, y0: y - 1.2, y1: y + (kind === 2 ? 6 : 1.3), kind: 'det', barrier: true }); }
+          }
+        }
+      }
+    }
+    // the Blackgate Bridge's two towers: legs outside the parapets (drawn by the scenery, solid to whatever flies into them)
+    isle.towers = [];
+    for (const R of Island.roads) for (const [k0, k1] of R.bridges) {
+      if (R.cum[k1] - R.cum[k0] < 300) continue;
+      for (const f of [0.27, 0.73]) {
+        const k = Math.round(k0 + (k1 - k0) * f), p = R.pts[k], q = R.pts[k + 1], h = Math.atan2(q[0] - p[0], q[1] - p[1]), rx = Math.cos(h), rz = -Math.sin(h), deck = R.y[k], bed = Island.base0(p[0], p[1]) - 1, top = deck + 48;
+        const legs = [-1, 1].map(s => ({ x: p[0] + rx * s * (R.w / 2 + 2.6), z: p[1] + rz * s * (R.w / 2 + 2.6) }));
+        for (const L of legs) this.grid.add({ x: L.x, z: L.z, r: 2, y0: bed, y1: top, kind: 'det' });
+        isle.towers.push({ road: R, k, x: p[0], z: p[1], h, deck, top, bed, legs });
+      }
+    }
+    // ================================================================ PORT VALEN INTERNATIONAL
+    const A = AIRPORT, Y = A.y, B = {};
+    B.term = this._isleBlock('ap_term', 600, 1915, 170, A.name);
+    B.east = this._isleBlock('ap_hangars', 1090, 1930, 190, A.name + ' hangars');
+    B.west = this._isleBlock('ap_west', 330, 1940, 170, A.name + ' heliport');
+    // the terminal: a glass hall with two piers out onto the apron, a canopy over the forecourt
+    this._bld(B.term, 500, 1890, 700, 1932, 14, STYLE.GLASS, 0x4a6274, 4.6, 5, { exactH: true, y0: Y, oy: Y });
+    for (const px of [532, 668]) {
+      this._bld(B.term, px - 12, 1932, px + 12, 1976, 8, STYLE.GLASS, 0x55707f, 4, 4, { exactH: true, y0: Y, oy: Y });
+      // the jet bridge and a parked airliner nosed in at the pier's end
+      box(B.term, px + 16, Y + 4.4, 1968, 9, 2.6, 3, 0xd8dade, false);
+      this._airliner(B.term, px + 23, Y, 2004, px < 600 ? 0x1c3f94 : 0xc8102e);
+    }
+    box(B.term, 600, Y + 6.2, 1883, 150, 0.5, 13, 0xe8eaed, false);
+    for (let x = 530; x <= 670; x += 28) cyl(B.term, x, Y + 3.1, 1878, 0.35, 6.2, 0x8c949c, true);
+    B.term.signs.push({ text: 'PORT VALEN INTERNATIONAL', x: 600, y: Y + 11.6, z: 1889.9, ry: Math.PI, w: 46, h: 2.6, bg: '#12202c', fg: '#ffffff' });
+    B.term.signs.push({ text: 'DEPARTURES · ARRIVALS', x: 600, y: Y + 4.6, z: 1876.4, ry: Math.PI, w: 20, h: 1.1, bg: '#1c3f94', fg: '#ffffff' });
+    B.term.place = { id: 'airport', name: A.name, kind: 'landmark', door: { x: 600, z: 1888.6, h: Math.PI }, under: { x: 600, z: 1911 } };
+    // the control tower: a shaft, a glass cab, a roof, the mast and its beacon
+    this._bld(B.term, 752, 1898, 766, 1912, 34, STYLE.IND, 0xcfd3d6, 3.4, 3.5, { exactH: true, y0: Y, oy: Y });
+    this._bld(B.term, 748, 1894, 770, 1916, 5.2, STYLE.GLASS, 0x2c3a48, 5.2, 3.6, { exactH: true, y0: Y + 34, oy: Y + 34 });
+    box(B.term, 759, Y + 39.5, 1905, 25, 0.6, 25, 0xe8eaed, false); cyl(B.term, 759, Y + 43.5, 1905, 0.25, 8, 0x8c949c, false);
+    B.term.fx.push({ type: 'beacon', x: 759, y: Y + 47.8, z: 1905 });
+    B.term.signs.push({ text: 'TOWER', x: 759, y: Y + 30, z: 1897.9, ry: Math.PI, w: 9, h: 1.8, bg: '#12202c', fg: '#ffd84d' });
+    // the airport fire station beside the tower
+    this._bld(B.term, 790, 1894, 826, 1914, 7, STYLE.BRICK, 0xa63a2e, 3.5, 4, { exactH: true, y0: Y, oy: Y });
+    B.term.signs.push({ text: 'AIRPORT FIRE & RESCUE', x: 808, y: Y + 5.6, z: 1914.1, ry: 0, w: 16, h: 1.2, bg: '#a01818', fg: '#ffffff' });
+    for (const dx of [-9, 0, 9]) box(B.term, 808 + dx, Y + 2.1, 1914.08, 6.4, 4.2, 0.12, 0x2a2e33, false);
+    // the car park and the taxi rank north-west of the terminal
+    isle.sites.carpark = { x0: 300, z0: 1848, x1: 478, z1: 1922 };
+    const lot = []; for (let r = 0; r < 3; r++) for (let k = 0; k < 11; k++) if (hash2i(k, r, 811) < 0.62) lot.push({ x: 312 + k * 15, z: 1862 + r * 22, h: r % 2 ? Math.PI : 0 });
+    fleet('ap_lot', 390, 1885, 260, lot);
+    fleet('ap_rank', 600, 1872, 240, [{ x: 571, z: 1879.5, h: Math.PI / 2, cls: 'taxi' }, { x: 578, z: 1879.5, h: Math.PI / 2, cls: 'taxi' }, { x: 585, z: 1879.5, h: Math.PI / 2, cls: 'taxi' }, { x: 808, z: 1921, h: 0, cls: 'firetruck' }, { x: 817, z: 1921, h: 0, cls: 'ambulance' }]);
+    for (let x = 300; x <= 478; x += 44.5) for (const z of [1850, 1920]) { cyl(B.west, x, Y + 4.5, z, 0.14, 9, 0x6a7078, true); B.west.fx.push({ type: 'flood', x, y: Y + 9, z, ry: z < 1900 ? 0 : Math.PI }); }
+    // three hangars open to the apron: walls and a roof up close (you can taxi in), one box from afar
+    isle.sites.hangars = [];
+    for (let k = 0; k < 3; k++) {
+      const x0 = 1000 + k * 56, x1 = x0 + 46, z0 = 1880, z1 = 1922, cx = (x0 + x1) / 2, col = [0xb8bec4, 0x9aa7b4, 0xc4b8a4][k];
+      box(B.east, cx, Y + 6.5, z0 + 0.3, 46, 13, 0.6, col, true); box(B.east, x0 + 0.3, Y + 6.5, (z0 + z1) / 2, 0.6, 13, 42, col, true); box(B.east, x1 - 0.3, Y + 6.5, (z0 + z1) / 2, 0.6, 13, 42, col, true);
+      box(B.east, cx, Y + 13.3, (z0 + z1) / 2, 47, 0.6, 43, 0x6f7a80, true); box(B.east, cx, Y + 11.4, z1 - 0.2, 46, 3.2, 0.4, col, false);
+      const far = this._bld(B.east, x0, z0, x1, z1, 13.6, STYLE.WARE, col, 13.6, 46, { exactH: true, y0: Y, oy: Y, noCol: true }); far.farOnly = true;
+      B.east.signs.push({ text: 'HANGAR ' + (k + 1), x: cx, y: Y + 11.4, z: z1 + 0.05, ry: 0, w: 12, h: 1.8, bg: '#1d2126', fg: '#ffffff' });
+      B.east.fx.push({ type: 'flood', x: cx, y: Y + 12.6, z: z1 + 0.6, ry: 0 });
+      isle.sites.hangars.push({ x0, z0, x1, z1 });
+    }
+    // fuel bowsers and baggage carts on the apron (static), the windsock
+    for (const [x, z] of [[910, 1962], [930, 1962]]) { box(B.east, x, Y + 1.5, z, 2.6, 2.4, 8, 0xe8eaed, true); box(B.east, x, Y + 1.2, z + 5.2, 2.4, 2.2, 2.2, 0xd8a227, true); }
+    for (let k = 0; k < 5; k++) box(B.term, 596 + k * 3.4, Y + 0.7, 1962, 2.6, 1.1, 1.6, [0x2a6fd6, 0xd8a227][k % 2], true);
+    cyl(B.west, 250, Y + 3.5, 2060, 0.12, 7, 0x8c949c, true); box(B.west, 251.6, Y + 6.6, 2060, 3, 0.7, 0.7, 0xff7a1a, false);
+    // the heliport: two pads with their lights
+    isle.sites.helipads = [{ x: 290, z: 1995 }, { x: 352, z: 1995 }];
+    for (const h of isle.sites.helipads) B.west.fx.push({ type: 'helipad', x: h.x, y: Y + 0.12, z: h.z });
+    // aircraft: two on the general-aviation stands, one in hangar 3, a helicopter on each pad
+    fleet('ap_air', 760, 1990, 900, [{ x: 1023, z: 1968, h: 0, cls: 'skylark' }, { x: 1079, z: 1968, h: 0, cls: 'skylark' }, { x: 1135, z: 1903, h: 0, cls: 'skylark' },
+      { x: 290, z: 1995, h: 0, cls: 'heli' }, { x: 352, z: 1995, h: 0, cls: 'heli' }, { x: 960, z: 1975, h: Math.PI / 2, cls: 'truck' }]);
+    // runway edge lights (white), the taxiway's (blue), threshold bars (green / red)
+    const lights = (x0, x1, z, w, c, step) => { for (let x = x0; x <= x1; x += step) for (const s of [-1, 1]) { const bk = this._isleLightBlock(x, z, A); bk.fx.push({ type: 'neon', x, y: Y + 0.22, z: z + s * (w / 2 + 1.2), w: 0.5, h: 0.3, d: 0.5, c }); } };
+    for (const r of A.rw) { lights(r.x0, r.x1, r.z, r.w, 0xfff4d6, 55); for (let q = -3; q <= 3; q++) { this._isleLightBlock(r.x0, r.z, A).fx.push({ type: 'neon', x: r.x0 - 2, y: Y + 0.22, z: r.z + q * r.w / 7, w: 0.5, h: 0.3, d: 0.8, c: 0x40ff70 }); this._isleLightBlock(r.x1, r.z, A).fx.push({ type: 'neon', x: r.x1 + 2, y: Y + 0.22, z: r.z + q * r.w / 7, w: 0.5, h: 0.3, d: 0.8, c: 0xff3030 }); } }
+    lights(A.tw.x0, A.tw.x1, A.tw.z, A.tw.w, 0x4080ff, 70);
+    // ================================================================ THE PROVING GROUND
+    const G = PROVING, GY = G.y, bg = this._isleBlock('proving', 1200, 1560, 330, G.name), bg2 = this._isleBlock('proving_e', 1760, 1590, 300, G.name);
+    this._bld(bg, 1150, 1494, 1176, 1506, 4.6, STYLE.IND, 0xd8dade, 4.6, 4, { exactH: true, y0: GY, oy: GY });
+    bg.signs.push({ text: 'VALEN PROVING GROUND', x: 1163, y: GY + 3.6, z: 1493.9, ry: Math.PI, w: 18, h: 1.3, bg: '#14181c', fg: '#ff6b4a' });
+    bg.place = { id: 'proving', name: G.name, kind: 'landmark', door: { x: 1163, z: 1492.6, h: Math.PI }, under: { x: 1163, z: 1500 } };
+    // gantries over the strip at the start and the kilometre, a board every 250 m
+    const S = G.strip;
+    for (const [gx, txt, bk] of [[S.x0 + 20, 'START', bg], [S.x0 + 1020, '1000 m', bg2]]) {
+      for (const s of [-1, 1]) box(bk, gx, GY + 3.5, S.z + s * (S.w / 2 + 1), 0.6, 7, 0.6, 0x2a2e33, true);
+      box(bk, gx, GY + 7.3, S.z, 1, 1.2, S.w + 3, 0x1d2126, false);
+      bk.signs.push({ text: txt, x: gx - 0.52, y: GY + 7.3, z: S.z, ry: -Math.PI / 2, w: 10, h: 1.0, bg: '#1d2126', fg: '#ffffff' });
+    }
+    for (let m = 250; m <= 750; m += 250) { const bk = m < 600 ? bg : bg2, x = S.x0 + 20 + m; box(bk, x, GY + 1.1, S.z - S.w / 2 - 2.2, 0.3, 2.2, 0.3, 0x8c949c, true); bk.signs.push({ text: m + ' m', x, y: GY + 2.4, z: S.z - S.w / 2 - 2.2, ry: -Math.PI / 2, w: 4, h: 1.0, bg: '#f2c230', fg: '#14181c' }); }
+    // tyre stacks round the skid pad, cones down the slalom
+    for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; cyl(bg, G.pad.x + Math.cos(a) * (G.pad.r + 3), GY + 0.45, G.pad.z + Math.sin(a) * (G.pad.r + 3), 0.42, 0.9, k % 2 ? 0x1c1c1e : 0xc8102e, true); }
+    for (let k = 0; k < 14; k++) cyl(bg2, G.lot.x0 + 60 + k * 36, GY + 0.35, G.lot.z0 + 50 + (k % 2 ? 9 : -9), 0.22, 0.7, 0xff7a1a, false);
+    fleet('proving', 950, 1530, 320, [{ x: S.x0 + 6, z: S.z - 6.5, h: Math.PI / 2, cls: 'gt3' }, { x: S.x0 + 6, z: S.z - 2.2, h: Math.PI / 2, cls: 'drift' }, { x: S.x0 + 6, z: S.z + 2.2, h: Math.PI / 2, cls: 'rally' }, { x: S.x0 + 6, z: S.z + 6.5, h: Math.PI / 2, cls: 'cup' },
+      { x: 1186, z: 1500, h: 0, cls: 'lmp' }, { x: 1192, z: 1500, h: 0, cls: 'formula' }]);
+    // ================================================================ VALEN POINT: the island's race cars
+    // pit boxes on the lane in front of the garages, a row in the paddock (the 24 garage bays stay the owner's)
+    {
+      const pit = [], cars = ['gt3', 'formula', 'lmp', 'cup', 'gt3', 'rally'];
+      for (let i = 0; i < 6; i++) pit.push({ x: VP_PIT.garX[1] + 3.3, z: VP_PIT.garZ[0] + VP_PIT.cell * (i * 2 + 0.5), h: Math.PI, cls: cars[i] });
+      fleet('vp_pits', 1570, 570, 330, pit);
+      fleet('vp_paddock', 1523, 520, 330, [{ x: 1524, z: 468, h: Math.PI, cls: 'drift' }, { x: 1524, z: 476, h: Math.PI, cls: 'cup' }, { x: 1524, z: 566, h: Math.PI, cls: 'formula' }, { x: 1524, z: 574, h: Math.PI, cls: 'gt3' }, { x: 1524, z: 648, h: Math.PI, cls: 'lmp' }, { x: 1524, z: 656, h: Math.PI, cls: 'rally' }]);
+      const pk = []; for (let k = 0; k < 8; k++) if (hash2i(k, 3, 813) < 0.7) pk.push({ x: 1460 + k * 8, z: 250, h: 0, cls: ['sports', 'apex', 'tempest', 'coupe', 'muscle', 'suv', 'sedan', 'hellion'][k] });
+      fleet('vp_park', 1488, 262, 300, pk);
+    }
+    // ================================================================ FIRE STATION No. 1 (the Coast Highway, north of the city)
+    {
+      const F = ISLE_FIRE, y = fireP.y, b = this._isleBlock('firehouse', 178, -127, 80, 'Fire Station No. 1');
+      this._bld(b, F.x0 + 22, F.z0 + 6, F.x1 - 6, F.z1 - 8, 9, STYLE.BRICK, 0xa63a2e, 4.5, 5, { exactH: true, y0: y, oy: y });
+      this._bld(b, F.x1 - 16, F.z1 - 20, F.x1 - 6, F.z1 - 8, 19, STYLE.BRICK, 0x8f3026, 3.8, 3.3, { exactH: true, y0: y, oy: y });
+      for (let k = 0; k < 3; k++) box(b, F.x0 + 21.9, y + 2.4, F.z0 + 14 + k * 13, 0.12, 4.8, 9, 0x2a2e33, false);
+      b.signs.push({ text: 'PORT VALEN FIRE DEPT · STATION 1', x: F.x0 + 21.85, y: y + 7.3, z: (F.z0 + F.z1) / 2 - 1, ry: -Math.PI / 2, w: 26, h: 1.4, bg: '#a01818', fg: '#ffd84d' });
+      b.place = { id: 'firehouse', name: 'Fire Station No. 1', kind: 'landmark', door: { x: F.x0 + 20.6, z: F.z1 - 14, h: -Math.PI / 2 }, under: { x: F.x0 + 40, z: (F.z0 + F.z1) / 2 } };
+      fleet('firehouse', 160, -127, 260, [{ x: F.x0 + 11, z: F.z0 + 14, h: -Math.PI / 2, cls: 'firetruck' }, { x: F.x0 + 11, z: F.z0 + 27, h: -Math.PI / 2, cls: 'firetruck' }, { x: F.x0 + 11, z: F.z0 + 40, h: -Math.PI / 2, cls: 'ambulance' }]);
+    }
+    // ================================================================ CRESTMOOR RIDGE: eight estates over the city
+    {
+      const cars = ['luxury', 'kodiak', 'sports', 'monarch', 'suv', 'crest', 'luxury', 'tempest'];
+      mans.forEach((m, i) => {
+        const y = m.P.y, b = this._isleBlock('mansion' + i, m.x, m.z, 46, 'Crestmoor Ridge'), f = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[m.f], along = f[0] ? 'z' : 'x';
+        const wall = [0xf2ede2, 0xe8e0d0, 0xdcd6cc, 0xf4f1ea][i % 4], roof = [0x8a4a34, 0x3a4652, 0x5a4a3a, 0x7a3a2e][i % 4];
+        // the house is set back from the forecourt: a two-storey block, a wing, a garage beside the drive
+        const hx = m.x - f[0] * 6, hz = m.z - f[1] * 6, hw = along === 'x' ? 13 : 7.5, hd = along === 'x' ? 7.5 : 13;
+        this._bld(b, hx - hw, hz - hd, hx + hw, hz + hd, 7.6, STYLE.HOUSE, wall, 3.8, 4.2, { exactH: true, y0: y, oy: y, roof: 'gable', roofColor: roof });
+        const wx = hx + (along === 'x' ? hw + 4.5 : 0) - f[0] * 2, wz = hz + (along === 'z' ? hd + 4.5 : 0) - f[1] * 2;
+        this._bld(b, wx - 4.5, wz - 4.5, wx + 4.5, wz + 4.5, 4.2, STYLE.HOUSE, wall, 4.2, 4.2, { exactH: true, y0: y, oy: y, roof: 'gable', roofColor: roof });
+        // a pool behind the house, a hedge round the plot with the drive left open
+        const px = m.x - f[0] * 19 + (along === 'x' ? -8 : 0), pz = m.z - f[1] * 17 + (along === 'z' ? -8 : 0);
+        this._det(b, 'disc', px, y + 0.06, pz, 5.4, 1, 5.4, C(0xd8d2c4)); b.water.push({ x: px, z: pz, r: 4.2, y: y + 0.1 });
+        for (const [ex, ez, sx, sz] of [[m.x, m.z - 21.4, 49, 1.1], [m.x, m.z + 21.4, 49, 1.1], [m.x - 24.4, m.z, 1.1, 43], [m.x + 24.4, m.z, 1.1, 43]]) {
+          const front = (ex - m.x) * f[0] + (ez - m.z) * f[1] > 1;
+          if (!front) box(b, ex, y + 0.7, ez, sx, 1.4, sz, 0x35602c, true);
+          else for (const s of [-1, 1]) box(b, ex + (sx > sz ? s * 15.5 : 0), y + 0.7, ez + (sz > sx ? s * 13.5 : 0), sx > sz ? 18 : sx, 1.4, sz > sx ? 16 : sz, 0x35602c, true);
+        }
+        const fx = m.x + f[0] * 15, fz = m.z + f[1] * 13, h = Math.atan2(f[0], f[1]);
+        fleet('mansion' + i, m.x, m.z, 230, [{ x: fx + (along === 'x' ? -4.5 : 0), z: fz + (along === 'z' ? -4.5 : 0), h, y, cls: cars[i] }, { x: fx + (along === 'x' ? 4.5 : 0), z: fz + (along === 'z' ? 4.5 : 0), h, y, cls: cars[(i + 3) % 8] }]);
+      });
+    }
+    // ================================================================ SALTMARSH (the bay's south shore) and its jetty
+    {
+      const cols = [0xf2d9c4, 0xc9e2e8, 0xf0e6b8, 0xd8e8c8, 0xe8c8c8, 0xdcdcec], bs = [this._isleBlock('saltmarsh_e', -420, 1180, 150, 'Saltmarsh'), this._isleBlock('saltmarsh_w', -620, 1160, 150, 'Saltmarsh')];
+      const slots = [];
+      salt.forEach((h, i) => {
+        const y = h.P.y, b = bs[h.x < -520 ? 1 : 0];
+        this._bld(b, h.x - 6, h.z - 4.5, h.x + 6, h.z + 4.5, 5.6, STYLE.HOUSE, cols[i % 6], 2.8, 3.2, { exactH: true, y0: y, oy: y, roof: 'gable', roofColor: [0x5a4a3a, 0x3a4652, 0x7a3a2e][i % 3] });
+        box(b, h.x, y + 0.3, h.z - h.s * 6.6, 9, 0.2, 3.6, 0x9a7d58, false);
+        if (hash2i(i, 5, 817) < 0.75) slots.push({ x: h.x + 8.6, z: h.z + h.s * 2, h: h.s > 0 ? Math.PI : 0, y });
+      });
+      bs[0].place = { id: 'saltmarsh', name: 'Saltmarsh', kind: 'landmark', door: { x: -460, z: 1000, h: Math.PI }, under: { x: -460, z: 1170 } };
+      fleet('saltmarsh', -500, 1170, 260, slots);
+      // the jetty: a stone mole into the bay with a light at its head
+      const J = ISLE_JETTY, jb = this._isleBlock('jetty', -460, 945, 70, 'Saltmarsh Jetty');
+      cyl(jb, -460, J.y + 2.4, J.z0 + 4, 0.5, 4.8, 0xe8eaed, true); jb.fx.push({ type: 'beacon', x: -460, y: J.y + 5.1, z: J.z0 + 4 });
+      for (let z = J.z0 + 12; z < J.z1; z += 14) for (const s of [-1, 1]) cyl(jb, -460 + s * 5.2, J.y + 0.45, z, 0.25, 0.9, 0x4a4036, true);
+    }
+    // ================================================================ GULL HARBOR (the north-west cove)
+    {
+      const b = this._isleBlock('gull', -1290, -2275, 170, 'Gull Harbor'), slots = [];
+      gull.forEach((h, i) => {
+        const y = h.P.y;
+        this._bld(b, h.x - 5, h.z - 4, h.x + 5, h.z + 4, 4.8, STYLE.HOUSE, [0xd8d0bc, 0xb8c4c8, 0xc8b8a4][i % 3], 2.6, 3, { exactH: true, y0: y, oy: y, roof: 'gable', roofColor: 0x3a3d40 });
+        for (let k = 0; k < 3; k++) box(b, h.x - 7.5, y + 0.45 + k * 0.5, h.z - 2 + (k % 2) * 0.4, 1.3, 0.5, 1.9, [0x2a6fd6, 0xd8a227, 0x9a4a3a][(i + k) % 3], false);
+        if (i % 2 === 0) slots.push({ x: h.x + 7.6, z: h.z, h: 0, y, cls: ['pickup', 'van', 'utility'][(i / 2) % 3] });
+      });
+      b.place = { id: 'gull', name: 'Gull Harbor', kind: 'landmark', door: { x: -1280, z: -2262, h: 0 }, under: { x: -1290, z: -2275 } };
+      fleet('gull', -1290, -2275, 260, slots);
+    }
+    // ================================================================ THE LIGHTHOUSE (the north-east point)
+    {
+      const L = ISLE_LIGHT, y = L.y, b = this._isleBlock('lighthouse', 1506, -2790, 60, 'Cape Valen Light'), x = 1500, z = -2796;
+      cyl(b, x, y + 5, z, 4.2, 10, 0xf2f4f6, true); cyl(b, x, y + 13, z, 3.6, 6, 0xc8102e, false); cyl(b, x, y + 20, z, 3.1, 8, 0xf2f4f6, false);
+      cyl(b, x, y + 24.3, z, 4, 0.6, 0x2a2e33, false); cyl(b, x, y + 26.2, z, 2.2, 3.2, 0x8fd0e8, false); this._det(b, 'cone', x, y + 29, z, 2.8, 2.4, 2.8, C(0x2a2e33));
+      b.fx.push({ type: 'neon', x, y: y + 26.2, z, w: 3, h: 2.2, d: 3, c: 0xfff0b0 }, { type: 'beacon', x, y: y + 30.6, z });
+      this._bld(b, 1512, -2806, 1524, -2797, 4.2, STYLE.HOUSE, 0xf2ede2, 2.8, 3, { exactH: true, y0: y, oy: y, roof: 'gable', roofColor: 0x8a4a34 });
+      b.place = { id: 'lighthouse', name: 'Cape Valen Light', kind: 'landmark', door: { x: 1506, z: -2790, h: 0 }, under: { x, z } };
+      fleet('lighthouse', 1520, -2785, 220, [{ x: 1532, z: -2794, h: 0, y, cls: 'pickup' }]);
+    }
+    // ================================================================ THE OBSERVATORY (Mount Valen's summit) and the mast
+    {
+      const Sm = ISLE_SUMMIT, y = Sm.y, b = this._isleBlock('summit', 390, -1823, 80, 'Mount Valen Observatory'), x = 366, z = -1842;
+      cyl(b, x, y + 3.5, z, 9, 7, 0xe8eaed, true); this._det(b, 'blob', x, y + 7.2, z, 9.4, 7.4, 9.4, C(0xf4f6f8)); box(b, x + 4, y + 11.2, z, 9, 5.2, 2.2, 0x2a2e33, false);
+      this._bld(b, 380, -1860, 398, -1850, 4.4, STYLE.IND, 0xd8dade, 4.4, 4, { exactH: true, y0: y, oy: y });
+      cyl(b, 428, y + 21, -1790, 0.5, 42, 0xc8102e, true); for (let k = 0; k < 3; k++) b.fx.push({ type: 'beacon', x: 428, y: y + 14 + k * 14, z: -1790 });
+      // the lookout's rail on the city side
+      for (let k = 0; k < 9; k++) cyl(b, 350 + k * 10, y + 0.55, -1782, 0.1, 1.1, 0x3a3f45, true);
+      box(b, 390, y + 1.1, -1782, 82, 0.1, 0.12, 0x3a3f45, false);
+      b.signs.push({ text: 'MOUNT VALEN · 246 m', x: 389, y: y + 3.4, z: -1849.9, ry: 0, w: 12, h: 1.2, bg: '#14181c', fg: '#ffffff' });
+      b.place = { id: 'summit', name: 'Mount Valen Observatory', kind: 'landmark', door: { x: 389, z: -1848.6, h: 0 }, under: { x, z } };
+      fleet('summit', 390, -1820, 220, [{ x: 404, z: -1846, h: Math.PI / 2, y, cls: 'offroad' }]);
+    }
+    // ================================================================ the city's two rooftop helipads (built in 090) and their lifts
+    for (const key of ['hospital', 'police']) {
+      const cb = this.block(SPECIAL[key].bx, SPECIAL[key].bz), H = cb && cb.helipad; if (!H) continue;
+      isle.lifts.push({ name: key === 'hospital' ? 'St. Alda helipad' : 'Police air unit', a: { x: H.lift.x, z: H.lift.z, y: CURB_H }, b: { x: H.top.x, z: H.top.z, y: H.y } });
+      fleet('roof_' + key, H.x, H.z, 420, [{ x: H.x, z: H.z, h: Math.PI / 2, y: H.y, cls: key === 'hospital' ? 'medevac' : 'polheli' }]);
+    }
+    // colliders for the island's blocks (the city's and Valen Point's loops ran before these existed)
+    for (const b of isle.blocks) {
+      for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
+      for (const d of b.det) if (d.col) this.grid.add(d.col);
+    }
+    isle.mans = mans;
+  },
+  // runway lights stream in 400 m blocks along the airfield
+  _isleLightBlock(x, z, A) {
+    const k = Math.floor((x - A.x0) / 400), id = 'ap_lights' + k + (z > 2300 ? 's' : z > 2150 ? 'm' : 'n');
+    return this.xblocks.find(b => b.xb === id) || this._isleBlock(id, A.x0 + k * 400 + 200, z, 230, A.name);
+  },
+  // a parked airliner (static): nose at z, pointing north
+  _airliner(b, x, Y, z, tail) {
+    const D = (kind, dx, dy, dz, sx, sy, sz, col, rx = 0, ry = 0, rz = 0) => b.det.push({ kind, x: x + dx, y: Y + dy, z: z + dz, sx, sy, sz, color: C(col), ry, rx, rz });
+    D('cylr', 0, 4.1, 17, 1.95, 31, 1.95, 0xf2f4f6, Math.PI / 2); D('cone', 0, 4.1, -0.5, 1.95, 4, 1.95, 0xf2f4f6, -Math.PI / 2); D('cone', 0, 4.5, 35.5, 1.9, 6, 1.9, 0xf2f4f6, Math.PI / 2);
+    D('box', 0, 4.1, 17, 3.95, 0.5, 31, tail);
+    for (const s of [-1, 1]) { D('box', s * 9.5, 3.4, 18.5, 16, 0.45, 4.6, 0xe4e7ea, 0, -s * 0.36); D('cylr', s * 6.2, 2.3, 15.5, 1.05, 3.8, 1.05, 0x9aa0a6, Math.PI / 2); D('box', s * 4.2, 5.2, 35.5, 7, 0.3, 2.6, 0xe4e7ea, 0, -s * 0.3); D('box', s * 2.6, 1.1, 18.5, 0.6, 2.2, 1.4, 0x2a2e33); }
+    D('box', 0, 8.4, 35, 0.4, 6.4, 5.2, tail, 0.5); D('box', 0, 1.0, 4, 0.5, 2, 1, 0x2a2e33);
+    this.grid.add({ x0: x - 2.1, z0: z - 2, x1: x + 2.1, z1: z + 38, y0: Y, y1: Y + 6.2, kind: 'det' });
+    this.grid.add({ x0: x - 17, z0: z + 15, x1: x + 17, z1: z + 22, y0: Y + 1.6, y1: Y + 4.4, kind: 'det' });
+  }
+});
+/* =====================================================================
    [CORE] TRAFFIC SIGNALS (shared timing used by AI, peds, and bulbs)
    ===================================================================== */
 const Signals = {
@@ -39666,7 +40444,7 @@ const RoadGraph = {
   ready: false, nodes: [], edges: [], segAtt: new Map(),
   _cells: new Map(), _segE: null, _segK: null, _stamp: null, _q: 0,
   build(world) {
-    this.ready = false; this._walk = null;
+    this.ready = false; this._walk = null; this._offSpots = null;
     const chains = [];
     for (let a = 0; a < 2; a++) for (let line = 0; line <= N; line++) for (let seg = 0; seg < N; seg++) {
       if (!RoadNet.segOpen(a, line, seg)) continue;
@@ -40787,28 +41565,25 @@ function buildStaticScenery(scene, world) {
   const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half, eastRun = (z0, z1, f) => { if (z1 > z0) f((z0 + z1) / 2, z1 - z0); };
   eastRun(-ROAD_HALF, g0, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
   eastRun(g1, CITY + ROAD_HALF, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
-  // seawall faces
-  const wh = 3.2;
-  gs.add(TPL.box, M(CITY / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, L + 2, wh, 1), null);
-  for (const [x0, x1] of [[-E - 1, s0], [s1, CITY + E + 1]]) southRun(x0, x1, (xc, l) => gs.add(TPL.box, M(xc, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, l, wh, 1), null));
-  gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, CITY / 2, 1, wh, L), null);
-  eastRun(-E, g0, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
-  eastRun(g1, CITY + E, (zc, l) => gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, zc, 1, wh, l), null));
+  // seawall faces: only where the city's edge meets open water (world.shore; Operation Blackgate)
+  const wh = 3.2, SH = world.shore;
+  for (const [a, b] of SH.n) gs.add(TPL.box, M((a + b) / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, b - a, wh, 1), null);
+  for (const [a, b] of SH.s) gs.add(TPL.box, M((a + b) / 2, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, b - a, wh, 1), null);
+  for (const [a, b] of SH.w) gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, (a + b) / 2, 1, wh, b - a), null);
+  for (const [a, b] of SH.e) gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, (a + b) / 2, 1, wh, b - a), null);
   // the kerb cut away where each curved road leaves a lattice street (Curved Roads pass)
   addCurbCuts(gs);
   const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
   // the curved streets' painted lines
   buildRoadMarkings(scene);
-  // railing
+  // railing: posts and two rails along the same runs
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
-  for (let t = -E; t <= CITY + E; t += 2.5) {
-    for (const [x, z] of [[t, -E + 0.3], [t, CITY + E - 0.3], [-E + 0.3, t], [CITY + E - 0.3, t]]) if (!(x > CITY && z > g0 - 0.5 && z < g1 + 0.5) && !(z > CITY && x > s0 - 0.5 && x < s1 + 0.5)) gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc);
+  for (const [side, runs] of Object.entries(SH)) for (const [a, b] of runs) {
+    const P2 = t => side === 'n' ? [t, -E + 0.3] : side === 's' ? [t, CITY + E - 0.3] : side === 'w' ? [-E + 0.3, t] : [CITY + E - 0.3, t];
+    for (let t = Math.max(a, -E); t <= Math.min(b, CITY + E); t += 2.5) { const [x, z] = P2(t); gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc); }
+    const [mx, mz] = P2((a + b) / 2), alongX = side === 'n' || side === 's';
+    for (const [y, h] of [[1.1, 0.07], [0.6, 0.04]]) gr.add(TPL.box, M(mx, CURB_H + y, mz, alongX ? b - a : 0.08, h, alongX ? 0.08 : b - a), rc);
   }
-  for (const [x0, x1] of [[-E, s0], [s1, CITY + E]]) southRun(x0, x1, (xc, l) => { gr.add(TPL.box, M(xc, CURB_H + 1.1, CITY + E - 0.3, l, 0.07, 0.08), rc); gr.add(TPL.box, M(xc, CURB_H + 0.6, CITY + E - 0.3, l, 0.04, 0.08), rc); });
-  for (const [x, z, w, d] of [[CITY / 2, -E + 0.3, L, 0.08], [-E + 0.3, CITY / 2, 0.08, L]]) {
-    gr.add(TPL.box, M(x, CURB_H + 1.1, z, w, 0.07, d), rc); gr.add(TPL.box, M(x, CURB_H + 0.6, z, w, 0.04, d), rc);
-  }
-  for (const [z0, z1] of [[-E, g0], [g1, CITY + E]]) eastRun(z0, z1, (zc, l) => { gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 1.1, zc, 0.08, 0.07, l), rc); gr.add(TPL.box, M(CITY + E - 0.3, CURB_H + 0.6, zc, 0.08, 0.04, l), rc); });
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
   // water
@@ -40816,7 +41591,7 @@ function buildStaticScenery(scene, world) {
   water.position.set(CITY / 2, -1.2, CITY / 2);
   scene.add(water);
   // sky
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(2400, 32, 16), makeSkyMaterial());
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(4800, 32, 16), makeSkyMaterial());
   sky.frustumCulled = false; sky.renderOrder = -10;
   scene.add(sky);
   return { ground, slabs, water, sky, gmat };
@@ -41140,6 +41915,342 @@ class CedarScenery {
     this._farIndex(this.far, new Set(want));
     // keep the most recently used tiles; dispose the rest
     if (this.tiles.size > CFS_SCN.cache) for (const t of [...this.tiles.values()].sort((a, b) => a.used - b.used).slice(0, this.tiles.size - CFS_SCN.cache)) { t.mesh.geometry.dispose(); this.tiles.delete(t.key); }
+  }
+}
+/* =====================================================================
+   [CONTENT] VALEN ISLAND: SCENERY (Operation Blackgate)
+   The island's ground (022) drawn as vertex-coloured meshes:
+   - near the focus, 256 m tiles at the physics' own 4 m grid (the same
+     heights and the same two triangles a cell, so a wheel sits on what
+     you see), each with a skirt, built one a frame as you move and
+     dropped again behind you;
+   - everything else as one 32 m mesh of the whole island whose index
+     skips the tiles drawn near (and the sea bed, the city's square and
+     Cedar Fields, which draw themselves);
+   - forests: instanced trees on the near tiles (and their trunks'
+     colliders), by the island's own forest map;
+   - the roads as ribbons on their beds (one mesh, a painted texture), the
+     turning circles, the Blackgate Bridge (deck, parapets, piers, towers
+     and cables) and the Blackgate Tunnel (the tube, its lights, portals);
+   - the airfield's and the proving ground's surfaces and paint.
+   ===================================================================== */
+const ISLE_SCN = { near: [300, 380, 450, 520], far: 32, keep: 200, trees: [20, 16, 14, 12] };
+const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3d5c36, 0x8a9150, 0x9a9c9a];
+class IslandScenery {
+  constructor(scene, world, game) {
+    this.scene = scene; this.world = world; this.g = game;
+    this.mat = makeTerrainMaterial();
+    this.tiles = new Map(); this.queue = []; this.stats = { built: 0, trees: 0 };
+    this._c = new THREE.Color(); this._c2 = new THREE.Color(); this._rgb = [0, 0, 0];
+    this.far = this._farMesh(); scene.add(this.far);
+    this.roads = this._roadMesh(); scene.add(this.roads);
+    this.struct = this._structures(); scene.add(this.struct);
+    this.paint = this._paint(); scene.add(this.paint);
+    this._tx = 1e9; this._tz = 1e9; this._holes = new Set(); this._farDirty = true;
+    this._treeGeo = null;
+  }
+  // ---------------------------------------------------------------- colours
+  // the ground's colour at (x, z): its surface (grass, sand, rock, forest floor, dry grass), paler with height, mottled
+  _col(x, z, h, slope) {
+    const s = Island.surface(x, z, h, slope), c = this._c.setHex(ISLE_COL[s]), o = this._rgb;
+    let k = 1 + 0.09 * tNoise(x / 37, z / 37, 67) + 0.05 * tNoise(x / 9, z / 9, 69);
+    if (s === 0 || s === 4 || s === 5) {
+      // steep ground shows its rock, high ground goes pale and stony, the shore's grass thins into sand
+      const rock = smoothstep(0.42, 0.62, slope) + smoothstep(150, 215, h) * 0.7;
+      if (rock > 0) c.lerp(this._c2.setHex(ISLE_COL[2]), Math.min(1, rock));
+      k *= 1 + clamp((h - 30) * 0.0012, -0.04, 0.12);
+    } else if (s === 1) k *= h < SEA_Y + 0.25 ? 0.72 : 1;
+    o[0] = c.r * k; o[1] = c.g * k; o[2] = c.b * k;
+    return o;
+  }
+  // is the cell with corner (x, z) and size s one the island does not draw (the city's square, Cedar Fields' own ground)?
+  _foreign(x, z, s) {
+    const E = EDGE_MARGIN;
+    if (x >= -E && z >= -E && x + s <= CITY + E && z + s <= CITY + E) return true;
+    if (x >= CFS.x0 && z >= CFS.z0 && x + s <= CFS.x1 && z + s <= CFS.z1) return true;
+    return false;
+  }
+  // ---------------------------------------------------------------- the far mesh
+  _farMesh() {
+    const s = ISLE_SCN.far, nx = (ISLE.x1 - ISLE.x0) / s + 1, nz = (ISLE.z1 - ISLE.z0) / s + 1, n = nx * nz, E = EDGE_MARGIN;
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), nrm = new Float32Array(n * 3), H = new Float32Array(n);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const x = ISLE.x0 + i * s, z = ISLE.z0 + j * s;
+      // inside the city's square the coarse mesh ducks under the streets it would otherwise cover
+      H[j * nx + i] = x > -E && z > -E && x < CITY + E && z < CITY + E ? -0.6 : Island.compute(x, z, 26);
+    }
+    const hAt = (i, j) => H[clamp(j, 0, nz - 1) * nx + clamp(i, 0, nx - 1)];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const o = (j * nx + i) * 3, x = ISLE.x0 + i * s, z = ISLE.z0 + j * s, h = H[j * nx + i];
+      const gx = (hAt(i + 1, j) - hAt(i - 1, j)) / (2 * s), gz = (hAt(i, j + 1) - hAt(i, j - 1)) / (2 * s), l = Math.hypot(gx, 1, gz);
+      pos[o] = x; pos[o + 1] = h; pos[o + 2] = z; nrm[o] = -gx / l; nrm[o + 1] = 1 / l; nrm[o + 2] = -gz / l;
+      const c = this._col(x, z, h, Math.hypot(gx, gz)); col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    // which tiles hold any land at all (the rest are never built near)
+    const T = ISLE.tile / s, tw = (ISLE.x1 - ISLE.x0) / ISLE.tile, th = (ISLE.z1 - ISLE.z0) / ISLE.tile;
+    this.landTile = new Uint8Array(tw * th); this.tw = tw; this.th = th;
+    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) if (Math.max(H[j * nx + i], H[j * nx + i + 1], H[(j + 1) * nx + i], H[(j + 1) * nx + i + 1]) > SEA_Y - 0.6) this.landTile[Math.floor(j / T) * tw + Math.floor(i / T)] = 1;
+    this._fg = { nx, nz, s, H, idx: new Uint32Array((nx - 1) * (nz - 1) * 6) };
+    g.setIndex(new THREE.BufferAttribute(this._fg.idx, 1));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3((ISLE.x0 + ISLE.x1) / 2, 60, (ISLE.z0 + ISLE.z1) / 2), 4600);
+    const m = new THREE.Mesh(g, this.mat); m.receiveShadow = true; m.frustumCulled = false; m.name = 'isleFar';
+    return m;
+  }
+  _farIndex() {
+    const { nx, nz, s, H, idx } = this._fg, T = ISLE.tile / s; let n = 0;
+    for (let j = 0; j < nz - 1; j++) {
+      const tz = Math.floor(j / T);
+      for (let i = 0; i < nx - 1; i++) {
+        const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+        if (Math.max(H[a], H[b], H[c], H[d]) < SEA_Y - 0.5) continue;
+        if (this._holes.has(tz * 64 + Math.floor(i / T))) continue;
+        if (this._foreign(ISLE.x0 + i * s, ISLE.z0 + j * s, s)) continue;
+        idx[n++] = a; idx[n++] = c; idx[n++] = b; idx[n++] = b; idx[n++] = c; idx[n++] = d;
+      }
+    }
+    const g = this.far.geometry; g.index.needsUpdate = true; g.setDrawRange(0, n);
+    this._farDirty = false;
+  }
+  // ---------------------------------------------------------------- near tiles
+  _tileMesh(tx, tz) {
+    const T = Island._tile(tx, tz), n = T.n, c = ISLE.cell, hh = T.h, nv = n * n;
+    const pos = new Float32Array((nv + n * 8) * 3), col = new Float32Array((nv + n * 8) * 3), nrm = new Float32Array((nv + n * 8) * 3), idx = [];
+    const hAt = (i, j) => i >= 0 && j >= 0 && i < n && j < n ? hh[j * n + i] : Island.compute(T.x0 + i * c, T.z0 + j * c);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const o = (j * n + i) * 3, x = T.x0 + i * c, z = T.z0 + j * c, h = hh[j * n + i];
+      const gx = (hAt(i + 1, j) - hAt(i - 1, j)) / (2 * c), gz = (hAt(i, j + 1) - hAt(i, j - 1)) / (2 * c), l = Math.hypot(gx, 1, gz);
+      pos[o] = x; pos[o + 1] = h; pos[o + 2] = z; nrm[o] = -gx / l; nrm[o + 1] = 1 / l; nrm[o + 2] = -gz / l;
+      const q = this._col(x, z, h, Math.hypot(gx, gz)); col[o] = q[0]; col[o + 1] = q[1]; col[o + 2] = q[2];
+    }
+    // the tunnel's mouths: the cells of the cut's end wall that the bore goes through are left open
+    const mouth = (x, z) => {
+      if (!T.multi || !Island._nearRoad(Island._sseg, x, z)) return false;
+      const R = Island._rr, k = Island._rk; if (!R.tunnel || Island._rd > 2.6) return false;
+      return Math.abs(k - R.tunnel[0]) <= 1 || Math.abs(k + 1 - R.tunnel[1]) <= 1;
+    };
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+      const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
+      if (Math.max(hh[a], hh[b], hh[cc], hh[d]) < SEA_Y - 0.5) continue;
+      const x = T.x0 + i * c, z = T.z0 + j * c;
+      if (this._foreign(x, z, c) || mouth(x + c / 2, z + c / 2)) continue;
+      idx.push(a, cc, b, b, cc, d);
+    }
+    // a skirt round the tile hides the seam against the coarse mesh and a neighbour not built yet
+    let v = nv;
+    const edge = list => {
+      const base = v;
+      for (const q of list) { pos[v * 3] = pos[q * 3]; pos[v * 3 + 1] = pos[q * 3 + 1] - 2.2; pos[v * 3 + 2] = pos[q * 3 + 2]; col[v * 3] = col[q * 3] * 0.8; col[v * 3 + 1] = col[q * 3 + 1] * 0.8; col[v * 3 + 2] = col[q * 3 + 2] * 0.8; nrm[v * 3] = nrm[q * 3]; nrm[v * 3 + 1] = nrm[q * 3 + 1]; nrm[v * 3 + 2] = nrm[q * 3 + 2]; v++; }
+      for (let k = 0; k < list.length - 1; k++) { const A = list[k], B = list[k + 1], a2 = base + k, b2 = a2 + 1; if (pos[A * 3 + 1] < SEA_Y - 0.5 && pos[B * 3 + 1] < SEA_Y - 0.5) continue; idx.push(A, a2, B, B, a2, b2, A, B, a2, B, b2, a2); }
+    };
+    const N2 = [], S2 = [], W2 = [], E2 = [];
+    for (let i = 0; i < n; i++) { N2.push(i); S2.push((n - 1) * n + i); W2.push(i * n); E2.push(i * n + n - 1); }
+    edge(N2); edge(S2); edge(W2); edge(E2);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setIndex(idx); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, this.mat); m.receiveShadow = true; m.name = 'isleTile';
+    return m;
+  }
+  // the trees of a tile: a jittered grid over the island's forest map, clear of roads, pads, sand and rock
+  _trees(tx, tz) {
+    const lv = this.g.quality ? this.g.quality.level : 1, step = ISLE_SCN.trees[clamp(lv, 0, 3)], x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile, n = Math.floor(ISLE.tile / step);
+    const list = [[], []];
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const ix = Math.floor(x0 / step) + i, iz = Math.floor(z0 / step) + j;
+      const x = (ix + 0.15 + 0.7 * hash2i(ix, iz, 201)) * step, z = (iz + 0.15 + 0.7 * hash2i(ix, iz, 203)) * step;
+      const f = Island.forest(x, z); if (hash2i(ix, iz, 205) > (f - 0.42) * 2.4) continue;
+      if (this._foreign(x - 6, z - 6, 12) || inValenPoint(x, z)) continue;
+      const h = Island.height(x, z, 1e6), sl = Math.hypot(Island.gx, Island.gz);
+      if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
+      if (Island._nearRoad(Island._seg, x, z) && Island._rd < 5) continue;
+      if (Island._nearRoad(Island._sseg, x, z) && Island._rd < 14) continue;
+      let pad = false; for (const P of Island.pads) if (x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
+      if (pad || Island.surface(x, z, h, sl) === 1) continue;
+      const pine = hash2i(ix, iz, 207) < (z < 60 ? 0.3 + smoothstep(20, 120, h) * 0.55 : 0.2);
+      list[pine ? 1 : 0].push([x, h, z, 0.9 + hash2i(ix, iz, 209) * 0.75, hash2i(ix, iz, 211) * 6.28]);
+    }
+    return list;
+  }
+  _treeGeos() {
+    if (this._treeGeo) return this._treeGeo;
+    const mk = t => { const g = new GeoBuilder(); PROP_DEFS[t].lod(g); return g.build(); };
+    return this._treeGeo = [mk('tree'), mk('pine')];
+  }
+  _buildTile(tx, tz) {
+    const key = tz * 64 + tx, group = new THREE.Group(), mesh = this._tileMesh(tx, tz); group.add(mesh);
+    const T = { key, tx, tz, group, cols: [], trees: 0 };
+    const lists = this._trees(tx, tz), geos = this._treeGeos(), fol = this.g.props ? this.g.props.folMat : null, lv = this.g.quality ? this.g.quality.level : 1;
+    lists.forEach((L, k) => {
+      if (!L.length || !fol) return;
+      const im = new THREE.InstancedMesh(geos[k], fol, L.length); im.castShadow = lv >= 2; im.receiveShadow = true;
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(L.length * 3), 3);
+      L.forEach((t, i) => {
+        M(t[0], t[1] - 0.15, t[2], t[3], t[3], t[3], t[4]); im.setMatrixAt(i, _m4);
+        const v = 0.8 + hash2i(Math.floor(t[0]), Math.floor(t[2]), 213) * 0.4; this._c.setRGB(v, 0.85 + (v - 0.8) * 0.5, v * 0.9); im.setColorAt(i, this._c);
+        T.cols.push(this.world.grid.add({ x: t[0], z: t[2], r: 0.32 * t[3], y0: t[1] - 1, y1: t[1] + 3.2 * t[3], kind: 'det', tree: true }));
+      });
+      im.computeBoundingSphere(); group.add(im); T.trees += L.length;
+    });
+    this.scene.add(group); this.tiles.set(key, T);
+    this._holes.add(key); this._farDirty = true; this.stats.built++; this.stats.trees += T.trees;
+  }
+  _dropTile(T) {
+    this.scene.remove(T.group);
+    T.group.traverse(o => { if (o.isInstancedMesh) o.dispose(); else if (o.geometry) o.geometry.dispose(); });
+    for (const c of T.cols) this.world.grid.remove(c);
+    this.tiles.delete(T.key); this._holes.delete(T.key); this._farDirty = true; this.stats.trees -= T.trees;
+  }
+  // which tiles should be drawn near: every land tile within the near range of the focus
+  update(fx, fz) {
+    const lv = this.g.quality ? this.g.quality.level : 1, R = ISLE_SCN.near[clamp(lv, 0, 3)], Ts = ISLE.tile;
+    const tx = Math.floor((fx - ISLE.x0) / 32), tz = Math.floor((fz - ISLE.z0) / 32);
+    if (tx !== this._tx || tz !== this._tz || lv !== this._lv) {
+      this._tx = tx; this._tz = tz; this._lv = lv;
+      const want = [];
+      for (let j = Math.floor((fz - R - ISLE.z0) / Ts); j <= Math.floor((fz + R - ISLE.z0) / Ts); j++) for (let i = Math.floor((fx - R - ISLE.x0) / Ts); i <= Math.floor((fx + R - ISLE.x0) / Ts); i++) {
+        if (i < 0 || j < 0 || i >= this.tw || j >= this.th || !this.landTile[j * this.tw + i]) continue;
+        const x0 = ISLE.x0 + i * Ts, z0 = ISLE.z0 + j * Ts, d = Math.hypot(Math.max(x0 - fx, 0, fx - x0 - Ts), Math.max(z0 - fz, 0, fz - z0 - Ts));
+        if (d < R && !this.tiles.has(j * 64 + i)) want.push([d, i, j]);
+      }
+      want.sort((a, b) => a[0] - b[0]); this.queue = want;
+      for (const T of [...this.tiles.values()]) { const x0 = ISLE.x0 + T.tx * Ts, z0 = ISLE.z0 + T.tz * Ts, d = Math.hypot(Math.max(x0 - fx, 0, fx - x0 - Ts), Math.max(z0 - fz, 0, fz - z0 - Ts)); if (d > R + ISLE_SCN.keep) this._dropTile(T); }
+    }
+    // one tile a frame (all of them when nothing is drawn yet: a new game, a load, a long jump)
+    let budget = this.tiles.size === 0 ? 99 : 1;
+    while (budget-- > 0 && this.queue.length) { const [, i, j] = this.queue.shift(); if (!this.tiles.has(j * 64 + i)) this._buildTile(i, j); }
+    if (this._farDirty) this._farIndex();
+  }
+  // ---------------------------------------------------------------- roads
+  _roadTexture() {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 256; const g = c.getContext('2d');
+    g.fillStyle = '#3b3d41'; g.fillRect(0, 0, 128, 256);
+    // worn wheel tracks, a little grain, white edge lines, a dashed yellow centre line
+    for (let k = 0; k < 900; k++) { const v = 52 + Math.floor(hash2i(k, 7, 301) * 26); g.fillStyle = `rgba(${v},${v},${v + 2},0.5)`; g.fillRect(hash2i(k, 1, 303) * 128, hash2i(k, 2, 305) * 256, 2, 2); }
+    g.fillStyle = 'rgba(30,31,34,0.35)'; for (const x of [26, 46, 74, 94]) g.fillRect(x, 0, 8, 256);
+    g.fillStyle = '#e4e4de'; g.fillRect(6, 0, 3, 256); g.fillRect(119, 0, 3, 256);
+    g.fillStyle = '#e2b43a'; g.fillRect(62, 0, 4, 110);
+    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  _roadMesh() {
+    const pos = [], uv = [], nrm = [], idx = [], E = EDGE_MARGIN;
+    const inCity = p => p[0] > -E && p[1] > -E && p[0] < CITY + E && p[1] < CITY + E;
+    for (const R of Island.roads) {
+      let prev = -1;
+      for (let k = 0; k < R.pts.length; k++) {
+        const p = R.pts[k];
+        // inside the city's square the ground shader paints the road (the local-roads raster); the ribbon starts at its edge
+        if (inCity(p) && inCity(R.pts[Math.min(R.pts.length - 1, k + 1)]) && inCity(R.pts[Math.max(0, k - 1)])) { prev = -1; continue; }
+        const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = (b[1] - a[1]) / l, nz = -(b[0] - a[0]) / l, base = pos.length / 3, y = R.y[k] + 0.035;
+        pos.push(p[0] + nx * R.w / 2, y, p[1] + nz * R.w / 2, p[0] - nx * R.w / 2, y, p[1] - nz * R.w / 2);
+        uv.push(0, R.cum[k] / 12, 1, R.cum[k] / 12); nrm.push(0, 1, 0, 0, 1, 0);
+        if (prev >= 0) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
+        prev = base;
+      }
+      // the turning circle at a dead end
+      if (R.ring) {
+        const c0 = pos.length / 3, y = R.y[R.y.length - 1] + 0.03, rr = R.ring.r + R.w / 2;
+        pos.push(R.ring.x, y, R.ring.z); uv.push(0.3, 0); nrm.push(0, 1, 0);
+        for (let q = 0; q <= 32; q++) { const an = q / 32 * Math.PI * 2; pos.push(R.ring.x + Math.cos(an) * rr, y, R.ring.z + Math.sin(an) * rr); uv.push(0.3, 0.6); nrm.push(0, 1, 0); if (q) idx.push(c0, c0 + q + 1, c0 + q); }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setIndex(idx); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+    m.receiveShadow = true; m.frustumCulled = false; m.name = 'isleRoads';
+    return m;
+  }
+  // ---------------------------------------------------------------- the bridge and the tunnel
+  _structures() {
+    const g = new GeoBuilder(), glow = new GeoBuilder(), group = new THREE.Group(), steel = C(0x23272c), conc = C(0x9a9c98), dark = C(0x3a3c40);
+    const seg = (a, b, w, hgt, yOff, col) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz), pitch = Math.atan2(b[2] - a[2], L); g.add(TPL.box, M((a[0] + b[0]) / 2, (a[2] + b[2]) / 2 + yOff, (a[1] + b[1]) / 2, w, hgt, Math.hypot(L, b[2] - a[2]) + 0.05, Math.atan2(dx, dz), -pitch), col); };
+    for (const R of Island.roads) {
+      const P3 = k => [R.pts[k][0], R.pts[k][1], R.y[k]];
+      for (const [k0, k1] of R.bridges) {
+        const span = R.cum[k1] - R.cum[k0], big = span > 300;
+        for (let k = k0; k < k1; k++) seg(P3(k), P3(k + 1), R.w + 1.6, 1.1, -0.58, conc);
+        // piers down to the bed, a little under 50 m apart
+        const np = Math.max(1, Math.round(span / 48));
+        for (let q = 1; q < np; q++) { const k = Math.round(k0 + (k1 - k0) * q / np), p = P3(k), bed = Island.base0(p[0], p[1]); g.add(TPL.box, M(p[0], (p[2] - 1.1 + bed - 1) / 2, p[1], 2.4, p[2] - 1.1 - bed + 1, R.w * 0.7, Math.atan2(R.pts[k + 1][0] - p[0], R.pts[k + 1][1] - p[1])), conc); }
+        if (big) for (const T of this.world.isle.towers || []) if (T.road === R) {
+          // a tower: two legs, portal beams, a red light on each; the main cables and their hangers
+          for (const L of T.legs) { g.add(TPL.box, M(L.x, (T.top + T.bed) / 2, L.z, 3, T.top - T.bed, 3.4, T.h), steel); glow.add(TPL.sphere0, M(L.x, T.top + 0.7, L.z, 0.6, 0.6, 0.6), C(0xff2a2a)); }
+          for (const yy of [T.deck + 9, T.top - 4]) g.add(TPL.box, M(T.x, yy, T.z, R.w + 6, 2.2, 2.6, T.h), steel);
+        }
+        if (big) {
+          const TT = (this.world.isle.towers || []).filter(T => T.road === R).sort((a, b) => a.k - b.k);
+          if (TT.length === 2) for (const side of [-1, 1]) {
+            const off = R.w / 2 + 1.2, at = k => { const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [R.pts[k][0] + (b[1] - a[1]) / l * off * side, R.pts[k][1] - (b[0] - a[0]) / l * off * side, R.y[k]]; };
+            // the cable's height over the deck: from the anchorages up to each tower's top, sagging to 4 m at mid-span
+            const hgt = k => { const [A, B] = TT; if (k <= A.k) return lerp(1.2, A.top - A.deck, ((k - k0) / Math.max(1, A.k - k0)) ** 1.6); if (k >= B.k) return lerp(1.2, B.top - B.deck, ((k1 - k) / Math.max(1, k1 - B.k)) ** 1.6); const u = (k - A.k) / (B.k - A.k) * 2 - 1; return 4 + (A.top - A.deck - 4) * u * u; };
+            for (let k = k0; k < k1; k++) { const a = at(k), b = at(k + 1); a[2] += hgt(k); b[2] += hgt(k + 1); seg(a, b, 0.5, 0.5, 0, steel); if ((k - k0) % 4 === 2) { const p = at(k), hh = hgt(k); if (hh > 2) g.add(TPL.box, M(p[0], p[2] + hh / 2, p[1], 0.14, hh, 0.14), steel); } }
+          }
+        }
+      }
+      // parapets along every span's rails; the tunnel's walls, roof and lights
+      if (R.tunnel) {
+        const [k0, k1] = R.tunnel, a0 = Math.max(0, k0 - 2), a1 = Math.min(R.pts.length - 1, k1 + 2), wl = R.w / 2 + 1.1;
+        for (let k = a0; k < a1; k++) {
+          const a = P3(k), b = P3(k + 1), dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = dz / L, nz = -dx / L;
+          for (const s of [-1, 1]) seg([a[0] + nx * wl * s, a[1] + nz * wl * s, a[2]], [b[0] + nx * wl * s, b[1] + nz * wl * s, b[2]], 0.6, 6.6, 3.2, dark);
+          seg(a, b, R.w + 2.8, 0.6, 6.7, dark);
+          if (k % 4 === 0) glow.add(TPL.box, M(a[0], a[2] + 6.3, a[1], 1.6, 0.12, 0.5, Math.atan2(dx, dz)), C(0xffe2a8));
+        }
+        // the portals: two piers and a lintel in front of each mouth
+        for (const [k, dir] of [[a0, 1], [a1, -1]]) {
+          const p = P3(k), q = P3(k + dir), h = Math.atan2(q[0] - p[0], q[1] - p[1]), fx = Math.sin(h), fz = Math.cos(h), rx = fz, rz = -fx;
+          for (const s of [-1, 1]) g.add(TPL.box, M(p[0] + rx * s * (R.w / 2 + 3.4), p[2] + 4.5, p[1] + rz * s * (R.w / 2 + 3.4), 4.6, 9.6, 1.6, h), conc);
+          g.add(TPL.box, M(p[0], p[2] + 8.6, p[1], R.w + 11.4, 3.4, 1.6, h), conc);
+          const sgn = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.5), new THREE.MeshBasicMaterial({ map: makeSignTexture('BLACKGATE TUNNEL', '#14181c', '#ffffff', 1024, 118) }));
+          sgn.position.set(p[0] - fx * 0.85, p[2] + 8.6, p[1] - fz * 0.85); sgn.rotation.y = h + Math.PI; group.add(sgn);
+        }
+      }
+    }
+    for (const r of this.world.isle.rails) if (r.kind === 1) for (let k = 0; k < r.line.length - 1; k++) seg(r.line[k], r.line[k + 1], 0.3, 1.0, 0.5, conc);
+    if (!g.empty) { const m = new THREE.Mesh(g.build(), makePropMaterial(0.85, 0.1)); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; group.add(m); }
+    if (!glow.empty) { const m = new THREE.Mesh(glow.build(), new THREE.MeshBasicMaterial({ vertexColors: true })); m.frustumCulled = false; group.add(m); }
+    group.name = 'isleStruct';
+    return group;
+  }
+  // ---------------------------------------------------------------- the airfield and the proving ground: surfaces and paint
+  _paint() {
+    const g = new GeoBuilder(), group = new THREE.Group(), A = AIRPORT, Y = A.y, asph = C(0x2e3034), conc = C(0x8f918e), white = C(0xe8e8e2), yel = C(0xe2b43a), lot = C(0x3a3c40);
+    const slab = (x0, z0, x1, z1, y, col, lift = 0.03) => g.add(TPL.box, M((x0 + x1) / 2, y + lift - 0.05, (z0 + z1) / 2, x1 - x0, 0.1, z1 - z0), col);
+    const label = (text, x, y, z, w, h, ry, fg = '#e8e8e2') => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: makeSignTexture(text, '#2e3034', fg, 512, Math.round(512 * h / w)), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 })); m.rotation.set(-Math.PI / 2, 0, ry); m.position.set(x, y + 0.07, z); group.add(m); };
+    // the apron, the taxiway and its links to both runways, the runways with their centre lines, edges and thresholds
+    slab(A.apron.x0, A.apron.z0, A.apron.x1, A.apron.z1, Y, conc);
+    slab(A.tw.x0, A.tw.z - A.tw.w / 2, A.tw.x1, A.tw.z + A.tw.w / 2, Y, asph);
+    slab(A.tw.x0, A.tw.z - 0.2, A.tw.x1, A.tw.z + 0.2, Y, yel, 0.05);
+    for (const lx of A.links) { slab(lx - 9, A.apron.z1, lx + 9, A.rw[0].z - A.rw[0].w / 2, Y, asph, 0.025); slab(lx - 0.2, A.apron.z1, lx + 0.2, A.rw[0].z - A.rw[0].w / 2, Y, yel, 0.05); }
+    for (const r of A.rw) {
+      slab(r.x0, r.z - r.w / 2, r.x1, r.z + r.w / 2, Y, asph, 0.04);
+      for (let x = r.x0 + 150; x < r.x1 - 150; x += 60) slab(x, r.z - 0.45, x + 30, r.z + 0.45, Y, white, 0.06);
+      for (const s of [-1, 1]) slab(r.x0, r.z + s * (r.w / 2 - 1.2) - 0.45, r.x1, r.z + s * (r.w / 2 - 1.2) + 0.45, Y, white, 0.06);
+      for (const [x, d] of [[r.x0 + 8, 1], [r.x1 - 8, -1]]) for (let q = 0; q < 8; q++) { const z = r.z + (q - 3.5) * (r.w - 6) / 8; slab(Math.min(x, x + d * 30), z - 0.9, Math.max(x, x + d * 30), z + 0.9, Y, white, 0.06); }
+      label(r.id.split('/')[0], r.x0 + 62, Y, r.z, 18, 12, -Math.PI / 2); label(r.id.split('/')[1], r.x1 - 62, Y, r.z, 18, 12, Math.PI / 2);
+    }
+    // the helipads' circles, the stands' lead-in lines, the car park and its bays
+    for (const h of this.world.isle.sites.helipads) { for (let q = 0; q < 28; q++) { const a = q / 28 * Math.PI * 2; g.add(TPL.box, M(h.x + Math.cos(a) * 7, Y + 0.02, h.z + Math.sin(a) * 7, 1.6, 0.1, 0.45, -a + Math.PI / 2), yel); } label('H', h.x, Y, h.z, 6, 6, 0); }
+    for (const x of [1023, 1079]) slab(x - 0.2, 1950, x + 0.2, A.apron.z1, Y, yel, 0.05);
+    const cp = this.world.isle.sites.carpark; slab(cp.x0, cp.z0, cp.x1, cp.z1, Y, lot);
+    for (let r = 0; r < 3; r++) for (let k = 0; k <= 11; k++) slab(304.4 + k * 15, 1857 + r * 22, 304.7 + k * 15, 1867 + r * 22, Y, white, 0.05);
+    // hangar floors
+    for (const H of this.world.isle.sites.hangars) slab(H.x0, H.z0, H.x1, A.apron.z0, Y, conc, 0.025);
+    // the proving ground: the strip and its lanes, the skid pad's rings, the slalom lot
+    const G = PROVING, S = G.strip, GY = G.y;
+    slab(S.x0, S.z - S.w / 2, S.x1, S.z + S.w / 2, GY, asph, 0.04);
+    for (const s of [-1, 0, 1]) for (let x = S.x0 + 4; x < S.x1 - 8; x += s ? 1e9 : 24) slab(x, S.z + s * (S.w / 2 - 0.8) - 0.2, s ? S.x1 : x + 10, S.z + s * (S.w / 2 - 0.8) + 0.2, GY, white, 0.06);
+    slab(S.x0 + 19.4, S.z - S.w / 2, S.x0 + 20.6, S.z + S.w / 2, GY, white, 0.06); slab(S.x0 + 1019.4, S.z - S.w / 2, S.x0 + 1020.6, S.z + S.w / 2, GY, white, 0.06);
+    g.add(TPL.disc, M(G.pad.x, GY + 0.04, G.pad.z, G.pad.r, 1, G.pad.r), asph);
+    for (const rr of [18, 34, G.pad.r - 2]) for (let q = 0; q < 48; q++) { const a = q / 48 * Math.PI * 2; g.add(TPL.box, M(G.pad.x + Math.cos(a) * rr, GY + 0.02, G.pad.z + Math.sin(a) * rr, rr * 0.09, 0.1, 0.3, -a + Math.PI / 2), white); }
+    slab(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, GY, asph, 0.04);
+    slab(1196, 1503, 1204, S.z - S.w / 2, GY, asph, 0.035);
+    const m = new THREE.Mesh(g.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+    m.receiveShadow = true; m.frustumCulled = false; group.add(m); group.name = 'islePaint';
+    return group;
   }
 }
 /* =====================================================================
@@ -41520,6 +42631,8 @@ class Player {
     let speed = this.ads ? 2.6 : this.aiming ? (walking ? 1.8 : 3.9) : wantSprint ? SPRINT_SPEED + up.stamina * 0.3 : walking ? 1.8 : 4.4;
     if (this.blocking) speed = Math.min(speed, 1.6);
     if (this.attackT > 0 && this.wep.melee) speed *= 0.45;
+    // wading (the island's sea, 022): the deeper you stand in it, the slower you go
+    if (this.pos.y < SEA_Y - 0.25 && !this.interior) speed *= lerp(0.8, 0.38, clamp((SEA_Y - 0.25 - this.pos.y) / (ISLE.wade - 0.25), 0, 1));
     const stunned = this.knockT > 0;
     let tvx = dx * speed * (mv.mag > 0.05 ? 1 : 0), tvz = dz * speed * (mv.mag > 0.05 ? 1 : 0);
     if (stunned) { tvx = 0; tvz = 0; }
@@ -42080,6 +43193,8 @@ function profileTopAt(pts, z) {
 function vehicleGeometry(type) {
   if (VEH_GEO[type]) return VEH_GEO[type];
   const s = VEHICLES[type], pr = PROFILES[s.profile];
+  // a body of its own (232): the open-wheeler, the aeroplane, the helicopter
+  if (s.build) return VEH_GEO[type] = ISLE_BUILD[s.build](type);
   const g = new GeoBuilder({ part: true });
   const W = s.w, R = s.wheelR, wb = s.l * 0.6;
   const zs = pr.body.map(p => p[0]), ys = pr.body.map(p => p[1]);
@@ -42177,6 +43292,14 @@ function vehicleGeometry(type) {
     g.box(0.32, cabTop + 0.18, (cabF + cabR) / 2 - 0.05, 0.5, 0.12, 0.26, null, 0, { part: 8 });
     for (const sx of [-1, 1]) g.box(sx * (W / 2 + 0.04), (yb + belt) / 2 + 0.06, 0.15, 0.03, 0.34, 2.0, null, 0, { part: 10 });
     g.box(0, yb + 0.3, zf + 0.2, W * 0.7, 0.3, 0.12, null, 0, { part: 2 });
+  }
+  if (s.ems) {
+    // an ambulance (1) or a fire engine (2): a light bar over the cab, a stripe down each flank, the engine's ladder (232)
+    const tr = s.profile === 'truck', ly = tr ? 2.56 : 2.27, lz = tr ? 1.95 : 0.9;
+    g.box(0, ly, lz, W * 0.7, 0.1, 0.3, null, 0, { part: 2 });
+    g.box(-W * 0.2, ly + 0.1, lz, W * 0.3, 0.12, 0.26, null, 0, { part: 7 }); g.box(W * 0.2, ly + 0.1, lz, W * 0.3, 0.12, 0.26, null, 0, { part: tr ? 7 : 8 });
+    for (const sx of [-1, 1]) g.box(sx * (W / 2 + 0.02), tr ? 1.5 : 1.25, -0.3, 0.02, 0.26, s.l * 0.62, null, 0, { part: 10 });
+    if (tr) { for (const sx of [-0.42, 0.42]) g.box(sx, 3.36, -0.9, 0.08, 0.1, 5.4, null, 0, { part: 3 }); for (let k = 0; k < 9; k++) g.box(0, 3.36, -3.3 + k * 0.6, 0.84, 0.05, 0.06, null, 0, { part: 3 }); }
   }
   if (s.unmarked) { // hidden grille strobes and a push bar
     g.box(-0.2, frontTop - 0.25, zf + 0.09, 0.14, 0.06, 0.02, null, 0, { part: 7 });
@@ -42442,6 +43565,8 @@ class Vehicle {
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector2();
     this.ctl = { throttle: 0, steer: 0, handbrake: false };
     this.circles = Math.max(2, Math.round(this.spec.l / this.spec.w));
+    // an aircraft (232): its flight state, its propeller or rotors
+    this.air = null; if (this.spec.air) { Flight.init(this); this.rotors = makeRotors(this); }
   }
   reset(x, z, h, opts = {}) {
     const s = this.spec;
@@ -42466,6 +43591,7 @@ class Vehicle {
     this.mat.userData.u.uPaint2.value.setHex(s.police ? 0xf4f6f7 : s.paint2 !== undefined ? s.paint2 : 0xffffff);
     this.mat.userData.u.uMisc.value.set(0, 0, 0, 0);
     this.restoreGeo();
+    if (this.spec.air) Flight.init(this);
     this.colorHex = col;
     this.setTier(opts.vtier || (opts.parked || opts.kinematic ? (beaterRoll(this.type, x, z, opts.beaterSeed) ? 'beater' : s.tier) : s.tier));
     this.syncMesh(0);
@@ -42505,7 +43631,11 @@ class Vehicle {
   step(dt, game) {
     const s = this.spec;
     if (this.sleep) return;
+    if (this.air) return Flight.step(this, dt, game);
     if (this.hitT > 0) this.hitT -= dt;
+    // in the sea (022: deeper than the sills): the water takes the speed off and most of the engine with it
+    const wet = this.pos.y < SEA_Y - 0.55 && !this.airborne;
+    if (wet) { const k = Math.exp(-1.7 * dt); this.vel.x *= k; this.vel.y *= k; }
     // the Cedar Fields terrain under the car (Session 6C): grip, rolling drag and bumps by surface (null off it)
     const te = this.airborne ? null : Terrain.effect(this.pos.x, this.pos.z, this.trail);
     if (this.dirt < 1) this.dirt = Math.min(1, this.dirt + this.speed * dt * DIRT_PER_M * (te ? (te.s === TSURF.mud ? 12 : 4) : 1));
@@ -42527,7 +43657,7 @@ class Vehicle {
     let vf = this.vel.x * fx + this.vel.y * fz, vl = this.vel.x * rx + this.vel.y * rz;
     const ctl = this.ctl;
     const disabled = this.burnt || this.health <= 0;
-    const thr = disabled ? 0 : ctl.throttle;
+    const thr = disabled ? 0 : ctl.throttle * (wet ? 0.3 : 1);
     // damage stages (see VEH_STAGES): power fades as the car gets beaten up
     const hpK = this.health > VEH_T.smoke ? 1 : this.health > VEH_T.heavy ? 0.92 : this.health > VEH_T.critical ? 0.76 : 0.55;
     const isPlayer = this.driver === 'player';
@@ -42639,6 +43769,8 @@ class Vehicle {
   // (bodyOff) and weight-transfer tilt on top, and the wheels are drawn at their contact points but
   // never further than the suspension travel from their arches (see VehicleManager.render).
   ground(dt) {
+    // an aircraft keeps its own height (232): set down where it stands on a placement, its wheels' contacts otherwise
+    if (this.air) { if (dt > 0) Flight.wheels(this, this.vm.game.world); else Flight.place(this, this.vm.game.world); return; }
     const W = this.vg.wheels, wbase = W[0][1] - W[2][1], track = W[0][0] - W[1][0];
     const ref = this.pos.y;
     const h = this._sampleWheels(ref), wr = this._wr;
@@ -42719,7 +43851,8 @@ class Vehicle {
     this.pitchG = clamp(this.pitchG, -0.9, 0.9);
   }
   // body transform from the physics state (render only; no simulation here)
-  pose() {
+  pose(dt) {
+    if (this.air) return Flight.pose(this, dt);
     this.mesh.position.set(this.pos.x, this.pos.y + this.bodyOff + (this.planeOff || 0), this.pos.z);
     // weight transfer adds a little dive / squat and lean on top of the chassis attitude; small
     // enough that the arches always clear the tyres
@@ -42757,6 +43890,246 @@ class Vehicle {
   }
 }
 
+/* =====================================================================
+   [CORE+CONTENT] THE ISLAND'S VEHICLES (Operation Blackgate)
+   - Competition cars (the Valen Point pits and paddock, the proving
+     ground): a GT racer, a cup car, a prototype, an open-wheeler, a rally
+     car, a drift car. Track property: they can be taken and driven, not
+     kept (no cargo class, no chop value, never in a collection).
+   - Emergency vehicles: an ambulance and a fire engine (the horn works
+     their lights).
+   - Aircraft: the Skylark (a light aeroplane) and the Kestrel helicopter
+     in three liveries. They are vehicles like any other (you walk up,
+     get in, steal them) with their own geometry, a spinning propeller or
+     rotors, and flight physics of their own in place of the car's
+     (Flight, below): the aeroplane needs a take-off run and stalls when
+     it is slow; the helicopter spools up, lifts straight off and hovers.
+   ===================================================================== */
+Object.assign(VEHICLES, {
+  gt3: { rev: 0.33, name: 'Zephyr GT3', l: 4.55, w: 2.02, h: 1.14, mass: 1240, power: 21500, drift: 0.06, vmax: 88, steer: 0.56, grip: 1.66, brake: 22, soft: 0.4, wheelR: 0.35, camDist: 6.4, camH: 1.5, eng: 1.8, price: 0, profile: 'super', wing: 'swan', louvers: true, dualExhaust: true, tier: 'sport', fleet: true, race: 'GT',
+    colors: [0xc8102e, 0x1c3f94, 0xf2c230, 0xeeeeee], blurb: 'A Zephyr with everything road-legal taken off it.' },
+  cup: { rev: 0.36, name: 'Apex Cup', l: 4.05, w: 1.86, h: 1.4, mass: 1050, power: 12500, drift: 0.08, vmax: 70, steer: 0.62, grip: 1.55, brake: 20, soft: 0.5, wheelR: 0.33, camDist: 6.0, camH: 1.65, eng: 1.55, price: 0, profile: 'hothatch', wing: 'roof', tier: 'sport', fleet: true, race: 'Cup',
+    colors: [0x2a6fd6, 0xf39c12, 0x27ae60, 0xeeeeee], blurb: 'One-make cup racer: a roll cage, slicks and no back seat.' },
+  lmp: { rev: 0.32, name: 'Halcyon LMP', l: 4.7, w: 2.0, h: 1.04, mass: 930, power: 22500, drift: 0.04, vmax: 96, steer: 0.56, grip: 1.8, brake: 24, soft: 0.35, wheelR: 0.35, camDist: 6.6, camH: 1.45, eng: 1.9, price: 0, profile: 'hyper', wing: 'swan', sideIntakes: true, tier: 'sport', fleet: true, race: 'Prototype',
+    colors: [0x17202a, 0xe8e8e8, 0xc8102e], blurb: 'An endurance prototype. It makes its grip from the air.' },
+  formula: { rev: 0.3, name: 'Valen FR-1', l: 4.7, w: 1.9, h: 1.0, mass: 720, power: 19500, drift: 0.03, vmax: 92, steer: 0.6, grip: 1.95, brake: 26, soft: 0.3, wheelR: 0.33, camDist: 6.0, camH: 1.35, eng: 2.0, price: 0, profile: 'roadster', build: 'formula', tier: 'sport', fleet: true, race: 'Open-wheel',
+    colors: [0xc8102e, 0x1c3f94, 0xf2c230, 0x111418], blurb: 'Open wheels, wings front and rear, one seat.' },
+  rally: { rev: 0.38, name: 'Mesa RX', l: 4.1, w: 1.88, h: 1.46, mass: 1180, power: 13800, drift: 0.28, vmax: 66, steer: 0.62, grip: 1.34, brake: 18, soft: 1.25, wheelR: 0.35, camDist: 6.1, camH: 1.75, eng: 1.5, price: 0, profile: 'hothatch', wing: 'roof', scoop: true, tier: 'sport', fleet: true, race: 'Rally',
+    colors: [0x1c3f94, 0xeeeeee, 0xd8a227], blurb: 'Long springs, short gears. As quick on gravel as on the road.' },
+  drift: { rev: 0.35, name: 'Brakken Drift', l: 4.8, w: 1.92, h: 1.28, mass: 1450, power: 17500, drift: 0.62, vmax: 70, steer: 0.6, grip: 1.0, brake: 15, soft: 0.8, wheelR: 0.35, camDist: 6.6, camH: 1.7, eng: 0.74, price: 0, profile: 'muscle', wing: 'lip', scoop: true, tier: 'sport', fleet: true, race: 'Drift',
+    colors: [0x8e44ad, 0x17202a, 0xf39c12], blurb: 'More lock, more power, less grip: it goes sideways on purpose.' },
+  ambulance: { rev: 0.45, name: 'St. Alda Ambulance', l: 5.4, w: 2.05, h: 2.35, mass: 2700, power: 11500, drift: 0.04, vmax: 48, steer: 0.48, grip: 0.9, brake: 11, soft: 1.5, wheelR: 0.38, camDist: 8.2, camH: 2.5, eng: 0.75, price: 0, profile: 'van', ems: 1, paint2: 0xd02a3a, tier: 'nice', fleet: true,
+    colors: [0xf2f4f6], blurb: 'Lights, a siren and right of way.' },
+  firetruck: { rev: 0.5, name: 'Engine 9', l: 7.4, w: 2.4, h: 3.2, mass: 7800, power: 30000, drift: 0.04, vmax: 38, steer: 0.42, grip: 0.82, brake: 9, soft: 1.4, wheelR: 0.5, camDist: 11.5, camH: 3.7, eng: 0.48, price: 0, profile: 'truck', ems: 2, paint2: 0xe8e8e8, armorK: 1.5, tier: 'nice', fleet: true,
+    colors: [0xc8102e], blurb: 'Eight tonnes of pump and ladder.' },
+  // aircraft: l and w are the fuselage (what the collision circles cover); flight: the numbers Flight flies them by
+  skylark: { rev: 0.5, name: 'Skylark 180', l: 7.4, w: 1.9, h: 2.7, mass: 1100, power: 0, drift: 0, vmax: 78, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.24, camDist: 15, camH: 3.3, eng: 0.9, price: 0, profile: 'sedan', build: 'plane', air: 'plane', tier: 'nice', fleet: true, armorK: 0.7,
+    flight: { thrust: 6.4, drag: 0.00105, vStall: 25, pitchRate: 0.95, rollRate: 1.9, align: 2.6, span: 10.8 },
+    colors: [0xf2f4f6, 0xf2c230, 0xc8102e, 0x2a6fd6], paint2: 0x1c3f94, blurb: 'Four seats, one propeller, 180 horsepower: the island from above.' },
+  heli: { rev: 0.5, name: 'Kestrel', l: 6.6, w: 2.2, h: 3.3, mass: 1500, power: 0, drift: 0, vmax: 58, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.2, camDist: 13.5, camH: 3.4, eng: 0.6, price: 0, profile: 'sedan', build: 'heli', air: 'heli', noWheels: true, tier: 'nice', fleet: true, armorK: 0.7,
+    flight: { climb: 9, sink: 8, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
+    colors: [0x17202a, 0xc8102e, 0x2a6fd6], paint2: 0xe8e8e8, blurb: 'A light turbine helicopter. Lands on a roof, a beach or a traffic island.' }
+});
+VEHICLES.medevac = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Medevac', colors: [0xf2f4f6], paint2: 0xd02a3a, blurb: 'St. Alda’s air ambulance.' });
+VEHICLES.polheli = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Air Unit', colors: [0x14233f], paint2: 0xf4f6f7, polAir: true, blurb: 'The department’s eye in the sky.' });
+TRAIL.rally = 0.75;
+// custom bodies (a spec's `build`): the profile extruder cannot make an open-wheeler or anything with wings
+const ISLE_BUILD = {
+  formula(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), R = s.wheelR, P = part => ({ part });
+    const tube = (x, y, z, r, len, part, rx = Math.PI / 2, tpl = TPL.cyl) => g.add(tpl, M(x, y, z, r, len, r, 0, rx), null, P(part));
+    // the tub and the engine cover, the nose and its cone, the airbox, the cockpit's rim and the driver's helmet
+    g.box(0, 0.42, -0.1, 0.92, 0.42, 2.5, null, 0, P(0)); g.box(0, 0.6, -1.2, 0.66, 0.5, 1.5, null, 0, P(0)); g.box(0, 0.4, 1.55, 0.5, 0.26, 1.2, null, 0, P(0));
+    tube(0, 0.36, 2.5, 0.2, 0.8, 0, Math.PI / 2, TPL.cone); g.box(0, 0.98, -0.75, 0.3, 0.3, 0.5, null, 0, P(10));
+    g.box(0, 0.66, 0.22, 0.6, 0.1, 0.9, null, 0, P(2)); g.add(TPL.sphere, M(0, 0.86, 0.1, 0.16, 0.17, 0.2), null, P(10));
+    // side pods, the floor, the wings (two elements at the rear on end plates), the rain light
+    for (const sx of [-1, 1]) { g.box(sx * 0.68, 0.38, -0.35, 0.44, 0.34, 1.7, null, 0, P(0)); g.box(sx * 0.68, 0.38, 0.52, 0.4, 0.26, 0.08, null, 0, P(15)); g.box(sx * 0.78, 0.62, -2.05, 0.04, 0.56, 0.6, null, 0, P(10)); g.box(sx * 0.86, 0.2, 2.42, 0.04, 0.2, 0.52, null, 0, P(10)); }
+    g.box(0, 0.12, -0.2, 1.5, 0.05, 3.4, null, 0, P(14)); g.box(0, 0.16, 2.42, 1.76, 0.04, 0.46, null, 0, P(10)); g.box(0, 0.24, 2.3, 1.7, 0.03, 0.22, null, 0, P(0));
+    g.box(0, 0.86, -2.05, 1.56, 0.04, 0.44, null, 0, P(10)); g.box(0, 0.7, -2.15, 1.56, 0.03, 0.3, null, 0, P(0)); g.box(0, 0.34, -2.34, 0.12, 0.1, 0.06, null, 0, P(5));
+    // suspension arms out to the open wheels
+    const wb = 3.0, tr = s.w / 2 - 0.16;
+    for (const z of [wb / 2, -wb / 2]) for (const sx of [-1, 1]) for (const dz of [-0.22, 0.22]) g.add(TPL.box, M(sx * (tr + 0.35) / 2 + sx * 0.1, R + 0.04, z + dz / 2, tr - 0.5, 0.035, 0.05, sx * dz * 0.5), null, P(2));
+    const geo = g.build(); creaseNormals(geo, [0, 10]);
+    return { geo, lod: geo, wheels: [[tr, wb / 2], [-tr, wb / 2], [tr, -wb / 2], [-tr, -wb / 2]], yb: 0.12, zf: 2.9, zr: -2.4, frontTop: 0.5, rearTop: 0.9, cabTop: 1.0 };
+  },
+  plane(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), Y = 1.36, span = s.flight.span;
+    const tube = (x, y, z, rx0, len, rz0, part, rx = Math.PI / 2, tpl = TPL.cyl) => g.add(tpl, M(x, y, z, rx0, len, rz0, 0, rx), null, P(part));
+    // the cabin, the cowl and spinner, the tail cone; the windscreen and side windows as one glasshouse under the wing
+    tube(0, Y, 0.35, 0.74, 3.3, 0.8, 0); tube(0, Y - 0.04, 2.55, 0.62, 1.2, 0.66, 0); tube(0, Y, 3.36, 0.24, 0.5, 0.24, 3, Math.PI / 2, TPL.cone);
+    tube(0, Y + 0.08, -3.2, 0.7, 3.9, 0.72, 0, -Math.PI / 2, TPL.cone);
+    g.box(0, Y + 0.62, 0.75, 1.22, 0.56, 2.0, null, 0, P(1)); g.box(0, Y + 0.93, 0.7, 1.3, 0.08, 2.2, null, 0, P(0));
+    // the high wing with coloured tips, its struts, the tailplane and the fin with its rudder stripe
+    g.box(0, Y + 1.0, 0.55, span, 0.15, 1.5, null, 0, P(0));
+    for (const sx of [-1, 1]) { g.box(sx * (span / 2 - 0.45), Y + 1.0, 0.55, 0.9, 0.17, 1.54, null, 0, P(10)); g.add(TPL.box, M(sx * 1.7, Y + 0.4, 0.6, 0.07, 2.6, 0.12, 0, 0, sx * 1.02), null, P(2)); }
+    g.box(0, Y + 0.2, -4.75, 3.5, 0.09, 0.95, null, 0, P(0)); g.add(TPL.box, M(0, Y + 0.95, -4.7, 0.11, 1.6, 1.15, 0, -0.28), null, P(10));
+    // the undercarriage: two main legs and a nose leg (the wheels themselves are the manager's)
+    for (const sx of [-1, 1]) g.add(TPL.box, M(sx * 0.82, 0.62, 0.2, 0.09, 1.05, 0.16, 0, 0, -sx * 0.62), null, P(2));
+    g.box(0, 0.52, 2.4, 0.09, 0.72, 0.09, null, 0, P(2));
+    // the lamps: landing light in the cowl, red and green at the tips, a white tail light
+    g.box(0, Y - 0.38, 3.08, 0.2, 0.12, 0.06, null, 0, P(4)); g.box(span / 2 - 0.02, Y + 1.0, 0.55, 0.06, 0.1, 0.3, null, 0, P(5)); g.box(-span / 2 + 0.02, Y + 1.0, 0.55, 0.06, 0.1, 0.3, null, 0, P(12));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[0.13, 2.4], [-0.13, 2.4], [1.18, 0.2], [-1.18, 0.2]], yb: 0.6, zf: 3.6, zr: -5.2, frontTop: Y + 0.6, rearTop: Y + 0.8, cabTop: Y + 1.1 };
+  },
+  heli(type) {
+    const g = new GeoBuilder({ part: true }), P = part => ({ part });
+    // the cabin and its bubble, the engine cowl, the tail boom, the fin and tailplane, the mast, the skids
+    g.add(TPL.sphere, M(0, 1.5, 0.75, 1.06, 0.98, 1.85), null, P(0)); g.add(TPL.sphere, M(0, 1.62, 1.55, 0.98, 0.84, 1.18), null, P(1));
+    g.box(0, 2.42, 0.1, 1.06, 0.55, 2.0, null, 0, P(10)); g.add(TPL.cyl, M(0, 1.92, -3.3, 0.22, 4.8, 0.24, 0, Math.PI / 2), null, P(0));
+    g.add(TPL.box, M(0, 2.4, -5.5, 0.1, 1.5, 0.75, 0, -0.3), null, P(10)); g.box(0, 1.92, -4.9, 1.6, 0.07, 0.42, null, 0, P(0)); g.add(TPL.cyl6, M(0, 2.95, 0.15, 0.1, 0.55, 0.1), null, P(2));
+    for (const sx of [-1, 1]) { g.box(sx * 0.98, 0.06, 0.55, 0.1, 0.1, 3.3, null, 0, P(3)); for (const z of [1.5, -0.4]) g.add(TPL.box, M(sx * 0.78, 0.5, z, 0.07, 0.95, 0.07, 0, 0, -sx * 0.42), null, P(2)); }
+    // lamps: a nose light, a red beacon under the boom, the police unit's and the air ambulance's flashers on the belly
+    g.box(0, 0.86, 2.36, 0.24, 0.14, 0.08, null, 0, P(4)); g.box(0, 1.6, -5.72, 0.08, 0.1, 0.06, null, 0, P(5)); g.box(-0.3, 0.6, 0.6, 0.3, 0.1, 0.3, null, 0, P(7)); g.box(0.3, 0.6, 0.6, 0.3, 0.1, 0.3, null, 0, P(8));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[0.9, 1.5], [-0.9, 1.5], [0.9, -0.5], [-0.9, -0.5]], yb: 0.5, zf: 2.6, zr: -5.9, frontTop: 1.6, rearTop: 2.2, cabTop: 2.7 };
+  }
+};
+// the spinning parts (children of the body's mesh): a propeller, or a main and a tail rotor, each with a faint disc
+function makeRotors(v) {
+  const s = v.spec, steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 }), disc = new THREE.MeshBasicMaterial({ color: 0x1a1c20, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const R = {}, blur = r => new THREE.Mesh(new THREE.CircleGeometry(r, 24), disc);
+  if (s.air === 'plane') {
+    const hub = new THREE.Group(); hub.position.set(0, 1.36, 3.5);
+    hub.add(new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.17, 0.05), steel)); hub.add(blur(1.0));
+    v.mesh.add(hub); R.main = hub; R.axis = 'z'; R.disc = disc;
+  } else {
+    const hub = new THREE.Group(); hub.position.set(0, 3.24, 0.15);
+    for (const a of [0, Math.PI / 2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(s.flight.rotor * 2, 0.05, 0.3), steel); b.rotation.y = a; hub.add(b); }
+    const d = blur(s.flight.rotor); d.rotation.x = -Math.PI / 2; hub.add(d);
+    const tail = new THREE.Group(); tail.position.set(0.2, 2.42, -5.62);
+    tail.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.3, 0.14), steel)); const d2 = blur(0.66); d2.rotation.y = Math.PI / 2; tail.add(d2);
+    v.mesh.add(hub); v.mesh.add(tail); R.main = hub; R.tail = tail; R.axis = 'y'; R.disc = disc;
+  }
+  return R;
+}
+/* ---------------- Flight: the aircraft's physics in place of the car's ----------------
+   v.air: { on (engine / rotor, 0..1), thr (the aeroplane's throttle), vy, pitch (nose up +), bank (right wing down +),
+   grounded, agl (height over what is under it) }. v.vel stays the horizontal velocity, so everything that reads a
+   vehicle's speed and position still works; v.airborne stays false (that flag is the car's jump). */
+const Flight = {
+  G: 14,
+  _q: [], _res: {},
+  init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
+  // what an aircraft at height y over (x, z) would come down on: the ground or a deck at its level, or a roof below it
+  ground(world, x, z, y) {
+    let g = groundY(x, z, y + 0.5, 1.5);
+    for (const c of world.grid.query(x - 0.5, z - 0.5, x + 0.5, z + 0.5, this._q)) if (c.kind === 'bld' && c.x0 !== undefined && x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1 && c.y1 <= y + 1.2 && c.y1 > g) g = c.y1;
+    return g;
+  },
+  // set down where it stands (a spawn, a reset)
+  place(v, world) { const A = v.air; v.pos.y = this.ground(world, v.pos.x, v.pos.z, v.pos.y); A.vy = 0; A.pitch = 0; A.bank = 0; A.grounded = true; A.agl = 0; this.wheels(v, world); },
+  wheels(v, world) { const W = v.vg.wheels, c = Math.cos(v.h), s = Math.sin(v.h); for (let i = 0; i < 4; i++) v._wy[i] = v.air.grounded ? this.ground(world, v.pos.x + W[i][0] * c + W[i][1] * s, v.pos.z - W[i][0] * s + W[i][1] * c, v.pos.y) : -1e6; },
+  // a hard arrival: damage by how fast it came down (or what it flew into); beyond the limit it is a wreck
+  arrive(v, game, sink, limit, wreck) {
+    if (sink > limit) { v.hurt((sink - limit) * 16, 'land'); game.fx.sparks(v.pos.x, v.pos.y + 0.3, v.pos.z, 14); game.audio.play('crash', { x: v.pos.x, z: v.pos.z, k: clamp(sink / 14, 0.3, 1) }); if (v.driver === 'player') game.cam.shake(clamp(sink / 14, 0.2, 0.9)); }
+    else if (sink > 2) game.audio.play('thud', { x: v.pos.x, z: v.pos.z, gain: 0.6 });
+    if (wreck || v.health <= 0) { v.health = 0; game.fx.explodeVehicle(v); }
+  },
+  step(v, dt, game) {
+    const s = v.spec, A = v.air, F = s.flight, ctl = v.ctl, world = game.world, dead = v.burnt || v.health <= 0, flown = v.driver === 'player' && !dead;
+    if (!flown) { ctl.throttle = 0; ctl.steer = 0; ctl.pitch = 0; ctl.lift = 0; }
+    A.on = clamp(A.on + (flown ? dt / (s.air === 'heli' ? 2.6 : 1.4) : -dt / 3), 0, 1);
+    const h0 = v.h, gy = this.ground(world, v.pos.x, v.pos.z, v.pos.y);
+    let vx = v.vel.x, vz = v.vel.y, vy = A.vy;
+    const sh = Math.sin(v.h), ch = Math.cos(v.h);
+    if (s.air === 'plane') {
+      A.thr = flown ? clamp(A.thr + ctl.throttle * 0.6 * dt, 0, 1) : Math.max(0, A.thr - dt);
+      const cp = Math.cos(A.pitch), sp = Math.sin(A.pitch), fx = sh * cp, fy = sp, fz = ch * cp;
+      const speed = Math.hypot(vx, vy, vz), vf = vx * fx + vy * fy + vz * fz, q = clamp(vf / F.vStall, 0, 1.3), lift = Math.min(q * q, 1), auth = clamp(q, 0, 1);
+      const thrust = F.thrust * A.thr * A.on * (v.health > 45 ? 1 : 0.7);
+      if (A.grounded) {
+        // on its wheels: the ground carries it; the tyres hold it straight, the nose wheel steers, S brakes (and backs it up slowly)
+        let f = vx * sh + vz * ch, l = vx * -ch + vz * sh;
+        const te = Terrain.effect(v.pos.x, v.pos.z, 0), roll = 0.5 + (te ? te.drag * 2.5 : 0), braking = flown && ctl.throttle < -0.1 && A.thr <= 0.001;
+        f += (thrust - F.drag * f * Math.abs(f)) * dt;
+        const dec = (roll + (braking && f > 0.3 ? 9 : 0) + (flown ? 0 : 3)) * dt; f = Math.abs(f) <= dec ? 0 : f - Math.sign(f) * dec;
+        if (braking && f <= 0.3) f = Math.max(-3.5, f - 4 * dt);
+        l *= Math.exp(-9 * dt);
+        v.h += ctl.steer * clamp(f / 7, -1, 1) * (1.05 - 0.6 * auth) * dt;
+        const sh2 = Math.sin(v.h), ch2 = Math.cos(v.h); vx = sh2 * f - ch2 * l; vz = ch2 * f + sh2 * l; vy = 0;
+        // the nose comes up with the stick once there is air over the tail; it flies itself off a little above the stall
+        A.pitch = damp(A.pitch, clamp(ctl.pitch, 0, 1) * 0.2 * auth, 5, dt); A.bank = damp(A.bank, 0, 8, dt);
+        v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
+        if ((q >= 1 && A.pitch > 0.07) || q > 1.22) { A.grounded = false; v.pos.y += 0.06; vy = Math.max(1.2, f * Math.sin(A.pitch) * 0.7); }
+        v.braking = braking; v.spin += f * dt / s.wheelR; v.steer = damp(v.steer, ctl.steer * 0.5, 9, dt);
+      } else {
+        // in the air: thrust along the nose, drag against the path, the weight the wings do not carry, speed traded
+        // for height, the lift's sideways part in a bank
+        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp));
+        let ax = fx * thrust - vx * dr, ay = fy * thrust - vy * dr - this.G * (1 - lift), az = fz * thrust - vz * dr;
+        if (speed > 1) { const e = this.G * lift * vy / speed; ax -= vx / speed * e; ay -= vy / speed * e; az -= vz / speed * e; }
+        const side = this.G * lift * Math.sin(A.bank); ax -= ch * side; az += sh * side;
+        if (v.pos.y > 620) ay -= (v.pos.y - 620) * 0.06;
+        vx += ax * dt; vy += ay * dt; vz += az * dt;
+        // the wings pull the path round to where the nose points (not when they are stalled)
+        const sp2 = Math.hypot(vx, vy, vz), k = 1 - Math.exp(-F.align * lift * dt);
+        if (sp2 > 1 && vf > 0) { let nx = vx / sp2 + (fx - vx / sp2) * k, ny = vy / sp2 + (fy - vy / sp2) * k, nz = vz / sp2 + (fz - vz / sp2) * k; const nl = Math.hypot(nx, ny, nz) || 1; vx = nx / nl * sp2; vy = ny / nl * sp2; vz = nz / nl * sp2; }
+        // stick: roll and pitch by how much air there is; hands off, the wings level themselves; stalled, the nose drops
+        if (Math.abs(ctl.steer) > 0.05) A.bank = clamp(A.bank - ctl.steer * F.rollRate * (0.35 + 0.65 * auth) * dt, -1.2, 1.2); else A.bank = damp(A.bank, 0, 1.3, dt);
+        A.pitch = clamp(A.pitch + ctl.pitch * F.pitchRate * (0.3 + 0.7 * auth) * dt, -1.05, 1.05);
+        if (Math.abs(ctl.pitch) < 0.05) A.pitch = damp(A.pitch, clamp(A.pitch, -0.5, 0.5), 0.5, dt);
+        if (q < 0.9) A.pitch -= (0.9 - q) * 1.5 * dt;
+        v.h -= this.G * Math.tan(A.bank) / Math.max(vf, F.vStall * 0.8) * lift * dt;
+        v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y += vy * dt;
+        const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
+        if (v.pos.y <= g2) {
+          // touchdown: gently and wings level it is a landing; too hard, banked over or nose first, it is a crash
+          const sink = Math.max(0, -vy), bad = sink > 11 || Math.abs(A.bank) > 0.55 || A.pitch < -0.3 || (g2 < SEA_Y - 0.4);
+          v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 4.5, bad);
+        }
+        v.braking = false; v.spin += 6 * dt;
+      }
+    } else {
+      // the helicopter: collective up and down, the cyclic forward and back, the pedals turn it
+      const lifted = A.on > 0.9 && !dead;
+      let f = vx * sh + vz * ch, l = vx * -ch + vz * sh;
+      if (A.grounded) {
+        const dec = 12 * dt; f = Math.abs(f) <= dec ? 0 : f - Math.sign(f) * dec; l *= Math.exp(-10 * dt); vy = 0;
+        A.pitch = damp(A.pitch, 0, 6, dt); A.bank = damp(A.bank, 0, 6, dt);
+        if (lifted && ctl.lift > 0.1) { A.grounded = false; vy = 1.5; v.pos.y += 0.05; }
+        if (lifted) v.h += ctl.steer * F.yaw * 0.5 * dt;
+      } else {
+        if (lifted) {
+          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink; vy += clamp(want - vy, -11 * dt, 11 * dt);
+          const tf = ctl.throttle >= 0 ? ctl.throttle * s.vmax : ctl.throttle * F.vBack, acc = Math.abs(ctl.throttle) > 0.05 ? F.acc : 2.4;
+          f += clamp(tf - f, -acc * dt, acc * dt); l *= Math.exp(-1.8 * dt);
+          v.h += ctl.steer * F.yaw * (1 - 0.5 * clamp(Math.abs(f) / s.vmax, 0, 1)) * dt;
+          A.pitch = damp(A.pitch, -(clamp((tf - f) / 22, -1, 1) * 0.2 + f / s.vmax * 0.16), 4, dt);
+          A.bank = damp(A.bank, -ctl.steer * 0.36 * clamp(Math.abs(f) / 18, 0, 1), 3, dt);
+          if (v.pos.y > 520) vy -= (v.pos.y - 520) * 0.08 * dt * 10;
+        } else { vy -= this.G * dt; f *= Math.exp(-0.3 * dt); A.pitch = damp(A.pitch, -0.2, 1, dt); v.h += (1 - A.on) * 1.6 * dt; }
+      }
+      const sh2 = Math.sin(v.h), ch2 = Math.cos(v.h); vx = sh2 * f - ch2 * l; vz = ch2 * f + sh2 * l;
+      v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y += vy * dt;
+      const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
+      if (A.grounded) v.pos.y = g2;
+      else if (v.pos.y <= g2) { const sink = Math.max(0, -vy), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
+      v.braking = false;
+    }
+    // the island ends: a headwind that grows with every metre past the edge of the map turns it back
+    const ox = Math.max(ISLE.x0 - 300 - v.pos.x, 0) - Math.max(v.pos.x - ISLE.x1 - 300, 0), oz = Math.max(ISLE.z0 - 300 - v.pos.z, 0) - Math.max(v.pos.z - ISLE.z1 - 300, 0);
+    if (ox || oz) { vx += ox * 0.02 * dt * 10; vz += oz * 0.02 * dt * 10; if (v.driver === 'player' && (A.warn -= dt) <= 0) { A.warn = 8; game.ui.toast('Nothing out there but sea. Turn back.', 'warn'); } }
+    v.vel.set(vx, vz); A.vy = vy; A.agl = v.pos.y - gy;
+    v.yawRate = dt > 0 ? wrapPi(v.h - h0) / dt : 0;
+    v.rpm = damp(v.rpm, clamp(0.12 + A.on * (s.air === 'plane' ? 0.25 + A.thr * 0.6 : 0.62 + Math.abs(ctl.lift || 0) * 0.2), 0.1, 1), 4, dt);
+    v.gear = 1; v.reversing = false; v.slip = 0; v.skid = 0;
+    // asleep again once it stands with everything stopped
+    if (A.grounded && A.on <= 0 && Math.hypot(vx, vz) < 0.05 && v.driver === null && v.health > 0) { v.restT = (v.restT || 0) + dt; if (v.restT > 2) { v.sleep = true; v.vel.set(0, 0); } } else v.restT = 0;
+  },
+  // the body's attitude and the rotors' turn (render only)
+  pose(v, dt) {
+    const A = v.air, R = v.rotors;
+    v.mesh.position.set(v.pos.x, v.pos.y, v.pos.z);
+    v.mesh.rotation.set(-A.pitch, v.h, A.bank);
+    if (R) {
+      const w = A.on * (v.spec.air === 'plane' ? 34 + A.thr * 60 : 38) * (dt || 0);
+      if (R.axis === 'z') R.main.rotation.z += w; else { R.main.rotation.y += w; R.tail.rotation.x += w * 2.2; }
+      R.disc.opacity = clamp(A.on * 1.6 - 0.5, 0, 1) * 0.28;
+    }
+  },
+  // can you step out here? (On the ground, or low and slow enough to drop.)
+  canExit(v) { return v.air.grounded || (v.air.agl < 3 && v.speed < 9); }
+};
 /* =====================================================================
    [CORE] VEHICLE MANAGER (pools, wheels, collisions, parked cars, light pools)
    ===================================================================== */
@@ -43008,7 +44381,7 @@ class VehicleManager {
     const RM = this.rims, cnt = [0, 0, 0, 0]; let nb = 0;
     const camPos = camera.position;
     for (const v of this.list) {
-      if (v.mode === 'phys') v.pose();
+      if (v.mode === 'phys') v.pose(dt);
       v.headOn = night > 0.25 || this.game.env.rain > 0.5;
       v.updateMaterial(night, t);
       if (v.alarmT > 0) { v.alarmT -= dt; v.mat.userData.u.uLights.value.x = (Math.sin(t * 10) > 0) ? 1.5 : 0; if (Math.random() < dt * 3) this.game.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.2, gain: 0.6 }); }
@@ -43022,7 +44395,7 @@ class VehicleManager {
       // wheels
       const st = v.rim | 0, W = RM[st];
       let n = cnt[st];
-      if (n + 4 <= W.instanceMatrix.count && d2 < 160 * 160) {
+      if (n + 4 <= W.instanceMatrix.count && d2 < 160 * 160 && !v.spec.noWheels) {
         const s = v.spec, R = s.wheelR;
         v.mesh.updateMatrix();
         const e = v.mesh.matrix.elements, upY = Math.max(0.5, e[5]);
@@ -43052,6 +44425,50 @@ class VehicleManager {
   }
 }
 
+/* =====================================================================
+   [CORE] ISLAND FLEET (Operation Blackgate)
+   The vehicles that stand at the island's own places (world.isle.fleet,
+   listed by the generator in 127): race cars in the Valen Point pits and
+   paddock and at the proving ground, aircraft at the airport, a helicopter
+   on the hospital's and the police station's roofs, fire engines and
+   ambulances, the cars of each settlement. Like the city's parked cars
+   they appear as you come within reach of a site and go again when you
+   leave, unless you touched them; one you took is back in its place the
+   next time you come by.
+   ===================================================================== */
+class IslandFleet {
+  constructor(game) { this.g = game; this.sites = game.world.isle.fleet; this.live = new Map(); }
+  // what stands in a slot: its own class, or (a settlement's driveway) what parks in the city, by the same rolls
+  typeOf(site, si, k, s) {
+    if (s.cls) return s.cls;
+    const hh = hash2i(si + 400, k, 31);
+    if (hash2i(si + 400, k, 35) < (RARE_ZONES[zoneKey(s.x, s.z)] || 0)) return RARE_TYPES[Math.floor(hash2i(si + 400, k, 34) * RARE_TYPES.length)];
+    return CIVIL_TYPES[Math.floor(hh * CIVIL_TYPES.length)];
+  }
+  update(fx, fz) {
+    const g = this.g, V = g.vehicles, p = g.player;
+    this.sites.forEach((site, si) => {
+      const d = Math.hypot(site.x - fx, site.z - fz), cars = this.live.get(site.id);
+      if (cars && d > site.r + 70) {
+        for (const v of cars) if (V.list.includes(v) && !v.touched && v.driver === null && !v.mission && v !== p.lastVehicle) V.despawn(v);
+        this.live.delete(site.id);
+      } else if (!cars && d < site.r) {
+        const out = [];
+        site.slots.forEach((s, k) => {
+          if (Math.hypot(s.x - p.pos.x, s.z - p.pos.z) < 5) return;
+          for (const v of V.list) if (dist2(v.pos.x, v.pos.z, s.x, s.z) < 12) return;
+          const type = this.typeOf(site, si, k, s), spec = VEHICLES[type];
+          const v = V.spawn(type, s.x, s.z, s.h, { parked: true, y: s.y, vtier: spec.tier, color: spec.colors[Math.floor(hash2i(si + 400, k, 32) * spec.colors.length)] });
+          v.homeBlock = -1; v.fleet = site.id;
+          out.push(v);
+        });
+        this.live.set(site.id, out);
+      }
+    });
+  }
+  // every site's cars at once (the tests, the screenshots)
+  spawnAll() { this.sites.forEach(s => { const x = s.x, z = s.z; this.live.delete(s.id); this.update(x, z); }); }
+}
 /* =====================================================================
    [CORE] PARTICLES (pooled CPU-simulated point sprites, two blend modes)
    ===================================================================== */
@@ -62919,7 +64336,7 @@ class UIManager {
     this.hud = $('hud'); this.toasts = $('toasts');
     this.mm = $('minimap'); this.mmc = this.mm.getContext('2d');
     this.bigc = $('bigmapCanvas').getContext('2d');
-    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP(); this.cfsImg = this._renderCFS();
+    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP(); this.cfsImg = this._renderCFS(); this.isleImg = this._renderIsle();
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
     this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
@@ -62934,6 +64351,8 @@ class UIManager {
     this.mapK = k; this.mapE = E; this.mapW = Math.ceil((WORLD_X1 + E) * k);
     // and south to Cedar Fields South (Session 6C): mapH tall
     this.mapH = Math.ceil((WORLD_Z1 + E) * k);
+    // and north and west over the rest of the island (Operation Blackgate): map space starts at (mapX0, mapZ0), both negative
+    this.mapX0 = Math.floor((WORLD_X0 + E) * k); this.mapZ0 = Math.floor((WORLD_Z0 + E) * k);
     const X = x => (x + E) * k;
     this._paintMap(g, null);
     const lab = [];
@@ -62951,6 +64370,10 @@ class UIManager {
       g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillText(ZONES[key].name.toUpperCase(), X(cx * P) + 1.5, X(cz * P) + 1.5);
       g.fillStyle = ZONES[key].col; g.fillText(ZONES[key].name.toUpperCase(), X(cx * P), X(cz * P));
     }
+    // the island off the lattice (022): its districts and waters
+    for (const [t, x, z, col, big] of [['CRESTMOOR RIDGE', 250, -640, ZONES.k.col, 1], ['MOUNT VALEN', MT_VALEN.x, MT_VALEN.z + 120, ZONES.n.col, 1], ['BLACKGATE HIGHLANDS', -1250, -1700, ZONES.t.col, 1], ['SALTMARSH', -520, 1090, ZONES.b.col, 1],
+      ['SOUTHSHORE', -520, 2000, ZONES.e.col, 1], ['PORT VALEN INTERNATIONAL', 600, 2290, ZONES.y.col, 1], ['PROVING GROUND', 1420, 1610, ZONES.j.col, 1], ['LAKE VALEN', LAKE.x, LAKE.z, '#8fd0e8', 0], ['VALEN BAY', -520, 330, '#8fd0e8', 0],
+      ['VALEN SOUND', 1210, 300, '#8fd0e8', 0], ['GULL HARBOR', -1290, -2330, ZONES.t.col, 0], ['CAPE VALEN LIGHT', 1500, -2850, ZONES.t.col, 0], ['BLACKGATE BRIDGE', -1100, 520, '#ffffff', 0]]) lab.push({ t, x: X(x), z: X(z), col, big: !!big });
     // landmarks
     g.font = 'bold 11px Arial';
     for (const key in LANDMARK_BLOCKS) {
@@ -63022,25 +64445,72 @@ class UIManager {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
     const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CITY + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
     const c = document.createElement('canvas'); c.width = x1 - x0; c.height = z1 - z0;
-    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, c.width, c.height); g.translate(-x0, -z0);
+    const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintCFS(g, null);
     return { img: c, x: x0, z: z0 };
   }
   // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
   _renderVP() {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(WORLD_X1)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
+    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const g = c.getContext('2d'); g.fillStyle = '#0f2b3a'; g.fillRect(0, 0, w, h); g.translate(-x0, -z0);
+    const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintVP(g, null);
     return { img: c, x: x0, z: z0 };
+  }
+  // the island's ground as a small image (once; 16 m a pixel, the shore soft-edged, the sea and the lake left clear)
+  _renderIsle() {
+    const S = 16, W = Math.round((ISLE.x1 - ISLE.x0) / S), H = Math.round((ISLE.z1 - ISLE.z0) / S), c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'), id = g.createImageData(W, H), d = id.data, E = EDGE_MARGIN;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      const x = ISLE.x0 + (i + 0.5) * S, z = ISLE.z0 + (j + 0.5) * S, sd = Island.sd(x, z); if (sd > 10) continue;
+      const h = Island.base0(x, z), o = (j * W + i) * 4; if (h < SEA_Y - 0.6) continue;
+      let r, gg, b;
+      if (h < SEA_Y + 3.2 && sd > -44) { r = 205; gg = 191; b = 142; }
+      else { const f = clamp(Island.forest(x, z) * 1.4 - 0.4, 0, 1), e = clamp((h - 20) / 200, 0, 1); r = lerp(lerp(86, 62, f), 150, e); gg = lerp(lerp(116, 92, f), 142, e); b = lerp(lerp(66, 54, f), 124, e); if (z > 980) { r += 14; gg += 8; } }
+      d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255 * clamp(Math.min(0.5 - sd / S, (h - SEA_Y + 0.6) / 1.2), 0, 1);
+    }
+    g.putImageData(id, 0, 0);
+    // road chunks for the painter below: a bounding box every 48 points
+    for (const R of Island.roads) { R.mapChunks = []; for (let k0 = 0; k0 < R.pts.length - 1; k0 += 48) { const k1 = Math.min(R.pts.length - 1, k0 + 48); let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (let k = k0; k <= k1; k++) { const q = R.pts[k]; x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); } R.mapChunks.push([k0, k1, x0 - 12, z0 - 12, x1 + 12, z1 + 12]); } }
+    void E;
+    return c;
+  }
+  // the island in map space: its ground, the airfield and the proving ground, the roads (a bridge edged white, the
+  // tunnel dashed), the footprints of what stands out there. view: a world rectangle to cull to (null: everything)
+  _paintIsle(g, view) {
+    const k = this.mapK, E = this.mapE, X = x => (x + E) * k, I = this.isleImg; if (!I) return;
+    const inV = (x0, z0, x1, z1) => !view || (x1 >= view.x0 && x0 <= view.x1 && z1 >= view.z0 && z0 <= view.z1);
+    const R4 = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
+    g.imageSmoothingEnabled = true; g.drawImage(I, X(ISLE.x0), X(ISLE.z0), (ISLE.x1 - ISLE.x0) * k, (ISLE.z1 - ISLE.z0) * k);
+    const A = AIRPORT, G = PROVING;
+    if (inV(A.x0, A.z0, A.x1, A.z1)) {
+      R4(A.apron.x0, A.apron.z0, A.apron.x1, A.apron.z1, '#8a8c8a'); R4(A.tw.x0, A.tw.z - A.tw.w / 2, A.tw.x1, A.tw.z + A.tw.w / 2, '#5a5d63');
+      for (const lx of A.links) R4(lx - 9, A.apron.z1, lx + 9, A.rw[0].z, '#5a5d63');
+      for (const r of A.rw) { R4(r.x0, r.z - r.w / 2, r.x1, r.z + r.w / 2, '#3d3f44'); g.fillStyle = '#e8e8e2'; for (let x = r.x0 + 60; x < r.x1 - 60; x += 90) g.fillRect(X(x), X(r.z - 1), 40 * k, 2 * k); }
+      const cp = this.g.world.isle.sites.carpark; R4(cp.x0, cp.z0, cp.x1, cp.z1, '#55585e');
+    }
+    if (inV(G.x0, G.z0, G.x1, G.z1)) { R4(G.strip.x0, G.strip.z - G.strip.w / 2, G.strip.x1, G.strip.z + G.strip.w / 2, '#3d3f44'); R4(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, '#4a4d52'); g.fillStyle = '#4a4d52'; g.beginPath(); g.arc(X(G.pad.x), X(G.pad.z), G.pad.r * k, 0, 7); g.fill(); }
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const R of Island.roads) for (const [k0, k1, x0, z0, x1, z1] of R.mapChunks) {
+      if (!inV(x0, z0, x1, z1)) continue;
+      const path = (a, b) => { g.beginPath(); for (let q = a; q <= b; q++) { const p = R.pts[q]; q === a ? g.moveTo(X(p[0]), X(p[1])) : g.lineTo(X(p[0]), X(p[1])); } g.stroke(); };
+      g.strokeStyle = '#6f7682'; g.lineWidth = Math.max(1.6, R.w * k); path(k0, k1);
+      // spans: a bridge's deck edged in white, the tunnel dashed
+      let a = -1;
+      for (let q = k0; q <= k1 + 1; q++) { const sp = q <= k1 ? R.sp[q] : 0; if (sp && a < 0) a = q; if ((!sp || (a >= 0 && R.sp[a] !== sp)) && a >= 0) { if (R.sp[a] === 1) { g.strokeStyle = '#e8e8e2'; g.lineWidth = Math.max(2.4, (R.w + 5) * k); path(a, q - 1); g.strokeStyle = '#8a909a'; g.lineWidth = Math.max(1.6, R.w * k); path(a, q - 1); } else { g.strokeStyle = '#2a2d33'; g.setLineDash([6 * k, 6 * k]); g.lineWidth = Math.max(1.6, R.w * k); path(a, q - 1); g.setLineDash([]); } a = sp ? q : -1; } }
+    }
+    for (const R of Island.roads) if (R.ring && inV(R.ring.x - 30, R.ring.z - 30, R.ring.x + 30, R.ring.z + 30)) { g.fillStyle = '#6f7682'; g.beginPath(); g.arc(X(R.ring.x), X(R.ring.z), (R.ring.r + R.w / 2) * k, 0, 7); g.fill(); }
+    g.fillStyle = 'rgba(0,0,0,0.34)';
+    for (const b of this.g.world.isle.blocks) if (inV(b.cx - b.r, b.cz - b.r, b.cx + b.r, b.cz + b.r)) for (const r of b.bld) if (!r.farOnly || true) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
   }
   // paints the city (no text) in 1024-unit map space onto any 2D context; view = world-space
   // rectangle to cull to (null = everything). Used for the cached images and the live big map.
   _paintMap(g, view) {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
     const inView = (x0, z0, x1, z1) => !view || (x1 >= view.x0 && x0 <= view.x1 && z1 >= view.z0 && z0 <= view.z1);
-    g.fillStyle = '#0f2b3a'; g.fillRect(X(-E), X(-E), (CITY + E * 2) * k, (CITY + E * 2) * k);
+    // the island under everything (live painting only: the cached images are drawn over the island's own)
+    if (view) this._paintIsle(g, view);
     g.fillStyle = '#3d3a36'; g.fillRect(X(-EDGE_MARGIN), X(-EDGE_MARGIN), (CITY + EDGE_MARGIN * 2) * k, (CITY + EDGE_MARGIN * 2) * k);
     g.fillStyle = '#6f7682'; g.fillRect(X(-ROAD_HALF), X(-ROAD_HALF), (CITY + ROAD_HALF * 2) * k, (CITY + ROAD_HALF * 2) * k);
     const cols = MAP_LAND_COLS;
@@ -63397,7 +64867,7 @@ class UIManager {
   drawMinimap() {
     const g = this.g, c = this.mmc, W = this.mm.width, R = W / 2, p = g.player;
     const pv = p.state === 'vehicle' ? p.vehicle : null;
-    const zoom = (pv ? clamp(1.5 - pv.speed * 0.012, 0.85, 1.5) : 1.9) * (W / 380);
+    const zoom = (pv ? (pv.air ? lerp(1.2, 0.42, clamp(pv.air.agl / 60, 0, 1)) : clamp(1.5 - pv.speed * 0.012, 0.85, 1.5)) : 1.9) * (W / 380);
     const rot = g.cam.yaw + Math.PI;
     c.save();
     c.clearRect(0, 0, W, W);
@@ -63406,6 +64876,8 @@ class UIManager {
     c.translate(R, R); c.rotate(rot); c.scale(zoom / this.mapK, zoom / this.mapK);
     const [px, pz] = this._mapXY(p.pos.x, p.pos.z);
     c.translate(-px, -pz);
+    // the island under the city's image (a pixel of the minimap is 1 / zoom metres: what is within the dial, and a margin)
+    { const vr = R / zoom * 1.45 + 20; this._paintIsle(c, { x0: p.pos.x - vr, z0: p.pos.z - vr, x1: p.pos.x + vr, z1: p.pos.z + vr }); }
     c.drawImage(this.mmImg, 0, 0);
     if (this.vpImg) c.drawImage(this.vpImg.img, this.vpImg.x, this.vpImg.z);
     if (this.cfsImg) c.drawImage(this.cfsImg.img, this.cfsImg.x, this.cfsImg.z);
@@ -63700,17 +65172,20 @@ class MapView {
   toMap(sx, sy) { const s = this.scale; return [(sx - this.W / 2) / s + this.cx, (sy - this.H / 2) / s + this.cz]; }
   worldToScreen(x, z) { const [mx, mz] = this.ui._mapXY(x, z); return this.toScreen(mx, mz); }
   screenToWorld(sx, sy) { const [mx, mz] = this.toMap(sx, sy); return [mx / this.ui.mapK - this.ui.mapE, mz / this.ui.mapK - this.ui.mapE]; }
+  // zoomed right out, the whole island fits the shorter side of the screen
+  minZoom() { return clamp(1024 / Math.max((this.ui.mapW || 1024) - (this.ui.mapX0 || 0), (this.ui.mapH || 1024) - (this.ui.mapZ0 || 0)) * 0.98, 0.1, 1); }
   clampView(z, cx, cz) {
     const s = Math.min(this.W, this.H) / 1024 * z, hw = this.W / 2 / s, hh = this.H / 2 / s;
     // zoomed in, any point of the map can be brought to the centre (edges show water beyond)
     // east as far as Valen Point and south to Cedar Fields South (map space is ui.mapW wide and ui.mapH tall)
-    const MW = this.ui.mapW || 1024, MH = this.ui.mapH || 1024;
-    cx = hw >= 512 ? clamp(cx, 512, Math.max(512, MW - hw)) : clamp(cx, Math.min(hw, 0), Math.max(MW - hw, MW)); cz = hh >= 512 ? clamp(cz, 512, Math.max(512, MH - hh)) : clamp(cz, Math.min(hh, 0), Math.max(MH - hh, MH));
+    // (Operation Blackgate: and north and west over the rest of the island, from ui.mapX0 / ui.mapZ0)
+    const MW = this.ui.mapW || 1024, MH = this.ui.mapH || 1024, X0 = this.ui.mapX0 || 0, Z0 = this.ui.mapZ0 || 0;
+    cx = clamp(cx, Math.min(X0 + hw, (X0 + MW) / 2), Math.max(MW - hw, (X0 + MW) / 2)); cz = clamp(cz, Math.min(Z0 + hh, (Z0 + MH) / 2), Math.max(MH - hh, (Z0 + MH) / 2));
     return [cx, cz];
   }
   // zoom keeping the map point under (sx,sy) fixed; animated unless instant
   zoomAt(f, sx, sy, instant) {
-    const nz = clamp(this.tz * f, 1, 8);
+    const nz = clamp(this.tz * f, this.minZoom(), 8);
     const [mx, mz] = this.toMap(sx, sy);
     // the point under the cursor stays put: solve for the new centre at the target zoom
     const s = Math.min(this.W, this.H) / 1024 * nz;
@@ -63739,7 +65214,7 @@ class MapView {
       const [x, y] = pos(e); pt.x = x; pt.y = y;
       if (this.ptrs.size >= 2 && this.pinch) {
         const [a, b] = [...this.ptrs.values()];
-        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, nz = clamp(this.pinch.z * d / this.pinch.d, 1, 8);
+        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, nz = clamp(this.pinch.z * d / this.pinch.d, this.minZoom(), 8);
         const s = Math.min(this.W, this.H) / 1024 * nz, sx = (a.x + b.x) / 2, sy = (a.y + b.y) / 2;
         const [cx, cz] = this.clampView(nz, this.pinch.mid[0] - (sx - this.W / 2) / s, this.pinch.mid[1] - (sy - this.H / 2) / s);
         this.zoom = this.tz = nz; this.cx = this.tcx = cx; this.cz = this.tcz = cz; this.dirty = true;
@@ -63969,7 +65444,7 @@ class MapView {
     // map-space layers under the view transform
     c.save();
     c.setTransform(d * s, 0, 0, d * s, d * (W / 2 - this.cx * s), d * (H / 2 - this.cz * s));
-    if (this.zoom < 1.35) { c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
+    if (this.zoom < 1.35) { ui._paintIsle(c, null); c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);
@@ -64177,7 +65652,7 @@ class Game {
     // under one group, so an interior can switch the whole outdoors off: interiors are built 60 m under their door,
     // and without this the city above stayed in the view frustum and was drawn behind the walls (G2)
     this.outdoor = new THREE.Group(); this.outdoor.name = 'outdoor'; this.scene.add(this.outdoor); this._indoor = false;
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.15, 3000);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.15, 5200);
     this.time = 0; this.frame = 0; this.state = 'loading'; this.focus = new THREE.Vector3(6.5 * P, 0, 5 * P);
     this.debug = { open: false, god: false, col: false };
     this.input = new InputManager(this.canvas);
@@ -64207,7 +65682,10 @@ class Game {
     this.player = new Player(this);
     this.cam = new CameraRig(this.camera, this);
     this.quality = new QualityManager(this);
+    // the island off the lattice (022/177): its ground, roads, bridge and tunnel, forests, the airfield's paint
+    this.isleScene = new IslandScenery(this.outdoor, this.world, this);
     this.vehicles = new VehicleManager(this);
+    this.fleet = new IslandFleet(this);
     this.traffic = new TrafficManager(this);
     this.peds = new PedManager(this);
     this.police = new PoliceManager(this);
@@ -64250,6 +65728,7 @@ class Game {
     this.menuCam(0);
     this.env.update(0.016);
     for (let k = 0; k < 6; k++) { this.chunks.update(this.focus.x, this.focus.z, this.frame++); }
+    this.isleScene.update(this.focus.x, this.focus.z);
     progress(0.85, 'Compiling shaders'); await nextFrame();
     try { this.renderer.compile(this.scene, this.camera); } catch { /* compile is an optimisation only */ }
     this.warmShaders();
@@ -64388,7 +65867,9 @@ class Game {
       this.lifeToken++; $('gameover').classList.add('hidden');
       this.player.vest = clamp(this.save.vest || 0, 0, VEST_MAX);
       // fresh: on the street in the Old Quarter with nothing. continue: where you last saved
-      const start = fresh ? null : this.save.pos;
+      let start = fresh ? null : this.save.pos;
+      // a spot out at sea (022: saved in the air, or wading) comes back ashore at the nearest road, or at the city's edge
+      if (start && offCity(start.x, start.z) && !inExtension(start.x, start.z)) { const q = RoadGraph.nearest(start.x, start.z, { maxD: 1500, kinds: RG_STREETS }); start = q && Island.land(q.x, q.z) ? { x: q.x, z: q.z, h: start.h } : { x: clamp(start.x, -10, CITY + 10), z: clamp(start.z, -10, CITY + 10), h: start.h }; }
       if (start) this.resetPlayerState(start.x, start.z, start.h);
       else { const lp = this.uw.loc('prop', 'pawn'), sp = sidewalkSpot(2, 6, 0, 52); this.resetPlayerState(sp.x, sp.z, Math.atan2(lp.x - sp.x, lp.z - sp.z)); }
       this.env.time = this.save.timeOfDay;
@@ -64644,7 +66125,7 @@ class Game {
       this.ui.toast(`You jacked a ${v.spec.name}.`);
     } else if (!v.owned && !v.stolenBefore && !v.legit && v.origin !== 'found') {
       s.stats.stolen++; v.stolenBefore = true;
-      if (v.type === 'police') this.police.crime('stealcop', v.pos.x, v.pos.z);
+      if (v.type === 'police' || v.spec.polAir) this.police.crime('stealcop', v.pos.x, v.pos.z);
       else this.police.crime('theft', v.pos.x, v.pos.z);
       if (v.parked && Math.random() < 0.15) { v.alarmT = 5; this.ui.toast('Car alarm!', 'warn'); }
     }
@@ -64657,10 +66138,16 @@ class Game {
     p.vehicle = v; p.lastVehicle = v; p.state = 'vehicle'; p.trans = null;
     this.audio.play('door');
     this.cam.yaw = v.h;
+    // an aircraft (232): how it flies, once each time you take one
+    if (v.air) this.ui.toast(v.spec.air === 'plane'
+      ? (IS_TOUCH ? 'Gas and Brake are the throttle. The stick rolls it; pull it back to climb.' : 'W / S throttle · A / D roll · Space climbs · Ctrl dives. Build speed, then ease the nose up.')
+      : (IS_TOUCH ? 'Gas climbs, Brake descends once the rotor is up to speed. The stick flies it forward, back and round.' : 'Space climbs · Ctrl descends · W / S forward and back · A / D turn. Wait for the rotor.'));
     HitchLog.mark('got into a ' + v.type);
   }
   exitVehicle(force) {
     const p = this.player, v = p.vehicle; if (!v) return;
+    // an aircraft: on the ground, or low and slow enough to drop out of (232)
+    if (v.air && !force && !Flight.canExit(v)) { this.ui.toast('Land first.', 'warn'); this.audio.play('deny'); return; }
     this.cam.revT = 0; this.cam.revCam = false; this.cam.revBack = false;
     const res = {};
     let spot = null;
@@ -64701,11 +66188,20 @@ class Game {
     let steer = (inp.isDown('left') ? 1 : 0) - (inp.isDown('right') ? 1 : 0);
     if (inp.stick.active) steer -= inp.stick.x;
     if (inp.gp.active) { thr += inp.gp.rt - inp.gp.lt; steer -= inp.gp.lx; }
+    if (v.air) {
+      // aircraft (232). Keys: W / S the throttle (the helicopter: forward and back), A / D roll or turn, Space or Shift up,
+      // Ctrl or X down. Touch: the stick flies it; Gas and Brake are the throttle (the helicopter: up and down).
+      const upK = (inp.isDown('jump') || inp.isDown('sprint') ? 1 : 0) - (inp.isDown('walk') || inp.isDown('dodge') ? 1 : 0);
+      const key = (inp.isDown('up') ? 1 : 0) - (inp.isDown('down') ? 1 : 0), btn = (inp.isDown('gas') ? 1 : 0) - (inp.isDown('brake') ? 1 : 0);
+      const sy = inp.stick.active ? inp.stick.y : 0, gy = inp.gp.active ? inp.gp.ly : 0, trig = inp.gp.active ? inp.gp.rt - inp.gp.lt : 0;
+      if (v.spec.air === 'plane') { thr = key + btn + trig; v.ctl.pitch = blocked ? 0 : clamp(upK - sy - gy, -1, 1); }
+      else { thr = key + sy + gy; v.ctl.lift = blocked ? 0 : clamp(upK + btn + trig, -1, 1); }
+    }
     v.ctl.throttle = blocked ? 0 : clamp(thr, -1, 1);
     v.ctl.steer = blocked ? 0 : clamp(steer, -1, 1);
     v.ctl.handbrake = !blocked && (inp.isDown('jump') || inp.isDown('handbrake'));
     if (inp.pressed('horn')) {
-      if (v.type === 'police') { v.siren = !v.siren; this.ui.toast(v.siren ? 'Siren on' : 'Siren off'); }
+      if (v.type === 'police' || v.spec.ems || v.spec.polAir) { v.siren = !v.siren; this.ui.toast(v.siren ? 'Siren on' : 'Siren off'); }
       else { this.audio.play('horn', { dur: 0.5, gain: 0.9 }); this.peds.panic(v.pos.x + Math.sin(v.h) * 8, v.pos.z + Math.cos(v.h) * 8, 7, 0); }
     }
     if (inp.pressed('radio')) { const n = this.audio.nextStation(); const r = $('radio'); r.textContent = '♪ ' + n; r.classList.add('show'); clearTimeout(this._rt); this._rt = setTimeout(() => r.classList.remove('show'), 2500); }
@@ -64714,6 +66210,14 @@ class Game {
     s.distDrive += v.speed * dt; s.topSpeed = Math.max(s.topSpeed, v.speed);
     p.regen(dt);
   }
+  // the lifts to the two rooftop helipads (the hospital's, the police station's): a door at the foot of the wing, one on the roof
+  liftAction() {
+    const p = this.player; if (p.state !== 'foot' || p.interior) return null;
+    for (const L of this.world.isle.lifts) for (const [from, to, label] of [[L.a, L.b, 'Lift up to the ' + L.name], [L.b, L.a, 'Lift down to the street']]) {
+      if (Math.abs(p.pos.y - from.y) < 1.5 && Math.hypot(p.pos.x - from.x, p.pos.z - from.z) < 1.7) return { label, act: () => this.fade(() => { p.pos.set(to.x, to.y, to.z); p.vel.set(0, 0, 0); this.audio.play('door'); }) };
+    }
+    return null;
+  }
   interact() {
     const p = this.player, m = this.missions;
     if (p.passenger) { this.taxi.getOut(); return; }
@@ -64721,6 +66225,7 @@ class Game {
     if (this.uw.S.jail) return;
     const uq = this.uniques.findAction(); if (uq) { uq.act(); return; }
     if (m.offer && !m.active) { m.start(m.offer); return; }
+    const la = this.liftAction(); if (la) { la.act(); return; }
     const a = this.content.findAction();
     if (a) { a.act(); return; }
     if (p.state === 'vehicle') { if (p.passenger) this.taxi.getOut(); else this.exitVehicle(false); return; }
@@ -64741,7 +66246,7 @@ class Game {
       if (u) t = u.label;
       else if (this.uw.S.jail) t = null;
       else if (p.state === 'foot' && !m.offer) {
-        const a = this.uniques.findAction() || this.content.findAction();
+        const a = this.uniques.findAction() || this.liftAction() || this.content.findAction();
         if (a) t = a.label;
         else if (!p.interior || p.interior.vspace) { const v = this.nearestVehicle(1.8); if (v) t = v.uniqueId && !v.garageUid ? `Take the ${v.spec.name} (one-off)` : v.locked ? (v.mission === 'sold' || v.dealer ? null : 'Locked') : (v.driver === 'npc' || v.driver === 'cop' ? 'Steal ' : 'Enter ') + v.spec.name; }
       } else if (p.state === 'vehicle' && p.vehicle.health <= 0 && !p.vehicle.burnt) t = 'Get out \u2014 it\u2019s on fire!';
@@ -64829,7 +66334,7 @@ class Game {
     this.env.update(dt);
     this.content.interiors.update(dt);
     this.chunks.update(this.focus.x, this.focus.z, this.frame);
-    this.vpScene.update(this.focus.x, this.focus.z); this.cfsScene.update(this.focus.x, this.focus.z);
+    this.vpScene.update(this.focus.x, this.focus.z); this.cfsScene.update(this.focus.x, this.focus.z); this.isleScene.update(this.focus.x, this.focus.z);
     this.propT -= rdt;
     if (this.propT <= 0) {
       this.propT = 0.5;
@@ -64838,6 +66343,7 @@ class Game {
       this.props.setActiveBlocks(set);
       this.props.respawnTick(this.focus.x, this.focus.z);
       this.vehicles.updateParked(this.focus.x, this.focus.z, this.parkedR);
+      if (this.state === 'playing') this.fleet.update(this.focus.x, this.focus.z);
     }
     if (dt > 0) {
       this.traffic.update(dt, this.frame);
@@ -65060,7 +66566,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack });
+    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

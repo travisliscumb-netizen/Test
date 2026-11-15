@@ -17,28 +17,36 @@ const CFS = {
 };
 // the city's Cedar Fields strip (superblock 'fields'): rough too, around what is built there
 const CF_STRIP = { x0: 0, x1: 320, z0: 880, z1: 960 };
-const WORLD_Z1 = CFS.z1 + EDGE_MARGIN;
+const WORLD_Z1 = ISLE.z1;
 function cfsLand(x, z) { return x >= CFS.x0 && x <= CFS.x1 && z >= CFS.z0 && z <= CFS.z1; }
 function cfsBridge(x, z) { return z >= CFS.lb.z0 && z <= CFS.z0 + 0.5 && Math.abs(x - CFS.lb.x) <= CFS.lb.half; }
 function inCedarSouth(x, z) { return cfsLand(x, z) || (z > CITY + EDGE_MARGIN && cfsBridge(x, z)); }
 // south of the city's seawall, on the countryside's side: where routing and spawns go by the land bridge
 function cfsSide(x, z) { return z > CITY + EDGE_MARGIN && x > CFS.x0 - 150 && x < CFS.x1 + 150; }
-// either extension (Valen Point or Cedar Fields South): routing off the lattice goes by its spur
-function extSide(x, z) { return vpSide(x, z) || cfsSide(x, z); }
-function inExtension(x, z) { return inValenPoint(x, z) || inCedarSouth(x, z); }
+// anywhere off the city's square (Valen Point, Cedar Fields South, the rest of the island): routing and spawns go by
+// the roads that leave the lattice
+function extSide(x, z) { return offCity(x, z); }
+// on ground of its own off the lattice: Valen Point, Cedar Fields South, the island's dry land (022)
+function inExtension(x, z) { return inValenPoint(x, z) || inCedarSouth(x, z) || (offCity(x, z) && Island.land(x, z)); }
 // places a car can join the road out there, for police units and taxis: Valen Point's causeway lanes, or in Cedar
 // Fields South every ~20 m along the land bridge's track and the countryside tracks, in both lanes (h is the heading)
 function extRoadSpots(x, z) {
-  if (!cfsSide(x, z)) return vpRoadSpots();
-  // every ~20 m of the countryside's roads (the land bridge's track and the tracks traffic drives), from the seawall out
-  return RoadGraph.ready ? RoadGraph.spots(e => (e.ext === 'cfs' && e.traffic) || (e.kind === 'spur' && e.name === 'Cedar Fields Track')).filter(s => s.z > CITY + EDGE_MARGIN + 8) : [];
+  if (vpSide(x, z)) return vpRoadSpots();
+  if (!RoadGraph.ready) return [];
+  // every ~20 m of the roads traffic drives off the lattice (the countryside's tracks, the island's highways), from
+  // the seawall out; the ones within reach of (x, z)
+  const all = RoadGraph._offSpots || (RoadGraph._offSpots = RoadGraph.spots(e => e.kind !== 'grid' && e.kind !== 'loop' && e.traffic && e.ext !== 'vp').filter(s => offCity(s.x, s.z) && (s.z > CITY + EDGE_MARGIN + 8 || !cfsSide(s.x, s.z))));
+  return all.filter(s => Math.abs(s.x - x) < 420 && Math.abs(s.z - z) < 420);
 }
 // is a car at spot s heading toward (x, z)?
 const spotToward = (s, x, z) => Math.sin(s.h) * (x - s.x) + Math.cos(s.h) * (z - s.z) > 0;
 // a point for the police to drive to near `ref`: kept on the ground that `ref` is on
 function extClampSearch(refX, refZ, x, z, m) {
-  if (cfsSide(refX, refZ)) return [clamp(x, CFS.x0 + m, CFS.x1 - m), clamp(z, CFS.z0 + m, CFS.z1 - m)];
-  return vpClampSearch(refX, x, z, m);
+  if (!offCity(refX, refZ)) return [clamp(x, m, CITY - m), clamp(z, m, CITY - m)];
+  if (inCedarSouth(refX, refZ)) return [clamp(x, CFS.x0 + m, CFS.x1 - m), clamp(z, CFS.z0 + m, CFS.z1 - m)];
+  if (vpSide(refX, refZ)) return vpClampSearch(refX, x, z, m);
+  // out on the island: anywhere
+  return [x, z];
 }
 // a closed loop of straights joined by constant-radius arcs: a fillet of radius r at every corner [x, z, r] of V,
 // sampled every `step` m. Returns { pts, R (radius at each sample, 0 on a straight), cum, len, nl (left normals of

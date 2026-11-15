@@ -18,7 +18,7 @@ const RoadGraph = {
   ready: false, nodes: [], edges: [], segAtt: new Map(),
   _cells: new Map(), _segE: null, _segK: null, _stamp: null, _q: 0,
   build(world) {
-    this.ready = false; this._walk = null;
+    this.ready = false; this._walk = null; this._offSpots = null;
     const chains = [];
     for (let a = 0; a < 2; a++) for (let line = 0; line <= N; line++) for (let seg = 0; seg < N; seg++) {
       if (!RoadNet.segOpen(a, line, seg)) continue;
