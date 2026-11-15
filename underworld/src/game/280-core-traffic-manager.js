@@ -87,6 +87,8 @@ class TrafficManager {
     const ai = v.ai;
     ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
     ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
+    // out on the island's highways (022) traffic runs at highway speed (the bends' own limits still hold)
+    ai.path.fast = steps.some(st => st.e.link && st.e.link.road && st.e.link.road.isle && st.e.w >= 10) ? 1.75 : 1;
     // (a car put straight onto a bend starts no faster than the bend allows)
     ai.speed = Math.min(ai.speed, lim[0]);
     return true;
@@ -271,7 +273,7 @@ class TrafficManager {
     if (ai.mode === 'path') {
       // curved road: brake ahead of bends, wait for a gap before merging back onto the lattice
       const pa = ai.path;
-      vAllow = Math.min(vAllow, ai.maxV * 0.92);
+      vAllow = Math.min(vAllow, ai.maxV * 0.92) * (pa.fast || 1);
       for (let k = pa.k; k < pa.pts.length && pa.cum[k] - pa.d < 45; k++) { const va = Math.sqrt(pa.lim[k] * pa.lim[k] + 2 * 4.5 * Math.max(0, pa.cum[k] - pa.d)); if (va < vAllow) vAllow = va; }
       // a lattice street ahead to join or cross: wait for a gap. A car stopped there (a queue at a light) must not
       // hold us forever: after a few seconds we nose out anyway and the obstacle check keeps us off its bumper

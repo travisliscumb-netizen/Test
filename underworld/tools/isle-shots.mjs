@@ -16,7 +16,7 @@ await page.evaluate(q => {
   const g = window.game; g.events.cool = 1e9; g.save.settings.guide = false; g.police.enabled = false; g.player.health = 1e6; if (g.debug) g.debug.god = true;
   g.quality.mode = q; g.quality.setMode(q);
   const U = g.cam.update.bind(g.cam); g.cam.update = (...a) => { U(...a); const c = window.__cam; if (c) { g.camera.position.set(c[0], c[1], c[2]); g.camera.lookAt(c[3], c[4], c[5]); } };
-  const E = g.env.update.bind(g.env); g.env.update = (...a) => { E(...a); if (window.__clear) { g.scene.fog.density = window.__clear; for (const m of [g.isleScene.mat]) void m; } };
+  const E = g.env.update.bind(g.env); g.env.update = (...a) => { E(...a); if (window.__clear) { g.scene.fog.density = window.__clear; g.scenery.water.material.uniforms.uFogDen.value = window.__clear; } };
 }, FILE_Q);
 const frames = async n => { const f0 = await page.evaluate(() => window.game.frame); await page.waitForFunction(t => window.game.frame >= t, f0 + n, { timeout: Math.max(240000, n * 2500), polling: 50 }); };
 const hud = on => page.evaluate(on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts', 'tip', 'zoneCard', 'objective']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? '' : 'hidden'; } }, on);

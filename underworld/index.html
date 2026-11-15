@@ -33253,7 +33253,7 @@ function blockLamps(bx, bz) {
    maps, zones, spawns.
    ===================================================================== */
 const SEA_Y = -1.2;
-const ISLE = { name: 'Valen Island', x0: -2560, z0: -3328, x1: 3072, z1: 3072, tile: 256, cell: 4, wade: 1.25, sdfCell: 16, sdfMax: 400, shMax: 34 };
+const ISLE = { name: 'Valen Island', x0: -2560, z0: -3328, x1: 3072, z1: 3072, tile: 256, cell: 4, wade: 1.25, sdfCell: 16, sdfMax: 400, shMax: 34, verge: 6 };
 const WORLD_X0 = ISLE.x0, WORLD_Z0 = ISLE.z0;
 // the coast, clockwise from the city's north-west corner: Valen Bay's north shore and Blackgate Point, the highlands'
 // west coast, the north cape, the east coast and the north shore of Valen Sound, the city's east side (inside the
@@ -33464,9 +33464,19 @@ const Island = {
     // a bridge's span reaches a little past the water's edge onto the abutments
     for (let pass = 0; pass < 2; pass++) { const c = sp.slice(); for (let k = 0; k < n; k++) if (c[k] === 1 && pass < 2) { if (k > 0 && !c[k - 1]) sp[k - 1] = 1; if (k < n - 1 && !c[k + 1]) sp[k + 1] = 1; } }
     // the ends: the lattice's kerb level, the level of the road it meets, or the ground itself
+    // (held for as long as it runs beside the other road, at that road's level abreast of it, or over the city's
+    // promenade: the ground there is theirs)
     R.ends.forEach((e, k) => {
-      const i = k ? n - 1 : 0, H = R.hosts[k];
-      if (e === 'lat') pin[i] = CURB_H; else if (H) pin[i] = H.road.y[H.k];
+      const i = k ? n - 1 : 0, H = R.hosts[k]; if (e !== 'lat' && !H) return;
+      for (let j = 0; j < n; j++) {
+        const q = k ? n - 1 - j : j, along = Math.abs(cum[q] - cum[i]);
+        if (e === 'lat') { if (along > EDGE_MARGIN - ROAD_HALF + 2) break; pin[q] = CURB_H; continue; }
+        // (as far as its own carriageway is still on the other road's verge, 150 m at most)
+        const hp = H.road.pts; let best = H.k, bd = Infinity;
+        for (let m = Math.max(0, H.k - 40); m <= Math.min(hp.length - 1, H.k + 40); m++) { const d = Math.hypot(hp[m][0] - pts[q][0], hp[m][1] - pts[q][1]); if (d < bd) { bd = d; best = m; } }
+        if (bd - H.road.w / 2 > ISLE.verge + R.w / 2 + 2 || along > 150) break;
+        pin[q] = H.road.y[best];
+      }
     });
     // the cut: from where the ground first rises above T either side of the ridge, one even grade
     let cut = null;
@@ -33493,7 +33503,7 @@ const Island = {
     this._seg.clear(); this._sseg.clear(); this._multi.clear();
     const C = 64, T = ISLE.tile;
     this.roads.forEach((R, ri) => {
-      const reach = R.w / 2 + 1 + ISLE.shMax;
+      const reach = R.w / 2 + ISLE.verge + ISLE.shMax;
       for (let k = 0; k < R.pts.length - 1; k++) {
         const a = R.pts[k], b = R.pts[k + 1], span = R.sp[k] && R.sp[k + 1], id = ri * 65536 + k;
         const put = (M, m) => { for (let cx = Math.floor((Math.min(a[0], b[0]) - m) / C); cx <= Math.floor((Math.max(a[0], b[0]) + m) / C); cx++) for (let cz = Math.floor((Math.min(a[1], b[1]) - m) / C); cz <= Math.floor((Math.max(a[1], b[1]) + m) / C); cz++) { const key = (cx + 512) * 1024 + cz + 512; let L = M.get(key); if (!L) M.set(key, L = []); L.push(id); } };
@@ -33509,12 +33519,14 @@ const Island = {
   // _ry (the road's level there), _rr (the road), _rk (segment), _rt (how far along the segment), _ro (signed offset)
   _nearRoad(M, x, z) {
     const L = M.get((Math.floor(x / 64) + 512) * 1024 + Math.floor(z / 64) + 512); if (!L) return false;
-    let bd = Infinity;
+    // (on its own carriageway and verge a road listed earlier wins over one listed later: the road another joins keeps
+    // its own level right through the junction, and the joining road meets it)
+    let bd = Infinity, bk = Infinity;
     for (let q = 0; q < L.length; q++) {
-      const id = L[q], R = this.roads[(id / 65536) | 0], k = id % 65536, a = R.pts[k], b = R.pts[k + 1];
+      const id = L[q], ri = (id / 65536) | 0, R = this.roads[ri], k = id % 65536, a = R.pts[k], b = R.pts[k + 1];
       const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
-      const ox = x - a[0] - dx * t, oz = z - a[1] - dz * t, d = Math.hypot(ox, oz) - R.w / 2;
-      if (d < bd) { bd = d; this._rr = R; this._rk = k; this._rt = t; this._ry = R.y[k] + (R.y[k + 1] - R.y[k]) * t; }
+      const ox = x - a[0] - dx * t, oz = z - a[1] - dz * t, d = Math.hypot(ox, oz) - R.w / 2, key = d < ISLE.verge ? ri * 100 + Math.max(d, 0) * 0.001 + (d < 0 ? d * 1e-6 : 0) : 1e6 + d;
+      if (key < bk) { bk = key; bd = d; this._rr = R; this._rk = k; this._rt = t; this._ry = R.y[k] + (R.y[k + 1] - R.y[k]) * t; }
     }
     this._rd = bd;
     return bd < Infinity;
@@ -33527,9 +33539,11 @@ const Island = {
     if (!this._nearRoad(this._seg, x, z)) return h;
     const y = this._ry, d = this._rd;
     if (wide) return d < wide ? Math.min(h, y - 0.4) : h;
-    const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h));
-    if (d >= 1 + sh) return h;
-    const t = smoothstep(1, 1 + sh, d);
+    // level across the road and a verge either side (ISLE.verge: wide enough that every 4 m cell the carriageway
+    // touches is level, so the baked tile is too), then eased into the hillside over a shoulder as wide as the cut is deep
+    const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h)), v0 = ISLE.verge;
+    if (d >= v0 + sh) return h;
+    const t = smoothstep(v0, v0 + sh, d);
     return y * (1 - t) + h * t;
   },
   // ---------------------------------------------------------------- tiles
@@ -40380,6 +40394,19 @@ Object.assign(World.prototype, {
       isle.lifts.push({ name: key === 'hospital' ? 'St. Alda helipad' : 'Police air unit', a: { x: H.lift.x, z: H.lift.z, y: CURB_H }, b: { x: H.top.x, z: H.top.z, y: H.y } });
       fleet('roof_' + key, H.x, H.z, 420, [{ x: H.x, z: H.z, h: Math.PI / 2, y: H.y, cls: key === 'hospital' ? 'medevac' : 'polheli' }]);
     }
+    // ================================================================ the people of each place (bystanders who stand about while you are near)
+    {
+      const folk = (id, x, z, people) => isle.fleet.push({ id: 'folk_' + id, x, z, r: 0, slots: [], people });
+      folk('terminal', 600, 1884, [[590, 1885, 1.2], [594, 1886, -1.5], [606, 1885.5, 0.4], [612, 1886, -2.4], [575, 1881.6, 1.57], [628, 1884, 2.8], [600, 1886.5, 3.1]]);
+      folk('apron', 1050, 1968, [[1030, 1975, -1.2], [1085, 1960, 0.6], [958, 1968, 1.57]]);
+      folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1519, 472, 1.57], [1519, 570, 1.57], [1508, 520, 0.4]]);
+      folk('proving', 1163, 1492, [[1166, 1491, 3.14], [1170, 1490, -2.6], [PROVING.strip.x0 + 3, PROVING.strip.z - 12.5, 1.57]]);
+      folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
+      folk('summit', 380, -1800, [[372, -1784.5, 0.2], [376, -1785.5, -0.3], [392, -1847, 3.14]]);
+      folk('lighthouse', 1508, -2788, [[1508, -2788, 1.2]]);
+      folk('firehouse', 160, -127, [[ISLE_FIRE.x0 + 17, ISLE_FIRE.z0 + 20, -1.57], [ISLE_FIRE.x0 + 18, ISLE_FIRE.z0 + 34, -1.57]]);
+      folk('gull', -1290, -2265, [[-1282, -2264, 0.5], [-1330, -2262, 2.0], [-1240, -2300, -0.8]]);
+    }
     // colliders for the island's blocks (the city's and Valen Point's loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
@@ -40980,7 +41007,8 @@ function buildRoadMarkings(scene) {
   // the stretches of each street that are clear of junctions, as [from, to] distances along its polyline
   const R = RoadGraph;
   for (const L of Links.list) {
-    if (L.spur || (L.road.st || 'asphalt') !== 'asphalt') continue;
+    // (the island's roads, 022, carry their paint on their own ribbons: they are not at kerb height)
+    if (L.spur || (L.road.st || 'asphalt') !== 'asphalt' || L.road.isle) continue;
     const pts = L.pts, cum = L.cum, near = [];
     for (const e of L.ends) if (e.onLink) { const H = Links.list.find(h => h.name === e.onLink && Links.nearestOn(h, e.C.x, e.C.z).d < 0.6); near.push([e.C.x, e.C.z, (H ? H.w : 8) / 2 + 1.6]); }
     // where another street meets this one part way along (a Y-junction on it)
@@ -41587,7 +41615,7 @@ function buildStaticScenery(scene, world) {
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
   // water
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), makeWaterMaterial());
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000).rotateX(-Math.PI / 2), makeWaterMaterial());
   water.position.set(CITY / 2, -1.2, CITY / 2);
   scene.add(water);
   // sky
@@ -41934,8 +41962,8 @@ class CedarScenery {
      and cables) and the Blackgate Tunnel (the tube, its lights, portals);
    - the airfield's and the proving ground's surfaces and paint.
    ===================================================================== */
-const ISLE_SCN = { near: [300, 380, 450, 520], far: 32, keep: 200, trees: [20, 16, 14, 12] };
-const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3d5c36, 0x8a9150, 0x9a9c9a];
+const ISLE_SCN = { near: [240, 320, 400, 480], far: 32, keep: 200, trees: [20, 16, 14, 12] };
+const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3f6238, 0x7c9450, 0x9a9c9a];
 class IslandScenery {
   constructor(scene, world, game) {
     this.scene = scene; this.world = world; this.g = game;
@@ -41955,6 +41983,8 @@ class IslandScenery {
     const s = Island.surface(x, z, h, slope), c = this._c.setHex(ISLE_COL[s]), o = this._rgb;
     let k = 1 + 0.09 * tNoise(x / 37, z / 37, 67) + 0.05 * tNoise(x / 9, z / 9, 69);
     if (s === 0 || s === 4 || s === 5) {
+      // open ground shades into the forest's floor by how wooded it is (no hard edge: the far mesh is 32 m a vertex)
+      c.setHex(ISLE_COL[z > 980 ? 5 : 0]).lerp(this._c2.setHex(ISLE_COL[4]), smoothstep(z > 980 ? 0.5 : 0.36, z > 980 ? 0.78 : 0.66, Island.forest(x, z)));
       // steep ground shows its rock, high ground goes pale and stony, the shore's grass thins into sand
       const rock = smoothstep(0.42, 0.62, slope) + smoothstep(150, 215, h) * 0.7;
       if (rock > 0) c.lerp(this._c2.setHex(ISLE_COL[2]), Math.min(1, rock));
@@ -42064,7 +42094,7 @@ class IslandScenery {
       if (this._foreign(x - 6, z - 6, 12) || inValenPoint(x, z)) continue;
       const h = Island.height(x, z, 1e6), sl = Math.hypot(Island.gx, Island.gz);
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
-      if (Island._nearRoad(Island._seg, x, z) && Island._rd < 5) continue;
+      if (Island._nearRoad(Island._seg, x, z) && Island._rd < ISLE.verge + 2) continue;
       if (Island._nearRoad(Island._sseg, x, z) && Island._rd < 14) continue;
       let pad = false; for (const P of Island.pads) if (x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
       if (pad || Island.surface(x, z, h, sl) === 1) continue;
@@ -43924,7 +43954,7 @@ Object.assign(VEHICLES, {
     colors: [0xc8102e], blurb: 'Eight tonnes of pump and ladder.' },
   // aircraft: l and w are the fuselage (what the collision circles cover); flight: the numbers Flight flies them by
   skylark: { rev: 0.5, name: 'Skylark 180', l: 7.4, w: 1.9, h: 2.7, mass: 1100, power: 0, drift: 0, vmax: 78, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.24, camDist: 15, camH: 3.3, eng: 0.9, price: 0, profile: 'sedan', build: 'plane', air: 'plane', tier: 'nice', fleet: true, armorK: 0.7,
-    flight: { thrust: 6.4, drag: 0.00105, vStall: 25, pitchRate: 0.95, rollRate: 1.9, align: 2.6, span: 10.8 },
+    flight: { thrust: 6.4, drag: 0.00105, vStall: 25, pitchRate: 0.7, rollRate: 1.6, align: 2.6, span: 10.8 },
     colors: [0xf2f4f6, 0xf2c230, 0xc8102e, 0x2a6fd6], paint2: 0x1c3f94, blurb: 'Four seats, one propeller, 180 horsepower: the island from above.' },
   heli: { rev: 0.5, name: 'Kestrel', l: 6.6, w: 2.2, h: 3.3, mass: 1500, power: 0, drift: 0, vmax: 58, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.2, camDist: 13.5, camH: 3.4, eng: 0.6, price: 0, profile: 'sedan', build: 'heli', air: 'heli', noWheels: true, tier: 'nice', fleet: true, armorK: 0.7,
     flight: { climb: 9, sink: 8, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
@@ -44021,7 +44051,7 @@ const Flight = {
   wheels(v, world) { const W = v.vg.wheels, c = Math.cos(v.h), s = Math.sin(v.h); for (let i = 0; i < 4; i++) v._wy[i] = v.air.grounded ? this.ground(world, v.pos.x + W[i][0] * c + W[i][1] * s, v.pos.z - W[i][0] * s + W[i][1] * c, v.pos.y) : -1e6; },
   // a hard arrival: damage by how fast it came down (or what it flew into); beyond the limit it is a wreck
   arrive(v, game, sink, limit, wreck) {
-    if (sink > limit) { v.hurt((sink - limit) * 16, 'land'); game.fx.sparks(v.pos.x, v.pos.y + 0.3, v.pos.z, 14); game.audio.play('crash', { x: v.pos.x, z: v.pos.z, k: clamp(sink / 14, 0.3, 1) }); if (v.driver === 'player') game.cam.shake(clamp(sink / 14, 0.2, 0.9)); }
+    if (sink > limit) { v.hurt((sink - limit) * 9, 'land'); game.fx.sparks(v.pos.x, v.pos.y + 0.3, v.pos.z, 14); game.audio.play('crash', { x: v.pos.x, z: v.pos.z, k: clamp(sink / 14, 0.3, 1) }); if (v.driver === 'player') game.cam.shake(clamp(sink / 14, 0.2, 0.9)); }
     else if (sink > 2) game.audio.play('thud', { x: v.pos.x, z: v.pos.z, gain: 0.6 });
     if (wreck || v.health <= 0) { v.health = 0; game.fx.explodeVehicle(v); }
   },
@@ -44055,7 +44085,8 @@ const Flight = {
       } else {
         // in the air: thrust along the nose, drag against the path, the weight the wings do not carry, speed traded
         // for height, the lift's sideways part in a bank
-        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp));
+        // (throttled back, the flaps come out: up to two and a half times the drag, so it slows down to land)
+        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp)) * (1 + 1.6 * (1 - A.thr));
         let ax = fx * thrust - vx * dr, ay = fy * thrust - vy * dr - this.G * (1 - lift), az = fz * thrust - vz * dr;
         if (speed > 1) { const e = this.G * lift * vy / speed; ax -= vx / speed * e; ay -= vy / speed * e; az -= vz / speed * e; }
         const side = this.G * lift * Math.sin(A.bank); ax -= ch * side; az += sh * side;
@@ -44064,18 +44095,23 @@ const Flight = {
         // the wings pull the path round to where the nose points (not when they are stalled)
         const sp2 = Math.hypot(vx, vy, vz), k = 1 - Math.exp(-F.align * lift * dt);
         if (sp2 > 1 && vf > 0) { let nx = vx / sp2 + (fx - vx / sp2) * k, ny = vy / sp2 + (fy - vy / sp2) * k, nz = vz / sp2 + (fz - vz / sp2) * k; const nl = Math.hypot(nx, ny, nz) || 1; vx = nx / nl * sp2; vy = ny / nl * sp2; vz = nz / nl * sp2; }
-        // stick: roll and pitch by how much air there is; hands off, the wings level themselves; stalled, the nose drops
-        if (Math.abs(ctl.steer) > 0.05) A.bank = clamp(A.bank - ctl.steer * F.rollRate * (0.35 + 0.65 * auth) * dt, -1.2, 1.2); else A.bank = damp(A.bank, 0, 1.3, dt);
-        A.pitch = clamp(A.pitch + ctl.pitch * F.pitchRate * (0.3 + 0.7 * auth) * dt, -1.05, 1.05);
-        if (Math.abs(ctl.pitch) < 0.05) A.pitch = damp(A.pitch, clamp(A.pitch, -0.5, 0.5), 0.5, dt);
+        // the stick asks for an attitude (a climb or a dive, a bank) and the aeroplane takes it up as fast as the air
+        // over its surfaces allows; hands off, it levels out. Stalled, the nose drops whatever the stick says.
+        // Close to the ground and coming down it flares: the nose is held up to a shallow glide, so it arrives on its wheels.
+        const au = 0.3 + 0.7 * auth, tb = -ctl.steer * 0.95;
+        let tp = ctl.pitch >= 0 ? ctl.pitch * 0.36 : ctl.pitch * 0.32;
+        if (A.agl < 9 && vy < 0 && q > 0.75) tp = Math.max(tp, -0.035 - 0.06 * A.agl / 9);
+        A.pitch += clamp(tp - A.pitch, -F.pitchRate * au * dt, F.pitchRate * au * dt);
+        A.bank += clamp(tb - A.bank, -F.rollRate * au * dt, F.rollRate * au * dt);
         if (q < 0.9) A.pitch -= (0.9 - q) * 1.5 * dt;
+        A.pitch = clamp(A.pitch, -1.05, 0.9);
         v.h -= this.G * Math.tan(A.bank) / Math.max(vf, F.vStall * 0.8) * lift * dt;
         v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y += vy * dt;
         const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
         if (v.pos.y <= g2) {
           // touchdown: gently and wings level it is a landing; too hard, banked over or nose first, it is a crash
-          const sink = Math.max(0, -vy), bad = sink > 11 || Math.abs(A.bank) > 0.55 || A.pitch < -0.3 || (g2 < SEA_Y - 0.4);
-          v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 4.5, bad);
+          const sink = Math.max(0, -vy), bad = sink > 13 || Math.abs(A.bank) > 0.6 || A.pitch < -0.33 || (g2 < SEA_Y - 0.4);
+          v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 5, bad);
         }
         v.braking = false; v.spin += 6 * dt;
       }
@@ -44090,7 +44126,8 @@ const Flight = {
         if (lifted) v.h += ctl.steer * F.yaw * 0.5 * dt;
       } else {
         if (lifted) {
-          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink; vy += clamp(want - vy, -11 * dt, 11 * dt);
+          // (the last few metres down it sinks on its own cushion of air: a third of the rate at the ground)
+          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink * clamp(A.agl / 8, 0.3, 1); vy += clamp(want - vy, -11 * dt, 11 * dt);
           const tf = ctl.throttle >= 0 ? ctl.throttle * s.vmax : ctl.throttle * F.vBack, acc = Math.abs(ctl.throttle) > 0.05 ? F.acc : 2.4;
           f += clamp(tf - f, -acc * dt, acc * dt); l *= Math.exp(-1.8 * dt);
           v.h += ctl.steer * F.yaw * (1 - 0.5 * clamp(Math.abs(f) / s.vmax, 0, 1)) * dt;
@@ -44437,7 +44474,7 @@ class VehicleManager {
    next time you come by.
    ===================================================================== */
 class IslandFleet {
-  constructor(game) { this.g = game; this.sites = game.world.isle.fleet; this.live = new Map(); }
+  constructor(game) { this.g = game; this.sites = game.world.isle.fleet; this.live = new Map(); this.folk = new Map(); }
   // what stands in a slot: its own class, or (a settlement's driveway) what parks in the city, by the same rolls
   typeOf(site, si, k, s) {
     if (s.cls) return s.cls;
@@ -44449,6 +44486,13 @@ class IslandFleet {
     const g = this.g, V = g.vehicles, p = g.player;
     this.sites.forEach((site, si) => {
       const d = Math.hypot(site.x - fx, site.z - fz), cars = this.live.get(site.id);
+      // the people of the place: bystanders (an event's idle brain) while you are within 120 m, gone again past 170
+      if (site.people) {
+        const folk = this.folk.get(site.id);
+        if (!folk && d < 120) this.folk.set(site.id, site.people.map(([x, z, h]) => { const q = g.peds.make('civ'); q.x = x; q.z = z; q.y = groundY(x, z); q.h = h; q.state = 'free'; q.keep = true; q.brain = idleBrain; g.peds.peds.push(q); return q; }));
+        else if (folk && d > 170) { for (const q of folk) { const i = g.peds.peds.indexOf(q); if (i >= 0 && q.state !== 'down') g.peds.peds.splice(i, 1); else q.keep = false; } this.folk.delete(site.id); }
+        return;
+      }
       if (cars && d > site.r + 70) {
         for (const v of cars) if (V.list.includes(v) && !v.touched && v.driver === null && !v.mission && v !== p.lastVehicle) V.despawn(v);
         this.live.delete(site.id);
@@ -44861,6 +44905,8 @@ class TrafficManager {
     const ai = v.ai;
     ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
     ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
+    // out on the island's highways (022) traffic runs at highway speed (the bends' own limits still hold)
+    ai.path.fast = steps.some(st => st.e.link && st.e.link.road && st.e.link.road.isle && st.e.w >= 10) ? 1.75 : 1;
     // (a car put straight onto a bend starts no faster than the bend allows)
     ai.speed = Math.min(ai.speed, lim[0]);
     return true;
@@ -45045,7 +45091,7 @@ class TrafficManager {
     if (ai.mode === 'path') {
       // curved road: brake ahead of bends, wait for a gap before merging back onto the lattice
       const pa = ai.path;
-      vAllow = Math.min(vAllow, ai.maxV * 0.92);
+      vAllow = Math.min(vAllow, ai.maxV * 0.92) * (pa.fast || 1);
       for (let k = pa.k; k < pa.pts.length && pa.cum[k] - pa.d < 45; k++) { const va = Math.sqrt(pa.lim[k] * pa.lim[k] + 2 * 4.5 * Math.max(0, pa.cum[k] - pa.d)); if (va < vAllow) vAllow = va; }
       // a lattice street ahead to join or cross: wait for a gap. A car stopped there (a queue at a light) must not
       // hold us forever: after a few seconds we nose out anyway and the obstacle check keeps us off its bumper
@@ -64825,9 +64871,13 @@ class UIManager {
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     this.show('speedo', !!pv);
     document.body.classList.toggle('driving', !!pv);
+    // in an aircraft (232) the thumb buttons are the throttle (the helicopter: up and down)
+    const air = pv && pv.air ? pv.spec.air : '';
+    if (this._airUI !== air) { this._airUI = air; const lab = air === 'plane' ? ['Thr +', 'Thr −'] : air === 'heli' ? ['Up', 'Down'] : ['Gas', 'Brake'], gb = document.querySelector('#touch .tbtn[data-act="gas"]'), bb = document.querySelector('#touch .tbtn[data-act="brake"]'); if (gb) gb.textContent = lab[0]; if (bb) bb.textContent = lab[1]; }
     if (pv) {
-      $('spd').textContent = Math.round(pv.speed * 3.6);
-      $('gear').textContent = pv.gear < 0 ? 'R' : pv.speed < 0.5 ? 'N' : pv.gear;
+      // an aircraft shows its airspeed, and its height over the ground where a car shows its gear
+      $('spd').textContent = Math.round((pv.air ? Math.hypot(pv.speed, pv.air.vy) : pv.speed) * 3.6);
+      $('gear').textContent = pv.air ? (pv.air.grounded ? 'GND' : Math.round(pv.air.agl) + ' m') + (air === 'plane' ? ' · ' + Math.round(pv.air.thr * 100) + '%' : '') : pv.gear < 0 ? 'R' : pv.speed < 0.5 ? 'N' : pv.gear;
       const vs = vehStage(pv.health);
       const vn = pv.spec.name + (vs[1] !== 'NORMAL' ? ' · ' + vs[1] : '');
       if ($('vehName').textContent !== vn) { $('vehName').textContent = vn; $('vehName').style.color = vs[1] === 'NORMAL' ? '' : vs[2]; }
@@ -66566,7 +66616,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
+    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

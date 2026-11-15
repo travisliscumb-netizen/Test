@@ -64,7 +64,7 @@ function buildStaticScenery(scene, world) {
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
   // water
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), makeWaterMaterial());
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000).rotateX(-Math.PI / 2), makeWaterMaterial());
   water.position.set(CITY / 2, -1.2, CITY / 2);
   scene.add(water);
   // sky

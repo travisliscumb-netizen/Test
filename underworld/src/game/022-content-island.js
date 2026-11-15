@@ -23,7 +23,7 @@
    maps, zones, spawns.
    ===================================================================== */
 const SEA_Y = -1.2;
-const ISLE = { name: 'Valen Island', x0: -2560, z0: -3328, x1: 3072, z1: 3072, tile: 256, cell: 4, wade: 1.25, sdfCell: 16, sdfMax: 400, shMax: 34 };
+const ISLE = { name: 'Valen Island', x0: -2560, z0: -3328, x1: 3072, z1: 3072, tile: 256, cell: 4, wade: 1.25, sdfCell: 16, sdfMax: 400, shMax: 34, verge: 6 };
 const WORLD_X0 = ISLE.x0, WORLD_Z0 = ISLE.z0;
 // the coast, clockwise from the city's north-west corner: Valen Bay's north shore and Blackgate Point, the highlands'
 // west coast, the north cape, the east coast and the north shore of Valen Sound, the city's east side (inside the
@@ -234,9 +234,19 @@ const Island = {
     // a bridge's span reaches a little past the water's edge onto the abutments
     for (let pass = 0; pass < 2; pass++) { const c = sp.slice(); for (let k = 0; k < n; k++) if (c[k] === 1 && pass < 2) { if (k > 0 && !c[k - 1]) sp[k - 1] = 1; if (k < n - 1 && !c[k + 1]) sp[k + 1] = 1; } }
     // the ends: the lattice's kerb level, the level of the road it meets, or the ground itself
+    // (held for as long as it runs beside the other road, at that road's level abreast of it, or over the city's
+    // promenade: the ground there is theirs)
     R.ends.forEach((e, k) => {
-      const i = k ? n - 1 : 0, H = R.hosts[k];
-      if (e === 'lat') pin[i] = CURB_H; else if (H) pin[i] = H.road.y[H.k];
+      const i = k ? n - 1 : 0, H = R.hosts[k]; if (e !== 'lat' && !H) return;
+      for (let j = 0; j < n; j++) {
+        const q = k ? n - 1 - j : j, along = Math.abs(cum[q] - cum[i]);
+        if (e === 'lat') { if (along > EDGE_MARGIN - ROAD_HALF + 2) break; pin[q] = CURB_H; continue; }
+        // (as far as its own carriageway is still on the other road's verge, 150 m at most)
+        const hp = H.road.pts; let best = H.k, bd = Infinity;
+        for (let m = Math.max(0, H.k - 40); m <= Math.min(hp.length - 1, H.k + 40); m++) { const d = Math.hypot(hp[m][0] - pts[q][0], hp[m][1] - pts[q][1]); if (d < bd) { bd = d; best = m; } }
+        if (bd - H.road.w / 2 > ISLE.verge + R.w / 2 + 2 || along > 150) break;
+        pin[q] = H.road.y[best];
+      }
     });
     // the cut: from where the ground first rises above T either side of the ridge, one even grade
     let cut = null;
@@ -263,7 +273,7 @@ const Island = {
     this._seg.clear(); this._sseg.clear(); this._multi.clear();
     const C = 64, T = ISLE.tile;
     this.roads.forEach((R, ri) => {
-      const reach = R.w / 2 + 1 + ISLE.shMax;
+      const reach = R.w / 2 + ISLE.verge + ISLE.shMax;
       for (let k = 0; k < R.pts.length - 1; k++) {
         const a = R.pts[k], b = R.pts[k + 1], span = R.sp[k] && R.sp[k + 1], id = ri * 65536 + k;
         const put = (M, m) => { for (let cx = Math.floor((Math.min(a[0], b[0]) - m) / C); cx <= Math.floor((Math.max(a[0], b[0]) + m) / C); cx++) for (let cz = Math.floor((Math.min(a[1], b[1]) - m) / C); cz <= Math.floor((Math.max(a[1], b[1]) + m) / C); cz++) { const key = (cx + 512) * 1024 + cz + 512; let L = M.get(key); if (!L) M.set(key, L = []); L.push(id); } };
@@ -279,12 +289,14 @@ const Island = {
   // _ry (the road's level there), _rr (the road), _rk (segment), _rt (how far along the segment), _ro (signed offset)
   _nearRoad(M, x, z) {
     const L = M.get((Math.floor(x / 64) + 512) * 1024 + Math.floor(z / 64) + 512); if (!L) return false;
-    let bd = Infinity;
+    // (on its own carriageway and verge a road listed earlier wins over one listed later: the road another joins keeps
+    // its own level right through the junction, and the joining road meets it)
+    let bd = Infinity, bk = Infinity;
     for (let q = 0; q < L.length; q++) {
-      const id = L[q], R = this.roads[(id / 65536) | 0], k = id % 65536, a = R.pts[k], b = R.pts[k + 1];
+      const id = L[q], ri = (id / 65536) | 0, R = this.roads[ri], k = id % 65536, a = R.pts[k], b = R.pts[k + 1];
       const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
-      const ox = x - a[0] - dx * t, oz = z - a[1] - dz * t, d = Math.hypot(ox, oz) - R.w / 2;
-      if (d < bd) { bd = d; this._rr = R; this._rk = k; this._rt = t; this._ry = R.y[k] + (R.y[k + 1] - R.y[k]) * t; }
+      const ox = x - a[0] - dx * t, oz = z - a[1] - dz * t, d = Math.hypot(ox, oz) - R.w / 2, key = d < ISLE.verge ? ri * 100 + Math.max(d, 0) * 0.001 + (d < 0 ? d * 1e-6 : 0) : 1e6 + d;
+      if (key < bk) { bk = key; bd = d; this._rr = R; this._rk = k; this._rt = t; this._ry = R.y[k] + (R.y[k + 1] - R.y[k]) * t; }
     }
     this._rd = bd;
     return bd < Infinity;
@@ -297,9 +309,11 @@ const Island = {
     if (!this._nearRoad(this._seg, x, z)) return h;
     const y = this._ry, d = this._rd;
     if (wide) return d < wide ? Math.min(h, y - 0.4) : h;
-    const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h));
-    if (d >= 1 + sh) return h;
-    const t = smoothstep(1, 1 + sh, d);
+    // level across the road and a verge either side (ISLE.verge: wide enough that every 4 m cell the carriageway
+    // touches is level, so the baked tile is too), then eased into the hillside over a shoulder as wide as the cut is deep
+    const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h)), v0 = ISLE.verge;
+    if (d >= v0 + sh) return h;
+    const t = smoothstep(v0, v0 + sh, d);
     return y * (1 - t) + h * t;
   },
   // ---------------------------------------------------------------- tiles

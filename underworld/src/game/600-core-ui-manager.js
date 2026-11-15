@@ -671,9 +671,13 @@ class UIManager {
     const pv = p.state === 'vehicle' ? p.vehicle : null;
     this.show('speedo', !!pv);
     document.body.classList.toggle('driving', !!pv);
+    // in an aircraft (232) the thumb buttons are the throttle (the helicopter: up and down)
+    const air = pv && pv.air ? pv.spec.air : '';
+    if (this._airUI !== air) { this._airUI = air; const lab = air === 'plane' ? ['Thr +', 'Thr −'] : air === 'heli' ? ['Up', 'Down'] : ['Gas', 'Brake'], gb = document.querySelector('#touch .tbtn[data-act="gas"]'), bb = document.querySelector('#touch .tbtn[data-act="brake"]'); if (gb) gb.textContent = lab[0]; if (bb) bb.textContent = lab[1]; }
     if (pv) {
-      $('spd').textContent = Math.round(pv.speed * 3.6);
-      $('gear').textContent = pv.gear < 0 ? 'R' : pv.speed < 0.5 ? 'N' : pv.gear;
+      // an aircraft shows its airspeed, and its height over the ground where a car shows its gear
+      $('spd').textContent = Math.round((pv.air ? Math.hypot(pv.speed, pv.air.vy) : pv.speed) * 3.6);
+      $('gear').textContent = pv.air ? (pv.air.grounded ? 'GND' : Math.round(pv.air.agl) + ' m') + (air === 'plane' ? ' · ' + Math.round(pv.air.thr * 100) + '%' : '') : pv.gear < 0 ? 'R' : pv.speed < 0.5 ? 'N' : pv.gear;
       const vs = vehStage(pv.health);
       const vn = pv.spec.name + (vs[1] !== 'NORMAL' ? ' · ' + vs[1] : '');
       if ($('vehName').textContent !== vn) { $('vehName').textContent = vn; $('vehName').style.color = vs[1] === 'NORMAL' ? '' : vs[2]; }

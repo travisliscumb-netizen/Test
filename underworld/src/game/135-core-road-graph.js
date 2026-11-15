@@ -554,7 +554,8 @@ function buildRoadMarkings(scene) {
   // the stretches of each street that are clear of junctions, as [from, to] distances along its polyline
   const R = RoadGraph;
   for (const L of Links.list) {
-    if (L.spur || (L.road.st || 'asphalt') !== 'asphalt') continue;
+    // (the island's roads, 022, carry their paint on their own ribbons: they are not at kerb height)
+    if (L.spur || (L.road.st || 'asphalt') !== 'asphalt' || L.road.isle) continue;
     const pts = L.pts, cum = L.cum, near = [];
     for (const e of L.ends) if (e.onLink) { const H = Links.list.find(h => h.name === e.onLink && Links.nearestOn(h, e.C.x, e.C.z).d < 0.6); near.push([e.C.x, e.C.z, (H ? H.w : 8) / 2 + 1.6]); }
     // where another street meets this one part way along (a Y-junction on it)

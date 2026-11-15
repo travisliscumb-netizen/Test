@@ -10,7 +10,7 @@
    next time you come by.
    ===================================================================== */
 class IslandFleet {
-  constructor(game) { this.g = game; this.sites = game.world.isle.fleet; this.live = new Map(); }
+  constructor(game) { this.g = game; this.sites = game.world.isle.fleet; this.live = new Map(); this.folk = new Map(); }
   // what stands in a slot: its own class, or (a settlement's driveway) what parks in the city, by the same rolls
   typeOf(site, si, k, s) {
     if (s.cls) return s.cls;
@@ -22,6 +22,13 @@ class IslandFleet {
     const g = this.g, V = g.vehicles, p = g.player;
     this.sites.forEach((site, si) => {
       const d = Math.hypot(site.x - fx, site.z - fz), cars = this.live.get(site.id);
+      // the people of the place: bystanders (an event's idle brain) while you are within 120 m, gone again past 170
+      if (site.people) {
+        const folk = this.folk.get(site.id);
+        if (!folk && d < 120) this.folk.set(site.id, site.people.map(([x, z, h]) => { const q = g.peds.make('civ'); q.x = x; q.z = z; q.y = groundY(x, z); q.h = h; q.state = 'free'; q.keep = true; q.brain = idleBrain; g.peds.peds.push(q); return q; }));
+        else if (folk && d > 170) { for (const q of folk) { const i = g.peds.peds.indexOf(q); if (i >= 0 && q.state !== 'down') g.peds.peds.splice(i, 1); else q.keep = false; } this.folk.delete(site.id); }
+        return;
+      }
       if (cars && d > site.r + 70) {
         for (const v of cars) if (V.list.includes(v) && !v.touched && v.driver === null && !v.mission && v !== p.lastVehicle) V.despawn(v);
         this.live.delete(site.id);

@@ -32,7 +32,7 @@ Object.assign(VEHICLES, {
     colors: [0xc8102e], blurb: 'Eight tonnes of pump and ladder.' },
   // aircraft: l and w are the fuselage (what the collision circles cover); flight: the numbers Flight flies them by
   skylark: { rev: 0.5, name: 'Skylark 180', l: 7.4, w: 1.9, h: 2.7, mass: 1100, power: 0, drift: 0, vmax: 78, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.24, camDist: 15, camH: 3.3, eng: 0.9, price: 0, profile: 'sedan', build: 'plane', air: 'plane', tier: 'nice', fleet: true, armorK: 0.7,
-    flight: { thrust: 6.4, drag: 0.00105, vStall: 25, pitchRate: 0.95, rollRate: 1.9, align: 2.6, span: 10.8 },
+    flight: { thrust: 6.4, drag: 0.00105, vStall: 25, pitchRate: 0.7, rollRate: 1.6, align: 2.6, span: 10.8 },
     colors: [0xf2f4f6, 0xf2c230, 0xc8102e, 0x2a6fd6], paint2: 0x1c3f94, blurb: 'Four seats, one propeller, 180 horsepower: the island from above.' },
   heli: { rev: 0.5, name: 'Kestrel', l: 6.6, w: 2.2, h: 3.3, mass: 1500, power: 0, drift: 0, vmax: 58, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.2, camDist: 13.5, camH: 3.4, eng: 0.6, price: 0, profile: 'sedan', build: 'heli', air: 'heli', noWheels: true, tier: 'nice', fleet: true, armorK: 0.7,
     flight: { climb: 9, sink: 8, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
@@ -129,7 +129,7 @@ const Flight = {
   wheels(v, world) { const W = v.vg.wheels, c = Math.cos(v.h), s = Math.sin(v.h); for (let i = 0; i < 4; i++) v._wy[i] = v.air.grounded ? this.ground(world, v.pos.x + W[i][0] * c + W[i][1] * s, v.pos.z - W[i][0] * s + W[i][1] * c, v.pos.y) : -1e6; },
   // a hard arrival: damage by how fast it came down (or what it flew into); beyond the limit it is a wreck
   arrive(v, game, sink, limit, wreck) {
-    if (sink > limit) { v.hurt((sink - limit) * 16, 'land'); game.fx.sparks(v.pos.x, v.pos.y + 0.3, v.pos.z, 14); game.audio.play('crash', { x: v.pos.x, z: v.pos.z, k: clamp(sink / 14, 0.3, 1) }); if (v.driver === 'player') game.cam.shake(clamp(sink / 14, 0.2, 0.9)); }
+    if (sink > limit) { v.hurt((sink - limit) * 9, 'land'); game.fx.sparks(v.pos.x, v.pos.y + 0.3, v.pos.z, 14); game.audio.play('crash', { x: v.pos.x, z: v.pos.z, k: clamp(sink / 14, 0.3, 1) }); if (v.driver === 'player') game.cam.shake(clamp(sink / 14, 0.2, 0.9)); }
     else if (sink > 2) game.audio.play('thud', { x: v.pos.x, z: v.pos.z, gain: 0.6 });
     if (wreck || v.health <= 0) { v.health = 0; game.fx.explodeVehicle(v); }
   },
@@ -163,7 +163,8 @@ const Flight = {
       } else {
         // in the air: thrust along the nose, drag against the path, the weight the wings do not carry, speed traded
         // for height, the lift's sideways part in a bank
-        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp));
+        // (throttled back, the flaps come out: up to two and a half times the drag, so it slows down to land)
+        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp)) * (1 + 1.6 * (1 - A.thr));
         let ax = fx * thrust - vx * dr, ay = fy * thrust - vy * dr - this.G * (1 - lift), az = fz * thrust - vz * dr;
         if (speed > 1) { const e = this.G * lift * vy / speed; ax -= vx / speed * e; ay -= vy / speed * e; az -= vz / speed * e; }
         const side = this.G * lift * Math.sin(A.bank); ax -= ch * side; az += sh * side;
@@ -172,18 +173,23 @@ const Flight = {
         // the wings pull the path round to where the nose points (not when they are stalled)
         const sp2 = Math.hypot(vx, vy, vz), k = 1 - Math.exp(-F.align * lift * dt);
         if (sp2 > 1 && vf > 0) { let nx = vx / sp2 + (fx - vx / sp2) * k, ny = vy / sp2 + (fy - vy / sp2) * k, nz = vz / sp2 + (fz - vz / sp2) * k; const nl = Math.hypot(nx, ny, nz) || 1; vx = nx / nl * sp2; vy = ny / nl * sp2; vz = nz / nl * sp2; }
-        // stick: roll and pitch by how much air there is; hands off, the wings level themselves; stalled, the nose drops
-        if (Math.abs(ctl.steer) > 0.05) A.bank = clamp(A.bank - ctl.steer * F.rollRate * (0.35 + 0.65 * auth) * dt, -1.2, 1.2); else A.bank = damp(A.bank, 0, 1.3, dt);
-        A.pitch = clamp(A.pitch + ctl.pitch * F.pitchRate * (0.3 + 0.7 * auth) * dt, -1.05, 1.05);
-        if (Math.abs(ctl.pitch) < 0.05) A.pitch = damp(A.pitch, clamp(A.pitch, -0.5, 0.5), 0.5, dt);
+        // the stick asks for an attitude (a climb or a dive, a bank) and the aeroplane takes it up as fast as the air
+        // over its surfaces allows; hands off, it levels out. Stalled, the nose drops whatever the stick says.
+        // Close to the ground and coming down it flares: the nose is held up to a shallow glide, so it arrives on its wheels.
+        const au = 0.3 + 0.7 * auth, tb = -ctl.steer * 0.95;
+        let tp = ctl.pitch >= 0 ? ctl.pitch * 0.36 : ctl.pitch * 0.32;
+        if (A.agl < 9 && vy < 0 && q > 0.75) tp = Math.max(tp, -0.035 - 0.06 * A.agl / 9);
+        A.pitch += clamp(tp - A.pitch, -F.pitchRate * au * dt, F.pitchRate * au * dt);
+        A.bank += clamp(tb - A.bank, -F.rollRate * au * dt, F.rollRate * au * dt);
         if (q < 0.9) A.pitch -= (0.9 - q) * 1.5 * dt;
+        A.pitch = clamp(A.pitch, -1.05, 0.9);
         v.h -= this.G * Math.tan(A.bank) / Math.max(vf, F.vStall * 0.8) * lift * dt;
         v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y += vy * dt;
         const g2 = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
         if (v.pos.y <= g2) {
           // touchdown: gently and wings level it is a landing; too hard, banked over or nose first, it is a crash
-          const sink = Math.max(0, -vy), bad = sink > 11 || Math.abs(A.bank) > 0.55 || A.pitch < -0.3 || (g2 < SEA_Y - 0.4);
-          v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 4.5, bad);
+          const sink = Math.max(0, -vy), bad = sink > 13 || Math.abs(A.bank) > 0.6 || A.pitch < -0.33 || (g2 < SEA_Y - 0.4);
+          v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink, 5, bad);
         }
         v.braking = false; v.spin += 6 * dt;
       }
@@ -198,7 +204,8 @@ const Flight = {
         if (lifted) v.h += ctl.steer * F.yaw * 0.5 * dt;
       } else {
         if (lifted) {
-          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink; vy += clamp(want - vy, -11 * dt, 11 * dt);
+          // (the last few metres down it sinks on its own cushion of air: a third of the rate at the ground)
+          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink * clamp(A.agl / 8, 0.3, 1); vy += clamp(want - vy, -11 * dt, 11 * dt);
           const tf = ctl.throttle >= 0 ? ctl.throttle * s.vmax : ctl.throttle * F.vBack, acc = Math.abs(ctl.throttle) > 0.05 ? F.acc : 2.4;
           f += clamp(tf - f, -acc * dt, acc * dt); l *= Math.exp(-1.8 * dt);
           v.h += ctl.steer * F.yaw * (1 - 0.5 * clamp(Math.abs(f) / s.vmax, 0, 1)) * dt;

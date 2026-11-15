@@ -259,6 +259,19 @@ Object.assign(World.prototype, {
       isle.lifts.push({ name: key === 'hospital' ? 'St. Alda helipad' : 'Police air unit', a: { x: H.lift.x, z: H.lift.z, y: CURB_H }, b: { x: H.top.x, z: H.top.z, y: H.y } });
       fleet('roof_' + key, H.x, H.z, 420, [{ x: H.x, z: H.z, h: Math.PI / 2, y: H.y, cls: key === 'hospital' ? 'medevac' : 'polheli' }]);
     }
+    // ================================================================ the people of each place (bystanders who stand about while you are near)
+    {
+      const folk = (id, x, z, people) => isle.fleet.push({ id: 'folk_' + id, x, z, r: 0, slots: [], people });
+      folk('terminal', 600, 1884, [[590, 1885, 1.2], [594, 1886, -1.5], [606, 1885.5, 0.4], [612, 1886, -2.4], [575, 1881.6, 1.57], [628, 1884, 2.8], [600, 1886.5, 3.1]]);
+      folk('apron', 1050, 1968, [[1030, 1975, -1.2], [1085, 1960, 0.6], [958, 1968, 1.57]]);
+      folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1519, 472, 1.57], [1519, 570, 1.57], [1508, 520, 0.4]]);
+      folk('proving', 1163, 1492, [[1166, 1491, 3.14], [1170, 1490, -2.6], [PROVING.strip.x0 + 3, PROVING.strip.z - 12.5, 1.57]]);
+      folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
+      folk('summit', 380, -1800, [[372, -1784.5, 0.2], [376, -1785.5, -0.3], [392, -1847, 3.14]]);
+      folk('lighthouse', 1508, -2788, [[1508, -2788, 1.2]]);
+      folk('firehouse', 160, -127, [[ISLE_FIRE.x0 + 17, ISLE_FIRE.z0 + 20, -1.57], [ISLE_FIRE.x0 + 18, ISLE_FIRE.z0 + 34, -1.57]]);
+      folk('gull', -1290, -2265, [[-1282, -2264, 0.5], [-1330, -2262, 2.0], [-1240, -2300, -0.8]]);
+    }
     // colliders for the island's blocks (the city's and Valen Point's loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });

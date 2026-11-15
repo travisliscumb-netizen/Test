@@ -15,8 +15,8 @@
      and cables) and the Blackgate Tunnel (the tube, its lights, portals);
    - the airfield's and the proving ground's surfaces and paint.
    ===================================================================== */
-const ISLE_SCN = { near: [300, 380, 450, 520], far: 32, keep: 200, trees: [20, 16, 14, 12] };
-const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3d5c36, 0x8a9150, 0x9a9c9a];
+const ISLE_SCN = { near: [240, 320, 400, 480], far: 32, keep: 200, trees: [20, 16, 14, 12] };
+const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3f6238, 0x7c9450, 0x9a9c9a];
 class IslandScenery {
   constructor(scene, world, game) {
     this.scene = scene; this.world = world; this.g = game;
@@ -36,6 +36,8 @@ class IslandScenery {
     const s = Island.surface(x, z, h, slope), c = this._c.setHex(ISLE_COL[s]), o = this._rgb;
     let k = 1 + 0.09 * tNoise(x / 37, z / 37, 67) + 0.05 * tNoise(x / 9, z / 9, 69);
     if (s === 0 || s === 4 || s === 5) {
+      // open ground shades into the forest's floor by how wooded it is (no hard edge: the far mesh is 32 m a vertex)
+      c.setHex(ISLE_COL[z > 980 ? 5 : 0]).lerp(this._c2.setHex(ISLE_COL[4]), smoothstep(z > 980 ? 0.5 : 0.36, z > 980 ? 0.78 : 0.66, Island.forest(x, z)));
       // steep ground shows its rock, high ground goes pale and stony, the shore's grass thins into sand
       const rock = smoothstep(0.42, 0.62, slope) + smoothstep(150, 215, h) * 0.7;
       if (rock > 0) c.lerp(this._c2.setHex(ISLE_COL[2]), Math.min(1, rock));
@@ -145,7 +147,7 @@ class IslandScenery {
       if (this._foreign(x - 6, z - 6, 12) || inValenPoint(x, z)) continue;
       const h = Island.height(x, z, 1e6), sl = Math.hypot(Island.gx, Island.gz);
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
-      if (Island._nearRoad(Island._seg, x, z) && Island._rd < 5) continue;
+      if (Island._nearRoad(Island._seg, x, z) && Island._rd < ISLE.verge + 2) continue;
       if (Island._nearRoad(Island._sseg, x, z) && Island._rd < 14) continue;
       let pad = false; for (const P of Island.pads) if (x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
       if (pad || Island.surface(x, z, h, sl) === 1) continue;

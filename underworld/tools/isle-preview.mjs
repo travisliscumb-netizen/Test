@@ -36,3 +36,15 @@ console.log(`sdf ${tS} ms, roads ${tR} ms, heights ${tH} ms (${(tH / W / H * 100
 for (const R of Island.roads) { let g = 0, lo = 1e9, hi = -1e9, off = 0; for (let k = 1; k < R.pts.length; k++) { g = Math.max(g, Math.abs(R.y[k] - R.y[k - 1]) / (R.cum[k] - R.cum[k - 1])); lo = Math.min(lo, R.y[k]); hi = Math.max(hi, R.y[k]); } for (let k = 0; k < R.pts.length; k++) if (!R.sp[k]) off = Math.max(off, Math.abs(R.y[k] - Island.base0(R.pts[k][0], R.pts[k][1]))); console.log(R.id.padEnd(3), R.name.padEnd(22), (R.len / 1000).toFixed(2) + ' km', 'y', lo.toFixed(1), '..', hi.toFixed(1), 'max grade', (g * 100).toFixed(1) + '%', 'max cut/fill', off.toFixed(1), 'bridges', JSON.stringify(R.bridges.map(b => Math.round(R.cum[b[1]] - R.cum[b[0]]))), R.tunnel ? 'tunnel ' + Math.round(R.cum[R.tunnel[1]] - R.cum[R.tunnel[0]]) + ' m' : ''); }
 // where each road's deepest cut or highest fill is
 for (const R of Island.roads) { let m = 0, at = 0; for (let k = 0; k < R.pts.length; k++) if (!R.sp[k]) { const d = R.y[k] - Island.base0(R.pts[k][0], R.pts[k][1]); if (Math.abs(d) > Math.abs(m)) { m = d; at = k; } } console.log(R.id, 'worst', m.toFixed(1), 'm at', R.pts[at].map(Math.round).join(','), 'along', Math.round(R.cum[at])); }
+// where the ground on a road's centre line is furthest from the road's own level, and where it is least level across
+if (process.env.ISLE_BEDS) for (const R of Island.roads) {
+  let c = [0, 0], x = [0, 0];
+  for (let k = 2; k < R.pts.length - 2; k++) {
+    const p = R.pts[k]; if (R.sp[k] || R.sp[k - 1] || R.sp[k + 1] || (p[0] > -30 && p[1] > -30 && p[0] < 990 && p[1] < 990)) continue;
+    const a = R.pts[k - 1], b = R.pts[k + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = (b[1] - a[1]) / l, nz = -(b[0] - a[0]) / l, w = R.w / 2 - 1.5;
+    const h0 = Island.height(p[0], p[1], R.y[k] + 1), hl = Island.height(p[0] + nx * w, p[1] + nz * w, R.y[k] + 1), hr = Island.height(p[0] - nx * w, p[1] - nz * w, R.y[k] + 1);
+    if (Math.abs(h0 - R.y[k]) > c[0]) c = [Math.abs(h0 - R.y[k]), k]; if (Math.abs(hl - hr) > x[0]) x = [Math.abs(hl - hr), k];
+  }
+  console.log(R.id, 'centre', c[0].toFixed(3), 'at k', c[1], R.pts[c[1]].map(Math.round).join(','), 'of', R.pts.length, '| cross', x[0].toFixed(3), 'at k', x[1], R.pts[x[1]].map(Math.round).join(','));
+}
+if (process.env.ISLE_DBG) { const R = Island.roads.find(r => r.id === process.env.ISLE_DBG); for (let k = 0; k < 20; k++) { const p = R.pts[k]; Island._nearRoad(Island._seg, p[0], p[1]); console.log(k, p.map(v => v.toFixed(1)).join(','), 'y', R.y[k].toFixed(2), 'compute', Island.compute(p[0], p[1]).toFixed(2), 'tile', Island.height(p[0], p[1], R.y[k] + 1).toFixed(2), 'sel', Island._rr.id, 'd', Island._rd.toFixed(1)); } }
