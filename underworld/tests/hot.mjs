@@ -277,7 +277,7 @@ const geo = await ev(() => {
   const g = window.game, P = window.__pv, I = g.impound, W = g.world.compounds, PM = g.uw.props, out = {};
   let bays = 0; for (const def of P.PROPS) bays += PM.bays(def).length;
   out.bays = bays; out.cap = I.capacity(); out.lots = I.lots(); out.main = W[P.IMPOUND.id].slots.length; out.over = W[P.IMPOUND.overflow.id].slots.length; out.annex = W[P.IMPOUND.annex.id] ? W[P.IMPOUND.annex.id].slots.length : 0;
-  const own = Object.keys(P.VEHICLES).filter(k => !P.VEHICLES[k].police && k !== 'police');
+  const own = Object.keys(P.VEHICLES).filter(k => !P.VEHICLES[k].police && !P.VEHICLES[k].fleet && k !== 'police'); // fleet-only models cannot be owned, so are never impounded
   out.maxL = Math.max(...own.map(k => P.VEHICLES[k].l)); out.maxW = Math.max(...own.map(k => P.VEHICLES[k].w));
   // a slot's footprint: the bay where it has one (overflow), else the biggest car's
   const S = I.slots(), foot = sp => { const d = sp.d || out.maxL + 0.2, w = sp.w || out.maxW + 0.5, al = Math.abs(Math.sin(sp.h)) > 0.5; return al ? { x0: sp.x - d / 2, x1: sp.x + d / 2, z0: sp.z - w / 2, z1: sp.z + w / 2 } : { x0: sp.x - w / 2, x1: sp.x + w / 2, z0: sp.z - d / 2, z1: sp.z + d / 2 }; };

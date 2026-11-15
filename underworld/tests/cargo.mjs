@@ -30,7 +30,7 @@ const census = () => ev(() => {
 
 // ---------------------------------------------------------------- 1. capacities by body
 const caps = await ev(() => {
-  const P = window.__pv, out = { missing: Object.keys(P.VEHICLES).filter(k => P.CARGO_LB[k] === undefined), lb: P.CARGO_LB };
+  const P = window.__pv, out = { missing: Object.keys(P.VEHICLES).filter(k => !P.VEHICLES[k].fleet && P.CARGO_LB[k] === undefined) /* fleet-only models (race cars, aircraft, emergency: ISLAND.md §5) cannot be kept, so carry no cargo class */, lb: P.CARGO_LB };
   return out;
 });
 const L = caps.lb;
