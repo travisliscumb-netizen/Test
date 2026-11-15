@@ -11,6 +11,9 @@ Read this first, then `CURRENT_SESSION.md` (what is in progress and the exact ne
 - `OVERHAUL_STATUS.md`: the detailed per-session history (long). `DECISIONS.md` summarises the rulings that matter.
 - `ISLAND.md`: Operation Blackgate, the owner's world rebuild (the island, its roads, the airport, aircraft, race
   cars). The owner gave full creative and technical authority for it; its decisions are recorded there.
+- `CITY_SPREAD.md`: the city into the island. The owner ruled for true relocation (the lattice's districts moved
+  out across the island, nothing redrawn). It is the plan, the checklist of every place that still assumes a square,
+  the stage gates and the status; work on it continues from its §0. Built on `claude/epic-galileo-m47k4d`.
 
 ## Repository rules
 - Branch `claude/practical-lamport-zld81y`; push with `git push -u origin claude/practical-lamport-zld81y`.
@@ -23,6 +26,8 @@ Read this first, then `CURRENT_SESSION.md` (what is in progress and the exact ne
 
 ## Engineering rules
 - One source of truth per system; no parallel legacy paths. Old sessions are history, not frozen code.
+- What is city and where a block stands is `CityLayout`'s business (`021`). Never compare a world coordinate
+  against `0`, `CITY` or `N` to decide it; never clamp to `0…N − 1` by hand (CITY_SPREAD.md §2, §5).
 - Every money movement goes through `Money` (`035`) with a declared source tag (static-money suite enforces it).
 - Save fields: add a default in `SaveSystem.defaults`, sanitize in the owning system's `static sanitize`, keep
   loads idempotent; never bump `SAVE_VERSION` for an additive field.

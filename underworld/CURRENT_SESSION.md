@@ -1,5 +1,24 @@
 # CURRENT SESSION
 
+- **The city into the island (CITY_SPREAD.md): stage S1 DONE; stage S2 is next.** The owner played the island, asked
+  for the city to stop being a square in the middle of it, and ruled for true relocation (the lattice's districts
+  moved out across the island, every system kept, nothing redrawn) over building new neighbourhoods round a fixed
+  grid. CITY_SPREAD.md is the plan, the checklist of every place that still assumes a square (741 references in 55
+  files), the stage gates and the log. Branch `claude/epic-galileo-m47k4d`.
+  - S1 (`d228a94`): `CityLayout` (`021`: the lattice is the address, where a block stands is data), its rules, suite
+    `layout`, `tools/world-print.mjs` and the baseline print; `offCity`, `zoneKey`, `districtNameAt`, `groundBase`,
+    `turfAt` ask the layout. **Nothing moved**: the world fingerprint is identical to the island build.
+  - A bug fixed on the way (`f4f42b9`): the HUD named city streets all over the island ("Elm St" on Mount Valen,
+    "Dock St" on the runway). It is the only thing a player can see from this session.
+  - Checks: fingerprint `IDENTICAL` (24 sections, 144 + 56 blocks); `layout` 23/23, and it fails on each of four
+    deliberate faults; build 5/5, static-money 8/8, smoke 16/16, island 41/41, city 25/25, map 22/22, gangs 23/23,
+    police 13/13, taxi 20/20, property 33/33; roadnet 41/42, the one failure being the estate-relocation reload
+    check, which fails the same way here on three earlier builds (KNOWN_ISSUES). The full regression was not run:
+    S1 moves nothing, and S2's gate is where it is due.
+  - The draft siting (`tools/city-siting.mjs`, CITY_SPREAD.md §3) went to the owner as a picture: the city wrapped
+    round Valen Bay. **Waiting on the owner's yes / no / move-that; it is needed at S5, not before.**
+  - Next: CITY_SPREAD.md §4 stage S2, working §5's checklist from the top.
+
 - **Operation Blackgate (the island rebuild): COMPLETE, delivered for owner review.** ISLAND.md is the record (design,
   what was built and where, decisions, performance, tests). Branch `claude/epic-galileo-m47k4d`. Gate: `island` 40/40;
   full regression 1,928 / 10 (four were roster checks now scoped to ownable models, six load-timing; all pass solo).

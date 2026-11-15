@@ -2,7 +2,8 @@
 
 - Suites: `underworld/tests/*.mjs` (Playwright + headless Chromium/SwiftShader, offline). Run one:
   `node underworld/tests/<suite>.mjs` from the repo root. `UW_FILE=<path>` runs against another build.
-- Node-only checks: `build.mjs` (index matches src), `static-money.mjs` (ledger discipline).
+- Node-only checks: `build.mjs` (index matches src), `static-money.mjs` (ledger discipline), `layout.mjs` (the city
+  layout, below).
 - Regression runner (`underworld/tools/runall.mjs`, results in `underworld/.runs/<label>/`, git-ignored): runs suites N at a time, writes `results.json`, skips
   passed suites on resume: `CONC=3 node underworld/tools/runall.mjs <label> underworld/index.html [suites…]`. Its ORDER list must name every suite.
 - Discipline: a milestone's own suite + affected suites, then the full regression; failures under load are
@@ -50,3 +51,15 @@
   browser and prints each road's length, grade, deepest cut, bridges, tunnel and sharpest kink (`ISLE_BEDS=1` adds the
   road-bed check); `node underworld/tools/isle-shots.mjs <out dir> [prefixes…]` captures the island's views
   (`ISLE_DPR=2` for presentation).
+- The city into the island (CITY_SPREAD.md): `layout` (Node, no browser: `010`, `020`, `021` and `turfAt` run as built;
+  the classic layout against the lattice arithmetic it replaced at 95,291 points, a layout cut in place, a layout whose
+  precincts stand apart, eight bad layouts refused; mutation-checked, so extend it with every table that learns the
+  layout). `island` gained the street-name check (a city street's name stops at the city).
+- World fingerprint (not a test): `node underworld/tools/world-print.mjs [out.json] [index.html]` hashes every block,
+  the world's lists, the road net and graph, every collider, the places and a lattice of samples of zone, ground, road
+  and off-city; `--cmp a.json b.json` names what differs and exits 1. A change that must not move the world compares
+  `IDENTICAL` against `docs/city-spread/world-print-classic.json` (18 s). Two runs of one build are identical.
+- City siting (not a test): `node underworld/tools/city-siting.mjs [out.png] [m per px]` surveys the island's natural
+  ground under the draft layout in its `LAYOUT` table and lists the candidate sites for each precinct;
+  `SITING_AREAS=1` the best site per 640 m square, `SITING_SET="docks=11,21"` another offset, `SITING_JSON=` the
+  heights and the layout for a labelled picture.
