@@ -64,7 +64,14 @@ function buildStaticScenery(scene, world) {
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
   // water
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000).rotateX(-Math.PI / 2), makeWaterMaterial());
+  // the sea is a frame round the city's square, not a sheet under it: nothing shows through the city's ground, and a
+  // sheet 1.2 m below it loses the depth test to it from high in the air (seen as half the city under water)
+  const wp = [], wi = [], WH = 8000, C2 = CITY / 2;
+  for (const [x0, x1, z0, z1] of [[-WH, WH, -WH, -C2], [-WH, WH, C2, WH], [-WH, -C2, -C2, C2], [C2, WH, -C2, C2]]) {
+    const n = wp.length / 3; wp.push(x0, 0, z0, x0, 0, z1, x1, 0, z1, x1, 0, z0); wi.push(n, n + 1, n + 2, n, n + 2, n + 3);
+  }
+  const wgeo = new THREE.BufferGeometry(); wgeo.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wgeo.setIndex(wi);
+  const water = new THREE.Mesh(wgeo, makeWaterMaterial());
   water.position.set(CITY / 2, -1.2, CITY / 2);
   scene.add(water);
   // sky

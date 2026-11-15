@@ -91,6 +91,8 @@ Harbor, Cape Valen Light, the Mount Valen observatory.
   gambling ×2, raid, threat; ui and business timed out at boot); all ten suites pass run alone.
 - The screenshot-only suites (shots, cityshots, qashots, frontshots) time out in `page.screenshot` on this machine;
   `shots` does the same against the build from before the island, so it is the environment, not the island.
-- Size: `index.html` 3,777,128 → 3,915,554 bytes (+3.7%; about +44 KB gzipped). Boot about +0.8 s on software GL.
+- Size: `index.html` 3,777,128 → 3,916,159 bytes (+3.7%; about +44 KB gzipped). Boot about +0.8 s on software GL.
   Phone profile downtown: about +100,000 triangles and +20 draw calls (the far mesh, road ribbons and structures).
+- After the gate: the sea became a frame round the city's square instead of a sheet under it (from 3.5 km up the sheet
+  won the depth test and half the city looked flooded); build, smoke, island and city re-run green on it.
 - Tools: `tools/isle-preview.mjs`, `tools/isle-shots.mjs` (TESTING.md).
