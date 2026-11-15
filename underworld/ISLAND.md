@@ -66,7 +66,7 @@ Harbor, Cape Valen Light, the Mount Valen observatory.
   triangles each, built one a frame, with their trees. Downtown, no near tile is in range.
 - The collision grid covers the island with lists made on demand (it would otherwise be 140,000 empty arrays).
 - The shore's distance grid is built once at boot (about 0.15 s on a desktop); a tile about 3–5 ms when first needed.
-- Measurements and the single-file release's size are in §8.
+- Measurements are in §8.
 
 ## 7. Decisions (Claude's calls under the directive's authority)
 - The lattice city stays (§2). The owner can still ask for the city itself to be redrawn; it is a separate, larger job.
@@ -82,5 +82,15 @@ Harbor, Cape Valen Light, the Mount Valen observatory.
   a save out at sea comes back ashore at the nearest road.
 
 ## 8. Tests and results
-See TESTING.md for the `island` suite and the two tools (`tools/isle-preview.mjs`, `tools/isle-shots.mjs`); the gate's
-results are recorded in CURRENT_SESSION.md.
+- Suite `island` (40 checks): the shore, heights and two-level spans, every road's grade and level bed, the graph
+  (every island road reachable from the lattice), the airport, the fleet, a take-off / circuit / landing flown through
+  the physics, a helicopter lift-off and roof landing, wading, the map, saves, the phone profile. 40 / 40.
+- Full regression on `ac13fb5` (74 suites, three wide): 1,928 passed, 10 failed. Four were the new fleet-only models
+  turning up in roster-wide checks (cargo classes, the 25-30 model dealer roster, the one-offs' top-speed order, the
+  impound's bay size); those checks now cover the models a player can own, and pass. Six were load-timing (stress,
+  gambling ×2, raid, threat; ui and business timed out at boot); all ten suites pass run alone.
+- The screenshot-only suites (shots, cityshots, qashots, frontshots) time out in `page.screenshot` on this machine;
+  `shots` does the same against the build from before the island, so it is the environment, not the island.
+- Size: `index.html` 3,777,128 → 3,915,554 bytes (+3.7%; about +44 KB gzipped). Boot about +0.8 s on software GL.
+  Phone profile downtown: about +100,000 triangles and +20 draw calls (the far mesh, road ribbons and structures).
+- Tools: `tools/isle-preview.mjs`, `tools/isle-shots.mjs` (TESTING.md).

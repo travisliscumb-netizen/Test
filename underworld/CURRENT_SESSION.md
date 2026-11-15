@@ -1,5 +1,11 @@
 # CURRENT SESSION
 
+- **Operation Blackgate (the island rebuild): COMPLETE, delivered for owner review.** ISLAND.md is the record (design,
+  what was built and where, decisions, performance, tests). Branch `claude/epic-galileo-m47k4d`. Gate: `island` 40/40;
+  full regression 1,928 / 10 (four were roster checks now scoped to ownable models, six load-timing; all pass solo).
+  Not done: the lattice city itself is unchanged in layout (ISLAND.md §2), no AI air traffic, no boats, no aircraft
+  missions; the fleet is not saved. Next (owner): play it, rule on ISLAND.md §7.
+
 - **Last addition (owner follow-up on the banks): the vault doors fixed, and the loot bag, dye packs, hostages and a
   rear staff door for every bank** (`353`, `512`; ECONOMY.md §12, DECISIONS.md "The banks", KNOWN_ISSUES "Banks").
   Also fixed: people inside interiors were not drawn (the bank guards and police were invisible). Suite `banks`
