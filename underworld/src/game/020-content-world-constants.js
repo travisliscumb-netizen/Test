@@ -120,21 +120,24 @@ const ZONES = {
     traffic: { sports: 2, sedan: 2, suv: 1.5, van: 1.2, pickup: 0.8, muscle: 0.6, truck: 0.4 } }
 };
 function zoneKey(x, z) {
-  if (offCity(x, z)) {
+  // the precinct whose frame this is (021): its own cell of the lattice names the zone
+  const p = CityLayout.at(x, z);
+  if (!p) {
     // Valen Point and the sound round it; Cedar Fields South (Session 6C) is more of Cedar Fields; the rest of the island
     if (vpSide(x, z)) return 'v';
     if (inCedarSouth(x, z)) return 'r';
     return Island.zoneKey(x, z);
   }
-  const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
-  return ZONE_MAP[bz][bx];
+  return ZONE_MAP[CityLayout.lz(p, z)][CityLayout.lx(p, x)];
 }
 function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
   if (inValenPoint(x, z)) return VP.name;
   if (inCedarSouth(x, z)) return CFS.name;
-  if (offCity(x, z)) return Island.land(x, z) ? ZONES[Island.zoneKey(x, z)].name : Island.lake(x, z) ? LAKE.name : 'Offshore';
-  if (x < -ROAD_HALF - 2 || z < -ROAD_HALF - 2 || x > CITY + ROAD_HALF + 2 || z > CITY + ROAD_HALF + 2) return 'Waterfront';
+  const p = CityLayout.at(x, z);
+  if (!p) return Island.land(x, z) ? ZONES[Island.zoneKey(x, z)].name : Island.lake(x, z) ? LAKE.name : 'Offshore';
+  // the strip outside a precinct's edge streets
+  if (x < p.x0 - ROAD_HALF - 2 || z < p.z0 - ROAD_HALF - 2 || x > p.x1 + ROAD_HALF + 2 || z > p.z1 + ROAD_HALF + 2) return 'Waterfront';
   return zoneAt(x, z).name;
 }
 // Time-of-day curves for traffic and foot traffic (rush hours, lunch, nightlife).
@@ -353,7 +356,7 @@ function groundBase(x, z, y) {
   if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
-  if (x < -EDGE_MARGIN || z < -EDGE_MARGIN || x > CITY + EDGE_MARGIN || z > CITY + EDGE_MARGIN) {
+  if (offCity(x, z)) {
     // the island (022): its ground (a bridge's deck or the tunnel's floor by the height y of whoever asks), or as
     // deep as you can wade where that ground is under the sea
     const h = Island.height(x, z, y);

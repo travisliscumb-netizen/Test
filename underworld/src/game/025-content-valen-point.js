@@ -23,7 +23,7 @@ function inValenPoint(x, z) { return vpLand(x, z) || (x > CITY + EDGE_MARGIN && 
 // (anywhere else off the city is just sea, and keeps the lattice's behaviour)
 function vpSide(x, z) { return x > CITY + EDGE_MARGIN && z > VP.z0 - 200 && z < VP.z1 + 200; }
 // is (x, z) beyond the city altogether (the district or the water around it)?
-function offCity(x, z) { return x > CITY + EDGE_MARGIN || x < -EDGE_MARGIN || z < -EDGE_MARGIN || z > CITY + EDGE_MARGIN; }
+function offCity(x, z) { return CityLayout.at(x, z) === null; }
 // places a car can join the road out there: the causeway's lanes every 20 m (heading toward the island on the
 // south lane, back to the city on the north), for police units and taxis (Session 6B)
 function vpRoadSpots() {

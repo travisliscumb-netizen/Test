@@ -1,0 +1,328 @@
+{
+ "layout": {
+  "id": "classic",
+  "precincts": [
+   [
+    "city",
+    0,
+    0,
+    11,
+    11,
+    0,
+    0
+   ]
+  ]
+ },
+ "sections": {
+  "world.localRoads": {
+   "hash": "70a2bde4411e34fb",
+   "n": 987856
+  },
+  "world.homes": {
+   "hash": "95cce3605bf3d829",
+   "n": 33704
+  },
+  "world.mapPlaces": {
+   "hash": "dc298cdc8ed7a69f",
+   "n": 863
+  },
+  "world.lots": {
+   "hash": "d095202279b28c9e",
+   "n": 2
+  },
+  "world.lampSet": {
+   "hash": "d095202279b28c9e",
+   "n": 2
+  },
+  "world.links": {
+   "hash": "bf85eed3a89147cd",
+   "n": 495505
+  },
+  "world.secrets": {
+   "hash": "d095202279b28c9e",
+   "n": 2
+  },
+  "world.shore": {
+   "hash": "9ffe3e985c6c7501",
+   "n": 68
+  },
+  "world.compounds": {
+   "hash": "3c1c4de61e56f3f9",
+   "n": 23578
+  },
+  "world.propTypes": {
+   "hash": "414d63420270ca94",
+   "n": 1471651
+  },
+  "world.places": {
+   "hash": "2b46205b541022df",
+   "n": 5857
+  },
+  "roadnet.closed": {
+   "hash": "1f9f44abbedd3364",
+   "n": 108
+  },
+  "roadgraph.nodes": {
+   "hash": "853fed603778dc07",
+   "n": 3981
+  },
+  "roadgraph.edges": {
+   "hash": "8fbeeb32fc318695",
+   "n": 23169
+  },
+  "collision.grid": {
+   "hash": "e6988e5c20774884",
+   "n": 1169893
+  },
+  "ask.city.zone": {
+   "hash": "8291387a72e8d469",
+   "n": 15627
+  },
+  "ask.city.ground": {
+   "hash": "88eaf1d5937598c2",
+   "n": 155261
+  },
+  "ask.city.road": {
+   "hash": "996c5daecab7d16b",
+   "n": 15627
+  },
+  "ask.city.local": {
+   "hash": "d4a3e799f59a26fa",
+   "n": 15627
+  },
+  "ask.city.off": {
+   "hash": "becbf7b257e8c561",
+   "n": 15627
+  },
+  "ask.island.zone": {
+   "hash": "b6f75c5e1430ec3d",
+   "n": 3955
+  },
+  "ask.island.ground": {
+   "hash": "510bd20a1414816a",
+   "n": 47971
+  },
+  "tables.superblocks": {
+   "hash": "4895edfc58b25b6c",
+   "n": 368561
+  },
+  "tables.zones": {
+   "hash": "cd51004ed15a0938",
+   "n": 425
+  }
+ },
+ "blocks": [
+  "78ad7afe2372b8f4",
+  "83295023895a4da9",
+  "f2ce5560dcc85714",
+  "b75d963094faf3be",
+  "d125c366e0cf0b73",
+  "880834e8f85d21ac",
+  "f20313b4a6134ed6",
+  "5c330c7d9d646cfa",
+  "6cbb9507e7f65e10",
+  "58d7f15d8937957f",
+  "3cda1a896afa7679",
+  "d82e1f91617a837b",
+  "c30ff639ec73c417",
+  "5d16b97359f75820",
+  "e3b92e55ef443072",
+  "004c60eae9e4279b",
+  "292703e384417103",
+  "c72138b2b390c910",
+  "72d2b8bcd111d392",
+  "2ed9acbb1b8fd2b0",
+  "ad35af918a1f949b",
+  "bdeee190f17d8894",
+  "2236eb1ed7246c53",
+  "d5a7a328eb4de094",
+  "ff174cebc9071a40",
+  "31319597acfa9d88",
+  "b854fa6b912b2806",
+  "6617f323c337ffce",
+  "de7daaa926143b23",
+  "02a1e303a6da9fd1",
+  "f3814f6447653428",
+  "287b10a84a05b091",
+  "a0315ab650b29b40",
+  "7b2a73ff71e7a119",
+  "b6e05ea83350a86a",
+  "6050750959921a82",
+  "9b31bfd78d9a23cc",
+  "22d942b339231761",
+  "c9d9fe94d173b3cc",
+  "7213c52fb6849602",
+  "e844ee3ea2613b54",
+  "d975ee29daab77a0",
+  "b5832bd44ef5670a",
+  "d0793ae10228843f",
+  "0cc2c441374c6206",
+  "e3479fada89d1376",
+  "824ca07be5370505",
+  "1f139148f49c53b9",
+  "66718a0d4ddd386e",
+  "7f5edf9d6ee23115",
+  "a1a5830939386edc",
+  "0735bdba822a31fe",
+  "c0dd33ac39dea64d",
+  "2544b10430a20916",
+  "9f23dc9ff6b86ba0",
+  "9b3134c819fcd15e",
+  "26ce68a3e79ddfbe",
+  "9c9a0d6fcf43e9eb",
+  "98f2d98edf8ca669",
+  "8d83357ada87d2cc",
+  "1c23e6685a582fec",
+  "a48d745e8a2779f4",
+  "a953bfeda6a86aae",
+  "890cda5bf6749c76",
+  "a5638ffd89ebf678",
+  "964e623022e60a44",
+  "cf0050fd42f9d880",
+  "95e65d0a7ab3ea1b",
+  "15d170fcce9da0a4",
+  "76b1f7d0d6afdfc8",
+  "f12f9fc0fbe8d1f0",
+  "54105f71d0231d7a",
+  "230db2b6eb50da63",
+  "699b5afbebf444d3",
+  "fd6028fecd61215b",
+  "595aab2feb81d27b",
+  "379135c918b094e0",
+  "762c32aa801d1ac6",
+  "2f4dacf76995b2bd",
+  "2823049d00bcb02d",
+  "5e1b4b482ab3f1f4",
+  "31bdf948d510bd56",
+  "4cca7a747441b8fe",
+  "efa642c7b512aca4",
+  "8e4994d2bfb88ec1",
+  "90d7630d2dcdf1c6",
+  "5373b9967bb02932",
+  "734b96553fdd17a6",
+  "7fef77b51ca16e3b",
+  "849e9d3d22b45699",
+  "213ff7facc39cc17",
+  "8093456b4c9fe934",
+  "a50e01197527e34c",
+  "a8414d157e07495c",
+  "3021fa7f6ed140ff",
+  "8309a6200aff02ba",
+  "0fa075d4971aa8bb",
+  "9b6d154efaffcac3",
+  "701fc15b00c266c0",
+  "a65981b3839382ea",
+  "1263e00deec62d6f",
+  "5517d6d50c9402db",
+  "af70e22ba6a37d2d",
+  "8e80b82dffdbbdfe",
+  "da43b60c6916d824",
+  "102d1454b376d5ed",
+  "558393d8a63f1e3c",
+  "a9b0076c2a2e1d77",
+  "9de694b96904d8e6",
+  "070aceba5a627e09",
+  "9cdc392c1cf07735",
+  "8d77598959edca3e",
+  "f9cdf2467320a793",
+  "c1bad174bc0964de",
+  "53e798c18d5f2622",
+  "47d5d292b672b242",
+  "c344094b06ca20d2",
+  "e5d1d364879c48fe",
+  "cef931d90733fddc",
+  "0e098068e3ac5603",
+  "2dd1fb99d319699e",
+  "1cb13961cc6fa0dc",
+  "203b85e197d274fd",
+  "ad04108156cc3f7d",
+  "ff0465fe183958c5",
+  "49c882397aa6a226",
+  "ccd4ab2a203d9606",
+  "348107b849d3d9b9",
+  "fddf204a44cf4595",
+  "b0da3e979a02146a",
+  "79cc5e9cdddc47fe",
+  "d7240707afa62c95",
+  "d937449024031055",
+  "60b351eaec299c74",
+  "7d40e781fa9877ea",
+  "89080b991c9d5cef",
+  "ff3aeae7efeeb3dc",
+  "cb6eb18b8dbba0bb",
+  "a25cf03e46ba1e8f",
+  "a63af35e51c46495",
+  "35338512b2b370a0",
+  "eb7f3324f324d3a1",
+  "a5d7a58d08d47e7d",
+  "47965cfc2ae5d17b"
+ ],
+ "xblocks": [
+  "8205b55dcb996fa6",
+  "ad99bc7574890d7b",
+  "a1b6ea3eb8378759",
+  "86a7cdd65a75fd56",
+  "dc6102cc567c5510",
+  "cde0040ebcb281ca",
+  "5cd04c45edc8458c",
+  "6c1c549b1ba70879",
+  "9825f9ca1a6cab57",
+  "51cb2c263fdd9fc4",
+  "aeaf3bcb1375a7a4",
+  "1d16ae6cb84d829e",
+  "a6727ac88e15fec7",
+  "41cb8de4709abe56",
+  "9038318b4e453362",
+  "60df179194230b01",
+  "47db06e121153841",
+  "6d23982bc9873939",
+  "aa4e1ad87165e526",
+  "01d426a78090811c",
+  "59a71744d6d30237",
+  "5f18d58236b9c870",
+  "40bb70a2a59ae8a7",
+  "f95c0e5e082dfa73",
+  "d7805bf2d8675b2d",
+  "b41322214365fa2c",
+  "bda52d55c227ebbb",
+  "0ef1c457983865cb",
+  "5a285a8af2b7815c",
+  "ee160cda573f0354",
+  "86611e5e02caf510",
+  "4ac0390d16d7987c",
+  "b76f2a7f97847eae",
+  "a674230ad24de1d4",
+  "eca46ad3f1744f80",
+  "4aa367dacc79db6d",
+  "3593ba2985cec537",
+  "0919b3af84c499d7",
+  "de7cbc02d1b89ea5",
+  "c27c4ccb6812d1c9",
+  "0e440fa151a7478d",
+  "6eb8c0e4f4608d49",
+  "bffab8389ca68680",
+  "78862b4d7ab69433",
+  "eb461847d943e1f9",
+  "cc8a33cc342dcdcf",
+  "54e0760a1f2e0fb6",
+  "29d5604cee64988c",
+  "3484fd543e2c6884",
+  "b90e7f8475656caf",
+  "50e7b29482b3b00b",
+  "479ce66e2f0042c8",
+  "710f75a21c6d30bb",
+  "45685289c42bd6dd",
+  "93354341785b1daf",
+  "6b90d8e44319ab23"
+ ],
+ "counts": {
+  "blocks": 144,
+  "xblocks": 56,
+  "props": 8606,
+  "places": 41,
+  "homes": 56,
+  "links": 23
+ },
+ "file": "index.html",
+ "bytes": 3925131
+}
