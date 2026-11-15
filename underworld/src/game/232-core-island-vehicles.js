@@ -93,8 +93,17 @@ const ISLE_BUILD = {
   }
 };
 // the spinning parts (children of the body's mesh): a propeller, or a main and a tail rotor, each with a faint disc
+// (the blades' material is shared by every aircraft; each has its own disc, whose opacity is its rotor's speed. The
+// scenery puts one stand-in of each in the scene, so both programs are compiled with the rest at boot, not at the
+// first aircraft you see)
+const ROTOR_MAT = { steel: null, disc: () => new THREE.MeshBasicMaterial({ color: 0x1a1c20, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }) };
+function rotorWarmup(scene) {
+  ROTOR_MAT.steel = ROTOR_MAT.steel || new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 });
+  const a = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), ROTOR_MAT.steel), b = new THREE.Mesh(new THREE.CircleGeometry(0.01, 3), ROTOR_MAT.disc());
+  a.position.set(0, -400, 0); b.position.set(0, -400, 0); scene.add(a); scene.add(b);
+}
 function makeRotors(v) {
-  const s = v.spec, steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 }), disc = new THREE.MeshBasicMaterial({ color: 0x1a1c20, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const s = v.spec, steel = ROTOR_MAT.steel || (ROTOR_MAT.steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 })), disc = ROTOR_MAT.disc();
   const R = {}, blur = r => new THREE.Mesh(new THREE.CircleGeometry(r, 24), disc);
   if (s.air === 'plane') {
     const hub = new THREE.Group(); hub.position.set(0, 1.36, 3.5);

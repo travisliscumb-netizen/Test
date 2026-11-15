@@ -29,6 +29,7 @@ class IslandScenery {
     this.paint = this._paint(); scene.add(this.paint);
     this._tx = 1e9; this._tz = 1e9; this._holes = new Set(); this._farDirty = true;
     this._treeGeo = null;
+    rotorWarmup(scene);
   }
   // ---------------------------------------------------------------- colours
   // the ground's colour at (x, z): its surface (grass, sand, rock, forest floor, dry grass), paler with height, mottled

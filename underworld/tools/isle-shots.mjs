@@ -52,6 +52,30 @@ if (!process.env.ISLE_LIB) {
   await view('12-saltmarsh', -470, 1140, [-380, 30, 1250, -520, 2, 1050]);
   await view('13-lake-valen', 1650, -640, [1560, 60, -520, 1700, 0, -900], { clear: 0.0004 });
   await view('14-lighthouse', 1530, -2740, [1640, 30, -2660, 1500, 16, -2796]);
+  await view('15-skylark', 1026, 1975, [1016.5, 5.4, 1976.5, 1023, 4.6, 1968]);
+  await view('17-air-ambulance-roof', 676, 620, [682, 20.5, 628, 664, 16.6, 614]);
+  await view('19-pit-lane-cars', 1590, 500, [1580, 2.2, 476, 1572.5, 0.8, 503]);
+  // in the game's own camera, HUD on: flying the Skylark over Valen Bay, hovering the Kestrel over downtown
+  const fly = async (name, type, x, y, z, h, speed, site) => {
+    if (!want(name)) return;
+    await page.evaluate(([type, x, y, z, h, speed, site]) => {
+      const g = window.game; if (g.player.vehicle) g.exitVehicle(true); window.__cam = null; window.__clear = 0; window.__near = 0;
+      g.resetPlayerState(site[0], site[1], 0); g.fleet.live.clear(); g.fleet.update(site[0], site[1]);
+      const v = g.vehicles.list.find(v => v.type === type); g.player.pos.set(v.pos.x + 1.8, v.pos.y, v.pos.z); g.completeEnter(v);
+      v.pos.set(x, y, z); v.h = h; v.vel.set(Math.sin(h) * speed, Math.cos(h) * speed); v.air.grounded = false; v.air.on = 1; v.air.thr = 0.8; v.air.vy = 0; g.cam.yaw = h; g.env.time = 16.5;
+      for (let k = 0; k < 60; k++) { g.chunks.update(x, z, g.frame + k); g.isleScene.update(x, z); }
+    }, [type, x, y, z, h, speed, site]);
+    await hud(true); await frames(40);
+    await page.screenshot({ path: path.join(OUT, name + '.png'), timeout: 240000 }); console.log('shot', name);
+  };
+  await fly('16-flying-over-the-bay', 'skylark', -620, 150, 700, 1.25, 62, [1026, 1975]);
+  await fly('18-hovering-downtown', 'medevac', 560, 120, 760, Math.PI, 0, [676, 620]);
+  // the big map, zoomed right out
+  if (want('20-map')) {
+    await page.evaluate(() => { const g = window.game; if (g.player.vehicle) g.exitVehicle(true); g.resetPlayerState(500, 480, 0); g.ui.toggleMap(true); const v = g.ui.mapView; for (let k = 0; k < 10; k++) v.zoomAt(0.2, v.W / 2, v.H / 2, true); v.centerOn(250, -100); v.cx = v.tcx; v.cz = v.tcz; v.dirty = true; });
+    await frames(12); await page.screenshot({ path: path.join(OUT, '20-map.png'), timeout: 240000 }); console.log('shot 20-map');
+    await page.evaluate(() => window.game.ui.toggleMap(false));
+  }
   console.log('errors', errors.length, errors.slice(0, 5).join('\n').slice(0, 2000));
   await b.close(); process.exit(0);
 }
