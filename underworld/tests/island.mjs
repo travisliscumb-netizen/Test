@@ -63,12 +63,19 @@ const zones = await ev(() => {
   const at = { ridge: [250, -560], mount: [350, -1500], highlands: [-1500, -900], saltmarsh: [-500, 1150], southshore: [-600, 2000], airport: [600, 2100], proving: [1400, 1560], vp: [1800, 500], cfs: [300, 1300], downtown: [520, 440] };
   const out = {}; for (const k in at) out[k] = ZONES[zoneKey(at[k][0], at[k][1])].name;
   out.names = [districtNameAt(350, -1500), districtNameAt(-300, 500), districtNameAt(1650, -900)];
+  // a city street's name on its own street, and what the same grid lines are called out on the island
+  const { streetNameAt } = window.__pv;
+  out.streets = [streetNameAt(80, 300), streetNameAt(80, 80), streetNameAt(300, 480), streetNameAt(-12, 480), streetNameAt(600, 1800)];
+  out.offStreets = [[80, 1500], [80, 2300], [400, -1200], [-1100, 480], [1900, 480], [2000, 560], [320, 2410], [-600, 322]].map(q => streetNameAt(q[0], q[1]));
   out.places = ['airport', 'proving', 'firehouse', 'saltmarsh', 'gull', 'lighthouse', 'summit', 'motorsport', 'offroad', 'police', 'hospital', 'chopshop'].filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));
   out.banks = Object.keys(window.__pv.BANKS).length; out.casino = !!g.world.places.casino || Object.values(g.world.places).some(p => /Royale/i.test(p.name || ''));
   return out;
 });
 check('every district off the lattice by name', zones.ridge === 'Crestmoor Ridge' && zones.mount === 'Mount Valen' && zones.highlands === 'Blackgate Highlands' && zones.saltmarsh === 'Saltmarsh' && zones.southshore === 'Southshore' && zones.airport === 'Port Valen International' && zones.proving === 'Valen Proving Ground', JSON.stringify(zones));
 check('Valen Point, Cedar Fields and the city’s own districts keep theirs; the water has names too', zones.vp === 'Valen Point' && zones.cfs === 'Cedar Fields' && zones.downtown === 'Financial District' && zones.names[0] === 'Mount Valen' && zones.names[1] === 'Offshore' && zones.names[2] === 'Lake Valen', JSON.stringify(zones));
+check('a city street is named on its own street and nowhere else: the grid\u2019s lines across the mountain, the runways, the bridge and the racetrack are not Ash St or Central Blvd',
+  zones.streets[0] === 'Ash St' && zones.streets[1] === 'Ash St & 1st Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === 'Central Blvd' && zones.streets[4] === 'Airport Access' &&
+  zones.offStreets.every(n => n === null || !/ (St|Ave|Blvd)$|^(Harbor Ave|Foundry Rd|Quay Rd|North Shore Dr|South Shore Dr)$/.test(n)), JSON.stringify([zones.streets, zones.offStreets]));
 check('the new places are on the map, and the city’s essentials still are (police, hospital, chop shop, three banks, the casino)', zones.places.length === 12 && zones.banks === 3 && zones.casino, JSON.stringify(zones));
 // ---------------------------------------------------------------- roads
 const roads = await ev(() => {

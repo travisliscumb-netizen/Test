@@ -45,11 +45,16 @@ function districtAt(bx, bz) {
   return DISTRICT_MAP[bz][bx];
 }
 function streetNameAt(x, z) {
-  const i = Math.round(x / P), j = Math.round(z / P);
-  const dx = Math.abs(x - i * P), dz = Math.abs(z - j * P);
-  if (dx < ROAD_HALF + WALK_W && dz < ROAD_HALF + WALK_W && i >= 0 && j >= 0 && i <= N && j <= N) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
-  if (dx < ROAD_HALF + WALK_W && i >= 0 && i <= N) return STREET_NAMES_X[i];
-  if (dz < ROAD_HALF + WALK_W && j >= 0 && j <= N) return STREET_NAMES_Z[j];
+  // a lattice street has its name inside the frame of the precinct whose street it is (021), and nowhere else: its
+  // line carried on across the island used to name the mountain, the runways and the racetrack
+  const p = CityLayout.at(x, z);
+  if (p) {
+    const I = Math.round(x / P), J = Math.round(z / P), i = I - p.ox, j = J - p.oz;
+    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1, onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1;
+    if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
+    if (onX) return STREET_NAMES_X[i];
+    if (onZ) return STREET_NAMES_Z[j];
+  }
   if (x > CITY + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
   if (vpLand(x, z)) return VP.name;
   if (z > CITY + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
