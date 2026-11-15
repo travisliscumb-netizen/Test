@@ -93,8 +93,8 @@ the city as built (one precinct, offset 0, lattice and world the same numbers).
   (highway, coast road, bridge), each with its turfs, businesses, banks, homes, dealers, missions and police posts
   exactly as they are today.
 - **The draft siting** (measured, not yet approved: `tools/city-siting.mjs`, S5; the picture the owner was sent is
-  `docs/city-spread/draft-siting.png`). The idea: Valen Bay becomes the
-  city's harbour and the city wraps round it, tied together by the Blackgate Bridge.
+  `docs/city-spread/draft-siting.png`). The idea: Valen Bay becomes the city's harbour and the city wraps round it,
+  tied together by the Blackgate Bridge.
 
   | Precinct | Lattice cells | Offset (cells) | Stands at (m) | Natural ground | Dry |
   |---|---|---|---|---|---|
@@ -206,7 +206,10 @@ vehicles, pending cars, dropped weapons (`wloc`) and stashes.
 - **Streets inside a district stay a grid** (north–south, east–west, 80 m). That follows from "relocate, do not
   redraw" (§2.2). If the owner wants districts whose own streets bend, that is new building work on top of this.
 - **Every district sits on level ground at city height.** Hillside sites would be terraces cut into the slope; the
-  siting pass keeps to low ground, which is why Crestmoor Heights goes *under* the ridge, not on it.
+  siting pass keeps to low ground, which is why Crestmoor Heights goes to the bay's north shore and not up onto
+  Crestmoor Ridge. The alternative, if the owner wants a district on a hill: the bake lifts a precinct to its site's
+  own height, which costs every field that holds a height (colliders, buildings, props, the on-lattice ground);
+  decide at S3, not before.
 - **Scale.** The lattice is 0.92 km² of city on 19 km² of island. Relocation spreads those 144 blocks; it does not
   make more of them, so the result is a core and four districts round a bay, not a metropolis that fills the island
   (the draft picture shows it honestly). More city means new blocks, which is new building work the owner would have
