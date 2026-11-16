@@ -16,7 +16,8 @@ const helpers = () => ev(() => {
   window.__step = (n, dt = 1 / 60) => { for (let k = 0; k < n; k++) g.update(dt, dt); };
   // how far (x, z) is outside the surface of the streets round it (negative: on one, by that much)
   window.__off = (x, z) => P.RoadGraph.surfaceDist(x, z, { kinds: P.RG_STREETS });
-  window.__links = name => g.world.links.filter(L => L.name === name);
+  // (where the layout parts Tanner's Row's two blocks its far half is Cooper's Lane: both are the lane as laid)
+  window.__links = name => g.world.links.filter(L => L.name === name || name === 'Tanner’s Row' && L.name === 'Cooper’s Lane');
   // a physics car of the city's with an AI driver, at (x, z) facing h
   window.__aiCar = (type, x, z, h, mode) => { const v = g.vehicles.spawn(type, x, z, h, { driver: mode === 'pursue' ? 'cop' : 'npc' }); v.mission = 'test'; v.touched = true; v.drive = new P.DriveAI(v, g, mode); return v; };
 });
@@ -266,7 +267,8 @@ const drive = await ev(() => {
   };
   // police: a unit runs from Juniper St to a suspect on Tanner's Row (its route takes Saltmarsh Way? no: the shortest
   // streets; through the Old Quarter it takes Tanner's Row's bends), at pursuit speed
-  const tq = window.__links('Tanner’s Row')[1].pts[12];
+  // (the half in the unit's own precinct: under island the far half is across the bay)
+  const CL = window.__pv.CityLayout, home = CL.near(237.4, 740), rows = window.__links('Tanner’s Row'), tq = (rows.find((L, k) => k === 1 && CL.near(L.pts[12][0], L.pts[12][1]) === home) || rows[0]).pts[12];
   g.resetPlayerState(tq[0], tq[1], 0); window.__step(4);
   const cop = window.__aiCar('police', 237.4, 740, 0, 'pursue'); cop.siren = true;
   cop.drive.cruise = 20; cop.drive.target = () => ({ x: tq[0], z: tq[1], speed: 20 });

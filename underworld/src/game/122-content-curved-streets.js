@@ -51,7 +51,8 @@ const CURVED_STREETS = {
   '10,2': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, line: [[805.4, 178], [852, 234.6]], park: [1, -1] }] },
   '10,3': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, ctrl: SALT_B, park: [-1] }, { name: 'Kiln Lane', w: 8, fork: 0, at: 4, ctrl: [[862, 268], [858, 290], [846, 314.6]] }] },
   '3,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[262, 805.4], [266, 818], [280, 832], [300, 839], [314.6, 842]] }] },
-  '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] }
+  // where the layout parts the two blocks (island: the Strip on the bay's south shore) this half is its own lane
+  '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', apart: { of: '3,10', name: 'Cooper’s Lane' }, w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] }
 };
 {
   const base = World.prototype._genBlock;
@@ -80,6 +81,7 @@ Object.assign(World.prototype, {
       else pts = splinePts(R.ctrl);
       out.push(this._road(pts, R.w, R.st || 'asphalt', { link: R.name }));
       out[out.length - 1].park = R.park || null;
+      if (R.apart) out[out.length - 1].apart = { at: b.bx + ',' + b.bz, of: R.apart.of, name: R.apart.name };
     }
     return out;
   },
@@ -198,3 +200,9 @@ Object.assign(World.prototype, {
     b.roadKind = 'works';
   }
 });
+// a curved street laid across two blocks keeps one name only while the layout keeps the blocks together; run after
+// the bake, under the real layout
+World.prototype._nameApart = function () {
+  const off = k => { const [x, z] = k.split(',').map(Number), p = CityLayout.precinctOf(x, z); return p.ox + ',' + p.oz; };
+  for (const r of this.localRoads) if (r.apart && off(r.apart.at) !== off(r.apart.of)) r.link = r.apart.name;
+};

@@ -33914,6 +33914,8 @@ const Island = {
     const A = AIRPORT, G = PROVING;
     if (x > A.x0 - 60 && x < A.x1 + 60 && z > A.z0 - 90 && z < A.z1 + 60) return 'y';
     if (x > G.x0 - 30 && x < G.x1 + 30 && z > G.z0 - 30 && z < G.z1 + 30) return 'j';
+    // (the ground a moved precinct left inside the old square, built up as Linden Gardens: 128)
+    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island' && x > ISLE_GARDENS.x0 && x < ISLE_GARDENS.x1 && z > ISLE_GARDENS.z0 && z < ISLE_GARDENS.z1) return 'l';
     if (z > 880) return x < -160 && z < 1500 ? 'b' : 'e';
     if (z > -700 && z < -250 && x > -120 && x < 760) return 'k';
     if (Math.hypot(x - MT_VALEN.x, z - MT_VALEN.z) < 1250) return 'n';
@@ -33932,6 +33934,8 @@ const Island = {
     this.addPad(A.x0, A.z0, A.x1, A.z1, A.y, 140);
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
     for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
+    // Linden Gardens (128): the infill between the precincts, at the city's level
+    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island') for (const r of ISLE_GARDENS.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
   }
 };
 /* =====================================================================
@@ -38380,6 +38384,7 @@ Object.assign(World.prototype, {
     const real = CityLayout.current(); CityLayout.use('classic');
     try { base.call(this); } finally { CityLayout.restore(real); }
     this._bake();
+    this._nameApart();
     this._genPerimeter();
     this._registerCityCols();
     // the passes over the built city work where it stands (block-relative, or through CityLayout)
@@ -39999,7 +40004,8 @@ const CURVED_STREETS = {
   '10,2': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, line: [[805.4, 178], [852, 234.6]], park: [1, -1] }] },
   '10,3': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, ctrl: SALT_B, park: [-1] }, { name: 'Kiln Lane', w: 8, fork: 0, at: 4, ctrl: [[862, 268], [858, 290], [846, 314.6]] }] },
   '3,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[262, 805.4], [266, 818], [280, 832], [300, 839], [314.6, 842]] }] },
-  '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] }
+  // where the layout parts the two blocks (island: the Strip on the bay's south shore) this half is its own lane
+  '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', apart: { of: '3,10', name: 'Cooper’s Lane' }, w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] }
 };
 {
   const base = World.prototype._genBlock;
@@ -40028,6 +40034,7 @@ Object.assign(World.prototype, {
       else pts = splinePts(R.ctrl);
       out.push(this._road(pts, R.w, R.st || 'asphalt', { link: R.name }));
       out[out.length - 1].park = R.park || null;
+      if (R.apart) out[out.length - 1].apart = { at: b.bx + ',' + b.bz, of: R.apart.of, name: R.apart.name };
     }
     return out;
   },
@@ -40146,6 +40153,12 @@ Object.assign(World.prototype, {
     b.roadKind = 'works';
   }
 });
+// a curved street laid across two blocks keeps one name only while the layout keeps the blocks together; run after
+// the bake, under the real layout
+World.prototype._nameApart = function () {
+  const off = k => { const [x, z] = k.split(',').map(Number), p = CityLayout.precinctOf(x, z); return p.ox + ',' + p.oz; };
+  for (const r of this.localRoads) if (r.apart && off(r.apart.at) !== off(r.apart.of)) r.link = r.apart.name;
+};
 /* =====================================================================
    [CONTENT] VALEN POINT: GENERATION (Session 6B, §45.34)
    The motorsport park on the island east of the city:
@@ -40912,13 +40925,30 @@ Object.assign(ISLE_ROAD_LAYOUT.island, {
   h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
   m3: { pts: [[-480, 1466], [-472, 1400], [-465, 1345]] }
 });
+// Linden Gardens (island layout): the ground the Nightlife Strip left between Linden Hills, downtown's south edge and
+// the docks is built up as Linden Hills' newer half, on curving streets that tie the three together and meet the
+// Southshore Highway: shops and flats facing downtown, houses behind, a pair of yards by the docks
+const ISLE_INFILL_ROADS = [
+  { after: 'p2', id: 'g1', name: 'Garden Parade', w: 10, grade: 0.08, ends: ['lat', 's1'], pts: [[440, 646], [440, 700], [452, 752], [490, 800], [552, 838], [626, 860], [705, 872]] },
+  { after: 'p2', id: 'g2', name: 'Quince Street', w: 8, grade: 0.09, ends: ['lat', 'g1'], pts: [[326, 760], [370, 760], [410, 756], [452, 752]] },
+  { after: 'p2', id: 'g3', name: 'Gardenia Close', w: 8, grade: 0.09, ends: ['g1', 'ring'], ring: 12, pts: [[552, 838], [549, 878], [538, 914], [522, 944]] },
+  { after: 'p2', id: 'g4', name: 'Mercer Street', w: 8, grade: 0.09, ends: ['lat', 'g3'], pts: [[326, 920], [390, 922], [450, 922], [500, 918], [538, 914]] },
+  { after: 'p2', id: 'g6', name: 'Cobb Lane', w: 8, grade: 0.09, ends: ['lat', 'g1'], pts: [[326, 840], [380, 842], [430, 845], [470, 838], [502, 822]] },
+  { after: 'p2', id: 'g7', name: 'Sorrel Street', w: 9, grade: 0.08, ends: ['lat', 'g1'], pts: [[600, 646], [602, 700], [608, 760], [618, 815], [624, 856]] },
+  { after: 'p2', id: 'g5', name: 'Wharf Lane', w: 9, grade: 0.08, ends: ['s1', 'lat'], pts: [[694, 760], [730, 767], [770, 775], [794, 778]] }
+];
+ISLE_ROAD_LAYOUT.island.add.push(...ISLE_INFILL_ROADS);
+// the ground it fills (Island.zoneKey reads it as Linden Hills), levelled to the city's kerb in two rectangles that keep
+// off the inlet in its south-east corner (022 corePads)
+const ISLE_GARDENS = { x0: 320, z0: 640, x1: 800, z1: 1000, pads: [[320, 640, 800, 860], [320, 860, 690, 990]] };
 // the districts: their names, where their name sits on the map, the signs their shops and yards carry
 const ISLE_DISTRICTS = {
   bayview: { name: 'Bayview Heights', at: [-470, -230], signs: ['BAYVIEW MARKET', 'HARBOUR CAFÉ', 'CRESCENT PHARMACY', 'THE BAY BISTRO'], cars: ['luxury', 'crest', 'suv', 'sports', 'kodiak', 'sedan', 'coupe', 'estate'] },
   marsh: { name: 'Marsh Hollow', at: [-300, 1440], signs: ['HOLLOW GROCERY', 'HERON DINER', 'SUDS LAUNDROMAT', 'MARSH HARDWARE', 'PIZZA NAPOLI', 'REED ST BARBERS'], cars: ['sedan', 'compact', 'estate', 'pickup', 'metro', 'suv', 'regent', 'van'] },
   landing: { name: 'Blackgate Landing', at: [-1120, 1430], signs: ['BLACKGATE FREIGHT', 'VALEN COLD STORAGE', 'PIER 9 IMPORTS', 'SOUND SHIPPING CO.', 'WESTCOAST SALVAGE', 'FOUNDRY TRADING'], cars: ['truck', 'van', 'pickup', 'utility'] },
   lakeside: { name: 'Lake Valen Shore', at: [1880, -600], signs: ['LAKEVIEW DINER'], cars: ['pickup', 'suv', 'offroad', 'estate'] },
-  gull: { name: 'Gull Harbor', at: [-1290, -2275], signs: [], cars: ['pickup', 'van', 'utility'] }
+  gull: { name: 'Gull Harbor', at: [-1290, -2275], signs: [], cars: ['pickup', 'van', 'utility'] },
+  gardens: { name: 'Linden Gardens', at: [520, 800], signs: ['GARDEN PARADE DELI', 'QUINCE ST LAUNDRY', 'LINDEN FLORIST', 'PARADE NEWS', 'THE CORNER TAP', 'MERCER BAKERY'], cars: ['sedan', 'compact', 'estate', 'metro', 'suv', 'regent', 'coupe', 'van'] }
 };
 // what goes where: shops and flats first (they want the best frontage), then the houses fill the rest
 const ISLE_LOT_PLAN = [
@@ -40935,7 +40965,18 @@ const ISLE_LOT_PLAN = [
   { d: 'landing', road: 'p2', kind: 'ware', sp: 58 },
   { d: 'lakeside', road: 'n1', kind: 'shop', sp: 40, box: [1700, -680, 2000, -500], max: 1 },
   { d: 'lakeside', road: 'n1', kind: 'cabin', sp: 34, box: [1500, -800, 2260, -380], max: 12 },
-  { d: 'gull', road: 'n1', kind: 'cabin', sp: 30, box: [-1520, -2440, -1080, -2080], max: 8 }
+  { d: 'gull', road: 'n1', kind: 'cabin', sp: 30, box: [-1520, -2440, -1080, -2080], max: 8 },
+  // (infill: right up to the precincts' edge streets, not the 80 m the open-country districts keep from the city)
+  { d: 'gardens', road: 'g1', kind: 'shop', sp: 35, box: [380, 646, 640, 870], max: 6, gap: 1, infill: true },
+  { d: 'gardens', road: 'g1', kind: 'apt', sp: 38, max: 6, gap: 2, infill: true },
+  { d: 'gardens', road: 'g1', kind: 'house', sp: 23, gap: 1, infill: true },
+  { d: 'gardens', road: 'g2', kind: 'house', sp: 23, gap: 1, infill: true },
+  { d: 'gardens', road: 'g3', kind: 'house', sp: 23, gap: 1, infill: true },
+  { d: 'gardens', road: 'g4', kind: 'house', sp: 23, gap: 1, infill: true },
+  { d: 'gardens', road: 'g7', kind: 'apt', sp: 38, max: 4, gap: 2, infill: true },
+  { d: 'gardens', road: 'g7', kind: 'house', sp: 23, gap: 1, infill: true },
+  { d: 'gardens', road: 'g6', kind: 'house', sp: 23, gap: 1, infill: true },
+  { d: 'gardens', road: 'g5', kind: 'ware', sp: 58, infill: true }
 ];
 // a lot's size: W along the road, D back from it; set: the verge between the carriageway and the lot
 const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 } };
@@ -40965,7 +41006,8 @@ Object.assign(World.prototype, {
       return true;
     };
     const V = VILLA_VALEN;
-    const KEEP = [...CityLayout.precincts.map(p => [p.x0 - 80, p.z0 - 80, p.x1 + 80, p.z1 + 80]), [CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
+    const KEEP_CITY = m => CityLayout.precincts.map(p => [p.x0 - m, p.z0 - m, p.x1 + m, p.z1 + m]), CITY80 = KEEP_CITY(80), CITY_IN = KEEP_CITY(EDGE_MARGIN + 6);
+    const KEEP = [[CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
       [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], [VP.x0 - 50, VP.z0 - 50, VP.x1 + 50, VP.z1 + 50], [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12]];
     const hit = (a, b, m = 0) => a[0] - m < b[2] && a[2] + m > b[0] && a[1] - m < b[3] && a[3] + m > b[1];
     const pads0 = Island.pads.map(p => [p.x0, p.z0, p.x1, p.z1]), taken = [];
@@ -40997,7 +41039,7 @@ Object.assign(World.prototype, {
             const off = R.D.w / 2 + S.set + S.D / 2 + extra, cx = pts[k][0] + nx * off, cz = pts[k][1] + nz * off, r = [cx - hx, cz - hz, cx + hx, cz + hz];
             if (E.box && (cx < E.box[0] || cx > E.box[2] || cz < E.box[1] || cz > E.box[3])) break;
             if (r[0] < ISLE.x0 + 60 || r[1] < ISLE.z0 + 60 || r[2] > ISLE.x1 - 60 || r[3] > ISLE.z1 - 60) break;
-            if (KEEP.some(q => hit(r, q)) || pads0.some(q => hit(r, q, 8)) || taken.some(q => hit(r, q, 8))) continue;
+            if (KEEP.some(q => hit(r, q)) || (E.infill ? CITY_IN : CITY80).some(q => hit(r, q)) || pads0.some(q => hit(r, q, 8)) || taken.some(q => hit(r, q, E.gap ?? 8))) continue;
             if (!roadClear(r[0], r[1], r[2], r[3], 2.4) || !groundOk(r, E.kind === 'ware' ? 6 : 7.5)) continue;
             ok = { cx, cz, r }; break;
           }
@@ -41005,7 +41047,8 @@ Object.assign(World.prototype, {
           taken.push(ok.r);
           // levelled at the street's height in front of it: the street's bed eases into the ground over a shoulder that
           // widens with the step between them (022 compute), so a lot at the street's level keeps its whole area
-          const P = sitePad(ok.r[0] - 2, ok.r[1] - 2, ok.r[2] + 2, ok.r[3] + 2, 8, Math.round(Island.nat(pts[k][0], pts[k][1]) * 10) / 10);
+          // (infill stands on the city's own level, like the ground round it: corePads)
+          const P = sitePad(ok.r[0] - 2, ok.r[1] - 2, ok.r[2] + 2, ok.r[3] + 2, 8, E.infill ? CURB_H : Math.round(Island.nat(pts[k][0], pts[k][1]) * 10) / 10);
           lots.push({ d: E.d, kind: E.kind, x: ok.cx, z: ok.cz, vx, vz, ux: -vz, uz: vx, W: S.W, D: S.D, rect: ok.r, P, road: E.road, i: lots.length, seed: (i * 2 + (side > 0 ? 1 : 0)) * 31 + lots.length });
           n++;
         }
@@ -41098,9 +41141,11 @@ Object.assign(World.prototype, {
     }
     // ---------------------------------------------------------------- street lamps along the new streets
     const lotRects = plan.lots.map(L => L.rect), V = VILLA_VALEN, blockList = [...blocks.values()];
-    for (const D of ISLE_DISTRICT_ROADS) {
+    // a point clear of every island road but its own (a street tree must not stand in a crossing street)
+    const roadClearPt = (x, z, own) => Island.roads.every(Q => Q === own || Q.pts.every(p => Math.hypot(p[0] - x, p[1] - z) > Q.w / 2 + 2.5));
+    for (const D of [...ISLE_DISTRICT_ROADS, ...ISLE_INFILL_ROADS]) {
       const R = Island.roads.find(q => q.id === D.id); if (!R) continue;
-      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p' }[B.d]); if (!own.length) continue;
+      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p', gardens: 'g' }[B.d]); if (!own.length) continue;
       let side = 1;
       for (let s = 24; s < R.cum[R.cum.length - 1] - 10; s += 44) {
         let k = 0; while (k < R.pts.length - 2 && R.cum[k + 1] < s) k++;
@@ -41113,6 +41158,14 @@ Object.assign(World.prototype, {
         cyl(B.b, x, y + 3.2, z, 0.11, 6.4, 0x3a3f45, true);
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
         B.b.fx.push({ type: 'neon', x: x - nx * 1.2, y: y + 6.22, z: z - nz * 1.2, w: 0.5, h: 0.1, d: 0.5, c: 0xffe2b0 });
+        // Linden Gardens' streets are tree-lined: a street tree each side between the lamps
+        if (D.id[0] === 'g') for (const sd of [-1, 1]) {
+          let k2 = 0; const s2 = s + 22; while (k2 < R.pts.length - 2 && R.cum[k2 + 1] < s2) k2++;
+          const a2 = R.pts[Math.max(0, k2 - 1)], c2 = R.pts[Math.min(R.pts.length - 1, k2 + 1)], l2 = Math.hypot(c2[0] - a2[0], c2[1] - a2[1]) || 1;
+          const tx = R.pts[k2][0] + (c2[1] - a2[1]) / l2 * sd * (R.w / 2 + 2.6), tz = R.pts[k2][1] - (c2[0] - a2[0]) / l2 * sd * (R.w / 2 + 2.6);
+          if (s2 > R.cum[R.cum.length - 1] - 12 || lotRects.some(r => tx > r[0] - 2 && tx < r[2] + 2 && tz > r[1] - 2 && tz < r[3] + 2) || !roadClearPt(tx, tz, R) || CityLayout.inCity(tx, tz, EDGE_MARGIN + 3)) continue;
+          tree(B.b, tx, R.y[k2], tz, 0.95 + 0.25 * hash2i(Math.round(tx), Math.round(tz), 77), tx + tz);
+        }
       }
     }
     // ---------------------------------------------------------------- each district on the map, its cars and its people
@@ -46923,6 +46976,7 @@ class PoliceManager {
     let best = null;
     for (let k = 0; k < 20; k++) {
       const i = clamp(Math.round(p.pos.x / P) + randi(-3, 3), RoadNet.I0, RoadNet.I1), j = clamp(Math.round(p.pos.z / P) + randi(-3, 3), RoadNet.J0, RoadNet.J1);
+      if (!RoadNet.degree(i, j)) continue; // (the node range spans every precinct: between them it is open ground)
       const x = i * P, z = j * P;
       const d = Math.hypot(x - p.pos.x, z - p.pos.z);
       if (d < 120 || d > 260) continue;

@@ -218,6 +218,7 @@ class PoliceManager {
     let best = null;
     for (let k = 0; k < 20; k++) {
       const i = clamp(Math.round(p.pos.x / P) + randi(-3, 3), RoadNet.I0, RoadNet.I1), j = clamp(Math.round(p.pos.z / P) + randi(-3, 3), RoadNet.J0, RoadNet.J1);
+      if (!RoadNet.degree(i, j)) continue; // (the node range spans every precinct: between them it is open ground)
       const x = i * P, z = j * P;
       const d = Math.hypot(x - p.pos.x, z - p.pos.z);
       if (d < 120 || d > 260) continue;

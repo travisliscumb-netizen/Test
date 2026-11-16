@@ -438,6 +438,8 @@ const Island = {
     const A = AIRPORT, G = PROVING;
     if (x > A.x0 - 60 && x < A.x1 + 60 && z > A.z0 - 90 && z < A.z1 + 60) return 'y';
     if (x > G.x0 - 30 && x < G.x1 + 30 && z > G.z0 - 30 && z < G.z1 + 30) return 'j';
+    // (the ground a moved precinct left inside the old square, built up as Linden Gardens: 128)
+    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island' && x > ISLE_GARDENS.x0 && x < ISLE_GARDENS.x1 && z > ISLE_GARDENS.z0 && z < ISLE_GARDENS.z1) return 'l';
     if (z > 880) return x < -160 && z < 1500 ? 'b' : 'e';
     if (z > -700 && z < -250 && x > -120 && x < 760) return 'k';
     if (Math.hypot(x - MT_VALEN.x, z - MT_VALEN.z) < 1250) return 'n';
@@ -456,5 +458,7 @@ const Island = {
     this.addPad(A.x0, A.z0, A.x1, A.z1, A.y, 140);
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
     for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
+    // Linden Gardens (128): the infill between the precincts, at the city's level
+    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island') for (const r of ISLE_GARDENS.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
   }
 };
