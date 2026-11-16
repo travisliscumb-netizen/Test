@@ -87,6 +87,7 @@ class ChunkManager {
       const rx = d.rx || 0, rz = d.rz || 0;
       if (d.kind === 'box') gd.add(TPL.box, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'cylr') gd.add(TPL.cyl, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
+      else if (d.kind === 'cyl8') gd.add(TPL.cyl8, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'cone') gd.add(TPL.cone, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'disc') gd.add(TPL.disc, M(d.x, d.y, d.z, d.sx, 1, d.sz, d.ry, rx, rz), d.color);
       else if (d.kind === 'blob') gd.add(TPL.blob, M(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.ry, rx, rz), d.color);

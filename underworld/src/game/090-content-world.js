@@ -51,7 +51,13 @@ class World {
     }
     this.localRoads = []; this.homes = []; this.mapPlaces = []; this.compounds = {};
     for (const b of this.blocks) { const sb = superblockAt(b.bx, b.bz); if (sb) { b.superblock = sb; b.noPeds = !sb.peds; b.ground = sb.ground; } }
-    for (const b of this.blocks) this._genBlock(b);
+    // each block, then its streets (stop signs, manholes, drains: 121) from the local roads it laid
+    for (const b of this.blocks) {
+      const r0 = this.localRoads.length; this._genBlock(b);
+      if (this.localRoads.length > r0) { const sb = b.superblock, m = sb ? this.blocks.filter(q => q.superblock === sb) : [b]; this._dressStreets(b, r0, m); }
+    }
+    // the houses' yards and fronts (121), once every house, drive and lane stands
+    for (const b of this.blocks) this._dressHomes(b);
     // (the perimeter is built where each precinct stands, after the bake: the generate wrapper in 100)
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();

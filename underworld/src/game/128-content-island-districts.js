@@ -256,6 +256,8 @@ Object.assign(World.prototype, {
         for (const s of [-1, 1]) boxL(b, L, s * (L.W / 2 - 0.7), 3.5, 1.1, L.D - 8, y + 0.7, 1.4, 0x35602c, true);
         const [cx, cz] = W2(L, 10.5, -10); B.slots.push({ x: cx, z: cz, h, y, cls: car(3) });
         const [tx, tz] = W2(L, -13, -10); tree(b, tx, y, tz, 1, L.i);
+        // the yard, the front door and the porch (121)
+        this._dressLot(b, L, y, 'villa', [-12.5, -5, 6.5, 7], [[-4, 10.6, 5], [10.5, -1, 5.6], [10.5, -10, 3.6], [-13, -10, 2]]);
       } else if (L.kind === 'house') {
         const two = q(1) < 0.55, wall = [0xf2d9c4, 0xc9e2e8, 0xf0e6b8, 0xd8e8c8, 0xe8c8c8, 0xdcdcec, 0xe4dccc][Math.floor(q(2) * 7)];
         bld(rectL(L, -1, 1.5, two ? 6.5 : 7.5, 5), two ? 5.8 : 3.6, STYLE.HOUSE, wall, two ? 2.9 : 3.6, 3.2, { roof: 'gable', roofColor: [0x5a4a3a, 0x3a4652, 0x7a3a2e][Math.floor(q(3) * 3)] });
@@ -263,11 +265,13 @@ Object.assign(World.prototype, {
         boxL(b, L, 8, -7.5, 3.6, 7, y + 0.03, 0.06, 0x8a8a88, false);
         if (q(4) < 0.8) { const [cx, cz] = W2(L, 8, -6.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(5) }); }
         const [tx, tz] = W2(L, -7, 8.5); tree(b, tx, y, tz, 0.85, L.i);
+        const hu = two ? 6.5 : 7.5; this._dressLot(b, L, y, 'house', [-1 - hu, -3.5, -1 + hu, 6.5], [[8, -7.5, 4.4], [-7, 8.5, 1.8]]);
       } else if (L.kind === 'cabin') {
         bld(rectL(L, 0, 0, 4.6, 4), 4.4, STYLE.HOUSE, [0x7a5a3e, 0x8a6a48, 0x5e4a38][Math.floor(q(1) * 3)], 4.4, 3, { roof: 'gable', roofColor: 0x3a3d40 });
         boxL(b, L, -6.2, 2, 1.2, 2.6, y + 0.5, 1, 0x6a4a2e, true);
         if (q(2) < 0.75) { const [cx, cz] = W2(L, 5.8, -5.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(3) }); }
         const [tx, tz] = W2(L, -5, 6.5); tree(b, tx, y, tz, 1.1, L.i);
+        this._dressLot(b, L, y, 'cabin', [-4.6, -4, 4.6, 4], [[-6.2, 2, 2], [5.8, -5.5, 3.6], [-5, 6.5, 1.8]]);
       } else if (L.kind === 'shop') {
         const r = rectL(L, 0, 3, 15, 8), n = signN[L.d] = (signN[L.d] || 0) + 1, text = Dd.signs[(n - 1) % Math.max(1, Dd.signs.length)] || 'GENERAL STORE';
         boxL(b, L, 0, -9.5, L.W - 2, 6, y + 0.03, 0.06, 0x3c3f44, false); for (const k of [-4.5, 4.5]) boxL(b, L, k, -9.5, 0.15, 5, y + 0.07, 0.02, 0xf2f2f2, false);
@@ -346,6 +350,31 @@ Object.assign(World.prototype, {
           if (s2 > R.cum[R.cum.length - 1] - 12 || lotRects.some(r => tx > r[0] - 2 && tx < r[2] + 2 && tz > r[1] - 2 && tz < r[3] + 2) || !roadClearPt(tx, tz, R) || CityLayout.inCity(tx, tz, EDGE_MARGIN + 3)) continue;
           tree(B.b, tx, R.y[k2], tz, 0.95 + 0.25 * hash2i(Math.round(tx), Math.round(tz), 77), tx + tz);
         }
+      }
+    }
+    // ---------------------------------------------------------------- the district streets' junctions and services (121):
+    // a stop sign where a street meets another road, manhole covers down the middle, drains at the kerb
+    for (const D of [...ISLE_DISTRICT_ROADS, ...ISLE_INFILL_ROADS]) {
+      const R = Island.roads.find(q => q.id === D.id); if (!R || !R.pts || R.pts.length < 3) continue;
+      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p', gardens: 'g', midtown: 'd' }[B.d]); if (!own.length) continue;
+      const nearB = (x, z) => own.reduce((m, q) => Math.hypot(q.cx - x, q.cz - z) < Math.hypot(m.cx - x, m.cz - z) ? q : m).b;
+      const n = R.pts.length;
+      (R.ends || []).forEach((e, k) => {
+        if (!e || e === 'ring') return;
+        // 9 m short of the junction along the road, on the right-hand verge, facing the traffic coming up to it
+        let i = k ? n - 1 : 0; while (k ? (i > 1 && R.cum[n - 1] - R.cum[i] < 9) : (i < n - 2 && R.cum[i] < 9)) i += k ? -1 : 1;
+        const j = k ? i - 1 : i + 1, P = R.pts[i], Q = R.pts[j], l = Math.hypot(P[0] - Q[0], P[1] - Q[1]) || 1, tx = (P[0] - Q[0]) / l, tz = (P[1] - Q[1]) / l;
+        const x = P[0] - tz * (R.w / 2 + 1.0), z = P[1] + tx * (R.w / 2 + 1.0), y = R.y[i];
+        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || !roadClearPt(x, z, R)) return;
+        this._stopSign(nearB(x, z), x, y, z, tx, tz, true);
+      });
+      for (let s = 30, m = 0; s < R.cum[R.cum.length - 1] - 20; s += 30, m++) {
+        let k = 0; while (k < n - 2 && R.cum[k + 1] < s) k++;
+        if (R.bridges && R.bridges.some(sp => k >= sp[0] - 1 && k <= sp[1] + 1)) continue;
+        const a = R.pts[k], c = R.pts[k + 1], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, t = clamp((s - R.cum[k]) / l, 0, 1), tx = (c[0] - a[0]) / l, tz = (c[1] - a[1]) / l;
+        const x = a[0] + (c[0] - a[0]) * t, z = a[1] + (c[1] - a[1]) * t, y = R.y[k] + (R.y[k + 1] - R.y[k]) * t, B = nearB(x, z);
+        if (m % 2 === 0) this._det(B, 'disc', x - tz * 0.9, y + 0.03, z + tx * 0.9, 0.36, 1, 0.36, C(0x3a3c40));
+        else { const sd = m % 4 === 1 ? 1 : -1; this._det(B, 'box', x - tz * sd * (R.w / 2 - 0.35), y + 0.03, z + tx * sd * (R.w / 2 - 0.35), 0.4, 0.02, 0.9, C(0x2a2c30), Math.atan2(tx, tz)); }
       }
     }
     // ---------------------------------------------------------------- each district on the map, its cars and its people

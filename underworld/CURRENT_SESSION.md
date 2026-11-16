@@ -1,5 +1,21 @@
 # CURRENT SESSION
 
+- **Owner requests, 2026-11-16 (after the wider spread): DONE.**
+  - Aircraft coming down: nose-down authority 31°, flaps only low or nose-up, an idle glide trim, a sink-rate flare;
+    300 m: climb 21 s, idle dive 11 s (was 27 s). Helicopter sink 11 m/s. ISLAND.md §7; suite `island` 42/42.
+  - Dina Vance launders up to $100,000 a hand-off, no daily limit, from the start (ECONOMY.md); `fixer` 17/17.
+  - Villa Valen (354): walk in from the first minute; a 64 x 30 m two-storey house (entrance hall and grand
+    staircase, great living room, dining, library, study, cinema, kitchen, garden room; master suite and five more
+    bedrooms); a library bookcase hides the lift to the bunker (a scene change); a closet panel hides $20,000,000,
+    clean, once. For sale at $4.5M (PROPS 'villa'): owned, its bed, wardrobe, stash, laptop and a 12-bay garage
+    under the pavilion. The exterior was reworked to match. Suites `interiors` 27/27, `homes` 26/26, `property`.
+  - Yards, house fronts and street detail (121): back yards (patio, barbecue, shed, swing set, trampoline, washing
+    line, raised beds, sandpit, kennel, fire pit, a pool behind the bigger houses, a flower border, a back fence);
+    fronts (porch posts and lamp, house number, flower beds, a path, bins; on the island a door, porch and mailbox);
+    streets (octagonal stop signs with name blades where a residential street meets another, manholes, kerb drains)
+    on the lattice and the island districts. Static detail merged per block: no new draw calls; boot time unchanged.
+  - Not done: the phone-profile calm-scene render cost (CITY_SPREAD.md §9) is still being measured.
+
 - **The city into the island (CITY_SPREAD.md): S1–S8 DONE; the wider spread is the default.** Ten precincts: downtown
   on the waist (the core's south half, the Old Quarter, Linden Hills, the port), Crestmoor Heights and Greenway on the
   bay's north shore, Uptown on Valen Sound below Lake Valen, the Nightlife Strip and Stadium on the bay's south shore,
