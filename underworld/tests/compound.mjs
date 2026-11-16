@@ -408,6 +408,8 @@ check('Enforcers who work at a warehouse stand guard at their posts in the yard 
 const alarm = await ev(() => {
   const g = window.game, uw = g.uw, C = g.world.compounds.whse_w, gs = uw.gangs;
   uw.compounds.events.length = 0; uw.compounds.alarmT = {};
+  // room under the gang cap for the raiders (whatever street groups stand round the yard where this layout puts it)
+  for (const gr of [...gs.groups.values()]) if (gr.key !== 'wh:whse_w') gs.removeGroup(gr);
   const fid = Object.keys(window.__pv.FACTIONS)[0];
   const gr = gs.spawnGroup('raidCam', 'raid', fid, { x: C.center.x - 8, z: C.gate.z + C.gate.n[1] * 8 + C.gate.n[0] * 0, h: 0 }, 1, {}); window.__cg = gr;
   return gr.members.length;
