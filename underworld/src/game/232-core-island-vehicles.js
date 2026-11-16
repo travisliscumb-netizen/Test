@@ -35,7 +35,7 @@ Object.assign(VEHICLES, {
     flight: { thrust: 6.4, drag: 0.00105, vStall: 25, pitchRate: 0.7, rollRate: 1.6, align: 2.6, span: 10.8 },
     colors: [0xf2f4f6, 0xf2c230, 0xc8102e, 0x2a6fd6], paint2: 0x1c3f94, blurb: 'Four seats, one propeller, 180 horsepower: the island from above.' },
   heli: { rev: 0.5, name: 'Kestrel', l: 6.6, w: 2.2, h: 3.3, mass: 1500, power: 0, drift: 0, vmax: 58, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.2, camDist: 13.5, camH: 3.4, eng: 0.6, price: 0, profile: 'sedan', build: 'heli', air: 'heli', noWheels: true, tier: 'nice', fleet: true, armorK: 0.7,
-    flight: { climb: 9, sink: 8, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
+    flight: { climb: 9, sink: 11, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
     colors: [0x17202a, 0xc8102e, 0x2a6fd6], paint2: 0xe8e8e8, blurb: 'A light turbine helicopter. Lands on a roof, a beach or a traffic island.' }
 });
 VEHICLES.medevac = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Medevac', colors: [0xf2f4f6], paint2: 0xd02a3a, blurb: 'St. Alda’s air ambulance.' });
@@ -175,8 +175,11 @@ const Flight = {
       } else {
         // in the air: thrust along the nose, drag against the path, the weight the wings do not carry, speed traded
         // for height, the lift's sideways part in a bank
-        // (throttled back, the flaps come out: up to two and a half times the drag, so it slows down to land)
-        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp)) * (1 + 1.6 * (1 - A.thr));
+        // (throttled back, the flaps come out: up to two and a half times the drag, so it slows down to land. They come out
+        // only on the approach (below 60 m) or with the nose up: up high with the nose down they stay in, so a dive at idle gathers speed and
+        // comes down fast instead of mushing near the stall)
+        const flaps = A.agl < 60 || A.pitch > -0.06 ? 1 : 0.15;
+        const dr = F.drag * speed * (1 + 1.5 * Math.abs(sp)) * (1 + 1.6 * (1 - A.thr) * flaps);
         let ax = fx * thrust - vx * dr, ay = fy * thrust - vy * dr - this.G * (1 - lift), az = fz * thrust - vz * dr;
         if (speed > 1) { const e = this.G * lift * vy / speed; ax -= vx / speed * e; ay -= vy / speed * e; az -= vz / speed * e; }
         const side = this.G * lift * Math.sin(A.bank); ax -= ch * side; az += sh * side;
@@ -189,8 +192,13 @@ const Flight = {
         // over its surfaces allows; hands off, it levels out. Stalled, the nose drops whatever the stick says.
         // Close to the ground and coming down it flares: the nose is held up to a shallow glide, so it arrives on its wheels.
         const au = 0.3 + 0.7 * auth, tb = -ctl.steer * 0.95;
-        let tp = ctl.pitch >= 0 ? ctl.pitch * 0.36 : ctl.pitch * 0.32;
-        if (A.agl < 9 && vy < 0 && q > 0.75) tp = Math.max(tp, -0.035 - 0.06 * A.agl / 9);
+        // Nose down goes further than nose up (a dive is how you lose height quickly); throttled back and hands off it
+        // trims for a glide (about 5 m/s down) rather than holding its height until it stalls.
+        let tp = ctl.pitch >= 0 ? ctl.pitch * 0.36 : ctl.pitch * 0.55;
+        if (Math.abs(ctl.pitch) < 0.05 && A.thr < 0.25 && A.agl > 60) tp = -0.15;
+        // the flare starts higher the faster it is coming down (it needs about two seconds of sink to round out)
+        const fh = Math.max(9, -vy * 2.2);
+        if (A.agl < fh && vy < 0 && q > 0.75) tp = Math.max(tp, -0.035 - 0.06 * Math.min(1, A.agl / 9));
         A.pitch += clamp(tp - A.pitch, -F.pitchRate * au * dt, F.pitchRate * au * dt);
         A.bank += clamp(tb - A.bank, -F.rollRate * au * dt, F.rollRate * au * dt);
         if (q < 0.9) A.pitch -= (0.9 - q) * 1.5 * dt;
@@ -217,7 +225,7 @@ const Flight = {
       } else {
         if (lifted) {
           // (the last few metres down it sinks on its own cushion of air: a third of the rate at the ground)
-          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink * clamp(A.agl / 8, 0.3, 1); vy += clamp(want - vy, -11 * dt, 11 * dt);
+          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink * clamp(A.agl / 12, 0.3, 1); vy += clamp(want - vy, -11 * dt, 11 * dt);
           const tf = ctl.throttle >= 0 ? ctl.throttle * s.vmax : ctl.throttle * F.vBack, acc = Math.abs(ctl.throttle) > 0.05 ? F.acc : 2.4;
           f += clamp(tf - f, -acc * dt, acc * dt); l *= Math.exp(-1.8 * dt);
           v.h += ctl.steer * F.yaw * (1 - 0.5 * clamp(Math.abs(f) / s.vmax, 0, 1)) * dt;

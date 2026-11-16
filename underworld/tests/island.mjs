@@ -203,6 +203,17 @@ check('it needs a take-off run (over 60 m of runway), lifts off above its stall 
 const level = await hold(['up'], s => s.x > 1500, 500);
 const turn = await hold(['up', 'left'], s => s.h > 4.55 && s.h < 4.9);
 check('level flight holds its height hands-off; a banked turn brings it round onto the opposite heading', !turn.dead && Math.abs(level.y - climb.y) < 45 && Math.abs(turn.bank) > 0.5 && turn.h > 4.5 && turn.y > 50, JSON.stringify([level, turn]));
+// coming down (owner, 2026-11-16: "easy to go up, hard to come down"): from the same height, a dive at idle loses 300 m
+// at least twice as fast as a full-power climb gains it, and hands off at idle it glides down rather than holding height
+const descent = await ev(() => {
+  const g = window.game, v = g.player.vehicle, A = v.air, keep = { p: v.pos.clone(), v: v.vel.clone(), h: v.h, a: { ...A } };
+  const fly = (y0, ctl, done, max) => { v.pos.set(-1400, y0, 2900); v.h = Math.PI / 2; v.vel.set(60, 0); Object.assign(A, { vy: 0, grounded: false, pitch: 0, bank: 0, thr: 1, on: 1 }); let t = 0; for (; t < max && !done(); t++) { Object.assign(v.ctl, ctl); g.vehicles.update(1 / 60); } return +(t / 60).toFixed(1); };
+  const r = { climb: fly(150, { throttle: 1, pitch: 1, steer: 0 }, () => v.pos.y >= 450, 3600), dive: fly(450, { throttle: -1, pitch: -1, steer: 0 }, () => v.pos.y <= 150, 3600) };
+  fly(450, { throttle: -1, pitch: 0, steer: 0 }, () => false, 1200); r.glideVy = +A.vy.toFixed(1); r.glideSpd = +Math.hypot(v.vel.x, v.vel.y).toFixed(1); r.hp = Math.round(v.health);
+  v.pos.copy(keep.p); v.vel.copy(keep.v); v.h = keep.h; Object.assign(A, keep.a); v.ctl.pitch = 0; v.ctl.throttle = 0;
+  return r;
+});
+check('coming down is quick: a dive at idle loses 300 m in under 15 s, nearly twice as fast as a full-power climb gains it; hands off at idle it glides down (3-8 m/s) above the stall', descent.dive < 15 && descent.dive * 1.8 <= descent.climb && descent.glideVy < -3 && descent.glideVy > -8 && descent.glideSpd > 26 && descent.hp === 100, JSON.stringify(descent));
 await hold(['up'], s => s.x < -650, 700);
 await hold(['left'], s => s.h > 1.45 && s.h < 1.7);
 await ev(() => { const v = window.game.player.vehicle; v.pos.z = 2410; v.h = Math.PI / 2; });

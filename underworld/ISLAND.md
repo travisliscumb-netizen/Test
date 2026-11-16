@@ -80,6 +80,11 @@ Harbor, Cape Valen Light, the Mount Valen observatory.
   place to find a car's top speed is the proving ground's kilometre strip and the 1.5 km runway.
 - Roads off the lattice are level across with a 6 m verge either side, so a baked 4 m tile keeps the carriageway
   exactly level; where a road joins another, the one joined keeps its own level through the junction.
+- Coming down (owner, 2026-11-16: "easy to go up, hard to come down"): full nose-down is 31° (nose-up 21°); the flaps
+  come out only below 60 m or with the nose up, so a dive at idle gathers speed instead of mushing at the stall; hands
+  off at idle it trims for a ~5.5 m/s glide. 300 m: climb 21 s, idle dive 11 s (was 27 s), idle glide 53 s (was ~2 min
+  for 200 m). The flare starts at a height set by the sink rate (2.2 s of it), so a steep approach still lands on its
+  wheels. The helicopter's sink went from 8 to 11 m/s, its ground cushion from 8 m to 12 m. Suite `island` checks it.
 - The sea is shallow physics: you wade no deeper than 1.25 m and a car bogs down, rather than drowning, respawning
   or an invisible wall. Aircraft that come down in it are lost.
 - No model identifiers, no new save fields (so no migration and no `SAVE_VERSION` bump): the fleet is not saved, and
