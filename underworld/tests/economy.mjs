@@ -37,7 +37,7 @@ check('no laundering through cars: each currency comes back only in proportion t
 // ---------------------------------------------------------------- laundering: the ladder, the limits
 const lau = await ev(() => {
   const g = window.game, uw = g.uw, P = window.__pv, F = uw.fronts, out = {};
-  out.fixer = uw.fixer.quote(5000); out.fixerCap = uw.fixer.capacityLeft();
+  out.fixer = uw.fixer.quote(5000); out.fixerCap = uw.fixer.maxHand();
   const d = P.PROPS.find(p => p.kind === 'business' && p.launder); g.save.rep = 400; g.money.W.clean = 1e7; uw.props.buy(d.id);
   const lv = n => { uw.S.props[d.id].lvl = n; }, ladder = [];
   for (const n of [1, 2, 3]) { lv(n); ladder.push([F.fee(d.id), F.cap(d.id)]); }
@@ -46,7 +46,7 @@ const lau = await ev(() => {
   out.ladder = ladder; out.notFront = F.deposit(P.PROPS.find(p => p.kind === 'business' && !p.launder).id, 5000);
   return out;
 });
-check('the early fixer: 32% fee, $5,000 a day', lau.fixer.fee === 1600 && lau.fixer.clean === 3400 && lau.fixerCap === 5000, JSON.stringify(lau));
+check('the early fixer: 32% fee, up to $100,000 a hand-off', lau.fixer.fee === 1600 && lau.fixer.clean === 3400 && lau.fixerCap === 100000, JSON.stringify(lau));
 check('the laundering ladder: fixer 32% → front 25% / managed 20% → 15% / 10% → 10% / 5%, capacity growing with level', JSON.stringify(lau.ladder.map(x => x[0])) === JSON.stringify([0.25, 0.15, 0.1, 0.2, 0.1, 0.05]) && lau.ladder[0][1] < lau.ladder[1][1] && lau.ladder[1][1] < lau.ladder[2][1], JSON.stringify(lau.ladder));
 check('only an owned laundering business is a front', /Not a front/.test(lau.notFront), lau.notFront);
 

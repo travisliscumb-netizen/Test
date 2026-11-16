@@ -179,7 +179,7 @@ nothing that costs money: the opening's first job fronts $150.
 - **Lockpick:** $75.
 - **Robbery:** tills ×0.8, safes ×0.65.
 - **Front fees:** 25 / 15 / 10%, manager −5 points, floor 5%.
-- **Fixer:** 32% fee, $5,000 a day.
+- **Fixer:** 32% fee, up to $100,000 a hand-off, no daily limit (owner, 2026-11-16; was $5,000 a day).
 - **Official purses:** VP $2k / $6k / $15k; Cedar Fields $1.6k / $1.8k / $5k.
 - **Rank needs:** 100 / 400 / 400 + 2 crew / 800 + 1 turf / 1,500 + 4 crew + 8 turfs + Lieutenant + 450 influence /
   2,500 + 6 crew + 16 turfs + 2 Lieutenants + 800 influence + a warehouse.

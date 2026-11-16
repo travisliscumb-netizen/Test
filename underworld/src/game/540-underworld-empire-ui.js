@@ -871,14 +871,14 @@ class EmpireUI {
   // the laundering fixer (§45.6): carried Dirty Cash in, Clean Bank FIXER_DELAY economic hours later, minus her fee
   openFixer(L) {
     const uw = this.uw, g = this.g, FX = uw.fixer, F = uw.S.fixer;
-    const amounts = [500, 1000, 2500, FIXER_DAY_CAP];
+    const amounts = [1000, 10000, 50000, FIXER_MAX];
     const render = () => {
-      const cap = FX.capacityLeft(), have = Money.available('launderIn');
+      const have = Money.available('launderIn');
       const pend = F.batches.map(b => `<span>${fmtMoney(b.dirty)} → ${fmtMoney(b.clean)}</span><span>in about ${Math.max(1, Math.ceil(FX.hoursLeft(b)))} h</span>`).join('');
-      return `<div class="svcTop"><span>Cash on you <b class="cash dirty">${fmtMoney(have)}</b></span><span>She’ll take today <b class="cash dirty">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
+      return `<div class="svcTop"><span>Cash on you <b class="cash dirty">${fmtMoney(have)}</b></span><span>She takes up to <b class="cash dirty">${fmtMoney(FIXER_MAX)}</b> a time</span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
         <div class="hint">Dirty Cash you hand her lands in your bank, minus her cut, about ${Math.round(FIXER_DELAY / uw.econRate())} hours later. Once it’s with her it isn’t on you: the police can’t take it off you. A front business (later) will wash more, for less.</div>
-        <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_DAY_CAP ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_DAY_CAP ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
-        ${(() => { const l = FX.limit(FIXER_DAY_CAP); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
+        <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_MAX ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_MAX ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
+        ${(() => { const l = FX.limit(FIXER_MAX); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
         ${F.batches.length ? `<h3>With her now</h3><div class="stats">${pend}</div>` : ''}
         ${F.washed ? `<div class="hint">Washed so far: ${fmtMoney(F.washed)} for ${fmtMoney(F.fees)} in fees.</div>` : ''}`;
     };

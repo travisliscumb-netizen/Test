@@ -53346,10 +53346,11 @@ const SPOTS = [
   ...['n', 'd', 'c'].map(id => ({ id: 'bank_' + id, name: BANKS[id].name, role: BANKS[id].role, at: BANKS[id].at, bank: id, col: BANKS[id].col }))
 ];
 // the early laundering fixer (§45.6, §45.22): she takes Dirty Cash you hand her in person and puts it in your bank
-// FIXER_DELAY economic hours later, minus FIXER_FEE, at most FIXER_DAY_CAP a day. Time runs on the economic clock
+// FIXER_DELAY economic hours later, minus FIXER_FEE, up to FIXER_MAX a hand-off and as often as you bring cash (owner,
+// 2026-11-16: $100,000 at a time from the start, no daily limit). Time runs on the economic clock
 // (Underworld.econH), so the day-length setting doesn't change how much she washes per hour of play (§45.9).
 // Fronts (Session 9) supersede her.
-const FIXER_FEE = 0.32, FIXER_DAY_CAP = 5000, FIXER_DELAY = 12, FIXER_MIN = 100;
+const FIXER_FEE = 0.32, FIXER_MAX = 100000, FIXER_DELAY = 12, FIXER_MIN = 100;
 // the economic clock runs at the reference day length outside jail, and at world time in jail (1:1, §45.8)
 const ECON_REF_DAY = 30;
 // faction headquarters (the boss and guards stand here)
@@ -61262,7 +61263,7 @@ function uw_toastOnce(uw, text) { const g = uw.g; if (g.time - (uw._lastT || 0) 
    [UNDERWORLD] LAUNDERING FIXER (§45.6, §45.22): the early, low-capacity
    way to turn Dirty Cash into Clean Bank before you own a front. You hand
    Dina Vance cash in person; she keeps her fee and puts the rest in your
-   bank half an economic day later, at most so much a day. Money with her
+   bank half an economic day later, up to $100,000 a hand-off. Money with her
    is not on you: an arrest can't seize it, and it still arrives while you
    are inside. State lives in save.uw.fixer; time is the economic clock.
    ===================================================================== */
@@ -61274,11 +61275,11 @@ class LaunderFixer {
   static sanitize(f, num) {
     const d = LaunderFixer.fresh();
     if (!f || typeof f !== 'object') return d;
-    const out = { day: Math.floor(num(f.day, 0, 0, 1e7)), used: num(f.used, 0, 0, FIXER_DAY_CAP), next: Math.floor(num(f.next, 1, 1, 1e9)), washed: num(f.washed, 0, 0, 1e15), fees: num(f.fees, 0, 0, 1e15), batches: [] };
+    const out = { day: Math.floor(num(f.day, 0, 0, 1e7)), used: num(f.used, 0, 0, 1e15), next: Math.floor(num(f.next, 1, 1, 1e9)), washed: num(f.washed, 0, 0, 1e15), fees: num(f.fees, 0, 0, 1e15), batches: [] };
     for (const b of Array.isArray(f.batches) ? f.batches : []) {
       if (!b || typeof b !== 'object') continue;
       // never more out than her fee allows for what went in
-      const dirty = Math.floor(num(b.dirty, 0, 0, FIXER_DAY_CAP)), clean = num(b.clean, 0, 0, LaunderFixer.quote(dirty).clean);
+      const dirty = Math.floor(num(b.dirty, 0, 0, FIXER_MAX)), clean = num(b.clean, 0, 0, LaunderFixer.quote(dirty).clean);
       if (!(clean > 0)) continue;
       out.batches.push({ id: Math.floor(num(b.id, 0, 0, 1e9)), dirty, clean, due: num(b.due, 0, 0, 1e9) });
     }
@@ -61286,17 +61287,17 @@ class LaunderFixer {
     out.next = Math.max(out.next, ...out.batches.map(b => b.id + 1), 1);
     return out;
   }
-  // the economic day the capacity counts against (24 economic hours)
+  // the economic day (24 economic hours); day and used are what she has washed today (a tally, not a limit)
   econDay() { return Math.floor(this.S.econH / 24); }
-  capacityLeft() { const F = this.F; return F.day === this.econDay() ? Math.max(0, FIXER_DAY_CAP - F.used) : FIXER_DAY_CAP; }
+  // the most she takes in one hand-off (there is no daily limit)
+  maxHand() { return FIXER_MAX; }
   // what you would get for n and when, without doing it
   static quote(n) { const fee = Math.round(n * FIXER_FEE); return { dirty: n, fee, clean: n - fee }; }
   quote(n) { return LaunderFixer.quote(n); }
   // how much of n she would take right now, and why not more
   limit(n) {
-    const have = Money.available('launderIn'), cap = this.capacityLeft();
-    const take = Math.floor(Math.min(n, have, cap));
-    if (cap < FIXER_MIN) return { take: 0, why: 'That’s all she’ll wash today. Come back tomorrow.' };
+    const have = Money.available('launderIn');
+    const take = Math.floor(Math.min(n, have, FIXER_MAX));
     if (have < FIXER_MIN) return { take: 0, why: `She doesn’t get out of bed for less than ${fmtMoney(FIXER_MIN)}. Bring cash, on you.` };
     if (take < FIXER_MIN) return { take: 0, why: `At least ${fmtMoney(FIXER_MIN)}.` };
     return { take, why: '' };
@@ -63393,14 +63394,14 @@ class EmpireUI {
   // the laundering fixer (§45.6): carried Dirty Cash in, Clean Bank FIXER_DELAY economic hours later, minus her fee
   openFixer(L) {
     const uw = this.uw, g = this.g, FX = uw.fixer, F = uw.S.fixer;
-    const amounts = [500, 1000, 2500, FIXER_DAY_CAP];
+    const amounts = [1000, 10000, 50000, FIXER_MAX];
     const render = () => {
-      const cap = FX.capacityLeft(), have = Money.available('launderIn');
+      const have = Money.available('launderIn');
       const pend = F.batches.map(b => `<span>${fmtMoney(b.dirty)} → ${fmtMoney(b.clean)}</span><span>in about ${Math.max(1, Math.ceil(FX.hoursLeft(b)))} h</span>`).join('');
-      return `<div class="svcTop"><span>Cash on you <b class="cash dirty">${fmtMoney(have)}</b></span><span>She’ll take today <b class="cash dirty">${fmtMoney(cap)}</b></span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
+      return `<div class="svcTop"><span>Cash on you <b class="cash dirty">${fmtMoney(have)}</b></span><span>She takes up to <b class="cash dirty">${fmtMoney(FIXER_MAX)}</b> a time</span><span>Fee <b>${Math.round(FIXER_FEE * 100)}%</b></span></div>
         <div class="hint">Dirty Cash you hand her lands in your bank, minus her cut, about ${Math.round(FIXER_DELAY / uw.econRate())} hours later. Once it’s with her it isn’t on you: the police can’t take it off you. A front business (later) will wash more, for less.</div>
-        <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_DAY_CAP ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_DAY_CAP ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
-        ${(() => { const l = FX.limit(FIXER_DAY_CAP); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
+        <div class="btns">${amounts.map(n => { const l = FX.limit(n); return `<button class="sbtn${n === FIXER_MAX ? ' gold' : ''}" data-act="wash:${n}" ${l.take ? '' : 'disabled'}>${n === FIXER_MAX ? 'As much as she’ll take' : fmtMoney(n)}</button>`; }).join('')}</div>
+        ${(() => { const l = FX.limit(FIXER_MAX); return l.take ? `<div class="hint">${fmtMoney(l.take)} now: you get ${fmtMoney(FX.quote(l.take).clean)}, she keeps ${fmtMoney(FX.quote(l.take).fee)}.</div>` : `<div class="hint">${esc(l.why)}</div>`; })()}
         ${F.batches.length ? `<h3>With her now</h3><div class="stats">${pend}</div>` : ''}
         ${F.washed ? `<div class="hint">Washed so far: ${fmtMoney(F.washed)} for ${fmtMoney(F.fees)} in fees.</div>` : ''}`;
     };
@@ -66420,7 +66421,7 @@ class MapView {
         // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
         if (L.def.bank) { /* the banks list themselves once their district is known (BankSystem.mapEntries) */ }
         else if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
-        else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_DAY_CAP)} a day` });
+        else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_MAX)} at a time` });
         else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `${L.def.sells ? 'BUY ' + L.def.sells.map(k => GOODS[k].name).join(', ') : 'BUY guns, ammo, armour'}${L.def.arms ? ' · buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });

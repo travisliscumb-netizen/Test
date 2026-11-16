@@ -2,7 +2,7 @@
    [UNDERWORLD] LAUNDERING FIXER (§45.6, §45.22): the early, low-capacity
    way to turn Dirty Cash into Clean Bank before you own a front. You hand
    Dina Vance cash in person; she keeps her fee and puts the rest in your
-   bank half an economic day later, at most so much a day. Money with her
+   bank half an economic day later, up to $100,000 a hand-off. Money with her
    is not on you: an arrest can't seize it, and it still arrives while you
    are inside. State lives in save.uw.fixer; time is the economic clock.
    ===================================================================== */
@@ -14,11 +14,11 @@ class LaunderFixer {
   static sanitize(f, num) {
     const d = LaunderFixer.fresh();
     if (!f || typeof f !== 'object') return d;
-    const out = { day: Math.floor(num(f.day, 0, 0, 1e7)), used: num(f.used, 0, 0, FIXER_DAY_CAP), next: Math.floor(num(f.next, 1, 1, 1e9)), washed: num(f.washed, 0, 0, 1e15), fees: num(f.fees, 0, 0, 1e15), batches: [] };
+    const out = { day: Math.floor(num(f.day, 0, 0, 1e7)), used: num(f.used, 0, 0, 1e15), next: Math.floor(num(f.next, 1, 1, 1e9)), washed: num(f.washed, 0, 0, 1e15), fees: num(f.fees, 0, 0, 1e15), batches: [] };
     for (const b of Array.isArray(f.batches) ? f.batches : []) {
       if (!b || typeof b !== 'object') continue;
       // never more out than her fee allows for what went in
-      const dirty = Math.floor(num(b.dirty, 0, 0, FIXER_DAY_CAP)), clean = num(b.clean, 0, 0, LaunderFixer.quote(dirty).clean);
+      const dirty = Math.floor(num(b.dirty, 0, 0, FIXER_MAX)), clean = num(b.clean, 0, 0, LaunderFixer.quote(dirty).clean);
       if (!(clean > 0)) continue;
       out.batches.push({ id: Math.floor(num(b.id, 0, 0, 1e9)), dirty, clean, due: num(b.due, 0, 0, 1e9) });
     }
@@ -26,17 +26,17 @@ class LaunderFixer {
     out.next = Math.max(out.next, ...out.batches.map(b => b.id + 1), 1);
     return out;
   }
-  // the economic day the capacity counts against (24 economic hours)
+  // the economic day (24 economic hours); day and used are what she has washed today (a tally, not a limit)
   econDay() { return Math.floor(this.S.econH / 24); }
-  capacityLeft() { const F = this.F; return F.day === this.econDay() ? Math.max(0, FIXER_DAY_CAP - F.used) : FIXER_DAY_CAP; }
+  // the most she takes in one hand-off (there is no daily limit)
+  maxHand() { return FIXER_MAX; }
   // what you would get for n and when, without doing it
   static quote(n) { const fee = Math.round(n * FIXER_FEE); return { dirty: n, fee, clean: n - fee }; }
   quote(n) { return LaunderFixer.quote(n); }
   // how much of n she would take right now, and why not more
   limit(n) {
-    const have = Money.available('launderIn'), cap = this.capacityLeft();
-    const take = Math.floor(Math.min(n, have, cap));
-    if (cap < FIXER_MIN) return { take: 0, why: 'That’s all she’ll wash today. Come back tomorrow.' };
+    const have = Money.available('launderIn');
+    const take = Math.floor(Math.min(n, have, FIXER_MAX));
     if (have < FIXER_MIN) return { take: 0, why: `She doesn’t get out of bed for less than ${fmtMoney(FIXER_MIN)}. Bring cash, on you.` };
     if (take < FIXER_MIN) return { take: 0, why: `At least ${fmtMoney(FIXER_MIN)}.` };
     return { take, why: '' };

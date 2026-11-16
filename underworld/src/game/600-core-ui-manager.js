@@ -969,7 +969,7 @@ class MapView {
         // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
         if (L.def.bank) { /* the banks list themselves once their district is known (BankSystem.mapEntries) */ }
         else if (L.def.chop) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'chop', icon: 'C', x: L.x, z: L.z, sub: L.def.role });
-        else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_DAY_CAP)} a day` });
+        else if (L.def.fixer) add({ key: 'spot:' + L.id, name: L.def.name, cat: 'contact', icon: 'L', x: L.x, z: L.z, sub: `Launders cash: ${Math.round(FIXER_FEE * 100)}% fee, up to ${fmtMoney(FIXER_MAX)} at a time` });
         else add({ key: 'spot:' + L.id, name: L.def.name, cat: 'buy', icon: L.def.arms ? 'A' : '↓', x: L.x, z: L.z, sub: `${L.def.sells ? 'BUY ' + L.def.sells.map(k => GOODS[k].name).join(', ') : 'BUY guns, ammo, armour'}${L.def.arms ? ' · buys hardware' : ''}${g.save.rep < (L.def.rep || 0) ? ` · deals from ${L.def.rep} rep` : ''}` });
       }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) add({ key: 'hq:' + L.id, name: FACTIONS[L.id].name + ' HQ', cat: 'faction', col: FACTIONS[L.id].col, x: L.x, z: L.z, sub: FACTIONS[L.id].archetype });
