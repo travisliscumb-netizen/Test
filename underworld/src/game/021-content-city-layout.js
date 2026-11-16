@@ -157,6 +157,11 @@ const CityLayout = {
     }
     return best ? [x + best.ox * P, z + best.oz * P] : [x, z];
   },
+  // a lattice crossing (i, j), authored (a race's waypoints): where it stands, in world metres (the precinct whose
+  // streets cross there; precincts at one offset that share it agree)
+  nodeLat(i, j) { for (const p of this.precincts) if (i >= p.lx0 && i <= p.lx1 + 1 && j >= p.lz0 && j <= p.lz1 + 1) return p; return this.precinctOf(i, j); },
+  nodeX(i, j) { return (i + this.nodeLat(i, j).ox) * P; },
+  nodeZ(i, j) { return (j + this.nodeLat(i, j).oz) * P; },
   // the middle of town: where the lattice's centre stands (a fallback spot, the direction "away from the city")
   cx() { return this.wx(CITY / 2, CITY / 2); },
   cz() { return this.wz(CITY / 2, CITY / 2); },

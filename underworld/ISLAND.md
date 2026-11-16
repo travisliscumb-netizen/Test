@@ -16,6 +16,10 @@ airport south, an inland lake, a coast highway round the island), GTA IV's and V
 The island is original; nothing is copied from those maps.
 
 ## 2. The decision that shaped everything: the lattice city stays
+> **Superseded (2026-11-16):** the owner asked for the city to flow with the island. It now stands round Valen Bay in
+> precincts (the core, Old Quarter, Linden Hills and the port on the waist; Crestmoor Heights on the bay's north
+> shore; the Nightlife Strip, Stadium and Warehouse District on its south shore), every system kept and nothing
+> redrawn. CITY_SPREAD.md is the record. What follows is why Operation Blackgate itself left the lattice alone.
 The 12 × 12 block city is the metropolitan core of the island, unchanged in layout. Every business, bank, casino,
 dealer, gang turf, police post, the hospital, the jail, the homes, the missions, traffic, pedestrians, saves and
 about 1,800 regression checks are tied to that lattice, and the directive asks to keep the game's identity and working

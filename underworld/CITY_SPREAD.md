@@ -25,7 +25,8 @@ start; §4 is the stage list with what is done; §5 is the checklist of every pl
 - The layout's own suite: `node underworld/tests/layout.mjs` (Node only, under a second).
 - Then the suites a change touches, then the regression runner (`TESTING.md`). Two cores here: a suite takes 1–10
   minutes, the full regression several hours at `CONC=2`.
-- **Next action: §4, stage S2, then S3.** §9's latest entry says what S2 has converted and what is left.
+- **Next action: §4, stage S7** (the full regression on the island layout, then fix what it finds). §9's latest entries
+  say what each stage built.
 
 ## 1. Why this is not "move the pins"
 The city is a 12 × 12 lattice of 80 m blocks (`020`: `P`, `N`, `CITY = 960`), and the lattice is the game's address
@@ -127,12 +128,12 @@ Every stage ends playable, committed and pushed. A stage is done only when its g
 | # | Stage | Scope | Gate | Status |
 |---|---|---|---|---|
 | S1 | Foundation | `CityLayout` and its rules; suite `layout`; the world fingerprint tool and the classic baseline; the first tables answering in world space (`offCity`, `zoneKey`, `districtNameAt`, `groundBase`, `turfAt`, `streetNameAt`) | fingerprint `IDENTICAL` to the baseline; `layout` green and able to fail (mutation-checked); affected suites green | **DONE** (§9) |
-| S2 | Tables and bounds in world space | Every row of §5 marked S2: block lookups, `RoadNet`'s world-facing questions, loops and clamps over `N`, every use of `CITY` as "the city's extent", arrays and keys sized by `N`. Classic layout only; nothing visible changes | fingerprint `IDENTICAL`; `layout` extended to each converted table under the `apart` layout; full regression no worse than the island gate (1,928 / 10, the same ten) | **IN PROGRESS** (§9) |
-| S3 | Bake and the tracer | `World.generate` builds in the lattice then bakes to the world; rasters stay lattice-space with lookups converted; one ground plane per precinct with `uOff`; the collision grid, the chunk streamer and the far mesh follow blocks, not the square; `Island` takes the city's level pads, kept shore and far-mesh hole from `CityLayout` | a **tracer layout** (the whole city as one precinct moved two cells) boots, plays `smoke` and prints a fingerprint equal to classic's once every coordinate is taken relative to its block (`world-print --rel`, to be added); classic still `IDENTICAL` | TODO |
-| S4 | Edges, seams and joins | The perimeter per precinct (seawall where its edge is wet, verge where dry; lamps, corners); seam streets built once per precinct; road-graph nodes, signals and kerb cuts per precinct; connectors as island roads whose `lat` ends meet precinct edge streets; the causeway and the land bridge anchored to their host precinct | a **two-precinct tracer** (the city cut in half, the halves 3 cells apart, one connector) boots; GPS, traffic, taxis and police cross the connector; `roadnet`, `roads`, `taxi`, `police` green on it | TODO |
-| S5 | The real layout | Siting pass on the island's height map (level, low, dry, near a road, off the airport and the proving ground); the picture for the owner; `CITY_LAYOUTS.island`; the coast re-cut where the square's flanks were; connector roads; the big map, minimap and turf map; races, missions and deliveries that crossed what is now a seam | owner signs off the picture **before** the layout is made default; then every place reachable by GPS from every other; new suite `spread` | TODO |
-| S6 | Saves | The save is stamped with its layout (an additive field, default `classic`, no `SAVE_VERSION` bump); a classic save's every world position is carried to where its block now stands (old world → lattice → new world); idempotent | a save made by `releases/banks/Underworld_Banks.html` loads with the player, home, garage, parked and tracked cars, stashes and dropped weapons beside the same buildings | TODO |
-| S7 | Tests and the gate | Suites speak lattice positions through one helper instead of raw numbers; `island`, `city`, `map`, `roads` re-asserted for the new world; full regression; phone-profile performance against the island build; docs; release export | full regression at or above the island gate; perf within the mobile budget (`CLAUDE.md`) | TODO |
+| S2 | Tables and bounds in world space | Every row of §5 marked S2: block lookups, `RoadNet`'s world-facing questions, loops and clamps over `N`, every use of `CITY` as "the city's extent", arrays and keys sized by `N`. Classic layout only; nothing visible changes | fingerprint `IDENTICAL`; `layout` extended to each converted table under the `apart` layout; full regression no worse than the island gate (1,928 / 10, the same ten) | **DONE** (§9) |
+| S3 | Bake and the tracer | `World.generate` builds in the lattice then bakes to the world; rasters stay lattice-space with lookups converted; one ground plane per precinct with `uOff`; the collision grid, the chunk streamer and the far mesh follow blocks, not the square; `Island` takes the city's level pads, kept shore and far-mesh hole from `CityLayout` | a **tracer layout** (the whole city as one precinct moved two cells) boots, plays `smoke` and prints a fingerprint equal to classic's once every coordinate is taken relative to its block (`world-print --rel`, to be added); classic still `IDENTICAL` | **DONE** (§9) |
+| S4 | Edges, seams and joins | The perimeter per precinct (seawall where its edge is wet, verge where dry; lamps, corners); seam streets built once per precinct; road-graph nodes, signals and kerb cuts per precinct; connectors as island roads whose `lat` ends meet precinct edge streets; the causeway and the land bridge anchored to their host precinct | a **two-precinct tracer** (the city cut in half, the halves 3 cells apart, one connector) boots; GPS, traffic, taxis and police cross the connector; `roadnet`, `roads`, `taxi`, `police` green on it | **DONE** (§9) |
+| S5 | The real layout | Siting pass on the island's height map (level, low, dry, near a road, off the airport and the proving ground); the picture for the owner; `CITY_LAYOUTS.island`; the coast re-cut where the square's flanks were; connector roads; the big map, minimap and turf map; races, missions and deliveries that crossed what is now a seam | owner signs off the picture **before** the layout is made default; then every place reachable by GPS from every other; new suite `spread` | **DONE** (§9; the owner gave full control) |
+| S6 | Saves | The save is stamped with its layout (an additive field, default `classic`, no `SAVE_VERSION` bump); a classic save's every world position is carried to where its block now stands (old world → lattice → new world); idempotent | a save made by `releases/banks/Underworld_Banks.html` loads with the player, home, garage, parked and tracked cars, stashes and dropped weapons beside the same buildings | **DONE** (§9) |
+| S7 | Tests and the gate | Suites speak lattice positions through one helper instead of raw numbers; `island`, `city`, `map`, `roads` re-asserted for the new world; full regression; phone-profile performance against the island build; docs; release export | full regression at or above the island gate; perf within the mobile budget (`CLAUDE.md`) | **IN PROGRESS** (§9) |
 
 Order matters: S2 before S3 (the bake needs the tables to answer for moved blocks), S3 before S4 (edges are built on
 baked blocks), S5 only when a two-precinct world already plays. Do not make a new layout the default before S6.
@@ -263,6 +264,47 @@ vehicles, pending cars, dropped weapons (`wloc`) and stashes.
   files (`090` perimeter, `100`, `110`, `120`, `122`, `170`) and the anchored extensions (`025`, `026`, `022`, `127`,
   `128`, `176`, `177`) belong to S3/S4 by §5's own table; `localRoadAt`/`localSurfaceAt` (F, S3); the full
   regression (the S2 gate) when S3's tracer exists, since under `classic` it cannot see a wrong conversion.
+- **2026-11-16, S3.** The bake: the city is generated under `classic` (same seeds, same noise) and `World._bake`
+  moves every block and the world's lists by its precinct's offset (x/z keys, [x, z] points, wire runs, compound fence
+  runs, signal crossings in cells; normals, flags and shared tables untouched); colliders are registered after it in
+  their old order, then `_postGen` runs where the city stands. The perimeter is built per precinct after the bake
+  (`world.shoreRuns`), leaving out seams. One ground mesh and one ground material **per offset group** (precincts at one
+  offset share their streets): the mesh is the union of their frames with no overlap; the shader takes the offset off
+  (`uOff`) and knows its cells (the block texture's alpha) instead of assuming 0..960. The local-road raster is an
+  **atlas** with a tile per group (`LOCAL.tiles`, `localPx`, the shader's `uLoc`), because two groups' lattice frames
+  overlap near a cut and would share pixels. The AO map stays lattice. Island: every precinct's ground is land and
+  levelled (`corePads`, the SDF), its far mesh and ribbons skip every frame, `_coastAmp` keeps every frame's coast.
+  Test layouts: `?layout=tracer` (the city moved whole), `?layout=tracer2` (two halves and a connector); `UW_QUERY`
+  runs any suite under one.
+- **2026-11-16, S4.** Connectors: `CITY_CONNECTORS[layout]` (island roads in world metres whose `lat` ends meet
+  precinct edge streets). An island road's control point authored at the city's edge moves with the precinct it meets
+  (`CityLayout.anchor`). Valen Point's causeway and the Cedar Fields land bridge leave from whichever precinct edge
+  meets them (`VP_EDGE`, `CFS_EDGE`).
+- **2026-11-16, S5: the island layout** (the owner: "you have full control, whatever makes most sense for a smooth city
+  layout"). The draft of §3 with one change: **the port does not move.** A precinct never turns, and the Docklands'
+  quay, cranes and container berth face east; on the west coast they would face inland. So the Industrial Belt, the
+  Docklands and the Container Terminal stay on Valen Sound beside the core (Valen Point's causeway still lands on their
+  east street), and last session's Blackgate Landing keeps the west coast. Moved: **Crestmoor Heights** (cells 0..1 x
+  0..3, offset −8, −6) to the bay's north shore, **the Nightlife Strip, the Stadium and the Warehouse District** (4..9 x
+  8..11, offset −12, +4) to its south shore. Roads (`ISLE_ROAD_LAYOUT.island`): the Coast Highway runs through the
+  Heights' own streets (`n1e` from the core to its east street, `n1` on from its west street); the Southshore Highway's
+  east end reaches the core's south street; the Blackgate Bridge road leaves from the Strip's west street; Strip Road
+  joins the Strip's east street to the Southshore Highway; Bayview Crescent gives way to the Heights; Ridgeview Drive
+  climbs to Villa Valen from the Heights' north street; Reed Street stops short of the Strip. Saltmarsh (village, jetty)
+  steps aside where a precinct stands. Street races keep to one offset (`CityLayout.nodeX/Z`): the Quayside Sprint now
+  turns up the core's bay front, the Pink Slip keeps to the core and the port. Tanner's Row, which crossed from Linden
+  Hills into the Strip's block, is now two lanes, each meeting its own precinct's edge street.
+  **The island layout is the default** (`CITY_LAYOUT_DEFAULT`); `?layout=classic` is the square, fingerprint-identical
+  to the build before the city spread.
+- **2026-11-16, S6.** A save carries its layout (`layout`, additive; a save without one is classic). Loaded under
+  another, every `{ x, z }` that stood in a precinct of the old layout moves to where the same block stands now
+  (`CityLayout.relocate`), the stamp updates, a second load moves nothing. Suite `relocate` (7 checks).
+- **2026-11-16, S7 (started).** Suites updated for the island layout where they asserted the square: `city` (network
+  checks over the world and the road graph, races per offset), `roadnet` (grid over the layout's node rectangle,
+  crossings, fare points through the layout), `island` (seawall by precinct and side, Saltmarsh's shore, street names
+  and places through the layout, road beds skip every frame, road count), `districts` (the streets and lots the layout
+  keeps), `layout` (starts on island, tests classic explicitly). Full regression on the island default: running; its
+  result goes here and in CURRENT_SESSION.md.
 
 ## 10. Round the grid (live): the new districts, Villa Valen and the Valen Vault
 The owner's words, by voice: keep the grid; build districts round it, not in a grid pattern; raise the quality

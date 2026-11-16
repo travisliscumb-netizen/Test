@@ -28,8 +28,12 @@ const G = await ev(() => {
   out.n = [R.nodes.length, R.edges.length];
   let bad = 0, open = 0;
   for (const es of R.segEdges.values()) { const L = es.reduce((s, e) => s + e.len, 0); if (Math.abs(L - 80) > 1e-6 || es.some(e => e.pts.length !== 2 || e.kind !== 'grid')) bad++; }
-  for (const a of [0, 1]) for (let line = 0; line <= 12; line++) for (let seg = 0; seg < 12; seg++) if (P.RoadNet.segOpen(a, line, seg)) open++;
-  out.grid = { segs: R.segEdges.size, open, bad, closed: P.RoadNet.closed.size, bfs: P.RoadNet.path(0, 0, 12, 12).length };
+  // (the streets where they stand: world lines and segments over the city layout's node rectangle, CITY_SPREAD.md)
+  const RN = P.RoadNet;
+  for (const a of [0, 1]) for (let line = a ? RN.J0 : RN.I0; line <= (a ? RN.J1 : RN.I1); line++) for (let seg = a ? RN.I0 : RN.J0; seg < (a ? RN.I1 : RN.J1); seg++) if (RN.segOpen(a, line, seg)) open++;
+  // a lattice route across the precincts that stand together, corner to corner: the shortest there is
+  const CL = P.CityLayout, cs = CL.precincts.filter(p => !p.ox && !p.oz), i0 = Math.min(...cs.map(p => p.lx0)), j0 = Math.min(...cs.filter(p => p.lx0 === i0).map(p => p.lz0)), i1 = Math.max(...cs.map(p => p.lx1 + 1)), j1 = Math.max(...cs.filter(p => p.lx1 + 1 === i1).map(p => p.lz1 + 1));
+  out.grid = { segs: R.segEdges.size, open, bad, closed: RN.closed.size, bfs: RN.path(i0, j0, i1, j1).length, manhattan: Math.abs(i1 - i0) + Math.abs(j1 - j0) };
   const seen = new Set([0]), q = [R.nodes[0]];
   while (q.length) { const n = q.pop(); for (const { e } of n.edges) for (const m of [e.a, e.b]) if (!seen.has(m.id)) { seen.add(m.id); q.push(m); } }
   out.reach = seen.size / R.nodes.length;
@@ -61,13 +65,16 @@ const G = await ev(() => {
   }
   return out;
 });
-check('the grid is still the grid: every open lattice segment is in the graph, straight, 80 m end to end; closures and lattice paths unchanged', G.grid.bad === 0 && G.grid.segs === G.grid.open && G.grid.closed === 22 && G.grid.bfs === 25, JSON.stringify(G.grid));
+check('the grid is still the grid: every open lattice segment is in the graph, straight, 80 m end to end; closures and lattice paths unchanged', G.grid.bad === 0 && G.grid.segs === G.grid.open && G.grid.closed === 22 && G.grid.bfs === G.grid.manhattan + 1, JSON.stringify(G.grid));
 check('one connected network: every junction reaches every other (the city, the curved streets, Valen Point, Cedar Fields South)', G.reach === 1, JSON.stringify({ reach: G.reach, n: G.n }));
 const skew = G.tees.filter(x => x.ang < 75);
 check('T-junctions at any angle: at least three new streets leave the grid well off square (under 75°), none sharper than 30°', skew.length >= 3 && G.tees.every(x => x.ang >= 30), JSON.stringify(G.tees));
 check('a Y-junction: Kiln Lane forks off Saltmarsh Way at a shallow angle (15–40°)', G.y.some(y => y.minor === 'Kiln Lane' && y.main === 'Saltmarsh Way' && y.ang >= 15 && y.ang <= 40), JSON.stringify(G.y));
 check('a link-to-link T: the Farm Track meets Cedar Fields Road part way along it', G.y.some(y => y.minor === 'Farm Track' && y.main === 'Cedar Fields Road'), JSON.stringify(G.y));
-check('crossings: Saltmarsh Way and Tanner’s Row cross lattice streets, and the Farm Track meets the bridge track across the perimeter road (four roads at one point)', ['Saltmarsh Way / Saltmarsh Way', 'Tanner’s Row / Tanner’s Row'].every(c => G.cross.includes(c)) && G.cross.some(c => /Farm Track/.test(c) && /Cedar Fields Track/.test(c)), JSON.stringify(G.cross));
+// (Tanner's Row crossed from Linden Hills into the Nightlife Strip's block; with the Strip on the bay's south shore its two
+// halves each meet their own precinct's edge street, so it crosses nothing under the island layout)
+const tannerCrosses = await ev(() => window.__pv.CityLayout.precinctOf(3, 10) === window.__pv.CityLayout.precinctOf(4, 10) || window.__pv.CityLayout.precinctOf(3, 10).ox === window.__pv.CityLayout.precinctOf(4, 10).ox);
+check('crossings: Saltmarsh Way and (where its blocks stand together) Tanner’s Row cross lattice streets, and the Farm Track meets the bridge track across the perimeter road (four roads at one point)', ['Saltmarsh Way / Saltmarsh Way', ...(tannerCrosses ? ['Tanner’s Row / Tanner’s Row'] : [])].every(c => G.cross.includes(c)) && G.cross.some(c => /Farm Track/.test(c) && /Cedar Fields Track/.test(c)), JSON.stringify(G.cross));
 check('a diagonal: Saltmarsh Way leaves Juniper St in a straight line at about 40° to the grid', G.straight && Math.abs(G.diag - 39.5) < 1, JSON.stringify({ diag: G.diag, straight: G.straight }));
 check('curves: every new street is smooth (no turn over 10° between samples) and its bends are 20 m or wider', G.shapes.every(s => s.turn < 10 && (s.minR === 'straight' || s.minR >= 20)), JSON.stringify(G.shapes));
 check('a curve meets a straight: the diagonal runs into Saltmarsh Way’s curve across 3rd Ave without a kink (under 4°)', G.trans < 4, JSON.stringify(G.trans));
@@ -160,7 +167,9 @@ const gps = await ev(() => {
   }
   // a road that can't be reached is detected (no route), not drawn as a straight line: Cedar Fields South without its bridge track
   out.cut = R.route(500, 500, 300, 1300, { filter: e => e.name !== 'Cedar Fields Track' }) === null;
-  out.fare = { len: Math.round(P.routeLen(805, 175, 372, 870)), graph: Math.round(R.route(805, 175, 372, 870).len) };
+  // (Saltmarsh Way to Tanner's Row's far end: lattice metres, where their blocks stand)
+  const fx = P.CityLayout.wx(805, 175), fz = P.CityLayout.wz(805, 175), tx = P.CityLayout.wx(372, 870), tz = P.CityLayout.wz(372, 870);
+  out.fare = { len: Math.round(P.routeLen(fx, fz, tx, tz)), graph: Math.round(R.route(fx, fz, tx, tz).len) };
   return out;
 });
 check('route distance is the road’s length: Saltmarsh Way end to end measures the street (diagonal, crossing, curve)', Math.abs(gps.whole.route - gps.whole.street) < 0.5 && Math.abs(gps.whole.poly - gps.whole.route) < 0.5 && gps.whole.names.length === 1, JSON.stringify(gps.whole));

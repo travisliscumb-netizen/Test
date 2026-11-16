@@ -12,23 +12,41 @@ await ev(() => { const g = window.game; g.events.cool = 1e9; g.police.enabled = 
 
 // 1. road network
 const net = await ev(() => {
-  const { RoadNet, SUPERBLOCKS } = window.__pv, N = 12;
-  let closed = RoadNet.closed.size, dead = 0, tj = 0, iso = 0, open = 0;
-  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) { const d = RoadNet.degree(i, j); if (d === 1) dead++; if (d === 3) tj++; if (d === 0) iso++; if (d > 0) open++; }
-  // connectivity: BFS from (0,0) reaches every node that has a road
-  const seen = new Set(['0,0']), q = [[0, 0]];
-  while (q.length) { const [i, j] = q.shift(); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (RoadNet.open(i, j, dx, dz) && !seen.has((i + dx) + ',' + (j + dz))) { seen.add((i + dx) + ',' + (j + dz)); q.push([i + dx, j + dz]); } }
-  // perimeter stays whole; race lines on the lattice stay open (countryside races run on their own paths: offroad.mjs)
-  let perim = true; for (let k = 0; k < N; k++) for (const [a, i] of [[0, 0], [0, N], [1, 0], [1, N]]) if (!RoadNet.segOpen(a, i, k)) perim = false;
-  const races = window.__pv.RACES.filter(r => r.nodes).every(r => { const ns = r.nodes.concat(r.loop ? [r.nodes[0]] : []); for (let k = 0; k < ns.length - 1; k++) { const [a0, b0] = ns[k], [a1, b1] = ns[k + 1]; const dx = Math.sign(a1 - a0), dz = Math.sign(b1 - b0); let i = a0, j = b0; while (i !== a1 || j !== b1) { if (!RoadNet.open(i, j, dx, dz)) return false; i += dx; j += dz; } } return true; });
-  // longest straight run of open road (the old grid ran 12 blocks edge to edge everywhere)
-  let fullRuns = 0; for (let a = 0; a < 2; a++) for (let i = 1; i < N; i++) { let all = true; for (let k = 0; k < N; k++) if (!RoadNet.segOpen(a, i, k)) all = false; if (all) fullRuns++; }
-  return { closed, dead, tj, iso, open, reached: seen.size, perim, races, fullRuns, sb: SUPERBLOCKS.length };
+  // the streets as they stand (CITY_SPREAD.md: the city is in precincts round Valen Bay; RoadNet answers in world
+  // crossings over the layout's node rectangle; the island roads that join the precincts are links in RoadGraph)
+  const { RoadNet, RoadGraph, SUPERBLOCKS, CityLayout } = window.__pv, N = 12, R = RoadNet;
+  let closed = R.closed.size, dead = 0, tj = 0, iso = 0, open = 0;
+  for (let i = R.I0; i <= R.I1; i++) for (let j = R.J0; j <= R.J1; j++) { if (!CityLayout.nodeAt(i, j)) continue; const d = R.degree(i, j); if (d === 1) dead++; if (d === 3) tj++; if (d === 0) iso++; if (d > 0) open++; }
+  // connectivity: every node of the road graph (the city's streets, the curved roads, the island's roads that join
+  // the precincts) is reached from the first
+  const nodes = RoadGraph.nodes, seen = new Set([nodes[0]]), q = [nodes[0]];
+  while (q.length) { const n = q.shift(); for (const inc of n.edges) { const o = inc.e.a === n ? inc.e.b : inc.e.a; if (o && !seen.has(o)) { seen.add(o); q.push(o); } } }
+  // every precinct's edge streets stay whole where they face no other precinct's blocks; race lines stay open where
+  // their precinct stands, and a race keeps to one offset (countryside races run on their own paths: offroad.mjs)
+  let perim = true;
+  for (const p of CityLayout.precincts) for (const side of 'nswe') {
+    const ns = side === 'n' || side === 's', line = side === 'n' ? p.lz0 + p.oz : side === 's' ? p.lz1 + 1 + p.oz : side === 'w' ? p.lx0 + p.ox : p.lx1 + 1 + p.ox;
+    for (let k = ns ? p.lx0 : p.lz0; k <= (ns ? p.lx1 : p.lz1); k++) {
+      const w = k + (ns ? p.ox : p.oz), across = side === 'n' ? line - 1 : side === 'w' ? line - 1 : line;
+      if (ns ? CityLayout.cell(w, across) >= 0 : CityLayout.cell(across, w) >= 0) continue; // a seam
+      if (!R.segOpen(ns ? 1 : 0, line, w)) perim = false;
+    }
+  }
+  const races = window.__pv.RACES.filter(r => r.nodes).every(r => {
+    const ns = r.nodes.concat(r.loop ? [r.nodes[0]] : []), offs = new Set(ns.map(([i, j]) => CityLayout.nodeLat(i, j).ox + ',' + CityLayout.nodeLat(i, j).oz)); if (offs.size !== 1) return false;
+    const [ox, oz] = [...offs][0].split(',').map(Number);
+    for (let k = 0; k < ns.length - 1; k++) { const [a0, b0] = ns[k], [a1, b1] = ns[k + 1]; const dx = Math.sign(a1 - a0), dz = Math.sign(b1 - b0); let i = a0 + ox, j = b0 + oz; while (i !== a1 + ox || j !== b1 + oz) { if (!R.open(i, j, dx, dz)) return false; i += dx; j += dz; } }
+    return true;
+  });
+  // longest straight run of open road in the lattice as authored (the old grid ran 12 blocks edge to edge everywhere)
+  const latOpen = (a, i, k) => !R.closed.has(R.key(a, i, k));
+  let fullRuns = 0; for (let a = 0; a < 2; a++) for (let i = 1; i < N; i++) { let all = true; for (let k = 0; k < N; k++) if (!latOpen(a, i, k)) all = false; if (all) fullRuns++; }
+  return { closed, dead, tj, iso, open, reached: seen.size, nodes: nodes.length, perim, races, fullRuns, sb: SUPERBLOCKS.length };
 });
 check('superblocks close lattice segments (the grid is broken up)', net.closed >= 20 && net.sb >= 5, JSON.stringify(net));
 check('the road lattice has no dead ends', net.dead === 0, JSON.stringify(net));
 check('there are T-junctions where streets end at a superblock', net.tj >= 12, JSON.stringify(net));
-check('every road node is reachable from every other (connected)', net.reached === net.open, JSON.stringify(net));
+check('every road node is reachable from every other (connected: the precincts round the bay and the island\'s roads between them)', net.reached === net.nodes, JSON.stringify(net));
 check('the perimeter road and every race route stay open', net.perim && net.races, JSON.stringify(net));
 check('fewer inner streets run unbroken edge to edge than before (22 of 22 in the old grid)', net.fullRuns <= 16, `${net.fullRuns} unbroken inner streets`);
 const route = await ev(() => {

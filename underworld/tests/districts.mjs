@@ -12,7 +12,9 @@ const r = await page.evaluate(() => {
   out.badLots = D.lots.filter(L => { const r = L.rect, hx = (r[2] - r[0]) * 0.3, hz = (r[3] - r[1]) * 0.3; for (const q of [[L.x - hx, L.z - hz], [L.x + hx, L.z + hz], [L.x - hx, L.z + hz], [L.x + hx, L.z - hz], [L.x, L.z]]) { const dv = Math.abs(pv.groundY(q[0], q[1], 60) - L.P.y); out.worst = Math.max(out.worst || 0, dv); if (dv > 0.3) return true; if (!pv.offCity(q[0], q[1])) return true; } return pv.isOnRoad(L.x, L.z); }).map(L => L.i);
   out.overlap = 0; for (let i = 0; i < D.lots.length; i++) for (let j = i + 1; j < D.lots.length; j++) { const a = D.lots[i].rect, c = D.lots[j].rect; if (a[0] < c[2] && a[2] > c[0] && a[1] < c[3] && a[3] > c[1]) out.overlap++; }
   // the streets: in the road graph, curved, joined to the island's roads at both ends (or a turning circle)
-  const names = ['Bayview Crescent', 'Ridgeview Drive', 'Laurel Way', 'Marsh Hollow Road', 'Heron Loop', 'Reed Street', 'Quay Road', 'Foundry Wharf'];
+  // (the streets this city layout builds: under the island layout Bayview Crescent gives way to Crestmoor Heights)
+  const names = ['Bayview Crescent', 'Ridgeview Drive', 'Laurel Way', 'Marsh Hollow Road', 'Heron Loop', 'Reed Street', 'Quay Road', 'Foundry Wharf'].filter(n => pv.Island.roadDefs().some(D => D.name === n));
+  out.names = names; out.layout = pv.CityLayout.id;
   out.links = names.map(n => (w.links || []).some(L => L.name === n));
   out.edges = names.map(n => pv.RoadGraph.edges.filter(e => e.name === n).length);
   // the GPS finds a way from downtown to each district, the villa and the port
@@ -25,9 +27,12 @@ const r = await page.evaluate(() => {
   out.blocks = D.blocks.length; out.stream = D.blocks.every(B => w.xblocks[B.i - 1000] && w.xblocks[B.i - 1000].isle);
   return out;
 });
-check('the districts are built: Bayview Heights, Marsh Hollow, Blackgate Landing, Lake Valen Shore and Gull Harbor all have lots', ['bayview', 'marsh', 'landing', 'lakeside', 'gull'].every(d => r.by[d] > 0) && r.by.bayview > 30 && r.by.marsh > 50, JSON.stringify(r.by));
+// (under the island layout Crestmoor Heights stands on most of Bayview's shore and the Nightlife Strip by Marsh Hollow:
+// what is left of each is still built)
+const isl = r.layout === 'island';
+check('the districts are built: Bayview Heights, Marsh Hollow, Blackgate Landing, Lake Valen Shore and Gull Harbor all have lots', ['bayview', 'marsh', 'landing', 'lakeside', 'gull'].every(d => r.by[d] > 0) && r.by.bayview > (isl ? 5 : 30) && r.by.marsh > (isl ? 35 : 50), JSON.stringify(r.by));
 check('every lot stands on its own level ground, off the city and off every road, and no two lots overlap', r.badLots.length === 0 && r.overlap === 0, JSON.stringify([r.badLots.length, r.badLots.slice(0, 10), r.overlap, +(r.worst || 0).toFixed(2)]));
-check('the eight new streets are curved links in the road graph', r.links.every(Boolean) && r.edges.every(n => n > 0), JSON.stringify([r.links, r.edges]));
+check('the new streets (eight, less any the city layout gives way) are curved links in the road graph', r.names.length >= 7 && r.links.every(Boolean) && r.edges.every(n => n > 0), JSON.stringify([r.links, r.edges]));
 check('the GPS routes from downtown to Villa Valen, Marsh Hollow, Blackgate Landing, Bayview and the lake shore', r.routes.every(l => l > 100), JSON.stringify(r.routes));
 check('the Valen Vault: its walls are solid, its doorway is open and you can drive in, six cars in the gallery', r.vault.wall === true && r.vault.door === false && r.vault.inside === false && r.vault.gallery === 6, JSON.stringify(r.vault));
 check('Villa Valen, the vault and the districts are on the map', r.places.every(Boolean), JSON.stringify(r.places));

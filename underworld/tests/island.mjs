@@ -38,6 +38,9 @@ const isle = await ev(() => {
     islets: [[-560, 470], [-1720, 520], [2860, -900], [-1450, 2720], [2680, 2480], [-2330, -2480]].filter(p => I.land(p[0], p[1])).length,
     summit: Math.round(I.height(MT_VALEN.x, MT_VALEN.z, 1e6)), beach: (() => { let x = -1000; while (x > -1500 && I.land(x, 1500)) x -= 2; return I.surface(x + 14, 1500, I.height(x + 14, 1500, 1e6), 0); })(),
     shore: Object.fromEntries(Object.entries(g.world.shore).map(([k, v]) => [k, v.reduce((s, r) => s + r[1] - r[0], 0) | 0])),
+    // the seawall's runs by precinct and side (CITY_SPREAD.md: the city stands in precincts round Valen Bay)
+    walls: (() => { const o = {}; for (const r of g.world.shoreRuns) { const id = window.__pv.CityLayout.precincts[r.k].id + '.' + r.side; o[id] = (o[id] || 0) + Math.round(r.b - r.a); } return o; })(),
+    layout: window.__pv.CityLayout.id,
     wade: +groundY(-300, 500).toFixed(2), cityEdge: [+groundY(400, -19).toFixed(2), +groundY(400, -30).toFixed(2), +groundY(400, -17).toFixed(2)]
   };
 });
@@ -45,7 +48,9 @@ check('the island is built: about 19 km² of land in a 5.6 × 6.4 km sea, sea on
 check('an irregular outline, not a rectangle: the shore is between a few hundred metres and several kilometres from the middle', isle.radMin < 900 && isle.radMax > 2400 && isle.span[0] > 4200 && isle.span[1] > 5200, JSON.stringify([isle.radMin, isle.radMax, isle.span]));
 check('Valen Bay west of the city, Valen Sound east of it, Lake Valen inland with land all round it, six islets', isle.bay && isle.sound && isle.lake && isle.islets === 6, JSON.stringify(isle));
 check('a beach on the long shore (sand), and you can wade: the sea floor is never deeper than 1.25 m under the surface', isle.beach === 1 && Math.abs(isle.wade - (-2.45)) < 0.01, JSON.stringify([isle.beach, isle.wade]));
-check('the city is no square of sea: its north edge is dry land, the seawall stands only on the bay, the sound and round the terminal', isle.shore.n < 20 && isle.shore.w > 800 && isle.shore.e > 900 && isle.shore.s > 150 && isle.shore.s < 400, JSON.stringify(isle.shore));
+{ const W = isle.walls, w = k => W[k] || 0;
+  check('the seawall stands only where the city meets water: the port on Valen Sound, the Nightlife Strip and the core\'s and Old Quarter\'s west streets on Valen Bay; the core\'s north street and Linden Hills\' south street over dry ground have none',
+    isle.layout === 'island' && w('port.e') > 900 && w('strip.n') > 400 && w('core.w') + w('oldquarter.w') > 300 && w('core.n') < 60 && w('linden.s') < 20, JSON.stringify(W)); }
 check('the ground carries on from the city’s promenade without a step you could not walk', isle.cityEdge.every(h => h > -0.1 && h < 0.6), JSON.stringify(isle.cityEdge));
 // the meshes and the physics share the ground: a near tile's vertices are the tile's heights, and a point inside a cell
 // is on one of its two triangles
@@ -60,14 +65,17 @@ check('a near tile is drawn with the heights the physics stands on (to the milli
 // ---------------------------------------------------------------- districts and places
 const zones = await ev(() => {
   const { zoneKey, ZONES, districtNameAt } = window.__pv, g = window.game;
-  const at = { ridge: [250, -560], mount: [350, -1500], highlands: [-1500, -900], saltmarsh: [-500, 1150], southshore: [-600, 2000], airport: [600, 2100], proving: [1400, 1560], vp: [1800, 500], cfs: [300, 1300], downtown: [520, 440] };
+  const CL = window.__pv.CityLayout, L = (x, z) => [CL.wx(x, z), CL.wz(x, z)]; // a lattice point where its block stands
+  // (Saltmarsh's village gave way to the Nightlife Strip; its shore west of the Strip keeps the name)
+  const at = { ridge: [250, -560], mount: [350, -1500], highlands: [-1500, -900], saltmarsh: [-800, 1340], southshore: [-600, 2000], airport: [600, 2100], proving: [1400, 1560], vp: [1800, 500], cfs: [300, 1300], downtown: [520, 440] };
   const out = {}; for (const k in at) out[k] = ZONES[zoneKey(at[k][0], at[k][1])].name;
   out.names = [districtNameAt(350, -1500), districtNameAt(-300, 500), districtNameAt(1650, -900)];
   // a city street's name on its own street, and what the same grid lines are called out on the island
   const { streetNameAt } = window.__pv;
-  out.streets = [streetNameAt(80, 300), streetNameAt(80, 80), streetNameAt(300, 480), streetNameAt(-12, 480), streetNameAt(600, 1800)];
+  out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(300, 480)), streetNameAt(-12, 480), streetNameAt(600, 1800)];
   out.offStreets = [[80, 1500], [80, 2300], [400, -1200], [-1100, 480], [1900, 480], [2000, 560], [320, 2410], [-600, 322]].map(q => streetNameAt(q[0], q[1]));
-  out.places = ['airport', 'proving', 'firehouse', 'saltmarsh', 'gull', 'lighthouse', 'summit', 'motorsport', 'offroad', 'police', 'hospital', 'chopshop'].filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));
+  out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'motorsport', 'offroad', 'police', 'hospital', 'chopshop'];
+  out.places = out.want.filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));
   out.banks = Object.keys(window.__pv.BANKS).length; out.casino = !!g.world.places.casino || Object.values(g.world.places).some(p => /Royale/i.test(p.name || ''));
   return out;
 });
@@ -76,7 +84,7 @@ check('Valen Point, Cedar Fields and the city’s own districts keep theirs; the
 check('a city street is named on its own street and nowhere else: the grid\u2019s lines across the mountain, the runways, the bridge and the racetrack are not Ash St or Central Blvd',
   zones.streets[0] === 'Ash St' && zones.streets[1] === 'Ash St & 1st Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === 'Central Blvd' && zones.streets[4] === 'Airport Access' &&
   zones.offStreets.every(n => n === null || !/ (St|Ave|Blvd)$|^(Harbor Ave|Foundry Rd|Quay Rd|North Shore Dr|South Shore Dr)$/.test(n)), JSON.stringify([zones.streets, zones.offStreets]));
-check('the new places are on the map, and the city’s essentials still are (police, hospital, chop shop, three banks, the casino)', zones.places.length === 12 && zones.banks === 3 && zones.casino, JSON.stringify(zones));
+check('the new places are on the map, and the city’s essentials still are (police, hospital, chop shop, three banks, the casino)', zones.places.length === zones.want.length && zones.want.length >= 11 && zones.banks === 3 && zones.casino, JSON.stringify(zones));
 // ---------------------------------------------------------------- roads
 const roads = await ev(() => {
   const g = window.game, { Island: I, RoadGraph: RG, Links, groundY, SEA_Y } = window.__pv, out = { roads: I.roads.map(R => R.name), links: I.roads.filter(R => Links.list.some(L => L.name === R.name)).length };
@@ -90,7 +98,7 @@ const roads = await ev(() => {
     total += R.len;
     for (let k = 2; k < R.pts.length - 2; k += 3) {
       // (not on a span, not inside the city's square, not within 40 m of where it meets another road: two beds share the ground there)
-      const p = R.pts[k]; if (R.sp[k] || R.sp[k - 1] || R.sp[k + 1] || (p[0] > -30 && p[1] > -30 && p[0] < 990 && p[1] < 990)) continue;
+      const p = R.pts[k]; if (R.sp[k] || R.sp[k - 1] || R.sp[k + 1] || window.__pv.CityLayout.inCity(p[0], p[1], 30)) continue;
       if (I.roads.some(Q => Q !== R && (Q.hosts.some(H => H && H.road === R && Math.hypot(R.pts[H.k][0] - p[0], R.pts[H.k][1] - p[1]) < 40) || R.hosts.some(H => H && H.road === Q && Math.hypot(Q.pts[H.k][0] - p[0], Q.pts[H.k][1] - p[1]) < 40)))) continue;
       const a = R.pts[k - 1], c = R.pts[k + 1], l = Math.hypot(c[0] - a[0], c[1] - a[1]), nx = (c[1] - a[1]) / l, nz = -(c[0] - a[0]) / l, w = R.w / 2 - 1.5;
       const h0 = groundY(p[0], p[1], R.y[k] + 1), hl = groundY(p[0] + nx * w, p[1] + nz * w, R.y[k] + 1), hr = groundY(p[0] - nx * w, p[1] - nz * w, R.y[k] + 1);
@@ -108,7 +116,7 @@ const roads = await ev(() => {
   out.ribbon = [g.isleScene.roads.children.reduce((s, m) => s + m.geometry.attributes.position.count, 0), I.roads.reduce((s, R) => s + R.pts.filter(p => window.__pv.offCity(p[0], p[1])).length, 0) * 2];
   return out;
 });
-check('seventeen island roads (the nine of the island and the eight streets of the new districts), every one a curved link in the road graph, over 25 km of them, each painted by a ribbon along its own polyline', roads.roads.length === 17 && roads.links === 17 && roads.beds.km > 25 && roads.ribbon[0] >= roads.ribbon[1], JSON.stringify([roads.roads, roads.beds, roads.ribbon]));
+check('the island\'s roads (its own, the new districts\' streets and the roads between the city\'s precincts), every one a curved link in the road graph, over 25 km of them, each painted by a ribbon along its own polyline', roads.roads.length >= 17 && roads.links === roads.roads.length && roads.beds.km > 25 && roads.ribbon[0] >= roads.ribbon[1], JSON.stringify([roads.roads, roads.beds, roads.ribbon]));
 check('the GPS finds a way from the middle of the city to every place on the island, and back', Object.values(roads.routes).every(r => r && r[0] > 300 && r[1] < 60), JSON.stringify(roads.routes));
 check('Saltmarsh to Gull Harbor goes over the Blackgate Bridge; the in-game GPS routes to the airport', roads.overBridge && roads.gps > 10, JSON.stringify([roads.overBridge, roads.gps]));
 check('road beds: the ground on the centre line is the road’s own level, level across, never steeper than the road’s grade', roads.beds.centre < 0.1 && roads.beds.cross < 0.1 && roads.beds.grade < 0.002, JSON.stringify(roads.beds));
@@ -223,10 +231,10 @@ await frames(page, 400);
 const traf = await ev(() => { const g = window.game, { offCity } = window.__pv; return g.traffic.cars.filter(v => offCity(v.pos.x, v.pos.z)).length; });
 check('traffic drives the island’s highways', traf >= 1, String(traf));
 const map = await ev(() => {
-  const g = window.game, ui = g.ui; ui.toggleMap(true); const bm = ui.bigmap || g.bigmap || ui.map; const o = { x0: ui.mapX0, z0: ui.mapZ0, w: ui.mapW, h: ui.mapH, img: !!ui.isleImg && ui.isleImg.width > 300, labels: ui.mmImg.labels.filter(L => /MOUNT VALEN|PORT VALEN INTERNATIONAL|SALTMARSH|LAKE VALEN/.test(L.t)).length };
+  const g = window.game, ui = g.ui; ui.toggleMap(true); const bm = ui.bigmap || g.bigmap || ui.map; const o = { x0: ui.mapX0, z0: ui.mapZ0, w: ui.mapW, h: ui.mapH, img: !!ui.isleImg && ui.isleImg.width > 300, labels: ui.mmImg.labels.filter(L => /MOUNT VALEN|PORT VALEN INTERNATIONAL|SALTMARSH|LAKE VALEN/.test(L.t)).length, labelsWant: window.__pv.CityLayout.at(-520, 1090) ? 3 : 4 }; // (Saltmarsh's label is not drawn where a precinct of the city stands on it)
   const [mx, mz] = ui._mapXY(-2000, -3000); o.neg = mx < 0 && mz < 0; ui.toggleMap(false); return o;
 });
-check('the map covers the whole island: map space runs north and west of the city, the island’s image and its labels are on it', map.x0 < -2000 && map.z0 < -3000 && map.w > 2900 && map.h > 2900 && map.img && map.labels === 4 && map.neg, JSON.stringify(map));
+check('the map covers the whole island: map space runs north and west of the city, the island’s image and its labels are on it', map.x0 < -2000 && map.z0 < -3000 && map.w > 2900 && map.h > 2900 && map.img && map.labels === map.labelsWant && map.neg, JSON.stringify(map));
 await ev(() => { const g = window.game; g.resetPlayerState(395, -1815, 0); g.saveGame(true); });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await page.waitForFunction(() => { const l = document.getElementById('loading'); return !l || l.style.display === 'none' || l.classList.contains('hidden') || getComputedStyle(l).opacity === '0' || !l.isConnected; }, null, { timeout: 180000, polling: 200 });

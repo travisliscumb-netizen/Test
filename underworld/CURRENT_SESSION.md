@@ -1,10 +1,12 @@
 # CURRENT SESSION
 
-- **The city into the island: relocation RESUMED by the owner (2026-11-16); stage S2 mostly done.** The owner asked
-  again for the city to flow with the island (keep every system, relocate it, no redraw). CITY_SPREAD.md §9's latest
-  entry is the state: the simulation now speaks world cells (streets, blocks, pedestrians, traffic, police, taxis,
-  missions, turfs, maps, saves); suite `layout` checks it with districts actually moved apart. Nothing visible has
-  moved yet. Next: S3 (generate in the lattice, bake to where each precinct stands, the tracer layout).
+- **The city into the island (CITY_SPREAD.md): S2–S6 DONE, the island layout is the DEFAULT; S7 in progress.** The
+  city now stands round Valen Bay: the core, Old Quarter, Linden Hills and the port on the island's waist, Crestmoor
+  Heights on the bay's north shore, the Nightlife Strip / Stadium / Warehouse District on its south shore, joined by
+  the island's roads. Every system works in world cells; the city is generated as authored and baked to where each
+  precinct stands; saves move with the layout (suite `relocate`). CITY_SPREAD.md §9 is the record of every stage.
+  Next: the full regression on the island default (running: `underworld/.runs-spread.out`), fix what it finds,
+  re-run failures solo, then perf on the phone profile, screenshots, docs, deploy.
 
 - **Round the grid (CITY_SPREAD.md §10): BUILT, commit `77549bd`.** The owner switched from relocation to building
   round the grid. Eight curving streets, five districts (Bayview Heights, Marsh Hollow, Blackgate Landing, Lake Valen
