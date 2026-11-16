@@ -449,7 +449,10 @@ const reload = await ev(S => {
   const e1 = s.garage.find(e => e.uid === S.u1), v1 = e1 && g.vreg.live(e1);
   out.curve = v1 ? { d: +Math.hypot(v1.pos.x - S.p1[0], v1.pos.z - S.p1[1]).toFixed(2), dh: +Math.abs(v1.h - S.p1[2]).toFixed(3), y: +(v1.pos.y - P.groundY(v1.pos.x, v1.pos.z)).toFixed(2) } : null;
   const e2 = s.garage.find(e => e.uid === S.u2);
-  g.resetPlayerState(e2.loc.x + 5, e2.loc.z, 0); window.__step(20);
+  g.resetPlayerState(e2.loc.x + 5, e2.loc.z, 0);
+  // wait on the car itself (it streams in with its block; a slow machine needs more than a fixed step count)
+  for (let i = 0; i < 400 && !g.vreg.live(e2); i += 10) window.__step(10);
+  window.__step(10);
   const v2 = g.vreg.live(e2), [x0, z0, x1, z1] = S.wh;
   out.moved = v2 ? { inWh: v2.pos.x > x0 - 1 && v2.pos.x < x1 + 1 && v2.pos.z > z0 - 1 && v2.pos.z < z1 + 1, blocked: P.kerbBlocked(g.world, v2.pos.x, v2.pos.z, v2.pos.y, v2.h), onKerb: window.__off(v2.pos.x, v2.pos.z) < 0, savedThere: Math.hypot(e2.loc.x - v2.pos.x, e2.loc.z - v2.pos.z) < 0.5, far: Math.round(Math.hypot(v2.pos.x - (x0 + x1) / 2, v2.pos.z - (z0 + z1) / 2)), told: toasts.some(m => /moved to the kerb/.test(m)) } : null;
   return out;

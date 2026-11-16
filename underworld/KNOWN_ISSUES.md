@@ -26,8 +26,8 @@
   estate-relocation reload check (all pass solo; seen failing only in the 3-wide run, m12-full).
   On the two-core machine of the city-spread session (2026-11-15) the roadnet check fails run alone as well, and
   identically on the banks release (`d9f3943`), the island gate build (`ac13fb5`) and the island build (`c4abcc2`):
-  the kept car is not yet live 20 steps after the player is put beside it. A timing check, not a behaviour change;
-  it wants a wait on the car instead of a step count.
+  the kept car is not yet live 20 steps after the player is put beside it. A timing check, not a behaviour change.
+  Fixed in the test (2026-11-16): it now waits on the car (up to 400 steps) instead of a fixed count; 42/42 run alone.
 
 ## Banks (after the graphics gate) — known limits
 - Guards stay in their building; once you are out, the police take over (the street pursuit as ever).
