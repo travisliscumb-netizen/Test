@@ -984,7 +984,7 @@ function curbNear(x, z, shift = 0) {
 }
 // curb lane spot on one side of a block: side 0 north, 1 east, 2 south, 3 west
 function curbAt(bx, bz, side, along = 40) {
-  const x0 = bx * P, z0 = bz * P;
+  const x0 = CityLayout.siteI(bx, bz) * P, z0 = CityLayout.siteJ(bx, bz) * P; // a lattice address, where it stands (021)
   switch (side) {
     case 0: return { x: x0 + along, z: z0 + 4.6, h: Math.PI / 2 };
     case 1: return { x: x0 + P - 4.6, z: z0 + along, h: 0 };

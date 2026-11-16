@@ -424,7 +424,8 @@ function turfAt(x, z) {
 }
 // a sidewalk spot in front of a block face: side 0 N, 1 E, 2 S, 3 W; facing the street
 function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
-  const L = P - 2 * o, x0 = bx * P + o, z0 = bz * P + o, u = clamp(along - o, 2, L - 2);
+  // (bx, bz): a lattice address; the spot is where that block stands (021)
+  const L = P - 2 * o, x0 = CityLayout.siteI(bx, bz) * P + o, z0 = CityLayout.siteJ(bx, bz) * P + o, u = clamp(along - o, 2, L - 2);
   switch (side) {
     case 0: return { x: x0 + u, z: z0, h: Math.PI };
     case 1: return { x: x0 + L, z: z0 + u, h: Math.PI / 2 };

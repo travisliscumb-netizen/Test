@@ -77,7 +77,7 @@ class MissionManager {
       }
       const b = g.world.block(c.bx, c.bz);
       const o = ROAD_HALF + 2.6;
-      const pos = g.peds.ringPos(c.bx, c.bz, o, c.side * (P - 2 * o) + c.along);
+      const pos = g.peds.ringPos(CityLayout.siteI(c.bx, c.bz), CityLayout.siteJ(c.bx, c.bz), o, c.side * (P - 2 * o) + c.along);
       const look = randomLook(mulberry32(c.bx * 31 + c.bz));
       if (c.id === 'ferry') { look.shirt = C(0x2b2b2b); look.pants = C(0x1a1a1a); look.cap = C(0x3a2a1a); }
       if (c.id === 'rosa') { look.shirt = C(0x2a8a8a); look.hairStyle = 2; }

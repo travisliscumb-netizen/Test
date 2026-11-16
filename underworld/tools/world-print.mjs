@@ -38,7 +38,9 @@ const { launch, open, boot, FILE } = await import('../tests/lib.mjs');
 const browser = await launch();
 const { page, errors } = await open(browser);
 await boot(page);
-const print = await page.evaluate(() => {
+// WP_SKIP=I,J: leave those keys out of every object (to show that a change adds fields and moves nothing else)
+const SKIP = (process.env.WP_SKIP || '').split(',').filter(Boolean);
+const print = await page.evaluate((SKIP) => {
   const pv = window.__pv, g = window.game, w = g.world;
   // a running hash over a stream of text (two 32-bit halves, cyrb53's mixing)
   const H = () => {
@@ -75,7 +77,7 @@ const print = await page.evaluate(() => {
     if (v.isColor) { h.add('c' + v.getHexString()); return; }
     if (v.isVector3) { h.add('v' + v.x + ',' + v.y + ',' + v.z); return; }
     h.add('{');
-    for (const k of Object.keys(v).sort()) { h.add(k + ':'); walk(v[k], h, seen, depth + 1); }
+    for (const k of Object.keys(v).sort()) { if (SKIP.includes(k)) continue; h.add(k + ':'); walk(v[k], h, seen, depth + 1); }
     h.add('}');
   }
   const one = v => { const h = H(); walk(v, h, new Map(), 0); return { hash: h.done(), n: h.n }; };
@@ -103,7 +105,7 @@ const print = await page.evaluate(() => {
     sec('ask.island.zone', z2.join('')); sec('ask.island.ground', y2); }
   sec('tables.superblocks', pv.SUPERBLOCKS); sec('tables.zones', Object.keys(pv.ZONES).sort().map(k => [k, pv.ZONES[k].name]));
   return { layout: pv.CityLayout ? pv.CityLayout.describe() : null, sections, blocks, xblocks, counts: { blocks: w.blocks.length, xblocks: (w.xblocks || []).length, props: w.totalProps, places: Object.keys(w.places || {}).length, homes: (w.homes || []).length, links: (w.links || []).length } };
-});
+}, SKIP);
 await Promise.race([browser.close().catch(() => {}), new Promise(r => setTimeout(r, 5000))]);
 print.file = path.basename(FILE); print.bytes = fs.statSync(FILE).size;
 for (const k of Object.keys(print.sections).sort()) console.log(k.padEnd(24), print.sections[k].hash, String(print.sections[k].n).padStart(10));

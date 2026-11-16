@@ -174,8 +174,13 @@ const SUPERBLOCKS = [
 ];
 function superblockAt(bx, bz) { for (const sb of SUPERBLOCKS) if (bx >= sb.bx0 && bx <= sb.bx1 && bz >= sb.bz0 && bz <= sb.bz1) return sb; return null; }
 const RoadNet = {
-  closed: new Set(),
+  // closed: the lattice's own segments a superblock swallows (lattice numbers, as authored). open: every street
+  // segment that exists in the WORLD under the active city layout (021), by world line and segment, which is what
+  // every question below is asked in. A precinct builds the whole of its own edge streets, so a lattice street two
+  // parted precincts shared exists once for each; under 'classic' world and lattice are the same numbers
+  closed: new Set(), open_: new Set(), I0: 0, J0: 0, I1: N, J1: N,
   key(a, i, j) { return a * 10000 + i * 100 + j; },
+  wkey(a, i, j) { return ((a * 1024 + i + 512) * 1024) + j + 512; },
   init() {
     this.closed.clear();
     for (const sb of SUPERBLOCKS) {
@@ -183,56 +188,73 @@ const RoadNet = {
       for (let j = sb.bz0 + 1; j <= sb.bz1; j++) for (let i = sb.bx0; i <= sb.bx1; i++) this.closed.add(this.key(1, j, i));
     }
   },
+  // the world's street segments from the active layout (CityLayout.use calls this)
+  layout() {
+    this.open_.clear(); this.I0 = this.J0 = Infinity; this.I1 = this.J1 = -Infinity;
+    for (const p of CityLayout.precincts) {
+      for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1; j++) if (!this.closed.has(this.key(0, i, j))) this.open_.add(this.wkey(0, i + p.ox, j + p.oz));
+      for (let i = p.lz0; i <= p.lz1 + 1; i++) for (let j = p.lx0; j <= p.lx1; j++) if (!this.closed.has(this.key(1, i, j))) this.open_.add(this.wkey(1, i + p.oz, j + p.ox));
+      this.I0 = Math.min(this.I0, p.lx0 + p.ox); this.J0 = Math.min(this.J0, p.lz0 + p.oz); this.I1 = Math.max(this.I1, p.lx1 + 1 + p.ox); this.J1 = Math.max(this.J1, p.lz1 + 1 + p.oz);
+    }
+  },
   // axis 0: the north-south road x = i*P, segment j runs from node (i,j) to (i,j+1)
   // axis 1: the east-west road z = i*P, segment j runs from node (j,i) to (j+1,i)
-  segOpen(a, i, j) { return i >= 0 && i <= N && j >= 0 && j < N && !this.closed.has(this.key(a, i, j)); },
+  // (world lines and segments; see layout())
+  segOpen(a, i, j) { return this.open_.has(this.wkey(a, i, j)); },
   open(i, j, dx, dz) { return dx ? this.segOpen(1, j, Math.min(i, i + dx)) : this.segOpen(0, i, Math.min(j, j + dz)); },
   degree(i, j) { let d = 0; if (this.open(i, j, 1, 0)) d++; if (this.open(i, j, -1, 0)) d++; if (this.open(i, j, 0, 1)) d++; if (this.open(i, j, 0, -1)) d++; return d; },
   isJunction(i, j) { return this.degree(i, j) >= 3; },
   // is the world point on a lattice road that exists?
   roadAt(x, z) {
-    if (x < -ROAD_HALF || z < -ROAD_HALF || x > CITY + ROAD_HALF || z > CITY + ROAD_HALF) return false;
+    if (x < this.I0 * P - ROAD_HALF || z < this.J0 * P - ROAD_HALF || x > this.I1 * P + ROAD_HALF || z > this.J1 * P + ROAD_HALF) return false;
     const i = Math.round(x / P), j = Math.round(z / P);
     const onV = Math.abs(x - i * P) < ROAD_HALF, onH = Math.abs(z - j * P) < ROAD_HALF;
     if (!onV && !onH) return false;
     if (onV && onH) return this.degree(i, j) > 0;
-    if (onV) return this.segOpen(0, i, clamp(Math.floor(z / P), 0, N - 1));
-    return this.segOpen(1, j, clamp(Math.floor(x / P), 0, N - 1));
+    // (on one carriageway and not the other, the point is more than ROAD_HALF from every node, so floor() names the
+    // segment it is on; the old clamp to 0..N-1 never changed an answer)
+    if (onV) return this.segOpen(0, i, Math.floor(z / P));
+    return this.segOpen(1, j, Math.floor(x / P));
   },
   // block side -> is the road beside it open? side 0 north, 1 south, 2 west, 3 east (the _sidewalk order)
   sideOpen(bx, bz, side) { return side === 0 ? this.segOpen(1, bz, bx) : side === 1 ? this.segOpen(1, bz + 1, bx) : side === 2 ? this.segOpen(0, bx, bz) : this.segOpen(0, bx + 1, bz); },
   // shortest node path (BFS over open segments); falls back to the nearest reachable node
   path(i0, j0, i1, j1) {
-    i0 = clamp(i0, 0, N); j0 = clamp(j0, 0, N); i1 = clamp(i1, 0, N); j1 = clamp(j1, 0, N);
-    const W2 = N + 1, prev = new Int16Array(W2 * W2).fill(-1), q = [i0 * W2 + j0];
+    // world nodes, over the rectangle that holds every precinct's streets
+    const I0 = this.I0, J0 = this.J0, H = this.J1 - J0 + 1, W2 = (this.I1 - I0 + 1) * H;
+    i0 = clamp(i0, I0, this.I1); j0 = clamp(j0, J0, this.J1); i1 = clamp(i1, I0, this.I1); j1 = clamp(j1, J0, this.J1);
+    const id = (i, j) => (i - I0) * H + (j - J0), prev = new Int32Array(W2).fill(-1), q = [id(i0, j0)];
     prev[q[0]] = q[0];
     let best = q[0], bd = Math.abs(i0 - i1) + Math.abs(j0 - j1);
     for (let h = 0; h < q.length; h++) {
-      const c = q[h], i = Math.floor(c / W2), j = c % W2;
+      const c = q[h], i = Math.floor(c / H) + I0, j = c % H + J0;
       const d = Math.abs(i - i1) + Math.abs(j - j1); if (d < bd) { bd = d; best = c; }
       if (d === 0) break;
-      for (const [dx, dz] of DIRS4) { if (!this.open(i, j, dx, dz)) continue; const n = (i + dx) * W2 + (j + dz); if (prev[n] < 0) { prev[n] = c; q.push(n); } }
+      for (const [dx, dz] of DIRS4) { if (!this.open(i, j, dx, dz)) continue; const n = id(i + dx, j + dz); if (prev[n] < 0) { prev[n] = c; q.push(n); } }
     }
-    const out = []; for (let c = best; ; c = prev[c]) { out.push([Math.floor(c / W2), c % W2]); if (prev[c] === c) break; }
+    const out = []; for (let c = best; ; c = prev[c]) { out.push([Math.floor(c / H) + I0, c % H + J0]); if (prev[c] === c) break; }
     return out.reverse();
   },
   // nearest node that has at least one open segment
   nearNode(x, z) {
-    let i = clamp(Math.round(x / P), 0, N), j = clamp(Math.round(z / P), 0, N);
+    let i = clamp(Math.round(x / P), this.I0, this.I1), j = clamp(Math.round(z / P), this.J0, this.J1);
     if (this.degree(i, j) > 0) return [i, j];
     let best = null, bd = 1e9;
-    for (let a = 0; a <= N; a++) for (let b = 0; b <= N; b++) if (this.degree(a, b) > 0) { const d = (a * P - x) ** 2 + (b * P - z) ** 2; if (d < bd) { bd = d; best = [a, b]; } }
+    for (let a = this.I0; a <= this.I1; a++) for (let b = this.J0; b <= this.J1; b++) if (this.degree(a, b) > 0) { const d = (a * P - x) ** 2 + (b * P - z) ** 2; if (d < bd) { bd = d; best = [a, b]; } }
     return best;
   },
-  // data texture for the ground shader: R vertical seg open, G horizontal seg open, B junction, A node open
+  // data texture for the ground shader: R vertical seg open, G horizontal seg open, B junction, A node open. In
+  // LATTICE space (the shader takes each precinct's offset off before it reads it): the lattice's own segments
   texture() {
     const S = 16, d = new Uint8Array(S * S * 4);
+    const seg = (a, i, j) => i >= 0 && i <= N && j >= 0 && j < N && !this.closed.has(this.key(a, i, j));
+    const deg = (i, j) => (seg(1, j, i) ? 1 : 0) + (seg(1, j, i - 1) ? 1 : 0) + (seg(0, i, j) ? 1 : 0) + (seg(0, i, j - 1) ? 1 : 0);
     for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
       const o = (j * S + i) * 4;
-      d[o] = j < N && this.segOpen(0, i, j) ? 255 : 0;
-      d[o + 1] = i < N && this.segOpen(1, j, i) ? 255 : 0;
-      d[o + 2] = this.isJunction(i, j) ? 255 : 0;
-      d[o + 3] = this.degree(i, j) > 0 ? 255 : 0;
+      d[o] = seg(0, i, j) ? 255 : 0;
+      d[o + 1] = seg(1, j, i) ? 255 : 0;
+      d[o + 2] = deg(i, j) >= 3 ? 255 : 0;
+      d[o + 3] = deg(i, j) > 0 ? 255 : 0;
     }
     const t = new THREE.DataTexture(d, S, S, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
     return t;

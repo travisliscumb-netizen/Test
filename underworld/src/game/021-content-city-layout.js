@@ -68,6 +68,7 @@ const CityLayout = {
       for (let lz = p.lz0; lz <= p.lz1; lz++) for (let lx = p.lx0; lx <= p.lx1; lx++) { this.own[lz * N + lx] = p.k; this.sites.set(this.key(lx + p.ox, lz + p.oz), lz * N + lx); }
       this.x0 = Math.min(this.x0, p.x0); this.z0 = Math.min(this.z0, p.z0); this.x1 = Math.max(this.x1, p.x1); this.z1 = Math.max(this.z1, p.z1);
     }
+    RoadNet.layout();
     return this;
   },
   // ---------------------------------------------------------------- world -> city
@@ -111,9 +112,17 @@ const CityLayout = {
   // the precinct whose streets cross at world node (I, J) (the crossing of street lines x = I * P and z = J * P)
   nodeAt(I, J) { for (const p of this.precincts) { const i = I - p.ox, j = J - p.oz; if (i >= p.lx0 && i <= p.lx1 + 1 && j >= p.lz0 && j <= p.lz1 + 1) return p; } return null; },
   // ---------------------------------------------------------------- city -> world
-  precinctOf(lx, lz) { return this.precincts[this.own[lz * N + lx]]; },
-  siteI(lx, lz) { return lx + this.precincts[this.own[lz * N + lx]].ox; },
-  siteJ(lx, lz) { return lz + this.precincts[this.own[lz * N + lx]].oz; },
+  // (a lattice cell or node just outside the lattice, as a node on its far edge or a neighbour asked for, takes the
+  // offset of the edge cell beside it)
+  precinctOf(lx, lz) { return this.precincts[this.own[clamp(lz, 0, N - 1) * N + clamp(lx, 0, N - 1)]]; },
+  siteI(lx, lz) { return lx + this.precinctOf(lx, lz).ox; },
+  siteJ(lx, lz) { return lz + this.precinctOf(lx, lz).oz; },
+  // lattice metres -> world metres (a point of a block authored in the lattice: its cell's precinct moves it)
+  wx(x, z) { return x + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).ox * P; },
+  wz(x, z) { return z + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).oz * P; },
+  // a world point kept inside the frame of the precinct nearest it, m inside the frame's edge
+  frameX(p, x, m = 0) { return clamp(x, p.x0 - EDGE_MARGIN + m, p.x1 + EDGE_MARGIN - m); },
+  frameZ(p, z, m = 0) { return clamp(z, p.z0 - EDGE_MARGIN + m, p.z1 + EDGE_MARGIN - m); },
   worldX(p, x) { return x + p.ox * P; },
   worldZ(p, z) { return z + p.oz * P; },
   // the layout in plain data (the world fingerprint, the save's stamp)

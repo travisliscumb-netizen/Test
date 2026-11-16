@@ -26,7 +26,11 @@ class World {
     this.secrets = [];
     this.lots = []; // parking stall positions per block
   }
+  // a city block by its lattice address (bx, bz): what the authored tables (SPECIAL, landmarks, missions) speak
   block(bx, bz) { return (bx < 0 || bz < 0 || bx >= N || bz >= N) ? null : this.blocks[bz * N + bx]; }
+  // the city block standing in world cell (I, J) (floor(x / P), floor(z / P)), or null (CityLayout, 021)
+  blockW(I, J) { const c = CityLayout.cell(I, J); return c < 0 ? null : this.blocks[c]; }
+  blockAt(x, z) { const c = CityLayout.cellAt(x, z); return c < 0 ? null : this.blocks[c]; }
   // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
   blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
@@ -35,7 +39,7 @@ class World {
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
       const b = {
-        bx, bz, t, i: bz * N + bx,
+        bx, bz, t, i: bz * N + bx, I: CityLayout.siteI(bx, bz), J: CityLayout.siteJ(bx, bz),
         x0: bx * P + INNER, z0: bz * P + INNER, x1: (bx + 1) * P - INNER, z1: (bz + 1) * P - INNER,
         cx: bx * P + P / 2, cz: bz * P + P / 2,
         bld: [], det: [], props: [], parked: [], signs: [], billboards: [], fx: [], secrets: [], seats: [], water: [],
@@ -714,7 +718,7 @@ Object.assign(World.prototype, {
   driveSurfaceAt(x, z) {
     if (isOnRoad(x, z)) return true;
     if (typeof localRoadAt === 'function' && localRoadAt(x, z)) return true;
-    const b = this.block(Math.floor(x / P), Math.floor(z / P));
+    const b = this.blockAt(x, z);
     if (b && b.drives) for (const d of b.drives) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1) return true;
     return false;
   },
@@ -757,7 +761,7 @@ Object.assign(World.prototype, {
         b.props.splice(i, 1);
         if (nx === null) { rep.removed++; rep.list[rep.list.length - 1].removed = true; continue; }
         const q = this._prop(b, p.type, nx, nz, p.ry, p.s);
-        if (p.type === 'upole') for (const bb of [b, this.block(b.bx - 1, b.bz), this.block(b.bx + 1, b.bz), this.block(b.bx, b.bz - 1), this.block(b.bx, b.bz + 1)]) if (bb && bb.wires) for (const w of bb.wires) for (const o of [0, 3]) if (Math.hypot(w[o] - p.x, w[o + 2] - p.z) < 1.2) { w[o] += nx - p.x; w[o + 2] += nz - p.z; }
+        if (p.type === 'upole') for (const bb of [b, this.blockW(b.I - 1, b.J), this.blockW(b.I + 1, b.J), this.blockW(b.I, b.J - 1), this.blockW(b.I, b.J + 1)]) if (bb && bb.wires) for (const w of bb.wires) for (const o of [0, 3]) if (Math.hypot(w[o] - p.x, w[o + 2] - p.z) < 1.2) { w[o] += nx - p.x; w[o + 2] += nz - p.z; }
         for (const k of ['node', 'axis']) if (p[k] !== undefined) q[k] = p[k];
         // keep the moved prop at the old index for deterministic ordering
         b.props.pop(); b.props.splice(i, 0, q);
@@ -767,7 +771,7 @@ Object.assign(World.prototype, {
     // curbside parking never blocks a driveway mouth
     rep.parkedCleared = 0;
     for (const b of this.blocks) {
-      const drives = []; for (const bb of [b, this.block(b.bx - 1, b.bz), this.block(b.bx + 1, b.bz), this.block(b.bx, b.bz - 1), this.block(b.bx, b.bz + 1)]) if (bb && bb.drives) drives.push(...bb.drives);
+      const drives = []; for (const bb of [b, this.blockW(b.I - 1, b.J), this.blockW(b.I + 1, b.J), this.blockW(b.I, b.J - 1), this.blockW(b.I, b.J + 1)]) if (bb && bb.drives) drives.push(...bb.drives);
       if (!drives.length) continue;
       b.parked = b.parked.filter(c => { if (!c.curb) return true; const hit = drives.some(d => c.x > d.x0 - 3.2 && c.x < d.x1 + 3.2 && c.z > d.z0 - 3.2 && c.z < d.z1 + 3.2); if (hit) rep.parkedCleared++; return !hit; });
     }

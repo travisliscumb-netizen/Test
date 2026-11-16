@@ -21,7 +21,8 @@ class PedManager {
     return out;
   }
   projectRing(x, z) {
-    const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
+    // world cells (I, J) throughout this system; the precinct nearest the point keeps it on a block of its own
+    const pr = CityLayout.near(x, z), bx = CityLayout.lx(pr, x) + pr.ox, bz = CityLayout.lz(pr, z) + pr.oz;
     const o = ROAD_HALF + 2.2, L = P - 2 * o, x0 = bx * P + o, z0 = bz * P + o;
     const cx = clamp(x, x0, x0 + L), cz = clamp(z, z0, z0 + L);
     const dN = cz - z0, dS = z0 + L - cz, dW = cx - x0, dE = x0 + L - cx;
@@ -42,7 +43,7 @@ class PedManager {
   pickBlock(px, pz) {
     const cands = [];
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
-      const b = this.g.world.block(Math.floor(px / P) + dx, Math.floor(pz / P) + dz);
+      const b = this.g.world.blockW(Math.floor(px / P) + dx, Math.floor(pz / P) + dz);
       if (b && !b.noPeds) cands.push([b, (BLOCK_DENSITY[b.t] || 0.5) * zoneAt(b.cx, b.cz).ped]);
     }
     let sum = 0; for (const c of cands) sum += c[1];
@@ -55,7 +56,7 @@ class PedManager {
     for (let k = 0; k < 6; k++) {
       const b = this.pickBlock(px, pz); if (!b) return;
       const p = this.make('civ');
-      p.bx = b.bx; p.bz = b.bz; p.o = ROAD_HALF + p.d;
+      p.bx = b.I; p.bz = b.J; p.o = ROAD_HALF + p.d;
       const L = P - 2 * p.o; p.t = Math.random() * 4 * L;
       const q = this.ringPos(p.bx, p.bz, p.o, p.t);
       const d = Math.hypot(q.x - px, q.z - pz);
@@ -74,7 +75,8 @@ class PedManager {
     p.ct = p.dir > 0 ? (seg + 1) * L : (Math.abs(p.t - seg * L) < 1e-3 ? (seg - 1) * L : seg * L);
   }
   newDest(p) {
-    p.dest = { bx: clamp(p.bx + randi(-2, 2), 0, N - 1), bz: clamp(p.bz + randi(-2, 2), 0, N - 1) };
+    const pr = CityLayout.near(p.bx * P + P / 2, p.bz * P + P / 2);
+    p.dest = { bx: clamp(p.bx + randi(-2, 2), pr.lx0 + pr.ox, pr.lx1 + pr.ox), bz: clamp(p.bz + randi(-2, 2), pr.lz0 + pr.oz, pr.lz1 + pr.oz) };
     p.idleAt = null;
   }
   spawnAt(x, z, kind, look, state = 'flee') {
@@ -263,12 +265,13 @@ class PedManager {
     const wantX = p.dest.bx !== p.bx && Math.sign(p.dest.bx - p.bx) === sx;
     const wantZ = p.dest.bz !== p.bz && Math.sign(p.dest.bz - p.bz) === sz;
     const W0 = this.g.world;
-    if (nbx >= 0 && nbx < N && !W0.block(nbx, p.bz).noPeds) opts.push(['x', wantX ? 3 : 0.3]);
-    if (nbz >= 0 && nbz < N && !W0.block(p.bx, nbz).noPeds) opts.push(['z', wantZ ? 3 : 0.3]);
+    const bX = W0.blockW(nbx, p.bz), bZ = W0.blockW(p.bx, nbz);
+    if (bX && !bX.noPeds) opts.push(['x', wantX ? 3 : 0.3]);
+    if (bZ && !bZ.noPeds) opts.push(['z', wantZ ? 3 : 0.3]);
     opts.push(['go', (wantX || wantZ) ? 0.2 : 1.6]);
     if (p.bx === p.dest.bx && p.bz === p.dest.bz) {
       // in destination block: sometimes head for a bench, otherwise idle somewhere on this ring
-      const b = this.g.world.block(p.bx, p.bz);
+      const b = this.g.world.blockW(p.bx, p.bz);
       const seat = b && b.seats.find(s => !s.taken && Math.random() < 0.5);
       if (seat && Math.random() < 0.35) { seat.taken = true; p.seat = seat; p.state = 'toSeat'; return; }
       p.idleAt = p.t + p.dir * rand(8, L * 0.9);
@@ -323,7 +326,7 @@ class PedManager {
     const r = g.world.grid.resolveCircle(p.x, p.z, 0.3, p.y + 0.3, p.y + 1.7, this._res);
     if (r.hit) { p.x = r.x; p.z = r.z; if (p.state === 'rejoin' || p.state === 'flee') { p.vx += -r.nz * 2; p.vz += r.nx * 2; } }
     // kept to the city's promenade, unless standing on Valen Point or Cedar Fields South (and their causeway and bridge)
-    if ((p.x < -EDGE_MARGIN + 1 || p.z < -EDGE_MARGIN + 1 || p.x > CITY + EDGE_MARGIN - 1 || p.z > CITY + EDGE_MARGIN - 1) && !inExtension(p.x, p.z)) { p.x = clamp(p.x, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); p.z = clamp(p.z, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); }
+    if (!CityLayout.inCity(p.x, p.z, EDGE_MARGIN - 1) && !inExtension(p.x, p.z)) { const pr = CityLayout.near(p.x, p.z); p.x = CityLayout.frameX(pr, p.x, 1); p.z = CityLayout.frameZ(pr, p.z, 1); }
     const hs = Math.hypot(p.vx, p.vz);
     if (hs > 0.3 && p.state !== 'down') p.h = dampAngle(p.h, Math.atan2(p.vx, p.vz), 10, dt);
   }

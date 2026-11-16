@@ -33021,8 +33021,13 @@ const SUPERBLOCKS = [
 ];
 function superblockAt(bx, bz) { for (const sb of SUPERBLOCKS) if (bx >= sb.bx0 && bx <= sb.bx1 && bz >= sb.bz0 && bz <= sb.bz1) return sb; return null; }
 const RoadNet = {
-  closed: new Set(),
+  // closed: the lattice's own segments a superblock swallows (lattice numbers, as authored). open: every street
+  // segment that exists in the WORLD under the active city layout (021), by world line and segment, which is what
+  // every question below is asked in. A precinct builds the whole of its own edge streets, so a lattice street two
+  // parted precincts shared exists once for each; under 'classic' world and lattice are the same numbers
+  closed: new Set(), open_: new Set(), I0: 0, J0: 0, I1: N, J1: N,
   key(a, i, j) { return a * 10000 + i * 100 + j; },
+  wkey(a, i, j) { return ((a * 1024 + i + 512) * 1024) + j + 512; },
   init() {
     this.closed.clear();
     for (const sb of SUPERBLOCKS) {
@@ -33030,56 +33035,73 @@ const RoadNet = {
       for (let j = sb.bz0 + 1; j <= sb.bz1; j++) for (let i = sb.bx0; i <= sb.bx1; i++) this.closed.add(this.key(1, j, i));
     }
   },
+  // the world's street segments from the active layout (CityLayout.use calls this)
+  layout() {
+    this.open_.clear(); this.I0 = this.J0 = Infinity; this.I1 = this.J1 = -Infinity;
+    for (const p of CityLayout.precincts) {
+      for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1; j++) if (!this.closed.has(this.key(0, i, j))) this.open_.add(this.wkey(0, i + p.ox, j + p.oz));
+      for (let i = p.lz0; i <= p.lz1 + 1; i++) for (let j = p.lx0; j <= p.lx1; j++) if (!this.closed.has(this.key(1, i, j))) this.open_.add(this.wkey(1, i + p.oz, j + p.ox));
+      this.I0 = Math.min(this.I0, p.lx0 + p.ox); this.J0 = Math.min(this.J0, p.lz0 + p.oz); this.I1 = Math.max(this.I1, p.lx1 + 1 + p.ox); this.J1 = Math.max(this.J1, p.lz1 + 1 + p.oz);
+    }
+  },
   // axis 0: the north-south road x = i*P, segment j runs from node (i,j) to (i,j+1)
   // axis 1: the east-west road z = i*P, segment j runs from node (j,i) to (j+1,i)
-  segOpen(a, i, j) { return i >= 0 && i <= N && j >= 0 && j < N && !this.closed.has(this.key(a, i, j)); },
+  // (world lines and segments; see layout())
+  segOpen(a, i, j) { return this.open_.has(this.wkey(a, i, j)); },
   open(i, j, dx, dz) { return dx ? this.segOpen(1, j, Math.min(i, i + dx)) : this.segOpen(0, i, Math.min(j, j + dz)); },
   degree(i, j) { let d = 0; if (this.open(i, j, 1, 0)) d++; if (this.open(i, j, -1, 0)) d++; if (this.open(i, j, 0, 1)) d++; if (this.open(i, j, 0, -1)) d++; return d; },
   isJunction(i, j) { return this.degree(i, j) >= 3; },
   // is the world point on a lattice road that exists?
   roadAt(x, z) {
-    if (x < -ROAD_HALF || z < -ROAD_HALF || x > CITY + ROAD_HALF || z > CITY + ROAD_HALF) return false;
+    if (x < this.I0 * P - ROAD_HALF || z < this.J0 * P - ROAD_HALF || x > this.I1 * P + ROAD_HALF || z > this.J1 * P + ROAD_HALF) return false;
     const i = Math.round(x / P), j = Math.round(z / P);
     const onV = Math.abs(x - i * P) < ROAD_HALF, onH = Math.abs(z - j * P) < ROAD_HALF;
     if (!onV && !onH) return false;
     if (onV && onH) return this.degree(i, j) > 0;
-    if (onV) return this.segOpen(0, i, clamp(Math.floor(z / P), 0, N - 1));
-    return this.segOpen(1, j, clamp(Math.floor(x / P), 0, N - 1));
+    // (on one carriageway and not the other, the point is more than ROAD_HALF from every node, so floor() names the
+    // segment it is on; the old clamp to 0..N-1 never changed an answer)
+    if (onV) return this.segOpen(0, i, Math.floor(z / P));
+    return this.segOpen(1, j, Math.floor(x / P));
   },
   // block side -> is the road beside it open? side 0 north, 1 south, 2 west, 3 east (the _sidewalk order)
   sideOpen(bx, bz, side) { return side === 0 ? this.segOpen(1, bz, bx) : side === 1 ? this.segOpen(1, bz + 1, bx) : side === 2 ? this.segOpen(0, bx, bz) : this.segOpen(0, bx + 1, bz); },
   // shortest node path (BFS over open segments); falls back to the nearest reachable node
   path(i0, j0, i1, j1) {
-    i0 = clamp(i0, 0, N); j0 = clamp(j0, 0, N); i1 = clamp(i1, 0, N); j1 = clamp(j1, 0, N);
-    const W2 = N + 1, prev = new Int16Array(W2 * W2).fill(-1), q = [i0 * W2 + j0];
+    // world nodes, over the rectangle that holds every precinct's streets
+    const I0 = this.I0, J0 = this.J0, H = this.J1 - J0 + 1, W2 = (this.I1 - I0 + 1) * H;
+    i0 = clamp(i0, I0, this.I1); j0 = clamp(j0, J0, this.J1); i1 = clamp(i1, I0, this.I1); j1 = clamp(j1, J0, this.J1);
+    const id = (i, j) => (i - I0) * H + (j - J0), prev = new Int32Array(W2).fill(-1), q = [id(i0, j0)];
     prev[q[0]] = q[0];
     let best = q[0], bd = Math.abs(i0 - i1) + Math.abs(j0 - j1);
     for (let h = 0; h < q.length; h++) {
-      const c = q[h], i = Math.floor(c / W2), j = c % W2;
+      const c = q[h], i = Math.floor(c / H) + I0, j = c % H + J0;
       const d = Math.abs(i - i1) + Math.abs(j - j1); if (d < bd) { bd = d; best = c; }
       if (d === 0) break;
-      for (const [dx, dz] of DIRS4) { if (!this.open(i, j, dx, dz)) continue; const n = (i + dx) * W2 + (j + dz); if (prev[n] < 0) { prev[n] = c; q.push(n); } }
+      for (const [dx, dz] of DIRS4) { if (!this.open(i, j, dx, dz)) continue; const n = id(i + dx, j + dz); if (prev[n] < 0) { prev[n] = c; q.push(n); } }
     }
-    const out = []; for (let c = best; ; c = prev[c]) { out.push([Math.floor(c / W2), c % W2]); if (prev[c] === c) break; }
+    const out = []; for (let c = best; ; c = prev[c]) { out.push([Math.floor(c / H) + I0, c % H + J0]); if (prev[c] === c) break; }
     return out.reverse();
   },
   // nearest node that has at least one open segment
   nearNode(x, z) {
-    let i = clamp(Math.round(x / P), 0, N), j = clamp(Math.round(z / P), 0, N);
+    let i = clamp(Math.round(x / P), this.I0, this.I1), j = clamp(Math.round(z / P), this.J0, this.J1);
     if (this.degree(i, j) > 0) return [i, j];
     let best = null, bd = 1e9;
-    for (let a = 0; a <= N; a++) for (let b = 0; b <= N; b++) if (this.degree(a, b) > 0) { const d = (a * P - x) ** 2 + (b * P - z) ** 2; if (d < bd) { bd = d; best = [a, b]; } }
+    for (let a = this.I0; a <= this.I1; a++) for (let b = this.J0; b <= this.J1; b++) if (this.degree(a, b) > 0) { const d = (a * P - x) ** 2 + (b * P - z) ** 2; if (d < bd) { bd = d; best = [a, b]; } }
     return best;
   },
-  // data texture for the ground shader: R vertical seg open, G horizontal seg open, B junction, A node open
+  // data texture for the ground shader: R vertical seg open, G horizontal seg open, B junction, A node open. In
+  // LATTICE space (the shader takes each precinct's offset off before it reads it): the lattice's own segments
   texture() {
     const S = 16, d = new Uint8Array(S * S * 4);
+    const seg = (a, i, j) => i >= 0 && i <= N && j >= 0 && j < N && !this.closed.has(this.key(a, i, j));
+    const deg = (i, j) => (seg(1, j, i) ? 1 : 0) + (seg(1, j, i - 1) ? 1 : 0) + (seg(0, i, j) ? 1 : 0) + (seg(0, i, j - 1) ? 1 : 0);
     for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
       const o = (j * S + i) * 4;
-      d[o] = j < N && this.segOpen(0, i, j) ? 255 : 0;
-      d[o + 1] = i < N && this.segOpen(1, j, i) ? 255 : 0;
-      d[o + 2] = this.isJunction(i, j) ? 255 : 0;
-      d[o + 3] = this.degree(i, j) > 0 ? 255 : 0;
+      d[o] = seg(0, i, j) ? 255 : 0;
+      d[o + 1] = seg(1, j, i) ? 255 : 0;
+      d[o + 2] = deg(i, j) >= 3 ? 255 : 0;
+      d[o + 3] = deg(i, j) > 0 ? 255 : 0;
     }
     const t = new THREE.DataTexture(d, S, S, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
     return t;
@@ -33306,6 +33328,7 @@ const CityLayout = {
       for (let lz = p.lz0; lz <= p.lz1; lz++) for (let lx = p.lx0; lx <= p.lx1; lx++) { this.own[lz * N + lx] = p.k; this.sites.set(this.key(lx + p.ox, lz + p.oz), lz * N + lx); }
       this.x0 = Math.min(this.x0, p.x0); this.z0 = Math.min(this.z0, p.z0); this.x1 = Math.max(this.x1, p.x1); this.z1 = Math.max(this.z1, p.z1);
     }
+    RoadNet.layout();
     return this;
   },
   // ---------------------------------------------------------------- world -> city
@@ -33349,9 +33372,17 @@ const CityLayout = {
   // the precinct whose streets cross at world node (I, J) (the crossing of street lines x = I * P and z = J * P)
   nodeAt(I, J) { for (const p of this.precincts) { const i = I - p.ox, j = J - p.oz; if (i >= p.lx0 && i <= p.lx1 + 1 && j >= p.lz0 && j <= p.lz1 + 1) return p; } return null; },
   // ---------------------------------------------------------------- city -> world
-  precinctOf(lx, lz) { return this.precincts[this.own[lz * N + lx]]; },
-  siteI(lx, lz) { return lx + this.precincts[this.own[lz * N + lx]].ox; },
-  siteJ(lx, lz) { return lz + this.precincts[this.own[lz * N + lx]].oz; },
+  // (a lattice cell or node just outside the lattice, as a node on its far edge or a neighbour asked for, takes the
+  // offset of the edge cell beside it)
+  precinctOf(lx, lz) { return this.precincts[this.own[clamp(lz, 0, N - 1) * N + clamp(lx, 0, N - 1)]]; },
+  siteI(lx, lz) { return lx + this.precinctOf(lx, lz).ox; },
+  siteJ(lx, lz) { return lz + this.precinctOf(lx, lz).oz; },
+  // lattice metres -> world metres (a point of a block authored in the lattice: its cell's precinct moves it)
+  wx(x, z) { return x + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).ox * P; },
+  wz(x, z) { return z + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).oz * P; },
+  // a world point kept inside the frame of the precinct nearest it, m inside the frame's edge
+  frameX(p, x, m = 0) { return clamp(x, p.x0 - EDGE_MARGIN + m, p.x1 + EDGE_MARGIN - m); },
+  frameZ(p, z, m = 0) { return clamp(z, p.z0 - EDGE_MARGIN + m, p.z1 + EDGE_MARGIN - m); },
   worldX(p, x) { return x + p.ox * P; },
   worldZ(p, z) { return z + p.oz * P; },
   // the layout in plain data (the world fingerprint, the save's stamp)
@@ -36713,7 +36744,11 @@ class World {
     this.secrets = [];
     this.lots = []; // parking stall positions per block
   }
+  // a city block by its lattice address (bx, bz): what the authored tables (SPECIAL, landmarks, missions) speak
   block(bx, bz) { return (bx < 0 || bz < 0 || bx >= N || bz >= N) ? null : this.blocks[bz * N + bx]; }
+  // the city block standing in world cell (I, J) (floor(x / P), floor(z / P)), or null (CityLayout, 021)
+  blockW(I, J) { const c = CityLayout.cell(I, J); return c < 0 ? null : this.blocks[c]; }
+  blockAt(x, z) { const c = CityLayout.cellAt(x, z); return c < 0 ? null : this.blocks[c]; }
   // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
   blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
@@ -36722,7 +36757,7 @@ class World {
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
       const b = {
-        bx, bz, t, i: bz * N + bx,
+        bx, bz, t, i: bz * N + bx, I: CityLayout.siteI(bx, bz), J: CityLayout.siteJ(bx, bz),
         x0: bx * P + INNER, z0: bz * P + INNER, x1: (bx + 1) * P - INNER, z1: (bz + 1) * P - INNER,
         cx: bx * P + P / 2, cz: bz * P + P / 2,
         bld: [], det: [], props: [], parked: [], signs: [], billboards: [], fx: [], secrets: [], seats: [], water: [],
@@ -37401,7 +37436,7 @@ Object.assign(World.prototype, {
   driveSurfaceAt(x, z) {
     if (isOnRoad(x, z)) return true;
     if (typeof localRoadAt === 'function' && localRoadAt(x, z)) return true;
-    const b = this.block(Math.floor(x / P), Math.floor(z / P));
+    const b = this.blockAt(x, z);
     if (b && b.drives) for (const d of b.drives) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1) return true;
     return false;
   },
@@ -37444,7 +37479,7 @@ Object.assign(World.prototype, {
         b.props.splice(i, 1);
         if (nx === null) { rep.removed++; rep.list[rep.list.length - 1].removed = true; continue; }
         const q = this._prop(b, p.type, nx, nz, p.ry, p.s);
-        if (p.type === 'upole') for (const bb of [b, this.block(b.bx - 1, b.bz), this.block(b.bx + 1, b.bz), this.block(b.bx, b.bz - 1), this.block(b.bx, b.bz + 1)]) if (bb && bb.wires) for (const w of bb.wires) for (const o of [0, 3]) if (Math.hypot(w[o] - p.x, w[o + 2] - p.z) < 1.2) { w[o] += nx - p.x; w[o + 2] += nz - p.z; }
+        if (p.type === 'upole') for (const bb of [b, this.blockW(b.I - 1, b.J), this.blockW(b.I + 1, b.J), this.blockW(b.I, b.J - 1), this.blockW(b.I, b.J + 1)]) if (bb && bb.wires) for (const w of bb.wires) for (const o of [0, 3]) if (Math.hypot(w[o] - p.x, w[o + 2] - p.z) < 1.2) { w[o] += nx - p.x; w[o + 2] += nz - p.z; }
         for (const k of ['node', 'axis']) if (p[k] !== undefined) q[k] = p[k];
         // keep the moved prop at the old index for deterministic ordering
         b.props.pop(); b.props.splice(i, 0, q);
@@ -37454,7 +37489,7 @@ Object.assign(World.prototype, {
     // curbside parking never blocks a driveway mouth
     rep.parkedCleared = 0;
     for (const b of this.blocks) {
-      const drives = []; for (const bb of [b, this.block(b.bx - 1, b.bz), this.block(b.bx + 1, b.bz), this.block(b.bx, b.bz - 1), this.block(b.bx, b.bz + 1)]) if (bb && bb.drives) drives.push(...bb.drives);
+      const drives = []; for (const bb of [b, this.blockW(b.I - 1, b.J), this.blockW(b.I + 1, b.J), this.blockW(b.I, b.J - 1), this.blockW(b.I, b.J + 1)]) if (bb && bb.drives) drives.push(...bb.drives);
       if (!drives.length) continue;
       b.parked = b.parked.filter(c => { if (!c.curb) return true; const hit = drives.some(d => c.x > d.x0 - 3.2 && c.x < d.x1 + 3.2 && c.z > d.z0 - 3.2 && c.z < d.z1 + 3.2); if (hit) rep.parkedCleared++; return !hit; });
     }
@@ -39637,7 +39672,7 @@ function curbNear(x, z, shift = 0) {
 }
 // curb lane spot on one side of a block: side 0 north, 1 east, 2 south, 3 west
 function curbAt(bx, bz, side, along = 40) {
-  const x0 = bx * P, z0 = bz * P;
+  const x0 = CityLayout.siteI(bx, bz) * P, z0 = CityLayout.siteJ(bx, bz) * P; // a lattice address, where it stands (021)
   switch (side) {
     case 0: return { x: x0 + along, z: z0 + 4.6, h: Math.PI / 2 };
     case 1: return { x: x0 + P - 4.6, z: z0 + along, h: 0 };
@@ -45998,7 +46033,8 @@ class PedManager {
     return out;
   }
   projectRing(x, z) {
-    const bx = clamp(Math.floor(x / P), 0, N - 1), bz = clamp(Math.floor(z / P), 0, N - 1);
+    // world cells (I, J) throughout this system; the precinct nearest the point keeps it on a block of its own
+    const pr = CityLayout.near(x, z), bx = CityLayout.lx(pr, x) + pr.ox, bz = CityLayout.lz(pr, z) + pr.oz;
     const o = ROAD_HALF + 2.2, L = P - 2 * o, x0 = bx * P + o, z0 = bz * P + o;
     const cx = clamp(x, x0, x0 + L), cz = clamp(z, z0, z0 + L);
     const dN = cz - z0, dS = z0 + L - cz, dW = cx - x0, dE = x0 + L - cx;
@@ -46019,7 +46055,7 @@ class PedManager {
   pickBlock(px, pz) {
     const cands = [];
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
-      const b = this.g.world.block(Math.floor(px / P) + dx, Math.floor(pz / P) + dz);
+      const b = this.g.world.blockW(Math.floor(px / P) + dx, Math.floor(pz / P) + dz);
       if (b && !b.noPeds) cands.push([b, (BLOCK_DENSITY[b.t] || 0.5) * zoneAt(b.cx, b.cz).ped]);
     }
     let sum = 0; for (const c of cands) sum += c[1];
@@ -46032,7 +46068,7 @@ class PedManager {
     for (let k = 0; k < 6; k++) {
       const b = this.pickBlock(px, pz); if (!b) return;
       const p = this.make('civ');
-      p.bx = b.bx; p.bz = b.bz; p.o = ROAD_HALF + p.d;
+      p.bx = b.I; p.bz = b.J; p.o = ROAD_HALF + p.d;
       const L = P - 2 * p.o; p.t = Math.random() * 4 * L;
       const q = this.ringPos(p.bx, p.bz, p.o, p.t);
       const d = Math.hypot(q.x - px, q.z - pz);
@@ -46051,7 +46087,8 @@ class PedManager {
     p.ct = p.dir > 0 ? (seg + 1) * L : (Math.abs(p.t - seg * L) < 1e-3 ? (seg - 1) * L : seg * L);
   }
   newDest(p) {
-    p.dest = { bx: clamp(p.bx + randi(-2, 2), 0, N - 1), bz: clamp(p.bz + randi(-2, 2), 0, N - 1) };
+    const pr = CityLayout.near(p.bx * P + P / 2, p.bz * P + P / 2);
+    p.dest = { bx: clamp(p.bx + randi(-2, 2), pr.lx0 + pr.ox, pr.lx1 + pr.ox), bz: clamp(p.bz + randi(-2, 2), pr.lz0 + pr.oz, pr.lz1 + pr.oz) };
     p.idleAt = null;
   }
   spawnAt(x, z, kind, look, state = 'flee') {
@@ -46240,12 +46277,13 @@ class PedManager {
     const wantX = p.dest.bx !== p.bx && Math.sign(p.dest.bx - p.bx) === sx;
     const wantZ = p.dest.bz !== p.bz && Math.sign(p.dest.bz - p.bz) === sz;
     const W0 = this.g.world;
-    if (nbx >= 0 && nbx < N && !W0.block(nbx, p.bz).noPeds) opts.push(['x', wantX ? 3 : 0.3]);
-    if (nbz >= 0 && nbz < N && !W0.block(p.bx, nbz).noPeds) opts.push(['z', wantZ ? 3 : 0.3]);
+    const bX = W0.blockW(nbx, p.bz), bZ = W0.blockW(p.bx, nbz);
+    if (bX && !bX.noPeds) opts.push(['x', wantX ? 3 : 0.3]);
+    if (bZ && !bZ.noPeds) opts.push(['z', wantZ ? 3 : 0.3]);
     opts.push(['go', (wantX || wantZ) ? 0.2 : 1.6]);
     if (p.bx === p.dest.bx && p.bz === p.dest.bz) {
       // in destination block: sometimes head for a bench, otherwise idle somewhere on this ring
-      const b = this.g.world.block(p.bx, p.bz);
+      const b = this.g.world.blockW(p.bx, p.bz);
       const seat = b && b.seats.find(s => !s.taken && Math.random() < 0.5);
       if (seat && Math.random() < 0.35) { seat.taken = true; p.seat = seat; p.state = 'toSeat'; return; }
       p.idleAt = p.t + p.dir * rand(8, L * 0.9);
@@ -46300,7 +46338,7 @@ class PedManager {
     const r = g.world.grid.resolveCircle(p.x, p.z, 0.3, p.y + 0.3, p.y + 1.7, this._res);
     if (r.hit) { p.x = r.x; p.z = r.z; if (p.state === 'rejoin' || p.state === 'flee') { p.vx += -r.nz * 2; p.vz += r.nx * 2; } }
     // kept to the city's promenade, unless standing on Valen Point or Cedar Fields South (and their causeway and bridge)
-    if ((p.x < -EDGE_MARGIN + 1 || p.z < -EDGE_MARGIN + 1 || p.x > CITY + EDGE_MARGIN - 1 || p.z > CITY + EDGE_MARGIN - 1) && !inExtension(p.x, p.z)) { p.x = clamp(p.x, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); p.z = clamp(p.z, -EDGE_MARGIN + 1, CITY + EDGE_MARGIN - 1); }
+    if (!CityLayout.inCity(p.x, p.z, EDGE_MARGIN - 1) && !inExtension(p.x, p.z)) { const pr = CityLayout.near(p.x, p.z); p.x = CityLayout.frameX(pr, p.x, 1); p.z = CityLayout.frameZ(pr, p.z, 1); }
     const hs = Math.hypot(p.vx, p.vz);
     if (hs > 0.3 && p.state !== 'down') p.h = dampAngle(p.h, Math.atan2(p.vx, p.vz), 10, dt);
   }
@@ -47479,7 +47517,7 @@ class MissionManager {
       }
       const b = g.world.block(c.bx, c.bz);
       const o = ROAD_HALF + 2.6;
-      const pos = g.peds.ringPos(c.bx, c.bz, o, c.side * (P - 2 * o) + c.along);
+      const pos = g.peds.ringPos(CityLayout.siteI(c.bx, c.bz), CityLayout.siteJ(c.bx, c.bz), o, c.side * (P - 2 * o) + c.along);
       const look = randomLook(mulberry32(c.bx * 31 + c.bz));
       if (c.id === 'ferry') { look.shirt = C(0x2b2b2b); look.pants = C(0x1a1a1a); look.cap = C(0x3a2a1a); }
       if (c.id === 'rosa') { look.shirt = C(0x2a8a8a); look.hairStyle = 2; }
@@ -52709,7 +52747,8 @@ function turfAt(x, z) {
 }
 // a sidewalk spot in front of a block face: side 0 N, 1 E, 2 S, 3 W; facing the street
 function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
-  const L = P - 2 * o, x0 = bx * P + o, z0 = bz * P + o, u = clamp(along - o, 2, L - 2);
+  // (bx, bz): a lattice address; the spot is where that block stands (021)
+  const L = P - 2 * o, x0 = CityLayout.siteI(bx, bz) * P + o, z0 = CityLayout.siteJ(bx, bz) * P + o, u = clamp(along - o, 2, L - 2);
   switch (side) {
     case 0: return { x: x0 + u, z: z0, h: Math.PI };
     case 1: return { x: x0 + L, z: z0 + u, h: Math.PI / 2 };
