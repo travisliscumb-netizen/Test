@@ -108,7 +108,7 @@ const roads = await ev(() => {
   out.ribbon = [g.isleScene.roads.children.reduce((s, m) => s + m.geometry.attributes.position.count, 0), I.roads.reduce((s, R) => s + R.pts.filter(p => window.__pv.offCity(p[0], p[1])).length, 0) * 2];
   return out;
 });
-check('nine island roads, every one a curved link in the road graph, over 25 km of them, each painted by a ribbon along its own polyline', roads.roads.length === 9 && roads.links === 9 && roads.beds.km > 25 && roads.ribbon[0] >= roads.ribbon[1], JSON.stringify([roads.roads, roads.beds, roads.ribbon]));
+check('seventeen island roads (the nine of the island and the eight streets of the new districts), every one a curved link in the road graph, over 25 km of them, each painted by a ribbon along its own polyline', roads.roads.length === 17 && roads.links === 17 && roads.beds.km > 25 && roads.ribbon[0] >= roads.ribbon[1], JSON.stringify([roads.roads, roads.beds, roads.ribbon]));
 check('the GPS finds a way from the middle of the city to every place on the island, and back', Object.values(roads.routes).every(r => r && r[0] > 300 && r[1] < 60), JSON.stringify(roads.routes));
 check('Saltmarsh to Gull Harbor goes over the Blackgate Bridge; the in-game GPS routes to the airport', roads.overBridge && roads.gps > 10, JSON.stringify([roads.overBridge, roads.gps]));
 check('road beds: the ground on the centre line is the road’s own level, level across, never steeper than the road’s grade', roads.beds.centre < 0.1 && roads.beds.cross < 0.1 && roads.beds.grade < 0.002, JSON.stringify(roads.beds));

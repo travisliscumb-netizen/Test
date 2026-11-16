@@ -46,6 +46,8 @@ Object.assign(World.prototype, {
     Island.addPad(ISLE_LIGHT.x0, ISLE_LIGHT.z0, ISLE_LIGHT.x1, ISLE_LIGHT.z1, ISLE_LIGHT.y, 26);
     Island.addPad(ISLE_SUMMIT.x0, ISLE_SUMMIT.z0, ISLE_SUMMIT.x1, ISLE_SUMMIT.z1, ISLE_SUMMIT.y, 55);
     Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
+    // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
+    const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
     Island.addPad(CFS.lb.x - CFS.lb.half - 1, CITY + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
@@ -253,6 +255,8 @@ Object.assign(World.prototype, {
       b.place = { id: 'summit', name: 'Mount Valen Observatory', kind: 'landmark', door: { x: 389, z: -1848.6, h: 0 }, under: { x, z } };
       fleet('summit', 390, -1820, 220, [{ x: 404, z: -1846, h: Math.PI / 2, y, cls: 'offroad' }]);
     }
+    // ================================================================ THE NEW DISTRICTS, VILLA VALEN AND THE VALEN VAULT (128)
+    this._genDistricts(districtPlan, box, cyl, fleet);
     // ================================================================ the city's two rooftop helipads (built in 090) and their lifts
     for (const key of ['hospital', 'police']) {
       const cb = this.block(SPECIAL[key].bx, SPECIAL[key].bz), H = cb && cb.helipad; if (!H) continue;

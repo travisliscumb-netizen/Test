@@ -29,6 +29,7 @@
   "game/125-content-valen-point-gen.js",
   "game/126-content-cedar-south-gen.js",
   "game/127-content-island-gen.js",
+  "game/128-content-island-districts.js",
   "game/130-core-traffic-signals.js",
   "game/135-core-road-graph.js",
   "game/140-content-prop-definitions.js",
