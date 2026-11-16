@@ -25,8 +25,8 @@ start; §4 is the stage list with what is done; §5 is the checklist of every pl
 - The layout's own suite: `node underworld/tests/layout.mjs` (Node only, under a second).
 - Then the suites a change touches, then the regression runner (`TESTING.md`). Two cores here: a suite takes 1–10
   minutes, the full regression several hours at `CONC=2`.
-- **S1–S7 are done; the island layout is the default.** Open for the owner (§8, §9's last entry): whether to spread the
-  city further (split the core, move more precincts out). §9's latest entries say what each stage built.
+- **S1–S7 are done, and the wider spread (S8, owner's ruling 2026-11-16: split the core, move more out, fill the map
+  with city, suburb and countryside) is built.** The island layout has ten precincts; §9's last entry is the record.
 
 ## 1. Why this is not "move the pins"
 The city is a 12 × 12 lattice of 80 m blocks (`020`: `P`, `N`, `CITY = 960`), and the lattice is the game's address
@@ -331,6 +331,41 @@ vehicles, pending cars, dropped weapons (`wloc`) and stashes.
   Honest state: the city reads as downtown with the port and Linden Hills (now with Linden Gardens) in the island's
   waist, Crestmoor Heights on the bay's north shore and the Strip on its south shore. Only two of six precincts moved;
   a wider spread (splitting the core) is the owner's call.
+
+- **2026-11-16, S8: the wider spread (owner: "spread it wider, split the core and move more districts out, use up more
+  of the map ... rural, farmland ... research what makes it realistic").** Research: the classic urban models
+  (Burgess's rings, Hoyt's sectors, Harris and Ullman's multiple nuclei) and game-city design writing agree on one
+  dominant centre, specialised sub-centres, and transition belts out to countryside; players' complaint about open
+  worlds is one dense city and empty stretches. The layout follows the multiple-nuclei shape:
+  - **Downtown on the waist** (offset 0): the core's south half (`core`, lattice 2..9 × 4..7: Financial District,
+    Downtown, the Old Quarter's east), the Old Quarter's west, Linden Hills, the port.
+  - **The north shore** (offset −8, −6): Crestmoor Heights and, beside it, **Greenway** (2..5 × 0..3: Greenway Park,
+    the north Old Quarter): the affluent quarter on the bay.
+  - **Uptown** (6..9 × 0..3, offset 14, −5): a second business centre on Valen Sound's north shore below Lake Valen.
+  - **The freight park** (the Warehouse District, 6..9 × 10..11, offset 8, 4) on the south-east plain by the airport;
+    the **Stadium** (6..9 × 8..9) stays with the **Nightlife Strip** (4..5 × 8..11) on the bay's south shore.
+  - Connectors: Strip Road, Freight Road, Lakeside Avenue, Sound Road; the Coast Highway runs from Greenway across
+    Midtown to the core's north street.
+  - **Midtown** (128 `ISLE_INFILL`): the waist the core's north half left, levelled and built up on Harbour Boulevard,
+    Midtown Avenue, Ferry Street and Pier Road: office towers (new lot kind `tower`, 28–70 m) and mid-rise flats over
+    shops (new kind `mid`). Linden Gardens stays south of downtown. **Soundview** round Uptown (houses, flats) and
+    the **Southport Logistics Park** on Freight Road.
+  - **The countryside** (new `129-content-island-farms.js`, `Farms`): fields in seven regions as rotated patchworks of
+    varied parcels, each kept only on dry, gentle ground clear of every road, pad, precinct and site, painted by crop
+    on the island's vertex colours (wheat, barley, canola, maize, pasture, hay with bales, ploughed ground; tramlines
+    and furrows, headlands), orchards (trees on an 8 m grid), vineyards (trellis rows), hedgerows on the field edges
+    with gate gaps (shrubs, no collider: you can drive cross-country), 21 farmsteads on the country roads (house,
+    red barn, two silos, machinery shed: lot kind `farm`), and wind turbines with turning rotors on open high ground.
+  Bugs found and fixed on the way: the bake did not move `world.doors` (the Crestmoor mansion's garage door stood in
+  Midtown); the seawall walled off any island road leaving over a wet edge (gaps now cut for every road end); the
+  local-road atlas tiles were not on the lattice's pixel grid, so a footprint tested before the bake could read
+  differently after it (tile origins snapped; the atlas's metre size is its whole-pixel size); a district split
+  across precincts was labelled at an average between them. Races re-routed to keep to precincts that stand together
+  (Quayside Sprint, Saltworks Circuit). Classic stays `IDENTICAL` to the baseline (blocks 53, 65 and 66 take one of
+  two variants from run to run on every build, before this work too: KNOWN_ISSUES).
+  Gate: the affected suites pass on the final build (island 41, smoke 16, relocate 7, police 13, layout, districts,
+  map, taxi, races, gangs, property; city, roadnet, roads and offroad after the fixes); the full regression result is
+  in CURRENT_SESSION.md.
 
 ## 10. Round the grid (live): the new districts, Villa Valen and the Valen Vault
 The owner's words, by voice: keep the grid; build districts round it, not in a grid pattern; raise the quality

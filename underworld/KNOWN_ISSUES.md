@@ -120,4 +120,6 @@
 - Under full-regression load (three suites at once) `arrest`, `legal`, `taxi`, `races`, `stress`, `raid` and the
   screenshot suites can fail; every one passes run alone on the final build.
 - Linden Gardens is a garden suburb, not dense city; the open fields south of it run on to Cedar Fields South.
-- Only two of the six precincts move (Crestmoor Heights, the Nightlife Strip): downtown is still one 8 × 8 grid.
+- World fingerprint: under `?layout=classic` blocks 53, 65 and 66 hash to one of two variants from run to run of the
+  same build (seen before the wider spread too); every other section is stable. Compare against both baselines.
+- The Southport Logistics Park is thin (one yard): Freight Road crosses an inlet with little dry frontage.
