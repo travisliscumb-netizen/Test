@@ -98,7 +98,7 @@ Object.assign(World.prototype, {
     cf.fence = [[CFS.x0 + 1, CFS.z0 + 1, lb.x - lb.half, CFS.z0 + 1], [lb.x + lb.half, CFS.z0 + 1, CFS.x1 - 1, CFS.z0 + 1], [CFS.x1 - 1, CFS.z0 + 1, CFS.x1 - 1, CFS.z1 - 1], [CFS.x1 - 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z1 - 1], [CFS.x0 + 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z0 + 1]];
     for (const [x0, z0, x1, z1] of cf.fence) wall(Math.min(x0, x1) - 0.2, Math.min(z0, z1) - 0.2, Math.max(x0, x1) + 0.2, Math.max(z0, z1) + 0.2, 6);
     // the land bridge's rails, from the seawall out
-    cf.rails = [[lb.x - lb.half + 0.4, CITY + EDGE_MARGIN, lb.x - lb.half + 0.4, CFS.z0 + 1], [lb.x + lb.half - 0.4, CITY + EDGE_MARGIN, lb.x + lb.half - 0.4, CFS.z0 + 1]];
+    cf.rails = [[lb.x - lb.half + 0.4, CFS_EDGE + EDGE_MARGIN, lb.x - lb.half + 0.4, CFS.z0 + 1], [lb.x + lb.half - 0.4, CFS_EDGE + EDGE_MARGIN, lb.x + lb.half - 0.4, CFS.z0 + 1]];
     for (const [x0, z0, x1, z1] of cf.rails) wall(x0 - 0.2, z0, x1 + 0.2, z1, 3);
     // ---------------------------------------------------------------- the compound
     const bc = B.compound;

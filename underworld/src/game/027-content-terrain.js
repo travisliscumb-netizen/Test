@@ -150,7 +150,7 @@ const Terrain = {
     }
     // ---- the land bridge: a dirt road on an embankment from the perimeter road out to the fields
     {
-      const L = CFS.lb, R = this._region('bridge', L.x - L.half, L.z0, L.x + L.half, CFS.z0), y1 = cf.landY, ramp0 = CITY + EDGE_MARGIN;
+      const L = CFS.lb, R = this._region('bridge', L.x - L.half, L.z0, L.x + L.half, CFS.z0), y1 = cf.landY, ramp0 = CFS_EDGE + EDGE_MARGIN;
       for (let j = 0; j < R.H; j++) for (let i = 0; i < R.W; i++) {
         const x = R.x0 + i, z = R.z0 + j, o = j * R.W + i, dx = Math.abs(x - L.x);
         const yr = y1 * smoothstep(ramp0, CFS.z0, z);

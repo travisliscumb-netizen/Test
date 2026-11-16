@@ -171,7 +171,7 @@ class CedarScenery {
     const key = want.join('|');
     const S = this.R.strip, ds = Math.hypot(Math.max(S.x0 - fx, 0, fx - S.x1), Math.max(S.z0 - fz, 0, fz - S.z1));
     this.strip.visible = ds < CFS_SCN.stripNear; this.stripC.visible = !this.strip.visible && ds < CFS_SCN.stripR;
-    this.fence.visible = Math.min(d0, Math.hypot(CFS.lb.x - fx, Math.max(0, CITY - fz))) < CFS_SCN.fenceR;
+    this.fence.visible = Math.min(d0, Math.hypot(CFS.lb.x - fx, Math.max(0, CFS_EDGE - fz))) < CFS_SCN.fenceR;
     this.far.visible = d0 < CFS_SCN.farR; this.farC.visible = !this.far.visible;
     if (key === this.nearSet) return;
     this.nearSet = key;

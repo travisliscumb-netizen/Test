@@ -61,6 +61,23 @@ const BG_RIDGE = { ax: -2150, az: -1220, bx: -650, bz: -1560, h: 100, r: 150 };
    of over it, one even grade for `half` m either side of the point (the Blackgate Tunnel). Order matters: a road can
    only end on one listed before it. */
 function isleSpiral(cx, cz, r0, a0, r1, a1, n) { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, a = (a0 + (a1 - a0) * t) * Math.PI / 180, r = r0 + (r1 - r0) * t; out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return out; }
+// Roads re-laid for a city layout other than the classic square (021): by layout, by road id: an object replaces those
+// fields of the road (its points are then world metres, not anchored), null leaves the road out, and add lists new
+// roads, each built straight after the one it names (after)
+const ISLE_ROAD_LAYOUT = {
+  island: {
+    // the Coast Highway reaches Crestmoor Heights from the core and leaves from its west street: the district's own
+    // streets carry it through
+    n1: { ends: ['lat', 'lat'], pts: [[-634, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
+    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[200, -6], [200, -60], [150, -150], [-10, -270], [-240, -330], [-400, -356], [-474, -360]] }],
+    n2: { ends: ['n1e', 'ring'] },
+    // the Southshore Highway's east end comes up to the core's south street over the ground the square left
+    s1: { pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [728, 1040], [712, 900], [694, 760], [682, 680], [680, 646]] },
+    // the Blackgate Bridge road leaves from the Nightlife Strip's west street (the Strip's streets and Strip Road carry
+    // it on to the Southshore Highway); Longshore Drive still leaves it by the bay's south shore
+    s3: { ends: ['lat', 'n1'], pts: [[-646, 1080], [-700, 1088], [-780, 1110], [-880, 1090], [-960, 1060], [-1062, 960], [-1090, 860], [-1096, 700], [-1100, 500], [-1104, 300], [-1100, 190], [-1085, 60], [-1000, -140], [-920, -250], [-860, -300]] }
+  }
+};
 const ISLE_ROADS = [
   { id: 'n1', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], cut: { x: -1925, z: -1270, half: 340 },
     pts: [[120, -6], [120, -60], [95, -170], [-10, -270], [-240, -330], [-560, -330], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
@@ -203,11 +220,21 @@ const Island = {
   // ---------------------------------------------------------------- roads
   // lay the network out: sample each road, move its ends onto the roads they meet, then give each a level along its
   // length (its profile) and index the segments. Called once by the world's generator, after the pads are in.
+  // the roads this layout builds: the island's (re-laid for the layout where ISLE_ROAD_LAYOUT says), then the roads
+  // that join its precincts (021: CITY_CONNECTORS). world: the points are world metres (not anchored to a precinct)
+  roadDefs() {
+    const L = ISLE_ROAD_LAYOUT[CityLayout.id] || {}, out = [];
+    for (const D of ISLE_ROADS) {
+      const o = L[D.id];
+      if (o !== null) out.push(o ? { ...D, ...o, world: !!o.pts } : D);
+      for (const A of L.add || []) if (A.after === D.id) out.push({ ...A, world: true });
+    }
+    for (const C of (typeof CITY_CONNECTORS !== 'undefined' && CITY_CONNECTORS[CityLayout.id]) || []) out.push({ ...C, world: true });
+    return out;
+  },
   buildRoads() {
     this.roads = []; const byId = {};
-    // the island's roads, then the roads that join this layout's precincts (021: CITY_CONNECTORS, drawn in the world)
-    const conn = (typeof CITY_CONNECTORS !== 'undefined' && CITY_CONNECTORS[CityLayout.id]) || [];
-    for (const D of [...ISLE_ROADS, ...conn.map(c => ({ ...c, world: true }))]) {
+    for (const D of this.roadDefs()) {
       // a control point authored at the city's edge (its 'lat' end and the approach to it) moves with the precinct
       // whose streets it meets (021); out on the island it stays where it was drawn
       const cp = D.pts.map(p => D.world ? [p[0], p[1]] : CityLayout.anchor(p[0], p[1])), hosts = [null, null];

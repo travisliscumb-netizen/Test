@@ -38,19 +38,22 @@ Object.assign(World.prototype, {
     const cyl = (b, x, y, z, r, h, col, solid) => this._det(b, 'cyl', x, y, z, r, h, col, null, solid ? { x, z, r, y0: y - h / 2, y1: y + h / 2, kind: 'det' } : undefined);
     const fleet = (id, x, z, r, slots) => { const F = { id, x, z, r, slots }; isle.fleet.push(F); return F; };
     const sitePad = (x0, z0, x1, z1, blend = 28, y) => Island.addPad(x0, z0, x1, z1, y !== undefined ? y : Math.round(Island.nat((x0 + x1) / 2, (z0 + z1) / 2) * 10) / 10, blend);
+    // a site the city does not stand on (021: under the 'island' layout the Nightlife Strip takes Saltmarsh's shore)
+    const clearOfCity = (x0, z0, x1, z1, m = 40) => !CityLayout.precincts.some(p => x0 < p.x1 + EDGE_MARGIN + m && x1 > p.x0 - EDGE_MARGIN - m && z0 < p.z1 + EDGE_MARGIN + m && z1 > p.z0 - EDGE_MARGIN - m);
+    const saltmarsh = clearOfCity(-720, 890, -260, 1240);
     // ---------------------------------------------------------------- level sites (before the roads: a road's level comes from the ground it finds)
     const mans = ISLE_MANSIONS.map(([x, z, f]) => ({ x, z, f, P: sitePad(x - 25, z - 22, x + 25, z + 22) }));
-    const salt = []; for (const x of ISLE_SALTMARSH) for (const s of [-1, 1]) { const rz = x > -520 ? 1192 - (-270 - x) * 0.08 : 1172 - (-520 - x) * 0.1615, z = rz + s * 33; salt.push({ x, z, s, P: sitePad(x - 11, z - 9, x + 11, z + 9, 16) }); }
+    const salt = []; if (saltmarsh) for (const x of ISLE_SALTMARSH) for (const s of [-1, 1]) { const rz = x > -520 ? 1192 - (-270 - x) * 0.08 : 1172 - (-520 - x) * 0.1615, z = rz + s * 33; salt.push({ x, z, s, P: sitePad(x - 11, z - 9, x + 11, z + 9, 16) }); }
     const gull = ISLE_GULL.map(([x, z]) => ({ x, z, P: sitePad(x - 10, z - 8, x + 10, z + 8, 16) }));
     const fireP = sitePad(ISLE_FIRE.x0, ISLE_FIRE.z0, ISLE_FIRE.x1, ISLE_FIRE.z1, 30);
     Island.addPad(ISLE_LIGHT.x0, ISLE_LIGHT.z0, ISLE_LIGHT.x1, ISLE_LIGHT.z1, ISLE_LIGHT.y, 26);
     Island.addPad(ISLE_SUMMIT.x0, ISLE_SUMMIT.z0, ISLE_SUMMIT.x1, ISLE_SUMMIT.z1, ISLE_SUMMIT.y, 55);
-    Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
+    if (saltmarsh) Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
-    Island.addPad(CFS.lb.x - CFS.lb.half - 1, CITY + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
+    Island.addPad(CFS.lb.x - CFS.lb.half - 1, CFS_EDGE + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
     Island.buildRoads();
     // ---------------------------------------------------------------- the roads: curved links like the city's own
     for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
@@ -204,7 +207,7 @@ Object.assign(World.prototype, {
       });
     }
     // ================================================================ SALTMARSH (the bay's south shore) and its jetty
-    {
+    if (saltmarsh) {
       const cols = [0xf2d9c4, 0xc9e2e8, 0xf0e6b8, 0xd8e8c8, 0xe8c8c8, 0xdcdcec], bs = [this._isleBlock('saltmarsh_e', -420, 1180, 150, 'Saltmarsh'), this._isleBlock('saltmarsh_w', -620, 1160, 150, 'Saltmarsh')];
       const slots = [];
       salt.forEach((h, i) => {
@@ -270,7 +273,7 @@ Object.assign(World.prototype, {
       folk('apron', 1050, 1968, [[1030, 1975, -1.2], [1085, 1960, 0.6], [958, 1968, 1.57]]);
       folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1527.6, 472, -1.57], [1527.6, 570, -1.57], [1527.6, 652, -1.57]]);
       folk('proving', 1163, 1492, [[1166, 1491, 3.14], [1170, 1490, -2.6], [PROVING.strip.x0 + 3, PROVING.strip.z - 12.5, 1.57]]);
-      folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
+      if (saltmarsh) folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
       folk('summit', 380, -1800, [[372, -1784.5, 0.2], [376, -1785.5, -0.3], [392, -1847, 3.14]]);
       folk('lighthouse', 1508, -2788, [[1508, -2788, 1.2]]);
       folk('firehouse', 160, -127, [[ISLE_FIRE.x0 + 17, ISLE_FIRE.z0 + 20, -1.57], [ISLE_FIRE.x0 + 18, ISLE_FIRE.z0 + 34, -1.57]]);

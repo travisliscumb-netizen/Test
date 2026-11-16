@@ -220,7 +220,7 @@ class UIManager {
     // the island off the lattice (022): its districts and waters
     for (const [t, x, z, col, big] of [['CRESTMOOR RIDGE', 250, -640, ZONES.k.col, 1], ['MOUNT VALEN', MT_VALEN.x, MT_VALEN.z + 120, ZONES.n.col, 1], ['BLACKGATE HIGHLANDS', -1250, -1700, ZONES.t.col, 1], ['SALTMARSH', -520, 1090, ZONES.b.col, 1],
       ['SOUTHSHORE', -520, 2000, ZONES.e.col, 1], ['PORT VALEN INTERNATIONAL', 600, 2290, ZONES.y.col, 1], ['PROVING GROUND', 1420, 1610, ZONES.j.col, 1], ['LAKE VALEN', LAKE.x, LAKE.z, '#8fd0e8', 0], ['VALEN BAY', -520, 330, '#8fd0e8', 0],
-      ['VALEN SOUND', 1210, 300, '#8fd0e8', 0], ['GULL HARBOR', -1290, -2330, ZONES.t.col, 0], ['CAPE VALEN LIGHT', 1500, -2850, ZONES.t.col, 0], ['BLACKGATE BRIDGE', -1100, 520, '#ffffff', 0]]) lab.push({ t, x: X(x), z: X(z), col, big: !!big });
+      ['VALEN SOUND', 1210, 300, '#8fd0e8', 0], ['GULL HARBOR', -1290, -2330, ZONES.t.col, 0], ['CAPE VALEN LIGHT', 1500, -2850, ZONES.t.col, 0], ['BLACKGATE BRIDGE', -1100, 520, '#ffffff', 0]]) if (!CityLayout.at(x, z)) lab.push({ t, x: X(x), z: X(z), col, big: !!big }); // (not where a precinct of the city now stands)
     // landmarks
     g.font = 'bold 11px Arial';
     for (const key in LANDMARK_BLOCKS) {
@@ -239,10 +239,10 @@ class UIManager {
   _paintVP(g, view) {
     const vp = this.g.world.vp; if (!vp) return;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    if (view && (view.x1 < CITY || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
+    if (view && (view.x1 < VP_EDGE || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
     const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
-    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
-    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
+    R(VP_EDGE + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
+    R(VP_EDGE + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
     R(VP.x0, VP.z0, VP.x1, VP.z1, '#4f6e3f');
     const S = VP_SITE;
     for (const r of [S.paddock, S.parkN, S.parkS]) R(r.x0, r.z0, r.x1, r.z1, '#77787a');
@@ -262,10 +262,10 @@ class UIManager {
   _paintCFS(g, view) {
     const cf = this.g.world.cfs; if (!cf) return;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    if (view && (view.z1 < CITY || view.x1 < CFS.x0 - 20 || view.x0 > CFS.x1 + 20)) return;
+    if (view && (view.z1 < CFS_EDGE || view.x1 < CFS.x0 - 20 || view.x0 > CFS.x1 + 20)) return;
     const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
-    R(CFS.lb.x - CFS.lb.half, CITY + ROAD_HALF, CFS.lb.x + CFS.lb.half, CFS.z0, '#4f6e3f');
-    R(CFS.lb.x - CFS.lb.road, CITY + ROAD_HALF, CFS.lb.x + CFS.lb.road, CFS.z0, '#9a7d58');
+    R(CFS.lb.x - CFS.lb.half, CFS_EDGE + ROAD_HALF, CFS.lb.x + CFS.lb.half, CFS.z0, '#4f6e3f');
+    R(CFS.lb.x - CFS.lb.road, CFS_EDGE + ROAD_HALF, CFS.lb.x + CFS.lb.road, CFS.z0, '#9a7d58');
     // the ground: one pixel per map pixel, coloured by surface (cached by _renderCFS; drawn live only zoomed in)
     if (this._cfsGround) g.drawImage(this._cfsGround, X(CFS.x0), X(CFS.z0), (CFS.x1 - CFS.x0) * k, (CFS.z1 - CFS.z0) * k);
     else R(CFS.x0, CFS.z0, CFS.x1, CFS.z1, '#4f6e3f');
@@ -290,7 +290,7 @@ class UIManager {
     }
     gg.putImageData(id, 0, 0); this._cfsGround = gc;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CITY + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
+    const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CFS_EDGE + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
     const c = document.createElement('canvas'); c.width = x1 - x0; c.height = z1 - z0;
     const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintCFS(g, null);
@@ -299,7 +299,7 @@ class UIManager {
   // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
   _renderVP() {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
+    const x0 = Math.floor(X(VP_EDGE + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintVP(g, null);

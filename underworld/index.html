@@ -32902,9 +32902,9 @@ function streetNameAt(x, z) {
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
   }
-  if (x > CITY + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
+  if (x > VP_EDGE + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
   if (vpLand(x, z)) return VP.name;
-  if (z > CITY + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
+  if (z > CFS_EDGE + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
   // out on the island (022): the road you are on, by name
   if (offCity(x, z)) { const q = RoadGraph.ready ? RoadGraph.nearest(x, z, { maxD: 12, kinds: RG_STREETS }) : null; return q && q.d <= q.e.w / 2 + 2 ? q.e.name : null; }
@@ -33232,7 +33232,7 @@ function groundY(x, z, y, step) {
 }
 function groundBase(x, z, y) {
   // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
-  if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
+  if (x > VP_EDGE + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
   if (offCity(x, z)) {
@@ -33300,12 +33300,28 @@ const CITY_LAYOUTS = {
   tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }],
   // never shipped either: the city cut in two, the west half three cells further west, the halves joined by one
   // connector road (CITY_CONNECTORS), so routing, traffic and the edges between parted precincts are exercised (S4)
-  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }]
+  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
+  // the city round Valen Bay (CITY_SPREAD.md §3, §9): the core, the west of the Old Quarter, Linden Hills with the
+  // farm, and the port (the Industrial Belt, the Docklands and the Container Terminal, whose quay faces east and so
+  // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
+  // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
+  island: [
+    { id: 'core', lx0: 2, lz0: 0, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+    { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 1, lz1: 7, ox: 0, oz: 0 },
+    { id: 'linden', lx0: 0, lz0: 8, lx1: 3, lz1: 11, ox: 0, oz: 0 },
+    { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -8, oz: -6 },
+    { id: 'strip', lx0: 4, lz0: 8, lx1: 9, lz1: 11, ox: -12, oz: 4 },
+    { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 }
+  ]
 };
 // the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
 // precincts' edge streets side-on
 const CITY_CONNECTORS = {
-  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }]
+  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }],
+  island: [
+    // the Strip's east street to the Southshore Highway
+    { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1160], [-128, 1156], [-100, 1150]] }
+  ]
 };
 const CityLayout = {
   id: '', precincts: [], own: new Int8Array(N * N).fill(-1), sites: new Map(),
@@ -33488,6 +33504,23 @@ const BG_RIDGE = { ax: -2150, az: -1220, bx: -650, bz: -1560, h: 100, r: 150 };
    of over it, one even grade for `half` m either side of the point (the Blackgate Tunnel). Order matters: a road can
    only end on one listed before it. */
 function isleSpiral(cx, cz, r0, a0, r1, a1, n) { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, a = (a0 + (a1 - a0) * t) * Math.PI / 180, r = r0 + (r1 - r0) * t; out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return out; }
+// Roads re-laid for a city layout other than the classic square (021): by layout, by road id: an object replaces those
+// fields of the road (its points are then world metres, not anchored), null leaves the road out, and add lists new
+// roads, each built straight after the one it names (after)
+const ISLE_ROAD_LAYOUT = {
+  island: {
+    // the Coast Highway reaches Crestmoor Heights from the core and leaves from its west street: the district's own
+    // streets carry it through
+    n1: { ends: ['lat', 'lat'], pts: [[-634, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
+    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[200, -6], [200, -60], [150, -150], [-10, -270], [-240, -330], [-400, -356], [-474, -360]] }],
+    n2: { ends: ['n1e', 'ring'] },
+    // the Southshore Highway's east end comes up to the core's south street over the ground the square left
+    s1: { pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [728, 1040], [712, 900], [694, 760], [682, 680], [680, 646]] },
+    // the Blackgate Bridge road leaves from the Nightlife Strip's west street (the Strip's streets and Strip Road carry
+    // it on to the Southshore Highway); Longshore Drive still leaves it by the bay's south shore
+    s3: { ends: ['lat', 'n1'], pts: [[-646, 1080], [-700, 1088], [-780, 1110], [-880, 1090], [-960, 1060], [-1062, 960], [-1090, 860], [-1096, 700], [-1100, 500], [-1104, 300], [-1100, 190], [-1085, 60], [-1000, -140], [-920, -250], [-860, -300]] }
+  }
+};
 const ISLE_ROADS = [
   { id: 'n1', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], cut: { x: -1925, z: -1270, half: 340 },
     pts: [[120, -6], [120, -60], [95, -170], [-10, -270], [-240, -330], [-560, -330], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
@@ -33630,11 +33663,21 @@ const Island = {
   // ---------------------------------------------------------------- roads
   // lay the network out: sample each road, move its ends onto the roads they meet, then give each a level along its
   // length (its profile) and index the segments. Called once by the world's generator, after the pads are in.
+  // the roads this layout builds: the island's (re-laid for the layout where ISLE_ROAD_LAYOUT says), then the roads
+  // that join its precincts (021: CITY_CONNECTORS). world: the points are world metres (not anchored to a precinct)
+  roadDefs() {
+    const L = ISLE_ROAD_LAYOUT[CityLayout.id] || {}, out = [];
+    for (const D of ISLE_ROADS) {
+      const o = L[D.id];
+      if (o !== null) out.push(o ? { ...D, ...o, world: !!o.pts } : D);
+      for (const A of L.add || []) if (A.after === D.id) out.push({ ...A, world: true });
+    }
+    for (const C of (typeof CITY_CONNECTORS !== 'undefined' && CITY_CONNECTORS[CityLayout.id]) || []) out.push({ ...C, world: true });
+    return out;
+  },
   buildRoads() {
     this.roads = []; const byId = {};
-    // the island's roads, then the roads that join this layout's precincts (021: CITY_CONNECTORS, drawn in the world)
-    const conn = (typeof CITY_CONNECTORS !== 'undefined' && CITY_CONNECTORS[CityLayout.id]) || [];
-    for (const D of [...ISLE_ROADS, ...conn.map(c => ({ ...c, world: true }))]) {
+    for (const D of this.roadDefs()) {
       // a control point authored at the city's edge (its 'lat' end and the approach to it) moves with the precinct
       // whose streets it meets (021); out on the island it stays where it was drawn
       const cp = D.pts.map(p => D.world ? [p[0], p[1]] : CityLayout.anchor(p[0], p[1])), hosts = [null, null];
@@ -33866,36 +33909,39 @@ const Island = {
    blocks, turfs) covers it: the ground, collision, roads, AI routing,
    streaming and the maps each ask these helpers instead.
    ===================================================================== */
+// the city's edge the causeway leaves from: the east street of the precinct that faces Valen Point across the sound
+// (CityLayout, 021: under 'classic' the square's east edge, x = CITY)
+const VP_EDGE = (() => { let x = -Infinity; for (const p of CityLayout.precincts) if (p.z0 <= 520 && p.z1 >= 520 && p.x1 < 1440) x = Math.max(x, p.x1); return x; })();
 const VP = {
   name: 'Valen Point',
   // the island
   x0: 1440, x1: 2380, z0: 130, z1: 910,
   // the causeway: a two-lane road (±7 m) with a shoulder each side, from the perimeter road to the island
-  cw: { z: 520, road: 7, half: 9, x0: CITY + ROAD_HALF, x1: 1440 }
+  cw: { z: 520, road: 7, half: 9, x0: VP_EDGE + ROAD_HALF, x1: 1440 }
 };
 // the far edge of everything the collision grid and the maps have to cover
 const WORLD_X1 = ISLE.x1;
 function vpLand(x, z) { return x >= VP.x0 && x <= VP.x1 && z >= VP.z0 && z <= VP.z1; }
 function vpCauseway(x, z) { return x >= VP.cw.x0 && x <= VP.x0 + 0.5 && Math.abs(z - VP.cw.z) <= VP.cw.half; }
 // off the city's square and on Valen Point's ground (the island, or the causeway past the seawall)
-function inValenPoint(x, z) { return vpLand(x, z) || (x > CITY + EDGE_MARGIN && vpCauseway(x, z)); }
+function inValenPoint(x, z) { return vpLand(x, z) || (x > VP_EDGE + EDGE_MARGIN && vpCauseway(x, z)); }
 // east of the city's seawall, on Valen Point's side of the water: where routing and spawns go by the causeway
 // (anywhere else off the city is just sea, and keeps the lattice's behaviour)
-function vpSide(x, z) { return x > CITY + EDGE_MARGIN && z > VP.z0 - 200 && z < VP.z1 + 200; }
+function vpSide(x, z) { return x > VP_EDGE + EDGE_MARGIN && z > VP.z0 - 200 && z < VP.z1 + 200; }
 // is (x, z) beyond the city altogether (the district or the water around it)?
 function offCity(x, z) { return CityLayout.at(x, z) === null; }
 // places a car can join the road out there: the causeway's lanes every 20 m (heading toward the island on the
 // south lane, back to the city on the north), for police units and taxis (Session 6B)
 function vpRoadSpots() {
   const out = [], z = VP.cw.z;
-  for (let x = CITY + EDGE_MARGIN + 20; x < VP.x0 + 10; x += 20) { out.push({ x, z: z + LANE, h: Math.PI / 2 }); out.push({ x, z: z - LANE, h: -Math.PI / 2 }); }
+  for (let x = VP_EDGE + EDGE_MARGIN + 20; x < VP.x0 + 10; x += 20) { out.push({ x, z: z + LANE, h: Math.PI / 2 }); out.push({ x, z: z - LANE, h: -Math.PI / 2 }); }
   return out;
 }
 // a point for the police to drive to near `ref` (where you are, or were last seen): kept inside the city square, or
 // on Valen Point's island when that is where you are (Session 6B)
 function vpClampSearch(refX, x, z, m) {
-  if (refX > CITY + EDGE_MARGIN) return [clamp(x, VP.x0 + m, VP.x1 - m), clamp(z, VP.z0 + m, VP.z1 - m)];
-  return [clamp(x, m, CITY - m), clamp(z, m, CITY - m)];
+  if (refX > VP_EDGE + EDGE_MARGIN) return [clamp(x, VP.x0 + m, VP.x1 - m), clamp(z, VP.z0 + m, VP.z1 - m)];
+  const p = CityLayout.near(x, z); return [clamp(x, p.x0 + m, p.x1 - m), clamp(z, p.z0 + m, p.z1 - m)];
 }
 /* =====================================================================
    [CONTENT] CEDAR FIELDS SOUTH (Session 6C, §45.36)
@@ -33906,22 +33952,25 @@ function vpClampSearch(refX, x, z, m) {
    Like Valen Point it is off the lattice: the ground, collision, roads,
    AI routing, streaming and the maps ask these helpers.
    ===================================================================== */
+// the city's edge the land bridge leaves from: the south street of the precinct over the fields (021; under 'classic'
+// the square's south edge, z = CITY)
+const CFS_EDGE = (() => { let z = -Infinity; for (const p of CityLayout.precincts) if (p.x0 <= 200 && p.x1 >= 200 && p.z1 < 1040) z = Math.max(z, p.z1); return z; })();
 const CFS = {
   name: 'Cedar Fields South',
   // the countryside
   x0: -20, x1: 680, z0: 1040, z1: 1490,
   // the land bridge: a dirt road (±4 m) with grass verges between rails (±7 m), from the perimeter road's kerb
   // (z = CITY + ROAD_HALF) through a gap in the promenade and the seawall out to the fields
-  lb: { x: 200, road: 4, half: 7, z0: CITY + ROAD_HALF, z1: 1040 }
+  lb: { x: 200, road: 4, half: 7, z0: CFS_EDGE + ROAD_HALF, z1: 1040 }
 };
 // the city's Cedar Fields strip (superblock 'fields'): rough too, around what is built there
 const CF_STRIP = { x0: 0, x1: 320, z0: 880, z1: 960 };
 const WORLD_Z1 = ISLE.z1;
 function cfsLand(x, z) { return x >= CFS.x0 && x <= CFS.x1 && z >= CFS.z0 && z <= CFS.z1; }
 function cfsBridge(x, z) { return z >= CFS.lb.z0 && z <= CFS.z0 + 0.5 && Math.abs(x - CFS.lb.x) <= CFS.lb.half; }
-function inCedarSouth(x, z) { return cfsLand(x, z) || (z > CITY + EDGE_MARGIN && cfsBridge(x, z)); }
+function inCedarSouth(x, z) { return cfsLand(x, z) || (z > CFS_EDGE + EDGE_MARGIN && cfsBridge(x, z)); }
 // south of the city's seawall, on the countryside's side: where routing and spawns go by the land bridge
-function cfsSide(x, z) { return z > CITY + EDGE_MARGIN && x > CFS.x0 - 150 && x < CFS.x1 + 150; }
+function cfsSide(x, z) { return z > CFS_EDGE + EDGE_MARGIN && x > CFS.x0 - 150 && x < CFS.x1 + 150; }
 // anywhere off the city's square (Valen Point, Cedar Fields South, the rest of the island): routing and spawns go by
 // the roads that leave the lattice
 function extSide(x, z) { return offCity(x, z); }
@@ -33934,14 +33983,14 @@ function extRoadSpots(x, z) {
   if (!RoadGraph.ready) return [];
   // every ~20 m of the roads traffic drives off the lattice (the countryside's tracks, the island's highways), from
   // the seawall out; the ones within reach of (x, z)
-  const all = RoadGraph._offSpots || (RoadGraph._offSpots = RoadGraph.spots(e => e.kind !== 'grid' && e.kind !== 'loop' && e.traffic && e.ext !== 'vp').filter(s => offCity(s.x, s.z) && (s.z > CITY + EDGE_MARGIN + 8 || !cfsSide(s.x, s.z))));
+  const all = RoadGraph._offSpots || (RoadGraph._offSpots = RoadGraph.spots(e => e.kind !== 'grid' && e.kind !== 'loop' && e.traffic && e.ext !== 'vp').filter(s => offCity(s.x, s.z) && (s.z > CFS_EDGE + EDGE_MARGIN + 8 || !cfsSide(s.x, s.z))));
   return all.filter(s => Math.abs(s.x - x) < 420 && Math.abs(s.z - z) < 420);
 }
 // is a car at spot s heading toward (x, z)?
 const spotToward = (s, x, z) => Math.sin(s.h) * (x - s.x) + Math.cos(s.h) * (z - s.z) > 0;
 // a point for the police to drive to near `ref`: kept on the ground that `ref` is on
 function extClampSearch(refX, refZ, x, z, m) {
-  if (!offCity(refX, refZ)) return [clamp(x, m, CITY - m), clamp(z, m, CITY - m)];
+  if (!offCity(refX, refZ)) { const p = CityLayout.near(x, z); return [clamp(x, p.x0 + m, p.x1 - m), clamp(z, p.z0 + m, p.z1 - m)]; }
   if (inCedarSouth(refX, refZ)) return [clamp(x, CFS.x0 + m, CFS.x1 - m), clamp(z, CFS.z0 + m, CFS.z1 - m)];
   if (vpSide(refX, refZ)) return vpClampSearch(refX, x, z, m);
   // out on the island: anywhere
@@ -34134,7 +34183,7 @@ const Terrain = {
     }
     // ---- the land bridge: a dirt road on an embankment from the perimeter road out to the fields
     {
-      const L = CFS.lb, R = this._region('bridge', L.x - L.half, L.z0, L.x + L.half, CFS.z0), y1 = cf.landY, ramp0 = CITY + EDGE_MARGIN;
+      const L = CFS.lb, R = this._region('bridge', L.x - L.half, L.z0, L.x + L.half, CFS.z0), y1 = cf.landY, ramp0 = CFS_EDGE + EDGE_MARGIN;
       for (let j = 0; j < R.H; j++) for (let i = 0; i < R.W; i++) {
         const x = R.x0 + i, z = R.z0 + j, o = j * R.W + i, dx = Math.abs(x - L.x);
         const yr = y1 * smoothstep(ramp0, CFS.z0, z);
@@ -40096,7 +40145,7 @@ Object.assign(World.prototype, {
     const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half;
     wall(VP.x0 - 1, VP.z0 - 1, VP.x1 + 1, VP.z0, 3); wall(VP.x0 - 1, VP.z1, VP.x1 + 1, VP.z1 + 1, 3); wall(VP.x1, VP.z0, VP.x1 + 1, VP.z1, 3);
     wall(VP.x0 - 1, VP.z0, VP.x0, g0, 3); wall(VP.x0 - 1, g1, VP.x0, VP.z1, 3);
-    wall(CITY + EDGE_MARGIN, g0 - 0.4, VP.x0, g0); wall(CITY + EDGE_MARGIN, g1, VP.x0, g1 + 0.4);
+    wall(VP_EDGE + EDGE_MARGIN, g0 - 0.4, VP.x0, g0); wall(VP_EDGE + EDGE_MARGIN, g1, VP.x0, g1 + 0.4);
     // ---------------------------------------------------------------- barriers: armco each side, run-off by corner speed
     // offset from the centreline: 7 m of track and a run-off that grows on the outside of faster corners and
     // eases in over 50 m; the main straight's west side is the pit wall / catch fence line
@@ -40207,7 +40256,7 @@ Object.assign(World.prototype, {
     // out to the turning circle (a Links spur: traffic, the GPS, taxis and police all route along it)
     const R0 = VP_SITE.ring, sx = R0.x - R0.r;
     // sampled every 2.5 m like the other curved roads (one polyline for the paint, traffic and the GPS)
-    const cwPts = []; for (let x = CITY + ROAD_HALF; x < sx; x += 2.5) cwPts.push([x, VP.cw.z]); cwPts.push([sx, VP.cw.z]);
+    const cwPts = []; for (let x = VP_EDGE + ROAD_HALF; x < sx; x += 2.5) cwPts.push([x, VP.cw.z]); cwPts.push([sx, VP.cw.z]);
     this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: cwPts, ring: R0, mat: 'asphalt' });
     // the district's drivable routes for the GPS and AI drivers (polylines; two-way): from the turning circle round
     // to the paddock, the gaps either side of the garages, the pit lane and its merges, Race Control and the annex
@@ -40339,7 +40388,7 @@ Object.assign(World.prototype, {
     cf.fence = [[CFS.x0 + 1, CFS.z0 + 1, lb.x - lb.half, CFS.z0 + 1], [lb.x + lb.half, CFS.z0 + 1, CFS.x1 - 1, CFS.z0 + 1], [CFS.x1 - 1, CFS.z0 + 1, CFS.x1 - 1, CFS.z1 - 1], [CFS.x1 - 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z1 - 1], [CFS.x0 + 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z0 + 1]];
     for (const [x0, z0, x1, z1] of cf.fence) wall(Math.min(x0, x1) - 0.2, Math.min(z0, z1) - 0.2, Math.max(x0, x1) + 0.2, Math.max(z0, z1) + 0.2, 6);
     // the land bridge's rails, from the seawall out
-    cf.rails = [[lb.x - lb.half + 0.4, CITY + EDGE_MARGIN, lb.x - lb.half + 0.4, CFS.z0 + 1], [lb.x + lb.half - 0.4, CITY + EDGE_MARGIN, lb.x + lb.half - 0.4, CFS.z0 + 1]];
+    cf.rails = [[lb.x - lb.half + 0.4, CFS_EDGE + EDGE_MARGIN, lb.x - lb.half + 0.4, CFS.z0 + 1], [lb.x + lb.half - 0.4, CFS_EDGE + EDGE_MARGIN, lb.x + lb.half - 0.4, CFS.z0 + 1]];
     for (const [x0, z0, x1, z1] of cf.rails) wall(x0 - 0.2, z0, x1 + 0.2, z1, 3);
     // ---------------------------------------------------------------- the compound
     const bc = B.compound;
@@ -40493,19 +40542,22 @@ Object.assign(World.prototype, {
     const cyl = (b, x, y, z, r, h, col, solid) => this._det(b, 'cyl', x, y, z, r, h, col, null, solid ? { x, z, r, y0: y - h / 2, y1: y + h / 2, kind: 'det' } : undefined);
     const fleet = (id, x, z, r, slots) => { const F = { id, x, z, r, slots }; isle.fleet.push(F); return F; };
     const sitePad = (x0, z0, x1, z1, blend = 28, y) => Island.addPad(x0, z0, x1, z1, y !== undefined ? y : Math.round(Island.nat((x0 + x1) / 2, (z0 + z1) / 2) * 10) / 10, blend);
+    // a site the city does not stand on (021: under the 'island' layout the Nightlife Strip takes Saltmarsh's shore)
+    const clearOfCity = (x0, z0, x1, z1, m = 40) => !CityLayout.precincts.some(p => x0 < p.x1 + EDGE_MARGIN + m && x1 > p.x0 - EDGE_MARGIN - m && z0 < p.z1 + EDGE_MARGIN + m && z1 > p.z0 - EDGE_MARGIN - m);
+    const saltmarsh = clearOfCity(-720, 890, -260, 1240);
     // ---------------------------------------------------------------- level sites (before the roads: a road's level comes from the ground it finds)
     const mans = ISLE_MANSIONS.map(([x, z, f]) => ({ x, z, f, P: sitePad(x - 25, z - 22, x + 25, z + 22) }));
-    const salt = []; for (const x of ISLE_SALTMARSH) for (const s of [-1, 1]) { const rz = x > -520 ? 1192 - (-270 - x) * 0.08 : 1172 - (-520 - x) * 0.1615, z = rz + s * 33; salt.push({ x, z, s, P: sitePad(x - 11, z - 9, x + 11, z + 9, 16) }); }
+    const salt = []; if (saltmarsh) for (const x of ISLE_SALTMARSH) for (const s of [-1, 1]) { const rz = x > -520 ? 1192 - (-270 - x) * 0.08 : 1172 - (-520 - x) * 0.1615, z = rz + s * 33; salt.push({ x, z, s, P: sitePad(x - 11, z - 9, x + 11, z + 9, 16) }); }
     const gull = ISLE_GULL.map(([x, z]) => ({ x, z, P: sitePad(x - 10, z - 8, x + 10, z + 8, 16) }));
     const fireP = sitePad(ISLE_FIRE.x0, ISLE_FIRE.z0, ISLE_FIRE.x1, ISLE_FIRE.z1, 30);
     Island.addPad(ISLE_LIGHT.x0, ISLE_LIGHT.z0, ISLE_LIGHT.x1, ISLE_LIGHT.z1, ISLE_LIGHT.y, 26);
     Island.addPad(ISLE_SUMMIT.x0, ISLE_SUMMIT.z0, ISLE_SUMMIT.x1, ISLE_SUMMIT.z1, ISLE_SUMMIT.y, 55);
-    Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
+    if (saltmarsh) Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
-    Island.addPad(CFS.lb.x - CFS.lb.half - 1, CITY + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
+    Island.addPad(CFS.lb.x - CFS.lb.half - 1, CFS_EDGE + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
     Island.buildRoads();
     // ---------------------------------------------------------------- the roads: curved links like the city's own
     for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
@@ -40659,7 +40711,7 @@ Object.assign(World.prototype, {
       });
     }
     // ================================================================ SALTMARSH (the bay's south shore) and its jetty
-    {
+    if (saltmarsh) {
       const cols = [0xf2d9c4, 0xc9e2e8, 0xf0e6b8, 0xd8e8c8, 0xe8c8c8, 0xdcdcec], bs = [this._isleBlock('saltmarsh_e', -420, 1180, 150, 'Saltmarsh'), this._isleBlock('saltmarsh_w', -620, 1160, 150, 'Saltmarsh')];
       const slots = [];
       salt.forEach((h, i) => {
@@ -40725,7 +40777,7 @@ Object.assign(World.prototype, {
       folk('apron', 1050, 1968, [[1030, 1975, -1.2], [1085, 1960, 0.6], [958, 1968, 1.57]]);
       folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1527.6, 472, -1.57], [1527.6, 570, -1.57], [1527.6, 652, -1.57]]);
       folk('proving', 1163, 1492, [[1166, 1491, 3.14], [1170, 1490, -2.6], [PROVING.strip.x0 + 3, PROVING.strip.z - 12.5, 1.57]]);
-      folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
+      if (saltmarsh) folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
       folk('summit', 380, -1800, [[372, -1784.5, 0.2], [376, -1785.5, -0.3], [392, -1847, 3.14]]);
       folk('lighthouse', 1508, -2788, [[1508, -2788, 1.2]]);
       folk('firehouse', 160, -127, [[ISLE_FIRE.x0 + 17, ISLE_FIRE.z0 + 20, -1.57], [ISLE_FIRE.x0 + 18, ISLE_FIRE.z0 + 34, -1.57]]);
@@ -40791,6 +40843,14 @@ const ISLE_DISTRICT_ROADS = [
   { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] }
 ];
 ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
+// with the city round the bay (021 'island'): Crestmoor Heights takes the bay's north shore, so Bayview Crescent gives
+// way to it (its lots too: _districtPlan keeps clear of every precinct) and Ridgeview Drive climbs to Villa Valen from
+// the Heights' north street; Reed Street stops short of the Nightlife Strip on the south shore
+Object.assign(ISLE_ROAD_LAYOUT.island, {
+  h1: null,
+  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
+  m3: { pts: [[-480, 1466], [-472, 1400], [-465, 1345]] }
+});
 // the districts: their names, where their name sits on the map, the signs their shops and yards carry
 const ISLE_DISTRICTS = {
   bayview: { name: 'Bayview Heights', at: [-470, -230], signs: ['BAYVIEW MARKET', 'HARBOUR CAFÉ', 'CRESCENT PHARMACY', 'THE BAY BISTRO'], cars: ['luxury', 'crest', 'suv', 'sports', 'kodiak', 'sedan', 'coupe', 'estate'] },
@@ -40824,7 +40884,7 @@ Object.assign(World.prototype, {
   // ---------------------------------------------------------------- planning (before the roads are built)
   _districtPlan(sitePad) {
     const roads = {}, all = [];
-    for (const D of ISLE_ROADS) {
+    for (const D of Island.roadDefs()) {
       const pts = splinePts(D.pts.map(p => [p[0], p[1]]), 2.5), cum = [0];
       for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
       let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); }
@@ -40860,6 +40920,7 @@ Object.assign(World.prototype, {
     };
     const lots = [];
     for (const E of ISLE_LOT_PLAN) {
+      if (!roads[E.road]) continue; // a street this city layout does not build (ISLE_ROAD_LAYOUT)
       const R = roads[E.road], S = ISLE_LOT[E.kind], pts = R.pts, cum = R.cum, L = cum[cum.length - 1];
       let n = 0;
       for (let s = E.sp / 2 + 18, i = 0; s < L - 18 - (E.endClear || 0); s += E.sp, i++) {
@@ -42405,7 +42466,7 @@ class ValenPointScenery {
       // seawall faces (vertical) round the island and the causeway's embankment
       const face = (x0, z0, x1, z1) => { const cc = new THREE.Color(VP_COL.rock); for (const q of [[x0, 0, z0], [x0, -3, z0], [x1, -3, z1], [x0, 0, z0], [x1, -3, z1], [x1, 0, z1]]) { fb.p.push(q[0], q[1] + VP_Y.ground, q[2]); fb.c.push(cc.r, cc.g, cc.b); } };
       face(VP.x0, VP.z0, VP.x1, VP.z0); face(VP.x1, VP.z0, VP.x1, VP.z1); face(VP.x1, VP.z1, VP.x0, VP.z1); face(VP.x0, VP.z1, VP.x0, VP.cw.z + VP.cw.half); face(VP.x0, VP.cw.z - VP.cw.half, VP.x0, VP.z0);
-      const cz = VP.cw.z, h = VP.cw.half + 2, ce = CITY + EDGE_MARGIN;
+      const cz = VP.cw.z, h = VP.cw.half + 2, ce = VP_EDGE + EDGE_MARGIN;
       fb.rect(ce, cz - h, VP.x0, cz + h, -0.25, VP_COL.rock);
       face(ce, cz - h, VP.x0, cz - h); face(VP.x0, cz + h, ce, cz + h);
       fb.rect(VP.cw.x0, cz - VP.cw.road, VP_SITE.ring.x, cz + VP.cw.road, VP_Y.asphalt, VP_COL.asphalt);
@@ -42657,7 +42718,7 @@ class CedarScenery {
     const key = want.join('|');
     const S = this.R.strip, ds = Math.hypot(Math.max(S.x0 - fx, 0, fx - S.x1), Math.max(S.z0 - fz, 0, fz - S.z1));
     this.strip.visible = ds < CFS_SCN.stripNear; this.stripC.visible = !this.strip.visible && ds < CFS_SCN.stripR;
-    this.fence.visible = Math.min(d0, Math.hypot(CFS.lb.x - fx, Math.max(0, CITY - fz))) < CFS_SCN.fenceR;
+    this.fence.visible = Math.min(d0, Math.hypot(CFS.lb.x - fx, Math.max(0, CFS_EDGE - fz))) < CFS_SCN.fenceR;
     this.far.visible = d0 < CFS_SCN.farR; this.farC.visible = !this.far.visible;
     if (key === this.nearSet) return;
     this.nearSet = key;
@@ -65187,7 +65248,7 @@ class UIManager {
     // the island off the lattice (022): its districts and waters
     for (const [t, x, z, col, big] of [['CRESTMOOR RIDGE', 250, -640, ZONES.k.col, 1], ['MOUNT VALEN', MT_VALEN.x, MT_VALEN.z + 120, ZONES.n.col, 1], ['BLACKGATE HIGHLANDS', -1250, -1700, ZONES.t.col, 1], ['SALTMARSH', -520, 1090, ZONES.b.col, 1],
       ['SOUTHSHORE', -520, 2000, ZONES.e.col, 1], ['PORT VALEN INTERNATIONAL', 600, 2290, ZONES.y.col, 1], ['PROVING GROUND', 1420, 1610, ZONES.j.col, 1], ['LAKE VALEN', LAKE.x, LAKE.z, '#8fd0e8', 0], ['VALEN BAY', -520, 330, '#8fd0e8', 0],
-      ['VALEN SOUND', 1210, 300, '#8fd0e8', 0], ['GULL HARBOR', -1290, -2330, ZONES.t.col, 0], ['CAPE VALEN LIGHT', 1500, -2850, ZONES.t.col, 0], ['BLACKGATE BRIDGE', -1100, 520, '#ffffff', 0]]) lab.push({ t, x: X(x), z: X(z), col, big: !!big });
+      ['VALEN SOUND', 1210, 300, '#8fd0e8', 0], ['GULL HARBOR', -1290, -2330, ZONES.t.col, 0], ['CAPE VALEN LIGHT', 1500, -2850, ZONES.t.col, 0], ['BLACKGATE BRIDGE', -1100, 520, '#ffffff', 0]]) if (!CityLayout.at(x, z)) lab.push({ t, x: X(x), z: X(z), col, big: !!big }); // (not where a precinct of the city now stands)
     // landmarks
     g.font = 'bold 11px Arial';
     for (const key in LANDMARK_BLOCKS) {
@@ -65206,10 +65267,10 @@ class UIManager {
   _paintVP(g, view) {
     const vp = this.g.world.vp; if (!vp) return;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    if (view && (view.x1 < CITY || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
+    if (view && (view.x1 < VP_EDGE || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
     const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
-    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
-    R(CITY + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
+    R(VP_EDGE + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
+    R(VP_EDGE + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
     R(VP.x0, VP.z0, VP.x1, VP.z1, '#4f6e3f');
     const S = VP_SITE;
     for (const r of [S.paddock, S.parkN, S.parkS]) R(r.x0, r.z0, r.x1, r.z1, '#77787a');
@@ -65229,10 +65290,10 @@ class UIManager {
   _paintCFS(g, view) {
     const cf = this.g.world.cfs; if (!cf) return;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    if (view && (view.z1 < CITY || view.x1 < CFS.x0 - 20 || view.x0 > CFS.x1 + 20)) return;
+    if (view && (view.z1 < CFS_EDGE || view.x1 < CFS.x0 - 20 || view.x0 > CFS.x1 + 20)) return;
     const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
-    R(CFS.lb.x - CFS.lb.half, CITY + ROAD_HALF, CFS.lb.x + CFS.lb.half, CFS.z0, '#4f6e3f');
-    R(CFS.lb.x - CFS.lb.road, CITY + ROAD_HALF, CFS.lb.x + CFS.lb.road, CFS.z0, '#9a7d58');
+    R(CFS.lb.x - CFS.lb.half, CFS_EDGE + ROAD_HALF, CFS.lb.x + CFS.lb.half, CFS.z0, '#4f6e3f');
+    R(CFS.lb.x - CFS.lb.road, CFS_EDGE + ROAD_HALF, CFS.lb.x + CFS.lb.road, CFS.z0, '#9a7d58');
     // the ground: one pixel per map pixel, coloured by surface (cached by _renderCFS; drawn live only zoomed in)
     if (this._cfsGround) g.drawImage(this._cfsGround, X(CFS.x0), X(CFS.z0), (CFS.x1 - CFS.x0) * k, (CFS.z1 - CFS.z0) * k);
     else R(CFS.x0, CFS.z0, CFS.x1, CFS.z1, '#4f6e3f');
@@ -65257,7 +65318,7 @@ class UIManager {
     }
     gg.putImageData(id, 0, 0); this._cfsGround = gc;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CITY + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
+    const x0 = Math.floor(X(CFS.x0 - 4)), z0 = Math.floor(X(CFS_EDGE + EDGE_MARGIN)), x1 = Math.ceil(X(CFS.x1 + 4)), z1 = Math.ceil(X(CFS.z1 + 4));
     const c = document.createElement('canvas'); c.width = x1 - x0; c.height = z1 - z0;
     const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintCFS(g, null);
@@ -65266,7 +65327,7 @@ class UIManager {
   // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
   _renderVP() {
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(CITY + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
+    const x0 = Math.floor(X(VP_EDGE + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const g = c.getContext('2d'); g.translate(-x0, -z0);
     this._paintVP(g, null);

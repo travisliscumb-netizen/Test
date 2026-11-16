@@ -55,9 +55,9 @@ function streetNameAt(x, z) {
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
   }
-  if (x > CITY + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
+  if (x > VP_EDGE + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
   if (vpLand(x, z)) return VP.name;
-  if (z > CITY + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
+  if (z > CFS_EDGE + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
   // out on the island (022): the road you are on, by name
   if (offCity(x, z)) { const q = RoadGraph.ready ? RoadGraph.nearest(x, z, { maxD: 12, kinds: RG_STREETS }) : null; return q && q.d <= q.e.w / 2 + 2 ? q.e.name : null; }
@@ -385,7 +385,7 @@ function groundY(x, z, y, step) {
 }
 function groundBase(x, z, y) {
   // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
-  if (x > CITY + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
+  if (x > VP_EDGE + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
   if (offCity(x, z)) {

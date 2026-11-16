@@ -54,7 +54,7 @@ class ValenPointScenery {
       // seawall faces (vertical) round the island and the causeway's embankment
       const face = (x0, z0, x1, z1) => { const cc = new THREE.Color(VP_COL.rock); for (const q of [[x0, 0, z0], [x0, -3, z0], [x1, -3, z1], [x0, 0, z0], [x1, -3, z1], [x1, 0, z1]]) { fb.p.push(q[0], q[1] + VP_Y.ground, q[2]); fb.c.push(cc.r, cc.g, cc.b); } };
       face(VP.x0, VP.z0, VP.x1, VP.z0); face(VP.x1, VP.z0, VP.x1, VP.z1); face(VP.x1, VP.z1, VP.x0, VP.z1); face(VP.x0, VP.z1, VP.x0, VP.cw.z + VP.cw.half); face(VP.x0, VP.cw.z - VP.cw.half, VP.x0, VP.z0);
-      const cz = VP.cw.z, h = VP.cw.half + 2, ce = CITY + EDGE_MARGIN;
+      const cz = VP.cw.z, h = VP.cw.half + 2, ce = VP_EDGE + EDGE_MARGIN;
       fb.rect(ce, cz - h, VP.x0, cz + h, -0.25, VP_COL.rock);
       face(ce, cz - h, VP.x0, cz - h); face(VP.x0, cz + h, ce, cz + h);
       fb.rect(VP.cw.x0, cz - VP.cw.road, VP_SITE.ring.x, cz + VP.cw.road, VP_Y.asphalt, VP_COL.asphalt);

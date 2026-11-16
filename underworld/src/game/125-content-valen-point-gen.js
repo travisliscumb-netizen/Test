@@ -58,7 +58,7 @@ Object.assign(World.prototype, {
     const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half;
     wall(VP.x0 - 1, VP.z0 - 1, VP.x1 + 1, VP.z0, 3); wall(VP.x0 - 1, VP.z1, VP.x1 + 1, VP.z1 + 1, 3); wall(VP.x1, VP.z0, VP.x1 + 1, VP.z1, 3);
     wall(VP.x0 - 1, VP.z0, VP.x0, g0, 3); wall(VP.x0 - 1, g1, VP.x0, VP.z1, 3);
-    wall(CITY + EDGE_MARGIN, g0 - 0.4, VP.x0, g0); wall(CITY + EDGE_MARGIN, g1, VP.x0, g1 + 0.4);
+    wall(VP_EDGE + EDGE_MARGIN, g0 - 0.4, VP.x0, g0); wall(VP_EDGE + EDGE_MARGIN, g1, VP.x0, g1 + 0.4);
     // ---------------------------------------------------------------- barriers: armco each side, run-off by corner speed
     // offset from the centreline: 7 m of track and a run-off that grows on the outside of faster corners and
     // eases in over 50 m; the main straight's west side is the pit wall / catch fence line
@@ -169,7 +169,7 @@ Object.assign(World.prototype, {
     // out to the turning circle (a Links spur: traffic, the GPS, taxis and police all route along it)
     const R0 = VP_SITE.ring, sx = R0.x - R0.r;
     // sampled every 2.5 m like the other curved roads (one polyline for the paint, traffic and the GPS)
-    const cwPts = []; for (let x = CITY + ROAD_HALF; x < sx; x += 2.5) cwPts.push([x, VP.cw.z]); cwPts.push([sx, VP.cw.z]);
+    const cwPts = []; for (let x = VP_EDGE + ROAD_HALF; x < sx; x += 2.5) cwPts.push([x, VP.cw.z]); cwPts.push([sx, VP.cw.z]);
     this.localRoads.push({ k: 'line', link: 'Valen Point Causeway', spur: true, w: VP.cw.road * 2, pts: cwPts, ring: R0, mat: 'asphalt' });
     // the district's drivable routes for the GPS and AI drivers (polylines; two-way): from the turning circle round
     // to the paddock, the gaps either side of the garages, the pit lane and its merges, Race Control and the annex

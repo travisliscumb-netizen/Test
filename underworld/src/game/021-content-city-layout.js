@@ -35,12 +35,28 @@ const CITY_LAYOUTS = {
   tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }],
   // never shipped either: the city cut in two, the west half three cells further west, the halves joined by one
   // connector road (CITY_CONNECTORS), so routing, traffic and the edges between parted precincts are exercised (S4)
-  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }]
+  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
+  // the city round Valen Bay (CITY_SPREAD.md §3, §9): the core, the west of the Old Quarter, Linden Hills with the
+  // farm, and the port (the Industrial Belt, the Docklands and the Container Terminal, whose quay faces east and so
+  // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
+  // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
+  island: [
+    { id: 'core', lx0: 2, lz0: 0, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+    { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 1, lz1: 7, ox: 0, oz: 0 },
+    { id: 'linden', lx0: 0, lz0: 8, lx1: 3, lz1: 11, ox: 0, oz: 0 },
+    { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -8, oz: -6 },
+    { id: 'strip', lx0: 4, lz0: 8, lx1: 9, lz1: 11, ox: -12, oz: 4 },
+    { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 }
+  ]
 };
 // the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
 // precincts' edge streets side-on
 const CITY_CONNECTORS = {
-  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }]
+  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }],
+  island: [
+    // the Strip's east street to the Southshore Highway
+    { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1160], [-128, 1156], [-100, 1150]] }
+  ]
 };
 const CityLayout = {
   id: '', precincts: [], own: new Int8Array(N * N).fill(-1), sites: new Map(),

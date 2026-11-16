@@ -35,6 +35,14 @@ const ISLE_DISTRICT_ROADS = [
   { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] }
 ];
 ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
+// with the city round the bay (021 'island'): Crestmoor Heights takes the bay's north shore, so Bayview Crescent gives
+// way to it (its lots too: _districtPlan keeps clear of every precinct) and Ridgeview Drive climbs to Villa Valen from
+// the Heights' north street; Reed Street stops short of the Nightlife Strip on the south shore
+Object.assign(ISLE_ROAD_LAYOUT.island, {
+  h1: null,
+  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
+  m3: { pts: [[-480, 1466], [-472, 1400], [-465, 1345]] }
+});
 // the districts: their names, where their name sits on the map, the signs their shops and yards carry
 const ISLE_DISTRICTS = {
   bayview: { name: 'Bayview Heights', at: [-470, -230], signs: ['BAYVIEW MARKET', 'HARBOUR CAFÉ', 'CRESCENT PHARMACY', 'THE BAY BISTRO'], cars: ['luxury', 'crest', 'suv', 'sports', 'kodiak', 'sedan', 'coupe', 'estate'] },
@@ -68,7 +76,7 @@ Object.assign(World.prototype, {
   // ---------------------------------------------------------------- planning (before the roads are built)
   _districtPlan(sitePad) {
     const roads = {}, all = [];
-    for (const D of ISLE_ROADS) {
+    for (const D of Island.roadDefs()) {
       const pts = splinePts(D.pts.map(p => [p[0], p[1]]), 2.5), cum = [0];
       for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
       let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); }
@@ -104,6 +112,7 @@ Object.assign(World.prototype, {
     };
     const lots = [];
     for (const E of ISLE_LOT_PLAN) {
+      if (!roads[E.road]) continue; // a street this city layout does not build (ISLE_ROAD_LAYOUT)
       const R = roads[E.road], S = ISLE_LOT[E.kind], pts = R.pts, cum = R.cum, L = cum[cum.length - 1];
       let n = 0;
       for (let s = E.sp / 2 + 18, i = 0; s < L - 18 - (E.endClear || 0); s += E.sp, i++) {
