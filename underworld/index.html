@@ -36952,7 +36952,7 @@ class World {
     for (const b of this.blocks) { b.I = CityLayout.siteI(b.bx, b.bz); b.J = CityLayout.siteJ(b.bx, b.bz); }
     if (CityLayout.precincts.every(p => !p.ox && !p.oz)) return;
     const seen = new Set();
-    const XK = new Set(['x', 'x0', 'x1', 'cx', 'ox']), ZK = new Set(['z', 'z0', 'z1', 'cz', 'oz']), SKIP = new Set(['n', 'park', 'superblock', 'landmark', 'block', 'i', 'bx', 'bz', 'I', 'J', 'bx0', 'bz0', 'bx1', 'bz1']);
+    const XK = new Set(['x', 'x0', 'x1', 'cx', 'ox']), ZK = new Set(['z', 'z0', 'z1', 'cz', 'oz']), SKIP = new Set(['n', 'superblock', 'landmark', 'block', 'i', 'bx', 'bz', 'I', 'J', 'bx0', 'bz0', 'bx1', 'bz1']);
     const shift = (v, dx, dz, key) => {
       if (v === null || typeof v !== 'object' || seen.has(v)) return;
       if (v.isObject3D || v.isBufferGeometry || v.isMaterial || v.isTexture || v.isColor || v instanceof Map || v instanceof Set || ArrayBuffer.isView(v)) return;
@@ -36972,6 +36972,7 @@ class World {
       for (const k of Object.keys(v)) {
         if (SKIP.has(k)) continue;
         const e = v[k];
+        if (k === 'park' && Array.isArray(e) && typeof e[0] === 'number') continue; // a curved street's kerb sides ([1, -1]), not a point
         if (typeof e === 'number') { if (XK.has(k)) v[k] = e + dx; else if (ZK.has(k)) v[k] = e + dz; }
         else if (e && typeof e === 'object') shift(e, dx, dz, k);
       }

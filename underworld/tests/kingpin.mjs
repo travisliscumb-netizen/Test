@@ -13,7 +13,7 @@ const once = sd => page.evaluate(seed0 => {
   g.events.cool = 1e9;
   let seed = seed0; const R0 = Math.random; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   // the same 18 turfs in both runs: the middle of the map
-  const mine = uw.T.map(t => t.i).filter(i => { const t = uw.T[i]; const cx = t.deal.x / 80, cz = t.deal.z / 80; return cx > 1 && cx < 11 && cz > 1 && cz < 11; }).slice(0, 24);
+  const mine = uw.T.map(t => t.i).filter(i => { const t = uw.T[i], CL = window.__pv.CityLayout, p = CL.near(t.deal.x, t.deal.z), cx = CL.latX(p, t.deal.x) / 80, cz = CL.latZ(p, t.deal.z) / 80; return cx > 1 && cx < 11 && cz > 1 && cz < 11; }).slice(0, 24);
   // every seed starts from the same state: the game keeps running between calls, at a pace that depends on load
   const snap = window.__kpSnap || (window.__kpSnap = JSON.stringify({ turfs: S.turfs, factions: S.factions, infamy: S.infamy, props: S.props, day: S.day }));
   const run = (infamy, days) => {

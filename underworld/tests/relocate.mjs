@@ -8,6 +8,7 @@
 
    node underworld/tests/relocate.mjs */
 import { launch, open, check, frames, startNew, finish, FILE } from './lib.mjs';
+process.env.UW_QUERY = '?layout=classic'; // the save is made under the square (island is the default layout)
 const b = await launch();
 const { page, errors } = await open(b);
 const ev = (fn, a) => page.evaluate(fn, a);

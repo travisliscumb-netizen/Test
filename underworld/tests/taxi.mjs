@@ -78,7 +78,7 @@ const change = await ev(() => {
   const g = window.game, T = g.taxi, mv = g.ui.mapView, old = { ...T.dest };
   document.querySelector('#taxiHud [data-tx="change"]').click();
   const open = !!mv.pickMode;
-  mv.setPick(2 * 80, 9 * 80 + 40); const q = mv.pickMode.q;
+  mv.setPick(window.__pv.CityLayout.wx(2 * 80, 9 * 80 + 40), window.__pv.CityLayout.wz(2 * 80, 9 * 80 + 40)); const q = mv.pickMode.q;
   document.querySelector('#mapPick [data-pk="ok"]').click();
   return { open, old: old.name, now: T.dest.name, moved: Math.hypot(old.x - T.dest.x, old.z - T.dest.z) > 50, quote: T.quote, fare: q.fare, goal: T.cab.drive.goal && Math.round(Math.hypot(T.cab.drive.goal.x - T.dest.x, T.cab.drive.goal.z - T.dest.z)), state: T.state };
 });
@@ -140,7 +140,7 @@ const cops = await ev(() => {
   const v = T.cab; if (!v || T.state !== 'waiting') return { fail: T.state };
   const w = v.toWorld(v.spec.w / 2 + 0.6, 0); p.pos.set(w.x, p.pos.y, w.z);
   T.approach(v); document.querySelector('#svcBody [data-act="hire"]').click();
-  g.ui.mapView.setPick(6 * 80, 11 * 80); document.querySelector('#mapPick [data-pk="ok"]').click();
+  g.ui.mapView.setPick(window.__pv.CityLayout.wx(6 * 80, 11 * 80), window.__pv.CityLayout.wz(6 * 80, 11 * 80)); document.querySelector('#mapPick [data-pk="ok"]').click();
   for (let k = 0; k < 3 * 60; k++) g.update(1 / 60, 1 / 60);
   g.police.addHeat(2, p.pos.x, p.pos.z); g.update(1 / 60, 1 / 60); g.update(1 / 60, 1 / 60);
   out.after = T.state; out.foot = p.state === 'foot'; g.police.clear();
@@ -156,7 +156,7 @@ const stuck = await ev(() => {
   const v = T.cab; if (!v || T.state !== 'waiting') return { fail: T.state };
   const w = v.toWorld(v.spec.w / 2 + 0.6, 0); p.pos.set(w.x, p.pos.y, w.z);
   T.approach(v); document.querySelector('#svcBody [data-act="hire"]').click();
-  g.ui.mapView.setPick(1 * 80, 1 * 80); document.querySelector('#mapPick [data-pk="ok"]').click();
+  g.ui.mapView.setPick(window.__pv.CityLayout.wx(1 * 80, 1 * 80), window.__pv.CityLayout.wz(1 * 80, 1 * 80)); document.querySelector('#mapPick [data-pk="ok"]').click();
   // pin the cab: wipe its speed every frame, like a car wedged in a jam
   const r0 = T.remaining();
   for (let k = 0; k < 40 * 60 && T.state === 'riding'; k++) { v.vel.set(0, 0); g.update(1 / 60, 1 / 60); }

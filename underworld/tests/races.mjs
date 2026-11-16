@@ -51,7 +51,8 @@ const race = async (want, place = 1, opts = {}) => {
 };
 
 // ---------------------------------------------------------------- 1. the purse: by today's wins on that race
-const E1 = await ev(() => window.__car('sports', 300, 300).uid);
+// every district already discovered: a route through one new to this career would add the discovery's +5 Rep
+const E1 = await ev(() => { const z = window.game.save.discovered.zones; for (const k in window.__pv.ZONES) z[k] = 1; return window.__car('sports', 300, 300).uid; });
 const tiers = [];
 for (let k = 0; k < 4; k++) {
   const before = await ev(() => { const g = window.game; window.__log = []; return { me: g.money.W.dirty.me, rep: g.save.rep }; });
