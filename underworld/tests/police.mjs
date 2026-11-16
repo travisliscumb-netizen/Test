@@ -52,7 +52,8 @@ const parked = await ev(() => {
   // a fresh chase: the patrol from the last check is sent home and removed
   for (const u of P.units.slice()) { g.vehicles.despawn(u.v); } P.units.length = 0; P.setLevel(3); P.spawnT = 999;
   let x = p.pos.x + 34, z = p.pos.z;
-  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, cx = p.pos.x + Math.cos(a) * 34, cz = p.pos.z + Math.sin(a) * 34; if (g.world.grid.lineOfSight(cx, 1.4, cz, p.pos.x, p.pos.y + 1.2, p.pos.z)) { x = cx; z = cz; break; } }
+  // at the kerb (the nearest point of a road), where you can see it
+  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, kp = window.__pv.nearestRoadPoint(p.pos.x + Math.cos(a) * 34, p.pos.z + Math.sin(a) * 34); if (kp && Math.hypot(kp.x - p.pos.x, kp.z - p.pos.z) > 20 && g.world.grid.lineOfSight(kp.x, 1.4, kp.z, p.pos.x, p.pos.y + 1.2, p.pos.z)) { x = kp.x; z = kp.z; break; } }
   const v = g.vehicles.spawn('police', x, z, 0, { parked: true, driver: null }); v.staffed = true;
   let joined = -1;
   for (let n = 0; n < 300 && joined < 0; n++) { g.update(1 / 60, 1 / 60); if (P.units.some(u => u.v === v)) joined = n; }

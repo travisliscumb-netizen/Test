@@ -113,7 +113,7 @@ class World {
     };
     const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
     for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
-    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces']) if (Array.isArray(this[L])) moveList(this[L]);
+    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'doors']) if (Array.isArray(this[L])) moveList(this[L]);
     moveList(Object.values(this.compounds || {}));
   }
   // ----- helpers -----
@@ -710,6 +710,9 @@ class World {
     const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] }, runs = this.shoreRuns = [];
     const wet = (x, z) => Island.nat(x, z) < SEA_Y + 0.35;
     this.perimeter = [];
+    // the island roads' city ends (022, 021 connectors): where each meets a precinct's edge street
+    const roadEnds = [];
+    for (const D of Island.roadDefs()) D.ends.forEach((e, k) => { if (e !== 'lat') return; const q = D.pts[k ? D.pts.length - 1 : 0], [x, z] = D.world ? q : CityLayout.anchor(q[0], q[1]); roadEnds.push({ x, z, w: D.w }); });
     for (const p of CityLayout.precincts) {
       for (const side of 'nswe') {
         const ns = side === 'n' || side === 's', t0 = (ns ? p.x0 : p.z0) - E, t1 = (ns ? p.x1 : p.z1) + E;
@@ -725,7 +728,13 @@ class World {
         if (run) list.push(run);
         // the causeway and the land bridge leave the classic square's east and south edges (S4 re-anchors them)
         const gap = side === 'e' && Math.abs(p.x1 - CITY) < 0.5 ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' && Math.abs(p.z1 - CITY) < 0.5 ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
-        if (gap) list = list.flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
+        const gaps = gap ? [gap] : [];
+        // every island road that leaves this edge (its 'lat' end on the edge street) goes through the wall's line
+        for (const G of roadEnds) {
+          const d = ns ? Math.abs(G.z - (side === 'n' ? p.z0 : p.z1)) : Math.abs(G.x - (side === 'w' ? p.x0 : p.x1)), t = ns ? G.x : G.z;
+          if (d < ROAD_HALF + 3 && t > t0 && t < t1) gaps.push([t - G.w / 2 - 4, t + G.w / 2 + 4]);
+        }
+        for (const gp of gaps) list = list.flatMap(r => r[1] <= gp[0] || r[0] >= gp[1] ? [r] : [[r[0], gp[0]], [gp[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
         // a run that reaches a corner closes it
         for (const r of list) { if (r[0] <= t0 + 2) r[0] = t0 - 1; if (r[1] >= t1 - 2) r[1] = t1 + 1; }
         list = list.filter(r => r[1] - r[0] > 3);

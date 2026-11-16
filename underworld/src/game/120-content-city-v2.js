@@ -83,8 +83,13 @@ Object.assign(World.prototype, {
     const tiles = [...groups.values()].map(t => ({ ...t, gx0: t.lx0 * P - 48, gz0: t.lz0 * P - 48, w: (t.lx1 - t.lx0 + 1) * P + 96, h: (t.lz1 - t.lz0 + 1) * P + 96 })).sort((a, b) => b.w * b.h - a.w * a.h);
     const maxW = Math.max(1056, ...tiles.map(t => t.w)) * 1.6;
     let x = 0, z = 0, rowH = 0, W = 0;
-    for (const t of tiles) { if (x > 0 && x + t.w > maxW) { z += rowH; x = 0; rowH = 0; } t.tx0 = x; t.tz0 = z; x += t.w; rowH = Math.max(rowH, t.h); W = Math.max(W, x); }
-    const Wm = W, Hm = z + rowH, SW = Math.ceil(Wm * k), SH = Math.ceil(Hm * k);
+    // each tile's origin is nudged (under a pixel) so the lattice falls on the same pixel grid in every tile as in the
+    // classic raster (where the square's corner is 48 m in): a footprint tested before the bake (the prop validator, in
+    // the lattice) reads the same pixels after it
+    const snap = (v, g) => { const r = (((v - g - 48) * k) % 1 + 1) % 1; return r > 1e-6 ? v + (1 - r) / k : v; };
+    for (const t of tiles) { if (x > 0 && x + t.w > maxW) { z += rowH; x = 0; rowH = 0; } t.tx0 = snap(x, t.gx0); t.tz0 = snap(z, t.gz0); x = t.tx0 + t.w; rowH = Math.max(rowH, t.tz0 - z + t.h); W = Math.max(W, x); }
+    // (the atlas's size in metres is its size in whole pixels: the shader's uv and the CPU's pixel agree everywhere)
+    const SW = Math.ceil(W * k - 1e-6), SH = Math.ceil((z + rowH) * k - 1e-6), Wm = SW / k, Hm = SH / k;
     LOCAL.W = SW; LOCAL.H = SH; LOCAL.k = k; LOCAL.tiles = new Map(tiles.map(t => [t.key, t]));
     // the shader's view of a tile: [lattice x, z of the atlas origin, 1 / atlas width, 1 / atlas height] (metres)
     LOCAL.loc = (ox, oz) => { const t = LOCAL.tiles.get(ox + ',' + oz); return [t.gx0 - t.tx0, t.gz0 - t.tz0, 1 / Wm, 1 / Hm]; };

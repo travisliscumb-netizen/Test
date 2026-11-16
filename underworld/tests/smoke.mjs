@@ -45,7 +45,7 @@ check('six strategic days tick', days.day === 7, JSON.stringify(days));
 // big map overlay
 await page.keyboard.press('KeyM'); await frames(page, 3);
 const mapOk = await page.evaluate(() => window.game.mapOpen);
-await page.evaluate(() => window.game.uw.ui.mapClick(300, 300)); await frames(page, 2);
+await page.evaluate(() => window.game.uw.ui.mapClick(window.__pv.CityLayout.wx(300, 300), window.__pv.CityLayout.wz(300, 300))); await frames(page, 2);
 check('big map overlay + turf info', mapOk && await page.evaluate(() => !document.getElementById('turfInfo').classList.contains('hidden')));
 await page.keyboard.press('KeyM'); await frames(page, 10);
 check('no console errors', errors.length === 0, errors.slice(0, 6).join(' | '));

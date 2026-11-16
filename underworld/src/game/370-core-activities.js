@@ -112,8 +112,8 @@ class StuntTracker {
 const RACES = [
   // (lattice crossings; a race keeps to precincts that stand together, 021: the Quayside Sprint turns up the core's
   // west street, the waterfront on Valen Bay, and the Pink Slip keeps to the core and the port)
-  { id: 'quayside', name: 'Quayside Sprint', nodes: [[0, 11], [0, 8], [0, 4], [2, 4], [2, 0], [6, 0]], laps: 1, opp: 3, cls: ['sports', 'muscle', 'sedan'], reward: 1200, rep: 40, blurb: 'West shore, north along the seawall, round the Old Quarter onto the bay front, then hard right along North Shore Drive.' },
-  { id: 'saltloop', name: 'Saltworks Circuit', nodes: [[9, 0], [12, 0], [12, 3], [9, 3]], loop: true, laps: 2, opp: 3, cls: ['sports', 'muscle', 'pickup'], reward: 1600, rep: 45, blurb: 'Two laps around the refinery. Mind the trucks.' },
+  { id: 'quayside', name: 'Quayside Sprint', nodes: [[0, 11], [0, 8], [0, 4], [10, 4], [10, 0], [12, 0]], laps: 1, opp: 3, cls: ['sports', 'muscle', 'sedan'], reward: 1200, rep: 40, blurb: 'West shore, north along the seawall, then flat out along the top of downtown and up the docks to the harbour mouth.' },
+  { id: 'saltloop', name: 'Saltworks Circuit', nodes: [[10, 0], [12, 0], [12, 3], [10, 3]], loop: true, laps: 2, opp: 3, cls: ['sports', 'muscle', 'pickup'], reward: 1600, rep: 45, blurb: 'Two laps around the refinery. Mind the trucks.' },
   { id: 'midnight', name: 'Midnight Run', nodes: [[4, 4], [8, 4], [8, 6], [5, 6], [5, 8], [9, 8]], laps: 1, opp: 3, night: true, cls: ['sports', 'muscle', 'sports'], reward: 2200, rep: 55, blurb: 'Through the heart of the city after dark, traffic and all. 20:00–05:00 only.' },
   { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
   { id: 'wettrack', name: 'Wet Track', nodes: [[1, 6], [1, 10], [4, 10], [4, 6]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },

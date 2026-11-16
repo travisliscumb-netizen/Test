@@ -65,7 +65,7 @@ function sameAsLattice(label) {
 
 // ---------------------------------------------------------------- the classic layout
 // the build starts on the island layout (the city round Valen Bay); the classic one is the square as it was built
-const islandAtStart = L.id === 'island' && L.precincts.length === 6;
+const islandAtStart = L.id === 'island' && L.precincts.length === CITY_LAYOUTS.island.length;
 L.use('classic');
 check('the build starts on the island layout; classic is one precinct, all 144 cells, offset 0', islandAtStart && L.id === 'classic' && L.precincts.length === 1 && L.precincts[0].ox === 0 && L.precincts[0].oz === 0 && L.sites.size === N * N);
 sameAsLattice('classic');

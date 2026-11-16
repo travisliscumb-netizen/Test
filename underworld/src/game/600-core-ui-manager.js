@@ -864,7 +864,9 @@ const MAP_LAYERS = [
 ];
 const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true, intel: true };
 // centre of each named district (average of its blocks), for map labels and cards
-const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += CityLayout.wx((bx + 0.5) * P, (bz + 0.5) * P); a.z += CityLayout.wz((bx + 0.5) * P, (bz + 0.5) * P); a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
+// a district's centre on the map: the middle of its cells in the precinct that holds most of them (a district a layout
+// splits across precincts is labelled where most of it stands, not at an average between the two)
+const ZONE_CENTRE = (() => { const by = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], pk = CityLayout.precinctOf(bx, bz).k, a = (by[k] || (by[k] = {}))[pk] || (by[k][pk] = { x: 0, z: 0, n: 0 }); a.x += CityLayout.wx((bx + 0.5) * P, (bz + 0.5) * P); a.z += CityLayout.wz((bx + 0.5) * P, (bz + 0.5) * P); a.n++; } const acc = {}; for (const k in by) { const a = Object.values(by[k]).reduce((m, q) => q.n > m.n ? q : m); acc[k] = { x: a.x / a.n, z: a.z / a.n, n: a.n }; } return acc; })();
 // the street good paying furthest over its base price in a district right now
 function econBest(uw, z) { let best = null; for (const k of GOOD_IDS) { if (GOODS[k].fence || GOODS[k].arms || !DEMAND[z]) continue; const r = uw.market.ratio(z, k); if (!best || r > best.r) best = { k, r, price: uw.market.price(z, k) }; } return best; }
 // pictograms for the map symbols (G8), keyed by the symbol's letter so the data (and what the tests read) stays the

@@ -20,7 +20,7 @@ const geo = await ev(() => {
     let maxTurn = 0;
     for (let k = 1; k < L.pts.length - 1; k++) { const a = L.pts[k - 1], q = L.pts[k], c = L.pts[k + 1]; const h0 = Math.atan2(q[0] - a[0], q[1] - a[1]), h1 = Math.atan2(c[0] - q[0], c[1] - q[1]); let d = Math.abs(h1 - h0); if (d > Math.PI) d = 2 * Math.PI - d; maxTurn = Math.max(maxTurn, d); }
     // an end meets an open lattice road, another curved road part way along it (Curved Roads pass), or is a spur's free end
-    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || (e.onLink ? w.links.some(M => M !== L && M.name === e.onLink && M.pts.some((q, k) => k < M.pts.length - 1 && Math.hypot(q[0] - e.C.x, q[1] - e.C.z) < M.len)) : P.RoadNet.segOpen(e.axis, e.line, e.seg))), cross: L.ends.map(e => e.C ? Math.round(e.C.x) + ',' + Math.round(e.C.z) : ''), pre: L.ends.map(e => { const p = e.C && P.CityLayout.at(e.C.x, e.C.z); return p ? p.id : null; }) };
+    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || (e.onLink ? w.links.some(M => M !== L && M.name === e.onLink && M.pts.some((q, k) => k < M.pts.length - 1 && Math.hypot(q[0] - e.C.x, q[1] - e.C.z) < M.len)) : P.RoadNet.segOpen(e.axis, e.line, e.seg))), cross: L.ends.map(e => e.C ? Math.round(e.C.x) + ',' + Math.round(e.C.z) : ''), pre: L.ends.map(e => { const p = e.C && P.CityLayout.at(e.C.x, e.C.z); return p ? p.ox + ',' + p.oz : null; }) };
   });
   // the lattice: exactly the segments the superblocks close, nothing else
   let expect = 0; for (const sb of P.SUPERBLOCKS) expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
@@ -40,7 +40,8 @@ const geo = await ev(() => {
 });
 const names = geo.links.map(l => l.name);
 // a name appears twice only for a street that carries on across a lattice street (its two halves meet at one crossing)
-// or through a district's streets (the Coast Highway through Crestmoor Heights: both halves end on that precinct)
+// or through a district's streets (the Coast Highway through Crestmoor Heights and Greenway: both halves end on
+// precincts that stand together)
 const halves = (m, o) => m.cross.some(c => c && o.cross.includes(c)) || m.pre.some(p => p && o.pre.includes(p));
 const dupOk = geo.links.every(l => { const same = geo.links.filter(m => m.name === l.name); return same.length === 1 || same.length === 2 && halves(same[0], same[1]); });
 check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends (and the Curved Roads pass’s streets)', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend', 'Saltmarsh Way', 'Kiln Lane', 'Tanner’s Row', 'Farm Track'].every(n => names.includes(n)) && dupOk, JSON.stringify(names));

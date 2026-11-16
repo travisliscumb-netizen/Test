@@ -20,7 +20,7 @@ const offsetOf = (id, lx, lz) => ev(([id, lx, lz]) => { const T = window.__pv.CI
 await startNew(page);
 const made = await ev(() => {
   const g = window.game, w = g.world, pv = window.__pv;
-  const strip = w.block(5, 9), heights = w.block(1, 2), core = w.block(6, 3);
+  const strip = w.block(5, 9), heights = w.block(1, 2), core = w.block(6, 5);
   // the player on the pavement in front of the casino block; three marks saved with the game
   const px = strip.cx, pz = strip.z1 + 3.2;
   g.resetPlayerState(px, pz, 0);
@@ -45,7 +45,7 @@ const boot = async q => {
   await frames(page, 20);
 };
 await boot('?layout=island');
-const [sx, sz] = await offsetOf('island', 5, 9), [hx, hz] = await offsetOf('island', 1, 2), [cx, cz] = await offsetOf('island', 6, 3);
+const [sx, sz] = await offsetOf('island', 5, 9), [hx, hz] = await offsetOf('island', 1, 2), [cx, cz] = await offsetOf('island', 6, 5);
 const got = await ev(() => { const g = window.game, s = g.save; return { layout: window.__pv.CityLayout.id, stamp: s.layout, from: s.flags.relocatedFrom, pos: [g.player.pos.x, g.player.pos.z], marks: s.flags.relocTest, strip: [g.world.block(5, 9).cx, g.world.block(5, 9).z1], ground: g.player.pos.y }; });
 const m0 = made.marks, m1 = got.marks, near = (a, b) => Math.abs(a - b) < 0.01;
 check('loaded under island: the stamp is island and the save says where it came from', got.layout === 'island' && got.stamp === 'island' && got.from === 'classic', JSON.stringify({ stamp: got.stamp, from: got.from }));
