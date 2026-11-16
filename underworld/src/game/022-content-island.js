@@ -134,9 +134,12 @@ const Island = {
         for (const I of ISLE_ISLETS) d = Math.min(d, Math.hypot(x - I[0], z - I[1]) - I[2]);
         const amp = this._coastAmp(x, z);
         if (amp > 0) d += amp * (38 * tNoise(x / 330, z / 330, 91) + 15 * tNoise(x / 105, z / 105, 93));
-        // the city's own square (to its seawall) is land whatever the outline does
-        const ex = Math.max(-E - x, x - CITY - E), ez = Math.max(-E - z, z - CITY - E);
-        const dc = ex > 0 || ez > 0 ? Math.hypot(Math.max(ex, 0), Math.max(ez, 0)) : Math.max(ex, ez);
+        // every precinct of the city (to its seawall, 021) is land whatever the outline does
+        let dc = Infinity;
+        for (const p of CityLayout.precincts) {
+          const ex = Math.max(p.x0 - E - x, x - p.x1 - E), ez = Math.max(p.z0 - E - z, z - p.z1 - E);
+          dc = Math.min(dc, ex > 0 || ez > 0 ? Math.hypot(Math.max(ex, 0), Math.max(ez, 0)) : Math.max(ex, ez));
+        }
         sdf[j * W + i] = clamp(Math.min(d, dc), -MAXD, MAXD);
       }
     }
@@ -202,7 +205,9 @@ const Island = {
   buildRoads() {
     this.roads = []; const byId = {};
     for (const D of ISLE_ROADS) {
-      const cp = D.pts.map(p => [p[0], p[1]]), hosts = [null, null];
+      // a control point authored at the city's edge (its 'lat' end and the approach to it) moves with the precinct
+      // whose streets it meets (021); out on the island it stays where it was drawn
+      const cp = D.pts.map(p => CityLayout.anchor(p[0], p[1])), hosts = [null, null];
       D.ends.forEach((e, k) => {
         const H = byId[e]; if (!H) return;
         const q = k ? cp[cp.length - 1] : cp[0]; let best = 0, bd = Infinity;
@@ -390,7 +395,7 @@ const Island = {
   // do the island's hills rise through the straight line from a to b? (Sight: the police, the camera.)
   occludes(ax, ay, az, bx, by, bz) {
     if (!this.ready || ay < -5 || by < -5) return false;
-    const inC = (x, z) => x > -EDGE_MARGIN && z > -EDGE_MARGIN && x < CITY + EDGE_MARGIN && z < CITY + EDGE_MARGIN;
+    const inC = (x, z) => CityLayout.inCity(x, z);
     if (inC(ax, az) && inC(bx, bz)) return false;
     const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 12) return false;
     const n = Math.ceil(L / 8), gx = this.gx, gz = this.gz; let hit = false;
@@ -420,6 +425,6 @@ const Island = {
     this.addPad(G.x0, G.z0, G.x1, G.z1, G.y, 90);
     this.addPad(A.x0, A.z0, A.x1, A.z1, A.y, 140);
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
-    this.addPad(-E, -E, CITY + E, CITY + E, CURB_H, 110);
+    for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
   }
 };

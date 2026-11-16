@@ -28,9 +28,9 @@ function surfaceY(x, z, y, step = SURF_STEP) {
   const maxH = y === undefined ? Infinity : y + step;
   const L = SURF.lists;
   if (!L) return -1e9;
-  const bx = Math.floor(x / P), bz = Math.floor(z / P);
-  if (bx < 0 || bz < 0 || bx >= N || bz >= N) return -1e9;
-  const list = L[bz * N + bx];
+  const c = CityLayout.cell(Math.floor(x / P), Math.floor(z / P)); // the lattice cell of the block standing here (021)
+  if (c < 0) return -1e9;
+  const list = L[c];
   if (!list) return -1e9;
   let best = -1e9;
   for (const s of list) {
@@ -615,8 +615,9 @@ Object.assign(World.prototype, {
     SURF.lists = new Array(N * N).fill(null);
     // a surface is listed in every block it overlaps (superblock decks and ramps cross block lines)
     for (const s of this.surfaces || []) {
-      for (let bx = clamp(Math.floor(s.x0 / P), 0, N - 1); bx <= clamp(Math.floor(s.x1 / P), 0, N - 1); bx++)
-        for (let bz = clamp(Math.floor(s.z0 / P), 0, N - 1); bz <= clamp(Math.floor(s.z1 / P), 0, N - 1); bz++) { const k = bz * N + bx; (SURF.lists[k] || (SURF.lists[k] = [])).push(s); }
+      // (world cells, each listed under the lattice cell of the block standing there: surfaceY asks the same way)
+      for (let I = Math.floor(s.x0 / P); I <= Math.floor(s.x1 / P); I++)
+        for (let J = Math.floor(s.z0 / P); J <= Math.floor(s.z1 / P); J++) { const k = CityLayout.cell(I, J); if (k >= 0) (SURF.lists[k] || (SURF.lists[k] = [])).push(s); }
     }
     this.jumps = (this.surfaces || []).filter(s => s.unique);
     // hidden packages: alleys, courtyards, rooftops, parks, construction sites, the waterfront
@@ -624,7 +625,8 @@ Object.assign(World.prototype, {
     const rng = new RNG(4242);
     const pool = [];
     for (const b of this.blocks) for (const s of b.secrets) pool.push({ x: s.x, y: groundY(s.x, s.z), z: s.z });
-    pool.push({ x: -12, y: CURB_H, z: 4 * P + 30 }, { x: CITY + 12, y: CURB_H, z: 9 * P + 20 }, { x: 3 * P + 30, y: CURB_H, z: -12 }, { x: 8 * P + 50, y: CURB_H, z: CITY + 12 });
+    // four on the promenade (authored in the lattice: where their precinct stands)
+    for (const [x, z] of [[-12, 4 * P + 30], [CITY + 12, 9 * P + 20], [3 * P + 30, -12], [8 * P + 50, CITY + 12]]) pool.push({ x: CityLayout.wx(x, z), y: CURB_H, z: CityLayout.wz(x, z) });
     while (spots.length < 30 && pool.length) spots.push(pool.splice(Math.floor(rng.next() * pool.length), 1)[0]);
     this.packages = spots.slice(0, 30).map((s, i) => ({ id: i, x: s.x, y: s.y, z: s.z }));
   }
@@ -637,7 +639,14 @@ Object.assign(World.prototype, {
     for (const b of []) void b;
     const origBlockInit = this._genBlock;
     this._genBlock = function (b) { b.wires = b.wires || []; return origBlockInit.call(this, b); };
-    base.call(this);
+    // the shore under the real layout (022 keeps every precinct's ground dry); then the city is built in the lattice
+    // and baked to where each precinct stands (CITY_SPREAD.md S3)
+    Island.init();
+    const real = CityLayout.current(); CityLayout.use('classic');
+    try { base.call(this); } finally { CityLayout.restore(real); }
+    this._bake();
+    this._registerCityCols();
+    // the passes over the built city work where it stands (block-relative, or through CityLayout)
     this._postGen();
     // extra colliders created after the base registration (e.g. ramps added in _postGen)
     for (const b of this.blocks) for (const d of b.det) if (d.col && !d.col.__reg) { if (this.grid.all.indexOf(d.col) < 0) this.grid.add(d.col); d.col.__reg = true; }

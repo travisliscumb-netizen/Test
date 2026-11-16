@@ -29,7 +29,10 @@
    on the lattice and share their street as they always did).
    ===================================================================== */
 const CITY_LAYOUTS = {
-  classic: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }]
+  classic: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
+  // never shipped as the default: the whole city moved three cells west and two north, so a coordinate the bake
+  // (090) misses, or a question still asked of the square, shows up (CITY_SPREAD.md S3). ?layout=tracer
+  tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }]
 };
 const CityLayout = {
   id: '', precincts: [], own: new Int8Array(N * N).fill(-1), sites: new Map(),
@@ -62,7 +65,7 @@ const CityLayout = {
     const T = table || CITY_LAYOUTS[id]; if (!T) throw new Error('CityLayout: no layout "' + id + '"');
     const list = T.map((p, k) => ({ ...p, k, x0: (p.lx0 + p.ox) * P, z0: (p.lz0 + p.oz) * P, x1: (p.lx1 + 1 + p.ox) * P, z1: (p.lz1 + 1 + p.oz) * P }));
     const err = this.check(list); if (err) throw new Error('CityLayout "' + id + '": ' + err);
-    this.id = id; this.precincts = list; this.own.fill(-1); this.sites.clear();
+    this.id = id; this.table = T; this.precincts = list; this.own.fill(-1); this.sites.clear();
     this.x0 = this.z0 = Infinity; this.x1 = this.z1 = -Infinity;
     for (const p of list) {
       for (let lz = p.lz0; lz <= p.lz1; lz++) for (let lx = p.lx0; lx <= p.lx1; lx++) { this.own[lz * N + lx] = p.k; this.sites.set(this.key(lx + p.ox, lz + p.oz), lz * N + lx); }
@@ -120,6 +123,16 @@ const CityLayout = {
   // lattice metres -> world metres (a point of a block authored in the lattice: its cell's precinct moves it)
   wx(x, z) { return x + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).ox * P; },
   wz(x, z) { return z + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).oz * P; },
+  // a point authored in the lattice at a precinct's edge (an island road's end meeting its edge street, within m of
+  // its cells): where it stands once the precinct has moved; any other point is returned as it is
+  anchor(x, z, m = 60) {
+    let best = null, bd = Infinity;
+    for (const p of this.precincts) {
+      const dx = Math.max(p.lx0 * P - x, 0, x - (p.lx1 + 1) * P), dz = Math.max(p.lz0 * P - z, 0, z - (p.lz1 + 1) * P), d = Math.max(dx, dz);
+      if (d <= m && d < bd) { bd = d; best = p; }
+    }
+    return best ? [x + best.ox * P, z + best.oz * P] : [x, z];
+  },
   // the middle of town: where the lattice's centre stands (a fallback spot, the direction "away from the city")
   cx() { return this.wx(CITY / 2, CITY / 2); },
   cz() { return this.wz(CITY / 2, CITY / 2); },
@@ -131,7 +144,11 @@ const CityLayout = {
   frameZ(p, z, m = 0) { return clamp(z, p.z0 - EDGE_MARGIN + m, p.z1 + EDGE_MARGIN - m); },
   worldX(p, x) { return x + p.ox * P; },
   worldZ(p, z) { return z + p.oz * P; },
+  // the layout in use, to come back to (the world generator builds the city in the lattice, then bakes it, 090)
+  current() { return { id: this.id, table: this.table }; },
+  restore(c) { return this.use(c.id, c.table); },
   // the layout in plain data (the world fingerprint, the save's stamp)
   describe() { return { id: this.id, precincts: this.precincts.map(p => [p.id, p.lx0, p.lz0, p.lx1, p.lz1, p.ox, p.oz]) }; }
 };
-CityLayout.use('classic');
+// the layout the city is built to: 'classic' unless the page asks for another by name (?layout=…, the tests' tracers)
+CityLayout.use((() => { try { const m = /[?&]layout=([a-z0-9_]+)/i.exec(location.search); return m && CITY_LAYOUTS[m[1]] ? m[1] : 'classic'; } catch { return 'classic'; } })());

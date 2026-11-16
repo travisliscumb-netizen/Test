@@ -34,7 +34,8 @@ class World {
   // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
   blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
-    // the island's shore first (022): the city's edge is built by where it meets the water
+    // the island's shore first (022): the city's edge is built by where it meets the water (the generate wrapper in 100
+    // does it under the real layout before it switches to the lattice to build the city)
     Island.init();
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
@@ -54,12 +55,65 @@ class World {
     this._genPerimeter();
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();
-    // colliders
+    // (colliders: registered once the city stands where it does, by the generate wrapper in 100: _registerCityCols)
+  }
+  // the perimeter's walls, then every block's buildings, details and props: the order this pass always used
+  _registerCityCols() {
+    for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
     for (const b of this.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
       for (const d of b.det) if (d.col) this.grid.add(d.col);
       for (const p of b.props) if (p.col) { p.col.prop = p; this.grid.add(p.col); }
     }
+  }
+  // ---------- the bake (CITY_SPREAD.md S3) ----------
+  // The city is generated in the lattice (CityLayout 'classic': every block where it was authored, with the same seeds
+  // and noise, so every building is what it always was). Then each block, and everything the generators put in the
+  // world's own lists, moves by its precinct's offset to where it stands. Under 'classic' every offset is 0 and nothing
+  // is touched. What moves: x, x0, x1, cx, ox (a facade's texture origin) by dx; z, z0, z1, cz, oz by dz; every
+  // [x, z] point; a wire run [x, y, z, x, y, z]; a compound's fence run (along a0..a1, at e, by its side); a signal
+  // pole's crossing (node, in whole cells). What does not: normals (n), flags (park), the shared authored tables a block
+  // points at (superblock, landmark), sizes, heights, headings, ids
+  _bake() {
+    const off = (b) => { const p = CityLayout.precinctOf(b.bx, b.bz); return p; };
+    for (const b of this.blocks) { b.I = CityLayout.siteI(b.bx, b.bz); b.J = CityLayout.siteJ(b.bx, b.bz); }
+    if (CityLayout.precincts.every(p => !p.ox && !p.oz)) return;
+    const seen = new Set();
+    const XK = new Set(['x', 'x0', 'x1', 'cx', 'ox']), ZK = new Set(['z', 'z0', 'z1', 'cz', 'oz']), SKIP = new Set(['n', 'park', 'superblock', 'landmark', 'block', 'i', 'bx', 'bz', 'I', 'J', 'bx0', 'bz0', 'bx1', 'bz1']);
+    const shift = (v, dx, dz, key) => {
+      if (v === null || typeof v !== 'object' || seen.has(v)) return;
+      if (v.isObject3D || v.isBufferGeometry || v.isMaterial || v.isTexture || v.isColor || v instanceof Map || v instanceof Set || ArrayBuffer.isView(v)) return;
+      seen.add(v);
+      if (Array.isArray(v)) {
+        if (v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') {
+          if (key === 'node') { v[0] += dx / P; v[1] += dz / P; } else { v[0] += dx; v[1] += dz; }
+          return;
+        }
+        if (key === 'wires' && v.length === 6 && typeof v[0] === 'number') { v[0] += dx; v[2] += dz; v[3] += dx; v[5] += dz; return; }
+        for (const e of v) shift(e, dx, dz, key);
+        return;
+      }
+      if (typeof v.side === 'string' && typeof v.a0 === 'number' && typeof v.e === 'number') {
+        const ax = v.side === 'n' || v.side === 's'; v.a0 += ax ? dx : dz; v.a1 += ax ? dx : dz; v.e += ax ? dz : dx;
+      }
+      for (const k of Object.keys(v)) {
+        if (SKIP.has(k)) continue;
+        const e = v[k];
+        if (typeof e === 'number') { if (XK.has(k)) v[k] = e + dx; else if (ZK.has(k)) v[k] = e + dz; }
+        else if (e && typeof e === 'object') shift(e, dx, dz, k);
+      }
+    };
+    // a list entry moves with its block when it names one, else with the precinct of the cell its first point is in
+    const rep = (o) => {
+      if (typeof o.block === 'number' && o.block >= 0 && o.block < this.blocks.length) return this.blocks[o.block];
+      const pt = typeof o.x === 'number' ? [o.x, o.z] : typeof o.x0 === 'number' ? [o.x0, o.z0] : o.lot ? [o.lot.x0, o.lot.z0] : o.pts && o.pts.length ? o.pts[0] : o.door ? [o.door.x, o.door.z] : null;
+      if (!pt) return null;
+      return { bx: clamp(Math.floor(pt[0] / P), 0, N - 1), bz: clamp(Math.floor(pt[1] / P), 0, N - 1) };
+    };
+    const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
+    for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
+    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'perimeter', 'promenade']) if (Array.isArray(this[L])) moveList(this[L]);
+    moveList(Object.values(this.compounds || {}));
   }
   // ----- helpers -----
   _bld(b, x0, z0, x1, z1, h, style, color, fh, bayN, opts = {}) {
@@ -667,7 +721,7 @@ class World {
       ...shore.n.map(([a, b]) => ({ x0: a, z0: -E - 1, x1: b, z1: -E + 0.2 })), ...shore.s.map(([a, b]) => ({ x0: a, z0: CITY + E - 0.2, x1: b, z1: CITY + E + 1 })),
       ...shore.w.map(([a, b]) => ({ x0: -E - 1, z0: a, x1: -E + 0.2, z1: b })), ...shore.e.map(([a, b]) => ({ x0: CITY + E - 0.2, z0: a, x1: CITY + E + 1, z1: b }))
     ];
-    for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
+    // (registered with the city's other colliders once it stands where it does: _registerCityCols)
     // promenade lamps and benches outside the perimeter road
     this.promenade = [];
     for (let k = 0; k < N; k++) for (const o of LAMP_OFFS) {

@@ -31,7 +31,7 @@ export async function open(browser, ctxOpts = {}, init = null) {
   page.on('requestfailed', r => { const u = r.url(); if (!u.startsWith('data:') && !u.startsWith('blob:') && !net.includes(u)) { net.push(u); errors.push('REQUEST FAILED: ' + u + ' ' + (r.failure() && r.failure().errorText)); } });
   page.on('pageerror', e => errors.push('PAGEERROR ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n')));
   page.on('console', m => { if ((m.type() === 'error' || m.type() === 'warning') && !IGNORE.test(m.text())) errors.push(m.type() + ': ' + m.text()); });
-  await page.goto('file://' + FILE);
+  await page.goto('file://' + FILE + (process.env.UW_QUERY || '')); // UW_QUERY='?layout=tracer': a suite under another city layout (CITY_SPREAD.md)
   return { ctx, page, errors, net };
 }
 export const frames = async (page, n) => { const f0 = await page.evaluate(() => window.game.frame); await page.waitForFunction(t => window.game.frame >= t, f0 + n, { timeout: 240000, polling: 50 }); };

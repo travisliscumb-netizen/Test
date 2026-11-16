@@ -33291,7 +33291,10 @@ function blockLamps(bx, bz) {
    on the lattice and share their street as they always did).
    ===================================================================== */
 const CITY_LAYOUTS = {
-  classic: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }]
+  classic: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
+  // never shipped as the default: the whole city moved three cells west and two north, so a coordinate the bake
+  // (090) misses, or a question still asked of the square, shows up (CITY_SPREAD.md S3). ?layout=tracer
+  tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }]
 };
 const CityLayout = {
   id: '', precincts: [], own: new Int8Array(N * N).fill(-1), sites: new Map(),
@@ -33324,7 +33327,7 @@ const CityLayout = {
     const T = table || CITY_LAYOUTS[id]; if (!T) throw new Error('CityLayout: no layout "' + id + '"');
     const list = T.map((p, k) => ({ ...p, k, x0: (p.lx0 + p.ox) * P, z0: (p.lz0 + p.oz) * P, x1: (p.lx1 + 1 + p.ox) * P, z1: (p.lz1 + 1 + p.oz) * P }));
     const err = this.check(list); if (err) throw new Error('CityLayout "' + id + '": ' + err);
-    this.id = id; this.precincts = list; this.own.fill(-1); this.sites.clear();
+    this.id = id; this.table = T; this.precincts = list; this.own.fill(-1); this.sites.clear();
     this.x0 = this.z0 = Infinity; this.x1 = this.z1 = -Infinity;
     for (const p of list) {
       for (let lz = p.lz0; lz <= p.lz1; lz++) for (let lx = p.lx0; lx <= p.lx1; lx++) { this.own[lz * N + lx] = p.k; this.sites.set(this.key(lx + p.ox, lz + p.oz), lz * N + lx); }
@@ -33382,6 +33385,16 @@ const CityLayout = {
   // lattice metres -> world metres (a point of a block authored in the lattice: its cell's precinct moves it)
   wx(x, z) { return x + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).ox * P; },
   wz(x, z) { return z + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).oz * P; },
+  // a point authored in the lattice at a precinct's edge (an island road's end meeting its edge street, within m of
+  // its cells): where it stands once the precinct has moved; any other point is returned as it is
+  anchor(x, z, m = 60) {
+    let best = null, bd = Infinity;
+    for (const p of this.precincts) {
+      const dx = Math.max(p.lx0 * P - x, 0, x - (p.lx1 + 1) * P), dz = Math.max(p.lz0 * P - z, 0, z - (p.lz1 + 1) * P), d = Math.max(dx, dz);
+      if (d <= m && d < bd) { bd = d; best = p; }
+    }
+    return best ? [x + best.ox * P, z + best.oz * P] : [x, z];
+  },
   // the middle of town: where the lattice's centre stands (a fallback spot, the direction "away from the city")
   cx() { return this.wx(CITY / 2, CITY / 2); },
   cz() { return this.wz(CITY / 2, CITY / 2); },
@@ -33393,10 +33406,14 @@ const CityLayout = {
   frameZ(p, z, m = 0) { return clamp(z, p.z0 - EDGE_MARGIN + m, p.z1 + EDGE_MARGIN - m); },
   worldX(p, x) { return x + p.ox * P; },
   worldZ(p, z) { return z + p.oz * P; },
+  // the layout in use, to come back to (the world generator builds the city in the lattice, then bakes it, 090)
+  current() { return { id: this.id, table: this.table }; },
+  restore(c) { return this.use(c.id, c.table); },
   // the layout in plain data (the world fingerprint, the save's stamp)
   describe() { return { id: this.id, precincts: this.precincts.map(p => [p.id, p.lx0, p.lz0, p.lx1, p.lz1, p.ox, p.oz]) }; }
 };
-CityLayout.use('classic');
+// the layout the city is built to: 'classic' unless the page asks for another by name (?layout=…, the tests' tracers)
+CityLayout.use((() => { try { const m = /[?&]layout=([a-z0-9_]+)/i.exec(location.search); return m && CITY_LAYOUTS[m[1]] ? m[1] : 'classic'; } catch { return 'classic'; } })());
 /* =====================================================================
    [CONTENT] VALEN ISLAND (Operation Blackgate)
    The whole world as one island. The lattice city no longer stands in a
@@ -33533,9 +33550,12 @@ const Island = {
         for (const I of ISLE_ISLETS) d = Math.min(d, Math.hypot(x - I[0], z - I[1]) - I[2]);
         const amp = this._coastAmp(x, z);
         if (amp > 0) d += amp * (38 * tNoise(x / 330, z / 330, 91) + 15 * tNoise(x / 105, z / 105, 93));
-        // the city's own square (to its seawall) is land whatever the outline does
-        const ex = Math.max(-E - x, x - CITY - E), ez = Math.max(-E - z, z - CITY - E);
-        const dc = ex > 0 || ez > 0 ? Math.hypot(Math.max(ex, 0), Math.max(ez, 0)) : Math.max(ex, ez);
+        // every precinct of the city (to its seawall, 021) is land whatever the outline does
+        let dc = Infinity;
+        for (const p of CityLayout.precincts) {
+          const ex = Math.max(p.x0 - E - x, x - p.x1 - E), ez = Math.max(p.z0 - E - z, z - p.z1 - E);
+          dc = Math.min(dc, ex > 0 || ez > 0 ? Math.hypot(Math.max(ex, 0), Math.max(ez, 0)) : Math.max(ex, ez));
+        }
         sdf[j * W + i] = clamp(Math.min(d, dc), -MAXD, MAXD);
       }
     }
@@ -33601,7 +33621,9 @@ const Island = {
   buildRoads() {
     this.roads = []; const byId = {};
     for (const D of ISLE_ROADS) {
-      const cp = D.pts.map(p => [p[0], p[1]]), hosts = [null, null];
+      // a control point authored at the city's edge (its 'lat' end and the approach to it) moves with the precinct
+      // whose streets it meets (021); out on the island it stays where it was drawn
+      const cp = D.pts.map(p => CityLayout.anchor(p[0], p[1])), hosts = [null, null];
       D.ends.forEach((e, k) => {
         const H = byId[e]; if (!H) return;
         const q = k ? cp[cp.length - 1] : cp[0]; let best = 0, bd = Infinity;
@@ -33789,7 +33811,7 @@ const Island = {
   // do the island's hills rise through the straight line from a to b? (Sight: the police, the camera.)
   occludes(ax, ay, az, bx, by, bz) {
     if (!this.ready || ay < -5 || by < -5) return false;
-    const inC = (x, z) => x > -EDGE_MARGIN && z > -EDGE_MARGIN && x < CITY + EDGE_MARGIN && z < CITY + EDGE_MARGIN;
+    const inC = (x, z) => CityLayout.inCity(x, z);
     if (inC(ax, az) && inC(bx, bz)) return false;
     const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 12) return false;
     const n = Math.ceil(L / 8), gx = this.gx, gz = this.gz; let hit = false;
@@ -33819,7 +33841,7 @@ const Island = {
     this.addPad(G.x0, G.z0, G.x1, G.z1, G.y, 90);
     this.addPad(A.x0, A.z0, A.x1, A.z1, A.y, 140);
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
-    this.addPad(-E, -E, CITY + E, CITY + E, CURB_H, 110);
+    for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
   }
 };
 /* =====================================================================
@@ -36760,7 +36782,8 @@ class World {
   // a block by its index: a city block, or one of Valen Point's district blocks (index 1000 and up)
   blockI(i) { return i < 1000 ? this.blocks[i] : (this.xblocks || [])[i - 1000]; }
   generate() {
-    // the island's shore first (022): the city's edge is built by where it meets the water
+    // the island's shore first (022): the city's edge is built by where it meets the water (the generate wrapper in 100
+    // does it under the real layout before it switches to the lattice to build the city)
     Island.init();
     for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
       const t = districtAt(bx, bz);
@@ -36780,12 +36803,65 @@ class World {
     this._genPerimeter();
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();
-    // colliders
+    // (colliders: registered once the city stands where it does, by the generate wrapper in 100: _registerCityCols)
+  }
+  // the perimeter's walls, then every block's buildings, details and props: the order this pass always used
+  _registerCityCols() {
+    for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
     for (const b of this.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
       for (const d of b.det) if (d.col) this.grid.add(d.col);
       for (const p of b.props) if (p.col) { p.col.prop = p; this.grid.add(p.col); }
     }
+  }
+  // ---------- the bake (CITY_SPREAD.md S3) ----------
+  // The city is generated in the lattice (CityLayout 'classic': every block where it was authored, with the same seeds
+  // and noise, so every building is what it always was). Then each block, and everything the generators put in the
+  // world's own lists, moves by its precinct's offset to where it stands. Under 'classic' every offset is 0 and nothing
+  // is touched. What moves: x, x0, x1, cx, ox (a facade's texture origin) by dx; z, z0, z1, cz, oz by dz; every
+  // [x, z] point; a wire run [x, y, z, x, y, z]; a compound's fence run (along a0..a1, at e, by its side); a signal
+  // pole's crossing (node, in whole cells). What does not: normals (n), flags (park), the shared authored tables a block
+  // points at (superblock, landmark), sizes, heights, headings, ids
+  _bake() {
+    const off = (b) => { const p = CityLayout.precinctOf(b.bx, b.bz); return p; };
+    for (const b of this.blocks) { b.I = CityLayout.siteI(b.bx, b.bz); b.J = CityLayout.siteJ(b.bx, b.bz); }
+    if (CityLayout.precincts.every(p => !p.ox && !p.oz)) return;
+    const seen = new Set();
+    const XK = new Set(['x', 'x0', 'x1', 'cx', 'ox']), ZK = new Set(['z', 'z0', 'z1', 'cz', 'oz']), SKIP = new Set(['n', 'park', 'superblock', 'landmark', 'block', 'i', 'bx', 'bz', 'I', 'J', 'bx0', 'bz0', 'bx1', 'bz1']);
+    const shift = (v, dx, dz, key) => {
+      if (v === null || typeof v !== 'object' || seen.has(v)) return;
+      if (v.isObject3D || v.isBufferGeometry || v.isMaterial || v.isTexture || v.isColor || v instanceof Map || v instanceof Set || ArrayBuffer.isView(v)) return;
+      seen.add(v);
+      if (Array.isArray(v)) {
+        if (v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') {
+          if (key === 'node') { v[0] += dx / P; v[1] += dz / P; } else { v[0] += dx; v[1] += dz; }
+          return;
+        }
+        if (key === 'wires' && v.length === 6 && typeof v[0] === 'number') { v[0] += dx; v[2] += dz; v[3] += dx; v[5] += dz; return; }
+        for (const e of v) shift(e, dx, dz, key);
+        return;
+      }
+      if (typeof v.side === 'string' && typeof v.a0 === 'number' && typeof v.e === 'number') {
+        const ax = v.side === 'n' || v.side === 's'; v.a0 += ax ? dx : dz; v.a1 += ax ? dx : dz; v.e += ax ? dz : dx;
+      }
+      for (const k of Object.keys(v)) {
+        if (SKIP.has(k)) continue;
+        const e = v[k];
+        if (typeof e === 'number') { if (XK.has(k)) v[k] = e + dx; else if (ZK.has(k)) v[k] = e + dz; }
+        else if (e && typeof e === 'object') shift(e, dx, dz, k);
+      }
+    };
+    // a list entry moves with its block when it names one, else with the precinct of the cell its first point is in
+    const rep = (o) => {
+      if (typeof o.block === 'number' && o.block >= 0 && o.block < this.blocks.length) return this.blocks[o.block];
+      const pt = typeof o.x === 'number' ? [o.x, o.z] : typeof o.x0 === 'number' ? [o.x0, o.z0] : o.lot ? [o.lot.x0, o.lot.z0] : o.pts && o.pts.length ? o.pts[0] : o.door ? [o.door.x, o.door.z] : null;
+      if (!pt) return null;
+      return { bx: clamp(Math.floor(pt[0] / P), 0, N - 1), bz: clamp(Math.floor(pt[1] / P), 0, N - 1) };
+    };
+    const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
+    for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
+    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'perimeter', 'promenade']) if (Array.isArray(this[L])) moveList(this[L]);
+    moveList(Object.values(this.compounds || {}));
   }
   // ----- helpers -----
   _bld(b, x0, z0, x1, z1, h, style, color, fh, bayN, opts = {}) {
@@ -37393,7 +37469,7 @@ class World {
       ...shore.n.map(([a, b]) => ({ x0: a, z0: -E - 1, x1: b, z1: -E + 0.2 })), ...shore.s.map(([a, b]) => ({ x0: a, z0: CITY + E - 0.2, x1: b, z1: CITY + E + 1 })),
       ...shore.w.map(([a, b]) => ({ x0: -E - 1, z0: a, x1: -E + 0.2, z1: b })), ...shore.e.map(([a, b]) => ({ x0: CITY + E - 0.2, z0: a, x1: CITY + E + 1, z1: b }))
     ];
-    for (const p of this.perimeter) this.grid.add({ ...p, y0: -5, y1: 3, kind: 'wall' });
+    // (registered with the city's other colliders once it stands where it does: _registerCityCols)
     // promenade lamps and benches outside the perimeter road
     this.promenade = [];
     for (let k = 0; k < N; k++) for (const o of LAMP_OFFS) {
@@ -37543,9 +37619,9 @@ function surfaceY(x, z, y, step = SURF_STEP) {
   const maxH = y === undefined ? Infinity : y + step;
   const L = SURF.lists;
   if (!L) return -1e9;
-  const bx = Math.floor(x / P), bz = Math.floor(z / P);
-  if (bx < 0 || bz < 0 || bx >= N || bz >= N) return -1e9;
-  const list = L[bz * N + bx];
+  const c = CityLayout.cell(Math.floor(x / P), Math.floor(z / P)); // the lattice cell of the block standing here (021)
+  if (c < 0) return -1e9;
+  const list = L[c];
   if (!list) return -1e9;
   let best = -1e9;
   for (const s of list) {
@@ -38130,8 +38206,9 @@ Object.assign(World.prototype, {
     SURF.lists = new Array(N * N).fill(null);
     // a surface is listed in every block it overlaps (superblock decks and ramps cross block lines)
     for (const s of this.surfaces || []) {
-      for (let bx = clamp(Math.floor(s.x0 / P), 0, N - 1); bx <= clamp(Math.floor(s.x1 / P), 0, N - 1); bx++)
-        for (let bz = clamp(Math.floor(s.z0 / P), 0, N - 1); bz <= clamp(Math.floor(s.z1 / P), 0, N - 1); bz++) { const k = bz * N + bx; (SURF.lists[k] || (SURF.lists[k] = [])).push(s); }
+      // (world cells, each listed under the lattice cell of the block standing there: surfaceY asks the same way)
+      for (let I = Math.floor(s.x0 / P); I <= Math.floor(s.x1 / P); I++)
+        for (let J = Math.floor(s.z0 / P); J <= Math.floor(s.z1 / P); J++) { const k = CityLayout.cell(I, J); if (k >= 0) (SURF.lists[k] || (SURF.lists[k] = [])).push(s); }
     }
     this.jumps = (this.surfaces || []).filter(s => s.unique);
     // hidden packages: alleys, courtyards, rooftops, parks, construction sites, the waterfront
@@ -38139,7 +38216,8 @@ Object.assign(World.prototype, {
     const rng = new RNG(4242);
     const pool = [];
     for (const b of this.blocks) for (const s of b.secrets) pool.push({ x: s.x, y: groundY(s.x, s.z), z: s.z });
-    pool.push({ x: -12, y: CURB_H, z: 4 * P + 30 }, { x: CITY + 12, y: CURB_H, z: 9 * P + 20 }, { x: 3 * P + 30, y: CURB_H, z: -12 }, { x: 8 * P + 50, y: CURB_H, z: CITY + 12 });
+    // four on the promenade (authored in the lattice: where their precinct stands)
+    for (const [x, z] of [[-12, 4 * P + 30], [CITY + 12, 9 * P + 20], [3 * P + 30, -12], [8 * P + 50, CITY + 12]]) pool.push({ x: CityLayout.wx(x, z), y: CURB_H, z: CityLayout.wz(x, z) });
     while (spots.length < 30 && pool.length) spots.push(pool.splice(Math.floor(rng.next() * pool.length), 1)[0]);
     this.packages = spots.slice(0, 30).map((s, i) => ({ id: i, x: s.x, y: s.y, z: s.z }));
   }
@@ -38152,7 +38230,14 @@ Object.assign(World.prototype, {
     for (const b of []) void b;
     const origBlockInit = this._genBlock;
     this._genBlock = function (b) { b.wires = b.wires || []; return origBlockInit.call(this, b); };
-    base.call(this);
+    // the shore under the real layout (022 keeps every precinct's ground dry); then the city is built in the lattice
+    // and baked to where each precinct stands (CITY_SPREAD.md S3)
+    Island.init();
+    const real = CityLayout.current(); CityLayout.use('classic');
+    try { base.call(this); } finally { CityLayout.restore(real); }
+    this._bake();
+    this._registerCityCols();
+    // the passes over the built city work where it stands (block-relative, or through CityLayout)
     this._postGen();
     // extra colliders created after the base registration (e.g. ramps added in _postGen)
     for (const b of this.blocks) for (const d of b.det) if (d.col && !d.col.__reg) { if (this.grid.all.indexOf(d.col) < 0) this.grid.add(d.col); d.col.__reg = true; }
