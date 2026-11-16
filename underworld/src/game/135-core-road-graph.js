@@ -20,10 +20,14 @@ const RoadGraph = {
   build(world) {
     this.ready = false; this._walk = null; this._offSpots = null;
     const chains = [];
-    for (let a = 0; a < 2; a++) for (let line = 0; line <= N; line++) for (let seg = 0; seg < N; seg++) {
+    // the lattice streets as they stand in the world (world line and segment numbers; RoadNet, 021): named by
+    // their own precinct's lattice line
+    const R = RoadNet;
+    for (let a = 0; a < 2; a++) for (let line = a ? R.J0 : R.I0; line <= (a ? R.J1 : R.I1); line++) for (let seg = a ? R.I0 : R.J0; seg < (a ? R.I1 : R.J1); seg++) {
       if (!RoadNet.segOpen(a, line, seg)) continue;
+      const pr = a === 0 ? CityLayout.nodeAt(line, seg) : CityLayout.nodeAt(seg, line), ln = line - (a === 0 ? pr.ox : pr.oz);
       const p0 = a === 0 ? [line * P, seg * P] : [seg * P, line * P], p1 = a === 0 ? [line * P, (seg + 1) * P] : [(seg + 1) * P, line * P];
-      chains.push({ pts: [p0, p1], w: ROAD_HALF * 2, kind: 'grid', name: a === 0 ? STREET_NAMES_X[line] : STREET_NAMES_Z[line], lat: { axis: a, line, seg }, traffic: true });
+      chains.push({ pts: [p0, p1], w: ROAD_HALF * 2, kind: 'grid', name: a === 0 ? STREET_NAMES_X[ln] : STREET_NAMES_Z[ln], lat: { axis: a, line, seg }, traffic: true });
     }
     for (const L of Links.list) {
       // a link's ends meet the lattice road on its centreline (the attach point), so the junction is a point the

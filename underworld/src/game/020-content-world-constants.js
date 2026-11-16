@@ -61,7 +61,7 @@ function streetNameAt(x, z) {
   if (cfsLand(x, z)) return CFS.name;
   // out on the island (022): the road you are on, by name
   if (offCity(x, z)) { const q = RoadGraph.ready ? RoadGraph.nearest(x, z, { maxD: 12, kinds: RG_STREETS }) : null; return q && q.d <= q.e.w / 2 + 2 ? q.e.name : null; }
-  if (x < 0 || z < 0 || x > CITY || z > CITY) return 'Harbor Promenade';
+  if (CityLayout.cellAt(x, z) < 0) return 'Harbor Promenade';
   return null;
 }
 // Named districts (identity layer over the land-use map above). Each has its own
@@ -204,6 +204,8 @@ const RoadNet = {
   open(i, j, dx, dz) { return dx ? this.segOpen(1, j, Math.min(i, i + dx)) : this.segOpen(0, i, Math.min(j, j + dz)); },
   degree(i, j) { let d = 0; if (this.open(i, j, 1, 0)) d++; if (this.open(i, j, -1, 0)) d++; if (this.open(i, j, 0, 1)) d++; if (this.open(i, j, 0, -1)) d++; return d; },
   isJunction(i, j) { return this.degree(i, j) >= 3; },
+  // a node on the city's outer streets (a precinct's edge, where no block stands on one of its four corners)
+  edgeNode(i, j) { return CityLayout.cell(i - 1, j - 1) < 0 || CityLayout.cell(i, j - 1) < 0 || CityLayout.cell(i - 1, j) < 0 || CityLayout.cell(i, j) < 0; },
   // is the world point on a lattice road that exists?
   roadAt(x, z) {
     if (x < this.I0 * P - ROAD_HALF || z < this.J0 * P - ROAD_HALF || x > this.I1 * P + ROAD_HALF || z > this.J1 * P + ROAD_HALF) return false;
@@ -274,8 +276,8 @@ const Links = {
   attach(E) {
     const i = Math.round(E[0] / P), j = Math.round(E[1] / P), dV = Math.abs(E[0] - i * P), dH = Math.abs(E[1] - j * P);
     let a;
-    if (dV <= dH) { const seg = clamp(Math.floor(E[1] / P), 0, N - 1); a = { axis: 0, line: i, seg, along: E[1] - seg * P, C: { x: i * P, z: E[1] }, d: dV }; }
-    else { const seg = clamp(Math.floor(E[0] / P), 0, N - 1); a = { axis: 1, line: j, seg, along: E[0] - seg * P, C: { x: E[0], z: j * P }, d: dH }; }
+    if (dV <= dH) { const seg = Math.floor(E[1] / P); a = { axis: 0, line: i, seg, along: E[1] - seg * P, C: { x: i * P, z: E[1] }, d: dV }; }
+    else { const seg = Math.floor(E[0] / P); a = { axis: 1, line: j, seg, along: E[0] - seg * P, C: { x: E[0], z: j * P }, d: dH }; }
     return a.d <= ROAD_HALF + 1.5 && a.along > TURN_IN + 4 && a.along < P - TURN_IN - 4 && RoadNet.segOpen(a.axis, a.line, a.seg) ? a : null;
   },
   // an end that meets another curved road part way along it (a Y-junction, a lane off a lane): the point on that road

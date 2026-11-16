@@ -203,7 +203,8 @@ class UIManager {
     this._paintMap(g, null);
     const lab = [];
     const zc = {};
-    for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const key = ZONE_MAP[bz][bx]; (zc[key] || (zc[key] = [])).push([bx + 0.5, bz + 0.5]); }
+    // (world cells: each block where it stands, 021)
+    for (const b of this.g.world.blocks) { const key = ZONE_MAP[b.bz][b.bx]; (zc[key] || (zc[key] = [])).push([b.I + 0.5, b.J + 0.5]); }
     g.textAlign = 'center'; g.font = 'bold 16px Arial';
     for (const key in zc) {
       const pts = zc[key]; let sx = 0, sz = 0; for (const q of pts) { sx += q[0]; sz += q[1]; }
@@ -224,7 +225,7 @@ class UIManager {
     g.font = 'bold 11px Arial';
     for (const key in LANDMARK_BLOCKS) {
       const [bx, bz] = key.split(',').map(Number), L = LANDMARK_BLOCKS[key];
-      const x = X(bx * P + P / 2), z = X(bz * P + P / 2) + 16;
+      const x = X(CityLayout.wx(bx * P + P / 2, bz * P + P / 2)), z = X(CityLayout.wz(bx * P + P / 2, bz * P + P / 2)) + 16;
       g.fillStyle = 'rgba(10,12,18,0.8)'; g.beginPath(); g.arc(x, z, 8, 0, 7); g.fill();
       lab.push({ t: L.icon, x, z: z + 4, col: '#ffffff' }, { t: L.name, x, z: z + 20, col: 'rgba(255,255,255,0.75)' });
       if (!labels) continue;
@@ -357,17 +358,20 @@ class UIManager {
     const inView = (x0, z0, x1, z1) => !view || (x1 >= view.x0 && x0 <= view.x1 && z1 >= view.z0 && z0 <= view.z1);
     // the island under everything (live painting only: the cached images are drawn over the island's own)
     if (view) this._paintIsle(g, view);
-    g.fillStyle = '#3d3a36'; g.fillRect(X(-EDGE_MARGIN), X(-EDGE_MARGIN), (CITY + EDGE_MARGIN * 2) * k, (CITY + EDGE_MARGIN * 2) * k);
-    g.fillStyle = '#6f7682'; g.fillRect(X(-ROAD_HALF), X(-ROAD_HALF), (CITY + ROAD_HALF * 2) * k, (CITY + ROAD_HALF * 2) * k);
+    // each precinct's promenade and street bed, where it stands (021)
+    for (const p of CityLayout.precincts) {
+      g.fillStyle = '#3d3a36'; g.fillRect(X(p.x0 - EDGE_MARGIN), X(p.z0 - EDGE_MARGIN), (p.x1 - p.x0 + EDGE_MARGIN * 2) * k, (p.z1 - p.z0 + EDGE_MARGIN * 2) * k);
+      g.fillStyle = '#6f7682'; g.fillRect(X(p.x0 - ROAD_HALF), X(p.z0 - ROAD_HALF), (p.x1 - p.x0 + ROAD_HALF * 2) * k, (p.z1 - p.z0 + ROAD_HALF * 2) * k);
+    }
     const cols = MAP_LAND_COLS;
     for (const b of this.g.world.blocks) {
-      if (!inView(b.bx * P - P * 0.25, b.bz * P - P * 0.25, (b.bx + 1.25) * P, (b.bz + 1.25) * P)) continue;
+      if (!inView(b.I * P - P * 0.25, b.J * P - P * 0.25, (b.I + 1.25) * P, (b.J + 1.25) * P)) continue;
       g.fillStyle = cols[b.special === 'hospital' || b.special === 'police' ? 'S' : b.t] || cols.C;
-      g.fillRect(X(b.bx * P + ROAD_HALF), X(b.bz * P + ROAD_HALF), (P - ROAD_HALF * 2) * k, (P - ROAD_HALF * 2) * k);
+      g.fillRect(X(b.I * P + ROAD_HALF), X(b.J * P + ROAD_HALF), (P - ROAD_HALF * 2) * k, (P - ROAD_HALF * 2) * k);
     }
     if (this.g.world.paintMapExtra) this.g.world.paintMapExtra(g, X, k, view, 'ground');
     for (const b of this.g.world.blocks) {
-      if (!inView(b.bx * P - P * 0.25, b.bz * P - P * 0.25, (b.bx + 1.25) * P, (b.bz + 1.25) * P)) continue;
+      if (!inView(b.I * P - P * 0.25, b.J * P - P * 0.25, (b.I + 1.25) * P, (b.J + 1.25) * P)) continue;
       g.fillStyle = 'rgba(0,0,0,0.28)';
       for (const r of b.bld) if (r.far !== false || r.y0 <= CURB_H + 0.01) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
       if (b.t === 'P' && !b.superblock) { g.fillStyle = '#2f6e8a'; g.beginPath(); g.arc(X(b.cx), X(b.cz), 6 * k, 0, 7); g.fill(); }
@@ -377,20 +381,20 @@ class UIManager {
     g.strokeStyle = 'rgba(255,214,90,0.35)'; g.lineWidth = 1;
     const open = (ax, i, j) => typeof RoadNet === 'undefined' || RoadNet.segOpen(ax, i, j);
     g.beginPath();
-    for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) {
-      if (open(0, i, j)) { g.moveTo(X(i * P), X(j * P)); g.lineTo(X(i * P), X((j + 1) * P)); }
-      if (open(1, i, j)) { g.moveTo(X(j * P), X(i * P)); g.lineTo(X((j + 1) * P), X(i * P)); }
-    }
+    const R = RoadNet;
+    for (let i = R.I0; i <= R.I1; i++) for (let j = R.J0; j < R.J1; j++) if (open(0, i, j)) { g.moveTo(X(i * P), X(j * P)); g.lineTo(X(i * P), X((j + 1) * P)); }
+    for (let i = R.J0; i <= R.J1; i++) for (let j = R.I0; j < R.I1; j++) if (open(1, i, j)) { g.moveTo(X(j * P), X(i * P)); g.lineTo(X((j + 1) * P), X(i * P)); }
     g.stroke();
     // Valen Point and its causeway (Session 6B), Cedar Fields South and its land bridge (Session 6C)
     this._paintVP(g, view); this._paintCFS(g, view);
     // district tints and borders
-    for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) {
-      const key = ZONE_MAP[bz][bx], z = ZONES[key];
+    const W0 = this.g.world, zk = (I, J) => { const b = W0.blockW(I, J); return b ? ZONE_MAP[b.bz][b.bx] : null; };
+    for (const b of W0.blocks) {
+      const key = ZONE_MAP[b.bz][b.bx], z = ZONES[key], bx = b.I, bz = b.J;
       g.fillStyle = z.col; g.globalAlpha = 0.09; g.fillRect(X(bx * P), X(bz * P), P * k, P * k); g.globalAlpha = 1;
       g.strokeStyle = z.col; g.globalAlpha = 0.55; g.lineWidth = 2;
-      if (bx === 0 || ZONE_MAP[bz][bx - 1] !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X(bx * P), X((bz + 1) * P)); g.stroke(); }
-      if (bz === 0 || ZONE_MAP[bz - 1][bx] !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X((bx + 1) * P), X(bz * P)); g.stroke(); }
+      if (zk(bx - 1, bz) !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X(bx * P), X((bz + 1) * P)); g.stroke(); }
+      if (zk(bx, bz - 1) !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X((bx + 1) * P), X(bz * P)); g.stroke(); }
       g.globalAlpha = 1;
     }
   }
@@ -860,7 +864,7 @@ const MAP_LAYERS = [
 ];
 const MAP_LAYER_DEFAULT = { locations: true, landmarks: true, properties: false, businesses: false, factions: false, police: false, garages: true, economy: false, buy: true, sell: true, intel: true };
 // centre of each named district (average of its blocks), for map labels and cards
-const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += (bx + 0.5) * P; a.z += (bz + 0.5) * P; a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
+const ZONE_CENTRE = (() => { const acc = {}; for (let bz = 0; bz < N; bz++) for (let bx = 0; bx < N; bx++) { const k = ZONE_MAP[bz][bx], a = acc[k] || (acc[k] = { x: 0, z: 0, n: 0 }); a.x += CityLayout.wx((bx + 0.5) * P, (bz + 0.5) * P); a.z += CityLayout.wz((bx + 0.5) * P, (bz + 0.5) * P); a.n++; } for (const k in acc) { acc[k].x /= acc[k].n; acc[k].z /= acc[k].n; } return acc; })();
 // the street good paying furthest over its base price in a district right now
 function econBest(uw, z) { let best = null; for (const k of GOOD_IDS) { if (GOODS[k].fence || GOODS[k].arms || !DEMAND[z]) continue; const r = uw.market.ratio(z, k); if (!best || r > best.r) best = { k, r, price: uw.market.price(z, k) }; } return best; }
 // pictograms for the map symbols (G8), keyed by the symbol's letter so the data (and what the tests read) stays the
@@ -1168,7 +1172,7 @@ class MapView {
   setPick(wx, wz) {
     const o = this.pickMode; if (!o) return;
     const kp = nearestRoadPoint(wx, wz);
-    if (!kp || kp.d > 140 || ((wx < -40 || wz < -40 || wx > CITY + 40 || wz > CITY + 40) && !inExtension(wx, wz))) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
+    if (!kp || kp.d > 140 || (!CityLayout.inCity(wx, wz, 40) && !inExtension(wx, wz))) { this.g.ui.toast('No road there. Tap a street.', 'warn'); return; }
     o.dest = { x: kp.x, z: kp.z }; o.q = o.quote(kp.x, kp.z);
     this.renderPick(); this.dirty = true;
   }
@@ -1204,7 +1208,7 @@ class MapView {
       extra: `<div class="stats"><span>Length</span><span>${fmtDist(L.len)}</span><span>Surface</span><span>${L.road.st === 'dirt' ? 'Dirt track' : 'Asphalt'}</span><span>Joins</span><span>${L.ends.map(e => e.onLink || (e.free ? 'turning circle' : e.axis === 0 ? STREET_NAMES_X[e.line] : STREET_NAMES_Z[e.line])).join(' · ')}</span></div><div class="hint" style="margin:6px 0 0">A winding through-road. Traffic and your GPS use it.</div>` };
   }
   districtEntry(x, z) {
-    const g = this.g, uw = g.uw; if (x < 0 || z < 0 || x >= CITY || z >= CITY) return null;
+    const g = this.g, uw = g.uw; if (CityLayout.cellAt(x, z) < 0) return null;
     const zk = zoneKey(x, z), Z = ZONES[zk], cen = ZONE_CENTRE[zk];
     const lvl = v => v >= 1.4 ? 'Heavy' : v >= 1.0 ? 'Normal' : v >= 0.6 ? 'Light' : 'Rare';
     let h = `<div class="hint" style="margin:6px 0 0">${esc(Z.tag)}</div><div class="stats"><span>Police presence</span><span>${lvl(Z.cops)}</span><span>Foot traffic</span><span>${lvl(Z.ped)}</span><span>Nightlife</span><span>${lvl(Z.night)}</span>`;
@@ -1349,17 +1353,18 @@ class MapView {
     // street names when close
     if (z >= 3.2) {
       c.font = '700 11px Arial, sans-serif';
-      for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) {
-        if (typeof RoadNet !== 'undefined' && !RoadNet.segOpen(0, i, j)) continue;
+      const R = RoadNet;
+      for (let i = R.I0; i <= R.I1; i++) for (let j = R.J0; j < R.J1; j++) {
+        if (!R.segOpen(0, i, j)) continue;
         const [sx, sy] = this.worldToScreen(i * P, j * P + P / 2); if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
-        const t = STREET_NAMES_X[i], w2 = c.measureText(t).width;
+        const t = STREET_NAMES_X[i - CityLayout.nodeAt(i, j).ox], w2 = c.measureText(t).width;
         if (!fits(sx - 7, sy - w2 / 2, 14, w2)) continue;
         c.save(); c.translate(sx, sy); c.rotate(-Math.PI / 2); c.textAlign = 'center'; c.fillStyle = 'rgba(0,0,0,0.7)'; c.fillText(t, 1, 4); c.fillStyle = '#d8dde6'; c.fillText(t, 0, 3); c.restore();
       }
-      for (let j = 0; j <= N; j++) for (let i = 0; i < N; i++) {
-        if (typeof RoadNet !== 'undefined' && !RoadNet.segOpen(1, j, i)) continue;
+      for (let j = R.J0; j <= R.J1; j++) for (let i = R.I0; i < R.I1; i++) {
+        if (!R.segOpen(1, j, i)) continue;
         const [sx, sy] = this.worldToScreen(i * P + P / 2, j * P); if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
-        text(STREET_NAMES_Z[j], sx, sy + 4, 11, '#d8dde6', 700);
+        text(STREET_NAMES_Z[j - CityLayout.nodeAt(i, j).oz], sx, sy + 4, 11, '#d8dde6', 700);
       }
     }
     // live units, objective and the player

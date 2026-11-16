@@ -1,5 +1,11 @@
 # CURRENT SESSION
 
+- **The city into the island: relocation RESUMED by the owner (2026-11-16); stage S2 mostly done.** The owner asked
+  again for the city to flow with the island (keep every system, relocate it, no redraw). CITY_SPREAD.md §9's latest
+  entry is the state: the simulation now speaks world cells (streets, blocks, pedestrians, traffic, police, taxis,
+  missions, turfs, maps, saves); suite `layout` checks it with districts actually moved apart. Nothing visible has
+  moved yet. Next: S3 (generate in the lattice, bake to where each precinct stands, the tracer layout).
+
 - **Round the grid (CITY_SPREAD.md §10): BUILT, commit `77549bd`.** The owner switched from relocation to building
   round the grid. Eight curving streets, five districts (Bayview Heights, Marsh Hollow, Blackgate Landing, Lake Valen
   Shore, more of Gull Harbor), Villa Valen and the Valen Vault (a drive-in bunker). Suite `districts` 8/8. Next:

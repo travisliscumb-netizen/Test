@@ -120,6 +120,12 @@ const CityLayout = {
   // lattice metres -> world metres (a point of a block authored in the lattice: its cell's precinct moves it)
   wx(x, z) { return x + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).ox * P; },
   wz(x, z) { return z + this.precinctOf(Math.floor(x / P), Math.floor(z / P)).oz * P; },
+  // the middle of town: where the lattice's centre stands (a fallback spot, the direction "away from the city")
+  cx() { return this.wx(CITY / 2, CITY / 2); },
+  cz() { return this.wz(CITY / 2, CITY / 2); },
+  // the lattice cell (lz * N + lx) a world point belongs to: the block it stands in, or off every block the nearest
+  // precinct's edge cell (the old clamp of floor(x / P) to 0..N - 1)
+  cellNear(x, z) { const c = this.cellAt(x, z); if (c >= 0) return c; const p = this.near(x, z); return this.lz(p, z) * N + this.lx(p, x); },
   // a world point kept inside the frame of the precinct nearest it, m inside the frame's edge
   frameX(p, x, m = 0) { return clamp(x, p.x0 - EDGE_MARGIN + m, p.x1 + EDGE_MARGIN - m); },
   frameZ(p, z, m = 0) { return clamp(z, p.z0 - EDGE_MARGIN + m, p.z1 + EDGE_MARGIN - m); },

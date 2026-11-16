@@ -217,7 +217,7 @@ class PoliceManager {
     const g = this.g, p = g.player;
     let best = null;
     for (let k = 0; k < 20; k++) {
-      const i = clamp(Math.round(p.pos.x / P) + randi(-3, 3), 0, N), j = clamp(Math.round(p.pos.z / P) + randi(-3, 3), 0, N);
+      const i = clamp(Math.round(p.pos.x / P) + randi(-3, 3), RoadNet.I0, RoadNet.I1), j = clamp(Math.round(p.pos.z / P) + randi(-3, 3), RoadNet.J0, RoadNet.J1);
       const x = i * P, z = j * P;
       const d = Math.hypot(x - p.pos.x, z - p.pos.z);
       if (d < 120 || d > 260) continue;
@@ -267,7 +267,7 @@ class PoliceManager {
     const ax = Math.abs(vx) > Math.abs(vz);
     let x = p.pos.x + vx / l * 130, z = p.pos.z + vz / l * 130;
     if (ax) { z = Math.round(z / P) * P; x = (Math.floor(x / P) + 0.5) * P; } else { x = Math.round(x / P) * P; z = (Math.floor(z / P) + 0.5) * P; }
-    if (x < 30 || z < 30 || x > CITY - 30 || z > CITY - 30) return;
+    { const pr = CityLayout.at(x, z); if (!pr || x < pr.x0 + 30 || z < pr.z0 + 30 || x > pr.x1 - 30 || z > pr.z1 - 30) return; }
     if (g.inView(x, 1, z, 6) && Math.hypot(x - p.pos.x, z - p.pos.z) < 90) return;
     const rb = { t: 45, cars: [], cops: [] };
     const across = ax ? 0 : Math.PI / 2;

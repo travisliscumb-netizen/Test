@@ -624,7 +624,7 @@ class ContentManager {
     const g = this.g, p = g.player, s = g.save;
     if (p.interior) return;
     const zk = zoneKey(p.pos.x, p.pos.z);
-    const inCity = (p.pos.x > 0 && p.pos.z > 0 && p.pos.x < CITY && p.pos.z < CITY) || vpLand(p.pos.x, p.pos.z);
+    const inCity = CityLayout.cellAt(p.pos.x, p.pos.z) >= 0 || vpLand(p.pos.x, p.pos.z);
     if (inCity && !s.discovered.zones[zk]) {
       s.discovered.zones[zk] = 1;
       const z = ZONES[zk], n = Object.keys(s.discovered.zones).length;

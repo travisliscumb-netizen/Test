@@ -40,7 +40,7 @@ class VehicleManager {
     const s = v._safe || (v._safe = { x: v.pos.x, y: v.pos.y, z: v.pos.z, h: v.h });
     if (!ok || (v.pos.y < -20 && vspaceFloor(v.pos.x, v.pos.z, v.pos.y) === null)) {
       const ok2 = isFinite(s.x) && isFinite(s.z);
-      const x = ok2 ? s.x : CITY / 2, z = ok2 ? s.z : CITY / 2;
+      const x = ok2 ? s.x : CityLayout.cx(), z = ok2 ? s.z : CityLayout.cz();
       v.pos.set(x, groundY(x, z), z); v.h = isFinite(s.h) ? s.h : 0; v.vel.set(0, 0); v.yawRate = 0;
       v.airborne = false; v.yVel = 0; v.pitch = 0; v.roll = 0; v.pv = 0; v.rv = 0; v.steer = 0; v.pitchG = 0; v.rollG = 0; v.pitchGV = 0; v.bodyOff = 0; v.bodyV = 0;
       v.syncMesh(0);

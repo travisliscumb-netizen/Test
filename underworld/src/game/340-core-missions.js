@@ -134,11 +134,11 @@ class MissionManager {
         break;
       }
       case 'race': {
-        const pts = []; let i = clamp(Math.round(from.x / P), 0, N), j = clamp(Math.round(from.z / P), 0, N);
+        const pts = []; let i = clamp(Math.round(from.x / P), RoadNet.I0, RoadNet.I1), j = clamp(Math.round(from.z / P), RoadNet.J0, RoadNet.J1);
         let pdx = 0, pdz = 0;
         const n = 6 + Math.floor(d * 2);
         for (let k = 0; k < n; k++) {
-          const opts = DIRS.filter(([dx, dz]) => !(dx === -pdx && dz === -pdz) && i + dx >= 0 && i + dx <= N && j + dz >= 0 && j + dz <= N);
+          const opts = DIRS.filter(([dx, dz]) => !(dx === -pdx && dz === -pdz) && CityLayout.nodeAt(i + dx, j + dz));
           const [dx, dz] = Math.random() < 0.45 && opts.some(o => o[0] === pdx && o[1] === pdz) ? [pdx, pdz] : pick(opts);
           i += dx; j += dz; pdx = dx; pdz = dz;
           pts.push({ x: i * P, z: j * P });

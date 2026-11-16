@@ -90,7 +90,7 @@ class NeonSigns {
       const cand = b.bld.filter(r => r.h > 5 && r.y0 < 1 && r.x1 - r.x0 > 5 && r.z1 - r.z0 > 5);
       for (let k = 0; k < want && cand.length; k++) {
         const r = cand[Math.floor(rng() * cand.length)];
-        const gaps = [[r.z0 - b.bz * P, 0], [(b.bx + 1) * P - r.x1, 1], [(b.bz + 1) * P - r.z1, 2], [r.x0 - b.bx * P, 3]].sort((a, c) => a[0] - c[0]);
+        const gaps = [[r.z0 - b.J * P, 0], [(b.I + 1) * P - r.x1, 1], [(b.J + 1) * P - r.z1, 2], [r.x0 - b.I * P, 3]].sort((a, c) => a[0] - c[0]);
         const side = gaps[k % 2 === 0 ? 0 : 1][1], u = 0.25 + rng() * 0.5;
         let x, z, ry;
         if (side === 0) { x = lerp(r.x0, r.x1, u); z = r.z0 - 0.14; ry = Math.PI; }
@@ -327,7 +327,7 @@ class Underworld {
       const hang = sidewalkSpot(hb[0], hb[1], hs[Math.floor(rng() * hs.length)], 18 + rng() * 44);
       const db = pool[Math.floor(rng() * pool.length)], ds = sides(db[0], db[1]);
       const deal = sidewalkSpot(db[0], db[1], ds[Math.floor(rng() * ds.length)], 14 + rng() * 52);
-      this.T.push({ i, tx, tz, zone, blocks, cx: tx * 2 * P + P, cz: tz * 2 * P + P, hang, deal, name: '' });
+      this.T.push({ i, tx, tz, zone, blocks, cx: CityLayout.wx(tx * 2 * P + P, tz * 2 * P + P), cz: CityLayout.wz(tx * 2 * P + P, tz * 2 * P + P), hang, deal, name: '' });
     }
     // names: each district hands out its own street names in order
     const used = {};

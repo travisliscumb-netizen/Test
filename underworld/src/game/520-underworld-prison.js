@@ -905,8 +905,8 @@ class Prison {
       g.content.interiors.exit(true);
       g.player.applyOutfit(g.save.outfit);
       // the storm drain comes out by the harbour wall; the laundry truck drops you a few blocks further on
-      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CITY / 2, pl.z - CITY / 2), far = truck ? 260 : 140;
-      const x = clamp(pl.x + Math.sin(ang) * far, 20, CITY - 20), z = clamp(pl.z + Math.cos(ang) * far, 20, CITY - 20);
+      const pl = g.world.places.police.door, ang = Math.atan2(pl.x - CityLayout.cx(), pl.z - CityLayout.cz()), far = truck ? 260 : 140, pr = CityLayout.near(pl.x, pl.z);
+      const x = clamp(pl.x + Math.sin(ang) * far, pr.x0 + 20, pr.x1 - 20), z = clamp(pl.z + Math.cos(ang) * far, pr.z0 + 20, pr.z1 - 20);
       g.resetPlayerState(x, z, ang);
       S.lastHour = Math.floor(g.env.time);
       // nobody sees the truck route come out (a search at one star); the drain comes up in front of a patrol

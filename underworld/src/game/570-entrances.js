@@ -127,7 +127,7 @@ class EntranceDressing {
   // clear where people walk in. On ordinary pavement it is a short threshold of darker paving.
   approach(d, gb, y0) {
     const w = this.g.world, fx = Math.sin(d.h), fz = Math.cos(d.h), rx = Math.cos(d.h), rz = -Math.sin(d.h);
-    const wall = d.wall || 1.4, bx = Math.floor(d.x / P), bz = Math.floor(d.z / P), blk = w.block(bx, bz);
+    const wall = d.wall || 1.4, blk = w.blockAt(d.x, d.z);
     // keep a corridor 2.6 m wide and 8 m deep in front of the door free of parked cars
     let cleared = 0;
     if (blk && blk.parked) blk.parked = blk.parked.filter(c => { const lx = (c.x - d.x) * rx + (c.z - d.z) * rz, lz = (c.x - d.x) * fx + (c.z - d.z) * fz; const hit = Math.abs(lx) < 2.6 && lz > -wall && lz < 8.5; if (hit) cleared++; return !hit; });

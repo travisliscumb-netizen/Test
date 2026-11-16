@@ -55,8 +55,7 @@ class PropManager {
     this.active = new Set(set); this.dirty = false;
     const promoOK = (p) => {
       if (p.block >= 0) return this.active.has(p.block);
-      const bx = clamp(Math.floor(p.x / P), 0, N - 1), bz = clamp(Math.floor(p.z / P), 0, N - 1);
-      return this.active.has(bz * N + bx);
+      return this.active.has(CityLayout.cellNear(p.x, p.z));
     };
     for (const t in this.meshes) {
       const im = this.meshes[t], list = this.byType[t]; let n = 0;

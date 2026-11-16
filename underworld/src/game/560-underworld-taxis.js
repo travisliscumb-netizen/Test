@@ -33,7 +33,7 @@ function placeNameAt(x, z) {
   if (!best && g.uw) for (const L of g.uw.locs) if (L.kind === 'prop') { const dd = Math.hypot(L.x - x, L.z - z); if (dd < bd) { bd = dd; best = L.def.name; } }
   if (!best && inExtension(x, z)) return districtNameAt(x, z);
   const vi = Math.round(x / P), hj = Math.round(z / P);
-  const street = Math.abs(x - vi * P) < Math.abs(z - hj * P) ? STREET_NAMES_X[clamp(vi, 0, N)] : STREET_NAMES_Z[clamp(hj, 0, N)];
+  const pr = CityLayout.near(x, z), street = Math.abs(x - vi * P) < Math.abs(z - hj * P) ? STREET_NAMES_X[clamp(vi - pr.ox, pr.lx0, pr.lx1 + 1)] : STREET_NAMES_Z[clamp(hj - pr.oz, pr.lz0, pr.lz1 + 1)];
   return best ? `${best}` : `${street}, ${districtNameAt(x, z)}`;
 }
 class TaxiService {
@@ -86,14 +86,14 @@ class TaxiService {
       const sp = extRoadSpots(x, z).filter(s => spotToward(s, x, z)).map(s => ({ s, d: Math.hypot(s.x - x, s.z - z) })).filter(o => o.d > 60 && !g.inView(o.s.x, 1, o.s.z, 4)).sort((a, b) => a.d - b.d);
       for (const { s } of sp.slice(0, 8)) if (!g.vehicles.nearby(s.x, s.z, 6).some(v => Math.hypot(v.pos.x - s.x, v.pos.z - s.z) < 5)) return g.vehicles.spawn('taxi', s.x, s.z, s.h, {});
     }
-    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+    for (let i = RoadNet.I0; i <= RoadNet.I1; i++) for (let j = RoadNet.J0; j <= RoadNet.J1; j++) {
       if (!RoadNet.degree(i, j)) continue;
       const nx = i * P, nz = j * P, d = Math.hypot(nx - x, nz - z);
       if (d < 110 || d > 220) continue;
       if (g.inView(nx, 1, nz, 4)) continue;
       cands.push({ i, j, d });
     }
-    if (!cands.length) for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) if (RoadNet.degree(i, j)) { const d = Math.hypot(i * P - x, j * P - z); if (d > 60) cands.push({ i, j, d }); }
+    if (!cands.length) for (let i = RoadNet.I0; i <= RoadNet.I1; i++) for (let j = RoadNet.J0; j <= RoadNet.J1; j++) if (RoadNet.degree(i, j)) { const d = Math.hypot(i * P - x, j * P - z); if (d > 60) cands.push({ i, j, d }); }
     if (!cands.length) return null;
     cands.sort((a, b) => a.d - b.d);
     // the nearest node with nobody standing on it (a car parked on one node shouldn't mean "no cabs")

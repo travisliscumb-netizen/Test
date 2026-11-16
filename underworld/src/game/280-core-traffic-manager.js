@@ -25,7 +25,7 @@ class TrafficManager {
       if (v.drive && v.driver === 'npc') { v.drive.wait = 0; v.drive.mode = 'flee'; v.drive.cruise = rand(16, 22); const c = g.world.randomCurbSpot(v.pos.x, v.pos.z, 300, 700); v.drive.setGoal(c.x, c.z); }
     }
   }
-  validDir(i, j, dx, dz) { const a = i + dx, b = j + dz; return i >= 0 && j >= 0 && i <= N && j <= N && a >= 0 && b >= 0 && a <= N && b <= N && RoadNet.open(i, j, dx, dz); }
+  validDir(i, j, dx, dz) { const a = i + dx, b = j + dz; const R = RoadNet; return i >= R.I0 && j >= R.J0 && i <= R.I1 && j <= R.J1 && a >= R.I0 && b >= R.J0 && a <= R.I1 && b <= R.J1 && R.open(i, j, dx, dz); }
   // ---------------------------------------------------------------- the curved roads (the road graph, 135)
   // A lane car passing a junction with a curved road may turn off onto it; a car on the curved roads walks them
   // (any junction: a T at any angle, a Y, a crossing of a lattice street, a dead end's turning circle) until it
@@ -143,10 +143,10 @@ class TrafficManager {
   trySpawn() {
     const g = this.g, px = g.focus.x, pz = g.focus.z;
     // off the city's square (the countryside, the causeway) every car comes along the curved roads
-    const offCity = px < -150 || pz < -150 || px > CITY + 150 || pz > CITY + 150;
+    const offCity = !CityLayout.inCity(px, pz, 150);
     if (Math.random() < (offCity ? 1 : 0.18)) { const v = this.trySpawnLink(); if (v || offCity) return v; }
     for (let tries = 0; tries < 14; tries++) {
-      const i = clamp(Math.round(px / P) + randi(-3, 3), 0, N), j = clamp(Math.round(pz / P) + randi(-3, 3), 0, N);
+      const i = clamp(Math.round(px / P) + randi(-3, 3), RoadNet.I0, RoadNet.I1), j = clamp(Math.round(pz / P) + randi(-3, 3), RoadNet.J0, RoadNet.J1);
       const [dx, dz] = pick(DIRS);
       if (!this.validDir(i, j, dx, dz)) continue;
       const s = rand(TURN_IN + 4, P - TURN_IN - 10);
@@ -167,7 +167,7 @@ class TrafficManager {
       // gang cars cruise their own turf
       let fac = null;
       if (type !== 'police' && g.uw) { const own = g.uw.owner[turfAt(x, z)]; if (own && own !== 'pc' && FACTIONS[own] && !g.uw.S.factions[own].broken && Math.random() < 0.18) { fac = own; type = pick(FACTIONS[own].cars); } }
-      const edge = i === 0 || i === N || j === 0 || j === N;
+      const edge = RoadNet.edgeNode(i, j);
       const v = g.vehicles.spawn(type, x, z, Math.atan2(dx, dz), { kinematic: true, driver: 'npc' });
       // driver personality: cautious, normal or aggressive
       const r0 = Math.random(), pers = racer || fac ? 2 : r0 < 0.25 ? 0 : r0 < 0.8 ? 1 : 2;

@@ -1,9 +1,9 @@
 # CITY SPREAD — the city into the island (the plan, the record and the handoff)
 
-> **SUPERSEDED BY THE OWNER, 2026-11-15 (§10).** Usage ran short, so the owner switched from true relocation to
-> building round the grid: the 12 × 12 city stays where it is as old downtown, and new districts on curving streets
-> fill the island round it. §10 is the live state. §0–§9 remain the plan if relocation is ever resumed; S1 (the
-> layout layer, `021`) is built and harmless either way.
+> **RESUMED BY THE OWNER, 2026-11-16.** After seeing the round-the-grid districts (§10) the owner asked again for
+> the city to flow with the island instead of floating in the middle of it: keep every working system, relocate it,
+> no redraw, no placeholders. True relocation (§0–§9) is the live plan again; §10's districts stay and are part of
+> the island the precincts move into (their sites and §3's draft siting overlap and are settled at S5).
 
 
 The owner's directive (2026-11-15, after playing Operation Blackgate): the city must stop being a square that floats
@@ -25,7 +25,7 @@ start; §4 is the stage list with what is done; §5 is the checklist of every pl
 - The layout's own suite: `node underworld/tests/layout.mjs` (Node only, under a second).
 - Then the suites a change touches, then the regression runner (`TESTING.md`). Two cores here: a suite takes 1–10
   minutes, the full regression several hours at `CONC=2`.
-- **Next action: §4, stage S2.** Work the checklist in §5 from the top; each row says how to convert it.
+- **Next action: §4, stage S2, then S3.** §9's latest entry says what S2 has converted and what is left.
 
 ## 1. Why this is not "move the pins"
 The city is a 12 × 12 lattice of 80 m blocks (`020`: `P`, `N`, `CITY = 960`), and the lattice is the game's address
@@ -127,7 +127,7 @@ Every stage ends playable, committed and pushed. A stage is done only when its g
 | # | Stage | Scope | Gate | Status |
 |---|---|---|---|---|
 | S1 | Foundation | `CityLayout` and its rules; suite `layout`; the world fingerprint tool and the classic baseline; the first tables answering in world space (`offCity`, `zoneKey`, `districtNameAt`, `groundBase`, `turfAt`, `streetNameAt`) | fingerprint `IDENTICAL` to the baseline; `layout` green and able to fail (mutation-checked); affected suites green | **DONE** (§9) |
-| S2 | Tables and bounds in world space | Every row of §5 marked S2: block lookups, `RoadNet`'s world-facing questions, loops and clamps over `N`, every use of `CITY` as "the city's extent", arrays and keys sized by `N`. Classic layout only; nothing visible changes | fingerprint `IDENTICAL`; `layout` extended to each converted table under the `apart` layout; full regression no worse than the island gate (1,928 / 10, the same ten) | TODO (next) |
+| S2 | Tables and bounds in world space | Every row of §5 marked S2: block lookups, `RoadNet`'s world-facing questions, loops and clamps over `N`, every use of `CITY` as "the city's extent", arrays and keys sized by `N`. Classic layout only; nothing visible changes | fingerprint `IDENTICAL`; `layout` extended to each converted table under the `apart` layout; full regression no worse than the island gate (1,928 / 10, the same ten) | **IN PROGRESS** (§9) |
 | S3 | Bake and the tracer | `World.generate` builds in the lattice then bakes to the world; rasters stay lattice-space with lookups converted; one ground plane per precinct with `uOff`; the collision grid, the chunk streamer and the far mesh follow blocks, not the square; `Island` takes the city's level pads, kept shore and far-mesh hole from `CityLayout` | a **tracer layout** (the whole city as one precinct moved two cells) boots, plays `smoke` and prints a fingerprint equal to classic's once every coordinate is taken relative to its block (`world-print --rel`, to be added); classic still `IDENTICAL` | TODO |
 | S4 | Edges, seams and joins | The perimeter per precinct (seawall where its edge is wet, verge where dry; lamps, corners); seam streets built once per precinct; road-graph nodes, signals and kerb cuts per precinct; connectors as island roads whose `lat` ends meet precinct edge streets; the causeway and the land bridge anchored to their host precinct | a **two-precinct tracer** (the city cut in half, the halves 3 cells apart, one connector) boots; GPS, traffic, taxis and police cross the connector; `roadnet`, `roads`, `taxi`, `police` green on it | TODO |
 | S5 | The real layout | Siting pass on the island's height map (level, low, dry, near a road, off the airport and the proving ground); the picture for the owner; `CITY_LAYOUTS.island`; the coast re-cut where the square's flanks were; connector roads; the big map, minimap and turf map; races, missions and deliveries that crossed what is now a seam | owner signs off the picture **before** the layout is made default; then every place reachable by GPS from every other; new suite `spread` | TODO |
@@ -240,6 +240,29 @@ vehicles, pending cars, dropped weapons (`wloc`) and stashes.
   line's extension, anywhere in the world, so the HUD read "Elm St" on Mount Valen, "Dock St" on the main runway and
   "Central Blvd" on the Blackgate Bridge and at Valen Point. A lattice street is now named only inside the frame of
   the precinct whose street it is; suite `island` checks it.
+- **2026-11-16, S2 (most of it).** Relocation resumed. The convention, now fixed: *authored tables keep lattice
+  addresses; the simulation speaks world cells.* `world.block(bx, bz)` stays a lattice address (SPECIAL, landmarks,
+  missions); `world.blockW(I, J)` / `blockAt(x, z)` look up by world cell or point; every block records the world
+  cell it stands in (`b.I`, `b.J`). `RoadNet` keeps the authored closures in lattice numbers and builds the world's
+  open segments from the active layout (`RoadNet.layout()`, called by `CityLayout.use`); `segOpen`, `open`,
+  `degree`, `roadAt`, `path`, `nearNode` take world numbers over the layout's node rectangle (`I0..I1`, `J0..J1`);
+  `edgeNode` replaces `i === 0 || i === N …`; `texture()` stays lattice (the ground shader takes the offset off,
+  S3). New in `021`: `wx`/`wz` (lattice metres → world), `cellNear` (the old clamp of `floor(x / P)`), `cx`/`cz`
+  (the middle of town), `frameX`/`frameZ`; `precinctOf` accepts a cell or node just outside the lattice.
+  Converted: pedestrians (walk in world cells), traffic (spawn bounds, edge-street speed), drive AI, police (spawn,
+  roadblock), taxis (spawn loops, street names), missions (contacts, race routes), turf centres and the bar-sign
+  placement, sidewalk/curb spot helpers, `randomCurbSpot`, chunk streaming, prop activation, the road graph's lattice
+  chains (world lines, named by their own precinct's line), entrances, the prison transport, the save clamp, the
+  vehicle fallback, the big map and minimap (each precinct's bed, blocks, lanes, tints and borders by world cell),
+  the turf map, the map's street labels and pickers, `ZONE_CENTRE`. Suite `layout` gained 9 S2 checks under
+  `classic` (86,275 answers equal to the old arithmetic) and `apart` (every street where its precinct stands and no
+  other; roadAt; routes; edge streets; lattice metres → world); a mutation of `RoadNet.layout` fails 3 of them.
+  Fingerprint: differs from the build before only by the new `I`/`J` fields (`WP_SKIP=I,J` to show it), plus three
+  blocks (53, 65, 66) and `world.propTypes`, which already differ between two runs of the same build (runtime
+  state; the tool is not fully deterministic since the round-the-grid build). **Left for S2:** the generation-time
+  files (`090` perimeter, `100`, `110`, `120`, `122`, `170`) and the anchored extensions (`025`, `026`, `022`, `127`,
+  `128`, `176`, `177`) belong to S3/S4 by §5's own table; `localRoadAt`/`localSurfaceAt` (F, S3); the full
+  regression (the S2 gate) when S3's tracer exists, since under `classic` it cannot see a wrong conversion.
 
 ## 10. Round the grid (live): the new districts, Villa Valen and the Valen Vault
 The owner's words, by voice: keep the grid; build districts round it, not in a grid pattern; raise the quality

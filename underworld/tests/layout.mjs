@@ -25,10 +25,12 @@ const TURF_N = 6;
 const turfSrc = read('390-underworld-data.js').match(/function turfAt\(x, z\) \{[\s\S]*?\n\}/);
 check('the turf lookup is where the suite expects it (390)', !!turfSrc);
 const code = stubs + read('010-core-utilities.js') + '\n' + read('020-content-world-constants.js') + '\n' + read('021-content-city-layout.js') + '\n' + (turfSrc ? turfSrc[0] : '') +
-  '\n;globalThis.__x = { CityLayout, CITY_LAYOUTS, zoneKey, districtNameAt, turfAt, ZONE_MAP, ZONES, SUPERBLOCKS, N, P, CITY, EDGE_MARGIN, ROAD_HALF, clamp };';
-const ctx = vm.createContext({ console, Math, Number, Int8Array, Map, Set, Infinity });
+  '\n;globalThis.__x = { CityLayout, CITY_LAYOUTS, zoneKey, districtNameAt, turfAt, ZONE_MAP, ZONES, SUPERBLOCKS, N, P, CITY, EDGE_MARGIN, ROAD_HALF, clamp, RoadNet };';
+// THREE for RoadNet.texture(): the texture's bytes are what the suite compares
+const THREE = { DataTexture: class { constructor(d) { this.image = { data: d }; } }, RGBAFormat: 0, NearestFilter: 0 };
+const ctx = vm.createContext({ console, Math, Number, Int8Array, Int16Array, Int32Array, Uint8Array, Map, Set, Infinity, THREE });
 vm.runInContext(code, ctx, { filename: 'layout-under-test.js' });
-const { CityLayout: L, CITY_LAYOUTS, zoneKey, districtNameAt, turfAt, ZONE_MAP, ZONES, N, P, CITY, EDGE_MARGIN, ROAD_HALF, clamp } = ctx.__x;
+const { CityLayout: L, CITY_LAYOUTS, zoneKey, districtNameAt, turfAt, ZONE_MAP, ZONES, N, P, CITY, EDGE_MARGIN, ROAD_HALF, clamp, RoadNet: RN } = ctx.__x;
 
 // what the lattice arithmetic answered before there was a layout (the expressions 021 replaced)
 const old = {
@@ -133,6 +135,63 @@ refuse('precincts moved onto each other', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, l
 refuse('a precinct off the lattice', [{ id: 'a', lx0: 0, lz0: 0, lx1: 12, lz1: 11, ox: 0, oz: 0 }], /outside the lattice/);
 refuse('an offset that is not whole cells', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 11, ox: 0.5, oz: 0 }], /whole numbers/);
 let unknown = ''; try { L.use('nowhere'); } catch (e) { unknown = e.message; }
+// ---------------------------------------------------------------- stage S2: the street network and the world's questions
+{
+  // the lattice's own street segments (as authored: inside 0..N, not swallowed by a superblock)
+  const latOpen = (a, i, j) => i >= 0 && i <= N && j >= 0 && j < N && !RN.closed.has(RN.key(a, i, j));
+  const tex = () => Array.from(RN.texture().image.data).join(',');
+  L.use('classic');
+  const tex0 = tex();
+  let bad = 0, n = 0, first = '';
+  for (let a = 0; a < 2; a++) for (let i = -3; i <= N + 3; i++) for (let j = -3; j <= N + 3; j++) { n++; if (RN.segOpen(a, i, j) !== latOpen(a, i, j)) { bad++; if (!first) first = `${a},${i},${j}`; } }
+  for (let i = -2; i <= N + 2; i++) for (let j = -2; j <= N + 2; j++) { n++; if (RN.edgeNode(i, j) !== (i <= 0 || j <= 0 || i >= N || j >= N)) { bad++; if (!first) first = `edge ${i},${j}`; } }
+  for (let z = -60; z <= CITY + 60; z += 3.7) for (let x = -60; x <= CITY + 60; x += 3.7) { n++; if (L.cellNear(x, z) !== old.bx(z) * N + old.bx(x) || L.wx(x, z) !== x || L.wz(x, z) !== z) { bad++; if (!first) first = `${x},${z}`; } }
+  check('S2, classic: the street network, the edge streets, a point\'s block and lattice metres answer what the lattice did', bad === 0 && RN.I0 === 0 && RN.J0 === 0 && RN.I1 === N && RN.J1 === N && L.cx() === CITY / 2, `${n} answers${bad ? ', ' + bad + ' wrong, first ' + first : ''}`);
+  L.use('apart', apart);
+  bad = 0; n = 0; first = '';
+  // every lattice segment exists where its precinct stands, and nothing else does
+  let want = 0;
+  for (const p of L.precincts) {
+    for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1; j++) { n++; const o = latOpen(0, i, j); want += o; if (RN.segOpen(0, i + p.ox, j + p.oz) !== o) { bad++; if (!first) first = `${p.id} v ${i},${j}`; } }
+    for (let i = p.lz0; i <= p.lz1 + 1; i++) for (let j = p.lx0; j <= p.lx1; j++) { n++; const o = latOpen(1, i, j); want += o; if (RN.segOpen(1, i + p.oz, j + p.ox) !== o) { bad++; if (!first) first = `${p.id} h ${i},${j}`; } }
+  }
+  check('S2, apart: every precinct\'s streets stand where it does (its whole edge streets its own), and no other street exists', bad === 0 && RN.open_.size === want, `${n} segments, ${RN.open_.size} open of ${want}${bad ? ', ' + bad + ' wrong, first ' + first : ''}`);
+  check('S2, apart: the ground shader\'s street texture stays in the lattice (the same bytes as classic)', tex() === tex0);
+  // a point on a moved street is on a road; the old place of a moved street is not
+  bad = 0; n = 0; first = '';
+  for (const p of L.precincts) for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1; j++) {
+    const x = (i + p.ox) * P + 2, z = (j + p.oz + 0.5) * P; n++;
+    if (RN.roadAt(x, z) !== latOpen(0, i, j)) { bad++; if (!first) first = `${p.id} ${i},${j}`; }
+  }
+  n++; if (RN.roadAt(11 * P + 2, 3.5 * P)) { bad++; if (!first) first = 'old docks street'; } // (line 10 is also the core's own east edge street)
+  check('S2, apart: roadAt is true on a moved street and false where it used to be', bad === 0, `${n} points${bad ? ', ' + bad + ' wrong, first ' + first : ''}`);
+  // a route inside a moved precinct is the lattice route, moved; the ground between precincts has no route
+  const docks = L.precincts.find(p => p.id === 'docks');
+  const r = RN.path(10 + docks.ox, 0 + docks.oz, 12 + docks.ox, 9 + docks.oz), last = r[r.length - 1];
+  check('S2, apart: a route inside a moved precinct reaches its goal over its own streets', last[0] === 12 + docks.ox && last[1] === 9 + docks.oz && r.every(([i, j], k) => k === 0 || RN.open(r[k - 1][0], r[k - 1][1], i - r[k - 1][0], j - r[k - 1][1])), JSON.stringify(r));
+  const nn = RN.nearNode(12 * P, 4 * P); // between core and docks
+  check('S2, apart: the nearest street crossing to a point between precincts is one that has a street', nn && RN.degree(nn[0], nn[1]) > 0, JSON.stringify(nn));
+  // edge streets: a crossing on any precinct's edge, not one inside
+  bad = 0; n = 0; first = '';
+  for (const p of L.precincts) for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1 + 1; j++) {
+    const own = (I, J) => L.cell(I, J) >= 0, I = i + p.ox, J = j + p.oz, edge = !(own(I - 1, J - 1) && own(I, J - 1) && own(I - 1, J) && own(I, J)); n++;
+    const expect = i === p.lx0 || i === p.lx1 + 1 || j === p.lz0 || j === p.lz1 + 1;
+    if (RN.edgeNode(I, J) !== edge || (edge !== expect && !(p.id === 'core' || p.id === 'heights'))) { bad++; if (!first) first = `${p.id} ${i},${j}`; }
+  }
+  check('S2, apart: a precinct\'s edge crossings are edge streets and its inner ones are not', bad === 0, `${n} crossings${bad ? ', ' + bad + ' wrong, first ' + first : ''}`);
+  // lattice metres to world metres, a point's block, the middle of town
+  bad = 0; n = 0; first = '';
+  for (let lz = 0; lz < N; lz++) for (let lx = 0; lx < N; lx++) {
+    const p = L.precinctOf(lx, lz), x = (lx + 0.3) * P, z = (lz + 0.7) * P, wx = L.wx(x, z), wz = L.wz(x, z); n++;
+    if (wx !== x + p.ox * P || wz !== z + p.oz * P || L.cellNear(wx, wz) !== lz * N + lx || L.cellAt(wx, wz) !== lz * N + lx) { bad++; if (!first) first = `${lx},${lz}`; }
+  }
+  const mid = L.precinctOf(N / 2, N / 2);
+  check('S2, apart: lattice metres land where their block stands, a point finds its block, the middle of town moves with its precinct', bad === 0 && L.cx() === CITY / 2 + mid.ox * P && L.cz() === CITY / 2 + mid.oz * P, `${n} points${bad ? ', ' + bad + ' wrong, first ' + first : ''}`);
+  // a point in the empty ground between precincts belongs to the nearest precinct's edge cell
+  const gap = L.cellNear(10.5 * P, 3.5 * P), gp = L.precinctOf(gap % N, Math.floor(gap / N));
+  check('S2, apart: off every block, a point belongs to the nearest precinct\'s edge cell', gp === L.near(10.5 * P, 3.5 * P), `${gap}`);
+}
+
 check('an unknown layout name is an error', /no layout/.test(unknown));
 check('a refused layout leaves the one in use untouched', L.id === 'apart' && L.precincts.length === 4);
 L.use('classic');

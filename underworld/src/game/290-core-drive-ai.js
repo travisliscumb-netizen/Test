@@ -32,7 +32,7 @@ class DriveAI {
     const onV = Math.abs(v.pos.x - i * P) < 9, onH = Math.abs(v.pos.z - j * P) < 9;
     if (onV && !onH) j = fz > 0 ? Math.ceil(v.pos.z / P) : Math.floor(v.pos.z / P);
     else if (onH && !onV) i = fx > 0 ? Math.ceil(v.pos.x / P) : Math.floor(v.pos.x / P);
-    i = clamp(i, 0, N); j = clamp(j, 0, N);
+    i = clamp(i, RoadNet.I0, RoadNet.I1); j = clamp(j, RoadNet.J0, RoadNet.J1);
     if (RoadNet.degree(i, j) === 0) [i, j] = RoadNet.nearNode(v.pos.x, v.pos.z);
     const [gi, gj] = RoadNet.nearNode(tx, tz);
     // shortest route over the roads that exist (superblocks close some lattice segments)

@@ -151,8 +151,7 @@ class ChunkManager {
     const cand = [];
     for (let dz = -R - 1; dz <= R + 1; dz++) for (let dx = -R - 1; dx <= R + 1; dx++) {
       const bx = pbx + dx, bz = pbz + dz;
-      if (bx < 0 || bz < 0 || bx >= N || bz >= N) continue;
-      const b = this.world.block(bx, bz);
+      const b = this.world.blockW(bx, bz); if (!b) continue;
       const d = Math.hypot(b.cx - px, b.cz - pz);
       if (d < R * P + P * 0.5) { want.add(b.i); cand.push([d, b]); }
     }

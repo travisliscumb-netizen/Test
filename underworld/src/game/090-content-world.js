@@ -679,21 +679,22 @@ class World {
     }
   }
   // ---------- queries used by AI / missions ----------
-  nodePos(i, j) { return [i * P, j * P]; }
+  nodePos(i, j) { return [i * P, j * P]; } // a world node (RoadNet's numbers)
   randomCurbSpot(fromX, fromZ, minD, maxD, rng = Math.random) {
     for (let tries = 0; tries < 200; tries++) {
       const i = Math.floor(rng() * (N + 1)), j = Math.floor(rng() * N);
       const vertical = rng() < 0.5;
       const along = 20 + rng() * 40;
       const side = rng() < 0.5 ? -1 : 1;
-      let x, z, h;
-      if (vertical) { if (i > N || !RoadNet.segOpen(0, i, j)) continue; x = i * P + side * 4.6; z = j * P + along; h = side > 0 ? Math.PI : 0; }
-      else { const ii = Math.floor(rng() * N), jj = Math.floor(rng() * (N + 1)); if (!RoadNet.segOpen(1, jj, ii)) continue; x = ii * P + along; z = jj * P + side * 4.6; h = side > 0 ? Math.PI / 2 : -Math.PI / 2; }
-      if (x < -1 || z < -1 || x > CITY + 1 || z > CITY + 1) continue;
+      // a lattice segment, where its precinct stands (021); the kerb on the city side of an edge street only
+      let x, z, h, pv;
+      if (vertical) { pv = CityLayout.precinctOf(Math.min(i, N - 1), j); const I = i + pv.ox, J = j + pv.oz; if (!RoadNet.segOpen(0, I, J)) continue; x = I * P + side * 4.6; z = J * P + along; h = side > 0 ? Math.PI : 0; }
+      else { const ii = Math.floor(rng() * N), jj = Math.floor(rng() * (N + 1)); pv = CityLayout.precinctOf(ii, Math.min(jj, N - 1)); const I = ii + pv.ox, J = jj + pv.oz; if (!RoadNet.segOpen(1, J, I)) continue; x = I * P + along; z = J * P + side * 4.6; h = side > 0 ? Math.PI / 2 : -Math.PI / 2; }
+      if (x < pv.x0 - 1 || z < pv.z0 - 1 || x > pv.x1 + 1 || z > pv.z1 + 1) continue;
       const d = Math.hypot(x - fromX, z - fromZ);
       if (d >= minD && d <= maxD) return { x, z, h };
     }
-    return { x: P * 6 + 4.6, z: P * 6 + 30, h: 0 };
+    return { x: CityLayout.wx(P * 6 + 4.6, P * 6 + 30), z: CityLayout.wz(P * 6 + 4.6, P * 6 + 30), h: 0 };
   }
   randomSecret(fromX, fromZ, minD, maxD) {
     const all = [];

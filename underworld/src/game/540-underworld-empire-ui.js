@@ -46,7 +46,7 @@ class EmpireUI {
       const r = cv.getBoundingClientRect(), ui = this.uw.g.ui;
       const mx = (e.clientX - r.left) / r.width * 1024, mz = (e.clientY - r.top) / r.height * 1024;
       const wx = mx / ui.mapK - ui.mapE, wz = mz / ui.mapK - ui.mapE;
-      if (wx >= 0 && wz >= 0 && wx < CITY && wz < CITY) { this.selTurf = turfAt(wx, wz); this.render(); }
+      if (CityLayout.cellAt(wx, wz) >= 0) { this.selTurf = turfAt(wx, wz); this.render(); }
     });
     $('jailLife').addEventListener('click', () => { if (this.uw.S.jail) this.uw.prison.openLife(); });
     $('jailEmpire').addEventListener('click', () => { if (this.uw.prison.phone()) this.open('home'); });
@@ -328,7 +328,7 @@ class EmpireUI {
     this.drawOverlay(c, true);
     const p = this.g.player; const [px, pz] = ui._mapXY(p.pos.x, p.pos.z);
     c.fillStyle = '#ffb547'; c.strokeStyle = '#000'; c.lineWidth = 3; c.beginPath(); c.arc(px, pz, 11, 0, 7); c.fill(); c.stroke();
-    if (this.selTurf !== null) { const t = this.uw.T[this.selTurf]; const [x0, z0] = ui._mapXY(t.tx * 2 * P, t.tz * 2 * P); const s = 2 * P * ui.mapK; c.strokeStyle = '#fff'; c.lineWidth = 5; c.strokeRect(x0 + 3, z0 + 3, s - 6, s - 6); }
+    if (this.selTurf !== null) { const t = this.uw.T[this.selTurf]; const [x0, z0] = ui._mapXY(t.cx - P, t.cz - P); const s = 2 * P * ui.mapK; c.strokeStyle = '#fff'; c.lineWidth = 5; c.strokeRect(x0 + 3, z0 + 3, s - 6, s - 6); }
   }
   // turf colours, contested hatching, wars and points of interest
   drawOverlay(c, full) {
@@ -336,7 +336,7 @@ class EmpireUI {
     const s = 2 * P * k;
     for (let i = 0; i < uw.T.length; i++) {
       const t = uw.T[i], own = uw.owner[i];
-      const [x0, z0] = ui._mapXY(t.tx * 2 * P, t.tz * 2 * P);
+      const [x0, z0] = ui._mapXY(t.cx - P, t.cz - P);
       const col = own === 'pc' ? PLAYER_COL : own ? FACTIONS[own].col : '#666a70';
       c.globalAlpha = own ? 0.34 : 0.14; c.fillStyle = col; c.fillRect(x0, z0, s, s);
       c.globalAlpha = 0.9; c.strokeStyle = col; c.lineWidth = own === 'pc' ? 4 : 2; c.strokeRect(x0 + 2, z0 + 2, s - 4, s - 4);
@@ -1113,7 +1113,7 @@ class EmpireUI {
     if (this.g.mapOpen) this.g.ui.drawBigMap();
   }
   mapClick(x, z) {
-    if (!this.uw.mapOverlay || x < 0 || z < 0 || x >= CITY || z >= CITY) return false;
+    if (!this.uw.mapOverlay || CityLayout.cellAt(x, z) < 0) return false;
     const i = turfAt(x, z), el = $('turfInfo');
     el.innerHTML = this.turfCard(i) + '<div class="hint">Tap outside to close · T toggles the overlay</div>';
     el.classList.remove('hidden');

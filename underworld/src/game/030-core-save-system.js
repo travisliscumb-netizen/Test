@@ -204,7 +204,7 @@ const SaveSystem = {
     if (!d.pos || typeof d.pos !== 'object' || !isFinite(d.pos.x) || !isFinite(d.pos.z) || !isFinite(d.pos.h)) d.pos = null;
     // anywhere on the island's map (022); a spot out at sea comes back ashore when play starts (Game.startPlay), a
     // spot off the map altogether comes back to the city
-    else if (d.pos.x < ISLE.x0 || d.pos.z < ISLE.z0 || d.pos.x > ISLE.x1 || d.pos.z > ISLE.z1) { d.pos.x = clamp(d.pos.x, -10, CITY + 10); d.pos.z = clamp(d.pos.z, -10, CITY + 10); }
+    else if (d.pos.x < ISLE.x0 || d.pos.z < ISLE.z0 || d.pos.x > ISLE.x1 || d.pos.z > ISLE.z1) { const pr = CityLayout.near(d.pos.x, d.pos.z); d.pos.x = CityLayout.frameX(pr, d.pos.x, EDGE_MARGIN - 10); d.pos.z = CityLayout.frameZ(pr, d.pos.z, EDGE_MARGIN - 10); }
     if (typeof d.rep !== 'number' || !isFinite(d.rep) || d.rep < 0) d.rep = 0;
     if (!(d.nextUid > maxUid)) d.nextUid = maxUid + 1;
     if (!d.tips || typeof d.tips !== 'object' || Array.isArray(d.tips)) d.tips = {};
