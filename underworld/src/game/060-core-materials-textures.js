@@ -684,6 +684,121 @@ function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0, loc = [
   return m;
 }
 
+/* ---------------- The island's roads (177): the city streets' asphalt, laid along each road ----------------
+   Every vertex carries the road's own coordinates, in metres: aR = (u: across from the centre line, s: along it,
+   hw: the carriageway's half width, cls: 0 a district street, 1 a district avenue, 2 a country road, 3 a highway)
+   and aQ = (surf: 0 asphalt, 1 kerb, 2 pavement, 3 gravel shoulder; paint: 0 inside a junction .. 1; the distance
+   to the stop line at the road's first end and at its last, negative past it, 1e3 where the end joins nothing).
+   The asphalt is the city's (aggregate, repaired patches, cracks, tyre wear in each lane's wheel paths, puddles and a
+   wet sheen); the paint follows the class: a district street's gutters, an avenue's double yellow and lane dashes, a
+   country road's broken centre line and edge lines, a highway's double yellow, edge lines and rumble strips; a stop
+   line across the right-hand lane where a district street meets another road. */
+function makeIsleRoadMaterial() {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  m.defines = { PV_HQ: '' };
+  atmos(m, sh => {
+    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uTime = U.uTime; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
+    patchWorldVaryings(sh, 'attribute vec4 aR; attribute vec4 aQ; varying vec4 vR; varying vec4 vQ;');
+    sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n      vR = aR; vQ = aQ;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uNight; uniform float uWet; uniform float uTime; uniform float uRain; uniform float uCloudShadow; uniform vec3 uHorizon; uniform vec3 uZenith;
+        varying vec3 vPW; varying vec3 vPN; varying vec4 vR; varying vec4 vQ;
+        ${GLSL_NOISE}
+        ${GLSL_BUMP}
+        ${GLSL_CLOUDSHADOW}
+        float lineAA(float d, float w){ float fw = fwidth(d) + 0.001; return 1.0 - smoothstep(w - fw, w + fw, d); }
+        float boxAA(vec2 q, vec2 hs){ vec2 d = abs(q) - hs; float s = max(d.x, d.y); float fw = fwidth(s) + 0.001; return 1.0 - smoothstep(-fw, fw, s); }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec2 p = vPW.xz;
+        float u = vR.x, s = vR.y, hw = vR.z, cls = vR.w, surf = vQ.x, paint = vQ.y, au = abs(u);
+        float n1 = pvf(p * 0.35), n2 = pvn(p * 3.7), grain = pvn(p * 23.0);
+        vec3 col; float rough = 0.9, hgt = 0.0, isRoad = 0.0, puddleMask = 0.0;
+        if (surf < 0.5) {
+          isRoad = 1.0;
+          col = vec3(0.15, 0.155, 0.165) * (0.8 + 0.36 * n1) + (n2 - 0.5) * 0.03 + (grain - 0.5) * 0.035;
+          col += step(0.93, pvh(floor(p * 18.0))) * 0.035; hgt += grain * 0.004; rough = 0.88;
+          vec2 pc = floor(p / 7.0), pf = fract(p / 7.0); float ph = pvh(pc + 13.0);
+          if (ph > 0.84) { vec2 hs = vec2(0.2 + pvh(pc + 3.0) * 0.25, 0.15 + pvh(pc + 7.0) * 0.3); float rp = boxAA(pf - 0.5, hs); col = mix(col, vec3(0.105, 0.11, 0.115) * (0.9 + 0.2 * grain), rp * 0.9); float seam = boxAA(pf - 0.5, hs + 0.012) - rp; col *= 1.0 - seam * 0.3; }
+          float cr = abs(pvn(p * 0.9) - 0.5);
+          float crack = (1.0 - smoothstep(0.0, 0.012 + fwidth(cr), cr)) * step(0.58, pvn(p * 0.21 + 5.0));
+          col *= 1.0 - crack * 0.4; hgt -= crack * 0.01;
+          // the lanes: where the edge line runs, how many lanes each way, the wheel paths in each
+          float urban = step(cls, 1.5);
+          float edgeL = urban > 0.5 ? hw - 0.45 : (cls < 2.5 ? hw - (hw > 4.75 ? 1.3 : 0.6) : hw - 1.6);
+          float lanes = hw > 5.9 ? 2.0 : 1.0, laneW = edgeL / lanes;
+          float lc = (min(floor(au / laneW), lanes - 1.0) + 0.5) * laneW, du = abs(au - lc);
+          float wear = smoothstep(0.7, 0.0, abs(du - 0.85)) * step(au, edgeL);
+          col *= 1.0 - 0.1 * wear; col += vec3(0.02) * wear * step(0.5, n1);
+          col *= 1.0 - 0.07 * smoothstep(0.6, 0.0, du) * step(0.55, pvn(p * 0.6)) * step(au, edgeL);
+          // a country road's crumbling edge; a district street's concrete gutter
+          if (urban < 0.5) { float e = smoothstep(hw - 0.55, hw - 0.05, au + (pvn(vec2(s * 0.8, u * 2.0)) - 0.5) * 0.35); col = mix(col, col * 0.78 + vec3(0.035, 0.03, 0.025), e); rough = mix(rough, 0.95, e); }
+          float gut = urban * smoothstep(hw - 0.47, hw - 0.43, au);
+          // the paint
+          float y = 0.0, mk = 0.0;
+          if (cls > 2.5 || (cls > 0.5 && cls < 1.5)) y = lineAA(abs(au - 0.17), 0.065);
+          else if (cls > 1.5) y = lineAA(au, 0.07) * step(fract(s / 12.0), 0.25);
+          if (urban < 0.5) mk = max(mk, lineAA(abs(au - edgeL), 0.075));
+          if (cls > 0.5 && lanes > 1.5) mk = max(mk, lineAA(abs(au - laneW), 0.06) * step(fract(s / 9.0), 0.34));
+          if (cls > 2.5 && au > edgeL + 0.3 && au < edgeL + 0.9) { float g = step(0.5, fract(s / 0.32)); col *= 1.0 - 0.2 * g; hgt -= g * 0.006; }
+          // the stop line across the right-hand lane, short of a junction (it shows inside the junction's fade)
+          float stopL = max(lineAA(abs(vQ.z), 0.25) * step(0.3, u) * step(u, edgeL), lineAA(abs(vQ.w), 0.25) * step(0.3, -u) * step(-u, edgeL));
+          // a solid centre line up to the stop line
+          y = max(y, lineAA(au, 0.07) * step(cls, 2.5) * (step(0.0, vQ.z) * step(vQ.z, 18.0) + step(0.0, vQ.w) * step(vQ.w, 18.0)) * step(cls, 1.5));
+          float wearP = 0.86 - 0.28 * n1;
+          col = mix(col, vec3(0.86, 0.66, 0.16) * 0.9, y * 0.92 * wearP * paint);
+          col = mix(col, vec3(0.88) * (0.9 + 0.1 * n2), max(mk * paint, stopL) * wearP);
+          hgt += (y + mk + stopL) * 0.002;
+          if (gut > 0.0) { vec3 gc = vec3(0.44, 0.44, 0.42) * (0.85 + 0.15 * n2) * (1.0 - 0.3 * lineAA(abs(fract(s / 1.5) - 0.5) * 1.5, 0.02)); col = mix(col, gc, gut * 0.92); rough = mix(rough, 0.8, gut); }
+          col *= 1.0 - 0.14 * smoothstep(hw - 0.9, hw, au);
+          float puddle = smoothstep(0.56, 0.68, pvf(p * 0.11 + 3.0)) * uWet; puddleMask = puddle;
+          col *= mix(1.0, 0.5, uWet); rough = mix(rough, 0.28, uWet); rough = mix(rough, 0.03, puddle); col = mix(col, col * 0.7, puddle);
+        } else if (surf < 1.5) {
+          // the kerb: precast lengths of concrete
+          col = vec3(0.6, 0.6, 0.58) * (0.85 + 0.15 * n2) * (1.0 - 0.3 * lineAA(abs(fract(s) - 0.5), 0.015)); rough = 0.8;
+          col *= 1.0 - uWet * 0.3;
+        } else if (surf < 2.5) {
+          // the pavement: concrete slabs, joints, the odd stained or cracked one
+          vec2 tp = vec2(au - hw - 0.3, s) / 1.5; vec2 g = abs(fract(tp) - 0.5);
+          float joint = 1.0 - smoothstep(0.44, 0.49, max(g.x, g.y)), sh = pvh(floor(tp) + floor(hw));
+          col = vec3(0.5, 0.5, 0.48) * (0.88 + 0.12 * sh) * (0.9 + 0.1 * n2) * (0.72 + 0.28 * joint);
+          col *= 1.0 - 0.12 * step(0.86, sh) * smoothstep(0.3, 0.7, pvn(p * 1.3));
+          hgt -= (1.0 - joint) * 0.01; rough = 0.82;
+          col *= 1.0 - uWet * 0.3; rough = mix(rough, rough * 0.55, uWet);
+        } else {
+          // the gravel shoulder, thinning into grass at its outer edge
+          // (smooth noise, not hashed cells: hashed 11 cm cells alias into a checkerboard a few metres off)
+          float stn = pvn(p * 9.0) * 0.6 + pvn(p * 2.3 + 7.0) * 0.4;
+          col = mix(vec3(0.37, 0.35, 0.31), vec3(0.26, 0.25, 0.23), stn) * (0.88 + 0.24 * n2);
+          float grass = smoothstep(0.35, 0.95, (au - hw) / 1.1 + (pvn(p * 1.7) - 0.5) * 0.6);
+          col = mix(col, vec3(0.3, 0.42, 0.2) * (0.8 + 0.3 * n1), grass);
+          hgt += stn * 0.008; rough = 0.95;
+          col *= 1.0 - uWet * 0.3;
+        }
+        diffuseColor.rgb = col * pvCloudShadow(p);
+        roughnessFactor = rough;
+        if (uWet > 0.02 && vPN.y > 0.5) {
+          vec3 V = normalize(cameraPosition - vPW);
+          float ndv = clamp(V.y, 0.0, 1.0), fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+          float film = uWet * clamp(0.25 + 0.5 * isRoad + 0.75 * puddleMask, 0.0, 1.0);
+          totalEmissiveRadiance += mix(uHorizon, uZenith, clamp(ndv * 1.6, 0.0, 1.0)) * fres * film * (0.3 + 1.1 * puddleMask);
+        }
+        #ifdef PV_HQ
+          if (uRain > 0.05 && puddleMask > 0.05) {
+            vec2 rc = floor(p * 1.6); vec2 rf = fract(p * 1.6) - 0.5;
+            float rt = fract(uTime * 0.9 + pvh(rc) * 7.0);
+            float ring = sin((length(rf) - rt * 0.5) * 40.0) * (1.0 - rt) * step(length(rf), rt * 0.5);
+            hgt += ring * 0.002 * puddleMask * uRain;
+          }
+          if (vPN.y > 0.5) normal = pvBump(-vViewPosition, normal, hgt, 1.0);
+        #endif
+      }`);
+  });
+  m.customProgramCacheKey = () => 'pv-isleroad';
+  return m;
+}
+
 // soft ambient-occlusion map rendered from building footprints (≈1 m per texel)
 function makeAOTexture(world) {
   const S = 1056, c = document.createElement('canvas'); c.width = S; c.height = S;

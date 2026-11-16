@@ -225,49 +225,88 @@ class IslandScenery {
     if (this._farDirty) this._farIndex();
   }
   // ---------------------------------------------------------------- roads
-  _roadTexture() {
-    const c = document.createElement('canvas'); c.width = 128; c.height = 256; const g = c.getContext('2d');
-    g.fillStyle = '#3b3d41'; g.fillRect(0, 0, 128, 256);
-    // worn wheel tracks, a little grain, white edge lines, a dashed yellow centre line
-    for (let k = 0; k < 900; k++) { const v = 52 + Math.floor(hash2i(k, 7, 301) * 26); g.fillStyle = `rgba(${v},${v},${v + 2},0.5)`; g.fillRect(hash2i(k, 1, 303) * 128, hash2i(k, 2, 305) * 256, 2, 2); }
-    g.fillStyle = 'rgba(30,31,34,0.35)'; for (const x of [26, 46, 74, 94]) g.fillRect(x, 0, 8, 256);
-    g.fillStyle = '#e4e4de'; g.fillRect(6, 0, 3, 256); g.fillRect(119, 0, 3, 256);
-    g.fillStyle = '#e2b43a'; g.fillRect(62, 0, 4, 110);
-    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }
-  // the ribbons: a mesh for about every kilometre of each road (so only what is in view is drawn), one material
+  /* the roads (owner, 2026-11-16: "the new roads need to look amazing"): a mesh for about every kilometre of each
+     road, one material (makeIsleRoadMaterial, 060: the city streets' asphalt and paint). A district street has a
+     concrete kerb and a pavement each side, a country road or a highway a gravel shoulder. Kerbs, pavements and
+     shoulders are cut where another road's carriageway crosses them (no kerb across a side street's mouth); a road's
+     paint fades out where it runs into the road it joins, and a stop line is painted 2.5 m short of that road. */
   _roadMesh() {
-    const E = EDGE_MARGIN, group = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const E = EDGE_MARGIN, group = new THREE.Group(), mat = makeIsleRoadMaterial();
+    mat.side = THREE.DoubleSide;
     const inCity = p => CityLayout.precincts.some(q => p[0] > q.x0 - E && p[1] > q.z0 - E && p[0] < q.x1 + E && p[1] < q.z1 + E);
-    let pos = [], uv = [], nrm = [], idx = [];
-    const flush = () => {
-      if (!idx.length) { pos = []; uv = []; nrm = []; return; }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-      g.setIndex(idx); g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
-      pos = []; uv = []; nrm = []; idx = [];
+    const roads = Island.roads, byId = {}; for (const R of roads) byId[R.id] = R;
+    // every road's centre-line segments on a 24 m grid: how far a point is inside another road's carriageway
+    const G = 24, grid = new Map(), key = (i, j) => i * 100003 + j;
+    roads.forEach((R, ri) => { for (let k = 0; k < R.pts.length - 1; k++) { const a = R.pts[k], b = R.pts[k + 1]; for (let i = Math.floor(Math.min(a[0], b[0]) / G); i <= Math.floor(Math.max(a[0], b[0]) / G); i++) for (let j = Math.floor(Math.min(a[1], b[1]) / G); j <= Math.floor(Math.max(a[1], b[1]) / G); j++) { const kk = key(i, j); if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(ri, k); } } });
+    const inside = (x, z, R, only) => {
+      let best = -1e9; const i = Math.floor(x / G), j = Math.floor(z / G);
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+        const L = grid.get(key(i + di, j + dj)); if (!L) continue;
+        for (let q = 0; q < L.length; q += 2) { const Q = roads[L[q]]; if (Q === R || (only && !only.includes(Q))) continue; const a = Q.pts[L[q + 1]], b = Q.pts[L[q + 1] + 1], d = Q.w / 2 - segDist(x, z, a[0], a[1], b[0], b[1]); if (d > best) best = d; }
+      }
+      return best;
     };
-    for (const R of Island.roads) {
-      let prev = -1, chunk0 = 0;
-      for (let k = 0; k < R.pts.length; k++) {
+    let pos = [], nrm = [], aR = [], aQ = [], idx = [];
+    const flush = () => {
+      if (idx.length) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+        g.setAttribute('aR', new THREE.Float32BufferAttribute(aR, 4)); g.setAttribute('aQ', new THREE.Float32BufferAttribute(aQ, 4));
+        g.setIndex(idx); g.computeBoundingSphere();
+        const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
+      }
+      pos = []; nrm = []; aR = []; aQ = []; idx = [];
+    };
+    const vtx = (x, y, z, n, r, q) => { pos.push(x, y, z); nrm.push(n[0], n[1], n[2]); aR.push(r[0], r[1], r[2], r[3]); aQ.push(q[0], q[1], q[2], q[3]); return pos.length / 3 - 1; };
+    for (const R of roads) {
+      const urban = /^[ghmpd]\d/.test(R.id), cls = urban ? (R.w >= 9 ? 1 : 0) : (R.w >= 11 ? 3 : 2), hw = R.w / 2, n = R.pts.length;
+      const skipSide = k => (R.bridges || []).some(sp => k >= sp[0] - 1 && k <= sp[1] + 1) || (R.tunnel && k >= R.tunnel[0] - 3 && k <= R.tunnel[1] + 3);
+      // the stop lines: 2.5 m short of the road each end joins (a lattice street is 12 m wide)
+      const ends = (R.ends || []).map(e => e && e !== 'ring' ? (byId[e] ? byId[e].w / 2 : 6) + 2.5 : null), hosts = (R.ends || []).map(e => byId[e]).filter(Boolean);
+      // the cross-section's strips: [lateral from, lateral to, height from, height to, surface, normal: 'up' or a side]
+      const strips = [[-hw, hw, 0.035, 0.035, 0, 'up']];
+      if (urban) for (const sd of [-1, 1]) strips.push([sd * hw, sd * hw, 0.035, 0.185, 1, -sd], [sd * hw, sd * (hw + 0.3), 0.185, 0.185, 1, 'up'], [sd * (hw + 0.3), sd * (hw + 2.1), 0.185, 0.185, 2, 'up'], [sd * (hw + 2.1), sd * (hw + 2.1), 0.185, -0.35, 2, sd]);
+      else for (const sd of [-1, 1]) strips.push([sd * hw, sd * (hw + 1.1), 0.02, 0.02, 3, 'up']);
+      let prev = null, chunk0 = 0;
+      for (let k = 0; k < n; k++) {
         const p = R.pts[k];
         // inside the city's square the ground shader paints the road (the local-roads raster); the ribbon starts at its edge
-        if (inCity(p) && inCity(R.pts[Math.min(R.pts.length - 1, k + 1)]) && inCity(R.pts[Math.max(0, k - 1)])) { prev = -1; continue; }
-        const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = (b[1] - a[1]) / l, nz = -(b[0] - a[0]) / l, base = pos.length / 3, y = R.y[k] + 0.035;
-        pos.push(p[0] + nx * R.w / 2, y, p[1] + nz * R.w / 2, p[0] - nx * R.w / 2, y, p[1] - nz * R.w / 2);
-        uv.push(0, R.cum[k] / 12, 1, R.cum[k] / 12); nrm.push(0, 1, 0, 0, 1, 0);
-        if (prev >= 0) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
-        prev = base;
-        // a new mesh every 400 points (a kilometre): it starts with this point again, so the ribbon has no gap
-        if (k - chunk0 >= 400 && k < R.pts.length - 1) { flush(); chunk0 = k; k--; prev = -1; }
+        if (inCity(p) && inCity(R.pts[Math.min(n - 1, k + 1)]) && inCity(R.pts[Math.max(0, k - 1)])) { prev = null; continue; }
+        const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(n - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = (b[1] - a[1]) / l, nz = -(b[0] - a[0]) / l, y = R.y[k], sAt = R.cum[k];
+        const endA = ends[0] !== null && ends[0] !== undefined ? sAt - ends[0] : 1e3, endB = ends[1] !== null && ends[1] !== undefined ? R.len - sAt - ends[1] : 1e3;
+        // the paint fades out where the road runs into the road it joins (within 30 m of that end)
+        const paint = hosts.length && (sAt < 30 || R.len - sAt < 30) ? 1 - smoothstep(-7, -1, inside(p[0], p[1], R, hosts)) : 1;
+        const cur = strips.map(([l0, l1, y0, y1, surf, side], si) => {
+          if (si > 0 && skipSide(k)) return null;
+          const vert = side !== 'up', nn = vert ? [nx * side, 0, nz * side] : [0, 1, 0];
+          const q = [surf, paint, endA, endB];
+          // (the higher lateral first: with the index order below the strip faces up, as the old ribbon did)
+          const A = vtx(p[0] + nx * l1, y + y1, p[1] + nz * l1, nn, [l1, sAt, hw, cls], q), B = vtx(p[0] + nx * l0, y + y0, p[1] + nz * l0, nn, [l0, sAt, hw, cls], q);
+          // kerbs, pavements and shoulders give way to any other road's carriageway (tested at both edges); a joining
+          // street's also give way to the pavement of the road it joins, which runs on unbroken
+          const cut = si > 0 && (Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R), inside(p[0] + nx * l1, p[1] + nz * l1, R)) > -0.25
+            || (hosts.length && Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R, hosts), inside(p[0] + nx * l1, p[1] + nz * l1, R, hosts)) > -2.3));
+          return { A, B, cut };
+        });
+        if (prev) cur.forEach((c, si) => { const pr = prev[si]; if (c && pr && !c.cut && !pr.cut) idx.push(pr.A, c.A, pr.B, pr.B, c.A, c.B); });
+        // (a quad is drawn only when both its ends are clear, so a cut leaves no stub reaching into the junction)
+        prev = cur;
+        // a new mesh every 400 points (a kilometre): it starts with this point again, so the road has no gap
+        if (k - chunk0 >= 400 && k < n - 1) { flush(); chunk0 = k; k--; prev = null; }
       }
-      // the turning circle at a dead end
+      // the turning circle at a dead end: asphalt to a gutter, and on a district street its kerb and pavement round it
       if (R.ring) {
-        const c0 = pos.length / 3, y = R.y[R.y.length - 1] + 0.03, rr = R.ring.r + R.w / 2;
-        pos.push(R.ring.x, y, R.ring.z); uv.push(0.3, 0); nrm.push(0, 1, 0);
-        for (let q = 0; q <= 32; q++) { const an = q / 32 * Math.PI * 2; pos.push(R.ring.x + Math.cos(an) * rr, y, R.ring.z + Math.sin(an) * rr); uv.push(0.3, 0.6); nrm.push(0, 1, 0); if (q) idx.push(c0, c0 + q + 1, c0 + q); }
+        const y = R.y[R.y.length - 1], rr = R.ring.r + hw, cx = R.ring.x, cz = R.ring.z, N = 40;
+        const ring = (r0, r1, h0, h1, surf, side) => {
+          let pv = null;
+          for (let q = 0; q <= N; q++) {
+            const an = q / N * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an), nn = side === 'up' ? [0, 1, 0] : [ca * side, 0, sa * side], qq = [surf, 0, 1e3, 1e3];
+            const A = vtx(cx + ca * r1, y + h1, cz + sa * r1, nn, [r1, an * rr, rr, 0], qq), B = vtx(cx + ca * r0, y + h0, cz + sa * r0, nn, [r0, an * rr, rr, 0], qq);
+            if (pv) idx.push(pv[0], A, pv[1], pv[1], A, B); pv = [A, B];
+          }
+        };
+        ring(0, rr, 0.03, 0.03, 0, 'up');
+        if (urban) { ring(rr, rr, 0.03, 0.185, 1, -1); ring(rr, rr + 0.3, 0.185, 0.185, 1, 'up'); ring(rr + 0.3, rr + 2.1, 0.185, 0.185, 2, 'up'); ring(rr + 2.1, rr + 2.1, 0.185, -0.35, 2, 1); }
       }
       flush();
     }

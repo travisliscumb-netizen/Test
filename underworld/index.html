@@ -36172,6 +36172,121 @@ function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0, loc = [
   return m;
 }
 
+/* ---------------- The island's roads (177): the city streets' asphalt, laid along each road ----------------
+   Every vertex carries the road's own coordinates, in metres: aR = (u: across from the centre line, s: along it,
+   hw: the carriageway's half width, cls: 0 a district street, 1 a district avenue, 2 a country road, 3 a highway)
+   and aQ = (surf: 0 asphalt, 1 kerb, 2 pavement, 3 gravel shoulder; paint: 0 inside a junction .. 1; the distance
+   to the stop line at the road's first end and at its last, negative past it, 1e3 where the end joins nothing).
+   The asphalt is the city's (aggregate, repaired patches, cracks, tyre wear in each lane's wheel paths, puddles and a
+   wet sheen); the paint follows the class: a district street's gutters, an avenue's double yellow and lane dashes, a
+   country road's broken centre line and edge lines, a highway's double yellow, edge lines and rumble strips; a stop
+   line across the right-hand lane where a district street meets another road. */
+function makeIsleRoadMaterial() {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  m.defines = { PV_HQ: '' };
+  atmos(m, sh => {
+    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uTime = U.uTime; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
+    patchWorldVaryings(sh, 'attribute vec4 aR; attribute vec4 aQ; varying vec4 vR; varying vec4 vQ;');
+    sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n      vR = aR; vQ = aQ;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uNight; uniform float uWet; uniform float uTime; uniform float uRain; uniform float uCloudShadow; uniform vec3 uHorizon; uniform vec3 uZenith;
+        varying vec3 vPW; varying vec3 vPN; varying vec4 vR; varying vec4 vQ;
+        ${GLSL_NOISE}
+        ${GLSL_BUMP}
+        ${GLSL_CLOUDSHADOW}
+        float lineAA(float d, float w){ float fw = fwidth(d) + 0.001; return 1.0 - smoothstep(w - fw, w + fw, d); }
+        float boxAA(vec2 q, vec2 hs){ vec2 d = abs(q) - hs; float s = max(d.x, d.y); float fw = fwidth(s) + 0.001; return 1.0 - smoothstep(-fw, fw, s); }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec2 p = vPW.xz;
+        float u = vR.x, s = vR.y, hw = vR.z, cls = vR.w, surf = vQ.x, paint = vQ.y, au = abs(u);
+        float n1 = pvf(p * 0.35), n2 = pvn(p * 3.7), grain = pvn(p * 23.0);
+        vec3 col; float rough = 0.9, hgt = 0.0, isRoad = 0.0, puddleMask = 0.0;
+        if (surf < 0.5) {
+          isRoad = 1.0;
+          col = vec3(0.15, 0.155, 0.165) * (0.8 + 0.36 * n1) + (n2 - 0.5) * 0.03 + (grain - 0.5) * 0.035;
+          col += step(0.93, pvh(floor(p * 18.0))) * 0.035; hgt += grain * 0.004; rough = 0.88;
+          vec2 pc = floor(p / 7.0), pf = fract(p / 7.0); float ph = pvh(pc + 13.0);
+          if (ph > 0.84) { vec2 hs = vec2(0.2 + pvh(pc + 3.0) * 0.25, 0.15 + pvh(pc + 7.0) * 0.3); float rp = boxAA(pf - 0.5, hs); col = mix(col, vec3(0.105, 0.11, 0.115) * (0.9 + 0.2 * grain), rp * 0.9); float seam = boxAA(pf - 0.5, hs + 0.012) - rp; col *= 1.0 - seam * 0.3; }
+          float cr = abs(pvn(p * 0.9) - 0.5);
+          float crack = (1.0 - smoothstep(0.0, 0.012 + fwidth(cr), cr)) * step(0.58, pvn(p * 0.21 + 5.0));
+          col *= 1.0 - crack * 0.4; hgt -= crack * 0.01;
+          // the lanes: where the edge line runs, how many lanes each way, the wheel paths in each
+          float urban = step(cls, 1.5);
+          float edgeL = urban > 0.5 ? hw - 0.45 : (cls < 2.5 ? hw - (hw > 4.75 ? 1.3 : 0.6) : hw - 1.6);
+          float lanes = hw > 5.9 ? 2.0 : 1.0, laneW = edgeL / lanes;
+          float lc = (min(floor(au / laneW), lanes - 1.0) + 0.5) * laneW, du = abs(au - lc);
+          float wear = smoothstep(0.7, 0.0, abs(du - 0.85)) * step(au, edgeL);
+          col *= 1.0 - 0.1 * wear; col += vec3(0.02) * wear * step(0.5, n1);
+          col *= 1.0 - 0.07 * smoothstep(0.6, 0.0, du) * step(0.55, pvn(p * 0.6)) * step(au, edgeL);
+          // a country road's crumbling edge; a district street's concrete gutter
+          if (urban < 0.5) { float e = smoothstep(hw - 0.55, hw - 0.05, au + (pvn(vec2(s * 0.8, u * 2.0)) - 0.5) * 0.35); col = mix(col, col * 0.78 + vec3(0.035, 0.03, 0.025), e); rough = mix(rough, 0.95, e); }
+          float gut = urban * smoothstep(hw - 0.47, hw - 0.43, au);
+          // the paint
+          float y = 0.0, mk = 0.0;
+          if (cls > 2.5 || (cls > 0.5 && cls < 1.5)) y = lineAA(abs(au - 0.17), 0.065);
+          else if (cls > 1.5) y = lineAA(au, 0.07) * step(fract(s / 12.0), 0.25);
+          if (urban < 0.5) mk = max(mk, lineAA(abs(au - edgeL), 0.075));
+          if (cls > 0.5 && lanes > 1.5) mk = max(mk, lineAA(abs(au - laneW), 0.06) * step(fract(s / 9.0), 0.34));
+          if (cls > 2.5 && au > edgeL + 0.3 && au < edgeL + 0.9) { float g = step(0.5, fract(s / 0.32)); col *= 1.0 - 0.2 * g; hgt -= g * 0.006; }
+          // the stop line across the right-hand lane, short of a junction (it shows inside the junction's fade)
+          float stopL = max(lineAA(abs(vQ.z), 0.25) * step(0.3, u) * step(u, edgeL), lineAA(abs(vQ.w), 0.25) * step(0.3, -u) * step(-u, edgeL));
+          // a solid centre line up to the stop line
+          y = max(y, lineAA(au, 0.07) * step(cls, 2.5) * (step(0.0, vQ.z) * step(vQ.z, 18.0) + step(0.0, vQ.w) * step(vQ.w, 18.0)) * step(cls, 1.5));
+          float wearP = 0.86 - 0.28 * n1;
+          col = mix(col, vec3(0.86, 0.66, 0.16) * 0.9, y * 0.92 * wearP * paint);
+          col = mix(col, vec3(0.88) * (0.9 + 0.1 * n2), max(mk * paint, stopL) * wearP);
+          hgt += (y + mk + stopL) * 0.002;
+          if (gut > 0.0) { vec3 gc = vec3(0.44, 0.44, 0.42) * (0.85 + 0.15 * n2) * (1.0 - 0.3 * lineAA(abs(fract(s / 1.5) - 0.5) * 1.5, 0.02)); col = mix(col, gc, gut * 0.92); rough = mix(rough, 0.8, gut); }
+          col *= 1.0 - 0.14 * smoothstep(hw - 0.9, hw, au);
+          float puddle = smoothstep(0.56, 0.68, pvf(p * 0.11 + 3.0)) * uWet; puddleMask = puddle;
+          col *= mix(1.0, 0.5, uWet); rough = mix(rough, 0.28, uWet); rough = mix(rough, 0.03, puddle); col = mix(col, col * 0.7, puddle);
+        } else if (surf < 1.5) {
+          // the kerb: precast lengths of concrete
+          col = vec3(0.6, 0.6, 0.58) * (0.85 + 0.15 * n2) * (1.0 - 0.3 * lineAA(abs(fract(s) - 0.5), 0.015)); rough = 0.8;
+          col *= 1.0 - uWet * 0.3;
+        } else if (surf < 2.5) {
+          // the pavement: concrete slabs, joints, the odd stained or cracked one
+          vec2 tp = vec2(au - hw - 0.3, s) / 1.5; vec2 g = abs(fract(tp) - 0.5);
+          float joint = 1.0 - smoothstep(0.44, 0.49, max(g.x, g.y)), sh = pvh(floor(tp) + floor(hw));
+          col = vec3(0.5, 0.5, 0.48) * (0.88 + 0.12 * sh) * (0.9 + 0.1 * n2) * (0.72 + 0.28 * joint);
+          col *= 1.0 - 0.12 * step(0.86, sh) * smoothstep(0.3, 0.7, pvn(p * 1.3));
+          hgt -= (1.0 - joint) * 0.01; rough = 0.82;
+          col *= 1.0 - uWet * 0.3; rough = mix(rough, rough * 0.55, uWet);
+        } else {
+          // the gravel shoulder, thinning into grass at its outer edge
+          // (smooth noise, not hashed cells: hashed 11 cm cells alias into a checkerboard a few metres off)
+          float stn = pvn(p * 9.0) * 0.6 + pvn(p * 2.3 + 7.0) * 0.4;
+          col = mix(vec3(0.37, 0.35, 0.31), vec3(0.26, 0.25, 0.23), stn) * (0.88 + 0.24 * n2);
+          float grass = smoothstep(0.35, 0.95, (au - hw) / 1.1 + (pvn(p * 1.7) - 0.5) * 0.6);
+          col = mix(col, vec3(0.3, 0.42, 0.2) * (0.8 + 0.3 * n1), grass);
+          hgt += stn * 0.008; rough = 0.95;
+          col *= 1.0 - uWet * 0.3;
+        }
+        diffuseColor.rgb = col * pvCloudShadow(p);
+        roughnessFactor = rough;
+        if (uWet > 0.02 && vPN.y > 0.5) {
+          vec3 V = normalize(cameraPosition - vPW);
+          float ndv = clamp(V.y, 0.0, 1.0), fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+          float film = uWet * clamp(0.25 + 0.5 * isRoad + 0.75 * puddleMask, 0.0, 1.0);
+          totalEmissiveRadiance += mix(uHorizon, uZenith, clamp(ndv * 1.6, 0.0, 1.0)) * fres * film * (0.3 + 1.1 * puddleMask);
+        }
+        #ifdef PV_HQ
+          if (uRain > 0.05 && puddleMask > 0.05) {
+            vec2 rc = floor(p * 1.6); vec2 rf = fract(p * 1.6) - 0.5;
+            float rt = fract(uTime * 0.9 + pvh(rc) * 7.0);
+            float ring = sin((length(rf) - rt * 0.5) * 40.0) * (1.0 - rt) * step(length(rf), rt * 0.5);
+            hgt += ring * 0.002 * puddleMask * uRain;
+          }
+          if (vPN.y > 0.5) normal = pvBump(-vViewPosition, normal, hgt, 1.0);
+        #endif
+      }`);
+  });
+  m.customProgramCacheKey = () => 'pv-isleroad';
+  return m;
+}
+
 // soft ambient-occlusion map rendered from building footprints (≈1 m per texel)
 function makeAOTexture(world) {
   const S = 1056, c = document.createElement('canvas'); c.width = S; c.height = S;
@@ -43750,49 +43865,88 @@ class IslandScenery {
     if (this._farDirty) this._farIndex();
   }
   // ---------------------------------------------------------------- roads
-  _roadTexture() {
-    const c = document.createElement('canvas'); c.width = 128; c.height = 256; const g = c.getContext('2d');
-    g.fillStyle = '#3b3d41'; g.fillRect(0, 0, 128, 256);
-    // worn wheel tracks, a little grain, white edge lines, a dashed yellow centre line
-    for (let k = 0; k < 900; k++) { const v = 52 + Math.floor(hash2i(k, 7, 301) * 26); g.fillStyle = `rgba(${v},${v},${v + 2},0.5)`; g.fillRect(hash2i(k, 1, 303) * 128, hash2i(k, 2, 305) * 256, 2, 2); }
-    g.fillStyle = 'rgba(30,31,34,0.35)'; for (const x of [26, 46, 74, 94]) g.fillRect(x, 0, 8, 256);
-    g.fillStyle = '#e4e4de'; g.fillRect(6, 0, 3, 256); g.fillRect(119, 0, 3, 256);
-    g.fillStyle = '#e2b43a'; g.fillRect(62, 0, 4, 110);
-    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }
-  // the ribbons: a mesh for about every kilometre of each road (so only what is in view is drawn), one material
+  /* the roads (owner, 2026-11-16: "the new roads need to look amazing"): a mesh for about every kilometre of each
+     road, one material (makeIsleRoadMaterial, 060: the city streets' asphalt and paint). A district street has a
+     concrete kerb and a pavement each side, a country road or a highway a gravel shoulder. Kerbs, pavements and
+     shoulders are cut where another road's carriageway crosses them (no kerb across a side street's mouth); a road's
+     paint fades out where it runs into the road it joins, and a stop line is painted 2.5 m short of that road. */
   _roadMesh() {
-    const E = EDGE_MARGIN, group = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const E = EDGE_MARGIN, group = new THREE.Group(), mat = makeIsleRoadMaterial();
+    mat.side = THREE.DoubleSide;
     const inCity = p => CityLayout.precincts.some(q => p[0] > q.x0 - E && p[1] > q.z0 - E && p[0] < q.x1 + E && p[1] < q.z1 + E);
-    let pos = [], uv = [], nrm = [], idx = [];
-    const flush = () => {
-      if (!idx.length) { pos = []; uv = []; nrm = []; return; }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-      g.setIndex(idx); g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
-      pos = []; uv = []; nrm = []; idx = [];
+    const roads = Island.roads, byId = {}; for (const R of roads) byId[R.id] = R;
+    // every road's centre-line segments on a 24 m grid: how far a point is inside another road's carriageway
+    const G = 24, grid = new Map(), key = (i, j) => i * 100003 + j;
+    roads.forEach((R, ri) => { for (let k = 0; k < R.pts.length - 1; k++) { const a = R.pts[k], b = R.pts[k + 1]; for (let i = Math.floor(Math.min(a[0], b[0]) / G); i <= Math.floor(Math.max(a[0], b[0]) / G); i++) for (let j = Math.floor(Math.min(a[1], b[1]) / G); j <= Math.floor(Math.max(a[1], b[1]) / G); j++) { const kk = key(i, j); if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(ri, k); } } });
+    const inside = (x, z, R, only) => {
+      let best = -1e9; const i = Math.floor(x / G), j = Math.floor(z / G);
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+        const L = grid.get(key(i + di, j + dj)); if (!L) continue;
+        for (let q = 0; q < L.length; q += 2) { const Q = roads[L[q]]; if (Q === R || (only && !only.includes(Q))) continue; const a = Q.pts[L[q + 1]], b = Q.pts[L[q + 1] + 1], d = Q.w / 2 - segDist(x, z, a[0], a[1], b[0], b[1]); if (d > best) best = d; }
+      }
+      return best;
     };
-    for (const R of Island.roads) {
-      let prev = -1, chunk0 = 0;
-      for (let k = 0; k < R.pts.length; k++) {
+    let pos = [], nrm = [], aR = [], aQ = [], idx = [];
+    const flush = () => {
+      if (idx.length) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+        g.setAttribute('aR', new THREE.Float32BufferAttribute(aR, 4)); g.setAttribute('aQ', new THREE.Float32BufferAttribute(aQ, 4));
+        g.setIndex(idx); g.computeBoundingSphere();
+        const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
+      }
+      pos = []; nrm = []; aR = []; aQ = []; idx = [];
+    };
+    const vtx = (x, y, z, n, r, q) => { pos.push(x, y, z); nrm.push(n[0], n[1], n[2]); aR.push(r[0], r[1], r[2], r[3]); aQ.push(q[0], q[1], q[2], q[3]); return pos.length / 3 - 1; };
+    for (const R of roads) {
+      const urban = /^[ghmpd]\d/.test(R.id), cls = urban ? (R.w >= 9 ? 1 : 0) : (R.w >= 11 ? 3 : 2), hw = R.w / 2, n = R.pts.length;
+      const skipSide = k => (R.bridges || []).some(sp => k >= sp[0] - 1 && k <= sp[1] + 1) || (R.tunnel && k >= R.tunnel[0] - 3 && k <= R.tunnel[1] + 3);
+      // the stop lines: 2.5 m short of the road each end joins (a lattice street is 12 m wide)
+      const ends = (R.ends || []).map(e => e && e !== 'ring' ? (byId[e] ? byId[e].w / 2 : 6) + 2.5 : null), hosts = (R.ends || []).map(e => byId[e]).filter(Boolean);
+      // the cross-section's strips: [lateral from, lateral to, height from, height to, surface, normal: 'up' or a side]
+      const strips = [[-hw, hw, 0.035, 0.035, 0, 'up']];
+      if (urban) for (const sd of [-1, 1]) strips.push([sd * hw, sd * hw, 0.035, 0.185, 1, -sd], [sd * hw, sd * (hw + 0.3), 0.185, 0.185, 1, 'up'], [sd * (hw + 0.3), sd * (hw + 2.1), 0.185, 0.185, 2, 'up'], [sd * (hw + 2.1), sd * (hw + 2.1), 0.185, -0.35, 2, sd]);
+      else for (const sd of [-1, 1]) strips.push([sd * hw, sd * (hw + 1.1), 0.02, 0.02, 3, 'up']);
+      let prev = null, chunk0 = 0;
+      for (let k = 0; k < n; k++) {
         const p = R.pts[k];
         // inside the city's square the ground shader paints the road (the local-roads raster); the ribbon starts at its edge
-        if (inCity(p) && inCity(R.pts[Math.min(R.pts.length - 1, k + 1)]) && inCity(R.pts[Math.max(0, k - 1)])) { prev = -1; continue; }
-        const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = (b[1] - a[1]) / l, nz = -(b[0] - a[0]) / l, base = pos.length / 3, y = R.y[k] + 0.035;
-        pos.push(p[0] + nx * R.w / 2, y, p[1] + nz * R.w / 2, p[0] - nx * R.w / 2, y, p[1] - nz * R.w / 2);
-        uv.push(0, R.cum[k] / 12, 1, R.cum[k] / 12); nrm.push(0, 1, 0, 0, 1, 0);
-        if (prev >= 0) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
-        prev = base;
-        // a new mesh every 400 points (a kilometre): it starts with this point again, so the ribbon has no gap
-        if (k - chunk0 >= 400 && k < R.pts.length - 1) { flush(); chunk0 = k; k--; prev = -1; }
+        if (inCity(p) && inCity(R.pts[Math.min(n - 1, k + 1)]) && inCity(R.pts[Math.max(0, k - 1)])) { prev = null; continue; }
+        const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(n - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = (b[1] - a[1]) / l, nz = -(b[0] - a[0]) / l, y = R.y[k], sAt = R.cum[k];
+        const endA = ends[0] !== null && ends[0] !== undefined ? sAt - ends[0] : 1e3, endB = ends[1] !== null && ends[1] !== undefined ? R.len - sAt - ends[1] : 1e3;
+        // the paint fades out where the road runs into the road it joins (within 30 m of that end)
+        const paint = hosts.length && (sAt < 30 || R.len - sAt < 30) ? 1 - smoothstep(-7, -1, inside(p[0], p[1], R, hosts)) : 1;
+        const cur = strips.map(([l0, l1, y0, y1, surf, side], si) => {
+          if (si > 0 && skipSide(k)) return null;
+          const vert = side !== 'up', nn = vert ? [nx * side, 0, nz * side] : [0, 1, 0];
+          const q = [surf, paint, endA, endB];
+          // (the higher lateral first: with the index order below the strip faces up, as the old ribbon did)
+          const A = vtx(p[0] + nx * l1, y + y1, p[1] + nz * l1, nn, [l1, sAt, hw, cls], q), B = vtx(p[0] + nx * l0, y + y0, p[1] + nz * l0, nn, [l0, sAt, hw, cls], q);
+          // kerbs, pavements and shoulders give way to any other road's carriageway (tested at both edges); a joining
+          // street's also give way to the pavement of the road it joins, which runs on unbroken
+          const cut = si > 0 && (Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R), inside(p[0] + nx * l1, p[1] + nz * l1, R)) > -0.25
+            || (hosts.length && Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R, hosts), inside(p[0] + nx * l1, p[1] + nz * l1, R, hosts)) > -2.3));
+          return { A, B, cut };
+        });
+        if (prev) cur.forEach((c, si) => { const pr = prev[si]; if (c && pr && !c.cut && !pr.cut) idx.push(pr.A, c.A, pr.B, pr.B, c.A, c.B); });
+        // (a quad is drawn only when both its ends are clear, so a cut leaves no stub reaching into the junction)
+        prev = cur;
+        // a new mesh every 400 points (a kilometre): it starts with this point again, so the road has no gap
+        if (k - chunk0 >= 400 && k < n - 1) { flush(); chunk0 = k; k--; prev = null; }
       }
-      // the turning circle at a dead end
+      // the turning circle at a dead end: asphalt to a gutter, and on a district street its kerb and pavement round it
       if (R.ring) {
-        const c0 = pos.length / 3, y = R.y[R.y.length - 1] + 0.03, rr = R.ring.r + R.w / 2;
-        pos.push(R.ring.x, y, R.ring.z); uv.push(0.3, 0); nrm.push(0, 1, 0);
-        for (let q = 0; q <= 32; q++) { const an = q / 32 * Math.PI * 2; pos.push(R.ring.x + Math.cos(an) * rr, y, R.ring.z + Math.sin(an) * rr); uv.push(0.3, 0.6); nrm.push(0, 1, 0); if (q) idx.push(c0, c0 + q + 1, c0 + q); }
+        const y = R.y[R.y.length - 1], rr = R.ring.r + hw, cx = R.ring.x, cz = R.ring.z, N = 40;
+        const ring = (r0, r1, h0, h1, surf, side) => {
+          let pv = null;
+          for (let q = 0; q <= N; q++) {
+            const an = q / N * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an), nn = side === 'up' ? [0, 1, 0] : [ca * side, 0, sa * side], qq = [surf, 0, 1e3, 1e3];
+            const A = vtx(cx + ca * r1, y + h1, cz + sa * r1, nn, [r1, an * rr, rr, 0], qq), B = vtx(cx + ca * r0, y + h0, cz + sa * r0, nn, [r0, an * rr, rr, 0], qq);
+            if (pv) idx.push(pv[0], A, pv[1], pv[1], A, B); pv = [A, B];
+          }
+        };
+        ring(0, rr, 0.03, 0.03, 0, 'up');
+        if (urban) { ring(rr, rr, 0.03, 0.185, 1, -1); ring(rr, rr + 0.3, 0.185, 0.185, 1, 'up'); ring(rr + 0.3, rr + 2.1, 0.185, 0.185, 2, 'up'); ring(rr + 2.1, rr + 2.1, 0.185, -0.35, 2, 1); }
       }
       flush();
     }
