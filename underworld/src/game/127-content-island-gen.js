@@ -55,6 +55,8 @@ Object.assign(World.prototype, {
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
     Island.addPad(CFS.lb.x - CFS.lb.half - 1, CFS_EDGE + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
     Island.buildRoads();
+    // the countryside between the districts (129): fields against the finished roads and pads
+    Farms.init();
     // ---------------------------------------------------------------- the roads: curved links like the city's own
     for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
     // promenade lamps that would stand in a road leaving the city

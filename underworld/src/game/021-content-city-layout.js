@@ -41,12 +41,16 @@ const CITY_LAYOUTS = {
   // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
   // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
   island: [
-    { id: 'core', lx0: 2, lz0: 0, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+    { id: 'core', lx0: 2, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
     { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 1, lz1: 7, ox: 0, oz: 0 },
     { id: 'linden', lx0: 0, lz0: 8, lx1: 3, lz1: 11, ox: 0, oz: 0 },
+    { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 },
     { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -8, oz: -6 },
-    { id: 'strip', lx0: 4, lz0: 8, lx1: 9, lz1: 11, ox: -12, oz: 4 },
-    { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 }
+    { id: 'greenway', lx0: 2, lz0: 0, lx1: 5, lz1: 3, ox: -8, oz: -6 },
+    { id: 'uptown', lx0: 6, lz0: 0, lx1: 9, lz1: 3, ox: 14, oz: -5 },
+    { id: 'strip', lx0: 4, lz0: 8, lx1: 5, lz1: 11, ox: -12, oz: 4 },
+    { id: 'stadium', lx0: 6, lz0: 8, lx1: 9, lz1: 9, ox: -12, oz: 4 },
+    { id: 'freight', lx0: 6, lz0: 10, lx1: 9, lz1: 11, ox: 8, oz: 4 }
   ]
 };
 // the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
@@ -54,8 +58,13 @@ const CITY_LAYOUTS = {
 const CITY_CONNECTORS = {
   tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }],
   island: [
-    // the Strip's east street to the Southshore Highway
-    { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1160], [-128, 1156], [-100, 1150]] }
+    // the Stadium's east street to the Southshore Highway
+    { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1080], [-128, 1085], [-100, 1090]] },
+    // the freight park on the south-east plain: west to the Southshore Highway
+    { id: 'cW', name: 'Freight Road', w: 11, grade: 0.07, ends: ['lat', 's1'], pts: [[1114, 1160], [1040, 1162], [960, 1168], [860, 1176], [748, 1185]] },
+    // Uptown, on Valen Sound's north shore: up to the Coast Highway, and west along the shore to it
+    { id: 'cU', name: 'Lakeside Avenue', w: 11, grade: 0.07, ends: ['lat', 'n1'], pts: [[1720, -406], [1722, -450], [1724, -515]] },
+    { id: 'cV', name: 'Sound Road', w: 10, grade: 0.07, ends: ['lat', 'n1'], pts: [[1594, -200], [1500, -230], [1350, -280], [1240, -310], [1165, -330]] }
   ]
 };
 const CityLayout = {

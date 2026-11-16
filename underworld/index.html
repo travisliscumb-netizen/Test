@@ -33310,12 +33310,16 @@ const CITY_LAYOUTS = {
   // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
   // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
   island: [
-    { id: 'core', lx0: 2, lz0: 0, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+    { id: 'core', lx0: 2, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
     { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 1, lz1: 7, ox: 0, oz: 0 },
     { id: 'linden', lx0: 0, lz0: 8, lx1: 3, lz1: 11, ox: 0, oz: 0 },
+    { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 },
     { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -8, oz: -6 },
-    { id: 'strip', lx0: 4, lz0: 8, lx1: 9, lz1: 11, ox: -12, oz: 4 },
-    { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 }
+    { id: 'greenway', lx0: 2, lz0: 0, lx1: 5, lz1: 3, ox: -8, oz: -6 },
+    { id: 'uptown', lx0: 6, lz0: 0, lx1: 9, lz1: 3, ox: 14, oz: -5 },
+    { id: 'strip', lx0: 4, lz0: 8, lx1: 5, lz1: 11, ox: -12, oz: 4 },
+    { id: 'stadium', lx0: 6, lz0: 8, lx1: 9, lz1: 9, ox: -12, oz: 4 },
+    { id: 'freight', lx0: 6, lz0: 10, lx1: 9, lz1: 11, ox: 8, oz: 4 }
   ]
 };
 // the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
@@ -33323,8 +33327,13 @@ const CITY_LAYOUTS = {
 const CITY_CONNECTORS = {
   tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }],
   island: [
-    // the Strip's east street to the Southshore Highway
-    { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1160], [-128, 1156], [-100, 1150]] }
+    // the Stadium's east street to the Southshore Highway
+    { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1080], [-128, 1085], [-100, 1090]] },
+    // the freight park on the south-east plain: west to the Southshore Highway
+    { id: 'cW', name: 'Freight Road', w: 11, grade: 0.07, ends: ['lat', 's1'], pts: [[1114, 1160], [1040, 1162], [960, 1168], [860, 1176], [748, 1185]] },
+    // Uptown, on Valen Sound's north shore: up to the Coast Highway, and west along the shore to it
+    { id: 'cU', name: 'Lakeside Avenue', w: 11, grade: 0.07, ends: ['lat', 'n1'], pts: [[1720, -406], [1722, -450], [1724, -515]] },
+    { id: 'cV', name: 'Sound Road', w: 10, grade: 0.07, ends: ['lat', 'n1'], pts: [[1594, -200], [1500, -230], [1350, -280], [1240, -310], [1165, -330]] }
   ]
 };
 const CityLayout = {
@@ -33545,7 +33554,8 @@ const ISLE_ROAD_LAYOUT = {
     // the Coast Highway reaches Crestmoor Heights from the core and leaves from its west street: the district's own
     // streets carry it through
     n1: { ends: ['lat', 'lat'], pts: [[-646, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
-    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[200, -6], [200, -60], [150, -150], [-10, -270], [-240, -330], [-400, -356], [-474, -360]] }],
+    // ... and on from Greenway's east street across Midtown to the core's north street
+    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[-154, -280], [-90, -276], [-10, -270], [90, -200], [200, -100], [300, 40], [350, 200], [360, 314]] }],
     n2: { ends: ['n1e', 'ring'] },
     // the Southshore Highway's east end comes up to the core's south street over the ground the square left
     s1: { pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [728, 1040], [712, 900], [694, 760], [682, 680], [680, 646]] },
@@ -33914,8 +33924,8 @@ const Island = {
     const A = AIRPORT, G = PROVING;
     if (x > A.x0 - 60 && x < A.x1 + 60 && z > A.z0 - 90 && z < A.z1 + 60) return 'y';
     if (x > G.x0 - 30 && x < G.x1 + 30 && z > G.z0 - 30 && z < G.z1 + 30) return 'j';
-    // (the ground a moved precinct left inside the old square, built up as Linden Gardens: 128)
-    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island' && x > ISLE_GARDENS.x0 && x < ISLE_GARDENS.x1 && z > ISLE_GARDENS.z0 && z < ISLE_GARDENS.z1) return 'l';
+    // (the ground moved precincts left on the waist, built up as infill districts: 128 ISLE_INFILL)
+    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) if (x > F.box[0] && x < F.box[2] && z > F.box[1] && z < F.box[3]) return F.zone;
     if (z > 880) return x < -160 && z < 1500 ? 'b' : 'e';
     if (z > -700 && z < -250 && x > -120 && x < 760) return 'k';
     if (Math.hypot(x - MT_VALEN.x, z - MT_VALEN.z) < 1250) return 'n';
@@ -33935,7 +33945,7 @@ const Island = {
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
     for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
     // Linden Gardens (128): the infill between the precincts, at the city's level
-    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island') for (const r of ISLE_GARDENS.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
+    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
   }
 };
 /* =====================================================================
@@ -40633,6 +40643,8 @@ Object.assign(World.prototype, {
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
     Island.addPad(CFS.lb.x - CFS.lb.half - 1, CFS_EDGE + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
     Island.buildRoads();
+    // the countryside between the districts (129): fields against the finished roads and pads
+    Farms.init();
     // ---------------------------------------------------------------- the roads: curved links like the city's own
     for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
     // promenade lamps that would stand in a road leaving the city
@@ -40935,12 +40947,23 @@ const ISLE_INFILL_ROADS = [
   { after: 'p2', id: 'g4', name: 'Mercer Street', w: 8, grade: 0.09, ends: ['lat', 'g3'], pts: [[326, 920], [390, 922], [450, 922], [500, 918], [538, 914]] },
   { after: 'p2', id: 'g6', name: 'Cobb Lane', w: 8, grade: 0.09, ends: ['lat', 'g1'], pts: [[326, 840], [380, 842], [430, 845], [470, 838], [502, 822]] },
   { after: 'p2', id: 'g7', name: 'Sorrel Street', w: 9, grade: 0.08, ends: ['lat', 'g1'], pts: [[600, 646], [602, 700], [608, 760], [618, 815], [624, 856]] },
+  // Midtown (the waist the core's north half left): Harbour Boulevard from the port to the Coast Highway, Midtown
+  // Avenue up from the core, Ferry Street from the Old Quarter, Pier Road out to the north shore
+  { after: 'p2', id: 'd1', name: 'Harbour Boulevard', w: 12, grade: 0.07, ends: ['lat', 'n1e'], pts: [[794, 120], [700, 118], [600, 112], [500, 100], [400, 82], [330, 58], [300, 40]] },
+  { after: 'p2', id: 'd2', name: 'Midtown Avenue', w: 11, grade: 0.07, ends: ['lat', 'd1'], pts: [[600, 314], [600, 250], [598, 180], [600, 112]] },
+  { after: 'p2', id: 'd3', name: 'Ferry Street', w: 9, grade: 0.08, ends: ['lat', 'n1e'], pts: [[120, 314], [120, 240], [125, 140], [140, 40], [170, -40], [200, -100]] },
+  { after: 'p2', id: 'd4', name: 'Pier Road', w: 9, grade: 0.08, ends: ['d1', 'ring'], ring: 14, pts: [[500, 100], [502, 40], [506, -20], [512, -70]] },
   { after: 'p2', id: 'g5', name: 'Wharf Lane', w: 9, grade: 0.08, ends: ['s1', 'lat'], pts: [[694, 760], [730, 767], [770, 775], [794, 778]] }
 ];
 ISLE_ROAD_LAYOUT.island.add.push(...ISLE_INFILL_ROADS);
-// the ground it fills (Island.zoneKey reads it as Linden Hills), levelled to the city's kerb in two rectangles that keep
-// off the inlet in its south-east corner (022 corePads)
-const ISLE_GARDENS = { x0: 320, z0: 640, x1: 800, z1: 1000, pads: [[320, 640, 800, 860], [320, 860, 690, 990]] };
+// the ground infill districts fill, by layout (Island.zoneKey reads each as its zone), levelled to the city's kerb in
+// rectangles that keep off the water (022 corePads)
+const ISLE_INFILL = {
+  island: [
+    { d: 'gardens', zone: 'l', box: [320, 640, 800, 1000], pads: [[320, 640, 800, 860], [320, 860, 690, 990]] },
+    { d: 'midtown', zone: 'm', box: [0, -140, 800, 320], pads: [[12, -90, 800, 320]] }
+  ]
+};
 // the districts: their names, where their name sits on the map, the signs their shops and yards carry
 const ISLE_DISTRICTS = {
   bayview: { name: 'Bayview Heights', at: [-470, -230], signs: ['BAYVIEW MARKET', 'HARBOUR CAFÉ', 'CRESCENT PHARMACY', 'THE BAY BISTRO'], cars: ['luxury', 'crest', 'suv', 'sports', 'kodiak', 'sedan', 'coupe', 'estate'] },
@@ -40948,6 +40971,10 @@ const ISLE_DISTRICTS = {
   landing: { name: 'Blackgate Landing', at: [-1120, 1430], signs: ['BLACKGATE FREIGHT', 'VALEN COLD STORAGE', 'PIER 9 IMPORTS', 'SOUND SHIPPING CO.', 'WESTCOAST SALVAGE', 'FOUNDRY TRADING'], cars: ['truck', 'van', 'pickup', 'utility'] },
   lakeside: { name: 'Lake Valen Shore', at: [1880, -600], signs: ['LAKEVIEW DINER'], cars: ['pickup', 'suv', 'offroad', 'estate'] },
   gull: { name: 'Gull Harbor', at: [-1290, -2275], signs: [], cars: ['pickup', 'van', 'utility'] },
+  soundview: { name: 'Soundview', at: [1350, -300], signs: ['SOUNDVIEW MARKET', 'LAKESIDE PHARMACY', 'NORTHSHORE CAFÉ', 'SOUND SURF & TACKLE'], cars: ['sedan', 'suv', 'estate', 'compact', 'coupe', 'luxury'] },
+  logistics: { name: 'Southport Logistics Park', at: [930, 1170], signs: ['SOUTHPORT FREIGHT', 'AIRSIDE CARGO', 'VALEN COURIER', 'COLD CHAIN 24', 'ISLAND PARCEL CO.'], cars: ['truck', 'van', 'utility', 'pickup'] },
+  farms: { name: 'Valen Farmland', at: [380, 1650], signs: ['FARM SHOP', 'FRESH EGGS', 'PICK YOUR OWN', 'VALEN DAIRY', 'HAY FOR SALE'], cars: ['pickup', 'utility', 'estate', 'van', 'offroad'] },
+  midtown: { name: 'Midtown', at: [420, 160], signs: ['HARBOUR TRUST', 'MIDTOWN DELI', 'PIER 1 OYSTER BAR', 'VALEN HERALD', 'FERRY ST PHARMACY', 'NORTHSIDE GYM', 'BLUE TIDE CAFÉ', 'MIDTOWN BOOKS'], cars: ['sedan', 'luxury', 'taxi', 'coupe', 'suv', 'regent', 'metro', 'estate'] },
   gardens: { name: 'Linden Gardens', at: [520, 800], signs: ['GARDEN PARADE DELI', 'QUINCE ST LAUNDRY', 'LINDEN FLORIST', 'PARADE NEWS', 'THE CORNER TAP', 'MERCER BAKERY'], cars: ['sedan', 'compact', 'estate', 'metro', 'suv', 'regent', 'coupe', 'van'] }
 };
 // what goes where: shops and flats first (they want the best frontage), then the houses fill the rest
@@ -40976,10 +41003,33 @@ const ISLE_LOT_PLAN = [
   { d: 'gardens', road: 'g7', kind: 'apt', sp: 38, max: 4, gap: 2, infill: true },
   { d: 'gardens', road: 'g7', kind: 'house', sp: 23, gap: 1, infill: true },
   { d: 'gardens', road: 'g6', kind: 'house', sp: 23, gap: 1, infill: true },
-  { d: 'gardens', road: 'g5', kind: 'ware', sp: 58, infill: true }
+  { d: 'gardens', road: 'g5', kind: 'ware', sp: 58, infill: true },
+  // Uptown's neighbourhood along Sound Road and Lakeside Avenue; the logistics park along Freight Road
+  { d: 'soundview', road: 'cU', kind: 'shop', sp: 36, max: 2, gap: 2, layout: 'island' },
+  { d: 'soundview', road: 'cV', kind: 'apt', sp: 40, max: 4, gap: 2, layout: 'island' },
+  { d: 'soundview', road: 'cV', kind: 'house', sp: 24, gap: 2, layout: 'island' },
+  { d: 'soundview', road: 'n1', kind: 'house', sp: 24, gap: 2, box: [1180, -560, 1560, -330], layout: 'island' },
+  { d: 'logistics', road: 'cW', kind: 'ware', sp: 60, gap: 4, infill: true, layout: 'island' },
+  // farmsteads on the country roads, in the countryside's regions (129) under the layout that farms them
+  { d: 'farms', road: 's1', kind: 'farm', sp: 210, box: [-150, 1500, 880, 1810], max: 4, layout: 'island' },
+  { d: 'farms', road: 's4', kind: 'farm', sp: 230, box: [-1260, 1640, -300, 2570], max: 5, layout: 'island' },
+  { d: 'farms', road: 's4', kind: 'farm', sp: 230, box: [-300, 2560, 1500, 2760], max: 3, layout: 'island' },
+  { d: 'farms', road: 's4', kind: 'farm', sp: 220, box: [1470, 1690, 2120, 2410], max: 3, layout: 'island' },
+  { d: 'farms', road: 'n1', kind: 'farm', sp: 220, box: [920, -490, 1570, -120], max: 3, layout: 'island' },
+  { d: 'farms', road: 'n1', kind: 'farm', sp: 220, box: [-1670, -490, -750, -120], max: 3, layout: 'island' },
+  { d: 'farms', road: 's3', kind: 'farm', sp: 220, box: [-1670, -490, -750, -120], max: 2, layout: 'island' },
+  // Midtown: towers on the boulevard and the avenue, mid-rise flats behind, shops on the corners
+  { d: 'midtown', road: 'd2', kind: 'tower', sp: 38, gap: 2, infill: true },
+  { d: 'midtown', road: 'd1', kind: 'tower', sp: 38, max: 8, gap: 2, infill: true },
+  { d: 'midtown', road: 'd1', kind: 'shop', sp: 35, max: 4, gap: 1, infill: true },
+  { d: 'midtown', road: 'n1e', kind: 'mid', sp: 40, box: [0, -140, 800, 320], gap: 2, infill: true },
+  { d: 'midtown', road: 'd3', kind: 'mid', sp: 40, gap: 2, infill: true },
+  { d: 'midtown', road: 'd4', kind: 'shop', sp: 35, max: 3, gap: 1, infill: true },
+  { d: 'midtown', road: 'd4', kind: 'mid', sp: 40, gap: 2, infill: true },
+  { d: 'midtown', road: 'd1', kind: 'mid', sp: 40, gap: 2, infill: true }
 ];
 // a lot's size: W along the road, D back from it; set: the verge between the carriageway and the lot
-const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 } };
+const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 }, tower: { W: 34, D: 32, set: 4 }, farm: { W: 56, D: 48, set: 6 }, mid: { W: 36, D: 28, set: 3.5 } };
 // Villa Valen: the estate's walled grounds, levelled at one height, and the vault under its hill
 const VILLA_VALEN = { x0: -692, z0: -1062, x1: -518, z1: -850, y: 21.5, gate: -600, vault: { x0: -604, z0: -1052, x1: -528, z1: -994, door: -563 } };
 Object.assign(World.prototype, {
@@ -41023,7 +41073,7 @@ Object.assign(World.prototype, {
     };
     const lots = [];
     for (const E of ISLE_LOT_PLAN) {
-      if (!roads[E.road]) continue; // a street this city layout does not build (ISLE_ROAD_LAYOUT)
+      if (!roads[E.road] || (E.layout && E.layout !== CityLayout.id)) continue; // a street this city layout does not build (ISLE_ROAD_LAYOUT)
       const R = roads[E.road], S = ISLE_LOT[E.kind], pts = R.pts, cum = R.cum, L = cum[cum.length - 1];
       let n = 0;
       for (let s = E.sp / 2 + 18, i = 0; s < L - 18 - (E.endClear || 0); s += E.sp, i++) {
@@ -41122,6 +41172,30 @@ Object.assign(World.prototype, {
         const [fx, fz] = W2(L, 4, -6); B.folk.push([fx, fz, h + Math.PI], [fx + L.ux * 2.5, fz + L.uz * 2.5, h + 2.6]);
         // a shop is a place on the map: you can be sent to it
         if (!b.place) b.place = { id: 'dist_' + L.d + '_' + n, name: title(text), kind: 'landmark', door: { x: sx - L.vx * 1.4, z: sz - L.vz * 1.4, h }, under: { x: (r[0] + r[2]) / 2, z: (r[1] + r[3]) / 2 } };
+      } else if (L.kind === 'farm') {
+        // a farmstead: the house by the lane, a red barn and two silos behind, a machinery shed, a gravel yard
+        const wall = [0xf2ede2, 0xe8dcc4, 0xd8d0c0][Math.floor(q(1) * 3)];
+        boxL(b, L, 4, 2, L.W - 10, L.D - 12, y + 0.03, 0.06, 0x9a8f7c, false);
+        bld(rectL(L, -17, -12, 6, 5), 6.2, STYLE.HOUSE, wall, 3.1, 3.2, { roof: 'gable', roofColor: [0x5a4a3a, 0x3a4652, 0x7a3a2e][Math.floor(q(2) * 3)] });
+        bld(rectL(L, 6, 8, 11, 8), 10.5, STYLE.WARE, [0x8a2e24, 0x7a2a22, 0x9a3a2c][Math.floor(q(3) * 3)], 10.5, 6, { roof: 'gable', roofColor: 0x3a3d40 });
+        bld(rectL(L, 21, -6, 5, 7), 6, STYLE.WARE, 0x8a929a, 6, 6);
+        for (const k of [0, 1]) { const [sx, sz] = W2(L, -6 + k * 6.5, 15); cyl(b, sx, y + 8, sz, 2.6, 16, 0xb8bcc0, true); cyl(b, sx, y + 16.4, sz, 2.7, 0.8, 0x8a8e92, true); }
+        const [cx, cz] = W2(L, -6, -16); B.slots.push({ x: cx, z: cz, h, y, cls: car(3) });
+        const [tx, tz] = W2(L, -24, -20), [ux, uz] = W2(L, -10, -21); tree(b, tx, y, tz, 1.1, L.i); tree(b, ux, y, uz, 0.9, L.i + 3);
+      } else if (L.kind === 'tower') {
+        // an office tower on a plaza: glass, stone or deco, 28-70 m, its lobby on the street
+        const sty = [STYLE.GLASS, STYLE.GLASS, STYLE.OFFICE, STYLE.DECO][Math.floor(q(1) * 4)], col = (sty === STYLE.GLASS ? PAL.glass : sty === STYLE.DECO ? PAL.deco : PAL.office), hh = 28 + Math.round(q(2) * 42);
+        boxL(b, L, 0, 0, L.W - 1, L.D - 1, y + 0.04, 0.08, 0xb4b0a8, false);
+        bld(rectL(L, 0, 2.5, 13 - q(3) * 2, 11), hh, sty, col[Math.floor(q(4) * col.length)], 3.8, 4.2, { shops: true });
+        const [tx, tz] = W2(L, -14, -12.5), [ux, uz] = W2(L, 14, -12.5); tree(b, tx, y, tz, 0.9, L.i); tree(b, ux, y, uz, 0.9, L.i + 1);
+        for (const k of [-7, 7]) if (q(k + 40) < 0.5) { const [cx, cz] = W2(L, k, -13.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(k + 50) }); }
+        const [fx, fz] = W2(L, 2, -11); B.folk.push([fx, fz, h + Math.PI]);
+      } else if (L.kind === 'mid') {
+        // mid-rise flats over shops: 5-8 storeys of brick or render
+        const fl = 5 + Math.floor(q(1) * 4);
+        bld(rectL(L, 0, 2, 16.5, 9), fl * 3.2, q(2) < 0.5 ? STYLE.BRICK : STYLE.APT, [0xa8644a, 0x8a5a44, 0xc4b6a2, 0xb8a48c, 0x9a8a78, 0xd0c4b0][Math.floor(q(3) * 6)], 3.2, 4, { shops: true });
+        for (const k of [-11, 0, 11]) if (q(k + 40) < 0.55) { const [cx, cz] = W2(L, k, -11.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(k + 50) }); }
+        const [fx, fz] = W2(L, -6, -10); B.folk.push([fx, fz, h + Math.PI]);
       } else if (L.kind === 'apt') {
         bld(rectL(L, 0, 2, 16, 8), 13.6, STYLE.APT, [0xb8a48c, 0xc4b6a2, 0x9a8a78][Math.floor(q(1) * 3)], 3.4, 4);
         for (const k of [-12, -4, 4, 12]) if (q(k + 40) < 0.6) { const [cx, cz] = W2(L, k, -10.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(k + 50) }); }
@@ -41145,7 +41219,7 @@ Object.assign(World.prototype, {
     const roadClearPt = (x, z, own) => Island.roads.every(Q => Q === own || Q.pts.every(p => Math.hypot(p[0] - x, p[1] - z) > Q.w / 2 + 2.5));
     for (const D of [...ISLE_DISTRICT_ROADS, ...ISLE_INFILL_ROADS]) {
       const R = Island.roads.find(q => q.id === D.id); if (!R) continue;
-      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p', gardens: 'g' }[B.d]); if (!own.length) continue;
+      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p', gardens: 'g', midtown: 'd' }[B.d]); if (!own.length) continue;
       let side = 1;
       for (let s = 24; s < R.cum[R.cum.length - 1] - 10; s += 44) {
         let k = 0; while (k < R.pts.length - 2 && R.cum[k + 1] < s) k++;
@@ -41159,7 +41233,7 @@ Object.assign(World.prototype, {
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
         B.b.fx.push({ type: 'neon', x: x - nx * 1.2, y: y + 6.22, z: z - nz * 1.2, w: 0.5, h: 0.1, d: 0.5, c: 0xffe2b0 });
         // Linden Gardens' streets are tree-lined: a street tree each side between the lamps
-        if (D.id[0] === 'g') for (const sd of [-1, 1]) {
+        if (D.id[0] === 'g' || D.id[0] === 'd') for (const sd of [-1, 1]) {
           let k2 = 0; const s2 = s + 22; while (k2 < R.pts.length - 2 && R.cum[k2 + 1] < s2) k2++;
           const a2 = R.pts[Math.max(0, k2 - 1)], c2 = R.pts[Math.min(R.pts.length - 1, k2 + 1)], l2 = Math.hypot(c2[0] - a2[0], c2[1] - a2[1]) || 1;
           const tx = R.pts[k2][0] + (c2[1] - a2[1]) / l2 * sd * (R.w / 2 + 2.6), tz = R.pts[k2][1] - (c2[0] - a2[0]) / l2 * sd * (R.w / 2 + 2.6);
@@ -41303,6 +41377,196 @@ Object.assign(World.prototype, {
     this.isle.villa = { pad, vault: Q, y };
   }
 });
+/* =====================================================================
+   [CONTENT] VALEN ISLAND: THE COUNTRYSIDE (the wider city spread)
+   Between the city's districts the island is farmed, as land round a real
+   coastal city is: a patchwork of fields (wheat, barley, canola, maize,
+   pasture, hay, ploughed ground), orchards and vineyards on the warmer
+   slopes, hedgerows along the field edges with gaps for the gates,
+   farmsteads on the country roads (128: kind 'farm'), and wind turbines
+   on the open high ground.
+   Fields are laid out per region as a slightly rotated grid of parcels of
+   varied size; a parcel is kept only where all of it is dry, gentle
+   ground clear of every road, pad, precinct and site. They are paint and
+   planting, not new physics: the ground is the island's own, the crop is
+   its vertex colour (177 _col), hedges are shrubs a car can push through,
+   orchard trees and turbine towers collide.
+   ===================================================================== */
+const FARM_CROPS = {
+  wheat: { col: 0xc4ab55, row: 0x9c8538, stripe: 10 },
+  barley: { col: 0xd2c487, row: 0xae9f62, stripe: 10 },
+  canola: { col: 0xd9c636, row: 0xa99a2a, stripe: 0 },
+  maize: { col: 0x6b9440, row: 0x456b26, stripe: 6 },
+  pasture: { col: 0x7ba850, row: 0x6a9446, stripe: 0 },
+  hay: { col: 0xb4ab66, row: 0x948b4c, stripe: 14, bales: true },
+  plough: { col: 0x7a5c40, row: 0x5a4330, stripe: 5 },
+  orchard: { col: 0x6a8c46, row: 0x58783a, stripe: 0, orchard: true },
+  vines: { col: 0x8c8a5c, row: 0x6c6a44, stripe: 0, vines: true }
+};
+// regions by layout: a rectangle, the grid's angle, the parcel size (along, across), and the crops it grows
+const FARM_REGIONS = {
+  island: [
+    { id: 'southvale', box: [-150, 1505, 880, 1800], ang: 0.1, fw: 94, fd: 64, crops: ['wheat', 'wheat', 'barley', 'canola', 'maize', 'pasture', 'hay', 'plough'] },
+    { id: 'westmoor', box: [-1250, 1650, -300, 2560], ang: -0.22, fw: 101, fd: 72, crops: ['wheat', 'barley', 'canola', 'pasture', 'pasture', 'hay', 'plough', 'maize', 'orchard'] },
+    { id: 'southcape', box: [-300, 2540, 1500, 2700], ang: 0.03, fw: 109, fd: 56, crops: ['barley', 'wheat', 'canola', 'hay', 'plough'] },
+    { id: 'eastfields', box: [1480, 1700, 2100, 2400], ang: 0.35, fw: 78, fd: 56, crops: ['vines', 'vines', 'orchard', 'pasture', 'hay', 'wheat'], slope: 0.3 },
+    { id: 'soundplain', box: [930, -480, 1560, -130], ang: -0.3, fw: 86, fd: 60, crops: ['maize', 'wheat', 'pasture', 'canola', 'orchard', 'hay'] },
+    { id: 'northwest', box: [-1660, -480, -760, -130], ang: 0.25, fw: 90, fd: 64, crops: ['pasture', 'pasture', 'hay', 'barley', 'orchard', 'plough'] },
+    { id: 'gullfarms', box: [-1960, -2360, -1540, -1940], ang: -0.4, fw: 78, fd: 56, crops: ['pasture', 'hay', 'barley', 'plough'] }
+  ]
+};
+// wind farms: a line of sites (every `sp` m from a to b); a site not on open, gentle, dry ground is skipped
+const FARM_WIND = {
+  island: [
+    { a: [1840, 1880], b: [2180, 2300], sp: 120 },
+    { a: [-860, 2060], b: [-640, 2460], sp: 130 },
+    { a: [-1600, -430], b: [-1150, -330], sp: 140 }
+  ]
+};
+const Farms = {
+  fields: [], buckets: new Map(), trees: new Map(), boxes: new Map(), turbines: [], ready: false,
+  BK: 64,
+  // is (x, z) ground a field may cover: dry, clear of roads, pads, the city and every site
+  clear(x, z, m = 6) {
+    const h = Island.height(x, z, 1e6);
+    if (h < SEA_Y + 1.4) return false;
+    if (CityLayout.inCity(x, z, EDGE_MARGIN + 30)) return false;
+    const inR = (R, k) => x > R.x0 - k && x < R.x1 + k && z > R.z0 - k && z < R.z1 + k;
+    if (inR(CFS, 25) || inR(AIRPORT, 45) || inR(PROVING, 35) || inR(VP, 45) || inR(VILLA_VALEN, 20)) return false;
+    if (((x - LAKE.x) / (LAKE.rx + 60)) ** 2 + ((z - LAKE.z) / (LAKE.rz + 60)) ** 2 < 1) return false;
+    if (Island._nearRoad(Island._seg, x, z) && Island._rd < m) return false;
+    for (const P of Island.pads) if (P.x1 - P.x0 < 900 && x > P.x0 - 4 && x < P.x1 + 4 && z > P.z0 - 4 && z < P.z1 + 4) return false;
+    return true;
+  },
+  slope(x, z) { Island.height(x, z, 1e6); return Math.hypot(Island.gx, Island.gz); },
+  init() {
+    this.fields = []; this.buckets.clear(); this.trees.clear(); this.boxes.clear(); this.turbines = [];
+    const regions = FARM_REGIONS[CityLayout.id] || [];
+    for (const R of regions) this._region(R);
+    for (const W of FARM_WIND[CityLayout.id] || []) {
+      const L = Math.hypot(W.b[0] - W.a[0], W.b[1] - W.a[1]), n = Math.floor(L / W.sp);
+      for (let k = 0; k <= n; k++) {
+        const x = W.a[0] + (W.b[0] - W.a[0]) * k / Math.max(1, n), z = W.a[1] + (W.b[1] - W.a[1]) * k / Math.max(1, n);
+        if (!this.clear(x, z, 26) || this.slope(x, z) > 0.25 || this.at(x, z, 8)) continue;
+        this.turbines.push({ x, z, y: Island.height(x, z, 1e6), h: 1.1 + hash2i(Math.round(x), Math.round(z), 401) * 0.6, ph: hash2i(Math.round(x), Math.round(z), 403) * 6.28 });
+      }
+    }
+    this.ready = true;
+  },
+  _region(R) {
+    const ca = Math.cos(R.ang), sa = Math.sin(R.ang), cx = (R.box[0] + R.box[2]) / 2, cz = (R.box[1] + R.box[3]) / 2;
+    const ext = Math.hypot(R.box[2] - R.box[0], R.box[3] - R.box[1]) / 2 + 60, lane = 5, smax = R.slope || 0.27;
+    const W = (u, v) => [cx + u * ca - v * sa, cz + u * sa + v * ca];
+    // columns and rows of varied width: the patchwork of real field boundaries
+    const cuts = (len, base, seed) => { const out = [-len]; let s = -len; for (let k = 0; s < len; k++) { s += base * (0.65 + 0.7 * hash2i(k, seed, 405)) + lane; out.push(s); } return out; };
+    const us = cuts(ext, R.fw, R.id.length * 7 + 1), vs = cuts(ext, R.fd, R.id.length * 7 + 2);
+    const idx = new Map();
+    for (let i = 0; i < us.length - 1; i++) for (let j = 0; j < vs.length - 1; j++) {
+      const u0 = us[i], u1 = us[i + 1] - lane, v0 = vs[j], v1 = vs[j + 1] - lane, hu = (u1 - u0) / 2, hv = (v1 - v0) / 2;
+      const [fx, fz] = W((u0 + u1) / 2, (v0 + v1) / 2);
+      if (fx < R.box[0] || fx > R.box[2] || fz < R.box[1] || fz > R.box[3]) continue;
+      const crop = R.crops[Math.floor(hash2i(i * 31 + j, R.id.length, 407) * R.crops.length)], C = FARM_CROPS[crop];
+      let ok = true;
+      for (let a = -1; a <= 1 && ok; a++) for (let b = -1; b <= 1 && ok; b++) {
+        const [x, z] = W((u0 + u1) / 2 + a * (hu - 2), (v0 + v1) / 2 + b * (hv - 2));
+        if (!this.clear(x, z) || this.slope(x, z) > (C.vines || C.orchard ? smax + 0.08 : smax)) ok = false;
+      }
+      if (!ok) continue;
+      const F = { id: this.fields.length, region: R.id, crop, C, cx: fx, cz: fz, ca, sa, hu, hv, i, j, tone: 0.93 + 0.14 * hash2i(i, j, 409) };
+      this.fields.push(F); idx.set(i + ',' + j, F);
+      const r = Math.hypot(hu, hv);
+      for (let bx = Math.floor((fx - r) / this.BK); bx <= Math.floor((fx + r) / this.BK); bx++) for (let bz = Math.floor((fz - r) / this.BK); bz <= Math.floor((fz + r) / this.BK); bz++) {
+        const key = bx + ',' + bz; if (!this.buckets.has(key)) this.buckets.set(key, []); this.buckets.get(key).push(F);
+      }
+    }
+    // planting: hedgerows on the field edges (one row between neighbours), orchards, vines, bales
+    for (const F of this.fields) if (F.region === R.id) {
+      const L = (u, v) => [F.cx + u * ca - v * sa, F.cz + u * sa + v * ca];
+      const edge = (side, along, half, at, gate) => {
+        for (let s = -half + 2; s < half - 2; s += 3.1) {
+          if (Math.abs(s - gate) < 5) continue;
+          const [x, z] = side ? L(s, at) : L(at, s);
+          if (!this.clear(x, z, 4)) continue;
+          const k = hash2i(Math.round(x * 3), Math.round(z * 3), 411);
+          this._tree(x, z, 0.3 + k * 0.17, k * 6.28, 2);
+        }
+      };
+      const gate = (hash2i(F.i, F.j, 413) - 0.5) * F.hu;
+      edge(0, 0, F.hv, F.hu + lane / 2, (hash2i(F.i, F.j, 415) - 0.5) * F.hv);
+      edge(1, 0, F.hu, F.hv + lane / 2, gate);
+      if (!idx.has((F.i - 1) + ',' + F.j)) edge(0, 0, F.hv, -F.hu - lane / 2, 999);
+      if (!idx.has(F.i + ',' + (F.j - 1))) edge(1, 0, F.hu, -F.hv - lane / 2, 999);
+      if (F.C.orchard) for (let u = -F.hu + 5; u < F.hu - 4; u += 8) for (let v = -F.hv + 5; v < F.hv - 4; v += 8) {
+        const [x, z] = L(u, v), k = hash2i(Math.round(x), Math.round(z), 417);
+        this._tree(x + (k - 0.5), z, 0.5 + k * 0.16, k * 6.28, 0);
+      }
+      if (F.C.vines) for (let v = -F.hv + 3; v < F.hv - 2; v += 3.2) for (let u = -F.hu + 4; u < F.hu - 4; u += 10) {
+        const [x, z] = L(u + 5, v); this._box(x, z, 10, 1.25, 0.55, 0x3d5a2a, -R.ang);
+      }
+      if (F.C.bales) { const n = 4 + Math.floor(hash2i(F.i, F.j, 419) * 9); for (let k = 0; k < n; k++) { const [x, z] = L((hash2i(k, F.id, 421) - 0.5) * (F.hu * 1.6), (hash2i(k, F.id, 423) - 0.5) * (F.hv * 1.6)); this._box(x, z, 1.6, 1.5, 1.6, 0xc8b46a, hash2i(k, F.id, 425) * 3, true); } }
+    }
+  },
+  _tile(x, z) { return Math.floor((z - ISLE.z0) / ISLE.tile) * 64 + Math.floor((x - ISLE.x0) / ISLE.tile); },
+  _tree(x, z, s, r, kind) {
+    const key = this._tile(x, z); if (!this.trees.has(key)) this.trees.set(key, [[], [], []]);
+    this.trees.get(key)[kind].push([x, Island.height(x, z, 1e6), z, s, r]);
+  },
+  _box(x, z, w, h, d, col, ry, cyl) {
+    const key = this._tile(x, z); if (!this.boxes.has(key)) this.boxes.set(key, []);
+    this.boxes.get(key).push({ x, y: Island.height(x, z, 1e6), z, w, h, d, col, ry, cyl: !!cyl });
+  },
+  // the field at (x, z), or null; inset: how far inside its edge the point must be (negative reaches past it)
+  at(x, z, inset = 0) {
+    const L = this.buckets.get(Math.floor(x / this.BK) + ',' + Math.floor(z / this.BK)); if (!L) return null;
+    for (const F of L) {
+      const dx = x - F.cx, dz = z - F.cz, u = dx * F.ca + dz * F.sa, v = -dx * F.sa + dz * F.ca;
+      if (Math.abs(u) < F.hu - inset && Math.abs(v) < F.hv - inset) return F;
+    }
+    return null;
+  },
+  // the crop's colour at (x, z) into c (a THREE.Color holding the ground's own), or false where there is no field
+  tint(x, z, c, tmp) {
+    const F = this.at(x, z, 0); if (!F) return false;
+    const dx = x - F.cx, dz = z - F.cz, u = dx * F.ca + dz * F.sa, v = -dx * F.sa + dz * F.ca, C = F.C;
+    tmp.setHex(C.col);
+    if (C.stripe) { const s = 0.5 + 0.5 * Math.sin(v * 6.2832 / C.stripe), t2 = this._t2 || (this._t2 = new THREE.Color()); tmp.lerp(t2.setHex(C.row), s * 0.55); }
+    tmp.multiplyScalar(F.tone * (1 + 0.05 * tNoise(x / 23, z / 23, 427)));
+    // the headland: a few metres of the field's edge are grass and wheel ruts
+    const edge = Math.min(F.hu - Math.abs(u), F.hv - Math.abs(v));
+    c.lerp(tmp, smoothstep(1, 5, edge));
+    return true;
+  },
+  // the tile's farm geometry (vine rows, bales) as one vertex-coloured mesh, or null
+  tileGeo(key) {
+    const L = this.boxes.get(key); if (!L || !L.length) return null;
+    const gb = new GeoBuilder();
+    for (const b of L) { if (b.cyl) gb.cyl(b.x, b.y + b.h / 2 - 0.1, b.z, b.w / 2, b.h, C(b.col)); else gb.box(b.x, b.y + b.h / 2 - 0.1, b.z, b.w, b.h, b.d, C(b.col), b.ry); }
+    return gb.build();
+  },
+  // the wind turbines: one group for the whole island (seen from anywhere), their rotors turned by update()
+  buildTurbines(scene, grid) {
+    if (!this.turbines.length) return null;
+    const mat = makePropMaterial(0.55, 0.15), group = new THREE.Group(), rotors = [];
+    const tw = new GeoBuilder();
+    for (const T of this.turbines) {
+      const s = T.h;
+      tw.cyl(T.x, T.y + 30 * s, T.z, 1.5 * s, 60 * s, C(0xeef0f0));
+      tw.box(T.x, T.y + 60.8 * s, T.z, 3 * s, 3 * s, 9 * s, C(0xe6e8e8));
+      grid.add({ x: T.x, z: T.z, r: 1.7 * s, y0: T.y - 1, y1: T.y + 60 * s, kind: 'det' });
+    }
+    group.add(new THREE.Mesh(tw.build(), mat));
+    for (const T of this.turbines) {
+      const s = T.h, rg = new GeoBuilder();
+      rg.cyl(0, 0, 0, 1.3 * s, 1.6 * s, C(0xe0e2e2));
+      for (let k = 0; k < 3; k++) { const a = k * 2.0944; rg.add(TPL.box, new THREE.Matrix4().makeRotationZ(a).multiply(new THREE.Matrix4().makeTranslation(0, 12 * s, 0)).multiply(new THREE.Matrix4().makeScale(1.4 * s, 24 * s, 0.35 * s)), C(0xf4f5f5)); }
+      const m = new THREE.Mesh(rg.build(), mat), piv = new THREE.Group();
+      piv.position.set(T.x, T.y + 60.8 * s, T.z); piv.rotation.y = 0.6; m.position.set(0, 0, -4.9 * s); m.rotation.z = T.ph; piv.add(m); group.add(piv); rotors.push(m);
+    }
+    scene.add(group); this._rotors = rotors; this._turbGroup = group;
+    return group;
+  },
+  update(dt) { if (this._rotors) for (const m of this._rotors) m.rotation.z += dt * 1.35; }
+};
 /* =====================================================================
    [CORE] TRAFFIC SIGNALS (shared timing used by AI, peds, and bulbs)
    ===================================================================== */
@@ -42891,6 +43155,9 @@ class IslandScenery {
     this.paint = this._paint(); scene.add(this.paint);
     this._tx = 1e9; this._tz = 1e9; this._holes = new Set(); this._farDirty = true;
     this._treeGeo = null;
+    // the wind turbines (129): one group, seen from anywhere on the island
+    if (Farms.ready) Farms.buildTurbines(scene, world.grid);
+    this._tPrev = 0;
     rotorWarmup(scene);
   }
   // ---------------------------------------------------------------- colours
@@ -42909,6 +43176,8 @@ class IslandScenery {
       // and behind a beach the grass thins into the sand over a few metres (the physics' sand ends on a line; the eye's does not)
       const bk = (1 - smoothstep(34, 58, -Island.sd(x, z))) * (1 - smoothstep(SEA_Y + 2.9, SEA_Y + 4.6, h));
       if (bk > 0) c.lerp(this._c2.setHex(ISLE_COL[1]), bk);
+      // the countryside's fields (129) paint their crop over the grass (never over sand, rock or a road's verge)
+      if (Farms.ready && bk < 0.2 && rock < 0.3 && !(Island._nearRoad(Island._seg, x, z) && Island._rd < 3)) Farms.tint(x, z, c, this._c2);
       k *= 1 + clamp((h - 30) * 0.0012, -0.04, 0.12);
     } else if (s === 1) k *= h < SEA_Y + 0.25 ? 0.72 : 1;
     o[0] = c.r * k; o[1] = c.g * k; o[2] = c.b * k;
@@ -43008,11 +43277,12 @@ class IslandScenery {
   // the trees of a tile: a jittered grid over the island's forest map, clear of roads, pads, sand and rock
   _trees(tx, tz) {
     const lv = this.g.quality ? this.g.quality.level : 1, step = ISLE_SCN.trees[clamp(lv, 0, 3)], x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile, n = Math.floor(ISLE.tile / step);
-    const list = [[], []];
+    const list = [[], [], []];
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const ix = Math.floor(x0 / step) + i, iz = Math.floor(z0 / step) + j;
       const x = (ix + 0.15 + 0.7 * hash2i(ix, iz, 201)) * step, z = (iz + 0.15 + 0.7 * hash2i(ix, iz, 203)) * step;
       const f = Island.forest(x, z); if (hash2i(ix, iz, 205) > (f - 0.42) * 2.4) continue;
+      if (Farms.ready && Farms.at(x, z, -6)) continue; // (a field is cleared ground: 129 plants its own)
       if (this._foreign(x - 6, z - 6, 12) || inValenPoint(x, z)) continue;
       const h = Island.height(x, z, 1e6), sl = Math.hypot(Island.gx, Island.gz);
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
@@ -43023,12 +43293,15 @@ class IslandScenery {
       const pine = hash2i(ix, iz, 207) < (z < 60 ? 0.3 + smoothstep(20, 120, h) * 0.55 : 0.2);
       list[pine ? 1 : 0].push([x, h, z, 0.9 + hash2i(ix, iz, 209) * 0.75, hash2i(ix, iz, 211) * 6.28]);
     }
+    // the countryside's own planting (129): orchard trees and the hedgerows (shrubs: list 2, no collider)
+    const F = Farms.ready && Farms.trees.get(tz * 64 + tx); if (F) for (let k = 0; k < 3; k++) for (const t of F[k]) list[k].push(t);
     return list;
   }
   _treeGeos() {
     if (this._treeGeo) return this._treeGeo;
     const mk = t => { const g = new GeoBuilder(); PROP_DEFS[t].lod(g); return g.build(); };
-    return this._treeGeo = [mk('tree'), mk('pine')];
+    const tree = mk('tree');
+    return this._treeGeo = [tree, mk('pine'), tree];
   }
   _buildTile(tx, tz) {
     const key = tz * 64 + tx, group = new THREE.Group(), mesh = this._tileMesh(tx, tz); group.add(mesh);
@@ -43041,10 +43314,12 @@ class IslandScenery {
       L.forEach((t, i) => {
         M(t[0], t[1] - 0.15, t[2], t[3], t[3], t[3], t[4]); im.setMatrixAt(i, _m4);
         const v = 0.8 + hash2i(Math.floor(t[0]), Math.floor(t[2]), 213) * 0.4; this._c.setRGB(v, 0.85 + (v - 0.8) * 0.5, v * 0.9); im.setColorAt(i, this._c);
-        T.cols.push(this.world.grid.add({ x: t[0], z: t[2], r: 0.32 * t[3], y0: t[1] - 1, y1: t[1] + 3.2 * t[3], kind: 'det', tree: true }));
+        if (k < 2) T.cols.push(this.world.grid.add({ x: t[0], z: t[2], r: 0.32 * t[3], y0: t[1] - 1, y1: t[1] + 3.2 * t[3], kind: 'det', tree: true }));
       });
       im.computeBoundingSphere(); group.add(im); T.trees += L.length;
     });
+    // the tile's vine rows and hay bales (129)
+    const fg = Farms.ready && Farms.tileGeo(key); if (fg) { const fm = new THREE.Mesh(fg, this._farmMat || (this._farmMat = makePropMaterial(0.9, 0))); fm.receiveShadow = true; fm.castShadow = lv >= 2; group.add(fm); }
     this.scene.add(group); this.tiles.set(key, T);
     this._holes.add(key); this._farDirty = true; this.stats.built++; this.stats.trees += T.trees;
   }
@@ -43056,6 +43331,7 @@ class IslandScenery {
   }
   // which tiles should be drawn near: every land tile within the near range of the focus
   update(fx, fz) {
+    { const t = performance.now(), dt = this._tPrev ? Math.min(0.1, (t - this._tPrev) / 1000) : 0; this._tPrev = t; Farms.update(dt); }
     const lv = this.g.quality ? this.g.quality.level : 1, R = ISLE_SCN.near[clamp(lv, 0, 3)], Ts = ISLE.tile;
     const tx = Math.floor((fx - ISLE.x0) / 32), tz = Math.floor((fz - ISLE.z0) / 32);
     if (tx !== this._tx || tz !== this._tz || lv !== this._lv) {
@@ -67585,7 +67861,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
+    window.__pv = Object.freeze({ Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

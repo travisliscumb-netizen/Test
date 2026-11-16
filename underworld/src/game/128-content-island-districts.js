@@ -53,12 +53,23 @@ const ISLE_INFILL_ROADS = [
   { after: 'p2', id: 'g4', name: 'Mercer Street', w: 8, grade: 0.09, ends: ['lat', 'g3'], pts: [[326, 920], [390, 922], [450, 922], [500, 918], [538, 914]] },
   { after: 'p2', id: 'g6', name: 'Cobb Lane', w: 8, grade: 0.09, ends: ['lat', 'g1'], pts: [[326, 840], [380, 842], [430, 845], [470, 838], [502, 822]] },
   { after: 'p2', id: 'g7', name: 'Sorrel Street', w: 9, grade: 0.08, ends: ['lat', 'g1'], pts: [[600, 646], [602, 700], [608, 760], [618, 815], [624, 856]] },
+  // Midtown (the waist the core's north half left): Harbour Boulevard from the port to the Coast Highway, Midtown
+  // Avenue up from the core, Ferry Street from the Old Quarter, Pier Road out to the north shore
+  { after: 'p2', id: 'd1', name: 'Harbour Boulevard', w: 12, grade: 0.07, ends: ['lat', 'n1e'], pts: [[794, 120], [700, 118], [600, 112], [500, 100], [400, 82], [330, 58], [300, 40]] },
+  { after: 'p2', id: 'd2', name: 'Midtown Avenue', w: 11, grade: 0.07, ends: ['lat', 'd1'], pts: [[600, 314], [600, 250], [598, 180], [600, 112]] },
+  { after: 'p2', id: 'd3', name: 'Ferry Street', w: 9, grade: 0.08, ends: ['lat', 'n1e'], pts: [[120, 314], [120, 240], [125, 140], [140, 40], [170, -40], [200, -100]] },
+  { after: 'p2', id: 'd4', name: 'Pier Road', w: 9, grade: 0.08, ends: ['d1', 'ring'], ring: 14, pts: [[500, 100], [502, 40], [506, -20], [512, -70]] },
   { after: 'p2', id: 'g5', name: 'Wharf Lane', w: 9, grade: 0.08, ends: ['s1', 'lat'], pts: [[694, 760], [730, 767], [770, 775], [794, 778]] }
 ];
 ISLE_ROAD_LAYOUT.island.add.push(...ISLE_INFILL_ROADS);
-// the ground it fills (Island.zoneKey reads it as Linden Hills), levelled to the city's kerb in two rectangles that keep
-// off the inlet in its south-east corner (022 corePads)
-const ISLE_GARDENS = { x0: 320, z0: 640, x1: 800, z1: 1000, pads: [[320, 640, 800, 860], [320, 860, 690, 990]] };
+// the ground infill districts fill, by layout (Island.zoneKey reads each as its zone), levelled to the city's kerb in
+// rectangles that keep off the water (022 corePads)
+const ISLE_INFILL = {
+  island: [
+    { d: 'gardens', zone: 'l', box: [320, 640, 800, 1000], pads: [[320, 640, 800, 860], [320, 860, 690, 990]] },
+    { d: 'midtown', zone: 'm', box: [0, -140, 800, 320], pads: [[12, -90, 800, 320]] }
+  ]
+};
 // the districts: their names, where their name sits on the map, the signs their shops and yards carry
 const ISLE_DISTRICTS = {
   bayview: { name: 'Bayview Heights', at: [-470, -230], signs: ['BAYVIEW MARKET', 'HARBOUR CAFÉ', 'CRESCENT PHARMACY', 'THE BAY BISTRO'], cars: ['luxury', 'crest', 'suv', 'sports', 'kodiak', 'sedan', 'coupe', 'estate'] },
@@ -66,6 +77,10 @@ const ISLE_DISTRICTS = {
   landing: { name: 'Blackgate Landing', at: [-1120, 1430], signs: ['BLACKGATE FREIGHT', 'VALEN COLD STORAGE', 'PIER 9 IMPORTS', 'SOUND SHIPPING CO.', 'WESTCOAST SALVAGE', 'FOUNDRY TRADING'], cars: ['truck', 'van', 'pickup', 'utility'] },
   lakeside: { name: 'Lake Valen Shore', at: [1880, -600], signs: ['LAKEVIEW DINER'], cars: ['pickup', 'suv', 'offroad', 'estate'] },
   gull: { name: 'Gull Harbor', at: [-1290, -2275], signs: [], cars: ['pickup', 'van', 'utility'] },
+  soundview: { name: 'Soundview', at: [1350, -300], signs: ['SOUNDVIEW MARKET', 'LAKESIDE PHARMACY', 'NORTHSHORE CAFÉ', 'SOUND SURF & TACKLE'], cars: ['sedan', 'suv', 'estate', 'compact', 'coupe', 'luxury'] },
+  logistics: { name: 'Southport Logistics Park', at: [930, 1170], signs: ['SOUTHPORT FREIGHT', 'AIRSIDE CARGO', 'VALEN COURIER', 'COLD CHAIN 24', 'ISLAND PARCEL CO.'], cars: ['truck', 'van', 'utility', 'pickup'] },
+  farms: { name: 'Valen Farmland', at: [380, 1650], signs: ['FARM SHOP', 'FRESH EGGS', 'PICK YOUR OWN', 'VALEN DAIRY', 'HAY FOR SALE'], cars: ['pickup', 'utility', 'estate', 'van', 'offroad'] },
+  midtown: { name: 'Midtown', at: [420, 160], signs: ['HARBOUR TRUST', 'MIDTOWN DELI', 'PIER 1 OYSTER BAR', 'VALEN HERALD', 'FERRY ST PHARMACY', 'NORTHSIDE GYM', 'BLUE TIDE CAFÉ', 'MIDTOWN BOOKS'], cars: ['sedan', 'luxury', 'taxi', 'coupe', 'suv', 'regent', 'metro', 'estate'] },
   gardens: { name: 'Linden Gardens', at: [520, 800], signs: ['GARDEN PARADE DELI', 'QUINCE ST LAUNDRY', 'LINDEN FLORIST', 'PARADE NEWS', 'THE CORNER TAP', 'MERCER BAKERY'], cars: ['sedan', 'compact', 'estate', 'metro', 'suv', 'regent', 'coupe', 'van'] }
 };
 // what goes where: shops and flats first (they want the best frontage), then the houses fill the rest
@@ -94,10 +109,33 @@ const ISLE_LOT_PLAN = [
   { d: 'gardens', road: 'g7', kind: 'apt', sp: 38, max: 4, gap: 2, infill: true },
   { d: 'gardens', road: 'g7', kind: 'house', sp: 23, gap: 1, infill: true },
   { d: 'gardens', road: 'g6', kind: 'house', sp: 23, gap: 1, infill: true },
-  { d: 'gardens', road: 'g5', kind: 'ware', sp: 58, infill: true }
+  { d: 'gardens', road: 'g5', kind: 'ware', sp: 58, infill: true },
+  // Uptown's neighbourhood along Sound Road and Lakeside Avenue; the logistics park along Freight Road
+  { d: 'soundview', road: 'cU', kind: 'shop', sp: 36, max: 2, gap: 2, layout: 'island' },
+  { d: 'soundview', road: 'cV', kind: 'apt', sp: 40, max: 4, gap: 2, layout: 'island' },
+  { d: 'soundview', road: 'cV', kind: 'house', sp: 24, gap: 2, layout: 'island' },
+  { d: 'soundview', road: 'n1', kind: 'house', sp: 24, gap: 2, box: [1180, -560, 1560, -330], layout: 'island' },
+  { d: 'logistics', road: 'cW', kind: 'ware', sp: 60, gap: 4, infill: true, layout: 'island' },
+  // farmsteads on the country roads, in the countryside's regions (129) under the layout that farms them
+  { d: 'farms', road: 's1', kind: 'farm', sp: 210, box: [-150, 1500, 880, 1810], max: 4, layout: 'island' },
+  { d: 'farms', road: 's4', kind: 'farm', sp: 230, box: [-1260, 1640, -300, 2570], max: 5, layout: 'island' },
+  { d: 'farms', road: 's4', kind: 'farm', sp: 230, box: [-300, 2560, 1500, 2760], max: 3, layout: 'island' },
+  { d: 'farms', road: 's4', kind: 'farm', sp: 220, box: [1470, 1690, 2120, 2410], max: 3, layout: 'island' },
+  { d: 'farms', road: 'n1', kind: 'farm', sp: 220, box: [920, -490, 1570, -120], max: 3, layout: 'island' },
+  { d: 'farms', road: 'n1', kind: 'farm', sp: 220, box: [-1670, -490, -750, -120], max: 3, layout: 'island' },
+  { d: 'farms', road: 's3', kind: 'farm', sp: 220, box: [-1670, -490, -750, -120], max: 2, layout: 'island' },
+  // Midtown: towers on the boulevard and the avenue, mid-rise flats behind, shops on the corners
+  { d: 'midtown', road: 'd2', kind: 'tower', sp: 38, gap: 2, infill: true },
+  { d: 'midtown', road: 'd1', kind: 'tower', sp: 38, max: 8, gap: 2, infill: true },
+  { d: 'midtown', road: 'd1', kind: 'shop', sp: 35, max: 4, gap: 1, infill: true },
+  { d: 'midtown', road: 'n1e', kind: 'mid', sp: 40, box: [0, -140, 800, 320], gap: 2, infill: true },
+  { d: 'midtown', road: 'd3', kind: 'mid', sp: 40, gap: 2, infill: true },
+  { d: 'midtown', road: 'd4', kind: 'shop', sp: 35, max: 3, gap: 1, infill: true },
+  { d: 'midtown', road: 'd4', kind: 'mid', sp: 40, gap: 2, infill: true },
+  { d: 'midtown', road: 'd1', kind: 'mid', sp: 40, gap: 2, infill: true }
 ];
 // a lot's size: W along the road, D back from it; set: the verge between the carriageway and the lot
-const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 } };
+const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 }, tower: { W: 34, D: 32, set: 4 }, farm: { W: 56, D: 48, set: 6 }, mid: { W: 36, D: 28, set: 3.5 } };
 // Villa Valen: the estate's walled grounds, levelled at one height, and the vault under its hill
 const VILLA_VALEN = { x0: -692, z0: -1062, x1: -518, z1: -850, y: 21.5, gate: -600, vault: { x0: -604, z0: -1052, x1: -528, z1: -994, door: -563 } };
 Object.assign(World.prototype, {
@@ -141,7 +179,7 @@ Object.assign(World.prototype, {
     };
     const lots = [];
     for (const E of ISLE_LOT_PLAN) {
-      if (!roads[E.road]) continue; // a street this city layout does not build (ISLE_ROAD_LAYOUT)
+      if (!roads[E.road] || (E.layout && E.layout !== CityLayout.id)) continue; // a street this city layout does not build (ISLE_ROAD_LAYOUT)
       const R = roads[E.road], S = ISLE_LOT[E.kind], pts = R.pts, cum = R.cum, L = cum[cum.length - 1];
       let n = 0;
       for (let s = E.sp / 2 + 18, i = 0; s < L - 18 - (E.endClear || 0); s += E.sp, i++) {
@@ -240,6 +278,30 @@ Object.assign(World.prototype, {
         const [fx, fz] = W2(L, 4, -6); B.folk.push([fx, fz, h + Math.PI], [fx + L.ux * 2.5, fz + L.uz * 2.5, h + 2.6]);
         // a shop is a place on the map: you can be sent to it
         if (!b.place) b.place = { id: 'dist_' + L.d + '_' + n, name: title(text), kind: 'landmark', door: { x: sx - L.vx * 1.4, z: sz - L.vz * 1.4, h }, under: { x: (r[0] + r[2]) / 2, z: (r[1] + r[3]) / 2 } };
+      } else if (L.kind === 'farm') {
+        // a farmstead: the house by the lane, a red barn and two silos behind, a machinery shed, a gravel yard
+        const wall = [0xf2ede2, 0xe8dcc4, 0xd8d0c0][Math.floor(q(1) * 3)];
+        boxL(b, L, 4, 2, L.W - 10, L.D - 12, y + 0.03, 0.06, 0x9a8f7c, false);
+        bld(rectL(L, -17, -12, 6, 5), 6.2, STYLE.HOUSE, wall, 3.1, 3.2, { roof: 'gable', roofColor: [0x5a4a3a, 0x3a4652, 0x7a3a2e][Math.floor(q(2) * 3)] });
+        bld(rectL(L, 6, 8, 11, 8), 10.5, STYLE.WARE, [0x8a2e24, 0x7a2a22, 0x9a3a2c][Math.floor(q(3) * 3)], 10.5, 6, { roof: 'gable', roofColor: 0x3a3d40 });
+        bld(rectL(L, 21, -6, 5, 7), 6, STYLE.WARE, 0x8a929a, 6, 6);
+        for (const k of [0, 1]) { const [sx, sz] = W2(L, -6 + k * 6.5, 15); cyl(b, sx, y + 8, sz, 2.6, 16, 0xb8bcc0, true); cyl(b, sx, y + 16.4, sz, 2.7, 0.8, 0x8a8e92, true); }
+        const [cx, cz] = W2(L, -6, -16); B.slots.push({ x: cx, z: cz, h, y, cls: car(3) });
+        const [tx, tz] = W2(L, -24, -20), [ux, uz] = W2(L, -10, -21); tree(b, tx, y, tz, 1.1, L.i); tree(b, ux, y, uz, 0.9, L.i + 3);
+      } else if (L.kind === 'tower') {
+        // an office tower on a plaza: glass, stone or deco, 28-70 m, its lobby on the street
+        const sty = [STYLE.GLASS, STYLE.GLASS, STYLE.OFFICE, STYLE.DECO][Math.floor(q(1) * 4)], col = (sty === STYLE.GLASS ? PAL.glass : sty === STYLE.DECO ? PAL.deco : PAL.office), hh = 28 + Math.round(q(2) * 42);
+        boxL(b, L, 0, 0, L.W - 1, L.D - 1, y + 0.04, 0.08, 0xb4b0a8, false);
+        bld(rectL(L, 0, 2.5, 13 - q(3) * 2, 11), hh, sty, col[Math.floor(q(4) * col.length)], 3.8, 4.2, { shops: true });
+        const [tx, tz] = W2(L, -14, -12.5), [ux, uz] = W2(L, 14, -12.5); tree(b, tx, y, tz, 0.9, L.i); tree(b, ux, y, uz, 0.9, L.i + 1);
+        for (const k of [-7, 7]) if (q(k + 40) < 0.5) { const [cx, cz] = W2(L, k, -13.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(k + 50) }); }
+        const [fx, fz] = W2(L, 2, -11); B.folk.push([fx, fz, h + Math.PI]);
+      } else if (L.kind === 'mid') {
+        // mid-rise flats over shops: 5-8 storeys of brick or render
+        const fl = 5 + Math.floor(q(1) * 4);
+        bld(rectL(L, 0, 2, 16.5, 9), fl * 3.2, q(2) < 0.5 ? STYLE.BRICK : STYLE.APT, [0xa8644a, 0x8a5a44, 0xc4b6a2, 0xb8a48c, 0x9a8a78, 0xd0c4b0][Math.floor(q(3) * 6)], 3.2, 4, { shops: true });
+        for (const k of [-11, 0, 11]) if (q(k + 40) < 0.55) { const [cx, cz] = W2(L, k, -11.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(k + 50) }); }
+        const [fx, fz] = W2(L, -6, -10); B.folk.push([fx, fz, h + Math.PI]);
       } else if (L.kind === 'apt') {
         bld(rectL(L, 0, 2, 16, 8), 13.6, STYLE.APT, [0xb8a48c, 0xc4b6a2, 0x9a8a78][Math.floor(q(1) * 3)], 3.4, 4);
         for (const k of [-12, -4, 4, 12]) if (q(k + 40) < 0.6) { const [cx, cz] = W2(L, k, -10.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(k + 50) }); }
@@ -263,7 +325,7 @@ Object.assign(World.prototype, {
     const roadClearPt = (x, z, own) => Island.roads.every(Q => Q === own || Q.pts.every(p => Math.hypot(p[0] - x, p[1] - z) > Q.w / 2 + 2.5));
     for (const D of [...ISLE_DISTRICT_ROADS, ...ISLE_INFILL_ROADS]) {
       const R = Island.roads.find(q => q.id === D.id); if (!R) continue;
-      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p', gardens: 'g' }[B.d]); if (!own.length) continue;
+      const own = blockList.filter(B => ISLE_DISTRICTS[B.d] && D.id[0] === { bayview: 'h', marsh: 'm', landing: 'p', gardens: 'g', midtown: 'd' }[B.d]); if (!own.length) continue;
       let side = 1;
       for (let s = 24; s < R.cum[R.cum.length - 1] - 10; s += 44) {
         let k = 0; while (k < R.pts.length - 2 && R.cum[k + 1] < s) k++;
@@ -277,7 +339,7 @@ Object.assign(World.prototype, {
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
         B.b.fx.push({ type: 'neon', x: x - nx * 1.2, y: y + 6.22, z: z - nz * 1.2, w: 0.5, h: 0.1, d: 0.5, c: 0xffe2b0 });
         // Linden Gardens' streets are tree-lined: a street tree each side between the lamps
-        if (D.id[0] === 'g') for (const sd of [-1, 1]) {
+        if (D.id[0] === 'g' || D.id[0] === 'd') for (const sd of [-1, 1]) {
           let k2 = 0; const s2 = s + 22; while (k2 < R.pts.length - 2 && R.cum[k2 + 1] < s2) k2++;
           const a2 = R.pts[Math.max(0, k2 - 1)], c2 = R.pts[Math.min(R.pts.length - 1, k2 + 1)], l2 = Math.hypot(c2[0] - a2[0], c2[1] - a2[1]) || 1;
           const tx = R.pts[k2][0] + (c2[1] - a2[1]) / l2 * sd * (R.w / 2 + 2.6), tz = R.pts[k2][1] - (c2[0] - a2[0]) / l2 * sd * (R.w / 2 + 2.6);

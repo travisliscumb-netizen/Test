@@ -69,7 +69,8 @@ const ISLE_ROAD_LAYOUT = {
     // the Coast Highway reaches Crestmoor Heights from the core and leaves from its west street: the district's own
     // streets carry it through
     n1: { ends: ['lat', 'lat'], pts: [[-646, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
-    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[200, -6], [200, -60], [150, -150], [-10, -270], [-240, -330], [-400, -356], [-474, -360]] }],
+    // ... and on from Greenway's east street across Midtown to the core's north street
+    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[-154, -280], [-90, -276], [-10, -270], [90, -200], [200, -100], [300, 40], [350, 200], [360, 314]] }],
     n2: { ends: ['n1e', 'ring'] },
     // the Southshore Highway's east end comes up to the core's south street over the ground the square left
     s1: { pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [728, 1040], [712, 900], [694, 760], [682, 680], [680, 646]] },
@@ -438,8 +439,8 @@ const Island = {
     const A = AIRPORT, G = PROVING;
     if (x > A.x0 - 60 && x < A.x1 + 60 && z > A.z0 - 90 && z < A.z1 + 60) return 'y';
     if (x > G.x0 - 30 && x < G.x1 + 30 && z > G.z0 - 30 && z < G.z1 + 30) return 'j';
-    // (the ground a moved precinct left inside the old square, built up as Linden Gardens: 128)
-    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island' && x > ISLE_GARDENS.x0 && x < ISLE_GARDENS.x1 && z > ISLE_GARDENS.z0 && z < ISLE_GARDENS.z1) return 'l';
+    // (the ground moved precincts left on the waist, built up as infill districts: 128 ISLE_INFILL)
+    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) if (x > F.box[0] && x < F.box[2] && z > F.box[1] && z < F.box[3]) return F.zone;
     if (z > 880) return x < -160 && z < 1500 ? 'b' : 'e';
     if (z > -700 && z < -250 && x > -120 && x < 760) return 'k';
     if (Math.hypot(x - MT_VALEN.x, z - MT_VALEN.z) < 1250) return 'n';
@@ -459,6 +460,6 @@ const Island = {
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
     for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
     // Linden Gardens (128): the infill between the precincts, at the city's level
-    if (typeof ISLE_GARDENS !== 'undefined' && CityLayout.id === 'island') for (const r of ISLE_GARDENS.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
+    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
   }
 };

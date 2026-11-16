@@ -29,6 +29,9 @@ class IslandScenery {
     this.paint = this._paint(); scene.add(this.paint);
     this._tx = 1e9; this._tz = 1e9; this._holes = new Set(); this._farDirty = true;
     this._treeGeo = null;
+    // the wind turbines (129): one group, seen from anywhere on the island
+    if (Farms.ready) Farms.buildTurbines(scene, world.grid);
+    this._tPrev = 0;
     rotorWarmup(scene);
   }
   // ---------------------------------------------------------------- colours
@@ -47,6 +50,8 @@ class IslandScenery {
       // and behind a beach the grass thins into the sand over a few metres (the physics' sand ends on a line; the eye's does not)
       const bk = (1 - smoothstep(34, 58, -Island.sd(x, z))) * (1 - smoothstep(SEA_Y + 2.9, SEA_Y + 4.6, h));
       if (bk > 0) c.lerp(this._c2.setHex(ISLE_COL[1]), bk);
+      // the countryside's fields (129) paint their crop over the grass (never over sand, rock or a road's verge)
+      if (Farms.ready && bk < 0.2 && rock < 0.3 && !(Island._nearRoad(Island._seg, x, z) && Island._rd < 3)) Farms.tint(x, z, c, this._c2);
       k *= 1 + clamp((h - 30) * 0.0012, -0.04, 0.12);
     } else if (s === 1) k *= h < SEA_Y + 0.25 ? 0.72 : 1;
     o[0] = c.r * k; o[1] = c.g * k; o[2] = c.b * k;
@@ -146,11 +151,12 @@ class IslandScenery {
   // the trees of a tile: a jittered grid over the island's forest map, clear of roads, pads, sand and rock
   _trees(tx, tz) {
     const lv = this.g.quality ? this.g.quality.level : 1, step = ISLE_SCN.trees[clamp(lv, 0, 3)], x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile, n = Math.floor(ISLE.tile / step);
-    const list = [[], []];
+    const list = [[], [], []];
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const ix = Math.floor(x0 / step) + i, iz = Math.floor(z0 / step) + j;
       const x = (ix + 0.15 + 0.7 * hash2i(ix, iz, 201)) * step, z = (iz + 0.15 + 0.7 * hash2i(ix, iz, 203)) * step;
       const f = Island.forest(x, z); if (hash2i(ix, iz, 205) > (f - 0.42) * 2.4) continue;
+      if (Farms.ready && Farms.at(x, z, -6)) continue; // (a field is cleared ground: 129 plants its own)
       if (this._foreign(x - 6, z - 6, 12) || inValenPoint(x, z)) continue;
       const h = Island.height(x, z, 1e6), sl = Math.hypot(Island.gx, Island.gz);
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
@@ -161,12 +167,15 @@ class IslandScenery {
       const pine = hash2i(ix, iz, 207) < (z < 60 ? 0.3 + smoothstep(20, 120, h) * 0.55 : 0.2);
       list[pine ? 1 : 0].push([x, h, z, 0.9 + hash2i(ix, iz, 209) * 0.75, hash2i(ix, iz, 211) * 6.28]);
     }
+    // the countryside's own planting (129): orchard trees and the hedgerows (shrubs: list 2, no collider)
+    const F = Farms.ready && Farms.trees.get(tz * 64 + tx); if (F) for (let k = 0; k < 3; k++) for (const t of F[k]) list[k].push(t);
     return list;
   }
   _treeGeos() {
     if (this._treeGeo) return this._treeGeo;
     const mk = t => { const g = new GeoBuilder(); PROP_DEFS[t].lod(g); return g.build(); };
-    return this._treeGeo = [mk('tree'), mk('pine')];
+    const tree = mk('tree');
+    return this._treeGeo = [tree, mk('pine'), tree];
   }
   _buildTile(tx, tz) {
     const key = tz * 64 + tx, group = new THREE.Group(), mesh = this._tileMesh(tx, tz); group.add(mesh);
@@ -179,10 +188,12 @@ class IslandScenery {
       L.forEach((t, i) => {
         M(t[0], t[1] - 0.15, t[2], t[3], t[3], t[3], t[4]); im.setMatrixAt(i, _m4);
         const v = 0.8 + hash2i(Math.floor(t[0]), Math.floor(t[2]), 213) * 0.4; this._c.setRGB(v, 0.85 + (v - 0.8) * 0.5, v * 0.9); im.setColorAt(i, this._c);
-        T.cols.push(this.world.grid.add({ x: t[0], z: t[2], r: 0.32 * t[3], y0: t[1] - 1, y1: t[1] + 3.2 * t[3], kind: 'det', tree: true }));
+        if (k < 2) T.cols.push(this.world.grid.add({ x: t[0], z: t[2], r: 0.32 * t[3], y0: t[1] - 1, y1: t[1] + 3.2 * t[3], kind: 'det', tree: true }));
       });
       im.computeBoundingSphere(); group.add(im); T.trees += L.length;
     });
+    // the tile's vine rows and hay bales (129)
+    const fg = Farms.ready && Farms.tileGeo(key); if (fg) { const fm = new THREE.Mesh(fg, this._farmMat || (this._farmMat = makePropMaterial(0.9, 0))); fm.receiveShadow = true; fm.castShadow = lv >= 2; group.add(fm); }
     this.scene.add(group); this.tiles.set(key, T);
     this._holes.add(key); this._farDirty = true; this.stats.built++; this.stats.trees += T.trees;
   }
@@ -194,6 +205,7 @@ class IslandScenery {
   }
   // which tiles should be drawn near: every land tile within the near range of the focus
   update(fx, fz) {
+    { const t = performance.now(), dt = this._tPrev ? Math.min(0.1, (t - this._tPrev) / 1000) : 0; this._tPrev = t; Farms.update(dt); }
     const lv = this.g.quality ? this.g.quality.level : 1, R = ISLE_SCN.near[clamp(lv, 0, 3)], Ts = ISLE.tile;
     const tx = Math.floor((fx - ISLE.x0) / 32), tz = Math.floor((fz - ISLE.z0) / 32);
     if (tx !== this._tx || tz !== this._tz || lv !== this._lv) {
