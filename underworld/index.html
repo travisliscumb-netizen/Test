@@ -33297,7 +33297,15 @@ const CITY_LAYOUTS = {
   classic: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
   // never shipped as the default: the whole city moved three cells west and two north, so a coordinate the bake
   // (090) misses, or a question still asked of the square, shows up (CITY_SPREAD.md S3). ?layout=tracer
-  tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }]
+  tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }],
+  // never shipped either: the city cut in two, the west half three cells further west, the halves joined by one
+  // connector road (CITY_CONNECTORS), so routing, traffic and the edges between parted precincts are exercised (S4)
+  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }]
+};
+// the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
+// precincts' edge streets side-on
+const CITY_CONNECTORS = {
+  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }]
 };
 const CityLayout = {
   id: '', precincts: [], own: new Int8Array(N * N).fill(-1), sites: new Map(),
@@ -33624,10 +33632,12 @@ const Island = {
   // length (its profile) and index the segments. Called once by the world's generator, after the pads are in.
   buildRoads() {
     this.roads = []; const byId = {};
-    for (const D of ISLE_ROADS) {
+    // the island's roads, then the roads that join this layout's precincts (021: CITY_CONNECTORS, drawn in the world)
+    const conn = (typeof CITY_CONNECTORS !== 'undefined' && CITY_CONNECTORS[CityLayout.id]) || [];
+    for (const D of [...ISLE_ROADS, ...conn.map(c => ({ ...c, world: true }))]) {
       // a control point authored at the city's edge (its 'lat' end and the approach to it) moves with the precinct
       // whose streets it meets (021); out on the island it stays where it was drawn
-      const cp = D.pts.map(p => CityLayout.anchor(p[0], p[1])), hosts = [null, null];
+      const cp = D.pts.map(p => D.world ? [p[0], p[1]] : CityLayout.anchor(p[0], p[1])), hosts = [null, null];
       D.ends.forEach((e, k) => {
         const H = byId[e]; if (!H) return;
         const q = k ? cp[cp.length - 1] : cp[0]; let best = 0, bd = Infinity;

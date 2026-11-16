@@ -205,10 +205,12 @@ const Island = {
   // length (its profile) and index the segments. Called once by the world's generator, after the pads are in.
   buildRoads() {
     this.roads = []; const byId = {};
-    for (const D of ISLE_ROADS) {
+    // the island's roads, then the roads that join this layout's precincts (021: CITY_CONNECTORS, drawn in the world)
+    const conn = (typeof CITY_CONNECTORS !== 'undefined' && CITY_CONNECTORS[CityLayout.id]) || [];
+    for (const D of [...ISLE_ROADS, ...conn.map(c => ({ ...c, world: true }))]) {
       // a control point authored at the city's edge (its 'lat' end and the approach to it) moves with the precinct
       // whose streets it meets (021); out on the island it stays where it was drawn
-      const cp = D.pts.map(p => CityLayout.anchor(p[0], p[1])), hosts = [null, null];
+      const cp = D.pts.map(p => D.world ? [p[0], p[1]] : CityLayout.anchor(p[0], p[1])), hosts = [null, null];
       D.ends.forEach((e, k) => {
         const H = byId[e]; if (!H) return;
         const q = k ? cp[cp.length - 1] : cp[0]; let best = 0, bd = Infinity;

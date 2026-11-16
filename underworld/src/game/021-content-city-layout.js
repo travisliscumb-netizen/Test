@@ -32,7 +32,15 @@ const CITY_LAYOUTS = {
   classic: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
   // never shipped as the default: the whole city moved three cells west and two north, so a coordinate the bake
   // (090) misses, or a question still asked of the square, shows up (CITY_SPREAD.md S3). ?layout=tracer
-  tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }]
+  tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }],
+  // never shipped either: the city cut in two, the west half three cells further west, the halves joined by one
+  // connector road (CITY_CONNECTORS), so routing, traffic and the edges between parted precincts are exercised (S4)
+  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }]
+};
+// the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
+// precincts' edge streets side-on
+const CITY_CONNECTORS = {
+  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }]
 };
 const CityLayout = {
   id: '', precincts: [], own: new Int8Array(N * N).fill(-1), sites: new Map(),
