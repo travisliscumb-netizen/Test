@@ -366,18 +366,30 @@ Object.assign(World.prototype, {
     const V = VILLA_VALEN, y = pad.y, b = this._isleBlock('villa_valen', (V.x0 + V.x1) / 2, (V.z0 + V.z1) / 2, 150, 'Villa Valen');
     const GOLD = 0xd4af37, STONE = 0xe8e0cc, WALL = 0xf4efe4, SLATE = 0x2e3640;
     const bld = (x0, z0, x1, z1, h, style, col, fh, bay, o = {}) => this._bld(b, x0, z0, x1, z1, h, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o });
-    // ------------------------------------------------ the house: a three-storey hall, two wings, a portico facing the gate
-    bld(-642, -936, -578, -904, 12.6, STYLE.HOUSE, WALL, 4.2, 4.6, { roof: 'gable', roofColor: SLATE });
-    bld(-668, -932, -642, -908, 8.4, STYLE.HOUSE, WALL, 4.2, 4.4, { roof: 'gable', roofColor: SLATE });
-    bld(-578, -932, -552, -908, 8.4, STYLE.HOUSE, WALL, 4.2, 4.4, { roof: 'gable', roofColor: SLATE });
-    for (let k = 0; k < 6; k++) { const x = -622.5 + k * 5; cyl(b, x, y + 5.1, -899.6, 0.5, 10.2, 0xf8f4ea, true); box(b, x, y + 0.2, -899.6, 1.4, 0.4, 1.4, STONE, false); box(b, x, y + 10.25, -899.6, 1.3, 0.3, 1.3, GOLD, false); }
-    box(b, -610, y + 10.7, -901.4, 32, 0.7, 6.6, 0xf8f4ea, false); box(b, -610, y + 11.15, -898.2, 32.4, 0.25, 0.3, GOLD, false);
-    box(b, -610, y + 0.22, -901, 30, 0.44, 7, STONE, false); box(b, -610, y + 0.5, -903.4, 26, 0.3, 2.4, STONE, false);
-    box(b, -610, y + 2.4, -903.9, 3.2, 4.8, 0.2, 0x3a2418, false); box(b, -610, y + 4.95, -903.86, 3.6, 0.2, 0.22, GOLD, false);
-    b.fx.push({ type: 'neon', x: -610, y: y + 9.6, z: -901, w: 0.9, h: 0.9, d: 0.9, c: 0xfff0c8 });
+    // ------------------------------------------------ the house (owner, 2026-11-16: walk-in from the first minute, 354):
+    // a tall entrance block behind a six-column portico, a wing either side (the interior's 64 x 30 m: the great living
+    // room, dining room and library west; the study, cinema and kitchen east; six bedrooms over them), a glass orangery
+    // off the west wing and a colonnade from the east wing to the garage pavilion
+    bld(-618, -936, -602, -902, 12.4, STYLE.HOUSE, WALL, 4.6, 4.2, { roof: 'gable', roofColor: SLATE });
+    bld(-642, -936, -618, -906, 9.6, STYLE.HOUSE, WALL, 4.6, 4.4, { roof: 'gable', roofColor: SLATE });
+    bld(-602, -936, -578, -906, 9.6, STYLE.HOUSE, WALL, 4.6, 4.4, { roof: 'gable', roofColor: SLATE });
+    bld(-660, -932, -642, -912, 5.2, STYLE.GLASS, 0x3a5060, 5.2, 3.6);
+    box(b, -651, y + 5.35, -922, 19, 0.3, 21, 0xf8f4ea, false);
+    for (let k = 0; k < 6; k++) { const x = -622.5 + k * 5; cyl(b, x, y + 5.1, -898.6, 0.5, 10.2, 0xf8f4ea, true); box(b, x, y + 0.2, -898.6, 1.4, 0.4, 1.4, STONE, false); box(b, x, y + 10.25, -898.6, 1.3, 0.3, 1.3, GOLD, false); }
+    box(b, -610, y + 10.7, -899.9, 32, 0.7, 6.6, 0xf8f4ea, false); box(b, -610, y + 11.15, -896.7, 32.4, 0.25, 0.3, GOLD, false);
+    // the pediment over the portico
+    for (let i = 0; i < 6; i++) box(b, -610, y + 11.35 + i * 0.42, -897.2, 30 - i * 5, 0.42, 0.6, 0xf8f4ea, false);
+    box(b, -610, y + 0.2, -899.6, 30, 0.4, 6, STONE, false); box(b, -610, y + 0.1, -896.0, 26, 0.2, 1.4, STONE, false);
+    box(b, -610, y + 2.4, -901.95, 3.2, 4.8, 0.2, 0x3a2418, false); box(b, -610, y + 4.95, -901.9, 3.6, 0.2, 0.22, GOLD, false);
+    for (const sx of [-1, 1]) { box(b, -610 + sx * 2.6, y + 2.2, -901.9, 0.9, 4.4, 0.12, 0xb8d0e0, false); this._det(b, 'blob', -610 + sx * 4.2, y + 0.9, -897, 0.7, 0.9, 0.7, C(0x2f6a3a)); }
+    b.fx.push({ type: 'neon', x: -610, y: y + 9.6, z: -900, w: 0.9, h: 0.9, d: 0.9, c: 0xfff0c8 });
     b.glass = b.glass || [];
-    for (const x of [-660, -644, -628, -592, -576, -560]) b.glass.push({ x, y: y + 6.5, z: -903.82, sx: 3.2, sy: 2.2, sz: 0.1 });
-    for (const x of [-632, -618, -602, -588]) b.fx.push({ type: 'neon', x, y: y + 6.4, z: -903.86, w: 2.4, h: 1.6, d: 0.06, c: 0xffe8c0 });
+    for (const x of [-637, -629, -622, -598, -591, -583]) for (const gy of [2.6, 7.0]) b.glass.push({ x, y: y + gy, z: -905.82, sx: 3.0, sy: 2.0, sz: 0.1 });
+    for (const x of [-610]) for (const gy of [7.2]) b.glass.push({ x, y: y + gy, z: -901.82, sx: 3.6, sy: 2.4, sz: 0.1 });
+    for (const x of [-633, -625, -595, -587]) b.fx.push({ type: 'neon', x, y: y + 2.6, z: -905.86, w: 2.4, h: 1.6, d: 0.06, c: 0xffe8c0 });
+    // the colonnade to the garage pavilion
+    for (let x = -576; x <= -562; x += 3.5) cyl(b, x, y + 1.7, -905, 0.22, 3.4, 0xf8f4ea, true);
+    box(b, -569, y + 3.55, -906.5, 18, 0.3, 4, 0xf8f4ea, false); box(b, -569, y + 0.05, -906.5, 18, 0.1, 4, STONE, false);
     // ------------------------------------------------ the motor court, its fountain, the drive and the gate
     this._det(b, 'disc', -610, y + 0.04, -877, 21, 1, 21, C(0xd8d0c0));
     cyl(b, -610, y + 0.4, -877, 4.4, 0.8, STONE, true); this._det(b, 'disc', -610, y + 0.82, -877, 3.8, 1, 3.8, C(0x3a9ad0)); b.water.push({ x: -610, z: -877, r: 3.6, y: y + 0.82 });
@@ -394,7 +406,9 @@ Object.assign(World.prototype, {
     for (let x = V.x0 + 20; x < V.x1 - 10; x += 26) if (Math.abs(x - V.gate) > 12) b.fx.push({ type: 'neon', x, y: y + 2.95, z: V.z1 + 0.5, w: 0.4, h: 0.3, d: 0.1, c: 0xffe2b0 });
     // ------------------------------------------------ the garage pavilion (six bays) beside the motor court
     bld(-560, -924, -526, -900, 5, STYLE.HOUSE, WALL, 5, 5, { roof: 'gable', roofColor: SLATE });
-    for (let k = 0; k < 4; k++) box(b, -555.5 + k * 8.4, y + 1.9, -899.88, 6.4, 3.8, 0.12, 0x2a2e33, false);
+    // four doors; the second opens for the owner onto the garage under the pavilion (VSPACE_DEFS.villa)
+    for (let k = 0; k < 4; k++) if (k !== 1) box(b, -555.5 + k * 8.4, y + 1.9, -899.88, 6.4, 3.8, 0.12, 0x2a2e33, false);
+    this._door(b, { id: 'villaGarage', x: -547.1, z: -899.82, w: 6.0, h: 3.6, axis: 'x', face: 1, y, color: 0x2a2e33, block: b.i, kind: 'vspace', space: 'villa', prop: 'villa' });
     // ------------------------------------------------ behind the house: the pool terrace, the pool house, loungers
     box(b, -610, y + 0.05, -948, 66, 0.1, 22, STONE, false);
     box(b, -610, y + 0.12, -951, 44, 0.06, 10, 0x2f9ccf, false); for (let x = -628; x <= -592; x += 9) b.water.push({ x, z: -951, r: 4.8, y: y + 0.14 });
@@ -478,7 +492,7 @@ Object.assign(World.prototype, {
     // ------------------------------------------------ the place, the cars on the drive, the people
     b.place = { id: 'villa_valen', name: 'Villa Valen', kind: 'landmark', door: { x: V.gate, z: V.z1 + 6, h: Math.PI }, under: { x: -610, z: -920 } };
     this.mapPlaces.push({ id: 'vault', name: 'The Valen Vault', cat: 'landmark', icon: '♜', x: Q.door, z: Q.z1 + 6, sub: 'The bunker under Villa Valen' });
-    fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -547.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'heli' }]);
+    fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'heli' }]);
     this.isle.fleet.push({ id: 'folk_villa', x: -610, z: -900, r: 0, slots: [], people: [[-606, -896, 0.3], [-614, -896, -0.3], [-596, V.z1 + 3, Math.PI], [-563, Q.z1 + 4, 0], [-600, -948.5, 1.6]] });
     this.isle.villa = { pad, vault: Q, y };
   }

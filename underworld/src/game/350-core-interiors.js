@@ -1210,6 +1210,7 @@ Object.assign(INTERIOR_DEFS.penthouse, {
    out. On foot: the elevator (penthouse) or the stairs (mansion). */
 const VSPACE_DEFS = {
   mansion: { prop: 'mansion', name: 'Crestmoor Motor Court', door: 'mansionGarage', w: 32, d: 24, h: 4.6, bays: 10, at: { x: 116, z: 36 }, floor: 0x2a2c30, floor2: 0x34363c, wall: 0xe8e2d4, accent: 0xd8b04a },
+  villa: { prop: 'villa', name: 'Villa Valen Garage', door: 'villaGarage', w: 36, d: 24, h: 4.6, bays: 12, at: { x: -547, z: -1240 }, floor: 0x2a2c30, floor2: 0x34363c, wall: 0xe8e2d4, accent: 0xd4af37 },
   penthouse: { prop: 'penthouse', name: 'Valen Tower Garage', door: 'towerGarage', w: 22, d: 18, h: 3.6, bays: 4, at: null, floor: 0x3a3d42, floor2: 0x44474d, wall: 0xc8ccd0, accent: 0x4d8dff }
 };
 const VSPACE_RECTS = [];
@@ -1311,7 +1312,7 @@ class VSpaces {
     const g = this.g, p = g.player, D = this.cur; if (!D || p.state !== 'foot') return null;
     for (const s of D.spots) if (Math.hypot(p.pos.x - s.x, p.pos.z - s.z) < s.r) {
       if (s.id === 'elevator') return { label: 'Elevator', act: () => g.content.openElevator() };
-      if (s.id === 'stairs') return { label: 'Up to the house', act: () => g.content.enterHome('mansion') };
+      if (s.id === 'stairs') return { label: 'Up to the house', act: () => D.prop === 'villa' ? VillaValen.enterHouse(g, 'garage') : g.content.enterHome('mansion') };
       if (s.id === 'walkout') return { label: 'Walk out to the street', act: () => this.leave(D, null) };
     }
     return null;

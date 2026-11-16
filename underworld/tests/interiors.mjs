@@ -15,7 +15,7 @@ await ev(() => {
   g.events.cool = 1e9; g.police.enabled = false; g.traffic.enabled = false; g.peds.enabled = false;
   // walk search over an interior: 0.25 m cells, a 0.32 m body from 0.35 to 1.7 m above its feet,
   // floors from def.levels (step 0.75) — the same rules the player moves by
-  window.__reach = (def) => {
+  window.__reach = (def, cap = 60000) => {
     const grid = g.world.grid, res = {}, S = 0.25;
     const lvl = (x, z, h) => def.levels ? window.__pv.intFloorY(def, x, z, h) : 0;
     const free = (x, z, h) => !grid.resolveCircle(def.ox + x, def.oz + z, 0.32, def.fy + h + 0.35, def.fy + h + 1.7, res).hit;
@@ -23,7 +23,7 @@ await ev(() => {
     const seen = new Map(), q = [[sp.x, sp.z, 0]], cells = [];
     const key = (x, z, h) => Math.round(x / S) + ',' + Math.round(z / S) + ',' + Math.round(h * 4);
     seen.set(key(sp.x, sp.z, 0), 1);
-    while (q.length && cells.length < 60000) {
+    while (q.length && cells.length < cap) {
       const [x, z, h] = q.shift(); cells.push([x, z, h]);
       for (const [dx, dz] of [[S, 0], [-S, 0], [0, S], [0, -S]]) {
         const nx = x + dx, nz = z + dz;
@@ -40,6 +40,36 @@ await ev(() => {
     return { cells: cells.length, maxH: +maxH.toFixed(2), upper: cells.filter(c => c[2] > 3).length, spots, bad: spots.filter(s => !s.ok).map(s => s.id) };
   };
 });
+
+// ---------------------------------------------------------------- Villa Valen (354): walk in from the first minute; the bunker; the cache
+const villa = await ev(async () => {
+  const g = window.game, I = g.content.interiors, V = window.__pv.VillaValen, out = {};
+  const wait = async () => { for (let i = 0; i < 100 && g.fading; i++) await new Promise(r => setTimeout(r, 100)); };
+  g.resetPlayerState(-610, -899.9, Math.PI); for (let i = 0; i < 20; i++) g.update(1 / 60, 1 / 60);
+  const a = g.content.findAction(); out.door = a && a.label; if (a) a.act(); await wait();
+  let d = I.cur; out.id = d && d.id; out.rooms = d && d.levels.length;
+  out.r = window.__reach(d, 200000); out.spots = d.spots.map(s => s.id + (s.y ? '@up' : ''));
+  out.buy = (d.spots.find(s => s.id === 'v:buy') || {}).label;
+  // the lift down, the bunker's rooms, back up
+  const c0 = g.money.W.clean;
+  V.takeCache(g); out.cache = g.money.W.clean - c0; V.takeCache(g); out.cache2 = g.money.W.clean - c0; out.dirty = g.money.W.dirty.me;
+  g.content.spotAct('v:lift'); await wait();
+  d = I.cur; out.bunker = d && d.id; out.rb = window.__reach(d, 200000);
+  g.content.spotAct('v:up'); await wait(); out.back = I.cur && I.cur.id;
+  out.cacheGone = !I.cur.spots.find(s => s.id === 'v:cache').label;
+  // owned: the house's own spots, all reachable
+  g.uw.S.props.villa = { owned: true, dmg: 0, since: 1, lvl: 1 };
+  I.exit(true); V.enterHouse(g, 'door'); await wait();
+  d = I.cur; out.owned = d.owned; out.ro = window.__reach(d, 200000); out.ownSpots = d.spots.map(s => s.id + (s.y ? '@up' : ''));
+  I.exit(true); delete g.uw.S.props.villa;
+  return out;
+});
+await waitFade();
+check('Villa Valen: anyone walks in at the front door from the first minute; it is for sale from inside too', villa.door === 'Enter Villa Valen' && villa.id === 'villa' && /for sale \$4,500,000/.test(villa.buy || ''), JSON.stringify({ door: villa.door, id: villa.id, buy: villa.buy }));
+check('Villa Valen: the grand staircase reaches the upper floor (4.6 m) and the upper floor is large (six bedrooms)', villa.r.maxH > 4.5 && villa.r.upper > 8000, JSON.stringify({ maxH: villa.r.maxH, upper: villa.r.upper, cells: villa.r.cells }));
+check('Villa Valen: every spot can be walked to (the hidden lift in the library, the cache upstairs in the closet), owned or not', villa.r.bad.length === 0 && villa.ro.bad.length === 0 && villa.ownSpots.includes('bed@up') && villa.ownSpots.includes('wardrobe@up') && villa.ownSpots.includes('v:garage'), JSON.stringify({ bad: villa.r.bad, badOwned: villa.ro.bad, spots: villa.ownSpots }));
+check('the bunker: the lift is a scene change down and back; its rooms can all be walked to', villa.bunker === 'villa_bunker' && villa.rb.bad.length === 0 && villa.rb.cells > 8000 && villa.back === 'villa', JSON.stringify({ bunker: villa.bunker, bad: villa.rb.bad, cells: villa.rb.cells, back: villa.back }));
+check('the cache: $20,000,000 straight into the bank (clean), once; the panel has nothing more to offer', villa.cache === 20000000 && villa.cache2 === 20000000 && villa.dirty === 0 && villa.cacheGone, JSON.stringify({ cache: villa.cache, again: villa.cache2, dirty: villa.dirty, gone: villa.cacheGone }));
 
 // ---------------------------------------------------------------- the mansion
 await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; (g.money.W.clean = g.money.W.dirty.me = 1e6); g.content.enterHome('mansion'); });

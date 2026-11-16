@@ -22,6 +22,8 @@ const MONEY_SOURCES = {
   bounty: { earn: 'stash', book: 'bounties' }, dealers: { earn: 'stash', book: 'dealers' }, royalty: { earn: 'stash', book: 'territory tax' }, tribute: { earn: 'stash', book: 'tribute' },
   // ---- Clean income
   business: { earn: 'clean', book: 'businesses' }, carSale: { earn: 'clean' }, casino: { earn: 'clean' },
+  // Villa Valen's hidden cache (354): already laundered, it goes straight into the bank
+  cache: { earn: 'clean' },
   // a car you stole is not a legal sale even from your own garage until HOT/clean titles exist (§45.22, Session 5)
   stolenCarSale: { earn: 'me' },
   // the Dirty share of an ordinary car bought (in part) with Dirty Cash: its money keeps its colour (§45.24)

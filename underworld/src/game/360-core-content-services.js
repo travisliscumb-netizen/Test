@@ -90,7 +90,9 @@ const SECRETS = [
   { id: 'ghostferry', name: 'The Ghost Ferry', cash: 2000 },
   { id: 'owl', name: 'Night Owl', cash: 444 },
   { id: 'gold', name: 'The Golden Corsair', cash: 0 },
-  { id: 'pitch', name: 'Pitch Invader', cash: 800 }
+  { id: 'pitch', name: 'Pitch Invader', cash: 800 },
+  // the cache behind the panel in Villa Valen's walk-in closet (354): clean money, straight into the bank
+  { id: 'villacache', name: 'The Valen Cache', cash: 20000000, clean: true }
 ];
 const SERVICE_PLACES = ['motorworks', 'dealer', 'store', 'police', 'tower'];
 const POSTS = [
@@ -177,7 +179,7 @@ class ContentManager {
     const d = SECRETS.find(x => x.id === id); if (!d) return;
     s.secrets[id] = 1;
     this.g.ui.banner('Secret Found', d.name + (d.cash ? ' · ' + fmtMoney(d.cash) : ''), 'info', 3.5);
-    if (d.cash) this.g.earn(d.cash, 'secret');
+    if (d.cash) this.g.earn(d.cash, d.clean ? 'cache' : 'secret');
     this.addRep(25);
     this.g.audio.play('pass');
     if (Object.keys(s.secrets).length >= 4) this.ach('secrets4');
@@ -744,6 +746,8 @@ class ContentManager {
     if (hd) return hd;
     const cd = pl.casino && pl.casino.door;
     if (cd && Math.hypot(p.pos.x - cd.x, p.pos.z - cd.z) < 2.6) return { label: 'Enter The Valen Royale', act: () => this.enterCasino() };
+    const vd = VillaValen.doorAction(g);
+    if (vd) return vd;
     const def = I.nearDoor(p);
     if (def) {
       const why = this.canEnter(def);
@@ -790,6 +794,7 @@ class ContentManager {
     if (id.startsWith('w:')) { g.uw.compounds.spot(id.slice(2)); return; }
     if (id.startsWith('rv:')) { g.uw.rivalwh.spot(id.slice(3)); return; }
     if (id.startsWith('bk:')) { g.uw.banks.spot(id.slice(3)); return; }
+    if (id.startsWith('v:')) { VillaValen.spot(g, id.slice(2)); return; }
     switch (id) {
       case 'exit': I.exit(); break;
       case 'bed': g.uw.props.sleep(I.cur && I.cur.propId ? I.cur.propId : I.cur && I.cur.id === 'penthouse' ? 'penthouse' : 'linden'); break;

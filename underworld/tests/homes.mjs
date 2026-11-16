@@ -1,4 +1,4 @@
-/* Homes (v6): 45 buyable residences over every market (rooms and bedsits to the estate), signature homes in
+/* Homes (v6): 46 buyable residences (Villa Valen joined, 2026-11-16) over every market (rooms and bedsits to the estate), signature homes in
    each neighbourhood, attributes (storage, parking, crew room, prestige, security, finish, neighbourhood perk),
    seeded floor plans by tier (about 5 rooms in an ordinary house, 7-10 in better ones, 10+ in a signature home,
    11 substantial rooms in the mansion) that vary between houses and are fully walkable, every home enterable,
@@ -18,20 +18,20 @@ const cat = await ev(() => {
   const zones = {}; for (const h of homes) { const L = g.uw.loc('prop', h.id); zones[L.zone] = (zones[L.zone] || 0) + 1; }
   const sig = homes.filter(h => h.sig).map(h => [h.id, h.sig]);
   const prices = homes.map(h => h.price).sort((a, b) => a - b);
-  const enterable = homes.filter(h => h.home || h.place === 'tower' || h.id === 'linden').length;
+  const enterable = homes.filter(h => h.home || h.place === 'tower' || h.place === 'villa_valen' || h.id === 'linden').length;
   const attrs = homes.every(h => h.sec >= 1 && h.finish && h.storage > 0);
   // every home has its own door, at least 6 m from every other location
   const locs = g.uw.locs.filter(l => l.kind !== 'deal'); let minD = 1e9;
   for (const h of homes) { const L = g.uw.loc('prop', h.id); for (const o of locs) if (o !== L) minD = Math.min(minD, Math.hypot(o.x - L.x, o.z - L.z)); }
   return { n: homes.length, tiers, zones, sig, lo: prices[0], hi: prices[prices.length - 1], enterable, attrs, minD };
 });
-check('45 buyable homes in all', cat.n === 45, String(cat.n));
+check('46 buyable homes in all', cat.n === 46, String(cat.n));
 check('every tier of the market: rooms and bedsits, apartments, houses, upscale, luxury, penthouse and estate', [1, 2, 3, 4, 5, 6].every(t => cat.tiers[t] >= 2), JSON.stringify(cat.tiers));
-check('prices run from about $2,500 to $380,000', cat.lo <= 3000 && cat.hi >= 380000, `${cat.lo}–${cat.hi}`);
+check('prices run from about $2,500 to $4,500,000 (Villa Valen)', cat.lo <= 3000 && cat.hi >= 4500000, `${cat.lo}–${cat.hi}`);
 check('spread over at least seven districts', Object.keys(cat.zones).length >= 7, JSON.stringify(cat.zones));
 check('a signature home in each residential neighbourhood (Linden, Crestmoor, Cedar Fields, Old Quarter, Financial)', ['l', 'u', 'r', 'o', 'c'].every(z => cat.sig.some(s => s[1] === z)), JSON.stringify(cat.sig));
 check('every home lists security, finish and storage', cat.attrs, '');
-check('every home can be walked into', cat.enterable === 45, String(cat.enterable));
+check('every home can be walked into', cat.enterable === 46, String(cat.enterable));
 check('home doors are at least 6 m from any other location', cat.minD >= 6, cat.minD.toFixed(1));
 
 // floor plans: rooms by tier, variety, reachability (all homes, owned and break-in)
@@ -93,7 +93,7 @@ const loot = await ev(() => { const P = window.__pv, out = {}; for (const t of [
 check('better homes have better loot (valuables per jewellery box grow with the tier)', loot[5].hot > loot[3].hot && loot[3].hot > loot[1].hot && loot[6].hot >= loot[5].hot, JSON.stringify(loot));
 check('valuables have names (watches, bags, jewellery…)', loot[5].named > 1000, JSON.stringify(loot[5]));
 
-// the Property app: filters, search and sort over 45 homes
+// the Property app: filters, search and sort over 46 homes
 const app = await ev(() => {
   const g = window.game, U = g.uw.ui, out = {};
   U.open('assets');
@@ -113,7 +113,7 @@ const app = await ev(() => {
   return out;
 });
 check('Property app: owned / district / tier / parking-storage filters, sort and search', app.selects >= 4 && app.search && app.all >= 45 && app.owned >= 1 && app.sig >= 5 && app.crest >= 8 && app.g3 >= 4 && app.search1 >= 2, JSON.stringify(app));
-check('Property app: sorted by price, most expensive first (Valen Point Motorsport Park, $1.5M, heads the list since Session 6B)', /Motorsport Park/.test(app.first), app.first);
+check('Property app: sorted by price, most expensive first (Villa Valen, $4.5M, heads the list since 2026-11-16)', /Villa Valen/.test(app.first), app.first);
 check('Property app fits a phone (no sideways scroll, 44 px controls)', !app.overflow && app.minH >= 43.5, JSON.stringify(app));
 
 // save, reload and a v5 save with owned homes
@@ -126,6 +126,6 @@ const mig = await ev(() => {
   const d = SS.load(); const g = window.game; g.save = d.data; g.uw.bind(g.save);
   return { migrated: d.migrated, owned: ['linden', 'semi', 'triple2'].every(id => g.uw.props.owned(id)), lvl: g.uw.S.props.semi.lvl, total: window.__pv.PROPS.filter(p => p.kind === 'safehouse').length };
 });
-check('a v5 save keeps every home it owned; the new homes are simply for sale', mig.migrated && mig.owned && mig.lvl === 1 && mig.total === 45, JSON.stringify(mig));
+check('a v5 save keeps every home it owned; the new homes are simply for sale', mig.migrated && mig.owned && mig.lvl === 1 && mig.total === 46, JSON.stringify(mig));
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 await finish(b, 'homes');
