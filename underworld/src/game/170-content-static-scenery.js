@@ -15,21 +15,36 @@ function buildStaticScenery(scene, world) {
     // road style of the district (the road on a block's east and south sides takes it)
     data[b.i * 4 + 1] = ROAD_STYLE[zoneKey(b.cx, b.cz)] || 0;
   }
-  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
-  tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
+  // (each group's own texture: the same, with alpha marking only the cells its precincts own)
+  const blockTex = cells => { const d = data.slice(); for (let i = 0; i < N * N; i++) d[i * 4 + 3] = cells.has(i) ? 255 : 0; const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };
   U.uAO.value = makeAOTexture(world);
   const roadTex = RoadNet.texture(), localTex = world.localTexture();
   const E = EDGE_MARGIN, pw = E - ROAD_HALF, wh = 3.2;
-  // every precinct where it stands (021): its ground, its kerbs and slabs, its promenade and its seawall, drawn with a
-  // ground material of its own whose shader takes the precinct's offset off before it reads the lattice's textures
+  // The city where it stands (021), a group for each offset: precincts that stand at one offset share their streets,
+  // so they share a ground (one mesh, the union of their frames with no overlap) and a ground material whose shader
+  // takes their offset off before it reads the lattice's textures and knows which cells are theirs. Each precinct
+  // adds its kerbs and slabs, its promenade and its seawall to its group's mesh
+  const groups = new Map();
+  for (const p of CityLayout.precincts) { const key = p.ox + ',' + p.oz; if (!groups.has(key)) groups.set(key, { ox: p.ox, oz: p.oz, list: [] }); groups.get(key).list.push(p); }
   const grounds = [], slabsList = [], mats = [];
-  for (const p of CityLayout.precincts) {
-    const gmat = makeGroundMaterial(tex, roadTex, localTex, p.ox * P, p.oz * P); mats.push(gmat);
-    const W = p.x1 - p.x0 + E * 2, D = p.z1 - p.z0 + E * 2;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), gmat);
-    ground.position.set((p.x0 + p.x1) / 2, 0, (p.z0 + p.z1) / 2); ground.receiveShadow = true;
+  let gmat0 = null;
+  for (const G of groups.values()) {
+    const cells = new Set(); for (const p of G.list) for (let lz = p.lz0; lz <= p.lz1; lz++) for (let lx = p.lx0; lx <= p.lx1; lx++) cells.add(lz * N + lx);
+    const gmat = makeGroundMaterial(blockTex(cells), roadTex, localTex, G.ox * P, G.oz * P, LOCAL.loc(G.ox, G.oz)); mats.push(gmat);
+    if (!G.ox && !G.oz) gmat0 = gmat;
+    // the ground: the group's frames cut on every frame edge, a quad for each piece a frame covers
+    const xs = new Set(), zs = new Set(); for (const p of G.list) { xs.add(p.x0 - E); xs.add(p.x1 + E); zs.add(p.z0 - E); zs.add(p.z1 + E); }
+    const X = [...xs].sort((a, b) => a - b), Z = [...zs].sort((a, b) => a - b), gp = [], gn = [], gi = [];
+    for (let a = 0; a < X.length - 1; a++) for (let c = 0; c < Z.length - 1; c++) {
+      const x0 = X[a], x1 = X[a + 1], z0 = Z[c], z1 = Z[c + 1], mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      if (!G.list.some(p => mx > p.x0 - E && mx < p.x1 + E && mz > p.z0 - E && mz < p.z1 + E)) continue;
+      const n = gp.length / 3; gp.push(x0, 0, z0, x0, 0, z1, x1, 0, z1, x1, 0, z0); gn.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0); gi.push(n, n + 1, n + 2, n, n + 2, n + 3);
+    }
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3)); gg.setAttribute('normal', new THREE.Float32BufferAttribute(gn, 3)); gg.setIndex(gi);
+    const ground = new THREE.Mesh(gg, gmat); ground.receiveShadow = true;
     scene.add(ground); grounds.push(ground);
     const gs = new GeoBuilder();
+    for (const p of G.list) {
     for (const b of world.blocks) if (CityLayout.precinctOf(b.bx, b.bz) === p) gs.add(TPL.box, M(b.cx, CURB_H / 2, b.cz, P - ROAD_HALF * 2, CURB_H, P - ROAD_HALF * 2), null);
     // raised fill where a superblock swallowed a road segment (and its node, if no road is left there)
     for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1; j++) { const I = (i + p.ox) * P, J = (j + p.oz) * P; if (!RoadNet.segOpen(0, i + p.ox, j + p.oz)) gs.add(TPL.box, M(I, CURB_H / 2, J + P / 2, ROAD_HALF * 2, CURB_H, P - ROAD_HALF * 2), null); }
@@ -57,6 +72,7 @@ function buildStaticScenery(scene, world) {
     }
     // the kerb cut away where each curved road leaves this precinct's lattice streets (Curved Roads pass)
     addCurbCuts(gs, c => CityLayout.at(c.axis === 0 ? c.line * P : c.seg * P + P / 2, c.axis === 0 ? c.seg * P + P / 2 : c.line * P) === p);
+    }
     const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs); slabsList.push(slabs);
   }
   // the curved streets' painted lines
@@ -94,6 +110,6 @@ function buildStaticScenery(scene, world) {
   sky.frustumCulled = false; sky.renderOrder = -10;
   scene.add(sky);
   // (the extensions' scenery off the lattice uses a ground material that stands where the lattice was authored)
-  const at0 = CityLayout.precincts.find(p => !p.ox && !p.oz), gmat0 = at0 ? mats[at0.k] : makeGroundMaterial(tex, roadTex, localTex, 0, 0);
+  if (!gmat0) gmat0 = makeGroundMaterial(blockTex(new Set()), roadTex, localTex, 0, 0, LOCAL.loc(CityLayout.precincts[0].ox, CityLayout.precincts[0].oz));
   return { ground: grounds[0], grounds, slabs: slabsList[0], slabsList, water, sky, gmat: gmat0, gmats: mats };
 }

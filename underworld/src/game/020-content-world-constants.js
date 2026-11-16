@@ -352,20 +352,24 @@ const Links = {
    placement and for keeping houses, trees and poles out of the way. */
 const LOCAL = { S: 1536, data: null, canvas: null };
 // is (x,z) on a local lane (street, drive, path)? Lots and yards do not count.
-// (the local-road raster is in lattice space: the precinct whose frame holds the point takes its offset off, 021)
+// the local-road atlas (120 _buildLocalRaster) is in lattice space, a tile for each offset: the pixel of a world point
+// in the tile of the precinct whose frame holds it (021), or -1
+function localPx(x, z) {
+  const pr = CityLayout.at(x, z, 48), t = pr && LOCAL.tiles && LOCAL.tiles.get(pr.ox + ',' + pr.oz); if (!t) return -1;
+  const ax = t.tx0 + x - pr.ox * P - t.gx0, az = t.tz0 + z - pr.oz * P - t.gz0;
+  if (ax < t.tx0 || az < t.tz0 || ax >= t.tx0 + t.w || az >= t.tz0 + t.h) return -1;
+  const u = Math.floor(ax * LOCAL.k), v = Math.floor(az * LOCAL.k);
+  return u < 0 || v < 0 || u >= LOCAL.W || v >= LOCAL.H ? -1 : v * LOCAL.W + u;
+}
 function localRoadAt(x, z) {
   const d = LOCAL.lane; if (!d) return 0;
-  const pr = CityLayout.at(x, z, 48); if (!pr) return 0; x -= pr.ox * P; z -= pr.oz * P;
-  const S = LOCAL.S, u = Math.floor((x + 48) / 1056 * S), v = Math.floor((z + 48) / 1056 * S);
-  if (u < 0 || v < 0 || u >= S || v >= S) return 0;
-  return d[v * S + u] > 140 ? 1 : 0;
+  const i = localPx(x, z); if (i < 0) return 0;
+  return d[i] > 140 ? 1 : 0;
 }
 function localSurfaceAt(x, z) {
   const d = LOCAL.data; if (!d) return 0;
-  const pr = CityLayout.at(x, z, 48); if (!pr) return 0; x -= pr.ox * P; z -= pr.oz * P;
-  const S = LOCAL.S, u = Math.floor((x + 48) / 1056 * S), v = Math.floor((z + 48) / 1056 * S);
-  if (u < 0 || v < 0 || u >= S || v >= S) return 0;
-  const o = (v * S + u) * 4;
+  const i = localPx(x, z); if (i < 0) return 0;
+  const o = i * 4;
   return d[o] > 150 ? 1 : d[o + 1] > 150 ? 2 : d[o + 2] > 150 ? 3 : 0;
 }
 // Ground height: road surface 0, raised sidewalks/blocks at CURB_H.

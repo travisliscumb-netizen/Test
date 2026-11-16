@@ -69,22 +69,31 @@ Object.assign(World.prototype, {
     return true;
   },
   _buildLocalRaster() {
-    const S = LOCAL.S, c = document.createElement('canvas'); c.width = S; c.height = S;
-    // The raster is in LATTICE space (CITY_SPREAD.md S3): each precinct draws every road where it stands relative to
-    // itself (its offset taken off), clipped to its own frame in the lattice, so the ground shader and localRoadAt /
-    // localSurfaceAt (which take the same offset off) read the roads that are really there
-    const g = c.getContext('2d'), k = S / 1056;
-    let ox = 0, oz = 0;
-    const X = v => (v - ox + 48) * k, Z = v => (v - oz + 48) * k;
-    const each = (ctx, draw) => {
-      for (const p of CityLayout.precincts) {
-        ox = p.ox * P; oz = p.oz * P;
-        ctx.save(); ctx.beginPath(); ctx.rect((p.lx0 * P) * k, (p.lz0 * P) * k, ((p.lx1 - p.lx0 + 1) * P + 96) * k, ((p.lz1 - p.lz0 + 1) * P + 96) * k); ctx.clip();
-        draw(ctx); ctx.restore();
-      }
-      ox = oz = 0;
-    };
-    g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+    // An atlas in LATTICE space (CITY_SPREAD.md S3): one tile for each group of precincts that stand at one offset
+    // (they share their streets), covering their cells and 48 m round them. Every road is drawn in each tile where it
+    // stands relative to that group, clipped to the tile, so precincts that stand apart never share a pixel. The
+    // ground shader (uLoc) and localRoadAt / localSurfaceAt read their own group's tile. Under 'classic': one tile,
+    // the square and its 48 m margin, as it always was.
+    const k = LOCAL.S / 1056, groups = new Map();
+    for (const p of CityLayout.precincts) {
+      const key = p.ox + ',' + p.oz, g0 = groups.get(key) || { key, ox: p.ox * P, oz: p.oz * P, lx0: Infinity, lz0: Infinity, lx1: -Infinity, lz1: -Infinity };
+      g0.lx0 = Math.min(g0.lx0, p.lx0); g0.lz0 = Math.min(g0.lz0, p.lz0); g0.lx1 = Math.max(g0.lx1, p.lx1); g0.lz1 = Math.max(g0.lz1, p.lz1); groups.set(key, g0);
+    }
+    // shelf packing, biggest first: (gx0, gz0) the tile's lattice origin, (tx0, tz0) where it sits in the atlas, metres
+    const tiles = [...groups.values()].map(t => ({ ...t, gx0: t.lx0 * P - 48, gz0: t.lz0 * P - 48, w: (t.lx1 - t.lx0 + 1) * P + 96, h: (t.lz1 - t.lz0 + 1) * P + 96 })).sort((a, b) => b.w * b.h - a.w * a.h);
+    const maxW = Math.max(1056, ...tiles.map(t => t.w)) * 1.6;
+    let x = 0, z = 0, rowH = 0, W = 0;
+    for (const t of tiles) { if (x > 0 && x + t.w > maxW) { z += rowH; x = 0; rowH = 0; } t.tx0 = x; t.tz0 = z; x += t.w; rowH = Math.max(rowH, t.h); W = Math.max(W, x); }
+    const Wm = W, Hm = z + rowH, SW = Math.ceil(Wm * k), SH = Math.ceil(Hm * k);
+    LOCAL.W = SW; LOCAL.H = SH; LOCAL.k = k; LOCAL.tiles = new Map(tiles.map(t => [t.key, t]));
+    // the shader's view of a tile: [lattice x, z of the atlas origin, 1 / atlas width, 1 / atlas height] (metres)
+    LOCAL.loc = (ox, oz) => { const t = LOCAL.tiles.get(ox + ',' + oz); return [t.gx0 - t.tx0, t.gz0 - t.tz0, 1 / Wm, 1 / Hm]; };
+    const c = document.createElement('canvas'); c.width = SW; c.height = SH;
+    const g = c.getContext('2d');
+    let T = tiles[0];
+    const X = v => (T.tx0 + v - T.ox - T.gx0) * k, Z = v => (T.tz0 + v - T.oz - T.gz0) * k;
+    const each = (ctx, draw) => { for (const t of tiles) { T = t; ctx.save(); ctx.beginPath(); ctx.rect(t.tx0 * k, t.tz0 * k, t.w * k, t.h * k); ctx.clip(); draw(ctx); ctx.restore(); } };
+    g.fillStyle = '#000'; g.fillRect(0, 0, SW, SH);
     g.globalCompositeOperation = 'lighter'; g.lineCap = 'round'; g.lineJoin = 'round';
     each(g, g => {
       for (const r of this.localRoads) {
@@ -96,11 +105,11 @@ Object.assign(World.prototype, {
       }
     });
     g.globalCompositeOperation = 'source-over';
-    LOCAL.canvas = c; LOCAL.data = g.getImageData(0, 0, S, S).data;
+    LOCAL.canvas = c; LOCAL.data = g.getImageData(0, 0, SW, SH).data;
     // lanes only (streets, drives, paths): what props must keep clear of. Lots and yards are
     // paved but may hold lamp islands, dumpsters and pallets, so they are not in this mask.
-    const lc = document.createElement('canvas'); lc.width = S; lc.height = S;
-    const lg = lc.getContext('2d'); lg.fillStyle = '#000'; lg.fillRect(0, 0, S, S); lg.lineCap = 'round'; lg.lineJoin = 'round'; lg.fillStyle = lg.strokeStyle = '#fff';
+    const lc = document.createElement('canvas'); lc.width = SW; lc.height = SH;
+    const lg = lc.getContext('2d'); lg.fillStyle = '#000'; lg.fillRect(0, 0, SW, SH); lg.lineCap = 'round'; lg.lineJoin = 'round'; lg.fillStyle = lg.strokeStyle = '#fff';
     each(lg, lg => {
       for (const r of this.localRoads) {
         if (r.st === 'concrete' || r.k === 'poly') continue;
@@ -109,8 +118,8 @@ Object.assign(World.prototype, {
         else { lg.arc(X(r.x), Z(r.z), r.r * k, 0, Math.PI * 2); lg.fill(); }
       }
     });
-    const ld = lg.getImageData(0, 0, S, S).data, lane = new Uint8Array(S * S);
-    for (let i = 0; i < S * S; i++) lane[i] = ld[i * 4];
+    const ld = lg.getImageData(0, 0, SW, SH).data, lane = new Uint8Array(SW * SH);
+    for (let i = 0; i < SW * SH; i++) lane[i] = ld[i * 4];
     LOCAL.lane = lane;
   },
   localTexture() {

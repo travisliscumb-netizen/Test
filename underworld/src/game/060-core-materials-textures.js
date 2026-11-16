@@ -329,18 +329,26 @@ function makeBuildingMaterial() {
    Boulevards (road index 6 in both directions) carry two lanes per direction. */
 const BLVD = 6;
 function isBoulevard(axisIndex) { return axisIndex === BLVD; }
-// (ox, oz): the offset in metres of the precinct this ground belongs to (021); the shader takes it off the world position
-// before it reads the lattice's textures (blocks, streets, local roads, AO), so every precinct paints its own streets
-function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
+// (ox, oz): the offset in metres of the precincts this ground belongs to (021: one material per offset); the shader
+// takes it off the world position before it reads the lattice's textures (blocks, streets, AO). blockTex's alpha marks
+// the lattice cells those precincts own (the city is there and in the streets round them; anywhere else is outside
+// it). loc: where their tile of the local-road atlas sits ([lattice x, z of the atlas origin, 1 / atlas width, 1 /
+// atlas height], metres: 120 _buildLocalRaster)
+function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0, loc = [-48, -48, 1 / 1056, 1 / 1056]) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
-    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime; sh.uniforms.uOff = { value: new THREE.Vector2(ox, oz) };
+    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime; sh.uniforms.uOff = { value: new THREE.Vector2(ox, oz) }; sh.uniforms.uLoc = { value: new THREE.Vector4(...loc) };
     sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
     patchWorldVaryings(sh);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec2 uOff; uniform vec3 uHorizon; uniform vec3 uZenith;
+        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec2 uOff; uniform vec4 uLoc;
+        // is lattice cell c one of this ground's own (a block of its precincts stands there)?
+        float cellIn(vec2 c){ if (c.x < 0.0 || c.y < 0.0 || c.x > 11.0 || c.y > 11.0) return 0.0; return texture2D(uBlock, (c + 0.5) / 12.0).a; }
+        // in the city: on one of its own blocks or in the street beside one (6 m either side of a cell's edge)
+        bool cityAt(vec2 s){ return cellIn(floor((s + vec2(-6.0, -6.0)) / 80.0)) + cellIn(floor((s + vec2(6.0, -6.0)) / 80.0)) + cellIn(floor((s + vec2(-6.0, 6.0)) / 80.0)) + cellIn(floor((s + vec2(6.0, 6.0)) / 80.0)) > 0.5; }
+        uniform vec3 uHorizon; uniform vec3 uZenith;
         varying vec3 vPW; varying vec3 vPN;
         ${GLSL_NOISE}
         ${GLSL_BUMP}
@@ -363,7 +371,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
         // the street lamp nearest a ground point, as the offset from the point to the lamp's foot (0 when its road is
         // closed or the point is outside the city): the same lamp layout as lampPool
         vec2 lampOff(vec2 s){
-          if (s.x < -6.0 || s.y < -6.0 || s.x > 966.0 || s.y > 966.0) return vec2(1e3);
+          if (!cityAt(s)) return vec2(1e3);
           vec2 ci = floor(s / 80.0); vec2 l = s - ci * 80.0;
           vec2 rcl = clamp(floor((s + 40.0) / 80.0), 0.0, 12.0);
           float vO = texture2D(uRoad, (vec2(rcl.x, clamp(ci.y, 0.0, 11.0)) + 0.5) / 16.0).r;
@@ -382,7 +390,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
         vec2 dr = min(l, 80.0 - l);
         vec2 so = vec2(l.x < 40.0 ? l.x : l.x - 80.0, l.y < 40.0 ? l.y : l.y - 80.0);
         vec2 ri = floor((p + 40.0) / 80.0); // nearest road index on each axis
-        bool inCity = p.x > -6.0 && p.y > -6.0 && p.x < 966.0 && p.y < 966.0;
+        bool inCity = cityAt(p);
         bool rx = dr.x < 6.0; bool rz = dr.y < 6.0;
         // which lattice roads exist here (superblocks close some segments)
         vec2 rcl = clamp(ri, 0.0, 12.0);
@@ -602,7 +610,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
         }
         // local roads, paths and yards inside blocks (cul-de-sacs, the stadium ring, container lanes)
         if (inCity && !(rx || rz) && vPN.y > 0.5) {
-          vec4 lm = texture2D(uLocal, vec2((p.x + 48.0) / 1056.0, 1.0 - (p.y + 48.0) / 1056.0));
+          vec4 lm = texture2D(uLocal, vec2((p.x - uLoc.x) * uLoc.z, 1.0 - (p.y - uLoc.y) * uLoc.w));
           if (lm.r + lm.g + lm.b > 0.02) {
             float lgr = pvn(p * 23.0);
             vec3 conc = vec3(0.5, 0.49, 0.47) * (0.86 + 0.18 * pvh(floor(p / 3.0))) * (0.9 + 0.1 * n1);
@@ -625,7 +633,9 @@ function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
         }
         if (!inCity && vPN.y >= 0.5) {
           // waterfront promenade boards
-          float coordP = (abs(p.x) < 6.0 || abs(p.x - 960.0) < 6.0 || p.x < 0.0 || p.x > 960.0) ? p.y : p.x;
+          // boards run along the promenade: along z beside the city's west and east edges and in the corners
+          bool ew = cityAt(p + vec2(24.0, 0.0)) || cityAt(p - vec2(24.0, 0.0)), ns = cityAt(p + vec2(0.0, 24.0)) || cityAt(p - vec2(0.0, 24.0));
+          float coordP = (ew || !ns) ? p.y : p.x;
           float plank = step(0.06, fract(coordP / 1.2));
           col = vec3(0.42, 0.33, 0.24) * (0.8 + 0.25 * pvh(floor(p / 1.2))) * (0.75 + 0.25 * plank) * (0.9 + 0.15 * pvn(p * vec2(0.3, 8.0)));
           hgt -= (1.0 - plank) * 0.008;
