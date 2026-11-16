@@ -23,6 +23,9 @@ Read this first, then `CURRENT_SESSION.md` (what is in progress and the exact ne
 - Source is `src/` (concatenated in `src/manifest.json` order). Build: `node underworld/tools/build.mjs`
   (`--check` verifies `index.html` is byte-identical to the build). Never edit `index.html` by hand.
 - Commit and push working progress often; a stop hook requires a clean, pushed tree.
+- Preview: Vercel project `operation-blackgate-2` deploys every push. The repository root's `index.html` is a
+  different app (Ted's Lawn Care); the game is at `<deployment-url>/underworld/`. Check the page title before
+  sending a link.
 
 ## Engineering rules
 - One source of truth per system; no parallel legacy paths. Old sessions are history, not frozen code.
