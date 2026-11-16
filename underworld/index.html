@@ -33199,14 +33199,17 @@ const Links = {
    placement and for keeping houses, trees and poles out of the way. */
 const LOCAL = { S: 1536, data: null, canvas: null };
 // is (x,z) on a local lane (street, drive, path)? Lots and yards do not count.
+// (the local-road raster is in lattice space: the precinct whose frame holds the point takes its offset off, 021)
 function localRoadAt(x, z) {
   const d = LOCAL.lane; if (!d) return 0;
+  const pr = CityLayout.at(x, z, 48); if (!pr) return 0; x -= pr.ox * P; z -= pr.oz * P;
   const S = LOCAL.S, u = Math.floor((x + 48) / 1056 * S), v = Math.floor((z + 48) / 1056 * S);
   if (u < 0 || v < 0 || u >= S || v >= S) return 0;
   return d[v * S + u] > 140 ? 1 : 0;
 }
 function localSurfaceAt(x, z) {
   const d = LOCAL.data; if (!d) return 0;
+  const pr = CityLayout.at(x, z, 48); if (!pr) return 0; x -= pr.ox * P; z -= pr.oz * P;
   const S = LOCAL.S, u = Math.floor((x + 48) / 1056 * S), v = Math.floor((z + 48) / 1056 * S);
   if (u < 0 || v < 0 || u >= S || v >= S) return 0;
   const o = (v * S + u) * 4;
@@ -33458,7 +33461,8 @@ const ISLE_COAST = [
 const ISLE_ISLETS = [[-560, 470, 78, 'Battery Island'], [-1720, 520, 120, 'Gull Rock'], [2860, -900, 135, 'Tern Island'], [-1450, 2720, 150, 'Castaway Cay'], [2680, 2480, 165, 'Dutchman’s Rest'], [-2330, -2480, 120, 'Widow’s Tooth']];
 // where the shore must stay exactly as drawn (no coast noise): the city, Cedar Fields, the airport, the proving
 // ground, the bridge's two headlands, the lighthouse point
-const ISLE_KEEP = [[-140, -140, 1100, 1100], [-80, 980, 740, 1550], [-330, 1740, 1530, 2600], [800, 1420, 2040, 1760], [-1260, 60, -960, 360], [-1250, 690, -940, 990], [1380, -2900, 1680, -2620]];
+// (and every precinct of the city, 140 m round its cells: Island._coastAmp adds them from CityLayout, 021)
+const ISLE_KEEP = [[-80, 980, 740, 1550], [-330, 1740, 1530, 2600], [800, 1420, 2040, 1760], [-1260, 60, -960, 360], [-1250, 690, -940, 990], [1380, -2900, 1680, -2620]];
 // the airport and the proving ground (level pads; built in 127)
 const AIRPORT = { name: 'Port Valen International', x0: -250, z0: 1820, x1: 1450, z1: 2520, y: 3.2,
   rw: [{ id: '09/27', z: 2410, x0: -170, x1: 1370, w: 46 }, { id: '09R/27L', z: 2205, x0: 120, x1: 1220, w: 32 }],
@@ -33516,7 +33520,7 @@ const Island = {
   // how freely the shore may wander here: 0 inside a kept rectangle, 1 from 200 m out
   _coastAmp(x, z) {
     let a = 1;
-    for (const K of ISLE_KEEP) { const dx = Math.max(K[0] - x, 0, x - K[2]), dz = Math.max(K[1] - z, 0, z - K[3]); a = Math.min(a, smoothstep(0, 200, Math.hypot(dx, dz))); if (a === 0) break; }
+    for (const K of this._keep || (this._keep = [...CityLayout.precincts.map(p => [p.x0 - 140, p.z0 - 140, p.x1 + 140, p.z1 + 140]), ...ISLE_KEEP])) { const dx = Math.max(K[0] - x, 0, x - K[2]), dz = Math.max(K[1] - z, 0, z - K[3]); a = Math.min(a, smoothstep(0, 200, Math.hypot(dx, dz))); if (a === 0) break; }
     return a;
   },
   _buildSDF() {
@@ -35697,16 +35701,18 @@ function makeBuildingMaterial() {
    Boulevards (road index 6 in both directions) carry two lanes per direction. */
 const BLVD = 6;
 function isBoulevard(axisIndex) { return axisIndex === BLVD; }
-function makeGroundMaterial(blockTex, roadTex, localTex) {
+// (ox, oz): the offset in metres of the precinct this ground belongs to (021); the shader takes it off the world position
+// before it reads the lattice's textures (blocks, streets, local roads, AO), so every precinct paints its own streets
+function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
-    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime;
+    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime; sh.uniforms.uOff = { value: new THREE.Vector2(ox, oz) };
     sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
     patchWorldVaryings(sh);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec3 uHorizon; uniform vec3 uZenith;
+        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec2 uOff; uniform vec3 uHorizon; uniform vec3 uZenith;
         varying vec3 vPW; varying vec3 vPN;
         ${GLSL_NOISE}
         ${GLSL_BUMP}
@@ -35743,7 +35749,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
-        vec2 p = vPW.xz;
+        vec2 p = vPW.xz - uOff; // lattice metres (the precinct's offset taken off, 021)
         vec2 ci = floor(p / 80.0); vec2 l = p - ci * 80.0;
         vec2 dr = min(l, 80.0 - l);
         vec2 so = vec2(l.x < 40.0 ? l.x : l.x - 80.0, l.y < 40.0 ? l.y : l.y - 80.0);
@@ -36048,9 +36054,11 @@ function makeAOTexture(world) {
   const X = x => x + 48;
   // layered expanding rectangles approximate a blur without ctx.filter (unsupported in Safari)
   const layers = [[2.6, 0.1], [1.8, 0.12], [1.1, 0.15], [0.5, 0.2]];
+  // (lattice space, like every texture the ground shader reads: a block's footprints less its precinct's offset)
   for (const b of world.blocks) {
-    for (const r of b.bld) if (r.y0 <= CURB_H + 0.01) for (const [e, a] of layers) { g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(X(r.x0) - e, X(r.z0) - e, r.x1 - r.x0 + e * 2, r.z1 - r.z0 + e * 2); }
-    for (const d of b.det) if (d.col && d.col.x0 !== undefined && d.col.y1 > 1.5) for (const [e, a] of layers.slice(1)) { g.fillStyle = `rgba(0,0,0,${a * 0.6})`; g.fillRect(X(d.col.x0) - e, X(d.col.z0) - e, d.col.x1 - d.col.x0 + e * 2, d.col.z1 - d.col.z0 + e * 2); }
+    const ox = (b.I - b.bx) * P, oz = (b.J - b.bz) * P, X = x => x - ox + 48, Z = z => z - oz + 48;
+    for (const r of b.bld) if (r.y0 <= CURB_H + 0.01) for (const [e, a] of layers) { g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(X(r.x0) - e, Z(r.z0) - e, r.x1 - r.x0 + e * 2, r.z1 - r.z0 + e * 2); }
+    for (const d of b.det) if (d.col && d.col.x0 !== undefined && d.col.y1 > 1.5) for (const [e, a] of layers.slice(1)) { g.fillStyle = `rgba(0,0,0,${a * 0.6})`; g.fillRect(X(d.col.x0) - e, Z(d.col.z0) - e, d.col.x1 - d.col.x0 + e * 2, d.col.z1 - d.col.z0 + e * 2); }
   }
   g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 1.2;
   for (const b of world.blocks) g.strokeRect(X(b.bx * P + ROAD_HALF), X(b.bz * P + ROAD_HALF), P - ROAD_HALF * 2, P - ROAD_HALF * 2);
@@ -36241,12 +36249,17 @@ function makeSkyMaterial() {
   });
 }
 function makeWaterMaterial() {
+  // the city's frames (021), for the glow of its lights on the water near its edges
+  if (!U.uCityR) { U.uCityR = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) }; U.uCityN = { value: 0 }; }
+  const E = EDGE_MARGIN, fr = CityLayout.precincts.slice(0, 8);
+  fr.forEach((p, k) => U.uCityR.value[k].set(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E)); U.uCityN.value = fr.length;
   return new THREE.ShaderMaterial({
     uniforms: U,
     vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: `
       uniform float uTime; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uCam;
       uniform vec3 uFogCol; uniform float uFogDen; uniform float uNight; uniform float uRain;
+      uniform vec4 uCityR[8]; uniform int uCityN;
       varying vec3 vW;
       ${GLSL_NOISE}
       void main(){
@@ -36266,7 +36279,9 @@ function makeWaterMaterial() {
         float spec = pow(max(dot(R, normalize(uSunDir)), 0.0), 220.0);
         col += uSunCol * spec * 4.0 * clamp(uSunDir.y * 5.0, 0.0, 1.0);
         // city glow shimmering at night near the shore
-        float shore = smoothstep(80.0, 0.0, min(min(abs(p.x + 18.0), abs(p.x - 978.0)), min(abs(p.y + 18.0), abs(p.y - 978.0))));
+        float sd = 1e9;
+        for (int k = 0; k < 8; k++) { if (k >= uCityN) break; vec4 r = uCityR[k]; vec2 q = max(max(r.xy - p, p - r.zw), vec2(0.0)); sd = min(sd, length(q)); }
+        float shore = smoothstep(80.0, 0.0, sd);
         col += vec3(1.0, 0.7, 0.4) * uNight * shore * 0.25 * (0.5 + 0.5 * pvn(p * vec2(0.5, 3.0) + t));
         float dist = length(uCam - vW);
         float fogF = 1.0 - exp(-uFogDen * uFogDen * dist * dist);
@@ -36800,7 +36815,7 @@ class World {
     this.localRoads = []; this.homes = []; this.mapPlaces = []; this.compounds = {};
     for (const b of this.blocks) { const sb = superblockAt(b.bx, b.bz); if (sb) { b.superblock = sb; b.noPeds = !sb.peds; b.ground = sb.ground; } }
     for (const b of this.blocks) this._genBlock(b);
-    this._genPerimeter();
+    // (the perimeter is built where each precinct stands, after the bake: the generate wrapper in 100)
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();
     // (colliders: registered once the city stands where it does, by the generate wrapper in 100: _registerCityCols)
@@ -36860,7 +36875,7 @@ class World {
     };
     const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
     for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
-    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'perimeter', 'promenade']) if (Array.isArray(this[L])) moveList(this[L]);
+    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces']) if (Array.isArray(this[L])) moveList(this[L]);
     moveList(Object.values(this.compounds || {}));
   }
   // ----- helpers -----
@@ -37446,38 +37461,56 @@ class World {
     for (let k = 0; k < 4; k++) this._prop(b, 'planter', b.x0 + 30 + k * 7, b.z1 - 3, 0);
   }
   _genPerimeter() {
-    // The seawall (and the wall nothing drives through) stands only where the city's edge meets open water
+    // The seawall (and the wall nothing drives through) stands only where a precinct's edge meets open water
     // (Operation Blackgate, 022): Valen Bay on the west, Valen Sound on the east and round the terminal. Everywhere
-    // else the island's ground carries on from the promenade. world.shore: the wet stretches [t0, t1] of each side
-    // (t runs from -E to CITY + E), less the causeway to Valen Point and the land bridge to Cedar Fields South.
-    const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] };
+    // else the island's ground carries on from the promenade. Built where each precinct stands (CITY_SPREAD.md S3/S4),
+    // after the bake. A side, or the stretch of it, that faces another precinct's blocks across its street (a seam
+    // between precincts at the same offset) is no edge: no wall, no promenade there.
+    // world.shoreRuns: every wet stretch, { side, a, b, at } (a..b along the side, at: the wall's line);
+    // world.shore: the same stretches by side, [a, b] (the island suite reads it), less the causeway to Valen Point
+    // and the land bridge to Cedar Fields South where a precinct's edge still meets them.
+    const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] }, runs = this.shoreRuns = [];
     const wet = (x, z) => Island.nat(x, z) < SEA_Y + 0.35;
-    for (const side of 'nswe') {
-      let run = null;
-      for (let t = -E; t <= CITY + E + 0.01; t += 2) {
-        const [x, z] = side === 'n' ? [t, -E - 5] : side === 's' ? [t, CITY + E + 5] : side === 'w' ? [-E - 5, t] : [CITY + E + 5, t];
-        if (wet(x, z)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { shore[side].push(run); run = null; }
+    this.perimeter = [];
+    for (const p of CityLayout.precincts) {
+      for (const side of 'nswe') {
+        const ns = side === 'n' || side === 's', t0 = (ns ? p.x0 : p.z0) - E, t1 = (ns ? p.x1 : p.z1) + E;
+        const line = side === 'n' ? p.z0 - E - 5 : side === 's' ? p.z1 + E + 5 : side === 'w' ? p.x0 - E - 5 : p.x1 + E + 5;
+        // across the edge street: a block of another precinct there makes this a seam, not an edge
+        const across = side === 'n' ? p.z0 - P / 2 : side === 's' ? p.z1 + P / 2 : side === 'w' ? p.x0 - P / 2 : p.x1 + P / 2;
+        const seam = t => ns ? CityLayout.cellAt(t, across) >= 0 : CityLayout.cellAt(across, t) >= 0;
+        let run = null, list = [];
+        for (let t = t0; t <= t1 + 0.01; t += 2) {
+          const [x, z] = ns ? [t, line] : [line, t];
+          if (wet(x, z) && !seam(t)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { list.push(run); run = null; }
+        }
+        if (run) list.push(run);
+        // the causeway and the land bridge leave the classic square's east and south edges (S4 re-anchors them)
+        const gap = side === 'e' && Math.abs(p.x1 - CITY) < 0.5 ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' && Math.abs(p.z1 - CITY) < 0.5 ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
+        if (gap) list = list.flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
+        // a run that reaches a corner closes it
+        for (const r of list) { if (r[0] <= t0 + 2) r[0] = t0 - 1; if (r[1] >= t1 - 2) r[1] = t1 + 1; }
+        list = list.filter(r => r[1] - r[0] > 3);
+        const at = side === 'n' ? p.z0 - E : side === 's' ? p.z1 + E : side === 'w' ? p.x0 - E : p.x1 + E;
+        for (const [a, b] of list) {
+          shore[side].push([a, b]); runs.push({ side, a, b, at, k: p.k });
+          this.perimeter.push(side === 'n' ? { x0: a, z0: at - 1, x1: b, z1: at + 0.2 } : side === 's' ? { x0: a, z0: at - 0.2, x1: b, z1: at + 1 } : side === 'w' ? { x0: at - 1, z0: a, x1: at + 0.2, z1: b } : { x0: at - 0.2, z0: a, x1: at + 1, z1: b });
+        }
       }
-      if (run) shore[side].push(run);
-      const gap = side === 'e' ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
-      if (gap) shore[side] = shore[side].flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
-      // a run that reaches a corner closes it
-      for (const r of shore[side]) { if (r[0] <= -E + 2) r[0] = -E - 1; if (r[1] >= CITY + E - 2) r[1] = CITY + E + 1; }
-      shore[side] = shore[side].filter(r => r[1] - r[0] > 3);
     }
-    this.perimeter = [
-      ...shore.n.map(([a, b]) => ({ x0: a, z0: -E - 1, x1: b, z1: -E + 0.2 })), ...shore.s.map(([a, b]) => ({ x0: a, z0: CITY + E - 0.2, x1: b, z1: CITY + E + 1 })),
-      ...shore.w.map(([a, b]) => ({ x0: -E - 1, z0: a, x1: -E + 0.2, z1: b })), ...shore.e.map(([a, b]) => ({ x0: CITY + E - 0.2, z0: a, x1: CITY + E + 1, z1: b }))
-    ];
     // (registered with the city's other colliders once it stands where it does: _registerCityCols)
-    // promenade lamps and benches outside the perimeter road
+    // promenade lamps and benches outside the perimeter road (not along a seam; not across the land bridge)
     this.promenade = [];
-    for (let k = 0; k < N; k++) for (const o of LAMP_OFFS) {
-      const t = k * P + o;
-      this.promenade.push({ type: 'lamp', x: -LAMP_SIDE, z: t, ry: Math.PI / 2 });
-      this.promenade.push({ type: 'lamp', x: CITY + LAMP_SIDE, z: t, ry: -Math.PI / 2 });
-      this.promenade.push({ type: 'lamp', x: t, z: -LAMP_SIDE, ry: 0 });
-      if (Math.abs(t - CFS.lb.x) > CFS.lb.half + 2) this.promenade.push({ type: 'lamp', x: t, z: CITY + LAMP_SIDE, ry: Math.PI });
+    for (const p of CityLayout.precincts) {
+      const nx = p.lx1 - p.lx0 + 1, nz = p.lz1 - p.lz0 + 1;
+      const open = (side, t) => { const ns = side === 'n' || side === 's', across = side === 'n' ? p.z0 - P / 2 : side === 's' ? p.z1 + P / 2 : side === 'w' ? p.x0 - P / 2 : p.x1 + P / 2; return ns ? CityLayout.cellAt(t, across) < 0 : CityLayout.cellAt(across, t) < 0; };
+      for (let k = 0; k < Math.max(nx, nz); k++) for (const o of LAMP_OFFS) {
+        const tz = p.z0 + k * P + o, tx = p.x0 + k * P + o;
+        if (k < nz && open('w', tz)) this.promenade.push({ type: 'lamp', x: p.x0 - LAMP_SIDE, z: tz, ry: Math.PI / 2 });
+        if (k < nz && open('e', tz)) this.promenade.push({ type: 'lamp', x: p.x1 + LAMP_SIDE, z: tz, ry: -Math.PI / 2 });
+        if (k < nx && open('n', tx)) this.promenade.push({ type: 'lamp', x: tx, z: p.z0 - LAMP_SIDE, ry: 0 });
+        if (k < nx && open('s', tx) && (Math.abs(p.z1 - CITY) > 0.5 || Math.abs(tx - CFS.lb.x) > CFS.lb.half + 2)) this.promenade.push({ type: 'lamp', x: tx, z: p.z1 + LAMP_SIDE, ry: Math.PI });
+      }
     }
   }
   // ---------- queries used by AI / missions ----------
@@ -38236,6 +38269,7 @@ Object.assign(World.prototype, {
     const real = CityLayout.current(); CityLayout.use('classic');
     try { base.call(this); } finally { CityLayout.restore(real); }
     this._bake();
+    this._genPerimeter();
     this._registerCityCols();
     // the passes over the built city work where it stands (block-relative, or through CityLayout)
     this._postGen();
@@ -38852,28 +38886,45 @@ Object.assign(World.prototype, {
   },
   _buildLocalRaster() {
     const S = LOCAL.S, c = document.createElement('canvas'); c.width = S; c.height = S;
-    const g = c.getContext('2d'), k = S / 1056, X = v => (v + 48) * k;
+    // The raster is in LATTICE space (CITY_SPREAD.md S3): each precinct draws every road where it stands relative to
+    // itself (its offset taken off), clipped to its own frame in the lattice, so the ground shader and localRoadAt /
+    // localSurfaceAt (which take the same offset off) read the roads that are really there
+    const g = c.getContext('2d'), k = S / 1056;
+    let ox = 0, oz = 0;
+    const X = v => (v - ox + 48) * k, Z = v => (v - oz + 48) * k;
+    const each = (ctx, draw) => {
+      for (const p of CityLayout.precincts) {
+        ox = p.ox * P; oz = p.oz * P;
+        ctx.save(); ctx.beginPath(); ctx.rect((p.lx0 * P) * k, (p.lz0 * P) * k, ((p.lx1 - p.lx0 + 1) * P + 96) * k, ((p.lz1 - p.lz0 + 1) * P + 96) * k); ctx.clip();
+        draw(ctx); ctx.restore();
+      }
+      ox = oz = 0;
+    };
     g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
     g.globalCompositeOperation = 'lighter'; g.lineCap = 'round'; g.lineJoin = 'round';
-    for (const r of this.localRoads) {
-      g.fillStyle = g.strokeStyle = LOCAL_STYLE[r.st] || LOCAL_STYLE.asphalt;
-      g.beginPath();
-      if (r.k === 'line') { g.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), X(q[1])) : g.moveTo(X(q[0]), X(q[1]))); g.stroke(); }
-      else if (r.k === 'disc') { g.arc(X(r.x), X(r.z), r.r * k, 0, Math.PI * 2); g.fill(); }
-      else { r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), X(q[1])) : g.moveTo(X(q[0]), X(q[1]))); g.closePath(); g.fill(); }
-    }
+    each(g, g => {
+      for (const r of this.localRoads) {
+        g.fillStyle = g.strokeStyle = LOCAL_STYLE[r.st] || LOCAL_STYLE.asphalt;
+        g.beginPath();
+        if (r.k === 'line') { g.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), Z(q[1])) : g.moveTo(X(q[0]), Z(q[1]))); g.stroke(); }
+        else if (r.k === 'disc') { g.arc(X(r.x), Z(r.z), r.r * k, 0, Math.PI * 2); g.fill(); }
+        else { r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), Z(q[1])) : g.moveTo(X(q[0]), Z(q[1]))); g.closePath(); g.fill(); }
+      }
+    });
     g.globalCompositeOperation = 'source-over';
     LOCAL.canvas = c; LOCAL.data = g.getImageData(0, 0, S, S).data;
     // lanes only (streets, drives, paths): what props must keep clear of. Lots and yards are
     // paved but may hold lamp islands, dumpsters and pallets, so they are not in this mask.
     const lc = document.createElement('canvas'); lc.width = S; lc.height = S;
     const lg = lc.getContext('2d'); lg.fillStyle = '#000'; lg.fillRect(0, 0, S, S); lg.lineCap = 'round'; lg.lineJoin = 'round'; lg.fillStyle = lg.strokeStyle = '#fff';
-    for (const r of this.localRoads) {
-      if (r.st === 'concrete' || r.k === 'poly') continue;
-      lg.beginPath();
-      if (r.k === 'line') { lg.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? lg.lineTo(X(q[0]), X(q[1])) : lg.moveTo(X(q[0]), X(q[1]))); lg.stroke(); }
-      else { lg.arc(X(r.x), X(r.z), r.r * k, 0, Math.PI * 2); lg.fill(); }
-    }
+    each(lg, lg => {
+      for (const r of this.localRoads) {
+        if (r.st === 'concrete' || r.k === 'poly') continue;
+        lg.beginPath();
+        if (r.k === 'line') { lg.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? lg.lineTo(X(q[0]), Z(q[1])) : lg.moveTo(X(q[0]), Z(q[1]))); lg.stroke(); }
+        else { lg.arc(X(r.x), Z(r.z), r.r * k, 0, Math.PI * 2); lg.fill(); }
+      }
+    });
     const ld = lg.getImageData(0, 0, S, S).data, lane = new Uint8Array(S * S);
     for (let i = 0; i < S * S; i++) lane[i] = ld[i * 4];
     LOCAL.lane = lane;
@@ -40783,7 +40834,7 @@ Object.assign(World.prototype, {
       return true;
     };
     const V = VILLA_VALEN;
-    const KEEP = [[-80, -80, CITY + 80, CITY + 80], [CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
+    const KEEP = [...CityLayout.precincts.map(p => [p.x0 - 80, p.z0 - 80, p.x1 + 80, p.z1 + 80]), [CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
       [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], [VP.x0 - 50, VP.z0 - 50, VP.x1 + 50, VP.z1 + 50], [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12]];
     const hit = (a, b, m = 0) => a[0] - m < b[2] && a[2] + m > b[0] && a[1] - m < b[3] && a[3] + m > b[1];
     const pads0 = Island.pads.map(p => [p.x0, p.z0, p.x1, p.z1]), taken = [];
@@ -41622,8 +41673,9 @@ function wedgeTemplate() {
   g.computeVertexNormals();
   return (_wedgeTpl = templateFrom(g));
 }
-function addCurbCuts(gs) {
+function addCurbCuts(gs, keep = null) {
   for (const c of CurbCuts.list) {
+    if (keep && !keep(c)) continue;
     const len = c.a1 - c.a0, mid = (c.a0 + c.a1) / 2, g0 = ROAD_HALF - CUT_W;
     if (c.axis === 0) gs.add(wedgeTemplate(), M(c.line * P + c.side * g0, 0.004, c.seg * P + mid, CUT_W, CURB_H - 0.004, len, c.side > 0 ? 0 : Math.PI), null);
     else gs.add(wedgeTemplate(), M(c.seg * P + mid, 0.004, c.line * P + c.side * g0, CUT_W, CURB_H - 0.004, len, c.side > 0 ? -Math.PI / 2 : Math.PI / 2), null);
@@ -42197,7 +42249,7 @@ class ChunkManager {
 // no parking ticks), 5 Nightlife Strip (dark glossy asphalt that catches the neon at night)
 const ROAD_STYLE = { o: 1, c: 2, s: 3, w: 3, h: 3, u: 4, l: 4, p: 5 };
 function buildStaticScenery(scene, world) {
-  // block-type lookup texture for the ground shader
+  // block-type lookup texture for the ground shader (lattice-indexed: each precinct's shader takes its offset off)
   const data = new Uint8Array(N * N * 4);
   for (const b of world.blocks) {
     const t = b.special === 'hospital' || b.special === 'police' ? DTYPE.C : DTYPE[b.ground || (b.landmark && b.landmark.ground) || b.t] || DTYPE.C;
@@ -42208,69 +42260,85 @@ function buildStaticScenery(scene, world) {
   const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
   tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
   U.uAO.value = makeAOTexture(world);
-  const gmat = makeGroundMaterial(tex, RoadNet.texture(), world.localTexture());
-  const E = EDGE_MARGIN;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(CITY + E * 2, CITY + E * 2).rotateX(-Math.PI / 2), gmat);
-  ground.position.set(CITY / 2, 0, CITY / 2); ground.receiveShadow = true;
-  scene.add(ground);
-  const gs = new GeoBuilder();
-  for (const b of world.blocks) gs.add(TPL.box, M(b.cx, CURB_H / 2, b.cz, P - ROAD_HALF * 2, CURB_H, P - ROAD_HALF * 2), null);
-  // raised fill where a superblock swallowed a road segment (and its node, if no road is left there)
-  for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) {
-    if (!RoadNet.segOpen(0, i, j)) gs.add(TPL.box, M(i * P, CURB_H / 2, j * P + P / 2, ROAD_HALF * 2, CURB_H, P - ROAD_HALF * 2), null);
-    if (!RoadNet.segOpen(1, i, j)) gs.add(TPL.box, M(j * P + P / 2, CURB_H / 2, i * P, P - ROAD_HALF * 2, CURB_H, ROAD_HALF * 2), null);
+  const roadTex = RoadNet.texture(), localTex = world.localTexture();
+  const E = EDGE_MARGIN, pw = E - ROAD_HALF, wh = 3.2;
+  // every precinct where it stands (021): its ground, its kerbs and slabs, its promenade and its seawall, drawn with a
+  // ground material of its own whose shader takes the precinct's offset off before it reads the lattice's textures
+  const grounds = [], slabsList = [], mats = [];
+  for (const p of CityLayout.precincts) {
+    const gmat = makeGroundMaterial(tex, roadTex, localTex, p.ox * P, p.oz * P); mats.push(gmat);
+    const W = p.x1 - p.x0 + E * 2, D = p.z1 - p.z0 + E * 2;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), gmat);
+    ground.position.set((p.x0 + p.x1) / 2, 0, (p.z0 + p.z1) / 2); ground.receiveShadow = true;
+    scene.add(ground); grounds.push(ground);
+    const gs = new GeoBuilder();
+    for (const b of world.blocks) if (CityLayout.precinctOf(b.bx, b.bz) === p) gs.add(TPL.box, M(b.cx, CURB_H / 2, b.cz, P - ROAD_HALF * 2, CURB_H, P - ROAD_HALF * 2), null);
+    // raised fill where a superblock swallowed a road segment (and its node, if no road is left there)
+    for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1; j++) { const I = (i + p.ox) * P, J = (j + p.oz) * P; if (!RoadNet.segOpen(0, i + p.ox, j + p.oz)) gs.add(TPL.box, M(I, CURB_H / 2, J + P / 2, ROAD_HALF * 2, CURB_H, P - ROAD_HALF * 2), null); }
+    for (let i = p.lz0; i <= p.lz1 + 1; i++) for (let j = p.lx0; j <= p.lx1; j++) { const Z = (i + p.oz) * P, X = (j + p.ox) * P; if (!RoadNet.segOpen(1, i + p.oz, j + p.ox)) gs.add(TPL.box, M(X + P / 2, CURB_H / 2, Z, P - ROAD_HALF * 2, CURB_H, ROAD_HALF * 2), null); }
+    for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1 + 1; j++) if (RoadNet.degree(i + p.ox, j + p.oz) === 0) gs.add(TPL.box, M((i + p.ox) * P, CURB_H / 2, (j + p.oz) * P, ROAD_HALF * 2, CURB_H, ROAD_HALF * 2), null);
+    // promenade strips outside the edge streets, less a seam (another precinct's blocks across the street) and the
+    // land bridge to Cedar Fields South and the causeway to Valen Point where this edge still meets them
+    const strips = (side, a0, a1) => {
+      const ns = side === 'n' || side === 's', across = side === 'n' ? p.z0 - P / 2 : side === 's' ? p.z1 + P / 2 : side === 'w' ? p.x0 - P / 2 : p.x1 + P / 2;
+      let runs = [[a0, a1]];
+      const cut = (g0, g1) => { runs = runs.flatMap(([u, v]) => v <= g0 || u >= g1 ? [[u, v]] : [[u, g0], [g1, v]].filter(q => q[1] > q[0])); };
+      for (let k = ns ? p.lx0 : p.lz0; k <= (ns ? p.lx1 : p.lz1); k++) { const t0 = ((ns ? p.ox : p.oz) + k) * P; if (ns ? CityLayout.cellAt(t0 + P / 2, across) >= 0 : CityLayout.cellAt(across, t0 + P / 2) >= 0) cut(t0 - ROAD_HALF, t0 + P + ROAD_HALF); }
+      if (side === 's' && Math.abs(p.z1 - CITY) < 0.5) cut(CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half);
+      if (side === 'e' && Math.abs(p.x1 - CITY) < 0.5) cut(VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half);
+      return runs;
+    };
+    for (const [a, b2] of strips('n', p.x0 - E, p.x1 + E)) gs.add(TPL.box, M((a + b2) / 2, CURB_H / 2, p.z0 - ROAD_HALF - pw / 2, b2 - a, CURB_H, pw), null);
+    for (const [a, b2] of strips('s', p.x0 - E, p.x1 + E)) gs.add(TPL.box, M((a + b2) / 2, CURB_H / 2, p.z1 + ROAD_HALF + pw / 2, b2 - a, CURB_H, pw), null);
+    for (const [a, b2] of strips('w', p.z0 - ROAD_HALF, p.z1 + ROAD_HALF)) gs.add(TPL.box, M(p.x0 - ROAD_HALF - pw / 2, CURB_H / 2, (a + b2) / 2, pw, CURB_H, b2 - a), null);
+    for (const [a, b2] of strips('e', p.z0 - ROAD_HALF, p.z1 + ROAD_HALF)) gs.add(TPL.box, M(p.x1 + ROAD_HALF + pw / 2, CURB_H / 2, (a + b2) / 2, pw, CURB_H, b2 - a), null);
+    // seawall faces: only where this precinct's edge meets open water (world.shoreRuns; Operation Blackgate)
+    for (const r of world.shoreRuns) if (r.k === p.k) {
+      const ns = r.side === 'n' || r.side === 's', o = r.side === 'n' || r.side === 'w' ? -0.5 : 0.5;
+      gs.add(TPL.box, ns ? M((r.a + r.b) / 2, CURB_H - wh / 2 - 0.01, r.at + o, r.b - r.a, wh, 1) : M(r.at + o, CURB_H - wh / 2 - 0.01, (r.a + r.b) / 2, 1, wh, r.b - r.a), null);
+    }
+    // the kerb cut away where each curved road leaves this precinct's lattice streets (Curved Roads pass)
+    addCurbCuts(gs, c => CityLayout.at(c.axis === 0 ? c.line * P : c.seg * P + P / 2, c.axis === 0 ? c.seg * P + P / 2 : c.line * P) === p);
+    const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs); slabsList.push(slabs);
   }
-  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) if (RoadNet.degree(i, j) === 0) gs.add(TPL.box, M(i * P, CURB_H / 2, j * P, ROAD_HALF * 2, CURB_H, ROAD_HALF * 2), null);
-  // promenade ring
-  const pw = E - ROAD_HALF, L = CITY + E * 2;
-  gs.add(TPL.box, M(CITY / 2, CURB_H / 2, -ROAD_HALF - pw / 2, L, CURB_H, pw), null);
-  // the south promenade, seawall and railing stop either side of the land bridge to Cedar Fields South (Session 6C)
-  const s0 = CFS.lb.x - CFS.lb.half, s1 = CFS.lb.x + CFS.lb.half, southRun = (x0, x1, f) => { if (x1 > x0) f((x0 + x1) / 2, x1 - x0); };
-  for (const [x0, x1] of [[-E, s0], [s1, CITY + E]]) southRun(x0, x1, (xc, l) => gs.add(TPL.box, M(xc, CURB_H / 2, CITY + ROAD_HALF + pw / 2, l, CURB_H, pw), null));
-  gs.add(TPL.box, M(-ROAD_HALF - pw / 2, CURB_H / 2, CITY / 2, pw, CURB_H, CITY + ROAD_HALF * 2), null);
-  // the east promenade, seawall and railing stop either side of the causeway to Valen Point (Session 6B)
-  const g0 = VP.cw.z - VP.cw.half, g1 = VP.cw.z + VP.cw.half, eastRun = (z0, z1, f) => { if (z1 > z0) f((z0 + z1) / 2, z1 - z0); };
-  eastRun(-ROAD_HALF, g0, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
-  eastRun(g1, CITY + ROAD_HALF, (zc, l) => gs.add(TPL.box, M(CITY + ROAD_HALF + pw / 2, CURB_H / 2, zc, pw, CURB_H, l), null));
-  // seawall faces: only where the city's edge meets open water (world.shore; Operation Blackgate)
-  const wh = 3.2, SH = world.shore;
-  for (const [a, b] of SH.n) gs.add(TPL.box, M((a + b) / 2, CURB_H - wh / 2 - 0.01, -E - 0.5, b - a, wh, 1), null);
-  for (const [a, b] of SH.s) gs.add(TPL.box, M((a + b) / 2, CURB_H - wh / 2 - 0.01, CITY + E + 0.5, b - a, wh, 1), null);
-  for (const [a, b] of SH.w) gs.add(TPL.box, M(-E - 0.5, CURB_H - wh / 2 - 0.01, (a + b) / 2, 1, wh, b - a), null);
-  for (const [a, b] of SH.e) gs.add(TPL.box, M(CITY + E + 0.5, CURB_H - wh / 2 - 0.01, (a + b) / 2, 1, wh, b - a), null);
-  // the kerb cut away where each curved road leaves a lattice street (Curved Roads pass)
-  addCurbCuts(gs);
-  const slabs = new THREE.Mesh(gs.build(), gmat); slabs.receiveShadow = true; scene.add(slabs);
   // the curved streets' painted lines
   buildRoadMarkings(scene);
-  // railing: posts and two rails along the same runs
+  // railing: posts and two rails along the seawall's runs
   const gr = new GeoBuilder(); const rc = C(0x3a3f45);
-  for (const [side, runs] of Object.entries(SH)) for (const [a, b] of runs) {
-    const P2 = t => side === 'n' ? [t, -E + 0.3] : side === 's' ? [t, CITY + E - 0.3] : side === 'w' ? [-E + 0.3, t] : [CITY + E - 0.3, t];
-    for (let t = Math.max(a, -E); t <= Math.min(b, CITY + E); t += 2.5) { const [x, z] = P2(t); gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc); }
-    const [mx, mz] = P2((a + b) / 2), alongX = side === 'n' || side === 's';
-    for (const [y, h] of [[1.1, 0.07], [0.6, 0.04]]) gr.add(TPL.box, M(mx, CURB_H + y, mz, alongX ? b - a : 0.08, h, alongX ? 0.08 : b - a), rc);
+  for (const r of world.shoreRuns) {
+    const p = CityLayout.precincts[r.k], ns = r.side === 'n' || r.side === 's', o = r.side === 'n' || r.side === 'w' ? 0.3 : -0.3;
+    const lo = (ns ? p.x0 : p.z0) - E, hi = (ns ? p.x1 : p.z1) + E;
+    const P2 = t => ns ? [t, r.at + o] : [r.at + o, t];
+    for (let t = Math.max(r.a, lo); t <= Math.min(r.b, hi); t += 2.5) { const [x, z] = P2(t); gr.add(TPL.cyl6, M(x, CURB_H + 0.55, z, 0.04, 1.1, 0.04), rc); }
+    const [mx, mz] = P2((r.a + r.b) / 2);
+    for (const [y, h] of [[1.1, 0.07], [0.6, 0.04]]) gr.add(TPL.box, M(mx, CURB_H + y, mz, ns ? r.b - r.a : 0.08, h, ns ? 0.08 : r.b - r.a), rc);
   }
   const rail = new THREE.Mesh(gr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
   scene.add(rail);
-  // water
-  // the sea is a frame round the city's square, not a sheet under it: nothing shows through the city's ground, and a
-  // sheet 1.2 m below it loses the depth test to it from high in the air (seen as half the city under water)
-  const wp = [], wi = [], WH = 8000, C2 = CITY / 2;
-  for (const [x0, x1, z0, z1] of [[-WH, WH, -WH, -C2], [-WH, WH, C2, WH], [-WH, -C2, -C2, C2], [C2, WH, -C2, C2]]) {
+  // water: the sea everywhere but under the precincts' frames (nothing shows through the city's ground, and a sheet
+  // 1.2 m below it loses the depth test to it from high in the air). The plane is cut on every frame's edges, and a
+  // cell of that cut is left out when a frame covers it
+  const WH = 8000, xs = new Set([-WH, WH]), zs = new Set([-WH, WH]);
+  for (const p of CityLayout.precincts) { xs.add(p.x0 - E); xs.add(p.x1 + E); zs.add(p.z0 - E); zs.add(p.z1 + E); }
+  const X = [...xs].sort((a, b) => a - b), Z = [...zs].sort((a, b) => a - b), wp = [], wi = [];
+  const covered = (x, z) => CityLayout.precincts.some(p => x > p.x0 - E && x < p.x1 + E && z > p.z0 - E && z < p.z1 + E);
+  for (let a = 0; a < X.length - 1; a++) for (let c = 0; c < Z.length - 1; c++) {
+    const x0 = X[a], x1 = X[a + 1], z0 = Z[c], z1 = Z[c + 1];
+    if (covered((x0 + x1) / 2, (z0 + z1) / 2)) continue;
     const n = wp.length / 3; wp.push(x0, 0, z0, x0, 0, z1, x1, 0, z1, x1, 0, z0); wi.push(n, n + 1, n + 2, n, n + 2, n + 3);
   }
   const wgeo = new THREE.BufferGeometry(); wgeo.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wgeo.setIndex(wi);
   const water = new THREE.Mesh(wgeo, makeWaterMaterial());
-  water.position.set(CITY / 2, -1.2, CITY / 2);
+  water.position.set(0, -1.2, 0);
   scene.add(water);
   // sky
   const sky = new THREE.Mesh(new THREE.SphereGeometry(4800, 32, 16), makeSkyMaterial());
   sky.frustumCulled = false; sky.renderOrder = -10;
   scene.add(sky);
-  return { ground, slabs, water, sky, gmat };
+  // (the extensions' scenery off the lattice uses a ground material that stands where the lattice was authored)
+  const at0 = CityLayout.precincts.find(p => !p.ox && !p.oz), gmat0 = at0 ? mats[at0.k] : makeGroundMaterial(tex, roadTex, localTex, 0, 0);
+  return { ground: grounds[0], grounds, slabs: slabsList[0], slabsList, water, sky, gmat: gmat0, gmats: mats };
 }
-
 /* =====================================================================
    [CONTENT] VALEN POINT: STATIC SCENERY (Session 6B)
    Two merged versions of the district's ground-level dressing:
@@ -42648,7 +42716,7 @@ class IslandScenery {
   // is the cell with corner (x, z) and size s one the island does not draw (the city's square, Cedar Fields' own ground)?
   _foreign(x, z, s) {
     const E = EDGE_MARGIN;
-    if (x >= -E && z >= -E && x + s <= CITY + E && z + s <= CITY + E) return true;
+    if (CityLayout.precincts.some(p => x >= p.x0 - E && z >= p.z0 - E && x + s <= p.x1 + E && z + s <= p.z1 + E)) return true;
     if (x >= CFS.x0 && z >= CFS.z0 && x + s <= CFS.x1 && z + s <= CFS.z1) return true;
     return false;
   }
@@ -42660,7 +42728,7 @@ class IslandScenery {
       const x = ISLE.x0 + i * s, z = ISLE.z0 + j * s;
       // inside the city's square the coarse mesh ducks under the streets it would otherwise cover
       // (and within 52 m of a road it keeps under the road's level, so no coarse triangle rises through the ribbon)
-      H[j * nx + i] = x > -E && z > -E && x < CITY + E && z < CITY + E ? -0.6 : Island.compute(x, z, 52);
+      H[j * nx + i] = CityLayout.precincts.some(p => x > p.x0 - E && z > p.z0 - E && x < p.x1 + E && z < p.z1 + E) ? -0.6 : Island.compute(x, z, 52);
     }
     const hAt = (i, j) => H[clamp(j, 0, nz - 1) * nx + clamp(i, 0, nx - 1)];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
@@ -42820,7 +42888,7 @@ class IslandScenery {
   // the ribbons: a mesh for about every kilometre of each road (so only what is in view is drawn), one material
   _roadMesh() {
     const E = EDGE_MARGIN, group = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-    const inCity = p => p[0] > -E && p[1] > -E && p[0] < CITY + E && p[1] < CITY + E;
+    const inCity = p => CityLayout.precincts.some(q => p[0] > q.x0 - E && p[1] > q.z0 - E && p[0] < q.x1 + E && p[1] < q.z1 + E);
     let pos = [], uv = [], nrm = [], idx = [];
     const flush = () => {
       if (!idx.length) { pos = []; uv = []; nrm = []; return; }

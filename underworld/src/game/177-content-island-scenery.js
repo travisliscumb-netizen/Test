@@ -55,7 +55,7 @@ class IslandScenery {
   // is the cell with corner (x, z) and size s one the island does not draw (the city's square, Cedar Fields' own ground)?
   _foreign(x, z, s) {
     const E = EDGE_MARGIN;
-    if (x >= -E && z >= -E && x + s <= CITY + E && z + s <= CITY + E) return true;
+    if (CityLayout.precincts.some(p => x >= p.x0 - E && z >= p.z0 - E && x + s <= p.x1 + E && z + s <= p.z1 + E)) return true;
     if (x >= CFS.x0 && z >= CFS.z0 && x + s <= CFS.x1 && z + s <= CFS.z1) return true;
     return false;
   }
@@ -67,7 +67,7 @@ class IslandScenery {
       const x = ISLE.x0 + i * s, z = ISLE.z0 + j * s;
       // inside the city's square the coarse mesh ducks under the streets it would otherwise cover
       // (and within 52 m of a road it keeps under the road's level, so no coarse triangle rises through the ribbon)
-      H[j * nx + i] = x > -E && z > -E && x < CITY + E && z < CITY + E ? -0.6 : Island.compute(x, z, 52);
+      H[j * nx + i] = CityLayout.precincts.some(p => x > p.x0 - E && z > p.z0 - E && x < p.x1 + E && z < p.z1 + E) ? -0.6 : Island.compute(x, z, 52);
     }
     const hAt = (i, j) => H[clamp(j, 0, nz - 1) * nx + clamp(i, 0, nx - 1)];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
@@ -227,7 +227,7 @@ class IslandScenery {
   // the ribbons: a mesh for about every kilometre of each road (so only what is in view is drawn), one material
   _roadMesh() {
     const E = EDGE_MARGIN, group = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ map: this._roadTexture(), roughness: 0.92, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-    const inCity = p => p[0] > -E && p[1] > -E && p[0] < CITY + E && p[1] < CITY + E;
+    const inCity = p => CityLayout.precincts.some(q => p[0] > q.x0 - E && p[1] > q.z0 - E && p[0] < q.x1 + E && p[1] < q.z1 + E);
     let pos = [], uv = [], nrm = [], idx = [];
     const flush = () => {
       if (!idx.length) { pos = []; uv = []; nrm = []; return; }

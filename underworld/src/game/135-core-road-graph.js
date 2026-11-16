@@ -532,8 +532,9 @@ function wedgeTemplate() {
   g.computeVertexNormals();
   return (_wedgeTpl = templateFrom(g));
 }
-function addCurbCuts(gs) {
+function addCurbCuts(gs, keep = null) {
   for (const c of CurbCuts.list) {
+    if (keep && !keep(c)) continue;
     const len = c.a1 - c.a0, mid = (c.a0 + c.a1) / 2, g0 = ROAD_HALF - CUT_W;
     if (c.axis === 0) gs.add(wedgeTemplate(), M(c.line * P + c.side * g0, 0.004, c.seg * P + mid, CUT_W, CURB_H - 0.004, len, c.side > 0 ? 0 : Math.PI), null);
     else gs.add(wedgeTemplate(), M(c.seg * P + mid, 0.004, c.line * P + c.side * g0, CUT_W, CURB_H - 0.004, len, c.side > 0 ? -Math.PI / 2 : Math.PI / 2), null);

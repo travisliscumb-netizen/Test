@@ -42,7 +42,8 @@ const ISLE_COAST = [
 const ISLE_ISLETS = [[-560, 470, 78, 'Battery Island'], [-1720, 520, 120, 'Gull Rock'], [2860, -900, 135, 'Tern Island'], [-1450, 2720, 150, 'Castaway Cay'], [2680, 2480, 165, 'Dutchman’s Rest'], [-2330, -2480, 120, 'Widow’s Tooth']];
 // where the shore must stay exactly as drawn (no coast noise): the city, Cedar Fields, the airport, the proving
 // ground, the bridge's two headlands, the lighthouse point
-const ISLE_KEEP = [[-140, -140, 1100, 1100], [-80, 980, 740, 1550], [-330, 1740, 1530, 2600], [800, 1420, 2040, 1760], [-1260, 60, -960, 360], [-1250, 690, -940, 990], [1380, -2900, 1680, -2620]];
+// (and every precinct of the city, 140 m round its cells: Island._coastAmp adds them from CityLayout, 021)
+const ISLE_KEEP = [[-80, 980, 740, 1550], [-330, 1740, 1530, 2600], [800, 1420, 2040, 1760], [-1260, 60, -960, 360], [-1250, 690, -940, 990], [1380, -2900, 1680, -2620]];
 // the airport and the proving ground (level pads; built in 127)
 const AIRPORT = { name: 'Port Valen International', x0: -250, z0: 1820, x1: 1450, z1: 2520, y: 3.2,
   rw: [{ id: '09/27', z: 2410, x0: -170, x1: 1370, w: 46 }, { id: '09R/27L', z: 2205, x0: 120, x1: 1220, w: 32 }],
@@ -100,7 +101,7 @@ const Island = {
   // how freely the shore may wander here: 0 inside a kept rectangle, 1 from 200 m out
   _coastAmp(x, z) {
     let a = 1;
-    for (const K of ISLE_KEEP) { const dx = Math.max(K[0] - x, 0, x - K[2]), dz = Math.max(K[1] - z, 0, z - K[3]); a = Math.min(a, smoothstep(0, 200, Math.hypot(dx, dz))); if (a === 0) break; }
+    for (const K of this._keep || (this._keep = [...CityLayout.precincts.map(p => [p.x0 - 140, p.z0 - 140, p.x1 + 140, p.z1 + 140]), ...ISLE_KEEP])) { const dx = Math.max(K[0] - x, 0, x - K[2]), dz = Math.max(K[1] - z, 0, z - K[3]); a = Math.min(a, smoothstep(0, 200, Math.hypot(dx, dz))); if (a === 0) break; }
     return a;
   },
   _buildSDF() {

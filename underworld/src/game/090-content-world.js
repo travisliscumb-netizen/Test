@@ -52,7 +52,7 @@ class World {
     this.localRoads = []; this.homes = []; this.mapPlaces = []; this.compounds = {};
     for (const b of this.blocks) { const sb = superblockAt(b.bx, b.bz); if (sb) { b.superblock = sb; b.noPeds = !sb.peds; b.ground = sb.ground; } }
     for (const b of this.blocks) this._genBlock(b);
-    this._genPerimeter();
+    // (the perimeter is built where each precinct stands, after the bake: the generate wrapper in 100)
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();
     // (colliders: registered once the city stands where it does, by the generate wrapper in 100: _registerCityCols)
@@ -112,7 +112,7 @@ class World {
     };
     const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
     for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
-    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'perimeter', 'promenade']) if (Array.isArray(this[L])) moveList(this[L]);
+    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces']) if (Array.isArray(this[L])) moveList(this[L]);
     moveList(Object.values(this.compounds || {}));
   }
   // ----- helpers -----
@@ -698,38 +698,56 @@ class World {
     for (let k = 0; k < 4; k++) this._prop(b, 'planter', b.x0 + 30 + k * 7, b.z1 - 3, 0);
   }
   _genPerimeter() {
-    // The seawall (and the wall nothing drives through) stands only where the city's edge meets open water
+    // The seawall (and the wall nothing drives through) stands only where a precinct's edge meets open water
     // (Operation Blackgate, 022): Valen Bay on the west, Valen Sound on the east and round the terminal. Everywhere
-    // else the island's ground carries on from the promenade. world.shore: the wet stretches [t0, t1] of each side
-    // (t runs from -E to CITY + E), less the causeway to Valen Point and the land bridge to Cedar Fields South.
-    const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] };
+    // else the island's ground carries on from the promenade. Built where each precinct stands (CITY_SPREAD.md S3/S4),
+    // after the bake. A side, or the stretch of it, that faces another precinct's blocks across its street (a seam
+    // between precincts at the same offset) is no edge: no wall, no promenade there.
+    // world.shoreRuns: every wet stretch, { side, a, b, at } (a..b along the side, at: the wall's line);
+    // world.shore: the same stretches by side, [a, b] (the island suite reads it), less the causeway to Valen Point
+    // and the land bridge to Cedar Fields South where a precinct's edge still meets them.
+    const E = EDGE_MARGIN, shore = this.shore = { n: [], s: [], w: [], e: [] }, runs = this.shoreRuns = [];
     const wet = (x, z) => Island.nat(x, z) < SEA_Y + 0.35;
-    for (const side of 'nswe') {
-      let run = null;
-      for (let t = -E; t <= CITY + E + 0.01; t += 2) {
-        const [x, z] = side === 'n' ? [t, -E - 5] : side === 's' ? [t, CITY + E + 5] : side === 'w' ? [-E - 5, t] : [CITY + E + 5, t];
-        if (wet(x, z)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { shore[side].push(run); run = null; }
+    this.perimeter = [];
+    for (const p of CityLayout.precincts) {
+      for (const side of 'nswe') {
+        const ns = side === 'n' || side === 's', t0 = (ns ? p.x0 : p.z0) - E, t1 = (ns ? p.x1 : p.z1) + E;
+        const line = side === 'n' ? p.z0 - E - 5 : side === 's' ? p.z1 + E + 5 : side === 'w' ? p.x0 - E - 5 : p.x1 + E + 5;
+        // across the edge street: a block of another precinct there makes this a seam, not an edge
+        const across = side === 'n' ? p.z0 - P / 2 : side === 's' ? p.z1 + P / 2 : side === 'w' ? p.x0 - P / 2 : p.x1 + P / 2;
+        const seam = t => ns ? CityLayout.cellAt(t, across) >= 0 : CityLayout.cellAt(across, t) >= 0;
+        let run = null, list = [];
+        for (let t = t0; t <= t1 + 0.01; t += 2) {
+          const [x, z] = ns ? [t, line] : [line, t];
+          if (wet(x, z) && !seam(t)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { list.push(run); run = null; }
+        }
+        if (run) list.push(run);
+        // the causeway and the land bridge leave the classic square's east and south edges (S4 re-anchors them)
+        const gap = side === 'e' && Math.abs(p.x1 - CITY) < 0.5 ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' && Math.abs(p.z1 - CITY) < 0.5 ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
+        if (gap) list = list.flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
+        // a run that reaches a corner closes it
+        for (const r of list) { if (r[0] <= t0 + 2) r[0] = t0 - 1; if (r[1] >= t1 - 2) r[1] = t1 + 1; }
+        list = list.filter(r => r[1] - r[0] > 3);
+        const at = side === 'n' ? p.z0 - E : side === 's' ? p.z1 + E : side === 'w' ? p.x0 - E : p.x1 + E;
+        for (const [a, b] of list) {
+          shore[side].push([a, b]); runs.push({ side, a, b, at, k: p.k });
+          this.perimeter.push(side === 'n' ? { x0: a, z0: at - 1, x1: b, z1: at + 0.2 } : side === 's' ? { x0: a, z0: at - 0.2, x1: b, z1: at + 1 } : side === 'w' ? { x0: at - 1, z0: a, x1: at + 0.2, z1: b } : { x0: at - 0.2, z0: a, x1: at + 1, z1: b });
+        }
       }
-      if (run) shore[side].push(run);
-      const gap = side === 'e' ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
-      if (gap) shore[side] = shore[side].flatMap(r => r[1] <= gap[0] || r[0] >= gap[1] ? [r] : [[r[0], gap[0]], [gap[1], r[1]]].filter(q => q[1] - q[0] > 0.5));
-      // a run that reaches a corner closes it
-      for (const r of shore[side]) { if (r[0] <= -E + 2) r[0] = -E - 1; if (r[1] >= CITY + E - 2) r[1] = CITY + E + 1; }
-      shore[side] = shore[side].filter(r => r[1] - r[0] > 3);
     }
-    this.perimeter = [
-      ...shore.n.map(([a, b]) => ({ x0: a, z0: -E - 1, x1: b, z1: -E + 0.2 })), ...shore.s.map(([a, b]) => ({ x0: a, z0: CITY + E - 0.2, x1: b, z1: CITY + E + 1 })),
-      ...shore.w.map(([a, b]) => ({ x0: -E - 1, z0: a, x1: -E + 0.2, z1: b })), ...shore.e.map(([a, b]) => ({ x0: CITY + E - 0.2, z0: a, x1: CITY + E + 1, z1: b }))
-    ];
     // (registered with the city's other colliders once it stands where it does: _registerCityCols)
-    // promenade lamps and benches outside the perimeter road
+    // promenade lamps and benches outside the perimeter road (not along a seam; not across the land bridge)
     this.promenade = [];
-    for (let k = 0; k < N; k++) for (const o of LAMP_OFFS) {
-      const t = k * P + o;
-      this.promenade.push({ type: 'lamp', x: -LAMP_SIDE, z: t, ry: Math.PI / 2 });
-      this.promenade.push({ type: 'lamp', x: CITY + LAMP_SIDE, z: t, ry: -Math.PI / 2 });
-      this.promenade.push({ type: 'lamp', x: t, z: -LAMP_SIDE, ry: 0 });
-      if (Math.abs(t - CFS.lb.x) > CFS.lb.half + 2) this.promenade.push({ type: 'lamp', x: t, z: CITY + LAMP_SIDE, ry: Math.PI });
+    for (const p of CityLayout.precincts) {
+      const nx = p.lx1 - p.lx0 + 1, nz = p.lz1 - p.lz0 + 1;
+      const open = (side, t) => { const ns = side === 'n' || side === 's', across = side === 'n' ? p.z0 - P / 2 : side === 's' ? p.z1 + P / 2 : side === 'w' ? p.x0 - P / 2 : p.x1 + P / 2; return ns ? CityLayout.cellAt(t, across) < 0 : CityLayout.cellAt(across, t) < 0; };
+      for (let k = 0; k < Math.max(nx, nz); k++) for (const o of LAMP_OFFS) {
+        const tz = p.z0 + k * P + o, tx = p.x0 + k * P + o;
+        if (k < nz && open('w', tz)) this.promenade.push({ type: 'lamp', x: p.x0 - LAMP_SIDE, z: tz, ry: Math.PI / 2 });
+        if (k < nz && open('e', tz)) this.promenade.push({ type: 'lamp', x: p.x1 + LAMP_SIDE, z: tz, ry: -Math.PI / 2 });
+        if (k < nx && open('n', tx)) this.promenade.push({ type: 'lamp', x: tx, z: p.z0 - LAMP_SIDE, ry: 0 });
+        if (k < nx && open('s', tx) && (Math.abs(p.z1 - CITY) > 0.5 || Math.abs(tx - CFS.lb.x) > CFS.lb.half + 2)) this.promenade.push({ type: 'lamp', x: tx, z: p.z1 + LAMP_SIDE, ry: Math.PI });
+      }
     }
   }
   // ---------- queries used by AI / missions ----------

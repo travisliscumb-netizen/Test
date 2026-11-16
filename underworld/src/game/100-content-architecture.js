@@ -645,6 +645,7 @@ Object.assign(World.prototype, {
     const real = CityLayout.current(); CityLayout.use('classic');
     try { base.call(this); } finally { CityLayout.restore(real); }
     this._bake();
+    this._genPerimeter();
     this._registerCityCols();
     // the passes over the built city work where it stands (block-relative, or through CityLayout)
     this._postGen();

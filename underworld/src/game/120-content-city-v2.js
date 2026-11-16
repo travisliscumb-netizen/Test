@@ -70,28 +70,45 @@ Object.assign(World.prototype, {
   },
   _buildLocalRaster() {
     const S = LOCAL.S, c = document.createElement('canvas'); c.width = S; c.height = S;
-    const g = c.getContext('2d'), k = S / 1056, X = v => (v + 48) * k;
+    // The raster is in LATTICE space (CITY_SPREAD.md S3): each precinct draws every road where it stands relative to
+    // itself (its offset taken off), clipped to its own frame in the lattice, so the ground shader and localRoadAt /
+    // localSurfaceAt (which take the same offset off) read the roads that are really there
+    const g = c.getContext('2d'), k = S / 1056;
+    let ox = 0, oz = 0;
+    const X = v => (v - ox + 48) * k, Z = v => (v - oz + 48) * k;
+    const each = (ctx, draw) => {
+      for (const p of CityLayout.precincts) {
+        ox = p.ox * P; oz = p.oz * P;
+        ctx.save(); ctx.beginPath(); ctx.rect((p.lx0 * P) * k, (p.lz0 * P) * k, ((p.lx1 - p.lx0 + 1) * P + 96) * k, ((p.lz1 - p.lz0 + 1) * P + 96) * k); ctx.clip();
+        draw(ctx); ctx.restore();
+      }
+      ox = oz = 0;
+    };
     g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
     g.globalCompositeOperation = 'lighter'; g.lineCap = 'round'; g.lineJoin = 'round';
-    for (const r of this.localRoads) {
-      g.fillStyle = g.strokeStyle = LOCAL_STYLE[r.st] || LOCAL_STYLE.asphalt;
-      g.beginPath();
-      if (r.k === 'line') { g.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), X(q[1])) : g.moveTo(X(q[0]), X(q[1]))); g.stroke(); }
-      else if (r.k === 'disc') { g.arc(X(r.x), X(r.z), r.r * k, 0, Math.PI * 2); g.fill(); }
-      else { r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), X(q[1])) : g.moveTo(X(q[0]), X(q[1]))); g.closePath(); g.fill(); }
-    }
+    each(g, g => {
+      for (const r of this.localRoads) {
+        g.fillStyle = g.strokeStyle = LOCAL_STYLE[r.st] || LOCAL_STYLE.asphalt;
+        g.beginPath();
+        if (r.k === 'line') { g.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), Z(q[1])) : g.moveTo(X(q[0]), Z(q[1]))); g.stroke(); }
+        else if (r.k === 'disc') { g.arc(X(r.x), Z(r.z), r.r * k, 0, Math.PI * 2); g.fill(); }
+        else { r.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), Z(q[1])) : g.moveTo(X(q[0]), Z(q[1]))); g.closePath(); g.fill(); }
+      }
+    });
     g.globalCompositeOperation = 'source-over';
     LOCAL.canvas = c; LOCAL.data = g.getImageData(0, 0, S, S).data;
     // lanes only (streets, drives, paths): what props must keep clear of. Lots and yards are
     // paved but may hold lamp islands, dumpsters and pallets, so they are not in this mask.
     const lc = document.createElement('canvas'); lc.width = S; lc.height = S;
     const lg = lc.getContext('2d'); lg.fillStyle = '#000'; lg.fillRect(0, 0, S, S); lg.lineCap = 'round'; lg.lineJoin = 'round'; lg.fillStyle = lg.strokeStyle = '#fff';
-    for (const r of this.localRoads) {
-      if (r.st === 'concrete' || r.k === 'poly') continue;
-      lg.beginPath();
-      if (r.k === 'line') { lg.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? lg.lineTo(X(q[0]), X(q[1])) : lg.moveTo(X(q[0]), X(q[1]))); lg.stroke(); }
-      else { lg.arc(X(r.x), X(r.z), r.r * k, 0, Math.PI * 2); lg.fill(); }
-    }
+    each(lg, lg => {
+      for (const r of this.localRoads) {
+        if (r.st === 'concrete' || r.k === 'poly') continue;
+        lg.beginPath();
+        if (r.k === 'line') { lg.lineWidth = r.w * k; r.pts.forEach((q, i) => i ? lg.lineTo(X(q[0]), Z(q[1])) : lg.moveTo(X(q[0]), Z(q[1]))); lg.stroke(); }
+        else { lg.arc(X(r.x), Z(r.z), r.r * k, 0, Math.PI * 2); lg.fill(); }
+      }
+    });
     const ld = lg.getImageData(0, 0, S, S).data, lane = new Uint8Array(S * S);
     for (let i = 0; i < S * S; i++) lane[i] = ld[i * 4];
     LOCAL.lane = lane;

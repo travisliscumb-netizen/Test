@@ -352,14 +352,17 @@ const Links = {
    placement and for keeping houses, trees and poles out of the way. */
 const LOCAL = { S: 1536, data: null, canvas: null };
 // is (x,z) on a local lane (street, drive, path)? Lots and yards do not count.
+// (the local-road raster is in lattice space: the precinct whose frame holds the point takes its offset off, 021)
 function localRoadAt(x, z) {
   const d = LOCAL.lane; if (!d) return 0;
+  const pr = CityLayout.at(x, z, 48); if (!pr) return 0; x -= pr.ox * P; z -= pr.oz * P;
   const S = LOCAL.S, u = Math.floor((x + 48) / 1056 * S), v = Math.floor((z + 48) / 1056 * S);
   if (u < 0 || v < 0 || u >= S || v >= S) return 0;
   return d[v * S + u] > 140 ? 1 : 0;
 }
 function localSurfaceAt(x, z) {
   const d = LOCAL.data; if (!d) return 0;
+  const pr = CityLayout.at(x, z, 48); if (!pr) return 0; x -= pr.ox * P; z -= pr.oz * P;
   const S = LOCAL.S, u = Math.floor((x + 48) / 1056 * S), v = Math.floor((z + 48) / 1056 * S);
   if (u < 0 || v < 0 || u >= S || v >= S) return 0;
   const o = (v * S + u) * 4;

@@ -329,16 +329,18 @@ function makeBuildingMaterial() {
    Boulevards (road index 6 in both directions) carry two lanes per direction. */
 const BLVD = 6;
 function isBoulevard(axisIndex) { return axisIndex === BLVD; }
-function makeGroundMaterial(blockTex, roadTex, localTex) {
+// (ox, oz): the offset in metres of the precinct this ground belongs to (021); the shader takes it off the world position
+// before it reads the lattice's textures (blocks, streets, local roads, AO), so every precinct paints its own streets
+function makeGroundMaterial(blockTex, roadTex, localTex, ox = 0, oz = 0) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, envMapIntensity: 0.6 });
   m.defines = { PV_HQ: '' };
   atmos(m, sh => {
-    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime;
+    sh.uniforms.uNight = U.uNight; sh.uniforms.uWet = U.uWet; sh.uniforms.uBlock = { value: blockTex }; sh.uniforms.uRoad = { value: roadTex }; sh.uniforms.uLocal = { value: localTex }; sh.uniforms.uTime = U.uTime; sh.uniforms.uOff = { value: new THREE.Vector2(ox, oz) };
     sh.uniforms.uAO = U.uAO; sh.uniforms.uRain = U.uRain; sh.uniforms.uCloudShadow = U.uCloudShadow; sh.uniforms.uHorizon = U.uHorizon; sh.uniforms.uZenith = U.uZenith;
     patchWorldVaryings(sh);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec3 uHorizon; uniform vec3 uZenith;
+        uniform float uNight; uniform float uWet; uniform sampler2D uBlock; uniform sampler2D uRoad; uniform sampler2D uLocal; uniform float uTime; uniform sampler2D uAO; uniform float uRain; uniform float uCloudShadow; uniform vec2 uOff; uniform vec3 uHorizon; uniform vec3 uZenith;
         varying vec3 vPW; varying vec3 vPN;
         ${GLSL_NOISE}
         ${GLSL_BUMP}
@@ -375,7 +377,7 @@ function makeGroundMaterial(blockTex, roadTex, localTex) {
         }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
-        vec2 p = vPW.xz;
+        vec2 p = vPW.xz - uOff; // lattice metres (the precinct's offset taken off, 021)
         vec2 ci = floor(p / 80.0); vec2 l = p - ci * 80.0;
         vec2 dr = min(l, 80.0 - l);
         vec2 so = vec2(l.x < 40.0 ? l.x : l.x - 80.0, l.y < 40.0 ? l.y : l.y - 80.0);
@@ -680,9 +682,11 @@ function makeAOTexture(world) {
   const X = x => x + 48;
   // layered expanding rectangles approximate a blur without ctx.filter (unsupported in Safari)
   const layers = [[2.6, 0.1], [1.8, 0.12], [1.1, 0.15], [0.5, 0.2]];
+  // (lattice space, like every texture the ground shader reads: a block's footprints less its precinct's offset)
   for (const b of world.blocks) {
-    for (const r of b.bld) if (r.y0 <= CURB_H + 0.01) for (const [e, a] of layers) { g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(X(r.x0) - e, X(r.z0) - e, r.x1 - r.x0 + e * 2, r.z1 - r.z0 + e * 2); }
-    for (const d of b.det) if (d.col && d.col.x0 !== undefined && d.col.y1 > 1.5) for (const [e, a] of layers.slice(1)) { g.fillStyle = `rgba(0,0,0,${a * 0.6})`; g.fillRect(X(d.col.x0) - e, X(d.col.z0) - e, d.col.x1 - d.col.x0 + e * 2, d.col.z1 - d.col.z0 + e * 2); }
+    const ox = (b.I - b.bx) * P, oz = (b.J - b.bz) * P, X = x => x - ox + 48, Z = z => z - oz + 48;
+    for (const r of b.bld) if (r.y0 <= CURB_H + 0.01) for (const [e, a] of layers) { g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(X(r.x0) - e, Z(r.z0) - e, r.x1 - r.x0 + e * 2, r.z1 - r.z0 + e * 2); }
+    for (const d of b.det) if (d.col && d.col.x0 !== undefined && d.col.y1 > 1.5) for (const [e, a] of layers.slice(1)) { g.fillStyle = `rgba(0,0,0,${a * 0.6})`; g.fillRect(X(d.col.x0) - e, Z(d.col.z0) - e, d.col.x1 - d.col.x0 + e * 2, d.col.z1 - d.col.z0 + e * 2); }
   }
   g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 1.2;
   for (const b of world.blocks) g.strokeRect(X(b.bx * P + ROAD_HALF), X(b.bz * P + ROAD_HALF), P - ROAD_HALF * 2, P - ROAD_HALF * 2);
@@ -873,12 +877,17 @@ function makeSkyMaterial() {
   });
 }
 function makeWaterMaterial() {
+  // the city's frames (021), for the glow of its lights on the water near its edges
+  if (!U.uCityR) { U.uCityR = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) }; U.uCityN = { value: 0 }; }
+  const E = EDGE_MARGIN, fr = CityLayout.precincts.slice(0, 8);
+  fr.forEach((p, k) => U.uCityR.value[k].set(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E)); U.uCityN.value = fr.length;
   return new THREE.ShaderMaterial({
     uniforms: U,
     vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: `
       uniform float uTime; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uCam;
       uniform vec3 uFogCol; uniform float uFogDen; uniform float uNight; uniform float uRain;
+      uniform vec4 uCityR[8]; uniform int uCityN;
       varying vec3 vW;
       ${GLSL_NOISE}
       void main(){
@@ -898,7 +907,9 @@ function makeWaterMaterial() {
         float spec = pow(max(dot(R, normalize(uSunDir)), 0.0), 220.0);
         col += uSunCol * spec * 4.0 * clamp(uSunDir.y * 5.0, 0.0, 1.0);
         // city glow shimmering at night near the shore
-        float shore = smoothstep(80.0, 0.0, min(min(abs(p.x + 18.0), abs(p.x - 978.0)), min(abs(p.y + 18.0), abs(p.y - 978.0))));
+        float sd = 1e9;
+        for (int k = 0; k < 8; k++) { if (k >= uCityN) break; vec4 r = uCityR[k]; vec2 q = max(max(r.xy - p, p - r.zw), vec2(0.0)); sd = min(sd, length(q)); }
+        float shore = smoothstep(80.0, 0.0, sd);
         col += vec3(1.0, 0.7, 0.4) * uNight * shore * 0.25 * (0.5 + 0.5 * pvn(p * vec2(0.5, 3.0) + t));
         float dist = length(uCam - vW);
         float fogF = 1.0 - exp(-uFogDen * uFogDen * dist * dist);
