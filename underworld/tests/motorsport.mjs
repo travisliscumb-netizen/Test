@@ -271,7 +271,7 @@ check('a track day times a lap through every sector and keeps the best; cutting 
 // ---------------------------------------------------------------- 9. streaming: leaving and coming back
 const stream = await ev(() => {
   const g = window.game, out = {};
-  const xb = () => [...g.chunks.visible].filter(i => i >= 1000).length;
+  const xb = () => [...g.chunks.visible].filter(i => i >= 1000 && g.world.xblocks[i - 1000] && g.world.xblocks[i - 1000].t === 'V').length; // Valen Point's own blocks (the island's districts stream too)
   g.resetPlayerState(1700, 520, 0); window.__step(60); out.there = xb(); out.nearThere = g.vpScene.near.visible;
   g.resetPlayerState(200, 300, 0); window.__step(60); out.away = xb(); out.nearAway = g.vpScene.near.visible; out.farAway = g.vpScene.far.visible; out.cached = g.chunks.chunks.size <= g.chunks.maxCached + 8;
   g.resetPlayerState(1560, 560, 0); window.__step(60); out.back = xb(); out.nearBack = g.vpScene.near.visible;

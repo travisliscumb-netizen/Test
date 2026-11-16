@@ -39,7 +39,7 @@ const where = await ev(() => {
   const g = window.game, pl = g.world.places, U = g.ui;
   const d = (a, b2) => Math.round(Math.hypot(a.x - b2.x, a.z - b2.z));
   const idx = g.ui.map && g.ui.map.index ? g.ui.map.index() : null; void idx;
-  const out = { used: !!pl.usedlot, neu: !!pl.dealer, lux: !!pl.prestige, chop: (() => { const ub = g.world.block(Math.floor(pl.usedlot.door.x / 80), Math.floor(pl.usedlot.door.z / 80)), cb = g.world.block(10, 6); return { adj: ub.bx === cb.bx && ub.bz === cb.bz - 1, gate: Math.round(cb.z0 - ub.z1) }; })(), slots: [pl.usedlot.slots.length, pl.dealer.slots.length, pl.prestige.slots.length] };
+  const out = { used: !!pl.usedlot, neu: !!pl.dealer, lux: !!pl.prestige, chop: (() => { const ub = g.world.blockAt(pl.usedlot.door.x, pl.usedlot.door.z), cb = g.world.block(10, 6); return { adj: ub.bx === cb.bx && ub.bz === cb.bz - 1, gate: Math.round(cb.z0 - ub.z1) }; })(), slots: [pl.usedlot.slots.length, pl.dealer.slots.length, pl.prestige.slots.length] };
   out.cats = ['carsUsed', 'carsNew', 'carsLux'].filter(k => window.__pv.MAP_CATS[k]);
   void U;
   return out;
@@ -166,7 +166,7 @@ check('the flagship turns on its turntable', turned !== null && Math.abs(turned 
 const exits = await ev(() => {
   const g = window.game, grid = g.world.grid, out = {};
   for (const id of ['usedlot', 'dealer', 'prestige']) {
-    const pl = g.world.places[id], sl = pl.slots, cz = sl.reduce((a, s) => a + s.z, 0) / sl.length, b = g.world.block(Math.floor(pl.door.x / 80), Math.floor(pl.door.z / 80));
+    const pl = g.world.places[id], sl = pl.slots, cz = sl.reduce((a, s) => a + s.z, 0) / sl.length, b = g.world.blockAt(pl.door.x, pl.door.z);
     const x = id === 'usedlot' ? b.cx : b.cx, z0 = Math.min(...sl.map(s => s.z)), hit = grid.raycast(x, 0.9, z0, 0, 0, 1, b.z1 + 6 - z0, 0.3, false);
     out[id] = hit ? +hit.t.toFixed(1) + ' (' + (hit.col.kind || '') + ')' : 'clear';
     void cz;
