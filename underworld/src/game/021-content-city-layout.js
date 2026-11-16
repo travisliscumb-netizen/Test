@@ -171,6 +171,28 @@ const CityLayout = {
   // the layout in use, to come back to (the world generator builds the city in the lattice, then bakes it, 090)
   current() { return { id: this.id, table: this.table }; },
   restore(c) { return this.use(c.id, c.table); },
+  // A save made under another layout (CITY_SPREAD.md S6): every { x, z } in it that stood in one of that layout's
+  // precinct frames moves to where the same block stands under this one (old world -> lattice -> new world); a point
+  // off every old frame (out on the island, Valen Point, Cedar Fields South) keeps its numbers. Returns how many moved.
+  relocate(obj, fromId) {
+    const T = CITY_LAYOUTS[fromId]; if (!T || fromId === this.id) return 0;
+    const E = EDGE_MARGIN, from = T.map(p => ({ ...p, x0: (p.lx0 + p.ox) * P, z0: (p.lz0 + p.oz) * P, x1: (p.lx1 + 1 + p.ox) * P, z1: (p.lz1 + 1 + p.oz) * P }));
+    const oldAt = (x, z) => { let best = null, bd = Infinity; for (const p of from) { const dx = Math.max(p.x0 - x, 0, x - p.x1), dz = Math.max(p.z0 - z, 0, z - p.z1); if (dx > E || dz > E) continue; const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = p; } } return best; };
+    let n = 0; const seen = new Set();
+    const walk = v => {
+      if (!v || typeof v !== 'object' || seen.has(v)) return; seen.add(v);
+      if (!Array.isArray(v) && typeof v.x === 'number' && typeof v.z === 'number' && isFinite(v.x) && isFinite(v.z)) {
+        const q = oldAt(v.x, v.z);
+        if (q) {
+          const lx = clamp(Math.floor((v.x - q.ox * P) / P), q.lx0, q.lx1), lz = clamp(Math.floor((v.z - q.oz * P) / P), q.lz0, q.lz1), p = this.precinctOf(lx, lz);
+          const dx = (p.ox - q.ox) * P, dz = (p.oz - q.oz) * P; if (dx || dz) { v.x += dx; v.z += dz; n++; }
+        }
+      }
+      for (const k in v) walk(v[k]);
+    };
+    walk(obj);
+    return n;
+  },
   // the layout in plain data (the world fingerprint, the save's stamp)
   describe() { return { id: this.id, precincts: this.precincts.map(p => [p.id, p.lx0, p.lz0, p.lx1, p.lz1, p.ox, p.oz]) }; }
 };

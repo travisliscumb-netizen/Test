@@ -24,6 +24,8 @@ const SaveSystem = {
   defaults() {
     return {
       version: SAVE_VERSION,
+      // the city layout the save's positions were made under (CityLayout, 021; a save from before has none: classic)
+      layout: CityLayout.id,
       wallet: Money.fresh(),
       upgrades: { stamina: 0, health: 0 },
       weapons: { bat: false, pistol: false, smg: false, shotgun: false },
@@ -94,6 +96,7 @@ const SaveSystem = {
     const st = this.loadSettings();
     if (!data || typeof data !== 'object') { if (st) { this.mergeInto(d.settings, st); this.sanitize(d); } return { data: d, existed: false }; }
     const oldVersion = typeof data.version === 'number' ? data.version : 1;
+    const madeUnder = typeof data.layout === 'string' && CITY_LAYOUTS[data.layout] ? data.layout : 'classic';
     // v7 -> v8: the old single balance becomes Clean Bank (§45.2). Read raw, before merge() could drop it.
     if (oldVersion < 8 && !(data.wallet && typeof data.wallet === 'object')) data.wallet = { clean: typeof data.money === 'number' && isFinite(data.money) && data.money > 0 ? data.money : 0 };
     delete data.money;
@@ -114,6 +117,10 @@ const SaveSystem = {
     if (data.wloc && typeof data.wloc === 'object' && !Array.isArray(data.wloc)) d.wloc = { ...data.wloc }; // null defaults would block string values in merge()
     if (data.wallet && typeof data.wallet.treasury === 'string') d.wallet.treasury = data.wallet.treasury; // same: the Treasury Warehouse id (validated by Money.sanitize)
     if (st) this.mergeInto(d.settings, st);
+    // made under another city layout: every position moves to where its block stands now (CITY_SPREAD.md S6); the
+    // stamp is then this layout's, so loading again moves nothing
+    const relocated = CityLayout.relocate(d, madeUnder); d.layout = CityLayout.id;
+    if (relocated) d.flags.relocatedFrom = madeUnder;
     this.sanitize(d);
     // v3 -> v4: nothing to convert (new fields default sensibly); remember that it happened
     // v4 -> v5: every day served used to be a whole street day. The calendar shown keeps only a day per
@@ -135,6 +142,7 @@ const SaveSystem = {
   loadSettings() { try { const r = localStorage.getItem(SETTINGS_KEY); const o = r ? JSON.parse(r) : null; return o && typeof o === 'object' ? o : null; } catch { return null; } },
   saveSettings(s) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } },
   sanitize(d) {
+    if (typeof d.layout !== 'string' || !CITY_LAYOUTS[d.layout]) d.layout = CityLayout.id;
     d.wallet = Money.sanitize(d.wallet);
     delete d.money;
     if (!Array.isArray(d.garage)) d.garage = [];

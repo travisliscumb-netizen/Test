@@ -33436,6 +33436,28 @@ const CityLayout = {
   // the layout in use, to come back to (the world generator builds the city in the lattice, then bakes it, 090)
   current() { return { id: this.id, table: this.table }; },
   restore(c) { return this.use(c.id, c.table); },
+  // A save made under another layout (CITY_SPREAD.md S6): every { x, z } in it that stood in one of that layout's
+  // precinct frames moves to where the same block stands under this one (old world -> lattice -> new world); a point
+  // off every old frame (out on the island, Valen Point, Cedar Fields South) keeps its numbers. Returns how many moved.
+  relocate(obj, fromId) {
+    const T = CITY_LAYOUTS[fromId]; if (!T || fromId === this.id) return 0;
+    const E = EDGE_MARGIN, from = T.map(p => ({ ...p, x0: (p.lx0 + p.ox) * P, z0: (p.lz0 + p.oz) * P, x1: (p.lx1 + 1 + p.ox) * P, z1: (p.lz1 + 1 + p.oz) * P }));
+    const oldAt = (x, z) => { let best = null, bd = Infinity; for (const p of from) { const dx = Math.max(p.x0 - x, 0, x - p.x1), dz = Math.max(p.z0 - z, 0, z - p.z1); if (dx > E || dz > E) continue; const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = p; } } return best; };
+    let n = 0; const seen = new Set();
+    const walk = v => {
+      if (!v || typeof v !== 'object' || seen.has(v)) return; seen.add(v);
+      if (!Array.isArray(v) && typeof v.x === 'number' && typeof v.z === 'number' && isFinite(v.x) && isFinite(v.z)) {
+        const q = oldAt(v.x, v.z);
+        if (q) {
+          const lx = clamp(Math.floor((v.x - q.ox * P) / P), q.lx0, q.lx1), lz = clamp(Math.floor((v.z - q.oz * P) / P), q.lz0, q.lz1), p = this.precinctOf(lx, lz);
+          const dx = (p.ox - q.ox) * P, dz = (p.oz - q.oz) * P; if (dx || dz) { v.x += dx; v.z += dz; n++; }
+        }
+      }
+      for (const k in v) walk(v[k]);
+    };
+    walk(obj);
+    return n;
+  },
   // the layout in plain data (the world fingerprint, the save's stamp)
   describe() { return { id: this.id, precincts: this.precincts.map(p => [p.id, p.lx0, p.lz0, p.lx1, p.lz1, p.ox, p.oz]) }; }
 };
@@ -33511,7 +33533,7 @@ const ISLE_ROAD_LAYOUT = {
   island: {
     // the Coast Highway reaches Crestmoor Heights from the core and leaves from its west street: the district's own
     // streets carry it through
-    n1: { ends: ['lat', 'lat'], pts: [[-634, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
+    n1: { ends: ['lat', 'lat'], pts: [[-646, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
     add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[200, -6], [200, -60], [150, -150], [-10, -270], [-240, -330], [-400, -356], [-474, -360]] }],
     n2: { ends: ['n1e', 'ring'] },
     // the Southshore Highway's east end comes up to the core's south street over the ground the square left
@@ -34327,6 +34349,8 @@ const SaveSystem = {
   defaults() {
     return {
       version: SAVE_VERSION,
+      // the city layout the save's positions were made under (CityLayout, 021; a save from before has none: classic)
+      layout: CityLayout.id,
       wallet: Money.fresh(),
       upgrades: { stamina: 0, health: 0 },
       weapons: { bat: false, pistol: false, smg: false, shotgun: false },
@@ -34397,6 +34421,7 @@ const SaveSystem = {
     const st = this.loadSettings();
     if (!data || typeof data !== 'object') { if (st) { this.mergeInto(d.settings, st); this.sanitize(d); } return { data: d, existed: false }; }
     const oldVersion = typeof data.version === 'number' ? data.version : 1;
+    const madeUnder = typeof data.layout === 'string' && CITY_LAYOUTS[data.layout] ? data.layout : 'classic';
     // v7 -> v8: the old single balance becomes Clean Bank (§45.2). Read raw, before merge() could drop it.
     if (oldVersion < 8 && !(data.wallet && typeof data.wallet === 'object')) data.wallet = { clean: typeof data.money === 'number' && isFinite(data.money) && data.money > 0 ? data.money : 0 };
     delete data.money;
@@ -34417,6 +34442,10 @@ const SaveSystem = {
     if (data.wloc && typeof data.wloc === 'object' && !Array.isArray(data.wloc)) d.wloc = { ...data.wloc }; // null defaults would block string values in merge()
     if (data.wallet && typeof data.wallet.treasury === 'string') d.wallet.treasury = data.wallet.treasury; // same: the Treasury Warehouse id (validated by Money.sanitize)
     if (st) this.mergeInto(d.settings, st);
+    // made under another city layout: every position moves to where its block stands now (CITY_SPREAD.md S6); the
+    // stamp is then this layout's, so loading again moves nothing
+    const relocated = CityLayout.relocate(d, madeUnder); d.layout = CityLayout.id;
+    if (relocated) d.flags.relocatedFrom = madeUnder;
     this.sanitize(d);
     // v3 -> v4: nothing to convert (new fields default sensibly); remember that it happened
     // v4 -> v5: every day served used to be a whole street day. The calendar shown keeps only a day per
@@ -34438,6 +34467,7 @@ const SaveSystem = {
   loadSettings() { try { const r = localStorage.getItem(SETTINGS_KEY); const o = r ? JSON.parse(r) : null; return o && typeof o === 'object' ? o : null; } catch { return null; } },
   saveSettings(s) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } },
   sanitize(d) {
+    if (typeof d.layout !== 'string' || !CITY_LAYOUTS[d.layout]) d.layout = CityLayout.id;
     d.wallet = Money.sanitize(d.wallet);
     delete d.money;
     if (!Array.isArray(d.garage)) d.garage = [];
