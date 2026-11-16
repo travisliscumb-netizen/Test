@@ -3,6 +3,7 @@
 
      node underworld/tools/world-print.mjs [out.json] [index.html]          fingerprint a build
      node underworld/tools/world-print.mjs --cmp a.json b.json              compare two fingerprints (exit 1 on a difference)
+     UW_QUERY='?layout=classic' …                                            under another city layout (the baseline is classic)
 
    Sections: every city block and extra block (buildings, details, props, parked cars, signs, lights, seats ...),
    the world's own lists (local roads, homes, map places, lots, lamps, links), the road net and the road graph, the

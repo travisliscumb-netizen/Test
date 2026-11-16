@@ -33465,8 +33465,10 @@ const CityLayout = {
   // the layout in plain data (the world fingerprint, the save's stamp)
   describe() { return { id: this.id, precincts: this.precincts.map(p => [p.id, p.lx0, p.lz0, p.lx1, p.lz1, p.ox, p.oz]) }; }
 };
-// the layout the city is built to: 'classic' unless the page asks for another by name (?layout=…, the tests' tracers)
-CityLayout.use((() => { try { const m = /[?&]layout=([a-z0-9_]+)/i.exec(location.search); return m && CITY_LAYOUTS[m[1]] ? m[1] : 'classic'; } catch { return 'classic'; } })());
+// the layout the city is built to: 'island' (the city round Valen Bay, CITY_SPREAD.md) unless the page asks for another
+// by name (?layout=classic: the square as it was built, for the world fingerprint; the tests' tracers)
+const CITY_LAYOUT_DEFAULT = 'island';
+CityLayout.use((() => { try { const m = /[?&]layout=([a-z0-9_]+)/i.exec(location.search); return m && CITY_LAYOUTS[m[1]] ? m[1] : CITY_LAYOUT_DEFAULT; } catch { return CITY_LAYOUT_DEFAULT; } })());
 /* =====================================================================
    [CONTENT] VALEN ISLAND (Operation Blackgate)
    The whole world as one island. The lattice city no longer stands in a
