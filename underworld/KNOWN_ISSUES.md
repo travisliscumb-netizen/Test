@@ -112,3 +112,12 @@
 - Highways are unlit at night (a car's own lamps, the airfield's and the tunnel's lights).
 - The far ground and the forests' trees appear as you approach (tiles are built one a frame).
 
+
+## City spread (island layout) — known limits
+- `threat` (real-time clock check) and `cityshots` (screenshot timeout) fail on this container's software GL with the
+  island layout, exactly as they do on the pre-spread island build: too few frames reach the page in the wall time.
+  Not a code fault; re-check on hardware GL.
+- Under full-regression load (three suites at once) `arrest`, `legal`, `taxi`, `races`, `stress`, `raid` and the
+  screenshot suites can fail; every one passes run alone on the final build.
+- Linden Gardens is a garden suburb, not dense city; the open fields south of it run on to Cedar Fields South.
+- Only two of the six precincts move (Crestmoor Heights, the Nightlife Strip): downtown is still one 8 × 8 grid.

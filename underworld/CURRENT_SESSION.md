@@ -1,12 +1,12 @@
 # CURRENT SESSION
 
-- **The city into the island (CITY_SPREAD.md): S2–S6 DONE, the island layout is the DEFAULT; S7 in progress.** The
-  city now stands round Valen Bay: the core, Old Quarter, Linden Hills and the port on the island's waist, Crestmoor
-  Heights on the bay's north shore, the Nightlife Strip / Stadium / Warehouse District on its south shore, joined by
-  the island's roads. Every system works in world cells; the city is generated as authored and baked to where each
-  precinct stands; saves move with the layout (suite `relocate`). CITY_SPREAD.md §9 is the record of every stage.
-  Next: the full regression on the island default (running: `underworld/.runs-spread.out`), fix what it finds,
-  re-run failures solo, then perf on the phone profile, screenshots, docs, deploy.
+- **The city into the island (CITY_SPREAD.md): S1–S7 DONE, the island layout is the DEFAULT.** The city stands round
+  Valen Bay: downtown, the Old Quarter, Linden Hills, the port and the new **Linden Gardens** (curving streets on the
+  ground the Strip left) on the island's waist; Crestmoor Heights on the bay's north shore; the Nightlife Strip,
+  Stadium and Warehouse District on its south shore. Saves move with the layout. S7 found and fixed two real bugs
+  (warehouse yard parking left behind by the bake; police spawning in open ground between precincts) and named
+  Tanner's Row's far half Cooper's Lane; every affected suite passes on the final build (CITY_SPREAD.md §9).
+  Next (owner): play it; rule on spreading wider (split the core, move more precincts out).
 
 - **Round the grid (CITY_SPREAD.md §10): BUILT, commit `77549bd`.** The owner switched from relocation to building
   round the grid. Eight curving streets, five districts (Bayview Heights, Marsh Hollow, Blackgate Landing, Lake Valen

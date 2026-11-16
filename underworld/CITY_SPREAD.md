@@ -25,8 +25,8 @@ start; §4 is the stage list with what is done; §5 is the checklist of every pl
 - The layout's own suite: `node underworld/tests/layout.mjs` (Node only, under a second).
 - Then the suites a change touches, then the regression runner (`TESTING.md`). Two cores here: a suite takes 1–10
   minutes, the full regression several hours at `CONC=2`.
-- **Next action: §4, stage S7** (the full regression on the island layout, then fix what it finds). §9's latest entries
-  say what each stage built.
+- **S1–S7 are done; the island layout is the default.** Open for the owner (§8, §9's last entry): whether to spread the
+  city further (split the core, move more precincts out). §9's latest entries say what each stage built.
 
 ## 1. Why this is not "move the pins"
 The city is a 12 × 12 lattice of 80 m blocks (`020`: `P`, `N`, `CITY = 960`), and the lattice is the game's address
@@ -305,6 +305,32 @@ vehicles, pending cars, dropped weapons (`wloc`) and stashes.
   and places through the layout, road beds skip every frame, road count), `districts` (the streets and lots the layout
   keeps), `layout` (starts on island, tests classic explicitly). Full regression on the island default: running; its
   result goes here and in CURRENT_SESSION.md.
+
+- **2026-11-16, S7 (done).** Full regression on the island default (`underworld/.runs/spread/`), every failure re-run
+  alone and classified. Bugs it found, fixed: the bake left warehouse yard parking (`park`) at lattice coordinates, so
+  a warehouse in a moved precinct had its bays outside its yard (`park` now moves; a curved street's kerb-side list
+  `[1, -1]` does not); police units spawned on any node of the layout's node rectangle, which between precincts is open
+  ground (now only on a node with an open street; traffic, drive AI and taxis already checked). Tanner's Row's far
+  half is **Cooper's Lane** wherever the layout parts its two blocks (`_nameApart`, after the bake). Suites that still
+  asserted the square, updated: `relocate` (its save is made under `?layout=classic`), `roads` (corner path through
+  the layout's nodes, island ribbons by `inCity`, a street's two halves may meet through one precinct), `taxi` (map
+  picks through `wx/wz`), `races` (districts pre-discovered: a route through a new district adds the discovery Rep),
+  `kingpin` (inner turfs by lattice position), `roadnet` (Cooper's Lane, the pursuit target in the unit's precinct),
+  `compound` (street groups cleared under the gang cap before the raiders spawn).
+  **Linden Gardens** (128, `ISLE_INFILL_ROADS`): the screenshots showed the Strip's old ground between Linden Hills,
+  downtown and the docks as an empty lawn. It is levelled to the kerb (`ISLE_GARDENS.pads`, 022 `corePads`) and built
+  up on seven curving streets (Garden Parade, Quince Street, Cobb Lane, Mercer Street, Gardenia Close, Sorrel Street,
+  Wharf Lane) joining the three precincts and the Southshore Highway: 31 lots (shops and flats facing downtown,
+  houses behind, a yard by the docks; infill lots keep 24 m from the edge streets and pack tighter), tree-lined
+  streets, lamps; zone Linden Hills. Island layout only: classic stays `IDENTICAL` to the baseline.
+  Gate: the affected suites on the final build all pass (roadnet 42, offroad 51, roads 20, districts 8, island 41,
+  city 25, taxi 20, map 22, layout 32, police 13, arrest 126, legal 21, compound 56, relocate 7, races 24, kingpin 6;
+  stress, raid pass alone). Still failing here, identically on the pre-spread island build: `threat`'s real-time clock
+  check and `cityshots`' screenshot timeout (software GL: fewer than a second of frames in three of wall time).
+  Performance (perf suite, software GL, calm / busy): draw calls 156 / 163 before, 188 / 177 now; triangles +6 % / +4 %.
+  Honest state: the city reads as downtown with the port and Linden Hills (now with Linden Gardens) in the island's
+  waist, Crestmoor Heights on the bay's north shore and the Strip on its south shore. Only two of six precincts moved;
+  a wider spread (splitting the core) is the owner's call.
 
 ## 10. Round the grid (live): the new districts, Villa Valen and the Valen Vault
 The owner's words, by voice: keep the grid; build districts round it, not in a grid pattern; raise the quality
