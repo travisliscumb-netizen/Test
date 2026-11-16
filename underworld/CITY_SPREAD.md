@@ -1,5 +1,11 @@
 # CITY SPREAD — the city into the island (the plan, the record and the handoff)
 
+> **SUPERSEDED BY THE OWNER, 2026-11-15 (§10).** Usage ran short, so the owner switched from true relocation to
+> building round the grid: the 12 × 12 city stays where it is as old downtown, and new districts on curving streets
+> fill the island round it. §10 is the live state. §0–§9 remain the plan if relocation is ever resumed; S1 (the
+> layout layer, `021`) is built and harmless either way.
+
+
 The owner's directive (2026-11-15, after playing Operation Blackgate): the city must stop being a square that floats
 in the middle of the island. Spread it into the island so the whole map reads as one real coastal city. **Keep every
 working gameplay system and relocate it; do not redraw it. No placeholders: every stage leaves a properly playable
@@ -234,3 +240,36 @@ vehicles, pending cars, dropped weapons (`wloc`) and stashes.
   line's extension, anywhere in the world, so the HUD read "Elm St" on Mount Valen, "Dock St" on the main runway and
   "Central Blvd" on the Blackgate Bridge and at Valen Point. A lattice street is now named only inside the frame of
   the precinct whose street it is; suite `island` checks it.
+
+## 10. Round the grid (live): the new districts, Villa Valen and the Valen Vault
+The owner's words, by voice: keep the grid; build districts round it, not in a grid pattern; raise the quality
+elsewhere on the map with new builds and smaller rebuilds; a lavish mansion at the top of the map near the Crestmoor
+Ridge estates but in the new area, with an extravagant bunker. Built in `src/game/128-content-island-districts.js`
+(commit `77549bd`), hooked into `127`'s `_genIsland` at two points (`_districtPlan` before `Island.corePads`,
+`_genDistricts` before the rooftop helipads).
+
+- **Streets** (`ISLE_DISTRICT_ROADS`, appended to `ISLE_ROADS`): Bayview Crescent, Ridgeview Drive, Laurel Way
+  (north shore of Valen Bay); Marsh Hollow Road (a through route Longshore Drive → Southshore Highway), Heron Loop,
+  Reed Street (south-west lowlands); Quay Road and Foundry Wharf (west coast by the Blackgate Bridge). Island roads,
+  so they are road-graph links: GPS, traffic, taxis and police use them.
+- **Lots** (`ISLE_LOT_PLAN`, `ISLE_LOT`): planned along each street before roads are built, clear of every road
+  (and turning circle), the city, the airport, the proving ground, Cedar Fields South, Valen Point, the lake, the
+  sea, other pads and each other; levelled at their street's height (the road bed's shoulder widens with the step,
+  022 `compute`); any lot a second road's shoulder still reaches is dropped after the roads are cut. Kinds: villa,
+  house, cabin, shop (a map place), apt, ware. Count at `77549bd`: Bayview 40, Marsh Hollow 52, Blackgate Landing 7,
+  Lake Valen Shore 13, Gull Harbor 8. Street lamps every 44 m on the new streets.
+- **Villa Valen** (`VILLA_VALEN`, `_genVillaValen`): walled grounds x −692…−518, z −1062…−850, level at 21.5 m, at
+  the head of Ridgeview Drive. Hall and two wings, portico, fountain court, garage pavilion, infinity pool and pool
+  house, tennis court, helipad (a helicopter parked), avenue and perimeter trees, gate with the name in gold.
+- **The Valen Vault**: x −604…−528, z −1052…−994, a 7 m concrete shell under a turf roof with banks. The south
+  doorway is 10 m wide and open (drive in); the round vault door stands open beside it. Inside: a gallery of six cars
+  on lit turntables (valkyr, obsidian, revenant, monarch, hellion, kodiak), then through three doorways a command
+  room (screen wall, map table), a lounge (black-and-gold bar, sofas, grotto pool, chandelier) and a strongroom
+  (vault door, gold and cash pallets, armoury racks).
+- **Verification**: suite `districts` (8 checks: built, level, clear of roads and each other, streets in the road
+  graph, GPS reaches each, vault solid with an open doorway, places on the map, streamed, no page errors).
+  `tools/district-shots.mjs <dir>` captures the villa, the vault and each district.
+- **Not done (next, in order of value)**: make Villa Valen a buyable home (the homes ladder in `500` matches a
+  `world.homes` record; island blocks have no home record yet, and the vault would want to be its garage); more
+  "smaller rebuilds" elsewhere (the Highland Pass diner was tried and has no level site); street names in the HUD
+  for the new streets come from the island road names already.

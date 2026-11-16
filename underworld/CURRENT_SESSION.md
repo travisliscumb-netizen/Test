@@ -1,5 +1,10 @@
 # CURRENT SESSION
 
+- **Round the grid (CITY_SPREAD.md §10): BUILT, commit `77549bd`.** The owner switched from relocation to building
+  round the grid. Eight curving streets, five districts (Bayview Heights, Marsh Hollow, Blackgate Landing, Lake Valen
+  Shore, more of Gull Harbor), Villa Valen and the Valen Vault (a drive-in bunker). Suite `districts` 8/8. Next:
+  Villa Valen as a buyable home; more small rebuilds round the island.
+
 - **The city into the island (CITY_SPREAD.md): stage S1 DONE; stage S2 is next.** The owner played the island, asked
   for the city to stop being a square in the middle of it, and ruled for true relocation (the lattice's districts
   moved out across the island, every system kept, nothing redrawn) over building new neighbourhoods round a fixed
