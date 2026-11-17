@@ -58,6 +58,8 @@ class World {
     }
     // the houses' yards and fronts (121), once every house, drive and lane stands
     for (const b of this.blocks) this._dressHomes(b);
+    // nothing left standing inside a building's walls (a yard's pallet or a street lamp a later building covered)
+    for (const b of this.blocks) this._pruneBuried(b);
     // (the perimeter is built where each precinct stands, after the bake: the generate wrapper in 100)
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();
@@ -144,6 +146,34 @@ class World {
     else if (col) d.col = col;
     b.det.push(d);
     return d;
+  }
+  // a prop whose foot is inside a building at ground level is removed (it could not be seen or reached)
+  _pruneBuried(b) {
+    const keep = [];
+    for (const p of b.props) {
+      const inside = b.bld.some(r => !r.hollow && (r.y0 === undefined || r.y0 <= CURB_H + 1.0) && p.x > r.x0 + 0.15 && p.x < r.x1 - 0.15 && p.z > r.z0 + 0.15 && p.z < r.z1 - 0.15);
+      if (!inside) { keep.push(p); continue; }
+      const L = this.propTypes[p.type], i = L ? L.indexOf(p) : -1; if (i >= 0) L.splice(i, 1);
+    }
+    b.props = keep;
+  }
+  // a bench faces the nearest walk or street: one with a path or a road closer behind it than in front of it (within
+  // 4 m) is turned round. Where the city stands (after the bake), through the same lattice streets and local-road
+  // raster the game drives on
+  _faceBenches(b) {
+    const on = (x, z) => isOnRoad(x, z) || localRoadAt(x, z);
+    for (const p of b.props) {
+      if (p.type !== 'bench') continue;
+      const fx = Math.sin(p.ry), fz = Math.cos(p.ry);
+      let front = Infinity, back = Infinity;
+      for (let r = 0.5; r <= 4; r += 0.5) {
+        if (front === Infinity && on(p.x + fx * r, p.z + fz * r)) front = r;
+        if (back === Infinity && on(p.x - fx * r, p.z - fz * r)) back = r;
+      }
+      if (back < front) {
+        p.ry += Math.PI; const seat = b.seats.find(s => Math.abs(s.x - p.x) < 0.01 && Math.abs(s.z - p.z) < 0.01); if (seat) seat.ry = p.ry;
+      }
+    }
   }
   _prop(b, type, x, z, ry = 0, s = 1) {
     const p = { type, x, z, ry, s, id: this.totalProps++, broken: false, block: b.i };
@@ -310,7 +340,8 @@ class World {
         if (o.trees && r < o.trees && sl % 8 === 4) { const [x, z] = at(sl, 7.3); this._prop(b, o.palms ? 'pine' : 'tree', x, z, rng.range(0, 6), rng.range(0.85, 1.15)); continue; }
         if (!hyd && r > 0.9) { const [x, z] = at(sl, 6.55); this._prop(b, 'hydrant', x, z, s.ry); hyd = true; continue; }
         if (r > 0.8) { const [x, z] = at(sl, 6.9); this._prop(b, 'bin', x, z, 0); continue; }
-        if (o.benches && r > 0.7 && r < 0.78) { const [x, z] = at(sl, 9.45); this._prop(b, 'bench', x, z, s.ry + Math.PI); b.seats.push({ x, z, ry: s.ry + Math.PI }); continue; }
+        // (a bench at the back of the pavement faces the street, its back to the buildings)
+        if (o.benches && r > 0.7 && r < 0.78) { const [x, z] = at(sl, 9.45); this._prop(b, 'bench', x, z, s.ry); b.seats.push({ x, z, ry: s.ry }); continue; }
         if (o.news && r > 0.66 && r < 0.7) { const [x, z] = at(sl, 9.4); this._prop(b, 'newsbox', x, z, s.ry); continue; }
       }
       if (o.busStop && si === rng.int(0, 3)) { const [x, z] = at(30, 9.1); this._prop(b, 'busstop', x, z, s.ry); b.seats.push({ x, z, ry: s.ry }); }

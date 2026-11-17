@@ -21,7 +21,8 @@
    Valen Point's.
    ===================================================================== */
 // Crestmoor Ridge: [x, z, the side the forecourt faces] along Mount Valen Road's first leg
-const ISLE_MANSIONS = [[-150, -518, 'e'], [-58, -452, 'w'], [30, -628, 's'], [50, -536, 'n'], [232, -644, 's'], [238, -550, 'n'], [395, -646, 's'], [392, -551, 'n']];
+// (three stand 18 m further from Mount Valen Road than they did: its cutting reached under their houses)
+const ISLE_MANSIONS = [[-150, -518, 'e'], [-58, -452, 'w'], [27, -646, 's'], [50, -536, 'n'], [235, -662, 's'], [236, -532, 'n'], [395, -646, 's'], [392, -551, 'n']];
 // Saltmarsh: houses either side of the bay road (x, side: -1 the bay side, 1 the landward side)
 const ISLE_SALTMARSH = [-322, -392, -462, -532, -602, -672];
 const ISLE_GULL = [[-1389, -2230], [-1328, -2271], [-1266, -2311], [-1205, -2352], [-1304, -2191], [-1202, -2259]];
@@ -54,6 +55,21 @@ Object.assign(World.prototype, {
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
+    // the mansions' plots are levelled again, last, so no later level ground (a precinct's edge, a lot) eats into them;
+    // a plot that overlaps a precinct's own edge cannot have both, and is left unbuilt
+    for (const m of mans) {
+      const near = CityLayout.precincts.some(p => m.x + 25 + 28 > p.x0 - EDGE_MARGIN && m.x - 25 - 28 < p.x1 + EDGE_MARGIN && m.z + 22 + 28 > p.z0 - EDGE_MARGIN && m.z - 22 - 28 < p.z1 + EDGE_MARGIN);
+      const i = Island.pads.indexOf(m.P); if (i >= 0) Island.pads.splice(i, 1);
+      if (near) m.skip = true; else Island.pads.push(m.P);
+    }
+    // the fire station: where Midtown's level ground comes up to it (the island layout) Midtown's pad, laid later, took
+    // its level away and the building stood in the air. It is levelled again, last, at the height the Coast Highway has
+    // as it passes the doors (the highway comes down toward Midtown at 7%), with a short bank down to Midtown
+    {
+      const F = ISLE_FIRE, i = Island.pads.indexOf(fireP);
+      const infillNear = (ISLE_INFILL[CityLayout.id] || []).some(Q => Q.pads.some(r => r[0] < F.x1 + 70 && r[2] > F.x0 - 70 && r[1] < F.z1 + 70 && r[3] > F.z0 - 70));
+      if (i >= 0 && infillNear) { Island.pads.splice(i, 1); fireP.y = 6; fireP.blend = 12; Island.pads.push(fireP); }
+    }
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
     Island.addPad(CFS.lb.x - CFS.lb.half - 1, CFS_EDGE + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
     Island.buildRoads();
@@ -185,6 +201,9 @@ Object.assign(World.prototype, {
       this._bld(b, F.x0 + 22, F.z0 + 6, F.x1 - 6, F.z1 - 8, 9, STYLE.BRICK, 0xa63a2e, 4.5, 5, { exactH: true, y0: y, oy: y });
       this._bld(b, F.x1 - 16, F.z1 - 20, F.x1 - 6, F.z1 - 8, 19, STYLE.BRICK, 0x8f3026, 3.8, 3.3, { exactH: true, y0: y, oy: y });
       for (let k = 0; k < 3; k++) box(b, F.x0 + 21.9, y + 2.4, F.z0 + 14 + k * 13, 0.12, 4.8, 9, 0x2a2e33, false);
+      // the apron in front of the doors, with a red line along each bay
+      box(b, F.x0 + 11, y + 0.03, (F.z0 + F.z1) / 2, 22, 0.06, F.z1 - F.z0 - 8, 0x9a9c98, false);
+      for (let k = 0; k < 3; k++) for (const s2 of [-1, 1]) box(b, F.x0 + 11, y + 0.065, F.z0 + 14 + k * 13 + s2 * 4.6, 20, 0.01, 0.2, 0xc8102e, false);
       b.signs.push({ text: 'PORT VALEN FIRE DEPT · STATION 1', x: F.x0 + 21.85, y: y + 7.3, z: (F.z0 + F.z1) / 2 - 1, ry: -Math.PI / 2, w: 26, h: 1.4, bg: '#a01818', fg: '#ffd84d' });
       b.place = { id: 'firehouse', name: 'Fire Station No. 1', kind: 'landmark', door: { x: F.x0 + 20.6, z: F.z1 - 14, h: -Math.PI / 2 }, under: { x: F.x0 + 40, z: (F.z0 + F.z1) / 2 } };
       fleet('firehouse', 160, -127, 260, [{ x: F.x0 + 11, z: F.z0 + 14, h: -Math.PI / 2, cls: 'firetruck' }, { x: F.x0 + 11, z: F.z0 + 27, h: -Math.PI / 2, cls: 'firetruck' }, { x: F.x0 + 11, z: F.z0 + 40, h: -Math.PI / 2, cls: 'ambulance' }]);
@@ -193,6 +212,13 @@ Object.assign(World.prototype, {
     {
       const cars = ['luxury', 'kodiak', 'sports', 'monarch', 'suv', 'crest', 'luxury', 'tempest'];
       mans.forEach((m, i) => {
+        // the house stands on its plot's ground as it ends up (the city's own level grounds, laid after the plots, can
+        // take a plot's level away: one stood 23 m over its lawn); a plot left on a slope is not built on
+        if (m.skip) return;
+        // (and, should anything still have moved its ground, the house is not built floating or buried)
+        const gs = [[0, 0], [-13, -11], [13, -11], [-13, 11], [13, 11]].map(([dx, dz]) => Island.height(m.x + dx, m.z + dz));
+        if (Math.max(...gs) - Math.min(...gs) > 1.5) return;
+        m.P.y = gs[0];
         const y = m.P.y, b = this._isleBlock('mansion' + i, m.x, m.z, 46, 'Crestmoor Ridge'), f = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[m.f], along = f[0] ? 'z' : 'x';
         const wall = [0xf2ede2, 0xe8e0d0, 0xdcd6cc, 0xf4f1ea][i % 4], roof = [0x8a4a34, 0x3a4652, 0x5a4a3a, 0x7a3a2e][i % 4];
         // the house is set back from the forecourt: a two-storey block, a wing, a garage beside the drive
@@ -209,7 +235,9 @@ Object.assign(World.prototype, {
           else for (const s of [-1, 1]) box(b, ex + (sx > sz ? s * 15.5 : 0), y + 0.7, ez + (sz > sx ? s * 13.5 : 0), sx > sz ? 18 : sx, 1.4, sz > sx ? 16 : sz, 0x35602c, true);
         }
         const fx = m.x + f[0] * 15, fz = m.z + f[1] * 13, h = Math.atan2(f[0], f[1]);
-        fleet('mansion' + i, m.x, m.z, 230, [{ x: fx + (along === 'x' ? -4.5 : 0), z: fz + (along === 'z' ? -4.5 : 0), h, y, cls: cars[i] }, { x: fx + (along === 'x' ? 4.5 : 0), z: fz + (along === 'z' ? 4.5 : 0), h, y, cls: cars[(i + 3) % 8] }]);
+        // (a car parks only where the forecourt is level: a road's cutting can take the edge of it)
+        const level = (x, z) => Math.abs(Island.height(x, z) - y) < 0.4 && Math.abs(Island.height(x + 2.5, z) - Island.height(x - 2.5, z)) < 0.6 && Math.abs(Island.height(x, z + 2.5) - Island.height(x, z - 2.5)) < 0.6;
+        fleet('mansion' + i, m.x, m.z, 230, [{ x: fx + (along === 'x' ? -4.5 : 0), z: fz + (along === 'z' ? -4.5 : 0), h, y, cls: cars[i] }, { x: fx + (along === 'x' ? 4.5 : 0), z: fz + (along === 'z' ? 4.5 : 0), h, y, cls: cars[(i + 3) % 8] }].filter(q => level(q.x, q.z)));
       });
     }
     // ================================================================ SALTMARSH (the bay's south shore) and its jetty

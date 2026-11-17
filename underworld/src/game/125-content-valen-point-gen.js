@@ -161,7 +161,9 @@ Object.assign(World.prototype, {
     this._det(B.pad, 'cyl', VP_SITE.ring.x, Y + 0.25, VP_SITE.ring.z, 6, 0.5, 0x6f8a5a, null, { x: VP_SITE.ring.x, z: VP_SITE.ring.z, r: 6, y0: -1, y1: 0.5, kind: 'det' });
     this._det(B.pad, 'cyl', VP_SITE.ring.x, Y + 3, VP_SITE.ring.z, 0.25, 6, 0x8c949c);
     // marshal posts round the circuit, outside the barriers
-    for (let k = 0; k < N2; k += 120) { const p = T.pts[k], nl = T.nl[k], o = offL(k) + 4; const x = p[0] + nl[0] * o, z = p[1] + nl[1] * o; if (vpLand(x, z)) this._det(B.track, 'box', x, Y + 1.3, z, 2.4, 2.6, 2.4, C(0xf2f2f2), 0, true); }
+    // (not where the outside of the main straight is the pit complex: two of them stood in the middle of the pit lane)
+    const inPits = (x, z) => x > VP_PIT.garX[0] - 4 && x < VP_PIT.wallX + 4 && z > VP_PIT.lane[0] - 20 && z < VP_PIT.lane[1] + 20;
+    for (let k = 0; k < N2; k += 120) { const p = T.pts[k], nl = T.nl[k], o = offL(k) + 4; const x = p[0] + nl[0] * o, z = p[1] + nl[1] * o; if (vpLand(x, z) && !inPits(x, z)) this._det(B.track, 'box', x, Y + 1.3, z, 2.4, 2.6, 2.4, C(0xf2f2f2), 0, true); }
     // ---------------------------------------------------------------- the police impound's Valen Point annex
     const ab = this._vpBlock('annex', VP_SITE.annex.ox, VP_SITE.annex.oz, 60, IMPOUND.annex.name);
     this._genImpoundOverflow(ab, new RNG(9137), IMPOUND.annex, { side: 's', offMap: true });

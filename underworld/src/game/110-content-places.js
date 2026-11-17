@@ -416,6 +416,8 @@ Object.assign(World.prototype, {
     this._genIsland();
     // (the roads that leave the city cross its promenade: the ground shader paints them from the local-roads raster)
     this._buildLocalRaster();
+    // (the benches turn to the walk or street they sit on, read from the roads where the city now stands)
+    for (const b of this.blocks) this._faceBenches(b);
     this._placesGen();
     // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)

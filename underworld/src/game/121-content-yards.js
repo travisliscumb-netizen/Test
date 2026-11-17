@@ -222,7 +222,10 @@ Object.assign(World.prototype, {
       // ---- the front: porch posts and a lamp, the house number, flower beds, a path, the bins
       const door = h.inner, Ff = { o: [door.x, door.z], u, v: [f[0], f[1]], y: CURB_H };
       const doorA = (door.x - cx) * u[0] + (door.z - cz) * u[1];
-      for (const s of [-1.12, 1.12]) this._ybox(b, Ff, s, 1.62, 0.24, 0.14, 2.36, 0.14, 0xf0eee8, true);
+      // (the porch posts only where the porch stands on the house's own ground: a house whose door opens onto a lane
+      // gets its lamp and number, not posts in the lane)
+      if ([-1.12, 1.12].every(s => { const [x, z] = this._yw(Ff, s, 1.62); return rd(x, z) > 0.3 && !drives.some(r => x > r.x0 - 0.2 && x < r.x1 + 0.2 && z > r.z0 - 0.2 && z < r.z1 + 0.2); }))
+        for (const s of [-1.12, 1.12]) this._ybox(b, Ff, s, 1.62, 0.24, 0.14, 2.36, 0.14, 0xf0eee8, true);
       this._ybox(b, Ff, 0.86, 0.06, 1.8, 0.16, 0.26, 0.1, 0x2a2c30); this._ybox(b, Ff, 0.86, 0.12, 1.84, 0.1, 0.16, 0.05, 0xffe6a0);
       this._ybox(b, Ff, -0.86, 0.06, 1.55, 0.36, 0.16, 0.03, 0x2a2c30); this._ybox(b, Ff, -0.86, 0.075, 1.58, 0.26, 0.08, 0.02, 0xf2f2ee);
       // flower beds along the front wall, either side of the porch, as far as the ground is free
@@ -307,10 +310,13 @@ Object.assign(World.prototype, {
         const edge = Math.min(Math.abs(e[0] - E.x0), Math.abs(e[0] - E.x1), Math.abs(e[1] - E.z0), Math.abs(e[1] - E.z1));
         if (edge > 4) continue;
         const l = Math.hypot(e[0] - pr[0], e[1] - pr[1]) || 1, tx = (e[0] - pr[0]) / l, tz = (e[1] - pr[1]) / l;
-        for (const side of [1, -1]) {
-          const x = e[0] - tx * 3 + -tz * side * (R.w / 2 + 0.9), z = e[1] - tz * 3 + tx * side * (R.w / 2 + 0.9);
-          if (!clear(x, z)) continue;
-          this._stopSign(at(x, z), x, CURB_H, z, tx, tz, true); break;
+        // back from the junction until the post stands clear of every road (a local road's end can reach well into the
+        // street it joins: 3 m short of it left some posts standing in the street)
+        let done = false;
+        for (let back = 3; back <= 20 && !done; back += 0.5) for (const side of [1, -1]) {
+          const x = e[0] - tx * back + -tz * side * (R.w / 2 + 0.9), z = e[1] - tz * back + tx * side * (R.w / 2 + 0.9);
+          if (!clear(x, z) || RoadNet.roadAt(x, z) || this._roadDist(x, z) < 0.6) continue;
+          this._stopSign(at(x, z), x, CURB_H, z, tx, tz, true); done = true; break;
         }
       }
       // manhole covers down the middle, drains at the kerb

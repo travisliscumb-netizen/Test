@@ -647,6 +647,8 @@ Object.assign(World.prototype, {
     this._bake();
     this._nameApart();
     this._genPerimeter();
+    // (and once more where the city stands: a landmark's building and a street lamp can only meet after the bake)
+    for (const b of this.blocks) this._pruneBuried(b);
     this._registerCityCols();
     // the passes over the built city work where it stands (block-relative, or through CityLayout)
     this._postGen();

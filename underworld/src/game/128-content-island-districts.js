@@ -34,7 +34,7 @@ const ISLE_DISTRICT_ROADS = [
   { id: 'p1', name: 'Quay Road', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-1000, 1520], [-1080, 1500], [-1140, 1440], [-1162, 1340], [-1150, 1250]] },
   { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] },
   // to Valen Field, the villa's airstrip on the west coast
-  { id: 'x1', name: 'Airfield Road', w: 9, grade: 0.09, ends: ['h3', 'ring'], ring: 14, pts: [[-742, -640], [-860, -690], [-1000, -760], [-1120, -850], [-1210, -925], [-1285, -962]] }
+  { id: 'x1', name: 'Airfield Road', w: 9, grade: 0.09, ends: ['h3', 'ring'], ring: 14, pts: [[-742, -640], [-860, -690], [-1000, -760], [-1120, -850], [-1200, -915], [-1255, -965], [-1290, -968]] }
 ];
 ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // with the city round the bay (021 'island'): Crestmoor Heights takes the bay's north shore, so Bayview Crescent gives
@@ -59,7 +59,7 @@ const ISLE_INFILL_ROADS = [
   // Avenue up from the core, Ferry Street from the Old Quarter, Pier Road out to the north shore
   { after: 'p2', id: 'd1', name: 'Harbour Boulevard', w: 12, grade: 0.07, ends: ['lat', 'n1e'], pts: [[794, 120], [700, 118], [600, 112], [500, 100], [400, 82], [330, 58], [300, 40]] },
   { after: 'p2', id: 'd2', name: 'Midtown Avenue', w: 11, grade: 0.07, ends: ['lat', 'd1'], pts: [[600, 314], [600, 250], [598, 180], [600, 112]] },
-  { after: 'p2', id: 'd3', name: 'Ferry Street', w: 9, grade: 0.08, ends: ['lat', 'n1e'], pts: [[120, 314], [120, 240], [125, 140], [140, 40], [170, -40], [200, -100]] },
+  { after: 'p2', id: 'd3', name: 'Ferry Street', w: 9, grade: 0.08, ends: ['lat', 'n1e'], pts: [[120, 314], [120, 240], [125, 140], [140, 40], [160, -10], [175, -52]] },
   { after: 'p2', id: 'd4', name: 'Pier Road', w: 9, grade: 0.08, ends: ['d1', 'ring'], ring: 14, pts: [[500, 100], [502, 40], [506, -20], [512, -70]] },
   { after: 'p2', id: 'g5', name: 'Wharf Lane', w: 9, grade: 0.08, ends: ['s1', 'lat'], pts: [[694, 760], [730, 767], [770, 775], [794, 778]] }
 ];
@@ -357,7 +357,7 @@ Object.assign(World.prototype, {
         const a = R.pts[Math.max(0, k - 1)], c = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = (c[1] - a[1]) / l * side, nz = -(c[0] - a[0]) / l * side;
         const x = R.pts[k][0] + nx * (R.w / 2 + 1.6), z = R.pts[k][1] + nz * (R.w / 2 + 1.6), y = R.y[k];
         side = -side;
-        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || (x > V.x0 && x < V.x1 && z > V.z0 && z < V.z1)) continue;
+        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || (x > V.x0 && x < V.x1 && z > V.z0 && z < V.z1) || !roadClearPt(x, z, R)) continue;
         const B = own.reduce((m, q) => Math.hypot(q.cx - x, q.cz - z) < Math.hypot(m.cx - x, m.cz - z) ? q : m);
         cyl(B.b, x, y + 3.2, z, 0.11, 6.4, 0x3a3f45, true);
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
@@ -454,12 +454,12 @@ Object.assign(World.prototype, {
     box(b, -1310, y + 1.1, -944, 2.4, 2.2, 1.4, 0xc8102e, true); box(b, -1310, y + 2.35, -944, 2.6, 0.3, 1.6, 0x2a2c30, false);
     cyl(b, -1230, y + 3.5, -1040, 0.08, 7, 0xd8d8d8, true); const ws = this._det(b, 'cone', -1229, y + 6.6, -1040, 0.45, 2.4, 0.45, C(0xff7a1a)); ws.rz = Math.PI / 2;
     for (const x of [-1990, -1970]) box(b, x, y + 0.6, R.z, 1.2, 1.2, 40, 0x9a9c98, false);
-    // the helipad by the lounge: a ring and an H
-    this._det(b, 'disc', -1228, y + 0.05, -958, 10, 1, 10, C(0x3a3d42)); this._det(b, 'disc', -1228, y + 0.06, -958, 8.6, 1, 8.6, C(0x2c2e33)); for (const s2 of [-1, 1]) flat(-1228 + s2 * 2.2, -958, 0.8, 6, 0xf2c94c, 0.07); flat(-1228, -958, 4.4, 0.8, 0xf2c94c, 0.07);
+    // the helipad west of the hangar: a ring and an H
+    this._det(b, 'disc', -1546, y + 0.05, -950, 10, 1, 10, C(0x3a3d42)); this._det(b, 'disc', -1546, y + 0.06, -950, 8.6, 1, 8.6, C(0x2c2e33)); for (const s2 of [-1, 1]) flat(-1546 + s2 * 2.2, -950, 0.8, 6, 0xf2c94c, 0.07); flat(-1546, -950, 4.4, 0.8, 0xf2c94c, 0.07);
     // the place, the aircraft on the apron, a fuel truck, the ground crew
     b.place = { id: 'valen_field', name: F.name, kind: 'landmark', door: { x: -1273, z: -958, h: Math.PI }, under: { x: -1273, z: -940 } };
     this.mapPlaces.push({ id: 'valen_field', name: F.name, cat: 'landmark', icon: '✈', x: cx, z: R.z, sub: 'Villa Valen’s private airstrip: a jet, a twin and a helicopter' });
-    fleet('field_air', -1400, -980, 520, [{ x: -1460, z: -962, h: Math.PI, y, cls: 'meridian' }, { x: -1400, z: -962, h: Math.PI, y, cls: 'corsair' }, { x: -1340, z: -962, h: Math.PI, y, cls: 'skylark' }, { x: -1228, z: -958, h: Math.PI, y, cls: 'aurelia' }, { x: -1318, z: -942, h: -Math.PI / 2, y, cls: 'utility' }]);
+    fleet('field_air', -1400, -980, 520, [{ x: -1460, z: -962, h: Math.PI, y, cls: 'meridian' }, { x: -1400, z: -962, h: Math.PI, y, cls: 'corsair' }, { x: -1340, z: -962, h: Math.PI, y, cls: 'skylark' }, { x: -1546, z: -950, h: Math.PI, y, cls: 'aurelia' }, { x: -1318, z: -942, h: -Math.PI / 2, y, cls: 'utility' }]);
     this.isle.fleet.push({ id: 'folk_field', x: -1400, z: -960, r: 0, slots: [], people: [[-1275, -957, Math.PI], [-1312, -948, 0.4], [-1455, -975, 2.2]] });
     this.isle.field = F;
   },

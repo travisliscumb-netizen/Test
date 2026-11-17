@@ -33555,7 +33555,7 @@ const ISLE_ROAD_LAYOUT = {
     // streets carry it through
     n1: { ends: ['lat', 'lat'], pts: [[-646, -360], [-700, -342], [-860, -300], [-1180, -380], [-1500, -640], [-1740, -950], [-1930, -1250], [-1900, -1560], [-1740, -1850], [-1470, -2130], [-1060, -2400], [-560, -2700], [-60, -2790], [450, -2700], [960, -2490], [1460, -2500], [1960, -2320], [2280, -1940], [2400, -1450], [2180, -950], [1900, -600], [1520, -430], [1160, -330], [930, -230], [845, -110], [840, -60], [840, -6]] },
     // ... and on from Greenway's east street across Midtown to the core's north street
-    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[-154, -280], [-90, -276], [-10, -270], [90, -200], [200, -100], [300, 40], [350, 200], [360, 314]] }],
+    add: [{ after: 'n1', id: 'n1e', name: 'Coast Highway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[-154, -280], [-90, -276], [-10, -270], [90, -200], [126, -150], [132, -90], [200, -30], [300, 40], [350, 200], [360, 314]] }], // (round the fire station's west side, past its doors: it ran through the station)
     n2: { ends: ['n1e', 'ring'] },
     // the Southshore Highway's east end comes up to the core's south street over the ground the square left
     s1: { pts: [[40, 966], [40, 984], [34, 1002], [20, 1016], [-2, 1023], [-28, 1025], [-55, 1034], [-76, 1056], [-90, 1090], [-100, 1150], [-104, 1230], [-110, 1420], [-60, 1580], [80, 1680], [330, 1722], [600, 1716], [735, 1620], [762, 1420], [752, 1240], [742, 1150], [728, 1040], [712, 900], [694, 760], [682, 680], [680, 646]] },
@@ -37066,6 +37066,8 @@ class World {
     }
     // the houses' yards and fronts (121), once every house, drive and lane stands
     for (const b of this.blocks) this._dressHomes(b);
+    // nothing left standing inside a building's walls (a yard's pallet or a street lamp a later building covered)
+    for (const b of this.blocks) this._pruneBuried(b);
     // (the perimeter is built where each precinct stands, after the bake: the generate wrapper in 100)
     this._buildLocalRaster();
     if (this._propSanity) this._propSanity();
@@ -37152,6 +37154,34 @@ class World {
     else if (col) d.col = col;
     b.det.push(d);
     return d;
+  }
+  // a prop whose foot is inside a building at ground level is removed (it could not be seen or reached)
+  _pruneBuried(b) {
+    const keep = [];
+    for (const p of b.props) {
+      const inside = b.bld.some(r => !r.hollow && (r.y0 === undefined || r.y0 <= CURB_H + 1.0) && p.x > r.x0 + 0.15 && p.x < r.x1 - 0.15 && p.z > r.z0 + 0.15 && p.z < r.z1 - 0.15);
+      if (!inside) { keep.push(p); continue; }
+      const L = this.propTypes[p.type], i = L ? L.indexOf(p) : -1; if (i >= 0) L.splice(i, 1);
+    }
+    b.props = keep;
+  }
+  // a bench faces the nearest walk or street: one with a path or a road closer behind it than in front of it (within
+  // 4 m) is turned round. Where the city stands (after the bake), through the same lattice streets and local-road
+  // raster the game drives on
+  _faceBenches(b) {
+    const on = (x, z) => isOnRoad(x, z) || localRoadAt(x, z);
+    for (const p of b.props) {
+      if (p.type !== 'bench') continue;
+      const fx = Math.sin(p.ry), fz = Math.cos(p.ry);
+      let front = Infinity, back = Infinity;
+      for (let r = 0.5; r <= 4; r += 0.5) {
+        if (front === Infinity && on(p.x + fx * r, p.z + fz * r)) front = r;
+        if (back === Infinity && on(p.x - fx * r, p.z - fz * r)) back = r;
+      }
+      if (back < front) {
+        p.ry += Math.PI; const seat = b.seats.find(s => Math.abs(s.x - p.x) < 0.01 && Math.abs(s.z - p.z) < 0.01); if (seat) seat.ry = p.ry;
+      }
+    }
   }
   _prop(b, type, x, z, ry = 0, s = 1) {
     const p = { type, x, z, ry, s, id: this.totalProps++, broken: false, block: b.i };
@@ -37318,7 +37348,8 @@ class World {
         if (o.trees && r < o.trees && sl % 8 === 4) { const [x, z] = at(sl, 7.3); this._prop(b, o.palms ? 'pine' : 'tree', x, z, rng.range(0, 6), rng.range(0.85, 1.15)); continue; }
         if (!hyd && r > 0.9) { const [x, z] = at(sl, 6.55); this._prop(b, 'hydrant', x, z, s.ry); hyd = true; continue; }
         if (r > 0.8) { const [x, z] = at(sl, 6.9); this._prop(b, 'bin', x, z, 0); continue; }
-        if (o.benches && r > 0.7 && r < 0.78) { const [x, z] = at(sl, 9.45); this._prop(b, 'bench', x, z, s.ry + Math.PI); b.seats.push({ x, z, ry: s.ry + Math.PI }); continue; }
+        // (a bench at the back of the pavement faces the street, its back to the buildings)
+        if (o.benches && r > 0.7 && r < 0.78) { const [x, z] = at(sl, 9.45); this._prop(b, 'bench', x, z, s.ry); b.seats.push({ x, z, ry: s.ry }); continue; }
         if (o.news && r > 0.66 && r < 0.7) { const [x, z] = at(sl, 9.4); this._prop(b, 'newsbox', x, z, s.ry); continue; }
       }
       if (o.busStop && si === rng.int(0, 3)) { const [x, z] = at(30, 9.1); this._prop(b, 'busstop', x, z, s.ry); b.seats.push({ x, z, ry: s.ry }); }
@@ -38532,6 +38563,8 @@ Object.assign(World.prototype, {
     this._bake();
     this._nameApart();
     this._genPerimeter();
+    // (and once more where the city stands: a landmark's building and a street lamp can only meet after the bake)
+    for (const b of this.blocks) this._pruneBuried(b);
     this._registerCityCols();
     // the passes over the built city work where it stands (block-relative, or through CityLayout)
     this._postGen();
@@ -38958,6 +38991,8 @@ Object.assign(World.prototype, {
     this._genIsland();
     // (the roads that leave the city cross its promenade: the ground shader paints them from the local-roads raster)
     this._buildLocalRaster();
+    // (the benches turn to the walk or street they sit on, read from the roads where the city now stands)
+    for (const b of this.blocks) this._faceBenches(b);
     this._placesGen();
     // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
@@ -40326,7 +40361,10 @@ Object.assign(World.prototype, {
       // ---- the front: porch posts and a lamp, the house number, flower beds, a path, the bins
       const door = h.inner, Ff = { o: [door.x, door.z], u, v: [f[0], f[1]], y: CURB_H };
       const doorA = (door.x - cx) * u[0] + (door.z - cz) * u[1];
-      for (const s of [-1.12, 1.12]) this._ybox(b, Ff, s, 1.62, 0.24, 0.14, 2.36, 0.14, 0xf0eee8, true);
+      // (the porch posts only where the porch stands on the house's own ground: a house whose door opens onto a lane
+      // gets its lamp and number, not posts in the lane)
+      if ([-1.12, 1.12].every(s => { const [x, z] = this._yw(Ff, s, 1.62); return rd(x, z) > 0.3 && !drives.some(r => x > r.x0 - 0.2 && x < r.x1 + 0.2 && z > r.z0 - 0.2 && z < r.z1 + 0.2); }))
+        for (const s of [-1.12, 1.12]) this._ybox(b, Ff, s, 1.62, 0.24, 0.14, 2.36, 0.14, 0xf0eee8, true);
       this._ybox(b, Ff, 0.86, 0.06, 1.8, 0.16, 0.26, 0.1, 0x2a2c30); this._ybox(b, Ff, 0.86, 0.12, 1.84, 0.1, 0.16, 0.05, 0xffe6a0);
       this._ybox(b, Ff, -0.86, 0.06, 1.55, 0.36, 0.16, 0.03, 0x2a2c30); this._ybox(b, Ff, -0.86, 0.075, 1.58, 0.26, 0.08, 0.02, 0xf2f2ee);
       // flower beds along the front wall, either side of the porch, as far as the ground is free
@@ -40411,10 +40449,13 @@ Object.assign(World.prototype, {
         const edge = Math.min(Math.abs(e[0] - E.x0), Math.abs(e[0] - E.x1), Math.abs(e[1] - E.z0), Math.abs(e[1] - E.z1));
         if (edge > 4) continue;
         const l = Math.hypot(e[0] - pr[0], e[1] - pr[1]) || 1, tx = (e[0] - pr[0]) / l, tz = (e[1] - pr[1]) / l;
-        for (const side of [1, -1]) {
-          const x = e[0] - tx * 3 + -tz * side * (R.w / 2 + 0.9), z = e[1] - tz * 3 + tx * side * (R.w / 2 + 0.9);
-          if (!clear(x, z)) continue;
-          this._stopSign(at(x, z), x, CURB_H, z, tx, tz, true); break;
+        // back from the junction until the post stands clear of every road (a local road's end can reach well into the
+        // street it joins: 3 m short of it left some posts standing in the street)
+        let done = false;
+        for (let back = 3; back <= 20 && !done; back += 0.5) for (const side of [1, -1]) {
+          const x = e[0] - tx * back + -tz * side * (R.w / 2 + 0.9), z = e[1] - tz * back + tx * side * (R.w / 2 + 0.9);
+          if (!clear(x, z) || RoadNet.roadAt(x, z) || this._roadDist(x, z) < 0.6) continue;
+          this._stopSign(at(x, z), x, CURB_H, z, tx, tz, true); done = true; break;
         }
       }
       // manhole covers down the middle, drains at the kerb
@@ -40804,7 +40845,9 @@ Object.assign(World.prototype, {
     this._det(B.pad, 'cyl', VP_SITE.ring.x, Y + 0.25, VP_SITE.ring.z, 6, 0.5, 0x6f8a5a, null, { x: VP_SITE.ring.x, z: VP_SITE.ring.z, r: 6, y0: -1, y1: 0.5, kind: 'det' });
     this._det(B.pad, 'cyl', VP_SITE.ring.x, Y + 3, VP_SITE.ring.z, 0.25, 6, 0x8c949c);
     // marshal posts round the circuit, outside the barriers
-    for (let k = 0; k < N2; k += 120) { const p = T.pts[k], nl = T.nl[k], o = offL(k) + 4; const x = p[0] + nl[0] * o, z = p[1] + nl[1] * o; if (vpLand(x, z)) this._det(B.track, 'box', x, Y + 1.3, z, 2.4, 2.6, 2.4, C(0xf2f2f2), 0, true); }
+    // (not where the outside of the main straight is the pit complex: two of them stood in the middle of the pit lane)
+    const inPits = (x, z) => x > VP_PIT.garX[0] - 4 && x < VP_PIT.wallX + 4 && z > VP_PIT.lane[0] - 20 && z < VP_PIT.lane[1] + 20;
+    for (let k = 0; k < N2; k += 120) { const p = T.pts[k], nl = T.nl[k], o = offL(k) + 4; const x = p[0] + nl[0] * o, z = p[1] + nl[1] * o; if (vpLand(x, z) && !inPits(x, z)) this._det(B.track, 'box', x, Y + 1.3, z, 2.4, 2.6, 2.4, C(0xf2f2f2), 0, true); }
     // ---------------------------------------------------------------- the police impound's Valen Point annex
     const ab = this._vpBlock('annex', VP_SITE.annex.ox, VP_SITE.annex.oz, 60, IMPOUND.annex.name);
     this._genImpoundOverflow(ab, new RNG(9137), IMPOUND.annex, { side: 's', offMap: true });
@@ -41081,7 +41124,8 @@ Object.assign(World.prototype, {
    Valen Point's.
    ===================================================================== */
 // Crestmoor Ridge: [x, z, the side the forecourt faces] along Mount Valen Road's first leg
-const ISLE_MANSIONS = [[-150, -518, 'e'], [-58, -452, 'w'], [30, -628, 's'], [50, -536, 'n'], [232, -644, 's'], [238, -550, 'n'], [395, -646, 's'], [392, -551, 'n']];
+// (three stand 18 m further from Mount Valen Road than they did: its cutting reached under their houses)
+const ISLE_MANSIONS = [[-150, -518, 'e'], [-58, -452, 'w'], [27, -646, 's'], [50, -536, 'n'], [235, -662, 's'], [236, -532, 'n'], [395, -646, 's'], [392, -551, 'n']];
 // Saltmarsh: houses either side of the bay road (x, side: -1 the bay side, 1 the landward side)
 const ISLE_SALTMARSH = [-322, -392, -462, -532, -602, -672];
 const ISLE_GULL = [[-1389, -2230], [-1328, -2271], [-1266, -2311], [-1205, -2352], [-1304, -2191], [-1202, -2259]];
@@ -41114,6 +41158,21 @@ Object.assign(World.prototype, {
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
+    // the mansions' plots are levelled again, last, so no later level ground (a precinct's edge, a lot) eats into them;
+    // a plot that overlaps a precinct's own edge cannot have both, and is left unbuilt
+    for (const m of mans) {
+      const near = CityLayout.precincts.some(p => m.x + 25 + 28 > p.x0 - EDGE_MARGIN && m.x - 25 - 28 < p.x1 + EDGE_MARGIN && m.z + 22 + 28 > p.z0 - EDGE_MARGIN && m.z - 22 - 28 < p.z1 + EDGE_MARGIN);
+      const i = Island.pads.indexOf(m.P); if (i >= 0) Island.pads.splice(i, 1);
+      if (near) m.skip = true; else Island.pads.push(m.P);
+    }
+    // the fire station: where Midtown's level ground comes up to it (the island layout) Midtown's pad, laid later, took
+    // its level away and the building stood in the air. It is levelled again, last, at the height the Coast Highway has
+    // as it passes the doors (the highway comes down toward Midtown at 7%), with a short bank down to Midtown
+    {
+      const F = ISLE_FIRE, i = Island.pads.indexOf(fireP);
+      const infillNear = (ISLE_INFILL[CityLayout.id] || []).some(Q => Q.pads.some(r => r[0] < F.x1 + 70 && r[2] > F.x0 - 70 && r[1] < F.z1 + 70 && r[3] > F.z0 - 70));
+      if (i >= 0 && infillNear) { Island.pads.splice(i, 1); fireP.y = 6; fireP.blend = 12; Island.pads.push(fireP); }
+    }
     // a shallow ditch either side of the old land bridge, so its embankment (027's own ground) stands proud of the fields
     Island.addPad(CFS.lb.x - CFS.lb.half - 1, CFS_EDGE + EDGE_MARGIN, CFS.lb.x + CFS.lb.half + 1, CFS.z0, -0.45, 6);
     Island.buildRoads();
@@ -41245,6 +41304,9 @@ Object.assign(World.prototype, {
       this._bld(b, F.x0 + 22, F.z0 + 6, F.x1 - 6, F.z1 - 8, 9, STYLE.BRICK, 0xa63a2e, 4.5, 5, { exactH: true, y0: y, oy: y });
       this._bld(b, F.x1 - 16, F.z1 - 20, F.x1 - 6, F.z1 - 8, 19, STYLE.BRICK, 0x8f3026, 3.8, 3.3, { exactH: true, y0: y, oy: y });
       for (let k = 0; k < 3; k++) box(b, F.x0 + 21.9, y + 2.4, F.z0 + 14 + k * 13, 0.12, 4.8, 9, 0x2a2e33, false);
+      // the apron in front of the doors, with a red line along each bay
+      box(b, F.x0 + 11, y + 0.03, (F.z0 + F.z1) / 2, 22, 0.06, F.z1 - F.z0 - 8, 0x9a9c98, false);
+      for (let k = 0; k < 3; k++) for (const s2 of [-1, 1]) box(b, F.x0 + 11, y + 0.065, F.z0 + 14 + k * 13 + s2 * 4.6, 20, 0.01, 0.2, 0xc8102e, false);
       b.signs.push({ text: 'PORT VALEN FIRE DEPT · STATION 1', x: F.x0 + 21.85, y: y + 7.3, z: (F.z0 + F.z1) / 2 - 1, ry: -Math.PI / 2, w: 26, h: 1.4, bg: '#a01818', fg: '#ffd84d' });
       b.place = { id: 'firehouse', name: 'Fire Station No. 1', kind: 'landmark', door: { x: F.x0 + 20.6, z: F.z1 - 14, h: -Math.PI / 2 }, under: { x: F.x0 + 40, z: (F.z0 + F.z1) / 2 } };
       fleet('firehouse', 160, -127, 260, [{ x: F.x0 + 11, z: F.z0 + 14, h: -Math.PI / 2, cls: 'firetruck' }, { x: F.x0 + 11, z: F.z0 + 27, h: -Math.PI / 2, cls: 'firetruck' }, { x: F.x0 + 11, z: F.z0 + 40, h: -Math.PI / 2, cls: 'ambulance' }]);
@@ -41253,6 +41315,13 @@ Object.assign(World.prototype, {
     {
       const cars = ['luxury', 'kodiak', 'sports', 'monarch', 'suv', 'crest', 'luxury', 'tempest'];
       mans.forEach((m, i) => {
+        // the house stands on its plot's ground as it ends up (the city's own level grounds, laid after the plots, can
+        // take a plot's level away: one stood 23 m over its lawn); a plot left on a slope is not built on
+        if (m.skip) return;
+        // (and, should anything still have moved its ground, the house is not built floating or buried)
+        const gs = [[0, 0], [-13, -11], [13, -11], [-13, 11], [13, 11]].map(([dx, dz]) => Island.height(m.x + dx, m.z + dz));
+        if (Math.max(...gs) - Math.min(...gs) > 1.5) return;
+        m.P.y = gs[0];
         const y = m.P.y, b = this._isleBlock('mansion' + i, m.x, m.z, 46, 'Crestmoor Ridge'), f = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[m.f], along = f[0] ? 'z' : 'x';
         const wall = [0xf2ede2, 0xe8e0d0, 0xdcd6cc, 0xf4f1ea][i % 4], roof = [0x8a4a34, 0x3a4652, 0x5a4a3a, 0x7a3a2e][i % 4];
         // the house is set back from the forecourt: a two-storey block, a wing, a garage beside the drive
@@ -41269,7 +41338,9 @@ Object.assign(World.prototype, {
           else for (const s of [-1, 1]) box(b, ex + (sx > sz ? s * 15.5 : 0), y + 0.7, ez + (sz > sx ? s * 13.5 : 0), sx > sz ? 18 : sx, 1.4, sz > sx ? 16 : sz, 0x35602c, true);
         }
         const fx = m.x + f[0] * 15, fz = m.z + f[1] * 13, h = Math.atan2(f[0], f[1]);
-        fleet('mansion' + i, m.x, m.z, 230, [{ x: fx + (along === 'x' ? -4.5 : 0), z: fz + (along === 'z' ? -4.5 : 0), h, y, cls: cars[i] }, { x: fx + (along === 'x' ? 4.5 : 0), z: fz + (along === 'z' ? 4.5 : 0), h, y, cls: cars[(i + 3) % 8] }]);
+        // (a car parks only where the forecourt is level: a road's cutting can take the edge of it)
+        const level = (x, z) => Math.abs(Island.height(x, z) - y) < 0.4 && Math.abs(Island.height(x + 2.5, z) - Island.height(x - 2.5, z)) < 0.6 && Math.abs(Island.height(x, z + 2.5) - Island.height(x, z - 2.5)) < 0.6;
+        fleet('mansion' + i, m.x, m.z, 230, [{ x: fx + (along === 'x' ? -4.5 : 0), z: fz + (along === 'z' ? -4.5 : 0), h, y, cls: cars[i] }, { x: fx + (along === 'x' ? 4.5 : 0), z: fz + (along === 'z' ? 4.5 : 0), h, y, cls: cars[(i + 3) % 8] }].filter(q => level(q.x, q.z)));
       });
     }
     // ================================================================ SALTMARSH (the bay's south shore) and its jetty
@@ -41404,7 +41475,7 @@ const ISLE_DISTRICT_ROADS = [
   { id: 'p1', name: 'Quay Road', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-1000, 1520], [-1080, 1500], [-1140, 1440], [-1162, 1340], [-1150, 1250]] },
   { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] },
   // to Valen Field, the villa's airstrip on the west coast
-  { id: 'x1', name: 'Airfield Road', w: 9, grade: 0.09, ends: ['h3', 'ring'], ring: 14, pts: [[-742, -640], [-860, -690], [-1000, -760], [-1120, -850], [-1210, -925], [-1285, -962]] }
+  { id: 'x1', name: 'Airfield Road', w: 9, grade: 0.09, ends: ['h3', 'ring'], ring: 14, pts: [[-742, -640], [-860, -690], [-1000, -760], [-1120, -850], [-1200, -915], [-1255, -965], [-1290, -968]] }
 ];
 ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // with the city round the bay (021 'island'): Crestmoor Heights takes the bay's north shore, so Bayview Crescent gives
@@ -41429,7 +41500,7 @@ const ISLE_INFILL_ROADS = [
   // Avenue up from the core, Ferry Street from the Old Quarter, Pier Road out to the north shore
   { after: 'p2', id: 'd1', name: 'Harbour Boulevard', w: 12, grade: 0.07, ends: ['lat', 'n1e'], pts: [[794, 120], [700, 118], [600, 112], [500, 100], [400, 82], [330, 58], [300, 40]] },
   { after: 'p2', id: 'd2', name: 'Midtown Avenue', w: 11, grade: 0.07, ends: ['lat', 'd1'], pts: [[600, 314], [600, 250], [598, 180], [600, 112]] },
-  { after: 'p2', id: 'd3', name: 'Ferry Street', w: 9, grade: 0.08, ends: ['lat', 'n1e'], pts: [[120, 314], [120, 240], [125, 140], [140, 40], [170, -40], [200, -100]] },
+  { after: 'p2', id: 'd3', name: 'Ferry Street', w: 9, grade: 0.08, ends: ['lat', 'n1e'], pts: [[120, 314], [120, 240], [125, 140], [140, 40], [160, -10], [175, -52]] },
   { after: 'p2', id: 'd4', name: 'Pier Road', w: 9, grade: 0.08, ends: ['d1', 'ring'], ring: 14, pts: [[500, 100], [502, 40], [506, -20], [512, -70]] },
   { after: 'p2', id: 'g5', name: 'Wharf Lane', w: 9, grade: 0.08, ends: ['s1', 'lat'], pts: [[694, 760], [730, 767], [770, 775], [794, 778]] }
 ];
@@ -41727,7 +41798,7 @@ Object.assign(World.prototype, {
         const a = R.pts[Math.max(0, k - 1)], c = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = (c[1] - a[1]) / l * side, nz = -(c[0] - a[0]) / l * side;
         const x = R.pts[k][0] + nx * (R.w / 2 + 1.6), z = R.pts[k][1] + nz * (R.w / 2 + 1.6), y = R.y[k];
         side = -side;
-        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || (x > V.x0 && x < V.x1 && z > V.z0 && z < V.z1)) continue;
+        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || (x > V.x0 && x < V.x1 && z > V.z0 && z < V.z1) || !roadClearPt(x, z, R)) continue;
         const B = own.reduce((m, q) => Math.hypot(q.cx - x, q.cz - z) < Math.hypot(m.cx - x, m.cz - z) ? q : m);
         cyl(B.b, x, y + 3.2, z, 0.11, 6.4, 0x3a3f45, true);
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
@@ -41824,12 +41895,12 @@ Object.assign(World.prototype, {
     box(b, -1310, y + 1.1, -944, 2.4, 2.2, 1.4, 0xc8102e, true); box(b, -1310, y + 2.35, -944, 2.6, 0.3, 1.6, 0x2a2c30, false);
     cyl(b, -1230, y + 3.5, -1040, 0.08, 7, 0xd8d8d8, true); const ws = this._det(b, 'cone', -1229, y + 6.6, -1040, 0.45, 2.4, 0.45, C(0xff7a1a)); ws.rz = Math.PI / 2;
     for (const x of [-1990, -1970]) box(b, x, y + 0.6, R.z, 1.2, 1.2, 40, 0x9a9c98, false);
-    // the helipad by the lounge: a ring and an H
-    this._det(b, 'disc', -1228, y + 0.05, -958, 10, 1, 10, C(0x3a3d42)); this._det(b, 'disc', -1228, y + 0.06, -958, 8.6, 1, 8.6, C(0x2c2e33)); for (const s2 of [-1, 1]) flat(-1228 + s2 * 2.2, -958, 0.8, 6, 0xf2c94c, 0.07); flat(-1228, -958, 4.4, 0.8, 0xf2c94c, 0.07);
+    // the helipad west of the hangar: a ring and an H
+    this._det(b, 'disc', -1546, y + 0.05, -950, 10, 1, 10, C(0x3a3d42)); this._det(b, 'disc', -1546, y + 0.06, -950, 8.6, 1, 8.6, C(0x2c2e33)); for (const s2 of [-1, 1]) flat(-1546 + s2 * 2.2, -950, 0.8, 6, 0xf2c94c, 0.07); flat(-1546, -950, 4.4, 0.8, 0xf2c94c, 0.07);
     // the place, the aircraft on the apron, a fuel truck, the ground crew
     b.place = { id: 'valen_field', name: F.name, kind: 'landmark', door: { x: -1273, z: -958, h: Math.PI }, under: { x: -1273, z: -940 } };
     this.mapPlaces.push({ id: 'valen_field', name: F.name, cat: 'landmark', icon: '✈', x: cx, z: R.z, sub: 'Villa Valen’s private airstrip: a jet, a twin and a helicopter' });
-    fleet('field_air', -1400, -980, 520, [{ x: -1460, z: -962, h: Math.PI, y, cls: 'meridian' }, { x: -1400, z: -962, h: Math.PI, y, cls: 'corsair' }, { x: -1340, z: -962, h: Math.PI, y, cls: 'skylark' }, { x: -1228, z: -958, h: Math.PI, y, cls: 'aurelia' }, { x: -1318, z: -942, h: -Math.PI / 2, y, cls: 'utility' }]);
+    fleet('field_air', -1400, -980, 520, [{ x: -1460, z: -962, h: Math.PI, y, cls: 'meridian' }, { x: -1400, z: -962, h: Math.PI, y, cls: 'corsair' }, { x: -1340, z: -962, h: Math.PI, y, cls: 'skylark' }, { x: -1546, z: -950, h: Math.PI, y, cls: 'aurelia' }, { x: -1318, z: -942, h: -Math.PI / 2, y, cls: 'utility' }]);
     this.isle.fleet.push({ id: 'folk_field', x: -1400, z: -960, r: 0, slots: [], people: [[-1275, -957, Math.PI], [-1312, -948, 0.4], [-1455, -975, 2.2]] });
     this.isle.field = F;
   },
