@@ -35027,11 +35027,24 @@ class InputManager {
           q.x = t.clientX; q.y = t.clientY; this.lastLookInput = performance.now();
         }
       }, { passive: false });
+      // a thumb that slides from one held button onto another (Gas onto Brake, a helicopter's Up onto Down) lets go of
+      // the first and holds the second: the touch belonged to the button it started on, so the first stayed held (the
+      // helicopter climbed on, Down did nothing) until the thumb came off the glass. Off every button it keeps what it holds.
+      if (!btn.dataset.toggle && !btn.dataset.look) btn.addEventListener('touchmove', e => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+          const cur = this.touchActs.get(t.identifier); if (cur === undefined) continue;
+          const el = document.elementFromPoint(t.clientX, t.clientY), nb = el && el.closest ? el.closest('#touch .tbtn') : null;
+          if (!nb || nb.dataset.toggle || nb.dataset.look || nb.dataset.act === cur) continue;
+          this.touchActs.set(t.identifier, nb.dataset.act); this._releaseAct(cur);
+          this.down.add(nb.dataset.act); this.pressedSet.add(nb.dataset.act); nb.classList.add('on');
+        }
+      }, { passive: false });
+      // (a touch lets go of whatever it holds now: after a slide, not the button it started on)
       const end = e => {
         e.preventDefault();
-        for (const t of e.changedTouches) { this.touchActs.delete(t.identifier); this.btnLook.delete(t.identifier); }
-        let still = false; for (const v of this.touchActs.values()) if (v === act) still = true;
-        if (!still && !btn.dataset.toggle) { this.down.delete(act); btn.classList.remove('on'); }
+        if (btn.dataset.toggle) return;
+        for (const t of e.changedTouches) { const a = this.touchActs.get(t.identifier); this.touchActs.delete(t.identifier); this.btnLook.delete(t.identifier); this._releaseAct(a === undefined ? act : a); }
       };
       btn.addEventListener('touchend', end, { passive: false });
       btn.addEventListener('touchcancel', end, { passive: false });
@@ -35097,6 +35110,11 @@ class InputManager {
       if (!now && was) this.down.delete(map[k]);
       this.gp.prev[k] = now;
     }
+  }
+  // an action no touch holds any more is let go, and its buttons unlit
+  _releaseAct(a) {
+    for (const v of this.touchActs.values()) if (v === a) return;
+    this.down.delete(a); document.querySelectorAll(`#touch .tbtn[data-act="${a}"]:not([data-toggle])`).forEach(b => b.classList.remove('on'));
   }
   isDown(a) { return this.enabled && (this.down.has(a) || this.toggles.has(a)); }
   clearToggle(a) { if (!this.toggles.has(a)) return; this.toggles.delete(a); document.querySelectorAll(`#touch .tbtn[data-act="${a}"][data-toggle]`).forEach(b => b.classList.remove('on')); }
@@ -54446,7 +54464,7 @@ const PROPS = [
   { id: 'penthouse', name: 'Valen Tower Penthouse', kind: 'safehouse', price: 150000, place: 'tower', interior: 'penthouse', storage: 160, garage: 6, crew: 2, luxury: true, desc: 'The top of the tallest tower on the island. People notice who lives here.' },
   // Villa Valen (354, owner 2026-11-16): anyone can walk in from the start; bought at the gate, it is your home with a
   // twelve-car garage under the pavilion (VSPACE_DEFS.villa) and the bunker under the house
-  { id: 'villa', name: 'Villa Valen', kind: 'safehouse', tier: 6, type: 'Estate', price: 4500000, place: 'villa_valen', under: 12, storage: 600, garage: 0, crew: 6, luxury: true, desc: 'The island’s grandest estate at the head of Ridgeview Drive: a two-storey house with six bedrooms, a pool terrace, a helipad, a twelve-car garage under the pavilion and a bunker under it all. Nobody has lived here for years.' },
+  { id: 'villa', name: 'Villa Valen', kind: 'safehouse', tier: 6, type: 'Estate', price: 4500000, place: 'villa_valen', under: 12, storage: 600, garage: 0, crew: 6, luxury: true, anyRank: true, desc: 'The island’s grandest estate at the head of Ridgeview Drive: a two-storey house with six bedrooms, a pool terrace, a helipad, a twelve-car garage under the pavilion and a bunker under it all. Nobody has lived here for years.' },
   { id: 'qgarage', name: 'Quarter Garage Lock-ups', kind: 'garage', price: 8000, place: 'garageRoof', storage: 20, garage: 4, crew: 0, desc: 'Four lock-ups and a mechanic who doesn’t ask. Repairs, respray and tuning at cost.' },
   { id: 'docklock', name: 'Pier 9 Lock-up', kind: 'garage', price: 6000, at: [10, 9, 3, 30], storage: 60, garage: 2, crew: 0, desc: 'A rusted roll door near the water. Cheap, private and close to the boats.' },
   { id: 'whse_w', name: 'Cannery Row Warehouse', kind: 'warehouse', price: 32000, place: 'cannery', storage: 600, garage: 1, crew: 15, desc: 'Bulk storage. Enough room to sit on product until the price is right.' },
@@ -57671,7 +57689,8 @@ class PropertyManager {
     const price = this.price(def);
     if (!Money.can(price, 'property')) return `It costs ${fmtMoney(price)} from your bank (property is bought with Clean Bank).`;
     if (def.kind === 'business' && g.save.rep < 300 && def.price > 20000) return 'The owner won’t sell to an unknown. (300 Rep)';
-    if (def.luxury && uw.rank < 4) return `The building board turns you down. Come back when you’re somebody. (${RANKS[4].name})`;
+    // (Villa Valen's estate sells to whoever brings the money: its own cache, found from the start, buys it: the owner, 2026-11-17)
+    if (def.luxury && !def.anyRank && uw.rank < 4) return `The building board turns you down. Come back when you’re somebody. (${RANKS[4].name})`;
     if (g.police.level > 0) return 'Not with the police on you.';
     Money.pay(price, 'property');
     S.props[id] = { owned: true, dmg: 0, since: S.day, lvl: 1 };

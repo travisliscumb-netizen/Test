@@ -104,7 +104,8 @@ class PropertyManager {
     const price = this.price(def);
     if (!Money.can(price, 'property')) return `It costs ${fmtMoney(price)} from your bank (property is bought with Clean Bank).`;
     if (def.kind === 'business' && g.save.rep < 300 && def.price > 20000) return 'The owner won’t sell to an unknown. (300 Rep)';
-    if (def.luxury && uw.rank < 4) return `The building board turns you down. Come back when you’re somebody. (${RANKS[4].name})`;
+    // (Villa Valen's estate sells to whoever brings the money: its own cache, found from the start, buys it: the owner, 2026-11-17)
+    if (def.luxury && !def.anyRank && uw.rank < 4) return `The building board turns you down. Come back when you’re somebody. (${RANKS[4].name})`;
     if (g.police.level > 0) return 'Not with the police on you.';
     Money.pay(price, 'property');
     S.props[id] = { owned: true, dmg: 0, since: S.day, lvl: 1 };

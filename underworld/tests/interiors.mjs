@@ -57,6 +57,8 @@ const villa = await ev(async () => {
   d = I.cur; out.bunker = d && d.id; out.rb = window.__reach(d, 200000);
   g.content.spotAct('v:up'); await wait(); out.back = I.cur && I.cur.id;
   out.cacheGone = !I.cur.spots.find(s => s.id === 'v:cache').label;
+  // the cache buys the house: a new player (rank 0) with the cache's clean money buys Villa Valen
+  out.rank = g.uw.rank; out.buyMsg = g.uw.props.buy('villa'); out.bought = g.uw.props.owned('villa'); out.after = g.money.W.clean - c0;
   // owned: the house's own spots, all reachable
   g.uw.S.props.villa = { owned: true, dmg: 0, since: 1, lvl: 1 };
   I.exit(true); V.enterHouse(g, 'door'); await wait();
@@ -69,6 +71,7 @@ check('Villa Valen: anyone walks in at the front door from the first minute; it 
 check('Villa Valen: the grand staircase reaches the upper floor (4.6 m) and the upper floor is large (six bedrooms)', villa.r.maxH > 4.5 && villa.r.upper > 8000, JSON.stringify({ maxH: villa.r.maxH, upper: villa.r.upper, cells: villa.r.cells }));
 check('Villa Valen: every spot can be walked to (the hidden lift in the library, the cache upstairs in the closet), owned or not', villa.r.bad.length === 0 && villa.ro.bad.length === 0 && villa.ownSpots.includes('bed@up') && villa.ownSpots.includes('wardrobe@up') && villa.ownSpots.includes('v:garage'), JSON.stringify({ bad: villa.r.bad, badOwned: villa.ro.bad, spots: villa.ownSpots }));
 check('the bunker: the lift is a scene change down and back; its rooms can all be walked to', villa.bunker === 'villa_bunker' && villa.rb.bad.length === 0 && villa.rb.cells > 8000 && villa.back === 'villa', JSON.stringify({ bunker: villa.bunker, bad: villa.rb.bad, cells: villa.rb.cells, back: villa.back }));
+check('the cache buys the house: at rank 0, $4,500,000 of its clean money buys Villa Valen (the estate sells to anyone)', villa.rank === 0 && villa.buyMsg === '' && villa.bought && villa.after === 20000000 - 4500000, JSON.stringify({ rank: villa.rank, msg: villa.buyMsg, bought: villa.bought, after: villa.after }));
 check('the cache: $20,000,000 straight into the bank (clean), once; the panel has nothing more to offer', villa.cache === 20000000 && villa.cache2 === 20000000 && villa.dirty === 0 && villa.cacheGone, JSON.stringify({ cache: villa.cache, again: villa.cache2, dirty: villa.dirty, gone: villa.cacheGone }));
 
 // ---------------------------------------------------------------- the mansion

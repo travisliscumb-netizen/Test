@@ -95,11 +95,24 @@ class InputManager {
           q.x = t.clientX; q.y = t.clientY; this.lastLookInput = performance.now();
         }
       }, { passive: false });
+      // a thumb that slides from one held button onto another (Gas onto Brake, a helicopter's Up onto Down) lets go of
+      // the first and holds the second: the touch belonged to the button it started on, so the first stayed held (the
+      // helicopter climbed on, Down did nothing) until the thumb came off the glass. Off every button it keeps what it holds.
+      if (!btn.dataset.toggle && !btn.dataset.look) btn.addEventListener('touchmove', e => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+          const cur = this.touchActs.get(t.identifier); if (cur === undefined) continue;
+          const el = document.elementFromPoint(t.clientX, t.clientY), nb = el && el.closest ? el.closest('#touch .tbtn') : null;
+          if (!nb || nb.dataset.toggle || nb.dataset.look || nb.dataset.act === cur) continue;
+          this.touchActs.set(t.identifier, nb.dataset.act); this._releaseAct(cur);
+          this.down.add(nb.dataset.act); this.pressedSet.add(nb.dataset.act); nb.classList.add('on');
+        }
+      }, { passive: false });
+      // (a touch lets go of whatever it holds now: after a slide, not the button it started on)
       const end = e => {
         e.preventDefault();
-        for (const t of e.changedTouches) { this.touchActs.delete(t.identifier); this.btnLook.delete(t.identifier); }
-        let still = false; for (const v of this.touchActs.values()) if (v === act) still = true;
-        if (!still && !btn.dataset.toggle) { this.down.delete(act); btn.classList.remove('on'); }
+        if (btn.dataset.toggle) return;
+        for (const t of e.changedTouches) { const a = this.touchActs.get(t.identifier); this.touchActs.delete(t.identifier); this.btnLook.delete(t.identifier); this._releaseAct(a === undefined ? act : a); }
       };
       btn.addEventListener('touchend', end, { passive: false });
       btn.addEventListener('touchcancel', end, { passive: false });
@@ -165,6 +178,11 @@ class InputManager {
       if (!now && was) this.down.delete(map[k]);
       this.gp.prev[k] = now;
     }
+  }
+  // an action no touch holds any more is let go, and its buttons unlit
+  _releaseAct(a) {
+    for (const v of this.touchActs.values()) if (v === a) return;
+    this.down.delete(a); document.querySelectorAll(`#touch .tbtn[data-act="${a}"]:not([data-toggle])`).forEach(b => b.classList.remove('on'));
   }
   isDown(a) { return this.enabled && (this.down.has(a) || this.toggles.has(a)); }
   clearToggle(a) { if (!this.toggles.has(a)) return; this.toggles.delete(a); document.querySelectorAll(`#touch .tbtn[data-act="${a}"][data-toggle]`).forEach(b => b.classList.remove('on')); }
