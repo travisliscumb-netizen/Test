@@ -51955,6 +51955,8 @@ const CAR_MSRP = { compact: 1800, sedan: 3200, taxi: 3600, van: 4200, pickup: 65
   metro: 1500, regent: 2600, crest: 5200, estate: 4600, courier: 3800, apex: 15500, hellion: 34000, revenant: 38000, tempest: 28000, kodiak: 64000, monarch: 88000, valkyr: 120000, obsidian: 150000 };
 // the one-offs (Session 6D): what each is worth, for insurance, impound fees and event classes (never a sale price)
 for (const u of UNIQUE_CARS) CAR_MSRP[u.type] = u.msrp;
+// how long the opening line of a new game stays up (real time)
+const INTRO_LINE_MS = 30000;
 const carMsrp = type => CAR_MSRP[type] || (VEHICLES[type] && VEHICLES[type].price) || 8000;
 // ---- v6 dealerships: three lots with stock you walk up to, inspect and buy where it stands
 // used: a rotating cash lot (condition, mileage, bargains); new: Meridian's practical line-up, restocked daily;
@@ -52624,7 +52626,15 @@ class ContentManager {
       if (Math.hypot(p.pos.x - this.waypoint.x, p.pos.z - this.waypoint.z) < 12) { this.waypoint = null; g.ui.toast('Waypoint reached.'); }
       else { this.guideTarget = this.waypoint; this.guideArrow = true; g.ui.setObjective('▸ ' + this.waypoint.label + ' · ' + fmtDist(Math.hypot(p.pos.x - this.waypoint.x, p.pos.z - this.waypoint.z)), null, true); return; }
     }
-    if (s.settings.guide && g.uw && !p.interior && g.uw.rank === 0 && s.stats.playTime < 240 && !g.uw.inJail) { g.ui.setObjective('$0 to your name. ' + RANKS[0].hint, null, true); return; }
+    // the opening line of a new game: up for 30 s of real time from when it first shows, long enough to read, then out
+    // of the way (it was up for the first 240 s of play time, which a phone at a low frame rate counts slowly: ten minutes)
+    if (s.settings.guide && g.uw && !p.interior && g.uw.rank === 0 && s.stats.playTime < 240 && !g.uw.inJail) {
+      // (timed per game: another save, or a new game that resets this one's play time, gets its own 30 s)
+      const now = performance.now(), pt = s.stats.playTime;
+      if (this._introSave !== s || pt < this._introPT) { this._introSave = s; this._introAt = now; }
+      this._introPT = pt;
+      if (now - this._introAt < INTRO_LINE_MS) { g.ui.setObjective('$0 to your name. ' + RANKS[0].hint, null, true); return; }
+    }
     g.ui.setObjective(null);
   }
   // ------------------------------------------------------------ interaction hooks
