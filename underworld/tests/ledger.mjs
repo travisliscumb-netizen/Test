@@ -66,7 +66,7 @@ const bad = await ev(() => { const g = window.game, M = g.money, before = JSON.s
   return r; });
 check('negative, NaN, infinite, absurd and zero amounts are refused and change nothing', bad.earn.every(x => x === 0) && bad.pay.every(x => x === 0) && bad.same, JSON.stringify(bad));
 check('an unknown money source is a programming error, not a silent write', bad.threw === 2, String(bad.threw));
-check('a corrupt wallet loads clean: negatives, NaN, infinities, unknown places dropped', bad.sane === JSON.stringify({ v: 1, clean: 0, debt: 0, treasury: null, dirty: { me: 0, veh: { 8: 100 }, prop: { linden: 40 } }, stunt: { day: -1, paid: 0 } }), bad.sane);
+check('a corrupt wallet loads clean: negatives, NaN, infinities, unknown places dropped', bad.sane === JSON.stringify({ v: 1, clean: 0, debt: 0, treasury: null, vault: 0, vaultInit: 0, dirty: { me: 0, veh: { 8: 100 }, prop: { linden: 40 } }, stunt: { day: -1, paid: 0 } }), bad.sane);
 
 // ---------------------------------------------------------------- 5. deposit, withdraw and transfer at a safehouse (through the phone's Inventory)
 await ev(() => { const g = window.game, M = g.money; M.W.clean = 1e6; M.W.dirty.me = 50000; M.W.dirty.prop = {}; g.save.rep = 500; g.uw.computeInfluence(); const r = g.uw.props.buy('flop'); window.__flop = r; const L = g.uw.loc('prop', 'flop'); g.resetPlayerState(L.x, L.z, 0); });

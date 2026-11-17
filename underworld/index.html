@@ -34734,8 +34734,9 @@ const Money = {
     const D = w.dirty && typeof w.dirty === 'object' && !Array.isArray(w.dirty) ? w.dirty : {};
     const map = (o, keyOk) => { const out = {}; if (o && typeof o === 'object' && !Array.isArray(o)) for (const k in o) { const v = num(o[k]); if (v > 0 && keyOk(k)) out[k] = v; } return out; };
     return {
-      v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX), vault: num(w.vault), vaultInit: w.vaultInit ? 1 : 0,
+      v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX),
       treasury: typeof w.treasury === 'string' && PROP_BY_ID[w.treasury] && PROP_BY_ID[w.treasury].kind === 'warehouse' ? w.treasury : null,
+      vault: num(w.vault), vaultInit: w.vaultInit ? 1 : 0,
       // a car's cash is keyed by its fleet uid, or 't<id>' for a tracked car you don't own (Session 5A)
       dirty: { me: num(D.me), veh: map(D.veh, k => /^t?\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
       stunt: { day: w.stunt && Number.isFinite(w.stunt.day) ? Math.floor(w.stunt.day) : -1, paid: w.stunt ? num(w.stunt.paid) : 0 }
