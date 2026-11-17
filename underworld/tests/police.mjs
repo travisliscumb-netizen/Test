@@ -53,14 +53,16 @@ const parked = await ev(() => {
   for (const u of P.units.slice()) { g.vehicles.despawn(u.v); } P.units.length = 0; P.setLevel(3); P.spawnT = 999;
   let x = p.pos.x + 34, z = p.pos.z;
   // at the kerb (the nearest point of a road), where you can see it
-  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, kp = window.__pv.nearestRoadPoint(p.pos.x + Math.cos(a) * 34, p.pos.z + Math.sin(a) * 34); if (kp && Math.hypot(kp.x - p.pos.x, kp.z - p.pos.z) > 20 && g.world.grid.lineOfSight(kp.x, 1.4, kp.z, p.pos.x, p.pos.y + 1.2, p.pos.z)) { x = kp.x; z = kp.z; break; } }
+  // (you stand wherever the last check's patrol was: the kerb is searched at several distances and in 24 directions)
+  let seen = false;
+  for (const R of [34, 28, 40, 24, 46]) { for (let k = 0; k < 24 && !seen; k++) { const a = k / 24 * Math.PI * 2, kp = window.__pv.nearestRoadPoint(p.pos.x + Math.cos(a) * R, p.pos.z + Math.sin(a) * R); if (kp && Math.hypot(kp.x - p.pos.x, kp.z - p.pos.z) > 20 && g.world.grid.lineOfSight(kp.x, 1.4, kp.z, p.pos.x, p.pos.y + 1.2, p.pos.z)) { x = kp.x; z = kp.z; seen = true; } } if (seen) break; }
   const v = g.vehicles.spawn('police', x, z, 0, { parked: true, driver: null }); v.staffed = true;
   let joined = -1;
   for (let n = 0; n < 300 && joined < 0; n++) { g.update(1 / 60, 1 / 60); if (P.units.some(u => u.v === v)) joined = n; }
   for (let n = 0; n < 300; n++) g.update(1 / 60, 1 / 60);
-  const u = P.units.find(q => q.v === v); return { joined, parked: v.parked, siren: v.siren, driver: v.driver, crewOut: !!(u && u.dismounted), moved: Math.hypot(v.pos.x - x, v.pos.z - z), joins: P.joins.parked };
+  const u = P.units.find(q => q.v === v); return { seen, joined, parked: v.parked, siren: v.siren, driver: v.driver, crewOut: !!(u && u.dismounted), moved: Math.hypot(v.pos.x - x, v.pos.z - z), joins: P.joins.parked };
 });
-check('a staffed parked cruiser pulls out and joins the pursuit (drives to you; the crew gets out when it arrives)', parked.joined > 0 && !parked.parked && parked.siren && (parked.driver === 'cop' || parked.crewOut) && parked.moved > 3 && parked.joins >= 1, JSON.stringify(parked));
+check('a staffed parked cruiser pulls out and joins the pursuit (drives to you; the crew gets out when it arrives)', parked.seen && parked.joined > 0 && !parked.parked && parked.siren && (parked.driver === 'cop' || parked.crewOut) && parked.moved > 3 && parked.joins >= 1, JSON.stringify(parked));
 const empty = await ev(() => {
   const g = window.game, p = g.player, P = g.police;
   const v = g.vehicles.spawn('police', p.pos.x - 12, p.pos.z, 0, { parked: true, driver: null }); v.staffed = false;
