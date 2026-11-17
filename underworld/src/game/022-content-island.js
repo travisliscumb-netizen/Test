@@ -250,7 +250,9 @@ const Island = {
       const R = { id: D.id, name: D.name, w: D.w, grade: D.grade, deck: D.deck, cut: D.cut || null, ends: D.ends, ring: null, pts, hosts, st: D.st || 'asphalt' };
       // (ringOpen: points where a private drive leaves the turning circle: its kerb and pavement are left open there)
       if (D.ringOpen) R.ringOpen = D.ringOpen;
-      if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
+      // (ringAt: where the circle stands, when the road's last metres do not point at it: Villa Valen's on its gate's axis)
+      if (D.ring && D.ringAt) R.ring = { x: D.ringAt[0], z: D.ringAt[1], r: D.ring };
+      else if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
       this._profile(R);
       this.roads.push(R); byId[R.id] = R;
     }
@@ -349,8 +351,11 @@ const Island = {
   // the tunnel's floor are not part of it: see _spanAt). o.wide: for the far mesh (32 m apart), the ground within
   // that many metres of a road is never above it, so the road's ribbon is not buried by the coarse hills
   compute(x, z, wide) {
-    const h = this._computeRoad(x, z, wide), g = this._ringNear(x, z);
+    const h = this._computeRoad(x, z, wide), onRoad = this._nearRoad(this._seg, x, z) ? this._rd : Infinity, g = this._ringNear(x, z);
     if (!g) return h;
+    // (beyond its own asphalt and verge the circle's shoulder gives way to any road's bed: a road passing near a dead end
+    // keeps its own level)
+    if (this._rgd > ISLE.verge && onRoad < ISLE.verge + 4) return h;
     // a turning circle's bed: level across its asphalt and a verge, eased into the ground round it as a road's is (it
     // stood flat at the road's end on a slope: half of it under the grass, the cars that turned on it on the hillside)
     const d = this._rgd, y = g.y;

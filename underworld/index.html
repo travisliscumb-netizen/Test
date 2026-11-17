@@ -33735,7 +33735,9 @@ const Island = {
       const R = { id: D.id, name: D.name, w: D.w, grade: D.grade, deck: D.deck, cut: D.cut || null, ends: D.ends, ring: null, pts, hosts, st: D.st || 'asphalt' };
       // (ringOpen: points where a private drive leaves the turning circle: its kerb and pavement are left open there)
       if (D.ringOpen) R.ringOpen = D.ringOpen;
-      if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
+      // (ringAt: where the circle stands, when the road's last metres do not point at it: Villa Valen's on its gate's axis)
+      if (D.ring && D.ringAt) R.ring = { x: D.ringAt[0], z: D.ringAt[1], r: D.ring };
+      else if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
       this._profile(R);
       this.roads.push(R); byId[R.id] = R;
     }
@@ -33834,8 +33836,11 @@ const Island = {
   // the tunnel's floor are not part of it: see _spanAt). o.wide: for the far mesh (32 m apart), the ground within
   // that many metres of a road is never above it, so the road's ribbon is not buried by the coarse hills
   compute(x, z, wide) {
-    const h = this._computeRoad(x, z, wide), g = this._ringNear(x, z);
+    const h = this._computeRoad(x, z, wide), onRoad = this._nearRoad(this._seg, x, z) ? this._rd : Infinity, g = this._ringNear(x, z);
     if (!g) return h;
+    // (beyond its own asphalt and verge the circle's shoulder gives way to any road's bed: a road passing near a dead end
+    // keeps its own level)
+    if (this._rgd > ISLE.verge && onRoad < ISLE.verge + 4) return h;
     // a turning circle's bed: level across its asphalt and a verge, eased into the ground round it as a road's is (it
     // stood flat at the road's end on a slope: half of it under the grass, the cars that turned on it on the hillside)
     const d = this._rgd, y = g.y;
@@ -41541,9 +41546,9 @@ Object.assign(World.prototype, {
    ===================================================================== */
 const ISLE_DISTRICT_ROADS = [
   { id: 'h1', name: 'Bayview Crescent', w: 8, grade: 0.09, ends: ['n1', 'n1'], pts: [[-300, -330], [-332, -262], [-420, -205], [-540, -176], [-660, -188], [-760, -240], [-800, -305]] },
-  // (it climbs straight up the villa's axis to a turning circle at the gate, on the estate's level: it ended 35 m short and
-  // 2.6 m below the gate, the circle off the axis and half under the grass, with no drive to the gate)
-  { id: 'h3', name: 'Ridgeview Drive', w: 8, grade: 0.1, ends: ['n1', 'ring'], ring: 12, ringOpen: [[-600, -848]], pts: [[-450, -330], [-456, -400], [-500, -468], [-590, -520], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-624, -794], [-604, -802], [-600, -810], [-600, -818]] },
+  // (its turning circle stands on the villa's axis before the gate, on the estate's level: the road ended 2.6 m below the
+  // gate, the circle 7 m off the axis and half under the grass, with grass between it and the gate)
+  { id: 'h3', name: 'Ridgeview Drive', w: 8, grade: 0.1, ends: ['n1', 'ring'], ring: 12, ringAt: [-600, -830], ringOpen: [[-600, -848]], pts: [[-450, -330], [-456, -400], [-500, -468], [-590, -520], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
   { id: 'h4', name: 'Laurel Way', w: 8, grade: 0.1, ends: ['h3', 'ring'], ring: 13, pts: [[-596, -523], [-680, -472], [-790, -452], [-880, -472], [-930, -540]] },
   { id: 'm1', name: 'Marsh Hollow Road', w: 9, grade: 0.08, ends: ['s4', 's1'], pts: [[-918, 1290], [-800, 1356], [-640, 1418], [-480, 1466], [-330, 1450], [-200, 1402], [-108, 1420]] },
   { id: 'm2', name: 'Heron Loop', w: 8, grade: 0.09, ends: ['m1', 'm1'], pts: [[-640, 1418], [-622, 1540], [-520, 1628], [-380, 1636], [-282, 1560], [-330, 1450]] },
@@ -41559,7 +41564,7 @@ ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // the Heights' north street; Reed Street stops short of the Nightlife Strip on the south shore
 Object.assign(ISLE_ROAD_LAYOUT.island, {
   h1: null,
-  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-624, -794], [-604, -802], [-600, -810], [-600, -818]] },
+  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
   m3: { pts: [[-480, 1466], [-472, 1400], [-465, 1345]] }
 });
 // Linden Gardens (island layout): the ground the Nightlife Strip left between Linden Hills, downtown's south edge and

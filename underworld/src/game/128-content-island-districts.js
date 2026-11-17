@@ -26,9 +26,9 @@
    ===================================================================== */
 const ISLE_DISTRICT_ROADS = [
   { id: 'h1', name: 'Bayview Crescent', w: 8, grade: 0.09, ends: ['n1', 'n1'], pts: [[-300, -330], [-332, -262], [-420, -205], [-540, -176], [-660, -188], [-760, -240], [-800, -305]] },
-  // (it climbs straight up the villa's axis to a turning circle at the gate, on the estate's level: it ended 35 m short and
-  // 2.6 m below the gate, the circle off the axis and half under the grass, with no drive to the gate)
-  { id: 'h3', name: 'Ridgeview Drive', w: 8, grade: 0.1, ends: ['n1', 'ring'], ring: 12, ringOpen: [[-600, -848]], pts: [[-450, -330], [-456, -400], [-500, -468], [-590, -520], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-624, -794], [-604, -802], [-600, -810], [-600, -818]] },
+  // (its turning circle stands on the villa's axis before the gate, on the estate's level: the road ended 2.6 m below the
+  // gate, the circle 7 m off the axis and half under the grass, with grass between it and the gate)
+  { id: 'h3', name: 'Ridgeview Drive', w: 8, grade: 0.1, ends: ['n1', 'ring'], ring: 12, ringAt: [-600, -830], ringOpen: [[-600, -848]], pts: [[-450, -330], [-456, -400], [-500, -468], [-590, -520], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
   { id: 'h4', name: 'Laurel Way', w: 8, grade: 0.1, ends: ['h3', 'ring'], ring: 13, pts: [[-596, -523], [-680, -472], [-790, -452], [-880, -472], [-930, -540]] },
   { id: 'm1', name: 'Marsh Hollow Road', w: 9, grade: 0.08, ends: ['s4', 's1'], pts: [[-918, 1290], [-800, 1356], [-640, 1418], [-480, 1466], [-330, 1450], [-200, 1402], [-108, 1420]] },
   { id: 'm2', name: 'Heron Loop', w: 8, grade: 0.09, ends: ['m1', 'm1'], pts: [[-640, 1418], [-622, 1540], [-520, 1628], [-380, 1636], [-282, 1560], [-330, 1450]] },
@@ -44,7 +44,7 @@ ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // the Heights' north street; Reed Street stops short of the Nightlife Strip on the south shore
 Object.assign(ISLE_ROAD_LAYOUT.island, {
   h1: null,
-  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-624, -794], [-604, -802], [-600, -810], [-600, -818]] },
+  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
   m3: { pts: [[-480, 1466], [-472, 1400], [-465, 1345]] }
 });
 // Linden Gardens (island layout): the ground the Nightlife Strip left between Linden Hills, downtown's south edge and
