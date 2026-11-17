@@ -996,7 +996,9 @@ class DoorSystem {
       const prev = e.open;
       e.open = clamp(e.open + (e.want ? 1 : -1) * dt / 1.4, 0, 1);
       if (e.want && prev === 0 && e.open > 0) g.audio.play('door', { x: d.x, z: d.z });
-      e.mesh.position.y = d.y + d.h / 2 + e.open * (d.h - 0.35);
+      // (it rolls up into a band at the head of the opening, as a roller door does: it rose whole and stood in front of
+      // the wall over the door, which read as the door still shut)
+      const sh = 1 - 0.9 * e.open; e.mesh.scale.y = sh; e.mesh.position.y = d.y + d.h - d.h * sh / 2;
       e.col.on = e.open < 0.75;
       e.mesh.visible = Math.hypot(g.camera.position.x - d.x, g.camera.position.z - d.z) < 260;
     }

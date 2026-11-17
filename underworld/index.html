@@ -40232,7 +40232,9 @@ class DoorSystem {
       const prev = e.open;
       e.open = clamp(e.open + (e.want ? 1 : -1) * dt / 1.4, 0, 1);
       if (e.want && prev === 0 && e.open > 0) g.audio.play('door', { x: d.x, z: d.z });
-      e.mesh.position.y = d.y + d.h / 2 + e.open * (d.h - 0.35);
+      // (it rolls up into a band at the head of the opening, as a roller door does: it rose whole and stood in front of
+      // the wall over the door, which read as the door still shut)
+      const sh = 1 - 0.9 * e.open; e.mesh.scale.y = sh; e.mesh.position.y = d.y + d.h - d.h * sh / 2;
       e.col.on = e.open < 0.75;
       e.mesh.visible = Math.hypot(g.camera.position.x - d.x, g.camera.position.z - d.z) < 260;
     }
@@ -42078,9 +42080,7 @@ Object.assign(World.prototype, {
     for (const x of [-637, -629, -622, -598, -591, -583]) for (const gy of [2.6, 7.0]) b.glass.push({ x, y: y + gy, z: -905.82, sx: 3.0, sy: 2.0, sz: 0.1 });
     for (const x of [-610]) for (const gy of [7.2]) b.glass.push({ x, y: y + gy, z: -901.82, sx: 3.6, sy: 2.4, sz: 0.1 });
     for (const x of [-633, -625, -595, -587]) b.fx.push({ type: 'neon', x, y: y + 2.6, z: -905.86, w: 2.4, h: 1.6, d: 0.06, c: 0xffe8c0 });
-    // the colonnade to the garage pavilion
-    for (let x = -576; x <= -562; x += 3.5) cyl(b, x, y + 1.7, -905, 0.22, 3.4, 0xf8f4ea, true);
-    box(b, -569, y + 3.55, -906.5, 18, 0.3, 4, 0xf8f4ea, false); box(b, -569, y + 0.05, -906.5, 18, 0.1, 4, STONE, false);
+    // (no colonnade to the garage pavilion: the drive from the Valen Vault comes through the gap, owner 2026-11-17)
     // ------------------------------------------------ the motor court, its fountain, the drive and the gate
     this._det(b, 'disc', -610, y + 0.04, -877, 21, 1, 21, C(0xd8d0c0));
     cyl(b, -610, y + 0.4, -877, 4.4, 0.8, STONE, true); this._det(b, 'disc', -610, y + 0.82, -877, 3.8, 1, 3.8, C(0x3a9ad0)); b.water.push({ x: -610, z: -877, r: 3.6, y: y + 0.82 });
@@ -42098,9 +42098,16 @@ Object.assign(World.prototype, {
     wall(V.x0, V.z1, -607.4, V.z1); wall(-592.6, V.z1, V.x1, V.z1); wall(V.x0, V.z0, V.x0, V.z1); wall(V.x1, V.z0, V.x1, V.z1); wall(V.x0, V.z0, V.x1, V.z0);
     for (let x = V.x0 + 20; x < V.x1 - 10; x += 26) if (Math.abs(x - V.gate) > 12) b.fx.push({ type: 'neon', x, y: y + 2.95, z: V.z1 + 0.5, w: 0.4, h: 0.3, d: 0.1, c: 0xffe2b0 });
     // ------------------------------------------------ the garage pavilion (six bays) beside the motor court
-    bld(-560, -924, -526, -900, 5, STYLE.HOUSE, WALL, 5, 5, { roof: 'gable', roofColor: SLATE });
+    // (the building stands back: its front 6 m are four garage bays, so a door that rolls up shows a garage, not a wall)
+    bld(-560, -924, -526, -906, 5, STYLE.HOUSE, WALL, 5, 5, { roof: 'gable', roofColor: SLATE });
+    for (const x of [-560, -551.3, -542.9, -534.5, -526]) box(b, x + (x === -560 ? 0.6 : x === -526 ? -0.6 : 0), y + 2.5, -903, x === -560 || x === -526 ? 1.2 : 2.0, 5, 6, WALL, true);
+    box(b, -543, y + 4.4, -900.4, 34, 1.2, 0.8, WALL, false); box(b, -543, y + 5.1, -903, 34.6, 0.3, 6.6, SLATE, false);
+    for (let k = 0; k < 4; k++) { const cx = -555.5 + k * 8.4; box(b, cx, y + 0.02, -903, 6.4, 0.04, 5.6, 0x5a5d62, false); box(b, cx, y + 1.9, -905.9, 6.4, 3.8, 0.1, 0x8a8d90, false); box(b, cx, y + 3.75, -903, 6.4, 0.1, 5.6, 0x9a9da0, false); box(b, cx - 2.6, y + 1.0, -905.6, 0.8, 2.0, 0.5, 0x3a3f45, false); box(b, cx + 2.4, y + 1.3, -905.75, 1.4, 0.06, 0.3, 0x6a5a48, false); b.fx.push({ type: 'neon', x: cx, y: y + 3.68, z: -903, w: 2.4, h: 0.04, d: 0.2, c: 0xf2f6ff }); }
     // four doors; the second opens for the owner onto the garage under the pavilion (VSPACE_DEFS.villa)
     for (let k = 0; k < 4; k++) if (k !== 1) box(b, -555.5 + k * 8.4, y + 1.9, -899.88, 6.4, 3.8, 0.12, 0x2a2e33, false);
+    // the apron before the doors and the drive across to the motor court
+    box(b, -543, y + 0.03, -893.5, 34, 0.06, 13, 0xd8d0c0, false); for (let k = 0; k < 4; k++) box(b, -555.5 + k * 8.4, y + 0.065, -896, 6.0, 0.01, 0.12, 0xb8b0a0, false);
+    box(b, -576, y + 0.03, -890, 32, 0.06, 8, 0xd8d0c0, false);
     this._door(b, { id: 'villaGarage', x: -547.1, z: -899.82, w: 6.0, h: 3.6, axis: 'x', face: 1, y, color: 0x2a2e33, block: b.i, kind: 'vspace', space: 'villa', prop: 'villa' });
     // ------------------------------------------------ behind the house: the pool terrace, the pool house, loungers
     box(b, -610, y + 0.05, -948, 66, 0.1, 22, STONE, false);
@@ -42116,7 +42123,7 @@ Object.assign(World.prototype, {
     b.water.push({ x: -610, z: -951, w: 43.6, d: 9.6, y: y + 0.7 });
     box(b, -610, y + 0.86, -946, 44.4, 0.02, 0.3, GOLD, false); box(b, -610, y + 0.86, -956, 44.4, 0.02, 0.3, GOLD, false);
     for (let x = -626; x <= -594; x += 6.4) box(b, x, y + 0.35, -941.2, 1.6, 0.3, 3.4, 0xf8f8f4, false);
-    bld(-584, -966, -566, -952, 4.2, STYLE.GLASS, 0x3a5060, 4.2, 4);
+    // (no pool house: it was a dark glass box with nothing in it, owner 2026-11-17)
     // ------------------------------------------------ the tennis court and the helipad
     box(b, -667, y + 0.05, -878, 22, 0.08, 36, 0x2f6f5a, false);
     for (const z of [-895, -861, -878]) box(b, -667, y + 0.1, z, 20, 0.02, 0.12, 0xf2f2f2, false);
@@ -42149,6 +42156,9 @@ Object.assign(World.prototype, {
     b.signs.push({ text: 'THE VALEN VAULT', x: Q.door, y: y + H + 0.3, z: Q.z1 + 2.05, ry: 0, w: 12, h: 1.1, bg: '#14181c', fg: '#d4af37' });
     b.fx.push({ type: 'flood', x: dx0 - 1.2, y: y + H + 0.9, z: Q.z1 + 2.1, ry: 0 }, { type: 'flood', x: dx1 + 1.2, y: y + H + 0.9, z: Q.z1 + 2.1, ry: 0 });
     box(b, Q.door, y + 0.03, (Q.z1 - 959) / 2, 9, 0.06, -959 - Q.z1, 0x8a8a88, false);
+    // (and on: a bend west to the gap between the house and the garage pavilion, up past the house to the garages' apron)
+    box(b, -566, y + 0.03, -963, 15, 0.06, 8, 0x8a8a88, false); box(b, -569, y + 0.03, -929.5, 8, 0.06, 59, 0x8a8a88, false);
+    for (let z = -955; z < -903; z += 8) b.fx.push({ type: 'neon', x: -573.6, y: y + 0.25, z, w: 0.25, h: 0.25, d: 0.25, c: 0xffe2b0 });
     const gz = Q.z1 - 9, inner = Q.z1 - 18;
     // inside: a polished floor, strip lights down the ceiling
     box(b, cxv, y + 0.04, czv, Q.x1 - Q.x0 - t, 0.06, Q.z1 - Q.z0 - t, 0x3a3d44, false);
