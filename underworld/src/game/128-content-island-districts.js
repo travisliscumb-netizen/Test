@@ -362,6 +362,8 @@ Object.assign(World.prototype, {
         cyl(B.b, x, y + 3.2, z, 0.11, 6.4, 0x3a3f45, true);
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
         B.b.fx.push({ type: 'neon', x: x - nx * 1.2, y: y + 6.22, z: z - nz * 1.2, w: 0.5, h: 0.1, d: 0.5, c: 0xffe2b0 });
+        // (its pool of light on the road at night, 178)
+        (this.lampPools = this.lampPools || []).push({ x: x - nx * 1.2, z: z - nz * 1.2, y });
         // Linden Gardens' streets are tree-lined: a street tree each side between the lamps
         if (D.id[0] === 'g' || D.id[0] === 'd') for (const sd of [-1, 1]) {
           let k2 = 0; const s2 = s + 22; while (k2 < R.pts.length - 2 && R.cum[k2 + 1] < s2) k2++;

@@ -414,6 +414,8 @@ Object.assign(World.prototype, {
     base2.call(this); this._genValenPoint(); this._genCedarSouth();
     // the island off the lattice (Operation Blackgate, 127): its roads, the airport, the proving ground, the settlements
     this._genIsland();
+    // (and the lamps along the island's highways and country roads, 178)
+    this._genRoadLamps();
     // (the roads that leave the city cross its promenade: the ground shader paints them from the local-roads raster)
     this._buildLocalRaster();
     // (the benches turn to the walk or street they sit on, read from the roads where the city now stands)

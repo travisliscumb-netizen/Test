@@ -41,6 +41,7 @@
   "game/175-content-valen-point-scenery.js",
   "game/176-content-cedar-south-scenery.js",
   "game/177-content-island-scenery.js",
+  "game/178-content-road-lamps.js",
   "game/180-core-character-renderer.js",
   "game/190-core-player.js",
   "game/200-core-camera-rig.js",

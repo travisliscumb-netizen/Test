@@ -38989,6 +38989,8 @@ Object.assign(World.prototype, {
     base2.call(this); this._genValenPoint(); this._genCedarSouth();
     // the island off the lattice (Operation Blackgate, 127): its roads, the airport, the proving ground, the settlements
     this._genIsland();
+    // (and the lamps along the island's highways and country roads, 178)
+    this._genRoadLamps();
     // (the roads that leave the city cross its promenade: the ground shader paints them from the local-roads raster)
     this._buildLocalRaster();
     // (the benches turn to the walk or street they sit on, read from the roads where the city now stands)
@@ -41803,6 +41805,8 @@ Object.assign(World.prototype, {
         cyl(B.b, x, y + 3.2, z, 0.11, 6.4, 0x3a3f45, true);
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
         B.b.fx.push({ type: 'neon', x: x - nx * 1.2, y: y + 6.22, z: z - nz * 1.2, w: 0.5, h: 0.1, d: 0.5, c: 0xffe2b0 });
+        // (its pool of light on the road at night, 178)
+        (this.lampPools = this.lampPools || []).push({ x: x - nx * 1.2, z: z - nz * 1.2, y });
         // Linden Gardens' streets are tree-lined: a street tree each side between the lamps
         if (D.id[0] === 'g' || D.id[0] === 'd') for (const sd of [-1, 1]) {
           let k2 = 0; const s2 = s + 22; while (k2 < R.pts.length - 2 && R.cum[k2 + 1] < s2) k2++;
@@ -43846,6 +43850,8 @@ class IslandScenery {
     this._treeGeo = null;
     // the wind turbines (129): one group, seen from anywhere on the island
     if (Farms.ready) Farms.buildTurbines(scene, world.grid);
+    // the lamps along the roads, and the pools of light under every island lamp (178)
+    RoadLamps.build(scene, world);
     this._tPrev = 0;
     rotorWarmup(scene);
   }
@@ -44021,6 +44027,7 @@ class IslandScenery {
   // which tiles should be drawn near: every land tile within the near range of the focus
   update(fx, fz) {
     { const t = performance.now(), dt = this._tPrev ? Math.min(0.1, (t - this._tPrev) / 1000) : 0; this._tPrev = t; Farms.update(dt); }
+    if (this.g && this.g.env) RoadLamps.update(this.g.env.night);
     const lv = this.g.quality ? this.g.quality.level : 1, R = ISLE_SCN.near[clamp(lv, 0, 3)], Ts = ISLE.tile;
     const tx = Math.floor((fx - ISLE.x0) / 32), tz = Math.floor((fz - ISLE.z0) / 32);
     if (tx !== this._tx || tz !== this._tz || lv !== this._lv) {
@@ -44228,6 +44235,104 @@ class IslandScenery {
     return group;
   }
 }
+/* =====================================================================
+   [CONTENT] ROAD LAMPS: street lighting along the island's roads
+   The highways and country roads ran dark between the city and the
+   districts. Each road outside the city and the districts' own streets
+   (which have their lamps, 128) gets a lamp every ROAD_LAMP.step metres,
+   alternating sides, leaning over the carriageway; never on a bridge, in
+   the tunnel (its own lights), in another road, in anything built, over
+   the sea or where the ground beside the road falls away or rises (a
+   cutting, an embankment). Each post is solid (a cylinder in the grid).
+   At night every island lamp (these and the districts') throws a pool of
+   warm light on the road under its head: the island's ground has no
+   lamp pools of its own (the city's ground shader draws the lattice's).
+   Drawn as four instanced meshes (posts, arms, heads, pools) for the island.
+   ===================================================================== */
+const ROAD_LAMP = { step: 55, first: 30, endGap: 18, inset: 1.6, h: 7.2, arm: 3.0, pool: 9.5, poolPeak: 0.32, clearRoad: 1.2, maxStep: 1.2 };
+Object.assign(World.prototype, {
+  // where the lamps stand (gen-time, after the island and its districts: 110), their colliders, and the pools of every
+  // island lamp (the districts' are added by 128 as this.lampPools)
+  _genRoadLamps() {
+    const L = ROAD_LAMP, out = [], grid = this.grid;
+    this.lampPools = this.lampPools || [];
+    const lit = new Set([...ISLE_DISTRICT_ROADS, ...ISLE_INFILL_ROADS].map(D => D.id));
+    // what a post must keep clear of: every island road's carriageway (by segment) and everything built on the island
+    const segs = [];
+    for (const R of Island.roads) for (let k = 0; k < R.pts.length - 1; k++) { const a = R.pts[k], b = R.pts[k + 1]; segs.push({ R, a, b, x0: Math.min(a[0], b[0]) - R.w, x1: Math.max(a[0], b[0]) + R.w, z0: Math.min(a[1], b[1]) - R.w, z1: Math.max(a[1], b[1]) + R.w }); }
+    const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1); return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t); };
+    const inRoad = (x, z, m) => segs.some(s => x > s.x0 && x < s.x1 && z > s.z0 && z < s.z1 && segD(x, z, s.a, s.b) < s.R.w / 2 + m);
+    const built = []; for (const b of this.xblocks) { for (const r of b.bld) built.push([r.x0, r.z0, r.x1, r.z1]); for (const d of b.det) { const c = d.col; if (!c) continue; if (c.r !== undefined) built.push([c.x - c.r, c.z - c.r, c.x + c.r, c.z + c.r]); else built.push([c.x0, c.z0, c.x1, c.z1]); } }
+    const inBuilt = (x, z, m) => built.some(r => x > r[0] - m && x < r[2] + m && z > r[1] - m && z < r[3] + m);
+    for (const R of Island.roads) {
+      if (lit.has(R.id)) continue;
+      const len = R.cum[R.cum.length - 1];
+      let side = 1;
+      for (let s = L.first; s < len - L.endGap; s += L.step) {
+        let k = 0; while (k < R.pts.length - 2 && R.cum[k + 1] < s) k++;
+        if ((R.bridges || []).some(b => k >= b[0] - 2 && k <= b[1] + 2) || (R.tunnel && k >= R.tunnel[0] - 3 && k <= R.tunnel[1] + 3)) continue;
+        const a = R.pts[k], b = R.pts[k + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = clamp((s - R.cum[k]) / l, 0, 1);
+        const cx = a[0] + (b[0] - a[0]) * t, cz = a[1] + (b[1] - a[1]) * t, ry = R.y[k] + (R.y[k + 1] - R.y[k]) * t;
+        // the side's outward normal (alternating), and the post at the verge
+        const nx = (b[1] - a[1]) / l * side, nz = -(b[0] - a[0]) / l * side;
+        side = -side;
+        const x = cx + nx * (R.w / 2 + L.inset), z = cz + nz * (R.w / 2 + L.inset);
+        if (CityLayout.inCity(x, z, EDGE_MARGIN + 6)) continue;
+        if (inRoad(x, z, L.clearRoad) || inBuilt(x, z, 1.0)) continue;
+        const gy = Island.height(x, z);
+        if (gy < SEA_Y + 0.3 || Math.abs(gy - ry) > L.maxStep) continue;
+        out.push({ x, z, y: gy, ry: Math.atan2(-nx, -nz), hx: x - nx * L.arm, hz: z - nz * L.arm, road: R.id });
+      }
+    }
+    for (const p of out) {
+      grid.add({ x: p.x, z: p.z, r: 0.16, y0: p.y - 0.5, y1: p.y + L.h, kind: 'det' });
+      this.lampPools.push({ x: p.hx, z: p.hz });
+    }
+    this.roadLamps = out;
+  }
+});
+// the lamps' meshes: posts and heads for this file's lamps, pools under every island lamp head
+const RoadLamps = {
+  built: false, posts: null, arms: null, heads: null, pools: null, headMat: null, poolMat: null,
+  build(scene, world) {
+    const L = ROAD_LAMP, lamps = world.roadLamps || [], pools = world.lampPools || [];
+    // a post (tapered octagon), its arm toward the road, and the head under the arm's end
+    const post = new THREE.CylinderGeometry(0.08, 0.13, L.h, 8).translate(0, L.h / 2, 0);
+    const arm = new THREE.BoxGeometry(0.12, 0.12, L.arm + 0.2).translate(0, L.h - 0.1, (L.arm + 0.2) / 2 - 0.1);
+    const steel = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.6, metalness: 0.4 });
+    this.posts = new THREE.InstancedMesh(post, steel, Math.max(1, lamps.length));
+    this.arms = new THREE.InstancedMesh(arm, steel, Math.max(1, lamps.length));
+    const hg = new THREE.BoxGeometry(0.42, 0.14, 0.62).translate(0, L.h - 0.24, L.arm);
+    this.headMat = new THREE.MeshBasicMaterial({ color: 0xffe2b0 });
+    this.heads = new THREE.InstancedMesh(hg, this.headMat, Math.max(1, lamps.length));
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+    lamps.forEach((l, i) => { m.compose(p.set(l.x, l.y, l.z), q.setFromEuler(e.set(0, l.ry, 0)), one); this.posts.setMatrixAt(i, m); this.arms.setMatrixAt(i, m); this.heads.setMatrixAt(i, m); });
+    this.posts.count = this.arms.count = this.heads.count = lamps.length;
+    this.posts.castShadow = true; this.posts.receiveShadow = true;
+    // the pools: a soft warm disc on the ground under each head, tilted to the ground's slope there
+    const tex = makeRadialTexture('rgba(255,214,150,1)', 'rgba(255,214,150,0)', 128, false);
+    this.poolMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, fog: true });
+    const dg = new THREE.PlaneGeometry(L.pool * 2, L.pool * 2).rotateX(-Math.PI / 2);
+    this.pools = new THREE.InstancedMesh(dg, this.poolMat, Math.max(1, pools.length));
+    const nrm = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    pools.forEach((o, i) => {
+      const y = groundY(o.x, o.z, (o.y !== undefined ? o.y : Island.height(o.x, o.z)) + 2);
+      const gx = (groundY(o.x + 3, o.z, y + 2) - groundY(o.x - 3, o.z, y + 2)) / 6, gz = (groundY(o.x, o.z + 3, y + 2) - groundY(o.x, o.z - 3, y + 2)) / 6;
+      nrm.set(-gx, 1, -gz).normalize(); q.setFromUnitVectors(up, nrm);
+      m.compose(p.set(o.x, y + 0.06, o.z), q, one); this.pools.setMatrixAt(i, m);
+    });
+    this.pools.count = pools.length; this.pools.renderOrder = 2;
+    for (const im of [this.posts, this.arms, this.heads, this.pools]) { im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); scene.add(im); }
+    this.built = true;
+  },
+  // the heads glow and the pools show as night falls
+  update(night) {
+    if (!this.built) return;
+    this.poolMat.opacity = ROAD_LAMP.poolPeak * smoothstep(0.15, 0.6, night);
+    this.pools.visible = this.poolMat.opacity > 0.005;
+    this.headMat.color.setRGB(0.55 + 0.45 * night, 0.5 + 0.38 * night, 0.42 + 0.27 * night);
+  }
+};
 /* =====================================================================
    [CORE] CHARACTER RENDERER: every human (player, peds, cops) is drawn with a
    handful of InstancedMeshes; poses are computed procedurally per frame.
@@ -46490,7 +46595,8 @@ class VehicleManager {
     const camPos = camera.position;
     for (const v of this.list) {
       if (v.mode === 'phys') v.pose(dt);
-      v.headOn = night > 0.25 || this.game.env.rain > 0.5;
+      // (the player's own car: on whenever it is at all dark to drive, 330 gloom; traffic at dusk and in heavy rain)
+      v.headOn = v.driver === 'player' ? this.game.env.gloom > 0.08 : night > 0.25 || this.game.env.rain > 0.5;
       v.updateMaterial(night, t);
       if (v.alarmT > 0) { v.alarmT -= dt; v.mat.userData.u.uLights.value.x = (Math.sin(t * 10) > 0) ? 1.5 : 0; if (Math.random() < dt * 3) this.game.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.2, gain: 0.6 }); }
       const d2 = dist2(v.pos.x, v.pos.z, camPos.x, camPos.z);
@@ -48791,6 +48897,38 @@ const WEATHER = {
   heavy: { cloud: 1, rain: 1, fog: 0.5, dark: 0.9 },
   fog: { cloud: 0.6, rain: 0, fog: 1, dark: 0.3 }
 };
+// the player's headlights: the spots' strength (scaled by how dark it is) and reach, and the lit road ahead
+const HEAD_I = 110, HEAD_REACH = 95;
+const HEAD_POOL = { cols: 7, along: [1.6, 3, 5, 7.5, 10, 13, 16.5, 20, 24, 28.5, 33], w0: 2.6, spread: 0.36, lift: 0.07, peak: 0.6 };
+function makeHeadPool() {
+  const P = HEAD_POOL, nu = P.cols, nv = P.along.length, pos = new Float32Array(nu * nv * 3), col = new Float32Array(nu * nv * 3), idx = [];
+  for (let j = 0; j < nv - 1; j++) for (let i = 0; i < nu - 1; i++) { const a = j * nu + i, b = a + 1, c = a + nu, d = c + 1; idx.push(a, c, b, b, c, d); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setIndex(idx);
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, fog: true });
+  const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 2; return m;
+}
+// lay the fan on the ground ahead of the car: each vertex dropped onto the surface under it (the car's own level as the
+// reference, so a bridge deck or a roof above is not taken); a vertex over a drop (a ledge, the sea) goes dark
+function layHeadPool(m, pv, k) {
+  const P = HEAD_POOL, nu = P.cols, pa = m.geometry.attributes.position, ca = m.geometry.attributes.color, last = P.along[P.along.length - 1];
+  const sinH = Math.sin(pv.h), cosH = Math.cos(pv.h), zf = pv.vg.zf, y0 = pv.pos.y;
+  for (let j = 0; j < P.along.length; j++) {
+    const sAl = P.along[j], half = (P.w0 + sAl * P.spread) / 2;
+    // brightness along: up from nothing at the bumper to full by 5 m, then a long gentle fall to the far end
+    const along = Math.min(1, (sAl - 1.2) / 4) * Math.pow(1 - sAl / (last + 0.5), 1.15);
+    for (let i = 0; i < nu; i++) {
+      const u = i / (nu - 1) * 2 - 1, lx = u * half, lz = zf + sAl;
+      const x = pv.pos.x + sinH * lz + cosH * lx, z = pv.pos.z + cosH * lz - sinH * lx;
+      const gy = groundY(x, z, y0 + 1.5), drop = y0 - gy;
+      const e = (1 - u * u) * (1 - u * u) * along * P.peak * k * (drop > 3 ? 0 : 1);
+      const o = (j * nu + i) * 3;
+      pa.array[o] = x; pa.array[o + 1] = gy + P.lift; pa.array[o + 2] = z;
+      ca.array[o] = e; ca.array[o + 1] = e * 0.93; ca.array[o + 2] = e * 0.8;
+    }
+  }
+  pa.needsUpdate = true; ca.needsUpdate = true;
+}
 class Environment {
   constructor(game) {
     const g = this.g = game;
@@ -48806,8 +48944,16 @@ class Environment {
     g.scene.add(this.sun); g.scene.add(this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbcd4ff, 0x4a4238, 0.8); g.scene.add(this.hemi);
     // player headlights (always present so the shader light count never changes)
-    this.headL = new THREE.SpotLight(0xfff1dd, 0, 60, 0.42, 0.55, 1.4); this.headR = this.headL.clone();
+    // (they reach 95 m and fall off gently: what stands ahead of the car (a wall, a pole, a parked car) is lit well before
+    // you reach it, and the beam's brightest part is aimed ahead of the bonnet, not at the bumper)
+    this.headL = new THREE.SpotLight(0xfff1dd, 0, HEAD_REACH, 0.44, 0.6, 1.15); this.headR = this.headL.clone();
     g.scene.add(this.headL, this.headR, this.headL.target, this.headR.target);
+    // the road lit ahead of the player's car: a fan of light laid on the ground (conformed to it every frame: hills,
+    // cambers, bridges), brightest a few metres out and fading to its far end; what the spot lights at a glancing angle
+    // is too faint on a dark road to drive by
+    this.headPool = makeHeadPool(); this.headPool.visible = false; g.scene.add(this.headPool);
+    // how dark it is for driving: night, or a dark sky (heavy cloud, rain, fog) by day
+    this.gloom = 0;
     this.police = new THREE.PointLight(0xff2020, 0, 30, 1.6); g.scene.add(this.police);
     this.rainMesh = makeRainMesh(IS_MOBILE ? 1400 : 2600); g.scene.add(this.rainMesh);
     this.pmrem = new THREE.PMREMGenerator(g.renderer);
@@ -48899,16 +49045,20 @@ class Environment {
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt; g.scene.environment = rt.texture;
     }
-    // player headlights
+    // player headlights: on whenever it is at all dark to drive (dusk, night, cloud, rain, fog: 240 headOn)
+    this.gloom = Math.max(this.night, this.dark * 0.85, this.fog * 0.6);
     const pv = g.player.state === 'vehicle' ? g.player.vehicle : null;
     const on = pv && pv.headOn && !pv.burnt;
+    const hk = 0.25 + 0.75 * this.gloom;
     for (const [L, side] of [[this.headL, 1], [this.headR, -1]]) {
       if (on) {
-        const a = pv.toWorld(side * (pv.spec.w / 2 - 0.35), pv.vg.zf), b = pv.toWorld(side * 1.2, pv.vg.zf + 22);
-        L.position.set(a.x, pv.pos.y + pv.vg.frontTop - 0.1, a.z); L.target.position.set(b.x, pv.pos.y - 1.5, b.z);
-        L.intensity = 90 * (0.25 + this.night);
+        const a = pv.toWorld(side * (pv.spec.w / 2 - 0.35), pv.vg.zf), b = pv.toWorld(side * 1.4, pv.vg.zf + 30), hy = pv.pos.y + pv.vg.frontTop - 0.1;
+        L.position.set(a.x, hy, a.z); L.target.position.set(b.x, hy - 1.35, b.z);
+        L.intensity = HEAD_I * hk;
       } else L.intensity = 0;
     }
+    this.headPool.visible = !!on;
+    if (on) layHeadPool(this.headPool, pv, hk);
     // police light bar glow (nearest active siren)
     let best = null, bd = 60 * 60;
     for (const v of g.vehicles.list) if (v.siren && !v.burnt) { const d = dist2(v.pos.x, v.pos.z, g.cam.pos.x, g.cam.pos.z); if (d < bd) { bd = d; best = v; } }

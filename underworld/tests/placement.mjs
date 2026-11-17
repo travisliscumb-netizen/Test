@@ -82,6 +82,15 @@ const r = await ev(() => {
     if (!/^(ap_|field_)/.test(site.id)) for (const bk of w.xblocks) if (bk.bld.some(q => !q.hollow && x > q.x0 + 0.3 && x < q.x1 - 0.3 && z > q.z0 + 0.3 && z < q.z1 - 0.3 && (q.y0 || 0) < h + 1.5)) { sl.bld.push(tag.concat(bk.name)); break; }
   }
   out.slots = sl;
+  // the island's road lamps (178): the post off every road, the head over its own road's carriageway, on the ground
+  const RL = w.roadLamps || [], rlBad = [];
+  for (const l of RL) {
+    const R = I.roads.find(q => q.id === l.road); let dh = 1e9; for (let k = 0; k < R.pts.length - 1; k++) dh = Math.min(dh, segD(l.hx, l.hz, R.pts[k], R.pts[k + 1]));
+    const gy = P.groundY(l.x, l.z, l.y + 1);
+    if (isleRoad(l.x, l.z) || P.isOnRoad(l.x, l.z) || dh > R.w / 2 + 0.3 || Math.abs(gy - l.y) > 0.6) rlBad.push([l.road, Math.round(l.x), Math.round(l.z), isleRoad(l.x, l.z) || '', +dh.toFixed(1), +(gy - l.y).toFixed(1)]);
+  }
+  const rlIn = RL.filter(l => w.xblocks.some(bk => bk.bld.some(q => !q.hollow && l.x > q.x0 && l.x < q.x1 && l.z > q.z0 && l.z < q.z1))).length;
+  out.roadLamps = { n: RL.length, pools: (w.lampPools || []).length, bad: rlBad.length, inBld: rlIn, eg: rlBad.slice(0, 6) };
   // the fire station stands at the level of the Coast Highway passing its doors (the bays open onto it)
   const fs = w.xblocks.find(bk => bk.place && bk.place.id === 'firehouse'), hw = I.roads.find(R => R.id === 'n1e');
   if (fs && hw) { const d = fs.place.door; let best = 1e9, hy = null; hw.pts.forEach((p, k) => { const e = Math.hypot(p[0] - d.x, p[1] - d.z); if (e < best) { best = e; hy = hw.y[k]; } }); out.fire = { floor: fs.bld[0].y0, road: +hy.toFixed(2), dist: +best.toFixed(1) }; }
@@ -96,6 +105,7 @@ check('every bench faces the street or walk it sits on, and its seat faces the s
 check('no prop buried inside a building', r.buried.n === 0, JSON.stringify(r.buried));
 check('no island building stands in the air', r.float.n === 0, JSON.stringify(r.float));
 check('the parked fleet stands level, off the roads, out of buildings and out of the sea', r.slots.n >= 250 && !r.slots.steep.length && !r.slots.road.length && !r.slots.sea.length && !r.slots.bld.length, JSON.stringify({ n: r.slots.n, steep: r.slots.steep, road: r.slots.road, sea: r.slots.sea, bld: r.slots.bld }));
+check('the island highways have their lamps: each post off the road, its head over its own carriageway, on the ground, none in a building; a pool under every island lamp', r.roadLamps.n >= 300 && r.roadLamps.bad === 0 && r.roadLamps.inBld === 0 && r.roadLamps.pools >= r.roadLamps.n, JSON.stringify(r.roadLamps));
 check('the fire station stands level with the Coast Highway at its doors', !!r.fire && Math.abs(r.fire.floor - r.fire.road) < 1.5 && r.fire.dist < 40, JSON.stringify(r.fire));
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 await finish(b, 'placement');

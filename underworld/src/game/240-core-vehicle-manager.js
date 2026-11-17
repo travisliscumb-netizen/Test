@@ -250,7 +250,8 @@ class VehicleManager {
     const camPos = camera.position;
     for (const v of this.list) {
       if (v.mode === 'phys') v.pose(dt);
-      v.headOn = night > 0.25 || this.game.env.rain > 0.5;
+      // (the player's own car: on whenever it is at all dark to drive, 330 gloom; traffic at dusk and in heavy rain)
+      v.headOn = v.driver === 'player' ? this.game.env.gloom > 0.08 : night > 0.25 || this.game.env.rain > 0.5;
       v.updateMaterial(night, t);
       if (v.alarmT > 0) { v.alarmT -= dt; v.mat.userData.u.uLights.value.x = (Math.sin(t * 10) > 0) ? 1.5 : 0; if (Math.random() < dt * 3) this.game.audio.play('horn', { x: v.pos.x, z: v.pos.z, dur: 0.25, pitch: 1.2, gain: 0.6 }); }
       const d2 = dist2(v.pos.x, v.pos.z, camPos.x, camPos.z);
