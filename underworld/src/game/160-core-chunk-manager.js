@@ -11,7 +11,7 @@ class ChunkManager {
     this.bbMat = new THREE.MeshStandardMaterial({ map: this.atlas, emissiveMap: this.atlas, emissive: 0xffffff, emissiveIntensity: 0.2, roughness: 0.55 });
     this.glowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
     this.beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2020 });
-    this.poolMat = new THREE.MeshStandardMaterial({ color: 0x1b4652, roughness: 0.04, metalness: 0.4 });
+    this.poolMat = makePoolWaterMaterial();
     // showroom glass: one transparent material shared by every pane (drawn after the opaque city)
     this.glassMat = new THREE.MeshStandardMaterial({ color: 0xa8c8dc, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
     this.signCache = new Map();
@@ -133,9 +133,10 @@ class ChunkManager {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), this._signTex(s));
       m.position.set(s.x, s.y, s.z); m.rotation.y = s.ry; group.add(m);
     }
+    // (a round pool or fountain basin by r; a rectangular pool by w and d)
     for (const w of b.water) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(w.r, 24).rotateX(-Math.PI / 2), this.poolMat);
-      m.position.set(w.x, w.y, w.z); m.receiveShadow = true; group.add(m);
+      const m = new THREE.Mesh((w.w ? new THREE.PlaneGeometry(w.w, w.d) : new THREE.CircleGeometry(w.r, 32)).rotateX(-Math.PI / 2), this.poolMat);
+      m.position.set(w.x, w.y, w.z); m.renderOrder = 1; group.add(m);
     }
     return { group, block: b, lastUsed: 0 };
   }

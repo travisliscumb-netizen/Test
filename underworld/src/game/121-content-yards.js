@@ -68,7 +68,9 @@ Object.assign(World.prototype, {
       case 'pool': {
         B(a, c, 0, 10, 0.03, 5.6, 0xd8d0c0);
         for (const s of [-1, 1]) { B(a, c + s * 2.45, 0.03, 9.2, 0.1, 0.3, 0xe8e2d4); B(a + s * 4.45, c, 0.03, 0.3, 0.1, 5.2, 0xe8e2d4); }
-        B(a, c, 0.02, 8.6, 0.05, 4.6, 0x35a6cf); B(a + 2, c - 0.6, 0.071, 2.6, 0.004, 1.2, 0x5ac0e0);
+        // (a pale basin and real water a hand under the coping: it was a blue slab)
+        B(a, c, 0.02, 8.6, 0.02, 4.6, 0xbfe6f2);
+        { const [wx, wz] = this._yw(F, a, c); b.water.push({ x: wx, z: wz, w: Math.abs(F.u[0]) * 8.7 + Math.abs(F.v[0]) * 4.7, d: Math.abs(F.u[1]) * 8.7 + Math.abs(F.v[1]) * 4.7, y: F.y + 0.11 }); }
         for (const s of [-0.3, 0.3]) B(a + 3.7 + s, c - 2.05, 0.1, 0.05, 0.9, 0.05, 0xd8dcdc);
         break;
       }

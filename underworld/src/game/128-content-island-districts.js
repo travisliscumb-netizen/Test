@@ -538,8 +538,17 @@ Object.assign(World.prototype, {
     this._door(b, { id: 'villaGarage', x: -547.1, z: -899.82, w: 6.0, h: 3.6, axis: 'x', face: 1, y, color: 0x2a2e33, block: b.i, kind: 'vspace', space: 'villa', prop: 'villa' });
     // ------------------------------------------------ behind the house: the pool terrace, the pool house, loungers
     box(b, -610, y + 0.05, -948, 66, 0.1, 22, STONE, false);
-    box(b, -610, y + 0.12, -951, 44, 0.06, 10, 0x2f9ccf, false); for (let x = -628; x <= -592; x += 9) b.water.push({ x, z: -951, r: 4.8, y: y + 0.14 });
-    box(b, -610, y + 0.17, -946, 44.4, 0.04, 0.3, GOLD, false); box(b, -610, y + 0.17, -956, 44.4, 0.04, 0.3, GOLD, false);
+    // the pool: a raised basin 44 x 10 m, its coping a seat-high stone wall, pale tiles inside, a darker band and steps at
+    // the shallow end, and water 0.12 m under the coping (it was a blue slab and four disks laid on the stone)
+    box(b, -610, y + 0.1, -951, 43.2, 0.06, 9.2, 0xbfe6f2, false);
+    for (let x = -630; x <= -590; x += 2.2) box(b, x, y + 0.165, -951, 0.06, 0.004, 9.0, 0x9ad4e6, false);
+    box(b, -610, y + 0.17, -951, 1.6, 0.004, 9.0, 0x1f6f9a, false);
+    for (let i = 0; i < 3; i++) box(b, -630.2 + i * 0.5, y + 0.15 + i * 0.12, -951, 0.5, 0.12, 6, 0xe8f4f8, false);
+    for (const [cx, cz, sx, sz] of [[-610, -946.2, 44.8, 0.6], [-610, -955.8, 44.8, 0.6], [-632.2, -951, 0.6, 9], [-587.8, -951, 0.6, 9]]) {
+      box(b, cx, y + 0.4, cz, sx, 0.8, sz, 0xece6d8, true); box(b, cx, y + 0.82, cz, sx + 0.1, 0.06, sz + 0.12, 0xf6f2e8, false);
+    }
+    b.water.push({ x: -610, z: -951, w: 43.6, d: 9.6, y: y + 0.7 });
+    box(b, -610, y + 0.86, -946, 44.4, 0.02, 0.3, GOLD, false); box(b, -610, y + 0.86, -956, 44.4, 0.02, 0.3, GOLD, false);
     for (let x = -626; x <= -594; x += 6.4) box(b, x, y + 0.35, -941.2, 1.6, 0.3, 3.4, 0xf8f8f4, false);
     bld(-584, -966, -566, -952, 4.2, STYLE.GLASS, 0x3a5060, 4.2, 4);
     // ------------------------------------------------ the tennis court and the helipad

@@ -41,10 +41,12 @@ function villaInteriorDef(owned) {
       k.tiles(W, D, MARBLE, MARBLE2, 1.25);
       k.door(0, hd - 0.02, 0, 0x3a2418, GOLD);
       // a wooden floor laid over a room's marble (x0, z0, x1, z1 at height y): planks along x
-      const wood = (x0, z0, x1, z1, y = 0, c1 = OAK, c2 = OAK2) => { const n = Math.max(1, Math.round((z1 - z0) / 0.6)); for (let i = 0; i < n; i++) k.box((x0 + x1) / 2, y + 0.002, z0 + (i + 0.5) * (z1 - z0) / n, x1 - x0 - 0.02, 0.012, (z1 - z0) / n - 0.02, i % 2 ? c1 : c2, { flat: true }); };
+      const wood = (x0, z0, x1, z1, y = 0, c1 = OAK, c2 = OAK2) => { const n = Math.max(1, Math.round((z1 - z0) / 0.6)); for (let i = 0; i < n; i++) k.box((x0 + x1) / 2, y + 0.002, z0 + (i + 0.5) * (z1 - z0) / n, x1 - x0 - 0.02, 0.01, (z1 - z0) / n - 0.02, i % 2 ? c1 : c2, { flat: true }); };
       // a chequered floor laid over one room
-      const tilesAt = (x0, z0, x1, z1, y, c2, sz) => { const nx = Math.floor((x1 - x0) / sz), nz = Math.floor((z1 - z0) / sz); k.box((x0 + x1) / 2, y + 0.001, (z0 + z1) / 2, x1 - x0 - 0.02, 0.01, z1 - z0 - 0.02, 0xe8e4dc, { flat: true }); for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if ((i + j) % 2) k.box(x0 + (i + 0.5) * sz, y + 0.004, z0 + (j + 0.5) * sz, sz - 0.03, 0.01, sz - 0.03, c2, { flat: true }); };
-      const carpet = (x0, z0, x1, z1, y, c) => k.box((x0 + x1) / 2, y + 0.002, (z0 + z1) / 2, x1 - x0 - 0.02, 0.016, z1 - z0 - 0.02, c, { flat: true });
+      const tilesAt = (x0, z0, x1, z1, y, c2, sz) => { const nx = Math.floor((x1 - x0) / sz), nz = Math.floor((z1 - z0) / sz); k.box((x0 + x1) / 2, y + 0.001, (z0 + z1) / 2, x1 - x0 - 0.02, 0.01, z1 - z0 - 0.02, 0xe8e4dc, { flat: true }); for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if ((i + j) % 2) k.box(x0 + (i + 0.5) * sz, y + 0.011, z0 + (j + 0.5) * sz, sz - 0.03, 0.004, sz - 0.03, c2, { flat: true }); };
+      // (each floor finish has its own height, so none flickers against another: marble to 0.002, wood and tiled floors to
+      // 0.012, a fitted carpet to 0.024, a rug laid on any of them from 0.03, 350 FURN.rug)
+      const carpet = (x0, z0, x1, z1, y, c) => k.box((x0 + x1) / 2, y + 0.002, (z0 + z1) / 2, x1 - x0 - 0.02, 0.022, z1 - z0 - 0.02, c, { flat: true });
       // ---------------------------------------------------------------- the upper floor slab (ceiling of the ground floor)
       const slab = (x0, z0, x1, z1) => k.box((x0 + x1) / 2, H1 - 0.3, (z0 + z1) / 2, x1 - x0, 0.3, z1 - z0, 0xf6f2e8, { col: true });
       slab(-hw, -hd, -8, hd); slab(8, -hd, hw, hd); slab(-8, -hd, 8, 0);
@@ -82,7 +84,8 @@ function villaInteriorDef(owned) {
       // ---- the garden room behind the hall (under the landing): sofas round a rug, a grand piano, palms, the garden doors
       wood(-8, -hd, 4, 0);
       FURN.rug(k, -2, 0, -8, 7, 5, 0x5a6a4a, 0x6a7a5a); FURN.sofa(k, -2, 0, -10.2, 0, 3.0, 0xe6e2da); FURN.sofa(k, -5.4, 0, -7.6, 1, 2.4, 0xe6e2da); FURN.armchair(k, 1.4, 0, -7.6, 3, 0x8a6a4a); FURN.coffeeTable(k, -2, 0, -7.8, 0, 1.6, 0.9, WAL);
-      k.box(1.5, 0, -12.8, 2.0, 0.95, 1.5, 0x111113, { col: true }); k.box(1.5, 0.95, -12.8, 2.0, 0.08, 1.5, 0x1a1a1c); k.box(1.0, 0.95, -12.1, 0.9, 0.12, 0.3, 0xf2f2f0);
+      // (the piano stands in the west corner, clear of the powder room's door)
+      k.box(-5.2, 0, -12.8, 2.0, 0.95, 1.5, 0x111113, { col: true }); k.box(-5.2, 0.95, -12.8, 2.0, 0.08, 1.5, 0x1a1a1c); k.box(-5.7, 0.95, -12.1, 0.9, 0.12, 0.3, 0xf2f2f0);
       for (const x of [-7.3, 3.3]) FURN.plant(k, x, 0, -14.3, 1.2);
       for (const x of [-5, -1, 3]) { k.box(x, 0, -hd + 0.06, 1.6, 2.6, 0.06, 0x9fc4d8); k.box(x, 2.6, -hd + 0.06, 1.7, 0.08, 0.1, WAL); }
       // powder room
@@ -106,7 +109,8 @@ function villaInteriorDef(owned) {
       for (const [x, z, o, w] of [[-17.75, -10.5, 1, 7], [-17.75, -2.9, 1, 3.6], [-16, -14.75, 0, 3.2], [-9.6, -14.75, 0, 2.8]]) FURN.bookshelf(k, x, 0, z, o, w, rng, 3.6);
       // the secret: a bookcase that stands a hand's width proud of the wall, a red book that glows when you are close
       FURN.bookshelf(k, -12.9, 0, -14.68, 0, 2.6, rng, 3.6); k.box(-12.2, 1.55, -14.45, 0.08, 0.3, 0.2, 0x9a1a2a); k.glow(-12.2, 1.86, -14.45, 0.06, 0.02, 0.06, 0xff4d4d, 1.2);
-      FURN.rug(k, -13, 0, -7, 6, 5, 0x2a3a2a, 0x3a4a3a); FURN.armchair(k, -15.4, 0, -6, 1, 0x5a2a1a); FURN.armchair(k, -10.6, 0, -6, 3, 0x5a2a1a); FURN.coffeeTable(k, -13, 0, -6, 0, 1.0, 0.8, WAL);
+      // (the reading chairs face each other across the middle of the room, clear of the doorway from the dining room)
+      FURN.rug(k, -13, 0, -7.4, 6, 5, 0x2a3a2a, 0x3a4a3a); FURN.armchair(k, -14.4, 0, -8, 1, 0x5a2a1a); FURN.armchair(k, -11.4, 0, -8, 3, 0x5a2a1a); FURN.coffeeTable(k, -12.9, 0, -8, 0, 1.0, 0.8, WAL);
       FURN.desk(k, -15.6, 0, -2.4, 2, 1.8, false, WAL); k.box(-9.4, 0, -2.4, 0.5, 0.8, 0.5, WAL, { col: true });
       k.box(-9.4, 0.8, -2.4, 0.12, 0.25, 0.12, GOLD); k.box(-9.4, 1.05, -2.4, 0.6, 0.6, 0.6, 0x3a6a9a); FURN.lamp(k, -17.2, 0, -0.8);
       // ---- the study (yours once you own it): the desk with the laptop, the safe, shelves, a map of the island
@@ -172,7 +176,8 @@ function villaInteriorDef(owned) {
       FURN.shower(k, -hw + 0.9, U2, 14.1, 0, 1.6); FURN.toilet(k, -21, U2, 14.4, 2); FURN.plant(k, -21, U2, 1.0, 0.9);
       // the walk-in closet: wardrobes all round, an island of drawers, a mirror; and one panel that does not sit flush
       carpet(-20, 0, -8, hd, U2, 0xd8ccb8);
-      for (let i = 0; i < 6; i++) { FURN.wardrobe(k, -19.6, U2, 1.4 + i * 2.2, 1, 2.0, 0xf2ece0); }
+      // (the wardrobes along the west wall leave the doorway to the ensuite (z 6 to 7.6) open: two of them stood in it)
+      for (const z of [1.4, 3.6, 10.2, 12.4]) FURN.wardrobe(k, -19.6, U2, z, 1, 2.0, 0xf2ece0);
       for (let i = 0; i < 4; i++) FURN.wardrobe(k, -17.5 + i * 2.2, U2, hd - 0.4, 2, 2.0, 0xf2ece0);
       FURN.dresser(k, -14, U2, 7.5, 0, 3.0, 0xf2ece0, false); k.box(-14, U2 + 0.9, 7.5, 3.0, 0.04, 0.6, 0x2a2620);
       k.box(-8.25, U2 + 0.2, 4, 0.06, 2.4, 1.2, 0xcfe0ec); // the full-length mirror

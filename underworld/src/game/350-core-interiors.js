@@ -16,6 +16,14 @@ const KIT_FACES = [
   [[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1], 0.9],
   [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1], 0.86]
 ];
+// a unit icosphere (one subdivision: 80 faces) for the kit's rounded shapes
+const KIT_ICO = (() => {
+  const t = (1 + Math.sqrt(5)) / 2, v = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map(p => { const l = Math.hypot(...p); return p.map(c => c / l); });
+  let f = [0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1];
+  const mid = new Map(), m = (a, b) => { const k = a < b ? a + ',' + b : b + ',' + a; if (mid.has(k)) return mid.get(k); const p = v[a].map((c, i) => (c + v[b][i]) / 2), l = Math.hypot(...p); v.push(p.map(c => c / l)); mid.set(k, v.length - 1); return v.length - 1; };
+  const g = []; for (let i = 0; i < f.length; i += 3) { const a = f[i], b = f[i + 1], c = f[i + 2], ab = m(a, b), bc = m(b, c), ca = m(c, a); g.push(a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca); }
+  return { v, f: g };
+})();
 class InteriorKit {
   constructor(h) { this.H = h; this.a = { p: [], c: [], i: [] }; this.g = { p: [], c: [], i: [] }; this.cols = []; this._c = new THREE.Color(); this.lights = []; }
   // x,z: centre; y: bottom; w,h,d: size. opt.col adds a collider, opt.glow puts it in the emissive mesh.
@@ -34,6 +42,33 @@ class InteriorKit {
     }
     for (let q = 0; q < 6; q++) { const o = base + q * 4; t.i.push(o, o + 1, o + 2, o, o + 2, o + 3); }
     if (opt.col) this.cols.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, y0: y, y1: y + h });
+  }
+  // a rounded mass (foliage, a cushion, a globe): an icosphere of radii rx, ry, rz centred at (x, y, z), each face its own
+  // colour with its light baked in (top faces brighter, a little jitter so a leaf mass is not one flat tone)
+  ball(x, y, z, rx, ry, rz, color, opt = {}) {
+    const t = this.a, c = this._c.set(color), V = KIT_ICO, j = opt.jitter ?? 0.08;
+    for (let f = 0; f < V.f.length; f += 3) {
+      const A = V.v[V.f[f]], B = V.v[V.f[f + 1]], Cc = V.v[V.f[f + 2]], ny = (A[1] + B[1] + Cc[1]) / 3;
+      const sh = (0.6 + 0.4 * clamp(ny * 0.8 + 0.45, 0, 1)) * (1 + (hash2i(f, Math.round(x * 31 + z * 17), 77) - 0.5) * j * 2);
+      const base = t.p.length / 3;
+      for (const q of [A, B, Cc]) { t.p.push(x + q[0] * rx, y + q[1] * ry, z + q[2] * rz); t.c.push(c.r * sh, c.g * sh, c.b * sh); }
+      t.i.push(base, base + 1, base + 2);
+    }
+    if (opt.col) this.cols.push({ x0: x - rx, x1: x + rx, z0: z - rz, z1: z + rz, y0: y - ry, y1: y + ry });
+  }
+  // an upright round (a pot, a column, a stool): radius r0 at the bottom y, r1 at the top y + h, n sides, capped
+  cyl(x, y, z, r0, r1, h, color, n = 10, opt = {}) {
+    const t = this.a, c = this._c.set(color), base = t.p.length / 3;
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, sh = 0.72 + 0.2 * Math.cos(a0 + 0.6), b = t.p.length / 3;
+      for (const [r, yy, a] of [[r0, y, a0], [r0, y, a1], [r1, y + h, a1], [r1, y + h, a0]]) { t.p.push(x + Math.cos(a) * r, yy, z + Math.sin(a) * r); t.c.push(c.r * sh, c.g * sh, c.b * sh); }
+      t.i.push(b, b + 2, b + 1, b, b + 3, b + 2);
+    }
+    const top = t.p.length / 3; t.p.push(x, y + h, z); t.c.push(c.r, c.g, c.b);
+    for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2; t.p.push(x + Math.cos(a) * r1, y + h, z + Math.sin(a) * r1); t.c.push(c.r, c.g, c.b); }
+    for (let i = 0; i < n; i++) t.i.push(top, top + 2 + i, top + 1 + i);
+    void base;
+    if (opt.col) this.cols.push({ x0: x - Math.max(r0, r1), x1: x + Math.max(r0, r1), z0: z - Math.max(r0, r1), z1: z + Math.max(r0, r1), y0: y, y1: y + h });
   }
   // a lamp of any real size also lights the room (G4): its centre, colour and a strength from its size
   glow(x, y, z, w, h, d, color, k = 2.2) {
@@ -477,6 +512,8 @@ function iwall(k, along, c, a, b, y0, h, col, gaps = [], t = 0.15) {
     else k.box(c, yy, (s0 + s1) / 2, t, hh, s1 - s0, col, { col: true });
   };
   const gs = gaps.slice().sort((p, q) => p[0] - q[0]);
+  // (every doorway is kept: the interiors suite checks that nothing stands in one)
+  for (const [g0, g1] of gs) (k.doorways || (k.doorways = [])).push({ along, c, g0, g1, y0 });
   let s = a;
   for (const [g0, g1] of gs) {
     seg(s, g0, y0, h); seg(g0, g1, y0 + DOOR_H, h - DOOR_H);
@@ -489,7 +526,8 @@ function iwall(k, along, c, a, b, y0, h, col, gaps = [], t = 0.15) {
   seg(s, b, y0, h);
 }
 const FURN = {
-  rug(k, x, y, z, w, d, col, col2) { k.box(x, y - 0.004, z, w, 0.012, d, col, { flat: true }); if (col2 !== undefined) k.box(x, y, z, w - 0.3, 0.014, d - 0.3, col2, { flat: true }); },
+  // (a rug lies over whatever floor is under it, a laid floor or a fitted carpet: its border to y + 0.034, its field to 0.042)
+  rug(k, x, y, z, w, d, col, col2) { k.box(x, y + 0.026, z, w, 0.008, d, col, { flat: true }); if (col2 !== undefined) k.box(x, y + 0.026, z, w - 0.3, 0.016, d - 0.3, col2, { flat: true }); },
   bed(k, x, y, z, o, w = 1.9, l = 2.2, sheet = 0x2f5d8a, frame = 0x3a2a20) {
     FB(k, x, y, z, o, 0, 0, 0, w, 0.42, l, frame, { col: true });
     FB(k, x, y, z, o, 0, 0.42, 0.02, w - 0.08, 0.2, l - 0.1, 0xeeeae2);
@@ -578,7 +616,30 @@ const FURN = {
     for (let i = 0; i < bc.length; i++) FB(k, x, y, z, o, (i % 3 - 1) * 0.07 + (i === 0 ? 0.1 : 0), 0.81, i === 0 ? 0.7 : -0.5 - Math.floor(i / 3) * 0.07, 0.055, 0.055, 0.055, bc[i]);
     FB(k, x, y, z, o, 0.55, 0.82, 0.2, 0.025, 0.025, 1.4, 0xd8b48a);
   },
-  plant(k, x, y, z, s = 1) { k.box(x, y, z, 0.5 * s, 0.45 * s, 0.5 * s, 0xd8d0c0, { col: true }); k.box(x, y + 0.45 * s, z, 0.7 * s, 1.0 * s, 0.7 * s, 0x2f6a3a); k.box(x, y + 1.2 * s, z, 0.45 * s, 0.5 * s, 0.45 * s, 0x3a7a4a); },
+  // a house plant: a glazed round pot with a rim and soil, stems, and a full crown of leaf masses in three greens (s scales
+  // it; its kind, a leafy shrub, a tall fiddle-leaf or a palm, comes from where it stands)
+  plant(k, x, y, z, s = 1) {
+    const q = i => hash2i(Math.round(x * 13 + i), Math.round(z * 7 - i), 919), kind = Math.floor(q(0) * 3);
+    const pots = [0xe8e2d4, 0x2a2c30, 0xb8643a, 0xd8d0c0], pot = pots[Math.floor(q(1) * 4)], G = [0x2f6a3a, 0x3f7f44, 0x4f8f3e, 0x2a5a32];
+    k.cyl(x, y, z, 0.2 * s, 0.27 * s, 0.46 * s, pot, 12, { col: true });
+    k.cyl(x, y + 0.44 * s, z, 0.29 * s, 0.29 * s, 0.05 * s, pot, 12);
+    k.cyl(x, y + 0.47 * s, z, 0.25 * s, 0.25 * s, 0.01, 0x3a2a1e, 12);
+    if (kind === 1) {
+      // a fiddle-leaf fig: a slim trunk, broad leaf masses up its height
+      k.cyl(x, y + 0.48 * s, z, 0.03 * s, 0.025 * s, 1.1 * s, 0x5a4030, 6);
+      for (let i = 0; i < 7; i++) { const a = i * 2.4 + q(i) * 0.6, h = (0.75 + i * 0.16) * s, r = (0.16 + 0.05 * (i % 2)) * s; k.ball(x + Math.cos(a) * r, y + h, z + Math.sin(a) * r, 0.22 * s, 0.13 * s, 0.22 * s, G[i % 4]); }
+      k.ball(x, y + 1.72 * s, z, 0.2 * s, 0.16 * s, 0.2 * s, G[2]);
+    } else if (kind === 2) {
+      // a palm: a few stems and long arching fronds (flattened, drooping masses round the top)
+      for (let i = 0; i < 3; i++) k.cyl(x + (i - 1) * 0.05 * s, y + 0.48 * s, z, 0.022 * s, 0.018 * s, (0.9 + i * 0.15) * s, 0x6a5a3a, 5);
+      for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2 + q(i) * 0.3, r = 0.42 * s, h = (1.3 + q(i + 9) * 0.25) * s; k.ball(x + Math.cos(a) * r, y + h - 0.12 * s, z + Math.sin(a) * r, 0.36 * s, 0.05 * s, 0.11 * s, G[i % 4], { jitter: 0.12 }); k.ball(x + Math.cos(a) * r * 0.45, y + h, z + Math.sin(a) * r * 0.45, 0.18 * s, 0.06 * s, 0.1 * s, G[(i + 1) % 4]); }
+    } else {
+      // a full leafy shrub: one mass in the middle, a ring of smaller ones, a top
+      k.ball(x, y + 0.85 * s, z, 0.42 * s, 0.38 * s, 0.42 * s, G[0]);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + q(i) * 0.5, r = 0.3 * s; k.ball(x + Math.cos(a) * r, y + (0.7 + q(i + 6) * 0.35) * s, z + Math.sin(a) * r, 0.24 * s, 0.22 * s, 0.24 * s, G[1 + (i % 3)]); }
+      k.ball(x, y + 1.22 * s, z, 0.24 * s, 0.2 * s, 0.24 * s, G[2]);
+    }
+  },
   lamp(k, x, y, z) { k.box(x, y, z, 0.3, 0.04, 0.3, 0x2a2a2a); k.box(x, y, z, 0.04, 1.5, 0.04, 0x2a2a2a); k.glow(x, y + 1.45, z, 0.36, 0.3, 0.36, 0xffe0b0, 1.9); },
   art(k, x, y, z, o, w = 1.2, h = 0.8, col = 0x2a5f9e) { FB(k, x, y, z, o, 0, 0, 0, w + 0.08, h + 0.08, 0.03, 0x1a1410); FB(k, x, y, z, o, 0, 0.04, 0.012, w, h, 0.02, col); FB(k, x, y, z, o, -w * 0.15, h * 0.3, 0.024, w * 0.4, h * 0.35, 0.01, new THREE.Color(col).offsetHSL(0.3, 0, 0.15).getHex()); },
   bar(k, x, y, z, o, len = 3, stools = 4, top = 0xd8c8a0, col = 0x1a1c20) {
@@ -1453,6 +1514,7 @@ class InteriorManager {
     grp.visible = false;
     game.scene.add(grp);
     def.group = grp;
+    def.doorways = k.doorways || [];
     def.cols = k.cols.map(c => game.world.grid.add({ x0: ox + c.x0, x1: ox + c.x1, z0: oz + c.z0, z1: oz + c.z1, y0: fy + c.y0 - 0.5, y1: fy + c.y1, kind: 'int', base: fy }));
     def.chars = (def.npcs || []).map(n => {
       const look = n.look === 'cop' ? copLook() : Object.assign(randomLook(mulberry32(n.id.length * 31)), n.look ? { shirt: C(n.look.shirt), pants: C(n.look.pants), cap: n.look.cap !== undefined ? C(n.look.cap) : null } : {});

@@ -1241,6 +1241,31 @@ function makeBillboardAtlas() {
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   return tex;
 }
+// pool water (2026-11-17): clear blue over a pale basin, darker where deep at the middle, moving ripples that catch the
+// light and a net of caustic light under the surface (it was a flat dark tint laid on the ground)
+function makePoolWaterMaterial() {
+  const m = new THREE.MeshStandardMaterial({ color: 0x2aa6d8, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.86, depthWrite: false });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uTime = U.uTime;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPW;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvPW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uTime; varying vec3 vPW;\nfloat pwN(vec2 p){ return sin(p.x) * sin(p.y); }')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        vec2 q = vPW.xz * 1.6; float t = uTime;
+        vec2 d = vec2(cos(q.x * 1.3 + t * 1.7) + 0.6 * cos(q.y * 2.1 - t * 1.3), cos(q.y * 1.1 + t * 1.5) + 0.6 * cos(q.x * 1.9 + t * 1.1)) * 0.05;
+        normal = normalize(normal + vec3(d.x, 0.0, d.y));
+      }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec2 q = vPW.xz * 0.9; float t = uTime * 0.8;
+        float c = abs(pwN(q * 2.3 + vec2(t, -t * 0.7)) + pwN(q * 1.7 + vec2(-t * 0.6, t)) * 0.8);
+        c = pow(clamp(1.0 - c, 0.0, 1.0), 6.0);
+        totalEmissiveRadiance += vec3(0.55, 0.85, 1.0) * c * 0.22 + vec3(0.02, 0.09, 0.12);
+      }`);
+  };
+  m.customProgramCacheKey = () => 'pv-pool1';
+  return m;
+}
 function makeRadialTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,255,255,0)', size = 128, stretch = false) {
   const c = document.createElement('canvas'); c.width = size; c.height = size;
   const g = c.getContext('2d');
