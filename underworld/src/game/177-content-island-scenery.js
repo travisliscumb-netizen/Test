@@ -288,6 +288,8 @@ class IslandScenery {
           // kerbs, pavements and shoulders give way to any other road's carriageway (tested at both edges); a joining
           // street's also give way to the pavement of the road it joins, which runs on unbroken
           const cut = si > 0 && (Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R), inside(p[0] + nx * l1, p[1] + nz * l1, R)) > -0.25
+            // (and at a dead end they stop at the turning circle's own kerb: they ran on across its asphalt)
+            || (R.ring && Math.min(Math.hypot(p[0] + nx * l0 - R.ring.x, p[1] + nz * l0 - R.ring.z), Math.hypot(p[0] + nx * l1 - R.ring.x, p[1] + nz * l1 - R.ring.z)) < R.ring.r + hw + 0.3)
             || (hosts.length && Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R, hosts), inside(p[0] + nx * l1, p[1] + nz * l1, R, hosts)) > -2.3));
           return { A, B, cut };
         });
@@ -300,12 +302,15 @@ class IslandScenery {
       // the turning circle at a dead end: asphalt to a gutter, and on a district street its kerb and pavement round it
       if (R.ring) {
         const y = R.y[R.y.length - 1], rr = R.ring.r + hw, cx = R.ring.x, cz = R.ring.z, N = 40;
+        // (the kerb and pavement round it leave the mouth open where the road comes in: they ran across the road)
+        const mouth = an => { const x = cx + Math.cos(an) * (rr + 1), z = cz + Math.sin(an) * (rr + 1); for (let k = Math.max(0, n - 6); k < n - 1; k++) { const a = R.pts[k], b = R.pts[k + 1]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < hw + 2.4) return true; } return (R.ringOpen || []).some(o => Math.hypot(x - o[0], z - o[1]) < 6.5); };
         const ring = (r0, r1, h0, h1, surf, side) => {
           let pv = null;
           for (let q = 0; q <= N; q++) {
             const an = q / N * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an), nn = side === 'up' ? [0, 1, 0] : [ca * side, 0, sa * side], qq = [surf, 0, 1e3, 1e3];
             const A = vtx(cx + ca * r1, y + h1, cz + sa * r1, nn, [r1, an * rr, rr, 0], qq), B = vtx(cx + ca * r0, y + h0, cz + sa * r0, nn, [r0, an * rr, rr, 0], qq);
-            if (pv) idx.push(pv[0], A, pv[1], pv[1], A, B); pv = [A, B];
+            const open = surf !== 0 && (mouth(an) || mouth((q - 1) / N * Math.PI * 2));
+            if (pv && !open) idx.push(pv[0], A, pv[1], pv[1], A, B); pv = [A, B];
           }
         };
         ring(0, rr, 0.03, 0.03, 0, 'up');

@@ -62,7 +62,8 @@ class World {
     for (const b of this.blocks) this._pruneBuried(b);
     // (the perimeter is built where each precinct stands, after the bake: the generate wrapper in 100)
     this._buildLocalRaster();
-    if (this._propSanity) this._propSanity();
+    // (the drive mouths are where the city was laid out: dropped once the props are placed, before it moves out to the island)
+    if (this._propSanity) { this._propSanity(); for (const b of this.blocks) delete b.mouths; }
     // (colliders: registered once the city stands where it does, by the generate wrapper in 100: _registerCityCols)
   }
   // the perimeter's walls, then every block's buildings, details and props: the order this pass always used
@@ -840,7 +841,26 @@ Object.assign(World.prototype, {
     if (typeof localRoadAt === 'function' && localRoadAt(x, z)) return true;
     const b = this.blockAt(x, z);
     if (b && b.drives) for (const d of b.drives) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1) return true;
+    // (and a drive's mouth: the pavement between its end and the street, where the car crosses to the kerb)
+    if (b && b.mouths) for (const d of b.mouths) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1) return true;
     return false;
+  },
+  // each drive's mouth: from the side of it that first meets a street (within 9 m), as wide as the drive, to the street
+  // (a power pole, a lamp or a street tree stood there, square in the way of the car coming out)
+  _driveMouths() {
+    const road = (x, z) => isOnRoad(x, z) || (typeof localRoadAt === 'function' && localRoadAt(x, z));
+    for (const b of this.blocks) {
+      b.mouths = [];
+      for (const r of b.drives || []) {
+        const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2, hx = (r.x1 - r.x0) / 2, hz = (r.z1 - r.z0) / 2;
+        let m = null;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let t = 0.3; t < 9; t += 0.3) { if (road(cx + dx * (hx + t), cz + dz * (hz + t))) { if (!m || t < m.t) m = { dx, dz, t }; break; } }
+        if (!m || m.t < 0.5) continue;
+        const half = Math.min(m.dx ? hz : hx, 1.6) + 0.2;
+        if (m.dx) b.mouths.push({ x0: m.dx > 0 ? r.x1 : r.x0 - m.t, x1: m.dx > 0 ? r.x1 + m.t : r.x0, z0: cz - half, z1: cz + half });
+        else b.mouths.push({ x0: cx - half, x1: cx + half, z0: m.dz > 0 ? r.z1 : r.z0 - m.t, z1: m.dz > 0 ? r.z1 + m.t : r.z0 });
+      }
+    }
   },
   _propFootprintBad(type, x, z, ry, sc) {
     const def = PROP_DEFS[type]; if (!def) return false;
@@ -857,6 +877,7 @@ Object.assign(World.prototype, {
     return false;
   },
   _propSanity() {
+    this._driveMouths();
     const rep = this.propReport = { checked: 0, moved: 0, removed: 0, byType: {} };
     for (const b of this.blocks) {
       for (let i = b.props.length - 1; i >= 0; i--) {

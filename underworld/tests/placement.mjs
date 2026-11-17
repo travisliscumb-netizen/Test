@@ -3,7 +3,8 @@
    runways); stop signs stand off the road; every traffic light's arm reaches over its road; every street lamp leans
    over its road; sidewalk and park benches face the street or walk they sit on; no prop is buried inside a building;
    island buildings stand on the ground or on the building under them, never in the air; the parked fleet stands
-   level, off the roads and out of the sea; the fire station stands at the level of the highway at its doors. */
+   level, off the roads and out of the sea; the fire station stands at the level of the highway at its doors; the turning circles stand level; Villa Valen's
+   gate meets Ridgeview Drive's circle; every island house car has a drive to its road; the city's drive mouths are clear. */
 import { launch, open, check, startNew, finish } from './lib.mjs';
 const b = await launch();
 const { page, errors } = await open(b, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -91,6 +92,34 @@ const r = await ev(() => {
   }
   const rlIn = RL.filter(l => w.xblocks.some(bk => bk.bld.some(q => !q.hollow && l.x > q.x0 && l.x < q.x1 && l.z > q.z0 && l.z < q.z1))).length;
   out.roadLamps = { n: RL.length, pools: (w.lampPools || []).length, bad: rlBad.length, inBld: rlIn, eg: rlBad.slice(0, 6) };
+  // the turning circles (022): the ground under every one is level with it, across its asphalt
+  const rings = [];
+  for (const R of I.roads) { if (!R.ring) continue; const g2 = R.ring, rr = g2.r + R.w / 2, y = R.y[R.y.length - 1]; let dev = 0;
+    for (let k = 0; k < 24; k++) for (const f of [0, 0.5, 0.95]) { const a = k / 24 * Math.PI * 2; dev = Math.max(dev, Math.abs(P.groundY(g2.x + Math.cos(a) * rr * f, g2.z + Math.sin(a) * rr * f, y + 3) - y)); }
+    if (dev > 0.1) rings.push([R.id, +dev.toFixed(2)]); }
+  out.rings = { n: I.roads.filter(R => R.ring).length, bad: rings };
+  // Villa Valen: Ridgeview Drive's circle before the gate, on the gate's axis and the estate's level, the way to the gate clear
+  { const R = I.roads.find(q => q.id === 'h3'), g2 = R.ring, V = w.isle.villa, rr = g2.r + R.w / 2; let hit = null;
+    for (let z = g2.z - rr + 0.5; z > -862; z -= 0.5) { const gy = P.groundY(-600, z, V.y + 2); if (w.grid.resolveCircle(-600, z, 1.0, gy + 0.3, gy + 1.5, {}).hit) { hit = Math.round(z); break; } }
+    out.villaGate = { dx: +(g2.x + 600).toFixed(2), y: +R.y[R.y.length - 1].toFixed(2), estate: V.y, edge: +(g2.z - rr).toFixed(1), hit }; }
+  // the island's houses (128): every parked car has a drive from it to its road, nothing solid in the way
+  const dr = w.isle.drives || [], dBad = []; let dN = 0;
+  for (const F of w.isle.fleet) { if (!/^dist/.test(F.id)) continue;
+    for (const s2 of F.slots || []) { dN++; const d = dr.find(d => Math.hypot(d.ax - s2.x, d.az - s2.z) < 0.6); if (!d) { dBad.push([F.id, Math.round(s2.x), Math.round(s2.z), 'no drive']); continue; }
+      // (exactly, over every road: the grid above indexes the cells a centre line crosses, not the carriageway's edge)
+      if (!I.roads.some(R => R.pts.some((p, k) => k < R.pts.length - 1 && segD(d.bx, d.bz, p, R.pts[k + 1]) < R.w / 2 + 0.2))) dBad.push([F.id, Math.round(d.bx), Math.round(d.bz), 'ends off the road']);
+      const L = Math.hypot(d.bx - d.ax, d.bz - d.az);
+      for (let t = 2.6; t < L - 0.5; t += 0.5) { const x = d.ax + (d.bx - d.ax) * t / L, z = d.az + (d.bz - d.az) * t / L, gy = P.groundY(x, z, s2.y + 3); if (w.grid.resolveCircle(x, z, 1.0, gy + 0.3, gy + 1.5, {}).hit) { dBad.push([F.id, Math.round(x), Math.round(z), 'blocked']); break; } } } }
+  out.isleDrives = { n: dN, bad: dBad.length, eg: dBad.slice(0, 6) };
+  // the city's home drives (121): the pavement between each and its street clear of poles, lamps and trees
+  const mBad = []; let mN = 0;
+  for (const bk of w.blocks) for (const r of bk.drives || []) {
+    const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2, hx = (r.x1 - r.x0) / 2, hz = (r.z1 - r.z0) / 2; let m = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let t = 0.3; t < 9; t += 0.3) if (road(cx + dx * (hx + t), cz + dz * (hz + t))) { if (!m || t < m.t) m = { dx, dz, t }; break; }
+    mN++; if (!m) { mBad.push([bk.name, Math.round(cx), Math.round(cz), 'no street']); continue; }
+    const half = Math.min(m.dx ? hz : hx, 1.6);
+    for (let t = 0.2; t < m.t; t += 0.4) for (const o of [-half + 0.5, 0, half - 0.5]) { const x = cx + m.dx * (hx + t) + (m.dz ? o : 0), z = cz + m.dz * (hz + t) + (m.dx ? o : 0); const p = bk.props.find(p => p.col && Math.hypot(p.x - x, p.z - z) < 1.0); if (p) { mBad.push([bk.name, Math.round(cx), Math.round(cz), p.type]); t = 1e9; break; } } }
+  out.mouths = { n: mN, bad: mBad.length, eg: mBad.slice(0, 6) };
   // the fire station stands at the level of the Coast Highway passing its doors (the bays open onto it)
   const fs = w.xblocks.find(bk => bk.place && bk.place.id === 'firehouse'), hw = I.roads.find(R => R.id === 'n1e');
   if (fs && hw) { const d = fs.place.door; let best = 1e9, hy = null; hw.pts.forEach((p, k) => { const e = Math.hypot(p[0] - d.x, p[1] - d.z); if (e < best) { best = e; hy = hw.y[k]; } }); out.fire = { floor: fs.bld[0].y0, road: +hy.toFixed(2), dist: +best.toFixed(1) }; }
@@ -106,6 +135,10 @@ check('no prop buried inside a building', r.buried.n === 0, JSON.stringify(r.bur
 check('no island building stands in the air', r.float.n === 0, JSON.stringify(r.float));
 check('the parked fleet stands level, off the roads, out of buildings and out of the sea', r.slots.n >= 250 && !r.slots.steep.length && !r.slots.road.length && !r.slots.sea.length && !r.slots.bld.length, JSON.stringify({ n: r.slots.n, steep: r.slots.steep, road: r.slots.road, sea: r.slots.sea, bld: r.slots.bld }));
 check('the island highways have their lamps: each post off the road, its head over its own carriageway, on the ground, none in a building; a pool under every island lamp', r.roadLamps.n >= 300 && r.roadLamps.bad === 0 && r.roadLamps.inBld === 0 && r.roadLamps.pools >= r.roadLamps.n, JSON.stringify(r.roadLamps));
+check('every turning circle stands level on its ground (none half under the grass or in the air)', r.rings.n >= 10 && r.rings.bad.length === 0, JSON.stringify(r.rings));
+check('Villa Valen: Ridgeview Drive ends in a turning circle at the gate, on its axis and the estate’s level, the way through the gate clear', Math.abs(r.villaGate.dx) < 1.5 && Math.abs(r.villaGate.y - r.villaGate.estate) < 0.3 && r.villaGate.edge > -851 && r.villaGate.edge < -844 && r.villaGate.hit === null, JSON.stringify(r.villaGate));
+check('every car parked at an island house has a drive to its road, nothing in the way', r.isleDrives.n >= 150 && r.isleDrives.bad === 0, JSON.stringify(r.isleDrives));
+check('every city home drive meets its street with the pavement between clear (no pole, lamp or tree in the mouth)', r.mouths.n >= 60 && r.mouths.bad === 0, JSON.stringify(r.mouths));
 check('the fire station stands level with the Coast Highway at its doors', !!r.fire && Math.abs(r.fire.floor - r.fire.road) < 1.5 && r.fire.dist < 40, JSON.stringify(r.fire));
 check('no console errors', errors.length === 0, errors.slice(0, 5).join(' | '));
 await finish(b, 'placement');

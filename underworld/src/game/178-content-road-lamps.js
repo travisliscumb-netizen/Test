@@ -41,7 +41,7 @@ Object.assign(World.prototype, {
         side = -side;
         const x = cx + nx * (R.w / 2 + L.inset), z = cz + nz * (R.w / 2 + L.inset);
         if (CityLayout.inCity(x, z, EDGE_MARGIN + 6)) continue;
-        if (inRoad(x, z, L.clearRoad) || inBuilt(x, z, 1.0)) continue;
+        if (inRoad(x, z, L.clearRoad) || inBuilt(x, z, 1.0) || this._onIsleDrive(x, z, 1.0)) continue;
         const gy = Island.height(x, z);
         if (gy < SEA_Y + 0.3 || Math.abs(gy - ry) > L.maxStep) continue;
         out.push({ x, z, y: gy, ry: Math.atan2(-nx, -nz), hx: x - nx * L.arm, hz: z - nz * L.arm, road: R.id });

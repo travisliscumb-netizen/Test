@@ -26,7 +26,9 @@
    ===================================================================== */
 const ISLE_DISTRICT_ROADS = [
   { id: 'h1', name: 'Bayview Crescent', w: 8, grade: 0.09, ends: ['n1', 'n1'], pts: [[-300, -330], [-332, -262], [-420, -205], [-540, -176], [-660, -188], [-760, -240], [-800, -305]] },
-  { id: 'h3', name: 'Ridgeview Drive', w: 8, grade: 0.1, ends: ['n1', 'ring'], ring: 14, pts: [[-450, -330], [-456, -400], [-500, -468], [-590, -520], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
+  // (it climbs straight up the villa's axis to a turning circle at the gate, on the estate's level: it ended 35 m short and
+  // 2.6 m below the gate, the circle off the axis and half under the grass, with no drive to the gate)
+  { id: 'h3', name: 'Ridgeview Drive', w: 8, grade: 0.1, ends: ['n1', 'ring'], ring: 12, ringOpen: [[-600, -848]], pts: [[-450, -330], [-456, -400], [-500, -468], [-590, -520], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-624, -794], [-604, -802], [-600, -810], [-600, -818]] },
   { id: 'h4', name: 'Laurel Way', w: 8, grade: 0.1, ends: ['h3', 'ring'], ring: 13, pts: [[-596, -523], [-680, -472], [-790, -452], [-880, -472], [-930, -540]] },
   { id: 'm1', name: 'Marsh Hollow Road', w: 9, grade: 0.08, ends: ['s4', 's1'], pts: [[-918, 1290], [-800, 1356], [-640, 1418], [-480, 1466], [-330, 1450], [-200, 1402], [-108, 1420]] },
   { id: 'm2', name: 'Heron Loop', w: 8, grade: 0.09, ends: ['m1', 'm1'], pts: [[-640, 1418], [-622, 1540], [-520, 1628], [-380, 1636], [-282, 1560], [-330, 1450]] },
@@ -42,7 +44,7 @@ ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // the Heights' north street; Reed Street stops short of the Nightlife Strip on the south shore
 Object.assign(ISLE_ROAD_LAYOUT.island, {
   h1: null,
-  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-612, -800], [-600, -815]] },
+  h3: { ends: ['lat', 'ring'], pts: [[-520, -486], [-545, -512], [-590, -532], [-690, -560], [-742, -640], [-722, -730], [-662, -782], [-624, -794], [-604, -802], [-600, -810], [-600, -818]] },
   m3: { pts: [[-480, 1466], [-472, 1400], [-465, 1345]] }
 });
 // Linden Gardens (island layout): the ground the Nightlife Strip left between Linden Hills, downtown's south edge and
@@ -220,6 +222,8 @@ Object.assign(World.prototype, {
     }
     // the estate's grounds: one level, cut into the hill
     const estate = sitePad(V.x0, V.z0, V.x1, V.z1, 30, V.y);
+    // and the ground before the gate, where Ridgeview Drive ends in its turning circle, on the same level
+    sitePad(V.gate - 24, V.z1, V.gate + 24, V.z1 + 30, 26, V.y);
     return { lots, estate, roads };
   },
   // ---------------------------------------------------------------- building (after the roads)
@@ -263,6 +267,16 @@ Object.assign(World.prototype, {
       let r = 0; for (const L of B.lots) r = Math.max(r, Math.hypot(L.x - cx, L.z - cz));
       B.b = this._isleBlock('dist_' + B.d + bi++, cx, cz, r + 90, ISLE_DISTRICTS[B.d].name); B.cx = cx; B.cz = cz;
     }
+    // the yard is dressed clear of each car's way out: from the car straight out to the front of the lot (the drive, below)
+    const dressLot = (B, b, L, y, kind, house, keep) => {
+      const extra = [];
+      for (const S of B.slots) {
+        const cu = (S.x - L.x) * L.ux + (S.z - L.z) * L.uz, cv = (S.x - L.x) * L.vx + (S.z - L.z) * L.vz;
+        if (Math.abs(cu) > L.W / 2 || Math.abs(cv) > L.D / 2) continue;
+        for (let v = cv + 3; v > -L.D / 2 - 1; v -= 1.5) extra.push([cu, v, 2.6]);
+      }
+      this._dressLot(b, L, y, kind, house, [...keep, ...extra]);
+    };
     const signN = {};
     for (const B of blocks.values()) for (const L of B.lots) {
       const b = B.b, y = L.P.y, Dd = ISLE_DISTRICTS[L.d], h = face(L), q = k => rng(L.seed, k), car = k => Dd.cars[Math.floor(q(k) * Dd.cars.length)];
@@ -277,7 +291,7 @@ Object.assign(World.prototype, {
         const [cx, cz] = W2(L, 10.5, -10); B.slots.push({ x: cx, z: cz, h, y, cls: car(3) });
         const [tx, tz] = W2(L, -13, -10); tree(b, tx, y, tz, 1, L.i);
         // the yard, the front door and the porch (121)
-        this._dressLot(b, L, y, 'villa', [-12.5, -5, 6.5, 7], [[-4, 10.6, 5], [10.5, -1, 5.6], [10.5, -10, 3.6], [-13, -10, 2]]);
+        dressLot(B, b, L, y, 'villa', [-12.5, -5, 6.5, 7], [[-4, 10.6, 5], [10.5, -1, 5.6], [10.5, -10, 3.6], [-13, -10, 2]]);
       } else if (L.kind === 'house') {
         const two = q(1) < 0.55, wall = [0xf2d9c4, 0xc9e2e8, 0xf0e6b8, 0xd8e8c8, 0xe8c8c8, 0xdcdcec, 0xe4dccc][Math.floor(q(2) * 7)];
         bld(rectL(L, -1, 1.5, two ? 6.5 : 7.5, 5), two ? 5.8 : 3.6, STYLE.HOUSE, wall, two ? 2.9 : 3.6, 3.2, { roof: 'gable', roofColor: [0x5a4a3a, 0x3a4652, 0x7a3a2e][Math.floor(q(3) * 3)] });
@@ -285,13 +299,13 @@ Object.assign(World.prototype, {
         boxL(b, L, 8, -7.5, 3.6, 7, y + 0.03, 0.06, 0x8a8a88, false);
         if (q(4) < 0.8) { const [cx, cz] = W2(L, 8, -6.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(5) }); }
         const [tx, tz] = W2(L, -7, 8.5); tree(b, tx, y, tz, 0.85, L.i);
-        const hu = two ? 6.5 : 7.5; this._dressLot(b, L, y, 'house', [-1 - hu, -3.5, -1 + hu, 6.5], [[8, -7.5, 4.4], [-7, 8.5, 1.8]]);
+        const hu = two ? 6.5 : 7.5; dressLot(B, b, L, y, 'house', [-1 - hu, -3.5, -1 + hu, 6.5], [[8, -7.5, 4.4], [-7, 8.5, 1.8]]);
       } else if (L.kind === 'cabin') {
         bld(rectL(L, 0, 0, 4.6, 4), 4.4, STYLE.HOUSE, [0x7a5a3e, 0x8a6a48, 0x5e4a38][Math.floor(q(1) * 3)], 4.4, 3, { roof: 'gable', roofColor: 0x3a3d40 });
         boxL(b, L, -6.2, 2, 1.2, 2.6, y + 0.5, 1, 0x6a4a2e, true);
         if (q(2) < 0.75) { const [cx, cz] = W2(L, 5.8, -5.5); B.slots.push({ x: cx, z: cz, h, y, cls: car(3) }); }
         const [tx, tz] = W2(L, -5, 6.5); tree(b, tx, y, tz, 1.1, L.i);
-        this._dressLot(b, L, y, 'cabin', [-4.6, -4, 4.6, 4], [[-6.2, 2, 2], [5.8, -5.5, 3.6], [-5, 6.5, 1.8]]);
+        dressLot(B, b, L, y, 'cabin', [-4.6, -4, 4.6, 4], [[-6.2, 2, 2], [5.8, -5.5, 3.6], [-5, 6.5, 1.8]]);
       } else if (L.kind === 'shop') {
         const r = rectL(L, 0, 3, 15, 8), n = signN[L.d] = (signN[L.d] || 0) + 1, text = Dd.signs[(n - 1) % Math.max(1, Dd.signs.length)] || 'GENERAL STORE';
         boxL(b, L, 0, -9.5, L.W - 2, 6, y + 0.03, 0.06, 0x3c3f44, false); for (const k of [-4.5, 4.5]) boxL(b, L, k, -9.5, 0.15, 5, y + 0.07, 0.02, 0xf2f2f2, false);
@@ -343,6 +357,13 @@ Object.assign(World.prototype, {
         if (!b.place) b.place = { id: 'dist_' + L.d + '_' + n, name: ISLE_DISTRICTS[L.d].name, kind: 'landmark', door: { x: sx - L.vx * 2, z: sz - L.vz * 2, h }, under: { x: (r[0] + r[2]) / 2, z: (r[1] + r[3]) / 2 } };
       }
     }
+    // ---------------------------------------------------------------- driveways: every parked car at a house to its road
+    // (a car whose drive cannot be laid, too steep or blocked, is not parked there: it could never leave)
+    for (const B of blocks.values()) B.slots = B.slots.filter(S => {
+      const L = B.lots.find(L => S.x > L.rect[0] - 1 && S.x < L.rect[2] + 1 && S.z > L.rect[1] - 1 && S.z < L.rect[3] + 1);
+      const R = L && Island.roads.find(q => q.id === L.road);
+      return !R || this._isleDrive(B.b, S.x, S.z, S.y, R, [], ISLE_DRIVE.back, [-L.vx, -L.vz]);
+    });
     // ---------------------------------------------------------------- street lamps along the new streets
     const lotRects = plan.lots.map(L => L.rect), V = VILLA_VALEN, blockList = [...blocks.values()];
     // a point clear of every island road but its own (a street tree must not stand in a crossing street)
@@ -357,7 +378,7 @@ Object.assign(World.prototype, {
         const a = R.pts[Math.max(0, k - 1)], c = R.pts[Math.min(R.pts.length - 1, k + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = (c[1] - a[1]) / l * side, nz = -(c[0] - a[0]) / l * side;
         const x = R.pts[k][0] + nx * (R.w / 2 + 1.6), z = R.pts[k][1] + nz * (R.w / 2 + 1.6), y = R.y[k];
         side = -side;
-        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || (x > V.x0 && x < V.x1 && z > V.z0 && z < V.z1) || !roadClearPt(x, z, R)) continue;
+        if (lotRects.some(r => x > r[0] - 1 && x < r[2] + 1 && z > r[1] - 1 && z < r[3] + 1) || (x > V.x0 && x < V.x1 && z > V.z0 && z < V.z1) || !roadClearPt(x, z, R) || this._onIsleDrive(x, z, 1.2)) continue;
         const B = own.reduce((m, q) => Math.hypot(q.cx - x, q.cz - z) < Math.hypot(m.cx - x, m.cz - z) ? q : m);
         cyl(B.b, x, y + 3.2, z, 0.11, 6.4, 0x3a3f45, true);
         box(B.b, x - nx * 0.7, y + 6.35, z - nz * 0.7, Math.abs(nx) > 0.5 ? 1.5 : 0.3, 0.14, Math.abs(nx) > 0.5 ? 0.3 : 1.5, 0x3a3f45, false);
@@ -369,7 +390,7 @@ Object.assign(World.prototype, {
           let k2 = 0; const s2 = s + 22; while (k2 < R.pts.length - 2 && R.cum[k2 + 1] < s2) k2++;
           const a2 = R.pts[Math.max(0, k2 - 1)], c2 = R.pts[Math.min(R.pts.length - 1, k2 + 1)], l2 = Math.hypot(c2[0] - a2[0], c2[1] - a2[1]) || 1;
           const tx = R.pts[k2][0] + (c2[1] - a2[1]) / l2 * sd * (R.w / 2 + 2.6), tz = R.pts[k2][1] - (c2[0] - a2[0]) / l2 * sd * (R.w / 2 + 2.6);
-          if (s2 > R.cum[R.cum.length - 1] - 12 || lotRects.some(r => tx > r[0] - 2 && tx < r[2] + 2 && tz > r[1] - 2 && tz < r[3] + 2) || !roadClearPt(tx, tz, R) || CityLayout.inCity(tx, tz, EDGE_MARGIN + 3)) continue;
+          if (s2 > R.cum[R.cum.length - 1] - 12 || lotRects.some(r => tx > r[0] - 2 && tx < r[2] + 2 && tz > r[1] - 2 && tz < r[3] + 2) || !roadClearPt(tx, tz, R) || CityLayout.inCity(tx, tz, EDGE_MARGIN + 3) || this._onIsleDrive(tx, tz, 2)) continue;
           tree(B.b, tx, R.y[k2], tz, 0.95 + 0.25 * hash2i(Math.round(tx), Math.round(tz), 77), tx + tz);
         }
       }
@@ -499,6 +520,8 @@ Object.assign(World.prototype, {
     cyl(b, -610, y + 0.4, -877, 4.4, 0.8, STONE, true); this._det(b, 'disc', -610, y + 0.82, -877, 3.8, 1, 3.8, C(0x3a9ad0)); b.water.push({ x: -610, z: -877, r: 3.6, y: y + 0.82 });
     cyl(b, -610, y + 1.9, -877, 0.4, 2.4, STONE, false); cyl(b, -610, y + 3.15, -877, 1.4, 0.3, GOLD, false); b.fx.push({ type: 'fountain', x: -610, y: y + 3.4, z: -877 });
     box(b, -600, y + 0.03, -856, 9, 0.06, 12, 0xd8d0c0, false);
+    // (and on through the gate to Ridgeview Drive's turning circle outside)
+    box(b, -600, y + 0.03, V.z1 + 2.2, 9, 0.06, 4.4, 0xd8d0c0, false);
     for (const gx of [-606.5, -593.5]) {
       box(b, gx, y + 1.9, V.z1, 1.6, 3.8, 1.6, STONE, true); box(b, gx, y + 3.95, V.z1, 1.9, 0.3, 1.9, GOLD, false);
       this._det(b, 'blob', gx, y + 4.6, V.z1, 0.55, 0.55, 0.55, C(GOLD)); b.fx.push({ type: 'neon', x: gx, y: y + 3.3, z: V.z1 + 0.85, w: 0.5, h: 0.5, d: 0.08, c: 0xffe2b0 });
@@ -599,5 +622,98 @@ Object.assign(World.prototype, {
     fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'aurelia' }]);
     this.isle.fleet.push({ id: 'folk_villa', x: -610, z: -900, r: 0, slots: [], people: [[-606, -896, 0.3], [-614, -896, -0.3], [-596, V.z1 + 3, Math.PI], [-563, Q.z1 + 4, 0], [-600, -948.5, 1.6]] });
     this.isle.villa = { pad, vault: Q, y };
+  }
+});
+// ---------------------------------------------------------------- driveways (2026-11-17)
+// A parked car at an island house stood on its lawn with grass (a verge, trees) between it and its road: there was no
+// way for it to leave. Each one gets a paved drive from behind the car to the edge of its own road's carriageway: in
+// 2 m pieces that follow the ground (a sloped piece from point to point), up onto the pavement where a district street
+// has one (the dropped kerb), and never steeper than ISLE_DRIVE.maxGrade (a car climbs what the ground is; where it would be steeper, there is no drive and the
+// car is not parked there). A district tree standing in its way is taken out; anything else in the way (a wall, a
+// building, a hedge) and the car is not parked there either. this.isle.drives keeps them: the street lamps, the street
+// trees and the road lamps (178) keep off them.
+const ISLE_DRIVE = { w: 3.4, back: 3, piece: 2, maxGrade: 0.45, maxLen: 70, col: 0x8f918e };
+Object.assign(World.prototype, {
+  // (why a drive was not laid: kept for the placement suite and the audit)
+  _driveNo(why, x, z, ...a) { (this.isle.driveNo = this.isle.driveNo || []).push([why, Math.round(x), Math.round(z), ...a]); return false; },
+  _onIsleDrive(x, z, m = 0) {
+    for (const d of (this.isle && this.isle.drives) || []) {
+      const dx = d.bx - d.ax, dz = d.bz - d.az, l2 = dx * dx + dz * dz || 1, t = clamp(((x - d.ax) * dx + (z - d.az) * dz) / l2, 0, 1);
+      if (Math.hypot(x - d.ax - dx * t, z - d.az - dz * t) < d.w / 2 + m) return true;
+    }
+    return false;
+  },
+  // a drive for a car at (sx, sz) (its ground sy) to road R, through way points (a gap in a hedge) if any; true if laid
+  // (dir: the way the lot faces its road; the drive runs straight out that way to the road, square across the verge,
+  // not on a slant to the nearest point of the road through the neighbours' hedges)
+  _isleDrive(b, sx, sz, sy, R, via = [], back = ISLE_DRIVE.back, dir = null) {
+    const D = ISLE_DRIVE, isle = this.isle, urban = /^[ghmpd]\d/.test(R.id), hw = R.w / 2;
+    // the nearest point of the road's centre line to the last way point (or the car)
+    const [qx, qz] = via.length ? via[via.length - 1] : [sx, sz];
+    let best = null;
+    for (let k = 0; k < R.pts.length - 1; k++) {
+      const a = R.pts[k], c = R.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((qx - a[0]) * dx + (qz - a[1]) * dz) / l2, 0, 1);
+      const px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(qx - px, qz - pz);
+      if (!best || d < best.d) best = { d, px, pz, y: R.y[k] + (R.y[k + 1] - R.y[k]) * t };
+    }
+    if (dir && !via.length) {
+      // straight out of the lot: the first point along dir that is on the road's carriageway
+      for (let t = 0; t < ISLE_DRIVE.maxLen; t += 0.5) {
+        const x = sx + dir[0] * t, z = sz + dir[1] * t;
+        for (let k = 0; k < R.pts.length - 1; k++) {
+          const a = R.pts[k], c = R.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, u = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1);
+          const px = a[0] + dx * u, pz = a[1] + dz * u, d = Math.hypot(x - px, z - pz);
+          if (d < hw - 0.4) { best = { d: Math.hypot(sx - px, sz - pz), px, pz, y: R.y[k] + (R.y[k + 1] - R.y[k]) * u, ex: x, ez: z }; t = 1e9; break; }
+        }
+      }
+    }
+    if (!best || best.d < hw + 0.5) return true; // (already at the road)
+    // the line: behind the car, the car, the way points, the road's edge (just onto the carriageway)
+    const ex = best.ex !== undefined ? best.ex : best.px + (qx - best.px) / best.d * (hw - 0.4), ez = best.ez !== undefined ? best.ez : best.pz + (qz - best.pz) / best.d * (hw - 0.4);
+    const f = via.length ? via[0] : [ex, ez], fl = Math.hypot(f[0] - sx, f[1] - sz) || 1;
+    const line = [[sx - (f[0] - sx) / fl * back, sz - (f[1] - sz) / fl * back], [sx, sz], ...via, [ex, ez]];
+    let len = 0; for (let i = 1; i < line.length; i++) len += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
+    if (len > D.maxLen) return this._driveNo('long', sx, sz);
+    // the surface along it: the lot's level at the car, the ground on the way, the pavement and the road at the end
+    const surf = (x, z) => {
+      const dr = Math.hypot(x - best.px, z - best.pz);
+      if (dr <= hw) return best.y + 0.04;
+      if (urban && dr < hw + 2.4) return best.y + 0.2;
+      return Math.max(Island.height(x, z), SEA_Y + 0.4) + 0.03;
+    };
+    const P = [];
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1], c = line[i], l = Math.hypot(c[0] - a[0], c[1] - a[1]), n = Math.max(1, Math.ceil(l / D.piece));
+      for (let j = i === 1 ? 0 : 1; j <= n; j++) { const x = a[0] + (c[0] - a[0]) * j / n, z = a[1] + (c[1] - a[1]) * j / n; P.push([x, i <= 1 && j <= n ? sy + 0.03 : surf(x, z), z]); }
+    }
+    for (let i = 1; i < P.length; i++) { const l = Math.hypot(P[i][0] - P[i - 1][0], P[i][2] - P[i - 1][2]); if (l > 0.01 && Math.abs(P[i][1] - P[i - 1][1]) / l > D.maxGrade) return this._driveNo('steep', sx, sz, +(P[i][1] - P[i - 1][1]).toFixed(2), i); }
+    // what stands in the way: a district tree goes; anything else and there is no drive
+    const segs = []; for (let i = 1; i < line.length; i++) segs.push({ ax: line[i - 1][0], az: line[i - 1][1], bx: line[i][0], bz: line[i][1], w: D.w });
+    const near = (x, z, m) => segs.some(d => { const dx = d.bx - d.ax, dz = d.bz - d.az, l2 = dx * dx + dz * dz || 1, t = clamp(((x - d.ax) * dx + (z - d.az) * dz) / l2, 0, 1); return Math.hypot(x - d.ax - dx * t, z - d.az - dz * t) < d.w / 2 + m; });
+    const hitsRect = (x0, z0, x1, z1) => segs.some(d => {
+      const dx = d.bx - d.ax, dz = d.bz - d.az, l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l;
+      for (let t = 0; t <= l; t += 0.5) for (const o of [-d.w / 2, 0, d.w / 2]) { const x = d.ax + dx * t / l + nx * o, z = d.az + dz * t / l + nz * o; if (x > x0 && x < x1 && z > z0 && z < z1) return true; }
+      return false;
+    });
+    const trees = [];
+    for (const B of isle.blocks) {
+      for (const r of B.bld) { if (r.hollow) continue; for (const p of P) if (p[0] > r.x0 - 0.8 && p[0] < r.x1 + 0.8 && p[2] > r.z0 - 0.8 && p[2] < r.z1 + 0.8) return this._driveNo('bld', sx, sz, B.name); }
+      for (const d of B.det) {
+        const c = d.col; if (!c || c.y1 - c.y0 < 0.3) continue;
+        const x = c.x !== undefined ? c.x : (c.x0 + c.x1) / 2, z = c.z !== undefined ? c.z : (c.z0 + c.z1) / 2;
+        // (a post or a trunk by its radius; a box by its own rectangle: a long hedge is not a circle as wide as it is long)
+        if (c.r !== undefined ? !near(x, z, c.r + 0.3) : !hitsRect(c.x0 - 0.3, c.z0 - 0.3, c.x1 + 0.3, c.z1 + 0.3)) continue;
+        if (d.kind === 'cylr' && d.color && d.color.getHex() === C(0x4e3c2c).getHex()) trees.push([B, d.x, d.z]); else return this._driveNo('det', sx, sz, d.kind, d.color && d.color.getHexString(), Math.round(x), Math.round(z));
+      }
+    }
+    for (const [B, x, z] of trees) B.det = B.det.filter(d => !(Math.hypot(d.x - x, d.z - z) < 3.6 && (d.kind === 'blob' || (d.kind === 'cylr' && d.color && d.color.getHex() === C(0x4e3c2c).getHex()))));
+    // the pieces: a slab from point to point, pitched to the slope between them
+    for (let i = 1; i < P.length; i++) {
+      const a = P[i - 1], c = P[i], dx = c[0] - a[0], dz = c[2] - a[2], l = Math.hypot(dx, dz); if (l < 0.01) continue;
+      const dy = c[1] - a[1], s = this._det(b, 'box', (a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2, D.w, 0.06, Math.hypot(l, dy) + 0.12, C(D.col), Math.atan2(dx, dz));
+      s.rx = -Math.atan2(dy, l);
+    }
+    (isle.drives = isle.drives || []).push(...segs);
+    return true;
   }
 });

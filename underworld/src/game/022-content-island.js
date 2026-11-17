@@ -248,6 +248,8 @@ const Island = {
       });
       const pts = splinePts(cp, 2.5);
       const R = { id: D.id, name: D.name, w: D.w, grade: D.grade, deck: D.deck, cut: D.cut || null, ends: D.ends, ring: null, pts, hosts, st: D.st || 'asphalt' };
+      // (ringOpen: points where a private drive leaves the turning circle: its kerb and pavement are left open there)
+      if (D.ringOpen) R.ringOpen = D.ringOpen;
       if (D.ring) { const a = pts[pts.length - 2], b = pts[pts.length - 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; R.ring = { x: b[0] + (b[0] - a[0]) / l * D.ring, z: b[1] + (b[1] - a[1]) / l * D.ring, r: D.ring }; }
       this._profile(R);
       this.roads.push(R); byId[R.id] = R;
@@ -284,6 +286,9 @@ const Island = {
         pin[q] = H.road.y[best];
       }
     });
+    // a dead end meets the ground it ends on (a level site: Villa Valen's gate, a quay): the smoothing below averages
+    // only the road behind the end, which left it 2-3 m under a site on higher ground
+    if (R.ring && isNaN(pin[n - 1])) pin[n - 1] = raw[n - 1];
     // the cut: from where the ground first rises above T either side of the ridge, one even grade
     let cut = null;
     if (R.cut) {
@@ -307,6 +312,9 @@ const Island = {
   },
   _indexRoads() {
     this._seg.clear(); this._sseg.clear(); this._multi.clear();
+    // the turning circles: level at the road's end, as far as their asphalt reaches (the circle round ring.r is driven,
+    // the asphalt runs half a road's width beyond it)
+    this._rings = this.roads.filter(R => R.ring).map(R => ({ x: R.ring.x, z: R.ring.z, r: R.ring.r + R.w / 2, y: R.y[R.y.length - 1], R }));
     const C = 64, T = ISLE.tile;
     this.roads.forEach((R, ri) => {
       const reach = R.w / 2 + ISLE.verge + ISLE.shMax;
@@ -341,6 +349,29 @@ const Island = {
   // the tunnel's floor are not part of it: see _spanAt). o.wide: for the far mesh (32 m apart), the ground within
   // that many metres of a road is never above it, so the road's ribbon is not buried by the coarse hills
   compute(x, z, wide) {
+    const h = this._computeRoad(x, z, wide), g = this._ringNear(x, z);
+    if (!g) return h;
+    // a turning circle's bed: level across its asphalt and a verge, eased into the ground round it as a road's is (it
+    // stood flat at the road's end on a slope: half of it under the grass, the cars that turned on it on the hillside)
+    const d = this._rgd, y = g.y;
+    if (wide) return d < wide ? Math.min(h, y - 0.4 - 0.02 * Math.max(0, d)) : h;
+    const sh = Math.min(ISLE.shMax, 5 + 1.7 * Math.abs(y - h)), v0 = ISLE.verge;
+    if (d >= v0 + sh) return h;
+    const t = smoothstep(v0, v0 + sh, d);
+    return y * (1 - t) + h * t;
+  },
+  // the turning circle (from _rings) whose asphalt edge is nearest (x, z) within reach of its bed; _rgd: how far outside
+  // its asphalt the point is (negative on it)
+  _ringNear(x, z) {
+    let best = null, bd = Infinity;
+    for (const g of this._rings || []) {
+      const d = Math.hypot(x - g.x, z - g.z) - g.r;
+      if (d < bd && d < ISLE.verge + ISLE.shMax) { bd = d; best = g; }
+    }
+    this._rgd = bd;
+    return best;
+  },
+  _computeRoad(x, z, wide) {
     const h = this.base0(x, z);
     if (!this._nearRoad(this._seg, x, z)) return h;
     const y = this._ry, d = this._rd;
@@ -400,6 +431,7 @@ const Island = {
   // 0 grass, 1 sand, 2 rock, 3 road, 4 forest floor, 5 dry grass, 6 concrete (the airport, the proving ground)
   surface(x, z, h, slope) {
     if (this._nearRoad(this._seg, x, z) && this._rd <= 0.5) return 3;
+    if (this._ringNear(x, z) && this._rgd <= 0.5) return 3;
     const d = -this.sd(x, z);
     if ((d < 40 && h < SEA_Y + 3.4) || h < SEA_Y + 0.9) return 1;
     if (slope > 0.62 || h > 205) return 2;
@@ -417,6 +449,7 @@ const Island = {
     if (!this.ready || x < ISLE.x0 || z < ISLE.z0 || x >= ISLE.x1 || z >= ISLE.z1) return null;
     if (this._nearRoad(this._seg, x, z) && this._rd <= 1) return null;
     if (this._nearRoad(this._sseg, x, z) && this._rd <= 1) return null;
+    if (this._ringNear(x, z) && this._rgd <= 1) return null;
     const h = this.height(x, z, 1e6), s = this.surface(x, z, h, Math.hypot(this.gx, this.gz)), k = 1 - 0.65 * (trail || 0), E = this._fx;
     if (s === 6 || s === 3) return null;
     const F = s === 1 ? [0.66, 1.5, 0.03, TSURF.dirt] : s === 2 ? [0.74, 0.6, 0.08, TSURF.rock] : [0.82, 0.4, 0.035, TSURF.grass];
