@@ -108,7 +108,15 @@ function villaInteriorDef(owned) {
       wood(-18, -hd, -8, 0, 0, 0x6a4a32, 0x5e4029);
       for (const [x, z, o, w] of [[-17.75, -10.5, 1, 7], [-17.75, -2.9, 1, 3.6], [-16, -14.75, 0, 3.2], [-9.6, -14.75, 0, 2.8]]) FURN.bookshelf(k, x, 0, z, o, w, rng, 3.6);
       // the secret: a bookcase that stands a hand's width proud of the wall, a red book that glows when you are close
-      FURN.bookshelf(k, -12.9, 0, -14.68, 0, 2.6, rng, 3.6); k.box(-12.2, 1.55, -14.45, 0.08, 0.3, 0.2, 0x9a1a2a); k.glow(-12.2, 1.86, -14.45, 0.06, 0.02, 0.06, 0xff4d4d, 1.2);
+      // the lift to the bunker (x -14.4..-11.4, z -15..-12.6): a steel car behind a partition with sliding doors, and in front
+      // of it a bookcase that rolls aside (both movers, below)
+      iwall(k, 'z', -14.4, -hd, -12.6, 0, G, WALL); iwall(k, 'z', -11.4, -hd, -12.6, 0, G, WALL);
+      iwall(k, 'x', -12.6, -14.4, -11.4, 0, G, 0xb4b9bf, [[-13.6, -12.2]]);
+      k.box(-12.9, 0.01, -13.8, 2.9, 0.01, 2.3, 0x9a9fa5, { flat: true }); k.box(-12.9, 2.6, -13.8, 2.9, 0.08, 2.3, 0x9a9fa5); k.glow(-12.9, 2.56, -13.8, 1.4, 0.03, 1.2, 0xfff4dc, 2.2);
+      for (const sx of [-14.3, -11.5]) k.box(sx, 0, -13.8, 0.04, 2.6, 2.3, 0xc8ccd0);
+      k.box(-12.9, 0, -14.93, 2.9, 2.6, 0.04, 0xc8ccd0); k.box(-12.9, 0.9, -14.88, 2.6, 0.05, 0.05, 0xd8dcdf);
+      k.box(-11.56, 1.0, -13.3, 0.05, 0.5, 0.28, 0x22262b); k.glow(-11.58, 1.15, -13.3, 0.02, 0.08, 0.08, 0x8fe39b, 2.4);
+      k.box(-12.3, 1.0, -12.48, 0.16, 0.26, 0.04, 0x22262b); k.glow(-12.3, 1.08, -12.45, 0.06, 0.06, 0.02, 0xffd84d, 2.4);
       // (the reading chairs face each other across the middle of the room, clear of the doorway from the dining room)
       FURN.rug(k, -13, 0, -7.4, 6, 5, 0x2a3a2a, 0x3a4a3a); FURN.armchair(k, -14.4, 0, -8, 1, 0x5a2a1a); FURN.armchair(k, -11.4, 0, -8, 3, 0x5a2a1a); FURN.coffeeTable(k, -12.9, 0, -8, 0, 1.0, 0.8, WAL);
       FURN.desk(k, -15.6, 0, -2.4, 2, 1.8, false, WAL); k.box(-9.4, 0, -2.4, 0.5, 0.8, 0.5, WAL, { col: true });
@@ -181,7 +189,6 @@ function villaInteriorDef(owned) {
       for (let i = 0; i < 4; i++) FURN.wardrobe(k, -17.5 + i * 2.2, U2, hd - 0.4, 2, 2.0, 0xf2ece0);
       FURN.dresser(k, -14, U2, 7.5, 0, 3.0, 0xf2ece0, false); k.box(-14, U2 + 0.9, 7.5, 3.0, 0.04, 0.6, 0x2a2620);
       k.box(-8.25, U2 + 0.2, 4, 0.06, 2.4, 1.2, 0xcfe0ec); // the full-length mirror
-      if (!def.cacheTaken) { k.box(-8.24, U2 + 0.2, 12, 0.08, 2.2, 1.3, 0xe8e2d4); k.box(-8.2, U2 + 1.2, 11.5, 0.04, 0.08, 0.04, 0x9a8a6a); }
       // ---- the family lounge over the garden room: a pool table, a sectional round a screen, a card table
       wood(-8, -hd, 2, -3, U2);
       FURN.poolTable(k, -0.8, U2, -10.2, 0); FURN.ceilingLight(k, -0.8, H, -10.2, 1.6);
@@ -208,11 +215,25 @@ function villaInteriorDef(owned) {
       for (const [x, z] of [[-24, -7.5], [-12, -9], [-26, 7.5], [-14, 7.5], [-3, -6.5], [5, -9]]) FURN.ceilingLight(k, x, H, z, 1.1);
     }
   };
-  // the spots: the way out, the hidden lift, the hidden cache; owned, the house's own
+  // the moving parts: the bookcase (rolls 3.15 m east along the library's south wall) and the lift's two doors
+  def.movers = [
+    { id: 'book', off: [3.15, 0, 0], dur: 2.4, sound: 'thud', build(k2, rng2) { FURN.bookshelf(k2, -12.9, 0, -12.3, 0, 3.0, rng2, 3.4); k2.cols.push({ x0: -14.4, x1: -11.4, z0: -12.52, z1: -12.1, y0: 0, y1: 3.4 }); k2.box(-12.2, 1.55, -12.1, 0.08, 0.3, 0.2, 0x9a1a2a); k2.glow(-12.2, 1.86, -12.1, 0.06, 0.02, 0.06, 0xff4d4d, 1.2); } },
+    { id: 'liftL', off: [-0.72, 0, 0], dur: 1.0, build(k2) { k2.box(-13.25, 0, -12.6, 0.7, 2.3, 0.06, 0xd8dcdf, { col: true }); } },
+    { id: 'liftR', off: [0.72, 0, 0], dur: 1.0, build(k2) { k2.box(-12.55, 0, -12.6, 0.7, 2.3, 0.06, 0xd8dcdf, { col: true }); } }
+  ];
+  def.tick = (dt, g) => {
+    const I = g.content.interiors, sp = id => def.spots.find(s => s.id === id), M = id => I.mover(def, id), b = M('book'), l = M('liftL');
+    if (!b || !l) return;
+    sp('v:book').label = b.t === 0 && b.want === 0 ? 'A red book that does not belong on the shelf' : '';
+    sp('v:call').label = b.t === 1 && b.want === 1 && l.t === 0 && l.want === 0 ? 'Call the lift' : '';
+    sp('v:lift').label = l.t === 1 && l.want === 1 ? 'Down to the bunker' : '';
+  };
+  // the spots: the way out, the hidden lift; owned, the house's own
   def.spots = [
     { id: 'exit', x: 0, z: hd - 0.7, r: 1.3, label: 'Leave' },
-    { id: 'v:lift', x: -12.9, z: -13.4, r: 1.3, label: 'A bookcase that stands proud of the wall' },
-    { id: 'v:cache', x: -9.0, y: U, z: 12, r: 1.0, label: 'A panel that doesn’t sit flush' }
+    { id: 'v:book', x: -12.9, z: -11.2, r: 1.3, label: 'A red book that does not belong on the shelf' },
+    { id: 'v:call', x: -12.3, z: -11.6, r: 1.1, label: '' },
+    { id: 'v:lift', x: -12.9, z: -13.8, r: 0.9, label: '' }
   ];
   if (owned) def.spots.push(
     { id: 'laptop', x: 13, z: 5.2, r: 1.3, label: 'Run your empire' },
@@ -226,75 +247,6 @@ function villaInteriorDef(owned) {
     { id: 'pool', x: -2.2, y: U, z: -10.2, r: 1.3, label: 'Shoot some pool' }
   );
   else def.spots.push({ id: 'v:buy', x: 13, z: 5.2, r: 1.3, label: '' }); // (the label is set when the house is entered)
-  return def;
-}
-
-function villaBunkerDef(owned) {
-  const W = 52, D = 36, H = 4.4, hw = W / 2, hd = D / 2;
-  const def = {
-    id: 'villa_bunker', dynamic: true, name: 'The bunker under Villa Valen', w: W, d: D, h: H, seed: 9191, tier: 7,
-    exit: { x: 0, z: hd - 2 }, spawn: { x: 0, z: hd - 2.4 }, spawnH: Math.PI, place: null, at: { ...VILLA_INT.bunkerAt }, door: { ...VILLA_DOOR },
-    propId: owned ? 'villa' : null, owned, villa: true, noExit: true, noDoor: true,
-    build(k, rng) {
-      const CON = 0xb8bcc0, CON2 = 0xa8acb0, DARK = 0x2c3036, STEEL = 0x8a9096, GOLD = 0xd4af37, G = H;
-      k.room(W, D, H, { floor: 0x3a3d44, wall: CON, wall2: CON2, ceil: 0x55585c, trim: 0x1a1c20, band: [0, 1.0], bandC: 0x2c3036, lights: [6, 4], lightC: 0xe8f0ff });
-      k.tiles(W, D, 0x3a3d44, 0x34373e, 2);
-      // the spine corridor (z 6..10) with the rooms off it
-      iwall(k, 'x', 6, -hw, hw, 0, G, CON2, [[-20, -17.6], [-9, -5], [5, 9], [17.6, 20]]);    // north rooms: mess, operations (wide), lounge
-      iwall(k, 'x', 10, -hw, hw, 0, G, CON2, [[-22, -16], [-9, -7], [-2, 2], [7, 9], [18, 20.4]]); // south rooms: vault (glass), plant, lift lobby, med bay, comms
-      iwall(k, 'z', -12, -hd, 6, 0, G, CON); iwall(k, 'z', 12, -hd, 6, 0, G, CON);
-      iwall(k, 'x', -4, -hw, -12, 0, G, CON2, [[-14.6, -12.6]]); iwall(k, 'x', -4, 12, hw, 0, G, CON2, [[17.6, 20]]); // armoury|mess, bunks|lounge
-      for (const x of [-12, -4, 4, 12]) iwall(k, 'z', x, 10, hd, 0, G, CON);
-      // ---- the lift lobby: the lift doors, a gold band, the name
-      k.box(0, 0, hd - 0.1, 3.0, 2.6, 0.1, STEEL); k.box(0, 0, hd - 0.14, 0.04, 2.6, 0.04, DARK); k.glow(0, 2.75, hd - 0.15, 1.8, 0.14, 0.03, GOLD, 2.2);
-      k.glow(-2.4, 1.3, hd - 0.15, 0.2, 0.3, 0.03, 0x8fe39b, 2.0);
-      // ---- operations (x -12..12, z -18..6): a wall of screens, the island on a lit table, desks
-      for (let i = 0; i < 6; i++) for (let r = 0; r < 2; r++) k.glow(-10 + i * 4, 1.2 + r * 1.5, -hd + 0.12, 3.6, 1.3, 0.04, [0x2a8cff, 0x30d0a0, 0x1a5aa8][(i + r) % 3], 1.5);
-      k.box(0, 0, -7, 9, 0.95, 5.5, 0x30343a, { col: true }); k.glow(0, 0.95, -7, 8.4, 0.03, 5, 0x2ad1ff, 0.9);
-      for (const [x, z] of [[-2.6, -8.2], [1.4, -6.4], [3.0, -8.6]]) k.box(x, 0.98, z, 0.6, 0.4, 0.6, 0x9ab4c8);
-      for (const x of [-8, -4, 4, 8]) { FURN.desk(k, x, 0, -13.5, 2, 1.6, true, DARK); }
-      for (const x of [-6, 6]) FURN.sofa(k, x, 0, 3.6, 2, 2.6, 0x2a2c30);
-      // ---- the armoury (x -26..-12, z -18..-4): racks, crates, a bench
-      for (let i = 0; i < 4; i++) { k.box(-hw + 0.5, 0, -15 + i * 3, 0.5, 3.0, 2.6, DARK, { col: true }); for (let r = 0; r < 3; r++) k.box(-hw + 0.85, 0.7 + r * 0.8, -15 + i * 3, 0.12, 0.14, 2.2, 0x6a7078); }
-      for (let i = 0; i < 3; i++) k.box(-17 + i * 2.2, 0, -16.6, 1.8, 0.9, 1.2, 0x3a4a2a, { col: true });
-      k.box(-18, 0, -9, 4, 0.9, 1.2, STEEL, { col: true }); k.glow(-18, 3.0, -9, 2.4, 0.05, 0.4, 0xfff0d8, 2.4);
-      // ---- the mess (x -26..-12, z -4..6): a kitchen run, a long table, a fridge
-      FURN.kitchenRun(k, -19, 0, -3.65, 0, 8, { upper: true, base: DARK, top: 0xc8ccd0, fridgeC: 0xb8bcc2 });
-      FURN.diningSet(k, -19, 0, 2, 0, 10, 0x4a4e54);
-      // ---- crew quarters (x 12..26, z -18..-4): bunks
-      for (let i = 0; i < 4; i++) { const z = -16.6 + i * 3.2; for (const lv of [0, 1.3]) { k.box(23.5, lv, z, 4.4, 0.4, 1.6, 0x4a4e54, { col: lv === 0 }); k.box(23.5, lv + 0.4, z, 4.2, 0.16, 1.4, [0x2f5d8a, 0x3a6a4a, 0x6a3a3a, 0x5a5a6a][i]); } k.box(25.7, 0, z, 0.1, 2.4, 1.6, 0x4a4e54); }
-      for (let i = 0; i < 4; i++) FURN.wardrobe(k, 12.4, 0, -16 + i * 3, 1, 1.2, 0x5a5e64);
-      // ---- the lounge and cinema (x 12..26, z -4..6)
-      k.box(hw - 0.3, 0.5, 1, 0.2, 2.8, 7, 0x111111); k.glow(hw - 0.42, 0.65, 1, 0.02, 2.5, 6.6, 0x3a5a8a, 1.3);
-      FURN.sofa(k, 20, 0, 1, 1, 5, 0x6a1a2a); FURN.sofa(k, 16.6, 0, 1, 1, 5, 0x6a1a2a); FURN.bar(k, 14, 0, -2.6, 0, 3, 3);
-      // ---- the cash vault (x -26..-12, z 10..18): a round door, pallets of cash and gold
-      // the vault is seen through a wall of steel bars; its door, on a forty-year time lock, is the round one inside
-      for (let x = -21.85; x <= -16.1; x += 0.3) k.box(x, 0, 10, 0.07, G, 0.07, STEEL);
-      for (const yy of [0.05, 1.2, 2.4, G - 0.2]) k.box(-19, yy, 10, 6, 0.12, 0.14, STEEL);
-      k.cols.push({ x0: -22, x1: -16, z0: 9.9, z1: 10.1, y0: 0, y1: G });
-      k.box(-25.6, 0.2, 14, 0.3, 2.8, 2.8, STEEL); k.glow(-25.42, 1.6, 14, 0.03, 0.6, 0.6, GOLD, 1.2);
-      for (let p = 0; p < 6; p++) { const px = -22.6 + (p % 3) * 3.4, pz = 13.4 + Math.floor(p / 3) * 2.8; k.box(px, 0, pz, 2.2, 0.25, 2.2, 0x7a5a3a, { col: true }); for (let l = 0; l < 3; l++) k.box(px, 0.25 + l * 0.34, pz, 1.9 - l * 0.35, 0.32, 1.9 - l * 0.35, p % 2 ? 0x5d8a4a : GOLD); }
-      // ---- the plant room (x -12..-4): the generator, the air plant, pipes
-      k.box(-8, 0, 15, 5, 2.2, 2.6, 0x5a6a5a, { col: true }); k.box(-8, 2.2, 15, 1.2, 1.2, 1.2, 0x4a5a4a); k.box(-10.6, 0, 11.4, 1.6, 2.6, 1.6, STEEL, { col: true });
-      for (let i = 0; i < 3; i++) k.box(-8, 3.4 + i * 0.25, 13, 7.6, 0.18, 0.18, [0xd23a2a, 0x2a6fd6, 0xffd84d][i]);
-      // ---- the med bay (x 4..12): two beds, a cabinet
-      for (const x of [6, 10]) FURN.bed(k, x, 0, hd - 1.4, 2, 1.0, 2.1, 0xe8eef6, 0x8a9096);
-      k.box(11.6, 0, 13.6, 0.5, 1.8, 3, 0xe8eef6, { col: true }); k.glow(11.32, 2.2, 13.6, 0.03, 0.5, 0.5, 0xd23a2a, 1.6);
-      // ---- comms (x 12..26): server racks blinking
-      for (let i = 0; i < 5; i++) { k.box(15 + i * 2.2, 0, 16.6, 1.2, 2.4, 1.2, 0x1a1c20, { col: true }); for (let r = 0; r < 4; r++) k.glow(15 + i * 2.2, 0.5 + r * 0.5, 15.98, 0.8, 0.04, 0.02, [0x30d0a0, 0x2a8cff][(i + r) % 2], 1.6); }
-      FURN.desk(k, 23.5, 0, 12.4, 0, 2.0, true, DARK);
-      // corridor lights
-      for (let x = -22; x <= 22; x += 6) FURN.ceilingLight(k, x, H, 8, 1.2);
-    }
-  };
-  def.spots = [
-    { id: 'v:up', x: 0, z: hd - 1.2, r: 1.5, label: 'Lift · up to the house' },
-    { id: 'v:arms', x: -18, z: -7.6, r: 1.5, label: 'The armoury bench · patch up and strap on a vest' },
-    { id: 'fridge', x: -15.5, z: -2.6, r: 1.3, label: 'Grab something from the mess' },
-    { id: 'v:ops', x: 0, z: -3.6, r: 1.8, label: 'The operations table' },
-    { id: 'v:vault', x: -19, z: 9.4, r: 1.3, label: 'The vault door' }
-  ];
-  if (owned) def.spots.push({ id: 'bed', x: 21, z: -16.6, r: 1.6, label: 'Sleep & save' }, { id: 'tv', x: 18.2, z: 1, r: 1.6, label: 'Watch the news' });
   return def;
 }
 
@@ -312,35 +264,33 @@ const VillaValen = {
   // into the house: at the front door, out of the lift (from the bunker) or up the garage stairs
   enterHouse(g, from) {
     const I = g.content.interiors, own = this.owned(g);
-    if (I.defs.villa && (I.defs.villa.owned !== own || I.defs.villa.cacheTaken !== this.taken(g))) { if (I.cur === I.defs.villa) return; I.dispose(I.defs.villa); }
-    const d0 = villaInteriorDef(own); d0.cacheTaken = this.taken(g);
-    const def = I.addDynamic(d0);
-    const cache = def.spots.find(s => s.id === 'v:cache'); if (cache && this.taken(g)) cache.label = '';
+    if (I.defs.villa && I.defs.villa.owned !== own) { if (I.cur === I.defs.villa) return; I.dispose(I.defs.villa); }
+    const def = I.addDynamic(villaInteriorDef(own));
+    // up from the bunker: the bookcase aside and the lift open; any other way in, both shut
+    const up = from === 'lift'; for (const id of ['book', 'liftL', 'liftR']) I.move(def, id, up, null, true);
     const buy = def.spots.find(s => s.id === 'v:buy');
     if (buy && g.uw && PROP_BY_ID.villa) buy.label = `Villa Valen · for sale ${fmtMoney(g.uw.props.price(PROP_BY_ID.villa))}`;
-    if (from === 'lift') { def.spawn = { x: -12.9, z: -12.2 }; def.spawnH = Math.PI; }
+    if (from === 'lift') { def.spawn = { x: -12.9, z: -13.8 }; def.spawnH = 0; }
     else if (from === 'garage') { def.spawn = { x: VILLA_INT.W / 2 - 2.2, z: -1.2 }; def.spawnH = -Math.PI / 2; }
     else { def.spawn = null; def.spawnH = Math.PI; }
     const go = () => I.enter(def.id, true);
     if (from === 'door') I.enter(def.id); else g.content.ride(go);
   },
   enterBunker(g) {
-    const I = g.content.interiors, def = I.addDynamic(villaBunkerDef(this.owned(g)));
-    g.content.ride(() => { I.enter(def.id, true); g.ui.toast('The bookcase swings back into place above you. Nobody upstairs would ever know.'); });
-  },
-  takeCache(g) {
-    if (this.taken(g)) return;
-    g.audio.play('cash');
-    g.ui.toast('Behind the panel: duffel bags, banded and vacuum-sealed, and a bank transfer slip already signed. It is all yours, and all of it is clean.');
-    g.content.secret('villacache');
-    const I = g.content.interiors, def = I.cur; if (def && def.villa) { def.cacheTaken = true; const s = def.spots.find(x => x.id === 'v:cache'); if (s) s.label = ''; }
+    const I = g.content.interiors;
+    if (I.defs.villa_bunker && I.defs.villa_bunker.owned !== this.owned(g)) I.dispose(I.defs.villa_bunker);
+    const def = I.addDynamic(villaBunkerDef(this.owned(g)));
+    VillaBunker.ensureVault(g);
+    g.content.ride(() => { I.enter(def.id, true); VillaBunker.arrive(g, def); });
   },
   spot(g, id) {
     const p = g.player, own = this.owned(g);
+    if (VillaBunker.spot(g, id)) return;
     switch (id) {
-      case 'lift': this.enterBunker(g); break;
-      case 'up': this.enterHouse(g, 'lift'); break;
-      case 'cache': this.takeCache(g); break;
+      // the library: the red book rolls the bookcase aside, the button calls the lift, inside it the doors close and down
+      case 'book': { const def = g.content.interiors.cur; if (def && def.villa) g.content.interiors.move(def, 'book', true); g.audio.play('ui'); break; }
+      case 'call': { const I = g.content.interiors, def = I.cur; if (def && def.villa) { I.move(def, 'liftL', true); I.move(def, 'liftR', true); g.audio.play('ui'); } break; }
+      case 'lift': { const I = g.content.interiors, def = I.cur; if (def && def.villa) { I.move(def, 'liftL', false); I.move(def, 'liftR', false, () => this.enterBunker(g)); g.audio.play('ui'); } break; }
       case 'buy': if (g.uw) g.uw.ui.openProp('villa'); break;
       case 'garage': { const vs = g.vspaces && g.vspaces.byProp('villa'); if (vs && own) g.vspaces.enter(vs, null); break; }
       case 'arms':

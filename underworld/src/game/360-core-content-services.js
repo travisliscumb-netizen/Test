@@ -94,7 +94,8 @@ const SECRETS = [
   { id: 'gold', name: 'The Golden Corsair', cash: 0 },
   { id: 'pitch', name: 'Pitch Invader', cash: 800 },
   // the cache behind the panel in Villa Valen's walk-in closet (354): clean money, straight into the bank
-  { id: 'villacache', name: 'The Valen Cache', cash: 20000000, clean: true }
+  // (the $20,000,000 is in the bunker's vault now, 355: finding the vault is the secret)
+  { id: 'villacache', name: 'The bunker vault under Villa Valen' }
 ];
 const SERVICE_PLACES = ['motorworks', 'dealer', 'store', 'police', 'tower'];
 const POSTS = [

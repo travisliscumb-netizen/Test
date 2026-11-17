@@ -24,6 +24,8 @@ const MONEY_SOURCES = {
   business: { earn: 'clean', book: 'businesses' }, carSale: { earn: 'clean' }, casino: { earn: 'clean' },
   // Villa Valen's hidden cache (354): already laundered, it goes straight into the bank
   cache: { earn: 'clean' },
+  // Villa Valen's bunker vault (355): clean cash in the vault, carried in from the bank and back out to it
+  vaultIn: { pay: 'clean' }, vaultOut: { earn: 'clean' },
   // a car you stole is not a legal sale even from your own garage until HOT/clean titles exist (§45.22, Session 5)
   stolenCarSale: { earn: 'me' },
   // the Dirty share of an ordinary car bought (in part) with Dirty Cash: its money keeps its colour (§45.24)
@@ -78,7 +80,8 @@ const okAmount = n => typeof n === 'number' && isFinite(n) && n > 0 && n < MONEY
 const Money = {
   g: null, listeners: [], lastStunt: 0,
   bind(game) { this.g = game; },
-  fresh() { return { v: 1, clean: 0, debt: 0, treasury: null, dirty: { me: 0, veh: {}, prop: {} }, stunt: { day: -1, paid: 0 } }; },
+  // (vault: clean cash in Villa Valen's bunker vault, 355; vaultInit: 1 once the vault's own $20,000,000 has been put in it)
+  fresh() { return { v: 1, clean: 0, debt: 0, treasury: null, vault: 0, vaultInit: 0, dirty: { me: 0, veh: {}, prop: {} }, stunt: { day: -1, paid: 0 } }; },
   // every number finite, non-negative, whole cents; unknown places dropped
   sanitize(w) {
     const d = this.fresh(), num = v => typeof v === 'number' && isFinite(v) && v > 0 ? Math.min(Math.round(v * 100) / 100, MONEY_MAX) : 0;
@@ -86,7 +89,7 @@ const Money = {
     const D = w.dirty && typeof w.dirty === 'object' && !Array.isArray(w.dirty) ? w.dirty : {};
     const map = (o, keyOk) => { const out = {}; if (o && typeof o === 'object' && !Array.isArray(o)) for (const k in o) { const v = num(o[k]); if (v > 0 && keyOk(k)) out[k] = v; } return out; };
     return {
-      v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX),
+      v: 1, clean: num(w.clean), debt: Math.min(num(w.debt), HOSPITAL_MAX), vault: num(w.vault), vaultInit: w.vaultInit ? 1 : 0,
       treasury: typeof w.treasury === 'string' && PROP_BY_ID[w.treasury] && PROP_BY_ID[w.treasury].kind === 'warehouse' ? w.treasury : null,
       // a car's cash is keyed by its fleet uid, or 't<id>' for a tracked car you don't own (Session 5A)
       dirty: { me: num(D.me), veh: map(D.veh, k => /^t?\d+$/.test(k)), prop: map(D.prop, k => !!PROP_BY_ID[k]) },
@@ -97,12 +100,18 @@ const Money = {
   get uw() { return this.g && this.g.uw; },
   // ------------------------------------------------------------ reading
   get clean() { return this.W.clean; },
+  // the clean cash in Villa Valen's bunker vault (355): from the bank into it, out of it to the bank
+  get vault() { return this.W.vault || 0; },
+  // (the vault's own count: 355 pays the bank in or out with the vaultIn / vaultOut sources and moves the count with it)
+  vaultAdj(d) { this.W.vault = Math.max(0, Math.round(((this.W.vault || 0) + d) * 100) / 100); },
+  // the house's own $20,000,000, put in the vault once per game (n 0: none, the old closet panel already paid it out)
+  vaultSeed(n) { const W = this.W; if (W.vaultInit) return false; W.vaultInit = 1; if (n > 0) this.vaultAdj(n); return true; },
   get debt() { return this.W.debt; },
   get onMe() { return this.W.dirty.me; },
   dirtyAtProp(id) { return this.W.dirty.prop[id] || 0; },
   dirtyInCar(uid) { return this.W.dirty.veh[uid] || 0; },
   dirtyTotal() { const D = this.W.dirty; let t = D.me; for (const k in D.veh) t += D.veh[k]; for (const k in D.prop) t += D.prop[k]; return t; },
-  total() { return this.dirtyTotal() + this.W.clean; },
+  total() { return this.dirtyTotal() + this.W.clean + (this.W.vault || 0); },
   // the wallet key of a car: an owned car's fleet uid, a tracked car's 't<id>' (both saved), none for any other car
   uidOf(v) { return v ? (v.garageUid || (v.trackId ? 't' + v.trackId : 0)) : 0; },
   // cash in a live vehicle: an owned or tracked car keeps it in the wallet (saved), any other car on the vehicle itself

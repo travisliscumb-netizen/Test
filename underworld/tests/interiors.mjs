@@ -42,38 +42,49 @@ await ev(() => {
 });
 
 // ---------------------------------------------------------------- Villa Valen (354): walk in from the first minute; the bunker; the cache
+const out0 = v => v || '';
 const villa = await ev(async () => {
-  const g = window.game, I = g.content.interiors, V = window.__pv.VillaValen, out = {};
+  const g = window.game, I = g.content.interiors, V = window.__pv.VillaValen, VB = window.__pv.VillaBunker, out = {};
   const wait = async () => { for (let i = 0; i < 100 && g.fading; i++) await new Promise(r => setTimeout(r, 100)); };
   g.resetPlayerState(-610, -899.9, Math.PI); for (let i = 0; i < 20; i++) g.update(1 / 60, 1 / 60);
   const a = g.content.findAction(); out.door = a && a.label; if (a) a.act(); await wait();
   let d = I.cur; out.id = d && d.id; out.rooms = d && d.levels.length;
   out.r = window.__reach(d, 200000); out.spots = d.spots.map(s => s.id + (s.y ? '@up' : ''));
   out.buy = (d.spots.find(s => s.id === 'v:buy') || {}).label;
-  // the lift down, the bunker's rooms, back up
+  // the library: the red book rolls the bookcase aside, the button opens the lift, inside it the doors close and it goes down
+  const wt = ms => new Promise(r => setTimeout(r, ms)), sp = id => (I.cur.spots.find(s => s.id === id) || {}).label;
+  // (waits on the game's own clock: a door takes its seconds of game time, slower than real time in software GL)
+  const until = async (f, n = 300) => { for (let i = 0; i < n && !f(); i++) await wt(100); };
+  out.l0 = [sp('v:book'), sp('v:call'), sp('v:lift')];
+  g.content.spotAct('v:book'); await until(() => sp('v:call')); out.l1 = [sp('v:book'), sp('v:call')];
+  g.content.spotAct('v:call'); await until(() => sp('v:lift')); out.l2 = sp('v:lift');
+  out.r = window.__reach(I.cur, 200000); // (with the bookcase aside and the lift open, every spot)
   const c0 = g.money.W.clean;
-  V.takeCache(g); out.cache = g.money.W.clean - c0; V.takeCache(g); out.cache2 = g.money.W.clean - c0; out.dirty = g.money.W.dirty.me;
-  g.content.spotAct('v:lift'); await wait();
-  d = I.cur; out.bunker = d && d.id; out.rb = window.__reach(d, 200000);
-  g.content.spotAct('v:up'); await wait(); out.back = I.cur && I.cur.id;
-  out.cacheGone = !I.cur.spots.find(s => s.id === 'v:cache').label;
+  g.content.spotAct('v:lift'); for (let i = 0; i < 80 && (!I.cur || I.cur.id !== 'villa_bunker' || g.fading); i++) await wt(100);
+  d = I.cur; out.bunker = d && d.id; await until(() => sp('v:up')); out.upLabel = sp('v:up');
+  // the bunker: its doors open, every room reachable; ten live screens; the vault holds the house's $20,000,000, clean
+  for (const id of ['bdoor', 'vdoor']) I.move(d, id, true, null, true);
+  out.rb = window.__reach(d, 200000); out.screens = d.screens.length; out.vault0 = g.money.W.vault;
+  VB.fromVault(1e6); out.took = g.money.W.clean - c0; out.vault1 = g.money.W.vault; out.dirty = g.money.W.dirty.me;
+  g.content.spotAct('v:up'); for (let i = 0; i < 80 && (!I.cur || I.cur.id !== 'villa' || g.fading); i++) await wt(100); out.back = I.cur && I.cur.id;
+  VB.fromVault(g.money.W.vault);
   // the cache buys the house: a new player (rank 0) with the cache's clean money buys Villa Valen
   out.rank = g.uw.rank; out.buyMsg = g.uw.props.buy('villa'); out.bought = g.uw.props.owned('villa'); out.after = g.money.W.clean - c0;
   // owned: the house's own spots, all reachable
   g.uw.S.props.villa = { owned: true, dmg: 0, since: 1, lvl: 1 };
   I.exit(true); V.enterHouse(g, 'door'); await wait();
-  d = I.cur; out.owned = d.owned; out.ro = window.__reach(d, 200000); out.ownSpots = d.spots.map(s => s.id + (s.y ? '@up' : ''));
+  d = I.cur; for (const id of ['book', 'liftL', 'liftR']) I.move(d, id, true, null, true); out.owned = d.owned; out.ro = window.__reach(d, 200000); out.ownSpots = d.spots.map(s => s.id + (s.y ? '@up' : ''));
   I.exit(true); delete g.uw.S.props.villa;
   return out;
 });
 await waitFade();
 check('Villa Valen: anyone walks in at the front door from the first minute; it is for sale from inside too', villa.door === 'Enter Villa Valen' && villa.id === 'villa' && /for sale \$4,500,000/.test(villa.buy || ''), JSON.stringify({ door: villa.door, id: villa.id, buy: villa.buy }));
 check('Villa Valen: the grand staircase reaches the upper floor (4.6 m) and the upper floor is large (six bedrooms)', villa.r.maxH > 4.5 && villa.r.upper > 8000, JSON.stringify({ maxH: villa.r.maxH, upper: villa.r.upper, cells: villa.r.cells }));
-check('Villa Valen: every spot can be walked to (the hidden lift in the library, the cache upstairs in the closet), owned or not', villa.r.bad.length === 0 && villa.ro.bad.length === 0 && villa.ownSpots.includes('bed@up') && villa.ownSpots.includes('wardrobe@up') && villa.ownSpots.includes('v:garage'), JSON.stringify({ bad: villa.r.bad, badOwned: villa.ro.bad, spots: villa.ownSpots }));
-check('the bunker: the lift is a scene change down and back; its rooms can all be walked to', villa.bunker === 'villa_bunker' && villa.rb.bad.length === 0 && villa.rb.cells > 8000 && villa.back === 'villa', JSON.stringify({ bunker: villa.bunker, bad: villa.rb.bad, cells: villa.rb.cells, back: villa.back }));
-check('the cache buys the house: at rank 0, $4,500,000 of its clean money buys Villa Valen (the estate sells to anyone)', villa.rank === 0 && villa.buyMsg === '' && villa.bought && villa.after === 20000000 - 4500000, JSON.stringify({ rank: villa.rank, msg: villa.buyMsg, bought: villa.bought, after: villa.after }));
-check('the cache: $20,000,000 straight into the bank (clean), once; the panel has nothing more to offer', villa.cache === 20000000 && villa.cache2 === 20000000 && villa.dirty === 0 && villa.cacheGone, JSON.stringify({ cache: villa.cache, again: villa.cache2, dirty: villa.dirty, gone: villa.cacheGone }));
-
+check('Villa Valen: every spot can be walked to (the lift behind the library bookcase), owned or not', villa.r.bad.length === 0 && villa.ro.bad.length === 0 && villa.ownSpots.includes('bed@up') && villa.ownSpots.includes('wardrobe@up') && villa.ownSpots.includes('v:garage'), JSON.stringify({ bad: villa.r.bad, badOwned: villa.ro.bad, spots: villa.ownSpots }));
+check('the library: the red book rolls the bookcase aside, the lift is called, its doors open', /red book/.test(out0(villa.l0[0])) && !villa.l0[1] && !villa.l0[2] && !villa.l1[0] && villa.l1[1] === 'Call the lift' && villa.l2 === 'Down to the bunker', JSON.stringify([villa.l0, villa.l1, villa.l2]));
+check('the bunker: the lift is a scene change down (its doors open as you arrive) and back up; every room reachable with its doors open', villa.bunker === 'villa_bunker' && /up to the house/.test(villa.upLabel || '') && villa.rb.bad.length === 0 && villa.rb.cells > 8000 && villa.back === 'villa', JSON.stringify({ bunker: villa.bunker, up: villa.upLabel, bad: villa.rb.bad, cells: villa.rb.cells, back: villa.back }));
+check('the control room: ten live screens, one for each part of the empire', villa.screens === 10, String(villa.screens));
+check('the vault: the house’s $20,000,000 in clean cash; taken to the bank it is clean, a million at a time', villa.vault0 === 20000000 && villa.took === 1000000 && villa.vault1 === 19000000 && villa.dirty === 0, JSON.stringify({ v0: villa.vault0, took: villa.took, v1: villa.vault1, dirty: villa.dirty }));
 // ---------------------------------------------------------------- the mansion
 await ev(() => { const g = window.game; g.uw.S.props.mansion = { owned: true, dmg: 0, since: 1 }; (g.money.W.clean = g.money.W.dirty.me = 1e6); g.content.enterHome('mansion'); });
 await waitFade(); await frames(page, 4);

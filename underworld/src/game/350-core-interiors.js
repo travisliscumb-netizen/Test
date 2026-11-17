@@ -1511,6 +1511,15 @@ class InteriorManager {
     grp.add(parts.main); if (parts.glow) grp.add(parts.glow);
     if (def.windows) for (const w of def.windows) grp.add(this._window(w));
     if (def.afterInstall) def.afterInstall(grp, def);
+    // the room's moving parts (a bookcase that slides aside, lift doors, a bunker door): each its own mesh in the room's
+    // lamp-lit material, with its colliders where it stands (moved when it stops)
+    if (def.movers) for (const M of def.movers) {
+      const k2 = new InteriorKit(def.h); M.build(k2, mulberry32((def.seed || 7) * 31 + M.id.length * 7)); const pr = k2.build();
+      M.mesh = new THREE.Mesh(pr.main.geometry, grp.children[0].material); M.mesh.frustumCulled = false; grp.add(M.mesh);
+      if (pr.glow) { M.glowMesh = pr.glow; grp.add(pr.glow); }
+      M.cols0 = k2.cols; M.gcols = []; M.t = M.t || 0; M.want = M.t; M.def = def;
+      this._moverPose(M); this._moverCols(M);
+    }
     grp.visible = false;
     game.scene.add(grp);
     def.group = grp;
@@ -1521,11 +1530,39 @@ class InteriorManager {
       return { id: n.id, x: ox + n.x, y: fy, z: oz + n.z, h: n.h, look, pose: { phase: Math.random() * 5, amp: 0 }, flash: 0 };
     });
   }
+  // ---------------------------------------------------------------- moving parts
+  // M.off: where it moves to when open (local metres from where it was built); t 0 shut … 1 open, eased
+  _moverPose(M) { const e = smoothstep(0, 1, M.t), o = M.off; for (const m of [M.mesh, M.glowMesh]) if (m) m.position.set(o[0] * e, o[1] * e, o[2] * e); }
+  _moverCols(M) {
+    const d = M.def, grid = this.g.world.grid, e = smoothstep(0, 1, M.t), o = M.off;
+    for (const c of M.gcols) grid.remove(c);
+    M.gcols = M.cols0.map(c => grid.add({ x0: d.ox + c.x0 + o[0] * e, x1: d.ox + c.x1 + o[0] * e, z0: d.oz + c.z0 + o[2] * e, z1: d.oz + c.z1 + o[2] * e, y0: d.fy + c.y0 - 0.5 + o[1] * e, y1: d.fy + c.y1 + o[1] * e, kind: 'int', base: d.fy }));
+  }
+  mover(def, id) { return def && def.movers ? def.movers.find(M => M.id === id) : null; }
+  // set a moving part going (open true/false); done() when it gets there. Instant: no animation (a scene set as you arrive)
+  move(def, id, open, done, instant) {
+    const M = this.mover(def, id); if (!M) return false;
+    M.want = open ? 1 : 0; M.done = done || null;
+    if (instant || M.t === M.want) { M.t = M.want; this._moverPose(M); this._moverCols(M); const f = M.done; M.done = null; if (f) f(); return true; }
+    // (its colliders leave as it starts to open, and come back where it stops)
+    for (const c of M.gcols) this.g.world.grid.remove(c); M.gcols = [];
+    if (M.sound) this.g.audio.play(M.sound);
+    return true;
+  }
+  _tickMovers(def, dt) {
+    for (const M of def.movers || []) {
+      if (M.t === M.want) continue;
+      M.t = M.want > M.t ? Math.min(M.want, M.t + dt / (M.dur || 1.5)) : Math.max(M.want, M.t - dt / (M.dur || 1.5));
+      this._moverPose(M);
+      if (M.t === M.want) { this._moverCols(M); const f = M.done; M.done = null; if (f) f(); }
+    }
+  }
   // interiors built when you walk in and thrown away when you leave (houses)
   addDynamic(def) { if (this.defs[def.id]) return this.defs[def.id]; this._install(def, this.g.world.places); this.defs[def.id] = def; return def; }
   dispose(def) {
     if (!def || !def.dynamic) return;
     for (const c of def.cols || []) this.g.world.grid.remove(c);
+    for (const M of def.movers || []) for (const c of M.gcols || []) this.g.world.grid.remove(c);
     this.g.scene.remove(def.group);
     def.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.pick) o.material.dispose(); });
     delete this.defs[def.id];
@@ -1602,6 +1639,8 @@ class InteriorManager {
   update(dt) {
     const g = this.g, def = this.cur; if (!def) return;
     if (!def.realView) interiorLighting(g);
+    if (def.movers) this._tickMovers(def, dt);
+    if (def.tick) def.tick(dt, g);
     if (def.id === 'prison' && g.uw && g.uw.prison.esc) { g.env.hemi.intensity = 0.42; g.renderer.toneMappingExposure = 0.75; }
     for (const c of def.chars) { c.pose.phase += dt; }
     if (!this.guards.length) return;
