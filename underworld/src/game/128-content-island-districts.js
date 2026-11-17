@@ -579,9 +579,7 @@ Object.assign(World.prototype, {
     // the portal: a concrete frame, the round vault door swung open beside it, the name in gold, floodlights
     solidBox(dx0 - 1.2, y + H / 2, Q.z1 + 1, 2.4, H + 0.6, 2, 0x8a9096); solidBox(dx1 + 1.2, y + H / 2, Q.z1 + 1, 2.4, H + 0.6, 2, 0x8a9096);
     box(b, Q.door, y + H + 0.3, Q.z1 + 1, dw + 4.8, 1.2, 2, 0x8a9096, false);
-    const vd = this._det(b, 'cylr', dx0 - 4.6, y + 4.4, Q.z1 + 4.4, 4.2, 1.1, 4.2, C(0xa0a6ac)); vd.rx = Math.PI / 2; vd.ry = -0.9;
-    const vh = this._det(b, 'cylr', dx0 - 4.6, y + 4.4, Q.z1 + 4.4, 1.3, 1.3, 1.3, C(GOLD)); vh.rx = Math.PI / 2; vh.ry = -0.9;
-    this.grid.add({ x: dx0 - 4.6, z: Q.z1 + 4.4, r: 2.4, y0: y, y1: y + 8.6, kind: 'det' });
+    // (the door is a steel slab that rolls shut across the portal and locks: 357)
     b.signs.push({ text: 'THE VALEN VAULT', x: Q.door, y: y + H + 0.3, z: Q.z1 + 2.05, ry: 0, w: 12, h: 1.1, bg: '#14181c', fg: '#d4af37' });
     b.fx.push({ type: 'flood', x: dx0 - 1.2, y: y + H + 0.9, z: Q.z1 + 2.1, ry: 0 }, { type: 'flood', x: dx1 + 1.2, y: y + H + 0.9, z: Q.z1 + 2.1, ry: 0 });
     box(b, Q.door, y + 0.03, (Q.z1 - 959) / 2, 9, 0.06, -959 - Q.z1, 0x8a8a88, false);
@@ -614,13 +612,28 @@ Object.assign(World.prototype, {
     box(b, -564, y + 0.5, -1022.5, 12, 1, 2.4, 0xf2ece0, true); box(b, -571.6, y + 0.5, -1032, 2.4, 1, 8, 0xf2ece0, true); box(b, -556.4, y + 0.5, -1032, 2.4, 1, 8, 0xf2ece0, true);
     this._det(b, 'blob', -564, y + H - 1.4, -1032, 1.2, 0.9, 1.2, C(GOLD)); b.fx.push({ type: 'neon', x: -564, y: y + H - 2.3, z: -1032, w: 1.4, h: 0.5, d: 1.4, c: 0xfff0c8 });
     b.signs.push({ text: 'LOUNGE', x: -564, y: y + H - 1.2, z: inner - 0.3, ry: Math.PI, w: 5, h: 0.7, bg: '#14181c', fg: '#d4af37' });
-    // the strongroom: the vault door in the far wall, gold on pallets, cash, the armoury racks
-    const sd = this._det(b, 'cylr', -538, y + 3.2, Q.z0 + 0.7, 3, 0.8, 3, C(0x8c949c)); sd.rx = Math.PI / 2;
-    const sh = this._det(b, 'cylr', -538, y + 3.2, Q.z0 + 1.15, 0.9, 0.3, 0.9, C(GOLD)); sh.rx = Math.PI / 2;
-    for (let p = 0; p < 4; p++) {
-      const px = -547.5 + (p % 2) * 5, pz = -1046 + Math.floor(p / 2) * 7;
-      box(b, px, y + 0.25, pz, 2.4, 0.5, 2.4, 0x7a5a3a, true);
-      for (let l = 0; l < 3; l++) box(b, px, y + 0.68 + l * 0.36, pz, 2 - l * 0.4, 0.34, 2 - l * 0.4, p % 2 ? 0x5d8a4a : GOLD, false);
+    // the strongroom: a walk-in safe in its north-west corner (steel walls, its round door on the south face, 357), the
+    // money and the gold inside it on pallets, banded bundles and stacked bars; the armoury racks on the east wall
+    const SX0 = -550, SX1 = -536, SZ0 = Q.z0 + 0.4, SZ1 = -1040, SH = 3.4, STEEL = 0x6a7076;
+    solidBox(SX0, y + SH / 2, (SZ0 + SZ1) / 2, 0.4, SH, SZ1 - SZ0, STEEL); solidBox(SX1, y + SH / 2, (SZ0 + SZ1) / 2, 0.4, SH, SZ1 - SZ0, STEEL);
+    solidBox((SX0 + -544.4) / 2, y + SH / 2, SZ1, -544.4 - SX0, SH, 0.4, STEEL); solidBox((-541.6 + SX1) / 2, y + SH / 2, SZ1, SX1 + 541.6, SH, 0.4, STEEL);
+    solidBox(-543, y + 2.95, SZ1, 2.8, 0.9, 0.4, STEEL);
+    box(b, (SX0 + SX1) / 2, y + SH + 0.15, (SZ0 + SZ1) / 2, SX1 - SX0 + 0.4, 0.3, SZ1 - SZ0 + 0.4, 0x5a6066, false);
+    box(b, -543, y + 3.15, SZ1 + 0.25, 3.6, 0.3, 0.12, GOLD, false);
+    b.fx.push({ type: 'neon', x: -543, y: y + SH - 0.1, z: (SZ0 + SZ1) / 2, w: 10, h: 0.05, d: 0.3, c: 0xfff0d8 });
+    for (const [px, pz] of [[-547.6, -1049], [-547.6, -1045.4], [-544.4, -1049], [-544.4, -1045.4]]) {
+      box(b, px, y + 0.07, pz, 1.4, 0.14, 1.12, 0x8a6a44, true);
+      for (let l = 0; l < 5; l++) for (let a = 0; a < 3; a++) for (let c2 = 0; c2 < 2; c2++) {
+        const bx = px - 0.44 + a * 0.44, bz = pz - 0.26 + c2 * 0.52, by = y + 0.14 + l * 0.17 + 0.08;
+        box(b, bx, by, bz, 0.42, 0.16, 0.5, l % 2 ? 0x5e8f62 : 0x6a9a6c, false); box(b, bx, by, bz, 0.43, 0.06, 0.51, 0xf2f2ee, false);
+      }
+    }
+    for (const [px, pz] of [[-539.4, -1049], [-539.4, -1045.4]]) {
+      box(b, px, y + 0.07, pz, 1.4, 0.14, 1.12, 0x8a6a44, true);
+      for (let l = 0; l < 4; l++) for (let a = 0; a < 4 - l; a++) for (let c2 = 0; c2 < 5 - l; c2++) {
+        const bx = px - (3 - l) * 0.17 + a * 0.34, bz = pz - (4 - l) * 0.1 + c2 * 0.2, by = y + 0.14 + l * 0.12 + 0.06;
+        box(b, bx, by, bz, 0.3, 0.11, 0.17, (a + c2 + l) % 3 ? 0xd8a227 : 0xf2c94c, false);
+      }
     }
     for (let k = 0; k < 5; k++) { box(b, Q.x1 - 0.9, y + 2, Q.z0 + 6 + k * 5, 0.5, 3.4, 3.6, DARK, true); for (let r = 0; r < 3; r++) box(b, Q.x1 - 1.25, y + 1 + r * 0.9, Q.z0 + 6 + k * 5, 0.12, 0.16, 2.8, 0x6a7078, false); }
     b.fx.push({ type: 'neon', x: -538, y: y + H - 0.15, z: roomZ, w: 18, h: 0.06, d: 0.3, c: 0xfff0d8 });
@@ -629,7 +642,7 @@ Object.assign(World.prototype, {
     b.place = { id: 'villa_valen', name: 'Villa Valen', kind: 'landmark', door: { x: V.gate, z: V.z1 + 6, h: Math.PI }, under: { x: -610, z: -920 } };
     this.mapPlaces.push({ id: 'vault', name: 'The Valen Vault', cat: 'landmark', icon: '♜', x: Q.door, z: Q.z1 + 6, sub: 'The bunker under Villa Valen' });
     fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'aurelia' }]);
-    this.isle.fleet.push({ id: 'folk_villa', x: -610, z: -900, r: 0, slots: [], people: [[-606, -896, 0.3], [-614, -896, -0.3], [-596, V.z1 + 3, Math.PI], [-563, Q.z1 + 4, 0], [-600, -948.5, 1.6]] });
+    // (the staff, butler, valet and guards, are 357's)
     this.isle.villa = { pad, vault: Q, y };
   }
 });

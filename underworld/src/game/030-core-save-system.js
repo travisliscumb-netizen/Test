@@ -24,6 +24,8 @@ const SaveSystem = {
   defaults() {
     return {
       version: SAVE_VERSION,
+      // Villa Valen's vault doors (357): the front open, the inner safe shut
+      villa: { vault: false, safe: true },
       // the city layout the save's positions were made under (CityLayout, 021; a save from before has none: classic)
       layout: CityLayout.id,
       wallet: Money.fresh(),
@@ -181,6 +183,8 @@ const SaveSystem = {
     UniqueCars.sanitize(d);
     // the kart simulator's handling settings, best lap and wins (356)
     KartSim.sanitize(d);
+    // Villa Valen's vault doors (357): the front shut, the inner safe shut
+    d.villa = { vault: !!(d.villa && d.villa.vault), safe: !(d.villa && d.villa.safe === false) };
     for (const k of ['pistol', 'smg', 'shotgun', 'bat']) d.weapons[k] = !!d.weapons[k];
     // where each gun is: null = on you; a property id = in that property's stash
     if (!d.wloc || typeof d.wloc !== 'object') d.wloc = {};

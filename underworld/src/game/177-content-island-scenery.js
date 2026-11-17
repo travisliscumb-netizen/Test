@@ -33,6 +33,8 @@ class IslandScenery {
     if (Farms.ready) Farms.buildTurbines(scene, world.grid);
     // the lamps along the roads, and the pools of light under every island lamp (178)
     RoadLamps.build(scene, world);
+    // Villa Valen's vault doors (357)
+    VillaGrounds.build(scene, world, game);
     this._tPrev = 0;
     rotorWarmup(scene);
   }
@@ -207,8 +209,9 @@ class IslandScenery {
   }
   // which tiles should be drawn near: every land tile within the near range of the focus
   update(fx, fz) {
-    { const t = performance.now(), dt = this._tPrev ? Math.min(0.1, (t - this._tPrev) / 1000) : 0; this._tPrev = t; Farms.update(dt); }
+    const t = performance.now(), dt = this._tPrev ? Math.min(0.1, (t - this._tPrev) / 1000) : 0; this._tPrev = t; Farms.update(dt);
     if (this.g && this.g.env) RoadLamps.update(this.g.env.night);
+    if (this.g) VillaGrounds.update(dt, this.g);
     const lv = this.g.quality ? this.g.quality.level : 1, R = ISLE_SCN.near[clamp(lv, 0, 3)], Ts = ISLE.tile;
     const tx = Math.floor((fx - ISLE.x0) / 32), tz = Math.floor((fz - ISLE.z0) / 32);
     if (tx !== this._tx || tz !== this._tz || lv !== this._lv) {

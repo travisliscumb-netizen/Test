@@ -759,6 +759,8 @@ class ContentManager {
     if (cd && Math.hypot(p.pos.x - cd.x, p.pos.z - cd.z) < 2.6) return { label: 'Enter The Valen Royale', act: () => this.enterCasino() };
     const vd = VillaValen.doorAction(g);
     if (vd) return vd;
+    const vga = VillaGrounds.action(g);
+    if (vga) return vga;
     const def = I.nearDoor(p);
     if (def) {
       const why = this.canEnter(def);

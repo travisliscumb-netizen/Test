@@ -226,7 +226,7 @@ class GangManager {
       }
       // keep groups that are busy fighting near the player; drop the rest
       for (const gr of [...this.groups.values()]) {
-        if (gr.kind === 'body' || gr.kind === 'raid' || gr.kind === 'convoy' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
+        if (gr.kind === 'body' || gr.kind === 'villa' || gr.kind === 'raid' || gr.kind === 'convoy' || gr.kind === 'bounty' || gr.kind === 'squad' || gr.kind === 'assault') continue;
         if (want.has(gr.key)) continue;
         const near = gr.members.some(m => dist2(m.x, m.z, px, pz) < 70 * 70 && m.state !== 'down');
         if ((gr.hostile || gr.kind === 'war') && near) continue;
@@ -651,9 +651,13 @@ function crewBrain(p, dt) {
     const d = Math.hypot(gx - p.x, gz - p.z);
     // lost far behind and out of sight: catch up off-screen
     if (d > 60 && !g.inView(p.x, 1, p.z, 1)) { p.x = gx; p.z = gz; p.y = groundY(gx, gz); }
+  } else if (p.patrol) {
+    // a villa guard (357): walks its round, a short pause at each corner
+    const pt = p.patrol[p.pi]; gx = pt[0]; gz = pt[1];
+    if (Math.hypot(gx - p.x, gz - p.z) < 1.2) { p.waitT = (p.waitT || 0) + dt; if (p.waitT > 2.5) { p.waitT = 0; p.pi = (p.pi + 1) % p.patrol.length; } }
   } else { gx = p.home.x; gz = p.home.z; }
   const dx = gx - p.x, dz = gz - p.z, d = Math.hypot(dx, dz);
-  if (d > 0.8) { const sp = d > 7 ? 5.6 : d > 3 ? 3.2 : 1.5; p.vx = damp(p.vx, dx / d * sp, 6, dt); p.vz = damp(p.vz, dz / d * sp, 6, dt); p.h = dampAngle(p.h, Math.atan2(dx, dz), 8, dt); }
+  if (d > 0.8) { const sp = p.patrol ? (d > 30 ? 4.5 : 1.4) : d > 7 ? 5.6 : d > 3 ? 3.2 : 1.5; p.vx = damp(p.vx, dx / d * sp, 6, dt); p.vz = damp(p.vz, dz / d * sp, 6, dt); p.h = dampAngle(p.h, Math.atan2(dx, dz), 8, dt); }
   else { p.vx = damp(p.vx, 0, 8, dt); p.vz = damp(p.vz, 0, 8, dt); p.h = dampAngle(p.h, p.group && p.group.kind === 'body' ? pl.h : p.home.h, 3, dt); }
 }
 function buyerBrain(p, dt) {
