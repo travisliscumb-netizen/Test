@@ -48,6 +48,8 @@ Object.assign(World.prototype, {
     const fireP = sitePad(ISLE_FIRE.x0, ISLE_FIRE.z0, ISLE_FIRE.x1, ISLE_FIRE.z1, 30);
     Island.addPad(ISLE_LIGHT.x0, ISLE_LIGHT.z0, ISLE_LIGHT.x1, ISLE_LIGHT.z1, ISLE_LIGHT.y, 26);
     Island.addPad(ISLE_SUMMIT.x0, ISLE_SUMMIT.z0, ISLE_SUMMIT.x1, ISLE_SUMMIT.z1, ISLE_SUMMIT.y, 55);
+    // Valen Field, Villa Valen's own airstrip (128)
+    Island.addPad(VALEN_FIELD.x0, VALEN_FIELD.z0, VALEN_FIELD.x1, VALEN_FIELD.z1, VALEN_FIELD.y, 60);
     if (saltmarsh) Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
     const districtPlan = this._districtPlan(sitePad);
@@ -142,7 +144,9 @@ Object.assign(World.prototype, {
     for (const h of isle.sites.helipads) B.west.fx.push({ type: 'helipad', x: h.x, y: Y + 0.12, z: h.z });
     // aircraft: two on the general-aviation stands, one in hangar 3, a helicopter on each pad
     fleet('ap_air', 760, 1990, 900, [{ x: 1023, z: 1968, h: 0, cls: 'skylark' }, { x: 1079, z: 1968, h: 0, cls: 'skylark' }, { x: 1135, z: 1903, h: 0, cls: 'skylark' },
-      { x: 290, z: 1995, h: 0, cls: 'heli' }, { x: 352, z: 1995, h: 0, cls: 'heli' }, { x: 960, z: 1975, h: Math.PI / 2, cls: 'truck' }]);
+      { x: 290, z: 1995, h: 0, cls: 'heli' }, { x: 352, z: 1995, h: 0, cls: 'heli' }, { x: 960, z: 1975, h: Math.PI / 2, cls: 'truck' },
+      // the bigger aircraft (2026-11-17): a Corsair twin and a Meridian jet on the apron
+      { x: 520, z: 1998, h: 0, cls: 'meridian' }, { x: 700, z: 1998, h: 0, cls: 'corsair' }]);
     // runway edge lights (white), the taxiway's (blue), threshold bars (green / red)
     const lights = (x0, x1, z, w, c, step) => { for (let x = x0; x <= x1; x += step) for (const s of [-1, 1]) { const bk = this._isleLightBlock(x, z, A); bk.fx.push({ type: 'neon', x, y: Y + 0.22, z: z + s * (w / 2 + 1.2), w: 0.5, h: 0.3, d: 0.5, c }); } };
     for (const r of A.rw) { lights(r.x0, r.x1, r.z, r.w, 0xfff4d6, 55); for (let q = -3; q <= 3; q++) { this._isleLightBlock(r.x0, r.z, A).fx.push({ type: 'neon', x: r.x0 - 2, y: Y + 0.22, z: r.z + q * r.w / 7, w: 0.5, h: 0.3, d: 0.8, c: 0x40ff70 }); this._isleLightBlock(r.x1, r.z, A).fx.push({ type: 'neon', x: r.x1 + 2, y: Y + 0.22, z: r.z + q * r.w / 7, w: 0.5, h: 0.3, d: 0.8, c: 0xff3030 }); } }

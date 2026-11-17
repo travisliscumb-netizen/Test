@@ -32,7 +32,9 @@ const ISLE_DISTRICT_ROADS = [
   { id: 'm2', name: 'Heron Loop', w: 8, grade: 0.09, ends: ['m1', 'm1'], pts: [[-640, 1418], [-622, 1540], [-520, 1628], [-380, 1636], [-282, 1560], [-330, 1450]] },
   { id: 'm3', name: 'Reed Street', w: 8, grade: 0.09, ends: ['m1', 'ring'], ring: 12, pts: [[-480, 1466], [-470, 1380], [-450, 1312]] },
   { id: 'p1', name: 'Quay Road', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-1000, 1520], [-1080, 1500], [-1140, 1440], [-1162, 1340], [-1150, 1250]] },
-  { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] }
+  { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] },
+  // to Valen Field, the villa's airstrip on the west coast
+  { id: 'x1', name: 'Airfield Road', w: 9, grade: 0.09, ends: ['h3', 'ring'], ring: 14, pts: [[-742, -640], [-860, -690], [-1000, -760], [-1120, -850], [-1210, -925], [-1285, -962]] }
 ];
 ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // with the city round the bay (021 'island'): Crestmoor Heights takes the bay's north shore, so Bayview Crescent gives
@@ -137,6 +139,11 @@ const ISLE_LOT_PLAN = [
 // a lot's size: W along the road, D back from it; set: the verge between the carriageway and the lot
 const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 }, tower: { W: 34, D: 32, set: 4 }, farm: { W: 56, D: 48, set: 6 }, mid: { W: 36, D: 28, set: 3.5 } };
 // Villa Valen: the estate's walled grounds, levelled at one height, and the vault under its hill
+// Valen Field (owner, 2026-11-17: a runway on the other side of the island, behind the villa): the villa's private
+// airstrip on the flat ground west of it, 12 m up. A 700 m runway (09/27) for the Corsair and the Meridian, a taxiway to
+// an apron with a hangar, a lounge and a fuel point, a windsock, edge and threshold lights; Airfield Road from Ridgeview
+const VALEN_FIELD = { name: 'Valen Field', x0: -2000, z0: -1060, x1: -1200, z1: -925, y: 12, rw: { z: -1012, x0: -1950, x1: -1250, w: 30 },
+  apron: { x0: -1500, z0: -982, x1: -1300, z1: -938 }, tw: { x: -1400, z0: -997, z1: -982, w: 16 } };
 const VILLA_VALEN = { x0: -692, z0: -1062, x1: -518, z1: -850, y: 21.5, gate: -600, vault: { x0: -604, z0: -1052, x1: -528, z1: -994, door: -563 } };
 Object.assign(World.prototype, {
   // ---------------------------------------------------------------- planning (before the roads are built)
@@ -402,6 +409,59 @@ Object.assign(World.prototype, {
     });
     isle.districts = { lots: plan.lots, blocks: blockList.map(B => ({ d: B.d, i: B.b.i, n: B.lots.length })) };
     this._genVillaValen(plan.estate, box, cyl, fleet, tree);
+    this._genValenField(box, cyl, fleet);
+  },
+  // ---------------------------------------------------------------- VALEN FIELD: the villa's airstrip
+  _genValenField(box, cyl, fleet) {
+    const F = VALEN_FIELD, R = F.rw, y = F.y, cx = (R.x0 + R.x1) / 2, b = this._isleBlock('valen_field', cx, -985, 430, F.name);
+    const W = 0xf2f2ee, ASP = 0x2c2e33, CONC = 0x9a9c98;
+    const flat = (x, z, sx, sz, col, h = 0.04) => box(b, x, y + h, z, sx, 0.02, sz, col, false);
+    // the runway: asphalt with a lighter shoulder, edge lines, a dashed centre line, the threshold bars, the touchdown
+    // zone marks and the aiming points at each end, 09 and 27 in white
+    flat(cx, R.z, R.x1 - R.x0 + 20, R.w + 8, 0x4a4c50, 0.03); flat(cx, R.z, R.x1 - R.x0, R.w, ASP, 0.045);
+    for (const s of [-1, 1]) flat(cx, R.z + s * (R.w / 2 - 0.9), R.x1 - R.x0 - 8, 0.6, W, 0.06);
+    for (let x = R.x0 + 70; x < R.x1 - 70; x += 50) flat(x, R.z, 30, 0.7, W, 0.06);
+    for (const [ex, dir] of [[R.x0, 1], [R.x1, -1]]) {
+      for (let k = 0; k < 8; k++) { const zz = R.z - R.w / 2 + 3 + k * ((R.w - 6) / 7); if (Math.abs(zz - R.z) < 2) continue; flat(ex + dir * 16, zz, 28, 1.6, W, 0.06); }
+      for (const s of [-1, 1]) { flat(ex + dir * 150, R.z + s * 5.5, 40, 4, W, 0.06); for (const d of [240, 300, 360]) for (const q of [0, 1]) flat(ex + dir * d, R.z + s * (4 + q * 2.6), 20, 1.4, W, 0.06); }
+      // the designator: a 7-segment number from boxes, read from the approach (09 at the west end, 27 at the east)
+      const num = dir > 0 ? [0, 9] : [2, 7], SEG = { 0: 'abcdef', 2: 'abdeg', 7: 'abc', 9: 'abcdfg' };
+      num.forEach((n, i) => {
+        const ox = ex + dir * 52, oz = R.z + dir * (i ? 3.5 : -3.5), Lh = 7, Lw = 4.4, seg = SEG[n];
+        // (local: along the runway = up the digit, across = its width; seen from the approach end)
+        const P2 = (u, v2) => [ox + dir * v2, oz - dir * u];
+        const bar = (u0, v0, u1, v1) => { const [x0, z0] = P2(u0, v0), [x1, z1] = P2(u1, v1); flat((x0 + x1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0) + 0.9, Math.abs(z1 - z0) + 0.9, W, 0.065); };
+        if (seg.includes('a')) bar(-Lw / 2, Lh, Lw / 2, Lh); if (seg.includes('g')) bar(-Lw / 2, Lh / 2, Lw / 2, Lh / 2); if (seg.includes('d')) bar(-Lw / 2, 0, Lw / 2, 0);
+        if (seg.includes('b')) bar(Lw / 2, Lh / 2, Lw / 2, Lh); if (seg.includes('c')) bar(Lw / 2, 0, Lw / 2, Lh / 2);
+        if (seg.includes('f')) bar(-Lw / 2, Lh / 2, -Lw / 2, Lh); if (seg.includes('e')) bar(-Lw / 2, 0, -Lw / 2, Lh / 2);
+      });
+    }
+    // edge lights (white), threshold lights (green at the start, red at the far end), along both sides
+    for (let x = R.x0; x <= R.x1 + 0.1; x += 50) for (const s of [-1, 1]) { cyl(b, x, y + 0.25, R.z + s * (R.w / 2 + 1.4), 0.08, 0.5, 0x2a2c30, false); b.fx.push({ type: 'neon', x, y: y + 0.55, z: R.z + s * (R.w / 2 + 1.4), w: 0.22, h: 0.18, d: 0.22, c: 0xfff4d8 }); }
+    for (const [ex, c] of [[R.x0 - 4, 0x5aff8a], [R.x1 + 4, 0xff4a4a]]) for (let k = -6; k <= 6; k++) b.fx.push({ type: 'neon', x: ex, y: y + 0.3, z: R.z + k * 2.4, w: 0.22, h: 0.16, d: 0.22, c });
+    // the taxiway to the apron (yellow centre line), the apron with stand markings
+    const T = F.tw, A = F.apron;
+    flat(T.x, (R.z + R.w / 2 + A.z0) / 2, T.w, A.z0 - (R.z + R.w / 2) + 2, ASP, 0.05); flat(T.x, (R.z + A.z0) / 2, 0.3, A.z0 - R.z, 0xe2b43a, 0.065);
+    flat((A.x0 + A.x1) / 2, (A.z0 + A.z1) / 2, A.x1 - A.x0, A.z1 - A.z0, CONC, 0.05);
+    for (const sx of [-1460, -1400, -1340]) { flat(sx, (A.z0 + A.z1) / 2, 0.3, A.z1 - A.z0 - 6, 0xe2b43a, 0.065); flat(sx, A.z0 + 6, 9, 0.3, 0xe2b43a, 0.065); }
+    // the hangar (open-fronted toward the apron), the lounge with its canopy and glass, the fuel point, a windsock
+    const bld = (x0, z0, x1, z1, h, style, col, fh, bay, o = {}) => this._bld(b, x0, z0, x1, z1, h, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o });
+    bld(-1520, -968, -1490, -930, 11, STYLE.WARE, 0xa8aeb4, 11, 6, { roof: 'gable', roofColor: 0x4a5058 });
+    box(b, -1488.9, y + 4.5, -949, 0.2, 9, 30, 0x1a1c20, false);
+    bld(-1290, -950, -1256, -930, 4.6, STYLE.GLASS, 0x3a5060, 4.6, 4.2);
+    box(b, -1273, y + 4.7, -952.5, 36, 0.3, 6, 0xf2f2ee, false); for (const x of [-1288, -1258]) cyl(b, x, y + 2.3, -954.5, 0.14, 4.6, 0xd8d8d8, true);
+    b.signs.push({ text: 'VALEN FIELD', x: -1273, y: y + 5.4, z: -955.6, ry: Math.PI, w: 10, h: 1.0, bg: '#14181c', fg: '#d4af37' });
+    box(b, -1310, y + 1.1, -944, 2.4, 2.2, 1.4, 0xc8102e, true); box(b, -1310, y + 2.35, -944, 2.6, 0.3, 1.6, 0x2a2c30, false);
+    cyl(b, -1230, y + 3.5, -1040, 0.08, 7, 0xd8d8d8, true); const ws = this._det(b, 'cone', -1229, y + 6.6, -1040, 0.45, 2.4, 0.45, C(0xff7a1a)); ws.rz = Math.PI / 2;
+    for (const x of [-1990, -1970]) box(b, x, y + 0.6, R.z, 1.2, 1.2, 40, 0x9a9c98, false);
+    // the helipad by the lounge: a ring and an H
+    this._det(b, 'disc', -1228, y + 0.05, -958, 10, 1, 10, C(0x3a3d42)); this._det(b, 'disc', -1228, y + 0.06, -958, 8.6, 1, 8.6, C(0x2c2e33)); for (const s2 of [-1, 1]) flat(-1228 + s2 * 2.2, -958, 0.8, 6, 0xf2c94c, 0.07); flat(-1228, -958, 4.4, 0.8, 0xf2c94c, 0.07);
+    // the place, the aircraft on the apron, a fuel truck, the ground crew
+    b.place = { id: 'valen_field', name: F.name, kind: 'landmark', door: { x: -1273, z: -958, h: Math.PI }, under: { x: -1273, z: -940 } };
+    this.mapPlaces.push({ id: 'valen_field', name: F.name, cat: 'landmark', icon: '✈', x: cx, z: R.z, sub: 'Villa Valen’s private airstrip: a jet, a twin and a helicopter' });
+    fleet('field_air', -1400, -980, 520, [{ x: -1460, z: -962, h: Math.PI, y, cls: 'meridian' }, { x: -1400, z: -962, h: Math.PI, y, cls: 'corsair' }, { x: -1340, z: -962, h: Math.PI, y, cls: 'skylark' }, { x: -1228, z: -958, h: Math.PI, y, cls: 'aurelia' }, { x: -1318, z: -942, h: -Math.PI / 2, y, cls: 'utility' }]);
+    this.isle.fleet.push({ id: 'folk_field', x: -1400, z: -960, r: 0, slots: [], people: [[-1275, -957, Math.PI], [-1312, -948, 0.4], [-1455, -975, 2.2]] });
+    this.isle.field = F;
   },
   // ---------------------------------------------------------------- VILLA VALEN and the VALEN VAULT
   _genVillaValen(pad, box, cyl, fleet, tree) {
@@ -534,7 +594,7 @@ Object.assign(World.prototype, {
     // ------------------------------------------------ the place, the cars on the drive, the people
     b.place = { id: 'villa_valen', name: 'Villa Valen', kind: 'landmark', door: { x: V.gate, z: V.z1 + 6, h: Math.PI }, under: { x: -610, z: -920 } };
     this.mapPlaces.push({ id: 'vault', name: 'The Valen Vault', cat: 'landmark', icon: '♜', x: Q.door, z: Q.z1 + 6, sub: 'The bunker under Villa Valen' });
-    fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'heli' }]);
+    fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'aurelia' }]);
     this.isle.fleet.push({ id: 'folk_villa', x: -610, z: -900, r: 0, slots: [], people: [[-606, -896, 0.3], [-614, -896, -0.3], [-596, V.z1 + 3, Math.PI], [-563, Q.z1 + 4, 0], [-600, -948.5, 1.6]] });
     this.isle.villa = { pad, vault: Q, y };
   }

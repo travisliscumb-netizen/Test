@@ -41108,6 +41108,8 @@ Object.assign(World.prototype, {
     const fireP = sitePad(ISLE_FIRE.x0, ISLE_FIRE.z0, ISLE_FIRE.x1, ISLE_FIRE.z1, 30);
     Island.addPad(ISLE_LIGHT.x0, ISLE_LIGHT.z0, ISLE_LIGHT.x1, ISLE_LIGHT.z1, ISLE_LIGHT.y, 26);
     Island.addPad(ISLE_SUMMIT.x0, ISLE_SUMMIT.z0, ISLE_SUMMIT.x1, ISLE_SUMMIT.z1, ISLE_SUMMIT.y, 55);
+    // Valen Field, Villa Valen's own airstrip (128)
+    Island.addPad(VALEN_FIELD.x0, VALEN_FIELD.z0, VALEN_FIELD.x1, VALEN_FIELD.z1, VALEN_FIELD.y, 60);
     if (saltmarsh) Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
     const districtPlan = this._districtPlan(sitePad);
@@ -41202,7 +41204,9 @@ Object.assign(World.prototype, {
     for (const h of isle.sites.helipads) B.west.fx.push({ type: 'helipad', x: h.x, y: Y + 0.12, z: h.z });
     // aircraft: two on the general-aviation stands, one in hangar 3, a helicopter on each pad
     fleet('ap_air', 760, 1990, 900, [{ x: 1023, z: 1968, h: 0, cls: 'skylark' }, { x: 1079, z: 1968, h: 0, cls: 'skylark' }, { x: 1135, z: 1903, h: 0, cls: 'skylark' },
-      { x: 290, z: 1995, h: 0, cls: 'heli' }, { x: 352, z: 1995, h: 0, cls: 'heli' }, { x: 960, z: 1975, h: Math.PI / 2, cls: 'truck' }]);
+      { x: 290, z: 1995, h: 0, cls: 'heli' }, { x: 352, z: 1995, h: 0, cls: 'heli' }, { x: 960, z: 1975, h: Math.PI / 2, cls: 'truck' },
+      // the bigger aircraft (2026-11-17): a Corsair twin and a Meridian jet on the apron
+      { x: 520, z: 1998, h: 0, cls: 'meridian' }, { x: 700, z: 1998, h: 0, cls: 'corsair' }]);
     // runway edge lights (white), the taxiway's (blue), threshold bars (green / red)
     const lights = (x0, x1, z, w, c, step) => { for (let x = x0; x <= x1; x += step) for (const s of [-1, 1]) { const bk = this._isleLightBlock(x, z, A); bk.fx.push({ type: 'neon', x, y: Y + 0.22, z: z + s * (w / 2 + 1.2), w: 0.5, h: 0.3, d: 0.5, c }); } };
     for (const r of A.rw) { lights(r.x0, r.x1, r.z, r.w, 0xfff4d6, 55); for (let q = -3; q <= 3; q++) { this._isleLightBlock(r.x0, r.z, A).fx.push({ type: 'neon', x: r.x0 - 2, y: Y + 0.22, z: r.z + q * r.w / 7, w: 0.5, h: 0.3, d: 0.8, c: 0x40ff70 }); this._isleLightBlock(r.x1, r.z, A).fx.push({ type: 'neon', x: r.x1 + 2, y: Y + 0.22, z: r.z + q * r.w / 7, w: 0.5, h: 0.3, d: 0.8, c: 0xff3030 }); } }
@@ -41398,7 +41402,9 @@ const ISLE_DISTRICT_ROADS = [
   { id: 'm2', name: 'Heron Loop', w: 8, grade: 0.09, ends: ['m1', 'm1'], pts: [[-640, 1418], [-622, 1540], [-520, 1628], [-380, 1636], [-282, 1560], [-330, 1450]] },
   { id: 'm3', name: 'Reed Street', w: 8, grade: 0.09, ends: ['m1', 'ring'], ring: 12, pts: [[-480, 1466], [-470, 1380], [-450, 1312]] },
   { id: 'p1', name: 'Quay Road', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-1000, 1520], [-1080, 1500], [-1140, 1440], [-1162, 1340], [-1150, 1250]] },
-  { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] }
+  { id: 'p2', name: 'Foundry Wharf', w: 10, grade: 0.08, ends: ['s4', 'ring'], ring: 16, pts: [[-985, 1720], [-1070, 1724], [-1140, 1760]] },
+  // to Valen Field, the villa's airstrip on the west coast
+  { id: 'x1', name: 'Airfield Road', w: 9, grade: 0.09, ends: ['h3', 'ring'], ring: 14, pts: [[-742, -640], [-860, -690], [-1000, -760], [-1120, -850], [-1210, -925], [-1285, -962]] }
 ];
 ISLE_ROADS.push(...ISLE_DISTRICT_ROADS);
 // with the city round the bay (021 'island'): Crestmoor Heights takes the bay's north shore, so Bayview Crescent gives
@@ -41503,6 +41509,11 @@ const ISLE_LOT_PLAN = [
 // a lot's size: W along the road, D back from it; set: the verge between the carriageway and the lot
 const ISLE_LOT = { villa: { W: 34, D: 30, set: 4 }, house: { W: 22, D: 22, set: 3.5 }, cabin: { W: 18, D: 18, set: 4 }, shop: { W: 34, D: 26, set: 3.5 }, apt: { W: 36, D: 28, set: 3.5 }, ware: { W: 56, D: 40, set: 4 }, tower: { W: 34, D: 32, set: 4 }, farm: { W: 56, D: 48, set: 6 }, mid: { W: 36, D: 28, set: 3.5 } };
 // Villa Valen: the estate's walled grounds, levelled at one height, and the vault under its hill
+// Valen Field (owner, 2026-11-17: a runway on the other side of the island, behind the villa): the villa's private
+// airstrip on the flat ground west of it, 12 m up. A 700 m runway (09/27) for the Corsair and the Meridian, a taxiway to
+// an apron with a hangar, a lounge and a fuel point, a windsock, edge and threshold lights; Airfield Road from Ridgeview
+const VALEN_FIELD = { name: 'Valen Field', x0: -2000, z0: -1060, x1: -1200, z1: -925, y: 12, rw: { z: -1012, x0: -1950, x1: -1250, w: 30 },
+  apron: { x0: -1500, z0: -982, x1: -1300, z1: -938 }, tw: { x: -1400, z0: -997, z1: -982, w: 16 } };
 const VILLA_VALEN = { x0: -692, z0: -1062, x1: -518, z1: -850, y: 21.5, gate: -600, vault: { x0: -604, z0: -1052, x1: -528, z1: -994, door: -563 } };
 Object.assign(World.prototype, {
   // ---------------------------------------------------------------- planning (before the roads are built)
@@ -41768,6 +41779,59 @@ Object.assign(World.prototype, {
     });
     isle.districts = { lots: plan.lots, blocks: blockList.map(B => ({ d: B.d, i: B.b.i, n: B.lots.length })) };
     this._genVillaValen(plan.estate, box, cyl, fleet, tree);
+    this._genValenField(box, cyl, fleet);
+  },
+  // ---------------------------------------------------------------- VALEN FIELD: the villa's airstrip
+  _genValenField(box, cyl, fleet) {
+    const F = VALEN_FIELD, R = F.rw, y = F.y, cx = (R.x0 + R.x1) / 2, b = this._isleBlock('valen_field', cx, -985, 430, F.name);
+    const W = 0xf2f2ee, ASP = 0x2c2e33, CONC = 0x9a9c98;
+    const flat = (x, z, sx, sz, col, h = 0.04) => box(b, x, y + h, z, sx, 0.02, sz, col, false);
+    // the runway: asphalt with a lighter shoulder, edge lines, a dashed centre line, the threshold bars, the touchdown
+    // zone marks and the aiming points at each end, 09 and 27 in white
+    flat(cx, R.z, R.x1 - R.x0 + 20, R.w + 8, 0x4a4c50, 0.03); flat(cx, R.z, R.x1 - R.x0, R.w, ASP, 0.045);
+    for (const s of [-1, 1]) flat(cx, R.z + s * (R.w / 2 - 0.9), R.x1 - R.x0 - 8, 0.6, W, 0.06);
+    for (let x = R.x0 + 70; x < R.x1 - 70; x += 50) flat(x, R.z, 30, 0.7, W, 0.06);
+    for (const [ex, dir] of [[R.x0, 1], [R.x1, -1]]) {
+      for (let k = 0; k < 8; k++) { const zz = R.z - R.w / 2 + 3 + k * ((R.w - 6) / 7); if (Math.abs(zz - R.z) < 2) continue; flat(ex + dir * 16, zz, 28, 1.6, W, 0.06); }
+      for (const s of [-1, 1]) { flat(ex + dir * 150, R.z + s * 5.5, 40, 4, W, 0.06); for (const d of [240, 300, 360]) for (const q of [0, 1]) flat(ex + dir * d, R.z + s * (4 + q * 2.6), 20, 1.4, W, 0.06); }
+      // the designator: a 7-segment number from boxes, read from the approach (09 at the west end, 27 at the east)
+      const num = dir > 0 ? [0, 9] : [2, 7], SEG = { 0: 'abcdef', 2: 'abdeg', 7: 'abc', 9: 'abcdfg' };
+      num.forEach((n, i) => {
+        const ox = ex + dir * 52, oz = R.z + dir * (i ? 3.5 : -3.5), Lh = 7, Lw = 4.4, seg = SEG[n];
+        // (local: along the runway = up the digit, across = its width; seen from the approach end)
+        const P2 = (u, v2) => [ox + dir * v2, oz - dir * u];
+        const bar = (u0, v0, u1, v1) => { const [x0, z0] = P2(u0, v0), [x1, z1] = P2(u1, v1); flat((x0 + x1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0) + 0.9, Math.abs(z1 - z0) + 0.9, W, 0.065); };
+        if (seg.includes('a')) bar(-Lw / 2, Lh, Lw / 2, Lh); if (seg.includes('g')) bar(-Lw / 2, Lh / 2, Lw / 2, Lh / 2); if (seg.includes('d')) bar(-Lw / 2, 0, Lw / 2, 0);
+        if (seg.includes('b')) bar(Lw / 2, Lh / 2, Lw / 2, Lh); if (seg.includes('c')) bar(Lw / 2, 0, Lw / 2, Lh / 2);
+        if (seg.includes('f')) bar(-Lw / 2, Lh / 2, -Lw / 2, Lh); if (seg.includes('e')) bar(-Lw / 2, 0, -Lw / 2, Lh / 2);
+      });
+    }
+    // edge lights (white), threshold lights (green at the start, red at the far end), along both sides
+    for (let x = R.x0; x <= R.x1 + 0.1; x += 50) for (const s of [-1, 1]) { cyl(b, x, y + 0.25, R.z + s * (R.w / 2 + 1.4), 0.08, 0.5, 0x2a2c30, false); b.fx.push({ type: 'neon', x, y: y + 0.55, z: R.z + s * (R.w / 2 + 1.4), w: 0.22, h: 0.18, d: 0.22, c: 0xfff4d8 }); }
+    for (const [ex, c] of [[R.x0 - 4, 0x5aff8a], [R.x1 + 4, 0xff4a4a]]) for (let k = -6; k <= 6; k++) b.fx.push({ type: 'neon', x: ex, y: y + 0.3, z: R.z + k * 2.4, w: 0.22, h: 0.16, d: 0.22, c });
+    // the taxiway to the apron (yellow centre line), the apron with stand markings
+    const T = F.tw, A = F.apron;
+    flat(T.x, (R.z + R.w / 2 + A.z0) / 2, T.w, A.z0 - (R.z + R.w / 2) + 2, ASP, 0.05); flat(T.x, (R.z + A.z0) / 2, 0.3, A.z0 - R.z, 0xe2b43a, 0.065);
+    flat((A.x0 + A.x1) / 2, (A.z0 + A.z1) / 2, A.x1 - A.x0, A.z1 - A.z0, CONC, 0.05);
+    for (const sx of [-1460, -1400, -1340]) { flat(sx, (A.z0 + A.z1) / 2, 0.3, A.z1 - A.z0 - 6, 0xe2b43a, 0.065); flat(sx, A.z0 + 6, 9, 0.3, 0xe2b43a, 0.065); }
+    // the hangar (open-fronted toward the apron), the lounge with its canopy and glass, the fuel point, a windsock
+    const bld = (x0, z0, x1, z1, h, style, col, fh, bay, o = {}) => this._bld(b, x0, z0, x1, z1, h, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o });
+    bld(-1520, -968, -1490, -930, 11, STYLE.WARE, 0xa8aeb4, 11, 6, { roof: 'gable', roofColor: 0x4a5058 });
+    box(b, -1488.9, y + 4.5, -949, 0.2, 9, 30, 0x1a1c20, false);
+    bld(-1290, -950, -1256, -930, 4.6, STYLE.GLASS, 0x3a5060, 4.6, 4.2);
+    box(b, -1273, y + 4.7, -952.5, 36, 0.3, 6, 0xf2f2ee, false); for (const x of [-1288, -1258]) cyl(b, x, y + 2.3, -954.5, 0.14, 4.6, 0xd8d8d8, true);
+    b.signs.push({ text: 'VALEN FIELD', x: -1273, y: y + 5.4, z: -955.6, ry: Math.PI, w: 10, h: 1.0, bg: '#14181c', fg: '#d4af37' });
+    box(b, -1310, y + 1.1, -944, 2.4, 2.2, 1.4, 0xc8102e, true); box(b, -1310, y + 2.35, -944, 2.6, 0.3, 1.6, 0x2a2c30, false);
+    cyl(b, -1230, y + 3.5, -1040, 0.08, 7, 0xd8d8d8, true); const ws = this._det(b, 'cone', -1229, y + 6.6, -1040, 0.45, 2.4, 0.45, C(0xff7a1a)); ws.rz = Math.PI / 2;
+    for (const x of [-1990, -1970]) box(b, x, y + 0.6, R.z, 1.2, 1.2, 40, 0x9a9c98, false);
+    // the helipad by the lounge: a ring and an H
+    this._det(b, 'disc', -1228, y + 0.05, -958, 10, 1, 10, C(0x3a3d42)); this._det(b, 'disc', -1228, y + 0.06, -958, 8.6, 1, 8.6, C(0x2c2e33)); for (const s2 of [-1, 1]) flat(-1228 + s2 * 2.2, -958, 0.8, 6, 0xf2c94c, 0.07); flat(-1228, -958, 4.4, 0.8, 0xf2c94c, 0.07);
+    // the place, the aircraft on the apron, a fuel truck, the ground crew
+    b.place = { id: 'valen_field', name: F.name, kind: 'landmark', door: { x: -1273, z: -958, h: Math.PI }, under: { x: -1273, z: -940 } };
+    this.mapPlaces.push({ id: 'valen_field', name: F.name, cat: 'landmark', icon: '✈', x: cx, z: R.z, sub: 'Villa Valen’s private airstrip: a jet, a twin and a helicopter' });
+    fleet('field_air', -1400, -980, 520, [{ x: -1460, z: -962, h: Math.PI, y, cls: 'meridian' }, { x: -1400, z: -962, h: Math.PI, y, cls: 'corsair' }, { x: -1340, z: -962, h: Math.PI, y, cls: 'skylark' }, { x: -1228, z: -958, h: Math.PI, y, cls: 'aurelia' }, { x: -1318, z: -942, h: -Math.PI / 2, y, cls: 'utility' }]);
+    this.isle.fleet.push({ id: 'folk_field', x: -1400, z: -960, r: 0, slots: [], people: [[-1275, -957, Math.PI], [-1312, -948, 0.4], [-1455, -975, 2.2]] });
+    this.isle.field = F;
   },
   // ---------------------------------------------------------------- VILLA VALEN and the VALEN VAULT
   _genVillaValen(pad, box, cyl, fleet, tree) {
@@ -41900,7 +41964,7 @@ Object.assign(World.prototype, {
     // ------------------------------------------------ the place, the cars on the drive, the people
     b.place = { id: 'villa_valen', name: 'Villa Valen', kind: 'landmark', door: { x: V.gate, z: V.z1 + 6, h: Math.PI }, under: { x: -610, z: -920 } };
     this.mapPlaces.push({ id: 'vault', name: 'The Valen Vault', cat: 'landmark', icon: '♜', x: Q.door, z: Q.z1 + 6, sub: 'The bunker under Villa Valen' });
-    fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'heli' }]);
+    fleet('villa_court', -610, -880, 240, [{ x: -620, z: -889, h: Math.PI / 2, y, cls: 'luxury' }, { x: -598, z: -866, h: -Math.PI / 2, y, cls: 'kodiak' }, { x: -555.5, z: -893.5, h: Math.PI, y, cls: 'sports' }, { x: -530.7, z: -893.5, h: Math.PI, y, cls: 'monarch' }, { x: -540, z: -878, h: Math.PI / 2, y, cls: 'aurelia' }]);
     this.isle.fleet.push({ id: 'folk_villa', x: -610, z: -900, r: 0, slots: [], people: [[-606, -896, 0.3], [-614, -896, -0.3], [-596, V.z1 + 3, Math.PI], [-563, Q.z1 + 4, 0], [-600, -948.5, 1.6]] });
     this.isle.villa = { pad, vault: Q, y };
   }
@@ -45770,6 +45834,20 @@ Object.assign(VEHICLES, {
     flight: { climb: 9, sink: 11, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
     colors: [0x17202a, 0xc8102e, 0x2a6fd6], paint2: 0xe8e8e8, blurb: 'A light turbine helicopter. Lands on a roof, a beach or a traffic island.' }
 });
+// the bigger aircraft (owner, 2026-11-17: "bigger planes, a jet, nicer helicopters"). flight: thrust (m/s² at full
+// throttle), drag (top speed = sqrt(thrust / drag)), vStall (lift-off near it), pitchRate / rollRate (rad/s), align (how
+// hard the wings pull the path round), span; props: [x, y, z, radius] of each propeller (none: a jet)
+Object.assign(VEHICLES, {
+  corsair: { rev: 0.5, name: 'Corsair 350', l: 12.6, w: 2.1, h: 3.9, mass: 5600, power: 0, drift: 0, vmax: 112, steer: 0.4, grip: 1, brake: 8, soft: 1, wheelR: 0.34, camDist: 22, camH: 5.2, eng: 0.75, price: 0, profile: 'sedan', build: 'twin', air: 'plane', tier: 'nice', fleet: true, armorK: 0.9,
+    flight: { thrust: 8.6, drag: 0.000686, vStall: 30, pitchRate: 0.6, rollRate: 1.25, align: 2.4, span: 16.6, props: [[3.05, 1.3, 3.55, 1.25], [-3.05, 1.3, 3.55, 1.25]] },
+    colors: [0xf2f4f6, 0x1c2a44, 0x8a1c24], paint2: 0xd4af37, blurb: 'Two turboprops, eight leather seats and a range that outlasts the island.' },
+  meridian: { rev: 0.5, name: 'Meridian 7X', l: 17.4, w: 2.5, h: 5.2, mass: 9800, power: 0, drift: 0, vmax: 165, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.4, camDist: 27, camH: 6.4, eng: 2.6, price: 0, profile: 'sedan', build: 'jet', air: 'plane', jet: true, tier: 'nice', fleet: true, armorK: 1,
+    flight: { thrust: 15, drag: 0.000551, vStall: 42, pitchRate: 0.55, rollRate: 1.35, align: 2.2, span: 15.6, props: [] },
+    colors: [0xf4f5f6, 0x111418, 0x5a6470], paint2: 0x1c3f94, blurb: 'A business jet: two engines in the tail, 600 km/h and a bar in the back.' },
+  aurelia: { rev: 0.5, name: 'Aurelia AW9', l: 12.4, w: 2.6, h: 3.9, mass: 3900, power: 0, drift: 0, vmax: 82, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.2, camDist: 16, camH: 4.0, eng: 0.75, price: 0, profile: 'sedan', build: 'heli2', air: 'heli', noWheels: true, tier: 'nice', fleet: true, armorK: 0.9,
+    flight: { climb: 12, sink: 13, acc: 10, yaw: 1.4, vBack: 14, rotor: 6.4, blades: 5, hub: [0, 3.62, 0.25], tail: [0.24, 2.95, -6.95], tailR: 0.62, tailFan: true },
+    colors: [0x111316, 0x0d1c33, 0xf2f4f6], paint2: 0xd4af37, blurb: 'An executive twin: five blades, a glass nose, a quiet cabin and gold on black.' }
+});
 VEHICLES.medevac = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Medevac', colors: [0xf2f4f6], paint2: 0xd02a3a, blurb: 'St. Alda’s air ambulance.' });
 VEHICLES.polheli = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Air Unit', colors: [0x14233f], paint2: 0xf4f6f7, polAir: true, blurb: 'The department’s eye in the sky.' });
 TRAIL.rally = 0.75;
@@ -45811,6 +45889,77 @@ const ISLE_BUILD = {
     const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
     return { geo, lod: geo, wheels: [[0.13, 2.4], [-0.13, 2.4], [1.18, 0.2], [-1.18, 0.2]], yb: 0.6, zf: 3.6, zr: -5.2, frontTop: Y + 0.6, rearTop: Y + 0.8, cabTop: Y + 1.1 };
   },
+  // the Corsair: a twin turboprop, low wing, an engine nacelle on each, a T-tail, a row of cabin windows (8 seats)
+  twin(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), Y = 1.55, span = s.flight.span;
+    const tube = (x, y, z, rx0, len, rz0, part, rx = Math.PI / 2, tpl = TPL.cyl) => g.add(tpl, M(x, y, z, rx0, len, rz0, 0, rx), null, P(part));
+    tube(0, Y, 0.4, 0.98, 7.4, 1.02, 0); tube(0, Y - 0.06, 4.75, 0.92, 1.9, 0.96, 0, Math.PI / 2, TPL.cone); tube(0, Y + 0.18, -5.0, 0.95, 4.2, 1.0, 0, -Math.PI / 2, TPL.cone);
+    // the cockpit's glass, the cabin's window row each side, a cheat line in the second colour, the airstair door
+    g.box(0, Y + 0.48, 3.55, 1.32, 0.46, 1.25, null, 0, P(1));
+    for (const sx of [-1, 1]) { for (let k = 0; k < 6; k++) g.box(sx * 1.0, Y + 0.28, 2.0 - k * 0.78, 0.05, 0.34, 0.48, null, 0, P(1)); g.box(sx * 1.0, Y - 0.18, 0.3, 0.04, 0.12, 8.6, null, 0, P(10)); }
+    g.box(-1.01, Y - 0.1, 2.75, 0.03, 1.15, 0.72, null, 0, P(2));
+    // the low wing (a little dihedral), coloured tips; the nacelles with their spinners
+    for (const sx of [-1, 1]) {
+      g.add(TPL.box, M(sx * span / 4, Y - 0.62 + span / 4 * 0.05, 0.5, span / 2, 0.22, 2.3, 0, 0, sx * 0.05), null, P(0));
+      g.box(sx * (span / 2 - 0.4), Y - 0.62 + span / 2 * 0.05, 0.5, 0.8, 0.24, 2.0, null, 0, P(10));
+      tube(sx * 3.05, Y - 0.25, 1.55, 0.46, 3.6, 0.52, 0); tube(sx * 3.05, Y - 0.25, 3.62, 0.34, 0.55, 0.34, 3, Math.PI / 2, TPL.cone);
+      g.box(sx * 3.05, Y - 0.62, -0.75, 0.6, 0.3, 1.2, null, 0, P(14));
+    }
+    // the T-tail: a swept fin in the second colour, the tailplane on top
+    g.add(TPL.box, M(0, Y + 1.55, -6.0, 0.16, 2.6, 1.9, 0, -0.38), null, P(10)); g.box(0, Y + 2.78, -6.5, 5.4, 0.12, 1.2, null, 0, P(0));
+    // the undercarriage: a nose leg, two mains under the nacelles
+    g.box(0, 0.62, 4.1, 0.1, 0.9, 0.1, null, 0, P(2)); for (const sx of [-1, 1]) g.box(sx * 3.05, 0.62, 0.7, 0.12, 0.9, 0.14, null, 0, P(2));
+    // lamps: a landing light, red and green at the tips, a beacon on the fin and one under the belly
+    g.box(0, Y - 0.5, 5.2, 0.24, 0.12, 0.06, null, 0, P(4)); g.box(span / 2 - 0.02, Y - 0.62 + span / 2 * 0.05, 0.5, 0.06, 0.1, 0.3, null, 0, P(5)); g.box(-span / 2 + 0.02, Y - 0.62 + span / 2 * 0.05, 0.5, 0.06, 0.1, 0.3, null, 0, P(12));
+    g.box(0, Y + 2.9, -6.9, 0.12, 0.12, 0.12, null, 0, P(5)); g.box(0, Y - 1.0, -0.6, 0.14, 0.08, 0.14, null, 0, P(5));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[0.14, 4.1], [-0.14, 4.1], [3.05, 0.7], [-3.05, 0.7]], yb: 0.62, zf: 5.7, zr: -7.0, frontTop: Y + 0.8, rearTop: Y + 1.0, cabTop: Y + 1.0 };
+  },
+  // the Meridian: a business jet, swept wings with winglets, two engines on the tail, a T-tail, oval windows
+  jet(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), Y = 1.85, span = s.flight.span;
+    const tube = (x, y, z, rx0, len, rz0, part, rx = Math.PI / 2, tpl = TPL.cyl) => g.add(tpl, M(x, y, z, rx0, len, rz0, 0, rx), null, P(part));
+    tube(0, Y, 0.6, 1.18, 10.0, 1.24, 0); tube(0, Y - 0.08, 7.0, 1.12, 2.8, 1.18, 0, Math.PI / 2, TPL.cone); tube(0, Y + 0.25, -6.6, 1.14, 4.4, 1.2, 0, -Math.PI / 2, TPL.cone);
+    // the windscreen, the windows (oval-ish: a pair of boxes each), the cheat line, the door
+    g.box(0, Y + 0.5, 5.6, 1.5, 0.4, 0.95, null, 0, P(1));
+    for (const sx of [-1, 1]) { for (let k = 0; k < 7; k++) { g.box(sx * 1.2, Y + 0.32, 3.8 - k * 1.05, 0.05, 0.4, 0.42, null, 0, P(1)); } g.box(sx * 1.21, Y - 0.12, 0.6, 0.04, 0.14, 11.8, null, 0, P(10)); g.box(sx * 1.21, Y - 0.32, 0.6, 0.04, 0.05, 11.6, null, 0, P(3)); }
+    g.box(-1.22, Y - 0.05, 4.7, 0.03, 1.45, 0.82, null, 0, P(2));
+    // the swept wings (back 0.45 rad), their winglets in the second colour; the wing root fairing
+    for (const sx of [-1, 1]) {
+      g.add(TPL.box, M(sx * 3.9, Y - 0.72, -0.9, 6.6, 0.24, 2.4, sx * 0.45, 0, sx * 0.05), null, P(0));
+      g.add(TPL.box, M(sx * 7.55, Y - 0.15, -2.55, 0.12, 1.4, 1.0, 0, -0.35, sx * 0.15), null, P(10));
+      g.box(sx * 1.05, Y - 0.8, -0.3, 0.7, 0.5, 3.4, null, 0, P(0));
+    }
+    // two engines on pylons each side of the tail: a nacelle, its dark intake, the exhaust
+    for (const sx of [-1, 1]) {
+      tube(sx * 2.05, Y + 0.65, -4.2, 0.62, 3.4, 0.62, 0); tube(sx * 2.05, Y + 0.65, -2.45, 0.5, 0.12, 0.5, 14); tube(sx * 2.05, Y + 0.65, -5.95, 0.42, 0.25, 0.42, 2);
+      g.add(TPL.box, M(sx * 1.4, Y + 0.65, -4.2, 0.9, 0.18, 1.6, 0, 0, 0), null, P(2));
+    }
+    // the T-tail, swept
+    g.add(TPL.box, M(0, Y + 2.15, -7.0, 0.2, 3.2, 2.4, 0, -0.55), null, P(10)); g.add(TPL.box, M(0, Y + 3.65, -8.0, 6.2, 0.14, 1.4, 0, 0, 0), null, P(0));
+    // the undercarriage
+    g.box(0, 0.7, 5.6, 0.12, 1.0, 0.12, null, 0, P(2)); for (const sx of [-1, 1]) g.box(sx * 1.75, 0.7, -0.6, 0.16, 1.0, 0.18, null, 0, P(2));
+    // lamps: landing lights, wingtip red and green, a strobe on the tail, a beacon on top
+    g.box(0, Y - 0.6, 7.6, 0.3, 0.12, 0.06, null, 0, P(4)); g.box(7.6, Y - 0.1, -2.6, 0.06, 0.12, 0.3, null, 0, P(5)); g.box(-7.6, Y - 0.1, -2.6, 0.06, 0.12, 0.3, null, 0, P(12));
+    g.box(0, Y + 3.8, -8.6, 0.14, 0.14, 0.14, null, 0, P(4)); g.box(0, Y + 1.25, 1.2, 0.16, 0.08, 0.16, null, 0, P(5));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[0.15, 5.6], [-0.15, 5.6], [1.75, -0.6], [-1.75, -0.6]], yb: 0.7, zf: 8.4, zr: -9.0, frontTop: Y + 0.9, rearTop: Y + 1.2, cabTop: Y + 1.2 };
+  },
+  // the Aurelia: an executive twin helicopter: a long cabin with a glass nose, the engines' cowl, a tapering boom, a
+  // shrouded tail fan in the fin, sponsons and polished skids
+  heli2(type) {
+    const g = new GeoBuilder({ part: true }), P = part => ({ part });
+    g.add(TPL.sphere, M(0, 1.75, 0.6, 1.3, 1.15, 2.7), null, P(0)); g.add(TPL.sphere, M(0, 1.85, 2.35, 1.16, 0.98, 1.3), null, P(1));
+    for (const sx of [-1, 1]) { for (let k = 0; k < 3; k++) g.box(sx * 1.2, 2.0, 0.9 - k * 0.95, 0.06, 0.62, 0.78, null, 0, P(1)); g.box(sx * 1.22, 1.35, 0.4, 0.05, 0.08, 4.4, null, 0, P(10)); g.box(sx * 1.25, 0.95, 0.3, 0.42, 0.42, 1.9, null, 0, P(0)); }
+    g.box(0, 2.95, -0.1, 1.4, 0.62, 2.9, null, 0, P(10)); g.box(0, 3.3, -0.25, 0.6, 0.24, 1.3, null, 0, P(14)); g.add(TPL.cyl6, M(0, 3.4, 0.25, 0.14, 0.5, 0.14), null, P(2));
+    g.add(TPL.cone, M(0, 2.25, -4.4, 0.62, 5.6, 0.62, 0, -Math.PI / 2), null, P(0));
+    // the fin with its shrouded tail fan (the fan turns inside it), the tailplane with end plates
+    g.add(TPL.box, M(0, 2.85, -6.95, 0.34, 2.2, 1.7, 0, -0.32), null, P(10)); g.box(0, 2.15, -6.2, 2.5, 0.08, 0.55, null, 0, P(0)); for (const sx of [-1, 1]) g.box(sx * 1.25, 2.3, -6.2, 0.06, 0.45, 0.5, null, 0, P(10));
+    for (const sx of [-1, 1]) { g.box(sx * 1.05, 0.08, 0.6, 0.12, 0.1, 3.8, null, 0, P(3)); for (const z of [1.7, -0.5]) g.add(TPL.box, M(sx * 0.9, 0.42, z, 0.08, 0.8, 0.08, 0, 0, -sx * 0.3), null, P(3)); }
+    g.box(0, 0.95, 3.2, 0.3, 0.16, 0.08, null, 0, P(4)); g.box(0, 2.1, -7.6, 0.08, 0.1, 0.06, null, 0, P(5)); g.box(0, 3.6, -1.4, 0.14, 0.1, 0.14, null, 0, P(5));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[1.0, 1.7], [-1.0, 1.7], [1.0, -0.5], [-1.0, -0.5]], yb: 0.5, zf: 3.6, zr: -7.8, frontTop: 1.9, rearTop: 2.6, cabTop: 3.4 };
+  },
   heli(type) {
     const g = new GeoBuilder({ part: true }), P = part => ({ part });
     // the cabin and its bubble, the engine cowl, the tail boom, the fin and tailplane, the mast, the skids
@@ -45835,19 +45984,26 @@ function rotorWarmup(scene) {
   a.position.set(0, -400, 0); b.position.set(0, -400, 0); scene.add(a); scene.add(b);
 }
 function makeRotors(v) {
-  const s = v.spec, steel = ROTOR_MAT.steel || (ROTOR_MAT.steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 })), disc = ROTOR_MAT.disc();
-  const R = {}, blur = r => new THREE.Mesh(new THREE.CircleGeometry(r, 24), disc);
+  const s = v.spec, F = s.flight, steel = ROTOR_MAT.steel || (ROTOR_MAT.steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 })), disc = ROTOR_MAT.disc();
+  const R = { props: [], disc }, blur = r => new THREE.Mesh(new THREE.CircleGeometry(r, 24), disc);
   if (s.air === 'plane') {
-    const hub = new THREE.Group(); hub.position.set(0, 1.36, 3.5);
-    hub.add(new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.17, 0.05), steel)); hub.add(blur(1.0));
-    v.mesh.add(hub); R.main = hub; R.axis = 'z'; R.disc = disc;
+    // each propeller: two (a twin's: three) blades and a disc, turning about the nose's axis; a jet has none
+    for (const [x, y, z, r] of F.props || [[0, 1.36, 3.5, 1.0]]) {
+      const hub = new THREE.Group(); hub.position.set(x, y, z);
+      const nb = F.props ? 3 : 2;
+      for (let k = 0; k < nb; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(r * 1.95, 0.17, 0.05), steel); b.rotation.z = k / nb * Math.PI; hub.add(b); }
+      hub.add(blur(r)); v.mesh.add(hub); R.props.push(hub);
+    }
+    R.axis = 'z';
   } else {
-    const hub = new THREE.Group(); hub.position.set(0, 3.24, 0.15);
-    for (const a of [0, Math.PI / 2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(s.flight.rotor * 2, 0.05, 0.3), steel); b.rotation.y = a; hub.add(b); }
-    const d = blur(s.flight.rotor); d.rotation.x = -Math.PI / 2; hub.add(d);
-    const tail = new THREE.Group(); tail.position.set(0.2, 2.42, -5.62);
-    tail.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.3, 0.14), steel)); const d2 = blur(0.66); d2.rotation.y = Math.PI / 2; tail.add(d2);
-    v.mesh.add(hub); v.mesh.add(tail); R.main = hub; R.tail = tail; R.axis = 'y'; R.disc = disc;
+    const H = F.hub || [0, 3.24, 0.15], T = F.tail || [0.2, 2.42, -5.62], nb = F.blades || 2;
+    const hub = new THREE.Group(); hub.position.set(H[0], H[1], H[2]);
+    for (let k = 0; k < nb; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(F.rotor * 2 * (nb > 2 ? 0.5 : 1), 0.05, 0.3), steel); if (nb > 2) b.position.x = F.rotor / 2; const arm = new THREE.Group(); arm.rotation.y = k / nb * Math.PI * (nb > 2 ? 2 : 1); arm.add(b); hub.add(arm); }
+    if (nb > 2) hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.4, 0.3, 10), steel));
+    const d = blur(F.rotor); d.rotation.x = -Math.PI / 2; hub.add(d);
+    const tail = new THREE.Group(); tail.position.set(T[0], T[1], T[2]);
+    tail.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, (F.tailR || 0.66) * 1.95, 0.14), steel)); const d2 = blur(F.tailR || 0.66); d2.rotation.y = Math.PI / 2; tail.add(d2);
+    v.mesh.add(hub); v.mesh.add(tail); R.main = hub; R.tail = tail; R.axis = 'y';
   }
   return R;
 }
@@ -45858,7 +46014,7 @@ function makeRotors(v) {
 const Flight = {
   G: 14,
   _q: [], _res: {},
-  init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
+  init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0, pin: 0, lin: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
   // what an aircraft at height y over (x, z) would come down on: the ground or a deck at its level, or a roof below it
   // (its slope is left in _gx / _gz: flying into a hillside is not a landing)
   ground(world, x, z, y) {
@@ -45880,6 +46036,10 @@ const Flight = {
   step(v, dt, game) {
     const s = v.spec, A = v.air, F = s.flight, ctl = v.ctl, world = game.world, dead = v.burnt || v.health <= 0, flown = v.driver === 'player' && !dead;
     if (!flown) { ctl.throttle = 0; ctl.steer = 0; ctl.pitch = 0; ctl.lift = 0; }
+    // the stick and the collective ease in and out (keys and touch buttons are on or off): about a quarter of a second
+    // to full deflection, so the aircraft answers smoothly, never with a jolt
+    A.pin += clamp((ctl.pitch || 0) - A.pin, -4.5 * dt, 4.5 * dt); A.lin += clamp((ctl.lift || 0) - A.lin, -4 * dt, 4 * dt);
+    const pitchIn = A.pin, liftIn = A.lin;
     A.on = clamp(A.on + (flown ? dt / (s.air === 'heli' ? 2.6 : 1.4) : -dt / 3), 0, 1);
     const h0 = v.h, gy = this.ground(world, v.pos.x, v.pos.z, v.pos.y);
     let vx = v.vel.x, vz = v.vel.y, vy = A.vy;
@@ -45900,9 +46060,10 @@ const Flight = {
         v.h += ctl.steer * clamp(f / 7, -1, 1) * (1.05 - 0.6 * auth) * dt;
         const sh2 = Math.sin(v.h), ch2 = Math.cos(v.h); vx = sh2 * f - ch2 * l; vz = ch2 * f + sh2 * l; vy = 0;
         // the nose comes up with the stick once there is air over the tail; it flies itself off a little above the stall
-        A.pitch = damp(A.pitch, clamp(ctl.pitch, 0, 1) * 0.2 * auth, 5, dt); A.bank = damp(A.bank, 0, 8, dt);
+        A.pitch = damp(A.pitch, clamp(pitchIn, 0, 1) * 0.2 * auth, 5, dt); A.bank = damp(A.bank, 0, 8, dt);
         v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
-        if ((q >= 1 && A.pitch > 0.07) || q > 1.22) { A.grounded = false; v.pos.y += 0.06; vy = Math.max(1.2, f * Math.sin(A.pitch) * 0.7); }
+        // (it leaves the runway climbing gently: the wings take its weight over the next moments, no jump in its climb)
+        if ((q >= 1 && A.pitch > 0.07) || q > 1.22) { A.grounded = false; v.pos.y += 0.06; vy = 0.5; }
         v.braking = braking; v.spin += f * dt / s.wheelR; v.steer = damp(v.steer, ctl.steer * 0.5, 9, dt);
       } else {
         // in the air: thrust along the nose, drag against the path, the weight the wings do not carry, speed traded
@@ -45926,8 +46087,8 @@ const Flight = {
         const au = 0.3 + 0.7 * auth, tb = -ctl.steer * 0.95;
         // Nose down goes further than nose up (a dive is how you lose height quickly); throttled back and hands off it
         // trims for a glide (about 5 m/s down) rather than holding its height until it stalls.
-        let tp = ctl.pitch >= 0 ? ctl.pitch * 0.36 : ctl.pitch * 0.55;
-        if (Math.abs(ctl.pitch) < 0.05 && A.thr < 0.25 && A.agl > 60) tp = -0.15;
+        let tp = pitchIn >= 0 ? pitchIn * 0.36 : pitchIn * 0.55;
+        if (Math.abs(pitchIn) < 0.05 && A.thr < 0.25 && A.agl > 60) tp = -0.15;
         // the flare starts higher the faster it is coming down (it needs about two seconds of sink to round out)
         const fh = Math.max(9, -vy * 2.2);
         if (A.agl < fh && vy < 0 && q > 0.75) tp = Math.max(tp, -0.035 - 0.06 * Math.min(1, A.agl / 9));
@@ -45952,12 +46113,13 @@ const Flight = {
       if (A.grounded) {
         const dec = 12 * dt; f = Math.abs(f) <= dec ? 0 : f - Math.sign(f) * dec; l *= Math.exp(-10 * dt); vy = 0;
         A.pitch = damp(A.pitch, 0, 6, dt); A.bank = damp(A.bank, 0, 6, dt);
-        if (lifted && ctl.lift > 0.1) { A.grounded = false; vy = 1.5; v.pos.y += 0.05; }
+        if (lifted && liftIn > 0.1) { A.grounded = false; vy = 0.6; v.pos.y += 0.05; }
         if (lifted) v.h += ctl.steer * F.yaw * 0.5 * dt;
       } else {
         if (lifted) {
-          // (the last few metres down it sinks on its own cushion of air: a third of the rate at the ground)
-          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink * clamp(A.agl / 12, 0.3, 1); vy += clamp(want - vy, -11 * dt, 11 * dt);
+          // (the last 15 m down it sinks on its own cushion of air: it settles onto its skids at about 1.3 m/s)
+          // (the climb rate eases toward what the collective asks: quick at first, settling softly, never more than 14 m/s²)
+          const want = liftIn > 0 ? liftIn * F.climb : liftIn * F.sink * clamp(A.agl / 15, 0.12, 1); vy += clamp((want - vy) * (1 - Math.exp(-3.5 * dt)), -14 * dt, 14 * dt);
           const tf = ctl.throttle >= 0 ? ctl.throttle * s.vmax : ctl.throttle * F.vBack, acc = Math.abs(ctl.throttle) > 0.05 ? F.acc : 2.4;
           f += clamp(tf - f, -acc * dt, acc * dt); l *= Math.exp(-1.8 * dt);
           v.h += ctl.steer * F.yaw * (1 - 0.5 * clamp(Math.abs(f) / s.vmax, 0, 1)) * dt;
@@ -45973,12 +46135,20 @@ const Flight = {
       else if (v.pos.y <= g2) { const sink = this.closing(vx, vy, vz), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
       v.braking = false;
     }
-    // the island ends: a headwind that grows with every metre past the edge of the map turns it back
+    // the island ends: past the edge of the map the aircraft is turned back toward the island, heading and path
+    // together (up to 0.6 rad/s, harder the further out), so it keeps its speed (a headwind that took the speed off
+    // stalled a fast jet, which fell out of the sky)
     const ox = Math.max(ISLE.x0 - 300 - v.pos.x, 0) - Math.max(v.pos.x - ISLE.x1 - 300, 0), oz = Math.max(ISLE.z0 - 300 - v.pos.z, 0) - Math.max(v.pos.z - ISLE.z1 - 300, 0);
-    if (ox || oz) { vx += ox * 0.02 * dt * 10; vz += oz * 0.02 * dt * 10; if (v.driver === 'player' && (A.warn -= dt) <= 0) { A.warn = 8; game.ui.toast('Nothing out there but sea. Turn back.', 'warn'); } }
+    if ((ox || oz) && !A.grounded) {
+      const want = Math.atan2((ISLE.x0 + ISLE.x1) / 2 - v.pos.x, (ISLE.z0 + ISLE.z1) / 2 - v.pos.z), d = wrapPi(want - v.h);
+      const r = clamp(d, -1, 1) * clamp(0.25 + Math.hypot(ox, oz) / 400, 0, 0.6) * dt, c = Math.cos(r), sn = Math.sin(r);
+      v.h += r; const nvx = vx * c + vz * sn; vz = vz * c - vx * sn; vx = nvx;
+      if (s.air === 'plane') A.bank += clamp(-Math.sign(d) * 0.5 - A.bank, -dt, dt);
+      if (v.driver === 'player' && (A.warn -= dt) <= 0) { A.warn = 8; game.ui.toast('Nothing out there but sea. Turning back.', 'warn'); }
+    }
     v.vel.set(vx, vz); A.vy = vy; A.agl = v.pos.y - gy;
     v.yawRate = dt > 0 ? wrapPi(v.h - h0) / dt : 0;
-    v.rpm = damp(v.rpm, clamp(0.12 + A.on * (s.air === 'plane' ? 0.25 + A.thr * 0.6 : 0.62 + Math.abs(ctl.lift || 0) * 0.2), 0.1, 1), 4, dt);
+    v.rpm = damp(v.rpm, clamp(0.12 + A.on * (s.air === 'plane' ? 0.25 + A.thr * 0.6 : 0.62 + Math.abs(liftIn) * 0.2), 0.1, 1), 4, dt);
     v.gear = 1; v.reversing = false; v.slip = 0; v.skid = 0;
     // asleep again once it stands with everything stopped
     if (A.grounded && A.on <= 0 && Math.hypot(vx, vz) < 0.05 && v.driver === null && v.health > 0) { v.restT = (v.restT || 0) + dt; if (v.restT > 2) { v.sleep = true; v.vel.set(0, 0); } } else v.restT = 0;
@@ -45990,7 +46160,7 @@ const Flight = {
     v.mesh.rotation.set(-A.pitch, v.h, A.bank);
     if (R) {
       const w = A.on * (v.spec.air === 'plane' ? 34 + A.thr * 60 : 38) * (dt || 0);
-      if (R.axis === 'z') R.main.rotation.z += w; else { R.main.rotation.y += w; R.tail.rotation.x += w * 2.2; }
+      if (R.axis === 'z') { for (const p of R.props) p.rotation.z += w; } else { R.main.rotation.y += w; R.tail.rotation.x += w * 2.2; }
       R.disc.opacity = clamp(A.on * 1.6 - 0.5, 0, 1) * 0.28;
     }
   },

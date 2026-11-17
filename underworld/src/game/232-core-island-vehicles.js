@@ -38,6 +38,20 @@ Object.assign(VEHICLES, {
     flight: { climb: 9, sink: 11, acc: 8, yaw: 1.5, vBack: 12, rotor: 5.3 },
     colors: [0x17202a, 0xc8102e, 0x2a6fd6], paint2: 0xe8e8e8, blurb: 'A light turbine helicopter. Lands on a roof, a beach or a traffic island.' }
 });
+// the bigger aircraft (owner, 2026-11-17: "bigger planes, a jet, nicer helicopters"). flight: thrust (m/s² at full
+// throttle), drag (top speed = sqrt(thrust / drag)), vStall (lift-off near it), pitchRate / rollRate (rad/s), align (how
+// hard the wings pull the path round), span; props: [x, y, z, radius] of each propeller (none: a jet)
+Object.assign(VEHICLES, {
+  corsair: { rev: 0.5, name: 'Corsair 350', l: 12.6, w: 2.1, h: 3.9, mass: 5600, power: 0, drift: 0, vmax: 112, steer: 0.4, grip: 1, brake: 8, soft: 1, wheelR: 0.34, camDist: 22, camH: 5.2, eng: 0.75, price: 0, profile: 'sedan', build: 'twin', air: 'plane', tier: 'nice', fleet: true, armorK: 0.9,
+    flight: { thrust: 8.6, drag: 0.000686, vStall: 30, pitchRate: 0.6, rollRate: 1.25, align: 2.4, span: 16.6, props: [[3.05, 1.3, 3.55, 1.25], [-3.05, 1.3, 3.55, 1.25]] },
+    colors: [0xf2f4f6, 0x1c2a44, 0x8a1c24], paint2: 0xd4af37, blurb: 'Two turboprops, eight leather seats and a range that outlasts the island.' },
+  meridian: { rev: 0.5, name: 'Meridian 7X', l: 17.4, w: 2.5, h: 5.2, mass: 9800, power: 0, drift: 0, vmax: 165, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.4, camDist: 27, camH: 6.4, eng: 2.6, price: 0, profile: 'sedan', build: 'jet', air: 'plane', jet: true, tier: 'nice', fleet: true, armorK: 1,
+    flight: { thrust: 15, drag: 0.000551, vStall: 42, pitchRate: 0.55, rollRate: 1.35, align: 2.2, span: 15.6, props: [] },
+    colors: [0xf4f5f6, 0x111418, 0x5a6470], paint2: 0x1c3f94, blurb: 'A business jet: two engines in the tail, 600 km/h and a bar in the back.' },
+  aurelia: { rev: 0.5, name: 'Aurelia AW9', l: 12.4, w: 2.6, h: 3.9, mass: 3900, power: 0, drift: 0, vmax: 82, steer: 0.4, grip: 1, brake: 9, soft: 1, wheelR: 0.2, camDist: 16, camH: 4.0, eng: 0.75, price: 0, profile: 'sedan', build: 'heli2', air: 'heli', noWheels: true, tier: 'nice', fleet: true, armorK: 0.9,
+    flight: { climb: 12, sink: 13, acc: 10, yaw: 1.4, vBack: 14, rotor: 6.4, blades: 5, hub: [0, 3.62, 0.25], tail: [0.24, 2.95, -6.95], tailR: 0.62, tailFan: true },
+    colors: [0x111316, 0x0d1c33, 0xf2f4f6], paint2: 0xd4af37, blurb: 'An executive twin: five blades, a glass nose, a quiet cabin and gold on black.' }
+});
 VEHICLES.medevac = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Medevac', colors: [0xf2f4f6], paint2: 0xd02a3a, blurb: 'St. Alda’s air ambulance.' });
 VEHICLES.polheli = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Air Unit', colors: [0x14233f], paint2: 0xf4f6f7, polAir: true, blurb: 'The department’s eye in the sky.' });
 TRAIL.rally = 0.75;
@@ -79,6 +93,77 @@ const ISLE_BUILD = {
     const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
     return { geo, lod: geo, wheels: [[0.13, 2.4], [-0.13, 2.4], [1.18, 0.2], [-1.18, 0.2]], yb: 0.6, zf: 3.6, zr: -5.2, frontTop: Y + 0.6, rearTop: Y + 0.8, cabTop: Y + 1.1 };
   },
+  // the Corsair: a twin turboprop, low wing, an engine nacelle on each, a T-tail, a row of cabin windows (8 seats)
+  twin(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), Y = 1.55, span = s.flight.span;
+    const tube = (x, y, z, rx0, len, rz0, part, rx = Math.PI / 2, tpl = TPL.cyl) => g.add(tpl, M(x, y, z, rx0, len, rz0, 0, rx), null, P(part));
+    tube(0, Y, 0.4, 0.98, 7.4, 1.02, 0); tube(0, Y - 0.06, 4.75, 0.92, 1.9, 0.96, 0, Math.PI / 2, TPL.cone); tube(0, Y + 0.18, -5.0, 0.95, 4.2, 1.0, 0, -Math.PI / 2, TPL.cone);
+    // the cockpit's glass, the cabin's window row each side, a cheat line in the second colour, the airstair door
+    g.box(0, Y + 0.48, 3.55, 1.32, 0.46, 1.25, null, 0, P(1));
+    for (const sx of [-1, 1]) { for (let k = 0; k < 6; k++) g.box(sx * 1.0, Y + 0.28, 2.0 - k * 0.78, 0.05, 0.34, 0.48, null, 0, P(1)); g.box(sx * 1.0, Y - 0.18, 0.3, 0.04, 0.12, 8.6, null, 0, P(10)); }
+    g.box(-1.01, Y - 0.1, 2.75, 0.03, 1.15, 0.72, null, 0, P(2));
+    // the low wing (a little dihedral), coloured tips; the nacelles with their spinners
+    for (const sx of [-1, 1]) {
+      g.add(TPL.box, M(sx * span / 4, Y - 0.62 + span / 4 * 0.05, 0.5, span / 2, 0.22, 2.3, 0, 0, sx * 0.05), null, P(0));
+      g.box(sx * (span / 2 - 0.4), Y - 0.62 + span / 2 * 0.05, 0.5, 0.8, 0.24, 2.0, null, 0, P(10));
+      tube(sx * 3.05, Y - 0.25, 1.55, 0.46, 3.6, 0.52, 0); tube(sx * 3.05, Y - 0.25, 3.62, 0.34, 0.55, 0.34, 3, Math.PI / 2, TPL.cone);
+      g.box(sx * 3.05, Y - 0.62, -0.75, 0.6, 0.3, 1.2, null, 0, P(14));
+    }
+    // the T-tail: a swept fin in the second colour, the tailplane on top
+    g.add(TPL.box, M(0, Y + 1.55, -6.0, 0.16, 2.6, 1.9, 0, -0.38), null, P(10)); g.box(0, Y + 2.78, -6.5, 5.4, 0.12, 1.2, null, 0, P(0));
+    // the undercarriage: a nose leg, two mains under the nacelles
+    g.box(0, 0.62, 4.1, 0.1, 0.9, 0.1, null, 0, P(2)); for (const sx of [-1, 1]) g.box(sx * 3.05, 0.62, 0.7, 0.12, 0.9, 0.14, null, 0, P(2));
+    // lamps: a landing light, red and green at the tips, a beacon on the fin and one under the belly
+    g.box(0, Y - 0.5, 5.2, 0.24, 0.12, 0.06, null, 0, P(4)); g.box(span / 2 - 0.02, Y - 0.62 + span / 2 * 0.05, 0.5, 0.06, 0.1, 0.3, null, 0, P(5)); g.box(-span / 2 + 0.02, Y - 0.62 + span / 2 * 0.05, 0.5, 0.06, 0.1, 0.3, null, 0, P(12));
+    g.box(0, Y + 2.9, -6.9, 0.12, 0.12, 0.12, null, 0, P(5)); g.box(0, Y - 1.0, -0.6, 0.14, 0.08, 0.14, null, 0, P(5));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[0.14, 4.1], [-0.14, 4.1], [3.05, 0.7], [-3.05, 0.7]], yb: 0.62, zf: 5.7, zr: -7.0, frontTop: Y + 0.8, rearTop: Y + 1.0, cabTop: Y + 1.0 };
+  },
+  // the Meridian: a business jet, swept wings with winglets, two engines on the tail, a T-tail, oval windows
+  jet(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), Y = 1.85, span = s.flight.span;
+    const tube = (x, y, z, rx0, len, rz0, part, rx = Math.PI / 2, tpl = TPL.cyl) => g.add(tpl, M(x, y, z, rx0, len, rz0, 0, rx), null, P(part));
+    tube(0, Y, 0.6, 1.18, 10.0, 1.24, 0); tube(0, Y - 0.08, 7.0, 1.12, 2.8, 1.18, 0, Math.PI / 2, TPL.cone); tube(0, Y + 0.25, -6.6, 1.14, 4.4, 1.2, 0, -Math.PI / 2, TPL.cone);
+    // the windscreen, the windows (oval-ish: a pair of boxes each), the cheat line, the door
+    g.box(0, Y + 0.5, 5.6, 1.5, 0.4, 0.95, null, 0, P(1));
+    for (const sx of [-1, 1]) { for (let k = 0; k < 7; k++) { g.box(sx * 1.2, Y + 0.32, 3.8 - k * 1.05, 0.05, 0.4, 0.42, null, 0, P(1)); } g.box(sx * 1.21, Y - 0.12, 0.6, 0.04, 0.14, 11.8, null, 0, P(10)); g.box(sx * 1.21, Y - 0.32, 0.6, 0.04, 0.05, 11.6, null, 0, P(3)); }
+    g.box(-1.22, Y - 0.05, 4.7, 0.03, 1.45, 0.82, null, 0, P(2));
+    // the swept wings (back 0.45 rad), their winglets in the second colour; the wing root fairing
+    for (const sx of [-1, 1]) {
+      g.add(TPL.box, M(sx * 3.9, Y - 0.72, -0.9, 6.6, 0.24, 2.4, sx * 0.45, 0, sx * 0.05), null, P(0));
+      g.add(TPL.box, M(sx * 7.55, Y - 0.15, -2.55, 0.12, 1.4, 1.0, 0, -0.35, sx * 0.15), null, P(10));
+      g.box(sx * 1.05, Y - 0.8, -0.3, 0.7, 0.5, 3.4, null, 0, P(0));
+    }
+    // two engines on pylons each side of the tail: a nacelle, its dark intake, the exhaust
+    for (const sx of [-1, 1]) {
+      tube(sx * 2.05, Y + 0.65, -4.2, 0.62, 3.4, 0.62, 0); tube(sx * 2.05, Y + 0.65, -2.45, 0.5, 0.12, 0.5, 14); tube(sx * 2.05, Y + 0.65, -5.95, 0.42, 0.25, 0.42, 2);
+      g.add(TPL.box, M(sx * 1.4, Y + 0.65, -4.2, 0.9, 0.18, 1.6, 0, 0, 0), null, P(2));
+    }
+    // the T-tail, swept
+    g.add(TPL.box, M(0, Y + 2.15, -7.0, 0.2, 3.2, 2.4, 0, -0.55), null, P(10)); g.add(TPL.box, M(0, Y + 3.65, -8.0, 6.2, 0.14, 1.4, 0, 0, 0), null, P(0));
+    // the undercarriage
+    g.box(0, 0.7, 5.6, 0.12, 1.0, 0.12, null, 0, P(2)); for (const sx of [-1, 1]) g.box(sx * 1.75, 0.7, -0.6, 0.16, 1.0, 0.18, null, 0, P(2));
+    // lamps: landing lights, wingtip red and green, a strobe on the tail, a beacon on top
+    g.box(0, Y - 0.6, 7.6, 0.3, 0.12, 0.06, null, 0, P(4)); g.box(7.6, Y - 0.1, -2.6, 0.06, 0.12, 0.3, null, 0, P(5)); g.box(-7.6, Y - 0.1, -2.6, 0.06, 0.12, 0.3, null, 0, P(12));
+    g.box(0, Y + 3.8, -8.6, 0.14, 0.14, 0.14, null, 0, P(4)); g.box(0, Y + 1.25, 1.2, 0.16, 0.08, 0.16, null, 0, P(5));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[0.15, 5.6], [-0.15, 5.6], [1.75, -0.6], [-1.75, -0.6]], yb: 0.7, zf: 8.4, zr: -9.0, frontTop: Y + 0.9, rearTop: Y + 1.2, cabTop: Y + 1.2 };
+  },
+  // the Aurelia: an executive twin helicopter: a long cabin with a glass nose, the engines' cowl, a tapering boom, a
+  // shrouded tail fan in the fin, sponsons and polished skids
+  heli2(type) {
+    const g = new GeoBuilder({ part: true }), P = part => ({ part });
+    g.add(TPL.sphere, M(0, 1.75, 0.6, 1.3, 1.15, 2.7), null, P(0)); g.add(TPL.sphere, M(0, 1.85, 2.35, 1.16, 0.98, 1.3), null, P(1));
+    for (const sx of [-1, 1]) { for (let k = 0; k < 3; k++) g.box(sx * 1.2, 2.0, 0.9 - k * 0.95, 0.06, 0.62, 0.78, null, 0, P(1)); g.box(sx * 1.22, 1.35, 0.4, 0.05, 0.08, 4.4, null, 0, P(10)); g.box(sx * 1.25, 0.95, 0.3, 0.42, 0.42, 1.9, null, 0, P(0)); }
+    g.box(0, 2.95, -0.1, 1.4, 0.62, 2.9, null, 0, P(10)); g.box(0, 3.3, -0.25, 0.6, 0.24, 1.3, null, 0, P(14)); g.add(TPL.cyl6, M(0, 3.4, 0.25, 0.14, 0.5, 0.14), null, P(2));
+    g.add(TPL.cone, M(0, 2.25, -4.4, 0.62, 5.6, 0.62, 0, -Math.PI / 2), null, P(0));
+    // the fin with its shrouded tail fan (the fan turns inside it), the tailplane with end plates
+    g.add(TPL.box, M(0, 2.85, -6.95, 0.34, 2.2, 1.7, 0, -0.32), null, P(10)); g.box(0, 2.15, -6.2, 2.5, 0.08, 0.55, null, 0, P(0)); for (const sx of [-1, 1]) g.box(sx * 1.25, 2.3, -6.2, 0.06, 0.45, 0.5, null, 0, P(10));
+    for (const sx of [-1, 1]) { g.box(sx * 1.05, 0.08, 0.6, 0.12, 0.1, 3.8, null, 0, P(3)); for (const z of [1.7, -0.5]) g.add(TPL.box, M(sx * 0.9, 0.42, z, 0.08, 0.8, 0.08, 0, 0, -sx * 0.3), null, P(3)); }
+    g.box(0, 0.95, 3.2, 0.3, 0.16, 0.08, null, 0, P(4)); g.box(0, 2.1, -7.6, 0.08, 0.1, 0.06, null, 0, P(5)); g.box(0, 3.6, -1.4, 0.14, 0.1, 0.14, null, 0, P(5));
+    const geo = g.build(); creaseNormals(geo, [0, 1, 10]);
+    return { geo, lod: geo, wheels: [[1.0, 1.7], [-1.0, 1.7], [1.0, -0.5], [-1.0, -0.5]], yb: 0.5, zf: 3.6, zr: -7.8, frontTop: 1.9, rearTop: 2.6, cabTop: 3.4 };
+  },
   heli(type) {
     const g = new GeoBuilder({ part: true }), P = part => ({ part });
     // the cabin and its bubble, the engine cowl, the tail boom, the fin and tailplane, the mast, the skids
@@ -103,19 +188,26 @@ function rotorWarmup(scene) {
   a.position.set(0, -400, 0); b.position.set(0, -400, 0); scene.add(a); scene.add(b);
 }
 function makeRotors(v) {
-  const s = v.spec, steel = ROTOR_MAT.steel || (ROTOR_MAT.steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 })), disc = ROTOR_MAT.disc();
-  const R = {}, blur = r => new THREE.Mesh(new THREE.CircleGeometry(r, 24), disc);
+  const s = v.spec, F = s.flight, steel = ROTOR_MAT.steel || (ROTOR_MAT.steel = new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.4 })), disc = ROTOR_MAT.disc();
+  const R = { props: [], disc }, blur = r => new THREE.Mesh(new THREE.CircleGeometry(r, 24), disc);
   if (s.air === 'plane') {
-    const hub = new THREE.Group(); hub.position.set(0, 1.36, 3.5);
-    hub.add(new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.17, 0.05), steel)); hub.add(blur(1.0));
-    v.mesh.add(hub); R.main = hub; R.axis = 'z'; R.disc = disc;
+    // each propeller: two (a twin's: three) blades and a disc, turning about the nose's axis; a jet has none
+    for (const [x, y, z, r] of F.props || [[0, 1.36, 3.5, 1.0]]) {
+      const hub = new THREE.Group(); hub.position.set(x, y, z);
+      const nb = F.props ? 3 : 2;
+      for (let k = 0; k < nb; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(r * 1.95, 0.17, 0.05), steel); b.rotation.z = k / nb * Math.PI; hub.add(b); }
+      hub.add(blur(r)); v.mesh.add(hub); R.props.push(hub);
+    }
+    R.axis = 'z';
   } else {
-    const hub = new THREE.Group(); hub.position.set(0, 3.24, 0.15);
-    for (const a of [0, Math.PI / 2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(s.flight.rotor * 2, 0.05, 0.3), steel); b.rotation.y = a; hub.add(b); }
-    const d = blur(s.flight.rotor); d.rotation.x = -Math.PI / 2; hub.add(d);
-    const tail = new THREE.Group(); tail.position.set(0.2, 2.42, -5.62);
-    tail.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.3, 0.14), steel)); const d2 = blur(0.66); d2.rotation.y = Math.PI / 2; tail.add(d2);
-    v.mesh.add(hub); v.mesh.add(tail); R.main = hub; R.tail = tail; R.axis = 'y'; R.disc = disc;
+    const H = F.hub || [0, 3.24, 0.15], T = F.tail || [0.2, 2.42, -5.62], nb = F.blades || 2;
+    const hub = new THREE.Group(); hub.position.set(H[0], H[1], H[2]);
+    for (let k = 0; k < nb; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(F.rotor * 2 * (nb > 2 ? 0.5 : 1), 0.05, 0.3), steel); if (nb > 2) b.position.x = F.rotor / 2; const arm = new THREE.Group(); arm.rotation.y = k / nb * Math.PI * (nb > 2 ? 2 : 1); arm.add(b); hub.add(arm); }
+    if (nb > 2) hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.4, 0.3, 10), steel));
+    const d = blur(F.rotor); d.rotation.x = -Math.PI / 2; hub.add(d);
+    const tail = new THREE.Group(); tail.position.set(T[0], T[1], T[2]);
+    tail.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, (F.tailR || 0.66) * 1.95, 0.14), steel)); const d2 = blur(F.tailR || 0.66); d2.rotation.y = Math.PI / 2; tail.add(d2);
+    v.mesh.add(hub); v.mesh.add(tail); R.main = hub; R.tail = tail; R.axis = 'y';
   }
   return R;
 }
@@ -126,7 +218,7 @@ function makeRotors(v) {
 const Flight = {
   G: 14,
   _q: [], _res: {},
-  init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
+  init(v) { v.air = { on: 0, thr: 0, vy: 0, pitch: 0, bank: 0, grounded: true, agl: 0, warn: 0, pin: 0, lin: 0 }; v.ctl.pitch = 0; v.ctl.lift = 0; },
   // what an aircraft at height y over (x, z) would come down on: the ground or a deck at its level, or a roof below it
   // (its slope is left in _gx / _gz: flying into a hillside is not a landing)
   ground(world, x, z, y) {
@@ -148,6 +240,10 @@ const Flight = {
   step(v, dt, game) {
     const s = v.spec, A = v.air, F = s.flight, ctl = v.ctl, world = game.world, dead = v.burnt || v.health <= 0, flown = v.driver === 'player' && !dead;
     if (!flown) { ctl.throttle = 0; ctl.steer = 0; ctl.pitch = 0; ctl.lift = 0; }
+    // the stick and the collective ease in and out (keys and touch buttons are on or off): about a quarter of a second
+    // to full deflection, so the aircraft answers smoothly, never with a jolt
+    A.pin += clamp((ctl.pitch || 0) - A.pin, -4.5 * dt, 4.5 * dt); A.lin += clamp((ctl.lift || 0) - A.lin, -4 * dt, 4 * dt);
+    const pitchIn = A.pin, liftIn = A.lin;
     A.on = clamp(A.on + (flown ? dt / (s.air === 'heli' ? 2.6 : 1.4) : -dt / 3), 0, 1);
     const h0 = v.h, gy = this.ground(world, v.pos.x, v.pos.z, v.pos.y);
     let vx = v.vel.x, vz = v.vel.y, vy = A.vy;
@@ -168,9 +264,10 @@ const Flight = {
         v.h += ctl.steer * clamp(f / 7, -1, 1) * (1.05 - 0.6 * auth) * dt;
         const sh2 = Math.sin(v.h), ch2 = Math.cos(v.h); vx = sh2 * f - ch2 * l; vz = ch2 * f + sh2 * l; vy = 0;
         // the nose comes up with the stick once there is air over the tail; it flies itself off a little above the stall
-        A.pitch = damp(A.pitch, clamp(ctl.pitch, 0, 1) * 0.2 * auth, 5, dt); A.bank = damp(A.bank, 0, 8, dt);
+        A.pitch = damp(A.pitch, clamp(pitchIn, 0, 1) * 0.2 * auth, 5, dt); A.bank = damp(A.bank, 0, 8, dt);
         v.pos.x += vx * dt; v.pos.z += vz * dt; v.pos.y = this.ground(world, v.pos.x, v.pos.z, v.pos.y + 0.6);
-        if ((q >= 1 && A.pitch > 0.07) || q > 1.22) { A.grounded = false; v.pos.y += 0.06; vy = Math.max(1.2, f * Math.sin(A.pitch) * 0.7); }
+        // (it leaves the runway climbing gently: the wings take its weight over the next moments, no jump in its climb)
+        if ((q >= 1 && A.pitch > 0.07) || q > 1.22) { A.grounded = false; v.pos.y += 0.06; vy = 0.5; }
         v.braking = braking; v.spin += f * dt / s.wheelR; v.steer = damp(v.steer, ctl.steer * 0.5, 9, dt);
       } else {
         // in the air: thrust along the nose, drag against the path, the weight the wings do not carry, speed traded
@@ -194,8 +291,8 @@ const Flight = {
         const au = 0.3 + 0.7 * auth, tb = -ctl.steer * 0.95;
         // Nose down goes further than nose up (a dive is how you lose height quickly); throttled back and hands off it
         // trims for a glide (about 5 m/s down) rather than holding its height until it stalls.
-        let tp = ctl.pitch >= 0 ? ctl.pitch * 0.36 : ctl.pitch * 0.55;
-        if (Math.abs(ctl.pitch) < 0.05 && A.thr < 0.25 && A.agl > 60) tp = -0.15;
+        let tp = pitchIn >= 0 ? pitchIn * 0.36 : pitchIn * 0.55;
+        if (Math.abs(pitchIn) < 0.05 && A.thr < 0.25 && A.agl > 60) tp = -0.15;
         // the flare starts higher the faster it is coming down (it needs about two seconds of sink to round out)
         const fh = Math.max(9, -vy * 2.2);
         if (A.agl < fh && vy < 0 && q > 0.75) tp = Math.max(tp, -0.035 - 0.06 * Math.min(1, A.agl / 9));
@@ -220,12 +317,13 @@ const Flight = {
       if (A.grounded) {
         const dec = 12 * dt; f = Math.abs(f) <= dec ? 0 : f - Math.sign(f) * dec; l *= Math.exp(-10 * dt); vy = 0;
         A.pitch = damp(A.pitch, 0, 6, dt); A.bank = damp(A.bank, 0, 6, dt);
-        if (lifted && ctl.lift > 0.1) { A.grounded = false; vy = 1.5; v.pos.y += 0.05; }
+        if (lifted && liftIn > 0.1) { A.grounded = false; vy = 0.6; v.pos.y += 0.05; }
         if (lifted) v.h += ctl.steer * F.yaw * 0.5 * dt;
       } else {
         if (lifted) {
-          // (the last few metres down it sinks on its own cushion of air: a third of the rate at the ground)
-          const want = ctl.lift > 0 ? ctl.lift * F.climb : ctl.lift * F.sink * clamp(A.agl / 12, 0.3, 1); vy += clamp(want - vy, -11 * dt, 11 * dt);
+          // (the last 15 m down it sinks on its own cushion of air: it settles onto its skids at about 1.3 m/s)
+          // (the climb rate eases toward what the collective asks: quick at first, settling softly, never more than 14 m/s²)
+          const want = liftIn > 0 ? liftIn * F.climb : liftIn * F.sink * clamp(A.agl / 15, 0.12, 1); vy += clamp((want - vy) * (1 - Math.exp(-3.5 * dt)), -14 * dt, 14 * dt);
           const tf = ctl.throttle >= 0 ? ctl.throttle * s.vmax : ctl.throttle * F.vBack, acc = Math.abs(ctl.throttle) > 0.05 ? F.acc : 2.4;
           f += clamp(tf - f, -acc * dt, acc * dt); l *= Math.exp(-1.8 * dt);
           v.h += ctl.steer * F.yaw * (1 - 0.5 * clamp(Math.abs(f) / s.vmax, 0, 1)) * dt;
@@ -241,12 +339,20 @@ const Flight = {
       else if (v.pos.y <= g2) { const sink = this.closing(vx, vy, vz), hs = Math.hypot(vx, vz); v.pos.y = g2; A.grounded = true; vy = 0; this.arrive(v, game, sink + Math.max(0, hs - 6) * 0.6, 5, sink > 13 || hs > 22 || g2 < SEA_Y - 0.4); }
       v.braking = false;
     }
-    // the island ends: a headwind that grows with every metre past the edge of the map turns it back
+    // the island ends: past the edge of the map the aircraft is turned back toward the island, heading and path
+    // together (up to 0.6 rad/s, harder the further out), so it keeps its speed (a headwind that took the speed off
+    // stalled a fast jet, which fell out of the sky)
     const ox = Math.max(ISLE.x0 - 300 - v.pos.x, 0) - Math.max(v.pos.x - ISLE.x1 - 300, 0), oz = Math.max(ISLE.z0 - 300 - v.pos.z, 0) - Math.max(v.pos.z - ISLE.z1 - 300, 0);
-    if (ox || oz) { vx += ox * 0.02 * dt * 10; vz += oz * 0.02 * dt * 10; if (v.driver === 'player' && (A.warn -= dt) <= 0) { A.warn = 8; game.ui.toast('Nothing out there but sea. Turn back.', 'warn'); } }
+    if ((ox || oz) && !A.grounded) {
+      const want = Math.atan2((ISLE.x0 + ISLE.x1) / 2 - v.pos.x, (ISLE.z0 + ISLE.z1) / 2 - v.pos.z), d = wrapPi(want - v.h);
+      const r = clamp(d, -1, 1) * clamp(0.25 + Math.hypot(ox, oz) / 400, 0, 0.6) * dt, c = Math.cos(r), sn = Math.sin(r);
+      v.h += r; const nvx = vx * c + vz * sn; vz = vz * c - vx * sn; vx = nvx;
+      if (s.air === 'plane') A.bank += clamp(-Math.sign(d) * 0.5 - A.bank, -dt, dt);
+      if (v.driver === 'player' && (A.warn -= dt) <= 0) { A.warn = 8; game.ui.toast('Nothing out there but sea. Turning back.', 'warn'); }
+    }
     v.vel.set(vx, vz); A.vy = vy; A.agl = v.pos.y - gy;
     v.yawRate = dt > 0 ? wrapPi(v.h - h0) / dt : 0;
-    v.rpm = damp(v.rpm, clamp(0.12 + A.on * (s.air === 'plane' ? 0.25 + A.thr * 0.6 : 0.62 + Math.abs(ctl.lift || 0) * 0.2), 0.1, 1), 4, dt);
+    v.rpm = damp(v.rpm, clamp(0.12 + A.on * (s.air === 'plane' ? 0.25 + A.thr * 0.6 : 0.62 + Math.abs(liftIn) * 0.2), 0.1, 1), 4, dt);
     v.gear = 1; v.reversing = false; v.slip = 0; v.skid = 0;
     // asleep again once it stands with everything stopped
     if (A.grounded && A.on <= 0 && Math.hypot(vx, vz) < 0.05 && v.driver === null && v.health > 0) { v.restT = (v.restT || 0) + dt; if (v.restT > 2) { v.sleep = true; v.vel.set(0, 0); } } else v.restT = 0;
@@ -258,7 +364,7 @@ const Flight = {
     v.mesh.rotation.set(-A.pitch, v.h, A.bank);
     if (R) {
       const w = A.on * (v.spec.air === 'plane' ? 34 + A.thr * 60 : 38) * (dt || 0);
-      if (R.axis === 'z') R.main.rotation.z += w; else { R.main.rotation.y += w; R.tail.rotation.x += w * 2.2; }
+      if (R.axis === 'z') { for (const p of R.props) p.rotation.z += w; } else { R.main.rotation.y += w; R.tail.rotation.x += w * 2.2; }
       R.disc.opacity = clamp(A.on * 1.6 - 0.5, 0, 1) * 0.28;
     }
   },

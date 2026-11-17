@@ -222,6 +222,46 @@ const touch = await hold(['down'], s => s.gnd, 500);
 const stop = await hold(['down'], s => s.spd < 0.6, 700);
 const out = await ev(() => { const g = window.game, v = g.player.vehicle; window.__keys = new Set(); g.exitVehicle(false); return { state: g.player.state, hp: v ? Math.round(v.health) : -1, rw: v ? Math.abs(v.pos.z - 2410) < 40 : false }; });
 check('throttle back, a shallow descent and it lands on the runway on its wheels, brakes to a stop and you step out', !stop.dead && touch.gnd && stop.spd < 0.6 && out.state === 'foot' && out.hp > 55, JSON.stringify([fin, touch, stop, out]));
+// ---------------------------------------------------------------- the bigger aircraft (2026-11-17): a full flight each
+const fleetFlights = await ev(() => {
+  const g = window.game, P = window.__pv, out = {};
+  if (g.player.state === 'vehicle') g.exitVehicle(true);
+  const clear = () => { for (const q of g.vehicles.list.slice()) if (q.air && q !== g.player.vehicle && Math.abs(q.pos.z - 2410) < 40) g.vehicles.despawn(q); };
+  const take = (type, x, z, h) => { clear(); g.resetPlayerState(x + 6, z, 0); const v = g.vehicles.spawn(type, x, z, h, {}); P.Flight.place(v, g.world); g.player.pos.set(v.pos.x + 2, v.pos.y, v.pos.z); g.completeEnter(v); for (let i = 0; i < 90; i++) g.vehicles.update(1 / 60); return v; };
+  const fly = (v, n, ctl, until) => { let t = 0, jerk = 0, vy0 = v.air.vy; for (; t < n && g.player.vehicle === v; t++) { Object.assign(v.ctl, ctl(v)); g.vehicles.update(1 / 60); jerk = Math.max(jerk, Math.abs(v.air.vy - vy0) * 60); vy0 = v.air.vy; if (until && until(v)) break; } return { t, jerk }; };
+  for (const type of ['skylark', 'corsair', 'meridian']) {
+    const v = take(type, -120, 2410, Math.PI / 2), r = { type };
+    const roll = fly(v, 3600, () => ({ throttle: 1, pitch: 1, steer: 0 }), v => !v.air.grounded); r.liftJerk = +roll.jerk.toFixed(0);
+    fly(v, 3600, () => ({ throttle: 1, pitch: 0.6, steer: 0 }), v => v.pos.y > 150);
+    // flat out until it is past the map's edge and has been turned back
+    let maxX = 0; fly(v, 60 * 60, v => { maxX = Math.max(maxX, v.pos.x); return { throttle: 1, pitch: 0, steer: 0 }; }, v => maxX > P.ISLE.x1 + 320 && v.vel.x < -20);
+    r.edge = { maxX: Math.round(maxX), back: v.vel.x < -20, spd: +Math.hypot(v.vel.x, v.vel.y).toFixed(0), y: Math.round(v.pos.y) };
+    v.pos.set(-760, 110, 2410); v.h = Math.PI / 2; v.vel.set(v.spec.flight.vStall * 1.6, 0); Object.assign(v.air, { vy: 0, pitch: 0, bank: 0, grounded: false, thr: 0.5 });
+    fly(v, 3600, v => ({ throttle: -1, pitch: v.air.agl > 40 ? -0.6 : -0.15, steer: 0 }), v => v.air.grounded);
+    r.land = { x: Math.round(v.pos.x), onRunway: v.pos.x > -170 && v.pos.x < 1370 };
+    fly(v, 2400, () => ({ throttle: -1, pitch: 0, steer: 0 }), v => Math.hypot(v.vel.x, v.vel.y) < 0.5);
+    r.hp = Math.round(v.health); g.exitVehicle(false); r.out = g.player.state; out[type] = r;
+  }
+  for (const type of ['heli', 'aurelia']) {
+    const v = take(type, 600, 2000, 0), r = { type };
+    fly(v, 600, () => ({ throttle: 0, lift: 0, steer: 0 }));
+    r.up = fly(v, 1200, () => ({ throttle: 0, lift: 1, steer: 0 }), v => v.air.agl > 60).jerk;
+    const y0 = v.pos.y; let lo = 1e9, hi = -1e9, f = 0; fly(v, 600, v => { lo = Math.min(lo, v.air.vy); hi = Math.max(hi, v.air.vy); return { throttle: 0, lift: Math.floor(f++ / 60) % 2 ? -1 : 1, steer: 0 }; });
+    r.taps = [+lo.toFixed(1), +hi.toFixed(1)];
+    let touch = 0; fly(v, 2400, v => { touch = v.air.vy; return { throttle: 0, lift: -1, steer: 0 }; }, v => v.air.grounded);
+    r.touch = +touch.toFixed(1); r.hp = Math.round(v.health); g.exitVehicle(false); r.out = g.player.state; out[type] = r; void y0;
+  }
+  // where the new aircraft stand
+  const at = (x, z, site) => { g.resetPlayerState(x, z, 0); g.fleet.live.clear(); g.fleet.update(x, z); return g.vehicles.list.filter(v => v.fleet === site).map(v => v.type); };
+  out.field = at(-1380, -930, 'field_air'); out.villa = at(-600, -870, 'villa_court'); out.airport = at(760, 1990, 'ap_air');
+  out.fieldY = +P.groundY(-1600, -1012).toFixed(2); out.fieldPlace = !!g.world.places.valen_field;
+  return out;
+});
+for (const t of ['skylark', 'corsair', 'meridian']) { const r = fleetFlights[t];
+  check(`${t}: lifts off without a jolt, is turned back at the map's edge at full speed (no stall), lands on the runway, stops and you step out undamaged`, r.liftJerk < 60 && r.edge.back && r.edge.spd > (r.type === 'skylark' ? 60 : 90) && r.land.onRunway && r.hp === 100 && r.out === 'foot', JSON.stringify(r)); }
+for (const t of ['heli', 'aurelia']) { const r = fleetFlights[t];
+  check(`${t}: lifts off gently, answers quick up / down taps both ways, settles onto its skids (under 2.5 m/s) undamaged`, r.up < 60 && r.taps[0] < -4 && r.taps[1] > 6 && r.touch > -2.5 && r.hp === 100 && r.out === 'foot', JSON.stringify(r)); }
+check('Valen Field: a levelled strip west of Villa Valen with a jet, a twin, a light aeroplane and an Aurelia; the Aurelia stands at the villa; a Meridian and a Corsair at the airport', fleetFlights.fieldY === 12 && fleetFlights.fieldPlace && ['meridian', 'corsair', 'skylark', 'aurelia'].every(t => fleetFlights.field.includes(t)) && fleetFlights.villa.includes('aurelia') && ['meridian', 'corsair'].every(t => fleetFlights.airport.includes(t)), JSON.stringify({ field: fleetFlights.field, villa: fleetFlights.villa, airport: fleetFlights.airport, y: fleetFlights.fieldY }));
 // ---------------------------------------------------------------- flight: the helicopter on the hospital's roof
 const roof = await ev(() => { const g = window.game, L = g.world.isle.lifts.find(l => /Alda/.test(l.name)); g.resetPlayerState(L.a.x, L.a.z, 0); g.fleet.live.clear(); g.fleet.update(L.a.x, L.a.z); const a = g.liftAction(); return { lifts: g.world.isle.lifts.length, label: a && a.label, roofY: L.b.y }; });
 await ev(() => window.game.liftAction().act()); await frames(page, 60);
