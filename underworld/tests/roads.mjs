@@ -56,9 +56,14 @@ const trafficOn = await ev(async () => {
   const L = w.links[0], mid = L.pts[Math.floor(L.pts.length / 2)];
   g.resetPlayerState(mid[0] + 25, mid[1] + 25, 0);
   await new Promise(r => { const f0 = g.frame; const iv = setInterval(() => { if (g.frame > f0 + 5) { clearInterval(iv); r(); } }, 20); });
+  // (spawns are random along the curves: one spawned near its curve's end merges before the middle, so rounds of
+  // cars are sent until at least two have been measured through the middle, up to four rounds)
+  const all = [];
+  for (let round = 0; round < 4 && all.filter(T => T.mid > 0).length < 2; round++) {
   for (const v of tr.cars.slice()) g.vehicles.despawn(v);
   let n = 0; for (let k = 0; k < 60 && n < 4; k++) if (tr.trySpawnLink()) n++;
   const track = tr.cars.filter(v => v.ai && v.ai.mode === 'path').map(v => ({ v, maxOff: 0, mid: 0, merged: false, link: w.links[v.ai.path.link], d0: v.ai.path.d }));
+  all.push(...track);
   const t0 = g.time;
   await new Promise(res => { const iv = setInterval(() => {
     for (const T of track) {
@@ -69,6 +74,8 @@ const trafficOn = await ev(async () => {
       } else if (v.ai.mode !== 'path') T.merged = true;
     }
     if (g.time - t0 > 70 || track.every(T => T.merged)) { clearInterval(iv); res(); } }, 80); });
+  }
+  const track = all;
   out.n = track.length; out.cars = track.map(T => ({ off: +T.maxOff.toFixed(2), mid: T.mid, merged: T.merged, w: T.link.w, ...(T.merged ? {} : { alive: g.vehicles.list.includes(T.v), d: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.d), len: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.len), v: T.v.ai && +T.v.ai.speed.toFixed(1), blockT: T.v.ai && T.v.ai.blockT }) }));
   return out;
 });
