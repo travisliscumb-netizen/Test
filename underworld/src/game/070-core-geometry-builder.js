@@ -70,6 +70,8 @@ function initTemplates() {
   TPL.box = templateFrom(new THREE.BoxGeometry(1, 1, 1));
   TPL.cyl = templateFrom(new THREE.CylinderGeometry(1, 1, 1, 12));
   TPL.cyl6 = templateFrom(new THREE.CylinderGeometry(1, 1, 1, 6));
+  // a tapering 7-sided cylinder (a trunk, a limb): radius 1 at its foot, 0.7 at its top
+  TPL.taper = templateFrom(new THREE.CylinderGeometry(0.7, 1, 1, 7));
   // an octagon (a stop sign), turned so it has flat sides along its two cross axes
   TPL.cyl8 = templateFrom(new THREE.CylinderGeometry(1, 1, 1, 8).rotateY(Math.PI / 8));
   TPL.cone = templateFrom(new THREE.CylinderGeometry(0, 1, 1, 8));

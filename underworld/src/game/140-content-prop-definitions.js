@@ -3,21 +3,39 @@
    ===================================================================== */
 // a canopy of leaf clumps around (cx, cy, cz) with radii (rx, ry), shaded in the geometry: deeper and lower
 // clumps darker, the sunlit crown lighter, so a tree reads as a volume before any light touches it (G3)
+// a crown round (cx, cy, cz), radii (rx, ry): a main mass, then n clumps, a lower ring that spreads wide and droops
+// a little, an upper ring drawn in, and a clump on top for an uneven silhouette; shaded in the geometry: the underside
+// and the inside darker, the sunlit top lighter, so a tree reads as a volume before any light touches it (G3)
 function canopy(g, cx, cy, cz, rx, ry, n, cols, seed) {
-  const rnd = mulberry32(seed), from = g.n;
-  g.add(TPL.blob, M(cx, cy, cz, rx * 0.78, ry * 0.8, rx * 0.78, rnd() * 6), C(cols[0]));
+  const rnd = mulberry32(seed), from = g.n, nl = Math.max(1, Math.ceil(n * 0.55)), nu = n - nl;
+  g.add(TPL.blob, M(cx, cy, cz, rx * 0.8, ry * 0.78, rx * 0.8, rnd() * 6), C(cols[0]));
   for (let i = 0; i < n; i++) {
-    const a = i / n * Math.PI * 2 + rnd() * 0.6, up = rnd() * 2 - 0.8, r = 0.62 + rnd() * 0.25, s = 0.48 + rnd() * 0.22;
-    g.add(TPL.blob, M(cx + Math.cos(a) * rx * r, cy + up * ry * 0.45, cz + Math.sin(a) * rx * r, rx * s, ry * s * 0.9, rx * s, rnd() * 6, rnd() * 0.6), C(cols[1 + (i % (cols.length - 1))]));
+    const low = i < nl, k = low ? i : i - nl, m = low ? nl : nu, top = !low && k === m - 1 && n >= 6;
+    const a = (k + rnd() * 0.45) / m * Math.PI * 2 + (low ? 0 : 0.6), r = top ? 0.08 : low ? 0.66 + rnd() * 0.16 : 0.38 + rnd() * 0.14;
+    const up = top ? 0.62 : low ? -0.28 + rnd() * 0.18 : 0.3 + rnd() * 0.2, s = top ? 0.5 : low ? 0.5 + rnd() * 0.16 : 0.44 + rnd() * 0.14;
+    g.add(TPL.blob, M(cx + Math.cos(a) * rx * r, cy + up * ry, cz + Math.sin(a) * rx * r, rx * s, ry * s * (low ? 0.82 : 0.95), rx * s, rnd() * 6, (rnd() - 0.5) * 0.4), C(cols[1 + (i % (cols.length - 1))]));
   }
-  g.shade(from, (x, y, z) => { const dy = (y - cy) / ry, dr = Math.hypot(x - cx, z - cz) / rx; return clamp(0.62 + 0.3 * dy + 0.22 * dr, 0.45, 1.18); });
+  g.shade(from, (x, y, z) => { const dy = (y - cy) / ry, dr = Math.hypot(x - cx, z - cz) / rx; return clamp(0.6 + 0.32 * dy + 0.24 * dr, 0.42, 1.2); });
 }
-function trunk(g, h, r, bark, branches, seed) {
-  const rnd = mulberry32(seed);
-  g.add(TPL.cyl6, M(0, h * 0.35, 0, r, h * 0.7, r), bark);
-  g.add(TPL.cyl6, M(0, h * 0.82, 0, r * 0.72, h * 0.36, r * 0.72), bark);
-  g.add(TPL.cyl6, M(0, 0.12, 0, r * 1.5, 0.24, r * 1.5), bark); // root flare
-  for (let i = 0; i < branches; i++) { const a = i / branches * Math.PI * 2 + rnd(); g.add(TPL.cyl6, M(Math.cos(a) * 0.38, h * 0.78, Math.sin(a) * 0.38, r * 0.45, h * 0.42, r * 0.45, -a, 0, 0.75), bark); }
+// a limb or a trunk section from point A to point B: a tapering cylinder r thick at A (M's Euler order is YXZ: the
+// pitch tilts the cylinder's +Y toward +Z, the yaw then turns it round)
+function limb(g, ax, ay, az, bx, by, bz, r, bark) {
+  const dx = bx - ax, dy = by - ay, dz = bz - az, L = Math.hypot(dx, dy, dz) || 1e-3;
+  g.add(TPL.taper, M((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, r, L, r, Math.atan2(dx, dz), Math.acos(clamp(dy / L, -1, 1)), 0), bark);
+}
+/* a trunk h tall, r thick at the foot: a root flare, two tapering sections with a slight lean, and `branches` limbs
+   that leave the trunk at 55-80% of its height and grow up and out into the crown (crownR: how far out they reach,
+   crownY: the crown's centre). Nothing hangs below the canopy: every limb ends inside it. */
+function trunk(g, h, r, bark, branches, seed, crownR = 1.8, crownY = h + 1) {
+  const rnd = mulberry32(seed), lx = (rnd() - 0.5) * 0.18, lz = (rnd() - 0.5) * 0.18;
+  g.add(TPL.cyl6, M(0, 0.14, 0, r * 1.55, 0.28, r * 1.55, rnd() * 3), bark); // root flare
+  limb(g, 0, 0, 0, lx * 0.5, h * 0.55, lz * 0.5, r, bark);
+  limb(g, lx * 0.5, h * 0.55, lz * 0.5, lx, h + 0.35, lz, r * 0.72, bark);
+  for (let i = 0; i < branches; i++) {
+    const a = (i + rnd() * 0.5) / branches * Math.PI * 2, t = 0.55 + rnd() * 0.25, y0 = h * t;
+    const ox = lx * (t / 0.55) * 0.5, oz = lz * (t / 0.55) * 0.5, reach = crownR * (0.45 + rnd() * 0.2);
+    limb(g, ox, y0, oz, Math.cos(a) * reach, crownY - 0.2 + rnd() * 0.5, Math.sin(a) * reach, r * 0.42, bark);
+  }
 }
 const PROP_DEFS = {
   lamp: { col: { r: 0.16, h: 7.5 }, glow: [[0, 7.2, 1.5, 0.22, 0.07, 0.42]], cast: true, breakable: true, breakSpeed: 15, mass: 400,
@@ -37,11 +55,18 @@ const PROP_DEFS = {
     } },
   tree: { col: { r: 0.32, h: 4 }, cast: true, tint: true, foliage: true,
     build(g) {
-      trunk(g, 3.1, 0.17, C(0x4a3828), 3, 11);
-      canopy(g, 0, 4.05, 0, 2.15, 1.75, 7, [0x3a6326, 0x4b7a30, 0x355f25, 0x56853a, 0x416f2b], 7);
+      trunk(g, 3.0, 0.17, C(0x4a3828), 4, 11, 2.0, 4.05);
+      canopy(g, 0, 4.05, 0, 2.15, 1.75, 8, [0x3a6326, 0x4b7a30, 0x355f25, 0x56853a, 0x416f2b], 7);
     },
-    // past the near range (PropManager.cull): a trunk and three clumps in the same colours, a quarter of the triangles
-    lod(g) { g.add(TPL.cyl6, M(0, 1.6, 0, 0.17, 3.2, 0.17), C(0x4a3828)); canopy(g, 0, 4.05, 0, 2.15, 1.75, 2, [0x3a6326, 0x4b7a30, 0x416f2b], 7); } },
+    // past the near range (PropManager.cull), and the island's forests: the same trunk with two limbs, three clumps
+    // (three clumps, as before, but a fuller crown: a broad main mass sitting low on the limbs, a clump either side)
+    lod(g) {
+      trunk(g, 2.8, 0.21, C(0x4a3828), 2, 11, 1.8, 3.9); // (a little thicker than the near model's: a far trunk must not read as a stick)
+      const from = g.n;
+      g.add(TPL.blob, M(0, 3.95, 0, 2.0, 1.6, 2.0, 0.7), C(0x3a6326));
+      g.add(TPL.blob, M(1.25, 3.55, 0.45, 1.3, 1.05, 1.3, 2.1), C(0x4b7a30)); g.add(TPL.blob, M(-1.05, 4.55, -0.55, 1.25, 1.1, 1.25, 4.2), C(0x416f2b));
+      g.shade(from, (x, y, z) => clamp(0.6 + 0.32 * (y - 3.95) / 1.7 + 0.24 * Math.hypot(x, z) / 2.1, 0.42, 1.2));
+    } },
   pine: { col: { r: 0.3, h: 5 }, cast: true, tint: true, foliage: true,
     build(g) {
       g.add(TPL.cyl6, M(0, 1.4, 0, 0.16, 2.8, 0.16), C(0x4a3626));

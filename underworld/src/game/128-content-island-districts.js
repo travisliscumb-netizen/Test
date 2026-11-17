@@ -219,7 +219,20 @@ Object.assign(World.prototype, {
   _genDistricts(plan, box, cyl, fleet) {
     const isle = this.isle, rng = (a, b) => hash2i(a, b, 9137);
     const greens = [0x3f6b2e, 0x4c7a34, 0x355f2a, 0x5a8238];
-    const tree = (b, x, y, z, s, k) => { cyl(b, x, y + 1.2 * s, z, 0.22 * s, 2.4 * s, 0x5a4632, true); this._det(b, 'blob', x, y + 3.6 * s, z, 2.5 * s, 2.3 * s, 2.5 * s, C(greens[Math.abs(Math.round(k)) % 4])); };
+    // a district tree: a trunk with a root flare, and a crown of a main mass and three clumps in mixed greens, darker below
+    const tree = (b, x, y, z, s, k) => {
+      const q = j => hash2i(Math.round(x * 3 + j), Math.round(z * 3 - j), 431), g0 = Math.abs(Math.round(k)) % 4;
+      cyl(b, x, y + 1.25 * s, z, 0.2 * s, 2.5 * s, 0x4e3c2c, true); cyl(b, x, y + 0.12 * s, z, 0.32 * s, 0.24 * s, 0x4e3c2c, false);
+      this._det(b, 'blob', x, y + 3.8 * s, z, 1.7 * s, 1.5 * s, 1.7 * s, C(greens[g0]).multiplyScalar(0.88));
+      // three limbs from the trunk up into the crown (a cylinder from A to B: pitch, then yaw, as M's YXZ order does)
+      for (let j = 0; j < 3; j++) {
+        const a = (j + 0.3 + q(j + 20) * 0.4) / 3 * Math.PI * 2, ax = 0, ay = (1.7 + q(j + 23) * 0.5) * s, bx = Math.cos(a) * 1.15 * s, by = 3.4 * s, bz = Math.sin(a) * 1.15 * s;
+        const dx = bx - ax, dy = by - ay, dz = bz, L = Math.hypot(dx, dy, dz);
+        const lm = this._det(b, 'cylr', x + bx / 2, y + (ay + by) / 2, z + bz / 2, 0.08 * s, L, 0.08 * s, C(0x4e3c2c), Math.atan2(dx, dz)); lm.rx = Math.acos(dy / L);
+      }
+      // four clumps round it, two low and spreading, two high: an uneven crown, not a ball
+      for (let j = 0; j < 4; j++) { const a = (j + q(j) * 0.5) / 4 * Math.PI * 2, low = j % 2 === 0, r = (low ? 1.55 : 1.0) * s, w = (low ? 1.35 : 1.15) + q(j + 9) * 0.3; this._det(b, 'blob', x + Math.cos(a) * r, y + (low ? 3.2 : 4.6) * s + q(j + 5) * 0.4 * s, z + Math.sin(a) * r, w * s, (low ? 0.95 : 1.05) * s, w * s, C(greens[(g0 + j + 1) % 4]).multiplyScalar(low ? 0.86 : 1.1)); }
+    };
     const title = t => t.toLowerCase().replace(/(^|[\s.])([a-zà-ÿ])/g, (m, a, c) => a + c.toUpperCase());
     // a lot's own frame: cu along the road, cv inward from the lot's centre (the front edge is cv = -D/2)
     const W2 = (L, cu, cv) => [L.x + L.ux * cu + L.vx * cv, L.z + L.uz * cu + L.vz * cv];
