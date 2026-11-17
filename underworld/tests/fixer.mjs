@@ -1,5 +1,5 @@
 /* The early laundering fixer (overhaul Session 2.5, handoff §45.6, §45.22, §45.9).
-   - Dina Vance takes Dirty Cash you carry, keeps a 32% fee and puts the rest in your Clean Bank 12 economic hours
+   - Dina Vance takes Dirty Cash you carry, keeps a 15% fee and puts the rest in your Clean Bank 12 economic hours
      later, up to $100,000 a hand-off with no daily limit, at least $100 a time; stashed cash and the bank are never used.
    - Time is the economic clock: the day-length setting doesn't change how much she washes per hour of play; in jail
      the clock runs at world time.
@@ -20,7 +20,7 @@ const where = await ev(() => {
   g.resetPlayerState(L.x, L.z, 0);
   const act = uw.findAction();
   uw.ui.openSpot(L); const html = document.getElementById('svcBody').innerHTML; while (g.ui.stack.length) g.ui.back();
-  return { found: !!L, zone: L && L.zone, html: /32%/.test(html) && /\$100,000/.test(html) && /data-act="wash:/.test(html), places: places.some(p => p.key === 'spot:fixer' && /32%/.test(p.sub)), act: act && act.label };
+  return { found: !!L, zone: L && L.zone, html: /15%/.test(html) && /\$100,000/.test(html) && /data-act="wash:/.test(html), places: places.some(p => p.key === 'spot:fixer' && /15%/.test(p.sub)), act: act && act.label };
 });
 check('the fixer is a place in the Old Quarter, on the map, at her door, with a screen that states her fee and her $100,000-a-time limit', where.found && where.zone === 'o' && where.html && where.places && /Dina Vance/.test(where.act || ''), JSON.stringify(where));
 
@@ -44,9 +44,9 @@ const wash = await ev(() => {
   M.W.dirty.prop = {};
   return out;
 });
-check('handing her $1,000 takes it off you at once; the bank gets nothing yet', wash.afterHand.me === 1000 && wash.afterHand.clean === 0 && JSON.stringify(wash.afterHand.batches) === JSON.stringify([{ d: 1000, c: 680 }]), JSON.stringify(wash));
+check('handing her $1,000 takes it off you at once; the bank gets nothing yet', wash.afterHand.me === 1000 && wash.afterHand.clean === 0 && JSON.stringify(wash.afterHand.batches) === JSON.stringify([{ d: 1000, c: 850 }]), JSON.stringify(wash));
 check('less than $100 is refused', typeof wash.small === 'string' && /\$100/.test(wash.small), JSON.stringify(wash.small));
-check('after 11 hours nothing; at 12 hours $680 lands in Clean Bank (32% fee), once, with a message', wash.at11 === 0 && wash.at12 === 680 && wash.left === 0 && wash.washed === 1000 && wash.fees === 320 && wash.news >= 1, JSON.stringify(wash));
+check('after 11 hours nothing; at 12 hours $850 lands in Clean Bank (15% fee), once, with a message', wash.at11 === 0 && wash.at12 === 850 && wash.left === 0 && wash.washed === 1000 && wash.fees === 150 && wash.news >= 1, JSON.stringify(wash));
 check('only Dirty Cash on you can be washed: stash cash and the bank are not used', typeof wash.noCarry === 'string', JSON.stringify(wash.noCarry));
 
 // ---------------------------------------------------------------- 3. $100,000 a hand-off, no daily limit (owner, 2026-11-16)
@@ -60,7 +60,7 @@ const cap = await ev(() => {
   return out;
 });
 check('up to $100,000 a hand-off, again and again the same day: $100,000, $100,000, then the $50,000 left, then nothing on you', cap.max === 100000 && cap.first === 100000 && cap.second === 100000 && cap.third === 50000 && typeof cap.fourth === 'string' && cap.me === 0, JSON.stringify(cap));
-check('all three batches arrive (68% of $250,000)', cap.delivered === 170000, JSON.stringify(cap));
+check('all three batches arrive (85% of $250,000)', cap.delivered === 212500, JSON.stringify(cap));
 
 // ---------------------------------------------------------------- 4. the day-length setting doesn't change the pace per hour of play
 const pace = await ev(() => {
@@ -79,7 +79,7 @@ const pace = await ev(() => {
   out.rate4 = uw.econRate(); g.save.settings.dayLength = 60; out.rate60 = uw.econRate(); g.save.settings.dayLength = 30; out.rate30 = uw.econRate();
   return out;
 });
-check('on a 4-minute day she still takes the same real time: not after 12 world hours, done after 90', pace.at12 === 0 && pace.at89 === 0 && pace.at91 === 680, JSON.stringify(pace));
+check('on a 4-minute day she still takes the same real time: not after 12 world hours, done after 90', pace.at12 === 0 && pace.at89 === 0 && pace.at91 === 850, JSON.stringify(pace));
 check('the economic clock is the day length over 30 minutes per world hour (4 → 0.13, 30 → 1, 60 → 2)', Math.abs(pace.rate4 - 4 / 30) < 1e-9 && pace.rate30 === 1 && pace.rate60 === 2, JSON.stringify(pace));
 
 // ---------------------------------------------------------------- 5. arrested while the money is with her
@@ -101,7 +101,7 @@ const jail = await ev(() => {
   return out;
 });
 check('an arrest takes the $1,000 on you, not the $2,000 with her', pre.me === 1000 && pre.batches === 1 && jail.me === 0 && jail.seized >= 1000 && jail.batches === 1, JSON.stringify({ pre, jail }));
-check('in jail the clock runs at world time and the money arrives anyway ($1,360); nothing new can be handed over', jail.rate === 1 && jail.clean === 1360 && jail.left === 0 && /cell/.test(jail.refused), JSON.stringify(jail));
+check('in jail the clock runs at world time and the money arrives anyway ($1,700); nothing new can be handed over', jail.rate === 1 && jail.clean === 1700 && jail.left === 0 && /cell/.test(jail.refused), JSON.stringify(jail));
 await ev(() => { const g = window.game; g.uw.prison.release ? g.uw.prison.release('test') : null; });
 
 // ---------------------------------------------------------------- 6. save, reload, exactly once
@@ -127,8 +127,8 @@ const loaded = await ev(() => {
   return out;
 });
 check('save → reload: the batch with her, the clock and the day’s tally are identical', Math.abs(loaded.econH - saved.econH) < 1e-6 && JSON.stringify(loaded.batch) === JSON.stringify(saved.batch) && loaded.used === saved.used && loaded.clean0 === 0, JSON.stringify({ saved, loaded }));
-check('after reload it is delivered exactly once ($1,020)', loaded.clean === 1020 && loaded.left === 0, JSON.stringify(loaded));
-check('a corrupt fixer state loads clean (no negative, impossible or oversized batch)', loaded.bad.used === 1e12 && loaded.bad.day === 0 && loaded.bad.batches.every(x => x.clean > 0 && x.clean <= Math.round(x.dirty * 0.68) && x.dirty <= 100000), JSON.stringify(loaded.bad));
+check('after reload it is delivered exactly once ($1,275)', loaded.clean === 1275 && loaded.left === 0, JSON.stringify(loaded));
+check('a corrupt fixer state loads clean (no negative, impossible or oversized batch)', loaded.bad.used === 1e12 && loaded.bad.day === 0 && loaded.bad.batches.every(x => x.clean > 0 && x.clean <= Math.round(x.dirty * 0.85) && x.dirty <= 100000), JSON.stringify(loaded.bad));
 
 // ---------------------------------------------------------------- 7. no Clean Bank from a stolen car
 const stolen = await ev(() => {

@@ -372,7 +372,7 @@ const SPOTS = [
 // 2026-11-16: $100,000 at a time from the start, no daily limit). Time runs on the economic clock
 // (Underworld.econH), so the day-length setting doesn't change how much she washes per hour of play (§45.9).
 // Fronts (Session 9) supersede her.
-const FIXER_FEE = 0.32, FIXER_MAX = 100000, FIXER_DELAY = 12, FIXER_MIN = 100;
+const FIXER_FEE = 0.15, FIXER_MAX = 100000, FIXER_DELAY = 12, FIXER_MIN = 100;
 // the economic clock runs at the reference day length outside jail, and at world time in jail (1:1, §45.8)
 const ECON_REF_DAY = 30;
 // faction headquarters (the boss and guards stand here)

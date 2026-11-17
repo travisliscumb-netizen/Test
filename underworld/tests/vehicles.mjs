@@ -93,12 +93,13 @@ const crash = await ev(() => {
   return out;
 });
 check('small bumps (5-8 m/s) do almost nothing', crash[5] === 0 && crash[8] < 1.5, JSON.stringify(crash));
-check('a 43 km/h crash (12 m/s) matters but is survivable many times', crash[12] > 2 && crash[12] < 12, JSON.stringify(crash));
-check('a 100 km/h crash (28 m/s) is serious', crash[28] > 25, JSON.stringify(crash));
-check('a 126 km/h crash (35 m/s) is close to wrecking the car', crash[35] > 45, JSON.stringify(crash));
+// (cars take 3.5x the punishment they did, owner 2026-11-17: the damage a crash does is 1/3.5 of the old)
+check('a 43 km/h crash (12 m/s) matters but is survivable many times', crash[12] > 0.57 && crash[12] < 3.43, JSON.stringify(crash));
+check('a 100 km/h crash (28 m/s) is serious', crash[28] > 7.1, JSON.stringify(crash));
+check('a 126 km/h crash (35 m/s) takes a real bite out of the car', crash[35] > 12.9, JSON.stringify(crash));
 // gunfire: about twice as many shots to set a car on fire as before (old: 100 / 2.5 = 40 NPC hits)
 const shots = await ev(() => { const g = window.game, v = g.vehicles.spawn('sedan', 480, 480, 0, {}); let n = 0; while (v.health > 0 && n < 500) { v.hurt(2.5, 'gun'); n++; } g.vehicles.despawn(v); return n; });
-check('NPC gunfire: about double the hits to disable a car (80 vs 40)', shots >= 78 && shots <= 82, String(shots));
+check('NPC gunfire: 3.5x the hits to disable a car of the doubled cars (280 vs 80)', shots >= 273 && shots <= 287, String(shots));
 const stages = await ev(() => { const st = window.__pv.VEH_STAGES || []; return st.map(s => s[1]); });
 check('six damage stages + destroyed: normal, light, damaged, smoking, heavy, critical, destroyed', stages.length === 7 && stages.includes('SMOKING') && stages.includes('DESTROYED'), stages.join(','));
 // smoke only from the smoke threshold down; power loss by stage

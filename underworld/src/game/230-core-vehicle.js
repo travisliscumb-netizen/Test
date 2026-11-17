@@ -3,7 +3,7 @@
    ===================================================================== */
 let VEH_ID = 1;
 const LOD_D = 72; // metres: beyond this, cars draw their light LOD mesh
-const VEH_DUR = 2; // durability factor: every car withstands about twice the punishment it used to
+const VEH_DUR = 7; // durability factor: every car withstands about seven times the original punishment (3.5x the doubled cars, owner 2026-11-17)
 const BRAKE_K = 1.35; // service-brake strength over the old tables (~25% shorter stopping distance)
 const LAT_G = 1.45;     // cornering grip in g per unit of spec grip (arcade: a little above a real road car)
 const REV_DELAY = 0.4;  // a held brake at a standstill waits this long before it becomes reverse

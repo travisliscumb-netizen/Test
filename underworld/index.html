@@ -45863,7 +45863,7 @@ const isUniqueType = type => !!(VEHICLES[type] && VEHICLES[type].unique);
    ===================================================================== */
 let VEH_ID = 1;
 const LOD_D = 72; // metres: beyond this, cars draw their light LOD mesh
-const VEH_DUR = 2; // durability factor: every car withstands about twice the punishment it used to
+const VEH_DUR = 7; // durability factor: every car withstands about seven times the original punishment (3.5x the doubled cars, owner 2026-11-17)
 const BRAKE_K = 1.35; // service-brake strength over the old tables (~25% shorter stopping distance)
 const LAT_G = 1.45;     // cornering grip in g per unit of spec grip (arcade: a little above a real road car)
 const REV_DELAY = 0.4;  // a held brake at a standstill waits this long before it becomes reverse
@@ -55284,7 +55284,7 @@ const SPOTS = [
 // 2026-11-16: $100,000 at a time from the start, no daily limit). Time runs on the economic clock
 // (Underworld.econH), so the day-length setting doesn't change how much she washes per hour of play (§45.9).
 // Fronts (Session 9) supersede her.
-const FIXER_FEE = 0.32, FIXER_MAX = 100000, FIXER_DELAY = 12, FIXER_MIN = 100;
+const FIXER_FEE = 0.15, FIXER_MAX = 100000, FIXER_DELAY = 12, FIXER_MIN = 100;
 // the economic clock runs at the reference day length outside jail, and at world time in jail (1:1, §45.8)
 const ECON_REF_DAY = 30;
 // faction headquarters (the boss and guards stand here)
