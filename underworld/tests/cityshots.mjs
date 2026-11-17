@@ -10,7 +10,7 @@ const b = await launch();
 const { page, errors } = await open(b, { viewport: { width: 1100, height: 620 } });
 await startNew(page);
 await page.evaluate(() => { const g = window.game; g.quality.setMode(1); g.env.time = 11; g.env.setWeather('clear', true); g.events.cool = 1e9; g.police.enabled = false; });
-const shot = async (name) => { await frames(page, 20); await page.screenshot({ path: path.join(DIR, name + '.png') }); console.log('shot', name); };
+const shot = async (name) => { await frames(page, 20); await page.screenshot({ path: path.join(DIR, name + '.png'), timeout: 120000 }); console.log('shot', name); };
 // fly the camera: player parked under the view so chunks stream in, camera aimed by hand
 async function view(name, px, pz, cam, look) {
   if (ONLY && !ONLY.includes(name)) return;

@@ -22,7 +22,7 @@ const look = async (name, door, dist, up, side = 0) => {
   }, [door, dist, up, side]);
   for (const [w, t, rain] of [['day', 13, 0], ['night', 22.5, 0], ['rain', 15, 1]]) {
     await ev(([t, rain]) => { const g = window.game; g.env.time = t; g.env.setWeather ? g.env.setWeather(rain ? 'rain' : 'clear', true) : (g.env.rain = rain, g.env.rainT = rain); }, [t, rain]);
-    await frames(page, 30); await page.screenshot({ path: path.join(OUT, `front-${TAG}-${name}-${w}.png`) });
+    await frames(page, 30); await page.screenshot({ path: path.join(OUT, `front-${TAG}-${name}-${w}.png`), timeout: 120000 });
   }
 };
 const doors = await ev(() => {

@@ -15,7 +15,7 @@ const ev = (f, a) => page.evaluate(f, a);
 await ev(q => { const g = window.game; g.quality.setMode(q); g.save.settings.guide = false; g.events.cool = 1e9; g.police.enabled = false; (g.money.W.clean = g.money.W.dirty.me = 2e6); window.__hideTip = () => { const t = document.getElementById('tip'); if (t) t.style.visibility = 'hidden'; }; window.__hideHud = on => { for (const id of ['hud', 'touch', 'moneyFeed', 'toasts']) { const el = document.getElementById(id); if (el) el.style.visibility = on ? 'hidden' : ''; } };
   // a free camera for photos: after the rig updates, put the lens where window.__freeCam says
   const U = g.cam.update.bind(g.cam); g.cam.update = (...a) => { U(...a); const f = window.__freeCam; if (f) { g.camera.position.set(f.x, f.y, f.z); g.camera.lookAt(f.lx, f.ly, f.lz); } }; }, +(process.env.QA_Q || 1));
-const shot = async (name) => { await frames(page, 8); await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('shot', name); };
+const shot = async (name) => { await frames(page, 8); await page.screenshot({ path: path.join(OUT, name + '.png'), timeout: 120000 }); console.log('shot', name); };
 const fadeDone = () => page.waitForFunction(() => !window.game.fading, null, { timeout: 30000, polling: 100 });
 // place the player inside the current interior at local (x, y, z), facing yaw, camera pitch
 const at = (x, y, z, yaw, pitch = -0.15) => ev(([x, y, z, yaw, pitch]) => { const g = window.game, d = g.content.interiors.cur, p = g.player; p.pos.set(d.ox + x, d.fy + y, d.oz + z); p.vel.set(0, 0, 0); p.h = yaw; g.cam.yaw = yaw; g.cam.pitch = pitch; g.cam.init = false; }, [x, y, z, yaw, pitch]);

@@ -8,7 +8,7 @@ const b = await launch();
 const { page, errors } = await open(b, { viewport: { width: 960, height: 540 } });
 await startNew(page);
 await page.evaluate(() => window.game.quality.setMode(1));
-const shot = async (name) => { await frames(page, 25); await page.screenshot({ path: path.join(DIR, name + '.png') }); console.log('shot', name); };
+const shot = async (name) => { await frames(page, 25); await page.screenshot({ path: path.join(DIR, name + '.png'), timeout: 120000 }); console.log('shot', name); };
 const set = (fn, arg) => page.evaluate(fn, arg);
 await set(() => { const g = window.game; g.env.time = 10; g.env.setWeather('clear', true); });
 await shot('01-start');

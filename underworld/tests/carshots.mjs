@@ -29,7 +29,7 @@ for (let r = 0; r * per < types.length; r++) {
   for (const [name, cam] of [['side', { x: base.x0 + 15, y: 2.0, z: base.z - 11 }], ['above', { x: base.x0 + 15, y: 10, z: base.z + 9 }]]) {
     await ev(([c, b2]) => { window.__freeCam = { x: c.x, y: c.y, z: c.z, lx: b2.x0 + 15, ly: 0.8, lz: b2.z }; }, [cam, base]);
     await frames(page, 25);
-    await page.screenshot({ path: path.join(OUT, `cars-${r + 1}-${name}.png`) });
+    await page.screenshot({ path: path.join(OUT, `cars-${r + 1}-${name}.png`), timeout: 120000 });
   }
   console.log('row', r + 1, row.join(','));
 }
