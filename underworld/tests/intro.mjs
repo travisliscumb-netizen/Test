@@ -12,6 +12,8 @@ await page.waitForTimeout(20000); const z = await obj(); check("gone after 30 s 
 await page.evaluate(() => { const g = window.game; g.ui.stack && (() => { while (g.ui.stack.length) g.ui.back(); })(); });
 const again = await page.evaluate(() => { window.game.newGame(); return true; });
 await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
-await page.waitForTimeout(1500); const n = await obj(); check('a fresh save shows it again', n.shown && /to your name/.test(n.text), JSON.stringify({ n, again }));
+// (the guide refreshes every half second of game time, slow in software GL beside other suites: wait for it)
+await page.waitForFunction(() => { const e = document.getElementById('objective'); return e && !e.classList.contains('hidden') && /to your name/.test(e.textContent); }, null, { timeout: 25000, polling: 200 }).catch(() => {});
+const n = await obj(); check('a fresh save shows it again', n.shown && /to your name/.test(n.text), JSON.stringify({ n, again }));
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await finish(b, 'intro');
