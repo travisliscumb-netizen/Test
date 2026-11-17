@@ -691,3 +691,6 @@ b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
 /* G8 · each touch button, the status card and the minimap get a compositing layer of their own (as M13's
    backdrop-blurred buttons had), so a change to one repaints only it, not the whole control overlay */
 #touch .tbtn,#hud .tr,#minimapWrap{will-change:transform}
+/* the kart simulator (356): its own overlay; the game's HUD, money feed and banners stand aside, the car's thumb
+   controls stay (the stick steers, Gas and Brake, the pause button), the horn, drift and radio go */
+body.kart #hud,body.kart #moneyFeed,body.kart #banner,body.kart #touch .tbtn[data-act="horn"],body.kart #touch .tbtn[data-act="handbrake"],body.kart #touch .tbtn[data-act="radio"],body.kart #touch .tbtn[data-act="map"],body.kart #touch .tbtn[data-act="empire"],body.kart #touch .tbtn[data-act="camera"],body.kart #touch .tbtn[data-act="interact"]{display:none!important}

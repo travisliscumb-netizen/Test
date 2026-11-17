@@ -267,7 +267,7 @@ function villaBunkerDef(owned) {
     { id: 'v:goods', x: 6.75, z: -17.4, r: 1.4, label: 'The vault · goods' },
     { id: 'v:pc', x: 7, z: 9.4, r: 1.3, label: 'The computer · dark web, property, the empire' },
     { id: 'v:armory', x: -7, z: -15.6, r: 1.6, label: 'The armoury · guns, ammo, vests' },
-    { id: 'v:kart', x: 19, z: 10.2, r: 1.4, label: 'Kart simulator' },
+    { id: 'v:kart', x: 19, z: 10.2, r: 1.4, label: 'Kart simulator · Valen Kart Park, six karts, three laps' },
     { id: 'g:slot:royale', x: 27.6, z: -20, r: 1.2, label: 'Royale Billions' }, { id: 'g:slot:royale', x: 27.6, z: -16.6, r: 1.2, label: 'Royale Billions' },
     { id: 'g:slot:royale', x: 27.6, z: -13.2, r: 1.2, label: 'Royale Billions' }, { id: 'g:slot:royale', x: 27.6, z: -9.8, r: 1.2, label: 'Royale Billions' },
     { id: 'g:bj:0', x: 19, z: -16.2, r: 1.3, label: 'Blackjack' }, { id: 'g:roul:0', x: 19, z: -9.2, r: 1.3, label: 'Roulette' }, { id: 'g:poker:0', x: 24, z: -1.6, r: 1.5, label: 'Hold’em · choose your stakes' },
@@ -300,7 +300,7 @@ const VillaBunker = {
       case 'goods': if (VillaValen.owned(g)) g.uw.ui.openProp('villa'); else g.ui.toast('Buy the house to keep goods down here.'); return true;
       case 'armory': this.armoryMenu(g); return true;
       case 'pc': this.computer(g, 'web'); return true;
-      case 'kart': g.ui.toast('The kart simulator is being built: one detailed track, rival karts and a tuning menu.'); g.audio.play('ui'); return true;
+      case 'kart': if (!g.kart) g.kart = new KartSim(g); g.kart.start(); return true;
     }
     return false;
   },

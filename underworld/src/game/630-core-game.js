@@ -635,6 +635,8 @@ class Game {
     this.fps = lerp(this.fps, 1 / Math.max(dt, 1e-3), 0.05);
     const inp = this.input;
     inp.pollGamepad();
+    // the kart simulator (356) has the screen and the controls while it runs: the game stands still
+    if (this.kart && this.kart.active) { this.kart.frame(dt); inp.endFrame(); return; }
     if (inp.pressed('debug')) this.toggleDebug();
     if (this.state === 'playing') {
       if (inp.pressed('pause')) { if (this.ui.closeConfirm()) { /* dialog dismissed */ } else if (this.mapOpen) { this.ui.toggleMap(false); } else if (this.ui.modal) this.ui.back(); else this.pause(); }

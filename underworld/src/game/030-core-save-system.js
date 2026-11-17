@@ -179,6 +179,8 @@ const SaveSystem = {
     VehicleRegistry.sanitize(d);
     // the one-offs: their stages, and one fleet or waiting entry each at most (Session 6D)
     UniqueCars.sanitize(d);
+    // the kart simulator's handling settings, best lap and wins (356)
+    KartSim.sanitize(d);
     for (const k of ['pistol', 'smg', 'shotgun', 'bat']) d.weapons[k] = !!d.weapons[k];
     // where each gun is: null = on you; a property id = in that property's stash
     if (!d.wloc || typeof d.wloc !== 'object') d.wloc = {};
