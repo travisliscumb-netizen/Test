@@ -55,7 +55,7 @@ function streetNameAt(x, z) {
     // ran, in a block rebuilt on its own streets, is not that old street)
     if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
     // (only a lattice street that still runs there: a superblock or a square has taken some of their lengths)
-    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, Math.floor(z / P)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, Math.floor(x / P));
+    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, clamp(Math.floor(z / P), p.lz0 + p.oz, p.lz1 + p.oz)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, clamp(Math.floor(x / P), p.lx0 + p.ox, p.lx1 + p.ox));
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];

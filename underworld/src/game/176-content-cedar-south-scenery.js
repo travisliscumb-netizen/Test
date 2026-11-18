@@ -16,7 +16,7 @@
      else);
    - the shore fence and the bridge rails (one merged mesh).
    ===================================================================== */
-const TSURF_COL = [0x5d7f45, 0x8a6b47, 0x4b3a29, 0x7d776d, 0xa39478, 0x96784f];
+const TSURF_COL = [0x5d7f45, 0x8a6b47, 0x4b3a29, 0x7d776d, 0xa39478, 0x96784f, 0x2e3033];
 const CFS_SCN = { tile: 50, far: 5, farC: 10, farR: 300, nearR: 70, stripR: 500, stripNear: 120, stripStep: 4, fenceR: 250, cache: 24 };
 class CedarScenery {
   constructor(scene, world, gmat) {
@@ -181,5 +181,57 @@ class CedarScenery {
     this._farIndex(this.far, new Set(want));
     // keep the most recently used tiles; dispose the rest
     if (this.tiles.size > CFS_SCN.cache) for (const t of [...this.tiles.values()].sort((a, b) => a.used - b.used).slice(0, this.tiles.size - CFS_SCN.cache)) { t.mesh.geometry.dispose(); this.tiles.delete(t.key); }
+  }
+}
+// ---------------------------------------------------------------------- the Southshore Speedway's surface (2026-11-18)
+// The height field draws the oval's asphalt at its 1 m grid; over it, one merged mesh at the ground's own height (the
+// banking and all): the track with its edge lines, the apron and its double yellow, the start/finish chequer, the pit
+// lane and the paddock's concrete; and the walls: concrete round the outside, armco round the infield.
+class OvalScenery {
+  constructor(scene, world) {
+    const cf = world.cfs; if (!cf || !cf.oval) return;
+    const T = cf.track, O = OVAL, half = O.half, n = T.pts.length, pos = [], col = [];
+    const gy = (x, z) => { const y = Terrain.height(x, z); return y === null ? O.y : y - Terrain.rough; };
+    const C3 = new THREE.Color();
+    // a quad a little over the ground (a, b, c, d: [x, z] round it), wound to face up
+    const quad = (q, lift, hex) => {
+      C3.setHex(hex); const P3 = q.map(p => [p[0], gy(p[0], p[1]) + lift, p[1]]);
+      for (const tri of [[0, 1, 2], [0, 2, 3]]) {
+        let [a, b, c] = tri.map(i => P3[i]);
+        if ((b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]) < 0) [b, c] = [c, b];
+        for (const v of [a, b, c]) { pos.push(...v); col.push(C3.r, C3.g, C3.b); }
+      }
+    };
+    // a strip along the oval between left offsets o1 < o2, every sample
+    const strip = (o1, o2, lift, hex) => { for (let k = 0; k < n; k++) { const j = (k + 1) % n, A = T.pts[k], B2 = T.pts[j], na = T.nl[k], nb = T.nl[j]; const c = typeof hex === 'function' ? hex(k) : hex; if (c === null) continue; quad([[A[0] + na[0] * o1, A[1] + na[1] * o1], [A[0] + na[0] * o2, A[1] + na[1] * o2], [B2[0] + nb[0] * o2, B2[1] + nb[1] * o2], [B2[0] + nb[0] * o1, B2[1] + nb[1] * o1]], lift, c); } };
+    strip(-half, half, 0.05, 0x2b2d30);
+    strip(half, half + O.apron, 0.05, 0x55585c);
+    strip(-half + 0.35, -half + 0.6, 0.07, 0xeeeeea); strip(half - 0.6, half - 0.35, 0.07, 0xeeeeea);
+    strip(half + 0.1, half + 0.3, 0.07, 0xe8c04a); strip(half + 0.45, half + 0.65, 0.07, 0xe8c04a);
+    // the start/finish line: a chequered band across the track
+    { const k0 = cf.sf.k; for (let c = 0; c < 15; c++) for (let r2 = 0; r2 < 2; r2++) { const A = T.pts[(k0 + r2) % n], nl = T.nl[k0], o1 = -half + c, o2 = o1 + 1; quad([[A[0] + nl[0] * o1, A[1] + nl[1] * o1], [A[0] + nl[0] * o2, A[1] + nl[1] * o2], [A[0] + nl[0] * o2 - 1, A[1] + nl[1] * o2], [A[0] + nl[0] * o1 - 1, A[1] + nl[1] * o1]], 0.08, (c + r2) % 2 ? 0x111111 : 0xf2f2f2); } }
+    // the paddock, the garage apron, the pit lane and its merges
+    const Pd = O.paddock, PW = O.pit, R4 = (x0, z0, x1, z1, lift, hex) => quad([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], lift, hex);
+    R4(Pd.x0, Pd.z0, Pd.x1, PW.garZ[0], 0.04, 0x8e8c86); R4(PW.garX[0], PW.garZ[0], PW.garX[1], PW.garZ[1], 0.04, 0x8e8c86);
+    R4(PW.exit[0][0], PW.garZ[1], PW.entry[2][0], PW.z + PW.w / 2, 0.045, 0x34363a);
+    const lane = [...PW.exit.slice().reverse(), ...PW.entry.slice().reverse()].reverse(), ln = vpNormals(lane);
+    for (let k = 0; k < lane.length - 1; k++) { const A = lane[k], B2 = lane[k + 1], na = ln[k], nb = ln[k + 1], w = PW.w / 2; quad([[A[0] - na[0] * w, A[1] - na[1] * w], [A[0] + na[0] * w, A[1] + na[1] * w], [B2[0] + nb[0] * w, B2[1] + nb[1] * w], [B2[0] - nb[0] * w, B2[1] - nb[1] * w]], 0.045, 0x34363a); }
+    for (const x of [PW.x0 + 6, PW.x1 - 6]) R4(x - 0.3, PW.z - PW.w / 2, x + 0.3, PW.z + PW.w / 2, 0.055, 0xf2f2f2);
+    // the gate road's asphalt through the paddock to the turning circle
+    const gp = cf.gate, gn = vpNormals(gp);
+    for (let k = 0; k < gp.length - 1; k++) { if (gp[k][0] < CFS.x0) continue; const A = gp[k], B2 = gp[k + 1], na = gn[k], nb = gn[k + 1]; quad([[A[0] - na[0] * 4.5, A[1] - na[1] * 4.5], [A[0] + na[0] * 4.5, A[1] + na[1] * 4.5], [B2[0] + nb[0] * 4.5, B2[1] + nb[1] * 4.5], [B2[0] - nb[0] * 4.5, B2[1] - nb[1] * 4.5]], 0.045, 0x34363a); }
+    { const R0 = O.ring, r = R0.r + 4, m = 32; for (let i = 0; i < m; i++) { const a = i / m * Math.PI * 2, b = (i + 1) / m * Math.PI * 2; quad([[R0.x, R0.z], [R0.x + Math.cos(a) * r, R0.z + Math.sin(a) * r], [R0.x + Math.cos(b) * r, R0.z + Math.sin(b) * r], [R0.x, R0.z]], 0.05, 0x34363a); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+    this.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); this.mesh.name = 'speedway'; this.mesh.receiveShadow = true; scene.add(this.mesh);
+    // the walls: vertical faces along each line (both sides drawn), concrete 1.2 m with a fence above, armco a rail
+    const wp = [], wc = [];
+    const face = (a, b, y0, y1, hex) => { C3.setHex(hex); for (const v of [[a[0], a[2] + y0, a[1]], [b[0], b[2] + y0, b[1]], [b[0], b[2] + y1, b[1]], [a[0], a[2] + y0, a[1]], [b[0], b[2] + y1, b[1]], [a[0], a[2] + y1, a[1]]]) { wp.push(...v); wc.push(C3.r, C3.g, C3.b); } };
+    for (const W of cf.walls) for (let k = 0; k < W.line.length; k++) {
+      const a = W.line[k], b = W.line[(k + 1) % W.line.length]; if (!a || !b || Math.hypot(b[0] - a[0], b[1] - a[1]) > 6) continue;
+      if (W.kind === 'concrete') { face(a, b, -0.2, 1.2, 0xe4e4de); face(a, b, 1.2, 1.3, 0x1f6fb2); face(a, b, 1.3, 3.6, 0x6a7078); }
+      else face(a, b, 0.45, 0.85, 0xc8ccd0);
+    }
+    const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3)); wg.computeVertexNormals();
+    this.walls = new THREE.Mesh(wg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 1 })); this.walls.name = 'speedway-walls'; scene.add(this.walls);
   }
 }

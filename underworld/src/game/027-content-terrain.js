@@ -17,7 +17,7 @@
    Built once with the world (Terrain.build), after which groundBase
    answers from it.
    ===================================================================== */
-const TSURF = { grass: 0, dirt: 1, mud: 2, rock: 3, gravel: 4, track: 5 };
+const TSURF = { grass: 0, dirt: 1, mud: 2, rock: 3, gravel: 4, track: 5, asphalt: 6 };
 // grip multiplier, rolling drag (m/s²) and rough amplitude (m) per surface
 const TSURF_FX = [
   { grip: 0.82, drag: 0.35, rough: 0.035, name: 'grass' },
@@ -25,7 +25,9 @@ const TSURF_FX = [
   { grip: 0.45, drag: 2.4, rough: 0.025, name: 'mud' },
   { grip: 0.74, drag: 0.6, rough: 0.11, name: 'rock' },
   { grip: 0.72, drag: 0.4, rough: 0.05, name: 'gravel' },
-  { grip: 0.88, drag: 0.15, rough: 0.02, name: 'track' }
+  { grip: 0.88, drag: 0.15, rough: 0.02, name: 'track' },
+  // the speedway (owner, 2026-11-18): sealed track, no penalty
+  { grip: 1, drag: 0.02, rough: 0, name: 'asphalt' }
 ];
 // how well each model copes off the road (0 a road car, 1 a true off-roader): it scales every terrain penalty by
 // 1 − 0.65 × trail, and how much of the rough the suspension soaks up
@@ -164,7 +166,7 @@ const Terrain = {
     // ---- the countryside: hills, the course's features, the tracks and level pads
     {
       const R = this._region('country', CFS.x0, CFS.z0, CFS.x1, CFS.z1);
-      const pads = cf.pads, tracks = cf.tracks, course = cf.course;
+      const pads = cf.pads, tracks = cf.tracks;
       for (let j = 0; j < R.H; j++) for (let i = 0; i < R.W; i++) {
         const x = R.x0 + i, z = R.z0 + j, o = j * R.W + i;
         let h = this.raw(x, z), pad = null;
@@ -201,18 +203,21 @@ const Terrain = {
         });
         for (const o of mine) laid[o] = 1;
       }
-      // the course: dirt, with its features by distance along it
-      this._stampLine(R, course.pts, course.w, (o, along, off) => {
-        R.s[o] = TSURF.dirt; R.m[o] = 1;
-        for (const F of course.features) {
-          const t = (along - F.at) / F.len; if (t < 0 || t > 1) continue;
-          if (F.kind === 'jump') R.h[o] += F.h * (t < 0.62 ? Math.sin(Math.PI / 2 * t / 0.62) : Math.max(0, 1 - (t - 0.62) / 0.38) ** 2);
-          else if (F.kind === 'whoops') R.h[o] += F.h * (0.5 - 0.5 * Math.cos(t * Math.PI * 2 * F.n));
-          else if (F.kind === 'mud') { R.s[o] = TSURF.mud; R.h[o] -= F.h * Math.sin(Math.PI * t); }
-          else if (F.kind === 'rock') R.s[o] = TSURF.rock;
-          else if (F.kind === 'camber') R.h[o] += F.h * off / course.w * 2 * Math.sin(Math.PI * t);
-        }
-      }, true);
+      // the speedway (126): its level ground is plain grass held flat (no rough, no penalty); the oval sealed, its
+      // turns banked (the outside raised, easing in and out over the turns' first and last 40 m), the apron on the
+      // inside and the shelf to the outer wall level with the track's edge either side
+      if (cf.oval) {
+        const O = cf.oval, T = O.T, n = T.pts.length;
+        for (const P of O.flat) for (let z = Math.max(R.z0, P.z0); z <= Math.min(R.z1 - 1, P.z1); z++) for (let x = Math.max(R.x0, P.x0); x <= Math.min(R.x1 - 1, P.x1); x++) { const o = (z - R.z0) * R.W + (x - R.x0); if (R.s[o] === TSURF.track || laid[o]) continue; R.h[o] = O.y; R.s[o] = TSURF.grass; R.m[o] = 0; }
+        const bankAt = along => { const k = this._ovalK(T, ((along % T.len) + T.len) % T.len); return O.bankK[k]; };
+        this._stampLine(R, T.pts, O.half * 2 + O.apron * 2 + 4, (o, along, off) => {
+          const b = bankAt(along), out = -off * O.side, half = O.half;
+          // across the track: 0 at the inside edge, the full rise at the outside; the shelf outside holds the edge's level
+          const u = out <= half ? clamp((out + half) / (2 * half), 0, 1) : 1 - smoothstep(half + 3, half + 7, out);
+          R.h[o] = O.y + b * O.rise * u; R.m[o] = 0;
+          R.s[o] = Math.abs(off) <= half ? TSURF.asphalt : out < -half && out > -half - O.apron ? TSURF.asphalt : TSURF.grass;
+        }, true);
+      }
     }
     this.ready = true;
   },
@@ -248,6 +253,8 @@ const Terrain = {
     for (let pass = 0; pass < 2; pass++) for (let k = 1; k < n; k++) { const i = pass ? n - 1 - k : k, j = pass ? i + 1 : i - 1, ds = Math.abs(cum[i] - cum[j]) * 0.1; if (isNaN(pin[i])) y[i] = clamp(y[i], y[j] - ds, y[j] + ds); }
     return { cum, y, raw };
   },
+  // the oval's sample at distance `a` along it
+  _ovalK(T, a) { let lo = 0, hi = T.pts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (T.cum[m] <= a) lo = m; else hi = m - 1; } return lo; },
   // every cell within w/2 of a polyline: fn(cellIndex, distance along, signed offset (+ on the left of travel)).
   // Each cell takes its nearest segment, so features and offsets run on smoothly through the bends
   _stampLine(R, pts, w, fn, closed) {

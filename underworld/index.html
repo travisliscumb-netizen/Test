@@ -32905,7 +32905,7 @@ function streetNameAt(x, z) {
     // ran, in a block rebuilt on its own streets, is not that old street)
     if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
     // (only a lattice street that still runs there: a superblock or a square has taken some of their lengths)
-    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, Math.floor(z / P)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, Math.floor(x / P));
+    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, clamp(Math.floor(z / P), p.lz0 + p.oz, p.lz1 + p.oz)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, clamp(Math.floor(x / P), p.lx0 + p.ox, p.lx1 + p.ox));
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
@@ -34169,7 +34169,7 @@ function filletLoop(V, step) {
    Built once with the world (Terrain.build), after which groundBase
    answers from it.
    ===================================================================== */
-const TSURF = { grass: 0, dirt: 1, mud: 2, rock: 3, gravel: 4, track: 5 };
+const TSURF = { grass: 0, dirt: 1, mud: 2, rock: 3, gravel: 4, track: 5, asphalt: 6 };
 // grip multiplier, rolling drag (m/s²) and rough amplitude (m) per surface
 const TSURF_FX = [
   { grip: 0.82, drag: 0.35, rough: 0.035, name: 'grass' },
@@ -34177,7 +34177,9 @@ const TSURF_FX = [
   { grip: 0.45, drag: 2.4, rough: 0.025, name: 'mud' },
   { grip: 0.74, drag: 0.6, rough: 0.11, name: 'rock' },
   { grip: 0.72, drag: 0.4, rough: 0.05, name: 'gravel' },
-  { grip: 0.88, drag: 0.15, rough: 0.02, name: 'track' }
+  { grip: 0.88, drag: 0.15, rough: 0.02, name: 'track' },
+  // the speedway (owner, 2026-11-18): sealed track, no penalty
+  { grip: 1, drag: 0.02, rough: 0, name: 'asphalt' }
 ];
 // how well each model copes off the road (0 a road car, 1 a true off-roader): it scales every terrain penalty by
 // 1 − 0.65 × trail, and how much of the rough the suspension soaks up
@@ -34316,7 +34318,7 @@ const Terrain = {
     // ---- the countryside: hills, the course's features, the tracks and level pads
     {
       const R = this._region('country', CFS.x0, CFS.z0, CFS.x1, CFS.z1);
-      const pads = cf.pads, tracks = cf.tracks, course = cf.course;
+      const pads = cf.pads, tracks = cf.tracks;
       for (let j = 0; j < R.H; j++) for (let i = 0; i < R.W; i++) {
         const x = R.x0 + i, z = R.z0 + j, o = j * R.W + i;
         let h = this.raw(x, z), pad = null;
@@ -34353,18 +34355,21 @@ const Terrain = {
         });
         for (const o of mine) laid[o] = 1;
       }
-      // the course: dirt, with its features by distance along it
-      this._stampLine(R, course.pts, course.w, (o, along, off) => {
-        R.s[o] = TSURF.dirt; R.m[o] = 1;
-        for (const F of course.features) {
-          const t = (along - F.at) / F.len; if (t < 0 || t > 1) continue;
-          if (F.kind === 'jump') R.h[o] += F.h * (t < 0.62 ? Math.sin(Math.PI / 2 * t / 0.62) : Math.max(0, 1 - (t - 0.62) / 0.38) ** 2);
-          else if (F.kind === 'whoops') R.h[o] += F.h * (0.5 - 0.5 * Math.cos(t * Math.PI * 2 * F.n));
-          else if (F.kind === 'mud') { R.s[o] = TSURF.mud; R.h[o] -= F.h * Math.sin(Math.PI * t); }
-          else if (F.kind === 'rock') R.s[o] = TSURF.rock;
-          else if (F.kind === 'camber') R.h[o] += F.h * off / course.w * 2 * Math.sin(Math.PI * t);
-        }
-      }, true);
+      // the speedway (126): its level ground is plain grass held flat (no rough, no penalty); the oval sealed, its
+      // turns banked (the outside raised, easing in and out over the turns' first and last 40 m), the apron on the
+      // inside and the shelf to the outer wall level with the track's edge either side
+      if (cf.oval) {
+        const O = cf.oval, T = O.T, n = T.pts.length;
+        for (const P of O.flat) for (let z = Math.max(R.z0, P.z0); z <= Math.min(R.z1 - 1, P.z1); z++) for (let x = Math.max(R.x0, P.x0); x <= Math.min(R.x1 - 1, P.x1); x++) { const o = (z - R.z0) * R.W + (x - R.x0); if (R.s[o] === TSURF.track || laid[o]) continue; R.h[o] = O.y; R.s[o] = TSURF.grass; R.m[o] = 0; }
+        const bankAt = along => { const k = this._ovalK(T, ((along % T.len) + T.len) % T.len); return O.bankK[k]; };
+        this._stampLine(R, T.pts, O.half * 2 + O.apron * 2 + 4, (o, along, off) => {
+          const b = bankAt(along), out = -off * O.side, half = O.half;
+          // across the track: 0 at the inside edge, the full rise at the outside; the shelf outside holds the edge's level
+          const u = out <= half ? clamp((out + half) / (2 * half), 0, 1) : 1 - smoothstep(half + 3, half + 7, out);
+          R.h[o] = O.y + b * O.rise * u; R.m[o] = 0;
+          R.s[o] = Math.abs(off) <= half ? TSURF.asphalt : out < -half && out > -half - O.apron ? TSURF.asphalt : TSURF.grass;
+        }, true);
+      }
     }
     this.ready = true;
   },
@@ -34400,6 +34405,8 @@ const Terrain = {
     for (let pass = 0; pass < 2; pass++) for (let k = 1; k < n; k++) { const i = pass ? n - 1 - k : k, j = pass ? i + 1 : i - 1, ds = Math.abs(cum[i] - cum[j]) * 0.1; if (isNaN(pin[i])) y[i] = clamp(y[i], y[j] - ds, y[j] + ds); }
     return { cum, y, raw };
   },
+  // the oval's sample at distance `a` along it
+  _ovalK(T, a) { let lo = 0, hi = T.pts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (T.cum[m] <= a) lo = m; else hi = m - 1; } return lo; },
   // every cell within w/2 of a polyline: fn(cellIndex, distance along, signed offset (+ on the left of travel)).
   // Each cell takes its nearest segment, so features and offsets run on smoothly through the bends
   _stampLine(R, pts, w, fn, closed) {
@@ -34477,6 +34484,8 @@ const SaveSystem = {
       track: { best: null, prize: {}, hosted: null, laps: 0 },
       // Southshore Raceway (509c): best lap, laps
       raceway: { best: null, prize: {}, laps: 0 },
+      // the Southshore Speedway (509b): best lap, laps
+      oval: { best: null, prize: {}, laps: 0 },
       // the ten one-offs (Session 6D): each one's stage (undiscovered, clue, exact location, acquired)
       uniques: {},
       dealers: {},
@@ -34737,7 +34746,7 @@ const MONEY_SOURCES = {
   // the car wash: a wash and a repair at the Motor Works rate, licensed work from the bank (Session 6A, §45.33)
   carWash: { pay: 'clean' },
   // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank
-  trackFee: { pay: 'clean' }, trackPrize: { earn: 'clean' }, trackIncome: { earn: 'clean', book: 'businesses' }, trackHost: { pay: 'clean' }, pitService: { pay: 'clean' },
+  trackFee: { pay: 'clean' }, trackPrize: { earn: 'clean' }, propRefund: { earn: 'clean' }, trackIncome: { earn: 'clean', book: 'businesses' }, trackHost: { pay: 'clean' }, pitService: { pay: 'clean' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },
@@ -39154,8 +39163,8 @@ Object.assign(World.prototype, {
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
     this.exts = [
       { id: 'vp', name: 'Valen Point', loopName: 'Valen Point circuit', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK], traffic: [] },
-      // traffic drives the countryside's two tracks (the farm track east past the compound and the loop)
-      { id: 'cfs', name: 'Cedar Fields South', loopName: 'Cedar Fields off-road course', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [4, 5] }
+      // the Southshore Speedway (2026-11-18): the gate road from the highway carries traffic to the paddock
+      { id: 'cfs', name: 'Cedar Fields South', loopName: 'Southshore Speedway', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [0] }
     ];
     // (the island's own roads are curved links, not an extension's routes: Links.build takes them from localRoads)
     for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;
@@ -41423,207 +41432,185 @@ Object.assign(World.prototype, {
   }
 });
 /* =====================================================================
-   [CONTENT] CEDAR FIELDS SOUTH: GENERATION (Session 6C, §45.36)
-   The countryside south of the city, reached from Cedar Fields Road by
-   the farm track, the perimeter road and the land bridge:
-   - the ground is the height field (027): hills, hollows, rock and mud,
-     dirt tracks with ruts, level gravel pads where things are built;
-   - the off-road course: a closed loop of about 1 km, 12 m wide, of
-     straights and fillets (filletLoop), with whoops, two jumps, a mud
-     wallow, a rock garden and a cambered bend stamped into the ground;
-   - the off-road park's compound beside it: the Course Office (the place
-     you use), a six-bay garage shed (the registry's physical spaces for
-     the owner), a service stand, the timing tower and a spectator bank;
-   - the land bridge's dirt road, a Links spur from the south perimeter
-     road to a turning circle in the compound forecourt (traffic, the GPS,
-     taxis and the police use it), and the countryside's tracks for the
-     GPS and AI drivers (world.cfs.roads);
-   - trees, rocks, hay bales and a shore fence. Everything that is not
-     ground streams as district blocks (world.xblocks) like Valen Point.
+   [CONTENT] CEDAR FIELDS SOUTH: SOUTHSHORE SPEEDWAY (owner, 2026-11-18)
+   The off-road park is gone (its course, its compound, its countryside
+   tracks); in its place an asphalt oval, half of the Southshore
+   Motorsport Complex with the road course south-west of it (129b):
+   - the oval: two 400 m straights joined by 90 m turns, 15 m wide, the
+     turns banked (the outside 1.8 m up), driven anticlockwise (left
+     turns); a sealed apron on the inside, a concrete wall round the
+     outside, armco round the infield;
+   - the pits: a pit lane inside a pit wall along the front (north)
+     straight, twelve drive-through garages behind it (two bays each,
+     the complex's owner's parking), the paddock behind them with the
+     Speedway Office, transporters and a car park; a grandstand along the
+     back straight;
+   - the ways in: the land bridge's track from the city (a Links spur to
+     the paddock's turning circle, as before) and the gate road from the
+     Southshore Highway through a gate in the west fence (Oval Gate Road,
+     022/129b), the way from the road course (Paddock Road).
+   The ground is the height field (027): the whole site held level, the
+   oval stamped into it with its banking. Everything that is not ground
+   streams as district blocks (world.xblocks) like Valen Point.
    ===================================================================== */
-const CFS_COURSE = {
-  w: 12, step: 2,
-  // corners [x, z, radius], driven in this order (east along the start straight first)
-  verts: [[340, 1180, 25], [620, 1175, 35], [650, 1300, 30], [560, 1330, 20], [600, 1440, 30], [420, 1460, 35], [380, 1350, 22], [320, 1290, 25]],
-  sfX: 450
+const OVAL = {
+  name: 'Southshore Speedway', y: 1.0, half: 7.5, apron: 5, rise: 1.8, step: 2,
+  // corners [x, z, radius] in the direction of travel: west along the front straight, then south, east, north
+  verts: [[60, 1225, 90], [60, 1405, 90], [640, 1405, 90], [640, 1225, 90]],
+  sfX: 350,
+  // the pit lane (along x), the pit wall, the garages north of it, the merges at each end of the front straight
+  pit: { z: 1208, w: 10, x0: 188, x1: 512, wallZ: 1215.3, garX: [230, 470], garZ: [1176, 1200], cell: 20,
+    entry: [[548, 1220], [530, 1213], [512, 1208]], exit: [[188, 1208], [170, 1213], [152, 1220]] },
+  paddock: { x0: 110, z0: 1066, x1: 560, z1: 1176 },
+  ring: { x: 300, z: 1110, r: 12 },
+  office: { x0: 320, z0: 1098, x1: 350, z1: 1122 },
+  stand: { x0: 200, x1: 500, z0: 1420, z1: 1448 },
+  // the level site, and the gate in the west fence for the road from the highway
+  flat: [{ x0: 25, z0: 1058, x1: 675, z1: 1455 }],
+  gate: { z: 1150, half: 9 }
 };
-const CFS_SITE = {
-  land: { x0: 186, z0: 1040, x1: 214, z1: 1062 },
-  compound: { x0: 330, z0: 1086, x1: 470, z1: 1166 },
-  ring: { x: 345, z: 1112, r: 12 },
-  office: { x0: 440, x1: 462, z0: 1092, z1: 1108 },
-  shed: { x0: 372, x1: 399, z0: 1124, z1: 1132, bay: 4.5 },
-  stand: { x0: 403, x1: 412, z0: 1122, z1: 1134 },
-  bank: { x0: 452, x1: 468, z0: 1148, z1: 1165 }
-};
-// the course's features, by where they start (a fraction of the lap after the start/finish line) and their kind
-const CFS_FEATURES = [
-  { kind: 'whoops', f: 0.04, len: 55, h: 0.45, n: 5, straight: true },
-  { kind: 'jump', f: 0.2, len: 24, h: 1.5, straight: true },
-  { kind: 'mud', f: 0.33, len: 45, h: 0.2 },
-  { kind: 'rock', f: 0.47, len: 60 },
-  { kind: 'camber', f: 0.6, len: 70, h: 1.2, bend: true },
-  { kind: 'whoops', f: 0.76, len: 45, h: 0.35, n: 4, straight: true },
-  { kind: 'jump', f: 0.88, len: 20, h: 1.0, straight: true }
-];
-// the course's centreline (filletLoop), with the start/finish sample
-function cfsCourseLine() {
-  const T = filletLoop(CFS_COURSE.verts, CFS_COURSE.step);
-  T.sfK = T.pts.findIndex((p, k) => T.R[k] === 0 && Math.abs(p[0] - CFS_COURSE.sfX) <= CFS_COURSE.step && p[1] < 1200);
+// the oval's centreline (filletLoop: a rounded rectangle whose short sides are all turn), with the start/finish sample
+function ovalLine() {
+  const T = filletLoop(OVAL.verts, OVAL.step);
+  T.sfK = T.pts.findIndex((p, k) => T.R[k] === 0 && Math.abs(p[0] - OVAL.sfX) <= OVAL.step && Math.abs(p[1] - OVAL.verts[0][1]) < 0.5);
   T.sfAlong = T.cum[T.sfK];
   return T;
 }
+// the banking at each sample: 0 on the straights, full through the turns, eased in and out over the turns' first 40 m
+function ovalBank(T) {
+  const n = T.pts.length, out = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    if (!(T.R[k] > 0)) continue;
+    let d = 0; while (d < n && T.R[(k + d) % n] > 0 && T.R[(k - d + n) % n] > 0) d++;
+    out[k] = smoothstep(0, 40, d * OVAL.step);
+  }
+  return out;
+}
 Object.assign(World.prototype, {
   _genCedarSouth() {
-    const T = cfsCourseLine(), S = CFS_SITE, O0 = S.office, rng = new RNG(6301);
+    const T = ovalLine(), O = OVAL, rng = new RNG(6301), lb = CFS.lb;
     const tracks = [], pads = [];
-    // ---------------------------------------------------------------- level pads (their height from the hills they sit in)
-    const padY = r => clamp(Terrain.raw((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2), 0.6, 5);
-    const landY = 0.9;
-    pads.push({ ...S.land, y: landY }, { ...S.compound, y: padY(S.compound) });
-    const Yc = pads[1].y;
-    // ---------------------------------------------------------------- the course and its features (along from pts[0])
-    const len = T.len, inStraight = (a, l) => { for (let d = 0; d <= l; d += 2) { const k = this._cfsK(T, (a + d) % len); if (T.R[k] > 0) return false; } return true; };
-    const inBend = (a, l) => { const k = this._cfsK(T, (a + l / 2) % len); return T.R[k] > 0; };
-    const features = [];
-    for (const F of CFS_FEATURES) {
-      let at = (T.sfAlong + F.f * len) % len;
-      // slide forward to the first place it fits (a straight for whoops and jumps, a bend for the camber)
-      for (let tries = 0; tries < 400; tries++, at = (at + 2) % len) if ((!F.straight || inStraight(at, F.len)) && (!F.bend || inBend(at, F.len)) && at + F.len < len) break;
-      features.push({ kind: F.kind, at, len: F.len, h: F.h || 0, n: F.n || 1 });
-    }
-    // ---------------------------------------------------------------- the spur: perimeter road → land bridge → compound
-    const R0 = S.ring, lb = CFS.lb;
-    const spurPts = splinePts([[lb.x, lb.z0], [lb.x, CFS.z0], [lb.x + 2, 1064], [216, 1084], [240, 1098], [272, 1107], [R0.x - R0.r, R0.z]]);
+    const landY = 0.9, land = { x0: 186, z0: 1040, x1: 214, z1: 1062 };
+    pads.push({ ...land, y: landY }, ...O.flat.map(f => ({ ...f, y: O.y })));
+    // ---------------------------------------------------------------- the land bridge's track: the city → the paddock's turning circle
+    const R0 = O.ring;
+    const spurPts = splinePts([[lb.x, lb.z0], [lb.x, CFS.z0], [lb.x + 2, 1062], [225, 1086], [255, 1102], [R0.x - R0.r, R0.z]]);
     this.localRoads.push({ k: 'line', link: 'Cedar Fields Track', spur: true, w: lb.road * 2, pts: spurPts, ring: R0, mat: 'dirt' });
     tracks.push({ pts: spurPts.filter(p => p[1] >= CFS.z0 - 1), w: lb.road * 2 + 1 });
-    // the countryside loop (west fields, south hills and back), from the spur and back to it further along (both ends
-    // are spur vertices, so the GPS joins them): the illegal races' ground
-    const onSpur = (x, z) => spurPts.reduce((b2, p) => Math.hypot(p[0] - x, p[1] - z) < Math.hypot(b2[0] - x, b2[1] - z) ? p : b2);
-    const la = onSpur(200, 1068), lz = onSpur(270, 1106);
-    const loop = splinePts([la, [160, 1084], [90, 1112], [40, 1200], [52, 1320], [140, 1420], [255, 1445], [305, 1370], [258, 1260], [282, 1172], [306, 1124], lz], 2.5);
-    tracks.push({ pts: loop, w: 8 });
-    // a farm track east past the compound to the far fields, and back round the course's north side
-    const east = splinePts([[O0.x1 + 4, O0.z0 - 2], [540, 1102], [630, 1094], [662, 1150], [668, 1230]], 2.5);
-    tracks.push({ pts: east, w: 7 });
-    this.cfs = { pads, tracks, course: { pts: T.pts, w: CFS_COURSE.w, features, closed: true }, landY, track: T, site: S, Yc, loop, east, spur: spurPts, bays: [], blocks: [] };
+    // the gate road: from Oval Gate Road's end on the island (022), through the west gate, to the turning circle
+    const gr = ISLE_ROADS.find(D => D.id === 'sr3'), gEnd = gr.pts[gr.pts.length - 1];
+    const gatePts = splinePts([gEnd, [CFS.x0, O.gate.z], [40, 1146], [110, 1136], [190, 1124], [250, 1114], [R0.x - R0.r, R0.z]], 2.5);
+    tracks.push({ pts: gatePts.filter(p => p[0] >= CFS.x0), w: 9 });
+    const bank = ovalBank(T);
+    this.cfs = { pads, tracks, oval: { T, y: O.y, half: O.half, apron: O.apron, rise: O.rise, side: 1, bankK: bank, flat: O.flat }, landY, track: T, site: O, Yc: O.y, spur: spurPts, gate: gatePts, bays: [], blocks: [] };
     // ---------------------------------------------------------------- the ground
     Terrain.build(this);
     const gy = (x, z) => { const y = Terrain.height(x, z); return y === null ? 0 : y - Terrain.rough; };
-    const cf = this.cfs, wall = (x0, z0, x1, z1, y1 = 1.2, y0 = -5) => this.grid.add({ x0, z0, x1, z1, y0, y1, kind: 'wall' });
+    const cf = this.cfs, Y = O.y, wall = (x0, z0, x1, z1, y1 = 1.2, y0 = -5) => this.grid.add({ x0, z0, x1, z1, y0, y1, kind: 'wall' });
     // ---------------------------------------------------------------- district blocks (for streaming)
     const blk = (id, cx, cz, r, name) => { const b = this._vpBlock(id, cx - P / 2, cz - P / 2, r, name || CFS.name); b.t = 'S'; cf.blocks.push(b); return b; };
-    const B = { compound: blk('cfs_compound', 400, 1126, 90, 'Cedar Fields Off-Road Park'), course: blk('cfs_course', 490, 1320, 220, 'Cedar Fields off-road course') };
-    // the countryside in tiles: trees, rocks and bales stream with them
+    const B = { pad: blk('so_paddock', 330, 1120, 260, 'Southshore Speedway paddock'), pits: blk('so_pits', 350, 1200, 220, 'Southshore Speedway pits'), stand: blk('so_stand', 350, 1434, 170, 'Southshore Speedway grandstand'), oval: blk('so_oval', 350, 1315, 330, O.name) };
+    // the countryside round the site in tiles: trees stream with them
     const tiles = [];
     for (let tz = 0; tz < 3; tz++) for (let tx = 0; tx < 5; tx++) { const x0 = CFS.x0 + tx * 140, z0 = CFS.z0 + tz * 150; tiles.push({ x0, z0, x1: x0 + 140, z1: z0 + 150, b: blk('cfs_' + tx + '_' + tz, x0 + 70, z0 + 75, 110) }); }
     const tileAt = (x, z) => (tiles.find(t => x >= t.x0 && x < t.x1 && z >= t.z0 && z < t.z1) || tiles[0]).b;
-    // ---------------------------------------------------------------- the shore: a post-and-rail fence all round (and its colliders)
-    cf.fence = [[CFS.x0 + 1, CFS.z0 + 1, lb.x - lb.half, CFS.z0 + 1], [lb.x + lb.half, CFS.z0 + 1, CFS.x1 - 1, CFS.z0 + 1], [CFS.x1 - 1, CFS.z0 + 1, CFS.x1 - 1, CFS.z1 - 1], [CFS.x1 - 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z1 - 1], [CFS.x0 + 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z0 + 1]];
+    // ---------------------------------------------------------------- the fence all round (a gap for the land bridge and one for the west gate)
+    const G0 = O.gate;
+    cf.fence = [[CFS.x0 + 1, CFS.z0 + 1, lb.x - lb.half, CFS.z0 + 1], [lb.x + lb.half, CFS.z0 + 1, CFS.x1 - 1, CFS.z0 + 1], [CFS.x1 - 1, CFS.z0 + 1, CFS.x1 - 1, CFS.z1 - 1], [CFS.x1 - 1, CFS.z1 - 1, CFS.x0 + 1, CFS.z1 - 1],
+      [CFS.x0 + 1, CFS.z1 - 1, CFS.x0 + 1, G0.z + G0.half], [CFS.x0 + 1, G0.z - G0.half, CFS.x0 + 1, CFS.z0 + 1]];
     for (const [x0, z0, x1, z1] of cf.fence) wall(Math.min(x0, x1) - 0.2, Math.min(z0, z1) - 0.2, Math.max(x0, x1) + 0.2, Math.max(z0, z1) + 0.2, 6);
-    // the land bridge's rails, from the seawall out
     cf.rails = [[lb.x - lb.half + 0.4, CFS_EDGE + EDGE_MARGIN, lb.x - lb.half + 0.4, CFS.z0 + 1], [lb.x + lb.half - 0.4, CFS_EDGE + EDGE_MARGIN, lb.x + lb.half - 0.4, CFS.z0 + 1]];
     for (const [x0, z0, x1, z1] of cf.rails) wall(x0 - 0.2, z0, x1 + 0.2, z1, 3);
-    // ---------------------------------------------------------------- the compound
-    const bc = B.compound;
-    const O = S.office;
-    this._bld(bc, O.x0, O.z0, O.x1, O.z1, 7, STYLE.WARE, 0x7a5a3a, 3.4, 4, { exactH: true, y0: Yc, oy: Yc, roof: 'gable', roofColor: 0x3a3d40 });
-    bc.signs.push({ text: 'COURSE OFFICE', x: O.x0 - 0.06, y: Yc + 4.6, z: (O.z0 + O.z1) / 2, ry: -Math.PI / 2, w: 8, h: 1.1, bg: '#2a2016', fg: '#f2c230' });
-    this._det(bc, 'box', O.x0 - 0.06, Yc + 1.2, (O.z0 + O.z1) / 2, 0.12, 2.4, 1.4, C(0x22262b));
-    bc.fx.push({ type: 'canopy', x: O.x0 - 0.6, y: Yc + 2.9, z: (O.z0 + O.z1) / 2, w: 1, d: 1.6 });
-    bc.place = { id: 'offroad', name: 'Cedar Fields Off-Road Park', kind: 'landmark', door: { x: O.x0 - 1.1, z: (O.z0 + O.z1) / 2, h: -Math.PI / 2 }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
-    // the garage shed: six open bays facing the forecourt, a back wall, dividers and a roof
-    const G = S.shed, nb = Math.round((G.x1 - G.x0) / G.bay);
-    this._det(bc, 'box', (G.x0 + G.x1) / 2, Yc + 2.2, G.z0 - 0.2, G.x1 - G.x0 + 0.4, 4.4, 0.4, C(0x8a8f94), 0, true);
-    for (let i = 0; i <= nb; i++) { const x = G.x0 + i * G.bay; this._det(bc, 'box', x, Yc + 2.2, (G.z0 + G.z1) / 2, 0.25, 4.4, G.z1 - G.z0, C(0x8a8f94), 0, true); }
-    this._det(bc, 'box', (G.x0 + G.x1) / 2, Yc + 4.55, (G.z0 + G.z1) / 2 + 0.6, G.x1 - G.x0 + 1, 0.3, G.z1 - G.z0 + 1.6, C(0x5a3a2a));
-    bc.signs.push({ text: 'OWNERS’ GARAGE', x: (G.x0 + G.x1) / 2, y: Yc + 4.0, z: G.z1 + 1.35, ry: 0, w: 9, h: 0.8, bg: '#2a2016', fg: '#ffffff' });
-    for (let i = 0; i < nb; i++) {
-      const x = G.x0 + G.bay * (i + 0.5);
-      cf.bays.push({ x, z: (G.z0 + G.z1) / 2 + 0.6, h: Math.PI, y: Yc, garage: i + 1 });
-      this._det(bc, 'box', x, Yc + 0.035, (G.z0 + G.z1) / 2 + 0.6, G.bay - 0.6, 0.02, G.z1 - G.z0 - 0.4, C(0x6a6458));
-    }
-    // the service stand: a covered bay with a lift, beside the shed
-    const SS = S.stand;
-    for (const [x, z] of [[SS.x0, SS.z0], [SS.x1, SS.z0], [SS.x0, SS.z1], [SS.x1, SS.z1]]) this._det(bc, 'box', x, Yc + 2.1, z, 0.3, 4.2, 0.3, C(0x2a2e33), 0, true);
-    this._det(bc, 'box', (SS.x0 + SS.x1) / 2, Yc + 4.3, (SS.z0 + SS.z1) / 2, SS.x1 - SS.x0 + 0.8, 0.25, SS.z1 - SS.z0 + 0.8, C(0xc8102e));
-    for (const sx of [-1.1, 1.1]) this._det(bc, 'box', (SS.x0 + SS.x1) / 2 + sx, Yc + 0.08, (SS.z0 + SS.z1) / 2, 0.5, 0.16, 6, C(0xe8c04a));
-    bc.signs.push({ text: 'SERVICE', x: (SS.x0 + SS.x1) / 2, y: Yc + 3.8, z: SS.z1 + 0.45, ry: 0, w: 4, h: 0.7, bg: '#c8102e', fg: '#ffffff' });
-    cf.stand = SS;
-    // the park's gate on the spur and its sign
-    for (const s2 of [-1, 1]) this._det(bc, 'box', S.compound.x0 + 2, Yc + 3, R0.z + s2 * 7, 0.5, 6, 0.5, C(0x5a3a2a), 0, true);
-    this._det(bc, 'box', S.compound.x0 + 2, Yc + 5.8, R0.z, 0.6, 0.9, 14.6, C(0x5a3a2a));
-    bc.signs.push({ text: 'CEDAR FIELDS OFF-ROAD PARK', x: S.compound.x0 + 1.6, y: Yc + 5.8, z: R0.z, ry: -Math.PI / 2, w: 12, h: 0.8, bg: '#2a2016', fg: '#f2c230' });
-    // the turning circle's island
-    this._det(bc, 'cyl', R0.x, Yc + 0.25, R0.z, 4, 0.5, 0x6f8a5a, null, { x: R0.x, z: R0.z, r: 4, y0: -1, y1: Yc + 0.5, kind: 'det' });
-    // the timing tower at the start/finish line and the spectator bank
-    const sf = T.pts[T.sfK], tx = sf[0], tz = sf[1] - CFS_COURSE.w / 2 - 4;
-    this._bld(bc, tx - 2.5, tz - 2.5, tx + 2.5, tz + 2.5, 8, STYLE.IND, 0xd8dade, 4, 3, { exactH: true, y0: gy(tx, tz), oy: gy(tx, tz) });
-    bc.signs.push({ text: 'START · FINISH', x: tx, y: gy(tx, tz) + 7, z: tz + 2.56, ry: 0, w: 4.6, h: 0.8, bg: '#14181c', fg: '#ff6b4a' });
-    cf.sf = { k: T.sfK, x: sf[0], z: sf[1], along: T.sfAlong };
-    const BK = S.bank;
-    for (let t = 0; t < 4; t++) { const z1 = BK.z0 + t * 4, h = 0.6 + t * 0.9; this._bld(bc, BK.x0, z1, BK.x1, z1 + 4, h, STYLE.IND, 0x9aa0a6, h, 4, { exactH: true, y0: Yc, oy: Yc, far: t === 3 }); }
-    // ---------------------------------------------------------------- the course: marker poles both sides, tyre stacks on the bends
-    const half = CFS_COURSE.w / 2, bco = B.course;
-    for (let k = 0; k < T.pts.length; k += 6) {
-      const p = T.pts[k], nl = T.nl[k];
-      for (const s2 of [1, -1]) {
-        const x = p[0] + nl[0] * s2 * (half + 1.2), z = p[1] + nl[1] * s2 * (half + 1.2);
-        if (T.R[k] > 0 && k % 12 === 0) this._det(bco, 'cyl', x, gy(x, z) + 0.45, z, 0.55, 0.9, 0x1d1f22, null, { x, z, r: 0.6, y0: gy(x, z) - 1, y1: gy(x, z) + 0.9, kind: 'det' });
-        else this._det(bco, 'cyl', x, gy(x, z) + 0.6, z, 0.05, 1.2, (k / 6) % 2 ? 0xff6b1a : 0xf2f2f2);
+    // the gate: two posts and a sign over the road
+    for (const s2 of [-1, 1]) this._det(B.pad, 'box', CFS.x0 + 1, gy(CFS.x0 + 2, G0.z) + 3, G0.z + s2 * (G0.half - 0.5), 0.6, 6, 0.6, C(0x2a2e33), 0, true);
+    this._det(B.pad, 'box', CFS.x0 + 1, gy(CFS.x0 + 2, G0.z) + 6.1, G0.z, 0.7, 1.1, G0.half * 2, C(0x1f6fb2));
+    B.pad.signs.push({ text: 'SOUTHSHORE SPEEDWAY', x: CFS.x0 + 0.6, y: gy(CFS.x0 + 2, G0.z) + 6.1, z: G0.z, ry: -Math.PI / 2, w: G0.half * 2 - 1, h: 0.9, bg: '#1f6fb2', fg: '#ffffff' });
+    // ---------------------------------------------------------------- the walls: concrete round the outside, armco round the infield
+    const n = T.pts.length, half = O.half, pitSide = (x, z) => z < O.verts[0][1] && x > O.pit.exit[2][0] - 2 && x < O.pit.entry[0][0] + 2;
+    cf.walls = [];
+    for (const [side, off] of [[-1, half + 2], [1, half + O.apron + 0.6]]) {
+      const line = [];
+      for (let k = 0; k < n; k++) {
+        const p = T.pts[k], nl = T.nl[k], x = p[0] + nl[0] * side * off, z = p[1] + nl[1] * side * off;
+        line.push(side < 0 && pitSide(x, z) ? null : [x, z, gy(x - nl[0] * side * 0.8, z - nl[1] * side * 0.8)]);
+      }
+      cf.walls.push({ line, kind: side < 0 ? 'concrete' : 'armco' });
+      for (let k = 0; k < n; k++) {
+        const a = line[k], b2 = line[(k + 1) % n]; if (!a || !b2) continue;
+        const L = Math.hypot(b2[0] - a[0], b2[1] - a[1]), m = Math.max(1, Math.round(L));
+        for (let i = 0; i < m; i++) { const yy = lerp(a[2], b2[2], i / m); this.grid.add({ x: lerp(a[0], b2[0], i / m), z: lerp(a[1], b2[1], i / m), r: side < 0 ? 0.5 : 0.45, y0: yy - 1.5, y1: yy + (side < 0 ? 1.2 : 1.1), kind: 'det', barrier: true }); }
       }
     }
-    // the start/finish gantry over the course
-    for (const s2 of [1, -1]) { const x = sf[0], z = sf[1] + s2 * (half + 1.5); this._det(bco, 'box', x, gy(x, z) + 3, z, 0.4, 6, 0.4, 0x2a2e33, 0, true); }
-    this._det(bco, 'box', sf[0], gy(sf[0], sf[1]) + 5.8, sf[1], 0.5, 0.8, CFS_COURSE.w + 3.4, C(0xff6b1a));
-    // ---------------------------------------------------------------- the countryside: trees, rocks, bales (clear of tracks, the course, pads)
+    // the pit wall
+    const PW = O.pit;
+    this._det(B.pits, 'box', (PW.exit[0][0] + PW.entry[2][0]) / 2, Y + 0.6, PW.wallZ, PW.entry[2][0] - PW.exit[0][0] - 24, 1.2, 0.8, C(0xd8d8d0), 0, { x0: PW.exit[0][0] + 12, x1: PW.entry[2][0] - 12, z0: PW.wallZ - 0.4, z1: PW.wallZ + 0.4, y0: Y - 1, y1: Y + 1.2, kind: 'det' });
+    // ---------------------------------------------------------------- start / finish: the line, the gantry, the grid behind it (east: the straight runs west)
+    const sf = T.pts[T.sfK];
+    cf.sf = { k: T.sfK, x: sf[0], z: sf[1], along: T.sfAlong };
+    const gz0 = PW.wallZ + 0.6, gz1 = sf[1] + half + O.apron + 1.5;
+    for (const z of [gz0, gz1]) this._det(B.pits, 'box', sf[0], Y + 4.5, z, 0.6, 9, 0.6, 0x2a2e33, 0, true);
+    this._det(B.pits, 'box', sf[0], Y + 8.6, (gz0 + gz1) / 2, 1.0, 1.4, gz1 - gz0 + 0.6, 0x1d2126);
+    for (let k = 0; k < 5; k++) B.pits.fx.push({ type: 'neon', x: sf[0] + 0.55, y: Y + 7.8, z: sf[1] - 6 + k * 3, w: 0.1, h: 0.6, d: 0.6, c: 0xff2a2a });
+    B.pits.signs.push({ text: 'SOUTHSHORE SPEEDWAY', x: sf[0] + 0.52, y: Y + 8.6, z: (gz0 + gz1) / 2, ry: Math.PI / 2, w: 14, h: 1.2, bg: '#1d2126', fg: '#ffffff' });
+    cf.grid = [];
+    for (let k = 0; k < 10; k++) { const gx = sf[0] + 34 + k * 8, gzz = sf[1] + (k % 2 ? 3 : -3); cf.grid.push({ x: gx, z: gzz }); this._det(B.pits, 'box', gx - 2.6, Y + 0.09, gzz, 0.18, 0.02, 3, C(0xf2f2f2)); for (const s2 of [-1, 1]) this._det(B.pits, 'box', gx - 1.9, Y + 0.09, gzz + s2 * 1.5, 1.4, 0.02, 0.18, C(0xf2f2f2)); }
+    // ---------------------------------------------------------------- the garages: drive-through, two bays each, between the paddock and the pit lane
+    const [gxa, gxb] = PW.garX, [gza, gzb] = PW.garZ, cell = PW.cell, nG = Math.round((gxb - gxa) / cell);
+    for (let i = 0; i <= nG; i++) { const x = gxa + i * cell; this._bld(B.pits, x - 0.3, gza, x + 0.3, gzb, 5.6, STYLE.IND, 0xd8dade, 5.6, 4, { exactH: true, y0: Y, oy: Y }); }
+    this._bld(B.pits, gxa - 0.3, gza, gxb + 0.3, gzb, 6, STYLE.GLASS, 0x3a4652, 3, 4, { exactH: true, y0: Y + 5.6, oy: Y, far: true });
+    for (let i = 0; i < nG; i++) {
+      const xc = gxa + cell * (i + 0.5);
+      for (const dx of [-4.5, 4.5]) cf.bays.push({ x: xc + dx, z: (gza + gzb) / 2, h: 0, y: Y, garage: i + 1 });
+      B.pits.signs.push({ text: 'S' + (i + 1), x: xc, y: Y + 4.7, z: gzb + 0.05, ry: 0, w: 2.2, h: 1.2, bg: '#c8102e', fg: '#ffffff' });
+    }
+    // ---------------------------------------------------------------- the grandstand along the back straight: tiers rising away from the track
+    {
+      const S = O.stand;
+      for (let t = 0; t < 7; t++) {
+        const z0 = S.z0 + t * 4, h = 1 + t * 1.3;
+        this._bld(B.stand, S.x0, z0, S.x1, z0 + 4, h, STYLE.IND, 0x9aa0a6, h, 5, { exactH: true, y0: Y, oy: Y, far: t === 6 });
+        for (let x = S.x0 + 1.5; x < S.x1 - 1; x += 1.6) if (hash2i(Math.floor(x * 3), t, 53) < 0.6) this._det(B.stand, 'box', x, Y + h + 0.45, z0 + 2 + (hash2i(Math.floor(x), t, 55) - 0.5), 0.45, 0.9, 0.5, C([0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60][Math.floor(hash2i(Math.floor(x * 7), t, 57) * 5)]));
+      }
+      this._det(B.stand, 'box', (S.x0 + S.x1) / 2, Y + 13.5, S.z0 + 14, S.x1 - S.x0 + 2, 0.6, 30, C(0xe8eaed));
+      for (let x = S.x0; x <= S.x1; x += 30) this._det(B.stand, 'cyl', x, Y + 6.8, S.z1 - 1, 0.4, 13.6, 0x6a7078, null, { x, z: S.z1 - 1, r: 0.45, y0: Y, y1: Y + 13.6, kind: 'det' });
+      B.stand.signs.push({ text: 'SOUTHSHORE SPEEDWAY', x: (S.x0 + S.x1) / 2, y: Y + 1.1, z: S.z0 - 0.05, ry: Math.PI, w: 26, h: 1.0, bg: '#c8102e', fg: '#ffffff' });
+    }
+    // ---------------------------------------------------------------- the Speedway Office on the turning circle (the door you use: its west face)
+    {
+      const OF = O.office;
+      this._bld(B.pad, OF.x0, OF.z0, OF.x1, OF.z1, 9, STYLE.GLASS, 0x2c3a48, 3.4, 3.2, { exactH: true, y0: Y, oy: Y });
+      B.pad.signs.push({ text: 'SPEEDWAY OFFICE', x: OF.x0 - 0.06, y: Y + 7.6, z: (OF.z0 + OF.z1) / 2, ry: -Math.PI / 2, w: 12, h: 1.3, bg: '#14181c', fg: '#ff6b4a' });
+      this._det(B.pad, 'box', OF.x0 - 0.06, Y + 1.2, (OF.z0 + OF.z1) / 2, 0.12, 2.4, 1.4, C(0x22262b));
+      B.pad.place = { id: 'oval', name: O.name, kind: 'landmark', door: { x: OF.x0 - 1.1, z: (OF.z0 + OF.z1) / 2, h: -Math.PI / 2 }, under: { x: (OF.x0 + OF.x1) / 2, z: (OF.z0 + OF.z1) / 2 } };
+      // the turning circle's island, transporters along the paddock's back, lamps
+      this._det(B.pad, 'cyl', R0.x, Y + 0.25, R0.z, 4, 0.5, 0x6f8a5a, null, { x: R0.x, z: R0.z, r: 4, y0: Y - 1, y1: Y + 0.5, kind: 'det' });
+      for (let k = 0; k < 6; k++) { const x = 380 + k * 28; this._bld(B.pad, x, 1072, x + 16, 1075, 3.6, STYLE.IND, [0xd23a2a, 0x1f6fb2, 0xe8eaed, 0x2e2e2e, 0xf1c40f, 0x27ae60][k], 3.6, 4, { exactH: true, y0: Y, oy: Y }); }
+      for (const [x, z] of [[200, 1150], [380, 1150], [520, 1150], [150, 1100]]) this._prop(B.pad, 'lotlamp', x, z, 0);
+    }
+    // ---------------------------------------------------------------- the countryside round the site: trees (clear of the site, the roads and the fence)
     const clearOf = (x, z, m) => {
       for (const P2 of pads) if (x > P2.x0 - m && x < P2.x1 + m && z > P2.z0 - m && z < P2.z1 + m) return false;
-      for (const L of [...tracks, { pts: T.pts, w: CFS_COURSE.w + 8 }]) for (let k = 0; k < L.pts.length - 1; k += 2) { const a = L.pts[k], b2 = L.pts[Math.min(L.pts.length - 1, k + 2)]; if (segDist(x, z, a[0], a[1], b2[0], b2[1]) < L.w / 2 + m) return false; }
+      for (const L of tracks) for (let k = 0; k < L.pts.length - 1; k += 2) { const a = L.pts[k], b2 = L.pts[Math.min(L.pts.length - 1, k + 2)]; if (segDist(x, z, a[0], a[1], b2[0], b2[1]) < L.w / 2 + m) return false; }
       return x > CFS.x0 + 4 && x < CFS.x1 - 4 && z > CFS.z0 + 4 && z < CFS.z1 - 4;
     };
     cf.trees = 0;
-    for (let k = 0; k < 900 && cf.trees < 260; k++) {
-      // copses: trees gather where a slow noise is high
+    for (let k = 0; k < 600 && cf.trees < 90; k++) {
       const x = rng.range(CFS.x0 + 6, CFS.x1 - 6), z = rng.range(CFS.z0 + 6, CFS.z1 - 6);
       if (tNoise(x / 70, z / 70, 51) < 0.05 || !clearOf(x, z, 4)) continue;
-      const b = tileAt(x, z), y = gy(x, z), s = rng.range(0.85, 1.35), pine = rng.chance(0.55);
+      const b = tileAt(x, z), y = gy(x, z), s = rng.range(0.85, 1.35);
       this._det(b, 'cyl', x, y + 1.4 * s, z, 0.22 * s, 2.8 * s, 0x5a4330, null, { x, z, r: 0.35 * s, y0: y - 1, y1: y + 3 * s, kind: 'det' });
-      // firs in tiers of boughs, broadleaves as a canopy of leaf clumps (G3; they were a cone and a box)
-      if (pine) [[2.2, 2.3, 2.6, 0x264a2c], [1.75, 2.0, 4.1, 0x2c5232], [1.25, 1.8, 5.4, 0x325b37], [0.7, 1.4, 6.5, 0x3a643c]].forEach(([r, h, yy, c], i) => this._det(b, 'fir', x, y + yy * s, z, r * s, h * s, r * s, C(c), i * 0.8 + x));
-      else {
-        const ry0 = rng.range(0, 6);
-        this._det(b, 'blob', x, y + 3.7 * s, z, 2.1 * s, 1.7 * s, 2.1 * s, C(0x3e6a2e), ry0);
-        for (let q = 0; q < 4; q++) { const a = ry0 + q * 1.57 + rng.range(-0.3, 0.3); this._det(b, 'blob', x + Math.cos(a) * 1.3 * s, y + (3.2 + rng.range(0, 1.2)) * s, z + Math.sin(a) * 1.3 * s, 1.3 * s, 1.1 * s, 1.3 * s, C([0x4a7a3a, 0x3a6630, 0x54843f, 0x456f35][q]), a); }
-      }
+      [[2.2, 2.3, 2.6, 0x264a2c], [1.75, 2.0, 4.1, 0x2c5232], [1.25, 1.8, 5.4, 0x325b37], [0.7, 1.4, 6.5, 0x3a643c]].forEach(([r, h, yy, c], i) => this._det(b, 'fir', x, y + yy * s, z, r * s, h * s, r * s, C(c), i * 0.6));
       cf.trees++;
     }
-    cf.rocks = 0;
-    for (let k = 0; k < 1500 && cf.rocks < 120; k++) {
-      const x = rng.range(CFS.x0 + 6, CFS.x1 - 6), z = rng.range(CFS.z0 + 6, CFS.z1 - 6);
-      if (Terrain.surf(x, z) !== TSURF.rock || !clearOf(x, z, 2)) continue;
-      const b = tileAt(x, z), y = gy(x, z), s = rng.range(0.6, 1.8);
-      this._det(b, 'box', x, y + 0.25 * s, z, 1.3 * s, 0.9 * s, 1.1 * s, C(0x7d776d), rng.range(0, 3), { x, z, r: 0.6 * s, y0: y - 1, y1: y + 0.6 * s, kind: 'det' });
-      cf.rocks++;
-    }
-    for (let k = 0; k < 14; k++) {
-      const x = rng.range(60, 300), z = rng.range(1090, 1240); if (!clearOf(x, z, 3)) continue;
-      const b = tileAt(x, z), y = gy(x, z);
-      this._det(b, 'cyl', x, y + 0.6, z, 0.75, 1.2, 0xd8b45a, null, { x, z, r: 0.8, y0: y - 1, y1: y + 1.2, kind: 'det' });
-    }
-    // ---------------------------------------------------------------- routes for the GPS and AI drivers (polylines, two-way), from the spur's far end
-    const ex = [R0.x - R0.r, R0.z];
-    // the course joins at a sample 30 m before the line, off the paddock
-    cf.joinK = (T.sfK - 15 + T.pts.length) % T.pts.length;
-    const cj = T.pts[cf.joinK];
+    // ---------------------------------------------------------------- routes for the GPS and AI drivers (polylines, two-way)
+    // from the turning circle round to the office; through garage 6 to the pit lane and out of its exit onto the
+    // oval (the loop joins the routes there, at the front straight's west end)
+    cf.joinK = T.pts.reduce((b2, p, k) => Math.hypot(p[0] - PW.exit[2][0] + 6, p[1] - O.verts[0][1]) < Math.hypot(T.pts[b2][0] - PW.exit[2][0] + 6, T.pts[b2][1] - O.verts[0][1]) ? k : b2, 0);
+    const cj = T.pts[cf.joinK], ex = [R0.x - R0.r, R0.z], gc = gxa + cell * 5.5;
     cf.roads = [
-      [ex, [R0.x, R0.z - R0.r - 2], [R0.x + R0.r + 2, R0.z], [O.x0 - 6, (O.z0 + O.z1) / 2]],
-      [[R0.x + R0.r + 2, R0.z], [(G.x0 + G.x1) / 2, G.z1 + 6]],
-      [[R0.x + R0.r + 2, R0.z], [(SS.x0 + SS.x1) / 2, SS.z1 + 6]],
-      [[R0.x + R0.r + 2, R0.z], [cj[0], S.compound.z1 + 2], cj],
-      // the two tracks at their full resolution (the 2.5 m spline samples): routes follow the bends, not chords
-      [[O.x0 - 6, (O.z0 + O.z1) / 2], [O.x0 - 6, O.z0 - 6], [O.x1 + 4, O.z0 - 6], ...east],
-      loop
+      gatePts,
+      [ex, [R0.x, R0.z + R0.r + 2], [R0.x + R0.r + 2, R0.z], [O.office.x0 - 4, (O.office.z0 + O.office.z1) / 2]],
+      [[R0.x + R0.r + 2, R0.z], [gc, gza - 8], [gc, (gza + gzb) / 2], [gc, PW.z], [PW.exit[0][0], PW.z], PW.exit[1], cj]
     ];
     cf.road0 = ex;
     // colliders for the district's buildings and details
@@ -41631,10 +41618,8 @@ Object.assign(World.prototype, {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
       for (const d of b.det) if (d.col) this.grid.add(d.col);
     }
-    this.mapPlaces.push({ id: 'offroad', name: 'Cedar Fields Off-Road Park', cat: 'landmark', icon: 'O', x: (O.x0 + O.x1) / 2, z: O.z0 - 2, sub: 'Off-road course and compound · across the land bridge' });
-  },
-  // the course sample at distance `a` along it
-  _cfsK(T, a) { let lo = 0, hi = T.pts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (T.cum[m] <= a) lo = m; else hi = m - 1; } return lo; }
+    this.mapPlaces.push({ id: 'oval', name: O.name, cat: 'landmark', icon: 'R', x: O.office.x0 - 6, z: (O.office.z0 + O.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km banked oval, twelve pit garages · the Southshore Motorsport Complex` });
+  }
 });
 /* =====================================================================
    [CONTENT] VALEN ISLAND: GENERATION (Operation Blackgate)
@@ -42962,7 +42947,11 @@ function srTrackLine() { return filletLoop(SR.verts, SR.step); }
 function inRaceway(x, z, m = 0) { return SR.pads.some(p => x > p[0] - m && x < p[2] + m && z > p[1] - m && z < p[3] + m); }
 // Raceway Road: off Heron Loop (its ctrl point at the loop's south end) down to the paddock's turning circle
 const SR_ROAD = { id: 'sr1', name: 'Raceway Road', w: 9, grade: 0.08, ends: ['m2', 'ring'], ring: 14, ringAt: [-540, 1778], pts: [[-520, 1628], [-524, 1664], [-532, 1700], [-538, 1732], [-540, 1762]] };
-ISLE_DISTRICT_ROADS.push(SR_ROAD); ISLE_ROADS.push(SR_ROAD);
+// the Southshore Motorsport Complex (2026-11-18): Paddock Road from Raceway Road east to the Southshore Highway, and
+// Oval Gate Road from the highway to the oval's west gate (126 carries it on inside the fence to the paddock)
+const SR_LINK = { id: 'sr2', name: 'Paddock Road', w: 9, grade: 0.08, ends: ['sr1', 's1'], pts: [[-538, 1732], [-470, 1730], [-380, 1722], [-280, 1708], [-170, 1680], [-90, 1640], [-40, 1600]] };
+const SR_GATE = { id: 'sr3', name: 'Oval Gate Road', w: 9, grade: 0.08, ends: ['s1', 'ring'], ring: 10, pts: [[-100, 1150], [-82, 1150], [-62, 1150]] };
+ISLE_DISTRICT_ROADS.push(SR_ROAD, SR_LINK, SR_GATE); ISLE_ROADS.push(SR_ROAD, SR_LINK, SR_GATE);
 const SR_COL = { asphalt: 0x2b2d30, line: 0xeeeeea, red: 0xc0392b, white: 0xf2f2f2, gravel: 0xb3a27e, concrete: 0x8e8c86, pit: 0x34363a, check: 0x111111 };
 Object.assign(World.prototype, {
   // the level site, before the roads find their level (127 calls this)
@@ -43050,7 +43039,9 @@ Object.assign(World.prototype, {
     }
     // ---------------------------------------------------------------- the fleet: race cars in the garages and the paddock
     this.isle.fleet.push({ id: 'sr_pits', x: -620, z: 1816, r: 300, slots: sr.bays.filter((q, i) => i % 3 === 0).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: Y, cls: ['gt3', 'cup', 'drift', 'formula', 'lmp', 'rally'][i % 6] })) });
-    this.mapPlaces.push({ id: 'raceway', name: SR.name, cat: 'landmark', icon: 'R', x: SR.office.x0 - 6, z: (SR.office.z0 + SR.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km circuit, nine pit garages, official events` });
+    // and at the oval's garages (126)
+    if (this.cfs) this.isle.fleet.push({ id: 'so_pits', x: 350, z: 1188, r: 300, slots: this.cfs.bays.filter((q, i) => i % 4 === 1).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: q.y, cls: ['cup', 'gt3', 'muscle', 'lmp', 'sports', 'formula'][i % 6] })) });
+    this.mapPlaces.push({ id: 'raceway', name: SR.name, cat: 'landmark', icon: 'R', x: SR.office.x0 - 6, z: (SR.office.z0 + SR.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km road course, nine pit garages · the Southshore Motorsport Complex` });
     // (the blocks' colliders are added with the rest of the island's, 127)
   }
 });
@@ -44526,7 +44517,7 @@ class ValenPointScenery {
      else);
    - the shore fence and the bridge rails (one merged mesh).
    ===================================================================== */
-const TSURF_COL = [0x5d7f45, 0x8a6b47, 0x4b3a29, 0x7d776d, 0xa39478, 0x96784f];
+const TSURF_COL = [0x5d7f45, 0x8a6b47, 0x4b3a29, 0x7d776d, 0xa39478, 0x96784f, 0x2e3033];
 const CFS_SCN = { tile: 50, far: 5, farC: 10, farR: 300, nearR: 70, stripR: 500, stripNear: 120, stripStep: 4, fenceR: 250, cache: 24 };
 class CedarScenery {
   constructor(scene, world, gmat) {
@@ -44691,6 +44682,58 @@ class CedarScenery {
     this._farIndex(this.far, new Set(want));
     // keep the most recently used tiles; dispose the rest
     if (this.tiles.size > CFS_SCN.cache) for (const t of [...this.tiles.values()].sort((a, b) => a.used - b.used).slice(0, this.tiles.size - CFS_SCN.cache)) { t.mesh.geometry.dispose(); this.tiles.delete(t.key); }
+  }
+}
+// ---------------------------------------------------------------------- the Southshore Speedway's surface (2026-11-18)
+// The height field draws the oval's asphalt at its 1 m grid; over it, one merged mesh at the ground's own height (the
+// banking and all): the track with its edge lines, the apron and its double yellow, the start/finish chequer, the pit
+// lane and the paddock's concrete; and the walls: concrete round the outside, armco round the infield.
+class OvalScenery {
+  constructor(scene, world) {
+    const cf = world.cfs; if (!cf || !cf.oval) return;
+    const T = cf.track, O = OVAL, half = O.half, n = T.pts.length, pos = [], col = [];
+    const gy = (x, z) => { const y = Terrain.height(x, z); return y === null ? O.y : y - Terrain.rough; };
+    const C3 = new THREE.Color();
+    // a quad a little over the ground (a, b, c, d: [x, z] round it), wound to face up
+    const quad = (q, lift, hex) => {
+      C3.setHex(hex); const P3 = q.map(p => [p[0], gy(p[0], p[1]) + lift, p[1]]);
+      for (const tri of [[0, 1, 2], [0, 2, 3]]) {
+        let [a, b, c] = tri.map(i => P3[i]);
+        if ((b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]) < 0) [b, c] = [c, b];
+        for (const v of [a, b, c]) { pos.push(...v); col.push(C3.r, C3.g, C3.b); }
+      }
+    };
+    // a strip along the oval between left offsets o1 < o2, every sample
+    const strip = (o1, o2, lift, hex) => { for (let k = 0; k < n; k++) { const j = (k + 1) % n, A = T.pts[k], B2 = T.pts[j], na = T.nl[k], nb = T.nl[j]; const c = typeof hex === 'function' ? hex(k) : hex; if (c === null) continue; quad([[A[0] + na[0] * o1, A[1] + na[1] * o1], [A[0] + na[0] * o2, A[1] + na[1] * o2], [B2[0] + nb[0] * o2, B2[1] + nb[1] * o2], [B2[0] + nb[0] * o1, B2[1] + nb[1] * o1]], lift, c); } };
+    strip(-half, half, 0.05, 0x2b2d30);
+    strip(half, half + O.apron, 0.05, 0x55585c);
+    strip(-half + 0.35, -half + 0.6, 0.07, 0xeeeeea); strip(half - 0.6, half - 0.35, 0.07, 0xeeeeea);
+    strip(half + 0.1, half + 0.3, 0.07, 0xe8c04a); strip(half + 0.45, half + 0.65, 0.07, 0xe8c04a);
+    // the start/finish line: a chequered band across the track
+    { const k0 = cf.sf.k; for (let c = 0; c < 15; c++) for (let r2 = 0; r2 < 2; r2++) { const A = T.pts[(k0 + r2) % n], nl = T.nl[k0], o1 = -half + c, o2 = o1 + 1; quad([[A[0] + nl[0] * o1, A[1] + nl[1] * o1], [A[0] + nl[0] * o2, A[1] + nl[1] * o2], [A[0] + nl[0] * o2 - 1, A[1] + nl[1] * o2], [A[0] + nl[0] * o1 - 1, A[1] + nl[1] * o1]], 0.08, (c + r2) % 2 ? 0x111111 : 0xf2f2f2); } }
+    // the paddock, the garage apron, the pit lane and its merges
+    const Pd = O.paddock, PW = O.pit, R4 = (x0, z0, x1, z1, lift, hex) => quad([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], lift, hex);
+    R4(Pd.x0, Pd.z0, Pd.x1, PW.garZ[0], 0.04, 0x8e8c86); R4(PW.garX[0], PW.garZ[0], PW.garX[1], PW.garZ[1], 0.04, 0x8e8c86);
+    R4(PW.exit[0][0], PW.garZ[1], PW.entry[2][0], PW.z + PW.w / 2, 0.045, 0x34363a);
+    const lane = [...PW.exit.slice().reverse(), ...PW.entry.slice().reverse()].reverse(), ln = vpNormals(lane);
+    for (let k = 0; k < lane.length - 1; k++) { const A = lane[k], B2 = lane[k + 1], na = ln[k], nb = ln[k + 1], w = PW.w / 2; quad([[A[0] - na[0] * w, A[1] - na[1] * w], [A[0] + na[0] * w, A[1] + na[1] * w], [B2[0] + nb[0] * w, B2[1] + nb[1] * w], [B2[0] - nb[0] * w, B2[1] - nb[1] * w]], 0.045, 0x34363a); }
+    for (const x of [PW.x0 + 6, PW.x1 - 6]) R4(x - 0.3, PW.z - PW.w / 2, x + 0.3, PW.z + PW.w / 2, 0.055, 0xf2f2f2);
+    // the gate road's asphalt through the paddock to the turning circle
+    const gp = cf.gate, gn = vpNormals(gp);
+    for (let k = 0; k < gp.length - 1; k++) { if (gp[k][0] < CFS.x0) continue; const A = gp[k], B2 = gp[k + 1], na = gn[k], nb = gn[k + 1]; quad([[A[0] - na[0] * 4.5, A[1] - na[1] * 4.5], [A[0] + na[0] * 4.5, A[1] + na[1] * 4.5], [B2[0] + nb[0] * 4.5, B2[1] + nb[1] * 4.5], [B2[0] - nb[0] * 4.5, B2[1] - nb[1] * 4.5]], 0.045, 0x34363a); }
+    { const R0 = O.ring, r = R0.r + 4, m = 32; for (let i = 0; i < m; i++) { const a = i / m * Math.PI * 2, b = (i + 1) / m * Math.PI * 2; quad([[R0.x, R0.z], [R0.x + Math.cos(a) * r, R0.z + Math.sin(a) * r], [R0.x + Math.cos(b) * r, R0.z + Math.sin(b) * r], [R0.x, R0.z]], 0.05, 0x34363a); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+    this.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); this.mesh.name = 'speedway'; this.mesh.receiveShadow = true; scene.add(this.mesh);
+    // the walls: vertical faces along each line (both sides drawn), concrete 1.2 m with a fence above, armco a rail
+    const wp = [], wc = [];
+    const face = (a, b, y0, y1, hex) => { C3.setHex(hex); for (const v of [[a[0], a[2] + y0, a[1]], [b[0], b[2] + y0, b[1]], [b[0], b[2] + y1, b[1]], [a[0], a[2] + y0, a[1]], [b[0], b[2] + y1, b[1]], [a[0], a[2] + y1, a[1]]]) { wp.push(...v); wc.push(C3.r, C3.g, C3.b); } };
+    for (const W of cf.walls) for (let k = 0; k < W.line.length; k++) {
+      const a = W.line[k], b = W.line[(k + 1) % W.line.length]; if (!a || !b || Math.hypot(b[0] - a[0], b[1] - a[1]) > 6) continue;
+      if (W.kind === 'concrete') { face(a, b, -0.2, 1.2, 0xe4e4de); face(a, b, 1.2, 1.3, 0x1f6fb2); face(a, b, 1.3, 3.6, 0x6a7078); }
+      else face(a, b, 0.45, 0.85, 0xc8ccd0);
+    }
+    const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3)); wg.computeVertexNormals();
+    this.walls = new THREE.Mesh(wg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 1 })); this.walls.name = 'speedway-walls'; scene.add(this.walls);
   }
 }
 /* =====================================================================
@@ -55314,21 +55357,11 @@ const RACES = [
   { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
   { id: 'wettrack', name: 'Wet Track', nodes: [[1, 7], [1, 10], [4, 10], [4, 7]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
   { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 8], [10, 8], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' },
-  // Cedar Fields South (Session 6C): illegal off-road races across the countryside, each run on alternate economic
-  // days; and Vance's special, a pink slip across the fields every third day
-  { id: 'dustdevil', name: 'Dust Devil', path: 'loop', laps: 1, opp: 3, country: true, dayOff: 0, cls: ['pickup', 'offroad', 'suv'], reward: 1700, rep: 45, blurb: 'Across the land bridge and flat out round the fields and the south hills. Dirt, ruts and nobody watching. Bring something that likes mud.' },
-  { id: 'ridgerun', name: 'Ridge Run', path: 'ring', laps: 2, opp: 3, country: true, dayOff: 1, cls: ['offroad', 'pickup', 'kodiak'], reward: 2300, rep: 55, blurb: 'Two laps of the countryside loop: the west fields, the ridge and back along the farm track.' },
-  { id: 'pinkdirt', name: 'Pink Slip: Dirt', path: 'loop', laps: 1, opp: 1, cls: ['offroad'], storyOnly: true, pink: true, offroad: true, reward: 0, rep: 0, blurb: 'One on one with Vance across the Cedar Fields countryside, for pink slips. Off-road cars only: winner drives home in the other one.' }
+  // (Cedar Fields South's countryside races and Vance's dirt pink slip went with the off-road park, 2026-11-18)
 ];
-// a countryside race's ground (Session 6C): 'loop' is the countryside track from the land bridge round to the
-// compound; 'ring' closes it along the farm track between its two ends
-function cfsRacePath(def) {
-  if (def.route) return routeRacePath(def);
-  const cf = game.world.cfs, L = cf.loop;
-  if (def.path === 'loop') return { pts: L, closed: false };
-  const ia = cf.spur.findIndex(p => p[0] === L[0][0] && p[1] === L[0][1]), iz = cf.spur.findIndex(p => p[0] === L[L.length - 1][0] && p[1] === L[L.length - 1][1]);
-  return { pts: [...L, ...cf.spur.slice(ia + 1, iz).reverse()], closed: true };
-}
+// a race laid along its own path: the road graph's route through its waypoints (the countryside's loops went with
+// the off-road park, 2026-11-18)
+function cfsRacePath(def) { return routeRacePath(def); }
 // a race laid along streets between waypoints (the Curved Roads pass): the road graph's route through them, curves,
 // diagonals and junctions included, its centreline sampled every 2.5 m (a closed course when def.loop)
 function routeRacePath(def) {
@@ -55931,13 +55964,12 @@ class Campaign {
   raceOffer(c) {
     const g = this.g, list = RACES.filter(r => !r.storyOnly);
     // the rotation: every race in turn (skipping one that can't run now), and once an economic day a pink slip
-    // in the extra slot (§45.33); Vance's off-road special in a slot half way round (Session 6C), on its days
-    const n = list.length + 2, dirtSlot = Math.floor(list.length / 2), at = i => i < dirtSlot ? i : i - 1;
+    // in the extra slot (§45.33). (Vance's off-road special across Cedar Fields went with the off-road park, 2026-11-18)
+    const n = list.length + 1, at = i => i;
     let def = null;
     for (let k = 0; k < n; k++) {
       this._ri = ((this._ri ?? -1) + 1) % n;
       if (this._ri === n - 1) { if (g.pinks && g.pinks.available(false)) return g.pinks.offer(c, false); continue; }
-      if (this._ri === dirtSlot) { if (g.pinks && g.pinks.available(true)) return g.pinks.offer(c, true); continue; }
       def = list[at(this._ri)]; if (!raceAvailable(def, g)) break;
     }
     const why = raceAvailable(def, g), rec = this.save.races[def.id];
@@ -56442,8 +56474,7 @@ const PROPS = [
   { id: 'diner', name: 'Rosie’s Diner', kind: 'business', price: 26000, at: [6, 1, 3, 40], income: 620, storage: 30, crew: 2, desc: 'Coffee, pie and a back booth for meetings.' },
   // Valen Point (Session 6B): a legitimate asset bought from the bank, no Rank or Rep gate; its garage is the 24 pit
   // garage bays. Price provisional (Session 13)
-  { id: 'offroad', name: 'Cedar Fields Off-Road Park', kind: 'offroad', price: 180000, place: 'offroad', garage: 6, storage: 0, desc: 'The off-road course’s compound in Cedar Fields South: six bays in the owners’ garage shed, the service stand (repairs a third off) and private sessions on the course whenever you like. Price provisional.' },
-  { id: 'raceway', name: 'Southshore Raceway', kind: 'raceway', price: 420000, place: 'raceway', garage: 18, storage: 0, desc: 'The circuit south of Marsh Hollow: the track, nine pit garages with room for eighteen of your cars, the Race Office. Owners race and lap it free.' },
+  { id: 'raceway', name: 'Southshore Motorsport Complex', kind: 'raceway', price: 600000, place: 'raceway', garage: 42, storage: 0, desc: 'Both Southshore tracks: the road course south of Marsh Hollow and the banked oval at Cedar Fields, with their twenty-one pit garages (room for forty-two of your cars, one pool for both tracks). Owners race and lap both free.' },
   { id: 'motorsport', name: 'Valen Point Motorsport Park', kind: 'motorsport', price: 1500000, place: 'motorsport', garage: 24, storage: 0, desc: 'The circuit, its pit garages and grandstands on Valen Point. Track days, race meetings, a garage for a whole collection, and a clean income.' },
   { id: 'carwash', name: 'Suds Car Wash', kind: 'business', price: 34000, at: [9, 2, 3, 40], income: 760, storage: 40, garage: 1, crew: 2, launder: true, respray: true, desc: 'Cleans cars and cash. Respray stolen rides on site.' },
   { id: 'motel', name: 'Starlite Motel', kind: 'business', price: 42000, at: [4, 9, 1, 35], income: 980, storage: 80, crew: 2, night: true, desc: 'Rooms by the hour on the Nightlife Strip. Discreet, profitable, never quiet.' },
@@ -57687,7 +57718,7 @@ class Underworld {
     if (this.g.pinks) this.g.pinks.reset();
     if (this.g.wash) this.g.wash.reset();
     if (this.g.motorsport) this.g.motorsport.reset();
-    if (this.g.offroad) this.g.offroad.reset();
+    if (this.g.oval) this.g.oval.reset();
     if (this.g.raceway) this.g.raceway.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
@@ -58305,7 +58336,7 @@ class Underworld {
     const sa = this.shipments.findAction(); if (sa) return sa;
     const ia = g.impound.findAction(); if (ia) return ia;
     const ma = g.motorsport.findAction(); if (ma) return ma;
-    const oa = g.offroad.findAction(); if (oa) return oa;
+    const oa = g.oval.findAction(); if (oa) return oa;
     const sra = g.raceway.findAction(); if (sra) return sra;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
@@ -60865,8 +60896,8 @@ Object.assign(PropertyManager.prototype, {
     // the motorsport park's pit garages, two bays each (Session 6B)
     if (def.kind === 'motorsport' && w.vp) for (const b of w.vp.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: 0 });
     // the off-road compound's six bays in the owners' garage shed (Session 6C), on its pad
-    if (def.kind === 'offroad' && w.cfs) for (const b of w.cfs.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });
-    if (def.kind === 'raceway' && w.sr) for (const b of w.sr.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });
+    // the motorsport complex: one pool, the road course's garages then the oval's
+    if (def.kind === 'raceway') for (const b of [...(w.sr ? w.sr.bays : []), ...(w.cfs ? w.cfs.bays : [])]) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });
     if (def.under && g.vspaces) { const vs = g.vspaces.byProp(def.id); if (vs) for (const b of vs.bays) out.push({ ...b, kind: 'under', space: vs.id }); }
     // kerbside spaces for flats, lock-ups and businesses without a drive
     const want = home ? 0 : (def.street || def.garage || 0);
@@ -61495,13 +61526,9 @@ class UniqueCars {
       case 'riviera': sp = blk(1, 9, 0.3, 0.5); break;   // a Linden Hills carport
       case 'tourer': sp = blk(0, 6, 0, 0.5); break;      // the old ferry slip on the west shore
       case 'aeterna': { const t = w.places.tower; sp = t && t.door ? kerbSpot(w, t.door.x, t.door.z) : null; break; } // the foot of Valen Tower
-      case 'baja': { // just off the farm track in the far fields east of the park
-        const sps = extRoadSpots(CITY / 2, CITY + 300); let best = null, bd = 1e18;
-        for (const q of sps) { const d2 = dist2(q.x, q.z, 610, 1105); if (d2 < bd) { bd = d2; best = q; } }
-        if (best) {
-          const ox = best.x + Math.cos(best.h) * 7, oz = best.z - Math.sin(best.h) * 7;
-          sp = !kerbBlocked(w, ox, oz, groundY(ox, oz), best.h) ? { x: ox, z: oz, h: best.h } : { x: best.x, z: best.z, h: best.h };
-        }
+      case 'baja': { // left at the far end of the speedway's paddock, where the off-road park's farm track used to run
+        const ox = 600, oz = 1096, h = -Math.PI / 2;
+        sp = !kerbBlocked(w, ox, oz, groundY(ox, oz), h) ? { x: ox, z: oz, h } : { x: ox, z: oz + 10, h };
         break;
       }
     }
@@ -62117,7 +62144,7 @@ class PinkSlips {
     if (!s.raceDay || typeof s.raceDay !== 'object' || !Number.isInteger(s.raceDay.day) || !s.raceDay.wins || typeof s.raceDay.wins !== 'object') s.raceDay = { day: -1, wins: {} };
     // today's wins per race: street and countryside races, and the official events of both venues (whose tiers the
     // same record keeps)
-    const known = k => RACES.some(r => r.id === k) || VP_EVENTS.some(e => e.id === k) || OR_EVENTS.some(e => e.id === k);
+    const known = k => RACES.some(r => r.id === k) || VP_EVENTS.some(e => e.id === k) || SR_EVENTS.some(e => e.id === k) || OV_EVENTS.some(e => e.id === k);
     for (const k in s.raceDay.wins) { const n = s.raceDay.wins[k]; if (!known(k) || !Number.isInteger(n) || n < 0) delete s.raceDay.wins[k]; }
   }
 }
@@ -62243,13 +62270,13 @@ function loopSafeSpeeds(T, a, vTop, brake, cap) {
 function vpCheckpoints(def) { const vp = game.world.vp; return loopCheckpoints(vp.track, vp.sf.k, def, vpSafeSpeeds()); }
 function vpSafeSpeeds() { const T = game.world.vp.track; return T._vs || (T._vs = loopSafeSpeeds(T, 8.5, 60, 7)); }
 // which venue runs an official event
-function venueOf(def) { return def.venue === 'cfs' ? game.offroad : def.venue === 'sr' ? game.raceway : game.motorsport; }
+function venueOf(def) { return def.venue === 'oval' ? game.oval : def.venue === 'sr' ? game.raceway : game.motorsport; }
 /* ---------------------------------------------------------------------
    An official venue: everything Clean Bank, no Rep, no heat. Events with class rules and a buy-in at the start line
    (after scrutineering), prize money by the street races' daily tiers, a prize car once; track sessions with lap
    timing (sectors in order, the best saved). V: { key (its save slot), prop (the property), events, park (prices:
    trackDay, session, minHp), office ({ id, name }), chip, waive (the owner races free), line() → { T, sf: {k, x, z},
-   w } }. MotorsportPark (Valen Point) and OffroadPark (Cedar Fields South) are the two.
+   w } }. MotorsportPark (Valen Point), RacewayPark (the Southshore road course) and OvalPark (the Southshore Speedway).
    --------------------------------------------------------------------- */
 class OfficialVenue {
   constructor(g, V) { this.g = g; this.V = V; this.session = null; this.lapT = null; this.sect = 0; this._prev = null; }
@@ -62417,89 +62444,81 @@ class MotorsportPark extends OfficialVenue {
   }
 }
 /* =====================================================================
-   [UNDERWORLD] CEDAR FIELDS OFF-ROAD PARK (§45.36; Session 6C)
-   The official side of off-road racing, at the course in Cedar Fields
-   South (world: 026, 027, 126, 176). Like Valen Point it is an
-   OfficialVenue: Clean Bank, no Rep, never any heat.
-   - The Course Office: official events with class rules for off-road
-     vehicles, trucks and values; a buy-in from the bank and prize money
-     by the same daily tiers as every other race (per event, per economic
-     day); free-roam timed laps on the course (a session fee, free for
-     the owner: a private session).
-   - The compound is a property of its own (no Rank gate, Clean Bank, the
-     price provisional until Session 13): six real bays in the owners'
-     garage shed (the registry's physical spaces) and the service stand,
-     where the owner's cars are repaired a third off.
-   The illegal side (countryside races for Dirty Cash and Rep, and
-   Vance's off-road pink slip) is in RACES (370) and PinkSlips (508).
+   [UNDERWORLD] SOUTHSHORE SPEEDWAY AND THE MOTORSPORT COMPLEX (owner, 2026-11-18; world: 126, 129b)
+   The Cedar Fields off-road park was taken out for an asphalt oval; with the road course (Southshore
+   Raceway, 509c) it is one property, the Southshore Motorsport Complex:
+   - one purchase owns both tracks; their garages (nine at the road course, twelve at the oval) are
+     one pool of parking bays (the registry's physical spaces); Paddock Road and the Southshore
+     Highway join the two paddocks, so a car from any garage drives to either track's pit lane;
+   - either office (the road course's Race Office, the oval's Speedway Office) runs both tracks'
+     official events and timed sessions. Like every official venue: Clean Bank, no Rep, no heat.
+   A save that owned the off-road park has its price back (Clean, 'propRefund'), once, when it loads;
+   its cars parked there move to the street.
    ===================================================================== */
-const OR_EVENTS = [
-  { id: 'or_trail', name: 'Trail Cup', laps: 2, opp: 4, band: [0, 30000], trail: 0.55, fee: 200, reward: 1600, cls: ['pickup', 'suv', 'utility', 'offroad'], blurb: 'Pickups, SUVs and off-roaders worth under $30,000. Two laps of the course: whoops, jumps, mud and rock.' },
-  { id: 'or_truck', name: 'Truck Run', laps: 2, opp: 3, band: [0, Infinity], types: ['truck', 'pickup', 'utility'], fee: 250, reward: 1800, cls: ['truck', 'pickup', 'utility'], blurb: 'Trucks and pickups only. Two laps, heavy metal, mind the jumps.' },
-  { id: 'or_pro', name: 'Mesa Pro', laps: 3, opp: 4, band: [20000, Infinity], trail: 0.7, fee: 800, reward: 5000, cls: ['offroad', 'kodiak'], blurb: 'Real off-roaders worth $20,000 and up. Three laps, flat out.' }
+const OV_EVENTS = [
+  { id: 'ov_dash', name: 'Speedway Dash', laps: 5, opp: 5, band: [0, 25000], fee: 300, reward: 3000, cls: ['compact', 'apex', 'sedan', 'crest', 'muscle'], blurb: 'Anything worth under $25,000. Five laps of the oval, nose to tail down both straights.' },
+  { id: 'ov_muscle', name: 'Muscle Car Nationals', laps: 8, opp: 5, band: [10000, 45000], fee: 900, reward: 7500, cls: ['muscle', 'hellion', 'sports', 'tempest', 'revenant'], blurb: 'Cars worth $10,000 to $45,000. Eight laps on the banking.' },
+  { id: 'ov_500', name: 'Southshore 500', laps: 12, opp: 5, band: [40000, Infinity], fee: 3000, reward: 18000, cls: ['supercar', 'valkyr', 'obsidian', 'coupe', 'monarch'], blurb: 'The big one, $40,000 and up. Twelve laps flat out: the straights are 400 m.' }
 ];
-for (const e of OR_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; e.venue = 'cfs'; }
-// prices (M13, final): a session on the course, the compound's service stand discount
-const OR_PARK = { trackDay: 150, session: 600, minHp: 60, standK: 0.7 };
-const COURSE_OFFICE = { id: 'courseoffice', name: 'Course Office' };
-// the course's safe speeds: dirt corners (√(4.5·R)), 30 m/s at most, slower over the whoops, the mud and the rock
-// and into the jumps, braking back at 4.5 m/s²
-function cfsSafeSpeeds() {
-  const w = game.world, T = w.cfs.track; if (T._vs) return T._vs;
-  const cap = T.pts.map(() => Infinity), lim = { whoops: 15, mud: 11, rock: 14, jump: 20, camber: 20 };
-  for (const F of w.cfs.course.features) for (let k = 0; k < T.pts.length; k++) { const a = T.cum[k]; if (a >= F.at - 4 && a <= F.at + F.len) cap[k] = Math.min(cap[k], lim[F.kind]); }
-  return (T._vs = loopSafeSpeeds(T, 4.5, 30, 4.5, cap));
-}
-class OffroadPark extends OfficialVenue {
+for (const e of OV_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; e.venue = 'oval'; }
+// prices (provisional, like the other venues': ECONOMY.md): a session on the oval
+const OV_PARK = { trackDay: 200, session: 600, minHp: 60 };
+const SPEEDWAY_OFFICE = { id: 'speedwayoffice', name: 'Speedway Office' };
+// what the off-road park cost, for an owner's refund
+const OFFROAD_REFUND = 180000;
+// the oval's safe speeds: the banking holds the turns (√(9·R)), 70 m/s at most, braking back at 7 m/s²
+function ovalSafeSpeeds() { const T = game.world.cfs.track; return T._vs || (T._vs = loopSafeSpeeds(T, 9, 70, 7)); }
+class OvalPark extends OfficialVenue {
   constructor(g) {
-    super(g, { key: 'offroad', prop: 'offroad', events: OR_EVENTS, park: OR_PARK, office: COURSE_OFFICE, chip: 'CEDAR FIELDS · official', waive: false, wonAt: 'won at Cedar Fields', repairHint: '',
-      line: () => { const cf = game.world.cfs; return { T: cf.track, sf: cf.sf, w: CFS_COURSE.w }; } });
+    super(g, { key: 'oval', prop: 'raceway', events: OV_EVENTS, park: OV_PARK, office: SPEEDWAY_OFFICE, chip: 'SOUTHSHORE SPEEDWAY · official', waive: true, wonAt: 'won at the Southshore Speedway', repairHint: '',
+      line: () => { const cf = game.world.cfs; return { T: cf.track, sf: cf.sf, w: OVAL.half * 2 }; } });
   }
-  safeSpeeds() { return cfsSafeSpeeds(); }
-  // the class rules: the car's worth, and its kind (a list of models) or how well it copes off the road
-  classWhy(e, def) {
-    if (def.types && !def.types.includes(e.type)) return `Wrong class: the ${def.name} is for ${def.types.map(t => VEHICLES[t].name).join(', ')}.`;
-    if (def.trail && trailOf(e.type) < def.trail) return `Wrong class: the ${def.name} needs a car built for dirt${def.trail >= 0.7 ? ' (a real off-roader)' : ' (a pickup, an SUV or an off-roader)'}.`;
-    return super.classWhy(e, def);
-  }
-  // ---------------------------------------------------------------- the service stand (the owner's, in a car)
-  standAction(v) {
-    const g = this.g, S = g.world.cfs.stand;
-    if (v.speed > 2 || v.pos.x < S.x0 || v.pos.x > S.x1 || v.pos.z < S.z0 || v.pos.z > S.z1 + 3) return null;
-    if (!this.owned()) return { label: 'Service stand · owners only', act: () => g.ui.toast('The service stand belongs to the compound’s owner.', 'warn') };
-    const dmg = v.health < 99.5 || v.broken || v.deformed > 0.05; if (!dmg) return null;
-    const c = Math.round(g.content.repairCost(v.type, v.health) * OR_PARK.standK / 10) * 10;
-    return { label: `Service stand · repair ${fmtMoney(c)}`, act: () => { if (!Money.pay(c, 'pitService')) { g.ui.toast('Not enough in the bank.', 'warn'); return; } g.content.repair(v); const e = g.vreg.entryOf(v); if (e) e.dmg = 0; g.audio.play('cash'); g.ui.toast('Service stand: fixed.', 'money'); } };
-  }
-  door() { const pl = this.g.world.places.offroad; return pl ? pl.door : null; }
+  safeSpeeds() { return ovalSafeSpeeds(); }
+  door() { const pl = this.g.world.places.oval; return pl ? pl.door : null; }
   findAction() {
-    const g = this.g, p = g.player;
-    if (p.state === 'vehicle') return p.vehicle ? this.standAction(p.vehicle) : null;
-    const d = this.door(); if (!d || p.state !== 'foot' || p.interior) return null;
+    const g = this.g, p = g.player, d = this.door();
+    if (!d || p.state !== 'foot' || p.interior) return null;
     if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) > 2.6) return null;
-    return { label: 'Course Office · Cedar Fields Off-Road Park', act: () => this.openOffice() };
+    return { label: 'Speedway Office · Southshore Motorsport Complex', act: () => complexOffice(this.g, 'oval') };
   }
-  openOffice() {
-    const g = this.g, C2 = g.content, PM = g.uw.props, def = PROP_BY_ID.offroad;
-    const rule = e => e.types ? e.types.map(t => VEHICLES[t].name).join(', ') : e.trail >= 0.7 ? 'Off-roaders' : 'Built for dirt';
-    const render = () => {
-      const own = this.owned(), s = this.s;
-      let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>Best lap <b>${s.best ? fmtRace(s.best.t) : '—'}</b></span><span>${Money.html('trackFee')}</span></div>`;
-      if (!own) h += `<div class="card"><div class="t">Buy the compound</div><div class="d">${esc(def.desc)}</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
-      h += '<h3>Official events</h3><div class="grid2">' + OR_EVENTS.map(e => {
-        const p = this.payout(e, 1), f = this.fee(e);
-        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Class</span><span>${esc(rule(e))}</span></div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${fmtMoney(p.cash) + (p.tier ? ' (won today)' : '')}</span></div><button class="sbtn" data-act="ev:${e.id}">Enter</button></div>`;
+  reset() {
+    const T = super.reset(), s = this.g.save; if (!s) return T;
+    // the off-road park is gone: its owner has the price back, once; its record goes; its cars move to the street
+    const P = s.uw && s.uw.props;
+    if (P && P.offroad) {
+      if (P.offroad.owned) { Money.earn(OFFROAD_REFUND, 'propRefund'); s.messages = s.messages || []; s.messages.push({ from: 'Southshore Motorsport', text: `The Cedar Fields off-road park has closed for the new speedway. Your ${fmtMoney(OFFROAD_REFUND)} is back in your bank.`, t: Math.floor((s.stats && s.stats.playTime) || 0), day: '' }); }
+      delete P.offroad;
+    }
+    delete s.offroad;
+    for (const e of s.garage || []) if (e.at && e.at.p === 'offroad') e.at = null;
+    return T;
+  }
+}
+// the complex's two offices: one page with both tracks (buy the complex once; both tracks' events and sessions)
+function complexOffice(g, here) {
+  const C2 = g.content, PM = g.uw.props, def = PROP_BY_ID.raceway, V = { road: g.raceway, oval: g.oval };
+  const T = { road: { name: 'Southshore Raceway · road course', events: SR_EVENTS, len: g.world.sr ? g.world.sr.track.len : 0 }, oval: { name: 'Southshore Speedway · oval', events: OV_EVENTS, len: g.world.cfs ? g.world.cfs.track.len : 0 } };
+  const order = here === 'oval' ? ['oval', 'road'] : ['road', 'oval'];
+  const render = () => {
+    const own = V.road.owned();
+    let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>${Money.html('trackFee')}</span></div>`;
+    if (!own) h += `<div class="card"><div class="t">Buy the Southshore Motorsport Complex</div><div class="d">${esc(def.desc)}</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
+    for (const k of order) {
+      const v = V[k], t = T[k], s = v.s;
+      h += `<h3>${esc(t.name)} · ${(t.len / 1000).toFixed(2)} km · record ${s.best ? fmtRace(s.best.t) : '—'}</h3><div class="grid2">` + t.events.map(e => {
+        const p = v.payout(e, 1), f = v.fee(e), band = e.band[1] === Infinity ? fmtMoney(e.band[0]) + ' and up' : fmtMoney(e.band[0]) + '–' + fmtMoney(e.band[1]);
+        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Class</span><span>${band}</span></div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${fmtMoney(p.cash)}</span></div><button class="sbtn" data-act="ev:${k}:${e.id}">Enter · ${e.laps} laps</button></div>`;
       }).join('') + '</div>';
-      h += `<h3>On the course</h3><div class="btns"><button class="sbtn" data-act="day" ${this.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Timed laps · ' + fmtMoney(OR_PARK.trackDay)}</button></div>`;
-      return h;
-    };
-    C2.openSvc('Course Office', 'Marshal: “Official means clean: the bank pays, the bank collects, and nobody here calls the police on you.”', render, act => {
-      const [k, id] = act.split(':');
-      if (k === 'buy') { const r = PM.buy('offroad'); C2.refreshSvc(r || 'The Cedar Fields compound is yours.'); return; }
-      if (k === 'ev') { const e = OR_EVENTS.find(x => x.id === id); if (e) this.enter(e); return; }
-      if (k === 'day') { C2.refreshSvc(this.book() || 'Session booked.'); return; }
-    });
-  }
+      h += `<div class="btns"><button class="sbtn" data-act="day:${k}" ${v.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Timed laps · ' + fmtMoney(v.V.park.trackDay)}</button></div>`;
+    }
+    return h;
+  };
+  C2.openSvc(here === 'oval' ? 'Speedway Office' : 'Race Office', 'Clerk of the course: “One complex, two tracks. Official means clean: the bank pays, the bank collects, and nobody here calls the police on you.”', render, act => {
+    const [k, a, id] = act.split(':');
+    if (k === 'buy') { const r = PM.buy('raceway'); C2.refreshSvc(r || 'The Southshore Motorsport Complex is yours: both tracks and every garage.'); return; }
+    if (k === 'ev') { const e = T[a] && T[a].events.find(x => x.id === id); if (e) V[a].enter(e); return; }
+    if (k === 'day') { C2.refreshSvc(V[a].book() || 'Session booked.'); return; }
+  });
 }
 /* =====================================================================
    [UNDERWORLD] SOUTHSHORE RACEWAY (owner, 2026-11-18; world: 129b)
@@ -62535,28 +62554,9 @@ class RacewayPark extends OfficialVenue {
     const g = this.g, p = g.player, d = this.door();
     if (!d || p.state !== 'foot' || p.interior) return null;
     if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) > 2.6) return null;
-    return { label: 'Race Office · Southshore Raceway', act: () => this.openOffice() };
+    return { label: 'Race Office · Southshore Motorsport Complex', act: () => this.openOffice() };
   }
-  openOffice() {
-    const g = this.g, C2 = g.content, PM = g.uw.props, def = PROP_BY_ID.raceway;
-    const render = () => {
-      const own = this.owned(), s = this.s;
-      let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>Lap record <b>${s.best ? fmtRace(s.best.t) : '—'}</b></span><span>${Money.html('trackFee')}</span></div>`;
-      if (!own) h += `<div class="card"><div class="t">Buy the raceway</div><div class="d">${esc(def.desc)}</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
-      h += '<h3>Official events</h3><div class="grid2">' + SR_EVENTS.map(e => {
-        const p = this.payout(e, 1), f = this.fee(e), band = e.band[1] === Infinity ? fmtMoney(e.band[0]) + ' and up' : fmtMoney(e.band[0]) + '–' + fmtMoney(e.band[1]);
-        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Class</span><span>${band}</span></div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${fmtMoney(p.cash)}</span></div><button class="sbtn" data-act="ev:${e.id}">Enter · ${e.laps} laps</button></div>`;
-      }).join('') + '</div>';
-      h += `<h3>On the circuit</h3><div class="btns"><button class="sbtn" data-act="day" ${this.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Timed laps · ' + fmtMoney(SR_PARK.trackDay)}</button></div>`;
-      return h;
-    };
-    C2.openSvc('Race Office', 'Clerk of the course: “Official means clean. The bank pays, the bank collects, and nobody here calls the police on you.”', render, act => {
-      const [k, id] = act.split(':');
-      if (k === 'buy') { const r = PM.buy('raceway'); C2.refreshSvc(r || 'Southshore Raceway is yours.'); return; }
-      if (k === 'ev') { const e = SR_EVENTS.find(x => x.id === id); if (e) this.enter(e); return; }
-      if (k === 'day') { C2.refreshSvc(this.book() || 'Session booked.'); return; }
-    });
-  }
+  openOffice() { complexOffice(this.g, 'road'); }
 }
 /* =====================================================================
    [UNDERWORLD] POLICE PRESSURE & CORRUPTION: the long-term heat on the
@@ -69130,11 +69130,14 @@ class UIManager {
     // the ground: one pixel per map pixel, coloured by surface (cached by _renderCFS; drawn live only zoomed in)
     if (this._cfsGround) g.drawImage(this._cfsGround, X(CFS.x0), X(CFS.z0), (CFS.x1 - CFS.x0) * k, (CFS.z1 - CFS.z0) * k);
     else R(CFS.x0, CFS.z0, CFS.x1, CFS.z1, '#4f6e3f');
-    for (const P2 of cf.pads) R(P2.x0, P2.z0, P2.x1, P2.z1, '#9c8f74');
+    // (the speedway's level site is grass: the ground image has it; its paddock is concrete)
+    if (cf.site && cf.site.paddock) { const Pd = cf.site.paddock; R(Pd.x0, Pd.z0, Pd.x1, cf.site.pit.garZ[1], '#8e8c86'); }
     const line = (pts, w, col, closed) => { g.strokeStyle = col; g.lineWidth = Math.max(1.5, w * k); g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), X(p[1])) : g.moveTo(X(p[0]), X(p[1]))); if (closed) g.closePath(); g.stroke(); };
-    for (const T of cf.tracks) line(T.pts, T.w, '#9a7d58');
-    line(cf.track.pts, CFS_COURSE.w, '#7a5a38', true);
-    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
+    for (const T of cf.tracks) line(T.pts, T.w, '#6f7682');
+    // the oval: white-edged asphalt and its apron, the start/finish line
+    line(cf.track.pts, OVAL.half * 2 + 3, '#e8e8e2', true);
+    line(cf.track.pts, OVAL.half * 2, '#3a3c40', true);
+    if (cf.sf) { g.fillStyle = '#ffffff'; g.fillRect(X(cf.sf.x) - 1, X(cf.sf.z - OVAL.half), 2, OVAL.half * 2 * k); }
     g.fillStyle = 'rgba(0,0,0,0.32)';
     for (const b of cf.blocks) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
   }
@@ -69143,11 +69146,12 @@ class UIManager {
     const cf = this.g.world.cfs; if (!cf) return null;
     const R = Terrain.regions.find(r => r.id === 'country'), w = Math.ceil(R.x1 - R.x0), h = Math.ceil(R.z1 - R.z0);
     const gc = document.createElement('canvas'); gc.width = w; gc.height = h;
-    const gg = gc.getContext('2d'), id = gg.createImageData(w, h), C3 = new THREE.Color();
+    const gg = gc.getContext('2d'), id = gg.createImageData(w, h);
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-      const o = j * R.W + i, sf = R.s[o], y = R.h[o]; C3.setHex(TSURF_COL[sf]);
+      // (the surface's colour as written, in sRGB: THREE.Color would hand back linear light, far too dark on a canvas)
+      const o = j * R.W + i, sf = R.s[o], y = R.h[o], hx = TSURF_COL[sf];
       const sh = 0.82 + clamp(y * 0.03, 0, 0.3), q = (j * w + i) * 4;
-      id.data[q] = C3.r * 255 * sh; id.data[q + 1] = C3.g * 255 * sh; id.data[q + 2] = C3.b * 255 * sh; id.data[q + 3] = 255;
+      id.data[q] = (hx >> 16 & 255) * sh; id.data[q + 1] = (hx >> 8 & 255) * sh; id.data[q + 2] = (hx & 255) * sh; id.data[q + 3] = 255;
     }
     gg.putImageData(id, 0, 0); this._cfsGround = gc;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
@@ -70405,6 +70409,7 @@ class Game {
     // the island off the lattice (022/177): its ground, roads, bridge and tunnel, forests, the airfield's paint
     this.isleScene = new IslandScenery(this.outdoor, this.world, this);
     this.srScene = new RacewayScenery(this.outdoor, this.world);
+    this.ovalScene = new OvalScenery(this.outdoor, this.world);
     this.vehicles = new VehicleManager(this);
     this.fleet = new IslandFleet(this);
     this.traffic = new TrafficManager(this);
@@ -70435,12 +70440,12 @@ class Game {
     this.raceRules = new RaceRules(this); this.pinks = new PinkSlips(this); this.wash = new CarWash(this);
     // Session 6B: Valen Point Motorsport Park
     this.motorsport = new MotorsportPark(this);
-    // Session 6C: the Cedar Fields off-road park
-    this.offroad = new OffroadPark(this);
+    // the Southshore Speedway (the oval at Cedar Fields, 126, 509b; it took the off-road park's place, 2026-11-18)
+    this.oval = new OvalPark(this);
     // Southshore Raceway (129b, 509c)
     this.raceway = new RacewayPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset(); this.raceway.reset();
+    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.oval.reset(); this.raceway.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -71101,7 +71106,7 @@ class Game {
     this.props.cull(this.camera, this.frustum, rdt);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.raceway.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.oval.update(dt); this.raceway.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -71294,7 +71299,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, SR, SR_EVENTS, srTrackLine, inRaceway, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
+    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, SR, SR_EVENTS, srTrackLine, inRaceway, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OvalPark, OV_EVENTS, OV_PARK, ovalSafeSpeeds, complexOffice, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, OVAL, ovalLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

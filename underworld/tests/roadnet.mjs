@@ -159,7 +159,7 @@ const gps = await ev(() => {
   const r2 = P.gpsRoute(780, 170, kq[0], kq[1]);
   out.y = { n: r2.length, onKiln: r2.filter(p => K.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 1e-6)).length, onA: r2.filter(p => A.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 1e-6)).length, end: +Math.hypot(r2[r2.length - 1].x - kq[0], r2[r2.length - 1].z - kq[1]).toFixed(3) };
   // two ways round: the same distance there and back
-  const pairs = [[805, 175, 372, 870], [262, 806, 874, 262], [40, 600, 846, 316], [200, 940, 300, 1300]];
+  const pairs = [[805, 175, 372, 870], [262, 806, 874, 262], [40, 600, 846, 316], [200, 940, 300, 1135]];
   out.two = pairs.map(([a, b2, c, d]) => { const f = R.route(a, b2, c, d), r = R.route(c, d, a, b2); return [Math.round(f.len), Math.round(r.len)]; });
   // no chord cuts and no shortcuts: every metre of a route is on a road surface, and it is never shorter than the crow flies
   out.cuts = 0; out.short = 0; out.samples = 0;
@@ -168,8 +168,9 @@ const gps = await ev(() => {
     for (let k = 1; k < core.length; k++) { const p0 = core[k - 1], p1 = core[k], L = Math.hypot(p1.x - p0.x, p1.z - p0.z); for (let s = 0; s <= L; s += 1) { const x = p0.x + (p1.x - p0.x) * s / (L || 1), z = p0.z + (p1.z - p0.z) * s / (L || 1); out.samples++; if (window.__off(x, z) > 0.05) out.cuts++; } }
     if (len(r) < Math.hypot(c - a, d - b2) - 0.01) out.short++;
   }
-  // a road that can't be reached is detected (no route), not drawn as a straight line: Cedar Fields South without its bridge track
-  out.cut = R.route(500, 500, 300, 1300, { filter: e => e.name !== 'Cedar Fields Track' }) === null;
+  // a road that can't be reached is detected (no route), not drawn as a straight line: the speedway's paddock (Cedar Fields
+  // South) without its two ways in, the land bridge's track and the gate road
+  out.cut = R.route(500, 500, 300, 1135, { filter: e => e.name !== 'Cedar Fields Track' && e.name !== 'Oval Gate Road' && !(e.kind === 'ext' && e.ext === 'cfs') }) === null;
   // (Saltmarsh Way to Tanner's Row's far end: lattice metres, where their blocks stand)
   const fx = P.CityLayout.wx(805, 175), fz = P.CityLayout.wz(805, 175), tx = P.CityLayout.wx(372, 870), tz = P.CityLayout.wz(372, 870);
   out.fare = { len: Math.round(P.routeLen(fx, fz, tx, tz)), graph: Math.round(R.route(fx, fz, tx, tz).len) };
@@ -179,7 +180,7 @@ check('route distance is the road’s length: Saltmarsh Way end to end measures 
 check('the GPS takes the Y: from Juniper St along the diagonal and into Kiln Lane, ending on the curve', gps.y.onKiln >= 8 && gps.y.onA >= 10 && gps.y.end < 0.01, JSON.stringify(gps.y));
 check('two-way: every route is the same length there and back (within 2%)', gps.two.every(([f, r]) => Math.abs(f - r) <= Math.max(f, r) * 0.02), JSON.stringify(gps.two));
 check('no chord cuts: every metre of six cross-town routes lies on a road surface, none shorter than the crow flies', gps.cuts === 0 && gps.short === 0 && gps.samples > 3000, JSON.stringify({ cuts: gps.cuts, short: gps.short, n: gps.samples }));
-check('a disconnection is detected: with the bridge track gone, no route reaches Cedar Fields South', gps.cut, String(gps.cut));
+check('a disconnection is detected: with both its ways in gone, no route reaches the speedway’s paddock', gps.cut, String(gps.cut));
 check('taxi fares measure the same road distance as the route', Math.abs(gps.fare.len - gps.fare.graph) <= 12, JSON.stringify(gps.fare));
 
 // ---------------------------------------------------------------- 5. traffic on the curves and through the junctions
@@ -387,11 +388,11 @@ const race = await ev(() => {
 check('a race can be laid along curved streets: checkpoints follow the route (diagonal, crossing, Y, curve), all on the road', race.cps >= 4 && race.cpOff === 0 && race.viaKiln && race.ai >= 30, JSON.stringify(race));
 check('…its racing line slows for the bends and junction corners, and an AI racer runs it start to finish on the road', race.slow < race.fast && race.done && race.off === 0, JSON.stringify(race));
 
-// ---------------------------------------------------------------- 10. the countryside's tracks follow the hills as roads
+// ---------------------------------------------------------------- 10. the speedway's ways in (the off-road park's countryside went for the oval, 2026-11-18)
 const country = await ev(() => {
   const g = window.game, P = window.__pv, cf = g.world.cfs, out = {};
   const H = (x, z) => P.Terrain.height(x, z) - P.Terrain.rough;
-  for (const [name, T] of [['bridge track', cf.tracks[0]], ['loop', cf.tracks[1]], ['east track', cf.tracks[2]]]) {
+  for (const [name, T] of [['bridge track', cf.tracks[0]], ['gate road', cf.tracks[1]]]) {
     const pts = T.pts, hs = pts.map(q => H(q[0], q[1]));
     let g1 = 0, g20 = 0, cross = 0, lo = 1e9, hi = -1e9, cut = 0;
     for (let k = 1; k < pts.length; k++) { const d = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); if (d > 0.5) g1 = Math.max(g1, Math.abs(hs[k] - hs[k - 1]) / d); lo = Math.min(lo, hs[k]); hi = Math.max(hi, hs[k]); }
@@ -405,7 +406,7 @@ const country = await ev(() => {
   out.hills = +(hi - lo).toFixed(1);
   // traffic out there: a car comes along the tracks, on the ground
   const tr = g.traffic; for (const v of tr.cars.slice()) g.vehicles.despawn(v);
-  g.resetPlayerState(150, 1300, 0); window.__step(10);
+  g.resetPlayerState(60, 1150, 0); window.__step(10);
   // (kept as a test car: an ordinary one this far from the player and out of sight is recycled at once)
   let car = null; for (let k = 0; k < 80 && !car; k++) { const v = tr.trySpawn(); if (v && v.ai && v.ai.mode === 'path') { car = v; v.mission = 'test'; } }
   out.traffic = !!car;
@@ -419,10 +420,10 @@ const country = await ev(() => {
   function R2(v) { return Math.round(v); }
   return out;
 });
-const tr3 = ['bridge track', 'loop', 'east track'].map(k => country[k]);
-check('country roads: the tracks climb and fall with the hills (each still rises 3 m or more) but never steeper than 12% (8% over 20 m)', tr3.every(r => r.grade <= 0.12 && r.grade20 <= 0.08 && r.climb >= 3), JSON.stringify(country));
-check('…level across their width (under 2% side slope), cut and filled no more than 2.5 m, and the hills round them untouched', tr3.every(r => r.cross <= 0.02 && r.cutFill <= 2.5) && country.hills >= 7, JSON.stringify(country));
-check('traffic drives the countryside’s tracks, on the ground, on the road', country.traffic && country.car && country.car.air === 0 && country.car.off === 0 && country.car.n > 20, JSON.stringify(country.car));
+const tr3 = ['bridge track', 'gate road'].map(k => country[k]);
+check('the speedway’s ways in (the land bridge’s track, the gate road): never steeper than 12% (8% over 20 m)', tr3.every(r => r && r.grade <= 0.12 && r.grade20 <= 0.08), JSON.stringify(country));
+check('…level across their width (under 2% side slope), cut and filled no more than 2.5 m', tr3.every(r => r.cross <= 0.02 && r.cutFill <= 2.5), JSON.stringify(country));
+check('traffic drives the gate road into the speedway, on the ground, on the road', country.traffic && country.car && country.car.air === 0 && country.car.off === 0 && country.car.n > 20, JSON.stringify(country.car));
 
 // ---------------------------------------------------------------- 11. saves: a car on a curve, and a car whose spot was built on
 await ev(() => {

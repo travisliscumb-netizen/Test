@@ -22,7 +22,7 @@ R.catalogue = await ev(() => {
   const P = window.__pv, g = window.game, uw = g.uw, out = {};
   const by = k => P.PROPS.filter(p => p.kind === k).map(p => p.price).sort((a, b) => a - b);
   const q = a => a.length ? { n: a.length, min: a[0], med: a[a.length >> 1], max: a[a.length - 1] } : null;
-  out.props = { safehouse: q(by('safehouse')), garage: q(by('garage')), warehouse: q(by('warehouse')), business: q(by('business')), motorsport: q(by('motorsport')), offroad: q(by('offroad')) };
+  out.props = { safehouse: q(by('safehouse')), garage: q(by('garage')), warehouse: q(by('warehouse')), business: q(by('business')), motorsport: q(by('motorsport')), raceway: q(by('raceway')) };
   // businesses: price, daily gross/net at level 1 on neutral turf, payback days, upgrade costs and their payback
   const biz = P.PROPS.filter(p => p.kind === 'business').map(d => {
     const C2 = P.BIZ_CATS[d.cat] || { inc: [1, 1, 1] }, gross = lv => d.income * 1.2 * C2.inc[lv - 1], up = lv => d.income * [0.18, 0.24, 0.3][lv - 1];
@@ -36,7 +36,7 @@ R.catalogue = await ev(() => {
   out.cars = { msrp: P.CAR_MSRP, resaleCap: 0.85 };
   out.races = (P.RACES || []).filter(r => !r.storyOnly).map(r => ({ id: r.id, reward: r.reward, rep: r.rep, fee: Math.round(r.reward * 0.15 / 10) * 10 }));
   out.vp = { events: (window.__pv.VP_EVENTS || []).map(e => ({ id: e.id, fee: e.fee, reward: e.reward })), park: window.__pv.VP_PARK };
-  out.or = { events: (window.__pv.OR_EVENTS || []).map(e => ({ id: e.id, fee: e.fee, reward: e.reward })), park: window.__pv.OR_PARK };
+  out.ov = { events: (window.__pv.OV_EVENTS || []).map(e => ({ id: e.id, fee: e.fee, reward: e.reward })), park: window.__pv.OV_PARK };
   out.ranks = P.RANKS.map(r => ({ name: r.name, need: r.need }));
   out.fixer = { fee: 0.32, cap: 5000 };
   out.fronts = window.__pv.FRONT;

@@ -37,7 +37,11 @@ function srTrackLine() { return filletLoop(SR.verts, SR.step); }
 function inRaceway(x, z, m = 0) { return SR.pads.some(p => x > p[0] - m && x < p[2] + m && z > p[1] - m && z < p[3] + m); }
 // Raceway Road: off Heron Loop (its ctrl point at the loop's south end) down to the paddock's turning circle
 const SR_ROAD = { id: 'sr1', name: 'Raceway Road', w: 9, grade: 0.08, ends: ['m2', 'ring'], ring: 14, ringAt: [-540, 1778], pts: [[-520, 1628], [-524, 1664], [-532, 1700], [-538, 1732], [-540, 1762]] };
-ISLE_DISTRICT_ROADS.push(SR_ROAD); ISLE_ROADS.push(SR_ROAD);
+// the Southshore Motorsport Complex (2026-11-18): Paddock Road from Raceway Road east to the Southshore Highway, and
+// Oval Gate Road from the highway to the oval's west gate (126 carries it on inside the fence to the paddock)
+const SR_LINK = { id: 'sr2', name: 'Paddock Road', w: 9, grade: 0.08, ends: ['sr1', 's1'], pts: [[-538, 1732], [-470, 1730], [-380, 1722], [-280, 1708], [-170, 1680], [-90, 1640], [-40, 1600]] };
+const SR_GATE = { id: 'sr3', name: 'Oval Gate Road', w: 9, grade: 0.08, ends: ['s1', 'ring'], ring: 10, pts: [[-100, 1150], [-82, 1150], [-62, 1150]] };
+ISLE_DISTRICT_ROADS.push(SR_ROAD, SR_LINK, SR_GATE); ISLE_ROADS.push(SR_ROAD, SR_LINK, SR_GATE);
 const SR_COL = { asphalt: 0x2b2d30, line: 0xeeeeea, red: 0xc0392b, white: 0xf2f2f2, gravel: 0xb3a27e, concrete: 0x8e8c86, pit: 0x34363a, check: 0x111111 };
 Object.assign(World.prototype, {
   // the level site, before the roads find their level (127 calls this)
@@ -125,7 +129,9 @@ Object.assign(World.prototype, {
     }
     // ---------------------------------------------------------------- the fleet: race cars in the garages and the paddock
     this.isle.fleet.push({ id: 'sr_pits', x: -620, z: 1816, r: 300, slots: sr.bays.filter((q, i) => i % 3 === 0).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: Y, cls: ['gt3', 'cup', 'drift', 'formula', 'lmp', 'rally'][i % 6] })) });
-    this.mapPlaces.push({ id: 'raceway', name: SR.name, cat: 'landmark', icon: 'R', x: SR.office.x0 - 6, z: (SR.office.z0 + SR.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km circuit, nine pit garages, official events` });
+    // and at the oval's garages (126)
+    if (this.cfs) this.isle.fleet.push({ id: 'so_pits', x: 350, z: 1188, r: 300, slots: this.cfs.bays.filter((q, i) => i % 4 === 1).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: q.y, cls: ['cup', 'gt3', 'muscle', 'lmp', 'sports', 'formula'][i % 6] })) });
+    this.mapPlaces.push({ id: 'raceway', name: SR.name, cat: 'landmark', icon: 'R', x: SR.office.x0 - 6, z: (SR.office.z0 + SR.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km road course, nine pit garages · the Southshore Motorsport Complex` });
     // (the blocks' colliders are added with the rest of the island's, 127)
   }
 });

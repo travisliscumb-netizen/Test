@@ -73,7 +73,7 @@ const pools = await ev(() => {
   const P = window.__pv, uq = t => P.VEHICLES[t] && P.VEHICLES[t].unique, out = [];
   const D = P.DEALERSHIPS; for (const k in D) for (const t of [...(D[k].pool || []).map(x => x[0]), ...(D[k].line || []), ...(D[k].flagship || []), ...(D[k].core || []), ...(D[k].rare || [])]) if (uq(t)) out.push('dealer:' + t);
   for (const r of P.RACES) for (const t of r.cls) if (uq(t)) out.push('race:' + t);
-  for (const r of [...P.VP_EVENTS, ...P.OR_EVENTS]) for (const t of r.cls) if (uq(t)) out.push('event:' + t);
+  for (const r of [...P.VP_EVENTS, ...P.SR_EVENTS, ...P.OV_EVENTS]) for (const t of r.cls) if (uq(t)) out.push('event:' + t);
   const g = window.game; for (let k = 0; k < 200; k++) { const r = g.pinks.rival({ type: 'sports', vtier: 'sport' }); if (uq(r.type)) out.push('pink:' + r.type); }
   for (const z in P.ZONES) for (const t in P.ZONES[z].traffic || {}) if (uq(t)) out.push('traffic:' + t);
   if (g.vehicles.list.some(v => uq(v.type))) out.push('in the world at the start');
@@ -96,7 +96,7 @@ const spots = await ev(() => {
 });
 check('every car that stands somewhere has a place: clear of buildings and walls, inside its search area but never at its centre', spots.every(s => s.sp && s.clear && s.inArea && s.offCentre), JSON.stringify(spots));
 const Z = Object.fromEntries(spots.map(s => [s.id, s.zone]));
-check('placed where it makes sense: Docklands (Corsair), Crestmoor Heights (Ambassador), Warehouse District (Prototype), Cedar Fields (Baja), Linden Hills (Riviera), Old Quarter shore (Tourer), Financial District at Valen Tower (Aeterna)', Z.corsair === 'h' && Z.ambassador === 'u' && Z.proto === 'w' && Z.baja === 'r' && Z.riviera === 'l' && Z.tourer === 'o' && Z.aeterna === 'c', JSON.stringify(Z));
+check('placed where it makes sense: Docklands (Corsair), Crestmoor Heights (Ambassador), Warehouse District (Prototype), Cedar Fields, at the speedway (Baja), Linden Hills (Riviera), Old Quarter shore (Tourer), Financial District at Valen Tower (Aeterna)', Z.corsair === 'h' && Z.ambassador === 'u' && Z.proto === 'w' && Z.baja === 'r' && Z.riviera === 'l' && Z.tourer === 'o' && Z.aeterna === 'c', JSON.stringify(Z));
 
 // ---------------------------------------------------------------- 3. staged discovery: the Golden Corsair (fifteen packages)
 const fresh = await ev(() => { const g = window.game; return { all0: window.__pv.UNIQUE_CARS.every(u => g.save.uniques[u.id].st === 0), map: g.uniques.mapEntries().length, live: g.uniques.live.size }; });
@@ -247,15 +247,15 @@ const club = await ev(() => { const g = window.game, s = g.save; g.uniques.onRac
 check('the Clubsport: the GT Cup won at Valen Point, once (prize car, never twice)', club.n === 1 && club.st === 3 && club.origin === 'prize', JSON.stringify(club));
 
 // ---------------------------------------------------------------- 9. Vance's Widowmaker: a pink-slip challenge
-const bays = await ev(() => { const g = window.game, r = {}; for (const id of ['docklock', 'linden', 'offroad']) r[id] = g.uw.props.buy(id); window.__calm(); return { r, free: g.vreg.freeBays(), cap: g.content.garageCap, n: g.save.garage.length }; });
+const bays = await ev(() => { const g = window.game, r = {}; for (const id of ['docklock', 'linden', 'raceway']) r[id] = g.uw.props.buy(id); window.__calm(); return { r, free: g.vreg.freeBays(), cap: g.content.garageCap, n: g.save.garage.length }; });
 const ord = await ev(() => {
   const g = window.game, s = g.save, out = [];
   for (let k = 0; k < 3; k++) { const e = g.content.addToGarage('sports', 'bought', undefined, true); e.prov = { dirty: 0, clean: 15000 }; s.pink = { uid: e.uid, rival: g.pinks.rival(e, g.pinks.def(false)) }; out.push(s.pink.rival.type); g.pinks.resolve(true); }
   return { types: out, st: s.uniques.widow.st, n: s.uniques.widow.n, due: g.uniques.widowDue(), msg: s.messages.slice(-3).some(m => m.from === 'vance' && /Widowmaker/.test(m.text)) };
 });
 check('three ordinary pink slips won (none of them for a one-off): Vance offers the Widowmaker', ord.types.every(t => !t.startsWith('u_')) && ord.st === 2 && ord.n === 3 && ord.due && ord.msg, JSON.stringify(ord));
-const stakeRule = await ev(() => { const g = window.game, e = g.content.addToGarage('compact', 'bought', undefined, true); e.prov = { dirty: 0, clean: 1500 }; const v = g.vreg.spawnFor(e, { x: 300, z: 300, h: 0, y: 0.15 }); const why = g.pinks.canStake(v, g.pinks.def(false)), dirt = g.pinks.rival({ type: 'pickup', vtier: 'common' }, g.pinks.def(true)).type; g.vehicles.despawn(v); g.save.garage.splice(g.save.garage.indexOf(e), 1); return { why, dirt }; });
-check('he only stakes it against a car worth $24,000 or more, and never in the off-road pink slip', /24,000/.test(stakeRule.why) && !stakeRule.dirt.startsWith('u_'), JSON.stringify(stakeRule));
+const stakeRule = await ev(() => { const g = window.game, e = g.content.addToGarage('compact', 'bought', undefined, true); e.prov = { dirty: 0, clean: 1500 }; const v = g.vreg.spawnFor(e, { x: 300, z: 300, h: 0, y: 0.15 }); const why = g.pinks.canStake(v, g.pinks.def(false)); g.vehicles.despawn(v); g.save.garage.splice(g.save.garage.indexOf(e), 1); return { why }; });
+check('he only stakes it against a car worth $24,000 or more (the off-road pink slip went with the off-road park)', /24,000/.test(stakeRule.why), JSON.stringify(stakeRule));
 await ev(() => { const g = window.game; g.uw.S.day += 1; window.__E = window.__car('muscle', 320, 330).uid; window.__calm(); });
 const lose = await race(2);
 const lost = await ev(() => { const g = window.game, s = g.save; return { mine: s.garage.some(e => e.uid === window.__E), widow: s.garage.some(e => e.type === 'u_widow') || s.pendingCars.some(P => P.type === 'u_widow'), st: s.uniques.widow.st, strays: g.vehicles.list.filter(v => v.type === 'u_widow' && !v.garageUid).every(v => v.locked) }; });

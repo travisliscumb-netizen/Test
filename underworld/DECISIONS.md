@@ -161,3 +161,29 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
   Trophy, the Touring Cup and Southshore GT. It also offers timed sessions. The raceway is a property (kind
   `raceway`, $420,000, provisional like the other venues): the owner races free and parks 18 cars in the garages.
   Save key `raceway`.
+
+## The Southshore Motorsport Complex (owner, 2026-11-18): the oval, and one complex for both tracks
+- The owner removed the Cedar Fields off-road park for an oval, kept the road course as a road course, and asked for
+  one garage system feeding both tracks. Of three options offered they chose one complex, linked: one property,
+  pooled garages, a road between the paddocks, and both offices running both tracks.
+- Southshore Speedway (126; venue `OvalPark`, 509b) stands on the off-road park's ground:
+  - The oval has two 400 m straights joined by 90 m turns, 1.37 km a lap and 15 m wide, driven anticlockwise.
+  - The turns are banked: the outside is 1.8 m up, eased in over 40 m. The track is sealed (a new terrain surface,
+    `asphalt`: full grip, no rough), with a sealed apron and a concrete wall with a catch fence. Armco runs round the
+    infield.
+  - The pits have a pit lane and pit wall on the front straight, twelve drive-through garages (24 bays), the paddock
+    with the Speedway Office, and a grandstand on the back straight.
+  - The ways in are the land bridge's track (as before) and Oval Gate Road from the Southshore Highway, through a
+    gate in the west fence.
+- The complex (property `raceway`) is renamed the Southshore Motorsport Complex. It costs $600,000 (provisional) and
+  has 42 bays: the road course's 18 plus the oval's 24. Paddock Road runs from Raceway Road to the Southshore
+  Highway. Either office (`complexOffice`) lists both tracks' six events and both tracks' sessions.
+- Removed with the off-road park:
+  - Its three official events, the countryside dirt races (Dust Devil, Ridge Run) and Vance's dirt pink slip, which
+    all ran on its countryside tracks.
+  - The `offroad` property and its save slot.
+- Kept: Tull's Mesa Trail reward. It is for any five unique stunt jumps, not the course.
+- A save that owned the park has its $180,000 back, Clean and once, as it loads (money source `propRefund`). Its
+  cars parked there move to the street.
+- The map's Cedar Fields ground had drawn far too dark: its colours were read as linear light. It now uses the
+  surfaces' sRGB colours.

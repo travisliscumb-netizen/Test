@@ -113,13 +113,9 @@ class UniqueCars {
       case 'riviera': sp = blk(1, 9, 0.3, 0.5); break;   // a Linden Hills carport
       case 'tourer': sp = blk(0, 6, 0, 0.5); break;      // the old ferry slip on the west shore
       case 'aeterna': { const t = w.places.tower; sp = t && t.door ? kerbSpot(w, t.door.x, t.door.z) : null; break; } // the foot of Valen Tower
-      case 'baja': { // just off the farm track in the far fields east of the park
-        const sps = extRoadSpots(CITY / 2, CITY + 300); let best = null, bd = 1e18;
-        for (const q of sps) { const d2 = dist2(q.x, q.z, 610, 1105); if (d2 < bd) { bd = d2; best = q; } }
-        if (best) {
-          const ox = best.x + Math.cos(best.h) * 7, oz = best.z - Math.sin(best.h) * 7;
-          sp = !kerbBlocked(w, ox, oz, groundY(ox, oz), best.h) ? { x: ox, z: oz, h: best.h } : { x: best.x, z: best.z, h: best.h };
-        }
+      case 'baja': { // left at the far end of the speedway's paddock, where the off-road park's farm track used to run
+        const ox = 600, oz = 1096, h = -Math.PI / 2;
+        sp = !kerbBlocked(w, ox, oz, groundY(ox, oz), h) ? { x: ox, z: oz, h } : { x: ox, z: oz + 10, h };
         break;
       }
     }

@@ -72,9 +72,9 @@ const zones = await ev(() => {
   out.names = [districtNameAt(350, -1500), districtNameAt(-300, 500), districtNameAt(1650, -900)];
   // a city street's name on its own street, and what the same grid lines are called out on the island
   const { streetNameAt } = window.__pv;
-  out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(300, 480)), streetNameAt(-12, 480), streetNameAt(600, 1800)];
+  out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(300, 480)), streetNameAt(-12, 640), streetNameAt(600, 1800)];
   out.offStreets = [[80, 1500], [80, 2300], [400, -1200], [-1100, 480], [1900, 480], [2000, 560], [320, 2410], [-600, 322]].map(q => streetNameAt(q[0], q[1]));
-  out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'motorsport', 'offroad', 'police', 'hospital', 'chopshop'];
+  out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'motorsport', 'oval', 'raceway', 'police', 'hospital', 'chopshop'];
   out.places = out.want.filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));
   out.banks = Object.keys(window.__pv.BANKS).length; out.casino = !!g.world.places.casino || Object.values(g.world.places).some(p => /Royale/i.test(p.name || ''));
   return out;
@@ -82,13 +82,13 @@ const zones = await ev(() => {
 check('every district off the lattice by name', zones.ridge === 'Crestmoor Ridge' && zones.mount === 'Mount Valen' && zones.highlands === 'Blackgate Highlands' && zones.saltmarsh === 'Saltmarsh' && zones.southshore === 'Southshore' && zones.airport === 'Port Valen International' && zones.proving === 'Valen Proving Ground', JSON.stringify(zones));
 check('Valen Point, Cedar Fields and the city’s own districts keep theirs; the water has names too', zones.vp === 'Valen Point' && zones.cfs === 'Cedar Fields' && zones.downtown === 'Financial District' && zones.names[0] === 'Mount Valen' && zones.names[1] === 'Offshore' && zones.names[2] === 'Lake Valen', JSON.stringify(zones));
 check('a city street is named on its own street and nowhere else: the grid\u2019s lines across the mountain, the runways, the bridge and the racetrack are not Ash St or Central Blvd',
-  zones.streets[0] === 'Ash St' && zones.streets[1] === 'Ash St & 1st Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === 'Central Blvd' && zones.streets[4] === 'Airport Access' &&
+  zones.streets[0] === 'Ash St' && zones.streets[1] === 'Ash St & 1st Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === '8th Ave' && zones.streets[4] === 'Airport Access' &&
   zones.offStreets.every(n => n === null || !/ (St|Ave|Blvd)$|^(Harbor Ave|Foundry Rd|Quay Rd|North Shore Dr|South Shore Dr)$/.test(n)), JSON.stringify([zones.streets, zones.offStreets]));
 check('the new places are on the map, and the city’s essentials still are (police, hospital, chop shop, three banks, the casino)', zones.places.length === zones.want.length && zones.want.length >= 11 && zones.banks === 3 && zones.casino, JSON.stringify(zones));
 // ---------------------------------------------------------------- roads
 const roads = await ev(() => {
   const g = window.game, { Island: I, RoadGraph: RG, Links, groundY, SEA_Y } = window.__pv, out = { roads: I.roads.map(R => R.name), links: I.roads.filter(R => Links.list.some(L => L.name === R.name)).length };
-  const from = [500, 480], to = { airport: [600, 1850], proving: [1200, 1480], summit: [395, -1815], lighthouse: [1528, -2775], saltmarsh: [-520, 1172], gull: [-1265, -2265], bridge: [-1100, 500], tunnel: [-1925, -1270], vp: [1515, 520], cfs: [400, 1126], ridge: [140, -604] };
+  const from = [500, 480], to = { airport: [600, 1850], proving: [1200, 1480], summit: [395, -1815], lighthouse: [1528, -2775], saltmarsh: [-520, 1172], gull: [-1265, -2265], bridge: [-1100, 500], tunnel: [-1925, -1270], vp: [1515, 520], cfs: [300, 1135], ridge: [140, -604] };
   out.routes = {}; for (const k in to) { const r = RG.route(from[0], from[1], to[k][0], to[k][1], { kinds: new Set(['grid', 'link', 'spur', 'ext']) }), back = RG.route(to[k][0], to[k][1], from[0], from[1], { kinds: new Set(['grid', 'link', 'spur', 'ext']) }); out.routes[k] = r && back ? [Math.round(r.len), Math.round(Math.hypot(r.g.x - to[k][0], r.g.z - to[k][1]))] : null; }
   // from Saltmarsh to Gull Harbor the short way is over the bridge
   const rb = RG.route(-520, 1172, -1265, -2265, {}); out.overBridge = rb && rb.steps.some(s => s.e.name === 'Blackgate Bridge'); out.gps = window.__pv.gpsRoute(500, 480, 600, 1850).length;

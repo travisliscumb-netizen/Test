@@ -118,21 +118,11 @@ const RACES = [
   { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
   { id: 'wettrack', name: 'Wet Track', nodes: [[1, 7], [1, 10], [4, 10], [4, 7]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
   { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 8], [10, 8], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' },
-  // Cedar Fields South (Session 6C): illegal off-road races across the countryside, each run on alternate economic
-  // days; and Vance's special, a pink slip across the fields every third day
-  { id: 'dustdevil', name: 'Dust Devil', path: 'loop', laps: 1, opp: 3, country: true, dayOff: 0, cls: ['pickup', 'offroad', 'suv'], reward: 1700, rep: 45, blurb: 'Across the land bridge and flat out round the fields and the south hills. Dirt, ruts and nobody watching. Bring something that likes mud.' },
-  { id: 'ridgerun', name: 'Ridge Run', path: 'ring', laps: 2, opp: 3, country: true, dayOff: 1, cls: ['offroad', 'pickup', 'kodiak'], reward: 2300, rep: 55, blurb: 'Two laps of the countryside loop: the west fields, the ridge and back along the farm track.' },
-  { id: 'pinkdirt', name: 'Pink Slip: Dirt', path: 'loop', laps: 1, opp: 1, cls: ['offroad'], storyOnly: true, pink: true, offroad: true, reward: 0, rep: 0, blurb: 'One on one with Vance across the Cedar Fields countryside, for pink slips. Off-road cars only: winner drives home in the other one.' }
+  // (Cedar Fields South's countryside races and Vance's dirt pink slip went with the off-road park, 2026-11-18)
 ];
-// a countryside race's ground (Session 6C): 'loop' is the countryside track from the land bridge round to the
-// compound; 'ring' closes it along the farm track between its two ends
-function cfsRacePath(def) {
-  if (def.route) return routeRacePath(def);
-  const cf = game.world.cfs, L = cf.loop;
-  if (def.path === 'loop') return { pts: L, closed: false };
-  const ia = cf.spur.findIndex(p => p[0] === L[0][0] && p[1] === L[0][1]), iz = cf.spur.findIndex(p => p[0] === L[L.length - 1][0] && p[1] === L[L.length - 1][1]);
-  return { pts: [...L, ...cf.spur.slice(ia + 1, iz).reverse()], closed: true };
-}
+// a race laid along its own path: the road graph's route through its waypoints (the countryside's loops went with
+// the off-road park, 2026-11-18)
+function cfsRacePath(def) { return routeRacePath(def); }
 // a race laid along streets between waypoints (the Curved Roads pass): the road graph's route through them, curves,
 // diagonals and junctions included, its centreline sampled every 2.5 m (a closed course when def.loop)
 function routeRacePath(def) {

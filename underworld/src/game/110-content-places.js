@@ -425,8 +425,8 @@ Object.assign(World.prototype, {
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
     this.exts = [
       { id: 'vp', name: 'Valen Point', loopName: 'Valen Point circuit', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK], traffic: [] },
-      // traffic drives the countryside's two tracks (the farm track east past the compound and the loop)
-      { id: 'cfs', name: 'Cedar Fields South', loopName: 'Cedar Fields off-road course', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [4, 5] }
+      // the Southshore Speedway (2026-11-18): the gate road from the highway carries traffic to the paddock
+      { id: 'cfs', name: 'Cedar Fields South', loopName: 'Southshore Speedway', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [0] }
     ];
     // (the island's own roads are curved links, not an extension's routes: Links.build takes them from localRoads)
     for (const b of this.xblocks) if (b.place) this.places[b.place.id] = b.place;

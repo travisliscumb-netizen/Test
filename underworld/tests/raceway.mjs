@@ -4,8 +4,12 @@
      dry, clear of every other road (Longshore Drive runs past on the diagonal) and of every other site's buildings;
      the armco keeps off the track.
    - Raceway Road leaves Heron Loop and ends at the paddock: the GPS routes there from the city.
-   - The Race Office: its three official events (Clean Bank, class rules, a buy-in, prize money), timed sessions;
-     the raceway is a property (no Rank gate) whose nine pit garages hold eighteen cars; the owner races free.
+   - The Race Office: the complex's six official events (Clean Bank, class rules, a buy-in, prize money), timed
+     sessions; the Southshore Motorsport Complex is one property (no Rank gate) whose 21 pit garages (both tracks)
+     hold 42 cars; the owner races free.
+   - The oval (Southshore Speedway, 126/509b, where the off-road park was): two 400 m straights, banked turns, sealed,
+     walled; its office runs the whole complex; Paddock Road joins the two paddocks; a car laps it flat out; an old
+     save that owned the off-road park has its price back, once.
    - An AI car laps it at speed on its racing line and stays on the track; a session times a lap through every
      sector and keeps the record through a reload. The maps show it. */
 import { launch, open, check, startNew, finish, frames } from './lib.mjs';
@@ -69,12 +73,12 @@ const office = await ev(() => {
   const body = document.getElementById('svcBody'); out.events = body ? (body.innerHTML.match(/data-act="ev:/g) || []).length : 0; out.forSale = body ? /For sale/.test(body.innerHTML) : false;
   g.ui.closeAll();
   // buying it: Clean Bank, no Rank gate; its garages become parking
-  g.money.W.clean = 600000; out.rank = g.uw.rank;
+  g.money.W.clean = 700000; out.rank = g.uw.rank;
   const why = g.uw.props.buy('raceway'); out.buy = why || ''; out.owned = g.raceway.owned(); out.bays = g.uw.props.bays(window.__pv.PROPS.find(p => p.id === 'raceway')).length;
   return out;
 });
-check('the Race Office at its door: three official events, the raceway for sale', /Race Office/.test(office.label || '') && office.events === 3 && office.forSale, JSON.stringify(office));
-check('bought from the bank with no Rank gate; its nine pit garages are eighteen parking bays', office.buy === '' && office.owned && office.bays === 18, JSON.stringify(office));
+check('the Race Office at its door: both tracks’ six official events, the complex for sale', /Race Office/.test(office.label || '') && office.events === 6 && office.forSale, JSON.stringify(office));
+check('the complex bought from the bank with no Rank gate: both tracks’ 21 pit garages are one pool of 42 bays', office.buy === '' && office.owned && office.bays === 42, JSON.stringify(office));
 
 // ---------------------------------------------------------------- 4. an official event: a full race, Clean money
 const raceTo = async (id, place) => {
@@ -134,9 +138,62 @@ await ev(() => { const g = window.game; g.save.stats.playTime = Math.max(g.save.
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
 const after = await ev(() => { const g = window.game; return { best: g.raceway.s.best, owned: g.raceway.owned() }; });
+await helpers();
 check('save → reload: the raceway still yours, the lap record kept', after.owned && after.best && after.best.t === lap.best.t, JSON.stringify(after));
 
-// ---------------------------------------------------------------- 6. the maps
+// ---------------------------------------------------------------- 6. the oval (Southshore Speedway, 126/509b): the other half of the complex
+const oval = await ev(() => {
+  const g = window.game, w = g.world, P = window.__pv, cf = w.cfs, T = cf.track, O = P.OVAL, out = {};
+  out.len = Math.round(T.len);
+  // its straights: the runs of samples with no radius
+  const runs = []; let run = 0; for (let k = 0; k < T.pts.length * 2; k++) { const i = k % T.pts.length; if (T.R[i] === 0) run += O.step; else { if (run) runs.push(run); run = 0; } } out.straights = [...new Set(runs.map(Math.round))].sort((a, b) => b - a).slice(0, 2);
+  // the banking: the outside of a turn raised, its inside level; the straights flat
+  const gy = (x, z) => P.groundY(x, z, 5);
+  const kt = T.R.findIndex((r, k) => r > 0 && T.R[(k + 40) % T.R.length] > 0 && T.R[(k - 40 + T.R.length) % T.R.length] > 0), pt = T.pts[kt], nt = T.nl[kt];
+  out.turn = { inside: +gy(pt[0] + nt[0] * (O.half - 0.5), pt[1] + nt[1] * (O.half - 0.5)).toFixed(2), outside: +gy(pt[0] - nt[0] * (O.half - 0.5), pt[1] - nt[1] * (O.half - 0.5)).toFixed(2) };
+  const ps = T.pts[cf.sf.k]; out.straight = [+gy(ps[0], ps[1] - O.half + 0.5).toFixed(2), +gy(ps[0], ps[1] + O.half - 0.5).toFixed(2)];
+  out.grip = P.Terrain.effect(ps[0], ps[1], 0).grip;
+  let worst = 1e9; for (const W of cf.walls) for (let k = 0; k < W.line.length; k++) if (W.line[k]) worst = Math.min(worst, Math.hypot(W.line[k][0] - T.pts[k][0], W.line[k][1] - T.pts[k][1]));
+  out.wall = +worst.toFixed(1);
+  // its office runs the whole complex
+  const d = w.places.oval.door; if (g.player.state === 'vehicle') g.exitVehicle(true);
+  g.resetPlayerState(d.x + Math.sin(d.h) * 0.8, d.z + Math.cos(d.h) * 0.8, d.h + Math.PI);
+  const a = g.oval.findAction(); out.label = a && a.label; if (a) a.act();
+  const body = document.getElementById('svcBody'); out.events = body ? (body.innerHTML.match(/data-act="ev:/g) || []).length : 0; out.first = body ? (body.innerHTML.match(/<h3>([^<]*)/) || [])[1] : null; g.ui.closeAll();
+  // the drive between the paddocks: Paddock Road and the gate road
+  const rd = w.places.raceway.door, rt = P.RoadGraph.route(rd.x, rd.z, d.x, d.z), names = new Set(); if (rt && rt.steps) for (const st of rt.steps) if (st.e && st.e.name) names.add(st.e.name);
+  out.route = rt ? { len: Math.round(rt.len), paddock: [...names].some(n => /Paddock Road/.test(n)), gate: [...names].some(n => /Oval Gate Road|Cedar Fields South/.test(n)) } : null;
+  return out;
+});
+check('the oval: about 1.4 km, two 400 m straights (the big straightaways), 90 m turns', oval.len > 1300 && oval.len < 1450 && oval.straights[0] >= 390, JSON.stringify(oval));
+check('…its turns banked (the outside 1.5 m+ above the inside), the straights flat, sealed (full grip), the walls 9 m+ from the centreline', oval.turn.outside - oval.turn.inside > 1.5 && Math.abs(oval.straight[0] - oval.straight[1]) < 0.05 && oval.grip === 1 && oval.wall >= 9, JSON.stringify(oval));
+check('the Speedway Office runs the whole complex (the oval’s events first, the road course’s too)', /Speedway Office/.test(oval.label || '') && oval.events === 6 && /Speedway/.test(oval.first || ''), JSON.stringify(oval));
+check('the two paddocks are joined by road: Paddock Road and the gate road through the oval’s west fence', oval.route && oval.route.paddock && oval.route.len < 3500, JSON.stringify(oval.route));
+const ovLap = await ev(() => {
+  const g = window.game, P = g.oval, T = g.world.cfs.track, pv = window.__pv, out = {};
+  const ck = P.checkpoints({ laps: 1 }), s = ck.start, v = g.vehicles.spawn('supercar', s.x, s.z, s.h, { driver: 'npc' });
+  v.mission = 'test'; v.touched = true; v.drive = new pv.DriveAI(v, g, 'race'); v.drive.path = ck.aiPath.map(c => ({ ...c })); v.drive.pi = 0; v.drive.wait = 0; v.drive.cruise = 70;
+  let off = 0, maxV = 0, t = 0;
+  for (let k = 0; k < 4000 && v.drive.pi < v.drive.path.length - 8; k++) {
+    window.__step(1, v); t += 0.05; maxV = Math.max(maxV, v.speed);
+    if (k % 10 === 0) { let d = 1e9; for (let j = 0; j < T.pts.length; j += 3) d = Math.min(d, Math.hypot(T.pts[j][0] - v.pos.x, T.pts[j][1] - v.pos.z)); if (d > 9) off++; }
+  }
+  out.done = v.drive.pi >= v.drive.path.length - 8; out.t = Math.round(t); out.maxV = Math.round(maxV * 3.6); out.off = off;
+  g.vehicles.despawn(v);
+  return out;
+});
+check('free roam on the oval: a car laps it flat out on its racing line and stays on the track', ovLap.done && ovLap.off === 0 && ovLap.maxV > 150 && ovLap.t < 70, JSON.stringify(ovLap));
+// the off-road park's owner (an old save): the price back, once; its cars to the street
+const refund = await ev(() => {
+  const g = window.game, s = g.save, c0 = g.money.W.clean; window.__log = [];
+  s.uw.props.offroad = { owned: true, since: 0 }; s.offroad = { best: null, prize: {}, laps: 3 };
+  const e = g.content.addToGarage('pickup', 'bought', undefined, true); if (e) e.at = { p: 'offroad', i: 0 };
+  g.oval.reset(); const once = g.money.W.clean - c0; g.oval.reset();
+  return { got: once, twice: g.money.W.clean - c0, src: window.__log.filter(x => x.src === 'propRefund').length, gone: !s.uw.props.offroad && !s.offroad, car: e ? e.at : 'none' };
+});
+check('a save that owned the off-road park: its $180,000 back (Clean, once), the park gone, its car moved to the street', refund.got === 180000 && refund.twice === 180000 && refund.src === 1 && refund.gone && refund.car === null, JSON.stringify(refund));
+
+// ---------------------------------------------------------------- 7. the maps
 const map = await ev(() => {
   const g = window.game, ui = g.ui, T = g.world.sr.track, c = document.createElement('canvas'); c.width = c.height = 800;
   const x0 = -900, z0 = 1700, k = 1, gg = c.getContext('2d', { willReadFrequently: true }), k0 = ui.mapK, E0 = ui.mapE;

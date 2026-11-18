@@ -269,11 +269,14 @@ class UIManager {
     // the ground: one pixel per map pixel, coloured by surface (cached by _renderCFS; drawn live only zoomed in)
     if (this._cfsGround) g.drawImage(this._cfsGround, X(CFS.x0), X(CFS.z0), (CFS.x1 - CFS.x0) * k, (CFS.z1 - CFS.z0) * k);
     else R(CFS.x0, CFS.z0, CFS.x1, CFS.z1, '#4f6e3f');
-    for (const P2 of cf.pads) R(P2.x0, P2.z0, P2.x1, P2.z1, '#9c8f74');
+    // (the speedway's level site is grass: the ground image has it; its paddock is concrete)
+    if (cf.site && cf.site.paddock) { const Pd = cf.site.paddock; R(Pd.x0, Pd.z0, Pd.x1, cf.site.pit.garZ[1], '#8e8c86'); }
     const line = (pts, w, col, closed) => { g.strokeStyle = col; g.lineWidth = Math.max(1.5, w * k); g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), X(p[1])) : g.moveTo(X(p[0]), X(p[1]))); if (closed) g.closePath(); g.stroke(); };
-    for (const T of cf.tracks) line(T.pts, T.w, '#9a7d58');
-    line(cf.track.pts, CFS_COURSE.w, '#7a5a38', true);
-    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
+    for (const T of cf.tracks) line(T.pts, T.w, '#6f7682');
+    // the oval: white-edged asphalt and its apron, the start/finish line
+    line(cf.track.pts, OVAL.half * 2 + 3, '#e8e8e2', true);
+    line(cf.track.pts, OVAL.half * 2, '#3a3c40', true);
+    if (cf.sf) { g.fillStyle = '#ffffff'; g.fillRect(X(cf.sf.x) - 1, X(cf.sf.z - OVAL.half), 2, OVAL.half * 2 * k); }
     g.fillStyle = 'rgba(0,0,0,0.32)';
     for (const b of cf.blocks) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
   }
@@ -282,11 +285,12 @@ class UIManager {
     const cf = this.g.world.cfs; if (!cf) return null;
     const R = Terrain.regions.find(r => r.id === 'country'), w = Math.ceil(R.x1 - R.x0), h = Math.ceil(R.z1 - R.z0);
     const gc = document.createElement('canvas'); gc.width = w; gc.height = h;
-    const gg = gc.getContext('2d'), id = gg.createImageData(w, h), C3 = new THREE.Color();
+    const gg = gc.getContext('2d'), id = gg.createImageData(w, h);
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-      const o = j * R.W + i, sf = R.s[o], y = R.h[o]; C3.setHex(TSURF_COL[sf]);
+      // (the surface's colour as written, in sRGB: THREE.Color would hand back linear light, far too dark on a canvas)
+      const o = j * R.W + i, sf = R.s[o], y = R.h[o], hx = TSURF_COL[sf];
       const sh = 0.82 + clamp(y * 0.03, 0, 0.3), q = (j * w + i) * 4;
-      id.data[q] = C3.r * 255 * sh; id.data[q + 1] = C3.g * 255 * sh; id.data[q + 2] = C3.b * 255 * sh; id.data[q + 3] = 255;
+      id.data[q] = (hx >> 16 & 255) * sh; id.data[q + 1] = (hx >> 8 & 255) * sh; id.data[q + 2] = (hx & 255) * sh; id.data[q + 3] = 255;
     }
     gg.putImageData(id, 0, 0); this._cfsGround = gc;
     const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
