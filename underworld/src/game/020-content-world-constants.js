@@ -62,8 +62,6 @@ function streetNameAt(x, z) {
     // a curved street through the blocks (a lane, a crescent, an avenue): its own name
     if (RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
   }
-  if (x > VP_EDGE + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
-  if (vpLand(x, z)) return VP.name;
   if (z > CFS_EDGE + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
   // out on the island (022): the road you are on, by name
@@ -128,15 +126,15 @@ const ZONES = {
   j: { name: 'Valen Proving Ground', tag: 'A kilometre of nothing to hit', col: '#ff9d6b', ped: 0, cops: 0.2, night: 0.2,
     traffic: { sports: 2, van: 1.5, pickup: 1, sedan: 1 } },
   // Valen Point (Session 6B): off the lattice, east across the causeway; no foot traffic, few police
-  v: { name: 'Valen Point', tag: 'Pit garages, grandstands and the fastest legal mile on the island', col: '#ff6b4a', ped: 0, cops: 0.4, night: 0.4,
+  // (owner, 2026-11-18: Valen Point's zone is now the land where the sound was, north of the river: 022 zoneKey)
+  v: { name: 'Sound Flats', tag: 'Reclaimed land where Valen Sound was: open ground, a river, room to build', col: '#ff6b4a', ped: 0, cops: 0.4, night: 0.4,
     traffic: { sports: 2, sedan: 2, suv: 1.5, van: 1.2, pickup: 0.8, muscle: 0.6, truck: 0.4 } }
 };
 function zoneKey(x, z) {
   // the precinct whose frame this is (021): its own cell of the lattice names the zone
   const p = CityLayout.at(x, z);
   if (!p) {
-    // Valen Point and the sound round it; Cedar Fields South (Session 6C) is more of Cedar Fields; the rest of the island
-    if (vpSide(x, z)) return 'v';
+    // Cedar Fields South (Session 6C) is more of Cedar Fields; the rest of the island (the Sound Flats among it) by region
     if (inCedarSouth(x, z)) return 'r';
     return Island.zoneKey(x, z);
   }
@@ -144,7 +142,6 @@ function zoneKey(x, z) {
 }
 function zoneAt(x, z) { return ZONES[zoneKey(x, z)]; }
 function districtNameAt(x, z) {
-  if (inValenPoint(x, z)) return VP.name;
   if (inCedarSouth(x, z)) return CFS.name;
   const p = CityLayout.at(x, z);
   if (!p) return Island.land(x, z) ? ZONES[Island.zoneKey(x, z)].name : Island.lake(x, z) ? LAKE.name : 'Offshore';
@@ -418,8 +415,6 @@ function groundY(x, z, y, step) {
   return b;
 }
 function groundBase(x, z, y) {
-  // Valen Point (the island and its causeway, from the perimeter road out) is flat at road level
-  if (x > VP_EDGE + ROAD_HALF && (vpCauseway(x, z) || vpLand(x, z))) return 0;
   // the Cedar Fields strip, the land bridge and the countryside south of it: the height field
   if (Terrain.ready) { Terrain.hit = false; const t = Terrain.height(x, z); if (t !== null) return t; }
   if (offCity(x, z)) {

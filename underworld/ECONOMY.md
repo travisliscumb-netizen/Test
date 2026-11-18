@@ -41,8 +41,8 @@ Sleep passes the night but not the economy. A jail day is a full economic day, a
 | Territory royalties | Dirty → stash | turf held | daily | refusal at < 600 influence | $180–$950 a turf a day (6-turf median $330) | — | only districts with a Lieutenant pay, at ×0.3 |
 | Tribute | Dirty → stash | power ratio > 2 | daily | war | faction-dependent | — | — |
 | Businesses | Clean → bank | Clean price | daily | raids, protection | payback 40–49 econ days (median 41 ≈ 20 h of play); upgrades pay back in 47 / 83 days | none (§45.7) | managed: covers upkeep only; unmanaged: half of upkeep; no profit |
-| Valen Point park | Clean | $1.5M | daily + hosting | — | about 81 days' payback with hosting | none | upkeep only |
-| Official events (Valen Point / Cedar Fields) | Clean | fee | same 100/50/25 tiers | crash | Club $200→$2k, GT $1k→$6k, Supercar $3k→$15k; Trail Cup $200→$1.6k, Truck Run $250→$1.8k, Mesa Pro $800→$5k | **none** | — |
+| Southshore Motorsport Complex (2026-11-18; Valen Point's park closed) | Clean | $600k | $3,600 a day less $1,000 upkeep + hosting ($20k in, $32k at the gate the next day) | — | about 70 days' payback with hosting | none | upkeep only |
+| Official events (Southshore Raceway / Speedway) | Clean | fee | same 100/50/25 tiers | crash | Hot Hatch $200→$2.2k, Touring $900→$6.5k, Southshore GT $2.5k→$14k, Invitational $8k→a Monarch GT once; Speedway Dash $300→$3k, Muscle Nationals $900→$7.5k, Southshore 500 $3k→$15k | **none** | — |
 | Stunts | Clean | — | $1,500 a day cap; milestones once | — | — | — | — |
 | Car sales | Clean / Dirty in proportion to what paid for the car | owned car | — | — | ≤ 85% of price + parts | — | — |
 | Casino | Clean only | Clean stake | — | the house edge | RTP 90–99% (§5) | none | — |
@@ -53,7 +53,7 @@ purses can't pay crew wages.
 
 ## 3. Sinks
 - **Clean:** property and businesses ($2.5k–$380k safehouses, $12k–$260k businesses, two warehouses $32k / $48k,
-  Valen Point $1.5M, the off-road park $180k); business upgrades (0.6× and 1.2× of the price, M13); upkeep (18/24/30%
+  the Southshore Motorsport Complex $600k; Valen Point's $1.5M and the off-road park's $180k are refunded to old saves); business upgrades (0.6× and 1.2× of the price, M13); upkeep (18/24/30%
   of base income by level); garage, dealers and Motor Works (Clean); training; lawyers, court fines and a judge's
   fix (M7); impound fees; car wash; track fees; hospital (max($1,000, 10% of the bank), capped at $25k; medical
   debt is paid off first by Clean income).
@@ -128,7 +128,7 @@ The result is clamped to 0–1,000.
 | 3 Crew Leader | 400 Rep, 2 crew | + two dealers (+$2k/h Dirty) | a front (25%) | crew pay (Dirty), Rep 800 | ~2 h |
 | 4 Territory Holder | 800 Rep, 2 crew, 1 turf | + royalties $180–950 a turf a day | 3–12 businesses | turf showdowns, a Lieutenant (service days + Dirty) | 3–4 h |
 | 5 Underworld Power | 1,500 Rep, 4 crew, 8 turfs, 1 Lieutenant, 450 influence | mid empire ~$13k/h Clean | warehouses, upgrades | turf count, influence | 10–15 h |
-| 6 City Kingpin | 2,500 Rep, 6 crew, 16 turfs, 2 Lieutenants, 800 influence, an operating warehouse | late empire ~$49k/h Clean | Valen Point, anything | 16 turfs, 800 influence | 25–40 h |
+| 6 City Kingpin | 2,500 Rep, 6 crew, 16 turfs, 2 Lieutenants, 800 influence, an operating warehouse | late empire ~$49k/h Clean | the Motorsport Complex, anything | 16 turfs, 800 influence | 25–40 h |
 
 \*From the measured loops and the requirements. One econ day is 30 minutes. These are play-time estimates for a
 focused player, not a timed playthrough.
@@ -180,7 +180,8 @@ nothing that costs money: the opening's first job fronts $150.
 - **Robbery:** tills ×0.8, safes ×0.65.
 - **Front fees:** 25 / 15 / 10%, manager −5 points, floor 5%.
 - **Fixer:** 15% fee (owner, 2026-11-17; was 32%), up to $100,000 a hand-off, no daily limit (owner, 2026-11-16; was $5,000 a day).
-- **Official purses:** VP $2k / $6k / $15k; Cedar Fields $1.6k / $1.8k / $5k.
+- **Official purses:** Southshore Raceway $2.2k / $6.5k / $14k; the Speedway $3k / $7.5k / $15k (top $15k, as M13). Valen Point
+  ($2k / $6k / $15k) and the Cedar Fields off-road park ($1.6k / $1.8k / $5k) closed on 2026-11-18; owners are refunded.
 - **Rank needs:** 100 / 400 / 400 + 2 crew / 800 + 1 turf / 1,500 + 4 crew + 8 turfs + Lieutenant + 450 influence /
   2,500 + 6 crew + 16 turfs + 2 Lieutenants + 800 influence + a warehouse.
 - **Jail operations:** unmanaged ×0.5 of upkeep; dealers ×0.3 (×0.55 with a Lieutenant); royalties ×0.3 in a

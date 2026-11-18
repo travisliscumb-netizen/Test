@@ -1,9 +1,9 @@
 /* NaN frames: no shader may write a NaN or an infinity into the frame. One such pixel is enough: the bloom pass
    blurs it across its mip chain and a third to nine-tenths of the screen goes black (the graphics gate found
-   Valen Point's terrain doing it from the causeway, the docks and the skyline: bump mapping normalised a zero
-   vector where the screen derivatives degenerate). Each scene is rendered into a full-size float target and every
+   Valen Point's terrain doing it from its causeway, the docks and the skyline: bump mapping normalised a zero
+   vector where the screen derivatives degenerate; that district is the Sound Flats now, 2026-11-18). Each scene is rendered into a full-size float target and every
    pixel checked, at Medium (what auto quality picks on a phone; rooms lit per lamp) and High (shadows): the
-   causeway looking at Valen Point, the skyline at dusk, the docks from the air, Valen Point from the air, Cedar
+   Sound Parkway looking out over the Flats, the skyline at dusk, the docks from the air, the Flats and the river from the air, Cedar
    Fields at eye level, downtown at night in the rain (the wet film and lamp streaks) and the casino (lamp light). */
 import { launch, open, check, frames, startNew, finish } from './lib.mjs';
 const b = await launch();
@@ -34,10 +34,10 @@ const view = (px, pz, cam, time, weather = 'clear') => ev(([px, pz, cam, time, w
   window.__cam = cam; for (let k = 0; k < 40; k++) g.chunks.update(px, pz, g.frame + k);
 }, [px, pz, cam, time, weather]);
 const scenes = [
-  ['the causeway looking at Valen Point', () => view(1100, 530, [1080, 4.2, 530, 1080, 0.6, 512], 13)],
+  ['Sound Parkway looking out over the Flats', () => view(1100, 530, [1080, 4.2, 520, 1300, 1, 470], 13)],
   ['the skyline at dusk', () => view(480, 480, [-60, 40, 1000, 480, 40, 480], 19.2)],
   ['the docks from the air', () => view(800, 120, [870, 36, 30, 800, 0, 150], 14)],
-  ['Valen Point from the air', () => view(1650, 520, [1480, 60, 520, 1750, 0, 500], 14)],
+  ['the Flats and the river from the air', () => view(1650, 760, [1480, 60, 700, 1750, 0, 1000], 14)],
   ['Cedar Fields at eye level', () => view(220, 1180, [200, 2.2, 1150, 260, 1, 1250], 16)],
   ['downtown at night in the rain', () => view(560, 410, [563.5, 1.8, 418, 560, 9, 330], 22, 'rain')],
   ['the casino', () => ev(() => { const g = window.game; window.__cam = null; g.env.time = 22; g.env.setWeather('clear', true); g.content.enterCasino(); })],

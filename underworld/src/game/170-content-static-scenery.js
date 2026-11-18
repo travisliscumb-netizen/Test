@@ -51,14 +51,13 @@ function buildStaticScenery(scene, world) {
     for (let i = p.lz0; i <= p.lz1 + 1; i++) for (let j = p.lx0; j <= p.lx1; j++) { const Z = (i + p.oz) * P, X = (j + p.ox) * P; if (!RoadNet.segOpen(1, i + p.oz, j + p.ox)) gs.add(TPL.box, M(X + P / 2, CURB_H / 2, Z, P - ROAD_HALF * 2, CURB_H, ROAD_HALF * 2), null); }
     for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1 + 1; j++) if (RoadNet.degree(i + p.ox, j + p.oz) === 0) gs.add(TPL.box, M((i + p.ox) * P, CURB_H / 2, (j + p.oz) * P, ROAD_HALF * 2, CURB_H, ROAD_HALF * 2), null);
     // promenade strips outside the edge streets, less a seam (another precinct's blocks across the street) and the
-    // land bridge to Cedar Fields South and the causeway to Valen Point where this edge still meets them
+    // land bridge to Cedar Fields South where this edge still meets it
     const strips = (side, a0, a1) => {
       const ns = side === 'n' || side === 's', across = side === 'n' ? p.z0 - P / 2 : side === 's' ? p.z1 + P / 2 : side === 'w' ? p.x0 - P / 2 : p.x1 + P / 2;
       let runs = [[a0, a1]];
       const cut = (g0, g1) => { runs = runs.flatMap(([u, v]) => v <= g0 || u >= g1 ? [[u, v]] : [[u, g0], [g1, v]].filter(q => q[1] > q[0])); };
       for (let k = ns ? p.lx0 : p.lz0; k <= (ns ? p.lx1 : p.lz1); k++) { const t0 = ((ns ? p.ox : p.oz) + k) * P; if (ns ? CityLayout.cellAt(t0 + P / 2, across) >= 0 : CityLayout.cellAt(across, t0 + P / 2) >= 0) cut(t0 - ROAD_HALF, t0 + P + ROAD_HALF); }
       if (side === 's' && Math.abs(p.z1 - CITY) < 0.5) cut(CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half);
-      if (side === 'e' && Math.abs(p.x1 - CITY) < 0.5) cut(VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half);
       return runs;
     };
     for (const [a, b2] of strips('n', p.x0 - E, p.x1 + E)) gs.add(TPL.box, M((a + b2) / 2, CURB_H / 2, p.z0 - ROAD_HALF - pw / 2, b2 - a, CURB_H, pw), null);

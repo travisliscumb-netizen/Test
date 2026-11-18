@@ -41,6 +41,8 @@ class CameraRig {
     const g = this.game, p = g.player;
     this.time += dt;
     this.look(dt);
+    // aboard a fairground ride (509d): the onboard view from the seat
+    if (p.state === 'ride' && g.fair && g.fair.rideCamera(this, dt)) return;
     let target = _v3a, dist, fovAdd = 0, sideOff = 0;
     const v = p.state === 'vehicle' || p.state === 'exiting' ? p.vehicle : null;
     if (v) {

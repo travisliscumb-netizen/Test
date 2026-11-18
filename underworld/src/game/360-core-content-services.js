@@ -102,8 +102,8 @@ const POSTS = [
   { place: 'police', dx: -3.2, dz: -1.5 }, { place: 'police', dx: 3.4, dz: -1.2 },
   { place: 'mall', dx: -7, dz: 1.5 }, { place: 'tower', dx: 6.5, dz: 2.5 }, { place: 'stadium', dx: -9, dz: 1.2 }
 ];
-const CONTACT_AVATAR = { radio: '#4d8dff', rosa: '#46d4c4', tull: '#ff8a3d', ines: '#d28cff', ferry: '#ffd84d', dex: '#4d8dff', moss: '#7fb2ff', pv: '#e8eef6', unknown: '#8a8f96', vance: '#ff4d5e', lucky: '#c9a46b', prestige: '#e8d28a', farm: '#c9b06b', racecontrol: '#e8eef6' };
-const CONTACT_NAMES = { radio: 'Police radio', rosa: 'Rosa Calder', tull: '"Sprocket" Tull', ines: 'Ines Varga', ferry: 'The Ferryman', dex: 'Dex Okafor', moss: 'Sgt. Lena Moss', pv: 'Valen Courier', unknown: 'Unknown number', vance: 'Vance', lucky: 'Lucky (pawn shop)', prestige: 'Valen Prestige Motors', farm: 'Cedar Fields farmhand', racecontrol: 'Valen Point Race Control' };
+const CONTACT_AVATAR = { radio: '#4d8dff', rosa: '#46d4c4', tull: '#ff8a3d', ines: '#d28cff', ferry: '#ffd84d', dex: '#4d8dff', moss: '#7fb2ff', pv: '#e8eef6', unknown: '#8a8f96', vance: '#ff4d5e', lucky: '#c9a46b', prestige: '#e8d28a', farm: '#c9b06b', racecontrol: '#e8eef6', raceoffice: '#e8eef6' };
+const CONTACT_NAMES = { radio: 'Police radio', rosa: 'Rosa Calder', tull: '"Sprocket" Tull', ines: 'Ines Varga', ferry: 'The Ferryman', dex: 'Dex Okafor', moss: 'Sgt. Lena Moss', pv: 'Valen Courier', unknown: 'Unknown number', vance: 'Vance', lucky: 'Lucky (pawn shop)', prestige: 'Valen Prestige Motors', farm: 'Cedar Fields farmhand', racecontrol: 'Valen Point Race Control', raceoffice: 'Southshore Race Office' };
 
 function copPost(c, dt) {
   const g = game, pol = g.police;
@@ -629,8 +629,9 @@ class ContentManager {
     const g = this.g, p = g.player, s = g.save;
     if (p.interior) return;
     const zk = zoneKey(p.pos.x, p.pos.z);
-    const inCity = CityLayout.cellAt(p.pos.x, p.pos.z) >= 0 || vpLand(p.pos.x, p.pos.z);
-    if (inCity && !s.discovered.zones[zk]) {
+    // on the city's cells or the island's dry ground (its districts are zones too: every one can be discovered)
+    const onLand = CityLayout.cellAt(p.pos.x, p.pos.z) >= 0 || inExtension(p.pos.x, p.pos.z);
+    if (onLand && ZONES[zk] && !s.discovered.zones[zk]) {
       s.discovered.zones[zk] = 1;
       const z = ZONES[zk], n = Object.keys(s.discovered.zones).length;
       const el = $('zoneCard'); el.querySelector('b').textContent = z.name; el.querySelector('span').textContent = z.tag; el.querySelector('small').textContent = `DISTRICT DISCOVERED · ${n} / ${Object.keys(ZONES).length}`;

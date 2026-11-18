@@ -77,7 +77,7 @@ const office = await ev(() => {
   const why = g.uw.props.buy('raceway'); out.buy = why || ''; out.owned = g.raceway.owned(); out.bays = g.uw.props.bays(window.__pv.PROPS.find(p => p.id === 'raceway')).length;
   return out;
 });
-check('the Race Office at its door: both tracks’ six official events, the complex for sale', /Race Office/.test(office.label || '') && office.events === 6 && office.forSale, JSON.stringify(office));
+check('the Race Office at its door: both tracks’ seven official events, the complex for sale', /Race Office/.test(office.label || '') && office.events === 7 && office.forSale, JSON.stringify(office));
 check('the complex bought from the bank with no Rank gate: both tracks’ 21 pit garages are one pool of 42 bays', office.buy === '' && office.owned && office.bays === 42, JSON.stringify(office));
 
 // ---------------------------------------------------------------- 4. an official event: a full race, Clean money
@@ -167,7 +167,7 @@ const oval = await ev(() => {
 });
 check('the oval: about 1.4 km, two 400 m straights (the big straightaways), 90 m turns', oval.len > 1300 && oval.len < 1450 && oval.straights[0] >= 390, JSON.stringify(oval));
 check('…its turns banked (the outside 1.5 m+ above the inside), the straights flat, sealed (full grip), the walls 9 m+ from the centreline', oval.turn.outside - oval.turn.inside > 1.5 && Math.abs(oval.straight[0] - oval.straight[1]) < 0.05 && oval.grip === 1 && oval.wall >= 9, JSON.stringify(oval));
-check('the Speedway Office runs the whole complex (the oval’s events first, the road course’s too)', /Speedway Office/.test(oval.label || '') && oval.events === 6 && /Speedway/.test(oval.first || ''), JSON.stringify(oval));
+check('the Speedway Office runs the whole complex (the oval’s events first, the road course’s too)', /Speedway Office/.test(oval.label || '') && oval.events === 7 && /Speedway/.test(oval.first || ''), JSON.stringify(oval));
 check('the two paddocks are joined by road: Paddock Road and the gate road through the oval’s west fence', oval.route && oval.route.paddock && oval.route.len < 3500, JSON.stringify(oval.route));
 const ovLap = await ev(() => {
   const g = window.game, P = g.oval, T = g.world.cfs.track, pv = window.__pv, out = {};

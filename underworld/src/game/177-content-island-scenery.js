@@ -161,7 +161,7 @@ class IslandScenery {
       const x = (ix + 0.15 + 0.7 * hash2i(ix, iz, 201)) * step, z = (iz + 0.15 + 0.7 * hash2i(ix, iz, 203)) * step;
       const f = Island.forest(x, z); if (hash2i(ix, iz, 205) > (f - 0.42) * 2.4) continue;
       if (Farms.ready && Farms.at(x, z, -6)) continue; // (a field is cleared ground: 129 plants its own)
-      if (this._foreign(x - 6, z - 6, 12) || inValenPoint(x, z)) continue;
+      if (this._foreign(x - 6, z - 6, 12)) continue;
       const h = Island.height(x, z, 1e6), sl = Math.hypot(Island.gx, Island.gz);
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
       if (Island._nearRoad(Island._seg, x, z) && Island._rd < ISLE.verge + 2) continue;

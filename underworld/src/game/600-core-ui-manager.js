@@ -182,7 +182,7 @@ class UIManager {
     this.hud = $('hud'); this.toasts = $('toasts');
     this.mm = $('minimap'); this.mmc = this.mm.getContext('2d');
     this.bigc = $('bigmapCanvas').getContext('2d');
-    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.vpImg = this._renderVP(); this.cfsImg = this._renderCFS(); this.isleImg = this._renderIsle();
+    this.mapImg = this._renderMap(false); this.mmImg = this._renderMap(false); this.cfsImg = this._renderCFS(); this.isleImg = this._renderIsle();
     this.hudT = 0; this.mmT = 0; this.bannerUntil = 0; this.lastMoney = -1;
     this.layout = new HudLayout(this);
     this.feed = []; MoneyFeed.sink = (e, merged) => this.moneyPop(e, merged);
@@ -235,28 +235,6 @@ class UIManager {
     c.labels = lab;
     return c;
   }
-  // Valen Point in map space: the causeway, the island, the paved areas, the circuit, the buildings
-  _paintVP(g, view) {
-    const vp = this.g.world.vp; if (!vp) return;
-    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    if (view && (view.x1 < VP_EDGE || view.x0 > VP.x1 || view.z1 < VP.z0 - 40 || view.z0 > VP.z1 + 40)) return;
-    const R = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k); };
-    R(VP_EDGE + ROAD_HALF, VP.cw.z - VP.cw.half - 2, VP.x0, VP.cw.z + VP.cw.half + 2, '#3d3a36');
-    R(VP_EDGE + ROAD_HALF, VP.cw.z - VP.cw.road, VP_SITE.ring.x, VP.cw.z + VP.cw.road, '#6f7682');
-    R(VP.x0, VP.z0, VP.x1, VP.z1, '#4f6e3f');
-    const S = VP_SITE;
-    for (const r of [S.paddock, S.parkN, S.parkS]) R(r.x0, r.z0, r.x1, r.z1, '#77787a');
-    R(VP_PIT.laneX - VP_PIT.laneW / 2, VP_PIT.lane[0], VP_PIT.laneX + VP_PIT.laneW / 2, VP_PIT.lane[1], '#6f7682');
-    g.fillStyle = '#6f7682'; g.beginPath(); g.arc(X(S.ring.x), X(S.ring.z), (S.ring.r + VP.cw.road) * k, 0, 7); g.fill();
-    // the circuit
-    const T = vp.track;
-    g.strokeStyle = '#2b2d30'; g.lineWidth = Math.max(2, VP_TRACK.w * k); g.lineJoin = 'round';
-    g.beginPath(); T.pts.forEach((p, i) => i ? g.lineTo(X(p[0]), X(p[1])) : g.moveTo(X(p[0]), X(p[1]))); g.closePath(); g.stroke();
-    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.stroke();
-    // buildings
-    g.fillStyle = 'rgba(0,0,0,0.32)';
-    for (const b of this.g.world.xblocks) if (vpLand(b.cx, b.cz)) for (const r of b.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
-  }
   // Cedar Fields South in map space (Session 6C): the land bridge, the ground by surface, the tracks, the course,
   // the pads and the buildings
   _paintCFS(g, view) {
@@ -300,15 +278,6 @@ class UIManager {
     this._paintCFS(g, null);
     return { img: c, x: x0, z: z0 };
   }
-  // a cached image of Valen Point for the minimap and the zoomed-out big map: { img, x, z } in map space
-  _renderVP() {
-    const k = this.mapK, E = this.mapE, X = x => (x + E) * k;
-    const x0 = Math.floor(X(VP_EDGE + EDGE_MARGIN)), z0 = Math.floor(X(VP.z0 - 30)), w = Math.ceil(X(VP.x1 + EDGE_MARGIN)) - x0, h = Math.ceil(X(VP.z1 + 30)) - z0;
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const g = c.getContext('2d'); g.translate(-x0, -z0);
-    this._paintVP(g, null);
-    return { img: c, x: x0, z: z0 };
-  }
   // the island's ground as a small image (once; 16 m a pixel, the shore soft-edged, the sea and the lake left clear)
   _renderIsle() {
     const S = 16, W = Math.round((ISLE.x1 - ISLE.x0) / S), H = Math.round((ISLE.z1 - ISLE.z0) / S), c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -344,6 +313,8 @@ class UIManager {
     if (inV(G.x0, G.z0, G.x1, G.z1)) { R4(G.strip.x0, G.strip.z - G.strip.w / 2, G.strip.x1, G.strip.z + G.strip.w / 2, '#3d3f44'); R4(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, '#4a4d52'); g.fillStyle = '#4a4d52'; g.beginPath(); g.arc(X(G.pad.x), X(G.pad.z), G.pad.r * k, 0, 7); g.fill(); }
     // Southshore Raceway (129b)
     if (this.g.world.paintRaceway) this.g.world.paintRaceway(g, X, k, view);
+    // the Southshore Fairground (129c)
+    if (this.g.world.paintFair) this.g.world.paintFair(g, X, k, view);
     g.lineCap = 'round'; g.lineJoin = 'round';
     for (const R of Island.roads) for (const [k0, k1, x0, z0, x1, z1] of R.mapChunks) {
       if (!inV(x0, z0, x1, z1)) continue;
@@ -356,6 +327,9 @@ class UIManager {
     for (const R of Island.roads) if (R.ring && inV(R.ring.x - 30, R.ring.z - 30, R.ring.x + 30, R.ring.z + 30)) { g.fillStyle = '#6f7682'; g.beginPath(); g.arc(X(R.ring.x), X(R.ring.z), (R.ring.r + R.w / 2) * k, 0, 7); g.fill(); }
     g.fillStyle = 'rgba(0,0,0,0.34)';
     for (const b of this.g.world.isle.blocks) if (inV(b.cx - b.r, b.cz - b.r, b.cx + b.r, b.cz + b.r)) for (const r of b.bld) if (!r.farOnly || true) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+    // the impound's Sound annex (125): its yard and its shed
+    const ax = this.g.world.xblocks.find(b => b.xb === 'annex');
+    if (ax && inV(ax.x0, ax.z0, ax.x1, ax.z1)) { R4(ax.x0, ax.z0, ax.x1, ax.z1, '#55606a'); g.fillStyle = 'rgba(0,0,0,0.34)'; for (const r of ax.bld) g.fillRect(X(r.x0), X(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k); }
   }
   // paints the city (no text) in 1024-unit map space onto any 2D context; view = world-space
   // rectangle to cull to (null = everything). Used for the cached images and the live big map.
@@ -392,7 +366,7 @@ class UIManager {
     for (let i = R.J0; i <= R.J1; i++) for (let j = R.I0; j < R.I1; j++) if (open(1, i, j)) { g.moveTo(X(j * P), X(i * P)); g.lineTo(X((j + 1) * P), X(i * P)); }
     g.stroke();
     // Valen Point and its causeway (Session 6B), Cedar Fields South and its land bridge (Session 6C)
-    this._paintVP(g, view); this._paintCFS(g, view);
+    this._paintCFS(g, view);
     // district tints and borders
     const W0 = this.g.world, zk = (I, J) => { const b = W0.blockW(I, J); return b ? ZONE_MAP[b.bz][b.bx] : null; };
     for (const b of W0.blocks) {
@@ -739,7 +713,6 @@ class UIManager {
     // the island under the city's image (a pixel of the minimap is 1 / zoom metres: what is within the dial, and a margin)
     { const vr = R / zoom * 1.45 + 20; this._paintIsle(c, { x0: p.pos.x - vr, z0: p.pos.z - vr, x1: p.pos.x + vr, z1: p.pos.z + vr }); }
     c.drawImage(this.mmImg, 0, 0);
-    if (this.vpImg) c.drawImage(this.vpImg.img, this.vpImg.x, this.vpImg.z);
     if (this.cfsImg) c.drawImage(this.cfsImg.img, this.cfsImg.x, this.cfsImg.z);
     const k = this.mapK;
     // GPS route
@@ -799,7 +772,7 @@ class UIManager {
     const bs = 9 * (W / 380) * 1.6;
     { const cs = g.world.places.chopshop, pd = g.world.places.police.door; if (cs) badge(cs.door.x, cs.door.z, MAP_CATS.chop.col, 'C', bs, false); badge(pd.x, pd.z, MAP_CATS.police.col, 'P', bs, false); }
     for (const L of uw.locs) {
-      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : L.def.kind === 'raceway' ? 'R' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
+      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'raceway' ? 'R' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) blip(L.x, L.z, FACTIONS[L.id].col, 5, false, 'sq');
       else if (L.kind === 'spot' && L.def.bank) { if (g.save.discovered.zones[L.zone]) badge(L.x, L.z, MAP_CATS.bank.col, 'K', bs, false); }
       else if (L.kind === 'spot') blip(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), 4, false, 'sq');
@@ -970,7 +943,7 @@ class MapView {
       if (L.kind === 'prop') {
         const d = L.def, own = uw.props.owned(d.id);
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
-        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : d.kind === 'raceway' ? 'R' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
+        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'raceway' ? 'R' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
         if (L.def.bank) { /* the banks list themselves once their district is known (BankSystem.mapEntries) */ }
@@ -1306,7 +1279,7 @@ class MapView {
     // map-space layers under the view transform
     c.save();
     c.setTransform(d * s, 0, 0, d * s, d * (W / 2 - this.cx * s), d * (H / 2 - this.cz * s));
-    if (this.zoom < 1.35) { ui._paintIsle(c, null); c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.vpImg) c.drawImage(ui.vpImg.img, ui.vpImg.x, ui.vpImg.z); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
+    if (this.zoom < 1.35) { ui._paintIsle(c, null); c.drawImage(ui.mapImg, 0, 0, 1024, 1024); if (ui.cfsImg) c.drawImage(ui.cfsImg.img, ui.cfsImg.x, ui.cfsImg.z); }
     else { const [x0, z0] = this.screenToWorld(0, 0), [x1, z1] = this.screenToWorld(W, H); ui._paintMap(c, { x0, z0, x1, z1 }); }
     if (g.uw && g.uw.mapOverlay) { g.uw.ui.drawOverlay(c, false); c.globalAlpha = 1; }
     if (g.uw && this.layerOn('economy')) this.drawEconomy(c);

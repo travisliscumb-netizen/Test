@@ -38,7 +38,7 @@ const CITY_LAYOUTS = {
   tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
   // the city round Valen Bay (CITY_SPREAD.md §3, §9): the core, the west of the Old Quarter, Linden Hills with the
   // farm, and the port (the Industrial Belt, the Docklands and the Container Terminal, whose quay faces east and so
-  // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
+  // once faced Valen Sound, now the river's harbour basin: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
   // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
   island: [
     // (the Old Quarter's precinct takes in the column it shares a superblock with: both stand at offset 0, so nothing moves)
@@ -63,9 +63,14 @@ const CITY_CONNECTORS = {
     { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1080], [-128, 1085], [-100, 1090]] },
     // the freight park on the south-east plain: west to the Southshore Highway
     { id: 'cW', name: 'Freight Road', w: 11, grade: 0.07, ends: ['lat', 's1'], pts: [[1114, 1160], [1040, 1162], [960, 1168], [860, 1176], [748, 1185]] },
-    // Uptown, on Valen Sound's north shore: up to the Coast Highway, and west along the shore to it
+    // Uptown, on what was Valen Sound's north shore: up to the Coast Highway, and west along the shore to it
     { id: 'cU', name: 'Lakeside Avenue', w: 11, grade: 0.07, ends: ['lat', 'n1'], pts: [[1720, -406], [1722, -450], [1724, -515]] },
-    { id: 'cV', name: 'Sound Road', w: 10, grade: 0.07, ends: ['lat', 'n1'], pts: [[1594, -200], [1500, -230], [1350, -280], [1240, -310], [1165, -330]] }
+    { id: 'cV', name: 'Sound Road', w: 10, grade: 0.07, ends: ['lat', 'n1'], pts: [[1594, -200], [1500, -230], [1350, -280], [1240, -310], [1165, -330]] },
+    // the land where Valen Sound was (owner, 2026-11-18): Sound Parkway from the port's east street (past the impound's
+    // Sound annex) across the plain and up to Uptown's south street; Riverside Drive off it, east along the river's
+    // north bank to a turning circle short of the coast. The plain between them is kept open for what comes next
+    { id: 'sp1', name: 'Sound Parkway', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[966, 520], [1010, 520], [1120, 512], [1260, 470], [1400, 380], [1530, 260], [1640, 120], [1700, 10], [1718, -40], [1720, -74]] },
+    { id: 'sp2', name: 'Riverside Drive', w: 10, grade: 0.07, ends: ['sp1', 'ring'], ring: 14, ringAt: [2460, 990], pts: [[1300, 452], [1420, 560], [1560, 700], [1720, 820], [1900, 890], [2100, 930], [2300, 960], [2460, 990]] }
   ]
 };
 const CityLayout = {

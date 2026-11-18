@@ -75,7 +75,7 @@ Object.assign(World.prototype, {
     const gy = (x, z) => { const y = Terrain.height(x, z); return y === null ? 0 : y - Terrain.rough; };
     const cf = this.cfs, Y = O.y, wall = (x0, z0, x1, z1, y1 = 1.2, y0 = -5) => this.grid.add({ x0, z0, x1, z1, y0, y1, kind: 'wall' });
     // ---------------------------------------------------------------- district blocks (for streaming)
-    const blk = (id, cx, cz, r, name) => { const b = this._vpBlock(id, cx - P / 2, cz - P / 2, r, name || CFS.name); b.t = 'S'; cf.blocks.push(b); return b; };
+    const blk = (id, cx, cz, r, name) => { const b = this._xBlock(id, cx - P / 2, cz - P / 2, r, name || CFS.name); b.t = 'S'; cf.blocks.push(b); return b; };
     const B = { pad: blk('so_paddock', 330, 1120, 260, 'Southshore Speedway paddock'), pits: blk('so_pits', 350, 1200, 220, 'Southshore Speedway pits'), stand: blk('so_stand', 350, 1434, 170, 'Southshore Speedway grandstand'), oval: blk('so_oval', 350, 1315, 330, O.name) };
     // the countryside round the site in tiles: trees stream with them
     const tiles = [];

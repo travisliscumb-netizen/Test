@@ -1,5 +1,5 @@
 /* Placement (world audit, 2026-11-17): everything in the world stands where it should and faces the way it should.
-   Nothing solid stands on what you drive on (lattice streets, island roads, the Valen Point circuit and pit lane, the
+   Nothing solid stands on what you drive on (lattice streets, island roads, the Southshore circuits and pit lane, the
    runways); stop signs stand off the road; every traffic light's arm reaches over its road; every street lamp leans
    over its road; sidewalk and park benches face the street or walk they sit on; no prop is buried inside a building;
    island buildings stand on the ground or on the building under them, never in the air; the parked fleet stands
@@ -19,9 +19,11 @@ const r = await ev(() => {
   const G = 24, grid = new Map();
   I.roads.forEach((R, ri) => { for (let k = 0; k < R.pts.length - 1; k++) { const a = R.pts[k], c = R.pts[k + 1]; for (let i = Math.floor(Math.min(a[0], c[0]) / G); i <= Math.floor(Math.max(a[0], c[0]) / G); i++) for (let j = Math.floor(Math.min(a[1], c[1]) / G); j <= Math.floor(Math.max(a[1], c[1]) / G); j++) { const kk = i * 100003 + j; if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(ri, k); } } });
   const isleRoad = (x, z, m = 0) => { const L = grid.get(Math.floor(x / G) * 100003 + Math.floor(z / G)); if (!L) return null; for (let q = 0; q < L.length; q += 2) { const R = I.roads[L[q]]; if (segD(x, z, R.pts[L[q + 1]], R.pts[L[q + 1] + 1]) < R.w / 2 - m) return R.id; } return null; };
-  const T = w.vp && w.vp.track, VPP = P.VP_PIT;
-  const pitLane = (x, z) => x > VPP.laneX - VPP.laneW / 2 && x < VPP.laneX + VPP.laneW / 2 && z > VPP.lane[0] && z < VPP.lane[1];
-  const circuit = (x, z) => { if (!T || Math.hypot(x - 1880, z - 480) > 900) return false; for (let k = 0; k < T.pts.length - 1; k++) if (segD(x, z, T.pts[k], T.pts[k + 1]) < 6.5) return true; return false; };
+  // the two Southshore tracks (Valen Point's circuit closed, 2026-11-18): the road course with its pit lane, and the oval
+  const T = w.sr && w.sr.track, SP = P.SR.pit, OT = w.cfs && w.cfs.track;
+  const pitLane = (x, z) => x > SP.x0 && x < SP.x1 && Math.abs(z - SP.z) < SP.w / 2;
+  const onLoop = (L, cx, cz, r, half, x, z) => { if (!L || Math.hypot(x - cx, z - cz) > r) return false; for (let k = 0; k < L.pts.length - 1; k++) if (segD(x, z, L.pts[k], L.pts[k + 1]) < half) return true; return false; };
+  const circuit = (x, z) => onLoop(T, -620, 2100, 700, P.SR.w / 2, x, z) || onLoop(OT, 350, 1315, 450, P.OVAL.half, x, z);
   const A = P.AIRPORT, F = w.isle.field;
   const runway = (x, z) => A.rw.some(q => x > q.x0 && x < q.x1 && Math.abs(z - q.z) < q.w / 2) || (F && x > F.rw.x0 && x < F.rw.x1 && Math.abs(z - F.rw.z) < F.rw.w / 2);
   // what you drive on (the local lanes' raster is left out: a park's boulders and a car park's walls stand at its edges on purpose)
@@ -126,7 +128,7 @@ const r = await ev(() => {
   return out;
 });
 check('nothing solid stands on a street, an island road, the circuit, the pit lane or a runway', r.solid.n === 0, JSON.stringify(r.solid));
-check('the Valen Point pit lane is clear from the garages to the pit wall', r.pit.track && r.pit.n === 0, JSON.stringify(r.pit));
+check('the Southshore Raceway pit lane is clear from the garages to the pit wall', r.pit.track && r.pit.n === 0, JSON.stringify(r.pit));
 check('every stop sign stands off the road', r.stop.n >= 20 && r.stop.on === 0, JSON.stringify(r.stop));
 check('every traffic light stands off the road with its arm over it', r.tlight.n >= 200 && r.tlight.bad === 0, JSON.stringify(r.tlight));
 check('every street lamp stands off the road and leans over it', r.lamp.n >= 1000 && r.lamp.bad === 0, JSON.stringify(r.lamp));

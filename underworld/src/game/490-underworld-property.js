@@ -177,8 +177,8 @@ class PropertyManager {
     const floor = Math.min(MORALE_CAP, this.perk('loyalty') * 10);
     if (floor > 0) for (const c of uw.crew.active()) c.morale = Math.max(c.morale, floor);
     this.policeRaids();
-    // the motorsport park's day (Session 6B): its income, and the settling of a meeting you hosted
-    if (uw.g.motorsport) uw.g.motorsport.tickDay();
+    // the Southshore Motorsport Complex's day: its income, and the settling of a meeting you hosted (509c)
+    if (uw.g.raceway) uw.g.raceway.tickDay();
     this.raidChanceBonus = Math.max(0, this.raidChanceBonus - 0.1);
   }
   repairCost(def) { return Math.round(def.price * 0.12 / 10) * 10; }

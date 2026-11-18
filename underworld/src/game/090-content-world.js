@@ -764,8 +764,8 @@ class World {
           if (wet(x, z) && !seam(t)) { if (!run) run = [t, t]; run[1] = t; } else if (run) { list.push(run); run = null; }
         }
         if (run) list.push(run);
-        // the causeway and the land bridge leave the classic square's east and south edges (S4 re-anchors them)
-        const gap = side === 'e' && Math.abs(p.x1 - CITY) < 0.5 ? [VP.cw.z - VP.cw.half, VP.cw.z + VP.cw.half] : side === 's' && Math.abs(p.z1 - CITY) < 0.5 ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
+        // the land bridge leaves the classic square's south edge (S4 re-anchors it)
+        const gap = side === 's' && Math.abs(p.z1 - CITY) < 0.5 ? [CFS.lb.x - CFS.lb.half, CFS.lb.x + CFS.lb.half] : null;
         const gaps = gap ? [gap] : [];
         // every island road that leaves this edge (its 'lat' end on the edge street) goes through the wall's line
         for (const G of roadEnds) {

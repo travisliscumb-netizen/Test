@@ -97,6 +97,15 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
 - The sea is shallow physics (you wade to 1.25 m, a car bogs down); an aircraft that comes down in it is lost.
 - The racetrack was already there (Valen Point): it gained a chicane, a grid and race cars; the proving ground and
   the airport's 1.5 km runway are where a car's top speed is found.
+- (owner, 2026-11-18) Valen Sound filled in and Valen Point removed (ISLAND.md §8): Valen River winds along the old
+  sound's south side from the terminal's harbour basin to the sea; Sound Parkway and Riverside Drive serve the land;
+  the plain north of the river is reserved for future development. Valen Point's owner features, prize car, unique
+  and race cars went to the Southshore Motorsport Complex; its impound annex to Sound Parkway; old saves are refunded.
+  Island districts are now discoverable (they never were: a bug that blocked the Riviera).
+- (owner, 2026-11-18) The Southshore Fairground (ISLAND.md §9) on the plain by the airport (the reclaimed land kept for
+  later): six rides (Ferris wheel, roller coaster, pirate ship, carousel, drop tower, go-karts you drive yourself), four
+  carnival games, three empty ride slots. Rides run on shared clocks; aboard one the player is in a 'ride' state with an
+  onboard camera. Tickets and games are ordinary spending (cash first); prizes are plush, never money.
 
 ## The organic downtown (owner, 2026-11-18)
 - The owner asked for the central grid (the Old Quarter, Linden Hills, the commercial core, Diner Row and the port

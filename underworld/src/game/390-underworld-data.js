@@ -127,8 +127,7 @@ const PROPS = [
   { id: 'diner', name: 'Rosie’s Diner', kind: 'business', price: 26000, at: [6, 1, 3, 40], income: 620, storage: 30, crew: 2, desc: 'Coffee, pie and a back booth for meetings.' },
   // Valen Point (Session 6B): a legitimate asset bought from the bank, no Rank or Rep gate; its garage is the 24 pit
   // garage bays. Price provisional (Session 13)
-  { id: 'raceway', name: 'Southshore Motorsport Complex', kind: 'raceway', price: 600000, place: 'raceway', garage: 42, storage: 0, desc: 'Both Southshore tracks: the road course south of Marsh Hollow and the banked oval at Cedar Fields, with their twenty-one pit garages (room for forty-two of your cars, one pool for both tracks). Owners race and lap both free.' },
-  { id: 'motorsport', name: 'Valen Point Motorsport Park', kind: 'motorsport', price: 1500000, place: 'motorsport', garage: 24, storage: 0, desc: 'The circuit, its pit garages and grandstands on Valen Point. Track days, race meetings, a garage for a whole collection, and a clean income.' },
+  { id: 'raceway', name: 'Southshore Motorsport Complex', kind: 'raceway', price: 600000, place: 'raceway', garage: 42, storage: 0, desc: 'Both Southshore tracks: the road course south of Marsh Hollow and the banked oval at Cedar Fields, with their twenty-one pit garages (room for forty-two of your cars, one pool for both tracks). Owners race and lap both free, host race meetings, get the pit crew a third off, and take a clean daily income.' },
   { id: 'carwash', name: 'Suds Car Wash', kind: 'business', price: 34000, at: [9, 2, 3, 40], income: 760, storage: 40, garage: 1, crew: 2, launder: true, respray: true, desc: 'Cleans cars and cash. Respray stolen rides on site.' },
   { id: 'motel', name: 'Starlite Motel', kind: 'business', price: 42000, at: [4, 9, 1, 35], income: 980, storage: 80, crew: 2, night: true, desc: 'Rooms by the hour on the Nightlife Strip. Discreet, profitable, never quiet.' },
   { id: 'club', name: 'Club Neon', kind: 'business', price: 95000, at: [5, 8, 2, 40], income: 2300, storage: 60, crew: 3, night: true, recruit: true, infl: 30, desc: 'The hottest door on the Strip. Whoever owns it owns the night.' },
@@ -322,9 +321,10 @@ const IMPOUND = { id: 'impound', at: [4, 7], name: 'Port Valen Police Impound', 
   // the overflow yard next door: when the main yard's spaces are taken, seized cars go to their own numbered space
   // there. Between the two there is a space for every car you could ever own (tests/hot.mjs checks it)
   overflow: { id: 'impound_x', at: [4, 8], name: 'Police Impound · overflow yard' },
-  // Valen Point's annex (Session 6B): the pit garages add parking past what the two city yards hold, so a third
-  // yard by the causeway landing keeps a space for every car you could own
-  annex: { id: 'impound_vp', name: 'Police Impound · Valen Point annex', sign: 'ANNEX' } };
+  // the third yard (Session 6B, on Valen Point until the sound was filled in, 2026-11-18): the big garages add parking
+  // past what the two city yards hold, so the annex on Sound Parkway keeps a space for every car you could own (125).
+  // Its id is unchanged: a held car's space is an index across the three yards in this order
+  annex: { id: 'impound_vp', name: 'Police Impound · Sound annex', sign: 'ANNEX' } };
 // the overflow yard's spaces (yard-local metres: u across the gate fence, v in from it). Bays fit the biggest vehicle;
 // rows face aisles of 6.6 m or more (v 1–8.1 along the gate fence, 22.9–29.5, 44.3–50.9) joined by a lane at u −29…−22
 const OVERFLOW_BAY = { w: 2.9, d: 7.4, n: 17, u0: -19.7 };

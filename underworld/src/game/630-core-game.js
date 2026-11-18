@@ -44,8 +44,9 @@ class Game {
     for (const id of this.world.homeProps) { const d = PROP_BY_ID[id], h = d.home && this.world.homes.find(x => x.id === d.home); if (h && h.garageRect) hollowGarage(this.world, h, id); }
     progress(0.3, 'Pouring concrete'); await nextFrame();
     this.scenery = buildStaticScenery(this.outdoor, this.world);
-    this.vpScene = new ValenPointScenery(this.outdoor, this.world);
     this.cfsScene = new CedarScenery(this.outdoor, this.world, this.scenery.gmat);
+    // the Southshore Fairground's moving rides, its track and ground (179)
+    this.fairScene = new FairgroundScenery(this.outdoor, this.world);
     this.env = new Environment(this);
     this.chunks = new ChunkManager(this);
     this.props = new PropManager(this);
@@ -86,14 +87,14 @@ class Game {
     this.hotwatch = new HotWatch(this); this.impound = new ImpoundLot(this); this.chop = new ChopShop(this);
     // Session 6A: street-race purse tiers and heat, pink slips, the car wash
     this.raceRules = new RaceRules(this); this.pinks = new PinkSlips(this); this.wash = new CarWash(this);
-    // Session 6B: Valen Point Motorsport Park
-    this.motorsport = new MotorsportPark(this);
     // the Southshore Speedway (the oval at Cedar Fields, 126, 509b; it took the off-road park's place, 2026-11-18)
     this.oval = new OvalPark(this);
     // Southshore Raceway (129b, 509c)
     this.raceway = new RacewayPark(this);
+    // the Southshore Fairground: rides, karts, games (509d)
+    this.fair = new Fairground(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.oval.reset(); this.raceway.reset();
+    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.oval.reset(); this.raceway.reset(); this.fair.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -331,6 +332,9 @@ class Game {
     else if (!jail && !p.interior && (p.state === 'foot' || p.state === 'vehicle') && isFinite(p.pos.x)) {
       // a vehicle save restores you standing beside it (the car itself is in the vehicle registry)
       this.save.pos = { x: p.pos.x, z: p.pos.z, h: p.h };
+    } else if (p.state === 'ride' && this.fair && this.fair.ride) {
+      // aboard a fairground ride: you come back at its gate
+      const e = this.fair.F.rides[this.fair.ride.id].exit; this.save.pos = { x: e.x, z: e.z, h: e.h };
     } else if (p.interior && p.interior.id !== 'prison') { const d = p.interior.def.door; this.save.pos = { x: d.x + Math.sin(d.h) * 2, z: d.z + Math.cos(d.h) * 2, h: d.h }; }
     if (this.vreg) this.vreg.sync(); // every kept car where it stands now
     const ok = SaveSystem.save(this.save);
@@ -641,6 +645,8 @@ class Game {
     inp.pollGamepad();
     // the kart simulator (356) has the screen and the controls while it runs: the game stands still
     if (this.kart && this.kart.active) { this.kart.frame(dt); inp.endFrame(); return; }
+    // a carnival game at the fair (509d): the booth fills the screen, the world waits
+    if (this.fair && this.fair.game && this.fair.game.active) { this.fair.game.frame(dt); inp.endFrame(); return; }
     if (inp.pressed('debug')) this.toggleDebug();
     if (this.state === 'playing') {
       if (inp.pressed('pause')) { if (this.ui.closeConfirm()) { /* dialog dismissed */ } else if (this.mapOpen) { this.ui.toggleMap(false); } else if (this.ui.modal) this.ui.back(); else this.pause(); }
@@ -671,6 +677,8 @@ class Game {
       p.invuln = Math.max(0, p.invuln - dt); p.hitCooldown = Math.max(0, p.hitCooldown - dt);
       if (p.state === 'foot' && dt > 0) p.updateFoot(dt);
       else if (p.state === 'vehicle') this.driveControl(dt);
+      // aboard a fairground ride (509d): the seat carries you
+      else if (p.state === 'ride') this.fair.rideStep(dt);
       else if (p.state === 'entering') {
         const tr = p.trans; tr.t += dt;
         const v = tr.v;
@@ -712,7 +720,7 @@ class Game {
     this.env.update(dt);
     this.content.interiors.update(dt);
     this.chunks.update(this.focus.x, this.focus.z, this.frame);
-    this.vpScene.update(this.focus.x, this.focus.z); this.cfsScene.update(this.focus.x, this.focus.z); this.isleScene.update(this.focus.x, this.focus.z);
+    this.cfsScene.update(this.focus.x, this.focus.z); this.isleScene.update(this.focus.x, this.focus.z); this.fairScene.update(this.focus.x, this.focus.z, this.time, this.env.night > 0.4);
     this.propT -= rdt;
     if (this.propT <= 0) {
       this.propT = 0.5;
@@ -754,7 +762,7 @@ class Game {
     this.props.cull(this.camera, this.frustum, rdt);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.oval.update(dt); this.raceway.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.oval.update(dt); this.raceway.update(dt); this.fair.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -832,7 +840,7 @@ class Game {
     this.scenery.sky.position.copy(this.camera.position);
     // characters
     const cr = this.chars; cr.begin(this.camera);
-    const showPlayer = this.state !== 'menu' && this.state !== 'loading' && p.state !== 'vehicle';
+    const showPlayer = this.state !== 'menu' && this.state !== 'loading' && p.state !== 'vehicle' && p.state !== 'ride';
     if (showPlayer) cr.draw(p.char, { wantHand: true, noHead: this.cam.mode === 2 && p.state === 'foot', force: true });
     this.peds.draw(cr, indoor ? p.interior.floor : undefined);
     for (const c of this.missions.contacts) if ((c.marker.g.visible || this.state === 'menu' && !c.interior) || (c.interior && p.interior && p.interior.id === c.interior)) { c.ch.pose.phase += rdt; c.ch.pose.phone = !c.interior && Math.sin(this.time * 0.3 + c.x) > 0.3; cr.draw(c.ch); }

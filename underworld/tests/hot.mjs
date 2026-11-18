@@ -292,7 +292,7 @@ const geo = await ev(() => {
   out.gateApron = 0; for (const id of [P.IMPOUND.overflow.id, P.IMPOUND.annex.id]) { const G = W[id].gate; out.gateApron += F.filter(f => hit({ x0: G.x - 4, x1: G.x + 4, z0: G.z - 4, z1: G.z + 4 }, f)).length; }
   return out;
 });
-check('the yards hold a space for every car you could ever own (every property’s spaces together, the motorsport park’s pit garages included): the main yard, the overflow yard next door and Valen Point’s annex', geo.cap >= geo.bays && geo.main === 10 && geo.over === 85 && geo.annex === 85 && geo.lots.length === 3, JSON.stringify(geo));
+check('the yards hold a space for every car you could ever own (every property’s spaces together, the Southshore complex’s pit garages included): the main yard, the overflow yard next door and the Sound annex', geo.cap >= geo.bays && geo.main === 10 && geo.over === 85 && geo.annex === 85 && geo.lots.length === 3, JSON.stringify(geo));
 check('every space is a real bay: fits the biggest vehicle, inside its yard, no two overlapping, none in the shed or the gate mouth, each nosing out onto clear ground', geo.overlap === 0 && geo.outside === 0 && geo.inBuilding === 0 && geo.small === 0 && geo.blockedNose === 0 && geo.gateApron === 0, JSON.stringify(geo));
 
 // a dozen of your cars seized at once (a rare one and a unique one among them): twelve spaces, none shared

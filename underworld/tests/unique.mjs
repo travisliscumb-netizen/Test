@@ -73,7 +73,7 @@ const pools = await ev(() => {
   const P = window.__pv, uq = t => P.VEHICLES[t] && P.VEHICLES[t].unique, out = [];
   const D = P.DEALERSHIPS; for (const k in D) for (const t of [...(D[k].pool || []).map(x => x[0]), ...(D[k].line || []), ...(D[k].flagship || []), ...(D[k].core || []), ...(D[k].rare || [])]) if (uq(t)) out.push('dealer:' + t);
   for (const r of P.RACES) for (const t of r.cls) if (uq(t)) out.push('race:' + t);
-  for (const r of [...P.VP_EVENTS, ...P.SR_EVENTS, ...P.OV_EVENTS]) for (const t of r.cls) if (uq(t)) out.push('event:' + t);
+  for (const r of [...P.SR_EVENTS, ...P.OV_EVENTS]) for (const t of r.cls) if (uq(t)) out.push('event:' + t);
   const g = window.game; for (let k = 0; k < 200; k++) { const r = g.pinks.rival({ type: 'sports', vtier: 'sport' }); if (uq(r.type)) out.push('pink:' + r.type); }
   for (const z in P.ZONES) for (const t in P.ZONES[z].traffic || {}) if (uq(t)) out.push('traffic:' + t);
   if (g.vehicles.list.some(v => uq(v.type))) out.push('in the world at the start');
@@ -243,8 +243,8 @@ const rew = await ev(() => {
 check('the Spectre: a lead after the first city race win; all five won, Tull gives it once (no space: it waits with him)', rew.lead === 1 && rew.st === 3 && rew.pend === 1 && rew.inFleet === 0, JSON.stringify(rew));
 check('a one-time reward can’t be claimed twice (granting again, rechecking, winning again)', rew.twice === 1, JSON.stringify(rew));
 check('collected into a free space: one Spectre in the fleet, nothing left waiting', rew.c === '' && rew.fleet === 1 && rew.waiting === 0 && rew.vtier === 'unique' && rew.origin === 'reward', JSON.stringify(rew));
-const club = await ev(() => { const g = window.game, s = g.save; g.uniques.onRaceWin('vp_gt'); g.uniques.onRaceWin('vp_gt'); g.uniques.grant('club'); return { n: s.garage.filter(e => e.type === 'u_club').length + s.pendingCars.filter(P => P.type === 'u_club').length, st: s.uniques.club.st, origin: (s.garage.find(e => e.type === 'u_club') || {}).origin }; });
-check('the Clubsport: the GT Cup won at Valen Point, once (prize car, never twice)', club.n === 1 && club.st === 3 && club.origin === 'prize', JSON.stringify(club));
+const club = await ev(() => { const g = window.game, s = g.save; g.uniques.onRaceWin('sr_touring'); g.uniques.onRaceWin('sr_touring'); g.uniques.grant('club'); return { n: s.garage.filter(e => e.type === 'u_club').length + s.pendingCars.filter(P => P.type === 'u_club').length, st: s.uniques.club.st, origin: (s.garage.find(e => e.type === 'u_club') || {}).origin }; });
+check('the Clubsport: the Touring Cup won at Southshore Raceway (Valen Point’s GT Cup until it closed), once (prize car, never twice)', club.n === 1 && club.st === 3 && club.origin === 'prize', JSON.stringify(club));
 
 // ---------------------------------------------------------------- 9. Vance's Widowmaker: a pink-slip challenge
 const bays = await ev(() => { const g = window.game, r = {}; for (const id of ['docklock', 'linden', 'raceway']) r[id] = g.uw.props.buy(id); window.__calm(); return { r, free: g.vreg.freeBays(), cap: g.content.garageCap, n: g.save.garage.length }; });

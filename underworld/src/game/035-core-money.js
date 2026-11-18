@@ -51,6 +51,8 @@ const MONEY_SOURCES = {
   carWash: { pay: 'clean' },
   // Valen Point Motorsport Park (Session 6B, §45.34): all of it legitimate, all of it Clean Bank
   trackFee: { pay: 'clean' }, trackPrize: { earn: 'clean' }, propRefund: { earn: 'clean' }, trackIncome: { earn: 'clean', book: 'businesses' }, trackHost: { pay: 'clean' }, pitService: { pay: 'clean' },
+  // the Southshore Fairground (509d): ride and kart tickets, a go at a carnival game (cash first, then the bank)
+  fairTicket: { pay: 'either' }, fairGame: { pay: 'either' },
   // crew patching and repairing a warehouse's breaches: from its vault first (payroll order)
   whRepair: { pay: 'payroll', book: 'upkeep' },
   stunt: { earn: 'clean', capped: true }, stuntMilestone: { earn: 'clean' },

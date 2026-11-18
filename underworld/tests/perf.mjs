@@ -46,14 +46,15 @@ await page.evaluate(() => {
 await new Promise(r => setTimeout(r, 4000));
 await page.evaluate(() => { const g = window.game; if (g.uw) for (const gr of g.uw.gangs.groups.values()) if (gr.members.length) { g.uw.onPedHit(gr.members[0], 'light', 1); break; } });
 const busy = await measure();
-// Valen Point (Session 6B), when the build has it: on the main straight in a car, five AI cars lapping the circuit
+// Southshore Raceway (the road course that has the circuit racing since Valen Point closed, 2026-11-18), when the
+// build has it: on the main straight in a car, five AI cars lapping the circuit
 let track = null;
-if (await page.evaluate(() => !!(window.game.world && window.game.world.vp))) {
+if (await page.evaluate(() => !!(window.game.world && window.game.world.sr))) {
   await page.evaluate(() => {
     const g = window.game, pv = window.__pv; g.police.clear(); g.police.setLevel(0); g.env.time = 13; try { g.env.setWeather('clear', true); } catch {}
-    const ck = pv.vpCheckpoints({ laps: 3 }), s = ck.start;
-    const me = g.vehicles.spawn('sports', s.x - 2.7, s.z + 30, s.h, {}); g.resetPlayerState(me.pos.x + 2, me.pos.z, 0); g.completeEnter(me);
-    for (let k = 0; k < 5; k++) { const v = g.vehicles.spawn(['sports', 'muscle', 'tempest', 'hellion', 'revenant'][k], s.x + (k % 2 ? 2.7 : -2.7), s.z + 9 * k, s.h, { driver: 'npc' }); v.mission = 'perf'; v.drive = new pv.DriveAI(v, g, 'race'); v.drive.path = ck.aiPath.map(c => ({ ...c, x: c.x + (c.nx || 0) * (k % 2 ? 2.4 : -2.4), z: c.z + (c.nz || 0) * (k % 2 ? 2.4 : -2.4) })); v.drive.pi = 0; v.drive.wait = 0; v.drive.cruise = 60; }
+    const ck = g.raceway.checkpoints({ laps: 3 }), s = ck.start;
+    const me = g.vehicles.spawn('sports', s.x - 2.7 * s.dir.z, s.z + 2.7 * s.dir.x, s.h, {}); g.resetPlayerState(me.pos.x + 2, me.pos.z, 0); g.completeEnter(me);
+    for (let k = 0; k < 5; k++) { const sd = k % 2 ? 2.7 : -2.7, v = g.vehicles.spawn(['sports', 'muscle', 'tempest', 'hellion', 'revenant'][k], s.x + s.dir.x * (12 + 9 * k) - sd * s.dir.z, s.z + s.dir.z * (12 + 9 * k) + sd * s.dir.x, s.h, { driver: 'npc' }); v.mission = 'perf'; v.drive = new pv.DriveAI(v, g, 'race'); v.drive.path = ck.aiPath.map(c => ({ ...c, x: c.x + (c.nx || 0) * (k % 2 ? 2.4 : -2.4), z: c.z + (c.nz || 0) * (k % 2 ? 2.4 : -2.4) })); v.drive.pi = 0; v.drive.wait = 0; v.drive.cruise = 60; }
   });
   await new Promise(r => setTimeout(r, 4000));
   track = await measure();

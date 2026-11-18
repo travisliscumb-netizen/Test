@@ -152,7 +152,7 @@ class PinkSlips {
     if (!s.raceDay || typeof s.raceDay !== 'object' || !Number.isInteger(s.raceDay.day) || !s.raceDay.wins || typeof s.raceDay.wins !== 'object') s.raceDay = { day: -1, wins: {} };
     // today's wins per race: street and countryside races, and the official events of both venues (whose tiers the
     // same record keeps)
-    const known = k => RACES.some(r => r.id === k) || VP_EVENTS.some(e => e.id === k) || SR_EVENTS.some(e => e.id === k) || OV_EVENTS.some(e => e.id === k);
+    const known = k => RACES.some(r => r.id === k) || SR_EVENTS.some(e => e.id === k) || OV_EVENTS.some(e => e.id === k);
     for (const k in s.raceDay.wins) { const n = s.raceDay.wins[k]; if (!known(k) || !Number.isInteger(n) || n < 0) delete s.raceDay.wins[k]; }
   }
 }

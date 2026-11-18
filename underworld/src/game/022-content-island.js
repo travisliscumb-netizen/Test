@@ -32,12 +32,50 @@ const WORLD_X0 = ISLE.x0, WORLD_Z0 = ISLE.z0;
 const ISLE_COAST = [
   [30, 70], [-260, -40], [-640, -60], [-980, 40], [-1120, 235], [-1300, 150], [-1500, -150], [-1750, -500], [-2050, -900],
   [-2200, -1400], [-2050, -1900], [-1750, -2300], [-1300, -2550], [-800, -2900], [-200, -3100], [400, -3000], [1000, -2750],
-  [1500, -2830], [2100, -2600], [2500, -2200], [2700, -1700], [2600, -1200], [2300, -800], [2500, -450], [2250, -200],
-  [1800, -230], [1400, -170], [1120, -130], [960, 30], [930, 500], [930, 900], [790, 940], [800, 1080], [900, 1200],
-  [1150, 1230], [1500, 1150], [1900, 1160], [2300, 1300], [2450, 1650], [2300, 2050], [2000, 2300], [1700, 2700],
+  [1500, -2830], [2100, -2600], [2500, -2200], [2700, -1700], [2600, -1200], [2300, -800], [2500, -450],
+  // (owner, 2026-11-18: Valen Sound is land now, Valen Point's island and the water round it one plain with the two
+  // lobes; the coast runs straight down the east side, and Valen River winds out to it from the port: ISLE_RIVER)
+  [2620, -160], [2700, 230], [2735, 640], [2700, 1000], [2580, 1290], [2450, 1650], [2300, 2050], [2000, 2300], [1700, 2700],
   [1200, 2900], [600, 2850], [0, 2900], [-500, 2700], [-900, 2300], [-1150, 1900], [-1250, 1500], [-1300, 1100],
   [-1260, 940], [-1100, 760], [-880, 900], [-600, 1000], [-300, 960], [-100, 900], [30, 860]
 ];
+// Valen River (owner, 2026-11-18): what is left of Valen Sound, a broad river winding from the Container Terminal's
+// quay out to the east coast along the old sound's south side (well off its middle), [x, z, half width]. Its water is
+// the sea's level; its bed and banks are carved into the natural ground (Island.nat)
+const ISLE_RIVER = [[1010, 890, 30], [1070, 906, 31], [1150, 958, 33], [1240, 1008, 34], [1360, 1028, 35], [1480, 1006, 36], [1600, 1036, 37],
+  [1720, 1082, 38], [1850, 1068, 39], [1980, 1108, 40], [2120, 1096, 41], [2260, 1138, 42], [2400, 1156, 43], [2550, 1176, 44], [2700, 1196, 46], [2880, 1218, 50]];
+// the river's centreline as a smooth spline (every ~6 m), with its half width at each point
+const RIVER_LINE = (() => {
+  const P0 = ISLE_RIVER, out = [];
+  for (let i = 0; i < P0.length - 1; i++) {
+    const a = P0[Math.max(0, i - 1)], b = P0[i], c = P0[i + 1], d = P0[Math.min(P0.length - 1, i + 2)], m = Math.max(2, Math.ceil(Math.hypot(c[0] - b[0], c[1] - b[1]) / 6));
+    for (let k = 0; k < m; k++) { const t = k / m, t2 = t * t, t3 = t2 * t, f = (p, q, r, s) => 0.5 * (2 * q + (r - p) * t + (2 * p - 5 * q + 4 * r - s) * t2 + (3 * q - p - 3 * r + s) * t3); out.push([f(a[0], b[0], c[0], d[0]), f(a[1], b[1], c[1], d[1]), b[2] + (c[2] - b[2]) * t]); }
+  }
+  out.push(P0[P0.length - 1].slice());
+  return out;
+})();
+// the reclaimed plain north of the river, kept open for future development: nothing is scattered on it (128's farms
+// and lone houses); its roads are Sound Parkway and Riverside Drive (021)
+const SOUND_RESERVE = [1000, -60, 2560, 1000];
+// the river's mouth: a harbour basin along the Container Terminal's quay, deep enough for the ship alongside (120)
+const RIVER_BASIN = { x0: 960, z0: 812, x1: 1030, z1: 962, hw: 12 };
+// distance from (x, z) to the river's centreline (or the basin's edge) and its half width there (Infinity far from it)
+function riverAt(x, z) {
+  if (x < 900 || x > 2950 || z < 760 || z > 1300) return { d: Infinity, hw: 0 };
+  const B = RIVER_BASIN;
+  let best = Math.hypot(Math.max(B.x0 - x, 0, x - B.x1), Math.max(B.z0 - z, 0, z - B.z1)), hw = B.hw;
+  for (let k = 0; k < RIVER_LINE.length - 1; k++) {
+    const a = RIVER_LINE[k], b = RIVER_LINE[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), d = Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t);
+    if (d < best) { best = d; hw = a[2] + (b[2] - a[2]) * t; }
+  }
+  return { d: best, hw };
+}
+// the river's centreline z at x (its control points joined straight: for "which bank", not for the water's edge)
+function riverZ(x) {
+  const R = ISLE_RIVER; if (x <= R[0][0]) return R[0][1];
+  for (let i = 1; i < R.length; i++) if (x <= R[i][0]) { const t = (x - R[i - 1][0]) / (R[i][0] - R[i - 1][0]); return R[i - 1][1] + (R[i][1] - R[i - 1][1]) * t; }
+  return R[R.length - 1][1];
+}
 // islets: [x, z, radius, name]
 const ISLE_ISLETS = [[-560, 470, 78, 'Battery Island'], [-1720, 520, 120, 'Gull Rock'], [2860, -900, 135, 'Tern Island'], [-1450, 2720, 150, 'Castaway Cay'], [2680, 2480, 165, 'Dutchman’s Rest'], [-2330, -2480, 120, 'Widow’s Tooth']];
 // where the shore must stay exactly as drawn (no coast noise): the city, Cedar Fields, the airport, the proving
@@ -176,7 +214,11 @@ const Island = {
   // plain) and the hills of each lobe, which die away toward the coast
   nat(x, z) {
     const d = -this.sd(x, z);
-    if (d <= 0) return Math.max(SEA_Y - 6, SEA_Y + d * 0.07);
+    if (d <= 0) {
+      // the sea shelves away from the shore; Valen River's channel carries on through the shelf to deep water (no bar)
+      const s = Math.max(SEA_Y - 6, SEA_Y + d * 0.07), rv = riverAt(x, z);
+      return rv.d < rv.hw + 26 ? Math.min(s, SEA_Y - 3.4 + 2.2 * smoothstep(rv.hw * 0.62, rv.hw + 26, rv.d)) : s;
+    }
     const G = (dx, dz, r) => Math.exp(-(dx * dx + dz * dz) / (r * r));
     const shore = SEA_Y + 2.5 * smoothstep(0, 36, d) + 1.3 * smoothstep(36, 170, d), inl = smoothstep(26, 360, d);
     const wN = 1 - smoothstep(-260, 60, z), wS = smoothstep(980, 1220, z);
@@ -199,6 +241,9 @@ const Island = {
     // Lake Valen's basin: the ground eases down to a bed below the sea's level, the shore wandering a little
     const lx = (x - LAKE.x) / LAKE.rx, lz = (z - LAKE.z) / LAKE.rz, le = lx * lx + lz * lz;
     if (le < 2.6) { const k = 1 - smoothstep(0.55, 1.75, le + 0.22 * tNoise(x / 120, z / 120, 57)); return h * (1 - k) + (SEA_Y - 4.5) * k; }
+    // Valen River: its bed below the sea's level, the banks sloping up over ~26 m, the edge wandering a little
+    const rv = riverAt(x, z);
+    if (rv.d < rv.hw + 40) { const e = rv.d + 6 * tNoise(x / 70, z / 70, 59); const k = 1 - smoothstep(rv.hw * 0.62, rv.hw + 26, e); return h * (1 - k) + (SEA_Y - 3.4) * k; }
     return h;
   },
   // a level pad: the ground is exactly y inside the rectangle and eases back to the natural ground over `blend` m
@@ -479,6 +524,8 @@ const Island = {
     if (x > G.x0 - 30 && x < G.x1 + 30 && z > G.z0 - 30 && z < G.z1 + 30) return 'j';
     // (the ground moved precincts left on the waist, built up as infill districts: 128 ISLE_INFILL)
     if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) if (x > F.box[0] && x < F.box[2] && z > F.box[1] && z < F.box[3]) return F.zone;
+    // the Sound Flats: the reclaimed land east of the port, north of the river
+    if (x > 960 && z > -60 && z < riverZ(x)) return 'v';
     if (z > 880) return x < -160 && z < 1500 ? 'b' : 'e';
     if (z > -700 && z < -250 && x > -120 && x < 760) return 'k';
     if (Math.hypot(x - MT_VALEN.x, z - MT_VALEN.z) < 1250) return 'n';
@@ -497,6 +544,10 @@ const Island = {
     this.addPad(A.x0, A.z0, A.x1, A.z1, A.y, 140);
     this.addPad(CFS.x0, CFS.z0, CFS.x1, CFS.z1, 0.1, 70);
     for (const p of CityLayout.precincts) this.addPad(p.x0 - E, p.z0 - E, p.x1 + E, p.z1 + E, CURB_H, 110);
+    // the impound's Sound annex (125), at the city's level on the reclaimed land east of the port; the pad runs on
+    // north under Sound Parkway and west to the port's promenade, so the road comes out of the city at its lowest
+    // (0.5 m over the sea, Island roads' floor) past the gate, and a short driveway climbs the last 0.4 m to it
+    if (CityLayout.id === 'island') { const S = SOUND_ANNEX; this.addPad(S.ox - 40, S.oz - 34, S.ox + P - INNER + 4, S.oz + P - INNER + 4, CURB_H, 40); }
     // Linden Gardens (128): the infill between the precincts, at the city's level
     if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
   }

@@ -1,7 +1,7 @@
 /* Saves across city layouts (CITY_SPREAD.md S6): a save made with the city in one layout loads in another with every
    position beside the same buildings it was beside, and loading it again moves nothing.
    - a save made under 'classic' (the square, what every save before the city spread was made under) with the player
-     on the Nightlife Strip, and points in Crestmoor Heights, in the core and out at Valen Point;
+     on the Nightlife Strip, and points in Crestmoor Heights, in the core and out on the Sound Flats (where Valen Point was);
    - loaded under 'island': the Strip's and the Heights' points move by their precincts' offsets, the core's and Valen
      Point's stay, the player continues on the same pavement, the stamp is 'island';
    - saved and loaded again under 'island': nothing moves.
@@ -52,7 +52,7 @@ check('loaded under island: the stamp is island and the save says where it came 
 check('the player continues on the same pavement in front of the casino block, where the Nightlife Strip now stands',
   sx !== 0 && Math.abs(got.pos[0] - (made.pos.x + sx)) < 1 && Math.abs(got.pos[1] - (made.pos.z + sz)) < 1 && Math.abs(got.pos[0] - got.strip[0]) < 2 && Math.abs(got.pos[1] - (got.strip[1] + 3.2)) < 2,
   JSON.stringify({ was: [made.pos.x, made.pos.z], now: got.pos, strip: got.strip, off: [sx, sz] }));
-check('a point in Crestmoor Heights moves with the Heights; one in the core and one at Valen Point stay where they were',
+check('a point in Crestmoor Heights moves with the Heights; one in the core and one out on the Sound Flats stay where they were',
   hx !== 0 && near(m1.heights.x, m0.heights.x + hx) && near(m1.heights.z, m0.heights.z + hz) && m1.heights.h === 1 && cx === 0 && near(m1.core.x, m0.core.x) && near(m1.core.z, m0.core.z) && m1.vp.x === 1600 && m1.vp.z === 500,
   JSON.stringify({ heights: [m0.heights, m1.heights], core: [m0.core, m1.core], vp: m1.vp }));
 check('a point deep inside the save (a list in an object) moves too', near(m1.deep[0].x, m0.deep[0].x + sx) && near(m1.deep[0].z, m0.deep[0].z + sz), JSON.stringify([m0.deep[0], m1.deep[0]]));

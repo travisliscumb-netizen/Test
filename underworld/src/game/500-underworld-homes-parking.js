@@ -135,8 +135,6 @@ Object.assign(PropertyManager.prototype, {
     if (home && def.yard) { const f = FACE_V[home.face]; for (let k = 0; k < def.yard; k++) out.push({ x: home.door.x + f[0] * 9 + (home.face < 2 ? (k * 3.4 + 8) : 0), z: home.door.z + f[1] * 9 + (home.face < 2 ? 0 : (k * 3.4 + 8)), h: Math.atan2(-f[0], -f[1]), kind: 'yard', y: CURB_H }); }
     if (def.id === 'penthouse' && w.towerDrive) out.push({ ...w.towerDrive, kind: 'outdoor' });
     if (def.kind === 'warehouse' && w.compounds[def.id]) for (const p of w.compounds[def.id].park) out.push({ x: p.x, z: p.z, h: p.h, kind: 'yard', y: CURB_H });
-    // the motorsport park's pit garages, two bays each (Session 6B)
-    if (def.kind === 'motorsport' && w.vp) for (const b of w.vp.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: 0 });
     // the off-road compound's six bays in the owners' garage shed (Session 6C), on its pad
     // the motorsport complex: one pool, the road course's garages then the oval's
     if (def.kind === 'raceway') for (const b of [...(w.sr ? w.sr.bays : []), ...(w.cfs ? w.cfs.bays : [])]) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });

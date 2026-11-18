@@ -214,11 +214,11 @@ class OvalScenery {
     const Pd = O.paddock, PW = O.pit, R4 = (x0, z0, x1, z1, lift, hex) => quad([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], lift, hex);
     R4(Pd.x0, Pd.z0, Pd.x1, PW.garZ[0], 0.04, 0x8e8c86); R4(PW.garX[0], PW.garZ[0], PW.garX[1], PW.garZ[1], 0.04, 0x8e8c86);
     R4(PW.exit[0][0], PW.garZ[1], PW.entry[2][0], PW.z + PW.w / 2, 0.045, 0x34363a);
-    const lane = [...PW.exit.slice().reverse(), ...PW.entry.slice().reverse()].reverse(), ln = vpNormals(lane);
+    const lane = [...PW.exit.slice().reverse(), ...PW.entry.slice().reverse()].reverse(), ln = lineNormals(lane);
     for (let k = 0; k < lane.length - 1; k++) { const A = lane[k], B2 = lane[k + 1], na = ln[k], nb = ln[k + 1], w = PW.w / 2; quad([[A[0] - na[0] * w, A[1] - na[1] * w], [A[0] + na[0] * w, A[1] + na[1] * w], [B2[0] + nb[0] * w, B2[1] + nb[1] * w], [B2[0] - nb[0] * w, B2[1] - nb[1] * w]], 0.045, 0x34363a); }
     for (const x of [PW.x0 + 6, PW.x1 - 6]) R4(x - 0.3, PW.z - PW.w / 2, x + 0.3, PW.z + PW.w / 2, 0.055, 0xf2f2f2);
     // the gate road's asphalt through the paddock to the turning circle
-    const gp = cf.gate, gn = vpNormals(gp);
+    const gp = cf.gate, gn = lineNormals(gp);
     for (let k = 0; k < gp.length - 1; k++) { if (gp[k][0] < CFS.x0) continue; const A = gp[k], B2 = gp[k + 1], na = gn[k], nb = gn[k + 1]; quad([[A[0] - na[0] * 4.5, A[1] - na[1] * 4.5], [A[0] + na[0] * 4.5, A[1] + na[1] * 4.5], [B2[0] + nb[0] * 4.5, B2[1] + nb[1] * 4.5], [B2[0] - nb[0] * 4.5, B2[1] - nb[1] * 4.5]], 0.045, 0x34363a); }
     { const R0 = O.ring, r = R0.r + 4, m = 32; for (let i = 0; i < m; i++) { const a = i / m * Math.PI * 2, b = (i + 1) / m * Math.PI * 2; quad([[R0.x, R0.z], [R0.x + Math.cos(a) * r, R0.z + Math.sin(a) * r], [R0.x + Math.cos(b) * r, R0.z + Math.sin(b) * r], [R0.x, R0.z]], 0.05, 0x34363a); } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();

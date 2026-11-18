@@ -1,34 +1,24 @@
 /* =====================================================================
-   [UNDERWORLD] VALEN POINT MOTORSPORT PARK (§16, §45.34; Session 6B)
-   A legitimate asset on the island east of the city (world: 025, 125,
-   175). Everything here is Clean Bank, and nothing here draws heat:
-   - Race Control (the paddock office): buy the park (no Rank or Rep
-     gate), enter official events, book a track day.
+   [UNDERWORLD] OFFICIAL VENUES (§16, §45.34; Session 6B)
+   The base of the island's legitimate tracks: Southshore Raceway (the
+   road course, 509c) and the Southshore Speedway (the oval, 509b), one
+   property, the Southshore Motorsport Complex. Everything here is Clean
+   Bank, and nothing here draws heat:
    - Official events: circuit races against the clock and a grid, with
      class rules by the value of the car you bring (registered to you,
      not HOT, in one piece), a buy-in and prize money from the bank (the
      buy-in waived for the owner), paid by the same daily tiers as street
-     races (per event, per economic day); the Invitational awards a prize
+     races (per event, per economic day); an invitational awards a prize
      car, once.
    - Track days: timed laps on the circuit (a fee, or free for the owner:
      a private session). Valid laps pass every sector; the best is saved.
-   - The owner also gets: 24 pit-garage parking bays (the registry's
-     physical spaces), a pit crew for repairs a third off, the right to
-     host a race meeting (pay to put it on, the gate takes it back the
-     next day), and the park's daily income.
+   (Valen Point Motorsport Park, the first of them, closed on 2026-11-18
+   when Valen Sound was filled in: 509c takes its owners' features and
+   settles an old save.)
    ===================================================================== */
-const VP_EVENTS = [
-  { id: 'vp_club', name: 'Club Sprint', laps: 2, opp: 4, band: [0, 16000], fee: 200, reward: 2000, cls: ['compact', 'apex', 'sedan', 'crest'], blurb: 'Hatchbacks and saloons, nothing worth more than $16,000. Two laps.' },
-  { id: 'vp_gt', name: 'GT Cup', laps: 3, opp: 5, band: [16000, 65000], fee: 1000, reward: 6000, cls: ['sports', 'tempest', 'muscle', 'hellion', 'revenant'], blurb: 'Sports cars and muscle, $16,000 to $65,000. Three laps.' },
-  { id: 'vp_super', name: 'Supercar Showdown', laps: 3, opp: 5, band: [65000, Infinity], fee: 3000, reward: 15000, cls: ['supercar', 'valkyr', 'obsidian', 'monarch', 'coupe'], blurb: 'The fastest cars on the island, $65,000 and up. Three laps.' },
-  { id: 'vp_inv', name: 'Valen Point Invitational', laps: 3, opp: 5, band: [40000, Infinity], fee: 8000, reward: 0, car: 'monarch', cls: ['valkyr', 'obsidian', 'supercar', 'coupe', 'kodiak'], blurb: 'Invitation only, $40,000 and up. The winner drives home a Monarch GT. Once.' }
-];
-for (const e of VP_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; }
-const VP_PARK = { trackDay: 250, session: 600, hostCost: 20000, hostTake: 32000, income: 9000, upkeep: 2500, pitK: 0.7, minHp: 60 };
-const RACE_CONTROL = { id: 'racecontrol', name: 'Race Control' };
 // a loop's checkpoints for an event: every 40 m from the start/finish sample k0 round the loop, `laps` times (the
 // last of each lap the line itself); the grid 34 m behind the line; the racing line for AI drivers every 10 m with a
-// safe speed vs[k] and the left normal (Valen Point's circuit, Session 6B; the off-road course, Session 6C)
+// safe speed vs[k] and the left normal
 function loopCheckpoints(T, k0, def, vs) {
   const n = T.pts.length, laps = def.laps || 1, out = [], sf = T.pts[k0];
   for (let l = 0; l < laps; l++) for (let j = 20; j <= n; j += 20) { const k = (k0 + j) % n; out.push({ x: T.pts[k][0], z: T.pts[k][1], lap: l }); }
@@ -46,16 +36,14 @@ function loopSafeSpeeds(T, a, vTop, brake, cap) {
   for (let pass = 0; pass < 3; pass++) for (let i = n - 1; i >= 0; i--) { const j = (i + 1) % n, ds = T.cum[i + 1] - T.cum[i]; v[i] = Math.min(v[i], Math.sqrt(v[j] * v[j] + 2 * brake * ds)); }
   return v;
 }
-function vpCheckpoints(def) { const vp = game.world.vp; return loopCheckpoints(vp.track, vp.sf.k, def, vpSafeSpeeds()); }
-function vpSafeSpeeds() { const T = game.world.vp.track; return T._vs || (T._vs = loopSafeSpeeds(T, 8.5, 60, 7)); }
 // which venue runs an official event
-function venueOf(def) { return def.venue === 'oval' ? game.oval : def.venue === 'sr' ? game.raceway : game.motorsport; }
+function venueOf(def) { return def.venue === 'oval' ? game.oval : game.raceway; }
 /* ---------------------------------------------------------------------
    An official venue: everything Clean Bank, no Rep, no heat. Events with class rules and a buy-in at the start line
    (after scrutineering), prize money by the street races' daily tiers, a prize car once; track sessions with lap
    timing (sectors in order, the best saved). V: { key (its save slot), prop (the property), events, park (prices:
    trackDay, session, minHp), office ({ id, name }), chip, waive (the owner races free), line() → { T, sf: {k, x, z},
-   w } }. MotorsportPark (Valen Point), RacewayPark (the Southshore road course) and OvalPark (the Southshore Speedway).
+   w } }. RacewayPark (the Southshore road course) and OvalPark (the Southshore Speedway).
    --------------------------------------------------------------------- */
 class OfficialVenue {
   constructor(g, V) { this.g = g; this.V = V; this.session = null; this.lapT = null; this.sect = 0; this._prev = null; }
@@ -152,73 +140,5 @@ class OfficialVenue {
     T.laps = Number.isInteger(T.laps) && T.laps >= 0 ? T.laps : 0;
     s[this.V.key] = T; this.session = null; this.lapT = null; this.sect = 0; this._prev = null;
     return T;
-  }
-}
-class MotorsportPark extends OfficialVenue {
-  constructor(g) {
-    super(g, { key: 'track', prop: 'motorsport', events: VP_EVENTS, park: VP_PARK, office: RACE_CONTROL, chip: 'VALEN POINT · official', waive: true, wonAt: 'won at Valen Point', repairHint: ' (the pit crew can do it)',
-      line: () => { const vp = game.world.vp; return { T: vp.track, sf: vp.sf, w: VP_TRACK.w }; } });
-  }
-  static fresh() { return { best: null, prize: {}, hosted: null, laps: 0 }; }
-  safeSpeeds() { return vpSafeSpeeds(); }
-  // ---------------------------------------------------------------- the owner's meeting and the park's day
-  host() {
-    const g = this.g, s = this.s;
-    if (!this.owned()) return 'Only the owner hosts meetings.';
-    if (s.hosted) return 'A meeting is already on the calendar.';
-    if (!Money.pay(VP_PARK.hostCost, 'trackHost')) return `Putting a meeting on costs ${fmtMoney(VP_PARK.hostCost)} from your bank.`;
-    s.hosted = { day: this.day() };
-    g.saveGame(true);
-    return '';
-  }
-  // once an economic day (PropertyManager.tickDay): the park's takings, and the gate from a meeting you hosted
-  tickDay() {
-    const g = this.g, s = this.s; if (!this.owned()) return;
-    // inside (M13, §45.8): the park's staff keep it running at cost, no profit for an owner in a cell
-    Money.earn(g.uw && g.uw.S.jail ? VP_PARK.upkeep : VP_PARK.income, 'trackIncome');
-    Money.pay(VP_PARK.upkeep, 'upkeep', { partial: true });
-    if (s.hosted && s.hosted.day < this.day()) { s.hosted = null; Money.earn(VP_PARK.hostTake, 'trackIncome'); g.uw.news('pv', `Race meeting at Valen Point: a full house. ${fmtMoney(VP_PARK.hostTake)} from the gate is in your bank.`); }
-  }
-  // ---------------------------------------------------------------- the pit crew (in a pit garage, in a car)
-  pitAction(v) {
-    const g = this.g, [x0, x1] = VP_PIT.garX, [z0, z1] = VP_PIT.garZ;
-    if (v.speed > 2 || v.pos.x < x0 || v.pos.x > x1 || v.pos.z < z0 || v.pos.z > z1) return null;
-    const dmg = v.health < 99.5 || v.broken || v.deformed > 0.05; if (!dmg) return null;
-    const c = Math.round(g.content.repairCost(v.type, v.health) * (this.owned() ? VP_PARK.pitK : 1) / 10) * 10;
-    return { label: `Pit crew · repair ${fmtMoney(c)}`, act: () => { if (!Money.pay(c, 'pitService')) { g.ui.toast('Not enough in the bank.', 'warn'); return; } g.content.repair(v); const e = g.vreg.entryOf(v); if (e) e.dmg = 0; g.audio.play('cash'); g.ui.toast('Pit crew: fixed.', 'money'); } };
-  }
-  door() { const pl = this.g.world.places.motorsport; return pl ? pl.door : null; }
-  findAction() {
-    const g = this.g, p = g.player;
-    if (p.state === 'vehicle') return p.vehicle ? this.pitAction(p.vehicle) : null;
-    const d = this.door(); if (!d || p.state !== 'foot' || p.interior) return null;
-    if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) > 2.6) return null;
-    return { label: 'Race Control · Valen Point Motorsport Park', act: () => this.openOffice() };
-  }
-  openOffice() {
-    const g = this.g, C2 = g.content, PM = g.uw.props, def = PROP_BY_ID.motorsport;
-    const render = () => {
-      const own = this.owned(), s = this.s;
-      let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>Best lap <b>${s.best ? fmtRace(s.best.t) : '—'}</b></span><span>${Money.html('trackFee')}</span></div>`;
-      if (!own) h += `<div class="card"><div class="t">Buy the park</div><div class="d">${esc(def.desc)} 24 pit-garage spaces, no entry fees, a private session whenever you like, the pit crew a third off, race meetings you host, and about ${fmtMoney(VP_PARK.income - VP_PARK.upkeep)} a day clear.</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
-      h += '<h3>Official events</h3><div class="grid2">' + VP_EVENTS.map(e => {
-        const done = e.car && s.prize[e.id], p = this.payout(e, 1), f = this.fee(e);
-        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${e.car ? (done ? 'won' : esc(VEHICLES[e.car].name)) : fmtMoney(p.cash) + (p.tier ? ' (won today)' : '')}</span></div><button class="sbtn" data-act="ev:${e.id}" ${done ? 'disabled' : ''}>${done ? 'Won' : 'Enter'}</button></div>`;
-      }).join('') + '</div>';
-      h += `<h3>On track</h3><div class="btns"><button class="sbtn" data-act="day" ${this.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Track day · ' + fmtMoney(VP_PARK.trackDay)}</button>${own ? `<button class="sbtn" data-act="host" ${s.hosted ? 'disabled' : ''}>${s.hosted ? 'Meeting on the calendar' : 'Host a race meeting · ' + fmtMoney(VP_PARK.hostCost)}</button>` : ''}</div>`;
-      return h;
-    };
-    C2.openSvc('Race Control', 'Official: “Clean money, clean cars, a clean lap. Everything here goes through the bank.”', render, act => {
-      const [k, id] = act.split(':');
-      if (k === 'buy') { const r = PM.buy('motorsport'); C2.refreshSvc(r || 'Valen Point Motorsport Park is yours.'); return; }
-      if (k === 'ev') { const e = VP_EVENTS.find(x => x.id === id); if (e) this.enter(e); return; }
-      if (k === 'day') { C2.refreshSvc(this.book() || 'Session booked.'); return; }
-      if (k === 'host') { C2.refreshSvc(this.host() || 'Meeting on the calendar: the takings come in tomorrow.'); return; }
-    });
-  }
-  // a save's park state: validated
-  reset() {
-    const T = super.reset(); if (!T) return;
-    T.hosted = T.hosted && Number.isInteger(T.hosted.day) ? { day: T.hosted.day } : null;
   }
 }

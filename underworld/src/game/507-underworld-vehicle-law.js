@@ -46,7 +46,7 @@ class ImpoundLot {
   get id() { return IMPOUND.id; }
   get C() { return this.g.world.compounds[IMPOUND.id]; }
   get CS() { return this.g.uw.compounds; }
-  // the yards: the main lot (with the window), the overflow yard next door, and Valen Point's annex (Session 6B)
+  // the yards: the main lot (with the window), the overflow yard next door, and the Sound annex (125)
   lots() { const W = this.g.world.compounds; return [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id].filter(id => W[id]); }
   econ() { return this.g.uw ? this.g.uw.S.econH : 0; }
   // the release fee: a share of what the car is worth, fixed when it is seized
@@ -67,9 +67,9 @@ class ImpoundLot {
   freeSlot(skip, at) {
     const used = new Set(this.held().filter(e => e !== skip).map(e => e.imp.slot)), S = this.slots();
     // the yard nearest to where it was seized first (§45.35): from the city (and from Cedar Fields South, over the
-    // land bridge, Session 6C), the main yard, the overflow yard, then Valen Point's annex; from Valen Point, its
-    // annex first, then the city's yards
-    const order = at && vpSide(at.x, at.z) ? [IMPOUND.annex.id, IMPOUND.id, IMPOUND.overflow.id] : [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id];
+    // land bridge, Session 6C), the main yard, the overflow yard, then the Sound annex; from the Sound Flats (the
+    // reclaimed land the annex stands on), the annex first, then the city's yards
+    const order = at && zoneKey(at.x, at.z) === 'v' ? [IMPOUND.annex.id, IMPOUND.id, IMPOUND.overflow.id] : [IMPOUND.id, IMPOUND.overflow.id, IMPOUND.annex.id];
     for (const lot of order) for (let i = 0; i < S.length; i++) if (S[i].lot === lot && !used.has(i)) return i;
     return -1;
   }
@@ -149,7 +149,7 @@ class ImpoundLot {
     });
   }
   // "space 3 in the main yard", "space 27 in the overflow yard"
-  spaceName(e) { const S = this.slots(), sp = this.slotPos(e); if (!sp) return 'the waiting list (no space free yet)'; const n = S.filter((q, i) => q.lot === sp.lot && i <= e.imp.slot).length; return `space ${n} in the ${sp.lot === IMPOUND.id ? 'main yard' : sp.lot === IMPOUND.annex.id ? 'Valen Point annex' : 'overflow yard'}`; }
+  spaceName(e) { const S = this.slots(), sp = this.slotPos(e); if (!sp) return 'the waiting list (no space free yet)'; const n = S.filter((q, i) => q.lot === sp.lot && i <= e.imp.slot).length; return `space ${n} in the ${sp.lot === IMPOUND.id ? 'main yard' : sp.lot === IMPOUND.annex.id ? 'Sound annex' : 'overflow yard'}`; }
   findAction() {
     const g = this.g, p = g.player; if (!this.C || p.interior || p.state !== 'foot') return null;
     const picking = () => ({ label: `Picking the gate lock… ${Math.ceil(IMPOUND.pick - this.pick.t)} s`, act: () => {} });

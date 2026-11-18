@@ -53,7 +53,7 @@ const Farms = {
     if (h < SEA_Y + 1.4) return false;
     if (CityLayout.inCity(x, z, EDGE_MARGIN + 30)) return false;
     const inR = (R, k) => x > R.x0 - k && x < R.x1 + k && z > R.z0 - k && z < R.z1 + k;
-    if (inR(CFS, 25) || inR(AIRPORT, 45) || inR(PROVING, 35) || inR(VP, 45) || inR(VILLA_VALEN, 20)) return false;
+    if (inR(CFS, 25) || inR(AIRPORT, 45) || inR(PROVING, 35) || inR({ x0: SOUND_RESERVE[0], z0: SOUND_RESERVE[1], x1: SOUND_RESERVE[2], z1: SOUND_RESERVE[3] }, 0) || inR(VILLA_VALEN, 20)) return false;
     if (((x - LAKE.x) / (LAKE.rx + 60)) ** 2 + ((z - LAKE.z) / (LAKE.rz + 60)) ** 2 < 1) return false;
     if (Island._nearRoad(Island._seg, x, z) && Island._rd < m) return false;
     for (const P of Island.pads) if (P.x1 - P.x0 < 900 && x > P.x0 - 4 && x < P.x1 + 4 && z > P.z0 - 4 && z < P.z1 + 4) return false;

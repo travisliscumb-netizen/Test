@@ -13,7 +13,7 @@
 const OV_EVENTS = [
   { id: 'ov_dash', name: 'Speedway Dash', laps: 5, opp: 5, band: [0, 25000], fee: 300, reward: 3000, cls: ['compact', 'apex', 'sedan', 'crest', 'muscle'], blurb: 'Anything worth under $25,000. Five laps of the oval, nose to tail down both straights.' },
   { id: 'ov_muscle', name: 'Muscle Car Nationals', laps: 8, opp: 5, band: [10000, 45000], fee: 900, reward: 7500, cls: ['muscle', 'hellion', 'sports', 'tempest', 'revenant'], blurb: 'Cars worth $10,000 to $45,000. Eight laps on the banking.' },
-  { id: 'ov_500', name: 'Southshore 500', laps: 12, opp: 5, band: [40000, Infinity], fee: 3000, reward: 18000, cls: ['supercar', 'valkyr', 'obsidian', 'coupe', 'monarch'], blurb: 'The big one, $40,000 and up. Twelve laps flat out: the straights are 400 m.' }
+  { id: 'ov_500', name: 'Southshore 500', laps: 12, opp: 5, band: [40000, Infinity], fee: 3000, reward: 15000, cls: ['supercar', 'valkyr', 'obsidian', 'coupe', 'monarch'], blurb: 'The big one, $40,000 and up. Twelve laps flat out: the straights are 400 m.' }
 ];
 for (const e of OV_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; e.venue = 'oval'; }
 // prices (provisional, like the other venues': ECONOMY.md): a session on the oval
@@ -57,19 +57,22 @@ function complexOffice(g, here) {
   const render = () => {
     const own = V.road.owned();
     let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>${Money.html('trackFee')}</span></div>`;
-    if (!own) h += `<div class="card"><div class="t">Buy the Southshore Motorsport Complex</div><div class="d">${esc(def.desc)}</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
+    if (!own) h += `<div class="card"><div class="t">Buy the Southshore Motorsport Complex</div><div class="d">${esc(def.desc)} About ${fmtMoney(COMPLEX.income - COMPLEX.upkeep)} a day clear.</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
     for (const k of order) {
       const v = V[k], t = T[k], s = v.s;
       h += `<h3>${esc(t.name)} · ${(t.len / 1000).toFixed(2)} km · record ${s.best ? fmtRace(s.best.t) : '—'}</h3><div class="grid2">` + t.events.map(e => {
-        const p = v.payout(e, 1), f = v.fee(e), band = e.band[1] === Infinity ? fmtMoney(e.band[0]) + ' and up' : fmtMoney(e.band[0]) + '–' + fmtMoney(e.band[1]);
-        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Class</span><span>${band}</span></div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${fmtMoney(p.cash)}</span></div><button class="sbtn" data-act="ev:${k}:${e.id}">Enter · ${e.laps} laps</button></div>`;
+        const p = v.payout(e, 1), f = v.fee(e), band = e.band[1] === Infinity ? fmtMoney(e.band[0]) + ' and up' : fmtMoney(e.band[0]) + '–' + fmtMoney(e.band[1]), done = e.car && s.prize[e.id];
+        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Class</span><span>${band}</span></div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${e.car ? (done ? 'won' : esc(VEHICLES[e.car].name)) : fmtMoney(p.cash)}</span></div><button class="sbtn" data-act="ev:${k}:${e.id}" ${done ? 'disabled' : ''}>Enter · ${e.laps} laps</button></div>`;
       }).join('') + '</div>';
       h += `<div class="btns"><button class="sbtn" data-act="day:${k}" ${v.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Timed laps · ' + fmtMoney(v.V.park.trackDay)}</button></div>`;
     }
+    // the owner's meeting (the complex's, on the road course's record)
+    if (own) { const hs = V.road.s.hosted; h += `<h3>Race meetings</h3><div class="btns"><button class="sbtn" data-act="host" ${hs ? 'disabled' : ''}>${hs ? 'Meeting on the calendar' : 'Host a meeting · ' + fmtMoney(COMPLEX.hostCost)}</button></div><div class="hint">The gate pays ${fmtMoney(COMPLEX.hostTake)} the next day. Stop in any pit garage for the pit crew, a third off.</div>`; }
     return h;
   };
   C2.openSvc(here === 'oval' ? 'Speedway Office' : 'Race Office', 'Clerk of the course: “One complex, two tracks. Official means clean: the bank pays, the bank collects, and nobody here calls the police on you.”', render, act => {
     const [k, a, id] = act.split(':');
+    if (k === 'host') { C2.refreshSvc(V.road.host() || 'Meeting on the calendar: the takings come in tomorrow.'); return; }
     if (k === 'buy') { const r = PM.buy('raceway'); C2.refreshSvc(r || 'The Southshore Motorsport Complex is yours: both tracks and every garage.'); return; }
     if (k === 'ev') { const e = T[a] && T[a].events.find(x => x.id === id); if (e) V[a].enter(e); return; }
     if (k === 'day') { C2.refreshSvc(V[a].book() || 'Session booked.'); return; }

@@ -51,10 +51,11 @@ const SaveSystem = {
       // street racing (Session 6A): today's wins per race (the purse tiers), a pink slip's stake while it is down,
       // and the economic day of the last pink slip
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
-      // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
-      track: { best: null, prize: {}, hosted: null, laps: 0 },
-      // Southshore Raceway (509c): best lap, laps
-      raceway: { best: null, prize: {}, laps: 0 },
+      // Southshore Raceway and the Motorsport Complex (509c): best lap, prize cars won, laps, a hosted meeting waiting
+      // to settle (Valen Point's 'track' record went with it, 2026-11-18: 509c migrates an old save)
+      raceway: { best: null, prize: {}, hosted: null, laps: 0 },
+      // the Southshore Fairground (509d): rides taken by ride, the best kart lap, kart laps, plush prizes won, games played
+      fair: { rides: {}, kartBest: null, kartLaps: 0, prizes: [0, 0, 0], plays: 0 },
       // the Southshore Speedway (509b): best lap, laps
       oval: { best: null, prize: {}, laps: 0 },
       // the ten one-offs (Session 6D): each one's stage (undiscovered, clue, exact location, acquired)

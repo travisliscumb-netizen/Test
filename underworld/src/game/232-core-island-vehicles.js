@@ -52,6 +52,10 @@ Object.assign(VEHICLES, {
     flight: { climb: 12, sink: 13, acc: 10, yaw: 1.4, vBack: 14, rotor: 6.4, blades: 5, hub: [0, 3.62, 0.25], tail: [0.24, 2.95, -6.95], tailR: 0.62, tailFan: true },
     colors: [0x111316, 0x0d1c33, 0xf2f4f6], paint2: 0xd4af37, blurb: 'An executive twin: five blades, a glass nose, a quiet cabin and gold on black.' }
 });
+// the fairground's go-kart (129c, 511): a rental, the fair's property (taken out on its track, never kept or sold);
+// about 68 km/h flat out, light and grippy, one seat and an open frame
+VEHICLES.kart = { rev: 0.7, name: 'Southshore Rental Kart', l: 1.9, w: 1.3, h: 0.95, mass: 175, power: 980, drift: 0.12, vmax: 19, steer: 0.82, grip: 1.55, brake: 14, soft: 0.2, wheelR: 0.14, camDist: 3.6, camH: 1.05, eng: 2.6, price: 0, profile: 'roadster', build: 'kart', tier: 'sport', fleet: true, kart: true,
+  colors: [0xd23a2a, 0x2471a3, 0xf2c230, 0x2e8b57, 0xe08a1e, 0xe056fd], blurb: 'A rental kart from the Southshore Fairground. It stays on the fair’s track.' };
 VEHICLES.medevac = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Medevac', colors: [0xf2f4f6], paint2: 0xd02a3a, blurb: 'St. Alda’s air ambulance.' });
 VEHICLES.polheli = Object.assign({}, VEHICLES.heli, { name: 'Kestrel Air Unit', colors: [0x14233f], paint2: 0xf4f6f7, polAir: true, blurb: 'The department’s eye in the sky.' });
 TRAIL.rally = 0.75;
@@ -73,6 +77,26 @@ const ISLE_BUILD = {
     for (const z of [wb / 2, -wb / 2]) for (const sx of [-1, 1]) for (const dz of [-0.22, 0.22]) g.add(TPL.box, M(sx * (tr + 0.35) / 2 + sx * 0.1, R + 0.04, z + dz / 2, tr - 0.5, 0.035, 0.05, sx * dz * 0.5), null, P(2));
     const geo = g.build(); creaseNormals(geo, [0, 10]);
     return { geo, lod: geo, wheels: [[tr, wb / 2], [-tr, wb / 2], [tr, -wb / 2], [-tr, -wb / 2]], yb: 0.12, zf: 2.9, zr: -2.4, frontTop: 0.5, rearTop: 0.9, cabTop: 1.0 };
+  },
+  // the go-kart: a tube frame on the ground, a moulded seat, side pods, the front fairing and the rear bumper, the
+  // engine on the right behind the seat, a steering wheel, the driver's helmet
+  kart(type) {
+    const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), R = s.wheelR;
+    const tube = (x, y, z, r, len, part, rx = Math.PI / 2, rz = 0) => g.add(TPL.cyl, M(x, y, z, r, len, r, 0, rx, rz), null, P(part));
+    for (const sx of [-0.36, 0.36]) tube(sx, 0.12, 0, 0.025, 1.5, 2);
+    for (const z of [0.62, -0.1, -0.68]) tube(0, 0.12, z, 0.022, 0.74, 2, 0, Math.PI / 2);
+    g.box(0, 0.1, 0, 0.7, 0.02, 1.3, null, 0, P(14));
+    // the seat (a tub, its back up) and the side pods; the front fairing and nose; the rear bumper
+    g.box(0, 0.26, -0.28, 0.42, 0.22, 0.42, null, 0, P(14)); g.add(TPL.box, M(0, 0.48, -0.5, 0.42, 0.5, 0.08, 0, -0.35), null, P(14));
+    for (const sx of [-1, 1]) g.box(sx * 0.52, 0.2, -0.05, 0.16, 0.16, 0.66, null, 0, P(0));
+    g.add(TPL.box, M(0, 0.26, 0.58, 0.62, 0.22, 0.34, 0, 0.45), null, P(0)); g.box(0, 0.18, 0.86, 0.88, 0.14, 0.12, null, 0, P(0));
+    g.box(0, 0.2, -0.92, 1.0, 0.1, 0.1, null, 0, P(2));
+    // the engine and its exhaust; the steering column and wheel; the helmeted driver's head
+    g.box(0.3, 0.32, -0.62, 0.24, 0.28, 0.26, null, 0, P(2)); tube(0.36, 0.3, -0.84, 0.04, 0.24, 2);
+    g.add(TPL.box, M(0, 0.42, 0.22, 0.04, 0.4, 0.04, 0, 0.55), null, P(2)); g.add(TPL.cyl, M(0, 0.58, 0.12, 0.17, 0.03, 0.17, 0, -0.9), null, P(14));
+    g.add(TPL.sphere, M(0, 0.98, -0.32, 0.16, 0.17, 0.18), null, P(10));
+    const geo = g.build(); creaseNormals(geo, [0, 10]);
+    return { geo, lod: geo, wheels: [[0.56, 0.56], [-0.56, 0.56], [0.58, -0.6], [-0.58, -0.6]], yb: 0.04, zf: 0.95, zr: -0.98, frontTop: 0.35, rearTop: 0.5, cabTop: 1.15 };
   },
   plane(type) {
     const s = VEHICLES[type], g = new GeoBuilder({ part: true }), P = part => ({ part }), Y = 1.36, span = s.flight.span;

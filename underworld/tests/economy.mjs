@@ -118,7 +118,7 @@ check('every routine casino game returns less than it takes (roulette, baccarat,
 const race = await ev(() => {
   const g = window.game, P = window.__pv, R = g.raceRules, def = P.RACES.find(r => !r.storyOnly), out = {};
   out.tiers = []; for (let i = 0; i < 4; i++) { out.tiers.push(R.payout(def, 1).cash); R.noteWin(def.id); }
-  out.official = (P.VP_EVENTS || []).filter(e => e.reward).map(e => [e.id, e.fee, e.reward, e.rep]);
+  out.official = [...P.SR_EVENTS, ...P.OV_EVENTS].filter(e => e.reward).map(e => [e.id, e.fee, e.reward, e.rep]);
   // a hidden package pays once
   const C = g.content, pk = g.world.packages.find(p => !g.save.packages[p.id]); if (pk) { const m0 = g.money.total(); C.collectPackage(pk); C.collectPackage(pk); out.pkg = g.money.total() - m0; }
   return out;

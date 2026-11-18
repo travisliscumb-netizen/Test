@@ -69,7 +69,7 @@ const G = await ev(() => {
   return out;
 });
 check('the grid is still the grid: every open lattice segment is in the graph, straight, 80 m end to end; closures and lattice paths unchanged', G.grid.bad === 0 && G.grid.segs === G.grid.open && G.grid.closed === G.expect && G.grid.bfs === G.grid.manhattan + 1, JSON.stringify(G.grid));
-check('one connected network: every junction reaches every other (the city, the curved streets, Valen Point, Cedar Fields South)', G.reach === 1, JSON.stringify({ reach: G.reach, n: G.n }));
+check('one connected network: every junction reaches every other (the city, the curved streets, the island’s roads, Sound Parkway, Cedar Fields South)', G.reach === 1, JSON.stringify({ reach: G.reach, n: G.n }));
 const skew = G.tees.filter(x => x.ang < 75);
 check('T-junctions at any angle: at least three new streets leave the grid well off square (under 75°), none sharper than 30°', skew.length >= 3 && G.tees.every(x => x.ang >= 30), JSON.stringify(G.tees));
 check('a Y-junction: Kiln Lane forks off Saltmarsh Way at a shallow angle (15–40°)', G.y.some(y => y.minor === 'Kiln Lane' && y.main === 'Saltmarsh Way' && y.ang >= 15 && y.ang <= 40), JSON.stringify(G.y));

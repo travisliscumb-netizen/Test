@@ -301,9 +301,9 @@ class Underworld {
     if (this.g.uniques) this.g.uniques.reset();
     if (this.g.pinks) this.g.pinks.reset();
     if (this.g.wash) this.g.wash.reset();
-    if (this.g.motorsport) this.g.motorsport.reset();
     if (this.g.oval) this.g.oval.reset();
     if (this.g.raceway) this.g.raceway.reset();
+    if (this.g.fair) this.g.fair.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -919,9 +919,9 @@ class Underworld {
     const ra = this.rivalwh.findAction(); if (ra) return ra;
     const sa = this.shipments.findAction(); if (sa) return sa;
     const ia = g.impound.findAction(); if (ia) return ia;
-    const ma = g.motorsport.findAction(); if (ma) return ma;
     const oa = g.oval.findAction(); if (oa) return oa;
     const sra = g.raceway.findAction(); if (sra) return sra;
+    const fa = g.fair && g.fair.findAction(); if (fa) return fa;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       const wa = g.wash.findAction(); if (wa) return wa;

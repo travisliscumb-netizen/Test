@@ -61,7 +61,7 @@ Object.assign(World.prototype, {
     // ---------------------------------------------------------------- barriers: armco both sides, run-off by corner speed
     const runOut = R => R <= 0 ? 10 : R < 40 ? 16 : R < 60 ? 20 : 24;
     const ease = (k, f) => { let best = f(k); for (let d = 1; d <= 20; d++) { const w = 1 - d / 21; best = Math.max(best, f((k + d) % N2) * w, f((k - d + N2) % N2) * w); } return best; };
-    const turn = k => T.R[k] > 0 ? Math.sign(this._vpTurn(T, k)) : 0;
+    const turn = k => T.R[k] > 0 ? Math.sign(this._loopTurn(T, k)) : 0;
     const offL = k => half + ease(k, i => turn(i) > 0 ? runOut(T.R[i]) : T.R[i] > 0 ? 4 : 10);
     const offR = k => half + ease(k, i => turn(i) < 0 ? runOut(T.R[i]) : T.R[i] > 0 ? 4 : 10);
     sr.offL = offL; sr.offR = offR; sr.turn = turn;
@@ -129,8 +129,10 @@ Object.assign(World.prototype, {
     }
     // ---------------------------------------------------------------- the fleet: race cars in the garages and the paddock
     this.isle.fleet.push({ id: 'sr_pits', x: -620, z: 1816, r: 300, slots: sr.bays.filter((q, i) => i % 3 === 0).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: Y, cls: ['gt3', 'cup', 'drift', 'formula', 'lmp', 'rally'][i % 6] })) });
-    // and at the oval's garages (126)
-    if (this.cfs) this.isle.fleet.push({ id: 'so_pits', x: 350, z: 1188, r: 300, slots: this.cfs.bays.filter((q, i) => i % 4 === 1).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: q.y, cls: ['cup', 'gt3', 'muscle', 'lmp', 'sports', 'formula'][i % 6] })) });
+    // Valen Point's race cars came here when it closed (2026-11-18): six in a row in the paddock, facing the garages ...
+    this.isle.fleet.push({ id: 'sr_paddock', x: -710, z: 1786, r: 300, slots: ['drift', 'cup', 'formula', 'gt3', 'lmp', 'rally'].map((cls, k) => ({ x: SR.paddock.x0 + 30 + k * 12, z: 1788, h: 0, y: Y, cls })) });
+    // ... and at the oval's garages (126), its own six and Valen Point's pit six
+    if (this.cfs) this.isle.fleet.push({ id: 'so_pits', x: 350, z: 1188, r: 300, slots: this.cfs.bays.filter((q, i) => i % 2 === 1).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: q.y, cls: ['cup', 'gt3', 'muscle', 'lmp', 'sports', 'formula', 'gt3', 'formula', 'lmp', 'cup', 'gt3', 'rally'][i % 12] })) });
     this.mapPlaces.push({ id: 'raceway', name: SR.name, cat: 'landmark', icon: 'R', x: SR.office.x0 - 6, z: (SR.office.z0 + SR.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km road course, nine pit garages · the Southshore Motorsport Complex` });
     // (the blocks' colliders are added with the rest of the island's, 127)
   }
@@ -163,7 +165,7 @@ class RacewayScenery {
     fb.rect(SR.paddock.x0, SR.paddock.z0, SR.paddock.x1, SR.pit.garZ[0], Y + 0.05, SR_COL.concrete);
     fb.rect(SR.pit.garX[0], SR.pit.garZ[0], SR.pit.garX[1], SR.pit.garZ[1], Y + 0.05, SR_COL.concrete);
     fb.rect(SR.pit.entry[2][0], SR.pit.garZ[1], SR.pit.exit[0][0], SR.pit.z + SR.pit.w / 2, Y + 0.06, SR_COL.pit);
-    const lane = [...SR.pit.entry, [SR.pit.x0 + 10, SR.pit.z], [SR.pit.x1 - 10, SR.pit.z], ...SR.pit.exit], ln = vpNormals(lane);
+    const lane = [...SR.pit.entry, [SR.pit.x0 + 10, SR.pit.z], [SR.pit.x1 - 10, SR.pit.z], ...SR.pit.exit], ln = lineNormals(lane);
     fb.strip(lane, ln, 0, lane.length - 1, -SR.pit.w / 2, SR.pit.w / 2, Y + 0.065, SR_COL.pit, false);
     // the turning circle and the road's last metres onto the paddock
     { const R0 = SR_ROAD.ringAt, r = SR_ROAD.ring + SR_ROAD.w / 2, m = 32; for (let i = 0; i < m; i++) { const a = i / m * Math.PI * 2, b = (i + 1) / m * Math.PI * 2; fb.quad([R0[0], R0[1]], [R0[0] + Math.cos(a) * r, R0[1] + Math.sin(a) * r], [R0[0] + Math.cos(b) * r, R0[1] + Math.sin(b) * r], [R0[0], R0[1]], Y + 0.055, SR_COL.pit); } }

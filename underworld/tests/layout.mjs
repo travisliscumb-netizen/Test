@@ -17,8 +17,8 @@ const check = (name, ok, detail = '') => { if (!ok) fail++; console.log(`${ok ? 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'game');
 const read = f => fs.readFileSync(path.join(SRC, f), 'utf8');
 const stubs = `const window = {}, navigator = { maxTouchPoints: 0 }, screen = { width: 1200, height: 900 };
-const vpSide = () => false, inCedarSouth = () => false, inValenPoint = () => false;
-const Island = { zoneKey: () => 'e', land: () => true, lake: () => false }, VP = { name: 'Valen Point' }, CFS = { name: 'Cedar Fields South' }, LAKE = { name: 'Lake Valen' };
+const inCedarSouth = () => false;
+const Island = { zoneKey: () => 'e', land: () => true, lake: () => false }, CFS = { name: 'Cedar Fields South' }, LAKE = { name: 'Lake Valen' };
 function offCity(x, z) { return CityLayout.at(x, z) === null; }
 const TURF_N = 6;
 `;

@@ -7,7 +7,7 @@
      every place out there and back; road beds are level across and no steeper than their grade; the bridge's deck
      and the tunnel's floor answer by height.
    - The sea: you wade and slow down; a car bogs down.
-   - The fleet: race cars in the Valen Point pits and at the proving ground (taken and driven like any car, faster than
+   - The fleet: race cars in the Southshore Raceway pits and paddock (Valen Point's, since it closed) and at the proving ground (taken and driven like any car, faster than
      a street car, not something you can keep); aircraft at the airport; a helicopter on each of the two roofs.
    - Flight: the aeroplane takes off from the runway, climbs, turns and lands on it; the helicopter spools up, lifts
      straight off the hospital's roof, flies and sets down again. You cannot step out in the air.
@@ -34,7 +34,7 @@ const isle = await ev(() => {
   return {
     ready: I.ready, km2: +(land * S * S / 1e6).toFixed(1), frac: +(land / n).toFixed(2), hi: Math.round(hi), span: [Math.round(east - west), Math.round(south - north)],
     radMin: Math.min(...rad), radMax: Math.max(...rad), seaAllRound: [[ISLE.x0 + 40, 0], [ISLE.x1 - 40, 0], [0, ISLE.z0 + 40], [0, ISLE.z1 - 40]].every(p => edge(p[0], p[1])),
-    bay: I.sea(-520, 250) && I.sea(-300, 600), sound: I.sea(1200, 500), lake: I.lake(LAKE.x, LAKE.z) && I.land(LAKE.x, LAKE.z - 420) && I.land(LAKE.x, LAKE.z + 420) && I.land(LAKE.x - 520, LAKE.z) && I.land(LAKE.x + 520, LAKE.z),
+    bay: I.sea(-520, 250) && I.sea(-300, 600), sound: I.land(1500, 500) && I.land(1800, 300) && I.height(1720, 1082, 1e6) < SEA_Y - 1 && I.height(2300, 1140, 1e6) < SEA_Y - 1, lake: I.lake(LAKE.x, LAKE.z) && I.land(LAKE.x, LAKE.z - 420) && I.land(LAKE.x, LAKE.z + 420) && I.land(LAKE.x - 520, LAKE.z) && I.land(LAKE.x + 520, LAKE.z),
     islets: [[-560, 470], [-1720, 520], [2860, -900], [-1450, 2720], [2680, 2480], [-2330, -2480]].filter(p => I.land(p[0], p[1])).length,
     summit: Math.round(I.height(MT_VALEN.x, MT_VALEN.z, 1e6)), beach: (() => { let x = -1000; while (x > -1500 && I.land(x, 1500)) x -= 2; return I.surface(x + 14, 1500, I.height(x + 14, 1500, 1e6), 0); })(),
     shore: Object.fromEntries(Object.entries(g.world.shore).map(([k, v]) => [k, v.reduce((s, r) => s + r[1] - r[0], 0) | 0])),
@@ -45,12 +45,12 @@ const isle = await ev(() => {
   };
 });
 check('the island is built: about 19 km² of land in a 5.6 × 6.4 km sea, sea on every edge of the map, a summit over 240 m', isle.ready && isle.km2 > 15 && isle.km2 < 24 && isle.frac < 0.62 && isle.seaAllRound && isle.hi > 240 && isle.summit > 235, JSON.stringify(isle));
-check('an irregular outline, not a rectangle: the shore is between a few hundred metres and several kilometres from the middle', isle.radMin < 900 && isle.radMax > 2400 && isle.span[0] > 4200 && isle.span[1] > 5200, JSON.stringify([isle.radMin, isle.radMax, isle.span]));
-check('Valen Bay west of the city, Valen Sound east of it, Lake Valen inland with land all round it, six islets', isle.bay && isle.sound && isle.lake && isle.islets === 6, JSON.stringify(isle));
+check('an irregular outline, not a rectangle: the shore is between one and several kilometres from the middle, more than twice as far one way as another', isle.radMax > 2400 && isle.radMax / isle.radMin > 2 && isle.span[0] > 4200 && isle.span[1] > 5200, JSON.stringify([isle.radMin, isle.radMax, isle.span]));
+check('Valen Bay west of the city, the Sound Flats east of it (land now) with Valen River through them, Lake Valen inland with land all round it, six islets', isle.bay && isle.sound && isle.lake && isle.islets === 6, JSON.stringify(isle));
 check('a beach on the long shore (sand), and you can wade: the sea floor is never deeper than 1.25 m under the surface', isle.beach === 1 && Math.abs(isle.wade - (-2.45)) < 0.01, JSON.stringify([isle.beach, isle.wade]));
 { const W = isle.walls, w = k => W[k] || 0;
-  check('the seawall stands only where the city meets water: the port on Valen Sound, the Nightlife Strip and Stadium on the bay\'s south shore, the Old Quarter\'s west street on Valen Bay, Uptown and the freight park on the water; the core\'s north street (Midtown) and Linden Hills\' south street over dry ground have none',
-    isle.layout === 'island' && w('port.e') > 900 && w('strip.n') + w('stadium.n') > 400 && w('core.w') + w('oldquarter.w') > 300 && w('uptown.s') > 250 && w('freight.n') > 250 && w('core.n') < 60 && w('linden.s') < 20, JSON.stringify(W)); }
+  check('the seawall stands only where the city meets water: the port along the river\'s harbour basin (the rest of its east side is land now), the Nightlife Strip and Stadium on the bay\'s south shore, the Old Quarter\'s west street on Valen Bay; Uptown, the freight park, the core\'s north street (Midtown) and Linden Hills\' south street over dry ground have none',
+    isle.layout === 'island' && w('port.e') > 100 && w('port.e') < 260 && w('strip.n') + w('stadium.n') > 400 && w('core.w') + w('oldquarter.w') > 300 && w('uptown.s') < 20 && w('freight.n') < 20 && w('core.n') < 60 && w('linden.s') < 20, JSON.stringify(W)); }
 check('the ground carries on from the city’s promenade without a step you could not walk', isle.cityEdge.every(h => h > -0.1 && h < 0.6), JSON.stringify(isle.cityEdge));
 // the meshes and the physics share the ground: a near tile's vertices are the tile's heights, and a point inside a cell
 // is on one of its two triangles
@@ -74,13 +74,13 @@ const zones = await ev(() => {
   const { streetNameAt } = window.__pv;
   out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(300, 480)), streetNameAt(-12, 640), streetNameAt(600, 1800)];
   out.offStreets = [[80, 1500], [80, 2300], [400, -1200], [-1100, 480], [1900, 480], [2000, 560], [320, 2410], [-600, 322]].map(q => streetNameAt(q[0], q[1]));
-  out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'motorsport', 'oval', 'raceway', 'police', 'hospital', 'chopshop'];
+  out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'oval', 'raceway', 'police', 'hospital', 'chopshop'];
   out.places = out.want.filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));
   out.banks = Object.keys(window.__pv.BANKS).length; out.casino = !!g.world.places.casino || Object.values(g.world.places).some(p => /Royale/i.test(p.name || ''));
   return out;
 });
 check('every district off the lattice by name', zones.ridge === 'Crestmoor Ridge' && zones.mount === 'Mount Valen' && zones.highlands === 'Blackgate Highlands' && zones.saltmarsh === 'Saltmarsh' && zones.southshore === 'Southshore' && zones.airport === 'Port Valen International' && zones.proving === 'Valen Proving Ground', JSON.stringify(zones));
-check('Valen Point, Cedar Fields and the city’s own districts keep theirs; the water has names too', zones.vp === 'Valen Point' && zones.cfs === 'Cedar Fields' && zones.downtown === 'Financial District' && zones.names[0] === 'Mount Valen' && zones.names[1] === 'Offshore' && zones.names[2] === 'Lake Valen', JSON.stringify(zones));
+check('the Sound Flats (where Valen Point and the sound were), Cedar Fields and the city’s own districts keep theirs; the water has names too', zones.vp === 'Sound Flats' && zones.cfs === 'Cedar Fields' && zones.downtown === 'Financial District' && zones.names[0] === 'Mount Valen' && zones.names[1] === 'Offshore' && zones.names[2] === 'Lake Valen', JSON.stringify(zones));
 check('a city street is named on its own street and nowhere else: the grid\u2019s lines across the mountain, the runways, the bridge and the racetrack are not Ash St or Central Blvd',
   zones.streets[0] === 'Ash St' && zones.streets[1] === 'Ash St & 1st Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === '8th Ave' && zones.streets[4] === 'Airport Access' &&
   zones.offStreets.every(n => n === null || !/ (St|Ave|Blvd)$|^(Harbor Ave|Foundry Rd|Quay Rd|North Shore Dr|South Shore Dr)$/.test(n)), JSON.stringify([zones.streets, zones.offStreets]));
@@ -88,7 +88,7 @@ check('the new places are on the map, and the city’s essentials still are (pol
 // ---------------------------------------------------------------- roads
 const roads = await ev(() => {
   const g = window.game, { Island: I, RoadGraph: RG, Links, groundY, SEA_Y } = window.__pv, out = { roads: I.roads.map(R => R.name), links: I.roads.filter(R => Links.list.some(L => L.name === R.name)).length };
-  const from = [500, 480], to = { airport: [600, 1850], proving: [1200, 1480], summit: [395, -1815], lighthouse: [1528, -2775], saltmarsh: [-520, 1172], gull: [-1265, -2265], bridge: [-1100, 500], tunnel: [-1925, -1270], vp: [1515, 520], cfs: [300, 1135], ridge: [140, -604] };
+  const from = [500, 480], to = { airport: [600, 1850], proving: [1200, 1480], summit: [395, -1815], lighthouse: [1528, -2775], saltmarsh: [-520, 1172], gull: [-1265, -2265], bridge: [-1100, 500], tunnel: [-1925, -1270], flats: [1720, 820], cfs: [300, 1135], ridge: [140, -604] };
   out.routes = {}; for (const k in to) { const r = RG.route(from[0], from[1], to[k][0], to[k][1], { kinds: new Set(['grid', 'link', 'spur', 'ext']) }), back = RG.route(to[k][0], to[k][1], from[0], from[1], { kinds: new Set(['grid', 'link', 'spur', 'ext']) }); out.routes[k] = r && back ? [Math.round(r.len), Math.round(Math.hypot(r.g.x - to[k][0], r.g.z - to[k][1]))] : null; }
   // from Saltmarsh to Gull Harbor the short way is over the bridge
   const rb = RG.route(-520, 1172, -1265, -2265, {}); out.overBridge = rb && rb.steps.some(s => s.e.name === 'Blackgate Bridge'); out.gps = window.__pv.gpsRoute(500, 480, 600, 1850).length;
@@ -155,24 +155,24 @@ const bog2 = await ev(() => { const v = window.__bog, s = v.speed; window.game.v
 check('a car in the sea bogs down', bog < -1.7 && bog2 < 6, JSON.stringify([bog, bog2]));
 // ---------------------------------------------------------------- the fleet: race cars
 const fleet = await ev(() => {
-  const g = window.game, { VEHICLES: V, CARGO_LB, CAR_MSRP } = window.__pv; g.resetPlayerState(1590, 560, 0); g.fleet.update(1590, 560);
-  const cars = g.vehicles.list.filter(v => v.fleet), race = cars.filter(v => V[v.type].race);
-  return { n: cars.length, race: race.map(v => v.type), styles: [...new Set(race.map(v => V[v.type].race))].length, pit: race.filter(v => Math.abs(v.pos.x - 1573.3) < 1).length, unlocked: race.every(v => !v.locked),
+  const g = window.game, { VEHICLES: V, CARGO_LB, CAR_MSRP, SR } = window.__pv; g.resetPlayerState(-650, 1796, 0); g.fleet.update(-650, 1796);
+  const gz = (SR.pit.garZ[0] + SR.pit.garZ[1]) / 2, cars = g.vehicles.list.filter(v => v.fleet && Math.hypot(v.pos.x + 620, v.pos.z - 1800) < 200), race = cars.filter(v => V[v.type].race);
+  return { n: cars.length, race: race.map(v => v.type), styles: [...new Set(race.map(v => V[v.type].race))].length, pit: race.filter(v => Math.abs(v.pos.z - gz) < 2).length, paddock: race.filter(v => Math.abs(v.pos.z - 1788) < 2).length, unlocked: race.every(v => !v.locked),
     faster: V.gt3.vmax > V.supercar.vmax && V.lmp.grip > V.supercar.grip && V.formula.mass < 800, inert: race.every(v => CARGO_LB[v.type] === undefined && !CAR_MSRP[v.type]), sites: g.world.isle.fleet.length };
 });
-check('Valen Point: a dozen race cars of six kinds (GT, cup, prototype, open-wheel, rally, drift) in the pit boxes and the paddock, unlocked', fleet.race.length >= 12 && fleet.styles === 6 && fleet.pit === 6 && fleet.unlocked, JSON.stringify(fleet));
+check('Southshore Raceway (Valen Point’s cars among them): a dozen race cars of six kinds (GT, cup, prototype, open-wheel, rally, drift) in the pit garages and the paddock, unlocked', fleet.race.length >= 12 && fleet.styles === 6 && fleet.pit === 6 && fleet.paddock === 6 && fleet.unlocked, JSON.stringify(fleet));
 check('they outrun and outgrip the street’s fastest, and they are track property (nothing to keep or sell)', fleet.faster && fleet.inert, JSON.stringify(fleet));
 // take the GT car from its pit box and drive it down the pit lane and out onto the circuit
-const take = await ev(() => { const g = window.game, v = g.vehicles.list.find(v => v.type === 'gt3' && Math.abs(v.pos.x - 1573.3) < 1); g.player.pos.set(v.pos.x + 1.7, v.pos.y, v.pos.z); const n = g.nearestVehicle(1.8); window.__car = v; if (n) g.beginEnter(n); return { near: n && n.type, prompt: document.getElementById('prompt') ? document.getElementById('prompt').textContent : '' }; });
+const take = await ev(() => { const g = window.game, SR = window.__pv.SR, v = g.vehicles.list.find(v => v.type === 'gt3' && Math.abs(v.pos.z - (SR.pit.garZ[0] + SR.pit.garZ[1]) / 2) < 2); g.player.pos.set(v.pos.x + 1.7, v.pos.y, v.pos.z); const n = g.nearestVehicle(1.8); window.__car = v; if (n) g.beginEnter(n); return { near: n && n.type, prompt: document.getElementById('prompt') ? document.getElementById('prompt').textContent : '' }; });
 await frames(page, 70);
 const inCar = await ev(() => { const g = window.game, p = g.player; return { state: p.state, type: p.vehicle && p.vehicle.type, stolen: g.save.stats.stolen }; });
 check('you walk up to the GT car, take it and are in the seat', take.near === 'gt3' && inCar.state === 'vehicle' && inCar.type === 'gt3' && inCar.stolen >= 1, JSON.stringify([take, inCar]));
-await ev(() => { const v = window.__car, T = window.game.world.vp.track, k = window.game.world.vp.sf.k; v.pos.set(T.pts[k][0], 0, T.pts[k][1] + 30); v.h = Math.PI; v.vel.set(0, 0); });
+await ev(() => { const v = window.__car, SR = window.__pv.SR; v.pos.set(-735, SR.y, 1850); v.h = Math.PI / 2; v.vel.set(0, 0); });
 await keys(['up']);
 let top = 0; for (let k = 0; k < 6; k++) { await frames(page, 30); top = Math.max(top, await ev(() => window.__car.speed)); }
 const lap = await ev(top => { const v = window.__car; return { spd: +top.toFixed(1), z: Math.round(v.pos.z), x: Math.round(v.pos.x), hp: Math.round(v.health) }; }, top);
 await keys([]); await ev(() => window.game.exitVehicle(true));
-check('and drive it on the circuit: flat out down the main straight it is past 150 km/h within a few seconds, in one piece', lap.spd > 42 && lap.z < 560 && lap.hp > 60, JSON.stringify(lap));
+check('and drive it on the circuit: flat out down the main straight it is past 150 km/h within a few seconds, in one piece', lap.spd > 42 && lap.x > -700 && lap.hp > 60, JSON.stringify(lap));
 const prov = await ev(() => { const g = window.game, { PROVING: G, groundY } = window.__pv; g.resetPlayerState(G.strip.x0 + 12, G.strip.z + 9.5, 0); g.fleet.update(G.strip.x0, G.strip.z); let flat = 0; for (let x = G.strip.x0; x <= G.strip.x1; x += 20) flat = Math.max(flat, Math.abs(groundY(x, G.strip.z) - G.y)); return { cars: g.vehicles.list.filter(v => v.fleet === 'proving').map(v => v.type), len: G.strip.x1 - G.strip.x0, flat: +flat.toFixed(3), pad: G.pad.r }; });
 check('the proving ground: a level kilometre of strip, a skid pad, cars waiting on the start line', prov.len >= 1000 && prov.flat < 0.02 && prov.pad >= 50 && prov.cars.length >= 5, JSON.stringify(prov));
 // ---------------------------------------------------------------- flight: the aeroplane

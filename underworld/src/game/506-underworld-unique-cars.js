@@ -20,7 +20,7 @@
    ===================================================================== */
 const UQ = { tick: 0.5, near: 160, keep: 340, pop: 60, intel: 3000, intelRep: 800 };
 // who tells you about each (the phone contact)
-const UQ_FROM = { corsair: 'unknown', spectre: 'tull', ambassador: 'lucky', proto: 'prestige', baja: 'farm', widow: 'vance', club: 'racecontrol', riviera: 'pv', tourer: 'ferry', aeterna: 'unknown' };
+const UQ_FROM = { corsair: 'unknown', spectre: 'tull', ambassador: 'lucky', proto: 'prestige', baja: 'farm', widow: 'vance', club: 'raceoffice', riviera: 'pv', tourer: 'ferry', aeterna: 'unknown' };
 const UQ_STATE = ['Undiscovered', 'Clue known', 'Exact location known', 'Acquired'];
 // the five city street races (the Spectre's condition)
 const uqCityRaces = () => RACES.filter(r => !r.storyOnly && !r.country);
@@ -79,14 +79,15 @@ class UniqueCars {
     if (rep >= UQ.intelRep) this.setLead('ambassador');
     if (rep >= 2000) this.advance('proto', 1);
     if (inCedarSouth(p.pos.x, p.pos.z)) this.advance('baja', 1);
-    if (inValenPoint(p.pos.x, p.pos.z)) this.advance('club', 1);
+    if (inRaceway(p.pos.x, p.pos.z)) this.advance('club', 1);
     if (Object.keys(ZONES).every(z => s.discovered.zones[z])) { this.setLead('riviera'); if (rep >= UNIQUE_BY.riviera.rep) this.advance('riviera', 1); }
     if (s.secrets.ghostferry) this.advance('tourer', 1);
     if (UNIQUE_CARS.every(u => u.id === 'aeterna' || this.st(u.id) >= 3)) this.advance('aeterna', 1);
   }
-  // a race won: the Spectre (all five city races) and the Clubsport (the GT Cup at Valen Point)
+  // a race won: the Spectre (all five city races) and the Clubsport (the Touring Cup at Southshore Raceway; it was
+  // Valen Point's GT Cup until the circuit closed, 2026-11-18)
   onRaceWin(raceId) {
-    if (raceId === 'vp_gt') { this.advance('club', 1, true); this.grant('club'); }
+    if (raceId === 'sr_touring') { this.advance('club', 1, true); this.grant('club'); }
     this.check();
   }
   // a pink slip won against Vance: three ordinary ones and he puts up the Widowmaker

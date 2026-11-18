@@ -265,13 +265,13 @@ Object.assign(World.prototype, {
   // the overflow yard: every space sized for the biggest vehicle (2.9 × 7.4 m bays; the Boxline is 2.3 × 7.2), five
   // rows of 17, each nose-out onto an aisle of 6.6 m or more: the front aisle along the gate fence, two more behind,
   // all joined by a side lane down one side fence. A small shed in the back corner; no docks, no window
-  // Y: which overflow yard (the one next to the main lot, or Valen Point's annex), with any extra yard options
+  // Y: which overflow yard (the one next to the main lot, or the Sound annex), with any extra yard options
   _genImpoundOverflow(b, rng, Y = IMPOUND.overflow, extra = {}) {
     this._genYard(b, rng, { id: Y.id, impound: true, name: Y.name, color: 0x55606a, sign: Y.sign || 'OVERFLOW', sub: 'NO ENTRY', overflow: true, ...extra,
       slots: (W, hd) => {
         const out = [], B = OVERFLOW_BAY;
         // a painted line between neighbouring bays, the depth of the bay
-        const line = (u, v) => { const [x0, z0] = W(u, v - B.d / 2), [x1, z1] = W(u, v + B.d / 2); this._det(b, 'box', (x0 + x1) / 2, CURB_H + 0.012, (z0 + z1) / 2, Math.max(0.12, Math.abs(x1 - x0)), 0.02, Math.max(0.12, Math.abs(z1 - z0)), C(0xe8c04a)); };
+        const line = (u, v) => { const [x0, z0] = W(u, v - B.d / 2), [x1, z1] = W(u, v + B.d / 2); this._det(b, 'box', (x0 + x1) / 2, CURB_H + (extra.paved || 0) + 0.012, (z0 + z1) / 2, Math.max(0.12, Math.abs(x1 - x0)), 0.02, Math.max(0.12, Math.abs(z1 - z0)), C(0xe8c04a)); };
         for (const [v, dir] of OVERFLOW_ROWS) {
           for (let k = 0; k < B.n; k++) { const u = B.u0 + k * B.w, [x, z] = W(u, v); out.push({ x, z, h: hd(0, dir), w: B.w, d: B.d }); }
           for (let k = 0; k <= B.n; k++) line(B.u0 + (k - 0.5) * B.w, v);
@@ -280,7 +280,7 @@ Object.assign(World.prototype, {
       } });
   },
   _genYard(b, rng, M) {
-    // a yard off the lattice (Valen Point) names its gate side and has no city pavement round it
+    // a yard off the lattice (the Sound annex) names its gate side and has no city pavement round it
     if (!M.offMap) this._sidewalk(b, rng, { trees: 0, park: 0 });
     const side = M.side || ['n', 's', 'w', 'e'].find((sd, k) => RoadNet.sideOpen(b.bx, b.bz, k)) || 'n';
     const far = { n: 's', s: 'n', w: 'e', e: 'w' }[side];
@@ -411,9 +411,11 @@ Object.assign(World.prototype, {
 {
   const base2 = World.prototype.generate;
   World.prototype.generate = function () {
-    base2.call(this); this._genValenPoint(); this._genCedarSouth();
+    base2.call(this); this._genFirstXBlocks(); this._genCedarSouth();
     // the island off the lattice (Operation Blackgate, 127): its roads, the airport, the proving ground, the settlements
     this._genIsland();
+    // the impound's Sound annex on the reclaimed land (125)
+    this._genSoundAnnex();
     // (and the lamps along the island's highways and country roads, 178)
     this._genRoadLamps();
     // (the roads that leave the city cross its promenade: the ground shader paints them from the local-roads raster)
@@ -424,7 +426,6 @@ Object.assign(World.prototype, {
     // the extensions off the lattice, each reached by its spur: their own routes and a closed loop (a circuit or a
     // course) that the GPS, AI drivers, taxis and police route over (Sessions 6B, 6C)
     this.exts = [
-      { id: 'vp', name: 'Valen Point', loopName: 'Valen Point circuit', spur: 'Valen Point Causeway', roads: this.vp.roads, loop: this.vp.track, joins: [this.vp.exitK, this.vp.entryK], traffic: [] },
       // the Southshore Speedway (2026-11-18): the gate road from the highway carries traffic to the paddock
       { id: 'cfs', name: 'Cedar Fields South', loopName: 'Southshore Speedway', spur: 'Cedar Fields Track', roads: this.cfs.roads, loop: this.cfs.track, joins: [this.cfs.joinK], traffic: [0] }
     ];

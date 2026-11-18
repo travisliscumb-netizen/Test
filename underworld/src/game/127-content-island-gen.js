@@ -13,7 +13,7 @@
      lighthouse, the Mount Valen observatory, Fire Station No. 1;
    - colliders: the bridge's rails, the tunnel's walls;
    - the fleet: where the island's own vehicles stand (race cars in the
-     Valen Point pits and paddock, aircraft at the airport, helicopters on
+     Southshore pits and paddocks, aircraft at the airport, helicopters on
      the hospital's and the police station's roofs, fire engines,
      ambulances, the cars of each settlement). IslandFleet (245) spawns
      them as you come near, like the city's parked cars.
@@ -31,7 +31,7 @@ const ISLE_LIGHT = { x0: 1486, z0: -2812, x1: 1548, z1: -2758, y: 5 };
 const ISLE_SUMMIT = { x0: 342, z0: -1868, x1: 438, z1: -1778, y: 246 };
 const ISLE_JETTY = { x0: -468, z0: 898, x1: -452, z1: 992, y: 1.1 };
 Object.assign(World.prototype, {
-  _isleBlock(id, cx, cz, r, name) { const b = this._vpBlock(id, cx - P / 2, cz - P / 2, r, name || ISLE.name); b.t = 'S'; b.isle = true; this.isle.blocks.push(b); return b; },
+  _isleBlock(id, cx, cz, r, name) { const b = this._xBlock(id, cx - P / 2, cz - P / 2, r, name || ISLE.name); b.t = 'S'; b.isle = true; this.isle.blocks.push(b); return b; },
   _genIsland() {
     Island.init();
     const isle = this.isle = { blocks: [], fleet: [], lifts: [], rails: [], sites: {} };
@@ -57,6 +57,8 @@ Object.assign(World.prototype, {
     this._racewayPad();
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
+    // the Southshore Fairground's level site (129c), after the airport's and the proving ground's
+    this._fairPad();
     // the mansions' plots are levelled again, last, so no later level ground (a precinct's edge, a lot) eats into them;
     // a plot that overlaps a precinct's own edge cannot have both, and is left unbuilt
     for (const m of mans) {
@@ -187,16 +189,6 @@ Object.assign(World.prototype, {
     for (let k = 0; k < 14; k++) cyl(bg2, G.lot.x0 + 60 + k * 36, GY + 0.35, G.lot.z0 + 50 + (k % 2 ? 9 : -9), 0.22, 0.7, 0xff7a1a, false);
     fleet('proving', 950, 1530, 320, [{ x: S.x0 + 6, z: S.z - 6.5, h: Math.PI / 2, cls: 'gt3' }, { x: S.x0 + 6, z: S.z - 2.2, h: Math.PI / 2, cls: 'drift' }, { x: S.x0 + 6, z: S.z + 2.2, h: Math.PI / 2, cls: 'rally' }, { x: S.x0 + 6, z: S.z + 6.5, h: Math.PI / 2, cls: 'cup' },
       { x: 1186, z: 1500, h: 0, cls: 'lmp' }, { x: 1192, z: 1500, h: 0, cls: 'formula' }]);
-    // ================================================================ VALEN POINT: the island's race cars
-    // pit boxes on the lane in front of the garages, a row in the paddock (the 24 garage bays stay the owner's)
-    {
-      const pit = [], cars = ['gt3', 'formula', 'lmp', 'cup', 'gt3', 'rally'];
-      for (let i = 0; i < 6; i++) pit.push({ x: VP_PIT.garX[1] + 3.3, z: VP_PIT.garZ[0] + VP_PIT.cell * (i * 2 + 0.5), h: Math.PI, cls: cars[i] });
-      fleet('vp_pits', 1570, 570, 330, pit);
-      fleet('vp_paddock', 1523, 520, 330, [{ x: 1524, z: 468, h: Math.PI, cls: 'drift' }, { x: 1524, z: 476, h: Math.PI, cls: 'cup' }, { x: 1524, z: 566, h: Math.PI, cls: 'formula' }, { x: 1524, z: 574, h: Math.PI, cls: 'gt3' }, { x: 1524, z: 648, h: Math.PI, cls: 'lmp' }, { x: 1524, z: 656, h: Math.PI, cls: 'rally' }]);
-      const pk = []; for (let k = 0; k < 8; k++) if (hash2i(k, 3, 813) < 0.7) pk.push({ x: 1460 + k * 8, z: 250, h: 0, cls: ['sports', 'apex', 'tempest', 'coupe', 'muscle', 'suv', 'sedan', 'hellion'][k] });
-      fleet('vp_park', 1488, 262, 300, pk);
-    }
     // ================================================================ FIRE STATION No. 1 (the Coast Highway, north of the city)
     {
       const F = ISLE_FIRE, y = fireP.y, b = this._isleBlock('firehouse', 178, -127, 80, 'Fire Station No. 1');
@@ -307,7 +299,6 @@ Object.assign(World.prototype, {
       const folk = (id, x, z, people) => isle.fleet.push({ id: 'folk_' + id, x, z, r: 0, slots: [], people });
       folk('terminal', 600, 1884, [[590, 1885, 1.2], [594, 1886, -1.5], [606, 1885.5, 0.4], [612, 1886, -2.4], [575, 1881.6, 1.57], [628, 1884, 2.8], [600, 1886.5, 3.1]]);
       folk('apron', 1050, 1968, [[1030, 1975, -1.2], [1085, 1960, 0.6], [958, 1968, 1.57]]);
-      folk('pits', 1560, 560, [[1571.4, 462, 1.57], [1571.4, 540, 1.57], [1571.4, 622, 1.57], [1527.6, 472, -1.57], [1527.6, 570, -1.57], [1527.6, 652, -1.57]]);
       folk('proving', 1163, 1492, [[1166, 1491, 3.14], [1170, 1490, -2.6], [PROVING.strip.x0 + 3, PROVING.strip.z - 12.5, 1.57]]);
       if (saltmarsh) folk('saltmarsh', -470, 1090, [[-455, 1006, 0], [-463, 962, 2.2], [-520, 1164, 1.57], [-600, 1148, -1.57], [-392, 1176, 0.3]]);
       folk('summit', 380, -1800, [[372, -1784.5, 0.2], [376, -1785.5, -0.3], [392, -1847, 3.14]]);
@@ -317,7 +308,9 @@ Object.assign(World.prototype, {
     }
     // Southshore Raceway (129b)
     this._genRaceway();
-    // colliders for the island's blocks (the city's and Valen Point's loops ran before these existed)
+    // the Southshore Fairground (129c)
+    this._genFairground();
+    // colliders for the island's blocks (the city's and the first district blocks' loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
       for (const d of b.det) if (d.col) this.grid.add(d.col);

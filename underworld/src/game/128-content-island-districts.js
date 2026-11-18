@@ -173,7 +173,7 @@ Object.assign(World.prototype, {
     const V = VILLA_VALEN;
     const KEEP_CITY = m => CityLayout.precincts.map(p => [p.x0 - m, p.z0 - m, p.x1 + m, p.z1 + m]), CITY80 = KEEP_CITY(80), CITY_IN = KEEP_CITY(EDGE_MARGIN + 6);
     const KEEP = [[CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
-      [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], [VP.x0 - 50, VP.z0 - 50, VP.x1 + 50, VP.z1 + 50], [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12]];
+      [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], SOUND_RESERVE, [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12]];
     const hit = (a, b, m = 0) => a[0] - m < b[2] && a[2] + m > b[0] && a[1] - m < b[3] && a[3] + m > b[1];
     const pads0 = Island.pads.map(p => [p.x0, p.z0, p.x1, p.z1]), taken = [];
     const lakeIn = (x, z) => ((x - LAKE.x) / (LAKE.rx + 45)) ** 2 + ((z - LAKE.z) / (LAKE.rz + 45)) ** 2 < 1;
