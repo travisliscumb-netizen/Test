@@ -116,10 +116,12 @@ const sent = await page.evaluate(() => {
   const g = window.game, uw = g.uw, R = uw.S.rap;
   // a fixed baseline: no crimes on the current record, 1★ (whatever the steps above left behind)
   const keep = { cur: R.cur, maxLvl: R.maxLvl, lvl: g.police.level, heat: g.police.heat };
+  // (the case file too: what the steps above left in it varies from run to run)
+  const live0 = uw.legal.live; uw.legal.live = () => [];
   R.cur = {}; R.maxLvl = 1; g.police.level = 1;
   uw.S.inv = {}; const clean = uw.prison.charges().total;
   uw.S.inv = { snow: 5 }; g.save.weapons.pistol = true; const loaded = uw.prison.charges().total;
-  uw.S.inv = {}; g.save.weapons.pistol = false;
+  uw.S.inv = {}; g.save.weapons.pistol = false; uw.legal.live = live0;
   R.cur = keep.cur; R.maxLvl = keep.maxLvl; g.police.level = keep.lvl; g.police.heat = keep.heat;
   return { clean, loaded, priors: R.priors };
 });
