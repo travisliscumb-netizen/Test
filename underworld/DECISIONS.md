@@ -118,3 +118,25 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
     172 (168), Linden Hills 139 (137) and the port 41 (36).
 - The organic Linden Hills streets (bends and crescents) were already organic and are untouched. So are Crestmoor,
   Midtown, Linden Gardens, Cedar Fields and Southport.
+
+## The downtown rebuilt, district by district (owner, 2026-11-18, after the overlay)
+- The owner was not happy with the overlay and ruled for a real rebuild, with three choices:
+  - Only the financial core stays a grid.
+  - Everything round it is redeveloped on curving streets, the way the island's districts are built.
+  - The POIs move onto new plots in their district, and it ships one district at a time: Old Quarter, Linden Hills,
+    Diner Row and the commercial ring, then the port strip.
+- How a district is rebuilt: its cells become one superblock, so the lattice inside it closes and its streets are
+  curved links. The cells stay the address system, so its zone, turfs and district name are unchanged. A door given
+  as (block, side, along) on a street that no longer runs is found on the nearest new street: `sidewalkSpot` asks
+  the district (`oldQuarterSpot`). The generator builds a front behind every such door before it lays the rest of
+  the frontage. A side on an edge street that still runs keeps its spot.
+- Phase 1, the Old Quarter (124), is cells 0..2 × 4..6:
+  - Streets: Saint Ivo Street, Market Street (in two staggered halves), Bell Lane, Cooper's Walk, Chapel Lane,
+    Garage Row and Wick Lane. Saint Ivo Square has a fountain.
+  - Buildings: terrace frontage lines both sides of every street and the inside of the four edge streets, with a
+    second row behind it and gardens behind that. That is 268 buildings, where the nine grid blocks had 186.
+  - Kept: the Quarter Garage stands where it stood.
+  - Precincts: the oldquarter precinct now takes in column 3 (0..3 × 4..7; core 4..9). Both stand at offset 0, so
+    nothing moved.
+  - Races: the Wet Track runs (1,7)–(1,10)–(4,10)–(4,7).
+  - Overlay: its Old Quarter lanes and its two mews were removed.

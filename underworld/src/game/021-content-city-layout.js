@@ -41,8 +41,9 @@ const CITY_LAYOUTS = {
   // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
   // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
   island: [
-    { id: 'core', lx0: 2, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
-    { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 1, lz1: 7, ox: 0, oz: 0 },
+    // (the Old Quarter's precinct takes in the column it shares a superblock with: both stand at offset 0, so nothing moves)
+    { id: 'core', lx0: 4, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+    { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 3, lz1: 7, ox: 0, oz: 0 },
     { id: 'linden', lx0: 0, lz0: 8, lx1: 3, lz1: 11, ox: 0, oz: 0 },
     { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 },
     { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -8, oz: -6 },

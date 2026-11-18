@@ -51,7 +51,11 @@ function streetNameAt(x, z) {
   if (p) {
     const I = Math.round(x / P), J = Math.round(z / P), i = I - p.ox, j = J - p.oz;
     const cl = cityClosedAt(x - p.ox * P, z - p.oz * P); if (cl) return cl.name;
-    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1, onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1;
+    // off the lattice's carriageways, a curved street underfoot names itself (a lane across where a lattice street
+    // ran, in a block rebuilt on its own streets, is not that old street)
+    if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
+    // (only a lattice street that still runs there: a superblock or a square has taken some of their lengths)
+    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, Math.floor(z / P)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, Math.floor(x / P));
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
@@ -171,6 +175,8 @@ function isRushHour(t) { return (t >= 7.25 && t < 9.25) || (t >= 16.5 && t < 18.
 const SUPERBLOCKS = [
   { id: 'estate', bx0: 0, bz0: 0, bx1: 1, bz1: 0, gen: '_genEstate', peds: false, ground: 'W', land: 'W' },
   { id: 'park', bx0: 2, bz0: 2, bx1: 4, bz1: 3, gen: '_genBigPark', peds: true, ground: 'G', land: 'G' },
+  // the Old Quarter rebuilt on its own winding streets (124; owner, 2026-11-18)
+  { id: 'oldquarter', bx0: 0, bz0: 4, bx1: 2, bz1: 6, gen: '_genOldQuarter', peds: true, ground: 'R', land: 'R' },
   { id: 'stadium', bx0: 7, bz0: 8, bx1: 9, bz1: 9, gen: '_genStadiumDistrict', peds: false, ground: 'Z', land: 'A' },
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
@@ -182,8 +188,6 @@ const SUPERBLOCKS = [
 // checks all of it). a: 0 the north-south street x = i*P, segment j (z from j*P); 1 the east-west street z = i*P,
 // segment j (x from j*P). Lattice numbers: these precincts stand at offset 0 under every layout that ships.
 const CITY_CLOSED = [
-  { a: 0, i: 1, j: 4, name: 'Bell Passage', kind: 'mews' },
-  { a: 1, i: 7, j: 2, name: 'Chandler’s Yard', kind: 'mews' },
   { a: 0, i: 5, j: 4, name: 'Exchange Square', kind: 'plaza' },
   { a: 1, i: 6, j: 4, name: 'Assay Walk', kind: 'plaza' },
   { a: 1, i: 7, j: 7, name: 'Ledger Square', kind: 'plaza' },

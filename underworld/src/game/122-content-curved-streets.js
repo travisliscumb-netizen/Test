@@ -48,22 +48,15 @@ function segCross(a, b, c, d) {
 // kerbs that take parked cars (+1 the right-hand side of the road's direction, -1 the left)
 const SALT_B = [[852, 245.4], [857.73, 252.35], [866, 258], [874.6, 261]];
 // the lanes lined with new frontage where they cut a block (the organic downtown; Tanner's Row stays as it was laid)
-const CURVED_REFILL = new Set(['0,4', '0,5', '0,6', '2,4', '1,5', '1,6', '2,6', '1,7', '2,7', '2,8', '2,9', '3,6', '9,5', '9,6']);
+const CURVED_REFILL = new Set(['1,7', '2,7', '2,8', '2,9', '3,6', '9,5', '9,6']);
 const CURVED_STREETS = {
   '10,2': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, line: [[805.4, 178], [852, 234.6]], park: [1, -1] }] },
   '10,3': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, ctrl: SALT_B, park: [-1] }, { name: 'Kiln Lane', w: 8, fork: 0, at: 4, ctrl: [[862, 268], [858, 290], [846, 314.6]] }] },
   '3,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[262, 805.4], [266, 818], [280, 832], [300, 839], [314.6, 842]] }] },
   // where the layout parts the two blocks (island: the Strip on the bay's south shore) this half is its own lane
   '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', apart: { of: '3,10', name: 'Cooper’s Lane' }, w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] },
-  // ---- the organic downtown (owner, 2026-11-18). The Old Quarter: historic lanes winding through the terraces'
-  // courtyards, block to block across the streets (Saint Ivo Lane runs three blocks north to south), a crescent
-  '0,4': { kind: 'lane', roads: [{ name: 'Saint Ivo Lane', w: 7, ctrl: [[34, 325.4], [38, 340], [48, 356], [52, 372], [50, 394.6]] }] },
-  '0,5': { kind: 'lane', roads: [{ name: 'Saint Ivo Lane', w: 7, ctrl: [[50, 405.4], [44, 422], [34, 440], [30, 458], [32, 474.6]] }] },
-  '0,6': { kind: 'lane', roads: [{ name: 'Saint Ivo Lane', w: 7, ctrl: [[32, 485.4], [38, 500], [52, 516], [58, 536], [52, 554.6]] }] },
-  '2,4': { kind: 'lane', roads: [{ name: 'Abbey Steps', w: 7, ctrl: [[196, 325.4], [200, 340], [212, 356], [226, 366], [234.6, 372]] }] },
-  '1,5': { kind: 'lane', roads: [{ name: 'Cobble Row', w: 7, ctrl: [[136, 405.4], [132, 420], [118, 436], [100, 448], [85.4, 454]] }] },
-  '1,6': { kind: 'lane', roads: [{ name: 'Cutler’s Crescent', w: 7, ctrl: [[98, 485.4], [96, 500], [104, 516], [120, 522], [136, 516], [144, 500], [142, 485.4]] }] },
-  '2,6': { kind: 'lane', roads: [{ name: 'Wick Lane', w: 7, ctrl: [[234.6, 498], [220, 503], [204, 516], [186, 528], [165.4, 532]] }] },
+  // ---- the organic downtown (owner, 2026-11-18): lanes through the Old Quarter's terraces south of its rebuilt
+  // heart (124)
   '1,7': { kind: 'lane', roads: [{ name: 'Lantern Lane', w: 7, ctrl: [[85.4, 596], [100, 600], [118, 610], [136, 612], [154.6, 606]] }] },
   '2,7': { kind: 'lane', roads: [{ name: 'Lantern Lane', w: 7, ctrl: [[165.4, 606], [182, 598], [200, 596], [218, 602], [234.6, 604]] }] },
   // the Old Quarter's blocks in Linden Hills

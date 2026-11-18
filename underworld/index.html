@@ -32901,7 +32901,11 @@ function streetNameAt(x, z) {
   if (p) {
     const I = Math.round(x / P), J = Math.round(z / P), i = I - p.ox, j = J - p.oz;
     const cl = cityClosedAt(x - p.ox * P, z - p.oz * P); if (cl) return cl.name;
-    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1, onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1;
+    // off the lattice's carriageways, a curved street underfoot names itself (a lane across where a lattice street
+    // ran, in a block rebuilt on its own streets, is not that old street)
+    if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
+    // (only a lattice street that still runs there: a superblock or a square has taken some of their lengths)
+    const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, Math.floor(z / P)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, Math.floor(x / P));
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
@@ -33021,6 +33025,8 @@ function isRushHour(t) { return (t >= 7.25 && t < 9.25) || (t >= 16.5 && t < 18.
 const SUPERBLOCKS = [
   { id: 'estate', bx0: 0, bz0: 0, bx1: 1, bz1: 0, gen: '_genEstate', peds: false, ground: 'W', land: 'W' },
   { id: 'park', bx0: 2, bz0: 2, bx1: 4, bz1: 3, gen: '_genBigPark', peds: true, ground: 'G', land: 'G' },
+  // the Old Quarter rebuilt on its own winding streets (124; owner, 2026-11-18)
+  { id: 'oldquarter', bx0: 0, bz0: 4, bx1: 2, bz1: 6, gen: '_genOldQuarter', peds: true, ground: 'R', land: 'R' },
   { id: 'stadium', bx0: 7, bz0: 8, bx1: 9, bz1: 9, gen: '_genStadiumDistrict', peds: false, ground: 'Z', land: 'A' },
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
@@ -33032,8 +33038,6 @@ const SUPERBLOCKS = [
 // checks all of it). a: 0 the north-south street x = i*P, segment j (z from j*P); 1 the east-west street z = i*P,
 // segment j (x from j*P). Lattice numbers: these precincts stand at offset 0 under every layout that ships.
 const CITY_CLOSED = [
-  { a: 0, i: 1, j: 4, name: 'Bell Passage', kind: 'mews' },
-  { a: 1, i: 7, j: 2, name: 'Chandler’s Yard', kind: 'mews' },
   { a: 0, i: 5, j: 4, name: 'Exchange Square', kind: 'plaza' },
   { a: 1, i: 6, j: 4, name: 'Assay Walk', kind: 'plaza' },
   { a: 1, i: 7, j: 7, name: 'Ledger Square', kind: 'plaza' },
@@ -33343,8 +33347,9 @@ const CITY_LAYOUTS = {
   // stays on Valen Sound: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
   // north shore, the Nightlife Strip, the Stadium and the Warehouse District on its south shore
   island: [
-    { id: 'core', lx0: 2, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
-    { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 1, lz1: 7, ox: 0, oz: 0 },
+    // (the Old Quarter's precinct takes in the column it shares a superblock with: both stand at offset 0, so nothing moves)
+    { id: 'core', lx0: 4, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+    { id: 'oldquarter', lx0: 0, lz0: 4, lx1: 3, lz1: 7, ox: 0, oz: 0 },
     { id: 'linden', lx0: 0, lz0: 8, lx1: 3, lz1: 11, ox: 0, oz: 0 },
     { id: 'port', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 0, oz: 0 },
     { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -8, oz: -6 },
@@ -40681,22 +40686,15 @@ function segCross(a, b, c, d) {
 // kerbs that take parked cars (+1 the right-hand side of the road's direction, -1 the left)
 const SALT_B = [[852, 245.4], [857.73, 252.35], [866, 258], [874.6, 261]];
 // the lanes lined with new frontage where they cut a block (the organic downtown; Tanner's Row stays as it was laid)
-const CURVED_REFILL = new Set(['0,4', '0,5', '0,6', '2,4', '1,5', '1,6', '2,6', '1,7', '2,7', '2,8', '2,9', '3,6', '9,5', '9,6']);
+const CURVED_REFILL = new Set(['1,7', '2,7', '2,8', '2,9', '3,6', '9,5', '9,6']);
 const CURVED_STREETS = {
   '10,2': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, line: [[805.4, 178], [852, 234.6]], park: [1, -1] }] },
   '10,3': { kind: 'works', roads: [{ name: 'Saltmarsh Way', w: 12, ctrl: SALT_B, park: [-1] }, { name: 'Kiln Lane', w: 8, fork: 0, at: 4, ctrl: [[862, 268], [858, 290], [846, 314.6]] }] },
   '3,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', w: 7, ctrl: [[262, 805.4], [266, 818], [280, 832], [300, 839], [314.6, 842]] }] },
   // where the layout parts the two blocks (island: the Strip on the bay's south shore) this half is its own lane
   '4,10': { kind: 'lane', roads: [{ name: 'Tanner’s Row', apart: { of: '3,10', name: 'Cooper’s Lane' }, w: 7, ctrl: [[325.4, 842], [340, 845], [356, 855], [366, 866], [372, 874.6]] }] },
-  // ---- the organic downtown (owner, 2026-11-18). The Old Quarter: historic lanes winding through the terraces'
-  // courtyards, block to block across the streets (Saint Ivo Lane runs three blocks north to south), a crescent
-  '0,4': { kind: 'lane', roads: [{ name: 'Saint Ivo Lane', w: 7, ctrl: [[34, 325.4], [38, 340], [48, 356], [52, 372], [50, 394.6]] }] },
-  '0,5': { kind: 'lane', roads: [{ name: 'Saint Ivo Lane', w: 7, ctrl: [[50, 405.4], [44, 422], [34, 440], [30, 458], [32, 474.6]] }] },
-  '0,6': { kind: 'lane', roads: [{ name: 'Saint Ivo Lane', w: 7, ctrl: [[32, 485.4], [38, 500], [52, 516], [58, 536], [52, 554.6]] }] },
-  '2,4': { kind: 'lane', roads: [{ name: 'Abbey Steps', w: 7, ctrl: [[196, 325.4], [200, 340], [212, 356], [226, 366], [234.6, 372]] }] },
-  '1,5': { kind: 'lane', roads: [{ name: 'Cobble Row', w: 7, ctrl: [[136, 405.4], [132, 420], [118, 436], [100, 448], [85.4, 454]] }] },
-  '1,6': { kind: 'lane', roads: [{ name: 'Cutler’s Crescent', w: 7, ctrl: [[98, 485.4], [96, 500], [104, 516], [120, 522], [136, 516], [144, 500], [142, 485.4]] }] },
-  '2,6': { kind: 'lane', roads: [{ name: 'Wick Lane', w: 7, ctrl: [[234.6, 498], [220, 503], [204, 516], [186, 528], [165.4, 532]] }] },
+  // ---- the organic downtown (owner, 2026-11-18): lanes through the Old Quarter's terraces south of its rebuilt
+  // heart (124)
   '1,7': { kind: 'lane', roads: [{ name: 'Lantern Lane', w: 7, ctrl: [[85.4, 596], [100, 600], [118, 610], [136, 612], [154.6, 606]] }] },
   '2,7': { kind: 'lane', roads: [{ name: 'Lantern Lane', w: 7, ctrl: [[165.4, 606], [182, 598], [200, 596], [218, 602], [234.6, 604]] }] },
   // the Old Quarter's blocks in Linden Hills
@@ -41028,6 +41026,185 @@ Object.assign(World.prototype, {
     }
   };
 }
+/* =====================================================================
+   [CONTENT] THE OLD QUARTER, REBUILT (owner, 2026-11-18: the downtown torn down and redeveloped round
+   a gridded financial core, district by district; this is the first)
+   Nine lattice cells (0..2, 4..6) are one superblock with no grid inside it. Its streets are curved
+   through-roads (links, 020: traffic, the GPS, taxis and the police use them):
+   - Saint Ivo Street, the high street, winding from the north edge to the south;
+   - Market Street, crossing it in two staggered halves (west to the shore road, east to Downtown);
+   - Bell Lane, Cooper's Walk, Chapel Lane, Garage Row and Wick Lane, the old lanes off them;
+   - Saint Ivo Square beside the high street, with its fountain.
+   Every street is lined with terraces (brick, shopfronts, flats; two to four storeys) stepping along
+   its curve, and so are the four edge streets; behind the frontage, yards and gardens. The Quarter
+   Garage stands where it stood, Garage Row running past the foot of its ramp.
+   Everything that had an address on these cells keeps it: a door given as (block, side, along) on a
+   street that no longer exists is found on the nearest of the new streets (sidewalkSpot, 390, asks
+   oldQuarterSpot), and the frontage stands behind it. The district, its turfs and its name are the
+   cells', as they were.
+   ===================================================================== */
+// the streets, in lattice metres. A street that starts on another (`fork`: its index, `near`: where) starts on that
+// street's own polyline, so the junction is exact; every other end meets an edge street side-on
+const OQ_STREETS = [
+  { name: 'Saint Ivo Street', w: 9, park: [1, -1], ctrl: [[100, 325.6], [104, 345], [96, 368], [84, 392], [86, 418], [102, 440], [118, 462], [122, 488], [112, 512], [104, 534], [108, 554.4]] },
+  { name: 'Market Street', w: 8, park: [1], fork: 0, near: [86, 422], ctrl: [[64, 430], [44, 427], [24, 431], [5.6, 436]] },
+  { name: 'Market Street', w: 8, park: [-1], fork: 0, near: [92, 378], ctrl: [[120, 372], [150, 366], [180, 372], [210, 380], [234.4, 384]] },
+  { name: 'Bell Lane', w: 7, fork: 2, near: [182, 372], ctrl: [[186, 356], [190, 340], [196, 325.6]] },
+  { name: 'Cooper’s Walk', w: 7, fork: 0, near: [119, 470], ctrl: [[92, 482], [62, 492], [36, 506], [5.6, 518]] },
+  { name: 'Chapel Lane', w: 7, fork: 4, near: [56, 494], ctrl: [[50, 512], [40, 532], [32, 554.4]] },
+  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 480], [226, 488], [234.4, 504]] },
+  { name: 'Wick Lane', w: 7, fork: 0, near: [106, 530], ctrl: [[130, 530], [160, 524], [190, 528], [234.4, 538]] }
+];
+// Saint Ivo Square: a paved round beside the high street, its fountain in the middle
+const OQ_SQUARE = { x: 58, z: 462, r: 11 };
+// the streets' polylines (computed once; sidewalkSpot needs them before the world is built)
+let OQ_LINES = null;
+function oqLines() {
+  if (OQ_LINES) return OQ_LINES;
+  OQ_LINES = [];
+  for (const S of OQ_STREETS) {
+    let ctrl = S.ctrl;
+    if (S.fork !== undefined) {
+      const par = OQ_LINES[S.fork].pts; let k = 0, best = Infinity;
+      for (let i = 0; i < par.length; i++) { const d = Math.hypot(par[i][0] - S.near[0], par[i][1] - S.near[1]); if (d < best) { best = d; k = i; } }
+      ctrl = [par[k], ...S.ctrl];
+    }
+    OQ_LINES.push({ name: S.name, w: S.w, park: S.park || null, pts: splinePts(ctrl) });
+  }
+  return OQ_LINES;
+}
+const OQ_SB = () => SUPERBLOCKS.find(s => s.id === 'oldquarter');
+// a door on one of the old cells (sidewalkSpot's address), on the new streets: the kerbside point of the nearest
+// street, `o` from its centre line as the lattice spot was from its own, facing the street. Only for a side whose
+// lattice street is gone; a side on an edge street that still runs keeps its spot. Lattice metres, or null.
+function oldQuarterSpot(bx, bz, side, x, z, o) {
+  const sb = superblockAt(bx, bz); if (!sb || sb.id !== 'oldquarter') return null;
+  if (RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
+  let best = null;
+  for (const L of oqLines()) for (let k = 0; k < L.pts.length - 1; k++) {
+    const a = L.pts[k], c = L.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1;
+    const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
+    if (!best || d < best.d) best = { d, px, pz, L, tx: dx / Math.sqrt(l2), tz: dz / Math.sqrt(l2) };
+  }
+  // off the side of the street the old spot was on (along the normal, not toward a junction)
+  const s = Math.sign(-best.tz * (x - best.px) + best.tx * (z - best.pz)) || 1, nx = -best.tz * s, nz = best.tx * s;
+  const off = best.L.w / 2 + Math.max(1.6, o - ROAD_HALF);
+  return { x: best.px + nx * off, z: best.pz + nz * off, h: Math.atan2(-nx, -nz) };
+}
+Object.assign(World.prototype, {
+  _genOldQuarter(a, sb, rng) {
+    for (const m of sb.members) m.wires = m.wires || [];
+    this._sbSidewalks(sb, rng, { trees: 0.3, park: 0.4 });
+    const b = a, lines = oqLines(), roads = [];
+    // the streets (kerbside parking on the high street and Market Street)
+    for (const L of lines) { const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; roads.push(r); }
+    // the Quarter Garage, where it always stood
+    const gb = this.block(2, 5); this._genGarage(gb, rng); gb.name = 'Quarter Garage';
+    const G = { x0: gb.x0 - 1, z0: gb.z0 - 1, x1: gb.x1 + 1, z1: gb.z1 + 2 };
+    // Saint Ivo Square
+    const Q = OQ_SQUARE;
+    this._discS(Q.x, Q.z, Q.r, 'concrete');
+    this._det(b, 'cyl', Q.x, CURB_H + 0.4, Q.z, 2.8, 0.8, 0x8d8a84, null, { x: Q.x, z: Q.z, r: 2.8, y0: 0, y1: 0.9, kind: 'det' });
+    this._det(b, 'cyl', Q.x, CURB_H + 1.2, Q.z, 0.4, 1.6, 0x9a958c);
+    b.water.push({ x: Q.x, z: Q.z, r: 2.4, y: CURB_H + 0.82 });
+    b.fx.push({ type: 'fountain', x: Q.x, y: CURB_H + 2.0, z: Q.z });
+    for (let k = 0; k < 6; k++) { const t = k / 6 * Math.PI * 2 + 0.3, x = Q.x + Math.cos(t) * 7.2, z = Q.z + Math.sin(t) * 7.2; if (k % 2) this._prop(b, 'tree', x, z, rng.range(0, 6), 0.9); else { const ry = Math.atan2(Q.x - x, Q.z - z); this._prop(b, 'bench', x, z, ry); b.seats.push({ x, z, ry }); } }
+    this._prop(b, 'parklamp', Q.x + 9.5, Q.z - 3, 0); this._prop(b, 'parklamp', Q.x - 9.5, Q.z + 3, 0);
+    b.secrets.push({ x: Q.x + 5, z: Q.z + 5 });
+    // ---- the frontage: terraces along every street, both sides, and along the four edge streets inside them
+    const segD = (x, z, p, q) => { const dx = q[0] - p[0], dz = q[1] - p[1], l2 = dx * dx + dz * dz || 1; let t = ((x - p[0]) * dx + (z - p[1]) * dz) / l2; t = Math.max(0, Math.min(1, t)); return Math.hypot(x - p[0] - dx * t, z - p[1] - dz * t); };
+    const clearRoads = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m);
+    const placed = [];
+    const free = (x0, z0, x1, z1) => x0 >= sb.x0 && z0 >= sb.z0 && x1 <= sb.x1 && z1 <= sb.z1
+      && !(x0 < G.x1 && x1 > G.x0 && z0 < G.z1 && z1 > G.z0)
+      && Math.hypot(clamp(Q.x, x0, x1) - Q.x, clamp(Q.z, z0, z1) - Q.z) > Q.r + 2
+      && clearRoads(x0, z0, x1, z1, 2.6)
+      && !placed.some(q => x0 < q.x1 + 0.1 && x1 > q.x0 - 0.1 && z0 < q.z1 + 0.1 && z1 > q.z0 - 0.1);
+    const styles = [STYLE.BRICK, STYLE.BRICK, STYLE.BRICK, STYLE.SHOP, STYLE.HOUSE, STYLE.APT];
+    const pal = { [STYLE.BRICK]: PAL.brick, [STYLE.SHOP]: PAL.shop, [STYLE.HOUSE]: PAL.house, [STYLE.APT]: PAL.apt };
+    const build = (q, tx, tz, nx, nz, shopBias) => {
+      const style = rng.chance(shopBias) ? STYLE.SHOP : rng.pick(styles), h = rng.range(7.5, 15.5), fh = style === STYLE.SHOP ? 3.6 : 3.1;
+      const r = this._bld(b, q[0], q[1], q[2], q[3], h, style, rng.pick(pal[style]), fh, style === STYLE.BRICK ? 2.6 : 3.2, { gtype: style === STYLE.SHOP ? 1 : 0 });
+      this._rooftop(b, r, rng, 'old'); placed.push(r);
+      // the street face: an awning over a shop, a stoop at a house door
+      const cx = (q[0] + q[2]) / 2, cz = (q[1] + q[3]) / 2, alongX = Math.abs(nz) >= Math.abs(nx);
+      const fx = alongX ? cx : (nx < 0 ? q[0] : q[2]), fz = alongX ? (nz < 0 ? q[1] : q[3]) : cz, sx = alongX ? 0 : Math.sign(nx), sz = alongX ? Math.sign(nz) : 0;
+      const wide = alongX ? q[2] - q[0] : q[3] - q[1];
+      if (style === STYLE.SHOP) this._det(b, 'box', fx + sx * 0.9, CURB_H + 3.05, fz + sz * 0.9, alongX ? wide * 0.8 : 1.8, 0.12, alongX ? 1.8 : wide * 0.8, rng.pick(PAL.awning), 0);
+      else if (wide > 4) this._det(b, 'box', fx + sx * 0.6, CURB_H + 0.25, fz + sz * 0.6, alongX ? 2.2 : 1.2, 0.5, alongX ? 1.2 : 2.2, 0x8c8780, 0, true);
+      return r;
+    };
+    // along a polyline, on one side: terrace fronts set back across the pavement (`set` from the centre line), each the
+    // biggest that fits; beside a curve a front steps back until its corner clears the kerb
+    const line = (pts, set, side, shopBias) => {
+      const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+      const L = cum[cum.length - 1];
+      for (let d = 4; d < L - 4; d += 2) {
+        let k = 0; while (k < pts.length - 2 && cum[k + 1] < d) k++;
+        const p = pts[k], c = pts[k + 1], sl = (cum[k + 1] - cum[k]) || 1, tx = (c[0] - p[0]) / sl, tz = (c[1] - p[1]) / sl, t = (d - cum[k]) / sl;
+        const px = p[0] + (c[0] - p[0]) * t, pz = p[1] + (c[1] - p[1]) * t, nx = -tz * side, nz = tx * side;
+        let got = null;
+        for (const [w0, d0] of [[10, 11], [9, 10], [8, 10], [7, 9], [6, 8]]) {
+          for (let back = 0; back <= 3 && !got; back += 0.5) {
+            const off = set + d0 / 2 + back, cx = px + nx * off, cz = pz + nz * off, alongX = Math.abs(tx) >= Math.abs(tz);
+            const wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
+            if (free(...q)) got = q;
+          }
+          if (got) break;
+        }
+        if (got) { build(got, tx, tz, nx, nz, shopBias); d += Math.max(got[2] - got[0], got[3] - got[1]) * 0.35; }
+      }
+    };
+    // every door with an address on these cells first: a front right behind it, facing its street, so the business,
+    // the flat, the bank or the HQ has its building wherever the street now runs
+    const addr = [...PROPS, ...HOME_LADDER, ...SPOTS].map(d => d.at).concat(Object.values(HQS)).filter(at => at && superblockAt(at[0], at[1]) === sb);
+    for (const at of addr) {
+      const s = sidewalkSpot(at[0], at[1], at[2], at[3], ROAD_HALF + 3.1), ox = (CityLayout.siteI(at[0], at[1]) - at[0]) * P, oz = (CityLayout.siteJ(at[0], at[1]) - at[1]) * P;
+      const nx = -Math.sin(s.h), nz = -Math.cos(s.h), alongX = Math.abs(nz) >= Math.abs(nx);
+      let got = null;
+      for (const [w0, d0] of [[9, 10], [8, 9], [7, 8], [6, 7]]) {
+        for (let gap = 0.6; gap <= 2.6 && !got; gap += 0.4) {
+          const cx = s.x - ox + nx * (gap + d0 / 2), cz = s.z - oz + nz * (gap + d0 / 2), wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
+          if (free(...q)) got = q;
+        }
+        if (got) break;
+      }
+      if (got) build(got, 0, 0, -nx, -nz, 0.6);
+    }
+    // the high street first (shops), then the lanes, then the edge streets
+    for (const r of roads) { const hi = r.link === 'Saint Ivo Street' || r.link === 'Market Street'; for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6, s, hi ? 0.55 : 0.12); }
+    const E = [[[sb.x0 - INNER, sb.z0 - INNER], [sb.x1 + INNER, sb.z0 - INNER], 1], [[sb.x1 + INNER, sb.z1 + INNER], [sb.x0 - INNER, sb.z1 + INNER], 1], [[sb.x0 - INNER, sb.z1 + INNER], [sb.x0 - INNER, sb.z0 - INNER], 1], [[sb.x1 + INNER, sb.z0 - INNER], [sb.x1 + INNER, sb.z1 + INNER], 1]];
+    for (const [p, q, s] of E) line(linePts(p, q, 4), INNER, s, 0.2);
+    // a second row behind the first (back terraces and mews houses round courtyards), where the land is deep enough
+    for (const r of roads) for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6 + 15, s, 0);
+    // ---- behind the frontage: gardens and yards (trees, bushes, a shed), never in a street, a building or the square
+    const open = (x, z, m) => roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && Math.hypot(x - Q.x, z - Q.z) > Q.r + 1 && !(x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
+    for (let x = sb.x0 + 3; x < sb.x1 - 3; x += 6) for (let z = sb.z0 + 3; z < sb.z1 - 3; z += 6) {
+      const jx = x + rng.range(-1.8, 1.8), jz = z + rng.range(-1.8, 1.8);
+      if (!open(jx, jz, 2.4)) continue;
+      if (rng.chance(0.08) && open(jx, jz, 4.5)) { const r = this._bld(b, jx - 1.8, jz - 1.5, jx + 1.8, jz + 1.5, 2.6, STYLE.HOUSE, rng.pick(PAL.house), 2.6, 3, { exactH: true }); placed.push(r); continue; }
+      if (rng.chance(0.55)) this._prop(b, rng.chance(0.6) ? 'tree' : 'bush', jx, jz, rng.range(0, 6), rng.range(0.8, 1.2));
+    }
+    // ---- lamps along the streets (alternate sides on the pavement), cars at the kerbs
+    for (const r of roads) {
+      const pts = r.pts; let acc = 0, side = 1;
+      for (let k = 0; k < pts.length - 1; k++) {
+        const p = pts[k], c = pts[k + 1], l = Math.hypot(c[0] - p[0], c[1] - p[1]); if (l < 0.01) continue;
+        const tx = (c[0] - p[0]) / l, tz = (c[1] - p[1]) / l;
+        for (let s = (22 - acc % 22 + 22) % 22; s < l; s += 22) {
+          const x = p[0] + tx * s - tz * side * (r.w / 2 + 1.1), z = p[1] + tz * s + tx * side * (r.w / 2 + 1.1); side = -side;
+          if (x < sb.x0 || x > sb.x1 || z < sb.z0 || z > sb.z1 || this._roadDist(x, z) < 0.5 || placed.some(q => x > q.x0 - 0.5 && x < q.x1 + 0.5 && z > q.z0 - 0.5 && z < q.z1 + 0.5)) continue;
+          this._prop(b, 'parklamp', x, z, 0);
+        }
+        acc += l;
+      }
+      this._kerbCars(b, rng, r, roads);
+    }
+    b.secrets.push({ x: 30, z: 360 }, { x: 200, z: 540 });
+    this.mapPlaces.push({ id: 'oldquarter', name: 'Saint Ivo Square', cat: 'landmark', icon: '⛲', x: Q.x, z: Q.z, sub: 'The Old Quarter’s square, on Saint Ivo Street' });
+    sb.name = 'Old Quarter';
+  }
+});
 /* =====================================================================
    [CONTENT] VALEN POINT: GENERATION (Session 6B, §45.34)
    The motorsport park on the island east of the city:
@@ -54934,7 +55111,7 @@ const RACES = [
   { id: 'saltloop', name: 'Saltworks Circuit', nodes: [[10, 0], [12, 0], [12, 3], [10, 3]], loop: true, laps: 2, opp: 3, cls: ['sports', 'muscle', 'pickup'], reward: 1600, rep: 45, blurb: 'Two laps around the refinery. Mind the trucks.' },
   { id: 'midnight', name: 'Midnight Run', nodes: [[4, 4], [8, 4], [8, 6], [5, 6], [5, 8], [9, 8]], laps: 1, opp: 3, night: true, cls: ['sports', 'muscle', 'sports'], reward: 2200, rep: 55, blurb: 'Through the heart of the city after dark, traffic and all. 20:00–05:00 only.' },
   { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
-  { id: 'wettrack', name: 'Wet Track', nodes: [[1, 6], [1, 10], [4, 10], [4, 6]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
+  { id: 'wettrack', name: 'Wet Track', nodes: [[1, 7], [1, 10], [4, 10], [4, 7]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
   { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 8], [10, 8], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' },
   // Cedar Fields South (Session 6C): illegal off-road races across the countryside, each run on alternate economic
   // days; and Vance's special, a pink slip across the fields every third day
@@ -56367,6 +56544,12 @@ function turfAt(x, z) {
 function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
   // (bx, bz): a lattice address; the spot is where that block stands (021)
   const L = P - 2 * o, x0 = CityLayout.siteI(bx, bz) * P + o, z0 = CityLayout.siteJ(bx, bz) * P + o, u = clamp(along - o, 2, L - 2);
+  // a block rebuilt on its own streets (the Old Quarter, 124): the same door, on the nearest of them
+  {
+    const lx0 = bx * P + o, lz0 = bz * P + o, lp = side === 0 ? [lx0 + u, lz0] : side === 1 ? [lx0 + L, lz0 + u] : side === 2 ? [lx0 + L - u, lz0 + L] : [lx0, lz0 + L - u];
+    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o);
+    if (q) { const dx = (CityLayout.siteI(bx, bz) - bx) * P, dz = (CityLayout.siteJ(bx, bz) - bz) * P; return { x: q.x + dx, z: q.z + dz, h: q.h }; }
+  }
   switch (side) {
     case 0: return { x: x0 + u, z: z0, h: Math.PI };
     case 1: return { x: x0 + L, z: z0 + u, h: Math.PI / 2 };
@@ -70844,7 +71027,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
+    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

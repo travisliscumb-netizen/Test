@@ -74,7 +74,7 @@ check('far from the city is off the city, and the nearest precinct is still foun
 // ---------------------------------------------------------------- cut, but nothing moved
 const quad = (ox = 0, oz = 0) => [
   { id: 'nw', lx0: 0, lz0: 0, lx1: 5, lz1: 3, ox, oz }, { id: 'ne', lx0: 6, lz0: 0, lx1: 11, lz1: 3, ox, oz },
-  { id: 'w', lx0: 0, lz0: 4, lx1: 1, lz1: 9, ox, oz }, { id: 'mid', lx0: 2, lz0: 4, lx1: 9, lz1: 9, ox, oz }, { id: 'e', lx0: 10, lz0: 4, lx1: 11, lz1: 11, ox, oz },
+  { id: 'w', lx0: 0, lz0: 4, lx1: 3, lz1: 9, ox, oz }, { id: 'mid', lx0: 4, lz0: 4, lx1: 9, lz1: 9, ox, oz }, { id: 'e', lx0: 10, lz0: 4, lx1: 11, lz1: 11, ox, oz },
   { id: 'sw', lx0: 0, lz0: 10, lx1: 9, lz1: 11, ox, oz }];
 L.use('cut-in-place', quad());
 check('six precincts at one offset are a layout (neighbours on the lattice may abut)', L.precincts.length === 6 && L.sites.size === N * N);
@@ -82,8 +82,10 @@ sameAsLattice('cut in place');
 
 // ---------------------------------------------------------------- precincts that stand apart
 const apart = [
-  { id: 'core', lx0: 2, lz0: 0, lx1: 9, lz1: 7, ox: 0, oz: 0 },
-  { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 7, ox: -6, oz: -3 },
+  // (the Old Quarter's superblock, 0..2 × 4..6, stays whole in the core; the rows above it stand apart in two pieces)
+  { id: 'core', lx0: 0, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
+  { id: 'north', lx0: 2, lz0: 0, lx1: 9, lz1: 3, ox: 0, oz: -2 },
+  { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -6, oz: -3 },
   { id: 'docks', lx0: 10, lz0: 0, lx1: 11, lz1: 11, ox: 5, oz: 2 },
   { id: 'south', lx0: 0, lz0: 8, lx1: 9, lz1: 11, ox: 1, oz: 6 }];
 L.use('apart', apart);
@@ -121,7 +123,7 @@ L.use('apart', apart);
     n++; if (c > 1 || (c === 1) !== (L.at(x, z) !== null)) bad++;
   }
   check('standing apart: no two frames share a point, and at() is in a frame exactly where one is', bad === 0, `${n} points`);
-  const nodes = [[2, 0, 'core'], [10, 8, 'core'], [-6, -3, 'heights'], [-4, 5, 'heights'], [15, 2, 'docks'], [17, 14, 'docks'], [1, 14, 'south'], [11, 18, 'south']];
+  const nodes = [[0, 4, 'core'], [10, 8, 'core'], [2, -2, 'north'], [-6, -3, 'heights'], [-4, 1, 'heights'], [15, 2, 'docks'], [17, 14, 'docks'], [1, 14, 'south'], [11, 18, 'south']];
   check('standing apart: a street crossing belongs to the precinct whose streets cross there, and the ground between precincts has none',
     nodes.every(([I, J, id]) => { const p = L.nodeAt(I, J); return p && p.id === id; }) && L.nodeAt(12, 4) === null && L.nodeAt(-1, 0) === null && L.nodeAt(0, 10) === null);
   check('the layout describes itself in plain data', JSON.stringify(L.describe()) === JSON.stringify({ id: 'apart', precincts: apart.map(p => [p.id, p.lx0, p.lz0, p.lx1, p.lz1, p.ox, p.oz]) }));
@@ -133,8 +135,8 @@ refuse('a cell left out', apart.slice(0, 3), /is in no precinct/);
 refuse('a cell in two precincts', [...apart, { id: 'twice', lx0: 4, lz0: 4, lx1: 5, lz1: 5, ox: 20, oz: 20 }], /is in precincts/);
 refuse('a cut on an odd line (it would split a turf)', [{ id: 'a', lx0: 0, lz0: 0, lx1: 4, lz1: 11, ox: 0, oz: 0 }, { id: 'b', lx0: 5, lz0: 0, lx1: 11, lz1: 11, ox: 9, oz: 0 }], /odd line/);
 refuse('a cut through a superblock (the stadium)', [{ id: 'a', lx0: 0, lz0: 0, lx1: 7, lz1: 11, ox: 0, oz: 0 }, { id: 'b', lx0: 8, lz0: 0, lx1: 11, lz1: 11, ox: 9, oz: 0 }], /superblock stadium/);
-refuse('precincts at different offsets with touching frames', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 5, ox: 0, oz: 0 }, { id: 'b', lx0: 0, lz0: 6, lx1: 11, lz1: 11, ox: 1, oz: 0 }], /less than one cell apart/);
-refuse('precincts moved onto each other', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 5, ox: 0, oz: 0 }, { id: 'b', lx0: 0, lz0: 6, lx1: 11, lz1: 11, ox: 0, oz: -4 }], /less than one cell apart|overlap/);
+refuse('precincts at different offsets with touching frames', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 7, ox: 0, oz: 0 }, { id: 'b', lx0: 0, lz0: 8, lx1: 11, lz1: 11, ox: 1, oz: 0 }], /less than one cell apart/);
+refuse('precincts moved onto each other', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 7, ox: 0, oz: 0 }, { id: 'b', lx0: 0, lz0: 8, lx1: 11, lz1: 11, ox: 0, oz: -4 }], /less than one cell apart|overlap/);
 refuse('a precinct off the lattice', [{ id: 'a', lx0: 0, lz0: 0, lx1: 12, lz1: 11, ox: 0, oz: 0 }], /outside the lattice/);
 refuse('an offset that is not whole cells', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 11, ox: 0.5, oz: 0 }], /whole numbers/);
 let unknown = ''; try { L.use('nowhere'); } catch (e) { unknown = e.message; }
@@ -179,7 +181,7 @@ let unknown = ''; try { L.use('nowhere'); } catch (e) { unknown = e.message; }
   for (const p of L.precincts) for (let i = p.lx0; i <= p.lx1 + 1; i++) for (let j = p.lz0; j <= p.lz1 + 1; j++) {
     const own = (I, J) => L.cell(I, J) >= 0, I = i + p.ox, J = j + p.oz, edge = !(own(I - 1, J - 1) && own(I, J - 1) && own(I - 1, J) && own(I, J)); n++;
     const expect = i === p.lx0 || i === p.lx1 + 1 || j === p.lz0 || j === p.lz1 + 1;
-    if (RN.edgeNode(I, J) !== edge || (edge !== expect && !(p.id === 'core' || p.id === 'heights'))) { bad++; if (!first) first = `${p.id} ${i},${j}`; }
+    if (RN.edgeNode(I, J) !== edge || (edge !== expect && !(p.id === 'core' || p.id === 'north' || p.id === 'heights'))) { bad++; if (!first) first = `${p.id} ${i},${j}`; }
   }
   check('S2, apart: a precinct\'s edge crossings are edge streets and its inner ones are not', bad === 0, `${n} crossings${bad ? ', ' + bad + ' wrong, first ' + first : ''}`);
   // lattice metres to world metres, a point's block, the middle of town
@@ -196,7 +198,7 @@ let unknown = ''; try { L.use('nowhere'); } catch (e) { unknown = e.message; }
 }
 
 check('an unknown layout name is an error', /no layout/.test(unknown));
-check('a refused layout leaves the one in use untouched', L.id === 'apart' && L.precincts.length === 4);
+check('a refused layout leaves the one in use untouched', L.id === 'apart' && L.precincts.length === apart.length);
 L.use('classic');
 check('every layout the build ships passes its own rules', Object.keys(CITY_LAYOUTS).every(id => { try { L.use(id); return true; } catch { return false; } }) && L.use('classic').id === 'classic', Object.keys(CITY_LAYOUTS).join(', '));
 check('zones of the lattice are all known zones', ZONE_MAP.every(r => r.length === N && [...r].every(c => ZONES[c])));

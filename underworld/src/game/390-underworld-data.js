@@ -430,6 +430,12 @@ function turfAt(x, z) {
 function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
   // (bx, bz): a lattice address; the spot is where that block stands (021)
   const L = P - 2 * o, x0 = CityLayout.siteI(bx, bz) * P + o, z0 = CityLayout.siteJ(bx, bz) * P + o, u = clamp(along - o, 2, L - 2);
+  // a block rebuilt on its own streets (the Old Quarter, 124): the same door, on the nearest of them
+  {
+    const lx0 = bx * P + o, lz0 = bz * P + o, lp = side === 0 ? [lx0 + u, lz0] : side === 1 ? [lx0 + L, lz0 + u] : side === 2 ? [lx0 + L - u, lz0 + L] : [lx0, lz0 + L - u];
+    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o);
+    if (q) { const dx = (CityLayout.siteI(bx, bz) - bx) * P, dz = (CityLayout.siteJ(bx, bz) - bz) * P; return { x: q.x + dx, z: q.z + dz, h: q.h }; }
+  }
   switch (side) {
     case 0: return { x: x0 + u, z: z0, h: Math.PI };
     case 1: return { x: x0 + L, z: z0 + u, h: Math.PI / 2 };

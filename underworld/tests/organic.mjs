@@ -41,6 +41,7 @@ const R = await ev(() => {
   });
   // ---- the curved streets laid by the organic pass
   const names = new Set(); for (const k in P.CURVED_STREETS) if (!['10,2', '10,3', '3,10', '4,10'].includes(k)) for (const r of P.CURVED_STREETS[k].roads) names.add(r.name);
+  for (const S of P.OQ_STREETS) names.add(S.name);
   out.names = [...names];
   const ours = w.localRoads.filter(r => r.link && names.has(r.link));
   out.lanes = ours.length; out.linked = ours.filter(r => w.links.some(L => L.road === r && L.ends.every(Boolean))).length;
@@ -79,16 +80,37 @@ const R = await ev(() => {
   return out;
 });
 const cl = R.closures;
-check('the squares, mews and yards: inside a precinct, off every race line, both crossroads T-junctions or, on an edge, the edge street straight on (no dead end, no lone corner)', cl.length >= 7 && cl.every(c => c.inside && !c.race && c.deg.every(Boolean)), JSON.stringify(cl.map(c => [c.name, c.inside, c.race, c.deg])));
+check('the squares, mews and yards: inside a precinct, off every race line, both crossroads T-junctions or, on an edge, the edge street straight on (no dead end, no lone corner)', cl.length >= 6 && cl.every(c => c.inside && !c.race && c.deg.every(Boolean)), JSON.stringify(cl.map(c => [c.name, c.inside, c.race, c.deg])));
 check('closed to traffic: off the road network, raised to the pavement, bollards across both ends', cl.every(c => !c.road && c.y > 0.1 && c.ends.every(n => n >= 6)), JSON.stringify(cl.map(c => [c.name, c.road, c.y, c.ends])));
 check('dressed and named: a fountain in every square; the HUD gives its name; nothing a door, home or place stands on', cl.every(c => (c.kind !== 'plaza' || c.fountain) && c.named === c.name && c.prot === 0), JSON.stringify(cl.map(c => [c.name, c.fountain, c.named, c.prot])));
-check('the new streets: lanes, a crescent, avenues and works roads, every one a through street with both ends on an open road', R.names.length >= 15 && R.lanes >= 24 && R.linked === R.lanes, JSON.stringify({ names: R.names, lanes: R.lanes, linked: R.linked }));
+check('the new streets: lanes, a crescent, avenues and works roads, every one a through street with both ends on an open road', R.names.length >= 18 && R.lanes >= 25 && R.linked === R.lanes, JSON.stringify({ names: R.names, lanes: R.lanes, linked: R.linked }));
 check('standing on any of them, the HUD names it', R.hud.length === 0, JSON.stringify(R.hud));
 check('the GPS takes Glass Mile end to end, a diagonal across three blocks', R.gm.pieces === 3 && R.gm.onIt && R.gm.route < R.gm.chain * 1.25, JSON.stringify(R.gm));
 check('no new road over any door, garage or place; every home still has its building, no flat under a road', R.onRoad.length === 0 && R.homeless.length === 0, JSON.stringify({ onRoad: R.onRoad, homeless: R.homeless }));
 check('no block cut off: every downtown block keeps at least two open sides', R.shut.length === 0, JSON.stringify(R.shut));
+// ---- the Old Quarter, rebuilt (124): one superblock with no grid inside it, on its own winding streets
+const OQ = await ev(() => {
+  const g = window.game, w = g.world, P = window.__pv, RN = P.RoadNet, uw = g.uw;
+  const sb = P.SUPERBLOCKS.find(s => s.id === 'oldquarter'), inside = [];
+  for (let i = sb.bx0 + 1; i <= sb.bx1; i++) for (let j = sb.bz0; j <= sb.bz1; j++) inside.push(RN.segOpen(0, i, j));
+  for (let j = sb.bz0 + 1; j <= sb.bz1; j++) for (let i = sb.bx0; i <= sb.bx1; i++) inside.push(RN.segOpen(1, j, i));
+  const inOQ = (x, z) => x > sb.bx0 * 80 && x < (sb.bx1 + 1) * 80 && z > sb.bz0 * 80 && z < (sb.bz1 + 1) * 80;
+  const links = w.links.filter(L => P.OQ_STREETS.some(S => S.name === L.name) && L.pts.every(p => inOQ(p[0], p[1])));
+  // every door with an address on its cells: on a street, a building right behind it
+  const doors = uw.locs.filter(L => L.kind !== 'deal' && inOQ(L.x, L.z) && L.id !== 'qgarage').map(L => {
+    const fx = Math.sin(L.h), fz = Math.cos(L.h), hit = w.grid.raycast(L.x + fx * 1.5, P.groundY(L.x, L.z) + 1.2, L.z + fz * 1.5, -fx, 0, -fz, 6, 0.3), road = P.RoadGraph.nearest(L.x, L.z, { maxD: 30 });
+    return { id: L.kind + ':' + L.id, wall: hit ? +hit.t.toFixed(1) : null, road: road ? +road.d.toFixed(1) : null };
+  });
+  const gr = w.places.garageRoof, gq = gr && P.RoadGraph.nearest(gr.door.x, gr.door.z, { maxD: 40 });
+  const wt = P.raceCheckpoints(P.RACES.find(r => r.id === 'wettrack')), wtOn = wt.cps.every(c => P.RoadGraph.nearest(c.x, c.z, { maxD: 20 }) && P.RoadGraph.nearest(c.x, c.z, { maxD: 20 }).d < 8);
+  return { closed: inside.every(o => !o), n: inside.length, links: links.map(L => L.name), attached: links.every(L => L.ends.every(Boolean)), doors, garage: gq ? { road: gq.e.name, d: +gq.d.toFixed(1) } : null, wet: { n: wt.cps.length, on: wtOn }, sq: P.streetNameAt(P.OQ_SQUARE.x + 0.1, P.OQ_SQUARE.z) };
+});
+check('the Old Quarter is one superblock: no lattice street left inside it', OQ.closed && OQ.n === 12, JSON.stringify({ closed: OQ.closed, n: OQ.n }));
+check('its own winding streets: Saint Ivo Street, Market Street (two halves), five lanes; every end on an open road', OQ.links.length === 8 && OQ.attached && ['Saint Ivo Street', 'Market Street', 'Bell Lane', 'Cooper’s Walk', 'Chapel Lane', 'Garage Row', 'Wick Lane'].every(n => OQ.links.includes(n)), JSON.stringify(OQ.links));
+check('every door with an address there (flats, shops, the bank, the pawn shop, the Vipers’ HQ) is on a street with its building right behind it', OQ.doors.length >= 7 && OQ.doors.every(d => d.wall !== null && d.wall < 4 && d.road !== null && d.road < 12), JSON.stringify(OQ.doors));
+check('the Quarter Garage stands where it stood, Garage Row past the foot of its ramp; the Wet Track runs round its streets', OQ.garage && OQ.garage.d < 15 && OQ.wet.n >= 8 && OQ.wet.on, JSON.stringify({ garage: OQ.garage, wet: OQ.wet }));
 // the density before the pass (building counts per precinct, the grid as it was): the lanes' new frontage keeps it
-const BASE = { core: 207, oldquarter: 168, linden: 137, port: 36 };
+const BASE = { core: 107, oldquarter: 268, linden: 137, port: 36 };
 check('each district keeps its density (within 5% of the grid it was)', Object.entries(BASE).every(([k, v]) => R.cnt[k] >= v * 0.95), JSON.stringify({ now: R.cnt, before: BASE }));
 const near = (a, c, t = 14) => a.every((v, i) => Math.abs(v - c[i]) <= t);
 check('the map shows them: a square’s paving, a lane’s asphalt', near(R.map.square, [0x8f, 0x8a, 0x80], 30) && near(R.map.lane, [0x6f, 0x76, 0x82], 30), JSON.stringify(R.map));
