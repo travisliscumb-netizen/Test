@@ -531,12 +531,18 @@ Object.assign(World.prototype, {
     for (let x = V.x0 + 20; x < V.x1 - 10; x += 26) if (Math.abs(x - V.gate) > 12) b.fx.push({ type: 'neon', x, y: y + 2.95, z: V.z1 + 0.5, w: 0.4, h: 0.3, d: 0.1, c: 0xffe2b0 });
     // ------------------------------------------------ the garage pavilion (six bays) beside the motor court
     // (the building stands back: its front 6 m are four garage bays, so a door that rolls up shows a garage, not a wall)
-    bld(-560, -924, -526, -906, 5, STYLE.HOUSE, WALL, 5, 5, { roof: 'gable', roofColor: SLATE });
+    bld(-560, -924, -526, -906, 6.5, STYLE.BRICK, 0xd8cfbd, 6.5, 8.5, { roof: 'gable', roofColor: SLATE });
     for (const x of [-560, -551.3, -542.9, -534.5, -526]) box(b, x + (x === -560 ? 0.6 : x === -526 ? -0.6 : 0), y + 2.5, -903, x === -560 || x === -526 ? 1.2 : 2.0, 5, 6, WALL, true);
     box(b, -543, y + 4.4, -900.4, 34, 1.2, 0.8, WALL, false); box(b, -543, y + 5.1, -903, 34.6, 0.3, 6.6, SLATE, false);
     for (let k = 0; k < 4; k++) { const cx = -555.5 + k * 8.4; box(b, cx, y + 0.02, -903, 6.4, 0.04, 5.6, 0x5a5d62, false); box(b, cx, y + 1.9, -905.9, 6.4, 3.8, 0.1, 0x8a8d90, false); box(b, cx, y + 3.75, -903, 6.4, 0.1, 5.6, 0x9a9da0, false); box(b, cx - 2.6, y + 1.0, -905.6, 0.8, 2.0, 0.5, 0x3a3f45, false); box(b, cx + 2.4, y + 1.3, -905.75, 1.4, 0.06, 0.3, 0x6a5a48, false); b.fx.push({ type: 'neon', x: cx, y: y + 3.68, z: -903, w: 2.4, h: 0.04, d: 0.2, c: 0xf2f6ff }); }
-    // four doors; the second opens for the owner onto the garage under the pavilion (VSPACE_DEFS.villa)
-    for (let k = 0; k < 4; k++) if (k !== 1) box(b, -555.5 + k * 8.4, y + 1.9, -899.88, 6.4, 3.8, 0.12, 0x2a2e33, false);
+    // four roller doors that open for the owner: the second onto the garage under the pavilion (VSPACE_DEFS.villa), the
+    // others onto their own bays (a car fits in each)
+    for (let k = 0; k < 4; k++) if (k !== 1) this._door(b, { id: 'villaBay' + k, x: -555.5 + k * 8.4, z: -899.82, w: 6.0, h: 3.6, axis: 'x', face: 1, y, color: 0x2a2e33, block: b.i, kind: 'owner', prop: 'villa' });
+    // the motor house's dress: carriage lamps either side of each door, a cupola with a clock on the roof, its name in gold
+    for (const x of [-560, -551.3, -542.9, -534.5, -526]) { box(b, x, y + 3.0, -899.75, 0.3, 0.5, 0.25, 0x1a1c20, false); b.fx.push({ type: 'neon', x, y: y + 2.95, z: -899.6, w: 0.2, h: 0.3, d: 0.1, c: 0xffe2b0 }); }
+    box(b, -543, y + 7.6, -915, 3, 2.4, 3, WALL, false); box(b, -543, y + 9.2, -915, 3.6, 0.3, 3.6, SLATE, false); this._det(b, 'cone', -543, y + 10.3, -915, 2.6, 1.9, 2.6, C(SLATE));
+    this._det(b, 'disc', -543, y + 7.8, -913.48, 1.1, 1, 1.1, C(0xf4f0e6)).rx = Math.PI / 2; box(b, -543, y + 7.8, -913.42, 0.06, 0.7, 0.04, 0x1a1c20, false);
+    b.signs.push({ text: 'VALEN MOTOR HOUSE', x: -543, y: y + 4.45, z: -899.95, ry: 0, w: 12, h: 0.75, bg: '#14181c', fg: '#d4af37' });
     // the apron before the doors and the drive across to the motor court
     box(b, -543, y + 0.03, -893.5, 34, 0.06, 13, 0xd8d0c0, false); for (let k = 0; k < 4; k++) box(b, -555.5 + k * 8.4, y + 0.065, -896, 6.0, 0.01, 0.12, 0xb8b0a0, false);
     box(b, -576, y + 0.03, -890, 32, 0.06, 8, 0xd8d0c0, false);

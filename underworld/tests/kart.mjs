@@ -31,6 +31,18 @@ const drive = await ev(() => {
 });
 check('the kart answers: the throttle takes it to speed, it steers both ways, the brakes stop it', drive.v > 12 && drive.left > 0.05 && drive.right < -0.05 && drive.braked > 5, JSON.stringify(drive));
 check('the steering setting changes it: loose turns harder than tight', drive.loose > drive.tight * 1.2, JSON.stringify(drive));
+// the race's own thumb buttons: the game's (weapon, attack, jump…) are put aside; Gas, Brake, Drift drive the kart
+const btns = await ev(() => {
+  const g = window.game, k = g.kart, me = k.karts[0], inp = g.input, vis = q => { const e = document.querySelector(q); return !!e && getComputedStyle(e).display !== 'none'; };
+  const press = (sel, on) => { const e = document.querySelector('#kartUI ' + sel); e.dispatchEvent(new MouseEvent(on ? 'mousedown' : 'mouseup', { bubbles: true })); };
+  k.reset(); k.t = 0; press('.gas', true); for (let i = 0; i < 150; i++) k._step(1 / 60, inp); const v = me.vf;
+  // drifting through a turn: the tail steps out (more yaw for the same steering)
+  const yaw = dr => { k.reset(); k.t = 0; for (let i = 0; i < 150; i++) k._step(1 / 60, inp); inp.down.add('left'); if (dr) press('.drf', true); let r = 0; for (let i = 0; i < 40; i++) { k._step(1 / 60, inp); r = Math.max(r, Math.abs(me.r)); } inp.down.delete('left'); if (dr) press('.drf', false); return r; };
+  const plain = yaw(false), drift = yaw(true); press('.gas', false);
+  press('.brk', true); const braking = inp.isDown('brake'); press('.brk', false);
+  return { gameBtns: ['[data-act="weapon"]', '[data-act="attack"]', '[data-act="jump"]'].some(q => vis('#touch .tbtn' + q)), v: +v.toFixed(1), plain: +plain.toFixed(2), drift: +drift.toFixed(2), braking, released: !inp.isDown('gas') && !inp.isDown('brake') && !inp.isDown('handbrake') };
+});
+check('its own buttons: the game’s weapon, attack and jump buttons gone; Gas drives, Brake brakes, Drift swings the tail out', !btns.gameBtns && btns.v > 12 && btns.braking && btns.drift > btns.plain * 1.15 && btns.released, JSON.stringify(btns));
 // pause: the race stands still
 const paused = await ev(() => { const g = window.game, k = g.kart, inp = g.input; k.paused = true; k._pauseUI(true); const t0 = k.clock; for (let i = 0; i < 30; i++) k.frame(1 / 60); const vis = getComputedStyle(document.querySelector('#kartUI .kp')).display; k.paused = false; k._pauseUI(false); return { still: k.clock === t0, vis }; });
 check('pause freezes the race and shows the settings', paused.still && paused.vis === 'flex', JSON.stringify(paused));

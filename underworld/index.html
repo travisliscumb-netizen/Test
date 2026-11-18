@@ -710,7 +710,7 @@ b.gold,.svcTop b.gold,.wtop b.gold,.rylBar b.gold{color:var(--gold)}
 #touch .tbtn,#hud .tr,#minimapWrap{will-change:transform}
 /* the kart simulator (356): its own overlay; the game's HUD, money feed and banners stand aside, the car's thumb
    controls stay (the stick steers, Gas and Brake, the pause button), the horn, drift and radio go */
-body.kart #hud,body.kart #moneyFeed,body.kart #banner,body.kart #touch .tbtn[data-act="horn"],body.kart #touch .tbtn[data-act="handbrake"],body.kart #touch .tbtn[data-act="radio"],body.kart #touch .tbtn[data-act="map"],body.kart #touch .tbtn[data-act="empire"],body.kart #touch .tbtn[data-act="camera"],body.kart #touch .tbtn[data-act="interact"]{display:none!important}
+body.kart #touch .tbtn,body.kart #touch #tbar,body.kart #hud,body.kart #moneyFeed,body.kart #banner,body.kart #touch .tbtn[data-act="horn"],body.kart #touch .tbtn[data-act="handbrake"],body.kart #touch .tbtn[data-act="radio"],body.kart #touch .tbtn[data-act="map"],body.kart #touch .tbtn[data-act="empire"],body.kart #touch .tbtn[data-act="camera"],body.kart #touch .tbtn[data-act="interact"]{display:none!important}
 </style>
 </head>
 <body>
@@ -42099,12 +42099,18 @@ Object.assign(World.prototype, {
     for (let x = V.x0 + 20; x < V.x1 - 10; x += 26) if (Math.abs(x - V.gate) > 12) b.fx.push({ type: 'neon', x, y: y + 2.95, z: V.z1 + 0.5, w: 0.4, h: 0.3, d: 0.1, c: 0xffe2b0 });
     // ------------------------------------------------ the garage pavilion (six bays) beside the motor court
     // (the building stands back: its front 6 m are four garage bays, so a door that rolls up shows a garage, not a wall)
-    bld(-560, -924, -526, -906, 5, STYLE.HOUSE, WALL, 5, 5, { roof: 'gable', roofColor: SLATE });
+    bld(-560, -924, -526, -906, 6.5, STYLE.BRICK, 0xd8cfbd, 6.5, 8.5, { roof: 'gable', roofColor: SLATE });
     for (const x of [-560, -551.3, -542.9, -534.5, -526]) box(b, x + (x === -560 ? 0.6 : x === -526 ? -0.6 : 0), y + 2.5, -903, x === -560 || x === -526 ? 1.2 : 2.0, 5, 6, WALL, true);
     box(b, -543, y + 4.4, -900.4, 34, 1.2, 0.8, WALL, false); box(b, -543, y + 5.1, -903, 34.6, 0.3, 6.6, SLATE, false);
     for (let k = 0; k < 4; k++) { const cx = -555.5 + k * 8.4; box(b, cx, y + 0.02, -903, 6.4, 0.04, 5.6, 0x5a5d62, false); box(b, cx, y + 1.9, -905.9, 6.4, 3.8, 0.1, 0x8a8d90, false); box(b, cx, y + 3.75, -903, 6.4, 0.1, 5.6, 0x9a9da0, false); box(b, cx - 2.6, y + 1.0, -905.6, 0.8, 2.0, 0.5, 0x3a3f45, false); box(b, cx + 2.4, y + 1.3, -905.75, 1.4, 0.06, 0.3, 0x6a5a48, false); b.fx.push({ type: 'neon', x: cx, y: y + 3.68, z: -903, w: 2.4, h: 0.04, d: 0.2, c: 0xf2f6ff }); }
-    // four doors; the second opens for the owner onto the garage under the pavilion (VSPACE_DEFS.villa)
-    for (let k = 0; k < 4; k++) if (k !== 1) box(b, -555.5 + k * 8.4, y + 1.9, -899.88, 6.4, 3.8, 0.12, 0x2a2e33, false);
+    // four roller doors that open for the owner: the second onto the garage under the pavilion (VSPACE_DEFS.villa), the
+    // others onto their own bays (a car fits in each)
+    for (let k = 0; k < 4; k++) if (k !== 1) this._door(b, { id: 'villaBay' + k, x: -555.5 + k * 8.4, z: -899.82, w: 6.0, h: 3.6, axis: 'x', face: 1, y, color: 0x2a2e33, block: b.i, kind: 'owner', prop: 'villa' });
+    // the motor house's dress: carriage lamps either side of each door, a cupola with a clock on the roof, its name in gold
+    for (const x of [-560, -551.3, -542.9, -534.5, -526]) { box(b, x, y + 3.0, -899.75, 0.3, 0.5, 0.25, 0x1a1c20, false); b.fx.push({ type: 'neon', x, y: y + 2.95, z: -899.6, w: 0.2, h: 0.3, d: 0.1, c: 0xffe2b0 }); }
+    box(b, -543, y + 7.6, -915, 3, 2.4, 3, WALL, false); box(b, -543, y + 9.2, -915, 3.6, 0.3, 3.6, SLATE, false); this._det(b, 'cone', -543, y + 10.3, -915, 2.6, 1.9, 2.6, C(SLATE));
+    this._det(b, 'disc', -543, y + 7.8, -913.48, 1.1, 1, 1.1, C(0xf4f0e6)).rx = Math.PI / 2; box(b, -543, y + 7.8, -913.42, 0.06, 0.7, 0.04, 0x1a1c20, false);
+    b.signs.push({ text: 'VALEN MOTOR HOUSE', x: -543, y: y + 4.45, z: -899.95, ry: 0, w: 12, h: 0.75, bg: '#14181c', fg: '#d4af37' });
     // the apron before the doors and the drive across to the motor court
     box(b, -543, y + 0.03, -893.5, 34, 0.06, 13, 0xd8d0c0, false); for (let k = 0; k < 4; k++) box(b, -555.5 + k * 8.4, y + 0.065, -896, 6.0, 0.01, 0.12, 0xb8b0a0, false);
     box(b, -576, y + 0.03, -890, 32, 0.06, 8, 0xd8d0c0, false);
@@ -52889,7 +52895,9 @@ class KartSim {
     // the ground: mown grass in stripes
     const grass = this._tex(512, 512, (g, w, h) => { this._noise(g, w, h, '#4f8a3a', 0.12, 9000); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'; g.fillRect(0, i * h / 8, w, h / 8); } }, [80, 80]);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: grass, roughness: 0.95 }));
-    ground.position.y = -0.02; ground.receiveShadow = true; sc.add(ground);
+    ground.position.y = -0.06; ground.receiveShadow = true; sc.add(ground);
+    // (the grass is pushed back in depth and the road stands 12 cm over it: 5 cm flickered through at a distance)
+    ground.material.polygonOffset = true; ground.material.polygonOffsetFactor = 4; ground.material.polygonOffsetUnits = 4;
     // the asphalt (dark, flecked, worn darker on the racing line), its white edge lines; kerbs; the start line
     const asph = this._tex(256, 512, (g, w, h) => { this._noise(g, w, h, '#3a3c40', 0.18, 16000); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(w * 0.3, 0, w * 0.4, h); g.fillStyle = '#e8e8e2'; g.fillRect(4, 0, 6, h); g.fillRect(w - 10, 0, 6, h); });
     const kerbT = this._tex(64, 128, (g, w, h) => { for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#f2f2ee' : '#d2232a'; g.fillRect(0, i * h / 4, w, h / 4); } });
@@ -52904,18 +52912,18 @@ class KartSim {
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
       const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; sc.add(m); return m;
     };
-    ribbon(W, -W, new THREE.MeshStandardMaterial({ map: asph, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: -1 }), 0.03);
+    ribbon(W, -W, new THREE.MeshStandardMaterial({ map: asph, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: -1 }), 0.12);
     const corner = i => S[i].k > 0.012 && !S[i].narrow;
     const kmat = new THREE.MeshStandardMaterial({ map: kerbT, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 });
-    ribbon(W + 1.2, W, kmat, 0.06, corner); ribbon(-W, -W - 1.2, kmat, 0.06, corner);
+    ribbon(W + 1.2, W, kmat, 0.16, corner); ribbon(-W, -W - 1.2, kmat, 0.16, corner);
     // the run-off: a gravel band outside the corners
     const grav = this._tex(128, 128, (g, w, h) => this._noise(g, w, h, '#b8a27a', 0.35, 4000));
     const gmat = new THREE.MeshStandardMaterial({ map: grav, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 });
-    ribbon(W + KART.run, W + 1.2, gmat, 0.02, i => corner(i)); ribbon(-W - 1.2, -W - KART.run, gmat, 0.02, i => corner(i));
+    ribbon(W + KART.run, W + 1.2, gmat, 0.09, i => corner(i)); ribbon(-W - 1.2, -W - KART.run, gmat, 0.09, i => corner(i));
     // the start / finish line: a chequered band across the track at sample 0
     const chk = this._tex(128, 32, (g, w, h) => { for (let i = 0; i < 16; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#111' : '#f4f4f4'; g.fillRect(i * w / 16, j * h / 4, w / 16, h / 4); } });
     const s0 = S[0], line = new THREE.Mesh(new THREE.PlaneGeometry(KART.w, 1.6).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: chk, polygonOffset: true, polygonOffsetFactor: -3 }));
-    line.position.set(s0.x, s0.y + 0.07, s0.z); line.rotation.y = Math.atan2(s0.tx, s0.tz); sc.add(line);
+    line.position.set(s0.x, s0.y + 0.15, s0.z); line.rotation.y = Math.atan2(s0.tx, s0.tz); sc.add(line);
     // the tyre walls: stacks of tyres in red and white, outside the run-off (on the bridge and in the tunnel, the walls)
     const tyre = new THREE.CylinderGeometry(0.42, 0.42, 0.95, 12), tyres = [];
     for (let i = 0; i < n; i += 1) for (const sd of [-1, 1]) { const s = S[i]; if (s.narrow) continue; const o = sd * (W + KART.run + 0.5); tyres.push([s.x + s.lx * o, s.y, s.z + s.lz * o, (Math.floor(i / 2) + (sd > 0 ? 1 : 0)) % 2]); }
@@ -52972,29 +52980,85 @@ class KartSim {
       const ti = new THREE.InstancedMesh(trunk, new THREE.MeshStandardMaterial({ color: 0x5a4030 }), spots.length), ci = new THREE.InstancedMesh(crown, new THREE.MeshStandardMaterial({ color: 0x3f7a34, flatShading: true, roughness: 0.9 }), spots.length);
       spots.forEach(([x, z, k], i) => { M.compose(new THREE.Vector3(x, 1.5 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); ti.setMatrixAt(i, M); M.compose(new THREE.Vector3(x, 4.4 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k * 1.15, k)); ci.setMatrixAt(i, M); ci.setColorAt(i, col.setHSL(0.28 + Math.random() * 0.06, 0.45, 0.28 + Math.random() * 0.1)); });
       ti.castShadow = ci.castShadow = true; sc.add(ti, ci); }
+    // sponsor boards along the straights (outside the tyre walls), flags on poles, mountains round the park
+    { const words = [['VALEN', '#d2232a', '#fff'], ['UNDERWORLD', '#111', '#ffd84d'], ['KART PARK', '#2a6fd6', '#fff'], ['ROYALE', '#5a2a7a', '#ffd84d'], ['BLACKGATE', '#1f6a3a', '#fff'], ['FUEL & GO', '#ff8a3d', '#111']];
+      const mats = words.map(([t, bg, fg]) => new THREE.MeshStandardMaterial({ roughness: 0.6, map: this._tex(512, 96, (c, w, h) => { c.fillStyle = bg; c.fillRect(0, 0, w, h); c.fillStyle = fg; c.font = 'italic 900 64px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(t, w / 2, h / 2 + 4); c.strokeStyle = fg; c.lineWidth = 6; c.strokeRect(6, 6, w - 12, h - 12); }) }));
+      const leg = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.5, metalness: 0.5 }); let w = 0;
+      for (let i = 10; i < n; i += 22) { const s = S[i]; if (s.narrow || s.k > 0.01) continue;
+        const sd = (i / 22) % 2 < 1 ? 1 : -1, o = sd * (W + KART.run + 2.4), bd = new THREE.Mesh(new THREE.BoxGeometry(7, 1.3, 0.2), mats[w++ % mats.length]);
+        bd.position.set(s.x + s.lx * o, s.y + 1.2, s.z + s.lz * o); bd.rotation.y = Math.atan2(s.tx, s.tz) + (sd > 0 ? -Math.PI / 2 : Math.PI / 2); bd.castShadow = true; sc.add(bd);
+        for (const e of [-3, 3]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 0.12), leg); l.position.set(bd.position.x + s.tx * e, s.y + 0.3, bd.position.z + s.tz * e); sc.add(l); } }
+      const flagT = this._tex(64, 64, (c, w, h) => { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { c.fillStyle = (i + j) % 2 ? '#111' : '#f4f4f4'; c.fillRect(i * 8, j * 8, 8, 8); } });
+      for (let i = 0; i < n; i += 45) { const s = S[i]; if (s.narrow) continue; for (const sd of [-1, 1]) { const o = sd * (W + KART.run + 1.2), x = s.x + s.lx * o, z = s.z + s.lz * o;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 5, 6), leg); pole.position.set(x, s.y + 2.5, z); sc.add(pole);
+        const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), new THREE.MeshStandardMaterial({ map: i % 90 ? flagT : null, color: i % 90 ? 0xffffff : KART.colors[(i / 45) % 6 | 0], side: THREE.DoubleSide })); fl.position.set(x + s.tx * 0.7, s.y + 4.5, z + s.tz * 0.7); fl.rotation.y = Math.atan2(s.lx, s.lz); sc.add(fl); } }
+      const rock = new THREE.MeshStandardMaterial({ color: 0x6a7a6a, roughness: 1, flatShading: true }), snow = new THREE.MeshStandardMaterial({ color: 0xeef2f6, roughness: 0.9, flatShading: true });
+      for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2 + Math.sin(i * 7) * 0.1, r = 560 + (i % 3) * 60, h = 90 + ((i * 37) % 70), m = new THREE.Mesh(new THREE.ConeGeometry(70 + (i % 4) * 18, h, 6), rock); m.position.set(Math.cos(a) * r, h / 2 - 8, Math.sin(a) * r); m.rotation.y = i; sc.add(m);
+        const cap = new THREE.Mesh(new THREE.ConeGeometry((70 + (i % 4) * 18) * 0.3, h * 0.3, 6), snow); cap.position.set(m.position.x, h - 8 - h * 0.15 + 0.5, m.position.z); cap.rotation.y = i; sc.add(cap); }
+      // a banner over the start / finish
+      const s0 = S[3], ban = new THREE.Mesh(new THREE.PlaneGeometry(KART.w + 2, 1.1), new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, map: this._tex(512, 64, (c, w, h) => { c.fillStyle = '#111'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd84d'; c.font = 'italic 900 44px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('VALEN KART PARK', w / 2, h / 2 + 2); }) }));
+      ban.position.set(s0.x, s0.y + 7.2, s0.z); ban.rotation.y = Math.atan2(s0.tx, s0.tz); sc.add(ban); }
     // the karts
     this.karts = [];
-    for (let i = 0; i <= KART.rivals; i++) { const m = this._kartMesh(KART.colors[i]); sc.add(m); this.karts.push({ mesh: m, i, ai: i > 0 }); }
+    for (let i = 0; i <= KART.rivals; i++) { const m = this._kartMesh(KART.colors[i], i + 1); sc.add(m); this.karts.push({ mesh: m, i, ai: i > 0 }); }
     this.scene = sc;
-    this.cam = new THREE.PerspectiveCamera(68, 1, 0.1, 1200);
+    this.cam = new THREE.PerspectiveCamera(68, 1, 0.3, 1100);
   }
-  _kartMesh(color) {
-    const g = new THREE.Group(), body = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.3 }), dark = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6 }), chrome = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.25, metalness: 0.8 });
-    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
-    add(new THREE.BoxGeometry(1.1, 0.08, 1.9), chrome, 0, 0.16, 0);                 // the frame
-    add(new THREE.BoxGeometry(1.0, 0.22, 0.5), body, 0, 0.3, 0.85);                  // the nose
-    add(new THREE.BoxGeometry(0.9, 0.16, 0.6), body, 0, 0.28, 0.35);                 // the front panel
-    for (const sx of [-0.62, 0.62]) add(new THREE.BoxGeometry(0.22, 0.2, 0.9), body, sx, 0.26, -0.05); // side pods
-    add(new THREE.BoxGeometry(0.5, 0.45, 0.45), dark, 0, 0.42, -0.2);               // the seat
-    add(new THREE.BoxGeometry(0.42, 0.42, 0.28), new THREE.MeshStandardMaterial({ color: 0x22304a }), 0, 0.82, -0.18); // the driver
-    add(new THREE.SphereGeometry(0.2, 14, 10), new THREE.MeshStandardMaterial({ color, roughness: 0.2, metalness: 0.4 }), 0, 1.16, -0.12); // the helmet
-    add(new THREE.BoxGeometry(0.26, 0.07, 0.04), dark, 0, 1.17, 0.07);              // its visor
-    add(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 14).rotateX(Math.PI / 2.6), dark, 0, 0.62, 0.22); // the wheel
-    add(new THREE.BoxGeometry(1.25, 0.12, 0.16), body, 0, 0.22, -0.98);              // the rear bumper
+  // a kart: a tubular chassis, a shaped nose with its race number, side pods with stripes, the engine and its exhaust on
+  // the right, a rear bumper bar, tyres with tread and coloured rims; the driver in a suit of the kart's colour, arms to
+  // the wheel, gloves, a glossy helmet with a dark visor and a stripe
+  _kartMesh(color, num) {
+    const g = new THREE.Group(), col = new THREE.Color(color), light = col.clone().lerp(new THREE.Color(0xffffff), 0.35);
+    const body = new THREE.MeshStandardMaterial({ color, roughness: 0.28, metalness: 0.25 }), stripe = new THREE.MeshStandardMaterial({ color: light, roughness: 0.3 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.55 }), chrome = new THREE.MeshStandardMaterial({ color: 0xd8dce0, roughness: 0.18, metalness: 0.9 }), rubber = new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.92 });
+    const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; g.add(m); return m; };
+    const tube = (a, b, r = 0.03, mat = chrome) => { const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), L = A.distanceTo(B), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 8), mat); m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize()); m.castShadow = true; g.add(m); return m; };
+    // the chassis: two side rails, cross members, the floor tray
+    for (const sx of [-0.42, 0.42]) tube([sx, 0.16, 0.9], [sx, 0.16, -0.9], 0.035);
+    for (const z of [0.85, 0.2, -0.85]) tube([-0.42, 0.16, z], [0.42, 0.16, z], 0.03);
+    add(new THREE.BoxGeometry(0.78, 0.03, 1.5), dark, 0, 0.14, 0);
+    // the nose: a wedge (a box tipped down) and a rounded front with the number plate
+    add(new THREE.BoxGeometry(0.95, 0.16, 0.62), body, 0, 0.3, 0.86, 0.22);
+    add(new THREE.CylinderGeometry(0.11, 0.11, 0.95, 16).rotateZ(Math.PI / 2), body, 0, 0.24, 1.15);
+    add(new THREE.BoxGeometry(0.9, 0.04, 0.5), stripe, 0, 0.395, 0.84, 0.22);
+    const plate = document.createElement('canvas'); plate.width = plate.height = 64; { const c = plate.getContext('2d'); c.fillStyle = '#f4f4f0'; c.beginPath(); c.arc(32, 32, 30, 0, 7); c.fill(); c.fillStyle = '#111'; c.font = 'bold 40px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(num), 32, 34); }
+    const pt = new THREE.CanvasTexture(plate); pt.colorSpace = THREE.SRGBColorSpace;
+    add(new THREE.CircleGeometry(0.16, 20), new THREE.MeshStandardMaterial({ map: pt, roughness: 0.4 }), 0, 0.33, 1.27, -0.15);
+    // the side pods, each with a stripe and the number
+    for (const sx of [-1, 1]) {
+      add(new THREE.BoxGeometry(0.2, 0.24, 0.95), body, sx * 0.6, 0.26, -0.08);
+      add(new THREE.BoxGeometry(0.205, 0.05, 0.96), stripe, sx * 0.6, 0.31, -0.08);
+      add(new THREE.CircleGeometry(0.1, 16), new THREE.MeshStandardMaterial({ map: pt, roughness: 0.4 }), sx * 0.704, 0.25, -0.1, 0, sx * Math.PI / 2);
+    }
+    // the seat, the engine on the right with its pipe, the fuel tank, the rear bumper bar
+    add(new THREE.BoxGeometry(0.46, 0.08, 0.5), dark, 0, 0.24, -0.28); add(new THREE.BoxGeometry(0.46, 0.5, 0.08), dark, 0, 0.47, -0.52, -0.25);
+    add(new THREE.BoxGeometry(0.26, 0.3, 0.32), chrome, 0.52, 0.34, -0.62); add(new THREE.BoxGeometry(0.2, 0.06, 0.34), dark, 0.52, 0.5, -0.62);
+    tube([0.52, 0.3, -0.78], [0.62, 0.36, -1.05], 0.045, chrome); add(new THREE.CylinderGeometry(0.06, 0.05, 0.22, 10).rotateX(Math.PI / 2), dark, 0.62, 0.37, -1.12);
+    add(new THREE.CylinderGeometry(0.1, 0.1, 0.22, 12), stripe, -0.2, 0.3, 0.42);
+    tube([-0.7, 0.22, -1.02], [0.7, 0.22, -1.02], 0.05, body); for (const sx of [-0.4, 0.4]) tube([sx, 0.16, -0.85], [sx, 0.22, -1.02], 0.03);
+    // the steering column and wheel
+    tube([0, 0.2, 0.62], [0, 0.6, 0.26], 0.025, dark);
+    add(new THREE.TorusGeometry(0.15, 0.025, 8, 20), dark, 0, 0.62, 0.24, -1.0); add(new THREE.BoxGeometry(0.26, 0.04, 0.04), dark, 0, 0.62, 0.24, -1.0);
+    // the driver: hips in the seat, a torso leaning back a little, shoulders, arms to the wheel, gloves, the neck and helmet
+    const suit = new THREE.MeshStandardMaterial({ color: col.clone().multiplyScalar(0.75), roughness: 0.7 }), glove = new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.8 });
+    add(new THREE.BoxGeometry(0.38, 0.16, 0.36), suit, 0, 0.34, -0.26);
+    for (const sx of [-0.1, 0.1]) tube([sx, 0.34, -0.12], [sx, 0.3, 0.42], 0.065, suit);
+    const torso = add(new THREE.CapsuleGeometry(0.17, 0.26, 4, 10), suit, 0, 0.66, -0.36, -0.22);
+    add(new THREE.BoxGeometry(0.44, 0.1, 0.2), suit, 0, 0.84, -0.4, -0.22);
+    for (const sx of [-1, 1]) { tube([sx * 0.2, 0.82, -0.36], [sx * 0.17, 0.68, -0.06], 0.05, suit); tube([sx * 0.17, 0.68, -0.06], [sx * 0.13, 0.64, 0.2], 0.045, suit); add(new THREE.SphereGeometry(0.05, 8, 6), glove, sx * 0.13, 0.64, 0.22); }
+    add(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 10), suit, 0, 0.96, -0.42);
+    const helm = new THREE.MeshStandardMaterial({ color, roughness: 0.12, metalness: 0.35 });
+    add(new THREE.SphereGeometry(0.19, 20, 16), helm, 0, 1.12, -0.4); add(new THREE.SphereGeometry(0.192, 20, 16, 0, Math.PI * 2, 0, 0.6), new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.15 }), 0, 1.12, -0.4);
+    add(new THREE.SphereGeometry(0.175, 18, 10, -0.9, 1.8, 1.25, 0.6), new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.05, metalness: 0.6 }), 0, 1.13, -0.38);
+    void torso;
+    // the wheels: tyres with tread rings, coloured rims, a hub
     g.wheels = [];
-    for (const [x, z, r, w] of [[-0.62, 0.62, 0.2, 0.2], [0.62, 0.62, 0.2, 0.2], [-0.66, -0.66, 0.25, 0.3], [0.66, -0.66, 0.25, 0.3]]) {
-      const wh = new THREE.Group(); const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 16).rotateZ(Math.PI / 2), dark); t.castShadow = true; wh.add(t);
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, w + 0.01, 10).rotateZ(Math.PI / 2), chrome); wh.add(hub);
+    const rim = new THREE.MeshStandardMaterial({ color: light, roughness: 0.3, metalness: 0.6 });
+    for (const [x, z, r, w] of [[-0.66, 0.66, 0.2, 0.18], [0.66, 0.66, 0.2, 0.18], [-0.7, -0.66, 0.24, 0.3], [0.7, -0.66, 0.24, 0.3]]) {
+      const wh = new THREE.Group(), tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 20).rotateZ(Math.PI / 2), rubber); tyre.castShadow = true; wh.add(tyre);
+      for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(r - 0.004, 0.012, 4, 20).rotateY(Math.PI / 2), dark); t.position.x = (i - 1) * w * 0.3; wh.add(t); }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r * 0.6, w + 0.012, 12).rotateZ(Math.PI / 2), rim); wh.add(hub);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.18, r * 0.18, w + 0.03, 8).rotateZ(Math.PI / 2), chrome); wh.add(cap);
       wh.position.set(x, r, z); g.add(wh); g.wheels.push(wh);
     }
     return g;
@@ -53033,10 +53097,11 @@ class KartSim {
     this._render(dt);
   }
   _input(inp) {
-    let thr = (inp.isDown('up') || inp.isDown('gas') ? 1 : 0), brk = (inp.isDown('down') || inp.isDown('brake') ? 1 : 0), st = (inp.isDown('left') ? 1 : 0) - (inp.isDown('right') ? 1 : 0);
+    let thr = (inp.isDown('up') || inp.isDown('gas') ? 1 : 0), brk = (inp.isDown('down') || inp.isDown('brake') ? 1 : 0), st = (inp.isDown('left') ? 1 : 0) - (inp.isDown('right') ? 1 : 0), drift = inp.isDown('handbrake') || inp.isDown('jump') ? 1 : 0;
     if (inp.stick.active) { st -= inp.stick.x; if (inp.stick.y < -0.35) thr = Math.max(thr, -inp.stick.y); if (inp.stick.y > 0.5) brk = 1; }
     if (inp.gp.active) { thr = Math.max(thr, inp.gp.rt); brk = Math.max(brk, inp.gp.lt); st -= inp.gp.lx; }
-    return { thr, brk, st: clamp(st, -1, 1) };
+    if (inp.gp.active && inp.gp.a) drift = 1;
+    return { thr, brk, st: clamp(st, -1, 1), drift };
   }
   _step(dt, inp) {
     const { S, n } = this.T, K = this.karts, set = this.S, W = KART.w / 2;
@@ -53044,9 +53109,9 @@ class KartSim {
     if (go) this.clock += dt;
     for (const k of K) {
       // ---- what it wants: the player from the controls, a rival from the line ahead
-      let thr = 0, brk = 0, st = 0;
+      let thr = 0, brk = 0, st = 0, drift = 0;
       const steerK = k.ai ? 1 : set.steer, fG = k.ai ? 1 : set.fgrip, rG = k.ai ? 1 : set.rgrip, top = 27 * (k.ai ? k.sk * 1.04 : set.top);
-      if (!k.ai) { const c = this._input(inp); thr = c.thr; brk = c.brk; st = c.st; }
+      if (!k.ai) { const c = this._input(inp); thr = c.thr; brk = c.brk; st = c.st; drift = c.drift; }
       else {
         const look = Math.round(6 + Math.abs(k.vf) * 0.55), tgt = S[(k.idx + look) % n], o = clamp(k.lane, -W + 1.8, W - 1.8);
         const tx = tgt.x + tgt.lx * o, tz = tgt.z + tgt.lz * o, want = Math.atan2(tx - k.x, tz - k.z);
@@ -53068,8 +53133,10 @@ class KartSim {
       const off = Math.abs(this._lat(k)) > W, grass = off ? 0.55 : 1;
       const vx = Math.max(Math.abs(k.vf), 1.5) * (k.vf < 0 ? -1 : 1);
       const af = Math.atan2(k.vl + a * k.r, Math.abs(vx)) - delta * Math.sign(vx), ar = Math.atan2(k.vl - b * k.r, Math.abs(vx));
-      const Nf = m * 9.8 / 2, Nr = m * 9.8 / 2, Cf = 9500 * fG, Cr = 10500 * rG;
-      let Ff = clamp(-Cf * af, -1.55 * fG * grass * Nf, 1.55 * fG * grass * Nf), Fr = clamp(-Cr * ar, -1.6 * rG * grass * Nr, 1.6 * rG * grass * Nr);
+      // (drifting: the rear tyres let go, about half their grip, and the kart swings round its nose)
+      const dr = drift && Math.abs(k.vf) > 4 ? 0.45 : 1;
+      const Nf = m * 9.8 / 2, Nr = m * 9.8 / 2, Cf = 9500 * fG, Cr = 10500 * rG * dr;
+      let Ff = clamp(-Cf * af, -1.55 * fG * grass * Nf, 1.55 * fG * grass * Nf), Fr = clamp(-Cr * ar, -1.6 * rG * dr * grass * Nr, 1.6 * rG * dr * grass * Nr);
       if (sc) { Ff *= Math.abs(k.vf); Fr *= Math.abs(k.vf); }
       // drive: strong low down, fading toward the top speed; brakes; rolling and air drag; the grass slows you
       let Fx = thr * 2600 * clamp(1 - k.vf / top, 0, 1) - brk * (k.vf > 0.5 ? 3600 : k.vf > -4 ? 900 : 0) - 0.9 * k.vf * Math.abs(k.vf) - 40 * Math.sign(k.vf) - (off ? 520 * Math.sign(k.vf) : 0);
@@ -53115,7 +53182,7 @@ class KartSim {
   _render(dt) {
     const g = this.g, r = g.renderer, cam = this.cam, me = this.karts[0];
     for (const k of this.karts) {
-      k.mesh.position.set(k.x, k.y + 0.02, k.z); k.mesh.rotation.set(0, k.h, -k.r * 0.02 * Math.min(1, Math.abs(k.vf) / 10), 'YXZ');
+      k.mesh.position.set(k.x, k.y + 0.13, k.z); k.mesh.rotation.set(0, k.h, -k.r * 0.02 * Math.min(1, Math.abs(k.vf) / 10), 'YXZ');
       k.spin += k.vf * dt / 0.22; for (const [i, w] of k.mesh.wheels.entries()) { w.rotation.set(k.spin, i < 2 ? k.steer * 0.42 : 0, 0, 'YXZ'); }
     }
     // the chase camera: behind and above, swinging after the kart, pulled back and widened with speed
@@ -53136,33 +53203,60 @@ class KartSim {
     this._hud();
   }
   // ---------------------------------------------------------------- the overlay
+  // the overlay: a race game's own HUD and its own thumb controls (the game's are put aside while it runs)
   _ui(on) {
     let el = document.getElementById('kartUI');
     if (!el) {
       el = document.createElement('div'); el.id = 'kartUI';
       el.innerHTML = `<style>
-        #kartUI{position:fixed;inset:0;pointer-events:none;z-index:40;font-family:system-ui,sans-serif;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)}
-        #kartUI .kt{position:absolute;top:calc(12px + var(--safe-t,0px));left:calc(14px + var(--safe-l,0px));font-weight:800;font-size:28px;line-height:1.05}
-        #kartUI .kt small{display:block;font-size:14px;font-weight:600;opacity:.85}
-        #kartUI .kr{position:absolute;top:calc(12px + var(--safe-t,0px));right:calc(70px + var(--safe-r,0px));text-align:right;font-weight:700;font-size:16px}
-        #kartUI .ks{position:absolute;bottom:calc(150px + var(--safe-b,0px));right:calc(22px + var(--safe-r,0px));font-weight:900;font-size:40px}
-        #kartUI .ks small{font-size:14px;margin-left:4px}
-        #kartUI .kc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:110px;font-weight:900}
-        #kartUI .kf{position:absolute;top:30%;left:0;right:0;text-align:center;font-size:34px;font-weight:900}
-        #kartUI .kp,#kartUI .kx{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,10,14,.72);pointer-events:auto}
-        #kartUI .box{background:#11151c;border:1px solid #2a3240;border-radius:14px;padding:18px 20px;width:min(420px,88vw);max-height:84vh;overflow:auto}
-        #kartUI h2{margin:0 0 10px;font-size:22px} #kartUI label{display:block;margin:10px 0 2px;font-size:14px;opacity:.9}
-        #kartUI input[type=range]{width:100%} #kartUI .row{display:flex;justify-content:space-between;font-size:12px;opacity:.7}
-        #kartUI button{margin:8px 6px 0 0;padding:10px 16px;border-radius:10px;border:0;font-weight:800;font-size:15px;background:#2a3240;color:#fff}
-        #kartUI button.go{background:#f2c230;color:#111} #kartUI table{width:100%;border-collapse:collapse;margin:6px 0} #kartUI td{padding:4px 2px}
-      </style><div class="kt"></div><div class="kr"></div><div class="ks"></div><div class="kc"></div><div class="kf"></div>
-      <div class="kp"><div class="box"><h2>Kart simulator · paused</h2>
+        #kartUI{position:fixed;inset:0;pointer-events:none;z-index:40;font-family:system-ui,-apple-system,sans-serif;color:#fff;font-style:italic;user-select:none;-webkit-user-select:none}
+        #kartUI .o{text-shadow:0 0 1px #000,0 3px 0 rgba(0,0,0,.45),0 0 14px rgba(0,0,0,.35)}
+        #kartUI .pos{position:absolute;top:calc(10px + var(--safe-t,0px));left:calc(12px + var(--safe-l,0px));display:flex;align-items:flex-end;gap:2px;padding:4px 14px 6px 10px;border-radius:14px;background:linear-gradient(135deg,#ffcf3a,#ff8a1d);color:#1a1205;transform:skewX(-8deg);box-shadow:0 4px 0 #a8500a,0 6px 16px rgba(0,0,0,.35)}
+        #kartUI .pos b{font-size:44px;font-weight:900;line-height:.95} #kartUI .pos span{font-size:16px;font-weight:900;margin-bottom:6px}
+        #kartUI .lap{position:absolute;top:calc(74px + var(--safe-t,0px));left:calc(12px + var(--safe-l,0px));padding:4px 12px;border-radius:10px;background:rgba(10,14,22,.72);border:2px solid #46d4c4;font-weight:900;font-size:18px;transform:skewX(-8deg)}
+        #kartUI .tm{position:absolute;top:calc(10px + var(--safe-t,0px));left:50%;transform:translateX(-50%) skewX(-8deg);padding:5px 16px;border-radius:12px;background:rgba(10,14,22,.72);border:2px solid rgba(255,255,255,.25);text-align:center;white-space:nowrap}
+        #kartUI .tm b{display:block;font-size:24px;font-weight:900;font-variant-numeric:tabular-nums} #kartUI .tm small{font-size:11px;font-weight:700;opacity:.85;font-variant-numeric:tabular-nums}
+        #kartUI .mm{position:absolute;top:calc(10px + var(--safe-t,0px));right:calc(12px + var(--safe-r,0px));width:118px;height:118px;border-radius:16px;background:rgba(10,14,22,.62);border:2px solid rgba(255,255,255,.22)}
+        #kartUI .sp{position:absolute;left:50%;bottom:calc(14px + var(--safe-b,0px));transform:translateX(-50%);width:132px;height:74px;text-align:center}
+        #kartUI .sp canvas{position:absolute;inset:0} #kartUI .sp b{position:relative;display:block;padding-top:24px;font-size:32px;font-weight:900;line-height:1} #kartUI .sp small{position:relative;font-size:11px;font-weight:800;opacity:.85}
+        #kartUI .kc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:120px;font-weight:900;color:#ffd84d}
+        #kartUI .kf{position:absolute;top:28%;left:0;right:0;text-align:center;font-size:38px;font-weight:900;color:#ffd84d}
+        #kartUI .btn{position:absolute;pointer-events:auto;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;font-weight:900;font-size:15px;letter-spacing:.04em;color:#fff;border:3px solid rgba(255,255,255,.55);transform:skewX(-6deg);transition:transform .06s}
+        #kartUI .btn i{font-style:normal;font-size:24px;line-height:1}
+        #kartUI .btn.on{transform:skewX(-6deg) scale(.9);filter:brightness(1.25)}
+        #kartUI .gas{right:calc(18px + var(--safe-r,0px));bottom:calc(22px + var(--safe-b,0px));width:104px;height:104px;background:radial-gradient(circle at 35% 30%,#7dff9a,#14a83c 60%,#0b6b26);box-shadow:0 6px 0 #075220,0 8px 22px rgba(20,200,80,.45)}
+        #kartUI .brk{right:calc(132px + var(--safe-r,0px));bottom:calc(16px + var(--safe-b,0px));width:82px;height:82px;background:radial-gradient(circle at 35% 30%,#ff8a8a,#d2232a 60%,#7a0f14);box-shadow:0 6px 0 #5a0a0e,0 8px 22px rgba(220,40,40,.4)}
+        #kartUI .drf{right:calc(40px + var(--safe-r,0px));bottom:calc(140px + var(--safe-b,0px));width:76px;height:76px;background:radial-gradient(circle at 35% 30%,#ffd27a,#ff8a1d 60%,#9a4a08);box-shadow:0 6px 0 #6a3304,0 8px 22px rgba(255,140,30,.4)}
+        #kartUI .pz{right:calc(144px + var(--safe-r,0px));top:calc(14px + var(--safe-t,0px));width:46px;height:46px;border-radius:14px;background:rgba(10,14,22,.72);font-size:18px}
+        #kartUI .hint{position:absolute;left:calc(22px + var(--safe-l,0px));bottom:calc(26px + var(--safe-b,0px));font-size:12px;font-weight:800;opacity:.75}
+        body:not(.touch) #kartUI .btn:not(.pz),body:not(.touch) #kartUI .hint{display:none}
+        #kartUI .pz{right:calc(12px + var(--safe-r,0px));top:calc(138px + var(--safe-t,0px))}
+        @media (max-width:640px){
+          #kartUI .tm{left:calc(12px + var(--safe-l,0px));top:calc(112px + var(--safe-t,0px));transform:skewX(-8deg);text-align:left;max-width:calc(100vw - 170px);white-space:normal}
+          #kartUI .tm b{font-size:22px}
+          #kartUI .sp{left:calc(10px + var(--safe-l,0px));bottom:calc(120px + var(--safe-b,0px));transform:none}
+          #kartUI .hint{bottom:calc(36px + var(--safe-b,0px))}
+        }
+        #kartUI .kp,#kartUI .kx{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,10,14,.72);pointer-events:auto;font-style:normal}
+        #kartUI .box{background:linear-gradient(160deg,#141a26,#0d1018);border:2px solid #46d4c4;border-radius:18px;padding:18px 20px;width:min(440px,90vw);max-height:84vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+        #kartUI h2{margin:0 0 10px;font-size:24px;font-style:italic;font-weight:900;color:#ffd84d} #kartUI label{display:block;margin:12px 0 2px;font-size:14px;font-weight:800}
+        #kartUI input[type=range]{width:100%;accent-color:#ff8a1d} #kartUI .row{display:flex;justify-content:space-between;font-size:12px;opacity:.7}
+        #kartUI .box button{margin:10px 6px 0 0;padding:11px 16px;border-radius:12px;border:0;font-weight:900;font-size:15px;background:#2a3240;color:#fff}
+        #kartUI .box button.go{background:linear-gradient(135deg,#ffcf3a,#ff8a1d);color:#1a1205} #kartUI table{width:100%;border-collapse:collapse;margin:6px 0} #kartUI td{padding:5px 3px;font-weight:700}
+      </style>
+      <div class="pos o"><b>P6</b><span>/6</span></div><div class="lap o">LAP 1/3</div>
+      <div class="tm o"><b>0:00.00</b><small></small></div><canvas class="mm" width="236" height="236"></canvas>
+      <div class="sp o"><canvas width="264" height="148"></canvas><b>0</b><small>KM/H</small></div>
+      <div class="kc o"></div><div class="kf o"></div>
+      <div class="btn pz" data-b="pause"><i>❚❚</i></div><div class="btn brk" data-b="brake"><i>■</i>BRAKE</div><div class="btn gas" data-b="gas"><i>▲</i>GAS</div><div class="btn drf" data-b="handbrake"><i>↯</i>DRIFT</div>
+      <div class="hint o">STEER: drag here</div>
+      <div class="kp"><div class="box"><h2>PAUSED</h2>
         <label>Steering <span data-v="steer"></span></label><input type="range" data-k="steer" min="0.6" max="1.5" step="0.05"><div class="row"><span>tight</span><span>loose</span></div>
         <label>Front grip <span data-v="fgrip"></span></label><input type="range" data-k="fgrip" min="0.6" max="1.5" step="0.05"><div class="row"><span>slides wide</span><span>sticky</span></div>
         <label>Rear grip <span data-v="rgrip"></span></label><input type="range" data-k="rgrip" min="0.6" max="1.5" step="0.05"><div class="row"><span>loose tail</span><span>planted</span></div>
         <label>Top speed <span data-v="top"></span></label><input type="range" data-k="top" min="0.8" max="1.2" step="0.05"><div class="row"><span>80%</span><span>120%</span></div>
         <div><button class="go" data-a="resume">Resume</button><button data-a="reset">Default handling</button><button data-a="restart">Restart race</button><button data-a="quit">Quit to the bunker</button></div></div></div>
-      <div class="kx"><div class="box"><h2>Race result</h2><table></table><div><button class="go" data-a="restart">Race again</button><button data-a="quit">Quit to the bunker</button></div></div></div>`;
+      <div class="kx"><div class="box"><h2>RACE RESULT</h2><table></table><div><button class="go" data-a="restart">Race again</button><button data-a="quit">Quit to the bunker</button></div></div></div>`;
       document.body.appendChild(el);
       el.addEventListener('input', e => { const k = e.target.dataset.k; if (k) { this.S[k] = +e.target.value; this._pauseUI(true); } });
       el.addEventListener('click', e => { const a = e.target.dataset && e.target.dataset.a; if (!a) return; this.g.audio.play('ui');
@@ -53170,8 +53264,17 @@ class KartSim {
         else if (a === 'reset') { Object.assign(this.S, { steer: 1, fgrip: 1, rgrip: 1, top: 1 }); this._pauseUI(true); }
         else if (a === 'restart') { this.paused = false; this._pauseUI(false); el.querySelector('.kx').style.display = 'none'; this.reset(); }
         else if (a === 'quit') { this.paused = false; this._pauseUI(false); el.querySelector('.kx').style.display = 'none'; this.stop(); } });
+      // the thumb buttons: held while a finger is on them (the input's own 'gas', 'brake', 'handbrake'); pause toggles
+      const inp = this.g.input;
+      el.querySelectorAll('.btn').forEach(b => {
+        const act = b.dataset.b, down = e => { e.preventDefault(); b.classList.add('on'); if (act === 'pause') { this.paused = !this.paused; this._pauseUI(this.paused); } else inp.down.add(act); },
+          up = e => { e.preventDefault(); b.classList.remove('on'); if (act !== 'pause') inp.down.delete(act); };
+        b.addEventListener('touchstart', down, { passive: false }); b.addEventListener('touchend', up, { passive: false }); b.addEventListener('touchcancel', up, { passive: false });
+        b.addEventListener('mousedown', down); b.addEventListener('mouseup', up); b.addEventListener('mouseleave', up);
+      });
     }
     el.style.display = on ? '' : 'none';
+    if (!on) for (const a of ['gas', 'brake', 'handbrake']) this.g.input.down.delete(a);
     this.el = el;
   }
   _pauseUI(on) {
@@ -53180,17 +53283,30 @@ class KartSim {
   }
   _flash(t) { this._fl = { t, until: this.clock + 1.6 }; }
   _hud() {
-    const el = this.el, me = this.karts[0], ord = this._order(), pos = ord.indexOf(me) + 1, fmt = t => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '—';
-    el.querySelector('.kt').innerHTML = `P${pos}<small>of ${this.karts.length}</small>LAP ${Math.min(me.lap + 1, KART.laps)}/${KART.laps}`;
-    el.querySelector('.kr').innerHTML = `${fmt(me.done ? me.fin : this.clock)}<br><small>Lap ${fmt(this.clock - me.lapT)} · Best ${fmt(me.best)} · Record ${fmt(this.S.best)}</small>`;
-    el.querySelector('.ks').innerHTML = `${Math.round(Math.abs(me.vf) * 3.6)}<small>km/h</small>`;
+    const el = this.el, me = this.karts[0], ord = this._order(), pos = ord.indexOf(me) + 1, fmt = t => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '–:––.––', sp = Math.round(Math.abs(me.vf) * 3.6);
+    el.querySelector('.pos').innerHTML = `<b>P${pos}</b><span>/${this.karts.length}</span>`;
+    el.querySelector('.lap').textContent = `LAP ${Math.min(me.lap + 1, KART.laps)}/${KART.laps}`;
+    el.querySelector('.tm').innerHTML = `<b>${fmt(me.done ? me.fin : this.clock)}</b><small>LAP ${fmt(this.clock - me.lapT)} · BEST ${fmt(me.best)} · RECORD ${fmt(this.S.best)}</small>`;
+    const spEl = el.querySelector('.sp'); spEl.querySelector('b').textContent = sp;
+    // the speed arc
+    { const c = spEl.querySelector('canvas').getContext('2d'), f = clamp(sp / 110, 0, 1); c.clearRect(0, 0, 264, 148); c.lineWidth = 14; c.lineCap = 'round';
+      c.strokeStyle = 'rgba(10,14,22,.65)'; c.beginPath(); c.arc(132, 140, 112, Math.PI, 0); c.stroke();
+      const gr = c.createLinearGradient(20, 0, 244, 0); gr.addColorStop(0, '#46d4c4'); gr.addColorStop(0.6, '#ffd84d'); gr.addColorStop(1, '#ff3a3a'); c.strokeStyle = gr; c.beginPath(); c.arc(132, 140, 112, Math.PI, Math.PI + Math.PI * f); c.stroke(); }
+    // the track map: the circuit, the karts as dots (you the big yellow one)
+    { const c = el.querySelector('.mm').getContext('2d'), { S, n } = this.T;
+      if (!this._mmB) { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const q of S) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z); } const k = 200 / Math.max(x1 - x0, z1 - z0); this._mmB = { k, ox: 118 - (x0 + x1) / 2 * k, oz: 118 - (z0 + z1) / 2 * k }; }
+      const B = this._mmB, X = x => B.ox + x * B.k, Z = z => B.oz + z * B.k;
+      c.clearRect(0, 0, 236, 236); c.lineJoin = 'round'; c.lineCap = 'round';
+      for (const [w, col] of [[16, 'rgba(0,0,0,.55)'], [10, '#e8eef6']]) { c.lineWidth = w; c.strokeStyle = col; c.beginPath(); for (let i = 0; i <= n; i += 4) { const q = S[i % n]; i ? c.lineTo(X(q.x), Z(q.z)) : c.moveTo(X(q.x), Z(q.z)); } c.closePath(); c.stroke(); }
+      c.lineWidth = 4; c.strokeStyle = '#111'; const s0 = S[0]; c.beginPath(); c.moveTo(X(s0.x + s0.lx * 6), Z(s0.z + s0.lz * 6)); c.lineTo(X(s0.x - s0.lx * 6), Z(s0.z - s0.lz * 6)); c.stroke();
+      for (const k of this.karts.slice().reverse()) { c.fillStyle = k === me ? '#ffd84d' : '#' + new THREE.Color(KART.colors[k.i]).getHexString(); c.strokeStyle = '#000'; c.lineWidth = 3; c.beginPath(); c.arc(X(k.x), Z(k.z), k === me ? 11 : 7, 0, 7); c.fill(); c.stroke(); } }
     el.querySelector('.kc').textContent = this.t < 0 ? (this.t > -3 ? String(Math.ceil(-this.t)) : '') : this.t < 0.8 ? 'GO!' : '';
     el.querySelector('.kf').textContent = this._fl && this.clock < this._fl.until ? this._fl.t : '';
     // (the table stays live while the others finish)
-    if (this.result && this._finishShown) { const x = el.querySelector('.kx'); if (x.style.display !== 'none' && ((this._tbT = (this._tbT || 0) + 1) % 20 === 0)) { this._finishShown = false; } }
+    if (this.result && this._finishShown) { const x = el.querySelector('.kx'); if (x.style.display !== 'none' && ((this._tbT = (this._tbT || 0) + 1) % 20 === 0)) this._finishShown = false; }
     if (this.result && !this._finishShown) {
       this._finishShown = true; const x = el.querySelector('.kx');
-      x.querySelector('table').innerHTML = this._order().map((k, i) => `<tr style="${k === me ? 'color:#f2c230;font-weight:800' : ''}"><td>${i + 1}</td><td>${KART.names[k.i]}</td><td style="text-align:right">${k.done ? fmt(k.fin) : 'running'}</td></tr>`).join('') + `<tr><td colspan="3">Your best lap ${fmt(me.best)} · record ${fmt(this.S.best)} · wins ${this.S.wins}</td></tr>`;
+      x.querySelector('table').innerHTML = this._order().map((k, i) => `<tr style="${k === me ? 'color:#ffd84d;font-weight:900' : ''}"><td>${i + 1}</td><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#${new THREE.Color(KART.colors[k.i]).getHexString()};margin-right:6px"></span>${KART.names[k.i]}</td><td style="text-align:right">${k.done ? fmt(k.fin) : 'running'}</td></tr>`).join('') + `<tr><td colspan="3" style="opacity:.8">Your best lap ${fmt(me.best)} · record ${fmt(this.S.best)} · wins ${this.S.wins}</td></tr>`;
       x.style.display = 'flex';
     }
   }
