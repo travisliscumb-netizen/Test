@@ -267,7 +267,7 @@ guard at their posts. Module: `src/game/497-underworld-compounds.js` (`CompoundS
 
 ## The laundering fixer (overhaul Session 2.5)
 
-Dina Vance in the Old Quarter (map icon "L") washes Dirty Cash you carry into Clean Bank: 32% fee, the money lands
+Dina Vance in the Old Quarter (map icon "L") washes Dirty Cash you carry into Clean Bank: 15% fee, the money lands
 12 economic hours later, up to $100,000 a hand-off with no daily limit, at least $100 a time. Money with her is not on you, so an arrest
 doesn't take it and it still lands while you are in jail. The economic clock runs at the 30-minute reference day
 whatever the day-length setting (in jail, at world time), so a short day doesn't wash more per hour of play. Front

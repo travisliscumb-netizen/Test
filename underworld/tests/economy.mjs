@@ -46,8 +46,8 @@ const lau = await ev(() => {
   out.ladder = ladder; out.notFront = F.deposit(P.PROPS.find(p => p.kind === 'business' && !p.launder).id, 5000);
   return out;
 });
-check('the early fixer: 32% fee, up to $100,000 a hand-off', lau.fixer.fee === 1600 && lau.fixer.clean === 3400 && lau.fixerCap === 100000, JSON.stringify(lau));
-check('the laundering ladder: fixer 32% → front 25% / managed 20% → 15% / 10% → 10% / 5%, capacity growing with level', JSON.stringify(lau.ladder.map(x => x[0])) === JSON.stringify([0.25, 0.15, 0.1, 0.2, 0.1, 0.05]) && lau.ladder[0][1] < lau.ladder[1][1] && lau.ladder[1][1] < lau.ladder[2][1], JSON.stringify(lau.ladder));
+check('the early fixer: 15% fee (owner 2026-11-17), up to $100,000 a hand-off', lau.fixer.fee === 750 && lau.fixer.clean === 4250 && lau.fixerCap === 100000, JSON.stringify(lau));
+check('the laundering ladder: fixer 15% → front 25% / managed 20% → 15% / 10% → 10% / 5%, capacity growing with level', JSON.stringify(lau.ladder.map(x => x[0])) === JSON.stringify([0.25, 0.15, 0.1, 0.2, 0.1, 0.05]) && lau.ladder[0][1] < lau.ladder[1][1] && lau.ladder[1][1] < lau.ladder[2][1], JSON.stringify(lau.ladder));
 check('only an owned laundering business is a front', /Not a front/.test(lau.notFront), lau.notFront);
 
 // ---------------------------------------------------------------- the economic day: the day-length setting and sleep don't speed it up

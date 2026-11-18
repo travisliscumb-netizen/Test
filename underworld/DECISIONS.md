@@ -37,7 +37,7 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
   not visual midnight; one sleep a day and it skips no payday; no profit in jail (`JAIL_OPS`); influence = earned
   (turfs, crew, Lieutenants, infamy) + bought (businesses, paid officers) capped at earned; Rank needs
   100 / 400 / 400+2 crew / 800+1 turf / 1,500+4 crew+8 turfs+Lt+450 / 2,500+6 crew+16 turfs+2 Lts+800+warehouse;
-  laundering ladder fixer 32% ($5k) → fronts 25/20 → 15/10 → 10/5%; robbery tills ×0.8 / safes ×0.65; pickpocket
+  laundering ladder fixer 15% ($100k a hand-off; owner 2026-11-17) → fronts 25/20 → 15/10 → 10/5%; robbery tills ×0.8 / safes ×0.65; pickpocket
   wariness per district, much stronger in the rich districts (circling them ≈ $6.6k/h, was $31–38k/h); official purses $2k/$6k/$15k (VP) and $1.6k/$1.8k/$5k (Cedar Fields), Clean, no Rep;
   business upgrades 0.6×/1.2× of price; suppliers restock half a shelf a day; the Armorer buys hardware but no
   longer sells it; the Royale progressive is also won by other visitors (1 in 400 econ days), so it stays bounded
