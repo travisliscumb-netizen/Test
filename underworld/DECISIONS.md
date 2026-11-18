@@ -140,3 +140,24 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
     nothing moved.
   - Races: the Wet Track runs (1,7)–(1,10)–(4,10)–(4,7).
   - Overlay: its Old Quarter lanes and its two mews were removed.
+
+## Southshore Raceway (owner, 2026-11-18: a second racetrack wherever it fits)
+- Site: chosen by a survey of the whole island for open ground clear of every road, pad, district, farm and site.
+  The widest level ground left was the south lobe's plain between Marsh Hollow and the airport. The plain east of
+  the airport was smaller, cut diagonally by Longshore Drive. The highlands are too steep.
+- Constraints there:
+  - The sea comes in at the south-west, the farms stand to the west, and the airport's level ground (140 m blend)
+    lies to the east.
+  - Longshore Drive passes on the diagonal: the circuit keeps 50 m from it, and the level site steps back from it in
+    six pads.
+- The circuit: 1.57 km, 13 m wide, eleven corners (28–56 m), built with `filletLoop`. It has a 240 m main straight,
+  a fast east side, a long south straight, a hairpin and a chicane through the infield.
+- Facilities:
+  - Armco with run-off by corner speed, gravel traps, kerbs and paint.
+  - A pit lane, a pit wall, nine drive-through garages (18 bays) and the paddock with the Race Office.
+  - A grandstand in the infield.
+  - Raceway Road runs off Heron Loop to a turning circle at the office door.
+- The venue: `RacewayPark` is an OfficialVenue (Clean Bank, no Rep, no heat). Its three events are the Hot Hatch
+  Trophy, the Touring Cup and Southshore GT. It also offers timed sessions. The raceway is a property (kind
+  `raceway`, $420,000, provisional like the other venues): the owner races free and parks 18 cars in the garages.
+  Save key `raceway`.

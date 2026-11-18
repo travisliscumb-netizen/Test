@@ -56,6 +56,7 @@ class Game {
     this.quality = new QualityManager(this);
     // the island off the lattice (022/177): its ground, roads, bridge and tunnel, forests, the airfield's paint
     this.isleScene = new IslandScenery(this.outdoor, this.world, this);
+    this.srScene = new RacewayScenery(this.outdoor, this.world);
     this.vehicles = new VehicleManager(this);
     this.fleet = new IslandFleet(this);
     this.traffic = new TrafficManager(this);
@@ -88,8 +89,10 @@ class Game {
     this.motorsport = new MotorsportPark(this);
     // Session 6C: the Cedar Fields off-road park
     this.offroad = new OffroadPark(this);
+    // Southshore Raceway (129b, 509c)
+    this.raceway = new RacewayPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
+    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset(); this.raceway.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -750,7 +753,7 @@ class Game {
     this.props.cull(this.camera, this.frustum, rdt);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.raceway.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);

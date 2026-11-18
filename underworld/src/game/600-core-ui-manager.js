@@ -338,6 +338,8 @@ class UIManager {
       const cp = this.g.world.isle.sites.carpark; R4(cp.x0, cp.z0, cp.x1, cp.z1, '#55585e');
     }
     if (inV(G.x0, G.z0, G.x1, G.z1)) { R4(G.strip.x0, G.strip.z - G.strip.w / 2, G.strip.x1, G.strip.z + G.strip.w / 2, '#3d3f44'); R4(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, '#4a4d52'); g.fillStyle = '#4a4d52'; g.beginPath(); g.arc(X(G.pad.x), X(G.pad.z), G.pad.r * k, 0, 7); g.fill(); }
+    // Southshore Raceway (129b)
+    if (this.g.world.paintRaceway) this.g.world.paintRaceway(g, X, k, view);
     g.lineCap = 'round'; g.lineJoin = 'round';
     for (const R of Island.roads) for (const [k0, k1, x0, z0, x1, z1] of R.mapChunks) {
       if (!inV(x0, z0, x1, z1)) continue;
@@ -793,7 +795,7 @@ class UIManager {
     const bs = 9 * (W / 380) * 1.6;
     { const cs = g.world.places.chopshop, pd = g.world.places.police.door; if (cs) badge(cs.door.x, cs.door.z, MAP_CATS.chop.col, 'C', bs, false); badge(pd.x, pd.z, MAP_CATS.police.col, 'P', bs, false); }
     for (const L of uw.locs) {
-      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
+      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : L.def.kind === 'raceway' ? 'R' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) blip(L.x, L.z, FACTIONS[L.id].col, 5, false, 'sq');
       else if (L.kind === 'spot' && L.def.bank) { if (g.save.discovered.zones[L.zone]) badge(L.x, L.z, MAP_CATS.bank.col, 'K', bs, false); }
       else if (L.kind === 'spot') blip(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), 4, false, 'sq');
@@ -964,7 +966,7 @@ class MapView {
       if (L.kind === 'prop') {
         const d = L.def, own = uw.props.owned(d.id);
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
-        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
+        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : d.kind === 'raceway' ? 'R' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
         if (L.def.bank) { /* the banks list themselves once their district is known (BankSystem.mapEntries) */ }

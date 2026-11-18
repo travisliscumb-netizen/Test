@@ -24,9 +24,13 @@ const OQ_STREETS = [
   { name: 'Bell Lane', w: 7, fork: 2, near: [182, 372], ctrl: [[186, 356], [190, 340], [196, 325.6]] },
   { name: 'Cooper’s Walk', w: 7, fork: 0, near: [119, 470], ctrl: [[92, 482], [62, 492], [36, 506], [5.6, 518]] },
   { name: 'Chapel Lane', w: 7, fork: 4, near: [56, 494], ctrl: [[50, 512], [40, 532], [32, 554.4]] },
-  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 480], [226, 488], [234.4, 504]] },
+  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 481], [222, 487], [234.4, 497]] },
   { name: 'Wick Lane', w: 7, fork: 0, near: [106, 530], ctrl: [[130, 530], [160, 524], [190, 528], [234.4, 538]] }
 ];
+// an address whose own street point has no room for what stands there: where on the new streets to look for it
+// instead (block, side, along → a point near the street it fronts). The Neighborhood Bank (353: 2,5 north side, the
+// Quarter Garage's front) is a deep building with a staff door on its back: it stands on Saint Ivo Street
+const OQ_ADDR = { '2,5,0,44': [118, 420] };
 // Saint Ivo Square: a paved round beside the high street, its fountain in the middle
 const OQ_SQUARE = { x: 58, z: 462, r: 11 };
 // the streets' polylines (computed once; sidewalkSpot needs them before the world is built)
@@ -49,9 +53,10 @@ const OQ_SB = () => SUPERBLOCKS.find(s => s.id === 'oldquarter');
 // a door on one of the old cells (sidewalkSpot's address), on the new streets: the kerbside point of the nearest
 // street, `o` from its centre line as the lattice spot was from its own, facing the street. Only for a side whose
 // lattice street is gone; a side on an edge street that still runs keeps its spot. Lattice metres, or null.
-function oldQuarterSpot(bx, bz, side, x, z, o) {
+function oldQuarterSpot(bx, bz, side, x, z, o, along) {
   const sb = superblockAt(bx, bz); if (!sb || sb.id !== 'oldquarter') return null;
   if (RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
+  const fix = OQ_ADDR[bx + ',' + bz + ',' + side + ',' + along]; if (fix) { x = fix[0]; z = fix[1]; }
   let best = null;
   for (const L of oqLines()) for (let k = 0; k < L.pts.length - 1; k++) {
     const a = L.pts[k], c = L.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1;
@@ -69,9 +74,12 @@ Object.assign(World.prototype, {
     this._sbSidewalks(sb, rng, { trees: 0.3, park: 0.4 });
     const b = a, lines = oqLines(), roads = [];
     // the streets (kerbside parking on the high street and Market Street)
+    // pavements both sides, the frontage's depth (concrete under the asphalt: what the shader and the maps draw)
+    for (const L of lines) this._road(L.pts, L.w + 5.4, 'concrete');
     for (const L of lines) { const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; roads.push(r); }
     // the Quarter Garage, where it always stood
-    const gb = this.block(2, 5); this._genGarage(gb, rng); gb.name = 'Quarter Garage';
+    // (a landmark as it always was: the kicker pass leaves it alone, and it keeps its name in the superblock)
+    const gb = this.block(2, 5); this._genGarage(gb, rng); gb.landmark = LANDMARK_BLOCKS['2,5']; gb.name = gb.landmark.name;
     const G = { x0: gb.x0 - 1, z0: gb.z0 - 1, x1: gb.x1 + 1, z1: gb.z1 + 2 };
     // Saint Ivo Square
     const Q = OQ_SQUARE;
@@ -87,7 +95,14 @@ Object.assign(World.prototype, {
     const segD = (x, z, p, q) => { const dx = q[0] - p[0], dz = q[1] - p[1], l2 = dx * dx + dz * dz || 1; let t = ((x - p[0]) * dx + (z - p[1]) * dz) / l2; t = Math.max(0, Math.min(1, t)); return Math.hypot(x - p[0] - dx * t, z - p[1] - dz * t); };
     const clearRoads = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m);
     const placed = [];
+    // the stunt jumps' lanes (the garage roof's leap flies north over Market Street): run-up, flight and landing kept
+    // clear of anything built
+    const lanes = (this.surfaces || []).filter(s => s.unique && s.x1 > sb.x0 - 40 && s.x0 < sb.x1 + 40 && s.z1 > sb.z0 - 40 && s.z0 < sb.z1 + 40).map(s => {
+      const ax = s.axis === 'x', c = ax ? (s.z0 + s.z1) / 2 : (s.x0 + s.x1) / 2, lo = (ax ? s.x0 : s.z0) - 32, hi = (ax ? s.x1 : s.z1) + 32, hw = (ax ? s.z1 - s.z0 : s.x1 - s.x0) / 2 + 4;
+      return ax ? [lo, c - hw, hi, c + hw] : [c - hw, lo, c + hw, hi];
+    });
     const free = (x0, z0, x1, z1) => x0 >= sb.x0 && z0 >= sb.z0 && x1 <= sb.x1 && z1 <= sb.z1
+      && !lanes.some(L => x0 < L[2] && x1 > L[0] && z0 < L[3] && z1 > L[1])
       && !(x0 < G.x1 && x1 > G.x0 && z0 < G.z1 && z1 > G.z0)
       && Math.hypot(clamp(Q.x, x0, x1) - Q.x, clamp(Q.z, z0, z1) - Q.z) > Q.r + 2
       && clearRoads(x0, z0, x1, z1, 2.6)
@@ -129,19 +144,24 @@ Object.assign(World.prototype, {
     };
     // every door with an address on these cells first: a front right behind it, facing its street, so the business,
     // the flat, the bank or the HQ has its building wherever the street now runs
-    const addr = [...PROPS, ...HOME_LADDER, ...SPOTS].map(d => d.at).concat(Object.values(HQS)).filter(at => at && superblockAt(at[0], at[1]) === sb);
-    for (const at of addr) {
+    // (a bank is a deep building: its staff door is on the back, well behind the counter)
+    const addr = [...PROPS, ...HOME_LADDER, ...SPOTS].map(d => ({ at: d.at, bank: !!d.bank })).concat(Object.values(HQS).map(at => ({ at }))).filter(a => a.at && superblockAt(a.at[0], a.at[1]) === sb);
+    for (const { at, bank } of addr) {
       const s = sidewalkSpot(at[0], at[1], at[2], at[3], ROAD_HALF + 3.1), ox = (CityLayout.siteI(at[0], at[1]) - at[0]) * P, oz = (CityLayout.siteJ(at[0], at[1]) - at[1]) * P;
       const nx = -Math.sin(s.h), nz = -Math.cos(s.h), alongX = Math.abs(nz) >= Math.abs(nx);
       let got = null;
-      for (const [w0, d0] of [[9, 10], [8, 9], [7, 8], [6, 7]]) {
+      for (const [w0, d0] of bank ? [[18, 24], [16, 23], [14, 22]] : [[9, 10], [8, 9], [7, 8], [6, 7]]) {
         for (let gap = 0.6; gap <= 2.6 && !got; gap += 0.4) {
           const cx = s.x - ox + nx * (gap + d0 / 2), cz = s.z - oz + nz * (gap + d0 / 2), wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
           if (free(...q)) got = q;
         }
         if (got) break;
       }
-      if (got) build(got, 0, 0, -nx, -nz, 0.6);
+      if (got) {
+        const r = build(got, 0, 0, -nx, -nz, bank ? 0 : 0.6);
+        // a bank's service yard behind it, kept open: its staff door is on the back wall (512, rearOf)
+        if (bank) { r.style = STYLE.DECO; r.color = C(rng.pick(PAL.deco)); const [x0, z0, x1, z1] = got; placed.push(alongX ? (nz > 0 ? { x0, z0: z1, x1, z1: z1 + 8 } : { x0, z0: z0 - 8, x1, z1: z0 }) : (nx > 0 ? { x0: x1, z0, x1: x1 + 8, z1 } : { x0: x0 - 8, z0, x1: x0, z1 })); }
+      }
     }
     // the high street first (shops), then the lanes, then the edge streets
     for (const r of roads) { const hi = r.link === 'Saint Ivo Street' || r.link === 'Market Street'; for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6, s, hi ? 0.55 : 0.12); }
@@ -150,7 +170,7 @@ Object.assign(World.prototype, {
     // a second row behind the first (back terraces and mews houses round courtyards), where the land is deep enough
     for (const r of roads) for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6 + 15, s, 0);
     // ---- behind the frontage: gardens and yards (trees, bushes, a shed), never in a street, a building or the square
-    const open = (x, z, m) => roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && Math.hypot(x - Q.x, z - Q.z) > Q.r + 1 && !(x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
+    const open = (x, z, m) => !lanes.some(L => x > L[0] - m && x < L[2] + m && z > L[1] - m && z < L[3] + m) && roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && Math.hypot(x - Q.x, z - Q.z) > Q.r + 1 && !(x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
     for (let x = sb.x0 + 3; x < sb.x1 - 3; x += 6) for (let z = sb.z0 + 3; z < sb.z1 - 3; z += 6) {
       const jx = x + rng.range(-1.8, 1.8), jz = z + rng.range(-1.8, 1.8);
       if (!open(jx, jz, 2.4)) continue;

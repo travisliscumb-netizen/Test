@@ -53,6 +53,8 @@ const SaveSystem = {
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
       // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
       track: { best: null, prize: {}, hosted: null, laps: 0 },
+      // Southshore Raceway (509c): best lap, laps
+      raceway: { best: null, prize: {}, laps: 0 },
       // the ten one-offs (Session 6D): each one's stage (undiscovered, clue, exact location, acquired)
       uniques: {},
       dealers: {},

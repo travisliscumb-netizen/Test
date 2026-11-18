@@ -146,7 +146,7 @@ check('an honest sergeant refuses and pressure rises', cor.moss === 'refused' &&
 // ---------------------------------------------------------------- 11b. one continuous stretch of play across systems
 // drive, reverse, get chased, get busted in the car, serve, walk out, use the map and overlay,
 // pickpocket and brawl again, then audit every system for corrupted state.
-await ev(() => { const g = window.game; g.police.enabled = true; g.police.clear(); const x = 2 * 80 + 2.6, z = 6 * 80 + 12; const v = g.vehicles.spawn('sedan', x, z, 0, { parked: true }); v.touched = true; window.__sv = v; g.resetPlayerState(x + 2.4, z, -Math.PI / 2); g.cam.yaw = 0; });
+await ev(() => { const g = window.game; g.police.enabled = true; g.police.clear(); const x = 3 * 80 + 2.6, z = 6 * 80 + 12; /* (Downtown's west street: the lattice street at x = 160 is inside the rebuilt Old Quarter, 124) */ const v = g.vehicles.spawn('sedan', x, z, 0, { parked: true }); v.touched = true; window.__sv = v; g.resetPlayerState(x + 2.4, z, -Math.PI / 2); g.cam.yaw = 0; });
 await frames(page, 3);
 await page.keyboard.press('KeyE'); await frames(page, 35);
 const drove = { inCar: await ev(() => window.game.player.state) };

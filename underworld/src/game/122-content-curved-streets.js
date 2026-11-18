@@ -62,15 +62,9 @@ const CURVED_STREETS = {
   // the Old Quarter's blocks in Linden Hills
   '2,8': { kind: 'lane', roads: [{ name: 'Mason’s Walk', w: 7, ctrl: [[186, 645.4], [190, 660], [204, 676], [220, 684], [234.6, 688]] }] },
   '2,9': { kind: 'lane', roads: [{ name: 'Ropewalk', w: 7, ctrl: [[165.4, 752], [180, 756], [194, 766], [204, 782], [206, 794.6]] }] },
-  // the commercial core: a diagonal avenue across the Glass Mile (the towers it displaces are rebuilt beside it);
+  // (the financial core stays the gridded downtown, owner 2026-11-18: no lanes or avenues in it)
   // Diner Row: a crescent and a lane
-  '3,4': { kind: 'avenue', roads: [{ name: 'Glass Mile', w: 12, ctrl: [[262, 325.4], [270, 336], [286, 344], [302, 347], [314.6, 347]], park: [1, -1] }] },
-  '4,4': { kind: 'avenue', roads: [{ name: 'Glass Mile', w: 12, ctrl: [[325.4, 347], [336, 351], [344, 362], [346, 380], [344, 394.6]], park: [1, -1] }] },
-  '4,5': { kind: 'avenue', roads: [{ name: 'Glass Mile', w: 12, ctrl: [[344, 405.4], [354, 418], [372, 438], [394.6, 456]], park: [1, -1] }] },
   '3,6': { kind: 'lane', roads: [{ name: 'Tallow Lane', w: 7, ctrl: [[245.4, 500], [262, 506], [280, 520], [292, 538], [296, 554.6]] }] },
-  '7,6': { kind: 'avenue', roads: [{ name: 'Kestrel Way', w: 10, ctrl: [[565.4, 500], [584, 504], [604, 520], [620, 536], [634.6, 540]], park: [1] }] },
-  '6,4': { kind: 'avenue', roads: [{ name: 'Bourse Lane', w: 8, ctrl: [[500, 325.4], [506, 342], [520, 360], [536, 372], [554.6, 376]] }] },
-  '8,4': { kind: 'avenue', roads: [{ name: 'Harbour Steps', w: 8, ctrl: [[656, 325.4], [662, 342], [674, 360], [686, 380], [690, 394.6]] }] },
   '9,5': { kind: 'lane', roads: [{ name: 'Fry Lane', w: 7, ctrl: [[725.4, 428], [740, 432], [756, 444], [766, 460], [770, 474.6]] }] },
   '9,6': { kind: 'lane', roads: [{ name: 'Marigold Crescent', w: 8, ctrl: [[744, 485.4], [748, 500], [760, 514], [776, 522], [794.6, 526]] }] },
   // the port strip: works roads curving through the yards

@@ -49,7 +49,7 @@ function loopSafeSpeeds(T, a, vTop, brake, cap) {
 function vpCheckpoints(def) { const vp = game.world.vp; return loopCheckpoints(vp.track, vp.sf.k, def, vpSafeSpeeds()); }
 function vpSafeSpeeds() { const T = game.world.vp.track; return T._vs || (T._vs = loopSafeSpeeds(T, 8.5, 60, 7)); }
 // which venue runs an official event
-function venueOf(def) { return def.venue === 'cfs' ? game.offroad : game.motorsport; }
+function venueOf(def) { return def.venue === 'cfs' ? game.offroad : def.venue === 'sr' ? game.raceway : game.motorsport; }
 /* ---------------------------------------------------------------------
    An official venue: everything Clean Bank, no Rep, no heat. Events with class rules and a buy-in at the start line
    (after scrutineering), prize money by the street races' daily tiers, a prize car once; track sessions with lap

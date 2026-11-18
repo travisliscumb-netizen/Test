@@ -367,7 +367,7 @@ class World {
     if (b.superblock) {
       const sb = b.superblock;
       if (b.bx === sb.bx0 && b.bz === sb.bz0) { this._sbRun(sb, rng); }
-      b.name = sb.name || DNAME[b.t] || 'Port Valen';
+      b.name = b.landmark ? b.landmark.name : sb.name || DNAME[b.t] || 'Port Valen';
       return;
     }
     if (lm) { this[lm.gen](b, rng); b.name = lm.name; b.landmark = lm; return; }

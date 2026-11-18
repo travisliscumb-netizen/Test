@@ -128,6 +128,7 @@ const PROPS = [
   // Valen Point (Session 6B): a legitimate asset bought from the bank, no Rank or Rep gate; its garage is the 24 pit
   // garage bays. Price provisional (Session 13)
   { id: 'offroad', name: 'Cedar Fields Off-Road Park', kind: 'offroad', price: 180000, place: 'offroad', garage: 6, storage: 0, desc: 'The off-road course’s compound in Cedar Fields South: six bays in the owners’ garage shed, the service stand (repairs a third off) and private sessions on the course whenever you like. Price provisional.' },
+  { id: 'raceway', name: 'Southshore Raceway', kind: 'raceway', price: 420000, place: 'raceway', garage: 18, storage: 0, desc: 'The circuit south of Marsh Hollow: the track, nine pit garages with room for eighteen of your cars, the Race Office. Owners race and lap it free.' },
   { id: 'motorsport', name: 'Valen Point Motorsport Park', kind: 'motorsport', price: 1500000, place: 'motorsport', garage: 24, storage: 0, desc: 'The circuit, its pit garages and grandstands on Valen Point. Track days, race meetings, a garage for a whole collection, and a clean income.' },
   { id: 'carwash', name: 'Suds Car Wash', kind: 'business', price: 34000, at: [9, 2, 3, 40], income: 760, storage: 40, garage: 1, crew: 2, launder: true, respray: true, desc: 'Cleans cars and cash. Respray stolen rides on site.' },
   { id: 'motel', name: 'Starlite Motel', kind: 'business', price: 42000, at: [4, 9, 1, 35], income: 980, storage: 80, crew: 2, night: true, desc: 'Rooms by the hour on the Nightlife Strip. Discreet, profitable, never quiet.' },
@@ -433,7 +434,7 @@ function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
   // a block rebuilt on its own streets (the Old Quarter, 124): the same door, on the nearest of them
   {
     const lx0 = bx * P + o, lz0 = bz * P + o, lp = side === 0 ? [lx0 + u, lz0] : side === 1 ? [lx0 + L, lz0 + u] : side === 2 ? [lx0 + L - u, lz0 + L] : [lx0, lz0 + L - u];
-    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o);
+    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o, along);
     if (q) { const dx = (CityLayout.siteI(bx, bz) - bx) * P, dz = (CityLayout.siteJ(bx, bz) - bz) * P; return { x: q.x + dx, z: q.z + dz, h: q.h }; }
   }
   switch (side) {

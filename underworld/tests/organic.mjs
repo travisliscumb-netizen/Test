@@ -47,11 +47,11 @@ const R = await ev(() => {
   out.lanes = ours.length; out.linked = ours.filter(r => w.links.some(L => L.road === r && L.ends.every(Boolean))).length;
   // the HUD's name on a lane, half way along
   out.hud = ours.map(r => { const q = r.pts[Math.floor(r.pts.length / 2)]; return [r.link, P.streetNameAt(q[0], q[1])]; }).filter(([a, c]) => a !== c);
-  // the GPS follows Glass Mile end to end
-  const gm = w.links.filter(L => L.name === 'Glass Mile').sort((a, c) => a.pts[0][0] - c.pts[0][0]);
-  const s0 = gm[0].pts[3], s1 = gm[gm.length - 1].pts[gm[gm.length - 1].pts.length - 4], rt = P.RoadGraph.route(s0[0], s0[1], s1[0], s1[1]);
-  const chain = gm.reduce((t, L) => t + L.len, 0);
-  out.gm = { pieces: gm.length, chain: Math.round(chain), route: rt ? Math.round(rt.len) : null, onIt: rt ? rt.pts.every(p => { const x = p.x ?? p[0], z = p.z ?? p[1]; return gm.some(L => polyD(x, z, L.pts) < 9); }) : false };
+  // the GPS follows Saint Ivo Street, the Old Quarter's high street, end to end
+  const gm = w.links.filter(L => L.name === 'Saint Ivo Street');
+  const s0 = gm[0].pts[4], s1 = gm[0].pts[gm[0].pts.length - 5], rt = P.RoadGraph.route(s0[0], s0[1], s1[0], s1[1]);
+  const chain = gm[0].len;
+  out.gm = { pieces: gm.length, chain: Math.round(chain), route: rt ? Math.round(rt.len) : null, onIt: rt ? rt.pts.every(p => { const x = p.x ?? p[0], z = p.z ?? p[1]; return polyD(x, z, gm[0].pts) < 9; }) : false };
   // ---- nothing a save or the game stands on is under a new road
   const prot = [...Object.entries(w.places || {}).flatMap(([id, p]) => ['door', 'garage', 'under'].map(k => p[k] && { k: id + ':' + k, x: p[k].x, z: p[k].z }).filter(Boolean)), ...(w.doors || []).map(d => ({ k: 'door:' + d.id, x: d.x, z: d.z }))];
   out.onRoad = prot.filter(q => ours.some(r => polyD(q.x, q.z, r.pts) < r.w / 2 + 1)).map(q => q.k);
@@ -74,18 +74,18 @@ const R = await ev(() => {
   const gg = c.getContext('2d', { willReadFrequently: true }), k0 = ui.mapK, E0 = ui.mapE; ui.mapK = 1; ui.mapE = 60;
   try { ui._paintMap(gg, { x0: -60, z0: -60, x1: 1020, z1: 1020 }); } finally { ui.mapK = k0; ui.mapE = E0; }
   const px = (x, z) => Array.from(gg.getImageData(Math.round(x + 60), Math.round(z + 60), 1, 1).data.slice(0, 3));
-  const sq = P.CITY_CLOSED.find(q => q.name === 'Ledger Square'), sqm = sq.a === 0 ? [sq.i * Pm, (sq.j + 0.5) * Pm + 12] : [(sq.j + 0.5) * Pm + 12, sq.i * Pm];
-  const ln = ours.find(r => r.link === 'Glass Mile'), lq = ln.pts[Math.floor(ln.pts.length / 2)];
+  const sq = P.CITY_CLOSED.find(q => q.name === 'Pier Yard'), sqm = sq.a === 0 ? [sq.i * Pm, (sq.j + 0.5) * Pm + 12] : [(sq.j + 0.5) * Pm + 12, sq.i * Pm];
+  const ln = ours.find(r => r.link === 'Saint Ivo Street'), lq = ln.pts[Math.floor(ln.pts.length / 2)];
   out.map = { square: px(...sqm), lane: px(lq[0], lq[1]) };
   return out;
 });
 const cl = R.closures;
-check('the squares, mews and yards: inside a precinct, off every race line, both crossroads T-junctions or, on an edge, the edge street straight on (no dead end, no lone corner)', cl.length >= 6 && cl.every(c => c.inside && !c.race && c.deg.every(Boolean)), JSON.stringify(cl.map(c => [c.name, c.inside, c.race, c.deg])));
+check('the squares, mews and yards: inside a precinct, off every race line, both crossroads T-junctions or, on an edge, the edge street straight on (no dead end, no lone corner)', cl.length >= 2 && cl.every(c => c.inside && !c.race && c.deg.every(Boolean)), JSON.stringify(cl.map(c => [c.name, c.inside, c.race, c.deg])));
 check('closed to traffic: off the road network, raised to the pavement, bollards across both ends', cl.every(c => !c.road && c.y > 0.1 && c.ends.every(n => n >= 6)), JSON.stringify(cl.map(c => [c.name, c.road, c.y, c.ends])));
-check('dressed and named: a fountain in every square; the HUD gives its name; nothing a door, home or place stands on', cl.every(c => (c.kind !== 'plaza' || c.fountain) && c.named === c.name && c.prot === 0), JSON.stringify(cl.map(c => [c.name, c.fountain, c.named, c.prot])));
-check('the new streets: lanes, a crescent, avenues and works roads, every one a through street with both ends on an open road', R.names.length >= 18 && R.lanes >= 25 && R.linked === R.lanes, JSON.stringify({ names: R.names, lanes: R.lanes, linked: R.linked }));
+check('dressed and named: a fountain in any square; the HUD gives its name; nothing a door, home or place stands on', cl.every(c => (c.kind !== 'plaza' || c.fountain) && c.named === c.name && c.prot === 0), JSON.stringify(cl.map(c => [c.name, c.fountain, c.named, c.prot])));
+check('the new streets: lanes, a crescent, avenues and works roads, every one a through street with both ends on an open road', R.names.length >= 15 && R.lanes >= 18 && R.linked === R.lanes, JSON.stringify({ names: R.names, lanes: R.lanes, linked: R.linked }));
 check('standing on any of them, the HUD names it', R.hud.length === 0, JSON.stringify(R.hud));
-check('the GPS takes Glass Mile end to end, a diagonal across three blocks', R.gm.pieces === 3 && R.gm.onIt && R.gm.route < R.gm.chain * 1.25, JSON.stringify(R.gm));
+check('the GPS takes Saint Ivo Street end to end, the Old Quarter’s winding high street', R.gm.pieces === 1 && R.gm.onIt && R.gm.route < R.gm.chain * 1.25, JSON.stringify(R.gm));
 check('no new road over any door, garage or place; every home still has its building, no flat under a road', R.onRoad.length === 0 && R.homeless.length === 0, JSON.stringify({ onRoad: R.onRoad, homeless: R.homeless }));
 check('no block cut off: every downtown block keeps at least two open sides', R.shut.length === 0, JSON.stringify(R.shut));
 // ---- the Old Quarter, rebuilt (124): one superblock with no grid inside it, on its own winding streets
@@ -113,6 +113,6 @@ check('the Quarter Garage stands where it stood, Garage Row past the foot of its
 const BASE = { core: 107, oldquarter: 268, linden: 137, port: 36 };
 check('each district keeps its density (within 5% of the grid it was)', Object.entries(BASE).every(([k, v]) => R.cnt[k] >= v * 0.95), JSON.stringify({ now: R.cnt, before: BASE }));
 const near = (a, c, t = 14) => a.every((v, i) => Math.abs(v - c[i]) <= t);
-check('the map shows them: a square’s paving, a lane’s asphalt', near(R.map.square, [0x8f, 0x8a, 0x80], 30) && near(R.map.lane, [0x6f, 0x76, 0x82], 30), JSON.stringify(R.map));
+check('the map shows them: a yard’s paving, a street’s asphalt', near(R.map.square, [0x6f, 0x6c, 0x66], 30) && near(R.map.lane, [0x6f, 0x76, 0x82], 30), JSON.stringify(R.map));
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await finish(b, 'organic');

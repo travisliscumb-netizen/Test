@@ -42,6 +42,8 @@ what the directive's own references look like; a grid torn up to look irregular 
 | The fleet | `245-core-island-fleet.js` | Spawns each site's vehicles and bystanders as you come near, like the city's parked cars: 12 race cars in the Valen Point pit boxes and paddock, 6 at the proving ground, 3 aeroplanes and 2 helicopters at the airport, the air ambulance on the hospital's roof, the police air unit on the station's, fire engines and ambulances, cars at every settlement. |
 | Integration | `020`, `025`–`027`, `030`, `080`, `110`, `135`, `190`, `280`, `600`, `630` | `groundBase` asks the island off the lattice; zones and names; the collision grid covers the island (cells made on demand); traffic runs the highways at highway speed; you wade in the sea and a car bogs down; saves anywhere on the island; the minimap and the big map show all of it (zoom out to the whole island); aircraft controls, the speedometer's height readout, the touch buttons' labels; the helipad lifts. |
 
+| Southshore Raceway | `129b`, `509c` | The second circuit (2026-11-18), on the plain between Marsh Hollow and the airport: 1.57 km, eleven corners, pits, nine garages, the Race Office, a grandstand; Raceway Road off Heron Loop. An OfficialVenue like Valen Point (DECISIONS.md). |
+
 ## 4. Districts off the lattice
 Crestmoor Ridge · Mount Valen · Blackgate Highlands · Saltmarsh · Southshore · Port Valen International · Valen
 Proving Ground (each a `ZONES` entry with its own traffic mix), beside Valen Point and Cedar Fields. Waters: Valen Bay,

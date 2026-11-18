@@ -34,7 +34,8 @@ const G = await ev(() => {
   for (const a of [0, 1]) for (let line = a ? RN.J0 : RN.I0; line <= (a ? RN.J1 : RN.I1); line++) for (let seg = a ? RN.I0 : RN.J0; seg < (a ? RN.I1 : RN.J1); seg++) if (RN.segOpen(a, line, seg)) open++;
   // a lattice route across the precincts that stand together, corner to corner: the shortest there is
   const CL = P.CityLayout, cs = CL.precincts.filter(p => !p.ox && !p.oz), i0 = Math.min(...cs.map(p => p.lx0)), j0 = Math.min(...cs.filter(p => p.lx0 === i0).map(p => p.lz0)), i1 = Math.max(...cs.map(p => p.lx1 + 1)), j1 = Math.max(...cs.filter(p => p.lx1 + 1 === i1).map(p => p.lz1 + 1));
-  out.nClosed = P.CITY_CLOSED.length;
+  // every segment a superblock swallows, and the organic downtown's closures (020)
+  out.expect = P.CITY_CLOSED.length; for (const sb of P.SUPERBLOCKS) out.expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
   out.grid = { segs: R.segEdges.size, open, bad, closed: RN.closed.size, bfs: RN.path(i0, j0, i1, j1).length, manhattan: Math.abs(i1 - i0) + Math.abs(j1 - j0) };
   const seen = new Set([0]), q = [R.nodes[0]];
   while (q.length) { const n = q.pop(); for (const { e } of n.edges) for (const m of [e.a, e.b]) if (!seen.has(m.id)) { seen.add(m.id); q.push(m); } }
@@ -67,7 +68,7 @@ const G = await ev(() => {
   }
   return out;
 });
-check('the grid is still the grid: every open lattice segment is in the graph, straight, 80 m end to end; closures and lattice paths unchanged', G.grid.bad === 0 && G.grid.segs === G.grid.open && G.grid.closed === 22 + G.nClosed && G.grid.bfs === G.grid.manhattan + 1, JSON.stringify(G.grid));
+check('the grid is still the grid: every open lattice segment is in the graph, straight, 80 m end to end; closures and lattice paths unchanged', G.grid.bad === 0 && G.grid.segs === G.grid.open && G.grid.closed === G.expect && G.grid.bfs === G.grid.manhattan + 1, JSON.stringify(G.grid));
 check('one connected network: every junction reaches every other (the city, the curved streets, Valen Point, Cedar Fields South)', G.reach === 1, JSON.stringify({ reach: G.reach, n: G.n }));
 const skew = G.tees.filter(x => x.ang < 75);
 check('T-junctions at any angle: at least three new streets leave the grid well off square (under 75°), none sharper than 30°', skew.length >= 3 && G.tees.every(x => x.ang >= 30), JSON.stringify(G.tees));

@@ -33032,16 +33032,12 @@ const SUPERBLOCKS = [
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
 ];
 // the organic downtown (owner, 2026-11-18): lattice segments given over to people. Each is a short street closed to
-// traffic and paved across (123 dresses it): a cobbled mews in the Old Quarter, a square in the commercial core, a
-// working yard on the port strip. Like a superblock's, a closure turns the crossroads at its two ends into
+// traffic and paved across (123 dresses it): a working yard on the port strip (the financial
+// core keeps its grid whole, and the Old Quarter is rebuilt on its own streets, 124). Like a superblock's, a closure turns the crossroads at its two ends into
 // T-junctions; it never touches a precinct's edge street, a race line, a door, a home or a flat (the organic suite
 // checks all of it). a: 0 the north-south street x = i*P, segment j (z from j*P); 1 the east-west street z = i*P,
 // segment j (x from j*P). Lattice numbers: these precincts stand at offset 0 under every layout that ships.
 const CITY_CLOSED = [
-  { a: 0, i: 5, j: 4, name: 'Exchange Square', kind: 'plaza' },
-  { a: 1, i: 6, j: 4, name: 'Assay Walk', kind: 'plaza' },
-  { a: 1, i: 7, j: 7, name: 'Ledger Square', kind: 'plaza' },
-  { a: 1, i: 5, j: 7, name: 'Bourse Court', kind: 'plaza' },
   { a: 1, i: 1, j: 11, name: 'Saltworks Yard', kind: 'yard' },
   { a: 1, i: 5, j: 11, name: 'Pier Yard', kind: 'yard' }
 ];
@@ -34479,6 +34475,8 @@ const SaveSystem = {
       raceDay: { day: -1, wins: {} }, pink: null, pinkDay: -1,
       // Valen Point Motorsport Park (Session 6B): best lap, prize cars won, a hosted meeting waiting to settle
       track: { best: null, prize: {}, hosted: null, laps: 0 },
+      // Southshore Raceway (509c): best lap, laps
+      raceway: { best: null, prize: {}, laps: 0 },
       // the ten one-offs (Session 6D): each one's stage (undiscovered, clue, exact location, acquired)
       uniques: {},
       dealers: {},
@@ -37510,7 +37508,7 @@ class World {
     if (b.superblock) {
       const sb = b.superblock;
       if (b.bx === sb.bx0 && b.bz === sb.bz0) { this._sbRun(sb, rng); }
-      b.name = sb.name || DNAME[b.t] || 'Port Valen';
+      b.name = b.landmark ? b.landmark.name : sb.name || DNAME[b.t] || 'Port Valen';
       return;
     }
     if (lm) { this[lm.gen](b, rng); b.name = lm.name; b.landmark = lm; return; }
@@ -40700,15 +40698,9 @@ const CURVED_STREETS = {
   // the Old Quarter's blocks in Linden Hills
   '2,8': { kind: 'lane', roads: [{ name: 'Mason’s Walk', w: 7, ctrl: [[186, 645.4], [190, 660], [204, 676], [220, 684], [234.6, 688]] }] },
   '2,9': { kind: 'lane', roads: [{ name: 'Ropewalk', w: 7, ctrl: [[165.4, 752], [180, 756], [194, 766], [204, 782], [206, 794.6]] }] },
-  // the commercial core: a diagonal avenue across the Glass Mile (the towers it displaces are rebuilt beside it);
+  // (the financial core stays the gridded downtown, owner 2026-11-18: no lanes or avenues in it)
   // Diner Row: a crescent and a lane
-  '3,4': { kind: 'avenue', roads: [{ name: 'Glass Mile', w: 12, ctrl: [[262, 325.4], [270, 336], [286, 344], [302, 347], [314.6, 347]], park: [1, -1] }] },
-  '4,4': { kind: 'avenue', roads: [{ name: 'Glass Mile', w: 12, ctrl: [[325.4, 347], [336, 351], [344, 362], [346, 380], [344, 394.6]], park: [1, -1] }] },
-  '4,5': { kind: 'avenue', roads: [{ name: 'Glass Mile', w: 12, ctrl: [[344, 405.4], [354, 418], [372, 438], [394.6, 456]], park: [1, -1] }] },
   '3,6': { kind: 'lane', roads: [{ name: 'Tallow Lane', w: 7, ctrl: [[245.4, 500], [262, 506], [280, 520], [292, 538], [296, 554.6]] }] },
-  '7,6': { kind: 'avenue', roads: [{ name: 'Kestrel Way', w: 10, ctrl: [[565.4, 500], [584, 504], [604, 520], [620, 536], [634.6, 540]], park: [1] }] },
-  '6,4': { kind: 'avenue', roads: [{ name: 'Bourse Lane', w: 8, ctrl: [[500, 325.4], [506, 342], [520, 360], [536, 372], [554.6, 376]] }] },
-  '8,4': { kind: 'avenue', roads: [{ name: 'Harbour Steps', w: 8, ctrl: [[656, 325.4], [662, 342], [674, 360], [686, 380], [690, 394.6]] }] },
   '9,5': { kind: 'lane', roads: [{ name: 'Fry Lane', w: 7, ctrl: [[725.4, 428], [740, 432], [756, 444], [766, 460], [770, 474.6]] }] },
   '9,6': { kind: 'lane', roads: [{ name: 'Marigold Crescent', w: 8, ctrl: [[744, 485.4], [748, 500], [760, 514], [776, 522], [794.6, 526]] }] },
   // the port strip: works roads curving through the yards
@@ -41052,9 +41044,13 @@ const OQ_STREETS = [
   { name: 'Bell Lane', w: 7, fork: 2, near: [182, 372], ctrl: [[186, 356], [190, 340], [196, 325.6]] },
   { name: 'Cooper’s Walk', w: 7, fork: 0, near: [119, 470], ctrl: [[92, 482], [62, 492], [36, 506], [5.6, 518]] },
   { name: 'Chapel Lane', w: 7, fork: 4, near: [56, 494], ctrl: [[50, 512], [40, 532], [32, 554.4]] },
-  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 480], [226, 488], [234.4, 504]] },
+  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 481], [222, 487], [234.4, 497]] },
   { name: 'Wick Lane', w: 7, fork: 0, near: [106, 530], ctrl: [[130, 530], [160, 524], [190, 528], [234.4, 538]] }
 ];
+// an address whose own street point has no room for what stands there: where on the new streets to look for it
+// instead (block, side, along → a point near the street it fronts). The Neighborhood Bank (353: 2,5 north side, the
+// Quarter Garage's front) is a deep building with a staff door on its back: it stands on Saint Ivo Street
+const OQ_ADDR = { '2,5,0,44': [118, 420] };
 // Saint Ivo Square: a paved round beside the high street, its fountain in the middle
 const OQ_SQUARE = { x: 58, z: 462, r: 11 };
 // the streets' polylines (computed once; sidewalkSpot needs them before the world is built)
@@ -41077,9 +41073,10 @@ const OQ_SB = () => SUPERBLOCKS.find(s => s.id === 'oldquarter');
 // a door on one of the old cells (sidewalkSpot's address), on the new streets: the kerbside point of the nearest
 // street, `o` from its centre line as the lattice spot was from its own, facing the street. Only for a side whose
 // lattice street is gone; a side on an edge street that still runs keeps its spot. Lattice metres, or null.
-function oldQuarterSpot(bx, bz, side, x, z, o) {
+function oldQuarterSpot(bx, bz, side, x, z, o, along) {
   const sb = superblockAt(bx, bz); if (!sb || sb.id !== 'oldquarter') return null;
   if (RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
+  const fix = OQ_ADDR[bx + ',' + bz + ',' + side + ',' + along]; if (fix) { x = fix[0]; z = fix[1]; }
   let best = null;
   for (const L of oqLines()) for (let k = 0; k < L.pts.length - 1; k++) {
     const a = L.pts[k], c = L.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1;
@@ -41097,9 +41094,12 @@ Object.assign(World.prototype, {
     this._sbSidewalks(sb, rng, { trees: 0.3, park: 0.4 });
     const b = a, lines = oqLines(), roads = [];
     // the streets (kerbside parking on the high street and Market Street)
+    // pavements both sides, the frontage's depth (concrete under the asphalt: what the shader and the maps draw)
+    for (const L of lines) this._road(L.pts, L.w + 5.4, 'concrete');
     for (const L of lines) { const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; roads.push(r); }
     // the Quarter Garage, where it always stood
-    const gb = this.block(2, 5); this._genGarage(gb, rng); gb.name = 'Quarter Garage';
+    // (a landmark as it always was: the kicker pass leaves it alone, and it keeps its name in the superblock)
+    const gb = this.block(2, 5); this._genGarage(gb, rng); gb.landmark = LANDMARK_BLOCKS['2,5']; gb.name = gb.landmark.name;
     const G = { x0: gb.x0 - 1, z0: gb.z0 - 1, x1: gb.x1 + 1, z1: gb.z1 + 2 };
     // Saint Ivo Square
     const Q = OQ_SQUARE;
@@ -41115,7 +41115,14 @@ Object.assign(World.prototype, {
     const segD = (x, z, p, q) => { const dx = q[0] - p[0], dz = q[1] - p[1], l2 = dx * dx + dz * dz || 1; let t = ((x - p[0]) * dx + (z - p[1]) * dz) / l2; t = Math.max(0, Math.min(1, t)); return Math.hypot(x - p[0] - dx * t, z - p[1] - dz * t); };
     const clearRoads = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m);
     const placed = [];
+    // the stunt jumps' lanes (the garage roof's leap flies north over Market Street): run-up, flight and landing kept
+    // clear of anything built
+    const lanes = (this.surfaces || []).filter(s => s.unique && s.x1 > sb.x0 - 40 && s.x0 < sb.x1 + 40 && s.z1 > sb.z0 - 40 && s.z0 < sb.z1 + 40).map(s => {
+      const ax = s.axis === 'x', c = ax ? (s.z0 + s.z1) / 2 : (s.x0 + s.x1) / 2, lo = (ax ? s.x0 : s.z0) - 32, hi = (ax ? s.x1 : s.z1) + 32, hw = (ax ? s.z1 - s.z0 : s.x1 - s.x0) / 2 + 4;
+      return ax ? [lo, c - hw, hi, c + hw] : [c - hw, lo, c + hw, hi];
+    });
     const free = (x0, z0, x1, z1) => x0 >= sb.x0 && z0 >= sb.z0 && x1 <= sb.x1 && z1 <= sb.z1
+      && !lanes.some(L => x0 < L[2] && x1 > L[0] && z0 < L[3] && z1 > L[1])
       && !(x0 < G.x1 && x1 > G.x0 && z0 < G.z1 && z1 > G.z0)
       && Math.hypot(clamp(Q.x, x0, x1) - Q.x, clamp(Q.z, z0, z1) - Q.z) > Q.r + 2
       && clearRoads(x0, z0, x1, z1, 2.6)
@@ -41157,19 +41164,24 @@ Object.assign(World.prototype, {
     };
     // every door with an address on these cells first: a front right behind it, facing its street, so the business,
     // the flat, the bank or the HQ has its building wherever the street now runs
-    const addr = [...PROPS, ...HOME_LADDER, ...SPOTS].map(d => d.at).concat(Object.values(HQS)).filter(at => at && superblockAt(at[0], at[1]) === sb);
-    for (const at of addr) {
+    // (a bank is a deep building: its staff door is on the back, well behind the counter)
+    const addr = [...PROPS, ...HOME_LADDER, ...SPOTS].map(d => ({ at: d.at, bank: !!d.bank })).concat(Object.values(HQS).map(at => ({ at }))).filter(a => a.at && superblockAt(a.at[0], a.at[1]) === sb);
+    for (const { at, bank } of addr) {
       const s = sidewalkSpot(at[0], at[1], at[2], at[3], ROAD_HALF + 3.1), ox = (CityLayout.siteI(at[0], at[1]) - at[0]) * P, oz = (CityLayout.siteJ(at[0], at[1]) - at[1]) * P;
       const nx = -Math.sin(s.h), nz = -Math.cos(s.h), alongX = Math.abs(nz) >= Math.abs(nx);
       let got = null;
-      for (const [w0, d0] of [[9, 10], [8, 9], [7, 8], [6, 7]]) {
+      for (const [w0, d0] of bank ? [[18, 24], [16, 23], [14, 22]] : [[9, 10], [8, 9], [7, 8], [6, 7]]) {
         for (let gap = 0.6; gap <= 2.6 && !got; gap += 0.4) {
           const cx = s.x - ox + nx * (gap + d0 / 2), cz = s.z - oz + nz * (gap + d0 / 2), wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
           if (free(...q)) got = q;
         }
         if (got) break;
       }
-      if (got) build(got, 0, 0, -nx, -nz, 0.6);
+      if (got) {
+        const r = build(got, 0, 0, -nx, -nz, bank ? 0 : 0.6);
+        // a bank's service yard behind it, kept open: its staff door is on the back wall (512, rearOf)
+        if (bank) { r.style = STYLE.DECO; r.color = C(rng.pick(PAL.deco)); const [x0, z0, x1, z1] = got; placed.push(alongX ? (nz > 0 ? { x0, z0: z1, x1, z1: z1 + 8 } : { x0, z0: z0 - 8, x1, z1: z0 }) : (nx > 0 ? { x0: x1, z0, x1: x1 + 8, z1 } : { x0: x0 - 8, z0, x1: x0, z1 })); }
+      }
     }
     // the high street first (shops), then the lanes, then the edge streets
     for (const r of roads) { const hi = r.link === 'Saint Ivo Street' || r.link === 'Market Street'; for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6, s, hi ? 0.55 : 0.12); }
@@ -41178,7 +41190,7 @@ Object.assign(World.prototype, {
     // a second row behind the first (back terraces and mews houses round courtyards), where the land is deep enough
     for (const r of roads) for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6 + 15, s, 0);
     // ---- behind the frontage: gardens and yards (trees, bushes, a shed), never in a street, a building or the square
-    const open = (x, z, m) => roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && Math.hypot(x - Q.x, z - Q.z) > Q.r + 1 && !(x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
+    const open = (x, z, m) => !lanes.some(L => x > L[0] - m && x < L[2] + m && z > L[1] - m && z < L[3] + m) && roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && Math.hypot(x - Q.x, z - Q.z) > Q.r + 1 && !(x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
     for (let x = sb.x0 + 3; x < sb.x1 - 3; x += 6) for (let z = sb.z0 + 3; z < sb.z1 - 3; z += 6) {
       const jx = x + rng.range(-1.8, 1.8), jz = z + rng.range(-1.8, 1.8);
       if (!open(jx, jz, 2.4)) continue;
@@ -41679,6 +41691,8 @@ Object.assign(World.prototype, {
     Island.addPad(VALEN_FIELD.x0, VALEN_FIELD.z0, VALEN_FIELD.x1, VALEN_FIELD.z1, VALEN_FIELD.y, 60);
     if (saltmarsh) Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
+    // Southshore Raceway's level site (129b)
+    this._racewayPad();
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
     // the mansions' plots are levelled again, last, so no later level ground (a precinct's edge, a lot) eats into them;
@@ -41939,6 +41953,8 @@ Object.assign(World.prototype, {
       folk('firehouse', 160, -127, [[ISLE_FIRE.x0 + 17, ISLE_FIRE.z0 + 20, -1.57], [ISLE_FIRE.x0 + 18, ISLE_FIRE.z0 + 34, -1.57]]);
       folk('gull', -1290, -2265, [[-1282, -2264, 0.5], [-1330, -2262, 2.0], [-1240, -2300, -0.8]]);
     }
+    // Southshore Raceway (129b)
+    this._genRaceway();
     // colliders for the island's blocks (the city's and Valen Point's loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
@@ -42907,6 +42923,191 @@ const Farms = {
   },
   update(dt) { if (this._rotors) for (const m of this._rotors) m.rotation.z += dt * 1.35; }
 };
+/* =====================================================================
+   [CONTENT] SOUTHSHORE RACEWAY (owner, 2026-11-18: "find another open space and put a racetrack on one
+   of the two main islands, wherever it fits properly")
+   The island's second circuit, on the south lobe: the open plain between Marsh Hollow and the airport,
+   the widest level ground left free (a survey of every road, pad, district, farm and site: the sea
+   comes in to its south-west, the farms stand to its west, the airport's level ground to its east).
+   - The circuit: 1.6 km, 13 m wide, eleven corners (filletLoop, like Valen Point's): a main straight
+     running east past the pits, a fast east side with a kink, a long south straight, a hairpin, a
+     chicane back through the infield and a sweeper onto the main straight. It keeps 50 m from
+     Longshore Drive, which runs past its south-west on the diagonal; the level site steps back from it. Run-off gravel on the outside of the faster corners, armco both sides,
+     red-and-white kerbs, edge lines, a start/finish line with a gantry, a ten-car grid.
+   - The pits: a pit lane beside the main straight behind a pit wall, nine drive-through garages (two
+     bays each, the owner's parking), the paddock behind them with the Race Office, a grandstand in
+     the infield.
+   - Raceway Road leaves Heron Loop in Marsh Hollow and ends in a turning circle at the paddock.
+   The whole site stands on one level pad. The venue (events, sessions, the property) is RacewayPark
+   (509c); the near ground (track, kerbs, paint, run-off, paddock) is RacewayScenery below.
+   ===================================================================== */
+const SR = {
+  name: 'Southshore Raceway', y: 7,
+  // the level site: stepped back from Longshore Drive, which runs south-west of it on the diagonal
+  pad: { x0: -812, z0: 1762, x1: -415, z1: 2412 }, blend: 40,
+  pads: [[-812, 1762, -415, 2082], [-772, 2082, -415, 2146], [-678, 2146, -415, 2210], [-614, 2210, -415, 2306], [-598, 2306, -415, 2370], [-574, 2370, -430, 2412]],
+  w: 13, step: 2,
+  // corners [x, z, radius], in the direction of travel (east along the main straight first)
+  verts: [[-790, 1850, 50], [-460, 1850, 45], [-445, 2015, 55], [-540, 2105, 28], [-445, 2195, 40], [-447, 2370, 45], [-525, 2385, 40], [-588, 2265, 32], [-575, 2185, 30], [-685, 2090, 40], [-770, 2040, 40]],
+  sfX: -640,
+  // the pit lane (east along z), the wall between it and the track, the garages north of it, their merges
+  pit: { z: 1833, w: 9, x0: -720, x1: -518, wallZ: 1840.8, garZ: [1806, 1826], garX: [-710, -530], cell: 20,
+    entry: [[-744, 1846.5], [-734, 1841], [-722, 1834.5]], exit: [[-516, 1834.5], [-504, 1841], [-494, 1846.5]] },
+  paddock: { x0: -770, z0: 1768, x1: -466, z1: 1804 },
+  // (its door on the turning circle at the end of Raceway Road)
+  office: { x0: -519, z0: 1766, x1: -491, z1: 1792 },
+  stand: { x0: -700, x1: -560, z0: 1872, z1: 1896 }
+};
+function srTrackLine() { return filletLoop(SR.verts, SR.step); }
+function inRaceway(x, z, m = 0) { return SR.pads.some(p => x > p[0] - m && x < p[2] + m && z > p[1] - m && z < p[3] + m); }
+// Raceway Road: off Heron Loop (its ctrl point at the loop's south end) down to the paddock's turning circle
+const SR_ROAD = { id: 'sr1', name: 'Raceway Road', w: 9, grade: 0.08, ends: ['m2', 'ring'], ring: 14, ringAt: [-540, 1778], pts: [[-520, 1628], [-524, 1664], [-532, 1700], [-538, 1732], [-540, 1762]] };
+ISLE_DISTRICT_ROADS.push(SR_ROAD); ISLE_ROADS.push(SR_ROAD);
+const SR_COL = { asphalt: 0x2b2d30, line: 0xeeeeea, red: 0xc0392b, white: 0xf2f2f2, gravel: 0xb3a27e, concrete: 0x8e8c86, pit: 0x34363a, check: 0x111111 };
+Object.assign(World.prototype, {
+  // the level site, before the roads find their level (127 calls this)
+  _racewayPad() { for (const p of SR.pads) Island.addPad(p[0], p[1], p[2], p[3], SR.y, SR.blend); },
+  _genRaceway() {
+    const T = srTrackLine(), Y = SR.y, half = SR.w / 2, N2 = T.pts.length;
+    const sr = this.sr = { track: T, sf: null, bays: [], barriers: [], road: SR_ROAD };
+    const B = {
+      pits: this._isleBlock('sr_pits', -620, 1816, 200, 'Southshore Raceway pits'),
+      pad: this._isleBlock('sr_paddock', -560, 1786, 260, 'Southshore Raceway paddock'),
+      stand: this._isleBlock('sr_stand', -630, 1884, 120, 'Southshore Raceway grandstand'),
+      track: this._isleBlock('sr_track', -625, 2110, 380, SR.name)
+    };
+    // ---------------------------------------------------------------- start / finish
+    const sfK = T.pts.findIndex(p => Math.abs(p[1] - SR.verts[0][1]) < 0.5 && Math.abs(p[0] - SR.sfX) <= SR.step);
+    sr.sf = { k: sfK, x: T.pts[sfK][0], z: T.pts[sfK][1], along: T.cum[sfK] };
+    // ---------------------------------------------------------------- barriers: armco both sides, run-off by corner speed
+    const runOut = R => R <= 0 ? 10 : R < 40 ? 16 : R < 60 ? 20 : 24;
+    const ease = (k, f) => { let best = f(k); for (let d = 1; d <= 20; d++) { const w = 1 - d / 21; best = Math.max(best, f((k + d) % N2) * w, f((k - d + N2) % N2) * w); } return best; };
+    const turn = k => T.R[k] > 0 ? Math.sign(this._vpTurn(T, k)) : 0;
+    const offL = k => half + ease(k, i => turn(i) > 0 ? runOut(T.R[i]) : T.R[i] > 0 ? 4 : 10);
+    const offR = k => half + ease(k, i => turn(i) < 0 ? runOut(T.R[i]) : T.R[i] > 0 ? 4 : 10);
+    sr.offL = offL; sr.offR = offR; sr.turn = turn;
+    // the main straight's pit side is the pit wall and the merges (no armco)
+    const pitSide = (x, z) => z < SR.verts[0][1] && x > SR.pit.entry[0][0] - 6 && x < SR.pit.exit[2][0] + 6;
+    for (const side of [1, -1]) {
+      const line = [];
+      for (let k = 0; k < N2; k++) {
+        const p = T.pts[k], nl = T.nl[k], off = side > 0 ? offL(k) : offR(k), x = p[0] + nl[0] * side * off, z = p[1] + nl[1] * side * off;
+        line.push(pitSide(x, z) && Math.abs(p[1] - SR.verts[0][1]) < 1 ? null : [x, z]);
+      }
+      sr.barriers.push(line);
+      for (let k = 0; k < N2; k++) {
+        const a = line[k], b2 = line[(k + 1) % N2]; if (!a || !b2) continue;
+        const L = Math.hypot(b2[0] - a[0], b2[1] - a[1]), m = Math.max(1, Math.round(L));
+        for (let i = 0; i < m; i++) this.grid.add({ x: lerp(a[0], b2[0], i / m), z: lerp(a[1], b2[1], i / m), r: 0.45, y0: Y - 1, y1: Y + 1.1, kind: 'det', barrier: true });
+      }
+    }
+    // the pit wall
+    this._det(B.pits, 'box', (SR.pit.x0 + SR.pit.x1) / 2 + 1, Y + 0.6, SR.pit.wallZ, SR.pit.x1 - SR.pit.x0 - 6, 1.2, 0.8, C(0xd8d8d0), 0, { x0: SR.pit.x0 + 4, x1: SR.pit.x1 - 2, z0: SR.pit.wallZ - 0.4, z1: SR.pit.wallZ + 0.4, y0: Y - 1, y1: Y + 1.2, kind: 'det' });
+    // ---------------------------------------------------------------- the gantry over the line and the grid behind it
+    const gz0 = SR.pit.wallZ + 0.6, gz1 = sr.sf.z + half + 3;
+    for (const z of [gz0, gz1]) this._det(B.pits, 'box', sr.sf.x, Y + 4.5, z, 0.6, 9, 0.6, 0x2a2e33, 0, true);
+    this._det(B.pits, 'box', sr.sf.x, Y + 8.6, (gz0 + gz1) / 2, 1.0, 1.4, gz1 - gz0 + 0.6, 0x1d2126);
+    for (let k = 0; k < 5; k++) B.pits.fx.push({ type: 'neon', x: sr.sf.x - 0.55, y: Y + 7.8, z: sr.sf.z - 6 + k * 3, w: 0.1, h: 0.6, d: 0.6, c: 0xff2a2a });
+    B.pits.signs.push({ text: 'SOUTHSHORE RACEWAY', x: sr.sf.x - 0.52, y: Y + 8.6, z: (gz0 + gz1) / 2, ry: -Math.PI / 2, w: 13, h: 1.2, bg: '#1d2126', fg: '#ffffff' });
+    // the grid: ten boxes in two staggered files behind the line (west of it: the straight runs east)
+    sr.grid = [];
+    for (let k = 0; k < 10; k++) {
+      const gx = sr.sf.x - 34 - k * 8, gz = sr.sf.z + (k % 2 ? 3 : -3); sr.grid.push({ x: gx, z: gz });
+      this._det(B.pits, 'box', gx + 2.6, Y + 0.09, gz, 0.18, 0.02, 3, C(0xf2f2f2));
+      for (const s2 of [-1, 1]) this._det(B.pits, 'box', gx + 1.9, Y + 0.09, gz + s2 * 1.5, 1.4, 0.02, 0.18, C(0xf2f2f2));
+    }
+    // ---------------------------------------------------------------- the pit garages: drive-through, two bays each
+    const [gxa, gxb] = SR.pit.garX, [gza, gzb] = SR.pit.garZ, cell = SR.pit.cell, n = Math.round((gxb - gxa) / cell);
+    for (let i = 0; i <= n; i++) { const x = gxa + i * cell; this._bld(B.pits, x - 0.3, gza, x + 0.3, gzb, 5.6, STYLE.IND, 0xd8dade, 5.6, 4, { exactH: true, y0: Y, oy: Y }); }
+    this._bld(B.pits, gxa - 0.3, gza, gxb + 0.3, gzb, 6, STYLE.GLASS, 0x3a4652, 3, 4, { exactH: true, y0: Y + 5.6, oy: Y, far: true });
+    for (let i = 0; i < n; i++) {
+      const xc = gxa + cell * (i + 0.5);
+      for (const dx of [-4.5, 4.5]) sr.bays.push({ x: xc + dx, z: (gza + gzb) / 2, h: 0, y: Y, garage: i + 1 });
+      B.pits.signs.push({ text: String(i + 1), x: xc, y: Y + 4.7, z: gzb + 0.05, ry: 0, w: 2.2, h: 1.2, bg: '#1f6fb2', fg: '#ffffff' });
+    }
+    // ---------------------------------------------------------------- the grandstand in the infield: tiers rising away from the track
+    {
+      const S = SR.stand;
+      for (let t = 0; t < 6; t++) {
+        const z0 = S.z0 + t * 4, h = 1 + t * 1.3;
+        this._bld(B.stand, S.x0, z0, S.x1, z0 + 4, h, STYLE.IND, 0x9aa0a6, h, 5, { exactH: true, y0: Y, oy: Y, far: t === 5 });
+        for (let x = S.x0 + 1.5; x < S.x1 - 1; x += 1.6) if (hash2i(Math.floor(x * 3), t, 47) < 0.6) this._det(B.stand, 'box', x, Y + h + 0.45, z0 + 2 + (hash2i(Math.floor(x), t, 49) - 0.5), 0.45, 0.9, 0.5, C([0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60][Math.floor(hash2i(Math.floor(x * 7), t, 51) * 5)]));
+      }
+      this._det(B.stand, 'box', (S.x0 + S.x1) / 2, Y + 12.5, S.z0 + 12, S.x1 - S.x0 + 2, 0.6, 26, C(0xe8eaed));
+      for (let x = S.x0; x <= S.x1; x += 28) this._det(B.stand, 'cyl', x, Y + 6.3, S.z1 - 1, 0.4, 12.6, 0x6a7078, null, { x, z: S.z1 - 1, r: 0.45, y0: Y, y1: Y + 12.6, kind: 'det' });
+      B.stand.signs.push({ text: 'SOUTHSHORE RACEWAY', x: (S.x0 + S.x1) / 2, y: Y + 1.1, z: S.z0 - 0.05, ry: Math.PI, w: 22, h: 1.0, bg: '#1f6fb2', fg: '#ffffff' });
+    }
+    // ---------------------------------------------------------------- the Race Office in the paddock (the door you use: its west face, on the turning circle)
+    {
+      const O = SR.office;
+      this._bld(B.pad, O.x0, O.z0, O.x1, O.z1, 9, STYLE.GLASS, 0x2c3a48, 3.4, 3.2, { exactH: true, y0: Y, oy: Y });
+      B.pad.signs.push({ text: 'RACE OFFICE', x: O.x0 - 0.06, y: Y + 7.6, z: (O.z0 + O.z1) / 2, ry: -Math.PI / 2, w: 11, h: 1.3, bg: '#14181c', fg: '#4ab3ff' });
+      this._det(B.pad, 'box', O.x0 - 0.06, Y + 1.2, (O.z0 + O.z1) / 2, 0.12, 2.4, 1.4, C(0x22262b));
+      B.pad.place = { id: 'raceway', name: SR.name, kind: 'landmark', door: { x: O.x0 - 1.1, z: (O.z0 + O.z1) / 2, h: -Math.PI / 2 }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
+      // transporters along the paddock's back
+      for (let k = 0; k < 5; k++) { const x = SR.paddock.x0 + 16 + k * 30; this._bld(B.pad, x, SR.paddock.z0 + 2, x + 16, SR.paddock.z0 + 5, 3.6, STYLE.IND, [0xd23a2a, 0x1f6fb2, 0xe8eaed, 0x2e2e2e, 0xf1c40f][k], 3.6, 4, { exactH: true, y0: Y, oy: Y }); }
+      for (const [x, z] of [[-560, 1800], [-760, 1800], [-660, 1790]]) this._prop(B.pad, 'lotlamp', x, z, 0);
+    }
+    // ---------------------------------------------------------------- the fleet: race cars in the garages and the paddock
+    this.isle.fleet.push({ id: 'sr_pits', x: -620, z: 1816, r: 300, slots: sr.bays.filter((q, i) => i % 3 === 0).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: Y, cls: ['gt3', 'cup', 'drift', 'formula', 'lmp', 'rally'][i % 6] })) });
+    this.mapPlaces.push({ id: 'raceway', name: SR.name, cat: 'landmark', icon: 'R', x: SR.office.x0 - 6, z: (SR.office.z0 + SR.office.z1) / 2, sub: `A ${(T.len / 1000).toFixed(1)} km circuit, nine pit garages, official events` });
+    // (the blocks' colliders are added with the rest of the island's, 127)
+  }
+});
+// the maps (the big map, the minimap, the whole island: 600's island painter calls this): the circuit, its pit lane
+// and paddock
+World.prototype.paintRaceway = function (g, X, k, view) {
+  {
+    if (!this.sr) return;
+    const p = SR.pad; if (view && (p.x1 < view.x0 || p.x0 > view.x1 || p.z1 < view.z0 || p.z0 > view.z1)) return;
+    const T = this.sr.track;
+    g.fillStyle = '#8e8c86'; g.fillRect(X(SR.paddock.x0), X(SR.paddock.z0), (SR.paddock.x1 - SR.paddock.x0) * k, (SR.pit.z + SR.pit.w / 2 - SR.paddock.z0) * k);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = '#e8e8e2'; g.lineWidth = Math.max(2.5, (SR.w + 3) * k);
+    g.beginPath(); T.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), X(q[1])) : g.moveTo(X(q[0]), X(q[1]))); g.closePath(); g.stroke();
+    g.strokeStyle = '#3a3c40'; g.lineWidth = Math.max(1.6, SR.w * k);
+    g.beginPath(); T.pts.forEach((q, i) => i ? g.lineTo(X(q[0]), X(q[1])) : g.moveTo(X(q[0]), X(q[1]))); g.closePath(); g.stroke();
+    const sf = this.sr.sf; g.fillStyle = '#ffffff'; g.fillRect(X(sf.x) - 1, X(sf.z - SR.w / 2), 2, SR.w * k);
+  }
+};
+// ---------------------------------------------------------------------- the near ground: one merged mesh at the pad's level
+class RacewayScenery {
+  constructor(scene, world) {
+    const sr = world.sr; if (!sr) return;
+    const T = sr.track, half = SR.w / 2, N2 = T.pts.length, Y = SR.y, fb = new FlatBuilder();
+    // gravel on the outside of the faster corners, out to where the armco stands
+    fb.strip(T.pts, T.nl, 0, N2, k => half + 1.2, k => sr.offL(k) - 0.6, Y + 0.04, k => sr.turn(k) > 0 && T.R[k] > 0 && T.R[k] < 70 ? SR_COL.gravel : null, true);
+    fb.strip(T.pts, T.nl, 0, N2, k => -(sr.offR(k) - 0.6), k => -(half + 1.2), Y + 0.04, k => sr.turn(k) < 0 && T.R[k] > 0 && T.R[k] < 70 ? SR_COL.gravel : null, true);
+    // the paddock, the apron in front of the garages and the pit lane (with its merges)
+    fb.rect(SR.paddock.x0, SR.paddock.z0, SR.paddock.x1, SR.pit.garZ[0], Y + 0.05, SR_COL.concrete);
+    fb.rect(SR.pit.garX[0], SR.pit.garZ[0], SR.pit.garX[1], SR.pit.garZ[1], Y + 0.05, SR_COL.concrete);
+    fb.rect(SR.pit.entry[2][0], SR.pit.garZ[1], SR.pit.exit[0][0], SR.pit.z + SR.pit.w / 2, Y + 0.06, SR_COL.pit);
+    const lane = [...SR.pit.entry, [SR.pit.x0 + 10, SR.pit.z], [SR.pit.x1 - 10, SR.pit.z], ...SR.pit.exit], ln = vpNormals(lane);
+    fb.strip(lane, ln, 0, lane.length - 1, -SR.pit.w / 2, SR.pit.w / 2, Y + 0.065, SR_COL.pit, false);
+    // the turning circle and the road's last metres onto the paddock
+    { const R0 = SR_ROAD.ringAt, r = SR_ROAD.ring + SR_ROAD.w / 2, m = 32; for (let i = 0; i < m; i++) { const a = i / m * Math.PI * 2, b = (i + 1) / m * Math.PI * 2; fb.quad([R0[0], R0[1]], [R0[0] + Math.cos(a) * r, R0[1] + Math.sin(a) * r], [R0[0] + Math.cos(b) * r, R0[1] + Math.sin(b) * r], [R0[0], R0[1]], Y + 0.055, SR_COL.pit); } }
+    // the track, its edge lines and kerbs
+    fb.strip(T.pts, T.nl, 0, N2, -half, half, Y + 0.08, SR_COL.asphalt, true);
+    for (const s of [1, -1]) fb.strip(T.pts, T.nl, 0, N2, s > 0 ? half - 0.6 : -half + 0.35, s > 0 ? half - 0.35 : -half + 0.6, Y + 0.1, SR_COL.line, true);
+    for (const s of [1, -1]) fb.strip(T.pts, T.nl, 0, N2, s > 0 ? half : -half - 1.2, s > 0 ? half + 1.2 : -half, Y + 0.1, k => T.R[k] > 0 && T.R[k] < 70 ? (Math.floor(k / 2) % 2 ? SR_COL.red : SR_COL.white) : null, true);
+    // the start/finish line (a chequered band across the track) and the pit lane's speed lines
+    { const k0 = sr.sf.k; for (let c = 0; c < 13; c++) for (let r2 = 0; r2 < 2; r2++) { const o1 = -half + c, o2 = o1 + 1, A = T.pts[(k0 + r2) % N2], nl = T.nl[k0]; fb.quad([A[0] + nl[0] * o1, A[1] + nl[1] * o1], [A[0] + nl[0] * o2, A[1] + nl[1] * o2], [A[0] + nl[0] * o2 + 1, A[1] + nl[1] * o2], [A[0] + nl[0] * o1 + 1, A[1] + nl[1] * o1], Y + 0.11, (c + r2) % 2 ? SR_COL.check : SR_COL.white); } }
+    for (const x of [SR.pit.x0 + 4, SR.pit.x1 - 4]) fb.rect(x - 0.3, SR.pit.z - SR.pit.w / 2, x + 0.3, SR.pit.z + SR.pit.w / 2, Y + 0.075, SR_COL.white);
+    // every triangle faces up (a strip's quads wind one way or the other by which side of the centreline they lie on)
+    for (let i = 0; i < fb.p.length; i += 9) {
+      const P0 = fb.p, ax = P0[i], az = P0[i + 2], bx = P0[i + 3], bz = P0[i + 5], cx = P0[i + 6], cz = P0[i + 8];
+      if ((bz - az) * (cx - ax) - (bx - ax) * (cz - az) < 0) for (let j = 0; j < 3; j++) { const t = P0[i + 3 + j]; P0[i + 3 + j] = P0[i + 6 + j]; P0[i + 6 + j] = t; const u = fb.c[i + 3 + j]; fb.c[i + 3 + j] = fb.c[i + 6 + j]; fb.c[i + 6 + j] = u; }
+    }
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    this.mesh = fb.mesh(mat); this.mesh.name = 'raceway'; scene.add(this.mesh);
+    // the armco: a rail on posts along both barrier lines (one merged mesh)
+    const rp = [], rc = [], cc = new THREE.Color(0xc8ccd0);
+    const quad = (a, b, y0, y1) => { for (const q of [[a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y0, a[1]], [b[0], y1, b[1]], [a[0], y1, a[1]]]) { rp.push(...q); rc.push(cc.r, cc.g, cc.b); } };
+    for (const line of sr.barriers) for (let k = 0; k < line.length; k++) { const a = line[k], b = line[(k + 1) % line.length]; if (!a || !b || Math.hypot(b[0] - a[0], b[1] - a[1]) > 6) continue; quad(a, b, Y + 0.45, Y + 0.85); }
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(rc, 3)); gg.computeVertexNormals();
+    this.rail = new THREE.Mesh(gg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })); this.rail.name = 'raceway-armco'; scene.add(this.rail);
+  }
+}
 /* =====================================================================
    [CORE] TRAFFIC SIGNALS (shared timing used by AI, peds, and bulbs)
    ===================================================================== */
@@ -56242,6 +56443,7 @@ const PROPS = [
   // Valen Point (Session 6B): a legitimate asset bought from the bank, no Rank or Rep gate; its garage is the 24 pit
   // garage bays. Price provisional (Session 13)
   { id: 'offroad', name: 'Cedar Fields Off-Road Park', kind: 'offroad', price: 180000, place: 'offroad', garage: 6, storage: 0, desc: 'The off-road course’s compound in Cedar Fields South: six bays in the owners’ garage shed, the service stand (repairs a third off) and private sessions on the course whenever you like. Price provisional.' },
+  { id: 'raceway', name: 'Southshore Raceway', kind: 'raceway', price: 420000, place: 'raceway', garage: 18, storage: 0, desc: 'The circuit south of Marsh Hollow: the track, nine pit garages with room for eighteen of your cars, the Race Office. Owners race and lap it free.' },
   { id: 'motorsport', name: 'Valen Point Motorsport Park', kind: 'motorsport', price: 1500000, place: 'motorsport', garage: 24, storage: 0, desc: 'The circuit, its pit garages and grandstands on Valen Point. Track days, race meetings, a garage for a whole collection, and a clean income.' },
   { id: 'carwash', name: 'Suds Car Wash', kind: 'business', price: 34000, at: [9, 2, 3, 40], income: 760, storage: 40, garage: 1, crew: 2, launder: true, respray: true, desc: 'Cleans cars and cash. Respray stolen rides on site.' },
   { id: 'motel', name: 'Starlite Motel', kind: 'business', price: 42000, at: [4, 9, 1, 35], income: 980, storage: 80, crew: 2, night: true, desc: 'Rooms by the hour on the Nightlife Strip. Discreet, profitable, never quiet.' },
@@ -56547,7 +56749,7 @@ function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
   // a block rebuilt on its own streets (the Old Quarter, 124): the same door, on the nearest of them
   {
     const lx0 = bx * P + o, lz0 = bz * P + o, lp = side === 0 ? [lx0 + u, lz0] : side === 1 ? [lx0 + L, lz0 + u] : side === 2 ? [lx0 + L - u, lz0 + L] : [lx0, lz0 + L - u];
-    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o);
+    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o, along);
     if (q) { const dx = (CityLayout.siteI(bx, bz) - bx) * P, dz = (CityLayout.siteJ(bx, bz) - bz) * P; return { x: q.x + dx, z: q.z + dz, h: q.h }; }
   }
   switch (side) {
@@ -56787,7 +56989,7 @@ const Inv = {
   }
 };
 // the five kinds of place goods can be (Part 14 of the design): property kind -> location class
-const LOC_CLASS = { safehouse: 'SAFEHOUSE', business: 'PROPERTY', garage: 'PROPERTY', warehouse: 'WAREHOUSE', motorsport: 'MOTORSPORT', offroad: 'OFF-ROAD' };
+const LOC_CLASS = { safehouse: 'SAFEHOUSE', business: 'PROPERTY', garage: 'PROPERTY', warehouse: 'WAREHOUSE', motorsport: 'MOTORSPORT', offroad: 'OFF-ROAD', raceway: 'RACEWAY' };
 const LOC_ORDER = ['ON PERSON', 'VEHICLE', 'SAFEHOUSE', 'PROPERTY', 'WAREHOUSE', 'CORNER'];
 // valuation of one container at a district's street price: per good qty, cost, value, P/L
 function holdings(o, zone, market) {
@@ -57486,6 +57688,7 @@ class Underworld {
     if (this.g.wash) this.g.wash.reset();
     if (this.g.motorsport) this.g.motorsport.reset();
     if (this.g.offroad) this.g.offroad.reset();
+    if (this.g.raceway) this.g.raceway.reset();
     if (!this.S.chopWanted.length) this.rollChopList();
     if (!this.S.marketPrev) this.market.snapshot();
   }
@@ -58103,6 +58306,7 @@ class Underworld {
     const ia = g.impound.findAction(); if (ia) return ia;
     const ma = g.motorsport.findAction(); if (ma) return ma;
     const oa = g.offroad.findAction(); if (oa) return oa;
+    const sra = g.raceway.findAction(); if (sra) return sra;
     if (p.state === 'vehicle') {
       const v = p.vehicle;
       const wa = g.wash.findAction(); if (wa) return wa;
@@ -60662,6 +60866,7 @@ Object.assign(PropertyManager.prototype, {
     if (def.kind === 'motorsport' && w.vp) for (const b of w.vp.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: 0 });
     // the off-road compound's six bays in the owners' garage shed (Session 6C), on its pad
     if (def.kind === 'offroad' && w.cfs) for (const b of w.cfs.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });
+    if (def.kind === 'raceway' && w.sr) for (const b of w.sr.bays) out.push({ x: b.x, z: b.z, h: b.h, kind: 'garage', y: b.y });
     if (def.under && g.vspaces) { const vs = g.vspaces.byProp(def.id); if (vs) for (const b of vs.bays) out.push({ ...b, kind: 'under', space: vs.id }); }
     // kerbside spaces for flats, lock-ups and businesses without a drive
     const want = home ? 0 : (def.street || def.garage || 0);
@@ -62038,7 +62243,7 @@ function loopSafeSpeeds(T, a, vTop, brake, cap) {
 function vpCheckpoints(def) { const vp = game.world.vp; return loopCheckpoints(vp.track, vp.sf.k, def, vpSafeSpeeds()); }
 function vpSafeSpeeds() { const T = game.world.vp.track; return T._vs || (T._vs = loopSafeSpeeds(T, 8.5, 60, 7)); }
 // which venue runs an official event
-function venueOf(def) { return def.venue === 'cfs' ? game.offroad : game.motorsport; }
+function venueOf(def) { return def.venue === 'cfs' ? game.offroad : def.venue === 'sr' ? game.raceway : game.motorsport; }
 /* ---------------------------------------------------------------------
    An official venue: everything Clean Bank, no Rep, no heat. Events with class rules and a buy-in at the start line
    (after scrutineering), prize money by the street races' daily tiers, a prize car once; track sessions with lap
@@ -62292,6 +62497,63 @@ class OffroadPark extends OfficialVenue {
       const [k, id] = act.split(':');
       if (k === 'buy') { const r = PM.buy('offroad'); C2.refreshSvc(r || 'The Cedar Fields compound is yours.'); return; }
       if (k === 'ev') { const e = OR_EVENTS.find(x => x.id === id); if (e) this.enter(e); return; }
+      if (k === 'day') { C2.refreshSvc(this.book() || 'Session booked.'); return; }
+    });
+  }
+}
+/* =====================================================================
+   [UNDERWORLD] SOUTHSHORE RACEWAY (owner, 2026-11-18; world: 129b)
+   The island's second circuit, an OfficialVenue like Valen Point and
+   Cedar Fields: Clean Bank, no Rep, never any heat.
+   - The Race Office in the paddock: three official events with class
+     rules by the car's worth, a buy-in from the bank and prize money
+     by the same daily tiers as every other race; timed laps on the
+     circuit (a session fee, free for the owner: a private session).
+   - The raceway is a property of its own (no Rank gate, Clean Bank):
+     its nine pit garages hold eighteen of the owner's cars (the
+     registry's physical spaces), and the owner races free.
+   ===================================================================== */
+const SR_EVENTS = [
+  { id: 'sr_hatch', name: 'Hot Hatch Trophy', laps: 3, opp: 5, band: [0, 18000], fee: 200, reward: 2200, cls: ['compact', 'apex', 'sedan', 'crest'], blurb: 'Hatchbacks and saloons worth under $18,000. Three laps, elbows out.' },
+  { id: 'sr_touring', name: 'Touring Cup', laps: 4, opp: 5, band: [14000, 50000], fee: 900, reward: 6500, cls: ['sports', 'tempest', 'muscle', 'hellion', 'revenant'], blurb: 'Sports cars and muscle, $14,000 to $50,000. Four laps of the hairpin.' },
+  { id: 'sr_gt', name: 'Southshore GT', laps: 5, opp: 5, band: [45000, Infinity], fee: 2500, reward: 14000, cls: ['supercar', 'valkyr', 'obsidian', 'coupe', 'monarch'], blurb: 'The quick stuff, $45,000 and up. Five laps, flat out down the back straight.' }
+];
+for (const e of SR_EVENTS) { e.circuit = true; e.official = true; e.rep = 0; e.venue = 'sr'; }
+// prices (provisional, like the other venues': ECONOMY.md): a session on the circuit
+const SR_PARK = { trackDay: 200, session: 600, minHp: 60 };
+const RACE_OFFICE = { id: 'raceoffice', name: 'Race Office' };
+// the circuit's safe speeds: tarmac corners (√(8·R)), 58 m/s at most, braking back at 7 m/s²
+function srSafeSpeeds() { const T = game.world.sr.track; return T._vs || (T._vs = loopSafeSpeeds(T, 8, 58, 7)); }
+class RacewayPark extends OfficialVenue {
+  constructor(g) {
+    super(g, { key: 'raceway', prop: 'raceway', events: SR_EVENTS, park: SR_PARK, office: RACE_OFFICE, chip: 'SOUTHSHORE · official', waive: true, wonAt: 'won at Southshore', repairHint: '',
+      line: () => { const sr = game.world.sr; return { T: sr.track, sf: sr.sf, w: SR.w }; } });
+  }
+  safeSpeeds() { return srSafeSpeeds(); }
+  door() { const pl = this.g.world.places.raceway; return pl ? pl.door : null; }
+  findAction() {
+    const g = this.g, p = g.player, d = this.door();
+    if (!d || p.state !== 'foot' || p.interior) return null;
+    if (Math.hypot(p.pos.x - d.x, p.pos.z - d.z) > 2.6) return null;
+    return { label: 'Race Office · Southshore Raceway', act: () => this.openOffice() };
+  }
+  openOffice() {
+    const g = this.g, C2 = g.content, PM = g.uw.props, def = PROP_BY_ID.raceway;
+    const render = () => {
+      const own = this.owned(), s = this.s;
+      let h = `<div class="svcTop"><span>${own ? 'Yours' : 'For sale · ' + fmtMoney(PM.price(def))}</span><span>Lap record <b>${s.best ? fmtRace(s.best.t) : '—'}</b></span><span>${Money.html('trackFee')}</span></div>`;
+      if (!own) h += `<div class="card"><div class="t">Buy the raceway</div><div class="d">${esc(def.desc)}</div><button class="sbtn gold" data-act="buy" ${Money.can(PM.price(def), 'property') ? '' : 'disabled'}>Buy · ${fmtMoney(PM.price(def))}</button></div>`;
+      h += '<h3>Official events</h3><div class="grid2">' + SR_EVENTS.map(e => {
+        const p = this.payout(e, 1), f = this.fee(e), band = e.band[1] === Infinity ? fmtMoney(e.band[0]) + ' and up' : fmtMoney(e.band[0]) + '–' + fmtMoney(e.band[1]);
+        return `<div class="card"><div class="t">${esc(e.name)}</div><div class="d">${esc(e.blurb)}</div><div class="stat"><span>Class</span><span>${band}</span></div><div class="stat"><span>Entry</span><span>${f ? fmtMoney(f) : 'free'}</span></div><div class="stat"><span>Prize</span><span>${fmtMoney(p.cash)}</span></div><button class="sbtn" data-act="ev:${e.id}">Enter · ${e.laps} laps</button></div>`;
+      }).join('') + '</div>';
+      h += `<h3>On the circuit</h3><div class="btns"><button class="sbtn" data-act="day" ${this.session ? 'disabled' : ''}>${own ? 'Private session (free)' : 'Timed laps · ' + fmtMoney(SR_PARK.trackDay)}</button></div>`;
+      return h;
+    };
+    C2.openSvc('Race Office', 'Clerk of the course: “Official means clean. The bank pays, the bank collects, and nobody here calls the police on you.”', render, act => {
+      const [k, id] = act.split(':');
+      if (k === 'buy') { const r = PM.buy('raceway'); C2.refreshSvc(r || 'Southshore Raceway is yours.'); return; }
+      if (k === 'ev') { const e = SR_EVENTS.find(x => x.id === id); if (e) this.enter(e); return; }
       if (k === 'day') { C2.refreshSvc(this.book() || 'Session booked.'); return; }
     });
   }
@@ -66019,7 +66281,7 @@ class EmpireUI {
     if (!full) return;
     const icon = (x, z, col, txt) => { const [mx, mz] = ui._mapXY(x, z); c.fillStyle = col; c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.rect(mx - 9, mz - 9, 18, 18); c.fill(); c.stroke(); c.fillStyle = '#111'; c.font = 'bold 12px Arial'; c.textAlign = 'center'; c.fillText(txt, mx, mz + 4); };
     for (const L of uw.locs) {
-      if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : 'W');
+      if (L.kind === 'prop') icon(L.x, L.z, uw.props.owned(L.id) ? '#8fe39b' : '#e8eef6', L.def.kind === 'business' ? 'B' : L.def.kind === 'safehouse' ? 'H' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : L.def.kind === 'raceway' ? 'R' : 'W');
       else if (L.kind === 'hq' && !S.factions[L.id].broken) icon(L.x, L.z, FACTIONS[L.id].col, '♛');
       else if (L.kind === 'spot' && L.def.bank) { if (this.g.save.discovered.zones[L.zone]) icon(L.x, L.z, '#ffd84d', 'K'); }
       else if (L.kind === 'spot') icon(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), L.def.chop ? 'C' : L.def.arms ? 'A' : L.def.fixer ? 'L' : 'S');
@@ -68937,6 +69199,8 @@ class UIManager {
       const cp = this.g.world.isle.sites.carpark; R4(cp.x0, cp.z0, cp.x1, cp.z1, '#55585e');
     }
     if (inV(G.x0, G.z0, G.x1, G.z1)) { R4(G.strip.x0, G.strip.z - G.strip.w / 2, G.strip.x1, G.strip.z + G.strip.w / 2, '#3d3f44'); R4(G.lot.x0, G.lot.z0, G.lot.x1, G.lot.z1, '#4a4d52'); g.fillStyle = '#4a4d52'; g.beginPath(); g.arc(X(G.pad.x), X(G.pad.z), G.pad.r * k, 0, 7); g.fill(); }
+    // Southshore Raceway (129b)
+    if (this.g.world.paintRaceway) this.g.world.paintRaceway(g, X, k, view);
     g.lineCap = 'round'; g.lineJoin = 'round';
     for (const R of Island.roads) for (const [k0, k1, x0, z0, x1, z1] of R.mapChunks) {
       if (!inV(x0, z0, x1, z1)) continue;
@@ -69392,7 +69656,7 @@ class UIManager {
     const bs = 9 * (W / 380) * 1.6;
     { const cs = g.world.places.chopshop, pd = g.world.places.police.door; if (cs) badge(cs.door.x, cs.door.z, MAP_CATS.chop.col, 'C', bs, false); badge(pd.x, pd.z, MAP_CATS.police.col, 'P', bs, false); }
     for (const L of uw.locs) {
-      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
+      if (L.kind === 'prop') { if (uw.props.owned(L.id)) badge(L.x, L.z, '#8fe39b', L.def.kind === 'business' ? 'B' : L.def.kind === 'garage' ? 'G' : L.def.kind === 'motorsport' ? 'M' : L.def.kind === 'offroad' ? 'O' : L.def.kind === 'raceway' ? 'R' : 'H', bs, L.def.kind === 'safehouse'); else blip(L.x, L.z, '#e8eef6', 3, false, 'sq'); }
       else if (L.kind === 'hq' && !uw.S.factions[L.id].broken) blip(L.x, L.z, FACTIONS[L.id].col, 5, false, 'sq');
       else if (L.kind === 'spot' && L.def.bank) { if (g.save.discovered.zones[L.zone]) badge(L.x, L.z, MAP_CATS.bank.col, 'K', bs, false); }
       else if (L.kind === 'spot') blip(L.x, L.z, '#' + new THREE.Color(L.col).getHexString(), 4, false, 'sq');
@@ -69563,7 +69827,7 @@ class MapView {
       if (L.kind === 'prop') {
         const d = L.def, own = uw.props.owned(d.id);
         const cat = own ? 'owned' : d.kind === 'business' ? 'business' : d.kind === 'garage' || d.kind === 'warehouse' ? 'garage' : 'home';
-        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
+        add({ key: 'prop:' + d.id, name: d.name, cat, icon: d.kind === 'business' ? 'B' : d.kind === 'garage' ? 'G' : d.kind === 'warehouse' ? 'W' : d.kind === 'motorsport' ? 'M' : d.kind === 'offroad' ? 'O' : d.kind === 'raceway' ? 'R' : 'H', col: own ? '#8fe39b' : undefined, x: L.x, z: L.z, prop: d, sub: own ? 'Yours' : fmtMoney(uw.props.price(d)) });
       } else if (L.kind === 'spot') {
         // suppliers are BUY points (teal ↓); the armorer sells guns and buys hardware (M13: he no longer sells it, so it can't be flipped at his counter)
         if (L.def.bank) { /* the banks list themselves once their district is known (BankSystem.mapEntries) */ }
@@ -70140,6 +70404,7 @@ class Game {
     this.quality = new QualityManager(this);
     // the island off the lattice (022/177): its ground, roads, bridge and tunnel, forests, the airfield's paint
     this.isleScene = new IslandScenery(this.outdoor, this.world, this);
+    this.srScene = new RacewayScenery(this.outdoor, this.world);
     this.vehicles = new VehicleManager(this);
     this.fleet = new IslandFleet(this);
     this.traffic = new TrafficManager(this);
@@ -70172,8 +70437,10 @@ class Game {
     this.motorsport = new MotorsportPark(this);
     // Session 6C: the Cedar Fields off-road park
     this.offroad = new OffroadPark(this);
+    // Southshore Raceway (129b, 509c)
+    this.raceway = new RacewayPark(this);
     // the Underworld bound the loaded save before these existed: house its cars and its impounded ones now
-    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset();
+    this.vreg.reset(); this.uniques.reset(); this.pinks.reset(); this.motorsport.reset(); this.offroad.reset(); this.raceway.reset();
     this.dealers = new DealerLots(this);
     this.entrances = new EntranceDressing(this); this.bizSigns = this.entrances;
     this.tutorial = new Tutorial(this);
@@ -70834,7 +71101,7 @@ class Game {
     this.props.cull(this.camera, this.frustum, rdt);
     U.uCam.value.copy(this.camera.position);
     this.content.update(dt, rdt);
-    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
+    if (this.state === 'playing') { this.doors.update(dt); this.vspaces.update(dt); this.vreg.update(dt); this.uniques.update(dt); this.impound.update(dt); this.hotwatch.update(dt); this.wash.update(dt); this.motorsport.update(dt); this.offroad.update(dt); this.raceway.update(dt); this.dealers.update(dt); this.entrances.update(dt); this.tutorial.update(dt); }
     this.uw.update(dt, rdt);
     this.mixAudio(rdt);
     this.ui.update(rdt);
@@ -71027,7 +71294,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
+    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, SR, SR_EVENTS, srTrackLine, inRaceway, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, MotorsportPark, VP_EVENTS, OffroadPark, OR_EVENTS, OR_PARK, cfsSafeSpeeds, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, VP_PARK, VP, VP_TRACK, VP_PIT, VP_SITE, vpTrackLine, vpCheckpoints, vpSafeSpeeds, inValenPoint, offCity, vpSide, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, CFS_COURSE, CFS_SITE, cfsCourseLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

@@ -53,6 +53,8 @@ Object.assign(World.prototype, {
     Island.addPad(VALEN_FIELD.x0, VALEN_FIELD.z0, VALEN_FIELD.x1, VALEN_FIELD.z1, VALEN_FIELD.y, 60);
     if (saltmarsh) Island.addPad(ISLE_JETTY.x0, ISLE_JETTY.z0, ISLE_JETTY.x1, ISLE_JETTY.z1, ISLE_JETTY.y, 5);
     // the new districts' lots and Villa Valen's grounds (128): planned against every road, levelled before the roads find their level
+    // Southshore Raceway's level site (129b)
+    this._racewayPad();
     const districtPlan = this._districtPlan(sitePad);
     Island.corePads();
     // the mansions' plots are levelled again, last, so no later level ground (a precinct's edge, a lot) eats into them;
@@ -313,6 +315,8 @@ Object.assign(World.prototype, {
       folk('firehouse', 160, -127, [[ISLE_FIRE.x0 + 17, ISLE_FIRE.z0 + 20, -1.57], [ISLE_FIRE.x0 + 18, ISLE_FIRE.z0 + 34, -1.57]]);
       folk('gull', -1290, -2265, [[-1282, -2264, 0.5], [-1330, -2262, 2.0], [-1240, -2300, -0.8]]);
     }
+    // Southshore Raceway (129b)
+    this._genRaceway();
     // colliders for the island's blocks (the city's and Valen Point's loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });

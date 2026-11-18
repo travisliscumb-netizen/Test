@@ -182,16 +182,12 @@ const SUPERBLOCKS = [
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
 ];
 // the organic downtown (owner, 2026-11-18): lattice segments given over to people. Each is a short street closed to
-// traffic and paved across (123 dresses it): a cobbled mews in the Old Quarter, a square in the commercial core, a
-// working yard on the port strip. Like a superblock's, a closure turns the crossroads at its two ends into
+// traffic and paved across (123 dresses it): a working yard on the port strip (the financial
+// core keeps its grid whole, and the Old Quarter is rebuilt on its own streets, 124). Like a superblock's, a closure turns the crossroads at its two ends into
 // T-junctions; it never touches a precinct's edge street, a race line, a door, a home or a flat (the organic suite
 // checks all of it). a: 0 the north-south street x = i*P, segment j (z from j*P); 1 the east-west street z = i*P,
 // segment j (x from j*P). Lattice numbers: these precincts stand at offset 0 under every layout that ships.
 const CITY_CLOSED = [
-  { a: 0, i: 5, j: 4, name: 'Exchange Square', kind: 'plaza' },
-  { a: 1, i: 6, j: 4, name: 'Assay Walk', kind: 'plaza' },
-  { a: 1, i: 7, j: 7, name: 'Ledger Square', kind: 'plaza' },
-  { a: 1, i: 5, j: 7, name: 'Bourse Court', kind: 'plaza' },
   { a: 1, i: 1, j: 11, name: 'Saltworks Yard', kind: 'yard' },
   { a: 1, i: 5, j: 11, name: 'Pier Yard', kind: 'yard' }
 ];
