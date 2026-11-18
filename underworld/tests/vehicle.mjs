@@ -56,7 +56,9 @@ const outA = await ev(() => {
   const g = window.game, s = g.save, R = g.vreg, e = s.garage.find(x => x.uid === window.__A), bay = R.bayPos(e);
   g.resetPlayerState(bay.x + 4, bay.z + 4, 0); window.__tick(2);
   const v = R.live(e); g.completeEnter(v);
-  v.pos.x += 30; v.pos.z += 0; v.syncMesh(0); window.__tick(2);
+  // parked at a real kerb 30 m or so along (an arbitrary point can be inside a building, and the registry then rightly
+  // moves the car out to the kerb on the next spawn)
+  const k = window.__pv.kerbSpot(g.world, v.pos.x + 30, v.pos.z); v.pos.x = k.x; v.pos.z = k.z; v.h = k.h; v.syncMesh(0); window.__tick(2);
   g.exitVehicle(true); window.__tick(1);
   const pc = g.vehicles.spawn('coupe', bay.x, bay.z, bay.h, { parked: true });
   const offer = g.uw.props.nearFreeBay(bay.x, bay.z, bay.y ?? 0);
