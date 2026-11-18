@@ -14,6 +14,7 @@ const RG_EPS = 0.75, RG_CELL = 16;
 // road kinds: 'grid' (a lattice segment or part of one), 'link' (a curved through-road), 'spur' (a road with a
 // free end: the causeway, the land bridge track), 'ext' (an extension's own routes), 'loop' (a circuit or course)
 const RG_STREETS = new Set(['grid', 'link', 'spur', 'ext']);
+const RG_LINKS = new Set(['link']);
 const RoadGraph = {
   ready: false, nodes: [], edges: [], segAtt: new Map(),
   _cells: new Map(), _segE: null, _segK: null, _stamp: null, _q: 0,

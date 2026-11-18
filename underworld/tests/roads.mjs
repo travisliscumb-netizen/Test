@@ -23,7 +23,7 @@ const geo = await ev(() => {
     return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || (e.onLink ? w.links.some(M => M !== L && M.name === e.onLink && M.pts.some((q, k) => k < M.pts.length - 1 && Math.hypot(q[0] - e.C.x, q[1] - e.C.z) < M.len)) : P.RoadNet.segOpen(e.axis, e.line, e.seg))), cross: L.ends.map(e => e.C ? Math.round(e.C.x) + ',' + Math.round(e.C.z) : ''), pre: L.ends.map(e => { const p = e.C && P.CityLayout.at(e.C.x, e.C.z); return p ? p.ox + ',' + p.oz : null; }) };
   });
   // the lattice: exactly the segments the superblocks close, nothing else
-  let expect = 0; for (const sb of P.SUPERBLOCKS) expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
+  let expect = P.CITY_CLOSED.length; for (const sb of P.SUPERBLOCKS) expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
   out.closed = P.RoadNet.closed.size; out.expect = expect;
   const CL = P.CityLayout, n0 = CL.nodeLat(0, 0), n1 = CL.nodeLat(12, 12); // the lattice's far corners, wherever the layout puts them
   out.path = P.RoadNet.path(n0.ox, n0.oz, 12 + n1.ox, 12 + n1.oz).length;
@@ -39,16 +39,17 @@ const geo = await ev(() => {
   return out;
 });
 const names = geo.links.map(l => l.name);
-// a name appears twice only for a street that carries on across a lattice street (its two halves meet at one crossing)
+// a name appears more than once only for a street that carries on across lattice streets (each piece meets the next at
+// one crossing: Saint Ivo Lane runs three blocks)
 // or through a district's streets (the Coast Highway through Crestmoor Heights and Greenway: both halves end on
 // precincts that stand together)
 const halves = (m, o) => m.cross.some(c => c && o.cross.includes(c)) || m.pre.some(p => p && o.pre.includes(p));
-const dupOk = geo.links.every(l => { const same = geo.links.filter(m => m.name === l.name); return same.length === 1 || same.length === 2 && halves(same[0], same[1]); });
+const dupOk = geo.links.every(l => { const same = geo.links.filter(m => m.name === l.name); return same.length === 1 || same.every(m => same.some(o => o !== m && halves(m, o))); });
 check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends (and the Curved Roads pass’s streets)', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend', 'Saltmarsh Way', 'Kiln Lane', 'Tanner’s Row', 'Farm Track'].every(n => names.includes(n)) && dupOk, JSON.stringify(names));
 check('they are smooth splines (samples every ~2.5 m, no kink sharper than 10°)', geo.links.every(l => l.n >= l.len / 3 && l.maxTurn < 0.175), JSON.stringify(geo.links.map(l => [l.name, l.n, Math.round(l.len), +l.maxTurn.toFixed(3)])));
 check('one polyline: what the ground paints and the maps draw is what traffic and GPS follow', geo.links.every(l => l.same) && geo.offRaster === 0, JSON.stringify(geo.offRaster));
 check('each end meets an open lattice road or another curved road (a spur’s far end is its turning circle)', geo.links.every(l => l.ends.every(Boolean)), JSON.stringify(geo.links.filter(l => !l.ends.every(Boolean)).map(l => l.name)));
-check('the lattice graph is unchanged (only superblock closures)', geo.closed === geo.expect && geo.path > 1, JSON.stringify([geo.closed, geo.expect, geo.path]));
+check('the lattice graph is unchanged (only the superblocks’ closures and the organic downtown’s squares and mews)', geo.closed === geo.expect && geo.path > 1, JSON.stringify([geo.closed, geo.expect, geo.path]));
 
 // ---------------------------------------------------------------- 2. traffic on the curves
 const trafficOn = await ev(async () => {

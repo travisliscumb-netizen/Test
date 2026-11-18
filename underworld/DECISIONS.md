@@ -97,3 +97,24 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
 - The sea is shallow physics (you wade to 1.25 m, a car bogs down); an aircraft that comes down in it is lost.
 - The racetrack was already there (Valen Point): it gained a chicane, a grid and race cars; the proving ground and
   the airport's 1.5 km runway are where a car's top speed is found.
+
+## The organic downtown (owner, 2026-11-18)
+- The owner asked for the central grid (the Old Quarter, Linden Hills, the commercial core, Diner Row and the port
+  strip) to read as a city that grew, its gameplay unchanged. Of the three ways offered (an organic overlay on the
+  lattice, a true warp of the lattice, the map redrawn alone) the owner chose the overlay. The 80 m lattice stays the
+  address system and the backbone every AI drives on.
+- What was laid: 24 curved pieces forming 17 named streets, built with the Curved Roads machinery (122). They are
+  winding lanes and a crescent through the Old Quarter's courtyards, with Saint Ivo Lane running three blocks. There is
+  a diagonal avenue, Glass Mile, across three blocks of the core, plus Diner Row's crescent and lane, and works roads
+  on the port strip. Eight lattice segments were closed to traffic (CITY_CLOSED, 020; dressed by 123): mews in the
+  Old Quarter, squares in the core and yards on the port strip. Each turns its crossroads into T-junctions; a closure
+  on an edge street leaves that street running straight on.
+- Rules kept (the organic suite checks them):
+  - No closure is on a race line or a precinct's edge street.
+  - No road crosses a door, garage, place, home or flat, and every POI stands where it did.
+  - Every block keeps two open sides.
+  - Each district keeps its density: the owner allowed filler buildings to go, but the lanes are lined with new
+    frontage (`_laneFrontage`), so no district lost any. The building counts are now core 210 (was 207), Old Quarter
+    172 (168), Linden Hills 139 (137) and the port 41 (36).
+- The organic Linden Hills streets (bends and crescents) were already organic and are untouched. So are Crestmoor,
+  Midtown, Linden Gardens, Cedar Fields and Southport.

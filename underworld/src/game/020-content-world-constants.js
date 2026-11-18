@@ -50,10 +50,13 @@ function streetNameAt(x, z) {
   const p = CityLayout.at(x, z);
   if (p) {
     const I = Math.round(x / P), J = Math.round(z / P), i = I - p.ox, j = J - p.oz;
+    const cl = cityClosedAt(x - p.ox * P, z - p.oz * P); if (cl) return cl.name;
     const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1, onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1;
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
+    // a curved street through the blocks (a lane, a crescent, an avenue): its own name
+    if (RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
   }
   if (x > VP_EDGE + ROAD_HALF && vpCauseway(x, z)) return 'Valen Point Causeway';
   if (vpLand(x, z)) return VP.name;
@@ -172,6 +175,32 @@ const SUPERBLOCKS = [
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
 ];
+// the organic downtown (owner, 2026-11-18): lattice segments given over to people. Each is a short street closed to
+// traffic and paved across (123 dresses it): a cobbled mews in the Old Quarter, a square in the commercial core, a
+// working yard on the port strip. Like a superblock's, a closure turns the crossroads at its two ends into
+// T-junctions; it never touches a precinct's edge street, a race line, a door, a home or a flat (the organic suite
+// checks all of it). a: 0 the north-south street x = i*P, segment j (z from j*P); 1 the east-west street z = i*P,
+// segment j (x from j*P). Lattice numbers: these precincts stand at offset 0 under every layout that ships.
+const CITY_CLOSED = [
+  { a: 0, i: 1, j: 4, name: 'Bell Passage', kind: 'mews' },
+  { a: 1, i: 7, j: 2, name: 'Chandler’s Yard', kind: 'mews' },
+  { a: 0, i: 5, j: 4, name: 'Exchange Square', kind: 'plaza' },
+  { a: 1, i: 6, j: 4, name: 'Assay Walk', kind: 'plaza' },
+  { a: 1, i: 7, j: 7, name: 'Ledger Square', kind: 'plaza' },
+  { a: 1, i: 5, j: 7, name: 'Bourse Court', kind: 'plaza' },
+  { a: 1, i: 1, j: 11, name: 'Saltworks Yard', kind: 'yard' },
+  { a: 1, i: 5, j: 11, name: 'Pier Yard', kind: 'yard' }
+];
+// the closure whose paved strip (its carriageway and both pavements, between the cross streets) holds the lattice
+// point (lx, lz), or null
+function cityClosedAt(lx, lz) {
+  const W = ROAD_HALF + WALK_W;
+  for (const c of CITY_CLOSED) {
+    const u = c.a === 0 ? lx : lz, v = c.a === 0 ? lz : lx;
+    if (Math.abs(u - c.i * P) < W && v > c.j * P + ROAD_HALF && v < (c.j + 1) * P - ROAD_HALF) return c;
+  }
+  return null;
+}
 function superblockAt(bx, bz) { for (const sb of SUPERBLOCKS) if (bx >= sb.bx0 && bx <= sb.bx1 && bz >= sb.bz0 && bz <= sb.bz1) return sb; return null; }
 const RoadNet = {
   // closed: the lattice's own segments a superblock swallows (lattice numbers, as authored). open: every street
@@ -187,6 +216,7 @@ const RoadNet = {
       for (let i = sb.bx0 + 1; i <= sb.bx1; i++) for (let j = sb.bz0; j <= sb.bz1; j++) this.closed.add(this.key(0, i, j));
       for (let j = sb.bz0 + 1; j <= sb.bz1; j++) for (let i = sb.bx0; i <= sb.bx1; i++) this.closed.add(this.key(1, j, i));
     }
+    for (const c of CITY_CLOSED) this.closed.add(this.key(c.a, c.i, c.j));
   },
   // the world's street segments from the active layout (CityLayout.use calls this)
   layout() {
