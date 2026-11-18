@@ -78,7 +78,11 @@ check('a threat starts as a message warning with about two minutes on the clock'
 const tick = async (setup, ms, teardown) => {
   await ev(setup || (() => {}));
   const snap = () => ev(() => { const uw = window.game.uw; return { left: uw.S.threats.list.find(o => o.id === window.__th).left, t0: uw.threats.t0 }; });
-  const a = await snap(); await new Promise(r => setTimeout(r, ms)); const z = await snap();
+  // software GL runs a few frames a second with frames up to ~2 s, so a fixed window can hold almost no frames:
+  // wait at least ms, and (for a counting clock) until the threat system's own updates span over 1.5 s
+  const a = await snap(); const tEnd = Date.now() + ms; let z;
+  const enough = () => z.t0 - a.t0 >= 1500 || Date.now() > tEnd + 30000 || (z.t0 === a.t0 && Date.now() > tEnd + 5000);
+  do { await new Promise(r => setTimeout(r, 250)); z = await snap(); } while (Date.now() < tEnd || !enough());
   await ev(teardown || (() => {}));
   return { ran: +(a.left - z.left).toFixed(3), wall: +((z.t0 - a.t0) / 1000).toFixed(3) };
 };
@@ -100,11 +104,12 @@ check('Messages lists it first (CRITICAL) with its clock; opening it routes you 
 const s0 = await ev(() => { const g = window.game, uw = g.uw, o = uw.S.threats.list.find(x => x.id === window.__th); o.left = 37.5; g.save.stats.playTime = Math.max(g.save.stats.playTime, 120); g.saveGame(true); return { ...o, n: uw.threats.open().length }; });
 await page.reload(); await page.waitForFunction(() => window.__pvBooted === true, null, { timeout: 180000 });
 await ev(() => window.game.quality.setMode(0));
+const tGo = await ev(() => performance.now());
 await page.click('#btnContinue'); await page.waitForFunction(() => window.game.state === 'playing' && !window.game.fading, null, { timeout: 90000 });
-await ev(() => window.game.pause());
+const played = await ev(t => { window.game.pause(); return (performance.now() - t) / 1000; }, tGo);
 await helpers();
 const s1 = await ev(id => { const uw = window.game.uw, o = uw.S.threats.list.find(x => x.id === id); const dup = uw.threats.create(o.fid, o.kind, o.target, 2); for (let k = 0; k < 6; k++) uw.threats.tickDay(false); return { o: { ...o }, n: uw.threats.open().length, same: uw.threats.open().filter(x => x.key === o.key).length, dup: dup === null }; }, s0.id);
-check('save → reload: the threat is still there with the same clock, strength and dice', s1.o.state === 'imminent' && Math.abs(s1.o.left - 37.5) < 0.6 && s1.o.power === s0.power && s1.o.roll === s0.roll && s1.o.opened, JSON.stringify({ s0, s1 }));
+check('save → reload: the threat is still there with the same clock, strength and dice', s1.o.state === 'imminent' && s1.o.left <= 37.5 + 1e-6 && s1.o.left >= 37.5 - played - 0.05 && s1.o.power === s0.power && s1.o.roll === s0.roll && s1.o.opened, JSON.stringify({ s0, s1, played }));
 check('…and a reload or new days never stack a second threat on the same asset', s1.dup && s1.same === 1, JSON.stringify(s1));
 await ev(() => window.game.resume());
 

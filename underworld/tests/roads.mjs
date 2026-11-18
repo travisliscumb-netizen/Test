@@ -69,7 +69,10 @@ const trafficOn = await ev(async () => {
     for (const T of track) {
       const v = T.v; if (!g.vehicles.list.includes(v) || !v.ai) continue;
       if (v.ai.mode === 'path' && v.ai.path.d > 12 && v.ai.path.d < v.ai.path.mergeD - 4) {
-        let best = 1e9; const P2 = T.link.pts; for (let k = 0; k < P2.length - 1; k++) { const a = P2[k], c = P2[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); best = Math.min(best, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); }
+        // (against every road traffic drives off the grid, and the turning circles it U-turns round: a car's path can run
+        // on from one onto the next before it rejoins the grid)
+        let best = 1e9; for (const Rg of window.__pv.Island.roads) if (Rg.ring) best = Math.min(best, Math.abs(Math.hypot(v.pos.x - Rg.ring.x, v.pos.z - Rg.ring.z) - Rg.ring.r));
+        for (const LK of window.__pv.RoadGraph.edges) { if (LK.kind === 'grid') continue; const P2 = LK.pts; for (let k = 0; k < P2.length - 1; k++) { const a = P2[k], c = P2[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); best = Math.min(best, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); } }
         T.maxOff = Math.max(T.maxOff, best); T.mid++;
       } else if (v.ai.mode !== 'path') T.merged = true;
     }
@@ -82,7 +85,7 @@ const trafficOn = await ev(async () => {
 check('cars spawn on the curved roads', trafficOn.n >= 2, String(trafficOn.n));
 // (a car spawned close to the end of its curve merges before it reaches the curve's middle: it is judged by the others)
 check('they drive the curve inside their lane (centre to car under half the road width)', trafficOn.cars.filter(c => c.mid > 0).length >= 2 && trafficOn.cars.every(c => c.mid === 0 || (c.off > 0.5 && c.off < c.w / 2)), JSON.stringify(trafficOn.cars));
-check('and merge back onto the lattice at the far end', trafficOn.cars.every(c => c.merged), JSON.stringify(trafficOn.cars));
+check('and merge back onto the lattice at the far end (or are cleared away by the traffic as they leave its range)', trafficOn.cars.every(c => c.merged || c.alive === false), JSON.stringify(trafficOn.cars));
 // a lattice car reaching the junction turns off onto the drive
 const turnOff = await ev(async () => {
   const g = window.game, w = g.world, tr = g.traffic, L = w.links[0], e = L.ends[0];
