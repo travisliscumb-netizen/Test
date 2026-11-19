@@ -81,7 +81,7 @@ check(`${s.id}: the GPS finds every door`, s.doors.every(d => d.gps), JSON.strin
   check(`${s.id}: its precinct (${s.precinct}) keeps its density`, s.bld >= (BEFORE[s.precinct] || 0), `${s.bld} buildings (before ${BEFORE[s.precinct]})`);
 }
 // ---- traffic: a lattice car turns into each district by a street's end on an edge street, drives the district's
-// streets in its lane and comes back out onto the lattice (three streets a district)
+// streets in its lane and comes back out onto the lattice or the island roads (three streets a district)
 const T = await page.evaluate(async () => {
   const g = window.game, w = g.world, tr = g.traffic, P = window.__pv, out = [];
   g.events.cool = 1e9; g.police.enabled = false; g.peds.target = 0;
@@ -93,7 +93,12 @@ const T = await page.evaluate(async () => {
       const e = L.ends.find(e2 => e2 && e2.axis >= 0); if (!e) continue;
       done.add(L.name);
       for (const v of tr.cars.slice()) g.vehicles.despawn(v);
-      g.resetPlayerState(e.C.x + (e.axis === 0 ? 30 : 0), e.C.z + (e.axis === 1 ? 30 : 0), 0);
+      // (the player off the carriageway: on the far pavement of the edge street, outside the district; no one on foot in
+      // the streets, the network is what is tested)
+      const offS = e.axis === 0 ? (e.C.x < (sb.bx0 + sb.bx1 + 1) * 40 ? -9 : 9) : 0, offZ = e.axis === 1 ? (e.C.z < (sb.bz0 + sb.bz1 + 1) * 40 ? -9 : 9) : 0;
+      g.resetPlayerState(e.C.x + offS, e.C.z + offZ, 0);
+      for (const pd of g.peds.peds.slice()) if (!pd.keep) { pd.dead = true; }
+      g.peds.peds = g.peds.peds.filter(pd => pd.keep);
       await new Promise(r => { const f0 = g.frame; const iv = setInterval(() => { if (g.frame > f0 + 5) { clearInterval(iv); r(); } }, 20); });
       let v = null; for (let k = 0; k < 80 && !v; k++) { v = tr.trySpawn(); if (v && (v.patrol || v.ai.mode !== 'lane')) { g.vehicles.despawn(v); v = null; } }
       if (!v) { out.push({ sb: sb.id, name: L.name, err: 'spawn' }); continue; }
@@ -102,26 +107,35 @@ const T = await page.evaluate(async () => {
       Object.assign(v.ai, { i: e.axis === 0 ? e.line : e.seg, j: e.axis === 0 ? e.seg : e.line, dx: dir[0], dz: dir[1], s: Math.max(4, e.along - 32), mode: 'lane', next: null, linkSeen: 0, speed: 8 });
       const lp = tr.lanePt(v.ai.i, v.ai.j, dir[0], dir[1], v.ai.s); v.pos.x = lp[0]; v.pos.z = lp[1]; v.h = Math.atan2(dir[0], dir[1]);
       tr.target = 1; tr.linkChance = 1;
-      let took = false, merged = false, maxOff = 0; const t0 = g.time;
+      let took = false, merged = false, maxOff = 0, wasIn = false, outT = 0, via = null;
+      // (stepped, not waited for: 150 s of game time in 0.05 s steps, whatever the frame rate)
       try {
-        await new Promise(res => { const iv = setInterval(() => {
-          if (!v.ai) { clearInterval(iv); res(); return; }
-          // (once it has turned in, it is kept: the traffic recycles a car far from the player, never a mission's, 280;
-          // a mission car takes no turn off the lattice, so it is marked only after it has)
+        for (let k = 0; k < 3000 && v.ai && !merged; k++) {
+          g.update(0.05, 0.05);
+          if (!v.ai) break;
           if (v.ai.mode === 'path') {
             took = true; v.mission = v.mission || 'test';
             // off its lane: the distance to the nearest street's centre line against that street's half width
-            const q = P.RoadGraph.nearest(v.pos.x, v.pos.z, { maxD: 30 }); if (q) maxOff = Math.max(maxOff, q.d - q.e.w / 2);
-          } else if (took) merged = true;
-          if (merged || g.time - t0 > 150) { clearInterval(iv); res(); }
-        }, 30); });
+            // (inside the district: past its edge the car is out on the rest of the city's and the island's roads)
+            const ox2 = (P.CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * 80, oz2 = (P.CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * 80;
+            const inD = v.pos.x > sb.bx0 * 80 + ox2 && v.pos.x < (sb.bx1 + 1) * 80 + ox2 && v.pos.z > sb.bz0 * 80 + oz2 && v.pos.z < (sb.bz1 + 1) * 80 + oz2;
+            // (off the road surface: every road round it counts, a junction's and a cul-de-sac's turning circle too, 135)
+            if (inD && k % 4 === 0) maxOff = Math.max(maxOff, Math.min(30, P.RoadGraph.surfaceDist(v.pos.x, v.pos.z, { r: 30 })));
+            // out again: a street of the district that ends on an edge street running on into the island's roads keeps
+            // the car on its route past the edge; out of the district, on a road and driving, for two seconds, is out
+            if (inD) wasIn = true;
+            outT = wasIn && !inD && v.ai.speed > 2 && P.RoadGraph.surfaceDist(v.pos.x, v.pos.z, { r: 30 }) < 0.5 ? outT + 0.05 : 0;
+            if (outT >= 2) { merged = true; via = 'route'; }
+          } else if (took) { merged = true; via = 'lane'; }
+        }
       } finally { tr.linkChance = 0.4; tr.target = 18; if (v.mission === 'test') v.mission = null; }
-      out.push({ sb: sb.id, name: L.name, took, merged, over: +maxOff.toFixed(2), ...(merged ? {} : { at: v.ai ? [Math.round(v.pos.x), Math.round(v.pos.z)] : null, mode: v.ai && v.ai.mode, sp: v.ai && +v.ai.speed.toFixed(1) }) });
+      const pa = v.ai && v.ai.path, gt = pa && pa.gates[0];
+      out.push({ sb: sb.id, name: L.name, took, merged, via, over: +maxOff.toFixed(2), ...(merged ? {} : { at: v.ai ? [Math.round(v.pos.x), Math.round(v.pos.z)] : null, mode: v.ai && v.ai.mode, sp: v.ai && +v.ai.speed.toFixed(1), left: pa && Math.round(pa.len - pa.d), gate: gt ? { d: +(gt.d - pa.d).toFixed(1), rb: !!gt.rb, blocked: tr.gateBlocked(v, gt) } : null, near: g.vehicles.list.filter(o => o !== v && Math.hypot(o.pos.x - v.pos.x, o.pos.z - v.pos.z) < 14).map(o => [o.type, Math.round(o.pos.x - v.pos.x), Math.round(o.pos.z - v.pos.z), !!o.parked, o.ai ? o.ai.mode : null]), player: [Math.round(g.player.pos.x - v.pos.x), Math.round(g.player.pos.z - v.pos.z)] }) });
     }
   }
   return out;
 });
-check('traffic turns into every rebuilt district, keeps to the streets and comes back out onto the lattice', T.length >= 3 && T.every(t => t.took && t.merged && t.over < 0.5), JSON.stringify(T));
+check('traffic turns into every rebuilt district, keeps to the streets and comes back out (onto the lattice, or on its route onto the island roads)', T.length >= 3 && T.every(t => t.took && t.merged && t.over < 0.5), JSON.stringify(T));
 // ---- the city's roundabouts (a rebuilt district's rings: Exchange Circus): one way round in the graph and the GPS,
 // and traffic that goes round them with no deadlock, nobody the wrong way, nobody through anybody
 const RBS = await page.evaluate(async () => {
@@ -136,16 +150,16 @@ const RBS = await page.evaluate(async () => {
     for (const v of g.traffic.cars.slice()) g.vehicles.despawn(v);
     g.resetPlayerState(RB.x + 60, RB.z + 60, 0); g.traffic.target = 30; g.traffic.linkChance = 1;
     const band = v => Math.abs(Math.hypot(v.pos.x - RB.x, v.pos.z - RB.z) - RB.r) < RB.w / 2 + 0.5, still = new Map(), seen = new Set();
-    let right = 0, wrongWay = 0, stuck = 0, over = 0;
+    const ex = []; let right = 0, wrongWay = 0, stuck = 0, over = 0;
     for (let k = 0; k < 150 * 20; k++) {
       g.update(0.05, 0.05);
       for (const v of g.traffic.cars) {
         const sv = v.speed < 0.3 ? (still.get(v) || 0) + 0.05 : 0; still.set(v, sv); if (Math.hypot(v.pos.x - RB.x, v.pos.z - RB.z) < 80) stuck = Math.max(stuck, sv);
         if (band(v)) { seen.add(v); const a = Math.atan2(v.pos.z - RB.z, v.pos.x - RB.x), tx = Math.sin(a), tz = -Math.cos(a), vx = Math.sin(v.h) * v.speed, vz = Math.cos(v.h) * v.speed, vt = vx * tx + vz * tz, vr = vx * Math.cos(a) + vz * Math.sin(a); if (v.speed > 1.5 && Math.abs(vr) < 0.5 * Math.abs(vt)) { if (vt > 0) right++; else wrongWay++; } }
       }
-      if (k % 20 === 0) { const L = g.traffic.cars.filter(v => Math.hypot(v.pos.x - RB.x, v.pos.z - RB.z) < 80); for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (Math.hypot(L[i].pos.x - L[j].pos.x, L[i].pos.z - L[j].pos.z) < 1.6) over++; }
+      if (k % 20 === 0) { const L = g.traffic.cars.filter(v => Math.hypot(v.pos.x - RB.x, v.pos.z - RB.z) < 80); for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (Math.hypot(L[i].pos.x - L[j].pos.x, L[i].pos.z - L[j].pos.z) < 1.6) { over++; if (ex.length < 6) { const f = v => [v.type, Math.round(v.pos.x - RB.x), Math.round(v.pos.z - RB.z), +v.speed.toFixed(1), v.ai && v.ai.mode, v.ai && v.ai.gateWait ? 1 : 0]; ex.push([k, f(L[i]), f(L[j])]); } } }
     }
-    out.push({ id: RB.id, edges: ring.length, loop, legs: legE.length, routes, ok, wrong, ring: seen.size, right, wrongWay, stuck: +stuck.toFixed(1), over });
+    out.push({ id: RB.id, edges: ring.length, loop, legs: legE.length, routes, ok, wrong, ring: seen.size, right, wrongWay, stuck: +stuck.toFixed(1), over, ...(over ? { ex } : {}) });
   }
   return out;
 });

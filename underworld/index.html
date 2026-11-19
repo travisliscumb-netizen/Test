@@ -41033,14 +41033,21 @@ Object.assign(World.prototype, {
   },
   // cars parked along a road's kerbs, nose to tail with it (clear of its two ends and of any other road)
   _kerbCars(b, rng, r, others) {
-    if (!r.park) return;
+    // (only where a parked car leaves the lane clear: a street of 11 m or more, the car's middle 1 m in from the kerb, the
+    // traffic's lane 2.6 m out from the centre line; not within 24 m of either end, where traffic turns in across the
+    // kerb, and not on a bend, whose lane cuts in toward its inside kerb. On a narrower street a car parked there stood in
+    // the lane, and the traffic ran into it, 2026-11-19)
+    if (!r.park || r.w < 11) return;
     const pts = r.pts, cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
     const L = cum[cum.length - 1];
-    for (const side of r.park) for (let d = 16; d < L - 16; d += 6.4) {
+    const headAt = dd => { let k = 0; while (k < pts.length - 2 && cum[k + 1] < dd) k++; return Math.atan2(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]); };
+    for (const side of r.park) for (let d = 24; d < L - 24; d += 6.4) {
       if (!rng.chance(0.55)) continue;
+      const bend = Math.abs(Math.atan2(Math.sin(headAt(d + 10) - headAt(d - 10)), Math.cos(headAt(d + 10) - headAt(d - 10))));
+      if (bend > 0.3) continue;
       let k = 0; while (k < pts.length - 2 && cum[k + 1] < d) k++;
       const a = pts[k], c = pts[k + 1], t = (d - cum[k]) / ((cum[k + 1] - cum[k]) || 1), tx = (c[0] - a[0]) / ((cum[k + 1] - cum[k]) || 1), tz = (c[1] - a[1]) / ((cum[k + 1] - cum[k]) || 1);
-      const o = (r.w / 2 - 1.15) * side, x = a[0] + (c[0] - a[0]) * t - tz * o, z = a[1] + (c[1] - a[1]) * t + tx * o;
+      const o = (r.w / 2 - 1.0) * side, x = a[0] + (c[0] - a[0]) * t - tz * o, z = a[1] + (c[1] - a[1]) * t + tx * o;
       if (others.some(q => q !== r && polyDist(x, z, q.pts) < q.w / 2 + 4)) continue;
       // on the right-hand kerb a car faces the way the road runs; on the left, the other way (with the traffic)
       b.parked.push({ x, z, h: side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz), cls: null, kerb: true });
@@ -41622,9 +41629,9 @@ Object.assign(World.prototype, {
    ===================================================================== */
 // the streets, in lattice metres
 const OQ_STREETS = [
-  { name: 'Saint Ivo Street', w: 9, park: [1, -1], high: true, ctrl: [[100, 325.6], [104, 345], [96, 368], [84, 392], [86, 418], [102, 440], [118, 462], [122, 488], [112, 512], [104, 534], [110, 560], [122, 586], [126, 610], [120, 634.4]] },
-  { name: 'Market Street', w: 8, park: [1], high: true, fork: 0, near: [86, 422], ctrl: [[64, 430], [44, 427], [24, 431], [5.6, 436]] },
-  { name: 'Market Street', w: 8, park: [-1], high: true, fork: 0, near: [92, 378], ctrl: [[120, 372], [150, 366], [180, 372], [210, 380], [240, 386], [268, 390], [292, 384], [314.4, 378]] },
+  { name: 'Saint Ivo Street', w: 11.5, park: [1, -1], high: true, ctrl: [[100, 325.6], [104, 345], [96, 368], [84, 392], [86, 418], [102, 440], [118, 462], [122, 488], [112, 512], [104, 534], [110, 560], [122, 586], [126, 610], [120, 634.4]] },
+  { name: 'Market Street', w: 8, high: true, fork: 0, near: [86, 422], ctrl: [[64, 430], [44, 427], [24, 431], [5.6, 436]] },
+  { name: 'Market Street', w: 8, high: true, fork: 0, near: [92, 378], ctrl: [[120, 372], [150, 366], [180, 372], [210, 380], [240, 386], [268, 390], [292, 384], [314.4, 378]] },
   { name: 'Bell Lane', w: 7, fork: 2, near: [182, 372], ctrl: [[186, 356], [190, 340], [196, 325.6]] },
   { name: 'Cooper’s Walk', w: 7, fork: 0, near: [119, 470], ctrl: [[92, 482], [62, 492], [36, 506], [5.6, 518]] },
   { name: 'Chapel Lane', w: 7, fork: 4, near: [56, 494], ctrl: [[50, 512], [40, 532], [30, 560], [26, 596], [36, 634.4]] },
@@ -41668,7 +41675,7 @@ REBUILDS.oldquarter = {
 REBUILDS.linden = {
   name: 'Linden Hills',
   streets: [
-    { name: 'Linden Parade', w: 9, park: [1, -1], high: true, ctrl: [[100, 645.6], [96, 668], [84, 690], [72, 714], [70, 742], [72, 772], [78, 800], [96, 826], [116, 848], [124, 874.4]] },
+    { name: 'Linden Parade', w: 11.5, park: [1, -1], high: true, ctrl: [[100, 645.6], [96, 668], [84, 690], [72, 714], [70, 742], [72, 772], [78, 800], [96, 826], [116, 848], [124, 874.4]] },
     { name: 'Kestrel Curve', w: 7, res: true, fork: 0, near: [84, 690], ctrl: [[110, 688], [140, 692], [170, 702], [196, 718], [214, 744], [220, 772], [214, 800], [204, 822], [198, 846], [200, 874.4]] },
     { name: 'Millrace Lane', w: 7, res: true, fork: 1, near: [170, 702], ctrl: [[184, 684], [198, 664], [210, 645.6]] },
     { name: 'Willow Bend', w: 7, res: true, fork: 1, near: [214, 744], ctrl: [[232, 722], [256, 708], [284, 700], [314.4, 694]] },

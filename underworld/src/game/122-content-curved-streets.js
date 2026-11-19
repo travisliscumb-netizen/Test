@@ -201,14 +201,21 @@ Object.assign(World.prototype, {
   },
   // cars parked along a road's kerbs, nose to tail with it (clear of its two ends and of any other road)
   _kerbCars(b, rng, r, others) {
-    if (!r.park) return;
+    // (only where a parked car leaves the lane clear: a street of 11 m or more, the car's middle 1 m in from the kerb, the
+    // traffic's lane 2.6 m out from the centre line; not within 24 m of either end, where traffic turns in across the
+    // kerb, and not on a bend, whose lane cuts in toward its inside kerb. On a narrower street a car parked there stood in
+    // the lane, and the traffic ran into it, 2026-11-19)
+    if (!r.park || r.w < 11) return;
     const pts = r.pts, cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
     const L = cum[cum.length - 1];
-    for (const side of r.park) for (let d = 16; d < L - 16; d += 6.4) {
+    const headAt = dd => { let k = 0; while (k < pts.length - 2 && cum[k + 1] < dd) k++; return Math.atan2(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]); };
+    for (const side of r.park) for (let d = 24; d < L - 24; d += 6.4) {
       if (!rng.chance(0.55)) continue;
+      const bend = Math.abs(Math.atan2(Math.sin(headAt(d + 10) - headAt(d - 10)), Math.cos(headAt(d + 10) - headAt(d - 10))));
+      if (bend > 0.3) continue;
       let k = 0; while (k < pts.length - 2 && cum[k + 1] < d) k++;
       const a = pts[k], c = pts[k + 1], t = (d - cum[k]) / ((cum[k + 1] - cum[k]) || 1), tx = (c[0] - a[0]) / ((cum[k + 1] - cum[k]) || 1), tz = (c[1] - a[1]) / ((cum[k + 1] - cum[k]) || 1);
-      const o = (r.w / 2 - 1.15) * side, x = a[0] + (c[0] - a[0]) * t - tz * o, z = a[1] + (c[1] - a[1]) * t + tx * o;
+      const o = (r.w / 2 - 1.0) * side, x = a[0] + (c[0] - a[0]) * t - tz * o, z = a[1] + (c[1] - a[1]) * t + tx * o;
       if (others.some(q => q !== r && polyDist(x, z, q.pts) < q.w / 2 + 4)) continue;
       // on the right-hand kerb a car faces the way the road runs; on the left, the other way (with the traffic)
       b.parked.push({ x, z, h: side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz), cls: null, kerb: true });
