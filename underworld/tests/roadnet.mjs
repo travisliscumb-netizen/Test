@@ -268,12 +268,14 @@ const drive = await ev(() => {
     }
     return T;
   };
-  // police: a unit runs from Juniper St to a suspect on Tanner's Row (its route takes Saltmarsh Way? no: the shortest
+  // police: a unit runs from Linden's edge street to a suspect on Tanner's Row (its route takes Saltmarsh Way? no: the shortest
   // streets; through the Old Quarter it takes Tanner's Row's bends), at pursuit speed
   // (the half in the unit's own precinct: under island the far half is across the bay)
-  const CL = window.__pv.CityLayout, home = CL.near(237.4, 740), rows = window.__links('Tanner’s Row'), tq = (rows.find((L, k) => k === 1 && CL.near(L.pts[12][0], L.pts[12][1]) === home) || rows[0]).pts[12];
+  // (from Linden Hills' east edge street, x = 320: Juniper St, x = 240, ran through the blocks rebuilt on their own
+  // streets, 124c, 2026-11-19)
+  const CL = window.__pv.CityLayout, home = CL.near(317.4, 740), rows = window.__links('Tanner’s Row'), tq = (rows.find((L, k) => k === 1 && CL.near(L.pts[12][0], L.pts[12][1]) === home) || rows[0]).pts[12];
   g.resetPlayerState(tq[0], tq[1], 0); window.__step(4);
-  const cop = window.__aiCar('police', 237.4, 740, 0, 'pursue'); cop.siren = true;
+  const cop = window.__aiCar('police', 317.4, 740, 0, 'pursue'); cop.siren = true;
   cop.drive.cruise = 20; cop.drive.target = () => ({ x: tq[0], z: tq[1], speed: 20 });
   const T1 = run(cop, 70, () => Math.hypot(cop.pos.x - tq[0], cop.pos.z - tq[1]) < 12);
   out.police = { ...T1, d: Math.round(Math.hypot(cop.pos.x - tq[0], cop.pos.z - tq[1])), viaRow: cop.drive.path.some(p => window.__links('Tanner’s Row').some(L => L.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 3))) };

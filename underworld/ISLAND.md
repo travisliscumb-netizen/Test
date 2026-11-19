@@ -180,3 +180,38 @@ four games. Use reclaimed land only if nothing better exists.
 - **Money**: tickets and games are `fairTicket` / `fairGame`, paid from cash first, then the bank (`either`).
 - Tests: `tests/fair.mjs` (20 checks: the site, the coaster, every ride end to end, the karts, the games, save/reload).
 
+
+## 10. Roundabouts, island architecture and streaming (the world overhaul, 2026-11-19)
+- **Six roundabouts** (023), where the island's roads meet the districts, the logistics park, the Sound Flats and
+  the fair: Harbour Circus (314, 50), Gardens Circle (709, 872), Freight Circle (747, 1186), Longshore Circle
+  (760, 1330), Sound Circus (1298, 450) and Fairground Circle (2000, 2049). Each is placed where its roads already met,
+  and it moves only as far as needed to bring its legs in at least 15 m apart round the ring.
+- **How a ring is built.**
+  - Its ground is the last pad laid, at the level the ground already has there.
+  - Every road crossing its circle is cut into legs. Each leg ends exactly on a ring vertex, eases to the ring's
+    level over its last 25 m and keeps its road's name. A road cut at two rings has unique piece ids.
+  - The ring is a closed, one-way road, anticlockwise on the map (traffic keeps right).
+  - Road hosts are re-pointed at the right piece, and the ring is each leg's host.
+- **The road graph and the GPS** (135) take the ring as one-way edges. Routes only go the right way round.
+- **Traffic** (280):
+  - A car entering gives way at the ring's outer kerb to cars already going round. The gap needed is about 3 s at
+    their speed, and cars about to turn off at that very leg don't count.
+  - Once past the line a car is committed, so it never stops in the ring's way.
+  - Cars on the ring ignore only cars still short of their line.
+  - Highway cars look as far ahead as their stopping distance.
+- **The scenery** (128b, 177):
+  - A kerbed central island with planting and a tree.
+  - A give-way sign and two dashed give-way lines at each entry.
+  - "ROUNDABOUT" and name signs on each approach.
+  - Lane arrows 7 m and 25 m before every junction line on the island's roads.
+  - No stop line, arrow or centre line on the ring itself.
+- **Island architecture** (128b): district buildings get shopfront ground floors, awnings, signs, rooftops and fire
+  escapes. Street furniture along the streets includes hydrants, bins, benches, bus stops, name signs and highway
+  speed limits. It is kept off roads, runways, buildings and house drives. A row of mid-rise frontage faces each
+  precinct's edge street; these lots have no private parking.
+- **Streaming:** island terrain tiles and their meshes build a few milliseconds a frame (time-sliced generators,
+  022/177). A tile within 64 m of the player is urgent. The worst driving-route frame spikes fell from 513/289 ms to
+  96/45 ms.
+- **Sharpness:** dynamic resolution is now a last resort. It only trims on the Low preset, or on Medium after the
+  cooldown, never below 85% (610).
+- **Suite `roundabouts`**: the network, lanes, levels, legs, GPS, scenery and traffic at three rings.

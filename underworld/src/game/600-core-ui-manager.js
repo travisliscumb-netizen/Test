@@ -373,8 +373,11 @@ class UIManager {
       const key = ZONE_MAP[b.bz][b.bx], z = ZONES[key], bx = b.I, bz = b.J;
       g.fillStyle = z.col; g.globalAlpha = 0.09; g.fillRect(X(bx * P), X(bz * P), P * k, P * k); g.globalAlpha = 1;
       g.strokeStyle = z.col; g.globalAlpha = 0.55; g.lineWidth = 2;
-      if (zk(bx - 1, bz) !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X(bx * P), X((bz + 1) * P)); g.stroke(); }
-      if (zk(bx, bz - 1) !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X((bx + 1) * P), X(bz * P)); g.stroke(); }
+      // (no border between two cells of one superblock: a district rebuilt on its own streets is one place, and its
+      // cells' edges would draw the old grid back over its streets, 124)
+      const same = (I, J) => { const o = W0.blockW(I, J); return !!(o && b.superblock && o.superblock === b.superblock); };
+      if (zk(bx - 1, bz) !== key && !same(bx - 1, bz)) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X(bx * P), X((bz + 1) * P)); g.stroke(); }
+      if (zk(bx, bz - 1) !== key && !same(bx, bz - 1)) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X((bx + 1) * P), X(bz * P)); g.stroke(); }
       g.globalAlpha = 1;
     }
   }

@@ -15,6 +15,8 @@ const RG_EPS = 0.75, RG_CELL = 16;
 // free end: the causeway, the land bridge track), 'ext' (an extension's own routes), 'loop' (a circuit or course)
 const RG_STREETS = new Set(['grid', 'link', 'spur', 'ext']);
 const RG_LINKS = new Set(['link']);
+// the roads a street name is read from underfoot (streetNameAt, 020): a cul-de-sac (a spur) names itself too
+const RG_NAMED = new Set(['link', 'spur']);
 const RoadGraph = {
   ready: false, nodes: [], edges: [], segAtt: new Map(),
   _cells: new Map(), _segE: null, _segK: null, _stamp: null, _q: 0,
@@ -36,6 +38,8 @@ const RoadGraph = {
       const pts = L.pts.map(q => [q[0], q[1]]), e0 = L.ends[0], e1 = L.ends[1], last = pts[pts.length - 1];
       if (!e0.onLink && Math.hypot(pts[0][0] - e0.C.x, pts[0][1] - e0.C.z) > 0.01) pts.unshift([e0.C.x, e0.C.z]);
       if (!L.spur && !e1.onLink && Math.hypot(last[0] - e1.C.x, last[1] - e1.C.z) > 0.01) pts.push([e1.C.x, e1.C.z]);
+      // (a roundabout's ring, 023: closed and one-way, its pieces run the way the chain does)
+      if (L.closed) { const pr = L.pts.slice(0, -1).map(q => [q[0], q[1]]); chains.push({ pts: pr, closed: true, oneway: true, w: L.w, kind: 'link', name: L.name, link: L, st: 'asphalt', ring: null, traffic: true, roundabout: L.road.isle ? L.road.isle.roundabout : (L.road.roundabout || null) }); continue; }
       chains.push({ pts, w: L.w, kind: L.spur ? 'spur' : 'link', name: L.name, link: L, st: L.road.st || L.road.mat || 'asphalt', ring: L.spur ? L.ring : null, traffic: true });
     }
     for (const X of world.exts || []) {
@@ -123,7 +127,7 @@ const RoadGraph = {
         const cum = new Float64Array(P2.length);
         for (let k = 1; k < P2.length; k++) cum[k] = cum[k - 1] + Math.hypot(P2[k][0] - P2[k - 1][0], P2[k][1] - P2[k - 1][1]);
         const len = cum[P2.length - 1]; if (len < 0.05) return;
-        const e = { id: edges.length, a: A.node, b: B.node, pts: P2, cum, len, w: c.w, kind: c.kind, name: c.name, traffic: c.traffic, st: c.st || 'asphalt', ext: c.ext || null, link: c.link || null, lat: null };
+        const e = { id: edges.length, a: A.node, b: B.node, pts: P2, cum, len, w: c.w, kind: c.kind, name: c.name, traffic: c.traffic, st: c.st || 'asphalt', ext: c.ext || null, link: c.link || null, lat: null, oneway: !!c.oneway, roundabout: c.roundabout || null };
         if (c.lat) e.lat = { axis: c.lat.axis, line: c.lat.line, seg: c.lat.seg, a0: A.s * P, a1: (wrap ? B.s + n : B.s) * P };
         const u0 = [P2[1][0] - P2[0][0], P2[1][1] - P2[0][1]], m = P2.length, u1 = [P2[m - 1][0] - P2[m - 2][0], P2[m - 1][1] - P2[m - 2][1]], l0 = Math.hypot(u0[0], u0[1]) || 1, l1 = Math.hypot(u1[0], u1[1]) || 1;
         e.t0 = [u0[0] / l0, u0[1] / l0]; e.t1 = [u1[0] / l1, u1[1] / l1];
@@ -262,8 +266,9 @@ const RoadGraph = {
     const gx = g.x, gz = g.z, H = n => Math.hypot(n.x - gx, n.z - gz);
     const kinds = o.kinds || null, filter = o.filter || null, ok = e => (!kinds || kinds.has(e.kind)) && (!filter || filter(e));
     let best = Infinity, bestS = -2, bestTail = 0;
-    if (s.e === g.e) { const dir = g.along >= s.along ? 0 : 1; best = Math.abs(g.along - s.along) + hp(dir); bestS = -1; bestTail = dir; }
+    if (s.e === g.e) { const dir = g.along >= s.along ? 0 : 1; if (!(s.e.oneway && dir)) { best = Math.abs(g.along - s.along) + hp(dir); bestS = -1; bestTail = dir; } }
     for (const dir of [0, 1]) {
+      if (s.e.oneway && dir) continue;
       const st = s.e.id * 2 + dir, c = (dir ? s.along : s.e.len - s.along) + hp(dir);
       dist[st] = c; heap.push(st, c + H(dir ? s.e.a : s.e.b));
     }
@@ -273,10 +278,11 @@ const RoadGraph = {
       const e = E[st >> 1], dir = st & 1, n = dir ? e.a : e.b, c = dist[st];
       // reaching the goal's road from this node
       if (n === g.e.a) { const tot = c + this._turn(e, dir, g.e, 0, turnK) + g.along; if (tot < best) { best = tot; bestS = st; bestTail = 0; } }
-      if (n === g.e.b) { const tot = c + this._turn(e, dir, g.e, 1, turnK) + g.e.len - g.along; if (tot < best) { best = tot; bestS = st; bestTail = 1; } }
+      if (n === g.e.b && !g.e.oneway) { const tot = c + this._turn(e, dir, g.e, 1, turnK) + g.e.len - g.along; if (tot < best) { best = tot; bestS = st; bestTail = 1; } }
       for (const inc of n.edges) {
         const e2 = inc.e; if (!ok(e2)) continue;
         const dir2 = inc.end === 0 ? 0 : 1;
+        if (e2.oneway && dir2) continue; // (a roundabout's ring: one way round)
         let pen;
         if (e2 === e) { if (dir2 === dir || n.edges.length > 1) continue; pen = n.ring ? 6 : 25; } // a U-turn only at a dead end
         else pen = this._turn(e, dir, e2, dir2, turnK);
@@ -390,7 +396,9 @@ const RoadGraph = {
       const off = Math.min(LANE * 0.8, e.w / 4);
       for (let d = Math.min(e.len / 2, 8); d < e.len - 4; d += every) {
         const [x, z, tx, tz] = this.pointAt(e, d), h = Math.atan2(tx, tz);
-        out.push({ x: x - tz * off, z: z + tx * off, h, e }, { x: x + tz * off, z: z - tx * off, h: h + Math.PI, e });
+        out.push({ x: x - tz * off, z: z + tx * off, h, e });
+        // (a one-way road, a roundabout's ring: no spot facing against it)
+        if (!e.oneway) out.push({ x: x + tz * off, z: z - tx * off, h: h + Math.PI, e });
       }
     }
     return out;

@@ -52,7 +52,8 @@ check('fewer inner streets run unbroken edge to edge than before (22 of 22 in th
 const route = await ev(() => {
   const { RoadNet } = window.__pv, P = 80;
   // a drive AI asked to go through the stadium district takes roads that exist
-  const path = RoadNet.path(7, 7, 10, 10); let ok = true; for (let k = 0; k < path.length - 1; k++) { const [i, j] = path[k], [a, c] = path[k + 1]; if (!RoadNet.open(i, j, a - i, c - j)) ok = false; }
+  // (from the core's south edge street: the core itself is rebuilt on its own streets, 124d, 2026-11-19)
+  const path = RoadNet.path(6, 8, 10, 10); let ok = true; for (let k = 0; k < path.length - 1; k++) { const [i, j] = path[k], [a, c] = path[k + 1]; if (!RoadNet.open(i, j, a - i, c - j)) ok = false; }
   const gps = window.game.ui && true;
   return { len: path.length, ok, gps };
 });

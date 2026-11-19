@@ -80,7 +80,7 @@ Object.assign(World.prototype, {
     // the countryside between the districts (129): fields against the finished roads and pads
     Farms.init();
     // ---------------------------------------------------------------- the roads: curved links like the city's own
-    for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
+    for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, closed: !!R.closed, oneway: !!R.oneway, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
     // promenade lamps that would stand in a road leaving the city
     this.promenade = this.promenade.filter(l => !Island.roads.some(R => R.ends.includes('lat') && [R.pts[0], R.pts[R.pts.length - 1]].some(e => Math.hypot(l.x - e[0], l.z - e[1]) < 13)));
     // ---------------------------------------------------------------- colliders: bridge rails, tunnel walls (posts 1.3 m apart)
@@ -310,10 +310,17 @@ Object.assign(World.prototype, {
     this._genRaceway();
     // the Southshore Fairground (129c)
     this._genFairground();
+    // the roundabouts' central islands and signs (023)
+    this._genRoundabouts();
+    // the districts' buildings dressed like the city's (128b): shop floors, facades, roof plant
+    isle.dressed = this._dressIsland();
+    isle.furniture = this._isleFurniture();
     // colliders for the island's blocks (the city's and the first district blocks' loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
       for (const d of b.det) if (d.col) this.grid.add(d.col);
+      // (and their props: the street furniture, the lamps; the city's are added the same way, 090)
+      for (const p of b.props) if (p.col && !p.col.prop) { p.col.prop = p; this.grid.add(p.col); }
     }
     isle.mans = mans;
   },

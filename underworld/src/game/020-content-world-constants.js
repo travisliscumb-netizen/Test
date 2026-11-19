@@ -53,14 +53,14 @@ function streetNameAt(x, z) {
     const cl = cityClosedAt(x - p.ox * P, z - p.oz * P); if (cl) return cl.name;
     // off the lattice's carriageways, a curved street underfoot names itself (a lane across where a lattice street
     // ran, in a block rebuilt on its own streets, is not that old street)
-    if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
+    if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_NAMED }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
     // (only a lattice street that still runs there: a superblock or a square has taken some of their lengths)
     const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, clamp(Math.floor(z / P), p.lz0 + p.oz, p.lz1 + p.oz)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, clamp(Math.floor(x / P), p.lx0 + p.ox, p.lx1 + p.ox));
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
     // a curved street through the blocks (a lane, a crescent, an avenue): its own name
-    if (RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
+    if (RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_NAMED }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
   }
   if (z > CFS_EDGE + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
@@ -172,8 +172,12 @@ function isRushHour(t) { return (t >= 7.25 && t < 9.25) || (t >= 16.5 && t < 18.
 const SUPERBLOCKS = [
   { id: 'estate', bx0: 0, bz0: 0, bx1: 1, bz1: 0, gen: '_genEstate', peds: false, ground: 'W', land: 'W' },
   { id: 'park', bx0: 2, bz0: 2, bx1: 4, bz1: 3, gen: '_genBigPark', peds: true, ground: 'G', land: 'G' },
-  // the Old Quarter rebuilt on its own winding streets (124; owner, 2026-11-18)
-  { id: 'oldquarter', bx0: 0, bz0: 4, bx1: 2, bz1: 6, gen: '_genOldQuarter', peds: true, ground: 'R', land: 'R' },
+  // the Old Quarter rebuilt on its own winding streets (124b; owner, 2026-11-18; the whole precinct since 2026-11-19)
+  { id: 'oldquarter', bx0: 0, bz0: 4, bx1: 3, bz1: 7, gen: '_genRebuilt', rb: 'oldquarter', peds: true, ground: 'H', land: 'R' },
+  // the financial core rebuilt on its own streets (124d; owner, 2026-11-19)
+  { id: 'core', bx0: 4, bz0: 4, bx1: 9, bz1: 7, gen: '_genRebuilt', rb: 'core', peds: true, ground: 'C', land: 'D' },
+  // Linden Hills rebuilt on its own streets (124c; owner, 2026-11-19)
+  { id: 'linden', bx0: 0, bz0: 8, bx1: 3, bz1: 10, gen: '_genRebuilt', rb: 'linden', peds: true, ground: 'H', land: 'R' },
   { id: 'stadium', bx0: 7, bz0: 8, bx1: 9, bz1: 9, gen: '_genStadiumDistrict', peds: false, ground: 'Z', land: 'A' },
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
@@ -327,10 +331,11 @@ const Links = {
       // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle.
       // An end may also meet another curved road (Curved Roads pass: Y-junctions, the farm track off Cedar Fields Road)
       const last = r.pts[r.pts.length - 1];
-      const a = this.attach(r.pts[0]) || this.attachLink(r.pts[0], world, r), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last) || this.attachLink(last, world, r);
+      // (a roundabout's ring, 023, is closed: it has no ends, only the roads that end on it)
+      const a = r.closed ? { free: true, closed: true, axis: -1, C: { x: r.pts[0][0], z: r.pts[0][1] } } : this.attach(r.pts[0]) || this.attachLink(r.pts[0], world, r), b = r.closed ? { free: true, closed: true, axis: -1, C: { x: last[0], z: last[1] } } : r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last) || this.attachLink(last, world, r);
       if (!a || !b) continue;
       const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
-      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null };
+      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null, closed: !!r.closed, oneway: !!r.oneway };
       this.list.push(L);
       L.ends.forEach((e, k) => { if (e.free || e.onLink) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
     }

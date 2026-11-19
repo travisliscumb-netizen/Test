@@ -301,6 +301,8 @@ const Island = {
       this._profile(R);
       this.roads.push(R); byId[R.id] = R;
     }
+    // the roundabouts (023): roads cut at each ring, the rings added
+    this.applyRoundabouts();
     this._indexRoads();
     this.tiles.clear();
     this.ready = true;
@@ -434,6 +436,16 @@ const Island = {
     return y * (1 - t) + h * t;
   },
   // ---------------------------------------------------------------- tiles
+  // the same, as a job that yields every few rows (the scenery streams tiles a few milliseconds a frame, 177): a tile
+  // a car or a person asks for meanwhile is computed whole, at once, as before
+  *_tileJob(tx, tz) {
+    const key = tz * 64 + tx; if (this.tiles.has(key)) return this.tiles.get(key);
+    const c = ISLE.cell, n = ISLE.tile / c + 1, h = new Float32Array(n * n), x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile;
+    for (let j = 0; j < n; j++) { for (let i = 0; i < n; i++) h[j * n + i] = this.compute(x0 + i * c, z0 + j * c); if (j % 3 === 2) { yield; if (this.tiles.has(key)) return this.tiles.get(key); } }
+    const T = { tx, tz, x0, z0, h, n, multi: this._multi.has(key) };
+    this.tiles.set(key, T);
+    return T;
+  },
   _tile(tx, tz) {
     const key = tz * 64 + tx; let T = this.tiles.get(key); if (T) return T;
     const c = ISLE.cell, n = ISLE.tile / c + 1, h = new Float32Array(n * n), x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile;
@@ -549,6 +561,10 @@ const Island = {
     // (0.5 m over the sea, Island roads' floor) past the gate, and a short driveway climbs the last 0.4 m to it
     if (CityLayout.id === 'island') { const S = SOUND_ANNEX; this.addPad(S.ox - 40, S.oz - 34, S.ox + P - INNER + 4, S.oz + P - INNER + 4, CURB_H, 40); }
     // Linden Gardens (128): the infill between the precincts, at the city's level
-    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
+    // (marked infill: the scenery plants trees on it between the lots, 177, as on any open ground)
+    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60).infill = true;
+    // the roundabouts' level ground (023), last: each at the level the ground already has there (the city's level by
+    // the precincts, where their streets come to it)
+    this.roundaboutPads();
   }
 };

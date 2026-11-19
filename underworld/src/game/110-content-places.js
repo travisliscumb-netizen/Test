@@ -382,7 +382,8 @@ Object.assign(World.prototype, {
     const P2 = this.places = {};
     for (const b of this.blocks) if (b.place) P2[b.place.id] = b.place;
     const sb = this.block(SPECIAL.safehouse.bx, SPECIAL.safehouse.bz).safehouse;
-    P2.safehouse = { id: 'safehouse', name: 'Linden Hills Safehouse', kind: 'home', door: { x: sb.x, z: sb.z, h: 0 }, garage: sb.garage, under: { x: sb.x, z: sb.z - 9 } };
+    // (a house's own door faces its street whichever way that is: the rebuilt Linden Hills', 124c)
+    P2.safehouse = { id: 'safehouse', name: 'Linden Hills Safehouse', kind: 'home', door: { x: sb.x, z: sb.z, h: sb.h ?? 0 }, garage: sb.garage, under: sb.home && sb.home.inner ? { x: sb.home.inner.x, z: sb.home.inner.z } : { x: sb.x, z: sb.z - 9 } };
     // Valen Tower lobby (penthouse lift), Fuel & Go store, Police HQ lobby
     const tb = this.block(6, 5), base = tb.bld[0];
     P2.tower = { id: 'tower', name: 'Valen Tower', kind: 'home2', door: { x: tb.cx, z: base.z1 + 1.1, h: 0 }, garage: { x: tb.bx * P + P - 4.6, z: tb.cz + 22, h: 0 }, under: { x: tb.cx, z: tb.cz - 6 } };

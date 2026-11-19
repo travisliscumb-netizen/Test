@@ -222,9 +222,11 @@ Object.assign(World.prototype, {
     // attached garage / carport on one side, flush with the front. The side (and if need be the
     // size) is chosen so the garage never sits on a drive, a lane or another building.
     let gs = spec.gs || 1, gk = spec.garage || 'street';
+    // (the ground a garage may take: the block's, or a rebuilt district's when the kit builds the house, 124)
+    const B0 = spec.bounds || b;
     const NB = { single: 1, double: 2, triple: 3, carport: spec.carportN || 1 };
     const gRect = (side, n) => { const gw = n * 3.3 + 0.4, half = ns ? hw : hd, gd = 6.6; const gcx = spec.x + lat[0] * side * (half + gw / 2), gcz = spec.z + lat[1] * side * (half + gw / 2); const fcx = gcx + f[0] * ((ns ? hd : hw) - gd / 2), fcz = gcz + f[1] * ((ns ? hd : hw) - gd / 2); return [fcx - (ns ? gw / 2 : gd / 2), fcz - (ns ? gd / 2 : gw / 2), fcx + (ns ? gw / 2 : gd / 2), fcz + (ns ? gd / 2 : gw / 2)]; };
-    const gFree = (side, n) => { const [a0, b0, a1, b1] = gRect(side, n); return this._rectClear(a0, b0, a1, b1, 0.5) && !b.bld.some(q => q !== r && q.y0 <= CURB_H + 0.01 && a0 < q.x1 && a1 > q.x0 && b0 < q.z1 && b1 > q.z0) && a0 > b.x0 - 0.5 && a1 < b.x1 + 0.5 && b0 > b.z0 - 0.5 && b1 < b.z1 + 0.5; };
+    const gFree = (side, n) => { const [a0, b0, a1, b1] = gRect(side, n); return this._rectClear(a0, b0, a1, b1, 0.5) && !b.bld.some(q => q !== r && q.y0 <= CURB_H + 0.01 && a0 < q.x1 && a1 > q.x0 && b0 < q.z1 && b1 > q.z0) && a0 > B0.x0 - 0.5 && a1 < B0.x1 + 0.5 && b0 > B0.z0 - 0.5 && b1 < B0.z1 + 0.5; };
     const order = ['triple', 'double', 'single', 'carport'];
     if (NB[gk]) {
       let ok = false;

@@ -35,7 +35,8 @@ const CITY_LAYOUTS = {
   tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }],
   // never shipped either: the city cut in two, the west half three cells further west, the halves joined by one
   // connector road (CITY_CONNECTORS), so routing, traffic and the edges between parted precincts are exercised (S4)
-  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
+  // (parted between the core and the port since 2026-11-19: a rebuilt district's superblock stays whole)
+  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 9, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 10, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
   // the city round Valen Bay (CITY_SPREAD.md §3, §9): the core, the west of the Old Quarter, Linden Hills with the
   // farm, and the port (the Industrial Belt, the Docklands and the Container Terminal, whose quay faces east and so
   // once faced Valen Sound, now the river's harbour basin: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
@@ -57,7 +58,7 @@ const CITY_LAYOUTS = {
 // the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
 // precincts' edge streets side-on
 const CITY_CONNECTORS = {
-  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }],
+  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[560, 440], [620, 441], [740, 441], [800, 440]] }],
   island: [
     // the Stadium's east street to the Southshore Highway
     { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1080], [-128, 1085], [-100, 1090]] },

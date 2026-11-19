@@ -40,8 +40,11 @@ const R = await ev(() => {
     return { name: c.name, kind: c.kind, inside, race: race.has(`${c.a}:${c.i}:${c.j}`), deg: [tee(n0), tee(n1)], road: RN.roadAt(mid[0], mid[1]), y: +P.groundY(mid[0], mid[1]).toFixed(2), ends, fountain, named: P.streetNameAt(mid[0], mid[1]), prot };
   });
   // ---- the curved streets laid by the organic pass
-  const names = new Set(); for (const k in P.CURVED_STREETS) if (!['10,2', '10,3', '3,10', '4,10'].includes(k)) for (const r of P.CURVED_STREETS[k].roads) names.add(r.name);
-  for (const S of P.OQ_STREETS) names.add(S.name);
+  // (a lane on a cell a rebuilt district took in, 124, is gone with the cell's grid: the district's own streets, which
+  // keep the names, are counted instead)
+  const sbAt = k => { const [x, z] = k.split(',').map(Number); return P.SUPERBLOCKS.some(sb => x >= sb.bx0 && x <= sb.bx1 && z >= sb.bz0 && z <= sb.bz1); };
+  const names = new Set(); for (const k in P.CURVED_STREETS) if (!['10,2', '10,3', '3,10', '4,10'].includes(k) && !sbAt(k)) for (const r of P.CURVED_STREETS[k].roads) names.add(r.name);
+  for (const id in P.REBUILDS) for (const S of P.REBUILDS[id].streets) names.add(S.name);
   out.names = [...names];
   const ours = w.localRoads.filter(r => r.link && names.has(r.link));
   out.lanes = ours.length; out.linked = ours.filter(r => w.links.some(L => L.road === r && L.ends.every(Boolean))).length;
@@ -103,10 +106,12 @@ const OQ = await ev(() => {
   });
   const gr = w.places.garageRoof, gq = gr && P.RoadGraph.nearest(gr.door.x, gr.door.z, { maxD: 40 });
   const wt = P.raceCheckpoints(P.RACES.find(r => r.id === 'wettrack')), wtOn = wt.cps.every(c => P.RoadGraph.nearest(c.x, c.z, { maxD: 20 }) && P.RoadGraph.nearest(c.x, c.z, { maxD: 20 }).d < 8);
-  return { closed: inside.every(o => !o), n: inside.length, links: links.map(L => L.name), attached: links.every(L => L.ends.every(Boolean)), doors, garage: gq ? { road: gq.e.name, d: +gq.d.toFixed(1) } : null, wet: { n: wt.cps.length, on: wtOn }, sq: P.streetNameAt(P.OQ_SQUARE.x + 0.1, P.OQ_SQUARE.z) };
+  const expect = (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
+  return { expect, streets: P.OQ_STREETS.length, closed: inside.every(o => !o), n: inside.length, links: links.map(L => L.name), attached: links.every(L => L.ends.every(Boolean)), doors, garage: gq ? { road: gq.e.name, d: +gq.d.toFixed(1) } : null, wet: { n: wt.cps.length, on: wtOn }, sq: P.streetNameAt(P.OQ_SQUARE.x + 0.1, P.OQ_SQUARE.z) };
 });
-check('the Old Quarter is one superblock: no lattice street left inside it', OQ.closed && OQ.n === 12, JSON.stringify({ closed: OQ.closed, n: OQ.n }));
-check('its own winding streets: Saint Ivo Street, Market Street (two halves), five lanes; every end on an open road', OQ.links.length === 8 && OQ.attached && ['Saint Ivo Street', 'Market Street', 'Bell Lane', 'Cooper’s Walk', 'Chapel Lane', 'Garage Row', 'Wick Lane'].every(n => OQ.links.includes(n)), JSON.stringify(OQ.links));
+// (the whole precinct since 2026-11-19: 4 x 4 cells, 24 lattice segments closed)
+check('the Old Quarter is one superblock: no lattice street left inside it', OQ.closed && OQ.n === OQ.expect && OQ.n === 24, JSON.stringify({ closed: OQ.closed, n: OQ.n }));
+check('its own winding streets: Saint Ivo Street, Market Street (two halves), seven lanes; every end on an open road', OQ.links.length === OQ.streets && OQ.streets === 10 && OQ.attached && ['Saint Ivo Street', 'Market Street', 'Bell Lane', 'Cooper’s Walk', 'Chapel Lane', 'Garage Row', 'Wick Lane', 'Lantern Lane', 'Hawthorn Bend'].every(n => OQ.links.includes(n)), JSON.stringify(OQ.links));
 check('every door with an address there (flats, shops, the bank, the pawn shop, the Vipers’ HQ) is on a street with its building right behind it', OQ.doors.length >= 7 && OQ.doors.every(d => d.wall !== null && d.wall < 4 && d.road !== null && d.road < 12), JSON.stringify(OQ.doors));
 check('the Quarter Garage stands where it stood, Garage Row past the foot of its ramp; the Wet Track runs round its streets', OQ.garage && OQ.garage.d < 15 && OQ.wet.n >= 8 && OQ.wet.on, JSON.stringify({ garage: OQ.garage, wet: OQ.wet }));
 // the density before the pass (building counts per precinct, the grid as it was): the lanes' new frontage keeps it

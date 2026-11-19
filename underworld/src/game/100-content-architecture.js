@@ -81,7 +81,7 @@ Object.assign(World.prototype, {
     const trim = r.color.clone().lerp(C(0xe8e2d4), 0.45);
     const dark = r.color.clone().multiplyScalar(0.55);
     if (st !== STYLE.GLASS && st !== STYLE.HOUSE) this._ring(b, r, top - 0.3, 0.55, 0.32, st === STYLE.BRICK ? C(0xcfc6b2) : trim);
-    if (st === STYLE.BRICK || st === STYLE.SHOP || st === STYLE.DECO || st === STYLE.APT) this._ring(b, r, CURB_H + 0.32, 0.64, 0.07, dark);
+    if (st === STYLE.BRICK || st === STYLE.SHOP || st === STYLE.DECO || st === STYLE.APT) this._ring(b, r, r.y0 + 0.32, 0.64, 0.07, dark);
     if (st === STYLE.BRICK || st === STYLE.DECO) for (let k = 2; k < floors - 1; k += 3) this._ring(b, r, r.y0 + k * r.fh, 0.18, 0.09, C(0xcfc6b2));
     // downspouts on the street corners
     if (st === STYLE.BRICK || st === STYLE.SHOP || st === STYLE.APT) for (const t of [0.22, L - 0.22]) this._faceBox(b, r, f, t, r.y0 + r.h / 2, 0.12, r.h, 0.12, 0.12, 0x3c3f42);
@@ -98,10 +98,10 @@ Object.assign(World.prototype, {
     // shopfront: blade sign hanging off the facade plus a canopy light strip
     if (f.shop && rng.chance(0.35) && L > 5) {
       const t = rng.chance(0.5) ? 0.8 : L - 0.8;
-      this._faceBox(b, r, f, t, CURB_H + 5.2, 0.12, 1.6, 0.7, 0.9, rng.pick(PAL.awning));
-      this._faceBox(b, r, f, t, CURB_H + 6.05, 0.06, 0.06, 0.6, 1.0, IRON);
+      this._faceBox(b, r, f, t, r.y0 + 5.2, 0.12, 1.6, 0.7, 0.9, rng.pick(PAL.awning));
+      this._faceBox(b, r, f, t, r.y0 + 6.05, 0.06, 0.06, 0.6, 1.0, IRON);
     }
-    if (st === STYLE.HOUSE && floors >= 1) this._faceBox(b, r, f, L / 2, CURB_H + 2.4, Math.min(3, L - 1), 0.1, 0.75, 1.5, dark);
+    if (st === STYLE.HOUSE && floors >= 1) this._faceBox(b, r, f, L / 2, r.y0 + 2.4, Math.min(3, L - 1), 0.1, 0.75, 1.5, dark);
   },
   _fireEscape(b, r, f, rng, floors, L) {
     const w = Math.min(3.2, L - 1.5), t0 = clamp(L * rng.range(0.3, 0.7), w / 2 + 0.4, L - w / 2 - 0.4);
@@ -151,29 +151,29 @@ Object.assign(World.prototype, {
       const s = sides[0][1];
       const cw = Math.min(10, (s < 2 ? w : d) * 0.5);
       const pos = s === 0 ? [cx, r.z0 - 1.6] : s === 1 ? [cx, r.z1 + 1.6] : s === 2 ? [r.x0 - 1.6, cz] : [r.x1 + 1.6, cz];
-      this._det(b, 'box', pos[0], CURB_H + 4.4, pos[1], s < 2 ? cw : 3.2, 0.35, s < 2 ? 3.2 : cw, C(0x2a2d33));
-      b.fx.push({ type: 'canopy', x: pos[0], y: CURB_H + 4.2, z: pos[1], w: s < 2 ? cw : 3.2, d: s < 2 ? 3.2 : cw });
+      this._det(b, 'box', pos[0], r.y0 + 4.4, pos[1], s < 2 ? cw : 3.2, 0.35, s < 2 ? 3.2 : cw, C(0x2a2d33));
+      b.fx.push({ type: 'canopy', x: pos[0], y: r.y0 + 4.2, z: pos[1], w: s < 2 ? cw : 3.2, d: s < 2 ? 3.2 : cw });
       for (const k of [-1, 1]) {
         const px = s < 2 ? pos[0] + k * (cw / 2 - 0.3) : pos[0] + (s === 2 ? -1.4 : 1.4), pz = s < 2 ? pos[1] + (s === 0 ? -1.4 : 1.4) : pos[1] + k * (cw / 2 - 0.3);
-        this._det(b, 'cyl', px, CURB_H + 2.2, pz, 0.15, 4.4, 0x8c9096, null, { x: px, z: pz, r: 0.2, y0: 0, y1: 4.4, kind: 'det' });
+        this._det(b, 'cyl', px, r.y0 + 2.2, pz, 0.15, 4.4, 0x8c9096, null, { x: px, z: pz, r: 0.2, y0: 0, y1: 4.4, kind: 'det' });
       }
       // vertical fins on glass towers
       if (r.style === STYLE.GLASS && rng.chance(0.5)) {
         const fin = C(0xb8c0c8), n = Math.floor(w / 6);
         for (let i = 0; i <= n; i++) { const x = r.x0 + i * (w / n); this._det(b, 'box', x, r.y0 + r.h / 2, r.z0 - 0.2, 0.18, r.h, 0.4, fin); this._det(b, 'box', x, r.y0 + r.h / 2, r.z1 + 0.2, 0.18, r.h, 0.4, fin); }
       }
-      if (r.style !== STYLE.GLASS) this._ring(b, r, CURB_H + 4.9, 0.4, 0.12, r.color.clone().multiplyScalar(0.7));
+      if (r.style !== STYLE.GLASS) this._ring(b, r, r.y0 + 4.9, 0.4, 0.12, r.color.clone().multiplyScalar(0.7));
     } else if (kind === 'podium') {
       this._ring(b, r, r.y0 + r.h - 0.3, 0.5, 0.35, C(0xd6d0c4));
-      this._ring(b, r, CURB_H + 3.9, 0.12, 0.9, rng.pick(PAL.awning));
+      this._ring(b, r, r.y0 + 3.9, 0.12, 0.9, rng.pick(PAL.awning));
     } else if (kind === 'warehouse') {
       // loading dock with bumpers and a ramp along the yard side
       const dw = Math.min(w - 4, 24), dx = cx;
-      this._det(b, 'box', dx, CURB_H + 0.6, r.z1 + 1.3, dw, 1.2, 2.6, C(CONCRETE), 0, true);
-      for (let i = 0; i < Math.floor(dw / 4); i++) this._det(b, 'box', dx - dw / 2 + 2 + i * 4, CURB_H + 0.7, r.z1 + 2.62, 0.45, 0.45, 0.12, C(0x151515));
-      this._det(b, 'box', dx + dw / 2 + 1.2, CURB_H + 0.3, r.z1 + 1.3, 2.4, 0.6, 2.4, C(CONCRETE));
+      this._det(b, 'box', dx, r.y0 + 0.6, r.z1 + 1.3, dw, 1.2, 2.6, C(CONCRETE), 0, true);
+      for (let i = 0; i < Math.floor(dw / 4); i++) this._det(b, 'box', dx - dw / 2 + 2 + i * 4, r.y0 + 0.7, r.z1 + 2.62, 0.45, 0.45, 0.12, C(0x151515));
+      this._det(b, 'box', dx + dw / 2 + 1.2, r.y0 + 0.3, r.z1 + 1.3, 2.4, 0.6, 2.4, C(CONCRETE));
       this._ring(b, r, r.y0 + r.h - 0.25, 0.5, 0.2, C(0x6f767c));
-      b.fx.push({ type: 'docklight', x: dx, y: CURB_H + 4.8, z: r.z1 + 0.3, w: dw });
+      b.fx.push({ type: 'docklight', x: dx, y: r.y0 + 4.8, z: r.z1 + 0.3, w: dw });
     }
   },
   // ---------- rooftops: parapets, HVAC, ducts, bulkheads, tanks, dishes ----------

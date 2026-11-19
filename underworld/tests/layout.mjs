@@ -74,15 +74,17 @@ check('far from the city is off the city, and the nearest precinct is still foun
 // ---------------------------------------------------------------- cut, but nothing moved
 const quad = (ox = 0, oz = 0) => [
   { id: 'nw', lx0: 0, lz0: 0, lx1: 5, lz1: 3, ox, oz }, { id: 'ne', lx0: 6, lz0: 0, lx1: 11, lz1: 3, ox, oz },
-  { id: 'w', lx0: 0, lz0: 4, lx1: 3, lz1: 9, ox, oz }, { id: 'mid', lx0: 4, lz0: 4, lx1: 9, lz1: 9, ox, oz }, { id: 'e', lx0: 10, lz0: 4, lx1: 11, lz1: 11, ox, oz },
-  { id: 'sw', lx0: 0, lz0: 10, lx1: 9, lz1: 11, ox, oz }];
+  // (the rebuilt districts' superblocks stay whole: the Old Quarter, Linden Hills and Cedar Fields in 'w', the core and
+  // the stadium in 'mid', 2026-11-19)
+  { id: 'w', lx0: 0, lz0: 4, lx1: 3, lz1: 11, ox, oz }, { id: 'mid', lx0: 4, lz0: 4, lx1: 9, lz1: 9, ox, oz }, { id: 'e', lx0: 10, lz0: 4, lx1: 11, lz1: 11, ox, oz },
+  { id: 'sw', lx0: 4, lz0: 10, lx1: 9, lz1: 11, ox, oz }];
 L.use('cut-in-place', quad());
 check('six precincts at one offset are a layout (neighbours on the lattice may abut)', L.precincts.length === 6 && L.sites.size === N * N);
 sameAsLattice('cut in place');
 
 // ---------------------------------------------------------------- precincts that stand apart
 const apart = [
-  // (the Old Quarter's superblock, 0..2 × 4..6, stays whole in the core; the rows above it stand apart in two pieces)
+  // (the Old Quarter's and the core's superblocks stay whole in 'core'; the rows above it stand apart in two pieces)
   { id: 'core', lx0: 0, lz0: 4, lx1: 9, lz1: 7, ox: 0, oz: 0 },
   { id: 'north', lx0: 2, lz0: 0, lx1: 9, lz1: 3, ox: 0, oz: -2 },
   { id: 'heights', lx0: 0, lz0: 0, lx1: 1, lz1: 3, ox: -6, oz: -3 },
@@ -134,7 +136,8 @@ const refuse = (name, table, why) => { let msg = ''; try { L.use('bad', table); 
 refuse('a cell left out', apart.slice(0, 3), /is in no precinct/);
 refuse('a cell in two precincts', [...apart, { id: 'twice', lx0: 4, lz0: 4, lx1: 5, lz1: 5, ox: 20, oz: 20 }], /is in precincts/);
 refuse('a cut on an odd line (it would split a turf)', [{ id: 'a', lx0: 0, lz0: 0, lx1: 4, lz1: 11, ox: 0, oz: 0 }, { id: 'b', lx0: 5, lz0: 0, lx1: 11, lz1: 11, ox: 9, oz: 0 }], /odd line/);
-refuse('a cut through a superblock (the stadium)', [{ id: 'a', lx0: 0, lz0: 0, lx1: 7, lz1: 11, ox: 0, oz: 0 }, { id: 'b', lx0: 8, lz0: 0, lx1: 11, lz1: 11, ox: 9, oz: 0 }], /superblock stadium/);
+// (a cut at 7 | 8 runs through the rebuilt core before it reaches the stadium: either is the superblock it cuts)
+refuse('a cut through a superblock (the core, the stadium)', [{ id: 'a', lx0: 0, lz0: 0, lx1: 7, lz1: 11, ox: 0, oz: 0 }, { id: 'b', lx0: 8, lz0: 0, lx1: 11, lz1: 11, ox: 9, oz: 0 }], /superblock (core|stadium)/);
 refuse('precincts at different offsets with touching frames', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 7, ox: 0, oz: 0 }, { id: 'b', lx0: 0, lz0: 8, lx1: 11, lz1: 11, ox: 1, oz: 0 }], /less than one cell apart/);
 refuse('precincts moved onto each other', [{ id: 'a', lx0: 0, lz0: 0, lx1: 11, lz1: 7, ox: 0, oz: 0 }, { id: 'b', lx0: 0, lz0: 8, lx1: 11, lz1: 11, ox: 0, oz: -4 }], /less than one cell apart|overlap/);
 refuse('a precinct off the lattice', [{ id: 'a', lx0: 0, lz0: 0, lx1: 12, lz1: 11, ox: 0, oz: 0 }], /outside the lattice/);

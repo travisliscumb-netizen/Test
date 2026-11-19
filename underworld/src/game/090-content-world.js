@@ -176,15 +176,17 @@ class World {
       }
     }
   }
-  _prop(b, type, x, z, ry = 0, s = 1) {
+  // y: the ground it stands on, off the city's level (the island's streets, 128b); the city's props stand at the kerb
+  _prop(b, type, x, z, ry = 0, s = 1, y) {
     const p = { type, x, z, ry, s, id: this.totalProps++, broken: false, block: b.i };
-    const def = PROP_DEFS[type];
+    if (y !== undefined) p.y = y;
+    const def = PROP_DEFS[type], y0 = y !== undefined ? y - CURB_H : 0;
     if (def && def.col) {
-      if (def.col.r !== undefined) p.col = { x, z, r: def.col.r * s, y0: 0, y1: def.col.h * s, kind: 'prop' };
+      if (def.col.r !== undefined) p.col = { x, z, r: def.col.r * s, y0, y1: y0 + def.col.h * s, kind: 'prop' };
       else {
         const c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry));
         const hw = (def.col.w * c + def.col.d * sn) / 2 * s, hd = (def.col.w * sn + def.col.d * c) / 2 * s;
-        p.col = { x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd, y0: 0, y1: def.col.h * s, kind: 'prop' };
+        p.col = { x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd, y0, y1: y0 + def.col.h * s, kind: 'prop' };
       }
       if (def.breakable) p.col.breakable = true;
     }
@@ -813,6 +815,24 @@ class World {
       if (x < pv.x0 - 1 || z < pv.z0 - 1 || x > pv.x1 + 1 || z > pv.z1 + 1) continue;
       const d = Math.hypot(x - fromX, z - fromZ);
       if (d >= minD && d <= maxD) return { x, z, h };
+    }
+    // no lattice kerb in range (a district rebuilt on its own streets has few, 124): the kerb side of a curved street,
+    // facing the way its traffic runs (never on a roundabout's ring)
+    if (RoadGraph.ready) {
+      const list = [];
+      for (const e of RoadGraph.edges) {
+        if ((e.kind !== 'link' && e.kind !== 'spur') || e.oneway) continue;
+        const m = RoadGraph.pointAt(e, e.len / 2); if (Math.hypot(m[0] - fromX, m[1] - fromZ) > maxD + e.len / 2) continue;
+        const off = Math.max(1.6, e.w / 2 - 1.1);
+        for (let dd = 8; dd < e.len - 8; dd += 12) {
+          const [x, z, tx, tz] = RoadGraph.pointAt(e, dd), q = Math.hypot(x - fromX, z - fromZ); if (q < minD || q > maxD) continue;
+          const side = rng() < 0.5 ? 1 : -1;
+          list.push({ x: x - tz * off * side, z: z + tx * off * side, h: side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz) });
+        }
+      }
+      if (list.length) return list[Math.floor(rng() * list.length)];
+      // (and failing that, the road nearest the place itself)
+      const q = RoadGraph.nearest(fromX, fromZ, { kinds: RG_STREETS }); if (q) return { x: q.x, z: q.z, h: Math.atan2(q.e.pts[Math.min(q.k + 1, q.e.pts.length - 1)][0] - q.e.pts[q.k][0], q.e.pts[Math.min(q.k + 1, q.e.pts.length - 1)][1] - q.e.pts[q.k][1]) };
     }
     return { x: CityLayout.wx(P * 6 + 4.6, P * 6 + 30), z: CityLayout.wz(P * 6 + 4.6, P * 6 + 30), h: 0 };
   }

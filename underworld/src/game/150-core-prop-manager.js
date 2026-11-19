@@ -62,12 +62,12 @@ class PropManager {
       const gm = this.glows[t];
       if (this.far[t]) { // foliage: collect the active instances; cull() places them
         const A = this.act[t]; A.length = 0;
-        for (const p of list) if (!p.broken && promoOK(p)) { const h = hash2i(p.id, 3, 9); A.push({ x: p.x, z: p.z, ry: p.ry, s: p.s, r: 0.8 + h * 0.4, g: 0.85 + hash2i(p.id, 4, 9) * 0.3, b: 0.75 + h * 0.3 }); }
+        for (const p of list) if (!p.broken && promoOK(p)) { const h = hash2i(p.id, 3, 9); A.push({ x: p.x, y: p.y ?? CURB_H, z: p.z, ry: p.ry, s: p.s, r: 0.8 + h * 0.4, g: 0.85 + hash2i(p.id, 4, 9) * 0.3, b: 0.75 + h * 0.3 }); }
         this._cullT = 0; continue;
       }
       for (const p of list) {
         if (p.broken || !promoOK(p)) continue;
-        M(p.x, CURB_H, p.z, p.s, p.s, p.s, p.ry);
+        M(p.x, p.y ?? CURB_H, p.z, p.s, p.s, p.s, p.ry);
         im.setMatrixAt(n, _m4);
         if (gm) gm.setMatrixAt(n, _m4);
         if (im.instanceColor) {
@@ -100,8 +100,8 @@ class PropManager {
       const im = this.meshes[t], fm = this.far[t]; let n = 0, f = 0;
       for (const a of this.act[t]) {
         const d2 = (a.x - cx) * (a.x - cx) + (a.z - cz) * (a.z - cz);
-        if (d2 > 18 * 18) { sph.center.set(a.x, 3.5 * a.s, a.z); sph.radius = 5 * a.s; if (!frustum.intersectsSphere(sph)) continue; }
-        M(a.x, CURB_H, a.z, a.s, a.s, a.s, a.ry); col.setRGB(a.r, a.g, a.b);
+        if (d2 > 18 * 18) { sph.center.set(a.x, a.y + 3.5 * a.s, a.z); sph.radius = 5 * a.s; if (!frustum.intersectsSphere(sph)) continue; }
+        M(a.x, a.y, a.z, a.s, a.s, a.s, a.ry); col.setRGB(a.r, a.g, a.b);
         if (d2 < nr2) { im.setMatrixAt(n, _m4); im.setColorAt(n, col); n++; } else { fm.setMatrixAt(f, _m4); fm.setColorAt(f, col); f++; }
       }
       im.count = n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;

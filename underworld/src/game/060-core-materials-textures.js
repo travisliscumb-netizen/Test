@@ -708,11 +708,15 @@ function makeIsleRoadMaterial() {
         ${GLSL_BUMP}
         ${GLSL_CLOUDSHADOW}
         float lineAA(float d, float w){ float fw = fwidth(d) + 0.001; return 1.0 - smoothstep(w - fw, w + fw, d); }
-        float boxAA(vec2 q, vec2 hs){ vec2 d = abs(q) - hs; float s = max(d.x, d.y); float fw = fwidth(s) + 0.001; return 1.0 - smoothstep(-fw, fw, s); }`)
+        float boxAA(vec2 q, vec2 hs){ vec2 d = abs(q) - hs; float s = max(d.x, d.y); float fw = fwidth(s) + 0.001; return 1.0 - smoothstep(-fw, fw, s); }
+        // a lane arrow (straight on), q: across the lane, along it (forward +); 5 m long, its head 0.9 m wide
+        float arrowAA(vec2 q){ float sh = boxAA(q - vec2(0.0, -1.2), vec2(0.11, 1.3)); float t = (1.3 - q.y) / 1.3; float d = max(abs(q.x) - 0.45 * t, max(q.y - 1.3, -q.y)); float fw = fwidth(d) + 0.001; return max(sh, 1.0 - smoothstep(-fw, fw, d)); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
         vec2 p = vPW.xz;
-        float u = vR.x, s = vR.y, hw = vR.z, cls = vR.w, surf = vQ.x, paint = vQ.y, au = abs(u);
+        float u = vR.x, s = vR.y, hw = vR.z, surf = vQ.x, paint = vQ.y, au = abs(u);
+        // (the class's fraction marks an end on a roundabout's ring: .1 the a end, .2 the b end, .3 both)
+        float cls = floor(vR.w + 0.02), rbf = vR.w - cls, rbA = step(0.05, rbf) * (1.0 - step(0.15, rbf) * (1.0 - step(0.25, rbf))), rbB = step(0.15, rbf);
         float n1 = pvf(p * 0.35), n2 = pvn(p * 3.7), grain = pvn(p * 23.0);
         vec3 col; float rough = 0.9, hgt = 0.0, isRoad = 0.0, puddleMask = 0.0;
         if (surf < 0.5) {
@@ -743,7 +747,15 @@ function makeIsleRoadMaterial() {
           if (cls > 0.5 && lanes > 1.5) mk = max(mk, lineAA(abs(au - laneW), 0.06) * step(fract(s / 9.0), 0.34));
           if (cls > 2.5 && au > edgeL + 0.3 && au < edgeL + 0.9) { float g = step(0.5, fract(s / 0.32)); col *= 1.0 - 0.2 * g; hgt -= g * 0.006; }
           // the stop line across the right-hand lane, short of a junction (it shows inside the junction's fade)
-          float stopL = max(lineAA(abs(vQ.z), 0.25) * step(0.3, u) * step(u, edgeL), lineAA(abs(vQ.w), 0.25) * step(0.3, -u) * step(-u, edgeL));
+          // (at a roundabout's entry it is the give-way line: two rows of short dashes)
+          float dsh = step(fract(au / 1.0), 0.6);
+          float gwA = max(lineAA(abs(vQ.z), 0.1), lineAA(abs(vQ.z - 0.5), 0.1)) * dsh, gwB = max(lineAA(abs(vQ.w), 0.1), lineAA(abs(vQ.w - 0.5), 0.1)) * dsh;
+          float stopL = max(mix(lineAA(abs(vQ.z), 0.25), gwA, rbA) * step(0.3, u) * step(u, edgeL), mix(lineAA(abs(vQ.w), 0.25), gwB, rbB) * step(0.3, -u) * step(-u, edgeL));
+          // arrows in each lane coming up to a junction: 7 m and 25 m short of its line (the lane's centre: lc)
+          float arw = 0.0;
+          if (vQ.z > 2.0 && vQ.z < 30.0 && u > 0.3 && au < edgeL) arw = max(arrowAA(vec2(au - lc, 7.0 - vQ.z)), arrowAA(vec2(au - lc, 25.0 - vQ.z)));
+          if (vQ.w > 2.0 && vQ.w < 30.0 && u < -0.3 && au < edgeL) arw = max(arw, max(arrowAA(vec2(au - lc, 7.0 - vQ.w)), arrowAA(vec2(au - lc, 25.0 - vQ.w))));
+          stopL = max(stopL, arw);
           // a solid centre line up to the stop line
           y = max(y, lineAA(au, 0.07) * step(cls, 2.5) * (step(0.0, vQ.z) * step(vQ.z, 18.0) + step(0.0, vQ.w) * step(vQ.w, 18.0)) * step(cls, 1.5));
           float wearP = 0.86 - 0.28 * n1;

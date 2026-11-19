@@ -196,3 +196,25 @@ Full text: handoff §45.1–§45.39; history: OVERHAUL_STATUS.md. Highlights tha
   cars parked there move to the street.
 - The map's Cedar Fields ground had drawn far too dark: its colours were read as linear light. It now uses the
   surfaces' sRGB colours.
+
+## The whole original city redeveloped (owner, 2026-11-19: Phase 1 of the brief; CITY_REBUILD.md)
+- The owner asked for every remaining square-grid neighbourhood to be rebuilt from the ground up, before any other
+  work in the brief. Asked about the 2026-11-18 ruling that the financial core stays a grid, the owner ruled that it
+  is redeveloped too: a few straight avenues, irregular blocks, a diagonal boulevard, a plaza and a roundabout.
+- The way it is done is the Old Quarter's, made general: the district rebuild kit (124).
+  - Each district is a definition: its streets, cul-de-sacs, squares, the cells it keeps, address fixes and its
+    frontage style.
+  - The Old Quarter was ported first, and its city fingerprint was unchanged (243df6f6), so the port was exact.
+- Rules the kit keeps (suite `rebuild`):
+  - Every street is a link, with both ends on a road that runs.
+  - Every special and landmark cell is kept, or, for the starter safehouse, rehoused in a house on the new streets
+    at its old address.
+  - Every door is on a street, its own building behind it and its doorway clear.
+  - Every kept cell's door and respawn point has a clear way to a road.
+  - The GPS reaches every door.
+  - Each precinct keeps its density.
+  - Traffic enters, keeps to the streets and leaves.
+- Street names: a new street takes the name of the old lane in its place (Lantern Lane, Hawthorn Bend, Kestrel
+  Curve, Millrace Lane, Willow Bend, Mason's Walk, Ropewalk, Tanner's Row), so the names players know survive.
+- Districts rebuilt get a plain lawn ground (no cross paths per old cell, which drew the grid's ghost). Kept cells
+  keep their own ground.

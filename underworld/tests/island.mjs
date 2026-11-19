@@ -72,7 +72,7 @@ const zones = await ev(() => {
   out.names = [districtNameAt(350, -1500), districtNameAt(-300, 500), districtNameAt(1650, -900)];
   // a city street's name on its own street, and what the same grid lines are called out on the island
   const { streetNameAt } = window.__pv;
-  out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(300, 480)), streetNameAt(-12, 640), streetNameAt(600, 1800)];
+  out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(520, 480)), streetNameAt(-12, 640), streetNameAt(600, 1800)];
   out.offStreets = [[80, 1500], [80, 2300], [400, -1200], [-1100, 480], [1900, 480], [2000, 560], [320, 2410], [-600, 322]].map(q => streetNameAt(q[0], q[1]));
   out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'oval', 'raceway', 'police', 'hospital', 'chopshop'];
   out.places = out.want.filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));

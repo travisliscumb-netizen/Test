@@ -15,7 +15,9 @@
      and cables) and the Blackgate Tunnel (the tube, its lights, portals);
    - the airfield's and the proving ground's surfaces and paint.
    ===================================================================== */
-const ISLE_SCN = { near: [240, 320, 400, 480], far: 32, keep: 200, trees: [20, 16, 14, 12] };
+// budgetMs: how long the tile streaming may run in a frame (177's update: a tile is a job of many small steps);
+// urgentMs: when the tile in hand is under the focus or next to it
+const ISLE_SCN = { near: [240, 320, 400, 480], far: 32, keep: 200, trees: [20, 16, 14, 12], budgetMs: 3, urgentMs: 16 };
 const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3f6238, 0x7c9450, 0x9a9c9a];
 class IslandScenery {
   constructor(scene, world, game) {
@@ -113,8 +115,12 @@ class IslandScenery {
     this._farDirty = false;
   }
   // ---------------------------------------------------------------- near tiles
-  _tileMesh(tx, tz) {
-    const T = Island._tile(tx, tz), n = T.n, c = ISLE.cell, hh = T.h, nv = n * n;
+  _tileMesh(tx, tz) { const it = this._tileMeshJob(tx, tz); let r = it.next(); while (!r.done) r = it.next(); return r.value; }
+  // (a job: it yields every few rows, so streaming a tile in never takes one frame's whole budget; 2026-11-18, the
+  // island's stutter: a tile took 50 ms on average, up to 300, all in one frame)
+  *_tileMeshJob(tx, tz) {
+    const T = yield* Island._tileJob(tx, tz), n = T.n, c = ISLE.cell, hh = T.h, nv = n * n;
+    yield;
     const pos = new Float32Array((nv + n * 8) * 3), col = new Float32Array((nv + n * 8) * 3), nrm = new Float32Array((nv + n * 8) * 3), idx = [];
     const hAt = (i, j) => i >= 0 && j >= 0 && i < n && j < n ? hh[j * n + i] : Island.compute(T.x0 + i * c, T.z0 + j * c);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -122,6 +128,7 @@ class IslandScenery {
       const gx = (hAt(i + 1, j) - hAt(i - 1, j)) / (2 * c), gz = (hAt(i, j + 1) - hAt(i, j - 1)) / (2 * c), l = Math.hypot(gx, 1, gz);
       pos[o] = x; pos[o + 1] = h; pos[o + 2] = z; nrm[o] = -gx / l; nrm[o + 1] = 1 / l; nrm[o + 2] = -gz / l;
       const q = this._col(x, z, h, Math.hypot(gx, gz)); col[o] = q[0]; col[o + 1] = q[1]; col[o + 2] = q[2];
+      if (i === n - 1 && j % 2 === 1) yield;
     }
     // the tunnel's mouths: the cells of the cut's end wall that the bore goes through are left open
     const mouth = (x, z) => {
@@ -133,8 +140,9 @@ class IslandScenery {
       const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
       if (Math.max(hh[a], hh[b], hh[cc], hh[d]) < SEA_Y - 0.5) continue;
       const x = T.x0 + i * c, z = T.z0 + j * c;
-      if (this._foreign(x, z, c) || mouth(x + c / 2, z + c / 2)) continue;
+      if (this._foreign(x, z, c) || mouth(x + c / 2, z + c / 2)) { if (i === n - 2 && j % 16 === 15) yield; continue; }
       idx.push(a, cc, b, b, cc, d);
+      if (i === n - 2 && j % 16 === 15) yield;
     }
     // a skirt round the tile hides the seam against the coarse mesh and a neighbour not built yet
     let v = nv;
@@ -166,7 +174,8 @@ class IslandScenery {
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
       if (Island._nearRoad(Island._seg, x, z) && Island._rd < ISLE.verge + 2) continue;
       if (Island._nearRoad(Island._sseg, x, z) && Island._rd < 14) continue;
-      let pad = false; for (const P of Island.pads) if (x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
+      // (not on a level site: a lot, a park, the airport; a district's infill ground is open ground, its lots are sites)
+      let pad = false; for (const P of Island.pads) if (!P.infill && x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
       if (pad || Island.surface(x, z, h, sl) === 1) continue;
       const pine = hash2i(ix, iz, 207) < (z < 60 ? 0.3 + smoothstep(20, 120, h) * 0.55 : 0.2);
       list[pine ? 1 : 0].push([x, h, z, 0.9 + hash2i(ix, iz, 209) * 0.75, hash2i(ix, iz, 211) * 6.28]);
@@ -181,10 +190,13 @@ class IslandScenery {
     const tree = mk('tree');
     return this._treeGeo = [tree, mk('pine'), tree];
   }
-  _buildTile(tx, tz) {
-    const key = tz * 64 + tx, group = new THREE.Group(), mesh = this._tileMesh(tx, tz); group.add(mesh);
+  _buildTile(tx, tz) { const it = this._buildTileJob(tx, tz); let r = it.next(); while (!r.done) r = it.next(); }
+  *_buildTileJob(tx, tz) {
+    const key = tz * 64 + tx, group = new THREE.Group(), mesh = yield* this._tileMeshJob(tx, tz); group.add(mesh);
+    yield;
     const T = { key, tx, tz, group, cols: [], trees: 0 };
     const lists = this._trees(tx, tz), geos = this._treeGeos(), fol = this.g.props ? this.g.props.folMat : null, lv = this.g.quality ? this.g.quality.level : 1;
+    yield;
     lists.forEach((L, k) => {
       if (!L.length || !fol) return;
       const im = new THREE.InstancedMesh(geos[k], fol, L.length); im.castShadow = lv >= 2; im.receiveShadow = true;
@@ -225,10 +237,22 @@ class IslandScenery {
       want.sort((a, b) => a[0] - b[0]); this.queue = want;
       for (const T of [...this.tiles.values()]) { const x0 = ISLE.x0 + T.tx * Ts, z0 = ISLE.z0 + T.tz * Ts, d = Math.hypot(Math.max(x0 - fx, 0, fx - x0 - Ts), Math.max(z0 - fz, 0, fz - z0 - Ts)); if (d > R + ISLE_SCN.keep) this._dropTile(T); }
     }
-    // one tile a frame (all of them when nothing is drawn yet: a new game, a load, a long jump)
-    let budget = this.tiles.size === 0 ? 99 : 1;
-    while (budget-- > 0 && this.queue.length) { const [, i, j] = this.queue.shift(); if (!this.tiles.has(j * 64 + i)) this._buildTile(i, j); }
-    if (this._farDirty) this._farIndex();
+    // tiles stream in as jobs run a few milliseconds a frame (all at once when nothing is drawn yet: a new game, a load,
+    // a long jump); the job in hand is dropped if the focus has moved so far that its tile is no longer wanted
+    if (this.tiles.size === 0) { while (this.queue.length) { const [, i, j] = this.queue.shift(); if (!this.tiles.has(j * 64 + i)) this._buildTile(i, j); } this.job = null; }
+    // (a tile the focus is already on or next to is urgent: it gets most of a frame, so the ground under you is never
+    // missing; the rest stream in the background)
+    const t0 = performance.now(), tileD = key => { const i = key % 64, j = Math.floor(key / 64), x0 = ISLE.x0 + i * Ts, z0 = ISLE.z0 + j * Ts; return Math.hypot(Math.max(x0 - fx, 0, fx - x0 - Ts), Math.max(z0 - fz, 0, fz - z0 - Ts)); };
+    const urgent = (this.job && tileD(this.job.key) < 64) || (this.queue.length && this.queue[0][0] < 64), budget = urgent ? ISLE_SCN.urgentMs : ISLE_SCN.budgetMs;
+    while (performance.now() - t0 < budget) {
+      if (!this.job) {
+        if (!this.queue.length) break;
+        const [, i, j] = this.queue.shift(); if (this.tiles.has(j * 64 + i)) continue;
+        this.job = { key: j * 64 + i, it: this._buildTileJob(i, j) };
+      }
+      if (this.job.it.next().done) this.job = null;
+    }
+    if (this._farDirty && !this.job) this._farIndex();
   }
   // ---------------------------------------------------------------- roads
   /* the roads (owner, 2026-11-16: "the new roads need to look amazing"): a mesh for about every kilometre of each
@@ -265,10 +289,14 @@ class IslandScenery {
     };
     const vtx = (x, y, z, n, r, q) => { pos.push(x, y, z); nrm.push(n[0], n[1], n[2]); aR.push(r[0], r[1], r[2], r[3]); aQ.push(q[0], q[1], q[2], q[3]); return pos.length / 3 - 1; };
     for (const R of roads) {
-      const urban = /^[ghmpd]\d/.test(R.id), cls = urban ? (R.w >= 9 ? 1 : 0) : (R.w >= 11 ? 3 : 2), hw = R.w / 2, n = R.pts.length;
+      // (a roundabout's ring, 023, is a kerbed street with no centre line: class 0)
+      const urban = /^[ghmpd]\d/.test(R.id) || R.cls === 0, cls = R.cls ?? (urban ? (R.w >= 9 ? 1 : 0) : (R.w >= 11 ? 3 : 2)), hw = R.w / 2, n = R.pts.length;
       const skipSide = k => (R.bridges || []).some(sp => k >= sp[0] - 1 && k <= sp[1] + 1) || (R.tunnel && k >= R.tunnel[0] - 3 && k <= R.tunnel[1] + 3);
       // the stop lines: 2.5 m short of the road each end joins (a lattice street is 12 m wide)
-      const ends = (R.ends || []).map(e => e && e !== 'ring' ? (byId[e] ? byId[e].w / 2 : 6) + 2.5 : null), hosts = (R.ends || []).map(e => byId[e]).filter(Boolean);
+      // (a roundabout's ring is closed: it joins nothing, its 'ends' are itself)
+      const ends = (R.closed ? [] : R.ends || []).map(e => e && e !== 'ring' ? (byId[e] ? byId[e].w / 2 : 6) + 2.5 : null), hosts = (R.closed ? [] : R.ends || []).map(e => byId[e]).filter(Boolean);
+      // (an end on a roundabout's ring has a give-way line, not a stop line: the shader reads it from the class's fraction)
+      const rbEnd = (R.ends || []).map(e => !R.closed && typeof e === 'string' && e.startsWith('rb:')), clsF = (rbEnd[0] ? 0.1 : 0) + (rbEnd[1] ? 0.2 : 0);
       // the cross-section's strips: [lateral from, lateral to, height from, height to, surface, normal: 'up' or a side]
       const strips = [[-hw, hw, 0.035, 0.035, 0, 'up']];
       if (urban) for (const sd of [-1, 1]) strips.push([sd * hw, sd * hw, 0.035, 0.185, 1, -sd], [sd * hw, sd * (hw + 0.3), 0.185, 0.185, 1, 'up'], [sd * (hw + 0.3), sd * (hw + 2.1), 0.185, 0.185, 2, 'up'], [sd * (hw + 2.1), sd * (hw + 2.1), 0.185, -0.35, 2, sd]);
@@ -287,7 +315,7 @@ class IslandScenery {
           const vert = side !== 'up', nn = vert ? [nx * side, 0, nz * side] : [0, 1, 0];
           const q = [surf, paint, endA, endB];
           // (the higher lateral first: with the index order below the strip faces up, as the old ribbon did)
-          const A = vtx(p[0] + nx * l1, y + y1, p[1] + nz * l1, nn, [l1, sAt, hw, cls], q), B = vtx(p[0] + nx * l0, y + y0, p[1] + nz * l0, nn, [l0, sAt, hw, cls], q);
+          const A = vtx(p[0] + nx * l1, y + y1, p[1] + nz * l1, nn, [l1, sAt, hw, cls + clsF], q), B = vtx(p[0] + nx * l0, y + y0, p[1] + nz * l0, nn, [l0, sAt, hw, cls + clsF], q);
           // kerbs, pavements and shoulders give way to any other road's carriageway (tested at both edges); a joining
           // street's also give way to the pavement of the road it joins, which runs on unbroken
           const cut = si > 0 && (Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R), inside(p[0] + nx * l1, p[1] + nz * l1, R)) > -0.25

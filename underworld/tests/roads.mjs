@@ -20,7 +20,7 @@ const geo = await ev(() => {
     let maxTurn = 0;
     for (let k = 1; k < L.pts.length - 1; k++) { const a = L.pts[k - 1], q = L.pts[k], c = L.pts[k + 1]; const h0 = Math.atan2(q[0] - a[0], q[1] - a[1]), h1 = Math.atan2(c[0] - q[0], c[1] - q[1]); let d = Math.abs(h1 - h0); if (d > Math.PI) d = 2 * Math.PI - d; maxTurn = Math.max(maxTurn, d); }
     // an end meets an open lattice road, another curved road part way along it (Curved Roads pass), or is a spur's free end
-    return { name: L.name, n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || (e.onLink ? w.links.some(M => M !== L && M.name === e.onLink && M.pts.some((q, k) => k < M.pts.length - 1 && Math.hypot(q[0] - e.C.x, q[1] - e.C.z) < M.len)) : P.RoadNet.segOpen(e.axis, e.line, e.seg))), cross: L.ends.map(e => e.C ? Math.round(e.C.x) + ',' + Math.round(e.C.z) : ''), pre: L.ends.map(e => { const p = e.C && P.CityLayout.at(e.C.x, e.C.z); return p ? p.ox + ',' + p.oz : null; }) };
+    return { name: L.name, base: L.road.isle ? (L.road.isle.base || L.road.isle.id) : null, ring: !!(L.road.isle && L.road.isle.roundabout), n: L.pts.length, len: L.len, maxTurn, same: L.pts === L.road.pts && w.localRoads.includes(L.road), ends: L.ends.map(e => e.free || (e.onLink ? w.links.some(M => M !== L && M.name === e.onLink && M.pts.some((q, k) => k < M.pts.length - 1 && Math.hypot(q[0] - e.C.x, q[1] - e.C.z) < M.len)) : P.RoadNet.segOpen(e.axis, e.line, e.seg))), cross: L.ends.map(e => e.C ? Math.round(e.C.x) + ',' + Math.round(e.C.z) : ''), pre: L.ends.map(e => { const p = e.C && P.CityLayout.at(e.C.x, e.C.z); return p ? p.ox + ',' + p.oz : null; }) };
   });
   // the lattice: exactly the segments the superblocks close, nothing else
   let expect = P.CITY_CLOSED.length; for (const sb of P.SUPERBLOCKS) expect += (sb.bx1 - sb.bx0) * (sb.bz1 - sb.bz0 + 1) + (sb.bz1 - sb.bz0) * (sb.bx1 - sb.bx0 + 1);
@@ -42,7 +42,8 @@ const names = geo.links.map(l => l.name);
 // one crossing: Saint Ivo Lane runs three blocks)
 // or through a district's streets (the Coast Highway through Crestmoor Heights and Greenway: both halves end on
 // precincts that stand together)
-const halves = (m, o) => m.cross.some(c => c && o.cross.includes(c)) || m.pre.some(p => p && o.pre.includes(p));
+// or a road a roundabout cuts into pieces (023: each piece is the same road, its 'base', and ends on the ring)
+const halves = (m, o) => m.cross.some(c => c && o.cross.includes(c)) || m.pre.some(p => p && o.pre.includes(p)) || (m.base && m.base === o.base);
 const dupOk = geo.links.every(l => { const same = geo.links.filter(m => m.name === l.name); return same.length === 1 || same.every(m => same.some(o => o !== m && halves(m, o))); });
 check('curved through-roads: Greenway Park Drive, the Cedar Fields road and four suburb bends (and the Curved Roads pass’s streets)', names.includes('Greenway Park Drive') && names.includes('Cedar Fields Road') && ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend', 'Saltmarsh Way', 'Kiln Lane', 'Tanner’s Row', 'Farm Track'].every(n => names.includes(n)) && dupOk, JSON.stringify(names));
 check('they are smooth splines (samples every ~2.5 m, no kink sharper than 10°)', geo.links.every(l => l.n >= l.len / 3 && l.maxTurn < 0.175), JSON.stringify(geo.links.map(l => [l.name, l.n, Math.round(l.len), +l.maxTurn.toFixed(3)])));
@@ -107,7 +108,12 @@ check('lattice traffic turns off onto the curved road at its junction', turnOff.
 // every suburb bend is a real road: a lattice car turns in, drives it in lane and merges out the far end
 const bends = await ev(async () => {
   const g = window.game, w = g.world, tr = g.traffic, out = [];
-  for (const L of w.links.filter(L => ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].includes(L.name))) {
+  // (a bend whose block a rebuilt district took in, 124, went with its grid: the rebuild suite drives the district's
+  // own streets in at one end and out at the other the same way)
+  const P0 = window.__pv, swallowed = ([x, z]) => P0.SUPERBLOCKS.some(sb => x >= sb.bx0 && x <= sb.bx1 && z >= sb.bz0 && z <= sb.bz1);
+  const BENDS = [['Hawthorn Bend', [0, 7]], ['Kestrel Curve', [0, 8]], ['Millrace Lane', [1, 8]], ['Willow Bend', [2, 10]]].filter(([, c]) => !swallowed(c)).map(([n]) => n);
+  window.__bendsLeft = BENDS.length;
+  for (const L of w.links.filter(L => BENDS.includes(L.name))) {
     for (const v of tr.cars.slice()) g.vehicles.despawn(v);
     const e = L.ends[0];
     g.resetPlayerState(e.C.x + (e.axis === 0 ? 30 : 0), e.C.z + (e.axis === 1 ? 30 : 0), 0);
@@ -133,7 +139,8 @@ const bends = await ev(async () => {
   }
   return out;
 });
-check('every suburb bend is driven by traffic: in at one street, along the curve in lane, out onto the other', bends.length === 4 && bends.every(b => b.took && b.merged && b.off < b.w / 2), JSON.stringify(bends));
+const bendsLeft = await ev(() => window.__bendsLeft);
+check('every suburb bend is driven by traffic: in at one street, along the curve in lane, out onto the other', bends.length === bendsLeft && bends.every(b => b.took && b.merged && b.off < b.w / 2), JSON.stringify(bends));
 const bendGps = await ev(() => {
   const g = window.game, P = window.__pv, out = [];
   for (const L of g.world.links.filter(L => ['Hawthorn Bend', 'Kestrel Curve', 'Millrace Lane', 'Willow Bend'].includes(L.name))) { const q = L.pts[Math.floor(L.pts.length / 2)], r = P.gpsRoute(q[0] + 200, q[1] + 200, q[0], q[1]), end = r[r.length - 1]; out.push({ name: L.name, end: +Math.hypot(end.x - q[0], end.z - q[1]).toFixed(2), on: r.filter(p => L.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)).length }); }
@@ -148,8 +155,9 @@ const gps = await ev(() => {
   const r = P.gpsRoute(130, 290, q[0], q[1]);
   let onLink = 0; for (const p of r) if (L.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)) onLink++;
   const end = r[r.length - 1];
-  // a trip across the city that has no reason to use the park still routes on the lattice
-  const r2 = P.gpsRoute(600, 600, 900, 620); let onLink2 = 0; for (const p of r2) for (const L2 of g.world.links) if (L2.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)) onLink2++;
+  // a trip along a street that runs (the edge street between the Old Quarter and the core, x = 320) has no reason to
+  // leave it for a curved road (2026-11-19: the districts either side are rebuilt on their own streets)
+  const r2 = P.gpsRoute(322, 350, 322, 620); let onLink2 = 0; for (const p of r2) for (const L2 of g.world.links) if (L2.pts.some(s => Math.hypot(s[0] - p.x, s[1] - p.z) < 0.01)) onLink2++;
   return { onLink, n: r.length, end: Math.hypot(end.x - q[0], end.z - q[1]), onLink2, n2: r2.length };
 });
 check('GPS: a destination on the drive is reached along the curve', gps.onLink >= 20 && gps.end < 0.01, JSON.stringify(gps));

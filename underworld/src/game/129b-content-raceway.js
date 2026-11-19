@@ -125,7 +125,7 @@ Object.assign(World.prototype, {
       B.pad.place = { id: 'raceway', name: SR.name, kind: 'landmark', door: { x: O.x0 - 1.1, z: (O.z0 + O.z1) / 2, h: -Math.PI / 2 }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
       // transporters along the paddock's back
       for (let k = 0; k < 5; k++) { const x = SR.paddock.x0 + 16 + k * 30; this._bld(B.pad, x, SR.paddock.z0 + 2, x + 16, SR.paddock.z0 + 5, 3.6, STYLE.IND, [0xd23a2a, 0x1f6fb2, 0xe8eaed, 0x2e2e2e, 0xf1c40f][k], 3.6, 4, { exactH: true, y0: Y, oy: Y }); }
-      for (const [x, z] of [[-560, 1800], [-760, 1800], [-660, 1790]]) this._prop(B.pad, 'lotlamp', x, z, 0);
+      for (const [x, z] of [[-560, 1800], [-760, 1800], [-660, 1790]]) this._prop(B.pad, 'lotlamp', x, z, 0, 1, Y);
     }
     // ---------------------------------------------------------------- the fleet: race cars in the garages and the paddock
     this.isle.fleet.push({ id: 'sr_pits', x: -620, z: 1816, r: 300, slots: sr.bays.filter((q, i) => i % 3 === 0).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: Y, cls: ['gt3', 'cup', 'drift', 'formula', 'lmp', 'rally'][i % 6] })) });

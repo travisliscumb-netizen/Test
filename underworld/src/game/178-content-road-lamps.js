@@ -28,7 +28,7 @@ Object.assign(World.prototype, {
     const built = []; for (const b of this.xblocks) { for (const r of b.bld) built.push([r.x0, r.z0, r.x1, r.z1]); for (const d of b.det) { const c = d.col; if (!c) continue; if (c.r !== undefined) built.push([c.x - c.r, c.z - c.r, c.x + c.r, c.z + c.r]); else built.push([c.x0, c.z0, c.x1, c.z1]); } }
     const inBuilt = (x, z, m) => built.some(r => x > r[0] - m && x < r[2] + m && z > r[1] - m && z < r[3] + m);
     for (const R of Island.roads) {
-      if (lit.has(R.id)) continue;
+      if (lit.has(R.base || R.id) || R.closed) continue;
       const len = R.cum[R.cum.length - 1];
       let side = 1;
       for (let s = L.first; s < len - L.endGap; s += L.step) {

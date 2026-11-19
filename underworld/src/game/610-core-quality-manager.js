@@ -16,11 +16,14 @@ class QualityManager {
     this.level = this.mode === 'auto' ? (IS_MOBILE ? 1 : 2) : this.mode;
     this.acc = 0; this.frames = 0; this.cool = 3; this.history = [];
   }
+  // the preset's pixel ratio on this screen, and how far dynamic resolution may take it (see update)
+  basePR() { return Math.min(Math.min(window.devicePixelRatio || 1, 3), QUALITY[this.level].pr); }
+  drsFloor() { const base = this.basePR(); return this.level === 0 ? 0.85 : clamp(Math.max(0.85, 1 / base), 0.85, 1); }
   setMode(m) { this.mode = m; if (m !== 'auto') this.level = m; this.apply(); }
   apply() {
     const g = this.g, q = QUALITY[this.level], s = g.save.settings;
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    g.renderer.setPixelRatio(Math.min(dpr, q.pr) * (this.dynScale || 1));
+    this.dynScale = Math.max(this.drsFloor(), this.dynScale || 1);
+    g.renderer.setPixelRatio(this.basePR() * this.dynScale);
     const sh = s.shadows && q.shadow > 0, shChanged = this._sh !== undefined && this._sh !== sh; this._sh = sh;
     g.renderer.shadowMap.enabled = sh;
     g.env.sun.castShadow = sh;
@@ -43,18 +46,24 @@ class QualityManager {
   update(dt) {
     if (this.mode !== 'auto' || this.g.state !== 'playing') return;
     this.acc += dt; this.frames++; this.cool -= dt;
-    // dynamic resolution (G2): every second, a long frame takes 8% of the pixel ratio away (down to 60% of the
-    // preset's), a quick one gives 5% back; whole presets only change when that is not enough (below)
+    // dynamic resolution, the last resort (2026-11-18: it used to take up to 40% of the pixels away first, which is
+    // what made the island builds soft: the heavier world held frames over 21 ms and the image sat at 60%). A slow
+    // frame now costs the preset's real work first (shadow map, draw distance, crowds, MSAA: below); only on the lowest
+    // preset it is on, or once the preset can drop no further, does resolution give way, by 15% at most and never
+    // under the screen's own CSS pixels from Medium up
     this.drsAcc = (this.drsAcc || 0) + dt; this.drsN = (this.drsN || 0) + 1;
     if (this.drsAcc >= 1) {
       const ms = this.drsAcc / this.drsN * 1000, k = this.dynScale || 1; this.drsAcc = 0; this.drsN = 0;
-      const nk = ms > 21 ? Math.max(0.6, k * 0.92) : ms < 15 ? Math.min(1, k * 1.05) : k;
-      if (Math.abs(nk - k) > 0.004) { this.dynScale = nk; this.g.renderer.setPixelRatio(Math.min(Math.min(window.devicePixelRatio || 1, 3), QUALITY[this.level].pr) * nk); this.g.onResize(); }
+      const floorK = this.drsFloor(), lastResort = this.level === 0 || (this.level === 1 && this.cool <= 0);
+      const nk = ms > 24 && lastResort ? Math.max(floorK, k * 0.95) : ms < 16 ? Math.min(1, k * 1.05) : k;
+      if (Math.abs(nk - k) > 0.004) { this.dynScale = nk; this.g.renderer.setPixelRatio(this.basePR() * nk); this.g.onResize(); }
     }
     if (this.acc >= 2) {
       const ms = this.acc / this.frames * 1000; this.acc = 0; this.frames = 0;
-      if (this.cool > 0 || (this.dynScale || 1) > 0.62 && ms > 24) return;
-      if (ms > 24 && this.level > 0) { this.level--; this.cool = 5; this.apply(); this.g.ui.toast(`Graphics adjusted to ${QUALITY[this.level].name} for smoother play.`); }
+      if (this.cool > 0) return;
+      // presets step down before any pixels go (above); to Low (the weak-device preset, 0.7 of the screen's pixels)
+      // only when frames are truly struggling
+      if (ms > (this.level === 1 ? 34 : 24) && this.level > 0) { this.level--; this.cool = 5; this.apply(); this.g.ui.toast(`Graphics adjusted to ${QUALITY[this.level].name} for smoother play.`); }
       else if (ms < 12.5 && this.level < (IS_MOBILE ? 2 : 3) && !this.droppedFrom?.[this.level + 1]) { this.level++; this.cool = 8; this.apply(); }
       if (ms > 24) { this.droppedFrom = this.droppedFrom || {}; this.droppedFrom[this.level + 1] = true; }
     }

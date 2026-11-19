@@ -32903,14 +32903,14 @@ function streetNameAt(x, z) {
     const cl = cityClosedAt(x - p.ox * P, z - p.oz * P); if (cl) return cl.name;
     // off the lattice's carriageways, a curved street underfoot names itself (a lane across where a lattice street
     // ran, in a block rebuilt on its own streets, is not that old street)
-    if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
+    if (!RoadNet.roadAt(x, z) && RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_NAMED }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
     // (only a lattice street that still runs there: a superblock or a square has taken some of their lengths)
     const onX = Math.abs(x - I * P) < ROAD_HALF + WALK_W && i >= p.lx0 && i <= p.lx1 + 1 && RoadNet.segOpen(0, I, clamp(Math.floor(z / P), p.lz0 + p.oz, p.lz1 + p.oz)), onZ = Math.abs(z - J * P) < ROAD_HALF + WALK_W && j >= p.lz0 && j <= p.lz1 + 1 && RoadNet.segOpen(1, J, clamp(Math.floor(x / P), p.lx0 + p.ox, p.lx1 + p.ox));
     if (onX && onZ) return STREET_NAMES_X[i] + ' & ' + STREET_NAMES_Z[j];
     if (onX) return STREET_NAMES_X[i];
     if (onZ) return STREET_NAMES_Z[j];
     // a curved street through the blocks (a lane, a crescent, an avenue): its own name
-    if (RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_LINKS }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
+    if (RoadGraph.ready) { const q = RoadGraph.nearest(x, z, { maxD: 10, kinds: RG_NAMED }); if (q && q.d <= q.e.w / 2 + 1) return q.e.name; }
   }
   if (z > CFS_EDGE + EDGE_MARGIN && cfsBridge(x, z)) return 'Cedar Fields Track';
   if (cfsLand(x, z)) return CFS.name;
@@ -33022,8 +33022,12 @@ function isRushHour(t) { return (t >= 7.25 && t < 9.25) || (t >= 16.5 && t < 18.
 const SUPERBLOCKS = [
   { id: 'estate', bx0: 0, bz0: 0, bx1: 1, bz1: 0, gen: '_genEstate', peds: false, ground: 'W', land: 'W' },
   { id: 'park', bx0: 2, bz0: 2, bx1: 4, bz1: 3, gen: '_genBigPark', peds: true, ground: 'G', land: 'G' },
-  // the Old Quarter rebuilt on its own winding streets (124; owner, 2026-11-18)
-  { id: 'oldquarter', bx0: 0, bz0: 4, bx1: 2, bz1: 6, gen: '_genOldQuarter', peds: true, ground: 'R', land: 'R' },
+  // the Old Quarter rebuilt on its own winding streets (124b; owner, 2026-11-18; the whole precinct since 2026-11-19)
+  { id: 'oldquarter', bx0: 0, bz0: 4, bx1: 3, bz1: 7, gen: '_genRebuilt', rb: 'oldquarter', peds: true, ground: 'H', land: 'R' },
+  // the financial core rebuilt on its own streets (124d; owner, 2026-11-19)
+  { id: 'core', bx0: 4, bz0: 4, bx1: 9, bz1: 7, gen: '_genRebuilt', rb: 'core', peds: true, ground: 'C', land: 'D' },
+  // Linden Hills rebuilt on its own streets (124c; owner, 2026-11-19)
+  { id: 'linden', bx0: 0, bz0: 8, bx1: 3, bz1: 10, gen: '_genRebuilt', rb: 'linden', peds: true, ground: 'H', land: 'R' },
   { id: 'stadium', bx0: 7, bz0: 8, bx1: 9, bz1: 9, gen: '_genStadiumDistrict', peds: false, ground: 'Z', land: 'A' },
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
@@ -33177,10 +33181,11 @@ const Links = {
       // a spur (the Valen Point causeway) meets the lattice at its first end only; its far end is a turning circle.
       // An end may also meet another curved road (Curved Roads pass: Y-junctions, the farm track off Cedar Fields Road)
       const last = r.pts[r.pts.length - 1];
-      const a = this.attach(r.pts[0]) || this.attachLink(r.pts[0], world, r), b = r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last) || this.attachLink(last, world, r);
+      // (a roundabout's ring, 023, is closed: it has no ends, only the roads that end on it)
+      const a = r.closed ? { free: true, closed: true, axis: -1, C: { x: r.pts[0][0], z: r.pts[0][1] } } : this.attach(r.pts[0]) || this.attachLink(r.pts[0], world, r), b = r.closed ? { free: true, closed: true, axis: -1, C: { x: last[0], z: last[1] } } : r.spur ? { free: true, axis: -1, C: { x: last[0], z: last[1] } } : this.attach(last) || this.attachLink(last, world, r);
       if (!a || !b) continue;
       const cum = [0]; for (let k = 1; k < r.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(r.pts[k][0] - r.pts[k - 1][0], r.pts[k][1] - r.pts[k - 1][1]));
-      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null };
+      const L = { id: this.list.length, name: r.link, pts: r.pts, w: r.w, cum, len: cum[cum.length - 1], lane: Math.min(LANE, r.w / 4), ends: [a, b], road: r, spur: !!r.spur, ring: r.ring || null, closed: !!r.closed, oneway: !!r.oneway };
       this.list.push(L);
       L.ends.forEach((e, k) => { if (e.free || e.onLink) return; const key = this.key(e.axis, e.line, e.seg); if (!this.idx.has(key)) this.idx.set(key, []); this.idx.get(key).push({ link: L, e: k, end: e }); });
     }
@@ -33332,7 +33337,8 @@ const CITY_LAYOUTS = {
   tracer: [{ id: 'city', lx0: 0, lz0: 0, lx1: N - 1, lz1: N - 1, ox: -3, oz: -2 }],
   // never shipped either: the city cut in two, the west half three cells further west, the halves joined by one
   // connector road (CITY_CONNECTORS), so routing, traffic and the edges between parted precincts are exercised (S4)
-  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 5, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 6, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
+  // (parted between the core and the port since 2026-11-19: a rebuilt district's superblock stays whole)
+  tracer2: [{ id: 'west', lx0: 0, lz0: 0, lx1: 9, lz1: N - 1, ox: -3, oz: 0 }, { id: 'east', lx0: 10, lz0: 0, lx1: N - 1, lz1: N - 1, ox: 0, oz: 0 }],
   // the city round Valen Bay (CITY_SPREAD.md §3, §9): the core, the west of the Old Quarter, Linden Hills with the
   // farm, and the port (the Industrial Belt, the Docklands and the Container Terminal, whose quay faces east and so
   // once faced Valen Sound, now the river's harbour basin: a precinct never turns) stay on the island's waist; Crestmoor Heights stands on the bay's
@@ -33354,7 +33360,7 @@ const CITY_LAYOUTS = {
 // the roads that join a layout's precincts: island roads (022's format, in world metres) whose 'lat' ends meet two
 // precincts' edge streets side-on
 const CITY_CONNECTORS = {
-  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[240, 440], [300, 441], [420, 441], [480, 440]] }],
+  tracer2: [{ id: 'c1', name: 'Tracer Link', w: 11, grade: 0.07, ends: ['lat', 'lat'], pts: [[560, 440], [620, 441], [740, 441], [800, 440]] }],
   island: [
     // the Stadium's east street to the Southshore Highway
     { id: 'cS', name: 'Strip Road', w: 10, grade: 0.07, ends: ['lat', 's1'], pts: [[-154, 1080], [-128, 1085], [-100, 1090]] },
@@ -33820,6 +33826,8 @@ const Island = {
       this._profile(R);
       this.roads.push(R); byId[R.id] = R;
     }
+    // the roundabouts (023): roads cut at each ring, the rings added
+    this.applyRoundabouts();
     this._indexRoads();
     this.tiles.clear();
     this.ready = true;
@@ -33953,6 +33961,16 @@ const Island = {
     return y * (1 - t) + h * t;
   },
   // ---------------------------------------------------------------- tiles
+  // the same, as a job that yields every few rows (the scenery streams tiles a few milliseconds a frame, 177): a tile
+  // a car or a person asks for meanwhile is computed whole, at once, as before
+  *_tileJob(tx, tz) {
+    const key = tz * 64 + tx; if (this.tiles.has(key)) return this.tiles.get(key);
+    const c = ISLE.cell, n = ISLE.tile / c + 1, h = new Float32Array(n * n), x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile;
+    for (let j = 0; j < n; j++) { for (let i = 0; i < n; i++) h[j * n + i] = this.compute(x0 + i * c, z0 + j * c); if (j % 3 === 2) { yield; if (this.tiles.has(key)) return this.tiles.get(key); } }
+    const T = { tx, tz, x0, z0, h, n, multi: this._multi.has(key) };
+    this.tiles.set(key, T);
+    return T;
+  },
   _tile(tx, tz) {
     const key = tz * 64 + tx; let T = this.tiles.get(key); if (T) return T;
     const c = ISLE.cell, n = ISLE.tile / c + 1, h = new Float32Array(n * n), x0 = ISLE.x0 + tx * ISLE.tile, z0 = ISLE.z0 + tz * ISLE.tile;
@@ -34068,9 +34086,121 @@ const Island = {
     // (0.5 m over the sea, Island roads' floor) past the gate, and a short driveway climbs the last 0.4 m to it
     if (CityLayout.id === 'island') { const S = SOUND_ANNEX; this.addPad(S.ox - 40, S.oz - 34, S.ox + P - INNER + 4, S.oz + P - INNER + 4, CURB_H, 40); }
     // Linden Gardens (128): the infill between the precincts, at the city's level
-    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60);
+    // (marked infill: the scenery plants trees on it between the lots, 177, as on any open ground)
+    if (typeof ISLE_INFILL !== 'undefined') for (const F of ISLE_INFILL[CityLayout.id] || []) for (const r of F.pads) this.addPad(r[0], r[1], r[2], r[3], CURB_H, 60).infill = true;
+    // the roundabouts' level ground (023), last: each at the level the ground already has there (the city's level by
+    // the precincts, where their streets come to it)
+    this.roundaboutPads();
   }
 };
+/* =====================================================================
+   [CONTENT] ROUNDABOUTS (the world overhaul, 2026-11-19; ISLAND.md §10)
+   Six junctions of the island's roads become roundabouts, where the roads
+   meet the districts, the logistics park, the Sound Flats and the fair:
+   - the ground under each is levelled (a pad, before the roads find their
+     level), every road that crosses its circle is cut at the ring (a road
+     through it becomes two legs, each ending on the ring), and the ring is
+     a road of its own: closed, one-way, anticlockwise on the map (traffic
+     keeps right), its id 'rb:<id>' so each leg's stop line stands at the
+     ring's edge (177);
+   - the road graph takes the ring's pieces as one-way edges (135): the GPS,
+     AI drivers, traffic and taxis only ever go round it the right way;
+     traffic entering gives way to traffic already on it (280);
+   - a raised central island with a kerb, planting and a tree, give-way
+     signs at each entry and a sign ahead on each approach (_genRoundabouts).
+   ===================================================================== */
+// [id, name, x, z, ring radius (to the carriageway's centre), carriageway width]
+const ROUNDABOUTS = [
+  { id: 'harbour', name: 'Harbour Circus', x: 314, z: 50, r: 17, w: 9 },
+  { id: 'gardens', name: 'Gardens Circle', x: 709, z: 872, r: 16, w: 9 },
+  { id: 'freight', name: 'Freight Circle', x: 747, z: 1186, r: 17, w: 9.5 },
+  { id: 'longshore', name: 'Longshore Circle', x: 760, z: 1330, r: 18, w: 9.5 },
+  { id: 'sound', name: 'Sound Circus', x: 1298, z: 450, r: 16, w: 9 },
+  { id: 'fairground', name: 'Fairground Circle', x: 2000, z: 2049, r: 16, w: 9 }
+];
+// the central island's planting radius inside the ring's inner kerb
+function roundaboutIsland(RB) { return RB.r - RB.w / 2 - 0.4; }
+Object.assign(Island, {
+  // each roundabout's level ground: the last pad (after every other, before the roads take their level: buildRoads)
+  roundaboutPads() {
+    if (CityLayout.id !== 'island') return;
+    for (const RB of ROUNDABOUTS) { const e = RB.r + RB.w / 2 + 8; RB.y = Math.round(Math.max(this.base0(RB.x, RB.z), SEA_Y + 1.7) * 10) / 10; this.addPad(RB.x - e, RB.z - e, RB.x + e, RB.z + e, RB.y, 45); }
+  },
+  // cut the roads at each ring and add the rings (after every road is laid and has its level; before the index)
+  applyRoundabouts() {
+    if (CityLayout.id !== 'island') return;
+    for (const RB of ROUNDABOUTS) {
+      const cx = RB.x, cz = RB.z, r = RB.r, ringId = 'rb:' + RB.id, out = [], meets = [], cutInto = new Map();
+      const inside = p => Math.hypot(p[0] - cx, p[1] - cz) < r;
+      // where a segment from a (outside) to b (inside), or the other way, crosses the circle: the point and the share
+      const cross = (a, b) => { let lo = 0, hi = 1; const ia = inside(a); for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2, q = [a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m]; if (inside(q) === ia) lo = m; else hi = m; } const t = (lo + hi) / 2; return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], t }; };
+      for (const R of this.roads) {
+        if (R.closed) { out.push(R); continue; }
+        const n = R.pts.length, ins = R.pts.map(inside);
+        if (!ins.some(Boolean)) { out.push(R); continue; }
+        // the stretches outside the circle, each ending at the ring where it meets it
+        const pieces = []; let s = 0;
+        for (let i = 0; i < n; i++) if (ins[i]) { if (i > s) pieces.push([s, i - 1]); while (i + 1 < n && ins[i + 1]) i++; s = i + 1; }
+        if (s < n) pieces.push([s, n - 1]);
+        const made = pieces.map(([a, b]) => {
+          const startRing = a > 0, endRing = b < n - 1, pts = [], y = [], sp = [];
+          // (the leg ends exactly on the circle, where the ring has a vertex of its own: a road point within 2 m of
+          // that end goes, so no sliver of a segment is left to turn the leg's last heading about)
+          const c0 = startRing && cross(R.pts[a], R.pts[a - 1]), c1 = endRing && cross(R.pts[b], R.pts[b + 1]);
+          const far = q => (!c0 || Math.hypot(q[0] - c0.p[0], q[1] - c0.p[1]) > 2) && (!c1 || Math.hypot(q[0] - c1.p[0], q[1] - c1.p[1]) > 2);
+          if (c0) { pts.push(c0.p); y.push(RB.y); sp.push(0); meets.push(c0.p); }
+          for (let k = a; k <= b; k++) if (far(R.pts[k]) || (k === a && !c0) || (k === b && !c1)) { pts.push(R.pts[k]); y.push(R.y[k]); sp.push(R.sp[k]); }
+          if (c1) { pts.push(c1.p); y.push(RB.y); sp.push(0); meets.push(c1.p); }
+          const cum = new Float64Array(pts.length); for (let k = 1; k < pts.length; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+          // (the leg eases to the ring's level over its last 25 m: the road's own level where it was cut need not be
+          // the ring's, and the step would stand at the give-way line)
+          const RAMP = 25, ease = (iEnd, iNext, dir) => { if (pts.length < 3) return; const dy = RB.y - y[iNext]; for (let k = iNext; k >= 0 && k < pts.length; k += dir) { const d = Math.abs(cum[k] - cum[iEnd]); if (d >= RAMP) break; y[k] += dy * (1 - d / RAMP); } };
+          if (c0) ease(0, 1, 1);
+          if (c1) ease(pts.length - 1, pts.length - 2, -1);
+          // (bridges and tunnels index the road's points: the leg keeps none of those within 2 m of the ring, and a
+          // roundabout stands on level open ground, so only indices clear of the ring end are mapped)
+          const off = a - (startRing ? 1 : 0), dropped = startRing ? (() => { let n2 = 0; for (let k = a; k <= b && !far(R.pts[k]); k++) n2++; return n2; })() : 0;
+          const remap = L => L && L.map(q => [q[0] - off - dropped, q[1] - off - dropped]).filter(q => q[0] >= (startRing ? 1 : 0) && q[1] < pts.length - (endRing ? 1 : 0));
+          return { ...R, pts, y: Float64Array.from(y), sp: Uint8Array.from(sp), cum, len: cum[pts.length - 1],
+            ends: [startRing ? ringId : R.ends[0], endRing ? ringId : R.ends[1]], hosts: [startRing ? null : R.hosts[0], endRing ? null : R.hosts[1]],
+            ring: endRing ? null : R.ring, bridges: remap(R.bridges), tunnel: (q => q && q.length ? q[0] : null)(remap(R.tunnel && [R.tunnel])), base: R.base || R.id, mapChunks: null };
+        }).filter(P2 => P2.len > 6);
+        // the longest piece keeps the road's id (its name is every piece's); the others are '<id>.<n>'
+        let main = 0; made.forEach((P2, k) => { if (P2.len > made[main].len) main = k; });
+        // (ids stay unique when a road is cut at more than one ring: the next free '<base>.<n>')
+        cutInto.set(R, made);
+        made.forEach((P2, k) => { if (k !== main) { const base = R.base || R.id; let q = 1; while (this.roads.some(o => o.id === base + '.' + q) || out.some(o => o.id === base + '.' + q)) q++; P2.id = base + '.' + q; } out.push(P2); });
+      }
+      // the ring: anticlockwise on the map (decreasing angle: x east, z south), every ~2 m, closed, with a vertex
+      // exactly where each leg meets it (its node there is that leg's end: 020 Links, 135)
+      const m = Math.max(24, Math.round(2 * Math.PI * r / 2)), TAU = Math.PI * 2, norm = a => ((a % TAU) + TAU) % TAU;
+      const at = meets.map(p => norm(-Math.atan2(p[1] - cz, p[0] - cx))), angs = [...at];
+      for (let k = 0; k < m; k++) { const u = k / m * TAU; if (at.every(q => Math.min(Math.abs(q - u), TAU - Math.abs(q - u)) * r > 0.7)) angs.push(u); }
+      angs.sort((p, q) => p - q);
+      const pts = angs.map(u => [cx + Math.cos(-u) * r, cz + Math.sin(-u) * r]); pts.push(pts[0].slice());
+      const cum = new Float64Array(pts.length); for (let k = 1; k < pts.length; k++) cum[k] = cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+      const ringR = { id: ringId, name: RB.name, w: RB.w, grade: 0.07, deck: undefined, cut: null, ends: [ringId, ringId], ring: null, pts, hosts: [null, null], st: 'asphalt', closed: true, oneway: true, roundabout: RB, cls: 0,
+        y: new Float64Array(pts.length).fill(RB.y), sp: new Uint8Array(pts.length), cum, len: cum[pts.length - 1], bridges: [], tunnel: null };
+      out.push(ringR);
+      // each leg's host at its ring end is the ring (the point of it the leg meets), as a road's is the road it joins
+      for (const Q of out) if (Q !== ringR) for (const k of [0, 1]) if (Q.ends[k] === ringId) {
+        const [hx, hz] = Q.pts[k ? Q.pts.length - 1 : 0]; let bi = 0, bd = Infinity;
+        ringR.pts.forEach((q, i) => { const d = Math.hypot(q[0] - hx, q[1] - hz); if (d < bd) { bd = d; bi = i; } });
+        Q.hosts = Q.hosts.slice(); Q.hosts[k] = { road: ringR, k: bi };
+      }
+      // every road that joins one this ring cut (its host: the road and the point it meets) now joins the piece that
+      // runs past that point, at that point's index there
+      for (const Q of out) Q.hosts = (Q.hosts || []).map(H => {
+        const made = H && cutInto.get(H.road); if (!made) return H;
+        const [hx, hz] = H.road.pts[H.k]; let best = null;
+        for (const P2 of made) P2.pts.forEach((q, i) => { const d = Math.hypot(q[0] - hx, q[1] - hz); if (!best || d < best.d) best = { d, road: P2, k: i }; });
+        return best && best.d < 3 ? { ...H, road: best.road, k: best.k } : null;
+      });
+      this.roads = out;
+    }
+  }
+});
+// (each roundabout's central island and signs: World._genRoundabouts, 128b, which loads after the world)
 /* =====================================================================
    [CONTENT] THE WORLD'S EXTENT OFF THE CITY
    The far edge the collision grid and the maps cover, and whether a point is
@@ -36334,11 +36464,15 @@ function makeIsleRoadMaterial() {
         ${GLSL_BUMP}
         ${GLSL_CLOUDSHADOW}
         float lineAA(float d, float w){ float fw = fwidth(d) + 0.001; return 1.0 - smoothstep(w - fw, w + fw, d); }
-        float boxAA(vec2 q, vec2 hs){ vec2 d = abs(q) - hs; float s = max(d.x, d.y); float fw = fwidth(s) + 0.001; return 1.0 - smoothstep(-fw, fw, s); }`)
+        float boxAA(vec2 q, vec2 hs){ vec2 d = abs(q) - hs; float s = max(d.x, d.y); float fw = fwidth(s) + 0.001; return 1.0 - smoothstep(-fw, fw, s); }
+        // a lane arrow (straight on), q: across the lane, along it (forward +); 5 m long, its head 0.9 m wide
+        float arrowAA(vec2 q){ float sh = boxAA(q - vec2(0.0, -1.2), vec2(0.11, 1.3)); float t = (1.3 - q.y) / 1.3; float d = max(abs(q.x) - 0.45 * t, max(q.y - 1.3, -q.y)); float fw = fwidth(d) + 0.001; return max(sh, 1.0 - smoothstep(-fw, fw, d)); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
         vec2 p = vPW.xz;
-        float u = vR.x, s = vR.y, hw = vR.z, cls = vR.w, surf = vQ.x, paint = vQ.y, au = abs(u);
+        float u = vR.x, s = vR.y, hw = vR.z, surf = vQ.x, paint = vQ.y, au = abs(u);
+        // (the class's fraction marks an end on a roundabout's ring: .1 the a end, .2 the b end, .3 both)
+        float cls = floor(vR.w + 0.02), rbf = vR.w - cls, rbA = step(0.05, rbf) * (1.0 - step(0.15, rbf) * (1.0 - step(0.25, rbf))), rbB = step(0.15, rbf);
         float n1 = pvf(p * 0.35), n2 = pvn(p * 3.7), grain = pvn(p * 23.0);
         vec3 col; float rough = 0.9, hgt = 0.0, isRoad = 0.0, puddleMask = 0.0;
         if (surf < 0.5) {
@@ -36369,7 +36503,15 @@ function makeIsleRoadMaterial() {
           if (cls > 0.5 && lanes > 1.5) mk = max(mk, lineAA(abs(au - laneW), 0.06) * step(fract(s / 9.0), 0.34));
           if (cls > 2.5 && au > edgeL + 0.3 && au < edgeL + 0.9) { float g = step(0.5, fract(s / 0.32)); col *= 1.0 - 0.2 * g; hgt -= g * 0.006; }
           // the stop line across the right-hand lane, short of a junction (it shows inside the junction's fade)
-          float stopL = max(lineAA(abs(vQ.z), 0.25) * step(0.3, u) * step(u, edgeL), lineAA(abs(vQ.w), 0.25) * step(0.3, -u) * step(-u, edgeL));
+          // (at a roundabout's entry it is the give-way line: two rows of short dashes)
+          float dsh = step(fract(au / 1.0), 0.6);
+          float gwA = max(lineAA(abs(vQ.z), 0.1), lineAA(abs(vQ.z - 0.5), 0.1)) * dsh, gwB = max(lineAA(abs(vQ.w), 0.1), lineAA(abs(vQ.w - 0.5), 0.1)) * dsh;
+          float stopL = max(mix(lineAA(abs(vQ.z), 0.25), gwA, rbA) * step(0.3, u) * step(u, edgeL), mix(lineAA(abs(vQ.w), 0.25), gwB, rbB) * step(0.3, -u) * step(-u, edgeL));
+          // arrows in each lane coming up to a junction: 7 m and 25 m short of its line (the lane's centre: lc)
+          float arw = 0.0;
+          if (vQ.z > 2.0 && vQ.z < 30.0 && u > 0.3 && au < edgeL) arw = max(arrowAA(vec2(au - lc, 7.0 - vQ.z)), arrowAA(vec2(au - lc, 25.0 - vQ.z)));
+          if (vQ.w > 2.0 && vQ.w < 30.0 && u < -0.3 && au < edgeL) arw = max(arw, max(arrowAA(vec2(au - lc, 7.0 - vQ.w)), arrowAA(vec2(au - lc, 25.0 - vQ.w))));
+          stopL = max(stopL, arw);
           // a solid centre line up to the stop line
           y = max(y, lineAA(au, 0.07) * step(cls, 2.5) * (step(0.0, vQ.z) * step(vQ.z, 18.0) + step(0.0, vQ.w) * step(vQ.w, 18.0)) * step(cls, 1.5));
           float wearP = 0.86 - 0.28 * n1;
@@ -37347,15 +37489,17 @@ class World {
       }
     }
   }
-  _prop(b, type, x, z, ry = 0, s = 1) {
+  // y: the ground it stands on, off the city's level (the island's streets, 128b); the city's props stand at the kerb
+  _prop(b, type, x, z, ry = 0, s = 1, y) {
     const p = { type, x, z, ry, s, id: this.totalProps++, broken: false, block: b.i };
-    const def = PROP_DEFS[type];
+    if (y !== undefined) p.y = y;
+    const def = PROP_DEFS[type], y0 = y !== undefined ? y - CURB_H : 0;
     if (def && def.col) {
-      if (def.col.r !== undefined) p.col = { x, z, r: def.col.r * s, y0: 0, y1: def.col.h * s, kind: 'prop' };
+      if (def.col.r !== undefined) p.col = { x, z, r: def.col.r * s, y0, y1: y0 + def.col.h * s, kind: 'prop' };
       else {
         const c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry));
         const hw = (def.col.w * c + def.col.d * sn) / 2 * s, hd = (def.col.w * sn + def.col.d * c) / 2 * s;
-        p.col = { x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd, y0: 0, y1: def.col.h * s, kind: 'prop' };
+        p.col = { x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd, y0, y1: y0 + def.col.h * s, kind: 'prop' };
       }
       if (def.breakable) p.col.breakable = true;
     }
@@ -37985,6 +38129,24 @@ class World {
       const d = Math.hypot(x - fromX, z - fromZ);
       if (d >= minD && d <= maxD) return { x, z, h };
     }
+    // no lattice kerb in range (a district rebuilt on its own streets has few, 124): the kerb side of a curved street,
+    // facing the way its traffic runs (never on a roundabout's ring)
+    if (RoadGraph.ready) {
+      const list = [];
+      for (const e of RoadGraph.edges) {
+        if ((e.kind !== 'link' && e.kind !== 'spur') || e.oneway) continue;
+        const m = RoadGraph.pointAt(e, e.len / 2); if (Math.hypot(m[0] - fromX, m[1] - fromZ) > maxD + e.len / 2) continue;
+        const off = Math.max(1.6, e.w / 2 - 1.1);
+        for (let dd = 8; dd < e.len - 8; dd += 12) {
+          const [x, z, tx, tz] = RoadGraph.pointAt(e, dd), q = Math.hypot(x - fromX, z - fromZ); if (q < minD || q > maxD) continue;
+          const side = rng() < 0.5 ? 1 : -1;
+          list.push({ x: x - tz * off * side, z: z + tx * off * side, h: side > 0 ? Math.atan2(tx, tz) : Math.atan2(-tx, -tz) });
+        }
+      }
+      if (list.length) return list[Math.floor(rng() * list.length)];
+      // (and failing that, the road nearest the place itself)
+      const q = RoadGraph.nearest(fromX, fromZ, { kinds: RG_STREETS }); if (q) return { x: q.x, z: q.z, h: Math.atan2(q.e.pts[Math.min(q.k + 1, q.e.pts.length - 1)][0] - q.e.pts[q.k][0], q.e.pts[Math.min(q.k + 1, q.e.pts.length - 1)][1] - q.e.pts[q.k][1]) };
+    }
     return { x: CityLayout.wx(P * 6 + 4.6, P * 6 + 30), z: CityLayout.wz(P * 6 + 4.6, P * 6 + 30), h: 0 };
   }
   randomSecret(fromX, fromZ, minD, maxD) {
@@ -38181,7 +38343,7 @@ Object.assign(World.prototype, {
     const trim = r.color.clone().lerp(C(0xe8e2d4), 0.45);
     const dark = r.color.clone().multiplyScalar(0.55);
     if (st !== STYLE.GLASS && st !== STYLE.HOUSE) this._ring(b, r, top - 0.3, 0.55, 0.32, st === STYLE.BRICK ? C(0xcfc6b2) : trim);
-    if (st === STYLE.BRICK || st === STYLE.SHOP || st === STYLE.DECO || st === STYLE.APT) this._ring(b, r, CURB_H + 0.32, 0.64, 0.07, dark);
+    if (st === STYLE.BRICK || st === STYLE.SHOP || st === STYLE.DECO || st === STYLE.APT) this._ring(b, r, r.y0 + 0.32, 0.64, 0.07, dark);
     if (st === STYLE.BRICK || st === STYLE.DECO) for (let k = 2; k < floors - 1; k += 3) this._ring(b, r, r.y0 + k * r.fh, 0.18, 0.09, C(0xcfc6b2));
     // downspouts on the street corners
     if (st === STYLE.BRICK || st === STYLE.SHOP || st === STYLE.APT) for (const t of [0.22, L - 0.22]) this._faceBox(b, r, f, t, r.y0 + r.h / 2, 0.12, r.h, 0.12, 0.12, 0x3c3f42);
@@ -38198,10 +38360,10 @@ Object.assign(World.prototype, {
     // shopfront: blade sign hanging off the facade plus a canopy light strip
     if (f.shop && rng.chance(0.35) && L > 5) {
       const t = rng.chance(0.5) ? 0.8 : L - 0.8;
-      this._faceBox(b, r, f, t, CURB_H + 5.2, 0.12, 1.6, 0.7, 0.9, rng.pick(PAL.awning));
-      this._faceBox(b, r, f, t, CURB_H + 6.05, 0.06, 0.06, 0.6, 1.0, IRON);
+      this._faceBox(b, r, f, t, r.y0 + 5.2, 0.12, 1.6, 0.7, 0.9, rng.pick(PAL.awning));
+      this._faceBox(b, r, f, t, r.y0 + 6.05, 0.06, 0.06, 0.6, 1.0, IRON);
     }
-    if (st === STYLE.HOUSE && floors >= 1) this._faceBox(b, r, f, L / 2, CURB_H + 2.4, Math.min(3, L - 1), 0.1, 0.75, 1.5, dark);
+    if (st === STYLE.HOUSE && floors >= 1) this._faceBox(b, r, f, L / 2, r.y0 + 2.4, Math.min(3, L - 1), 0.1, 0.75, 1.5, dark);
   },
   _fireEscape(b, r, f, rng, floors, L) {
     const w = Math.min(3.2, L - 1.5), t0 = clamp(L * rng.range(0.3, 0.7), w / 2 + 0.4, L - w / 2 - 0.4);
@@ -38251,29 +38413,29 @@ Object.assign(World.prototype, {
       const s = sides[0][1];
       const cw = Math.min(10, (s < 2 ? w : d) * 0.5);
       const pos = s === 0 ? [cx, r.z0 - 1.6] : s === 1 ? [cx, r.z1 + 1.6] : s === 2 ? [r.x0 - 1.6, cz] : [r.x1 + 1.6, cz];
-      this._det(b, 'box', pos[0], CURB_H + 4.4, pos[1], s < 2 ? cw : 3.2, 0.35, s < 2 ? 3.2 : cw, C(0x2a2d33));
-      b.fx.push({ type: 'canopy', x: pos[0], y: CURB_H + 4.2, z: pos[1], w: s < 2 ? cw : 3.2, d: s < 2 ? 3.2 : cw });
+      this._det(b, 'box', pos[0], r.y0 + 4.4, pos[1], s < 2 ? cw : 3.2, 0.35, s < 2 ? 3.2 : cw, C(0x2a2d33));
+      b.fx.push({ type: 'canopy', x: pos[0], y: r.y0 + 4.2, z: pos[1], w: s < 2 ? cw : 3.2, d: s < 2 ? 3.2 : cw });
       for (const k of [-1, 1]) {
         const px = s < 2 ? pos[0] + k * (cw / 2 - 0.3) : pos[0] + (s === 2 ? -1.4 : 1.4), pz = s < 2 ? pos[1] + (s === 0 ? -1.4 : 1.4) : pos[1] + k * (cw / 2 - 0.3);
-        this._det(b, 'cyl', px, CURB_H + 2.2, pz, 0.15, 4.4, 0x8c9096, null, { x: px, z: pz, r: 0.2, y0: 0, y1: 4.4, kind: 'det' });
+        this._det(b, 'cyl', px, r.y0 + 2.2, pz, 0.15, 4.4, 0x8c9096, null, { x: px, z: pz, r: 0.2, y0: 0, y1: 4.4, kind: 'det' });
       }
       // vertical fins on glass towers
       if (r.style === STYLE.GLASS && rng.chance(0.5)) {
         const fin = C(0xb8c0c8), n = Math.floor(w / 6);
         for (let i = 0; i <= n; i++) { const x = r.x0 + i * (w / n); this._det(b, 'box', x, r.y0 + r.h / 2, r.z0 - 0.2, 0.18, r.h, 0.4, fin); this._det(b, 'box', x, r.y0 + r.h / 2, r.z1 + 0.2, 0.18, r.h, 0.4, fin); }
       }
-      if (r.style !== STYLE.GLASS) this._ring(b, r, CURB_H + 4.9, 0.4, 0.12, r.color.clone().multiplyScalar(0.7));
+      if (r.style !== STYLE.GLASS) this._ring(b, r, r.y0 + 4.9, 0.4, 0.12, r.color.clone().multiplyScalar(0.7));
     } else if (kind === 'podium') {
       this._ring(b, r, r.y0 + r.h - 0.3, 0.5, 0.35, C(0xd6d0c4));
-      this._ring(b, r, CURB_H + 3.9, 0.12, 0.9, rng.pick(PAL.awning));
+      this._ring(b, r, r.y0 + 3.9, 0.12, 0.9, rng.pick(PAL.awning));
     } else if (kind === 'warehouse') {
       // loading dock with bumpers and a ramp along the yard side
       const dw = Math.min(w - 4, 24), dx = cx;
-      this._det(b, 'box', dx, CURB_H + 0.6, r.z1 + 1.3, dw, 1.2, 2.6, C(CONCRETE), 0, true);
-      for (let i = 0; i < Math.floor(dw / 4); i++) this._det(b, 'box', dx - dw / 2 + 2 + i * 4, CURB_H + 0.7, r.z1 + 2.62, 0.45, 0.45, 0.12, C(0x151515));
-      this._det(b, 'box', dx + dw / 2 + 1.2, CURB_H + 0.3, r.z1 + 1.3, 2.4, 0.6, 2.4, C(CONCRETE));
+      this._det(b, 'box', dx, r.y0 + 0.6, r.z1 + 1.3, dw, 1.2, 2.6, C(CONCRETE), 0, true);
+      for (let i = 0; i < Math.floor(dw / 4); i++) this._det(b, 'box', dx - dw / 2 + 2 + i * 4, r.y0 + 0.7, r.z1 + 2.62, 0.45, 0.45, 0.12, C(0x151515));
+      this._det(b, 'box', dx + dw / 2 + 1.2, r.y0 + 0.3, r.z1 + 1.3, 2.4, 0.6, 2.4, C(CONCRETE));
       this._ring(b, r, r.y0 + r.h - 0.25, 0.5, 0.2, C(0x6f767c));
-      b.fx.push({ type: 'docklight', x: dx, y: CURB_H + 4.8, z: r.z1 + 0.3, w: dw });
+      b.fx.push({ type: 'docklight', x: dx, y: r.y0 + 4.8, z: r.z1 + 0.3, w: dw });
     }
   },
   // ---------- rooftops: parapets, HVAC, ducts, bulkheads, tanks, dishes ----------
@@ -39141,7 +39303,8 @@ Object.assign(World.prototype, {
     const P2 = this.places = {};
     for (const b of this.blocks) if (b.place) P2[b.place.id] = b.place;
     const sb = this.block(SPECIAL.safehouse.bx, SPECIAL.safehouse.bz).safehouse;
-    P2.safehouse = { id: 'safehouse', name: 'Linden Hills Safehouse', kind: 'home', door: { x: sb.x, z: sb.z, h: 0 }, garage: sb.garage, under: { x: sb.x, z: sb.z - 9 } };
+    // (a house's own door faces its street whichever way that is: the rebuilt Linden Hills', 124c)
+    P2.safehouse = { id: 'safehouse', name: 'Linden Hills Safehouse', kind: 'home', door: { x: sb.x, z: sb.z, h: sb.h ?? 0 }, garage: sb.garage, under: sb.home && sb.home.inner ? { x: sb.home.inner.x, z: sb.home.inner.z } : { x: sb.x, z: sb.z - 9 } };
     // Valen Tower lobby (penthouse lift), Fuel & Go store, Police HQ lobby
     const tb = this.block(6, 5), base = tb.bld[0];
     P2.tower = { id: 'tower', name: 'Valen Tower', kind: 'home2', door: { x: tb.cx, z: base.z1 + 1.1, h: 0 }, garage: { x: tb.bx * P + P - 4.6, z: tb.cz + 22, h: 0 }, under: { x: tb.cx, z: tb.cz - 6 } };
@@ -39522,9 +39685,11 @@ Object.assign(World.prototype, {
     // attached garage / carport on one side, flush with the front. The side (and if need be the
     // size) is chosen so the garage never sits on a drive, a lane or another building.
     let gs = spec.gs || 1, gk = spec.garage || 'street';
+    // (the ground a garage may take: the block's, or a rebuilt district's when the kit builds the house, 124)
+    const B0 = spec.bounds || b;
     const NB = { single: 1, double: 2, triple: 3, carport: spec.carportN || 1 };
     const gRect = (side, n) => { const gw = n * 3.3 + 0.4, half = ns ? hw : hd, gd = 6.6; const gcx = spec.x + lat[0] * side * (half + gw / 2), gcz = spec.z + lat[1] * side * (half + gw / 2); const fcx = gcx + f[0] * ((ns ? hd : hw) - gd / 2), fcz = gcz + f[1] * ((ns ? hd : hw) - gd / 2); return [fcx - (ns ? gw / 2 : gd / 2), fcz - (ns ? gd / 2 : gw / 2), fcx + (ns ? gw / 2 : gd / 2), fcz + (ns ? gd / 2 : gw / 2)]; };
-    const gFree = (side, n) => { const [a0, b0, a1, b1] = gRect(side, n); return this._rectClear(a0, b0, a1, b1, 0.5) && !b.bld.some(q => q !== r && q.y0 <= CURB_H + 0.01 && a0 < q.x1 && a1 > q.x0 && b0 < q.z1 && b1 > q.z0) && a0 > b.x0 - 0.5 && a1 < b.x1 + 0.5 && b0 > b.z0 - 0.5 && b1 < b.z1 + 0.5; };
+    const gFree = (side, n) => { const [a0, b0, a1, b1] = gRect(side, n); return this._rectClear(a0, b0, a1, b1, 0.5) && !b.bld.some(q => q !== r && q.y0 <= CURB_H + 0.01 && a0 < q.x1 && a1 > q.x0 && b0 < q.z1 && b1 > q.z0) && a0 > B0.x0 - 0.5 && a1 < B0.x1 + 0.5 && b0 > B0.z0 - 0.5 && b1 < B0.z1 + 0.5; };
     const order = ['triple', 'double', 'single', 'carport'];
     if (NB[gk]) {
       let ok = false;
@@ -41050,66 +41215,93 @@ Object.assign(World.prototype, {
   };
 }
 /* =====================================================================
-   [CONTENT] THE OLD QUARTER, REBUILT (owner, 2026-11-18: the downtown torn down and redeveloped round
-   a gridded financial core, district by district; this is the first)
-   Nine lattice cells (0..2, 4..6) are one superblock with no grid inside it. Its streets are curved
-   through-roads (links, 020: traffic, the GPS, taxis and the police use them):
-   - Saint Ivo Street, the high street, winding from the north edge to the south;
-   - Market Street, crossing it in two staggered halves (west to the shore road, east to Downtown);
-   - Bell Lane, Cooper's Walk, Chapel Lane, Garage Row and Wick Lane, the old lanes off them;
-   - Saint Ivo Square beside the high street, with its fountain.
-   Every street is lined with terraces (brick, shopfronts, flats; two to four storeys) stepping along
-   its curve, and so are the four edge streets; behind the frontage, yards and gardens. The Quarter
-   Garage stands where it stood, Garage Row running past the foot of its ramp.
-   Everything that had an address on these cells keeps it: a door given as (block, side, along) on a
-   street that no longer exists is found on the nearest of the new streets (sidewalkSpot, 390, asks
-   oldQuarterSpot), and the frontage stands behind it. The district, its turfs and its name are the
-   cells', as they were.
+   [CONTENT] THE DISTRICT REBUILD KIT (owner, 2026-11-19: the whole original city redeveloped; CITY_REBUILD.md)
+   A district's lattice cells are one superblock (020: SUPERBLOCKS, its `gen` '_genRebuilt' and its `rb` the id of
+   its definition here). The lattice inside it closes and its streets are hand-shaped curves (links, 020: traffic,
+   the GPS, taxis and the police use them). The kit lays everything else from the definition:
+   - the streets and their pavements, kerbside parking where the definition says;
+   - the landmarks it keeps (a whole cell regenerated where it stood, `keep`) and its squares;
+   - a front behind every door with an address on its cells (a business, a home, a bank, an HQ), found on the
+     nearest of its streets when the lattice street it had is gone (`rebuiltSpot`, asked by sidewalkSpot, 390);
+   - frontage along every street (shops on the high streets), along the edge streets inside the district, a second
+     row behind, gardens and yards behind that; lamps along the streets, cars at the kerbs.
+   The cells stay the address system: the district, its turfs and its name are the cells', as they were.
+   Definitions are in lattice metres (the district's precinct places them, 021).
+
+   A definition (REBUILDS[id]):
+     name        the district's name (the superblock's)
+     streets     [{ name, w, park: [sides], fork: index, near: [x, z], ctrl: [[x, z]...], high: true, res: true,
+                   circle: r }]: `high` a high street (shops), `res` lined with detached houses, `circle` a cul-de-sac
+                 ending in a turning circle of that radius
+                 a street that starts on another (`fork`) starts on that street's own polyline, so the junction is
+                 exact; every other end meets an edge street side-on
+     addr        { 'bx,bz,side,along': [x, z] }: where to look for a door whose own street point has no room
+     keep        [{ bx, bz, gen, landmark: 'bx,bz' } | { bx, bz, cell: true }]: a cell regenerated where it stood (its
+                 rect kept clear): by a landmark generator, or by the city's own (a SPECIAL cell, 020); `forecourts`
+                 [[x0, z0, x1, z1]]: paved and kept clear between a door (or a respawn point) and its street; `low`
+                 { r, h }: everything built within r of it no taller than h (a rooftop helipad's approaches)
+                 or a roundabout's ring: { name, id, ring: radius, at: [x, z], w }; a street ends on another
+                 (`join`: its index, `joinNear`: where), exactly on its line
+     squares     [{ x, z, r, ring, fountain: true, name, sub, icon, secret: [dx, dz] }]
+     styles      the frontage's styles (weights by repetition); heights [lo, hi]
+     sidewalks   _sbSidewalks' options
+     secrets     [[x, z]]
+     houses      the edge streets inside the district lined with houses too; rich: the bigger houses; mix: the
+                 weights of a residential lot's kind ({ house, semi, apartment })
+     require     [{ spec: { type, w, d, garage }, n, zone }]: homes the district must have (the property ladder's), placed
+                 first where the cell's zone is `zone`
+     gap         the space kept between buildings (0.1 m: terraces)
+     secondRow   false: no back row behind the street frontage (suburbs)
+     extras      (world, b, sb, rng, kit) a hook after the frontage, before the gardens
    ===================================================================== */
-// the streets, in lattice metres. A street that starts on another (`fork`: its index, `near`: where) starts on that
-// street's own polyline, so the junction is exact; every other end meets an edge street side-on
-const OQ_STREETS = [
-  { name: 'Saint Ivo Street', w: 9, park: [1, -1], ctrl: [[100, 325.6], [104, 345], [96, 368], [84, 392], [86, 418], [102, 440], [118, 462], [122, 488], [112, 512], [104, 534], [108, 554.4]] },
-  { name: 'Market Street', w: 8, park: [1], fork: 0, near: [86, 422], ctrl: [[64, 430], [44, 427], [24, 431], [5.6, 436]] },
-  { name: 'Market Street', w: 8, park: [-1], fork: 0, near: [92, 378], ctrl: [[120, 372], [150, 366], [180, 372], [210, 380], [234.4, 384]] },
-  { name: 'Bell Lane', w: 7, fork: 2, near: [182, 372], ctrl: [[186, 356], [190, 340], [196, 325.6]] },
-  { name: 'Cooper’s Walk', w: 7, fork: 0, near: [119, 470], ctrl: [[92, 482], [62, 492], [36, 506], [5.6, 518]] },
-  { name: 'Chapel Lane', w: 7, fork: 4, near: [56, 494], ctrl: [[50, 512], [40, 532], [32, 554.4]] },
-  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 481], [222, 487], [234.4, 497]] },
-  { name: 'Wick Lane', w: 7, fork: 0, near: [106, 530], ctrl: [[130, 530], [160, 524], [190, 528], [234.4, 538]] }
-];
-// an address whose own street point has no room for what stands there: where on the new streets to look for it
-// instead (block, side, along → a point near the street it fronts). The Neighborhood Bank (353: 2,5 north side, the
-// Quarter Garage's front) is a deep building with a staff door on its back: it stands on Saint Ivo Street
-const OQ_ADDR = { '2,5,0,44': [118, 420] };
-// Saint Ivo Square: a paved round beside the high street, its fountain in the middle
-const OQ_SQUARE = { x: 58, z: 462, r: 11 };
-// the streets' polylines (computed once; sidewalkSpot needs them before the world is built)
-let OQ_LINES = null;
-function oqLines() {
-  if (OQ_LINES) return OQ_LINES;
-  OQ_LINES = [];
-  for (const S of OQ_STREETS) {
-    let ctrl = S.ctrl;
-    if (S.fork !== undefined) {
-      const par = OQ_LINES[S.fork].pts; let k = 0, best = Infinity;
-      for (let i = 0; i < par.length; i++) { const d = Math.hypot(par[i][0] - S.near[0], par[i][1] - S.near[1]); if (d < best) { best = d; k = i; } }
-      ctrl = [par[k], ...S.ctrl];
+const REBUILDS = {};
+// how far a polyline turns along its length (radians, summed): a crescent's, not a straight street's
+function polyTurn(pts) { let t = 0; for (let k = 1; k < pts.length - 1; k++) { const a = Math.atan2(pts[k][1] - pts[k - 1][1], pts[k][0] - pts[k - 1][0]), c = Math.atan2(pts[k + 1][1] - pts[k][1], pts[k + 1][0] - pts[k][0]); t += Math.abs(Math.atan2(Math.sin(c - a), Math.cos(c - a))); } return t; }
+// the city's roundabouts (a rebuilt district's rings, in world metres; filled as the world is built): the traffic reads
+// them beside the island's (023: ROUNDABOUTS)
+const CITY_RINGS = [];
+// the streets' polylines (computed once per district: sidewalkSpot needs them before the world is built)
+const REBUILD_LINES = {};
+function rebuildLines(id) {
+  if (REBUILD_LINES[id]) return REBUILD_LINES[id];
+  const out = [];
+  const nearOn = (pts, q) => { let k = 0, best = Infinity; for (let i = 0; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - q[0], pts[i][1] - q[1]); if (d < best) { best = d; k = i; } } return pts[k]; };
+  for (const S of REBUILDS[id].streets) {
+    // a roundabout's ring: closed, one way, anticlockwise on the map (decreasing angle: traffic keeps right), a vertex
+    // every ~2 m; the streets that meet it start on it (`fork`) or end on it (`join`) at one of its vertices
+    if (S.ring) {
+      const [cx, cz] = S.at, r = S.ring, m = Math.max(24, Math.round(2 * Math.PI * r / 2)), pts = [];
+      for (let k = 0; k < m; k++) { const an = -k / m * Math.PI * 2; pts.push([cx + Math.cos(an) * r, cz + Math.sin(an) * r]); }
+      pts.push(pts[0].slice());
+      out.push({ name: S.name, w: S.w, park: null, high: false, res: false, ring: null, closed: true, rb: { id: S.id, name: S.name, x: cx, z: cz, r, w: S.w }, pts });
+      continue;
     }
-    OQ_LINES.push({ name: S.name, w: S.w, park: S.park || null, pts: splinePts(ctrl) });
+    let ctrl = S.ctrl;
+    if (S.join !== undefined) ctrl = [...ctrl, nearOn(out[S.join].pts, S.joinNear)];
+    if (S.fork !== undefined) {
+      const par = out[S.fork].pts; let k = 0, best = Infinity;
+      for (let i = 0; i < par.length; i++) { const d = Math.hypot(par[i][0] - S.near[0], par[i][1] - S.near[1]); if (d < best) { best = d; k = i; } }
+      ctrl = [par[k], ...ctrl];
+    }
+    const pts = splinePts(ctrl);
+    // a cul-de-sac: its far end opens into a turning circle (radius `circle` to the lane's centre) straight ahead
+    let ring = null;
+    if (S.circle) { const a = pts[pts.length - 2], c = pts[pts.length - 1], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; ring = { x: c[0] + (c[0] - a[0]) / l * S.circle, z: c[1] + (c[1] - a[1]) / l * S.circle, r: S.circle }; }
+    out.push({ name: S.name, w: S.w, park: S.park || null, high: !!S.high, res: !!S.res, ring, pts });
   }
-  return OQ_LINES;
+  return (REBUILD_LINES[id] = out);
 }
-const OQ_SB = () => SUPERBLOCKS.find(s => s.id === 'oldquarter');
-// a door on one of the old cells (sidewalkSpot's address), on the new streets: the kerbside point of the nearest
-// street, `o` from its centre line as the lattice spot was from its own, facing the street. Only for a side whose
-// lattice street is gone; a side on an edge street that still runs keeps its spot. Lattice metres, or null.
-function oldQuarterSpot(bx, bz, side, x, z, o, along) {
-  const sb = superblockAt(bx, bz); if (!sb || sb.id !== 'oldquarter') return null;
-  if (RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
-  const fix = OQ_ADDR[bx + ',' + bz + ',' + side + ',' + along]; if (fix) { x = fix[0]; z = fix[1]; }
+// a door on a rebuilt district's cells (sidewalkSpot's address), on its new streets: the kerbside point of the
+// nearest street, `o` from its centre line as the lattice spot was from its own, facing the street. Only for a side
+// whose lattice street is gone; a side on an edge street that still runs keeps its spot. Lattice metres, or null.
+function rebuiltSpot(bx, bz, side, x, z, o, along) {
+  const sb = superblockAt(bx, bz); if (!sb || !sb.rb || !REBUILDS[sb.rb]) return null;
+  // (an address the definition moves is moved even from an edge street that still runs: its corner is a junction now)
+  const fix = (REBUILDS[sb.rb].addr || {})[bx + ',' + bz + ',' + side + ',' + along];
+  if (!fix && RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
+  if (fix) { x = fix[0]; z = fix[1]; }
   let best = null;
-  for (const L of oqLines()) for (let k = 0; k < L.pts.length - 1; k++) {
+  for (const L of rebuildLines(sb.rb)) for (let k = 0; k < L.pts.length - 1; k++) {
     const a = L.pts[k], c = L.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1;
     const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(x - px, z - pz);
     if (!best || d < best.d) best = { d, px, pz, L, tx: dx / Math.sqrt(l2), tz: dz / Math.sqrt(l2) };
@@ -41120,60 +41312,120 @@ function oldQuarterSpot(bx, bz, side, x, z, o, along) {
   return { x: best.px + nx * off, z: best.pz + nz * off, h: Math.atan2(-nx, -nz) };
 }
 Object.assign(World.prototype, {
-  _genOldQuarter(a, sb, rng) {
-    for (const m of sb.members) m.wires = m.wires || [];
-    this._sbSidewalks(sb, rng, { trees: 0.3, park: 0.4 });
-    const b = a, lines = oqLines(), roads = [];
-    // the streets (kerbside parking on the high street and Market Street)
-    // pavements both sides, the frontage's depth (concrete under the asphalt: what the shader and the maps draw)
-    for (const L of lines) this._road(L.pts, L.w + 5.4, 'concrete');
-    for (const L of lines) { const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; roads.push(r); }
-    // the Quarter Garage, where it always stood
-    // (a landmark as it always was: the kicker pass leaves it alone, and it keeps its name in the superblock)
-    const gb = this.block(2, 5); this._genGarage(gb, rng); gb.landmark = LANDMARK_BLOCKS['2,5']; gb.name = gb.landmark.name;
-    const G = { x0: gb.x0 - 1, z0: gb.z0 - 1, x1: gb.x1 + 1, z1: gb.z1 + 2 };
-    // Saint Ivo Square
-    const Q = OQ_SQUARE;
+  // a square: paving, and a fountain with trees, benches and lamps round it
+  _rbSquare(b, Q, rng) {
     this._discS(Q.x, Q.z, Q.r, 'concrete');
-    this._det(b, 'cyl', Q.x, CURB_H + 0.4, Q.z, 2.8, 0.8, 0x8d8a84, null, { x: Q.x, z: Q.z, r: 2.8, y0: 0, y1: 0.9, kind: 'det' });
-    this._det(b, 'cyl', Q.x, CURB_H + 1.2, Q.z, 0.4, 1.6, 0x9a958c);
-    b.water.push({ x: Q.x, z: Q.z, r: 2.4, y: CURB_H + 0.82 });
-    b.fx.push({ type: 'fountain', x: Q.x, y: CURB_H + 2.0, z: Q.z });
-    for (let k = 0; k < 6; k++) { const t = k / 6 * Math.PI * 2 + 0.3, x = Q.x + Math.cos(t) * 7.2, z = Q.z + Math.sin(t) * 7.2; if (k % 2) this._prop(b, 'tree', x, z, rng.range(0, 6), 0.9); else { const ry = Math.atan2(Q.x - x, Q.z - z); this._prop(b, 'bench', x, z, ry); b.seats.push({ x, z, ry }); } }
-    this._prop(b, 'parklamp', Q.x + 9.5, Q.z - 3, 0); this._prop(b, 'parklamp', Q.x - 9.5, Q.z + 3, 0);
-    b.secrets.push({ x: Q.x + 5, z: Q.z + 5 });
-    // ---- the frontage: terraces along every street, both sides, and along the four edge streets inside them
-    const segD = (x, z, p, q) => { const dx = q[0] - p[0], dz = q[1] - p[1], l2 = dx * dx + dz * dz || 1; let t = ((x - p[0]) * dx + (z - p[1]) * dz) / l2; t = Math.max(0, Math.min(1, t)); return Math.hypot(x - p[0] - dx * t, z - p[1] - dz * t); };
-    const clearRoads = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m);
+    if (Q.fountain !== false) {
+      this._det(b, 'cyl', Q.x, CURB_H + 0.4, Q.z, 2.8, 0.8, 0x8d8a84, null, { x: Q.x, z: Q.z, r: 2.8, y0: 0, y1: 0.9, kind: 'det' });
+      this._det(b, 'cyl', Q.x, CURB_H + 1.2, Q.z, 0.4, 1.6, 0x9a958c);
+      b.water.push({ x: Q.x, z: Q.z, r: 2.4, y: CURB_H + 0.82 });
+      b.fx.push({ type: 'fountain', x: Q.x, y: CURB_H + 2.0, z: Q.z });
+    }
+    const R = Q.ring || Q.r * 0.65;
+    for (let k = 0; k < 6; k++) { const t = k / 6 * Math.PI * 2 + 0.3, x = Q.x + Math.cos(t) * R, z = Q.z + Math.sin(t) * R; if (k % 2) this._prop(b, 'tree', x, z, rng.range(0, 6), 0.9); else { const ry = Math.atan2(Q.x - x, Q.z - z); this._prop(b, 'bench', x, z, ry); b.seats.push({ x, z, ry }); } }
+    this._prop(b, 'parklamp', Q.x + Q.r - 1.5, Q.z - 3, 0); this._prop(b, 'parklamp', Q.x - Q.r + 1.5, Q.z + 3, 0);
+    if (Q.secret) b.secrets.push({ x: Q.x + Q.secret[0], z: Q.z + Q.secret[1] });
+  },
+  // a city roundabout's middle: a kerbed island with planting and a tree, and a give-way sign at each street that comes
+  // onto the ring (the island's roundabouts have the same, 128b)
+  _rbCentre(b, RB, roads, lines) {
+    const ri = RB.r - RB.w / 2 - 0.4, y = CURB_H - 0.15;
+    this._det(b, 'cyl', RB.x, y + 0.12, RB.z, ri, 0.24, C(0xc9c6bd), null, { x: RB.x, z: RB.z, r: ri - 0.3, y0: y - 1, y1: y + 0.6, kind: 'det' });
+    this._det(b, 'cyl', RB.x, y + 0.255, RB.z, ri - 0.35, 0.03, C(0x5f8a46));
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, rr = ri - 1.4; this._det(b, 'blob', RB.x + Math.cos(a) * rr, y + 0.7, RB.z + Math.sin(a) * rr, 0.8, 0.7, 0.8, C(k % 2 ? 0x3f6a34 : 0x4c7a3a)); }
+    this._det(b, 'cyl', RB.x, y + 1.6, RB.z, 0.28, 2.8, C(0x5a4632));
+    this._det(b, 'blob', RB.x, y + 4.2, RB.z, 2.8, 2.4, 2.8, C(0x3f6a34));
+    for (const L of lines) {
+      if (L.closed) continue;
+      for (const [p, q] of [[L.pts[0], L.pts[Math.min(L.pts.length - 1, 6)]], [L.pts[L.pts.length - 1], L.pts[Math.max(0, L.pts.length - 7)]]]) {
+        if (Math.abs(Math.hypot(p[0] - RB.x, p[1] - RB.z) - RB.r) > 0.6) continue;
+        const l = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1, ux = (p[0] - q[0]) / l, uz = (p[1] - q[1]) / l, rx = -uz, rz = ux, side = L.w / 2 + 1.2;
+        const gx = p[0] - ux * (RB.w / 2 + 2.5) + rx * side, gz = p[1] - uz * (RB.w / 2 + 2.5) + rz * side;
+        this._det(b, 'cyl', gx, CURB_H + 1.25, gz, 0.05, 2.5, 0x6a6e72, null, { x: gx, z: gz, r: 0.12, y0: 0, y1: 2.6, kind: 'det' });
+        b.signs.push({ text: 'GIVE WAY', x: gx - ux * 0.04, y: CURB_H + 2.3, z: gz - uz * 0.04, ry: Math.atan2(-ux, -uz), w: 0.95, h: 0.62, bg: '#ffffff', fg: '#c8102e' });
+      }
+    }
+  },
+  // a rebuilt district (its superblock's `rb` names the definition)
+  _genRebuilt(a, sb, rng) {
+    const D = REBUILDS[sb.rb];
+    for (const m of sb.members) m.wires = m.wires || [];
+    this._sbSidewalks(sb, rng, D.sidewalks || { trees: 0.3, park: 0.4 });
+    const b = a, lines = rebuildLines(sb.rb), roads = [];
+    // the streets: pavements both sides, the frontage's depth (concrete under the asphalt: what the shader and the maps
+    // draw), then the carriageways (kerbside parking where the definition says)
+    for (const L of lines) { this._road(L.pts, L.w + 5.4, 'concrete'); if (L.ring) this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2 + 2.7, 'concrete'); }
+    // (where the district's precinct stands: a roundabout's ring is known to the traffic in world metres)
+    const wox = (CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * P, woz = (CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * P;
+    for (const L of lines) {
+      const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; r.high = L.high; r.res = L.res; roads.push(r);
+      // a roundabout's ring (023's machinery: one way round, give way on entry, 135 and 280)
+      if (L.closed) { r.closed = true; r.oneway = true; r.ringOf = L.rb; r.roundabout = { ...L.rb, x: L.rb.x + wox, z: L.rb.z + woz, y: CURB_H }; { const i0 = CITY_RINGS.findIndex(q => q.id === L.rb.id); if (i0 >= 0) CITY_RINGS.splice(i0, 1); } CITY_RINGS.push(r.roundabout); this._rbCentre(b, L.rb, roads, lines); }
+      // (a cul-de-sac is a spur: its far end is free, traffic turns round its circle, 020 Links, 135)
+      if (L.ring) { r.spur = true; r.ring = L.ring; this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2, 'asphalt'); }
+    }
+    const circles = lines.filter(L => L.ring).map(L => ({ x: L.ring.x, z: L.ring.z, r: L.ring.r + L.w / 2 })).concat(lines.filter(L => L.closed).map(L => ({ x: L.rb.x, z: L.rb.z, r: L.rb.r + L.w / 2 + 2.7 })));
+    // the landmarks it keeps, where they always stood (a landmark as it always was: the kicker pass leaves it alone, and
+    // it keeps its name in the superblock)
+    const kept = [], lows = [];
+    for (const K of D.keep || []) {
+      // (`cell`: the city's own generator for that cell, as it was before the district was rebuilt: the police station,
+      // the hospital; its own seed, so it stands exactly as it did)
+      // (its own ground: a park's paths, a forecourt's paving; the district's lawn is the superblock's)
+      const gb = this.block(K.bx, K.bz); gb.ground = null;
+      if (K.cell) { const sbk = gb.superblock; gb.superblock = null; this._genBlock(gb); gb.superblock = sbk; gb.kept = true; } else this[K.gen](gb, rng);
+      if (K.landmark) { gb.landmark = LANDMARK_BLOCKS[K.landmark]; gb.name = gb.landmark.name; }
+      kept.push({ x0: gb.x0 - 1, z0: gb.z0 - 1, x1: gb.x1 + 1, z1: gb.z1 + 2 });
+      if (K.low) lows.push({ x: (gb.x0 + gb.x1) / 2, z: (gb.z0 + gb.z1) / 2, r: K.low.r, h: K.low.h });
+      // its forecourt: paved and kept clear from its door to the street that serves it now
+      for (const [x0, z0, x1, z1] of K.forecourts || []) { this._rectS(x0, z0, x1, z1, 'concrete'); kept.push({ x0, z0, x1, z1 }); }
+    }
+    // the squares
+    const squares = D.squares || [];
+    for (const Q of squares) this._rbSquare(b, Q, rng);
+    // ---- the frontage: terraces along every street, both sides, and along the edge streets inside the district
+    const clearRoads = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m) && circles.every(c => Math.hypot(clamp(c.x, x0, x1) - c.x, clamp(c.z, z0, z1) - c.z) > c.r + m);
     const placed = [];
-    // the stunt jumps' lanes (the garage roof's leap flies north over Market Street): run-up, flight and landing kept
-    // clear of anything built
+    // the stunt jumps' lanes: run-up, flight and landing kept clear of anything built
     const lanes = (this.surfaces || []).filter(s => s.unique && s.x1 > sb.x0 - 40 && s.x0 < sb.x1 + 40 && s.z1 > sb.z0 - 40 && s.z0 < sb.z1 + 40).map(s => {
       const ax = s.axis === 'x', c = ax ? (s.z0 + s.z1) / 2 : (s.x0 + s.x1) / 2, lo = (ax ? s.x0 : s.z0) - 32, hi = (ax ? s.x1 : s.z1) + 32, hw = (ax ? s.z1 - s.z0 : s.x1 - s.x0) / 2 + 4;
       return ax ? [lo, c - hw, hi, c + hw] : [c - hw, lo, c + hw, hi];
     });
+    const gap = D.gap ?? 0.1, doorways = [];
+    let ownDoor = null;
+    const inKept = (x0, z0, x1, z1) => kept.some(G => x0 < G.x1 && x1 > G.x0 && z0 < G.z1 && z1 > G.z0);
+    const inSquare = (x0, z0, x1, z1, m) => squares.some(Q => Math.hypot(clamp(Q.x, x0, x1) - Q.x, clamp(Q.z, z0, z1) - Q.z) <= Q.r + m);
     const free = (x0, z0, x1, z1) => x0 >= sb.x0 && z0 >= sb.z0 && x1 <= sb.x1 && z1 <= sb.z1
       && !lanes.some(L => x0 < L[2] && x1 > L[0] && z0 < L[3] && z1 > L[1])
-      && !(x0 < G.x1 && x1 > G.x0 && z0 < G.z1 && z1 > G.z0)
-      && Math.hypot(clamp(Q.x, x0, x1) - Q.x, clamp(Q.z, z0, z1) - Q.z) > Q.r + 2
+      && !inKept(x0, z0, x1, z1)
+      && !inSquare(x0, z0, x1, z1, 2)
       && clearRoads(x0, z0, x1, z1, 2.6)
-      && !placed.some(q => x0 < q.x1 + 0.1 && x1 > q.x0 - 0.1 && z0 < q.z1 + 0.1 && z1 > q.z0 - 0.1);
-    const styles = [STYLE.BRICK, STYLE.BRICK, STYLE.BRICK, STYLE.SHOP, STYLE.HOUSE, STYLE.APT];
-    const pal = { [STYLE.BRICK]: PAL.brick, [STYLE.SHOP]: PAL.shop, [STYLE.HOUSE]: PAL.house, [STYLE.APT]: PAL.apt };
-    const build = (q, tx, tz, nx, nz, shopBias) => {
-      const style = rng.chance(shopBias) ? STYLE.SHOP : rng.pick(styles), h = rng.range(7.5, 15.5), fh = style === STYLE.SHOP ? 3.6 : 3.1;
+      && !placed.some(q => x0 < q.x1 + gap && x1 > q.x0 - gap && z0 < q.z1 + gap && z1 > q.z0 - gap)
+      && !doorways.some(q => q !== ownDoor && x0 < q[2] && x1 > q[0] && z0 < q[3] && z1 > q[1]);
+    const styles = D.styles || [STYLE.BRICK, STYLE.BRICK, STYLE.BRICK, STYLE.SHOP, STYLE.HOUSE, STYLE.APT];
+    const pal = { [STYLE.BRICK]: PAL.brick, [STYLE.SHOP]: PAL.shop, [STYLE.HOUSE]: PAL.house, [STYLE.APT]: PAL.apt, [STYLE.DECO]: PAL.deco, [STYLE.OFFICE]: PAL.office, [STYLE.GLASS]: PAL.glass || PAL.deco, [STYLE.TOWER]: PAL.glass || PAL.deco, [STYLE.IND]: PAL.ind || PAL.brick, [STYLE.WARE]: PAL.ind || PAL.brick };
+    const [hLo, hHi] = D.heights || [7.5, 15.5];
+    D.secondAt = D.secondAt ?? 15;
+    // (`door`: a building behind an address's door: the game dresses that door itself, 450, and nudges it off anything
+    // solid, so no stoop is built under it)
+    const build = (q, tx, tz, nx, nz, shopBias, door = false) => {
+      const style = rng.chance(shopBias) ? STYLE.SHOP : rng.pick(styles), fh = style === STYLE.SHOP ? 3.6 : 3.1;
+      // (low round a kept rooftop helipad: its approaches are kept clear, `low` on the cell it keeps)
+      let h = rng.range(hLo, hHi);
+      for (const L2 of lows) if (Math.hypot(clamp(L2.x, q[0], q[2]) - L2.x, clamp(L2.z, q[1], q[3]) - L2.z) < L2.r) h = Math.min(h, L2.h);
       const r = this._bld(b, q[0], q[1], q[2], q[3], h, style, rng.pick(pal[style]), fh, style === STYLE.BRICK ? 2.6 : 3.2, { gtype: style === STYLE.SHOP ? 1 : 0 });
-      this._rooftop(b, r, rng, 'old'); placed.push(r);
+      this._rooftop(b, r, rng, D.roof || 'old'); placed.push(r);
       // the street face: an awning over a shop, a stoop at a house door
       const cx = (q[0] + q[2]) / 2, cz = (q[1] + q[3]) / 2, alongX = Math.abs(nz) >= Math.abs(nx);
       const fx = alongX ? cx : (nx < 0 ? q[0] : q[2]), fz = alongX ? (nz < 0 ? q[1] : q[3]) : cz, sx = alongX ? 0 : Math.sign(nx), sz = alongX ? Math.sign(nz) : 0;
       const wide = alongX ? q[2] - q[0] : q[3] - q[1];
       if (style === STYLE.SHOP) this._det(b, 'box', fx + sx * 0.9, CURB_H + 3.05, fz + sz * 0.9, alongX ? wide * 0.8 : 1.8, 0.12, alongX ? 1.8 : wide * 0.8, rng.pick(PAL.awning), 0);
-      else if (wide > 4) this._det(b, 'box', fx + sx * 0.6, CURB_H + 0.25, fz + sz * 0.6, alongX ? 2.2 : 1.2, 0.5, alongX ? 1.2 : 2.2, 0x8c8780, 0, true);
+      else if (wide > 4 && !door) this._det(b, 'box', fx + sx * 0.6, CURB_H + 0.25, fz + sz * 0.6, alongX ? 2.2 : 1.2, 0.5, alongX ? 1.2 : 2.2, 0x8c8780, 0, true);
       return r;
     };
-    // along a polyline, on one side: terrace fronts set back across the pavement (`set` from the centre line), each the
-    // biggest that fits; beside a curve a front steps back until its corner clears the kerb
+    // along a polyline, on one side: fronts set back across the pavement (`set` from the centre line), each the biggest
+    // that fits; beside a curve a front steps back until its corner clears the kerb
+    const sizes = D.sizes || [[10, 11], [9, 10], [8, 10], [7, 9], [6, 8]];
     const line = (pts, set, side, shopBias) => {
       const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
       const L = cum[cum.length - 1];
@@ -41182,7 +41434,7 @@ Object.assign(World.prototype, {
         const p = pts[k], c = pts[k + 1], sl = (cum[k + 1] - cum[k]) || 1, tx = (c[0] - p[0]) / sl, tz = (c[1] - p[1]) / sl, t = (d - cum[k]) / sl;
         const px = p[0] + (c[0] - p[0]) * t, pz = p[1] + (c[1] - p[1]) * t, nx = -tz * side, nz = tx * side;
         let got = null;
-        for (const [w0, d0] of [[10, 11], [9, 10], [8, 10], [7, 9], [6, 8]]) {
+        for (const [w0, d0] of sizes) {
           for (let back = 0; back <= 3 && !got; back += 0.5) {
             const off = set + d0 / 2 + back, cx = px + nx * off, cz = pz + nz * off, alongX = Math.abs(tx) >= Math.abs(tz);
             const wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
@@ -41193,35 +41445,126 @@ Object.assign(World.prototype, {
         if (got) { build(got, tx, tz, nx, nz, shopBias); d += Math.max(got[2] - got[0], got[3] - got[1]) * 0.35; }
       }
     };
+    // along a residential street, on one side: detached houses (the city's own, 120: a drive, a garage or carport, a
+    // yard), each facing the street square to its nearest axis, set back behind a front garden
+    // (a house goes into the block of the cell it stands in: its home's address, its streaming chunk)
+    const cellAt = (x, z) => this.block(clamp(Math.floor(x / P), sb.bx0, sb.bx1), clamp(Math.floor(z / P), sb.bz0, sb.bz1));
+    const mix = D.mix || { house: 1 }, mixT = Object.values(mix).reduce((a2, c2) => a2 + c2, 0);
+    const lotKind = () => { let r = rng.next() * mixT; for (const k in mix) { r -= mix[k]; if (r <= 0) return k; } return 'house'; };
+    // the homes a district must have (the property ladder buys them by type, garage and district, 500): placed first
+    // where the zone is right, each counted only when its garage was really built
+    const req = (D.require || []).map(r => ({ ...r, left: r.n }));
+    const houseLine = (pts, set, side) => {
+      const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+      const L = cum[cum.length - 1];
+      for (let d = 8; d < L - 8; d += 2) {
+        let k = 0; while (k < pts.length - 2 && cum[k + 1] < d) k++;
+        const p = pts[k], c = pts[k + 1], sl = (cum[k + 1] - cum[k]) || 1, tx = (c[0] - p[0]) / sl, tz = (c[1] - p[1]) / sl, t = (d - cum[k]) / sl;
+        const px = p[0] + (c[0] - p[0]) * t, pz = p[1] + (c[1] - p[1]) * t, nx = -tz * side, nz = tx * side;
+        // the door faces the street: the axis nearest to -n
+        const face = Math.abs(nx) > Math.abs(nz) ? (nx > 0 ? 2 : 3) : (nz > 0 ? 0 : 1), ns = face < 2;
+        // the lot: a house (the city's mix, 120), a semi-detached pair or a low block of flats (D.mix: their weights)
+        const zk = zoneKey(px + nx * 15 + wox, pz + nz * 15 + woz), R0 = req.find(r => r.left > 0 && (!r.zone || r.zone === zk));
+        const kind = R0 ? (R0.spec.type === 'semi' ? 'semi' : R0.spec.type === 'apartment' ? 'apartment' : 'house') : lotKind();
+        const H = R0 ? { ...R0.spec } : kind === 'semi' ? { type: 'semi', w: 14.4, d: 9, garage: 'street' } : kind === 'apartment' ? { type: 'apartment', w: 22, d: 12, garage: 'street', flat: true } : this._pickHouse(rng, !!D.rich);
+        const gw = H.garage === 'triple' ? 10.3 : H.garage === 'double' ? 7 : H.garage === 'single' || H.garage === 'carport' ? 3.7 : 0;
+        // (a house with a garage or carport stands back 6 m, room for its drive and the garage beside it; a semi or flats 3.5 m)
+        const off = set + (kind === 'house' ? 6 : 3.5) + H.d / 2, cx = px + nx * off, cz = pz + nz * off, half = H.w / 2 + gw;
+        const q = ns ? [cx - half, cz - H.d / 2 - 1, cx + half, cz + H.d / 2 + 1] : [cx - H.d / 2 - 1, cz - half, cx + H.d / 2 + 1, cz + half];
+        if (!free(...q)) continue;
+        // (its drive must meet the street straight out of the garage side of the front, as a real drive does: where the
+        // street is not ahead within 22 m the house would need a spur across its neighbours' lots, so none is built)
+        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2;
+        let reach = false; for (let t = 0; t <= 22 && !reach; t += 0.5) if (this._roadDist(fx0 + fv[0] * t, fz0 + fv[1] * t) < 0.15) reach = true;
+        if (!reach) continue;
+        let home;
+        if (kind === 'semi') for (const s2 of [-1, 1]) home = this._house(cellAt(cx, cz), rng, { x: ns ? cx + s2 * 3.6 : cx, z: ns ? cz : cz + s2 * 3.6, face, type: 'semi', w: 7.2, d: 9, garage: 'street', drive: 'auto', doorOff: s2 * 1.6, bounds: sb });
+        else home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive: 'auto', gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
+        placed.push({ x0: q[0], z0: q[1], x1: q[2], z1: q[3], house: home });
+        if (R0 && home && home.type === R0.spec.type && (home.garage || 'street') === R0.spec.garage) R0.left--;
+        d += (ns ? q[2] - q[0] : q[3] - q[1]) * 0.6;
+      }
+    };
+    // round a cul-de-sac's turning circle: houses facing it (not across its mouth)
+    const circleHouses = L => {
+      const R0 = L.ring, a0 = L.pts[L.pts.length - 2], mouth = Math.atan2(a0[1] - R0.z, a0[0] - R0.x);
+      for (let k = 0; k < 7; k++) {
+        const an = mouth + (k + 1) / 8 * Math.PI * 2, nx = Math.cos(an), nz = Math.sin(an);
+        const face = Math.abs(nx) > Math.abs(nz) ? (nx > 0 ? 2 : 3) : (nz > 0 ? 0 : 1), ns = face < 2;
+        const H = this._pickHouse(rng, !!D.rich), gw = H.garage === 'triple' ? 10.3 : H.garage === 'double' ? 7 : H.garage === 'single' || H.garage === 'carport' ? 3.7 : 0;
+        const off = R0.r + L.w / 2 + 2.6 + 3.5 + H.d / 2, cx = R0.x + nx * off, cz = R0.z + nz * off, half = H.w / 2 + gw;
+        const q = ns ? [cx - half, cz - H.d / 2 - 1, cx + half, cz + H.d / 2 + 1] : [cx - H.d / 2 - 1, cz - half, cx + H.d / 2 + 1, cz + half];
+        if (!free(...q)) continue;
+        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2;
+        let reach = false; for (let t = 0; t <= 22 && !reach; t += 0.5) if (this._roadDist(fx0 + fv[0] * t, fz0 + fv[1] * t) < 0.15) reach = true;
+        if (!reach) continue;
+        const home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive: 'auto', gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
+        placed.push({ x0: q[0], z0: q[1], x1: q[2], z1: q[3], house: home });
+      }
+    };
     // every door with an address on these cells first: a front right behind it, facing its street, so the business,
     // the flat, the bank or the HQ has its building wherever the street now runs
     // (a bank is a deep building: its staff door is on the back, well behind the counter)
     const addr = [...PROPS, ...HOME_LADDER, ...SPOTS].map(d => ({ at: d.at, bank: !!d.bank })).concat(Object.values(HQS).map(at => ({ at }))).filter(a => a.at && superblockAt(a.at[0], a.at[1]) === sb);
+    const doorOf = new Map();
+    // every door's way in, kept clear: from the kerb to just behind where the door stands (the game finds each door at
+    // the facade behind its kerbside spot, 450; a neighbour's front built there would swallow it)
+    for (const { at } of addr) {
+      const s0 = sidewalkSpot(at[0], at[1], at[2], at[3]), ox = (CityLayout.siteI(at[0], at[1]) - at[0]) * P, oz = (CityLayout.siteJ(at[0], at[1]) - at[1]) * P;
+      const fx = Math.sin(s0.h), fz = Math.cos(s0.h), x = s0.x - ox, z = s0.z - oz, ax = Math.abs(fz) >= Math.abs(fx);
+      // (2 m to the street side of the spot, 0.4 m behind it, 1.6 m to either side)
+      const xa = x + fx * 2, za = z + fz * 2, xb = x - fx * 0.4, zb = z - fz * 0.4;
+      const dw = ax ? [Math.min(xa, xb) - 1.6, Math.min(za, zb), Math.max(xa, xb) + 1.6, Math.max(za, zb)] : [Math.min(xa, xb), Math.min(za, zb) - 1.6, Math.max(xa, xb), Math.max(za, zb) + 1.6];
+      doorways.push(dw); doorOf.set(at, dw);
+    }
+    // (a bank first: it needs the most ground, a deep hall with its service yard behind)
+    addr.sort((p2, q2) => (q2.bank ? 1 : 0) - (p2.bank ? 1 : 0));
     for (const { at, bank } of addr) {
+      // (an address's own way in never stops its own building: only its neighbours')
+      ownDoor = doorOf.get(at) || null;
       const s = sidewalkSpot(at[0], at[1], at[2], at[3], ROAD_HALF + 3.1), ox = (CityLayout.siteI(at[0], at[1]) - at[0]) * P, oz = (CityLayout.siteJ(at[0], at[1]) - at[1]) * P;
       const nx = -Math.sin(s.h), nz = -Math.cos(s.h), alongX = Math.abs(nz) >= Math.abs(nx);
       let got = null;
-      for (const [w0, d0] of bank ? [[18, 24], [16, 23], [14, 22]] : [[9, 10], [8, 9], [7, 8], [6, 7]]) {
-        for (let gap = 0.6; gap <= 2.6 && !got; gap += 0.4) {
-          const cx = s.x - ox + nx * (gap + d0 / 2), cz = s.z - oz + nz * (gap + d0 / 2), wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
+      for (const [w0, d0] of bank ? [[18, 24], [16, 23], [14, 22], [13, 20], [12, 18]] : [[9, 10], [8, 9], [7, 8], [6, 7], [5.5, 6], [5, 5.5]]) {
+        // (further back where a slanted street leaves no room close in: the game walks the door up to its facade, 450)
+        for (let gap = 0.7; gap <= 8 && !got; gap += 0.35) {
+          // (square to the axis the front faces: the front stands `gap` behind the door whatever the street's slant, so
+          // the door is never inside its own building's corner)
+          const cx = s.x - ox + (alongX ? 0 : Math.sign(nx) * (gap + d0 / 2)), cz = s.z - oz + (alongX ? Math.sign(nz) * (gap + d0 / 2) : 0), wx = alongX ? w0 : d0, wz = alongX ? d0 : w0, q = [cx - wx / 2, cz - wz / 2, cx + wx / 2, cz + wz / 2];
           if (free(...q)) got = q;
         }
         if (got) break;
       }
       if (got) {
-        const r = build(got, 0, 0, -nx, -nz, bank ? 0 : 0.6);
+        // the way from the door to the facade, when it stands back: kept clear (the door walks up to it, 450)
+        { const [x0, z0, x1, z1] = got, sx = s.x - ox, sz = s.z - oz; doorways.push(alongX ? [sx - 2, Math.min(sz, nz > 0 ? z0 : z1), sx + 2, Math.max(sz, nz > 0 ? z0 : z1)] : [Math.min(sx, nx > 0 ? x0 : x1), sz - 2, Math.max(sx, nx > 0 ? x0 : x1), sz + 2]); }
+        const r = build(got, 0, 0, -nx, -nz, bank ? 0 : 0.6, true);
         // a bank's service yard behind it, kept open: its staff door is on the back wall (512, rearOf)
         if (bank) { r.style = STYLE.DECO; r.color = C(rng.pick(PAL.deco)); const [x0, z0, x1, z1] = got; placed.push(alongX ? (nz > 0 ? { x0, z0: z1, x1, z1: z1 + 8 } : { x0, z0: z0 - 8, x1, z1: z0 }) : (nx > 0 ? { x0: x1, z0, x1: x1 + 8, z1 } : { x0: x0 - 8, z0, x1: x0, z1 })); }
       }
     }
-    // the high street first (shops), then the lanes, then the edge streets
-    for (const r of roads) { const hi = r.link === 'Saint Ivo Street' || r.link === 'Market Street'; for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6, s, hi ? 0.55 : 0.12); }
+    // the high streets first (shops), then the lanes, then the edge streets
+    ownDoor = null;
+    for (const L of lines) if (L.ring && L.res) circleHouses(L);
+    for (const r of roads) { if (r.closed) continue; const hi = r.high; for (const s of [1, -1]) { if (r.res) houseLine(r.pts, r.w / 2 + 2.6, s); else line(r.pts, r.w / 2 + 2.6, s, hi ? 0.55 : 0.12); } }
     const E = [[[sb.x0 - INNER, sb.z0 - INNER], [sb.x1 + INNER, sb.z0 - INNER], 1], [[sb.x1 + INNER, sb.z1 + INNER], [sb.x0 - INNER, sb.z1 + INNER], 1], [[sb.x0 - INNER, sb.z1 + INNER], [sb.x0 - INNER, sb.z0 - INNER], 1], [[sb.x1 + INNER, sb.z0 - INNER], [sb.x1 + INNER, sb.z1 + INNER], 1]];
-    for (const [p, q, s] of E) line(linePts(p, q, 4), INNER, s, 0.2);
+    for (const [p, q, s] of E) { if (D.houses) houseLine(linePts(p, q, 4), INNER, s); else line(linePts(p, q, 4), INNER, s, 0.2); }
     // a second row behind the first (back terraces and mews houses round courtyards), where the land is deep enough
-    for (const r of roads) for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6 + 15, s, 0);
-    // ---- behind the frontage: gardens and yards (trees, bushes, a shed), never in a street, a building or the square
-    const open = (x, z, m) => !lanes.some(L => x > L[0] - m && x < L[2] + m && z > L[1] - m && z < L[3] + m) && roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && Math.hypot(x - Q.x, z - Q.z) > Q.r + 1 && !(x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
+    if (D.secondRow !== false) for (const r of roads) if (!r.closed) for (const s of [1, -1]) line(r.pts, r.w / 2 + 2.6 + D.secondAt, s, 0);
+    // the starter safehouse (SPECIAL.safehouse) on a rebuilt cell: the house nearest the cell's middle, a family house
+    // with a single garage first (a tier-3 home, as it always was: a double garage reads as tier 4), its address the
+    // cell's as it always was
+    const S0 = SPECIAL.safehouse, keptS = (D.keep || []).some(K => K.bx === S0.bx && K.bz === S0.bz);
+    if (!keptS && superblockAt(S0.bx, S0.bz) === sb) {
+      const cb = this.block(S0.bx, S0.bz), mx = (cb.x0 + cb.x1) / 2, mz = (cb.z0 + cb.z1) / 2, pref = x => x.garage === 'single' ? 0 : x.garage === 'double' ? 1 : 2;
+      const h = placed.filter(q => q.house && q.house.type !== 'apartment').map(q => q.house).sort((a2, c2) => pref(a2) - pref(c2) || Math.hypot(a2.door.x - mx, a2.door.z - mz) - Math.hypot(c2.door.x - mx, c2.door.z - mz))[0];
+      if (h) { h.reserved = 'linden'; const bay = h.bays[0]; cb.safehouse = { x: h.door.x, z: h.door.z, h: h.door.h, home: h, garage: bay ? { x: bay.x + Math.sin(bay.h) * -4.2, z: bay.z + Math.cos(bay.h) * -4.2, h: bay.h + Math.PI } : { x: h.door.x, z: h.door.z, h: 0 } }; }
+    }
+    if (D.extras) D.extras(this, b, sb, rng, { roads, placed, free, build, line });
+    // ---- behind the frontage: gardens and yards (trees, bushes, a shed), never in a street, a building or a square
+    // (nor in a house's drive or its mouth across the pavement: 120 records each drive on its block)
+    const drives = sb.members.flatMap(m2 => m2.drives || []), onDrive = (x, z, m) => drives.some(d => x > d.x0 - m && x < d.x1 + m && z > d.z0 - m && z < d.z1 + m);
+    const open = (x, z, m) => !onDrive(x, z, m + 1.5) && !lanes.some(L => x > L[0] - m && x < L[2] + m && z > L[1] - m && z < L[3] + m) && roads.every(r => polyDist(x, z, r.pts) > r.w / 2 + m) && circles.every(c => Math.hypot(x - c.x, z - c.z) > c.r + m) && !squares.some(Q => Math.hypot(x - Q.x, z - Q.z) <= Q.r + 1) && !kept.some(G => x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m);
     for (let x = sb.x0 + 3; x < sb.x1 - 3; x += 6) for (let z = sb.z0 + 3; z < sb.z1 - 3; z += 6) {
       const jx = x + rng.range(-1.8, 1.8), jz = z + rng.range(-1.8, 1.8);
       if (!open(jx, jz, 2.4)) continue;
@@ -41230,24 +41573,188 @@ Object.assign(World.prototype, {
     }
     // ---- lamps along the streets (alternate sides on the pavement), cars at the kerbs
     for (const r of roads) {
+      if (r.closed) continue;
       const pts = r.pts; let acc = 0, side = 1;
       for (let k = 0; k < pts.length - 1; k++) {
         const p = pts[k], c = pts[k + 1], l = Math.hypot(c[0] - p[0], c[1] - p[1]); if (l < 0.01) continue;
         const tx = (c[0] - p[0]) / l, tz = (c[1] - p[1]) / l;
         for (let s = (22 - acc % 22 + 22) % 22; s < l; s += 22) {
           const x = p[0] + tx * s - tz * side * (r.w / 2 + 1.1), z = p[1] + tz * s + tx * side * (r.w / 2 + 1.1); side = -side;
-          if (x < sb.x0 || x > sb.x1 || z < sb.z0 || z > sb.z1 || this._roadDist(x, z) < 0.5 || placed.some(q => x > q.x0 - 0.5 && x < q.x1 + 0.5 && z > q.z0 - 0.5 && z < q.z1 + 0.5)) continue;
+          if (x < sb.x0 || x > sb.x1 || z < sb.z0 || z > sb.z1 || this._roadDist(x, z) < 0.5 || onDrive(x, z, 1.2) || placed.some(q => x > q.x0 - 0.5 && x < q.x1 + 0.5 && z > q.z0 - 0.5 && z < q.z1 + 0.5)) continue;
           this._prop(b, 'parklamp', x, z, 0);
         }
         acc += l;
       }
       this._kerbCars(b, rng, r, roads);
     }
-    b.secrets.push({ x: 30, z: 360 }, { x: 200, z: 540 });
-    this.mapPlaces.push({ id: 'oldquarter', name: 'Saint Ivo Square', cat: 'landmark', icon: '⛲', x: Q.x, z: Q.z, sub: 'The Old Quarter’s square, on Saint Ivo Street' });
-    sb.name = 'Old Quarter';
+    // each cell's street pattern now (what the suburb generator tags its blocks with, 120): a cul-de-sac round its
+    // circle, low-rise flats, a curving residential street, a plain one, or a terrace street
+    for (const m of sb.members) {
+      if (m.kept || m.roadKind) continue;
+      const inM = (x, z) => x >= m.bx * P && x < (m.bx + 1) * P && z >= m.bz * P && z < (m.bz + 1) * P;
+      const homesHere = this.homes.filter(h => inM((h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2));
+      if (lines.some(L => L.ring && inM(L.ring.x, L.ring.z))) m.roadKind = 'culdesac';
+      else if (homesHere.some(h => h.type === 'apartment')) m.roadKind = 'lowrise';
+      else if (homesHere.length) m.roadKind = roads.some(r => r.res && r.pts.some(q => inM(q[0], q[1])) && polyTurn(r.pts) > 0.6) ? 'crescent' : 'street';
+      else m.roadKind = 'terrace';
+    }
+    for (const s of D.secrets || []) b.secrets.push({ x: s[0], z: s[1] });
+    for (const Q of squares) if (Q.name) this.mapPlaces.push({ id: Q.id || sb.id, name: Q.name, cat: 'landmark', icon: Q.icon || '⛲', x: Q.x, z: Q.z, sub: Q.sub || '' });
+    sb.name = D.name;
   }
 });
+/* =====================================================================
+   [CONTENT] THE OLD QUARTER, REBUILT (owner, 2026-11-18: the first district of the downtown redeveloped; since
+   2026-11-19 one definition of the district rebuild kit, 124)
+   Sixteen lattice cells (0..3, 4..7: the whole precinct since 2026-11-19, when the grid's last column and row went)
+   are one superblock with no grid inside it. Its streets are curved through-roads:
+   - Saint Ivo Street, the high street, winding from the north edge to the south;
+   - Market Street, crossing it in two staggered halves (west to the shore road, east to Downtown);
+   - Bell Lane, Cooper's Walk, Chapel Lane, Garage Row, Wick Lane, Lantern Lane and Hawthorn Bend, the old lanes off them
+     (the names the blocks' own lanes had, 122);
+     Market Street and Garage Row run on east to the core, Saint Ivo Street, Chapel Lane and Wick Lane south to
+     Linden Hills;
+   - Saint Ivo Square beside the high street, with its fountain.
+   Every street is lined with terraces (brick, shopfronts, flats; two to four storeys) stepping along
+   its curve, and so are the four edge streets; behind the frontage, yards and gardens. The Quarter
+   Garage stands where it stood, Garage Row running past the foot of its ramp; so does the Westside Fuel & Go,
+   on the street to the south it has always faced.
+   ===================================================================== */
+// the streets, in lattice metres
+const OQ_STREETS = [
+  { name: 'Saint Ivo Street', w: 9, park: [1, -1], high: true, ctrl: [[100, 325.6], [104, 345], [96, 368], [84, 392], [86, 418], [102, 440], [118, 462], [122, 488], [112, 512], [104, 534], [110, 560], [122, 586], [126, 610], [120, 634.4]] },
+  { name: 'Market Street', w: 8, park: [1], high: true, fork: 0, near: [86, 422], ctrl: [[64, 430], [44, 427], [24, 431], [5.6, 436]] },
+  { name: 'Market Street', w: 8, park: [-1], high: true, fork: 0, near: [92, 378], ctrl: [[120, 372], [150, 366], [180, 372], [210, 380], [240, 386], [268, 390], [292, 384], [314.4, 378]] },
+  { name: 'Bell Lane', w: 7, fork: 2, near: [182, 372], ctrl: [[186, 356], [190, 340], [196, 325.6]] },
+  { name: 'Cooper’s Walk', w: 7, fork: 0, near: [119, 470], ctrl: [[92, 482], [62, 492], [36, 506], [5.6, 518]] },
+  { name: 'Chapel Lane', w: 7, fork: 4, near: [56, 494], ctrl: [[50, 512], [40, 532], [30, 560], [26, 596], [36, 634.4]] },
+  { name: 'Garage Row', w: 8, fork: 0, near: [121, 494], ctrl: [[150, 486], [180, 482], [206, 481], [222, 487], [246, 494], [272, 495], [296, 495], [314.4, 495]] },
+  { name: 'Wick Lane', w: 7, fork: 0, near: [106, 530], ctrl: [[130, 530], [160, 524], [190, 528], [214, 538], [226, 560], [230, 592], [222, 634.4]] },
+  { name: 'Lantern Lane', w: 7, fork: 0, near: [123, 590], ctrl: [[146, 592], [170, 600], [190, 616], [196, 634.4]] },
+  { name: 'Hawthorn Bend', w: 7, fork: 5, near: [28, 580], ctrl: [[44, 588], [58, 604], [64, 634.4]] }
+];
+// Saint Ivo Square: a paved round beside the high street, its fountain in the middle
+const OQ_SQUARE = { x: 58, z: 462, r: 11, ring: 7.2, secret: [5, 5], name: 'Saint Ivo Square', icon: '⛲', id: 'oldquarter', sub: 'The Old Quarter’s square, on Saint Ivo Street' };
+REBUILDS.oldquarter = {
+  name: 'Old Quarter',
+  streets: OQ_STREETS,
+  // the Neighborhood Bank (353: 2,5 north side, the Quarter Garage's front) is a deep building with a staff door on
+  // its back
+  // (since 2026-11-19 on Market Street's west half, north side, where the street runs straight enough for its deep hall
+  // to stand flush behind its door)
+  addr: { '2,5,0,44': [44, 418] },
+  // the Quarter Garage stands where it stood, Garage Row running past the foot of its ramp
+  // and so do the Westside Fuel & Go, facing the street to the south, and the police station (SPECIAL.police): its
+  // front door faces north, across a forecourt to Market Street; its yard (where an arrest is released) south to
+  // Garage Row
+  keep: [{ bx: 2, bz: 5, gen: '_genGarage', landmark: '2,5' }, { bx: 3, bz: 7, gen: '_genGasStation', landmark: '3,7' }, { bx: 3, bz: 5, cell: true, forecourts: [[248, 392, 312, 405], [248, 475, 312, 486]] }],
+  squares: [OQ_SQUARE],
+  secrets: [[30, 360], [200, 540]]
+};
+/* =====================================================================
+   [CONTENT] LINDEN HILLS, REBUILT (owner, 2026-11-19: the original city redeveloped; CITY_REBUILD.md §5)
+   Twelve lattice cells (0..3, 8..10) are one superblock: the grid of square suburban blocks gives way to
+   streets that wander as a suburb's do. Its street names are the ones the blocks' own lanes had:
+   - Linden Parade, the local high street (shops and the launderette, the pizzeria, the pharmacy), winding
+     from the Old Quarter's edge to Cedar Fields;
+   - Kestrel Curve, the long loop east of it, with Millrace Lane up to the north edge, Willow Bend out to the
+     east and Tanner's Row on to Cooper's Lane across the avenue (the strip's lane, 122);
+   - Mason's Walk off the shore road, Ropewalk and Orchard Close off the Parade, Linden Close off Kestrel Curve:
+     cul-de-sacs, each round its turning circle.
+   Detached houses line the residential streets (the city's own houses, 120: a drive, a garage or a carport,
+   a back yard); the Pocket Park stands where it stood. The starter safehouse is the house nearest its cell's
+   middle (the kit, 124). The cells stay the address system: Linden Hills is the district it was.
+   ===================================================================== */
+REBUILDS.linden = {
+  name: 'Linden Hills',
+  streets: [
+    { name: 'Linden Parade', w: 9, park: [1, -1], high: true, ctrl: [[100, 645.6], [96, 668], [84, 690], [72, 714], [70, 742], [72, 772], [78, 800], [96, 826], [116, 848], [124, 874.4]] },
+    { name: 'Kestrel Curve', w: 7, res: true, fork: 0, near: [84, 690], ctrl: [[110, 688], [140, 692], [170, 702], [196, 718], [214, 744], [220, 772], [214, 800], [204, 822], [198, 846], [200, 874.4]] },
+    { name: 'Millrace Lane', w: 7, res: true, fork: 1, near: [170, 702], ctrl: [[184, 684], [198, 664], [210, 645.6]] },
+    { name: 'Willow Bend', w: 7, res: true, fork: 1, near: [214, 744], ctrl: [[232, 722], [256, 708], [284, 700], [314.4, 694]] },
+    { name: 'Tanner’s Row', w: 7, res: true, fork: 1, near: [206, 824], ctrl: [[232, 832], [262, 838], [290, 842], [314.4, 842]] },
+    { name: 'Mason’s Walk', w: 7, res: true, circle: 9, ctrl: [[5.6, 690], [24, 694], [40, 690]] },
+    { name: 'Ropewalk', w: 7, res: true, circle: 9, fork: 0, near: [72, 772], ctrl: [[52, 780], [36, 796]] },
+    { name: 'Linden Close', w: 7, res: true, circle: 9, fork: 1, near: [140, 692], ctrl: [[142, 716], [138, 742], [130, 764]] },
+    { name: 'Orchard Close', w: 7, res: true, circle: 9, fork: 0, near: [96, 826], ctrl: [[120, 812], [146, 804], [166, 800]] }
+  ],
+  // Tony's Pizzeria and Bubbles Wash & Fold: their own corners are junctions now; they stand on the Parade
+  // (and the Linden Chemist beside them; the Market Street Apartment's corner is Willow Bend's mouth: it stands
+  // just north of it)
+  addr: { '2,9,1,16': [88, 728], '0,9,2,48': [58, 736], '2,9,3,28': [88, 756], '3,8,1,48': [302, 672] },
+  // the Pocket Park, where it stood (the city's own park block, 090)
+  keep: [{ bx: 3, bz: 9, cell: true }],
+  // (the suburb's own mix: houses, semi-detached pairs, a few low blocks of flats; the property ladder buys from it)
+  houses: true, mix: { house: 0.82, semi: 0.08, apartment: 0.1 }, gap: 3, secondRow: false,
+  // the homes the property ladder buys here (500: bungalows, family houses, the double-garage houses, the flats)
+  require: [
+    { spec: { type: 'apartment', w: 22, d: 12, garage: 'street', flat: true }, n: 3 },
+    { spec: { type: 'semi', w: 14.4, d: 9, garage: 'street' }, n: 2 },
+    { spec: { type: 'bungalow', w: 12, d: 9, garage: 'carport' }, n: 3 },
+    { spec: { type: 'bungalow', w: 12, d: 9, garage: 'street' }, n: 2 },
+    { spec: { type: 'bungalow', w: 11, d: 8.5, garage: 'single' }, n: 5, zone: 'l' },
+    { spec: { type: 'house', w: 9, d: 8.5, garage: 'carport' }, n: 3, zone: 'l' },
+    { spec: { type: 'house', w: 10, d: 9, garage: 'single' }, n: 8, zone: 'l' },
+    { spec: { type: 'house', w: 11, d: 9, garage: 'double' }, n: 4, zone: 'l' }
+  ],
+  sidewalks: { trees: 0.75, park: 0.3 },
+  styles: [STYLE.HOUSE, STYLE.HOUSE, STYLE.BRICK, STYLE.APT],
+  heights: [6.5, 11],
+  secrets: [[30, 860], [290, 660]]
+};
+/* =====================================================================
+   [CONTENT] THE FINANCIAL CORE, REBUILT (owner, 2026-11-19: the original city redeveloped, the core included;
+   CITY_REBUILD.md §5.3)
+   Twenty-four lattice cells (4..9, 4..7) are one superblock. A downtown keeps some straight streets, and the core's
+   are where its landmarks need them:
+   - Central Blvd, the one straight avenue, on the old Central Blvd's line and keeping its name: Valen Tower's door, Valen Prestige
+     Motors' showroom and the Central Parkade's ramp all open onto it; its ends swing in to meet the edge streets;
+   - Exchange Circus, a roundabout on the boulevard east of the tower, with Exchange Street north and south of it;
+   - Glass Mile, a diagonal avenue from the north edge down to the boulevard;
+   - Assay Lane, Ledger Row, Bourse Lane, Mint Street and Counting House Lane between the towers; Tower Mews, a short
+     close to the tower's garage door;
+   - Exchange Square, a plaza with a fountain south of the boulevard.
+   Kept where they stood, as the city builds them: Valen Tower, the Central Parkade, Valen Prestige Motors, the
+   Glasshouse depot, the Police Impound, Fuel & Go Eastgate and St. Alda Hospital. The Central Bank moves onto the
+   boulevard, the Commercial Bank onto Counting House Lane (a Downtown cell), each a deep hall with its service yard.
+   ===================================================================== */
+REBUILDS.core = {
+  name: 'Financial District',
+  streets: [
+    /* 0 */ { name: 'Exchange Circus', id: 'exchange', ring: 13, at: [612, 480], w: 9 },
+    /* 1 */ { name: 'Central Blvd', w: 11, high: true, ctrl: [[325.6, 454], [345, 470], [372, 480], [440, 480], [520, 480], [584, 480]], join: 0, joinNear: [599, 480] },
+    /* 2 */ { name: 'Central Blvd', w: 11, high: true, fork: 0, near: [625, 480], ctrl: [[642, 480], [700, 480], [760, 480], [780, 470], [794.4, 456]] },
+    /* 3 */ { name: 'Exchange Street', w: 9, high: true, fork: 0, near: [612, 467], ctrl: [[612, 450], [608, 420], [600, 400], [598, 370], [600, 340], [606, 325.6]] },
+    /* 4 */ { name: 'Exchange Street', w: 9, high: true, fork: 0, near: [612, 493], ctrl: [[612, 512], [614, 550], [616, 590], [614, 634.4]] },
+    /* 5 */ { name: 'Glass Mile', w: 10, high: true, fork: 1, near: [462, 480], ctrl: [[452, 460], [434, 430], [414, 398], [392, 366], [372, 325.6]] },
+    /* 6 */ { name: 'Tower Mews', w: 7, circle: 6, fork: 1, near: [564, 480], ctrl: [[564, 466], [564, 450]] },
+    /* 7 */ { name: 'Bourse Lane', w: 8, fork: 1, near: [380, 480], ctrl: [[384, 500], [386, 530], [392, 560], [402, 584], [418, 606], [436, 634.4]] },
+    /* 8 */ { name: 'Mint Street', w: 8, fork: 7, near: [408, 594], ctrl: [[440, 600], [480, 606], [520, 608], [570, 604]], join: 4, joinNear: [615, 600] },
+    /* 9 */ { name: 'Ledger Row', w: 8, fork: 3, near: [600, 400], ctrl: [[630, 400], [660, 399], [700, 400], [730, 404], [760, 414], [794.4, 430]] },
+    /* 10 */ { name: 'Counting House Lane', w: 8, fork: 2, near: [700, 480], ctrl: [[714, 500], [740, 514], [768, 522], [794.4, 528]] },
+    /* 11 */ { name: 'Assay Lane', w: 8, fork: 5, near: [414, 398], ctrl: [[440, 390], [480, 386], [520, 388], [560, 391]], join: 3, joinNear: [600, 396] }
+  ],
+  // the banks on the boulevard: deep buildings with their service yards behind (the kit's bank rule)
+  // (the Commercial Bank keeps to Downtown's cells, on Counting House Lane: the three banks stand in three districts)
+  // (the hotel and the jeweller on straight stretches, each in its own district's cells: where their old corners are now
+  // the boulevard's curve and Bourse Lane's bend, a building cannot stand flush behind the door)
+  addr: { '6,6,2,28': [520, 494], '8,7,3,52': [752, 540], '4,5,2,56': [420, 470], '5,7,3,16': [450, 594] },
+  keep: [
+    { bx: 6, bz: 5, cell: true }, { bx: 5, bz: 6, cell: true }, { bx: 8, bz: 5, cell: true }, { bx: 9, bz: 4, cell: true },
+    // (St. Alda's rooftop helipad, the air ambulance's: its approaches kept clear, nothing over 22 m within 70 m)
+    { bx: 4, bz: 7, cell: true }, { bx: 9, bz: 7, cell: true }, { bx: 8, bz: 7, cell: true, low: { r: 70, h: 22 } }
+  ],
+  squares: [{ x: 520, z: 578, r: 15, ring: 9.5, name: 'Exchange Square', id: 'exchangesq', icon: '⛲', sub: 'The core’s plaza, off Central Blvd', secret: [6, -6] }],
+  // towers and offices: big footprints, tall
+  styles: [STYLE.GLASS, STYLE.GLASS, STYLE.OFFICE, STYLE.DECO],
+  sizes: [[30, 26], [26, 24], [22, 20], [18, 18], [14, 16], [12, 12]],
+  heights: [24, 96],
+  roof: 'mid',
+  gap: 0.6,
+  secondAt: 26,
+  sidewalks: { trees: 0.5, benches: true, news: true, park: 0.1 },
+  secrets: [[340, 340], [780, 620]]
+};
 /* =====================================================================
    [CONTENT] DISTRICT BLOCKS OFF THE LATTICE, AND THE IMPOUND'S SOUND ANNEX
    Geometry off the city's lattice (the island's sites, the Southshore
@@ -41456,7 +41963,7 @@ Object.assign(World.prototype, {
       // the turning circle's island, transporters along the paddock's back, lamps
       this._det(B.pad, 'cyl', R0.x, Y + 0.25, R0.z, 4, 0.5, 0x6f8a5a, null, { x: R0.x, z: R0.z, r: 4, y0: Y - 1, y1: Y + 0.5, kind: 'det' });
       for (let k = 0; k < 6; k++) { const x = 380 + k * 28; this._bld(B.pad, x, 1072, x + 16, 1075, 3.6, STYLE.IND, [0xd23a2a, 0x1f6fb2, 0xe8eaed, 0x2e2e2e, 0xf1c40f, 0x27ae60][k], 3.6, 4, { exactH: true, y0: Y, oy: Y }); }
-      for (const [x, z] of [[200, 1150], [380, 1150], [520, 1150], [150, 1100]]) this._prop(B.pad, 'lotlamp', x, z, 0);
+      for (const [x, z] of [[200, 1150], [380, 1150], [520, 1150], [150, 1100]]) this._prop(B.pad, 'lotlamp', x, z, 0, 1, OVAL.y);
     }
     // ---------------------------------------------------------------- the countryside round the site: trees (clear of the site, the roads and the fence)
     const clearOf = (x, z, m) => {
@@ -41574,7 +42081,7 @@ Object.assign(World.prototype, {
     // the countryside between the districts (129): fields against the finished roads and pads
     Farms.init();
     // ---------------------------------------------------------------- the roads: curved links like the city's own
-    for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
+    for (const R of Island.roads) this.localRoads.push({ k: 'line', link: R.name, spur: !!R.ring, closed: !!R.closed, oneway: !!R.oneway, w: R.w, pts: R.pts, ring: R.ring, mat: 'asphalt', st: 'asphalt', isle: R });
     // promenade lamps that would stand in a road leaving the city
     this.promenade = this.promenade.filter(l => !Island.roads.some(R => R.ends.includes('lat') && [R.pts[0], R.pts[R.pts.length - 1]].some(e => Math.hypot(l.x - e[0], l.z - e[1]) < 13)));
     // ---------------------------------------------------------------- colliders: bridge rails, tunnel walls (posts 1.3 m apart)
@@ -41804,10 +42311,17 @@ Object.assign(World.prototype, {
     this._genRaceway();
     // the Southshore Fairground (129c)
     this._genFairground();
+    // the roundabouts' central islands and signs (023)
+    this._genRoundabouts();
+    // the districts' buildings dressed like the city's (128b): shop floors, facades, roof plant
+    isle.dressed = this._dressIsland();
+    isle.furniture = this._isleFurniture();
     // colliders for the island's blocks (the city's and the first district blocks' loops ran before these existed)
     for (const b of isle.blocks) {
       for (const bl of b.bld) if (!bl.noCol) bl.col = this.grid.add({ x0: bl.x0, z0: bl.z0, x1: bl.x1, z1: bl.z1, y0: bl.y0 - 1, y1: bl.y0 + bl.h, kind: 'bld' });
       for (const d of b.det) if (d.col) this.grid.add(d.col);
+      // (and their props: the street furniture, the lamps; the city's are added the same way, 090)
+      for (const p of b.props) if (p.col && !p.col.prop) { p.col.prop = p; this.grid.add(p.col); }
     }
     isle.mans = mans;
   },
@@ -42002,7 +42516,9 @@ Object.assign(World.prototype, {
     const V = VILLA_VALEN;
     const KEEP_CITY = m => CityLayout.precincts.map(p => [p.x0 - m, p.z0 - m, p.x1 + m, p.z1 + m]), CITY80 = KEEP_CITY(80), CITY_IN = KEEP_CITY(EDGE_MARGIN + 6);
     const KEEP = [[CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
-      [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], SOUND_RESERVE, [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12]];
+      [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], SOUND_RESERVE, [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12],
+      // the roundabouts (023): the ring, its pavement and its approaches kept clear of lots and their drives
+      ...(typeof ROUNDABOUTS !== 'undefined' ? ROUNDABOUTS.map(RB => { const e = RB.r + RB.w / 2 + 14; return [RB.x - e, RB.z - e, RB.x + e, RB.z + e]; }) : [])];
     const hit = (a, b, m = 0) => a[0] - m < b[2] && a[2] + m > b[0] && a[1] - m < b[3] && a[3] + m > b[1];
     const pads0 = Island.pads.map(p => [p.x0, p.z0, p.x1, p.z1]), taken = [];
     const lakeIn = (x, z) => ((x - LAKE.x) / (LAKE.rx + 45)) ** 2 + ((z - LAKE.z) / (LAKE.rz + 45)) ** 2 < 1;
@@ -42047,6 +42563,30 @@ Object.assign(World.prototype, {
           n++;
         }
         if (E.max && n >= E.max) break;
+      }
+    }
+    // the city's edges that face land (2026-11-18, the world overhaul: past the promenade the city just stopped, a lawn
+    // and then a district's houses): a row of mid-rise frontage, flats over shops like the city's own, just behind the
+    // promenade and facing the edge street, so the street is a street on both sides. Wherever the ground is land and
+    // level enough, clear of every road, site and lot; the district is the nearest one (its signs, its cars)
+    if (CityLayout.id === 'island') {
+      const S = ISLE_LOT.mid, step = S.W + 3, Ds = Object.entries(ISLE_DISTRICTS).filter(([, D]) => D.at);
+      for (const p of CityLayout.precincts) for (const side of ['n', 's', 'w', 'e']) {
+        const ns = side === 'n' || side === 's', line = side === 'n' ? p.z0 : side === 's' ? p.z1 : side === 'w' ? p.x0 : p.x1, out = side === 'n' || side === 'w' ? -1 : 1;
+        const a0 = ns ? p.x0 : p.z0, a1 = ns ? p.x1 : p.z1, off = EDGE_MARGIN + 1 + S.D / 2;
+        for (let t = a0 + S.W / 2 + 4, i = 0; t <= a1 - S.W / 2 - 4; t += step, i++) {
+          const cx = ns ? t : line + out * off, cz = ns ? line + out * off : t, hx = ns ? S.W / 2 : S.D / 2, hz = ns ? S.D / 2 : S.W / 2, r = [cx - hx, cz - hz, cx + hx, cz + hz];
+          if (CityLayout.precincts.some(q => hit(r, [q.x0 - EDGE_MARGIN, q.z0 - EDGE_MARGIN, q.x1 + EDGE_MARGIN, q.z1 + EDGE_MARGIN], 0.5))) continue;
+          if (KEEP.some(q => hit(r, q)) || pads0.some(q => hit(r, q, 8)) || taken.some(q => hit(r, q, 3))) continue;
+          if (!roadClear(r[0], r[1], r[2], r[3], 2.4) || !groundOk(r, 6)) continue;
+          // (not where the city faces open water a little further out: a frontage row on a sea wall's narrow strip)
+          if (Island.nat(cx + (ns ? 0 : out * 40), cz + (ns ? out * 40 : 0)) < SEA_Y + 1.1) continue;
+          const d = Ds.reduce((m, [k, D]) => Math.hypot(D.at[0] - cx, D.at[1] - cz) < Math.hypot(ISLE_DISTRICTS[m].at[0] - cx, ISLE_DISTRICTS[m].at[1] - cz) ? k : m, 'midtown');
+          const vx = ns ? 0 : out, vz = ns ? out : 0;
+          taken.push(r);
+          const P = sitePad(r[0] - 2, r[1] - 2, r[2] + 2, r[3] + 2, 8, CURB_H);
+          lots.push({ d, kind: 'mid', x: cx, z: cz, vx, vz, ux: -vz, uz: vx, W: S.W, D: S.D, rect: r, P, road: 'edge:' + p.id + ':' + side, i: lots.length, seed: (i * 2 + 1) * 37 + lots.length, edge: true });
+        }
       }
     }
     // the estate's grounds: one level, cut into the hill
@@ -42109,7 +42649,8 @@ Object.assign(World.prototype, {
     const signN = {};
     for (const B of blocks.values()) for (const L of B.lots) {
       const b = B.b, y = L.P.y, Dd = ISLE_DISTRICTS[L.d], h = face(L), q = k => rng(L.seed, k), car = k => Dd.cars[Math.floor(q(k) * Dd.cars.length)];
-      const bld = (r, hh, style, col, fh, bay, o = {}) => this._bld(b, r[0], r[1], r[2], r[3], hh, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o });
+      // (each building remembers which way its lot faces the street: the dressing's front, 128b)
+      const bld = (r, hh, style, col, fh, bay, o = {}) => { const q2 = this._bld(b, r[0], r[1], r[2], r[3], hh, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o }); q2.face = [-L.vx, -L.vz]; return q2; };
       if (L.kind === 'villa') {
         const wall = [0xf2ede2, 0xe8e0d0, 0xdcd6cc, 0xf4f1ea, 0xe6dccb][Math.floor(q(1) * 5)], roof = [0x8a4a34, 0x3a4652, 0x5a4a3a, 0x7a3a2e][Math.floor(q(2) * 4)];
         bld(rectL(L, -3, 1, 9.5, 6), 7.4, STYLE.HOUSE, wall, 3.7, 4.2, { roof: 'gable', roofColor: roof });
@@ -42190,6 +42731,9 @@ Object.assign(World.prototype, {
     // (a car whose drive cannot be laid, too steep or blocked, is not parked there: it could never leave)
     for (const B of blocks.values()) B.slots = B.slots.filter(S => {
       const L = B.lots.find(L => S.x > L.rect[0] - 1 && S.x < L.rect[2] + 1 && S.z > L.rect[1] - 1 && S.z < L.rect[3] + 1);
+      // (a lot fronting the city's edge street, shops and flats on its pavement, has no private parking: no drive
+      // could reach the lattice across the promenade)
+      if (L && L.edge) return false;
       const R = L && Island.roads.find(q => q.id === L.road);
       return !R || this._isleDrive(B.b, S.x, S.z, S.y, R, [], ISLE_DRIVE.back, [-L.vx, -L.vz]);
     });
@@ -42539,6 +43083,8 @@ Object.assign(World.prototype, {
     const line = [[sx - (f[0] - sx) / fl * back, sz - (f[1] - sz) / fl * back], [sx, sz], ...via, [ex, ez]];
     let len = 0; for (let i = 1; i < line.length; i++) len += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
     if (len > D.maxLen) return this._driveNo('long', sx, sz);
+    // (never onto a roundabout, 023: its ring, its central island or the give-way approach)
+    if (typeof ROUNDABOUTS !== 'undefined' && line.some(p => ROUNDABOUTS.some(RB => Math.hypot(p[0] - RB.x, p[1] - RB.z) < RB.r + RB.w / 2 + 8))) return this._driveNo('roundabout', sx, sz);
     // the surface along it: the lot's level at the car, the ground on the way, the pavement and the road at the end
     const surf = (x, z) => {
       const dr = Math.hypot(x - best.px, z - best.pz);
@@ -42580,6 +43126,172 @@ Object.assign(World.prototype, {
     }
     (isle.drives = isle.drives || []).push(...segs);
     return true;
+  }
+});
+/* =====================================================================
+   [CONTENT] THE ISLAND'S BUILDINGS DRESSED LIKE THE CITY'S (2026-11-18)
+   The world overhaul's audit (ISLAND.md §10): the island districts' buildings
+   were the city's own boxes (_bld) without the city's dressing, so beside the
+   original city they read as placeholders. This pass gives every district
+   building the same treatment a city street building gets (090/100):
+   - its front is the face toward its nearest road;
+   - a shop, office or showroom there gets the glazed shop floor (gtype 1),
+     an awning and a fascia sign, like the city's high streets;
+   - the facade dressing (_dress: plinth, cornice, string courses, downpipes,
+     fire escapes, balconies, air-conditioners, blade signs, a house's porch);
+   - a flat roof gets its plant (_rooftop: tanks, vents, parapets, water
+     towers on old brick); a warehouse its loading dock (_dressBox).
+   Only the island districts' blocks (dist_*): the tracks, the airport, the
+   fairground and the villa have their own architecture.
+   And the island's streets furnished like the city's (_isleFurniture):
+   hydrants, bins, benches, bus stops and news boxes along the district
+   streets, a name sign at each end of every street, speed-limit signs on
+   the highways; each clear of the carriageways, of anything built and of
+   every post already standing.
+   ===================================================================== */
+// spacing (m) along a street, each side: hydrants, bins, benches (urban streets only); a bus stop on a street longer than
+// busMin; a highway's speed-limit signs every limitStep
+const ISLE_FURN = { hydrant: 85, bin: 64, bench: 110, busMin: 260, limitStep: 1400, limits: { n1: 50, n1e: 40, s1: 50, s4: 50, n2: 40, s3: 40, sp1: 40, sp2: 40, x1: 30 } };
+Object.assign(World.prototype, {
+  _dressIsland() {
+    let n = 0;
+    for (const b of this.isle.blocks) {
+      if (!/^dist_/.test(b.xb || '')) continue;
+      const rng = new RNG(hash2i(Math.floor(b.cx), Math.floor(b.cz), 2301) * 1e9);
+      for (const r of b.bld.slice()) {
+        if (r.noDress || r.h < 2.5) continue;
+        const f = this._isleFront(r);
+        // the shop floor and its awning and sign (the city's street-row rule, 090 _row)
+        const shopStyle = r.style === STYLE.SHOP || r.style === STYLE.OFFICE || r.style === STYLE.DECO || (r.style === STYLE.APT && r.h > 12 && rng.chance(0.5));
+        if (f && f.near && (shopStyle || (r.style === STYLE.BRICK && rng.chance(0.4))) && r.h >= 4) {
+          r.gtype = 1; f.shop = true;
+          if (shopStyle && f.w > 5) {
+            const aw = f.w - 1.2;
+            if (rng.chance(0.75)) this._det(b, 'box', f.faceX + f.fx * 0.9, r.y0 + 3.05, f.faceZ + f.fz * 0.9, f.ax === 'x' ? aw : 1.8, 0.12, f.ax === 'x' ? 1.8 : aw, rng.pick(PAL.awning), 0);
+            if (rng.chance(0.7)) b.signs.push({ x: f.faceX + f.fx * 0.08, y: r.y0 + 3.9, z: f.faceZ + f.fz * 0.08, ry: f.ry, w: Math.min(aw * 0.8, 6), h: 0.9, ad: rng.int(0, 7) });
+          }
+        }
+        if (f) this._dress(b, r, rng, f);
+        if (r.roof !== 'gable') {
+          if (r.style === STYLE.WARE) { this._dressBox(b, r, rng, 'warehouse'); this._rooftop(b, r, rng, 'ind'); }
+          else this._rooftop(b, r, rng, r.h > 20 ? 'mid' : r.style === STYLE.BRICK ? 'old' : 'mid');
+        }
+        n++;
+      }
+    }
+    return n;
+  },
+  _isleFurniture() {
+    const F = ISLE_FURN, urban = new Set(ISLE_INFILL_ROADS.map(D => D.id)), street = new Set([...ISLE_DISTRICT_ROADS, ...ISLE_INFILL_ROADS].map(D => D.id));
+    // what a post must keep clear of: every carriageway, everything built, every post already standing
+    const segs = []; for (const R of Island.roads) for (let k = 0; k < R.pts.length - 1; k += 1) { const a = R.pts[k], c = R.pts[k + 1]; segs.push({ R, a, c, x0: Math.min(a[0], c[0]) - R.w, x1: Math.max(a[0], c[0]) + R.w, z0: Math.min(a[1], c[1]) - R.w, z1: Math.max(a[1], c[1]) + R.w }); }
+    const grid = new Map(), cellOf = (x, z) => Math.floor(x / 32) * 4096 + Math.floor(z / 32);
+    for (const sg of segs) for (let i = Math.floor(sg.x0 / 32); i <= Math.floor(sg.x1 / 32); i++) for (let j = Math.floor(sg.z0 / 32); j <= Math.floor(sg.z1 / 32); j++) { const k = i * 4096 + j; (grid.get(k) || grid.set(k, []).get(k)).push(sg); }
+    const segD = (x, z, a, c) => { const dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1); return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t); };
+    const inRoad = (x, z, m) => (grid.get(cellOf(x, z)) || []).some(sg => segD(x, z, sg.a, sg.c) < sg.R.w / 2 + m);
+    const solid = []; for (const b of this.xblocks) { for (const r of b.bld) solid.push([r.x0 - 1.2, r.z0 - 1.2, r.x1 + 1.2, r.z1 + 1.2]); for (const d of b.det) { const c = d.col; if (!c) continue; solid.push(c.r !== undefined ? [c.x - c.r - 1, c.z - c.r - 1, c.x + c.r + 1, c.z + c.r + 1] : [c.x0 - 1, c.z0 - 1, c.x1 + 1, c.z1 + 1]); } }
+    // (nor on a runway: the airport's and Valen Field's, with 6 m to spare either side)
+    const AP = AIRPORT, FLD = this.isle && this.isle.field, runway = (x, z) => AP.rw.some(q => x > q.x0 - 6 && x < q.x1 + 6 && Math.abs(z - q.z) < q.w / 2 + 6) || !!(FLD && x > FLD.rw.x0 - 6 && x < FLD.rw.x1 + 6 && Math.abs(z - FLD.rw.z) < FLD.rw.w / 2 + 6);
+    // (nor on a house's drive: a post there would stand in the way of the car parked up it)
+    const onDrive = (x, z) => this._onIsleDrive(x, z, 1.2);
+    const placed = [], free = (x, z, m = 1.5) => !solid.some(r => x > r[0] && x < r[2] && z > r[1] && z < r[3]) && !placed.some(q => Math.hypot(q[0] - x, q[1] - z) < m + 1.5) && !inRoad(x, z, 0.4) && !runway(x, z) && !onDrive(x, z);
+    // the block a thing streams with: the nearest island block that reaches it, or one for this street
+    const blockAt = (R, x, z) => { let best = null, bd = Infinity; for (const b of this.isle.blocks) { const d = Math.hypot(b.cx - x, b.cz - z); if (d < b.r && d < bd) { bd = d; best = b; } } return best || this.xblocks.find(b => b.xb === 'furn_' + R.id) || this._isleBlock('furn_' + R.id, x, z, 260, R.name); };
+    let n = 0;
+    const put = (R, type, x, z, ry, y) => { this._prop(blockAt(R, x, z), type, x, z, ry, 1, y); placed.push([x, z]); n++; };
+    // a post with a plate: a street name, a speed limit (white, black figures)
+    const sign = (R, x, z, y, ry, text, bg, fg, w, h) => { const b = blockAt(R, x, z); this._det(b, 'cyl', x, y + 1.35, z, 0.05, 2.7, 0x6a6e72, null, { x, z, r: 0.12, y0: y - 1, y1: y + 2.7, kind: 'det' }); b.signs.push({ text, x: x + Math.sin(ry) * 0.04, y: y + 2.45, z: z + Math.cos(ry) * 0.04, ry, w, h, bg, fg }); b.signs.push({ text, x: x - Math.sin(ry) * 0.04, y: y + 2.45, z: z - Math.cos(ry) * 0.04, ry: ry + Math.PI, w, h, bg, fg }); placed.push([x, z]); n++; };
+    for (const R of Island.roads) {
+      if (R.closed) continue;
+      const len = R.cum[R.cum.length - 1], isStreet = street.has(R.base || R.id), isUrban = urban.has(R.base || R.id), off = R.w / 2 + 1.7;
+      const at = (s2, side) => {
+        let k = 0; while (k < R.pts.length - 2 && R.cum[k + 1] < s2) k++;
+        if ((R.bridges || []).some(b => k >= b[0] - 3 && k <= b[1] + 3) || (R.tunnel && k >= R.tunnel[0] - 4 && k <= R.tunnel[1] + 4)) return null;
+        const a = R.pts[k], c = R.pts[k + 1], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, t = clamp((s2 - R.cum[k]) / l, 0, 1), tx = (c[0] - a[0]) / l, tz = (c[1] - a[1]) / l;
+        const nx = tz * side, nz = -tx * side, cx = a[0] + (c[0] - a[0]) * t + nx * off, cz = a[1] + (c[1] - a[1]) * t + nz * off, y = R.y[k] + (R.y[k + 1] - R.y[k]) * t + (isStreet ? CURB_H : 0);
+        // facing the carriageway (a bench's seat, a sign's face to the oncoming traffic)
+        return { x: cx, z: cz, y, toRoad: Math.atan2(-nx, -nz), along: Math.atan2(tx, tz) };
+      };
+      // the street's name at both ends, on the right of the traffic coming in
+      if (isStreet && len > 60) for (const [s2, side, dir] of [[12, 1, 0], [len - 12, -1, Math.PI]]) { const q = at(s2, side); if (q && free(q.x, q.z, 1)) sign(R, q.x, q.z, q.y, q.along + dir, R.name.toUpperCase(), '#1f5f3a', '#ffffff', Math.min(3.6, 0.5 + R.name.length * 0.22), 0.42); }
+      // a highway's limit: after each end, then every limitStep, facing the traffic
+      const lim = F.limits[R.base || R.id];
+      if (lim) for (let s2 = 60; s2 < len - 40; s2 += F.limitStep) for (const side of [1, -1]) { const q = at(side > 0 ? s2 : len - s2, side); if (q && free(q.x, q.z, 1)) sign(R, q.x, q.z, q.y, q.along + (side > 0 ? Math.PI : 0), 'SPEED LIMIT ' + lim, '#f4f4f0', '#111111', 1.0, 1.1); }
+      if (!isStreet) continue;
+      // hydrants, bins and benches by the kerb; one bus stop (with its news box) on a longer street
+      for (const side of [1, -1]) {
+        for (let s2 = 30 + (side > 0 ? 0 : F.hydrant / 2); s2 < len - 25; s2 += F.hydrant) { const q = at(s2, side); if (q && free(q.x, q.z)) put(R, 'hydrant', q.x, q.z, q.toRoad, q.y); }
+        if (isUrban) {
+          for (let s2 = 22 + (side > 0 ? 10 : 40); s2 < len - 20; s2 += F.bin) { const q = at(s2, side); if (q && free(q.x, q.z)) put(R, 'bin', q.x, q.z, q.toRoad, q.y); }
+          for (let s2 = 50 + (side > 0 ? 0 : 55); s2 < len - 30; s2 += F.bench) { const q = at(s2, side); if (q && free(q.x, q.z, 2)) { put(R, 'bench', q.x, q.z, q.toRoad + Math.PI, q.y); const b = blockAt(R, q.x, q.z); b.seats.push({ x: q.x, z: q.z, ry: q.toRoad + Math.PI }); } }
+        }
+      }
+      if (len > F.busMin) for (const side of [1, -1]) { const q = at(len * (side > 0 ? 0.42 : 0.58), side); if (q && free(q.x, q.z, 4)) { put(R, 'busstop', q.x, q.z, q.toRoad + Math.PI, q.y); const p2 = at(len * (side > 0 ? 0.42 : 0.58) + 5, side); if (p2 && free(p2.x, p2.z)) put(R, 'newsbox', p2.x, p2.z, p2.toRoad, p2.y); break; } }
+    }
+    return n;
+  },
+  // the face of r toward its nearest island road: the facade frame _dress takes ({ ax, dir, ry, fx, fz, faceX, faceZ,
+  // w }; near: within a street's frontage), or null when no road is within reach
+  _isleFront(r) {
+    const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+    // a lot's building knows which way its lot faces the street (128); otherwise the nearest island road decides
+    if (r.face) {
+      const [fx, fz] = r.face;
+      if (fx < -0.5) return { ax: 'z', dir: 1, ry: -Math.PI / 2, fx: -1, fz: 0, faceX: r.x0, faceZ: cz, w: r.z1 - r.z0, near: true };
+      if (fx > 0.5) return { ax: 'z', dir: -1, ry: Math.PI / 2, fx: 1, fz: 0, faceX: r.x1, faceZ: cz, w: r.z1 - r.z0, near: true };
+      if (fz < -0.5) return { ax: 'x', dir: 1, ry: Math.PI, fx: 0, fz: -1, faceX: cx, faceZ: r.z0, w: r.x1 - r.x0, near: true };
+      return { ax: 'x', dir: -1, ry: 0, fx: 0, fz: 1, faceX: cx, faceZ: r.z1, w: r.x1 - r.x0, near: true };
+    }
+    if (!Island._nearRoad(Island._seg, cx, cz)) return null;
+    const R = Island._rr, k = Island._rk, t = Island._rt, a = R.pts[k], c = R.pts[k + 1], px = a[0] + (c[0] - a[0]) * t, pz = a[1] + (c[1] - a[1]) * t;
+    const dx = px - cx, dz = pz - cz, w = r.x1 - r.x0, d = r.z1 - r.z0;
+    const near = Island._rd < 40;
+    if (Math.abs(dx) / w > Math.abs(dz) / d) {
+      // the front runs along z, on the x0 (west) or x1 (east) side
+      return dx < 0 ? { ax: 'z', dir: 1, ry: -Math.PI / 2, fx: -1, fz: 0, faceX: r.x0, faceZ: cz, w: d, near } : { ax: 'z', dir: -1, ry: Math.PI / 2, fx: 1, fz: 0, faceX: r.x1, faceZ: cz, w: d, near };
+    }
+    return dz < 0 ? { ax: 'x', dir: 1, ry: Math.PI, fx: 0, fz: -1, faceX: cx, faceZ: r.z0, w, near } : { ax: 'x', dir: -1, ry: 0, fx: 0, fz: 1, faceX: cx, faceZ: r.z1, w, near };
+  }
+});
+// the roundabouts' central islands and signs (023 lays the rings out)
+Object.assign(World.prototype, {
+  // each roundabout's central island (raised, kerbed, planted, a tree in the middle), its give-way signs and the signs
+  // on the approaches; a solid cylinder keeps cars off the island
+  _genRoundabouts() {
+    if (CityLayout.id !== 'island') return;
+    for (const RB of ROUNDABOUTS) {
+      const b = this._isleBlock('rb_' + RB.id, RB.x, RB.z, 140, RB.name), y = RB.y, ri = roundaboutIsland(RB);
+      this._det(b, 'cyl', RB.x, y + 0.12, RB.z, ri, 0.24, C(0xc9c6bd), null, { x: RB.x, z: RB.z, r: ri - 0.3, y0: y - 1, y1: y + 0.6, kind: 'det' });
+      this._det(b, 'cyl', RB.x, y + 0.255, RB.z, ri - 0.35, 0.03, C(0x5f8a46));
+      // planting: a ring of shrubs, flower beds, the tree in the middle
+      for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, rr = ri - 1.6; this._det(b, 'blob', RB.x + Math.cos(a) * rr, y + 0.7, RB.z + Math.sin(a) * rr, 0.9, 0.8, 0.9, C(k % 2 ? 0x3f6a34 : 0x4c7a3a)); }
+      for (let k = 0; k < 6; k++) { const a = (k + 0.5) / 6 * Math.PI * 2, rr = ri * 0.5; this._det(b, 'cyl', RB.x + Math.cos(a) * rr, y + 0.32, RB.z + Math.sin(a) * rr, 1.1, 0.12, C([0xd23a2a, 0xf2c230, 0xe056fd][k % 3])); }
+      this._det(b, 'cyl', RB.x, y + 1.6, RB.z, 0.28, 2.8, C(0x5a4632));
+      this._det(b, 'blob', RB.x, y + 4.4, RB.z, 3.2, 2.6, 3.2, C(0x3f6a34));
+      // the island's name on a low stone in its kerb, toward each entry; a give-way sign at each entry; a sign ahead on
+      // each approach (a leg of a road that ends on this ring)
+      for (const R of Island.roads) {
+        if (R.closed) continue;
+        for (const [k, at] of [[0, 0], [1, R.pts.length - 1]]) {
+          if (R.ends[k] !== 'rb:' + RB.id) continue;
+          const p = R.pts[at], q = R.pts[k ? Math.max(0, at - 6) : Math.min(R.pts.length - 1, at + 6)], l = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1, ux = (p[0] - q[0]) / l, uz = (p[1] - q[1]) / l;
+          // (on the right of the traffic coming in: the right of travel is (−uz, ux) on the map)
+          const rx = -uz, rz = ux, side = R.w / 2 + 1.2, face = Math.atan2(-ux, -uz);
+          const gx = p[0] - ux * (RB.w / 2 + 2.5) + rx * side, gz = p[1] - uz * (RB.w / 2 + 2.5) + rz * side;
+          this._det(b, 'cyl', gx, y + 1.25, gz, 0.05, 2.5, 0x6a6e72, null, { x: gx, z: gz, r: 0.12, y0: y - 1, y1: y + 2.5, kind: 'det' });
+          b.signs.push({ text: 'GIVE WAY', x: gx - ux * 0.04, y: y + 2.3, z: gz - uz * 0.04, ry: face, w: 0.95, h: 0.62, bg: '#ffffff', fg: '#c8102e' });
+          const da = Math.min(70, R.len - 8); if (da < 30) continue;
+          // the sign ahead: where the leg is da m back from the ring
+          let s = k ? R.len - da : da, kk = 0; while (kk < R.pts.length - 2 && R.cum[kk + 1] < s) kk++;
+          const a = R.pts[kk], c2 = R.pts[kk + 1], l2 = Math.hypot(c2[0] - a[0], c2[1] - a[1]) || 1, dx = (c2[0] - a[0]) / l2 * (k ? 1 : -1), dz = (c2[1] - a[1]) / l2 * (k ? 1 : -1);
+          const sx = a[0] - dz * side, sz = a[1] + dx * side, sy = R.y[kk];
+          const bb = this.xblocks.find(x => x.xb === 'rb_' + RB.id);
+          this._det(bb, 'cyl', sx, sy + 1.35, sz, 0.05, 2.7, 0x6a6e72, null, { x: sx, z: sz, r: 0.12, y0: sy - 1, y1: sy + 2.7, kind: 'det' });
+          bb.signs.push({ text: 'ROUNDABOUT', x: sx - dx * 0.04, y: sy + 2.45, z: sz - dz * 0.04, ry: Math.atan2(-dx, -dz), w: 1.3, h: 0.6, bg: '#1f4f9a', fg: '#ffffff' });
+          bb.signs.push({ text: RB.name.toUpperCase(), x: sx - dx * 0.04, y: sy + 1.9, z: sz - dz * 0.04, ry: Math.atan2(-dx, -dz), w: 1.6, h: 0.36, bg: '#1f4f9a', fg: '#ffffff' });
+        }
+      }
+    }
   }
 });
 /* =====================================================================
@@ -42899,7 +43611,7 @@ Object.assign(World.prototype, {
       B.pad.place = { id: 'raceway', name: SR.name, kind: 'landmark', door: { x: O.x0 - 1.1, z: (O.z0 + O.z1) / 2, h: -Math.PI / 2 }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
       // transporters along the paddock's back
       for (let k = 0; k < 5; k++) { const x = SR.paddock.x0 + 16 + k * 30; this._bld(B.pad, x, SR.paddock.z0 + 2, x + 16, SR.paddock.z0 + 5, 3.6, STYLE.IND, [0xd23a2a, 0x1f6fb2, 0xe8eaed, 0x2e2e2e, 0xf1c40f][k], 3.6, 4, { exactH: true, y0: Y, oy: Y }); }
-      for (const [x, z] of [[-560, 1800], [-760, 1800], [-660, 1790]]) this._prop(B.pad, 'lotlamp', x, z, 0);
+      for (const [x, z] of [[-560, 1800], [-760, 1800], [-660, 1790]]) this._prop(B.pad, 'lotlamp', x, z, 0, 1, Y);
     }
     // ---------------------------------------------------------------- the fleet: race cars in the garages and the paddock
     this.isle.fleet.push({ id: 'sr_pits', x: -620, z: 1816, r: 300, slots: sr.bays.filter((q, i) => i % 3 === 0).map((q, i) => ({ x: q.x, z: q.z, h: q.h, y: Y, cls: ['gt3', 'cup', 'drift', 'formula', 'lmp', 'rally'][i % 6] })) });
@@ -43219,7 +43931,7 @@ Object.assign(World.prototype, {
       this._det(B.gate, 'box', (O.x0 + O.x1) / 2, Y + 1.2, O.z1 + 0.06, 1.4, 2.4, 0.12, C(0x22262b));
       B.gate.place = { id: 'fair', name: F.name, kind: 'landmark', door: { x: (O.x0 + O.x1) / 2, z: O.z1 + 1.1, h: 0 }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
       // lamps along the midway and the footpath; strings of bulbs over the midway
-      for (let x = F.mid.x0 + 18; x < F.mid.x1 - 12; x += 36) for (const s of [-1, 1]) this._prop(x < 1700 ? B.north : B.gate, 'lotlamp', x, F.mid.z + s * (F.mid.w / 2 + 0.8), s > 0 ? Math.PI : 0);
+      for (let x = F.mid.x0 + 18; x < F.mid.x1 - 12; x += 36) for (const s of [-1, 1]) this._prop(x < 1700 ? B.north : B.gate, 'lotlamp', x, F.mid.z + s * (F.mid.w / 2 + 0.8), s > 0 ? Math.PI : 0, 1, Y);
       // bunting across the midway between each pair of lamps: a sagging wire with eleven pennants
       for (let x = F.mid.x0 + 18; x < F.mid.x1 - 12; x += 36) {
         const b = x < 1700 ? B.north : B.gate, za = F.mid.z - F.mid.w / 2 - 0.8, zb = F.mid.z + F.mid.w / 2 + 0.8, top = Y + 5.6, sag = 1.1, n = 12;
@@ -43338,8 +44050,10 @@ Object.assign(World.prototype, {
     {
       const Pk = F.park, slots = [];
       for (let r = 0; r < 2; r++) for (let k = 0; k < 26; k++) { const x = Pk.x0 + 5 + k * 3.2, z = r ? Pk.z1 - 6 : Pk.z0 + 6; if (x < Pk.x1 - 3 && hash2i(k, r, 2207) < 0.55) slots.push({ x, z, h: r ? Math.PI : 0, cls: ['sedan', 'compact', 'suv', 'estate', 'pickup', 'van', 'apex', 'crest'][(k + r * 3) % 8] }); }
-      this.isle.fleet.push({ id: 'fair_park', x: (Pk.x0 + Pk.x1) / 2, z: (Pk.z0 + Pk.z1) / 2, r: 300, slots: slots.map(s => ({ ...s, y: Y })) });
-      for (const [x, z] of [[Pk.x0 + 24, (Pk.z0 + Pk.z1) / 2], [Pk.x1 - 24, (Pk.z0 + Pk.z1) / 2]]) this._prop(B.park, 'lotlamp', x, z, 0);
+      // (never a bay Fairground Way runs across on its way to the turning circle: 3 m clear of its carriageway)
+      const onRoad = (x, z) => Island.roads.some(R => R.pts.some((p, k) => k < R.pts.length - 1 && segDist(x, z, p[0], p[1], R.pts[k + 1][0], R.pts[k + 1][1]) < R.w / 2 + 3));
+      this.isle.fleet.push({ id: 'fair_park', x: (Pk.x0 + Pk.x1) / 2, z: (Pk.z0 + Pk.z1) / 2, r: 300, slots: slots.filter(s => !onRoad(s.x, s.z)).map(s => ({ ...s, y: Y })) });
+      for (const [x, z] of [[Pk.x0 + 24, (Pk.z0 + Pk.z1) / 2], [Pk.x1 - 24, (Pk.z0 + Pk.z1) / 2]]) this._prop(B.park, 'lotlamp', x, z, 0, 1, Y);
     }
     // ---------------------------------------------------------------- visitors on the midway and in the queues
     {
@@ -43408,6 +44122,8 @@ const RG_EPS = 0.75, RG_CELL = 16;
 // free end: the causeway, the land bridge track), 'ext' (an extension's own routes), 'loop' (a circuit or course)
 const RG_STREETS = new Set(['grid', 'link', 'spur', 'ext']);
 const RG_LINKS = new Set(['link']);
+// the roads a street name is read from underfoot (streetNameAt, 020): a cul-de-sac (a spur) names itself too
+const RG_NAMED = new Set(['link', 'spur']);
 const RoadGraph = {
   ready: false, nodes: [], edges: [], segAtt: new Map(),
   _cells: new Map(), _segE: null, _segK: null, _stamp: null, _q: 0,
@@ -43429,6 +44145,8 @@ const RoadGraph = {
       const pts = L.pts.map(q => [q[0], q[1]]), e0 = L.ends[0], e1 = L.ends[1], last = pts[pts.length - 1];
       if (!e0.onLink && Math.hypot(pts[0][0] - e0.C.x, pts[0][1] - e0.C.z) > 0.01) pts.unshift([e0.C.x, e0.C.z]);
       if (!L.spur && !e1.onLink && Math.hypot(last[0] - e1.C.x, last[1] - e1.C.z) > 0.01) pts.push([e1.C.x, e1.C.z]);
+      // (a roundabout's ring, 023: closed and one-way, its pieces run the way the chain does)
+      if (L.closed) { const pr = L.pts.slice(0, -1).map(q => [q[0], q[1]]); chains.push({ pts: pr, closed: true, oneway: true, w: L.w, kind: 'link', name: L.name, link: L, st: 'asphalt', ring: null, traffic: true, roundabout: L.road.isle ? L.road.isle.roundabout : (L.road.roundabout || null) }); continue; }
       chains.push({ pts, w: L.w, kind: L.spur ? 'spur' : 'link', name: L.name, link: L, st: L.road.st || L.road.mat || 'asphalt', ring: L.spur ? L.ring : null, traffic: true });
     }
     for (const X of world.exts || []) {
@@ -43516,7 +44234,7 @@ const RoadGraph = {
         const cum = new Float64Array(P2.length);
         for (let k = 1; k < P2.length; k++) cum[k] = cum[k - 1] + Math.hypot(P2[k][0] - P2[k - 1][0], P2[k][1] - P2[k - 1][1]);
         const len = cum[P2.length - 1]; if (len < 0.05) return;
-        const e = { id: edges.length, a: A.node, b: B.node, pts: P2, cum, len, w: c.w, kind: c.kind, name: c.name, traffic: c.traffic, st: c.st || 'asphalt', ext: c.ext || null, link: c.link || null, lat: null };
+        const e = { id: edges.length, a: A.node, b: B.node, pts: P2, cum, len, w: c.w, kind: c.kind, name: c.name, traffic: c.traffic, st: c.st || 'asphalt', ext: c.ext || null, link: c.link || null, lat: null, oneway: !!c.oneway, roundabout: c.roundabout || null };
         if (c.lat) e.lat = { axis: c.lat.axis, line: c.lat.line, seg: c.lat.seg, a0: A.s * P, a1: (wrap ? B.s + n : B.s) * P };
         const u0 = [P2[1][0] - P2[0][0], P2[1][1] - P2[0][1]], m = P2.length, u1 = [P2[m - 1][0] - P2[m - 2][0], P2[m - 1][1] - P2[m - 2][1]], l0 = Math.hypot(u0[0], u0[1]) || 1, l1 = Math.hypot(u1[0], u1[1]) || 1;
         e.t0 = [u0[0] / l0, u0[1] / l0]; e.t1 = [u1[0] / l1, u1[1] / l1];
@@ -43655,8 +44373,9 @@ const RoadGraph = {
     const gx = g.x, gz = g.z, H = n => Math.hypot(n.x - gx, n.z - gz);
     const kinds = o.kinds || null, filter = o.filter || null, ok = e => (!kinds || kinds.has(e.kind)) && (!filter || filter(e));
     let best = Infinity, bestS = -2, bestTail = 0;
-    if (s.e === g.e) { const dir = g.along >= s.along ? 0 : 1; best = Math.abs(g.along - s.along) + hp(dir); bestS = -1; bestTail = dir; }
+    if (s.e === g.e) { const dir = g.along >= s.along ? 0 : 1; if (!(s.e.oneway && dir)) { best = Math.abs(g.along - s.along) + hp(dir); bestS = -1; bestTail = dir; } }
     for (const dir of [0, 1]) {
+      if (s.e.oneway && dir) continue;
       const st = s.e.id * 2 + dir, c = (dir ? s.along : s.e.len - s.along) + hp(dir);
       dist[st] = c; heap.push(st, c + H(dir ? s.e.a : s.e.b));
     }
@@ -43666,10 +44385,11 @@ const RoadGraph = {
       const e = E[st >> 1], dir = st & 1, n = dir ? e.a : e.b, c = dist[st];
       // reaching the goal's road from this node
       if (n === g.e.a) { const tot = c + this._turn(e, dir, g.e, 0, turnK) + g.along; if (tot < best) { best = tot; bestS = st; bestTail = 0; } }
-      if (n === g.e.b) { const tot = c + this._turn(e, dir, g.e, 1, turnK) + g.e.len - g.along; if (tot < best) { best = tot; bestS = st; bestTail = 1; } }
+      if (n === g.e.b && !g.e.oneway) { const tot = c + this._turn(e, dir, g.e, 1, turnK) + g.e.len - g.along; if (tot < best) { best = tot; bestS = st; bestTail = 1; } }
       for (const inc of n.edges) {
         const e2 = inc.e; if (!ok(e2)) continue;
         const dir2 = inc.end === 0 ? 0 : 1;
+        if (e2.oneway && dir2) continue; // (a roundabout's ring: one way round)
         let pen;
         if (e2 === e) { if (dir2 === dir || n.edges.length > 1) continue; pen = n.ring ? 6 : 25; } // a U-turn only at a dead end
         else pen = this._turn(e, dir, e2, dir2, turnK);
@@ -43783,7 +44503,9 @@ const RoadGraph = {
       const off = Math.min(LANE * 0.8, e.w / 4);
       for (let d = Math.min(e.len / 2, 8); d < e.len - 4; d += every) {
         const [x, z, tx, tz] = this.pointAt(e, d), h = Math.atan2(tx, tz);
-        out.push({ x: x - tz * off, z: z + tx * off, h, e }, { x: x + tz * off, z: z - tx * off, h: h + Math.PI, e });
+        out.push({ x: x - tz * off, z: z + tx * off, h, e });
+        // (a one-way road, a roundabout's ring: no spot facing against it)
+        if (!e.oneway) out.push({ x: x + tz * off, z: z - tx * off, h: h + Math.PI, e });
       }
     }
     return out;
@@ -44232,12 +44954,12 @@ class PropManager {
       const gm = this.glows[t];
       if (this.far[t]) { // foliage: collect the active instances; cull() places them
         const A = this.act[t]; A.length = 0;
-        for (const p of list) if (!p.broken && promoOK(p)) { const h = hash2i(p.id, 3, 9); A.push({ x: p.x, z: p.z, ry: p.ry, s: p.s, r: 0.8 + h * 0.4, g: 0.85 + hash2i(p.id, 4, 9) * 0.3, b: 0.75 + h * 0.3 }); }
+        for (const p of list) if (!p.broken && promoOK(p)) { const h = hash2i(p.id, 3, 9); A.push({ x: p.x, y: p.y ?? CURB_H, z: p.z, ry: p.ry, s: p.s, r: 0.8 + h * 0.4, g: 0.85 + hash2i(p.id, 4, 9) * 0.3, b: 0.75 + h * 0.3 }); }
         this._cullT = 0; continue;
       }
       for (const p of list) {
         if (p.broken || !promoOK(p)) continue;
-        M(p.x, CURB_H, p.z, p.s, p.s, p.s, p.ry);
+        M(p.x, p.y ?? CURB_H, p.z, p.s, p.s, p.s, p.ry);
         im.setMatrixAt(n, _m4);
         if (gm) gm.setMatrixAt(n, _m4);
         if (im.instanceColor) {
@@ -44270,8 +44992,8 @@ class PropManager {
       const im = this.meshes[t], fm = this.far[t]; let n = 0, f = 0;
       for (const a of this.act[t]) {
         const d2 = (a.x - cx) * (a.x - cx) + (a.z - cz) * (a.z - cz);
-        if (d2 > 18 * 18) { sph.center.set(a.x, 3.5 * a.s, a.z); sph.radius = 5 * a.s; if (!frustum.intersectsSphere(sph)) continue; }
-        M(a.x, CURB_H, a.z, a.s, a.s, a.s, a.ry); col.setRGB(a.r, a.g, a.b);
+        if (d2 > 18 * 18) { sph.center.set(a.x, a.y + 3.5 * a.s, a.z); sph.radius = 5 * a.s; if (!frustum.intersectsSphere(sph)) continue; }
+        M(a.x, a.y, a.z, a.s, a.s, a.s, a.ry); col.setRGB(a.r, a.g, a.b);
         if (d2 < nr2) { im.setMatrixAt(n, _m4); im.setColorAt(n, col); n++; } else { fm.setMatrixAt(f, _m4); fm.setColorAt(f, col); f++; }
       }
       im.count = n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
@@ -44926,7 +45648,9 @@ class OvalScenery {
      and cables) and the Blackgate Tunnel (the tube, its lights, portals);
    - the airfield's and the proving ground's surfaces and paint.
    ===================================================================== */
-const ISLE_SCN = { near: [240, 320, 400, 480], far: 32, keep: 200, trees: [20, 16, 14, 12] };
+// budgetMs: how long the tile streaming may run in a frame (177's update: a tile is a job of many small steps);
+// urgentMs: when the tile in hand is under the focus or next to it
+const ISLE_SCN = { near: [240, 320, 400, 480], far: 32, keep: 200, trees: [20, 16, 14, 12], budgetMs: 3, urgentMs: 16 };
 const ISLE_COL = [0x5f8146, 0xd9c9a0, 0x7d776d, 0x4a4d50, 0x3f6238, 0x7c9450, 0x9a9c9a];
 class IslandScenery {
   constructor(scene, world, game) {
@@ -45024,8 +45748,12 @@ class IslandScenery {
     this._farDirty = false;
   }
   // ---------------------------------------------------------------- near tiles
-  _tileMesh(tx, tz) {
-    const T = Island._tile(tx, tz), n = T.n, c = ISLE.cell, hh = T.h, nv = n * n;
+  _tileMesh(tx, tz) { const it = this._tileMeshJob(tx, tz); let r = it.next(); while (!r.done) r = it.next(); return r.value; }
+  // (a job: it yields every few rows, so streaming a tile in never takes one frame's whole budget; 2026-11-18, the
+  // island's stutter: a tile took 50 ms on average, up to 300, all in one frame)
+  *_tileMeshJob(tx, tz) {
+    const T = yield* Island._tileJob(tx, tz), n = T.n, c = ISLE.cell, hh = T.h, nv = n * n;
+    yield;
     const pos = new Float32Array((nv + n * 8) * 3), col = new Float32Array((nv + n * 8) * 3), nrm = new Float32Array((nv + n * 8) * 3), idx = [];
     const hAt = (i, j) => i >= 0 && j >= 0 && i < n && j < n ? hh[j * n + i] : Island.compute(T.x0 + i * c, T.z0 + j * c);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -45033,6 +45761,7 @@ class IslandScenery {
       const gx = (hAt(i + 1, j) - hAt(i - 1, j)) / (2 * c), gz = (hAt(i, j + 1) - hAt(i, j - 1)) / (2 * c), l = Math.hypot(gx, 1, gz);
       pos[o] = x; pos[o + 1] = h; pos[o + 2] = z; nrm[o] = -gx / l; nrm[o + 1] = 1 / l; nrm[o + 2] = -gz / l;
       const q = this._col(x, z, h, Math.hypot(gx, gz)); col[o] = q[0]; col[o + 1] = q[1]; col[o + 2] = q[2];
+      if (i === n - 1 && j % 2 === 1) yield;
     }
     // the tunnel's mouths: the cells of the cut's end wall that the bore goes through are left open
     const mouth = (x, z) => {
@@ -45044,8 +45773,9 @@ class IslandScenery {
       const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
       if (Math.max(hh[a], hh[b], hh[cc], hh[d]) < SEA_Y - 0.5) continue;
       const x = T.x0 + i * c, z = T.z0 + j * c;
-      if (this._foreign(x, z, c) || mouth(x + c / 2, z + c / 2)) continue;
+      if (this._foreign(x, z, c) || mouth(x + c / 2, z + c / 2)) { if (i === n - 2 && j % 16 === 15) yield; continue; }
       idx.push(a, cc, b, b, cc, d);
+      if (i === n - 2 && j % 16 === 15) yield;
     }
     // a skirt round the tile hides the seam against the coarse mesh and a neighbour not built yet
     let v = nv;
@@ -45077,7 +45807,8 @@ class IslandScenery {
       if (h < SEA_Y + 1.6 || sl > 0.6 || h > 200) continue;
       if (Island._nearRoad(Island._seg, x, z) && Island._rd < ISLE.verge + 2) continue;
       if (Island._nearRoad(Island._sseg, x, z) && Island._rd < 14) continue;
-      let pad = false; for (const P of Island.pads) if (x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
+      // (not on a level site: a lot, a park, the airport; a district's infill ground is open ground, its lots are sites)
+      let pad = false; for (const P of Island.pads) if (!P.infill && x > P.x0 - 5 && x < P.x1 + 5 && z > P.z0 - 5 && z < P.z1 + 5) { pad = true; break; }
       if (pad || Island.surface(x, z, h, sl) === 1) continue;
       const pine = hash2i(ix, iz, 207) < (z < 60 ? 0.3 + smoothstep(20, 120, h) * 0.55 : 0.2);
       list[pine ? 1 : 0].push([x, h, z, 0.9 + hash2i(ix, iz, 209) * 0.75, hash2i(ix, iz, 211) * 6.28]);
@@ -45092,10 +45823,13 @@ class IslandScenery {
     const tree = mk('tree');
     return this._treeGeo = [tree, mk('pine'), tree];
   }
-  _buildTile(tx, tz) {
-    const key = tz * 64 + tx, group = new THREE.Group(), mesh = this._tileMesh(tx, tz); group.add(mesh);
+  _buildTile(tx, tz) { const it = this._buildTileJob(tx, tz); let r = it.next(); while (!r.done) r = it.next(); }
+  *_buildTileJob(tx, tz) {
+    const key = tz * 64 + tx, group = new THREE.Group(), mesh = yield* this._tileMeshJob(tx, tz); group.add(mesh);
+    yield;
     const T = { key, tx, tz, group, cols: [], trees: 0 };
     const lists = this._trees(tx, tz), geos = this._treeGeos(), fol = this.g.props ? this.g.props.folMat : null, lv = this.g.quality ? this.g.quality.level : 1;
+    yield;
     lists.forEach((L, k) => {
       if (!L.length || !fol) return;
       const im = new THREE.InstancedMesh(geos[k], fol, L.length); im.castShadow = lv >= 2; im.receiveShadow = true;
@@ -45136,10 +45870,22 @@ class IslandScenery {
       want.sort((a, b) => a[0] - b[0]); this.queue = want;
       for (const T of [...this.tiles.values()]) { const x0 = ISLE.x0 + T.tx * Ts, z0 = ISLE.z0 + T.tz * Ts, d = Math.hypot(Math.max(x0 - fx, 0, fx - x0 - Ts), Math.max(z0 - fz, 0, fz - z0 - Ts)); if (d > R + ISLE_SCN.keep) this._dropTile(T); }
     }
-    // one tile a frame (all of them when nothing is drawn yet: a new game, a load, a long jump)
-    let budget = this.tiles.size === 0 ? 99 : 1;
-    while (budget-- > 0 && this.queue.length) { const [, i, j] = this.queue.shift(); if (!this.tiles.has(j * 64 + i)) this._buildTile(i, j); }
-    if (this._farDirty) this._farIndex();
+    // tiles stream in as jobs run a few milliseconds a frame (all at once when nothing is drawn yet: a new game, a load,
+    // a long jump); the job in hand is dropped if the focus has moved so far that its tile is no longer wanted
+    if (this.tiles.size === 0) { while (this.queue.length) { const [, i, j] = this.queue.shift(); if (!this.tiles.has(j * 64 + i)) this._buildTile(i, j); } this.job = null; }
+    // (a tile the focus is already on or next to is urgent: it gets most of a frame, so the ground under you is never
+    // missing; the rest stream in the background)
+    const t0 = performance.now(), tileD = key => { const i = key % 64, j = Math.floor(key / 64), x0 = ISLE.x0 + i * Ts, z0 = ISLE.z0 + j * Ts; return Math.hypot(Math.max(x0 - fx, 0, fx - x0 - Ts), Math.max(z0 - fz, 0, fz - z0 - Ts)); };
+    const urgent = (this.job && tileD(this.job.key) < 64) || (this.queue.length && this.queue[0][0] < 64), budget = urgent ? ISLE_SCN.urgentMs : ISLE_SCN.budgetMs;
+    while (performance.now() - t0 < budget) {
+      if (!this.job) {
+        if (!this.queue.length) break;
+        const [, i, j] = this.queue.shift(); if (this.tiles.has(j * 64 + i)) continue;
+        this.job = { key: j * 64 + i, it: this._buildTileJob(i, j) };
+      }
+      if (this.job.it.next().done) this.job = null;
+    }
+    if (this._farDirty && !this.job) this._farIndex();
   }
   // ---------------------------------------------------------------- roads
   /* the roads (owner, 2026-11-16: "the new roads need to look amazing"): a mesh for about every kilometre of each
@@ -45176,10 +45922,14 @@ class IslandScenery {
     };
     const vtx = (x, y, z, n, r, q) => { pos.push(x, y, z); nrm.push(n[0], n[1], n[2]); aR.push(r[0], r[1], r[2], r[3]); aQ.push(q[0], q[1], q[2], q[3]); return pos.length / 3 - 1; };
     for (const R of roads) {
-      const urban = /^[ghmpd]\d/.test(R.id), cls = urban ? (R.w >= 9 ? 1 : 0) : (R.w >= 11 ? 3 : 2), hw = R.w / 2, n = R.pts.length;
+      // (a roundabout's ring, 023, is a kerbed street with no centre line: class 0)
+      const urban = /^[ghmpd]\d/.test(R.id) || R.cls === 0, cls = R.cls ?? (urban ? (R.w >= 9 ? 1 : 0) : (R.w >= 11 ? 3 : 2)), hw = R.w / 2, n = R.pts.length;
       const skipSide = k => (R.bridges || []).some(sp => k >= sp[0] - 1 && k <= sp[1] + 1) || (R.tunnel && k >= R.tunnel[0] - 3 && k <= R.tunnel[1] + 3);
       // the stop lines: 2.5 m short of the road each end joins (a lattice street is 12 m wide)
-      const ends = (R.ends || []).map(e => e && e !== 'ring' ? (byId[e] ? byId[e].w / 2 : 6) + 2.5 : null), hosts = (R.ends || []).map(e => byId[e]).filter(Boolean);
+      // (a roundabout's ring is closed: it joins nothing, its 'ends' are itself)
+      const ends = (R.closed ? [] : R.ends || []).map(e => e && e !== 'ring' ? (byId[e] ? byId[e].w / 2 : 6) + 2.5 : null), hosts = (R.closed ? [] : R.ends || []).map(e => byId[e]).filter(Boolean);
+      // (an end on a roundabout's ring has a give-way line, not a stop line: the shader reads it from the class's fraction)
+      const rbEnd = (R.ends || []).map(e => !R.closed && typeof e === 'string' && e.startsWith('rb:')), clsF = (rbEnd[0] ? 0.1 : 0) + (rbEnd[1] ? 0.2 : 0);
       // the cross-section's strips: [lateral from, lateral to, height from, height to, surface, normal: 'up' or a side]
       const strips = [[-hw, hw, 0.035, 0.035, 0, 'up']];
       if (urban) for (const sd of [-1, 1]) strips.push([sd * hw, sd * hw, 0.035, 0.185, 1, -sd], [sd * hw, sd * (hw + 0.3), 0.185, 0.185, 1, 'up'], [sd * (hw + 0.3), sd * (hw + 2.1), 0.185, 0.185, 2, 'up'], [sd * (hw + 2.1), sd * (hw + 2.1), 0.185, -0.35, 2, sd]);
@@ -45198,7 +45948,7 @@ class IslandScenery {
           const vert = side !== 'up', nn = vert ? [nx * side, 0, nz * side] : [0, 1, 0];
           const q = [surf, paint, endA, endB];
           // (the higher lateral first: with the index order below the strip faces up, as the old ribbon did)
-          const A = vtx(p[0] + nx * l1, y + y1, p[1] + nz * l1, nn, [l1, sAt, hw, cls], q), B = vtx(p[0] + nx * l0, y + y0, p[1] + nz * l0, nn, [l0, sAt, hw, cls], q);
+          const A = vtx(p[0] + nx * l1, y + y1, p[1] + nz * l1, nn, [l1, sAt, hw, cls + clsF], q), B = vtx(p[0] + nx * l0, y + y0, p[1] + nz * l0, nn, [l0, sAt, hw, cls + clsF], q);
           // kerbs, pavements and shoulders give way to any other road's carriageway (tested at both edges); a joining
           // street's also give way to the pavement of the road it joins, which runs on unbroken
           const cut = si > 0 && (Math.max(inside(p[0] + nx * l0, p[1] + nz * l0, R), inside(p[0] + nx * l1, p[1] + nz * l1, R)) > -0.25
@@ -45365,7 +46115,7 @@ Object.assign(World.prototype, {
     const built = []; for (const b of this.xblocks) { for (const r of b.bld) built.push([r.x0, r.z0, r.x1, r.z1]); for (const d of b.det) { const c = d.col; if (!c) continue; if (c.r !== undefined) built.push([c.x - c.r, c.z - c.r, c.x + c.r, c.z + c.r]); else built.push([c.x0, c.z0, c.x1, c.z1]); } }
     const inBuilt = (x, z, m) => built.some(r => x > r[0] - m && x < r[2] + m && z > r[1] - m && z < r[3] + m);
     for (const R of Island.roads) {
-      if (lit.has(R.id)) continue;
+      if (lit.has(R.base || R.id) || R.closed) continue;
       const len = R.cum[R.cum.length - 1];
       let side = 1;
       for (let s = L.first; s < len - L.endGap; s += L.step) {
@@ -48356,12 +49106,13 @@ class TrafficManager {
     return sgn > 0 ? { i: e.seg, j: e.line, dx: 1, dz: 0, s: e.along } : { i: e.seg + 1, j: e.line, dx: -1, dz: 0, s: P - e.along };
   }
   // the roads a car on the curved roads may go on by from node n, having come by edge `from`
-  walkOpts(n, from) { return n.edges.filter(x => x.e.traffic && x.e.kind !== 'grid' && x.e !== from).map(x => x.e); }
+  // (a roundabout's ring, 023, only the way round it runs: from its a end)
+  walkOpts(n, from) { return n.edges.filter(x => x.e.traffic && x.e.kind !== 'grid' && x.e !== from && !(x.e.oneway && x.end !== 0)).map(x => x.e); }
   // a walk from node n (come by edge `from`) over the curved roads to a junction with the lattice and the lane it
   // merges into there. Appends to `steps`; returns { exit, gates } or null. `enter`: the car has just turned off the
   // lattice at n (it doesn't merge straight back)
   walk(n, from, steps, enter) {
-    const gates = [];
+    const gates = [], outs = [];
     let total = 0, cur = n, prev = from;
     for (let guard = 0; guard < 80; guard++) {
       let opts = this.walkOpts(cur, prev);
@@ -48373,14 +49124,18 @@ class TrafficManager {
         const k0 = steps.length;
         steps.push(...RoadGraph.gridSteps(at.axis, at.line, at.seg, at.along, sgn > 0 ? xs : P - xs));
         gates.push({ k: k0, node: cur });
-        return { exit: { ...x, s: xs }, gates };
+        return { exit: { ...x, s: xs }, gates, outs };
       }
-      if (!opts.length) opts = prev ? [prev] : [];              // a dead end: back the way we came (round its turning circle)
+      if (!opts.length) opts = prev && !prev.oneway ? [prev] : [];  // a dead end: back the way we came (round its turning circle)
       if (!opts.length) return null;
       // a long way from the lattice already: head for the nearest junction with it
       const e2 = total > 1500 ? opts.reduce((p, q) => ((p.a === cur ? p.b : p.a).exitD <= (q.a === cur ? q.b : q.a).exitD ? p : q)) : pick(opts);
       const dir = e2.a === cur ? 0 : 1;
       if (cur.att) gates.push({ k: steps.length, node: cur });   // crossing a lattice street
+      // entering a roundabout: give way to the traffic already going round
+      if (e2.oneway && !(prev && prev.oneway)) gates.push({ k: steps.length, node: cur, rb: e2.roundabout });
+      // leaving one: where it turns off the ring (traffic waiting to come on there needn't wait for it)
+      if (!e2.oneway && prev && prev.oneway) outs.push({ k: steps.length, node: cur });
       steps.push({ e: e2, dir, from: dir ? e2.len : 0, to: dir ? 0 : e2.len });
       total += e2.len; prev = e2; cur = dir ? e2.a : e2.b;
     }
@@ -48394,6 +49149,13 @@ class TrafficManager {
     const lim = Array.from(L.rad, R => clamp(Math.sqrt(3.2 * R), 4.5, 40));
     // a gate stops the car short of the lattice street it joins or crosses: the first lane point on that street
     const gates = w.gates.map(gt => {
+      // (a roundabout's entry: the give-way line where the lane comes to the ring's outer kerb)
+      if (gt.rb) {
+        const RB = gt.rb, edge = RB.r + RB.w / 2 + 1.2, d0 = gt.k > 0 ? L.marks[gt.k - 1] || 0 : 0;
+        let d = Math.max(0, (L.marks[gt.k] || 0) - 7);
+        for (let k = 0; k < pts.length; k++) if (cum[k] >= d0 && Math.hypot(pts[k][0] - RB.x, pts[k][1] - RB.z) < edge) { d = Math.max(0, cum[k] - 1); break; }
+        return { d, rb: RB, node: gt.node };
+      }
       const d0 = gt.k > 0 ? L.marks[gt.k - 1] : 0;
       let d = L.marks[gt.k] || 0;
       for (let k = 0; k < pts.length; k++) if (cum[k] >= d0 && RoadNet.roadAt(pts[k][0], pts[k][1])) { d = cum[k]; break; }
@@ -48401,7 +49163,8 @@ class TrafficManager {
     }).sort((p, q) => p.d - q.d);
     const ln = steps.find(st => st.e.link);
     const ai = v.ai;
-    ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
+    const outs = (w.outs || []).map(o => ({ node: o.node, d: L.marks[o.k] || 0 }));
+    ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, outs, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
     ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
     // out on the island's highways (022) traffic runs at highway speed (the bends' own limits still hold)
     ai.path.fast = steps.some(st => st.e.link && st.e.link.road && st.e.link.road.isle && st.e.w >= 10) ? 1.75 : 1;
@@ -48423,8 +49186,35 @@ class TrafficManager {
       return;
     }
   }
+  // is this car on one of these rings, moving along it (in the ring's band, its heading tangential)?
+  onRingOf(v, fx, fz, list) {
+    for (const RB of list) { const px = v.pos.x - RB.x, pz = v.pos.z - RB.z, rr = Math.hypot(px, pz); if (Math.abs(rr - RB.r) < RB.w / 2 + 0.8 && Math.abs(fx * px + fz * pz) / (rr || 1) < 0.45) return true; }
+    return false;
+  }
+  // is this car still waiting to join a roundabout (its next give-way is a ring's entry, and it hasn't reached it)?
+  mergingAt(c) { const pa = c.ai.mode === 'path' && c.ai.path, gt = pa && pa.gates[0]; return !!(gt && gt.rb && pa.d <= gt.d); }
   // is a lattice car about to pass the junction this car has to cross or join (either way along that street)?
   gateBlocked(v, gt) {
+    // a roundabout's entry: a car on the ring within 32 m before this entry, coming round toward it, has the way
+    if (gt.rb) {
+      const RB = gt.rb, nx = gt.node.x, nz = gt.node.z;
+      // (only a car going round: one waiting at its own give-way line stands in the ring's band too, and counting it
+      // would let the entries wait on each other all the way round)
+      for (const c of this.cars) {
+        if (c === v || !c.ai || c.ai.mode !== 'path' || !c.ai.onRing) continue;
+        const px = c.pos.x - RB.x, pz = c.pos.z - RB.z, rr = Math.hypot(px, pz); if (Math.abs(rr - RB.r) > RB.w / 2 + 1.5) continue;
+        // its angle round the ring before the entry (the ring runs to decreasing angle on the map)
+        const ac = Math.atan2(pz, px), an = Math.atan2(nz - RB.z, nx - RB.x), ahead = ((ac - an) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        // (one turning off the ring at this very leg leaves it before the entry: it is no reason to wait)
+        const pc = c.ai.path, out = pc.outs && pc.outs.find(o => o.d > pc.d - 2); if (out && out.node === gt.node) continue;
+        // a gap of about 3 s at its speed (8 m at least); a car standing on the ring blocks only when right at the entry
+        const lim = c.speed > 1 ? Math.max(8, Math.min(32, c.speed * 3)) : 9;
+        if (ahead > 0.02 && ahead * RB.r < lim) return true;
+      }
+      const pl = this.g.player, pv = pl.state === 'vehicle' ? pl.vehicle : null;
+      if (pv) { const px = pv.pos.x - RB.x, pz = pv.pos.z - RB.z; if (Math.abs(Math.hypot(px, pz) - RB.r) < RB.w / 2 + 1.5) { const ac = Math.atan2(pz, px), an = Math.atan2(nz - RB.z, nx - RB.x), ahead = ((ac - an) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); if (ahead * RB.r < 32 && ahead > 0.02 && pv.speed > 1) return true; } }
+      return false;
+    }
     const at = gt.att, key = Links.key(at.axis, at.line, at.seg);
     for (const c of this.cars) {
       const ca = c.ai; if (!ca || c === v || ca.mode !== 'lane' || this.segKey(ca) !== key) continue;
@@ -48441,7 +49231,7 @@ class TrafficManager {
     if (!R._walk) { R._walk = []; for (const e of R.edges) if (e.traffic && e.kind !== 'grid') for (let d = 5; d < e.len - 5; d += 10) R._walk.push([e, d, ...R.pointAt(e, d)]); }
     const near = R._walk.filter(q => { const d = Math.hypot(q[2] - px, q[3] - pz); return d > 75 && d < 230; });
     const c = pick(near); if (!c) return null;
-    const e = c[0], dir = Math.random() < 0.5 ? 0 : 1, d = c[1], [cx, cz, tx, tz] = R.pointAt(e, d), sg = dir ? -1 : 1, off = Math.min(LANE, e.w / 4);
+    const e = c[0], dir = e.oneway || Math.random() < 0.5 ? 0 : 1, d = c[1], [cx, cz, tx, tz] = R.pointAt(e, d), sg = dir ? -1 : 1, off = Math.min(LANE, e.w / 4);
     const x = cx - tz * sg * off, z = cz + tx * sg * off, dd = Math.hypot(x - px, z - pz);
     if (dd < 75 || dd > 230 || (dd < 160 && g.inView(x, 1, z, 3))) return null;
     for (const o of g.vehicles.list) if (dist2(o.pos.x, o.pos.z, x, z) < 15 * 15) return null;
@@ -48593,9 +49383,11 @@ class TrafficManager {
       for (let k = pa.k; k < pa.pts.length && pa.cum[k] - pa.d < 45; k++) { const va = Math.sqrt(pa.lim[k] * pa.lim[k] + 2 * 4.5 * Math.max(0, pa.cum[k] - pa.d)); if (va < vAllow) vAllow = va; }
       // a lattice street ahead to join or cross: wait for a gap. A car stopped there (a queue at a light) must not
       // hold us forever: after a few seconds we nose out anyway and the obstacle check keeps us off its bumper
-      while (pa.gates.length && pa.gates[0].d < pa.d - 4) { pa.gates.shift(); pa.waitT = 0; }
+      // (past a roundabout's give-way line a car is committed: it goes on round, it never stops in the ring's way)
+      while (pa.gates.length && pa.gates[0].d < pa.d - (pa.gates[0].rb ? 0 : 4)) { pa.gates.shift(); pa.waitT = 0; }
       const gt = pa.gates[0];
-      if (gt && gt.d - pa.d < 24 && (pa.waitT || 0) < 6 && this.gateBlocked(v, gt)) {
+      // (a roundabout's entry has no such impatience: the ring keeps moving, a gap always comes)
+      if (gt && gt.d - pa.d < 24 && (gt.rb || (pa.waitT || 0) < 6) && this.gateBlocked(v, gt)) {
         const va = Math.sqrt(2 * 5 * Math.max(0, gt.d - pa.d - 3)); if (va < vAllow) { vAllow = va; lightStop = true; }
         if (ai.speed < 0.5) pa.waitT = (pa.waitT || 0) + dt;
       }
@@ -48628,11 +49420,19 @@ class TrafficManager {
     } else vAllow = Math.min(vAllow, ai.next && ai.next.type !== 0 ? 7.5 : vAllow);
     // obstacles ahead (vehicles, people, the player)
     const fx = Math.sin(v.h), fz = Math.cos(v.h), rx = -fz, rz = fx;
-    const look = 7 + ai.speed * 1.5;
+    // going round a roundabout (on its ring, moving along it): this car has the way over one still merging onto it
+    ai.onRing = false;
+    // (the island's rings, 023, and the city's, 124)
+    if (ai.mode === 'path') ai.onRing = this.onRingOf(v, fx, fz, ROUNDABOUTS) || this.onRingOf(v, fx, fz, CITY_RINGS);
+    // (far enough to stop from its speed for what stands ahead: at the island's highway speeds the stopping distance
+    // outgrows the town's 1.5 s of look)
+    const look = Math.max(7 + ai.speed * 1.5, 10 + ai.speed * ai.speed / 11);
     const near = dyn.query(v.pos.x + fx * look * 0.5, v.pos.z + fz * look * 0.5, look * 0.5 + 4, this._near);
     let blocker = null;
     for (const e of near) {
       if (e.ref === v) continue;
+      // (only one still short of its give-way line: a car turning off the ring ahead is traffic like any other)
+      if (ai.onRing && e.veh && e.ref.ai && !e.ref.ai.onRing && this.mergingAt(e.ref) && Math.abs(wrapPi(e.ref.h - v.h)) > 0.35) continue;
       const dx = e.x - v.pos.x, dz = e.z - v.pos.z;
       const fwd = dx * fx + dz * fz; if (fwd <= 0) continue;
       const lat = dx * rx + dz * rz;
@@ -55748,10 +56548,10 @@ const RACES = [
   // west street, the waterfront on Valen Bay, and the Pink Slip keeps to the core and the port)
   { id: 'quayside', name: 'Quayside Sprint', nodes: [[0, 11], [0, 8], [0, 4], [10, 4], [10, 0], [12, 0]], laps: 1, opp: 3, cls: ['sports', 'muscle', 'sedan'], reward: 1200, rep: 40, blurb: 'West shore, north along the seawall, then flat out along the top of downtown and up the docks to the harbour mouth.' },
   { id: 'saltloop', name: 'Saltworks Circuit', nodes: [[10, 0], [12, 0], [12, 3], [10, 3]], loop: true, laps: 2, opp: 3, cls: ['sports', 'muscle', 'pickup'], reward: 1600, rep: 45, blurb: 'Two laps around the refinery. Mind the trucks.' },
-  { id: 'midnight', name: 'Midnight Run', nodes: [[4, 4], [8, 4], [8, 6], [5, 6], [5, 8], [9, 8]], laps: 1, opp: 3, night: true, cls: ['sports', 'muscle', 'sports'], reward: 2200, rep: 55, blurb: 'Through the heart of the city after dark, traffic and all. 20:00–05:00 only.' },
-  { id: 'industrial', name: 'Industrial Rumble', nodes: [[9, 5], [11, 5], [11, 8], [9, 8]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
-  { id: 'wettrack', name: 'Wet Track', nodes: [[1, 7], [1, 10], [4, 10], [4, 7]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
-  { id: 'pinkslip', name: 'Pink Slip', nodes: [[6, 6], [6, 8], [10, 8], [10, 4], [12, 4], [12, 8]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' },
+  { id: 'midnight', name: 'Midnight Run', route: [[330, 322], [600, 330], [606, 420], [520, 482], [386, 520], [430, 630], [720, 642]], laps: 1, opp: 3, night: true, cls: ['sports', 'muscle', 'sports'], reward: 2200, rep: 55, blurb: 'Through the heart of the city after dark, traffic and all. 20:00–05:00 only.' },
+  { id: 'industrial', name: 'Industrial Rumble', route: [[730, 404], [880, 400], [880, 640], [720, 642]], loop: true, laps: 2, opp: 3, cls: ['pickup', 'van', 'muscle', 'suv'], reward: 1500, rep: 45, blurb: 'Container yards and loading docks. Heavy metal only, bring something tough.' },
+  { id: 'wettrack', name: 'Wet Track', route: [[104, 350], [118, 600], [90, 700], [120, 860], [300, 878], [318, 700], [318, 420], [200, 322]], loop: true, laps: 2, opp: 3, rain: true, cls: ['sedan', 'sports', 'muscle'], reward: 1800, rep: 50, blurb: 'Only runs when it’s pouring. Old Market cobbles, zero grip.' },
+  { id: 'pinkslip', name: 'Pink Slip', route: [[480, 482], [520, 600], [614, 630], [800, 640], [800, 320], [960, 320], [960, 640]], laps: 1, opp: 1, cls: ['classic'], storyOnly: true, pink: true, reward: 0, rep: 0, blurb: 'One on one with Vance, for pink slips: winner drives home in the other car.' },
   // (Cedar Fields South's countryside races and Vance's dirt pink slip went with the off-road park, 2026-11-18)
 ];
 // a race laid along its own path: the road graph's route through its waypoints (the countryside's loops went with
@@ -57172,10 +57972,10 @@ function turfAt(x, z) {
 function sidewalkSpot(bx, bz, side, along, o = ROAD_HALF + 2.4) {
   // (bx, bz): a lattice address; the spot is where that block stands (021)
   const L = P - 2 * o, x0 = CityLayout.siteI(bx, bz) * P + o, z0 = CityLayout.siteJ(bx, bz) * P + o, u = clamp(along - o, 2, L - 2);
-  // a block rebuilt on its own streets (the Old Quarter, 124): the same door, on the nearest of them
+  // a block rebuilt on its own streets (a rebuilt district, 124): the same door, on the nearest of them
   {
     const lx0 = bx * P + o, lz0 = bz * P + o, lp = side === 0 ? [lx0 + u, lz0] : side === 1 ? [lx0 + L, lz0 + u] : side === 2 ? [lx0 + L - u, lz0 + L] : [lx0, lz0 + L - u];
-    const q = oldQuarterSpot(bx, bz, side, lp[0], lp[1], o, along);
+    const q = rebuiltSpot(bx, bz, side, lp[0], lp[1], o, along);
     if (q) { const dx = (CityLayout.siteI(bx, bz) - bx) * P, dz = (CityLayout.siteJ(bx, bz) - bz) * P; return { x: q.x + dx, z: q.z + dz, h: q.h }; }
   }
   switch (side) {
@@ -69946,8 +70746,11 @@ class UIManager {
       const key = ZONE_MAP[b.bz][b.bx], z = ZONES[key], bx = b.I, bz = b.J;
       g.fillStyle = z.col; g.globalAlpha = 0.09; g.fillRect(X(bx * P), X(bz * P), P * k, P * k); g.globalAlpha = 1;
       g.strokeStyle = z.col; g.globalAlpha = 0.55; g.lineWidth = 2;
-      if (zk(bx - 1, bz) !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X(bx * P), X((bz + 1) * P)); g.stroke(); }
-      if (zk(bx, bz - 1) !== key) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X((bx + 1) * P), X(bz * P)); g.stroke(); }
+      // (no border between two cells of one superblock: a district rebuilt on its own streets is one place, and its
+      // cells' edges would draw the old grid back over its streets, 124)
+      const same = (I, J) => { const o = W0.blockW(I, J); return !!(o && b.superblock && o.superblock === b.superblock); };
+      if (zk(bx - 1, bz) !== key && !same(bx - 1, bz)) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X(bx * P), X((bz + 1) * P)); g.stroke(); }
+      if (zk(bx, bz - 1) !== key && !same(bx, bz - 1)) { g.beginPath(); g.moveTo(X(bx * P), X(bz * P)); g.lineTo(X((bx + 1) * P), X(bz * P)); g.stroke(); }
       g.globalAlpha = 1;
     }
   }
@@ -70969,11 +71772,14 @@ class QualityManager {
     this.level = this.mode === 'auto' ? (IS_MOBILE ? 1 : 2) : this.mode;
     this.acc = 0; this.frames = 0; this.cool = 3; this.history = [];
   }
+  // the preset's pixel ratio on this screen, and how far dynamic resolution may take it (see update)
+  basePR() { return Math.min(Math.min(window.devicePixelRatio || 1, 3), QUALITY[this.level].pr); }
+  drsFloor() { const base = this.basePR(); return this.level === 0 ? 0.85 : clamp(Math.max(0.85, 1 / base), 0.85, 1); }
   setMode(m) { this.mode = m; if (m !== 'auto') this.level = m; this.apply(); }
   apply() {
     const g = this.g, q = QUALITY[this.level], s = g.save.settings;
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    g.renderer.setPixelRatio(Math.min(dpr, q.pr) * (this.dynScale || 1));
+    this.dynScale = Math.max(this.drsFloor(), this.dynScale || 1);
+    g.renderer.setPixelRatio(this.basePR() * this.dynScale);
     const sh = s.shadows && q.shadow > 0, shChanged = this._sh !== undefined && this._sh !== sh; this._sh = sh;
     g.renderer.shadowMap.enabled = sh;
     g.env.sun.castShadow = sh;
@@ -70996,18 +71802,24 @@ class QualityManager {
   update(dt) {
     if (this.mode !== 'auto' || this.g.state !== 'playing') return;
     this.acc += dt; this.frames++; this.cool -= dt;
-    // dynamic resolution (G2): every second, a long frame takes 8% of the pixel ratio away (down to 60% of the
-    // preset's), a quick one gives 5% back; whole presets only change when that is not enough (below)
+    // dynamic resolution, the last resort (2026-11-18: it used to take up to 40% of the pixels away first, which is
+    // what made the island builds soft: the heavier world held frames over 21 ms and the image sat at 60%). A slow
+    // frame now costs the preset's real work first (shadow map, draw distance, crowds, MSAA: below); only on the lowest
+    // preset it is on, or once the preset can drop no further, does resolution give way, by 15% at most and never
+    // under the screen's own CSS pixels from Medium up
     this.drsAcc = (this.drsAcc || 0) + dt; this.drsN = (this.drsN || 0) + 1;
     if (this.drsAcc >= 1) {
       const ms = this.drsAcc / this.drsN * 1000, k = this.dynScale || 1; this.drsAcc = 0; this.drsN = 0;
-      const nk = ms > 21 ? Math.max(0.6, k * 0.92) : ms < 15 ? Math.min(1, k * 1.05) : k;
-      if (Math.abs(nk - k) > 0.004) { this.dynScale = nk; this.g.renderer.setPixelRatio(Math.min(Math.min(window.devicePixelRatio || 1, 3), QUALITY[this.level].pr) * nk); this.g.onResize(); }
+      const floorK = this.drsFloor(), lastResort = this.level === 0 || (this.level === 1 && this.cool <= 0);
+      const nk = ms > 24 && lastResort ? Math.max(floorK, k * 0.95) : ms < 16 ? Math.min(1, k * 1.05) : k;
+      if (Math.abs(nk - k) > 0.004) { this.dynScale = nk; this.g.renderer.setPixelRatio(this.basePR() * nk); this.g.onResize(); }
     }
     if (this.acc >= 2) {
       const ms = this.acc / this.frames * 1000; this.acc = 0; this.frames = 0;
-      if (this.cool > 0 || (this.dynScale || 1) > 0.62 && ms > 24) return;
-      if (ms > 24 && this.level > 0) { this.level--; this.cool = 5; this.apply(); this.g.ui.toast(`Graphics adjusted to ${QUALITY[this.level].name} for smoother play.`); }
+      if (this.cool > 0) return;
+      // presets step down before any pixels go (above); to Low (the weak-device preset, 0.7 of the screen's pixels)
+      // only when frames are truly struggling
+      if (ms > (this.level === 1 ? 34 : 24) && this.level > 0) { this.level--; this.cool = 5; this.apply(); this.g.ui.toast(`Graphics adjusted to ${QUALITY[this.level].name} for smoother play.`); }
       else if (ms < 12.5 && this.level < (IS_MOBILE ? 2 : 3) && !this.droppedFrom?.[this.level + 1]) { this.level++; this.cool = 8; this.apply(); }
       if (ms > 24) { this.droppedFrom = this.droppedFrom || {}; this.droppedFrom[this.level + 1] = true; }
     }
@@ -71992,7 +72804,7 @@ const GAME_CONFIG = Object.freeze({
     game = new Game();
     window.game = game;
     // debug/test namespace (module-scoped tables are otherwise unreachable from the console)
-    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, SR, SR_EVENTS, srTrackLine, inRaceway, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, OvalPark, OV_EVENTS, OV_PARK, ovalSafeSpeeds, complexOffice, FAIR, FAIR_ROAD, FairClock, fairSeat, fairCoaster, fairCoasterAt, fairKartLine, inFair, Fairground, FairGame, FAIR_GAMES, FAIR_PRICE, FAIR_KART, FairgroundScenery, COMPLEX, MOTORSPORT_REFUND, SOUND_ANNEX, SOUND_RESERVE, ISLE_RIVER, RIVER_LINE, RIVER_BASIN, riverAt, riverZ, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, offCity, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, OVAL, ovalLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
+    window.__pv = Object.freeze({ VillaValen, VillaBunker, BUNKER_SCREENS, KartSim, KART, VillaGrounds, VILLA_STAFF, villaInteriorDef, villaBunkerDef, Farms, FARM_REGIONS, BANKS, BANK_T, BANK_LAYOUT, BANK_IDS, BankSystem, bankInteriorDef, bankDoorOpenBox, MAP_GLYPHS, mapGlyph, PICK_WARY, pickWary, ZONE_WEALTH, JAIL_OPS, GOOD_IDS, BIZ_UPKEEP, TUTORIAL, CAMPAIGN, TAXI_RULES, PHONE_APPS, Tools, TOOLS, ROB_THEMES, ROB_CAT_THEME, ROB_SEC, BURGLARY, STORE_ROB, bizInteriorDef, robTheme, pocketTimeK, eventBias, Legal, LEGAL, Fronts, FRONT, JAIL, JAIL_SPEEDS, INMATE_FAVORS, baccaratDeal, baccaratPay, crapsRoll, crapsDecision, crapsPay, tcpRank, tcpCmp, tcpDeal, tcpRound, sportsDay, SPORTS, UNIQUE_CARS, UNIQUE_BY, UniqueCars, isUniqueType, zoneKey, raceCheckpoints, routeRacePath, RoadGraph, CurbCuts, kerbSpot, kerbBlocked, CURVED_STREETS, RG_STREETS, fareFor, routeLen, nearestRoadPoint, placeNameAt, FARE_BASE, FARE_PER_KM, TaxiService, fmtSentence, Prison, INMATES, intFloorY, houseInteriorDef, mansionInteriorDef, homeTier, rollLoot, LOOT_KIND, LOOT_VALUABLES, CAR_MSRP, DEALERSHIPS, CAR_REP, MoneyFeed, Links, GPS, splinePts, ROAD_STYLE, ZONE_CENTRE, gpsRoute, SCRATCH_CARDS, scratchRTP, SLOT_DEFS, SLOT_SYMS, slotRTP, slotSpin, slotTop, winClass, CASINO, ROYALE, ROYALE_MAJORS, ROYALE_PAY, ROYALE_BASE_RTP, ROYALE_DROUGHT_K, royaleSpin, royaleRollMajor, royaleSeedPressure, royaleChances, royaleEvery, royaleLive, royaleEval, royaleBuild, royaleBaseScale, royaleClass, roulettePick, roulLabel, parseMoney, fmtShort, bjValue, rank5, bestOf, handCat, HAND_NAMES, roulettePayout, ROUL_RED, makeDeck, pokerEquity, POKER_AI, VEH_STAGES, VEH_T, HP_BASE, GANG_AGGRO, CARGO_LB, GOOD_CLB, cargoC, cargoCapC, cargoFit, fmtLb, VEST_MAX, npcGunDamage, Inv, lotsFor, fmtQty, holdings: (o, z) => holdings(o, z, game.uw.market), GOOD_UNIT, PROP_BY_ID, RoadNet, SUPERBLOCKS, CITY_CLOSED, cityClosedAt, OQ_STREETS, OQ_SQUARE, REBUILDS, rebuildLines, rebuiltSpot, CITY_RINGS, SR, SR_EVENTS, srTrackLine, inRaceway, localRoadAt, localSurfaceAt, VY, PARK_LABEL, MAP_CATS, isOnRoad, SURF, GAME_CONFIG, CAMPAIGN, RACES, ARCS, IY, groundY, curbAt, ZONES, SaveSystem, VEHICLES, INTERIOR_DEFS, ACHIEVEMENTS, SECRETS, GOODS, FACTIONS, PROPS, OFFICERS, RANKS, CREW_RANKS, LaunderFixer, WarehouseSystem, CompoundSystem, ThreatSystem, RivalWarehouses, RIVAL_WH, VehicleRegistry, VREG, HotWatch, ImpoundLot, ChopShop, HOT_T, IMPOUND, OVERFLOW_BAY, OVERFLOW_ROWS, CHOP_WORK, RaceRules, PinkSlips, CarWash, RACE_T, WASH_T, carWorth, DriveAI, OvalPark, OV_EVENTS, OV_PARK, ovalSafeSpeeds, complexOffice, ROUNDABOUTS, roundaboutIsland, FAIR, FAIR_ROAD, FairClock, fairSeat, fairCoaster, fairCoasterAt, fairKartLine, inFair, Fairground, FairGame, FAIR_GAMES, FAIR_PRICE, FAIR_KART, FairgroundScenery, COMPLEX, MOTORSPORT_REFUND, SOUND_ANNEX, SOUND_RESERVE, ISLE_RIVER, RIVER_LINE, RIVER_BASIN, riverAt, riverZ, pathCheckpoints, cfsRacePath, loopCheckpoints, venueOf, offCity, Terrain, TSURF, TSURF_FX, TRAIL, trailOf, CFS, CF_STRIP, OVAL, ovalLine, inCedarSouth, cfsSide, CityLayout, CITY_LAYOUTS, extSide, inExtension, extRoadSpots, filletLoop, ShipmentSystem, SHIP_T, IMPORT, RAID_T, rivalInteriorDef, PRESSURE, PRESS_STAGE, THREAT_T, LaneDriver, InteriorKit, warehouseInteriorDef, WH_FENCE, WH_GATE, WH_SURV, PED_TYPES, PED_JACKPOTS, pedType, pocketLoot, BIZ_CATS, BIZ_IDS, HOOD, bizUpgradeCost, housePlan, kitReach, turfAt, sidewalkSpot, units, WEAPONS, factionLook, copLook, randomLook, lookFrom, copPost, copBrain, copFootChase, copWalkBack, districtNameAt, streetNameAt, Island, ISLE, SEA_Y, AIRPORT, PROVING, LAKE, MT_VALEN, Flight, ISLE_SCN });
     await game.init(progress);
   } catch (e) {
     console.error(e);

@@ -96,6 +96,8 @@ const lob = await ev(() => { const g = window.game, a = g.content.findAction(); 
 check('Valen Tower has a street door into a lobby', /Lobby/.test(lob) && await ev(() => window.game.player.interior.id === 'lobby'), lob);
 const elev = async act => { await ev(() => window.game.content.openElevator()); await frames(page, 3); await ev(([a]) => document.querySelector(`#svcBody [data-act="${a}"]`).click(), [act]); await waitFade(); await frames(page, 20); };
 await elev('ph');
+// (the view streams in a chunk a frame: wait until it has settled, up to 400 frames, before counting it)
+await page.waitForFunction(() => { const c = window.game.chunks, n = c.visible.size; const s = window.__phN === n; window.__phN = n; return s && n > 0 && (window.__phK = (window.__phK || 0) + 1) > 30; }, null, { timeout: 240000, polling: 100 }).catch(() => {});
 const ph = await ev(() => { const g = window.game, p = g.player; return { id: p.interior.id, y: +p.pos.y.toFixed(1), top: g.world.towerTop.y, r: g.chunks.radius, chunks: g.chunks.visible.size, spots: g.content.interiors.cur.spots.map(s => s.id) }; });
 check('the elevator goes up to the penthouse at the top of the real tower', ph.id === 'penthouse' && Math.abs(ph.y - ph.top) < 0.5 && ph.y > 200, JSON.stringify(ph));
 check('the penthouse looks out over the real city (wide streaming) and has a terrace view spot', ph.r >= 5 && ph.chunks > 60 && ph.spots.includes('view'), JSON.stringify(ph));

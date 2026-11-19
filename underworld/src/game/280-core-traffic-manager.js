@@ -40,12 +40,13 @@ class TrafficManager {
     return sgn > 0 ? { i: e.seg, j: e.line, dx: 1, dz: 0, s: e.along } : { i: e.seg + 1, j: e.line, dx: -1, dz: 0, s: P - e.along };
   }
   // the roads a car on the curved roads may go on by from node n, having come by edge `from`
-  walkOpts(n, from) { return n.edges.filter(x => x.e.traffic && x.e.kind !== 'grid' && x.e !== from).map(x => x.e); }
+  // (a roundabout's ring, 023, only the way round it runs: from its a end)
+  walkOpts(n, from) { return n.edges.filter(x => x.e.traffic && x.e.kind !== 'grid' && x.e !== from && !(x.e.oneway && x.end !== 0)).map(x => x.e); }
   // a walk from node n (come by edge `from`) over the curved roads to a junction with the lattice and the lane it
   // merges into there. Appends to `steps`; returns { exit, gates } or null. `enter`: the car has just turned off the
   // lattice at n (it doesn't merge straight back)
   walk(n, from, steps, enter) {
-    const gates = [];
+    const gates = [], outs = [];
     let total = 0, cur = n, prev = from;
     for (let guard = 0; guard < 80; guard++) {
       let opts = this.walkOpts(cur, prev);
@@ -57,14 +58,18 @@ class TrafficManager {
         const k0 = steps.length;
         steps.push(...RoadGraph.gridSteps(at.axis, at.line, at.seg, at.along, sgn > 0 ? xs : P - xs));
         gates.push({ k: k0, node: cur });
-        return { exit: { ...x, s: xs }, gates };
+        return { exit: { ...x, s: xs }, gates, outs };
       }
-      if (!opts.length) opts = prev ? [prev] : [];              // a dead end: back the way we came (round its turning circle)
+      if (!opts.length) opts = prev && !prev.oneway ? [prev] : [];  // a dead end: back the way we came (round its turning circle)
       if (!opts.length) return null;
       // a long way from the lattice already: head for the nearest junction with it
       const e2 = total > 1500 ? opts.reduce((p, q) => ((p.a === cur ? p.b : p.a).exitD <= (q.a === cur ? q.b : q.a).exitD ? p : q)) : pick(opts);
       const dir = e2.a === cur ? 0 : 1;
       if (cur.att) gates.push({ k: steps.length, node: cur });   // crossing a lattice street
+      // entering a roundabout: give way to the traffic already going round
+      if (e2.oneway && !(prev && prev.oneway)) gates.push({ k: steps.length, node: cur, rb: e2.roundabout });
+      // leaving one: where it turns off the ring (traffic waiting to come on there needn't wait for it)
+      if (!e2.oneway && prev && prev.oneway) outs.push({ k: steps.length, node: cur });
       steps.push({ e: e2, dir, from: dir ? e2.len : 0, to: dir ? 0 : e2.len });
       total += e2.len; prev = e2; cur = dir ? e2.a : e2.b;
     }
@@ -78,6 +83,13 @@ class TrafficManager {
     const lim = Array.from(L.rad, R => clamp(Math.sqrt(3.2 * R), 4.5, 40));
     // a gate stops the car short of the lattice street it joins or crosses: the first lane point on that street
     const gates = w.gates.map(gt => {
+      // (a roundabout's entry: the give-way line where the lane comes to the ring's outer kerb)
+      if (gt.rb) {
+        const RB = gt.rb, edge = RB.r + RB.w / 2 + 1.2, d0 = gt.k > 0 ? L.marks[gt.k - 1] || 0 : 0;
+        let d = Math.max(0, (L.marks[gt.k] || 0) - 7);
+        for (let k = 0; k < pts.length; k++) if (cum[k] >= d0 && Math.hypot(pts[k][0] - RB.x, pts[k][1] - RB.z) < edge) { d = Math.max(0, cum[k] - 1); break; }
+        return { d, rb: RB, node: gt.node };
+      }
       const d0 = gt.k > 0 ? L.marks[gt.k - 1] : 0;
       let d = L.marks[gt.k] || 0;
       for (let k = 0; k < pts.length; k++) if (cum[k] >= d0 && RoadNet.roadAt(pts[k][0], pts[k][1])) { d = cum[k]; break; }
@@ -85,7 +97,8 @@ class TrafficManager {
     }).sort((p, q) => p.d - q.d);
     const ln = steps.find(st => st.e.link);
     const ai = v.ai;
-    ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
+    const outs = (w.outs || []).map(o => ({ node: o.node, d: L.marks[o.k] || 0 }));
+    ai.path = { pts, cum, lim, len: L.len, d: 0, k: 0, exit: w.exit, gates, outs, mergeD: gates.length ? gates[gates.length - 1].d : L.len, link: ln ? ln.e.link.id : -1 };
     ai.mode = 'path'; ai.next = null; ai.overtake = 0; ai.laneOff = 0; ai.runLight = null;
     // out on the island's highways (022) traffic runs at highway speed (the bends' own limits still hold)
     ai.path.fast = steps.some(st => st.e.link && st.e.link.road && st.e.link.road.isle && st.e.w >= 10) ? 1.75 : 1;
@@ -107,8 +120,35 @@ class TrafficManager {
       return;
     }
   }
+  // is this car on one of these rings, moving along it (in the ring's band, its heading tangential)?
+  onRingOf(v, fx, fz, list) {
+    for (const RB of list) { const px = v.pos.x - RB.x, pz = v.pos.z - RB.z, rr = Math.hypot(px, pz); if (Math.abs(rr - RB.r) < RB.w / 2 + 0.8 && Math.abs(fx * px + fz * pz) / (rr || 1) < 0.45) return true; }
+    return false;
+  }
+  // is this car still waiting to join a roundabout (its next give-way is a ring's entry, and it hasn't reached it)?
+  mergingAt(c) { const pa = c.ai.mode === 'path' && c.ai.path, gt = pa && pa.gates[0]; return !!(gt && gt.rb && pa.d <= gt.d); }
   // is a lattice car about to pass the junction this car has to cross or join (either way along that street)?
   gateBlocked(v, gt) {
+    // a roundabout's entry: a car on the ring within 32 m before this entry, coming round toward it, has the way
+    if (gt.rb) {
+      const RB = gt.rb, nx = gt.node.x, nz = gt.node.z;
+      // (only a car going round: one waiting at its own give-way line stands in the ring's band too, and counting it
+      // would let the entries wait on each other all the way round)
+      for (const c of this.cars) {
+        if (c === v || !c.ai || c.ai.mode !== 'path' || !c.ai.onRing) continue;
+        const px = c.pos.x - RB.x, pz = c.pos.z - RB.z, rr = Math.hypot(px, pz); if (Math.abs(rr - RB.r) > RB.w / 2 + 1.5) continue;
+        // its angle round the ring before the entry (the ring runs to decreasing angle on the map)
+        const ac = Math.atan2(pz, px), an = Math.atan2(nz - RB.z, nx - RB.x), ahead = ((ac - an) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        // (one turning off the ring at this very leg leaves it before the entry: it is no reason to wait)
+        const pc = c.ai.path, out = pc.outs && pc.outs.find(o => o.d > pc.d - 2); if (out && out.node === gt.node) continue;
+        // a gap of about 3 s at its speed (8 m at least); a car standing on the ring blocks only when right at the entry
+        const lim = c.speed > 1 ? Math.max(8, Math.min(32, c.speed * 3)) : 9;
+        if (ahead > 0.02 && ahead * RB.r < lim) return true;
+      }
+      const pl = this.g.player, pv = pl.state === 'vehicle' ? pl.vehicle : null;
+      if (pv) { const px = pv.pos.x - RB.x, pz = pv.pos.z - RB.z; if (Math.abs(Math.hypot(px, pz) - RB.r) < RB.w / 2 + 1.5) { const ac = Math.atan2(pz, px), an = Math.atan2(nz - RB.z, nx - RB.x), ahead = ((ac - an) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); if (ahead * RB.r < 32 && ahead > 0.02 && pv.speed > 1) return true; } }
+      return false;
+    }
     const at = gt.att, key = Links.key(at.axis, at.line, at.seg);
     for (const c of this.cars) {
       const ca = c.ai; if (!ca || c === v || ca.mode !== 'lane' || this.segKey(ca) !== key) continue;
@@ -125,7 +165,7 @@ class TrafficManager {
     if (!R._walk) { R._walk = []; for (const e of R.edges) if (e.traffic && e.kind !== 'grid') for (let d = 5; d < e.len - 5; d += 10) R._walk.push([e, d, ...R.pointAt(e, d)]); }
     const near = R._walk.filter(q => { const d = Math.hypot(q[2] - px, q[3] - pz); return d > 75 && d < 230; });
     const c = pick(near); if (!c) return null;
-    const e = c[0], dir = Math.random() < 0.5 ? 0 : 1, d = c[1], [cx, cz, tx, tz] = R.pointAt(e, d), sg = dir ? -1 : 1, off = Math.min(LANE, e.w / 4);
+    const e = c[0], dir = e.oneway || Math.random() < 0.5 ? 0 : 1, d = c[1], [cx, cz, tx, tz] = R.pointAt(e, d), sg = dir ? -1 : 1, off = Math.min(LANE, e.w / 4);
     const x = cx - tz * sg * off, z = cz + tx * sg * off, dd = Math.hypot(x - px, z - pz);
     if (dd < 75 || dd > 230 || (dd < 160 && g.inView(x, 1, z, 3))) return null;
     for (const o of g.vehicles.list) if (dist2(o.pos.x, o.pos.z, x, z) < 15 * 15) return null;
@@ -277,9 +317,11 @@ class TrafficManager {
       for (let k = pa.k; k < pa.pts.length && pa.cum[k] - pa.d < 45; k++) { const va = Math.sqrt(pa.lim[k] * pa.lim[k] + 2 * 4.5 * Math.max(0, pa.cum[k] - pa.d)); if (va < vAllow) vAllow = va; }
       // a lattice street ahead to join or cross: wait for a gap. A car stopped there (a queue at a light) must not
       // hold us forever: after a few seconds we nose out anyway and the obstacle check keeps us off its bumper
-      while (pa.gates.length && pa.gates[0].d < pa.d - 4) { pa.gates.shift(); pa.waitT = 0; }
+      // (past a roundabout's give-way line a car is committed: it goes on round, it never stops in the ring's way)
+      while (pa.gates.length && pa.gates[0].d < pa.d - (pa.gates[0].rb ? 0 : 4)) { pa.gates.shift(); pa.waitT = 0; }
       const gt = pa.gates[0];
-      if (gt && gt.d - pa.d < 24 && (pa.waitT || 0) < 6 && this.gateBlocked(v, gt)) {
+      // (a roundabout's entry has no such impatience: the ring keeps moving, a gap always comes)
+      if (gt && gt.d - pa.d < 24 && (gt.rb || (pa.waitT || 0) < 6) && this.gateBlocked(v, gt)) {
         const va = Math.sqrt(2 * 5 * Math.max(0, gt.d - pa.d - 3)); if (va < vAllow) { vAllow = va; lightStop = true; }
         if (ai.speed < 0.5) pa.waitT = (pa.waitT || 0) + dt;
       }
@@ -312,11 +354,19 @@ class TrafficManager {
     } else vAllow = Math.min(vAllow, ai.next && ai.next.type !== 0 ? 7.5 : vAllow);
     // obstacles ahead (vehicles, people, the player)
     const fx = Math.sin(v.h), fz = Math.cos(v.h), rx = -fz, rz = fx;
-    const look = 7 + ai.speed * 1.5;
+    // going round a roundabout (on its ring, moving along it): this car has the way over one still merging onto it
+    ai.onRing = false;
+    // (the island's rings, 023, and the city's, 124)
+    if (ai.mode === 'path') ai.onRing = this.onRingOf(v, fx, fz, ROUNDABOUTS) || this.onRingOf(v, fx, fz, CITY_RINGS);
+    // (far enough to stop from its speed for what stands ahead: at the island's highway speeds the stopping distance
+    // outgrows the town's 1.5 s of look)
+    const look = Math.max(7 + ai.speed * 1.5, 10 + ai.speed * ai.speed / 11);
     const near = dyn.query(v.pos.x + fx * look * 0.5, v.pos.z + fz * look * 0.5, look * 0.5 + 4, this._near);
     let blocker = null;
     for (const e of near) {
       if (e.ref === v) continue;
+      // (only one still short of its give-way line: a car turning off the ring ahead is traffic like any other)
+      if (ai.onRing && e.veh && e.ref.ai && !e.ref.ai.onRing && this.mergingAt(e.ref) && Math.abs(wrapPi(e.ref.h - v.h)) > 0.35) continue;
       const dx = e.x - v.pos.x, dz = e.z - v.pos.z;
       const fwd = dx * fx + dz * fz; if (fwd <= 0) continue;
       const lat = dx * rx + dz * rz;

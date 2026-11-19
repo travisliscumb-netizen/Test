@@ -1,5 +1,14 @@
 # CURRENT SESSION
 
+- **Owner brief 2026-11-19 (complete city redevelopment, world overhaul, interaction systems, HUD): Phase 1 in
+  progress.** Phase 1 (rebuild every remaining square-grid district) comes first; Phases 2–10 wait for its gate and
+  the owner's review. CITY_REBUILD.md is the plan, the record and the handoff; its §0 has the next action.
+  - Done: island roundabouts (6, traffic and GPS verified, ISLAND.md §10); the rebuild kit (124); the Old Quarter over
+    its whole precinct; Linden Hills; suite `rebuild`; before screenshots in `releases/p1-before/`.
+  - Owner ruling: the financial core is redeveloped too (DECISIONS.md).
+  - Next: the financial core, then Uptown, Greenway/Heights, the port strip, the Strip/stadium cells, the freight
+    park; races re-laid; the Phase 1 gate.
+
 - **Owner requests, 2026-11-16 (after the wider spread): DONE.**
   - Aircraft coming down: nose-down authority 31°, flaps only low or nose-up, an idle glide trim, a sink-rate flare;
     300 m: climb 21 s, idle dive 11 s (was 27 s). Helicopter sink 11 m/s. ISLAND.md §7; suite `island` 42/42.

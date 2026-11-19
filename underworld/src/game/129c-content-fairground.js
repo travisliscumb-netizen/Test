@@ -252,7 +252,7 @@ Object.assign(World.prototype, {
       this._det(B.gate, 'box', (O.x0 + O.x1) / 2, Y + 1.2, O.z1 + 0.06, 1.4, 2.4, 0.12, C(0x22262b));
       B.gate.place = { id: 'fair', name: F.name, kind: 'landmark', door: { x: (O.x0 + O.x1) / 2, z: O.z1 + 1.1, h: 0 }, under: { x: (O.x0 + O.x1) / 2, z: (O.z0 + O.z1) / 2 } };
       // lamps along the midway and the footpath; strings of bulbs over the midway
-      for (let x = F.mid.x0 + 18; x < F.mid.x1 - 12; x += 36) for (const s of [-1, 1]) this._prop(x < 1700 ? B.north : B.gate, 'lotlamp', x, F.mid.z + s * (F.mid.w / 2 + 0.8), s > 0 ? Math.PI : 0);
+      for (let x = F.mid.x0 + 18; x < F.mid.x1 - 12; x += 36) for (const s of [-1, 1]) this._prop(x < 1700 ? B.north : B.gate, 'lotlamp', x, F.mid.z + s * (F.mid.w / 2 + 0.8), s > 0 ? Math.PI : 0, 1, Y);
       // bunting across the midway between each pair of lamps: a sagging wire with eleven pennants
       for (let x = F.mid.x0 + 18; x < F.mid.x1 - 12; x += 36) {
         const b = x < 1700 ? B.north : B.gate, za = F.mid.z - F.mid.w / 2 - 0.8, zb = F.mid.z + F.mid.w / 2 + 0.8, top = Y + 5.6, sag = 1.1, n = 12;
@@ -371,8 +371,10 @@ Object.assign(World.prototype, {
     {
       const Pk = F.park, slots = [];
       for (let r = 0; r < 2; r++) for (let k = 0; k < 26; k++) { const x = Pk.x0 + 5 + k * 3.2, z = r ? Pk.z1 - 6 : Pk.z0 + 6; if (x < Pk.x1 - 3 && hash2i(k, r, 2207) < 0.55) slots.push({ x, z, h: r ? Math.PI : 0, cls: ['sedan', 'compact', 'suv', 'estate', 'pickup', 'van', 'apex', 'crest'][(k + r * 3) % 8] }); }
-      this.isle.fleet.push({ id: 'fair_park', x: (Pk.x0 + Pk.x1) / 2, z: (Pk.z0 + Pk.z1) / 2, r: 300, slots: slots.map(s => ({ ...s, y: Y })) });
-      for (const [x, z] of [[Pk.x0 + 24, (Pk.z0 + Pk.z1) / 2], [Pk.x1 - 24, (Pk.z0 + Pk.z1) / 2]]) this._prop(B.park, 'lotlamp', x, z, 0);
+      // (never a bay Fairground Way runs across on its way to the turning circle: 3 m clear of its carriageway)
+      const onRoad = (x, z) => Island.roads.some(R => R.pts.some((p, k) => k < R.pts.length - 1 && segDist(x, z, p[0], p[1], R.pts[k + 1][0], R.pts[k + 1][1]) < R.w / 2 + 3));
+      this.isle.fleet.push({ id: 'fair_park', x: (Pk.x0 + Pk.x1) / 2, z: (Pk.z0 + Pk.z1) / 2, r: 300, slots: slots.filter(s => !onRoad(s.x, s.z)).map(s => ({ ...s, y: Y })) });
+      for (const [x, z] of [[Pk.x0 + 24, (Pk.z0 + Pk.z1) / 2], [Pk.x1 - 24, (Pk.z0 + Pk.z1) / 2]]) this._prop(B.park, 'lotlamp', x, z, 0, 1, Y);
     }
     // ---------------------------------------------------------------- visitors on the midway and in the queues
     {

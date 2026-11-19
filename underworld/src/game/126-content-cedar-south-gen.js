@@ -152,7 +152,7 @@ Object.assign(World.prototype, {
       // the turning circle's island, transporters along the paddock's back, lamps
       this._det(B.pad, 'cyl', R0.x, Y + 0.25, R0.z, 4, 0.5, 0x6f8a5a, null, { x: R0.x, z: R0.z, r: 4, y0: Y - 1, y1: Y + 0.5, kind: 'det' });
       for (let k = 0; k < 6; k++) { const x = 380 + k * 28; this._bld(B.pad, x, 1072, x + 16, 1075, 3.6, STYLE.IND, [0xd23a2a, 0x1f6fb2, 0xe8eaed, 0x2e2e2e, 0xf1c40f, 0x27ae60][k], 3.6, 4, { exactH: true, y0: Y, oy: Y }); }
-      for (const [x, z] of [[200, 1150], [380, 1150], [520, 1150], [150, 1100]]) this._prop(B.pad, 'lotlamp', x, z, 0);
+      for (const [x, z] of [[200, 1150], [380, 1150], [520, 1150], [150, 1100]]) this._prop(B.pad, 'lotlamp', x, z, 0, 1, OVAL.y);
     }
     // ---------------------------------------------------------------- the countryside round the site: trees (clear of the site, the roads and the fence)
     const clearOf = (x, z, m) => {

@@ -173,7 +173,9 @@ Object.assign(World.prototype, {
     const V = VILLA_VALEN;
     const KEEP_CITY = m => CityLayout.precincts.map(p => [p.x0 - m, p.z0 - m, p.x1 + m, p.z1 + m]), CITY80 = KEEP_CITY(80), CITY_IN = KEEP_CITY(EDGE_MARGIN + 6);
     const KEEP = [[CFS.x0 - 40, CFS.z0 - 40, CFS.x1 + 40, CFS.z1 + 40], [AIRPORT.x0 - 40, AIRPORT.z0 - 40, AIRPORT.x1 + 40, AIRPORT.z1 + 40],
-      [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], SOUND_RESERVE, [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12]];
+      [PROVING.x0 - 40, PROVING.z0 - 40, PROVING.x1 + 40, PROVING.z1 + 40], SOUND_RESERVE, [V.x0 - 12, V.z0 - 12, V.x1 + 12, V.z1 + 12],
+      // the roundabouts (023): the ring, its pavement and its approaches kept clear of lots and their drives
+      ...(typeof ROUNDABOUTS !== 'undefined' ? ROUNDABOUTS.map(RB => { const e = RB.r + RB.w / 2 + 14; return [RB.x - e, RB.z - e, RB.x + e, RB.z + e]; }) : [])];
     const hit = (a, b, m = 0) => a[0] - m < b[2] && a[2] + m > b[0] && a[1] - m < b[3] && a[3] + m > b[1];
     const pads0 = Island.pads.map(p => [p.x0, p.z0, p.x1, p.z1]), taken = [];
     const lakeIn = (x, z) => ((x - LAKE.x) / (LAKE.rx + 45)) ** 2 + ((z - LAKE.z) / (LAKE.rz + 45)) ** 2 < 1;
@@ -218,6 +220,30 @@ Object.assign(World.prototype, {
           n++;
         }
         if (E.max && n >= E.max) break;
+      }
+    }
+    // the city's edges that face land (2026-11-18, the world overhaul: past the promenade the city just stopped, a lawn
+    // and then a district's houses): a row of mid-rise frontage, flats over shops like the city's own, just behind the
+    // promenade and facing the edge street, so the street is a street on both sides. Wherever the ground is land and
+    // level enough, clear of every road, site and lot; the district is the nearest one (its signs, its cars)
+    if (CityLayout.id === 'island') {
+      const S = ISLE_LOT.mid, step = S.W + 3, Ds = Object.entries(ISLE_DISTRICTS).filter(([, D]) => D.at);
+      for (const p of CityLayout.precincts) for (const side of ['n', 's', 'w', 'e']) {
+        const ns = side === 'n' || side === 's', line = side === 'n' ? p.z0 : side === 's' ? p.z1 : side === 'w' ? p.x0 : p.x1, out = side === 'n' || side === 'w' ? -1 : 1;
+        const a0 = ns ? p.x0 : p.z0, a1 = ns ? p.x1 : p.z1, off = EDGE_MARGIN + 1 + S.D / 2;
+        for (let t = a0 + S.W / 2 + 4, i = 0; t <= a1 - S.W / 2 - 4; t += step, i++) {
+          const cx = ns ? t : line + out * off, cz = ns ? line + out * off : t, hx = ns ? S.W / 2 : S.D / 2, hz = ns ? S.D / 2 : S.W / 2, r = [cx - hx, cz - hz, cx + hx, cz + hz];
+          if (CityLayout.precincts.some(q => hit(r, [q.x0 - EDGE_MARGIN, q.z0 - EDGE_MARGIN, q.x1 + EDGE_MARGIN, q.z1 + EDGE_MARGIN], 0.5))) continue;
+          if (KEEP.some(q => hit(r, q)) || pads0.some(q => hit(r, q, 8)) || taken.some(q => hit(r, q, 3))) continue;
+          if (!roadClear(r[0], r[1], r[2], r[3], 2.4) || !groundOk(r, 6)) continue;
+          // (not where the city faces open water a little further out: a frontage row on a sea wall's narrow strip)
+          if (Island.nat(cx + (ns ? 0 : out * 40), cz + (ns ? out * 40 : 0)) < SEA_Y + 1.1) continue;
+          const d = Ds.reduce((m, [k, D]) => Math.hypot(D.at[0] - cx, D.at[1] - cz) < Math.hypot(ISLE_DISTRICTS[m].at[0] - cx, ISLE_DISTRICTS[m].at[1] - cz) ? k : m, 'midtown');
+          const vx = ns ? 0 : out, vz = ns ? out : 0;
+          taken.push(r);
+          const P = sitePad(r[0] - 2, r[1] - 2, r[2] + 2, r[3] + 2, 8, CURB_H);
+          lots.push({ d, kind: 'mid', x: cx, z: cz, vx, vz, ux: -vz, uz: vx, W: S.W, D: S.D, rect: r, P, road: 'edge:' + p.id + ':' + side, i: lots.length, seed: (i * 2 + 1) * 37 + lots.length, edge: true });
+        }
       }
     }
     // the estate's grounds: one level, cut into the hill
@@ -280,7 +306,8 @@ Object.assign(World.prototype, {
     const signN = {};
     for (const B of blocks.values()) for (const L of B.lots) {
       const b = B.b, y = L.P.y, Dd = ISLE_DISTRICTS[L.d], h = face(L), q = k => rng(L.seed, k), car = k => Dd.cars[Math.floor(q(k) * Dd.cars.length)];
-      const bld = (r, hh, style, col, fh, bay, o = {}) => this._bld(b, r[0], r[1], r[2], r[3], hh, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o });
+      // (each building remembers which way its lot faces the street: the dressing's front, 128b)
+      const bld = (r, hh, style, col, fh, bay, o = {}) => { const q2 = this._bld(b, r[0], r[1], r[2], r[3], hh, style, col, fh, bay, { exactH: true, y0: y, oy: y, ...o }); q2.face = [-L.vx, -L.vz]; return q2; };
       if (L.kind === 'villa') {
         const wall = [0xf2ede2, 0xe8e0d0, 0xdcd6cc, 0xf4f1ea, 0xe6dccb][Math.floor(q(1) * 5)], roof = [0x8a4a34, 0x3a4652, 0x5a4a3a, 0x7a3a2e][Math.floor(q(2) * 4)];
         bld(rectL(L, -3, 1, 9.5, 6), 7.4, STYLE.HOUSE, wall, 3.7, 4.2, { roof: 'gable', roofColor: roof });
@@ -361,6 +388,9 @@ Object.assign(World.prototype, {
     // (a car whose drive cannot be laid, too steep or blocked, is not parked there: it could never leave)
     for (const B of blocks.values()) B.slots = B.slots.filter(S => {
       const L = B.lots.find(L => S.x > L.rect[0] - 1 && S.x < L.rect[2] + 1 && S.z > L.rect[1] - 1 && S.z < L.rect[3] + 1);
+      // (a lot fronting the city's edge street, shops and flats on its pavement, has no private parking: no drive
+      // could reach the lattice across the promenade)
+      if (L && L.edge) return false;
       const R = L && Island.roads.find(q => q.id === L.road);
       return !R || this._isleDrive(B.b, S.x, S.z, S.y, R, [], ISLE_DRIVE.back, [-L.vx, -L.vz]);
     });
@@ -710,6 +740,8 @@ Object.assign(World.prototype, {
     const line = [[sx - (f[0] - sx) / fl * back, sz - (f[1] - sz) / fl * back], [sx, sz], ...via, [ex, ez]];
     let len = 0; for (let i = 1; i < line.length; i++) len += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
     if (len > D.maxLen) return this._driveNo('long', sx, sz);
+    // (never onto a roundabout, 023: its ring, its central island or the give-way approach)
+    if (typeof ROUNDABOUTS !== 'undefined' && line.some(p => ROUNDABOUTS.some(RB => Math.hypot(p[0] - RB.x, p[1] - RB.z) < RB.r + RB.w / 2 + 8))) return this._driveNo('roundabout', sx, sz);
     // the surface along it: the lot's level at the car, the ground on the way, the pavement and the road at the end
     const surf = (x, z) => {
       const dr = Math.hypot(x - best.px, z - best.pz);

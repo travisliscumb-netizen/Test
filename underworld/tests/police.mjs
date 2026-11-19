@@ -26,7 +26,9 @@ check('higher wanted levels react faster and from further away', params.every((p
 // no chase, no join: a patrol right next to you ignores you
 const idle = await ev(() => {
   const g = window.game, p = g.player, P = g.police;
-  const v = g.traffic.cars.find(c => !c.patrol) || g.traffic.cars[0]; v.patrol = true; window.__pat = v;
+  // (a car on a lattice lane: 6 m beside it is the pavement; beside a car on a narrow street in a rebuilt district it can
+  // be inside a building, 2026-11-19)
+  const v = g.traffic.cars.find(c => !c.patrol && c.ai && c.ai.mode === 'lane') || g.traffic.cars.find(c => !c.patrol) || g.traffic.cars[0]; v.patrol = true; window.__pat = v;
   p.pos.set(v.pos.x + 6, p.pos.y, v.pos.z); p.vel.set(0, 0, 0);
   for (let n = 0; n < 120; n++) g.update(1 / 60, 1 / 60);
   return { units: P.units.length, level: P.level };
@@ -74,7 +76,11 @@ check('an empty parked car (nobody in it) stays parked', !empty.inUnits && empty
 // an officer on foot: reacts, chases, gives up when you're well away and walks back (never into a car)
 const foot = await ev(() => {
   const g = window.game, p = g.player, P = g.police, out = {};
-  const c = g.peds.make('cop', window.__pv.copLook()); c.x = p.pos.x + 10; c.z = p.pos.z + 3; c.y = p.pos.y; c.state = 'free'; c.keep = true; c.brain = window.__pv.copPost; c.postH = 0; c.home = { x: c.x, z: c.z }; c.fireT = 1; g.peds.peds.push(c); P.cops.push(c);
+  // (on an open street, the officer 12 m along it: beside a random car in the rebuilt districts, 10 m to one side can be
+  // inside a building, 2026-11-19)
+  if (p.state === 'vehicle') g.exitVehicle(true);
+  p.pos.set(321, window.__pv.groundY(321, 600) + 0.01, 600); p.vel.set(0, 0, 0);
+  const c = g.peds.make('cop', window.__pv.copLook()); c.x = p.pos.x; c.z = p.pos.z + 12; c.y = p.pos.y; c.state = 'free'; c.keep = true; c.brain = window.__pv.copPost; c.postH = 0; c.home = { x: c.x, z: c.z }; c.fireT = 1; g.peds.peds.push(c); P.cops.push(c);
   window.__fc = c;
   let joined = -1;
   for (let n = 0; n < 200 && joined < 0; n++) { g.update(1 / 60, 1 / 60); if (c.brain && c.brain.name === 'copFootChase') joined = n; }
@@ -94,7 +100,8 @@ const cap = await ev(() => {
   const g = window.game, p = g.player, P = g.police;
   P.setLevel(4); P.spawnT = 0;
   const made = [];
-  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; const v = g.vehicles.spawn('police', p.pos.x + Math.cos(a) * 25, p.pos.z + Math.sin(a) * 25, 0, { parked: true, driver: null }); v.staffed = true; made.push(v); }
+  // (each on the road nearest its point of the ring: in the rebuilt districts a point 25 m out can be inside a building)
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, x = p.pos.x + Math.cos(a) * 25, z = p.pos.z + Math.sin(a) * 25, q = window.__pv.RoadGraph.nearest(x, z, { maxD: 60 }); const v = g.vehicles.spawn('police', q ? q.x : x, q ? q.z : z, 0, { parked: true, driver: null }); v.staffed = true; made.push(v); }
   let maxLive = 0;
   for (let n = 0; n < 60 * 12; n++) { g.update(1 / 60, 1 / 60); maxLive = Math.max(maxLive, P.units.filter(u => !u.standDown && !u.v.burnt).length); }
   const roles = {}; for (const u of P.units) if (!u.standDown) roles[u.role] = (roles[u.role] || 0) + 1;
