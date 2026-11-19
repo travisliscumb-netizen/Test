@@ -28,13 +28,8 @@ Phase 1 may span two sessions. This file is the handoff between them. Read §0 f
   - The port's north end (10,0, 11,0, 11,1) and 11,4, beside its yards.
   - The mall's cell and the one south of it (6,8, 6,9).
   - The Velvet bonded store and the tow yard (6,10, 6,11).
-- **Next action:** the Phase 1 gate (§1):
-  - full regression;
-  - save compatibility;
-  - perf against the baseline;
-  - before/after screenshots;
-  - the report;
-  - then stop for the owner's visual review. Phases 2–10 wait for it.
+- **The Phase 1 gate has been run (§9). Phase 1 stops here for the owner's visual review.** Phases 2–10 wait for it,
+  along with the decisions in §9.6.
 
 ## 1. What "done" means (the gate, from the brief)
 - No obvious large repetitive square grid left anywhere in the city. Straight streets are allowed where a real city
@@ -304,3 +299,70 @@ Then the races, the city roundabouts, verification, screenshots, documentation a
 ## 8. Before screenshots
 `releases/p1-before/`: `<precinct>_aerial.jpg` and `<precinct>_top.jpg` for all ten precincts, plus `city_top.jpg`. They are
 taken from `0beff6a` (the committed build) at 13:00 in clear weather, on the High preset.
+
+## 9. The Phase 1 gate (2026-11-19)
+### 9.1 Full regression
+- 86 suites, 2,242 checks, 0 failing.
+- The run started on `aeaf52d`. Suites that failed were fixed and rerun on the later builds:
+  - `da2b896` adds the save fix;
+  - then the generation speed-up, whose world fingerprint is identical.
+- Every first-run failure was one of two kinds:
+  - **A timeout under load.** Twenty suites shared a software-GL machine. Each passed alone, and the slow-generation
+    fix (§9.4) removed the boot timeouts.
+  - **A test standing on a lattice street the rebuild removed.** These tests were moved onto streets that still run,
+    with no tolerance changed:
+    - shooting (Central Blvd), core (reversing on the edge street; step-in against a building's wall);
+    - island (Kestrel St, as Ash St is gone);
+    - survival (every fight on the same open street).
+- The two failures known from before Phase 1 are both gone. The Route 9 Diner has its building, and the roads
+  suite's recycled-car case did not recur.
+
+### 9.2 Connectivity, the GPS and traffic
+- **The road graph:** 382 nodes and 505 edges, all reachable from one node (`rebuild`, `roadnet`).
+- **The `rebuild` suite (105 checks) covers every rebuilt district:**
+  - every street is a link with both ends on a road;
+  - every door is on a street, with its building right behind it;
+  - the GPS finds every door;
+  - every respawn is clear;
+  - every precinct keeps its density;
+  - traffic turns into each district's streets, keeps to the road surface (within 0.5 m) and comes back out.
+- **The city roundabouts (Exchange Circus, Meridian Circus):** one way, round the right way in the GPS, with traffic
+  going round, nobody the wrong way, no deadlock and no overlaps.
+- **The `roadnet` suite (42 checks):** the graph builds in 23 ms, a route takes 0.07 ms, and taxis, police and races
+  run on the curved streets.
+
+### 9.3 Saves
+- The `savecompat` suite uses a real save made on the build before Phase 1, with 26 properties bought in every
+  rebuilt district. On this build:
+  - every property is still owned;
+  - every owned door is on a street the GPS reaches;
+  - a player saved on an old street that a building now covers comes back on the nearest pavement.
+- No `SAVE_VERSION` bump. Positions come from addresses; kept cars already move to a clear kerb (505).
+
+### 9.4 Performance (pre-Phase 1 `0beff6a` against this build; 1280×720, High preset, 13:00, software GL)
+- **Cold boot:** 20.7 s before, 22.0 s now. It was 40.3 s until the kit's lot clearance was indexed by street segment;
+  the fingerprint is identical.
+- **Buildings:** 1,063 before, 1,702 now. Props: 8,096 before, 6,208 now (fewer lattice kerbs).
+- **JS heap:** 169 MB before, 179 MB now.
+- **Aerial and street views of every precinct:** draw calls and triangles are similar or lower (core street level:
+  826k → 617k triangles). The median render time is unchanged within the noise of software GL. The table is in the
+  gate report.
+
+### 9.5 Screenshots
+- `releases/p1-before/` and `releases/p1-after/`: every precinct (aerial and top), the port in two halves, and the
+  whole city.
+
+### 9.6 Remaining issues and the owner's decisions
+- **The port strip still reads as a grid from above.** Its middle street and cross streets run between seven kept
+  landmarks, two paved yards (Saltworks Yard, Pier Yard) and the Saltmarsh curves. Only Harbor Row was rebuilt.
+  Going further means absorbing or moving a yard (the organic rules need two), re-laying the saltloop race on a route
+  and rerouting the landmarks' access.
+  - **Decision:** keep the dock grid (ports are often rectilinear), or redesign the port.
+- **Cells kept on the grid, each for a stated reason** (§5.6–5.8): the mall's cell and the one south of it; the
+  Velvet store and the tow yard.
+- **The island pass's city-edge frontage** (128, 2026-11-18) is a row of mid-rise blocks facing every edge street
+  that borders land. Around Uptown, which stands alone, it reads as a ring of detached buildings.
+  - **Decision:** keep it, or drop or rethink it in Phase 2's environment pass.
+- **The traffic light floor** in the placement suite is now 160, down from 200. Lights stand only at lattice
+  crossroads, which the districts replace with T-junctions and roundabouts. The rebuilt districts have no signals
+  of their own, because path traffic would not obey them.

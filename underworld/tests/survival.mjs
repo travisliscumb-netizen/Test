@@ -48,6 +48,10 @@ check('health regenerates out of combat (to 65%)', regen.h1 > regen.h0 + 30 && r
 const fight = async (k) => {
   const r = await ev(async (k) => {
     const g = window.game, p = g.player, uw = g.uw;
+    // (every fight where the first was, on the open street of a new career: after a death you come round at the
+    // hospital, and what stands 12 m from its door is not an open street)
+    const home = window.__fightHome || (window.__fightHome = { x: p.pos.x, z: p.pos.z, h: p.h });
+    g.resetPlayerState(home.x, home.z, home.h);
     p.health = p.maxHealth; p.vest = 0; p.vel.set(0, 0, 0);
     for (const gr of [...uw.gangs.groups.values()]) uw.gangs.removeGroup(gr, true);
     const fid = Object.keys(uw.S.factions)[0], x = p.pos.x, z = p.pos.z;

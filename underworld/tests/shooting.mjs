@@ -275,10 +275,10 @@ const outCar = await ev(() => ({ gm: document.body.classList.contains('gunmode')
 check('after getting out: gun mode, FIRE and crosshair are back', outCar.gm && outCar.fire !== 'none' && outCar.xh, JSON.stringify(outCar));
 {
   await ev(() => { const g = window.game; g.peds.peds.length = 0; g.__tg = []; g.player.mag.smg = 30; });
-  // (the target down the avenue, the way the range was set up: wherever the camera was dragged to, it could be the
-  // facade a few metres off across the pavement)
+  // (the target down the avenue, behind you as the range was set up: wherever the camera was dragged to, it could be
+  // the facade a few metres off across the pavement, and ahead is the car you got out of, parked along the avenue)
   const p0 = await ev(() => { const p = window.game.player; return { x: p.pos.x, z: p.pos.z }; });
-  const x = p0.x + Math.sin(facing) * 8, z = p0.z + Math.cos(facing) * 8, id = await dummy(x, z);
+  const x = p0.x - Math.sin(facing) * 8, z = p0.z - Math.cos(facing) * 8, id = await dummy(x, z);
   const gy = await ev(([x, z]) => window.__pv.groundY(x, z), [x, z]);
   await ads(true); await frames(page, 12); await aimAt(x, gy + 1.25, z);
   const shot = await fire();

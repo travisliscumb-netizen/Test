@@ -174,7 +174,26 @@ Object.assign(World.prototype, {
     const squares = D.squares || [];
     for (const Q of squares) this._rbSquare(b, Q, rng);
     // ---- the frontage: terraces along every street, both sides, and along the edge streets inside the district
-    const clearRoads = (x0, z0, x1, z1, m) => roads.every(r => rectPolyDist(x0, z0, x1, z1, r.pts) > r.w / 2 + m) && circles.every(c => Math.hypot(clamp(c.x, x0, x1) - c.x, clamp(c.z, z0, z1) - c.z) > c.r + m);
+    // (the streets' segments in 20 m buckets: a lot is tested against the segments near it, each by the same distance
+    // as against its whole street; checking every lot against every point of every street made the city take twice as
+    // long to build)
+    const SB = 20, segB = new Map(), maxHW = roads.reduce((a2, r) => Math.max(a2, r.w / 2), 0);
+    for (const r of roads) for (let k = 0; k < r.pts.length - 1; k++) {
+      const a = r.pts[k], c = r.pts[k + 1], sg = { a, c, hw: r.w / 2, q: 0 };
+      for (let i = Math.floor(Math.min(a[0], c[0]) / SB); i <= Math.floor(Math.max(a[0], c[0]) / SB); i++) for (let j = Math.floor(Math.min(a[1], c[1]) / SB); j <= Math.floor(Math.max(a[1], c[1]) / SB); j++) {
+        const key = i * 100003 + j; if (!segB.has(key)) segB.set(key, []); segB.get(key).push(sg);
+      }
+    }
+    let segQ = 0;
+    const clearOfStreets = (x0, z0, x1, z1, m) => {
+      const pad = maxHW + m, q = ++segQ;
+      for (let i = Math.floor((x0 - pad) / SB); i <= Math.floor((x1 + pad) / SB); i++) for (let j = Math.floor((z0 - pad) / SB); j <= Math.floor((z1 + pad) / SB); j++) {
+        const L2 = segB.get(i * 100003 + j); if (!L2) continue;
+        for (const sg of L2) { if (sg.q === q) continue; sg.q = q; if (rectPolyDist(x0, z0, x1, z1, [sg.a, sg.c]) <= sg.hw + m) return false; }
+      }
+      return true;
+    };
+    const clearRoads = (x0, z0, x1, z1, m) => clearOfStreets(x0, z0, x1, z1, m) && circles.every(c => Math.hypot(clamp(c.x, x0, x1) - c.x, clamp(c.z, z0, z1) - c.z) > c.r + m);
     const placed = [];
     // the stunt jumps' lanes: run-up, flight and landing kept clear of anything built
     const lanes = (this.surfaces || []).filter(s => s.unique && s.x1 > sb.x0 - 40 && s.x0 < sb.x1 + 40 && s.z1 > sb.z0 - 40 && s.z0 < sb.z1 + 40).map(s => {

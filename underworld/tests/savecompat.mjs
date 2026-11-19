@@ -65,9 +65,10 @@ const spot = await ev(() => {
   return null;
 });
 if (spot) {
-  // (this page saves no more: its own autosave on the way out would write the player's spot back over the edit)
-  await ev(sp => { window.game.saveGame = () => true; window.game.autosave = () => {}; const raw = JSON.parse(localStorage.getItem('pvunderworld.save.v1')); raw.pos = sp; localStorage.setItem('pvunderworld.save.v1', JSON.stringify(raw)); }, spot);
+  // (the spot is written into the save after the reload, at the title screen, where nothing saves: the old page's own
+  // save on its way out would write the player's spot back over it)
   await page.reload({ timeout: 180000 }); await boot(page);
+  await ev(sp => { const raw = JSON.parse(localStorage.getItem('pvunderworld.save.v1')); raw.pos = sp; localStorage.setItem('pvunderworld.save.v1', JSON.stringify(raw)); }, spot);
   // (what the save holds as it is continued: the edited spot)
   var pre = await ev(() => JSON.parse(localStorage.getItem('pvunderworld.save.v1')).pos);
   await page.waitForFunction(() => { const l = document.getElementById('loading'); return !l || l.style.display === 'none' || l.classList.contains('hidden') || getComputedStyle(l).opacity === '0' || !l.isConnected; }, null, { timeout: 180000, polling: 200 });
