@@ -1,0 +1,190 @@
+<title>Port Valen Phase 1 Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column for the decisions and findings; a wide two-up gallery for before/after views. */
+:root {
+  --bg: #f4f6f8; --surface: #ffffff; --ink: #18202a; --muted: #5a6573; --line: #d9dfe6;
+  --accent: #2b5f8e; --accent-soft: #e3edf6; --good: #2f7d4f; --warn: #a86a12; --warn-soft: #fbf0dd;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161c; --surface: #1a2129; --ink: #e6ebf0; --muted: #9aa6b3; --line: #2c3540;
+  --accent: #7fb2e0; --accent-soft: #1d2d3d; --good: #6cc394; --warn: #e2a64a; --warn-soft: #2e2416; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #1a2129; --ink: #e6ebf0; --muted: #9aa6b3; --line: #2c3540;
+  --accent: #7fb2e0; --accent-soft: #1d2d3d; --good: #6cc394; --warn: #e2a64a; --warn-soft: #2e2416; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--f-body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 48px; }
+.col { max-width: 760px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.2 }
+h1 { font-size: clamp(28px, 4.2vw, 40px); font-weight: 700; letter-spacing: -0.01em }
+h2 { font-size: 24px; font-weight: 600; }
+h3 { font-size: 17px; font-weight: 600; }
+p { margin: 0 }
+.eyebrow { font: 500 12px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
+section { display: grid; gap: 18px }
+.lede { font-size: 17px; color: var(--ink); }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: 13px }
+.meta code, code { font-family: var(--f-mono); font-size: 0.9em }
+a { color: var(--accent) }
+.status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 600 13px/1 var(--f-body); width: max-content; max-width: 100% }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor }
+.decisions { display: grid; gap: 12px; }
+.decision { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 6px; padding: 16px 18px; display: grid; gap: 6px; }
+.decision.go { border-left-color: var(--good) }
+.decision .q { font-weight: 600 }
+.decision p { color: var(--muted) }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 6px }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0 }
+.stat b { font: 600 24px/1.1 var(--f-display); font-variant-numeric: tabular-nums }
+.stat span { color: var(--muted); font-size: 13px }
+.gallery { display: grid; gap: 36px }
+.area { display: grid; gap: 12px }
+.area-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px }
+.area-head p { color: var(--muted); max-width: 70ch; min-width: 0 }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: none }
+.seg button { font: 500 13px/1 var(--f-body); color: var(--muted); background: var(--surface); border: 0; padding: 8px 12px; cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent) }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+@media (max-width: 720px) { .pair { grid-template-columns: 1fr } }
+figure { margin: 0; display: grid; gap: 6px; min-width: 0 }
+figure img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); background: var(--line); display: block }
+figcaption { font: 500 12px/1 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted) }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface) }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left }
+th { font: 600 12px/1.2 var(--f-body); color: var(--muted); background: var(--bg) }
+tr:last-child td { border-bottom: 0 }
+td.lower { color: var(--good) }
+td.higher { color: var(--warn) }
+.net { display: grid; gap: 10px }
+.net div { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; gap: 12px; align-items: baseline; padding-bottom: 10px; border-bottom: 1px solid var(--line) }
+.net div:last-child { border-bottom: 0 }
+.net dt, .net .k { font-weight: 600 }
+.net .v { color: var(--muted); min-width: 0 }
+.note { background: var(--warn-soft); border-radius: 6px; padding: 14px 16px; }
+@media (max-width: 520px) { .net div { grid-template-columns: 1fr; gap: 2px } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+
+<div class="wrap">
+  <header class="col" style="display:grid; gap:16px">
+    <span class="eyebrow">Owner brief, 2026-11-19 · Phase 1 gate</span>
+    <h1>The original city, redeveloped</h1>
+    <p class="lede">Every square-grid district of the original city now stands on its own streets: winding high streets, lanes, cul-de-sacs, squares and two city roundabouts, joined to the island's roads. Phase 1 has stopped here for your visual review. Phases 2 to 10 wait for it.</p>
+    <span class="status">Ready for your review</span>
+    <div class="meta">
+      <span>Branch <code>claude/epic-galileo-m47k4d</code></span>
+      <span>Commit <code>222e49f</code></span>
+      <span>Live build: <a href="https://operation-blackgate-2-git-claude-epic-galileo-m47k4d-travis16.vercel.app/underworld/">The Underworld</a></span>
+      <span>Plan and record: <code>CITY_REBUILD.md</code></span>
+    </div>
+  </header>
+
+  <section class="col" aria-labelledby="dec">
+    <h2 id="dec">What I need from you</h2>
+    <div class="decisions">
+      <div class="decision go"><span class="q">1. Approve Phase 1 so Phase 2 (graphics and environment) can start.</span><p>Look through the before/after views below, or drive the live build. Anything you want changed in the street layouts is cheaper to change now.</p></div>
+      <div class="decision"><span class="q">2. The port strip: keep its dock grid, or redesign it?</span><p>From above, the port still reads as a grid. Its middle street and cross streets run between seven kept landmarks, two paved yards and the Saltmarsh curves. Only Harbor Row was rebuilt. A full redesign means absorbing or moving one yard, re-laying the saltloop race on a route and rerouting the landmarks' access. Ports are often rectilinear, so keeping it is defensible, but it is your call.</p></div>
+      <div class="decision"><span class="q">3. The ring of detached blocks around free-standing districts: keep or rethink?</span><p>The island pass (2026-11-18) puts a row of mid-rise blocks facing every edge street that borders land. Around Uptown, which stands on its own, it reads as a ring of separate buildings. I left it alone in Phase 1. It belongs in Phase 2's environment pass if you want it changed.</p></div>
+    </div>
+  </section>
+
+  <section class="col" aria-labelledby="ver">
+    <h2 id="ver">Verification</h2>
+    <div class="stats">
+      <div class="stat"><b>86 / 86</b><span>test suites passing</span></div>
+      <div class="stat"><b>2,242</b><span>checks passing, 0 failing</span></div>
+      <div class="stat"><b>26 / 26</b><span>properties kept in an old save</span></div>
+      <div class="stat"><b>22.0 s</b><span>cold boot (20.7 s before)</span></div>
+    </div>
+    <ul>
+      <li><b>Connectivity and GPS.</b> One road graph of 382 nodes and 505 edges, all reachable from one node. Every street in every rebuilt district is a link with both ends on a road. Every door is on a street with its building right behind it, and the GPS finds every one.</li>
+      <li><b>Traffic.</b> Cars turn into each district's streets, stay on the road surface (within 0.5 m) and come back out. At Exchange Circus and Meridian Circus traffic goes round the right way, with no deadlock and no overlaps. The GPS routes the right way round both.</li>
+      <li><b>Saves.</b> A real save made on the build before Phase 1, owning 26 properties across every rebuilt district, loads with every property still owned and every door reachable. A player saved on an old street that a building now covers comes back on the nearest pavement. Kept cars already move to a clear kerb. No save version bump.</li>
+      <li><b>Nothing lost.</b> Every business, home, garage, landmark, gang yard, race and stunt jump is still in place. The property ladder still sells 46 homes, and all 14 unique stunt jumps launch cleanly at three speeds.</li>
+      <li><b>Test changes.</b> Where a test stood on a lattice street that no longer exists, I moved it onto a street that still runs and kept its tolerance. One floor changed: the city needs at least 160 traffic lights instead of 200. Lights only stand at lattice crossroads, and the new districts use T-junctions and roundabouts instead. I did not add signals there, because traffic on curved streets would not obey them.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="gal">
+    <div class="col" style="display:grid; gap:10px">
+      <h2 id="gal">Before and after</h2>
+      <p style="color:var(--muted)">All views at 13:00 in clear weather on the High preset. Before is the build from the start of Phase 1. Switch each area between the top-down view and the aerial view.</p>
+    </div>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <section class="col" aria-labelledby="net">
+    <h2 id="net">How the new road network works</h2>
+    <div class="net">
+      <div><span class="k">Kept straight</span><span class="v">Edge streets between districts, the arterials and the waterfront stay straight. They are the old lattice's backbone, and lane traffic, signals and the races still use them.</span></div>
+      <div><span class="k">High streets</span><span class="v">Each district has one or two winding main streets with shops, benches and kerb parking (where the street is at least 11 m wide), for example Saint Ivo Street, Linden Parade, Central Blvd, Meridian Way, Northgate Road and Neon Row.</span></div>
+      <div><span class="k">Lanes and closes</span><span class="v">Smaller streets fork off the high streets and join edge streets at least 14 m from any crossing. Cul-de-sacs end in turning circles, and houses face them.</span></div>
+      <div><span class="k">Roundabouts</span><span class="v">Exchange Circus (financial core) and Meridian Circus (Uptown), where several streets meet at a district's heart, plus the six island roundabouts. Traffic gives way on entry and goes round anticlockwise.</span></div>
+      <div><span class="k">Entrances</span><span class="v">Where an island road reaches a district, the district's street continues it as a crossroads: Lakeside Avenue into Meridian Way, the Coast Highway into Crestmoor Drive and Parkside Crescent, Sound Parkway into Anchor Street.</span></div>
+      <div><span class="k">Landmarks</span><span class="v">Landmark cells stand where they always stood. The new streets run past their entrances: Meridian Motors' drive, the Royale's door, the gas stations' forecourts.</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="perf">
+    <div class="col" style="display:grid; gap:10px">
+      <h2 id="perf">Performance, before and after</h2>
+      <p style="color:var(--muted)">Measured at 1280×720 on the High preset with software rendering. Draw calls and triangles are exact. Frame times under software rendering are noisy, so read them as "unchanged", not as a speed-up. JS heap: 169 MB before, 179 MB after. The city has 1,702 buildings, up from 1,063.</p>
+    </div>
+    <div class="tablebox"><table id="perfTable">
+      <thead><tr><th>District</th><th>View</th><th>Draw calls</th><th>→</th><th>Triangles (k)</th><th>→</th><th>Render ms</th><th>→</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="col note">Generation got slower first, then I fixed it. Partway through the gate the city took 40 s to build, double the old 20.7 s, because the district kit tested every candidate lot against every point of every street. Each lot now checks only the streets near it, using the same distance test. Boot is down to 22.0 s and the generated world is byte-for-byte identical.</p>
+  </section>
+
+  <section class="col" aria-labelledby="left">
+    <h2 id="left">Still on the grid, and why</h2>
+    <ul>
+      <li><b>The port's north end (10,0, 11,0, 11,1) and 11,4.</b> These sit beside the two paved yards. Rebuilding them would close a street the yards' rules need (see decision 2).</li>
+      <li><b>Harborview Mall and the cell south of it (6,8, 6,9).</b> The mall's car park opens onto the street between them.</li>
+      <li><b>The Velvet bonded store and the tow yard (6,10, 6,11).</b> The street between the two warehouse yards carries their back doors, and nothing narrower than it fits there.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const AREAS = [
+  ['oldquarter', 'Old Quarter', 'The whole precinct on winding streets: Saint Ivo Street, Market Street, Bell Lane and the old lanes, with Saint Ivo Square. The police station, the Quarter Garage and Fuel & Go Westside are kept.'],
+  ['linden', 'Linden Hills', 'Linden Parade and Kestrel Curve with four cul-de-sacs. Detached houses, semis and flats with drives and garages, and the Pocket Park.'],
+  ['core', 'Financial core', 'Central Blvd on its old line, Exchange Circus, Glass Mile and lanes between the towers, plus Exchange Square. Valen Tower, the Parkade, the Prestige showroom, the Glasshouse depot, the Impound, Fuel & Go Eastgate and St. Alda are kept.'],
+  ['uptown', 'Uptown', 'Meridian Way swings round Meridian Motors. Meridian Circus is where Sound Road comes in. Meridian Square. The dealer, works, warehouse and building site are kept.'],
+  ['heights', 'Crestmoor Heights', 'Crestmoor Drive from the Coast Highway, with Hillcrest Lane and three closes. Big houses on gated drives, and a gatehouse at the entrance.'],
+  ['greenway', 'Northgate, Potter’s Lane and Parkside', 'Northgate Road and its square, Potter’s Lane of big houses, and Parkside Crescent from the Coast Highway. The Vipers yard and Fuel & Go Northgate are kept.'],
+  ['port_north', 'Port strip, north', 'Kept landmarks, Saltworks Yard and the Saltmarsh curves. This part is largely as it was (see decision 2).'],
+  ['port_south', 'Port strip, south', 'Harbor Row, beside Pier Yard, and Anchor Street out to Sound Parkway. The chop shop, Okafor, the depot and the Tidewater shed are kept.'],
+  ['strip', 'Nightlife Strip', 'Neon Row and Starlite Way in the north. Cooper’s Lane and Lark Lane in the south, past the Southbank forecourt. The Royale and the overflow yard are kept.'],
+  ['stadium', 'Stadium and mall', 'The stadium district and Harborview Mall, unchanged apart from their neighbours.'],
+  ['freight', 'Freight park', 'Freight Way along the warehouses’ backs, with Bonded Lane, Gantry Road and Ironside Lane. The Cannery Row warehouse is kept.'],
+  ['city', 'The whole city', 'Every precinct where it stands on the island.']
+];
+const g = document.getElementById('gallery');
+for (const [id, name, text] of AREAS) {
+  const views = id === 'city' ? ['top'] : ['top', 'aerial'];
+  const el = document.createElement('article'); el.className = 'area';
+  el.innerHTML = `<div class="area-head"><div style="display:grid; gap:4px; min-width:0"><h3>${name}</h3><p>${text}</p></div>${views.length > 1 ? `<div class="seg" role="group" aria-label="View for ${name}">${views.map((v, i) => `<button type="button" id="v-${id}-${v}" aria-pressed="${i === 0}" data-v="${v}">${v === 'top' ? 'Top' : 'Aerial'}</button>`).join('')}</div>` : ''}</div>
+    <div class="pair"><figure><img loading="lazy" alt="${name} before, top view" data-side="before"><figcaption>Before</figcaption></figure><figure><img loading="lazy" alt="${name} after, top view" data-side="after"><figcaption>After</figcaption></figure></div>`;
+  const set = v => { for (const im of el.querySelectorAll('img')) { im.src = `img/${im.dataset.side}/${id}_${v}.jpg`; im.alt = `${name} ${im.dataset.side}, ${v} view`; } for (const b of el.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(b.dataset.v === v)); };
+  for (const b of el.querySelectorAll('.seg button')) b.addEventListener('click', () => set(b.dataset.v));
+  set('top'); g.appendChild(el);
+}
+const PERF = [["core","air",462,488,912,991,17,19],["core","street",301,289,826,617,12,13],["oldquarter","air",390,356,1027,956,10,9],["oldquarter","street",347,339,1019,981,12,10],["linden","air",350,360,912,881,8,11],["linden","street",201,287,585,726,8,6],["port","air",422,428,780,767,10,11],["port","street",267,304,695,753,13,7],["heights","air",292,215,880,788,10,8],["heights","street",286,274,882,709,7,8],["greenway","air",328,261,1108,940,7,6],["greenway","street",264,244,937,814,8,8],["uptown","air",260,274,1320,1225,10,5],["uptown","street",247,207,1123,973,9,5],["strip","air",292,250,621,586,11,7],["strip","street",244,287,817,681,6,7],["stadium","air",298,288,578,512,11,9],["stadium","street",249,250,686,630,8,6],["freight","air",234,246,529,589,7,5],["freight","street",445,182,515,549,8,8]];
+const NAMES = { core: 'Financial core', oldquarter: 'Old Quarter', linden: 'Linden Hills', port: 'Port strip', heights: 'Crestmoor Heights', greenway: 'Greenway', uptown: 'Uptown', strip: 'Nightlife Strip', stadium: 'Stadium', freight: 'Freight park' };
+const tb = document.querySelector('#perfTable tbody');
+const cell = (a, b) => `<td>${a.toLocaleString()}</td><td class="${b < a * 0.97 ? 'lower' : b > a * 1.03 ? 'higher' : ''}">${b.toLocaleString()}</td>`;
+for (const [p, v, c0, c1, t0, t1, m0, m1] of PERF) tb.insertAdjacentHTML('beforeend', `<tr><td>${NAMES[p] || p}</td><td>${v === 'air' ? 'Aerial' : 'Street'}</td>${cell(c0, c1)}${cell(t0, t1)}<td>${m0}</td><td>${m1}</td></tr>`);
+</script>
