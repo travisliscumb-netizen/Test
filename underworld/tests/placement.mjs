@@ -130,7 +130,9 @@ const r = await ev(() => {
 check('nothing solid stands on a street, an island road, the circuit, the pit lane or a runway', r.solid.n === 0, JSON.stringify(r.solid));
 check('the Southshore Raceway pit lane is clear from the garages to the pit wall', r.pit.track && r.pit.n === 0, JSON.stringify(r.pit));
 check('every stop sign stands off the road', r.stop.n >= 20 && r.stop.on === 0, JSON.stringify(r.stop));
-check('every traffic light stands off the road with its arm over it', r.tlight.n >= 200 && r.tlight.bad === 0, JSON.stringify(r.tlight));
+// (lights stand at the lattice's crossroads: the districts rebuilt on their own streets (124, CITY_REBUILD.md) meet them
+// with T-junctions, give-way mouths and roundabouts instead, so there are fewer of them than the full grid's 200-odd)
+check('every traffic light stands off the road with its arm over it', r.tlight.n >= 160 && r.tlight.bad === 0, JSON.stringify(r.tlight));
 check('every street lamp stands off the road and leans over it', r.lamp.n >= 1000 && r.lamp.bad === 0, JSON.stringify(r.lamp));
 check('every bench faces the street or walk it sits on, and its seat faces the same way', r.bench.n >= 150 && r.bench.back === 0 && r.bench.seatOff === 0, JSON.stringify(r.bench));
 check('no prop buried inside a building', r.buried.n === 0, JSON.stringify(r.buried));

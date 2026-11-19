@@ -3,11 +3,23 @@
 - **Owner brief 2026-11-19 (complete city redevelopment, world overhaul, interaction systems, HUD): Phase 1 in
   progress.** Phase 1 (rebuild every remaining square-grid district) comes first; Phases 2–10 wait for its gate and
   the owner's review. CITY_REBUILD.md is the plan, the record and the handoff; its §0 has the next action.
-  - Done: island roundabouts (6, traffic and GPS verified, ISLAND.md §10); the rebuild kit (124); the Old Quarter over
-    its whole precinct; Linden Hills; suite `rebuild`; before screenshots in `releases/p1-before/`.
+  - Done in Session A:
+    - island roundabouts (6, with traffic and GPS verified; ISLAND.md §10);
+    - the rebuild kit (124);
+    - the Old Quarter over its whole precinct, Linden Hills, and the financial core (Exchange Circus);
+    - suite `rebuild`;
+    - before screenshots in `releases/p1-before/`.
+  - Done in Session B:
+    - Uptown (Meridian Circus);
+    - Crestmoor Heights, Potter's Lane, Northgate and Parkside;
+    - the port's Harbor Row, the Nightlife Strip (north and south) and the freight park;
+    - kit fixes for offset precincts, street lighting, houses on edge streets and stunt jumps (CITY_REBUILD.md
+      §5.4–5.8).
   - Owner ruling: the financial core is redeveloped too (DECISIONS.md).
-  - Next: the financial core, then Uptown, Greenway/Heights, the port strip, the Strip/stadium cells, the freight
-    park; races re-laid; the Phase 1 gate.
+  - Next: the Phase 1 gate:
+    - full regression, save compatibility and perf;
+    - before/after screenshots and the report;
+    - then stop for the owner's visual review.
 
 - **Owner requests, 2026-11-16 (after the wider spread): DONE.**
   - Aircraft coming down: nose-down authority 31°, flaps only low or nose-up, an idle glide trim, a sink-rate flare;

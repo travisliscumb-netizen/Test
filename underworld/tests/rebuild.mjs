@@ -95,42 +95,58 @@ const T = await page.evaluate(async () => {
       for (const v of tr.cars.slice()) g.vehicles.despawn(v);
       // (the player off the carriageway: on the far pavement of the edge street, outside the district; no one on foot in
       // the streets, the network is what is tested)
-      const offS = e.axis === 0 ? (e.C.x < (sb.bx0 + sb.bx1 + 1) * 40 ? -9 : 9) : 0, offZ = e.axis === 1 ? (e.C.z < (sb.bz0 + sb.bz1 + 1) * 40 ? -9 : 9) : 0;
+      // (the district's middle where its precinct stands, 021: an end's crossing is in world metres)
+      const wcx = (sb.bx0 + sb.bx1 + 1) * 40 + (P.CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * 80, wcz = (sb.bz0 + sb.bz1 + 1) * 40 + (P.CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * 80;
+      const offS = e.axis === 0 ? (e.C.x < wcx ? -9 : 9) : 0, offZ = e.axis === 1 ? (e.C.z < wcz ? -9 : 9) : 0;
       g.resetPlayerState(e.C.x + offS, e.C.z + offZ, 0);
       for (const pd of g.peds.peds.slice()) if (!pd.keep) { pd.dead = true; }
       g.peds.peds = g.peds.peds.filter(pd => pd.keep);
       await new Promise(r => { const f0 = g.frame; const iv = setInterval(() => { if (g.frame > f0 + 5) { clearInterval(iv); r(); } }, 20); });
-      let v = null; for (let k = 0; k < 80 && !v; k++) { v = tr.trySpawn(); if (v && (v.patrol || v.ai.mode !== 'lane')) { g.vehicles.despawn(v); v = null; } }
+      // (a street's end can be a crossroads with a road going the other way out of the district, an island road, or have
+      // another street's mouth close by: a car that turns onto that one is not the test, and another is sent, up to eight)
+      let v = null, took = false, merged = false, maxOff = 0, wasIn = false, outT = 0, via = null; const other = [];
+      for (let attempt = 0; attempt < 8; attempt++) {
+        if (v && g.vehicles.list.includes(v)) g.vehicles.despawn(v);
+        v = null; for (let k = 0; k < 80 && !v; k++) { v = tr.trySpawn(); if (v && (v.patrol || v.ai.mode !== 'lane')) { g.vehicles.despawn(v); v = null; } }
+        if (!v) break;
+        // (coming up the edge street toward the end: one way, then the other; from 32 m out, then from 12 m, inside the
+        // stretch where traffic decides on a turn (280 maybeTakeLink), past any other street's mouth close by; at a
+        // crossroads a car takes one of the two roads, so it may take some tries to turn in toward the district)
+        const sg = attempt % 2 ? -1 : 1, dir = e.axis === 0 ? [0, sg] : [sg, 0], back = attempt % 4 < 2 ? 32 : 12;
+        const n0 = sg > 0 ? [e.axis === 0 ? e.line : e.seg, e.axis === 0 ? e.seg : e.line] : [e.axis === 0 ? e.line : e.seg + 1, e.axis === 0 ? e.seg + 1 : e.line];
+        Object.assign(v.ai, { i: n0[0], j: n0[1], dx: dir[0], dz: dir[1], s: Math.max(4, (sg > 0 ? e.along : 80 - e.along) - back), mode: 'lane', next: null, linkSeen: 0, speed: 8 });
+        const lp = tr.lanePt(v.ai.i, v.ai.j, dir[0], dir[1], v.ai.s); v.pos.x = lp[0]; v.pos.z = lp[1]; v.h = Math.atan2(dir[0], dir[1]);
+        tr.target = 1; tr.linkChance = 1;
+        took = false; merged = false; maxOff = 0; wasIn = false; outT = 0; via = null;
+        let wrong = null;
+        // (stepped, not waited for: up to 240 s of game time in 0.05 s steps, whatever the frame rate: a route through a big
+        // district can run round its roundabout and its avenues before it leaves)
+        try {
+          for (let k = 0; k < 4800 && v.ai && !merged; k++) {
+            g.update(0.05, 0.05);
+            if (!v.ai) break;
+            if (v.ai.mode === 'path') {
+              if (!took) { const first = w.links[v.ai.path.link]; if (first && first.name !== L.name) { wrong = first.name; break; } }
+              took = true; v.mission = v.mission || 'test';
+              // (inside the district: past its edge the car is out on the rest of the city's and the island's roads)
+              const ox2 = (P.CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * 80, oz2 = (P.CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * 80;
+              const inD = v.pos.x > sb.bx0 * 80 + ox2 && v.pos.x < (sb.bx1 + 1) * 80 + ox2 && v.pos.z > sb.bz0 * 80 + oz2 && v.pos.z < (sb.bz1 + 1) * 80 + oz2;
+              // (off the road surface: every road round it counts, a junction's and a cul-de-sac's turning circle too, 135)
+              if (inD && k % 4 === 0) maxOff = Math.max(maxOff, Math.min(30, P.RoadGraph.surfaceDist(v.pos.x, v.pos.z, { r: 30 })));
+              // out again: a street of the district that ends on an edge street running on into the island's roads keeps
+              // the car on its route past the edge; out of the district, on a road and driving, for two seconds, is out
+              if (inD) wasIn = true;
+              outT = wasIn && !inD && v.ai.speed > 2 && P.RoadGraph.surfaceDist(v.pos.x, v.pos.z, { r: 30 }) < 0.5 ? outT + 0.05 : 0;
+              if (outT >= 2) { merged = true; via = 'route'; }
+            } else if (took) { merged = true; via = 'lane'; }
+          }
+        } finally { tr.linkChance = 0.4; tr.target = 18; if (v.mission === 'test') v.mission = null; }
+        if (!wrong) break;
+        other.push(wrong);
+      }
       if (!v) { out.push({ sb: sb.id, name: L.name, err: 'spawn' }); continue; }
-      // (coming up the edge street toward the end, on the side it turns in from)
-      const dir = e.axis === 0 ? [0, 1] : [1, 0];
-      Object.assign(v.ai, { i: e.axis === 0 ? e.line : e.seg, j: e.axis === 0 ? e.seg : e.line, dx: dir[0], dz: dir[1], s: Math.max(4, e.along - 32), mode: 'lane', next: null, linkSeen: 0, speed: 8 });
-      const lp = tr.lanePt(v.ai.i, v.ai.j, dir[0], dir[1], v.ai.s); v.pos.x = lp[0]; v.pos.z = lp[1]; v.h = Math.atan2(dir[0], dir[1]);
-      tr.target = 1; tr.linkChance = 1;
-      let took = false, merged = false, maxOff = 0, wasIn = false, outT = 0, via = null;
-      // (stepped, not waited for: 150 s of game time in 0.05 s steps, whatever the frame rate)
-      try {
-        for (let k = 0; k < 3000 && v.ai && !merged; k++) {
-          g.update(0.05, 0.05);
-          if (!v.ai) break;
-          if (v.ai.mode === 'path') {
-            took = true; v.mission = v.mission || 'test';
-            // off its lane: the distance to the nearest street's centre line against that street's half width
-            // (inside the district: past its edge the car is out on the rest of the city's and the island's roads)
-            const ox2 = (P.CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * 80, oz2 = (P.CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * 80;
-            const inD = v.pos.x > sb.bx0 * 80 + ox2 && v.pos.x < (sb.bx1 + 1) * 80 + ox2 && v.pos.z > sb.bz0 * 80 + oz2 && v.pos.z < (sb.bz1 + 1) * 80 + oz2;
-            // (off the road surface: every road round it counts, a junction's and a cul-de-sac's turning circle too, 135)
-            if (inD && k % 4 === 0) maxOff = Math.max(maxOff, Math.min(30, P.RoadGraph.surfaceDist(v.pos.x, v.pos.z, { r: 30 })));
-            // out again: a street of the district that ends on an edge street running on into the island's roads keeps
-            // the car on its route past the edge; out of the district, on a road and driving, for two seconds, is out
-            if (inD) wasIn = true;
-            outT = wasIn && !inD && v.ai.speed > 2 && P.RoadGraph.surfaceDist(v.pos.x, v.pos.z, { r: 30 }) < 0.5 ? outT + 0.05 : 0;
-            if (outT >= 2) { merged = true; via = 'route'; }
-          } else if (took) { merged = true; via = 'lane'; }
-        }
-      } finally { tr.linkChance = 0.4; tr.target = 18; if (v.mission === 'test') v.mission = null; }
       const pa = v.ai && v.ai.path, gt = pa && pa.gates[0];
-      out.push({ sb: sb.id, name: L.name, took, merged, via, over: +maxOff.toFixed(2), ...(merged ? {} : { at: v.ai ? [Math.round(v.pos.x), Math.round(v.pos.z)] : null, mode: v.ai && v.ai.mode, sp: v.ai && +v.ai.speed.toFixed(1), left: pa && Math.round(pa.len - pa.d), gate: gt ? { d: +(gt.d - pa.d).toFixed(1), rb: !!gt.rb, blocked: tr.gateBlocked(v, gt) } : null, near: g.vehicles.list.filter(o => o !== v && Math.hypot(o.pos.x - v.pos.x, o.pos.z - v.pos.z) < 14).map(o => [o.type, Math.round(o.pos.x - v.pos.x), Math.round(o.pos.z - v.pos.z), !!o.parked, o.ai ? o.ai.mode : null]), player: [Math.round(g.player.pos.x - v.pos.x), Math.round(g.player.pos.z - v.pos.z)] }) });
+      out.push({ sb: sb.id, name: L.name, took, merged, via, over: +maxOff.toFixed(2), ...(other.length ? { other } : {}), ...(merged ? {} : { at: v.ai ? [Math.round(v.pos.x), Math.round(v.pos.z)] : null, mode: v.ai && v.ai.mode, sp: v.ai && +v.ai.speed.toFixed(1), left: pa && Math.round(pa.len - pa.d), gate: gt ? { d: +(gt.d - pa.d).toFixed(1), rb: !!gt.rb, blocked: tr.gateBlocked(v, gt) } : null, near: g.vehicles.list.filter(o => o !== v && Math.hypot(o.pos.x - v.pos.x, o.pos.z - v.pos.z) < 14).map(o => [o.type, Math.round(o.pos.x - v.pos.x), Math.round(o.pos.z - v.pos.z), !!o.parked, o.ai ? o.ai.mode : null]), player: [Math.round(g.player.pos.x - v.pos.x), Math.round(g.player.pos.z - v.pos.z)] }) });
     }
   }
   return out;

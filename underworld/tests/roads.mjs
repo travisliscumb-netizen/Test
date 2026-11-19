@@ -73,14 +73,18 @@ const trafficOn = await ev(async () => {
         // (against every road traffic drives off the grid, and the turning circles it U-turns round: a car's path can run
         // on from one onto the next before it rejoins the grid)
         let best = 1e9; for (const Rg of window.__pv.Island.roads) if (Rg.ring) best = Math.min(best, Math.abs(Math.hypot(v.pos.x - Rg.ring.x, v.pos.z - Rg.ring.z) - Rg.ring.r));
-        for (const LK of window.__pv.RoadGraph.edges) { if (LK.kind === 'grid') continue; const P2 = LK.pts; for (let k = 0; k < P2.length - 1; k++) { const a = P2[k], c = P2[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); best = Math.min(best, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); } }
-        T.maxOff = Math.max(T.maxOff, best); T.mid++;
+        // (and the city's cul-de-sacs: a spur's turning circle, 135)
+        for (const n of window.__pv.RoadGraph.nodes) if (n.ring) best = Math.min(best, Math.abs(Math.hypot(v.pos.x - n.ring.x, v.pos.z - n.ring.z) - n.ring.r));
+        let gridBest = 1e9; for (const LK of window.__pv.RoadGraph.edges) { if (LK.kind === 'grid') { for (let k = 0; k < LK.pts.length - 1; k++) { const a = LK.pts[k], c = LK.pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); gridBest = Math.min(gridBest, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); } continue; } const P2 = LK.pts; for (let k = 0; k < P2.length - 1; k++) { const a = P2[k], c = P2[k + 1], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((v.pos.x - a[0]) * dx + (v.pos.z - a[1]) * dz) / l2)); best = Math.min(best, Math.hypot(v.pos.x - a[0] - dx * t, v.pos.z - a[1] - dz * t)); } }
+        // (a car's route can run on along a lattice street between curves: it is judged on the curves, not there)
+        if (gridBest < best) continue;
+        if (best > T.maxOff) { T.maxOff = best; T.at = [Math.round(v.pos.x), Math.round(v.pos.z)]; } T.mid++;
       } else if (v.ai.mode !== 'path') T.merged = true;
     }
     if (g.time - t0 > 70 || track.every(T => T.merged)) { clearInterval(iv); res(); } }, 80); });
   }
   const track = all;
-  out.n = track.length; out.cars = track.map(T => ({ off: +T.maxOff.toFixed(2), mid: T.mid, merged: T.merged, w: T.link.w, ...(T.merged ? {} : { alive: g.vehicles.list.includes(T.v), d: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.d), len: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.len), v: T.v.ai && +T.v.ai.speed.toFixed(1), blockT: T.v.ai && T.v.ai.blockT }) }));
+  out.n = track.length; out.cars = track.map(T => ({ name: T.link.name, at: T.at, off: +T.maxOff.toFixed(2), mid: T.mid, merged: T.merged, w: T.link.w, ...(T.merged ? {} : { alive: g.vehicles.list.includes(T.v), d: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.d), len: T.v.ai && T.v.ai.path && Math.round(T.v.ai.path.len), v: T.v.ai && +T.v.ai.speed.toFixed(1), blockT: T.v.ai && T.v.ai.blockT }) }));
   return out;
 });
 check('cars spawn on the curved roads', trafficOn.n >= 2, String(trafficOn.n));
@@ -89,7 +93,7 @@ check('they drive the curve inside their lane (centre to car under half the road
 check('and merge back onto the lattice at the far end (or are cleared away by the traffic as they leave its range)', trafficOn.cars.every(c => c.merged || c.alive === false), JSON.stringify(trafficOn.cars));
 // a lattice car reaching the junction turns off onto the drive
 const turnOff = await ev(async () => {
-  const g = window.game, w = g.world, tr = g.traffic, L = w.links[0], e = L.ends[0];
+  const g = window.game, w = g.world, tr = g.traffic, L = w.links.find(L2 => L2.name === 'Greenway Park Drive'), e = L.ends[0];
   for (const v of tr.cars.slice()) g.vehicles.despawn(v);
   // a car on the west perimeter road heading south (+z) towards the drive's junction
   g.resetPlayerState(e.C.x + 40, e.C.z, 0); g.traffic.enabled = true;
@@ -174,7 +178,7 @@ const map = await ev(async () => {
   await new Promise(r => setTimeout(r, 300));
   const c = P.ZONE_CENTRE.c, dEn = mv.districtEntry(c.x, c.z);
   out.district = { name: dEn.name, prices: /Street prices now/.test(dEn.extra), police: /Police presence/.test(dEn.extra), turf: /Turf/.test(dEn.extra), prop: /Property/.test(dEn.extra) };
-  const L = g.world.links[0], q = L.pts[30], rEn = mv.roadEntry(q[0] + 2, q[1], 6);
+  const L = g.world.links.find(L2 => L2.name === 'Greenway Park Drive'), q = L.pts[30], rEn = mv.roadEntry(q[0] + 2, q[1], 6);
   out.road = rEn && rEn.name;
   // tap on open ground (no card open) shows the district card; a second tap closes it
   mv.hideCard(); g.uw.mapOverlay = false;

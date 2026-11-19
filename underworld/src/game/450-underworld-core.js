@@ -323,7 +323,8 @@ class Underworld {
       const pool = ok.length ? ok : free.length ? free : blocks;
       const hb = pool[Math.floor(rng() * pool.length)];
       // sidewalkSpot sides are 0 N, 1 E, 2 S, 3 W; only sides that face a road that exists
-      const sides = (bx, bz) => { const o = [0, 1, 2, 3].filter(sd => RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][sd])); return o.length ? o : [0]; };
+      // (the road net is by site, where the block's precinct stands, 021)
+      const sides = (bx, bz) => { const o = [0, 1, 2, 3].filter(sd => RoadNet.sideOpen(CityLayout.siteI(bx, bz), CityLayout.siteJ(bx, bz), [0, 3, 1, 2][sd])); return o.length ? o : [0]; };
       const hs = sides(hb[0], hb[1]);
       const hang = sidewalkSpot(hb[0], hb[1], hs[Math.floor(rng() * hs.length)], 18 + rng() * 44);
       const db = pool[Math.floor(rng() * pool.length)], ds = sides(db[0], db[1]);

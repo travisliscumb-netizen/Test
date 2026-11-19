@@ -33028,6 +33028,19 @@ const SUPERBLOCKS = [
   { id: 'core', bx0: 4, bz0: 4, bx1: 9, bz1: 7, gen: '_genRebuilt', rb: 'core', peds: true, ground: 'C', land: 'D' },
   // Linden Hills rebuilt on its own streets (124c; owner, 2026-11-19)
   { id: 'linden', bx0: 0, bz0: 8, bx1: 3, bz1: 10, gen: '_genRebuilt', rb: 'linden', peds: true, ground: 'H', land: 'R' },
+  // Uptown rebuilt on its own streets (124e; owner, 2026-11-19)
+  { id: 'uptown', bx0: 6, bz0: 0, bx1: 9, bz1: 3, gen: '_genRebuilt', rb: 'uptown', peds: true, ground: 'C', land: 'C' },
+  // Crestmoor Heights, Potter's Lane, Northgate and Parkside rebuilt on their own streets (124f, 124g; owner, 2026-11-19)
+  { id: 'crestmoor', bx0: 0, bz0: 1, bx1: 1, bz1: 3, gen: '_genRebuilt', rb: 'crestmoor', peds: true, ground: 'W', land: 'W' },
+  { id: 'potters', bx0: 2, bz0: 0, bx1: 2, bz1: 1, gen: '_genRebuilt', rb: 'potters', peds: true, ground: 'W', land: 'W' },
+  { id: 'northgate', bx0: 3, bz0: 0, bx1: 5, bz1: 1, gen: '_genRebuilt', rb: 'northgate', peds: true, ground: 'H', land: 'R' },
+  { id: 'parkside', bx0: 5, bz0: 2, bx1: 5, bz1: 3, gen: '_genRebuilt', rb: 'parkside', peds: true, ground: 'C', land: 'C' },
+  // the port strip's Harbor Row, beside Pier Yard (124h; owner, 2026-11-19)
+  { id: 'harborrow', bx0: 11, bz0: 5, bx1: 11, bz1: 7, gen: '_genRebuilt', rb: 'harborrow', peds: true, ground: 'I', land: 'I' },
+  // the Nightlife Strip round its landmarks, and the freight park (124i, 124j; owner, 2026-11-19)
+  { id: 'stripn', bx0: 4, bz0: 8, bx1: 5, bz1: 9, gen: '_genRebuilt', rb: 'stripn', peds: true, ground: 'C', land: 'P' },
+  { id: 'southbank', bx0: 4, bz0: 10, bx1: 5, bz1: 11, gen: '_genRebuilt', rb: 'southbank', peds: true, ground: 'C', land: 'P' },
+  { id: 'freight', bx0: 7, bz0: 10, bx1: 9, bz1: 11, gen: '_genRebuilt', rb: 'freight', peds: true, ground: 'I', land: 'I' },
   { id: 'stadium', bx0: 7, bz0: 8, bx1: 9, bz1: 9, gen: '_genStadiumDistrict', peds: false, ground: 'Z', land: 'A' },
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }
@@ -37433,10 +37446,14 @@ class World {
       if (!pt) return null;
       return { bx: clamp(Math.floor(pt[0] / P), 0, N - 1), bz: clamp(Math.floor(pt[1] / P), 0, N - 1) };
     };
-    const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
+    // (where each entry stands is read before anything moves: two entries can share a point list, a road and the pavement
+    // under it, and the second must not be placed by a point the first has already moved)
+    const moves = [];
+    for (const list of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'lampPools', 'secrets', 'packageSpots', 'surfaces', 'doors'].map(L => this[L]).filter(Array.isArray).concat([Object.values(this.compounds || {})])) {
+      for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) moves.push([o, p]); }
+    }
     for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
-    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'doors']) if (Array.isArray(this[L])) moveList(this[L]);
-    moveList(Object.values(this.compounds || {}));
+    for (const [o, p] of moves) shift(o, p.ox * P, p.oz * P, '');
   }
   // ----- helpers -----
   _bld(b, x0, z0, x1, z1, h, style, color, fh, bayN, opts = {}) {
@@ -38868,8 +38885,17 @@ Object.assign(World.prototype, {
       const rng = new RNG(b.i * 31 + 7);
       if (b.landmark) continue;
       if (b.t === 'K' && rng.chance(0.8)) this._kicker(b, b.cx + rng.range(-10, 10), b.cz - 11.8, 'x', rng.chance(0.5) ? 1 : -1, 7, 1.4, true);
-      if (b.t === 'X') this._ramp(b, b.cx - 6, b.z1 - 16, b.cx + 4, b.z1 - 11, 'x', 1, CURB_H, 2.6, { unique: true, id: 'dirt' + b.i, color: 0x6b5b45 });
-      if (b.t === 'I' && rng.chance(0.3)) this._kicker(b, b.cx + 18, b.cz + 22, 'z', -1, 8, 1.6, true);
+      if (b.t === 'X') {
+        // (a rebuilt cell, 124, chose the ramp's spot before it built: the same jump, its id, wherever it stands)
+        const D2 = b.superblock && b.superblock.rb && !b.kept ? b.dirtSpot : { x: b.cx - 1, z: b.z1 - 13.5, axis: 'x' };
+        if (D2) this._ramp(b, D2.x - (D2.axis === 'x' ? 5 : 2.5), D2.z - (D2.axis === 'x' ? 2.5 : 5), D2.x + (D2.axis === 'x' ? 5 : 2.5), D2.z + (D2.axis === 'x' ? 2.5 : 5), D2.axis, 1, CURB_H, 2.6, { unique: true, id: 'dirt' + b.i, color: 0x6b5b45 });
+      }
+      if (b.t === 'I' && rng.chance(0.3)) {
+        // (a cell rebuilt on its district's own streets, 124, chose the jump's spot before it built, its ramp off every
+        // street and its run-up and landing kept clear: the same jump, its id, wherever it stands)
+        const id = 'jump' + b.i + '_' + Math.round(b.cz + 22), at = b.superblock && b.superblock.rb && !b.kept ? (b.jumpSpot ? [b.jumpSpot.x, b.jumpSpot.z] : null) : [b.cx + 18, b.cz + 22];
+        if (at) this._ramp(b, at[0] - 2.4, at[1] - 4, at[0] + 2.4, at[1] + 4, 'z', -1, 0.15, 1.6, { unique: true, id, color: 0x6c6f74 });
+      }
     }
     // every stunt jump at ground level gets a clear run-up and landing (rooftop leaps are laid out by hand)
     // rooftop leaps keep their decks as built and only get the street below their flight path cleared
@@ -41305,7 +41331,9 @@ function rebuiltSpot(bx, bz, side, x, z, o, along) {
   const sb = superblockAt(bx, bz); if (!sb || !sb.rb || !REBUILDS[sb.rb]) return null;
   // (an address the definition moves is moved even from an edge street that still runs: its corner is a junction now)
   const fix = (REBUILDS[sb.rb].addr || {})[bx + ',' + bz + ',' + side + ',' + along];
-  if (!fix && RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
+  // (the road net is by site, where the precinct stands, 021: the same answer while the city is built in the lattice and
+  // once it stands on the island)
+  if (!fix && RoadNet.sideOpen(CityLayout.siteI(bx, bz), CityLayout.siteJ(bx, bz), [0, 3, 1, 2][side])) return null;
   if (fix) { x = fix[0]; z = fix[1]; }
   let best = null;
   for (const L of rebuildLines(sb.rb)) for (let k = 0; k < L.pts.length - 1; k++) {
@@ -41361,15 +41389,19 @@ Object.assign(World.prototype, {
     const b = a, lines = rebuildLines(sb.rb), roads = [];
     // the streets: pavements both sides, the frontage's depth (concrete under the asphalt: what the shader and the maps
     // draw), then the carriageways (kerbside parking where the definition says)
-    for (const L of lines) { this._road(L.pts, L.w + 5.4, 'concrete'); if (L.ring) this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2 + 2.7, 'concrete'); }
-    // (where the district's precinct stands: a roundabout's ring is known to the traffic in world metres)
+    // (the world gets its own copies of the lines' points and rings: the bake moves what the world holds to where the
+    // precinct stands, 090, and the lines stay in lattice metres for rebuiltSpot)
+    const own = pts => pts.map(q => [q[0], q[1]]);
+    for (const L of lines) { this._road(own(L.pts), L.w + 5.4, 'concrete'); if (L.ring) this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2 + 2.7, 'concrete'); }
     const wox = (CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * P, woz = (CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * P;
     for (const L of lines) {
-      const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; r.high = L.high; r.res = L.res; roads.push(r);
-      // a roundabout's ring (023's machinery: one way round, give way on entry, 135 and 280)
-      if (L.closed) { r.closed = true; r.oneway = true; r.ringOf = L.rb; r.roundabout = { ...L.rb, x: L.rb.x + wox, z: L.rb.z + woz, y: CURB_H }; { const i0 = CITY_RINGS.findIndex(q => q.id === L.rb.id); if (i0 >= 0) CITY_RINGS.splice(i0, 1); } CITY_RINGS.push(r.roundabout); this._rbCentre(b, L.rb, roads, lines); }
+      const r = this._road(own(L.pts), L.w, 'asphalt', { link: L.name }); r.park = L.park; r.high = L.high; r.res = L.res; roads.push(r);
+      // a roundabout's ring (023's machinery: one way round, give way on entry, 135 and 280): built in the lattice, its
+      // centre moves with the road when the city is baked to where its precinct stands; the traffic reads the same
+      // object in CITY_RINGS, in world metres once the world stands
+      if (L.closed) { r.closed = true; r.oneway = true; r.ringOf = { ...L.rb }; r.roundabout = { ...L.rb, y: CURB_H }; { const i0 = CITY_RINGS.findIndex(q => q.id === L.rb.id); if (i0 >= 0) CITY_RINGS.splice(i0, 1); } CITY_RINGS.push(r.roundabout); this._rbCentre(b, L.rb, roads, lines); }
       // (a cul-de-sac is a spur: its far end is free, traffic turns round its circle, 020 Links, 135)
-      if (L.ring) { r.spur = true; r.ring = L.ring; this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2, 'asphalt'); }
+      if (L.ring) { r.spur = true; r.ring = { ...L.ring }; this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2, 'asphalt'); }
     }
     const circles = lines.filter(L => L.ring).map(L => ({ x: L.ring.x, z: L.ring.z, r: L.ring.r + L.w / 2 })).concat(lines.filter(L => L.closed).map(L => ({ x: L.rb.x, z: L.rb.z, r: L.rb.r + L.w / 2 + 2.7 })));
     // the landmarks it keeps, where they always stood (a landmark as it always was: the kicker pass leaves it alone, and
@@ -41409,6 +41441,40 @@ Object.assign(World.prototype, {
       && clearRoads(x0, z0, x1, z1, 2.6)
       && !placed.some(q => x0 < q.x1 + gap && x1 > q.x0 - gap && z0 < q.z1 + gap && z1 > q.z0 - gap)
       && !doorways.some(q => q !== ownDoor && x0 < q[2] && x1 > q[0] && z0 < q[3] && z1 > q[1]);
+    // the kicker jumps the city sets in its industrial cells after it is built (100 _postGen: the same seeded draw): in a
+    // rebuilt cell its spot is chosen now, off every street, and its ramp, run-up and landing are kept clear like a
+    // stunt lane, so the jump (the same one, its id) has room wherever the district's streets now run
+    for (const m of sb.members) {
+      if (m.t !== 'I' || m.landmark || m.kept || !new RNG(m.i * 31 + 7).chance(0.3)) continue;
+      let best = null, bd = Infinity;
+      for (let x = m.x0 + 6; x <= m.x1 - 6; x += 2) for (let z = m.z0 + 20; z <= m.z1 - 4; z += 2) {
+        const ramp = [x - 2.4, z - 4, x + 2.4, z + 4], lane = [x - 3.4, z - 4 - 16, x + 3.4, z + 4 + 20];
+        if (!clearRoads(...ramp, 2) || inKept(...lane) || inSquare(...lane, 1) || lanes.some(L => lane[0] < L[2] && lane[2] > L[0] && lane[1] < L[3] && lane[3] > L[1])) continue;
+        const d = Math.hypot(x - (m.x0 + m.x1) / 2, z - (m.z0 + m.z1) / 2); if (d < bd) { bd = d; best = { x, z, lane }; }
+      }
+      if (!best) continue;
+      m.jumpSpot = { x: best.x, z: best.z };
+      lanes.push(best.lane);
+    }
+    // the building site's dirt jump (100 _postGen: the city's `X` cells): in a rebuilt cell its spot is chosen now too,
+    // the ramp off every street, its 30 m run-up and 24 m landing kept clear (along x as it always ran, else along z)
+    for (const m of sb.members) {
+      if (m.t !== 'X' || m.landmark || m.kept) continue;
+      const want = [(m.x0 + m.x1) / 2 - 1, m.z1 - 13.5];
+      let best = null, bd = Infinity;
+      for (const axis of ['x', 'z']) {
+        for (let x = m.x0 + 5; x <= m.x1 - 5; x += 2) for (let z = m.z0 + 5; z <= m.z1 - 5; z += 2) {
+          const ramp = axis === 'x' ? [x - 5, z - 2.5, x + 5, z + 2.5] : [x - 2.5, z - 5, x + 2.5, z + 5];
+          const lane = axis === 'x' ? [x - 35, z - 3.6, x + 29, z + 3.6] : [x - 3.6, z - 35, x + 3.6, z + 29];
+          if (!clearRoads(...ramp, 1.5) || inKept(...lane) || inSquare(...lane, 1) || lanes.some(L => lane[0] < L[2] && lane[2] > L[0] && lane[1] < L[3] && lane[3] > L[1])) continue;
+          const d = Math.hypot(x - want[0], z - want[1]); if (d < bd) { bd = d; best = { x, z, axis, lane }; }
+        }
+        if (best) break;
+      }
+      if (!best) continue;
+      m.dirtSpot = { x: best.x, z: best.z, axis: best.axis };
+      lanes.push(best.lane);
+    }
     const styles = D.styles || [STYLE.BRICK, STYLE.BRICK, STYLE.BRICK, STYLE.SHOP, STYLE.HOUSE, STYLE.APT];
     const pal = { [STYLE.BRICK]: PAL.brick, [STYLE.SHOP]: PAL.shop, [STYLE.HOUSE]: PAL.house, [STYLE.APT]: PAL.apt, [STYLE.DECO]: PAL.deco, [STYLE.OFFICE]: PAL.office, [STYLE.GLASS]: PAL.glass || PAL.deco, [STYLE.TOWER]: PAL.glass || PAL.deco, [STYLE.IND]: PAL.ind || PAL.brick, [STYLE.WARE]: PAL.ind || PAL.brick };
     const [hLo, hHi] = D.heights || [7.5, 15.5];
@@ -41461,6 +41527,18 @@ Object.assign(World.prototype, {
     // the homes a district must have (the property ladder buys them by type, garage and district, 500): placed first
     // where the zone is right, each counted only when its garage was really built
     const req = (D.require || []).map(r => ({ ...r, left: r.n }));
+    // a house's drive: straight out of the front, to the street ahead within 22 m. The district's own streets are local
+    // roads (the drive finds them itself, 'auto', 120); an edge street is the lattice's (RoadNet): the drive is paved to
+    // its carriageway, as long as it is from the front. null: no street ahead (a spur across the neighbours' lots would
+    // be needed, so no house)
+    const driveAhead = (x, z, fv) => {
+      for (let t = 0; t <= 22; t += 0.5) {
+        const qx = x + fv[0] * t, qz = z + fv[1] * t;
+        if (this._roadDist(qx, qz) < 0.15) return 'auto';
+        if (RoadNet.roadAt(qx, qz)) return t;
+      }
+      return null;
+    };
     const houseLine = (pts, set, side) => {
       const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
       const L = cum[cum.length - 1];
@@ -41481,12 +41559,11 @@ Object.assign(World.prototype, {
         if (!free(...q)) continue;
         // (its drive must meet the street straight out of the garage side of the front, as a real drive does: where the
         // street is not ahead within 22 m the house would need a spur across its neighbours' lots, so none is built)
-        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2;
-        let reach = false; for (let t = 0; t <= 22 && !reach; t += 0.5) if (this._roadDist(fx0 + fv[0] * t, fz0 + fv[1] * t) < 0.15) reach = true;
-        if (!reach) continue;
+        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2, drive = driveAhead(fx0, fz0, fv);
+        if (drive === null) continue;
         let home;
-        if (kind === 'semi') for (const s2 of [-1, 1]) home = this._house(cellAt(cx, cz), rng, { x: ns ? cx + s2 * 3.6 : cx, z: ns ? cz : cz + s2 * 3.6, face, type: 'semi', w: 7.2, d: 9, garage: 'street', drive: 'auto', doorOff: s2 * 1.6, bounds: sb });
-        else home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive: 'auto', gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
+        if (kind === 'semi') for (const s2 of [-1, 1]) home = this._house(cellAt(cx, cz), rng, { x: ns ? cx + s2 * 3.6 : cx, z: ns ? cz : cz + s2 * 3.6, face, type: 'semi', w: 7.2, d: 9, garage: 'street', drive, doorOff: s2 * 1.6, bounds: sb });
+        else home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive, gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
         placed.push({ x0: q[0], z0: q[1], x1: q[2], z1: q[3], house: home });
         if (R0 && home && home.type === R0.spec.type && (home.garage || 'street') === R0.spec.garage) R0.left--;
         d += (ns ? q[2] - q[0] : q[3] - q[1]) * 0.6;
@@ -41502,10 +41579,9 @@ Object.assign(World.prototype, {
         const off = R0.r + L.w / 2 + 2.6 + 3.5 + H.d / 2, cx = R0.x + nx * off, cz = R0.z + nz * off, half = H.w / 2 + gw;
         const q = ns ? [cx - half, cz - H.d / 2 - 1, cx + half, cz + H.d / 2 + 1] : [cx - H.d / 2 - 1, cz - half, cx + H.d / 2 + 1, cz + half];
         if (!free(...q)) continue;
-        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2;
-        let reach = false; for (let t = 0; t <= 22 && !reach; t += 0.5) if (this._roadDist(fx0 + fv[0] * t, fz0 + fv[1] * t) < 0.15) reach = true;
-        if (!reach) continue;
-        const home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive: 'auto', gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
+        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2, drive = driveAhead(fx0, fz0, fv);
+        if (drive === null) continue;
+        const home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive, gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
         placed.push({ x0: q[0], z0: q[1], x1: q[2], z1: q[3], house: home });
       }
     };
@@ -41578,22 +41654,44 @@ Object.assign(World.prototype, {
       if (rng.chance(0.08) && open(jx, jz, 4.5)) { const r = this._bld(b, jx - 1.8, jz - 1.5, jx + 1.8, jz + 1.5, 2.6, STYLE.HOUSE, rng.pick(PAL.house), 2.6, 3, { exactH: true }); placed.push(r); continue; }
       if (rng.chance(0.55)) this._prop(b, rng.chance(0.6) ? 'tree' : 'bush', jx, jz, rng.range(0, 6), rng.range(0.8, 1.2));
     }
-    // ---- lamps along the streets (alternate sides on the pavement), cars at the kerbs
-    for (const r of roads) {
-      if (r.closed) continue;
-      const pts = r.pts; let acc = 0, side = 1;
+    // ---- the streets' own furniture: the city's street lamps on both pavements, staggered about as close as the
+    // lattice's (three a side every 80 m), each leaning over the carriageway with a pool of light under its head at
+    // night (178: the ground shader only lights the lattice's); benches and news boxes at the back of the high streets'
+    // pavements (and the other shopping streets', where the district has them), facing the street; cars at the kerbs
+    const LSTEP = 26, lamps = [];
+    const onPave = (x, z, m) => x >= sb.x0 && x <= sb.x1 && z >= sb.z0 && z <= sb.z1 && this._roadDist(x, z) >= 0.5 && !onDrive(x, z, 1.2)
+      && !inKept(x - m, z - m, x + m, z + m) && !inSquare(x - m, z - m, x + m, z + m, 0.5)
+      && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m)
+      && !doorways.some(q => x > q[0] - m && x < q[2] + m && z > q[1] - m && z < q[3] + m);
+    const along = (r, step, phase, fn) => {
+      const pts = r.pts; let acc = 0;
       for (let k = 0; k < pts.length - 1; k++) {
         const p = pts[k], c = pts[k + 1], l = Math.hypot(c[0] - p[0], c[1] - p[1]); if (l < 0.01) continue;
         const tx = (c[0] - p[0]) / l, tz = (c[1] - p[1]) / l;
-        for (let s = (22 - acc % 22 + 22) % 22; s < l; s += 22) {
-          const x = p[0] + tx * s - tz * side * (r.w / 2 + 1.1), z = p[1] + tz * s + tx * side * (r.w / 2 + 1.1); side = -side;
-          if (x < sb.x0 || x > sb.x1 || z < sb.z0 || z > sb.z1 || this._roadDist(x, z) < 0.5 || onDrive(x, z, 1.2) || placed.some(q => x > q.x0 - 0.5 && x < q.x1 + 0.5 && z > q.z0 - 0.5 && z < q.z1 + 0.5)) continue;
-          this._prop(b, 'parklamp', x, z, 0);
-        }
+        for (const side of [1, -1]) for (let s = ((phase + (side > 0 ? 0 : step / 2) - acc) % step + step) % step; s < l; s += step) fn(p[0] + tx * s, p[1] + tz * s, -tz * side, tx * side);
         acc += l;
       }
-      this._kerbCars(b, rng, r, roads);
+    };
+    for (const r of roads) {
+      if (r.closed) continue;
+      along(r, LSTEP, 8, (cx, cz, nx, nz) => {
+        const x = cx + nx * (r.w / 2 + 1.1), z = cz + nz * (r.w / 2 + 1.1);
+        if (!onPave(x, z, 0.5) || lamps.some(q => Math.hypot(q[0] - x, q[1] - z) < LSTEP * 0.45)) return;
+        lamps.push([x, z]);
+        // (the lamp's arm, local +z, toward the street; its head 1.5 m out, over the kerb lane)
+        this._prop(b, 'lamp', x, z, Math.atan2(-nx, -nz));
+        (this.lampPools = this.lampPools || []).push({ x: x - nx * 1.5, z: z - nz * 1.5 });
+      });
+      const SW = D.sidewalks || {};
+      if (r.res || !(r.high || SW.benches)) continue;
+      along(r, r.high ? 40 : 72, 20, (cx, cz, nx, nz) => {
+        const x = cx + nx * (r.w / 2 + 2.0), z = cz + nz * (r.w / 2 + 2.0), ry = Math.atan2(-nx, -nz);
+        if (!onPave(x, z, 1.2) || lamps.some(q => Math.hypot(q[0] - x, q[1] - z) < 2.5)) return;
+        if (rng.chance(SW.news ? 0.25 : 0)) { this._prop(b, 'newsbox', x, z, ry); return; }
+        this._prop(b, 'bench', x, z, ry); b.seats.push({ x, z, ry });
+      });
     }
+    for (const r of roads) if (!r.closed) this._kerbCars(b, rng, r, roads);
     // each cell's street pattern now (what the suburb generator tags its blocks with, 120): a cul-de-sac round its
     // circle, low-rise flats, a curving residential street, a plain one, or a terrace street
     for (const m of sb.members) {
@@ -41761,6 +41859,247 @@ REBUILDS.core = {
   secondAt: 26,
   sidewalks: { trees: 0.5, benches: true, news: true, park: 0.1 },
   secrets: [[340, 340], [780, 620]]
+};
+/* =====================================================================
+   [CONTENT] UPTOWN, REBUILT (owner, 2026-11-19: the original city redeveloped; CITY_REBUILD.md §5.4)
+   Sixteen lattice cells (6..9, 0..3; the precinct stands out on the island at its own offset, 021) are one
+   superblock. Three island roads reach it: Lakeside Avenue from the north, Sound Road from the west and Sound Parkway
+   from the south. Its streets carry them in:
+   - Meridian Way, the avenue from Lakeside Avenue down to Sound Parkway, swinging round Meridian Motors (its showroom
+     drive and its delivery bay open onto it, as they did onto the lattice streets);
+   - Meridian Circus, the roundabout where Sound Road comes in (Sound Street) and Bellcourt Street leaves for the east;
+   - Halden Street down the east side, Copper Lane and Wren Street on the west, Plover Lane on to the south edge;
+   - Meridian Square, a plaza south of the circus.
+   Kept where they stood, as the city builds them: Meridian Motors (7,1), the Industrial Belt works (9,0), the
+   Bellcourt warehouse (9,1) and the building site with its dirt jump (9,2), along the east edge street.
+   ===================================================================== */
+REBUILDS.uptown = {
+  name: 'Uptown',
+  streets: [
+    /* 0 */ { name: 'Meridian Circus', id: 'meridian', ring: 13, at: [642, 212], w: 9 },
+    /* 1 */ { name: 'Meridian Way', w: 11, high: true, ctrl: [[600, 5.6], [598, 26], [586, 48], [568, 68], [557, 92], [555, 120], [558, 144], [570, 158], [600, 162], [622, 166], [636, 180]], join: 0, joinNear: [642, 199] },
+    /* 2 */ { name: 'Meridian Way', w: 11, high: true, fork: 0, near: [642, 225], ctrl: [[642, 244], [634, 270], [616, 294], [600, 314.4]] },
+    /* 3 */ { name: 'Sound Street', w: 10, high: true, fork: 0, near: [629, 212], ctrl: [[610, 210], [580, 206], [548, 201], [516, 199], [485.6, 200]] },
+    /* 4 */ { name: 'Bellcourt Street', w: 9, fork: 0, near: [655, 212], ctrl: [[672, 216], [700, 226], [728, 246], [756, 266], [794.4, 282]] },
+    /* 5 */ { name: 'Halden Street', w: 8, ctrl: [[680, 5.6], [684, 40], [690, 80], [694, 120], [698, 160], [700, 200]], join: 4, joinNear: [700, 226] },
+    /* 6 */ { name: 'Copper Lane', w: 8, ctrl: [[520, 5.6], [516, 36], [507, 70], [510, 110], [518, 150], [528, 180]], join: 3, joinNear: [530, 200] },
+    /* 7 */ { name: 'Wren Street', w: 8, fork: 3, near: [548, 201], ctrl: [[546, 230], [537, 260], [529, 290], [526, 314.4]] },
+    /* 8 */ { name: 'Plover Lane', w: 7, fork: 4, near: [756, 266], ctrl: [[751, 290], [746, 314.4]] }
+  ],
+  // Velvet Hair Studio: its north-side door is at the mouth of Meridian Way, where no building can stand behind it; it
+  // moves a little down the avenue, in its own cell
+  addr: { '7,0,0,32': [608, 40] },
+  // the landmarks, as the city builds them, along the east edge street and round the dealer's lot
+  keep: [{ bx: 7, bz: 1, cell: true }, { bx: 9, bz: 0, cell: true }, { bx: 9, bz: 1, cell: true }, { bx: 9, bz: 2, cell: true }],
+  squares: [{ x: 586, z: 258, r: 14, ring: 9, name: 'Meridian Square', id: 'meridiansq', icon: '⛲', sub: 'Uptown’s plaza, off Meridian Circus', secret: [5, -5] }],
+  // shops, offices and flats: Uptown is the downtown's busier, lower half
+  styles: [STYLE.SHOP, STYLE.BRICK, STYLE.OFFICE, STYLE.DECO, STYLE.APT, STYLE.OFFICE],
+  sizes: [[22, 18], [18, 16], [16, 14], [14, 14], [12, 12], [10, 12]],
+  heights: [9, 42],
+  roof: 'mid',
+  gap: 0.6,
+  secondAt: 20,
+  sidewalks: { trees: 0.55, benches: true, news: true, park: 0.15 },
+  secrets: [[500, 300], [700, 20]]
+};
+/* =====================================================================
+   [CONTENT] CRESTMOOR HEIGHTS, REBUILT (owner, 2026-11-19: the original city redeveloped; CITY_REBUILD.md §5.5)
+   Six lattice cells (0..1, 1..3; the Heights precinct, at its own offset, 021) are one superblock below the
+   Crestmoor estate: the grid of square plots gives way to the lanes a hillside of big houses has.
+   - Crestmoor Drive, from the Coast Highway at the west edge winding down to the south edge;
+   - Hillcrest Lane off it, east to Greenway's edge street;
+   - Ashby Close, Sorrel Close and Rowan Close, cul-de-sacs round their turning circles.
+   The houses are the city's own big ones (120: gated drives, double and triple garages), the homes the property
+   ladder buys in Crestmoor among them; the edge streets inside the district are lined with them too.
+   ===================================================================== */
+REBUILDS.crestmoor = {
+  name: 'Crestmoor Heights',
+  streets: [
+    /* 0 */ { name: 'Crestmoor Drive', w: 8, res: true, ctrl: [[5.6, 120], [30, 124], [60, 134], [90, 150], [112, 176], [124, 206], [126, 240], [118, 272], [110, 314.4]] },
+    /* 1 */ { name: 'Hillcrest Lane', w: 7, res: true, fork: 0, near: [90, 150], ctrl: [[112, 134], [134, 114], [154.4, 106]] },
+    /* 2 */ { name: 'Ashby Close', w: 7, res: true, circle: 9, fork: 0, near: [60, 134], ctrl: [[50, 158], [40, 180], [34, 198]] },
+    /* 3 */ { name: 'Rowan Close', w: 7, res: true, circle: 9, fork: 0, near: [126, 240], ctrl: [[100, 250], [74, 262], [52, 276]] },
+    /* 4 */ { name: 'Sorrel Close', w: 7, res: true, circle: 8, fork: 0, near: [112, 176], ctrl: [[92, 190], [76, 206]] }
+  ],
+  // Greenhouse Gus (the green supplier, 1,1 east side): his pitch would be the mouth of Hillcrest Lane; he stands on
+  // the lane itself
+  addr: { '1,1,1,30': [128, 129] },
+  // the big houses (120's rich mix) on every street and along the edge streets inside it
+  houses: true, rich: true, gap: 1.5, secondRow: false,
+  // the homes the property ladder buys in Crestmoor (500: the upscale doubles, the luxury triples)
+  require: [
+    { spec: { type: 'large', w: 18, d: 12, garage: 'triple' }, n: 4, zone: 'u' },
+    { spec: { type: 'large', w: 16, d: 11, garage: 'double' }, n: 5, zone: 'u' },
+    { spec: { type: 'house', w: 14, d: 10, garage: 'double' }, n: 1, zone: 'u' }
+  ],
+  // the gatehouse at the Crestmoor Drive entrance, off the Coast Highway: a little lodge with a pitched roof beside the
+  // drive, as the old money keeps one (the first free spot back from the pavement, either side, near the gate)
+  extras(world, b, sb, rng, kit) {
+    const spots = [];
+    for (const dx of [8, 12, 16, 20, 26, 32]) spots.push([dx, 106.5], [dx, 128.6], [dx, 104], [dx, 131]);
+    for (const [x0, z0] of spots) {
+      const q = [x0, z0, x0 + 6, z0 + 5];
+      if (!kit.free(...q)) continue;
+      const r = world._bld(b, q[0], q[1], q[2], q[3], 3.4, STYLE.HOUSE, 0xd8cfbf, 3.4, 3, { exactH: true, roof: 'gable', roofColor: 0x3d4247 });
+      kit.placed.push(r);
+      // (its name board on the side facing the drive)
+      const north = z0 < 120;
+      b.signs.push({ text: 'CRESTMOOR HEIGHTS', x: (q[0] + q[2]) / 2, y: CURB_H + 2.6, z: north ? q[3] + 0.05 : q[1] - 0.05, ry: north ? 0 : Math.PI, w: 4.6, h: 0.5, bg: '#2a2f35', fg: '#e8d28a' });
+      return;
+    }
+  },
+  sidewalks: { trees: 0.85, park: 0.2 },
+  styles: [STYLE.HOUSE, STYLE.HOUSE, STYLE.BRICK],
+  heights: [6.5, 10],
+  secrets: [[20, 300], [150, 200]]
+};
+/* =====================================================================
+   [CONTENT] POTTER'S LANE, NORTHGATE AND PARKSIDE, REBUILT (owner, 2026-11-19: the original city redeveloped;
+   CITY_REBUILD.md §5.5)
+   The Greenway precinct (at its own offset, 021) round Greenway Park: three superblocks.
+   Potter's Lane (2, 0..1), Crestmoor's corner north of the park: one winding lane of big houses (gated drives,
+   double and triple garages: the homes the property ladder buys in Crestmoor among them), the edge streets lined with
+   them too.
+   Northgate (3..5, 0..1), the old quarter's northern spill:
+   - Northgate Road, its high street, from Potter's Lane's edge street east and down to the park's north side;
+   - Weavers Row down to the park, Mill Street up to the north edge, Northgate Mews round its turning circle;
+   - Northgate Square, a small paved square off the high street;
+   - kept where they stood: the Vipers stash yard (5,0; the Canal Street Loft over its north side) and Fuel & Go
+     Northgate (5,1), its forecourt on the street to the south.
+   Parkside (5, 2..3), the strip between the park and the east edge, where the Coast Highway comes in:
+   - Parkside Crescent from the highway down to the south edge, Lamplighter Walk up to Northgate.
+   ===================================================================== */
+REBUILDS.potters = {
+  name: 'Crestmoor Heights',
+  streets: [
+    /* 0 */ { name: 'Potter’s Lane', w: 7, res: true, ctrl: [[196, 5.6], [192, 30], [200, 58], [210, 84], [206, 112], [198, 136], [204, 154.4]] }
+  ],
+  addr: {},
+  houses: true, rich: true, gap: 2, secondRow: false,
+  require: [
+    { spec: { type: 'large', w: 18, d: 12, garage: 'triple' }, n: 2, zone: 'u' },
+    { spec: { type: 'large', w: 16, d: 11, garage: 'double' }, n: 2, zone: 'u' }
+  ],
+  sidewalks: { trees: 0.85, park: 0.2 },
+  styles: [STYLE.HOUSE],
+  heights: [6.5, 10],
+  secrets: [[180, 10]]
+};
+REBUILDS.northgate = {
+  name: 'Northgate',
+  streets: [
+    /* 0 */ { name: 'Northgate Road', w: 10, high: true, ctrl: [[245.6, 44], [270, 40], [300, 34], [330, 42], [356, 64], [374, 96], [382, 128], [384, 154.4]] },
+    /* 1 */ { name: 'Weavers Row', w: 8, fork: 0, near: [300, 34], ctrl: [[302, 62], [296, 92], [290, 124], [288, 154.4]] },
+    /* 2 */ { name: 'Mill Street', w: 8, ctrl: [[338, 5.6], [336, 24]], join: 0, joinNear: [331, 42] },
+    /* 3 */ { name: 'Northgate Mews', w: 7, circle: 7, fork: 1, near: [296, 92], ctrl: [[320, 100], [340, 108]] }
+  ],
+  addr: {},
+  keep: [{ bx: 5, bz: 0, cell: true }, { bx: 5, bz: 1, cell: true }],
+  squares: [{ x: 322, z: 138, r: 10, ring: 6.5, name: 'Northgate Square', id: 'northgatesq', icon: '⛲', sub: 'A small square off Northgate Road', secret: [4, 4] }],
+  styles: [STYLE.BRICK, STYLE.BRICK, STYLE.SHOP, STYLE.APT, STYLE.HOUSE],
+  sidewalks: { trees: 0.6, benches: true, park: 0.2 },
+  secrets: [[300, 150]]
+};
+REBUILDS.parkside = {
+  name: 'Parkside',
+  streets: [
+    /* 0 */ { name: 'Parkside Crescent', w: 9, high: true, ctrl: [[474.4, 200], [452, 212], [434, 236], [428, 268], [432, 296], [440, 314.4]] },
+    /* 1 */ { name: 'Lamplighter Walk', w: 7, fork: 0, near: [452, 212], ctrl: [[440, 190], [428, 172], [424, 165.6]] }
+  ],
+  // Voltline Electronics: its door on the north edge street is at Lamplighter Walk's mouth; it stands on Parkside
+  // Crescent, in its own cell
+  addr: { '5,2,0,16': [448, 236] },
+  styles: [STYLE.BRICK, STYLE.SHOP, STYLE.APT, STYLE.OFFICE],
+  heights: [9, 22],
+  secondAt: 18,
+  sidewalks: { trees: 0.6, benches: true, news: true, park: 0.15 },
+  secrets: [[470, 310]]
+};
+/* =====================================================================
+   [CONTENT] THE PORT STRIP, REBUILT (owner, 2026-11-19: the original city redeveloped; CITY_REBUILD.md §5.6)
+   The port strip (10..11, 0..11) keeps its landmarks (the Saltworks Plant, the Harbor Road Fuel & Go, Saltworks Used
+   Autos, the chop shop, Okafor Motor Works, Harbor Row Depot, the Tidewater shed), the Saltmarsh estate's and Cannery
+   Cut's curved streets (122) and its two paved yards (Saltworks Yard, Pier Yard: 020's closures). Harbor Row (11, 5..7),
+   beside Pier Yard, is its last run of grid rebuilt: Harbor Row from the strip's street (the landmarks' side) down to
+   the depot's edge street, Anchor Street out to the Sound Parkway at the waterfront; sheds, a chandler's, rooms over
+   the bars.
+   (The three cells at the strip's north end stay as they are: a superblock over 10..11, 0 would close the street north
+   of Saltworks Yard and leave the yard's west end a lone corner, which the organic downtown's rules forbid; 11,1 is the
+   yard's other side.)
+   ===================================================================== */
+const PORT_STYLE = { styles: [STYLE.IND, STYLE.WARE, STYLE.IND, STYLE.BRICK], sizes: [[26, 18], [22, 16], [18, 14], [16, 12], [12, 12]], heights: [7, 14], roof: 'ind', gap: 1.2, secondAt: 22 };
+REBUILDS.harborrow = Object.assign({
+  name: 'Industrial Belt',
+  streets: [
+    /* 0 */ { name: 'Harbor Row', w: 10, ctrl: [[885.6, 432], [904, 450], [920, 480], [930, 512], [928, 548], [916, 580], [904, 610], [900, 634.4]] },
+    /* 1 */ { name: 'Anchor Street', w: 9, fork: 0, near: [930, 512], ctrl: [[944, 518], [954.4, 520]] }
+  ],
+  addr: {},
+  sidewalks: { trees: 0.15, park: 0 },
+  secrets: [[950, 630]]
+}, PORT_STYLE);
+/* =====================================================================
+   [CONTENT] THE NIGHTLIFE STRIP, REBUILT (owner, 2026-11-19: the original city redeveloped; CITY_REBUILD.md §5.7)
+   The Strip (4..5, 8..11; the precinct stands at its own offset, 021) is two superblocks round its landmarks:
+   - Strip North (4..5, 8..9): Neon Row through Club Neon's cell from the north edge to the stadium's edge street;
+     Starlite Way from the Blackgate Bridge's crossroads down past the Starlite Motel. Kept where they stood: the
+     impound's overflow yard (4,8) and the Valen Royale (5,9), its doors on the street to the south;
+   - Strip South (4..5, 10..11): Cooper's Lane (the Curved Roads pass's lane, 122, carried on) from the west edge along
+     the Southbank Fuel & Go's forecourt, where the street ran, out to the east edge; Lark Lane down to the south edge.
+     Fuel & Go Southbank (5,10) is kept.
+   Harborview Mall (6,8) and the cell south of it keep their streets: the mall's car park opens onto the street between
+   them.
+   ===================================================================== */
+const STRIP_STYLE = { styles: [STYLE.SHOP, STYLE.SHOP, STYLE.BRICK, STYLE.APT, STYLE.DECO], heights: [8, 20], gap: 0.4, secondAt: 18 };
+REBUILDS.stripn = Object.assign({
+  name: 'Nightlife Strip',
+  streets: [
+    /* 0 */ { name: 'Neon Row', w: 10, high: true, ctrl: [[430, 645.6], [434, 668], [446, 688], [462, 700], [474.4, 704]] },
+    /* 1 */ { name: 'Starlite Way', w: 9, high: true, ctrl: [[325.6, 760], [344, 764], [362, 774], [372, 788], [376, 794.4]] }
+  ],
+  addr: {},
+  keep: [{ bx: 4, bz: 8, cell: true }, { bx: 5, bz: 9, cell: true }],
+  sidewalks: { trees: 0.3, benches: true, news: true, park: 0.1 },
+  secrets: [[470, 650]]
+}, STRIP_STYLE);
+REBUILDS.southbank = Object.assign({
+  name: 'Nightlife Strip',
+  streets: [
+    /* 0 */ { name: 'Cooper’s Lane', w: 8, high: true, ctrl: [[325.6, 842], [348, 856], [372, 868], [398, 877], [424, 882], [452, 882], [474.4, 896]] },
+    /* 1 */ { name: 'Lark Lane', w: 7, fork: 0, near: [372, 868], ctrl: [[368, 898], [366, 928], [370, 954.4]] }
+  ],
+  addr: {},
+  keep: [{ bx: 5, bz: 10, cell: true }],
+  sidewalks: { trees: 0.3, benches: true, news: true, park: 0.1 },
+  secrets: [[330, 950]]
+}, STRIP_STYLE);
+/* =====================================================================
+   [CONTENT] THE FREIGHT PARK, REBUILT (owner, 2026-11-19: the original city redeveloped; CITY_REBUILD.md §5.8)
+   Six lattice cells (7..9, 10..11; the precinct stands at its own offset, 021) are one superblock of sheds and yards:
+   - Freight Way, the works road across it from the street by the bonded stores to the east edge, along the Cannery
+     Row warehouse's back where the street ran;
+   - Bonded Lane and Gantry Road up to the north edge, Ironside Lane down to the south edge.
+   Kept where it stood: the Cannery Row warehouse (7,10), its gate on the north edge street. The Velvet bonded store
+   (6,10) and the tow yard south of it keep their streets: the warehouses' back doors open onto the street between them.
+   ===================================================================== */
+REBUILDS.freight = {
+  name: 'Warehouse District',
+  streets: [
+    /* 0 */ { name: 'Freight Way', w: 11, ctrl: [[565.6, 900], [580, 892], [600, 888], [640, 890], [700, 896], [740, 908], [770, 916], [794.4, 920]] },
+    /* 1 */ { name: 'Bonded Lane', w: 9, fork: 0, near: [640, 890], ctrl: [[652, 868], [658, 840], [660, 805.6]] },
+    /* 2 */ { name: 'Gantry Road', w: 9, fork: 0, near: [740, 908], ctrl: [[748, 880], [750, 850], [742, 805.6]] },
+    /* 3 */ { name: 'Ironside Lane', w: 8, fork: 0, near: [620, 889], ctrl: [[616, 915], [612, 954.4]] }
+  ],
+  addr: {},
+  keep: [{ bx: 7, bz: 10, cell: true }],
+  styles: [STYLE.WARE, STYLE.IND, STYLE.WARE, STYLE.IND, STYLE.BRICK],
+  sizes: [[30, 20], [26, 18], [22, 16], [18, 14], [14, 12]],
+  heights: [7, 13],
+  roof: 'ind',
+  gap: 1.5,
+  secondAt: 24,
+  sidewalks: { trees: 0.1, park: 0 },
+  secrets: [[790, 950]]
 };
 /* =====================================================================
    [CONTENT] DISTRICT BLOCKS OFF THE LATTICE, AND THE IMPOUND'S SOUND ANNEX
@@ -58941,7 +59280,8 @@ class Underworld {
       const pool = ok.length ? ok : free.length ? free : blocks;
       const hb = pool[Math.floor(rng() * pool.length)];
       // sidewalkSpot sides are 0 N, 1 E, 2 S, 3 W; only sides that face a road that exists
-      const sides = (bx, bz) => { const o = [0, 1, 2, 3].filter(sd => RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][sd])); return o.length ? o : [0]; };
+      // (the road net is by site, where the block's precinct stands, 021)
+      const sides = (bx, bz) => { const o = [0, 1, 2, 3].filter(sd => RoadNet.sideOpen(CityLayout.siteI(bx, bz), CityLayout.siteJ(bx, bz), [0, 3, 1, 2][sd])); return o.length ? o : [0]; };
       const hs = sides(hb[0], hb[1]);
       const hang = sidewalkSpot(hb[0], hb[1], hs[Math.floor(rng() * hs.length)], 18 + rng() * 44);
       const db = pool[Math.floor(rng() * pool.length)], ds = sides(db[0], db[1]);

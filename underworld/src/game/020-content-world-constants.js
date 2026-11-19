@@ -178,6 +178,19 @@ const SUPERBLOCKS = [
   { id: 'core', bx0: 4, bz0: 4, bx1: 9, bz1: 7, gen: '_genRebuilt', rb: 'core', peds: true, ground: 'C', land: 'D' },
   // Linden Hills rebuilt on its own streets (124c; owner, 2026-11-19)
   { id: 'linden', bx0: 0, bz0: 8, bx1: 3, bz1: 10, gen: '_genRebuilt', rb: 'linden', peds: true, ground: 'H', land: 'R' },
+  // Uptown rebuilt on its own streets (124e; owner, 2026-11-19)
+  { id: 'uptown', bx0: 6, bz0: 0, bx1: 9, bz1: 3, gen: '_genRebuilt', rb: 'uptown', peds: true, ground: 'C', land: 'C' },
+  // Crestmoor Heights, Potter's Lane, Northgate and Parkside rebuilt on their own streets (124f, 124g; owner, 2026-11-19)
+  { id: 'crestmoor', bx0: 0, bz0: 1, bx1: 1, bz1: 3, gen: '_genRebuilt', rb: 'crestmoor', peds: true, ground: 'W', land: 'W' },
+  { id: 'potters', bx0: 2, bz0: 0, bx1: 2, bz1: 1, gen: '_genRebuilt', rb: 'potters', peds: true, ground: 'W', land: 'W' },
+  { id: 'northgate', bx0: 3, bz0: 0, bx1: 5, bz1: 1, gen: '_genRebuilt', rb: 'northgate', peds: true, ground: 'H', land: 'R' },
+  { id: 'parkside', bx0: 5, bz0: 2, bx1: 5, bz1: 3, gen: '_genRebuilt', rb: 'parkside', peds: true, ground: 'C', land: 'C' },
+  // the port strip's Harbor Row, beside Pier Yard (124h; owner, 2026-11-19)
+  { id: 'harborrow', bx0: 11, bz0: 5, bx1: 11, bz1: 7, gen: '_genRebuilt', rb: 'harborrow', peds: true, ground: 'I', land: 'I' },
+  // the Nightlife Strip round its landmarks, and the freight park (124i, 124j; owner, 2026-11-19)
+  { id: 'stripn', bx0: 4, bz0: 8, bx1: 5, bz1: 9, gen: '_genRebuilt', rb: 'stripn', peds: true, ground: 'C', land: 'P' },
+  { id: 'southbank', bx0: 4, bz0: 10, bx1: 5, bz1: 11, gen: '_genRebuilt', rb: 'southbank', peds: true, ground: 'C', land: 'P' },
+  { id: 'freight', bx0: 7, bz0: 10, bx1: 9, bz1: 11, gen: '_genRebuilt', rb: 'freight', peds: true, ground: 'I', land: 'I' },
   { id: 'stadium', bx0: 7, bz0: 8, bx1: 9, bz1: 9, gen: '_genStadiumDistrict', peds: false, ground: 'Z', land: 'A' },
   { id: 'terminal', bx0: 10, bz0: 10, bx1: 11, bz1: 11, gen: '_genTerminal', peds: false, ground: 'A', land: 'T' },
   { id: 'fields', bx0: 0, bz0: 11, bx1: 3, bz1: 11, gen: '_genFields', peds: false, ground: 'F', land: 'F' }

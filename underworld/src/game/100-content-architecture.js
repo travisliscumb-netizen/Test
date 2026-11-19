@@ -606,8 +606,17 @@ Object.assign(World.prototype, {
       const rng = new RNG(b.i * 31 + 7);
       if (b.landmark) continue;
       if (b.t === 'K' && rng.chance(0.8)) this._kicker(b, b.cx + rng.range(-10, 10), b.cz - 11.8, 'x', rng.chance(0.5) ? 1 : -1, 7, 1.4, true);
-      if (b.t === 'X') this._ramp(b, b.cx - 6, b.z1 - 16, b.cx + 4, b.z1 - 11, 'x', 1, CURB_H, 2.6, { unique: true, id: 'dirt' + b.i, color: 0x6b5b45 });
-      if (b.t === 'I' && rng.chance(0.3)) this._kicker(b, b.cx + 18, b.cz + 22, 'z', -1, 8, 1.6, true);
+      if (b.t === 'X') {
+        // (a rebuilt cell, 124, chose the ramp's spot before it built: the same jump, its id, wherever it stands)
+        const D2 = b.superblock && b.superblock.rb && !b.kept ? b.dirtSpot : { x: b.cx - 1, z: b.z1 - 13.5, axis: 'x' };
+        if (D2) this._ramp(b, D2.x - (D2.axis === 'x' ? 5 : 2.5), D2.z - (D2.axis === 'x' ? 2.5 : 5), D2.x + (D2.axis === 'x' ? 5 : 2.5), D2.z + (D2.axis === 'x' ? 2.5 : 5), D2.axis, 1, CURB_H, 2.6, { unique: true, id: 'dirt' + b.i, color: 0x6b5b45 });
+      }
+      if (b.t === 'I' && rng.chance(0.3)) {
+        // (a cell rebuilt on its district's own streets, 124, chose the jump's spot before it built, its ramp off every
+        // street and its run-up and landing kept clear: the same jump, its id, wherever it stands)
+        const id = 'jump' + b.i + '_' + Math.round(b.cz + 22), at = b.superblock && b.superblock.rb && !b.kept ? (b.jumpSpot ? [b.jumpSpot.x, b.jumpSpot.z] : null) : [b.cx + 18, b.cz + 22];
+        if (at) this._ramp(b, at[0] - 2.4, at[1] - 4, at[0] + 2.4, at[1] + 4, 'z', -1, 0.15, 1.6, { unique: true, id, color: 0x6c6f74 });
+      }
     }
     // every stunt jump at ground level gets a clear run-up and landing (rooftop leaps are laid out by hand)
     // rooftop leaps keep their decks as built and only get the street below their flight path cleared

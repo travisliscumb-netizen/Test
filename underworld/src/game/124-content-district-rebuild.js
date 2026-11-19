@@ -82,7 +82,9 @@ function rebuiltSpot(bx, bz, side, x, z, o, along) {
   const sb = superblockAt(bx, bz); if (!sb || !sb.rb || !REBUILDS[sb.rb]) return null;
   // (an address the definition moves is moved even from an edge street that still runs: its corner is a junction now)
   const fix = (REBUILDS[sb.rb].addr || {})[bx + ',' + bz + ',' + side + ',' + along];
-  if (!fix && RoadNet.sideOpen(bx, bz, [0, 3, 1, 2][side])) return null;
+  // (the road net is by site, where the precinct stands, 021: the same answer while the city is built in the lattice and
+  // once it stands on the island)
+  if (!fix && RoadNet.sideOpen(CityLayout.siteI(bx, bz), CityLayout.siteJ(bx, bz), [0, 3, 1, 2][side])) return null;
   if (fix) { x = fix[0]; z = fix[1]; }
   let best = null;
   for (const L of rebuildLines(sb.rb)) for (let k = 0; k < L.pts.length - 1; k++) {
@@ -138,15 +140,19 @@ Object.assign(World.prototype, {
     const b = a, lines = rebuildLines(sb.rb), roads = [];
     // the streets: pavements both sides, the frontage's depth (concrete under the asphalt: what the shader and the maps
     // draw), then the carriageways (kerbside parking where the definition says)
-    for (const L of lines) { this._road(L.pts, L.w + 5.4, 'concrete'); if (L.ring) this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2 + 2.7, 'concrete'); }
-    // (where the district's precinct stands: a roundabout's ring is known to the traffic in world metres)
+    // (the world gets its own copies of the lines' points and rings: the bake moves what the world holds to where the
+    // precinct stands, 090, and the lines stay in lattice metres for rebuiltSpot)
+    const own = pts => pts.map(q => [q[0], q[1]]);
+    for (const L of lines) { this._road(own(L.pts), L.w + 5.4, 'concrete'); if (L.ring) this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2 + 2.7, 'concrete'); }
     const wox = (CityLayout.siteI(sb.bx0, sb.bz0) - sb.bx0) * P, woz = (CityLayout.siteJ(sb.bx0, sb.bz0) - sb.bz0) * P;
     for (const L of lines) {
-      const r = this._road(L.pts, L.w, 'asphalt', { link: L.name }); r.park = L.park; r.high = L.high; r.res = L.res; roads.push(r);
-      // a roundabout's ring (023's machinery: one way round, give way on entry, 135 and 280)
-      if (L.closed) { r.closed = true; r.oneway = true; r.ringOf = L.rb; r.roundabout = { ...L.rb, x: L.rb.x + wox, z: L.rb.z + woz, y: CURB_H }; { const i0 = CITY_RINGS.findIndex(q => q.id === L.rb.id); if (i0 >= 0) CITY_RINGS.splice(i0, 1); } CITY_RINGS.push(r.roundabout); this._rbCentre(b, L.rb, roads, lines); }
+      const r = this._road(own(L.pts), L.w, 'asphalt', { link: L.name }); r.park = L.park; r.high = L.high; r.res = L.res; roads.push(r);
+      // a roundabout's ring (023's machinery: one way round, give way on entry, 135 and 280): built in the lattice, its
+      // centre moves with the road when the city is baked to where its precinct stands; the traffic reads the same
+      // object in CITY_RINGS, in world metres once the world stands
+      if (L.closed) { r.closed = true; r.oneway = true; r.ringOf = { ...L.rb }; r.roundabout = { ...L.rb, y: CURB_H }; { const i0 = CITY_RINGS.findIndex(q => q.id === L.rb.id); if (i0 >= 0) CITY_RINGS.splice(i0, 1); } CITY_RINGS.push(r.roundabout); this._rbCentre(b, L.rb, roads, lines); }
       // (a cul-de-sac is a spur: its far end is free, traffic turns round its circle, 020 Links, 135)
-      if (L.ring) { r.spur = true; r.ring = L.ring; this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2, 'asphalt'); }
+      if (L.ring) { r.spur = true; r.ring = { ...L.ring }; this._discS(L.ring.x, L.ring.z, L.ring.r + L.w / 2, 'asphalt'); }
     }
     const circles = lines.filter(L => L.ring).map(L => ({ x: L.ring.x, z: L.ring.z, r: L.ring.r + L.w / 2 })).concat(lines.filter(L => L.closed).map(L => ({ x: L.rb.x, z: L.rb.z, r: L.rb.r + L.w / 2 + 2.7 })));
     // the landmarks it keeps, where they always stood (a landmark as it always was: the kicker pass leaves it alone, and
@@ -186,6 +192,40 @@ Object.assign(World.prototype, {
       && clearRoads(x0, z0, x1, z1, 2.6)
       && !placed.some(q => x0 < q.x1 + gap && x1 > q.x0 - gap && z0 < q.z1 + gap && z1 > q.z0 - gap)
       && !doorways.some(q => q !== ownDoor && x0 < q[2] && x1 > q[0] && z0 < q[3] && z1 > q[1]);
+    // the kicker jumps the city sets in its industrial cells after it is built (100 _postGen: the same seeded draw): in a
+    // rebuilt cell its spot is chosen now, off every street, and its ramp, run-up and landing are kept clear like a
+    // stunt lane, so the jump (the same one, its id) has room wherever the district's streets now run
+    for (const m of sb.members) {
+      if (m.t !== 'I' || m.landmark || m.kept || !new RNG(m.i * 31 + 7).chance(0.3)) continue;
+      let best = null, bd = Infinity;
+      for (let x = m.x0 + 6; x <= m.x1 - 6; x += 2) for (let z = m.z0 + 20; z <= m.z1 - 4; z += 2) {
+        const ramp = [x - 2.4, z - 4, x + 2.4, z + 4], lane = [x - 3.4, z - 4 - 16, x + 3.4, z + 4 + 20];
+        if (!clearRoads(...ramp, 2) || inKept(...lane) || inSquare(...lane, 1) || lanes.some(L => lane[0] < L[2] && lane[2] > L[0] && lane[1] < L[3] && lane[3] > L[1])) continue;
+        const d = Math.hypot(x - (m.x0 + m.x1) / 2, z - (m.z0 + m.z1) / 2); if (d < bd) { bd = d; best = { x, z, lane }; }
+      }
+      if (!best) continue;
+      m.jumpSpot = { x: best.x, z: best.z };
+      lanes.push(best.lane);
+    }
+    // the building site's dirt jump (100 _postGen: the city's `X` cells): in a rebuilt cell its spot is chosen now too,
+    // the ramp off every street, its 30 m run-up and 24 m landing kept clear (along x as it always ran, else along z)
+    for (const m of sb.members) {
+      if (m.t !== 'X' || m.landmark || m.kept) continue;
+      const want = [(m.x0 + m.x1) / 2 - 1, m.z1 - 13.5];
+      let best = null, bd = Infinity;
+      for (const axis of ['x', 'z']) {
+        for (let x = m.x0 + 5; x <= m.x1 - 5; x += 2) for (let z = m.z0 + 5; z <= m.z1 - 5; z += 2) {
+          const ramp = axis === 'x' ? [x - 5, z - 2.5, x + 5, z + 2.5] : [x - 2.5, z - 5, x + 2.5, z + 5];
+          const lane = axis === 'x' ? [x - 35, z - 3.6, x + 29, z + 3.6] : [x - 3.6, z - 35, x + 3.6, z + 29];
+          if (!clearRoads(...ramp, 1.5) || inKept(...lane) || inSquare(...lane, 1) || lanes.some(L => lane[0] < L[2] && lane[2] > L[0] && lane[1] < L[3] && lane[3] > L[1])) continue;
+          const d = Math.hypot(x - want[0], z - want[1]); if (d < bd) { bd = d; best = { x, z, axis, lane }; }
+        }
+        if (best) break;
+      }
+      if (!best) continue;
+      m.dirtSpot = { x: best.x, z: best.z, axis: best.axis };
+      lanes.push(best.lane);
+    }
     const styles = D.styles || [STYLE.BRICK, STYLE.BRICK, STYLE.BRICK, STYLE.SHOP, STYLE.HOUSE, STYLE.APT];
     const pal = { [STYLE.BRICK]: PAL.brick, [STYLE.SHOP]: PAL.shop, [STYLE.HOUSE]: PAL.house, [STYLE.APT]: PAL.apt, [STYLE.DECO]: PAL.deco, [STYLE.OFFICE]: PAL.office, [STYLE.GLASS]: PAL.glass || PAL.deco, [STYLE.TOWER]: PAL.glass || PAL.deco, [STYLE.IND]: PAL.ind || PAL.brick, [STYLE.WARE]: PAL.ind || PAL.brick };
     const [hLo, hHi] = D.heights || [7.5, 15.5];
@@ -238,6 +278,18 @@ Object.assign(World.prototype, {
     // the homes a district must have (the property ladder buys them by type, garage and district, 500): placed first
     // where the zone is right, each counted only when its garage was really built
     const req = (D.require || []).map(r => ({ ...r, left: r.n }));
+    // a house's drive: straight out of the front, to the street ahead within 22 m. The district's own streets are local
+    // roads (the drive finds them itself, 'auto', 120); an edge street is the lattice's (RoadNet): the drive is paved to
+    // its carriageway, as long as it is from the front. null: no street ahead (a spur across the neighbours' lots would
+    // be needed, so no house)
+    const driveAhead = (x, z, fv) => {
+      for (let t = 0; t <= 22; t += 0.5) {
+        const qx = x + fv[0] * t, qz = z + fv[1] * t;
+        if (this._roadDist(qx, qz) < 0.15) return 'auto';
+        if (RoadNet.roadAt(qx, qz)) return t;
+      }
+      return null;
+    };
     const houseLine = (pts, set, side) => {
       const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
       const L = cum[cum.length - 1];
@@ -258,12 +310,11 @@ Object.assign(World.prototype, {
         if (!free(...q)) continue;
         // (its drive must meet the street straight out of the garage side of the front, as a real drive does: where the
         // street is not ahead within 22 m the house would need a spur across its neighbours' lots, so none is built)
-        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2;
-        let reach = false; for (let t = 0; t <= 22 && !reach; t += 0.5) if (this._roadDist(fx0 + fv[0] * t, fz0 + fv[1] * t) < 0.15) reach = true;
-        if (!reach) continue;
+        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2, drive = driveAhead(fx0, fz0, fv);
+        if (drive === null) continue;
         let home;
-        if (kind === 'semi') for (const s2 of [-1, 1]) home = this._house(cellAt(cx, cz), rng, { x: ns ? cx + s2 * 3.6 : cx, z: ns ? cz : cz + s2 * 3.6, face, type: 'semi', w: 7.2, d: 9, garage: 'street', drive: 'auto', doorOff: s2 * 1.6, bounds: sb });
-        else home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive: 'auto', gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
+        if (kind === 'semi') for (const s2 of [-1, 1]) home = this._house(cellAt(cx, cz), rng, { x: ns ? cx + s2 * 3.6 : cx, z: ns ? cz : cz + s2 * 3.6, face, type: 'semi', w: 7.2, d: 9, garage: 'street', drive, doorOff: s2 * 1.6, bounds: sb });
+        else home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive, gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
         placed.push({ x0: q[0], z0: q[1], x1: q[2], z1: q[3], house: home });
         if (R0 && home && home.type === R0.spec.type && (home.garage || 'street') === R0.spec.garage) R0.left--;
         d += (ns ? q[2] - q[0] : q[3] - q[1]) * 0.6;
@@ -279,10 +330,9 @@ Object.assign(World.prototype, {
         const off = R0.r + L.w / 2 + 2.6 + 3.5 + H.d / 2, cx = R0.x + nx * off, cz = R0.z + nz * off, half = H.w / 2 + gw;
         const q = ns ? [cx - half, cz - H.d / 2 - 1, cx + half, cz + H.d / 2 + 1] : [cx - H.d / 2 - 1, cz - half, cx + H.d / 2 + 1, cz + half];
         if (!free(...q)) continue;
-        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2;
-        let reach = false; for (let t = 0; t <= 22 && !reach; t += 0.5) if (this._roadDist(fx0 + fv[0] * t, fz0 + fv[1] * t) < 0.15) reach = true;
-        if (!reach) continue;
-        const home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive: 'auto', gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
+        const fv = FACE_V[face], fx0 = cx + fv[0] * H.d / 2, fz0 = cz + fv[1] * H.d / 2, drive = driveAhead(fx0, fz0, fv);
+        if (drive === null) continue;
+        const home = this._house(cellAt(cx, cz), rng, Object.assign({}, H, { x: cx, z: cz, face, drive, gs: rng.chance(0.5) ? 1 : -1, bounds: sb }));
         placed.push({ x0: q[0], z0: q[1], x1: q[2], z1: q[3], house: home });
       }
     };
@@ -355,22 +405,44 @@ Object.assign(World.prototype, {
       if (rng.chance(0.08) && open(jx, jz, 4.5)) { const r = this._bld(b, jx - 1.8, jz - 1.5, jx + 1.8, jz + 1.5, 2.6, STYLE.HOUSE, rng.pick(PAL.house), 2.6, 3, { exactH: true }); placed.push(r); continue; }
       if (rng.chance(0.55)) this._prop(b, rng.chance(0.6) ? 'tree' : 'bush', jx, jz, rng.range(0, 6), rng.range(0.8, 1.2));
     }
-    // ---- lamps along the streets (alternate sides on the pavement), cars at the kerbs
-    for (const r of roads) {
-      if (r.closed) continue;
-      const pts = r.pts; let acc = 0, side = 1;
+    // ---- the streets' own furniture: the city's street lamps on both pavements, staggered about as close as the
+    // lattice's (three a side every 80 m), each leaning over the carriageway with a pool of light under its head at
+    // night (178: the ground shader only lights the lattice's); benches and news boxes at the back of the high streets'
+    // pavements (and the other shopping streets', where the district has them), facing the street; cars at the kerbs
+    const LSTEP = 26, lamps = [];
+    const onPave = (x, z, m) => x >= sb.x0 && x <= sb.x1 && z >= sb.z0 && z <= sb.z1 && this._roadDist(x, z) >= 0.5 && !onDrive(x, z, 1.2)
+      && !inKept(x - m, z - m, x + m, z + m) && !inSquare(x - m, z - m, x + m, z + m, 0.5)
+      && !placed.some(q => x > q.x0 - m && x < q.x1 + m && z > q.z0 - m && z < q.z1 + m)
+      && !doorways.some(q => x > q[0] - m && x < q[2] + m && z > q[1] - m && z < q[3] + m);
+    const along = (r, step, phase, fn) => {
+      const pts = r.pts; let acc = 0;
       for (let k = 0; k < pts.length - 1; k++) {
         const p = pts[k], c = pts[k + 1], l = Math.hypot(c[0] - p[0], c[1] - p[1]); if (l < 0.01) continue;
         const tx = (c[0] - p[0]) / l, tz = (c[1] - p[1]) / l;
-        for (let s = (22 - acc % 22 + 22) % 22; s < l; s += 22) {
-          const x = p[0] + tx * s - tz * side * (r.w / 2 + 1.1), z = p[1] + tz * s + tx * side * (r.w / 2 + 1.1); side = -side;
-          if (x < sb.x0 || x > sb.x1 || z < sb.z0 || z > sb.z1 || this._roadDist(x, z) < 0.5 || onDrive(x, z, 1.2) || placed.some(q => x > q.x0 - 0.5 && x < q.x1 + 0.5 && z > q.z0 - 0.5 && z < q.z1 + 0.5)) continue;
-          this._prop(b, 'parklamp', x, z, 0);
-        }
+        for (const side of [1, -1]) for (let s = ((phase + (side > 0 ? 0 : step / 2) - acc) % step + step) % step; s < l; s += step) fn(p[0] + tx * s, p[1] + tz * s, -tz * side, tx * side);
         acc += l;
       }
-      this._kerbCars(b, rng, r, roads);
+    };
+    for (const r of roads) {
+      if (r.closed) continue;
+      along(r, LSTEP, 8, (cx, cz, nx, nz) => {
+        const x = cx + nx * (r.w / 2 + 1.1), z = cz + nz * (r.w / 2 + 1.1);
+        if (!onPave(x, z, 0.5) || lamps.some(q => Math.hypot(q[0] - x, q[1] - z) < LSTEP * 0.45)) return;
+        lamps.push([x, z]);
+        // (the lamp's arm, local +z, toward the street; its head 1.5 m out, over the kerb lane)
+        this._prop(b, 'lamp', x, z, Math.atan2(-nx, -nz));
+        (this.lampPools = this.lampPools || []).push({ x: x - nx * 1.5, z: z - nz * 1.5 });
+      });
+      const SW = D.sidewalks || {};
+      if (r.res || !(r.high || SW.benches)) continue;
+      along(r, r.high ? 40 : 72, 20, (cx, cz, nx, nz) => {
+        const x = cx + nx * (r.w / 2 + 2.0), z = cz + nz * (r.w / 2 + 2.0), ry = Math.atan2(-nx, -nz);
+        if (!onPave(x, z, 1.2) || lamps.some(q => Math.hypot(q[0] - x, q[1] - z) < 2.5)) return;
+        if (rng.chance(SW.news ? 0.25 : 0)) { this._prop(b, 'newsbox', x, z, ry); return; }
+        this._prop(b, 'bench', x, z, ry); b.seats.push({ x, z, ry });
+      });
     }
+    for (const r of roads) if (!r.closed) this._kerbCars(b, rng, r, roads);
     // each cell's street pattern now (what the suburb generator tags its blocks with, 120): a cul-de-sac round its
     // circle, low-rise flats, a curving residential street, a plain one, or a terrace street
     for (const m of sb.members) {

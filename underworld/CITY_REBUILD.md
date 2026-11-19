@@ -10,19 +10,31 @@ HUD, input, the final regression) wait until Phase 1 has passed its gate and bee
 Phase 1 may span two sessions. This file is the handoff between them. Read §0 first.
 
 ## 0. Start here (status)
-- **Session A (2026-11-19). Done so far:**
-  - The checkpoint of the earlier overhaul work: island roundabouts, architecture, DRS and tile streaming (ISLAND.md
-    §10).
-  - The audit (§2), the plan, and the before screenshots.
-  - The rebuild kit (124). The Old Quarter was ported onto it, and its fingerprint was unchanged.
-  - **The Old Quarter rebuilt over its whole precinct** (column 3 and row 7).
-  - **Linden Hills rebuilt.**
-  - **The financial core rebuilt**, with Exchange Circus, the city's first roundabout.
-  - Suite `rebuild` covers every rebuilt district.
-- **Owner ruling (2026-11-19).** The financial core is redeveloped too (DECISIONS.md).
-- **Next action:** Session B: Uptown, Greenway and Heights, the port strip, the Nightlife Strip and stadium cells,
-  the freight park (§5). These precincts stand at their own offsets (021), so check the kit's lattice-to-world
-  handling (`wox`/`woz` and the address offsets) on the first of them.
+- **Session A (2026-11-19):**
+  - The rebuild kit (124).
+  - The Old Quarter (whole precinct), Linden Hills and the financial core, with Exchange Circus, the first city
+    roundabout.
+  - The island roundabouts.
+- **Session B (2026-11-19):**
+  - Uptown, with Meridian Circus.
+  - Crestmoor Heights, Potter's Lane, Northgate and Parkside.
+  - The port's Harbor Row.
+  - The Nightlife Strip (north and south).
+  - The freight park.
+  - Kit fixes for offset precincts, street lighting, houses on edge streets and stunt jumps (§5.4–5.8 and the kit
+    fixes).
+  - Pre-existing failures fixed on the way: the Route 9 Diner's name board, and the turf corners in offset precincts.
+- **What is left of the grid, and why** (all deliberate, §5.6–5.8):
+  - The port's north end (10,0, 11,0, 11,1) and 11,4, beside its yards.
+  - The mall's cell and the one south of it (6,8, 6,9).
+  - The Velvet bonded store and the tow yard (6,10, 6,11).
+- **Next action:** the Phase 1 gate (§1):
+  - full regression;
+  - save compatibility;
+  - perf against the baseline;
+  - before/after screenshots;
+  - the report;
+  - then stop for the owner's visual review. Phases 2–10 wait for it.
 
 ## 1. What "done" means (the gate, from the brief)
 - No obvious large repetitive square grid left anywhere in the city. Straight streets are allowed where a real city
@@ -172,6 +184,56 @@ Then the races, the city roundabouts, verification, screenshots, documentation a
 - **Races re-laid as routes:** Midnight Run, Pink Slip and Industrial Rumble (its corner was on a core street that
   closed).
 
+### 5.4 Uptown (precinct uptown, cells 6..9 × 0..3; 124e)
+- **Streets.** Three island roads reach it. Meridian Way carries Lakeside Avenue (north) down to Sound Parkway
+  (south), swinging round Meridian Motors: its showroom drive and its delivery bay open onto the avenue, as they did
+  onto the lattice. Meridian Circus (642, 212; radius 13) is the roundabout where Sound Road comes in (Sound
+  Street) and Bellcourt Street leaves for the east. Halden Street, Copper Lane, Wren Street and Plover Lane fill the rest.
+- **Square:** Meridian Square, south of the circus.
+- **Kept:** Meridian Motors (7,1), the Industrial Belt works (9,0), the Bellcourt warehouse (9,1; its gate now on
+  the east edge street, the only side still open) and the building site with its dirt jump (9,2).
+- **Density:** 225 buildings (115 before).
+
+### 5.5 Crestmoor Heights, Potter's Lane, Northgate and Parkside (precincts heights and greenway; 124f, 124g)
+- **Crestmoor** (0..1 × 1..3): Crestmoor Drive from the Coast Highway (a crossroads at the west edge) down to the
+  south edge; Hillcrest Lane; Ashby, Sorrel and Rowan Close. Big houses with gated drives on every street and on
+  the edge streets, and a gatehouse at the drive's entrance.
+- **Potter's Lane** (2 × 0..1): the Crestmoor cells north of the park, one winding lane of big houses.
+- **Northgate** (3..5 × 0..1): Northgate Road (the high street), Weavers Row, Mill Street, Northgate Mews and
+  Northgate Square. The Vipers stash yard (5,0) and Fuel & Go Northgate (5,1; its forecourt on the street to the
+  south) are kept.
+- **Parkside** (5 × 2..3): Parkside Crescent from the Coast Highway (a crossroads at the east edge) to the south
+  edge, and Lamplighter Walk.
+- **The property ladder:** Crestmoor's homes are all there (`require`: the luxury triples, the upscale doubles,
+  the house with a double garage). The homes and property suites count 46 buyable homes, as before.
+
+### 5.6 The port strip (precinct port; 124h)
+- **Harbor Row** (11 × 5..7, beside Pier Yard): Harbor Row from the landmarks' street down to the depot's edge
+  street, and Anchor Street out to Sound Parkway at the waterfront. Sheds and works buildings.
+- **Already off the grid:** the Saltmarsh estate (10..11 × 2..3) and Cannery Cut (10,8–10,9), the Curved Roads
+  pass's streets.
+- **Not rebuilt:**
+  - The three cells at the strip's north end (10,0, 11,0, 11,1). A superblock over 10..11 × 0 would close the
+    street north of Saltworks Yard, leaving the yard's west end a lone corner, which the organic downtown's rules
+    forbid. 11,1 is the yard's other side.
+  - 11,4, on Pier Yard's north side.
+- **Landmarks:** all kept. Both races on the port's lattice (quayside, saltloop) run only on edge streets that stay
+  open.
+
+### 5.7 The Nightlife Strip (precinct strip; 124i)
+- **Strip North** (4..5 × 8..9): Neon Row through Club Neon's cell, and Starlite Way from the Blackgate Bridge's
+  crossroads. The impound's overflow yard and the Valen Royale (its doors on the street to the south) are kept.
+- **Strip South** (4..5 × 10..11): Cooper's Lane (the Curved Roads pass's lane, carried on) runs along Fuel & Go
+  Southbank's forecourt where the street ran, plus Lark Lane.
+- **Not rebuilt:** Harborview Mall (6,8) and the cell south of it (6,9). The mall's car park opens onto the street
+  between them.
+
+### 5.8 The freight park (precinct freight; 124j)
+- **Freight** (7..9 × 10..11): Freight Way along the Cannery Row warehouse's back, where the street ran, plus
+  Bonded Lane, Gantry Road and Ironside Lane. The Cannery Row warehouse is kept.
+- **Not rebuilt:** the Velvet bonded store (6,10) and the tow yard south of it (6,11). The street between the two
+  yards (x = 560) carries both warehouses' back doors, and nothing narrower than it fits there.
+
 ### Kit fixes found on the way (all in 124)
 - An address's building is set square to the axis its front faces, so its corner never swallows the door on a
   slanted street.
@@ -183,6 +245,30 @@ Then the races, the city roundabouts, verification, screenshots, documentation a
 - Kit houses go into the cell they stand in, and a garage may use the whole district (`_house`'s `bounds`, 120).
   Before this fix, only houses in the anchor cell could have garages.
 - `require` guarantees the homes the property ladder buys by type, garage and zone.
+- Session B: the precincts that stand at their own offsets (021).
+  - The world gets its own copies of the cached street lines, rings and turning circles. Before this, the bake
+    (090) moved the cache (`rebuiltSpot` then read world metres as lattice metres) and missed the roundabout's
+    centre, so no traffic went round Meridian Circus.
+  - The bake now reads where every entry stands before it moves anything.
+  - `rebuiltSpot` asks the road net by site (`CityLayout.siteI/J`), so a door is where it was built for, at
+    generation and in play. The turf corners (450) had the same bug.
+- Street lighting:
+  - The kit lit its streets with park lamps. The city's street lamps now stand on both pavements, staggered about as
+    close as the lattice's, each with a pool of light at night (`lampPools`, 178).
+  - Benches and news boxes stand on the shopping streets.
+  - Uptown had 55 lamps and now has the lattice's density again.
+- Houses facing an edge street:
+  - They were refused, because the drive check only knew the kit's own streets.
+  - The drive is now paved to the lattice carriageway ahead (`driveAhead`).
+- Stunt jumps:
+  - The city sets its industrial kicker jumps and the building site's dirt jump after it is built (100 `_postGen`),
+    at fixed spots in their cells. In a rebuilt cell those spots were on the new streets, or behind buildings with
+    no run-up. The core's dirt jump (7,6) had no run-up since Session A.
+  - The kit now chooses each jump's spot before it builds: the ramp off every street, its run-up and landing kept
+    clear like a stunt lane. The jump keeps its id, so saves keep it.
+  - All 14 unique jumps are in place; the ramps suite drives each one at three speeds.
+- Street names that would repeat another street's (Kiln Lane, Gull Lane) were renamed (Potter's Lane, Plover
+  Lane).
 
 ## 6. Checklist
 - [x] Checkpoint of the earlier overhaul work (roundabouts on the island, architecture, DRS)
@@ -192,11 +278,11 @@ Then the races, the city roundabouts, verification, screenshots, documentation a
 - [x] Old Quarter remainder (column 3, row 7)
 - [x] Linden Hills
 - [x] Financial core
-- [ ] Uptown
-- [ ] Greenway and Heights
-- [ ] Port strip
-- [ ] Nightlife Strip, stadium cells, freight park
-- [ ] Races re-laid on routes; city roundabouts
+- [x] Uptown (Meridian Circus, the second city roundabout)
+- [x] Greenway and Heights (Crestmoor, Potter's Lane, Northgate, Parkside)
+- [x] Port strip (Harbor Row; the rest already off the grid or kept, §5.6)
+- [x] Nightlife Strip (north and south), freight park; the stadium's cells are the stadium and the mall (§5.7)
+- [x] Races re-laid on routes where their streets closed; city roundabouts (Exchange Circus, Meridian Circus)
 - [ ] Gate: connectivity/GPS, traffic, saves, perf, screenshots, full regression, report
 
 ## 7. Risks
@@ -210,9 +296,8 @@ Then the races, the city roundabouts, verification, screenshots, documentation a
 - The full regression is long (2 h+). Run per-district suites and a full run at the gate.
 
 ### Known failures that predate Phase 1 (they fail the same way on `0beff6a`)
-- `business`: "every storefront business wears a name board" is missing `diner_s` (the Route 9 Diner, port cell
-  11,5). Its facade is not found behind its door. The port's rebuild (Session B) gives every address its own
-  building behind its door, which should close this. Re-check it then.
+- `business`: "every storefront business wears a name board" was missing `diner_s` (the Route 9 Diner, port cell
+  11,5). **Fixed in Session B:** Harbor Row's rebuild gives the diner its own building behind its door.
 - `roads`: "merge back onto the lattice" can fail on a recycled vehicle. The test reads a pooled car that was
   despawned and reused, and sees `ai` null.
 

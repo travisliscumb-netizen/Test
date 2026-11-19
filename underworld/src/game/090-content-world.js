@@ -120,10 +120,14 @@ class World {
       if (!pt) return null;
       return { bx: clamp(Math.floor(pt[0] / P), 0, N - 1), bz: clamp(Math.floor(pt[1] / P), 0, N - 1) };
     };
-    const moveList = (list) => { for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) shift(o, p.ox * P, p.oz * P, ''); } };
+    // (where each entry stands is read before anything moves: two entries can share a point list, a road and the pavement
+    // under it, and the second must not be placed by a point the first has already moved)
+    const moves = [];
+    for (const list of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'lampPools', 'secrets', 'packageSpots', 'surfaces', 'doors'].map(L => this[L]).filter(Array.isArray).concat([Object.values(this.compounds || {})])) {
+      for (const o of list) { const r = o && typeof o === 'object' ? rep(o) : null; if (!r) continue; const p = off(r); if (p.ox || p.oz) moves.push([o, p]); }
+    }
     for (const b of this.blocks) { const p = off(b); if (p.ox || p.oz) shift(b, p.ox * P, p.oz * P, ''); }
-    for (const L of ['localRoads', 'homes', 'mapPlaces', 'lots', 'lampSet', 'secrets', 'packageSpots', 'surfaces', 'doors']) if (Array.isArray(this[L])) moveList(this[L]);
-    moveList(Object.values(this.compounds || {}));
+    for (const [o, p] of moves) shift(o, p.ox * P, p.oz * P, '');
   }
   // ----- helpers -----
   _bld(b, x0, z0, x1, z1, h, style, color, fh, bayN, opts = {}) {
