@@ -188,7 +188,8 @@ const punchTrack = async (idx, n = 12) => {
       const x = bx * 80 + 40;
       for (let z = bz * 80 + 1; z < bz * 80 + 30; z += 0.2) {
         const y = window.__pv.groundY(x, z);
-        if (grid.resolveCircle(x, z, 0.34, y + 0.35, y + 1.7, res).hit) return { x, z: z - 0.2, zw: z };
+        // (a building's wall: a lamp post or a bin is stepped round, as it should be)
+        if (grid.resolveCircle(x, z, 0.34, y + 0.35, y + 1.7, res).hit && res.col && res.col.kind === 'bld') return { x, z: z - 0.2, zw: z };
       }
     }
     return null;
@@ -210,7 +211,9 @@ async function reverseRun(type) {
   await reset(0, 0);
   await page.evaluate((type) => {
     const g = window.game, p = g.player;
-    const x = 2 * 80 + 2.6, z = 6 * 80 + 12; // long straight north-south road
+    // (a long straight north-south road: the edge street between the Old Quarter and the core, both rebuilt on their own
+    // streets, CITY_REBUILD.md; the lattice street this used to be on, x = 160, is inside the Old Quarter now)
+    const x = 4 * 80 + 2.6, z = 6 * 80 + 12;
     const v = g.vehicles.spawn(type, x, z, 0, { parked: true }); v.touched = true;
     g.resetPlayerState(x + 2.5, z, 0); g.completeEnter(v); g.cam.yaw = v.h;
   }, type);
@@ -255,7 +258,7 @@ async function camCar(type = 'sedan', place = null) {
   await reset(0, 0);
   await page.evaluate(([type, place]) => {
     const g = window.game;
-    const x = place ? place.x : 2 * 80 + 2.6, z = place ? place.z : 6 * 80 + 12, h = place ? place.h : 0;
+    const x = place ? place.x : 4 * 80 + 2.6, z = place ? place.z : 6 * 80 + 12, h = place ? place.h : 0;
     const v = g.vehicles.spawn(type, x, z, h, { parked: true }); v.touched = true;
     g.resetPlayerState(x + 2.5, z, 0); g.completeEnter(v); g.cam.yaw = v.h; g.__cv = v;
   }, [type, place]);

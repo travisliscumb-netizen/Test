@@ -247,6 +247,16 @@ class Game {
       let start = fresh ? null : this.save.pos;
       // a spot out at sea (022: saved in the air, or wading) comes back ashore at the nearest road, or at the city's edge
       if (start && offCity(start.x, start.z) && !inExtension(start.x, start.z)) { const q = RoadGraph.nearest(start.x, start.z, { maxD: 1500, kinds: RG_STREETS }); start = q && Island.land(q.x, q.z) ? { x: q.x, z: q.z, h: start.h } : { x: clamp(start.x, -10, CITY + 10), z: clamp(start.z, -10, CITY + 10), h: start.h }; }
+      // a spot in a city that was rebuilt round it (CITY_REBUILD.md): where a street ran there may be a building now, or a
+      // yard the new frontage closes in; you come back on the pavement of the nearest street instead, and are told
+      if (start && !offCity(start.x, start.z) && !this.reachesRoad(start.x, start.z)) {
+        const q = RoadGraph.nearest(start.x, start.z, { kinds: RG_STREETS });
+        if (q) {
+          const dx = start.x - q.x, dz = start.z - q.z, d = Math.hypot(dx, dz) || 1, off = q.e.w / 2 + 1.6;
+          start = { x: q.x + dx / d * off, z: q.z + dz / d * off, h: start.h };
+          this.later(1600, () => this.ui.toast(`You are back on ${q.e.name || 'the street'}: where you left from has been rebuilt.`));
+        }
+      }
       if (start) this.resetPlayerState(start.x, start.z, start.h);
       else { const lp = this.uw.loc('prop', 'pawn'), sp = sidewalkSpot(2, 6, 0, 52); this.resetPlayerState(sp.x, sp.z, Math.atan2(lp.x - sp.x, lp.z - sp.z)); }
       this.env.time = this.save.timeOfDay;
@@ -424,6 +434,26 @@ class Game {
     $('bustbar').classList.add('hidden');
   }
   // nearest spot (spiralling out) where a standing player fits without touching anything
+  // whether you can walk from (x, z) to a road (a street's carriageway, a lattice street's) within about 70 m: a
+  // flood over the collision grid in 1.5 m steps, props (a bin, a bench) stepped round as passable
+  reachesRoad(x, z) {
+    const grid = this.world.grid, res = {}, S = 1.5, R = 47, seen = new Set(), q = [[0, 0]];
+    const free = (px, pz) => { const y = groundY(px, pz); return !grid.resolveCircle(px, pz, 0.45, y + 0.3, y + 1.6, res).hit || (res.col && res.col.kind === 'prop'); };
+    const road = (px, pz) => RoadNet.roadAt(px, pz) || (RoadGraph.ready && RoadGraph.surfaceDist(px, pz, { r: 6 }) < 0);
+    if (!free(x, z)) return false;
+    seen.add('0,0');
+    while (q.length) {
+      const [i, j] = q.shift(), px = x + i * S, pz = z + j * S;
+      if (road(px, pz)) return true;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj, k = ni + ',' + nj;
+        if (Math.abs(ni) > R || Math.abs(nj) > R || seen.has(k)) continue;
+        seen.add(k);
+        if (free(x + ni * S, z + nj * S)) q.push([ni, nj]);
+      }
+    }
+    return false;
+  }
   clearSpot(x, z, rad = 0.7) {
     const grid = this.world.grid, res = {};
     const fits = (px, pz) => {

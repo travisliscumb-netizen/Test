@@ -61,9 +61,10 @@ const ads = on => ev(on => { const i = window.game.input; if (on) i.toggles.add(
 const dist3 = (a, b2) => Math.hypot(a.x - b2.x, a.y - b2.y, a.z - b2.z);
 
 // ---------------------------------------------------------------- 1. reticle -> hit alignment
-// node (5,6) looking north along a straight avenue
-const X0 = 5 * 80, Z0 = 6 * 80;
-await setup(X0, Z0 - 4, Math.PI);
+// on Central Blvd, the financial core's one straight avenue (124d: its old line, z = 480), looking east along it
+// (the lattice node this used to stand on, 5,6, is inside the rebuilt core: CITY_REBUILD.md §5.3)
+const X0 = 450, Z0 = 486;
+await setup(X0, Z0 - 4, Math.PI / 2);
 const facing = await ev(() => window.game.player.h);
 await ads(true); await frames(page, 15);
 for (const [dist, label] of [[4, 'close'], [14, 'medium'], [34, 'distant']]) {
@@ -84,7 +85,8 @@ await ev(() => { const g = window.game; g.peds.peds.length = 0; g.__tg = []; });
 // ---------------------------------------------------------------- 2. a wall at chest / low / high
 const wall = await ev(() => {
   const g = window.game, p = g.player;
-  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; const h = g.world.grid.raycast(p.pos.x, p.pos.y + 1.3, p.pos.z, Math.sin(a), 0, Math.cos(a), 40, 0); if (h && h.t > 6 && h.t < 30) return { a, t: h.t }; }
+  // (a wall: the same surface at all three heights the shots aim at, not a shopfront's awning or a setback above)
+  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, ray = hy => g.world.grid.raycast(p.pos.x, p.pos.y + hy, p.pos.z, Math.sin(a), 0, Math.cos(a), 40, 0), h = ray(1.3); if (!h || h.t <= 6 || h.t >= 30) continue; if ([0.5, 3.2].every(hy => { const q = ray(hy); return q && Math.abs(q.t - h.t) < 0.3; })) return { a, t: h.t }; }
   return null;
 });
 check('test setup: a wall 6-30 m away', !!wall, JSON.stringify(wall));
@@ -273,8 +275,10 @@ const outCar = await ev(() => ({ gm: document.body.classList.contains('gunmode')
 check('after getting out: gun mode, FIRE and crosshair are back', outCar.gm && outCar.fire !== 'none' && outCar.xh, JSON.stringify(outCar));
 {
   await ev(() => { const g = window.game; g.peds.peds.length = 0; g.__tg = []; g.player.mag.smg = 30; });
-  const p0 = await ev(() => { const p = window.game.player; return { x: p.pos.x, z: p.pos.z, h: window.game.cam.yaw }; });
-  const x = p0.x + Math.sin(p0.h) * 8, z = p0.z + Math.cos(p0.h) * 8, id = await dummy(x, z);
+  // (the target down the avenue, the way the range was set up: wherever the camera was dragged to, it could be the
+  // facade a few metres off across the pavement)
+  const p0 = await ev(() => { const p = window.game.player; return { x: p.pos.x, z: p.pos.z }; });
+  const x = p0.x + Math.sin(facing) * 8, z = p0.z + Math.cos(facing) * 8, id = await dummy(x, z);
   const gy = await ev(([x, z]) => window.__pv.groundY(x, z), [x, z]);
   await ads(true); await frames(page, 12); await aimAt(x, gy + 1.25, z);
   const shot = await fire();

@@ -72,7 +72,9 @@ const zones = await ev(() => {
   out.names = [districtNameAt(350, -1500), districtNameAt(-300, 500), districtNameAt(1650, -900)];
   // a city street's name on its own street, and what the same grid lines are called out on the island
   const { streetNameAt } = window.__pv;
-  out.streets = [streetNameAt(...L(80, 300)), streetNameAt(...L(80, 80)), streetNameAt(...L(520, 480)), streetNameAt(-12, 640), streetNameAt(600, 1800)];
+  // (Kestrel St, the port's middle street: Ash St, the first one, ran through districts rebuilt on their own streets and is
+  // gone, CITY_REBUILD.md)
+  out.streets = [streetNameAt(...L(880, 300)), streetNameAt(...L(880, 320)), streetNameAt(...L(520, 480)), streetNameAt(-12, 640), streetNameAt(600, 1800)];
   out.offStreets = [[80, 1500], [80, 2300], [400, -1200], [-1100, 480], [1900, 480], [2000, 560], [320, 2410], [-600, 322]].map(q => streetNameAt(q[0], q[1]));
   out.want = ['airport', 'proving', 'firehouse', ...(CL.at(-500, 1150) ? [] : ['saltmarsh']), 'gull', 'lighthouse', 'summit', 'oval', 'raceway', 'police', 'hospital', 'chopshop'];
   out.places = out.want.filter(id => g.world.places[id] && isFinite(g.world.places[id].door.x));
@@ -82,7 +84,7 @@ const zones = await ev(() => {
 check('every district off the lattice by name', zones.ridge === 'Crestmoor Ridge' && zones.mount === 'Mount Valen' && zones.highlands === 'Blackgate Highlands' && zones.saltmarsh === 'Saltmarsh' && zones.southshore === 'Southshore' && zones.airport === 'Port Valen International' && zones.proving === 'Valen Proving Ground', JSON.stringify(zones));
 check('the Sound Flats (where Valen Point and the sound were), Cedar Fields and the city’s own districts keep theirs; the water has names too', zones.vp === 'Sound Flats' && zones.cfs === 'Cedar Fields' && zones.downtown === 'Financial District' && zones.names[0] === 'Mount Valen' && zones.names[1] === 'Offshore' && zones.names[2] === 'Lake Valen', JSON.stringify(zones));
 check('a city street is named on its own street and nowhere else: the grid\u2019s lines across the mountain, the runways, the bridge and the racetrack are not Ash St or Central Blvd',
-  zones.streets[0] === 'Ash St' && zones.streets[1] === 'Ash St & 1st Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === '8th Ave' && zones.streets[4] === 'Airport Access' &&
+  zones.streets[0] === 'Kestrel St' && zones.streets[1] === 'Kestrel St & 4th Ave' && zones.streets[2] === 'Central Blvd' && zones.streets[3] === '8th Ave' && zones.streets[4] === 'Airport Access' &&
   zones.offStreets.every(n => n === null || !/ (St|Ave|Blvd)$|^(Harbor Ave|Foundry Rd|Quay Rd|North Shore Dr|South Shore Dr)$/.test(n)), JSON.stringify([zones.streets, zones.offStreets]));
 check('the new places are on the map, and the city’s essentials still are (police, hospital, chop shop, three banks, the casino)', zones.places.length === zones.want.length && zones.want.length >= 11 && zones.banks === 3 && zones.casino, JSON.stringify(zones));
 // ---------------------------------------------------------------- roads
