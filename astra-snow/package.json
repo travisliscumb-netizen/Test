@@ -1,0 +1,27 @@
+{
+  "name": "astra-snow",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ASTRA — night snow-operations command system for one tractor and one route.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5180",
+    "build": "tsc --noEmit && vite build && node tools/postbuild.mjs",
+    "preview": "vite preview --host 127.0.0.1 --port 5181",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test tests/unit/*.test.ts",
+    "test:e2e": "node --experimental-strip-types --no-warnings tests/e2e/run.mjs",
+    "sim": "node --experimental-strip-types --no-warnings tools/simulate.mjs"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.7",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.8"
+  }
+}
