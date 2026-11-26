@@ -43,6 +43,9 @@ async function phone(device = 'iPhone 14', extra = {}) {
   page.on('console', (m) => {
     // Application errors only: a third-party live feed failing (CORS-less error
     // responses, network drops) is handled by the app and tested separately.
+    // On Vercel previews the platform injects its feedback-toolbar script;
+    // the Content-Security-Policy blocking it is the intended outcome.
+    if (m.type() === 'error' && /vercel\.live/.test(m.text()) && /Content Security Policy/.test(m.text())) return;
     if (m.type() === 'error' && !/WebGL|GL Driver|Failed to load resource|blocked by CORS policy|net::ERR_/.test(m.text())) errors.push(m.text());
   });
   return { ctx, page, errors };

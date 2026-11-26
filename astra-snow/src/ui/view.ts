@@ -151,10 +151,11 @@ export class View {
     this.els.gps.className = `pip ${gpsClass}`;
     setText(this.els.gps, t ? `GPS ${Math.round(t.accuracy)}m` : a.gpsPermission === 'denied' ? 'GPS OFF' : 'GPS …');
     const f = a.cityFreshness(now);
-    this.els.cityPip.className = `pip ${a.city.error && f !== 'live' ? 'bad' : f === 'live' ? 'ok' : f === 'recent' ? 'warn' : 'bad'}`;
+    // A failing feed is never shown green, however fresh the last snapshot.
+    this.els.cityPip.className = `pip ${a.city.error ? (f === 'live' || f === 'recent' ? 'warn' : 'bad') : f === 'live' ? 'ok' : f === 'recent' ? 'warn' : 'bad'}`;
     const vehNow = a.city.vehicles.filter((v) => now - v.t < 20 * 60_000);
     const units = new Set(vehNow.map((v) => v.vehicle)).size;
-    setText(this.els.cityPip, `CITY ${f === 'none' ? '—' : shortAge(a.city.checkedAt!, now)}${units ? ` ▲${units}` : ''}`);
+    setText(this.els.cityPip, `CITY ${f === 'none' ? '—' : shortAge(a.city.checkedAt!, now)}${a.city.error ? '!' : ''}${units ? ` ▲${units}` : ''}`);
     const rate = a.radar ? (a.radar.cmPerHour > 0 ? `${a.radar.cmPerHour.toFixed(1)}cm/h` : 'dry') : '—';
     const temp = a.station?.airTempC != null ? `${Math.round(a.station.airTempC)}°` : '';
     setText(this.els.wx, `${temp} ${rate}`.trim());
@@ -274,7 +275,11 @@ export class View {
     // City line for this street.
     const intel = s.approachRoadId !== null ? a.routeIntel(now).get(s.approachRoadId) : undefined;
     this.els.cityLine.hidden = !intel;
-    if (intel) this.els.cityLine.innerHTML = `${ICON.city}<span>${intelLine(intel, now)}</span>`;
+    if (intel) {
+      const f = a.cityFreshness(now);
+      const age = f === 'stale' && a.city.checkedAt ? ` · City data ${ago(a.city.checkedAt, now).replace(' ago', '')} old` : a.city.error ? ' · City feed not answering' : '';
+      this.els.cityLine.innerHTML = `${ICON.city}<span>${intelLine(intel, now)}${age}</span>`;
+    }
     const up = a.upcoming(2).map((q) => `#${q} ${a.stop(q).address}`);
     setText(this.els.then, up.length ? `then ${up.join('  ·  ')}` : 'last driveway');
     // Street chip
