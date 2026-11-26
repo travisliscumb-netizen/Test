@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "//": "BRANCH-ONLY build config for previewing ASTRA (astra-snow/) from this branch in the repo-linked Vercel project. Do NOT merge into main: on main it would replace that project's production output.",
   "installCommand": "cd astra-snow && npm ci",
   "buildCommand": "cd astra-snow && npm run build",
   "outputDirectory": "astra-snow/dist",
