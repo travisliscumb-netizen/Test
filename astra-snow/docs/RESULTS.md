@@ -42,13 +42,13 @@ counted as independent corroboration.
 
 | Suite | Result |
 |---|---|
-| Unit tests (parser, geometry, GPS filter, routing, event log, optimizer, plow model, windrow, ETA, crypto, copilot, feeds) | **51/51** |
-| Browser end-to-end, local build, iPhone SE / 14 / 15 Pro Max / 14 landscape | **18/18**, three consecutive runs |
+| Unit tests (parser, geometry, GPS filter, routing, event log, optimizer, plow model, windrow, ETA, crypto incl. PIN wrap, copilot, feeds) | **52/52** |
+| Browser end-to-end, local build, iPhone SE / 14 / 15 Pro Max / 14 landscape | **20/20** (incl. PIN pad: right PIN opens, wrong PIN refused) |
 | Same suite against the **live deployment** | **18/18** |
 | Live: full reload with the network cut (service worker) | opens in Drive mode, 162 stops, progress intact, DONE works |
 | Integrity verifier | **8/8** |
 
-The end-to-end suite covers: wrong key refused; key removed from URL;
+The end-to-end suite covers: PIN pad (right PIN opens in ~0.4 s and is not asked again; wrong PIN refused, nothing revealed); wrong key refused; key removed from URL;
 DONE/UNDO persisted across reload; double-bounce; defer/blocked return list;
 street observation; offline commits and honest feed labels; arrival detection
 from injected GPS; inaccurate-fix pause; all park tabs; corner-lot

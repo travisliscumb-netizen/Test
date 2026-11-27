@@ -2,7 +2,7 @@
 // read from it and call its actions; nothing else mutates state.
 
 import type { RoadsDoc, RouteDoc, SealedDoc, Stop } from '../data/schema.ts';
-import { unseal, isKeyString, UnsealError, sha256Hex } from '../core/crypto.ts';
+import { unseal, isKeyString, UnsealError, sha256Hex, unwrapKeyWithPin } from '../core/crypto.ts';
 import { openStore, requestPersistence, type Store, type PingRow } from '../data/db.ts';
 import { reduce, nextStop, upcoming, revisitQueue, skippedBehind, eventId, type ShiftEvent, type ShiftState, type EventInput, type StreetState, type BlockReason } from '../data/events.ts';
 import { GpsFilter, type Track } from '../core/kalman.ts';
@@ -150,6 +150,35 @@ export class App {
     } catch (e) {
       this.fatal = (e as Error).message;
       this.go('fatal');
+    }
+  }
+
+  unlocking = false;
+
+  /** PIN unlock: derive the route key from the PIN, then open as usual. */
+  async unlockWithPin(pin: string): Promise<boolean> {
+    if (this.unlocking) return false;
+    this.unlocking = true;
+    this.unlockError = null;
+    this.emit();
+    try {
+      const res = await fetch(SEALED_URL, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`route file unavailable (${res.status})`);
+      const sealed: SealedDoc = await res.json();
+      if (!sealed.pin) {
+        this.unlockError = 'This route has no PIN set up. Use the unlock link.';
+        return false;
+      }
+      const key = await unwrapKeyWithPin(sealed.pin, pin);
+      await this.openRoute(key, true);
+      return this.screen !== 'unlock';
+    } catch (e) {
+      this.unlockError = e instanceof UnsealError ? e.message : `Could not load the route file: ${(e as Error).message}`;
+      this.fb.tone('alert');
+      return false;
+    } finally {
+      this.unlocking = false;
+      if (this.screen === 'unlock') this.go('unlock');
     }
   }
 

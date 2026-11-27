@@ -6,8 +6,9 @@ as the fallback for the first nights.
 
 ## 0. Install (5 minutes, at home)
 
-1. Open the unlock link in Safari → **Share → Add to Home Screen** → open
-   ASTRA from the home screen.
+1. Open the app address in Safari, enter the route PIN →
+   **Share → Add to Home Screen** → open ASTRA from the home screen (it should
+   not ask for the PIN again).
 2. Preflight must show: Route 162/162, Storage "saving · protected".
    If it says "NOT SAVING", Safari is in private mode — leave it.
 3. SYSTEM → **EXPORT BACKUP** once, to prove the download works.

@@ -597,7 +597,7 @@ export class View {
   private screenSig = '';
   private renderScreen(): void {
     const a = this.app;
-    const sig = `${a.screen}|${a.unlockError}|${a.fatal}|${a.screen === 'preflight' ? Math.floor(Date.now() / 2000) + '|' + a.city.checkedAt + '|' + (a.track ? 1 : 0) + a.gpsPermission : ''}|${a.screen === 'debrief' ? a.state.events : ''}`;
+    const sig = `${a.screen}|${a.unlockError}|${a.fatal}|${this.showLinkEntry}|${a.screen === 'preflight' ? Math.floor(Date.now() / 2000) + '|' + a.city.checkedAt + '|' + (a.track ? 1 : 0) + a.gpsPermission : ''}|${a.screen === 'debrief' ? a.state.events : ''}`;
     if (sig === this.screenSig) return;
     this.screenSig = sig;
     const el = this.els.screen;
@@ -608,21 +608,7 @@ export class View {
       el.append(h('div', { class: 'boot-mark', html: ICON.logo }), h('div', { class: 'boot-t' }, 'ASTRA'), h('div', { class: 'fine' }, 'opening the route…'));
     } else if (a.screen === 'unlock') {
       el.className = 'screen show unlock';
-      const input = h('input', { class: 'key', placeholder: 'Paste the unlock link or key', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' }) as HTMLInputElement;
-      const go = () => {
-        const v = input.value.trim();
-        const m = v.match(/[#&]k=([A-Za-z0-9_-]{43})/) ?? v.match(/^([A-Za-z0-9_-]{43})$/);
-        void a.openRoute(m ? m[1] : v, true);
-      };
-      el.append(
-        h('div', { class: 'boot-mark', html: ICON.logo }),
-        h('h1', {}, 'ASTRA'),
-        h('p', {}, 'The route is sealed. Open the unlock link you were given on this phone, or paste it here.'),
-        input,
-        h('button', { class: 'wide go', onclick: go }, 'OPEN ROUTE'),
-        h('p', { class: 'fine' }, 'The key stays on this phone. The route file on the server is encrypted and unreadable without it.'),
-      );
-      if (a.unlockError) el.insertBefore(h('div', { class: 'callout bad' }, a.unlockError), el.lastChild);
+      el.append(this.unlockScreen());
     } else if (a.screen === 'preflight') {
       el.className = 'screen show preflight';
       el.append(this.preflight());
@@ -633,6 +619,69 @@ export class View {
       el.className = 'screen show unlock';
       el.append(h('h1', {}, 'ASTRA could not start'), h('div', { class: 'callout bad' }, a.fatal ?? 'Unknown error'), h('button', { class: 'wide', onclick: () => location.reload() }, 'RELOAD'));
     }
+  }
+
+  private showLinkEntry = false;
+
+  /** PIN pad (glove-sized), with the unlock link as a fallback. */
+  private unlockScreen(): HTMLElement {
+    const a = this.app;
+    let pin = '';
+    const dots = h('div', { class: 'pin-dots', 'aria-label': 'PIN entered' }, ...[0, 1, 2, 3].map(() => h('i', {})));
+    const status = h('div', { class: 'pin-status', role: 'status', 'aria-live': 'polite' }, a.unlockError ?? '');
+    if (a.unlockError) status.classList.add('bad');
+    const paint = () => [...dots.children].forEach((d, i) => d.classList.toggle('on', i < pin.length));
+    const press = async (k: string) => {
+      if (a.unlocking) return;
+      a.fb.unlock();
+      a.fb.haptic();
+      if (k === 'del') pin = pin.slice(0, -1);
+      else if (pin.length < 4) pin += k;
+      paint();
+      if (pin.length === 4) {
+        status.textContent = 'Checking…';
+        status.classList.remove('bad');
+        dots.classList.add('busy');
+        const ok = await a.unlockWithPin(pin);
+        dots.classList.remove('busy');
+        if (!ok) {
+          pin = '';
+          paint();
+          status.textContent = a.unlockError ?? 'Wrong PIN';
+          status.classList.add('bad');
+          dots.classList.remove('shake');
+          void dots.offsetWidth;
+          dots.classList.add('shake');
+        }
+      }
+    };
+    const key = (k: string, label = k) => h('button', { class: `pin-key ${k === 'del' ? 'del' : ''}`, 'aria-label': k === 'del' ? 'Delete' : k, onclick: () => void press(k) }, label);
+    const pad = h('div', { class: 'pin-pad' }, ...['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => key(k)), h('span', {}), key('0'), key('del', '⌫'));
+    const wrap = h('div', { class: 'unlock-wrap' },
+      h('div', { class: 'boot-mark small', html: ICON.logo }),
+      h('h1', {}, 'ASTRA'),
+      h('p', { class: 'fine' }, 'Enter the route PIN'),
+      dots,
+      status,
+      pad,
+    );
+    if (this.showLinkEntry) {
+      const input = h('input', { class: 'key', placeholder: 'Paste the unlock link or key', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' }) as HTMLInputElement;
+      wrap.append(input, h('button', { class: 'wide', onclick: () => {
+        const v = input.value.trim();
+        const m = v.match(/[#&]k=([A-Za-z0-9_-]{43})/) ?? v.match(/^([A-Za-z0-9_-]{43})$/);
+        void a.openRoute(m ? m[1] : v, true);
+      } }, 'OPEN WITH LINK'));
+    } else {
+      wrap.append(h('button', { class: 'wide ghost', onclick: () => { this.showLinkEntry = true; this.render(); } }, 'USE UNLOCK LINK INSTEAD'));
+    }
+    // Hardware keyboard / testing: digits and backspace.
+    wrap.tabIndex = -1;
+    wrap.addEventListener('keydown', (e) => {
+      if (/^\d$/.test(e.key)) void press(e.key);
+      else if (e.key === 'Backspace') void press('del');
+    });
+    return wrap;
   }
 
   private preflight(): HTMLElement {

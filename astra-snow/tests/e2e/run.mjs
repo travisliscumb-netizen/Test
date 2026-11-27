@@ -66,6 +66,42 @@ async function begin(page) {
 }
 
 // ---------------------------------------------------------------- tests
+const PIN = process.env.ROUTE_PIN; // never committed; pass it to run the PIN tests
+
+if (PIN) {
+  await test('PIN pad: a wrong PIN is refused and the pad clears', async () => {
+    const { ctx, page } = await phone();
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('.pin-pad');
+    const wrong = PIN === '0000' ? '1111' : '0000';
+    for (const d of wrong) await page.getByRole('button', { name: d, exact: true }).click();
+    await page.waitForFunction(() => /Wrong PIN/.test(document.querySelector('.pin-status')?.textContent ?? ''), null, { timeout: 30_000 });
+    assert((await page.locator('.pin-dots i.on').count()) === 0, 'pad not cleared');
+    assert(!(await page.content()).includes('Davidson'), 'route text leaked on wrong PIN');
+    await page.screenshot({ path: `${SHOTS}/e2e-pin-wrong.png` });
+    await ctx.close();
+  });
+
+  await test('PIN pad: the right PIN opens the route and is not needed again', async () => {
+    const { ctx, page, errors } = await phone();
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('.pin-pad');
+    await page.screenshot({ path: `${SHOTS}/e2e-pin-pad.png` });
+    const t0 = Date.now();
+    for (const d of PIN) await page.getByRole('button', { name: d, exact: true }).click();
+    await page.waitForFunction(() => window.__astra?.screen === 'preflight', null, { timeout: 30_000 });
+    console.log(`      PIN to preflight: ${Date.now() - t0} ms`);
+    const txt = await page.locator('.screen').innerText();
+    assert(txt.includes('162/162 stops'), txt.slice(0, 200));
+    await page.reload();
+    await page.waitForFunction(() => window.__astra?.screen === 'preflight', null, { timeout: 30_000 });
+    assert(errors.length === 0, errors.join('; '));
+    await ctx.close();
+  });
+} else {
+  console.log('SKIP  PIN tests (set ROUTE_PIN to run them)');
+}
+
 await test('wrong key is refused with a reason; nothing is shown', async () => {
   const { ctx, page } = await phone();
   await page.goto(`${BASE}/#k=${'A'.repeat(43)}`);

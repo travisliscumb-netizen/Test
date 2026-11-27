@@ -9,13 +9,14 @@ It is a separate app from the existing deployments, which are untouched.
 
 ## Put it on the phone
 
-1. Open the **unlock link** (sent privately; it contains the route key after
-   `#k=`) in **Safari** on the iPhone.
+1. Open the app's address in **Safari** on the iPhone and enter the
+   **route PIN** on the keypad (given privately, not written anywhere in this
+   repository).
 2. **Share → Add to Home Screen.** Open ASTRA from the home screen from then
    on (better storage protection, screen wake lock, full screen).
-3. The key is now stored on the phone and removed from the address bar. Keep
-   the link somewhere private (it is a password): you need it again only if
-   the phone's website data is cleared.
+3. The phone now keeps the route key itself: the PIN is needed again only if
+   Safari's website data is cleared. The original unlock link (`#k=…`) still
+   works as an alternative.
 
 ## A night with ASTRA
 
@@ -50,9 +51,13 @@ Details in [docs/MUNICIPAL-DATA.md](docs/MUNICIPAL-DATA.md).
 ## Data and privacy
 
 - The customer route never exists in this repository in readable form.
-  `public/data/route.sealed.json` is AES-GCM-256 ciphertext; the key travels
-  only in the link's `#` fragment (browsers never send it to a server) and
-  lives in the phone's storage.
+  `public/data/route.sealed.json` is AES-GCM-256 ciphertext under a random
+  256-bit key, which the phone stores after the first unlock.
+- **The PIN is the weak point.** It wraps that key with PBKDF2-SHA256
+  (600,000 iterations), but a 4-digit PIN has only 10,000 possibilities: anyone
+  who downloads the public file can try them all offline in minutes. It stops
+  casual viewers, not a determined person. To remove the PIN and go back to
+  link-only protection, re-seal without `ASTRA_PIN`.
 - Nothing leaves the phone except requests to the City of Barrie GIS and
   Environment Canada. No accounts, analytics or tracking.
 - `private/` (plaintext route, key, review sheets) is git-ignored. The build
@@ -65,7 +70,7 @@ Details in [docs/MUNICIPAL-DATA.md](docs/MUNICIPAL-DATA.md).
 node --experimental-strip-types tools/fetch-roads.mjs           # refresh City roads (occasionally)
 ROUTE_ROWS=<rows.json> node --experimental-strip-types tools/build-route.mjs
 python3 tools/contact-sheet.py                                   # visual QA over City imagery
-node --experimental-strip-types tools/seal.mjs                   # same key unless private/route.key is deleted
+ASTRA_PIN=<pin> node --experimental-strip-types tools/seal.mjs   # same key unless private/route.key is deleted; omit ASTRA_PIN for link-only
 ROUTE_ROWS=<rows.json> node --experimental-strip-types tools/verify-integrity.mjs
 npm run build
 ```
@@ -78,9 +83,9 @@ list); a row it cannot read with certainty stops the build with the reason.
 ```
 npm ci
 npm run dev                      # http://127.0.0.1:5180
-npm test                         # 51 unit tests (Node, no browser)
+npm test                         # 52 unit tests (Node, no browser)
 npm run build && npx vite preview --port 5181 &
-node tests/e2e/run.mjs           # 18 browser tests on 4 iPhone sizes (needs private/route.key)
+ROUTE_PIN=<pin> node tests/e2e/run.mjs   # 20 browser tests on 4 iPhone sizes (needs private/route.key)
 node --experimental-strip-types tools/simulate.mjs 10 1 consistent   # synthetic full-shift simulation
 ```
 

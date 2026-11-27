@@ -56,12 +56,18 @@ tools/         fetch-roads, build-route, contact-sheet, seal, verify-integrity, 
 
 ## Key decisions and why
 
-**Route data is sealed, not hidden behind a PIN.** The repository is public.
-The route (addresses, notes, parcels, driveways) is published only as
-AES-GCM-256 ciphertext; the 256-bit key reaches the phone once in the URL
-fragment (never sent to any server) and stays in IndexedDB. A 4-digit PIN in
-front of a downloadable file can be brute-forced in milliseconds; a random
-256-bit key cannot. No server, no account, works offline.
+**Route data is sealed; a PIN is the owner's convenience choice.** The
+repository is public. The route (addresses, notes, parcels, driveways) is
+published only as AES-GCM-256 ciphertext under a random 256-bit key, which the
+phone keeps in IndexedDB after the first unlock. It can reach the phone two
+ways: the original link (`#k=…` fragment, never sent to a server; strong), or
+a 4-digit PIN that unwraps the key (PBKDF2-SHA256, 600,000 iterations). The
+owner chose the PIN after the link proved hard to deliver. **Trade-off,
+stated plainly:** 10,000 PINs can be tried offline against the public file in
+minutes, so with the PIN enabled the route is protected from casual viewers
+only. Stronger options, if wanted later: a longer passphrase, or a private
+repository plus a server-checked PIN with rate limiting. No server, no
+account, works offline.
 
 **Event-sourced progress.** Every action is an immutable event; state is a
 pure fold. Reload/crash loses nothing written; duplicates are idempotent; undo

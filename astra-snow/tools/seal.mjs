@@ -1,6 +1,6 @@
 // Encrypt private/route.json into public/data/route.sealed.json.
 //
-//   node --experimental-strip-types tools/seal.mjs [--print-key]
+//   [ASTRA_PIN=<digits>] node --experimental-strip-types tools/seal.mjs [--print-key]
 //
 // The key lives in private/route.key (git-ignored) and is reused across
 // rebuilds so an unlock link already on the phone keeps working. Rotate it by
@@ -8,7 +8,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { seal, unseal, newKey, isKeyString } from '../src/core/crypto.ts';
+import { seal, unseal, newKey, isKeyString, wrapKeyWithPin, unwrapKeyWithPin } from '../src/core/crypto.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const KEY_FILE = path.join(ROOT, 'private/route.key');
@@ -29,6 +29,12 @@ if (!key || !isKeyString(key)) {
 }
 
 const sealed = await seal(text, key, doc.title, doc.stops.length);
+// Optional PIN (ASTRA_PIN, never written to the repository): wraps the key.
+if (process.env.ASTRA_PIN) {
+  sealed.pin = await wrapKeyWithPin(key, process.env.ASTRA_PIN);
+  if ((await unwrapKeyWithPin(sealed.pin, process.env.ASTRA_PIN)) !== key) throw new Error('PIN round-trip mismatch');
+  console.log(`PIN unlock enabled (PBKDF2-SHA256, ${sealed.pin.iterations} iterations)`);
+}
 // Prove the round trip before writing anything public.
 const back = await unseal(sealed, key);
 if (back !== text) throw new Error('round-trip mismatch');

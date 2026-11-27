@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseRow, parseRoute, parseNote, indexStreets, type CityStreet } from '../../src/data/route-parse.ts';
 import { dist, haversine, projectOnLine, pointInPolygon, bearing, headingDelta, simplify, toXY, toLngLat, type LngLat } from '../../src/core/geo.ts';
 import { GpsFilter } from '../../src/core/kalman.ts';
-import { seal, unseal, newKey, UnsealError, isKeyString } from '../../src/core/crypto.ts';
+import { seal, unseal, newKey, UnsealError, isKeyString, wrapKeyWithPin, unwrapKeyWithPin, PIN_ITERATIONS } from '../../src/core/crypto.ts';
 import { speakable } from '../../src/copilot/feedback.ts';
 
 // ------------------------------------------------------------------ parser
@@ -215,6 +215,20 @@ test('crypto: two seals of the same text differ (random IV)', async () => {
   const b = await seal('same', key, 'l', 1);
   assert.notEqual(a.data, b.data);
   assert.notEqual(a.iv, b.iv);
+});
+
+test('crypto: a PIN unwraps the route key; wrong PIN and tampering are refused', async () => {
+  const key = newKey();
+  const wrap = await wrapKeyWithPin(key, '1234');
+  assert.equal(wrap.iterations, PIN_ITERATIONS);
+  assert.ok(PIN_ITERATIONS >= 600_000);
+  assert.equal(await unwrapKeyWithPin(wrap, '1234'), key);
+  await assert.rejects(unwrapKeyWithPin(wrap, '1235'), /Wrong PIN/);
+  await assert.rejects(unwrapKeyWithPin(wrap, 'abcd'), /Wrong PIN/);
+  await assert.rejects(unwrapKeyWithPin({ ...wrap, salt: wrap.salt.replace(/^./, (c) => (c === 'A' ? 'B' : 'A')) }, '1234'), /Wrong PIN/);
+  await assert.rejects(wrapKeyWithPin(key, '12'), /4-8 digits/);
+  // the PIN never appears in the wrap
+  assert.ok(!JSON.stringify(wrap).includes('1234'));
 });
 
 // ------------------------------------------------------------------ voice

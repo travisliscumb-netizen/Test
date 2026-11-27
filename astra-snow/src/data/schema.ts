@@ -1,6 +1,7 @@
 // Data contracts shared by the app, the build tools and the tests.
 
 import type { LngLat } from '../core/geo.ts';
+import type { PinWrap } from '../core/crypto.ts';
 
 export interface RoadSegment {
   id: number;
@@ -108,4 +109,6 @@ export interface SealedDoc {
   /** Short non-secret label for the UI. */
   label: string;
   stops: number;
+  /** Optional: the route key wrapped by a short PIN. */
+  pin?: PinWrap;
 }
