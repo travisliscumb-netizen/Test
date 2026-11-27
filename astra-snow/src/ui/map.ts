@@ -40,9 +40,9 @@ export interface MapApi {
   setServiceAges(serviced: Map<number, number>, opStart: number | null, now: number): void;
   setVehicles(trails: { vehicle: string; coords: LngLat[]; last: number }[], now: number): void;
   setImagery(on: boolean): void;
-  setRadar(on: boolean): void;
+  setRadar(on: boolean, stamp: number): void;
   follow(pos: LngLat, heading: number | null, drive: boolean): void;
-  overview(points: LngLat[]): void;
+  overview(points: LngLat[], bottomPad?: number): void;
   resize(): void;
 }
 
@@ -55,7 +55,7 @@ function style(): StyleSpecification {
   };
 }
 
-export function createMap(container: HTMLElement, roads: RoadsDoc, stops: Stop[]): MapApi {
+export function createMap(container: HTMLElement, roads: RoadsDoc, stops: Stop[], onSourceError?: (source: string) => void): MapApi {
   const bb = bboxOf(stops.map((s) => s.target), 300);
   const map = new maplibregl.Map({
     container,
@@ -96,6 +96,11 @@ export function createMap(container: HTMLElement, roads: RoadsDoc, stops: Stop[]
       })),
     ),
   });
+
+  map.on('error', (e: { sourceId?: string }) => {
+    if (e.sourceId && onSourceError) onSourceError(e.sourceId);
+  });
+  let radarStamp = 0;
 
   const ready = new Promise<void>((resolve) => {
     map.on('load', () => {
@@ -177,8 +182,11 @@ export function createMap(container: HTMLElement, roads: RoadsDoc, stops: Stop[]
         paint: { 'line-color': ['match', ['get', 'st'], 'next', COLORS.ice, 'done', COLORS.done, '#3d7fa3'], 'line-width': ['match', ['get', 'st'], 'next', 2, 1] },
       });
 
-      map.addSource('radar', { type: 'raster', tiles: [radarTileUrl()], tileSize: 256, attribution: 'Radar © ECCC' });
-      map.addLayer({ id: 'radar', type: 'raster', source: 'radar', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.55, 'raster-fade-duration': 0 } });
+      // The radar is a 1 km product: a few z9 tiles cover the whole city and
+      // are stretched for closer zooms — far fewer requests to ECCC than one
+      // per street-level tile, so far fewer chances for one to fail.
+      map.addSource('radar', { type: 'raster', tiles: [radarTileUrl()], tileSize: 256, maxzoom: 9, attribution: 'Radar © ECCC' });
+      map.addLayer({ id: 'radar', type: 'raster', source: 'radar', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' } });
 
       map.addSource('vehicles', { type: 'geojson', data: empty() });
       map.addLayer({
@@ -344,8 +352,15 @@ export function createMap(container: HTMLElement, roads: RoadsDoc, stops: Stop[]
     setImagery(on) {
       void ready.then(() => map.setLayoutProperty('ortho', 'visibility', on ? 'visible' : 'none'));
     },
-    setRadar(on) {
-      void ready.then(() => map.setLayoutProperty('radar', 'visibility', on ? 'visible' : 'none'));
+    setRadar(on, stamp) {
+      void ready.then(() => {
+        map.setLayoutProperty('radar', 'visibility', on ? 'visible' : 'none');
+        // New scan (or a retry): point the source at fresh tiles.
+        if (on && stamp !== radarStamp) {
+          radarStamp = stamp;
+          (map.getSource('radar') as maplibregl.RasterTileSource).setTiles([`${radarTileUrl()}&_=${stamp}`]);
+        }
+      });
     },
     follow(pos, heading, drive) {
       const h = container.clientHeight;
@@ -353,17 +368,17 @@ export function createMap(container: HTMLElement, roads: RoadsDoc, stops: Stop[]
         center: pos,
         bearing: drive && heading !== null ? heading : map.getBearing(),
         pitch: drive ? 52 : map.getPitch(),
-        zoom: drive ? Math.max(map.getZoom(), 17.3) : map.getZoom(),
-        padding: drive ? { top: h * 0.38, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
+        zoom: drive ? Math.max(map.getZoom(), 17.3) : Math.max(map.getZoom(), 16.5),
+        padding: drive ? { top: h * 0.38, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: h * 0.6, left: 0, right: 0 },
         duration: 900,
         easing: (t) => t * (2 - t),
         essential: true,
       });
     },
-    overview(points) {
+    overview(points, bottomPad = 0) {
       if (!points.length) return;
       const b = bboxOf(points, 60);
-      map.fitBounds([b.w, b.s, b.e, b.n], { bearing: 0, pitch: 0, padding: 40, duration: 900 });
+      map.fitBounds([b.w, b.s, b.e, b.n], { bearing: 0, pitch: 0, padding: { top: 70, left: 30, right: 100, bottom: 30 + bottomPad }, duration: 900 });
     },
     resize() {
       map.resize();

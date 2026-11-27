@@ -22,7 +22,7 @@ It is a separate app from the existing deployments, which are untouched.
 
 - **Preflight** checks the route (162/162, integrity hash), storage, GPS,
   City feed, radar and sound. Tap **ENABLE GPS**, then **BEGIN SHIFT**.
-- **Drive mode**: the map turns with the tractor; the panel shows the next
+- **Work screen** (where you start): the map turns with the tractor; the panel shows the next
   stop number, address, and the dispatcher's note word for word (amber), the
   City's status for that street, and the next two stops.
   - **DONE** — the only way a driveway is ever marked done. 7-second UNDO bar.
@@ -37,10 +37,10 @@ It is a separate app from the existing deployments, which are untouched.
   brackets stay on screen, not spoken). If you leave a driveway, or start the
   next one, without tapping DONE, it asks "mark it done?". It never decides
   for you.
-- **PARK** (top right) opens mission control: ROUTE (search, return list,
+- **MENU** (top right) opens the menu over the map; **✕ CLOSE** brings you back to the work screen. Menu tabs: ROUTE (search, return list,
   windrow watch), INTEL (City crews, your streets, radar), PLAN (compare
   Ted's order with a street-block plan), NIGHT (live stats, end shift),
-  SYSTEM (integrity, voice/sound, red night vision, dimmer, backup).
+  SYSTEM (integrity, voice/sound, red night vision, dimmer, backup). Map buttons there: IMAGERY (City 2023 aerial photos) and RADAR (Environment Canada snow radar) light up green when on, with a status line; ROUTE frames all stops; ME centres on you.
 
 ## What the City data can and cannot tell you
 

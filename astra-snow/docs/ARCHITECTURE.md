@@ -25,9 +25,9 @@ gloved, often at 2–6 a.m. The costs that matter, in order:
 
 | Concept | Idea | Verdict |
 |---|---|---|
-| A. Instrument HUD | one live instrument: map above, one decision below | **core of Drive mode** |
+| A. Instrument HUD | one live instrument: map above, one decision below | **core of the work screen** |
 | B. Audio-first copilot | spoken cues, glanceable screen | **merged into A** (voice + tones + haptics) |
-| C. Mission control | rich parked planning/analysis | **Park mode** (tabs) |
+| C. Mission control | rich parked planning/analysis | **the MENU** (tabs) |
 | D. Route ribbon | linear tape of stops, map secondary | rejected as primary — loses spatial context at corners and blocks; kept as the progress strip |
 | E. Native iOS app | background GPS, CarPlay, real haptics | rejected for now — needs Xcode, a Mac and a $99/yr developer account; cannot be built or shipped from here. PWA first; revisit if field tests show background GPS matters |
 

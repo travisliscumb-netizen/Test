@@ -89,7 +89,7 @@ input, textarea { font: inherit; color: inherit; -webkit-user-select: text; user
   padding: 10px 9px; min-height: 36px; border-radius: 10px; border: 1px solid var(--line-2); background: rgba(12, 22, 36, 0.8);
 }
 @media (max-width: 520px) { .brand span { display: none; } }
-@media (max-width: 380px) { .pip.wx { display: none; } }
+@media (max-width: 380px) { .pip.wx { display: none; } #app[data-screen='park'] .clock { display: none; } }
 
 /* ----------------------------------------------------------------- HUD */
 .hud {
@@ -277,7 +277,14 @@ input, textarea { font: inherit; color: inherit; -webkit-user-select: text; user
 
 .map-ctl { display: none; position: absolute; z-index: 16; right: 10px; top: calc(var(--safe-t) + 60px); flex-direction: column; gap: 6px; }
 #app[data-screen='park'] .map-ctl { display: flex; }
-.ctl { min-height: 44px; min-width: 76px; padding: 0 10px; border-radius: 10px; font: 700 10px/1 var(--display); letter-spacing: 0.16em; color: var(--ice); background: var(--glass); border: 1px solid var(--line-2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.ctl.on { color: #032015; background: var(--done); border-color: var(--done); box-shadow: 0 0 16px rgba(108, 255, 180, 0.45); }
+.map-note {
+  position: absolute; z-index: 16; left: 10px; right: 140px; top: calc(var(--safe-t) + 60px);
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.map-note[hidden] { display: none; }
+.map-note div { padding: 8px 10px; border-radius: 10px; font-size: 12.5px; line-height: 1.35; color: var(--text); background: var(--glass); border: 1px solid var(--line-2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.ctl { min-height: 44px; width: 120px; padding: 0 6px; border-radius: 10px; font: 700 10px/1 var(--display); letter-spacing: 0.1em; color: var(--ice); background: var(--glass); border: 1px solid var(--line-2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
 /* ----------------------------------------------------------- modal */
 .modal { display: none; position: absolute; inset: 0; z-index: 50; }

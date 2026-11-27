@@ -30,6 +30,9 @@ export class View {
   private sheetTab: 'route' | 'intel' | 'plan' | 'night' | 'system' = 'route';
   private routeFilter = '';
   private openStop: number | null = null;
+  private radarRetry = 0;
+  private radarFailedAt = 0;
+  private lastScreen = '';
   private lastSeq: number | null = null;
 
   private app: App;
@@ -55,7 +58,7 @@ export class View {
       (this.els.wx = h('div', { class: 'pip wx', title: 'Weather' })),
       h('div', { class: 'spacer' }),
       (this.els.clock = h('div', { class: 'clock mono' })),
-      (this.els.modeBtn = h('button', { class: 'mode', onclick: () => a.go(a.screen === 'drive' ? 'park' : 'drive') })),
+      (this.els.modeBtn = h('button', { class: 'mode', onclick: () => this.toggleMenu() })),
     );
 
     // Drive HUD
@@ -95,12 +98,15 @@ export class View {
 
     // Map overlay controls (park)
     this.els.mapCtl = h('div', { class: 'map-ctl' },
-      h('button', { class: 'ctl', onclick: () => { a.imagery = !a.imagery; void a.savePrefs(); } }, 'IMAGERY'),
-      h('button', { class: 'ctl', onclick: () => { a.radarLayer = !a.radarLayer; a.emit(); } }, 'RADAR'),
-      h('button', { class: 'ctl', onclick: () => this.mapApi?.overview(a.route.stops.map((s) => s.target)) }, 'ROUTE'),
-      h('button', { class: 'ctl', onclick: () => { if (a.track) this.mapApi?.follow(a.track.position, a.track.heading, false); } }, 'ME'),
+      (this.els.ctlImagery = h('button', { class: 'ctl', 'aria-pressed': 'false', onclick: () => { a.imagery = !a.imagery; void a.savePrefs(); } }, 'IMAGERY')),
+      (this.els.ctlRadar = h('button', { class: 'ctl', 'aria-pressed': 'false', onclick: () => { a.radarLayer = !a.radarLayer; if (a.radarLayer) void a.pollRadar(); a.emit(); } }, 'RADAR')),
+      h('button', { class: 'ctl', onclick: () => this.fitRoute() }, 'ROUTE'),
+      h('button', { class: 'ctl', onclick: () => {
+        if (a.track) this.mapApi?.follow(a.track.position, a.track.heading, false);
+        else a.flash(a.gpsPermission === 'denied' ? 'Location is off for Safari — allow it in Settings › Privacy › Location' : 'No GPS position yet — keep the phone outside a moment', 'warn', 4500);
+      } }, 'ME'),
     );
-
+    this.els.mapNote = h('div', { class: 'map-note', role: 'status' });
     this.els.toast = h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' });
     this.els.undo = h('div', { class: 'undo-bar' });
     this.els.prompt = h('div', { class: 'prompt' });
@@ -108,7 +114,7 @@ export class View {
     this.els.modal = h('div', { class: 'modal' });
     this.els.screen = h('div', { class: 'screen' });
 
-    this.root.append(mapEl, rail, this.els.mapCtl, hud, sheet, this.els.prompt, this.els.undo, this.els.toast, this.els.saveErr, this.els.modal, this.els.screen);
+    this.root.append(mapEl, rail, this.els.mapCtl, this.els.mapNote, hud, sheet, this.els.prompt, this.els.undo, this.els.toast, this.els.saveErr, this.els.modal, this.els.screen);
     this.els.map = mapEl;
     this.els.hud = hud;
     this.els.sheet = sheet;
@@ -116,7 +122,18 @@ export class View {
 
   private ensureMap(): void {
     if (this.mapApi || !this.app.route) return;
-    this.mapApi = createMap(this.els.map, this.app.roads, this.app.route.stops);
+    this.mapApi = createMap(this.els.map, this.app.roads, this.app.route.stops, (source) => {
+      if (source !== 'radar') return;
+      // ECCC sometimes fails a request outright: note it, retry once a minute.
+      const now = Date.now();
+      if (now - this.radarFailedAt > 60_000) {
+        this.radarFailedAt = now;
+        setTimeout(() => {
+          this.radarRetry++;
+          this.render();
+        }, 30_000);
+      }
+    });
     this.mapApi.map.on('click', 'stop-dot', (e) => {
       const seq = e.features?.[0]?.properties?.seq;
       if (typeof seq === 'number') this.showStop(seq);
@@ -135,6 +152,11 @@ export class View {
     this.renderScreen();
     if (a.screen !== 'drive' && a.screen !== 'park') return;
     this.ensureMap();
+    if (a.screen !== this.lastScreen) {
+      // Entering the menu: show the whole route above the panel.
+      if (a.screen === 'park') setTimeout(() => this.fitRoute(), 50);
+      this.lastScreen = a.screen;
+    }
     const now = Date.now();
     this.renderRail(now);
     this.renderMap(now);
@@ -161,7 +183,9 @@ export class View {
     setText(this.els.wx, `${temp} ${rate}`.trim());
     this.els.wx.className = `pip wx ${a.radar && a.radar.cmPerHour >= 2 ? 'heavy' : ''}`;
     setText(this.els.clock, clock(now));
-    setText(this.els.modeBtn, a.screen === 'drive' ? 'PARK' : 'DRIVE');
+    // Says what tapping it does: open the menu, or close it and go back to work.
+    setText(this.els.modeBtn, a.screen === 'drive' ? 'MENU' : '✕ CLOSE');
+    this.els.modeBtn.setAttribute('aria-label', a.screen === 'drive' ? 'Open the menu' : 'Close the menu and go back to the work screen');
   }
 
   private renderMap(now: number): void {
@@ -198,7 +222,23 @@ export class View {
       }), now);
     }
     m.setImagery(a.imagery);
-    m.setRadar(a.radarLayer);
+    m.setRadar(a.radarLayer, (a.radar?.scanAt ?? 0) + this.radarRetry);
+    this.els.ctlImagery.classList.toggle('on', a.imagery);
+    this.els.ctlImagery.setAttribute('aria-pressed', String(a.imagery));
+    setText(this.els.ctlImagery, a.imagery ? 'IMAGERY ON' : 'IMAGERY');
+    this.els.ctlRadar.classList.toggle('on', a.radarLayer);
+    this.els.ctlRadar.setAttribute('aria-pressed', String(a.radarLayer));
+    setText(this.els.ctlRadar, a.radarLayer ? 'RADAR ON' : 'RADAR');
+    const notes: string[] = [];
+    if (a.radarLayer) {
+      if (this.radarFailedAt && now - this.radarFailedAt < 60_000) notes.push('Radar: some images did not load from Environment Canada — retrying');
+      else if (a.radar) notes.push(`Snow radar · scan ${clock(a.radar.scanAt)} · ${a.radar.cmPerHour > 0 ? `${a.radar.cmPerHour.toFixed(1)} cm/h where you are` : 'no snow falling where you are'} · coloured patches = snow`);
+      else notes.push(a.radarError ? 'Snow radar unavailable right now' : 'Snow radar loading…');
+    }
+    if (a.imagery) notes.push('Aerial photos: City of Barrie, 2023');
+    this.els.mapNote.hidden = !notes.length || a.screen !== 'park';
+    this.els.mapNote.innerHTML = '';
+    for (const n of notes) this.els.mapNote.append(h('div', {}, n));
     if (pos && now - this.followAt > 1500) {
       this.followAt = now;
       if (a.screen === 'drive') m.follow(pos, a.track?.heading ?? null, true);
@@ -512,6 +552,18 @@ export class View {
   }
 
   // ----------------------------------------------------------- stop modal
+  private toggleMenu(): void {
+    const a = this.app;
+    a.fb.unlock();
+    a.go(a.screen === 'drive' ? 'park' : 'drive');
+  }
+
+  private fitRoute(): void {
+    const sheetH = this.els.sheet.getBoundingClientRect().height;
+    const landscape = innerWidth > innerHeight;
+    this.mapApi?.overview(this.app.route.stops.map((s) => s.target), landscape ? 0 : sheetH);
+  }
+
   showStop(seq: number): void {
     this.openStop = seq;
     this.renderStopModal(seq);
@@ -706,7 +758,7 @@ export class View {
       h('div', { class: op ? 'callout city' : 'callout' }, crewsSentence(op, a.snowEvidence(now))),
       !a.track ? h('button', { class: 'wide', onclick: () => { a.fb.unlock(); a.startGps(); } }, 'ENABLE GPS') : null,
       h('button', { class: 'wide go big', onclick: () => void (resuming ? a.resumeShift() : a.beginShift()) }, resuming ? `RESUME SHIFT · ${a.state.doneCount}/${a.original.length}` : 'BEGIN SHIFT'),
-      h('button', { class: 'wide ghost', onclick: () => { a.fb.unlock(); a.go('park'); } }, 'PLAN FIRST (PARKED)'),
+      h('button', { class: 'wide ghost', onclick: () => { a.fb.unlock(); a.go('park'); } }, 'LOOK AT THE ROUTE FIRST'),
     );
   }
 
