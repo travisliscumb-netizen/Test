@@ -44,7 +44,7 @@ counted as independent corroboration.
 |---|---|
 | Unit tests (parser, geometry, GPS filter, routing, event log, optimizer, plow model, windrow, ETA, crypto incl. PIN wrap, copilot, feeds) | **52/52** |
 | Browser end-to-end, local build, iPhone SE / 14 / 15 Pro Max / 14 landscape | **20/20** (incl. PIN pad: right PIN opens, wrong PIN refused) |
-| Same suite against the **live deployment** | **18/18** |
+| Same suite against the **live deployment** | **20/20** |
 | Live: full reload with the network cut (service worker) | opens in the work screen, 162 stops, progress intact, DONE works |
 | Integrity verifier | **8/8** |
 
